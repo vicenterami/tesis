@@ -1,0 +1,109 @@
+\section{Marco metodológico}
+\label{sec:metodologia}
+
+\subsection{Metodología adoptada y su justificación}
+
+Se adopta \textbf{PPDIOO} como ciclo de vida de ingeniería. Se trata de la metodología de ciclo de vida
+de redes formulada por Cisco Systems, estructurada en seis fases: \emph{Prepare}, \emph{Plan},
+\emph{Design}, \emph{Implement}, \emph{Operate} y \emph{Optimize}.
+
+La elección se fundamenta en tres razones:
+
+\begin{enumerate}
+\item Es el marco propio del dominio de redes, que constituye el eje técnico del trabajo.
+\item Corresponde al perfil de especialidad del profesor guía.
+\item Sus fases coinciden naturalmente con las cuatro etapas de evaluación del curso, según muestra la
+tabla~\ref{tab:ppdioo}.
+\end{enumerate}
+
+\begin{longtable}{@{}C{1.2cm}L{3.3cm}L{5.0cm}L{4.2cm}@{}}
+\filaencab \encab{Etapa} & \encab{Fase PPDIOO} & \encab{Actividad principal} & \encab{Entregable} \\ \midrule \endhead
+\textbf{1} & Prepare, Plan & Levantamiento del problema, requerimientos y planificación & Este documento y el backlog \\
+\textbf{2} & Design & Arquitectura, modelo de datos, especificación del protocolo & Diagramas y especificación técnica \\
+\textbf{3} & Implement & Construcción del prototipo y pruebas iniciales & Prototipo funcional e informe de pruebas \\
+\textbf{4} & Operate, Optimize & Validación en condiciones realistas y optimización & Informe final y validación \\
+\bottomrule
+\caption{Correspondencia entre las fases de PPDIOO y las etapas de evaluación.}
+\label{tab:ppdioo}
+\end{longtable}
+
+\subsection{Descarte de Scrum y conservación de sus artefactos de planificación}
+
+Se descarta \textbf{Scrum como marco de gestión de equipo}. El proyecto es unipersonal, de modo que sus
+ceremonias --- reunión diaria de sincronización, retrospectiva grupal, y los roles de Dueño de Producto
+y Facilitador --- carecen de sentido: no existe un equipo al que coordinar.
+
+Sin embargo, \textbf{se conservan sus artefactos de planificación}, en particular el \textbf{backlog}
+con épicas, historias de usuario, tareas técnicas, criterios de aceptación y estimaciones.
+
+\begin{cajaclave}[title={Formulación de la decisión metodológica}]
+\textbf{PPDIOO define qué fases existen y en qué orden}, con el rigor propio de la ingeniería de redes.
+\textbf{El backlog define cómo se prioriza y cómo se mide el avance.} Son marcos complementarios, no
+alternativos: lo que se descarta de Scrum son sus ceremonias de coordinación de equipo, no sus
+instrumentos de planificación.
+\end{cajaclave}
+
+La conservación del backlog no responde únicamente a una preferencia metodológica. La pauta de
+evaluación asigna el 20\% de esta etapa a su construcción, y mide el avance de las etapas siguientes
+como porcentaje de tareas del backlog completadas. Sin él no existiría instrumento de medición.
+
+\subsection{Calendario y cadencia de trabajo}
+\label{sec:calendario}
+
+\subsubsection{Cadencia}
+
+El avance se presenta al profesor guía los \textbf{miércoles}, y cada revisión se registra en bitácora
+el mismo día, junto con los cambios derivados de la retroalimentación recibida. Este registro responde
+a que las etapas 2, 3 y 4 asignan un 20\% cada una al criterio de incorporación de la
+retroalimentación, exigiendo \enquote{ejemplos específicos de cambios en el proyecto}.
+
+\subsubsection{Fechas de las etapas}
+
+\begin{cajahallazgo}[title={Ambigüedad no resuelta en el calendario}]
+La pauta de evaluación disponible está fechada el \textbf{13 de agosto de 2025} y sus hitos corresponden
+a ese año. Existen dos lecturas posibles para el calendario 2026, que difieren en dos semanas y que en
+ambos casos resultan consistentes con la regla de la pauta (último viernes de la cuarta semana del
+sprint). \textbf{La confirmación con el profesor guía es la primera gestión pendiente.}
+\end{cajahallazgo}
+
+\begin{longtable}{@{}L{4.6cm}C{2.6cm}C{2.6cm}C{2.6cm}C{2.4cm}@{}}
+\filaencab \encab{Escenario} & \encab{Etapa 1} & \encab{Etapa 2} & \encab{Etapa 3} & \encab{Etapa 4} \\ \midrule \endhead
+\textbf{A}: la pauta se replica al calendario 2026 & \textbf{28 ago} & 25 sep & 23 oct & 20 nov \\
+\textbf{B}: el sprint 1 inicia el 17 de agosto & 11 sep & 9 oct & 6 nov & 4 dic \\
+\bottomrule
+\caption{Escenarios de calendario. Todas las fechas caen en viernes.}
+\label{tab:escenarios}
+\end{longtable}
+
+\textbf{Decisión de planificación:} se planifica contra el \textbf{escenario A}, por ser el más
+exigente. Si el calendario resulta ser el B, se obtienen dos semanas de holgura; la decisión inversa
+habría implicado incumplir la entrega. Un antecedente favorece al escenario A: la pauta de 2025 fijaba
+la Etapa 1 el 29 de agosto, lo que implica un inicio de semestre a comienzos de agosto y no a mediados.
+
+\subsubsection{Presupuesto de tiempo}
+
+El estudiante desempeña una jornada laboral completa de lunes a viernes, de modo que el tiempo dedicable
+al trabajo de título corresponde a tardes de días hábiles y bloques de fin de semana, estimado en
+\textbf{aproximadamente 15 horas semanales}. Esta restricción condiciona el dimensionamiento del alcance
+y se verifica cuantitativamente en la sección~\ref{sec:viabilidad}.
+
+\subsection{Gestión de la configuración y trazabilidad}
+
+Todo el trabajo se versiona en un repositorio git privado, con mensajes de commit descriptivos que
+documentan no solo qué cambió sino por qué. Los documentos de trabajo se mantienen en formato de texto
+plano dentro del mismo repositorio, de modo que el historial de versiones constituye evidencia directa
+del avance y de la incorporación de la retroalimentación recibida.
+
+\subsection{Riesgos identificados}
+
+\begin{longtable}{@{}L{1.1cm}L{4.4cm}L{2.0cm}L{1.9cm}L{4.0cm}@{}}
+\filaencab \encab{} & \encab{Riesgo} & \encab{Impacto} & \encab{Probab.} & \encab{Mitigación} \\ \midrule \endhead
+\textbf{R1} & No disponer del hardware de sensores a tiempo & Alto: bloquea OE5 y OE6 & Media & Emulador de nodo por software; el sensor físico demuestra el caso de uso, el emulador demuestra el comportamiento bajo carga \\
+\textbf{R2} & No lograr acceso a las partes interesadas & Alto: compromete el 10\% del criterio 1 y el respaldo del criterio 3 & Media & Escalar la solicitud mediante el profesor guía; documentar el intento y recurrir a fuentes secundarias \\
+\textbf{R3} & Ambigüedad en las fechas de las etapas & Alto: invalida la planificación & \textbf{Alta} & Planificar contra el escenario más exigente; confirmar con el profesor guía \\
+\textbf{R4} & Alcance excesivo para el tiempo disponible & Medio: riesgo de no superar el 70\% de logro & \textbf{Confirmado} & Separación entre núcleo comprometido y alcance condicional; verificación de holgura al cierre de cada etapa (sección~\ref{sec:viabilidad}) \\
+\textbf{R5} & Contact ID insuficiente para telemetría continua & Medio & Identificado & Arquitectura de dos planos, documentada como decisión de diseño (sección~\ref{sec:dosplanos}) \\
+\bottomrule
+\caption{Registro de riesgos del proyecto.}
+\label{tab:riesgos}
+\end{longtable}

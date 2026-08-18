@@ -1,0 +1,250 @@
+\section{Análisis de requerimientos}
+\label{sec:requerimientos}
+
+\subsection{Metodología del levantamiento y fuentes}
+
+Cada requerimiento declara su origen. Se emplean cuatro tipos de fuente, con distinto peso probatorio.
+
+\begin{longtable}{@{}C{1.5cm}L{5.2cm}L{7.0cm}@{}}
+\filaencab \encab{Código} & \encab{Fuente} & \encab{Peso probatorio} \\ \midrule \endhead
+\textbf{[PO]} & Solicitud del propietario del proyecto & Alto: es requerimiento declarado, no inferido \\
+\textbf{[EM]} & Estudio de mercado: oferta regional y sector de alarmas monitoreadas & Medio-alto: evidencia de lo que el mercado cubre y no cubre \\
+\textbf{[BT]} & Base teórica: estándares SIA DC-05 y DC-09, LoRaWAN RP002, ISO/IEC 25010, RFC 8428 & Alto para requerimientos técnicos \\
+\textbf{[DP]} & Derivación del problema: consecuencia lógica de una causa identificada & Medio: depende de que la causa esté bien fundada \\
+\bottomrule
+\caption{Tipos de fuente empleados en el levantamiento.}
+\label{tab:fuentes}
+\end{longtable}
+
+\begin{cajahallazgo}[title={Brecha de fuente declarada}]
+Falta la fuente \textbf{[ENT]}: entrevistas directas a las partes interesadas. Hasta obtenerlas, los
+requerimientos marcados \textbf{[PO]} se sustentan en la indicación transmitida por el profesor guía y
+no en levantamiento directo. Esta limitación se declara explícitamente, y su cierre constituye la acción
+prioritaria del período.
+\end{cajahallazgo}
+
+\subsection{Estructura modular de la solución}
+
+El análisis descompone la solución en ocho módulos con responsabilidades separadas. Esta descomposición
+condiciona posteriormente la elección de la tecnología de implementación (sección~\ref{sec:lenguaje}) y
+el diseño de la arquitectura de la Etapa 2.
+
+\begin{longtable}{@{}C{1.4cm}L{5.4cm}C{1.6cm}L{4.6cm}@{}}
+\filaencab \encab{Módulo} & \encab{Responsabilidad} & \encab{Req.} & \encab{Causas que aborda} \\ \midrule \endhead
+\textbf{M1} & Ingesta multiprotocolo & 10 & C1, C2 \\
+\textbf{M2} & Normalización de eventos y telemetría & 7 & C1, C5 \\
+\textbf{M3} & Inventario y aprovisionamiento de dispositivos & 6 & C4, C5 \\
+\textbf{M4} & Supervisión de salud de enlace & 7 & \textbf{C5} \\
+\textbf{M5} & Persistencia y consulta & 5 & C1, C3, C4 \\
+\textbf{M6} & Alertas y notificación & 4 & C5 \\
+\textbf{M7} & Seguridad, identidad y multi-tenencia & 7 & C1, C3, C4 \\
+\textbf{M8} & Interfaz de administración & 6 & C1, C2, C4, C5 \\
+\bottomrule
+\caption{Módulos de la solución y su relación con las causas del problema.}
+\label{tab:modulos}
+\end{longtable}
+
+\subsection{Síntesis del catálogo}
+
+El catálogo completo, con el enunciado, la fuente, la causa y la prioridad de cada elemento, se presenta
+en el anexo~\ref{anx:requerimientos}. Se cataloga un total de \textbf{68 requerimientos}, frente al
+mínimo de 20 comprometido en OE1.
+
+\begin{longtable}{@{}L{5.4cm}C{2.4cm}C{2.6cm}C{2.2cm}@{}}
+\filaencab \encab{Prioridad} & \encab{Funcionales} & \encab{No funcionales} & \encab{Total} \\ \midrule \endhead
+\textbf{Must}: indispensable para el producto & 35 & 14 & \textbf{49} \\
+\textbf{Should}: importante, postergable & 14 & 2 & 16 \\
+\textbf{Could}: deseable & 3 & 0 & 3 \\
+\midrule
+\textbf{Total catalogado} & \textbf{52} & \textbf{16} & \textbf{68} \\
+\bottomrule
+\caption{Distribución de requerimientos según priorización MoSCoW.}
+\label{tab:moscow}
+\end{longtable}
+
+Los requerimientos no funcionales se clasifican según las características de calidad de la norma
+\textbf{ISO/IEC 25010}: eficiencia de desempeño, fiabilidad, seguridad, mantenibilidad, y portabilidad
+y compatibilidad.
+
+\subsection{Requerimientos que anclan el trabajo al enfoque de redes}
+
+Cuatro requerimientos no funcionales merecen mención destacada por vincular el trabajo con el dominio de
+administración de infraestructura de red.
+
+\begin{longtable}{@{}L{1.8cm}L{11.9cm}@{}}
+\filaencab \encab{ID} & \encab{Requerimiento y justificación} \\ \midrule \endhead
+\textbf{RNF-09} & Los dispositivos IoT deben poder residir en un \textbf{segmento de red separado} del
+segmento de usuarios, con acceso restringido a los puertos de ingesta. Corresponde a segmentación de red
+e impide que un sensor comprometido alcance la red corporativa. \\
+\textbf{RNF-10} & El sistema \textbf{no debe requerir puertos entrantes abiertos hacia los
+dispositivos}: la conexión se inicia siempre desde el dispositivo hacia la plataforma. Resuelve la
+alcanzabilidad de dispositivos situados tras traducción de direcciones y cortafuegos, sin exponerlos. \\
+\textbf{RNF-12} & Añadir un transporte nuevo debe requerir implementar solo un adaptador, sin modificar
+el núcleo de normalización. Es la traducción arquitectónica de la indicación de no cerrarse a una sola
+tecnología: si añadir un transporte obliga a modificar el núcleo, el sistema no es multiprotocolo sino
+monoprotocolo con excepciones. \\
+\textbf{RNF-16} & El mensaje de evento debe caber en el payload de LoRaWAN AU915 en su configuración más
+restrictiva, de 11 bytes. Verificado empíricamente: 8 bytes (sección~\ref{sec:tamano}). \\
+\bottomrule
+\caption{Requerimientos no funcionales de anclaje al dominio de redes.}
+\label{tab:rnfredes}
+\end{longtable}
+
+\subsection{Requerimientos que sustentan la diferenciación}
+
+Del análisis de la oferta regional se desprende que el valor diferencial no se distribuye
+uniformemente. Los siguientes requerimientos corresponden a capacidades que ningún proveedor regional
+identificado satisface.
+
+\begin{longtable}{@{}L{2.9cm}L{10.8cm}@{}}
+\filaencab \encab{Requerimiento} & \encab{Fundamento de la diferenciación} \\ \midrule \endhead
+\textbf{RF-04} Receptor DC-09 nativo & Permite ingerir paneles de alarma ya instalados sin reemplazarlos \\
+\textbf{RF-24, 27, 30} Salud de enlace & La oferta regional presenta el dato del sensor, no el estado del dispositivo ni de su enlace \\
+\textbf{RF-34} Exportación abierta & Materializa la ausencia de dependencia de proveedor: una plataforma que se declara abierta y no permite retirar los datos reproduce el problema que pretende resolver \\
+\textbf{RF-51} Vista por transporte & Ninguna plataforma presenta la flota organizada por tecnología de red \\
+\textbf{RNF-12} Extensibilidad & Las soluciones cerradas no admiten hardware de terceros \\
+\textbf{RNF-15} Solo componentes abiertos & Elimina el costo de licencia por dispositivo \\
+\bottomrule
+\caption{Requerimientos que sustentan la diferenciación competitiva.}
+\label{tab:diferenciacion}
+\end{longtable}
+
+\subsection{Verificación de cobertura}
+
+\begin{longtable}{@{}L{6.4cm}C{2.2cm}L{4.6cm}@{}}
+\filaencab \encab{Causa del problema} & \encab{Req.} & \encab{Módulos principales} \\ \midrule \endhead
+C1 Fragmentación de protocolos y formatos & 24 & M1, M2, M7 \\
+C2 Acoplamiento hardware-plataforma & 5 & M1, M8 \\
+C3 Costo y dependencia comercial & 5 & M5, M7 \\
+C4 Ausencia de capacidad técnica interna & 11 & M3, M8 \\
+C5 Falta de visibilidad de la conectividad & 20 & M4, M6 \\
+\bottomrule
+\caption{Cobertura de las causas del problema por el catálogo de requerimientos.}
+\label{tab:coberturareq}
+\end{longtable}
+
+Ninguna causa queda sin requerimientos asociados, y ningún requerimiento del catálogo carece de causa
+declarada.
+
+\subsection{Evaluación crítica de alternativas de solución}
+
+La evaluación de la decisión de mayor peso técnico ---el protocolo de comunicación--- se desarrolla en la
+sección~\ref{sec:protocolo}. Esta subsección cubre las decisiones restantes.
+
+\subsubsection{Servidor de red LoRaWAN}
+
+\begin{longtable}{@{}L{3.0cm}L{4.6cm}L{4.4cm}C{1.8cm}@{}}
+\filaencab \encab{Alternativa} & \encab{Ventajas} & \encab{Desventajas} & \encab{Decisión} \\ \midrule \endhead
+\textbf{ChirpStack} & Abierto, autoalojable, publica en MQTT de forma nativa, gestión completa de dispositivos & Requiere operar el componente & \textbf{Seleccionado} \\
+The Things Stack & Funcionalmente equivalente, comunidad amplia & Despliegue autoalojado más exigente en recursos & Descartado \\
+The Things Network (servicio público) & Sin operación propia, gratuito & Los datos transitan por infraestructura de terceros: contradice RNF-14 y el control del dato & Descartado \\
+Desarrollo propio & Control total & Reimplementar LoRaWAN no es el aporte del trabajo y consumiría todo el presupuesto de tiempo & Descartado \\
+\bottomrule
+\caption{Evaluación de alternativas de servidor de red LoRaWAN.}
+\label{tab:lorawan}
+\end{longtable}
+
+\subsubsection{Motor de persistencia}
+
+\begin{longtable}{@{}L{3.0cm}L{4.6cm}L{4.4cm}C{1.8cm}@{}}
+\filaencab \encab{Alternativa} & \encab{Ventajas} & \encab{Desventajas} & \encab{Decisión} \\ \midrule \endhead
+\textbf{TimescaleDB} (extensión de PostgreSQL) & Un solo motor para datos relacionales y series de tiempo; SQL estándar; licencia abierta & Menos optimizado que InfluxDB en escritura masiva pura & \textbf{Seleccionado} \\
+InfluxDB & Muy eficiente en series de tiempo & Obliga a operar dos motores, porque el inventario y la identidad son relacionales & Descartado \\
+PostgreSQL sin extensión & Máxima simplicidad & Sin optimización de series de tiempo ni políticas de retención automáticas & Descartado \\
+\bottomrule
+\caption{Evaluación de alternativas de motor de persistencia.}
+\label{tab:bd}
+\end{longtable}
+
+\begin{cajaclave}[title={Razón de la selección}]
+El factor decisivo es operativo y no de rendimiento. Se trata de un proyecto unipersonal con
+aproximadamente 15 horas semanales: operar, respaldar y consultar dos motores de base de datos distintos
+duplica la carga de mantenimiento sin beneficio proporcional a la escala del prototipo. El volumen
+esperado ---decenas de dispositivos reportando cada pocos minutos--- se sitúa muy por debajo del punto
+en que la ventaja de InfluxDB resulta relevante. \textbf{Se documenta que a escala mayor la decisión
+podría invertirse}, lo que constituye una recomendación de trabajo futuro.
+\end{cajaclave}
+
+\subsubsection{Broker MQTT y estrategia de despliegue}
+
+Se selecciona \textbf{Mosquitto} frente a EMQX por proporcionalidad: sus capacidades de agrupamiento y
+alta concurrencia resultan desproporcionadas para la escala del prototipo, mientras que Mosquitto
+provee cifrado del transporte y autenticación con consumo mínimo.
+
+Se selecciona el despliegue mediante \textbf{contenedores orquestados}, frente a la instalación directa
+en el sistema operativo. La razón no es preferencia técnica sino requisito de evaluación: la Etapa 4
+exige demostrar el funcionamiento \enquote{bajo condiciones operativas realistas}, y que el sistema
+completo se levante con un solo comando en una máquina distinta a la de desarrollo constituye evidencia
+directa de ello.
+
+\subsubsection{Lenguaje y marco de trabajo de la aplicación}
+\label{sec:lenguaje}
+
+\begin{longtable}{@{}C{1.4cm}L{7.4cm}C{1.6cm}@{}}
+\filaencab \encab{} & \encab{Criterio} & \encab{Peso} \\ \midrule \endhead
+\textbf{L-A} & Experiencia previa del desarrollador & 25\% \\
+\textbf{L-B} & Correspondencia entre estructura del código y arquitectura documentable & 15\% \\
+\textbf{L-C} & Generación automática de la especificación de la interfaz & 15\% \\
+\textbf{L-D} & Unificación del lenguaje con la interfaz de usuario & 15\% \\
+\textbf{L-E} & Madurez de bibliotecas para MQTT, PostgreSQL y manipulación binaria & 15\% \\
+\textbf{L-F} & Tipado estático & 10\% \\
+\textbf{L-G} & Rendimiento en tiempo de ejecución & 5\% \\
+\bottomrule
+\caption{Criterios de evaluación de la tecnología de implementación y su ponderación.}
+\label{tab:criterioslenguaje}
+\end{longtable}
+
+\begin{longtable}{@{}L{4.0cm}C{1.1cm}C{1.1cm}C{1.1cm}C{1.1cm}C{1.1cm}C{1.1cm}C{1.1cm}C{1.4cm}@{}}
+\filaencab \encab{Alternativa} & \encab{L-A} & \encab{L-B} & \encab{L-C} & \encab{L-D} & \encab{L-E} & \encab{L-F} & \encab{L-G} & \encab{Total} \\ \midrule \endhead
+\textbf{TypeScript + NestJS} & 4 & 5 & 5 & 5 & 5 & 5 & 4 & \textbf{4,70} \\
+TypeScript + Fastify & 5 & 3 & 4 & 5 & 5 & 5 & 5 & 4,55 \\
+Python + FastAPI & 3 & 3 & 5 & 2 & 5 & 4 & 3 & 3,55 \\
+Java + Spring Boot & 2 & 5 & 4 & 1 & 5 & 5 & 4 & 3,45 \\
+Go + Echo & 1 & 3 & 3 & 1 & 4 & 5 & 5 & 2,65 \\
+\bottomrule
+\caption{Matriz comparativa ponderada de tecnologías de implementación.}
+\label{tab:matrizlenguaje}
+\end{longtable}
+
+\textbf{Sobre el criterio L-B, que decide el resultado.} El análisis identificó ocho módulos con
+responsabilidades separadas (tabla~\ref{tab:modulos}). NestJS impone una estructura de módulos con
+dependencias explícitas que corresponde uno a uno con esa descomposición: cada módulo del análisis se
+convierte en un módulo del código, de modo que los diagramas de arquitectura de la Etapa 2 describen la
+estructura real del sistema. Es la diferencia entre documentar lo que existe y confiar en que lo que
+existe se asemeje a lo documentado.
+
+\textbf{Sobre el criterio L-D.} El evento Contact ID posee una estructura estricta de siete campos. Con
+un único lenguaje en todo el sistema, esa estructura se define una sola vez y la emplean el validador de
+ingesta, la capa de persistencia, la interfaz de programación y la interfaz de usuario. Con dos
+lenguajes debe definirse dos veces y mantenerse sincronizada manualmente, lo que constituye una fuente
+permanente de error.
+
+\textbf{Sobre el bajo peso de L-G.} El requerimiento RNF-01 exige sostener 50 eventos por segundo, cifra
+que todas las alternativas evaluadas superan holgadamente. Ponderar el rendimiento por encima de la
+velocidad de desarrollo equivaldría a optimizar el recurso abundante a costa del escaso, que en este
+proyecto es el tiempo del desarrollador.
+
+\begin{cajaclave}[title={Decisión}]
+Se selecciona \textbf{TypeScript con NestJS}, con la interfaz de administración en el mismo lenguaje y
+repositorio, compartiendo las definiciones de tipos del dominio.
+
+Se declara que la diferencia con Fastify, de 0,15 puntos, \textbf{no constituye una ventaja decisiva}:
+ambas opciones son defendibles. Si durante la Etapa 2 la curva de aprendizaje de NestJS resulta más
+costosa de lo previsto, migrar a Fastify constituiría una desviación aceptable y quedaría documentada
+como tal.
+\end{cajaclave}
+
+\subsection{Restricciones y supuestos}
+
+\begin{longtable}{@{}L{1.4cm}L{5.6cm}L{6.6cm}@{}}
+\filaencab \encab{} & \encab{Restricción} & \encab{Consecuencia} \\ \midrule \endhead
+\textbf{RE-01} & Presupuesto de aproximadamente 15 horas semanales & El alcance se limita al núcleo demostrativo \\
+\textbf{RE-02} & Proyecto unipersonal & Se descartan alternativas que exijan operar múltiples componentes complejos \\
+\textbf{RE-03} & Sin licencias de pago & Solo componentes de código abierto \\
+\textbf{RE-04} & Banda 915--928\,MHz, plan AU915, sin licencia & Payload limitado; verificado como suficiente \\
+\textbf{RE-05} & Umbral de aprobación del 70\% de logro & El alcance se dimensiona para superar el umbral, no para maximizar funcionalidad \\
+\textbf{RE-06} & Disponibilidad de hardware no confirmada & La validación debe funcionar con emulación por software \\
+\bottomrule
+\caption{Restricciones del proyecto.}
+\label{tab:restricciones}
+\end{longtable}

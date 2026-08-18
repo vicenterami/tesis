@@ -1,0 +1,219 @@
+\section{Planificación: backlog y verificación de viabilidad}
+\label{sec:planificacion}
+
+\subsection{Naturaleza del backlog}
+
+Conforme a la decisión metodológica de la sección~\ref{sec:metodologia}, el backlog constituye el
+instrumento de planificación y medición del proyecto. Su detalle completo se presenta en el
+anexo~\ref{anx:backlog}.
+
+\begin{longtable}{@{}L{3.0cm}C{2.2cm}L{8.3cm}@{}}
+\filaencab \encab{Elemento} & \encab{Cantidad} & \encab{Descripción} \\ \midrule \endhead
+Épicas & 14 & Todas vinculadas a un objetivo específico \\
+Historias de usuario & 25 & Con rol, capacidad y beneficio \\
+Tareas técnicas & 38 & Elementos sin usuario directo asociado \\
+\midrule
+\textbf{Total estimado} & \textbf{63} & \textbf{275 horas} \\
+Núcleo demostrativo & 33 & \textbf{165 horas} \\
+\bottomrule
+\caption{Composición del backlog.}
+\label{tab:composicionbacklog}
+\end{longtable}
+
+\subsubsection{Criterio de estimación}
+
+Las estimaciones se expresan en \textbf{horas ideales de trabajo efectivo} y no en puntos de historia.
+La razón es la verificabilidad: el presupuesto de tiempo disponible se conoce, de modo que las horas
+permiten comprobar si el alcance cabe en el plazo, comprobación que una escala abstracta no permite. La
+sección~\ref{sec:viabilidad} demuestra que esa comprobación resultó determinante.
+
+\subsubsection{Grado de refinamiento}
+
+Los 33 elementos del núcleo demostrativo cuentan con criterios de aceptación detallados. Los restantes
+se dejan deliberadamente sin refinar hasta que su ejecución se aproxime, dado que refinar por adelantado
+todo el backlog constituiría trabajo perdido si el alcance se ajusta.
+
+\subsection{Roles de usuario}
+
+\begin{longtable}{@{}L{3.6cm}L{9.9cm}@{}}
+\filaencab \encab{Rol} & \encab{Descripción} \\ \midrule \endhead
+\textbf{Administrador de sitio} & Responsable técnico de la infraestructura de sensores de una organización. Registra dispositivos, vigila la salud de los enlaces y configura umbrales \\
+\textbf{Usuario de consulta} & Consulta mediciones e historial sin capacidad de modificar la configuración \\
+\textbf{Integrador} & Conecta un sensor o sistema externo a la plataforma; consume la interfaz de programación y la especificación del protocolo \\
+\bottomrule
+\caption{Roles de usuario considerados en las historias.}
+\label{tab:roles}
+\end{longtable}
+
+\subsection{Épicas}
+
+\begin{longtable}{@{}C{1.6cm}L{6.6cm}C{1.8cm}C{1.6cm}C{1.4cm}@{}}
+\filaencab \encab{Épica} & \encab{Nombre} & \encab{Objetivo} & \encab{Etapa} & \encab{Horas} \\ \midrule \endhead
+EP-01 & Infraestructura y entorno de desarrollo & OE5 & 2 & 14 \\
+EP-02 & Diseño de arquitectura, red y datos & OE3 & 2 & 26 \\
+EP-03 & Especificación formal del protocolo & OE2 & 2 & 16 \\
+EP-04 & Ingesta multiprotocolo & OE5 & 2, 3 & 26 \\
+EP-05 & Normalización y máquina de estados & OE5 & 3 & 19 \\
+EP-06 & Persistencia y consulta & OE5 & 2, 3 & 17 \\
+EP-07 & Inventario y aprovisionamiento & OE5 & 3 & 15 \\
+EP-08 & Supervisión de salud de enlace & OE5 & 3 & 18 \\
+EP-09 & Seguridad y multi-tenencia & OE5 & 3 & 16 \\
+EP-10 & Interfaz de administración & OE5 & 3, 4 & 30 \\
+EP-11 & Alertas y notificación & OE5 & 4 & 10 \\
+EP-12 & Modelo de despliegue y costos & OE4 & 2 & 8 \\
+EP-13 & Validación y pruebas & OE6 & 3, 4 & 26 \\
+EP-14 & Documentación y entregables & Todos & 1--4 & 34 \\
+\midrule
+\multicolumn{4}{@{}r}{\textbf{Total}} & \textbf{275} \\
+\bottomrule
+\caption{Épicas del proyecto con su objetivo asociado y esfuerzo estimado.}
+\label{tab:epicas}
+\end{longtable}
+
+\subsection{Definición del núcleo demostrativo}
+
+\begin{cajaclave}[title={Criterio de demostración de la tesis}]
+El prototipo demuestra la tesis si recibe eventos por \textbf{al menos dos transportes distintos}, los
+normaliza a un formato único, \textbf{detecta que un dispositivo dejó de reportar}, lo presenta en una
+interfaz de gestión con el estado de cada enlace, y permite \textbf{exportar los datos en formato
+abierto}.
+\end{cajaclave}
+
+\begin{longtable}{@{}L{5.6cm}L{8.0cm}@{}}
+\filaencab \encab{Qué demuestra} & \encab{Elementos del núcleo} \\ \midrule \endhead
+Ingesta por más de un transporte & HU-01, HU-02 o HU-03, TT-16, RF-05, RF-06 \\
+Normalización a formato único & TT-17, HU-05, TT-18 \\
+Supervisión de salud del enlace & HU-14, HU-15, HU-16 \\
+Persistencia y consulta & TT-19, HU-07 \\
+Interfaz de gestión & HU-19, HU-20, HU-21 \\
+Ausencia de dependencia de proveedor & HU-08 \\
+Seguridad mínima & TT-20, TT-21, TT-22 \\
+Extensibilidad verificable & RNF-12, validada en el diseño \\
+\bottomrule
+\caption{Composición del núcleo demostrativo.}
+\label{tab:nucleo}
+\end{longtable}
+
+\subsection{Verificación de viabilidad del alcance}
+\label{sec:viabilidad}
+
+Las cifras de esta subsección se obtuvieron sumando programáticamente las estimaciones de los 63
+elementos del backlog, y no estimando el total de forma agregada. El procedimiento es reproducible
+sobre el documento fuente.
+
+\subsubsection{Presupuesto disponible}
+
+Cuatro semanas por etapa a aproximadamente 15 horas semanales, conforme a la restricción RE-01:
+Etapa 1, 21 horas; Etapas 2, 3 y 4, 60 horas cada una. Total: \textbf{201 horas}.
+
+\subsubsection{Contraste entre alcance y presupuesto}
+
+\begin{longtable}{@{}C{1.6cm}C{2.4cm}C{2.4cm}C{2.2cm}C{2.4cm}C{2.2cm}@{}}
+\filaencab \encab{Etapa} & \encab{Backlog completo} & \encab{Solo núcleo} & \encab{Presup.} & \encab{Holgura completo} & \encab{Holgura núcleo} \\ \midrule \endhead
+1 & 10 h & 4 h & 21 h & $+$52\% & $+$81\% \\
+2 & 84 h & 53 h & 60 h & \textbf{$-$40\%} & $+$12\% \\
+3 & \textbf{115 h} & \textbf{97 h} & 60 h & \textbf{$-$92\%} & \textbf{$-$62\%} \\
+4 & 66 h & 11 h & 60 h & $-$10\% & $+$82\% \\
+\midrule
+\textbf{Total} & \textbf{275 h} & \textbf{165 h} & \textbf{201 h} & \textbf{$-$37\%} & \textbf{$+$18\%} \\
+\bottomrule
+\caption{Contraste entre el esfuerzo estimado y el presupuesto de tiempo disponible.}
+\label{tab:viabilidad}
+\end{longtable}
+
+\begin{cajahallazgo}[title={Primer hallazgo: el backlog completo no cabe en el tiempo disponible}]
+El alcance completo excede el presupuesto en un \textbf{37\%} y no resulta ejecutable. El núcleo
+demostrativo, en cambio, cabe con un \textbf{18\% de holgura}.
+
+\textbf{Decisión de planificación:} el núcleo de 165 horas constituye el compromiso del proyecto; los
+30 elementos restantes se declaran \textbf{alcance condicional}, ejecutables únicamente contra holgura
+verificada al cierre de cada etapa.
+
+El fundamento de esta decisión es que la pauta mide el avance como porcentaje de tareas completadas.
+Comprometer 275 horas y ejecutar 165 arrojaría un cumplimiento del 60\%, por debajo del umbral de
+aprobación del 70\%; comprometer 165 y ejecutar 165 arroja un 100\%. \textbf{El mismo trabajo
+produce resultados opuestos según cómo se declare el alcance.}
+\end{cajahallazgo}
+
+\subsubsection{Redistribución correctiva}
+
+\begin{cajahallazgo}[title={Segundo hallazgo: el núcleo estaba mal distribuido en el tiempo}]
+Aun limitándose al núcleo, la distribución inicial resultaba defectuosa: la Etapa 3 concentraba 97 horas
+frente a 60 disponibles, mientras la Etapa 4 empleaba 11 de 60. La causa fue situar la totalidad de la
+implementación en la Etapa 3, cuando \textbf{la pauta exige allí el 50\% y el 100\% en la Etapa 4}.
+\end{cajahallazgo}
+
+Se trasladan de la Etapa 3 a la Etapa 4 aproximadamente 37 horas del núcleo, correspondientes a
+elementos que no forman parte de la cadena mínima que debe demostrarse funcionando al cierre de la
+Etapa 3: autenticación de ingesta, aislamiento entre sitios, cifrado del transporte, consulta de
+historial, exportación, vista de inventario, pruebas del protocolo e indicador agregado de salud.
+
+\begin{longtable}{@{}C{2.0cm}C{2.6cm}C{2.6cm}C{2.6cm}@{}}
+\filaencab \encab{Etapa} & \encab{Núcleo} & \encab{Presupuesto} & \encab{Holgura} \\ \midrule \endhead
+1 & 4 h & 21 h & $+$81\% \\
+2 & 53 h & 60 h & $+$12\% \\
+3 & 60 h & 60 h & 0\% \\
+4 & 48 h & 60 h & $+$20\% \\
+\midrule
+\textbf{Total} & \textbf{165 h} & \textbf{201 h} & \textbf{$+$18\%} \\
+\bottomrule
+\caption{Distribución del núcleo tras la redistribución correctiva.}
+\label{tab:redistribucion}
+\end{longtable}
+
+\textbf{Verificación del umbral de la Etapa 3.} La pauta exige el 50\% de las tareas de implementación
+completadas. El esfuerzo total de implementación asciende a 165 horas; lo ejecutado al cierre de la
+Etapa 3 corresponde a 28 horas adelantadas en la Etapa 2 más 60 horas de la Etapa 3, esto es, 88 horas
+equivalentes al \textbf{53\%}. El umbral se cumple.
+
+\subsubsection{Orden de recorte}
+
+Los 110 horas fuera del núcleo se ordenan por valor decreciente y se ejecutan solo contra holgura
+verificada.
+
+\begin{longtable}{@{}C{1.4cm}L{6.0cm}C{1.6cm}L{4.4cm}@{}}
+\filaencab \encab{Orden} & \encab{Elementos} & \encab{Horas} & \encab{Valor si se ejecuta} \\ \midrule \endhead
+1 & HU-04 Receptor DC-09 nativo & 7 & Alto: es el diferenciador frente a la oferta regional \\
+2 & TT-32 Validación con sensor físico & 3 & Alto: evidencia empírica de extremo a extremo \\
+3 & HU-11, HU-12 Aprovisionamiento y agrupación & 8 & Medio-alto: completa la vista de administrador \\
+4 & HU-24 Notificación de condición crítica & 5 & Medio \\
+5 & HU-23 Vista por tecnología de red & 3 & Medio: refuerza el argumento multiprotocolo \\
+6 & HU-09 Interfaz de consulta externa & 4 & Bajo para la demostración \\
+7 & Resto de elementos & 80 & Variable \\
+\bottomrule
+\caption{Orden de ejecución del alcance condicional.}
+\label{tab:recorte}
+\end{longtable}
+
+\begin{cajaaviso}[title={Límite del recorte}]
+Los 33 elementos del núcleo no se recortan bajo ninguna circunstancia: su ausencia invalidaría la
+demostración en lugar de reducirla. Si el tiempo no alcanzara siquiera para el núcleo, la vía correcta
+no es recortar en silencio sino \textbf{renegociar el alcance con el profesor guía y documentar la
+desviación}, conducta que la pauta valora explícitamente frente al incumplimiento no justificado.
+\end{cajaaviso}
+
+\subsubsection{Reserva para imprevistos}
+
+El 18\% de holgura del núcleo, equivalente a 36 horas, constituye la única reserva. \textbf{No se
+infló ninguna estimación individual}: hacerlo habría producido un plan con apariencia de viabilidad sin
+mejorarla, y habría impedido detectar la sobrecarga que esta subsección documenta. El riesgo R4 se
+actualiza en consecuencia, de probabilidad media a confirmado.
+
+\subsection{Criterio de priorización}
+
+El orden de ejecución no sigue la numeración de las épicas, sino tres reglas:
+
+\begin{enumerate}
+\item \textbf{Primero lo que desbloquea:} el entorno de desarrollo y el esquema de datos condicionan
+todo lo demás.
+\item \textbf{Después lo que demuestra la tesis:} la cadena ingesta, normalización, supervisión e
+interfaz. Es el recorrido que un evaluador seguirá durante una demostración.
+\item \textbf{Al final lo que mejora el producto:} notificación avanzada, receptor DC-09, interfaz de
+consulta externa. Valiosos, pero su ausencia no invalida la demostración.
+\end{enumerate}
+
+\begin{cajaclave}[title={Regla de decisión ante retraso}]
+Se sacrifica amplitud antes que profundidad. Resulta preferible una cadena completa con dos transportes
+y supervisión operando de extremo a extremo, que cuatro transportes a medio terminar: \textbf{un
+recorrido completo demuestra la hipótesis; cuatro recorridos parciales no demuestran ninguna.}
+\end{cajaclave}

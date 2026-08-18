@@ -1,0 +1,176 @@
+\section{Objetivos}
+\label{sec:objetivos}
+
+\subsection{Criterio de redacción}
+
+Conforme a la indicación del profesor guía, cada objetivo explicita \textbf{qué se hará}, \textbf{cómo
+se hará} y \textbf{qué resultado verificable se obtendrá}, acompañado de un indicador medible y un
+plazo. La estructura aplicada es:
+
+\begin{cajadefinicion}
+\emph{[verbo en infinitivo]} + \emph{[objeto]} + \textbf{mediante} \emph{[método]} + \textbf{para
+obtener} \emph{[resultado verificable]} + \textbf{en} \emph{[plazo]}.
+\end{cajadefinicion}
+
+\subsection{Objetivo general}
+
+\begin{cajaclave}[title={Objetivo general}]
+Diseñar, implementar y validar una plataforma web abierta para la gestión de datos de redes de sensores
+IoT heterogéneas, que unifique la ingesta mediante un protocolo de comunicación basado en el estándar
+Contact ID (SIA DC-05), aplicando la metodología PPDIOO, de modo que una organización que ya posee
+sensores de distintas tecnologías pueda centralizar, normalizar y administrar sus datos desde una única
+interfaz, validada sobre un caso de uso con sensores reales al término del semestre académico 2026.
+\end{cajaclave}
+
+\subsection{Objetivos específicos}
+
+\subsubsection{OE1 --- Caracterizar el problema y establecer los requerimientos}
+
+\begin{cajadefinicion}
+\textbf{Caracterizar} la situación actual de gestión de datos de sensores en la organización
+destinataria, \textbf{mediante} entrevistas semiestructuradas a las partes interesadas, revisión de
+literatura técnica y análisis de la oferta regional, \textbf{para obtener} un catálogo de requerimientos
+funcionales y no funcionales íntegramente trazables a las causas del problema, \textbf{al 28 de agosto
+de 2026}.
+\end{cajadefinicion}
+
+\begin{longtable}{@{}L{1.5cm}L{12.2cm}@{}}
+\filaencab \encab{} & \encab{Concreción} \\ \midrule \endhead
+\textbf{S} & Catálogo de requerimientos con trazabilidad explícita causa $\rightarrow$ requerimiento. \\
+\textbf{M} & $\geq 2$ entrevistas realizadas; $\geq 20$ requerimientos documentados; \textbf{100\%} trazados a al menos una causa (C1--C5); $\geq 2$ competidores analizados. \\
+\textbf{A} & Requiere gestión de entrevistas y trabajo documental, sin dependencia de hardware. \\
+\textbf{R} & Aborda C4 y sustenta los criterios 1 y 3 de la etapa, que suman el 55\% de su ponderación. \\
+\textbf{T} & Viernes 28 de agosto de 2026. Fase PPDIOO: \emph{Prepare}. \\
+\bottomrule
+\end{longtable}
+
+\subsubsection{OE2 --- Especificar el protocolo de comunicación sensor--plataforma}
+
+\begin{cajadefinicion}
+\textbf{Especificar} un protocolo de comunicación entre sensor y plataforma basado en el estándar
+Contact ID (SIA DC-05), \textbf{mediante} un análisis comparativo ponderado frente a alternativas
+vigentes y la definición de un perfil de aplicación con su mapeo de códigos de evento, \textbf{para
+obtener} un documento de especificación que incluya la gramática del mensaje, la tabla de equivalencias
+y el contrato de la interfaz de ingesta, \textbf{al 25 de septiembre de 2026}.
+\end{cajadefinicion}
+
+\begin{longtable}{@{}L{1.5cm}L{12.2cm}@{}}
+\filaencab \encab{} & \encab{Concreción} \\ \midrule \endhead
+\textbf{S} & Especificación formal del protocolo y de la interfaz, no una descripción general. \\
+\textbf{M} & $\geq 6$ alternativas evaluadas con matriz ponderada; $\geq 25$ códigos de evento mapeados; mensaje de evento $\leq 11$ bytes, verificado contra el payload útil mínimo de LoRaWAN; gramática formalizada. \\
+\textbf{A} & El estándar SIA DC-05 es público y está documentado; el trabajo es de análisis y diseño. \\
+\textbf{R} & Aborda directamente C1 y responde a la instrucción explícita del profesor guía de justificar la elección del protocolo frente a otros. \\
+\textbf{T} & Viernes 25 de septiembre de 2026. Fase PPDIOO: \emph{Plan} y \emph{Design}. \\
+\bottomrule
+\end{longtable}
+
+\subsubsection{OE3 --- Diseñar la arquitectura de la plataforma y su red de soporte}
+
+\begin{cajadefinicion}
+\textbf{Diseñar} la arquitectura de la plataforma y el diseño de red que la soporta, \textbf{mediante}
+la aplicación de la fase \emph{Design} de PPDIOO y el uso de notaciones de modelado reconocidas,
+\textbf{para obtener} un conjunto de diagramas, un modelo de datos y una especificación de seguridad y
+segmentación que cubra la totalidad de los requerimientos levantados, \textbf{al 25 de septiembre de
+2026}.
+\end{cajadefinicion}
+
+\begin{longtable}{@{}L{1.5cm}L{12.2cm}@{}}
+\filaencab \encab{} & \encab{Concreción} \\ \midrule \endhead
+\textbf{S} & Diagramas de arquitectura, topología de red, modelo de datos y diseño de seguridad. \\
+\textbf{M} & $\geq 5$ diagramas en notación estándar; \textbf{100\%} de los requerimientos asignados a un componente; modelo de datos con $\geq 8$ entidades. \\
+\textbf{A} & Trabajo documental de diseño, sin dependencia de adquisiciones. \\
+\textbf{R} & Aborda C2 y C5; constituye el 55\% de la Etapa 2. \\
+\textbf{T} & Viernes 25 de septiembre de 2026. Fase PPDIOO: \emph{Design}. \\
+\bottomrule
+\end{longtable}
+
+\subsubsection{OE4 --- Determinar el modelo de despliegue y el costo de operación}
+
+\begin{cajadefinicion}
+\textbf{Determinar} la alternativa de alojamiento de la plataforma y su costo total de operación,
+\textbf{mediante} la comparación de al menos tres opciones de despliegue bajo criterios de costo,
+soberanía del dato y sostenibilidad, \textbf{para obtener} una recomendación justificada con el costo
+mensual y anual estimado del producto, \textbf{al 25 de septiembre de 2026}.
+\end{cajadefinicion}
+
+\begin{longtable}{@{}L{1.5cm}L{12.2cm}@{}}
+\filaencab \encab{} & \encab{Concreción} \\ \midrule \endhead
+\textbf{S} & Recomendación única de despliegue con costo cuantificado. \\
+\textbf{M} & $\geq 3$ alternativas comparadas; costo mensual y anual en pesos chilenos y dólares; matriz de criterios ponderados. \\
+\textbf{A} & Información de precios de acceso público. \\
+\textbf{R} & Responde a la instrucción del profesor guía de definir dónde se alojará la plataforma y cuánto costará el producto, aun siendo abierto. Aborda C3. \\
+\textbf{T} & Viernes 25 de septiembre de 2026. Fase PPDIOO: \emph{Plan}. \\
+\bottomrule
+\end{longtable}
+
+\subsubsection{OE5 --- Implementar la plataforma y sus adaptadores multiprotocolo}
+
+\begin{cajadefinicion}
+\textbf{Implementar} la interfaz de ingesta, el motor de normalización y la interfaz web de gestión,
+junto con adaptadores para al menos dos transportes distintos, \textbf{mediante} desarrollo incremental
+guiado por el backlog priorizado y versionado en repositorio git, \textbf{para obtener} un prototipo
+funcional capaz de recibir, normalizar, almacenar y presentar datos de sensores de tecnologías
+diferentes, \textbf{al 20 de noviembre de 2026}, con el 50\% de avance verificable al 23 de octubre.
+\end{cajadefinicion}
+
+\begin{longtable}{@{}L{1.5cm}L{12.2cm}@{}}
+\filaencab \encab{} & \encab{Concreción} \\ \midrule \endhead
+\textbf{S} & Prototipo funcional con ingesta, normalización, persistencia e interfaz de gestión. \\
+\textbf{M} & \textbf{50\%} de las tareas de implementación al 23/10 y \textbf{100\%} al 20/11; $\geq 2$ transportes operativos; $\geq 1$ sensor físico reportando de extremo a extremo; mensaje descriptivo en el 100\% de los commits. \\
+\textbf{A} & Condicionado a la disponibilidad de hardware; mitigado mediante emulación por software (riesgo R1). \\
+\textbf{R} & Materializa la solución al problema central. \\
+\textbf{T} & 23 de octubre (50\%) y 20 de noviembre de 2026 (100\%). Fase PPDIOO: \emph{Implement}. \\
+\bottomrule
+\end{longtable}
+
+\subsubsection{OE6 --- Validar la plataforma en condiciones que replican el entorno operativo}
+
+\begin{cajadefinicion}
+\textbf{Validar} el funcionamiento de la plataforma en condiciones que replican el entorno operativo
+real, \textbf{mediante} una batería de pruebas funcionales, de carga y de recuperación ante fallas, con
+comparación cuantitativa antes y después de las optimizaciones aplicadas, \textbf{para obtener} un
+informe de validación que acredite el cumplimiento de los requerimientos establecidos en OE1, \textbf{al
+20 de noviembre de 2026}.
+\end{cajadefinicion}
+
+\begin{longtable}{@{}L{1.5cm}L{12.2cm}@{}}
+\filaencab \encab{} & \encab{Concreción} \\ \midrule \endhead
+\textbf{S} & Informe de validación con datos cuantitativos y trazabilidad a requerimientos. \\
+\textbf{M} & $\geq 15$ casos de prueba documentados; $\geq$ 90\% aprobados; ingesta sostenida de $\geq 50$ mensajes por segundo sin pérdida; detección de sensor caído en $\leq 2$ intervalos de reporte; $\geq 3$ comparaciones cuantitativas antes y después de optimizar. \\
+\textbf{A} & Las pruebas de carga se ejecutan con generación de tráfico sintético, sin requerir sensores físicos masivos. \\
+\textbf{R} & Aborda C5 y E4; constituye el 30\% de la Etapa 3 y el 50\% de la Etapa 4. \\
+\textbf{T} & Viernes 20 de noviembre de 2026. Fase PPDIOO: \emph{Operate} y \emph{Optimize}. \\
+\bottomrule
+\end{longtable}
+
+\subsection{Matriz de trazabilidad}
+
+\begin{longtable}{@{}L{1.3cm}L{3.9cm}L{2.1cm}L{1.6cm}L{2.4cm}C{1.1cm}@{}}
+\filaencab \encab{Obj.} & \encab{Enunciado abreviado} & \encab{Causas} & \encab{Efectos} & \encab{Fase PPDIOO} & \encab{Etapa} \\ \midrule \endhead
+\textbf{OE1} & Caracterizar y levantar requerimientos & C4 (diagnostica C1--C5) & E1, E3 & Prepare & 1 \\
+\textbf{OE2} & Especificar el protocolo & \textbf{C1} & E2, E5 & Plan, Design & 2 \\
+\textbf{OE3} & Diseñar arquitectura y red & C2, C5 & E2, E4 & Design & 2 \\
+\textbf{OE4} & Despliegue y costo de operación & \textbf{C3} & E1, E5 & Plan & 2 \\
+\textbf{OE5} & Implementar la plataforma & C1, C2, C4 & E1, E2, E3 & Implement & 3, 4 \\
+\textbf{OE6} & Validar en entorno realista & C5 & E4 & Operate, Optimize & 4 \\
+\bottomrule
+\caption{Trazabilidad entre objetivos específicos, causas, efectos, fase metodológica y etapa.}
+\label{tab:trazabilidad}
+\end{longtable}
+
+\subsubsection*{Verificación de cobertura}
+
+\begin{longtable}{@{}L{5.6cm}L{2.5cm}L{4.4cm}L{1.6cm}@{}}
+\filaencab \encab{Causa} & \encab{Objetivos} & \encab{Efecto} & \encab{Objetivos} \\ \midrule \endhead
+C1 Fragmentación de protocolos & OE1, \textbf{OE2}, OE5 & E1 Inversión inmovilizada & OE1, OE4, OE5 \\
+C2 Acoplamiento hardware-plataforma & \textbf{OE3}, OE5 & E2 Datos perdidos & OE2, OE3, OE5 \\
+C3 Costo y dependencia comercial & \textbf{OE4} & E3 Decisiones sin dato & OE1, OE5 \\
+C4 Falta de capacidad técnica & \textbf{OE1}, OE5 & E4 Fallas detectadas tarde & OE3, \textbf{OE6} \\
+C5 Sin visibilidad de conectividad & OE3, \textbf{OE6} & E5 Dependencia de proveedor & OE2, OE4 \\
+\bottomrule
+\caption{Cobertura de causas y efectos por los objetivos específicos.}
+\label{tab:cobertura}
+\end{longtable}
+
+Las cinco causas y los cinco efectos quedan cubiertos por al menos un objetivo específico. Ninguna causa
+carece de objetivo asociado y ningún objetivo carece de vínculo con el problema.

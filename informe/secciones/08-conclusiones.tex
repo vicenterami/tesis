@@ -1,0 +1,82 @@
+\section{Conclusiones de la etapa y trabajo pendiente}
+\label{sec:conclusiones}
+
+\subsection{Cumplimiento de los objetivos de la etapa}
+
+\begin{longtable}{@{}L{5.0cm}C{1.6cm}L{6.9cm}@{}}
+\filaencab \encab{Criterio de la pauta} & \encab{Peso} & \encab{Estado} \\ \midrule \endhead
+Definición clara del problema & 10\% & Redactada con árbol de causas y efectos, justificación de relevancia y análisis de la oferta regional. \textbf{Pendiente el levantamiento directo con las partes interesadas} \\
+Objetivos específicos y de relevancia & 25\% & Objetivo general y seis objetivos específicos con desglose SMART, indicador numérico, plazo y matriz de trazabilidad \\
+Análisis de requerimientos & 45\% & 68 requerimientos con fuente y causa declaradas; siete alternativas de protocolo y cinco de implementación evaluadas mediante matrices ponderadas \\
+Planificación de los objetivos & 20\% & 63 elementos con criterios de aceptación en el núcleo, estimaciones y verificación de viabilidad \\
+\bottomrule
+\caption{Estado de cumplimiento de los criterios de la Etapa 1.}
+\label{tab:cumplimiento}
+\end{longtable}
+
+\subsection{Conclusiones principales}
+
+\subsubsection{Sobre la elección del protocolo}
+
+El análisis comparativo de siete alternativas arroja un resultado que no era evidente al inicio:
+\textbf{ningún protocolo de telemetría contemporáneo combina compacidad extrema con vocabulario
+semántico normalizado}. Los formatos compactos ---CayenneLPP--- estandarizan tipos de dato pero no
+eventos ni estados de salud del dispositivo; los formatos semánticamente ricos ---LwM2M, Sparkplug B---
+no caben en el payload disponible de LoRaWAN.
+
+Contact ID resuelve ambas exigencias por una razón histórica: fue diseñado en la década de 1980 para
+transmitirse mediante tonos telefónicos sobre una línea analógica, restricción que impuso un formato de
+16 dígitos y un vocabulario cerrado de códigos. \textbf{Esa restricción de hace cuatro décadas es
+precisamente la que lo hace apropiado hoy para radio de bajo consumo.}
+
+\subsubsection{Sobre el vocabulario de salud de enlace}
+
+Los códigos 381, 384, 344, 602 y 603 conforman un vocabulario normalizado de supervisión de nodos
+inalámbricos alimentados a batería que precede al término \enquote{Internet de las Cosas}. La industria
+de la seguridad electrónica resolvió y estandarizó ese problema décadas atrás. El aporte de este trabajo
+consiste en reutilizar dicho vocabulario en un contexto abierto, en lugar de proponer uno nuevo que
+incrementaría la fragmentación que se pretende resolver.
+
+\subsubsection{Sobre la limitación identificada}
+
+Contact ID no puede transportar valores analógicos. La limitación se declara y se resuelve mediante una
+arquitectura de dos planos con requisitos de entrega diferenciados, decisión que además resulta
+defendible en términos de ingeniería: los eventos exigen entrega confirmada y la telemetría admite
+pérdida tolerable.
+
+\subsubsection{Sobre la viabilidad del alcance}
+
+La verificación numérica del backlog produjo el hallazgo de mayor consecuencia práctica de esta etapa:
+\textbf{el alcance completo excede el tiempo disponible en un 37\%}. Detectarlo en la fase de
+planificación, y no durante la implementación, permite acotar el compromiso al núcleo demostrativo, que
+sí cabe con holgura. Esta constatación justifica retrospectivamente la decisión de estimar en horas y no
+en unidades abstractas.
+
+\subsection{Trabajo pendiente}
+
+\begin{longtable}{@{}C{1.4cm}L{6.8cm}L{5.5cm}@{}}
+\filaencab \encab{} & \encab{Pendiente} & \encab{Consecuencia si no se resuelve} \\ \midrule \endhead
+\textbf{P1} & \textbf{Entrevistas a las partes interesadas} de la organización destinataria & Ausencia de validación directa del problema y del respaldo de los requerimientos \\
+\textbf{P2} & \textbf{Confirmación de las fechas} de las cuatro etapas con el profesor guía & Invalidación de la planificación completa \\
+\textbf{P3} & Validación de la arquitectura de dos planos con el profesor guía & Rediseño del tratamiento de la telemetría \\
+\textbf{P4} & Determinar si la normativa chilena impone restricción de tiempo de permanencia en 915--928\,MHz & Ninguna sobre la viabilidad; solo afecta el margen disponible \\
+\textbf{P5} & Acceso al texto íntegro de los estándares SIA DC-05 y DC-09 & Mitigado: el formato está documentado en fuentes secundarias verificables \\
+\textbf{P6} & Confirmar la disponibilidad de hardware de sensores y su presupuesto & Activación del riesgo R1; mitigado mediante emulación por software \\
+\bottomrule
+\caption{Trabajo pendiente al cierre de la Etapa 1.}
+\label{tab:pendientes}
+\end{longtable}
+
+\subsection{Trabajo previsto para la Etapa 2}
+
+Conforme a la fase \emph{Design} de PPDIOO y al backlog establecido, la Etapa 2 comprende:
+
+\begin{itemize}
+\item Diagramas de arquitectura de componentes, topología de red con segmentación, modelo de datos,
+flujo de ingesta y secuencia de aprovisionamiento.
+\item Especificación formal del perfil CID-IoT: gramática en notación ABNF, tabla de mapeo completa y
+contrato de la interfaz de programación.
+\item Determinación del modelo de despliegue y cuantificación del costo de operación (OE4).
+\item Puesta en marcha del entorno de desarrollo e inicio de la implementación, adelantando trabajo
+respecto de la Etapa 3 conforme a la redistribución correctiva de la sección~\ref{sec:viabilidad}.
+\end{itemize}

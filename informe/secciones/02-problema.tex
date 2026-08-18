@@ -1,0 +1,180 @@
+\section{Definición del problema}
+\label{sec:problema}
+
+\subsection{Enunciado del problema central}
+
+\begin{cajaclave}[title={Problema central}]
+Las organizaciones que ya poseen sensores IoT no logran convertir los datos que estos generan en
+información utilizable, porque carecen de una plataforma que unifique la ingesta, la normalización y la
+gestión de dispositivos que se comunican mediante tecnologías y formatos distintos entre sí.
+\end{cajaclave}
+
+Formulado desde la perspectiva del afectado, el problema se expresa así: \enquote{tengo los sensores
+instalados y funcionando, pero no tengo dónde recibir sus datos, ni cómo administrarlos, ni cómo saber
+si siguen reportando}.
+
+\subsection{Análisis de causas}
+
+\begin{longtable}{@{}L{1.1cm}L{3.4cm}L{9.2cm}@{}}
+\filaencab \encab{} & \encab{Causa} & \encab{Descripción} \\
+\midrule
+\endfirsthead
+\filaencab \encab{} & \encab{Causa} & \encab{Descripción} \\ \midrule \endhead
+\textbf{C1} & Fragmentación de protocolos y formatos &
+Cada fabricante define su propio esquema de datos. Un sensor LoRaWAN entrega una trama binaria
+propietaria; uno WiFi publica un objeto JSON con nombres de campo arbitrarios; un tercero expone una
+interfaz distinta. No existe vocabulario común entre ellos. \\
+\textbf{C2} & Acoplamiento entre hardware y plataforma &
+La oferta comercial regional vende solución cerrada llave en mano: el panel funciona con el hardware
+del propio proveedor. Un sensor ya instalado de otra marca no se integra. \\
+\textbf{C3} & Costo y dependencia de plataformas comerciales &
+Las alternativas de mercado cobran licencia por dispositivo o por volumen de datos, y alojan la
+información en infraestructura de terceros fuera del control de la organización. \\
+\textbf{C4} & Ausencia de capacidad técnica interna &
+Construir la capa de ingesta, normalización y almacenamiento exige competencias de redes, protocolos y
+desarrollo que las organizaciones destinatarias no poseen internamente. \\
+\textbf{C5} & Falta de visibilidad del estado de la conectividad &
+Sin una capa de gestión no se detecta que un sensor dejó de reportar, que su batería se agotó o que el
+enlace de radio se degradó. \\
+\bottomrule
+\caption{Causas identificadas del problema central.}
+\label{tab:causas}
+\end{longtable}
+
+\begin{cajaclave}
+La causa C5 admite una formulación especialmente compacta, que además orienta el diseño de la
+solución: \textbf{el silencio de un sensor es indistinguible de la ausencia de novedades.}
+\end{cajaclave}
+
+\subsection{Efectos observables}
+
+\begin{longtable}{@{}L{1.1cm}L{5.4cm}L{7.2cm}@{}}
+\filaencab \encab{} & \encab{Efecto} & \encab{Consecuencia} \\ \midrule \endfirsthead
+\filaencab \encab{} & \encab{Efecto} & \encab{Consecuencia} \\ \midrule \endhead
+\textbf{E1} & Inversión en sensores subutilizada o inmovilizada & Equipamiento adquirido que no produce retorno \\
+\textbf{E2} & Datos que se pierden o nunca se almacenan & Imposibilidad de análisis histórico o de tendencias \\
+\textbf{E3} & Decisiones operativas tomadas sin dato & El sensor existe, pero no informa la decisión \\
+\textbf{E4} & Fallas de sensores detectadas tardíamente & Pérdida de continuidad del monitoreo sin advertencia \\
+\textbf{E5} & Dependencia de proveedor & Cada ampliación obliga a comprar al mismo proveedor \\
+\bottomrule
+\caption{Efectos observables del problema.}
+\label{tab:efectos}
+\end{longtable}
+
+\begin{center}
+\begin{lstlisting}
+                +---------------------------------------------------+
+   EFECTOS      | E1 inversion    E2 datos       E3 decisiones      |
+                |    inmovilizada    perdidos       sin dato        |
+                |      E4 fallas tardias      E5 lock-in            |
+                +------------------------^--------------------------+
+                                         |
+     +-----------------------------------+-----------------------------------+
+ PROBLEMA | Quien ya posee sensores heterogeneos no puede convertir sus datos |
+ CENTRAL  | en informacion utilizable: falta una plataforma que unifique la   |
+          | ingesta, la normalizacion y la gestion de dispositivos.           |
+     +-----------------------------------^-----------------------------------+
+                                         |
+                +------------------------+--------------------------+
+   CAUSAS       | C1 fragmentacion     C2 acoplamiento              |
+                |    de protocolos        hardware-plataforma       |
+                | C3 costo/dependencia  C4 falta de capacidad       |
+                |      comercial            tecnica interna         |
+                |     C5 sin visibilidad de la conectividad         |
+                +---------------------------------------------------+
+\end{lstlisting}
+\captionof{figure}{Árbol de problemas: causas, problema central y efectos.}
+\label{fig:arbol}
+\end{center}
+
+\subsection{Justificación de relevancia e impacto}
+
+\subsubsection{Relevancia para el propietario del proyecto}
+
+La \datoUniversidad{} dispone de sensores desplegados y requiere un destino para sus datos: una interfaz
+de programación a la cual enviarlos y una plataforma desde la cual administrarlos. Esta necesidad,
+transmitida por el profesor guía en la reunión del 17 de agosto de 2026, constituye la solicitud que
+origina el proyecto.
+
+\subsubsection{Vacío en la oferta existente}
+
+El análisis de la oferta regional identifica dos actores relevantes en La Araucanía.
+
+\begin{longtable}{@{}L{2.9cm}L{5.5cm}L{5.3cm}@{}}
+\filaencab \encab{Proveedor} & \encab{Oferta} & \encab{Qué queda sin cubrir} \\ \midrule \endfirsthead
+\filaencab \encab{Proveedor} & \encab{Oferta} & \encab{Qué queda sin cubrir} \\ \midrule \endhead
+\textbf{IoT3.cl} &
+Monitoreo y automatización en tiempo real: sensores, controladores y plataforma web. Fuerte presencia en
+agricultura. Solución llave en mano por proyecto. &
+Si el hardware ya está instalado y es de otra marca, no existe vía de integración. \\
+\textbf{ControlTec.cl} (SpA, 2021) &
+Telemetría industrial inalámbrica: niveles de estanques y combustible, climatización, agricultura.
+Supervisión desde dispositivo móvil. &
+Panel de telemetría acoplado a su propio hardware; no constituye una plataforma de ingesta abierta. \\
+\bottomrule
+\caption{Oferta regional identificada y espacio no cubierto.}
+\label{tab:competencia}
+\end{longtable}
+
+\begin{cajaclave}[title={Espacio que este trabajo aborda}]
+Ambos proveedores comercializan la solución completa acoplada a su propio hardware. Ninguno ofrece la
+\textbf{capa de gestión desacoplada del equipamiento}: una plataforma neutral capaz de recibir datos de
+sensores que la organización ya posee, cualquiera sea su procedencia.
+\end{cajaclave}
+
+\subsubsection{Relevancia académica}
+
+La interoperabilidad entre protocolos IoT constituye un problema abierto: la proliferación de estándares
+de aplicación no convergentes obliga a resolver la normalización en la capa de plataforma. El aporte de
+este trabajo consiste en especificar y validar un mecanismo concreto de normalización \textbf{basado en
+un estándar de industria ya existente y ampliamente desplegado}, en lugar de proponer un formato nuevo
+que agregaría un elemento más a la fragmentación que pretende resolver.
+
+\subsection{Partes interesadas}
+\label{sec:interesados}
+
+\begin{longtable}{@{}L{3.4cm}L{2.8cm}L{4.6cm}L{2.9cm}@{}}
+\filaencab \encab{Parte interesada} & \encab{Rol} & \encab{Interés} & \encab{Levantamiento} \\ \midrule \endfirsthead
+\filaencab \encab{Parte interesada} & \encab{Rol} & \encab{Interés} & \encab{Levantamiento} \\ \midrule \endhead
+\datoUniversidad & Propietaria del proyecto & Enviar los datos de sus sensores a una interfaz de programación y administrarlos & \pendiente{Entrevista pendiente} \\
+Responsable técnico de los sensores & Usuario administrador & Conocer qué dispositivos existen, si reportan y cómo incorporar uno nuevo & \pendiente{Por identificar} \\
+Usuario operativo & Consumidor de información & Consultar mediciones y recibir avisos & \pendiente{Por identificar} \\
+Pymes productivas de la región & Beneficiario potencial & Aprovechar sensores ya adquiridos sin rehacer la inversión & Caracterización indirecta \\
+Profesor guía & Supervisor académico & Rigor metodológico y enfoque de redes & Reunión del 17/08/2026 \\
+\bottomrule
+\caption{Partes interesadas y estado de su levantamiento.}
+\label{tab:interesados}
+\end{longtable}
+
+\begin{cajahallazgo}[title={Brecha declarada en el levantamiento}]
+La rúbrica de evaluación exige incorporar \enquote{la percepción de las partes interesadas para validar
+la relevancia del problema}. \textbf{Ese levantamiento directo está pendiente.} Las entrevistas al
+responsable técnico de los sensores de la organización destinataria constituyen la acción prioritaria
+del período, y sus resultados se incorporarán a esta sección y al catálogo de requerimientos.
+
+Se opta por declarar esta brecha de forma explícita antes que presentar como levantada una percepción
+que aún no ha sido recogida.
+\end{cajahallazgo}
+
+\subsection{Delimitación del alcance}
+
+\begin{minipage}[t]{0.48\textwidth}
+\textbf{El trabajo abarca:}
+\begin{itemize}
+\item La plataforma de ingesta, normalización, almacenamiento y gestión de datos de sensores.
+\item La especificación del protocolo de comunicación y de la interfaz de programación asociada.
+\item Adaptadores para al menos dos transportes distintos.
+\item El diseño de red: segmentación, seguridad del transporte y monitoreo del estado del enlace.
+\item La validación sobre un caso de uso con sensores reales.
+\end{itemize}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.48\textwidth}
+\textbf{El trabajo no abarca:}
+\begin{itemize}
+\item Fabricación o comercialización de sensores.
+\item Firmware de grado comercial, más allá del nodo de prueba necesario para validar.
+\item Analítica avanzada, aprendizaje automático o predicción.
+\item Despliegue productivo a escala ni operación continua posterior a la entrega.
+\item Certificación normativa del equipamiento.
+\end{itemize}
+\end{minipage}

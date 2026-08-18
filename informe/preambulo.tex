@@ -1,0 +1,106 @@
+%% ============================ PREÁMBULO ==============================
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[spanish,es-tabla,es-nodecimaldot]{babel}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage[a4paper,top=2.7cm,bottom=2.7cm,left=2.8cm,right=2.5cm]{geometry}
+
+\usepackage{graphicx}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{multirow}
+\usepackage{colortbl}
+\usepackage[table]{xcolor}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage[font=small,labelfont=bf]{caption}
+\usepackage{fancyhdr}
+\usepackage{listings}
+\usepackage[most]{tcolorbox}
+\usepackage{csquotes}
+
+\usepackage[
+  colorlinks=true, linkcolor=azuloscuro, urlcolor=verdeacento,
+  citecolor=azuloscuro, pdfstartview=FitH
+]{hyperref}
+
+%% ------------------------------ Colores ------------------------------
+\definecolor{azuloscuro}{HTML}{1F3A5F}
+\definecolor{verdeacento}{HTML}{2E7D5B}
+\definecolor{ambar}{HTML}{B06A1F}
+\definecolor{rojoaviso}{HTML}{A32A2A}
+\definecolor{grisclaro}{HTML}{F2F4F3}
+\definecolor{grislinea}{HTML}{C9D1CC}
+\definecolor{gristexto}{HTML}{55635B}
+
+%% ------------------------- Títulos de sección ------------------------
+\titleformat{\section}{\Large\bfseries\color{azuloscuro}}{\thesection}{0.7em}{}
+\titleformat{\subsection}{\large\bfseries\color{azuloscuro}}{\thesubsection}{0.6em}{}
+\titleformat{\subsubsection}{\normalsize\bfseries\color{gristexto}}{\thesubsubsection}{0.5em}{}
+\titlespacing*{\section}{0pt}{2.2ex plus 1ex minus .2ex}{1.3ex plus .2ex}
+
+%% ------------------------ Encabezado y pie ---------------------------
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\footnotesize\color{gristexto}\datoCodigo{} · \datoEtapa}
+\fancyhead[R]{\footnotesize\color{gristexto}\datoEstudiante}
+\fancyfoot[C]{\footnotesize\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+\renewcommand{\headrule}{\hbox to\headwidth{\color{grislinea}\leaders\hrule height \headrulewidth\hfill}}
+
+%% ---------------------------- Tablas ---------------------------------
+\renewcommand{\arraystretch}{1.25}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+\newcommand{\encab}[1]{\textcolor{white}{\textbf{#1}}}
+\newcommand{\filaencab}{\rowcolor{azuloscuro}}
+\newcommand{\thc}[1]{\textcolor{white}{\textbf{#1}}}
+
+%% ------------------------- Cajas destacadas --------------------------
+\newtcolorbox{cajaclave}[1][]{
+  enhanced, breakable, colback=verdeacento!5, colframe=verdeacento,
+  boxrule=0pt, leftrule=3pt, arc=2pt, left=10pt, right=10pt, top=8pt, bottom=8pt,
+  fonttitle=\bfseries\color{verdeacento}, coltitle=verdeacento, #1}
+
+\newtcolorbox{cajaaviso}[1][]{
+  enhanced, breakable, colback=ambar!7, colframe=ambar,
+  boxrule=0pt, leftrule=3pt, arc=2pt, left=10pt, right=10pt, top=8pt, bottom=8pt,
+  fonttitle=\bfseries\color{ambar}, coltitle=ambar, #1}
+
+\newtcolorbox{cajahallazgo}[1][]{
+  enhanced, breakable, colback=rojoaviso!5, colframe=rojoaviso,
+  boxrule=0pt, leftrule=3pt, arc=2pt, left=10pt, right=10pt, top=8pt, bottom=8pt,
+  fonttitle=\bfseries\color{rojoaviso}, coltitle=rojoaviso, #1}
+
+\newtcolorbox{cajadefinicion}[1][]{
+  enhanced, breakable, colback=grisclaro, colframe=grislinea,
+  boxrule=0.6pt, arc=2pt, left=10pt, right=10pt, top=8pt, bottom=8pt, #1}
+
+%% ------------------------ Marca de pendiente -------------------------
+\newcommand{\pendiente}[1]{\textcolor{rojoaviso}{\textbf{[#1]}}}
+\newcommand{\porconfirmar}[1]{\textcolor{ambar}{#1\,$^{\dagger}$}}
+
+%% ------------------------------ Código -------------------------------
+\lstdefinestyle{plano}{
+  basicstyle=\ttfamily\footnotesize, backgroundcolor=\color{grisclaro},
+  frame=single, rulecolor=\color{grislinea}, framesep=6pt,
+  breaklines=true, showstringspaces=false, columns=fullflexible,
+  xleftmargin=0pt, xrightmargin=0pt, aboveskip=1.2em, belowskip=1.2em,
+  literate={á}{{\'a}}1 {é}{{\'e}}1 {í}{{\'i}}1 {ó}{{\'o}}1 {ú}{{\'u}}1
+           {ñ}{{\~n}}1 {Á}{{\'A}}1 {É}{{\'E}}1 {Í}{{\'I}}1 {Ó}{{\'O}}1
+           {Ú}{{\'U}}1 {Ñ}{{\~N}}1 {¿}{{?`}}1 {°}{{$^\circ$}}1
+           {→}{{$\rightarrow$}}1 {←}{{$\leftarrow$}}1 {│}{{|}}1 {─}{{-}}1
+           {┌}{{+}}1 {┐}{{+}}1 {└}{{+}}1 {┘}{{+}}1 {├}{{+}}1 {┤}{{+}}1
+           {▶}{{>}}1 {·}{{$\cdot$}}1 {≤}{{$\leq$}}1 {≥}{{$\geq$}}1
+}
+\lstset{style=plano}
+
+\setlist[itemize]{topsep=3pt,itemsep=2pt,parsep=0pt,leftmargin=1.4em}
+\setlist[enumerate]{topsep=3pt,itemsep=2pt,parsep=0pt,leftmargin=1.6em}
+
+\setlength{\parskip}{0.55em}
+\setlength{\parindent}{0pt}
+\sloppy
