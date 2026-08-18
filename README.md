@@ -21,9 +21,11 @@ Plataforma abierta de gestión e interoperabilidad de datos para redes de sensor
 
 | Si buscas… | Ve a |
 |---|---|
-| Cómo se trabaja, calendario y prioridades | **[`PLAN-MAESTRO.md`](PLAN-MAESTRO.md)** |
+| **Qué es el proyecto y por qué estas decisiones** | **[`RESUMEN.md`](RESUMEN.md)** ← empieza aquí |
+| Cómo se trabaja, calendario y prioridades | [`PLAN-MAESTRO.md`](PLAN-MAESTRO.md) |
 | Contexto técnico y de negocio acumulado | [`docs/00-contexto.md`](docs/00-contexto.md) |
 | Problema, objetivos SMART y trazabilidad | [`docs/01-problema-y-objetivos.md`](docs/01-problema-y-objetivos.md) |
+| Catálogo de requerimientos y alternativas | [`docs/02-requerimientos.md`](docs/02-requerimientos.md) |
 | **El protocolo de comunicación y por qué este** | **[`docs/05-protocolo-contactid.md`](docs/05-protocolo-contactid.md)** |
 | Qué dijo el profesor y qué se cambió por eso | [`bitacora/`](bitacora/) |
 | La pauta de evaluación oficial | [`referencias/`](referencias/) |

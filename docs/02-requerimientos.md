@@ -1,0 +1,462 @@
+# Análisis de requerimientos
+
+> **Cubre:** criterio 3 de la Etapa 1 (**45 %**, el de mayor peso) · sustenta **OE1**
+> **Fase PPDIOO:** Prepare + Plan
+> **Versión:** borrador 1 — 18 de agosto de 2026
+>
+> La rúbrica exige que los requerimientos estén «completos, bien documentados, claramente vinculados a
+> los objetivos del proyecto, y adecuadamente justificados con datos o teorías sólidas», con «una
+> evaluación crítica de alternativas consideradas y las razones para la selección final». Este
+> documento se organiza en torno a esas dos exigencias.
+
+---
+
+## Índice
+
+1. [Metodología del levantamiento y fuentes](#1-metodología-del-levantamiento-y-fuentes)
+2. [Requerimientos funcionales](#2-requerimientos-funcionales)
+3. [Requerimientos no funcionales](#3-requerimientos-no-funcionales)
+4. [Priorización y alcance del producto mínimo](#4-priorización-y-alcance-del-producto-mínimo)
+5. [Matriz de trazabilidad](#5-matriz-de-trazabilidad)
+6. [Evaluación crítica de alternativas de solución](#6-evaluación-crítica-de-alternativas-de-solución)
+7. [Restricciones y supuestos](#7-restricciones-y-supuestos)
+
+---
+
+# 1. Metodología del levantamiento y fuentes
+
+## 1.1 Fuentes utilizadas
+
+Cada requerimiento declara su origen. Se emplean cuatro tipos de fuente, con distinto peso probatorio:
+
+| Código | Fuente | Peso probatorio |
+|---|---|---|
+| **[PO]** | **Solicitud del propietario del proyecto** — indicaciones de la universidad transmitidas por el profesor guía, registradas en `bitacora/2026-08-17-reunion-mario.md` | Alto: es requerimiento declarado, no inferido |
+| **[EM]** | **Estudio de mercado** — análisis de la oferta regional (IoT3, ControlTec) y del sector de alarmas monitoreadas | Medio-alto: evidencia de lo que el mercado cubre y no cubre |
+| **[BT]** | **Base teórica** — estándares (SIA DC-05, DC-09, LoRaWAN RP002, ISO/IEC 25010, RFC 8428) y literatura técnica | Alto para requerimientos técnicos |
+| **[DP]** | **Derivación del problema** — consecuencia lógica de una causa identificada en `docs/01-problema-y-objetivos.md` | Medio: requiere que la causa esté bien fundada |
+
+> 🔴 **Brecha declarada.** Falta la fuente **[ENT]** — entrevistas directas a las partes interesadas.
+> Las entrevistas al responsable técnico de los sensores de la universidad están pendientes. Hasta
+> obtenerlas, los requerimientos marcados **[PO]** se sustentan en la indicación transmitida por el
+> profesor guía, no en el levantamiento directo. **Esta brecha se declara explícitamente en lugar de
+> disimularla**, y su cierre es la acción prioritaria de la Etapa 1.
+
+## 1.2 Convención de identificación
+
+- **RF-nn** — requerimiento funcional
+- **RNF-nn** — requerimiento no funcional
+- Prioridad **MoSCoW**: **M** (*Must*, indispensable para el MVP de la tesis) · **S** (*Should*,
+  importante pero postergable) · **C** (*Could*, deseable) · **W** (*Won't*, fuera de alcance
+  declarado)
+
+## 1.3 Módulos de la solución
+
+| Módulo | Responsabilidad |
+|---|---|
+| **M1** | Ingesta multiprotocolo |
+| **M2** | Normalización de eventos y telemetría |
+| **M3** | Inventario y aprovisionamiento de dispositivos |
+| **M4** | Supervisión de salud de enlace |
+| **M5** | Persistencia y consulta |
+| **M6** | Alertas y notificación |
+| **M7** | Seguridad, identidad y multi-tenencia |
+| **M8** | Interfaz de administración |
+
+---
+
+# 2. Requerimientos funcionales
+
+## M1 — Ingesta multiprotocolo
+
+| ID | Requerimiento | Fuente | Causa | Prior. |
+|---|---|---|---|:---:|
+| **RF-01** | El sistema debe exponer un punto de ingesta **HTTP** que reciba eventos en formato Contact ID de 16 dígitos | [PO] [BT] | C1 | **M** |
+| **RF-02** | El sistema debe recibir eventos originados en **LoRaWAN** mediante integración con el servidor de red, decodificando el payload de 8 bytes en BCD | [PO] [BT] | C1, C2 | **M** |
+| **RF-03** | El sistema debe recibir eventos publicados en un **broker MQTT**, suscribiéndose a los tópicos configurados por sitio | [PO] | C1, C2 | **M** |
+| **RF-04** | El sistema debe exponer un receptor **SIA DC-09** sobre TCP/UDP que acepte mensajes de paneles de alarma existentes sin modificación | [EM] [BT] | C2 | **S** |
+| **RF-05** | El sistema debe **validar el checksum** de todo mensaje Contact ID recibido y rechazar los inválidos sin persistirlos como eventos válidos | [BT] | C1 | **M** |
+| **RF-06** | El sistema debe **confirmar la recepción** de cada evento aceptado al emisor, como equivalente funcional del *kissoff* del protocolo original | [BT] | C1 | **M** |
+| **RF-07** | El sistema debe **registrar los intentos rechazados** con su motivo, para diagnóstico, sin mezclarlos con los eventos válidos | [DP] | C5 | **S** |
+| **RF-08** | El sistema debe recibir **telemetría con valor y unidad** por un punto de ingesta distinto del de eventos, aceptando SenML para clientes IP y CayenneLPP para nodos LoRaWAN | [BT] | C1 | **M** |
+| **RF-09** | El sistema debe **preservar los metadatos del transporte** de cada recepción (RSSI, SNR, gateway, identificador del nodo) asociándolos al evento | [BT] [DP] | C5 | **M** |
+| **RF-10** | El sistema debe **descartar duplicados** cuando el mismo evento llegue por más de un camino o gateway | [BT] | C1 | **S** |
+
+**Justificación ampliada de RF-04.** Es el requerimiento que distingue la solución de la oferta
+existente. El análisis del sector muestra que las centrales de monitoreo en operación hablan Contact
+ID sobre DC-09, y ni IoT3 ni ControlTec ofrecen un punto de ingesta compatible. Aceptar mensajes de
+paneles instalados **sin modificarlos** convierte al parque existente en fuente de datos, en lugar de
+exigir su reemplazo. Se prioriza como *Should* y no *Must* porque el MVP puede demostrarse sin él,
+pero su valor demostrativo es alto.
+
+## M2 — Normalización de eventos y telemetría
+
+| ID | Requerimiento | Fuente | Causa | Prior. |
+|---|---|---|---|:---:|
+| **RF-11** | El sistema debe **traducir señales de sensores heterogéneos a códigos de evento DC-05** conforme a la tabla de mapeo del perfil CID-IoT, sin introducir códigos ajenos al estándar | [PO] [BT] | C1 | **M** |
+| **RF-12** | El sistema debe mantener una **máquina de estados de condiciones abiertas** por dispositivo, gobernada por el calificador `Q`: `Q=1` abre la condición y `Q=3` la cierra | [BT] | C1, C5 | **M** |
+| **RF-13** | El sistema debe **generar eventos por umbral** cuando un valor de telemetría cruce un límite configurado, emitiendo el código DC-05 correspondiente | [PO] | C1 | **M** |
+| **RF-14** | El sistema debe permitir **configurar umbrales de disparo y de restauración por dispositivo**, con banda de histéresis para evitar oscilación | [BT] | C5 | **S** |
+| **RF-15** | El sistema debe **correlacionar eventos con telemetría** mediante la tripleta de identidad `(ACCT, GG, CCC)` y la marca temporal, para reconstruir el contexto de un evento | [DP] | C1 | **S** |
+| **RF-16** | El sistema debe **normalizar las marcas temporales** a un huso único, tolerando que el nodo no disponga de reloj confiable y usando la hora de recepción cuando corresponda | [BT] | C1 | **M** |
+| **RF-17** | El sistema debe **resolver la identidad del dispositivo** desde los metadatos del transporte cuando el mensaje no la incluya explícitamente | [DP] | C1 | **M** |
+
+## M3 — Inventario y aprovisionamiento de dispositivos
+
+| ID | Requerimiento | Fuente | Causa | Prior. |
+|---|---|---|---|:---:|
+| **RF-18** | El sistema debe mantener un **inventario de dispositivos** con tipo, ubicación, sitio, zona lógica, transporte de llegada y estado | [PO] | C4, C5 | **M** |
+| **RF-19** | El sistema debe permitir **registrar un dispositivo nuevo** asignándole su tripleta `(ACCT, GG, CCC)` sin intervenir la consola del servidor de red | [PO] [EM] | C4 | **M** |
+| **RF-20** | El sistema debe **rechazar el registro** de un dispositivo cuya tripleta ya exista, y advertir cuando el espacio de direcciones de un sitio se agote | [BT] | C1 | **S** |
+| **RF-21** | El sistema debe permitir **agrupar dispositivos por sitio y por zona lógica**, y presentar la vista agrupada | [PO] | C4 | **M** |
+| **RF-22** | El sistema debe permitir **marcar un dispositivo en mantenimiento**, suprimiendo sus alertas y registrando el evento con el código 570 | [BT] | C5 | **C** |
+| **RF-23** | El sistema debe registrar **quién realizó cada cambio de configuración de un dispositivo y cuándo** | [BT] | C5 | **S** |
+
+## M4 — Supervisión de salud de enlace
+
+| ID | Requerimiento | Fuente | Causa | Prior. |
+|---|---|---|---|:---:|
+| **RF-24** | El sistema debe **detectar la pérdida de supervisión** de un dispositivo cuando no reporte durante un número configurable de intervalos, y emitir el código 381 | [PO] [BT] | **C5** | **M** |
+| **RF-25** | El sistema debe **detectar la restauración** del dispositivo y cerrar la condición con `Q=3` | [BT] | C5 | **M** |
+| **RF-26** | El sistema debe registrar la **última vez que se recibió** comunicación de cada dispositivo | [PO] | C5 | **M** |
+| **RF-27** | El sistema debe **presentar la calidad del enlace** por dispositivo (RSSI, SNR y porcentaje de recepción) cuando el transporte la provea | [BT] | C5 | **M** |
+| **RF-28** | El sistema debe **procesar eventos de batería baja** (código 384) y exponer los dispositivos que requieren mantenimiento | [PO] [BT] | C5 | **M** |
+| **RF-29** | El sistema debe **aceptar y contabilizar los *heartbeat*** (códigos 602 y 603) como evidencia de supervisión activa | [BT] | C5 | **M** |
+| **RF-30** | El sistema debe presentar un **indicador agregado de salud por sitio**: total de dispositivos, en línea, con condición abierta y sin supervisión | [PO] | C4, C5 | **M** |
+
+**Justificación ampliada del módulo M4.** Es el módulo que materializa el aporte diferencial frente a
+la oferta regional. El análisis de mercado muestra que IoT3 y ControlTec presentan **el dato del
+sensor**; ninguna posiciona **el estado del dispositivo y de su enlace** como funcionalidad del
+producto. La causa C5 —el silencio de un sensor es indistinguible de la ausencia de novedades— solo se
+resuelve con supervisión activa, no con visualización de mediciones. Todos los requerimientos de este
+módulo salvo uno son *Must*.
+
+## M5 — Persistencia y consulta
+
+| ID | Requerimiento | Fuente | Causa | Prior. |
+|---|---|---|---|:---:|
+| **RF-31** | El sistema debe **almacenar de forma persistente** todo evento aceptado, conservando el mensaje original íntegro junto a su interpretación | [BT] [DP] | C1 | **M** |
+| **RF-32** | El sistema debe **almacenar series de tiempo** de telemetría con valor, unidad y marca temporal | [PO] | C1 | **M** |
+| **RF-33** | El sistema debe permitir **consultar el historial** de eventos y mediciones de un dispositivo en un rango de fechas | [PO] | C4 | **M** |
+| **RF-34** | El sistema debe permitir **exportar** los datos de un sitio en formato abierto (CSV y JSON) | [PO] [EM] | **C3, C5** | **M** |
+| **RF-35** | El sistema debe exponer una **API de consulta** que permita a sistemas externos acceder a los datos del sitio | [PO] | C3 | **S** |
+
+**Justificación ampliada de RF-34.** La exportación en formato abierto no es una comodidad: es el
+requerimiento que **materializa la ausencia de dependencia de proveedor** (causa C3, efecto E5). Una
+plataforma que declara ser abierta y no permite retirar los datos reproduce el problema que pretende
+resolver. Es *Must* por coherencia con la propuesta de valor.
+
+## M6 — Alertas y notificación
+
+| ID | Requerimiento | Fuente | Causa | Prior. |
+|---|---|---|---|:---:|
+| **RF-36** | El sistema debe **notificar** cuando se abra una condición de severidad configurada como notificable | [PO] | C5 | **M** |
+| **RF-37** | El sistema debe permitir **configurar los destinatarios** de notificación por sitio | [PO] | C4 | **S** |
+| **RF-38** | El sistema debe **agrupar notificaciones repetidas** del mismo dispositivo en una ventana temporal, para evitar saturación | [BT] | C5 | **S** |
+| **RF-39** | El sistema debe permitir **reconocer una alerta**, registrando quién y cuándo | [BT] | C5 | **C** |
+
+## M7 — Seguridad, identidad y multi-tenencia
+
+| ID | Requerimiento | Fuente | Causa | Prior. |
+|---|---|---|---|:---:|
+| **RF-40** | El sistema debe **autenticar toda ingesta** mediante credencial por sitio, rechazando mensajes sin credencial válida | [BT] | C1 | **M** |
+| **RF-41** | El sistema debe **aislar los datos entre sitios**: ningún usuario de un sitio puede acceder a datos de otro | [BT] [DP] | C3 | **M** |
+| **RF-42** | El sistema debe **cifrar el transporte** de toda comunicación externa (TLS para HTTP y MQTT; AES para DC-09 conforme al estándar) | [BT] | C1 | **M** |
+| **RF-43** | El sistema debe **autenticar a los usuarios** de la interfaz de administración con credenciales individuales | [BT] | C4 | **M** |
+| **RF-44** | El sistema debe distinguir al menos **dos roles**: administrador del sitio y usuario de consulta | [PO] | C4 | **S** |
+| **RF-45** | El sistema debe permitir **rotar las credenciales de ingesta** de un sitio sin interrumpir el servicio, conforme al criterio de DC-09-2026 | [BT] | C1 | **C** |
+| **RF-46** | El sistema debe **registrar en bitácora** los accesos y las operaciones sensibles | [BT] | C5 | **S** |
+
+## M8 — Interfaz de administración
+
+| ID | Requerimiento | Fuente | Causa | Prior. |
+|---|---|---|---|:---:|
+| **RF-47** | La interfaz debe presentar el **inventario de dispositivos** con su estado y transporte de llegada, filtrable por sitio, zona y estado | [PO] | C4 | **M** |
+| **RF-48** | La interfaz debe presentar el **panel de salud del sitio** con semáforo por dispositivo | [PO] | C5 | **M** |
+| **RF-49** | La interfaz debe presentar el **detalle de un dispositivo**: identidad, condiciones abiertas, historial de eventos y serie de mediciones | [PO] | C4 | **M** |
+| **RF-50** | La interfaz debe ofrecer el **asistente de registro** de un dispositivo nuevo | [PO] | C4 | **M** |
+| **RF-51** | La interfaz debe presentar la **vista agrupada por transporte de red**, mostrando cuántos dispositivos llegan por cada tecnología | [PO] [DP] | C1, C2 | **S** |
+| **RF-52** | La interfaz debe ser **utilizable desde un navegador móvil** | [EM] | C4 | **S** |
+
+**Justificación de RF-52.** El análisis de la oferta regional muestra que ControlTec destaca la
+supervisión desde el teléfono como característica comercial. Es una expectativa establecida del
+mercado local, no una preferencia estética.
+
+---
+
+# 3. Requerimientos no funcionales
+
+Clasificados según las características de calidad de **ISO/IEC 25010**.
+
+## 3.1 Eficiencia de desempeño
+
+| ID | Requerimiento | Métrica de verificación | Fuente | Prior. |
+|---|---|---|---|:---:|
+| **RNF-01** | El sistema debe sostener la ingesta de **≥ 50 eventos por segundo** sin pérdida | Prueba de carga con generador sintético | [DP] | **M** |
+| **RNF-02** | El tiempo desde la recepción de un evento hasta su disponibilidad para consulta debe ser **≤ 2 segundos** en el percentil 95 | Medición instrumentada | [DP] | **M** |
+| **RNF-03** | El sistema debe **detectar la pérdida de supervisión** de un dispositivo en **≤ 2 intervalos** de reporte configurados | Prueba funcional con nodo silenciado | [PO] | **M** |
+| **RNF-04** | Una consulta de historial de 30 días de un dispositivo debe responder en **≤ 3 segundos** | Medición con volumen sintético | [DP] | **S** |
+
+## 3.2 Fiabilidad
+
+| ID | Requerimiento | Métrica de verificación | Fuente | Prior. |
+|---|---|---|---|:---:|
+| **RNF-05** | Ningún evento aceptado y confirmado puede perderse ante un reinicio del sistema | Prueba de recuperación ante falla | [BT] | **M** |
+| **RNF-06** | El sistema debe **reanudar la ingesta automáticamente** tras recuperarse de una interrupción, sin intervención manual | Prueba de reinicio | [BT] | **M** |
+| **RNF-07** | La indisponibilidad de un adaptador de transporte **no debe afectar** la ingesta por los demás | Prueba de aislamiento de fallas | [DP] | **S** |
+
+## 3.3 Seguridad
+
+| ID | Requerimiento | Métrica de verificación | Fuente | Prior. |
+|---|---|---|---|:---:|
+| **RNF-08** | Ninguna credencial debe almacenarse en texto claro, ni en base de datos ni en el repositorio de código | Inspección y revisión del repositorio | [BT] | **M** |
+| **RNF-09** | Los dispositivos IoT deben poder residir en un **segmento de red separado** del segmento de usuarios, con acceso restringido solo a los puertos de ingesta | Diseño de red verificado y documentado | [BT] | **M** |
+| **RNF-10** | El sistema **no debe requerir puertos entrantes abiertos hacia los dispositivos**: la conexión siempre se inicia desde el dispositivo hacia la plataforma | Revisión de arquitectura | [BT] | **M** |
+
+**Justificación de RNF-09 y RNF-10.** Son los dos requerimientos que anclan el trabajo al enfoque de
+redes del profesor guía. RNF-10 en particular resuelve el problema de alcanzabilidad de dispositivos
+detrás de NAT y cortafuegos: la práctica correcta es que el dispositivo establezca la conexión
+saliente, nunca exponer el dispositivo a internet. RNF-09 corresponde a segmentación de red
+—material de administración de infraestructura— y es lo que impide que un sensor comprometido alcance
+la red corporativa.
+
+## 3.4 Mantenibilidad
+
+| ID | Requerimiento | Métrica de verificación | Fuente | Prior. |
+|---|---|---|---|:---:|
+| **RNF-11** | El código debe residir en un **repositorio git** con mensajes de commit descriptivos en la totalidad de ellos | Inspección del historial | [BT] | **M** |
+| **RNF-12** | Añadir un **transporte nuevo** debe requerir implementar solo un adaptador, sin modificar el núcleo de normalización | Revisión de diseño y prueba de extensión | [DP] | **M** |
+| **RNF-13** | La especificación del protocolo debe estar **documentada de forma independiente** de la implementación | Existencia del documento | [PO] | **M** |
+
+**Justificación de RNF-12.** Es la traducción arquitectónica de la indicación del profesor guía de no
+cerrarse a una sola tecnología. Si añadir un transporte obliga a modificar el núcleo, la plataforma no
+es realmente multiprotocolo: es monoprotocolo con excepciones.
+
+## 3.5 Portabilidad y compatibilidad
+
+| ID | Requerimiento | Métrica de verificación | Fuente | Prior. |
+|---|---|---|---|:---:|
+| **RNF-14** | El sistema debe poder **desplegarse completo en un único servidor** con recursos modestos, sin dependencia de servicios propietarios de nube | Despliegue verificado en máquina local | [PO] | **M** |
+| **RNF-15** | El sistema debe construirse **exclusivamente con componentes de código abierto**, sin licencias de pago | Inventario de dependencias | [PO] | **M** |
+| **RNF-16** | El mensaje de evento debe caber en el payload de LoRaWAN AU915 en su **configuración más restrictiva (11 bytes)** | Verificado: 8 bytes en BCD | [BT] | **M** |
+
+**Justificación de RNF-14 y RNF-15.** Provienen directamente de la indicación del propietario del
+proyecto: plataforma «gratuita o abierta», con la universidad como destinataria. RNF-14 además habilita
+la respuesta a OE4 sobre alojamiento y costo: un sistema que solo funciona en nube propietaria tiene un
+costo de operación irreducible; uno que corre en un servidor propio permite el escenario de costo
+marginal cero para la institución.
+
+---
+
+# 4. Priorización y alcance del producto mínimo
+
+## 4.1 Distribución MoSCoW
+
+| Prioridad | Funcionales | No funcionales | Total |
+|---|:---:|:---:|:---:|
+| **Must** — indispensable para el producto | 35 | 14 | **49** |
+| **Should** — importante, postergable | 14 | 2 | **16** |
+| **Could** — deseable | 3 | 0 | **3** |
+| **Won't** — fuera de alcance | — | — | ver 4.3 |
+| **Total catalogado** | **52** | **16** | **68** |
+
+> ⚠️ **Tensión detectada en la priorización, declarada explícitamente.** 49 requerimientos *Must*
+> representan un alcance considerable frente a la restricción **RE-01** (~15 horas semanales) y al
+> riesgo **R4**. La lectura correcta es que los *Must* definen **el producto que la tesis propone**,
+> mientras que el **núcleo demostrativo** de la sección 4.2 —el conjunto mínimo que prueba la
+> hipótesis— es un subconjunto más reducido. Si al cerrar la Etapa 2 el avance sugiere que el alcance
+> es excesivo, **el recorte debe hacerse sobre los *Must* no pertenecientes al núcleo demostrativo**,
+> documentando la decisión y su justificación. La pauta evalúa el porcentaje de tareas del backlog
+> completadas: un alcance sobredimensionado penaliza más que un alcance recortado y justificado.
+
+## 4.2 Definición del producto mínimo
+
+> **El MVP demuestra la tesis si**: recibe eventos Contact ID por **al menos dos transportes
+> distintos**, los normaliza a un único formato, detecta que un dispositivo dejó de reportar, lo
+> muestra en una interfaz de gestión con el estado de cada dispositivo y su enlace, y permite exportar
+> los datos en formato abierto.
+
+**Núcleo demostrativo** — los requerimientos cuya ausencia invalidaría la demostración:
+
+| Qué demuestra | Requerimientos del núcleo |
+|---|---|
+| Ingesta por más de un transporte | RF-01, RF-02 *o* RF-03, RF-05, RF-06 |
+| Normalización a formato único | RF-11, RF-12, RF-16, RF-17 |
+| Supervisión de salud del enlace | RF-24, RF-25, RF-26, RF-30 |
+| Persistencia y consulta | RF-31, RF-33 |
+| Interfaz de gestión | RF-47, RF-48, RF-49 |
+| Ausencia de dependencia de proveedor | RF-34 |
+| Seguridad mínima | RF-40, RF-42, RNF-08, RNF-10 |
+| Extensibilidad verificable | RNF-12 |
+
+Son **20 requerimientos**. Ese conjunto cubre las cinco causas del problema y es alcanzable con el
+presupuesto de tiempo disponible. Todo lo demás es mejora del producto, no demostración de la tesis.
+
+## 4.3 Fuera de alcance declarado (*Won't*)
+
+Declarar los límites es parte del análisis: evita que la ausencia de una funcionalidad se interprete
+como omisión.
+
+| Fuera de alcance | Razón |
+|---|---|
+| Analítica predictiva o aprendizaje automático sobre los datos | No aborda ninguna causa identificada; ampliaría el alcance sin fortalecer la tesis |
+| Actuación remota sobre dispositivos (*downlink*, control) | La plataforma es de gestión de datos y conectividad, no de control de procesos |
+| Aplicación móvil nativa | RF-52 se satisface con interfaz web adaptativa |
+| Facturación o gestión comercial de suscripciones | El producto se define como abierto y sin costo de licencia |
+| Firmware de grado comercial para los nodos | Solo el nodo de prueba necesario para la validación |
+| Alta disponibilidad y redundancia geográfica | Excede el alcance de un prototipo de titulación; se documenta como trabajo futuro |
+| Certificación normativa del equipamiento | No corresponde a un trabajo de titulación |
+
+---
+
+# 5. Matriz de trazabilidad
+
+## 5.1 Cobertura de causas por requerimiento
+
+| Causa del problema | Requerimientos que la abordan | Nº |
+|---|---|:---:|
+| **C1** Fragmentación de protocolos y formatos | RF-01…RF-06, RF-08, RF-10…RF-17, RF-20, RF-31, RF-40, RF-42, RF-45, RF-51, RNF-16 | **24** |
+| **C2** Acoplamiento hardware-plataforma | RF-02, RF-03, RF-04, RF-51, RNF-12 | **5** |
+| **C3** Costo y dependencia de plataformas SaaS | RF-34, RF-35, RF-41, RNF-14, RNF-15 | **5** |
+| **C4** Ausencia de capacidad técnica interna | RF-18, RF-19, RF-21, RF-30, RF-33, RF-43, RF-44, RF-47, RF-49, RF-50, RF-52 | **11** |
+| **C5** Falta de visibilidad de la conectividad | RF-07, RF-12, RF-14, RF-22, RF-23, RF-24…RF-30, RF-34, RF-36, RF-38, RF-39, RF-46, RF-48, RNF-03 | **20** |
+
+**Verificación:** ninguna causa queda sin requerimientos asociados, y ningún requerimiento del catálogo
+carece de causa declarada.
+
+## 5.2 Trazabilidad requerimiento → objetivo → etapa
+
+| Objetivo | Módulos que lo materializan | Requerimientos | Etapa |
+|---|---|---|:---:|
+| **OE1** Caracterizar y levantar requerimientos | — | *este documento* | 1 |
+| **OE2** Especificar el protocolo | M2 | RF-05, RF-06, RF-11, RF-12, RF-16, RNF-13, RNF-16 | 2 |
+| **OE3** Diseñar arquitectura y red | M1, M7 | RF-01…RF-04, RF-40…RF-42, RNF-09, RNF-10, RNF-12 | 2 |
+| **OE4** Despliegue y costo | — | RNF-14, RNF-15 | 2 |
+| **OE5** Implementar la plataforma | M1…M8 | todos los *Must* | 3 · 4 |
+| **OE6** Validar en entorno realista | — | RNF-01…RNF-07 | 4 |
+
+## 5.3 Requerimientos que sustentan la diferenciación competitiva
+
+Del análisis de mercado se desprende que el valor diferencial no está distribuido de forma uniforme.
+Estos son los requerimientos que ningún competidor regional identificado satisface:
+
+| Requerimiento | Por qué diferencia |
+|---|---|
+| **RF-04** Receptor DC-09 nativo | Permite ingerir paneles de alarma instalados sin reemplazarlos |
+| **RF-24, RF-27, RF-30** Supervisión de salud de enlace | La oferta regional muestra el dato del sensor, no el estado del dispositivo |
+| **RF-34** Exportación en formato abierto | Elimina la dependencia de proveedor |
+| **RF-51** Vista agrupada por transporte | Ninguna plataforma presenta la flota organizada por tecnología de red |
+| **RNF-12** Extensibilidad por adaptador | Las soluciones cerradas no admiten hardware de terceros |
+| **RNF-15** Solo componentes abiertos | Elimina el costo de licencia por dispositivo |
+
+---
+
+# 6. Evaluación crítica de alternativas de solución
+
+La rúbrica exige «una evaluación crítica de alternativas consideradas y las razones para la selección
+final». La evaluación del **protocolo de comunicación** —la decisión de mayor peso— está desarrollada
+en `docs/05-protocolo-contactid.md`, sección 2, con siete alternativas sobre seis criterios
+ponderados. Esta sección cubre las decisiones restantes de infraestructura.
+
+## 6.1 Servidor de red LoRaWAN
+
+| Alternativa | Ventajas | Desventajas | Decisión |
+|---|---|---|---|
+| **ChirpStack** | Código abierto, autoalojable, publica en MQTT de forma nativa, gestión de dispositivos completa, se ejecuta en un servidor modesto | Requiere operar el componente | **✅ Seleccionado** |
+| The Things Stack (open source) | Funcionalmente equivalente, comunidad amplia | Despliegue autoalojado más exigente en recursos | Descartado |
+| The Things Network (servicio público) | Sin operación propia, gratuito | Los datos transitan por infraestructura de terceros: contradice RNF-14 y el control del dato | Descartado |
+| Desarrollo propio | Control total | Reimplementar LoRaWAN no es el aporte de la tesis y consumiría todo el presupuesto de tiempo | Descartado |
+
+**Razón de la selección:** ChirpStack satisface RNF-14 y RNF-15, y su publicación nativa en MQTT
+encaja directamente con RF-02 y RF-03, reduciendo el adaptador de LoRaWAN a un consumidor de tópicos.
+
+## 6.2 Motor de persistencia
+
+| Alternativa | Ventajas | Desventajas | Decisión |
+|---|---|---|---|
+| **TimescaleDB** (extensión de PostgreSQL) | **Un solo motor** para datos relacionales (inventario, sitios, usuarios, condiciones) y series de tiempo. SQL estándar. Licencia abierta | Menos optimizado que InfluxDB en escritura masiva pura | **✅ Seleccionado** |
+| InfluxDB | Muy eficiente en series de tiempo | Obliga a operar **dos motores** en paralelo, porque el inventario y la identidad son relacionales | Descartado |
+| PostgreSQL sin extensión | Máxima simplicidad | Sin optimización de series de tiempo ni políticas de retención automáticas | Descartado |
+
+**Razón de la selección:** el factor decisivo es operativo, no de rendimiento. Este es un **proyecto
+unipersonal con ~15 horas semanales**: operar, respaldar y consultar dos motores de base de datos
+distintos duplica la carga de mantenimiento sin beneficio proporcional a la escala del prototipo. El
+volumen esperado —decenas de dispositivos reportando cada pocos minutos— está muy por debajo del punto
+donde la ventaja de InfluxDB se vuelve relevante. **Se documenta explícitamente que a escala mayor la
+decisión podría invertirse**, lo que constituye una recomendación de trabajo futuro.
+
+## 6.3 Broker MQTT
+
+| Alternativa | Ventajas | Desventajas | Decisión |
+|---|---|---|---|
+| **Mosquitto** | Ligero, maduro, TLS y autenticación estándar, consumo mínimo | Sin agrupamiento ni funciones empresariales | **✅ Seleccionado** |
+| EMQX | Agrupamiento, reglas, alta concurrencia | Complejidad y consumo desproporcionados para la escala | Descartado |
+
+## 6.4 Estrategia de despliegue
+
+| Alternativa | Ventajas | Desventajas | Decisión |
+|---|---|---|---|
+| **Contenedores orquestados por Docker Compose** | Despliegue reproducible con un comando; **habilita que la validación de la Etapa 4 se ejecute en cualquier máquina**; aísla los componentes | Capa adicional de abstracción | **✅ Seleccionado** |
+| Instalación directa en el sistema operativo | Sin capa intermedia | Frágil de reproducir; complica la evidencia de validación | Descartado |
+
+**Razón de la selección:** la reproducibilidad no es una preferencia técnica, es un requisito de la
+evaluación. La Etapa 4 exige demostrar el funcionamiento «bajo condiciones operativas realistas»; que
+el sistema completo se levante con un comando en una máquina distinta a la de desarrollo es evidencia
+directa de ello.
+
+## 6.5 Lenguaje y marco de trabajo del backend
+
+> ⚠️ **Decisión pendiente de validación con el estudiante.** La recomendación depende de su experiencia
+> previa, que es el factor de mayor peso en un proyecto unipersonal con tiempo acotado.
+
+| Alternativa | Ventajas | Desventajas |
+|---|---|---|
+| **Python + FastAPI** *(recomendado)* | Velocidad de desarrollo alta; **genera la especificación OpenAPI automáticamente**, lo que la Etapa 2 necesita como entregable de diseño; ecosistema maduro para MQTT y PostgreSQL; ya presente en el entorno de trabajo | Menor rendimiento por proceso que alternativas compiladas — irrelevante a la escala de RNF-01 |
+| Go | Alto rendimiento, binario único | Más lento de desarrollar para una persona sola con plazos cerrados |
+| Node.js + Express | Ecosistema amplio | Requiere más andamiaje para llegar a la documentación de API automática |
+
+**Criterio de decisión propuesto:** en un proyecto con 15 horas semanales y cuatro entregas evaluadas,
+la **velocidad de desarrollo y la calidad de la documentación generada** pesan más que el rendimiento
+en tiempo de ejecución, porque el cuello de botella es el tiempo del desarrollador, no la CPU. La
+generación automática de OpenAPI es un argumento concreto: convierte un entregable de la Etapa 2 en un
+subproducto de la implementación.
+
+---
+
+# 7. Restricciones y supuestos
+
+## 7.1 Restricciones
+
+| # | Restricción | Origen | Consecuencia |
+|---|---|---|---|
+| **RE-01** | Presupuesto de tiempo de ~15 horas semanales | Jornada laboral completa del estudiante | El alcance se limita a los requerimientos *Must* |
+| **RE-02** | Proyecto unipersonal | Condición del trabajo de título | Se descartan alternativas que exijan operar múltiples componentes complejos |
+| **RE-03** | Sin licencias de pago | [PO] — producto abierto | Solo componentes de código abierto (RNF-15) |
+| **RE-04** | Banda 915–928 MHz, plan AU915, sin licencia de espectro | Normativa chilena | Payload limitado; verificado como suficiente (RNF-16) |
+| **RE-05** | Cuatro entregas evaluadas con umbral de aprobación del 70 % | Pauta del curso | El alcance se dimensiona para superar el umbral, no para maximizar funcionalidad |
+| **RE-06** | Disponibilidad de hardware de sensores no confirmada | Riesgo R1 | La validación debe funcionar con emulación por software |
+
+## 7.2 Supuestos
+
+| # | Supuesto | Riesgo si no se cumple |
+|---|---|---|
+| **SU-01** | La universidad dispone de sensores accesibles para el caso de validación | Se recurre a nodos propios y emulación; debilita la evidencia del propietario del proyecto |
+| **SU-02** | El profesor guía acepta la arquitectura de dos planos | Rediseño del tratamiento de la telemetría (pendiente P5) |
+| **SU-03** | Es posible obtener al menos una entrevista con una parte interesada | Compromete el 10 % del criterio 1 y el respaldo del 45 % del criterio 3 |
+| **SU-04** | Los estándares SIA son accesibles al menos vía documentación secundaria verificable | Ya mitigado: el formato está documentado en múltiples fuentes independientes |
+
+---
+
+# 8. Estado del documento
+
+| Sección | Estado |
+|---|---|
+| 1 Metodología y fuentes | ✅ Completo, con la brecha de entrevistas declarada |
+| 2 Requerimientos funcionales (52) | ✅ Completo, sujeto a ajuste tras las entrevistas |
+| 3 Requerimientos no funcionales (16) | ✅ Completo |
+| 4 Priorización MoSCoW y MVP | ✅ Completo |
+| 5 Matriz de trazabilidad | ✅ Completo, cobertura de las 5 causas verificada |
+| 6 Evaluación de alternativas | 🟡 Completo salvo 6.5, pendiente de validar con el estudiante |
+| 7 Restricciones y supuestos | ✅ Completo |
+
+**Total catalogado: 68 requerimientos**, frente al mínimo de 20 comprometido en OE1.

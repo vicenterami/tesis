@@ -12,6 +12,7 @@
 ## Índice
 
 1. [Qué es Contact ID y cómo funciona](#1-qué-es-contact-id-y-cómo-funciona)
+   · [1.6 El protocolo en la industria: el caso de las alarmas monitoreadas](#16-el-protocolo-en-la-industria-por-qué-el-ejemplo-de-las-alarmas-monitoreadas-es-pertinente)
 2. [Evaluación de alternativas](#2-evaluación-de-alternativas)
 3. [Verificación de la restricción de tamaño](#3-verificación-de-la-restricción-de-tamaño)
 4. [La limitación de Contact ID y la arquitectura de dos planos](#4-la-limitación-de-contact-id-y-la-arquitectura-de-dos-planos)
@@ -208,6 +209,88 @@ necesita reportar.
 > antes de que el término «IoT» se acuñara. La industria de seguridad electrónica resolvió el problema
 > de supervisar miles de nodos de radio a batería décadas atrás, y estandarizó su vocabulario. Este
 > trabajo lo reutiliza en lugar de inventar uno nuevo.
+
+## 1.6 El protocolo en la industria: por qué el ejemplo de las alarmas monitoreadas es pertinente
+
+El profesor guía señaló como referencia los sensores de empresas de alarmas monitoreadas —**Verisure**
+entre ellas— y su comunicación «tipo llamada celular». Conviene precisar el mecanismo, porque explica
+el diseño del formato y valida la elección.
+
+### La cadena de comunicación de una alarma monitoreada
+
+```
+  Sensores inalámbricos           Panel /                    Central receptora
+  a batería (868/915 MHz)         comunicador                (ARC · CMS)
+        │                              │                            │
+        │─── radio propietaria ───────▶│                            │
+        │                              │                            │
+        │                              │── PSTN: DTMF ─────────────▶│  ← histórico
+        │                              │── GSM/GPRS: DTMF o datos ──▶│  ← «llamada celular»
+        │                              │── IP: SIA DC-09 ──────────▶│  ← actual
+        │                              │                            │
+        │                              │   en los tres casos el mensaje de
+        │                              │   aplicación es CONTACT ID
+```
+
+**La «comunicación celular» que mencionó el profesor es un cambio de transporte, no de protocolo.**
+Los comunicadores GSM del sector convierten la marcación DTMF de línea fija en marcación DTMF sobre
+red celular (2G/3G/4G) **conservando el mensaje Contact ID intacto**. El protocolo de aplicación es el
+mismo desde 1985: cambió el medio, no el formato.
+
+Esto explica por qué el mensaje tiene **16 dígitos y no un objeto JSON**: tenía que caber en tonos
+telefónicos por una línea analógica. **Y esa restricción de hace cuatro décadas es exactamente la que
+hoy lo hace apropiado para LoRa.** El protocolo fue diseñado para un canal estrecho, poco fiable y
+costoso por transmisión — la misma descripción del enlace de un nodo LoRa a batería.
+
+### El caso Verisure, y por qué es el ejemplo del problema *y* de la solución
+
+Verisure Securitas Direct opera con **GSM como canal principal** y añadió **Sigfox como canal
+secundario** en su parque instalado: cuando el panel detecta la **pérdida de señal GSM** —señal de un
+intento de interferencia o *jamming*— emite la alerta por la red alternativa para garantizar
+continuidad del servicio.
+
+Dos observaciones que interesan directamente a este trabajo:
+
+1. **Es multiprotocolo por diseño, y por la razón correcta.** Un operador que se juega la continuidad
+   del servicio no se ata a un solo transporte. Refuerza el requisito de no cerrarse a una sola
+   tecnología de radio, que fue una indicación explícita del profesor guía.
+2. **La condición que detecta —pérdida del enlace por interferencia— es el código 344 de Contact ID.**
+   El vocabulario del protocolo ya contempla exactamente ese evento. No hay que inventar nada para
+   expresarlo.
+
+**Y aquí está la observación central:** Verisure, como el resto del sector, es un **sistema cerrado y
+verticalmente integrado**. Sus sensores solo hablan con su panel; su panel solo reporta a su central;
+el cliente no puede llevarse sus datos ni conectar un sensor de otra marca. **Eso es literalmente la
+causa C2 (acoplamiento hardware-plataforma) y la causa C3 (dependencia de proveedor) del problema
+definido en `docs/01-problema-y-objetivos.md`.**
+
+> **El planteamiento del trabajo, en una línea:** la industria de la seguridad electrónica resolvió
+> hace décadas el problema de supervisar flotas de sensores inalámbricos a batería, y estandarizó su
+> vocabulario en un protocolo **abierto** (ANSI/SIA DC-05) — pero lo aplica dentro de **sistemas
+> cerrados**. Este trabajo toma ese protocolo estándar y lo usa como contrato de interoperabilidad de
+> una **plataforma abierta**, extendiendo su transporte a LoRaWAN, WiFi/HTTP y MQTT, para que quien ya
+> posee sensores administre sus propios datos.
+
+### Sobre el transporte celular por voz: por qué el diseño usa DC-09 y no DTMF
+
+El transporte DTMF sobre llamada celular está en retirada porque **las redes 2G y 3G están siendo
+desactivadas** por los operadores a nivel mundial, y la transmisión de tonos de voz depende de un
+canal conmutado que ya no está garantizado. La migración del sector va hacia **datos sobre IP con
+DC-09**, que es el transporte que este trabajo adopta.
+
+> ⚠️ **Pendiente de verificación** (P6): estado del apagado de 2G/3G en Chile por operador. No afecta
+> la decisión de diseño —DC-09 sobre IP es la opción correcta en cualquier caso— pero es un dato de
+> contexto que fortalece la justificación.
+
+### Consecuencia para la ingesta de sensores WiFi
+
+La pregunta de fondo era si el enfoque sirve también para sensores WiFi. **Sí, y sin fricción.** El
+mensaje Contact ID es agnóstico del transporte: son 16 dígitos. Un nodo WiFi (por ejemplo un ESP32)
+puede construir el mensaje y enviarlo por **HTTP a la API** (vía C de la sección 5.3), sin línea
+telefónica, sin módem celular y sin gateway LoRa.
+
+Es decir: **el mismo formato de evento llega por tres caminos distintos y se almacena una sola vez,
+normalizado.** Esa convergencia es el resultado que la plataforma debe demostrar.
 
 ---
 
@@ -595,6 +678,7 @@ tienen condiciones abiertas, cuáles dejaron de reportar y cuándo se los vio po
 | **P3** | ¿Existe alguna central de monitoreo en La Araucanía dispuesta a validar la interoperabilidad? | Debilitaría la evidencia del criterio C-C, aunque no la argumentación |
 | **P4** | Confirmar el listado exacto de códigos DC-05 usados, contra al menos dos fuentes de fabricante | Riesgo de citar un código con significado inexacto |
 | **P5** | Validar con el profesor guía que el enfoque de dos planos es aceptable | Si exige Contact ID puro, hay que rediseñar el tratamiento de la telemetría |
+| **P6** | Estado del apagado de 2G/3G en Chile por operador | Ninguno sobre el diseño; es dato de contexto que refuerza la elección de DC-09 sobre IP frente al DTMF celular |
 
 ---
 
@@ -615,6 +699,8 @@ tienen condiciones abiertas, cuáles dejaron de reportar y cuándo se los vio po
 - GeoArm Security. *What Is Contact ID — Contact ID Report Codes.* [support.geoarm.com](https://support.geoarm.com/geoarm/faqgeoarm/whatiscontactid-contactidreportcodes)
 - FortSense. *SIA DC-09 Protocol: Implementation Design Guide.* [fortsense.net](https://fortsense.net/blog/sia-dc-09-protocol-for-alarm-transmission)
 - The Things Network. *Regional Parameters — US902-928 / AU915.* [thethingsnetwork.org](https://www.thethingsnetwork.org/docs/lorawan/regional-parameters/us915/)
+- Business Wire. *Verisure Securitas Direct Connects 200,000 Alarm Systems to the SIGFOX IoT Network* (canal secundario ante pérdida de señal GSM por interferencia). [businesswire.com](https://www.businesswire.com/news/home/20160222005802/en/Verisure-Securitas-Direct-Connects-200000-Alarm-Systems)
+- Roombanker. *Contact ID Protocol: How a Security System Sends Alarm Info to ARC/CMS* (descomposición del mensaje DTMF de 16 dígitos). [roombanker.com](https://www.roombanker.com/blog/ademco-contact-id-protocol/)
 
 **Verificación propia**
 
