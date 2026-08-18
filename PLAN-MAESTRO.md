@@ -73,9 +73,13 @@ complementarios, no alternativos.*
 
 ### Hitos
 
-> ⚠️ **Pendiente de confirmar con Mario.** El PDF de la pauta está fechado el 13/08/2025 y sus hitos
-> son de 2025. Las fechas siguientes son las equivalentes en el calendario 2026 (todas viernes, como
-> exige la pauta). **Confirmarlas es la primera gestión de la semana.**
+> 🔴 **SIN RESOLVER — es el riesgo R3 y bloquea toda la planificación.** Hay dos lecturas posibles
+> y difieren en **dos semanas**. Hasta que Mario lo confirme, **se planifica contra el escenario A**,
+> que es el más exigente: si resulta ser B, se gana holgura; si se planificara para B y resulta ser A,
+> se pierde la etapa.
+
+**Escenario A — la pauta se replica al calendario 2026** (el semestre habría iniciado el lunes 3 de
+agosto; el PDF de la pauta está fechado el 13/08/2025 con hitos de 2025):
 
 | Etapa | Revisiones (miércoles) | Entrega (viernes) |
 |---|---|---|
@@ -83,6 +87,20 @@ complementarios, no alternativos.*
 | **2** — Diseño e implementación inicial | 2, 9, 16, 23 de septiembre | **25 de septiembre** |
 | **3** — Mejoras, pruebas, validación preliminar | 30 sep · 7, 14, 21 de octubre | **23 de octubre** |
 | **4** — Validación final e informe | 28 oct · 4, 11, 18 de noviembre | **20 de noviembre** |
+
+**Escenario B — el sprint 1 arranca hoy, lunes 17 de agosto**, con ciclos de cuatro semanas y entrega
+el último viernes de la cuarta semana (interpretación literal de la pauta contada desde hoy):
+
+| Etapa | Semanas del sprint | Entrega (viernes) |
+|---|---|---|
+| **1** | 17 ago – 11 sep | **11 de septiembre** |
+| **2** | 14 sep – 9 oct | **9 de octubre** |
+| **3** | 12 oct – 6 nov | **6 de noviembre** |
+| **4** | 9 nov – 4 dic | **4 de diciembre** |
+
+**Pregunta exacta que hay que hacerle a Mario:** *«¿La fecha máxima de la Etapa 1 es el viernes 28 de
+agosto o el viernes 11 de septiembre? Es decir, ¿el sprint de cuatro semanas se cuenta desde el inicio
+del semestre o desde esta semana?»*
 
 ### Umbral de aprobación
 
@@ -174,8 +192,8 @@ Ponderación oficial y orden de ataque:
 
 | Prioridad | Entregable | Peso | Depende de | Estado |
 |---|---|---|---|---|
-| **1** | Definición del problema + validación con partes interesadas | **10 %** | Entrevistas | ⬜ |
-| **2** | Objetivos SMART + matriz de trazabilidad objetivo ↔ problema | **25 %** | Prioridad 1 | ⬜ |
+| **1** | Definición del problema + validación con partes interesadas | **10 %** | Entrevistas | 🟡 redactado, faltan entrevistas |
+| **2** | Objetivos SMART + matriz de trazabilidad objetivo ↔ problema | **25 %** | Prioridad 1 | ✅ `docs/01-problema-y-objetivos.md` |
 | **3** | Análisis de requerimientos: base teórica, estudio de mercado, **evaluación crítica de alternativas de protocolo** | **45 %** | Prioridades 1-2 | ⬜ |
 | **4** | Backlog: épicas, historias, tareas, criterios de aceptación, estimaciones | **20 %** | Prioridades 2-3 | ⬜ |
 
@@ -210,11 +228,11 @@ recuperan.
 
 ## 6. Pendientes abiertos
 
-- [ ] **Confirmar fechas de las cuatro etapas** con Mario (pauta fechada en 2025).
+- [ ] 🔴 **Confirmar fechas de las cuatro etapas** con Mario — escenario A (28 ago) vs B (11 sep). Riesgo R3.
 - [ ] Identificar el interlocutor concreto de la universidad: departamento, sensores, cantidad, tipo.
 - [ ] Confirmar el entregable final exigido por la carrera: prototipo, documento, o ambos.
-- [ ] Crear el repositorio privado `tesis` en GitHub (`vicenterami`) y agregar el remoto.
-- [ ] Instalar LaTeX local (`texlive` + `latexmk`) — pendiente de autorización.
+- [x] ~~Crear el repositorio privado `tesis` en GitHub (`vicenterami`) y agregar el remoto.~~ ✅ 17/08/2026 — `git@github.com:vicenterami/tesis.git`, privado, conectado por SSH.
+- [x] ~~Instalar LaTeX local (`texlive` + `latexmk`).~~ ✅ 17/08/2026 — TeX Live 2025, con `pdflatex`, `latexmk` y `biber`.
 - [ ] Verificar si la UCT tiene licencia institucional de Overleaf.
 - [ ] Definir horario de la revisión de los miércoles, compatible con jornada horario laboral.
 - [ ] Hardware para el prototipo: qué hay disponible, qué se necesita comprar, presupuesto.
