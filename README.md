@@ -26,6 +26,7 @@ Plataforma abierta de gestión e interoperabilidad de datos para redes de sensor
 | Contexto técnico y de negocio acumulado | [`docs/00-contexto.md`](docs/00-contexto.md) |
 | Problema, objetivos SMART y trazabilidad | [`docs/01-problema-y-objetivos.md`](docs/01-problema-y-objetivos.md) |
 | Catálogo de requerimientos y alternativas | [`docs/02-requerimientos.md`](docs/02-requerimientos.md) |
+| Backlog con estimaciones y viabilidad | [`docs/04-backlog.md`](docs/04-backlog.md) |
 | **El protocolo de comunicación y por qué este** | **[`docs/05-protocolo-contactid.md`](docs/05-protocolo-contactid.md)** |
 | Qué dijo el profesor y qué se cambió por eso | [`bitacora/`](bitacora/) |
 | La pauta de evaluación oficial | [`referencias/`](referencias/) |

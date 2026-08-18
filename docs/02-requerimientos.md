@@ -404,22 +404,88 @@ evaluación. La Etapa 4 exige demostrar el funcionamiento «bajo condiciones ope
 el sistema completo se levante con un comando en una máquina distinta a la de desarrollo es evidencia
 directa de ello.
 
-## 6.5 Lenguaje y marco de trabajo del backend
+## 6.5 Lenguaje y marco de trabajo de la aplicación
 
-> ⚠️ **Decisión pendiente de validación con el estudiante.** La recomendación depende de su experiencia
-> previa, que es el factor de mayor peso en un proyecto unipersonal con tiempo acotado.
+> **Corrección respecto de la versión anterior de este documento.** El borrador inicial recomendaba
+> Python + FastAPI asumiendo desconocido el perfil del desarrollador. Confirmada su experiencia previa
+> con **Node.js y pnpm**, la evaluación se rehace incorporando ese dato — que en un proyecto
+> unipersonal con plazos cerrados es un criterio de primer orden, no una preferencia — y **el resultado
+> cambia**. La decisión anterior queda registrada como desviación justificada del plan original.
 
-| Alternativa | Ventajas | Desventajas |
-|---|---|---|
-| **Python + FastAPI** *(recomendado)* | Velocidad de desarrollo alta; **genera la especificación OpenAPI automáticamente**, lo que la Etapa 2 necesita como entregable de diseño; ecosistema maduro para MQTT y PostgreSQL; ya presente en el entorno de trabajo | Menor rendimiento por proceso que alternativas compiladas — irrelevante a la escala de RNF-01 |
-| Go | Alto rendimiento, binario único | Más lento de desarrollar para una persona sola con plazos cerrados |
-| Node.js + Express | Ecosistema amplio | Requiere más andamiaje para llegar a la documentación de API automática |
+### 6.5.1 Criterios y ponderación
 
-**Criterio de decisión propuesto:** en un proyecto con 15 horas semanales y cuatro entregas evaluadas,
-la **velocidad de desarrollo y la calidad de la documentación generada** pesan más que el rendimiento
-en tiempo de ejecución, porque el cuello de botella es el tiempo del desarrollador, no la CPU. La
-generación automática de OpenAPI es un argumento concreto: convierte un entregable de la Etapa 2 en un
-subproducto de la implementación.
+| # | Criterio | Peso | Fundamento del peso |
+|---|---|---|---|
+| **L-A** | **Experiencia previa del desarrollador** | **25 %** | Restricción RE-01 y RE-02: un desarrollador único con ~15 h semanales y cuatro entregas evaluadas. El tiempo de aprendizaje se descuenta directamente del tiempo de construcción |
+| **L-B** | **Correspondencia entre estructura del código y arquitectura documentable** | **15 %** | La Etapa 2 asigna el **55 %** a «diseña adecuadamente según estándares de calidad». Si los módulos del código corresponden a los módulos del diseño, los diagramas describen el sistema real en lugar de una idealización |
+| **L-C** | **Generación automática de especificación OpenAPI** | **15 %** | El contrato de la API es entregable de la Etapa 2. Si se genera desde el código, deja de ser trabajo adicional y no puede desincronizarse de la implementación |
+| **L-D** | **Unificación del lenguaje con el frontend** | **15 %** | La interfaz de administración (M8) será una aplicación web. Un solo lenguaje en todo el sistema permite **compartir las definiciones de tipos** del evento Contact ID entre backend y frontend, definiéndolas una sola vez |
+| **L-E** | **Madurez de bibliotecas para MQTT, PostgreSQL/TimescaleDB y manipulación binaria** | **15 %** | RF-02 exige decodificar BCD; RF-03 exige cliente MQTT; toda la persistencia es PostgreSQL |
+| **L-F** | **Tipado estático** | **10 %** | El sistema manipula mensajes de formato estricto donde un campo mal posicionado es un error silencioso. El tipado traslada esos errores a tiempo de compilación |
+| **L-G** | **Rendimiento en tiempo de ejecución** | **5 %** | Peso bajo deliberadamente: RNF-01 exige 50 eventos/segundo, cifra que **todas** las alternativas alcanzan holgadamente. El cuello de botella del proyecto es el tiempo del desarrollador, no la CPU |
+
+### 6.5.2 Matriz comparativa ponderada
+
+| Alternativa | L-A 25 % | L-B 15 % | L-C 15 % | L-D 15 % | L-E 15 % | L-F 10 % | L-G 5 % | **Total** |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| **TypeScript + NestJS** | 4 | 5 | 5 | 5 | 5 | 5 | 4 | **4,70** |
+| TypeScript + Fastify | 5 | 3 | 4 | 5 | 5 | 5 | 5 | **4,55** |
+| Python + FastAPI | 3 | 3 | 5 | 2 | 5 | 4 | 3 | **3,55** |
+| Java + Spring Boot | 2 | 5 | 4 | 1 | 5 | 5 | 4 | **3,45** |
+| Go + Echo | 1 | 3 | 3 | 1 | 4 | 5 | 5 | **2,65** |
+
+### 6.5.3 Justificación de las puntuaciones determinantes
+
+**Sobre L-A, el criterio de mayor peso.** La experiencia declarada es Node.js con pnpm. NestJS obtiene
+4 y no 5 porque su modelo de módulos e inyección de dependencias supone una curva de aprendizaje
+adicional, aunque sobre un ecosistema ya conocido. Fastify obtiene 5 por ser conceptualmente cercano a
+Express. Go obtiene 1: aprender un lenguaje nuevo consumiría semanas del presupuesto de 195 horas
+restantes.
+
+**Sobre L-B, el criterio que decide el resultado.** El análisis de requerimientos identificó **ocho
+módulos** (M1 a M8) con responsabilidades separadas. NestJS impone una estructura de módulos con
+dependencias explícitas que **corresponde uno a uno con esa descomposición**: cada módulo del análisis
+se convierte en un módulo del código, y los diagramas de arquitectura de la Etapa 2 describen la
+estructura real del sistema. Fastify no impone estructura, de modo que la correspondencia habría que
+construirla y mantenerla por convención. Es la diferencia entre documentar lo que existe y confiar en
+que lo que existe se parezca a lo documentado.
+
+**Sobre L-D, una ventaja concreta y medible.** El evento Contact ID tiene una estructura estricta de
+siete campos. Con un solo lenguaje en todo el sistema, esa estructura se define **una vez** y la usan
+el validador de ingesta, la capa de persistencia, la API y la interfaz. En dos lenguajes hay que
+definirla dos veces y mantenerlas sincronizadas manualmente — una fuente de errores permanente por el
+resto del proyecto. Esto penaliza a Python (2), Java (1) y Go (1) con independencia de sus méritos.
+
+**Sobre L-G y por qué su peso es bajo.** Go y Fastify obtienen 5 en rendimiento, y es irrelevante:
+RNF-01 pide 50 eventos por segundo, un orden de magnitud por debajo de lo que cualquiera de estas
+alternativas sostiene. Ponderar el rendimiento por encima de la velocidad de desarrollo sería optimizar
+el recurso abundante a costa del escaso.
+
+### 6.5.4 Decisión
+
+> **Se selecciona TypeScript + NestJS** para el backend, con la interfaz de administración en
+> TypeScript sobre el mismo repositorio, compartiendo las definiciones de tipos del dominio.
+
+**La diferencia con Fastify es de 0,15 puntos, lo que no constituye una ventaja decisiva.** Se declara
+explícitamente: ambas opciones son defendibles, y el criterio que inclina la balanza es la
+correspondencia entre estructura del código y arquitectura documentable (L-B), por su peso en la
+evaluación de la Etapa 2. **Si durante la Etapa 2 la curva de aprendizaje de NestJS resulta más costosa
+de lo previsto, migrar a Fastify es una desviación aceptable** —el resto del stack no cambia— y quedaría
+documentada como tal.
+
+**Nota sobre la herramienta de verificación en Python.** `plataforma/herramientas/contactid.py` continúa
+en Python de forma deliberada. Al ser una implementación **independiente** del protocolo, sirve como
+implementación de referencia para **validación cruzada** de la implementación de producción en
+TypeScript: si ambas, escritas en lenguajes distintos y sin código compartido, producen el mismo
+mensaje y el mismo checksum para las mismas entradas, la especificación está correctamente interpretada.
+Esa comprobación se incorpora como caso de prueba en la Etapa 3.
+
+## 6.6 Componentes de la interfaz de administración
+
+Decisión diferida a la Etapa 2, una vez definido el diseño de las vistas. Restricciones ya
+establecidas: TypeScript (por la decisión 6.5), componentes de código abierto (RNF-15), y
+funcionamiento en navegador móvil (RF-52). Las alternativas a evaluar serán marcos de componentes
+(React, Svelte, Vue) y bibliotecas de visualización de series de tiempo.
 
 ---
 
@@ -456,7 +522,7 @@ subproducto de la implementación.
 | 3 Requerimientos no funcionales (16) | ✅ Completo |
 | 4 Priorización MoSCoW y MVP | ✅ Completo |
 | 5 Matriz de trazabilidad | ✅ Completo, cobertura de las 5 causas verificada |
-| 6 Evaluación de alternativas | 🟡 Completo salvo 6.5, pendiente de validar con el estudiante |
+| 6 Evaluación de alternativas | ✅ Completo. 6.5 resuelto con la experiencia del desarrollador confirmada; 6.6 diferido a la Etapa 2 |
 | 7 Restricciones y supuestos | ✅ Completo |
 
 **Total catalogado: 68 requerimientos**, frente al mínimo de 20 comprometido en OE1.

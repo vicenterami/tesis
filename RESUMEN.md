@@ -66,6 +66,7 @@ hardware que no vendió ella.
 | **Dos planos: eventos + telemetría** | Contact ID **no puede transportar "23,4 °C"** — solo eventos codificados. Se declara el límite y se resuelve por diseño: eventos con entrega confirmada, mediciones con pérdida tolerable |
 | **Metodología: PPDIOO, no Scrum** | Es de Cisco, es el marco del dominio de redes, y sus fases **coinciden con las cuatro etapas de evaluación**. Se descartan las ceremonias de Scrum (proyecto unipersonal) pero **se conserva el backlog**, porque la pauta lo evalúa con un 20 % |
 | **Multiprotocolo, no solo LoRa** | Indicación del profesor guía, y respaldada por la industria: Verisure opera GSM **más** Sigfox como canal secundario. Quien se juega la continuidad del servicio no se ata a un transporte |
+| **Lenguaje: TypeScript + NestJS** | Ganó una matriz de **5 alternativas sobre 7 criterios** (4,70). Decisivo: sus módulos **corresponden uno a uno** con los 8 módulos del análisis, así que los diagramas de la Etapa 2 describen el sistema real; y un solo lenguaje permite **definir los tipos del evento una sola vez** para backend y frontend |
 | **Persistencia: TimescaleDB** | **Un solo motor** para inventario relacional y series de tiempo. InfluxDB obligaría a operar dos bases de datos: inaceptable en un proyecto de una persona con 15 h semanales |
 | **Servidor LoRaWAN: ChirpStack** | Abierto, autoalojable, publica en MQTT de forma nativa. La red pública de TTN haría transitar los datos por terceros |
 | **Despliegue: contenedores** | La Etapa 4 exige demostrar funcionamiento «en condiciones operativas realistas». Que el sistema se levante con un comando en otra máquina **es** esa evidencia |
@@ -103,7 +104,12 @@ Para comparar: un JSON equivalente ocupa entre **60 y 150 bytes**. No cabe.
 normaliza a un formato único, **detecta que un dispositivo dejó de reportar**, lo muestra en una
 interfaz de gestión con el estado de cada enlace, y permite **exportar los datos en formato abierto**.
 
-Son **20 requerimientos** de los 68 catalogados. El resto es mejora del producto, no demostración.
+Son **20 requerimientos** de los 68 catalogados, que se traducen en **33 elementos del backlog y 165
+horas** de trabajo. El resto es mejora del producto, no demostración.
+
+**Verificación de viabilidad:** el backlog completo suma **275 h** contra **201 h disponibles** (15 h
+semanales hasta el 20 de noviembre) — un **37 % de exceso**. El núcleo, en cambio, cabe con **18 % de
+holgura**. Por eso el compromiso es el núcleo, y el resto es alcance condicional.
 
 ---
 
@@ -111,7 +117,7 @@ Son **20 requerimientos** de los 68 catalogados. El resto es mejora del producto
 
 | Etapa | Entrega | Estado |
 |---|---|---|
-| **1** — Problema, objetivos y requerimientos | viernes 28 de agosto | 🟡 **~65 %** |
+| **1** — Problema, objetivos y requerimientos | viernes 28 de agosto | 🟡 **~90 %** — falta solo el levantamiento con partes interesadas |
 | 2 — Diseño e implementación inicial | viernes 25 de septiembre | ⬜ |
 | 3 — Mejoras, pruebas y validación preliminar | viernes 23 de octubre | ⬜ |
 | 4 — Validación final e informe | viernes 20 de noviembre | ⬜ |
@@ -123,7 +129,7 @@ Son **20 requerimientos** de los 68 catalogados. El resto es mejora del producto
 | Definición del problema | 10 % | 🟡 redactado · **faltan las entrevistas** |
 | Objetivos SMART y trazabilidad | 25 % | ✅ 6 objetivos, cada uno con indicador medible |
 | Análisis de requerimientos | 45 % | ✅ 68 requerimientos · 7 protocolos evaluados · alternativas de infraestructura decididas |
-| Backlog priorizado | 20 % | ⬜ siguiente |
+| Backlog priorizado | 20 % | ✅ 63 elementos, 275 h estimadas, viabilidad verificada |
 
 ### Lo que bloquea
 
@@ -141,7 +147,8 @@ Son **20 requerimientos** de los 68 catalogados. El resto es mejora del producto
 |---|---|
 | [`PLAN-MAESTRO.md`](PLAN-MAESTRO.md) | Metodología, calendario, forma de trabajo |
 | [`docs/01-problema-y-objetivos.md`](docs/01-problema-y-objetivos.md) | Árbol de problemas, 6 objetivos SMART, trazabilidad, riesgos |
-| [`docs/02-requerimientos.md`](docs/02-requerimientos.md) | 68 requerimientos, MoSCoW, alternativas de infraestructura |
+| [`docs/02-requerimientos.md`](docs/02-requerimientos.md) | 68 requerimientos, MoSCoW, alternativas de infraestructura y de lenguaje |
+| [`docs/04-backlog.md`](docs/04-backlog.md) | 14 épicas, 25 historias, 38 tareas, estimaciones y verificación de viabilidad |
 | [`docs/05-protocolo-contactid.md`](docs/05-protocolo-contactid.md) | El protocolo: cómo funciona, por qué este, y el perfil CID-IoT |
 | [`plataforma/herramientas/contactid.py`](plataforma/herramientas/contactid.py) | Genera y valida mensajes reales. `python3 contactid.py` |
 | [`bitacora/`](bitacora/) | Qué dijo Mario y qué se cambió por eso |
