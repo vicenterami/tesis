@@ -23,6 +23,8 @@ Plataforma abierta de gestión e interoperabilidad de datos para redes de sensor
 |---|---|
 | Cómo se trabaja, calendario y prioridades | **[`PLAN-MAESTRO.md`](PLAN-MAESTRO.md)** |
 | Contexto técnico y de negocio acumulado | [`docs/00-contexto.md`](docs/00-contexto.md) |
+| Problema, objetivos SMART y trazabilidad | [`docs/01-problema-y-objetivos.md`](docs/01-problema-y-objetivos.md) |
+| **El protocolo de comunicación y por qué este** | **[`docs/05-protocolo-contactid.md`](docs/05-protocolo-contactid.md)** |
 | Qué dijo el profesor y qué se cambió por eso | [`bitacora/`](bitacora/) |
 | La pauta de evaluación oficial | [`referencias/`](referencias/) |
 | Reglas de trabajo del asistente | [`CLAUDE.md`](CLAUDE.md) |
@@ -34,7 +36,7 @@ docs/         documentos de trabajo por etapa (Markdown)
 bitacora/     reuniones con el profesor guía y retroalimentación incorporada
 referencias/  pauta de evaluación y material de apoyo
 informe/      entregables formales en LaTeX
-plataforma/   código del prototipo (desde la Etapa 2)
+plataforma/   código del prototipo y herramientas de verificación
 ```
 
 ## Regla de trabajo fundamental

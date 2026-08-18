@@ -194,7 +194,7 @@ Ponderación oficial y orden de ataque:
 |---|---|---|---|---|
 | **1** | Definición del problema + validación con partes interesadas | **10 %** | Entrevistas | 🟡 redactado, faltan entrevistas |
 | **2** | Objetivos SMART + matriz de trazabilidad objetivo ↔ problema | **25 %** | Prioridad 1 | ✅ `docs/01-problema-y-objetivos.md` |
-| **3** | Análisis de requerimientos: base teórica, estudio de mercado, **evaluación crítica de alternativas de protocolo** | **45 %** | Prioridades 1-2 | ⬜ |
+| **3** | Análisis de requerimientos: base teórica, estudio de mercado, **evaluación crítica de alternativas de protocolo** | **45 %** | Prioridades 1-2 | 🟡 alternativas de protocolo listas en `docs/05-…`; falta el catálogo de requerimientos |
 | **4** | Backlog: épicas, historias, tareas, criterios de aceptación, estimaciones | **20 %** | Prioridades 2-3 | ⬜ |
 
 **El criterio 3 vale casi la mitad de la etapa.** Ahí entra la justificación de Contact ID frente a
