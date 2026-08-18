@@ -1,0 +1,45 @@
+# ── LaTeX: archivos generados ─────────────────────────
+informe/build/
+*.aux
+*.log
+*.out
+*.toc
+*.lof
+*.lot
+*.fls
+*.fdb_latexmk
+*.synctex.gz
+*.bbl
+*.blg
+*.bcf
+*.run.xml
+*.nav
+*.snm
+*.vrb
+
+# ── Secretos y credenciales: NUNCA versionar ──────────
+*.pem
+*.key
+!*.pub
+id_rsa
+id_ed25519
+.env
+.env.*
+secrets.*
+credentials.*
+*.password
+*password*
+*.token
+
+# ── Entornos y dependencias ───────────────────────────
+node_modules/
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# ── Sistema operativo ─────────────────────────────────
+.DS_Store
+Thumbs.db
+*~
+.*.swp
