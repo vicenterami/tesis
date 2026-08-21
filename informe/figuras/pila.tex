@@ -1,0 +1,48 @@
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[font=\footnotesize]
+
+\def\w{7.2}   % ancho de las cajas de capa
+\def\h{1.15}  % alto de cada capa
+
+% ---- capas ----
+\node[caja, minimum width=\w cm, minimum height=\h cm, align=left,
+      draw=azuloscuro, line width=1.1pt, fill=azuloscuro!5] (app) at (0,0)
+  {\textbf{\color{azuloscuro}APLICACIÓN}\ \ \small ¿qué \emph{significa} el mensaje?\\[2pt]
+   \scriptsize \textbf{Contact ID (DC-05)} · JSON · MQTT · SenML};
+
+\node[caja, minimum width=\w cm, minimum height=\h cm, align=left,
+      draw=verdeacento, line width=1.1pt, fill=verdeacento!5, below=1.5mm of app] (red)
+  {\textbf{\color{verdeacento}RED Y TRANSPORTE}\ \ \small ¿cómo \emph{llega} de un punto a otro?\\[2pt]
+   \scriptsize IP · TCP · UDP · \textbf{LoRaWAN} · \textbf{DC-09}};
+
+\node[caja, minimum width=\w cm, minimum height=\h cm, align=left,
+      draw=ambar, line width=1.1pt, fill=ambar!5, below=1.5mm of red] (fis)
+  {\textbf{\color{ambar}FÍSICA Y RADIO}\ \ \small ¿cómo \emph{viajan los bits}?\\[2pt]
+   \scriptsize \textbf{WiFi (802.11)} · \textbf{LoRa} · Ethernet · 4G};
+
+% ---- analogia de la carta ----
+\node[caja, minimum width=5.4cm, minimum height=\h cm, align=left, right=8mm of app,
+      draw=grislinea, fill=grisclaro] (a1)
+  {\textbf{El idioma} en que está escrita\\[2pt]\scriptsize la carta};
+\node[caja, minimum width=5.4cm, minimum height=\h cm, align=left, right=8mm of red,
+      draw=grislinea, fill=grisclaro] (a2)
+  {\textbf{Las direcciones} y el correo\\[2pt]\scriptsize que la encaminan};
+\node[caja, minimum width=5.4cm, minimum height=\h cm, align=left, right=8mm of fis,
+      draw=grislinea, fill=grisclaro] (a3)
+  {\textbf{El camión, el avión}\\[2pt]\scriptsize que la transportan};
+
+\node[nota, above=1.5mm of a1, font=\scriptsize\bfseries\color{gristexto}] {LA ANALOGÍA};
+
+% ---- conclusion ----
+\node[cajaacento, below=6mm of fis.south, anchor=north, text width=13.4cm, xshift=3.1cm,
+      fill=verdeacento!6, font=\footnotesize]
+  {La misma carta en español puede viajar en camión, avión o bicicleta: \textbf{el idioma no cambia
+   porque cambie el vehículo.} Del mismo modo, \textbf{el mismo mensaje Contact ID llega por LoRa, por
+   WiFi o por cable, y la plataforma lo interpreta igual en los tres casos.}};
+
+\end{tikzpicture}
+\caption{Los protocolos se apilan, no compiten. Cada nivel responde una pregunta distinta, y la
+elección en un nivel no condiciona la de los otros.}
+\label{fig:pila}
+\end{figure}

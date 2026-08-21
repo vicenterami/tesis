@@ -1,0 +1,34 @@
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[font=\scriptsize]
+
+\node[caja, text width=1.9cm] (s1) at (0,1.35) {sensor 1};
+\node[caja, text width=1.9cm] (s2) at (0,0)    {sensor 2};
+\node[caja, text width=1.9cm] (s3) at (0,-1.35){panel de alarma};
+
+\node[caja, text width=2.5cm, align=center, draw=verdeacento, line width=1.2pt,
+      fill=verdeacento!6, minimum height=2.9cm] (br) at (4.3,0)
+  {\textbf{BROKER}\\[3pt] Mosquitto\\[3pt] \emph{recibe de quien publica,\\ entrega a quien se suscribe}};
+
+\node[caja, text width=2.5cm] (c1) at (8.9,1.35) {el \emph{dashboard}};
+\node[caja, text width=2.5cm] (c2) at (8.9,0)    {la base de datos};
+\node[caja, text width=2.5cm] (c3) at (8.9,-1.35){el motor de alertas};
+
+\foreach \s in {s1,s2,s3} \draw[flecha] (\s.east) -- (br.west);
+\foreach \c in {c1,c2,c3} \draw[flecha, color=verdeacento] (br.east) -- (\c.west);
+
+\node[nota, above=1mm of s1, font=\scriptsize\bfseries\color{gristexto}] {PUBLICAN};
+\node[nota, above=1mm of c1, font=\scriptsize\bfseries\color{gristexto}] {SE SUSCRIBEN};
+
+\node[caja, below=5mm of br.south, anchor=north, text width=13.2cm, xshift=0.15cm,
+      draw=grislinea, fill=grisclaro, font=\scriptsize, align=left]
+  {Los mensajes se organizan en \textbf{tópicos}, con forma de ruta:
+   \texttt{sitio/temuco/invernadero-2/sensor-007/temperatura}\\[3pt]
+   Quien se suscribe a \texttt{sitio/temuco/\#} recibe todo lo del sitio \textbf{sin necesidad de saber
+   qué sensores existen}. Añadir un consumidor nuevo no obliga a modificar ningún sensor.};
+
+\end{tikzpicture}
+\caption{Patrón publicar/suscribir de MQTT. El desacoplamiento entre emisores y receptores es lo que
+permite añadir consumidores sin tocar los dispositivos.}
+\label{fig:mqtt}
+\end{figure}

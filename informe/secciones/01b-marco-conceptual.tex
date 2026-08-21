@@ -1,0 +1,117 @@
+\section{Marco conceptual}
+\label{sec:marco}
+
+Esta sección establece los conceptos y la terminología que el resto del informe emplea. Se incluye
+porque la comprensión de la solución propuesta depende de una distinción que suele pasarse por alto: la
+relación entre los distintos protocolos y tecnologías que intervienen.
+
+\subsection{Los protocolos se apilan, no compiten}
+
+Al enumerar «WiFi», «LoRaWAN» y «Contact ID» parece tratarse de tres alternativas entre las cuales
+corresponde elegir una. No lo son: \textbf{operan en niveles distintos y funcionan de forma
+conjunta}. Cada nivel responde una pregunta diferente, y la elección en uno no condiciona la de los
+otros.
+
+\input{figuras/pila}
+
+\begin{cajaclave}[title={Consecuencia para este trabajo}]
+La independencia entre niveles es lo que hace posible la propuesta. \textbf{El mismo mensaje Contact ID
+puede llegar por radio LoRa, por WiFi o por cable, y la plataforma lo interpreta de forma idéntica en los
+tres casos.} La normalización ocurre en la capa de aplicación, con independencia del medio físico.
+\end{cajaclave}
+
+\subsection{Tecnologías de radio: LoRa y LoRaWAN}
+
+Corresponde distinguir dos elementos que suelen nombrarse indistintamente:
+
+\begin{longtable}{@{}L{2.4cm}L{7.6cm}L{3.4cm}@{}}
+\filaencab \encab{} & \encab{Qué es} & \encab{Analogía} \\ \midrule \endhead
+\textbf{LoRa} & La técnica de \textbf{modulación de radio}: define únicamente cómo viajan los bits por el aire. Patentada por Semtech & Es el 802.11 de LoRaWAN \\
+\textbf{LoRaWAN} & El \textbf{protocolo de red} construido sobre esa radio: registro de dispositivos, cifrado, control de colisiones y entrega al servidor. Estándar abierto de la LoRa Alliance & Es el TCP/IP de LoRa \\
+\bottomrule
+\caption{Distinción entre LoRa y LoRaWAN.}
+\label{tab:loralorawan}
+\end{longtable}
+
+\begin{longtable}{@{}L{3.6cm}L{4.6cm}L{4.8cm}@{}}
+\filaencab \encab{Característica} & \encab{LoRa} & \encab{WiFi, para comparación} \\ \midrule \endhead
+Alcance & 2--5\,km urbano, 10--15\,km rural & 30--100\,m \\
+Velocidad de datos & 0,3--27\,kbps & cientos de Mbps \\
+Consumo & Años con dos pilas AA & Horas o días \\
+Banda en Chile & 915--928\,MHz, libre & 2,4 y 5\,GHz, libre \\
+Costo recurrente & Ninguno (red propia) & Ninguno \\
+\bottomrule
+\caption{Características de LoRa frente a WiFi.}
+\label{tab:comparalora}
+\end{longtable}
+
+\begin{cajaaviso}[title={El compromiso que define el ámbito de aplicación}]
+LoRa intercambia \textbf{velocidad} por \textbf{alcance y autonomía}: resulta entre tres y cinco órdenes
+de magnitud más lento que WiFi, y a cambio alcanza distancias mil veces mayores con una fracción del
+consumo.
+
+En consecuencia \textbf{no es apto para datos pesados ni transmisión continua}. Su patrón de uso es
+«cada cierto intervalo transmito una lectura de pocos bytes» o «aviso de inmediato cuando ocurre algo»,
+que es precisamente el comportamiento de un sensor de apertura, de temperatura o de nivel.
+\end{cajaaviso}
+
+\input{figuras/lorawan}
+
+\subsection{Servidor de red: ChirpStack}
+
+Entre el sensor y la plataforma intervienen más componentes de lo que resulta evidente. El
+\textbf{gateway} es un traductor sin capacidad de interpretación: recibe la señal de radio, la empaqueta
+y la reenvía por IP, sin poseer las claves de cifrado. El \textbf{servidor de red} es el componente que
+realiza el trabajo sustantivo.
+
+\begin{longtable}{@{}L{4.4cm}L{9.3cm}@{}}
+\filaencab \encab{Función del servidor de red} & \encab{Qué implica} \\ \midrule \endhead
+Descifra los mensajes & El cifrado es de extremo a extremo entre el nodo y el servidor \\
+Elimina duplicados & Si varios gateways recibieron la misma trama, entrega una sola \\
+Administra los dispositivos & Alta, baja y gestión de claves de cada nodo \\
+Verifica la integridad & Comprueba el código de autenticación y descarta tramas corruptas \\
+Controla el orden & Contadores para detectar repeticiones y pérdidas \\
+Reporta la calidad del enlace & Entrega RSSI y SNR de cada recepción: \textbf{las métricas de salud que la plataforma necesita} \\
+Publica en MQTT & Entrega el dato normalizado en un tópico, del cual la plataforma lo consume \\
+\bottomrule
+\caption{Funciones del servidor de red LoRaWAN.}
+\label{tab:funcioneschirpstack}
+\end{longtable}
+
+Se emplea \textbf{ChirpStack} por ser de código abierto, autoalojable y publicar en MQTT de forma
+nativa, lo que reduce el adaptador de LoRaWAN de la plataforma a un consumidor de tópicos. La evaluación
+de alternativas se detalla en la sección~\ref{sec:requerimientos}.
+
+\subsection{Mensajería: MQTT}
+
+MQTT es un protocolo de mensajería que aplica el patrón \textbf{publicar/suscribir}. En lugar de que
+cada dispositivo se comunique directamente con cada programa que requiere sus datos, todos se comunican
+con un intermediario denominado \emph{broker}.
+
+\input{figuras/mqtt}
+
+Dos propiedades de MQTT resultan determinantes para este trabajo:
+
+\begin{enumerate}
+\item \textbf{El dispositivo inicia la conexión saliente.} No es necesario abrir puertos entrantes hacia
+el sensor, y el esquema funciona detrás de cualquier traducción de direcciones o cortafuegos. Esto
+materializa el requerimiento RNF-10.
+
+\item \textbf{Dispone del mecanismo de última voluntad} (\emph{Last Will and Testament}): el
+\emph{broker} notifica automáticamente cuando un cliente se desconecta sin anunciarlo. \textbf{Esa
+notificación se traduce directamente al código 381 de Contact ID}, de modo que la detección de caída de
+un dispositivo no requiere lógica adicional en el transporte MQTT.
+\end{enumerate}
+
+\subsection{Persistencia de series de tiempo}
+
+Los datos de sensores presentan dos características simultáneas: son voluminosos y llevan siempre una
+marca temporal. Una instalación de cincuenta sensores midiendo cada cinco minutos genera del orden de
+cinco millones de registros anuales, volumen ante el cual las consultas de agregación temporal sobre una
+tabla convencional se degradan.
+
+Se emplea \textbf{TimescaleDB}, que es una \textbf{extensión de PostgreSQL} y por tanto conserva el
+modelo relacional y el lenguaje SQL estándar. Aporta tres capacidades: particionado automático de la
+tabla por rangos temporales, funciones de agregación por intervalo, y políticas automáticas de retención
+y compresión. La justificación de esta elección frente a alternativas se desarrolla en la
+sección~\ref{sec:requerimientos}.

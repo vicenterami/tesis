@@ -1,0 +1,35 @@
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[font=\scriptsize]
+
+\node[caja, text width=3.9cm, align=left, draw=ambar, line width=1pt] (a) at (0,1.6)
+  {\textbf{A}\ \ Nodos LoRa propios\\[2pt]\scriptsize payload de 8 B en BCD, vía el servidor de red};
+\node[caja, text width=3.9cm, align=left, draw=verdeacento, line width=1.2pt,
+      fill=verdeacento!6] (b) at (0,0)
+  {\textbf{B}\ \ Paneles de alarma \textbf{ya instalados}\\[2pt]\scriptsize DC-09 nativo sobre TCP/UDP con AES};
+\node[caja, text width=3.9cm, align=left, draw=azuloscuro, line width=1pt] (c) at (0,-1.6)
+  {\textbf{C}\ \ Sensores WiFi e integraciones\\[2pt]\scriptsize API HTTP, mensaje de 16 dígitos};
+
+\node[caja, text width=3.3cm, align=center, draw=azuloscuro, line width=1.2pt,
+      fill=azuloscuro!5, minimum height=3.2cm] (norm) at (6.6,0)
+  {\textbf{NORMALIZACIÓN}\\[4pt]\scriptsize valida el checksum\\ traduce al vocabulario DC-05\\ resuelve la identidad\\ del dispositivo};
+
+\node[caja, text width=2.9cm, align=center, draw=verdeacento, line width=1.1pt,
+      fill=verdeacento!6] (uno) at (11.9,0)
+  {\textbf{UN SOLO}\\\textbf{ALMACÉN}\\[3pt]\scriptsize formato único\\ normalizado};
+
+\foreach \x in {a,b,c} \draw[flecha] (\x.east) -- (norm.west);
+\draw[flechagruesa] (norm.east) -- (uno.west);
+
+\node[cajaclave, below=5mm of norm.south, anchor=north, text width=13.2cm, xshift=-0.9cm,
+      fill=verdeacento!6, font=\scriptsize]
+  {\textbf{La vía B es el diferenciador.} Un panel de alarma existente no requiere traducción alguna,
+   porque ya emplea el protocolo: la plataforma lo ingiere sin adaptador. Ningún proveedor regional
+   identificado ofrece un punto de ingesta compatible con la infraestructura de monitoreo ya
+   desplegada.};
+
+\end{tikzpicture}
+\caption{Las tres vías de ingesta convergen a un único formato normalizado. El mismo evento llega por
+tres caminos distintos y se almacena una sola vez.}
+\label{fig:ingesta}
+\end{figure}
