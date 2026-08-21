@@ -324,6 +324,7 @@ Escala de puntuación: **1** (inadecuado) a **5** (óptimo).
 | **Sparkplug B** | Especificación sobre MQTT con Protocol Buffers, orientada a industria y SCADA | Eclipse Sparkplug 3.0 |
 | **SenML** | Formato de representación de mediciones con unidad y marca temporal | RFC 8428 |
 | **CayenneLPP** | Formato binario compacto de facto en el ecosistema LoRaWAN | The Things Network |
+| **SIA DC-03** | El otro formato SIA: bloques de longitud variable en texto ASCII, códigos de dos letras | SIA DC-03-2017 |
 | **Contact ID + DC-09** | Formato de eventos DC-05 sobre transporte IP DC-09 con AES | SIA DC-05-2016 · DC-09-2026 |
 
 ## 2.3 Matriz comparativa ponderada
@@ -336,7 +337,16 @@ Escala de puntuación: **1** (inadecuado) a **5** (óptimo).
 | Sparkplug B | 2 | 4 | 3 | 4 | 5 | 2 | **3,15** |
 | LwM2M | 3 | 4 | 3 | 5 | 5 | 2 | **3,55** |
 | CayenneLPP | 5 | 2 | 2 | 3 | 4 | 5 | **3,55** |
-| **Contact ID + DC-09** | **5** | **5** | **5** | **4** | **1** | **5** | **4,45** |
+| SIA DC-03 | 3 | 5 | 5 | 4 | 4 | 3 | **3,95** |
+| **Contact ID + DC-09 con datos extendidos** | **5** | **5** | **5** | **4** | **4** | **5** | **4,75** |
+
+> **Nota sobre la puntuación de Contact ID en el criterio C-E.** En la primera versión de este análisis
+> Contact ID obtuvo **1** en soporte de telemetría, porque el mensaje DC-05 no tiene campo para un valor
+> medido. Esa puntuación se corrige a **4** al verificarse que **el estándar de transporte DC-09 define un
+> campo de datos extendidos** destinado precisamente a información adicional definida por el
+> implementador (sección 4.3). El valor medido no requiere un protocolo aparte: cabe en un campo que el
+> propio estándar reserva. No alcanza 5 porque ese campo admite solo texto ASCII, lo que resulta menos
+> compacto que un formato binario dedicado.
 
 ### Justificación de las puntuaciones determinantes
 
@@ -370,16 +380,18 @@ hardware mayor y un solo transporte celular.**
 - **C-D = 4:** AES-128/192/256 definido por DC-09, con rotación de claves desde la revisión 2026. No
   llega a 5 porque el cifrado es opcional y depende de clave precompartida, sin el *bootstrap*
   automático de credenciales de LwM2M.
-- **C-E = 1:** **no puede transportar un valor medido.** Esta es la debilidad real y es la razón de la
-  sección 4.
+- **C-E = 4:** el mensaje DC-05 no transporta valores, pero **el campo de datos extendidos de DC-09 sí**,
+  y su formato lo define el implementador. Ver sección 4.3.
 - **C-F = 5:** aritmética de enteros y concatenación de dígitos. No requiere parser, ni biblioteca de
   serialización, ni asignación dinámica de memoria.
 
 ## 2.4 Decisión
 
-> **Se adopta Contact ID (SIA DC-05) sobre transporte DC-09 como protocolo del plano de eventos**, y
-> se complementa con un **plano de telemetría** para las mediciones con valor, dado que Contact ID no
-> puede expresarlas (C-E = 1).
+> **Se adopta Contact ID (SIA DC-05) sobre transporte DC-09 como protocolo único del perfil.** Los
+> eventos se expresan en el mensaje DC-05 y las mediciones con valor viajan en el **campo de datos
+> extendidos que DC-09 define** para información determinada por el implementador (sección 4.3). La
+> separación entre eventos y telemetría se mantiene como **separación lógica** —tienen requisitos de
+> entrega distintos— pero **no se traduce en dos implementaciones en el dispositivo.**
 
 Argumento sintético defendible ante el profesor guía:
 
@@ -403,14 +415,24 @@ Chile opera en la banda 915–928 MHz bajo el plan regional **AU915**. El payloa
 disponible depende del *data rate* y de si aplica restricción de **tiempo de permanencia en canal**
 (*dwell time*):
 
-| Condición | DR0 | DR1 | DR2 | Observación |
-|---|:---:|:---:|:---:|---|
-| Sin restricción de *dwell time* | 51 B | 51 B | 51 B | Caso habitual |
-| **Con** restricción de *dwell time* | no disponible | no disponible | **11 B** | **Peor caso** |
+Chile autoriza la banda 915–928 MHz para uso libre mediante la **Resolución 737 de Subtel**, y admite
+tanto el plan **AU915** como el plan **US915**. La diferencia entre ambos es relevante:
 
-> ⚠️ **Pendiente de verificación** (P1): determinar si la normativa chilena de Subtel para la banda
-> 915–928 MHz impone restricción de *dwell time*. El diseño se dimensiona contra el **peor caso de 11
-> bytes**, de modo que la respuesta no altera la viabilidad, solo el margen disponible.
+| Plan | Condición | DR0 | DR1 | DR2 | Observación |
+|---|---|:---:|:---:|:---:|---|
+| **AU915** | Sin restricción de *dwell time* | 51 B | 51 B | 51 B | |
+| **AU915** | Con restricción de *dwell time* | no disp. | no disp. | **11 B** | AU915 la asume activa por omisión |
+| **US915** | Norma FCC, sin *dwell time* | **11 B** | **53 B** | 125 B | DR0 es la tasa de máximo alcance |
+
+> **Precisión respecto de la primera versión de este documento.** La restricción de 11 bytes no es un
+> techo permanente: corresponde a la **tasa de datos más lenta**, que es la empleada para obtener el
+> alcance máximo. En operación normal el payload disponible es de **51 a 53 bytes**. El diseño se
+> dimensiona igualmente contra los 11 bytes, porque un protocolo que solo funcione en tasas altas
+> renunciaría al alcance que justifica el uso de LoRa.
+
+> ⚠️ **Pendiente de verificación** (P1): confirmar cuál de los dos planes regionales corresponde emplear
+> en Chile según la Resolución 737, y si aplica restricción de *dwell time*. No altera la viabilidad del
+> diseño, solo el margen disponible.
 
 ## 3.2 Tamaño del mensaje Contact ID
 
@@ -523,6 +545,106 @@ permite tratarlos distinto: el plano de eventos exige **entrega confirmada** (un
 una alarma que no suena) y el de telemetría admite **pérdida tolerable** (una lectura perdida en una
 serie de mil no cambia la tendencia). Esta distinción es argumentable como decisión de ingeniería de
 redes, no como una concesión ante una limitación.
+
+## 4.3 El mecanismo del estándar: campo de datos extendidos de DC-09
+
+La separación en dos planos responde a una necesidad real de diseño —eventos y mediciones tienen
+requisitos de entrega distintos— pero **no obliga a que el dispositivo implemente dos protocolos
+distintos.** El estándar de transporte DC-09 provee el mecanismo para evitarlo.
+
+### Qué define el estándar
+
+DC-09 especifica un **campo de datos extendidos** con la siguiente estructura:
+
+```
+[<identificador><datos>]
+
+  identificador : un carácter ASCII mayúscula, de «A» a «Z»
+  datos         : caracteres ASCII; el formato lo determina el implementador
+  terminación   : el carácter «]», incluido en el mensaje transmitido
+```
+
+El estándar establece que **la longitud, el formato y el algoritmo de los datos de este campo los
+determina el fabricante**, con una única restricción: **no se admite contenido binario**.
+
+### Consecuencia para el diseño
+
+El valor medido no requiere un protocolo aparte. Viaja en un campo que el propio estándar reserva para
+información definida por el implementador:
+
+```
+Mensaje DC-09
+  token    : *ADM-CID              Contact ID cifrado con AES
+  msgdata  : 123418138100007B      el evento, 16 dígitos DC-05
+  extdata  : [T23.4]               el valor medido
+              │└──── dato en ASCII
+              └───── identificador asignado por el perfil (T = temperatura)
+```
+
+**Tres propiedades que esto conserva:**
+
+| Propiedad | Por qué se conserva |
+|---|---|
+| **No se sale del estándar** | El campo está definido por DC-09; solo se elige qué poner dentro |
+| **La interoperabilidad queda intacta** | Una receptora que no interprete el campo lo ignora y procesa el evento igual. Es el comportamiento previsto para datos definidos por el fabricante |
+| **El dispositivo implementa un solo formato** | Una sola rutina de composición de mensaje, con el valor como parámetro opcional |
+
+### Cómo queda la implementación en cada transporte
+
+| Transporte | Cómo viaja el evento y el valor |
+|---|---|
+| **HTTP y DC-09 sobre IP** | Mensaje DC-09 completo, con el evento en `msgdata` y el valor en `extdata`. Nativo del estándar |
+| **LoRaWAN** | El nodo no genera tramas DC-09 —son demasiado extensas para el payload disponible—: emite **un único mensaje** con el evento en 8 bytes y el valor en el mismo paquete. **La plataforma** compone el DC-09 cuando debe reenviar a una receptora externa |
+| **MQTT** | Igual que HTTP, o el formato compacto según la capacidad del cliente |
+
+> **La distinción que importa.** Los dos planos siguen existiendo como **separación lógica**, con sus
+> requisitos de entrega diferenciados, porque esa separación es correcta desde el punto de vista de
+> ingeniería. Lo que se elimina es la **duplicación de implementación**: el dispositivo emite un mensaje,
+> no dos, y quien programa el firmware implementa una rutina, no dos.
+
+Esta distinción entre separación lógica y unificación de la implementación es la que responde a la
+objeción legítima de que dos planos suponen el doble de trabajo en el nodo. **No lo suponen.**
+
+### Verificación del tamaño del mensaje unificado
+
+El campo de datos extendidos aumenta el tamaño del mensaje, porque el estándar exige texto ASCII y no
+admite formato binario. Valores obtenidos con `plataforma/herramientas/contactid.py`:
+
+| Mensaje | Evento | Valor | Total |
+|---|:---:|:---:|:---:|
+| Solo evento (`381`) | 8 B | — | **8 B** |
+| Evento con batería (`[B12]`) | 8 B | 5 B | **13 B** |
+| Evento con temperatura (`[T23.4]`) | 8 B | 7 B | **15 B** |
+| Evento con RSSI y SNR (`[S-103/4.2]`) | 8 B | 11 B | **19 B** |
+
+> 🔴 **Consecuencia verificada: el valor debe ser opcional.** El mensaje unificado ocupa 13 a 19 bytes, de
+> modo que **no cabe en los 11 bytes de la tasa más lenta**, aunque sí en los 51-53 de operación normal.
+>
+> **Decisión derivada:** el valor es **opcional**. En la tasa de alcance máximo el nodo transmite solo el
+> evento de 8 bytes; la medición se envía cuando el canal lo permite o en un mensaje separado de menor
+> frecuencia.
+>
+> La degradación es deliberada y coherente con la jerarquía de requisitos: **el evento es lo que no puede
+> perderse**, porque un evento no entregado es una alarma que no suena, mientras que una medición ausente
+> solo interrumpe una serie. Cuando el canal se estrecha, se sacrifica la medición y se preserva el evento.
+
+### Identificadores del perfil
+
+El perfil CID-IoT reserva los siguientes identificadores del campo de datos extendidos. La tabla
+completa se cierra en la Etapa 2.
+
+| Id. | Contenido | Ejemplo |
+|:---:|---|---|
+| `T` | Temperatura en grados Celsius | `[T23.4]` |
+| `H` | Humedad relativa en por ciento | `[H67]` |
+| `N` | Nivel en por ciento o centímetros | `[N45]` |
+| `B` | Batería en por ciento | `[B87]` |
+| `V` | Tensión en voltios | `[V3.28]` |
+| `S` | Calidad de señal: RSSI y SNR | `[S-103/4.2]` |
+| `Q` | Contador de secuencia del nodo | `[Q1042]` |
+
+> ⚠️ **Pendiente de verificación** (P7): determinar si DC-09 impone un límite de longitud al campo de
+> datos extendidos, y si existen identificadores ya asignados por convención que deban evitarse.
 
 ---
 
@@ -674,11 +796,13 @@ tienen condiciones abiertas, cuáles dejaron de reportar y cuándo se los vio po
 | # | Pendiente | Impacto si la respuesta es adversa |
 |---|---|---|
 | **P1** | ¿La normativa de Subtel impone *dwell time* en 915–928 MHz en Chile? | Ninguno sobre la viabilidad: el diseño ya usa el peor caso de 11 bytes. Solo cambia el margen |
-| **P2** | Acceso al texto íntegro de SIA DC-05-2016 y DC-09-2026 (son estándares de pago) | La gramática y los códigos están documentados en fuentes secundarias verificables y en manuales de fabricante. Confirmar si la biblioteca de la universidad tiene acceso a normas SIA/ANSI |
+| ~~**P2**~~ | ~~Acceso al texto íntegro de SIA DC-05 y DC-09~~ **RESUELTO**: en agosto de 2025 la SIA publicó una **implementación de referencia de DC-09 de código consultable** (licencia *Polyform Noncommercial*, que admite uso académico), y el formato está documentado en fuentes secundarias independientes. La implementación del proyecto es propia y verificada, de modo que la norma no es una dependencia | — |
 | **P3** | ¿Existe alguna central de monitoreo en La Araucanía dispuesta a validar la interoperabilidad? | Debilitaría la evidencia del criterio C-C, aunque no la argumentación |
 | **P4** | Confirmar el listado exacto de códigos DC-05 usados, contra al menos dos fuentes de fabricante | Riesgo de citar un código con significado inexacto |
 | **P5** | Validar con el profesor guía que el enfoque de dos planos es aceptable | Si exige Contact ID puro, hay que rediseñar el tratamiento de la telemetría |
 | **P6** | Estado del apagado de 2G/3G en Chile por operador | Ninguno sobre el diseño; es dato de contexto que refuerza la elección de DC-09 sobre IP frente al DTMF celular |
+| **P7** | Límite de longitud del campo de datos extendidos de DC-09 e identificadores ya asignados por convención | Podría obligar a acortar la codificación de valores o a reasignar identificadores del perfil |
+| **P8** | Gramática exacta de SIA DC-03 para valores numéricos, si se obtiene acceso al estándar | Si resultara más eficiente de lo estimado, DC-03 pasaría a ser la alternativa preferente |
 
 ---
 
@@ -687,6 +811,10 @@ tienen condiciones abiertas, cuáles dejaron de reportar y cuándo se los vio po
 **Estándares**
 
 - Security Industry Association. *DC-05-2016: Ademco® Contact ID Protocol for Alarm System Communications.* [securityindustry.org](https://www.securityindustry.org/industry-standards/dc-05-2016/)
+- Security Industry Association. *DC-03-2017: DCS SIA Format Standard.* [securityindustry.org](https://www.securityindustry.org/industry-standards/dc-03-2017/)
+- Security Industry Association. *Implementación de referencia de ANSI/SIA DC-09*, publicada por el subcomité de intrusión en agosto de 2025. Licencia *Polyform Noncommercial 1.0.0*: admite uso no comercial, requiere licencia aparte para uso comercial. [github.com/Swissdotnet/sia-dc-09-library](https://github.com/Swissdotnet/sia-dc-09-library) · [anuncio](https://www.securityindustry.org/2025/08/26/sia-releases-open-source-library-for-ansi-sia-dc-09-implementation/)
+- *Listado completo de códigos de evento SIA DC-03.* [peoplecall.com](https://peoplecall.com/dc03-sia-codes/)
+- Certificación Telecom. *LoRa Chile: LoRaWAN 915 MHz AU915, Resolución 737 de Subtel.* [certificacion-telecom.cl](https://certificacion-telecom.cl/tecnologia/lora/)
 - Security Industry Association. *DC-09: Internet Protocol Event Reporting.* Revisión 2026 con aprobación ANSI, auto-comisionamiento y rotación de claves. [securitytoday.com](https://securitytoday.com/articles/2026/03/04/sia-updates-dc-09-standard-for-enhanced-alarm-communication.aspx) · [pavion.com](https://pavion.com/resource/what-the-new-ansi-sia-dc-09-2026-standard-means-for-modern-alarm-monitoring/)
 - LoRa Alliance. *RP002-1.0.3 LoRaWAN® Regional Parameters.* [lora-alliance.org](https://lora-alliance.org/wp-content/uploads/2021/05/RP002-1.0.3-FINAL-1.pdf)
 - IETF. *RFC 8428 — Sensor Measurement Lists (SenML).*

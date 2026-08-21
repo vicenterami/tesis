@@ -5,7 +5,7 @@
 > decisión cambia; el detalle vive en `docs/`.
 >
 > Trabajo de Título INFO-1197 · Universidad Católica de Temuco · Profesor guía: Mario
-> **Última actualización: 18 de agosto de 2026**
+> **Última actualización: 21 de agosto de 2026**
 
 ---
 
@@ -62,8 +62,8 @@ hardware que no vendió ella.
 
 | Decisión | Por qué esta y no otra |
 |---|---|
-| **Protocolo: Contact ID (SIA DC-05) sobre DC-09** | Ganó una evaluación de **7 alternativas sobre 6 criterios ponderados** con 4,45 sobre 5. Único candidato que combina un mensaje de **8 bytes** con un **vocabulario semántico normalizado**: los formatos compactos no normalizan semántica, y los que normalizan no son compactos |
-| **Dos planos: eventos + telemetría** | Contact ID **no puede transportar "23,4 °C"** — solo eventos codificados. Se declara el límite y se resuelve por diseño: eventos con entrega confirmada, mediciones con pérdida tolerable |
+| **Protocolo: Contact ID (SIA DC-05) sobre DC-09** | Ganó una evaluación de **8 alternativas sobre 6 criterios ponderados** con 4,75 sobre 5. Único candidato que combina un mensaje de **8 bytes** con un **vocabulario semántico normalizado**: los formatos compactos no normalizan semántica, y los que normalizan no son compactos |
+| **Un mensaje, dos planos lógicos** | Contact ID **no puede transportar "23,4 °C"**, pero **DC-09 define un campo de datos extendidos** cuyo formato determina el implementador. El valor viaja ahí: **el nodo emite un mensaje y el firmware implementa una rutina**. La separación entre eventos y telemetría se conserva como separación lógica en la plataforma, con requisitos de entrega distintos |
 | **Metodología: PPDIOO, no Scrum** | Es de Cisco, es el marco del dominio de redes, y sus fases **coinciden con las cuatro etapas de evaluación**. Se descartan las ceremonias de Scrum (proyecto unipersonal) pero **se conserva el backlog**, porque la pauta lo evalúa con un 20 % |
 | **Multiprotocolo, no solo LoRa** | Indicación del profesor guía, y respaldada por la industria: Verisure opera GSM **más** Sigfox como canal secundario. Quien se juega la continuidad del servicio no se ata a un transporte |
 | **Lenguaje: TypeScript + NestJS** | Ganó una matriz de **5 alternativas sobre 7 criterios** (4,70). Decisivo: sus módulos **corresponden uno a uno** con los 8 módulos del análisis, así que los diagramas de la Etapa 2 describen el sistema real; y un solo lenguaje permite **definir los tipos del evento una sola vez** para backend y frontend |
@@ -95,6 +95,11 @@ Payload LoRaWAN AU915, peor caso:        11 bytes
 ```
 
 Para comparar: un JSON equivalente ocupa entre **60 y 150 bytes**. No cabe.
+
+Con el valor medido incluido el mensaje sube a **13–19 bytes**, que no cabe en los 11 del enlace de
+alcance máximo pero sí en los 51–53 de operación normal. **De ahí que el valor sea opcional:** cuando el
+canal se estrecha se sacrifica la medición y se preserva el evento, porque un evento perdido es una
+alarma que no suena.
 
 ---
 
@@ -136,8 +141,10 @@ holgura**. Por eso el compromiso es el núcleo, y el resto es alcance condiciona
 1. 🔴 **Entrevistar al responsable de los sensores de la universidad.** Vale el 10 % directo y respalda
    el 45 %. **Nadie más puede hacerlo.**
 2. 🔴 **Confirmar las fechas con Mario:** ¿Etapa 1 el 28 de agosto o el 11 de septiembre?
-3. 🟡 **Validar la arquitectura de dos planos con Mario** — si exige Contact ID puro para todo, hay que
-   rediseñar el tratamiento de la telemetría.
+3. 🟡 **Validar con Mario el uso del campo de datos extendidos de DC-09** para llevar la medición. La
+   pregunta está formulada en `docs/03-instrumentos-levantamiento.md`, P3.
+4. 🟡 **Aclarar si el trabajo del compañero es tesis conjunta o separada** — afecta la restricción RE-02
+   y exige un contrato de interfaz entre su firmware y esta plataforma.
 
 ---
 
@@ -150,5 +157,7 @@ holgura**. Por eso el compromiso es el núcleo, y el resto es alcance condiciona
 | [`docs/02-requerimientos.md`](docs/02-requerimientos.md) | 68 requerimientos, MoSCoW, alternativas de infraestructura y de lenguaje |
 | [`docs/04-backlog.md`](docs/04-backlog.md) | 14 épicas, 25 historias, 38 tareas, estimaciones y verificación de viabilidad |
 | [`docs/05-protocolo-contactid.md`](docs/05-protocolo-contactid.md) | El protocolo: cómo funciona, por qué este, y el perfil CID-IoT |
+| [`docs/GLOSARIO.md`](docs/GLOSARIO.md) | Fundamentos y glosario: para poder explicar cada pieza |
+| [`docs/03-instrumentos-levantamiento.md`](docs/03-instrumentos-levantamiento.md) | Preguntas para el profesor guía y guion de entrevistas |
 | [`plataforma/herramientas/contactid.py`](plataforma/herramientas/contactid.py) | Genera y valida mensajes reales. `python3 contactid.py` |
 | [`bitacora/`](bitacora/) | Qué dijo Mario y qué se cambió por eso |

@@ -143,6 +143,8 @@ poco fiable y costoso por transmisión, que es la misma descripción del enlace 
 alimentado a batería.
 \end{cajaclave}
 
+\input{figuras/alarmas}
+
 Un caso ilustrativo: Verisure Securitas Direct opera con red celular como canal principal e incorporó
 Sigfox como canal secundario en su parque instalado. Cuando el panel detecta pérdida de señal celular
 ---indicio de un intento de interferencia--- emite la alerta por la red alternativa para garantizar
@@ -245,9 +247,10 @@ SenML (RFC 8428) & 3 & 3 & 2 & 2 & 5 & 3 & 2,90 \\
 Sparkplug B & 2 & 4 & 3 & 4 & 5 & 2 & 3,15 \\
 LwM2M (OMA) & 3 & 4 & 3 & 5 & 5 & 2 & 3,55 \\
 CayenneLPP & 5 & 2 & 2 & 3 & 4 & 5 & 3,55 \\
-\textbf{Contact ID + DC-09} & \textbf{5} & \textbf{5} & \textbf{5} & \textbf{4} & \textbf{1} & \textbf{5} & \textbf{4,45} \\
+SIA DC-03 & 3 & 5 & 5 & 4 & 4 & 3 & 3,95 \\
+\textbf{Contact ID + DC-09} & \textbf{5} & \textbf{5} & \textbf{5} & \textbf{4} & \textbf{4} & \textbf{5} & \textbf{4,75} \\
 \bottomrule
-\caption{Matriz comparativa ponderada de alternativas de protocolo. Escala de 1 a 5.}
+\caption{Matriz comparativa ponderada de alternativas de protocolo. Escala de 1 a 5. La puntuación de Contact ID en el criterio C-E se corrige de 1 a 4 conforme a la sección~\ref{sec:extdata}.}
 \label{tab:matrizprotocolo}
 \end{longtable}
 
@@ -273,25 +276,90 @@ despliegue real se concentra en redes celulares antes que en radio de banda libr
 reconocer que sería la alternativa preferible si el proyecto contase con mayor presupuesto de hardware y
 un único transporte celular.}
 
-\textbf{Contact ID con DC-09 (4,45): gana en cinco de seis criterios y pierde marcadamente en uno.} La
-puntuación de 1 en soporte de telemetría constituye su debilidad real y motiva la
-sección~\ref{sec:dosplanos}.
+\textbf{SIA DC-03 (3,95): la alternativa más cercana.} Es el otro formato publicado por la SIA,
+transportado por el mismo DC-09 y con la misma base instalada, de modo que obtiene 5 en normalización
+semántica e interoperabilidad. Su vocabulario resulta incluso \textbf{más completo que el de Contact ID
+para este proyecto}: incluye el código \texttt{XL} (\emph{Low Received Signal Strength}), que expresa
+que la señal de un nodo está débil y para el cual \textbf{Contact ID no tiene equivalente}. Admite
+además valores medidos de forma nativa mediante sus bloques de longitud variable.
+
+Se descarta por dos razones. La primera es de eficiencia: sus mensajes son texto ASCII de longitud
+variable, del orden de 15 a 25 bytes frente a los 8 de Contact ID en BCD, y componerlos exige
+manipulación de cadenas en lugar de concatenación de dígitos, lo que sobre un enlace de radio a batería
+se traduce en más tiempo de aire y mayor consumo. La segunda es metodológica: \textbf{la sintaxis exacta
+de su bloque de datos para valores numéricos no pudo verificarse}, pues aparece únicamente en el
+estándar DC-03, de acceso pagado. Fundar la decisión técnica central del trabajo en un supuesto no
+verificado sería incoherente con el criterio de verificación empírica aplicado en el resto del análisis.
+Queda registrada como alternativa preferente en caso de que la restricción de compacidad se relaje o de
+que se obtenga acceso al estándar (pendiente P8).
+
+\textbf{Contact ID con DC-09 (4,75): gana en cinco de seis criterios y resuelve el sexto mediante un
+mecanismo del propio estándar.} El mensaje DC-05 no transporta valores medidos, pero el estándar de
+transporte DC-09 define un campo de datos extendidos destinado a información determinada por el
+implementador, según se desarrolla en la sección~\ref{sec:extdata}.
+
+\subsubsection{Decisión}
+
+\begin{cajaclave}[title={Protocolo seleccionado}]
+\textbf{Se adopta Contact ID (SIA DC-05) sobre transporte DC-09 como protocolo único del perfil.} Los
+eventos se expresan en el mensaje DC-05 de 16 dígitos y las mediciones con valor viajan en el
+\textbf{campo de datos extendidos que DC-09 define} para información determinada por el implementador
+(sección~\ref{sec:extdata}).
+
+La separación entre eventos y telemetría se mantiene como \textbf{separación lógica} ---cada uno tiene
+requisitos de entrega distintos--- pero \textbf{no se traduce en dos implementaciones en el
+dispositivo}: el nodo emite un solo mensaje.
+\end{cajaclave}
+
+Argumento sintético de la decisión:
+
+\begin{enumerate}
+\item \textbf{Restricción física:} es el único candidato que combina un mensaje de 8 bytes con un
+vocabulario semántico normalizado. Los formatos compactos no normalizan semántica; los que normalizan
+semántica no son compactos.
+\item \textbf{Alineación con el problema:} su vocabulario ya contiene los eventos de salud de nodos de
+radio alimentados a batería ---381, 384, 344, 602 y 603--- que son exactamente las métricas que la
+plataforma debe gestionar.
+\item \textbf{Interoperabilidad real:} es un estándar ANSI/SIA con base instalada, no un formato propio.
+La plataforma puede recibir eventos de paneles de alarma existentes sin modificarlos.
+\item \textbf{Disponibilidad de implementación de referencia:} en agosto de 2025 la SIA publicó una
+implementación de DC-09 cuyo código es de acceso público, bajo licencia \emph{Polyform Noncommercial},
+que \textbf{permite el uso no comercial} ---categoría que comprende este trabajo de titulación--- y
+requiere licencia aparte para uso comercial. Constituye por tanto una referencia consultable para
+verificar el comportamiento del protocolo sin adquirir la norma, aunque \textbf{no es una dependencia
+del proyecto}: la implementación empleada en este trabajo es propia y se verificó de forma
+independiente (sección~\ref{sec:alfabeto}).
+\item \textbf{Honestidad técnica:} se adopta reconociendo explícitamente el límite del formato DC-05 y
+resolviéndolo mediante un mecanismo del propio estándar, no ignorándolo ni inventando una extensión
+propietaria.
+\end{enumerate}
 
 \subsection{Verificación de la restricción de tamaño}
 \label{sec:tamano}
 
-\begin{longtable}{@{}L{6.4cm}C{2.0cm}C{2.0cm}C{2.0cm}@{}}
-\filaencab \encab{Condición} & \encab{DR0} & \encab{DR1} & \encab{DR2} \\ \midrule \endhead
-Sin restricción de tiempo de permanencia & 51 B & 51 B & 51 B \\
-Con restricción de tiempo de permanencia & no disp. & no disp. & \textbf{11 B} \\
+Chile autoriza la banda 915--928\,MHz para uso libre mediante la \textbf{Resolución 737 de Subtel}, y
+admite tanto el plan AU915 como el plan US915. La diferencia entre ambos es relevante para el diseño.
+
+\begin{longtable}{@{}L{1.8cm}L{5.2cm}C{1.9cm}C{1.9cm}C{1.9cm}@{}}
+\filaencab \encab{Plan} & \encab{Condición} & \encab{DR0} & \encab{DR1} & \encab{DR2} \\ \midrule \endhead
+AU915 & Sin restricción de tiempo de permanencia & 51 B & 51 B & 51 B \\
+AU915 & Con restricción de tiempo de permanencia & no disp. & no disp. & \textbf{11 B} \\
+US915 & Norma FCC, sin restricción & \textbf{11 B} & \textbf{53 B} & 125 B \\
 \bottomrule
-\caption{Payload de aplicación disponible en LoRaWAN AU915 según tasa de datos.}
+\caption{Payload de aplicación disponible según plan regional y tasa de datos.}
 \label{tab:payload}
 \end{longtable}
 
-El diseño se dimensiona contra el \textbf{peor caso de 11 bytes}. Queda pendiente determinar si la
-normativa chilena impone restricción de tiempo de permanencia en la banda de 915--928\,MHz; la respuesta
-no altera la viabilidad, únicamente el margen disponible.
+\begin{cajaaviso}[title={Precisión sobre el límite de 11 bytes}]
+La restricción de 11 bytes \textbf{no constituye un techo permanente}: corresponde a la tasa de datos más
+lenta, que es la empleada para obtener el alcance máximo. En operación normal el payload disponible es de
+51 a 53 bytes. El diseño se dimensiona igualmente contra los 11 bytes, porque un protocolo que solo
+funcionara en tasas altas renunciaría al alcance que justifica el empleo de LoRa.
+\end{cajaaviso}
+
+Queda pendiente confirmar cuál de los dos planes regionales corresponde emplear en Chile según la
+Resolución 737 y si aplica restricción de tiempo de permanencia; la respuesta no altera la viabilidad del
+diseño, únicamente el margen disponible.
 
 \begin{longtable}{@{}L{6.4cm}C{3.0cm}L{4.0cm}@{}}
 \filaencab \encab{Representación} & \encab{Tamaño} & \encab{Comentario} \\ \midrule \endhead
@@ -377,6 +445,134 @@ altera la tendencia. La separación es por tanto una decisión de ingeniería de
 ante una limitación.
 \end{cajaclave}
 
+\subsection{El mecanismo del estándar: campo de datos extendidos de DC-09}
+\label{sec:extdata}
+
+La separación en dos planos responde a una necesidad real de diseño ---eventos y mediciones tienen
+requisitos de entrega distintos--- pero \textbf{no obliga a que el dispositivo implemente dos protocolos
+distintos}. El estándar de transporte DC-09 provee el mecanismo para evitarlo.
+
+\subsubsection{Definición del campo}
+
+DC-09 especifica un campo de datos extendidos con la estructura siguiente:
+
+\begin{center}
+\begin{minipage}{0.88\textwidth}
+\begin{lstlisting}
+[<identificador><datos>]
+
+  identificador : un caracter ASCII mayuscula, de "A" a "Z"
+  datos         : caracteres ASCII; el formato lo determina el implementador
+  terminacion   : el caracter "]", incluido en el mensaje transmitido
+\end{lstlisting}
+\end{minipage}
+\end{center}
+
+El estándar establece que \textbf{la longitud, el formato y el algoritmo de los datos de este campo los
+determina el fabricante}, con una única restricción: no se admite contenido binario.
+
+\subsubsection{Consecuencia para el diseño}
+
+El valor medido no requiere un protocolo aparte: viaja en un campo que el propio estándar reserva para
+información definida por el implementador.
+
+\begin{center}
+\begin{minipage}{0.88\textwidth}
+\begin{lstlisting}
+Mensaje DC-09
+  token    : *ADM-CID              Contact ID cifrado con AES
+  msgdata  : 123418138100007B      el evento, 16 digitos DC-05
+  extdata  : [T23.4]               el valor medido
+              |+---- dato en ASCII
+              +----- identificador asignado por el perfil (T = temperatura)
+\end{lstlisting}
+\end{minipage}
+\end{center}
+
+\begin{longtable}{@{}L{4.4cm}L{9.3cm}@{}}
+\filaencab \encab{Propiedad que se conserva} & \encab{Fundamento} \\ \midrule \endhead
+No se abandona el estándar & El campo está definido por DC-09; el perfil únicamente determina su contenido \\
+La interoperabilidad queda intacta & Una receptora que no interprete el campo lo ignora y procesa el evento igual. Es el comportamiento previsto para datos definidos por el fabricante \\
+El dispositivo implementa un solo formato & Una sola rutina de composición de mensaje, con el valor como parámetro opcional \\
+\bottomrule
+\caption{Propiedades que preserva el empleo del campo de datos extendidos.}
+\label{tab:propiedadesextdata}
+\end{longtable}
+
+\subsubsection{Realización en cada transporte}
+
+\begin{longtable}{@{}L{3.2cm}L{10.5cm}@{}}
+\filaencab \encab{Transporte} & \encab{Cómo viajan el evento y el valor} \\ \midrule \endhead
+HTTP y DC-09 sobre IP & Mensaje DC-09 completo, con el evento en \texttt{msgdata} y el valor en \texttt{extdata}. Nativo del estándar \\
+LoRaWAN & El nodo no genera tramas DC-09 ---resultan demasiado extensas para el payload disponible---: emite \textbf{un único mensaje} con el evento en 8 bytes y el valor en el mismo paquete. La plataforma compone el mensaje DC-09 cuando corresponde reenviarlo a una receptora externa \\
+MQTT & Igual que HTTP, o el formato compacto según la capacidad del cliente \\
+\bottomrule
+\caption{Realización del mensaje unificado en cada transporte.}
+\label{tab:realizacion}
+\end{longtable}
+
+\begin{cajaclave}[title={La distinción que importa}]
+Los dos planos subsisten como \textbf{separación lógica}, con sus requisitos de entrega diferenciados,
+porque esa separación es correcta desde el punto de vista de la ingeniería. Lo que se elimina es la
+\textbf{duplicación de implementación}: el dispositivo emite un mensaje y no dos, y quien programa el
+firmware implementa una rutina y no dos.
+
+Esta distinción entre separación lógica y unificación de la implementación responde a la objeción
+legítima de que dos planos supondrían el doble de trabajo en el nodo. \textbf{No lo suponen.}
+\end{cajaclave}
+
+\subsubsection{Identificadores reservados por el perfil}
+
+\begin{longtable}{@{}C{1.6cm}L{7.6cm}L{4.2cm}@{}}
+\filaencab \encab{Id.} & \encab{Contenido} & \encab{Ejemplo} \\ \midrule \endhead
+\texttt{T} & Temperatura en grados Celsius & \texttt{[T23.4]} \\
+\texttt{H} & Humedad relativa en por ciento & \texttt{[H67]} \\
+\texttt{N} & Nivel en por ciento o centímetros & \texttt{[N45]} \\
+\texttt{B} & Batería en por ciento & \texttt{[B87]} \\
+\texttt{V} & Tensión en voltios & \texttt{[V3.28]} \\
+\texttt{S} & Calidad de señal: RSSI y SNR & \texttt{[S-103/4.2]} \\
+\texttt{Q} & Contador de secuencia del nodo & \texttt{[Q1042]} \\
+\bottomrule
+\caption{Identificadores del campo de datos extendidos reservados por el perfil CID-IoT. La tabla se
+cierra en la Etapa 2.}
+\label{tab:identificadores}
+\end{longtable}
+
+Queda pendiente determinar si DC-09 impone un límite de longitud a este campo y si existen
+identificadores ya asignados por convención que corresponda evitar.
+
+
+\subsubsection{Verificación del tamaño del mensaje unificado}
+
+El empleo del campo de datos extendidos aumenta el tamaño del mensaje, porque el estándar exige que su
+contenido sea texto ASCII y no admite formato binario. Los valores siguientes se obtuvieron ejecutando
+la herramienta de verificación del proyecto.
+
+\begin{longtable}{@{}L{5.6cm}C{2.2cm}C{2.2cm}C{2.4cm}@{}}
+\filaencab \encab{Mensaje} & \encab{Evento} & \encab{Valor} & \encab{Total} \\ \midrule \endhead
+Solo evento (\texttt{381}) & 8 B & --- & \textbf{8 B} \\
+Evento con batería (\texttt{[B12]}) & 8 B & 5 B & \textbf{13 B} \\
+Evento con temperatura (\texttt{[T23.4]}) & 8 B & 7 B & \textbf{15 B} \\
+Evento con RSSI y SNR (\texttt{[S-103/4.2]}) & 8 B & 11 B & \textbf{19 B} \\
+\bottomrule
+\caption{Tamaño del mensaje unificado según el valor transportado, verificado programáticamente.}
+\label{tab:tamanounificado}
+\end{longtable}
+
+\begin{cajahallazgo}[title={Consecuencia verificada: el valor debe ser opcional}]
+El mensaje unificado ocupa entre 13 y 19 bytes, de modo que \textbf{no cabe en los 11 bytes de la tasa de
+datos más lenta}, aunque sí holgadamente en los 51 a 53 bytes de la operación normal.
+
+\textbf{Decisión de diseño derivada:} el valor es \textbf{opcional}. Cuando el enlace opera en la tasa
+más lenta ---la de alcance máximo--- el nodo transmite únicamente el evento de 8 bytes, y la medición se
+envía cuando el canal lo permite o en un mensaje separado de menor frecuencia.
+
+Esta degradación es deliberada y coherente con la jerarquía de requisitos establecida: \textbf{el evento
+es la información que no puede perderse}, porque un evento no entregado es una alarma que no suena,
+mientras que una medición ausente solo interrumpe momentáneamente una serie. Cuando el canal se estrecha,
+se sacrifica la medición y se preserva el evento.
+\end{cajahallazgo}
+
 \subsection{Perfil de aplicación propuesto: CID-IoT}
 
 El aporte original del trabajo no consiste en emplear Contact ID, sino en especificar un \textbf{perfil
@@ -441,6 +637,8 @@ requiere traducción, porque ya emplea el protocolo}. La plataforma lo ingiere s
 \caption{Vías de ingesta definidas por el perfil.}
 \label{tab:vias}
 \end{longtable}
+
+\input{figuras/ingesta}
 
 \textbf{La vía B constituye el diferenciador}: ningún proveedor regional identificado ofrece un punto de
 ingesta compatible con la infraestructura de monitoreo de alarmas ya desplegada.

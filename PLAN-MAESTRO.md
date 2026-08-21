@@ -3,7 +3,7 @@
 > Documento de gobierno del proyecto. Define **cómo** se trabaja, **cuándo** se entrega y **dónde**
 > vive cada cosa. Se actualiza al cerrar cada etapa.
 >
-> Última actualización: **lunes 17 de agosto de 2026**
+> Última actualización: **viernes 21 de agosto de 2026**
 
 ---
 
@@ -235,4 +235,7 @@ recuperan.
 - [x] ~~Instalar LaTeX local (`texlive` + `latexmk`).~~ ✅ 17/08/2026 — TeX Live 2025, con `pdflatex`, `latexmk` y `biber`.
 - [ ] Verificar si la UCT tiene licencia institucional de Overleaf.
 - [ ] Definir horario de la revisión de los miércoles, compatible con jornada horario laboral.
+- [ ] 🔴 **Validar con Mario el uso del campo de datos extendidos de DC-09** (pregunta P3 de `docs/03-instrumentos-levantamiento.md`).
+- [ ] 🔴 **Aclarar si el trabajo del compañero es tesis conjunta o separada.** Afecta la restricción RE-02 y exige un contrato de interfaz entre su firmware y esta plataforma, que hoy no está en el backlog.
+- [ ] Obtener acceso al estándar SIA DC-03 para verificar su sintaxis de valores (pendiente P8); si resultara más eficiente, sería la alternativa preferente.
 - [ ] Hardware para el prototipo: qué hay disponible, qué se necesita comprar, presupuesto.

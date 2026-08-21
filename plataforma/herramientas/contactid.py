@@ -90,6 +90,76 @@ def a_bcd(mensaje: str) -> bytes:
     return bytes((nibble(m[i]) << 4) | nibble(m[i + 1]) for i in range(0, len(m), 2))
 
 
+# ---------------------------------------------------------------------------
+# Campo de datos extendidos de SIA DC-09
+# ---------------------------------------------------------------------------
+# DC-09 define un campo de datos extendidos con la forma [<id><datos>], donde
+# el identificador es un caracter ASCII mayuscula de "A" a "Z" y el formato de
+# los datos lo determina el implementador. No se admite contenido binario.
+#
+# El perfil CID-IoT reserva los identificadores de abajo. Permite transportar
+# la medicion en el mismo mensaje que el evento, sin salir del estandar.
+
+IDENTIFICADORES = {
+    "T": ("Temperatura", "grados Celsius"),
+    "H": ("Humedad relativa", "por ciento"),
+    "N": ("Nivel", "por ciento o centimetros"),
+    "B": ("Bateria", "por ciento"),
+    "V": ("Tension", "voltios"),
+    "S": ("Calidad de senal", "RSSI/SNR"),
+    "Q": ("Contador de secuencia", "entero"),
+}
+
+
+def extdata(**valores) -> str:
+    """
+    Compone el campo de datos extendidos a partir de identificadores del perfil.
+
+        >>> extdata(T=23.4, B=87)
+        '[T23.4][B87]'
+    """
+    partes = []
+    for ident, valor in valores.items():
+        i = ident.upper()
+        if i not in IDENTIFICADORES:
+            raise ValueError(f"identificador no reservado por el perfil: {ident!r}")
+        texto = f"{valor}"
+        if not texto.isascii():
+            raise ValueError(f"el campo solo admite ASCII: {texto!r}")
+        if "[" in texto or "]" in texto:
+            raise ValueError("los corchetes delimitan el campo y no pueden ir en los datos")
+        partes.append(f"[{i}{texto}]")
+    return "".join(partes)
+
+
+def leer_extdata(campo: str) -> dict:
+    """Descompone un campo de datos extendidos en sus identificadores y valores."""
+    import re
+    fuera = {}
+    for ident, dato in re.findall(r"\[([A-Z])([^\]]*)\]", campo):
+        fuera[ident] = dato
+    return fuera
+
+
+def mensaje_dc09(acct: str, q: str, evento: str, grupo: str = "00",
+                 zona: str = "000", cifrado: bool = True, **valores) -> dict:
+    """
+    Compone un mensaje DC-09 con el evento Contact ID en msgdata y las
+    mediciones en el campo de datos extendidos.
+
+    Representacion simplificada: la trama DC-09 completa incluye ademas
+    longitud, secuencia, prefijos de receptor y CRC, que se agregan en la
+    implementacion de la plataforma.
+    """
+    cid = construir(acct, q, evento, grupo, zona)
+    return {
+        "token": "*ADM-CID" if cifrado else "ADM-CID",
+        "msgdata": cid,
+        "extdata": extdata(**valores) if valores else "",
+        "descripcion": CODIGOS.get(evento, "-"),
+    }
+
+
 # Códigos de evento relevantes para gestión de sensores IoT (subconjunto DC-05)
 CODIGOS = {
     "110": "Alarma de incendio",
@@ -155,6 +225,23 @@ if __name__ == "__main__":
     print(f"  Mensaje en BCD comprimido: {len(a_bcd(m))} bytes")
     print(f"  Payload útil LoRaWAN AU915, peor caso (DR2 con dwell time): 11 bytes")
     print(f"  → cabe con {11 - len(a_bcd(m))} bytes de margen")
+
+    print("\n" + "=" * 78)
+    print("MENSAJE UNIFICADO: evento + valor en el campo de datos extendidos de DC-09")
+    print("=" * 78)
+    for desc, kw in [
+        ("Temperatura alta en camara de frio, con el valor medido", dict(T=23.4)),
+        ("Nodo con bateria baja, informando el nivel exacto",       dict(B=12)),
+        ("Nodo con senal debil, informando RSSI y SNR",             dict(S="-103/4.2")),
+    ]:
+        m = mensaje_dc09("1234", "1", "158" if "Temperatura" in desc else
+                                     "384" if "bateria" in desc else "344", "01", "003", **kw)
+        print(f"\n{desc}")
+        print(f"  token   : {m['token']}")
+        print(f"  msgdata : {m['msgdata']}   ({len(a_bcd(m['msgdata']))} bytes en BCD)")
+        print(f"  extdata : {m['extdata']}   ({len(m['extdata'])} bytes en ASCII)")
+        print(f"  total   : {len(a_bcd(m['msgdata'])) + len(m['extdata'])} bytes")
+        print(f"  leido   : {leer_extdata(m['extdata'])}")
 
     print("\n" + "=" * 78)
     print("PRUEBA DE VALIDACIÓN: mensaje con un dígito alterado")

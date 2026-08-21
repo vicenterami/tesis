@@ -47,7 +47,30 @@ respaldo del 45 % del criterio 3.
 | «Las fechas cambiaron, son estas otras» | Recalcular todo el calendario. Es un comando |
 | «No te preocupes de la fecha exacta» | 🔴 No aceptar esa respuesta. Insistir: sin fecha no hay planificación medible, y la nota P depende de superar el 70 % de los hitos **en plazo** |
 
-## 🔴 P3. ¿Acepta la arquitectura de dos planos?
+## 🔴 P3. ¿Acepta llevar la medición en el campo de datos extendidos de DC-09?
+
+> *«Contact ID transporta eventos codificados, pero no un valor: puede decir "temperatura alta en la
+> zona 3", no "23,4 grados". Investigando encontré que **el propio estándar DC-09 define un campo de
+> datos extendidos cuyo formato determina el implementador**. Propongo llevar el valor medido ahí, de
+> modo que el evento y la medición viajen en **un solo mensaje** sin salir de la norma. La separación
+> entre eventos y telemetría se mantiene como separación lógica en la plataforma, pero el dispositivo
+> emite un único mensaje y el firmware implementa una sola rutina. ¿Le parece correcto ese enfoque?»*
+
+**Por qué es crítica:** define la arquitectura del protocolo, que es el aporte central del trabajo. Y
+determina cuánto trabajo recae en quien implemente el firmware de los sensores.
+
+| Respuesta posible | Qué implica | Acción |
+|---|---|---|
+| «Correcto, así debe ser» | Lo esperado. El enfoque queda validado | Registrar en bitácora como decisión aprobada, con fecha |
+| «¿Y por qué no un protocolo que haga todo?» | Está pidiendo la justificación | Para eso existe la matriz de **8 alternativas** de la sección 6. La respuesta corta: ningún protocolo combina compacidad de 8 bytes con vocabulario semántico normalizado; los compactos no normalizan semántica y los que sí, no caben en el payload de LoRa |
+| «Usa DC-03, que lleva valores nativamente» | Es la alternativa que quedó segunda (3,95) | Explicar los dos motivos del descarte: mensajes de 15 a 25 bytes frente a 8, y **su sintaxis exacta para valores no pudo verificarse** porque el estándar es de pago. Ofrecer reevaluarlo en la Etapa 2 si se obtiene acceso |
+| «Quiero Contact ID puro, sin campo extendido» | Se pierde toda la telemetría con valor: no habría gráficos ni análisis histórico | Explicar qué se pierde. Existe la salida de codificar el valor en el campo `CCC`, pero ese campo identifica el dispositivo: se ganaría el valor a costa de la identidad del sensor. **Es posible y es peor.** Si insiste, se implementa y se documenta como decisión suya |
+
+**Preparación:** llevar el dato verificado de que el mensaje solo con evento ocupa **8 bytes** y con
+valor entre **13 y 19**, frente a los **11 bytes** del enlace de alcance máximo y los **51 a 53** de
+operación normal. De ahí que el valor sea opcional.
+
+## 🟡 P3b. ¿Acepta la arquitectura de dos planos como separación lógica?
 
 > *«Contact ID transporta eventos codificados, pero no puede transportar un valor: puede decir
 > "temperatura alta en la zona 3", no "23,4 grados". Propongo dos planos: los eventos y alarmas en Contact

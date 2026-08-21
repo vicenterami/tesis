@@ -3,7 +3,7 @@
 > **Para qué sirve:** entender y poder **explicar** cada pieza del proyecto. Si no puedes explicarle
 > algo a Mario en dos frases, está en este documento.
 >
-> Versión: 20 de agosto de 2026
+> Versión: 21 de agosto de 2026
 
 ---
 
@@ -310,6 +310,30 @@ Esta es la pregunta más importante que has hecho. La respuesta:
 **Son dos cosas distintas, con dos requisitos distintos, y por eso viajan por caminos distintos.** Nadie
 diseñaría un monitor cardíaco que mandara la alarma por el mismo canal «best effort» que el gráfico.
 
+## Actualización del 21 de agosto: un mensaje, no dos
+
+La investigación posterior encontró que **el estándar DC-09 ya define el mecanismo para evitar dos
+implementaciones**: un campo de datos extendidos con la forma `[<identificador A-Z><datos ASCII>]`, cuyo
+formato **lo determina el implementador**.
+
+```
+Mensaje DC-09
+  token   : *ADM-CID          Contact ID cifrado con AES
+  msgdata : 123418138100007B  el evento
+  extdata : [T23.4]           el valor medido
+```
+
+**Consecuencia:** los dos planos siguen existiendo, pero como **separación lógica en la plataforma**, no
+como dos caminos en el dispositivo. El nodo emite **un solo mensaje** y quien programa el firmware
+implementa **una sola rutina**.
+
+Y una receptora de alarmas que no interprete ese campo simplemente lo ignora y procesa el evento igual —
+que es el comportamiento previsto por la norma para datos definidos por el fabricante.
+
+**El costo verificado:** el mensaje pasa de 8 bytes (solo evento) a 13–19 bytes (con valor). No cabe en
+los 11 bytes del enlace de alcance máximo, así que **el valor es opcional**: cuando el canal se estrecha
+se manda solo el evento.
+
 ## Qué significaría «Contact ID puro»
 
 Si Mario exigiera que absolutamente todo pase por Contact ID:
@@ -346,6 +370,8 @@ se documenta como su decisión.
 | **Contact ID** | Protocolo de mensajes de evento de 16 dígitos, de la industria de alarmas. Tu protocolo |
 | **SIA DC-05** | El estándar que define Contact ID. Mismo protocolo, nombre formal |
 | **SIA DC-09** | El estándar que transporta Contact ID por internet, con cifrado AES. Tu transporte |
+| **SIA DC-03** | El otro formato SIA: bloques variables, texto ASCII, códigos de dos letras. Lleva valores nativamente. Quedó segundo en la evaluación |
+| **Datos extendidos** | El campo `[<A-Z><datos>]` que DC-09 reserva para el implementador. Ahí viaja tu valor medido |
 | **DTMF** | Los tonos del teclado telefónico. Cómo viajaba Contact ID originalmente |
 | ***Kissoff*** | El «recibido» que la central devuelve si el checksum es correcto. Confirmación de entrega |
 | **Checksum** | Dígito de verificación. Si un dígito se corrompe, no cuadra y el mensaje se rechaza |
