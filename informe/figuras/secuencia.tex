@@ -1,0 +1,37 @@
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[font=\footnotesize]
+
+\def\lx{0}
+\def\rx{9.2}
+
+\node[cajaacento, minimum width=26mm, font=\footnotesize] (panel) at (\lx,0) {\textbf{Panel de alarma}};
+\node[cajaacento, minimum width=30mm, font=\footnotesize] (recep) at (\rx,0) {\textbf{Central receptora}};
+
+\draw[line width=0.6pt, color=grislinea, dashed] (panel.south) -- (\lx,-7.0);
+\draw[line width=0.6pt, color=grislinea, dashed] (recep.south) -- (\rx,-7.0);
+
+\draw[flecha] (\lx,-1.0) -- node[nota, above, font=\scriptsize] {descuelga y marca} (\rx,-1.0);
+
+\draw[flecha] (\rx,-2.2) -- node[nota, above, font=\scriptsize] {\textit{handshake}: tonos 1400 Hz + 2300 Hz} (\lx,-2.2);
+\node[nota, font=\scriptsize\itshape, below=0.5mm of {(4.6,-2.2)}] {«hablo Contact ID»};
+
+\draw[flecha, line width=1.2pt, color=verdeacento] (\lx,-3.7) --
+  node[nota, above, font=\scriptsize\bfseries\color{verdeacento}] {16 dígitos en DTMF ($\approx$ 1,6 s)} (\rx,-3.7);
+
+\draw[flecha, color=ambar, line width=1pt] (\rx,-4.9) --
+  node[nota, above, font=\scriptsize\bfseries\color{ambar}] {\textit{kissoff}: tono 1400 Hz} (\lx,-4.9);
+\node[nota, font=\scriptsize\itshape, below=0.5mm of {(4.6,-4.9)}] {«recibido, checksum correcto»};
+
+\draw[flecha] (\lx,-6.2) -- node[nota, above, font=\scriptsize] {cuelga} (\rx,-6.2);
+
+\node[cajaambar, below=4mm of {(4.6,-7.0)}, text width=11.6cm, fill=ambar!6,
+      font=\scriptsize]
+  {El \textbf{\textit{kissoff}} solo se emite si el checksum es correcto. Si el panel no lo recibe,
+   \textbf{reintenta}: el protocolo incorpora confirmación explícita a nivel de aplicación,
+   independiente del transporte.};
+
+\end{tikzpicture}
+\caption{Secuencia de transmisión original de Contact ID sobre línea telefónica.}
+\label{fig:dtmf}
+\end{figure}

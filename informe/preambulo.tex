@@ -21,6 +21,27 @@
 \usepackage{listings}
 \usepackage[most]{tcolorbox}
 \usepackage{csquotes}
+\usepackage{tikz}
+\usetikzlibrary{positioning,shapes.geometric,arrows.meta,fit,backgrounds,calc}
+
+%% ------------------------- Estilos de diagrama -----------------------
+\tikzset{
+  caja/.style={
+    draw=azuloscuro, fill=white, line width=0.7pt, rounded corners=2pt,
+    align=center, inner sep=5pt, font=\footnotesize},
+  cajaacento/.style={caja, draw=verdeacento, line width=1.1pt},
+  cajaambar/.style={caja, draw=ambar, line width=1.1pt},
+  grupo/.style={
+    draw=grislinea, fill=grisclaro, line width=0.6pt, rounded corners=3pt,
+    inner sep=8pt},
+  etiqueta/.style={font=\scriptsize\bfseries\color{gristexto}, align=right},
+  flecha/.style={-{Stealth[length=2.4mm]}, line width=0.7pt, color=gristexto},
+  flechagruesa/.style={-{Stealth[length=3mm]}, line width=1.1pt, color=verdeacento},
+  nota/.style={font=\scriptsize\color{gristexto}, align=center},
+  campo/.style={
+    draw=azuloscuro, line width=0.7pt, minimum height=7mm,
+    align=center, font=\ttfamily\small, inner sep=3pt},
+}
 
 \usepackage[
   colorlinks=true, linkcolor=azuloscuro, urlcolor=verdeacento,

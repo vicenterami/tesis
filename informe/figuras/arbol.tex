@@ -1,0 +1,46 @@
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[node distance=6mm, font=\scriptsize]
+
+% ---- EFECTOS ----
+\node[caja, font=\scriptsize, text width=2.0cm] (e1) {\textbf{E1}\\Inversión\\inmovilizada};
+\node[caja, font=\scriptsize, text width=2.0cm, right=3mm of e1] (e2) {\textbf{E2}\\Datos\\perdidos};
+\node[caja, font=\scriptsize, text width=2.0cm, right=3mm of e2] (e3) {\textbf{E3}\\Decisiones\\sin dato};
+\node[caja, font=\scriptsize, text width=2.0cm, right=3mm of e3] (e4) {\textbf{E4}\\Fallas vistas\\tarde};
+\node[caja, font=\scriptsize, text width=2.0cm, right=3mm of e4] (e5) {\textbf{E5}\\Dependencia\\de proveedor};
+
+\begin{scope}[on background layer]
+\node[grupo, fit=(e1)(e5)] (gefectos) {};
+\end{scope}
+\node[etiqueta, left=2mm of gefectos, font=\scriptsize\bfseries\color{gristexto}] {EFECTOS};
+
+% ---- PROBLEMA CENTRAL ----
+\node[cajaacento, below=11mm of gefectos, text width=12.0cm, fill=verdeacento!6,
+      font=\scriptsize] (prob)
+  {\textbf{Quien ya posee sensores heterogéneos no puede convertir sus datos en información
+   utilizable:}\\ falta una plataforma que unifique la ingesta, la normalización y la gestión de
+   dispositivos.};
+\node[etiqueta, left=2mm of prob, font=\scriptsize\bfseries\color{gristexto}] {PROBLEMA\\CENTRAL};
+
+% ---- CAUSAS ----
+\node[caja, font=\scriptsize, below=11mm of prob, text width=2.0cm, xshift=-4.65cm] (c1)
+  {\textbf{C1}\\Fragmentación\\de protocolos};
+\node[caja, font=\scriptsize, text width=2.0cm, right=3mm of c1] (c2) {\textbf{C2}\\Acoplamiento\\hardware};
+\node[caja, font=\scriptsize, text width=2.0cm, right=3mm of c2] (c3) {\textbf{C3}\\Costo y\\dependencia};
+\node[caja, font=\scriptsize, text width=2.0cm, right=3mm of c3] (c4) {\textbf{C4}\\Sin capacidad\\técnica};
+\node[caja, font=\scriptsize, text width=2.0cm, right=3mm of c4] (c5) {\textbf{C5}\\Sin visibilidad\\del enlace};
+
+\begin{scope}[on background layer]
+\node[grupo, fit=(c1)(c5)] (gcausas) {};
+\end{scope}
+\node[etiqueta, left=2mm of gcausas, font=\scriptsize\bfseries\color{gristexto}] {CAUSAS};
+
+% ---- FLECHAS ----
+\draw[flechagruesa] (gcausas.north) -- node[nota, right=1mm, midway, font=\scriptsize] {provocan} (prob.south);
+\draw[flechagruesa] (prob.north) -- node[nota, right=1mm, midway, font=\scriptsize] {produce} (gefectos.south);
+
+\end{tikzpicture}
+\caption{Árbol de problemas: las cinco causas provocan el problema central, que a su vez produce
+los cinco efectos observables.}
+\label{fig:arbol}
+\end{figure}

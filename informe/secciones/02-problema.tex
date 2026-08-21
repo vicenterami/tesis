@@ -61,31 +61,7 @@ solución: \textbf{el silencio de un sensor es indistinguible de la ausencia de 
 \label{tab:efectos}
 \end{longtable}
 
-\begin{center}
-\begin{lstlisting}
-                +---------------------------------------------------+
-   EFECTOS      | E1 inversion    E2 datos       E3 decisiones      |
-                |    inmovilizada    perdidos       sin dato        |
-                |      E4 fallas tardias      E5 lock-in            |
-                +------------------------^--------------------------+
-                                         |
-     +-----------------------------------+-----------------------------------+
- PROBLEMA | Quien ya posee sensores heterogeneos no puede convertir sus datos |
- CENTRAL  | en informacion utilizable: falta una plataforma que unifique la   |
-          | ingesta, la normalizacion y la gestion de dispositivos.           |
-     +-----------------------------------^-----------------------------------+
-                                         |
-                +------------------------+--------------------------+
-   CAUSAS       | C1 fragmentacion     C2 acoplamiento              |
-                |    de protocolos        hardware-plataforma       |
-                | C3 costo/dependencia  C4 falta de capacidad       |
-                |      comercial            tecnica interna         |
-                |     C5 sin visibilidad de la conectividad         |
-                +---------------------------------------------------+
-\end{lstlisting}
-\captionof{figure}{Árbol de problemas: causas, problema central y efectos.}
-\label{fig:arbol}
-\end{center}
+\input{figuras/arbol}
 
 \subsection{Justificación de relevancia e impacto}
 

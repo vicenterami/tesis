@@ -1,0 +1,49 @@
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[font=\footnotesize]
+
+% ---- nodo sensor ----
+\node[cajaacento, text width=3.6cm, fill=verdeacento!6] (sensor) at (0,0)
+  {\textbf{NODO SENSOR}};
+
+% ---- los dos planos, en fila ----
+\node[caja, text width=5.6cm, align=left, draw=azuloscuro, line width=1.1pt,
+      font=\scriptsize, anchor=north east] (eventos) at (-0.35,-1.5)
+  {\normalsize\textbf{\color{azuloscuro}PLANO DE EVENTOS}\\[4pt]
+   Contact ID DC-05 sobre DC-09 con AES\\[4pt]
+   \textbf{8 bytes} por evento\\
+   vocabulario cerrado de códigos\\
+   máquina de estados: \texttt{Q=1} abre, \texttt{Q=3} cierra\\
+   \textbf{entrega confirmada}};
+
+\node[caja, text width=5.6cm, align=left, draw=ambar, line width=1.1pt,
+      font=\scriptsize, anchor=north west] (telemetria) at (0.35,-1.5)
+  {\normalsize\textbf{\color{ambar}PLANO DE TELEMETRÍA}\\[4pt]
+   CayenneLPP (LoRa) · SenML (IP)\\[4pt]
+   \textbf{4 bytes} por medición\\
+   valor + unidad + marca temporal\\
+   serie de tiempo\\
+   \textbf{pérdida tolerable}};
+
+% ---- flechas del sensor a cada plano ----
+\draw[flecha] (sensor.south) -- (0,-1.1) -| (eventos.north);
+\draw[flecha] (sensor.south) -- (0,-1.1) -| (telemetria.north);
+
+% ---- nota de correlacion, debajo de los planos ----
+\coordinate (bajo) at ($(eventos.south)!0.5!(telemetria.south)$);
+\node[nota, font=\scriptsize\itshape, below=3mm of bajo] (corr)
+  {se correlacionan por la tripleta de identidad \texttt{(ACCT, GG, CCC)} y la marca temporal};
+
+% ---- plataforma ----
+\node[cajaacento, text width=8.0cm, fill=verdeacento!6, below=3mm of corr] (plat)
+  {\textbf{PLATAFORMA}\\[2pt]\scriptsize normalización, correlación y persistencia};
+
+% ---- flechas de cada plano a la plataforma ----
+\draw[flechagruesa] (eventos.south) |- ($(corr.south)+(0,-0.15)$) -| ([xshift=-2.6cm]plat.north);
+\draw[flechagruesa, color=ambar] (telemetria.south) |- ($(corr.south)+(0,-0.15)$) -| ([xshift=2.6cm]plat.north);
+
+\end{tikzpicture}
+\caption{Arquitectura de dos planos: los eventos y las mediciones viajan por caminos con requisitos
+de entrega distintos, y se correlacionan en la plataforma mediante la identidad del dispositivo.}
+\label{fig:dosplanos}
+\end{figure}

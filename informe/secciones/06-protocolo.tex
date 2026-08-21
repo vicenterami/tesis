@@ -40,27 +40,7 @@ seguro y gestión del ciclo de vida de credenciales--- que constituyen el eje de
 
 Un mensaje Contact ID es una secuencia de \textbf{16 dígitos}.
 
-\begin{center}
-\begin{lstlisting}
-   ACCT      MT    Q    XYZ     GG    CCC    S
-  +----+   +--+  +-+  +---+   +--+  +---+  +-+
-  |1234|   |18|  |1|  |381|   |00|  |007|  |B|
-  +----+   +--+  +-+  +---+   +--+  +---+  +-+
-    |       |     |     |      |     |      |
-    |       |     |     |      |     |      +- checksum
-    |       |     |     |      |     +-------- zona 007 (el dispositivo)
-    |       |     |     |      +-------------- grupo o particion 00
-    |       |     |     +--------------------- codigo de evento 381
-    |       |     +--------------------------- calificador 1 = nuevo evento
-    |       +--------------------------------- tipo de mensaje 18
-    +----------------------------------------- cuenta o abonado 1234
-
-  Lectura: "en la cuenta 1234 se produjo un nuevo evento de perdida de
-            supervision RF en el dispositivo 007"
-\end{lstlisting}
-\captionof{figure}{Estructura del mensaje Contact ID.}
-\label{fig:mensaje}
-\end{center}
+\input{figuras/mensaje}
 
 \begin{longtable}{@{}L{1.8cm}C{1.6cm}L{10.3cm}@{}}
 \filaencab \encab{Campo} & \encab{Dígitos} & \encab{Contenido} \\ \midrule \endhead
@@ -138,23 +118,7 @@ la capa de aplicación, no como único mecanismo de integridad.
 
 \subsubsection{Transporte histórico: DTMF sobre línea telefónica}
 
-\begin{center}
-\begin{lstlisting}
-  Panel                                          Receptora
-    |                                                |
-    |---- descuelga y marca ------------------------>|
-    |                                                |
-    |<--- handshake: tonos 1400 Hz + 2300 Hz --------|  "hablo Contact ID"
-    |                                                |
-    |---- 16 digitos DTMF (~1,6 s) ----------------->|
-    |                                                |
-    |<--- kissoff: tono 1400 Hz ---------------------|  "recibido, checksum OK"
-    |                                                |
-    |---- cuelga ----------------------------------->|
-\end{lstlisting}
-\captionof{figure}{Secuencia de transmisión original de Contact ID sobre línea telefónica.}
-\label{fig:dtmf}
-\end{center}
+\input{figuras/secuencia}
 
 El elemento relevante es el \textbf{kissoff}: la receptora lo emite únicamente si el checksum resulta
 correcto; en su ausencia, el panel reintenta. El protocolo incorpora por tanto \textbf{confirmación
@@ -387,36 +351,7 @@ límites conocidos del diseño.
 
 \subsubsection{La solución adoptada}
 
-\begin{center}
-\begin{lstlisting}
-                  +--------------------------------------+
-                  |            NODO SENSOR               |
-                  +------------------+-------------------+
-                                     |
-            +------------------------+------------------------+
-            |                                                 |
-  +---------v----------+                          +-----------v-----------+
-  |  PLANO DE EVENTOS  |                          |  PLANO DE TELEMETRIA  |
-  +--------------------+                          +-----------------------+
-  | Contact ID DC-05   |                          | CayenneLPP  (LoRa)    |
-  | sobre DC-09 con AES|                          | SenML       (IP)      |
-  |                    |                          |                       |
-  | 8 bytes            |                          | 4 bytes por medicion  |
-  | vocabulario cerrado|                          | valor + unidad + hora |
-  | maquina de estados |                          | serie de tiempo       |
-  | entrega confirmada |                          | perdida tolerable     |
-  +---------+----------+                          +-----------+-----------+
-            |                                                 |
-            |        correlacion por (ACCT, GG, CCC)          |
-            +------------------------+------------------------+
-                                     |
-                  +------------------v-------------------+
-                  | PLATAFORMA: normalizacion y registro |
-                  +--------------------------------------+
-\end{lstlisting}
-\captionof{figure}{Arquitectura de dos planos.}
-\label{fig:dosplanos}
-\end{center}
+\input{figuras/dosplanos}
 
 \begin{longtable}{@{}L{6.7cm}L{6.7cm}@{}}
 \filaencab \encab{Plano de eventos} & \encab{Plano de telemetría} \\ \midrule \endhead
