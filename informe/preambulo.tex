@@ -42,6 +42,12 @@
   campo/.style={
     draw=azuloscuro, line width=0.7pt, minimum height=7mm,
     align=center, font=\ttfamily\small, inner sep=3pt},
+  notaclave/.style={
+    draw=verdeacento, fill=verdeacento!6, line width=0.9pt, rounded corners=2pt,
+    align=left, inner sep=7pt, font=\scriptsize},
+  notaaviso/.style={
+    draw=ambar, fill=ambar!6, line width=0.9pt, rounded corners=2pt,
+    align=left, inner sep=7pt, font=\scriptsize},
 }
 
 \usepackage[
@@ -65,6 +71,7 @@
 \titlespacing*{\section}{0pt}{2.2ex plus 1ex minus .2ex}{1.3ex plus .2ex}
 
 %% ------------------------ Encabezado y pie ---------------------------
+\setlength{\headheight}{14pt}
 \pagestyle{fancy}
 \fancyhf{}
 \fancyhead[L]{\footnotesize\color{gristexto}\datoCodigo{} · \datoEtapa}
