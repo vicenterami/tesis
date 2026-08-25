@@ -1,11 +1,12 @@
 \chapter{Catálogo completo de requerimientos}
 \label{anx:requerimientos}
+\small
 
 Cada requerimiento declara su fuente (véase tabla~\ref{tab:fuentes}), la causa del problema que
 aborda y su prioridad MoSCoW.
 
 \section{M1 --- Ingesta multiprotocolo}
-\begin{longtable}{@{}C{1.6cm}L{8.2cm}L{1.5cm}L{1.3cm}C{1.1cm}@{}}
+\begin{longtable}{@{}C{1.4cm}L{6.5cm}L{1.6cm}L{1.3cm}C{0.8cm}@{}}
 \filaencab \encab{ID} & \encab{Requerimiento} & \encab{Fuente} & \encab{Causa} & \encab{Pr.} \\ \midrule \endhead
 \textbf{RF-01} & El sistema debe exponer un punto de ingesta \textbf{HTTP} que reciba eventos en formato Contact ID de 16 dígitos & [PO] [BT] & C1 & \textbf{M} \\
 \textbf{RF-02} & El sistema debe recibir eventos originados en \textbf{LoRaWAN} mediante integración con el servidor de red, decodificando el payload de 8 bytes en BCD & [PO] [BT] & C1, C2 & \textbf{M} \\
@@ -20,7 +21,7 @@ aborda y su prioridad MoSCoW.
 \end{longtable}
 
 \section{M2 --- Normalización de eventos y telemetría}
-\begin{longtable}{@{}C{1.6cm}L{8.2cm}L{1.5cm}L{1.3cm}C{1.1cm}@{}}
+\begin{longtable}{@{}C{1.4cm}L{6.5cm}L{1.6cm}L{1.3cm}C{0.8cm}@{}}
 \filaencab \encab{ID} & \encab{Requerimiento} & \encab{Fuente} & \encab{Causa} & \encab{Pr.} \\ \midrule \endhead
 \textbf{RF-11} & El sistema debe \textbf{traducir señales de sensores heterogéneos a códigos de evento DC-05} conforme a la tabla de mapeo del perfil CID-IoT, sin introducir códigos ajenos al estándar & [PO] [BT] & C1 & \textbf{M} \\
 \textbf{RF-12} & El sistema debe mantener una \textbf{máquina de estados de condiciones abiertas} por dispositivo, gobernada por el calificador \texttt{Q}: \texttt{Q=1} abre la condición y \texttt{Q=3} la cierra & [BT] & C1, C5 & \textbf{M} \\
@@ -32,7 +33,7 @@ aborda y su prioridad MoSCoW.
 \end{longtable}
 
 \section{M3 --- Inventario y aprovisionamiento de dispositivos}
-\begin{longtable}{@{}C{1.6cm}L{8.2cm}L{1.5cm}L{1.3cm}C{1.1cm}@{}}
+\begin{longtable}{@{}C{1.4cm}L{6.5cm}L{1.6cm}L{1.3cm}C{0.8cm}@{}}
 \filaencab \encab{ID} & \encab{Requerimiento} & \encab{Fuente} & \encab{Causa} & \encab{Pr.} \\ \midrule \endhead
 \textbf{RF-18} & El sistema debe mantener un \textbf{inventario de dispositivos} con tipo, ubicación, sitio, zona lógica, transporte de llegada y estado & [PO] & C4, C5 & \textbf{M} \\
 \textbf{RF-19} & El sistema debe permitir \textbf{registrar un dispositivo nuevo} asignándole su tripleta \texttt{(ACCT, GG, CCC)} sin intervenir la consola del servidor de red & [PO] [EM] & C4 & \textbf{M} \\
@@ -43,7 +44,7 @@ aborda y su prioridad MoSCoW.
 \end{longtable}
 
 \section{M4 --- Supervisión de salud de enlace}
-\begin{longtable}{@{}C{1.6cm}L{8.2cm}L{1.5cm}L{1.3cm}C{1.1cm}@{}}
+\begin{longtable}{@{}C{1.4cm}L{6.5cm}L{1.6cm}L{1.3cm}C{0.8cm}@{}}
 \filaencab \encab{ID} & \encab{Requerimiento} & \encab{Fuente} & \encab{Causa} & \encab{Pr.} \\ \midrule \endhead
 \textbf{RF-24} & El sistema debe \textbf{detectar la pérdida de supervisión} de un dispositivo cuando no reporte durante un número configurable de intervalos, y emitir el código 381 & [PO] [BT] & \textbf{C5} & \textbf{M} \\
 \textbf{RF-25} & El sistema debe \textbf{detectar la restauración} del dispositivo y cerrar la condición con \texttt{Q=3} & [BT] & C5 & \textbf{M} \\
@@ -55,7 +56,7 @@ aborda y su prioridad MoSCoW.
 \end{longtable}
 
 \section{M5 --- Persistencia y consulta}
-\begin{longtable}{@{}C{1.6cm}L{8.2cm}L{1.5cm}L{1.3cm}C{1.1cm}@{}}
+\begin{longtable}{@{}C{1.4cm}L{6.5cm}L{1.6cm}L{1.3cm}C{0.8cm}@{}}
 \filaencab \encab{ID} & \encab{Requerimiento} & \encab{Fuente} & \encab{Causa} & \encab{Pr.} \\ \midrule \endhead
 \textbf{RF-31} & El sistema debe \textbf{almacenar de forma persistente} todo evento aceptado, conservando el mensaje original íntegro junto a su interpretación & [BT] [DP] & C1 & \textbf{M} \\
 \textbf{RF-32} & El sistema debe \textbf{almacenar series de tiempo} de telemetría con valor, unidad y marca temporal & [PO] & C1 & \textbf{M} \\
@@ -65,7 +66,7 @@ aborda y su prioridad MoSCoW.
 \end{longtable}
 
 \section{M6 --- Alertas y notificación}
-\begin{longtable}{@{}C{1.6cm}L{8.2cm}L{1.5cm}L{1.3cm}C{1.1cm}@{}}
+\begin{longtable}{@{}C{1.4cm}L{6.5cm}L{1.6cm}L{1.3cm}C{0.8cm}@{}}
 \filaencab \encab{ID} & \encab{Requerimiento} & \encab{Fuente} & \encab{Causa} & \encab{Pr.} \\ \midrule \endhead
 \textbf{RF-36} & El sistema debe \textbf{notificar} cuando se abra una condición de severidad configurada como notificable & [PO] & C5 & \textbf{M} \\
 \textbf{RF-37} & El sistema debe permitir \textbf{configurar los destinatarios} de notificación por sitio & [PO] & C4 & \textbf{S} \\
@@ -74,7 +75,7 @@ aborda y su prioridad MoSCoW.
 \end{longtable}
 
 \section{M7 --- Seguridad, identidad y multi-tenencia}
-\begin{longtable}{@{}C{1.6cm}L{8.2cm}L{1.5cm}L{1.3cm}C{1.1cm}@{}}
+\begin{longtable}{@{}C{1.4cm}L{6.5cm}L{1.6cm}L{1.3cm}C{0.8cm}@{}}
 \filaencab \encab{ID} & \encab{Requerimiento} & \encab{Fuente} & \encab{Causa} & \encab{Pr.} \\ \midrule \endhead
 \textbf{RF-40} & El sistema debe \textbf{autenticar toda ingesta} mediante credencial por sitio, rechazando mensajes sin credencial válida & [BT] & C1 & \textbf{M} \\
 \textbf{RF-41} & El sistema debe \textbf{aislar los datos entre sitios}: ningún usuario de un sitio puede acceder a datos de otro & [BT] [DP] & C3 & \textbf{M} \\
@@ -86,7 +87,7 @@ aborda y su prioridad MoSCoW.
 \end{longtable}
 
 \section{M8 --- Interfaz de administración}
-\begin{longtable}{@{}C{1.6cm}L{8.2cm}L{1.5cm}L{1.3cm}C{1.1cm}@{}}
+\begin{longtable}{@{}C{1.4cm}L{6.5cm}L{1.6cm}L{1.3cm}C{0.8cm}@{}}
 \filaencab \encab{ID} & \encab{Requerimiento} & \encab{Fuente} & \encab{Causa} & \encab{Pr.} \\ \midrule \endhead
 \textbf{RF-47} & La interfaz debe presentar el \textbf{inventario de dispositivos} con su estado y transporte de llegada, filtrable por sitio, zona y estado & [PO] & C4 & \textbf{M} \\
 \textbf{RF-48} & La interfaz debe presentar el \textbf{panel de salud del sitio} con semáforo por dispositivo & [PO] & C5 & \textbf{M} \\
@@ -97,7 +98,7 @@ aborda y su prioridad MoSCoW.
 \end{longtable}
 
 \section{Requerimientos no funcionales}
-\begin{longtable}{@{}C{1.7cm}L{7.6cm}L{2.0cm}L{1.4cm}C{1.2cm}@{}}
+\begin{longtable}{@{}C{1.5cm}L{5.3cm}L{2.7cm}L{1.4cm}C{0.8cm}@{}}
 \filaencab \encab{ID} & \encab{Requerimiento} & \encab{Verificación} & \encab{Fuente} & \encab{Pr.} \\ \midrule \endhead
 \textbf{RNF-01} & El sistema debe sostener la ingesta de \textbf{$\geq$ 50 eventos por segundo} sin pérdida & Prueba de carga con generador sintético & [DP] & \textbf{M} \\
 \textbf{RNF-02} & El tiempo desde la recepción de un evento hasta su disponibilidad para consulta debe ser \textbf{$\leq$ 2 segundos} en el percentil 95 & Medición instrumentada & [DP] & \textbf{M} \\

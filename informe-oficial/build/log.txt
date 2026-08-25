@@ -1,12 +1,14 @@
 Rc files read:
   /etc/LatexMk
 Latexmk: This is Latexmk, John Collins, 15 June 2025. Version 4.87.
-No existing .aux file, so I'll make a simple one, and require run of *latex.
 Latexmk: applying rule 'pdflatex'...
 Rule 'pdflatex':  Reasons for rerun
-Category 'other':
-  Rerun of 'pdflatex' forced or previously required:
-    Reason or flag: 'Initial setup'
+Changed files or newly in use/created:
+  anexos/a-requerimientos.tex
+  anexos/c-protocolo.tex
+Category 'changed_user':
+  anexos/a-requerimientos.tex
+  anexos/c-protocolo.tex
 
 ------------
 Run number 1 of rule 'pdflatex'
@@ -217,28 +219,67 @@ zlibrarycalc.code.tex)
 
 Package biblatex Warning: Load 'inputenc' before biblatex.
 
-(build/main.aux)
+(build/main.aux (build/Portada.aux) (build/resumen.aux) (build/cap1.aux)
+(build/cap2.aux) (build/cap3.aux) (build/cap4.aux) (build/conclusion.aux)
+(build/glosario.aux) (build/anexos/a-requerimientos.aux)
+(build/anexos/b-backlog.aux) (build/anexos/c-protocolo.aux))
 (/usr/share/texlive/texmf-dist/tex/latex/biblatex-apa/spanish-apa.lbx
 (/usr/share/texlive/texmf-dist/tex/latex/biblatex/lbx/spanish.lbx)
 (/usr/share/texlive/texmf-dist/tex/latex/biblatex/lbx/spanish.lbx))
-No file main.bbl.
+(build/main.bbl)
 (/usr/share/texlive/texmf-dist/tex/context/base/mkii/supp-pdf.mkii
 [Loading MPS to PDF converter (version 2006.09.02).]
 ) (/usr/share/texlive/texmf-dist/tex/latex/epstopdf-pkg/epstopdf-base.sty
 (/usr/share/texlive/texmf-dist/tex/latex/grfext/grfext.sty)
 (/usr/share/texlive/texmf-dist/tex/latex/latexconfig/epstopdf-sys.cfg))
-(./Portada.tex (/usr/share/texlive/texmf-dist/tex/latex/psnfss/ts1ppl.fd)
+(build/main.out) (build/main.out) (./Portada.tex
+(/usr/share/texlive/texmf-dist/tex/latex/psnfss/ts1ppl.fd)
 [1{/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map}{/usr/share/texlive/texmf-
 dist/fonts/enc/dvips/base/8r.enc} <./images/Logo_depto_ing_informatica.png>])
-No file main.toc.
-
+(build/main.toc (/usr/share/texlive/texmf-dist/tex/latex/psnfss/ot1ppl.fd)
+(/usr/share/texlive/texmf-dist/tex/latex/psnfss/omlzplm.fd)
+(/usr/share/texlive/texmf-dist/tex/latex/psnfss/omszplm.fd)
+(/usr/share/texlive/texmf-dist/tex/latex/psnfss/omxzplm.fd)
+(/usr/share/texlive/texmf-dist/tex/latex/psnfss/ot1zplm.fd)
 [1]
-No file main.lof.
 
+Class memoir Warning: The material used in the headers is too large
+(15.35402pt) for the given head height (14.5pt), it is recommended to
+either increase the head height or redesign the header
+(in both cases you will find help in the memoir manual). on input line 58.
+
+
+Overfull \vbox (0.85402pt too high) has occurred while \output is active
 [2]
-No file main.lot.
+Underfull \hbox (badness 1292) in paragraph at lines 63--63
+ [][] [][]\T1/ppl/m/n/12 Identificadores del cam-po de da-tos ex-ten-di-dos (pe
+r-fil 
+)
 
-[3] (./resumen.tex
+Overfull \vbox (0.85402pt too high) has occurred while \output is active
+[3] (build/main.lof
+Underfull \hbox (badness 1609) in paragraph at lines 12--12
+ [][] [][]\T1/ppl/m/n/12 Las tres vías de in-ges-ta con-ver-gen a un úni-co for
+-ma-to 
+)
+[4] (build/main.lot
+Underfull \hbox (badness 10000) in paragraph at lines 6--6
+ [][] [][]\T1/ppl/m/n/12 Módulos de la so-lu-ción. Nin-gu-na cau-sa que-da sin 
+
+
+Underfull \hbox (badness 2334) in paragraph at lines 6--6
+ \T1/ppl/m/n/12 re-que-ri-mien-tos y nin-gún re-que-ri-mien-to ca-re-ce de cau-
+sa 
+
+Underfull \hbox (badness 5726) in paragraph at lines 10--10
+ [][] [][]\T1/ppl/m/n/12 Calendario ofi-cial (pau-ta del 17 de agos-to de 2026)
+. 
+
+Underfull \hbox (badness 5711) in paragraph at lines 15--15
+ [][] [][]\T1/ppl/m/n/12 Resumen del es-fuer-zo es-ti-ma-do fren-te al pre-su-p
+ues-to 
+)
+[5] (./resumen.tex
 Underfull \hbox (badness 1122) in paragraph at lines 3--17
 \T1/ppl/m/n/10.95 hard-wa-re de su pro-vee-dor, y no exis-te vi-si-bi-li-dad de
 l es-ta-do
@@ -281,208 +322,134 @@ Class memoir Warning: The \bf font command is deprecated.
 
 
 
-Class memoir Warning: The material used in the headers is too large
-(15.35402pt) for the given head height (14.5pt), it is recommended to
-either increase the head height or redesign the header
-(in both cases you will find help in the memoir manual). on input line 21.
-
-
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[4]) (./cap1.tex
+[6]) (./cap1.tex
 Underfull \hbox (badness 1221) in paragraph at lines 13--17
 \T1/ppl/m/n/12 IoT no lo-gran con-ver-tir los da-tos que es-tos ge-ne-ran en
 
 Underfull \hbox (badness 3078) in paragraph at lines 13--17
 \T1/ppl/m/n/12 que uni-fi-que la in-ges-ta, la nor-ma-li-za-ción y la ges-tión
-
-LaTeX Warning: Reference `fig:arbol' on page 1 undefined on input line 24.
-
 (./figuras/arbol.tex
-Overfull \hbox (2.8538pt too wide) in paragraph at lines 27--27
+Overfull \hbox (2.8538pt too wide) in paragraph at lines 43--43
  []\T1/ppl/m/n/9 Fragmentación 
-
-Overfull \hbox (81.13643pt too wide) in paragraph at lines 42--44
- [][] 
 )
 [1]
-Underfull \hbox (badness 10000) in paragraph at lines 34--39
+Underfull \hbox (badness 10000) in paragraph at lines 35--40
 \T1/ppl/m/n/12 al-ma-ce-na-mien-to y ges-tión; la es-pe-ci-fi-ca-ción del pro-t
 o-co-lo
 
-Underfull \hbox (badness 2181) in paragraph at lines 34--39
+Underfull \hbox (badness 2181) in paragraph at lines 35--40
 \T1/ppl/m/n/12 sensor--plataforma; adap-ta-do-res pa-ra al me-nos dos trans-por
 -tes; el
 
-LaTeX Warning: Citation 'iot3web' on page 2 undefined on input line 43.
-
-
-LaTeX Warning: Citation 'controltecweb' on page 2 undefined on input line 44.
-
-
-Underfull \hbox (badness 1303) in paragraph at lines 42--48
+Underfull \hbox (badness 1303) in paragraph at lines 43--49
 []\T1/ppl/b/n/12 Oferta re-gio-nal. \T1/ppl/m/n/12 Se iden-ti-fi-can dos ac-to-
 res en La Arau-ca-nía: \T1/ppl/b/n/12 IoT3
 
-Underfull \hbox (badness 2426) in paragraph at lines 42--48
-\T1/ppl/m/n/12 ([]), mo-ni-to-reo y au-to-ma-ti-za-ción lla-ve en mano con fuer
--te
+Underfull \hbox (badness 1087) in paragraph at lines 43--49
+\T1/ppl/m/n/12 pre-sen-cia agrí-co-la, y \T1/ppl/b/n/12 Con-trol-Tec \T1/ppl/m/
+n/12 ([]Con-trol-Tec SpA, []2026[]), te-le-me-tría
 
-Underfull \hbox (badness 2932) in paragraph at lines 42--48
-\T1/ppl/m/n/12 in-alám-bri-ca su-per-vi-sa-da des-de el mó-vil. Am-bos co-mer-c
-ia-li-zan la
-
-Underfull \hbox (badness 1715) in paragraph at lines 42--48
-\T1/ppl/m/n/12 de otra mar-ca no se in-te-gra. Nin-guno ofre-ce la \T1/ppl/b/n/
-12 ca-pa de ges-tión
-
-Underfull \hbox (badness 1062) in paragraph at lines 42--48
+Underfull \hbox (badness 1062) in paragraph at lines 43--49
 \T1/ppl/b/n/12 des-aco-pla-da del equi-pa-mien-to\T1/ppl/m/n/12 , que es el es-
 pa-cio que es-te tra-ba-jo
 
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
 [2]
-
-LaTeX Warning: Citation 'siadc05' on page 3 undefined on input line 51.
-
-
-LaTeX Warning: Citation 'siadc09' on page 3 undefined on input line 51.
-
-
-LaTeX Warning: Citation 'verisuresigfox' on page 3 undefined on input line 53.
-
-
-Underfull \hbox (badness 2608) in paragraph at lines 49--56
+Underfull \hbox (badness 2608) in paragraph at lines 50--57
 []\T1/ppl/b/n/12 El sec-tor de las alar-mas mo-ni-to-rea-das \T1/ppl/m/n/12 re-
 sol-vió ha-ce dé-ca-das la
 
-Underfull \hbox (badness 2197) in paragraph at lines 49--56
-\T1/ppl/m/n/12 su vo-ca-bu-la-rio en el pro-to-co-lo abier-to Con-tact ID ([]),
- hoy
+Underfull \hbox (badness 1728) in paragraph at lines 50--57
+\T1/ppl/m/n/12 com-bi-nan ade-más ca-na-les re-dun-dan-tes de ra-dio an-te in-t
+er-fe-ren-cia
 
-LaTeX Warning: Citation 'rfc8428' on page 3 undefined on input line 59.
-
-
-LaTeX Warning: Citation 'lwm2m' on page 3 undefined on input line 60.
-
-
-LaTeX Warning: Reference `cap:especificacion' on page 3 undefined on input line
- 60.
-
+Underfull \hbox (badness 1776) in paragraph at lines 50--57
+\T1/ppl/m/n/12 ([]Bu-si-ness Wi-re, []2016[]). Sin em-bar-go, el sec-tor lo apl
+i-ca den-tro de
 
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
 [3]
-Underfull \hbox (badness 6961) in paragraph at lines 77--80
+Underfull \hbox (badness 6961) in paragraph at lines 78--81
 []\T1/ppl/m/n/12 Cada ob-je-ti-vo ex-pli-ci-ta qué se ha-rá, me-dian-te qué mé-
 to-do y
 
-Underfull \hbox (badness 4108) in paragraph at lines 77--80
+Underfull \hbox (badness 4108) in paragraph at lines 78--81
 \T1/ppl/m/n/12 qué re-sul-ta-do ve-ri-fi-ca-ble pro-du-ce, con-for-me a la in-d
 i-ca-ción del
 
-Underfull \hbox (badness 10000) in paragraph at lines 77--80
+Underfull \hbox (badness 10000) in paragraph at lines 78--81
 \T1/ppl/m/n/12 pro-fe-sor guía. El des-glo-se SMART com-ple-to, con in-di-ca-do
 -res
 
-Underfull \hbox (badness 2600) in paragraph at lines 77--80
+Underfull \hbox (badness 2600) in paragraph at lines 78--81
 \T1/ppl/m/n/12 nu-mé-ri-cos por cri-te-rio, se in-clu-ye en el re-po-si-to-rio 
 del pro-yec-to
 
-Underfull \hbox (badness 5578) in paragraph at lines 82--86
+Underfull \hbox (badness 5578) in paragraph at lines 83--87
 []\T1/ppl/b/n/12 OE1 \T1/ppl/m/n/12 ^^V Ca-rac-te-ri-zar la si-tua-ción de ges-
 tión de da-tos de
 
-Underfull \hbox (badness 1596) in paragraph at lines 82--86
+Underfull \hbox (badness 1596) in paragraph at lines 83--87
 \T1/ppl/m/n/12 sen-so-res en la or-ga-ni-za-ción des-ti-na-ta-ria, me-dian-te e
 n-tre-vis-tas
 
-Underfull \hbox (badness 1490) in paragraph at lines 86--90
+Underfull \hbox (badness 1490) in paragraph at lines 87--91
 []\T1/ppl/b/n/12 OE2 \T1/ppl/m/n/12 ^^V Es-pe-ci-fi-car el pro-to-co-lo sensor-
 -plataforma ba-sa-do en
 
-Underfull \hbox (badness 4217) in paragraph at lines 86--90
+Underfull \hbox (badness 4217) in paragraph at lines 87--91
 \T1/ppl/m/n/12 Con-tact ID, me-dian-te aná-li-sis com-pa-ra-ti-vo pon-de-ra-do 
 y la
 
-Underfull \hbox (badness 2173) in paragraph at lines 93--96
+Underfull \hbox (badness 2173) in paragraph at lines 94--97
 []\T1/ppl/b/n/12 OE4 \T1/ppl/m/n/12 ^^V De-ter-mi-nar el mo-de-lo de des-plie-g
 ue y el cos-to de
-(/usr/share/texlive/texmf-dist/tex/latex/psnfss/ot1ppl.fd)
-(/usr/share/texlive/texmf-dist/tex/latex/psnfss/omlzplm.fd)
-(/usr/share/texlive/texmf-dist/tex/latex/psnfss/omszplm.fd)
-(/usr/share/texlive/texmf-dist/tex/latex/psnfss/omxzplm.fd)
-(/usr/share/texlive/texmf-dist/tex/latex/psnfss/ot1zplm.fd)
-Underfull \hbox (badness 10000) in paragraph at lines 96--99
+
+Underfull \hbox (badness 10000) in paragraph at lines 97--100
 []\T1/ppl/b/n/12 OE5 \T1/ppl/m/n/12 ^^V Im-ple-men-tar la pla-ta-for-ma y sus a
 dap-ta-do-res
 
-Underfull \hbox (badness 5519) in paragraph at lines 96--99
+Underfull \hbox (badness 5519) in paragraph at lines 97--100
 \T1/ppl/m/n/12 mul-ti-pro-to-co-lo, me-dian-te de-sa-rro-llo in-cre-men-tal gui
 a-do por
+
+Underfull \hbox (badness 1221) in paragraph at lines 100--103
+[]\T1/ppl/b/n/12 OE6 \T1/ppl/m/n/12 ^^V Va-li-dar la pla-ta-for-ma en con-di-ci
+o-nes que re-pli-can el
+
+Underfull \hbox (badness 1728) in paragraph at lines 100--103
+\T1/ppl/m/n/12 en-torno ope-ra-ti-vo, me-dian-te prue-bas fun-cio-na-les, de ca
+r-ga y
 
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
 [4]
-Underfull \hbox (badness 1221) in paragraph at lines 99--102
-[]\T1/ppl/b/n/12 OE6 \T1/ppl/m/n/12 ^^V Va-li-dar la pla-ta-for-ma en con-di-ci
-o-nes que re-pli-can el
+Underfull \hbox (badness 1552) in paragraph at lines 126--132
+\T1/ppl/m/n/12 y el có-di-go de la pla-ta-for-ma son de \T1/ppl/b/n/12 au-to-rí
+a de Vi-cen-te Ri-car-do
 
-Underfull \hbox (badness 1728) in paragraph at lines 99--102
-\T1/ppl/m/n/12 en-torno ope-ra-ti-vo, me-dian-te prue-bas fun-cio-na-les, de ca
-r-ga y
-
-Overfull \hbox (86.43924pt too wide) in paragraph at lines 106--119
- [][] 
-
-LaTeX Warning: Reference `cap:antecedentes' on page 5 undefined on input line 1
-25.
-
-
-LaTeX Warning: Reference `cap:especificacion' on page 5 undefined on input line
- 126.
-
-
-LaTeX Warning: Reference `cap:metodologia' on page 5 undefined on input line 12
-7.
-
+Underfull \hbox (badness 1024) in paragraph at lines 126--132
+\T1/ppl/m/n/12 or-ga-ni-za-ción que ya po-sea sen-so-res pue-da uti-li-zar-lo l
+i-bre-men-te; la
 )
-Underfull \hbox (badness 2913) in paragraph at lines 125--84
-[]\T1/ppl/m/n/12 El ca-pí-tu-lo [] es-ta-ble-ce los an-te-ce-den-tes téc-ni-cos
-. El ca-pí-tu-lo []
+Underfull \hbox (badness 1168) in paragraph at lines 135--84
+\T1/ppl/m/n/12 pro-to-co-lo; la do-cu-men-ta-ción ex-ten-di-da re-si-de en el r
+e-po-si-to-rio del
 
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[5] (./cap2.tex
+[5]
 
-LaTeX Warning: Reference `fig:pila' on page 6 undefined on input line 11.
-
-(./figuras/pila.tex
-Overfull \hbox (66.00215pt too wide) in paragraph at lines 44--46
- [][] 
-)
-
-LaTeX Warning: Citation 'rp002' on page 6 undefined on input line 19.
-
-
-LaTeX Warning: Citation 'lorachile' on page 6 undefined on input line 21.
-
-
-LaTeX Warning: Reference `fig:lorawan' on page 6 undefined on input line 27.
-
-
-[6] (./figuras/lorawan.tex
-Underfull \hbox (badness 1308) in paragraph at lines 25--27
+Overfull \vbox (0.85402pt too high) has occurred while \output is active
+[6] (./cap2.tex (./figuras/pila.tex)
+[7] (./figuras/lorawan.tex
+Underfull \hbox (badness 1308) in paragraph at lines 30--30
 [][]\T1/ppl/b/n/9 El ci-fra-do es de ex-tre-mo a ex-tre-mo, del no-do al ser-vi
 -dor de red. \T1/ppl/m/n/9 El ga-te-way so-lo 
-
-Overfull \hbox (93.68214pt too wide) in paragraph at lines 29--30
- [][] 
 )
-
-LaTeX Warning: Reference `fig:mqtt' on page 7 undefined on input line 33.
-
-
 Underfull \hbox (badness 3209) in paragraph at lines 33--38
 []\T1/ppl/m/n/12 MQTT apli-ca el pa-trón pu-bli-car/suscribir a tra-vés de un \
 T1/ppl/m/it/12 bro-ker
@@ -501,66 +468,25 @@ Underfull \hbox (badness 1448) in paragraph at lines 33--38
 
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[7] (./figuras/mqtt.tex
-Underfull \hbox (badness 10000) in paragraph at lines 25--26
+[8] (./figuras/mqtt.tex
+Underfull \hbox (badness 10000) in paragraph at lines 31--31
 [][]\T1/ppl/m/n/9 Los men-sa-jes se or-ga-ni-zan en \T1/ppl/b/n/9 tó-pi-cos\T1/
 ppl/m/n/9 , con for-ma de ru-ta: 
-
-Overfull \hbox (3.27625pt too wide) in paragraph at lines 30--32
- [][] 
 )
-
-LaTeX Warning: Citation 'siadc05' on page 8 undefined on input line 44.
-
-
-LaTeX Warning: Citation 'siadc03' on page 8 undefined on input line 45.
-
-
-LaTeX Warning: Citation 'siadc09' on page 8 undefined on input line 46.
-
-
-Underfull \hbox (badness 1466) in paragraph at lines 43--48
-[]\T1/ppl/m/n/12 Contact ID es el pro-to-co-lo de re-por-te de even-tos de la i
-n-dus-tria
-
-LaTeX Warning: Reference `fig:mensaje' on page 8 undefined on input line 49.
-
-
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[8] (./figuras/mensaje.tex
-Overfull \hbox (25.36589pt too wide) in paragraph at lines 37--38
- [][] 
-)
-
-LaTeX Warning: Reference `fig:alarmas' on page 9 undefined on input line 59.
-
-(./figuras/alarmas.tex
+[9] (./figuras/mensaje.tex) (./figuras/alarmas.tex
 Missing character: There is no ) in font nullfont!
 Missing character: There is no ) in font nullfont!
 Missing character: There is no ) in font nullfont!
 
-Overfull \hbox (53.41864pt too wide) in paragraph at lines 51--53
- [][] 
-
-Underfull \hbox (badness 1117) in paragraph at lines 53--53
+Underfull \hbox (badness 1117) in paragraph at lines 54--54
 \T1/ppl/m/n/12 for-ma-to del men-sa-je se con-ser-va a tra-vés de tres ge-ne-ra
 -cio-nes de
 )
-
-LaTeX Warning: Citation 'contactidcodes' on page 9 undefined on input line 68.
-
-
 Underfull \hbox (badness 1147) in paragraph at lines 65--69
 \T1/ppl/m/n/12 que es-te tra-ba-jo ne-ce-si-ta: pér-di-da de su-per-vi-sión RF 
 (381), ba-te-ría
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[9]
-
-LaTeX Warning: Reference `sec:infra' on page 10 undefined on input line 76.
-
 )
 Underfull \hbox (badness 1270) in paragraph at lines 72--85
 \T1/ppl/m/n/12 Se em-plea Ti-mes-ca-leDB, ex-ten-sión de Post-greSQL que con-se
@@ -572,28 +498,17 @@ Underfull \hbox (badness 1270) in paragraph at lines 72--85
 
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[10] (./cap3.tex
+[10]
 
-LaTeX Warning: Citation 'iso25010' on page 11 undefined on input line 8.
+Overfull \vbox (0.85402pt too high) has occurred while \output is active
+[11] (./cap3.tex
+Underfull \hbox (badness 1668) in paragraph at lines 6--12
+\T1/ppl/m/n/12 des-ti-na-ta-ria ^^V^^Spro-pie-ta-rio del pro-yec-to^^T en la te
+r-mi-no-lo-gía de la
 
-
-LaTeX Warning: Citation 'swebok' on page 11 undefined on input line 9.
-
-
-Underfull \hbox (badness 1205) in paragraph at lines 6--12
-\T1/ppl/m/n/12 es-tu-dio de mer-ca-do, \T1/ppl/b/n/12 [BT] \T1/ppl/m/n/12 ba-se
- teó-ri-ca (es-tán-da-res SIA, Lo-Ra-WAN
-
-Underfull \hbox (badness 2302) in paragraph at lines 6--12
-\T1/ppl/m/n/12 RP002, ISO/IEC 25010 ([]), RFC 8428, SWE-BOK ([]))
-
-Underfull \hbox (badness 1259) in paragraph at lines 6--12
-\T1/ppl/m/n/12 y \T1/ppl/b/n/12 [DP] \T1/ppl/m/n/12 de-ri-va-ción del pro-ble-m
-a. \T1/ppl/b/n/12 Bre-cha de-cla-ra-da: \T1/ppl/m/n/12 fal-ta la fuen-te
-
-LaTeX Warning: Reference `anx:requerimientos' on page 11 undefined on input lin
-e 18.
-
+Underfull \hbox (badness 1303) in paragraph at lines 6--12
+\T1/ppl/m/n/12 rú-bri-ca^^V (in-di-ca-cio-nes de la uni-ver-si-dad vía pro-fe-s
+or guía), \T1/ppl/b/n/12 [EM]
 
 Underfull \hbox (badness 1394) in paragraph at lines 15--19
 \T1/ppl/m/n/12 MoS-CoW: 49 \T1/ppl/m/it/12 Must\T1/ppl/m/n/12 , 16 \T1/ppl/m/it
@@ -604,82 +519,40 @@ Underfull \hbox (badness 3769) in paragraph at lines 37--37
 []\T1/ppl/m/n/12 Cuadro 3.1: []Módulos de la so-lu-ción. Nin-gu-na cau-sa que-d
 a sin
 
-[11]
-
-LaTeX Warning: Reference `tab:matriz' on page 12 undefined on input line 54.
-
-
-Overfull \hbox (23.75992pt too wide) in paragraph at lines 61--77
+[12]
+Overfull \hbox (16.82484pt too wide) in paragraph at lines 61--77
  [][] 
-
-LaTeX Warning: Reference `anx:protocolo' on page 12 undefined on input line 77.
-
-
-
-LaTeX Warning: Reference `anx:protocolo' on page 12 undefined on input line 77.
-
-
 
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[12]
-
-LaTeX Warning: Reference `fig:dosplanos' on page 13 undefined on input line 94.
-
-
-
-LaTeX Warning: Reference `anx:protocolo' on page 13 undefined on input line 95.
-
-
-
-Underfull \hbox (badness 1337) in paragraph at lines 89--97
-\T1/ppl/m/n/12 la pla-ta-for-ma (fi-gu-ra []). Ve-ri-fi-ca-do con la im-ple-men
--ta-ción pro-pia
-(./figuras/dosplanos.tex
+[13] (./figuras/dosplanos.tex
 Missing character: There is no ) in font nullfont!
 )
-
-LaTeX Warning: Reference `fig:ingesta' on page 13 undefined on input line 101.
-
-
 Underfull \hbox (badness 1057) in paragraph at lines 100--102
 \T1/ppl/m/n/12 pa-ra pa-ne-les ins-ta-la-dos; HTTP pa-ra sen-so-res Wi-Fi e in-
 te-gra-cio-nes)
 
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[13] (./figuras/ingesta.tex
-Overfull \hbox (63.47664pt too wide) in paragraph at lines 31--33
- [][] 
-)
-Overfull \hbox (150.61873pt too wide) in paragraph at lines 110--127
- [][] 
-
+[14] (./figuras/ingesta.tex)
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[14]
+[15]
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[15])
+[16])
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[16] (./cap4.tex
-
-LaTeX Warning: Citation 'swebok' on page 17 undefined on input line 17.
-
-
-Overfull \hbox (1.89766pt too wide) in paragraph at lines 27--38
- [][] 
+[17] (./cap4.tex
+Underfull \hbox (badness 1675) in paragraph at lines 17--22
+\T1/ppl/m/n/12 y di-se-ño (caps. 2--3), prue-bas (cap. 5) y ges-tión de con-fi-
+gu-ra-ción
 
 Underfull \hbox (badness 2012) in paragraph at lines 38--38
 []\T1/ppl/m/n/12 Cuadro 4.1: []Calendario ofi-cial (pau-ta del 17 de agos-to de
  2026).
 
-[17]
-
-LaTeX Warning: Reference `anx:backlog' on page 18 undefined on input line 48.
-
-
+[18]
 Underfull \hbox (badness 10000) in paragraph at lines 56--64
 []\T1/ppl/m/n/12 La ve-ri-fi-ca-ción nu-mé-ri-ca ^^Vsu-man-do pro-gra-má-ti-ca-
 men-te las
@@ -694,21 +567,14 @@ Underfull \hbox (badness 1270) in paragraph at lines 56--64
 
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[18]
+[19]
 Underfull \hbox (badness 1558) in paragraph at lines 65--68
 []\T1/ppl/m/n/12 La dis-tri-bu-ción tem-po-ral tam-bién se co-rri-gió: la asig-
 na-ción ini-cial
-
-LaTeX Warning: Reference `sec:protocolo' on page 19 undefined on input line 81.
-
-
-
-Overfull \hbox (52.27449pt too wide) in paragraph at lines 73--84
- [][] 
 )
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[19] (./conclusion.tex
+[20] (./conclusion.tex
 Underfull \hbox (badness 1603) in paragraph at lines 3--11
 []\T1/ppl/b/n/12 Sobre la elec-ción del pro-to-co-lo. \T1/ppl/m/n/12 El aná-li-
 sis com-pa-ra-ti-vo de ocho
@@ -721,60 +587,196 @@ Underfull \hbox (badness 1859) in paragraph at lines 18--21
 []\T1/ppl/b/n/12 Sobre la via-bi-li-dad. \T1/ppl/m/n/12 Ve-ri-fi-car nu-mé-ri-c
 a-men-te el bac-klog an-tes de
 )
-[20]
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
 [21]
 
-LaTeX Warning: Empty bibliography on input line 90.
+Overfull \vbox (0.85402pt too high) has occurred while \output is active
+[22] (./glosario.tex
+Underfull \hbox (badness 3815) in paragraph at lines 5--7
+[]\T1/ppl/m/n/12 Intermediario de MQTT. Re-ci-be los men-sa-jes de quie-nes
 
-! I can't write on file `anexos/a-requerimientos.aux'.
-\@include ...mmediate \openout \@partaux "#1.aux" 
-                                                  \immediate \write \@partau...
-l.93 \include{anexos/a-requerimientos}
-                                      
-(Press Enter to retry, or Control-D to exit; default file extension is `.tex')
-Please type another output file name
-! Emergency stop.
-\@include ...mmediate \openout \@partaux "#1.aux" 
-                                                  \immediate \write \@partau...
-l.93 \include{anexos/a-requerimientos}
-                                      
-!  ==> Fatal error occurred, no output PDF file produced!
+Underfull \hbox (badness 3240) in paragraph at lines 9--12
+[]\T1/ppl/m/n/12 Servidor de red Lo-Ra-WAN de có-di-go abier-to. Es el
+
+Underfull \hbox (badness 1383) in paragraph at lines 12--14
+[]\T1/ppl/m/n/12 Protocolo de 16 dí-gi-tos de la in-dus-tria de
+
+Underfull \hbox (badness 5064) in paragraph at lines 14--16
+[]\T1/ppl/m/n/12 Campo \T1/cmtt/m/n/12 [<A--Z><datos>] \T1/ppl/m/n/12 que el es
+-tán-dar DC-09
+
+Underfull \hbox (badness 1694) in paragraph at lines 17--18
+[]\T1/ppl/m/n/12 Tonos del te-cla-do te-le-fó-ni-co. Fue el trans-por-te ori-gi
+-nal de
+
+[23]
+Underfull \hbox (badness 4752) in paragraph at lines 21--22
+[]\T1/ppl/m/n/12 Protocolo de red cons-trui-do so-bre Lo-Ra: re-gis-tro de
+
+Underfull \hbox (badness 10000) in paragraph at lines 22--26
+[]\T1/ppl/m/n/12 Protocolo de men-sa-je-ría ^^Spu-bli-car/suscribir^^T:
+
+Underfull \hbox (badness 10000) in paragraph at lines 22--26
+\T1/ppl/m/n/12 los sen-so-res pu-bli-can en un tó-pi-co
+
+Underfull \hbox (badness 10000) in paragraph at lines 22--26
+\T1/ppl/m/n/12 (\T1/cmtt/m/n/12 sitio/invernadero-2/sensor-007/temperatura\T1/p
+pl/m/n/12 ) y cual-quier
+)
+
+Overfull \vbox (0.85402pt too high) has occurred while \output is active
+[24]
+Underfull \hbox (badness 1102) in paragraph at lines 91--91
+[][]\T1/ppl/m/n/12 Ademco. (1999). \T1/ppl/m/it/12 Di-gi-tal Com-mu-ni-ca-tion 
+Stan-dard: Adem-co Con-tact ID
+
+Underfull \hbox (badness 6268) in paragraph at lines 91--91
+[][]\T1/ppl/m/n/12 IoT3. (2026). \T1/ppl/m/it/12 So-lu-cio-nes in-te-li-gen-tes
+ de mo-ni-to-reo y au-to-ma-ti-za-ción\T1/ppl/m/n/12 .
+
+Underfull \hbox (badness 10000) in paragraph at lines 91--91
+\T1/ppl/m/it/12 and Eva-lua-tion (SQua-RE)\T1/ppl/m/n/12 . In-ter-na-tio-nal Or
+-ga-ni-za-tion for
+
+Underfull \hbox (badness 2980) in paragraph at lines 91--91
+\T1/ppl/m/it/12 Pro-to-col for Alarm Sys-tem Com-mu-ni-ca-tions\T1/ppl/m/n/12 .
+ Se-cu-rity In-dustry
+
+[25]
+Underfull \hbox (badness 1303) in paragraph at lines 91--91
+[][]\T1/ppl/m/n/12 Security In-dustry As-so-cia-tion. (2017). \T1/ppl/m/it/12 D
+C-03-2017: DCS SIA For-mat
+
+Underfull \hbox (badness 3503) in paragraph at lines 91--91
+\T1/ppl/m/it/12 Stan-dard\T1/ppl/m/n/12 . Se-cu-rity In-dustry As-so-cia-tion. 
+[]$https : / / www .
+
+Underfull \hbox (badness 10000) in paragraph at lines 91--91
+[][]\T1/ppl/m/n/12 Security In-dustry As-so-cia-tion. (2026). \T1/ppl/m/it/12 D
+C-09: In-ter-net Pro-to-col
+
+Underfull \hbox (badness 3439) in paragraph at lines 91--91
+\T1/ppl/m/it/12 Event Re-por-ting, re-vi-sión 2026 \T1/ppl/m/n/12 (Apro-ba-ción
+ AN-SI; in-cor-po-ra
+
+[26] (./anexos/a-requerimientos.tex
+
+LaTeX Warning: Reference `tab:fuentes' on page 27 undefined on input line 5.
+
+[27]
+
+Overfull \vbox (0.85402pt too high) has occurred while \output is active
+[28]
+
+Overfull \vbox (0.85402pt too high) has occurred while \output is active
+[29]
+
+Overfull \vbox (0.85402pt too high) has occurred while \output is active
+[30]
+
+Overfull \vbox (0.85402pt too high) has occurred while \output is active
+[31]
+
+Overfull \vbox (0.85402pt too high) has occurred while \output is active
+[32]
+
+Overfull \vbox (0.85402pt too high) has occurred while \output is active
+[33]
+Overfull \vbox (0.85402pt too high) has occurred while \output is active
+[34]
+Overfull \vbox (0.85402pt too high) has occurred while \output is active
+[35])
+
+Overfull \vbox (0.85402pt too high) has occurred while \output is active
+[36] (./anexos/b-backlog.tex
+Underfull \hbox (badness 2134) in paragraph at lines 5--7
+\T1/ppl/m/n/10.95 con cri-te-rios de acep-ta-ción de-ta-lla-dos en el do-cu-men
+-to de bac-klog del
+
+[37]
+Overfull \vbox (0.85402pt too high) has occurred while \output is active
+[38]
+
+Overfull \vbox (0.85402pt too high) has occurred while \output is active
+[39]
+
+Overfull \vbox (0.85402pt too high) has occurred while \output is active
+[40]
+Overfull \vbox (0.85402pt too high) has occurred while \output is active
+[41]
+Overfull \vbox (0.85402pt too high) has occurred while \output is active
+[42]
+
+Overfull \vbox (0.85402pt too high) has occurred while \output is active
+[43]
+Overfull \vbox (0.85402pt too high) has occurred while \output is active
+[44]
+Underfull \hbox (badness 1360) in paragraph at lines 152--152
+[]\T1/ppl/m/n/10.95 Cuadro B.15: Re-su-men del es-fuer-zo es-ti-ma-do fren-te a
+l
+)
+
+Overfull \vbox (0.85402pt too high) has occurred while \output is active
+[45] (./anexos/c-protocolo.tex
+Underfull \hbox (badness 10000) in paragraph at lines 26--26
+[]\T1/ppl/m/n/10.95 Cuadro C.1: Men-sa-jes de ejem-plo con su-ma de
+[46]
+Underfull \hbox (badness 3229) in paragraph at lines 39--39
+[]\T1/ppl/m/n/10.95 Cuadro C.2: Ve-ri-fi-ca-ción pro-gra-má-ti-ca del ta-ma-ño.
+ El
+
+Overfull \vbox (0.85402pt too high) has occurred while \output is active
+[47]
+Overfull \hbox (2.36372pt too wide) in paragraph at lines 60--60
+ []|[]\T1/ppl/b/n/10.95 Código[]| 
+
+Overfull \hbox (11.26837pt too wide) in paragraph at lines 64--64
+[]|\T1/ppl/m/n/10.95 MQTT/HTTP|  
+)
+
+Overfull \vbox (0.85402pt too high) has occurred while \output is active
+[48]
+
+Class memoir Warning: The material used in the headers is too large
+(15.35402pt) for the given head height (14.5pt), it is recommended to
+either increase the head height or redesign the header
+(in both cases you will find help in the memoir manual). on input line 97.
+
+(build/main.aux (build/Portada.aux) (build/resumen.aux) (build/cap1.aux)
+(build/cap2.aux) (build/cap3.aux) (build/cap4.aux) (build/conclusion.aux)
+(build/glosario.aux) (build/anexos/a-requerimientos.aux)
+(build/anexos/b-backlog.aux) (build/anexos/c-protocolo.aux))
+
+LaTeX Warning: There were undefined references.
+
+ )
+(see the transcript file for additional information) </home/vicenterog/.texlive
+2025/texmf-var/fonts/pk/ljfour/jknappen/ec/ectt1095.600pk> </home/vicenterog/.t
+exlive2025/texmf-var/fonts/pk/ljfour/jknappen/ec/ectt0900.600pk> </home/vicente
+rog/.texlive2025/texmf-var/fonts/pk/ljfour/jknappen/ec/ectt1200.600pk></usr/sha
+re/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/share/texl
+ive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/share/texlive/te
+xmf-dist/fonts/type1/public/mathpazo/fplmr.pfb></usr/share/texlive/texmf-dist/f
+onts/type1/urw/palatino/uplb8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/u
+rw/palatino/uplbi8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/palatino
+/uplr8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/palatino/uplr8a.pfb>
+</usr/share/texlive/texmf-dist/fonts/type1/urw/palatino/uplri8a.pfb>
+Output written on build/main.pdf (55 pages, 367368 bytes).
 Transcript written on build/main.log.
 Latexmk: Getting log file 'build/main.log'
 Latexmk: Examining 'build/main.fls'
 Latexmk: Examining 'build/main.log'
-Latexmk: Missing bbl file 'build/main.bbl' in following:
- No file main.bbl.
-Latexmk: Missing input file 'main.toc' message in .log file:
-  No file main.toc.
-Latexmk: Missing input file 'main.lof' message in .log file:
-  No file main.lof.
-Latexmk: Missing input file 'main.lot' message in .log file:
-  No file main.lot.
-Use of uninitialized value $title in concatenation (.) or string at /usr/bin/latexmk line 11939.
-Latexmk: making  directory 'build/anexos'
-Latexmk: Couldn't create directory 'build/anexos'.
-    System error: 'No such file or directory'
+Latexmk: Found input bbl file 'build/main.bbl'
+Latexmk: Log file says output to 'build/main.pdf'
 Latexmk: Using biber to make bibliography file(s).
-Latexmk: Incomplete (and hence corrupt) bcf file 'build/main.bcf'
 Latexmk: Bibliography file(s) from .bcf file:
   referencias.bib
 Sources for biber
   referencias.bib
   build/main.bcf
-Latexmk: ========== Incomplete .bcf file 'build/main.bcf'.
-  I'll rename the file to 'build/main.bcf-SAVE-ERROR'.
-  I'll rename the bbl file to 'build/main.bbl-SAVE-ERROR',
-  in case the incomplete bcf file was a result of error in
-  'pdflatex' caused by an error in the bbl file.
-Error in *LaTeX, but needed subdirectories in output directory
-   were missing and successfully created, so try again.
 Latexmk: applying rule 'pdflatex'...
 Rule 'pdflatex':  Reasons for rerun
 Changed files or newly in use/created:
-  build/main.aux
+  build/anexos/a-requerimientos.aux
 
 ------------
 Run number 2 of rule 'pdflatex'
@@ -987,11 +989,12 @@ Package biblatex Warning: Load 'inputenc' before biblatex.
 
 (build/main.aux (build/Portada.aux) (build/resumen.aux) (build/cap1.aux)
 (build/cap2.aux) (build/cap3.aux) (build/cap4.aux) (build/conclusion.aux)
-No file anexos/a-requerimientos.aux.
-) (/usr/share/texlive/texmf-dist/tex/latex/biblatex-apa/spanish-apa.lbx
+(build/glosario.aux) (build/anexos/a-requerimientos.aux)
+(build/anexos/b-backlog.aux) (build/anexos/c-protocolo.aux))
+(/usr/share/texlive/texmf-dist/tex/latex/biblatex-apa/spanish-apa.lbx
 (/usr/share/texlive/texmf-dist/tex/latex/biblatex/lbx/spanish.lbx)
 (/usr/share/texlive/texmf-dist/tex/latex/biblatex/lbx/spanish.lbx))
-No file main.bbl.
+(build/main.bbl)
 (/usr/share/texlive/texmf-dist/tex/context/base/mkii/supp-pdf.mkii
 [Loading MPS to PDF converter (version 2006.09.02).]
 ) (/usr/share/texlive/texmf-dist/tex/latex/epstopdf-pkg/epstopdf-base.sty
@@ -1001,15 +1004,50 @@ No file main.bbl.
 (/usr/share/texlive/texmf-dist/tex/latex/psnfss/ts1ppl.fd)
 [1{/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map}{/usr/share/texlive/texmf-
 dist/fonts/enc/dvips/base/8r.enc} <./images/Logo_depto_ing_informatica.png>])
-No file main.toc.
-
+(build/main.toc (/usr/share/texlive/texmf-dist/tex/latex/psnfss/ot1ppl.fd)
+(/usr/share/texlive/texmf-dist/tex/latex/psnfss/omlzplm.fd)
+(/usr/share/texlive/texmf-dist/tex/latex/psnfss/omszplm.fd)
+(/usr/share/texlive/texmf-dist/tex/latex/psnfss/omxzplm.fd)
+(/usr/share/texlive/texmf-dist/tex/latex/psnfss/ot1zplm.fd)
 [1]
-No file main.lof.
 
+Class memoir Warning: The material used in the headers is too large
+(15.35402pt) for the given head height (14.5pt), it is recommended to
+either increase the head height or redesign the header
+(in both cases you will find help in the memoir manual). on input line 58.
+
+
+Overfull \vbox (0.85402pt too high) has occurred while \output is active
 [2]
-No file main.lot.
+Underfull \hbox (badness 1292) in paragraph at lines 63--63
+ [][] [][]\T1/ppl/m/n/12 Identificadores del cam-po de da-tos ex-ten-di-dos (pe
+r-fil 
+)
 
-[3] (./resumen.tex
+Overfull \vbox (0.85402pt too high) has occurred while \output is active
+[3] (build/main.lof
+Underfull \hbox (badness 1609) in paragraph at lines 12--12
+ [][] [][]\T1/ppl/m/n/12 Las tres vías de in-ges-ta con-ver-gen a un úni-co for
+-ma-to 
+)
+[4] (build/main.lot
+Underfull \hbox (badness 10000) in paragraph at lines 6--6
+ [][] [][]\T1/ppl/m/n/12 Módulos de la so-lu-ción. Nin-gu-na cau-sa que-da sin 
+
+
+Underfull \hbox (badness 2334) in paragraph at lines 6--6
+ \T1/ppl/m/n/12 re-que-ri-mien-tos y nin-gún re-que-ri-mien-to ca-re-ce de cau-
+sa 
+
+Underfull \hbox (badness 5726) in paragraph at lines 10--10
+ [][] [][]\T1/ppl/m/n/12 Calendario ofi-cial (pau-ta del 17 de agos-to de 2026)
+. 
+
+Underfull \hbox (badness 5711) in paragraph at lines 15--15
+ [][] [][]\T1/ppl/m/n/12 Resumen del es-fuer-zo es-ti-ma-do fren-te al pre-su-p
+ues-to 
+)
+[5] (./resumen.tex
 Underfull \hbox (badness 1122) in paragraph at lines 3--17
 \T1/ppl/m/n/10.95 hard-wa-re de su pro-vee-dor, y no exis-te vi-si-bi-li-dad de
 l es-ta-do
@@ -1052,177 +1090,133 @@ Class memoir Warning: The \bf font command is deprecated.
 
 
 
-Class memoir Warning: The material used in the headers is too large
-(15.35402pt) for the given head height (14.5pt), it is recommended to
-either increase the head height or redesign the header
-(in both cases you will find help in the memoir manual). on input line 21.
-
-
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[4]) (./cap1.tex
+[6]) (./cap1.tex
 Underfull \hbox (badness 1221) in paragraph at lines 13--17
 \T1/ppl/m/n/12 IoT no lo-gran con-ver-tir los da-tos que es-tos ge-ne-ran en
 
 Underfull \hbox (badness 3078) in paragraph at lines 13--17
 \T1/ppl/m/n/12 que uni-fi-que la in-ges-ta, la nor-ma-li-za-ción y la ges-tión
 (./figuras/arbol.tex
-Overfull \hbox (2.8538pt too wide) in paragraph at lines 27--27
+Overfull \hbox (2.8538pt too wide) in paragraph at lines 43--43
  []\T1/ppl/m/n/9 Fragmentación 
-
-Overfull \hbox (81.13643pt too wide) in paragraph at lines 42--44
- [][] 
 )
 [1]
-Underfull \hbox (badness 10000) in paragraph at lines 34--39
+Underfull \hbox (badness 10000) in paragraph at lines 35--40
 \T1/ppl/m/n/12 al-ma-ce-na-mien-to y ges-tión; la es-pe-ci-fi-ca-ción del pro-t
 o-co-lo
 
-Underfull \hbox (badness 2181) in paragraph at lines 34--39
+Underfull \hbox (badness 2181) in paragraph at lines 35--40
 \T1/ppl/m/n/12 sensor--plataforma; adap-ta-do-res pa-ra al me-nos dos trans-por
 -tes; el
 
-LaTeX Warning: Citation 'iot3web' on page 2 undefined on input line 43.
-
-
-LaTeX Warning: Citation 'controltecweb' on page 2 undefined on input line 44.
-
-
-Underfull \hbox (badness 1303) in paragraph at lines 42--48
+Underfull \hbox (badness 1303) in paragraph at lines 43--49
 []\T1/ppl/b/n/12 Oferta re-gio-nal. \T1/ppl/m/n/12 Se iden-ti-fi-can dos ac-to-
 res en La Arau-ca-nía: \T1/ppl/b/n/12 IoT3
 
-Underfull \hbox (badness 2426) in paragraph at lines 42--48
-\T1/ppl/m/n/12 ([]), mo-ni-to-reo y au-to-ma-ti-za-ción lla-ve en mano con fuer
--te
+Underfull \hbox (badness 1087) in paragraph at lines 43--49
+\T1/ppl/m/n/12 pre-sen-cia agrí-co-la, y \T1/ppl/b/n/12 Con-trol-Tec \T1/ppl/m/
+n/12 ([]Con-trol-Tec SpA, []2026[]), te-le-me-tría
 
-Underfull \hbox (badness 2932) in paragraph at lines 42--48
-\T1/ppl/m/n/12 in-alám-bri-ca su-per-vi-sa-da des-de el mó-vil. Am-bos co-mer-c
-ia-li-zan la
-
-Underfull \hbox (badness 1715) in paragraph at lines 42--48
-\T1/ppl/m/n/12 de otra mar-ca no se in-te-gra. Nin-guno ofre-ce la \T1/ppl/b/n/
-12 ca-pa de ges-tión
-
-Underfull \hbox (badness 1062) in paragraph at lines 42--48
+Underfull \hbox (badness 1062) in paragraph at lines 43--49
 \T1/ppl/b/n/12 des-aco-pla-da del equi-pa-mien-to\T1/ppl/m/n/12 , que es el es-
 pa-cio que es-te tra-ba-jo
 
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
 [2]
-
-LaTeX Warning: Citation 'siadc05' on page 3 undefined on input line 51.
-
-
-LaTeX Warning: Citation 'siadc09' on page 3 undefined on input line 51.
-
-
-LaTeX Warning: Citation 'verisuresigfox' on page 3 undefined on input line 53.
-
-
-Underfull \hbox (badness 2608) in paragraph at lines 49--56
+Underfull \hbox (badness 2608) in paragraph at lines 50--57
 []\T1/ppl/b/n/12 El sec-tor de las alar-mas mo-ni-to-rea-das \T1/ppl/m/n/12 re-
 sol-vió ha-ce dé-ca-das la
 
-Underfull \hbox (badness 2197) in paragraph at lines 49--56
-\T1/ppl/m/n/12 su vo-ca-bu-la-rio en el pro-to-co-lo abier-to Con-tact ID ([]),
- hoy
+Underfull \hbox (badness 1728) in paragraph at lines 50--57
+\T1/ppl/m/n/12 com-bi-nan ade-más ca-na-les re-dun-dan-tes de ra-dio an-te in-t
+er-fe-ren-cia
 
-LaTeX Warning: Citation 'rfc8428' on page 3 undefined on input line 59.
-
-
-LaTeX Warning: Citation 'lwm2m' on page 3 undefined on input line 60.
-
+Underfull \hbox (badness 1776) in paragraph at lines 50--57
+\T1/ppl/m/n/12 ([]Bu-si-ness Wi-re, []2016[]). Sin em-bar-go, el sec-tor lo apl
+i-ca den-tro de
 
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
 [3]
-Underfull \hbox (badness 6961) in paragraph at lines 77--80
+Underfull \hbox (badness 6961) in paragraph at lines 78--81
 []\T1/ppl/m/n/12 Cada ob-je-ti-vo ex-pli-ci-ta qué se ha-rá, me-dian-te qué mé-
 to-do y
 
-Underfull \hbox (badness 4108) in paragraph at lines 77--80
+Underfull \hbox (badness 4108) in paragraph at lines 78--81
 \T1/ppl/m/n/12 qué re-sul-ta-do ve-ri-fi-ca-ble pro-du-ce, con-for-me a la in-d
 i-ca-ción del
 
-Underfull \hbox (badness 10000) in paragraph at lines 77--80
+Underfull \hbox (badness 10000) in paragraph at lines 78--81
 \T1/ppl/m/n/12 pro-fe-sor guía. El des-glo-se SMART com-ple-to, con in-di-ca-do
 -res
 
-Underfull \hbox (badness 2600) in paragraph at lines 77--80
+Underfull \hbox (badness 2600) in paragraph at lines 78--81
 \T1/ppl/m/n/12 nu-mé-ri-cos por cri-te-rio, se in-clu-ye en el re-po-si-to-rio 
 del pro-yec-to
 
-Underfull \hbox (badness 5578) in paragraph at lines 82--86
+Underfull \hbox (badness 5578) in paragraph at lines 83--87
 []\T1/ppl/b/n/12 OE1 \T1/ppl/m/n/12 ^^V Ca-rac-te-ri-zar la si-tua-ción de ges-
 tión de da-tos de
 
-Underfull \hbox (badness 1596) in paragraph at lines 82--86
+Underfull \hbox (badness 1596) in paragraph at lines 83--87
 \T1/ppl/m/n/12 sen-so-res en la or-ga-ni-za-ción des-ti-na-ta-ria, me-dian-te e
 n-tre-vis-tas
 
-Underfull \hbox (badness 1490) in paragraph at lines 86--90
+Underfull \hbox (badness 1490) in paragraph at lines 87--91
 []\T1/ppl/b/n/12 OE2 \T1/ppl/m/n/12 ^^V Es-pe-ci-fi-car el pro-to-co-lo sensor-
 -plataforma ba-sa-do en
 
-Underfull \hbox (badness 4217) in paragraph at lines 86--90
+Underfull \hbox (badness 4217) in paragraph at lines 87--91
 \T1/ppl/m/n/12 Con-tact ID, me-dian-te aná-li-sis com-pa-ra-ti-vo pon-de-ra-do 
 y la
 
-Underfull \hbox (badness 2173) in paragraph at lines 93--96
+Underfull \hbox (badness 2173) in paragraph at lines 94--97
 []\T1/ppl/b/n/12 OE4 \T1/ppl/m/n/12 ^^V De-ter-mi-nar el mo-de-lo de des-plie-g
 ue y el cos-to de
-(/usr/share/texlive/texmf-dist/tex/latex/psnfss/ot1ppl.fd)
-(/usr/share/texlive/texmf-dist/tex/latex/psnfss/omlzplm.fd)
-(/usr/share/texlive/texmf-dist/tex/latex/psnfss/omszplm.fd)
-(/usr/share/texlive/texmf-dist/tex/latex/psnfss/omxzplm.fd)
-(/usr/share/texlive/texmf-dist/tex/latex/psnfss/ot1zplm.fd)
-Underfull \hbox (badness 10000) in paragraph at lines 96--99
+
+Underfull \hbox (badness 10000) in paragraph at lines 97--100
 []\T1/ppl/b/n/12 OE5 \T1/ppl/m/n/12 ^^V Im-ple-men-tar la pla-ta-for-ma y sus a
 dap-ta-do-res
 
-Underfull \hbox (badness 5519) in paragraph at lines 96--99
+Underfull \hbox (badness 5519) in paragraph at lines 97--100
 \T1/ppl/m/n/12 mul-ti-pro-to-co-lo, me-dian-te de-sa-rro-llo in-cre-men-tal gui
 a-do por
+
+Underfull \hbox (badness 1221) in paragraph at lines 100--103
+[]\T1/ppl/b/n/12 OE6 \T1/ppl/m/n/12 ^^V Va-li-dar la pla-ta-for-ma en con-di-ci
+o-nes que re-pli-can el
+
+Underfull \hbox (badness 1728) in paragraph at lines 100--103
+\T1/ppl/m/n/12 en-torno ope-ra-ti-vo, me-dian-te prue-bas fun-cio-na-les, de ca
+r-ga y
 
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
 [4]
-Underfull \hbox (badness 1221) in paragraph at lines 99--102
-[]\T1/ppl/b/n/12 OE6 \T1/ppl/m/n/12 ^^V Va-li-dar la pla-ta-for-ma en con-di-ci
-o-nes que re-pli-can el
+Underfull \hbox (badness 1552) in paragraph at lines 126--132
+\T1/ppl/m/n/12 y el có-di-go de la pla-ta-for-ma son de \T1/ppl/b/n/12 au-to-rí
+a de Vi-cen-te Ri-car-do
 
-Underfull \hbox (badness 1728) in paragraph at lines 99--102
-\T1/ppl/m/n/12 en-torno ope-ra-ti-vo, me-dian-te prue-bas fun-cio-na-les, de ca
-r-ga y
-
-Overfull \hbox (86.43924pt too wide) in paragraph at lines 106--119
- [][] 
+Underfull \hbox (badness 1024) in paragraph at lines 126--132
+\T1/ppl/m/n/12 or-ga-ni-za-ción que ya po-sea sen-so-res pue-da uti-li-zar-lo l
+i-bre-men-te; la
 )
-Underfull \hbox (badness 1168) in paragraph at lines 125--84
+Underfull \hbox (badness 1168) in paragraph at lines 135--84
 \T1/ppl/m/n/12 pro-to-co-lo; la do-cu-men-ta-ción ex-ten-di-da re-si-de en el r
 e-po-si-to-rio del
 
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[5] (./cap2.tex (./figuras/pila.tex
-Overfull \hbox (66.00215pt too wide) in paragraph at lines 44--46
- [][] 
-)
+[5]
 
-LaTeX Warning: Citation 'rp002' on page 6 undefined on input line 19.
-
-
-LaTeX Warning: Citation 'lorachile' on page 6 undefined on input line 21.
-
-
-[6] (./figuras/lorawan.tex
-Underfull \hbox (badness 1308) in paragraph at lines 25--27
+Overfull \vbox (0.85402pt too high) has occurred while \output is active
+[6] (./cap2.tex (./figuras/pila.tex)
+[7] (./figuras/lorawan.tex
+Underfull \hbox (badness 1308) in paragraph at lines 30--30
 [][]\T1/ppl/b/n/9 El ci-fra-do es de ex-tre-mo a ex-tre-mo, del no-do al ser-vi
 -dor de red. \T1/ppl/m/n/9 El ga-te-way so-lo 
-
-Overfull \hbox (93.68214pt too wide) in paragraph at lines 29--30
- [][] 
 )
 Underfull \hbox (badness 3209) in paragraph at lines 33--38
 []\T1/ppl/m/n/12 MQTT apli-ca el pa-trón pu-bli-car/suscribir a tra-vés de un \
@@ -1242,56 +1236,26 @@ Underfull \hbox (badness 1448) in paragraph at lines 33--38
 
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[7] (./figuras/mqtt.tex
-Underfull \hbox (badness 10000) in paragraph at lines 25--26
+[8] (./figuras/mqtt.tex
+Underfull \hbox (badness 10000) in paragraph at lines 31--31
 [][]\T1/ppl/m/n/9 Los men-sa-jes se or-ga-ni-zan en \T1/ppl/b/n/9 tó-pi-cos\T1/
 ppl/m/n/9 , con for-ma de ru-ta: 
-
-Overfull \hbox (3.27625pt too wide) in paragraph at lines 30--32
- [][] 
 )
 
-LaTeX Warning: Citation 'siadc05' on page 8 undefined on input line 44.
-
-
-LaTeX Warning: Citation 'siadc03' on page 8 undefined on input line 45.
-
-
-LaTeX Warning: Citation 'siadc09' on page 8 undefined on input line 46.
-
-
-Underfull \hbox (badness 1466) in paragraph at lines 43--48
-[]\T1/ppl/m/n/12 Contact ID es el pro-to-co-lo de re-por-te de even-tos de la i
-n-dus-tria
-
-
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[8] (./figuras/mensaje.tex
-Overfull \hbox (25.36589pt too wide) in paragraph at lines 37--38
- [][] 
-) (./figuras/alarmas.tex
+[9] (./figuras/mensaje.tex) (./figuras/alarmas.tex
 Missing character: There is no ) in font nullfont!
 Missing character: There is no ) in font nullfont!
 Missing character: There is no ) in font nullfont!
 
-Overfull \hbox (53.41864pt too wide) in paragraph at lines 51--53
- [][] 
-
-Underfull \hbox (badness 1117) in paragraph at lines 53--53
+Underfull \hbox (badness 1117) in paragraph at lines 54--54
 \T1/ppl/m/n/12 for-ma-to del men-sa-je se con-ser-va a tra-vés de tres ge-ne-ra
 -cio-nes de
 )
-
-LaTeX Warning: Citation 'contactidcodes' on page 9 undefined on input line 68.
-
-
 Underfull \hbox (badness 1147) in paragraph at lines 65--69
 \T1/ppl/m/n/12 que es-te tra-ba-jo ne-ce-si-ta: pér-di-da de su-per-vi-sión RF 
 (381), ba-te-ría
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[9])
+)
 Underfull \hbox (badness 1270) in paragraph at lines 72--85
 \T1/ppl/m/n/12 Se em-plea Ti-mes-ca-leDB, ex-ten-sión de Post-greSQL que con-se
 r-va el
@@ -1302,28 +1266,17 @@ Underfull \hbox (badness 1270) in paragraph at lines 72--85
 
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[10] (./cap3.tex
+[10]
 
-LaTeX Warning: Citation 'iso25010' on page 11 undefined on input line 8.
+Overfull \vbox (0.85402pt too high) has occurred while \output is active
+[11] (./cap3.tex
+Underfull \hbox (badness 1668) in paragraph at lines 6--12
+\T1/ppl/m/n/12 des-ti-na-ta-ria ^^V^^Spro-pie-ta-rio del pro-yec-to^^T en la te
+r-mi-no-lo-gía de la
 
-
-LaTeX Warning: Citation 'swebok' on page 11 undefined on input line 9.
-
-
-Underfull \hbox (badness 1205) in paragraph at lines 6--12
-\T1/ppl/m/n/12 es-tu-dio de mer-ca-do, \T1/ppl/b/n/12 [BT] \T1/ppl/m/n/12 ba-se
- teó-ri-ca (es-tán-da-res SIA, Lo-Ra-WAN
-
-Underfull \hbox (badness 2302) in paragraph at lines 6--12
-\T1/ppl/m/n/12 RP002, ISO/IEC 25010 ([]), RFC 8428, SWE-BOK ([]))
-
-Underfull \hbox (badness 1259) in paragraph at lines 6--12
-\T1/ppl/m/n/12 y \T1/ppl/b/n/12 [DP] \T1/ppl/m/n/12 de-ri-va-ción del pro-ble-m
-a. \T1/ppl/b/n/12 Bre-cha de-cla-ra-da: \T1/ppl/m/n/12 fal-ta la fuen-te
-
-LaTeX Warning: Reference `anx:requerimientos' on page 11 undefined on input lin
-e 18.
-
+Underfull \hbox (badness 1303) in paragraph at lines 6--12
+\T1/ppl/m/n/12 rú-bri-ca^^V (in-di-ca-cio-nes de la uni-ver-si-dad vía pro-fe-s
+or guía), \T1/ppl/b/n/12 [EM]
 
 Underfull \hbox (badness 1394) in paragraph at lines 15--19
 \T1/ppl/m/n/12 MoS-CoW: 49 \T1/ppl/m/it/12 Must\T1/ppl/m/n/12 , 16 \T1/ppl/m/it
@@ -1334,26 +1287,13 @@ Underfull \hbox (badness 3769) in paragraph at lines 37--37
 []\T1/ppl/m/n/12 Cuadro 3.1: []Módulos de la so-lu-ción. Nin-gu-na cau-sa que-d
 a sin
 
-[11]
-Overfull \hbox (23.75992pt too wide) in paragraph at lines 61--77
+[12]
+Overfull \hbox (16.82484pt too wide) in paragraph at lines 61--77
  [][] 
-
-LaTeX Warning: Reference `anx:protocolo' on page 12 undefined on input line 77.
-
-
-
-LaTeX Warning: Reference `anx:protocolo' on page 12 undefined on input line 77.
-
-
 
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[12]
-
-LaTeX Warning: Reference `anx:protocolo' on page 13 undefined on input line 95.
-
-
-(./figuras/dosplanos.tex
+[13] (./figuras/dosplanos.tex
 Missing character: There is no ) in font nullfont!
 )
 Underfull \hbox (badness 1057) in paragraph at lines 100--102
@@ -1362,38 +1302,25 @@ te-gra-cio-nes)
 
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[13] (./figuras/ingesta.tex
-Overfull \hbox (63.47664pt too wide) in paragraph at lines 31--33
- [][] 
-)
-Overfull \hbox (150.61873pt too wide) in paragraph at lines 110--127
- [][] 
-
+[14] (./figuras/ingesta.tex)
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[14]
+[15]
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[15])
+[16])
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[16] (./cap4.tex
-
-LaTeX Warning: Citation 'swebok' on page 17 undefined on input line 17.
-
-
-Overfull \hbox (1.89766pt too wide) in paragraph at lines 27--38
- [][] 
+[17] (./cap4.tex
+Underfull \hbox (badness 1675) in paragraph at lines 17--22
+\T1/ppl/m/n/12 y di-se-ño (caps. 2--3), prue-bas (cap. 5) y ges-tión de con-fi-
+gu-ra-ción
 
 Underfull \hbox (badness 2012) in paragraph at lines 38--38
 []\T1/ppl/m/n/12 Cuadro 4.1: []Calendario ofi-cial (pau-ta del 17 de agos-to de
  2026).
 
-[17]
-
-LaTeX Warning: Reference `anx:backlog' on page 18 undefined on input line 48.
-
-
+[18]
 Underfull \hbox (badness 10000) in paragraph at lines 56--64
 []\T1/ppl/m/n/12 La ve-ri-fi-ca-ción nu-mé-ri-ca ^^Vsu-man-do pro-gra-má-ti-ca-
 men-te las
@@ -1408,17 +1335,14 @@ Underfull \hbox (badness 1270) in paragraph at lines 56--64
 
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[18]
+[19]
 Underfull \hbox (badness 1558) in paragraph at lines 65--68
 []\T1/ppl/m/n/12 La dis-tri-bu-ción tem-po-ral tam-bién se co-rri-gió: la asig-
 na-ción ini-cial
-
-Overfull \hbox (52.27449pt too wide) in paragraph at lines 73--84
- [][] 
 )
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[19] (./conclusion.tex
+[20] (./conclusion.tex
 Underfull \hbox (badness 1603) in paragraph at lines 3--11
 []\T1/ppl/b/n/12 Sobre la elec-ción del pro-to-co-lo. \T1/ppl/m/n/12 El aná-li-
 sis com-pa-ra-ti-vo de ocho
@@ -1431,2428 +1355,164 @@ Underfull \hbox (badness 1859) in paragraph at lines 18--21
 []\T1/ppl/b/n/12 Sobre la via-bi-li-dad. \T1/ppl/m/n/12 Ve-ri-fi-car nu-mé-ri-c
 a-men-te el bac-klog an-tes de
 )
-[20]
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
 [21]
 
-LaTeX Warning: Empty bibliography on input line 90.
-
-(./anexos/a-requerimientos.tex
-
-LaTeX Warning: Reference `tab:fuentes' on page 22 undefined on input line 4.
-
-
-Overfull \hbox (54.80307pt too wide) in alignment at lines 8--9
- [] [] [] [] [] 
-
-Overfull \hbox (54.80307pt too wide) in alignment at lines 9--20
- [] [] [] [] [] 
-[22]
-Overfull \hbox (54.80307pt too wide) in alignment at lines 23--24
- [] [] [] [] [] 
-
-Overfull \hbox (54.80307pt too wide) in alignment at lines 24--32
- [] [] [] [] [] 
-
-
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
+[22] (./glosario.tex
+Underfull \hbox (badness 3815) in paragraph at lines 5--7
+[]\T1/ppl/m/n/12 Intermediario de MQTT. Re-ci-be los men-sa-jes de quie-nes
+
+Underfull \hbox (badness 3240) in paragraph at lines 9--12
+[]\T1/ppl/m/n/12 Servidor de red Lo-Ra-WAN de có-di-go abier-to. Es el
+
+Underfull \hbox (badness 1383) in paragraph at lines 12--14
+[]\T1/ppl/m/n/12 Protocolo de 16 dí-gi-tos de la in-dus-tria de
+
+Underfull \hbox (badness 5064) in paragraph at lines 14--16
+[]\T1/ppl/m/n/12 Campo \T1/cmtt/m/n/12 [<A--Z><datos>] \T1/ppl/m/n/12 que el es
+-tán-dar DC-09
+
+Underfull \hbox (badness 1694) in paragraph at lines 17--18
+[]\T1/ppl/m/n/12 Tonos del te-cla-do te-le-fó-ni-co. Fue el trans-por-te ori-gi
+-nal de
+
 [23]
-Overfull \hbox (54.80307pt too wide) in alignment at lines 35--36
- [] [] [] [] [] 
+Underfull \hbox (badness 4752) in paragraph at lines 21--22
+[]\T1/ppl/m/n/12 Protocolo de red cons-trui-do so-bre Lo-Ra: re-gis-tro de
 
-Overfull \hbox (54.80307pt too wide) in alignment at lines 36--43
- [] [] [] [] [] 
+Underfull \hbox (badness 10000) in paragraph at lines 22--26
+[]\T1/ppl/m/n/12 Protocolo de men-sa-je-ría ^^Spu-bli-car/suscribir^^T:
 
+Underfull \hbox (badness 10000) in paragraph at lines 22--26
+\T1/ppl/m/n/12 los sen-so-res pu-bli-can en un tó-pi-co
+
+Underfull \hbox (badness 10000) in paragraph at lines 22--26
+\T1/ppl/m/n/12 (\T1/cmtt/m/n/12 sitio/invernadero-2/sensor-007/temperatura\T1/p
+pl/m/n/12 ) y cual-quier
+)
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
 [24]
-Overfull \hbox (54.80307pt too wide) in alignment at lines 46--47
- [] [] [] [] [] 
+Underfull \hbox (badness 1102) in paragraph at lines 91--91
+[][]\T1/ppl/m/n/12 Ademco. (1999). \T1/ppl/m/it/12 Di-gi-tal Com-mu-ni-ca-tion 
+Stan-dard: Adem-co Con-tact ID
 
-Overfull \hbox (54.80307pt too wide) in alignment at lines 47--55
- [] [] [] [] [] 
+Underfull \hbox (badness 6268) in paragraph at lines 91--91
+[][]\T1/ppl/m/n/12 IoT3. (2026). \T1/ppl/m/it/12 So-lu-cio-nes in-te-li-gen-tes
+ de mo-ni-to-reo y au-to-ma-ti-za-ción\T1/ppl/m/n/12 .
 
+Underfull \hbox (badness 10000) in paragraph at lines 91--91
+\T1/ppl/m/it/12 and Eva-lua-tion (SQua-RE)\T1/ppl/m/n/12 . In-ter-na-tio-nal Or
+-ga-ni-za-tion for
 
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
+Underfull \hbox (badness 2980) in paragraph at lines 91--91
+\T1/ppl/m/it/12 Pro-to-col for Alarm Sys-tem Com-mu-ni-ca-tions\T1/ppl/m/n/12 .
+ Se-cu-rity In-dustry
+
 [25]
-Overfull \hbox (54.80307pt too wide) in alignment at lines 58--59
- [] [] [] [] [] 
+Underfull \hbox (badness 1303) in paragraph at lines 91--91
+[][]\T1/ppl/m/n/12 Security In-dustry As-so-cia-tion. (2017). \T1/ppl/m/it/12 D
+C-03-2017: DCS SIA For-mat
 
-Overfull \hbox (54.80307pt too wide) in alignment at lines 59--65
- [] [] [] [] [] 
+Underfull \hbox (badness 3503) in paragraph at lines 91--91
+\T1/ppl/m/it/12 Stan-dard\T1/ppl/m/n/12 . Se-cu-rity In-dustry As-so-cia-tion. 
+[]$https : / / www .
 
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[26]
-Overfull \hbox (54.80307pt too wide) in alignment at lines 68--69
- [] [] [] [] [] 
+Underfull \hbox (badness 10000) in paragraph at lines 91--91
+[][]\T1/ppl/m/n/12 Security In-dustry As-so-cia-tion. (2026). \T1/ppl/m/it/12 D
+C-09: In-ter-net Pro-to-col
 
-Overfull \hbox (54.80307pt too wide) in alignment at lines 69--74
- [] [] [] [] [] 
+Underfull \hbox (badness 3439) in paragraph at lines 91--91
+\T1/ppl/m/it/12 Event Re-por-ting, re-vi-sión 2026 \T1/ppl/m/n/12 (Apro-ba-ción
+ AN-SI; in-cor-po-ra
 
-Overfull \hbox (54.80307pt too wide) in alignment at lines 77--78
- [] [] [] [] [] 
+[26] (./anexos/a-requerimientos.tex
 
-Overfull \hbox (54.80307pt too wide) in alignment at lines 78--86
- [] [] [] [] [] 
+LaTeX Warning: Reference `tab:fuentes' on page 27 undefined on input line 5.
 
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
 [27]
-Overfull \hbox (54.80307pt too wide) in alignment at lines 89--90
- [] [] [] [] [] 
-
-Overfull \hbox (54.80307pt too wide) in alignment at lines 90--97
- [] [] [] [] [] 
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
 [28]
-Overfull \hbox (7.74991pt too wide) in paragraph at lines 101--101
-[]|[]\T1/ppl/b/n/12 Verificación[]|  
-
-Overfull \hbox (60.49309pt too wide) in alignment at lines 100--101
- [] [] [] [] [] 
-
-Overfull \hbox (21.02165pt too wide) in paragraph at lines 103--103
-\T1/ppl/m/n/12 ins-tru-men-ta-da|  
-
-Overfull \hbox (11.9856pt too wide) in paragraph at lines 106--106
-\T1/ppl/m/n/12 re-cu-pe-ra-ción 
-
-Overfull \hbox (4.44972pt too wide) in paragraph at lines 108--108
-\T1/ppl/m/n/12 ais-la-mien-to 
-
-Overfull \hbox (0.95764pt too wide) in paragraph at lines 109--109
-\T1/ppl/m/n/12 re-po-si-to-rio|  
-
-Overfull \hbox (16.6658pt too wide) in paragraph at lines 110--110
-\T1/ppl/m/n/12 do-cu-men-ta-do|  
-
-Overfull \hbox (7.94159pt too wide) in paragraph at lines 111--111
-\T1/ppl/m/n/12 ar-qui-tec-tu-ra|  
-
-Overfull \hbox (3.33382pt too wide) in paragraph at lines 114--114
-\T1/ppl/m/n/12 do-cu-men-to|  
-
-Overfull \hbox (2.81761pt too wide) in paragraph at lines 115--115
-[]|\T1/ppl/m/n/12 Despliegue 
-
-Overfull \hbox (16.08972pt too wide) in paragraph at lines 116--116
-\T1/ppl/m/n/12 de-pen-den-cias|  
-
-Overfull \hbox (60.49309pt too wide) in alignment at lines 101--118
- [] [] [] [] [] 
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
 [29]
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[30])
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[31] (./anexos/b-backlog.tex
-Overfull \hbox (54.80309pt too wide) in alignment at lines 8--9
- [] [] [] [] [] 
+[30]
 
-Overfull \hbox (54.80309pt too wide) in alignment at lines 9--14
- [] [] [] [] [] 
+Overfull \vbox (0.85402pt too high) has occurred while \output is active
+[31]
 
-Overfull \hbox (54.80309pt too wide) in alignment at lines 17--18
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 18--25
- [] [] [] [] [] 
-
+Overfull \vbox (0.85402pt too high) has occurred while \output is active
 [32]
-Overfull \hbox (54.80309pt too wide) in alignment at lines 28--29
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 29--35
- [] [] [] [] [] 
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
 [33]
-Overfull \hbox (54.80309pt too wide) in alignment at lines 38--39
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 39--45
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 48--49
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 49--54
- [] [] [] [] [] 
-
-
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
 [34]
-Overfull \hbox (54.80309pt too wide) in alignment at lines 57--58
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 58--63
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 66--67
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 67--72
- [] [] [] [] [] 
-
+Overfull \vbox (0.85402pt too high) has occurred while \output is active
+[35])
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[35]
-Overfull \hbox (54.80309pt too wide) in alignment at lines 75--76
- [] [] [] [] [] 
+[36] (./anexos/b-backlog.tex
+Underfull \hbox (badness 2134) in paragraph at lines 5--7
+\T1/ppl/m/n/10.95 con cri-te-rios de acep-ta-ción de-ta-lla-dos en el do-cu-men
+-to de bac-klog del
 
-Overfull \hbox (54.80309pt too wide) in alignment at lines 76--81
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 84--85
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 85--90
- [] [] [] [] [] 
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[36]
-Overfull \hbox (54.80309pt too wide) in alignment at lines 93--94
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 94--100
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 103--104
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 104--108
- [] [] [] [] [] 
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
 [37]
-Overfull \hbox (54.80309pt too wide) in alignment at lines 111--112
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 112--116
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 119--120
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 120--127
- [] [] [] [] [] 
-
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
 [38]
-Overfull \hbox (54.80309pt too wide) in alignment at lines 130--131
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 131--138
- [] [] [] [] [] 
-
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[39])
+[39]
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[40] (./anexos/c-protocolo.tex
-Underfull \hbox (badness 10000) in paragraph at lines 13--15
-[]\T1/ppl/m/n/12 Producidos con la he-rra-mien-ta pro-pia
-
-Underfull \hbox (badness 10000) in paragraph at lines 13--15
-\T1/cmtt/m/n/12 plataforma/herramientas/contactid.py\T1/ppl/m/n/12 , que ge-ne-
-ra, va-li-da y
-
-Underfull \hbox (badness 3039) in paragraph at lines 13--15
-\T1/ppl/m/n/12 em-pa-que-ta men-sa-jes; la al-te-ra-ción de un so-lo dí-gi-to i
-n-va-li-da la
-
-Overfull \hbox (22.26717pt too wide) in alignment at lines 16--17
- [] [] [] 
-
-Underfull \hbox (badness 3826) in paragraph at lines 25--25
-[]\T1/ppl/m/n/12 Cuadro C.1: Men-sa-jes de ejem-plo con su-ma de
-
-Overfull \hbox (22.26717pt too wide) in alignment at lines 17--26
- [] [] [] 
+[40]
+Overfull \vbox (0.85402pt too high) has occurred while \output is active
 [41]
-
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
 [42]
-Overfull \hbox (5.86444pt too wide) in paragraph at lines 59--59
- []|[]\T1/ppl/b/n/12 Código[]| 
-
-Overfull \hbox (17.81396pt too wide) in alignment at lines 58--59
- [] [] [] [] [] 
-
-Overfull \hbox (6.42467pt too wide) in paragraph at lines 63--63
-[]|\T1/ppl/m/n/12 MQTT/HTTP|  
-
-Underfull \hbox (badness 10000) in paragraph at lines 68--68
-[]\T1/ppl/m/n/12 Cuadro C.4: Ex-trac-to del ma-peo del per-fil.
-
-Underfull \hbox (badness 10000) in paragraph at lines 68--68
-\T1/ppl/m/n/12 La ta-bla com-ple-ta se de-sa-rro-lla en la Eta-pa
-
-Underfull \hbox (badness 6157) in paragraph at lines 68--68
-\T1/ppl/m/n/12 2; la ver-sión de tra-ba-jo es-tá en el re-po-si-to-rio
-
-Overfull \hbox (17.81396pt too wide) in alignment at lines 59--69
- [] [] [] [] [] 
-)
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
 [43]
-
-Class memoir Warning: The material used in the headers is too large
-(15.35402pt) for the given head height (14.5pt), it is recommended to
-either increase the head height or redesign the header
-(in both cases you will find help in the memoir manual). on input line 96.
-
-(build/main.aux (build/Portada.aux) (build/resumen.aux) (build/cap1.aux)
-(build/cap2.aux) (build/cap3.aux) (build/cap4.aux) (build/conclusion.aux)
-(build/anexos/a-requerimientos.aux) (build/anexos/b-backlog.aux)
-(build/anexos/c-protocolo.aux))
-kpathsea: Running mktexpk --mfmode / --bdpi 600 --mag 1+0/600 --dpi 600 ectt1095
-mktexpk: Running mf-nowin -progname=mf \mode:=ljfour; mag:=1+0/600; nonstopmode; input ectt1095
-This is METAFONT, Version 2.71828182 (TeX Live 2025/dev/Debian) (preloaded base=mf)
-
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/ectt1095.mf
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exbase.mf)
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/ectt.mf
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exroman.mf
- Ok (/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exaccess.mf
- Ok) (/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/expseudo.mf
- Ok) (/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exruwest.mf
- Ok [192] [193] [194] [195] [196] [197] [198] [199] [200] [201] [202] [203]
-[204] [205] [206] [207] [208] [209] [210] [211] [212] [213] [214] [215]
-[216] [217] [218] [219] [220] [221] [222] [223])
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exrlwest.mf
- Ok [224] [225] [226] [227] [228] [229] [230] [231] [232] [233] [234] [235]
-[236] [237] [238] [239] [240] [241] [242] [243] [244] [245] [246] [247]
-[248] [249] [250] [251] [252] [253] [254] [255])
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exrueast.mf
- Ok [128] [129] [130] [131] [132] [133] [134] [135] [136] [137] [138] [139]
-[140] [141] [142] [143] [144] [145] [146] [147] [148] [149] [150] [151]
-[152] [153] [154] [155] [156] [157])
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exrleast.mf
- Ok [158] [160] [161] [162] [163] [164] [165] [166] [167] [168] [169] [170]
-[171] [172] [173] [174] [175] [176] [177] [178] [179] [180] [181] [182]
-[183] [184] [185] [186] [187] [188])
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exbraces.mf
- Ok [94] [126] [23] [40] [41] [60] [124] [62] [91] [93] [92] [123] [125]
-[95] [127] [32])
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/expunct.mf
- Ok [14] [15] [19] [20] [13] [18] [33] [39] [42] [43] [44] [46] [47] [58]
-[59] [61] [96] [189] [17] [45] [16] [21] [22])
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exaccent.mf
- Ok [0] [1] [2] [3] [4] [5] [6] [7] [8] [9] [10] [11] [12])
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exsign.mf
- Ok [24] [34] [35] [36] [37] [64] [191] [159])
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exrlig.mf
- Ok [25] [26] [28] [27] [29] [30] [31])
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exromp.mf
- Ok [38] [63] [190])
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exrulett.mf
- Ok [65] [66] [67] [68] [69] [70] [71] [72] [73] [74] [75] [76] [77] [78]
-[79] [80] [81] [82] [83] [84] [85] [86] [87] [88] [89] [90])
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exrllett.mf
- Ok [97] [98] [99] [100] [101] [102] [103] [104] [105] [106] [107] [108]
-[109] [110] [111] [112] [113] [114] [115] [116] [117] [118] [119] [120]
-[121] [122])
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exrdigit.mf
- Ok [48] [49] [50] [51] [52] [53] [54] [55] [56] [57])
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exmligtb.mf
- Ok) ) ) )
-Font metrics written on ectt1095.tfm.
-Output written on ectt1095.600gf (256 characters, 47796 bytes).
-Transcript written on ectt1095.log.
-mktexpk: /home/vicenterog/.texlive2025/texmf-var/fonts/pk/ljfour/jknappen/ec/ectt1095.600pk: successfully generated.
-
-
-LaTeX Warning: There were undefined references.
-
-
-LaTeX Warning: Label(s) may have changed. Rerun to get cross-references right.
-
-
-Package rerunfilecheck Warning: File `main.out' has changed.
-(rerunfilecheck)                Rerun to get outlines right
-(rerunfilecheck)                or use package `bookmark'.
-
-
-Package biblatex Warning: Please (re)run Biber on the file:
-(biblatex)                main
-(biblatex)                and rerun LaTeX afterwards.
-
- )
-(see the transcript file for additional information) </home/vicenterog/.texlive
-2025/texmf-var/fonts/pk/ljfour/jknappen/ec/ectt1095.600pk>
-kpathsea: Running mktexpk --mfmode / --bdpi 600 --mag 1+0/600 --dpi 600 ectt0900
-mktexpk: Running mf-nowin -progname=mf \mode:=ljfour; mag:=1+0/600; nonstopmode; input ectt0900
-This is METAFONT, Version 2.71828182 (TeX Live 2025/dev/Debian) (preloaded base=mf)
-
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/ectt0900.mf
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exbase.mf)
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/ectt.mf
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exroman.mf
- Ok (/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exaccess.mf
- Ok) (/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/expseudo.mf
- Ok) (/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exruwest.mf
- Ok [192] [193] [194] [195] [196] [197] [198] [199] [200] [201] [202] [203]
-[204] [205] [206] [207] [208] [209] [210] [211] [212] [213] [214] [215]
-[216] [217] [218] [219] [220] [221] [222] [223])
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exrlwest.mf
- Ok [224] [225] [226] [227] [228] [229] [230] [231] [232] [233] [234] [235]
-[236] [237] [238] [239] [240] [241] [242] [243] [244] [245] [246] [247]
-[248] [249] [250] [251] [252] [253] [254] [255])
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exrueast.mf
- Ok [128] [129] [130] [131] [132] [133] [134] [135] [136] [137] [138] [139]
-[140] [141] [142] [143] [144] [145] [146] [147] [148] [149] [150] [151]
-[152] [153] [154] [155] [156] [157])
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exrleast.mf
- Ok [158] [160] [161] [162] [163] [164] [165] [166] [167] [168] [169] [170]
-[171] [172] [173] [174] [175] [176] [177] [178] [179] [180] [181] [182]
-[183] [184] [185] [186] [187] [188])
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exbraces.mf
- Ok [94] [126] [23] [40] [41] [60] [124] [62] [91] [93] [92] [123] [125]
-[95] [127] [32])
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/expunct.mf
- Ok [14] [15] [19] [20] [13] [18] [33] [39] [42] [43] [44] [46] [47] [58]
-[59] [61] [96] [189] [17] [45] [16] [21] [22])
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exaccent.mf
- Ok [0] [1] [2] [3] [4] [5] [6] [7] [8] [9] [10] [11] [12])
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exsign.mf
- Ok [24] [34] [35] [36] [37] [64] [191] [159])
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exrlig.mf
- Ok [25] [26] [28] [27] [29] [30] [31])
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exromp.mf
- Ok [38] [63] [190])
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exrulett.mf
- Ok [65] [66] [67] [68] [69] [70] [71] [72] [73] [74] [75] [76] [77] [78]
-[79] [80] [81] [82] [83] [84] [85] [86] [87] [88] [89] [90])
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exrllett.mf
- Ok [97] [98] [99] [100] [101] [102] [103] [104] [105] [106] [107] [108]
-[109] [110] [111] [112] [113] [114] [115] [116] [117] [118] [119] [120]
-[121] [122])
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exrdigit.mf
- Ok [48] [49] [50] [51] [52] [53] [54] [55] [56] [57])
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exmligtb.mf
- Ok) ) ) )
-Font metrics written on ectt0900.tfm.
-Output written on ectt0900.600gf (256 characters, 39464 bytes).
-Transcript written on ectt0900.log.
-mktexpk: /home/vicenterog/.texlive2025/texmf-var/fonts/pk/ljfour/jknappen/ec/ectt0900.600pk: successfully generated.
- </home/vicenterog/.t
-exlive2025/texmf-var/fonts/pk/ljfour/jknappen/ec/ectt0900.600pk>
-kpathsea: Running mktexpk --mfmode / --bdpi 600 --mag 1+0/600 --dpi 600 ectt1200
-mktexpk: Running mf-nowin -progname=mf \mode:=ljfour; mag:=1+0/600; nonstopmode; input ectt1200
-This is METAFONT, Version 2.71828182 (TeX Live 2025/dev/Debian) (preloaded base=mf)
-
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/ectt1200.mf
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exbase.mf)
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/ectt.mf
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exroman.mf
- Ok (/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exaccess.mf
- Ok) (/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/expseudo.mf
- Ok) (/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exruwest.mf
- Ok [192] [193] [194] [195] [196] [197] [198] [199] [200] [201] [202] [203]
-[204] [205] [206] [207] [208] [209] [210] [211] [212] [213] [214] [215]
-[216] [217] [218] [219] [220] [221] [222] [223])
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exrlwest.mf
- Ok [224] [225] [226] [227] [228] [229] [230] [231] [232] [233] [234] [235]
-[236] [237] [238] [239] [240] [241] [242] [243] [244] [245] [246] [247]
-[248] [249] [250] [251] [252] [253] [254] [255])
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exrueast.mf
- Ok [128] [129] [130] [131] [132] [133] [134] [135] [136] [137] [138] [139]
-[140] [141] [142] [143] [144] [145] [146] [147] [148] [149] [150] [151]
-[152] [153] [154] [155] [156] [157])
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exrleast.mf
- Ok [158] [160] [161] [162] [163] [164] [165] [166] [167] [168] [169] [170]
-[171] [172] [173] [174] [175] [176] [177] [178] [179] [180] [181] [182]
-[183] [184] [185] [186] [187] [188])
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exbraces.mf
- Ok [94] [126] [23] [40] [41] [60] [124] [62] [91] [93] [92] [123] [125]
-[95] [127] [32])
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/expunct.mf
- Ok [14] [15] [19] [20] [13] [18] [33] [39] [42] [43] [44] [46] [47] [58]
-[59] [61] [96] [189] [17] [45] [16] [21] [22])
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exaccent.mf
- Ok [0] [1] [2] [3] [4] [5] [6] [7] [8] [9] [10] [11] [12])
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exsign.mf
- Ok [24] [34] [35] [36] [37] [64] [191] [159])
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exrlig.mf
- Ok [25] [26] [28] [27] [29] [30] [31])
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exromp.mf
- Ok [38] [63] [190])
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exrulett.mf
- Ok [65] [66] [67] [68] [69] [70] [71] [72] [73] [74] [75] [76] [77] [78]
-[79] [80] [81] [82] [83] [84] [85] [86] [87] [88] [89] [90])
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exrllett.mf
- Ok [97] [98] [99] [100] [101] [102] [103] [104] [105] [106] [107] [108]
-[109] [110] [111] [112] [113] [114] [115] [116] [117] [118] [119] [120]
-[121] [122])
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exrdigit.mf
- Ok [48] [49] [50] [51] [52] [53] [54] [55] [56] [57])
-(/usr/share/texlive/texmf-dist/fonts/source/jknappen/ec/exmligtb.mf
- Ok) ) ) )
-Font metrics written on ectt1200.tfm.
-Output written on ectt1200.600gf (256 characters, 51736 bytes).
-Transcript written on ectt1200.log.
-mktexpk: /home/vicenterog/.texlive2025/texmf-var/fonts/pk/ljfour/jknappen/ec/ectt1200.600pk: successfully generated.
- </home/vicente
-rog/.texlive2025/texmf-var/fonts/pk/ljfour/jknappen/ec/ectt1200.600pk></usr/sha
-re/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/share/texl
-ive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/share/texlive/te
-xmf-dist/fonts/type1/public/mathpazo/fplmr.pfb></usr/share/texlive/texmf-dist/f
-onts/type1/urw/palatino/uplb8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/u
-rw/palatino/uplbi8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/palatino
-/uplr8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/palatino/uplr8a.pfb>
-</usr/share/texlive/texmf-dist/fonts/type1/urw/palatino/uplri8a.pfb>
-Output written on build/main.pdf (48 pages, 335149 bytes).
-Transcript written on build/main.log.
-Latexmk: Getting log file 'build/main.log'
-Latexmk: Examining 'build/main.fls'
-Latexmk: Examining 'build/main.log'
-Latexmk: Missing input file 'anexos/a-requerimientos.aux' message in .log file:
-  No file anexos/a-requerimientos.aux.
-Latexmk: Missing bbl file 'build/main.bbl' in following:
- No file main.bbl.
-Latexmk: Missing input file 'main.toc' message in .log file:
-  No file main.toc.
-Latexmk: Missing input file 'main.lof' message in .log file:
-  No file main.lof.
-Latexmk: Missing input file 'main.lot' message in .log file:
-  No file main.lot.
-Latexmk: References changed.
-Latexmk: References changed.
-====== biblatex/biber in use
-Latexmk: Log file says output to 'build/main.pdf'
-Latexmk: Using biber to make bibliography file(s).
-Latexmk: Bibliography file(s) from .bcf file:
-  referencias.bib
-Sources for biber
-  referencias.bib
-  build/main.bcf
-Latexmk: applying rule 'biber build/main'...
-Rule 'biber build/main':  Reasons for rerun
-Category 'other':
-  Rerun of 'biber build/main' forced or previously required:
-    Reason or flag: 'Initial set up of rule'
-
-------------
-Run number 1 of rule 'biber build/main'
-------------
-------------
-Running 'biber  "build/main.bcf"'
-------------
-INFO - This is Biber 2.20
-INFO - Logfile is 'build/main.blg'
-INFO - Reading 'build/main.bcf'
-INFO - Found 13 citekeys in bib section 0
-INFO - Processing section 0
-INFO - Looking for bibtex file 'referencias.bib' for section 0
-INFO - LaTeX decoding ...
-INFO - Found BibTeX data source 'referencias.bib'
-INFO - Overriding locale 'es-ES' defaults 'normalization = NFD' with 'normalization = prenormalized'
-INFO - Overriding locale 'es-ES' defaults 'variable = shifted' with 'variable = non-ignorable'
-INFO - Sorting list 'apa/apasortcite//global/global/global' of type 'entry' with template 'apa' and locale 'es-ES'
-INFO - Overriding locale 'es-ES' defaults 'variable = shifted' with 'variable = non-ignorable'
-INFO - Overriding locale 'es-ES' defaults 'normalization = NFD' with 'normalization = prenormalized'
-INFO - Sorting list 'apa/global//global/global/global' of type 'entry' with template 'apa' and locale 'es-ES'
-INFO - Writing 'build/main.bbl' with encoding 'UTF-8'
-INFO - Output to build/main.bbl
-Latexmk: Found biber source file(s) [build/main.bcf, referencias.bib]
-Latexmk: applying rule 'pdflatex'...
-Rule 'pdflatex':  Reasons for rerun
-Changed files or newly in use/created:
-  build/Portada.aux
-  build/anexos/a-requerimientos.aux
-  build/anexos/b-backlog.aux
-  build/anexos/c-protocolo.aux
-  build/cap1.aux
-  build/cap2.aux
-  build/cap3.aux
-  build/cap4.aux
-  build/conclusion.aux
-  build/main.aux
-  build/main.bbl
-  build/main.lof
-  build/main.lot
-  build/main.out
-  build/main.toc
-  build/resumen.aux
-
-------------
-Run number 3 of rule 'pdflatex'
-------------
-------------
-Running 'pdflatex  -interaction=nonstopmode -recorder -output-directory="build"  "main.tex"'
-------------
-This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex)
- restricted \write18 enabled.
-entering extended mode
-(./main.tex
-LaTeX2e <2024-11-01> patch level 2
-L3 programming layer <2025-01-18>
-(/usr/share/texlive/texmf-dist/tex/latex/memoir/memoir.cls
-Document Class: memoir 2025/03/06 v3.8.3 configurable book, report, article doc
-ument class
-(/usr/share/texlive/texmf-dist/tex/latex/xpatch/xpatch.sty
-(/usr/share/texlive/texmf-dist/tex/latex/l3kernel/expl3.sty
-(/usr/share/texlive/texmf-dist/tex/latex/l3backend/l3backend-pdftex.def))
-(/usr/share/texlive/texmf-dist/tex/latex/l3packages/xparse/xparse.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/etoolbox/etoolbox.sty))
-(/usr/share/texlive/texmf-dist/tex/generic/iftex/iftex.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/memoir/mem12.clo)
-(/usr/share/texlive/texmf-dist/tex/latex/tools/array.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/tools/dcolumn.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/tools/delarray.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/tools/tabularx.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/booktabs/booktabs.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/hyperref/nameref.sty
-(/usr/share/texlive/texmf-dist/tex/latex/refcount/refcount.sty
-(/usr/share/texlive/texmf-dist/tex/generic/ltxcmds/ltxcmds.sty)
-(/usr/share/texlive/texmf-dist/tex/generic/infwarerr/infwarerr.sty))
-(/usr/share/texlive/texmf-dist/tex/generic/gettitlestring/gettitlestring.sty
-(/usr/share/texlive/texmf-dist/tex/latex/kvoptions/kvoptions.sty
-(/usr/share/texlive/texmf-dist/tex/latex/graphics/keyval.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/kvsetkeys/kvsetkeys.sty))))
-(/usr/share/texlive/texmf-dist/tex/latex/tools/verbatim.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/base/shortvrb.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/textcase/textcase.sty))
-(/usr/share/texlive/texmf-dist/tex/latex/biblatex/biblatex.sty
-(/usr/share/texlive/texmf-dist/tex/generic/pdftexcmds/pdftexcmds.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/logreq/logreq.sty
-(/usr/share/texlive/texmf-dist/tex/latex/logreq/logreq.def))
-(/usr/share/texlive/texmf-dist/tex/latex/base/ifthen.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/url/url.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/biblatex/blx-dm.def)
-(/usr/share/texlive/texmf-dist/tex/latex/biblatex-apa/apa.dbx)
-(/usr/share/texlive/texmf-dist/tex/latex/biblatex/blx-compat.def)
-(/usr/share/texlive/texmf-dist/tex/latex/biblatex/biblatex.def)
-(/usr/share/texlive/texmf-dist/tex/latex/biblatex-apa/apa.bbx
-(/usr/share/texlive/texmf-dist/tex/latex/biblatex/bbx/standard.bbx))
-(/usr/share/texlive/texmf-dist/tex/latex/biblatex-apa/apa.cbx)
-(/usr/share/texlive/texmf-dist/tex/latex/biblatex/biblatex.cfg)
-(/usr/share/texlive/texmf-dist/tex/latex/biblatex/blx-case-expl3.sty))
-(/usr/share/texlive/texmf-dist/tex/latex/psnfss/mathpazo.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/base/fontenc.sty
-(/usr/share/texlive/texmf-dist/tex/latex/psnfss/t1ppl.fd))
-(/usr/share/texlive/texmf-dist/tex/latex/base/inputenc.sty)
-(/usr/share/texlive/texmf-dist/tex/generic/babel/babel.sty
-(/usr/share/texlive/texmf-dist/tex/generic/babel/txtbabel.def)
-(/usr/share/texlive/texmf-dist/tex/generic/babel-spanish/spanish.ldf))
-(/usr/share/texlive/texmf-dist/tex/generic/babel/locale/es/babel-spanish.tex)
-(/usr/share/texlive/texmf-dist/tex/latex/float/float.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/base/textcomp.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/graphics/graphicx.sty
-(/usr/share/texlive/texmf-dist/tex/latex/graphics/graphics.sty
-(/usr/share/texlive/texmf-dist/tex/latex/graphics/trig.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/graphics-cfg/graphics.cfg)
-(/usr/share/texlive/texmf-dist/tex/latex/graphics-def/pdftex.def)))
-(/usr/share/texlive/texmf-dist/tex/latex/csquotes/csquotes.sty
-(/usr/share/texlive/texmf-dist/tex/latex/csquotes/csquotes.def)
-(/usr/share/texlive/texmf-dist/tex/latex/csquotes/csquotes.cfg))
-(/usr/share/texlive/texmf-dist/tex/latex/tools/longtable.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/multirow/multirow.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/xcolor/xcolor.sty
-(/usr/share/texlive/texmf-dist/tex/latex/graphics-cfg/color.cfg)
-(/usr/share/texlive/texmf-dist/tex/latex/graphics/mathcolor.ltx))
-(/usr/share/texlive/texmf-dist/tex/latex/colortbl/colortbl.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/pgf/frontendlayer/tikz.sty
-(/usr/share/texlive/texmf-dist/tex/latex/pgf/basiclayer/pgf.sty
-(/usr/share/texlive/texmf-dist/tex/latex/pgf/utilities/pgfrcs.sty
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/utilities/pgfutil-common.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/utilities/pgfutil-latex.def)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/utilities/pgfrcs.code.tex
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/pgf.revision.tex)))
-(/usr/share/texlive/texmf-dist/tex/latex/pgf/basiclayer/pgfcore.sty
-(/usr/share/texlive/texmf-dist/tex/latex/pgf/systemlayer/pgfsys.sty
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/systemlayer/pgfsys.code.tex
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/utilities/pgfkeys.code.tex
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/utilities/pgfkeyslibraryfiltered
-.code.tex)) (/usr/share/texlive/texmf-dist/tex/generic/pgf/systemlayer/pgf.cfg)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/systemlayer/pgfsys-pdftex.def
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/systemlayer/pgfsys-common-pdf.de
-f)))
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/systemlayer/pgfsyssoftpath.code.
-tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/systemlayer/pgfsysprotocol.code.
-tex))
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcore.code.tex
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmath.code.tex
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmathutil.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmathparser.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.basic.code
-.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.trigonomet
-ric.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.random.cod
-e.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.comparison
-.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.base.code.
-tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.round.code
-.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.misc.code.
-tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.integerari
-thmetics.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmathcalc.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmathfloat.code.tex))
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfint.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcorepoints.code.te
-x)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcorepathconstruct.
-code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcorepathusage.code
-.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcorescopes.code.te
-x)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcoregraphicstate.c
-ode.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcoretransformation
-s.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcorequick.code.tex
-)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcoreobjects.code.t
-ex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcorepathprocessing
-.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcorearrows.code.te
-x)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcoreshade.code.tex
-)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcoreimage.code.tex
-)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcoreexternal.code.
-tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcorelayers.code.te
-x)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcoretransparency.c
-ode.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcorepatterns.code.
-tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcorerdf.code.tex))
-)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/modules/pgfmoduleshapes.code.tex
-) (/usr/share/texlive/texmf-dist/tex/generic/pgf/modules/pgfmoduleplot.code.tex
-)
-(/usr/share/texlive/texmf-dist/tex/latex/pgf/compatibility/pgfcomp-version-0-65
-.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/pgf/compatibility/pgfcomp-version-1-18
-.sty)) (/usr/share/texlive/texmf-dist/tex/latex/pgf/utilities/pgffor.sty
-(/usr/share/texlive/texmf-dist/tex/latex/pgf/utilities/pgfkeys.sty
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/utilities/pgfkeys.code.tex))
-(/usr/share/texlive/texmf-dist/tex/latex/pgf/math/pgfmath.sty
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmath.code.tex))
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/utilities/pgffor.code.tex))
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/frontendlayer/tikz/tikz.code.tex
-
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/libraries/pgflibraryplothandlers
-.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/modules/pgfmodulematrix.code.tex
-)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/frontendlayer/tikz/libraries/tik
-zlibrarytopaths.code.tex)))
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/frontendlayer/tikz/libraries/tik
-zlibrarypositioning.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/frontendlayer/tikz/libraries/tik
-zlibraryshapes.geometric.code.tex
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/libraries/shapes/pgflibraryshape
-s.geometric.code.tex))
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/libraries/pgflibraryarrows.meta.
-code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/frontendlayer/tikz/libraries/tik
-zlibraryfit.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/frontendlayer/tikz/libraries/tik
-zlibrarybackgrounds.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/frontendlayer/tikz/libraries/tik
-zlibrarycalc.code.tex)
-(/usr/share/texlive/texmf-dist/tex/latex/hyperref/hyperref.sty
-(/usr/share/texlive/texmf-dist/tex/generic/kvdefinekeys/kvdefinekeys.sty)
-(/usr/share/texlive/texmf-dist/tex/generic/pdfescape/pdfescape.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/hycolor/hycolor.sty)
-(/usr/share/texlive/texmf-dist/tex/generic/stringenc/stringenc.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/hyperref/pd1enc.def)
-(/usr/share/texlive/texmf-dist/tex/generic/intcalc/intcalc.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/hyperref/puenc.def)
-(/usr/share/texlive/texmf-dist/tex/generic/bitset/bitset.sty
-(/usr/share/texlive/texmf-dist/tex/generic/bigintcalc/bigintcalc.sty))
-(/usr/share/texlive/texmf-dist/tex/latex/base/atbegshi-ltx.sty))
-(/usr/share/texlive/texmf-dist/tex/latex/hyperref/hpdftex.def
-(/usr/share/texlive/texmf-dist/tex/latex/base/atveryend-ltx.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/rerunfilecheck/rerunfilecheck.sty
-(/usr/share/texlive/texmf-dist/tex/generic/uniquecounter/uniquecounter.sty)))
-(/usr/share/texlive/texmf-dist/tex/latex/memoir/memhfixc.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/hyphenat/hyphenat.sty)
-
-Package biblatex Warning: Load 'inputenc' before biblatex.
-
-(build/main.aux (build/Portada.aux) (build/resumen.aux) (build/cap1.aux)
-(build/cap2.aux) (build/cap3.aux) (build/cap4.aux) (build/conclusion.aux)
-(build/anexos/a-requerimientos.aux) (build/anexos/b-backlog.aux)
-(build/anexos/c-protocolo.aux))
-(/usr/share/texlive/texmf-dist/tex/latex/biblatex-apa/spanish-apa.lbx
-(/usr/share/texlive/texmf-dist/tex/latex/biblatex/lbx/spanish.lbx)
-(/usr/share/texlive/texmf-dist/tex/latex/biblatex/lbx/spanish.lbx))
-(build/main.bbl)
-(/usr/share/texlive/texmf-dist/tex/context/base/mkii/supp-pdf.mkii
-[Loading MPS to PDF converter (version 2006.09.02).]
-) (/usr/share/texlive/texmf-dist/tex/latex/epstopdf-pkg/epstopdf-base.sty
-(/usr/share/texlive/texmf-dist/tex/latex/grfext/grfext.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/latexconfig/epstopdf-sys.cfg))
-(build/main.out) (build/main.out) (./Portada.tex
-(/usr/share/texlive/texmf-dist/tex/latex/psnfss/ts1ppl.fd)
-[1{/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map}{/usr/share/texlive/texmf-
-dist/fonts/enc/dvips/base/8r.enc} <./images/Logo_depto_ing_informatica.png>])
-(build/main.toc (/usr/share/texlive/texmf-dist/tex/latex/psnfss/ot1ppl.fd)
-(/usr/share/texlive/texmf-dist/tex/latex/psnfss/omlzplm.fd)
-(/usr/share/texlive/texmf-dist/tex/latex/psnfss/omszplm.fd)
-(/usr/share/texlive/texmf-dist/tex/latex/psnfss/omxzplm.fd)
-(/usr/share/texlive/texmf-dist/tex/latex/psnfss/ot1zplm.fd)
-[1]
-
-Class memoir Warning: The material used in the headers is too large
-(15.35402pt) for the given head height (14.5pt), it is recommended to
-either increase the head height or redesign the header
-(in both cases you will find help in the memoir manual). on input line 59.
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[2]
-Underfull \hbox (badness 1292) in paragraph at lines 60--60
- [][] [][]\T1/ppl/m/n/12 Identificadores del cam-po de da-tos ex-ten-di-dos (pe
-r-fil 
-)
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[3] (build/main.lof
-Underfull \hbox (badness 1609) in paragraph at lines 12--12
- [][] [][]\T1/ppl/m/n/12 Las tres vías de in-ges-ta con-ver-gen a un úni-co for
--ma-to 
-)
-[4] (build/main.lot
-Underfull \hbox (badness 10000) in paragraph at lines 6--6
- [][] [][]\T1/ppl/m/n/12 Módulos de la so-lu-ción. Nin-gu-na cau-sa que-da sin 
-
-
-Underfull \hbox (badness 2334) in paragraph at lines 6--6
- \T1/ppl/m/n/12 re-que-ri-mien-tos y nin-gún re-que-ri-mien-to ca-re-ce de cau-
-sa 
-
-Underfull \hbox (badness 5726) in paragraph at lines 10--10
- [][] [][]\T1/ppl/m/n/12 Calendario ofi-cial (pau-ta del 17 de agos-to de 2026)
-. 
-
-Underfull \hbox (badness 5711) in paragraph at lines 15--15
- [][] [][]\T1/ppl/m/n/12 Resumen del es-fuer-zo es-ti-ma-do fren-te al pre-su-p
-ues-to 
-)
-[5] (./resumen.tex
-Underfull \hbox (badness 1122) in paragraph at lines 3--17
-\T1/ppl/m/n/10.95 hard-wa-re de su pro-vee-dor, y no exis-te vi-si-bi-li-dad de
-l es-ta-do
-
-Underfull \hbox (badness 1184) in paragraph at lines 3--17
-\T1/ppl/m/n/10.95 de la co-nec-ti-vi-dad. Es-te tra-ba-jo pro-po-ne una pla-ta-
-for-ma web
-
-Underfull \hbox (badness 2452) in paragraph at lines 3--17
-\T1/ppl/m/n/10.95 de in-dus-tria Con-tact ID (AN-SI/SIA DC-05) so-bre trans-por
--te
-
-Underfull \hbox (badness 1107) in paragraph at lines 3--17
-\T1/ppl/m/n/10.95 de dis-po-si-ti-vos in-alám-bri-cos que la in-dus-tria de la 
-se-gu-ri-dad
-
-Underfull \hbox (badness 1552) in paragraph at lines 3--17
-\T1/ppl/m/n/10.95 el pro-ble-ma me-dian-te un ár-bol de cau-sas y efec-tos, for
--mu-la
-
-Underfull \hbox (badness 1297) in paragraph at lines 3--17
-\T1/ppl/m/n/10.95 seis ob-je-ti-vos es-pe-cí-fi-cos ba-jo cri-te-rios SMART con
- ma-triz de
-
-Underfull \hbox (badness 1831) in paragraph at lines 3--17
-\T1/ppl/m/n/10.95 cri-te-rios pon-de-ra-dos ^^Vve-ri-fi-can-do em-pí-ri-ca-men-
-te ta-ma-ños de
-
-Underfull \hbox (badness 2452) in paragraph at lines 3--17
-\T1/ppl/m/n/10.95 men-sa-je y su-mas de com-pro-ba-ción con una im-ple-men-ta-c
-ión
-
-Underfull \hbox (badness 6978) in paragraph at lines 3--17
-\T1/ppl/m/n/10.95 nu-mé-ri-ca de via-bi-li-dad de-li-mi-tó el com-pro-mi-so al 
-nú-cleo
-
-Class memoir Warning: The \bf font command is deprecated. 
-(memoir)              Use \textbf{...} or {\bfseries... } instead on input line
- 18.
-
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[6]) (./cap1.tex
-Underfull \hbox (badness 1221) in paragraph at lines 13--17
-\T1/ppl/m/n/12 IoT no lo-gran con-ver-tir los da-tos que es-tos ge-ne-ran en
-
-Underfull \hbox (badness 3078) in paragraph at lines 13--17
-\T1/ppl/m/n/12 que uni-fi-que la in-ges-ta, la nor-ma-li-za-ción y la ges-tión
-(./figuras/arbol.tex
-Overfull \hbox (2.8538pt too wide) in paragraph at lines 27--27
- []\T1/ppl/m/n/9 Fragmentación 
-
-Overfull \hbox (81.13643pt too wide) in paragraph at lines 42--44
- [][] 
-)
-[1]
-Underfull \hbox (badness 10000) in paragraph at lines 34--39
-\T1/ppl/m/n/12 al-ma-ce-na-mien-to y ges-tión; la es-pe-ci-fi-ca-ción del pro-t
-o-co-lo
-
-Underfull \hbox (badness 2181) in paragraph at lines 34--39
-\T1/ppl/m/n/12 sensor--plataforma; adap-ta-do-res pa-ra al me-nos dos trans-por
--tes; el
-
-Underfull \hbox (badness 1303) in paragraph at lines 42--48
-[]\T1/ppl/b/n/12 Oferta re-gio-nal. \T1/ppl/m/n/12 Se iden-ti-fi-can dos ac-to-
-res en La Arau-ca-nía: \T1/ppl/b/n/12 IoT3
-
-Underfull \hbox (badness 1087) in paragraph at lines 42--48
-\T1/ppl/m/n/12 pre-sen-cia agrí-co-la, y \T1/ppl/b/n/12 Con-trol-Tec \T1/ppl/m/
-n/12 ([]Con-trol-Tec SpA, []2026[]), te-le-me-tría
-
-Underfull \hbox (badness 1062) in paragraph at lines 42--48
-\T1/ppl/b/n/12 des-aco-pla-da del equi-pa-mien-to\T1/ppl/m/n/12 , que es el es-
-pa-cio que es-te tra-ba-jo
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[2]
-Underfull \hbox (badness 2608) in paragraph at lines 49--56
-[]\T1/ppl/b/n/12 El sec-tor de las alar-mas mo-ni-to-rea-das \T1/ppl/m/n/12 re-
-sol-vió ha-ce dé-ca-das la
-
-Underfull \hbox (badness 1728) in paragraph at lines 49--56
-\T1/ppl/m/n/12 com-bi-nan ade-más ca-na-les re-dun-dan-tes de ra-dio an-te in-t
-er-fe-ren-cia
-
-Underfull \hbox (badness 1776) in paragraph at lines 49--56
-\T1/ppl/m/n/12 ([]Bu-si-ness Wi-re, []2016[]). Sin em-bar-go, el sec-tor lo apl
-i-ca den-tro de
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[3]
-Underfull \hbox (badness 6961) in paragraph at lines 77--80
-[]\T1/ppl/m/n/12 Cada ob-je-ti-vo ex-pli-ci-ta qué se ha-rá, me-dian-te qué mé-
-to-do y
-
-Underfull \hbox (badness 4108) in paragraph at lines 77--80
-\T1/ppl/m/n/12 qué re-sul-ta-do ve-ri-fi-ca-ble pro-du-ce, con-for-me a la in-d
-i-ca-ción del
-
-Underfull \hbox (badness 10000) in paragraph at lines 77--80
-\T1/ppl/m/n/12 pro-fe-sor guía. El des-glo-se SMART com-ple-to, con in-di-ca-do
--res
-
-Underfull \hbox (badness 2600) in paragraph at lines 77--80
-\T1/ppl/m/n/12 nu-mé-ri-cos por cri-te-rio, se in-clu-ye en el re-po-si-to-rio 
-del pro-yec-to
-
-Underfull \hbox (badness 5578) in paragraph at lines 82--86
-[]\T1/ppl/b/n/12 OE1 \T1/ppl/m/n/12 ^^V Ca-rac-te-ri-zar la si-tua-ción de ges-
-tión de da-tos de
-
-Underfull \hbox (badness 1596) in paragraph at lines 82--86
-\T1/ppl/m/n/12 sen-so-res en la or-ga-ni-za-ción des-ti-na-ta-ria, me-dian-te e
-n-tre-vis-tas
-
-Underfull \hbox (badness 1490) in paragraph at lines 86--90
-[]\T1/ppl/b/n/12 OE2 \T1/ppl/m/n/12 ^^V Es-pe-ci-fi-car el pro-to-co-lo sensor-
--plataforma ba-sa-do en
-
-Underfull \hbox (badness 4217) in paragraph at lines 86--90
-\T1/ppl/m/n/12 Con-tact ID, me-dian-te aná-li-sis com-pa-ra-ti-vo pon-de-ra-do 
-y la
-
-Underfull \hbox (badness 2173) in paragraph at lines 93--96
-[]\T1/ppl/b/n/12 OE4 \T1/ppl/m/n/12 ^^V De-ter-mi-nar el mo-de-lo de des-plie-g
-ue y el cos-to de
-
-Underfull \hbox (badness 10000) in paragraph at lines 96--99
-[]\T1/ppl/b/n/12 OE5 \T1/ppl/m/n/12 ^^V Im-ple-men-tar la pla-ta-for-ma y sus a
-dap-ta-do-res
-
-Underfull \hbox (badness 5519) in paragraph at lines 96--99
-\T1/ppl/m/n/12 mul-ti-pro-to-co-lo, me-dian-te de-sa-rro-llo in-cre-men-tal gui
-a-do por
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[4]
-Underfull \hbox (badness 1221) in paragraph at lines 99--102
-[]\T1/ppl/b/n/12 OE6 \T1/ppl/m/n/12 ^^V Va-li-dar la pla-ta-for-ma en con-di-ci
-o-nes que re-pli-can el
-
-Underfull \hbox (badness 1728) in paragraph at lines 99--102
-\T1/ppl/m/n/12 en-torno ope-ra-ti-vo, me-dian-te prue-bas fun-cio-na-les, de ca
-r-ga y
-
-Overfull \hbox (86.43924pt too wide) in paragraph at lines 106--119
- [][] 
-)
-Underfull \hbox (badness 1168) in paragraph at lines 125--84
-\T1/ppl/m/n/12 pro-to-co-lo; la do-cu-men-ta-ción ex-ten-di-da re-si-de en el r
-e-po-si-to-rio del
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[5] (./cap2.tex (./figuras/pila.tex
-Overfull \hbox (66.00215pt too wide) in paragraph at lines 44--46
- [][] 
-)
-[6] (./figuras/lorawan.tex
-Underfull \hbox (badness 1308) in paragraph at lines 25--27
-[][]\T1/ppl/b/n/9 El ci-fra-do es de ex-tre-mo a ex-tre-mo, del no-do al ser-vi
--dor de red. \T1/ppl/m/n/9 El ga-te-way so-lo 
-
-Overfull \hbox (93.68214pt too wide) in paragraph at lines 29--30
- [][] 
-)
-Underfull \hbox (badness 3209) in paragraph at lines 33--38
-[]\T1/ppl/m/n/12 MQTT apli-ca el pa-trón pu-bli-car/suscribir a tra-vés de un \
-T1/ppl/m/it/12 bro-ker
-
-Underfull \hbox (badness 2503) in paragraph at lines 33--38
-\T1/ppl/b/n/12 ini-cia la co-ne-xión sa-lien-te\T1/ppl/m/n/12 , lo que evi-ta a
-brir puer-tos ha-cia los
-
-Underfull \hbox (badness 10000) in paragraph at lines 33--38
-\T1/ppl/m/n/12 sen-so-res y fun-cio-na tras NAT y cor-ta-fue-gos ^^Vma-te-ria-l
-i-za el
-
-Underfull \hbox (badness 1448) in paragraph at lines 33--38
-\T1/ppl/m/n/12 re-que-ri-mien-to RNF-10^^V; (2) el me-ca-nis-mo \T1/ppl/m/it/12
- Last Will and Tes-ta-ment
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[7] (./figuras/mqtt.tex
-Underfull \hbox (badness 10000) in paragraph at lines 25--26
-[][]\T1/ppl/m/n/9 Los men-sa-jes se or-ga-ni-zan en \T1/ppl/b/n/9 tó-pi-cos\T1/
-ppl/m/n/9 , con for-ma de ru-ta: 
-
-Overfull \hbox (3.27625pt too wide) in paragraph at lines 30--32
- [][] 
-)
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[8] (./figuras/mensaje.tex
-Overfull \hbox (25.36589pt too wide) in paragraph at lines 37--38
- [][] 
-) (./figuras/alarmas.tex
-Missing character: There is no ) in font nullfont!
-Missing character: There is no ) in font nullfont!
-Missing character: There is no ) in font nullfont!
-
-Overfull \hbox (53.41864pt too wide) in paragraph at lines 51--53
- [][] 
-
-Underfull \hbox (badness 1117) in paragraph at lines 53--53
-\T1/ppl/m/n/12 for-ma-to del men-sa-je se con-ser-va a tra-vés de tres ge-ne-ra
--cio-nes de
-)
-Underfull \hbox (badness 1147) in paragraph at lines 65--69
-\T1/ppl/m/n/12 que es-te tra-ba-jo ne-ce-si-ta: pér-di-da de su-per-vi-sión RF 
-(381), ba-te-ría
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[9])
-Underfull \hbox (badness 1270) in paragraph at lines 72--85
-\T1/ppl/m/n/12 Se em-plea Ti-mes-ca-leDB, ex-ten-sión de Post-greSQL que con-se
-r-va el
-
-Underfull \hbox (badness 1270) in paragraph at lines 72--85
-\T1/ppl/m/n/12 por tiem-po, agre-ga-ción por in-ter-va-los y po-lí-ti-cas de re
--ten-ción. La
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[10] (./cap3.tex
-Underfull \hbox (badness 1394) in paragraph at lines 15--19
-\T1/ppl/m/n/12 MoS-CoW: 49 \T1/ppl/m/it/12 Must\T1/ppl/m/n/12 , 16 \T1/ppl/m/it
-/12 Should\T1/ppl/m/n/12 , 3 \T1/ppl/m/it/12 Could\T1/ppl/m/n/12 . El ca-tá-lo-
-go com-ple-to, con
-
-Underfull \hbox (badness 3769) in paragraph at lines 37--37
-[]\T1/ppl/m/n/12 Cuadro 3.1: []Módulos de la so-lu-ción. Nin-gu-na cau-sa que-d
-a sin
-
-[11]
-Overfull \hbox (23.75992pt too wide) in paragraph at lines 61--77
- [][] 
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[12] (./figuras/dosplanos.tex
-Missing character: There is no ) in font nullfont!
-)
-Underfull \hbox (badness 1057) in paragraph at lines 100--102
-\T1/ppl/m/n/12 pa-ra pa-ne-les ins-ta-la-dos; HTTP pa-ra sen-so-res Wi-Fi e in-
-te-gra-cio-nes)
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[13] (./figuras/ingesta.tex
-Overfull \hbox (63.47664pt too wide) in paragraph at lines 31--33
- [][] 
-)
-Overfull \hbox (150.61873pt too wide) in paragraph at lines 110--127
- [][] 
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[14]
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[15])
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[16] (./cap4.tex
-Underfull \hbox (badness 1675) in paragraph at lines 17--22
-\T1/ppl/m/n/12 y di-se-ño (caps. 2--3), prue-bas (cap. 5) y ges-tión de con-fi-
-gu-ra-ción
-
-Overfull \hbox (1.89766pt too wide) in paragraph at lines 27--38
- [][] 
-
-Underfull \hbox (badness 2012) in paragraph at lines 38--38
-[]\T1/ppl/m/n/12 Cuadro 4.1: []Calendario ofi-cial (pau-ta del 17 de agos-to de
- 2026).
-
-[17]
-Underfull \hbox (badness 10000) in paragraph at lines 56--64
-[]\T1/ppl/m/n/12 La ve-ri-fi-ca-ción nu-mé-ri-ca ^^Vsu-man-do pro-gra-má-ti-ca-
-men-te las
-
-Underfull \hbox (badness 2503) in paragraph at lines 56--64
-\T1/ppl/m/n/12 es-ti-ma-cio-nes^^V arro-jó el ha-llaz-go de ma-yor con-se-cuen-
-cia prác-ti-ca
-
-Underfull \hbox (badness 1270) in paragraph at lines 56--64
-\T1/ppl/m/n/12 (+31$ $% con el ca-len-da-rio ofi-cial). En con-se-cuen-cia, \T1
-/ppl/b/n/12 el com-pro-mi-so
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[18]
-Underfull \hbox (badness 1558) in paragraph at lines 65--68
-[]\T1/ppl/m/n/12 La dis-tri-bu-ción tem-po-ral tam-bién se co-rri-gió: la asig-
-na-ción ini-cial
-
-Overfull \hbox (52.27449pt too wide) in paragraph at lines 73--84
- [][] 
-)
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[19] (./conclusion.tex
-Underfull \hbox (badness 1603) in paragraph at lines 3--11
-[]\T1/ppl/b/n/12 Sobre la elec-ción del pro-to-co-lo. \T1/ppl/m/n/12 El aná-li-
-sis com-pa-ra-ti-vo de ocho
-
-Underfull \hbox (badness 8019) in paragraph at lines 3--11
-\T1/ppl/m/n/12 al-ter-na-ti-vas arro-jó un re-sul-ta-do no evi-den-te al ini-ci
-o: nin-gún
-
-Underfull \hbox (badness 1859) in paragraph at lines 18--21
-[]\T1/ppl/b/n/12 Sobre la via-bi-li-dad. \T1/ppl/m/n/12 Ve-ri-fi-car nu-mé-ri-c
-a-men-te el bac-klog an-tes de
-)
-[20]
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[21]
-Underfull \hbox (badness 1102) in paragraph at lines 90--90
-[][]\T1/ppl/m/n/12 Ademco. (1999). \T1/ppl/m/it/12 Di-gi-tal Com-mu-ni-ca-tion 
-Stan-dard: Adem-co Con-tact ID
-
-Underfull \hbox (badness 6268) in paragraph at lines 90--90
-[][]\T1/ppl/m/n/12 IoT3. (2026). \T1/ppl/m/it/12 So-lu-cio-nes in-te-li-gen-tes
- de mo-ni-to-reo y au-to-ma-ti-za-ción\T1/ppl/m/n/12 .
-
-Underfull \hbox (badness 10000) in paragraph at lines 90--90
-\T1/ppl/m/it/12 and Eva-lua-tion (SQua-RE)\T1/ppl/m/n/12 . In-ter-na-tio-nal Or
--ga-ni-za-tion for
-
-Underfull \hbox (badness 2980) in paragraph at lines 90--90
-\T1/ppl/m/it/12 Pro-to-col for Alarm Sys-tem Com-mu-ni-ca-tions\T1/ppl/m/n/12 .
- Se-cu-rity In-dustry
-
-[22]
-Underfull \hbox (badness 1303) in paragraph at lines 90--90
-[][]\T1/ppl/m/n/12 Security In-dustry As-so-cia-tion. (2017). \T1/ppl/m/it/12 D
-C-03-2017: DCS SIA For-mat
-
-Underfull \hbox (badness 3503) in paragraph at lines 90--90
-\T1/ppl/m/it/12 Stan-dard\T1/ppl/m/n/12 . Se-cu-rity In-dustry As-so-cia-tion. 
-[]$https : / / www .
-
-Underfull \hbox (badness 10000) in paragraph at lines 90--90
-[][]\T1/ppl/m/n/12 Security In-dustry As-so-cia-tion. (2026). \T1/ppl/m/it/12 D
-C-09: In-ter-net Pro-to-col
-
-Underfull \hbox (badness 3439) in paragraph at lines 90--90
-\T1/ppl/m/it/12 Event Re-por-ting, re-vi-sión 2026 \T1/ppl/m/n/12 (Apro-ba-ción
- AN-SI; in-cor-po-ra
-
-[23] (./anexos/a-requerimientos.tex
-
-LaTeX Warning: Reference `tab:fuentes' on page 24 undefined on input line 4.
-
-
-Overfull \hbox (54.80307pt too wide) in alignment at lines 8--9
- [] [] [] [] [] 
-
-Overfull \hbox (54.80307pt too wide) in alignment at lines 9--20
- [] [] [] [] [] 
-[24]
-Overfull \hbox (54.80307pt too wide) in alignment at lines 23--24
- [] [] [] [] [] 
-
-Overfull \hbox (54.80307pt too wide) in alignment at lines 24--32
- [] [] [] [] [] 
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[25]
-Overfull \hbox (54.80307pt too wide) in alignment at lines 35--36
- [] [] [] [] [] 
-
-Overfull \hbox (54.80307pt too wide) in alignment at lines 36--43
- [] [] [] [] [] 
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[26]
-Overfull \hbox (54.80307pt too wide) in alignment at lines 46--47
- [] [] [] [] [] 
-
-Overfull \hbox (54.80307pt too wide) in alignment at lines 47--55
- [] [] [] [] [] 
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[27]
-Overfull \hbox (54.80307pt too wide) in alignment at lines 58--59
- [] [] [] [] [] 
-
-Overfull \hbox (54.80307pt too wide) in alignment at lines 59--65
- [] [] [] [] [] 
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[28]
-Overfull \hbox (54.80307pt too wide) in alignment at lines 68--69
- [] [] [] [] [] 
-
-Overfull \hbox (54.80307pt too wide) in alignment at lines 69--74
- [] [] [] [] [] 
-
-Overfull \hbox (54.80307pt too wide) in alignment at lines 77--78
- [] [] [] [] [] 
-
-Overfull \hbox (54.80307pt too wide) in alignment at lines 78--86
- [] [] [] [] [] 
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[29]
-Overfull \hbox (54.80307pt too wide) in alignment at lines 89--90
- [] [] [] [] [] 
-
-Overfull \hbox (54.80307pt too wide) in alignment at lines 90--97
- [] [] [] [] [] 
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[30]
-Overfull \hbox (7.74991pt too wide) in paragraph at lines 101--101
-[]|[]\T1/ppl/b/n/12 Verificación[]|  
-
-Overfull \hbox (60.49309pt too wide) in alignment at lines 100--101
- [] [] [] [] [] 
-
-Overfull \hbox (21.02165pt too wide) in paragraph at lines 103--103
-\T1/ppl/m/n/12 ins-tru-men-ta-da|  
-
-Overfull \hbox (11.9856pt too wide) in paragraph at lines 106--106
-\T1/ppl/m/n/12 re-cu-pe-ra-ción 
-
-Overfull \hbox (4.44972pt too wide) in paragraph at lines 108--108
-\T1/ppl/m/n/12 ais-la-mien-to 
-
-Overfull \hbox (0.95764pt too wide) in paragraph at lines 109--109
-\T1/ppl/m/n/12 re-po-si-to-rio|  
-
-Overfull \hbox (16.6658pt too wide) in paragraph at lines 110--110
-\T1/ppl/m/n/12 do-cu-men-ta-do|  
-
-Overfull \hbox (7.94159pt too wide) in paragraph at lines 111--111
-\T1/ppl/m/n/12 ar-qui-tec-tu-ra|  
-
-Overfull \hbox (3.33382pt too wide) in paragraph at lines 114--114
-\T1/ppl/m/n/12 do-cu-men-to|  
-
-Overfull \hbox (2.81761pt too wide) in paragraph at lines 115--115
-[]|\T1/ppl/m/n/12 Despliegue 
-
-Overfull \hbox (16.08972pt too wide) in paragraph at lines 116--116
-\T1/ppl/m/n/12 de-pen-den-cias|  
-
-Overfull \hbox (60.49309pt too wide) in alignment at lines 101--118
- [] [] [] [] [] 
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[31]
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[32])
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[33] (./anexos/b-backlog.tex
-Overfull \hbox (54.80309pt too wide) in alignment at lines 8--9
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 9--14
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 17--18
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 18--25
- [] [] [] [] [] 
-
-[34]
-Overfull \hbox (54.80309pt too wide) in alignment at lines 28--29
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 29--35
- [] [] [] [] [] 
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[35]
-Overfull \hbox (54.80309pt too wide) in alignment at lines 38--39
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 39--45
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 48--49
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 49--54
- [] [] [] [] [] 
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[36]
-Overfull \hbox (54.80309pt too wide) in alignment at lines 57--58
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 58--63
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 66--67
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 67--72
- [] [] [] [] [] 
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[37]
-Overfull \hbox (54.80309pt too wide) in alignment at lines 75--76
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 76--81
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 84--85
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 85--90
- [] [] [] [] [] 
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[38]
-Overfull \hbox (54.80309pt too wide) in alignment at lines 93--94
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 94--100
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 103--104
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 104--108
- [] [] [] [] [] 
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[39]
-Overfull \hbox (54.80309pt too wide) in alignment at lines 111--112
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 112--116
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 119--120
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 120--127
- [] [] [] [] [] 
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[40]
-Overfull \hbox (54.80309pt too wide) in alignment at lines 130--131
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 131--138
- [] [] [] [] [] 
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[41])
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[42] (./anexos/c-protocolo.tex
-Underfull \hbox (badness 10000) in paragraph at lines 13--15
-[]\T1/ppl/m/n/12 Producidos con la he-rra-mien-ta pro-pia
-
-Underfull \hbox (badness 10000) in paragraph at lines 13--15
-\T1/cmtt/m/n/12 plataforma/herramientas/contactid.py\T1/ppl/m/n/12 , que ge-ne-
-ra, va-li-da y
-
-Underfull \hbox (badness 3039) in paragraph at lines 13--15
-\T1/ppl/m/n/12 em-pa-que-ta men-sa-jes; la al-te-ra-ción de un so-lo dí-gi-to i
-n-va-li-da la
-
-Overfull \hbox (22.26717pt too wide) in alignment at lines 16--17
- [] [] [] 
-
-Underfull \hbox (badness 3826) in paragraph at lines 25--25
-[]\T1/ppl/m/n/12 Cuadro C.1: Men-sa-jes de ejem-plo con su-ma de
-
-Overfull \hbox (22.26717pt too wide) in alignment at lines 17--26
- [] [] [] 
-[43]
-
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
 [44]
-Overfull \hbox (5.86444pt too wide) in paragraph at lines 59--59
- []|[]\T1/ppl/b/n/12 Código[]| 
-
-Overfull \hbox (17.81396pt too wide) in alignment at lines 58--59
- [] [] [] [] [] 
-
-Overfull \hbox (6.42467pt too wide) in paragraph at lines 63--63
-[]|\T1/ppl/m/n/12 MQTT/HTTP|  
-
-Underfull \hbox (badness 10000) in paragraph at lines 68--68
-[]\T1/ppl/m/n/12 Cuadro C.4: Ex-trac-to del ma-peo del per-fil.
-
-Underfull \hbox (badness 10000) in paragraph at lines 68--68
-\T1/ppl/m/n/12 La ta-bla com-ple-ta se de-sa-rro-lla en la Eta-pa
-
-Underfull \hbox (badness 6157) in paragraph at lines 68--68
-\T1/ppl/m/n/12 2; la ver-sión de tra-ba-jo es-tá en el re-po-si-to-rio
-
-Overfull \hbox (17.81396pt too wide) in alignment at lines 59--69
- [] [] [] [] [] 
+Underfull \hbox (badness 1360) in paragraph at lines 152--152
+[]\T1/ppl/m/n/10.95 Cuadro B.15: Re-su-men del es-fuer-zo es-ti-ma-do fren-te a
+l
 )
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[45]
+[45] (./anexos/c-protocolo.tex
+Underfull \hbox (badness 10000) in paragraph at lines 26--26
+[]\T1/ppl/m/n/10.95 Cuadro C.1: Men-sa-jes de ejem-plo con su-ma de
+[46]
+Underfull \hbox (badness 3229) in paragraph at lines 39--39
+[]\T1/ppl/m/n/10.95 Cuadro C.2: Ve-ri-fi-ca-ción pro-gra-má-ti-ca del ta-ma-ño.
+ El
+
+Overfull \vbox (0.85402pt too high) has occurred while \output is active
+[47]
+Overfull \hbox (2.36372pt too wide) in paragraph at lines 60--60
+ []|[]\T1/ppl/b/n/10.95 Código[]| 
+
+Overfull \hbox (11.26837pt too wide) in paragraph at lines 64--64
+[]|\T1/ppl/m/n/10.95 MQTT/HTTP|  
+)
+
+Overfull \vbox (0.85402pt too high) has occurred while \output is active
+[48]
 
 Class memoir Warning: The material used in the headers is too large
 (15.35402pt) for the given head height (14.5pt), it is recommended to
 either increase the head height or redesign the header
-(in both cases you will find help in the memoir manual). on input line 96.
+(in both cases you will find help in the memoir manual). on input line 97.
 
 (build/main.aux (build/Portada.aux) (build/resumen.aux) (build/cap1.aux)
 (build/cap2.aux) (build/cap3.aux) (build/cap4.aux) (build/conclusion.aux)
-(build/anexos/a-requerimientos.aux) (build/anexos/b-backlog.aux)
-(build/anexos/c-protocolo.aux))
-
-LaTeX Warning: There were undefined references.
-
-
-LaTeX Warning: Label(s) may have changed. Rerun to get cross-references right.
-
-
-Package rerunfilecheck Warning: File `main.out' has changed.
-(rerunfilecheck)                Rerun to get outlines right
-(rerunfilecheck)                or use package `bookmark'.
-
-
-Package biblatex Warning: Please rerun LaTeX.
-(biblatex)                Page breaks have changed.
-
- )
-(see the transcript file for additional information) </home/vicenterog/.texlive
-2025/texmf-var/fonts/pk/ljfour/jknappen/ec/ectt1095.600pk> </home/vicenterog/.t
-exlive2025/texmf-var/fonts/pk/ljfour/jknappen/ec/ectt0900.600pk> </home/vicente
-rog/.texlive2025/texmf-var/fonts/pk/ljfour/jknappen/ec/ectt1200.600pk></usr/sha
-re/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/share/texl
-ive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/share/texlive/te
-xmf-dist/fonts/type1/public/mathpazo/fplmr.pfb></usr/share/texlive/texmf-dist/f
-onts/type1/urw/palatino/uplb8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/u
-rw/palatino/uplbi8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/palatino
-/uplr8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/palatino/uplr8a.pfb>
-</usr/share/texlive/texmf-dist/fonts/type1/urw/palatino/uplri8a.pfb>
-Output written on build/main.pdf (52 pages, 354965 bytes).
-Transcript written on build/main.log.
-Latexmk: Getting log file 'build/main.log'
-Latexmk: Examining 'build/main.fls'
-Latexmk: Examining 'build/main.log'
-Latexmk: Found input bbl file 'build/main.bbl'
-Latexmk: References changed.
-Latexmk: References changed.
-Latexmk: Log file says output to 'build/main.pdf'
-Latexmk: Using biber to make bibliography file(s).
-Latexmk: Bibliography file(s) from .bcf file:
-  referencias.bib
-Sources for biber
-  referencias.bib
-  build/main.bcf
-Latexmk: applying rule 'pdflatex'...
-Rule 'pdflatex':  Reasons for rerun
-Changed files or newly in use/created:
-  build/Portada.aux
-  build/anexos/a-requerimientos.aux
-  build/anexos/b-backlog.aux
-  build/anexos/c-protocolo.aux
-  build/cap1.aux
-  build/cap2.aux
-  build/cap3.aux
-  build/cap4.aux
-  build/conclusion.aux
-  build/main.aux
-  build/main.lot
-  build/main.out
-  build/main.run.xml
-  build/main.toc
-  build/resumen.aux
-
-------------
-Run number 4 of rule 'pdflatex'
-------------
-------------
-Running 'pdflatex  -interaction=nonstopmode -recorder -output-directory="build"  "main.tex"'
-------------
-This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex)
- restricted \write18 enabled.
-entering extended mode
-(./main.tex
-LaTeX2e <2024-11-01> patch level 2
-L3 programming layer <2025-01-18>
-(/usr/share/texlive/texmf-dist/tex/latex/memoir/memoir.cls
-Document Class: memoir 2025/03/06 v3.8.3 configurable book, report, article doc
-ument class
-(/usr/share/texlive/texmf-dist/tex/latex/xpatch/xpatch.sty
-(/usr/share/texlive/texmf-dist/tex/latex/l3kernel/expl3.sty
-(/usr/share/texlive/texmf-dist/tex/latex/l3backend/l3backend-pdftex.def))
-(/usr/share/texlive/texmf-dist/tex/latex/l3packages/xparse/xparse.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/etoolbox/etoolbox.sty))
-(/usr/share/texlive/texmf-dist/tex/generic/iftex/iftex.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/memoir/mem12.clo)
-(/usr/share/texlive/texmf-dist/tex/latex/tools/array.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/tools/dcolumn.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/tools/delarray.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/tools/tabularx.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/booktabs/booktabs.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/hyperref/nameref.sty
-(/usr/share/texlive/texmf-dist/tex/latex/refcount/refcount.sty
-(/usr/share/texlive/texmf-dist/tex/generic/ltxcmds/ltxcmds.sty)
-(/usr/share/texlive/texmf-dist/tex/generic/infwarerr/infwarerr.sty))
-(/usr/share/texlive/texmf-dist/tex/generic/gettitlestring/gettitlestring.sty
-(/usr/share/texlive/texmf-dist/tex/latex/kvoptions/kvoptions.sty
-(/usr/share/texlive/texmf-dist/tex/latex/graphics/keyval.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/kvsetkeys/kvsetkeys.sty))))
-(/usr/share/texlive/texmf-dist/tex/latex/tools/verbatim.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/base/shortvrb.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/textcase/textcase.sty))
-(/usr/share/texlive/texmf-dist/tex/latex/biblatex/biblatex.sty
-(/usr/share/texlive/texmf-dist/tex/generic/pdftexcmds/pdftexcmds.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/logreq/logreq.sty
-(/usr/share/texlive/texmf-dist/tex/latex/logreq/logreq.def))
-(/usr/share/texlive/texmf-dist/tex/latex/base/ifthen.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/url/url.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/biblatex/blx-dm.def)
-(/usr/share/texlive/texmf-dist/tex/latex/biblatex-apa/apa.dbx)
-(/usr/share/texlive/texmf-dist/tex/latex/biblatex/blx-compat.def)
-(/usr/share/texlive/texmf-dist/tex/latex/biblatex/biblatex.def)
-(/usr/share/texlive/texmf-dist/tex/latex/biblatex-apa/apa.bbx
-(/usr/share/texlive/texmf-dist/tex/latex/biblatex/bbx/standard.bbx))
-(/usr/share/texlive/texmf-dist/tex/latex/biblatex-apa/apa.cbx)
-(/usr/share/texlive/texmf-dist/tex/latex/biblatex/biblatex.cfg)
-(/usr/share/texlive/texmf-dist/tex/latex/biblatex/blx-case-expl3.sty))
-(/usr/share/texlive/texmf-dist/tex/latex/psnfss/mathpazo.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/base/fontenc.sty
-(/usr/share/texlive/texmf-dist/tex/latex/psnfss/t1ppl.fd))
-(/usr/share/texlive/texmf-dist/tex/latex/base/inputenc.sty)
-(/usr/share/texlive/texmf-dist/tex/generic/babel/babel.sty
-(/usr/share/texlive/texmf-dist/tex/generic/babel/txtbabel.def)
-(/usr/share/texlive/texmf-dist/tex/generic/babel-spanish/spanish.ldf))
-(/usr/share/texlive/texmf-dist/tex/generic/babel/locale/es/babel-spanish.tex)
-(/usr/share/texlive/texmf-dist/tex/latex/float/float.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/base/textcomp.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/graphics/graphicx.sty
-(/usr/share/texlive/texmf-dist/tex/latex/graphics/graphics.sty
-(/usr/share/texlive/texmf-dist/tex/latex/graphics/trig.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/graphics-cfg/graphics.cfg)
-(/usr/share/texlive/texmf-dist/tex/latex/graphics-def/pdftex.def)))
-(/usr/share/texlive/texmf-dist/tex/latex/csquotes/csquotes.sty
-(/usr/share/texlive/texmf-dist/tex/latex/csquotes/csquotes.def)
-(/usr/share/texlive/texmf-dist/tex/latex/csquotes/csquotes.cfg))
-(/usr/share/texlive/texmf-dist/tex/latex/tools/longtable.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/multirow/multirow.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/xcolor/xcolor.sty
-(/usr/share/texlive/texmf-dist/tex/latex/graphics-cfg/color.cfg)
-(/usr/share/texlive/texmf-dist/tex/latex/graphics/mathcolor.ltx))
-(/usr/share/texlive/texmf-dist/tex/latex/colortbl/colortbl.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/pgf/frontendlayer/tikz.sty
-(/usr/share/texlive/texmf-dist/tex/latex/pgf/basiclayer/pgf.sty
-(/usr/share/texlive/texmf-dist/tex/latex/pgf/utilities/pgfrcs.sty
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/utilities/pgfutil-common.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/utilities/pgfutil-latex.def)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/utilities/pgfrcs.code.tex
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/pgf.revision.tex)))
-(/usr/share/texlive/texmf-dist/tex/latex/pgf/basiclayer/pgfcore.sty
-(/usr/share/texlive/texmf-dist/tex/latex/pgf/systemlayer/pgfsys.sty
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/systemlayer/pgfsys.code.tex
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/utilities/pgfkeys.code.tex
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/utilities/pgfkeyslibraryfiltered
-.code.tex)) (/usr/share/texlive/texmf-dist/tex/generic/pgf/systemlayer/pgf.cfg)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/systemlayer/pgfsys-pdftex.def
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/systemlayer/pgfsys-common-pdf.de
-f)))
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/systemlayer/pgfsyssoftpath.code.
-tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/systemlayer/pgfsysprotocol.code.
-tex))
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcore.code.tex
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmath.code.tex
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmathutil.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmathparser.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.basic.code
-.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.trigonomet
-ric.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.random.cod
-e.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.comparison
-.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.base.code.
-tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.round.code
-.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.misc.code.
-tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.integerari
-thmetics.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmathcalc.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmathfloat.code.tex))
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfint.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcorepoints.code.te
-x)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcorepathconstruct.
-code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcorepathusage.code
-.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcorescopes.code.te
-x)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcoregraphicstate.c
-ode.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcoretransformation
-s.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcorequick.code.tex
-)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcoreobjects.code.t
-ex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcorepathprocessing
-.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcorearrows.code.te
-x)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcoreshade.code.tex
-)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcoreimage.code.tex
-)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcoreexternal.code.
-tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcorelayers.code.te
-x)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcoretransparency.c
-ode.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcorepatterns.code.
-tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcorerdf.code.tex))
-)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/modules/pgfmoduleshapes.code.tex
-) (/usr/share/texlive/texmf-dist/tex/generic/pgf/modules/pgfmoduleplot.code.tex
-)
-(/usr/share/texlive/texmf-dist/tex/latex/pgf/compatibility/pgfcomp-version-0-65
-.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/pgf/compatibility/pgfcomp-version-1-18
-.sty)) (/usr/share/texlive/texmf-dist/tex/latex/pgf/utilities/pgffor.sty
-(/usr/share/texlive/texmf-dist/tex/latex/pgf/utilities/pgfkeys.sty
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/utilities/pgfkeys.code.tex))
-(/usr/share/texlive/texmf-dist/tex/latex/pgf/math/pgfmath.sty
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmath.code.tex))
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/utilities/pgffor.code.tex))
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/frontendlayer/tikz/tikz.code.tex
-
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/libraries/pgflibraryplothandlers
-.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/modules/pgfmodulematrix.code.tex
-)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/frontendlayer/tikz/libraries/tik
-zlibrarytopaths.code.tex)))
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/frontendlayer/tikz/libraries/tik
-zlibrarypositioning.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/frontendlayer/tikz/libraries/tik
-zlibraryshapes.geometric.code.tex
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/libraries/shapes/pgflibraryshape
-s.geometric.code.tex))
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/libraries/pgflibraryarrows.meta.
-code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/frontendlayer/tikz/libraries/tik
-zlibraryfit.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/frontendlayer/tikz/libraries/tik
-zlibrarybackgrounds.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/frontendlayer/tikz/libraries/tik
-zlibrarycalc.code.tex)
-(/usr/share/texlive/texmf-dist/tex/latex/hyperref/hyperref.sty
-(/usr/share/texlive/texmf-dist/tex/generic/kvdefinekeys/kvdefinekeys.sty)
-(/usr/share/texlive/texmf-dist/tex/generic/pdfescape/pdfescape.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/hycolor/hycolor.sty)
-(/usr/share/texlive/texmf-dist/tex/generic/stringenc/stringenc.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/hyperref/pd1enc.def)
-(/usr/share/texlive/texmf-dist/tex/generic/intcalc/intcalc.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/hyperref/puenc.def)
-(/usr/share/texlive/texmf-dist/tex/generic/bitset/bitset.sty
-(/usr/share/texlive/texmf-dist/tex/generic/bigintcalc/bigintcalc.sty))
-(/usr/share/texlive/texmf-dist/tex/latex/base/atbegshi-ltx.sty))
-(/usr/share/texlive/texmf-dist/tex/latex/hyperref/hpdftex.def
-(/usr/share/texlive/texmf-dist/tex/latex/base/atveryend-ltx.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/rerunfilecheck/rerunfilecheck.sty
-(/usr/share/texlive/texmf-dist/tex/generic/uniquecounter/uniquecounter.sty)))
-(/usr/share/texlive/texmf-dist/tex/latex/memoir/memhfixc.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/hyphenat/hyphenat.sty)
-
-Package biblatex Warning: Load 'inputenc' before biblatex.
-
-(build/main.aux (build/Portada.aux) (build/resumen.aux) (build/cap1.aux)
-(build/cap2.aux) (build/cap3.aux) (build/cap4.aux) (build/conclusion.aux)
-(build/anexos/a-requerimientos.aux) (build/anexos/b-backlog.aux)
-(build/anexos/c-protocolo.aux))
-(/usr/share/texlive/texmf-dist/tex/latex/biblatex-apa/spanish-apa.lbx
-(/usr/share/texlive/texmf-dist/tex/latex/biblatex/lbx/spanish.lbx)
-(/usr/share/texlive/texmf-dist/tex/latex/biblatex/lbx/spanish.lbx))
-(build/main.bbl)
-(/usr/share/texlive/texmf-dist/tex/context/base/mkii/supp-pdf.mkii
-[Loading MPS to PDF converter (version 2006.09.02).]
-) (/usr/share/texlive/texmf-dist/tex/latex/epstopdf-pkg/epstopdf-base.sty
-(/usr/share/texlive/texmf-dist/tex/latex/grfext/grfext.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/latexconfig/epstopdf-sys.cfg))
-(build/main.out) (build/main.out) (./Portada.tex
-(/usr/share/texlive/texmf-dist/tex/latex/psnfss/ts1ppl.fd)
-[1{/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map}{/usr/share/texlive/texmf-
-dist/fonts/enc/dvips/base/8r.enc} <./images/Logo_depto_ing_informatica.png>])
-(build/main.toc (/usr/share/texlive/texmf-dist/tex/latex/psnfss/ot1ppl.fd)
-(/usr/share/texlive/texmf-dist/tex/latex/psnfss/omlzplm.fd)
-(/usr/share/texlive/texmf-dist/tex/latex/psnfss/omszplm.fd)
-(/usr/share/texlive/texmf-dist/tex/latex/psnfss/omxzplm.fd)
-(/usr/share/texlive/texmf-dist/tex/latex/psnfss/ot1zplm.fd)
-[1]
-
-Class memoir Warning: The material used in the headers is too large
-(15.35402pt) for the given head height (14.5pt), it is recommended to
-either increase the head height or redesign the header
-(in both cases you will find help in the memoir manual). on input line 58.
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[2]
-Underfull \hbox (badness 1292) in paragraph at lines 61--61
- [][] [][]\T1/ppl/m/n/12 Identificadores del cam-po de da-tos ex-ten-di-dos (pe
-r-fil 
-)
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[3] (build/main.lof
-Underfull \hbox (badness 1609) in paragraph at lines 12--12
- [][] [][]\T1/ppl/m/n/12 Las tres vías de in-ges-ta con-ver-gen a un úni-co for
--ma-to 
-)
-[4] (build/main.lot
-Underfull \hbox (badness 10000) in paragraph at lines 6--6
- [][] [][]\T1/ppl/m/n/12 Módulos de la so-lu-ción. Nin-gu-na cau-sa que-da sin 
-
-
-Underfull \hbox (badness 2334) in paragraph at lines 6--6
- \T1/ppl/m/n/12 re-que-ri-mien-tos y nin-gún re-que-ri-mien-to ca-re-ce de cau-
-sa 
-
-Underfull \hbox (badness 5726) in paragraph at lines 10--10
- [][] [][]\T1/ppl/m/n/12 Calendario ofi-cial (pau-ta del 17 de agos-to de 2026)
-. 
-
-Underfull \hbox (badness 5711) in paragraph at lines 15--15
- [][] [][]\T1/ppl/m/n/12 Resumen del es-fuer-zo es-ti-ma-do fren-te al pre-su-p
-ues-to 
-)
-[5] (./resumen.tex
-Underfull \hbox (badness 1122) in paragraph at lines 3--17
-\T1/ppl/m/n/10.95 hard-wa-re de su pro-vee-dor, y no exis-te vi-si-bi-li-dad de
-l es-ta-do
-
-Underfull \hbox (badness 1184) in paragraph at lines 3--17
-\T1/ppl/m/n/10.95 de la co-nec-ti-vi-dad. Es-te tra-ba-jo pro-po-ne una pla-ta-
-for-ma web
-
-Underfull \hbox (badness 2452) in paragraph at lines 3--17
-\T1/ppl/m/n/10.95 de in-dus-tria Con-tact ID (AN-SI/SIA DC-05) so-bre trans-por
--te
-
-Underfull \hbox (badness 1107) in paragraph at lines 3--17
-\T1/ppl/m/n/10.95 de dis-po-si-ti-vos in-alám-bri-cos que la in-dus-tria de la 
-se-gu-ri-dad
-
-Underfull \hbox (badness 1552) in paragraph at lines 3--17
-\T1/ppl/m/n/10.95 el pro-ble-ma me-dian-te un ár-bol de cau-sas y efec-tos, for
--mu-la
-
-Underfull \hbox (badness 1297) in paragraph at lines 3--17
-\T1/ppl/m/n/10.95 seis ob-je-ti-vos es-pe-cí-fi-cos ba-jo cri-te-rios SMART con
- ma-triz de
-
-Underfull \hbox (badness 1831) in paragraph at lines 3--17
-\T1/ppl/m/n/10.95 cri-te-rios pon-de-ra-dos ^^Vve-ri-fi-can-do em-pí-ri-ca-men-
-te ta-ma-ños de
-
-Underfull \hbox (badness 2452) in paragraph at lines 3--17
-\T1/ppl/m/n/10.95 men-sa-je y su-mas de com-pro-ba-ción con una im-ple-men-ta-c
-ión
-
-Underfull \hbox (badness 6978) in paragraph at lines 3--17
-\T1/ppl/m/n/10.95 nu-mé-ri-ca de via-bi-li-dad de-li-mi-tó el com-pro-mi-so al 
-nú-cleo
-
-Class memoir Warning: The \bf font command is deprecated. 
-(memoir)              Use \textbf{...} or {\bfseries... } instead on input line
- 18.
-
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[6]) (./cap1.tex
-Underfull \hbox (badness 1221) in paragraph at lines 13--17
-\T1/ppl/m/n/12 IoT no lo-gran con-ver-tir los da-tos que es-tos ge-ne-ran en
-
-Underfull \hbox (badness 3078) in paragraph at lines 13--17
-\T1/ppl/m/n/12 que uni-fi-que la in-ges-ta, la nor-ma-li-za-ción y la ges-tión
-(./figuras/arbol.tex
-Overfull \hbox (2.8538pt too wide) in paragraph at lines 27--27
- []\T1/ppl/m/n/9 Fragmentación 
-
-Overfull \hbox (81.13643pt too wide) in paragraph at lines 42--44
- [][] 
-)
-[1]
-Underfull \hbox (badness 10000) in paragraph at lines 34--39
-\T1/ppl/m/n/12 al-ma-ce-na-mien-to y ges-tión; la es-pe-ci-fi-ca-ción del pro-t
-o-co-lo
-
-Underfull \hbox (badness 2181) in paragraph at lines 34--39
-\T1/ppl/m/n/12 sensor--plataforma; adap-ta-do-res pa-ra al me-nos dos trans-por
--tes; el
-
-Underfull \hbox (badness 1303) in paragraph at lines 42--48
-[]\T1/ppl/b/n/12 Oferta re-gio-nal. \T1/ppl/m/n/12 Se iden-ti-fi-can dos ac-to-
-res en La Arau-ca-nía: \T1/ppl/b/n/12 IoT3
-
-Underfull \hbox (badness 1087) in paragraph at lines 42--48
-\T1/ppl/m/n/12 pre-sen-cia agrí-co-la, y \T1/ppl/b/n/12 Con-trol-Tec \T1/ppl/m/
-n/12 ([]Con-trol-Tec SpA, []2026[]), te-le-me-tría
-
-Underfull \hbox (badness 1062) in paragraph at lines 42--48
-\T1/ppl/b/n/12 des-aco-pla-da del equi-pa-mien-to\T1/ppl/m/n/12 , que es el es-
-pa-cio que es-te tra-ba-jo
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[2]
-Underfull \hbox (badness 2608) in paragraph at lines 49--56
-[]\T1/ppl/b/n/12 El sec-tor de las alar-mas mo-ni-to-rea-das \T1/ppl/m/n/12 re-
-sol-vió ha-ce dé-ca-das la
-
-Underfull \hbox (badness 1728) in paragraph at lines 49--56
-\T1/ppl/m/n/12 com-bi-nan ade-más ca-na-les re-dun-dan-tes de ra-dio an-te in-t
-er-fe-ren-cia
-
-Underfull \hbox (badness 1776) in paragraph at lines 49--56
-\T1/ppl/m/n/12 ([]Bu-si-ness Wi-re, []2016[]). Sin em-bar-go, el sec-tor lo apl
-i-ca den-tro de
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[3]
-Underfull \hbox (badness 6961) in paragraph at lines 77--80
-[]\T1/ppl/m/n/12 Cada ob-je-ti-vo ex-pli-ci-ta qué se ha-rá, me-dian-te qué mé-
-to-do y
-
-Underfull \hbox (badness 4108) in paragraph at lines 77--80
-\T1/ppl/m/n/12 qué re-sul-ta-do ve-ri-fi-ca-ble pro-du-ce, con-for-me a la in-d
-i-ca-ción del
-
-Underfull \hbox (badness 10000) in paragraph at lines 77--80
-\T1/ppl/m/n/12 pro-fe-sor guía. El des-glo-se SMART com-ple-to, con in-di-ca-do
--res
-
-Underfull \hbox (badness 2600) in paragraph at lines 77--80
-\T1/ppl/m/n/12 nu-mé-ri-cos por cri-te-rio, se in-clu-ye en el re-po-si-to-rio 
-del pro-yec-to
-
-Underfull \hbox (badness 5578) in paragraph at lines 82--86
-[]\T1/ppl/b/n/12 OE1 \T1/ppl/m/n/12 ^^V Ca-rac-te-ri-zar la si-tua-ción de ges-
-tión de da-tos de
-
-Underfull \hbox (badness 1596) in paragraph at lines 82--86
-\T1/ppl/m/n/12 sen-so-res en la or-ga-ni-za-ción des-ti-na-ta-ria, me-dian-te e
-n-tre-vis-tas
-
-Underfull \hbox (badness 1490) in paragraph at lines 86--90
-[]\T1/ppl/b/n/12 OE2 \T1/ppl/m/n/12 ^^V Es-pe-ci-fi-car el pro-to-co-lo sensor-
--plataforma ba-sa-do en
-
-Underfull \hbox (badness 4217) in paragraph at lines 86--90
-\T1/ppl/m/n/12 Con-tact ID, me-dian-te aná-li-sis com-pa-ra-ti-vo pon-de-ra-do 
-y la
-
-Underfull \hbox (badness 2173) in paragraph at lines 93--96
-[]\T1/ppl/b/n/12 OE4 \T1/ppl/m/n/12 ^^V De-ter-mi-nar el mo-de-lo de des-plie-g
-ue y el cos-to de
-
-Underfull \hbox (badness 10000) in paragraph at lines 96--99
-[]\T1/ppl/b/n/12 OE5 \T1/ppl/m/n/12 ^^V Im-ple-men-tar la pla-ta-for-ma y sus a
-dap-ta-do-res
-
-Underfull \hbox (badness 5519) in paragraph at lines 96--99
-\T1/ppl/m/n/12 mul-ti-pro-to-co-lo, me-dian-te de-sa-rro-llo in-cre-men-tal gui
-a-do por
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[4]
-Underfull \hbox (badness 1221) in paragraph at lines 99--102
-[]\T1/ppl/b/n/12 OE6 \T1/ppl/m/n/12 ^^V Va-li-dar la pla-ta-for-ma en con-di-ci
-o-nes que re-pli-can el
-
-Underfull \hbox (badness 1728) in paragraph at lines 99--102
-\T1/ppl/m/n/12 en-torno ope-ra-ti-vo, me-dian-te prue-bas fun-cio-na-les, de ca
-r-ga y
-
-Overfull \hbox (86.43924pt too wide) in paragraph at lines 106--119
- [][] 
-)
-Underfull \hbox (badness 1168) in paragraph at lines 125--84
-\T1/ppl/m/n/12 pro-to-co-lo; la do-cu-men-ta-ción ex-ten-di-da re-si-de en el r
-e-po-si-to-rio del
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[5] (./cap2.tex (./figuras/pila.tex
-Overfull \hbox (66.00215pt too wide) in paragraph at lines 44--46
- [][] 
-)
-[6] (./figuras/lorawan.tex
-Underfull \hbox (badness 1308) in paragraph at lines 25--27
-[][]\T1/ppl/b/n/9 El ci-fra-do es de ex-tre-mo a ex-tre-mo, del no-do al ser-vi
--dor de red. \T1/ppl/m/n/9 El ga-te-way so-lo 
-
-Overfull \hbox (93.68214pt too wide) in paragraph at lines 29--30
- [][] 
-)
-Underfull \hbox (badness 3209) in paragraph at lines 33--38
-[]\T1/ppl/m/n/12 MQTT apli-ca el pa-trón pu-bli-car/suscribir a tra-vés de un \
-T1/ppl/m/it/12 bro-ker
-
-Underfull \hbox (badness 2503) in paragraph at lines 33--38
-\T1/ppl/b/n/12 ini-cia la co-ne-xión sa-lien-te\T1/ppl/m/n/12 , lo que evi-ta a
-brir puer-tos ha-cia los
-
-Underfull \hbox (badness 10000) in paragraph at lines 33--38
-\T1/ppl/m/n/12 sen-so-res y fun-cio-na tras NAT y cor-ta-fue-gos ^^Vma-te-ria-l
-i-za el
-
-Underfull \hbox (badness 1448) in paragraph at lines 33--38
-\T1/ppl/m/n/12 re-que-ri-mien-to RNF-10^^V; (2) el me-ca-nis-mo \T1/ppl/m/it/12
- Last Will and Tes-ta-ment
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[7] (./figuras/mqtt.tex
-Underfull \hbox (badness 10000) in paragraph at lines 25--26
-[][]\T1/ppl/m/n/9 Los men-sa-jes se or-ga-ni-zan en \T1/ppl/b/n/9 tó-pi-cos\T1/
-ppl/m/n/9 , con for-ma de ru-ta: 
-
-Overfull \hbox (3.27625pt too wide) in paragraph at lines 30--32
- [][] 
-)
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[8] (./figuras/mensaje.tex
-Overfull \hbox (25.36589pt too wide) in paragraph at lines 37--38
- [][] 
-) (./figuras/alarmas.tex
-Missing character: There is no ) in font nullfont!
-Missing character: There is no ) in font nullfont!
-Missing character: There is no ) in font nullfont!
-
-Overfull \hbox (53.41864pt too wide) in paragraph at lines 51--53
- [][] 
-
-Underfull \hbox (badness 1117) in paragraph at lines 53--53
-\T1/ppl/m/n/12 for-ma-to del men-sa-je se con-ser-va a tra-vés de tres ge-ne-ra
--cio-nes de
-)
-Underfull \hbox (badness 1147) in paragraph at lines 65--69
-\T1/ppl/m/n/12 que es-te tra-ba-jo ne-ce-si-ta: pér-di-da de su-per-vi-sión RF 
-(381), ba-te-ría
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[9])
-Underfull \hbox (badness 1270) in paragraph at lines 72--85
-\T1/ppl/m/n/12 Se em-plea Ti-mes-ca-leDB, ex-ten-sión de Post-greSQL que con-se
-r-va el
-
-Underfull \hbox (badness 1270) in paragraph at lines 72--85
-\T1/ppl/m/n/12 por tiem-po, agre-ga-ción por in-ter-va-los y po-lí-ti-cas de re
--ten-ción. La
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[10] (./cap3.tex
-Underfull \hbox (badness 1394) in paragraph at lines 15--19
-\T1/ppl/m/n/12 MoS-CoW: 49 \T1/ppl/m/it/12 Must\T1/ppl/m/n/12 , 16 \T1/ppl/m/it
-/12 Should\T1/ppl/m/n/12 , 3 \T1/ppl/m/it/12 Could\T1/ppl/m/n/12 . El ca-tá-lo-
-go com-ple-to, con
-
-Underfull \hbox (badness 3769) in paragraph at lines 37--37
-[]\T1/ppl/m/n/12 Cuadro 3.1: []Módulos de la so-lu-ción. Nin-gu-na cau-sa que-d
-a sin
-
-[11]
-Overfull \hbox (23.75992pt too wide) in paragraph at lines 61--77
- [][] 
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[12] (./figuras/dosplanos.tex
-Missing character: There is no ) in font nullfont!
-)
-Underfull \hbox (badness 1057) in paragraph at lines 100--102
-\T1/ppl/m/n/12 pa-ra pa-ne-les ins-ta-la-dos; HTTP pa-ra sen-so-res Wi-Fi e in-
-te-gra-cio-nes)
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[13] (./figuras/ingesta.tex
-Overfull \hbox (63.47664pt too wide) in paragraph at lines 31--33
- [][] 
-)
-Overfull \hbox (150.61873pt too wide) in paragraph at lines 110--127
- [][] 
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[14]
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[15])
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[16] (./cap4.tex
-Underfull \hbox (badness 1675) in paragraph at lines 17--22
-\T1/ppl/m/n/12 y di-se-ño (caps. 2--3), prue-bas (cap. 5) y ges-tión de con-fi-
-gu-ra-ción
-
-Overfull \hbox (1.89766pt too wide) in paragraph at lines 27--38
- [][] 
-
-Underfull \hbox (badness 2012) in paragraph at lines 38--38
-[]\T1/ppl/m/n/12 Cuadro 4.1: []Calendario ofi-cial (pau-ta del 17 de agos-to de
- 2026).
-
-[17]
-Underfull \hbox (badness 10000) in paragraph at lines 56--64
-[]\T1/ppl/m/n/12 La ve-ri-fi-ca-ción nu-mé-ri-ca ^^Vsu-man-do pro-gra-má-ti-ca-
-men-te las
-
-Underfull \hbox (badness 2503) in paragraph at lines 56--64
-\T1/ppl/m/n/12 es-ti-ma-cio-nes^^V arro-jó el ha-llaz-go de ma-yor con-se-cuen-
-cia prác-ti-ca
-
-Underfull \hbox (badness 1270) in paragraph at lines 56--64
-\T1/ppl/m/n/12 (+31$ $% con el ca-len-da-rio ofi-cial). En con-se-cuen-cia, \T1
-/ppl/b/n/12 el com-pro-mi-so
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[18]
-Underfull \hbox (badness 1558) in paragraph at lines 65--68
-[]\T1/ppl/m/n/12 La dis-tri-bu-ción tem-po-ral tam-bién se co-rri-gió: la asig-
-na-ción ini-cial
-
-Overfull \hbox (52.27449pt too wide) in paragraph at lines 73--84
- [][] 
-)
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[19] (./conclusion.tex
-Underfull \hbox (badness 1603) in paragraph at lines 3--11
-[]\T1/ppl/b/n/12 Sobre la elec-ción del pro-to-co-lo. \T1/ppl/m/n/12 El aná-li-
-sis com-pa-ra-ti-vo de ocho
-
-Underfull \hbox (badness 8019) in paragraph at lines 3--11
-\T1/ppl/m/n/12 al-ter-na-ti-vas arro-jó un re-sul-ta-do no evi-den-te al ini-ci
-o: nin-gún
-
-Underfull \hbox (badness 1859) in paragraph at lines 18--21
-[]\T1/ppl/b/n/12 Sobre la via-bi-li-dad. \T1/ppl/m/n/12 Ve-ri-fi-car nu-mé-ri-c
-a-men-te el bac-klog an-tes de
-)
-[20]
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[21]
-Underfull \hbox (badness 1102) in paragraph at lines 90--90
-[][]\T1/ppl/m/n/12 Ademco. (1999). \T1/ppl/m/it/12 Di-gi-tal Com-mu-ni-ca-tion 
-Stan-dard: Adem-co Con-tact ID
-
-Underfull \hbox (badness 6268) in paragraph at lines 90--90
-[][]\T1/ppl/m/n/12 IoT3. (2026). \T1/ppl/m/it/12 So-lu-cio-nes in-te-li-gen-tes
- de mo-ni-to-reo y au-to-ma-ti-za-ción\T1/ppl/m/n/12 .
-
-Underfull \hbox (badness 10000) in paragraph at lines 90--90
-\T1/ppl/m/it/12 and Eva-lua-tion (SQua-RE)\T1/ppl/m/n/12 . In-ter-na-tio-nal Or
--ga-ni-za-tion for
-
-Underfull \hbox (badness 2980) in paragraph at lines 90--90
-\T1/ppl/m/it/12 Pro-to-col for Alarm Sys-tem Com-mu-ni-ca-tions\T1/ppl/m/n/12 .
- Se-cu-rity In-dustry
-
-[22]
-Underfull \hbox (badness 1303) in paragraph at lines 90--90
-[][]\T1/ppl/m/n/12 Security In-dustry As-so-cia-tion. (2017). \T1/ppl/m/it/12 D
-C-03-2017: DCS SIA For-mat
-
-Underfull \hbox (badness 3503) in paragraph at lines 90--90
-\T1/ppl/m/it/12 Stan-dard\T1/ppl/m/n/12 . Se-cu-rity In-dustry As-so-cia-tion. 
-[]$https : / / www .
-
-Underfull \hbox (badness 10000) in paragraph at lines 90--90
-[][]\T1/ppl/m/n/12 Security In-dustry As-so-cia-tion. (2026). \T1/ppl/m/it/12 D
-C-09: In-ter-net Pro-to-col
-
-Underfull \hbox (badness 3439) in paragraph at lines 90--90
-\T1/ppl/m/it/12 Event Re-por-ting, re-vi-sión 2026 \T1/ppl/m/n/12 (Apro-ba-ción
- AN-SI; in-cor-po-ra
-
-[23] (./anexos/a-requerimientos.tex
-
-LaTeX Warning: Reference `tab:fuentes' on page 24 undefined on input line 4.
-
-
-Overfull \hbox (54.80307pt too wide) in alignment at lines 8--9
- [] [] [] [] [] 
-
-Overfull \hbox (54.80307pt too wide) in alignment at lines 9--20
- [] [] [] [] [] 
-[24]
-Overfull \hbox (54.80307pt too wide) in alignment at lines 23--24
- [] [] [] [] [] 
-
-Overfull \hbox (54.80307pt too wide) in alignment at lines 24--32
- [] [] [] [] [] 
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[25]
-Overfull \hbox (54.80307pt too wide) in alignment at lines 35--36
- [] [] [] [] [] 
-
-Overfull \hbox (54.80307pt too wide) in alignment at lines 36--43
- [] [] [] [] [] 
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[26]
-Overfull \hbox (54.80307pt too wide) in alignment at lines 46--47
- [] [] [] [] [] 
-
-Overfull \hbox (54.80307pt too wide) in alignment at lines 47--55
- [] [] [] [] [] 
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[27]
-Overfull \hbox (54.80307pt too wide) in alignment at lines 58--59
- [] [] [] [] [] 
-
-Overfull \hbox (54.80307pt too wide) in alignment at lines 59--65
- [] [] [] [] [] 
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[28]
-Overfull \hbox (54.80307pt too wide) in alignment at lines 68--69
- [] [] [] [] [] 
-
-Overfull \hbox (54.80307pt too wide) in alignment at lines 69--74
- [] [] [] [] [] 
-
-Overfull \hbox (54.80307pt too wide) in alignment at lines 77--78
- [] [] [] [] [] 
-
-Overfull \hbox (54.80307pt too wide) in alignment at lines 78--86
- [] [] [] [] [] 
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[29]
-Overfull \hbox (54.80307pt too wide) in alignment at lines 89--90
- [] [] [] [] [] 
-
-Overfull \hbox (54.80307pt too wide) in alignment at lines 90--97
- [] [] [] [] [] 
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[30]
-Overfull \hbox (7.74991pt too wide) in paragraph at lines 101--101
-[]|[]\T1/ppl/b/n/12 Verificación[]|  
-
-Overfull \hbox (60.49309pt too wide) in alignment at lines 100--101
- [] [] [] [] [] 
-
-Overfull \hbox (21.02165pt too wide) in paragraph at lines 103--103
-\T1/ppl/m/n/12 ins-tru-men-ta-da|  
-
-Overfull \hbox (11.9856pt too wide) in paragraph at lines 106--106
-\T1/ppl/m/n/12 re-cu-pe-ra-ción 
-
-Overfull \hbox (4.44972pt too wide) in paragraph at lines 108--108
-\T1/ppl/m/n/12 ais-la-mien-to 
-
-Overfull \hbox (0.95764pt too wide) in paragraph at lines 109--109
-\T1/ppl/m/n/12 re-po-si-to-rio|  
-
-Overfull \hbox (16.6658pt too wide) in paragraph at lines 110--110
-\T1/ppl/m/n/12 do-cu-men-ta-do|  
-
-Overfull \hbox (7.94159pt too wide) in paragraph at lines 111--111
-\T1/ppl/m/n/12 ar-qui-tec-tu-ra|  
-
-Overfull \hbox (3.33382pt too wide) in paragraph at lines 114--114
-\T1/ppl/m/n/12 do-cu-men-to|  
-
-Overfull \hbox (2.81761pt too wide) in paragraph at lines 115--115
-[]|\T1/ppl/m/n/12 Despliegue 
-
-Overfull \hbox (16.08972pt too wide) in paragraph at lines 116--116
-\T1/ppl/m/n/12 de-pen-den-cias|  
-
-Overfull \hbox (60.49309pt too wide) in alignment at lines 101--118
- [] [] [] [] [] 
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[31]
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[32])
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[33] (./anexos/b-backlog.tex
-Overfull \hbox (54.80309pt too wide) in alignment at lines 8--9
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 9--14
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 17--18
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 18--25
- [] [] [] [] [] 
-
-[34]
-Overfull \hbox (54.80309pt too wide) in alignment at lines 28--29
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 29--35
- [] [] [] [] [] 
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[35]
-Overfull \hbox (54.80309pt too wide) in alignment at lines 38--39
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 39--45
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 48--49
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 49--54
- [] [] [] [] [] 
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[36]
-Overfull \hbox (54.80309pt too wide) in alignment at lines 57--58
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 58--63
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 66--67
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 67--72
- [] [] [] [] [] 
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[37]
-Overfull \hbox (54.80309pt too wide) in alignment at lines 75--76
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 76--81
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 84--85
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 85--90
- [] [] [] [] [] 
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[38]
-Overfull \hbox (54.80309pt too wide) in alignment at lines 93--94
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 94--100
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 103--104
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 104--108
- [] [] [] [] [] 
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[39]
-Overfull \hbox (54.80309pt too wide) in alignment at lines 111--112
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 112--116
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 119--120
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 120--127
- [] [] [] [] [] 
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[40]
-Overfull \hbox (54.80309pt too wide) in alignment at lines 130--131
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 131--138
- [] [] [] [] [] 
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[41])
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[42] (./anexos/c-protocolo.tex
-Underfull \hbox (badness 10000) in paragraph at lines 13--15
-[]\T1/ppl/m/n/12 Producidos con la he-rra-mien-ta pro-pia
-
-Underfull \hbox (badness 10000) in paragraph at lines 13--15
-\T1/cmtt/m/n/12 plataforma/herramientas/contactid.py\T1/ppl/m/n/12 , que ge-ne-
-ra, va-li-da y
-
-Underfull \hbox (badness 3039) in paragraph at lines 13--15
-\T1/ppl/m/n/12 em-pa-que-ta men-sa-jes; la al-te-ra-ción de un so-lo dí-gi-to i
-n-va-li-da la
-
-Overfull \hbox (22.26717pt too wide) in alignment at lines 16--17
- [] [] [] 
-
-Underfull \hbox (badness 3826) in paragraph at lines 25--25
-[]\T1/ppl/m/n/12 Cuadro C.1: Men-sa-jes de ejem-plo con su-ma de
-
-Overfull \hbox (22.26717pt too wide) in alignment at lines 17--26
- [] [] [] 
-[43]
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[44]
-Overfull \hbox (5.86444pt too wide) in paragraph at lines 59--59
- []|[]\T1/ppl/b/n/12 Código[]| 
-
-Overfull \hbox (17.81396pt too wide) in alignment at lines 58--59
- [] [] [] [] [] 
-
-Overfull \hbox (6.42467pt too wide) in paragraph at lines 63--63
-[]|\T1/ppl/m/n/12 MQTT/HTTP|  
-
-Underfull \hbox (badness 10000) in paragraph at lines 68--68
-[]\T1/ppl/m/n/12 Cuadro C.4: Ex-trac-to del ma-peo del per-fil.
-
-Underfull \hbox (badness 10000) in paragraph at lines 68--68
-\T1/ppl/m/n/12 La ta-bla com-ple-ta se de-sa-rro-lla en la Eta-pa
-
-Underfull \hbox (badness 6157) in paragraph at lines 68--68
-\T1/ppl/m/n/12 2; la ver-sión de tra-ba-jo es-tá en el re-po-si-to-rio
-
-Overfull \hbox (17.81396pt too wide) in alignment at lines 59--69
- [] [] [] [] [] 
-)
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[45]
-
-Class memoir Warning: The material used in the headers is too large
-(15.35402pt) for the given head height (14.5pt), it is recommended to
-either increase the head height or redesign the header
-(in both cases you will find help in the memoir manual). on input line 96.
-
-(build/main.aux (build/Portada.aux) (build/resumen.aux) (build/cap1.aux)
-(build/cap2.aux) (build/cap3.aux) (build/cap4.aux) (build/conclusion.aux)
-(build/anexos/a-requerimientos.aux) (build/anexos/b-backlog.aux)
-(build/anexos/c-protocolo.aux))
+(build/glosario.aux) (build/anexos/a-requerimientos.aux)
+(build/anexos/b-backlog.aux) (build/anexos/c-protocolo.aux))
 
 LaTeX Warning: There were undefined references.
 
@@ -3868,954 +1528,7 @@ onts/type1/urw/palatino/uplb8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/u
 rw/palatino/uplbi8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/palatino
 /uplr8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/palatino/uplr8a.pfb>
 </usr/share/texlive/texmf-dist/fonts/type1/urw/palatino/uplri8a.pfb>
-Output written on build/main.pdf (52 pages, 354998 bytes).
-Transcript written on build/main.log.
-Latexmk: Getting log file 'build/main.log'
-Latexmk: Examining 'build/main.fls'
-Latexmk: Examining 'build/main.log'
-Latexmk: Found input bbl file 'build/main.bbl'
-Latexmk: Log file says output to 'build/main.pdf'
-Latexmk: Using biber to make bibliography file(s).
-Latexmk: Bibliography file(s) from .bcf file:
-  referencias.bib
-Sources for biber
-  referencias.bib
-  build/main.bcf
-Latexmk: applying rule 'pdflatex'...
-Rule 'pdflatex':  Reasons for rerun
-Changed files or newly in use/created:
-  build/Portada.aux
-  build/anexos/a-requerimientos.aux
-  build/anexos/b-backlog.aux
-  build/anexos/c-protocolo.aux
-  build/cap1.aux
-  build/cap2.aux
-  build/cap3.aux
-  build/cap4.aux
-  build/conclusion.aux
-  build/main.run.xml
-  build/resumen.aux
-
-------------
-Run number 5 of rule 'pdflatex'
-------------
-------------
-Running 'pdflatex  -interaction=nonstopmode -recorder -output-directory="build"  "main.tex"'
-------------
-This is pdfTeX, Version 3.141592653-2.6-1.40.26 (TeX Live 2025/dev/Debian) (preloaded format=pdflatex)
- restricted \write18 enabled.
-entering extended mode
-(./main.tex
-LaTeX2e <2024-11-01> patch level 2
-L3 programming layer <2025-01-18>
-(/usr/share/texlive/texmf-dist/tex/latex/memoir/memoir.cls
-Document Class: memoir 2025/03/06 v3.8.3 configurable book, report, article doc
-ument class
-(/usr/share/texlive/texmf-dist/tex/latex/xpatch/xpatch.sty
-(/usr/share/texlive/texmf-dist/tex/latex/l3kernel/expl3.sty
-(/usr/share/texlive/texmf-dist/tex/latex/l3backend/l3backend-pdftex.def))
-(/usr/share/texlive/texmf-dist/tex/latex/l3packages/xparse/xparse.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/etoolbox/etoolbox.sty))
-(/usr/share/texlive/texmf-dist/tex/generic/iftex/iftex.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/memoir/mem12.clo)
-(/usr/share/texlive/texmf-dist/tex/latex/tools/array.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/tools/dcolumn.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/tools/delarray.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/tools/tabularx.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/booktabs/booktabs.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/hyperref/nameref.sty
-(/usr/share/texlive/texmf-dist/tex/latex/refcount/refcount.sty
-(/usr/share/texlive/texmf-dist/tex/generic/ltxcmds/ltxcmds.sty)
-(/usr/share/texlive/texmf-dist/tex/generic/infwarerr/infwarerr.sty))
-(/usr/share/texlive/texmf-dist/tex/generic/gettitlestring/gettitlestring.sty
-(/usr/share/texlive/texmf-dist/tex/latex/kvoptions/kvoptions.sty
-(/usr/share/texlive/texmf-dist/tex/latex/graphics/keyval.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/kvsetkeys/kvsetkeys.sty))))
-(/usr/share/texlive/texmf-dist/tex/latex/tools/verbatim.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/base/shortvrb.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/textcase/textcase.sty))
-(/usr/share/texlive/texmf-dist/tex/latex/biblatex/biblatex.sty
-(/usr/share/texlive/texmf-dist/tex/generic/pdftexcmds/pdftexcmds.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/logreq/logreq.sty
-(/usr/share/texlive/texmf-dist/tex/latex/logreq/logreq.def))
-(/usr/share/texlive/texmf-dist/tex/latex/base/ifthen.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/url/url.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/biblatex/blx-dm.def)
-(/usr/share/texlive/texmf-dist/tex/latex/biblatex-apa/apa.dbx)
-(/usr/share/texlive/texmf-dist/tex/latex/biblatex/blx-compat.def)
-(/usr/share/texlive/texmf-dist/tex/latex/biblatex/biblatex.def)
-(/usr/share/texlive/texmf-dist/tex/latex/biblatex-apa/apa.bbx
-(/usr/share/texlive/texmf-dist/tex/latex/biblatex/bbx/standard.bbx))
-(/usr/share/texlive/texmf-dist/tex/latex/biblatex-apa/apa.cbx)
-(/usr/share/texlive/texmf-dist/tex/latex/biblatex/biblatex.cfg)
-(/usr/share/texlive/texmf-dist/tex/latex/biblatex/blx-case-expl3.sty))
-(/usr/share/texlive/texmf-dist/tex/latex/psnfss/mathpazo.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/base/fontenc.sty
-(/usr/share/texlive/texmf-dist/tex/latex/psnfss/t1ppl.fd))
-(/usr/share/texlive/texmf-dist/tex/latex/base/inputenc.sty)
-(/usr/share/texlive/texmf-dist/tex/generic/babel/babel.sty
-(/usr/share/texlive/texmf-dist/tex/generic/babel/txtbabel.def)
-(/usr/share/texlive/texmf-dist/tex/generic/babel-spanish/spanish.ldf))
-(/usr/share/texlive/texmf-dist/tex/generic/babel/locale/es/babel-spanish.tex)
-(/usr/share/texlive/texmf-dist/tex/latex/float/float.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/base/textcomp.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/graphics/graphicx.sty
-(/usr/share/texlive/texmf-dist/tex/latex/graphics/graphics.sty
-(/usr/share/texlive/texmf-dist/tex/latex/graphics/trig.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/graphics-cfg/graphics.cfg)
-(/usr/share/texlive/texmf-dist/tex/latex/graphics-def/pdftex.def)))
-(/usr/share/texlive/texmf-dist/tex/latex/csquotes/csquotes.sty
-(/usr/share/texlive/texmf-dist/tex/latex/csquotes/csquotes.def)
-(/usr/share/texlive/texmf-dist/tex/latex/csquotes/csquotes.cfg))
-(/usr/share/texlive/texmf-dist/tex/latex/tools/longtable.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/multirow/multirow.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/xcolor/xcolor.sty
-(/usr/share/texlive/texmf-dist/tex/latex/graphics-cfg/color.cfg)
-(/usr/share/texlive/texmf-dist/tex/latex/graphics/mathcolor.ltx))
-(/usr/share/texlive/texmf-dist/tex/latex/colortbl/colortbl.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/pgf/frontendlayer/tikz.sty
-(/usr/share/texlive/texmf-dist/tex/latex/pgf/basiclayer/pgf.sty
-(/usr/share/texlive/texmf-dist/tex/latex/pgf/utilities/pgfrcs.sty
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/utilities/pgfutil-common.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/utilities/pgfutil-latex.def)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/utilities/pgfrcs.code.tex
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/pgf.revision.tex)))
-(/usr/share/texlive/texmf-dist/tex/latex/pgf/basiclayer/pgfcore.sty
-(/usr/share/texlive/texmf-dist/tex/latex/pgf/systemlayer/pgfsys.sty
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/systemlayer/pgfsys.code.tex
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/utilities/pgfkeys.code.tex
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/utilities/pgfkeyslibraryfiltered
-.code.tex)) (/usr/share/texlive/texmf-dist/tex/generic/pgf/systemlayer/pgf.cfg)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/systemlayer/pgfsys-pdftex.def
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/systemlayer/pgfsys-common-pdf.de
-f)))
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/systemlayer/pgfsyssoftpath.code.
-tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/systemlayer/pgfsysprotocol.code.
-tex))
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcore.code.tex
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmath.code.tex
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmathutil.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmathparser.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.basic.code
-.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.trigonomet
-ric.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.random.cod
-e.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.comparison
-.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.base.code.
-tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.round.code
-.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.misc.code.
-tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmathfunctions.integerari
-thmetics.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmathcalc.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmathfloat.code.tex))
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfint.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcorepoints.code.te
-x)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcorepathconstruct.
-code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcorepathusage.code
-.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcorescopes.code.te
-x)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcoregraphicstate.c
-ode.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcoretransformation
-s.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcorequick.code.tex
-)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcoreobjects.code.t
-ex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcorepathprocessing
-.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcorearrows.code.te
-x)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcoreshade.code.tex
-)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcoreimage.code.tex
-)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcoreexternal.code.
-tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcorelayers.code.te
-x)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcoretransparency.c
-ode.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcorepatterns.code.
-tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/basiclayer/pgfcorerdf.code.tex))
-)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/modules/pgfmoduleshapes.code.tex
-) (/usr/share/texlive/texmf-dist/tex/generic/pgf/modules/pgfmoduleplot.code.tex
-)
-(/usr/share/texlive/texmf-dist/tex/latex/pgf/compatibility/pgfcomp-version-0-65
-.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/pgf/compatibility/pgfcomp-version-1-18
-.sty)) (/usr/share/texlive/texmf-dist/tex/latex/pgf/utilities/pgffor.sty
-(/usr/share/texlive/texmf-dist/tex/latex/pgf/utilities/pgfkeys.sty
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/utilities/pgfkeys.code.tex))
-(/usr/share/texlive/texmf-dist/tex/latex/pgf/math/pgfmath.sty
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/math/pgfmath.code.tex))
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/utilities/pgffor.code.tex))
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/frontendlayer/tikz/tikz.code.tex
-
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/libraries/pgflibraryplothandlers
-.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/modules/pgfmodulematrix.code.tex
-)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/frontendlayer/tikz/libraries/tik
-zlibrarytopaths.code.tex)))
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/frontendlayer/tikz/libraries/tik
-zlibrarypositioning.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/frontendlayer/tikz/libraries/tik
-zlibraryshapes.geometric.code.tex
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/libraries/shapes/pgflibraryshape
-s.geometric.code.tex))
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/libraries/pgflibraryarrows.meta.
-code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/frontendlayer/tikz/libraries/tik
-zlibraryfit.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/frontendlayer/tikz/libraries/tik
-zlibrarybackgrounds.code.tex)
-(/usr/share/texlive/texmf-dist/tex/generic/pgf/frontendlayer/tikz/libraries/tik
-zlibrarycalc.code.tex)
-(/usr/share/texlive/texmf-dist/tex/latex/hyperref/hyperref.sty
-(/usr/share/texlive/texmf-dist/tex/generic/kvdefinekeys/kvdefinekeys.sty)
-(/usr/share/texlive/texmf-dist/tex/generic/pdfescape/pdfescape.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/hycolor/hycolor.sty)
-(/usr/share/texlive/texmf-dist/tex/generic/stringenc/stringenc.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/hyperref/pd1enc.def)
-(/usr/share/texlive/texmf-dist/tex/generic/intcalc/intcalc.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/hyperref/puenc.def)
-(/usr/share/texlive/texmf-dist/tex/generic/bitset/bitset.sty
-(/usr/share/texlive/texmf-dist/tex/generic/bigintcalc/bigintcalc.sty))
-(/usr/share/texlive/texmf-dist/tex/latex/base/atbegshi-ltx.sty))
-(/usr/share/texlive/texmf-dist/tex/latex/hyperref/hpdftex.def
-(/usr/share/texlive/texmf-dist/tex/latex/base/atveryend-ltx.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/rerunfilecheck/rerunfilecheck.sty
-(/usr/share/texlive/texmf-dist/tex/generic/uniquecounter/uniquecounter.sty)))
-(/usr/share/texlive/texmf-dist/tex/latex/memoir/memhfixc.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/hyphenat/hyphenat.sty)
-
-Package biblatex Warning: Load 'inputenc' before biblatex.
-
-(build/main.aux (build/Portada.aux) (build/resumen.aux) (build/cap1.aux)
-(build/cap2.aux) (build/cap3.aux) (build/cap4.aux) (build/conclusion.aux)
-(build/anexos/a-requerimientos.aux) (build/anexos/b-backlog.aux)
-(build/anexos/c-protocolo.aux))
-(/usr/share/texlive/texmf-dist/tex/latex/biblatex-apa/spanish-apa.lbx
-(/usr/share/texlive/texmf-dist/tex/latex/biblatex/lbx/spanish.lbx)
-(/usr/share/texlive/texmf-dist/tex/latex/biblatex/lbx/spanish.lbx))
-(build/main.bbl)
-(/usr/share/texlive/texmf-dist/tex/context/base/mkii/supp-pdf.mkii
-[Loading MPS to PDF converter (version 2006.09.02).]
-) (/usr/share/texlive/texmf-dist/tex/latex/epstopdf-pkg/epstopdf-base.sty
-(/usr/share/texlive/texmf-dist/tex/latex/grfext/grfext.sty)
-(/usr/share/texlive/texmf-dist/tex/latex/latexconfig/epstopdf-sys.cfg))
-(build/main.out) (build/main.out) (./Portada.tex
-(/usr/share/texlive/texmf-dist/tex/latex/psnfss/ts1ppl.fd)
-[1{/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map}{/usr/share/texlive/texmf-
-dist/fonts/enc/dvips/base/8r.enc} <./images/Logo_depto_ing_informatica.png>])
-(build/main.toc (/usr/share/texlive/texmf-dist/tex/latex/psnfss/ot1ppl.fd)
-(/usr/share/texlive/texmf-dist/tex/latex/psnfss/omlzplm.fd)
-(/usr/share/texlive/texmf-dist/tex/latex/psnfss/omszplm.fd)
-(/usr/share/texlive/texmf-dist/tex/latex/psnfss/omxzplm.fd)
-(/usr/share/texlive/texmf-dist/tex/latex/psnfss/ot1zplm.fd)
-[1]
-
-Class memoir Warning: The material used in the headers is too large
-(15.35402pt) for the given head height (14.5pt), it is recommended to
-either increase the head height or redesign the header
-(in both cases you will find help in the memoir manual). on input line 58.
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[2]
-Underfull \hbox (badness 1292) in paragraph at lines 61--61
- [][] [][]\T1/ppl/m/n/12 Identificadores del cam-po de da-tos ex-ten-di-dos (pe
-r-fil 
-)
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[3] (build/main.lof
-Underfull \hbox (badness 1609) in paragraph at lines 12--12
- [][] [][]\T1/ppl/m/n/12 Las tres vías de in-ges-ta con-ver-gen a un úni-co for
--ma-to 
-)
-[4] (build/main.lot
-Underfull \hbox (badness 10000) in paragraph at lines 6--6
- [][] [][]\T1/ppl/m/n/12 Módulos de la so-lu-ción. Nin-gu-na cau-sa que-da sin 
-
-
-Underfull \hbox (badness 2334) in paragraph at lines 6--6
- \T1/ppl/m/n/12 re-que-ri-mien-tos y nin-gún re-que-ri-mien-to ca-re-ce de cau-
-sa 
-
-Underfull \hbox (badness 5726) in paragraph at lines 10--10
- [][] [][]\T1/ppl/m/n/12 Calendario ofi-cial (pau-ta del 17 de agos-to de 2026)
-. 
-
-Underfull \hbox (badness 5711) in paragraph at lines 15--15
- [][] [][]\T1/ppl/m/n/12 Resumen del es-fuer-zo es-ti-ma-do fren-te al pre-su-p
-ues-to 
-)
-[5] (./resumen.tex
-Underfull \hbox (badness 1122) in paragraph at lines 3--17
-\T1/ppl/m/n/10.95 hard-wa-re de su pro-vee-dor, y no exis-te vi-si-bi-li-dad de
-l es-ta-do
-
-Underfull \hbox (badness 1184) in paragraph at lines 3--17
-\T1/ppl/m/n/10.95 de la co-nec-ti-vi-dad. Es-te tra-ba-jo pro-po-ne una pla-ta-
-for-ma web
-
-Underfull \hbox (badness 2452) in paragraph at lines 3--17
-\T1/ppl/m/n/10.95 de in-dus-tria Con-tact ID (AN-SI/SIA DC-05) so-bre trans-por
--te
-
-Underfull \hbox (badness 1107) in paragraph at lines 3--17
-\T1/ppl/m/n/10.95 de dis-po-si-ti-vos in-alám-bri-cos que la in-dus-tria de la 
-se-gu-ri-dad
-
-Underfull \hbox (badness 1552) in paragraph at lines 3--17
-\T1/ppl/m/n/10.95 el pro-ble-ma me-dian-te un ár-bol de cau-sas y efec-tos, for
--mu-la
-
-Underfull \hbox (badness 1297) in paragraph at lines 3--17
-\T1/ppl/m/n/10.95 seis ob-je-ti-vos es-pe-cí-fi-cos ba-jo cri-te-rios SMART con
- ma-triz de
-
-Underfull \hbox (badness 1831) in paragraph at lines 3--17
-\T1/ppl/m/n/10.95 cri-te-rios pon-de-ra-dos ^^Vve-ri-fi-can-do em-pí-ri-ca-men-
-te ta-ma-ños de
-
-Underfull \hbox (badness 2452) in paragraph at lines 3--17
-\T1/ppl/m/n/10.95 men-sa-je y su-mas de com-pro-ba-ción con una im-ple-men-ta-c
-ión
-
-Underfull \hbox (badness 6978) in paragraph at lines 3--17
-\T1/ppl/m/n/10.95 nu-mé-ri-ca de via-bi-li-dad de-li-mi-tó el com-pro-mi-so al 
-nú-cleo
-
-Class memoir Warning: The \bf font command is deprecated. 
-(memoir)              Use \textbf{...} or {\bfseries... } instead on input line
- 18.
-
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[6]) (./cap1.tex
-Underfull \hbox (badness 1221) in paragraph at lines 13--17
-\T1/ppl/m/n/12 IoT no lo-gran con-ver-tir los da-tos que es-tos ge-ne-ran en
-
-Underfull \hbox (badness 3078) in paragraph at lines 13--17
-\T1/ppl/m/n/12 que uni-fi-que la in-ges-ta, la nor-ma-li-za-ción y la ges-tión
-(./figuras/arbol.tex
-Overfull \hbox (2.8538pt too wide) in paragraph at lines 27--27
- []\T1/ppl/m/n/9 Fragmentación 
-
-Overfull \hbox (81.13643pt too wide) in paragraph at lines 42--44
- [][] 
-)
-[1]
-Underfull \hbox (badness 10000) in paragraph at lines 34--39
-\T1/ppl/m/n/12 al-ma-ce-na-mien-to y ges-tión; la es-pe-ci-fi-ca-ción del pro-t
-o-co-lo
-
-Underfull \hbox (badness 2181) in paragraph at lines 34--39
-\T1/ppl/m/n/12 sensor--plataforma; adap-ta-do-res pa-ra al me-nos dos trans-por
--tes; el
-
-Underfull \hbox (badness 1303) in paragraph at lines 42--48
-[]\T1/ppl/b/n/12 Oferta re-gio-nal. \T1/ppl/m/n/12 Se iden-ti-fi-can dos ac-to-
-res en La Arau-ca-nía: \T1/ppl/b/n/12 IoT3
-
-Underfull \hbox (badness 1087) in paragraph at lines 42--48
-\T1/ppl/m/n/12 pre-sen-cia agrí-co-la, y \T1/ppl/b/n/12 Con-trol-Tec \T1/ppl/m/
-n/12 ([]Con-trol-Tec SpA, []2026[]), te-le-me-tría
-
-Underfull \hbox (badness 1062) in paragraph at lines 42--48
-\T1/ppl/b/n/12 des-aco-pla-da del equi-pa-mien-to\T1/ppl/m/n/12 , que es el es-
-pa-cio que es-te tra-ba-jo
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[2]
-Underfull \hbox (badness 2608) in paragraph at lines 49--56
-[]\T1/ppl/b/n/12 El sec-tor de las alar-mas mo-ni-to-rea-das \T1/ppl/m/n/12 re-
-sol-vió ha-ce dé-ca-das la
-
-Underfull \hbox (badness 1728) in paragraph at lines 49--56
-\T1/ppl/m/n/12 com-bi-nan ade-más ca-na-les re-dun-dan-tes de ra-dio an-te in-t
-er-fe-ren-cia
-
-Underfull \hbox (badness 1776) in paragraph at lines 49--56
-\T1/ppl/m/n/12 ([]Bu-si-ness Wi-re, []2016[]). Sin em-bar-go, el sec-tor lo apl
-i-ca den-tro de
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[3]
-Underfull \hbox (badness 6961) in paragraph at lines 77--80
-[]\T1/ppl/m/n/12 Cada ob-je-ti-vo ex-pli-ci-ta qué se ha-rá, me-dian-te qué mé-
-to-do y
-
-Underfull \hbox (badness 4108) in paragraph at lines 77--80
-\T1/ppl/m/n/12 qué re-sul-ta-do ve-ri-fi-ca-ble pro-du-ce, con-for-me a la in-d
-i-ca-ción del
-
-Underfull \hbox (badness 10000) in paragraph at lines 77--80
-\T1/ppl/m/n/12 pro-fe-sor guía. El des-glo-se SMART com-ple-to, con in-di-ca-do
--res
-
-Underfull \hbox (badness 2600) in paragraph at lines 77--80
-\T1/ppl/m/n/12 nu-mé-ri-cos por cri-te-rio, se in-clu-ye en el re-po-si-to-rio 
-del pro-yec-to
-
-Underfull \hbox (badness 5578) in paragraph at lines 82--86
-[]\T1/ppl/b/n/12 OE1 \T1/ppl/m/n/12 ^^V Ca-rac-te-ri-zar la si-tua-ción de ges-
-tión de da-tos de
-
-Underfull \hbox (badness 1596) in paragraph at lines 82--86
-\T1/ppl/m/n/12 sen-so-res en la or-ga-ni-za-ción des-ti-na-ta-ria, me-dian-te e
-n-tre-vis-tas
-
-Underfull \hbox (badness 1490) in paragraph at lines 86--90
-[]\T1/ppl/b/n/12 OE2 \T1/ppl/m/n/12 ^^V Es-pe-ci-fi-car el pro-to-co-lo sensor-
--plataforma ba-sa-do en
-
-Underfull \hbox (badness 4217) in paragraph at lines 86--90
-\T1/ppl/m/n/12 Con-tact ID, me-dian-te aná-li-sis com-pa-ra-ti-vo pon-de-ra-do 
-y la
-
-Underfull \hbox (badness 2173) in paragraph at lines 93--96
-[]\T1/ppl/b/n/12 OE4 \T1/ppl/m/n/12 ^^V De-ter-mi-nar el mo-de-lo de des-plie-g
-ue y el cos-to de
-
-Underfull \hbox (badness 10000) in paragraph at lines 96--99
-[]\T1/ppl/b/n/12 OE5 \T1/ppl/m/n/12 ^^V Im-ple-men-tar la pla-ta-for-ma y sus a
-dap-ta-do-res
-
-Underfull \hbox (badness 5519) in paragraph at lines 96--99
-\T1/ppl/m/n/12 mul-ti-pro-to-co-lo, me-dian-te de-sa-rro-llo in-cre-men-tal gui
-a-do por
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[4]
-Underfull \hbox (badness 1221) in paragraph at lines 99--102
-[]\T1/ppl/b/n/12 OE6 \T1/ppl/m/n/12 ^^V Va-li-dar la pla-ta-for-ma en con-di-ci
-o-nes que re-pli-can el
-
-Underfull \hbox (badness 1728) in paragraph at lines 99--102
-\T1/ppl/m/n/12 en-torno ope-ra-ti-vo, me-dian-te prue-bas fun-cio-na-les, de ca
-r-ga y
-
-Overfull \hbox (86.43924pt too wide) in paragraph at lines 106--119
- [][] 
-)
-Underfull \hbox (badness 1168) in paragraph at lines 125--84
-\T1/ppl/m/n/12 pro-to-co-lo; la do-cu-men-ta-ción ex-ten-di-da re-si-de en el r
-e-po-si-to-rio del
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[5] (./cap2.tex (./figuras/pila.tex
-Overfull \hbox (66.00215pt too wide) in paragraph at lines 44--46
- [][] 
-)
-[6] (./figuras/lorawan.tex
-Underfull \hbox (badness 1308) in paragraph at lines 25--27
-[][]\T1/ppl/b/n/9 El ci-fra-do es de ex-tre-mo a ex-tre-mo, del no-do al ser-vi
--dor de red. \T1/ppl/m/n/9 El ga-te-way so-lo 
-
-Overfull \hbox (93.68214pt too wide) in paragraph at lines 29--30
- [][] 
-)
-Underfull \hbox (badness 3209) in paragraph at lines 33--38
-[]\T1/ppl/m/n/12 MQTT apli-ca el pa-trón pu-bli-car/suscribir a tra-vés de un \
-T1/ppl/m/it/12 bro-ker
-
-Underfull \hbox (badness 2503) in paragraph at lines 33--38
-\T1/ppl/b/n/12 ini-cia la co-ne-xión sa-lien-te\T1/ppl/m/n/12 , lo que evi-ta a
-brir puer-tos ha-cia los
-
-Underfull \hbox (badness 10000) in paragraph at lines 33--38
-\T1/ppl/m/n/12 sen-so-res y fun-cio-na tras NAT y cor-ta-fue-gos ^^Vma-te-ria-l
-i-za el
-
-Underfull \hbox (badness 1448) in paragraph at lines 33--38
-\T1/ppl/m/n/12 re-que-ri-mien-to RNF-10^^V; (2) el me-ca-nis-mo \T1/ppl/m/it/12
- Last Will and Tes-ta-ment
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[7] (./figuras/mqtt.tex
-Underfull \hbox (badness 10000) in paragraph at lines 25--26
-[][]\T1/ppl/m/n/9 Los men-sa-jes se or-ga-ni-zan en \T1/ppl/b/n/9 tó-pi-cos\T1/
-ppl/m/n/9 , con for-ma de ru-ta: 
-
-Overfull \hbox (3.27625pt too wide) in paragraph at lines 30--32
- [][] 
-)
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[8] (./figuras/mensaje.tex
-Overfull \hbox (25.36589pt too wide) in paragraph at lines 37--38
- [][] 
-) (./figuras/alarmas.tex
-Missing character: There is no ) in font nullfont!
-Missing character: There is no ) in font nullfont!
-Missing character: There is no ) in font nullfont!
-
-Overfull \hbox (53.41864pt too wide) in paragraph at lines 51--53
- [][] 
-
-Underfull \hbox (badness 1117) in paragraph at lines 53--53
-\T1/ppl/m/n/12 for-ma-to del men-sa-je se con-ser-va a tra-vés de tres ge-ne-ra
--cio-nes de
-)
-Underfull \hbox (badness 1147) in paragraph at lines 65--69
-\T1/ppl/m/n/12 que es-te tra-ba-jo ne-ce-si-ta: pér-di-da de su-per-vi-sión RF 
-(381), ba-te-ría
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[9])
-Underfull \hbox (badness 1270) in paragraph at lines 72--85
-\T1/ppl/m/n/12 Se em-plea Ti-mes-ca-leDB, ex-ten-sión de Post-greSQL que con-se
-r-va el
-
-Underfull \hbox (badness 1270) in paragraph at lines 72--85
-\T1/ppl/m/n/12 por tiem-po, agre-ga-ción por in-ter-va-los y po-lí-ti-cas de re
--ten-ción. La
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[10] (./cap3.tex
-Underfull \hbox (badness 1394) in paragraph at lines 15--19
-\T1/ppl/m/n/12 MoS-CoW: 49 \T1/ppl/m/it/12 Must\T1/ppl/m/n/12 , 16 \T1/ppl/m/it
-/12 Should\T1/ppl/m/n/12 , 3 \T1/ppl/m/it/12 Could\T1/ppl/m/n/12 . El ca-tá-lo-
-go com-ple-to, con
-
-Underfull \hbox (badness 3769) in paragraph at lines 37--37
-[]\T1/ppl/m/n/12 Cuadro 3.1: []Módulos de la so-lu-ción. Nin-gu-na cau-sa que-d
-a sin
-
-[11]
-Overfull \hbox (23.75992pt too wide) in paragraph at lines 61--77
- [][] 
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[12] (./figuras/dosplanos.tex
-Missing character: There is no ) in font nullfont!
-)
-Underfull \hbox (badness 1057) in paragraph at lines 100--102
-\T1/ppl/m/n/12 pa-ra pa-ne-les ins-ta-la-dos; HTTP pa-ra sen-so-res Wi-Fi e in-
-te-gra-cio-nes)
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[13] (./figuras/ingesta.tex
-Overfull \hbox (63.47664pt too wide) in paragraph at lines 31--33
- [][] 
-)
-Overfull \hbox (150.61873pt too wide) in paragraph at lines 110--127
- [][] 
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[14]
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[15])
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[16] (./cap4.tex
-Underfull \hbox (badness 1675) in paragraph at lines 17--22
-\T1/ppl/m/n/12 y di-se-ño (caps. 2--3), prue-bas (cap. 5) y ges-tión de con-fi-
-gu-ra-ción
-
-Overfull \hbox (1.89766pt too wide) in paragraph at lines 27--38
- [][] 
-
-Underfull \hbox (badness 2012) in paragraph at lines 38--38
-[]\T1/ppl/m/n/12 Cuadro 4.1: []Calendario ofi-cial (pau-ta del 17 de agos-to de
- 2026).
-
-[17]
-Underfull \hbox (badness 10000) in paragraph at lines 56--64
-[]\T1/ppl/m/n/12 La ve-ri-fi-ca-ción nu-mé-ri-ca ^^Vsu-man-do pro-gra-má-ti-ca-
-men-te las
-
-Underfull \hbox (badness 2503) in paragraph at lines 56--64
-\T1/ppl/m/n/12 es-ti-ma-cio-nes^^V arro-jó el ha-llaz-go de ma-yor con-se-cuen-
-cia prác-ti-ca
-
-Underfull \hbox (badness 1270) in paragraph at lines 56--64
-\T1/ppl/m/n/12 (+31$ $% con el ca-len-da-rio ofi-cial). En con-se-cuen-cia, \T1
-/ppl/b/n/12 el com-pro-mi-so
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[18]
-Underfull \hbox (badness 1558) in paragraph at lines 65--68
-[]\T1/ppl/m/n/12 La dis-tri-bu-ción tem-po-ral tam-bién se co-rri-gió: la asig-
-na-ción ini-cial
-
-Overfull \hbox (52.27449pt too wide) in paragraph at lines 73--84
- [][] 
-)
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[19] (./conclusion.tex
-Underfull \hbox (badness 1603) in paragraph at lines 3--11
-[]\T1/ppl/b/n/12 Sobre la elec-ción del pro-to-co-lo. \T1/ppl/m/n/12 El aná-li-
-sis com-pa-ra-ti-vo de ocho
-
-Underfull \hbox (badness 8019) in paragraph at lines 3--11
-\T1/ppl/m/n/12 al-ter-na-ti-vas arro-jó un re-sul-ta-do no evi-den-te al ini-ci
-o: nin-gún
-
-Underfull \hbox (badness 1859) in paragraph at lines 18--21
-[]\T1/ppl/b/n/12 Sobre la via-bi-li-dad. \T1/ppl/m/n/12 Ve-ri-fi-car nu-mé-ri-c
-a-men-te el bac-klog an-tes de
-)
-[20]
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[21]
-Underfull \hbox (badness 1102) in paragraph at lines 90--90
-[][]\T1/ppl/m/n/12 Ademco. (1999). \T1/ppl/m/it/12 Di-gi-tal Com-mu-ni-ca-tion 
-Stan-dard: Adem-co Con-tact ID
-
-Underfull \hbox (badness 6268) in paragraph at lines 90--90
-[][]\T1/ppl/m/n/12 IoT3. (2026). \T1/ppl/m/it/12 So-lu-cio-nes in-te-li-gen-tes
- de mo-ni-to-reo y au-to-ma-ti-za-ción\T1/ppl/m/n/12 .
-
-Underfull \hbox (badness 10000) in paragraph at lines 90--90
-\T1/ppl/m/it/12 and Eva-lua-tion (SQua-RE)\T1/ppl/m/n/12 . In-ter-na-tio-nal Or
--ga-ni-za-tion for
-
-Underfull \hbox (badness 2980) in paragraph at lines 90--90
-\T1/ppl/m/it/12 Pro-to-col for Alarm Sys-tem Com-mu-ni-ca-tions\T1/ppl/m/n/12 .
- Se-cu-rity In-dustry
-
-[22]
-Underfull \hbox (badness 1303) in paragraph at lines 90--90
-[][]\T1/ppl/m/n/12 Security In-dustry As-so-cia-tion. (2017). \T1/ppl/m/it/12 D
-C-03-2017: DCS SIA For-mat
-
-Underfull \hbox (badness 3503) in paragraph at lines 90--90
-\T1/ppl/m/it/12 Stan-dard\T1/ppl/m/n/12 . Se-cu-rity In-dustry As-so-cia-tion. 
-[]$https : / / www .
-
-Underfull \hbox (badness 10000) in paragraph at lines 90--90
-[][]\T1/ppl/m/n/12 Security In-dustry As-so-cia-tion. (2026). \T1/ppl/m/it/12 D
-C-09: In-ter-net Pro-to-col
-
-Underfull \hbox (badness 3439) in paragraph at lines 90--90
-\T1/ppl/m/it/12 Event Re-por-ting, re-vi-sión 2026 \T1/ppl/m/n/12 (Apro-ba-ción
- AN-SI; in-cor-po-ra
-
-[23] (./anexos/a-requerimientos.tex
-
-LaTeX Warning: Reference `tab:fuentes' on page 24 undefined on input line 4.
-
-
-Overfull \hbox (54.80307pt too wide) in alignment at lines 8--9
- [] [] [] [] [] 
-
-Overfull \hbox (54.80307pt too wide) in alignment at lines 9--20
- [] [] [] [] [] 
-[24]
-Overfull \hbox (54.80307pt too wide) in alignment at lines 23--24
- [] [] [] [] [] 
-
-Overfull \hbox (54.80307pt too wide) in alignment at lines 24--32
- [] [] [] [] [] 
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[25]
-Overfull \hbox (54.80307pt too wide) in alignment at lines 35--36
- [] [] [] [] [] 
-
-Overfull \hbox (54.80307pt too wide) in alignment at lines 36--43
- [] [] [] [] [] 
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[26]
-Overfull \hbox (54.80307pt too wide) in alignment at lines 46--47
- [] [] [] [] [] 
-
-Overfull \hbox (54.80307pt too wide) in alignment at lines 47--55
- [] [] [] [] [] 
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[27]
-Overfull \hbox (54.80307pt too wide) in alignment at lines 58--59
- [] [] [] [] [] 
-
-Overfull \hbox (54.80307pt too wide) in alignment at lines 59--65
- [] [] [] [] [] 
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[28]
-Overfull \hbox (54.80307pt too wide) in alignment at lines 68--69
- [] [] [] [] [] 
-
-Overfull \hbox (54.80307pt too wide) in alignment at lines 69--74
- [] [] [] [] [] 
-
-Overfull \hbox (54.80307pt too wide) in alignment at lines 77--78
- [] [] [] [] [] 
-
-Overfull \hbox (54.80307pt too wide) in alignment at lines 78--86
- [] [] [] [] [] 
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[29]
-Overfull \hbox (54.80307pt too wide) in alignment at lines 89--90
- [] [] [] [] [] 
-
-Overfull \hbox (54.80307pt too wide) in alignment at lines 90--97
- [] [] [] [] [] 
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[30]
-Overfull \hbox (7.74991pt too wide) in paragraph at lines 101--101
-[]|[]\T1/ppl/b/n/12 Verificación[]|  
-
-Overfull \hbox (60.49309pt too wide) in alignment at lines 100--101
- [] [] [] [] [] 
-
-Overfull \hbox (21.02165pt too wide) in paragraph at lines 103--103
-\T1/ppl/m/n/12 ins-tru-men-ta-da|  
-
-Overfull \hbox (11.9856pt too wide) in paragraph at lines 106--106
-\T1/ppl/m/n/12 re-cu-pe-ra-ción 
-
-Overfull \hbox (4.44972pt too wide) in paragraph at lines 108--108
-\T1/ppl/m/n/12 ais-la-mien-to 
-
-Overfull \hbox (0.95764pt too wide) in paragraph at lines 109--109
-\T1/ppl/m/n/12 re-po-si-to-rio|  
-
-Overfull \hbox (16.6658pt too wide) in paragraph at lines 110--110
-\T1/ppl/m/n/12 do-cu-men-ta-do|  
-
-Overfull \hbox (7.94159pt too wide) in paragraph at lines 111--111
-\T1/ppl/m/n/12 ar-qui-tec-tu-ra|  
-
-Overfull \hbox (3.33382pt too wide) in paragraph at lines 114--114
-\T1/ppl/m/n/12 do-cu-men-to|  
-
-Overfull \hbox (2.81761pt too wide) in paragraph at lines 115--115
-[]|\T1/ppl/m/n/12 Despliegue 
-
-Overfull \hbox (16.08972pt too wide) in paragraph at lines 116--116
-\T1/ppl/m/n/12 de-pen-den-cias|  
-
-Overfull \hbox (60.49309pt too wide) in alignment at lines 101--118
- [] [] [] [] [] 
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[31]
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[32])
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[33] (./anexos/b-backlog.tex
-Overfull \hbox (54.80309pt too wide) in alignment at lines 8--9
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 9--14
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 17--18
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 18--25
- [] [] [] [] [] 
-
-[34]
-Overfull \hbox (54.80309pt too wide) in alignment at lines 28--29
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 29--35
- [] [] [] [] [] 
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[35]
-Overfull \hbox (54.80309pt too wide) in alignment at lines 38--39
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 39--45
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 48--49
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 49--54
- [] [] [] [] [] 
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[36]
-Overfull \hbox (54.80309pt too wide) in alignment at lines 57--58
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 58--63
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 66--67
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 67--72
- [] [] [] [] [] 
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[37]
-Overfull \hbox (54.80309pt too wide) in alignment at lines 75--76
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 76--81
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 84--85
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 85--90
- [] [] [] [] [] 
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[38]
-Overfull \hbox (54.80309pt too wide) in alignment at lines 93--94
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 94--100
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 103--104
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 104--108
- [] [] [] [] [] 
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[39]
-Overfull \hbox (54.80309pt too wide) in alignment at lines 111--112
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 112--116
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 119--120
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 120--127
- [] [] [] [] [] 
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[40]
-Overfull \hbox (54.80309pt too wide) in alignment at lines 130--131
- [] [] [] [] [] 
-
-Overfull \hbox (54.80309pt too wide) in alignment at lines 131--138
- [] [] [] [] [] 
-
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[41])
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[42] (./anexos/c-protocolo.tex
-Underfull \hbox (badness 10000) in paragraph at lines 13--15
-[]\T1/ppl/m/n/12 Producidos con la he-rra-mien-ta pro-pia
-
-Underfull \hbox (badness 10000) in paragraph at lines 13--15
-\T1/cmtt/m/n/12 plataforma/herramientas/contactid.py\T1/ppl/m/n/12 , que ge-ne-
-ra, va-li-da y
-
-Underfull \hbox (badness 3039) in paragraph at lines 13--15
-\T1/ppl/m/n/12 em-pa-que-ta men-sa-jes; la al-te-ra-ción de un so-lo dí-gi-to i
-n-va-li-da la
-
-Overfull \hbox (22.26717pt too wide) in alignment at lines 16--17
- [] [] [] 
-
-Underfull \hbox (badness 3826) in paragraph at lines 25--25
-[]\T1/ppl/m/n/12 Cuadro C.1: Men-sa-jes de ejem-plo con su-ma de
-
-Overfull \hbox (22.26717pt too wide) in alignment at lines 17--26
- [] [] [] 
-[43]
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[44]
-Overfull \hbox (5.86444pt too wide) in paragraph at lines 59--59
- []|[]\T1/ppl/b/n/12 Código[]| 
-
-Overfull \hbox (17.81396pt too wide) in alignment at lines 58--59
- [] [] [] [] [] 
-
-Overfull \hbox (6.42467pt too wide) in paragraph at lines 63--63
-[]|\T1/ppl/m/n/12 MQTT/HTTP|  
-
-Underfull \hbox (badness 10000) in paragraph at lines 68--68
-[]\T1/ppl/m/n/12 Cuadro C.4: Ex-trac-to del ma-peo del per-fil.
-
-Underfull \hbox (badness 10000) in paragraph at lines 68--68
-\T1/ppl/m/n/12 La ta-bla com-ple-ta se de-sa-rro-lla en la Eta-pa
-
-Underfull \hbox (badness 6157) in paragraph at lines 68--68
-\T1/ppl/m/n/12 2; la ver-sión de tra-ba-jo es-tá en el re-po-si-to-rio
-
-Overfull \hbox (17.81396pt too wide) in alignment at lines 59--69
- [] [] [] [] [] 
-)
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[45]
-
-Class memoir Warning: The material used in the headers is too large
-(15.35402pt) for the given head height (14.5pt), it is recommended to
-either increase the head height or redesign the header
-(in both cases you will find help in the memoir manual). on input line 96.
-
-(build/main.aux (build/Portada.aux) (build/resumen.aux) (build/cap1.aux)
-(build/cap2.aux) (build/cap3.aux) (build/cap4.aux) (build/conclusion.aux)
-(build/anexos/a-requerimientos.aux) (build/anexos/b-backlog.aux)
-(build/anexos/c-protocolo.aux))
-
-LaTeX Warning: There were undefined references.
-
- )
-(see the transcript file for additional information) </home/vicenterog/.texlive
-2025/texmf-var/fonts/pk/ljfour/jknappen/ec/ectt1095.600pk> </home/vicenterog/.t
-exlive2025/texmf-var/fonts/pk/ljfour/jknappen/ec/ectt0900.600pk> </home/vicente
-rog/.texlive2025/texmf-var/fonts/pk/ljfour/jknappen/ec/ectt1200.600pk></usr/sha
-re/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb></usr/share/texl
-ive/texmf-dist/fonts/type1/public/amsfonts/cm/cmsy10.pfb></usr/share/texlive/te
-xmf-dist/fonts/type1/public/mathpazo/fplmr.pfb></usr/share/texlive/texmf-dist/f
-onts/type1/urw/palatino/uplb8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/u
-rw/palatino/uplbi8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/palatino
-/uplr8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/palatino/uplr8a.pfb>
-</usr/share/texlive/texmf-dist/fonts/type1/urw/palatino/uplri8a.pfb>
-Output written on build/main.pdf (52 pages, 354998 bytes).
+Output written on build/main.pdf (55 pages, 367368 bytes).
 Transcript written on build/main.log.
 Latexmk: Getting log file 'build/main.log'
 Latexmk: Examining 'build/main.fls'
@@ -4837,6 +1550,6 @@ Latexmk: ====Undefined refs and citations with line #s in .tex file:
   Missing character: There is no ) in font nullfont!
   Missing character: There is no ) in font nullfont!
   Missing character: There is no ) in font nullfont!
-  Reference `tab:fuentes' on page 24 undefined on input line 4
+  Reference `tab:fuentes' on page 27 undefined on input line 5
 Latexmk: All targets (build/main.pdf) are up-to-date
 

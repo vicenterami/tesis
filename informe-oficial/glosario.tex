@@ -1,0 +1,39 @@
+\chapter*{Glosario}
+\addcontentsline{toc}{chapter}{Glosario}
+
+\begin{description}
+\item[Broker] Intermediario de MQTT. Recibe los mensajes de quienes publican y los entrega a quienes se
+suscribieron. Ningún sensor habla directamente con la plataforma: todos hablan con el broker.
+\item[Checksum (suma de comprobación)] Dígito de verificación al final del mensaje Contact ID. Si un
+dígito se corrompe en el camino, la suma no cuadra y el mensaje se rechaza.
+\item[ChirpStack] Servidor de red LoRaWAN de código abierto. Es el «cerebro» de la red de radio:
+descifra los mensajes de los nodos, elimina duplicados, administra los dispositivos y entrega el dato
+limpio a la plataforma mediante MQTT. El gateway, en cambio, solo reenvía sin entender.
+\item[Contact ID (SIA DC-05)] Protocolo de 16 dígitos de la industria de alarmas para reportar eventos.
+DC-05 es el nombre del estándar; Contact ID, el del protocolo (como IEEE 802.11 y WiFi).
+\item[Datos extendidos] Campo \texttt{[<A--Z><datos>]} que el estándar DC-09 reserva para información
+definida por el implementador. En este trabajo transporta la medición junto al evento.
+\item[DC-09] Estándar SIA que transporta mensajes Contact ID por internet (TCP/UDP) con cifrado AES.
+\item[DTMF] Tonos del teclado telefónico. Fue el transporte original de Contact ID.
+\item[Gateway] Antena que recibe la radio de los nodos LoRa y la reenvía por internet al servidor de
+red. No posee las claves de cifrado: es un traductor sin capacidad de leer el contenido.
+\item[LoRa] Técnica de modulación de radio de largo alcance y bajo consumo (capa física).
+\item[LoRaWAN] Protocolo de red construido sobre LoRa: registro de dispositivos, cifrado, entrega.
+\item[MQTT] Protocolo de mensajería «publicar/suscribir»: los sensores publican en un tópico
+(\texttt{sitio/invernadero-2/sensor-007/temperatura}) y cualquier programa suscrito lo recibe, sin que
+emisor y receptor se conozcan. El dispositivo inicia la conexión saliente, por lo que funciona detrás
+de cualquier router sin abrir puertos.
+\item[Payload] Los bytes útiles de un mensaje, descontadas las cabeceras del transporte. En LoRaWAN va
+de 11 bytes (tasa más lenta, máximo alcance) a 51--53 bytes.
+\item[PPDIOO] Metodología de ciclo de vida de redes de Cisco: Prepare, Plan, Design, Implement,
+Operate, Optimize.
+\item[RSSI] \emph{Received Signal Strength Indicator}: cuánta potencia de señal llegó al receptor, en
+dBm (típicamente entre $-30$, excelente, y $-120$, casi inaudible). Indica \emph{qué tan fuerte} se oye
+al nodo.
+\item[SNR] \emph{Signal-to-Noise Ratio}: cuánto sobresale la señal por encima del ruido de fondo, en dB.
+Indica \emph{qué tan limpia} se oye. Un nodo puede tener RSSI aceptable y SNR malo si hay
+interferencia: ambos juntos describen la salud del enlace.
+\item[TimescaleDB] Extensión de PostgreSQL para datos con marca temporal. Sigue siendo una base de datos
+relacional con SQL estándar.
+\item[Tópico] La «ruta» de un mensaje MQTT, con forma de carpetas separadas por barras.
+\end{description}

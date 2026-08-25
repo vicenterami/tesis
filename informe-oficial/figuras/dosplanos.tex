@@ -1,5 +1,6 @@
 \begin{figure}[htbp]
 \centering
+\resizebox{\linewidth}{!}{%
 \begin{tikzpicture}[font=\footnotesize]
 
 % ---- nodo sensor ----
@@ -44,7 +45,7 @@
 \draw[flecha] (plat.south) -- ++(0,-0.95) -| (eventos.north);
 \draw[flecha, color=ambar] (plat.south) -- ++(0,-0.95) -| (telemetria.north);
 
-\end{tikzpicture}
+\end{tikzpicture}}
 \caption{El nodo emite un solo mensaje, con el evento en formato DC-05 y el valor medido en el campo de
 datos extendidos que DC-09 reserva para el implementador. La separación en dos planos ---con sus
 requisitos de entrega distintos--- ocurre en la plataforma, no en el dispositivo.}

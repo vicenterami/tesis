@@ -1,5 +1,6 @@
 \begin{figure}[htbp]
 \centering
+\resizebox{\linewidth}{!}{%
 \begin{tikzpicture}[font=\scriptsize]
 
 \node[caja, text width=1.9cm] (s1) at (0,1.35) {sensor 1};
@@ -27,7 +28,7 @@
    Quien se suscribe a \texttt{sitio/temuco/\#} recibe todo lo del sitio \textbf{sin necesidad de saber
    qué sensores existen}. Añadir un consumidor nuevo no obliga a modificar ningún sensor.};
 
-\end{tikzpicture}
+\end{tikzpicture}}
 \caption{Patrón publicar/suscribir de MQTT. El desacoplamiento entre emisores y receptores es lo que
 permite añadir consumidores sin tocar los dispositivos.}
 \label{fig:mqtt}

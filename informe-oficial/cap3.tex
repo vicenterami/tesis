@@ -3,7 +3,7 @@
 
 \section{Metodología del levantamiento}
 
-Cada requerimiento declara su fuente: \textbf{[PO]} solicitud del propietario del proyecto (indicaciones
+Cada requerimiento declara su fuente: \textbf{[PO]} solicitud de la organización destinataria —«propietario del proyecto» en la terminología de la rúbrica— (indicaciones
 de la universidad vía profesor guía), \textbf{[EM]} estudio de mercado, \textbf{[BT]} base teórica
 (estándares SIA, LoRaWAN RP002, ISO/IEC 25010 \parencite{iso25010}, RFC 8428, SWEBOK
 \parencite{swebok}) y \textbf{[DP]} derivación del problema. \textbf{Brecha declarada:} falta la fuente
@@ -58,7 +58,7 @@ interoperabilidad con lo instalado 15\,\%, seguridad del transporte 15\,\%, tele
 
 \begin{table}[H]
 \centering\small
-\begin{tabular}{@{}lccccccc@{}}
+\begin{tabular}{@{}L{4.6cm}C{0.9cm}C{0.9cm}C{0.9cm}C{0.9cm}C{0.9cm}C{0.9cm}C{1.1cm}@{}}
 \toprule
 \textbf{Alternativa} & \textbf{C-A} & \textbf{C-B} & \textbf{C-C} & \textbf{C-D} & \textbf{C-E} & \textbf{C-F} & \textbf{Total} \\
  & 25\,\% & 20\,\% & 15\,\% & 15\,\% & 10\,\% & 15\,\% & \\
@@ -70,7 +70,7 @@ Sparkplug B & 2 & 4 & 3 & 4 & 5 & 2 & 3,15 \\
 LwM2M (OMA) & 3 & 4 & 3 & 5 & 5 & 2 & 3,55 \\
 CayenneLPP & 5 & 2 & 2 & 3 & 4 & 5 & 3,55 \\
 SIA DC-03 & 3 & 5 & 5 & 4 & 4 & 3 & 3,95 \\
-\textbf{Contact ID + DC-09 (datos ext.)} & \textbf{5} & \textbf{5} & \textbf{5} & \textbf{4} & \textbf{4} & \textbf{5} & \textbf{4,75} \\
+\textbf{Contact ID + DC-09} & \textbf{5} & \textbf{5} & \textbf{5} & \textbf{4} & \textbf{4} & \textbf{5} & \textbf{4,75} \\
 \bottomrule
 \end{tabular}
 \caption{Matriz comparativa ponderada (escala 1--5). El detalle de puntuaciones y descartes está en el
@@ -107,20 +107,15 @@ sensores WiFi e integraciones) convergen a un único formato normalizado (figura
 
 \begin{table}[H]
 \centering\small
-\begin{tabular}{@{}lll@{}}
+\begin{tabular}{@{}L{2.6cm}L{2.4cm}L{7.6cm}@{}}
 \toprule
 \textbf{Componente} & \textbf{Selección} & \textbf{Razón determinante frente a alternativas} \\
 \midrule
-Servidor de red LoRaWAN & ChirpStack & Autoalojable y publica en MQTT nativo; la red pública \\
- & & TTN haría transitar los datos por terceros \\
-Persistencia & TimescaleDB & Un solo motor relacional + series de tiempo; InfluxDB \\
- & & obligaría a operar dos bases (inviable unipersonal) \\
-Broker MQTT & Mosquitto & Proporcionalidad: EMQX sobredimensionado a esta escala \\
-Despliegue & Contenedores & La Etapa 4 exige demostrar en condiciones realistas: \\
- & & levantar todo con un comando es esa evidencia \\
-Aplicación & TypeScript + NestJS & Matriz de 5 alternativas y 7 criterios (4,70): sus módulos \\
- & & corresponden 1:1 con M1--M8 y un solo lenguaje permite \\
- & & definir los tipos del evento una única vez \\
+Servidor de red LoRaWAN & ChirpStack & Autoalojable y publica en MQTT nativo; la red pública TTN haría transitar los datos por terceros \\
+Persistencia & TimescaleDB & Un solo motor relacional y de series de tiempo; InfluxDB obligaría a operar dos bases, inviable en un proyecto unipersonal \\
+Broker MQTT & Mosquitto & Proporcionalidad: EMQX está sobredimensionado a esta escala \\
+Despliegue & Contenedores & La Etapa 4 exige demostrar en condiciones realistas: levantar todo con un comando es esa evidencia \\
+Aplicación & TypeScript + NestJS & Matriz de 5 alternativas y 7 criterios (4,70): sus módulos corresponden 1:1 con M1--M8, y un solo lenguaje permite definir los tipos del evento una única vez \\
 \bottomrule
 \end{tabular}
 \caption{Decisiones de infraestructura. Las matrices completas están en el repositorio

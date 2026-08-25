@@ -1,5 +1,6 @@
 \begin{figure}[htbp]
 \centering
+\resizebox{\linewidth}{!}{%
 \begin{tikzpicture}[node distance=6mm, font=\scriptsize]
 
 % ---- EFECTOS ----
@@ -39,7 +40,7 @@
 \draw[flechagruesa] (gcausas.north) -- node[nota, right=1mm, midway, font=\scriptsize] {provocan} (prob.south);
 \draw[flechagruesa] (prob.north) -- node[nota, right=1mm, midway, font=\scriptsize] {produce} (gefectos.south);
 
-\end{tikzpicture}
+\end{tikzpicture}}
 \caption{Árbol de problemas: las cinco causas provocan el problema central, que a su vez produce
 los cinco efectos observables.}
 \label{fig:arbol}
