@@ -55,7 +55,7 @@
 - [ ] **Confirmar las fechas de las cuatro etapas.** El PDF de la pauta está fechado el 13/08/2025 y sus hitos son de 2025. Verificar si se replican al calendario 2026.
 - [ ] **Identificar el interlocutor concreto en la universidad**: qué departamento, laboratorio o carrera tiene sensores desplegados, cuántos y de qué tipo.
 - [ ] **Confirmar el entregable final exigido por la carrera**: prototipo funcional, documento, o ambos.
-- [ ] **Definir el horario de la revisión de los miércoles** (compatible con jornada laboral horario laboral).
+- [ ] **Definir el horario de la revisión de los miércoles** (compatible con la jornada laboral).
 - [ ] Preguntar si Mario tiene preferencia sobre el alojamiento de la plataforma o si es decisión del estudiante.
 
 ## 4. Compromiso para la próxima revisión (miércoles 26 de agosto)

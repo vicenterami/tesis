@@ -43,3 +43,8 @@ venv/
 Thumbs.db
 *~
 .*.swp
+
+# ── Local, nunca versionar ────────────────────────
+privado/
+recursos-uct/
+referencias/*.pdf

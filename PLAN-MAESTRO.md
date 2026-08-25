@@ -73,34 +73,23 @@ complementarios, no alternativos.*
 
 ### Hitos
 
-> 🔴 **SIN RESOLVER — es el riesgo R3 y bloquea toda la planificación.** Hay dos lecturas posibles
-> y difieren en **dos semanas**. Hasta que Mario lo confirme, **se planifica contra el escenario A**,
-> que es el más exigente: si resulta ser B, se gana holgura; si se planificara para B y resulta ser A,
-> se pierde la etapa.
+> ✅ **RESUELTO el 24 de agosto de 2026.** El profesor del curso publicó la pauta oficial con las
+> fechas 2026. Ninguno de los dos escenarios que se manejaban resultó exacto: las fechas reales dan
+> **una semana más** que el escenario exigente con el que se venía planificando. El riesgo R3 se cierra.
 
-**Escenario A — la pauta se replica al calendario 2026** (el semestre habría iniciado el lunes 3 de
-agosto; el PDF de la pauta está fechado el 13/08/2025 con hitos de 2025):
-
-| Etapa | Revisiones (miércoles) | Entrega (viernes) |
-|---|---|---|
-| **1** — Problema, objetivos, requerimientos | **26 de agosto** | **28 de agosto** |
-| **2** — Diseño e implementación inicial | 2, 9, 16, 23 de septiembre | **25 de septiembre** |
-| **3** — Mejoras, pruebas, validación preliminar | 30 sep · 7, 14, 21 de octubre | **23 de octubre** |
-| **4** — Validación final e informe | 28 oct · 4, 11, 18 de noviembre | **20 de noviembre** |
-
-**Escenario B — el sprint 1 arranca hoy, lunes 17 de agosto**, con ciclos de cuatro semanas y entrega
-el último viernes de la cuarta semana (interpretación literal de la pauta contada desde hoy):
+**Calendario oficial** (pauta del 17 de agosto de 2026, publicada el 24):
 
 | Etapa | Semanas del sprint | Entrega (viernes) |
 |---|---|---|
-| **1** | 17 ago – 11 sep | **11 de septiembre** |
-| **2** | 14 sep – 9 oct | **9 de octubre** |
-| **3** | 12 oct – 6 nov | **6 de noviembre** |
-| **4** | 9 nov – 4 dic | **4 de diciembre** |
+| **1** — Problema, objetivos, requerimientos | 17 ago – 4 sep | **4 de septiembre** |
+| **2** — Diseño e implementación inicial | 7 sep – 2 oct | **2 de octubre** |
+| **3** — Mejoras, pruebas, validación preliminar | 5 oct – 30 oct | **30 de octubre** |
+| **4** — Validación final e informe | 2 nov – 4 dic | **4 de diciembre** |
 
-**Pregunta exacta que hay que hacerle a Mario:** *«¿La fecha máxima de la Etapa 1 es el viernes 28 de
-agosto o el viernes 11 de septiembre? Es decir, ¿el sprint de cuatro semanas se cuenta desde el inicio
-del semestre o desde esta semana?»*
+**Indicación adicional del curso:** el informe tiene un **límite blando de 30 páginas**; el resto va a
+anexos o al repositorio. Formato recomendado: plantilla LaTeX oficial + estructura de la Figura 3.1 de
+la guía de Cardiff, de común acuerdo con el profesor guía. Seguir los estándares IEEE (SWEBOK v4) en la
+medida de lo posible.
 
 ### Umbral de aprobación
 
@@ -110,7 +99,7 @@ superar cómodamente ese umbral, no para maximizar ambición.
 
 ### Presupuesto de tiempo real
 
-Jornada laboral en la empresa de horario de oficina, lunes a viernes. El tiempo de tesis es:
+Jornada laboral completa de lunes a viernes. El tiempo de tesis es:
 
 | Franja | Horas | Uso previsto |
 |---|---|---|
@@ -118,7 +107,7 @@ Jornada laboral en la empresa de horario de oficina, lunes a viernes. El tiempo 
 | Sábado y domingo | ~4 h × 2 = **8 h** | Bloques de trabajo profundo: construcción, pruebas |
 | **Total semanal realista** | **14-16 h** | |
 
-De aquí al 20 de noviembre: ~13,5 semanas ≈ **200 horas**. Es un presupuesto suficiente **si no se
+De aquí al 4 de diciembre (calendario oficial): ~14,5 semanas ≈ **215 horas**. Es un presupuesto suficiente **si no se
 desperdicia en rehacer trabajo perdido entre dispositivos** — de ahí la sección 4.
 
 ---
@@ -131,15 +120,15 @@ desperdicia en rehacer trabajo perdido entre dispositivos** — de ahí la secci
 > del teléfono— es vista, borrador o respaldo. Nada importante vive fuera del repo.
 
 Razón concreta y verificada: las **conversaciones de claude.ai no son legibles** por el asistente
-(devuelven HTTP 403). Los **artifacts publicados sí** lo son. Y los artifacts se alojan en la cuenta
-de Claude **de la empresa** (`[correo retirado]`), por lo que **no pueden ser almacenamiento de la
-tesis**: son vista regenerable, y se perderían al dejar la empresa.
+(devuelven HTTP 403). Los **artifacts publicados sí** lo son. Y los artifacts se alojan en una cuenta
+de Claude **que no es la personal del estudiante**, por lo que **no pueden ser almacenamiento de la
+tesis**: son vista regenerable.
 
 ### Qué se puede hacer desde dónde
 
 | Dispositivo / entorno | Qué hacer ahí | Cómo |
 |---|---|---|
-| **Portátil ASUS (Ubuntu)** — principal | **Todo**: redactar, compilar LaTeX, programar, commitear | Claude Code local sobre `~/tesis` |
+| **Portátil principal (Ubuntu)** | **Todo**: redactar, compilar LaTeX, programar, commitear | Claude Code local sobre `~/tesis` |
 | **Otro portátil** | **Todo**, si tiene el entorno | `git clone git@github.com:vicenterami/tesis.git` |
 | **Teléfono — app o web de GitHub** | **Leer** documentos, **anotar** en `bitacora/INBOX.md`, revisar el backlog | GitHub permite editar archivos `.md` desde el navegador y commitear |
 | **Teléfono — app de Claude** | Consultas puntuales, dictar ideas | ⚠️ **lo que se converse ahí no es recuperable después.** Todo lo valioso debe copiarse a un archivo del repo el mismo día |
@@ -186,7 +175,7 @@ informe/
 
 ---
 
-## 5. Prioridades de la Etapa 1 (entrega viernes 28 de agosto)
+## 5. Prioridades de la Etapa 1 (entrega viernes 4 de septiembre)
 
 Ponderación oficial y orden de ataque:
 
@@ -222,19 +211,19 @@ recuperan.
 | Lun 24 – mar 25 | Backlog completo con criterios de aceptación y estimaciones | Asistente redacta / él prioriza |
 | **Mié 26** | **Revisión con Mario del borrador completo** | Él |
 | Jue 27 | Incorporar retroalimentación, compilar LaTeX, exportar PDF | Ambos |
-| **Vie 28** | **Entrega** | Él |
+| **Vie 4 sep** | **Entrega** | Él |
 
 ---
 
 ## 6. Pendientes abiertos
 
-- [ ] 🔴 **Confirmar fechas de las cuatro etapas** con Mario — escenario A (28 ago) vs B (11 sep). Riesgo R3.
+- [x] ~~Confirmar fechas de las cuatro etapas~~ ✅ 24/08 — pauta oficial: 4 sep · 2 oct · 30 oct · 4 dic.
 - [ ] Identificar el interlocutor concreto de la universidad: departamento, sensores, cantidad, tipo.
 - [ ] Confirmar el entregable final exigido por la carrera: prototipo, documento, o ambos.
 - [x] ~~Crear el repositorio privado `tesis` en GitHub (`vicenterami`) y agregar el remoto.~~ ✅ 17/08/2026 — `git@github.com:vicenterami/tesis.git`, privado, conectado por SSH.
 - [x] ~~Instalar LaTeX local (`texlive` + `latexmk`).~~ ✅ 17/08/2026 — TeX Live 2025, con `pdflatex`, `latexmk` y `biber`.
 - [ ] Verificar si la UCT tiene licencia institucional de Overleaf.
-- [ ] Definir horario de la revisión de los miércoles, compatible con jornada horario laboral.
+- [ ] Definir horario de la revisión semanal, compatible con la jornada laboral.
 - [ ] 🔴 **Validar con Mario el uso del campo de datos extendidos de DC-09** (pregunta P3 de `docs/03-instrumentos-levantamiento.md`).
 - [ ] 🔴 **Aclarar si el trabajo del compañero es tesis conjunta o separada.** Afecta la restricción RE-02 y exige un contrato de interfaz entre su firmware y esta plataforma, que hoy no está en el backlog.
 - [ ] Obtener acceso al estándar SIA DC-03 para verificar su sintaxis de valores (pendiente P8); si resultara más eficiente, sería la alternativa preferente.
