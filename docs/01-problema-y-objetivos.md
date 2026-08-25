@@ -170,7 +170,7 @@ Cada objetivo se presenta con su desglose SMART y su indicador de cumplimiento.
 > **Caracterizar** la situación actual de gestión de datos de sensores en la organización
 > destinataria, **mediante** entrevistas semiestructuradas a las partes interesadas, revisión de
 > literatura técnica y análisis de la oferta regional, **para obtener** un catálogo de requerimientos
-> funcionales y no funcionales íntegramente trazables a las causas del problema, **al 28 de agosto de
+> funcionales y no funcionales íntegramente trazables a las causas del problema, **al 4 de septiembre de
 > 2026**.
 
 | Criterio | Concreción |
@@ -179,7 +179,7 @@ Cada objetivo se presenta con su desglose SMART y su indicador de cumplimiento.
 | **M** — Medible | ≥ 2 entrevistas a partes interesadas · ≥ 20 requerimientos documentados · **100 %** de los requerimientos trazados a al menos una causa (C1–C5) · ≥ 2 competidores analizados |
 | **A** — Alcanzable | Requiere gestión de entrevistas y trabajo documental, sin dependencia de hardware |
 | **R** — Relevante | Aborda C4 y sustenta los criterios 1 y 3 de la Etapa 1 (55 % de la etapa) |
-| **T** — Temporizado | Viernes 28 de agosto de 2026 (Etapa 1) |
+| **T** — Temporizado | Viernes 4 de septiembre de 2026 (Etapa 1) |
 
 **Fase PPDIOO:** Prepare
 
@@ -191,7 +191,7 @@ Cada objetivo se presenta con su desglose SMART y su indicador de cumplimiento.
 > Contact ID (SIA DC-05), **mediante** un análisis comparativo ponderado frente a alternativas
 > vigentes y la definición de un perfil de aplicación con su mapeo de códigos de evento, **para
 > obtener** un documento de especificación que incluya la gramática del mensaje, la tabla de
-> equivalencias y el contrato de la API de ingesta, **al 25 de septiembre de 2026**.
+> equivalencias y el contrato de la API de ingesta, **al 2 de octubre de 2026**.
 
 | Criterio | Concreción |
 |---|---|
@@ -199,7 +199,7 @@ Cada objetivo se presenta con su desglose SMART y su indicador de cumplimiento.
 | **M** — Medible | ≥ 6 alternativas evaluadas con matriz de criterios ponderados (MQTT+JSON, CoAP, LwM2M, Sparkplug B, SenML, SIA DC-09) · ≥ 25 códigos de evento mapeados · mensaje de evento **≤ 11 bytes**, verificado contra el payload útil mínimo de LoRaWAN · gramática del mensaje formalizada |
 | **A** — Alcanzable | El estándar SIA DC-05 es público y documentado; el trabajo es de análisis y diseño |
 | **R** — Relevante | Aborda directamente C1, y responde a la instrucción explícita del profesor guía de justificar la elección del protocolo frente a otros |
-| **T** — Temporizado | Viernes 25 de septiembre de 2026 (Etapa 2) |
+| **T** — Temporizado | Viernes 2 de octubre de 2026 (Etapa 2) |
 
 **Fase PPDIOO:** Plan + Design
 
@@ -210,7 +210,7 @@ Cada objetivo se presenta con su desglose SMART y su indicador de cumplimiento.
 > **Diseñar** la arquitectura de la plataforma y el diseño de red que la soporta, **mediante** la
 > aplicación de la fase *Design* de PPDIOO y el uso de notaciones de modelado reconocidas, **para
 > obtener** un conjunto de diagramas, un modelo de datos y una especificación de seguridad y
-> segmentación que cubra la totalidad de los requerimientos levantados, **al 25 de septiembre de
+> segmentación que cubra la totalidad de los requerimientos levantados, **al 2 de octubre de
 > 2026**.
 
 | Criterio | Concreción |
@@ -219,7 +219,7 @@ Cada objetivo se presenta con su desglose SMART y su indicador de cumplimiento.
 | **M** — Medible | ≥ 5 diagramas en notación estándar (arquitectura de componentes, topología de red con segmentación, modelo entidad-relación, flujo de ingesta, secuencia de aprovisionamiento) · **100 %** de los requerimientos de OE1 asignados a un componente · modelo de datos con ≥ 8 entidades |
 | **A** — Alcanzable | Trabajo de diseño documental, sin dependencia de adquisiciones |
 | **R** — Relevante | Aborda C2 y C5; constituye el 55 % de la Etapa 2 («diseña adecuadamente según estándares de calidad») |
-| **T** — Temporizado | Viernes 25 de septiembre de 2026 (Etapa 2) |
+| **T** — Temporizado | Viernes 2 de octubre de 2026 (Etapa 2) |
 
 **Fase PPDIOO:** Design
 
@@ -230,7 +230,7 @@ Cada objetivo se presenta con su desglose SMART y su indicador de cumplimiento.
 > **Determinar** la alternativa de alojamiento de la plataforma y su costo total de operación,
 > **mediante** la comparación de al menos tres opciones de despliegue bajo criterios de costo,
 > soberanía del dato y sostenibilidad, **para obtener** una recomendación justificada con el costo
-> mensual y anual estimado del producto, **al 25 de septiembre de 2026**.
+> mensual y anual estimado del producto, **al 2 de octubre de 2026**.
 
 | Criterio | Concreción |
 |---|---|
@@ -238,7 +238,7 @@ Cada objetivo se presenta con su desglose SMART y su indicador de cumplimiento.
 | **M** — Medible | ≥ 3 alternativas comparadas (infraestructura propia de la universidad, servidor virtual arrendado, nivel gratuito de proveedor de nube) · costo mensual y anual expresado en CLP y USD · matriz de criterios ponderados |
 | **A** — Alcanzable | Información de precios públicamente disponible |
 | **R** — Relevante | Responde a la instrucción explícita del profesor guía: definir dónde estará alojada y cuánto costará el producto aunque sea abierto. Aborda C3 |
-| **T** — Temporizado | Viernes 25 de septiembre de 2026 (Etapa 2) |
+| **T** — Temporizado | Viernes 2 de octubre de 2026 (Etapa 2) |
 
 **Fase PPDIOO:** Plan
 
@@ -250,7 +250,7 @@ Cada objetivo se presenta con su desglose SMART y su indicador de cumplimiento.
 > con adaptadores para al menos dos transportes distintos, **mediante** desarrollo incremental guiado
 > por el backlog priorizado y versionado en repositorio git, **para obtener** un prototipo funcional
 > capaz de recibir, normalizar, almacenar y presentar datos de sensores de tecnologías diferentes,
-> **al 20 de noviembre de 2026**, con el 50 % de avance verificable al 23 de octubre de 2026.
+> **al 4 de diciembre de 2026**, con el 50 % de avance verificable al 30 de octubre de 2026.
 
 | Criterio | Concreción |
 |---|---|
@@ -258,7 +258,7 @@ Cada objetivo se presenta con su desglose SMART y su indicador de cumplimiento.
 | **M** — Medible | **50 %** de las tareas de implementación del backlog al 23/10 y **100 %** al 20/11 · ≥ 2 transportes operativos · ≥ 1 sensor físico reportando de extremo a extremo · historial de commits con mensaje descriptivo en el 100 % de ellos |
 | **A** — Alcanzable | ⚠️ Condicionado a la disponibilidad de hardware; ver riesgo R1 |
 | **R** — Relevante | Materializa la solución al problema central. Constituye el 10 % de la Etapa 3 y el 10 % de la Etapa 4 |
-| **T** — Temporizado | 23 de octubre (50 %) y 20 de noviembre de 2026 (100 %) |
+| **T** — Temporizado | 30 de octubre (50 %) y 4 de diciembre de 2026 (100 %) |
 
 **Fase PPDIOO:** Implement
 
@@ -270,7 +270,7 @@ Cada objetivo se presenta con su desglose SMART y su indicador de cumplimiento.
 > real, **mediante** una batería de pruebas funcionales, de carga y de recuperación ante fallas, con
 > comparación cuantitativa antes y después de las optimizaciones aplicadas, **para obtener** un
 > informe de validación que acredite el cumplimiento de los requerimientos establecidos en OE1, **al
-> 20 de noviembre de 2026**.
+> 4 de diciembre de 2026**.
 
 | Criterio | Concreción |
 |---|---|
@@ -278,7 +278,7 @@ Cada objetivo se presenta con su desglose SMART y su indicador de cumplimiento.
 | **M** — Medible | ≥ 15 casos de prueba documentados · ≥ 90 % de casos aprobados · ingesta sostenida de ≥ 50 mensajes/segundo sin pérdida · detección de sensor caído en ≤ 2 intervalos de reporte · ≥ 3 comparaciones cuantitativas antes/después de optimización |
 | **A** — Alcanzable | Las pruebas de carga se ejecutan con generadores de tráfico sintético, sin requerir sensores físicos masivos |
 | **R** — Relevante | Aborda C5 y E4. Constituye el 30 % de la Etapa 3 y el 50 % de la Etapa 4 |
-| **T** — Temporizado | Viernes 20 de noviembre de 2026 (Etapa 4) |
+| **T** — Temporizado | Viernes 4 de diciembre de 2026 (Etapa 4) |
 
 **Fase PPDIOO:** Operate + Optimize
 
@@ -318,7 +318,7 @@ carece de vínculo con el problema.
 |---|---|---|---|---|
 | **R1** | No disponer del hardware de sensores a tiempo | Alto — bloquea OE5 y OE6 | Media | Diseñar la validación para que funcione con un emulador de nodo por software; el sensor físico demuestra el caso, el emulador demuestra la carga |
 | **R2** | No lograr acceso a las partes interesadas de la universidad | Alto — compromete el 10 % del criterio 1 y el respaldo del 45 % del criterio 3 | Media | Escalar la solicitud a través del profesor guía; documentar el intento y usar fuentes secundarias como respaldo parcial |
-| **R3** | Ambigüedad en las fechas de las etapas | Alto — invalida la planificación completa | **Alta, sin resolver** | Planificar contra el escenario más exigente (28 de agosto). Confirmar con el profesor guía en la primera oportunidad |
+| **R3** | ~~Ambigüedad en las fechas de las etapas~~ | — | **CERRADO 24/08** | La pauta oficial fijó las fechas: 4 sep · 2 oct · 30 oct · 4 dic. La planificación contra el escenario exigente dejó una semana de holgura adicional |
 | **R4** | Alcance excesivo para el tiempo disponible (≈15 h semanales) | Medio — riesgo de no superar el 70 % de logro | Media | Backlog priorizado con corte explícito de alcance mínimo viable; el umbral de aprobación es 70 %, no 100 % |
 | **R5** | Contact ID resulta insuficiente para casos de telemetría continua | Medio | **Ya identificado** | Arquitectura de dos planos: eventos en Contact ID, mediciones con valor en formato complementario. Documentado como decisión de diseño, no como hallazgo tardío |
 

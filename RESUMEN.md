@@ -5,7 +5,7 @@
 > decisión cambia; el detalle vive en `docs/`.
 >
 > Trabajo de Título INFO-1197 · Universidad Católica de Temuco · Profesor guía: Mario
-> **Última actualización: 21 de agosto de 2026**
+> **Última actualización: 24 de agosto de 2026**
 
 ---
 
@@ -113,8 +113,8 @@ Son **20 requerimientos** de los 68 catalogados, que se traducen en **33 element
 horas** de trabajo. El resto es mejora del producto, no demostración.
 
 **Verificación de viabilidad:** el backlog completo suma **275 h** contra **201 h disponibles** (15 h
-semanales hasta el 20 de noviembre) — un **37 % de exceso**. El núcleo, en cambio, cabe con **18 % de
-holgura**. Por eso el compromiso es el núcleo, y el resto es alcance condicional.
+semanales) — un **37 % de exceso** contra el presupuesto con que se planificó. El núcleo, en cambio,
+cabe holgado: con el calendario oficial del 24/08 (~240 h hasta el 4 de diciembre) su holgura es de **+31 %**. Por eso el compromiso es el núcleo, y el resto es alcance condicional.
 
 ---
 
@@ -122,10 +122,10 @@ holgura**. Por eso el compromiso es el núcleo, y el resto es alcance condiciona
 
 | Etapa | Entrega | Estado |
 |---|---|---|
-| **1** — Problema, objetivos y requerimientos | viernes 28 de agosto | 🟡 **~90 %** — falta solo el levantamiento con partes interesadas |
-| 2 — Diseño e implementación inicial | viernes 25 de septiembre | ⬜ |
-| 3 — Mejoras, pruebas y validación preliminar | viernes 23 de octubre | ⬜ |
-| 4 — Validación final e informe | viernes 20 de noviembre | ⬜ |
+| **1** — Problema, objetivos y requerimientos | **viernes 4 de septiembre** | 🟡 **~90 %** — falta el levantamiento con partes interesadas y migrar al formato oficial |
+| 2 — Diseño e implementación inicial | viernes 2 de octubre | ⬜ |
+| 3 — Mejoras, pruebas y validación preliminar | viernes 30 de octubre | ⬜ |
+| 4 — Validación final e informe | viernes 4 de diciembre | ⬜ |
 
 ### Etapa 1 en detalle
 
@@ -140,7 +140,7 @@ holgura**. Por eso el compromiso es el núcleo, y el resto es alcance condiciona
 
 1. 🔴 **Entrevistar al responsable de los sensores de la universidad.** Vale el 10 % directo y respalda
    el 45 %. **Nadie más puede hacerlo.**
-2. 🔴 **Confirmar las fechas con Mario:** ¿Etapa 1 el 28 de agosto o el 11 de septiembre?
+2. ✅ ~~Confirmar las fechas~~ — resuelto por la pauta oficial: Etapa 1 el 4 de septiembre.
 3. 🟡 **Validar con Mario el uso del campo de datos extendidos de DC-09** para llevar la medición. La
    pregunta está formulada en `docs/03-instrumentos-levantamiento.md`, P3.
 4. 🟡 **Aclarar si el trabajo del compañero es tesis conjunta o separada** — afecta la restricción RE-02

@@ -338,13 +338,17 @@ Por prioridad: **Must** 55 elementos / 249 h · **Should** 7 / 24 h · **Could**
 
 Cuatro semanas por etapa a ~15 horas semanales (restricción RE-01):
 
-| Etapa | Ventana | Presupuesto |
+| Etapa | Ventana (calendario oficial 24/08) | Presupuesto |
 |---|---|:---:|
-| 1 | 18 – 28 de agosto | ~21 h |
-| 2 | 31 de agosto – 25 de septiembre | ~60 h |
-| 3 | 28 de septiembre – 23 de octubre | ~60 h |
-| 4 | 26 de octubre – 20 de noviembre | ~60 h |
-| **Total** | | **~201 h** |
+| 1 | 17 de agosto – 4 de septiembre | ~45 h |
+| 2 | 7 de septiembre – 2 de octubre | ~60 h |
+| 3 | 5 – 30 de octubre | ~60 h |
+| 4 | 2 de noviembre – 4 de diciembre (5 semanas) | ~75 h |
+| **Total** | | **~240 h** |
+
+> **Actualización del 24 de agosto:** la pauta oficial dio una semana más que el escenario exigente con
+> que se planificó, y la Etapa 4 dura cinco semanas. El presupuesto sube de ~201 h a ~240 h: la holgura
+> del núcleo pasa de +18 % a **+31 %**, y parte del alcance condicional vuelve a ser ejecutable.
 
 ## 6.3 🔴 Hallazgo: el backlog completo no cabe en el tiempo disponible
 

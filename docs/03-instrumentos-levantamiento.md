@@ -31,21 +31,10 @@ respaldo del 45 % del criterio 3.
 | «Todavía no hay un caso concreto» | 🔴 **Riesgo R2 activado.** El propietario del proyecto es hipotético | Cambiar de estrategia: entrevistar externos (empresa de alarmas, pyme agrícola) y reformular a la universidad como usuario potencial, no como propietario. **Decírselo explícitamente para que quede constancia** |
 | «No necesitas entrevistas» | La rúbrica sí las pide, textualmente | Mostrarle la frase de la pauta: *«Debe incluirse también la percepción de las partes interesadas para validar la relevancia del problema»*. No es negociable desde su lado; es del curso |
 
-## 🔴 P2. ¿La Etapa 1 vence el 28 de agosto o el 11 de septiembre?
+## ✅ P2. ~~Fecha de la Etapa 1~~ — RESUELTA
 
-> *«La pauta que tengo está fechada el 13 de agosto de 2025 y sus hitos son de ese año. Con el calendario
-> 2026 hay dos lecturas: si los sprints se cuentan desde el inicio del semestre, la Etapa 1 vence el
-> viernes 28 de agosto; si se cuentan desde esta semana, el viernes 11 de septiembre. ¿Cuál es la
-> correcta?»*
-
-**Por qué es crítica:** invalida o valida toda la planificación, y son dos semanas de diferencia.
-
-| Respuesta | Qué implica |
-|---|---|
-| 28 de agosto | El plan actual está correcto. Quedan ~10 días |
-| 11 de septiembre | **Se ganan dos semanas.** Muy valioso dado el hallazgo de sobrecarga: pasan de 201 h a ~231 h de presupuesto, y la holgura del núcleo sube del 18 % al 29 % |
-| «Las fechas cambiaron, son estas otras» | Recalcular todo el calendario. Es un comando |
-| «No te preocupes de la fecha exacta» | 🔴 No aceptar esa respuesta. Insistir: sin fecha no hay planificación medible, y la nota P depende de superar el 70 % de los hitos **en plazo** |
+La pauta oficial publicada el 24 de agosto fijó las fechas: **4 de septiembre**, 2 de octubre,
+30 de octubre y 4 de diciembre. Ya no hay nada que preguntar sobre esto.
 
 ## 🔴 P3. ¿Acepta llevar la medición en el campo de datos extendidos de DC-09?
 

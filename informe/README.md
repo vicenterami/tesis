@@ -29,7 +29,7 @@ no pasen inadvertidos:
 - `\datoCarrera` — nombre exacto de la carrera
 - `\datoProfesor` — apellido del profesor guía
 - `\datoEstudiante` — verificar que el nombre esté completo
-- `\datoFechaEntrega` — confirmar 28 de agosto frente a 11 de septiembre
+- `\datoFechaEntrega` — 4 de septiembre de 2026, oficial
 
 ## Regenerar los anexos
 
