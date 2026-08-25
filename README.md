@@ -37,11 +37,14 @@ Plataforma abierta de gestión e interoperabilidad de datos para redes de sensor
 ## Estructura
 
 ```
-docs/         documentos de trabajo por etapa (Markdown)
-bitacora/     reuniones con el profesor guía y retroalimentación incorporada
-referencias/  pauta de evaluación y material de apoyo
-informe/      entregables formales en LaTeX
-plataforma/   código del prototipo y herramientas de verificación
+docs/            documentos de trabajo por etapa (Markdown)
+bitacora/        reuniones con el profesor guía y retroalimentación incorporada
+referencias/     índice propio de los materiales del curso
+informe-oficial/ EL ENTREGABLE: plantilla oficial del curso, cuerpo ≤30 páginas + anexos
+informe/         documento extendido de trabajo (la versión larga que alimenta los anexos)
+plataforma/      código del prototipo y herramientas de verificación
+privado/         (local, no versionada) notas sensibles
+recursos-uct/    (local, no versionada) materiales originales del curso
 ```
 
 ## Regla de trabajo fundamental

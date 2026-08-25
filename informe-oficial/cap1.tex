@@ -1,0 +1,129 @@
+\chapter{Introducción}
+\label{cap:intro}
+
+\section{Problema}
+
+La Región de La Araucanía concentra actividad agrícola, agroindustrial y pymes productivas con
+instalaciones dispersas donde el monitoreo remoto tiene valor operativo directo. La adquisición de
+sensores dejó de ser una barrera: un nodo con radio de largo alcance cuesta entre 5 y 30 dólares y la
+banda de 915--928\,MHz es de uso libre en Chile. La dificultad se desplazó hacia el destino de los
+datos.
+
+\begin{quote}
+\textbf{Problema central:} las organizaciones que ya poseen sensores IoT no logran convertir los datos
+que estos generan en información utilizable, porque carecen de una plataforma que unifique la ingesta,
+la normalización y la gestión de dispositivos que se comunican mediante tecnologías y formatos
+distintos entre sí.
+\end{quote}
+
+El análisis identifica cinco causas: \textbf{C1} fragmentación de protocolos y formatos; \textbf{C2}
+acoplamiento entre hardware y plataforma; \textbf{C3} costo y dependencia de plataformas comerciales;
+\textbf{C4} ausencia de capacidad técnica interna; y \textbf{C5} falta de visibilidad del estado de la
+conectividad --- \emph{el silencio de un sensor es indistinguible de la ausencia de novedades}. Sus
+efectos observables van desde la inversión inmovilizada (E1) hasta la dependencia de proveedor (E5),
+según muestra la figura~\ref{fig:arbol}.
+
+\input{figuras/arbol}
+
+La \textbf{Universidad Católica de Temuco}, propietaria del proyecto, dispone de sensores desplegados y
+requiere un destino para sus datos: una interfaz a la cual enviarlos y una plataforma desde la cual
+administrarlos, según lo transmitido por el profesor guía (reunión del 17/08/2026). El levantamiento
+directo con las partes interesadas está pendiente y constituye la acción prioritaria del período; esta
+brecha se declara en lugar de omitirse.
+
+\textbf{Delimitación.} El trabajo abarca la plataforma de ingesta, normalización, almacenamiento y
+gestión; la especificación del protocolo sensor--plataforma; adaptadores para al menos dos transportes;
+el diseño de red asociado (segmentación, seguridad, salud del enlace) y la validación con sensores
+reales. Excluye la fabricación de sensores, el firmware de grado comercial, la analítica predictiva y
+el despliegue productivo a escala.
+
+\section{Estado del arte}
+
+\textbf{Oferta regional.} Se identifican dos actores en La Araucanía: \textbf{IoT3}
+\parencite{iot3web}, monitoreo y automatización llave en mano con fuerte presencia agrícola, y
+\textbf{ControlTec} \parencite{controltecweb}, telemetría industrial inalámbrica supervisada desde el
+móvil. Ambos comercializan la solución completa acoplada a su propio hardware: un sensor ya instalado
+de otra marca no se integra. Ninguno ofrece la \textbf{capa de gestión desacoplada del equipamiento},
+que es el espacio que este trabajo aborda.
+
+\textbf{El sector de las alarmas monitoreadas} resolvió hace décadas la supervisión de flotas de
+sensores inalámbricos a batería y estandarizó su vocabulario en el protocolo abierto Contact ID
+\parencite{siadc05}, hoy transportado sobre IP mediante el estándar DC-09 \parencite{siadc09}.
+Operadores como Verisure combinan además canales redundantes de radio ante interferencia
+\parencite{verisuresigfox}. Sin embargo, el sector lo aplica dentro de sistemas cerrados y verticalmente
+integrados —el cliente no puede retirar sus datos ni incorporar hardware de terceros—, lo que
+constituye precisamente las causas C2 y C3 del problema.
+
+\textbf{Protocolos de aplicación IoT.} La literatura ofrece protocolos compactos que no normalizan
+semántica de eventos (CayenneLPP), formatos de medición sin vocabulario de estado de dispositivo (SenML,
+RFC~8428 \parencite{rfc8428}) y pilas completas de gestión cuyo costo en nodos restringidos es alto
+(LwM2M \parencite{lwm2m}). El capítulo~\ref{cap:especificacion} evalúa ocho alternativas; el hallazgo
+central es que \textbf{ninguna combina compacidad extrema con vocabulario semántico normalizado}, salvo
+el protocolo histórico de la industria de alarmas.
+
+\section{Objetivos}
+
+\subsection{Objetivo general}
+\begin{itemize}
+\item Diseñar, implementar y validar una plataforma web abierta para la gestión de datos de redes de
+sensores IoT heterogéneas, que unifique la ingesta mediante un protocolo de comunicación basado en el
+estándar Contact ID (SIA DC-05), aplicando la metodología PPDIOO, de modo que una organización que ya
+posee sensores de distintas tecnologías pueda centralizar, normalizar y administrar sus datos desde una
+única interfaz, validada sobre un caso de uso con sensores reales al término del semestre 2026.
+\end{itemize}
+
+\subsection{Objetivos específicos}
+
+Cada objetivo explicita qué se hará, mediante qué método y qué resultado verificable produce, conforme
+a la indicación del profesor guía. El desglose SMART completo, con indicadores numéricos por criterio,
+se incluye en el repositorio del proyecto (\texttt{docs/01-problema-y-objetivos.md}).
+
+\begin{itemize}
+\item \textbf{OE1} — Caracterizar la situación de gestión de datos de sensores en la organización
+destinataria, mediante entrevistas semiestructuradas, revisión de literatura y análisis de la oferta
+regional, para obtener un catálogo de requerimientos íntegramente trazable a las causas del problema,
+al 4 de septiembre de 2026.
+\item \textbf{OE2} — Especificar el protocolo sensor--plataforma basado en Contact ID, mediante
+análisis comparativo ponderado y la definición de un perfil de aplicación con su mapeo de códigos, para
+obtener la gramática del mensaje, la tabla de equivalencias y el contrato de la interfaz, al 2 de
+octubre de 2026.
+\item \textbf{OE3} — Diseñar la arquitectura de la plataforma y su red de soporte, mediante la fase
+\emph{Design} de PPDIOO y notaciones estándar, para obtener diagramas, modelo de datos y especificación
+de seguridad que cubran la totalidad de los requerimientos, al 2 de octubre de 2026.
+\item \textbf{OE4} — Determinar el modelo de despliegue y el costo de operación, mediante la
+comparación ponderada de al menos tres alternativas de alojamiento, para obtener una recomendación con
+costo mensual y anual cuantificado, al 2 de octubre de 2026.
+\item \textbf{OE5} — Implementar la plataforma y sus adaptadores multiprotocolo, mediante desarrollo
+incremental guiado por el backlog y versionado en git, para obtener un prototipo funcional con al menos
+dos transportes operativos, al 4 de diciembre de 2026, con 50\,\% verificable al 30 de octubre.
+\item \textbf{OE6} — Validar la plataforma en condiciones que replican el entorno operativo, mediante
+pruebas funcionales, de carga y de recuperación con comparaciones antes/después, para obtener un
+informe de validación que acredite el cumplimiento de los requerimientos, al 4 de diciembre de 2026.
+\end{itemize}
+
+\begin{table}[H]
+\centering\small
+\begin{tabular}{@{}lllll@{}}
+\toprule
+\textbf{Objetivo} & \textbf{Causas} & \textbf{Efectos} & \textbf{Fase PPDIOO} & \textbf{Etapa} \\
+\midrule
+OE1 Caracterizar y levantar & C4 (diagnostica C1--C5) & E1, E3 & Prepare & 1 \\
+OE2 Especificar el protocolo & \textbf{C1} & E2, E5 & Plan, Design & 2 \\
+OE3 Diseñar arquitectura y red & C2, C5 & E2, E4 & Design & 2 \\
+OE4 Despliegue y costo & \textbf{C3} & E1, E5 & Plan & 2 \\
+OE5 Implementar la plataforma & C1, C2, C4 & E1--E3 & Implement & 3, 4 \\
+OE6 Validar en entorno realista & C5 & E4 & Operate, Optimize & 4 \\
+\bottomrule
+\end{tabular}
+\caption{Matriz de trazabilidad objetivo--causa--efecto--etapa. Las cinco causas y los cinco efectos
+quedan cubiertos por al menos un objetivo.}
+\label{tab:trazabilidad}
+\end{table}
+
+\section{Estructura del documento}
+
+El capítulo~\ref{cap:antecedentes} establece los antecedentes técnicos. El
+capítulo~\ref{cap:especificacion} presenta el análisis de requerimientos y la evaluación de
+alternativas. El capítulo~\ref{cap:metodologia} expone la metodología y la planificación verificada.
+Los anexos contienen el catálogo completo de requerimientos, el backlog y el detalle del protocolo;
+la documentación extendida reside en el repositorio del proyecto.

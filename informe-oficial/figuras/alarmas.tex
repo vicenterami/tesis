@@ -1,0 +1,55 @@
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[font=\scriptsize]
+
+% ---- sensores y panel ----
+\node[caja, text width=2.2cm, align=center, draw=ambar, line width=1pt] (sens) at (0,0)
+  {\textbf{Sensores}\\ inalámbricos\\ a batería};
+
+\node[caja, text width=2.2cm, align=center, draw=ambar, line width=1pt] (panel) at (3.5,0)
+  {\textbf{Panel} o\\ comunicador};
+
+\draw[flecha] (sens) -- node[nota, above, font=\scriptsize, align=center] {radio\\propietaria} (panel);
+
+% ---- central receptora ----
+\node[caja, text width=2.5cm, align=center, draw=azuloscuro, line width=1.1pt,
+      fill=azuloscuro!5] (arc) at (12.6,0)
+  {\textbf{Central}\\ \textbf{receptora}\\ (ARC / CMS)};
+
+% ---- punto de bifurcacion: el panel elige transporte ----
+\coordinate (bif) at (5.5,0);
+\draw[line width=0.7pt, color=gristexto] (panel.east) -- (bif);
+\draw[line width=0.7pt, color=gristexto] (5.5,1.55) -- (5.5,-1.55);
+
+\coordinate (conv) at (11.1,0);
+\draw[line width=0.7pt, color=gristexto] (11.1,1.55) -- (11.1,-1.55);
+\draw[flecha] (conv) -- (arc.west);
+
+% ---- las tres generaciones, con etiqueta centrada en el tramo ----
+\draw[flecha] (5.5,1.55) -- (11.1,1.55);
+\node[nota, above=0.6mm of {(8.3,1.55)}, font=\scriptsize]
+  {línea telefónica fija: \textbf{DTMF}\ \ \textcolor{gristexto}{\itshape (histórico)}};
+
+\draw[flecha] (5.5,0.45) -- (11.1,0.45);
+\node[nota, above=0.6mm of {(8.3,0.45)}, font=\scriptsize]
+  {red celular: \textbf{DTMF} sobre 2G/3G\ \ \textcolor{gristexto}{\itshape (en retirada)}};
+
+\draw[flechagruesa] (5.5,-1.15) -- (11.1,-1.15);
+\node[nota, above=0.6mm of {(8.3,-1.15)}, font=\scriptsize\color{verdeacento}]
+  {\textbf{internet: SIA DC-09}\ \ \itshape (actual, el adoptado)};
+
+% ---- nota final ----
+\node[notaclave, text width=13.2cm, fill=verdeacento!6, font=\scriptsize, align=left]
+      at (6.3,-3.1)
+  {\textbf{En los tres casos el mensaje de aplicación es el mismo: Contact ID.} La «comunicación
+   celular» es un cambio de transporte, no de protocolo: los comunicadores convierten la marcación de
+   línea fija en marcación sobre red móvil conservando el mensaje intacto.\\[3pt]
+   Por eso el mensaje tiene \textbf{16 dígitos y ni uno más}: debía caber en tonos telefónicos sobre una
+   línea analógica. \textbf{Y esa restricción de hace cuatro décadas es la que hoy lo hace apropiado
+   para LoRa}, un canal igualmente estrecho.};
+
+\end{tikzpicture}
+\caption{Cadena de comunicación de una alarma monitoreada. El formato del mensaje se conserva a través
+de tres generaciones de transporte.}
+\label{fig:alarmas}
+\end{figure}

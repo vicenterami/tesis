@@ -1,0 +1,96 @@
+%% Informe de Trabajo de Título — basado en la plantilla oficial INFO-1197 (UCT)
+%% Estructura del cuerpo según la Figura 3.1 de la guía de Cardiff, adaptada a la Etapa 1.
+\documentclass[12pt,oneside,spanish,oldfontcommands]{memoir}
+\usepackage[backend=biber,style=apa]{biblatex}
+\addbibresource{referencias.bib}
+\DeclareLanguageMapping{spanish}{spanish-apa}
+\usepackage{mathpazo}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\setcounter{secnumdepth}{3}
+\setcounter{tocdepth}{2}
+\setlength{\parskip}{\medskipamount}
+\setlength{\parindent}{0pt}
+\usepackage{babel}
+\usepackage{booktabs}
+\usepackage{float}
+\usepackage{url}
+\usepackage{array}
+\usepackage{textcomp}
+\usepackage{graphicx}
+\usepackage{csquotes}
+\usepackage{longtable}
+\usepackage{multirow}
+\usepackage[table]{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{positioning,shapes.geometric,arrows.meta,fit,backgrounds,calc}
+\usepackage{hyperref}
+\usepackage[none]{hyphenat}
+\sloppy
+
+%% ---- paleta y utilidades compartidas con los documentos del repositorio ----
+\definecolor{azuloscuro}{HTML}{1F3A5F}
+\definecolor{verdeacento}{HTML}{2E7D5B}
+\definecolor{ambar}{HTML}{B06A1F}
+\definecolor{grisclaro}{HTML}{F2F4F3}
+\definecolor{grislinea}{HTML}{C9D1CC}
+\definecolor{gristexto}{HTML}{55635B}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+\newcommand{\encab}[1]{\textcolor{white}{\textbf{#1}}}
+\newcommand{\filaencab}{\rowcolor{azuloscuro}}
+\renewcommand{\arraystretch}{1.2}
+
+\tikzset{
+  caja/.style={draw=azuloscuro, fill=white, line width=0.7pt, rounded corners=2pt,
+    align=center, inner sep=5pt, font=\footnotesize},
+  cajaacento/.style={caja, draw=verdeacento, line width=1.1pt},
+  cajaambar/.style={caja, draw=ambar, line width=1.1pt},
+  grupo/.style={draw=grislinea, fill=grisclaro, line width=0.6pt, rounded corners=3pt, inner sep=8pt},
+  etiqueta/.style={font=\scriptsize\bfseries\color{gristexto}, align=right},
+  flecha/.style={-{Stealth[length=2.4mm]}, line width=0.7pt, color=gristexto},
+  flechagruesa/.style={-{Stealth[length=3mm]}, line width=1.1pt, color=verdeacento},
+  nota/.style={font=\scriptsize\color{gristexto}, align=center},
+  campo/.style={draw=azuloscuro, line width=0.7pt, minimum height=7mm,
+    align=center, font=\ttfamily\small, inner sep=3pt},
+  notaclave/.style={draw=verdeacento, fill=verdeacento!6, line width=0.9pt, rounded corners=2pt,
+    align=left, inner sep=7pt, font=\scriptsize},
+  notaaviso/.style={draw=ambar, fill=ambar!6, line width=0.9pt, rounded corners=2pt,
+    align=left, inner sep=7pt, font=\scriptsize},
+}
+%% las figuras compartidas usan estos alias
+\newenvironment{cajaclave}[1][]{\par\smallskip\begin{quotation}\small}{\end{quotation}\smallskip}
+\providecommand{\captionof}[2]{}
+
+\begin{document}
+\sloppy
+\include{Portada}
+%% Comisión, profesor guía/informante y agradecimientos corresponden al documento final:
+%% \include{Comision} \include{ProfesorGuia} \include{ProfesorInformante} \include{Agradecimientos}
+
+\pagenumbering{roman}
+\tableofcontents{}
+\clearpage
+\listoffigures
+\clearpage
+\listoftables
+\clearpage
+
+\include{resumen}
+
+\pagenumbering{arabic}
+\setcounter{page}{1}
+
+\include{cap1}
+\include{cap2}
+\include{cap3}
+\include{cap4}
+\include{conclusion}
+
+\printbibliography[heading=bibintoc,title={Referencias}]
+
+\appendix
+\include{anexos/a-requerimientos}
+\include{anexos/b-backlog}
+\include{anexos/c-protocolo}
+\end{document}

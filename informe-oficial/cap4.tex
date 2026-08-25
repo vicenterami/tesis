@@ -1,0 +1,86 @@
+\chapter{Metodología y planificación}
+\label{cap:metodologia}
+
+\section{Marco metodológico}
+
+Se adopta \textbf{PPDIOO} (Cisco) como ciclo de vida de ingeniería, por tres razones: es el marco propio
+del dominio de redes, corresponde a la especialidad del profesor guía, y sus fases coinciden con las
+cuatro etapas de evaluación (Prepare/Plan $\rightarrow$ Etapa 1; Design $\rightarrow$ Etapa 2; Implement
+$\rightarrow$ Etapa 3; Operate/Optimize $\rightarrow$ Etapa 4).
+
+Se descarta Scrum como marco de gestión de equipo —el proyecto es unipersonal y sus ceremonias carecen
+de sentido— pero \textbf{se conservan sus artefactos de planificación}: el backlog con épicas, historias
+de usuario, criterios de aceptación y estimaciones. No es solo preferencia metodológica: la pauta asigna
+el 20\,\% de esta etapa al backlog y mide el avance de las siguientes como porcentaje de tareas
+completadas. PPDIOO define qué fases hay; el backlog, cómo se mide el avance.
+
+Los estándares de referencia siguen al SWEBOK v4 \parencite{swebok} en sus áreas de requerimientos
+(cap.~1), arquitectura y diseño (caps.~2--3), pruebas (cap.~5) y gestión de configuración (cap.~7): todo
+el trabajo se versiona en un repositorio git con mensajes descriptivos, y la retroalimentación del
+profesor guía se registra en bitácora con trazabilidad indicación $\rightarrow$ cambio $\rightarrow$
+evidencia.
+
+\section{Calendario oficial}
+
+\begin{table}[H]
+\centering\small
+\begin{tabular}{@{}lcc@{}}
+\toprule
+\textbf{Etapa} & \textbf{Sprint} & \textbf{Entrega} \\
+\midrule
+1 --- Problema, objetivos, requerimientos & 17 ago -- 4 sep & \textbf{4 de septiembre} \\
+2 --- Diseño e implementación inicial & 7 sep -- 2 oct & 2 de octubre \\
+3 --- Mejoras, pruebas, validación preliminar & 5 -- 30 oct & 30 de octubre \\
+4 --- Validación final e informe & 2 nov -- 4 dic & 4 de diciembre \\
+\bottomrule
+\end{tabular}
+\caption{Calendario oficial (pauta del 17 de agosto de 2026). Presupuesto a $\sim$15 h semanales:
+$\sim$240 horas.}
+\label{tab:calendario}
+\end{table}
+
+\section{Backlog y verificación de viabilidad}
+
+El backlog contiene \textbf{63 elementos} —14 épicas, 25 historias de usuario y 38 tareas técnicas—
+estimados en horas ideales (no en puntos abstractos, para poder contrastar contra el presupuesto
+conocido). Los 33 elementos del \textbf{núcleo demostrativo} llevan criterios de aceptación detallados;
+el resto queda sin refinar hasta que su ejecución se aproxime. El backlog completo está en el
+anexo~\ref{anx:backlog}.
+
+\begin{quote}
+\textbf{Criterio de demostración:} el prototipo demuestra la tesis si recibe eventos por al menos dos
+transportes, los normaliza a un formato único, detecta que un dispositivo dejó de reportar, lo presenta
+en una interfaz con el estado de cada enlace, y permite exportar los datos en formato abierto.
+\end{quote}
+
+La verificación numérica —sumando programáticamente las estimaciones— arrojó el hallazgo de mayor
+consecuencia práctica de la etapa: \textbf{el backlog completo (275 h) excede el presupuesto y no es
+ejecutable íntegro; el núcleo demostrativo (165 h) cabe con holgura} (+31\,\% con el calendario
+oficial). En consecuencia, \textbf{el compromiso del proyecto es el núcleo} y los 30 elementos restantes
+son alcance condicional, ejecutable solo contra holgura verificada al cierre de cada etapa. El
+fundamento: la pauta mide el avance como porcentaje de tareas completadas, de modo que comprometer 275
+horas y ejecutar 165 arrojaría un 60\,\% —bajo el umbral de aprobación—, mientras que comprometer 165 y
+ejecutarlas arroja el 100\,\%.
+
+La distribución temporal también se corrigió: la asignación inicial concentraba la implementación en la
+Etapa 3 (162\,\% de su capacidad) cuando la pauta solo exige allí el 50\,\%; se trasladaron $\sim$37
+horas del núcleo a la Etapa 4, verificando que el umbral del 50\,\% se cumple (53\,\%).
+
+\section{Riesgos}
+
+\begin{table}[H]
+\centering\small
+\begin{tabular}{@{}lL{4.6cm}lL{4.6cm}@{}}
+\toprule
+ & \textbf{Riesgo} & \textbf{Estado} & \textbf{Mitigación} \\
+\midrule
+R1 & Hardware de sensores no disponible & Activo & Emulador de nodo por software; el sensor físico demuestra el caso, el emulador la carga \\
+R2 & Sin acceso a partes interesadas & Activo & Escalar vía profesor guía; documentar el intento; fuentes secundarias \\
+R3 & Ambigüedad de fechas & \textbf{Cerrado} & Calendario oficial publicado el 24/08 \\
+R4 & Alcance excesivo & \textbf{Confirmado y controlado} & Núcleo comprometido vs.\ alcance condicional; revisión de holgura por etapa \\
+R5 & Contact ID sin telemetría & \textbf{Cerrado} & Campo de datos extendidos de DC-09 (sección~\ref{sec:protocolo}) \\
+\bottomrule
+\end{tabular}
+\caption{Registro de riesgos.}
+\label{tab:riesgos}
+\end{table}

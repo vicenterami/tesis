@@ -1,0 +1,133 @@
+\chapter{Especificación: análisis de requerimientos}
+\label{cap:especificacion}
+
+\section{Metodología del levantamiento}
+
+Cada requerimiento declara su fuente: \textbf{[PO]} solicitud del propietario del proyecto (indicaciones
+de la universidad vía profesor guía), \textbf{[EM]} estudio de mercado, \textbf{[BT]} base teórica
+(estándares SIA, LoRaWAN RP002, ISO/IEC 25010 \parencite{iso25010}, RFC 8428, SWEBOK
+\parencite{swebok}) y \textbf{[DP]} derivación del problema. \textbf{Brecha declarada:} falta la fuente
+[ENT], entrevistas directas; hasta realizarlas, los requerimientos [PO] se sustentan en la indicación
+transmitida y no en levantamiento directo. Su cierre es la acción prioritaria del período.
+
+\section{Síntesis del catálogo}
+
+Se catalogaron \textbf{68 requerimientos} —52 funcionales en ocho módulos y 16 no funcionales
+clasificados según ISO/IEC 25010— con prioridad MoSCoW: 49 \emph{Must}, 16 \emph{Should}, 3
+\emph{Could}. El catálogo completo, con enunciado, fuente, causa y prioridad de cada uno, está en el
+anexo~\ref{anx:requerimientos}.
+
+\begin{table}[H]
+\centering\small
+\begin{tabular}{@{}clcl@{}}
+\toprule
+\textbf{Módulo} & \textbf{Responsabilidad} & \textbf{Req.} & \textbf{Causas} \\
+\midrule
+M1 & Ingesta multiprotocolo & 10 & C1, C2 \\
+M2 & Normalización de eventos y telemetría & 7 & C1, C5 \\
+M3 & Inventario y aprovisionamiento & 6 & C4, C5 \\
+M4 & Supervisión de salud de enlace & 7 & \textbf{C5} \\
+M5 & Persistencia y consulta & 5 & C1, C3, C4 \\
+M6 & Alertas y notificación & 4 & C5 \\
+M7 & Seguridad, identidad y multi-tenencia & 7 & C1, C3, C4 \\
+M8 & Interfaz de administración & 6 & C1, C2, C4, C5 \\
+\bottomrule
+\end{tabular}
+\caption{Módulos de la solución. Ninguna causa queda sin requerimientos y ningún requerimiento carece
+de causa declarada.}
+\label{tab:modulos}
+\end{table}
+
+Cuatro requerimientos anclan el trabajo al dominio de redes: \textbf{RNF-09} (dispositivos IoT en
+segmento separado con acceso restringido), \textbf{RNF-10} (ninguna conexión entrante hacia los
+dispositivos: siempre salientes, lo que resuelve NAT y cortafuegos), \textbf{RNF-12} (añadir un
+transporte requiere solo un adaptador) y \textbf{RNF-16} (el mensaje cabe en el payload más restrictivo
+de LoRaWAN, verificado: 8 bytes en 11 disponibles). Y seis sustentan la diferenciación frente a la
+oferta regional, en particular \textbf{RF-04} (receptor DC-09 nativo: ingiere paneles de alarma ya
+instalados sin adaptador) y \textbf{RF-34} (exportación en formato abierto: una plataforma que se
+declara abierta y no permite retirar los datos reproduce el problema que pretende resolver).
+
+\section{Evaluación de alternativas de protocolo}
+\label{sec:protocolo}
+
+Se evaluaron \textbf{ocho alternativas} sobre seis criterios ponderados según las causas del problema y
+las restricciones físicas del enlace (tabla~\ref{tab:matriz}). Los pesos: compacidad 25\,\% (el payload
+LoRaWAN puede descender a 11 bytes), normalización semántica 20\,\% (es la causa C1),
+interoperabilidad con lo instalado 15\,\%, seguridad del transporte 15\,\%, telemetría con valor
+10\,\% y costo en nodo restringido 15\,\%.
+
+\begin{table}[H]
+\centering\small
+\begin{tabular}{@{}lccccccc@{}}
+\toprule
+\textbf{Alternativa} & \textbf{C-A} & \textbf{C-B} & \textbf{C-C} & \textbf{C-D} & \textbf{C-E} & \textbf{C-F} & \textbf{Total} \\
+ & 25\,\% & 20\,\% & 15\,\% & 15\,\% & 10\,\% & 15\,\% & \\
+\midrule
+MQTT + JSON ad hoc & 1 & 1 & 3 & 4 & 5 & 3 & 2,45 \\
+CoAP (RFC 7252) & 4 & 1 & 2 & 4 & 4 & 3 & 2,95 \\
+SenML (RFC 8428) & 3 & 3 & 2 & 2 & 5 & 3 & 2,90 \\
+Sparkplug B & 2 & 4 & 3 & 4 & 5 & 2 & 3,15 \\
+LwM2M (OMA) & 3 & 4 & 3 & 5 & 5 & 2 & 3,55 \\
+CayenneLPP & 5 & 2 & 2 & 3 & 4 & 5 & 3,55 \\
+SIA DC-03 & 3 & 5 & 5 & 4 & 4 & 3 & 3,95 \\
+\textbf{Contact ID + DC-09 (datos ext.)} & \textbf{5} & \textbf{5} & \textbf{5} & \textbf{4} & \textbf{4} & \textbf{5} & \textbf{4,75} \\
+\bottomrule
+\end{tabular}
+\caption{Matriz comparativa ponderada (escala 1--5). El detalle de puntuaciones y descartes está en el
+anexo~\ref{anx:protocolo} y en el repositorio.}
+\label{tab:matriz}
+\end{table}
+
+Tres descartes merecen mención. \textbf{MQTT+JSON ad hoc es el problema, no la solución}: cada
+implementación define sus campos (causa C1) y un objeto típico ocupa 60--150 bytes. \textbf{LwM2M} es
+técnicamente la pila más completa, pero su vocabulario no es el de la industria instalada y su costo en
+nodos mínimos es alto. \textbf{SIA DC-03} es la alternativa más cercana —admite valores nativamente e
+incluye el código \texttt{XL} (señal débil) sin equivalente en Contact ID— pero sus mensajes son de 15
+a 25 bytes y su sintaxis exacta para valores no pudo verificarse por ser el estándar de pago; queda
+como alternativa preferente si la restricción de compacidad se relajara.
+
+\textbf{Decisión.} Se adopta Contact ID (DC-05) sobre DC-09 como protocolo único del perfil. El mensaje
+DC-05 no transporta valores medidos, pero \textbf{DC-09 define un campo de datos extendidos}
+\texttt{[<A--Z><datos ASCII>]} cuyo formato determina el implementador: la medición viaja ahí, de modo
+que \textbf{el nodo emite un solo mensaje y el firmware implementa una sola rutina}. La separación
+entre eventos (entrega confirmada) y telemetría (pérdida tolerable) se conserva como separación lógica
+en la plataforma (figura~\ref{fig:dosplanos}). Verificado con la implementación propia
+(anexo~\ref{anx:protocolo}): evento solo, 8 bytes; con valor, 13--19 bytes — por lo que el valor es
+opcional y en el enlace de máximo alcance se transmite solo el evento.
+
+\input{figuras/dosplanos}
+
+Las tres vías de ingesta (LoRaWAN vía servidor de red; DC-09 nativo para paneles instalados; HTTP para
+sensores WiFi e integraciones) convergen a un único formato normalizado (figura~\ref{fig:ingesta}).
+
+\input{figuras/ingesta}
+
+\section{Evaluación de alternativas de infraestructura}
+\label{sec:infra}
+
+\begin{table}[H]
+\centering\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Componente} & \textbf{Selección} & \textbf{Razón determinante frente a alternativas} \\
+\midrule
+Servidor de red LoRaWAN & ChirpStack & Autoalojable y publica en MQTT nativo; la red pública \\
+ & & TTN haría transitar los datos por terceros \\
+Persistencia & TimescaleDB & Un solo motor relacional + series de tiempo; InfluxDB \\
+ & & obligaría a operar dos bases (inviable unipersonal) \\
+Broker MQTT & Mosquitto & Proporcionalidad: EMQX sobredimensionado a esta escala \\
+Despliegue & Contenedores & La Etapa 4 exige demostrar en condiciones realistas: \\
+ & & levantar todo con un comando es esa evidencia \\
+Aplicación & TypeScript + NestJS & Matriz de 5 alternativas y 7 criterios (4,70): sus módulos \\
+ & & corresponden 1:1 con M1--M8 y un solo lenguaje permite \\
+ & & definir los tipos del evento una única vez \\
+\bottomrule
+\end{tabular}
+\caption{Decisiones de infraestructura. Las matrices completas están en el repositorio
+(\texttt{docs/02-requerimientos.md}).}
+\label{tab:infra}
+\end{table}
+
+\textbf{Restricciones:} RE-01 dedicación de ~15 horas semanales (jornada laboral completa); RE-02
+proyecto unipersonal; RE-03 sin licencias de pago; RE-04 banda AU915/US915; RE-05 umbral de aprobación
+del 70\,\%; RE-06 hardware no confirmado (mitigado con emulación por software).

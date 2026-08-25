@@ -1,0 +1,27 @@
+\chapter{Conclusiones de la etapa}
+
+\textbf{Sobre la elección del protocolo.} El análisis comparativo de ocho alternativas arrojó un
+resultado no evidente al inicio: ningún protocolo de telemetría contemporáneo combina compacidad
+extrema con vocabulario semántico normalizado. Contact ID resuelve ambas exigencias por una razón
+histórica —fue diseñado para transmitirse en tonos telefónicos sobre líneas analógicas, restricción que
+impuso 16 dígitos y un vocabulario cerrado— y esa restricción de hace cuatro décadas es precisamente la
+que lo hace apropiado para radio de bajo consumo. El límite real del formato (no transporta valores
+medidos) se resolvió con un mecanismo del propio estándar: el campo de datos extendidos de DC-09, con
+lo que el dispositivo emite un solo mensaje.
+
+\textbf{Sobre el vocabulario reutilizado.} Los códigos 381, 384, 344, 602 y 603 conforman un
+vocabulario normalizado de supervisión de nodos inalámbricos a batería que precede al término
+«Internet de las Cosas». El aporte de este trabajo consiste en reutilizarlo como contrato de
+interoperabilidad de una plataforma abierta, en lugar de proponer un formato nuevo que aumentaría la
+fragmentación que pretende resolver.
+
+\textbf{Sobre la viabilidad.} Verificar numéricamente el backlog antes de comprometerlo permitió
+detectar en planificación —y no en ejecución— que el alcance completo no cabe en el tiempo disponible,
+y acotar el compromiso al núcleo demostrativo, que cabe con 31\,\% de holgura.
+
+\textbf{Trabajo pendiente para cerrar la etapa:} las entrevistas a las partes interesadas (criterio 1) y
+la validación con el profesor guía del enfoque de datos extendidos y del formato de este informe.
+\textbf{Trabajo previsto para la Etapa 2} (fase \emph{Design}): diagramas de arquitectura y red con
+segmentación, modelo de datos, gramática ABNF del perfil CID-IoT, tabla de mapeo completa, contrato
+OpenAPI, modelo de despliegue con costos (OE4), e inicio adelantado de la implementación conforme a la
+redistribución correctiva.

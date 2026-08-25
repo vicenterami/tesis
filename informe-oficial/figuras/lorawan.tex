@@ -1,0 +1,32 @@
+\begin{figure}[htbp]
+\centering
+\begin{tikzpicture}[font=\scriptsize]
+
+\node[caja, text width=2.5cm, align=center, draw=ambar, line width=1pt] (nodos)
+  {\textbf{NODOS}\\ sensores a batería\\ \emph{duermen y despiertan}};
+
+\node[caja, text width=2.6cm, align=center, right=1.5cm of nodos, draw=ambar, line width=1pt] (gw)
+  {\textbf{GATEWAY}\\ antena\\ \emph{traductor: no descifra}};
+
+\node[caja, text width=3.0cm, align=center, right=1.5cm of gw, draw=verdeacento, line width=1.1pt,
+      fill=verdeacento!5] (cs)
+  {\textbf{ChirpStack}\\ servidor de red\\ \emph{descifra, deduplica, administra}};
+
+\node[caja, text width=2.6cm, align=center, right=1.5cm of cs, draw=azuloscuro, line width=1.1pt,
+      fill=azuloscuro!5] (plat)
+  {\textbf{PLATAFORMA}\\ \emph{aporte de este trabajo}};
+
+\draw[flecha] (nodos) -- node[nota, above, font=\scriptsize] {radio LoRa} node[nota, below, font=\scriptsize] {915 MHz} (gw);
+\draw[flecha] (gw) -- node[nota, above, font=\scriptsize] {internet} node[nota, below, font=\scriptsize] {UDP/IP} (cs);
+\draw[flechagruesa] (cs) -- node[nota, above, font=\scriptsize\bfseries\color{verdeacento}] {MQTT} (plat);
+
+\node[notaaviso, below=5mm of gw.south, anchor=north, text width=13.2cm, xshift=3.2cm,
+      fill=ambar!6, font=\scriptsize]
+  {\textbf{El cifrado es de extremo a extremo, del nodo al servidor de red.} El gateway solo empaqueta
+   tramas de radio y las reenvía: no posee las claves y no puede leer el contenido. Su única función es
+   escuchar el aire.};
+
+\end{tikzpicture}
+\caption{Cadena de una red LoRaWAN y ubicación del aporte de este trabajo.}
+\label{fig:lorawan}
+\end{figure}
