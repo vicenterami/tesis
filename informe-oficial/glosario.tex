@@ -17,12 +17,22 @@ definida por el implementador. En este trabajo transporta la medición junto al 
 \item[DTMF] Tonos del teclado telefónico. Fue el transporte original de Contact ID.
 \item[Gateway] Antena que recibe la radio de los nodos LoRa y la reenvía por internet al servidor de
 red. No posee las claves de cifrado: es un traductor sin capacidad de leer el contenido.
-\item[LoRa] Técnica de modulación de radio de largo alcance y bajo consumo (capa física).
-\item[LoRaWAN] Protocolo de red construido sobre LoRa: registro de dispositivos, cifrado, entrega.
-\item[MQTT] Protocolo de mensajería «publicar/suscribir»: los sensores publican en un tópico
+\item[LoRa] \emph{Long Range}. Técnica de modulación de radio de largo alcance y bajo consumo (capa
+física). Son ondas de radio como las de la telefonía celular; la diferencia está en la banda (915\,MHz
+de uso libre, sin licencia ni operador) y en el protocolo que viaja sobre ellas.
+\item[LoRaWAN] \emph{Long Range Wide Area Network}. Protocolo de red construido sobre LoRa: registro de dispositivos, cifrado, entrega.
+\item[MQTT] \emph{Message Queuing Telemetry Transport}. Protocolo de mensajería «publicar/suscribir»: los sensores publican en un tópico
 (\texttt{sitio/invernadero-2/sensor-007/temperatura}) y cualquier programa suscrito lo recibe, sin que
 emisor y receptor se conozcan. El dispositivo inicia la conexión saliente, por lo que funciona detrás
 de cualquier router sin abrir puertos.
+\item[NAT y puertos] El router de una red doméstica o empresarial comparte una sola dirección pública
+entre todos sus dispositivos (\emph{Network Address Translation}). Deja salir cualquier conexión
+iniciada desde dentro y recuerda a quién devolver la respuesta, pero \textbf{bloquea toda conexión que
+llegue desde fuera} sin que nadie la haya pedido. Para que un servidor externo pudiera «llamar» a un
+sensor, habría que abrir un puerto en el router y redirigirlo al sensor (\emph{port forwarding}): una
+configuración manual por cada red, y una puerta expuesta a internet. Si en cambio el sensor inicia la
+conexión hacia la plataforma, el router la deja pasar sin configurar nada. Es la razón del
+requerimiento RNF-10.
 \item[Payload] Los bytes útiles de un mensaje, descontadas las cabeceras del transporte. En LoRaWAN va
 de 11 bytes (tasa más lenta, máximo alcance) a 51--53 bytes.
 \item[PPDIOO] Metodología de ciclo de vida de redes de Cisco: Prepare, Plan, Design, Implement,
