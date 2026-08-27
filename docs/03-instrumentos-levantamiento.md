@@ -59,6 +59,15 @@ determina cuánto trabajo recae en quien implemente el firmware de los sensores.
 valor entre **13 y 19**, frente a los **11 bytes** del enlace de alcance máximo y los **51 a 53** de
 operación normal. De ahí que el valor sea opcional.
 
+## 🟢 Para Eduardo — el contrato del firmware, en una frase
+
+> *«Tu nodo manda un arreglo de 8 bytes con el evento Contact ID y, si hay medición, los bytes del valor
+> a continuación. Nada más: ni DC-09 ni MQTT — eso lo hace mi plataforma. La tabla exacta te la defino en
+> la Etapa 2 y te paso la función de referencia en Python para que verifiques tu implementación.
+> ¿Prefieres que el valor vaya en texto tipo `[T23.4]` (7 bytes) o en binario compacto (2–3 bytes)?»*
+
+Esa última pregunta es la **P9** (formato en el aire) y conviene decidirla juntos: él la programa.
+
 ## 🟡 P3b. ¿Acepta la arquitectura de dos planos como separación lógica?
 
 > *«Contact ID transporta eventos codificados, pero no puede transportar un valor: puede decir

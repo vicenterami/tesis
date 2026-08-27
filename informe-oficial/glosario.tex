@@ -25,6 +25,9 @@ de uso libre, sin licencia ni operador) y en el protocolo que viaja sobre ellas.
 (\texttt{sitio/invernadero-2/sensor-007/temperatura}) y cualquier programa suscrito lo recibe, sin que
 emisor y receptor se conozcan. El dispositivo inicia la conexión saliente, por lo que funciona detrás
 de cualquier router sin abrir puertos.
+\item[Emitir vs.\ suscribirse] El sensor \textbf{emite} (publica) sus mensajes; nunca se suscribe. Quien
+se suscribe —al broker MQTT, a los tópicos de ChirpStack— es la plataforma. Un nodo LoRa ni siquiera
+conoce MQTT: llena un arreglo de bytes y la librería LoRaWAN del chip lo transmite por radio.
 \item[NAT y puertos] El router de una red doméstica o empresarial comparte una sola dirección pública
 entre todos sus dispositivos (\emph{Network Address Translation}). Deja salir cualquier conexión
 iniciada desde dentro y recuerda a quién devolver la respuesta, pero \textbf{bloquea toda conexión que

@@ -334,6 +334,52 @@ que es el comportamiento previsto por la norma para datos definidos por el fabri
 los 11 bytes del enlace de alcance máximo, así que **el valor es opcional**: cuando el canal se estrecha
 se manda solo el evento.
 
+## Un contenido, dos envolturas — y quién traduce
+
+**DC-09 es un formato de internet. Un nodo LoRa no lo genera** (una trama DC-09 completa pesa más de
+50 bytes). Lo que viaja por el aire es mucho más simple:
+
+```
+   POR EL AIRE (LoRa)                          POR INTERNET (DC-09)
+   lo que emite el nodo                        lo que arma la plataforma si reenvía
+   ┌──────────────┬────────┐                   token   : *ADM-CID
+   │ 8 bytes BCD  │ valor  │  ─ChirpStack─▶    msgdata : 1234181158010037
+   │ 12 34 18 11  │ 2-7 B  │  ─MQTT──────▶     extdata : [T23.4]
+   │ 58 01 00 37  │        │                   + AES, secuencia, CRC
+   └──────────────┴────────┘
+```
+
+- **16 dígitos, no 16 bits:** cada dígito ocupa medio byte → 16 dígitos = 8 bytes = 64 bits.
+- **El valor va después, en el mismo paquete.** LoRaWAN es una bolsa de bytes de hasta 51 (11 en la tasa
+  más lenta): el nodo la llena como quiera. Con valor son 13–19 bytes → cabe en operación normal, no en
+  la tasa lenta → el valor es opcional.
+- **«Datos extendidos» es el nombre que DC-09 da al concepto.** En el aire son simplemente «los bytes
+  que siguen al evento». El formato exacto (ASCII `[T23.4]` o binario de 2–3 bytes) **se decide en la
+  Etapa 2 con quien programe el firmware.**
+- **La plataforma es la traductora:** recibe, separa evento y valor en los dos planos, guarda, y solo si
+  debe hablar con una central de alarmas externa envuelve en DC-09.
+
+### El sensor emite, no se suscribe
+
+El sensor **publica**. Suscribirse es lo que hace la plataforma. Y el nodo LoRa **jamás toca MQTT**:
+en su firmware hay una función que llena un arreglo de bytes y se lo pasa a la librería LoRaWAN del chip,
+que hace la radio. MQTT ocurre entre ChirpStack y la plataforma, en servidores. Un nodo **WiFi** (ESP32)
+sí puede hablar MQTT/HTTP directo porque tiene internet.
+
+**El contrato con quien haga el firmware, en una frase:** *«un arreglo de 8 bytes con el evento y, si hay
+medición, los bytes del valor a continuación; la tabla exacta se define en la Etapa 2 y se entrega con
+la función de referencia en Python para verificar la implementación».*
+
+### La analogía 802.11 / TCP-IP, aterrizada
+
+| Mundo del portátil | Mundo del sensor | Qué hace |
+|---|---|---|
+| **802.11** (WiFi) | **LoRa** | La radio: cómo viajan los bits por el aire |
+| **TCP/IP** | **LoRaWAN** | La red: quién es cada dispositivo, cifrado, cómo llega al servidor |
+| La página web | **Contact ID** | El contenido, que no cambia según el medio |
+
+La misma página web llega igual por WiFi, cable o 4G: TCP/IP no cambia, solo el tramo de radio de abajo.
+
 ## Qué significaría «Contact ID puro»
 
 Si Mario exigiera que absolutamente todo pase por Contact ID:

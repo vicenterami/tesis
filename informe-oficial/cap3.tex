@@ -97,6 +97,17 @@ opcional y en el enlace de máximo alcance se transmite solo el evento.
 
 \input{figuras/dosplanos}
 
+Conviene precisar la relación entre transportes: \textbf{DC-09 es un formato de internet; un nodo
+LoRa no lo genera}. En el aire el nodo emite únicamente el evento de 8 bytes seguido, si corresponde,
+de los bytes del valor; la plataforma lo recibe a través del servidor de red y MQTT, separa ambos planos
+y, solo cuando debe reenviar a una central de alarmas externa, compone el mensaje DC-09 con el valor en
+su campo de datos extendidos (figura~\ref{fig:envolturas}). El sensor nunca se suscribe a nada:
+\textbf{emite}; suscribirse es tarea de la plataforma. El formato exacto de los bytes del valor en el
+aire —ASCII como en DC-09 o binario compacto— se fija en la Etapa 2 junto con quien implemente el
+firmware.
+
+\input{figuras/envolturas}
+
 Las tres vías de ingesta (LoRaWAN vía servidor de red; DC-09 nativo para paneles instalados; HTTP para
 sensores WiFi e integraciones) convergen a un único formato normalizado (figura~\ref{fig:ingesta}).
 

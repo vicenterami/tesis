@@ -4,9 +4,9 @@ Latexmk: This is Latexmk, John Collins, 15 June 2025. Version 4.87.
 Latexmk: applying rule 'pdflatex'...
 Rule 'pdflatex':  Reasons for rerun
 Changed files or newly in use/created:
-  figuras/alarmas.tex
+  figuras/envolturas.tex
 Category 'changed_user':
-  figuras/alarmas.tex
+  figuras/envolturas.tex
 
 ------------
 Run number 1 of rule 'pdflatex'
@@ -197,6 +197,14 @@ zlibraryfit.code.tex)
 zlibrarybackgrounds.code.tex)
 (/usr/share/texlive/texmf-dist/tex/generic/pgf/frontendlayer/tikz/libraries/tik
 zlibrarycalc.code.tex)
+(/usr/share/texlive/texmf-dist/tex/generic/pgf/frontendlayer/tikz/libraries/tik
+zlibrarydecorations.pathreplacing.code.tex
+(/usr/share/texlive/texmf-dist/tex/generic/pgf/frontendlayer/tikz/libraries/tik
+zlibrarydecorations.code.tex
+(/usr/share/texlive/texmf-dist/tex/generic/pgf/modules/pgfmoduledecorations.cod
+e.tex))
+(/usr/share/texlive/texmf-dist/tex/generic/pgf/libraries/decorations/pgflibrary
+decorations.pathreplacing.code.tex))
 (/usr/share/texlive/texmf-dist/tex/latex/hyperref/hyperref.sty
 (/usr/share/texlive/texmf-dist/tex/generic/kvdefinekeys/kvdefinekeys.sty)
 (/usr/share/texlive/texmf-dist/tex/generic/pdfescape/pdfescape.sty)
@@ -256,7 +264,7 @@ r-fil
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
 [3] (build/main.lof
-Underfull \hbox (badness 1609) in paragraph at lines 12--12
+Underfull \hbox (badness 1609) in paragraph at lines 13--13
  [][] [][]\T1/ppl/m/n/12 Las tres vías de in-ges-ta con-ver-gen a un úni-co for
 -ma-to 
 )
@@ -519,22 +527,25 @@ Overfull \vbox (0.85402pt too high) has occurred while \output is active
 [13] (./figuras/dosplanos.tex
 Missing character: There is no ) in font nullfont!
 )
-Underfull \hbox (badness 1057) in paragraph at lines 100--102
+
+Overfull \vbox (0.85402pt too high) has occurred while \output is active
+[14] (./figuras/envolturas.tex)
+Underfull \hbox (badness 1057) in paragraph at lines 111--113
 \T1/ppl/m/n/12 pa-ra pa-ne-les ins-ta-la-dos; HTTP pa-ra sen-so-res Wi-Fi e in-
 te-gra-cio-nes)
 
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[14] (./figuras/ingesta.tex)
+[15] (./figuras/ingesta.tex)
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[15]
+[16]
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[16])
+[17])
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[17] (./cap4.tex
+[18] (./cap4.tex
 Underfull \hbox (badness 1675) in paragraph at lines 17--22
 \T1/ppl/m/n/12 y di-se-ño (caps. 2--3), prue-bas (cap. 5) y ges-tión de con-fi-
 gu-ra-ción
@@ -543,7 +554,7 @@ Underfull \hbox (badness 2012) in paragraph at lines 38--38
 []\T1/ppl/m/n/12 Cuadro 4.1: []Calendario ofi-cial (pau-ta del 17 de agos-to de
  2026).
 
-[18]
+[19]
 Underfull \hbox (badness 10000) in paragraph at lines 56--64
 []\T1/ppl/m/n/12 La ve-ri-fi-ca-ción nu-mé-ri-ca ^^Vsu-man-do pro-gra-má-ti-ca-
 men-te las
@@ -558,14 +569,14 @@ Underfull \hbox (badness 1270) in paragraph at lines 56--64
 
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[19]
+[20]
 Underfull \hbox (badness 1558) in paragraph at lines 65--68
 []\T1/ppl/m/n/12 La dis-tri-bu-ción tem-po-ral tam-bién se co-rri-gió: la asig-
 na-ción ini-cial
 )
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[20] (./conclusion.tex
+[21] (./conclusion.tex
 Underfull \hbox (badness 1603) in paragraph at lines 3--11
 []\T1/ppl/b/n/12 Sobre la elec-ción del pro-to-co-lo. \T1/ppl/m/n/12 El aná-li-
 sis com-pa-ra-ti-vo de ocho
@@ -578,10 +589,10 @@ Underfull \hbox (badness 1859) in paragraph at lines 18--21
 []\T1/ppl/b/n/12 Sobre la via-bi-li-dad. \T1/ppl/m/n/12 Ve-ri-fi-car nu-mé-ri-c
 a-men-te el bac-klog an-tes de
 )
-[21]
+[22]
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[22] (./glosario.tex
+[23] (./glosario.tex
 Underfull \hbox (badness 3815) in paragraph at lines 5--7
 []\T1/ppl/m/n/12 Intermediario de MQTT. Re-ci-be los men-sa-jes de quie-nes
 
@@ -599,7 +610,7 @@ Underfull \hbox (badness 1694) in paragraph at lines 17--18
 []\T1/ppl/m/n/12 Tonos del te-cla-do te-le-fó-ni-co. Fue el trans-por-te ori-gi
 -nal de
 
-[23]
+[24]
 Underfull \hbox (badness 10000) in paragraph at lines 24--28
 \T1/ppl/m/n/12 ^^Spu-bli-car/suscribir^^T: los sen-so-res pu-bli-can en un tó-p
 i-co
@@ -610,10 +621,10 @@ pl/m/n/12 ) y cual-quier
 
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[24])
+[25])
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[25]
+[26]
 Underfull \hbox (badness 1102) in paragraph at lines 91--91
 [][]\T1/ppl/m/n/12 Ademco. (1999). \T1/ppl/m/it/12 Di-gi-tal Com-mu-ni-ca-tion 
 Stan-dard: Adem-co Con-tact ID
@@ -630,7 +641,7 @@ Underfull \hbox (badness 2980) in paragraph at lines 91--91
 \T1/ppl/m/it/12 Pro-to-col for Alarm Sys-tem Com-mu-ni-ca-tions\T1/ppl/m/n/12 .
  Se-cu-rity In-dustry
 
-[26]
+[27]
 Underfull \hbox (badness 1303) in paragraph at lines 91--91
 [][]\T1/ppl/m/n/12 Security In-dustry As-so-cia-tion. (2017). \T1/ppl/m/it/12 D
 C-03-2017: DCS SIA For-mat
@@ -647,13 +658,10 @@ Underfull \hbox (badness 3439) in paragraph at lines 91--91
 \T1/ppl/m/it/12 Event Re-por-ting, re-vi-sión 2026 \T1/ppl/m/n/12 (Apro-ba-ción
  AN-SI; in-cor-po-ra
 
-[27] (./anexos/a-requerimientos.tex
+[28] (./anexos/a-requerimientos.tex
 
-LaTeX Warning: Reference `tab:fuentes' on page 28 undefined on input line 5.
+LaTeX Warning: Reference `tab:fuentes' on page 29 undefined on input line 5.
 
-[28]
-
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
 [29]
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
@@ -670,51 +678,54 @@ Overfull \vbox (0.85402pt too high) has occurred while \output is active
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
 [34]
+
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
 [35]
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[36])
+[36]
+Overfull \vbox (0.85402pt too high) has occurred while \output is active
+[37])
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[37] (./anexos/b-backlog.tex
+[38] (./anexos/b-backlog.tex
 Underfull \hbox (badness 2134) in paragraph at lines 5--7
 \T1/ppl/m/n/10.95 con cri-te-rios de acep-ta-ción de-ta-lla-dos en el do-cu-men
 -to de bac-klog del
 
-[38]
-Overfull \vbox (0.85402pt too high) has occurred while \output is active
 [39]
-
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
 [40]
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
 [41]
+
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
 [42]
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
 [43]
-
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
 [44]
+
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
 [45]
+Overfull \vbox (0.85402pt too high) has occurred while \output is active
+[46]
 Underfull \hbox (badness 1360) in paragraph at lines 152--152
 []\T1/ppl/m/n/10.95 Cuadro B.15: Re-su-men del es-fuer-zo es-ti-ma-do fren-te a
 l
 )
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[46] (./anexos/c-protocolo.tex
+[47] (./anexos/c-protocolo.tex
 Underfull \hbox (badness 10000) in paragraph at lines 26--26
 []\T1/ppl/m/n/10.95 Cuadro C.1: Men-sa-jes de ejem-plo con su-ma de
-[47]
+[48]
 Underfull \hbox (badness 3229) in paragraph at lines 39--39
 []\T1/ppl/m/n/10.95 Cuadro C.2: Ve-ri-fi-ca-ción pro-gra-má-ti-ca del ta-ma-ño.
  El
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[48]
+[49]
 Overfull \hbox (2.36372pt too wide) in paragraph at lines 60--60
  []|[]\T1/ppl/b/n/10.95 Código[]| 
 
@@ -723,7 +734,7 @@ Overfull \hbox (11.26837pt too wide) in paragraph at lines 64--64
 )
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[49]
+[50]
 
 Class memoir Warning: The material used in the headers is too large
 (15.35402pt) for the given head height (14.5pt), it is recommended to
@@ -749,7 +760,7 @@ onts/type1/urw/palatino/uplb8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/u
 rw/palatino/uplbi8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/palatino
 /uplr8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/palatino/uplr8a.pfb>
 </usr/share/texlive/texmf-dist/fonts/type1/urw/palatino/uplri8a.pfb>
-Output written on build/main.pdf (56 pages, 368240 bytes).
+Output written on build/main.pdf (57 pages, 377316 bytes).
 Transcript written on build/main.log.
 Latexmk: Getting log file 'build/main.log'
 Latexmk: Examining 'build/main.fls'
@@ -768,6 +779,6 @@ Latexmk: Summary of warnings from last run of *latex:
 =====See log file for details.
 Latexmk: ====Undefined refs and citations with line #s in .tex file:
   Missing character: There is no ) in font nullfont!
-  Reference `tab:fuentes' on page 28 undefined on input line 5
+  Reference `tab:fuentes' on page 29 undefined on input line 5
 Latexmk: All targets (build/main.pdf) are up-to-date
 

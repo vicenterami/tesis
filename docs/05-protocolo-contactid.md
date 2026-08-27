@@ -802,6 +802,7 @@ tienen condiciones abiertas, cuáles dejaron de reportar y cuándo se los vio po
 | **P5** | Validar con el profesor guía que el enfoque de dos planos es aceptable | Si exige Contact ID puro, hay que rediseñar el tratamiento de la telemetría |
 | **P6** | Estado del apagado de 2G/3G en Chile por operador | Ninguno sobre el diseño; es dato de contexto que refuerza la elección de DC-09 sobre IP frente al DTMF celular |
 | **P7** | Límite de longitud del campo de datos extendidos de DC-09 e identificadores ya asignados por convención | Podría obligar a acortar la codificación de valores o a reasignar identificadores del perfil |
+| **P9** | **Formato exacto de los bytes del valor en el aire (LoRa):** ASCII como en DC-09 o binario compacto (TLV de 2–3 bytes). Decidir con quien implemente el firmware | Define el contrato del firmware; el nodo nunca genera DC-09, la plataforma traduce |
 | **P8** | Gramática exacta de SIA DC-03 para valores numéricos, si se obtiene acceso al estándar | Si resultara más eficiente de lo estimado, DC-03 pasaría a ser la alternativa preferente |
 
 ---
