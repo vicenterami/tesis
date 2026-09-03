@@ -127,19 +127,26 @@ Así un sensor nuevo no exige tocar código: se registra, y sus tramas ya se ent
 ## 4. Decisión C — Arquitectura de adquisición y frontera con el compañero
 
 ```
-   LADO EDUARDO (hardware/radio)          │        LADO VICENTE (plataforma)
-                                          │
- sensor ──serial──▶ ESP32 ──WiFi/MQTT────────▶ ┌─────────────────────────────┐
-                                          │    │ 1 autenticación (TLS+cred.) │
- sensor LoRa ──radio──▶ gateway ──▶ ChirpStack │ 2 análisis de la trama      │
-                        (publica en MQTT) ────▶│ 3 validación c/ registro    │──▶ TimescaleDB
-                                          │    │ 4 normalización a modelo    │        │
- integración externa ──HTTP POST──────────────▶│   interno único             │   API REST
-                                          │    │ 5 supervisión (¿quién calla?)│        │
-                                          │    │ 6 alertas                   │    dashboard
-                                          │    └─────────────────────────────┘
-                                          │           el backend (NestJS)
-        LA FRONTERA: el tópico MQTT ──────┘
+LADO EDUARDO (hasta el tópico MQTT)
+  sensor ─serial→ ESP32 ─WiFi→ ┐
+  sensor LoRa ─radio→ gateway  │
+       └→ ChirpStack ─publica→ ┤
+                               ▼
+        ═════ FRONTERA: el tópico MQTT ═════
+                               ▼
+LADO VICENTE (desde el tópico hacia adentro)
+  broker Mosquitto
+     │ (también entra HTTP POST por la API)
+     ▼
+  BACKEND — el pipeline de 6 filtros:
+     1 autenticar (TLS + credencial)
+     2 analizar la trama
+     3 validar contra el registro
+     4 normalizar al modelo interno
+     5 supervisar (¿quién calla?)
+     6 alertar
+     ▼
+  TimescaleDB ←→ API REST ←→ dashboard
 ```
 
 - **Frontera contractual:** Eduardo entrega mensajes SenML publicados en un tópico MQTT acordado
