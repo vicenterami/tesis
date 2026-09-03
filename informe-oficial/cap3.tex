@@ -11,7 +11,9 @@ fuente [ENT], entrevistas directas; su cierre es la acción prioritaria del per�
 
 \section{Síntesis del catálogo}
 
-Se catalogan \textbf{68 requerimientos} —52 funcionales en ocho módulos y 16 no funcionales según
+Se catalogan \textbf{68 requerimientos}: 52 \textbf{funcionales} (RF: lo que el sistema debe
+\emph{hacer}) en ocho módulos, y 16 \textbf{no funcionales} (RNF: cómo debe \emph{comportarse} —
+rendimiento, seguridad, mantenibilidad) clasificados según
 ISO/IEC 25010— con prioridad MoSCoW (49 \emph{Must}, 16 \emph{Should}, 3 \emph{Could}). El catálogo
 completo está en el anexo~\ref{anx:requerimientos}.
 
@@ -52,8 +54,8 @@ por mensaje (10\,\%, la objeción a las cabeceras) y funcionar tras NAT sin abri
 RNF-10).
 
 \begin{table}[H]
-\centering\footnotesize\setlength{\tabcolsep}{3pt}
-\begin{tabular}{@{}L{3.3cm}C{1.5cm}C{1.6cm}C{1.4cm}C{1.5cm}C{1.5cm}C{1.3cm}C{1.1cm}@{}}
+\centering\scriptsize\setlength{\tabcolsep}{2pt}
+\begin{tabular}{@{}L{2.7cm}C{1.4cm}C{1.4cm}C{1.3cm}C{1.4cm}C{1.5cm}C{1.1cm}C{1.0cm}@{}}
 \toprule
  & \textbf{Entrega confiable} & \textbf{Detecta caídos} & \textbf{Costo en nodo} & \textbf{Facilidad backend} & \textbf{Sobrecarga mensaje} & \textbf{Tras NAT} & \textbf{Total} \\
  & 25\,\% & 20\,\% & 20\,\% & 15\,\% & 10\,\% & 10\,\% & \\

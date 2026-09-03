@@ -1,41 +1,38 @@
-\begin{figure}[htbp]
+\begin{figure}[H]
 \centering
 \resizebox{\linewidth}{!}{%
-\begin{tikzpicture}[font=\scriptsize, node distance=3mm]
+\begin{tikzpicture}[font=\scriptsize,
+  filtro/.style={caja, text width=1.75cm, minimum height=1.5cm, align=center, inner sep=3pt}]
 
-\node[caja, text width=1.9cm, align=center, draw=ambar, line width=1pt] (in) at (0,0)
-  {\textbf{trama}\\ MQTT · HTTP};
+\node[filtro, draw=ambar, line width=1pt] (in) at (0,0) {\textbf{trama}\\[1pt]{\tiny MQTT · HTTP}};
 
 \foreach \i/\nom/\det in {
-  1/{autenticar}/{TLS +\\credencial},
-  2/{analizar}/{¿se puede\\leer?},
-  3/{validar}/{contra el\\registro},
-  4/{normalizar}/{al modelo\\interno},
-  5/{supervisar}/{¿quién\\calla?},
-  6/{alertar}/{umbrales y\\caídas}}{
-  \pgfmathsetmacro\x{1.6 + \i*2.05}
-  \node[caja, text width=1.55cm, align=center, minimum height=1.35cm] (f\i) at (\x,0)
-    {\textbf{\i. \nom}\\[1pt]{\tiny \det}};
+  1/{autenticar}/{TLS + credencial},
+  2/{analizar}/{¿se puede leer?},
+  3/{validar}/{contra el registro},
+  4/{normalizar}/{al modelo interno},
+  5/{supervisar}/{¿quién calla?},
+  6/{alertar}/{umbrales y caídas}}{
+  \pgfmathsetmacro\x{\i*2.35}
+  \node[filtro] (f\i) at (\x,0) {\textbf{\i}\\ \textbf{\nom}\\[1pt]{\tiny \det}};
 }
-\node[cajaacento, text width=1.9cm, align=center, fill=verdeacento!6] (db) at (16.1,0)
-  {\textbf{TimescaleDB}\\ series de tiempo};
+\node[filtro, draw=verdeacento, line width=1.1pt, fill=verdeacento!6] (db) at (16.45,0)
+  {\textbf{TimescaleDB}\\[1pt]{\tiny series de tiempo}};
 
-\draw[flechagruesa] (in.east) -- (f1.west);
-\foreach \i [evaluate=\i as \j using int(\i+1)] in {1,...,5}
-  \draw[flechagruesa] (f\i.east) -- (f\j.west);
-\draw[flechagruesa] (f6.east) -- (db.west);
+\draw[flechagruesa] (in) -- (f1);
+\foreach \i [evaluate=\i as \j using int(\i+1)] in {1,...,5} \draw[flechagruesa] (f\i) -- (f\j);
+\draw[flechagruesa] (f6) -- (db);
 
-% salidas de rechazo
-\node[notaaviso, text width=3.4cm, align=center] (des) at (5.7,-2.1)
-  {\textbf{desconocido}\\ rechazo + registro del intento};
-\node[notaaviso, text width=3.4cm, align=center] (cua) at (9.8,-2.1)
-  {\textbf{malformada}\\ cuarentena: cruda, con motivo};
-\draw[flecha, color=ambar] (f1.south) |- (des.east);
+% rechazos: caída vertical bajo su filtro
+\node[notaaviso, text width=2.6cm, align=center, minimum height=1.05cm] (des) at (2.35,-2.3)
+  {\textbf{desconocido}\\{\tiny rechazo + registro}};
+\node[notaaviso, text width=2.6cm, align=center, minimum height=1.05cm] (cua) at (7.05,-2.3)
+  {\textbf{malformada}\\{\tiny cuarentena con motivo}};
+\draw[flecha, color=ambar] (f1.south) -- (des.north);
 \draw[flecha, color=ambar] (f3.south) -- (cua.north);
-
 \end{tikzpicture}}
-\caption{El pipeline de tratamiento de tramas, aporte central del trabajo: seis filtros
-independientes y testeables por separado, con dos salidas de rechazo que preservan la evidencia sin
+\caption{El pipeline de tratamiento de tramas, aporte central del trabajo. Cada filtro es
+independiente y verificable por separado; las dos salidas de rechazo preservan la evidencia sin
 contaminar las series.}
 \label{fig:pipeline}
 \end{figure}

@@ -1,47 +1,44 @@
-\begin{figure}[htbp]
+\begin{figure}[H]
 \centering
 \resizebox{\linewidth}{!}{%
-\begin{tikzpicture}[node distance=6mm, font=\scriptsize]
+\begin{tikzpicture}[font=\scriptsize,
+  cuadro/.style={caja, text width=2.0cm, minimum height=1.3cm, align=center}]
 
 % ---- EFECTOS ----
-\node[caja, font=\scriptsize, text width=2.0cm] (e1) {\textbf{E1}\\Inversión\\inmovilizada};
-\node[caja, font=\scriptsize, text width=2.0cm, right=3mm of e1] (e2) {\textbf{E2}\\Datos\\perdidos};
-\node[caja, font=\scriptsize, text width=2.0cm, right=3mm of e2] (e3) {\textbf{E3}\\Decisiones\\sin dato};
-\node[caja, font=\scriptsize, text width=2.0cm, right=3mm of e3] (e4) {\textbf{E4}\\Fallas vistas\\tarde};
-\node[caja, font=\scriptsize, text width=2.0cm, right=3mm of e4] (e5) {\textbf{E5}\\Dependencia\\de proveedor};
-
+\node[cuadro] (e1) {\textbf{E1}\\ Inversión\\ inmovilizada};
+\node[cuadro, right=3mm of e1] (e2) {\textbf{E2}\\ Datos\\ perdidos};
+\node[cuadro, right=3mm of e2] (e3) {\textbf{E3}\\ Decisiones\\ sin dato};
+\node[cuadro, right=3mm of e3] (e4) {\textbf{E4}\\ Fallas vistas\\ tarde};
+\node[cuadro, right=3mm of e4] (e5) {\textbf{E5}\\ Dependencia\\ del proveedor};
 \begin{scope}[on background layer]
 \node[grupo, fit=(e1)(e5)] (gefectos) {};
 \end{scope}
-\node[etiqueta, left=2mm of gefectos, font=\scriptsize\bfseries\color{gristexto}] {EFECTOS};
+\node[etiqueta, left=2mm of gefectos] {EFECTOS};
 
 % ---- PROBLEMA CENTRAL ----
-\node[cajaacento, below=11mm of gefectos, text width=12.0cm, fill=verdeacento!6,
-      font=\scriptsize] (prob)
-  {\textbf{Quien ya posee sensores heterogéneos no puede convertir sus datos en información
-   utilizable:}\\ falta una plataforma que unifique la ingesta, la normalización y la gestión de
-   dispositivos.};
-\node[etiqueta, left=2mm of prob, font=\scriptsize\bfseries\color{gristexto}] {PROBLEMA\\CENTRAL};
+\node[cajaacento, below=11mm of gefectos, text width=11.6cm, minimum height=1.15cm,
+      fill=verdeacento!6, font=\scriptsize, align=center] (prob)
+  {\textbf{Quien ya posee sensores no puede convertir sus datos en información utilizable:}\\
+   falta una plataforma que unifique la recepción, la normalización y la gestión de dispositivos.};
+\node[etiqueta, left=2mm of prob] {PROBLEMA\\CENTRAL};
 
-% ---- CAUSAS ----
-\node[caja, font=\scriptsize, below=11mm of prob, text width=2.0cm, xshift=-4.65cm] (c1)
-  {\textbf{C1}\\Fragmentación\\de protocolos};
-\node[caja, font=\scriptsize, text width=2.0cm, right=3mm of c1] (c2) {\textbf{C2}\\Acoplamiento\\hardware};
-\node[caja, font=\scriptsize, text width=2.0cm, right=3mm of c2] (c3) {\textbf{C3}\\Costo y\\dependencia};
-\node[caja, font=\scriptsize, text width=2.0cm, right=3mm of c3] (c4) {\textbf{C4}\\Sin capacidad\\técnica};
-\node[caja, font=\scriptsize, text width=2.0cm, right=3mm of c4] (c5) {\textbf{C5}\\Sin visibilidad\\del enlace};
-
+% ---- CAUSAS (con apodo memorizable) ----
+\node[cuadro, below=11mm of prob, xshift=-4.65cm] (c1) {\textbf{C1}\\ Formatos\\ dispares};
+\node[cuadro, right=3mm of c1] (c2) {\textbf{C2}\\ Hardware\\ atado};
+\node[cuadro, right=3mm of c2] (c3) {\textbf{C3}\\ Costo y\\ nube ajena};
+\node[cuadro, right=3mm of c3] (c4) {\textbf{C4}\\ Sin personal\\ técnico};
+\node[cuadro, right=3mm of c4] (c5) {\textbf{C5}\\ Sin\\ visibilidad};
 \begin{scope}[on background layer]
 \node[grupo, fit=(c1)(c5)] (gcausas) {};
 \end{scope}
-\node[etiqueta, left=2mm of gcausas, font=\scriptsize\bfseries\color{gristexto}] {CAUSAS};
+\node[etiqueta, left=2mm of gcausas] {CAUSAS};
 
-% ---- FLECHAS ----
-\draw[flechagruesa] (gcausas.north) -- node[nota, right=1mm, midway, font=\scriptsize] {provocan} (prob.south);
-\draw[flechagruesa] (prob.north) -- node[nota, right=1mm, midway, font=\scriptsize] {produce} (gefectos.south);
-
+% ---- flechas perfectamente verticales, ancladas al centro del problema ----
+\draw[flechagruesa] (prob.south |- gcausas.north) -- node[nota, right=1mm] {provocan} (prob.south);
+\draw[flechagruesa] (prob.north |- gefectos.south) -- node[nota, right=1mm] {produce} (prob.north);
 \end{tikzpicture}}
-\caption{Árbol de problemas: las cinco causas provocan el problema central, que a su vez produce
-los cinco efectos observables.}
+\caption{Árbol de problemas. Las cinco causas —C1 formatos dispares, C2 hardware atado, C3 costo y
+nube ajena, C4 sin personal técnico, C5 sin visibilidad— provocan el problema central, que produce
+los cinco efectos.}
 \label{fig:arbol}
 \end{figure}
