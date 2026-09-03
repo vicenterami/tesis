@@ -2,9 +2,9 @@
 \centering
 \resizebox{\linewidth}{!}{%
 \begin{tikzpicture}[font=\scriptsize,
-  filtro/.style={caja, text width=1.75cm, minimum height=1.5cm, align=center, inner sep=3pt}]
+  filtro/.style={caja, text width=1.95cm, minimum height=1.55cm, align=center, inner sep=3pt}]
 
-\node[filtro, draw=ambar, line width=1pt] (in) at (0,0) {\textbf{trama}\\[1pt]{\tiny MQTT · HTTP}};
+\node[filtro, draw=ambar, line width=1pt] (in) at (0,0) {\textbf{trama}\\[2pt]{\footnotesize MQTT · HTTP}};
 
 \foreach \i/\nom/\det in {
   1/{autenticar}/{TLS + credencial},
@@ -13,26 +13,26 @@
   4/{normalizar}/{al modelo interno},
   5/{supervisar}/{¿quién calla?},
   6/{alertar}/{umbrales y caídas}}{
-  \pgfmathsetmacro\x{\i*2.35}
-  \node[filtro] (f\i) at (\x,0) {\textbf{\i}\\ \textbf{\nom}\\[1pt]{\tiny \det}};
+  \pgfmathsetmacro\x{\i*2.55}
+  \node[filtro] (f\i) at (\x,0) {\textbf{\i}\\ \textbf{\nom}\\[2pt]{\footnotesize \det}};
 }
-\node[filtro, draw=verdeacento, line width=1.1pt, fill=verdeacento!6] (db) at (16.45,0)
-  {\textbf{TimescaleDB}\\[1pt]{\tiny series de tiempo}};
-
 \draw[flechagruesa] (in) -- (f1);
 \foreach \i [evaluate=\i as \j using int(\i+1)] in {1,...,5} \draw[flechagruesa] (f\i) -- (f\j);
-\draw[flechagruesa] (f6) -- (db);
 
-% rechazos: caída vertical bajo su filtro
-\node[notaaviso, text width=2.6cm, align=center, minimum height=1.05cm] (des) at (2.35,-2.3)
-  {\textbf{desconocido}\\{\tiny rechazo + registro}};
-\node[notaaviso, text width=2.6cm, align=center, minimum height=1.05cm] (cua) at (7.05,-2.3)
-  {\textbf{malformada}\\{\tiny cuarentena con motivo}};
+% destinos, en la fila inferior: cada caída es vertical
+\node[notaaviso, text width=2.7cm, align=center, minimum height=1.1cm] (des) at (2.55,-2.45)
+  {\textbf{desconocido}\\{\footnotesize rechazo + registro}};
+\node[notaaviso, text width=2.7cm, align=center, minimum height=1.1cm] (cua) at (7.65,-2.45)
+  {\textbf{malformada}\\{\footnotesize cuarentena con motivo}};
+\node[filtro, draw=verdeacento, line width=1.1pt, fill=verdeacento!6, minimum height=1.1cm, text width=2.5cm] (db) at (15.0,-2.45)
+  {\textbf{TimescaleDB}\\[2pt]{\footnotesize series de tiempo}};
+
 \draw[flecha, color=ambar] (f1.south) -- (des.north);
 \draw[flecha, color=ambar] (f3.south) -- (cua.north);
+\draw[flechagruesa] (f6.south) -- (db.north);
 \end{tikzpicture}}
 \caption{El pipeline de tratamiento de tramas, aporte central del trabajo. Cada filtro es
-independiente y verificable por separado; las dos salidas de rechazo preservan la evidencia sin
-contaminar las series.}
+independiente y verificable por separado; los tres destinos —almacenamiento, cuarentena y registro
+de desconocidos— preservan la evidencia sin contaminar las series.}
 \label{fig:pipeline}
 \end{figure}

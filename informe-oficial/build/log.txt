@@ -25,8 +25,8 @@ INFO - Found BibTeX data source 'referencias.bib'
 INFO - Overriding locale 'es-ES' defaults 'normalization = NFD' with 'normalization = prenormalized'
 INFO - Overriding locale 'es-ES' defaults 'variable = shifted' with 'variable = non-ignorable'
 INFO - Sorting list 'apa/apasortcite//global/global/global' of type 'entry' with template 'apa' and locale 'es-ES'
-INFO - Overriding locale 'es-ES' defaults 'variable = shifted' with 'variable = non-ignorable'
 INFO - Overriding locale 'es-ES' defaults 'normalization = NFD' with 'normalization = prenormalized'
+INFO - Overriding locale 'es-ES' defaults 'variable = shifted' with 'variable = non-ignorable'
 INFO - Sorting list 'apa/global//global/global/global' of type 'entry' with template 'apa' and locale 'es-ES'
 INFO - Writing 'build/main.bbl' with encoding 'UTF-8'
 INFO - Output to build/main.bbl
@@ -297,6 +297,10 @@ en-tral del
 Underfull \hbox (badness 4024) in paragraph at lines 9--9
  \T1/ppl/m/n/12 tra-ba-jo. Ca-da fil-tro es in-de-pen-dien-te y ve-ri-fi-ca-ble
  por 
+
+Underfull \hbox (badness 1629) in paragraph at lines 9--9
+ \T1/ppl/m/n/12 y re-gis-tro de des-co-no-ci-dos^^V pre-ser-van la evi-den-cia 
+sin 
 )
 [4] (build/main.lot
 Underfull \hbox (badness 5726) in paragraph at lines 11--11
@@ -515,8 +519,9 @@ Overfull \hbox (5.19577pt too wide) in paragraph at lines 84--94
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
 [14] (./figuras/pipeline.tex
-Overfull \hbox (10.75725pt too wide) in paragraph at lines 33--33
- [][]\T1/ppl/b/n/10 TimescaleDB 
+Underfull \hbox (badness 1616) in paragraph at lines 36--36
+\T1/ppl/m/n/10.95 ^^Val-ma-ce-na-mien-to, cua-ren-te-na y re-gis-tro de des-co-
+no-ci-dos^^V pre-ser-van la
 ) (./figuras/despliegue.tex)
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
@@ -540,18 +545,18 @@ Underfull \hbox (badness 1675) in paragraph at lines 17--22
 gu-ra-ción
 
 [18]
-Underfull \hbox (badness 10000) in paragraph at lines 57--65
+Underfull \hbox (badness 10000) in paragraph at lines 57--63
 []\T1/ppl/m/n/12 La ve-ri-fi-ca-ción nu-mé-ri-ca ^^Vsu-man-do pro-gra-má-ti-ca-
 men-te las
 
-Underfull \hbox (badness 2503) in paragraph at lines 57--65
+Underfull \hbox (badness 2503) in paragraph at lines 57--63
 \T1/ppl/m/n/12 es-ti-ma-cio-nes^^V arro-jó el ha-llaz-go de ma-yor con-se-cuen-
 cia prác-ti-ca
 
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
 [19]
-Underfull \hbox (badness 1558) in paragraph at lines 66--69
+Underfull \hbox (badness 1558) in paragraph at lines 64--67
 []\T1/ppl/m/n/12 La dis-tri-bu-ción tem-po-ral tam-bién se co-rri-gió: la asig-
 na-ción ini-cial
 )
@@ -709,7 +714,7 @@ ist/fonts/type1/urw/palatino/uplbi8a.pfb></usr/share/texlive/texmf-dist/fonts/t
 ype1/urw/palatino/uplr8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/pal
 atino/uplr8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/palatino/uplri8
 a.pfb>
-Output written on build/main.pdf (54 pages, 345491 bytes).
+Output written on build/main.pdf (54 pages, 345662 bytes).
 Transcript written on build/main.log.
 Latexmk: Getting log file 'build/main.log'
 Latexmk: Examining 'build/main.fls'
