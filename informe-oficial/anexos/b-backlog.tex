@@ -1,9 +1,9 @@
-\chapter{Backlog completo}
+\chapter[Backlog completo]{Backlog completo}
 \label{anx:backlog}
 \small
 
-Los elementos marcados con \textbf{(N)} pertenecen al núcleo demostrativo y cuentan con criterios
-de aceptación detallados en el documento de backlog del repositorio del proyecto.
+Los elementos marcados \textbf{(N)} pertenecen al núcleo demostrativo. Actualizado al pivote
+del 2 de septiembre.
 
 \section{EP-01 --- Infraestructura y entorno de desarrollo}
 \begin{longtable}{@{}C{1.4cm}L{7.0cm}C{0.9cm}C{1.2cm}C{1.1cm}@{}}
@@ -20,35 +20,35 @@ de aceptación detallados en el documento de backlog del repositorio del proyect
 \textbf{TT-05} & \textbf{(N)}~Diagrama de arquitectura de componentes, con los ocho módulos y sus dependencias & M & 2 & 5 \\
 \textbf{TT-06} & \textbf{(N)}~Diagrama de topología de red con segmentación de dispositivos IoT (RNF-09) y sentido de las conexiones (RNF-10) & M & 2 & 6 \\
 \textbf{TT-07} & \textbf{(N)}~Modelo de datos entidad-relación con al menos ocho entidades & M & 2 & 6 \\
-\textbf{TT-08} & Diagrama de flujo de ingesta, desde la recepción hasta la persistencia, para los tres transportes & M & 2 & 4 \\
+\textbf{TT-08} & Diagrama de flujo de recepción, desde la recepción hasta la persistencia, para los tres transportes & M & 2 & 4 \\
 \textbf{TT-09} & Diagrama de secuencia del aprovisionamiento de un dispositivo nuevo & M & 2 & 3 \\
 \textbf{TT-10} & Registro de decisiones de diseño con su justificación & M & 2 & 2 \\
 \end{longtable}
 
-\section{EP-03 --- Especificación formal del protocolo CID-IoT}
+\section{EP-03 --- Especificación del contrato de trama y adaptadores}
 \begin{longtable}{@{}C{1.4cm}L{7.0cm}C{0.9cm}C{1.2cm}C{1.1cm}@{}}
 \filaencab \encab{ID} & \encab{Elemento} & \encab{Pr.} & \encab{Etapa} & \encab{Horas} \\ \midrule \endhead
-\textbf{TT-11} & \textbf{(N)}~Gramática formal del mensaje en notación ABNF & M & 2 & 3 \\
-\textbf{TT-12} & \textbf{(N)}~Tabla de mapeo completa de señales de sensor a códigos DC-05, con umbrales de disparo y restauración & M & 2 & 6 \\
+\textbf{TT-11} & \textbf{(N)}~Esquema del modelo interno y contrato del tópico MQTT (nombres, unidades, identidad) & M & 2 & 3 \\
+\textbf{TT-12} & \textbf{(N)}~Catálogo de tipos de sensor y unidades aceptadas, con umbrales de disparo y restauración & M & 2 & 6 \\
 \textbf{TT-13} & \textbf{(N)}~Especificación del contrato de la API en OpenAPI, generada desde el código & M & 2 & 3 \\
-\textbf{TT-14} & Política de reintento y confirmación, equivalente funcional del *kissoff* & M & 2 & 2 \\
+\textbf{TT-14} & Política de QoS, reintento y cuarentena & M & 2 & 2 \\
 \textbf{TT-15} & Procedimiento de asignación de identidad y gestión de claves AES por sitio & S & 2 & 2 \\
 \end{longtable}
 
-\section{EP-04 --- Ingesta multiprotocolo}
+\section{EP-04 --- Recepción multiprotocolo}
 \begin{longtable}{@{}C{1.4cm}L{7.0cm}C{0.9cm}C{1.2cm}C{1.1cm}@{}}
 \filaencab \encab{ID} & \encab{Elemento} & \encab{Pr.} & \encab{Etapa} & \encab{Horas} \\ \midrule \endhead
-\textbf{HU-01} & \textbf{(N)}~\textbf{Como integrador}, quiero enviar un evento por HTTP en formato Contact ID, para reportar desde un sensor WiFi sin infraestructura intermedia & M & 2 & 6 \\
+\textbf{HU-01} & \textbf{(N)}~\textbf{Como integrador}, quiero publicar una trama SenML por MQTT o HTTP, para reportar desde un sensor sin infraestructura intermedia & M & 2 & 6 \\
 \textbf{HU-02} & \textbf{(N)}~\textbf{Como integrador}, quiero que mis eventos LoRaWAN lleguen a la plataforma, para aprovechar los nodos de radio ya instalados & M & 3 & 6 \\
 \textbf{HU-03} & \textbf{(N)}~\textbf{Como integrador}, quiero publicar eventos en MQTT, para integrar dispositivos que ya usan ese transporte & M & 3 & 4 \\
-\textbf{TT-16} & \textbf{(N)}~Decodificador y codificador BCD del mensaje de 8 bytes & M & 2 & 3 \\
-\textbf{HU-04} & \textbf{Como integrador}, quiero conectar un panel de alarma existente por DC-09, para incorporarlo sin reemplazarlo & S & 4 & 7 \\
+\textbf{TT-16} & \textbf{(N)}~Validador de esquema SenML y analizador de tramas & M & 2 & 3 \\
+\textbf{HU-04} & \textbf{Como integrador}, quiero un adaptador para un formato no SenML, para demostrar la extensibilidad de la capa de recepción & S & 4 & 7 \\
 \end{longtable}
 
 \section{EP-05 --- Normalización y máquina de estados}
 \begin{longtable}{@{}C{1.4cm}L{7.0cm}C{0.9cm}C{1.2cm}C{1.1cm}@{}}
 \filaencab \encab{ID} & \encab{Elemento} & \encab{Pr.} & \encab{Etapa} & \encab{Horas} \\ \midrule \endhead
-\textbf{TT-17} & \textbf{(N)}~Motor de traducción de señales heterogéneas a códigos DC-05 según la tabla de mapeo & M & 3 & 6 \\
+\textbf{TT-17} & \textbf{(N)}~Pipeline de normalización al modelo interno (los 6 filtros) con cuarentena & M & 3 & 6 \\
 \textbf{HU-05} & \textbf{(N)}~\textbf{Como administrador de sitio}, quiero que la plataforma sepa qué condiciones están abiertas en cada dispositivo, para no tener que deducirlo del historial & M & 3 & 7 \\
 \textbf{HU-06} & \textbf{Como administrador de sitio}, quiero configurar umbrales por dispositivo, para que se genere un evento cuando una medición los cruce & M & 3 & 4 \\
 \textbf{TT-18} & \textbf{(N)}~Normalización de marcas temporales, tolerando nodos sin reloj confiable & M & 3 & 2 \\
@@ -84,7 +84,7 @@ de aceptación detallados en el documento de backlog del repositorio del proyect
 \section{EP-09 --- Seguridad y multi-tenencia}
 \begin{longtable}{@{}C{1.4cm}L{7.0cm}C{0.9cm}C{1.2cm}C{1.1cm}@{}}
 \filaencab \encab{ID} & \encab{Elemento} & \encab{Pr.} & \encab{Etapa} & \encab{Horas} \\ \midrule \endhead
-\textbf{TT-20} & \textbf{(N)}~Autenticación de la ingesta mediante credencial por sitio & M & 3 & 4 \\
+\textbf{TT-20} & \textbf{(N)}~Autenticación de la recepción mediante credencial por sitio & M & 3 & 4 \\
 \textbf{TT-21} & \textbf{(N)}~Aislamiento de datos entre sitios, verificado con pruebas & M & 3 & 5 \\
 \textbf{TT-22} & \textbf{(N)}~Cifrado del transporte: TLS para HTTP y MQTT & M & 3 & 4 \\
 \textbf{HU-18} & \textbf{Como administrador de sitio}, quiero iniciar sesión con mis credenciales y que existan roles distintos de administración y consulta & M & 3 & 3 \\
@@ -119,7 +119,7 @@ de aceptación detallados en el documento de backlog del repositorio del proyect
 \section{EP-13 --- Validación y pruebas}
 \begin{longtable}{@{}C{1.4cm}L{7.0cm}C{0.9cm}C{1.2cm}C{1.1cm}@{}}
 \filaencab \encab{ID} & \encab{Elemento} & \encab{Pr.} & \encab{Etapa} & \encab{Horas} \\ \midrule \endhead
-\textbf{TT-27} & \textbf{(N)}~Pruebas automatizadas del protocolo, incluida la \textbf{validación cruzada} contra la implementación de referencia en Python & M & 3 & 5 \\
+\textbf{TT-27} & \textbf{(N)}~Pruebas automatizadas del contrato de trama (esquema, cuarentena, adaptadores) & M & 3 & 5 \\
 \textbf{TT-28} & \textbf{(N)}~Emulador de nodo por software, que genera eventos y telemetría sintéticos & M & 3 & 5 \\
 \textbf{TT-29} & \textbf{(N)}~Prueba de carga: sostener $\geq$ 50 eventos/segundo sin pérdida (RNF-01) & M & 4 & 4 \\
 \textbf{TT-30} & Prueba de recuperación: ningún evento confirmado se pierde ante reinicio (RNF-05, RNF-06) & M & 4 & 4 \\
@@ -139,16 +139,12 @@ de aceptación detallados en el documento de backlog del repositorio del proyect
 \end{longtable}
 
 \section{Resumen del esfuerzo}
-
 \begin{longtable}{@{}L{7.0cm}C{2.4cm}C{2.4cm}@{}}
 \filaencab \encab{Conjunto} & \encab{Elementos} & \encab{Horas} \\ \midrule \endhead
-Núcleo demostrativo & 33 & \textbf{165} \\
-Alcance condicional & 30 & 110 \\
-\midrule
-\textbf{Total del backlog} & \textbf{63} & \textbf{275} \\
-\midrule
-Presupuesto disponible (15 h/semana) & --- & \textbf{201} \\
+Núcleo demostrativo (tras el pivote) & 33 & $\sim$\textbf{155} \\
+Alcance condicional & 30 & $\sim$110 \\ \midrule
+\textbf{Total del backlog} & \textbf{63} & $\sim$\textbf{265} \\ \midrule
+Presupuesto disponible (calendario oficial) & --- & $\sim$\textbf{240} \\
 \bottomrule
-\caption{Resumen del esfuerzo estimado frente al presupuesto disponible.}
-\label{tab:resumenesfuerzo}
+\caption{Esfuerzo estimado frente al presupuesto. El compromiso es el núcleo.}
 \end{longtable}

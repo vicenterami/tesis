@@ -1,3 +1,7 @@
+> ⚠️ **ACTUALIZADO AL PIVOTE DEL 02/09/2026:** los elementos ligados a Contact ID se reformularon
+> hacia el contrato SenML/MQTT y el pipeline de normalización. Efecto neto: el núcleo baja de 165 h
+> a ~155 h y la holgura mejora.
+
 # Backlog del proyecto
 
 > **Cubre:** criterio 4 de la Etapa 1 (**20 %**) · sustenta el seguimiento de las Etapas 2, 3 y 4
@@ -52,8 +56,8 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 |---|---|---|---|:---:|:---:|
 | **EP-01** | Infraestructura y entorno de desarrollo | — | OE5 | 2 | 14 |
 | **EP-02** | Diseño de arquitectura, red y datos | — | OE3 | 2 | 26 |
-| **EP-03** | Especificación formal del protocolo CID-IoT | M2 | OE2 | 2 | 16 |
-| **EP-04** | Ingesta multiprotocolo | M1 | OE5 | 2 · 3 | 26 |
+| **EP-03** | Especificación del contrato de trama y adaptadores | M2 | OE2 | 2 | 16 |
+| **EP-04** | Recepción multiprotocolo | M1 | OE5 | 2 · 3 | 26 |
 | **EP-05** | Normalización y máquina de estados | M2 | OE5 | 3 | 19 |
 | **EP-06** | Persistencia y consulta | M5 | OE5 | 2 · 3 | 17 |
 | **EP-07** | Inventario y aprovisionamiento | M3 | OE5 | 3 | 15 |
@@ -98,7 +102,7 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 | **TT-05** | 🎯 Diagrama de arquitectura de componentes, con los ocho módulos y sus dependencias | M | 2 | 5 |
 | **TT-06** | 🎯 Diagrama de topología de red con segmentación de dispositivos IoT (RNF-09) y sentido de las conexiones (RNF-10) | M | 2 | 6 |
 | **TT-07** | 🎯 Modelo de datos entidad-relación con al menos ocho entidades | M | 2 | 6 |
-| **TT-08** | Diagrama de flujo de ingesta, desde la recepción hasta la persistencia, para los tres transportes | M | 2 | 4 |
+| **TT-08** | Diagrama de flujo de recepción, desde la recepción hasta la persistencia, para los tres transportes | M | 2 | 4 |
 | **TT-09** | Diagrama de secuencia del aprovisionamiento de un dispositivo nuevo | M | 2 | 3 |
 | **TT-10** | Registro de decisiones de diseño con su justificación | M | 2 | 2 |
 
@@ -111,19 +115,19 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 
 **TT-07 — criterios de aceptación** 🎯
 
-- Incluye al menos: sitio, zona lógica, dispositivo, tipo de dispositivo, evento, condición abierta, medición, usuario, credencial de ingesta.
+- Incluye al menos: sitio, zona lógica, dispositivo, tipo de dispositivo, evento, condición abierta, medición, usuario, credencial de recepción.
 - La identidad del dispositivo admite la tripleta `(ACCT, GG, CCC)` con su restricción de unicidad.
 - Los eventos conservan el mensaje original íntegro junto a su interpretación (RF-31).
 - Las mediciones son una tabla optimizada para series de tiempo, con política de retención definida.
 
-## EP-03 · Especificación formal del protocolo CID-IoT
+## EP-03 · Especificación del contrato de trama y adaptadores
 
 | ID | Elemento | Prior. | Etapa | Horas |
 |---|---|:---:|:---:|:---:|
-| **TT-11** | 🎯 Gramática formal del mensaje en notación ABNF | M | 2 | 3 |
-| **TT-12** | 🎯 Tabla de mapeo completa de señales de sensor a códigos DC-05, con umbrales de disparo y restauración | M | 2 | 6 |
+| **TT-11** | 🎯 Esquema del modelo interno y contrato del tópico MQTT (nombres, unidades, identidad) | M | 2 | 3 |
+| **TT-12** | 🎯 Catálogo de tipos de sensor y unidades aceptadas, con umbrales de disparo y restauración | M | 2 | 6 |
 | **TT-13** | 🎯 Especificación del contrato de la API en OpenAPI, generada desde el código | M | 2 | 3 |
-| **TT-14** | Política de reintento y confirmación, equivalente funcional del *kissoff* | M | 2 | 2 |
+| **TT-14** | Política de QoS, reintento y cuarentena | M | 2 | 2 |
 | **TT-15** | Procedimiento de asignación de identidad y gestión de claves AES por sitio | S | 2 | 2 |
 
 **TT-12 — criterios de aceptación** 🎯
@@ -134,15 +138,15 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 - No se introduce ningún código ajeno al estándar DC-05.
 - Los umbrales incluyen banda de histéresis para evitar oscilación (RF-14).
 
-## EP-04 · Ingesta multiprotocolo
+## EP-04 · Recepción multiprotocolo
 
 | ID | Elemento | Prior. | Etapa | Horas |
 |---|---|:---:|:---:|:---:|
-| **HU-01** | 🎯 **Como integrador**, quiero enviar un evento por HTTP en formato Contact ID, para reportar desde un sensor WiFi sin infraestructura intermedia | M | 2 | **6** |
+| **HU-01** | 🎯 **Como integrador**, quiero publicar una trama SenML por MQTT o HTTP, para reportar desde un sensor sin infraestructura intermedia | M | 2 | **6** |
 | **HU-02** | 🎯 **Como integrador**, quiero que mis eventos LoRaWAN lleguen a la plataforma, para aprovechar los nodos de radio ya instalados | M | 3 | **6** |
 | **HU-03** | 🎯 **Como integrador**, quiero publicar eventos en MQTT, para integrar dispositivos que ya usan ese transporte | M | 3 | **4** |
-| **TT-16** | 🎯 Decodificador y codificador BCD del mensaje de 8 bytes | M | 2 | 3 |
-| **HU-04** | **Como integrador**, quiero conectar un panel de alarma existente por DC-09, para incorporarlo sin reemplazarlo | S | 4 | 7 |
+| **TT-16** | 🎯 Validador de esquema SenML y analizador de tramas | M | 2 | 3 |
+| **HU-04** | **Como integrador**, quiero un adaptador para un formato no SenML, para demostrar la extensibilidad de la capa de recepción | S | 4 | 7 |
 
 **HU-01 — criterios de aceptación** 🎯
 
@@ -159,13 +163,13 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 - El payload de 8 bytes en BCD se decodifica correctamente a los 16 dígitos.
 - RSSI, SNR, identificador del nodo y gateway quedan asociados al evento (RF-09).
 - Un evento recibido por dos gateways se almacena una sola vez (RF-10).
-- Un payload de longitud o contenido inválido se rechaza sin interrumpir la ingesta de los demás (RNF-07).
+- Un payload de longitud o contenido inválido se rechaza sin interrumpir la recepción de los demás (RNF-07).
 
 ## EP-05 · Normalización y máquina de estados
 
 | ID | Elemento | Prior. | Etapa | Horas |
 |---|---|:---:|:---:|:---:|
-| **TT-17** | 🎯 Motor de traducción de señales heterogéneas a códigos DC-05 según la tabla de mapeo | M | 3 | 6 |
+| **TT-17** | 🎯 Pipeline de normalización al modelo interno (los 6 filtros) con cuarentena | M | 3 | 6 |
 | **HU-05** | 🎯 **Como administrador de sitio**, quiero que la plataforma sepa qué condiciones están abiertas en cada dispositivo, para no tener que deducirlo del historial | M | 3 | **7** |
 | **HU-06** | **Como administrador de sitio**, quiero configurar umbrales por dispositivo, para que se genere un evento cuando una medición los cruce | M | 3 | 4 |
 | **TT-18** | 🎯 Normalización de marcas temporales, tolerando nodos sin reloj confiable | M | 3 | 2 |
@@ -238,7 +242,7 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 
 | ID | Elemento | Prior. | Etapa | Horas |
 |---|---|:---:|:---:|:---:|
-| **TT-20** | 🎯 Autenticación de la ingesta mediante credencial por sitio | M | 3 | 4 |
+| **TT-20** | 🎯 Autenticación de la recepción mediante credencial por sitio | M | 3 | 4 |
 | **TT-21** | 🎯 Aislamiento de datos entre sitios, verificado con pruebas | M | 3 | 5 |
 | **TT-22** | 🎯 Cifrado del transporte: TLS para HTTP y MQTT | M | 3 | 4 |
 | **HU-18** | **Como administrador de sitio**, quiero iniciar sesión con mis credenciales y que existan roles distintos de administración y consulta | M | 3 | 3 |
@@ -287,7 +291,7 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 
 | ID | Elemento | Prior. | Etapa | Horas |
 |---|---|:---:|:---:|:---:|
-| **TT-27** | 🎯 Pruebas automatizadas del protocolo, incluida la **validación cruzada** contra la implementación de referencia en Python | M | 3 | 5 |
+| **TT-27** | 🎯 Pruebas automatizadas del contrato de trama (esquema, cuarentena, adaptadores) | M | 3 | 5 |
 | **TT-28** | 🎯 Emulador de nodo por software, que genera eventos y telemetría sintéticos | M | 3 | **5** |
 | **TT-29** | 🎯 Prueba de carga: sostener ≥ 50 eventos/segundo sin pérdida (RNF-01) | M | 4 | 4 |
 | **TT-30** | Prueba de recuperación: ningún evento confirmado se pierde ante reinicio (RNF-05, RNF-06) | M | 4 | 4 |
@@ -390,7 +394,7 @@ Se trasladan de la Etapa 3 a la Etapa 4 los siguientes elementos del núcleo (~3
 
 | Elemento | Horas | Por qué puede esperar |
 |---|:---:|---|
-| **TT-20** Autenticación de ingesta | 4 | La cadena funcional se demuestra antes de endurecerla |
+| **TT-20** Autenticación de recepción | 4 | La cadena funcional se demuestra antes de endurecerla |
 | **TT-21** Aislamiento entre sitios | 5 | Ídem; se valida con pruebas en la Etapa 4 |
 | **TT-22** Cifrado TLS del transporte | 4 | Ídem |
 | **HU-07** Consulta de historial | 4 | El dato se persiste en la Etapa 3; consultarlo puede seguir |
@@ -452,7 +456,7 @@ El orden de ejecución no sigue el número de las épicas, sino tres reglas:
 
 1. **Primero lo que desbloquea:** el entorno (EP-01) y el esquema de datos (TT-19) condicionan todo lo
    demás. Sin ellos ninguna historia puede completarse.
-2. **Después lo que demuestra la tesis:** la cadena ingesta → normalización → supervisión → interfaz
+2. **Después lo que demuestra la tesis:** la cadena recepción → normalización → supervisión → interfaz
    (EP-04, EP-05, EP-08, EP-10). Es el recorrido que un evaluador seguirá en una demostración.
 3. **Al final lo que mejora el producto:** alertas avanzadas, DC-09, API de consulta. Valiosos, pero su
    ausencia no invalida la demostración.

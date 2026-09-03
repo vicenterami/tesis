@@ -1,21 +1,22 @@
 \begin{abstract}
 \addcontentsline{toc}{chapter}{Resumen}
-Las organizaciones que ya poseen sensores IoT no logran convertir sus datos en información
-utilizable: cada dispositivo emplea un formato distinto, las plataformas comerciales operan solo
-con el hardware de su proveedor, y no existe visibilidad del estado de la conectividad. Este
-trabajo propone una plataforma web abierta que unifica la ingesta, normalización y gestión de
-datos de sensores heterogéneos —LoRaWAN, WiFi/HTTP y MQTT— mediante un protocolo de comunicación
-basado en el estándar de industria Contact ID (ANSI/SIA DC-05) sobre transporte DC-09, reutilizando
-el vocabulario normalizado de supervisión de dispositivos inalámbricos que la industria de la
-seguridad electrónica estandarizó hace décadas. Esta primera etapa define el problema mediante un
-árbol de causas y efectos, formula seis objetivos específicos bajo criterios SMART con matriz de
-trazabilidad, cataloga 68 requerimientos justificados por fuente, evalúa ocho alternativas de
-protocolo mediante una matriz de criterios ponderados —verificando empíricamente tamaños de
-mensaje y sumas de comprobación con una implementación propia— y construye un backlog de 63
-elementos cuya verificación numérica de viabilidad delimitó el compromiso al núcleo demostrativo
-de 165 horas.
+Las organizaciones de La Araucanía que ya poseen sensores no logran convertir sus datos en
+información utilizable: cada dispositivo emite tramas con formatos distintos, las plataformas
+comerciales operan solo con el hardware de su proveedor, y no existe visibilidad del estado de la
+conectividad. Este trabajo desarrolla una plataforma web para el registro, monitoreo y gestión de
+sensores que recibe tramas de telemetría continua a través de TCP/IP —con MQTT como vía principal y
+HTTP como vía secundaria—, las normaliza a un modelo interno único mediante un pipeline de seis
+filtros con cuarentena y adaptadores por formato, almacena las mediciones como series de tiempo,
+supervisa el estado de cada dispositivo y presenta la información en un panel de control. El
+contrato nativo de entrada es el estándar abierto SenML (RFC 8428). Esta primera etapa define el
+problema mediante un árbol de causas y efectos, formula un objetivo general y cinco específicos con
+matriz de trazabilidad, cataloga 68 requerimientos justificados por fuente, evalúa cinco mecanismos
+de transporte y cuatro formatos de trama mediante matrices de criterios ponderados —documentando
+además el descarte fundamentado del protocolo Contact ID evaluado en la fase previa— y construye un
+backlog de 63 elementos cuya verificación numérica delimitó el compromiso al núcleo demostrativo.
 
 {\bf Palabras Clave:}
-Internet de las Cosas, interoperabilidad, Contact ID, SIA DC-05, LoRaWAN, gestión de red, PPDIOO.
+Internet de las Cosas, monitoreo de sensores, telemetría, MQTT, SenML, normalización de tramas,
+series de tiempo, La Araucanía.
 \end{abstract}
 \clearpage

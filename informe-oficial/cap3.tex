@@ -3,137 +3,142 @@
 
 \section{Metodología del levantamiento}
 
-Cada requerimiento declara su fuente: \textbf{[PO]} solicitud de la organización destinataria —«propietario del proyecto» en la terminología de la rúbrica— (indicaciones
-de la universidad vía profesor guía), \textbf{[EM]} estudio de mercado, \textbf{[BT]} base teórica
-(estándares SIA, LoRaWAN RP002, ISO/IEC 25010 \parencite{iso25010}, RFC 8428, SWEBOK
-\parencite{swebok}) y \textbf{[DP]} derivación del problema. \textbf{Brecha declarada:} falta la fuente
-[ENT], entrevistas directas; hasta realizarlas, los requerimientos [PO] se sustentan en la indicación
-transmitida y no en levantamiento directo. Su cierre es la acción prioritaria del período.
+Cada requerimiento declara su fuente: \textbf{[PO]} solicitud de la organización destinataria
+—«propietario del proyecto» en la terminología de la rúbrica— vía profesor guía; \textbf{[EM]}
+estudio de mercado; \textbf{[BT]} base teórica (RFC 8428, ISO/IEC 25010 \parencite{iso25010}, SWEBOK
+\parencite{swebok}); \textbf{[DP]} derivación del problema. \textbf{Brecha declarada:} falta la
+fuente [ENT], entrevistas directas; su cierre es la acción prioritaria del período.
 
 \section{Síntesis del catálogo}
 
-Se catalogaron \textbf{68 requerimientos} —52 funcionales en ocho módulos y 16 no funcionales
-clasificados según ISO/IEC 25010— con prioridad MoSCoW: 49 \emph{Must}, 16 \emph{Should}, 3
-\emph{Could}. El catálogo completo, con enunciado, fuente, causa y prioridad de cada uno, está en el
-anexo~\ref{anx:requerimientos}.
+Se catalogan \textbf{68 requerimientos} —52 funcionales en ocho módulos y 16 no funcionales según
+ISO/IEC 25010— con prioridad MoSCoW (49 \emph{Must}, 16 \emph{Should}, 3 \emph{Could}). El catálogo
+completo está en el anexo~\ref{anx:requerimientos}.
 
 \begin{table}[H]
-\centering\small
-\begin{tabular}{@{}clcl@{}}
+\centering\footnotesize
+\begin{tabular}{@{}cL{6.2cm}cL{3.2cm}@{}}
 \toprule
 \textbf{Módulo} & \textbf{Responsabilidad} & \textbf{Req.} & \textbf{Causas} \\
 \midrule
-M1 & Ingesta multiprotocolo & 10 & C1, C2 \\
-M2 & Normalización de eventos y telemetría & 7 & C1, C5 \\
-M3 & Inventario y aprovisionamiento & 6 & C4, C5 \\
-M4 & Supervisión de salud de enlace & 7 & \textbf{C5} \\
-M5 & Persistencia y consulta & 5 & C1, C3, C4 \\
+M1 & Recepción multiprotocolo (MQTT, HTTP, adaptadores) & 10 & C1, C2 \\
+M2 & Normalización al modelo interno (el pipeline) & 7 & C1, C5 \\
+M3 & Registro y aprovisionamiento de dispositivos & 6 & C4, C5 \\
+M4 & Supervisión de salud (¿quién dejó de reportar?) & 7 & \textbf{C5} \\
+M5 & Persistencia y consulta de series de tiempo & 5 & C1, C3, C4 \\
 M6 & Alertas y notificación & 4 & C5 \\
 M7 & Seguridad, identidad y multi-tenencia & 7 & C1, C3, C4 \\
-M8 & Interfaz de administración & 6 & C1, C2, C4, C5 \\
+M8 & Panel de control (la vista, no el todo) & 6 & C1, C2, C4, C5 \\
 \bottomrule
 \end{tabular}
-\caption{Módulos de la solución. Ninguna causa queda sin requerimientos y ningún requerimiento carece
-de causa declarada.}
+\caption{Módulos de la solución. El panel es uno de ocho módulos: la sustancia de ingeniería está en
+M1--M7.}
 \label{tab:modulos}
 \end{table}
 
-Cuatro requerimientos anclan el trabajo al dominio de redes: \textbf{RNF-09} (dispositivos IoT en
-segmento separado con acceso restringido), \textbf{RNF-10} (ninguna conexión entrante hacia los
-dispositivos: siempre salientes, lo que resuelve NAT y cortafuegos), \textbf{RNF-12} (añadir un
-transporte requiere solo un adaptador) y \textbf{RNF-16} (el mensaje cabe en el payload más restrictivo
-de LoRaWAN, verificado: 8 bytes en 11 disponibles). Y seis sustentan la diferenciación frente a la
-oferta regional, en particular \textbf{RF-04} (receptor DC-09 nativo: ingiere paneles de alarma ya
-instalados sin adaptador) y \textbf{RF-34} (exportación en formato abierto: una plataforma que se
-declara abierta y no permite retirar los datos reproduce el problema que pretende resolver).
+Requerimientos que anclan el trabajo al dominio de redes: \textbf{RNF-09} (dispositivos en segmento
+de red separado), \textbf{RNF-10} (solo conexiones salientes desde los nodos), \textbf{RNF-12}
+(añadir una vía de recepción no modifica el núcleo) y \textbf{RNF-16} (la trama nativa cumple SenML).
+Y los que sustentan la diferenciación: \textbf{RF-04} (adaptadores por formato), \textbf{RF-24/27/30}
+(supervisión de salud) y \textbf{RF-34} (exportación en formato abierto).
 
-\section{Evaluación de alternativas de protocolo}
-\label{sec:protocolo}
+\section{Evaluación del mecanismo de transporte}
+\label{sec:transporte}
 
-Se evaluaron \textbf{ocho alternativas} sobre seis criterios ponderados según las causas del problema y
-las restricciones físicas del enlace (tabla~\ref{tab:matriz}). Los pesos: compacidad 25\,\% (el payload
-LoRaWAN puede descender a 11 bytes), normalización semántica 20\,\% (es la causa C1),
-interoperabilidad con lo instalado 15\,\%, seguridad del transporte 15\,\%, telemetría con valor
-10\,\% y costo en nodo restringido 15\,\%.
+Cinco alternativas sobre seis criterios. Los pesos derivan del problema: la plataforma debe saber
+qué llegó y qué no (25\,\%), detectar dispositivos caídos (20\,\%, causa C5), exigir poco al nodo
+(20\,\%, lo implementa el compañero), integrarse con poco esfuerzo al backend (15\,\%), pesar poco
+por mensaje (10\,\%, la objeción a las cabeceras) y funcionar tras NAT sin abrir puertos (10\,\%,
+RNF-10).
 
 \begin{table}[H]
-\centering\small\setlength{\tabcolsep}{3pt}
-\begin{tabular}{@{}L{4.4cm}C{1.0cm}C{1.0cm}C{1.0cm}C{1.0cm}C{1.0cm}C{1.0cm}C{1.2cm}@{}}
+\centering\footnotesize\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}L{3.3cm}C{1.5cm}C{1.6cm}C{1.4cm}C{1.5cm}C{1.5cm}C{1.3cm}C{1.1cm}@{}}
 \toprule
-\textbf{Alternativa} & \textbf{C-A} & \textbf{C-B} & \textbf{C-C} & \textbf{C-D} & \textbf{C-E} & \textbf{C-F} & \textbf{Total} \\
- & 25\,\% & 20\,\% & 15\,\% & 15\,\% & 10\,\% & 15\,\% & \\
+ & \textbf{Entrega confiable} & \textbf{Detecta caídos} & \textbf{Costo en nodo} & \textbf{Facilidad backend} & \textbf{Sobrecarga mensaje} & \textbf{Tras NAT} & \textbf{Total} \\
+ & 25\,\% & 20\,\% & 20\,\% & 15\,\% & 10\,\% & 10\,\% & \\
 \midrule
-MQTT + JSON ad hoc & 1 & 1 & 3 & 4 & 5 & 3 & 2,45 \\
-CoAP (RFC 7252) & 4 & 1 & 2 & 4 & 4 & 3 & 2,95 \\
-SenML (RFC 8428) & 3 & 3 & 2 & 2 & 5 & 3 & 2,90 \\
-Sparkplug B & 2 & 4 & 3 & 4 & 5 & 2 & 3,15 \\
-LwM2M (OMA) & 3 & 4 & 3 & 5 & 5 & 2 & 3,55 \\
-CayenneLPP & 5 & 2 & 2 & 3 & 4 & 5 & 3,55 \\
-SIA DC-03 & 3 & 5 & 5 & 4 & 4 & 3 & 3,95 \\
-\textbf{Contact ID + DC-09} & \textbf{5} & \textbf{5} & \textbf{5} & \textbf{4} & \textbf{4} & \textbf{5} & \textbf{4,75} \\
+\textbf{MQTT} & \textbf{5} & \textbf{5} & 4 & \textbf{5} & \textbf{5} & \textbf{5} & \textbf{4,85} \\
+HTTP/REST & 3 & 2 & 4 & \textbf{5} & 2 & \textbf{5} & 3,45 \\
+CoAP & 3 & 2 & 4 & 2 & \textbf{5} & 4 & 3,05 \\
+WebSocket & 2 & 3 & 3 & 3 & 4 & \textbf{5} & 3,05 \\
+Socket TCP propio & 1 & 2 & \textbf{5} & 1 & \textbf{5} & \textbf{5} & 2,60 \\
 \bottomrule
 \end{tabular}
-\caption{Matriz comparativa ponderada (escala 1--5). El detalle de puntuaciones y descartes está en el
-anexo~\ref{anx:protocolo} y en el repositorio.}
-\label{tab:matriz}
+\caption{Evaluación del mecanismo de transporte (escala 1--5). Los pros y contras en palabras de
+cada alternativa están en el anexo~\ref{anx:evaluacion}.}
+\label{tab:transporte}
 \end{table}
 
-Tres descartes merecen mención. \textbf{MQTT+JSON ad hoc es el problema, no la solución}: cada
-implementación define sus campos (causa C1) y un objeto típico ocupa 60--150 bytes. \textbf{LwM2M} es
-técnicamente la pila más completa, pero su vocabulario no es el de la industria instalada y su costo en
-nodos mínimos es alto. \textbf{SIA DC-03} es la alternativa más cercana —admite valores nativamente e
-incluye el código \texttt{XL} (señal débil) sin equivalente en Contact ID— pero sus mensajes son de 15
-a 25 bytes y su sintaxis exacta para valores no pudo verificarse por ser el estándar de pago; queda
-como alternativa preferente si la restricción de compacidad se relajara.
+\textbf{Decisión:} MQTT como vía principal —QoS y \emph{Last Will} resuelven de fábrica la entrega
+confiable y la detección de caída— y HTTP/REST como vía secundaria para integraciones. El navegador
+nunca toca MQTT: consulta la API REST del backend. El socket TCP propio se descarta explícitamente:
+lograría la mínima sobrecarga a costa de reinventar sesiones, confirmaciones y formato.
 
-\textbf{Decisión.} Se adopta Contact ID (DC-05) sobre DC-09 como protocolo único del perfil. El mensaje
-DC-05 no transporta valores medidos, pero \textbf{DC-09 define un campo de datos extendidos}
-\texttt{[<A--Z><datos ASCII>]} cuyo formato determina el implementador: la medición viaja ahí, de modo
-que \textbf{el nodo emite un solo mensaje y el firmware implementa una sola rutina}. La separación
-entre eventos (entrega confirmada) y telemetría (pérdida tolerable) se conserva como separación lógica
-en la plataforma (figura~\ref{fig:dosplanos}). Verificado con la implementación propia
-(anexo~\ref{anx:protocolo}): evento solo, 8 bytes; con valor, 13--19 bytes — por lo que el valor es
-opcional y en el enlace de máximo alcance se transmite solo el evento.
+\section{Evaluación del formato de trama}
 
-\input{figuras/dosplanos}
+\begin{table}[H]
+\centering\footnotesize
+\begin{tabular}{@{}L{2.6cm}L{4.6cm}L{5.6cm}@{}}
+\toprule
+\textbf{Alternativa} & \textbf{A favor} & \textbf{En contra} \\
+\midrule
+JSON libre & Flexible, universal & \textbf{Reproduce la causa C1}: cada fuente con sus campos \\
+\textbf{SenML (RFC 8428)} & Estándar IETF abierto; identidad, unidades y tiempo resueltos; legible & Algo más extenso que un JSON ad hoc \\
+Binario propio & Mínimo peso & Indocumentado, difícil de depurar; solo se justifica en radio \\
+CBOR & Compacto y estándar & Ilegible a ojo; librería adicional en el nodo \\
+\bottomrule
+\end{tabular}
+\caption{Evaluación del formato de trama.}
+\label{tab:formato}
+\end{table}
 
-Conviene precisar la relación entre transportes: \textbf{DC-09 es un formato de internet; un nodo
-LoRa no lo genera}. En el aire el nodo emite únicamente el evento de 8 bytes seguido, si corresponde,
-de los bytes del valor; la plataforma lo recibe a través del servidor de red y MQTT, separa ambos planos
-y, solo cuando debe reenviar a una central de alarmas externa, compone el mensaje DC-09 con el valor en
-su campo de datos extendidos (figura~\ref{fig:envolturas}). El sensor nunca se suscribe a nada:
-\textbf{emite}; suscribirse es tarea de la plataforma. El formato exacto de los bytes del valor en el
-aire —ASCII como en DC-09 o binario compacto— se fija en la Etapa 2 junto con quien implemente el
-firmware.
+\textbf{Decisión:} \textbf{SenML como contrato nativo}. Lo que no llegue en SenML entra mediante
+\textbf{adaptadores por formato} (uno por formato de fuente, no por sensor); la trama malformada de
+un dispositivo conocido va a \textbf{cuarentena} —cruda, con su motivo, sin contaminar las series—;
+el dispositivo no registrado se \textbf{rechaza y se registra el intento}. Este es el mismo patrón
+de entrada que aplica ThingsBoard con su formato propio \parencite{thingsboardmqtt}; la diferencia
+es que aquí el contrato nativo es un estándar abierto.
 
-\input{figuras/envolturas}
+\section{Arquitectura de recepción y frontera del trabajo}
+\label{sec:frontera}
 
-Las tres vías de ingesta (LoRaWAN vía servidor de red; DC-09 nativo para paneles instalados; HTTP para
-sensores WiFi e integraciones) convergen a un único formato normalizado (figura~\ref{fig:ingesta}).
+El aporte central es el \textbf{pipeline de tratamiento de tramas} (figura~\ref{fig:pipeline}):
+seis filtros independientes y verificables por separado. La identificación de dispositivos combina
+el \textbf{registro} (al dar de alta: identidad, tipo, ubicación, credencial) con la
+\textbf{autoidentificación} de cada trama (el campo \texttt{bn}); el filtro de validación cruza
+ambos.
 
-\input{figuras/ingesta}
+\input{figuras/pipeline}
 
-\section{Evaluación de alternativas de infraestructura}
+El despliegue completo corre como contenedores en un único servidor (figura~\ref{fig:despliegue}),
+con reinicio automático ante fallas. \textbf{La frontera con el trabajo del compañero es el tópico
+MQTT}: todo lo anterior (sensor, nodo, radio) es de él; todo lo posterior (broker, pipeline, base de
+datos, API, panel), de este trabajo. Un \textbf{emulador de nodo} publica tramas en el mismo tópico,
+de modo que la validación de la plataforma no depende del hardware ni de terceros.
+
+\input{figuras/despliegue}
+
+\section{Evaluación de infraestructura}
 \label{sec:infra}
 
 \begin{table}[H]
-\centering\small
-\begin{tabular}{@{}L{2.6cm}L{2.4cm}L{7.6cm}@{}}
+\centering\footnotesize
+\begin{tabular}{@{}L{2.4cm}L{2.4cm}L{7.6cm}@{}}
 \toprule
 \textbf{Componente} & \textbf{Selección} & \textbf{Razón determinante frente a alternativas} \\
 \midrule
-Servidor de red LoRaWAN & ChirpStack & Autoalojable y publica en MQTT nativo; la red pública TTN haría transitar los datos por terceros \\
-Persistencia & TimescaleDB & Un solo motor relacional y de series de tiempo; InfluxDB obligaría a operar dos bases, inviable en un proyecto unipersonal \\
-Broker MQTT & Mosquitto & Proporcionalidad: EMQX está sobredimensionado a esta escala \\
-Despliegue & Contenedores & La Etapa 4 exige demostrar en condiciones realistas: levantar todo con un comando es esa evidencia \\
-Aplicación & TypeScript + NestJS & Matriz de 5 alternativas y 7 criterios (4,70): sus módulos corresponden 1:1 con M1--M8, y un solo lenguaje permite definir los tipos del evento una única vez \\
+Broker MQTT & Mosquitto & C, $\sim$10\,MB de RAM, TLS y autenticación; EMQX/HiveMQ apuntan a millones de conexiones: desproporcionados \\
+Persistencia & TimescaleDB & Un solo motor relacional y de series; InfluxDB obligaría a operar dos bases \\
+Backend & TypeScript + NestJS & Tipos de la trama definidos una sola vez para backend y panel; módulos 1:1 con M1--M8; OpenAPI automático \\
+Rama LoRa & ChirpStack & Autoalojable; publica en MQTT: converge a la vía principal \\
+Despliegue & Contenedores Docker & Reproducible con un comando; reinicio automático; la Etapa 4 exige demostrar en condiciones realistas \\
 \bottomrule
 \end{tabular}
-\caption{Decisiones de infraestructura. Las matrices completas están en el repositorio
-(\texttt{docs/02-requerimientos.md}).}
+\caption{Decisiones de infraestructura. Las matrices completas están en el repositorio.}
 \label{tab:infra}
 \end{table}
 
-\textbf{Restricciones:} RE-01 dedicación de ~15 horas semanales (jornada laboral completa); RE-02
-proyecto unipersonal; RE-03 sin licencias de pago; RE-04 banda AU915/US915; RE-05 umbral de aprobación
-del 70\,\%; RE-06 hardware no confirmado (mitigado con emulación por software).
+\textbf{Restricciones:} RE-01 dedicación $\sim$15 h semanales; RE-02 proyecto individual coordinado
+con el trabajo del compañero; RE-03 solo componentes abiertos; RE-05 umbral de aprobación del
+70\,\%; RE-06 hardware no confirmado, mitigado con el emulador.

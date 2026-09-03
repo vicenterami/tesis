@@ -3,137 +3,136 @@
 
 \section{Problema}
 
-La Región de La Araucanía concentra actividad agrícola, agroindustrial y pymes productivas con
-instalaciones dispersas donde el monitoreo remoto tiene valor operativo directo. La adquisición de
-sensores dejó de ser una barrera: un nodo con radio de largo alcance cuesta entre 5 y 30 dólares y la
-banda de 915--928\,MHz es de uso libre en Chile. La dificultad se desplazó hacia el destino de los
-datos.
+La Región de La Araucanía concentra actividad agrícola, agroindustrial y pymes con instalaciones
+dispersas donde el monitoreo remoto tiene valor operativo directo. Adquirir sensores dejó de ser la
+barrera: un nodo con radio cuesta entre 5 y 30 dólares y la banda de 915--928\,MHz es de uso libre
+en Chile. La dificultad se desplazó hacia el destino de los datos: el patrón dominante es la
+\textbf{telemetría continua} —lecturas cada 5 a 30 minutos— que debe recibirse, entenderse,
+almacenarse y vigilarse.
 
 \begin{quote}
-\textbf{Problema central:} las organizaciones que ya poseen sensores IoT no logran convertir los datos
-que estos generan en información utilizable, porque carecen de una plataforma que unifique la ingesta,
-la normalización y la gestión de dispositivos que se comunican mediante tecnologías y formatos
-distintos entre sí.
+\textbf{Problema central:} las organizaciones que ya poseen sensores no logran convertir los datos
+que estos generan en información utilizable, porque carecen de una plataforma que unifique la
+recepción, la normalización y la gestión de dispositivos que emiten tramas con formatos distintos.
 \end{quote}
 
-El análisis identifica cinco causas: \textbf{C1} fragmentación de protocolos y formatos; \textbf{C2}
-acoplamiento entre hardware y plataforma; \textbf{C3} costo y dependencia de plataformas comerciales;
-\textbf{C4} ausencia de capacidad técnica interna; y \textbf{C5} falta de visibilidad del estado de la
-conectividad --- \emph{el silencio de un sensor es indistinguible de la ausencia de novedades}. Sus
-efectos observables van desde la inversión inmovilizada (E1) hasta la dependencia de proveedor (E5),
-según muestra la figura~\ref{fig:arbol}.
+El análisis identifica cinco causas: \textbf{C1} fragmentación de formatos de trama entre
+fabricantes; \textbf{C2} acoplamiento entre hardware y plataforma; \textbf{C3} costo y dependencia
+de plataformas comerciales en la nube; \textbf{C4} ausencia de capacidad técnica interna; y
+\textbf{C5} falta de visibilidad del estado de la conectividad --- \emph{el silencio de un sensor es
+indistinguible de la ausencia de novedades}. La figura~\ref{fig:arbol} muestra el árbol completo de
+causas y efectos.
 
 \input{figuras/arbol}
 
-La \textbf{Universidad Católica de Temuco} es la organización destinataria y parte interesada principal
-—lo que la rúbrica del curso denomina «propietario del proyecto» en el sentido de dueño del problema, no
-del trabajo—: dispone de sensores desplegados y requiere un destino para sus datos, según lo transmitido
-por el profesor guía (reunión del 17/08/2026). El levantamiento
-directo con las partes interesadas está pendiente y constituye la acción prioritaria del período; esta
-brecha se declara en lugar de omitirse.
+La \textbf{Universidad Católica de Temuco} es la organización destinataria y parte interesada
+principal —lo que la rúbrica denomina «propietario del proyecto» en el sentido de dueño del
+problema, no del trabajo—: dispone de sensores y requiere una plataforma donde registrarlos y
+monitorearlos, según lo transmitido por el profesor guía. El levantamiento directo con las partes
+interesadas está pendiente y es la acción prioritaria del período; la brecha se declara en lugar de
+omitirse.
 
-\textbf{Delimitación.} El trabajo abarca la plataforma de ingesta, normalización, almacenamiento y
-gestión; la especificación del protocolo sensor--plataforma; adaptadores para al menos dos transportes;
-el diseño de red asociado (segmentación, seguridad, salud del enlace) y la validación con sensores
-reales. Excluye la fabricación de sensores, el firmware de grado comercial, la analítica predictiva y
-el despliegue productivo a escala.
+\textbf{Delimitación.} El trabajo abarca la plataforma: recepción de tramas por MQTT y HTTP,
+normalización a un modelo interno, almacenamiento de series de tiempo, supervisión del estado de los
+dispositivos, alertas y panel de control, junto con el diseño de red y despliegue asociados. La
+electrónica de los nodos y la rama de radio LoRa corresponden al trabajo coordinado de un compañero;
+\textbf{la frontera contractual es el tópico MQTT} donde se publican las tramas
+(sección~\ref{sec:frontera}), y un emulador de nodo garantiza que la validación de esta plataforma
+no dependa del hardware. Quedan fuera la fabricación de sensores, la analítica predictiva y el
+despliegue productivo a escala.
 
 \section{Estado del arte}
 
-\textbf{Oferta regional.} Se identifican dos actores en La Araucanía: \textbf{IoT3}
-\parencite{iot3web}, monitoreo y automatización llave en mano con fuerte presencia agrícola, y
-\textbf{ControlTec} \parencite{controltecweb}, telemetría industrial inalámbrica supervisada desde el
-móvil. Ambos comercializan la solución completa acoplada a su propio hardware: un sensor ya instalado
-de otra marca no se integra. Ninguno ofrece la \textbf{capa de gestión desacoplada del equipamiento},
-que es el espacio que este trabajo aborda.
+\textbf{Oferta regional.} IoT3 \parencite{iot3web} y ControlTec \parencite{controltecweb} ofrecen
+monitoreo llave en mano acoplado a su propio hardware: un sensor ya instalado de otra marca no se
+integra. \textbf{Verticales nacionales.} Instacrops \parencite{instacropsweb} y WiseConn
+\parencite{wiseconnweb} son plataformas agrícolas chilenas maduras, también con hardware y
+suscripción propios, orientadas a fruticultura de exportación. \textbf{SaaS internacionales.}
+Ubidots y ThingSpeak cobran por dispositivo y alojan los datos fuera del país.
 
-\textbf{El sector de las alarmas monitoreadas} resolvió hace décadas la supervisión de flotas de
-sensores inalámbricos a batería y estandarizó su vocabulario en el protocolo abierto Contact ID
-\parencite{siadc05}, hoy transportado sobre IP mediante el estándar DC-09 \parencite{siadc09}.
-Operadores como Verisure combinan además canales redundantes de radio ante interferencia
-\parencite{verisuresigfox}. Sin embargo, el sector lo aplica dentro de sistemas cerrados y verticalmente
-integrados —el cliente no puede retirar sus datos ni incorporar hardware de terceros—, lo que
-constituye precisamente las causas C2 y C3 del problema.
+\textbf{El referente de código abierto es ThingsBoard} \parencite{thingsboardmqtt}: plataforma IoT
+autoalojable con paneles, reglas y soporte MQTT/HTTP/CoAP. Se evaluó como posible base de este
+trabajo y se descartó con tres razones: exige recursos considerables (Java, 4\,GB o más de memoria
+recomendada), su configuración —cadenas de reglas, decodificadores de carga útil— requiere personal
+técnico que las organizaciones destinatarias no poseen (precisamente la causa C4), y su interfaz y
+documentación están en inglés. Conviene notar que ThingsBoard aplica el mismo patrón de entrada que
+esta plataforma: exige su propio formato JSON (\texttt{\{"ts","values"\}}) en su tópico
+\texttt{v1/devices/me/telemetry}, y todo formato distinto requiere conversores
+\parencite{thingsboardmqtt}. La diferencia de este trabajo es que su contrato nativo es un
+\textbf{estándar IETF} y no un formato definido por el producto. Por último, el trío Node-RED +
+InfluxDB + Grafana permite prototipos de monitoreo, pero es un conjunto de piezas y no un producto:
+sin aprovisionamiento de dispositivos ni modelo de usuarios coherente, cada instalación resulta
+artesanal.
 
-\textbf{Protocolos de aplicación IoT.} La literatura ofrece protocolos compactos que no normalizan
-semántica de eventos (CayenneLPP), formatos de medición sin vocabulario de estado de dispositivo (SenML,
-RFC~8428 \parencite{rfc8428}) y pilas completas de gestión cuyo costo en nodos restringidos es alto
-(LwM2M \parencite{lwm2m}). El capítulo~\ref{cap:especificacion} evalúa ocho alternativas; el hallazgo
-central es que \textbf{ninguna combina compacidad extrema con vocabulario semántico normalizado}, salvo
-el protocolo histórico de la industria de alarmas.
+En la fase previa de este mismo trabajo se evaluó como eje el protocolo de la industria de alarmas
+Contact ID (SIA DC-05); el profesor guía lo descartó por estar orientado a eventos discretos y no a
+telemetría continua. El análisis completo y las razones quedan documentados en el
+anexo~\ref{anx:contactid} como evidencia del camino evaluado.
 
 \section{Objetivos}
-
 \subsection{Objetivo general}
 \begin{itemize}
-\item Diseñar, implementar y validar una plataforma web abierta para la gestión de datos de redes de
-sensores IoT heterogéneas, que unifique la ingesta mediante un protocolo de comunicación basado en el
-estándar Contact ID (SIA DC-05), aplicando la metodología PPDIOO, de modo que una organización que ya
-posee sensores de distintas tecnologías pueda centralizar, normalizar y administrar sus datos desde una
-única interfaz, validada sobre un caso de uso con sensores reales al término del semestre 2026.
+\item Desarrollar una plataforma web para el registro, monitoreo y gestión de sensores en La
+Araucanía, que reciba las tramas de distintos sensores a través de TCP/IP, las normalice a un modelo
+interno único, almacene las mediciones como series de tiempo, supervise el estado de cada
+dispositivo y presente la información en un panel de control, validada con un caso de uso con
+sensores reales al término del semestre académico 2026.
 \end{itemize}
 
 \subsection{Objetivos específicos}
-
-Cada objetivo explicita qué se hará, mediante qué método y qué resultado verificable produce, conforme
-a la indicación del profesor guía. El desglose SMART completo, con indicadores numéricos por criterio,
-se incluye en el repositorio del proyecto (\texttt{docs/01-problema-y-objetivos.md}).
-
 \begin{itemize}
 \item \textbf{OE1} — Caracterizar la situación de gestión de datos de sensores en la organización
 destinataria, mediante entrevistas semiestructuradas, revisión de literatura y análisis de la oferta
-regional, para obtener un catálogo de requerimientos íntegramente trazable a las causas del problema,
-al 4 de septiembre de 2026.
-\item \textbf{OE2} — Especificar el protocolo sensor--plataforma basado en Contact ID, mediante
-análisis comparativo ponderado y la definición de un perfil de aplicación con su mapeo de códigos, para
-obtener la gramática del mensaje, la tabla de equivalencias y el contrato de la interfaz, al 2 de
-octubre de 2026.
-\item \textbf{OE3} — Diseñar la arquitectura de la plataforma y su red de soporte, mediante la fase
-\emph{Design} de PPDIOO y notaciones estándar, para obtener diagramas, modelo de datos y especificación
-de seguridad que cubran la totalidad de los requerimientos, al 2 de octubre de 2026.
-\item \textbf{OE4} — Determinar el modelo de despliegue y el costo de operación, mediante la
-comparación ponderada de al menos tres alternativas de alojamiento, para obtener una recomendación con
-costo mensual y anual cuantificado, al 2 de octubre de 2026.
-\item \textbf{OE5} — Implementar la plataforma y sus adaptadores multiprotocolo, mediante desarrollo
-incremental guiado por el backlog y versionado en git, para obtener un prototipo funcional con al menos
-dos transportes operativos, al 4 de diciembre de 2026, con 50\,\% verificable al 30 de octubre.
-\item \textbf{OE6} — Validar la plataforma en condiciones que replican el entorno operativo, mediante
-pruebas funcionales, de carga y de recuperación con comparaciones antes/después, para obtener un
-informe de validación que acredite el cumplimiento de los requerimientos, al 4 de diciembre de 2026.
+nacional e internacional, para obtener un catálogo de requerimientos íntegramente trazable a las
+causas del problema, al 4 de septiembre de 2026.
+\item \textbf{OE2} — Evaluar y seleccionar el mecanismo de transporte y el formato de trama, y
+especificar el contrato de entrada con sus adaptadores y política de cuarentena, mediante matrices
+de criterios ponderados, para obtener el documento de especificación de la capa de recepción, al 2
+de octubre de 2026.
+\item \textbf{OE3} — Diseñar la arquitectura de la plataforma, su modelo de datos y su despliegue
+con costo cuantificado, mediante la fase \emph{Design} de PPDIOO y la comparación de al menos tres
+alternativas de alojamiento, para obtener los diagramas, el modelo y la recomendación justificada,
+al 2 de octubre de 2026.
+\item \textbf{OE4} — Implementar la plataforma —recepción por MQTT y HTTP, pipeline de
+normalización, almacenamiento, supervisión y panel—, mediante desarrollo incremental guiado por el
+backlog y versionado en git, para obtener un prototipo funcional con al menos dos vías de recepción
+operativas y un sensor real de extremo a extremo, al 4 de diciembre de 2026, con el 50\,\%
+verificable al 30 de octubre.
+\item \textbf{OE5} — Validar la plataforma en condiciones que replican el entorno operativo,
+mediante pruebas funcionales, de carga y de recuperación con comparaciones antes y después, para
+obtener un informe de validación que acredite el cumplimiento de los requerimientos, al 4 de
+diciembre de 2026.
 \end{itemize}
 
 \begin{table}[H]
 \centering\footnotesize
-\begin{tabular}{@{}L{3.8cm}L{2.4cm}L{1.4cm}L{2.5cm}C{0.9cm}@{}}
+\begin{tabular}{@{}L{4.4cm}L{2.2cm}L{1.5cm}L{2.6cm}C{1.0cm}@{}}
 \toprule
 \textbf{Objetivo} & \textbf{Causas} & \textbf{Efectos} & \textbf{Fase PPDIOO} & \textbf{Etapa} \\
 \midrule
 OE1 Caracterizar y levantar & C4 (diagnostica C1--C5) & E1, E3 & Prepare & 1 \\
-OE2 Especificar el protocolo & \textbf{C1} & E2, E5 & Plan, Design & 2 \\
-OE3 Diseñar arquitectura y red & C2, C5 & E2, E4 & Design & 2 \\
-OE4 Despliegue y costo & \textbf{C3} & E1, E5 & Plan & 2 \\
-OE5 Implementar la plataforma & C1, C2, C4 & E1--E3 & Implement & 3, 4 \\
-OE6 Validar en entorno realista & C5 & E4 & Operate, Optimize & 4 \\
+OE2 Contrato de recepción & \textbf{C1} & E2, E5 & Plan, Design & 2 \\
+OE3 Arquitectura y despliegue & C2, C3, C5 & E1, E4, E5 & Design, Plan & 2 \\
+OE4 Implementar la plataforma & C1, C2, C4 & E1--E3 & Implement & 3, 4 \\
+OE5 Validar en entorno realista & C5 & E4 & Operate, Optimize & 4 \\
 \bottomrule
 \end{tabular}
-\caption{Matriz de trazabilidad objetivo--causa--efecto--etapa. Las cinco causas y los cinco efectos
-quedan cubiertos por al menos un objetivo.}
+\caption{Matriz de trazabilidad. Las cinco causas y los cinco efectos quedan cubiertos por al menos
+un objetivo.}
 \label{tab:trazabilidad}
 \end{table}
 
 \section{Autoría y licenciamiento}
 
-Este trabajo de título, su documentación, la especificación del protocolo y el código de la plataforma
-son de \textbf{autoría de Vicente Ricardo Ramírez Oñate}. La universidad es la organización destinataria
-del producto y el contexto académico en que se desarrolla, no la titular de la obra. Es decisión del
-autor publicar el resultado bajo una licencia abierta al término del trabajo, de modo que la
-universidad y cualquier organización que ya posea sensores pueda utilizarlo libremente; la licencia
-concreta se fijará en la Etapa 2 junto con el modelo de despliegue (OE4).
+Este trabajo de título, su documentación y el código de la plataforma son de \textbf{autoría de
+Vicente Ricardo Ramírez Oñate}. La universidad es la organización destinataria del producto, no la
+titular de la obra. Es decisión del autor publicar el resultado bajo una licencia abierta al término
+del trabajo; la licencia concreta se fija en la Etapa 2 junto con el modelo de despliegue.
 
 \section{Estructura del documento}
 
 El capítulo~\ref{cap:antecedentes} establece los antecedentes técnicos. El
-capítulo~\ref{cap:especificacion} presenta el análisis de requerimientos y la evaluación de
-alternativas. El capítulo~\ref{cap:metodologia} expone la metodología y la planificación verificada.
-Los anexos contienen el catálogo completo de requerimientos, el backlog y el detalle del protocolo;
-la documentación extendida reside en el repositorio del proyecto.
+capítulo~\ref{cap:especificacion} presenta el análisis de requerimientos, las evaluaciones de
+transporte y formato, y la arquitectura de recepción. El capítulo~\ref{cap:metodologia} expone la
+metodología y la planificación verificada. Los anexos contienen el catálogo completo de
+requerimientos, el backlog, el detalle de las evaluaciones y la evidencia del camino descartado.

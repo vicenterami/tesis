@@ -1,0 +1,49 @@
+\begin{figure}[htbp]
+\centering
+\resizebox{0.98\linewidth}{!}{%
+\begin{tikzpicture}[font=\scriptsize]
+
+% lado emisores
+\node[caja, text width=2.6cm, align=center, draw=ambar, line width=1pt] (n1) at (0,1.7)
+  {sensor + ESP32\\ \tiny (lado del compañero)};
+\node[caja, text width=2.6cm, align=center, draw=ambar, line width=1pt] (n2) at (0,0.2)
+  {\textbf{emulador de nodo}\\ \tiny (respaldo: publica igual)};
+\node[caja, text width=2.6cm, align=center, draw=grislinea] (n3) at (0,-1.3)
+  {integración externa\\ \tiny HTTP POST};
+
+% frontera
+\draw[line width=1pt, color=gristexto, dashed] (2.3,2.6) -- (2.3,-2.2);
+\node[etiqueta, font=\scriptsize\bfseries\color{gristexto}, rotate=90] at (2.05,0.2) {FRONTERA: el tópico};
+
+% servidor
+\node[grupo, minimum width=9.6cm, minimum height=5.0cm, anchor=west] (srv) at (3.0,0) {};
+\node[font=\scriptsize\bfseries\color{gristexto}, anchor=north west] at (3.1,2.45)
+  {UN SERVIDOR (contenedores Docker, \texttt{restart: unless-stopped})};
+
+\node[caja, text width=2.2cm, align=center, draw=verdeacento, line width=1pt] (mq) at (4.6,1.0)
+  {\textbf{Mosquitto}\\ \tiny broker MQTT};
+\node[caja, text width=2.2cm, align=center, draw=grislinea] (cs) at (4.6,-1.1)
+  {ChirpStack\\ \tiny solo si hay rama LoRa};
+\node[caja, text width=2.6cm, align=center, draw=azuloscuro, line width=1.1pt, fill=azuloscuro!5] (be) at (8.0,1.0)
+  {\textbf{Backend} (NestJS)\\ \tiny pipeline de 6 filtros\\ \tiny + \textbf{API REST}};
+\node[caja, text width=2.4cm, align=center, draw=verdeacento, line width=1pt, fill=verdeacento!6] (db) at (11.3,1.0)
+  {\textbf{TimescaleDB}\\ \tiny PostgreSQL + series};
+
+\draw[flechagruesa] (n1.east) -- (mq.west|-n1.east);
+\draw[flechagruesa] (n2.east) -- (mq.west|-n2.east);
+\draw[flecha] (n3.east) -| (8.0,-1.6) -- (be.south);
+\draw[flechagruesa] (mq.east) -- (be.west);
+\draw[flecha, color=grislinea] (cs.north) -- (mq.south);
+\draw[flechagruesa] (be.east) -- (db.west);
+
+% dashboard afuera
+\node[caja, text width=2.3cm, align=center, draw=azuloscuro, line width=1pt] (dash) at (8.0,-3.3)
+  {\textbf{dashboard}\\ \tiny navegador del usuario};
+\draw[flecha] (dash.north) -- node[nota, right=1pt, font=\tiny] {HTTP GET a la API} (be.south|-srv.south);
+
+\end{tikzpicture}}
+\caption{Despliegue: todos los componentes corren como contenedores en un único servidor. La
+frontera con el trabajo del compañero es el tópico MQTT; el emulador de nodo publica en el mismo
+tópico, de modo que la validación no depende del hardware.}
+\label{fig:despliegue}
+\end{figure}

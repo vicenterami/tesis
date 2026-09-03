@@ -1,27 +1,28 @@
 \chapter{Conclusiones de la etapa}
 
-\textbf{Sobre la elección del protocolo.} El análisis comparativo de ocho alternativas arrojó un
-resultado no evidente al inicio: ningún protocolo de telemetría contemporáneo combina compacidad
-extrema con vocabulario semántico normalizado. Contact ID resuelve ambas exigencias por una razón
-histórica —fue diseñado para transmitirse en tonos telefónicos sobre líneas analógicas, restricción que
-impuso 16 dígitos y un vocabulario cerrado— y esa restricción de hace cuatro décadas es precisamente la
-que lo hace apropiado para radio de bajo consumo. El límite real del formato (no transporta valores
-medidos) se resolvió con un mecanismo del propio estándar: el campo de datos extendidos de DC-09, con
-lo que el dispositivo emite un solo mensaje.
+\textbf{Sobre el pivote.} La etapa incluyó un cambio de eje decidido con el profesor guía: el
+protocolo Contact ID, evaluado en la fase inicial, resultó adecuado para eventos discretos pero no
+para el patrón real del problema —telemetría continua—, y fue descartado. El costo del cambio fue
+acotado precisamente por el método: al estar cada decisión documentada con criterios explícitos,
+bastó rehacer la evaluación con pesos nuevos (capítulo~\ref{cap:especificacion}) y el resto del
+trabajo —metodología, requerimientos, backlog, análisis de competencia— se conservó en su mayor
+parte. El camino descartado queda como evidencia en el anexo~\ref{anx:contactid}.
 
-\textbf{Sobre el vocabulario reutilizado.} Los códigos 381, 384, 344, 602 y 603 conforman un
-vocabulario normalizado de supervisión de nodos inalámbricos a batería que precede al término
-«Internet de las Cosas». El aporte de este trabajo consiste en reutilizarlo como contrato de
-interoperabilidad de una plataforma abierta, en lugar de proponer un formato nuevo que aumentaría la
-fragmentación que pretende resolver.
+\textbf{Sobre la selección resultante.} MQTT con tramas SenML resuelve con mecanismos de fábrica lo
+que el problema exige: calidad de servicio para la entrega, testamento (\emph{Last Will}) para la
+detección inmediata de caídas, conexiones salientes que atraviesan NAT, y un formato de medición
+estandarizado por la IETF. El aporte de ingeniería del trabajo se concentra en el \textbf{pipeline
+de tratamiento de tramas} —autenticar, analizar, validar, normalizar, supervisar, alertar— con
+cuarentena y adaptadores por formato: el mismo patrón de entrada que aplican las plataformas
+existentes, con la diferencia de que el contrato nativo es un estándar abierto y no un formato de
+producto.
 
-\textbf{Sobre la viabilidad.} Verificar numéricamente el backlog antes de comprometerlo permitió
-detectar en planificación —y no en ejecución— que el alcance completo no cabe en el tiempo disponible,
-y acotar el compromiso al núcleo demostrativo, que cabe con 31\,\% de holgura.
+\textbf{Sobre la viabilidad.} La verificación numérica del backlog, recalculada tras el pivote,
+mantiene la conclusión: el compromiso es el núcleo demostrativo ($\sim$155 h frente a $\sim$240 h de
+presupuesto), y el resto es alcance condicional.
 
-\textbf{Trabajo pendiente para cerrar la etapa:} las entrevistas a las partes interesadas (criterio 1) y
-la validación con el profesor guía del enfoque de datos extendidos y del formato de este informe.
-\textbf{Trabajo previsto para la Etapa 2} (fase \emph{Design}): diagramas de arquitectura y red con
-segmentación, modelo de datos, gramática ABNF del perfil CID-IoT, tabla de mapeo completa, contrato
-OpenAPI, modelo de despliegue con costos (OE4), e inicio adelantado de la implementación conforme a la
-redistribución correctiva.
+\textbf{Trabajo pendiente para cerrar la etapa:} las entrevistas a las partes interesadas (criterio
+1) y el acuerdo con el compañero sobre los sensores concretos y el tópico de frontera.
+\textbf{Trabajo previsto para la Etapa 2} (fase \emph{Design}): especificación del contrato de
+recepción (tópicos, esquema, cuarentena, adaptadores), diagramas de arquitectura y red, modelo de
+datos, modelo de despliegue con costos, e inicio adelantado de la implementación.

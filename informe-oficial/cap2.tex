@@ -3,74 +3,94 @@
 
 \section{Los protocolos se apilan, no compiten}
 
-Al enumerar «WiFi», «LoRaWAN» y «Contact ID» parece tratarse de alternativas entre las cuales elegir.
-Operan en niveles distintos: la capa de \textbf{aplicación} define qué significa el mensaje (Contact
-ID, JSON, SenML); la de \textbf{red y transporte}, cómo llega (IP, TCP/UDP, LoRaWAN, DC-09); la
-\textbf{física}, cómo viajan los bits (WiFi 802.11, LoRa, cable). La independencia entre niveles es lo
-que hace posible la propuesta: \textbf{el mismo mensaje Contact ID llega por radio LoRa, por WiFi o por
-cable, y la plataforma lo interpreta de forma idéntica} (figura~\ref{fig:pila}).
+Al enumerar «WiFi», «MQTT» y «SenML» parece tratarse de alternativas entre las cuales elegir. Operan
+en niveles distintos: la capa \textbf{física} define cómo viajan los bits (WiFi, LoRa, cable);
+\textbf{TCP/IP} define direcciones y entrega entre máquinas; el \textbf{mecanismo de mensajería}
+define cómo viaja cada mensaje (MQTT, HTTP); y el \textbf{formato} define qué dice el mensaje
+(SenML, JSON). La figura~\ref{fig:pila} resume la escalera. La independencia entre niveles es lo que
+hace posible la propuesta: \textbf{la misma trama llega por WiFi, por cable o por la rama de radio,
+y la plataforma la interpreta de forma idéntica}.
 
 \input{figuras/pila}
 
-\section{Tecnologías de radio: LoRa y LoRaWAN}
-
-\textbf{LoRa} es la técnica de modulación de radio (capa física, patente Semtech); \textbf{LoRaWAN} es
-el protocolo de red abierto construido sobre ella: registro de dispositivos, cifrado AES-128 de extremo
-a extremo y entrega al servidor \parencite{rp002}. La analogía exacta: LoRa es a LoRaWAN lo que 802.11
-es a TCP/IP. Chile emplea la banda libre de 915--928\,MHz (Resolución 737 de Subtel
-\parencite{lorachile}).
-
-LoRa intercambia velocidad por alcance y autonomía: 0,3--27\,kbps y payloads de 11 a 53 bytes según la
-tasa de datos, a cambio de 2--15\,km de alcance y años de batería. Su patrón de uso —lecturas breves y
-avisos— coincide con el de los sensores de este trabajo. La cadena completa es nodo $\rightarrow$
-gateway (traductor sin claves) $\rightarrow$ servidor de red ChirpStack (descifra, deduplica,
-administra, reporta RSSI/SNR y publica en MQTT) $\rightarrow$ plataforma (figura~\ref{fig:lorawan}).
-
-\input{figuras/lorawan}
+Una distinción que evita confusiones frecuentes: \textbf{HTTP no es una alternativa a TCP/IP sino un
+protocolo que corre sobre él}, igual que MQTT. Cuando se critica a HTTP por sus cabeceras —cientos
+de bytes de metadatos por cada decenas de bytes de dato útil— se critica al protocolo de mensajería,
+no a la red que hay debajo.
 
 \section{Mensajería MQTT}
 
-MQTT aplica el patrón publicar/suscribir a través de un \emph{broker} (figura~\ref{fig:mqtt}). Dos
-propiedades resultan determinantes: (1) \textbf{el dispositivo inicia la conexión saliente}, lo que
-evita abrir puertos hacia los sensores y funciona tras NAT y cortafuegos —materializa el requerimiento
-RNF-10—; (2) el mecanismo \emph{Last Will and Testament} notifica automáticamente la desconexión
-abrupta de un cliente, lo que se traduce directamente al código 381 de Contact ID sin lógica adicional.
+MQTT (\emph{Message Queuing Telemetry Transport}) aplica el patrón publicar/suscribir a través de un
+intermediario llamado \emph{broker} (figura~\ref{fig:mqtt}): los dispositivos publican en
+\emph{tópicos} y los consumidores suscritos reciben los mensajes empujados por el broker en el
+momento, sin consultar. Cuatro propiedades resultan determinantes para este trabajo:
+
+\begin{enumerate}
+\item \textbf{El dispositivo inicia la conexión saliente} y la mantiene: no se abren puertos hacia
+los sensores y el esquema funciona tras NAT y cortafuegos (requerimiento RNF-10).
+\item \textbf{Calidad de servicio (QoS)} integrada en tres niveles (0: a lo más una vez; 1: al menos
+una vez; 2: exactamente una vez), sin lógica de reintento propia.
+\item \textbf{El testamento (\emph{Last Will})}: el dispositivo deja registrado al conectarse un
+mensaje que el broker publica automáticamente si aquel se desconecta sin despedirse — la detección
+de caída resulta inmediata y sin costo de desarrollo.
+\item \textbf{Cabeceras de 2 bytes}, frente a los cientos de bytes de HTTP: responde la objeción de
+sobrecarga para dispositivos que reportan cada pocos minutos.
+\end{enumerate}
 
 \input{figuras/mqtt}
 
-\section{El protocolo Contact ID (SIA DC-05)}
+Se emplea \textbf{Mosquitto} como broker: implementación en C de consumo mínimo
+($\sim$10\,MB de memoria), madura, con TLS y autenticación por cliente. Las alternativas de clúster
+(EMQX, HiveMQ) están dimensionadas para millones de conexiones y resultan desproporcionadas
+(sección~\ref{sec:infra}).
 
-Contact ID es el protocolo de reporte de eventos de la industria de alarmas, formalizado por la
-Security Industry Association como estándar DC-05 \parencite{siadc05}. Tres estándares SIA se apilan:
-\textbf{DC-05} define el formato del mensaje; DC-03 \parencite{siadc03} es un formato alternativo más
-expresivo; \textbf{DC-09} \parencite{siadc09} transporta cualquiera de los dos sobre IP con cifrado
-AES opcional y, en su revisión 2026, rotación de claves y auto-comisionamiento.
+\section{El formato de trama: SenML}
 
-El mensaje es una secuencia de \textbf{16 dígitos} (figura~\ref{fig:mensaje}): cuenta (ACCT), tipo
-(MT=18), calificador (\texttt{Q}: 1 abre una condición, 3 la cierra —una máquina de estados nativa—),
-código de evento (XYZ), partición (GG), zona (CCC) y suma de comprobación módulo 15. El alfabeto tiene
-15 símbolos porque el transporte original fue DTMF: tonos telefónicos, donde el cero vale diez.
+SenML (\emph{Sensor Measurement Lists}, RFC 8428 \parencite{rfc8428}) es el estándar de la IETF
+—organismo cuyas normas son públicas y gratuitas— para representar listas de mediciones. Cada trama
+declara la identidad del dispositivo, el tiempo base y una lista de mediciones con nombre, unidad
+estándar y valor:
 
-\input{figuras/mensaje}
+\begin{center}
+\begin{minipage}{0.88\textwidth}
+\begin{verbatim}
+[ {"bn":"urn:dev:mac:a4cf12ff001a:", "bt":1756857600},
+  {"n":"temperatura", "u":"Cel", "v":23.4},
+  {"n":"bateria",     "u":"%EL", "v":87} ]
+\end{verbatim}
+\end{minipage}
+\end{center}
 
-La transmisión original incluía el \emph{kissoff}: la receptora confirma solo si la suma de
-comprobación es válida, y el panel reintenta en su ausencia —confirmación a nivel de aplicación que
-este trabajo conserva—. La «comunicación celular» de las alarmas modernas es un cambio de transporte,
-no de protocolo (figura~\ref{fig:alarmas}); el mensaje de 16 dígitos nació para caber en tonos sobre
-una línea analógica, \textbf{y esa restricción de hace cuatro décadas es la que hoy lo hace apropiado
-para LoRa}, un canal igualmente estrecho.
+La identidad viaja dentro de la trama (\texttt{bn}) y se cruza con el registro de dispositivos de la
+plataforma. Sobre WiFi y cable el tamaño ($\sim$100--200 bytes) es irrelevante y la legibilidad
+facilita la depuración; la compactación binaria solo se justifica en la rama de radio, donde el
+servidor de red la expande antes de publicarla.
 
-\input{figuras/alarmas}
+\section{La rama de radio: LoRa, LoRaWAN y ChirpStack}
 
-Su vocabulario incluye los eventos de salud de dispositivos inalámbricos que este trabajo necesita:
-pérdida de supervisión RF (381), batería baja (384), interferencia (344), pruebas periódicas (602/603),
-además de condiciones medibles (temperatura 158/159, agua 154, accesos 134/400)
-\parencite{contactidcodes}.
+\textbf{LoRa} es la modulación de radio de largo alcance y bajo consumo (capa física);
+\textbf{LoRaWAN} es el protocolo de red sobre ella: registro de nodos, cifrado AES-128 de extremo a
+extremo y entrega al servidor \parencite{rp002}. En Chile se usa la banda libre de 915--928\,MHz
+\parencite{lorachile}. El \emph{gateway} capta la radio y la reenvía por IP sin poder descifrarla;
+\textbf{ChirpStack} —el servidor de red, un contenedor más en el servidor de la plataforma—
+descifra, elimina duplicados, administra los nodos y \textbf{publica las mediciones en MQTT}: la
+rama de radio converge así a la vía principal sin desarrollo adicional (figura~\ref{fig:lorawan}).
+Esta rama es opcional y corresponde al trabajo coordinado del compañero.
+
+\input{figuras/lorawan}
 
 \section{Persistencia de series de tiempo}
 
-Los datos de sensores son voluminosos y siempre temporales: cincuenta sensores cada cinco minutos
-generan cinco millones de registros anuales. Se emplea TimescaleDB, extensión de PostgreSQL que
-conserva el modelo relacional y el SQL estándar, añadiendo particionado automático por tiempo,
-agregación por intervalos y políticas de retención. La evaluación frente a alternativas está en la
-sección~\ref{sec:infra}.
+Cincuenta sensores reportando cada cinco minutos generan del orden de cinco millones de registros
+anuales. Se emplea \textbf{TimescaleDB}, extensión de PostgreSQL que conserva el modelo relacional y
+el SQL estándar, añadiendo particionado automático por tiempo, agregación por intervalos y políticas
+de retención; frente a InfluxDB evita operar dos motores (sección~\ref{sec:infra}).
+
+\section{Seguridad del transporte}
+
+\textbf{TLS} (\emph{Transport Layer Security}) es el cifrado del canal —el mismo del candado de
+HTTPS—: establece un túnel cifrado (AES en su interior) antes de intercambiar datos, y se configura
+en Mosquitto y en la API sin desarrollo propio. La \textbf{identidad} de cada dispositivo se
+resuelve con dos piezas complementarias: su identificador (por ejemplo la dirección MAC, que dice
+quién dice ser) y su \textbf{credencial} (un secreto emitido al darlo de alta, que lo demuestra). En
+la rama de radio, LoRaWAN aporta AES-128 de fábrica. Nunca se diseña cifrado propio.

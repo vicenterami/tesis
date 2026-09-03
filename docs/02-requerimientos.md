@@ -1,3 +1,7 @@
+> ⚠️ **ACTUALIZADO AL PIVOTE DEL 02/09/2026:** el contrato de entrada es **SenML (RFC 8428) sobre
+> MQTT**, con HTTP como vía secundaria y adaptadores por formato; Contact ID quedó descartado
+> (evaluación nueva en `docs/06`). «Recepción» se reemplazó por «recepción» en todo el catálogo.
+
 # Análisis de requerimientos
 
 > **Cubre:** criterio 3 de la Etapa 1 (**45 %**, el de mayor peso) · sustenta **OE1**
@@ -54,7 +58,7 @@ Cada requerimiento declara su origen. Se emplean cuatro tipos de fuente, con dis
 
 | Módulo | Responsabilidad |
 |---|---|
-| **M1** | Ingesta multiprotocolo |
+| **M1** | Recepción multiprotocolo |
 | **M2** | Normalización de eventos y telemetría |
 | **M3** | Inventario y aprovisionamiento de dispositivos |
 | **M4** | Supervisión de salud de enlace |
@@ -67,24 +71,24 @@ Cada requerimiento declara su origen. Se emplean cuatro tipos de fuente, con dis
 
 # 2. Requerimientos funcionales
 
-## M1 — Ingesta multiprotocolo
+## M1 — Recepción multiprotocolo
 
 | ID | Requerimiento | Fuente | Causa | Prior. |
 |---|---|---|---|:---:|
-| **RF-01** | El sistema debe exponer un punto de ingesta **HTTP** que reciba eventos en formato Contact ID de 16 dígitos | [PO] [BT] | C1 | **M** |
-| **RF-02** | El sistema debe recibir eventos originados en **LoRaWAN** mediante integración con el servidor de red, decodificando el payload de 8 bytes en BCD | [PO] [BT] | C1, C2 | **M** |
+| **RF-01** | El sistema debe exponer un punto de recepción **HTTP** que acepte tramas de medición en **SenML (RFC 8428)** | [PO] [BT] | C1 | **M** |
+| **RF-02** | El sistema debe poder recibir mediciones de la **rama LoRaWAN** a través del servidor de red, que las publica en MQTT (rama opcional) | [PO] [BT] | C1, C2 | **M** |
 | **RF-03** | El sistema debe recibir eventos publicados en un **broker MQTT**, suscribiéndose a los tópicos configurados por sitio | [PO] | C1, C2 | **M** |
-| **RF-04** | El sistema debe exponer un receptor **SIA DC-09** sobre TCP/UDP que acepte mensajes de paneles de alarma existentes sin modificación | [EM] [BT] | C2 | **S** |
-| **RF-05** | El sistema debe **validar el checksum** de todo mensaje Contact ID recibido y rechazar los inválidos sin persistirlos como eventos válidos | [BT] | C1 | **M** |
-| **RF-06** | El sistema debe **confirmar la recepción** de cada evento aceptado al emisor, como equivalente funcional del *kissoff* del protocolo original | [BT] | C1 | **M** |
-| **RF-07** | El sistema debe **registrar los intentos rechazados** con su motivo, para diagnóstico, sin mezclarlos con los eventos válidos | [DP] | C5 | **S** |
-| **RF-08** | El sistema debe recibir **telemetría con valor y unidad** por un punto de ingesta distinto del de eventos, aceptando SenML para clientes IP y CayenneLPP para nodos LoRaWAN | [BT] | C1 | **M** |
+| **RF-04** | El sistema debe admitir **adaptadores de formato por fuente** que traduzcan al modelo interno tramas que no lleguen en SenML, sin modificar el núcleo | [EM] [BT] | C2 | **S** |
+| **RF-05** | El sistema debe **validar cada trama** contra el esquema SenML y contra el registro del dispositivo, rechazando las inválidas sin contaminar las series | [BT] | C1 | **M** |
+| **RF-06** | El sistema debe **confirmar la recepción** al emisor: nivel de QoS acordado en MQTT y código de respuesta en HTTP | [BT] | C1 | **M** |
+| **RF-07** | El sistema debe **poner en cuarentena** las tramas rechazadas —crudas, con su motivo— y registrar los intentos de dispositivos desconocidos | [DP] | C5 | **S** |
+| **RF-08** | El sistema debe aceptar **múltiples mediciones por trama** (lista SenML con nombre, valor, unidad y tiempo por medición) | [BT] | C1 | **M** |
 | **RF-09** | El sistema debe **preservar los metadatos del transporte** de cada recepción (RSSI, SNR, gateway, identificador del nodo) asociándolos al evento | [BT] [DP] | C5 | **M** |
 | **RF-10** | El sistema debe **descartar duplicados** cuando el mismo evento llegue por más de un camino o gateway | [BT] | C1 | **S** |
 
 **Justificación ampliada de RF-04.** Es el requerimiento que distingue la solución de la oferta
 existente. El análisis del sector muestra que las centrales de monitoreo en operación hablan Contact
-ID sobre DC-09, y ni IoT3 ni ControlTec ofrecen un punto de ingesta compatible. Aceptar mensajes de
+ID sobre DC-09, y ni IoT3 ni ControlTec ofrecen un punto de recepción compatible. Aceptar mensajes de
 paneles instalados **sin modificarlos** convierte al parque existente en fuente de datos, en lugar de
 exigir su reemplazo. Se prioriza como *Should* y no *Must* porque el MVP puede demostrarse sin él,
 pero su valor demostrativo es alto.
@@ -93,9 +97,9 @@ pero su valor demostrativo es alto.
 
 | ID | Requerimiento | Fuente | Causa | Prior. |
 |---|---|---|---|:---:|
-| **RF-11** | El sistema debe **traducir señales de sensores heterogéneos a códigos de evento DC-05** conforme a la tabla de mapeo del perfil CID-IoT, sin introducir códigos ajenos al estándar | [PO] [BT] | C1 | **M** |
-| **RF-12** | El sistema debe mantener una **máquina de estados de condiciones abiertas** por dispositivo, gobernada por el calificador `Q`: `Q=1` abre la condición y `Q=3` la cierra | [BT] | C1, C5 | **M** |
-| **RF-13** | El sistema debe **generar eventos por umbral** cuando un valor de telemetría cruce un límite configurado, emitiendo el código DC-05 correspondiente | [PO] | C1 | **M** |
+| **RF-11** | El sistema debe **normalizar toda trama aceptada al modelo interno único** (dispositivo, magnitud, unidad, valor, marca temporal), venga de la vía y formato que venga | [PO] [BT] | C1 | **M** |
+| **RF-12** | El sistema debe mantener **condiciones abiertas y cerradas** por dispositivo: el cruce de umbral abre la condición y la vuelta al rango la cierra | [BT] | C1, C5 | **M** |
+| **RF-13** | El sistema debe **generar eventos por umbral** cuando una medición cruce un límite configurado | [PO] | C1 | **M** |
 | **RF-14** | El sistema debe permitir **configurar umbrales de disparo y de restauración por dispositivo**, con banda de histéresis para evitar oscilación | [BT] | C5 | **S** |
 | **RF-15** | El sistema debe **correlacionar eventos con telemetría** mediante la tripleta de identidad `(ACCT, GG, CCC)` y la marca temporal, para reconstruir el contexto de un evento | [DP] | C1 | **S** |
 | **RF-16** | El sistema debe **normalizar las marcas temporales** a un huso único, tolerando que el nodo no disponga de reloj confiable y usando la hora de recepción cuando corresponda | [BT] | C1 | **M** |
@@ -109,19 +113,19 @@ pero su valor demostrativo es alto.
 | **RF-19** | El sistema debe permitir **registrar un dispositivo nuevo** asignándole su tripleta `(ACCT, GG, CCC)` sin intervenir la consola del servidor de red | [PO] [EM] | C4 | **M** |
 | **RF-20** | El sistema debe **rechazar el registro** de un dispositivo cuya tripleta ya exista, y advertir cuando el espacio de direcciones de un sitio se agote | [BT] | C1 | **S** |
 | **RF-21** | El sistema debe permitir **agrupar dispositivos por sitio y por zona lógica**, y presentar la vista agrupada | [PO] | C4 | **M** |
-| **RF-22** | El sistema debe permitir **marcar un dispositivo en mantenimiento**, suprimiendo sus alertas y registrando el evento con el código 570 | [BT] | C5 | **C** |
+| **RF-22** | El sistema debe permitir **marcar un dispositivo en mantenimiento**, suprimiendo sus alertas y dejando registro del período | [BT] | C5 | **C** |
 | **RF-23** | El sistema debe registrar **quién realizó cada cambio de configuración de un dispositivo y cuándo** | [BT] | C5 | **S** |
 
 ## M4 — Supervisión de salud de enlace
 
 | ID | Requerimiento | Fuente | Causa | Prior. |
 |---|---|---|---|:---:|
-| **RF-24** | El sistema debe **detectar la pérdida de supervisión** de un dispositivo cuando no reporte durante un número configurable de intervalos, y emitir el código 381 | [PO] [BT] | **C5** | **M** |
-| **RF-25** | El sistema debe **detectar la restauración** del dispositivo y cerrar la condición con `Q=3` | [BT] | C5 | **M** |
+| **RF-24** | El sistema debe **detectar la pérdida de comunicación** de un dispositivo cuando no reporte durante un número configurable de intervalos, y abrir la condición correspondiente | [PO] [BT] | **C5** | **M** |
+| **RF-25** | El sistema debe **detectar la restauración** del dispositivo y cerrar la condición, registrando la duración de la interrupción | [BT] | C5 | **M** |
 | **RF-26** | El sistema debe registrar la **última vez que se recibió** comunicación de cada dispositivo | [PO] | C5 | **M** |
 | **RF-27** | El sistema debe **presentar la calidad del enlace** por dispositivo (RSSI, SNR y porcentaje de recepción) cuando el transporte la provea | [BT] | C5 | **M** |
 | **RF-28** | El sistema debe **procesar eventos de batería baja** (código 384) y exponer los dispositivos que requieren mantenimiento | [PO] [BT] | C5 | **M** |
-| **RF-29** | El sistema debe **aceptar y contabilizar los *heartbeat*** (códigos 602 y 603) como evidencia de supervisión activa | [BT] | C5 | **M** |
+| **RF-29** | El sistema debe **aprovechar el *keep-alive* y el *Last Will* de MQTT** como evidencia de conexión y aviso inmediato de desconexión | [BT] | C5 | **M** |
 | **RF-30** | El sistema debe presentar un **indicador agregado de salud por sitio**: total de dispositivos, en línea, con condición abierta y sin supervisión | [PO] | C4, C5 | **M** |
 
 **Justificación ampliada del módulo M4.** Es el módulo que materializa el aporte diferencial frente a
@@ -159,12 +163,12 @@ resolver. Es *Must* por coherencia con la propuesta de valor.
 
 | ID | Requerimiento | Fuente | Causa | Prior. |
 |---|---|---|---|:---:|
-| **RF-40** | El sistema debe **autenticar toda ingesta** mediante credencial por sitio, rechazando mensajes sin credencial válida | [BT] | C1 | **M** |
+| **RF-40** | El sistema debe **autenticar toda recepción** mediante credencial por sitio, rechazando mensajes sin credencial válida | [BT] | C1 | **M** |
 | **RF-41** | El sistema debe **aislar los datos entre sitios**: ningún usuario de un sitio puede acceder a datos de otro | [BT] [DP] | C3 | **M** |
-| **RF-42** | El sistema debe **cifrar el transporte** de toda comunicación externa (TLS para HTTP y MQTT; AES para DC-09 conforme al estándar) | [BT] | C1 | **M** |
+| **RF-42** | El sistema debe **cifrar el transporte** de toda comunicación externa: TLS para HTTP y MQTT (la rama LoRaWAN trae AES-128 de fábrica) | [BT] | C1 | **M** |
 | **RF-43** | El sistema debe **autenticar a los usuarios** de la interfaz de administración con credenciales individuales | [BT] | C4 | **M** |
 | **RF-44** | El sistema debe distinguir al menos **dos roles**: administrador del sitio y usuario de consulta | [PO] | C4 | **S** |
-| **RF-45** | El sistema debe permitir **rotar las credenciales de ingesta** de un sitio sin interrumpir el servicio, conforme al criterio de DC-09-2026 | [BT] | C1 | **C** |
+| **RF-45** | El sistema debe permitir **rotar las credenciales de recepción** de un sitio sin interrumpir el servicio | [BT] | C1 | **C** |
 | **RF-46** | El sistema debe **registrar en bitácora** los accesos y las operaciones sensibles | [BT] | C5 | **S** |
 
 ## M8 — Interfaz de administración
@@ -192,7 +196,7 @@ Clasificados según las características de calidad de **ISO/IEC 25010**.
 
 | ID | Requerimiento | Métrica de verificación | Fuente | Prior. |
 |---|---|---|---|:---:|
-| **RNF-01** | El sistema debe sostener la ingesta de **≥ 50 eventos por segundo** sin pérdida | Prueba de carga con generador sintético | [DP] | **M** |
+| **RNF-01** | El sistema debe sostener la recepción de **≥ 50 eventos por segundo** sin pérdida | Prueba de carga con generador sintético | [DP] | **M** |
 | **RNF-02** | El tiempo desde la recepción de un evento hasta su disponibilidad para consulta debe ser **≤ 2 segundos** en el percentil 95 | Medición instrumentada | [DP] | **M** |
 | **RNF-03** | El sistema debe **detectar la pérdida de supervisión** de un dispositivo en **≤ 2 intervalos** de reporte configurados | Prueba funcional con nodo silenciado | [PO] | **M** |
 | **RNF-04** | Una consulta de historial de 30 días de un dispositivo debe responder en **≤ 3 segundos** | Medición con volumen sintético | [DP] | **S** |
@@ -202,15 +206,15 @@ Clasificados según las características de calidad de **ISO/IEC 25010**.
 | ID | Requerimiento | Métrica de verificación | Fuente | Prior. |
 |---|---|---|---|:---:|
 | **RNF-05** | Ningún evento aceptado y confirmado puede perderse ante un reinicio del sistema | Prueba de recuperación ante falla | [BT] | **M** |
-| **RNF-06** | El sistema debe **reanudar la ingesta automáticamente** tras recuperarse de una interrupción, sin intervención manual | Prueba de reinicio | [BT] | **M** |
-| **RNF-07** | La indisponibilidad de un adaptador de transporte **no debe afectar** la ingesta por los demás | Prueba de aislamiento de fallas | [DP] | **S** |
+| **RNF-06** | El sistema debe **reanudar la recepción automáticamente** tras recuperarse de una interrupción, sin intervención manual | Prueba de reinicio | [BT] | **M** |
+| **RNF-07** | La indisponibilidad de un adaptador de transporte **no debe afectar** la recepción por los demás | Prueba de aislamiento de fallas | [DP] | **S** |
 
 ## 3.3 Seguridad
 
 | ID | Requerimiento | Métrica de verificación | Fuente | Prior. |
 |---|---|---|---|:---:|
 | **RNF-08** | Ninguna credencial debe almacenarse en texto claro, ni en base de datos ni en el repositorio de código | Inspección y revisión del repositorio | [BT] | **M** |
-| **RNF-09** | Los dispositivos IoT deben poder residir en un **segmento de red separado** del segmento de usuarios, con acceso restringido solo a los puertos de ingesta | Diseño de red verificado y documentado | [BT] | **M** |
+| **RNF-09** | Los dispositivos IoT deben poder residir en un **segmento de red separado** del segmento de usuarios, con acceso restringido solo a los puertos de recepción | Diseño de red verificado y documentado | [BT] | **M** |
 | **RNF-10** | El sistema **no debe requerir puertos entrantes abiertos hacia los dispositivos**: la conexión siempre se inicia desde el dispositivo hacia la plataforma | Revisión de arquitectura | [BT] | **M** |
 
 **Justificación de RNF-09 y RNF-10.** Son los dos requerimientos que anclan el trabajo al enfoque de
@@ -238,7 +242,7 @@ es realmente multiprotocolo: es monoprotocolo con excepciones.
 |---|---|---|---|:---:|
 | **RNF-14** | El sistema debe poder **desplegarse completo en un único servidor** con recursos modestos, sin dependencia de servicios propietarios de nube | Despliegue verificado en máquina local | [PO] | **M** |
 | **RNF-15** | El sistema debe construirse **exclusivamente con componentes de código abierto**, sin licencias de pago | Inventario de dependencias | [PO] | **M** |
-| **RNF-16** | El mensaje de evento debe caber en el payload de LoRaWAN AU915 en su **configuración más restrictiva (11 bytes)** | Verificado: 8 bytes en BCD | [BT] | **M** |
+| **RNF-16** | La trama nativa debe cumplir **SenML (RFC 8428)**; la rama LoRa, de concretarse, debe caber en el payload disponible del plan regional | Validación de esquema + verificación de tamaño | [BT] | **M** |
 
 **Justificación de RNF-14 y RNF-15.** Provienen directamente de la indicación del propietario del
 proyecto: plataforma «gratuita o abierta», con la universidad como destinataria. RNF-14 además habilita
@@ -280,7 +284,7 @@ marginal cero para la institución.
 
 | Qué demuestra | Requerimientos del núcleo |
 |---|---|
-| Ingesta por más de un transporte | RF-01, RF-02 *o* RF-03, RF-05, RF-06 |
+| Recepción por más de un transporte | RF-01, RF-02 *o* RF-03, RF-05, RF-06 |
 | Normalización a formato único | RF-11, RF-12, RF-16, RF-17 |
 | Supervisión de salud del enlace | RF-24, RF-25, RF-26, RF-30 |
 | Persistencia y consulta | RF-31, RF-33 |
@@ -452,7 +456,7 @@ que lo que existe se parezca a lo documentado.
 
 **Sobre L-D, una ventaja concreta y medible.** El evento Contact ID tiene una estructura estricta de
 siete campos. Con un solo lenguaje en todo el sistema, esa estructura se define **una vez** y la usan
-el validador de ingesta, la capa de persistencia, la API y la interfaz. En dos lenguajes hay que
+el validador de recepción, la capa de persistencia, la API y la interfaz. En dos lenguajes hay que
 definirla dos veces y mantenerlas sincronizadas manualmente — una fuente de errores permanente por el
 resto del proyecto. Esto penaliza a Python (2), Java (1) y Go (1) con independencia de sus méritos.
 

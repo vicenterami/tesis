@@ -1,0 +1,25 @@
+\chapter[Camino descartado: Contact ID]{Camino evaluado y descartado: el protocolo Contact ID}
+\label{anx:contactid}
+\small
+
+Durante la fase inicial de esta etapa (17 de agosto al 1 de septiembre) el trabajo evaluó como eje el
+protocolo \textbf{Contact ID (SIA DC-05)} de la industria de alarmas, sobre transporte DC-09. Se
+verificó empíricamente su gramática y su suma de comprobación con una implementación propia, se
+evaluaron ocho alternativas mediante una matriz ponderada y se diseñó un perfil de aplicación. Ese
+material completo permanece en el repositorio del proyecto (\texttt{docs/05-protocolo-contactid.md} y
+\texttt{plataforma/herramientas/contactid.py}).
+
+\textbf{Razón del descarte (reunión con el profesor guía, 2 de septiembre de 2026):} Contact ID está
+orientado a \textbf{eventos discretos} —alarmas que ocurren o no— mientras que el problema de este
+trabajo es \textbf{telemetría continua}: lecturas periódicas cada 5 a 30 minutos cuyo valor está en
+la serie, no en el evento. El mensaje de 16 dígitos no transporta valores medidos de forma nativa, y
+las extensiones necesarias para hacerlo desplazaban al protocolo fuera de su dominio de diseño.
+
+\textbf{Lo que el análisis aportó y se conserva:} la restricción de que el silencio de un sensor
+debe detectarse activamente (los códigos de supervisión de la industria de alarmas inspiran los
+requerimientos RF-24 a RF-30, hoy resueltos con el \emph{keep-alive} y el testamento de MQTT); la
+disciplina de evaluar alternativas con criterios ponderados y de verificar afirmaciones con código; y
+la separación lógica entre eventos y telemetría, que sobrevive dentro del modelo interno.
+
+El registro de la decisión, con las tareas derivadas, está en
+\texttt{bitacora/2026-09-02-reunion-pivote.md}.

@@ -9,8 +9,8 @@
 
 ## 1. Tema y alcance
 
-**Título de trabajo:** Plataforma abierta de gestión e interoperabilidad de datos para redes de
-sensores IoT heterogéneas.
+**Título de trabajo (desde el 02/09):** Plataforma web para el registro, monitoreo y gestión de
+sensores en La Araucanía.
 
 **Enunciado en una frase:**
 

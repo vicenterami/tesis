@@ -10,12 +10,12 @@
 \node[caja, minimum width=\w cm, minimum height=\h cm, align=left,
       draw=azuloscuro, line width=1.1pt, fill=azuloscuro!5] (app) at (0,0)
   {\textbf{\color{azuloscuro}APLICACIÓN}\ \ \small ¿qué \emph{significa} el mensaje?\\[2pt]
-   \scriptsize \textbf{Contact ID (DC-05)} · JSON · MQTT · SenML};
+   \scriptsize \textbf{SenML (RFC 8428)} · JSON · CSV del fabricante};
 
 \node[caja, minimum width=\w cm, minimum height=\h cm, align=left,
       draw=verdeacento, line width=1.1pt, fill=verdeacento!5, below=1.5mm of app] (red)
   {\textbf{\color{verdeacento}RED Y TRANSPORTE}\ \ \small ¿cómo \emph{llega} de un punto a otro?\\[2pt]
-   \scriptsize IP · TCP · UDP · \textbf{LoRaWAN} · \textbf{DC-09}};
+   \scriptsize IP · TCP · UDP · \textbf{MQTT} · HTTP · \textbf{LoRaWAN}};
 
 \node[caja, minimum width=\w cm, minimum height=\h cm, align=left,
       draw=ambar, line width=1.1pt, fill=ambar!5, below=1.5mm of red] (fis)
@@ -39,8 +39,8 @@
 \node[notaclave, below=6mm of fis.south, anchor=north, text width=13.4cm, xshift=3.1cm,
       fill=verdeacento!6, font=\footnotesize]
   {La misma carta en español puede viajar en camión, avión o bicicleta: \textbf{el idioma no cambia
-   porque cambie el vehículo.} Del mismo modo, \textbf{el mismo mensaje Contact ID llega por LoRa, por
-   WiFi o por cable, y la plataforma lo interpreta igual en los tres casos.}};
+   porque cambie el vehículo.} Del mismo modo, \textbf{la misma trama SenML llega por WiFi, por cable o
+   por la rama LoRa, y la plataforma la interpreta igual en los tres casos.}};
 
 \end{tikzpicture}}
 \caption{Los protocolos se apilan, no compiten. Cada nivel responde una pregunta distinta, y la

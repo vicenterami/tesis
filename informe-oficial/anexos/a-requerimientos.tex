@@ -2,20 +2,20 @@
 \label{anx:requerimientos}
 \small
 
-Cada requerimiento declara su fuente (véase tabla~\ref{tab:fuentes}), la causa del problema que
-aborda y su prioridad MoSCoW.
+Cada requerimiento declara su fuente, la causa del problema que aborda y su prioridad MoSCoW.
+Catálogo actualizado al pivote del 2 de septiembre (contrato SenML sobre MQTT).
 
-\section{M1 --- Ingesta multiprotocolo}
+\section{M1 --- Recepción multiprotocolo}
 \begin{longtable}{@{}C{1.4cm}L{6.5cm}L{1.6cm}L{1.3cm}C{0.8cm}@{}}
 \filaencab \encab{ID} & \encab{Requerimiento} & \encab{Fuente} & \encab{Causa} & \encab{Pr.} \\ \midrule \endhead
-\textbf{RF-01} & El sistema debe exponer un punto de ingesta \textbf{HTTP} que reciba eventos en formato Contact ID de 16 dígitos & [PO] [BT] & C1 & \textbf{M} \\
-\textbf{RF-02} & El sistema debe recibir eventos originados en \textbf{LoRaWAN} mediante integración con el servidor de red, decodificando el payload de 8 bytes en BCD & [PO] [BT] & C1, C2 & \textbf{M} \\
+\textbf{RF-01} & El sistema debe exponer un punto de recepción \textbf{HTTP} que acepte tramas de medición en \textbf{SenML (RFC 8428)} & [PO] [BT] & C1 & \textbf{M} \\
+\textbf{RF-02} & El sistema debe poder recibir mediciones de la \textbf{rama LoRaWAN} a través del servidor de red, que las publica en MQTT (rama opcional) & [PO] [BT] & C1, C2 & \textbf{M} \\
 \textbf{RF-03} & El sistema debe recibir eventos publicados en un \textbf{broker MQTT}, suscribiéndose a los tópicos configurados por sitio & [PO] & C1, C2 & \textbf{M} \\
-\textbf{RF-04} & El sistema debe exponer un receptor \textbf{SIA DC-09} sobre TCP/UDP que acepte mensajes de paneles de alarma existentes sin modificación & [EM] [BT] & C2 & \textbf{S} \\
-\textbf{RF-05} & El sistema debe \textbf{validar el checksum} de todo mensaje Contact ID recibido y rechazar los inválidos sin persistirlos como eventos válidos & [BT] & C1 & \textbf{M} \\
-\textbf{RF-06} & El sistema debe \textbf{confirmar la recepción} de cada evento aceptado al emisor, como equivalente funcional del *kissoff* del protocolo original & [BT] & C1 & \textbf{M} \\
-\textbf{RF-07} & El sistema debe \textbf{registrar los intentos rechazados} con su motivo, para diagnóstico, sin mezclarlos con los eventos válidos & [DP] & C5 & \textbf{S} \\
-\textbf{RF-08} & El sistema debe recibir \textbf{telemetría con valor y unidad} por un punto de ingesta distinto del de eventos, aceptando SenML para clientes IP y CayenneLPP para nodos LoRaWAN & [BT] & C1 & \textbf{M} \\
+\textbf{RF-04} & El sistema debe admitir \textbf{adaptadores de formato por fuente} que traduzcan al modelo interno tramas que no lleguen en SenML, sin modificar el núcleo & [EM] [BT] & C2 & \textbf{S} \\
+\textbf{RF-05} & El sistema debe \textbf{validar cada trama} contra el esquema SenML y contra el registro del dispositivo, rechazando las inválidas sin contaminar las series & [BT] & C1 & \textbf{M} \\
+\textbf{RF-06} & El sistema debe \textbf{confirmar la recepción} al emisor: nivel de QoS acordado en MQTT y código de respuesta en HTTP & [BT] & C1 & \textbf{M} \\
+\textbf{RF-07} & El sistema debe \textbf{poner en cuarentena} las tramas rechazadas ---crudas, con su motivo--- y registrar los intentos de dispositivos desconocidos & [DP] & C5 & \textbf{S} \\
+\textbf{RF-08} & El sistema debe aceptar \textbf{múltiples mediciones por trama} (lista SenML con nombre, valor, unidad y tiempo por medición) & [BT] & C1 & \textbf{M} \\
 \textbf{RF-09} & El sistema debe \textbf{preservar los metadatos del transporte} de cada recepción (RSSI, SNR, gateway, identificador del nodo) asociándolos al evento & [BT] [DP] & C5 & \textbf{M} \\
 \textbf{RF-10} & El sistema debe \textbf{descartar duplicados} cuando el mismo evento llegue por más de un camino o gateway & [BT] & C1 & \textbf{S} \\
 \end{longtable}
@@ -23,9 +23,9 @@ aborda y su prioridad MoSCoW.
 \section{M2 --- Normalización de eventos y telemetría}
 \begin{longtable}{@{}C{1.4cm}L{6.5cm}L{1.6cm}L{1.3cm}C{0.8cm}@{}}
 \filaencab \encab{ID} & \encab{Requerimiento} & \encab{Fuente} & \encab{Causa} & \encab{Pr.} \\ \midrule \endhead
-\textbf{RF-11} & El sistema debe \textbf{traducir señales de sensores heterogéneos a códigos de evento DC-05} conforme a la tabla de mapeo del perfil CID-IoT, sin introducir códigos ajenos al estándar & [PO] [BT] & C1 & \textbf{M} \\
-\textbf{RF-12} & El sistema debe mantener una \textbf{máquina de estados de condiciones abiertas} por dispositivo, gobernada por el calificador \texttt{Q}: \texttt{Q=1} abre la condición y \texttt{Q=3} la cierra & [BT] & C1, C5 & \textbf{M} \\
-\textbf{RF-13} & El sistema debe \textbf{generar eventos por umbral} cuando un valor de telemetría cruce un límite configurado, emitiendo el código DC-05 correspondiente & [PO] & C1 & \textbf{M} \\
+\textbf{RF-11} & El sistema debe \textbf{normalizar toda trama aceptada al modelo interno único} (dispositivo, magnitud, unidad, valor, marca temporal), venga de la vía y formato que venga & [PO] [BT] & C1 & \textbf{M} \\
+\textbf{RF-12} & El sistema debe mantener \textbf{condiciones abiertas y cerradas} por dispositivo: el cruce de umbral abre la condición y la vuelta al rango la cierra & [BT] & C1, C5 & \textbf{M} \\
+\textbf{RF-13} & El sistema debe \textbf{generar eventos por umbral} cuando una medición cruce un límite configurado & [PO] & C1 & \textbf{M} \\
 \textbf{RF-14} & El sistema debe permitir \textbf{configurar umbrales de disparo y de restauración por dispositivo}, con banda de histéresis para evitar oscilación & [BT] & C5 & \textbf{S} \\
 \textbf{RF-15} & El sistema debe \textbf{correlacionar eventos con telemetría} mediante la tripleta de identidad \texttt{(ACCT, GG, CCC)} y la marca temporal, para reconstruir el contexto de un evento & [DP] & C1 & \textbf{S} \\
 \textbf{RF-16} & El sistema debe \textbf{normalizar las marcas temporales} a un huso único, tolerando que el nodo no disponga de reloj confiable y usando la hora de recepción cuando corresponda & [BT] & C1 & \textbf{M} \\
@@ -39,19 +39,19 @@ aborda y su prioridad MoSCoW.
 \textbf{RF-19} & El sistema debe permitir \textbf{registrar un dispositivo nuevo} asignándole su tripleta \texttt{(ACCT, GG, CCC)} sin intervenir la consola del servidor de red & [PO] [EM] & C4 & \textbf{M} \\
 \textbf{RF-20} & El sistema debe \textbf{rechazar el registro} de un dispositivo cuya tripleta ya exista, y advertir cuando el espacio de direcciones de un sitio se agote & [BT] & C1 & \textbf{S} \\
 \textbf{RF-21} & El sistema debe permitir \textbf{agrupar dispositivos por sitio y por zona lógica}, y presentar la vista agrupada & [PO] & C4 & \textbf{M} \\
-\textbf{RF-22} & El sistema debe permitir \textbf{marcar un dispositivo en mantenimiento}, suprimiendo sus alertas y registrando el evento con el código 570 & [BT] & C5 & \textbf{C} \\
+\textbf{RF-22} & El sistema debe permitir \textbf{marcar un dispositivo en mantenimiento}, suprimiendo sus alertas y dejando registro del período & [BT] & C5 & \textbf{C} \\
 \textbf{RF-23} & El sistema debe registrar \textbf{quién realizó cada cambio de configuración de un dispositivo y cuándo} & [BT] & C5 & \textbf{S} \\
 \end{longtable}
 
 \section{M4 --- Supervisión de salud de enlace}
 \begin{longtable}{@{}C{1.4cm}L{6.5cm}L{1.6cm}L{1.3cm}C{0.8cm}@{}}
 \filaencab \encab{ID} & \encab{Requerimiento} & \encab{Fuente} & \encab{Causa} & \encab{Pr.} \\ \midrule \endhead
-\textbf{RF-24} & El sistema debe \textbf{detectar la pérdida de supervisión} de un dispositivo cuando no reporte durante un número configurable de intervalos, y emitir el código 381 & [PO] [BT] & \textbf{C5} & \textbf{M} \\
-\textbf{RF-25} & El sistema debe \textbf{detectar la restauración} del dispositivo y cerrar la condición con \texttt{Q=3} & [BT] & C5 & \textbf{M} \\
+\textbf{RF-24} & El sistema debe \textbf{detectar la pérdida de comunicación} de un dispositivo cuando no reporte durante un número configurable de intervalos, y abrir la condición correspondiente & [PO] [BT] & \textbf{C5} & \textbf{M} \\
+\textbf{RF-25} & El sistema debe \textbf{detectar la restauración} del dispositivo y cerrar la condición, registrando la duración de la interrupción & [BT] & C5 & \textbf{M} \\
 \textbf{RF-26} & El sistema debe registrar la \textbf{última vez que se recibió} comunicación de cada dispositivo & [PO] & C5 & \textbf{M} \\
 \textbf{RF-27} & El sistema debe \textbf{presentar la calidad del enlace} por dispositivo (RSSI, SNR y porcentaje de recepción) cuando el transporte la provea & [BT] & C5 & \textbf{M} \\
 \textbf{RF-28} & El sistema debe \textbf{procesar eventos de batería baja} (código 384) y exponer los dispositivos que requieren mantenimiento & [PO] [BT] & C5 & \textbf{M} \\
-\textbf{RF-29} & El sistema debe \textbf{aceptar y contabilizar los *heartbeat}* (códigos 602 y 603) como evidencia de supervisión activa & [BT] & C5 & \textbf{M} \\
+\textbf{RF-29} & El sistema debe \textbf{aprovechar el *keep-alive* y el *Last Will* de MQTT} como evidencia de conexión y aviso inmediato de desconexión & [BT] & C5 & \textbf{M} \\
 \textbf{RF-30} & El sistema debe presentar un \textbf{indicador agregado de salud por sitio}: total de dispositivos, en línea, con condición abierta y sin supervisión & [PO] & C4, C5 & \textbf{M} \\
 \end{longtable}
 
@@ -77,12 +77,12 @@ aborda y su prioridad MoSCoW.
 \section{M7 --- Seguridad, identidad y multi-tenencia}
 \begin{longtable}{@{}C{1.4cm}L{6.5cm}L{1.6cm}L{1.3cm}C{0.8cm}@{}}
 \filaencab \encab{ID} & \encab{Requerimiento} & \encab{Fuente} & \encab{Causa} & \encab{Pr.} \\ \midrule \endhead
-\textbf{RF-40} & El sistema debe \textbf{autenticar toda ingesta} mediante credencial por sitio, rechazando mensajes sin credencial válida & [BT] & C1 & \textbf{M} \\
+\textbf{RF-40} & El sistema debe \textbf{autenticar toda recepción} mediante credencial por sitio, rechazando mensajes sin credencial válida & [BT] & C1 & \textbf{M} \\
 \textbf{RF-41} & El sistema debe \textbf{aislar los datos entre sitios}: ningún usuario de un sitio puede acceder a datos de otro & [BT] [DP] & C3 & \textbf{M} \\
-\textbf{RF-42} & El sistema debe \textbf{cifrar el transporte} de toda comunicación externa (TLS para HTTP y MQTT; AES para DC-09 conforme al estándar) & [BT] & C1 & \textbf{M} \\
+\textbf{RF-42} & El sistema debe \textbf{cifrar el transporte} de toda comunicación externa: TLS para HTTP y MQTT (la rama LoRaWAN trae AES-128 de fábrica) & [BT] & C1 & \textbf{M} \\
 \textbf{RF-43} & El sistema debe \textbf{autenticar a los usuarios} de la interfaz de administración con credenciales individuales & [BT] & C4 & \textbf{M} \\
 \textbf{RF-44} & El sistema debe distinguir al menos \textbf{dos roles}: administrador del sitio y usuario de consulta & [PO] & C4 & \textbf{S} \\
-\textbf{RF-45} & El sistema debe permitir \textbf{rotar las credenciales de ingesta} de un sitio sin interrumpir el servicio, conforme al criterio de DC-09-2026 & [BT] & C1 & \textbf{C} \\
+\textbf{RF-45} & El sistema debe permitir \textbf{rotar las credenciales de recepción} de un sitio sin interrumpir el servicio & [BT] & C1 & \textbf{C} \\
 \textbf{RF-46} & El sistema debe \textbf{registrar en bitácora} los accesos y las operaciones sensibles & [BT] & C5 & \textbf{S} \\
 \end{longtable}
 
@@ -98,22 +98,22 @@ aborda y su prioridad MoSCoW.
 \end{longtable}
 
 \section{Requerimientos no funcionales}
-\begin{longtable}{@{}C{1.5cm}L{5.3cm}L{2.7cm}L{1.4cm}C{0.8cm}@{}}
+\begin{longtable}{@{}C{1.5cm}L{4.9cm}L{2.4cm}L{1.4cm}C{0.8cm}@{}}
 \filaencab \encab{ID} & \encab{Requerimiento} & \encab{Verificación} & \encab{Fuente} & \encab{Pr.} \\ \midrule \endhead
-\textbf{RNF-01} & El sistema debe sostener la ingesta de \textbf{$\geq$ 50 eventos por segundo} sin pérdida & Prueba de carga con generador sintético & [DP] & \textbf{M} \\
+\textbf{RNF-01} & El sistema debe sostener la recepción de \textbf{$\geq$ 50 eventos por segundo} sin pérdida & Prueba de carga con generador sintético & [DP] & \textbf{M} \\
 \textbf{RNF-02} & El tiempo desde la recepción de un evento hasta su disponibilidad para consulta debe ser \textbf{$\leq$ 2 segundos} en el percentil 95 & Medición instrumentada & [DP] & \textbf{M} \\
 \textbf{RNF-03} & El sistema debe \textbf{detectar la pérdida de supervisión} de un dispositivo en \textbf{$\leq$ 2 intervalos} de reporte configurados & Prueba funcional con nodo silenciado & [PO] & \textbf{M} \\
 \textbf{RNF-04} & Una consulta de historial de 30 días de un dispositivo debe responder en \textbf{$\leq$ 3 segundos} & Medición con volumen sintético & [DP] & \textbf{S} \\
 \textbf{RNF-05} & Ningún evento aceptado y confirmado puede perderse ante un reinicio del sistema & Prueba de recuperación ante falla & [BT] & \textbf{M} \\
-\textbf{RNF-06} & El sistema debe \textbf{reanudar la ingesta automáticamente} tras recuperarse de una interrupción, sin intervención manual & Prueba de reinicio & [BT] & \textbf{M} \\
-\textbf{RNF-07} & La indisponibilidad de un adaptador de transporte \textbf{no debe afectar} la ingesta por los demás & Prueba de aislamiento de fallas & [DP] & \textbf{S} \\
+\textbf{RNF-06} & El sistema debe \textbf{reanudar la recepción automáticamente} tras recuperarse de una interrupción, sin intervención manual & Prueba de reinicio & [BT] & \textbf{M} \\
+\textbf{RNF-07} & La indisponibilidad de un adaptador de transporte \textbf{no debe afectar} la recepción por los demás & Prueba de aislamiento de fallas & [DP] & \textbf{S} \\
 \textbf{RNF-08} & Ninguna credencial debe almacenarse en texto claro, ni en base de datos ni en el repositorio de código & Inspección y revisión del repositorio & [BT] & \textbf{M} \\
-\textbf{RNF-09} & Los dispositivos IoT deben poder residir en un \textbf{segmento de red separado} del segmento de usuarios, con acceso restringido solo a los puertos de ingesta & Diseño de red verificado y documentado & [BT] & \textbf{M} \\
+\textbf{RNF-09} & Los dispositivos IoT deben poder residir en un \textbf{segmento de red separado} del segmento de usuarios, con acceso restringido solo a los puertos de recepción & Diseño de red verificado y documentado & [BT] & \textbf{M} \\
 \textbf{RNF-10} & El sistema \textbf{no debe requerir puertos entrantes abiertos hacia los dispositivos}: la conexión siempre se inicia desde el dispositivo hacia la plataforma & Revisión de arquitectura & [BT] & \textbf{M} \\
 \textbf{RNF-11} & El código debe residir en un \textbf{repositorio git} con mensajes de commit descriptivos en la totalidad de ellos & Inspección del historial & [BT] & \textbf{M} \\
 \textbf{RNF-12} & Añadir un \textbf{transporte nuevo} debe requerir implementar solo un adaptador, sin modificar el núcleo de normalización & Revisión de diseño y prueba de extensión & [DP] & \textbf{M} \\
 \textbf{RNF-13} & La especificación del protocolo debe estar \textbf{documentada de forma independiente} de la implementación & Existencia del documento & [PO] & \textbf{M} \\
 \textbf{RNF-14} & El sistema debe poder \textbf{desplegarse completo en un único servidor} con recursos modestos, sin dependencia de servicios propietarios de nube & Despliegue verificado en máquina local & [PO] & \textbf{M} \\
 \textbf{RNF-15} & El sistema debe construirse \textbf{exclusivamente con componentes de código abierto}, sin licencias de pago & Inventario de dependencias & [PO] & \textbf{M} \\
-\textbf{RNF-16} & El mensaje de evento debe caber en el payload de LoRaWAN AU915 en su \textbf{configuración más restrictiva (11 bytes)} & Verificado: 8 bytes en BCD & [BT] & \textbf{M} \\
+\textbf{RNF-16} & La trama nativa debe cumplir \textbf{SenML (RFC 8428)}; la rama LoRa, de concretarse, debe caber en el payload disponible del plan regional & Validación de esquema + verificación de tamaño & [BT] & \textbf{M} \\
 \end{longtable}

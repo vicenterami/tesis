@@ -1,0 +1,53 @@
+\chapter[Evaluación detallada]{Evaluación detallada de transporte y formato}
+\label{anx:evaluacion}
+\small
+
+\section{Pros y contras de cada mecanismo de transporte}
+
+\textbf{MQTT (4,85).} A favor: publicar/suscribir desacopla emisores de consumidores; QoS en tres
+niveles sin lógica propia; el testamento (\emph{Last Will}) hace inmediata la detección de caída;
+cabecera de 2 bytes; conexión saliente persistente que atraviesa NAT; nació para IoT en redes
+inestables. En contra: exige operar un broker (Mosquitto: un contenedor, consumo mínimo); el
+navegador no lo habla nativo (irrelevante: el panel consulta la API).
+
+\textbf{HTTP/REST (3,45).} A favor: universal; sin broker; trivial de probar. En contra: cientos de
+bytes de cabeceras por decenas de bytes de dato; sin noción de «cliente conectado» (la caída solo se
+infiere por silencio); una conexión por envío. Rol: vía secundaria de integración.
+
+\textbf{CoAP (3,05).} El «HTTP compacto» sobre UDP para nodos mínimos. Digno técnicamente;
+ecosistema pequeño, UDP a veces filtrado, sin ventaja sobre MQTT en este caso.
+
+\textbf{WebSocket (3,05).} Canal persistente pensado para navegadores; para sensores obliga a
+construir encima temas, confirmaciones y testamento: lo que MQTT trae de fábrica. Útil como túnel de
+MQTT para paneles en vivo.
+
+\textbf{Socket TCP propio (2,60).} Máxima ligereza y control; a cambio, reinventar sesiones,
+reconexión, confirmaciones y formato. Se descarta con argumento: meses de trabajo para un resultado
+inferior a MQTT.
+
+\section{Identificación de dispositivos}
+
+El registro (aprovisionamiento) declara identidad, tipo, ubicación y credencial; cada trama se
+autoidentifica con el campo \texttt{bn}. La validación cruza ambos: dispositivo desconocido se
+rechaza y se registra el intento; trama malformada de dispositivo conocido va a cuarentena; unidad
+que no corresponde al tipo declarado va a cuarentena. Un sensor nuevo no exige tocar código: se
+registra y sus tramas ya se entienden.
+
+\section{Arquitecturas de nodo consideradas (lado del compañero)}
+
+\begin{longtable}{@{}L{3.4cm}L{3.2cm}L{3.2cm}L{3.2cm}@{}}
+\filaencab \encab{} & \encab{Puente ESP32} & \encab{Mini-PC de campo} & \encab{Sensor con red propia} \\ \midrule \endhead
+Costo por punto & $\sim$5--10 USD & $\sim$80--200 USD & según fabricante \\
+Consumo & bajo, admite batería & alto, enchufado & variable \\
+Flexibilidad & cualquier sensor serial & máxima (Python, SSH) & la que dio el fabricante \\
+Rol propuesto & nodo estándar & banco de pruebas & caso de integración HTTP \\
+\bottomrule
+\caption{Comparación de arquitecturas de nodo. La decisión es del trabajo coordinado del compañero;
+para esta plataforma todas convergen en el tópico MQTT.}
+\end{longtable}
+
+\section{Costos de alojamiento (preliminar; el detalle es OE3)}
+
+Servidor virtual arrendado: 6--20 USD/mes (2 vCPU, 4 GB). Mini-PC propio en la organización:
+150--250 USD por única vez. Servidor institucional: sin costo si se dispone. Todos los componentes
+son de código abierto sin licencias.
