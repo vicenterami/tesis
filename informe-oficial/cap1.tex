@@ -28,10 +28,11 @@ recuerdo, en adelante se citan con un apodo: \textbf{C1 formatos}, \textbf{C2 ha
 
 La \textbf{Universidad Católica de Temuco} es la organización destinataria y parte interesada
 principal —lo que la rúbrica denomina «propietario del proyecto» en el sentido de dueño del
-problema, no del trabajo—: dispone de sensores y requiere una plataforma donde registrarlos y
-monitorearlos, según lo transmitido por el profesor guía. El levantamiento directo con las partes
-interesadas está pendiente y es la acción prioritaria del período; la brecha se declara en lugar de
-omitirse.
+problema, no del trabajo—: dispone de sensores y requiere una plataforma donde registrarlos y monitorearlos. El caso de
+validación concreto es el \textbf{Campus Dr. Luis Rivas del Canto}, sede de la Facultad de
+Ingeniería, donde en paralelo se despliega una red de sensores que esta plataforma recibirá y
+gestionará (sección~\ref{sec:frontera}). El levantamiento directo con las partes interesadas está
+pendiente y es la acción prioritaria del período; la brecha se declara en lugar de omitirse.
 
 \textbf{Delimitación.} El trabajo abarca la plataforma: recepción de tramas por MQTT y HTTP,
 normalización a un modelo interno, almacenamiento de series de tiempo, supervisión del estado de los
@@ -71,6 +72,13 @@ InfluxDB + Grafana permite prototipos de monitoreo, pero es un conjunto de pieza
 sin aprovisionamiento de dispositivos ni modelo de usuarios coherente, cada instalación resulta
 artesanal.
 
+Conviene además distinguir esta plataforma de un \textbf{panel de visualización simple}: mostrar en
+pantalla que las tramas llegan es una función de validación de una red de sensores, no el objeto de
+este trabajo. El aporte aquí es la capa que existe \emph{antes} de cualquier gráfico —recepción
+multiprotocolo, pipeline de normalización, supervisión del estado de cada dispositivo, series de
+tiempo y alertas—; el panel es solo uno de sus ocho módulos. Un sistema que se limitara a graficar
+datos ya procesados no resolvería ninguna de las cinco causas del problema.
+
 En la fase previa de este mismo trabajo se evaluó como eje el protocolo de la industria de alarmas
 Contact ID (SIA DC-05); el profesor guía lo descartó por estar orientado a eventos discretos y no a
 telemetría continua. El análisis completo y las razones quedan documentados en el
@@ -79,11 +87,11 @@ anexo~\ref{anx:contactid} como evidencia del camino evaluado.
 \section{Objetivos}
 \subsection{Objetivo general}
 \begin{itemize}
-\item Desarrollar una plataforma web para el registro, monitoreo y gestión de sensores en La
-Araucanía, que reciba las tramas de distintos sensores a través de TCP/IP, las normalice a un modelo
-interno único, almacene las mediciones como series de tiempo, supervise el estado de cada
-dispositivo y presente la información en un panel de control, validada con un caso de uso con
-sensores reales al término del semestre académico 2026.
+\item Desarrollar una plataforma web para el registro, monitoreo y gestión de datos de sensores,
+que reciba las tramas de distintos sensores a través de TCP/IP, las normalice a un modelo interno
+único, almacene las mediciones como series de tiempo, supervise el estado de cada dispositivo y
+presente la información en un panel de control, validada sobre un caso de uso real en el Campus
+Dr. Luis Rivas del Canto de la Universidad Católica de Temuco al término del semestre académico 2026.
 \end{itemize}
 
 \subsection{Objetivos específicos}

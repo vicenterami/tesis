@@ -10,7 +10,7 @@
 ## 1. Tema y alcance
 
 **Título de trabajo (desde el 02/09):** Plataforma web para el registro, monitoreo y gestión de
-sensores en La Araucanía.
+datos de sensores; caso de validación: Campus Dr. Luis Rivas del Canto de la UCT.
 
 **Enunciado en una frase:**
 

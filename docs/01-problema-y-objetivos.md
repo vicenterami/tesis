@@ -153,8 +153,7 @@ específicos que explicitan qué se hace, mediante qué método y con qué resul
 
 ## 2.2 Objetivo general (único)
 
-> **Desarrollar una plataforma web para el registro, monitoreo y gestión de sensores en La
-> Araucanía, que reciba las tramas de distintos sensores a través de TCP/IP, las normalice a un
+> **Desarrollar una plataforma web para el registro, monitoreo y gestión de datos de sensores, que reciba las tramas de distintos sensores a través de TCP/IP, las normalice a un
 > modelo interno único, almacene las mediciones como series de tiempo, supervise el estado de cada
 > dispositivo y presente la información en un panel de control, validada con un caso de uso con
 > sensores reales al término del semestre académico 2026.**
