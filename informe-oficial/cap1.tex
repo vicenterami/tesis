@@ -56,7 +56,11 @@ autoalojable con paneles, reglas y soporte MQTT/HTTP/CoAP. Se evaluó como posib
 trabajo y se descartó con tres razones: exige recursos considerables (Java, 4\,GB o más de memoria
 recomendada), su configuración —cadenas de reglas, decodificadores de carga útil— requiere personal
 técnico que las organizaciones destinatarias no poseen (precisamente la causa C4), y su interfaz y
-documentación están en inglés. Conviene notar que ThingsBoard aplica el mismo patrón de entrada que
+documentación están en inglés. A ello se suma el licenciamiento: funciones centrales para este caso
+—las \emph{Platform Integrations}, incluida la integración con ChirpStack para la rama LoRa, y la
+personalización de marca— pertenecen a la \textbf{edición Professional, de pago}
+\parencite{thingsboardpe}; la edición Community obliga a construir esas piezas por cuenta propia,
+lo que reintroduce la causa C4. Conviene notar que ThingsBoard aplica el mismo patrón de entrada que
 esta plataforma: exige su propio formato JSON (\texttt{\{"ts","values"\}}) en su tópico
 \texttt{v1/devices/me/telemetry}, y todo formato distinto requiere conversores
 \parencite{thingsboardmqtt}. La diferencia de este trabajo es que su contrato nativo es un

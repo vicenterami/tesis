@@ -46,6 +46,35 @@ Rol propuesto & nodo estándar & banco de pruebas & caso de integración HTTP \\
 para esta plataforma todas convergen en el tópico MQTT.}
 \end{longtable}
 
+\section{Evaluación de la tecnología de backend}
+
+Cinco alternativas sobre siete criterios. El peso mayor es la experiencia previa del desarrollador
+(25\,\%), porque en un proyecto individual con plazos cerrados el tiempo de aprendizaje se descuenta
+del de construcción; le siguen la correspondencia entre la estructura del código y la arquitectura
+documentable (15\,\%, la Etapa 2 asigna 55\,\% al diseño), la generación automática de la
+especificación de la API (15\,\%), la unificación de lenguaje con la interfaz (15\,\%), la madurez de
+bibliotecas MQTT/PostgreSQL (15\,\%), el tipado estático (10\,\%) y el rendimiento (5\,\%: todas las
+alternativas superan con holgura los 50 mensajes por segundo requeridos).
+
+\begin{longtable}{@{}L{3.3cm}C{1.1cm}C{1.2cm}C{1.2cm}C{1.2cm}C{1.1cm}C{1.0cm}C{0.9cm}C{1.0cm}@{}}
+\filaencab \encab{Alternativa} & \encab{Exper.} & \encab{Arquit.} & \encab{OpenAPI} & \encab{1 leng.} & \encab{Libs} & \encab{Tipos} & \encab{Rend.} & \encab{Total} \\ \midrule \endhead
+\textbf{TypeScript + NestJS} & 4 & 5 & 5 & 5 & 5 & 5 & 4 & \textbf{4,70} \\
+TypeScript + Fastify & 5 & 3 & 4 & 5 & 5 & 5 & 5 & 4,55 \\
+Python + FastAPI & 3 & 3 & 5 & 2 & 5 & 4 & 3 & 3,55 \\
+Java + Spring Boot & 2 & 5 & 4 & 1 & 5 & 5 & 4 & 3,45 \\
+Go + Echo & 1 & 3 & 3 & 1 & 4 & 5 & 5 & 2,65 \\
+\bottomrule
+\caption{Matriz de tecnología de backend (escala 1--5).}
+\end{longtable}
+
+Se selecciona \textbf{NestJS}: sus módulos corresponden uno a uno con los módulos M1--M8 del
+análisis (los diagramas de la Etapa 2 describirán el código real), y con TypeScript en backend e
+interfaz los tipos de la trama se definen una sola vez para todo el sistema. La diferencia con
+Fastify (0,15) no es decisiva y migrar sería una desviación aceptable si la curva de NestJS
+resultara costosa. \textbf{La interfaz (frontend)} se decide en la Etapa 2, con el diseño de vistas
+en mano y tres restricciones ya fijadas: TypeScript, componentes de código abierto y uso en
+navegador móvil; se evaluarán React, Vue y Svelte con una matriz análoga.
+
 \section{Costos de alojamiento (preliminar; el detalle es OE3)}
 
 Servidor virtual arrendado: 6--20 USD/mes (2 vCPU, 4 GB). Mini-PC propio en la organización:

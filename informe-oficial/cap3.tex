@@ -139,9 +139,10 @@ Persistencia & TimescaleDB & Un solo motor relacional y de series; InfluxDB obli
 Backend & TypeScript + NestJS & Tipos de la trama definidos una sola vez para backend y panel; módulos 1:1 con M1--M8; OpenAPI automático \\
 Rama LoRa & ChirpStack & Autoalojable; publica en MQTT: converge a la vía principal \\
 Despliegue & Contenedores Docker & Reproducible con un comando; reinicio automático; la Etapa 4 exige demostrar en condiciones realistas \\
+Interfaz (frontend) & Diferida a la Etapa 2 & Restricciones ya fijadas: TypeScript (mismo lenguaje del backend), componentes abiertos, uso en navegador móvil; se evaluarán React, Vue y Svelte con el diseño de vistas en mano \\
 \bottomrule
 \end{tabular}
-\caption{Decisiones de infraestructura. Las matrices completas están en el repositorio.}
+\caption{Decisiones de infraestructura. La matriz completa de la tecnología de backend —cinco alternativas y siete criterios— está en el anexo~\ref{anx:evaluacion}; el resto, en el repositorio.}
 \label{tab:infra}
 \end{table}
 
