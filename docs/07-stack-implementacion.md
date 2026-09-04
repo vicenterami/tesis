@@ -63,7 +63,7 @@ el informe**. Hay que elegir conscientemente:
 > del backend para tiempo real). Razones: no expone el broker, no pone credenciales MQTT en JavaScript
 > del cliente, mantiene el pipeline de filtros como único camino de los datos, y **es lo que el informe
 > ya declara**. El Patrón A es más rápido de prototipar pero rompe la capa de seguridad y el pipeline.
-> Decisión a confirmar en la Etapa 2.
+> **Decisión tomada (04/09): Patrón B.** El navegador habla solo con el backend.
 
 ---
 
