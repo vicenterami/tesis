@@ -242,6 +242,7 @@ es realmente multiprotocolo: es monoprotocolo con excepciones.
 |---|---|---|---|:---:|
 | **RNF-14** | El sistema debe poder **desplegarse completo en un único servidor** con recursos modestos, sin dependencia de servicios propietarios de nube | Despliegue verificado en máquina local | [PO] | **M** |
 | **RNF-15** | El sistema debe construirse **exclusivamente con componentes de código abierto**, sin licencias de pago | Inventario de dependencias | [PO] | **M** |
+| **RNF-17** | La plataforma completa (broker, base de datos, backend, interfaz y, de existir, el servidor de red) debe **operar en un servidor de 2 GB de memoria**, por debajo de las exigencias del referente comercial | Medición de consumo en reposo y bajo carga en la Etapa 4 | [DP] [EM] | **M** |
 | **RNF-16** | La trama nativa debe cumplir **SenML (RFC 8428)**; la rama LoRa, de concretarse, debe caber en el payload disponible del plan regional | Validación de esquema + verificación de tamaño | [BT] | **M** |
 
 **Justificación de RNF-14 y RNF-15.** Provienen directamente de la indicación del propietario del

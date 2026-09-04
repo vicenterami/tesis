@@ -54,7 +54,8 @@ por mensaje (10\,\%, la objeción a las cabeceras) y funcionar tras NAT sin abri
 RNF-10).
 
 \begin{table}[H]
-\centering\scriptsize\setlength{\tabcolsep}{2pt}
+\centering\footnotesize
+\begin{tablaseg}
 \begin{tabular}{@{}L{2.7cm}C{1.4cm}C{1.4cm}C{1.3cm}C{1.4cm}C{1.5cm}C{1.1cm}C{1.0cm}@{}}
 \toprule
  & \textbf{Entrega confiable} & \textbf{Detecta caídos} & \textbf{Costo en nodo} & \textbf{Facilidad backend} & \textbf{Sobrecarga mensaje} & \textbf{Tras NAT} & \textbf{Total} \\
@@ -67,6 +68,7 @@ WebSocket & 2 & 3 & 3 & 3 & 4 & \textbf{5} & 3,05 \\
 Socket TCP propio & 1 & 2 & \textbf{5} & 1 & \textbf{5} & \textbf{5} & 2,60 \\
 \bottomrule
 \end{tabular}
+\end{tablaseg}
 \caption{Evaluación del mecanismo de transporte (escala 1--5). Los pros y contras en palabras de
 cada alternativa están en el anexo~\ref{anx:evaluacion}.}
 \label{tab:transporte}
@@ -139,12 +141,16 @@ Persistencia & TimescaleDB & Un solo motor relacional y de series; InfluxDB obli
 Backend & TypeScript + NestJS & Tipos de la trama definidos una sola vez para backend y panel; módulos 1:1 con M1--M8; OpenAPI automático \\
 Rama LoRa & ChirpStack & Autoalojable; publica en MQTT: converge a la vía principal \\
 Despliegue & Contenedores Docker & Reproducible con un comando; reinicio automático; la Etapa 4 exige demostrar en condiciones realistas \\
-Interfaz (frontend) & Diferida a la Etapa 2 & Restricciones ya fijadas: TypeScript (mismo lenguaje del backend), componentes abiertos, uso en navegador móvil; se evaluarán React, Vue y Svelte con el diseño de vistas en mano \\
+Interfaz (frontend) & Svelte + uPlot & Artefacto liviano sin \emph{virtual DOM}, coherente con la ligereza objetivo; gráficos de series de tiempo de pocos kilobytes; se confirma en la Etapa 2 (anexo~\ref{anx:evaluacion}) \\
 \bottomrule
 \end{tabular}
 \caption{Decisiones de infraestructura. La matriz completa de la tecnología de backend —cinco alternativas y siete criterios— está en el anexo~\ref{anx:evaluacion}; el resto, en el repositorio.}
 \label{tab:infra}
 \end{table}
+
+Un requerimiento no funcional propio del enfoque es \textbf{RNF-17}: la plataforma completa debe
+operar en un servidor de 2\,GB de memoria —frente a los 4\,GB o más que exige el referente—, lo que
+se estima en el anexo~\ref{anx:evaluacion} y se mide en la Etapa 4.
 
 \textbf{Restricciones:} RE-01 dedicación $\sim$15 h semanales; RE-02 proyecto individual coordinado
 con el trabajo del compañero; RE-03 solo componentes abiertos; RE-05 umbral de aprobación del

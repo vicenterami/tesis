@@ -22,6 +22,8 @@
 \usepackage{longtable}
 \usepackage{multirow}
 \usepackage[table]{xcolor}
+\usepackage{adjustbox}   %% regla permanente: \begin{tablaseg}...\end{tablaseg} nunca desborda
+\newenvironment{tablaseg}{\begin{adjustbox}{max width=\linewidth,center}}{\end{adjustbox}}
 \usepackage{tikz}
 \usetikzlibrary{positioning,shapes.geometric,arrows.meta,fit,backgrounds,calc,decorations.pathreplacing}
 \usepackage{hyperref}

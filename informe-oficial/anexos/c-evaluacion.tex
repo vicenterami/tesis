@@ -56,16 +56,24 @@ especificación de la API (15\,\%), la unificación de lenguaje con la interfaz 
 bibliotecas MQTT/PostgreSQL (15\,\%), el tipado estático (10\,\%) y el rendimiento (5\,\%: todas las
 alternativas superan con holgura los 50 mensajes por segundo requeridos).
 
-\begin{longtable}{@{}L{3.3cm}C{1.1cm}C{1.2cm}C{1.2cm}C{1.2cm}C{1.1cm}C{1.0cm}C{0.9cm}C{1.0cm}@{}}
-\filaencab \encab{Alternativa} & \encab{Exper.} & \encab{Arquit.} & \encab{OpenAPI} & \encab{1 leng.} & \encab{Libs} & \encab{Tipos} & \encab{Rend.} & \encab{Total} \\ \midrule \endhead
+\begin{table}[H]
+\centering\footnotesize
+\begin{tablaseg}
+\begin{tabular}{@{}L{3.6cm}C{1.3cm}C{1.4cm}C{1.4cm}C{1.4cm}C{1.1cm}C{1.1cm}C{1.1cm}C{1.1cm}@{}}
+\toprule
+\textbf{Alternativa} & \textbf{Exper.} & \textbf{Arquit.} & \textbf{OpenAPI} & \textbf{1 leng.} & \textbf{Libs} & \textbf{Tipos} & \textbf{Rend.} & \textbf{Total} \\
+ & 25\,\% & 15\,\% & 15\,\% & 15\,\% & 15\,\% & 10\,\% & 5\,\% & \\
+\midrule
 \textbf{TypeScript + NestJS} & 4 & 5 & 5 & 5 & 5 & 5 & 4 & \textbf{4,70} \\
 TypeScript + Fastify & 5 & 3 & 4 & 5 & 5 & 5 & 5 & 4,55 \\
 Python + FastAPI & 3 & 3 & 5 & 2 & 5 & 4 & 3 & 3,55 \\
 Java + Spring Boot & 2 & 5 & 4 & 1 & 5 & 5 & 4 & 3,45 \\
 Go + Echo & 1 & 3 & 3 & 1 & 4 & 5 & 5 & 2,65 \\
 \bottomrule
+\end{tabular}
+\end{tablaseg}
 \caption{Matriz de tecnología de backend (escala 1--5).}
-\end{longtable}
+\end{table}
 
 Se selecciona \textbf{NestJS}: sus módulos corresponden uno a uno con los módulos M1--M8 del
 análisis (los diagramas de la Etapa 2 describirán el código real), y con TypeScript en backend e
@@ -74,6 +82,70 @@ Fastify (0,15) no es decisiva y migrar sería una desviación aceptable si la cu
 resultara costosa. \textbf{La interfaz (frontend)} se decide en la Etapa 2, con el diseño de vistas
 en mano y tres restricciones ya fijadas: TypeScript, componentes de código abierto y uso en
 navegador móvil; se evaluarán React, Vue y Svelte con una matriz análoga.
+
+\section{Evaluación de la tecnología de interfaz (frontend)}
+
+El panel es el único módulo que el usuario final ve, pero \textbf{la restricción dominante de este
+trabajo es la ligereza}: la plataforma debe operar en hardware modesto, por debajo de las
+exigencias del referente (ThingsBoard recomienda 4\,GB de memoria solo para sí mismo). Por ello el
+criterio de mayor peso es el tamaño del artefacto entregado al navegador y el consumo en el
+servidor que lo sirve, seguido de la coherencia con el backend (TypeScript), la disponibilidad de
+componentes de gráficos de series de tiempo, y la experiencia previa.
+
+\begin{table}[H]
+\centering\footnotesize
+\begin{tablaseg}
+\begin{tabular}{@{}L{3.4cm}C{1.6cm}C{1.6cm}C{1.7cm}C{1.5cm}C{1.5cm}C{1.1cm}@{}}
+\toprule
+\textbf{Alternativa} & \textbf{Ligereza} & \textbf{TypeScript} & \textbf{Gráficos series} & \textbf{Experien.} & \textbf{Ecosist.} & \textbf{Total} \\
+ & 35\,\% & 20\,\% & 20\,\% & 15\,\% & 10\,\% & \\
+\midrule
+\textbf{Svelte + uPlot} & 5 & 5 & 5 & 3 & 3 & \textbf{4,45} \\
+Vue + ECharts & 3 & 5 & 4 & 4 & 4 & 3,75 \\
+React + Recharts & 2 & 5 & 5 & 4 & 5 & 3,70 \\
+Angular (como ThingsBoard) & 1 & 5 & 4 & 2 & 4 & 2,85 \\
+\bottomrule
+\end{tabular}
+\end{tablaseg}
+\caption{Matriz de tecnología de interfaz (escala 1--5).}
+\end{table}
+
+Se recomienda \textbf{Svelte con uPlot}. Svelte compila a JavaScript mínimo sin \emph{virtual DOM},
+lo que produce artefactos varias veces más livianos que React o Angular —coherente con la ligereza
+que diferencia a la plataforma de ThingsBoard, construido en Angular—; uPlot es una biblioteca de
+gráficos especializada en series de tiempo de unos pocos kilobytes, apropiada para paneles de
+telemetría en navegador móvil. Se mantiene TypeScript, con lo que los tipos del modelo interno se
+comparten entre backend e interfaz. La decisión se confirma en la Etapa 2 con el diseño de las
+vistas en mano; React queda como alternativa si se prioriza el ecosistema de componentes sobre la
+ligereza.
+
+\section{Presupuesto de recursos frente al referente}
+
+La preocupación por el consumo de hardware es legítima y se aborda con una estimación explícita del
+uso de memoria en reposo de cada componente:
+
+\begin{table}[H]
+\centering\footnotesize
+\begin{tabular}{@{}L{5.0cm}L{3.2cm}L{4.4cm}@{}}
+\toprule
+\textbf{Componente} & \textbf{Memoria en reposo} & \textbf{Nota} \\
+\midrule
+Mosquitto (broker) & $\sim$10\,MB & escrito en C \\
+TimescaleDB (PostgreSQL) & $\sim$150--300\,MB & crece con la carga; configurable \\
+Backend NestJS (Node) & $\sim$80--150\,MB & \\
+ChirpStack (si hay rama LoRa) & $\sim$50\,MB & escrito en Go \\
+Interfaz servida (estática) & $\sim$10\,MB & Svelte compilado \\
+\midrule
+\textbf{Total estimado en reposo} & $\sim$\textbf{0,3--0,5\,GB} & frente a $\geq$4\,GB de ThingsBoard \\
+\bottomrule
+\end{tabular}
+\caption{Presupuesto de memoria estimado. Da origen al requerimiento RNF-17: la plataforma completa
+debe operar en un servidor de 2\,GB de memoria, lo que se verifica empíricamente en la Etapa 4.}
+\end{table}
+
+Esta estimación es preliminar y se somete a medición real en el banco de comparación de la Etapa 4:
+es una hipótesis de diseño, no una afirmación cerrada. El riesgo de que TimescaleDB crezca bajo
+carga se controla con políticas de retención y compresión.
 
 \section{Costos de alojamiento (preliminar; el detalle es OE3)}
 
