@@ -27,6 +27,8 @@ Plataforma abierta de gestión e interoperabilidad de datos para redes de sensor
 | Problema, objetivos SMART y trazabilidad | [`docs/01-problema-y-objetivos.md`](docs/01-problema-y-objetivos.md) |
 | Catálogo de requerimientos y alternativas | [`docs/02-requerimientos.md`](docs/02-requerimientos.md) |
 | Backlog con estimaciones y viabilidad | [`docs/04-backlog.md`](docs/04-backlog.md) |
+| Evaluación de comunicación y formato de trama | [`docs/06-evaluacion-comunicacion.md`](docs/06-evaluacion-comunicacion.md) |
+| Stack de implementación verificado (Etapa 2) | [`docs/07-stack-implementacion.md`](docs/07-stack-implementacion.md) |
 | Fundamentos y glosario para explicar el proyecto | [`docs/GLOSARIO.md`](docs/GLOSARIO.md) |
 | Preguntas al profesor guía y guion de entrevistas | [`docs/03-instrumentos-levantamiento.md`](docs/03-instrumentos-levantamiento.md) |
 | **El protocolo de comunicación y por qué este** | **[`docs/05-protocolo-contactid.md`](docs/05-protocolo-contactid.md)** |
