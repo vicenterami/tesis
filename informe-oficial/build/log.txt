@@ -522,18 +522,18 @@ Overfull \vbox (0.85402pt too high) has occurred while \output is active
 Underfull \hbox (badness 1616) in paragraph at lines 36--36
 \T1/ppl/m/n/10.95 ^^Val-ma-ce-na-mien-to, cua-ren-te-na y re-gis-tro de des-co-
 no-ci-dos^^V pre-ser-van la
-) (./figuras/despliegue.tex)
+)
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
-[15]
+[15] (./figuras/despliegue.tex)
 
 Overfull \vbox (0.85402pt too high) has occurred while \output is active
 [16])
-Underfull \hbox (badness 1769) in paragraph at lines 144--91
+Underfull \hbox (badness 1769) in paragraph at lines 148--91
 []\T1/ppl/b/n/12 Restricciones: \T1/ppl/m/n/12 RE-01 de-di-ca-ción $\OMS/zplm/m
 /n/12 ^^X$\T1/ppl/m/n/12 15 h se-ma-na-les; RE-02 pro-yec-to
 
-Underfull \hbox (badness 3229) in paragraph at lines 144--91
+Underfull \hbox (badness 3229) in paragraph at lines 148--91
 \T1/ppl/m/n/12 in-di-vi-dual coor-di-na-do con el tra-ba-jo del com-pa-ñe-ro; R
 E-03 so-lo
 
@@ -714,7 +714,7 @@ ist/fonts/type1/urw/palatino/uplbi8a.pfb></usr/share/texlive/texmf-dist/fonts/t
 ype1/urw/palatino/uplr8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/pal
 atino/uplr8a.pfb></usr/share/texlive/texmf-dist/fonts/type1/urw/palatino/uplri8
 a.pfb>
-Output written on build/main.pdf (54 pages, 345662 bytes).
+Output written on build/main.pdf (54 pages, 346037 bytes).
 Transcript written on build/main.log.
 Latexmk: Getting log file 'build/main.log'
 Latexmk: Examining 'build/main.fls'

@@ -34,7 +34,7 @@ análisis de rúbrica realizado sigue siendo válido.
 
 ## 4. Próxima reunión
 
-**Jueves 27 de agosto, por la tarde**, con el profesor Mario Villanueva y Eduardo Manrique
+**Jueves 27 de agosto, por la tarde**, con el profesor Mario Villanueva y Eduardo M.
 (posible compañero de tesis). Temas: mostrar avance; definir tesis conjunta o trabajos
 separados coordinados; acordar el protocolo de comunicación común (sensores ↔ plataforma);
 validar formato Cardiff/plantilla oficial; contactos para entrevistas.
