@@ -50,3 +50,7 @@ recursos-uct/
 referencias/*.pdf
 informe-oficial/build/
 /CLAUDE.md
+
+# Secretos de despliegue
+plataforma/.env
+plataforma/mosquitto/config/passwd
