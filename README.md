@@ -29,6 +29,9 @@ Plataforma abierta de gestión e interoperabilidad de datos para redes de sensor
 | Backlog con estimaciones y viabilidad | [`docs/04-backlog.md`](docs/04-backlog.md) |
 | Evaluación de comunicación y formato de trama | [`docs/06-evaluacion-comunicacion.md`](docs/06-evaluacion-comunicacion.md) |
 | Stack de implementación verificado (Etapa 2) | [`docs/07-stack-implementacion.md`](docs/07-stack-implementacion.md) |
+| Modelo de datos (Etapa 2) | [`docs/08-modelo-datos.md`](docs/08-modelo-datos.md) |
+| Protocolo de validación y banco de comparación | [`docs/09-protocolo-validacion.md`](docs/09-protocolo-validacion.md) |
+| Arquitectura: C4, secuencias y despliegue (Etapa 2) | [`docs/10-arquitectura.md`](docs/10-arquitectura.md) |
 | Fundamentos y glosario para explicar el proyecto | [`docs/GLOSARIO.md`](docs/GLOSARIO.md) |
 | Preguntas al profesor guía y guion de entrevistas | [`docs/03-instrumentos-levantamiento.md`](docs/03-instrumentos-levantamiento.md) |
 | **El protocolo de comunicación y por qué este** | **[`docs/05-protocolo-contactid.md`](docs/05-protocolo-contactid.md)** |
