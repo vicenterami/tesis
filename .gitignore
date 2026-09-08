@@ -54,3 +54,4 @@ informe-oficial/build/
 # Secretos de despliegue
 plataforma/.env
 plataforma/mosquitto/config/passwd
+!plataforma/.env.example
