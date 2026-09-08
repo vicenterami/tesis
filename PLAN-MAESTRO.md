@@ -119,20 +119,17 @@ desperdicia en rehacer trabajo perdido entre dispositivos** — de ahí la secci
 > **La fuente de verdad es este repositorio git.** Todo lo demás —artifacts, chats, Overleaf, notas
 > del teléfono— es vista, borrador o respaldo. Nada importante vive fuera del repo.
 
-Razón concreta y verificada: las **conversaciones de claude.ai no son legibles** por el asistente
-(devuelven HTTP 403). Los **artifacts publicados sí** lo son. Y los artifacts se alojan en una cuenta
-de Claude **que no es la personal del estudiante**, por lo que **no pueden ser almacenamiento de la
-tesis**: son vista regenerable.
+El repositorio git es la única fuente de verdad del proyecto. Cualquier borrador, nota o material de
+apoyo que no esté versionado aquí se considera desechable: lo que no está en el repo, no existe.
 
 ### Qué se puede hacer desde dónde
 
 | Dispositivo / entorno | Qué hacer ahí | Cómo |
 |---|---|---|
-| **Portátil principal (Ubuntu)** | **Todo**: redactar, compilar LaTeX, programar, commitear | Claude Code local sobre `~/tesis` |
+| **Portátil principal (Ubuntu)** | **Todo**: redactar, compilar LaTeX, programar, commitear | Trabajo local sobre `~/tesis` |
 | **Otro portátil** | **Todo**, si tiene el entorno | `git clone git@github.com:vicenterami/tesis.git` |
 | **Teléfono — app o web de GitHub** | **Leer** documentos, **anotar** en `bitacora/INBOX.md`, revisar el backlog | GitHub permite editar archivos `.md` desde el navegador y commitear |
-| **Teléfono — app de Claude** | Consultas puntuales, dictar ideas | ⚠️ **lo que se converse ahí no es recuperable después.** Todo lo valioso debe copiarse a un archivo del repo el mismo día |
-| **Navegador — claude.ai/code** | Trabajar sobre el repo con contexto completo | Requiere conectar GitHub a la cuenta de Claude. ⚠️ es cuenta corporativa: decisión a evaluar |
+| **Teléfono** | Anotar ideas rápidas y revisar documentos | ⚠️ lo que no se copie a un archivo del repo el mismo día se pierde |
 
 **Regla de oro:** **producir solo donde hay git; en el teléfono, capturar.** El teléfono sirve para no
 perder una idea, nunca para tomar una decisión que después no quede registrada.

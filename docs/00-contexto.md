@@ -1,7 +1,7 @@
 # Contexto de la tesis — punto de partida
 
 > Documento de traspaso. Léelo al iniciar una sesión nueva dedicada a la tesis.
-> Las reglas de trabajo y del entorno están en `CLAUDE.md` (se carga solo).
+
 
 ## Idea central
 
@@ -73,5 +73,4 @@ Todo lo anterior es investigación de base ya hecha. **Nada está comprometido c
 
 ## Recursos
 
-- Informe visual completo (artifact web, se abre desde cualquier dispositivo con sesión de claude.ai):
-  https://claude.ai/code/artifact/9f771792-b4e6-4dc2-b1e9-70fa75c38030
+

@@ -34,7 +34,6 @@ Plataforma abierta de gestión e interoperabilidad de datos para redes de sensor
 | **El protocolo de comunicación y por qué este** | **[`docs/05-protocolo-contactid.md`](docs/05-protocolo-contactid.md)** |
 | Qué dijo el profesor y qué se cambió por eso | [`bitacora/`](bitacora/) |
 | La pauta de evaluación oficial | [`referencias/`](referencias/) |
-| Reglas de trabajo del asistente | [`CLAUDE.md`](CLAUDE.md) |
 
 ## Estructura
 
@@ -51,6 +50,5 @@ recursos-uct/    (local, no versionada) materiales originales del curso
 
 ## Regla de trabajo fundamental
 
-> **Este repositorio es la única fuente de verdad.** Los artifacts de claude.ai, las conversaciones y
-> las notas del teléfono son vistas o borradores: lo que no está aquí, no existe. Ver la sección 4 de
-> `PLAN-MAESTRO.md`.
+> **Este repositorio es la única fuente de verdad.** Los borradores y las notas sueltas son material
+> de apoyo desechable: lo que no está versionado aquí, no existe. Ver la sección 4 de `PLAN-MAESTRO.md`.
