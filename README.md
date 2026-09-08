@@ -34,6 +34,7 @@ estado de cada dispositivo y panel de control. Caso de validación: Campus Dr. L
 | Modelo de datos (Etapa 2) | [`docs/08-modelo-datos.md`](docs/08-modelo-datos.md) |
 | Protocolo de validación y banco de comparación | [`docs/09-protocolo-validacion.md`](docs/09-protocolo-validacion.md) |
 | Arquitectura: C4, secuencias y despliegue (Etapa 2) | [`docs/10-arquitectura.md`](docs/10-arquitectura.md) |
+| Seguridad en capas: amenazas y controles verificados | [`docs/11-seguridad.md`](docs/11-seguridad.md) |
 | Fundamentos y glosario para explicar el proyecto | [`docs/GLOSARIO.md`](docs/GLOSARIO.md) |
 | Preguntas al profesor guía y guion de entrevistas | [`docs/03-instrumentos-levantamiento.md`](docs/03-instrumentos-levantamiento.md) |
 | **El protocolo de comunicación y por qué este** | **[`docs/05-protocolo-contactid.md`](docs/05-protocolo-contactid.md)** |

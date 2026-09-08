@@ -13,8 +13,10 @@ services:
 
   # ── Base de datos de series de tiempo ───────────────────────────────────────
   timescaledb:
-    image: timescale/timescaledb:latest-pg16     # PostgreSQL 16 + extensión TimescaleDB
+    image: timescale/timescaledb:2.24.0-pg16     # versión fijada: un despliegue reproducible no usa "latest"
     restart: unless-stopped                      # vuelve solo tras un reinicio del servidor
+    security_opt:
+      - no-new-privileges:true                   # un proceso comprometido no puede escalar privilegios
     environment:
       POSTGRES_DB: ${DB_NOMBRE}
       POSTGRES_USER: ${DB_USUARIO}
@@ -36,10 +38,13 @@ services:
 
   # ── Broker MQTT ─────────────────────────────────────────────────────────────
   mosquitto:
-    image: eclipse-mosquitto:2.0
+    image: eclipse-mosquitto:2.0.22
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     ports:
-      - "1883:1883"        # SOLO en desarrollo local. En producción va detrás del proxy TLS (8883).
+      - "127.0.0.1:1883:1883"   # SOLO desarrollo, y SOLO desde este equipo: ningún aparato de la
+                                # red local alcanza el broker. En producción: proxy TLS en 8883.
     volumes:
       - ./mosquitto/config:/mosquitto/config:ro
       - datos-mosquitto:/mosquitto/data                    # mensajes retenidos y sesiones
