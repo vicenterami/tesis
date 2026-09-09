@@ -186,11 +186,11 @@ sequenceDiagram
                 F4->>F4: convierte unidad, ajusta marca de tiempo (sin reloj → hora de recepción)
                 F4->>DB: INSERT medicion (hypertable)
                 F4->>F5: lecturas normalizadas
-                F5->>DB: UPDATE visto_por_ultima_vez; cierra condición "sin_comunicacion" si estaba abierta
+                F5->>DB: UPDATE visto_por_ultima_vez · cierra condición "sin_comunicacion" si estaba abierta
                 F5->>F6: lecturas + reglas de umbral del canal
                 alt cruza umbral (con histéresis)
                     F6->>DB: abre/cierra condicion, INSERT evento
-                    F6-->>MQ: notifica (WS al panel; correo si configurado)
+                    F6-->>MQ: notifica (WS al panel · correo si configurado)
                 end
             end
         end
@@ -237,9 +237,9 @@ cientos de puntos, no millones, sin importar cuánto tiempo lleve el sensor tran
 flowchart TB
     subgraph HOST["Servidor Ubuntu · Docker Engine"]
         subgraph NET["red interna: plataforma"]
-            C1["mosquitto\nimagen eclipse-mosquitto\nlímite: 0,25 GB"]
-            C2["chirpstack\n+ redis propio; usa una base aparte\nen el mismo PostgreSQL\nlímite: 0,35 GB"]
-            C3["timescaledb\nimagen timescale/timescaledb-ha\nlímite: 0,75 GB"]
+            C1["mosquitto\nimagen eclipse-mosquitto:2.0.22\nlímite: 0,25 GB"]
+            C2["chirpstack\n+ redis propio · usa una base aparte\nen el mismo PostgreSQL\nlímite: 0,35 GB"]
+            C3["timescaledb\nimagen timescale/timescaledb:2.24.0-pg16\nlímite: 0,75 GB"]
             C4["backend\nimagen propia (NestJS + panel estático)\nlímite: 0,5 GB"]
             C5["proxy\nimagen caddy (TLS automático)\nlímite: 0,1 GB"]
         end
