@@ -12,10 +12,10 @@ estado de cada dispositivo y panel de control. Caso de validación: Campus Dr. L
 
 | Etapa | Entrega | Estado |
 |---|---|---|
-| 1 — Problema, objetivos y requerimientos | viernes 28 de agosto de 2026 | 🟡 en curso |
-| 2 — Diseño e implementación inicial | viernes 25 de septiembre de 2026 | ⬜ |
-| 3 — Mejoras, pruebas y validación preliminar | viernes 23 de octubre de 2026 | ⬜ |
-| 4 — Validación final e informe | viernes 20 de noviembre de 2026 | ⬜ |
+| 1 — Problema, objetivos y requerimientos | viernes 4 de septiembre de 2026 | ✅ entregada |
+| 2 — Diseño e implementación inicial | viernes 2 de octubre de 2026 | 🟡 en curso — ver [`docs/12`](docs/12-estado-etapa2.md) |
+| 3 — Mejoras, pruebas y validación preliminar | viernes 30 de octubre de 2026 | ⬜ |
+| 4 — Validación final e informe | viernes 4 de diciembre de 2026 | ⬜ |
 
 **Próximo hito:** revisión con el profesor guía el **miércoles 26 de agosto de 2026**.
 

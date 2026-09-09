@@ -480,3 +480,9 @@ no demuestran ninguna.
 | Estimaciones | ✅ 63 elementos estimados, **275 h** en total, sumadas programáticamente |
 | Priorización | ✅ MoSCoW heredado del catálogo, más orden de ejecución justificado |
 | Verificación de viabilidad | 🔴 **Realizada. El backlog completo excede el presupuesto en 37 %; el núcleo cabe con 18 % de holgura. Redistribución correctiva definida** |
+
+## Seguimiento de ejecución
+
+El estado de cada ítem tocado (hecho / parcial / pendiente, con su evidencia) se lleva en
+`docs/12-estado-etapa2.md` §3 y se actualiza en cada corte. Esta tabla conserva la planificación
+original para poder comparar lo previsto con lo ejecutado.
