@@ -133,3 +133,21 @@ clave tienen hashes distintos.
 
 **Qué NO es respaldo de credenciales:** el repositorio. Git respalda código y configuración; los
 secretos y los datos se respaldan aparte (`pg_dump` cifrado, gestor de contraseñas).
+
+## 8. Lista de verificación antes de desplegar en un servidor
+
+Lo que se hizo en desarrollo **no** se traslada tal cual. Antes del primer despliegue fuera del equipo
+de desarrollo:
+
+- [ ] **Rotar todas las credenciales** (base de datos, `sonda`, `backend`, dispositivos): las de
+      desarrollo se consideran expuestas por definición. Generar nuevas en el servidor con
+      `openssl rand`; nunca copiar el `.env` del portátil.
+- [ ] **No copiar `docker-compose.override.yml`**: es el archivo que publica 5432 y 1883 en
+      desarrollo. Sin él, el archivo base no publica ningún puerto (forma de producción).
+- [ ] **Eliminar los usuarios y dispositivos de prueba** (`dev-*`) de `passwd` y de la base.
+- [ ] Proxy TLS en 443 y 8883 antes de exponer nada a Internet (capa 2).
+- [ ] Rol de base de datos del backend sin `DROP`/`TRUNCATE` (capa 6).
+- [ ] Respaldo automático configurado y **una restauración probada** antes de recibir datos reales.
+- [ ] Cortafuegos del servidor coordinado con Docker (regla `DOCKER-USER`), documentado en §4.
+- [ ] `docker compose config` en el servidor para revisar la configuración efectiva final: cero
+      `ports` salvo los del proxy.
