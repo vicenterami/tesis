@@ -1,7 +1,9 @@
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { Pool } from 'pg';
+import { AlertasService } from '../alertas/alertas.service';
 import { BrokerService } from '../broker/broker.service';
 import { POOL } from '../db/db.module';
+import { SupervisionService } from '../supervision/supervision.service';
 import { Adaptador, TramaMalformada } from './adaptadores/adaptador';
 import { PlanoAdaptador } from './adaptadores/plano.adaptador';
 import { SenmlAdaptador } from './adaptadores/senml.adaptador';
@@ -14,8 +16,8 @@ const PATRON_TOPICO = /^sitio\/([^/]+)\/dispositivo\/([^/]+)\/([^/]+)$/;
 interface Dispositivo { id: string; estado: 'activo' | 'mantenimiento' | 'baja' }
 interface Canal { id: string; magnitud: string; unidad_canonica: string; rango_min: number | null; rango_max: number | null }
 
-// M1 Recepción + M2 Pipeline. Filtros implementados: 1 autenticar · 2 analizar · 3 validar ·
-// 4 normalizar · 5 supervisar (parcial: "visto por última vez"). Pendiente: 6 alertar.
+// M1 Recepción + M2 Pipeline. Los seis filtros: 1 autenticar · 2 analizar · 3 validar ·
+// 4 normalizar · 5 supervisar (con SupervisionService) · 6 alertar (con AlertasService).
 //
 //   trama ─► [1] ¿registrado y activo? ──no──► cuarentena "desconocido"
 //             │
@@ -29,7 +31,11 @@ interface Canal { id: string; magnitud: string; unidad_canonica: string; rango_m
 //           [4] convertir a unidad canónica · fijar tiempo · INSERT medicion (hypertable)
 //             │
 //             ▼
-//           [5] visto_por_ultima_vez = now()      [6] umbrales → pendiente
+//           [6] umbrales con histéresis → abre/cierra condición "umbral" (AlertasService)
+//             │
+//             ▼
+//           [5] visto_por_ultima_vez = now() · cierra "sin_comunicacion" si estaba abierta
+//               (la APERTURA de "sin_comunicacion" la hace el barrido periódico de SupervisionService)
 @Injectable()
 export class RecepcionService implements OnModuleInit {
   private readonly log = new Logger('recepcion');
@@ -38,6 +44,8 @@ export class RecepcionService implements OnModuleInit {
   constructor(
     @Inject(POOL) private readonly pool: Pool,
     private readonly broker: BrokerService,
+    private readonly alertas: AlertasService,
+    private readonly supervision: SupervisionService,
     senml: SenmlAdaptador,
     plano: PlanoAdaptador,
   ) {
@@ -96,10 +104,13 @@ export class RecepcionService implements OnModuleInit {
         [canal.id, tiempo, valor, canal.unidad_canonica],
       );
       guardadas++;
+      // ── [6] Alertar: ¿la medición cruza un umbral de este canal? ──
+      await this.alertas.evaluar(dispositivo.id, canal.id, ctx.idFisico, valor, canal.unidad_canonica);
     }
 
-    // ── [5] Supervisar (parcial): el dispositivo dio señales de vida ──
+    // ── [5] Supervisar: el dispositivo dio señales de vida; si estaba "sin comunicación", se cierra ──
     await this.pool.query('UPDATE dispositivo SET visto_por_ultima_vez = now() WHERE id = $1', [dispositivo.id]);
+    await this.supervision.marcarVivo(dispositivo.id, ctx.idFisico);
     if (guardadas) this.log.log(`${ctx.idFisico}: ${guardadas}/${lecturas.length} lecturas guardadas vía ${adaptador.nombre}`);
   }
 

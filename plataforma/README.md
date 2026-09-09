@@ -11,7 +11,9 @@ plataforma/
 ├── docker-compose.override.yml # SOLO desarrollo: publica 5432 y 1883 en 127.0.0.1 (Compose lo carga solo)
 ├── backend/                  # NestJS: recepción, pipeline, API (ver backend/README.md)
 ├── .env.example              # variables de entorno (copiar a .env; .env NO se versiona)
-├── db/init/01-esquema.sql    # modelo de datos (docs/08) — se aplica solo al primer arranque
+├── db/init/                  # esquema y migraciones numeradas; en una instalación nueva corren todas
+│   ├── 01-esquema.sql        #   en orden al primer arranque. En una base existente, cada archivo nuevo
+│   └── 02-…sql               #   se aplica a mano: docker compose exec -T timescaledb psql -U plataforma -d plataforma < db/init/NN-x.sql
 ├── mosquitto/config/
 │   ├── mosquitto.conf        # broker sin anónimos, con contraseñas y ACL
 │   ├── acl                   # cada dispositivo publica solo en su tópico

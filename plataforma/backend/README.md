@@ -10,8 +10,10 @@ src/
 ├── app.module.ts              # módulo raíz: junta los demás
 ├── db/db.module.ts            # pool de conexiones a TimescaleDB (SQL directo, driver pg)
 ├── broker/broker.service.ts   # conexión MQTT como usuario "backend"; reparte tramas
+├── supervision/               # M3: barrido periódico → condición "sin_comunicacion" (filtro 5)
+├── alertas/                   # M4: umbrales con histéresis → condición "umbral" (filtro 6)
 ├── recepcion/
-│   ├── recepcion.service.ts   # M1+M2: filtros 1–4 y cuarentena
+│   ├── recepcion.service.ts   # M1+M2: orquesta los seis filtros y la cuarentena
 │   ├── lectura.ts             # la unidad que viaja por el pipeline: {magnitud, valor, unidad, tiempo}
 │   ├── unidades.ts            # conversiones a la unidad canónica (filtro 4)
 │   └── adaptadores/           # filtro 2: senml (nativo, RFC 8428) y plano (número o JSON simple)
@@ -76,8 +78,32 @@ Con el canal declarado, publica estos casos y observa el log del backend y la ta
 docker compose exec timescaledb psql -U plataforma -d plataforma -c "SELECT m.codigo, x.valor, x.unidad, x.tiempo FROM medicion x JOIN canal c ON c.id=x.canal_id JOIN magnitud m ON m.codigo=c.magnitud_codigo ORDER BY x.tiempo DESC LIMIT 5;"
 ```
 
-Pendientes del pipeline: filtro 5 completo (supervisor periódico de `sin_comunicacion`), filtro 6
-(umbrales con histéresis), adaptador de ChirpStack.
+## Probar los filtros 5 y 6
+
+Regla de umbral (alto 30 Cel, histéresis 2) y un intervalo esperado corto para provocar el silencio:
+
+```sql
+INSERT INTO regla_umbral (canal_id, umbral_alto, histeresis)
+  SELECT c.id, 30, 2 FROM canal c JOIN dispositivo d ON d.id = c.dispositivo_id
+   WHERE d.id_fisico = 'dev-0001' AND c.magnitud_codigo = 'temperatura';
+UPDATE dispositivo SET intervalo_esperado_s = 5 WHERE id_fisico = 'dev-0001';
+```
+
+| Acción | Log del backend | `condicion` |
+|---|---|---|
+| publicar `35` | `umbral alto cruzado (35 Cel) · condición abierta` | umbral ABIERTA |
+| publicar `29` | (nada: 29 está entre 28 y 30, zona de histéresis) | umbral ABIERTA |
+| publicar `27` | `valor de vuelta en rango · condición cerrada` | umbral cerrada |
+| callar > 10 s y esperar el barrido (≤ 60 s) | `sin comunicación hace N s · condición abierta` | sin_comunicacion ABIERTA |
+| publicar `25` | `comunicación restablecida · condición cerrada` | sin_comunicacion cerrada |
+
+```bash
+docker compose exec timescaledb psql -U plataforma -d plataforma -c "SELECT tipo, abierta_en, cerrada_en FROM condicion ORDER BY abierta_en DESC LIMIT 5; SELECT tipo, detalle, ocurrido_en FROM evento ORDER BY ocurrido_en DESC LIMIT 5;"
+```
+
+`SUPERVISION_INTERVALO_S` en el `.env` cambia la frecuencia del barrido (60 s por defecto).
+
+Pendientes del pipeline: adaptador de ChirpStack; notificación de condiciones al panel (WebSocket) y por correo.
 
 ## Reglas del proyecto en este código
 
