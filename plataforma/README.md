@@ -75,5 +75,5 @@ Capas, amenazas y controles verificados: `docs/11-seguridad.md`.
 
 1. Esqueleto del backend (NestJS) con conexión a la base y suscripción al broker.
 2. Contenedor del backend en el Compose (imagen propia, multi-etapa con el panel estático).
-3. ChirpStack (con su PostgreSQL y Redis propios) cuando exista el gateway.
+3. ChirpStack (base aparte en el mismo PostgreSQL + Redis propio) cuando exista el gateway.
 4. Proxy inverso con TLS (Caddy) para 443 y 8883; retirar el puerto 1883 publicado.

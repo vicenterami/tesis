@@ -238,7 +238,7 @@ flowchart TB
     subgraph HOST["Servidor Ubuntu · Docker Engine"]
         subgraph NET["red interna: plataforma"]
             C1["mosquitto\nimagen eclipse-mosquitto\nlímite: 0,25 GB"]
-            C2["chirpstack\n+ postgres + redis propios\nlímite: 0,5 GB"]
+            C2["chirpstack\n+ redis propio; usa una base aparte\nen el mismo PostgreSQL\nlímite: 0,35 GB"]
             C3["timescaledb\nimagen timescale/timescaledb-ha\nlímite: 0,75 GB"]
             C4["backend\nimagen propia (NestJS + panel estático)\nlímite: 0,5 GB"]
             C5["proxy\nimagen caddy (TLS automático)\nlímite: 0,1 GB"]
@@ -258,13 +258,17 @@ flowchart TB
 |---|---|---|---|
 | proxy | certificados | `unless-stopped` | 443, 8883, 1700/udp |
 | mosquitto | retenidos + ACL | `unless-stopped` | no (vía proxy) |
-| chirpstack | claves de dispositivos | `unless-stopped` | no (vía proxy) |
+| chirpstack | claves de dispositivos (base `chirpstack` en el mismo PostgreSQL) + redis | `unless-stopped` | no (vía proxy) |
 | timescaledb | **todo el dato** | `unless-stopped` | no |
 | backend | ninguna (sin estado) | `unless-stopped` | no (vía proxy) |
 
-**Suma de límites: ~2,1 GB** — coherente con RNF-17 (operar en ≤ 2 GB en reposo; los límites son
+**Suma de límites: ~1,95 GB** — coherente con RNF-17 (operar en ≤ 2 GB en reposo; los límites son
 techos, no consumo). Los límites de recursos cumplen doble función: proteger al servidor y ser el
-**entorno de referencia** del banco de pruebas (`docs/09`). El backend **no guarda estado**: se puede
+**entorno de referencia** del banco de pruebas (`docs/09`). **ChirpStack comparte el servidor PostgreSQL** (una base y un rol propios, aislados de la base de la
+plataforma) en lugar de traer un segundo PostgreSQL: ahorra ~100 MB de memoria en reposo, un
+respaldo cubre todo, y la extensión TimescaleDB no interfiere (ChirpStack solo necesita `pg_trgm` y
+`hstore`, presentes en la imagen). Redis sí es propio: ChirpStack lo exige y es pequeño (~10 MB).
+El backend **no guarda estado**: se puede
 destruir y recrear sin perder nada, lo que simplifica actualizaciones y pruebas.
 
 ## 7. Trazabilidad con los requerimientos

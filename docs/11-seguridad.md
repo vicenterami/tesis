@@ -93,3 +93,41 @@ restricciones de la capa 7. Lo que hay que cuidar es lo que se le **entrega** al
 solo se montan `db/init` y `mosquitto/config` en modo lectura y los volúmenes de datos; jamás la raíz
 del sistema ni el socket de Docker. Un dispositivo malicioso solo puede hablar con el broker, y el
 broker solo puede escribir en su propio volumen.
+
+## 7. Gestión de credenciales
+
+**Dónde viven** (nunca en el repositorio):
+
+| Credencial | Archivo | Formato | Quién la usa |
+|---|---|---|---|
+| Clave de la base de datos | `plataforma/.env` | texto (solo legible por el operador, permisos 600) | TimescaleDB al crearse; el backend |
+| Claves MQTT de `sonda` y `backend` | `plataforma/.env` (en claro) **y** `mosquitto/config/passwd` (hash) | el broker compara el hash; el healthcheck y el backend leen el `.env` | broker, healthcheck, backend |
+| Claves MQTT de dispositivos | solo `mosquitto/config/passwd` (hash) | el secreto en claro vive únicamente en el firmware del dispositivo | broker |
+
+**Permisos de `passwd`:** dueño `mosquitto` (uid 1883, el usuario con el que corre el broker) y modo
+**0640**. Verificado empíricamente (Mosquitto 2.0.22): con dueño `root` el broker **no arranca** —
+lee el archivo *después* de soltar privilegios—; con 0644 arranca pero advierte que es legible por
+todos. 0640/uid 1883 es la combinación más restrictiva que funciona: solo el broker (y root) lo leen;
+el operador necesita `sudo` para verlo, lo cual es deseable. La herramienta `mosquitto_passwd` emite
+una advertencia contraria ("owner is not root") porque corre como root: se ignora, manda el broker.
+
+`sonda` es el usuario interno con el que el *healthcheck* pregunta al broker si está vivo; solo puede
+leer `$SYS/#` (estadísticas). No es un dispositivo.
+
+**Cómo se generan.** Las claves reales se producen con un generador criptográfico
+(`openssl rand -base64 24` → 192 bits de entropía), nunca las elige una persona ni un asistente.
+El archivo `passwd` guarda **hashes PBKDF2-SHA512** (prefijo `$7$` en Mosquitto 2.x) con sal
+aleatoria por entrada: aunque alguien lea el archivo, no obtiene la clave; y dos usuarios con la misma
+clave tienen hashes distintos.
+
+**Cómo se rotan** (una credencial se rota, nunca se "recupera"):
+
+1. Generar la clave nueva con `openssl rand -base64 24`.
+2. Si es de `sonda`/`backend`: actualizar `.env` **y** recrear su línea en `passwd`
+   (`mosquitto_passwd -b`). Si es de un dispositivo: solo `passwd` y el firmware.
+3. `docker compose restart mosquitto` (relee `passwd`); si cambió el `.env`, `docker compose up -d`
+   para que el healthcheck tome la clave nueva.
+4. Las credenciales de prueba (`dev-*`) se eliminan antes de conectar dispositivos reales.
+
+**Qué NO es respaldo de credenciales:** el repositorio. Git respalda código y configuración; los
+secretos y los datos se respaldan aparte (`pg_dump` cifrado, gestor de contraseñas).
