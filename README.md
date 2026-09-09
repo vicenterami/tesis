@@ -35,6 +35,8 @@ estado de cada dispositivo y panel de control. Caso de validación: Campus Dr. L
 | Protocolo de validación y banco de comparación | [`docs/09-protocolo-validacion.md`](docs/09-protocolo-validacion.md) |
 | Arquitectura: C4, secuencias y despliegue (Etapa 2) | [`docs/10-arquitectura.md`](docs/10-arquitectura.md) |
 | Seguridad en capas: amenazas y controles verificados | [`docs/11-seguridad.md`](docs/11-seguridad.md) |
+| Estado de la Etapa 2: avance, backlog, prioridades | [`docs/12-estado-etapa2.md`](docs/12-estado-etapa2.md) |
+| Reglas de tiempo y zonas horarias (UTC, IANA por sitio) | [`docs/13-tiempo-y-zonas-horarias.md`](docs/13-tiempo-y-zonas-horarias.md) |
 | Fundamentos y glosario para explicar el proyecto | [`docs/GLOSARIO.md`](docs/GLOSARIO.md) |
 | Preguntas al profesor guía y guion de entrevistas | [`docs/03-instrumentos-levantamiento.md`](docs/03-instrumentos-levantamiento.md) |
 | **El protocolo de comunicación y por qué este** | **[`docs/05-protocolo-contactid.md`](docs/05-protocolo-contactid.md)** |
