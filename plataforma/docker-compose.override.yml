@@ -1,0 +1,10 @@
+# Ajustes SOLO para desarrollo local. Compose lo carga automáticamente junto al archivo base;
+# en el servidor este archivo no se copia, así que la forma de producción queda intacta.
+# Publica puertos únicamente en 127.0.0.1: ningún otro equipo de la red los alcanza.
+services:
+  timescaledb:
+    ports:
+      - "127.0.0.1:5432:5432"   # el backend en desarrollo corre fuera de Docker y necesita llegar a la base
+  mosquitto:
+    ports:
+      - "127.0.0.1:1883:1883"   # ídem para el broker y para las pruebas con mosquitto_pub/sub

@@ -38,8 +38,8 @@
 
 | Capa | Control | Dónde | Verificación |
 |---|---|---|---|
-| 1 | Broker publicado solo en `127.0.0.1` en desarrollo | `docker-compose.yml` | ✅ `docker compose ps` muestra `127.0.0.1:1883` |
-| 1 | Base de datos sin `ports` | `docker-compose.yml` | ✅ solo `5432/tcp` interno |
+| 1 | Broker y base publicados solo en `127.0.0.1`, y solo en desarrollo (el archivo base no publica puertos) | `docker-compose.override.yml` | ✅ `docker compose ps` muestra `127.0.0.1:1883` |
+| 1 | Base de datos sin `ports` en la forma de producción | `docker-compose.yml` | ✅ el archivo base no la publica |
 | 3 | `allow_anonymous false` | `mosquitto.conf` | ✅ publicación anónima → *not authorised* |
 | 3 | Contraseñas con hash (`mosquitto_passwd`) | `passwd` (no versionado) | ✅ clave incorrecta → rechazada |
 | 4 | ACL por patrón `%u` | `acl` | ✅ dev-0001 publicando como dev-0002 → descartado; el backend no lo recibe |
@@ -49,6 +49,8 @@
 | 7 | Imágenes con versión exacta (no `latest`) | `docker-compose.yml` | ✅ `2.24.0-pg16`, `2.0.22` |
 | 7 | Límites de memoria y CPU | `docker-compose.yml` | ✅ 768 MB / 256 MB; consumo real ≈ 31 MB + 3 MB |
 | 8 | Secretos ignorados por git | `.gitignore` | ✅ `git status` no muestra `.env` ni `passwd` |
+| 5 | Filtro 1 (autenticar) + cuarentena en el backend | `backend/src/recepcion` | ✅ dispositivo con credencial válida pero **no registrado** → cuarentena `desconocido`; registrado → aceptado |
+| 7 | Dependencias sin scripts de instalación (`ignore-scripts`, `allowBuilds: false`), versiones exactas | `backend/.npmrc`, `pnpm-workspace.yaml` | ✅ pnpm bloqueó 2 scripts; lockfile pasa políticas de cadena de suministro |
 
 ## 4. Controles pendientes (por tanda)
 
@@ -57,7 +59,7 @@
 | 2 | Proxy con TLS (Caddy) en 443 y 8883; retirar 1883 | Al desplegar en servidor |
 | 3 | Credenciales por dispositivo generadas por la plataforma (flujo de alta, docs/10 §3) | Backend |
 | 4 | ACL dinámica: el backend agrega/revoca usuarios del broker al dar de alta/baja | Backend |
-| 5 | Filtros 1–4 del pipeline con cuarentena | Backend |
+| 5 | Filtros 2–4 del pipeline (analizar, validar, normalizar) | Backend |
 | 6 | Un rol de base de datos para el backend **sin** permiso de `DROP`/`TRUNCATE` | Backend |
 | 7 | Sistema de archivos de solo lectura + `tmpfs` donde el servicio lo tolere | Endurecimiento |
 | 7 | Escaneo de vulnerabilidades de imágenes (`docker scout` o Trivy) antes de cada entrega | Etapa 3 |

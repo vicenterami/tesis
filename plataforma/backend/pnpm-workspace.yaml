@@ -1,0 +1,9 @@
+# Decisión explícita sobre scripts de instalación de dependencias (pnpm >= 10 exige declararla;
+# desde pnpm 11 la opción se llama `allowBuilds`). `false` = el paquete se instala pero su script
+# de instalación NO se ejecuta. Ninguno de estos lo necesita:
+#   @nestjs/core  → su postinstall solo imprime un mensaje de donación
+#   unrs-resolver → su postinstall descarga un binario; pnpm ya lo instala como dependencia opcional
+# Si una dependencia futura lo requiere de verdad, se pone en `true` con el porqué al lado.
+allowBuilds:
+  '@nestjs/core': false
+  unrs-resolver: false

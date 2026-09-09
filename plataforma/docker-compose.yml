@@ -42,9 +42,8 @@ services:
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
-    ports:
-      - "127.0.0.1:1883:1883"   # SOLO desarrollo, y SOLO desde este equipo: ningún aparato de la
-                                # red local alcanza el broker. En producción: proxy TLS en 8883.
+    # Sin `ports`: en producción el broker se alcanza solo vía proxy TLS (8883).
+    # Para desarrollo local, los puertos se publican en docker-compose.override.yml.
     volumes:
       - ./mosquitto/config:/mosquitto/config:ro
       - datos-mosquitto:/mosquitto/data                    # mensajes retenidos y sesiones
