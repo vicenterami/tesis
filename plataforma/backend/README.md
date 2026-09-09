@@ -10,7 +10,11 @@ src/
 ├── app.module.ts              # módulo raíz: junta los demás
 ├── db/db.module.ts            # pool de conexiones a TimescaleDB (SQL directo, driver pg)
 ├── broker/broker.service.ts   # conexión MQTT como usuario "backend"; reparte tramas
-├── recepcion/recepcion.service.ts  # M1+M2: filtro 1 (autenticar) y cuarentena
+├── recepcion/
+│   ├── recepcion.service.ts   # M1+M2: filtros 1–4 y cuarentena
+│   ├── lectura.ts             # la unidad que viaja por el pipeline: {magnitud, valor, unidad, tiempo}
+│   ├── unidades.ts            # conversiones a la unidad canónica (filtro 4)
+│   └── adaptadores/           # filtro 2: senml (nativo, RFC 8428) y plano (número o JSON simple)
 └── salud/salud.controller.ts  # GET /salud
 ```
 
@@ -46,8 +50,34 @@ INSERT INTO zona (id, sitio_id, nombre) VALUES ('00000000-0000-0000-0000-0000000
 INSERT INTO dispositivo (zona_id, id_fisico, nombre) VALUES ('00000000-0000-0000-0000-000000000002', 'dev-0001', 'Nodo de prueba 1');
 ```
 
-→ el log del backend dice `aceptada: dev-0001/temperatura` y `dispositivo.visto_por_ultima_vez`
-se actualiza. Los filtros 2–6 llegan en las próximas tandas.
+→ el backend registra `visto_por_ultima_vez`, pero **aún no guarda la medición**: el filtro 3 exige
+que el dispositivo tenga el **canal** declarado. Decláralo:
+
+```sql
+INSERT INTO canal (dispositivo_id, magnitud_codigo)
+  SELECT id, 'temperatura' FROM dispositivo WHERE id_fisico = 'dev-0001';
+```
+
+## Probar los filtros 2–4
+
+Con el canal declarado, publica estos casos y observa el log del backend y la tabla `medicion`:
+
+| Cuerpo publicado en `…/dev-0001/temperatura` | Adaptador | Resultado |
+|---|---|---|
+| `21.5` | plano | guardada: 21,5 Cel |
+| `[{"bn":"dev-0001","n":"temperatura","u":"Cel","v":22.1}]` | senml | guardada: 22,1 Cel |
+| `{"v":300,"u":"K"}` | plano | guardada **convertida**: 26,85 Cel |
+| `500` | plano | cuarentena `invalida` · fuera de rango (−40…85) |
+| `abc` | ninguno | cuarentena `malformada` |
+| `{"v":20,"u":"furlongs"}` | plano | cuarentena `invalida` · unidad no convertible |
+| en `…/dev-0001/presion`: `1013` | plano | cuarentena `invalida` · canal no declarado |
+
+```bash
+docker compose exec timescaledb psql -U plataforma -d plataforma -c "SELECT m.codigo, x.valor, x.unidad, x.tiempo FROM medicion x JOIN canal c ON c.id=x.canal_id JOIN magnitud m ON m.codigo=c.magnitud_codigo ORDER BY x.tiempo DESC LIMIT 5;"
+```
+
+Pendientes del pipeline: filtro 5 completo (supervisor periódico de `sin_comunicacion`), filtro 6
+(umbrales con histéresis), adaptador de ChirpStack.
 
 ## Reglas del proyecto en este código
 
