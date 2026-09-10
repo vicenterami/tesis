@@ -1,24 +1,52 @@
 # Reglas de manejo del tiempo y las zonas horarias
 
-> Regla de diseño transversal (pipeline, base de datos, API, panel). Chile alterna entre UTC−4
-> (invierno) y UTC−3 (verano), y la fecha del cambio la fija el gobierno cada año; otros países
-> tienen reglas distintas. Un sistema que mezcle horas locales con UTC produce mediciones
-> "movidas" y filtros por día que pierden o duplican horas. Versión: 9 de septiembre de 2026.
+> Regla de diseño transversal (base de datos, pipeline, API, panel, exportaciones). Chile alterna
+> entre UTC−4 (invierno) y UTC−3 (verano) y la fecha del cambio la fija el gobierno cada año; otros
+> países tienen reglas distintas. Un sistema que mezcle horas locales con UTC produce mediciones
+> "movidas", días con horas de menos y filtros que pierden o duplican datos. Este documento fija cómo
+> se evita, y cada regla marcada ✅ tiene una prueba reproducible en `plataforma/db/pruebas/` o
+> `plataforma/pruebas/`. Versión 2 — 9 de septiembre de 2026.
 
-## Las reglas
+---
 
-| # | Regla | Dónde se aplica |
-|---|---|---|
-| 1 | **Se almacena siempre en UTC.** Toda columna de tiempo es `timestamptz`; nunca `timestamp` sin zona | `01-esquema.sql` (ya cumplido) |
-| 2 | **La marca de tiempo del emisor se interpreta como instante absoluto** (segundos Unix en SenML). Los nodos no manejan zonas horarias: no deben hacerlo | filtro 4 |
-| 3 | **Cada sitio declara su zona horaria** (nombre IANA, p. ej. `America/Santiago`), nunca un desfase fijo como «−3»: el nombre incluye las reglas de horario de verano | `sitio.zona_horaria` (migración 03) |
-| 4 | **Los filtros por día, semana o mes se resuelven en la zona del sitio, dentro de la base de datos**, no restando horas en el código. «El lunes 7» son las 00:00–24:00 *de Santiago*, que en UTC empiezan a las 03:00 o 04:00 según la época | API de consulta: `time_bucket(intervalo, tiempo, zona)` y `date_trunc('day', tiempo AT TIME ZONE zona)` |
-| 5 | **La API entrega instantes en UTC con formato ISO 8601 y sufijo `Z`** (`2026-09-09T03:07:56Z`). Nunca una hora local sin zona | controladores |
-| 6 | **El panel convierte a la zona del sitio para mostrar**, con la zona que la API le informa, no con la del navegador del usuario: un administrador viajando debe ver la hora *del sitio* | panel (Svelte) |
-| 7 | **No se aceptan tiempos futuros** del emisor (reloj mal puesto → hora de recepción) | filtro 4 (ya cumplido) |
-| 8 | **Los rangos de consulta son semiabiertos** `[desde, hasta)`: evita contar dos veces el instante frontera | API |
+## 1. Tres cosas distintas que la gente llama «fecha»
 
-## Por qué la regla 4 es la que más importa
+Casi todos los errores de fechas nacen de tratar como una sola cosa a tres cosas diferentes.
+
+| Familia | Qué representa | Ejemplo en esta plataforma | ¿Tiene zona? | Tipo en PostgreSQL | Cómo viaja en la API |
+|---|---|---|---|---|---|
+| **Instante** | Un punto exacto de la línea del tiempo | `medicion.tiempo`, `visto_por_ultima_vez`, `abierta_en`, `recibido_en` | Sí: el mismo instante es 14:32 en Santiago y 17:32 en UTC | `timestamptz` | ISO 8601 UTC con `Z`: `2026-09-09T03:07:44.504Z` |
+| **Día calendario** | Una fecha sin hora | «el reporte del 7 de septiembre», un rango de consulta «del 1 al 15» | **No**: el 7 es el 7 en Santiago, en Madrid y en Tokio | `date` | texto `YYYY-MM-DD`, nunca convertido a instante |
+| **Hora de pared** | Una hora del reloj sin zona | «horario de silencio de alertas 22:00–07:00» (si existiera) | No, y por eso es ambigua | `timestamp` sin zona **solo** con comentario explícito en el DDL | `YYYY-MM-DDTHH:mm` sin `Z` |
+
+**El tipo de la columna declara la familia.** Hoy la plataforma solo tiene instantes (todas las
+columnas de tiempo son `timestamptz`; prueba ✅ *guardia*). Convención de nombres para el futuro:
+`_en`/`tiempo` = instante · `_dia`/`fecha_` = día calendario · `_local` = hora de pared (excepcional).
+
+El error clásico es guardar un día calendario como instante: «el 15» se convierte en «el 15 a las
+00:00 UTC», que visto desde Chile es **el 14 a las 20:00 o 21:00**. Como el error aparece siempre
+(no solo de noche), en Chile se nota rápido; en Europa (UTC+1/+2) el mismo error solo se ve de
+madrugada y sobrevive años.
+
+## 2. Las reglas
+
+| # | Regla | Dónde se aplica | Prueba |
+|---|---|---|---|
+| 1 | **Se almacena en UTC.** Toda columna de instante es `timestamptz`; nunca `timestamp` sin zona | `01-esquema.sql` | ✅ guardia SQL |
+| 2 | **La marca de tiempo del emisor es un instante absoluto** (segundos Unix en SenML). Los nodos no manejan zonas y no deben hacerlo | filtro 4 | ✅ casos del adaptador |
+| 3 | **Cada sitio declara su zona horaria con nombre IANA** (`America/Santiago`), nunca un desfase fijo como «−3»: el nombre incluye las reglas de verano/invierno. Un desfase fijo se rompe dos veces al año | `sitio.zona_horaria` (migración 03), disparador que rechaza nombres inválidos | ✅ `-03` rechazado |
+| 4 | **Toda pregunta de "día" se responde dentro de la base, en la zona del sitio**: `time_bucket(intervalo, tiempo, zona)`, `(tiempo AT TIME ZONE zona)::date`. Nunca `CURRENT_DATE`, `now()::date`, `::date` ni `date_trunc` sobre un instante sin pasar por la zona | API de consulta | ✅ 23:30 del 4-sep cae en el 4, no en el 5 |
+| 5 | **La API entrega instantes en ISO 8601 UTC con `Z`**, también los que viajan dentro de JSON armado en SQL (`json_agg`, `json_build_object`), que por defecto emiten `+00:00`: se pasan por `iso_utc()` (migración 04). Un solo formato para una sola cosa | controladores, `consulta.service` | ✅ prueba de humo «termina en Z» |
+| 6 | **El panel convierte a la zona del sitio al pintar**, con la zona que la API le informa, no con la del navegador: quien mire el panel desde otro país ve la hora del sitio, y el panel muestra un aviso cuando la zona del navegador difiere | panel (Svelte) | ⬜ pendiente (panel) |
+| 7 | **La marca del emisor se acepta solo si es plausible**: sin marca, anterior al año 2000 (reloj sin inicializar) o más de 2 minutos en el futuro → hora de recepción; hasta 2 minutos de adelanto se tolera como deriva; **una marca antigua pero posterior a 2000 se respeta**: un nodo que acumuló lecturas sin cobertura y las envía después reporta tiempos legítimamente viejos | filtro 4, `tiempoPlausible` | ✅ casos del adaptador |
+| 8 | **Los rangos de consulta son semiabiertos** `[desde, hasta)`: el instante frontera cuenta una vez | API | ✅ |
+| 9 | **El proceso del backend corre en UTC siempre** (`process.env.TZ = 'UTC'` antes de cualquier import; `ENV TZ=UTC` en la imagen), sin depender de la zona del sistema que lo aloje. Vale también para cualquier tarea programada: el barrido de supervisión y los futuros reportes diarios | `main.ts`, imagen Docker | ✅ |
+| 10 | **Un reporte "diario" o "mensual" se define en la zona del sitio**, no en UTC: «el informe de ayer» es el día de ayer en Santiago | tareas programadas (futuras) | ⬜ |
+| 11 | **Las exportaciones (CSV/JSON) llevan el instante en ISO UTC con `Z` y, si se agrega una columna legible, la hora en la zona del sitio con su nombre**. Nunca una hora local sin decir de qué zona; nunca construir fechas de hoja de cálculo desde la época sin cuidado (muestran componentes UTC) | RF-exportación (futuro) | ⬜ |
+| 12 | **Ninguna operación con `Date` en JavaScript decide un "día"**: `new Date('2026-09-15')` es medianoche UTC; `new Date('2026-09-15T00:00')` es hora local; `toISOString()` sobre un día lo corre. Los días se calculan en SQL en la zona del sitio o se comparan como texto `YYYY-MM-DD` | revisión de código | señales de alarma §5 |
+| 13 | **Al cambiar el tipo de una columna de fecha, el código debe funcionar con el tipo viejo y el nuevo**, la migración se aplica junto con el despliegue, y se sigue el dato completo: quién lo escribe, quién lo lee, quién lo pinta (`grep` por el nombre de la columna) | migraciones | método §6 |
+
+## 3. Por qué la regla 4 es la que más importa
 
 Con datos en UTC y un usuario en Santiago que pide «las mediciones del 7 de septiembre»:
 
@@ -27,24 +55,84 @@ Santiago (UTC−4, invierno): 07-09 00:00 → 07-09 24:00  ==  UTC 07-09 04:00 �
 Santiago (UTC−3, verano):   07-09 00:00 → 07-09 24:00  ==  UTC 07-09 03:00 → 08-09 03:00
 ```
 
-Si el código restara «3 horas» a mano, en invierno el día quedaría corrido una hora y una medición de
-las 23:30 caería en el día equivocado. Delegar el cálculo a PostgreSQL con el nombre de la zona
-resuelve ambos casos y el propio día del cambio de hora (que tiene 23 o 25 horas).
+Si el código restara «3 horas» a mano, en invierno el día quedaría corrido una hora y una medición
+de las 23:30 caería en el día equivocado. Delegar el cálculo a PostgreSQL con el **nombre** de la
+zona resuelve ambos casos y también el día del cambio de hora. Verificado en la base:
 
-Ejemplo de la consulta correcta para el histórico agregado por hora en la zona del sitio:
+| Caso | Resultado |
+|---|---|
+| Inicio del día en Santiago, abril (UTC−4) | `04:00Z` |
+| Inicio del día en Santiago, septiembre (UTC−3) | `03:00Z` |
+| Domingo 6-sep-2026, día del salto 00:00 → 01:00 | el día dura **23 h**; su bucket empieza a las `04:00Z` (01:00 local, el primer instante que existe) y el siguiente a las `03:00Z` |
+| Medición a las 23:30 del 4-sep (Santiago) | pertenece al **4** con la zona; `::date` sin zona diría el **5** |
+| Mes de agosto 2026 en Santiago | empieza el 1 a las `04:00Z` |
+| Un sitio en Madrid (UTC+2) con el mismo código | su día empieza a las `22:00Z` de la víspera |
+
+Ese último caso es la prueba de que el modelo es **multi-sitio y multi-país sin un solo `if`**: la
+zona es un dato del sitio, no una constante del programa.
+
+Consulta de referencia para el histórico agregado en la zona del sitio:
 
 ```sql
-SELECT time_bucket('1 hour', m.tiempo, s.zona_horaria) AS intervalo, avg(m.valor)
+SELECT time_bucket($4::interval, m.tiempo, s.zona_horaria) AS intervalo, avg(m.valor)
   FROM medicion m
-  JOIN canal c ON c.id = m.canal_id
-  JOIN dispositivo d ON d.id = c.dispositivo_id
-  JOIN zona z ON z.id = d.zona_id
-  JOIN sitio s ON s.id = z.sitio_id
+  JOIN canal c ON c.id = m.canal_id JOIN dispositivo d ON d.id = c.dispositivo_id
+  JOIN zona z ON z.id = d.zona_id   JOIN sitio s ON s.id = z.sitio_id
  WHERE m.canal_id = $1 AND m.tiempo >= $2 AND m.tiempo < $3
  GROUP BY intervalo ORDER BY intervalo;
 ```
 
-## Verificación prevista (Etapa 3)
+## 4. Lo específico de una plataforma de sensores
 
-Prueba automatizada con mediciones a las 23:30 y 00:30 hora de Santiago en un día de invierno y otro
-de verano: el filtro «por día» debe asignarlas al día correcto en ambos casos.
+A diferencia de un sistema de gestión, aquí **quien pone la hora es una máquina**, y eso agrega casos
+propios:
+
+| Situación real | Qué hace la plataforma | Por qué |
+|---|---|---|
+| Nodo sin reloj (ESP32 recién encendido, sin NTP) | Marca ausente → hora de recepción | La hora de llegada es la mejor estimación disponible |
+| Reloj sin inicializar (reporta 1970 o 2000) | Marca descartada → hora de recepción | Un instante antes del año 2000 no puede ser una medición real de este sistema |
+| Reloj adelantado unos segundos | Se tolera hasta 2 min (se usa la hora de recepción como techo) | La deriva de relojes baratos es normal; rechazarla perdería datos buenos |
+| Reloj adelantado horas o días | Marca descartada → hora de recepción | Un tiempo futuro nunca es válido para una medición ya recibida |
+| Nodo que estuvo sin cobertura y envía su cola de lecturas acumuladas | **Se respetan** las marcas antiguas | Son mediciones reales de cuando ocurrieron; aplanarlas a la hora de llegada destruiría la serie |
+| Un nodo envía hora local «sin zona» como texto | Adaptador: se trata como malformada salvo que el adaptador de ese formato declare la zona del dispositivo | Una hora de pared no es un instante; adivinarla corrompe |
+| Marcas en milisegundos en vez de segundos | El adaptador plano detecta `> 1e12` y divide por 1000 | Error frecuente de firmware; se documenta y se acepta |
+| Segundos intercalares, años bisiestos | Nada especial: `timestamptz` los maneja | — |
+
+Pendiente de decisión (Etapa 3): guardar también `recibido_en` en `medicion` para medir latencia y
+deriva de reloj por dispositivo. Cuesta 8 bytes por fila; da diagnóstico que hoy no existe.
+
+## 5. Señales de alarma en una revisión de código
+
+Cualquiera de estas en un cambio exige justificación escrita:
+
+- `CURRENT_DATE`, `now()::date`, `::date` o `date_trunc(` sobre un `timestamptz` **sin** `AT TIME ZONE` / zona en `time_bucket`.
+- Un desfase escrito a mano: `- interval '3 hours'`, `-3`, `-4`, `+ 180`.
+- `new Date('YYYY-MM-DD')`, `toISOString()` sobre algo que representa un día, `getDate()/getHours()` para decidir fechas.
+- Una `Z` literal pegada con `to_char` sobre un `timestamp` **sin** zona (la `Z` mentiría).
+- Una columna `timestamp without time zone` nueva sin comentario que diga «hora de pared elegida por una persona».
+- Formatear un instante como texto sin zona y volver a parsearlo (`new Date(texto)`): crea un instante corrido.
+
+## 6. Método para tocar una columna de fecha (aprendido de casos reales de la industria)
+
+1. Clasificar la columna: ¿instante, día o hora de pared? Si no puedes decir «hora de pared elegida
+   por una persona» con convicción, es un instante.
+2. Seguir el dato completo con `grep` por el **nombre de la columna**: quién lo escribe (`INSERT`/`UPDATE`),
+   quién lo lee (`new Date(`, `toISOString`, `getTime`), quién lo pinta.
+3. Al cambiar qué devuelve una función de fechas, `grep` de **todos** sus llamadores: uno que la use
+   para otra familia se rompe en silencio.
+4. Código compatible con el tipo viejo y el nuevo → migración numerada → despliegue. Nunca una
+   migración sola ni un despliegue solo.
+5. Verificar con fechas de **ambos** desfases (un día de abril y uno de septiembre) y con el día
+   del cambio de hora. `tsc` limpio no prueba nada de esto.
+
+## 7. Pruebas reproducibles
+
+| Prueba | Archivo | Cómo se corre |
+|---|---|---|
+| Buckets por día/mes en la zona, día de 23 h, otras zonas, `iso_utc`, guardias de tipo | `plataforma/db/pruebas/zonas-horarias.sql` | `docker compose exec -T timescaledb psql -U plataforma -d plataforma < db/pruebas/zonas-horarias.sql` |
+| API: formato `Z` en todas las fechas (incluidas las de JSON en SQL), buckets a medianoche del sitio, validaciones | `plataforma/pruebas/api-smoke.sh` | `bash pruebas/api-smoke.sh` con el backend arriba |
+| Filtro 4: marcas ausentes, en 1970, futuras, en milisegundos | casos manuales del README del backend; automatizar en Etapa 3 (TT-27) | — |
+
+Previsto para la Etapa 3: prueba automatizada que inserte mediciones a las 23:30 y 00:30 hora de
+Santiago en un día de invierno y otro de verano y compruebe que el filtro «por día» las asigna al día
+correcto en ambos casos.

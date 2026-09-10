@@ -5,6 +5,8 @@ import { Intervalo } from './validacion';
 
 // Consultas de lectura. SQL explícito y parametrizado ($1, $2…): se lee, se audita, se explica.
 // Las fechas salen como Date → JSON las serializa en ISO 8601 con 'Z' (UTC), regla 5 de docs/13.
+// Cuando la fecha va DENTRO de un JSON armado en SQL (json_agg/json_build_object) se usa iso_utc():
+// sin ella Postgres emite '+00:00' y la API mezclaría dos formatos.
 @Injectable()
 export class ConsultaService {
   constructor(@Inject(POOL) private readonly pool: Pool) {}
@@ -40,7 +42,7 @@ export class ConsultaService {
       SELECT c.id, c.magnitud_codigo AS magnitud, m.nombre AS magnitud_nombre, m.unidad_canonica AS unidad, c.etiqueta,
              (SELECT json_agg(json_build_object('id', r.id, 'umbral_alto', r.umbral_alto, 'umbral_bajo', r.umbral_bajo, 'histeresis', r.histeresis))
                 FROM regla_umbral r WHERE r.canal_id = c.id) AS reglas,
-             (SELECT json_build_object('valor', x.valor, 'tiempo', x.tiempo) FROM medicion x
+             (SELECT json_build_object('valor', x.valor, 'tiempo', iso_utc(x.tiempo)) FROM medicion x
                WHERE x.canal_id = c.id ORDER BY x.tiempo DESC LIMIT 1) AS ultima_medicion
         FROM canal c JOIN magnitud m ON m.codigo = c.magnitud_codigo
        WHERE c.dispositivo_id = $1 ORDER BY c.magnitud_codigo`, [id]);

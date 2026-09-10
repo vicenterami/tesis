@@ -1,3 +1,8 @@
+// El proceso corre SIEMPRE en UTC, sin depender de la zona del sistema que lo aloje (portátil en
+// Chile, servidor en UTC, contenedor sin zona). Ninguna operación con Date debe verse afectada por
+// dónde corre el backend (docs/13). Va antes de cualquier import que pueda crear un Date.
+process.env.TZ = 'UTC';
+
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';

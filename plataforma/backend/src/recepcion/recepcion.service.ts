@@ -13,6 +13,22 @@ import { aCanonica } from './unidades';
 // Forma del tópico acordada: sitio/<sitio>/dispositivo/<id_fisico>/<magnitud>
 const PATRON_TOPICO = /^sitio\/([^/]+)\/dispositivo\/([^/]+)\/([^/]+)$/;
 
+// Marca de tiempo del emisor: se acepta solo si es plausible (docs/13, regla 7).
+//  · sin marca                      → hora de recepción (nodo sin reloj)
+//  · anterior al año 2000           → hora de recepción (reloj sin inicializar: epoch 0 = 1970)
+//  · más de 2 min en el futuro      → hora de recepción (reloj adelantado); ≤ 2 min se tolera como deriva
+//  · antigua pero posterior a 2000  → se RESPETA: un nodo que guardó lecturas sin cobertura y las
+//                                     envía después reporta tiempos legítimamente viejos
+const ANIO_2000 = Date.UTC(2000, 0, 1);
+const DERIVA_MAX_MS = 2 * 60 * 1000;
+function tiempoPlausible(emisor: Date | undefined, recibidoEn: Date): Date {
+  if (!emisor) return recibidoEn;
+  const t = emisor.getTime();
+  if (Number.isNaN(t) || t < ANIO_2000) return recibidoEn;
+  if (t > recibidoEn.getTime() + DERIVA_MAX_MS) return recibidoEn;
+  return t > recibidoEn.getTime() ? recibidoEn : emisor;
+}
+
 interface Dispositivo { id: string; estado: 'activo' | 'mantenimiento' | 'baja' }
 interface Canal { id: string; magnitud: string; unidad_canonica: string; rango_min: number | null; rango_max: number | null }
 
@@ -97,8 +113,7 @@ export class RecepcionService implements OnModuleInit {
         await this.cuarentena(topico, carga, 'invalida', `fuera de rango: ${valor} ${canal.unidad_canonica}`);
         continue;
       }
-      // Sin reloj confiable en el nodo → hora de recepción. Tampoco se aceptan tiempos futuros.
-      const tiempo = l.tiempo && l.tiempo <= recibidoEn ? l.tiempo : recibidoEn;
+      const tiempo = tiempoPlausible(l.tiempo, recibidoEn);
       await this.pool.query(
         'INSERT INTO medicion (canal_id, tiempo, valor, unidad) VALUES ($1, $2, $3, $4)',
         [canal.id, tiempo, valor, canal.unidad_canonica],
