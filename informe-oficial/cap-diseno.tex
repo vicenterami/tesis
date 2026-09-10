@@ -107,7 +107,10 @@ La figura~\ref{fig:sec-tiemporeal} muestra los dos tiempos del panel. El histór
 \textbf{agregado por la base de datos} con \texttt{time\_bucket}: cientos de puntos, no millones, sin
 importar cuánto lleve el sensor transmitiendo. Las lecturas nuevas se empujan por WebSocket desde el
 backend. Toda la consulta valida sus entradas antes de tocar SQL (identificadores, fechas, un intervalo
-tomado de una lista cerrada) y usa parámetros, nunca texto interpolado.
+tomado de una lista cerrada) y usa parámetros, nunca texto interpolado. El \textbf{contrato de la API se
+genera desde el código} (OpenAPI 3.0 a partir de los decoradores de los controladores), de modo que no
+puede describir rutas inexistentes; se sirve junto a la API y se versiona en el repositorio como el
+acuerdo que consumirá el panel.
 
 \input{figuras/sec-tiemporeal}
 

@@ -109,6 +109,11 @@ Pendientes del pipeline: adaptador de ChirpStack; notificación de condiciones a
 
 Solo lectura, sin autenticación aún (por eso escucha en 127.0.0.1). Fechas en ISO 8601 UTC (`Z`).
 
+**Contrato OpenAPI (TT-13):** se genera desde los decoradores de los controladores, así que no puede
+describir rutas que no existen. Con el backend corriendo, la documentación interactiva está en
+`http://127.0.0.1:3000/docs` y el documento en `/docs/openapi.json`. `pnpm openapi` lo exporta a
+`openapi.json` en esta carpeta (versionado: es el contrato que consumirá el panel).
+
 | Endpoint | Devuelve | Notas |
 |---|---|---|
 | `GET /dispositivos` | inventario: estado, `en_linea`, última vista, canales, condiciones abiertas | `en_linea` = visto hace menos de 2 × intervalo esperado |

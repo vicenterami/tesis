@@ -31,5 +31,6 @@ fi
 caso "UUID inválido → 400"                    /dispositivos/no-es-uuid 400
 caso "limite fuera de rango → 400"            "/condiciones?limite=99999" 400
 caso "condiciones abiertas es lista con duracion_s" "/condiciones?abiertas=true" "isinstance(r,list) and all(isinstance(c['duracion_s'],int) for c in r)"
+caso "contrato OpenAPI servido con 6 rutas"      /docs/openapi.json "len(r['paths'])==6 and r['openapi'].startswith('3.')"
 caso "cuarentena limitada a 2"                "/cuarentena?limite=2" "isinstance(r,list) and len(r)<=2"
 echo; [[ $fallos -eq 0 ]] && echo "TODO OK" || { echo "$fallos caso(s) con falla"; exit 1; }

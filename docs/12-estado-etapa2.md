@@ -31,7 +31,7 @@ implementando solo lo que **sustente el diseño** (API de consulta, que demuestr
 
 ## 3. Seguimiento del backlog (corte 10 de septiembre)
 
-**Etapa 2 planificada: 22 ítems, 84 h.** Hechos: 16 (58 h) · parciales: 5 · pendientes: 1.
+**Etapa 2 planificada: 22 ítems, 84 h.** Hechos: 17 (61 h) · parciales: 5 · pendientes: 0.
 
 | Ítem | Tarea | Pr. | h | Estado | Evidencia |
 |---|---|---|---|---|---|
@@ -47,7 +47,7 @@ implementando solo lo que **sustente el diseño** (API de consulta, que demuestr
 | TT-10 | Registro de decisiones de diseño con su justificación | M | 2 | ✅ | tablas de decisiones en el cap. 4 y bitácora |
 | TT-11 | Esquema del modelo interno y contrato del tópico MQTT (nombres, unidades, identi | M | 3 | ✅ | docs/08, docs/10 §1; tópico sitio/·/dispositivo/·/magnitud |
 | TT-12 | Catálogo de tipos de sensor y unidades aceptadas, con umbrales de disparo y rest | M | 6 | 🟡 | 5 magnitudes con rango; ampliar con los sensores reales |
-| TT-13 | Especificación del contrato de la API en OpenAPI, generada desde el código | M | 3 | ⬜ | OpenAPI pendiente; la API existe (5 endpoints) |
+| TT-13 | Especificación del contrato de la API en OpenAPI, generada desde el código | M | 3 | ✅ | `@nestjs/swagger`: `/docs` y `backend/openapi.json` (6 rutas), generado desde los decoradores |
 | TT-14 | Política de QoS, reintento y cuarentena | M | 2 | ✅ | QoS 1, reconexión, cuarentena con motivo |
 | TT-15 | Procedimiento de asignación de identidad y gestión de claves AES por sitio | S | 2 | 🟡 | gestión de credenciales documentada (docs/11 §7); claves LoRaWAN dependen de ChirpStack |
 | HU-01 | Como integrador, quiero publicar una trama SenML por MQTT o HTTP, para reportar  | M | 6 | 🟡 | MQTT sí; HTTP en la Etapa 3 |
@@ -69,7 +69,7 @@ implementando solo lo que **sustente el diseño** (API de consulta, que demuestr
 | TT-18 | Normalización de marcas temporales, tolerando nodos sin reloj confiabl | E3 | ✅ | tiempoPlausible |
 | TT-20 | Autenticación de la recepción mediante credencial por sitio | E3 | ✅ | credencial por dispositivo + ACL |
 
-**Pendiente para cerrar la etapa:** TT-13 (OpenAPI, 3 h) y completar TT-35 (pulir informe), TT-03 (ESLint/pruebas), TT-12 y TT-15.
+**Pendiente para cerrar la etapa:** completar los parciales — TT-35 (pulir informe e incorporar retroalimentación), TT-03 (ESLint y pruebas unitarias), TT-12 (catálogo con los sensores reales), TT-15 (claves LoRaWAN, depende de ChirpStack) y HU-01 (entrada HTTP, Etapa 3).
 
 ## 4. ¿Vamos pesados? — medición real
 

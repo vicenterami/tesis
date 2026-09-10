@@ -1,0 +1,229 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/dispositivos": {
+      "get": {
+        "description": "Cada dispositivo con su sitio, zona horaria, canales, `en_linea` (última trama hace menos de 2 × intervalo esperado) y número de condiciones abiertas.",
+        "operationId": "DispositivosController_listar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Lista de dispositivos"
+          }
+        },
+        "summary": "Inventario de dispositivos con estado",
+        "tags": [
+          "dispositivos"
+        ]
+      }
+    },
+    "/dispositivos/{id}": {
+      "get": {
+        "description": "Canales con sus reglas de umbral y última medición, y condiciones abiertas.",
+        "operationId": "DispositivosController_detalle",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "UUID del dispositivo",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Ficha del dispositivo"
+          },
+          "404": {
+            "description": "No existe"
+          }
+        },
+        "summary": "Ficha de un dispositivo",
+        "tags": [
+          "dispositivos"
+        ]
+      }
+    },
+    "/canales/{id}/historico": {
+      "get": {
+        "description": "Promedio por intervalo calculado con time_bucket EN LA ZONA HORARIA DEL SITIO. Formato columnar para uPlot: `tiempos` (segundos Unix), `valores`, `muestras` (cuántas lecturas hay detrás de cada promedio). Rango semiabierto [desde, hasta). Por defecto: últimas 24 h cada 15 minutos.",
+        "operationId": "CanalesController_historico",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "UUID del canal",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "desde",
+            "required": false,
+            "in": "query",
+            "description": "ISO 8601; por defecto hasta − 24 h",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": false,
+            "in": "query",
+            "description": "ISO 8601; por defecto ahora",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "intervalo",
+            "required": false,
+            "in": "query",
+            "description": "Lista cerrada: nunca texto libre en SQL",
+            "schema": {
+              "enum": [
+                "1 minute",
+                "5 minutes",
+                "15 minutes",
+                "1 hour",
+                "6 hours",
+                "1 day"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Serie agregada"
+          },
+          "400": {
+            "description": "UUID, fecha o intervalo inválidos"
+          },
+          "404": {
+            "description": "Canal inexistente"
+          }
+        },
+        "summary": "Histórico agregado de un canal",
+        "tags": [
+          "canales"
+        ]
+      }
+    },
+    "/condiciones": {
+      "get": {
+        "description": "Cada condición con `duracion_s`, dispositivo y regla que la disparó. `sin_comunicacion` la abre el supervisor periódico; `umbral`, el filtro de alertas con histéresis.",
+        "operationId": "CondicionesController_listar",
+        "parameters": [
+          {
+            "name": "abiertas",
+            "required": false,
+            "in": "query",
+            "description": "Sin el parámetro: todas",
+            "schema": {
+              "enum": [
+                "true",
+                "false"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "limite",
+            "required": false,
+            "in": "query",
+            "description": "1–500, por defecto 50",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de condiciones"
+          }
+        },
+        "summary": "Condiciones (estados anómalos) con duración",
+        "tags": [
+          "condiciones"
+        ]
+      }
+    },
+    "/cuarentena": {
+      "get": {
+        "description": "Motivo (`desconocido`, `malformada`, `invalida`), tópico y los primeros 200 caracteres de la carga cruda. Para diagnosticar por qué un sensor no aparece.",
+        "operationId": "CuarentenaController_listar",
+        "parameters": [
+          {
+            "name": "limite",
+            "required": false,
+            "in": "query",
+            "description": "1–500, por defecto 50",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de tramas en cuarentena"
+          }
+        },
+        "summary": "Últimas tramas rechazadas",
+        "tags": [
+          "cuarentena"
+        ]
+      }
+    },
+    "/salud": {
+      "get": {
+        "operationId": "SaludController_estado",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "{ estado, base, tablas }"
+          }
+        },
+        "summary": "Estado del servicio y de su conexión a la base",
+        "tags": [
+          "salud"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "Plataforma de registro, monitoreo y gestión de datos de sensores",
+    "description": "API de consulta (M5) para el panel. Solo lectura. Todos los instantes en ISO 8601 UTC (sufijo Z); las agregaciones por día se calculan en la zona horaria del sitio. Rangos semiabiertos [desde, hasta).",
+    "version": "0.1.0",
+    "contact": {}
+  },
+  "tags": [
+    {
+      "name": "dispositivos",
+      "description": "Inventario y ficha de dispositivos"
+    },
+    {
+      "name": "canales",
+      "description": "Series de tiempo agregadas por canal"
+    },
+    {
+      "name": "condiciones",
+      "description": "Estados anómalos abiertos y cerrados"
+    },
+    {
+      "name": "cuarentena",
+      "description": "Tramas rechazadas por el pipeline"
+    },
+    {
+      "name": "salud",
+      "description": "Estado del servicio"
+    }
+  ],
+  "servers": [],
+  "components": {
+    "schemas": {}
+  }
+}

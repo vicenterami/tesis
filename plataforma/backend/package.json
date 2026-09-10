@@ -15,13 +15,15 @@
     "start:dev": "nest start --watch",
     "lint": "eslint \"src/**/*.ts\"",
     "test": "jest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "openapi": "nest build && node dist/exportar-openapi.js"
   },
   "dependencies": {
     "@nestjs/common": "11.1.6",
     "@nestjs/config": "4.0.2",
     "@nestjs/core": "11.1.6",
     "@nestjs/platform-express": "11.1.6",
+    "@nestjs/swagger": "11.4.7",
     "mqtt": "5.14.1",
     "pg": "8.16.3",
     "reflect-metadata": "0.2.2",
