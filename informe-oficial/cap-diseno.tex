@@ -44,7 +44,7 @@ dispares).
 \input{figuras/modelo-datos}
 
 
-Las decisiones del modelo y su justificación —por qué la medición cuelga del canal, por qué la credencial es una entidad aparte, por qué la cuarentena no tiene relaciones— se detallan en el cuadro~\ref{tab:decisiones-datos} (anexo~\ref{anx:evaluacion}). El esquema evoluciona por \textbf{migraciones numeradas} (\texttt{01-esquema}, \texttt{02} unicidad
+Las decisiones del modelo y su justificación —por qué la medición cuelga del canal, por qué la credencial es una entidad aparte, por qué la cuarentena no tiene relaciones— se detallan en el cuadro~\ref{tab:decisiones-datos} (anexo~\ref{anx:evaluacion}). Lo que el diagrama no muestra por convención también está diseñado: el esquema sigue un conjunto de \textbf{convenciones de calidad} verificadas contra la base real —toda restricción con nombre explícito y prefijo (\texttt{pk\_}, \texttt{fk\_}, \texttt{uq\_}, \texttt{ck\_}), un índice por cada clave foránea (PostgreSQL no lo crea solo y sin él cada unión recorre la tabla completa), auditoría con \texttt{actualizado\_en} mantenida por disparador en toda tabla mutable, baja lógica en lugar de borrado, dominios cerrados como \texttt{CHECK} y catálogos donde el usuario administra los valores, y comentarios \texttt{COMMENT ON} en las columnas cuya razón de ser no es obvia, de modo que la documentación viaja con la base—. El esquema evoluciona por \textbf{migraciones numeradas} (\texttt{01-esquema}, \texttt{02} unicidad
 de condición por regla, \texttt{03} zona horaria por sitio, \texttt{04} serialización uniforme de
 instantes): nunca se edita un archivo ya aplicado. Una instalación nueva ejecuta todas en orden; una
 base existente aplica solo las nuevas.
