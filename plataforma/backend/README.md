@@ -105,6 +105,28 @@ docker compose exec timescaledb psql -U plataforma -d plataforma -c "SELECT tipo
 
 Pendientes del pipeline: adaptador de ChirpStack; notificación de condiciones al panel (WebSocket) y por correo.
 
+## API de consulta (M6)
+
+Solo lectura, sin autenticación aún (por eso escucha en 127.0.0.1). Fechas en ISO 8601 UTC (`Z`).
+
+| Endpoint | Devuelve | Notas |
+|---|---|---|
+| `GET /dispositivos` | inventario: estado, `en_linea`, última vista, canales, condiciones abiertas | `en_linea` = visto hace menos de 2 × intervalo esperado |
+| `GET /dispositivos/:id` | ficha: canales con reglas y última medición, condiciones abiertas | 404 si no existe |
+| `GET /canales/:id/historico?desde&hasta&intervalo` | `{tiempos[], valores[], muestras[]}` agregado con `time_bucket(…, zona_del_sitio)` | por defecto 24 h cada `15 minutes`; intervalos: 1 minute, 5 minutes, 15 minutes, 1 hour, 6 hours, 1 day; rango `[desde, hasta)` |
+| `GET /condiciones?abiertas=true|false&limite` | condiciones con `duracion_s`, dispositivo y regla | sin `abiertas`: todas |
+| `GET /cuarentena?limite` | últimas tramas rechazadas con motivo y carga (200 caracteres) | diagnóstico |
+
+```bash
+curl -s http://127.0.0.1:3000/dispositivos | python3 -m json.tool
+curl -s "http://127.0.0.1:3000/canales/<canal_id>/historico?intervalo=1%20hour" | python3 -m json.tool
+curl -s "http://127.0.0.1:3000/condiciones?abiertas=true"
+```
+
+Entradas inválidas responden `400` con el motivo (UUID mal formado, fecha no ISO, intervalo fuera
+de la lista, límite fuera de rango). El intervalo es una **lista cerrada**: nunca se interpola texto
+libre en SQL.
+
 ## Reglas del proyecto en este código
 
 - Dependencias con **versión exacta** (`save-exact`), sin `^`.

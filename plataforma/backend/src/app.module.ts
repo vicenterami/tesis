@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { DbModule } from './db/db.module';
 import { BrokerModule } from './broker/broker.module';
 import { RecepcionModule } from './recepcion/recepcion.module';
+import { ConsultaModule } from './consulta/consulta.module';
 import { SaludModule } from './salud/salud.module';
 
 // Módulo raíz. Cada módulo de aquí corresponde a un módulo funcional del diseño (docs/10 §1):
@@ -11,8 +12,9 @@ import { SaludModule } from './salud/salud.module';
 //   RecepcionModule → M1 Recepción + M2 Pipeline (seis filtros)
 //   SupervisionModule → M3 Supervisión de salud (barrido periódico "sin comunicación")
 //   AlertasModule   → M4 Alertas (umbrales con histéresis → condiciones)
-//   SaludModule     → M8 (API): endpoint de salud para healthchecks y pruebas
-// Los módulos M5–M7 (aprovisionamiento, consulta, usuarios) se agregan por tandas.
+//   ConsultaModule  → M6 Consulta: API de solo lectura para el panel (patrón B)
+//   SaludModule     → endpoint de salud para healthchecks y pruebas
+// Los módulos M5 (aprovisionamiento) y M7 (usuarios) se agregan por tandas.
 @Module({
   imports: [
     // Lee variables de entorno. En desarrollo toma el .env de la carpeta plataforma/ (el mismo que
@@ -21,6 +23,7 @@ import { SaludModule } from './salud/salud.module';
     DbModule,
     BrokerModule,
     RecepcionModule,
+    ConsultaModule,
     SaludModule,
   ],
 })
