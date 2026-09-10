@@ -29,29 +29,47 @@ implementando solo lo que **sustente el diseño** (API de consulta, que demuestr
 | Adaptadores: SenML (nativo) y plano | ✅ | 2 lecturas de un pack SenML; Kelvin → Celsius |
 | Rotación de credenciales probada | ✅ | claves viejas rechazadas, nuevas aceptadas |
 
-## 3. Seguimiento del backlog (ítems tocados)
+## 3. Seguimiento del backlog (corte 10 de septiembre)
 
-| Ítem | Estado | Evidencia / nota |
-|---|---|---|
-| TT-11 contrato del tópico y modelo interno | ✅ hecho | `docs/08`, `docs/10 §1`, tópico `sitio/<s>/dispositivo/<id>/<magnitud>` |
-| TT-12 catálogo de magnitudes con umbrales | 🟡 parcial | 5 magnitudes con rango; umbrales por regla en `regla_umbral`. Falta ampliar el catálogo con los sensores reales del compañero |
-| TT-14 política de QoS, reintento y cuarentena | ✅ hecho | QoS 1 en el suscriptor; cuarentena con motivo; reconexión cada 2 s |
-| TT-16 analizador SenML | ✅ hecho | `adaptadores/senml.adaptador.ts` |
-| TT-17 pipeline de 6 filtros | ✅ hecho | `recepcion.service.ts` + `alertas` + `supervision` |
-| TT-18 marcas temporales sin reloj confiable | ✅ hecho | tiempo del emisor si es plausible; futuro → hora de recepción |
-| TT-19 esquema y migraciones | ✅ hecho | `db/init/01`, `02` |
-| TT-20 autenticación de la recepción | ✅ hecho (mejor que lo planeado) | credencial **por dispositivo** + ACL, no solo por sitio |
-| HU-03 publicar por MQTT | ✅ hecho | probado con `mosquitto_pub` |
-| HU-01 publicar SenML por MQTT **o HTTP** | 🟡 parcial | MQTT sí; la entrada HTTP queda para la Etapa 3 |
-| HU-04 adaptador para formato no SenML | 🟡 parcial | `plano` con nombres tolerantes; se fija con la primera trama real del compañero |
-| HU-06 umbrales por dispositivo | 🟡 parcial | motor listo (filtro 6); falta la interfaz para configurarlos |
-| TT-08 diagrama de flujo de recepción | ✅ hecho | `docs/10 §4` (secuencia UML) |
-| TT-26 recomendación de despliegue justificada | ⬜ pendiente | **prioritario**: alimenta OE4 y el 10 % |
-| TT-22 TLS | ⬜ Etapa 3 | diseñado (`docs/11`), no implementado |
-| TT-27 pruebas automatizadas del contrato | ⬜ pendiente | hoy las pruebas son manuales reproducibles; automatizarlas en la Etapa 3 |
+**Etapa 2 planificada: 22 ítems, 84 h.** Hechos: 13 (50 h) · parciales: 6 · pendientes: 3.
 
-**Adelantado respecto del plan:** el backlog ubicaba TT-17, TT-18, TT-20 y HU-06 en la Etapa 3;
-están hechos en la 2. Ese margen se invierte en el informe, no en más código.
+| Ítem | Tarea | Pr. | h | Estado | Evidencia |
+|---|---|---|---|---|---|
+| TT-01 | Componer el entorno con contenedores: TimescaleDB, Mosquitto y ChirpStack orques | M | 6 | ✅ | docker-compose con TimescaleDB y Mosquitto; ChirpStack diseñado, pendiente de gateway |
+| TT-02 | Inicializar el proyecto TypeScript + NestJS con estructura de módulos correspond | M | 4 | ✅ | backend NestJS con módulos M1, M2, M4, M5, M6 |
+| TT-03 | Configurar verificación automática: tipos, formato y ejecución de pruebas | S | 3 | 🟡 | pruebas de solo lectura y guardianes; faltan ESLint y pruebas unitarias |
+| TT-04 | Documentar el procedimiento de puesta en marcha en el repositorio | M | 1 | ✅ | READMEs de plataforma y backend |
+| TT-05 | Diagrama de arquitectura de componentes, con los ocho módulos y sus dependencias | M | 5 | ✅ | vista de contenedores C4 (fig. 4.1) |
+| TT-06 | Diagrama de topología de red con segmentación de dispositivos IoT (RNF-09) y sen | M | 6 | ✅ | topología de red (fig. 4.3) |
+| TT-07 | Modelo de datos entidad-relación con al menos ocho entidades | M | 6 | ✅ | ER de 13 entidades generado desde la base (fig. 4.2) |
+| TT-08 | Diagrama de flujo de recepción, desde la recepción hasta la persistencia, para l | M | 4 | ✅ | secuencia del pipeline (fig. 4.5) |
+| TT-09 | Diagrama de secuencia del aprovisionamiento de un dispositivo nuevo | M | 3 | ✅ | secuencia de aprovisionamiento (fig. 4.4) |
+| TT-10 | Registro de decisiones de diseño con su justificación | M | 2 | ✅ | tablas de decisiones en el cap. 4 y bitácora |
+| TT-11 | Esquema del modelo interno y contrato del tópico MQTT (nombres, unidades, identi | M | 3 | ✅ | docs/08, docs/10 §1; tópico sitio/·/dispositivo/·/magnitud |
+| TT-12 | Catálogo de tipos de sensor y unidades aceptadas, con umbrales de disparo y rest | M | 6 | 🟡 | 5 magnitudes con rango; ampliar con los sensores reales |
+| TT-13 | Especificación del contrato de la API en OpenAPI, generada desde el código | M | 3 | ⬜ | OpenAPI pendiente; la API existe (5 endpoints) |
+| TT-14 | Política de QoS, reintento y cuarentena | M | 2 | ✅ | QoS 1, reconexión, cuarentena con motivo |
+| TT-15 | Procedimiento de asignación de identidad y gestión de claves AES por sitio | S | 2 | 🟡 | gestión de credenciales documentada (docs/11 §7); claves LoRaWAN dependen de ChirpStack |
+| HU-01 | Como integrador, quiero publicar una trama SenML por MQTT o HTTP, para reportar  | M | 6 | 🟡 | MQTT sí; HTTP en la Etapa 3 |
+| TT-16 | Validador de esquema SenML y analizador de tramas | M | 3 | ✅ | adaptador SenML |
+| TT-19 | Esquema de base de datos y migraciones versionadas | M | 5 | ✅ | esquema + 4 migraciones |
+| TT-24 | Comparar al menos tres alternativas de alojamiento con criterios ponderados | M | 4 | ⬜ | alternativas de alojamiento: pendiente |
+| TT-25 | Cuantificar el costo mensual y anual de operación en CLP y USD | M | 3 | ⬜ | costos CLP/USD: pendiente |
+| TT-26 | Redactar la recomendación de despliegue justificada | M | 1 | 🟡 | vista de despliegue y presupuesto de recursos; falta el costo por alternativa |
+| TT-35 | Documento de diseño de la Etapa 2, con todos los diagramas | M | 6 | 🟡 | borrador completo del informe (31 págs.); falta pulir e incorporar retroalimentación |
+
+**Adelantados desde las Etapas 3 y 4:**
+
+| Ítem | Tarea | Plan. | Estado | Evidencia |
+|---|---|---|---|---|
+| HU-03 | Como integrador, quiero publicar eventos en MQTT, para integrar dispos | E3 | ✅ | publicado y probado con mosquitto_pub |
+| HU-04 | Como integrador, quiero un adaptador para un formato no SenML, para de | E4 | 🟡 | adaptador plano; se cierra con la trama real |
+| TT-17 | Pipeline de normalización al modelo interno (los 6 filtros) con cuaren | E3 | ✅ | seis filtros verificados |
+| HU-06 | Como administrador de sitio, quiero configurar umbrales por dispositiv | E3 | 🟡 | motor listo; falta interfaz |
+| TT-18 | Normalización de marcas temporales, tolerando nodos sin reloj confiabl | E3 | ✅ | tiempoPlausible |
+| TT-20 | Autenticación de la recepción mediante credencial por sitio | E3 | ✅ | credencial por dispositivo + ACL |
+
+**Pendiente para cerrar la etapa:** TT-24 y TT-25 (alojamiento y costos, 7 h), TT-13 (OpenAPI, 3 h), y completar TT-26, TT-35, TT-03 y TT-12.
 
 ## 4. ¿Vamos pesados? — medición real
 
