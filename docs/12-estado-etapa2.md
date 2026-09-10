@@ -1,6 +1,6 @@
-# Estado de la Etapa 2 — corte al 9 de septiembre de 2026
+# Estado de la Etapa 2 — corte al 10 de septiembre de 2026
 
-> Entrega: viernes 2 de octubre de 2026 (quedan 23 días). Fase PPDIOO: *Design* (con implementación
+> Entrega: viernes 2 de octubre de 2026 (quedan 22 días). Fase PPDIOO: *Design* (con implementación
 > inicial adelantada). Este documento se actualiza en cada corte; la bitácora guarda el detalle diario.
 
 ## 1. Qué evalúa la Etapa 2 y cómo vamos
@@ -118,7 +118,7 @@ falla si informe, docs y base difieren. Sin dibujos a mano: sin solapes ni colum
 
 | Semana | Foco | Entregable |
 |---|---|---|
-| 9–14 sep | API de consulta (`time_bucket`), recomendación de despliegue y costos (TT-26) | endpoints probados ✅; `docs/14-despliegue-y-costos.md` |
-| 15–21 sep | **Informe Etapa 2**: capítulo de diseño con las figuras generadas, incorporar retroalimentación si llegó | borrador completo |
+| 9–14 sep | ~~API de consulta~~ ✅ · ~~capítulo de diseño~~ ✅ (borrador completo, 30 págs.) · **TT-24/25/26 alojamiento y costos** · TT-13 OpenAPI · escribir a profesor guía y compañero | `docs/14-despliegue-y-costos.md`; correos enviados |
+| 15–21 sep | Incorporar la retroalimentación (20 %); TT-03 ESLint y pruebas unitarias; pulir informe | informe v2 |
 | 22–28 sep | Aprovisionamiento por API (M3); pulir informe; **visita presencial a Temuco para mostrar avances** (a coordinar con el profesor guía) | demostración en vivo del pipeline |
 | 29 sep–2 oct | Revisión final, compilación, entrega | PDF Etapa 2 |
