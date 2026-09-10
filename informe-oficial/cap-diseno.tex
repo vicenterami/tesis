@@ -43,25 +43,8 @@ dispares).
 
 \input{figuras/modelo-datos}
 
-\begin{table}[H]
-\centering\small
-\begin{tablaseg}
-\begin{tabular}{L{4.6cm}L{9.2cm}}
-\filaencab \encab{Decisión} & \encab{Razón} \\
-\texttt{medicion} referencia a \texttt{canal}, no a \texttt{dispositivo} & Un dispositivo mide varias magnitudes; el canal (dispositivo más magnitud) es la unidad real de una serie de tiempo y coincide uno a uno con el tópico MQTT \\
-\texttt{magnitud} es un catálogo con unidad canónica y rango físico & Da al filtro de validación un criterio objetivo: un valor fuera de rango o con unidad no convertible va a cuarentena \\
-\texttt{credencial} es una entidad aparte & Permite rotar la credencial sin borrar el dispositivo y conservar el historial \\
-\texttt{condicion} tiene apertura y cierre & Modela un estado con duración (sensor caído de 14:00 a 16:30), no un evento puntual; un índice único impide dos condiciones abiertas del mismo tipo y regla \\
-\texttt{cuarentena} sin relaciones & Lo malformado nunca entra a las series; se conserva crudo para diagnóstico \\
-\texttt{sitio.zona\_horaria} con nombre IANA & Los filtros por día se resuelven en la zona del sitio dentro de la base (sección~\ref{sec:tiempo}) \\
-\texttt{medicion} como \emph{hypertable} & Particionada por tiempo en fragmentos de siete días; agregación con \texttt{time\_bucket} \\
-\end{tabular}
-\end{tablaseg}
-\caption{Decisiones del modelo de datos y su justificación.}
-\label{tab:decisiones-datos}
-\end{table}
 
-El esquema evoluciona por \textbf{migraciones numeradas} (\texttt{01-esquema}, \texttt{02} unicidad
+Las decisiones del modelo y su justificación —por qué la medición cuelga del canal, por qué la credencial es una entidad aparte, por qué la cuarentena no tiene relaciones— se detallan en el cuadro~\ref{tab:decisiones-datos} (anexo~\ref{anx:evaluacion}). El esquema evoluciona por \textbf{migraciones numeradas} (\texttt{01-esquema}, \texttt{02} unicidad
 de condición por regla, \texttt{03} zona horaria por sitio, \texttt{04} serialización uniforme de
 instantes): nunca se edita un archivo ya aplicado. Una instalación nueva ejecuta todas en orden; una
 base existente aplica solo las nuevas.
@@ -171,44 +154,14 @@ memoria mínima del servidor sí, y la fija el RNF-17.
 
 Se compararon cinco alternativas de alojamiento que ejecutan el mismo despliegue, con precios
 consultados el 10 de septiembre de 2026 y convertidos con el dólar observado de la fecha
-(cuadro~\ref{tab:alojamiento}). La recomendación es un \textbf{VPS internacional de 2~vCPU y 4~GB} (del
+(cuadro~\ref{tab:alojamiento}, anexo~\ref{anx:evaluacion}). La recomendación es un \textbf{VPS internacional de 2~vCPU y 4~GB} (del
 orden de CLP~6\,000 mensuales, unos CLP~75\,000 anuales) para la validación y un primer sitio, con un
 VPS nacional como alternativa si el cliente exige datos en Chile; la decisión es reversible en horas
 porque los contenedores no dependen del proveedor. Se descartan una base de datos gestionada aparte y
 un orquestador: complejidad y costo sin retorno a esta escala.
 
-\begin{table}[H]
-\centering\small
-\begin{tablaseg}
-\begin{tabular}{L{2.8cm}L{3.6cm}L{2.6cm}C{1.1cm}}
-\filaencab \encab{Alternativa} & \encab{Plan de referencia} & \encab{Costo mensual} & \encab{Total} \\
-VPS internacional (Europa) & 2 vCPU · 4 GB (x86 o ARM) & €5,49--5,99 $\approx$ CLP 5\,900--6\,500 & \textbf{4,30} \\
-VPS internacional (EE.\,UU.) & 2 vCPU · 4 GB & USD 24 $\approx$ CLP 22\,200 & 3,95 \\
-VPS nacional (Santiago) & 2--4 GB & CLP 26\,000--40\,000 & 3,80 \\
-Servidor propio en el campus & mini-PC 8--16 GB + energía & capital CLP 250--400 mil; luego $\approx$ CLP 1\,500 & 3,25 \\
-Nube gratuita (ARM) & 2 OCPU · 12 GB, sin garantía de capacidad & CLP 0 & 3,05 \\
-\end{tabular}
-\end{tablaseg}
-\caption{Alternativas de alojamiento evaluadas con seis criterios ponderados (costo 30\,\%, disponibilidad 20\,\%, operación 20\,\%, ubicación de los datos 15\,\%, escalabilidad 10\,\%, latencia 5\,\%; escala 1--5). Fuentes, fechas y detalle en la documentación del repositorio.}
-\label{tab:alojamiento}
-\end{table}
 
 \section{Trazabilidad con los requerimientos}
 
-\begin{table}[H]
-\centering\small
-\begin{tablaseg}
-\begin{tabular}{L{8.2cm}L{5.4cm}}
-\filaencab \encab{Elemento de diseño} & \encab{Requerimientos} \\
-Un punto de entrada TLS para máquinas (8883) y otro para personas (443) & RNF-08, RNF-09, RNF-10 \\
-Adaptadores por formato en el filtro de análisis & RF-01, RF-02, RF-04 \\
-Cuarentena separada de las series, con motivo y trama cruda & RF-11, RF-12, RF-13 \\
-Supervisor periódico de «sin comunicación» & RF-22, RF-24, RF-25 \\
-Credencial de un solo vistazo y ACL por dispositivo & RF-40, RF-41, RF-42 \\
-Histórico agregado con \texttt{time\_bucket} en la zona del sitio; WebSocket desde el backend & RF-29, RNF-04, RNF-17 \\
-Límites de recursos por contenedor; entorno de referencia del banco de pruebas & RNF-17, OE5 \\
-\end{tabular}
-\end{tablaseg}
-\caption{Trazabilidad entre las decisiones de diseño y los requerimientos que materializan.}
-\label{tab:trazabilidad-diseno}
-\end{table}
+Cada elemento de diseño de este capítulo materializa requerimientos concretos del catálogo: el doble punto de entrada TLS responde a RNF-08 a RNF-10; los adaptadores del filtro de análisis a RF-01, RF-02 y RF-04; la cuarentena a RF-11 a RF-13; el supervisor periódico a RF-22, RF-24 y RF-25; la credencial de un solo vistazo con ACL a RF-40 a RF-42; el histórico agregado y el WebSocket a RF-29, RNF-04 y RNF-17. El cuadro~\ref{tab:trazabilidad-diseno} (anexo~\ref{anx:evaluacion}) presenta la correspondencia completa.
+
