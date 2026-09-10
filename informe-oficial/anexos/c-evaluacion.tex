@@ -4,6 +4,64 @@
 
 \section{Pros y contras de cada mecanismo de transporte}
 
+\begin{table}[H]
+\centering\footnotesize
+\begin{tabular}{@{}cL{6.2cm}cL{3.2cm}@{}}
+\toprule
+\textbf{Módulo} & \textbf{Responsabilidad} & \textbf{Req.} & \textbf{Causas} \\
+\midrule
+M1 & Recepción multiprotocolo (MQTT, HTTP, adaptadores) & 10 & C1, C2 \\
+M2 & Normalización al modelo interno (el pipeline) & 7 & C1, C5 \\
+M3 & Registro y aprovisionamiento de dispositivos & 6 & C4, C5 \\
+M4 & Supervisión de salud (¿quién dejó de reportar?) & 7 & \textbf{C5} \\
+M5 & Persistencia y consulta de series de tiempo & 5 & C1, C3, C4 \\
+M6 & Alertas y notificación & 4 & C5 \\
+M7 & Seguridad, identidad y multi-tenencia & 7 & C1, C3, C4 \\
+M8 & Panel de control (la vista, no el todo) & 6 & C1, C2, C4, C5 \\
+\bottomrule
+\end{tabular}
+\caption{Módulos de la solución. El panel es uno de ocho módulos: la sustancia de ingeniería está en
+M1--M7.}
+\label{tab:modulos}
+\end{table}
+
+Requerimientos que anclan el trabajo al dominio de redes: \textbf{RNF-09} (dispositivos en segmento
+de red separado), \textbf{RNF-10} (solo conexiones salientes desde los nodos), \textbf{RNF-12}
+(añadir una vía de recepción no modifica el núcleo) y \textbf{RNF-16} (la trama nativa cumple SenML).
+Y los que sustentan la diferenciación: \textbf{RF-04} (adaptadores por formato), \textbf{RF-24/27/30}
+(supervisión de salud) y \textbf{RF-34} (exportación en formato abierto).
+
+\section{Evaluación del mecanismo de transporte}
+\label{sec:transporte}
+
+Cinco alternativas sobre seis criterios. Los pesos derivan del problema: la plataforma debe saber
+qué llegó y qué no (25\,\%), detectar dispositivos caídos (20\,\%, causa C5), exigir poco al nodo
+(20\,\%, lo implementa el compañero), integrarse con poco esfuerzo al backend (15\,\%), pesar poco
+por mensaje (10\,\%, la objeción a las cabeceras) y funcionar tras NAT sin abrir puertos (10\,\%,
+RNF-10).
+
+\begin{table}[H]
+\centering\footnotesize
+\begin{tablaseg}
+\begin{tabular}{@{}L{2.7cm}C{1.4cm}C{1.4cm}C{1.3cm}C{1.4cm}C{1.5cm}C{1.1cm}C{1.0cm}@{}}
+\toprule
+ & \textbf{Entrega confiable} & \textbf{Detecta caídos} & \textbf{Costo en nodo} & \textbf{Facilidad backend} & \textbf{Sobrecarga mensaje} & \textbf{Tras NAT} & \textbf{Total} \\
+ & 25\,\% & 20\,\% & 20\,\% & 15\,\% & 10\,\% & 10\,\% & \\
+\midrule
+\textbf{MQTT} & \textbf{5} & \textbf{5} & 4 & \textbf{5} & \textbf{5} & \textbf{5} & \textbf{4,85} \\
+HTTP/REST & 3 & 2 & 4 & \textbf{5} & 2 & \textbf{5} & 3,45 \\
+CoAP & 3 & 2 & 4 & 2 & \textbf{5} & 4 & 3,05 \\
+WebSocket & 2 & 3 & 3 & 3 & 4 & \textbf{5} & 3,05 \\
+Socket TCP propio & 1 & 2 & \textbf{5} & 1 & \textbf{5} & \textbf{5} & 2,60 \\
+\bottomrule
+\end{tabular}
+\end{tablaseg}
+\caption{Evaluación del mecanismo de transporte (escala 1--5). Los pros y contras en palabras de
+cada alternativa están en el anexo~\ref{anx:evaluacion}.}
+\label{tab:transporte}
+\end{table}
+
+
 \textbf{MQTT (4,85).} A favor: publicar/suscribir desacopla emisores de consumidores; QoS en tres
 niveles sin lógica propia; el testamento (\emph{Last Will}) hace inmediata la detección de caída;
 cabecera de 2 bytes; conexión saliente persistente que atraviesa NAT; nació para IoT en redes
@@ -25,6 +83,26 @@ MQTT para paneles en vivo.
 reconexión, confirmaciones y formato. Se descarta con argumento: meses de trabajo para un resultado
 inferior a MQTT.
 
+\section{Evaluación del formato de trama}
+
+\begin{table}[H]
+\centering\footnotesize
+\begin{tablaseg}
+\begin{tabular}{@{}L{2.6cm}L{4.6cm}L{5.6cm}@{}}
+\toprule
+\textbf{Alternativa} & \textbf{A favor} & \textbf{En contra} \\
+\midrule
+JSON libre & Flexible, universal & \textbf{Reproduce la causa C1}: cada fuente con sus campos \\
+\textbf{SenML (RFC 8428)} & Estándar IETF abierto; identidad, unidades y tiempo resueltos; legible & Algo más extenso que un JSON ad hoc \\
+Binario propio & Mínimo peso & Indocumentado, difícil de depurar; solo se justifica en radio \\
+CBOR & Compacto y estándar & Ilegible a ojo; librería adicional en el nodo \\
+\bottomrule
+\end{tabular}
+\end{tablaseg}
+\caption{Evaluación del formato de trama.}
+\label{tab:formato}
+\end{table}
+
 \section{Identificación de dispositivos}
 
 El registro (aprovisionamiento) declara identidad, tipo, ubicación y credencial; cada trama se
@@ -45,6 +123,28 @@ Rol propuesto & nodo estándar & banco de pruebas & caso de integración HTTP \\
 \caption{Comparación de arquitecturas de nodo. La decisión es del trabajo coordinado del compañero;
 para esta plataforma todas convergen en el tópico MQTT.}
 \end{longtable}
+
+\section{Decisiones de infraestructura}
+
+\begin{table}[H]
+\centering\footnotesize
+\begin{tablaseg}
+\begin{tabular}{@{}L{2.4cm}L{2.4cm}L{7.6cm}@{}}
+\toprule
+\textbf{Componente} & \textbf{Selección} & \textbf{Razón determinante frente a alternativas} \\
+\midrule
+Broker MQTT & Mosquitto & C, $\sim$10\,MB de RAM, TLS y autenticación; EMQX/HiveMQ apuntan a millones de conexiones: desproporcionados \\
+Persistencia & TimescaleDB & Un solo motor relacional y de series; InfluxDB obligaría a operar dos bases \\
+Backend & TypeScript + NestJS & Tipos de la trama definidos una sola vez para backend y panel; módulos 1:1 con M1--M8; OpenAPI automático \\
+Rama LoRa & ChirpStack & Autoalojable; publica en MQTT: converge a la vía principal \\
+Despliegue & Contenedores Docker & Reproducible con un comando; reinicio automático; la Etapa 4 exige demostrar en condiciones realistas \\
+Interfaz (frontend) & Svelte + uPlot & Artefacto liviano sin \emph{virtual DOM}, coherente con la ligereza objetivo; gráficos de series de tiempo de pocos kilobytes; se confirma en la Etapa 2 (anexo~\ref{anx:evaluacion}) \\
+\bottomrule
+\end{tabular}
+\end{tablaseg}
+\caption{Decisiones de infraestructura. La matriz completa de la tecnología de backend —cinco alternativas y siete criterios— está en el anexo~\ref{anx:evaluacion}; el resto, en el repositorio.}
+\label{tab:infra}
+\end{table}
 
 \section{Evaluación de la tecnología de backend}
 

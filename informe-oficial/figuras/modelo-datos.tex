@@ -1,6 +1,6 @@
-\begin{figure}[H]
+\begin{figure}[!htb]
 \centering
-\includegraphics[width=1.0\linewidth]{figuras/render/modelo-datos.pdf}
+\includegraphics[height=0.6\textheight,keepaspectratio]{figuras/render/modelo-datos.pdf}
 \caption{Modelo de datos (diagrama entidad-relación, notación \emph{crow's foot}), generado desde el esquema real de la base de datos. Trece entidades: la organización (sitio, zona, usuarios), el inventario (dispositivo, canal, credencial, catálogo de magnitudes), las series de tiempo (\texttt{medicion}, única hypertable), el estado (reglas, condiciones, eventos) y la cuarentena, deliberadamente sin relaciones. Una medición pertenece a un \emph{canal} —dispositivo más magnitud— y no al dispositivo: un nodo que mide temperatura y humedad produce dos series.}
 \label{fig:modelo-datos}
 \end{figure}

@@ -41,7 +41,7 @@ $\sim$240 horas.}
 
 \section{Backlog y verificación de viabilidad}
 
-El backlog contiene \textbf{63 elementos} —14 épicas, 25 historias de usuario y 38 tareas técnicas—
+El backlog contiene \textbf{65 elementos} —25 historias de usuario y 40 tareas técnicas, agrupados en 14 épicas—
 estimados en horas ideales, ajustados tras el pivote del 2 de septiembre: los elementos ligados al
 protocolo descartado se reformularon hacia el contrato SenML y el pipeline, con un efecto neto de
 $-10$ horas en el núcleo demostrativo ($\sim$155 h). El backlog completo está en el
@@ -55,15 +55,51 @@ abierto.
 \end{quote}
 
 La verificación numérica —sumando programáticamente las estimaciones— arrojó el hallazgo de mayor
-consecuencia práctica de la etapa: \textbf{el backlog completo ($\sim$265 h) excede el presupuesto y no es
+consecuencia práctica de la etapa: \textbf{el backlog completo ($\sim$272 h) excede el presupuesto y no es
 ejecutable íntegro; el núcleo demostrativo ($\sim$155 h) cabe con holgura} ($\sim$+35\,\% con el
-calendario oficial). En consecuencia, \textbf{el compromiso del proyecto es el núcleo} y los 30 elementos restantes
+calendario oficial). En consecuencia, \textbf{el compromiso del proyecto es el núcleo} y los 32 elementos restantes
 son alcance condicional, ejecutable solo contra holgura verificada al cierre de cada etapa. El
 fundamento: la pauta mide el avance como porcentaje de tareas completadas, de modo que comprometer el backlog íntegro y ejecutar solo el núcleo arrojaría cerca de un 60\,\% —bajo el umbral—, mientras que comprometer el núcleo y ejecutarlo arroja el 100\,\%.
 
 La distribución temporal también se corrigió: la asignación inicial concentraba la implementación en la
 Etapa 3 (162\,\% de su capacidad) cuando la pauta solo exige allí el 50\,\%; se trasladaron $\sim$37
 horas del núcleo a la Etapa 4, verificando que el umbral del 50\,\% se cumple (53\,\%).
+
+\section{Seguimiento del backlog en la Etapa 2}
+\label{sec:seguimiento}
+
+La pauta evalúa el avance como el cumplimiento de las tareas de diseño previstas en el backlog. El
+cuadro~\ref{tab:seguimiento} compara lo planificado con lo ejecutado al cierre de la etapa; el detalle
+con evidencia por ítem se mantiene en la documentación del repositorio.
+
+\begin{table}[H]
+\centering\small
+\begin{tablaseg}
+\begin{tabular}{L{1.4cm}L{6.2cm}C{1.4cm}L{4.6cm}}
+\filaencab \encab{Ítem} & \encab{Tarea} & \encab{Etapa plan.} & \encab{Estado al cierre} \\
+TT-08 & Diagrama de flujo de recepción & 2 & Hecho (secuencia UML, fig.~\ref{fig:sec-pipeline}) \\
+TT-11 & Contrato del tópico y modelo interno & 2 & Hecho \\
+TT-12 & Catálogo de magnitudes con umbrales & 2 & Parcial: 5 magnitudes; ampliar con los sensores reales \\
+TT-14 & Política de QoS, reintento y cuarentena & 2 & Hecho (QoS 1, cuarentena con motivo) \\
+TT-16 & Analizador SenML & 2 & Hecho \\
+TT-19 & Esquema de base de datos y migraciones & 2 & Hecho (4 migraciones) \\
+TT-26 & Recomendación de despliegue justificada & 2 & Parcial: vista de despliegue y presupuesto de recursos; falta el costo por alternativa \\
+TT-17 & Pipeline de seis filtros con cuarentena & 3 & \textbf{Adelantado}: hecho y verificado \\
+TT-18 & Marcas de tiempo sin reloj confiable & 3 & \textbf{Adelantado}: hecho \\
+TT-20 & Autenticación de la recepción & 3 & \textbf{Adelantado}: credencial por dispositivo y ACL \\
+HU-06 & Umbrales por dispositivo & 3 & \textbf{Adelantado} en el motor; falta la interfaz \\
+HU-01 & Publicar SenML por MQTT o HTTP & 3 & Parcial: MQTT sí; HTTP en la Etapa 3 \\
+HU-04 & Adaptador para formato no SenML & 4 & Parcial: adaptador plano; se cierra con la trama real del compañero \\
+TT-22 & Cifrado del transporte (TLS) & 3 & Diseñado; implementación en la Etapa 3 \\
+\end{tabular}
+\end{tablaseg}
+\caption{Backlog planificado frente a ejecutado al cierre de la Etapa 2.}
+\label{tab:seguimiento}
+\end{table}
+
+De las siete tareas de diseño previstas para la etapa, cinco están completas y dos parciales con su
+faltante identificado. Cuatro tareas de la Etapa~3 se adelantaron; ese margen se invirtió en el
+capítulo de diseño y en el método de generación y verificación de figuras, no en más código.
 
 \section{Riesgos}
 

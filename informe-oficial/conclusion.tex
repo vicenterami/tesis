@@ -1,32 +1,37 @@
 \chapter{Conclusiones de la etapa}
 
-\textbf{Sobre la redefinición del enfoque.} La etapa incluyó un cambio de eje decidido con el profesor guía: el
-protocolo Contact ID, evaluado en la fase inicial, resultó adecuado para eventos discretos pero no
-para el patrón real del problema —telemetría continua—, y fue descartado. El costo del cambio fue
-acotado precisamente por el método: al estar cada decisión documentada con criterios explícitos,
-bastó rehacer la evaluación con pesos nuevos (capítulo~\ref{cap:especificacion}) y el resto del
-trabajo —metodología, requerimientos, backlog, análisis de competencia— se conservó en su mayor
-parte. El camino descartado queda como evidencia en el anexo~\ref{anx:contactid}.
+\textbf{Sobre el diseño.} La etapa cumplió su propósito: la plataforma quedó descrita desde varias
+vistas con notaciones reconocidas —C4 para los contenedores, entidad-relación para los datos,
+secuencias UML para el comportamiento— y cada decisión de diseño está justificada y trazada a los
+requerimientos que materializa (capítulo~\ref{cap:diseno}). Dos rasgos distinguen este diseño de un
+panel de visualización: el pipeline de seis filtros con cuarentena, que garantiza que ninguna trama
+llega a las series sin autenticarse, analizarse, validarse y normalizarse, y el modelo interno único,
+que hace indistinguibles una trama LoRaWAN y una Wi-Fi una vez superado el filtro de análisis.
 
-\textbf{Sobre la selección resultante.} MQTT con tramas SenML resuelve con mecanismos de fábrica lo
-que el problema exige: calidad de servicio para la entrega, testamento (\emph{Last Will}) para la
-detección inmediata de caídas, conexiones salientes que atraviesan NAT, y un formato de medición
-estandarizado por la IETF. El aporte de ingeniería del trabajo se concentra en el \textbf{pipeline
-de tratamiento de tramas} —autenticar, analizar, validar, normalizar, supervisar, alertar— con
-cuarentena y adaptadores por formato: el mismo patrón de entrada que aplican las plataformas
-existentes, con la diferencia de que el contrato nativo es un estándar abierto y no un formato de
-producto.
+\textbf{Sobre la implementación adelantada.} El backlog ubicaba el pipeline, la normalización de
+marcas de tiempo, la autenticación de la recepción y los umbrales en la Etapa~3; están implementados y
+verificados en la Etapa~2, junto con la API de consulta. Ese adelanto no se logró recortando diseño,
+sino al revés: implementar temprano obligó a tomar decisiones de diseño que en el papel habrían quedado
+ambiguas —la unicidad de una condición por regla, la plausibilidad del reloj de un nodo, la
+serialización uniforme de instantes— y a corregir el esquema con migraciones antes de que hubiera datos
+reales.
 
-\textbf{Sobre la viabilidad.} La verificación numérica del backlog, recalculada tras el pivote,
-mantiene la conclusión: el compromiso es el núcleo demostrativo ($\sim$155 h frente a $\sim$240 h de
-presupuesto), y el resto es alcance condicional.
+\textbf{Sobre la concordancia.} Se adoptó un método que evita que informe, documentación y sistema se
+separen: las figuras del capítulo de diseño se generan desde la documentación versionada y, el modelo de
+datos, desde el esquema real de la base; un guion de verificación falla si alguno de los tres difiere.
+El método ya detectó y corrigió cinco discrepancias entre el modelo documentado y el implementado, y una
+numeración de módulos inconsistente. La documentación deja de ser una descripción que envejece y pasa a
+ser una proyección del sistema.
 
-\textbf{Trabajo pendiente para cerrar la etapa:} las entrevistas a las partes interesadas (criterio
-1) y el acuerdo con el compañero sobre los sensores concretos y el tópico de frontera.
-\textbf{Trabajo previsto para la Etapa 2} (fase \emph{Design}): especificación del contrato de
-recepción (tópicos, esquema, cuarentena, adaptadores), diagramas de arquitectura y red, modelo de
-datos, modelo de despliegue con costos, e inicio adelantado de la implementación. Para la validación de
-la Etapa 4 se planifica además un \textbf{banco de comparación contra ThingsBoard Community
-Edition}: instalar ambas plataformas en el mismo servidor y medir consumo de memoria, tiempo de
-puesta en marcha y número de pasos para dar de alta un sensor y verlo graficado — una comparación
-empírica y reproducible del ajuste de cada una al contexto destinatario.
+\textbf{Sobre la ligereza como argumento.} El consumo medido en reposo de la base de datos y el broker
+es inferior a 100~MB, y la suma de los techos de recursos de los cinco contenedores es de 1,95~GB; el
+referente de código abierto exige al menos 4~GB para arrancar. La comparación formal queda para el
+banco de pruebas de la Etapa~4, con un protocolo escrito antes de medir para que no favorezca a la
+plataforma propia.
+
+\textbf{Lo pendiente.} La retroalimentación de la Etapa~1 no se recibió durante esta etapa; cuando
+llegue, cada observación se registrará con el cambio concreto que motive. El formato real de las tramas
+del compañero aún no se ha fijado: el adaptador correspondiente acepta nombres de campo tolerantes y se
+cerrará con la primera trama real. Las entrevistas con partes interesadas siguen siendo la brecha
+declarada desde la Etapa~1. La Etapa~3 concentra el aprovisionamiento por API, la identidad de usuarios,
+la entrada HTTP, el cifrado del transporte y las pruebas automatizadas del contrato de trama.

@@ -7,7 +7,7 @@
 
 | Criterio de la rúbrica | Peso | Estado | Qué falta para el puntaje completo |
 |---|---|---|---|
-| Diseña según estándares de calidad | **55 %** | 🟢 avanzado | Diagramas en notación reconocida (C4, UML, ER) generados desde una fuente única y ya renderizados para el informe (§6); **falta redactar el capítulo de diseño** que los integre |
+| Diseña según estándares de calidad | **55 %** | 🟢 avanzado | Diagramas en notación reconocida (C4, UML, ER) generados desde una fuente única e **integrados en el capítulo 4 «Diseño de la plataforma»** del informe (borrador completo, 31 págs. de cuerpo); falta pulir redacción e incorporar la retroalimentación |
 | Incorpora la retroalimentación | 20 % | ⚪ bloqueado | Sin retroalimentación aún del profesor guía sobre la Etapa 1. Al llegar: registrar cada observación → cambio concreto (bitácora + informe) |
 | Avanza en el diseño según backlog | 10 % | 🟢 avanzado | Ver §3: ítems de diseño de la Etapa 2 casi cerrados; queda TT-26 (recomendación de despliegue) |
 | Documenta en repositorio | 15 % | 🟢 cumplido | Commits descriptivos, docs/07–12, bitácora, READMEs. Mantener el ritmo |
