@@ -1,8 +1,8 @@
 {
   // TypeScript del proyecto (versión fijada en package.json), no el que trae VS Code:
   // así los avisos que ves son los mismos que ve la compilación.
-  "typescript.tsdk": "plataforma/backend/node_modules/typescript/lib",
-  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "js/ts.tsdk.path": "plataforma/backend/node_modules/typescript/lib",
+  "js/ts.tsdk.promptToUseWorkspaceVersion": true,
 
   // LaTeX: compilar con latexmk en build/, como en la terminal
   "latex-workshop.latex.outDir": "%DIR%/build",
@@ -21,10 +21,10 @@
     "Hetzner", "PPDIOO", "SWEBOK", "Cardiff", "Rivas", "Canto", "Villanueva", "latexmk", "adjustbox", "booktabs",
     "longtable", "toprule", "midrule", "bottomrule", "tabcolsep", "includegraphics", "keepaspectratio",
     "resizebox", "textbf", "texttt", "parencite", "Overfull", "hbox", "Mermaid", "openapi", "swagger",
-    "histéresis", "cuarentena", "semiabierto", "semiabiertos", "idempotente", "idempotentes", "backlog"
+    "histéresis", "cuarentena", "multiprotocolo", "bierner", "azuretools", "semiabierto", "semiabiertos", "idempotente", "idempotentes", "backlog"
   ],
   "cSpell.ignorePaths": [
     "**/node_modules", "**/dist", "**/build", "**/pnpm-lock.yaml", "**/openapi.json", "**/*.pdf", "**/*.png",
-    "**/figuras/render", "**/*.mmd", "recursos-uct", "historico"
+    "**/figuras/render", "**/*.mmd", ".vscode/extensions.json", "recursos-uct", "historico"
   ]
 }

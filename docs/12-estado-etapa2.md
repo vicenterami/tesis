@@ -7,7 +7,7 @@
 
 | Criterio de la rúbrica | Peso | Estado | Qué falta para el puntaje completo |
 |---|---|---|---|
-| Diseña según estándares de calidad | **55 %** | 🟢 avanzado | Diagramas en notación reconocida (C4, UML, ER) generados desde una fuente única e **integrados en el capítulo 4 «Diseño de la plataforma»** del informe (borrador completo, 31 págs. de cuerpo); falta pulir redacción e incorporar la retroalimentación |
+| Diseña según estándares de calidad | **55 %** | 🟢 avanzado | Diagramas en notación reconocida (C4, UML, ER) generados desde una fuente única e **integrados en el capítulo 4 «Diseño de la plataforma»** del informe (borrador completo, 30 págs. de cuerpo); falta pulir redacción e incorporar la retroalimentación |
 | Incorpora la retroalimentación | 20 % | ⚪ bloqueado | Sin retroalimentación aún del profesor guía sobre la Etapa 1. Al llegar: registrar cada observación → cambio concreto (bitácora + informe) |
 | Avanza en el diseño según backlog | 10 % | 🟢 avanzado | Ver §3: ítems de diseño de la Etapa 2 casi cerrados; queda TT-26 (recomendación de despliegue) |
 | Documenta en repositorio | 15 % | 🟢 cumplido | Commits descriptivos, docs/07–12, bitácora, READMEs. Mantener el ritmo |
@@ -52,11 +52,11 @@ implementando solo lo que **sustente el diseño** (API de consulta, que demuestr
 | TT-15 | Procedimiento de asignación de identidad y gestión de claves AES por sitio | S | 2 | 🟡 | gestión de credenciales documentada (docs/11 §7); claves LoRaWAN dependen de ChirpStack |
 | HU-01 | Como integrador, quiero publicar una trama SenML por MQTT o HTTP, para reportar  | M | 6 | 🟡 | MQTT sí; HTTP en la Etapa 3 |
 | TT-16 | Validador de esquema SenML y analizador de tramas | M | 3 | ✅ | adaptador SenML |
-| TT-19 | Esquema de base de datos y migraciones versionadas | M | 5 | ✅ | esquema + 4 migraciones |
+| TT-19 | Esquema de base de datos y migraciones versionadas | M | 5 | ✅ | esquema + 5 migraciones (la 05 aplica las convenciones de calidad) |
 | TT-24 | Comparar al menos tres alternativas de alojamiento con criterios ponderados | M | 4 | ✅ | `docs/14 §3–§4`: cinco alternativas, seis criterios |
 | TT-25 | Cuantificar el costo mensual y anual de operación en CLP y USD | M | 3 | ✅ | `docs/14 §3`: precios fechados y convertidos con dólar observado |
 | TT-26 | Redactar la recomendación de despliegue justificada | M | 1 | ✅ | `docs/14 §5` y cap. 4 del informe |
-| TT-35 | Documento de diseño de la Etapa 2, con todos los diagramas | M | 6 | 🟡 | borrador completo del informe (31 págs.); falta pulir e incorporar retroalimentación |
+| TT-35 | Documento de diseño de la Etapa 2, con todos los diagramas | M | 6 | 🟡 | borrador completo del informe (30 págs.); falta pulir e incorporar retroalimentación |
 
 **Adelantados desde las Etapas 3 y 4:**
 
