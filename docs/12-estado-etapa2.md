@@ -31,7 +31,7 @@ implementando solo lo que **sustente el diseño** (API de consulta, que demuestr
 
 ## 3. Seguimiento del backlog (corte 10 de septiembre)
 
-**Etapa 2 planificada: 22 ítems, 84 h.** Hechos: 13 (50 h) · parciales: 6 · pendientes: 3.
+**Etapa 2 planificada: 22 ítems, 84 h.** Hechos: 16 (58 h) · parciales: 5 · pendientes: 1.
 
 | Ítem | Tarea | Pr. | h | Estado | Evidencia |
 |---|---|---|---|---|---|
@@ -53,9 +53,9 @@ implementando solo lo que **sustente el diseño** (API de consulta, que demuestr
 | HU-01 | Como integrador, quiero publicar una trama SenML por MQTT o HTTP, para reportar  | M | 6 | 🟡 | MQTT sí; HTTP en la Etapa 3 |
 | TT-16 | Validador de esquema SenML y analizador de tramas | M | 3 | ✅ | adaptador SenML |
 | TT-19 | Esquema de base de datos y migraciones versionadas | M | 5 | ✅ | esquema + 4 migraciones |
-| TT-24 | Comparar al menos tres alternativas de alojamiento con criterios ponderados | M | 4 | ⬜ | alternativas de alojamiento: pendiente |
-| TT-25 | Cuantificar el costo mensual y anual de operación en CLP y USD | M | 3 | ⬜ | costos CLP/USD: pendiente |
-| TT-26 | Redactar la recomendación de despliegue justificada | M | 1 | 🟡 | vista de despliegue y presupuesto de recursos; falta el costo por alternativa |
+| TT-24 | Comparar al menos tres alternativas de alojamiento con criterios ponderados | M | 4 | ✅ | `docs/14 §3–§4`: cinco alternativas, seis criterios |
+| TT-25 | Cuantificar el costo mensual y anual de operación en CLP y USD | M | 3 | ✅ | `docs/14 §3`: precios fechados y convertidos con dólar observado |
+| TT-26 | Redactar la recomendación de despliegue justificada | M | 1 | ✅ | `docs/14 §5` y cap. 4 del informe |
 | TT-35 | Documento de diseño de la Etapa 2, con todos los diagramas | M | 6 | 🟡 | borrador completo del informe (31 págs.); falta pulir e incorporar retroalimentación |
 
 **Adelantados desde las Etapas 3 y 4:**
@@ -69,7 +69,7 @@ implementando solo lo que **sustente el diseño** (API de consulta, que demuestr
 | TT-18 | Normalización de marcas temporales, tolerando nodos sin reloj confiabl | E3 | ✅ | tiempoPlausible |
 | TT-20 | Autenticación de la recepción mediante credencial por sitio | E3 | ✅ | credencial por dispositivo + ACL |
 
-**Pendiente para cerrar la etapa:** TT-24 y TT-25 (alojamiento y costos, 7 h), TT-13 (OpenAPI, 3 h), y completar TT-26, TT-35, TT-03 y TT-12.
+**Pendiente para cerrar la etapa:** TT-13 (OpenAPI, 3 h) y completar TT-35 (pulir informe), TT-03 (ESLint/pruebas), TT-12 y TT-15.
 
 ## 4. ¿Vamos pesados? — medición real
 
@@ -107,10 +107,11 @@ falla si informe, docs y base difieren. Sin dibujos a mano: sin solapes ni colum
 
 ## 7. Lo que frena hoy
 
-1. **Retroalimentación de la Etapa 1**: no ha llegado; condiciona el 20 %. Acción: preguntar al
-   profesor guía en la próxima comunicación; mientras, avanzar con lo que no depende de ella.
-2. **Formato real del compañero**: sin su primera trama no se fija el adaptador ni el catálogo de
-   sensores. Acción: pedir nombres de campos, unidad y sensores del primer nodo.
+1. **Retroalimentación de la Etapa 1**: correo enviado el 10/09 con el borrador de la Etapa 2 y propuesta
+   de visita; sin respuesta aún. Condiciona el 20 %. Mientras, avanzar con lo que no depende de ella.
+2. **Formato real del compañero**: respondió el 10/09 — sensores de temperatura y material particulado;
+   primeras tramas en octubre (Etapa 3). Catálogo ampliado (PM2,5, PM10); el adaptador se cierra en la
+   Etapa 3 con la trama real. Deja de ser bloqueante para la Etapa 2.
 3. **Entrevistas con partes interesadas**: brecha declarada en la Etapa 1, sigue abierta.
 4. Tiempo: ~15 h semanales; el informe de la Etapa 2 necesita al menos 12 h de redacción y figuras.
 

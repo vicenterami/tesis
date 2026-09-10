@@ -159,6 +159,40 @@ referente de código abierto exige al menos 4~GB solo para arrancar, según su p
 límites cumplen además una segunda función: definen el \textbf{entorno de referencia} del banco de pruebas
 de la Etapa~4, para que la comparación no dependa del equipo de desarrollo.
 
+\subsection{Alojamiento, costo de operación y retención}
+
+El costo de una plataforma de sensores no lo mueve la cantidad de usuarios sino la \textbf{tasa de
+recepción por la retención}. Para el núcleo demostrativo —50 canales reportando cada cinco minutos—
+resultan 14\,400 filas diarias y unos 5,3 millones al año, del orden de 330~MB sin comprimir; con la
+compresión por columnas de TimescaleDB para fragmentos antiguos (razones típicas de 10 a 20 veces) y
+una política en capas —crudo reciente 30 días, crudo comprimido dos años, agregados horarios y diarios
+indefinidos— diez años de operación caben en menos de 1~GB. El almacenamiento no es el problema; la
+memoria mínima del servidor sí, y la fija el RNF-17.
+
+Se compararon cinco alternativas de alojamiento que ejecutan el mismo despliegue, con precios
+consultados el 10 de septiembre de 2026 y convertidos con el dólar observado de la fecha
+(cuadro~\ref{tab:alojamiento}). La recomendación es un \textbf{VPS internacional de 2~vCPU y 4~GB} (del
+orden de CLP~6\,000 mensuales, unos CLP~75\,000 anuales) para la validación y un primer sitio, con un
+VPS nacional como alternativa si el cliente exige datos en Chile; la decisión es reversible en horas
+porque los contenedores no dependen del proveedor. Se descartan una base de datos gestionada aparte y
+un orquestador: complejidad y costo sin retorno a esta escala.
+
+\begin{table}[H]
+\centering\small
+\begin{tablaseg}
+\begin{tabular}{L{2.8cm}L{3.6cm}L{2.6cm}C{1.1cm}}
+\filaencab \encab{Alternativa} & \encab{Plan de referencia} & \encab{Costo mensual} & \encab{Total} \\
+VPS internacional (Europa) & 2 vCPU · 4 GB (x86 o ARM) & €5,49--5,99 $\approx$ CLP 5\,900--6\,500 & \textbf{4,30} \\
+VPS internacional (EE.\,UU.) & 2 vCPU · 4 GB & USD 24 $\approx$ CLP 22\,200 & 3,95 \\
+VPS nacional (Santiago) & 2--4 GB & CLP 26\,000--40\,000 & 3,80 \\
+Servidor propio en el campus & mini-PC 8--16 GB + energía & capital CLP 250--400 mil; luego $\approx$ CLP 1\,500 & 3,25 \\
+Nube gratuita (ARM) & 2 OCPU · 12 GB, sin garantía de capacidad & CLP 0 & 3,05 \\
+\end{tabular}
+\end{tablaseg}
+\caption{Alternativas de alojamiento evaluadas con seis criterios ponderados (costo 30\,\%, disponibilidad 20\,\%, operación 20\,\%, ubicación de los datos 15\,\%, escalabilidad 10\,\%, latencia 5\,\%; escala 1--5). Fuentes, fechas y detalle en la documentación del repositorio.}
+\label{tab:alojamiento}
+\end{table}
+
 \section{Trazabilidad con los requerimientos}
 
 \begin{table}[H]

@@ -16,6 +16,7 @@ erDiagram
         uuid dispositivo_id FK
         text magnitud_codigo FK
         text etiqueta
+        timestamptz actualizado_en
     }
     condicion {
         uuid id PK
@@ -31,6 +32,7 @@ erDiagram
         text hash
         bool activa
         timestamptz creada_en
+        timestamptz actualizado_en
     }
     cuarentena {
         uuid id PK
@@ -49,6 +51,7 @@ erDiagram
         int intervalo_esperado_s
         timestamptz visto_por_ultima_vez
         timestamptz creado_en
+        timestamptz actualizado_en
     }
     evento {
         uuid id PK
@@ -63,6 +66,7 @@ erDiagram
         text unidad_canonica
         float rango_min
         float rango_max
+        timestamptz actualizado_en
     }
     medicion {
         uuid canal_id FK
@@ -76,6 +80,7 @@ erDiagram
         float umbral_alto
         float umbral_bajo
         float histeresis
+        timestamptz actualizado_en
     }
     sitio {
         uuid id PK
@@ -83,6 +88,8 @@ erDiagram
         text descripcion
         timestamptz creado_en
         text zona_horaria
+        timestamptz actualizado_en
+        bool activo
     }
     usuario {
         uuid id PK
@@ -90,14 +97,18 @@ erDiagram
         text email
         text hash_password
         timestamptz creado_en
+        timestamptz actualizado_en
+        bool activo
     }
     usuario_sitio {
         uuid usuario_id PK,FK
         uuid sitio_id PK,FK
         text rol
+        timestamptz actualizado_en
     }
     zona {
         uuid id PK
         uuid sitio_id FK
         text nombre
+        timestamptz actualizado_en
     }

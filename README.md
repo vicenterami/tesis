@@ -37,6 +37,7 @@ estado de cada dispositivo y panel de control. Caso de validación: Campus Dr. L
 | Seguridad en capas: amenazas y controles verificados | [`docs/11-seguridad.md`](docs/11-seguridad.md) |
 | Estado de la Etapa 2: avance, backlog, prioridades | [`docs/12-estado-etapa2.md`](docs/12-estado-etapa2.md) |
 | Reglas de tiempo y zonas horarias (UTC, IANA por sitio) | [`docs/13-tiempo-y-zonas-horarias.md`](docs/13-tiempo-y-zonas-horarias.md) |
+| Despliegue, costos y retención (OE4) | [`docs/14-despliegue-y-costos.md`](docs/14-despliegue-y-costos.md) |
 | Fundamentos y glosario para explicar el proyecto | [`docs/GLOSARIO.md`](docs/GLOSARIO.md) |
 | Preguntas al profesor guía y guion de entrevistas | [`docs/03-instrumentos-levantamiento.md`](docs/03-instrumentos-levantamiento.md) |
 | Enfoque previo (Contact ID), conservado como evidencia | [`historico/`](historico/README.md) |

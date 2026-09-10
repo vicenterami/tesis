@@ -15,7 +15,7 @@ plataforma/
 ├── pruebas/api-smoke.sh      # prueba de humo de la API (OK/FALLA por caso)
 ├── db/init/                  # esquema y migraciones numeradas; en una instalación nueva corren todas
 │   ├── 01-esquema.sql        #   en orden al primer arranque. En una base existente, cada archivo nuevo
-│   └── 02-…sql               #   se aplica a mano: docker compose exec -T timescaledb psql -U plataforma -d plataforma < db/init/NN-x.sql
+│   └── 02…05-*.sql           #   se aplica a mano: docker compose exec -T timescaledb psql -U plataforma -d plataforma < db/init/NN-x.sql
 └── mosquitto/config/
     ├── mosquitto.conf        # broker sin anónimos, con contraseñas y ACL
     ├── acl                   # cada dispositivo publica solo en su tópico

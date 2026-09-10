@@ -60,6 +60,7 @@ erDiagram
         uuid dispositivo_id FK
         text magnitud_codigo FK
         text etiqueta
+        timestamptz actualizado_en
     }
     condicion {
         uuid id PK
@@ -75,6 +76,7 @@ erDiagram
         text hash
         bool activa
         timestamptz creada_en
+        timestamptz actualizado_en
     }
     cuarentena {
         uuid id PK
@@ -93,6 +95,7 @@ erDiagram
         int intervalo_esperado_s
         timestamptz visto_por_ultima_vez
         timestamptz creado_en
+        timestamptz actualizado_en
     }
     evento {
         uuid id PK
@@ -107,6 +110,7 @@ erDiagram
         text unidad_canonica
         float rango_min
         float rango_max
+        timestamptz actualizado_en
     }
     medicion {
         uuid canal_id FK
@@ -120,6 +124,7 @@ erDiagram
         float umbral_alto
         float umbral_bajo
         float histeresis
+        timestamptz actualizado_en
     }
     sitio {
         uuid id PK
@@ -127,6 +132,8 @@ erDiagram
         text descripcion
         timestamptz creado_en
         text zona_horaria
+        timestamptz actualizado_en
+        bool activo
     }
     usuario {
         uuid id PK
@@ -134,16 +141,20 @@ erDiagram
         text email
         text hash_password
         timestamptz creado_en
+        timestamptz actualizado_en
+        bool activo
     }
     usuario_sitio {
         uuid usuario_id PK,FK
         uuid sitio_id PK,FK
         text rol
+        timestamptz actualizado_en
     }
     zona {
         uuid id PK
         uuid sitio_id FK
         text nombre
+        timestamptz actualizado_en
     }
 ```
 
@@ -170,9 +181,47 @@ erDiagram
 - La **supervisión de salud** compara `visto_por_ultima_vez` contra `intervalo_esperado_s` para abrir
   condiciones de tipo `sin_comunicacion`.
 
-## 6. Pendiente
+## 6. Convenciones del esquema (aplicadas en la migración 05)
 
-- [ ] Índices y políticas de retención/compresión de la hypertable (detalle de implementación).
+Reglas que rigen toda tabla nueva o modificada. Provienen de práctica de la industria sobre esquemas
+PostgreSQL en producción y se verificaron contra la base real (`plataforma/pruebas/verificar-todo.sh`).
+
+| Convención | Regla | Por qué | Estado |
+|---|---|---|---|
+| Nombres | Español, `snake_case`, singular; PK `id` (uuid) salvo catálogos con código natural (`magnitud.codigo`) | Consistencia con el dominio del informe | ✅ |
+| Restricciones con nombre | Toda restricción se nombra con prefijo: `pk_`, `fk_<tabla>_<destino>`, `uq_`, `ck_`, `idx_`, `trg_`, `fn_` | Un nombre autogenerado (`canal_dispositivo_id_fkey`) no dice qué protege ni se puede citar en un informe o en un error | ✅ 32/32 |
+| Índice por cada FK | Cada clave foránea lleva su índice | Postgres no lo crea solo; sin él cada `JOIN` y cada `ON DELETE` recorre la tabla | ✅ 0 FK sin índice |
+| Tipos | `text` (nunca `varchar(n)`), `timestamptz` (nunca `timestamp`), `uuid`, `boolean`. `double precision` **solo** para mediciones físicas, que tienen incertidumbre propia; `numeric(p,s)` para dinero o cantidades exactas (no hay hoy) | Un límite arbitrario obliga a migrar; un `timestamp` sin zona es ambiguo; el flotante binario no sirve para dinero | ✅ |
+| Auditoría | `creado_en` y `actualizado_en` con disparador `trg_<tabla>_actualizado_en` en toda tabla mutable; las de solo inserción (`medicion`, `evento`, `cuarentena`) llevan solo su instante | Saber cuándo cambió algo sin depender de la aplicación. `creado_por`/`actualizado_por` llegarán con M7 (usuarios) | ✅ 9 tablas |
+| Baja lógica | `dispositivo.estado = 'baja'`, `sitio.activo`, `usuario.activo`, `credencial.activa`; nunca `DELETE` sobre entidades con historia | Conserva la historia y no rompe las filas que referencian el registro | ✅ |
+| Dominios cerrados | Si el **código** interpreta los valores (`estado`, `condicion.tipo`, `rol`) → `CHECK`. Si el **usuario** los administra (magnitudes) → tabla catálogo con código estable y nombre visible | Un `CHECK` exige `ALTER` para crecer y no guarda etiqueta ni orden; un catálogo para valores que solo entiende el código sería una indirección vacía | ✅ |
+| Foto por valor | Lo que un registro **posee** se copia (`medicion.unidad`, `evento.detalle` con el umbral vigente); lo que **referencia** se lee por FK (`condicion.regla_id` como procedencia) | Cambiar el catálogo o una regla no debe reinterpretar el pasado | ✅ |
+| JSON solo para fotos | `jsonb` únicamente para capturar un contenido tal como fue (`evento.detalle`); nunca para datos de dominio consultables | Lo consultable va en columnas con tipo y FK | ✅ |
+| Ledger sobre contador | Las series (`medicion`) y los hechos (`evento`, `condicion`) son registros que se acumulan; `visto_por_ultima_vez` es un derivado recalculable, no la fuente | Un contador se corrompe en silencio; un registro se audita y se recalcula | ✅ |
+| Comentarios en el modelo | `COMMENT ON` en toda columna cuya razón de ser no es obvia (qué es, quién la escribe, qué no hacer con ella) | El comentario viaja con la base y lo ve quien lea el esquema sin abrir el informe | ✅ 10 comentarios |
+| Migraciones idempotentes | Cada `NN-*.sql` puede reejecutarse sin duplicar ni pisar nada (`IF NOT EXISTS`, `ON CONFLICT DO NOTHING`, `CREATE OR REPLACE`) | Permite aplicar el mismo archivo en cualquier ambiente sin miedo | ✅ 02–05 |
+| Deprecación | Una columna en uso no se borra: se comenta como DEPRECADA con fecha y reemplazo, y se elimina en una migración posterior | El código que la lee puede estar desplegado | regla |
+| Qué NO va en la base | Validaciones de negocio, transiciones de estado, permisos y cálculos con reglas cambiantes viven en el backend (el pipeline). En la base quedan integridad referencial, unicidad, rangos fijos, `actualizado_en` | Las reglas cambian con el negocio; la integridad no | ✅ |
+
+## 7. Estado derivado, estado persistido y foto
+
+Tres tipos de dato que se confunden y que aquí tienen destino distinto:
+
+| Tipo | Ejemplo | Dónde vive | Cuándo se calcula |
+|---|---|---|---|
+| **Derivado al leer** | `en_linea` (¿última trama hace menos de 2 × intervalo?) | se calcula en la consulta, no se guarda | cada lectura de la API; nunca escribe |
+| **Persistido por proceso** | `condicion` tipo `sin_comunicacion` | fila en `condicion`, la abre el barrido periódico (M4) | cada 60 s, una sola vez por transición |
+| **Exigido en la transición** | «un dispositivo dado de baja no acepta tramas» | el pipeline lo evalúa contra el dato del momento | en cada trama |
+| **Foto** | `evento.detalle` (valor y umbral al dispararse), `medicion.unidad` | columna copiada | una vez, al ocurrir |
+
+Regla operativa: **una lectura nunca escribe** (un `GET` que hace `UPDATE` no se puede cachear y toma
+bloqueos en tablas que todos leen); lo que deba persistirse lo hace un proceso programado; lo que deba
+cumplirse se exige en la transición. El panel muestra el derivado al instante y la base queda
+consistente para reportes.
+
+## 8. Pendiente
+
+- [ ] Políticas de retención en capas y agregados continuos de la hypertable (`docs/14`).
 - [ ] Validar el modelo contra el catálogo de magnitudes real, cuando se acuerden los sensores con el
       compañero.
 - [ ] Llevar el diagrama a la versión TikZ/imagen para el informe LaTeX de la Etapa 2.

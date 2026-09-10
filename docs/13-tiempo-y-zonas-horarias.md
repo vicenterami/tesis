@@ -97,6 +97,9 @@ propios:
 | Un nodo envía hora local «sin zona» como texto | Adaptador: se trata como malformada salvo que el adaptador de ese formato declare la zona del dispositivo | Una hora de pared no es un instante; adivinarla corrompe |
 | Marcas en milisegundos en vez de segundos | El adaptador plano detecta `> 1e12` y divide por 1000 | Error frecuente de firmware; se documenta y se acepta |
 | Segundos intercalares, años bisiestos | Nada especial: `timestamptz` los maneja | — |
+| El día del cambio de hora tiene 23 o 25 horas | Los promedios diarios se calculan sobre las **muestras reales** del bucket (la API entrega `muestras`), nunca dividiendo por 24 | Un reporte que divide por 24 da mal dos días al año |
+| La hora repetida al retrasar el reloj | Ninguna clave incluye hora local: `uuid` + `timestamptz` | Con hora local habría dos lecturas «a la misma hora» |
+| Zona del dispositivo ≠ zona del dato | La zona se resuelve **al recibir**, una sola vez, y se conserva la trama cruda en cuarentena si hizo falta rechazarla | Dejarlo para el reporte obliga a adivinar después |
 
 Pendiente de decisión (Etapa 3): guardar también `recibido_en` en `medicion` para medir latencia y
 deriva de reloj por dispositivo. Cuesta 8 bytes por fila; da diagnóstico que hoy no existe.
@@ -111,6 +114,10 @@ Cualquiera de estas en un cambio exige justificación escrita:
 - Una `Z` literal pegada con `to_char` sobre un `timestamp` **sin** zona (la `Z` mentiría).
 - Una columna `timestamp without time zone` nueva sin comentario que diga «hora de pared elegida por una persona».
 - Formatear un instante como texto sin zona y volver a parsearlo (`new Date(texto)`): crea un instante corrido.
+- `toISOString().slice(0, 10)` para obtener «el día»: es el día en UTC, no el del sitio.
+- `getFullYear() / getMonth() / getDate()` para recortar un día: usan la zona del **proceso** (UTC en el servidor); el código parece trabajar en días y no lo hace.
+- `Intl.DateTimeFormat(...).format(new Date('basura'))` **lanza** `RangeError`: una fila corrupta puede tumbar un lote entero; toda fecha externa se valida antes de formatearse.
+- Confiar en lo que muestra el cliente gráfico de base de datos: fija su propia zona de sesión; la zona del servidor se verifica desde el mismo driver que usa la aplicación.
 
 ## 6. Método para tocar una columna de fecha (aprendido de casos reales de la industria)
 
@@ -133,6 +140,20 @@ Cualquiera de estas en un cambio exige justificación escrita:
 | API: formato `Z` en todas las fechas (incluidas las de JSON en SQL), buckets a medianoche del sitio, validaciones | `plataforma/pruebas/api-smoke.sh` | `bash pruebas/api-smoke.sh` con el backend arriba |
 | Filtro 4: marcas ausentes, en 1970, futuras, en milisegundos | casos manuales del README del backend; automatizar en Etapa 3 (TT-27) | — |
 
+**Cómo se prueba (la parte que casi nadie hace).** A la hora en que uno programa, las dos
+interpretaciones suelen dar lo mismo: mirar un dato del mediodía no descarta nada. Dos formas de
+hacer que difieran: (a) **elegir el dato**: registros cuyo instante caiga entre las 00:00 y las 03:00 UTC,
+donde el día local y el día UTC no coinciden; (b) **mover al observador**: en las herramientas de
+desarrollo del navegador, panel *Sensors*, fijar una zona de desfase positivo (Tokio) y **recargar**;
+casi cualquier instante de la tarde cae al día siguiente. La predicción única que se verifica: **los
+instantes se mueven de día; los días calendario y los buckets del sitio no se mueven nunca**.
+
+**Cómo se escribe una guardia que sirva.** Una guardia que nunca dispara es peor que ninguna: da un
+OK falso. Por eso toda guardia de este repositorio se prueba en los dos sentidos —**plantando una
+violación** y viendo que la detecta, y comprobando que no marca lo correcto—, y si no puede evaluarse
+(pila caída, archivo ausente) **falla, no pasa**.
+
 Previsto para la Etapa 3: prueba automatizada que inserte mediciones a las 23:30 y 00:30 hora de
 Santiago en un día de invierno y otro de verano y compruebe que el filtro «por día» las asigna al día
-correcto en ambos casos.
+correcto en ambos casos; y plantar una columna `timestamp` sin zona para verificar que la guardia de
+tipos la rechaza.
