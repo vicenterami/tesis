@@ -360,7 +360,7 @@ Estos son los requerimientos que ningún competidor regional identificado satisf
 
 La rúbrica exige «una evaluación crítica de alternativas consideradas y las razones para la selección
 final». La evaluación del **protocolo de comunicación** —la decisión de mayor peso— está desarrollada
-en `docs/05-protocolo-contactid.md`, sección 2, con siete alternativas sobre seis criterios
+en `historico/docs/05-protocolo-contactid.md`, sección 2, con siete alternativas sobre seis criterios
 ponderados. Esta sección cubre las decisiones restantes de infraestructura.
 
 ## 6.1 Servidor de red LoRaWAN
@@ -478,7 +478,7 @@ evaluación de la Etapa 2. **Si durante la Etapa 2 la curva de aprendizaje de Ne
 de lo previsto, migrar a Fastify es una desviación aceptable** —el resto del stack no cambia— y quedaría
 documentada como tal.
 
-**Nota sobre la herramienta de verificación en Python.** `plataforma/herramientas/contactid.py` continúa
+**Nota sobre la herramienta de verificación en Python.** `historico/herramientas/contactid.py` continúa
 en Python de forma deliberada. Al ser una implementación **independiente** del protocolo, sirve como
 implementación de referencia para **validación cruzada** de la implementación de producción en
 TypeScript: si ambas, escritas en lenguajes distintos y sin código compartido, producen el mismo

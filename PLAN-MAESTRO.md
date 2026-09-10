@@ -142,7 +142,7 @@ líneas sueltas desde cualquier parte, y se vacía procesándolas hacia su docum
 Los entregables formales se redactan en LaTeX. Para que Overleaf no se convierta en un punto ciego:
 
 ```
-informe/
+historico/informe-v1/   (informe v1, previo a la plantilla oficial)
 ├── main.tex              ← documento maestro
 ├── secciones/*.tex       ← una sección por archivo
 ├── bibliografia.bib      ← referencias

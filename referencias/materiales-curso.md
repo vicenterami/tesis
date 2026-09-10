@@ -47,4 +47,4 @@ de software de la IEEE, 411 páginas, 18 áreas. Las áreas que tocan directamen
 
 Clase `memoir` 12pt, bibliografía **biblatex estilo APA**, estructura de capítulos con portada,
 comisión, profesor guía/informante, resumen, abstract y anexos. Es la base a la que debe
-migrar `informe/`.
+migrar `informe/` (hoy `historico/informe-v1/`).

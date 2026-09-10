@@ -19,4 +19,4 @@ latexmk -pdf -outdir=build main.tex     # SIEMPRE desde esta carpeta, nunca desd
 | `anexos/` | Catálogo de 68 requerimientos, backlog de 63 elementos, detalle del protocolo |
 | `referencias.bib` | Bibliografía en biblatex/APA |
 
-La versión extendida de cada sección vive en `informe/` y en `docs/`.
+La versión extendida de cada sección vive en `docs/`; la primera versión del informe está en `historico/informe-v1/`.

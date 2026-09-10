@@ -205,4 +205,4 @@ Las cinco causas y los cinco efectos quedan cubiertos.
 | 3 Riesgos | ✅ Completo |
 
 **Siguiente documento:** `docs/02-requerimientos.md` (criterio 3, 45 % de la etapa) y
-`docs/05-protocolo-contactid.md` (evaluación de alternativas que sustenta OE2).
+`historico/docs/05-protocolo-contactid.md` (evaluación de alternativas que sustenta OE2).

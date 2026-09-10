@@ -328,7 +328,7 @@ bitacora/2026-08-XX-entrevista-<rol>.md
 | `docs/01-problema-y-objetivos.md`, secc. 1.6 | Estado del levantamiento: de «pendiente» a «realizado» |
 | `docs/02-requerimientos.md`, secc. 1.1 | Habilitar la fuente `[ENT]` y reasignar los requerimientos que ahora tengan respaldo directo |
 | `docs/02-requerimientos.md` | Agregar los requerimientos nuevos que hayan surgido |
-| `informe/secciones/02-problema.tex` | Reemplazar el recuadro rojo de brecha por las citas obtenidas |
+| `historico/informe-v1/secciones/02-problema.tex` | Reemplazar el recuadro rojo de brecha por las citas obtenidas |
 | `bitacora/` | El registro completo, como anexo de evidencia |
 
 > **Un requerimiento que nazca de una entrevista es más valioso que diez derivados de la teoría.** Si

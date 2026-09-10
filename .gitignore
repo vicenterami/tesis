@@ -1,5 +1,5 @@
 # ── LaTeX: archivos generados ─────────────────────────
-informe/build/
+historico/informe-v1/build/
 *.aux
 *.log
 *.out

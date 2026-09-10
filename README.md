@@ -39,7 +39,7 @@ estado de cada dispositivo y panel de control. Caso de validación: Campus Dr. L
 | Reglas de tiempo y zonas horarias (UTC, IANA por sitio) | [`docs/13-tiempo-y-zonas-horarias.md`](docs/13-tiempo-y-zonas-horarias.md) |
 | Fundamentos y glosario para explicar el proyecto | [`docs/GLOSARIO.md`](docs/GLOSARIO.md) |
 | Preguntas al profesor guía y guion de entrevistas | [`docs/03-instrumentos-levantamiento.md`](docs/03-instrumentos-levantamiento.md) |
-| **El protocolo de comunicación y por qué este** | **[`docs/05-protocolo-contactid.md`](docs/05-protocolo-contactid.md)** |
+| Enfoque previo (Contact ID), conservado como evidencia | [`historico/`](historico/README.md) |
 | Qué dijo el profesor y qué se cambió por eso | [`bitacora/`](bitacora/) |
 | La pauta de evaluación oficial | [`referencias/`](referencias/) |
 
@@ -50,7 +50,7 @@ docs/            documentos de trabajo por etapa (Markdown)
 bitacora/        reuniones con el profesor guía y retroalimentación incorporada
 referencias/     índice propio de los materiales del curso
 informe-oficial/ EL ENTREGABLE: plantilla oficial del curso, cuerpo ≤30 páginas + anexos
-informe/         documento extendido de trabajo (la versión larga que alimenta los anexos)
+historico/       enfoque previo a la redefinición (Contact ID, informe v1)
 plataforma/      código del prototipo y herramientas de verificación
 privado/         (local, no versionada) notas sensibles
 recursos-uct/    (local, no versionada) materiales originales del curso

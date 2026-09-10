@@ -115,8 +115,8 @@ zona `007`.
 **Mensaje completo:** `123418138100007B` — verificado: `79 + 11 = 90`, y `90 mod 15 = 0`. ✅
 
 > **Verificación empírica.** El cálculo no se asume: la herramienta
-> `plataforma/herramientas/contactid.py` genera y valida mensajes, y comprueba que la alteración de un
-> solo dígito invalida el checksum. Ejecutable con `python3 plataforma/herramientas/contactid.py`.
+> `historico/herramientas/contactid.py` genera y valida mensajes, y comprueba que la alteración de un
+> solo dígito invalida el checksum. Ejecutable con `python3 historico/herramientas/contactid.py`.
 
 **Capacidad de detección de errores.** El checksum módulo 15 detecta cualquier error de un solo
 dígito, pero **no detecta transposiciones** (intercambiar dos dígitos no altera la suma). Es una
@@ -436,7 +436,7 @@ tanto el plan **AU915** como el plan **US915**. La diferencia entre ambos es rel
 
 ## 3.2 Tamaño del mensaje Contact ID
 
-Resultados obtenidos con `plataforma/herramientas/contactid.py`:
+Resultados obtenidos con `historico/herramientas/contactid.py`:
 
 | Representación | Tamaño | Comentario |
 |---|---|---|
@@ -608,7 +608,7 @@ objeción legítima de que dos planos suponen el doble de trabajo en el nodo. **
 ### Verificación del tamaño del mensaje unificado
 
 El campo de datos extendidos aumenta el tamaño del mensaje, porque el estándar exige texto ASCII y no
-admite formato binario. Valores obtenidos con `plataforma/herramientas/contactid.py`:
+admite formato binario. Valores obtenidos con `historico/herramientas/contactid.py`:
 
 | Mensaje | Evento | Valor | Total |
 |---|:---:|:---:|:---:|
@@ -833,5 +833,5 @@ tienen condiciones abiertas, cuáles dejaron de reportar y cuándo se los vio po
 
 **Verificación propia**
 
-- `plataforma/herramientas/contactid.py` — generador y validador de mensajes Contact ID. Todos los
+- `historico/herramientas/contactid.py` — generador y validador de mensajes Contact ID. Todos los
   ejemplos y tamaños de este documento fueron calculados con esta herramienta, no estimados.
