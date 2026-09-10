@@ -5,6 +5,7 @@
 #
 #   bash informe-oficial/figuras/generar-figuras.sh              # regenera todo
 #   bash informe-oficial/figuras/generar-figuras.sh --verificar  # guardián: sale 1 si algo difiere
+#   bash informe-oficial/figuras/generar-figuras.sh --forzar     # re-renderiza todo aunque no haya cambios
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 MMD=informe-oficial/figuras/mermaid; OUT=informe-oficial/figuras/render
@@ -43,7 +44,13 @@ PY
   exit $fallo
 fi
 
-# 3) Copiar fuentes al informe y actualizar docs/08 §3 con el ER real
+# 3) Copiar fuentes al informe (anotando cuáles cambiaron) y actualizar docs/08 §3 con el ER real
+#    Los PDF de mermaid-cli no son deterministas (bytes distintos con el mismo dibujo): solo se
+#    renderiza lo que cambió o no existe, para no ensuciar git en cada corrida.
+CAMBIADOS=""
+for f in "$TMP"/*.mmd; do n=$(basename "$f" .mmd)
+  if ! diff -q "$f" "$MMD/$n.mmd" >/dev/null 2>&1 || [[ ! -f "$OUT/$n.pdf" ]]; then CAMBIADOS="$CAMBIADOS $n"; fi
+done
 cp "$TMP"/*.mmd "$MMD/"
 python3 - "$TMP/modelo-datos.mmd" <<'PY'
 import re, sys, pathlib
@@ -60,8 +67,10 @@ PY
 
 # 4) Render a PDF (vectorial) y PNG (revisión)
 mkdir -p "$OUT" privado/previsualizaciones
-for f in "$MMD"/*.mmd; do
-  n=$(basename "$f" .mmd)
+[[ -z "$CAMBIADOS" ]] && echo "figuras sin cambios: no se vuelve a renderizar (usa --forzar para rehacerlas)"
+[[ "${1:-}" == "--forzar" ]] && CAMBIADOS=$(cd "$MMD" && ls *.mmd | sed 's/\.mmd$//')
+for n in $CAMBIADOS; do
+  f="$MMD/$n.mmd"
   docker run --rm -u "$(id -u):$(id -g)" -v "$PWD/$MMD:/in" -v "$PWD/$OUT:/out" "$IMG" \
     -i "/in/$n.mmd" -o "/out/$n.pdf" -c /in/tema.json --pdfFit -q
   docker run --rm -u "$(id -u):$(id -g)" -v "$PWD/$MMD:/in" -v "$PWD/privado/previsualizaciones:/out" "$IMG" \

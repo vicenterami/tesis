@@ -68,49 +68,7 @@ horas del núcleo a la Etapa 4, verificando que el umbral del 50\,\% se cumple (
 \section{Seguimiento del backlog en la Etapa 2}
 \label{sec:seguimiento}
 
-La pauta evalúa el avance como el cumplimiento de las tareas de diseño previstas en el backlog. El
-cuadro~\ref{tab:seguimiento} compara lo planificado con lo ejecutado al cierre de la etapa; el detalle
-con evidencia por ítem se mantiene en la documentación del repositorio.
-
-\begin{table}[H]
-\centering\scriptsize
-\setlength{\tabcolsep}{4pt}
-\begin{tablaseg}
-\begin{tabular}{L{1.2cm}L{5.4cm}C{0.6cm}L{6.2cm}}
-\filaencab \encab{Ítem} & \encab{Tarea} & \encab{h} & \encab{Estado al cierre} \\
-TT-01 & Componer el entorno con contenedores: TimescaleDB, Mosquitto y ChirpStack orquestados, con un único comando de arranque & 6 & Hecho: docker-compose con TimescaleDB y Mosquitto; ChirpStack diseñado, pendiente de gateway \\
-TT-02 & Inicializar el proyecto TypeScript + NestJS con estructura de módulos correspondiente a M1–M8 & 4 & Hecho: backend NestJS con módulos M1, M2, M4, M5, M6 \\
-TT-03 & Configurar verificación automática: tipos, formato y ejecución de pruebas & 3 & Parcial: pruebas de solo lectura y guardianes; faltan ESLint y pruebas unitarias \\
-TT-04 & Documentar el procedimiento de puesta en marcha en el repositorio & 1 & Hecho: READMEs de plataforma y backend \\
-TT-05 & Diagrama de arquitectura de componentes, con los ocho módulos y sus dependencias & 5 & Hecho: vista de contenedores C4 (fig. 4.1) \\
-TT-06 & Diagrama de topología de red con segmentación de dispositivos IoT (RNF-09) y sentido de las conexiones (RNF-10) & 6 & Hecho: topología de red (fig. 4.3) \\
-TT-07 & Modelo de datos entidad-relación con al menos ocho entidades & 6 & Hecho: ER de 13 entidades generado desde la base (fig. 4.2) \\
-TT-08 & Diagrama de flujo de recepción, desde la recepción hasta la persistencia, para los tres transportes & 4 & Hecho: secuencia del pipeline (fig. 4.5) \\
-TT-09 & Diagrama de secuencia del aprovisionamiento de un dispositivo nuevo & 3 & Hecho: secuencia de aprovisionamiento (fig. 4.4) \\
-TT-10 & Registro de decisiones de diseño con su justificación & 2 & Hecho: tablas de decisiones en el cap. 4 y bitácora \\
-TT-11 & Esquema del modelo interno y contrato del tópico MQTT (nombres, unidades, identidad) & 3 & Hecho: docs/08, docs/10 §1; tópico sitio/·/dispositivo/·/magnitud \\
-TT-12 & Catálogo de tipos de sensor y unidades aceptadas, con umbrales de disparo y restauración & 6 & Parcial: 5 magnitudes con rango; ampliar con los sensores reales \\
-TT-13 & Especificación del contrato de la API en OpenAPI, generada desde el código & 3 & Pendiente el contrato OpenAPI; la API existe (cinco endpoints) \\
-TT-14 & Política de QoS, reintento y cuarentena & 2 & Hecho: QoS 1, reconexión, cuarentena con motivo \\
-TT-15 & Procedimiento de asignación de identidad y gestión de claves AES por sitio & 2 & Parcial: gestión de credenciales documentada (docs/11 §7); claves LoRaWAN dependen de ChirpStack \\
-HU-01 & Publicar una trama SenML por MQTT o HTTP desde un sensor sin infraestructura intermedia & 6 & Parcial: MQTT sí; HTTP en la Etapa 3 \\
-TT-16 & Validador de esquema SenML y analizador de tramas & 3 & Hecho: adaptador SenML \\
-TT-19 & Esquema de base de datos y migraciones versionadas & 5 & Hecho: esquema + 4 migraciones \\
-TT-24 & Comparar al menos tres alternativas de alojamiento con criterios ponderados & 4 & Pendiente \\
-TT-25 & Cuantificar el costo mensual y anual de operación en CLP y USD & 3 & Pendiente \\
-TT-26 & Redactar la recomendación de despliegue justificada & 1 & Parcial: vista de despliegue y presupuesto de recursos; falta el costo por alternativa \\
-TT-35 & Documento de diseño de la Etapa 2, con todos los diagramas & 6 & Parcial: borrador completo del informe (31 págs.); falta pulir e incorporar retroalimentación \\
-HU-03 & Publicar eventos en MQTT desde dispositivos que ya usan ese transporte & 4 & \textbf{Adelantado} (plan.\ E3), hecho: publicado y probado con mosquitto\_pub \\
-HU-04 & Adaptador para un formato no SenML (extensibilidad de la recepción) & 7 & \textbf{Adelantado} (plan.\ E4), parcial: adaptador plano; se cierra con la trama real \\
-TT-17 & Pipeline de normalización al modelo interno (seis filtros) con cuarentena & 6 & \textbf{Adelantado} (plan.\ E3), hecho: seis filtros verificados \\
-HU-06 & Configurar umbrales por dispositivo para generar un evento al cruzarlos & 4 & \textbf{Adelantado} (plan.\ E3), parcial: motor listo; falta interfaz \\
-TT-18 & Normalización de marcas temporales, tolerando nodos sin reloj confiable & 2 & \textbf{Adelantado} (plan.\ E3), hecho: tiempoPlausible \\
-TT-20 & Autenticación de la recepción mediante credencial por sitio & 4 & \textbf{Adelantado} (plan.\ E3), hecho: credencial por dispositivo + ACL \\
-\end{tabular}
-\end{tablaseg}
-\caption{Backlog de la Etapa 2 (22 ítems, 84~h) frente a lo ejecutado, más los ítems adelantados de etapas posteriores.}
-\label{tab:seguimiento}
-\end{table}
+La pauta evalúa el avance como el cumplimiento de las tareas de diseño previstas en el backlog. El cuadro~\ref{tab:seguimiento} (anexo~\ref{anx:seguimiento}) compara ítem por ítem lo planificado con lo ejecutado.
 
 De los 22 ítems planificados para la etapa, 13 están completos, 6 parciales con su faltante identificado y 3 pendientes (alojamiento, costos y el contrato OpenAPI). Seis ítems de las Etapas~3 y~4 se adelantaron; ese margen se invirtió en el capítulo de diseño y en el método de generación y verificación de figuras.
 
