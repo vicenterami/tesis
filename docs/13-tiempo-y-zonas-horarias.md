@@ -33,12 +33,12 @@ madrugada y sobrevive años.
 | # | Regla | Dónde se aplica | Prueba |
 |---|---|---|---|
 | 1 | **Se almacena en UTC.** Toda columna de instante es `timestamptz`; nunca `timestamp` sin zona | `01-esquema.sql` | ✅ guardia SQL |
-| 2 | **La marca de tiempo del emisor es un instante absoluto** (segundos Unix en SenML). Los nodos no manejan zonas y no deben hacerlo | filtro 4 | ✅ casos del adaptador |
+| 2 | **La marca de tiempo del emisor es un instante absoluto** (segundos Unix en SenML). Los nodos no manejan zonas y no deben hacerlo | filtro 4 | ✅ pruebas unitarias `tiempo.spec.ts` |
 | 3 | **Cada sitio declara su zona horaria con nombre IANA** (`America/Santiago`), nunca un desfase fijo como «−3»: el nombre incluye las reglas de verano/invierno. Un desfase fijo se rompe dos veces al año | `sitio.zona_horaria` (migración 03), disparador que rechaza nombres inválidos | ✅ `-03` rechazado |
 | 4 | **Toda pregunta de "día" se responde dentro de la base, en la zona del sitio**: `time_bucket(intervalo, tiempo, zona)`, `(tiempo AT TIME ZONE zona)::date`. Nunca `CURRENT_DATE`, `now()::date`, `::date` ni `date_trunc` sobre un instante sin pasar por la zona | API de consulta | ✅ 23:30 del 4-sep cae en el 4, no en el 5 |
 | 5 | **La API entrega instantes en ISO 8601 UTC con `Z`**, también los que viajan dentro de JSON armado en SQL (`json_agg`, `json_build_object`), que por defecto emiten `+00:00`: se pasan por `iso_utc()` (migración 04). Un solo formato para una sola cosa | controladores, `consulta.service` | ✅ prueba de humo «termina en Z» |
 | 6 | **El panel convierte a la zona del sitio al pintar**, con la zona que la API le informa, no con la del navegador: quien mire el panel desde otro país ve la hora del sitio, y el panel muestra un aviso cuando la zona del navegador difiere | panel (Svelte) | ⬜ pendiente (panel) |
-| 7 | **La marca del emisor se acepta solo si es plausible**: sin marca, anterior al año 2000 (reloj sin inicializar) o más de 2 minutos en el futuro → hora de recepción; hasta 2 minutos de adelanto se tolera como deriva; **una marca antigua pero posterior a 2000 se respeta**: un nodo que acumuló lecturas sin cobertura y las envía después reporta tiempos legítimamente viejos | filtro 4, `tiempoPlausible` | ✅ casos del adaptador |
+| 7 | **La marca del emisor se acepta solo si es plausible**: sin marca, anterior al año 2000 (reloj sin inicializar) o más de 2 minutos en el futuro → hora de recepción; hasta 2 minutos de adelanto se respeta la marca (deriva normal, y conservarla mantiene el espaciado real entre lecturas del nodo); **una marca antigua pero posterior a 2000 se respeta**: un nodo que acumuló lecturas sin cobertura y las envía después reporta tiempos legítimamente viejos | filtro 4, `tiempoPlausible` | ✅ pruebas unitarias `tiempo.spec.ts` |
 | 8 | **Los rangos de consulta son semiabiertos** `[desde, hasta)`: el instante frontera cuenta una vez | API | ✅ |
 | 9 | **El proceso del backend corre en UTC siempre** (`process.env.TZ = 'UTC'` antes de cualquier import; `ENV TZ=UTC` en la imagen), sin depender de la zona del sistema que lo aloje. Vale también para cualquier tarea programada: el barrido de supervisión y los futuros reportes diarios | `main.ts`, imagen Docker | ✅ |
 | 10 | **Un reporte "diario" o "mensual" se define en la zona del sitio**, no en UTC: «el informe de ayer» es el día de ayer en Santiago | tareas programadas (futuras) | ⬜ |
@@ -91,7 +91,7 @@ propios:
 |---|---|---|
 | Nodo sin reloj (ESP32 recién encendido, sin NTP) | Marca ausente → hora de recepción | La hora de llegada es la mejor estimación disponible |
 | Reloj sin inicializar (reporta 1970 o 2000) | Marca descartada → hora de recepción | Un instante antes del año 2000 no puede ser una medición real de este sistema |
-| Reloj adelantado unos segundos | Se tolera hasta 2 min (se usa la hora de recepción como techo) | La deriva de relojes baratos es normal; rechazarla perdería datos buenos |
+| Reloj adelantado unos segundos | Se respeta la marca hasta 2 min de adelanto | La deriva de relojes baratos es normal; aplanar esas marcas a la hora de llegada distorsionaría el espaciado de la serie |
 | Reloj adelantado horas o días | Marca descartada → hora de recepción | Un tiempo futuro nunca es válido para una medición ya recibida |
 | Nodo que estuvo sin cobertura y envía su cola de lecturas acumuladas | **Se respetan** las marcas antiguas | Son mediciones reales de cuando ocurrieron; aplanarlas a la hora de llegada destruiría la serie |
 | Un nodo envía hora local «sin zona» como texto | Adaptador: se trata como malformada salvo que el adaptador de ese formato declare la zona del dispositivo | Una hora de pared no es un instante; adivinarla corrompe |

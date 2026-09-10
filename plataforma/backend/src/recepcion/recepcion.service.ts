@@ -8,26 +8,11 @@ import { Adaptador, TramaMalformada } from './adaptadores/adaptador';
 import { PlanoAdaptador } from './adaptadores/plano.adaptador';
 import { SenmlAdaptador } from './adaptadores/senml.adaptador';
 import { ContextoTrama, Lectura } from './lectura';
+import { tiempoPlausible } from './tiempo';
 import { aCanonica } from './unidades';
 
 // Forma del tópico acordada: sitio/<sitio>/dispositivo/<id_fisico>/<magnitud>
 const PATRON_TOPICO = /^sitio\/([^/]+)\/dispositivo\/([^/]+)\/([^/]+)$/;
-
-// Marca de tiempo del emisor: se acepta solo si es plausible (docs/13, regla 7).
-//  · sin marca                      → hora de recepción (nodo sin reloj)
-//  · anterior al año 2000           → hora de recepción (reloj sin inicializar: epoch 0 = 1970)
-//  · más de 2 min en el futuro      → hora de recepción (reloj adelantado); ≤ 2 min se tolera como deriva
-//  · antigua pero posterior a 2000  → se RESPETA: un nodo que guardó lecturas sin cobertura y las
-//                                     envía después reporta tiempos legítimamente viejos
-const ANIO_2000 = Date.UTC(2000, 0, 1);
-const DERIVA_MAX_MS = 2 * 60 * 1000;
-function tiempoPlausible(emisor: Date | undefined, recibidoEn: Date): Date {
-  if (!emisor) return recibidoEn;
-  const t = emisor.getTime();
-  if (Number.isNaN(t) || t < ANIO_2000) return recibidoEn;
-  if (t > recibidoEn.getTime() + DERIVA_MAX_MS) return recibidoEn;
-  return t > recibidoEn.getTime() ? recibidoEn : emisor;
-}
 
 interface Dispositivo { id: string; estado: 'activo' | 'mantenimiento' | 'baja' }
 interface Canal { id: string; magnitud: string; unidad_canonica: string; rango_min: number | null; rango_max: number | null }

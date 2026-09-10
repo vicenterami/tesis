@@ -4,8 +4,15 @@
 # Requiere la pila arriba (docker compose up -d en plataforma/) y, para la API, el backend corriendo.
 set -u
 cd "$(dirname "$0")/../.."
+# Cada corrida queda registrada (fecha y hora en el nombre) en una carpeta que git ignora.
+LOG_DIR="${VERIFICAR_LOG_DIR:-privado/logs}"; mkdir -p "$LOG_DIR"
+exec > >(tee "$LOG_DIR/verificar-$(date +%F-%H%M%S).log") 2>&1
+echo "verificar-todo · $(date -Is) · commit $(git rev-parse --short HEAD 2>/dev/null || echo ?)"
 fallos=0
 paso() { echo; echo "══ $1 ══"; }
+
+paso "0. Backend: tipos, lint y pruebas unitarias (pnpm verificar) — no necesita base ni broker"
+if command -v pnpm >/dev/null; then (cd plataforma/backend && pnpm verificar 2>&1 | grep -E "^\$ |Tests:|error|✖|FAIL"; exit "${PIPESTATUS[0]}") || fallos=$((fallos+1)); else echo "omitida: pnpm no está en el PATH"; fi
 
 paso "1. Esquema: guardias de tipo y zonas horarias (db/pruebas/zonas-horarias.sql)"
 docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -U plataforma -d plataforma -v ON_ERROR_STOP=1 -tA -F ' · ' \

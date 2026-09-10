@@ -15,10 +15,30 @@ src/
 ├── recepcion/
 │   ├── recepcion.service.ts   # M1+M2: orquesta los seis filtros y la cuarentena
 │   ├── lectura.ts             # la unidad que viaja por el pipeline: {magnitud, valor, unidad, tiempo}
+│   ├── tiempo.ts              # plausibilidad de la marca de tiempo del emisor (filtro 4, docs/13 regla 7)
 │   ├── unidades.ts            # conversiones a la unidad canónica (filtro 4)
-│   └── adaptadores/           # filtro 2: senml (nativo, RFC 8428) y plano (número o JSON simple)
+│   ├── adaptadores/           # filtro 2: senml (nativo, RFC 8428) y plano (número o JSON simple)
+│   └── *.spec.ts              # pruebas unitarias de las funciones puras (jest)
+├── consulta/                  # M5: API de solo lectura (dispositivos, canales, condiciones, cuarentena)
+├── openapi.ts                 # contrato OpenAPI generado desde los decoradores; /docs
 └── salud/salud.controller.ts  # GET /salud
 ```
+
+## Verificación automática (TT-03)
+
+```bash
+pnpm verificar        # = pnpm typecheck && pnpm lint && pnpm test  (≈ 5 s, sin base ni broker)
+```
+
+| Capa | Herramienta | Qué atrapa |
+|---|---|---|
+| Tipos | `tsc --noEmit` (`strict`) | usos incorrectos entre módulos; `null` no tratado |
+| Estilo y errores latentes | ESLint 10 + typescript-eslint `recommendedTypeChecked` | promesas sin `await` (`no-floating-promises`), variables sin uso, `async` mal colocado |
+| Comportamiento | jest + ts-jest sobre las funciones **puras** del pipeline | reglas de tiempo, conversión de unidades, adaptadores SenML y plano |
+
+Las pruebas unitarias viven junto al código (`*.spec.ts`) y no tocan base ni broker: cada caso
+documenta una regla (p. ej. «marca anterior al año 2000 → hora de recepción»). Lo que sí depende
+de la pila (esquema, migraciones, API) lo cubre `plataforma/pruebas/verificar-todo.sh`.
 
 ## Ejecutar en desarrollo
 

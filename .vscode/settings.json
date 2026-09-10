@@ -15,5 +15,16 @@
   "files.trimTrailingWhitespace": true,
   "editor.rulers": [100],
   "cSpell.language": "es,en",
-  "cSpell.words": ["Mosquitto", "TimescaleDB", "ChirpStack", "LoRaWAN", "SenML", "hypertable", "NestJS", "uPlot", "Svelte", "ThingsBoard"]
+  "cSpell.words": [
+    "Mosquitto", "TimescaleDB", "Timescale", "ChirpStack", "LoRaWAN", "SenML", "hypertable", "NestJS", "uPlot",
+    "Svelte", "ThingsBoard", "pnpm", "eslint", "typecheck", "jest", "mqtt", "timestamptz", "uuid", "PBKDF",
+    "Hetzner", "PPDIOO", "SWEBOK", "Cardiff", "Rivas", "Canto", "Villanueva", "latexmk", "adjustbox", "booktabs",
+    "longtable", "toprule", "midrule", "bottomrule", "tabcolsep", "includegraphics", "keepaspectratio",
+    "resizebox", "textbf", "texttt", "parencite", "Overfull", "hbox", "Mermaid", "openapi", "swagger",
+    "histéresis", "cuarentena", "semiabierto", "semiabiertos", "idempotente", "idempotentes", "backlog"
+  ],
+  "cSpell.ignorePaths": [
+    "**/node_modules", "**/dist", "**/build", "**/pnpm-lock.yaml", "**/openapi.json", "**/*.pdf", "**/*.png",
+    "**/figuras/render", "**/*.mmd", "recursos-uct", "historico"
+  ]
 }

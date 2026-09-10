@@ -31,13 +31,13 @@ implementando solo lo que **sustente el diseño** (API de consulta, que demuestr
 
 ## 3. Seguimiento del backlog (corte 10 de septiembre)
 
-**Etapa 2 planificada: 22 ítems, 84 h.** Hechos: 17 (61 h) · parciales: 5 · pendientes: 0.
+**Etapa 2 planificada: 22 ítems, 84 h.** Hechos: 18 (64 h) · parciales: 4 · pendientes: 0.
 
 | Ítem | Tarea | Pr. | h | Estado | Evidencia |
 |---|---|---|---|---|---|
 | TT-01 | Componer el entorno con contenedores: TimescaleDB, Mosquitto y ChirpStack orques | M | 6 | ✅ | docker-compose con TimescaleDB y Mosquitto; ChirpStack diseñado, pendiente de gateway |
 | TT-02 | Inicializar el proyecto TypeScript + NestJS con estructura de módulos correspond | M | 4 | ✅ | backend NestJS con módulos M1, M2, M4, M5, M6 |
-| TT-03 | Configurar verificación automática: tipos, formato y ejecución de pruebas | S | 3 | 🟡 | pruebas de solo lectura y guardianes; faltan ESLint y pruebas unitarias |
+| TT-03 | Configurar verificación automática: tipos, formato y ejecución de pruebas | S | 3 | ✅ | `pnpm verificar`: tsc + ESLint (typescript-eslint, reglas con tipos) + 19 pruebas jest de las funciones puras; guardianes de concordancia en `verificar-todo.sh` |
 | TT-04 | Documentar el procedimiento de puesta en marcha en el repositorio | M | 1 | ✅ | READMEs de plataforma y backend |
 | TT-05 | Diagrama de arquitectura de componentes, con los ocho módulos y sus dependencias | M | 5 | ✅ | vista de contenedores C4 (fig. 4.1) |
 | TT-06 | Diagrama de topología de red con segmentación de dispositivos IoT (RNF-09) y sen | M | 6 | ✅ | topología de red (fig. 4.3) |
@@ -69,7 +69,7 @@ implementando solo lo que **sustente el diseño** (API de consulta, que demuestr
 | TT-18 | Normalización de marcas temporales, tolerando nodos sin reloj confiabl | E3 | ✅ | tiempoPlausible |
 | TT-20 | Autenticación de la recepción mediante credencial por sitio | E3 | ✅ | credencial por dispositivo + ACL |
 
-**Pendiente para cerrar la etapa:** completar los parciales — TT-35 (pulir informe e incorporar retroalimentación), TT-03 (ESLint y pruebas unitarias), TT-12 (catálogo con los sensores reales), TT-15 (claves LoRaWAN, depende de ChirpStack) y HU-01 (entrada HTTP, Etapa 3).
+**Pendiente para cerrar la etapa:** completar los parciales — TT-35 (pulir informe e incorporar retroalimentación), TT-12 (catálogo con los sensores reales), TT-15 (claves LoRaWAN, depende de ChirpStack) y HU-01 (entrada HTTP, Etapa 3).
 
 ## 4. ¿Vamos pesados? — medición real
 
@@ -120,6 +120,6 @@ falla si informe, docs y base difieren. Sin dibujos a mano: sin solapes ni colum
 | Semana | Foco | Entregable |
 |---|---|---|
 | 9–14 sep | ~~API de consulta~~ ✅ · ~~capítulo de diseño~~ ✅ (borrador completo, 30 págs.) · **TT-24/25/26 alojamiento y costos** · TT-13 OpenAPI · escribir a profesor guía y compañero | `docs/14-despliegue-y-costos.md`; correos enviados |
-| 15–21 sep | Incorporar la retroalimentación (20 %); TT-03 ESLint y pruebas unitarias; pulir informe | informe v2 |
+| 15–21 sep | Incorporar la retroalimentación (20 %); pulir informe | informe v2 |
 | 22–28 sep | Aprovisionamiento por API (M3); pulir informe; **visita presencial a Temuco para mostrar avances** (a coordinar con el profesor guía) | demostración en vivo del pipeline |
 | 29 sep–2 oct | Revisión final, compilación, entrega | PDF Etapa 2 |
