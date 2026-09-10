@@ -2,52 +2,54 @@
 
 > **Sustenta:** OE2 y OE3 · criterio «diseña según estándares de calidad» (55 %) de la Etapa 2.
 > **Notación:** vista de contenedores del modelo C4 (Brown) para la estructura; diagramas de
-> secuencia UML para el comportamiento; vista de despliegue para la infraestructura. Todos se
-> renderizan con Mermaid y se llevarán a TikZ para el informe. Versión: 8 de septiembre de 2026.
+> secuencia UML para el comportamiento; vista de despliegue para la infraestructura. Todos son
+> Mermaid: se ven en GitHub y `informe-oficial/figuras/generar-figuras.sh` los renderiza a PDF para el informe
+> desde esta misma fuente (el modelo de datos se genera desde la base real). Versión: 8 de septiembre de 2026.
 > **Depende de:** `docs/06` (pipeline), `docs/07` (stack y patrón B), `docs/08` (modelo de datos).
 
 ---
 
 ## 1. Vista de contenedores (C4, nivel 2)
 
-Qué piezas ejecutables existen y cómo se hablan. La **frontera** del trabajo es la línea punteada:
-a la izquierda está la red de sensores (lado del compañero); a la derecha, la plataforma.
+Qué piezas ejecutables existen y cómo se hablan. La **frontera** del trabajo es el tópico MQTT: a la
+izquierda está la red de sensores (lado del compañero); a la derecha, la plataforma. Los módulos M1–M8
+son los del análisis de requerimientos (`docs/02` §3); M3 (aprovisionamiento), M7 (seguridad e
+identidad) y M8 (interfaz) no aparecen como cajas porque son transversales o viven en el cliente.
 
 ```mermaid
-flowchart LR
-    subgraph RED["Red de sensores (fuera de la frontera)"]
-        N1["Nodo sensor LoRa\n(ESP32 + sensores)"]
-        N2["Nodo sensor Wi-Fi\n(ESP32, MQTT directo)"]
-        GW["Gateway LoRaWAN"]
+flowchart TB
+    subgraph RED["Red de sensores · lado del compañero"]
+        direction LR
+        N1["Nodo sensor LoRa<br/>ESP32 + sensores"] -- "LoRa (radio)" --> GW["Gateway LoRaWAN"]
+        N2["Nodo sensor Wi-Fi<br/>MQTT directo"]
     end
 
-    subgraph SRV["Servidor de la plataforma (Docker)"]
-        CS["ChirpStack\nNetwork server LoRaWAN"]
-        MQ["Mosquitto\nBroker MQTT · TLS"]
-        subgraph BE["Backend (NestJS)"]
-            M1["M1 Recepción\n(suscriptor MQTT + HTTP)"]
-            M2["M2 Pipeline\n6 filtros"]
-            M3["M3 Supervisión\nde salud"]
-            M4["M4 Alertas"]
-            M5["M5 API REST\n+ WebSocket"]
+    subgraph SRV["Servidor de la plataforma · contenedores Docker"]
+        direction TB
+        CS["ChirpStack<br/>servidor de red LoRaWAN"]
+        MQ["Mosquitto<br/>broker MQTT · TLS"]
+        subgraph BE["Backend · NestJS"]
+            direction LR
+            M1["M1 Recepción<br/>suscriptor MQTT"] --> M2["M2 Normalización<br/>pipeline de 6 filtros"]
+            M2 --> M4["M4 Supervisión<br/>de salud"] --> M6["M6 Alertas<br/>umbrales, condiciones"]
+            M5["M5 Persistencia y consulta<br/>API REST + WebSocket"]
         end
-        DB[("TimescaleDB\nseries de tiempo\n+ tablas relacionales")]
-        FE["Panel web\n(Svelte + uPlot, estático)"]
+        DB[("TimescaleDB<br/>series de tiempo + tablas relacionales")]
     end
 
-    U(["Usuario\n(navegador)"])
+    subgraph CLI["Cliente"]
+        direction LR
+        U(["Usuario<br/>navegador"]) --- FE["Panel web<br/>Svelte + uPlot"]
+    end
 
-    N1 -- "LoRa (radio)" --> GW
     GW -- "UDP/IP → Internet" --> CS
-    CS -- "publica JSON\ndecodificado" --> MQ
+    CS -- "publica JSON decodificado" --> MQ
     N2 -- "MQTT/TLS 8883" --> MQ
-    MQ -- "suscripción" --> M1
-    M1 --> M2 --> DB
-    M2 --> M3 --> M4
-    M5 -- "SQL" --> DB
-    M5 -- "sirve archivos" --> FE
-    U -- "HTTPS 443" --> M5
-    FE -. "REST histórico\nWS tiempo real" .-> M5
+    MQ -- "suscripción sitio/#" --> M1
+    M2 -- "INSERT medicion" --> DB
+    M6 -- "condiciones, eventos" --> DB
+    M5 -- "SQL · time_bucket" --> DB
+    FE -- "HTTPS 443 · REST histórico · WS tiempo real" --> M5
 ```
 
 **Decisiones visibles en el diagrama:**
@@ -235,30 +237,31 @@ cientos de puntos, no millones, sin importar cuánto tiempo lleve el sensor tran
 
 ```mermaid
 flowchart TB
-    subgraph HOST["Servidor Ubuntu · Docker Engine"]
-        subgraph NET["red interna: plataforma"]
-            C1["mosquitto\nimagen eclipse-mosquitto:2.0.22\nlímite: 0,25 GB"]
-            C2["chirpstack\n+ redis propio · usa una base aparte\nen el mismo PostgreSQL\nlímite: 0,35 GB"]
-            C3["timescaledb\nimagen timescale/timescaledb:2.24.0-pg16\nlímite: 0,75 GB"]
-            C4["backend\nimagen propia (NestJS + panel estático)\nlímite: 0,5 GB"]
-            C5["proxy\nimagen caddy (TLS automático)\nlímite: 0,1 GB"]
+    subgraph HOST["Servidor Ubuntu · Docker Engine · red interna «plataforma»"]
+        direction LR
+        subgraph SVC["Contenedores (versión fijada · no-new-privileges · reinicio automático)"]
+            direction TB
+            C5["proxy<br/>Caddy · TLS automático<br/>límite 0,1 GB · publica 443, 8883, 1700/udp"]
+            C1["mosquitto<br/>eclipse-mosquitto 2.0.22<br/>límite 0,25 GB"]
+            C2["chirpstack<br/>+ redis propio<br/>límite 0,35 GB"]
+            C4["backend<br/>imagen propia: NestJS + panel estático<br/>límite 0,5 GB · sin estado"]
+            C3["timescaledb<br/>timescale/timescaledb 2.24.0-pg16<br/>límite 0,75 GB"]
         end
-        V1[("vol: datos-timescale")]
-        V2[("vol: datos-mosquitto")]
-        V3[("vol: datos-chirpstack")]
         V4[("vol: certificados")]
+        V2[("vol: datos-mosquitto")]
+        V1[("vol: datos-timescale<br/>todo el dato · base «chirpstack» aparte")]
     end
-    C3 --- V1
-    C1 --- V2
-    C2 --- V3
     C5 --- V4
+    C1 --- V2
+    C3 --- V1
+    C2 -. "base propia en el mismo PostgreSQL" .-> C3
 ```
 
 | Servicio | Persistencia | Reinicio | Expuesto |
 |---|---|---|---|
 | proxy | certificados | `unless-stopped` | 443, 8883, 1700/udp |
 | mosquitto | retenidos + ACL | `unless-stopped` | no (vía proxy) |
-| chirpstack | claves de dispositivos (base `chirpstack` en el mismo PostgreSQL) + redis | `unless-stopped` | no (vía proxy) |
+| chirpstack | base `chirpstack` en el mismo PostgreSQL (volumen datos-timescale) + redis | `unless-stopped` | no (vía proxy) |
 | timescaledb | **todo el dato** | `unless-stopped` | no |
 | backend | ninguna (sin estado) | `unless-stopped` | no (vía proxy) |
 

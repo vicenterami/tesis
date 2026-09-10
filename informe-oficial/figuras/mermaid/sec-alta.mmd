@@ -1,0 +1,24 @@
+sequenceDiagram
+    actor Admin as Administrador de sitio
+    participant FE as Panel web
+    participant API as Backend · API
+    participant DB as TimescaleDB
+    participant MQ as Broker
+    participant Dev as Dispositivo
+
+    Admin->>FE: Asistente "nuevo dispositivo"
+    FE->>API: POST /dispositivos {zona, id_fisico, canales[]}
+    API->>DB: INSERT dispositivo, canal×N
+    API->>API: genera credencial (secreto aleatorio)
+    API->>DB: INSERT credencial (solo el hash)
+    API->>MQ: registra usuario MQTT + ACL al tópico del dispositivo
+    API-->>FE: 201 {id, credencial en claro — se muestra UNA vez}
+    FE-->>Admin: Muestra credencial + tópico + ejemplo de trama
+    Admin->>Dev: Carga credencial en el firmware (o la entrega al compañero)
+    Dev->>MQ: CONNECT (id_fisico, credencial) · TLS
+    MQ->>MQ: valida credencial y ACL
+    Dev->>MQ: PUBLISH sitio/…/dispositivo/<id>/<magnitud>
+    MQ->>API: entrega la trama (suscriptor)
+    API->>DB: UPDATE dispositivo.visto_por_ultima_vez
+    API-->>FE: WS "dispositivo en línea"
+    FE-->>Admin: Estado: en línea ✅

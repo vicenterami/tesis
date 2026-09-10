@@ -9,12 +9,12 @@ import { SaludModule } from './salud/salud.module';
 // Módulo raíz. Cada módulo de aquí corresponde a un módulo funcional del diseño (docs/10 §1):
 //   DbModule        → acceso a TimescaleDB (infraestructura compartida)
 //   BrokerModule    → conexión al broker MQTT como usuario "backend" (infraestructura compartida)
-//   RecepcionModule → M1 Recepción + M2 Pipeline (seis filtros)
-//   SupervisionModule → M3 Supervisión de salud (barrido periódico "sin comunicación")
-//   AlertasModule   → M4 Alertas (umbrales con histéresis → condiciones)
-//   ConsultaModule  → M6 Consulta: API de solo lectura para el panel (patrón B)
+//   RecepcionModule → M1 Recepción + M2 Normalización (pipeline de seis filtros)
+//   SupervisionModule → M4 Supervisión de salud (barrido periódico "sin comunicación")
+//   AlertasModule   → M6 Alertas (umbrales con histéresis → condiciones)
+//   ConsultaModule  → M5 Persistencia y consulta: API de solo lectura para el panel (patrón B)
 //   SaludModule     → endpoint de salud para healthchecks y pruebas
-// Los módulos M5 (aprovisionamiento) y M7 (usuarios) se agregan por tandas.
+// Los módulos M3 (aprovisionamiento) y M7 (seguridad e identidad) se agregan por tandas; M8 es el panel.
 @Module({
   imports: [
     // Lee variables de entorno. En desarrollo toma el .env de la carpeta plataforma/ (el mismo que

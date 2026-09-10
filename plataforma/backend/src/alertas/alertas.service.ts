@@ -4,7 +4,7 @@ import { POOL } from '../db/db.module';
 
 interface Regla { id: string; umbral_alto: number | null; umbral_bajo: number | null; histeresis: number }
 
-// M4 Alertas — filtro 6 del pipeline. Evalúa cada medición aceptada contra las reglas de umbral
+// M6 Alertas — filtro 6 del pipeline. Evalúa cada medición aceptada contra las reglas de umbral
 // de su canal y abre/cierra CONDICIONES (estados con duración), no eventos sueltos.
 //
 // Histéresis: para evitar que una lectura que oscila alrededor del umbral abra y cierre la

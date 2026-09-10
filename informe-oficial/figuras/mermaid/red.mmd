@@ -1,0 +1,30 @@
+flowchart TB
+    subgraph CAMPO["Segmento de campo (sitio del cliente)"]
+        S1["Nodos LoRa"] -- radio --> G["Gateway"]
+        S2["Nodos Wi-Fi"] --> R["Router del sitio\n(NAT, sin puertos abiertos)"]
+        G --> R
+    end
+
+    INET(("Internet"))
+
+    subgraph DMZ["Servidor · red pública (expuesta)"]
+        RP["Proxy inverso / TLS\n:443 → panel y API\n:8883 → broker (mTLS opcional)\n:1700/udp → ChirpStack (solo gateway)"]
+    end
+
+    subgraph INT["Servidor · red interna Docker (no expuesta)"]
+        MQ["Mosquitto :1883"]
+        CS["ChirpStack :8080"]
+        BE["Backend :3000"]
+        DB[("TimescaleDB :5432")]
+    end
+
+    R -- "salientes únicamente" --> INET
+    INET --> RP
+    RP --> MQ
+    RP --> CS
+    RP --> BE
+    CS --> MQ
+    MQ --> BE
+    BE --> DB
+
+    NAV(["Navegador del usuario"]) -- "HTTPS :443" --> INET

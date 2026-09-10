@@ -1,13 +1,13 @@
-# Estado de la Etapa 2 — corte al 8 de septiembre de 2026
+# Estado de la Etapa 2 — corte al 9 de septiembre de 2026
 
-> Entrega: viernes 2 de octubre de 2026 (quedan 24 días). Fase PPDIOO: *Design* (con implementación
+> Entrega: viernes 2 de octubre de 2026 (quedan 23 días). Fase PPDIOO: *Design* (con implementación
 > inicial adelantada). Este documento se actualiza en cada corte; la bitácora guarda el detalle diario.
 
 ## 1. Qué evalúa la Etapa 2 y cómo vamos
 
 | Criterio de la rúbrica | Peso | Estado | Qué falta para el puntaje completo |
 |---|---|---|---|
-| Diseña según estándares de calidad | **55 %** | 🟢 avanzado | Diagramas ya existen en notación reconocida (C4, UML, ER) en Mermaid; **falta llevarlos al informe LaTeX** (TikZ o imagen) y redactar el capítulo de diseño |
+| Diseña según estándares de calidad | **55 %** | 🟢 avanzado | Diagramas en notación reconocida (C4, UML, ER) generados desde una fuente única y ya renderizados para el informe (§6); **falta redactar el capítulo de diseño** que los integre |
 | Incorpora la retroalimentación | 20 % | ⚪ bloqueado | Sin retroalimentación aún del profesor guía sobre la Etapa 1. Al llegar: registrar cada observación → cambio concreto (bitácora + informe) |
 | Avanza en el diseño según backlog | 10 % | 🟢 avanzado | Ver §3: ítems de diseño de la Etapa 2 casi cerrados; queda TT-26 (recomendación de despliegue) |
 | Documenta en repositorio | 15 % | 🟢 cumplido | Commits descriptivos, docs/07–12, bitácora, READMEs. Mantener el ritmo |
@@ -79,9 +79,13 @@ sobrepeso**; la regla sigue siendo agregar dependencias solo con justificación 
 
 | Diagrama | Dónde (se renderiza en GitHub) | En el informe |
 |---|---|---|
-| Entidad-relación (13 entidades) | `docs/08-modelo-datos.md` §3 | ⬜ pendiente |
-| Contenedores C4, topología de red, 3 secuencias UML, despliegue | `docs/10-arquitectura.md` §1–§6 | ⬜ pendiente |
-| Pipeline de 6 filtros, despliegue, árbol del problema (Etapa 1) | `informe-oficial/figuras/*.tex` | ✅ ya en TikZ |
+| Entidad-relación (13 entidades) | `docs/08-modelo-datos.md` §3 — **generado desde la base real** | ✅ `figuras/render/modelo-datos.pdf` |
+| Contenedores C4, topología de red, 3 secuencias UML, despliegue | `docs/10-arquitectura.md` §1–§6 | ✅ `figuras/render/*.pdf`, generados por `generar-figuras.sh` desde la misma fuente |
+| Pipeline de 6 filtros, árbol del problema (Etapa 1) | `informe-oficial/figuras/pipeline.tex`, `arbol.tex` | ✅ TikZ |
+
+**Método (09/09):** una sola fuente por diagrama (Mermaid en `docs/`; el ER sale del esquema de la base),
+render automático a PDF con `mermaid-cli` en Docker, y un guardián (`generar-figuras.sh --verificar`) que
+falla si informe, docs y base difieren. Sin dibujos a mano: sin solapes ni columnas olvidadas.
 
 ## 7. Lo que frena hoy
 
@@ -96,7 +100,7 @@ sobrepeso**; la regla sigue siendo agregar dependencias solo con justificación 
 
 | Semana | Foco | Entregable |
 |---|---|---|
-| 9–14 sep | API de consulta (`time_bucket`), recomendación de despliegue y costos (TT-26) | endpoints probados; `docs/13-despliegue-y-costos.md` |
-| 15–21 sep | **Informe Etapa 2**: capítulo de diseño, diagramas a TikZ, incorporar retroalimentación si llegó | borrador completo |
-| 22–28 sep | Aprovisionamiento por API (M5); pulir informe; **visita presencial a Temuco para mostrar avances** (a coordinar con el profesor guía) | demostración en vivo del pipeline |
+| 9–14 sep | API de consulta (`time_bucket`), recomendación de despliegue y costos (TT-26) | endpoints probados ✅; `docs/14-despliegue-y-costos.md` |
+| 15–21 sep | **Informe Etapa 2**: capítulo de diseño con las figuras generadas, incorporar retroalimentación si llegó | borrador completo |
+| 22–28 sep | Aprovisionamiento por API (M3); pulir informe; **visita presencial a Temuco para mostrar avances** (a coordinar con el profesor guía) | demostración en vivo del pipeline |
 | 29 sep–2 oct | Revisión final, compilación, entrega | PDF Etapa 2 |

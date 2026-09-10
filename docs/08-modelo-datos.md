@@ -39,54 +39,35 @@ resto son tablas relacionales normales de PostgreSQL.
 
 ## 3. Diagrama entidad-relación
 
+> Diagrama **generado desde la base de datos real** por `informe-oficial/figuras/generar-figuras.sh` (`db/pruebas/er-mermaid.sql`). No editar a mano: si el esquema cambia, se regenera.
+
 ```mermaid
 erDiagram
-    sitio ||--o{ zona : "agrupa"
-    sitio ||--o{ usuario_sitio : ""
-    usuario ||--o{ usuario_sitio : ""
-    zona ||--o{ dispositivo : "ubica"
-    dispositivo ||--o{ canal : "reporta"
-    magnitud ||--o{ canal : "tipifica"
-    dispositivo ||--|| credencial : "autentica con"
-    canal ||--o{ medicion : "produce"
-    canal ||--o{ regla_umbral : "vigila"
-    dispositivo ||--o{ condicion : "presenta"
-    dispositivo ||--o{ evento : "registra"
-    regla_umbral ||--o{ condicion : "dispara"
-
-    sitio {
-        uuid id PK
-        text nombre
-        text descripcion
-        text zona_horaria "IANA, p. ej. America/Santiago"
-        timestamptz creado_en
-    }
-    zona {
-        uuid id PK
-        uuid sitio_id FK
-        text nombre
-    }
-    magnitud {
-        text codigo PK
-        text nombre
-        text unidad_canonica
-        float rango_min
-        float rango_max
-    }
-    dispositivo {
-        uuid id PK
-        uuid zona_id FK
-        text id_fisico "MAC / DevEUI, unico"
-        text nombre
-        text estado "activo/mantenimiento/baja"
-        int intervalo_esperado_s
-        timestamptz visto_por_ultima_vez
-    }
+    dispositivo ||--o{ canal : canal
+    magnitud ||--o{ canal : canal
+    dispositivo ||--o{ condicion : condicion
+    regla_umbral ||--o{ condicion : condicion
+    dispositivo ||--o{ credencial : credencial
+    zona ||--o{ dispositivo : dispositivo
+    dispositivo ||--o{ evento : evento
+    canal ||--o{ medicion : medicion
+    canal ||--o{ regla_umbral : regla_umbral
+    sitio ||--o{ usuario_sitio : usuario_sitio
+    usuario ||--o{ usuario_sitio : usuario_sitio
+    sitio ||--o{ zona : zona
     canal {
         uuid id PK
         uuid dispositivo_id FK
         text magnitud_codigo FK
         text etiqueta
+    }
+    condicion {
+        uuid id PK
+        uuid dispositivo_id FK
+        uuid regla_id FK
+        text tipo
+        timestamptz abierta_en
+        timestamptz cerrada_en
     }
     credencial {
         uuid id PK
@@ -95,26 +76,23 @@ erDiagram
         bool activa
         timestamptz creada_en
     }
-    medicion {
-        uuid canal_id FK
-        float valor
-        text unidad
-        timestamptz tiempo "clave de la hypertable"
-    }
-    regla_umbral {
+    cuarentena {
         uuid id PK
-        uuid canal_id FK
-        float umbral_alto
-        float umbral_bajo
-        float histeresis
+        text origen
+        text topico
+        text motivo
+        bytea payload_crudo
+        timestamptz recibido_en
     }
-    condicion {
+    dispositivo {
         uuid id PK
-        uuid dispositivo_id FK
-        uuid regla_id FK
-        text tipo "sin_comunicacion/umbral/bateria/manipulacion"
-        timestamptz abierta_en
-        timestamptz cerrada_en
+        uuid zona_id FK
+        text id_fisico
+        text nombre
+        text estado
+        int intervalo_esperado_s
+        timestamptz visto_por_ultima_vez
+        timestamptz creado_en
     }
     evento {
         uuid id PK
@@ -123,23 +101,49 @@ erDiagram
         jsonb detalle
         timestamptz ocurrido_en
     }
-    cuarentena {
+    magnitud {
+        text codigo PK
+        text nombre
+        text unidad_canonica
+        float rango_min
+        float rango_max
+    }
+    medicion {
+        uuid canal_id FK
+        timestamptz tiempo
+        float valor
+        text unidad
+    }
+    regla_umbral {
         uuid id PK
-        text origen "mqtt/http"
-        text motivo
-        text payload_crudo
-        timestamptz recibido_en
+        uuid canal_id FK
+        float umbral_alto
+        float umbral_bajo
+        float histeresis
+    }
+    sitio {
+        uuid id PK
+        text nombre
+        text descripcion
+        timestamptz creado_en
+        text zona_horaria
     }
     usuario {
         uuid id PK
         text nombre
         text email
         text hash_password
+        timestamptz creado_en
     }
     usuario_sitio {
-        uuid usuario_id FK
+        uuid usuario_id PK,FK
+        uuid sitio_id PK,FK
+        text rol
+    }
+    zona {
+        uuid id PK
         uuid sitio_id FK
-        text rol "administrador/consulta"
+        text nombre
     }
 ```
 

@@ -1,0 +1,17 @@
+sequenceDiagram
+    actor U as Usuario
+    participant FE as Panel (Svelte)
+    participant API as Backend
+    participant DB as TimescaleDB
+
+    U->>FE: abre la vista de un dispositivo
+    FE->>API: GET /canales/{id}/historico?desde=-24h&bucket=15m
+    API->>DB: SELECT time_bucket('15 min', tiempo), avg(valor) …
+    DB-->>API: ~100 puntos agregados
+    API-->>FE: [[tiempos],[valores]]
+    FE->>FE: uPlot dibuja el histórico
+    FE->>API: WS suscribe {canal_id}
+    loop cada trama nueva que pasa el pipeline
+        API-->>FE: WS {canal_id, valor, tiempo}
+        FE->>FE: uPlot.setData (añade el punto)
+    end

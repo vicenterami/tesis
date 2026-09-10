@@ -32,7 +32,7 @@ function tiempoPlausible(emisor: Date | undefined, recibidoEn: Date): Date {
 interface Dispositivo { id: string; estado: 'activo' | 'mantenimiento' | 'baja' }
 interface Canal { id: string; magnitud: string; unidad_canonica: string; rango_min: number | null; rango_max: number | null }
 
-// M1 Recepción + M2 Pipeline. Los seis filtros: 1 autenticar · 2 analizar · 3 validar ·
+// M1 Recepción + M2 Normalización (pipeline). Los seis filtros: 1 autenticar · 2 analizar · 3 validar ·
 // 4 normalizar · 5 supervisar (con SupervisionService) · 6 alertar (con AlertasService).
 //
 //   trama ─► [1] ¿registrado y activo? ──no──► cuarentena "desconocido"

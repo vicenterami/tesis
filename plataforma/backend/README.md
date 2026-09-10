@@ -10,8 +10,8 @@ src/
 ├── app.module.ts              # módulo raíz: junta los demás
 ├── db/db.module.ts            # pool de conexiones a TimescaleDB (SQL directo, driver pg)
 ├── broker/broker.service.ts   # conexión MQTT como usuario "backend"; reparte tramas
-├── supervision/               # M3: barrido periódico → condición "sin_comunicacion" (filtro 5)
-├── alertas/                   # M4: umbrales con histéresis → condición "umbral" (filtro 6)
+├── supervision/               # M4: barrido periódico → condición "sin_comunicacion" (filtro 5)
+├── alertas/                   # M6: umbrales con histéresis → condición "umbral" (filtro 6)
 ├── recepcion/
 │   ├── recepcion.service.ts   # M1+M2: orquesta los seis filtros y la cuarentena
 │   ├── lectura.ts             # la unidad que viaja por el pipeline: {magnitud, valor, unidad, tiempo}
@@ -105,7 +105,7 @@ docker compose exec timescaledb psql -U plataforma -d plataforma -c "SELECT tipo
 
 Pendientes del pipeline: adaptador de ChirpStack; notificación de condiciones al panel (WebSocket) y por correo.
 
-## API de consulta (M6)
+## API de consulta (M5)
 
 Solo lectura, sin autenticación aún (por eso escucha en 127.0.0.1). Fechas en ISO 8601 UTC (`Z`).
 

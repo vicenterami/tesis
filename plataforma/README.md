@@ -11,7 +11,7 @@ plataforma/
 ├── docker-compose.override.yml # SOLO desarrollo: publica 5432 y 1883 en 127.0.0.1 (Compose lo carga solo)
 ├── backend/                  # NestJS: recepción, pipeline, API (ver backend/README.md)
 ├── .env.example              # variables de entorno (copiar a .env; .env NO se versiona)
-├── db/pruebas/               # pruebas SQL de solo lectura (zonas horarias, guardias de tipo)
+├── db/pruebas/               # pruebas SQL de solo lectura (zonas horarias, guardias) y er-mermaid.sql (ER desde el esquema)
 ├── pruebas/api-smoke.sh      # prueba de humo de la API (OK/FALLA por caso)
 ├── db/init/                  # esquema y migraciones numeradas; en una instalación nueva corren todas
 │   ├── 01-esquema.sql        #   en orden al primer arranque. En una base existente, cada archivo nuevo
@@ -76,8 +76,8 @@ docker compose exec mosquitto mosquitto_sub -u backend -P 'OTRA_CLAVE' -t 'sitio
 ## Pruebas semiautomáticas
 
 ```bash
-docker compose exec -T timescaledb psql -U plataforma -d plataforma < db/pruebas/zonas-horarias.sql
-bash pruebas/api-smoke.sh          # con el backend corriendo
+bash pruebas/verificar-todo.sh     # TODO: guardias de esquema, migraciones aplicadas, diagramas = docs = base, API
+bash pruebas/api-smoke.sh          # solo la API, con el backend corriendo
 ```
 Una línea `OK`/`FALLA` por caso. Son de solo lectura: no publican en el broker ni escriben en la base.
 

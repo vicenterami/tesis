@@ -1,0 +1,103 @@
+erDiagram
+    dispositivo ||--o{ canal : canal
+    magnitud ||--o{ canal : canal
+    dispositivo ||--o{ condicion : condicion
+    regla_umbral ||--o{ condicion : condicion
+    dispositivo ||--o{ credencial : credencial
+    zona ||--o{ dispositivo : dispositivo
+    dispositivo ||--o{ evento : evento
+    canal ||--o{ medicion : medicion
+    canal ||--o{ regla_umbral : regla_umbral
+    sitio ||--o{ usuario_sitio : usuario_sitio
+    usuario ||--o{ usuario_sitio : usuario_sitio
+    sitio ||--o{ zona : zona
+    canal {
+        uuid id PK
+        uuid dispositivo_id FK
+        text magnitud_codigo FK
+        text etiqueta
+    }
+    condicion {
+        uuid id PK
+        uuid dispositivo_id FK
+        uuid regla_id FK
+        text tipo
+        timestamptz abierta_en
+        timestamptz cerrada_en
+    }
+    credencial {
+        uuid id PK
+        uuid dispositivo_id FK
+        text hash
+        bool activa
+        timestamptz creada_en
+    }
+    cuarentena {
+        uuid id PK
+        text origen
+        text topico
+        text motivo
+        bytea payload_crudo
+        timestamptz recibido_en
+    }
+    dispositivo {
+        uuid id PK
+        uuid zona_id FK
+        text id_fisico
+        text nombre
+        text estado
+        int intervalo_esperado_s
+        timestamptz visto_por_ultima_vez
+        timestamptz creado_en
+    }
+    evento {
+        uuid id PK
+        uuid dispositivo_id FK
+        text tipo
+        jsonb detalle
+        timestamptz ocurrido_en
+    }
+    magnitud {
+        text codigo PK
+        text nombre
+        text unidad_canonica
+        float rango_min
+        float rango_max
+    }
+    medicion {
+        uuid canal_id FK
+        timestamptz tiempo
+        float valor
+        text unidad
+    }
+    regla_umbral {
+        uuid id PK
+        uuid canal_id FK
+        float umbral_alto
+        float umbral_bajo
+        float histeresis
+    }
+    sitio {
+        uuid id PK
+        text nombre
+        text descripcion
+        timestamptz creado_en
+        text zona_horaria
+    }
+    usuario {
+        uuid id PK
+        text nombre
+        text email
+        text hash_password
+        timestamptz creado_en
+    }
+    usuario_sitio {
+        uuid usuario_id PK,FK
+        uuid sitio_id PK,FK
+        text rol
+    }
+    zona {
+        uuid id PK
+        uuid sitio_id FK
+        text nombre
+    }

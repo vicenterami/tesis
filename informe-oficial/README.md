@@ -20,3 +20,19 @@ latexmk -pdf -outdir=build main.tex     # SIEMPRE desde esta carpeta, nunca desd
 | `referencias.bib` | Bibliografía en biblatex/APA |
 
 La versión extendida de cada sección vive en `docs/`; la primera versión del informe está en `historico/informe-v1/`.
+
+## Figuras generadas (fuente única)
+
+Las figuras de diseño **no se dibujan a mano**: `figuras/generar-figuras.sh` toma los bloques Mermaid de
+`docs/10-arquitectura.md`, genera el modelo de datos desde el esquema real de la base
+(`plataforma/db/pruebas/er-mermaid.sql`) y los renderiza a PDF vectorial en `figuras/render/` con
+`mermaid-cli` dentro de Docker (imagen fijada; nada que instalar). Los `.tex` de `figuras/` solo
+incluyen el PDF con su leyenda APA.
+
+```bash
+bash informe-oficial/figuras/generar-figuras.sh              # regenerar (requiere la pila arriba)
+bash informe-oficial/figuras/generar-figuras.sh --verificar  # guardián: informe = docs = base
+```
+
+Si un diagrama debe cambiar, se edita **en `docs/10`** (o se migra el esquema) y se regenera; nunca el PDF.
+Las figuras de la Etapa 1 (`arbol`, `pipeline`, `pila`, `mqtt`, `lorawan`) siguen en TikZ.

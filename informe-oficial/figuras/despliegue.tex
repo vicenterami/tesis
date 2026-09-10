@@ -1,44 +1,6 @@
 \begin{figure}[H]
 \centering
-\resizebox{0.98\linewidth}{!}{%
-\begin{tikzpicture}[font=\scriptsize,
-  fuente/.style={caja, text width=2.5cm, minimum height=1.15cm, align=center}]
-
-% emisores, bien separados
-\node[fuente, draw=ambar, line width=1pt] (n1) at (0,2.0)  {\textbf{sensor + ESP32}\\{\tiny lado del compañero}};
-\node[fuente, draw=ambar, line width=1pt] (n2) at (0,0.3)  {\textbf{emulador de nodo}\\{\tiny publica lo mismo}};
-\node[fuente, draw=grislinea]            (n3) at (0,-1.4) {integración externa\\{\tiny HTTP POST}};
-
-% frontera
-\draw[line width=1pt, color=gristexto, dashed] (2.15,3.0) -- (2.15,-2.2);
-\node[nota, font=\scriptsize\bfseries\color{gristexto}] at (2.15,3.35) {FRONTERA: el tópico MQTT};
-
-% servidor
-\node[grupo, minimum width=10.2cm, minimum height=4.6cm, anchor=west] (srv) at (2.9,0.3) {};
-\node[font=\scriptsize\bfseries\color{gristexto}, anchor=north west] at (3.05,2.45)
-  {UN SERVIDOR --- contenedores Docker con reinicio automático};
-
-\node[fuente, draw=verdeacento, line width=1pt] (mq) at (4.6,1.1) {\textbf{Mosquitto}\\{\tiny broker MQTT}};
-\node[fuente, draw=grislinea] (cs) at (4.6,-1.0) {ChirpStack\\{\tiny solo si hay rama LoRa}};
-\node[fuente, text width=2.8cm, draw=azuloscuro, line width=1.1pt, fill=azuloscuro!5, minimum height=1.5cm] (be) at (8.3,1.1)
-  {\textbf{Backend} (NestJS)\\{\tiny pipeline de 6 filtros}\\ {\footnotesize\textbf{+ API REST}}};
-\node[fuente, draw=verdeacento, line width=1pt, fill=verdeacento!6] (db) at (11.7,1.1)
-  {\textbf{TimescaleDB}\\{\tiny PostgreSQL + series}};
-
-\draw[flechagruesa] (n1.east) -- (mq.west |- n1.east);
-\draw[flechagruesa] (n2.east) -- (mq.west |- n2.east);
-\draw[flecha, color=grislinea] (cs.north) -- (mq.south);
-\draw[flechagruesa] (mq.east) -- (be.west |- mq.east);
-\draw[flechagruesa] (be.east) -- (db.west |- be.east);
-\draw[flecha] (n3.east) -- ++(0.35,0) -- ++(0,-0.65) -- (8.3,-2.05) -- (be.south);
-
-% dashboard, abajo y con aire
-\node[fuente, draw=azuloscuro, line width=1pt] (dash) at (9.6,-3.3)
-  {\textbf{dashboard}\\{\tiny navegador del usuario}};
-\draw[flecha] (dash.north) -- node[nota, right=2pt, pos=0.45, font=\tiny] {HTTP GET a la API} (9.6,-0.42);
-\end{tikzpicture}}
-\caption{Despliegue: todos los componentes corren como contenedores en un único servidor. La
-frontera con el trabajo del compañero es el tópico MQTT; el emulador publica en el mismo tópico, de
-modo que la validación no depende del hardware.}
+\includegraphics[width=0.9\linewidth]{figuras/render/despliegue.pdf}
+\caption{Vista de despliegue: un servidor, cinco contenedores, tres volúmenes y una red interna. ChirpStack usa una base propia dentro del mismo PostgreSQL; el backend no guarda estado y puede recrearse sin pérdida. Los límites de recursos protegen al servidor y definen el entorno de referencia del banco de pruebas (suma de techos $\approx$ 1,95 GB, RNF-17).}
 \label{fig:despliegue}
 \end{figure}
