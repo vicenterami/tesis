@@ -1,0 +1,12 @@
+{
+  // Recomendaciones para este repositorio. VS Code las ofrece al abrir la carpeta; nada se instala solo.
+  "recommendations": [
+    "James-Yu.latex-workshop",              // compilar y previsualizar el informe (latexmk, SyncTeX)
+    "bierner.markdown-mermaid",             // ver los diagramas Mermaid de docs/ en la vista previa de Markdown
+    "ms-azuretools.vscode-containers",      // contenedores, volúmenes y logs de Docker desde el editor
+    "dbaeumer.vscode-eslint",               // errores de TypeScript/estilo en el backend (cuando se configure ESLint)
+    "streetsidesoftware.code-spell-checker",          // ortografía en el informe y docs…
+    "streetsidesoftware.code-spell-checker-spanish",  // …con diccionario español
+    "editorconfig.editorconfig"             // respeta la indentación y finales de línea del repo
+  ]
+}

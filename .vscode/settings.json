@@ -1,0 +1,19 @@
+{
+  // TypeScript del proyecto (versión fijada en package.json), no el que trae VS Code:
+  // así los avisos que ves son los mismos que ve la compilación.
+  "typescript.tsdk": "plataforma/backend/node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+
+  // LaTeX: compilar con latexmk en build/, como en la terminal
+  "latex-workshop.latex.outDir": "%DIR%/build",
+  "latex-workshop.latex.recipe.default": "latexmk",
+  "latex-workshop.latex.autoBuild.run": "never",
+
+  "files.exclude": { "**/node_modules": true, "**/dist": true, "**/build": true },
+  "search.exclude": { "**/node_modules": true, "**/dist": true, "**/build": true, "historico/**": true },
+  "files.insertFinalNewline": true,
+  "files.trimTrailingWhitespace": true,
+  "editor.rulers": [100],
+  "cSpell.language": "es,en",
+  "cSpell.words": ["Mosquitto", "TimescaleDB", "ChirpStack", "LoRaWAN", "SenML", "hypertable", "NestJS", "uPlot", "Svelte", "ThingsBoard"]
+}
