@@ -2,11 +2,11 @@
 \label{cap:diseno}
 
 Este capítulo describe \emph{cómo} la plataforma cumple los requerimientos del capítulo anterior.
-Siguiendo la recomendación de describir un sistema desde varias vistas, se presentan la estructura
+Siguiendo la recomendación de describir un sistema desde varias vistas \parencite{iso42010}, se presentan la estructura
 estática (contenedores), los datos, la red y la seguridad, el comportamiento dinámico (secuencias),
 el manejo del tiempo y el despliegue. Las notaciones son las reconocidas en la industria: el modelo
-C4 para la vista de contenedores, diagramas entidad-relación para los datos y diagramas de secuencia
-UML para el comportamiento. Todas las figuras de este capítulo se \textbf{generan desde una única
+C4 \parencite{c4brown} para la vista de contenedores, diagramas entidad-relación \parencite{chen1976}
+para los datos y diagramas de secuencia UML \parencite{uml251} para el comportamiento. Todas las figuras de este capítulo se \textbf{generan desde una única
 fuente} —la documentación versionada del repositorio y, en el caso del modelo de datos, el esquema
 real de la base de datos— mediante un guion que también verifica que informe, documentación y base no
 difieran. Así el diseño descrito aquí es, por construcción, el que está implementado.
@@ -83,12 +83,13 @@ no nace del alta, sino del \textbf{primer mensaje autenticado}.
 
 \subsection{Recepción de una trama: el pipeline}
 
-La figura~\ref{fig:sec-pipeline} detalla el aporte central del trabajo. Cada filtro tiene una salida que
+La figura~\ref{fig:sec-pipeline} detalla el aporte central del trabajo, organizado según el patrón
+\emph{pipes and filters} \parencite{posa1}. Cada filtro tiene una salida que
 continúa y una de rechazo hacia la cuarentena; ninguna trama llega a las series sin superar los seis.
 El orden importa: autenticar primero evita gastar recursos en tramas de desconocidos; validar antes de
 normalizar evita convertir basura; supervisar después de guardar garantiza que «visto por última vez»
 refleje una lectura real. El filtro de análisis delega en \textbf{adaptadores} intercambiables —SenML
-como contrato nativo y un formato plano para nodos simples—, de modo que admitir el formato de un nuevo
+\parencite{rfc8428} como contrato nativo y un formato plano para nodos simples—, de modo que admitir el formato de un nuevo
 fabricante es agregar una clase, no modificar el pipeline (RF-04).
 
 \input{figuras/sec-pipeline}
@@ -108,7 +109,7 @@ La figura~\ref{fig:sec-tiemporeal} muestra los dos tiempos del panel. El histór
 importar cuánto lleve el sensor transmitiendo. Las lecturas nuevas se empujan por WebSocket desde el
 backend. Toda la consulta valida sus entradas antes de tocar SQL (identificadores, fechas, un intervalo
 tomado de una lista cerrada) y usa parámetros, nunca texto interpolado. El \textbf{contrato de la API se
-genera desde el código} (OpenAPI 3.0 a partir de los decoradores de los controladores), de modo que no
+genera desde el código}, en OpenAPI 3.0 \parencite{openapi303}, a partir de los decoradores de los controladores, de modo que no
 puede describir rutas inexistentes; se sirve junto a la API y se versiona en el repositorio como el
 acuerdo que consumirá el panel.
 
@@ -125,7 +126,8 @@ de dos minutos en el futuro se reemplaza por la hora de recepción, mientras que
 válida se respeta, porque un nodo que acumuló lecturas sin cobertura reporta tiempos legítimamente
 viejos; (3)~cada sitio declara su zona con nombre IANA, nunca un desfase fijo; (4)~\textbf{toda pregunta
 de «día» se responde dentro de la base, en la zona del sitio}; (5)~la API entrega instantes en ISO~8601
-con sufijo \texttt{Z}, también los que viajan dentro de JSON armado en SQL. Se verificó en la base que
+\parencite{iso8601} con sufijo \texttt{Z} —el perfil de internet RFC~3339 \parencite{rfc3339}—, también los
+que viajan dentro de JSON armado en SQL. Se verificó en la base que
 el día de Santiago comienza a las 04:00~UTC en invierno y a las 03:00~UTC en verano, que el domingo del
 cambio de hora dura 23 horas, y que un sitio en otra zona horaria funciona con el mismo código: la zona
 es un dato del sitio, no una constante del programa.
