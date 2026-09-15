@@ -1,0 +1,21 @@
+{
+  "$schema": "https://raw.githubusercontent.com/streetsidesoftware/cspell/main/cspell.schema.json",
+  "version": "0.2",
+  "language": "es,en",
+  "ignorePaths": ["node_modules", "dist", "build", "**/pnpm-lock.yaml", "**/openapi.json", "**/*.pdf", "**/*.png", "**/figuras/render", "**/*.mmd", ".vscode/extensions.json", "recursos-uct", "historico", "**/*.bib"],
+  "ignoreRegExpList": [
+    "/\\b[a-z]+(?:_[a-z0-9]+)+\\b/g",
+    "/\\b(?:pk|fk|uq|ck|idx|trg|fn)_[a-z0-9_]+/g",
+    "/\\b(?:RF|RNF|HU|TT|OE|SU|C)-?\\d+\\b/g",
+    "/`[^`]*`/g"
+  ],
+  "words": [
+    "medicion", "condicion", "cuarentena", "codigo", "canonica", "comunicacion", "bitacora", "arbol", "descripcion", "magnitud", "regla", "umbral", "histeresis", "histéresis",
+    "reconexión", "reentrega", "reentregas", "reentregar", "idempotencia", "idempotente", "idempotentes", "deduplica", "desnormalización", "desnormalizadas", "desnormalizada",
+    "correlacionar", "correlacionarlos", "cruzarlos", "bloqueante", "autogenerado", "aprovisionamiento", "aprovisionar", "multiprotocolo", "semiabierto", "semiabiertos",
+    "bytea", "timestamptz", "jsonb", "hypertable", "hypertables", "chunk", "chunks", "uuid", "psql", "pgdump",
+    "Mosquitto", "TimescaleDB", "Timescale", "ChirpStack", "chirpstack", "LoRaWAN", "LoRa", "SenML", "NestJS", "uPlot", "Svelte", "ThingsBoard", "Hetzner", "Caddy",
+    "pnpm", "eslint", "typecheck", "jest", "mqtt", "openapi", "swagger", "Mermaid", "latexmk", "adjustbox", "booktabs", "longtable", "PBKDF",
+    "PPDIOO", "SWEBOK", "Cardiff", "Rivas", "Canto", "Villanueva", "backlog", "sprint", "Etapa"
+  ]
+}

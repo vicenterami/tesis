@@ -134,6 +134,20 @@ clave tienen hashes distintos.
 **Qué NO es respaldo de credenciales:** el repositorio. Git respalda código y configuración; los
 secretos y los datos se respaldan aparte (`pg_dump` cifrado, gestor de contraseñas).
 
+**Reglas de manejo en el día a día** (aprendidas de práctica profesional, generalizadas):
+
+- Un secreto **nunca se imprime**: en registros y diagnósticos se muestra el nombre de la variable y su
+  largo (`MQTT_BACKEND_CLAVE: 44 caracteres`), jamás el valor. Tampoco los hashes.
+- En tablas con credenciales (`usuario`, `credencial`) nunca `SELECT *`: columnas explícitas, para que
+  el hash no viaje por accidente a un registro, una API o un chat.
+- Variable de entorno nueva → se agrega a `.env.example` con comentario **y** se verifica al arrancar
+  (`getOrThrow`): el fallo debe ser al inicio, con nombre, no a las 3 de la mañana.
+- A un chat o a un ticket va el **filtro** (`grep`, `jq`), nunca el registro completo ni una captura de
+  la pestaña Red del navegador (trae cookies y tokens).
+- Antes de publicar cualquier cambio: `git diff --staged` buscando secretos, `.env` y reformateos ajenos.
+- Todo lo que se pega en un chat con una IA sale de la máquina: se aplica el mismo criterio que para
+  publicarlo.
+
 ## 8. Lista de verificación antes de desplegar en un servidor
 
 Lo que se hizo en desarrollo **no** se traslada tal cual. Antes del primer despliegue fuera del equipo

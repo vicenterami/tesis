@@ -82,6 +82,13 @@ instante termina en `Z`.
 - `verificar-todo.sh`: esquema, migraciones, diagramas del informe y API en concordancia.
 - Las figuras del informe se generan desde la documentación y desde la base real: lo que se muestra es lo que está implementado.
 
+## Tres hábitos para la demostración
+
+- Decir «datos de prueba» **antes** de que aparezca un número en pantalla, no después.
+- Ensayar en voz alta la frase difícil (qué pasa si cae la base) hasta que salga sin titubear.
+- Tener lista la respuesta a «¿qué tan confiable es esto?» con el **límite real** (prototipo con un
+  nodo, sin TLS aún, comparación con ThingsBoard pendiente para la Etapa 4), no con una defensa.
+
 ## Si algo falla en vivo
 
 | Síntoma | Causa probable | Salida |

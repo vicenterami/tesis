@@ -35,22 +35,22 @@ implementando solo lo que **sustente el diseño** (API de consulta, que demuestr
 
 | Ítem | Tarea | Pr. | h | Estado | Evidencia |
 |---|---|---|---|---|---|
-| TT-01 | Componer el entorno con contenedores: TimescaleDB, Mosquitto y ChirpStack orques | M | 6 | ✅ | docker-compose con TimescaleDB y Mosquitto; ChirpStack diseñado, pendiente de gateway |
-| TT-02 | Inicializar el proyecto TypeScript + NestJS con estructura de módulos correspond | M | 4 | ✅ | backend NestJS con módulos M1, M2, M4, M5, M6 |
+| TT-01 | Componer el entorno con contenedores: TimescaleDB, Mosquitto y ChirpStack orquestados, con un único comando de arranque | M | 6 | ✅ | docker-compose con TimescaleDB y Mosquitto; ChirpStack diseñado, pendiente de gateway |
+| TT-02 | Inicializar el proyecto TypeScript + NestJS con estructura de módulos correspondiente a M1–M8 | M | 4 | ✅ | backend NestJS con módulos M1, M2, M4, M5, M6 |
 | TT-03 | Configurar verificación automática: tipos, formato y ejecución de pruebas | S | 3 | ✅ | `pnpm verificar`: tsc + ESLint (typescript-eslint, reglas con tipos) + 19 pruebas jest de las funciones puras; guardianes de concordancia en `verificar-todo.sh` |
 | TT-04 | Documentar el procedimiento de puesta en marcha en el repositorio | M | 1 | ✅ | READMEs de plataforma y backend |
 | TT-05 | Diagrama de arquitectura de componentes, con los ocho módulos y sus dependencias | M | 5 | ✅ | vista de contenedores C4 (fig. 4.1) |
-| TT-06 | Diagrama de topología de red con segmentación de dispositivos IoT (RNF-09) y sen | M | 6 | ✅ | topología de red (fig. 4.3) |
+| TT-06 | Diagrama de topología de red con segmentación de dispositivos IoT (RNF-09) y sentido de las conexiones (RNF-10) | M | 6 | ✅ | topología de red (fig. 4.3) |
 | TT-07 | Modelo de datos entidad-relación con al menos ocho entidades | M | 6 | ✅ | ER de 13 entidades generado desde la base (fig. 4.2) |
-| TT-08 | Diagrama de flujo de recepción, desde la recepción hasta la persistencia, para l | M | 4 | ✅ | secuencia del pipeline (fig. 4.5) |
+| TT-08 | Diagrama de flujo de recepción, desde la recepción hasta la persistencia, para los tres transportes | M | 4 | ✅ | secuencia del pipeline (fig. 4.5) |
 | TT-09 | Diagrama de secuencia del aprovisionamiento de un dispositivo nuevo | M | 3 | ✅ | secuencia de aprovisionamiento (fig. 4.4) |
 | TT-10 | Registro de decisiones de diseño con su justificación | M | 2 | ✅ | tablas de decisiones en el cap. 4 y bitácora |
-| TT-11 | Esquema del modelo interno y contrato del tópico MQTT (nombres, unidades, identi | M | 3 | ✅ | docs/08, docs/10 §1; tópico sitio/·/dispositivo/·/magnitud |
-| TT-12 | Catálogo de tipos de sensor y unidades aceptadas, con umbrales de disparo y rest | M | 6 | 🟡 | 5 magnitudes con rango; ampliar con los sensores reales |
+| TT-11 | Esquema del modelo interno y contrato del tópico MQTT (nombres, unidades, identidad) | M | 3 | ✅ | docs/08, docs/10 §1; tópico sitio/·/dispositivo/·/magnitud |
+| TT-12 | Catálogo de tipos de sensor y unidades aceptadas, con umbrales de disparo y restauración | M | 6 | 🟡 | 5 magnitudes con rango; ampliar con los sensores reales |
 | TT-13 | Especificación del contrato de la API en OpenAPI, generada desde el código | M | 3 | ✅ | `@nestjs/swagger`: `/docs` y `backend/openapi.json` (6 rutas), generado desde los decoradores |
 | TT-14 | Política de QoS, reintento y cuarentena | M | 2 | ✅ | QoS 1 con sesión persistente (cola en el broker si el backend cae); INSERT idempotente sobre `(canal, tiempo)` (migración 06); cuarentena con motivo; `docs/10 §4.1` |
 | TT-15 | Procedimiento de asignación de identidad y gestión de claves AES por sitio | S | 2 | 🟡 | gestión de credenciales documentada (docs/11 §7); claves LoRaWAN dependen de ChirpStack |
-| HU-01 | Como integrador, quiero publicar una trama SenML por MQTT o HTTP, para reportar  | M | 6 | 🟡 | MQTT sí; HTTP en la Etapa 3 |
+| HU-01 | Como integrador, quiero publicar una trama SenML por MQTT o HTTP, para reportar desde un sensor sin infraestructura intermedia | M | 6 | 🟡 | MQTT sí; HTTP en la Etapa 3 |
 | TT-16 | Validador de esquema SenML y analizador de tramas | M | 3 | ✅ | adaptador SenML |
 | TT-19 | Esquema de base de datos y migraciones versionadas | M | 5 | ✅ | esquema + 6 migraciones (05 convenciones de calidad, 06 clave natural única de la serie) |
 | TT-24 | Comparar al menos tres alternativas de alojamiento con criterios ponderados | M | 4 | ✅ | `docs/14 §3–§4`: cinco alternativas, seis criterios |
@@ -62,11 +62,11 @@ implementando solo lo que **sustente el diseño** (API de consulta, que demuestr
 
 | Ítem | Tarea | Plan. | Estado | Evidencia |
 |---|---|---|---|---|
-| HU-03 | Como integrador, quiero publicar eventos en MQTT, para integrar dispos | E3 | ✅ | publicado y probado con mosquitto_pub |
-| HU-04 | Como integrador, quiero un adaptador para un formato no SenML, para de | E4 | 🟡 | adaptador plano; se cierra con la trama real |
-| TT-17 | Pipeline de normalización al modelo interno (los 6 filtros) con cuaren | E3 | ✅ | seis filtros verificados |
-| HU-06 | Como administrador de sitio, quiero configurar umbrales por dispositiv | E3 | 🟡 | motor listo; falta interfaz |
-| TT-18 | Normalización de marcas temporales, tolerando nodos sin reloj confiabl | E3 | ✅ | tiempoPlausible |
+| HU-03 | Como integrador, quiero publicar eventos en MQTT, para integrar dispositivos que ya usan ese transporte | E3 | ✅ | publicado y probado con mosquitto_pub |
+| HU-04 | Como integrador, quiero un adaptador para un formato no SenML, para demostrar la extensibilidad de la capa de recepción | E4 | 🟡 | adaptador plano; se cierra con la trama real |
+| TT-17 | Pipeline de normalización al modelo interno (los 6 filtros) con cuarentena | E3 | ✅ | seis filtros verificados |
+| HU-06 | Como administrador de sitio, quiero configurar umbrales por dispositivo, para que se genere un evento cuando una medición los cruce | E3 | 🟡 | motor listo; falta interfaz |
+| TT-18 | Normalización de marcas temporales, tolerando nodos sin reloj confiable | E3 | ✅ | tiempoPlausible |
 | TT-20 | Autenticación de la recepción mediante credencial por sitio | E3 | ✅ | credencial por dispositivo + ACL |
 
 **Pendiente para cerrar la etapa:** completar los parciales — TT-35 (pulir informe e incorporar retroalimentación), TT-12 (catálogo con los sensores reales), TT-15 (claves LoRaWAN, depende de ChirpStack) y HU-01 (entrada HTTP, Etapa 3).

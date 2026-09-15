@@ -160,4 +160,8 @@ libre en SQL.
 - Dependencias con **versión exacta** (`save-exact`), sin `^`.
 - **`ignore-scripts=true`**: ninguna dependencia ejecuta código al instalarse.
 - Secretos solo por variables de entorno; nunca en el código ni en el repositorio.
-- SQL parametrizado siempre (`$1, $2…`): sin concatenar cadenas → sin inyección SQL.
+- SQL parametrizado siempre (`$1, $2…`): sin concatenar cadenas → sin inyección SQL. Cast explícito
+  cuando el parámetro no se compara directo con una columna (`$1::int`).
+- Errores de restricción de la base (`23505` unicidad, `23503` FK) se traducen a un `4xx` con mensaje
+  para la persona; un `5xx` es un defecto nuestro, no del usuario (aplica desde M3).
+- Nunca `SELECT *` sobre `usuario` ni `credencial`: columnas explícitas, el hash no sale de la base.

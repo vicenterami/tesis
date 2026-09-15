@@ -45,6 +45,9 @@ madrugada y sobrevive años.
 | 11 | **Las exportaciones (CSV/JSON) llevan el instante en ISO UTC con `Z` y, si se agrega una columna legible, la hora en la zona del sitio con su nombre**. Nunca una hora local sin decir de qué zona; nunca construir fechas de hoja de cálculo desde la época sin cuidado (muestran componentes UTC) | RF-exportación (futuro) | ⬜ |
 | 12 | **Ninguna operación con `Date` en JavaScript decide un "día"**: `new Date('2026-09-15')` es medianoche UTC; `new Date('2026-09-15T00:00')` es hora local; `toISOString()` sobre un día lo corre. Los días se calculan en SQL en la zona del sitio o se comparan como texto `YYYY-MM-DD` | revisión de código | señales de alarma §5 |
 | 13 | **Al cambiar el tipo de una columna de fecha, el código debe funcionar con el tipo viejo y el nuevo**, la migración se aplica junto con el despliegue, y se sigue el dato completo: quién lo escribe, quién lo lee, quién lo pinta (`grep` por el nombre de la columna) | migraciones | método §6 |
+| 14 | **La conversión de zona va del lado del parámetro, nunca envolviendo la columna**: `tiempo >= $1` con `$1` ya convertido (o `($1::date)::timestamp AT TIME ZONE zona`) usa el índice; `date(tiempo AT TIME ZONE zona) = $1` fuerza recorrer toda la tabla. Un índice funcional solo con un `EXPLAIN ANALYZE` que lo justifique | `consulta.service` (histórico) | ✅ `tiempo >= $2 AND tiempo < $3` |
+| 15 | **«Cada N días» se compara por día calendario en la zona del sitio, no por intervalo de horas**: un proceso a hora fija deriva con el cambio de hora y un día de 23 h se salta | tareas programadas (futuras) | ⬜ |
+| 16 | **Validar antes de formatear**: `Intl.DateTimeFormat.format` y `toISOString` lanzan con una fecha inválida, y dentro de una transacción tumban el lote entero; `Number.isNaN(d.getTime())` primero | filtro 4 (`tiempoPlausible` ya lo hace), exportaciones | ✅ prueba «fecha inválida» |
 
 ## 3. Por qué la regla 4 es la que más importa
 
@@ -152,6 +155,10 @@ instantes se mueven de día; los días calendario y los buckets del sitio no se 
 OK falso. Por eso toda guardia de este repositorio se prueba en los dos sentidos —**plantando una
 violación** y viendo que la detecta, y comprobando que no marca lo correcto—, y si no puede evaluarse
 (pila caída, archivo ausente) **falla, no pasa**.
+
+**Bordes obligatorios** en toda prueba de fechas: un instante entre las 00:00 y las 03:00 UTC; el
+día 15 y el último día del mes a las 21:00 hora del sitio (cruzan el día y el mes en UTC); el domingo
+del cambio de hora en ambos sentidos.
 
 Previsto para la Etapa 3: prueba automatizada que inserte mediciones a las 23:30 y 00:30 hora de
 Santiago en un día de invierno y otro de verano y compruebe que el filtro «por día» las asigna al día

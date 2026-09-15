@@ -23,7 +23,18 @@
 | 4 | Dos sensores cercanos que miden lo mismo **no son duplicados**: dos canales, dos series | Correlacionar es análisis, no recepción | `docs/10 §4.1` |
 | 5 | Redis, balanceador, API gateway: **fuera de alcance** por RNF-17 y por la escala (50 canales cada 5 min ≈ 0,2 mensajes/s); la cola es el propio broker | Agregar piezas que la carga no justifica contradice el objetivo de ligereza; se documenta cuándo sí harían falta | guía local; `docs/14 §6` para la escala |
 
-## 3. Verificaciones
+## 3. Lecciones incorporadas desde la práctica profesional (generalizadas, sin datos de terceros)
+
+| Lección | Dónde quedó |
+|---|---|
+| La conversión de zona va del lado del parámetro, nunca envolviendo la columna (conserva el índice); «cada N días» por día calendario; validar antes de formatear | `docs/13` reglas 14–16 y bordes obligatorios de prueba |
+| Un secreto nunca se imprime (nombre y largo); columnas explícitas donde hay hashes; variable nueva → ejemplo + verificación al arrancar; al chat va el filtro, no el registro | `docs/11 §7` |
+| Todo cambio sobre datos reales: preflight → cambio → mismo `SELECT` → commit o rollback; casts explícitos en parámetros | `docs/08 §6` |
+| `tsc` con salida 0 no prueba nada si no revisó archivos | `verificar-todo.sh` paso 0 |
+| Verificación automática también en el servidor de integración, con tiempo máximo | `.github/workflows/verificar.yml` |
+| Hábitos de demostración: «datos de prueba» antes del número; el límite real como respuesta | `docs/15` |
+
+## 4. Verificaciones
 
 - `pnpm verificar`: tipos, lint y 19 pruebas en verde. `verificar-todo.sh`: migraciones 02 a 06 aplicadas, diagramas y esquema en concordancia.
 - Informe: 0 referencias rotas, cuerpo en 30 páginas.

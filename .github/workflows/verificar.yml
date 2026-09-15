@@ -1,0 +1,32 @@
+# Verificación automática del backend en cada push y pull request (TT-03).
+# Solo lo que no necesita base ni broker: tipos, lint y pruebas unitarias. Lo que sí las necesita
+# (esquema, migraciones, API) corre en local con plataforma/pruebas/verificar-todo.sh.
+name: verificar
+on:
+  push:
+    branches: [main]
+    paths: ['plataforma/backend/**', '.github/workflows/verificar.yml']
+  pull_request:
+    paths: ['plataforma/backend/**', '.github/workflows/verificar.yml']
+concurrency:
+  group: verificar-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  backend:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: plataforma/backend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: plataforma/backend/package.json
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: plataforma/backend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm verificar
