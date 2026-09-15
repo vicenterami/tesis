@@ -34,7 +34,22 @@
 | Verificación automática también en el servidor de integración, con tiempo máximo | `.github/workflows/verificar.yml` |
 | Hábitos de demostración: «datos de prueba» antes del número; el límite real como respuesta | `docs/15` |
 
-## 4. Verificaciones
+## 4. Laboratorio de entrega (15/09, madrugada) y un error que solo se ve ejecutando
+
+Con el backend apagado se publicaron dos tramas; al encenderlo, el broker entregó ambas (la cola
+persistente funciona). Pero la segunda se descartó como «duplicada»: ninguna traía marca de tiempo,
+ambas tomaron la hora de recepción del `Date` de JavaScript (milisegundos) y, procesadas en el mismo
+milisegundo, compartieron la clave `(canal, tiempo)`. **Decisión 6:** cuando el instante no viene
+del emisor, lo pone la base con `clock_timestamp()` (microsegundos) y la deduplicación no aplica:
+sin identidad del emisor, cada llegada es una lectura distinta. La regla queda escrita en
+`docs/10 §4.1` y `docs/13` regla 7. Lección: la prueba unitaria no podía verlo; el laboratorio sí.
+
+## 5. Verificaciones
+
+- Laboratorio de entrega repetido tras la corrección: dos tramas publicadas con el backend apagado
+  llegaron y se guardaron ambas al encenderlo (instantes distintos, microsegundos); la misma trama
+  SenML con `t` explícito publicada tres veces quedó guardada una vez y dos veces ignorada como
+  duplicada. El supervisor cerró la condición «sin comunicación» al recibir la primera trama.
 
 - `pnpm verificar`: tipos, lint y 19 pruebas en verde. `verificar-todo.sh`: migraciones 02 a 06 aplicadas, diagramas y esquema en concordancia.
 - Informe: 0 referencias rotas, cuerpo en 30 páginas.

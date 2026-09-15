@@ -102,9 +102,16 @@ export class RecepcionService implements OnModuleInit {
       const tiempo = tiempoPlausible(l.tiempo, recibidoEn);
       // Idempotente: la misma lectura (canal + instante) puede llegar dos veces con QoS 1 —reentrega
       // tras una reconexión, o un nodo que reenvía su cola— y debe contar una sola vez (RF-10).
+      // La deduplicación solo tiene sentido si el INSTANTE LO PUSO EL EMISOR. Si la marca no es plausible
+      // y se usa la hora de recepción, cada llegada es una lectura distinta por definición: la base pone
+      // clock_timestamp() (microsegundos) en vez del Date de JavaScript (milisegundos), porque una ráfaga
+      // de tramas en cola se procesa en el mismo milisegundo y colisionaría entre sí (visto el 15/09).
+      const tiempoDelEmisor = tiempo !== recibidoEn;
       const r = await this.pool.query(
-        'INSERT INTO medicion (canal_id, tiempo, valor, unidad) VALUES ($1, $2, $3, $4) ON CONFLICT (canal_id, tiempo) DO NOTHING',
-        [canal.id, tiempo, valor, canal.unidad_canonica],
+        `INSERT INTO medicion (canal_id, tiempo, valor, unidad)
+         VALUES ($1, COALESCE($2::timestamptz, clock_timestamp()), $3, $4)
+         ON CONFLICT (canal_id, tiempo) DO NOTHING`,
+        [canal.id, tiempoDelEmisor ? tiempo : null, valor, canal.unidad_canonica],
       );
       if (r.rowCount === 0) {
         duplicadas++;
