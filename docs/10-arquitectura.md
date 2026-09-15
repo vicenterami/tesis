@@ -208,6 +208,20 @@ el caso contrario —un dispositivo que **dejó de** transmitir— hay una tarea
 que compara `visto_por_ultima_vez` contra `intervalo_esperado_s` y abre la condición
 `sin_comunicacion`. Sin ella, un sensor caído sería invisible.
 
+### 4.1 Entrega «al menos una vez», caídas y duplicados (RF-06, RF-10)
+
+| Situación | Qué pasa | Por qué basta |
+|---|---|---|
+| El **backend** cae | El broker conserva en cola los mensajes QoS 1 de `sitio/#` (sesión persistente: `clientId` fijo + `clean: false`, `persistence true` en Mosquitto) y los entrega al reconectar | Nada se pierde mientras el broker viva; `restart: unless-stopped` levanta el backend en segundos |
+| El **broker** cae | Docker lo reinicia; el backend reintenta cada 2 s. Los nodos Wi-Fi con QoS 1 reintentan la publicación; ChirpStack reintenta según su integración | El broker es la pieza más simple y estable de la pila; su caída es corta |
+| La **base** cae | El INSERT falla, el manejador registra el error y el mensaje ya fue confirmado al broker: **se pierde**. Limitación conocida; en la Etapa 3 se confirma al broker solo después del INSERT (`manualAck`) | Hoy la base y el backend comparten servidor: si cae una, cae todo; el caso relevante es la Etapa 3 |
+| La misma trama llega **dos veces** (reentrega QoS 1 tras reconexión; nodo que reenvía su cola) | El INSERT es idempotente: índice único `(canal_id, tiempo)` + `ON CONFLICT DO NOTHING`; la repetida se ignora y **no** vuelve a evaluar umbrales | «Al menos una vez» + operación idempotente = efecto de exactamente una |
+| Dos gateways LoRaWAN reciben el **mismo uplink** | Lo deduplica ChirpStack por contador de trama antes de publicar | Es responsabilidad del servidor de red, no de la plataforma |
+| Dos **sensores distintos** miden lo mismo cerca | **No es duplicado**: son dos canales, dos series, dos evaluaciones de umbral. Correlacionarlos es una función de análisis futura, no del pipeline | La plataforma registra lo que cada sensor dijo; interpretar es otra capa |
+
+El orden del tiempo no importa para la serie: `medicion` se indexa por `(canal_id, tiempo)`, y una lectura
+que llega tarde (nodo sin cobertura que reenvía su cola) se inserta en su instante real (regla 7 de `docs/13`).
+
 ## 5. Secuencia: panel en tiempo real (patrón B)
 
 ```mermaid

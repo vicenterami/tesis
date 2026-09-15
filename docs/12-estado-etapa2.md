@@ -48,11 +48,11 @@ implementando solo lo que **sustente el diseño** (API de consulta, que demuestr
 | TT-11 | Esquema del modelo interno y contrato del tópico MQTT (nombres, unidades, identi | M | 3 | ✅ | docs/08, docs/10 §1; tópico sitio/·/dispositivo/·/magnitud |
 | TT-12 | Catálogo de tipos de sensor y unidades aceptadas, con umbrales de disparo y rest | M | 6 | 🟡 | 5 magnitudes con rango; ampliar con los sensores reales |
 | TT-13 | Especificación del contrato de la API en OpenAPI, generada desde el código | M | 3 | ✅ | `@nestjs/swagger`: `/docs` y `backend/openapi.json` (6 rutas), generado desde los decoradores |
-| TT-14 | Política de QoS, reintento y cuarentena | M | 2 | ✅ | QoS 1, reconexión, cuarentena con motivo |
+| TT-14 | Política de QoS, reintento y cuarentena | M | 2 | ✅ | QoS 1 con sesión persistente (cola en el broker si el backend cae); INSERT idempotente sobre `(canal, tiempo)` (migración 06); cuarentena con motivo; `docs/10 §4.1` |
 | TT-15 | Procedimiento de asignación de identidad y gestión de claves AES por sitio | S | 2 | 🟡 | gestión de credenciales documentada (docs/11 §7); claves LoRaWAN dependen de ChirpStack |
 | HU-01 | Como integrador, quiero publicar una trama SenML por MQTT o HTTP, para reportar  | M | 6 | 🟡 | MQTT sí; HTTP en la Etapa 3 |
 | TT-16 | Validador de esquema SenML y analizador de tramas | M | 3 | ✅ | adaptador SenML |
-| TT-19 | Esquema de base de datos y migraciones versionadas | M | 5 | ✅ | esquema + 5 migraciones (la 05 aplica las convenciones de calidad) |
+| TT-19 | Esquema de base de datos y migraciones versionadas | M | 5 | ✅ | esquema + 6 migraciones (05 convenciones de calidad, 06 clave natural única de la serie) |
 | TT-24 | Comparar al menos tres alternativas de alojamiento con criterios ponderados | M | 4 | ✅ | `docs/14 §3–§4`: cinco alternativas, seis criterios |
 | TT-25 | Cuantificar el costo mensual y anual de operación en CLP y USD | M | 3 | ✅ | `docs/14 §3`: precios fechados y convertidos con dólar observado |
 | TT-26 | Redactar la recomendación de despliegue justificada | M | 1 | ✅ | `docs/14 §5` y cap. 4 del informe |

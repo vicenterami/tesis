@@ -20,14 +20,21 @@ export class BrokerService implements OnModuleInit, OnModuleDestroy {
     this.cliente = mqtt.connect(url, {
       username: 'backend',
       password: this.config.getOrThrow<string>('MQTT_BACKEND_CLAVE'),
-      clientId: 'backend-' + Math.random().toString(16).slice(2, 8),
-      clean: true,
+      // Sesión PERSISTENTE (clientId fijo + clean:false): si el backend cae, el broker guarda en cola
+      // los mensajes QoS 1 de sitio/# y los entrega al reconectar (Mosquitto: persistence true,
+      // max_queued_messages). Con clean:true la cola se descartaba: "al menos una vez" solo valía
+      // mientras la conexión estuviera viva. Una segunda instancia con el mismo id desconecta a la
+      // primera: es deliberado, el pipeline debe correr en un solo proceso.
+      clientId: this.config.get<string>('MQTT_CLIENT_ID', 'backend'),
+      clean: false,
       reconnectPeriod: 2000, // si el broker cae, reintenta cada 2 s (RNF de recuperación)
     });
 
     this.cliente.on('connect', () => {
       this.log.log(`conectado a ${url}`);
       // QoS 1: el broker reintenta la entrega hasta que el backend confirme (al menos una vez).
+      // La contraparte de "al menos una vez" es que puede llegar dos veces: el INSERT de medicion es
+      // idempotente (índice único canal+tiempo, ON CONFLICT DO NOTHING), así el efecto es exactamente una.
       this.cliente?.subscribe('sitio/#', { qos: 1 }, (err) => {
         if (err) this.log.error(`no se pudo suscribir: ${err.message}`);
         else this.log.log('suscrito a sitio/#');

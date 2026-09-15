@@ -83,6 +83,7 @@ export class RecepcionService implements OnModuleInit {
     // ── [3] Validar y [4] Normalizar, lectura por lectura ──
     const recibidoEn = new Date();
     let guardadas = 0;
+    let duplicadas = 0;
     for (const l of lecturas) {
       const canal = await this.buscarCanal(dispositivo.id, l.magnitud);
       if (!canal) {
@@ -99,10 +100,16 @@ export class RecepcionService implements OnModuleInit {
         continue;
       }
       const tiempo = tiempoPlausible(l.tiempo, recibidoEn);
-      await this.pool.query(
-        'INSERT INTO medicion (canal_id, tiempo, valor, unidad) VALUES ($1, $2, $3, $4)',
+      // Idempotente: la misma lectura (canal + instante) puede llegar dos veces con QoS 1 —reentrega
+      // tras una reconexión, o un nodo que reenvía su cola— y debe contar una sola vez (RF-10).
+      const r = await this.pool.query(
+        'INSERT INTO medicion (canal_id, tiempo, valor, unidad) VALUES ($1, $2, $3, $4) ON CONFLICT (canal_id, tiempo) DO NOTHING',
         [canal.id, tiempo, valor, canal.unidad_canonica],
       );
+      if (r.rowCount === 0) {
+        duplicadas++;
+        continue; // ya estaba: no se reevalúa el umbral ni se cuenta como nueva
+      }
       guardadas++;
       // ── [6] Alertar: ¿la medición cruza un umbral de este canal? ──
       await this.alertas.evaluar(dispositivo.id, canal.id, ctx.idFisico, valor, canal.unidad_canonica);
@@ -111,7 +118,10 @@ export class RecepcionService implements OnModuleInit {
     // ── [5] Supervisar: el dispositivo dio señales de vida; si estaba "sin comunicación", se cierra ──
     await this.pool.query('UPDATE dispositivo SET visto_por_ultima_vez = now() WHERE id = $1', [dispositivo.id]);
     await this.supervision.marcarVivo(dispositivo.id, ctx.idFisico);
-    if (guardadas) this.log.log(`${ctx.idFisico}: ${guardadas}/${lecturas.length} lecturas guardadas vía ${adaptador.nombre}`);
+    if (guardadas || duplicadas) {
+      const dup = duplicadas ? ` · ${duplicadas} duplicada(s) ignorada(s)` : '';
+      this.log.log(`${ctx.idFisico}: ${guardadas}/${lecturas.length} lecturas guardadas vía ${adaptador.nombre}${dup}`);
+    }
   }
 
   private async buscarDispositivo(idFisico: string): Promise<Dispositivo | undefined> {

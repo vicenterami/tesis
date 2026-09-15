@@ -6,10 +6,9 @@ Siguiendo la recomendación de describir un sistema desde varias vistas \parenci
 estática (contenedores), los datos, la red y la seguridad, el comportamiento dinámico (secuencias),
 el manejo del tiempo y el despliegue. Las notaciones son las reconocidas en la industria: el modelo
 C4 \parencite{c4brown} para la vista de contenedores, diagramas entidad-relación \parencite{chen1976}
-para los datos y diagramas de secuencia UML \parencite{uml251} para el comportamiento. Todas las figuras de este capítulo se \textbf{generan desde una única
-fuente} —la documentación versionada del repositorio y, en el caso del modelo de datos, el esquema
-real de la base de datos— mediante un guion que también verifica que informe, documentación y base no
-difieran. Así el diseño descrito aquí es, por construcción, el que está implementado.
+para los datos y diagramas de secuencia UML \parencite{uml251} para el comportamiento. Las figuras
+se generan automáticamente desde la documentación versionada y, el modelo de datos, desde el esquema
+real de la base, de modo que lo descrito aquí es lo que está implementado.
 
 \section{Vista de contenedores y frontera del trabajo}
 
@@ -29,24 +28,30 @@ broker: una trama LoRaWAN decodificada y una trama Wi-Fi directa son indistingui
 plataforma después del filtro de análisis, que es lo que resuelve la causa C2 (hardware atado a la
 plataforma).
 
-Los módulos M1 a M8 del análisis se materializan así: M1 y M2 en el servicio de recepción del
-backend; M4 en el supervisor periódico; M5 en la API de consulta; M6 en el servicio de alertas; M3
-(aprovisionamiento) y M7 (identidad) son la siguiente tanda de implementación; M8 es el panel, que
-corre en el navegador.
+Los ocho módulos del análisis (capítulo~\ref{cap:especificacion}) se reparten así: M1 recepción y M2
+normalización forman el servicio de recepción del backend, es decir, el pipeline; M4 supervisión de
+salud es el barrido periódico; M5 persistencia y consulta es la API sobre TimescaleDB; M6 alertas es el
+servicio de umbrales. No aparecen como cajas M3 inventario y aprovisionamiento ni M7 seguridad e
+identidad, transversales al backend y previstos para la siguiente etapa, ni M8 interfaz, que es el
+panel y corre en el navegador.
 
 \section{Modelo de datos}
 
 El modelo (figura~\ref{fig:modelo-datos}) tiene trece entidades y una idea rectora: \textbf{el modelo
 interno es único}. No importa por qué vía ni en qué formato llegó una trama; una vez superado el
 pipeline, todo se guarda con la misma forma. Esa uniformidad es la respuesta a la causa C1 (formatos
-dispares).
+dispares). El esquema está en tercera forma normal: cada hecho vive en una sola tabla y las
+relaciones muchos a muchos se resuelven con entidades de asociación (\texttt{canal} es dispositivo por
+magnitud; \texttt{usuario\_sitio}, usuario por sitio). Las únicas redundancias son deliberadas y se
+llaman «foto por valor»: la unidad copiada en cada medición y el umbral vigente copiado en cada evento,
+para que cambiar un catálogo no reinterprete el pasado.
 
 \input{figuras/modelo-datos}
 
 
 Las decisiones del modelo y su justificación —por qué la medición cuelga del canal, por qué la credencial es una entidad aparte, por qué la cuarentena no tiene relaciones— se detallan en el cuadro~\ref{tab:decisiones-datos} (anexo~\ref{anx:evaluacion}). Lo que el diagrama no muestra por convención también está diseñado: el esquema sigue un conjunto de \textbf{convenciones de calidad} verificadas contra la base real —toda restricción con nombre explícito y prefijo (\texttt{pk\_}, \texttt{fk\_}, \texttt{uq\_}, \texttt{ck\_}), un índice por cada clave foránea (PostgreSQL no lo crea solo y sin él cada unión recorre la tabla completa), auditoría con \texttt{actualizado\_en} mantenida por disparador en toda tabla mutable, baja lógica en lugar de borrado, dominios cerrados como \texttt{CHECK} y catálogos donde el usuario administra los valores, y comentarios \texttt{COMMENT ON} en las columnas cuya razón de ser no es obvia, de modo que la documentación viaja con la base—. El esquema evoluciona por \textbf{migraciones numeradas} (\texttt{01-esquema}, \texttt{02} unicidad
 de condición por regla, \texttt{03} zona horaria por sitio, \texttt{04} serialización uniforme de
-instantes, \texttt{05} convenciones de calidad): nunca se edita un archivo ya aplicado. Una instalación nueva ejecuta todas en orden; una
+instantes, \texttt{05} convenciones de calidad, \texttt{06} clave natural única de la serie): nunca se edita un archivo ya aplicado. Una instalación nueva ejecuta todas en orden; una
 base existente aplica solo las nuevas.
 
 \section{Topología de red y seguridad en capas}
@@ -90,7 +95,11 @@ El orden importa: autenticar primero evita gastar recursos en tramas de desconoc
 normalizar evita convertir basura; supervisar después de guardar garantiza que «visto por última vez»
 refleje una lectura real. El filtro de análisis delega en \textbf{adaptadores} intercambiables —SenML
 \parencite{rfc8428} como contrato nativo y un formato plano para nodos simples—, de modo que admitir el formato de un nuevo
-fabricante es agregar una clase, no modificar el pipeline (RF-04).
+fabricante es agregar una clase, no modificar el pipeline (RF-04). La entrega desde el broker es
+«al menos una vez»: QoS~1 con sesión persistente, de modo que si el backend cae el broker conserva la
+cola y la entrega al volver. Eso admite reentregas, y por ello la inserción en la serie es idempotente
+sobre la clave natural canal e instante: una lectura repetida se ignora sin volver a evaluar umbrales
+(RF-06, RF-10).
 
 \input{figuras/sec-pipeline}
 
