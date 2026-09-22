@@ -486,3 +486,29 @@ no demuestran ninguna.
 El estado de cada ítem tocado (hecho / parcial / pendiente, con su evidencia) se lleva en
 `docs/12-estado-etapa2.md` §3 y se actualiza en cada corte. Esta tabla conserva la planificación
 original para poder comparar lo previsto con lo ejecutado.
+
+---
+
+## Núcleo mínimo demostrable (retroalimentación del 21 de septiembre de 2026)
+
+El profesor guía pidió acotar el alcance comprometido: «la prioridad debe recaer en demostrar
+recepción, normalización, supervisión de caída y consulta básica». Dentro del núcleo demostrativo 🎯 se
+distingue desde ahora un **primer nivel**, que es el compromiso mínimo, y un **segundo nivel** que se
+ejecuta contra la holgura verificada al cierre de cada etapa.
+
+| Nivel | Capacidad | Ítems | Estado al 21/09 |
+|---|---|---|---|
+| **1. Núcleo mínimo** | Recepción por MQTT autenticada | HU-03, TT-11, TT-20, TT-01, TT-02 | ✅ |
+| **1. Núcleo mínimo** | Normalización al modelo interno | TT-16, TT-17, TT-18, TT-19, TT-12 | ✅ (TT-12 parcial: sensores reales) |
+| **1. Núcleo mínimo** | Supervisión de caída | HU-14, HU-05 | ✅ |
+| **1. Núcleo mínimo** | Consulta básica por API | HU-07, TT-13 | ✅ |
+| **1. Núcleo mínimo** | Sensor real de extremo a extremo | HU-02 (vía ChirpStack) o HU-03 con el nodo del compañero | ⬜ octubre |
+| 2. Segundo nivel | Entrada HTTP | HU-01 | ⬜ E3 |
+| 2. Segundo nivel | Alertas por umbral con interfaz | HU-06 | 🟡 motor listo |
+| 2. Segundo nivel | Aprovisionamiento desde la plataforma | HU-10, HU-11 | ⬜ E3 |
+| 2. Segundo nivel | Cifrado del transporte | TT-22 | ⬜ E3 |
+| 2. Segundo nivel | Panel de control | HU-19, HU-20, HU-21 | ⬜ E3/E4 |
+| 2. Segundo nivel | Exportación en formato abierto | HU-08 | ⬜ E4 |
+| 2. Segundo nivel | Validación formal | TT-27, TT-28, TT-29 | ⬜ E4 |
+
+El criterio de demostración del informe (cap. 5 §5.3) y OE4 (`docs/01`) siguen este orden.

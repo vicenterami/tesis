@@ -69,6 +69,14 @@
 \newenvironment{cajaclave}[1][]{\par\smallskip\begin{quotation}\small}{\end{quotation}\smallskip}
 \providecommand{\captionof}[2]{}
 
+% TeX Live 2025 (kernel 2025-11-01): un paquete engancha \@makecaption y memoir la define de una forma
+% que el núcleo no puede re-tokenizar («Generic hooks cannot be added»). Se envuelve en una definición
+% limpia y equivalente para que el gancho se instale. Sin esto latexmk termina con error aunque genere PDF.
+\makeatletter
+\let\memoir@orig@makecaption\@makecaption
+\long\def\@makecaption#1#2{\memoir@orig@makecaption{#1}{#2}}
+\makeatother
+
 \begin{document}
 \sloppy
 \include{Portada}
@@ -103,5 +111,6 @@
 \include{anexos/b-backlog}
 \include{anexos/e-seguimiento}
 \include{anexos/c-evaluacion}
+\include{anexos/f-figuras}
 \include{anexos/d-contactid}
 \end{document}

@@ -17,11 +17,11 @@ TT-01 & Componer el entorno con contenedores: TimescaleDB, Mosquitto y ChirpStac
 TT-02 & Inicializar el proyecto TypeScript + NestJS con estructura de módulos correspondiente a M1–M8 & 4 & Hecho: backend NestJS con módulos M1, M2, M4, M5, M6 \\
 TT-03 & Configurar verificación automática: tipos, formato y ejecución de pruebas & 3 & Hecho: comprobación de tipos, ESLint con reglas tipadas y pruebas unitarias de las funciones puras del pipeline; guardianes de concordancia \\
 TT-04 & Documentar el procedimiento de puesta en marcha en el repositorio & 1 & Hecho: READMEs de plataforma y backend \\
-TT-05 & Diagrama de arquitectura de componentes, con los ocho módulos y sus dependencias & 5 & Hecho: vista de contenedores C4 (fig. 4.1) \\
-TT-06 & Diagrama de topología de red con segmentación de dispositivos IoT (RNF-09) y sentido de las conexiones (RNF-10) & 6 & Hecho: topología de red (fig. 4.3) \\
-TT-07 & Modelo de datos entidad-relación con al menos ocho entidades & 6 & Hecho: ER de 13 entidades generado desde la base (fig. 4.2) \\
-TT-08 & Diagrama de flujo de recepción, desde la recepción hasta la persistencia, para los tres transportes & 4 & Hecho: secuencia del pipeline (fig. 4.5) \\
-TT-09 & Diagrama de secuencia del aprovisionamiento de un dispositivo nuevo & 3 & Hecho: secuencia de aprovisionamiento (fig. 4.4) \\
+TT-05 & Diagrama de arquitectura de componentes, con los ocho módulos y sus dependencias & 5 & Hecho: vista de contenedores C4 (figura~\ref{fig:contenedores}) \\
+TT-06 & Diagrama de topología de red con segmentación de dispositivos IoT (RNF-09) y sentido de las conexiones (RNF-10) & 6 & Hecho: topología de red (figura~\ref{fig:red}) \\
+TT-07 & Modelo de datos entidad-relación con al menos ocho entidades & 6 & Hecho: ER de 13 entidades generado desde la base (figura~\ref{fig:modelo-datos}) \\
+TT-08 & Diagrama de flujo de recepción, desde la recepción hasta la persistencia, para los tres transportes & 4 & Hecho: secuencia del pipeline (figura~\ref{fig:sec-pipeline}) \\
+TT-09 & Diagrama de secuencia del aprovisionamiento de un dispositivo nuevo & 3 & Hecho: secuencia de aprovisionamiento (figura~\ref{fig:sec-alta}) \\
 TT-10 & Registro de decisiones de diseño con su justificación & 2 & Hecho: tablas de decisiones en el cap. 4 y bitácora \\
 TT-11 & Esquema del modelo interno y contrato del tópico MQTT (nombres, unidades, identidad) & 3 & Hecho: docs/08, docs/10 §1; tópico sitio/·/dispositivo/·/magnitud \\
 TT-12 & Catálogo de tipos de sensor y unidades aceptadas, con umbrales de disparo y restauración & 6 & Parcial: 5 magnitudes con rango; ampliar con los sensores reales \\
@@ -42,3 +42,42 @@ HU-06 & Configurar umbrales por dispositivo para generar un evento al cruzarlos 
 TT-18 & Normalización de marcas temporales, tolerando nodos sin reloj confiable & 2 & \textbf{Adelantado} (plan.\ E3), hecho: tiempoPlausible \\
 TT-20 & Autenticación de la recepción mediante credencial por sitio & 4 & \textbf{Adelantado} (plan.\ E3), hecho: credencial por dispositivo + ACL \\
 \end{longtable}
+
+\section*{Calendario oficial}
+
+\begin{table}[H]
+\centering\small
+\begin{tabular}{@{}L{6.6cm}C{2.8cm}C{3.0cm}@{}}
+\toprule
+\textbf{Etapa} & \textbf{Sprint} & \textbf{Entrega} \\
+\midrule
+1 --- Problema, objetivos, requerimientos & 17 ago -- 4 sep & \textbf{4 de septiembre} \\
+2 --- Diseño e implementación inicial & 7 sep -- 2 oct & 2 de octubre \\
+3 --- Mejoras, pruebas, validación preliminar & 5 -- 30 oct & 30 de octubre \\
+4 --- Validación final e informe & 2 nov -- 4 dic & 4 de diciembre \\
+\bottomrule
+\end{tabular}
+\caption{Calendario oficial (pauta del 17 de agosto de 2026). Presupuesto a $\sim$15 h semanales:
+$\sim$240 horas.}
+\label{tab:calendario}
+\end{table}
+
+
+\section*{Registro de riesgos}
+
+\begin{table}[H]
+\centering\small
+\begin{tabular}{@{}lL{3.8cm}L{2.2cm}L{5.0cm}@{}}
+\toprule
+ & \textbf{Riesgo} & \textbf{Estado} & \textbf{Mitigación} \\
+\midrule
+R1 & Hardware de sensores no disponible & Activo & Emulador de nodo por software; el sensor físico demuestra el caso, el emulador la carga \\
+R2 & Sin acceso a partes interesadas & \textbf{En tratamiento} & Contactos solicitados al profesor guía tras la retroalimentación del 21/09 (sección~\ref{sec:retro}); contingencia documentada: registrar el intento, fuentes externas, informar por escrito \\
+R3 & Ambigüedad de fechas & \textbf{Cerrado} & Calendario oficial publicado el 24/08 \\
+R4 & Alcance excesivo & \textbf{Confirmado y controlado} & Núcleo comprometido vs.\ alcance condicional; revisión de holgura por etapa \\
+R5 & Protocolo inadecuado al patrón de uso & \textbf{Cerrado} & Se materializó y resolvió: Contact ID descartado el 02/09; el transporte es MQTT y el formato SenML (sección~\ref{sec:transporte}) \\
+\bottomrule
+\end{tabular}
+\caption{Registro de riesgos.}
+\label{tab:riesgos}
+\end{table}

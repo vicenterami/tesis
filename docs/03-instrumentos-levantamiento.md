@@ -1,349 +1,100 @@
 # Instrumentos de levantamiento
 
-> **Para qué sirve:** guion operativo para conseguir la evidencia que falta en la Etapa 1. Contiene a
-> quién entrevistar, qué preguntar, y qué implica cada respuesta posible.
->
-> **Cierra:** la brecha de fuente `[ENT]` de `docs/02-requerimientos.md` y el criterio 1 de la Etapa 1.
-> **Versión:** 18 de agosto de 2026
+> **Para qué sirve:** guion operativo para las entrevistas con la organización destinataria (la UCT).
+> Cierra la fuente `[ENT]` de `docs/02` y responde la observación 1 del profesor guía (21/09/2026).
+> **Versión:** 21 de septiembre de 2026. La versión del 18 de agosto (preguntas al profesor guía ya
+> resueltas, entrevistas externas a centrales de alarma del enfoque Contact ID) está en el historial git.
 
 ---
 
-# Parte 1 — Preguntas para el profesor guía
+## 1. A quién entrevistar
 
-**Mario Villanueva es la llave de acceso a todo lo demás.** Sin resolver estas preguntas, las entrevistas
-no se pueden agendar y la planificación no se puede cerrar. Van ordenadas por criticidad, no por orden de
-conversación.
+Meta: **dos entrevistas** documentadas antes del 30 de octubre (OE1), la primera dentro de la Etapa 2.
 
-## 🔴 P1. ¿A quién debo entrevistar?
-
-> *«Necesito recoger la percepción de las partes interesadas, que la rúbrica exige para el criterio 1.
-> ¿Quién en la universidad tiene sensores desplegados y podría describirme el problema en sus propias
-> palabras? ¿Me puede presentar o autorizar el contacto?»*
-
-**Por qué es la más crítica:** es la única pregunta que **bloquea trabajo de otra persona**. Las demás las
-puedes resolver solo o asumiendo un supuesto; esta no. Y de ella depende el 10 % del criterio 1 más el
-respaldo del 45 % del criterio 3.
-
-| Respuesta posible | Qué implica | Acción |
-|---|---|---|
-| Da uno o más nombres concretos | Ideal. Camino despejado | Pedir que envíe un correo de presentación el mismo día |
-| «Habla con la Dirección de Informática» o similar, sin nombre | Hay que hacer el trabajo de identificación | Pedir al menos el área y llegar por ahí; ver Parte 2 |
-| «Todavía no hay un caso concreto» | 🔴 **Riesgo R2 activado.** El propietario del proyecto es hipotético | Cambiar de estrategia: entrevistar externos (empresa de alarmas, pyme agrícola) y reformular a la universidad como usuario potencial, no como propietario. **Decírselo explícitamente para que quede constancia** |
-| «No necesitas entrevistas» | La rúbrica sí las pide, textualmente | Mostrarle la frase de la pauta: *«Debe incluirse también la percepción de las partes interesadas para validar la relevancia del problema»*. No es negociable desde su lado; es del curso |
-
-## ✅ P2. ~~Fecha de la Etapa 1~~ — RESUELTA
-
-La pauta oficial publicada el 24 de agosto fijó las fechas: **4 de septiembre**, 2 de octubre,
-30 de octubre y 4 de diciembre. Ya no hay nada que preguntar sobre esto.
-
-## 🔴 P3. ¿Acepta llevar la medición en el campo de datos extendidos de DC-09?
-
-> *«Contact ID transporta eventos codificados, pero no un valor: puede decir "temperatura alta en la
-> zona 3", no "23,4 grados". Investigando encontré que **el propio estándar DC-09 define un campo de
-> datos extendidos cuyo formato determina el implementador**. Propongo llevar el valor medido ahí, de
-> modo que el evento y la medición viajen en **un solo mensaje** sin salir de la norma. La separación
-> entre eventos y telemetría se mantiene como separación lógica en la plataforma, pero el dispositivo
-> emite un único mensaje y el firmware implementa una sola rutina. ¿Le parece correcto ese enfoque?»*
-
-**Por qué es crítica:** define la arquitectura del protocolo, que es el aporte central del trabajo. Y
-determina cuánto trabajo recae en quien implemente el firmware de los sensores.
-
-| Respuesta posible | Qué implica | Acción |
-|---|---|---|
-| «Correcto, así debe ser» | Lo esperado. El enfoque queda validado | Registrar en bitácora como decisión aprobada, con fecha |
-| «¿Y por qué no un protocolo que haga todo?» | Está pidiendo la justificación | Para eso existe la matriz de **8 alternativas** de la sección 6. La respuesta corta: ningún protocolo combina compacidad de 8 bytes con vocabulario semántico normalizado; los compactos no normalizan semántica y los que sí, no caben en el payload de LoRa |
-| «Usa DC-03, que lleva valores nativamente» | Es la alternativa que quedó segunda (3,95) | Explicar los dos motivos del descarte: mensajes de 15 a 25 bytes frente a 8, y **su sintaxis exacta para valores no pudo verificarse** porque el estándar es de pago. Ofrecer reevaluarlo en la Etapa 2 si se obtiene acceso |
-| «Quiero Contact ID puro, sin campo extendido» | Se pierde toda la telemetría con valor: no habría gráficos ni análisis histórico | Explicar qué se pierde. Existe la salida de codificar el valor en el campo `CCC`, pero ese campo identifica el dispositivo: se ganaría el valor a costa de la identidad del sensor. **Es posible y es peor.** Si insiste, se implementa y se documenta como decisión suya |
-
-**Preparación:** llevar el dato verificado de que el mensaje solo con evento ocupa **8 bytes** y con
-valor entre **13 y 19**, frente a los **11 bytes** del enlace de alcance máximo y los **51 a 53** de
-operación normal. De ahí que el valor sea opcional.
-
-## 🟢 Para Eduardo — el contrato del firmware, en una frase
-
-> *«Tu nodo manda un arreglo de 8 bytes con el evento Contact ID y, si hay medición, los bytes del valor
-> a continuación. Nada más: ni DC-09 ni MQTT — eso lo hace mi plataforma. La tabla exacta te la defino en
-> la Etapa 2 y te paso la función de referencia en Python para que verifiques tu implementación.
-> ¿Prefieres que el valor vaya en texto tipo `[T23.4]` (7 bytes) o en binario compacto (2–3 bytes)?»*
-
-Esa última pregunta es la **P9** (formato en el aire) y conviene decidirla juntos: él la programa.
-
-## 🟡 P3b. ¿Acepta la arquitectura de dos planos como separación lógica?
-
-> *«Contact ID transporta eventos codificados, pero no puede transportar un valor: puede decir
-> "temperatura alta en la zona 3", no "23,4 grados". Propongo dos planos: los eventos y alarmas en Contact
-> ID con entrega confirmada, y las mediciones con valor en un formato complementario, correlacionados por
-> la identidad del dispositivo. ¿Le parece correcto, o espera que todo pase por Contact ID?»*
-
-**Por qué es crítica:** si responde que quiere Contact ID puro para todo, **hay que rediseñar** el
-tratamiento de la telemetría, y eso afecta los requerimientos, la arquitectura y el backlog.
-
-| Respuesta | Qué implica | Acción |
-|---|---|---|
-| «Correcto, así debe ser» | Lo esperado. El diseño queda validado | Registrarlo en bitácora como decisión aprobada |
-| «Quiero Contact ID para todo» | Rediseño del plano de telemetría | Explicar el límite técnico con el ejemplo concreto. Si insiste, se puede codificar el valor en el campo `CCC` a costa de perder la identificación de zona: es posible pero **degrada el protocolo**. Documentarlo como decisión del profesor guía |
-| «¿Y no sería mejor otro protocolo?» | Está cuestionando la elección | Para eso existe la matriz de 7 alternativas de la sección 6. Llevar el informe impreso |
-
-**Preparación:** ten a mano el dato de que **Contact ID ocupa 8 bytes y el payload mínimo de LoRaWAN es
-11**, mientras un JSON equivalente ocupa 60 a 150. Es el argumento más contundente.
-
-## 🟡 P4. ¿Qué exige la carrera como entregable final?
-
-> *«¿La entrega final es un prototipo funcional, un documento, o ambos? ¿Hay defensa oral o comisión?»*
-
-| Respuesta | Qué implica |
-|---|---|
-| Prototipo + documento | El plan actual es correcto |
-| Solo documento | Se puede reducir el peso de la implementación y reforzar diseño y validación. **Cambiaría el reparto de las 165 h** |
-| Prototipo + defensa ante comisión | Hay que reservar tiempo para preparar la presentación, que hoy **no está en el backlog**. Añadir ~8 h |
-
-## 🟡 P5. ¿Acepta que el alcance se acote al núcleo demostrativo?
-
-> *«Estimé el backlog en horas y sumé: el alcance completo son 275 horas contra 201 disponibles con mi
-> jornada laboral, un 37 % de exceso. El núcleo que demuestra la tesis son 165 horas y sí cabe, con 18 %
-> de holgura. Propongo comprometer el núcleo y tratar el resto como alcance condicional. ¿Le parece?»*
-
-**Por qué importa:** es una conversación que **te conviene tener ahora y no en octubre**. Además te posiciona
-bien: muy pocos estudiantes llegan con una verificación numérica de su propio plan.
-
-| Respuesta | Qué implica |
-|---|---|
-| «Bien, es lo razonable» | Queda documentado y protegido. **Registrarlo en bitácora con fecha** |
-| «Deberías poder hacer más» | Pedirle que indique **qué elementos del alcance condicional considera indispensables**, y ajustar. Si añade, hay que quitar de otro lado |
-| «Dedica más horas» | Es incompatible con jornada laboral completa. Exponerlo con la restricción RE-01 del documento |
-
-## 🟡 P6. ¿Hay hardware disponible, o presupuesto para comprarlo?
-
-> *«Para validar necesito al menos un gateway LoRaWAN y dos o tres nodos: unos 150 a 250 dólares. ¿La
-> universidad tiene equipos disponibles en laboratorio, hay algún fondo, o corre por mi cuenta?»*
-
-| Respuesta | Qué implica |
-|---|---|
-| Hay equipos en laboratorio | **Riesgo R1 desactivado.** Confirmar modelos exactos, porque el plan de frecuencias importa (AU915) |
-| Hay presupuesto o fondo concursable | Iniciar el trámite de inmediato: los plazos de compra y envío pueden ser de semanas |
-| Corre por tu cuenta | Decisión económica tuya. **El emulador de software (TT-28) mantiene la validación viable sin hardware**; el sensor físico solo añade la demostración |
-| No hay nada | Riesgo R1 activo pero mitigado. Documentarlo como restricción, no como fracaso |
-
-## 🟢 P7 a P10 — Preguntas de ajuste
-
-| # | Pregunta | Qué implica la respuesta |
-|---|---|---|
-| **P7** | *¿Seis objetivos específicos son demasiados, o le parece bien el nivel de detalle?* | Si los ve excesivos, OE3 y OE4 se fusionan en «diseño de la solución y su despliegue». Cambio de 10 minutos |
-| **P8** | *¿Los umbrales que puse son razonables? 50 eventos por segundo, 15 casos de prueba, detección de caída en 2 intervalos* | Si los considera altos, se bajan ahora. **Es mejor bajarlos antes de firmarlos que incumplirlos después** |
-| **P9** | *¿Tiene preferencia de tecnología de implementación? Elegí TypeScript con NestJS por una matriz de 7 criterios* | Si tiene preferencia, se documenta como restricción del propietario. Si no, la matriz queda como justificación |
-| **P10** | *¿Hay profesor secundario para las consultas de sensores y electrónica?* | Define a quién dirigir las dudas de hardware sin gastar el tiempo de Mario |
-
-## Estrategia para la reunión del miércoles 26
-
-Tienes una reunión, no diez. Reparte así:
-
-1. **Entrega el PDF impreso al empezar.** Que lo tenga en la mano mientras conversan.
-2. **P1 y P2 primero, siempre.** Si la reunión se corta, esas dos son las que no pueden quedar sin
-   respuesta.
-3. **P3 y P5 en el cuerpo de la conversación** — son las que generan discusión técnica y donde tu trabajo
-   luce.
-4. **P4, P6 a P10 al final**, o por correo si no alcanza el tiempo.
-5. **Registra todo en bitácora el mismo día**, con la tabla «indicación recibida → cambio realizado →
-   evidencia». Eso es el 20 % de las etapas siguientes.
-
----
-
-# Parte 2 — A quién entrevistar
-
-## 2.1 Prioridad: dentro de la universidad
-
-El propietario declarado del proyecto es la universidad, así que la evidencia más valiosa viene de ahí.
-Perfiles a buscar, en orden de utilidad:
-
-| # | Perfil | Por qué sirve | Cómo llegar |
+| # | Perfil | Qué valida | Cómo llegar |
 |---|---|---|---|
-| **1** | **Encargado de laboratorios de la Facultad de Ingeniería** | Suele custodiar el equipamiento que ya se compró y quedó sin uso. Es la fuente más probable de la frase *«tenemos sensores y no sabemos qué hacer con ellos»* | Vía Mario, o directamente en la facultad |
-| **2** | **Dirección de Informática / TI de la universidad** | Es el rol del administrador de red de tu tesis. Valida RNF-09 (segmentación) y RNF-10 (conexión saliente), que son tus requerimientos de anclaje al enfoque de redes | Vía Mario; puede requerir autorización formal |
-| **3** | **Académico investigador con proyecto que use sensores** | En una universidad regional agrícola, las áreas de agronomía, recursos naturales y ciencias ambientales suelen tener sensores de campo. Muy probable que tengan datos que no procesan | Buscar en la página de proyectos de investigación de la UCT |
-| **4** | **Encargado de mantención o servicios generales** | Cámaras de frío, salas de servidores, riego de áreas verdes, consumo eléctrico. Necesidades reales, no hipotéticas | Vía administración |
-| **5** | **Vinculación con el medio / transferencia tecnológica** | Conocen empresas de la región con este problema. Puerta a un caso externo real | Vía Mario |
+| 1 | Responsable de laboratorios o del equipamiento de sensores de la Facultad de Ingeniería | Causas C1, C2, C4; qué sensores existen y qué pasa con sus datos | Contacto solicitado al profesor guía |
+| 2 | Dirección de informática de la universidad (red) | RNF-08 credenciales, RNF-09 segmentación, RNF-10 conexión saliente; cómo se despliega en la red del campus | Contacto solicitado al profesor guía |
+| 3 (reserva) | Académico con proyecto que use sensores (agronomía, ambiental) | C3, C5; datos que hoy no se procesan | Página de proyectos de la UCT; vía profesor guía |
 
-**Meta mínima: dos entrevistas.** Es lo que comprometiste en OE1. Con una del grupo 1 o 3 y una del
-grupo 2 tienes cubierta tanto la perspectiva del dueño del dato como la del administrador de red.
-
-## 2.2 Complemento: fuera de la universidad
-
-Refuerzan el estudio de mercado y validan decisiones técnicas concretas. **No sustituyen las internas.**
-
-| Perfil | Qué valida | Pregunta clave |
-|---|---|---|
-| **Empresa de alarmas o central de monitoreo de Temuco** | Valida el criterio C-C: interoperabilidad con lo instalado. **Confirma empíricamente que Contact ID sigue vigente en Chile** | *«¿Qué protocolo reciben sus paneles en la central? ¿Contact ID, SIA, ambos? ¿Por IP o por celular?»* |
-| **Agricultor o pyme con sensores instalados** | Valida las causas C2 y C3 con un caso real y externo | *«¿Puede sacar sus datos de la plataforma del proveedor?»* |
-| **Integrador o proveedor local de IoT** | Contrasta el análisis de competencia | *«¿Qué le piden los clientes que hoy no pueden ofrecer?»* |
-
-> **Una sola entrevista con una central de monitoreo local vale mucho.** Si te confirman que reciben
-> Contact ID a diario, tu criterio C-C deja de ser argumentado y pasa a ser verificado en terreno. Es el
-> tipo de evidencia que distingue un trabajo de titulación de un ensayo.
+Datos personales: **ninguno al repositorio**. En la bitácora solo el rol.
 
 ---
 
-# Parte 3 — Guion de entrevista
+## 2. Guion (25 a 40 minutos, semiestructurado)
 
-**Formato:** semiestructurada, 25 a 40 minutos. Las preguntas son guía, no cuestionario: si la persona se
-va por un camino interesante, seguirlo.
+Las preguntas guían; si la persona toma un camino interesante, seguirlo. **Ellos hablan el 70 %.**
+Anotar frases textuales entre comillas; lo interpretado, entre corchetes. No corregir al entrevistado:
+su percepción es el dato.
 
-**Regla de oro:** ellos hablan, tú anotas. Si hablas más del 30 % del tiempo, la entrevista falló.
+### Apertura (2 min)
+> «Estoy haciendo mi trabajo de título sobre una plataforma para administrar datos de sensores. No vengo
+> a ofrecer nada: vengo a entender si el problema que creo que existe, existe de verdad. ¿Le molesta si
+> anoto lo que me diga y cito alguna frase en el informe? Puedo mantenerlo anónimo.»
 
-## Bloque 0 — Apertura (2 min)
+Sin ese permiso no se puede citar.
 
-> *«Estoy haciendo mi trabajo de título sobre una plataforma para administrar datos de sensores. No vengo
-> a ofrecerle nada ni a venderle nada: vengo a entender si el problema que creo que existe, existe de
-> verdad. ¿Le molesta si anoto lo que me diga y cito alguna frase suya en el informe? Puedo mantenerlo
-> anónimo si prefiere.»*
+### Bloque 1 — Qué hay (5 min)
+1. ¿Qué sensores o dispositivos de medición tienen hoy? ¿Cuántos y dónde?
+2. ¿Cómo se comunican (Wi-Fi, cable, radio, SIM)? ¿Quién los eligió e instaló?
+3. ¿Están todos funcionando hoy? → si «no sé» o «creo que algunos no»: evidencia directa de **C5**.
 
-**Por qué así:** pedir permiso explícito para citar es lo que te habilita a usar la cita textual en el
-informe. Sin eso, no puedes citarla.
+### Bloque 2 — Qué pasa con los datos (10 min, el central)
+4. ¿Dónde llegan los datos? ¿Quién los mira y con qué frecuencia? → C1, C4
+5. ¿Puede ver el historial de hace tres meses? ¿Cómo? → RF-33
+6. **¿Podría descargar todos sus datos y llevárselos a otra parte?** → C3, RF-34. La pregunta más importante: «no sé» o «habría que pedirlo al proveedor» valida C3 en terreno.
+7. Si mañana agregara un sensor de otra marca, ¿qué pasaría? → C2
+8. ¿Pagan algo mensual por plataforma o servicio? → C3
 
-## Bloque 1 — Inventario actual (5 min)
+### Bloque 3 — El dolor concreto (8 min)
+9. ¿Le ha pasado que un sensor deje de reportar y se enteren tarde? ¿Cómo se enteraron, cuánto tardaron, qué consecuencia tuvo? → C5. Un incidente con consecuencia es la evidencia más valiosa: **pedir detalles y anotar literal**.
+10. ¿Hay alguna decisión que hoy tomen «a ojo» y preferirían tomar con dato?
 
-*Objetivo: saber qué hay. Sin juicio, solo hechos.*
+### Bloque 4 — Validar el catálogo (8 min; describir la capacidad, no el requerimiento)
+11. Una pantalla con todos sus sensores y cuáles responden: ¿la usaría? ¿cada cuánto? → RF-47, RF-48
+12. ¿Prefiere aviso por correo o mensaje, o que solo quede registrado? → RF-36, RF-37
+13. ¿Le sirve agrupar sensores por edificio, sector o proyecto? → RF-21
+14. ¿Qué importa más: ver el valor exacto o que le avisen cuando algo se sale de rango? → alertas por umbral frente a histórico; cualquier respuesta sirve, documentada.
+15. ¿Quién debería ver estos datos y quién no? → RF-41, RF-44
+16. (solo perfil 2) ¿Los dispositivos pueden vivir en un segmento de red aparte? ¿Se permite que solo abran conexiones salientes? → RNF-09, RNF-10
 
-1. ¿Qué sensores o dispositivos de medición tienen instalados hoy?
-2. ¿Cuántos, aproximadamente? ¿Dónde están?
-3. ¿Cómo se comunican? ¿WiFi, cable, radio, tarjeta SIM? ¿Lo sabe, o lo instaló un tercero?
-4. ¿Hace cuánto están? ¿Quién los eligió?
-5. ¿Están todos funcionando hoy?
+### Cierre (3 min)
+17. Si esto existiera, ¿lo probaría? ¿Con qué sensores empezaría?
+18. ¿Hay alguien más con quien debería hablar? → multiplica las entrevistas.
+19. ¿Puedo volver a consultarle durante el desarrollo? → abre la validación con usuario real de la Etapa 4.
 
-> **Pregunta 5 es más reveladora de lo que parece.** Si la respuesta es *«no sé»* o *«creo que algunos
-> no»*, acabas de obtener evidencia directa de la causa **C5**.
-
-## Bloque 2 — Qué pasa con los datos (10 min) — *el bloque central*
-
-6. ¿Dónde llegan los datos que generan esos sensores?
-7. ¿Quién los mira? ¿Con qué frecuencia?
-8. ¿Puede ver el historial de hace tres meses? ¿Cómo?
-9. **¿Podría descargar todos sus datos y llevárselos a otra parte?**
-10. Si mañana quisiera agregar un sensor de otra marca, ¿qué pasaría?
-11. ¿Paga algo mensual por la plataforma o el servicio?
-
-| Pregunta | Causa que valida |
-|---|---|
-| 6, 7, 8 | **C1** fragmentación · **C4** falta de capacidad interna |
-| **9** | **C3** dependencia comercial · **E5** dependencia de proveedor |
-| **10** | **C2** acoplamiento hardware-plataforma |
-| 11 | **C3** costo |
-
-> **La pregunta 9 es la más importante de toda la entrevista.** Si la respuesta es *«no sé»*, *«creo que
-> no»* o *«habría que pedirle al proveedor»*, tienes validada la causa C3 con evidencia de campo. Y es la
-> pregunta que justifica tu requerimiento **RF-34** (exportación en formato abierto).
-
-## Bloque 3 — El dolor concreto (8 min)
-
-12. ¿Le ha pasado que un sensor deje de reportar y se enteren tarde?
-13. ¿Cómo se enteraron? ¿Alguien lo notó, o falló algo primero?
-14. ¿Cuánto tiempo pasó entre que dejó de funcionar y que lo supieron?
-15. ¿Qué consecuencia tuvo?
-16. ¿Hay alguna decisión que hoy tomen «a ojo» y que preferirían tomar con dato?
-
-> **Las preguntas 12 a 15 son la mina de oro.** Un incidente concreto con consecuencia concreta convierte
-> la causa C5 de afirmación teórica en hecho documentado. Si te cuentan uno, **pide detalles y anota
-> literalmente**.
-
-## Bloque 4 — Validación de requerimientos (8 min)
-
-*Aquí contrastas tu catálogo con la realidad. Describe la capacidad, no el requerimiento.*
-
-17. Si existiera una pantalla que le mostrara todos sus sensores y cuáles están respondiendo, ¿la usaría?
-    ¿Con qué frecuencia?
-18. ¿Preferiría que le avise por correo, por mensaje, o que simplemente quede registrado?
-19. ¿Le sirve poder agrupar los sensores por edificio, sector o proyecto?
-20. ¿Qué es más importante: ver el valor exacto, o que le avisen cuando algo se sale del rango?
-21. ¿Quién debería poder ver estos datos y quién no?
-
-| Pregunta | Requerimientos que valida |
-|---|---|
-| 17 | RF-47, RF-48, HU-19 |
-| 18 | RF-36, RF-37, HU-24 |
-| 19 | RF-21, HU-12 |
-| **20** | **Valida directamente la arquitectura de dos planos** |
-| 21 | RF-41, RF-44 (multi-tenencia y roles) |
-
-> **La pregunta 20 es tu validación de diseño.** Si responden que lo importante es *«que me avisen cuando
-> algo se sale del rango»*, eso respalda la primacía del plano de eventos y por tanto la elección de
-> Contact ID. Si responden que necesitan el valor exacto permanentemente, refuerza el plano de telemetría.
-> **Cualquiera de las dos respuestas te sirve**; lo que importa es tenerla documentada.
-
-## Bloque 5 — Cierre (3 min)
-
-22. Si esto existiera y fuera gratis, ¿lo probaría? ¿Con qué sensores empezaría?
-23. ¿Hay alguien más con quien debería hablar sobre esto?
-24. ¿Puedo volver a consultarle si me surgen dudas durante el desarrollo?
-
-> **La pregunta 23 multiplica tus entrevistas.** Y la 24 te abre la puerta para las Etapas 3 y 4, cuando
-> necesites validar el prototipo con un usuario real: eso es exactamente lo que la Etapa 4 pide como
-> «necesidades del usuario final».
-
-## La pregunta que cierra el criterio 1
-
-Si la entrevista se corta y solo puedes hacer una pregunta, es esta:
-
-> ### *«¿Qué es lo más frustrante de tener estos sensores instalados?»*
-
-Es abierta, invita a desahogarse, y la respuesta suele venir en la forma exacta de cita textual que la
-rúbrica pide: la percepción de la parte interesada, en sus propias palabras.
+**Si solo alcanza una pregunta:** «¿Qué es lo más frustrante de tener estos sensores instalados?»
 
 ---
 
-# Parte 4 — Cómo registrar y convertir en evidencia
+## 3. Registro (el mismo día)
 
-## 4.1 Durante la entrevista
-
-- **Anota frases textuales, no resúmenes.** «Nadie revisa eso» vale más que «no hay revisión periódica».
-- Marca con comillas lo literal y con corchetes lo que interpretaste.
-- Si autorizan grabar, graba; si no, dedica los 5 minutos siguientes a completar las notas antes de que
-  se enfríen.
-- **No corrijas al entrevistado** aunque diga algo técnicamente impreciso. Su percepción *es* el dato.
-
-## 4.2 Después: el archivo de registro
-
-Crear un archivo por entrevista en `bitacora/`, con este formato:
+Un archivo por entrevista: `bitacora/AAAA-MM-DD-entrevista-<rol>.md`
 
 ```
-bitacora/2026-08-XX-entrevista-<rol>.md
-
-# Entrevista — <rol o cargo> — <fecha>
-- Modalidad, duración
-- Autorización de cita: sí / sí anonimizada / no
-
+# Entrevista — <rol> — <fecha>
+- Modalidad, duración · Autorización de cita: sí / anonimizada / no
 ## Inventario declarado
-## Citas textuales
-> «...»                       <- literal, entre comillas
+## Citas textuales            (literal, entre comillas)
 ## Incidentes relatados
 ## Requerimientos que valida o refuta
-| Cita o hecho | Causa que valida | Requerimiento afectado |
-## Requerimientos nuevos que surgieron
-## Contactos derivados
+| Cita o hecho | Causa | Requerimiento |
+## Requerimientos nuevos       (se agregan al catálogo marcados [ENT])
+## Contactos derivados         (solo roles)
 ```
 
-## 4.3 Cómo se incorpora al informe
+## 4. Cómo entra al informe y a los docs
 
 | Destino | Qué se agrega |
 |---|---|
-| `docs/01-problema-y-objetivos.md`, secc. 1.5 | Las citas textuales, como validación de relevancia |
-| `docs/01-problema-y-objetivos.md`, secc. 1.6 | Estado del levantamiento: de «pendiente» a «realizado» |
-| `docs/02-requerimientos.md`, secc. 1.1 | Habilitar la fuente `[ENT]` y reasignar los requerimientos que ahora tengan respaldo directo |
-| `docs/02-requerimientos.md` | Agregar los requerimientos nuevos que hayan surgido |
-| `historico/informe-v1/secciones/02-problema.tex` | Reemplazar el recuadro rojo de brecha por las citas obtenidas |
-| `bitacora/` | El registro completo, como anexo de evidencia |
+| `docs/02` §1.1 | Habilitar `[ENT]`; reasignar los requerimientos con respaldo directo; agregar los nuevos |
+| `docs/01` | Citas como validación de relevancia; estado del levantamiento → realizado |
+| Informe cap. 1 §1.1 | El párrafo de evidencia deja de decir «aún no realizado» y cita lo recogido |
+| Informe cap. 3 §3.1 y cap. 5 §5.5 | Fuente `[ENT]` habilitada; fila 1 del cuadro de retroalimentación → realizada |
+| `bitacora/` | El registro completo |
 
-> **Un requerimiento que nazca de una entrevista es más valioso que diez derivados de la teoría.** Si
-> alguien pide algo que no está en el catálogo, **agrégalo y déjalo marcado como `[ENT]`**: es la prueba
-> de que el levantamiento sirvió para algo y no fue un trámite.
+## 5. Si no se consiguen antes del 2 de octubre
 
-## 4.4 Si las entrevistas no se consiguen
-
-Plan de contingencia, en orden:
-
-1. **Documentar el intento**: a quién se escribió, cuándo, qué respondieron. Un intento documentado vale
-   más que un silencio.
-2. **Sustituir por fuentes externas**: empresa de alarmas, pyme, integrador. Es evidencia de campo aunque
-   no sea del propietario declarado.
-3. **Reformular el rol de la universidad** en el informe: de «propietario del proyecto» a «usuario
-   potencial identificado», y declarar el cambio como desviación justificada.
-4. **Informar a Mario por escrito** antes de la entrega, no después. Que la limitación sea conocida y no
-   descubierta.
+1. Documentar el intento: a quién se escribió, cuándo, qué respondieron.
+2. Informar al profesor guía por escrito antes de la entrega.
+3. Mantener OE1 al 30 de octubre (Etapa 3) y buscar el perfil 3 de reserva.

@@ -37,7 +37,7 @@ panel y corre en el navegador.
 
 \section{Modelo de datos}
 
-El modelo (figura~\ref{fig:modelo-datos}) tiene trece entidades y una idea rectora: \textbf{el modelo
+El modelo (figura~\ref{fig:modelo-datos}) tiene 13 entidades y una idea rectora: \textbf{el modelo
 interno es único}. No importa por qué vía ni en qué formato llegó una trama; una vez superado el
 pipeline, todo se guarda con la misma forma. Esa uniformidad es la respuesta a la causa C1 (formatos
 dispares). El esquema está en tercera forma normal: cada hecho vive en una sola tabla y las
@@ -56,12 +56,11 @@ base existente aplica solo las nuevas.
 
 \section{Topología de red y seguridad en capas}
 
-La figura~\ref{fig:red} muestra los tres segmentos de red y qué cruza cada frontera. Los dispositivos
+La figura~\ref{fig:red} (anexo~\ref{anx:figuras}) muestra los tres segmentos de red y qué cruza cada frontera. Los dispositivos
 del sitio abren únicamente \textbf{conexiones salientes}, de modo que el router del cliente no necesita
 puertos abiertos ni configuración alguna (RNF-10): una organización sin personal técnico (causa C4)
 conecta un sensor sin tocar su red.
 
-\input{figuras/red}
 
 La seguridad se diseñó en capas, asumiendo en cada una que la anterior falló: (1)~red: solo 443, 8883
 y 1700/udp publicados; (2)~TLS obligatorio en producción; (3)~identidad: broker sin conexiones anónimas,
@@ -78,13 +77,12 @@ que el suscriptor llegue a recibir el mensaje.
 
 \subsection{Aprovisionamiento de un dispositivo}
 
-La figura~\ref{fig:sec-alta} describe cómo un dispositivo pasa de desconocido a reconocido. Es el flujo
+La figura~\ref{fig:sec-alta} (anexo~\ref{anx:figuras}) describe cómo un dispositivo pasa de desconocido a reconocido. Es el flujo
 que ataca directamente la causa C4: una persona sin perfil técnico da de alta un sensor desde el panel,
 y la plataforma genera la credencial, la muestra \textbf{una sola vez}, guarda solo su hash y registra
 al dispositivo en el broker con una lista de acceso restringida a su propio tópico. El estado «en línea»
 no nace del alta, sino del \textbf{primer mensaje autenticado}.
 
-\input{figuras/sec-alta}
 
 \subsection{Recepción de una trama: el pipeline}
 
@@ -113,7 +111,7 @@ límite no dispare y cierre alertas sin parar.
 
 \subsection{Panel en tiempo real}
 
-La figura~\ref{fig:sec-tiemporeal} muestra los dos tiempos del panel. El histórico llega
+La figura~\ref{fig:sec-tiemporeal} (anexo~\ref{anx:figuras}) muestra los dos tiempos del panel. El histórico llega
 \textbf{agregado por la base de datos} con \texttt{time\_bucket}: cientos de puntos, no millones, sin
 importar cuánto lleve el sensor transmitiendo. Las lecturas nuevas se empujan por WebSocket desde el
 backend. Toda la consulta valida sus entradas antes de tocar SQL (identificadores, fechas, un intervalo
@@ -122,7 +120,6 @@ genera desde el código}, en OpenAPI 3.0 \parencite{openapi303}, a partir de los
 puede describir rutas inexistentes; se sirve junto a la API y se versiona en el repositorio como el
 acuerdo que consumirá el panel.
 
-\input{figuras/sec-tiemporeal}
 
 \section{Manejo del tiempo y zonas horarias}
 \label{sec:tiempo}
@@ -143,12 +140,11 @@ es un dato del sitio, no una constante del programa.
 
 \section{Despliegue y presupuesto de recursos}
 
-La figura~\ref{fig:despliegue} muestra el despliegue: un servidor, cinco contenedores y una red interna.
+La figura~\ref{fig:despliegue} (anexo~\ref{anx:figuras}) muestra el despliegue: un servidor, cinco contenedores y una red interna.
 ChirpStack usa una base propia dentro del mismo PostgreSQL —una instancia menos que mantener— y el
 backend no guarda estado, por lo que puede recrearse sin pérdida. Cada contenedor tiene versión de imagen
 fijada, no puede escalar privilegios, se reinicia solo ante fallas y tiene un techo de memoria y CPU.
 
-\input{figuras/despliegue}
 
 La suma de techos es de aproximadamente 1,95~GB, coherente con el RNF-17 (operar en un servidor de
 2~GB). El consumo \textbf{medido} en reposo de la base de datos y el broker es inferior a 100~MB; el

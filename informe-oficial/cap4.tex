@@ -8,62 +8,38 @@ del dominio de redes, corresponde a la especialidad del profesor guía, y sus fa
 cuatro etapas de evaluación (Prepare/Plan $\rightarrow$ Etapa 1; Design $\rightarrow$ Etapa 2; Implement
 $\rightarrow$ Etapa 3; Operate/Optimize $\rightarrow$ Etapa 4).
 
-Se descarta Scrum como marco de gestión de equipo —el proyecto es unipersonal y sus ceremonias carecen
-de sentido— pero \textbf{se conservan sus artefactos de planificación}: el backlog con épicas, historias
-de usuario, criterios de aceptación y estimaciones. No es solo preferencia metodológica: la pauta asigna
-el 20\,\% de esta etapa al backlog y mide el avance de las siguientes como porcentaje de tareas
-completadas. PPDIOO define qué fases hay; el backlog, cómo se mide el avance.
-
-Los estándares de referencia siguen al SWEBOK v4 \parencite{swebok} en sus áreas de requerimientos
-(cap.~1), arquitectura y diseño (caps.~2--3), pruebas (cap.~5) y gestión de configuración (cap.~7): todo
-el trabajo se versiona en un repositorio git con mensajes descriptivos, y la retroalimentación del
-profesor guía se registra en bitácora con trazabilidad indicación $\rightarrow$ cambio $\rightarrow$
-evidencia.
-
-\section{Calendario oficial}
-
-\begin{table}[H]
-\centering\small
-\begin{tabular}{@{}L{6.6cm}C{2.8cm}C{3.0cm}@{}}
-\toprule
-\textbf{Etapa} & \textbf{Sprint} & \textbf{Entrega} \\
-\midrule
-1 --- Problema, objetivos, requerimientos & 17 ago -- 4 sep & \textbf{4 de septiembre} \\
-2 --- Diseño e implementación inicial & 7 sep -- 2 oct & 2 de octubre \\
-3 --- Mejoras, pruebas, validación preliminar & 5 -- 30 oct & 30 de octubre \\
-4 --- Validación final e informe & 2 nov -- 4 dic & 4 de diciembre \\
-\bottomrule
-\end{tabular}
-\caption{Calendario oficial (pauta del 17 de agosto de 2026). Presupuesto a $\sim$15 h semanales:
-$\sim$240 horas.}
-\label{tab:calendario}
-\end{table}
+Se descarta Scrum como marco de equipo —el proyecto es unipersonal— pero \textbf{se conservan sus
+artefactos}: backlog con épicas, historias, criterios de aceptación y estimaciones, porque la pauta mide
+el avance como porcentaje de tareas completadas. PPDIOO define las fases; el backlog, cómo se mide el
+avance. Los estándares siguen al SWEBOK v4 \parencite{swebok} en requerimientos, arquitectura y diseño,
+pruebas y gestión de configuración: todo se versiona en git y la retroalimentación del profesor guía se
+registra en bitácora con trazabilidad indicación $\rightarrow$ cambio $\rightarrow$ evidencia. El
+calendario oficial (cuadro~\ref{tab:calendario}, anexo~\ref{anx:seguimiento}) fija las entregas al 4
+de septiembre, 2 de octubre, 30 de octubre y 4 de diciembre, con $\sim$240 horas de presupuesto.
 
 \section{Backlog y verificación de viabilidad}
+\label{sec:backlog}
 
-El backlog contiene \textbf{65 elementos} —25 historias de usuario y 40 tareas técnicas, agrupados en 14 épicas—
-estimados en horas ideales, ajustados tras el pivote del 2 de septiembre: los elementos ligados al
-protocolo descartado se reformularon hacia el contrato SenML y el pipeline, con un efecto neto de
-$-10$ horas en el núcleo demostrativo ($\sim$155 h). El backlog completo está en el
-anexo~\ref{anx:backlog}.
+El backlog contiene \textbf{65 elementos} —25 historias de usuario y 40 tareas técnicas en 14 épicas—
+estimados en horas ideales y reformulados tras el pivote del 2 de septiembre hacia el contrato SenML y
+el pipeline (núcleo demostrativo $\sim$155 h; anexo~\ref{anx:backlog}).
 
 \begin{quote}
-\textbf{Criterio de demostración:} el prototipo demuestra la tesis si recibe tramas por al menos dos
-vías (MQTT y HTTP), las normaliza al modelo interno, detecta que un dispositivo dejó de reportar, lo
-presenta en el panel con el estado de cada dispositivo, y permite exportar los datos en formato
-abierto.
+\textbf{Criterio de demostración, en dos niveles.} El \textbf{núcleo mínimo demostrable} —prioridad
+absoluta, acotado tras la retroalimentación de la Etapa 1— demuestra la tesis si el prototipo recibe
+tramas por MQTT, las normaliza al modelo interno, detecta que un dispositivo dejó de reportar y
+permite consultar sus mediciones por la API; al cierre de esta etapa, los cuatro elementos están
+construidos y verificados (capítulo~\ref{cap:diseno}). El \textbf{segundo nivel} —vía HTTP,
+alertas por umbral, panel de control y exportación en formato abierto— se ejecuta contra la holgura
+verificada al cierre de cada etapa.
 \end{quote}
 
-La verificación numérica —sumando programáticamente las estimaciones— arrojó el hallazgo de mayor
-consecuencia práctica de la etapa: \textbf{el backlog completo ($\sim$272 h) excede el presupuesto y no es
-ejecutable íntegro; el núcleo demostrativo ($\sim$155 h) cabe con holgura} ($\sim$+35\,\% con el
-calendario oficial). En consecuencia, \textbf{el compromiso del proyecto es el núcleo} y los 32 elementos restantes
-son alcance condicional, ejecutable solo contra holgura verificada al cierre de cada etapa. El
-fundamento: la pauta mide el avance como porcentaje de tareas completadas, de modo que comprometer el backlog íntegro y ejecutar solo el núcleo arrojaría cerca de un 60\,\% —bajo el umbral—, mientras que comprometer el núcleo y ejecutarlo arroja el 100\,\%.
-
-La distribución temporal también se corrigió: la asignación inicial concentraba la implementación en la
-Etapa 3 (162\,\% de su capacidad) cuando la pauta solo exige allí el 50\,\%; se trasladaron $\sim$37
-horas del núcleo a la Etapa 4, verificando que el umbral del 50\,\% se cumple (53\,\%).
+La verificación numérica de las estimaciones mostró que \textbf{el backlog completo ($\sim$272 h)
+excede el presupuesto y el núcleo demostrativo ($\sim$155 h) cabe con holgura} ($\sim$+35\,\%). Por
+eso \textbf{el compromiso es el núcleo} y los 32 elementos restantes son alcance condicional: la pauta
+mide el avance como porcentaje de tareas completadas, y comprometer lo que no se ejecutará bajaría
+ese porcentaje por debajo del umbral. La distribución temporal también se corrigió, trasladando
+$\sim$37 horas de la Etapa 3 a la Etapa 4 para cumplir el 50\,\% exigido al 30 de octubre.
 
 \section{Seguimiento del backlog en la Etapa 2}
 \label{sec:seguimiento}
@@ -72,21 +48,48 @@ La pauta evalúa el avance como el cumplimiento de las tareas de diseño previst
 
 De los 22 ítems planificados para la etapa, 18 están completos y 4 parciales con su faltante identificado; ninguno queda sin iniciar. Seis ítems de las Etapas~3 y~4 se adelantaron; ese margen se invirtió en el capítulo de diseño y en el método de generación y verificación de figuras.
 
-\section{Riesgos}
+\section{Retroalimentación de la Etapa 1 y cambios derivados}
+\label{sec:retro}
 
-\begin{table}[H]
-\centering\small
-\begin{tabular}{@{}lL{3.8cm}L{2.2cm}L{5.0cm}@{}}
+El profesor guía evaluó el informe de la Etapa 1 el 21 de septiembre de 2026: destacó el árbol de
+problemas, la delimitación, la trazabilidad, la separación núcleo/condicional y el análisis de
+alternativas, y señaló seis puntos por mejorar. El cuadro~\ref{tab:retro} indica el cambio hecho por
+cada uno y dónde queda; la transcripción íntegra está en la bitácora del repositorio.
+
+\begin{table}[!tb]
+\centering\footnotesize
+\begin{tabular}{@{}L{4.1cm}L{6.0cm}L{2.5cm}@{}}
 \toprule
- & \textbf{Riesgo} & \textbf{Estado} & \textbf{Mitigación} \\
+\textbf{Observación} & \textbf{Cambio realizado} & \textbf{Dónde} \\
 \midrule
-R1 & Hardware de sensores no disponible & Activo & Emulador de nodo por software; el sensor físico demuestra el caso, el emulador la carga \\
-R2 & Sin acceso a partes interesadas & Activo & Escalar vía profesor guía; documentar el intento; fuentes secundarias \\
-R3 & Ambigüedad de fechas & \textbf{Cerrado} & Calendario oficial publicado el 24/08 \\
-R4 & Alcance excesivo & \textbf{Confirmado y controlado} & Núcleo comprometido vs.\ alcance condicional; revisión de holgura por etapa \\
-R5 & Protocolo inadecuado al patrón de uso & \textbf{Cerrado} & Se materializó y resolvió: Contact ID descartado el 02/09; el transporte es MQTT y el formato SenML (sección~\ref{sec:transporte}) \\
+Diagnóstico directo con la organización destinataria pendiente; sin percepción de las partes interesadas &
+Entrevistas semiestructuradas planificadas para las Etapas 2 y 3, aún no realizadas: contactos solicitados al profesor guía el 21/09 para dos perfiles (responsable de laboratorios de la Facultad; dirección de informática). Guion, registro e incorporación definidos en el repositorio; al realizarse habilitan la fuente [ENT] &
+OE1; §\ref{sec:levantamiento}; R2 \\
+Se alterna entre organizaciones de La Araucanía y la UCT como destinatario &
+El problema se centra solo en la UCT, con el campus como caso de validación; ninguna otra organización ha manifestado interés y la generalización queda fuera del alcance &
+§\ref{sec:problema}; resumen \\
+Causas respaldadas solo con la oferta comercial &
+Párrafo de evidencia: literatura sobre interoperabilidad y fragmentación (C1, C2), requisitos publicados del referente (C4), costos de operación cuantificados (C3); la evidencia directa se asigna al levantamiento &
+§\ref{sec:problema}; anexo~\ref{anx:evaluacion} \\
+OE1 fija el levantamiento al 4 de septiembre pero se declara pendiente &
+OE1 con plazo al 30 de octubre; la evidencia recogida antes del 4 de septiembre (indicaciones del profesor guía, mercado, base teórica) queda explicitada en §\ref{sec:levantamiento} y el catálogo se valida con las entrevistas &
+§\ref{sec:objetivos} \\
+Alcance funcional comprometido demasiado amplio &
+Criterio de demostración en dos niveles (§\ref{sec:backlog}): el núcleo mínimo demostrable primero, el resto contra holgura; OE4 reescrito en ese orden &
+OE4; §\ref{sec:backlog} \\
+OE5 sin umbrales de validación &
+OE5 con umbrales explícitos —casos de prueba, carga, latencia, detección de caída, recuperación, disponibilidad, memoria— tomados de los requerimientos no funcionales &
+OE5 \\
 \bottomrule
 \end{tabular}
-\caption{Registro de riesgos.}
-\label{tab:riesgos}
+\caption{Observaciones del profesor guía sobre la Etapa 1 y cambios derivados en esta versión.}
+\label{tab:retro}
 \end{table}
+
+\section{Riesgos}
+
+El registro de riesgos (cuadro~\ref{tab:riesgos}, anexo~\ref{anx:seguimiento}) mantiene cinco
+riesgos: dos cerrados (ambigüedad de fechas; protocolo inadecuado, materializado y resuelto con el
+pivote a MQTT y SenML), uno confirmado y controlado (alcance excesivo, tratado con el criterio de
+demostración en dos niveles), uno activo (hardware de sensores, mitigado con el emulador de nodo) y
+uno en tratamiento (acceso a partes interesadas, sección~\ref{sec:retro}).

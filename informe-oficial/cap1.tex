@@ -2,13 +2,21 @@
 \label{cap:intro}
 
 \section{Problema}
+\label{sec:problema}
 
-La Región de La Araucanía concentra actividad agrícola, agroindustrial y pymes con instalaciones
-dispersas donde el monitoreo remoto tiene valor operativo directo. Adquirir sensores dejó de ser la
-barrera: un nodo con radio cuesta entre 5 y 30 dólares y la banda de 915--928\,MHz es de uso libre
-en Chile. La dificultad se desplazó hacia el destino de los datos: el patrón dominante es la
-\textbf{telemetría continua} —lecturas cada 5 a 30 minutos— que debe recibirse, entenderse,
-almacenarse y vigilarse.
+\textbf{Organización destinataria.} La \textbf{Universidad Católica de Temuco} es la organización
+destinataria y dueña del problema —lo que la rúbrica denomina «propietario del proyecto» en el
+sentido de dueño del problema, no del trabajo—: dispone de sensores y requiere una plataforma donde
+registrarlos, monitorearlos y gestionar sus datos. El caso de validación es el \textbf{Campus Dr.\
+Luis Rivas del Canto}, sede de la Facultad de Ingeniería, donde en paralelo se despliega una red de
+sensores que esta plataforma recibirá y gestionará (sección~\ref{sec:frontera}). El problema se
+centra en esta organización; ninguna otra ha manifestado interés, y la eventual generalización a
+otras queda fuera del alcance de este trabajo.
+
+Adquirir sensores dejó de ser la barrera: un nodo con radio cuesta entre 5 y 30 dólares y la banda
+de 915--928\,MHz es de uso libre en Chile. La dificultad se desplazó hacia el destino de los datos:
+el patrón dominante es la \textbf{telemetría continua} —lecturas cada 5 a 30 minutos— que debe
+recibirse, entenderse, almacenarse y vigilarse.
 
 \begin{quote}
 \textbf{Problema central:} las organizaciones que ya poseen sensores no logran convertir los datos
@@ -26,24 +34,28 @@ recuerdo, en adelante se citan con un apodo: \textbf{C1 formatos}, \textbf{C2 ha
 
 \input{figuras/arbol}
 
-La \textbf{Universidad Católica de Temuco} es la organización destinataria y parte interesada
-principal —lo que la rúbrica denomina «propietario del proyecto» en el sentido de dueño del
-problema, no del trabajo—: dispone de sensores y requiere una plataforma donde registrarlos y monitorearlos. El caso de
-validación concreto es el \textbf{Campus Dr. Luis Rivas del Canto}, sede de la Facultad de
-Ingeniería, donde en paralelo se despliega una red de sensores que esta plataforma recibirá y
-gestionará (sección~\ref{sec:frontera}). El levantamiento directo con las partes interesadas está
-pendiente y es la acción prioritaria del período; la brecha se declara en lugar de omitirse.
+\textbf{Evidencia de las causas.} Más allá de la oferta comercial revisada en la sección
+siguiente, las causas se respaldan en tres fuentes. La literatura identifica la fragmentación de
+protocolos y formatos y la falta de interoperabilidad entre dispositivos y plataformas como uno de
+los obstáculos principales del Internet de las Cosas \parencite{alfuqaha2015,noura2019}, lo que
+sustenta C1 y C2. Los requisitos publicados de la plataforma abierta de referencia —4\,GB de memoria
+y configuración manual de cadenas de reglas y decodificadores— muestran la carga técnica que recae en
+la organización que la adopta (C4) \parencite{thingsboardmqtt}. Y la cuantificación de costos
+realizada en esta etapa (anexo~\ref{anx:evaluacion}) sitúa la operación propia en torno a CLP~6\,000
+mensuales frente a suscripciones cobradas por dispositivo (C3). La evidencia directa de la
+organización destinataria —necesidades, incidentes de pérdida de telemetría, dificultades de
+administración— es el objeto del levantamiento con partes interesadas, aún no realizado; su planificación se
+detalla en la sección~\ref{sec:retro}.
 
 \textbf{Delimitación.} El trabajo abarca la plataforma: recepción de tramas por MQTT y HTTP,
-normalización a un modelo interno, almacenamiento de series de tiempo, supervisión del estado de los
-dispositivos, alertas y panel de control, junto con el diseño de red y despliegue asociados. La
-electrónica de los nodos y la rama de radio LoRa corresponden al trabajo coordinado de un compañero;
-\textbf{la frontera contractual es el tópico MQTT} donde se publican las tramas
-(sección~\ref{sec:frontera}), y un emulador de nodo garantiza que la validación de esta plataforma
-no dependa del hardware. Quedan fuera la fabricación de sensores, la analítica predictiva y el
-despliegue productivo a escala.
+normalización a un modelo interno, series de tiempo, supervisión del estado de los dispositivos,
+alertas y panel, con el diseño de red y despliegue asociados. La electrónica de los nodos y la radio
+LoRa corresponden al trabajo coordinado de un compañero; \textbf{la frontera contractual es el tópico
+MQTT} (sección~\ref{sec:frontera}) y un emulador de nodo independiza la validación del hardware.
+Quedan fuera la fabricación de sensores, la analítica predictiva y el despliegue productivo a escala.
 
 \section{Estado del arte}
+\label{sec:estado-arte}
 
 \textbf{Oferta regional.} IoT3 \parencite{iot3web} y ControlTec \parencite{controltecweb} ofrecen
 monitoreo llave en mano acoplado a su propio hardware: un sensor ya instalado de otra marca no se
@@ -53,24 +65,16 @@ suscripción propios, orientadas a fruticultura de exportación. \textbf{SaaS in
 Ubidots y ThingSpeak cobran por dispositivo y alojan los datos fuera del país.
 
 \textbf{El referente de código abierto es ThingsBoard} \parencite{thingsboardmqtt}: plataforma IoT
-autoalojable con paneles, reglas y soporte MQTT/HTTP/CoAP. Se evaluó como posible base de este
-trabajo y se descartó con tres razones: exige recursos considerables (Java, 4\,GB o más de memoria
-recomendada), su configuración —cadenas de reglas, decodificadores de carga útil— requiere personal
-técnico que las organizaciones destinatarias no poseen (precisamente la causa C4), y su interfaz y
-documentación están en inglés. A ello se suma el licenciamiento: funciones centrales para este caso
-—las \emph{Platform Integrations}, incluida la integración con ChirpStack para la rama LoRa, y la
-personalización de marca— pertenecen a la \textbf{edición Professional, de pago}
-\parencite{thingsboardpe}. La edición Community permite conectar un servidor LoRaWAN de forma
-gratuita vía MQTT, pero configurando manualmente el puente, las cadenas de reglas y los
-decodificadores de carga útil: precisamente el trabajo técnico del que carecen las organizaciones
-destinatarias, con lo que la alternativa gratuita reintroduce la causa C4. Conviene notar que ThingsBoard aplica el mismo patrón de entrada que
-esta plataforma: exige su propio formato JSON (\texttt{\{"ts","values"\}}) en su tópico
-\texttt{v1/devices/me/telemetry}, y todo formato distinto requiere conversores
-\parencite{thingsboardmqtt}. La diferencia de este trabajo es que su contrato nativo es un
-\textbf{estándar IETF} y no un formato definido por el producto. Por último, el trío Node-RED +
-InfluxDB + Grafana permite prototipos de monitoreo, pero es un conjunto de piezas y no un producto:
-sin aprovisionamiento de dispositivos ni modelo de usuarios coherente, cada instalación resulta
-artesanal.
+autoalojable con paneles, reglas y soporte MQTT/HTTP/CoAP. Se evaluó como posible base y se descartó
+por tres razones: exige 4\,GB o más de memoria; su configuración —cadenas de reglas, decodificadores
+de carga útil, puente manual hacia un servidor LoRaWAN en la edición gratuita— requiere el personal
+técnico del que carece la organización destinataria (la causa C4), mientras que las integraciones
+listas para usar pertenecen a la edición Professional, de pago \parencite{thingsboardpe}; y su
+interfaz y documentación están en inglés. ThingsBoard aplica además el mismo patrón de entrada que
+esta plataforma —un formato JSON propio en un tópico fijo, con conversores para todo lo demás—; la
+diferencia es que aquí el contrato nativo es un \textbf{estándar IETF} y no un formato del producto.
+El trío Node-RED + InfluxDB + Grafana permite prototipos, pero es un conjunto de piezas sin
+aprovisionamiento de dispositivos ni modelo de usuarios: cada instalación resulta artesanal.
 
 Conviene además distinguir esta plataforma de un \textbf{panel de visualización simple}: mostrar en
 pantalla que las tramas llegan es una función de validación de una red de sensores, no el objeto de
@@ -85,6 +89,7 @@ telemetría continua. El análisis completo y las razones quedan documentados en
 anexo~\ref{anx:contactid} como evidencia del camino evaluado.
 
 \section{Objetivos}
+\label{sec:objetivos}
 \subsection{Objetivo general}
 \begin{itemize}
 \item Desarrollar una plataforma web para el registro, monitoreo y gestión de datos de sensores,
@@ -97,9 +102,9 @@ Dr. Luis Rivas del Canto de la Universidad Católica de Temuco al término del s
 \subsection{Objetivos específicos}
 \begin{itemize}
 \item \textbf{OE1} — Caracterizar la situación de gestión de datos de sensores en la organización
-destinataria, mediante entrevistas semiestructuradas, revisión de literatura y análisis de la oferta
-nacional e internacional, para obtener un catálogo de requerimientos íntegramente trazable a las
-causas del problema, al 4 de septiembre de 2026.
+destinataria, mediante revisión de literatura, análisis de la oferta existente y entrevistas
+semiestructuradas a las partes interesadas, para establecer un catálogo de requerimientos trazable a
+las causas del problema, al 30 de octubre de 2026.
 \item \textbf{OE2} — Evaluar y seleccionar el mecanismo de transporte y el formato de trama, y
 especificar el contrato de entrada con sus adaptadores y política de cuarentena, mediante matrices
 de criterios ponderados, para obtener el documento de especificación de la capa de recepción, al 2
@@ -108,49 +113,55 @@ de octubre de 2026.
 con costo cuantificado, mediante la fase \emph{Design} de PPDIOO y la comparación de al menos tres
 alternativas de alojamiento, para obtener los diagramas, el modelo y la recomendación justificada,
 al 2 de octubre de 2026.
-\item \textbf{OE4} — Implementar la plataforma —recepción por MQTT y HTTP, pipeline de
-normalización, almacenamiento, supervisión y panel—, mediante desarrollo incremental guiado por el
-backlog y versionado en git, para obtener un prototipo funcional con al menos dos vías de recepción
-operativas y un sensor real de extremo a extremo, al 4 de diciembre de 2026, con el 50\,\%
-verificable al 30 de octubre.
-\item \textbf{OE5} — Validar la plataforma en condiciones que replican el entorno operativo,
-mediante pruebas funcionales, de carga y de recuperación con comparaciones antes y después, para
-obtener un informe de validación que acredite el cumplimiento de los requerimientos, al 4 de
-diciembre de 2026.
+\item \textbf{OE4} — Implementar la plataforma, mediante desarrollo incremental, para obtener
+primero el \textbf{núcleo mínimo demostrable} —recepción por MQTT, normalización, supervisión de
+caída y consulta básica— con un sensor real de extremo a extremo al 30 de octubre de 2026, y luego
+la entrada HTTP, las alertas y el panel de control al 4 de diciembre de 2026.
+\item \textbf{OE5} — Validar la plataforma en un servidor de recursos modestos, mediante pruebas
+funcionales, de carga y de recuperación, para obtener un informe de validación contra los umbrales
+de los requerimientos no funcionales —al menos 15 casos de prueba con el 90\,\% aprobados; 50
+mensajes por segundo sin pérdida; latencia de recepción a consulta de 2 segundos o menos en el
+percentil 95; caída detectada en a lo más dos intervalos de reporte; recuperación automática sin
+perder mensajes confirmados; disponibilidad de la recepción del 99\,\% o más, medida en una ventana
+continua de 72 horas; memoria total de 2\,GB o menos (RNF-01 a RNF-06 y RNF-17)—, al 4 de diciembre
+de 2026.
 \end{itemize}
+
+Los hitos intermedios, las metas numéricas y la evidencia de cada objetivo se detallan en la
+documentación del repositorio y en el seguimiento del capítulo~\ref{cap:metodologia}; el
+cuadro~\ref{tab:trazabilidad} resume el producto verificable de cada uno y su trazabilidad.
 
 \begin{table}[H]
 \centering\footnotesize
-\begin{tabular}{@{}L{4.4cm}L{2.2cm}L{1.5cm}L{2.6cm}C{1.0cm}@{}}
+\begin{tablaseg}
+\begin{tabular}{@{}L{2.9cm}L{3.5cm}L{1.9cm}L{1.3cm}L{2.2cm}C{0.9cm}@{}}
 \toprule
-\textbf{Objetivo} & \textbf{Causas} & \textbf{Efectos} & \textbf{Fase PPDIOO} & \textbf{Etapa} \\
+\textbf{Objetivo} & \textbf{Producto verificable} & \textbf{Causas} & \textbf{Efectos} & \textbf{Fase PPDIOO} & \textbf{Etapa} \\
 \midrule
-OE1 Caracterizar y levantar & C4 (diagnostica C1--C5) & E1, E3 & Prepare & 1 \\
-OE2 Contrato de recepción & \textbf{C1} & E2, E5 & Plan, Design & 2 \\
-OE3 Arquitectura y despliegue & C2, C3, C5 & E1, E4, E5 & Design, Plan & 2 \\
-OE4 Implementar la plataforma & C1, C2, C4 & E1--E3 & Implement & 3, 4 \\
-OE5 Validar en entorno realista & C5 & E4 & Operate, Optimize & 4 \\
+OE1 Caracterizar & Catálogo de requerimientos con fuente por ítem (anexo~\ref{anx:requerimientos}); registros de entrevista & C4 (diagnostica C1--C5) & E1, E3 & Prepare & 1, 3 \\
+OE2 Contrato de recepción & Especificación del contrato: tópico, SenML, adaptadores, cuarentena (cap.~\ref{cap:especificacion}) & \textbf{C1} & E2, E5 & Plan, Design & 2 \\
+OE3 Arquitectura y despliegue & Vistas C4, ER y UML; recomendación de alojamiento con costo (cap.~\ref{cap:diseno}) & C2, C3, C5 & E1, E4, E5 & Design, Plan & 2 \\
+OE4 Implementar & Prototipo en repositorio: núcleo mínimo y luego segundo nivel & C1, C2, C4 & E1--E3 & Implement & 3, 4 \\
+OE5 Validar & Informe de validación contra los umbrales & C5 & E4 & Operate, Optimize & 4 \\
 \bottomrule
 \end{tabular}
-\caption{Matriz de trazabilidad. Las cinco causas y los cinco efectos quedan cubiertos por al menos
-un objetivo.}
+\end{tablaseg}
+\caption{Matriz de trazabilidad: producto verificable de cada objetivo, causas y efectos que ataca,
+fase y etapa. Las cinco causas y los cinco efectos quedan cubiertos por al menos un objetivo.}
 \label{tab:trazabilidad}
 \end{table}
 
 \section{Autoría y licenciamiento}
 
-Este trabajo de título, su documentación y el código de la plataforma son de \textbf{autoría de
-Vicente Ricardo Ramírez Oñate}. La universidad es la organización destinataria del producto, no la
-titular de la obra. Es decisión del autor publicar el resultado bajo una licencia abierta al término
-del trabajo; la licencia concreta se fija en la Etapa 2 junto con el modelo de despliegue.
+Este trabajo, su documentación y el código son de \textbf{autoría de Vicente Ricardo Ramírez Oñate};
+la universidad es la organización destinataria del producto, no la titular de la obra. La licencia
+de publicación se decidirá antes de liberar el resultado, evaluando opciones que permitan el uso
+abierto e impidan el aprovechamiento comercial por terceros sin acuerdo con el autor.
 
 \section{Estructura del documento}
 
-El capítulo~\ref{cap:antecedentes} establece los antecedentes técnicos. El
-capítulo~\ref{cap:especificacion} presenta el análisis de requerimientos, las evaluaciones de
-transporte y formato, y la arquitectura de recepción. El capítulo~\ref{cap:diseno} —nuevo en esta
-etapa— describe el diseño de la plataforma desde varias vistas (contenedores, datos, red y seguridad,
-comportamiento, tiempo y despliegue), con las decisiones justificadas y su trazabilidad a los
-requerimientos. El capítulo~\ref{cap:metodologia} expone la metodología, la planificación y el
-seguimiento del backlog. Los anexos contienen el catálogo completo de requerimientos, el backlog, el
-detalle de las evaluaciones y la evidencia del camino descartado.
+Antecedentes técnicos (cap.~\ref{cap:antecedentes}); requerimientos y evaluaciones
+(cap.~\ref{cap:especificacion}); diseño desde varias vistas, nuevo en esta etapa
+(cap.~\ref{cap:diseno}); metodología, seguimiento y retroalimentación incorporada
+(cap.~\ref{cap:metodologia}); anexos con el catálogo, el backlog, las evaluaciones, figuras
+complementarias y el camino descartado.

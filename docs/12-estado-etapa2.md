@@ -1,6 +1,6 @@
-# Estado de la Etapa 2 — corte al 10 de septiembre de 2026
+# Estado de la Etapa 2 — corte al 21 de septiembre de 2026
 
-> Entrega: viernes 2 de octubre de 2026 (quedan 22 días). Fase PPDIOO: *Design* (con implementación
+> Entrega: viernes 2 de octubre de 2026 (quedan 11 días), según la pauta oficial del 17 de agosto. Fase PPDIOO: *Design* (con implementación
 > inicial adelantada). Este documento se actualiza en cada corte; la bitácora guarda el detalle diario.
 
 ## 1. Qué evalúa la Etapa 2 y cómo vamos
@@ -8,7 +8,7 @@
 | Criterio de la rúbrica | Peso | Estado | Qué falta para el puntaje completo |
 |---|---|---|---|
 | Diseña según estándares de calidad | **55 %** | 🟢 avanzado | Diagramas en notación reconocida (C4, UML, ER) generados desde una fuente única e **integrados en el capítulo 4 «Diseño de la plataforma»** del informe (borrador completo, 30 págs. de cuerpo); falta pulir redacción e incorporar la retroalimentación |
-| Incorpora la retroalimentación | 20 % | ⚪ bloqueado | Sin retroalimentación aún del profesor guía sobre la Etapa 1. Al llegar: registrar cada observación → cambio concreto (bitácora + informe) |
+| Incorpora la retroalimentación | 20 % | 🟢 en curso | Recibida el 21/09 (Etapa 1: 6,0). Seis observaciones → seis cambios en el informe (cap. 5 §5.5, cuadro) y en docs/01, 02, 04; bitácora del 21/09. Falta ejecutar las entrevistas, que es la observación 1 |
 | Avanza en el diseño según backlog | 10 % | 🟢 avanzado | Ver §3: ítems de diseño de la Etapa 2 casi cerrados; queda TT-26 (recomendación de despliegue) |
 | Documenta en repositorio | 15 % | 🟢 cumplido | Commits descriptivos, docs/07–12, bitácora, READMEs. Mantener el ritmo |
 
@@ -39,11 +39,11 @@ implementando solo lo que **sustente el diseño** (API de consulta, que demuestr
 | TT-02 | Inicializar el proyecto TypeScript + NestJS con estructura de módulos correspondiente a M1–M8 | M | 4 | ✅ | backend NestJS con módulos M1, M2, M4, M5, M6 |
 | TT-03 | Configurar verificación automática: tipos, formato y ejecución de pruebas | S | 3 | ✅ | `pnpm verificar`: tsc + ESLint (typescript-eslint, reglas con tipos) + 19 pruebas jest de las funciones puras; guardianes de concordancia en `verificar-todo.sh` |
 | TT-04 | Documentar el procedimiento de puesta en marcha en el repositorio | M | 1 | ✅ | READMEs de plataforma y backend |
-| TT-05 | Diagrama de arquitectura de componentes, con los ocho módulos y sus dependencias | M | 5 | ✅ | vista de contenedores C4 (fig. 4.1) |
-| TT-06 | Diagrama de topología de red con segmentación de dispositivos IoT (RNF-09) y sentido de las conexiones (RNF-10) | M | 6 | ✅ | topología de red (fig. 4.3) |
-| TT-07 | Modelo de datos entidad-relación con al menos ocho entidades | M | 6 | ✅ | ER de 13 entidades generado desde la base (fig. 4.2) |
-| TT-08 | Diagrama de flujo de recepción, desde la recepción hasta la persistencia, para los tres transportes | M | 4 | ✅ | secuencia del pipeline (fig. 4.5) |
-| TT-09 | Diagrama de secuencia del aprovisionamiento de un dispositivo nuevo | M | 3 | ✅ | secuencia de aprovisionamiento (fig. 4.4) |
+| TT-05 | Diagrama de arquitectura de componentes, con los ocho módulos y sus dependencias | M | 5 | ✅ | vista de contenedores C4 (cap. 4) |
+| TT-06 | Diagrama de topología de red con segmentación de dispositivos IoT (RNF-09) y sentido de las conexiones (RNF-10) | M | 6 | ✅ | topología de red (anexo de figuras complementarias) |
+| TT-07 | Modelo de datos entidad-relación con al menos ocho entidades | M | 6 | ✅ | ER de 13 entidades generado desde la base (cap. 4) |
+| TT-08 | Diagrama de flujo de recepción, desde la recepción hasta la persistencia, para los tres transportes | M | 4 | ✅ | secuencia del pipeline (cap. 4) |
+| TT-09 | Diagrama de secuencia del aprovisionamiento de un dispositivo nuevo | M | 3 | ✅ | secuencia de aprovisionamiento (anexo de figuras complementarias) |
 | TT-10 | Registro de decisiones de diseño con su justificación | M | 2 | ✅ | tablas de decisiones en el cap. 4 y bitácora |
 | TT-11 | Esquema del modelo interno y contrato del tópico MQTT (nombres, unidades, identidad) | M | 3 | ✅ | docs/08, docs/10 §1; tópico sitio/·/dispositivo/·/magnitud |
 | TT-12 | Catálogo de tipos de sensor y unidades aceptadas, con umbrales de disparo y restauración | M | 6 | 🟡 | 5 magnitudes con rango; ampliar con los sensores reales |
@@ -120,6 +120,6 @@ falla si informe, docs y base difieren. Sin dibujos a mano: sin solapes ni colum
 | Semana | Foco | Entregable |
 |---|---|---|
 | 9–14 sep | ~~API de consulta~~ ✅ · ~~capítulo de diseño~~ ✅ (borrador completo, 30 págs.) · **TT-24/25/26 alojamiento y costos** · TT-13 OpenAPI · escribir a profesor guía y compañero | `docs/14-despliegue-y-costos.md`; correos enviados |
-| 15–21 sep | Incorporar la retroalimentación (20 %); pulir informe | informe v2 |
-| 22–28 sep | Aprovisionamiento por API (M3); pulir informe; **visita presencial a Temuco para mostrar avances** (a coordinar con el profesor guía) | demostración en vivo del pipeline |
-| 29 sep–2 oct | Revisión final, compilación, entrega | PDF Etapa 2 |
+| 15–21 sep | ~~Actualización del sistema, laboratorio de entrega (sesión persistente e idempotencia), lectura crítica hasta 4.1~~ ✅ · **retroalimentación recibida el 21/09 e incorporada** | informe v2 (30 págs.) |
+| 22–28 sep | **Entrevistas** si llegan los contactos · terminar la lectura crítica (4.2 → anexos) · ensayar la demostración · autoevaluación del núcleo | registro de la primera entrevista |
+| 29 sep–2 oct | Incorporar la entrevista si ocurrió (fuente [ENT]); revisión final; compilación; **entrega oficial el viernes 2 de octubre** | PDF Etapa 2 |

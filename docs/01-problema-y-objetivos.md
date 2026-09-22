@@ -162,11 +162,11 @@ específicos que explicitan qué se hace, mediante qué método y con qué resul
 
 | | Objetivo | Método | Resultado verificable | Plazo |
 |---|---|---|---|---|
-| **OE1** | Caracterizar la situación de gestión de datos de sensores en la organización destinataria y establecer los requerimientos | Entrevistas semiestructuradas, revisión de literatura y análisis de la oferta nacional e internacional | Catálogo de requerimientos 100 % trazable a las causas del problema; ≥ 2 entrevistas; ≥ 6 competidores analizados | 4 sep 2026 |
+| **OE1** | Caracterizar la situación de gestión de datos de sensores en la organización destinataria y establecer sus requerimientos | Revisión de literatura, análisis de la oferta nacional e internacional y entrevistas semiestructuradas a las partes interesadas | **Hito 1 (cumplido):** catálogo preliminar 100 % trazable a las causas, con fuentes secundarias e indicaciones del profesor guía. **Hito 2:** catálogo validado con ≥ 2 entrevistas documentadas (participantes, necesidades, problemas actuales, prioridades), la primera dentro de la Etapa 2 | 4 sep 2026 / 30 oct 2026 |
 | **OE2** | Evaluar y seleccionar el mecanismo de transporte y el formato de trama, y especificar el contrato de entrada y sus adaptadores | Matrices de criterios ponderados con nombre legible (≥ 5 transportes, ≥ 4 formatos); especificación del contrato | Documento de especificación: tópicos, esquema de trama, política de cuarentena y adaptadores | 2 oct 2026 |
 | **OE3** | Diseñar la arquitectura de la plataforma, su modelo de datos y su despliegue con costo cuantificado | Fase *Design* de PPDIOO, notaciones estándar; comparación de ≥ 3 alternativas de alojamiento | ≥ 5 diagramas; modelo de datos ≥ 8 entidades; costo mensual y anual en CLP y USD | 2 oct 2026 |
-| **OE4** | Implementar la plataforma: recepción MQTT y HTTP, pipeline de normalización, almacenamiento, supervisión y panel | Desarrollo incremental guiado por el backlog, versionado en git | 50 % de tareas al 30 oct y 100 % al 4 dic; ≥ 2 vías de recepción operativas; ≥ 1 sensor real de extremo a extremo | 30 oct / 4 dic 2026 |
-| **OE5** | Validar la plataforma en condiciones que replican el entorno operativo | Pruebas funcionales, de carga y de recuperación; comparaciones antes/después | ≥ 15 casos de prueba, ≥ 90 % aprobados; ≥ 50 mensajes/s sin pérdida; detección de dispositivo caído ≤ 2 intervalos | 4 dic 2026 |
+| **OE4** | Implementar la plataforma en dos niveles: **núcleo mínimo demostrable** (recepción MQTT, normalización, supervisión de caída, consulta básica por API) y luego HTTP, alertas y panel | Desarrollo incremental guiado por el backlog, versionado en git; el segundo nivel se ejecuta contra la holgura verificada al cierre de cada etapa | Núcleo mínimo con ≥ 1 sensor real de extremo a extremo al 30 oct; segundo nivel al 4 dic | 30 oct / 4 dic 2026 |
+| **OE5** | Validar la plataforma en condiciones que replican el entorno operativo (servidor modesto, no el equipo de desarrollo) | Pruebas funcionales, de carga y de recuperación; comparaciones antes/después; protocolo escrito antes de medir (`docs/09`) | ≥ 15 casos de prueba con ≥ 90 % aprobados · ≥ 50 mensajes/s sin pérdida (RNF-01) · latencia recepción→consulta ≤ 2 s p95 (RNF-02) · caída detectada ≤ 2 intervalos (RNF-03) · recuperación automática tras reinicio sin perder mensajes confirmados (RNF-05/06) · disponibilidad de la recepción ≥ 99 % en 7 días · memoria total ≤ 2 GB (RNF-17) | 4 dic 2026 |
 
 ## 2.4 Matriz de trazabilidad
 
@@ -206,3 +206,26 @@ Las cinco causas y los cinco efectos quedan cubiertos.
 
 **Siguiente documento:** `docs/02-requerimientos.md` (criterio 3, 45 % de la etapa) y
 `historico/docs/05-protocolo-contactid.md` (evaluación de alternativas que sustenta OE2).
+
+---
+
+## Retroalimentación del profesor guía incorporada (21 de septiembre de 2026)
+
+Seis observaciones sobre la Etapa 1 (`bitacora/2026-09-21-retroalimentacion-etapa1.md`) produjeron
+estos cambios en este documento y en el informe:
+
+1. **Destinatario único.** La Universidad Católica de Temuco es la organización destinataria y dueña del
+   problema; el Campus Dr. Luis Rivas del Canto es el caso de validación. El problema se centra **solo en la
+   UCT**: ninguna otra organización ha manifestado interés. La sección «Relevancia regional» de este
+   documento queda como antecedente histórico de la motivación; en el informe no forma parte del problema
+   y la generalización se menciona una vez, como fuera de alcance, en la conclusión.
+2. **Evidencia de las causas** más allá de la oferta comercial: literatura revisada por pares sobre
+   interoperabilidad y fragmentación en IoT (Al-Fuqaha et al., 2015, *IEEE Communications Surveys &
+   Tutorials*; Noura, Atiquzzaman y Gaedke, 2019, *Mobile Networks and Applications*) para C1 y C2;
+   requisitos publicados del referente abierto para C4; costos de operación cuantificados (`docs/14`) para
+   C3. La evidencia directa de la organización es el objeto del levantamiento.
+3. **OE1 en dos hitos** (tabla §2.3), con la evidencia recogida antes del 4/09 explicitada.
+4. **OE4 en dos niveles**: núcleo mínimo demostrable primero.
+5. **OE5 con umbrales**, todos tomados de los RNF ya catalogados.
+6. **Levantamiento programado**: perfiles, guion y registro en `docs/03`; contactos gestionados vía
+   profesor guía.

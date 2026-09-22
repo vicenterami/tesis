@@ -1,37 +1,33 @@
 \chapter{Conclusiones de la etapa}
 
-\textbf{Sobre el diseño.} La etapa cumplió su propósito: la plataforma quedó descrita desde varias
-vistas con notaciones reconocidas —C4 para los contenedores, entidad-relación para los datos,
-secuencias UML para el comportamiento— y cada decisión de diseño está justificada y trazada a los
-requerimientos que materializa (capítulo~\ref{cap:diseno}). Dos rasgos distinguen este diseño de un
-panel de visualización: el pipeline de seis filtros con cuarentena, que garantiza que ninguna trama
-llega a las series sin autenticarse, analizarse, validarse y normalizarse, y el modelo interno único,
-que hace indistinguibles una trama LoRaWAN y una Wi-Fi una vez superado el filtro de análisis.
+\textbf{Sobre el diseño.} La plataforma quedó descrita desde varias vistas con notaciones reconocidas
+—C4, entidad-relación, secuencias UML— y cada decisión está justificada y trazada a los requerimientos
+que materializa (capítulo~\ref{cap:diseno}). Dos rasgos la distinguen de un panel de visualización: el
+pipeline de seis filtros con cuarentena, que impide que una trama llegue a las series sin autenticarse,
+analizarse, validarse y normalizarse, y el modelo interno único, que hace indistinguibles una trama
+LoRaWAN y una Wi-Fi una vez superado el filtro de análisis.
 
-\textbf{Sobre la implementación adelantada.} El backlog ubicaba el pipeline, la normalización de
-marcas de tiempo, la autenticación de la recepción y los umbrales en la Etapa~3; están implementados y
-verificados en la Etapa~2, junto con la API de consulta. Ese adelanto no se logró recortando diseño,
-sino al revés: implementar temprano obligó a tomar decisiones de diseño que en el papel habrían quedado
-ambiguas —la unicidad de una condición por regla, la plausibilidad del reloj de un nodo, la
-serialización uniforme de instantes— y a corregir el esquema con migraciones antes de que hubiera datos
-reales.
+\textbf{Sobre la implementación adelantada.} El pipeline, la normalización de marcas de tiempo, la
+autenticación de la recepción, los umbrales y la API de consulta, previstos para la Etapa~3, están
+implementados y verificados. Implementar temprano obligó a tomar decisiones que en el papel habrían
+quedado ambiguas —la unicidad de una condición por regla, la plausibilidad del reloj de un nodo, la
+entrega «al menos una vez» con inserción idempotente— y a corregir el esquema con migraciones antes de
+que hubiera datos reales. El núcleo mínimo demostrable acotado tras la retroalimentación ya existe.
 
-\textbf{Sobre la concordancia.} Se adoptó un método que evita que informe, documentación y sistema se
-separen: las figuras del capítulo de diseño se generan desde la documentación versionada y, el modelo de
-datos, desde el esquema real de la base; un guion de verificación falla si alguno de los tres difiere.
-El método ya detectó y corrigió cinco discrepancias entre el modelo documentado y el implementado, y una
-numeración de módulos inconsistente. La documentación deja de ser una descripción que envejece y pasa a
-ser una proyección del sistema.
+\textbf{Sobre la concordancia.} Las figuras de diseño se generan desde la documentación versionada y,
+el modelo de datos, desde el esquema real de la base; una verificación automática falla si informe,
+documentación o sistema difieren. El método detectó y corrigió cinco discrepancias entre el modelo
+documentado y el implementado. La documentación deja de envejecer: es una proyección del sistema.
 
-\textbf{Sobre la ligereza como argumento.} El consumo medido en reposo de la base de datos y el broker
-es inferior a 100~MB, y la suma de los techos de recursos de los cinco contenedores es de 1,95~GB; el
-referente de código abierto exige al menos 4~GB para arrancar. La comparación formal queda para el
-banco de pruebas de la Etapa~4, con un protocolo escrito antes de medir para que no favorezca a la
-plataforma propia.
+\textbf{Sobre la ligereza.} El consumo medido en reposo de base de datos y broker es inferior a
+100~MB, y la suma de techos de los cinco contenedores es de 1,95~GB frente a los 4~GB que exige el
+referente. La comparación formal queda para el banco de pruebas de la Etapa~4, con protocolo escrito
+antes de medir.
 
-\textbf{Lo pendiente.} La retroalimentación de la Etapa~1 no se recibió durante esta etapa; cuando
-llegue, cada observación se registrará con el cambio concreto que motive. El formato real de las tramas
-del compañero aún no se ha fijado: el adaptador correspondiente acepta nombres de campo tolerantes y se
-cerrará con la primera trama real. Las entrevistas con partes interesadas siguen siendo la brecha
-declarada desde la Etapa~1. La Etapa~3 concentra el aprovisionamiento por API, la identidad de usuarios,
-la entrada HTTP, el cifrado del transporte y las pruebas automatizadas del contrato de trama.
+\textbf{Sobre la retroalimentación y lo pendiente.} Las seis observaciones del profesor guía sobre la
+Etapa~1 se tradujeron en cambios concretos (sección~\ref{sec:retro}): destinatario único, evidencia
+de las causas, OE1 en dos hitos, alcance en dos niveles y umbrales de validación en OE5. La brecha que
+persiste es el levantamiento directo con las partes interesadas, ahora programado y gestionado vía
+profesor guía. El formato real de las tramas del compañero se fijará con la primera trama en octubre.
+Generalizar la plataforma a otras organizaciones queda fuera del alcance de este trabajo. La Etapa~3 concentra las entrevistas, el aprovisionamiento por API, la identidad de usuarios, la
+entrada HTTP, el cifrado del transporte y las pruebas automatizadas del contrato de trama.

@@ -45,6 +45,11 @@ Cada requerimiento declara su origen. Se emplean cuatro tipos de fuente, con dis
 > obtenerlas, los requerimientos marcados **[PO]** se sustentan en la indicación transmitida por el
 > profesor guía, no en el levantamiento directo. **Esta brecha se declara explícitamente en lugar de
 > disimularla**, y su cierre es la acción prioritaria de la Etapa 1.
+>
+> **Actualización 21/09/2026:** el profesor guía pidió realizar y documentar las entrevistas de inmediato.
+> Plan: dos perfiles (responsable de laboratorios de la Facultad; dirección de informática), contactos
+> solicitados al profesor guía, primera entrevista dentro de la Etapa 2 y catálogo validado al 30/10 (OE1,
+> hito 2). Guion y registro: `docs/03` §2 y §3. Detalle: `bitacora/2026-09-21-retroalimentacion-etapa1.md`.
 
 ## 1.2 Convención de identificación
 
@@ -200,6 +205,19 @@ Clasificados según las características de calidad de **ISO/IEC 25010**.
 | **RNF-02** | El tiempo desde la recepción de un evento hasta su disponibilidad para consulta debe ser **≤ 2 segundos** en el percentil 95 | Medición instrumentada | [DP] | **M** |
 | **RNF-03** | El sistema debe **detectar la pérdida de supervisión** de un dispositivo en **≤ 2 intervalos** de reporte configurados | Prueba funcional con nodo silenciado | [PO] | **M** |
 | **RNF-04** | Una consulta de historial de 30 días de un dispositivo debe responder en **≤ 3 segundos** | Medición con volumen sintético | [DP] | **S** |
+
+> **Fundamento de las cifras (agregado el 21/09/2026 tras la retroalimentación).** La carga del caso de
+> validación es de 50 canales que reportan cada 5 minutos: 50 / 300 s ≈ **0,17 lecturas por segundo**,
+> unas 14 400 al día y 5,3 millones al año (`docs/14`). **RNF-01 (50 mensajes/s)** es una meta de estrés
+> unas 300 veces mayor que esa carga: equivale a 15 000 canales a 5 minutos, o a que los 50 canales del
+> campus reenvíen una cola acumulada tras una caída de red. Se fija para demostrar holgura en el servidor
+> de referencia (2 vCPU y 4 GB, `docs/14`), no para describir la operación normal; Mosquitto y
+> PostgreSQL sostienen órdenes de magnitud más en ese hardware, así que la cifra es conservadora respecto
+> de la capacidad y exigente respecto del caso. **RNF-02 (≤ 2 s en el percentil 95)**: el percentil 95 es
+> la convención habitual para metas de latencia (el 5 % peor se excluye para no medir picos aislados); los
+> 2 segundos salen del panel en tiempo real, donde una lectura debe aparecer antes de la siguiente
+> actualización visible. Ambas cifras son estimaciones nuestras de la Etapa 1 y se **miden** en la Etapa 4
+> (TT-29) con el emulador de nodo publicando a tasa creciente y contando filas guardadas y perdidas.
 
 ## 3.2 Fiabilidad
 
