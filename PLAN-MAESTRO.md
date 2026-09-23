@@ -15,7 +15,7 @@ datos de sensores; caso de validación: Campus Dr. Luis Rivas del Canto de la UC
 **Enunciado en una frase:**
 
 > Una plataforma abierta (sin costo de licencia) que permite a organizaciones que **ya poseen
-> sensores** heterogéneos —LoRa/LoRaWAN, WiFi, MQTT— **ingerir, normalizar, gestionar y explotar**
+> sensores** de distintos fabricantes —LoRa/LoRaWAN, WiFi, MQTT— **recibir, normalizar, gestionar y explotar**
 > sus datos a través de un **protocolo de comunicación unificado basado en Contact ID (SIA DC-05)**,
 > diseñado bajo la metodología **PPDIOO**.
 

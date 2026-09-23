@@ -34,18 +34,16 @@ recuerdo, en adelante se citan con un apodo: \textbf{C1 formatos}, \textbf{C2 ha
 
 \input{figuras/arbol}
 
-\textbf{Evidencia de las causas.} Más allá de la oferta comercial revisada en la sección
-siguiente, las causas se respaldan en tres fuentes. La literatura identifica la fragmentación de
-protocolos y formatos y la falta de interoperabilidad entre dispositivos y plataformas como uno de
-los obstáculos principales del Internet de las Cosas \parencite{alfuqaha2015,noura2019}, lo que
-sustenta C1 y C2. Los requisitos publicados de la plataforma abierta de referencia —4\,GB de memoria
-y configuración manual de cadenas de reglas y decodificadores— muestran la carga técnica que recae en
-la organización que la adopta (C4) \parencite{thingsboardmqtt}. Y la cuantificación de costos
-realizada en esta etapa (anexo~\ref{anx:evaluacion}) sitúa la operación propia en torno a CLP~6\,000
-mensuales frente a suscripciones cobradas por dispositivo (C3). La evidencia directa de la
-organización destinataria —necesidades, incidentes de pérdida de telemetría, dificultades de
-administración— es el objeto del levantamiento con partes interesadas, aún no realizado; su planificación se
-detalla en la sección~\ref{sec:retro}.
+\textbf{Evidencia de las causas.} Más allá de la oferta comercial revisada en la sección siguiente,
+las causas se respaldan en tres fuentes. La literatura revisa la fragmentación de protocolos y
+formatos como uno de los desafíos centrales del Internet de las Cosas \parencite{alfuqaha2015} y
+documenta que la falta de interoperabilidad y la dependencia de proveedor impiden su adopción a gran
+escala \parencite{noura2019}, lo que sustenta C1, C2 y C3. Los requisitos publicados del referente
+abierto —4\,GB de memoria y configuración manual de reglas y decodificadores— muestran la carga
+técnica que recae en quien lo adopta (C4) \parencite{thingsboardmqtt}, y la cuantificación de costos
+de esta etapa (anexo~\ref{anx:evaluacion}) sitúa la operación propia en $\approx$CLP~6\,000
+mensuales frente a suscripciones por dispositivo. La evidencia directa —necesidades, incidentes,
+dificultades de administración— es el objeto del levantamiento, aún no realizado (§\ref{sec:retro}).
 
 \textbf{Delimitación.} El trabajo abarca la plataforma: recepción de tramas por MQTT y HTTP,
 normalización a un modelo interno, series de tiempo, supervisión del estado de los dispositivos,
@@ -102,9 +100,9 @@ Dr. Luis Rivas del Canto de la Universidad Católica de Temuco al término del s
 \subsection{Objetivos específicos}
 \begin{itemize}
 \item \textbf{OE1} — Caracterizar la situación de gestión de datos de sensores en la organización
-destinataria, mediante revisión de literatura, análisis de la oferta existente y entrevistas
-semiestructuradas a las partes interesadas, para establecer un catálogo de requerimientos trazable a
-las causas del problema, al 30 de octubre de 2026.
+destinataria, mediante revisión de literatura, análisis de la oferta existente y al menos dos entrevistas
+semiestructuradas documentadas (participantes, necesidades, prioridades), para validar un catálogo
+de requerimientos trazable a las causas del problema, al 30 de octubre de 2026.
 \item \textbf{OE2} — Evaluar y seleccionar el mecanismo de transporte y el formato de trama, y
 especificar el contrato de entrada con sus adaptadores y política de cuarentena, mediante matrices
 de criterios ponderados, para obtener el documento de especificación de la capa de recepción, al 2
@@ -123,7 +121,7 @@ de los requerimientos no funcionales —al menos 15 casos de prueba con el 90\,\
 mensajes por segundo sin pérdida; latencia de recepción a consulta de 2 segundos o menos en el
 percentil 95; caída detectada en a lo más dos intervalos de reporte; recuperación automática sin
 perder mensajes confirmados; disponibilidad de la recepción del 99\,\% o más, medida en una ventana
-continua de 72 horas; memoria total de 2\,GB o menos (RNF-01 a RNF-06 y RNF-17)—, al 4 de diciembre
+continua de 72 horas; memoria total de 2\,GB o menos (RNF-01 a RNF-06, RNF-17 y RNF-18)—, al 4 de diciembre
 de 2026.
 \end{itemize}
 

@@ -3,10 +3,11 @@
 # `%u` se sustituye por el nombre del usuario conectado: así UNA regla sirve para
 # todos los dispositivos y ninguno puede publicar en el tópico de otro.
 
-# El backend lee todo lo que publican los dispositivos y puede enviarles órdenes.
+# El backend lee todo lo que publican los dispositivos. El envío de órdenes al dispositivo
+# (downlink) está fuera de alcance (docs/02 §4.3, Won't); si se implementa, el backend NO debe
+# suscribirse a ese mismo tópico o sus propias órdenes le volverían como tramas.
 user backend
 topic read  sitio/#
-topic write sitio/+/dispositivo/+/orden
 
 # Sonda del healthcheck: solo estadísticas internas del broker.
 user sonda
@@ -15,4 +16,3 @@ topic read $SYS/#
 # Todos los dispositivos: cada uno publica SOLO bajo su propio nombre de usuario,
 # que coincide con su id físico (RF-40, RF-41). Patrón: sitio/<sitio>/dispositivo/<id>/<magnitud>
 pattern write sitio/+/dispositivo/%u/+
-pattern read  sitio/+/dispositivo/%u/orden

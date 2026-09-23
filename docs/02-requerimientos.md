@@ -106,7 +106,7 @@ pero su valor demostrativo es alto.
 | **RF-12** | El sistema debe mantener **condiciones abiertas y cerradas** por dispositivo: el cruce de umbral abre la condición y la vuelta al rango la cierra | [BT] | C1, C5 | **M** |
 | **RF-13** | El sistema debe **generar eventos por umbral** cuando una medición cruce un límite configurado | [PO] | C1 | **M** |
 | **RF-14** | El sistema debe permitir **configurar umbrales de disparo y de restauración por dispositivo**, con banda de histéresis para evitar oscilación | [BT] | C5 | **S** |
-| **RF-15** | El sistema debe **correlacionar eventos con telemetría** mediante la tripleta de identidad `(ACCT, GG, CCC)` y la marca temporal, para reconstruir el contexto de un evento | [DP] | C1 | **S** |
+| **RF-15** | El sistema debe **correlacionar eventos con telemetría** mediante el identificador del dispositivo (`bn` / `id_fisico`) y la marca temporal, para reconstruir el contexto de un evento | [DP] | C1 | **S** |
 | **RF-16** | El sistema debe **normalizar las marcas temporales** a un huso único, tolerando que el nodo no disponga de reloj confiable y usando la hora de recepción cuando corresponda | [BT] | C1 | **M** |
 | **RF-17** | El sistema debe **resolver la identidad del dispositivo** desde los metadatos del transporte cuando el mensaje no la incluya explícitamente | [DP] | C1 | **M** |
 
@@ -115,8 +115,8 @@ pero su valor demostrativo es alto.
 | ID | Requerimiento | Fuente | Causa | Prior. |
 |---|---|---|---|:---:|
 | **RF-18** | El sistema debe mantener un **inventario de dispositivos** con tipo, ubicación, sitio, zona lógica, transporte de llegada y estado | [PO] | C4, C5 | **M** |
-| **RF-19** | El sistema debe permitir **registrar un dispositivo nuevo** asignándole su tripleta `(ACCT, GG, CCC)` sin intervenir la consola del servidor de red | [PO] [EM] | C4 | **M** |
-| **RF-20** | El sistema debe **rechazar el registro** de un dispositivo cuya tripleta ya exista, y advertir cuando el espacio de direcciones de un sitio se agote | [BT] | C1 | **S** |
+| **RF-19** | El sistema debe permitir **registrar un dispositivo nuevo** asignándole su identificador físico, credencial y canales, sin intervenir la consola del servidor de red | [PO] [EM] | C4 | **M** |
+| **RF-20** | El sistema debe **rechazar el registro** de un dispositivo cuyo identificador físico ya exista | [BT] | C1 | **S** |
 | **RF-21** | El sistema debe permitir **agrupar dispositivos por sitio y por zona lógica**, y presentar la vista agrupada | [PO] | C4 | **M** |
 | **RF-22** | El sistema debe permitir **marcar un dispositivo en mantenimiento**, suprimiendo sus alertas y dejando registro del período | [BT] | C5 | **C** |
 | **RF-23** | El sistema debe registrar **quién realizó cada cambio de configuración de un dispositivo y cuándo** | [BT] | C5 | **S** |
@@ -129,7 +129,7 @@ pero su valor demostrativo es alto.
 | **RF-25** | El sistema debe **detectar la restauración** del dispositivo y cerrar la condición, registrando la duración de la interrupción | [BT] | C5 | **M** |
 | **RF-26** | El sistema debe registrar la **última vez que se recibió** comunicación de cada dispositivo | [PO] | C5 | **M** |
 | **RF-27** | El sistema debe **presentar la calidad del enlace** por dispositivo (RSSI, SNR y porcentaje de recepción) cuando el transporte la provea | [BT] | C5 | **M** |
-| **RF-28** | El sistema debe **procesar eventos de batería baja** (código 384) y exponer los dispositivos que requieren mantenimiento | [PO] [BT] | C5 | **M** |
+| **RF-28** | El sistema debe **procesar lecturas de batería bajo el umbral configurado** (magnitud `bateria`) y exponer los dispositivos que requieren mantenimiento | [PO] [BT] | C5 | **M** |
 | **RF-29** | El sistema debe **aprovechar el *keep-alive* y el *Last Will* de MQTT** como evidencia de conexión y aviso inmediato de desconexión | [BT] | C5 | **M** |
 | **RF-30** | El sistema debe presentar un **indicador agregado de salud por sitio**: total de dispositivos, en línea, con condición abierta y sin supervisión | [PO] | C4, C5 | **M** |
 
@@ -261,6 +261,7 @@ es realmente multiprotocolo: es monoprotocolo con excepciones.
 | **RNF-14** | El sistema debe poder **desplegarse completo en un único servidor** con recursos modestos, sin dependencia de servicios propietarios de nube | Despliegue verificado en máquina local | [PO] | **M** |
 | **RNF-15** | El sistema debe construirse **exclusivamente con componentes de código abierto**, sin licencias de pago | Inventario de dependencias | [PO] | **M** |
 | **RNF-17** | La plataforma completa (broker, base de datos, backend, interfaz y, de existir, el servidor de red) debe **operar en un servidor de 2 GB de memoria**, por debajo de las exigencias del referente comercial | Medición de consumo en reposo y bajo carga en la Etapa 4 | [DP] [EM] | **M** |
+| **RNF-18** | La recepción debe tener una **disponibilidad ≥ 99 %** en una ventana continua de 72 horas (≤ 43 min de indisponibilidad) — agregado 22/09/2026 tras la retroalimentación (observación 6), umbral de OE5 que no tenía RNF de respaldo | Emulador publicando cada minuto en el banco de pruebas de la Etapa 4; se cuentan las ventanas sin confirmación | [DP] | **M** |
 | **RNF-16** | La trama nativa debe cumplir **SenML (RFC 8428)**; la rama LoRa, de concretarse, debe caber en el payload disponible del plan regional | Validación de esquema + verificación de tamaño | [BT] | **M** |
 
 **Justificación de RNF-14 y RNF-15.** Provienen directamente de la indicación del propietario del
@@ -548,4 +549,4 @@ funcionamiento en navegador móvil (RF-52). Las alternativas a evaluar serán ma
 | 6 Evaluación de alternativas | ✅ Completo. 6.5 resuelto con la experiencia del desarrollador confirmada; 6.6 diferido a la Etapa 2 |
 | 7 Restricciones y supuestos | ✅ Completo |
 
-**Total catalogado: 68 requerimientos**, frente al mínimo de 20 comprometido en OE1.
+**Total catalogado: 70 requerimientos**, frente al mínimo de 20 comprometido en OE1.

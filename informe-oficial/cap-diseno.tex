@@ -173,7 +173,7 @@ un orquestador: complejidad y costo sin retorno a esta escala.
 
 \section{Trazabilidad con los requerimientos}
 
-Cada elemento de diseño de este capítulo materializa requerimientos concretos del catálogo: el doble punto de entrada TLS responde a RNF-08 a RNF-10; los adaptadores del filtro de análisis a RF-01, RF-02 y RF-04; la cuarentena a RF-11 a RF-13; el supervisor periódico a RF-22, RF-24 y RF-25; la credencial de un solo vistazo con ACL a RF-40 a RF-42; el histórico agregado y el WebSocket a RF-29, RNF-04 y RNF-17. El cuadro~\ref{tab:trazabilidad-diseno} (anexo~\ref{anx:evaluacion}) presenta la correspondencia completa.
+Cada elemento de diseño de este capítulo materializa requerimientos concretos del catálogo: el doble punto de entrada TLS responde a RNF-08 a RNF-10; los adaptadores del filtro de análisis a RF-01, RF-02 y RF-04; la cuarentena a RF-05 y RF-07; el supervisor periódico a RF-24 a RF-26; la credencial de un solo vistazo con ACL a RF-40 a RF-42; el histórico agregado y el WebSocket a RF-33 y RNF-04. RF-29 queda pendiente: el backend aún no publica \emph{Last Will}. El cuadro~\ref{tab:trazabilidad-diseno} (anexo~\ref{anx:evaluacion}) presenta la correspondencia completa.
 
 El diseño se acompaña de una \textbf{verificación automática en tres capas} que se ejecuta con un solo comando y sin base ni broker: comprobación estricta de tipos, análisis estático con reglas que usan la información de tipos (por ejemplo, promesas sin esperar) y pruebas unitarias de las funciones puras del pipeline (plausibilidad del reloj, conversión de unidades, adaptadores). Cada prueba documenta una regla de diseño en forma ejecutable; lo que depende de la pila (esquema, migraciones, API y figuras) lo cubre un verificador de concordancia aparte.
 

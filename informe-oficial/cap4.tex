@@ -20,9 +20,9 @@ de septiembre, 2 de octubre, 30 de octubre y 4 de diciembre, con $\sim$240 horas
 \section{Backlog y verificación de viabilidad}
 \label{sec:backlog}
 
-El backlog contiene \textbf{65 elementos} —25 historias de usuario y 40 tareas técnicas en 14 épicas—
+El backlog contiene \textbf{63 elementos} —25 historias de usuario y 38 tareas técnicas en 14 épicas—
 estimados en horas ideales y reformulados tras el pivote del 2 de septiembre hacia el contrato SenML y
-el pipeline (núcleo demostrativo $\sim$155 h; anexo~\ref{anx:backlog}).
+el pipeline (núcleo demostrativo 165 h; anexo~\ref{anx:backlog}).
 
 \begin{quote}
 \textbf{Criterio de demostración, en dos niveles.} El \textbf{núcleo mínimo demostrable} —prioridad
@@ -34,12 +34,12 @@ alertas por umbral, panel de control y exportación en formato abierto— se eje
 verificada al cierre de cada etapa.
 \end{quote}
 
-La verificación numérica de las estimaciones mostró que \textbf{el backlog completo ($\sim$272 h)
-excede el presupuesto y el núcleo demostrativo ($\sim$155 h) cabe con holgura} ($\sim$+35\,\%). Por
-eso \textbf{el compromiso es el núcleo} y los 32 elementos restantes son alcance condicional: la pauta
+La verificación numérica de las estimaciones mostró que \textbf{el backlog completo (275 h) excede
+el presupuesto (201 h) y el núcleo demostrativo (165 h) cabe con holgura} (+18\,\%). Por eso
+\textbf{el compromiso es el núcleo} y los 30 elementos restantes son alcance condicional: la pauta
 mide el avance como porcentaje de tareas completadas, y comprometer lo que no se ejecutará bajaría
-ese porcentaje por debajo del umbral. La distribución temporal también se corrigió, trasladando
-$\sim$37 horas de la Etapa 3 a la Etapa 4 para cumplir el 50\,\% exigido al 30 de octubre.
+ese porcentaje por debajo del umbral. La distribución temporal también se corrigió, trasladando horas
+de la Etapa 3 a la Etapa 4 para cumplir el 50\,\% exigido al 30 de octubre.
 
 \section{Seguimiento del backlog en la Etapa 2}
 \label{sec:seguimiento}
@@ -56,14 +56,15 @@ problemas, la delimitación, la trazabilidad, la separación núcleo/condicional
 alternativas, y señaló seis puntos por mejorar. El cuadro~\ref{tab:retro} indica el cambio hecho por
 cada uno y dónde queda; la transcripción íntegra está en la bitácora del repositorio.
 
-\begin{table}[!tb]
+\begin{table}[H]
 \centering\footnotesize
+\begin{tablaseg}
 \begin{tabular}{@{}L{4.1cm}L{6.0cm}L{2.5cm}@{}}
 \toprule
 \textbf{Observación} & \textbf{Cambio realizado} & \textbf{Dónde} \\
 \midrule
 Diagnóstico directo con la organización destinataria pendiente; sin percepción de las partes interesadas &
-Entrevistas semiestructuradas planificadas para las Etapas 2 y 3, aún no realizadas: contactos solicitados al profesor guía el 21/09 para dos perfiles (responsable de laboratorios de la Facultad; dirección de informática). Guion, registro e incorporación definidos en el repositorio; al realizarse habilitan la fuente [ENT] &
+Entrevistas semiestructuradas planificadas para las Etapas 2 y 3, aún no realizadas: contactos solicitados al profesor guía el 22/09 para dos perfiles (responsable de laboratorios de la Facultad; dirección de informática). Guion, registro e incorporación definidos en el repositorio; al realizarse habilitan la fuente [ENT] &
 OE1; §\ref{sec:levantamiento}; R2 \\
 Se alterna entre organizaciones de La Araucanía y la UCT como destinatario &
 El problema se centra solo en la UCT, con el campus como caso de validación; ninguna otra organización ha manifestado interés y la generalización queda fuera del alcance &
@@ -82,6 +83,7 @@ OE5 con umbrales explícitos —casos de prueba, carga, latencia, detección de 
 OE5 \\
 \bottomrule
 \end{tabular}
+\end{tablaseg}
 \caption{Observaciones del profesor guía sobre la Etapa 1 y cambios derivados en esta versión.}
 \label{tab:retro}
 \end{table}

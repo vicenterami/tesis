@@ -8,8 +8,8 @@
 | Criterio de la rúbrica | Peso | Estado | Qué falta para el puntaje completo |
 |---|---|---|---|
 | Diseña según estándares de calidad | **55 %** | 🟢 avanzado | Diagramas en notación reconocida (C4, UML, ER) generados desde una fuente única e **integrados en el capítulo 4 «Diseño de la plataforma»** del informe (borrador completo, 30 págs. de cuerpo); falta pulir redacción e incorporar la retroalimentación |
-| Incorpora la retroalimentación | 20 % | 🟢 en curso | Recibida el 21/09 (Etapa 1: 6,0). Seis observaciones → seis cambios en el informe (cap. 5 §5.5, cuadro) y en docs/01, 02, 04; bitácora del 21/09. Falta ejecutar las entrevistas, que es la observación 1 |
-| Avanza en el diseño según backlog | 10 % | 🟢 avanzado | Ver §3: ítems de diseño de la Etapa 2 casi cerrados; queda TT-26 (recomendación de despliegue) |
+| Incorpora la retroalimentación | 20 % | 🟢 en curso | Recibida el 21/09 (Etapa 1: 6,0). Seis observaciones → seis cambios en el informe (cap. 5 §5.4, cuadro) y en docs/01, 02, 04; bitácora del 21/09. Contactos para entrevistas solicitados el 22/09; falta realizarlas, que es la observación 1 |
+| Avanza en el diseño según backlog | 10 % | 🟢 avanzado | Ver §3: 18/22 ítems de la Etapa 2 hechos, 4 parciales (TT-12, TT-15, HU-01, TT-35); TT-26 ya está hecho |
 | Documenta en repositorio | 15 % | 🟢 cumplido | Commits descriptivos, docs/07–12, bitácora, READMEs. Mantener el ritmo |
 
 **Prioridad para la nota, en orden:** (1) informe de la Etapa 2 con los diagramas y el diseño
@@ -29,7 +29,7 @@ implementando solo lo que **sustente el diseño** (API de consulta, que demuestr
 | Adaptadores: SenML (nativo) y plano | ✅ | 2 lecturas de un pack SenML; Kelvin → Celsius |
 | Rotación de credenciales probada | ✅ | claves viejas rechazadas, nuevas aceptadas |
 
-## 3. Seguimiento del backlog (corte 10 de septiembre)
+## 3. Seguimiento del backlog (corte 21 de septiembre)
 
 **Etapa 2 planificada: 22 ítems, 84 h.** Hechos: 18 (64 h) · parciales: 4 · pendientes: 0.
 

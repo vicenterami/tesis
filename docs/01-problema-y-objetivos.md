@@ -1,7 +1,8 @@
-> ⚠️ **ACTUALIZADO AL PIVOTE DEL 02/09/2026.** Título nuevo: *Plataforma web para el registro,
-> monitoreo y gestión de sensores en La Araucanía*. Se descartó Contact ID (ver
-> `bitacora/2026-09-02-reunion-pivote.md` y `docs/06`); el eje es la telemetría continua y el
-> pipeline de recepción y normalización de tramas. El árbol de causas y efectos sigue vigente.
+> ⚠️ **ACTUALIZADO AL PIVOTE DEL 02/09/2026 Y A LA RETROALIMENTACIÓN DEL 21/09/2026.** Título vigente:
+> *Plataforma web para el registro, monitoreo y gestión de datos de sensores* (sin alcance regional en
+> el título: la UCT es la única organización destinataria, ver §1.1 y la actualización al final). Se
+> descartó Contact ID (ver `bitacora/2026-09-02-reunion-pivote.md` y `docs/06`); el eje es la telemetría
+> continua y el pipeline de recepción y normalización de tramas. El árbol de causas y efectos sigue vigente.
 
 # Etapa 1 — Definición del problema y objetivos
 
@@ -16,21 +17,23 @@
 
 ## 1.1 Contexto
 
-La Región de La Araucanía concentra actividad agrícola, agroindustrial y de pequeñas y medianas
-empresas productivas. En los últimos años la adopción de sensores para monitoreo —temperatura en
-cámaras de frío e invernaderos, nivel en estanques, consumo eléctrico, apertura de accesos, humedad
-de suelo— dejó de ser una barrera económica: un nodo sensor con radio de largo alcance cuesta entre
-USD 5 y 30, y las bandas de radio de uso libre (915–928 MHz en Chile, plan AU915) no requieren
-licencia de espectro.
+La Universidad Católica de Temuco es la organización destinataria y dueña del problema: dispone de
+sensores en el Campus Dr. Luis Rivas del Canto y no tiene dónde recibir sus datos ni cómo
+administrarlos (§1.6). El contexto regional —La Araucanía concentra actividad agrícola, agroindustrial
+y pequeñas y medianas empresas donde la adopción de sensores dejó de ser una barrera económica (un
+nodo con radio de largo alcance cuesta entre USD 5 y 30, bandas 915–928 MHz sin licencia de espectro)—
+es la motivación y el ámbito de generalización posible, **no el problema que este trabajo valida**
+(actualización del 21/09, ver el final de este documento).
 
 El resultado es que **la barrera se desplazó**. Ya no está en adquirir el sensor, sino en qué hacer
 con lo que el sensor emite.
 
 ## 1.2 Enunciado del problema central
 
-> **Las organizaciones que ya poseen sensores IoT no logran convertir los datos que estos generan en
-> información utilizable, porque carecen de una plataforma que unifique la ingesta, la normalización
-> y la gestión de dispositivos que se comunican mediante tecnologías y formatos distintos entre sí.**
+> **La UCT, que ya posee sensores IoT en el Campus Dr. Luis Rivas del Canto, no logra convertir los
+> datos que estos generan en información utilizable, porque carece de una plataforma que unifique la
+> recepción, la normalización y la gestión de dispositivos que se comunican mediante tecnologías y
+> formatos distintos entre sí.**
 
 Formulado desde la perspectiva del afectado: *«tengo los sensores instalados y funcionando, pero no
 tengo dónde recibir sus datos, ni cómo administrarlos, ni cómo saber si siguen reportando».*
@@ -42,7 +45,7 @@ tengo dónde recibir sus datos, ni cómo administrarlos, ni cómo saber si sigue
 | **C1** | **Fragmentación de protocolos y formatos** | Cada fabricante define su propio esquema de datos. Un sensor LoRaWAN entrega una trama binaria propietaria; uno WiFi publica un JSON con nombres de campo arbitrarios; otro expone una API REST distinta. No existe vocabulario común entre ellos. |
 | **C2** | **Acoplamiento entre hardware y plataforma** | La oferta comercial regional vende solución cerrada llave en mano: el panel funciona con el hardware del propio proveedor. Un sensor ya instalado de otra marca no se integra. |
 | **C3** | **Costo y dependencia de plataformas SaaS comerciales** | Las alternativas de mercado cobran licencia por dispositivo o por volumen de datos, y alojan la información en infraestructura de terceros fuera del control de la organización. |
-| **C4** | **Ausencia de capacidad técnica interna** | Construir la capa de ingesta, normalización y almacenamiento requiere competencias de redes, protocolos y desarrollo que las organizaciones destinatarias no tienen internamente. |
+| **C4** | **Ausencia de capacidad técnica interna** | Construir la capa de recepción, normalización y almacenamiento requiere competencias de redes, protocolos y desarrollo que la organización destinataria no tiene internamente. |
 | **C5** | **Falta de visibilidad del estado de la conectividad** | Sin una capa de gestión, no se detecta que un sensor dejó de reportar, que su batería se agotó o que el enlace de radio se degradó. El silencio de un sensor es indistinguible de la ausencia de novedades. |
 
 ## 1.4 Efectos observables
@@ -63,9 +66,9 @@ tengo dónde recibir sus datos, ni cómo administrarlos, ni cómo saber si sigue
                     └──────────────────────▲──────────────────────┘
                                            │
         ┌──────────────────────────────────┴──────────────────────────────────┐
- PROBLEMA│ Quien ya posee sensores heterogéneos no puede convertir sus datos  │
- CENTRAL │ en información utilizable: falta una plataforma que unifique la    │
-        │ ingesta, la normalización y la gestión de dispositivos.             │
+ PROBLEMA│ Quien ya posee sensores de distintos fabricantes no puede convertir │
+ CENTRAL │ sus datos en información utilizable: falta una plataforma que      │
+        │ unifique la recepción, la normalización y la gestión de dispositivos│
         └──────────────────────────────────▲──────────────────────────────────┘
                                            │
                     ┌──────────────────────┴──────────────────────┐
@@ -88,8 +91,9 @@ reunión del 17 de agosto de 2026, constituye la solicitud que origina el proyec
 > interesadas** —la rúbrica lo exige literalmente— mediante entrevistas al responsable de los
 > sensores de la universidad. Ver sección 1.6.
 
-**Relevancia regional.** La estructura productiva de La Araucanía —predios agrícolas dispersos,
-agroindustria, pymes con instalaciones distribuidas— genera condiciones donde el monitoreo remoto
+**Relevancia regional (motivación, no objeto de validación — ver actualización del 21/09).** La
+estructura productiva de La Araucanía —predios agrícolas dispersos, agroindustria, pymes con
+instalaciones distribuidas— genera condiciones donde el monitoreo remoto
 tiene valor operativo directo, y donde los sensores de largo alcance y bajo consumo son técnicamente
 apropiados.
 
@@ -117,7 +121,7 @@ de proponer un formato nuevo.
 | **Universidad Católica de Temuco** | Propietaria del proyecto | Enviar los datos de sus sensores a una API y administrarlos | ⚠️ Entrevista pendiente |
 | **Responsable técnico de los sensores** | Usuario administrador | Saber qué dispositivos hay, si reportan y cómo incorporar uno nuevo | ⚠️ Por identificar |
 | **Usuario operativo** | Consumidor de la información | Consultar mediciones y recibir alertas | ⚠️ Por identificar |
-| **Pymes productivas de la región** | Beneficiario potencial | Aprovechar sensores ya adquiridos sin rehacer la inversión | Caracterización indirecta vía análisis de oferta |
+| Pymes productivas de la región *(contexto regional, fuera de la validación desde el 21/09)* | Generalización posible | Aprovechar sensores ya adquiridos sin rehacer la inversión | No se valida en este trabajo |
 | **Profesor guía (Mario)** | Supervisor académico | Rigor metodológico y enfoque en redes | Reunión del 17/08/2026 registrada en `bitacora/` |
 
 > 🔴 **Acción crítica de la semana:** identificar y entrevistar al responsable de los sensores de la

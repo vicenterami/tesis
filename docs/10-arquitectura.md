@@ -295,11 +295,14 @@ destruir y recrear sin perder nada, lo que simplifica actualizaciones y pruebas.
 |---|---|
 | Un punto de entrada TLS para máquinas (8883) y otro para personas (443) | RNF-08, RNF-09, RNF-10 |
 | Adaptadores por origen (filtro 2) | RF-01, RF-02, RF-04 (recepción multiprotocolo) |
-| Cuarentena separada de las series | RF-11, RF-12, RF-13 |
-| Supervisor periódico de `sin_comunicacion` | RF-22, RF-24, RF-25 |
+| Cuarentena separada de las series | RF-05, RF-07 |
+| Supervisor periódico de `sin_comunicacion` | RF-24, RF-25, RF-26 |
 | Credencial de un solo vistazo + ACL por dispositivo | RF-40, RF-41, RF-42 |
-| Histórico agregado con `time_bucket` + WS del backend | RF-29, RNF-04, RNF-17 |
+| Histórico agregado con `time_bucket` + WS del backend | RF-33, RNF-04 |
 | Límites de recursos por contenedor | RNF-17, protocolo de validación |
+
+> **Pendiente:** RF-29 (keep-alive y *Last Will* de MQTT) no está trazado porque el cliente MQTT del
+> backend aún no publica testamento (`will`); queda como brecha declarada hasta implementarlo (Etapa 3).
 
 ## 8. Pendiente
 

@@ -9,7 +9,7 @@ Plataforma web (dashboard) para **gestionar la conectividad de una flota de sens
 
 El aporte no está en mostrar el dato del sensor (eso ya lo hace la competencia), sino en la **capa de administración de red**: qué dispositivos existen, por qué red llegan, si el enlace está sano, y cómo se incorpora uno nuevo de forma segura. Es la vista del administrador TI, no la del operario que mira una temperatura.
 
-**Una frase para defenderla:** *una plataforma que permite a un administrador de TI ver, aprovisionar y diagnosticar la conectividad de sensores heterogéneos —LoRa, WiFi, remotos— bajo criterios de entorno de producción: segmentación, seguridad y monitoreo del enlace.*
+**Una frase para defenderla:** *una plataforma que permite a un administrador de TI ver, aprovisionar y diagnosticar la conectividad de sensores de distintos fabricantes —LoRa, WiFi, remotos— bajo criterios de entorno de producción: segmentación, seguridad y monitoreo del enlace.*
 
 ## Contexto académico
 

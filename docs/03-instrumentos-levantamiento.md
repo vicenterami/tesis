@@ -90,7 +90,7 @@ Un archivo por entrevista: `bitacora/AAAA-MM-DD-entrevista-<rol>.md`
 | `docs/02` §1.1 | Habilitar `[ENT]`; reasignar los requerimientos con respaldo directo; agregar los nuevos |
 | `docs/01` | Citas como validación de relevancia; estado del levantamiento → realizado |
 | Informe cap. 1 §1.1 | El párrafo de evidencia deja de decir «aún no realizado» y cita lo recogido |
-| Informe cap. 3 §3.1 y cap. 5 §5.5 | Fuente `[ENT]` habilitada; fila 1 del cuadro de retroalimentación → realizada |
+| Informe cap. 3 §3.1 y cap. 5 §5.4 | Fuente `[ENT]` habilitada; fila 1 del cuadro de retroalimentación → realizada |
 | `bitacora/` | El registro completo |
 
 ## 5. Si no se consiguen antes del 2 de octubre

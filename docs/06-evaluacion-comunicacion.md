@@ -100,7 +100,7 @@ son RFCs) son **públicos y gratuitos** — al contrario que los estándares SIA
 
 ```json
 [
-  {"bn":"urn:dev:mac:a4cf12ff001a:", "bt":1756857600},
+  {"bn":"urn:dev:ow:10e2073a01080063", "bt":1756857600},
   {"n":"temperatura", "u":"Cel",  "v":23.4},
   {"n":"humedad",     "u":"%RH",  "v":67},
   {"n":"bateria",     "u":"%EL",  "v":87}

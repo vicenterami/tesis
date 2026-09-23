@@ -4,7 +4,8 @@ import mqtt, { MqttClient } from 'mqtt';
 
 export type ManejadorTrama = (topico: string, carga: Buffer) => void | Promise<void>;
 
-// Conexión única al broker como usuario "backend" (ACL: lee sitio/#, escribe sitio/+/dispositivo/+/orden).
+// Conexión única al broker como usuario "backend" (ACL: lee sitio/#). El envío de órdenes al
+// dispositivo (downlink) está fuera de alcance (docs/02 §4.3).
 // El resto de la aplicación no toca MQTT directamente: se registra como "manejador" y recibe
 // cada trama con su tópico. Así el transporte queda aislado del pipeline (M1 → M2).
 @Injectable()

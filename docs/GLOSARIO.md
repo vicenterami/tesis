@@ -163,7 +163,7 @@ Quien se suscribe a `sitio/temuco/#` recibe **todo** lo de ese sitio, sin saber 
 > y tú traduces ese aviso al código 381 de Contact ID. Está en tu tabla de mapeo.
 
 **En tu proyecto:** MQTT es cómo ChirpStack te entrega los datos de LoRa, y también una de las tres
-vías de ingesta directa. **Mosquitto** es el broker que vas a usar: la implementación de MQTT más
+vías de recepción directa. **Mosquitto** es el broker que vas a usar: la implementación de MQTT más
 liviana y madura.
 
 ## 3.2 ChirpStack — el cerebro de la red LoRaWAN
