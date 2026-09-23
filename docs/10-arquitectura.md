@@ -31,7 +31,7 @@ flowchart TB
         subgraph BE["Backend · NestJS"]
             direction LR
             M1["M1 Recepción<br/>suscriptor MQTT"] --> M2["M2 Normalización<br/>pipeline de 6 filtros"]
-            M2 --> M4["M4 Supervisión<br/>de salud"] --> M6["M6 Alertas<br/>umbrales, condiciones"]
+            M2 --> M6["M6 Alertas<br/>umbrales, condiciones"] --> M4["M4 Supervisión<br/>de salud"]
             M5["M5 Persistencia y consulta<br/>API REST + WebSocket"]
         end
         DB[("TimescaleDB<br/>series de tiempo + tablas relacionales")]
@@ -165,8 +165,8 @@ sequenceDiagram
     participant F2 as 2 Analizar (adaptador)
     participant F3 as 3 Validar
     participant F4 as 4 Normalizar
-    participant F5 as 5 Supervisar
-    participant F6 as 6 Alertar
+    participant F5 as 5 Alertar
+    participant F6 as 6 Supervisar
     participant DB as TimescaleDB
     participant Q as Cuarentena
 
@@ -187,15 +187,15 @@ sequenceDiagram
                 F3->>F4: lecturas válidas
                 F4->>F4: convierte unidad, ajusta marca de tiempo (sin reloj → hora de recepción)
                 F4->>DB: INSERT medicion (hypertable)
-                F4->>F5: lecturas normalizadas
-                F5->>DB: UPDATE visto_por_ultima_vez · cierra condición "sin_comunicacion" si estaba abierta
-                F5->>F6: lecturas + reglas de umbral del canal
+                F4->>F5: cada lectura guardada + reglas de umbral de su canal
                 alt cruza umbral (con histéresis)
-                    F6->>DB: abre/cierra condicion, INSERT evento
-                    F6-->>MQ: notifica (WS al panel · correo si configurado)
+                    F5->>DB: abre/cierra condicion, INSERT evento
+                    Note right of F5: notifica al panel (tiempo real) y por correo si está configurado
                 end
             end
         end
+        F1->>F6: trama cerrada: el dispositivo autenticado se comunicó (aunque sus lecturas hayan ido a cuarentena)
+        F6->>DB: UPDATE visto_por_ultima_vez · cierra condición "sin_comunicacion" si estaba abierta
     end
 ```
 
@@ -217,7 +217,7 @@ está. Los dos problemas se registran por separado: el silencio, como condición
 el formato inválido, en `cuarentena` con su motivo (ver la propuesta de §8 para convertirlo también
 en condición, en lugar de acumular filas).
 
-**Un supervisor aparte, por tiempo:** el filtro 5 solo corre cuando *llega* una trama. Para detectar
+**Un supervisor aparte, por tiempo:** el filtro 6 solo corre cuando *llega* una trama. Para detectar
 el caso contrario —un dispositivo que **dejó de** transmitir— hay una tarea periódica (cada minuto)
 que compara `visto_por_ultima_vez` contra `intervalo_esperado_s` y abre la condición
 `sin_comunicacion`. Sin ella, un sensor caído sería invisible.
@@ -262,6 +262,16 @@ sequenceDiagram
 El histórico viene **agregado por la base de datos** (`time_bucket`), no crudo: el navegador recibe
 cientos de puntos, no millones, sin importar cuánto tiempo lleve el sensor transmitiendo.
 
+**El canal de tiempo real es del backend y está autenticado** (decidido el 23/09/2026; TT-39). Corre
+dentro del mismo 443 detrás del proxy (`wss`, nunca `ws`), se abre con la misma sesión del panel y se
+rechaza en el apretón de manos si falta; el backend valida la cabecera `Origin` contra el dominio del
+panel y limita el tamaño y la tasa de lo que recibe. Son las recomendaciones de OWASP para WebSocket,
+que no trae autenticación propia (`docs/11 §4`). Como el canal es casi unidireccional —el servidor
+empuja, el navegador solo elige qué canal mira—, la alternativa **SSE** (*Server-Sent Events*: HTTP
+unidireccional, reconexión nativa, sin biblioteca extra) es más simple y cabe en el mismo 443.
+**WebSocket frente a SSE queda como decisión abierta para la Etapa 3** (§8.3); ninguna de las dos
+toca el broker.
+
 ## 6. Vista de despliegue (Docker Compose)
 
 ```mermaid
@@ -302,6 +312,25 @@ respaldo cubre todo, y la extensión TimescaleDB no interfiere (ChirpStack solo 
 `hstore`, presentes en la imagen). Redis sí es propio: ChirpStack lo exige y es pequeño (~10 MB).
 El backend **no guarda estado**: se puede
 destruir y recrear sin perder nada, lo que simplifica actualizaciones y pruebas.
+
+**Dónde escucha el backend** (decidido el 23/09/2026; el código sigue a este texto). Fuera de Docker,
+en desarrollo, escucha solo en `127.0.0.1` (variable `HTTP_INTERFAZ`, valor por defecto). Dentro del
+contenedor escucha en todas las interfaces **del contenedor** (`HTTP_INTERFAZ=0.0.0.0`), que es la
+única forma de que el proxy lo alcance por la red interna. Eso no lo expone: el servicio no lleva
+`ports`, y Docker solo hace alcanzables los puertos de un contenedor desde el anfitrión y desde los
+contenedores de su misma red; desde fuera del servidor esa dirección no existe. La conexión a la base
+y al broker usa el nombre del servicio (`DB_HOST=timescaledb`, `MQTT_URL=mqtt://mosquitto:1883`,
+`.env.example`).
+
+**Escalado.** Una sola instancia del backend, a propósito. Con `clientId` fijo y sesión persistente el
+broker conserva la cola mientras el backend está caído (§4.1); dos instancias con el mismo
+identificador se desconectarían mutuamente, y con identificadores distintos recibirían ambas todas las
+tramas. Dentro del servidor no hace falta más: Node delega la entrada y salida al núcleo del sistema,
+que sí es multihilo, y la carga de RNF-01 (50 eventos/s) se medirá en el banco de pruebas de `docs/09`
+sobre esta única instancia. Si algún día hiciera falta repartir carga entre varias, el camino
+documentado es: suscripciones compartidas de MQTT 5 (`$share/<grupo>/sitio/#`, admitidas por
+Mosquitto) para que las instancias se repartan las tramas, y `cluster` o `worker_threads` de Node para
+ocupar más núcleos. No está en el alcance: RNF-17 fija un servidor de 2 GB y RNF-14 un único servidor.
 
 ## 7. Trazabilidad con los requerimientos
 
@@ -380,15 +409,17 @@ ventana, días de retención), el texto exacto del aviso al operador y si notifi
 en el panel. Entra en la Etapa 3, después del Dockerfile y del proxy. Al aprobarse: primero este
 documento y el diagrama, después el código (regla de concordancia).
 
-### 8.2 Numeración de los filtros 5 y 6 (propuesta, 23/09/2026)
+### 8.2 Numeración de los filtros 5 y 6 (decidido el 23/09/2026)
 
-El diagrama numera *5 supervisar* y *6 alertar*, pero la ejecución es la inversa: las alertas se
-evalúan por cada lectura guardada, dentro del bucle, y la supervisión cierra la trama una sola vez al
-final (§4). Propuesta: intercambiar los números —**5 alertar, 6 supervisar**— para que el diagrama
-describa la secuencia real, manteniendo los seis filtros y los módulos M4 y M6 sin cambio. Afecta este
-documento, el diagrama Mermaid, el capítulo de diseño, los comentarios del backend y su README.
-Alternativa si se prefiere no tocar la numeración: dejarla y explicar la granularidad en cada lugar,
-como ya se hace en §4. **Decisión del estudiante.**
+Hasta el 23/09 el diagrama numeraba *5 supervisar* y *6 alertar*, pero la ejecución es la inversa: las
+alertas se evalúan por cada lectura guardada, dentro del bucle, y la supervisión cierra la trama una
+sola vez al final (§4). **Decisión: intercambiar los números —5 alertar, 6 supervisar— para que el
+diagrama describa la secuencia real**, manteniendo los seis filtros y los módulos M4 y M6 sin cambio.
+Aplicado en este documento y su diagrama, el capítulo de diseño (vía la figura generada), los
+comentarios del backend, su README y la evaluación de comunicación (`docs/06`). En la misma revisión se
+detectó que el código **no** marcaba vivo al dispositivo cuando la trama caía en cuarentena por formato
+(el filtro 2 cortaba el pipeline), en contra de lo que dice §4; se corrigió el código para que siga al
+diseño (regla de concordancia): tras autenticar, el filtro 6 corre siempre.
 
 ### 8.3 Pendientes
 
@@ -396,4 +427,6 @@ como ya se hace en §4. **Decisión del estudiante.**
       (filtro 2) — ver bitácora de acuerdos.
 - [ ] Decidir el proxy inverso definitivo (Caddy por TLS automático vs. Nginx por familiaridad y por
       traer limitador de tasa nativo; Caddy no hace TLS para MQTT sin módulo externo).
-- [ ] Dockerfile del backend y su servicio en el compose (hoy solo corren dos contenedores).
+- [ ] Dockerfile del backend y su servicio en el compose (hoy solo corren dos contenedores): requiere
+      `HTTP_INTERFAZ` (§6) y `DB_HOST`/`MQTT_URL` por nombre de servicio (`.env.example`).
+- [ ] Decidir WebSocket o SSE para el canal de tiempo real (§5) antes de implementar TT-39 (Etapa 3).

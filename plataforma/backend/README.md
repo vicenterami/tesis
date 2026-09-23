@@ -10,8 +10,8 @@ src/
 ├── app.module.ts              # módulo raíz: junta los demás
 ├── db/db.module.ts            # pool de conexiones a TimescaleDB (SQL directo, driver pg)
 ├── broker/broker.service.ts   # conexión MQTT como usuario "backend"; reparte tramas
-├── supervision/               # M4: barrido periódico → condición "sin_comunicacion" (filtro 5)
-├── alertas/                   # M6: umbrales con histéresis → condición "umbral" (filtro 6)
+├── supervision/               # M4: barrido periódico → condición "sin_comunicacion" (filtro 6)
+├── alertas/                   # M6: umbrales con histéresis → condición "umbral" (filtro 5)
 ├── recepcion/
 │   ├── recepcion.service.ts   # M1+M2: orquesta los seis filtros y la cuarentena
 │   ├── lectura.ts             # la unidad que viaja por el pipeline: {magnitud, valor, unidad, tiempo}

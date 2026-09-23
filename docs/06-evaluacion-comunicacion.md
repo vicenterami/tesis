@@ -143,8 +143,8 @@ LADO VICENTE (desde el tópico hacia adentro)
      2 analizar la trama
      3 validar contra el registro
      4 normalizar al modelo interno
-     5 supervisar (¿quién calla?)
-     6 alertar
+     5 alertar
+     6 supervisar (¿quién calla?)
      ▼
   TimescaleDB ←→ API REST ←→ dashboard
 ```

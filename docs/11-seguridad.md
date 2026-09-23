@@ -3,7 +3,7 @@
 > **Sustenta:** RNF-08, RNF-09, RNF-10, RF-40–RF-42 · Etapa 2 (diseño) y su verificación.
 > Principio: **ninguna capa es la única barrera**. Un sensor defectuoso o malicioso, un error
 > humano o un servicio comprometido deben quedar contenidos por la capa siguiente.
-> Versión: 8 de septiembre de 2026. Cada control marcado ✅ fue probado en el despliegue local.
+> Versión: 23 de septiembre de 2026. Cada control marcado ✅ fue probado en el despliegue local.
 
 ---
 
@@ -23,7 +23,8 @@
 ```
  Internet / red local
  ─────────────────────────────────────────────────────────────
- [1] Red      · solo 443 / 8883 / 1700-udp publicados; en desarrollo 1883 SOLO en 127.0.0.1
+ [1] Red      · solo 443 / 8883 / 1700-udp publicados; en desarrollo 1883 SOLO en 127.0.0.1;
+              el backend escucha en 127.0.0.1 fuera de Docker y solo en la red interna dentro del contenedor
  [2] TLS      · cifrado obligatorio en producción (proxy); credenciales nunca en claro por la red
  [3] Identidad· broker sin anónimos; usuario MQTT = id físico del dispositivo; hash en passwd
  [4] ACL      · patrón %u: cada dispositivo escribe SOLO bajo su propio id; backend lee todo
@@ -50,6 +51,7 @@
 | 7 | Límites de memoria y CPU | `docker-compose.yml` | ✅ 768 MB / 256 MB; consumo real ≈ 31 MB + 3 MB |
 | 8 | Secretos ignorados por git | `.gitignore` | ✅ `git status` no muestra `.env` ni `passwd` |
 | 5 | Filtro 1 (autenticar) + cuarentena en el backend | `backend/src/recepcion` | ✅ dispositivo con credencial válida pero **no registrado** → cuarentena `desconocido`; registrado → aceptado |
+| 5 | Filtros 2–5 (analizar, validar, normalizar, alertar) y 6 (supervisar) | `backend/src/recepcion`, `alertas`, `supervision` | ✅ 7 casos de formato/rango/unidad a cuarentena; umbral con histéresis; silencio detectado (`docs/12 §2`) |
 | 7 | Dependencias sin scripts de instalación (`ignore-scripts`, `allowBuilds: false`), versiones exactas | `backend/.npmrc`, `pnpm-workspace.yaml` | ✅ pnpm bloqueó 2 scripts; lockfile pasa políticas de cadena de suministro |
 
 ## 4. Controles pendientes (por tanda)
@@ -59,8 +61,9 @@
 | 2 | Proxy con TLS (Caddy) en 443 y 8883; retirar 1883 | Al desplegar en servidor |
 | 3 | Credenciales por dispositivo generadas por la plataforma (flujo de alta, docs/10 §3) | Backend |
 | 4 | ACL dinámica: el backend agrega/revoca usuarios del broker al dar de alta/baja | Backend |
-| 5 | Filtros 2–4 del pipeline (analizar, validar, normalizar) | Backend |
 | 6 | Un rol de base de datos para el backend **sin** permiso de `DROP`/`TRUNCATE` | Backend |
+| 1 | Backend en contenedor: escucha en la red interna (`HTTP_INTERFAZ=0.0.0.0`) **sin** `ports`; solo el proxy lo alcanza (`docs/10 §6`) | Dockerfile |
+| 2–3 | Canal de tiempo real hacia el panel (TT-39): solo `wss` vía proxy; sesión del panel verificada en el apretón de manos (rechazar antes de aceptar); lista blanca de `Origin`; ningún token en la URL; límite de tamaño (≤ 64 KB) y de tasa; todo mensaje entrante se valida. Fuente: OWASP, *WebSocket Security Cheat Sheet* | Etapa 3 |
 | 7 | Sistema de archivos de solo lectura + `tmpfs` donde el servicio lo tolere | Endurecimiento |
 | 7 | Escaneo de vulnerabilidades de imágenes (`docker scout` o Trivy) antes de cada entrega | Etapa 3 |
 | 8 | Respaldo diario automático de la base (`pg_dump` a un volumen aparte) + prueba de restauración | Antes de datos reales |

@@ -16,7 +16,7 @@ latexmk -pdf -outdir=build main.tex     # SIEMPRE desde esta carpeta, nunca desd
 | `cap3.tex` | Especificación: requerimientos y evaluación de alternativas |
 | `cap4.tex` | Metodología y planificación verificada |
 | `conclusion.tex` | Conclusiones de la etapa |
-| `anexos/` | Catálogo de 68 requerimientos, backlog de 63 elementos, detalle del protocolo |
+| `anexos/` | Catálogo de 70 requerimientos, backlog de 64 elementos, detalle del protocolo |
 | `referencias.bib` | Bibliografía en biblatex/APA |
 
 La versión extendida de cada sección vive en `docs/`; la primera versión del informe está en `historico/informe-v1/`.

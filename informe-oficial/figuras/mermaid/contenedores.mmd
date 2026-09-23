@@ -12,7 +12,7 @@ flowchart TB
         subgraph BE["Backend · NestJS"]
             direction LR
             M1["M1 Recepción<br/>suscriptor MQTT"] --> M2["M2 Normalización<br/>pipeline de 6 filtros"]
-            M2 --> M4["M4 Supervisión<br/>de salud"] --> M6["M6 Alertas<br/>umbrales, condiciones"]
+            M2 --> M6["M6 Alertas<br/>umbrales, condiciones"] --> M4["M4 Supervisión<br/>de salud"]
             M5["M5 Persistencia y consulta<br/>API REST + WebSocket"]
         end
         DB[("TimescaleDB<br/>series de tiempo + tablas relacionales")]

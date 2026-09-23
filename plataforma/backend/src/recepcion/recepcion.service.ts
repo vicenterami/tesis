@@ -18,7 +18,7 @@ interface Dispositivo { id: string; estado: 'activo' | 'mantenimiento' | 'baja' 
 interface Canal { id: string; magnitud: string; unidad_canonica: string; rango_min: number | null; rango_max: number | null }
 
 // M1 Recepción + M2 Normalización (pipeline). Los seis filtros: 1 autenticar · 2 analizar · 3 validar ·
-// 4 normalizar · 5 supervisar (con SupervisionService) · 6 alertar (con AlertasService).
+// 4 normalizar · 5 alertar (con AlertasService) · 6 supervisar (con SupervisionService).
 //
 //   trama ─► [1] ¿registrado y activo? ──no──► cuarentena "desconocido"
 //             │
@@ -32,10 +32,11 @@ interface Canal { id: string; magnitud: string; unidad_canonica: string; rango_m
 //           [4] convertir a unidad canónica · fijar tiempo · INSERT medicion (hypertable)
 //             │
 //             ▼
-//           [6] umbrales con histéresis → abre/cierra condición "umbral" (AlertasService)
+//           [5] umbrales con histéresis → abre/cierra condición "umbral" (AlertasService)
 //             │
 //             ▼
-//           [5] visto_por_ultima_vez = now() · cierra "sin_comunicacion" si estaba abierta
+//           [6] visto_por_ultima_vez = now() · cierra "sin_comunicacion" si estaba abierta
+//               (corre SIEMPRE tras [1], aunque [2] o [3] hayan mandado la trama a cuarentena)
 //               (la APERTURA de "sin_comunicacion" la hace el barrido periódico de SupervisionService)
 @Injectable()
 export class RecepcionService implements OnModuleInit {
@@ -70,14 +71,21 @@ export class RecepcionService implements OnModuleInit {
     }
 
     // ── [2] Analizar: el primer adaptador que reconozca el formato la traduce a lecturas ──
-    let lecturas: Lectura[];
+    // Una trama que no se entiende va a cuarentena, pero el pipeline NO termina aquí: el dispositivo ya
+    // se autenticó, así que el filtro 6 debe marcarlo vivo igual (docs/10 §4: «vivo» es salud del enlace,
+    // no calidad del dato; un nodo mal configurado está vivo, no en silencio). Con lecturas vacías, los
+    // filtros 3 a 5 simplemente no tienen nada que hacer.
+    let lecturas: Lectura[] = [];
     const adaptador = this.adaptadores.find((a) => a.reconoce(ctx));
-    if (!adaptador) return this.cuarentena(topico, carga, 'malformada', 'ningún adaptador reconoce el formato');
-    try {
-      lecturas = adaptador.analizar(ctx);
-    } catch (e) {
-      if (e instanceof TramaMalformada) return this.cuarentena(topico, carga, 'malformada', `${adaptador.nombre}: ${e.message}`);
-      throw e;
+    if (!adaptador) {
+      await this.cuarentena(topico, carga, 'malformada', 'ningún adaptador reconoce el formato');
+    } else {
+      try {
+        lecturas = adaptador.analizar(ctx);
+      } catch (e) {
+        if (!(e instanceof TramaMalformada)) throw e;
+        await this.cuarentena(topico, carga, 'malformada', `${adaptador.nombre}: ${e.message}`);
+      }
     }
 
     // ── [3] Validar y [4] Normalizar, lectura por lectura ──
@@ -118,16 +126,16 @@ export class RecepcionService implements OnModuleInit {
         continue; // ya estaba: no se reevalúa el umbral ni se cuenta como nueva
       }
       guardadas++;
-      // ── [6] Alertar: ¿la medición cruza un umbral de este canal? ──
+      // ── [5] Alertar: ¿la medición cruza un umbral de este canal? ──
       await this.alertas.evaluar(dispositivo.id, canal.id, ctx.idFisico, valor, canal.unidad_canonica);
     }
 
-    // ── [5] Supervisar: el dispositivo dio señales de vida; si estaba "sin comunicación", se cierra ──
+    // ── [6] Supervisar: el dispositivo dio señales de vida; si estaba "sin comunicación", se cierra ──
     await this.pool.query('UPDATE dispositivo SET visto_por_ultima_vez = now() WHERE id = $1', [dispositivo.id]);
     await this.supervision.marcarVivo(dispositivo.id, ctx.idFisico);
     if (guardadas || duplicadas) {
       const dup = duplicadas ? ` · ${duplicadas} duplicada(s) ignorada(s)` : '';
-      this.log.log(`${ctx.idFisico}: ${guardadas}/${lecturas.length} lecturas guardadas vía ${adaptador.nombre}${dup}`);
+      this.log.log(`${ctx.idFisico}: ${guardadas}/${lecturas.length} lecturas guardadas vía ${adaptador?.nombre}${dup}`);
     }
   }
 

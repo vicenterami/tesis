@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Pool } from 'pg';
 import { POOL } from '../db/db.module';
 
-// M4 Supervisión de salud — filtro 5 completo.
+// M4 Supervisión de salud — filtro 6 completo.
 //
 // El pipeline solo corre cuando LLEGA una trama; por eso no puede notar que un dispositivo DEJÓ
 // de transmitir. Este servicio barre la tabla periódicamente y compara "visto por última vez"

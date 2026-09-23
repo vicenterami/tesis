@@ -4,8 +4,8 @@ sequenceDiagram
     participant F2 as 2 Analizar (adaptador)
     participant F3 as 3 Validar
     participant F4 as 4 Normalizar
-    participant F5 as 5 Supervisar
-    participant F6 as 6 Alertar
+    participant F5 as 5 Alertar
+    participant F6 as 6 Supervisar
     participant DB as TimescaleDB
     participant Q as Cuarentena
 
@@ -26,13 +26,13 @@ sequenceDiagram
                 F3->>F4: lecturas válidas
                 F4->>F4: convierte unidad, ajusta marca de tiempo (sin reloj → hora de recepción)
                 F4->>DB: INSERT medicion (hypertable)
-                F4->>F5: lecturas normalizadas
-                F5->>DB: UPDATE visto_por_ultima_vez · cierra condición "sin_comunicacion" si estaba abierta
-                F5->>F6: lecturas + reglas de umbral del canal
+                F4->>F5: cada lectura guardada + reglas de umbral de su canal
                 alt cruza umbral (con histéresis)
-                    F6->>DB: abre/cierra condicion, INSERT evento
-                    F6-->>MQ: notifica (WS al panel · correo si configurado)
+                    F5->>DB: abre/cierra condicion, INSERT evento
+                    Note right of F5: notifica al panel (tiempo real) y por correo si está configurado
                 end
             end
         end
+        F1->>F6: trama cerrada: el dispositivo autenticado se comunicó (aunque sus lecturas hayan ido a cuarentena)
+        F6->>DB: UPDATE visto_por_ultima_vez · cierra condición "sin_comunicacion" si estaba abierta
     end

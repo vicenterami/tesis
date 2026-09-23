@@ -1,8 +1,8 @@
 > ⚠️ **ACTUALIZADO AL PIVOTE DEL 02/09/2026:** los elementos ligados a Contact ID se reformularon
 > hacia el contrato SenML/MQTT y el pipeline de normalización. Las cifras vigentes son las de §6.1,
-> calculadas sumando las filas: **63 elementos, 275 h; núcleo 33 elementos, 165 h** (una estimación
+> calculadas sumando las filas: **64 elementos, 279 h; núcleo 33 elementos, 165 h** (una estimación
 > preliminar de ~155 h del 02/09 quedó superada y se corrigió el 22/09 para que informe y backlog
-> digan lo mismo).
+> digan lo mismo; TT-39 agregada el 23/09).
 
 # Backlog del proyecto
 
@@ -196,7 +196,7 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 **HU-08 — criterios de aceptación** 🎯
 
 - La exportación incluye eventos y mediciones del rango solicitado, en CSV y en JSON.
-- Los eventos exportados conservan el mensaje Contact ID original, no solo su interpretación.
+- Los eventos exportados conservan la trama original íntegra (RF-31), no solo su interpretación.
 - La exportación contiene únicamente datos del sitio del solicitante (RF-41).
 - Un archivo exportado puede reimportarse sin pérdida de información.
 
@@ -248,6 +248,7 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 | **TT-21** | 🎯 Aislamiento de datos entre sitios, verificado con pruebas | M | 3 | 5 |
 | **TT-22** | 🎯 Cifrado del transporte: TLS para HTTP y MQTT | M | 3 | 4 |
 | **HU-18** | **Como administrador de sitio**, quiero iniciar sesión con mis credenciales y que existan roles distintos de administración y consulta | M | 3 | 3 |
+| **TT-39** | Canal de tiempo real autenticado hacia el panel (WebSocket o SSE tras el proxy TLS): sesión del panel verificada al abrir, lista blanca de `Origin`, límite de tamaño y tasa (RF-43, RNF-08; `docs/11 §4`) — agregada el 23/09/2026 | M | 3 | 4 |
 
 **TT-21 — criterios de aceptación** 🎯
 
@@ -327,7 +328,7 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 # 6. Verificación de viabilidad del alcance
 
 > Todas las cifras de esta sección se obtuvieron **sumando programáticamente** las estimaciones de los
-> 63 elementos del backlog, no estimando el total a ojo. El procedimiento es reproducible sobre este
+> 64 elementos del backlog, no estimando el total a ojo. El procedimiento es reproducible sobre este
 > mismo documento.
 
 ## 6.1 Esfuerzo estimado
@@ -335,10 +336,10 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 | | Elementos | Horas |
 |---|:---:|:---:|
 | **Núcleo demostrativo** 🎯 | 33 | **165** |
-| Fuera del núcleo | 30 | 110 |
-| **Total del backlog** | **63** | **275** |
+| Fuera del núcleo | 31 | 114 |
+| **Total del backlog** | **64** | **279** |
 
-Por prioridad: **Must** 55 elementos / 249 h · **Should** 7 / 24 h · **Could** 1 / 2 h.
+Por prioridad: **Must** 56 elementos / 253 h · **Should** 7 / 24 h · **Could** 1 / 2 h.
 
 ## 6.2 Presupuesto disponible
 
@@ -362,21 +363,21 @@ Cuatro semanas por etapa a ~15 horas semanales (restricción RE-01):
 |---|:---:|:---:|:---:|:---:|:---:|
 | 1 | 10 h | 4 h | 21 h | +52 % | +81 % |
 | 2 | 84 h | 53 h | 60 h | **−40 %** | +12 % |
-| 3 | **115 h** | **97 h** | 60 h | **−92 %** | **−62 %** |
+| 3 | **119 h** | **97 h** | 60 h | **−98 %** | **−62 %** |
 | 4 | 66 h | 11 h | 60 h | −10 % | +82 % |
-| **Total** | **275 h** | **165 h** | **201 h** | **−37 %** | **+18 %** |
+| **Total** | **279 h** | **165 h** | **201 h** | **−39 %** | **+18 %** |
 
 **Dos conclusiones, y la segunda es la que importa:**
 
-1. **El backlog completo excede el presupuesto en un 37 %.** No es viable ejecutarlo entero.
+1. **El backlog completo excede el presupuesto en un 39 %.** No es viable ejecutarlo entero.
 2. **El núcleo demostrativo sí cabe: 165 h contra 201 disponibles, con 18 % de holgura.** La tesis es
-   demostrable dentro del plazo — pero **solo si el alcance se limita al núcleo** y los 110 h restantes
+   demostrable dentro del plazo — pero **solo si el alcance se limita al núcleo** y los 114 h restantes
    se tratan como alcance opcional, no comprometido.
 
-> **Decisión de planificación derivada:** el **núcleo (165 h) constituye el compromiso**; los 30
+> **Decisión de planificación derivada:** el **núcleo (165 h) constituye el compromiso**; los 31
 > elementos fuera del núcleo son **alcance condicional**, ejecutables únicamente contra holgura real
-> verificada al cierre de cada etapa. Comprometerse con los 275 h produciría un incumplimiento del
-> 37 % — y la pauta mide el avance como porcentaje de tareas completadas, de modo que un alcance
+> verificada al cierre de cada etapa. Comprometerse con los 279 h produciría un incumplimiento del
+> 39 % — y la pauta mide el avance como porcentaje de tareas completadas, de modo que un alcance
 > sobredimensionado penaliza más que un alcance acotado y justificado.
 
 ## 6.4 🔴 Segundo hallazgo: el núcleo está mal distribuido en el tiempo
@@ -421,18 +422,18 @@ adelantadas en la Etapa 2 más 60 h de la Etapa 3 = **88 h ≈ 53 %**. ✅ El um
 
 ## 6.5 Qué se recorta y en qué orden
 
-Los 110 h fuera del núcleo se ordenan por valor decreciente. Se ejecutan de arriba hacia abajo, solo
+Los 114 h fuera del núcleo se ordenan por valor decreciente. Se ejecutan de arriba hacia abajo, solo
 contra holgura verificada:
 
 | Orden | Elementos | Horas | Valor si se ejecuta |
 |:---:|---|:---:|---|
-| 1 | **HU-04** Receptor DC-09 nativo | 7 | **Alto** — es el diferenciador frente a la competencia regional |
+| 1 | **HU-04** Adaptador para un formato no SenML | 7 | **Alto** — demuestra la extensibilidad por adaptador (RNF-12), el argumento contra el hardware atado a la plataforma |
 | 2 | **TT-32** Validación con sensor físico | 3 | **Alto** — evidencia empírica de extremo a extremo |
 | 3 | **HU-11, HU-12** Aprovisionamiento y agrupación | 8 | Medio-alto — completa la vista de administrador |
 | 4 | **HU-24** Notificación de condición crítica | 5 | Medio — funcionalidad esperada de una plataforma de este tipo |
 | 5 | **HU-23** Vista por tecnología de red | 3 | Medio — refuerza el argumento multiprotocolo |
 | 6 | **HU-09** API de consulta externa | 4 | Bajo para la demostración |
-| 7 | Resto (HU-06, 13, 17, 18, 21, 22, 25, TT-03, 23, 24-26, 28-31, 33-38) | 80 | Variable |
+| 7 | Resto (HU-06, 13, 17, 18, 21, 22, 25, TT-03, 23, 24-26, 28-31, 33-39) | 84 | Variable |
 
 > **Lo que no se recorta bajo ninguna circunstancia:** los 33 elementos marcados 🎯. Su ausencia
 > invalidaría la demostración en lugar de reducirla. Si el tiempo no alcanza para el núcleo completo, el
@@ -460,7 +461,7 @@ El orden de ejecución no sigue el número de las épicas, sino tres reglas:
    demás. Sin ellos ninguna historia puede completarse.
 2. **Después lo que demuestra la tesis:** la cadena recepción → normalización → supervisión → interfaz
    (EP-04, EP-05, EP-08, EP-10). Es el recorrido que un evaluador seguirá en una demostración.
-3. **Al final lo que mejora el producto:** alertas avanzadas, DC-09, API de consulta. Valiosos, pero su
+3. **Al final lo que mejora el producto:** alertas avanzadas, adaptadores adicionales, API de consulta. Valiosos, pero su
    ausencia no invalida la demostración.
 
 **Regla de decisión ante retraso:** se sacrifica amplitud antes que profundidad. Es preferible una
@@ -476,12 +477,12 @@ no demuestran ninguna.
 |---|---|
 | Épicas definidas | ✅ 14, todas vinculadas a un objetivo específico |
 | Historias de usuario | ✅ 25, con rol, capacidad y beneficio |
-| Tareas técnicas | ✅ 38 |
+| Tareas técnicas | ✅ 39 |
 | Elementos del núcleo demostrativo | ✅ 33 elementos, 165 h |
 | Criterios de aceptación | ✅ Detallados en los elementos del núcleo; deliberadamente sin refinar en el resto |
-| Estimaciones | ✅ 63 elementos estimados, **275 h** en total, sumadas programáticamente |
+| Estimaciones | ✅ 64 elementos estimados, **279 h** en total, sumadas programáticamente |
 | Priorización | ✅ MoSCoW heredado del catálogo, más orden de ejecución justificado |
-| Verificación de viabilidad | 🔴 **Realizada. El backlog completo excede el presupuesto en 37 %; el núcleo cabe con 18 % de holgura. Redistribución correctiva definida** |
+| Verificación de viabilidad | 🔴 **Realizada. El backlog completo excede el presupuesto en 39 %; el núcleo cabe con 18 % de holgura. Redistribución correctiva definida** |
 
 ## Seguimiento de ejecución
 

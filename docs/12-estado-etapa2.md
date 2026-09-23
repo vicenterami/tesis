@@ -121,5 +121,5 @@ falla si informe, docs y base difieren. Sin dibujos a mano: sin solapes ni colum
 |---|---|---|
 | 9–14 sep | ~~API de consulta~~ ✅ · ~~capítulo de diseño~~ ✅ (borrador completo, 30 págs.) · **TT-24/25/26 alojamiento y costos** · TT-13 OpenAPI · escribir a profesor guía y compañero | `docs/14-despliegue-y-costos.md`; correos enviados |
 | 15–21 sep | ~~Actualización del sistema, laboratorio de entrega (sesión persistente e idempotencia), lectura crítica hasta 4.1~~ ✅ · **retroalimentación recibida el 21/09 e incorporada** | informe v2 (30 págs.) |
-| 22–28 sep | **Entrevistas** si llegan los contactos · terminar la lectura crítica (4.2 → anexos) · ensayar la demostración · autoevaluación del núcleo | registro de la primera entrevista |
+| 22–28 sep | **Entrevistas** si llegan los contactos · ~~concordancia diseño↔código (filtros 5/6, vivo con trama malformada, `.env.example`)~~ ✅ 23/09 · Dockerfile del backend · terminar la lectura crítica (4.2 → anexos) · ensayar la demostración · autoevaluación del núcleo | registro de la primera entrevista |
 | 29 sep–2 oct | Incorporar la entrevista si ocurrió (fuente [ENT]); revisión final; compilación; **entrega oficial el viernes 2 de octubre** | PDF Etapa 2 |

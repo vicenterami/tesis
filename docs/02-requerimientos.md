@@ -295,7 +295,7 @@ marginal cero para la institución.
 
 ## 4.2 Definición del producto mínimo
 
-> **El MVP demuestra la tesis si**: recibe eventos Contact ID por **al menos dos transportes
+> **El MVP demuestra la tesis si**: recibe tramas de sensores por **al menos dos transportes
 > distintos**, los normaliza a un único formato, detecta que un dispositivo dejó de reportar, lo
 > muestra en una interfaz de gestión con el estado de cada dispositivo y su enlace, y permite exportar
 > los datos en formato abierto.
@@ -366,7 +366,7 @@ Estos son los requerimientos que ningún competidor regional identificado satisf
 
 | Requerimiento | Por qué diferencia |
 |---|---|
-| **RF-04** Receptor DC-09 nativo | Permite ingerir paneles de alarma instalados sin reemplazarlos |
+| **RF-04** Adaptadores de formato por fuente | Admite sensores de distintos fabricantes y formatos sin modificar el núcleo |
 | **RF-24, RF-27, RF-30** Supervisión de salud de enlace | La oferta regional muestra el dato del sensor, no el estado del dispositivo |
 | **RF-34** Exportación en formato abierto | Elimina la dependencia de proveedor |
 | **RF-51** Vista agrupada por transporte | Ninguna plataforma presenta la flota organizada por tecnología de red |
@@ -457,14 +457,24 @@ directa de ello.
 | Python + FastAPI | 3 | 3 | 5 | 2 | 5 | 4 | 3 | **3,55** |
 | Java + Spring Boot | 2 | 5 | 4 | 1 | 5 | 5 | 4 | **3,45** |
 | Go + Echo | 1 | 3 | 3 | 1 | 4 | 5 | 5 | **2,65** |
+| Rust + Axum | 1 | 3 | 3 | 1 | 4 | 5 | 5 | **2,65** |
 
 ### 6.5.3 Justificación de las puntuaciones determinantes
 
 **Sobre L-A, el criterio de mayor peso.** La experiencia declarada es Node.js con pnpm. NestJS obtiene
 4 y no 5 porque su modelo de módulos e inyección de dependencias supone una curva de aprendizaje
 adicional, aunque sobre un ecosistema ya conocido. Fastify obtiene 5 por ser conceptualmente cercano a
-Express. Go obtiene 1: aprender un lenguaje nuevo consumiría semanas del presupuesto de 195 horas
+Express. Go y Rust obtienen 1: aprender un lenguaje nuevo consumiría semanas del presupuesto de 195 horas
 restantes.
+
+> **Rust se incorporó a la matriz el 23/09/2026.** Era la preferencia personal del desarrollador y no había
+> sido evaluada: un análisis de alternativas que omite la que el autor prefería está incompleto. Con los
+> mismos criterios queda igual que Go (2,65): excelente en tipado y rendimiento (5 y 5), con bibliotecas
+> maduras para MQTT y PostgreSQL (`rumqttc`, `sqlx`; 4), pero sin experiencia previa (1), sin imponer una
+> estructura de módulos que corresponda al análisis (3), con OpenAPI por macros de anotación (`utoipa`; 3)
+> y sin unificar el lenguaje con el frontend (1). Se registra para que la decisión muestre la alternativa
+> considerada y por qué se descartó, no para reabrirla: el criterio que la descarta es el tiempo de
+> aprendizaje frente a un presupuesto cerrado, no su calidad técnica.
 
 **Sobre L-B, el criterio que decide el resultado.** El análisis de requerimientos identificó **ocho
 módulos** (M1 a M8) con responsabilidades separadas. NestJS impone una estructura de módulos con
@@ -474,13 +484,13 @@ estructura real del sistema. Fastify no impone estructura, de modo que la corres
 construirla y mantenerla por convención. Es la diferencia entre documentar lo que existe y confiar en
 que lo que existe se parezca a lo documentado.
 
-**Sobre L-D, una ventaja concreta y medible.** El evento Contact ID tiene una estructura estricta de
-siete campos. Con un solo lenguaje en todo el sistema, esa estructura se define **una vez** y la usan
+**Sobre L-D, una ventaja concreta y medible.** Una lectura normalizada tiene una estructura estricta
+(canal, valor, unidad, marca de tiempo) y el *pack* SenML un conjunto fijo de campos (RFC 8428). Con un solo lenguaje en todo el sistema, esa estructura se define **una vez** y la usan
 el validador de recepción, la capa de persistencia, la API y la interfaz. En dos lenguajes hay que
 definirla dos veces y mantenerlas sincronizadas manualmente — una fuente de errores permanente por el
-resto del proyecto. Esto penaliza a Python (2), Java (1) y Go (1) con independencia de sus méritos.
+resto del proyecto. Esto penaliza a Python (2) y a Java, Go y Rust (1) con independencia de sus méritos.
 
-**Sobre L-G y por qué su peso es bajo.** Go y Fastify obtienen 5 en rendimiento, y es irrelevante:
+**Sobre L-G y por qué su peso es bajo.** Go, Rust y Fastify obtienen 5 en rendimiento, y es irrelevante:
 RNF-01 pide 50 eventos por segundo, un orden de magnitud por debajo de lo que cualquiera de estas
 alternativas sostiene. Ponderar el rendimiento por encima de la velocidad de desarrollo sería optimizar
 el recurso abundante a costa del escaso.
