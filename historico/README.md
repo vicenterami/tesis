@@ -11,3 +11,4 @@ describe el sistema actual.
 | `docs/05-protocolo-contactid.md` | Evaluación del protocolo Contact ID y alternativas |
 | `herramientas/contactid.py` | Generador y validador de mensajes Contact ID (Python) |
 | `informe-v1/` | Primera versión extendida del informe (LaTeX), anterior a la plantilla oficial |
+| `docs/referencias-contactid.bib` | Nueve referencias del protocolo descartado (SIA DC-05/DC-09/DC-03, CoAP, LwM2M, Verisure, Ademco), sin citar en el informe vigente; movidas aquí el 23/09/2026 |
