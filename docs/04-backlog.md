@@ -1,8 +1,10 @@
 > ⚠️ **ACTUALIZADO AL PIVOTE DEL 02/09/2026:** los elementos ligados a Contact ID se reformularon
 > hacia el contrato SenML/MQTT y el pipeline de normalización. Las cifras vigentes son las de §6.1,
-> calculadas sumando las filas: **64 elementos, 279 h; núcleo 33 elementos, 165 h** (una estimación
+> calculadas sumando las filas: **64 elementos, 279 h; núcleo 34 elementos, 168 h** (una estimación
 > preliminar de ~155 h del 02/09 quedó superada y se corrigió el 22/09 para que informe y backlog
-> digan lo mismo; TT-39 agregada el 23/09).
+> digan lo mismo; TT-39 agregada el 23/09; TT-32 promovida a núcleo y adelantada a la Etapa 3, y la
+> redistribución de §6.4 —decidida por escrito el 22/09 pero nunca aplicada a las filas— ejecutada,
+> el 23/09: la Etapa 3 tenía en realidad 97 h de núcleo, no las 60 que este documento afirmaba).
 
 # Backlog del proyecto
 
@@ -189,8 +191,8 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 | ID | Elemento | Prior. | Etapa | Horas |
 |---|---|:---:|:---:|:---:|
 | **TT-19** | 🎯 Esquema de base de datos y migraciones versionadas | M | 2 | 5 |
-| **HU-07** | 🎯 **Como usuario de consulta**, quiero ver el historial de eventos y mediciones de un dispositivo en un rango de fechas | M | 3 | 4 |
-| **HU-08** | 🎯 **Como administrador de sitio**, quiero exportar los datos de mi sitio en CSV y JSON, para no depender de la plataforma para conservarlos | M | 3 | **4** |
+| **HU-07** | 🎯 **Como usuario de consulta**, quiero ver el historial de eventos y mediciones de un dispositivo en un rango de fechas | M | 4 | 4 |
+| **HU-08** | 🎯 **Como administrador de sitio**, quiero exportar los datos de mi sitio en CSV y JSON, para no depender de la plataforma para conservarlos | M | 4 | **4** |
 | **HU-09** | **Como integrador**, quiero consultar los datos del sitio por API, para alimentar sistemas propios | S | 4 | 4 |
 
 **HU-08 — criterios de aceptación** 🎯
@@ -227,7 +229,7 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 |---|---|:---:|:---:|:---:|
 | **HU-14** | 🎯 **Como administrador de sitio**, quiero que la plataforma detecte que un dispositivo dejó de reportar, porque el silencio de un sensor es indistinguible de que no haya novedades | M | 3 | **7** |
 | **HU-15** | 🎯 **Como administrador de sitio**, quiero ver la calidad del enlace de cada dispositivo, para anticipar fallas antes de que ocurran | M | 3 | **4** |
-| **HU-16** | 🎯 **Como administrador de sitio**, quiero un indicador agregado de salud de mi sitio, para saber de un vistazo si algo requiere atención | M | 3 | **4** |
+| **HU-16** | 🎯 **Como administrador de sitio**, quiero un indicador agregado de salud de mi sitio, para saber de un vistazo si algo requiere atención | M | 4 | **4** |
 | **HU-17** | **Como administrador de sitio**, quiero saber qué dispositivos tienen la batería baja, para planificar el mantenimiento | M | 3 | 3 |
 
 **HU-14 — criterios de aceptación** 🎯 — *elemento central de la tesis*
@@ -244,11 +246,18 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 
 | ID | Elemento | Prior. | Etapa | Horas |
 |---|---|:---:|:---:|:---:|
-| **TT-20** | 🎯 Autenticación de la recepción mediante credencial por sitio | M | 3 | 4 |
-| **TT-21** | 🎯 Aislamiento de datos entre sitios, verificado con pruebas | M | 3 | 5 |
-| **TT-22** | 🎯 Cifrado del transporte: TLS para HTTP y MQTT | M | 3 | 4 |
+| **TT-20** | 🎯 Autenticación de la recepción mediante credencial por sitio | M | 4 | 4 |
+| **TT-21** | 🎯 Aislamiento de datos entre sitios, verificado con pruebas | M | 4 | 5 |
+| **TT-22** | 🎯 Cifrado del transporte: TLS para HTTP y MQTT | M | 4 | 4 |
 | **HU-18** | **Como administrador de sitio**, quiero iniciar sesión con mis credenciales y que existan roles distintos de administración y consulta | M | 3 | 3 |
 | **TT-39** | Canal de tiempo real autenticado hacia el panel (WebSocket o SSE tras el proxy TLS): sesión del panel verificada al abrir, lista blanca de `Origin`, límite de tamaño y tasa (RF-43, RNF-08; `docs/11 §4`) — agregada el 23/09/2026 | M | 3 | 4 |
+
+**TT-32 — criterios de aceptación** 🎯
+
+- Un sensor físico (LoRaWAN si el compañero lo entrega a tiempo; si no, el ESP32 por Wi-Fi del plan B)
+  publica al menos una trama que el pipeline recibe, normaliza y guarda.
+- La medición guardada es consultable por la API con su valor, unidad y marca de tiempo reales.
+- Queda registrado (captura o registro) para poder mostrarse en la defensa.
 
 **TT-21 — criterios de aceptación** 🎯
 
@@ -261,7 +270,7 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 | ID | Elemento | Prior. | Etapa | Horas |
 |---|---|:---:|:---:|:---:|
 | **HU-19** | 🎯 **Como administrador de sitio**, quiero un panel de salud del sitio con semáforo por dispositivo | M | 3 | **9** |
-| **HU-20** | 🎯 **Como administrador de sitio**, quiero la vista de inventario filtrable por sitio, zona, estado y transporte | M | 3 | **7** |
+| **HU-20** | 🎯 **Como administrador de sitio**, quiero la vista de inventario filtrable por sitio, zona, estado y transporte | M | 4 | **7** |
 | **HU-21** | 🎯 **Como usuario de consulta**, quiero el detalle de un dispositivo con sus condiciones abiertas, historial y serie de mediciones | M | 4 | **7** |
 | **HU-22** | **Como administrador de sitio**, quiero un asistente guiado para registrar un dispositivo nuevo | M | 4 | 4 |
 | **HU-23** | **Como administrador de sitio**, quiero ver mi flota agrupada por tecnología de red, para entender por dónde llega cada cosa | S | 4 | 3 |
@@ -294,17 +303,27 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 
 | ID | Elemento | Prior. | Etapa | Horas |
 |---|---|:---:|:---:|:---:|
-| **TT-27** | 🎯 Pruebas automatizadas del contrato de trama (esquema, cuarentena, adaptadores) | M | 3 | 5 |
+| **TT-27** | 🎯 Pruebas automatizadas del contrato de trama (esquema, cuarentena, adaptadores) | M | 4 | 5 |
 | **TT-28** | 🎯 Emulador de nodo por software, que genera eventos y telemetría sintéticos | M | 3 | **5** |
 | **TT-29** | 🎯 Prueba de carga: sostener ≥ 50 eventos/segundo sin pérdida (RNF-01) | M | 4 | 4 |
 | **TT-30** | Prueba de recuperación: ningún evento confirmado se pierde ante reinicio (RNF-05, RNF-06) | M | 4 | 4 |
 | **TT-31** | Batería de al menos 15 casos de prueba funcionales documentados | M | 4 | 5 |
-| **TT-32** | Validación de extremo a extremo con al menos un sensor físico | M | 4 | 3 |
+| **TT-32** | 🎯 Validación de extremo a extremo con al menos un sensor físico | M | 3 | 3 |
 
 > **TT-28 es mitigación del riesgo R1.** El emulador desacopla la validación de la disponibilidad de
 > hardware: permite ejecutar las pruebas de carga y de recuperación sin sensores físicos. El sensor real
-> (TT-32) demuestra el caso de uso; el emulador demuestra el comportamiento bajo carga. **Si el hardware
-> no llega, la validación sigue siendo posible** — solo pierde la demostración física.
+> (TT-32) demuestra el caso de uso; el emulador demuestra el comportamiento bajo carga.
+>
+> **Plan B de R1 (decidido el 23/09/2026).** El objetivo OE4 promete «un sensor real de extremo a
+> extremo» al 30 de octubre; TT-32 no exige que ese sensor sea LoRaWAN. La arquitectura ya trata un
+> nodo Wi-Fi directo como entrada de primera clase (`docs/10` §1, nodo N2): tras el filtro de análisis,
+> una trama LoRaWAN y una Wi-Fi son indistinguibles. **Fecha gatillo: 8 de octubre.** Si para entonces
+> no hay confirmación de acceso al hardware LoRaWAN del compañero, se compra un ESP32 con un sensor de
+> temperatura barato y se publica SenML por MQTT/TLS directo al broker, sin depender de nadie más. Si
+> el LoRaWAN del compañero llega después, se suma como evidencia adicional para la defensa del 4 de
+> diciembre, no como condición para el 30 de octubre. Por eso **TT-32 se promovió a núcleo y se
+> adelantó de la Etapa 4 a la Etapa 3**: sin eso, nada en el backlog garantizaba un sensor real antes
+> del 30 de octubre, aunque el objetivo ya lo prometiera (hallazgo del 23/09).
 
 ## EP-14 · Documentación y entregables académicos
 
@@ -335,8 +354,8 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 
 | | Elementos | Horas |
 |---|:---:|:---:|
-| **Núcleo demostrativo** 🎯 | 33 | **165** |
-| Fuera del núcleo | 31 | 114 |
+| **Núcleo demostrativo** 🎯 | 34 | **168** |
+| Fuera del núcleo | 30 | 111 |
 | **Total del backlog** | **64** | **279** |
 
 Por prioridad: **Must** 56 elementos / 253 h · **Should** 7 / 24 h · **Could** 1 / 2 h.
@@ -355,36 +374,43 @@ Cuatro semanas por etapa a ~15 horas semanales (restricción RE-01):
 
 > **Actualización del 24 de agosto:** la pauta oficial dio una semana más que el escenario exigente con
 > que se planificó, y la Etapa 4 dura cinco semanas. El presupuesto sube de ~201 h a ~240 h: la holgura
-> del núcleo pasa de +18 % a **+31 %**, y parte del alcance condicional vuelve a ser ejecutable.
+> del núcleo pasa de +16 % a **+30 %**, y parte del alcance condicional vuelve a ser ejecutable.
 
 ## 6.3 🔴 Hallazgo: el backlog completo no cabe en el tiempo disponible
 
 | Etapa | Backlog completo | Solo el núcleo | Presupuesto | Holgura (completo) | Holgura (núcleo) |
 |---|:---:|:---:|:---:|:---:|:---:|
-| 1 | 10 h | 4 h | 21 h | +52 % | +81 % |
+| 1 | 9 h | 4 h | 21 h | +57 % | +81 % |
 | 2 | 84 h | 53 h | 60 h | **−40 %** | +12 % |
-| 3 | **119 h** | **97 h** | 60 h | **−98 %** | **−62 %** |
-| 4 | 66 h | 11 h | 60 h | −10 % | +82 % |
-| **Total** | **279 h** | **165 h** | **201 h** | **−39 %** | **+18 %** |
+| 3 | 85 h | 63 h | 60 h | **−42 %** | **−5 %** |
+| 4 | 99 h | 48 h | 60 h | −65 % | +20 % |
+| **Total** | **277 h** | **168 h** | **201 h** | **−38 %** | **+16 %** |
+
+> `TT-38` (2 h, bitácora, Etapa «1–4») no se asigna a una sola etapa y queda fuera de este desglose;
+> se cuenta en el total del backlog (§6.1: 64 elementos, 279 h). Esta tabla ya incorpora, al
+> 23/09/2026, la redistribución de §6.4 (antes solo escrita, no aplicada a las filas) y la promoción
+> de TT-32 (plan B de R1).
 
 **Dos conclusiones, y la segunda es la que importa:**
 
 1. **El backlog completo excede el presupuesto en un 39 %.** No es viable ejecutarlo entero.
-2. **El núcleo demostrativo sí cabe: 165 h contra 201 disponibles, con 18 % de holgura.** La tesis es
-   demostrable dentro del plazo — pero **solo si el alcance se limita al núcleo** y los 114 h restantes
+2. **El núcleo demostrativo sí cabe: 168 h contra 201 disponibles, con 16 % de holgura.** La tesis es
+   demostrable dentro del plazo — pero **solo si el alcance se limita al núcleo** y los 111 h restantes
    se tratan como alcance opcional, no comprometido.
 
-> **Decisión de planificación derivada:** el **núcleo (165 h) constituye el compromiso**; los 31
+> **Decisión de planificación derivada:** el **núcleo (168 h) constituye el compromiso**; los 30
 > elementos fuera del núcleo son **alcance condicional**, ejecutables únicamente contra holgura real
 > verificada al cierre de cada etapa. Comprometerse con los 279 h produciría un incumplimiento del
 > 39 % — y la pauta mide el avance como porcentaje de tareas completadas, de modo que un alcance
 > sobredimensionado penaliza más que un alcance acotado y justificado.
 
-## 6.4 🔴 Segundo hallazgo: el núcleo está mal distribuido en el tiempo
+## 6.4 🔴 Segundo hallazgo: el núcleo estaba mal distribuido en el tiempo (corregido el 23/09/2026)
 
-Aun limitándose al núcleo, la distribución es defectuosa: **la Etapa 3 concentra 97 h contra 60
-disponibles (−62 %), mientras la Etapa 4 usa 11 h de 60 (+82 %)**. El problema no es el volumen total,
-es su reparto.
+Aun limitándose al núcleo, la distribución era defectuosa: **la Etapa 3 concentraba 97 h contra 60
+disponibles (−62 %), mientras la Etapa 4 usaba 11 h de 60 (+82 %)**. El problema no era el volumen
+total, era su reparto. La redistribución de más abajo se decidió el 22/09 pero, hasta el 23/09, **nunca
+se aplicó a las filas del backlog**: seguían con Etapa 3, así que esta sección describía una corrección
+de papel, no una real. Se corrigió y se verificó recalculando desde las filas (§6.3).
 
 La causa es que la asignación inicial situó toda la implementación en la Etapa 3, cuando **la pauta solo
 exige el 50 % de la implementación en esa etapa y el 100 % en la Etapa 4**. Reservar la Etapa 4 casi
@@ -406,36 +432,44 @@ Se trasladan de la Etapa 3 a la Etapa 4 los siguientes elementos del núcleo (~3
 | **TT-27** Pruebas del protocolo y validación cruzada | 5 | Corresponde al ciclo de validación de la Etapa 4 |
 | **HU-16** Indicador agregado de salud del sitio | 4 | Depende de que la supervisión ya funcione |
 
-**Distribución del núcleo tras la corrección:**
+**Distribución real del núcleo (recalculada desde las filas el 23/09/2026):**
 
 | Etapa | Núcleo | Presupuesto | Holgura |
 |---|:---:|:---:|:---:|
 | 1 | 4 h | 21 h | +81 % |
 | 2 | 53 h | 60 h | ✅ +12 % |
-| 3 | **60 h** | 60 h | ⚠️ 0 % |
+| 3 | **63 h** | 60 h | ⚠️ **−5 %** |
 | 4 | **48 h** | 60 h | ✅ +20 % |
-| **Total** | **165 h** | **201 h** | ✅ **+18 %** |
+| **Total** | **168 h** | **201 h** | ✅ **+16 %** |
+
+Los 63 h de la Etapa 3 son 60 h de la redistribución más las 3 h de TT-32 (plan B de R1, agregado el
+23/09). Un −5 % es una sobrecarga real y pequeña (3 h en cuatro semanas): se acepta a conciencia frente
+al riesgo de no tener un sensor real para el 30 de octubre, y no se oculta corriendo otro elemento.
 
 **Verificación del umbral de la Etapa 3.** La pauta exige el **50 % de las tareas de implementación**
-completadas. Implementación total (EP-01, 04–11) = 165 h. Ejecutado al cierre de la Etapa 3: ~28 h
-adelantadas en la Etapa 2 más 60 h de la Etapa 3 = **88 h ≈ 53 %**. ✅ El umbral se cumple.
+completadas. Usando el núcleo completo como base (168 h; **nota**: una versión anterior de este
+párrafo decía «Implementación total (EP-01, 04–11) = 165 h», pero la suma real de esas épicas
+específicas es 118 h, no 165 — el número que sí sostiene el cálculo de abajo es el núcleo completo,
+no ese subconjunto de épicas; pendiente decidir cuál de las dos lecturas es la que se quiere sostener
+ante el profesor guía). Ejecutado al cierre de la Etapa 3: ~28 h adelantadas en la Etapa 2 más 63 h de
+la Etapa 3 = **91 h ≈ 54 %**. ✅ El umbral se cumple con cualquiera de las dos lecturas.
 
 ## 6.5 Qué se recorta y en qué orden
 
-Los 114 h fuera del núcleo se ordenan por valor decreciente. Se ejecutan de arriba hacia abajo, solo
+Los 111 h fuera del núcleo se ordenan por valor decreciente. Se ejecutan de arriba hacia abajo, solo
 contra holgura verificada:
 
 | Orden | Elementos | Horas | Valor si se ejecuta |
 |:---:|---|:---:|---|
 | 1 | **HU-04** Adaptador para un formato no SenML | 7 | **Alto** — demuestra la extensibilidad por adaptador (RNF-12), el argumento contra el hardware atado a la plataforma |
-| 2 | **TT-32** Validación con sensor físico | 3 | **Alto** — evidencia empírica de extremo a extremo |
-| 3 | **HU-11, HU-12** Aprovisionamiento y agrupación | 8 | Medio-alto — completa la vista de administrador |
-| 4 | **HU-24** Notificación de condición crítica | 5 | Medio — funcionalidad esperada de una plataforma de este tipo |
-| 5 | **HU-23** Vista por tecnología de red | 3 | Medio — refuerza el argumento multiprotocolo |
-| 6 | **HU-09** API de consulta externa | 4 | Bajo para la demostración |
-| 7 | Resto (HU-06, 13, 17, 18, 21, 22, 25, TT-03, 23, 24-26, 28-31, 33-39) | 84 | Variable |
+| 2 | **HU-11, HU-12** Aprovisionamiento y agrupación | 8 | Medio-alto — completa la vista de administrador |
+| 3 | **HU-24** Notificación de condición crítica | 5 | Medio — funcionalidad esperada de una plataforma de este tipo |
+| 4 | **HU-23** Vista por tecnología de red | 3 | Medio — refuerza el argumento multiprotocolo |
+| 5 | **HU-09** API de consulta externa | 4 | Bajo para la demostración |
+| 6 | Resto (HU-06, 13, 17, 18, 21, 22, 25, TT-03, 23, 24-26, 28-31, 33-39) | 84 | Variable — **nota:** esta lista incluye TT-28 y TT-29,
+  marcados 🎯 (núcleo): no deberían poder recortarse; revisar aparte, pendiente |
 
-> **Lo que no se recorta bajo ninguna circunstancia:** los 33 elementos marcados 🎯. Su ausencia
+> **Lo que no se recorta bajo ninguna circunstancia:** los 34 elementos marcados 🎯. Su ausencia
 > invalidaría la demostración en lugar de reducirla. Si el tiempo no alcanza para el núcleo completo, el
 > problema no se resuelve recortando: hay que **renegociar el alcance con el profesor guía y documentar
 > la desviación**, que es lo que la pauta valora frente a un incumplimiento silencioso.
@@ -447,7 +481,7 @@ El riesgo R4 («alcance excesivo para el tiempo disponible») pasa de probabilid
 mantiene bajo control mediante la separación explícita entre **núcleo comprometido** y **alcance
 condicional**, y mediante la revisión de holgura al cierre de cada etapa.
 
-**Reserva para imprevistos:** el 18 % de holgura del núcleo (36 h) constituye la única reserva. No se
+**Reserva para imprevistos:** el 16 % de holgura del núcleo (33 h) constituye la única reserva. No se
 infló ninguna estimación individual: hacerlo habría producido un plan con apariencia de viabilidad sin
 mejorarla, y habría impedido detectar la sobrecarga que esta sección documenta.
 
@@ -478,11 +512,11 @@ no demuestran ninguna.
 | Épicas definidas | ✅ 14, todas vinculadas a un objetivo específico |
 | Historias de usuario | ✅ 25, con rol, capacidad y beneficio |
 | Tareas técnicas | ✅ 39 |
-| Elementos del núcleo demostrativo | ✅ 33 elementos, 165 h |
+| Elementos del núcleo demostrativo | ✅ 34 elementos, 168 h |
 | Criterios de aceptación | ✅ Detallados en los elementos del núcleo; deliberadamente sin refinar en el resto |
 | Estimaciones | ✅ 64 elementos estimados, **279 h** en total, sumadas programáticamente |
 | Priorización | ✅ MoSCoW heredado del catálogo, más orden de ejecución justificado |
-| Verificación de viabilidad | 🔴 **Realizada. El backlog completo excede el presupuesto en 39 %; el núcleo cabe con 18 % de holgura. Redistribución correctiva definida** |
+| Verificación de viabilidad | 🔴 **Realizada. El backlog completo excede el presupuesto en 39 %; el núcleo cabe con 16 % de holgura. Redistribución correctiva definida** |
 
 ## Seguimiento de ejecución
 

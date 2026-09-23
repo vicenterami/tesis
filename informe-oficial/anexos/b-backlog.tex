@@ -59,8 +59,8 @@ del 2 de septiembre.
 \begin{longtable}{@{}C{1.3cm}L{6.1cm}C{0.9cm}C{1.2cm}C{1.0cm}@{}}
 \filaencab \encab{ID} & \encab{Elemento} & \encab{Pr.} & \encab{Etapa} & \encab{Horas} \\ \midrule \endhead
 \textbf{TT-19} & \textbf{(N)}~Esquema de base de datos y migraciones versionadas & M & 2 & 5 \\
-\textbf{HU-07} & \textbf{(N)}~\textbf{Como usuario de consulta}, quiero ver el historial de eventos y mediciones de un dispositivo en un rango de fechas & M & 3 & 4 \\
-\textbf{HU-08} & \textbf{(N)}~\textbf{Como administrador de sitio}, quiero exportar los datos de mi sitio en CSV y JSON, para no depender de la plataforma para conservarlos & M & 3 & 4 \\
+\textbf{HU-07} & \textbf{(N)}~\textbf{Como usuario de consulta}, quiero ver el historial de eventos y mediciones de un dispositivo en un rango de fechas & M & 4 & 4 \\
+\textbf{HU-08} & \textbf{(N)}~\textbf{Como administrador de sitio}, quiero exportar los datos de mi sitio en CSV y JSON, para no depender de la plataforma para conservarlos & M & 4 & 4 \\
 \textbf{HU-09} & \textbf{Como integrador}, quiero consultar los datos del sitio por API, para alimentar sistemas propios & S & 4 & 4 \\
 \end{longtable}
 
@@ -78,16 +78,16 @@ del 2 de septiembre.
 \filaencab \encab{ID} & \encab{Elemento} & \encab{Pr.} & \encab{Etapa} & \encab{Horas} \\ \midrule \endhead
 \textbf{HU-14} & \textbf{(N)}~\textbf{Como administrador de sitio}, quiero que la plataforma detecte que un dispositivo dejó de reportar, porque el silencio de un sensor es indistinguible de que no haya novedades & M & 3 & 7 \\
 \textbf{HU-15} & \textbf{(N)}~\textbf{Como administrador de sitio}, quiero ver la calidad del enlace de cada dispositivo, para anticipar fallas antes de que ocurran & M & 3 & 4 \\
-\textbf{HU-16} & \textbf{(N)}~\textbf{Como administrador de sitio}, quiero un indicador agregado de salud de mi sitio, para saber de un vistazo si algo requiere atención & M & 3 & 4 \\
+\textbf{HU-16} & \textbf{(N)}~\textbf{Como administrador de sitio}, quiero un indicador agregado de salud de mi sitio, para saber de un vistazo si algo requiere atención & M & 4 & 4 \\
 \textbf{HU-17} & \textbf{Como administrador de sitio}, quiero saber qué dispositivos tienen la batería baja, para planificar el mantenimiento & M & 3 & 3 \\
 \end{longtable}
 
 \section{EP-09 --- Seguridad y multi-tenencia}
 \begin{longtable}{@{}C{1.3cm}L{6.1cm}C{0.9cm}C{1.2cm}C{1.0cm}@{}}
 \filaencab \encab{ID} & \encab{Elemento} & \encab{Pr.} & \encab{Etapa} & \encab{Horas} \\ \midrule \endhead
-\textbf{TT-20} & \textbf{(N)}~Autenticación de la recepción mediante credencial por sitio & M & 3 & 4 \\
-\textbf{TT-21} & \textbf{(N)}~Aislamiento de datos entre sitios, verificado con pruebas & M & 3 & 5 \\
-\textbf{TT-22} & \textbf{(N)}~Cifrado del transporte: TLS para HTTP y MQTT & M & 3 & 4 \\
+\textbf{TT-20} & \textbf{(N)}~Autenticación de la recepción mediante credencial por sitio & M & 4 & 4 \\
+\textbf{TT-21} & \textbf{(N)}~Aislamiento de datos entre sitios, verificado con pruebas & M & 4 & 5 \\
+\textbf{TT-22} & \textbf{(N)}~Cifrado del transporte: TLS para HTTP y MQTT & M & 4 & 4 \\
 \textbf{HU-18} & \textbf{Como administrador de sitio}, quiero iniciar sesión con mis credenciales y que existan roles distintos de administración y consulta & M & 3 & 3 \\
 \textbf{TT-39} & Canal de tiempo real autenticado hacia el panel (WebSocket o SSE tras el proxy TLS): sesión verificada al abrir, lista blanca de \texttt{Origin}, límite de tamaño y tasa & M & 3 & 4 \\
 \end{longtable}
@@ -96,7 +96,7 @@ del 2 de septiembre.
 \begin{longtable}{@{}C{1.3cm}L{6.1cm}C{0.9cm}C{1.2cm}C{1.0cm}@{}}
 \filaencab \encab{ID} & \encab{Elemento} & \encab{Pr.} & \encab{Etapa} & \encab{Horas} \\ \midrule \endhead
 \textbf{HU-19} & \textbf{(N)}~\textbf{Como administrador de sitio}, quiero un panel de salud del sitio con semáforo por dispositivo & M & 3 & 9 \\
-\textbf{HU-20} & \textbf{(N)}~\textbf{Como administrador de sitio}, quiero la vista de inventario filtrable por sitio, zona, estado y transporte & M & 3 & 7 \\
+\textbf{HU-20} & \textbf{(N)}~\textbf{Como administrador de sitio}, quiero la vista de inventario filtrable por sitio, zona, estado y transporte & M & 4 & 7 \\
 \textbf{HU-21} & \textbf{(N)}~\textbf{Como usuario de consulta}, quiero el detalle de un dispositivo con sus condiciones abiertas, historial y serie de mediciones & M & 4 & 7 \\
 \textbf{HU-22} & \textbf{Como administrador de sitio}, quiero un asistente guiado para registrar un dispositivo nuevo & M & 4 & 4 \\
 \textbf{HU-23} & \textbf{Como administrador de sitio}, quiero ver mi flota agrupada por tecnología de red, para entender por dónde llega cada cosa & S & 4 & 3 \\
@@ -121,12 +121,12 @@ del 2 de septiembre.
 \section{EP-13 --- Validación y pruebas}
 \begin{longtable}{@{}C{1.3cm}L{6.1cm}C{0.9cm}C{1.2cm}C{1.0cm}@{}}
 \filaencab \encab{ID} & \encab{Elemento} & \encab{Pr.} & \encab{Etapa} & \encab{Horas} \\ \midrule \endhead
-\textbf{TT-27} & \textbf{(N)}~Pruebas automatizadas del contrato de trama (esquema, cuarentena, adaptadores) & M & 3 & 5 \\
+\textbf{TT-27} & \textbf{(N)}~Pruebas automatizadas del contrato de trama (esquema, cuarentena, adaptadores) & M & 4 & 5 \\
 \textbf{TT-28} & \textbf{(N)}~Emulador de nodo por software, que genera eventos y telemetría sintéticos & M & 3 & 5 \\
 \textbf{TT-29} & \textbf{(N)}~Prueba de carga: sostener $\geq$ 50 eventos/segundo sin pérdida (RNF-01) & M & 4 & 4 \\
 \textbf{TT-30} & Prueba de recuperación: ningún evento confirmado se pierde ante reinicio (RNF-05, RNF-06) & M & 4 & 4 \\
 \textbf{TT-31} & Batería de al menos 15 casos de prueba funcionales documentados & M & 4 & 5 \\
-\textbf{TT-32} & Validación de extremo a extremo con al menos un sensor físico & M & 4 & 3 \\
+\textbf{TT-32} & \textbf{(N)}~Validación de extremo a extremo con al menos un sensor físico & M & 3 & 3 \\
 \end{longtable}
 
 \section{EP-14 --- Documentación y entregables académicos}
@@ -143,8 +143,8 @@ del 2 de septiembre.
 \section{Resumen del esfuerzo}
 \begin{longtable}{@{}L{7.0cm}C{2.4cm}C{2.4cm}@{}}
 \filaencab \encab{Conjunto} & \encab{Elementos} & \encab{Horas} \\ \midrule \endhead
-Núcleo demostrativo & 33 & \textbf{165} \\
-Alcance condicional & 31 & 114 \\ \midrule
+Núcleo demostrativo & 34 & \textbf{168} \\
+Alcance condicional & 30 & 111 \\ \midrule
 \textbf{Total del backlog} & \textbf{64} & \textbf{279} \\ \midrule
 Presupuesto disponible (calendario oficial) & --- & $\sim$\textbf{240} \\
 \bottomrule
