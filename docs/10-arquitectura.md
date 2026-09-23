@@ -237,6 +237,22 @@ que compara `visto_por_ultima_vez` contra `intervalo_esperado_s` y abre la condi
 El orden del tiempo no importa para la serie: `medicion` se indexa por `(canal_id, tiempo)`, y una lectura
 que llega tarde (nodo sin cobertura que reenvía su cola) se inserta en su instante real (regla 7 de `docs/13`).
 
+**Hallazgo al contenedorizar (23/09/2026): el barrido periódico SÍ podía tumbar el proceso.** El
+pipeline normal está protegido (`BrokerService` atrapa el rechazo de cada mensaje), pero el
+temporizador del supervisor (M4) no tenía quien atrapara el suyo: una consulta fallida durante el
+barrido era un rechazo sin manejar y **terminaba todo el proceso**, no solo ese ciclo. Probado
+plantando la caída de la base con la pila en contenedores: sin el arreglo, el backend entraba en un
+ciclo de reinicios (`docker inspect` mostraba `restarts` subiendo); con `barridoSeguro()`
+(`try/catch` alrededor de `barrer()`, con registro de error) el proceso sigue vivo, `GET /salud`
+informa el problema con honestidad (código 500, no oculta nada) y el siguiente barrido, un minuto
+después, se ejecuta normal en cuanto la base vuelve. Cero reinicios en la prueba repetida.
+
+**Límite conocido de `/salud` (mismo hallazgo).** El endpoint solo verifica la base; con el broker
+caído responde `200 ok` igual, porque `BrokerService` reconecta solo y no lo consulta. No es un error:
+hoy nada depende de que `/salud` refleje el broker, y `BrokerService` ya registra sus propios avisos
+de conexión. Si más adelante el healthcheck del contenedor necesita reflejar también el broker, es un
+cambio de diseño (qué significa «sano»), no una corrección: se decide en `docs/10` primero.
+
 ## 5. Secuencia: panel en tiempo real (patrón B)
 
 ```mermaid
@@ -288,7 +304,7 @@ flowchart TB
             C5["proxy<br/>Caddy · TLS automático<br/>límite 0,1 GB · publica 443, 8883, 1700/udp"]
             C1["mosquitto<br/>eclipse-mosquitto 2.0.22<br/>límite 0,25 GB"]
             C2["chirpstack<br/>+ redis propio<br/>límite 0,35 GB"]
-            C4["backend<br/>imagen propia: NestJS + panel estático<br/>límite 0,5 GB · sin estado"]
+            C4["backend<br/>imagen propia: NestJS (Etapa 2); + panel estático cuando exista<br/>límite 0,5 GB · sin estado"]
             C3["timescaledb<br/>timescale/timescaledb 2.24.0-pg16<br/>límite 0,75 GB"]
         end
         V4[("vol: certificados")]
@@ -317,6 +333,17 @@ respaldo cubre todo, y la extensión TimescaleDB no interfiere (ChirpStack solo 
 `hstore`, presentes en la imagen). Redis sí es propio: ChirpStack lo exige y es pequeño (~10 MB).
 El backend **no guarda estado**: se puede
 destruir y recrear sin perder nada, lo que simplifica actualizaciones y pruebas.
+
+**Imagen del backend (23/09/2026).** *Multi-stage*: una etapa `build` con Node 22 completo compila
+TypeScript a JavaScript (`pnpm build`); la imagen final parte de la variante *slim* de Node 22, copia
+solo `dist/` y las dependencias de producción (`pnpm install --prod --frozen-lockfile`), y no lleva
+compilador, `devDependencies` ni el código fuente. Así la imagen que corre es más chica y no puede
+usarse para reconstruir nada por dentro. Corre como usuario **sin privilegios** (`USER node`, ya en la
+imagen oficial), con `security_opt: no-new-privileges` en el compose. El `HEALTHCHECK` llama a
+`GET /salud` (ya implementado, `src/salud`): confirma que el proceso responde y que su conexión a la
+base está viva, no solo que el proceso existe. El **panel Svelte no existe aún en el código** (Etapa
+3): la imagen de hoy sirve solo la API; cuando el panel exista, una etapa adicional lo compila y el
+backend estático lo sirve, sin cambiar esta estructura.
 
 **Dónde escucha el backend** (decidido el 23/09/2026; el código sigue a este texto). Fuera de Docker,
 en desarrollo, escucha solo en `127.0.0.1` (variable `HTTP_INTERFAZ`, valor por defecto). Dentro del

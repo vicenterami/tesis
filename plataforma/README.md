@@ -38,7 +38,7 @@ docker run --rm -v "$PWD/mosquitto/config:/c" eclipse-mosquitto:2.0.22 \
 docker run --rm -v "$PWD/mosquitto/config:/c" eclipse-mosquitto:2.0.22 \
   sh -c 'chown 1883:1883 /c/passwd && chmod 0640 /c/passwd'
 
-docker compose up -d                 # descarga imágenes, crea red, volúmenes y arranca
+docker compose up -d                 # descarga imágenes, construye el backend, crea red, volúmenes y arranca
 docker compose ps                    # estado y healthchecks
 docker compose logs -f timescaledb   # ver el esquema aplicándose la primera vez
 docker stats                         # memoria y CPU reales por contenedor
@@ -56,6 +56,14 @@ Probar el broker (publicar como un dispositivo de prueba requiere crearle usuari
 
 ```bash
 docker compose exec mosquitto mosquitto_sub -u backend -P 'LA_CLAVE_DE_MQTT_BACKEND_CLAVE' -t 'sitio/#' -v
+```
+
+Probar el backend contenedorizado (`docker compose ps` debe mostrarlo `healthy`; el override publica su
+puerto solo en `127.0.0.1`, igual que el resto):
+
+```bash
+curl http://127.0.0.1:3000/salud    # {"estado":"ok","base":"conectada","tablas":13}
+# http://127.0.0.1:3000/docs en el navegador → contrato OpenAPI
 ```
 
 ## Conceptos de Docker que aparecen aquí

@@ -8,3 +8,6 @@ services:
   mosquitto:
     ports:
       - "127.0.0.1:1883:1883"   # ídem para el broker y para las pruebas con mosquitto_pub/sub
+  backend:
+    ports:
+      - "127.0.0.1:3000:3000"   # para probar la imagen contenedorizada desde el equipo (curl, /docs)

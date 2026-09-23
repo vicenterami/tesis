@@ -165,3 +165,12 @@ libre en SQL.
 - Errores de restricción de la base (`23505` unicidad, `23503` FK) se traducen a un `4xx` con mensaje
   para la persona; un `5xx` es un defecto nuestro, no del usuario (aplica desde M3).
 - Nunca `SELECT *` sobre `usuario` ni `credencial`: columnas explícitas, el hash no sale de la base.
+
+## Imagen del contenedor (`Dockerfile`)
+
+*Multi-stage* (`docs/10 §6`): la etapa `build` usa Node completo para compilar (`pnpm build`); la
+imagen final (`runtime`) parte de la misma base *slim*, solo lleva `dist/` y las dependencias de
+producción, corre como usuario sin privilegios (`node`) y expone un `HEALTHCHECK` contra `GET /salud`.
+El almacén de pnpm se borra explícitamente tras instalar (`pnpm store prune` no basta: no borra lo que
+sigue referenciado). El panel Svelte no existe todavía en el código: cuando exista, se agrega como una
+etapa más sin cambiar esta estructura.

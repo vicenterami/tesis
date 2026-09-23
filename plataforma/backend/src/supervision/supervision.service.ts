@@ -20,12 +20,24 @@ export class SupervisionService implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit(): void {
     const cadaSeg = this.config.get<number>('SUPERVISION_INTERVALO_S', 60);
-    this.temporizador = setInterval(() => void this.barrer(), cadaSeg * 1000);
+    this.temporizador = setInterval(() => void this.barridoSeguro(), cadaSeg * 1000);
     this.log.log(`barrido de salud cada ${cadaSeg} s`);
   }
 
   onModuleDestroy(): void {
     if (this.temporizador) clearInterval(this.temporizador);
+  }
+
+  // El temporizador NO tiene quien atrape una promesa rechazada (no hay petición HTTP de por medio,
+  // a diferencia del pipeline): sin este try/catch, una base caída al momento del barrido tira abajo
+  // TODO el proceso con un rechazo no manejado (docs/10 §4.1; hallazgo del 23/09/2026, visto al
+  // dockerizar: la base caída dejaba al backend en un ciclo de caídas en vez de saltarse el ciclo).
+  async barridoSeguro(): Promise<void> {
+    try {
+      await this.barrer();
+    } catch (e) {
+      this.log.error(`barrido de salud falló, se reintenta en el próximo ciclo: ${(e as Error).message}`);
+    }
   }
 
   async barrer(): Promise<void> {

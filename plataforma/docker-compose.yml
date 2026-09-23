@@ -58,6 +58,34 @@ services:
           memory: 256M
           cpus: "0.5"
 
+  # ── Backend (API + pipeline + supervisor) ────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      DB_NOMBRE: ${DB_NOMBRE}
+      DB_USUARIO: ${DB_USUARIO}
+      DB_CLAVE: ${DB_CLAVE}
+      DB_HOST: timescaledb                        # nombre del servicio en la red interna (docs/10 §6)
+      MQTT_URL: mqtt://mosquitto:1883
+      MQTT_BACKEND_CLAVE: ${MQTT_BACKEND_CLAVE}
+      HTTP_INTERFAZ: 0.0.0.0                       # todas las interfaces DEL CONTENEDOR; sin `ports` no se ve desde fuera
+    depends_on:
+      timescaledb:
+        condition: service_healthy
+      mosquitto:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.5"
+    # Sin `ports`: solo se alcanza vía proxy (Etapa 3) o desde otro contenedor de esta red (docs/10 §2 y §6).
+    # El HEALTHCHECK ya viene definido en el Dockerfile (llama a GET /salud).
+
 volumes:
   datos-timescale:
   datos-mosquitto:
