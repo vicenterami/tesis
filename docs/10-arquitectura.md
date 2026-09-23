@@ -350,10 +350,35 @@ separados.
 3. **Retención**: política de borrado de `cuarentena` a los 30 días, igual que la compresión de
    `medicion`. Una trama basura de hace dos meses no diagnostica nada.
 
+4. **Avisar a quien puede arreglarlo, con lo que necesita para arreglarlo.** Detectar sin notificar
+   no sirve: hoy la evidencia queda en una tabla que solo mira quien sabe SQL. La condición
+   `datos_invalidos` debe aparecer en el panel como las demás (RF-47, RF-48) y notificar (RF-36,
+   RF-37), y el aviso debe ser **accionable**, no un código de error. Tres datos, que la plataforma
+   ya tiene:
+   - **Qué llegó y qué se esperaba**: el motivo (`malformada`, `invalida`, `desconocido`), una
+     muestra de la trama cruda y la regla que no se cumplió —«se esperaba un número o un pack SenML;
+     llegó `{"temp":"alto"}`», «la unidad `furlongs` no es convertible a `Cel`», «el canal
+     `presion` no está declarado para este dispositivo»—. Con eso, quien administra el sensor sabe
+     qué tocar en su firmware o en su configuración sin pedirle ayuda a nadie.
+   - **Cuánto lleva costando**: «este dispositivo lleva 3 días enviando 288 tramas diarias que no se
+     guardan». Un contador hace visible un desperdicio que hoy es invisible, y convierte «algún día
+     lo reviso» en una tarea con tamaño.
+   - **Qué se gana al corregirlo**: la medición vuelve a las series y la condición se cierra sola con
+     la primera trama válida.
+
+**Un límite honesto de esta idea.** Recibir y analizar la trama es un costo inevitable: hay que
+autenticarla y tratar de interpretarla para saber que es inválida. Lo que la propuesta ahorra es el
+**almacenamiento y el ruido** —miles de filas idénticas y un índice que crece— no el cómputo de los
+filtros 1 y 2. Si un dispositivo mal configurado llegara a ser un problema de carga y no solo de
+ruido, el instrumento correcto es el limitador de tasa por dispositivo ya previsto para la Etapa 3,
+y aun así nunca se descarta en silencio: el contador y la condición siguen registrando lo que se
+dejó de guardar. Y se asume la posibilidad contraria: que el formato esté bien y el equivocado sea
+nuestro adaptador. Por eso la muestra cruda se conserva siempre, aunque el resto se cuente.
+
 **Qué decidir antes de implementar:** los tres números (*N* tramas para abrir, *k* muestras por
-ventana, días de retención) y si la condición debe notificar como las demás. Entra en la Etapa 3,
-después del Dockerfile y del proxy. Al aprobarse: primero este documento y el diagrama, después el
-código (regla de concordancia).
+ventana, días de retención), el texto exacto del aviso al operador y si notifica por correo o solo
+en el panel. Entra en la Etapa 3, después del Dockerfile y del proxy. Al aprobarse: primero este
+documento y el diagrama, después el código (regla de concordancia).
 
 ### 8.2 Numeración de los filtros 5 y 6 (propuesta, 23/09/2026)
 
