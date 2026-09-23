@@ -1,5 +1,5 @@
 # Verificación automática del backend en cada push y pull request (TT-03).
-# Solo lo que no necesita base ni broker: tipos, lint y pruebas unitarias. Lo que sí las necesita
+# Solo lo que no necesita base ni broker: tipos, lint, pruebas unitarias y auditoría de dependencias. Lo que sí las necesita
 # (esquema, migraciones, API) corre en local con plataforma/pruebas/verificar-todo.sh.
 name: verificar
 on:
@@ -30,3 +30,5 @@ jobs:
           cache-dependency-path: plataforma/backend/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm verificar
+      # SCA: dependencias con vulnerabilidades conocidas (docs/11 §4). Falla con severidad alta o crítica.
+      - run: pnpm audit --audit-level=high

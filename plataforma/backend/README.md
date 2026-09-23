@@ -6,7 +6,7 @@ Recibe las tramas del broker, las pasa por el pipeline y expone la API. Diseño 
 
 ```
 src/
-├── main.ts                    # arranque; escucha en 127.0.0.1:3000 en desarrollo
+├── main.ts                    # arranque; escucha en HTTP_INTERFAZ:HTTP_PUERTO (127.0.0.1:3000 en desarrollo)
 ├── app.module.ts              # módulo raíz: junta los demás
 ├── db/db.module.ts            # pool de conexiones a TimescaleDB (SQL directo, driver pg)
 ├── broker/broker.service.ts   # conexión MQTT como usuario "backend"; reparte tramas

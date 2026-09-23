@@ -269,8 +269,13 @@ panel y limita el tamaño y la tasa de lo que recibe. Son las recomendaciones de
 que no trae autenticación propia (`docs/11 §4`). Como el canal es casi unidireccional —el servidor
 empuja, el navegador solo elige qué canal mira—, la alternativa **SSE** (*Server-Sent Events*: HTTP
 unidireccional, reconexión nativa, sin biblioteca extra) es más simple y cabe en el mismo 443.
-**WebSocket frente a SSE queda como decisión abierta para la Etapa 3** (§8.3); ninguna de las dos
-toca el broker.
+**WebSocket frente a SSE queda como decisión abierta para la Etapa 3** (§8.3; los diagramas muestran
+WebSocket como opción por defecto); ninguna de las dos toca el broker.
+
+> Fuentes (consultadas el 23/09/2026): OWASP, *WebSocket Security Cheat Sheet*,
+> https://cheatsheetseries.owasp.org/cheatsheets/WebSocket_Security_Cheat_Sheet.html · NestJS, *Gateways*
+> (los guards de HTTP aplican igual a los gateways), https://docs.nestjs.com/websockets/gateways · NestJS,
+> *Authentication*, https://docs.nestjs.com/security/authentication
 
 ## 6. Vista de despliegue (Docker Compose)
 
@@ -331,6 +336,12 @@ sobre esta única instancia. Si algún día hiciera falta repartir carga entre v
 documentado es: suscripciones compartidas de MQTT 5 (`$share/<grupo>/sitio/#`, admitidas por
 Mosquitto) para que las instancias se repartan las tramas, y `cluster` o `worker_threads` de Node para
 ocupar más núcleos. No está en el alcance: RNF-17 fija un servidor de 2 GB y RNF-14 un único servidor.
+
+> Fuentes (consultadas el 23/09/2026): Docker, *Networking overview* («ports are not accessible from
+> outside the host» sin `--publish`), https://docs.docker.com/engine/network/ · Node.js, *The Node.js
+> Event Loop*, https://nodejs.org/en/learn/asynchronous-work/event-loop-timers-and-nexttick · Node.js,
+> *Cluster*, https://nodejs.org/api/cluster.html · Eclipse Mosquitto, *mosquitto.conf(5)*
+> (`max_queued_messages`, por defecto 1000 por cliente), https://mosquitto.org/man/mosquitto-conf-5.html
 
 ## 7. Trazabilidad con los requerimientos
 
@@ -427,6 +438,6 @@ diseño (regla de concordancia): tras autenticar, el filtro 6 corre siempre.
       (filtro 2) — ver bitácora de acuerdos.
 - [ ] Decidir el proxy inverso definitivo (Caddy por TLS automático vs. Nginx por familiaridad y por
       traer limitador de tasa nativo; Caddy no hace TLS para MQTT sin módulo externo).
-- [ ] Dockerfile del backend y su servicio en el compose (hoy solo corren dos contenedores): requiere
-      `HTTP_INTERFAZ` (§6) y `DB_HOST`/`MQTT_URL` por nombre de servicio (`.env.example`).
+- [ ] Dockerfile del backend y su servicio en el compose (hoy solo corren dos contenedores). El código ya lee
+      `HTTP_INTERFAZ` (§6, 23/09) y `DB_HOST`/`MQTT_URL`; en el compose van por nombre de servicio (`.env.example`).
 - [ ] Decidir WebSocket o SSE para el canal de tiempo real (§5) antes de implementar TT-39 (Etapa 3).

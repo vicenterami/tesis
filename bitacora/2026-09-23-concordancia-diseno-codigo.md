@@ -21,6 +21,8 @@ el navegador (OWASP, documentación de Docker, Node y NestJS).
 | 5 | **Rust** entra a la matriz de tecnología con los mismos criterios | Era la preferencia personal del autor y no había sido evaluada; queda igual que Go (2,65): lo descarta el tiempo de aprendizaje, no su calidad | `docs/02 §6.5`, anexo C |
 | 6 | `.env.example` declara las diez variables que el backend lee y un guardián lo verifica | Faltaban siete, una obligatoria: quien clonara el repo no arrancaba el backend | `plataforma/.env.example`, `verificar-todo.sh` 2d, `docs/11 §7` |
 | 7 | Quitar los vestigios del protocolo descartado que quedaban en el backlog y en el catálogo | Contradecían el pivote del 02/09 (criterio del MVP, HU-04, HU-08, ventaja L-D) | `docs/02`, `docs/04` |
+| 8 | **Auditar dependencias en el CI** (`pnpm audit --audit-level=high`) y cerrar los 22 avisos (10 altos) que había | Tipos, lint y pruebas estaban en verde y aun así el backend arrastraba vulnerabilidades conocidas: «verde» no incluía dependencias. NestJS 11.2.5 (no 11.2.6, publicada ese día: pnpm exige 24 h de antigüedad y esa guardia no se salta), CLI 11.0.24 y tres *overrides* dejan 0 | `docs/11 §4`, workflow del CI, `package.json`, `pnpm-workspace.yaml` |
+| 9 | El backend lee `HTTP_INTERFAZ` (por defecto solo este equipo; `0.0.0.0` en contenedor), con `\|\|` y no `??` | Probado en ejecución: una variable vacía habría abierto todas las interfaces en silencio. Cuatro pruebas unitarias | `src/arranque.ts`, `main.ts`, `.env.example`, `docs/10 §6` |
 
 ## 3. Totales que cambian (recalculados sumando las filas)
 
@@ -34,7 +36,7 @@ el navegador (OWASP, documentación de Docker, Node y NestJS).
 
 ## 4. Pendiente
 
-- [ ] Dockerfile del backend y su servicio en el compose (`docs/10 §8.3`).
+- [ ] Dockerfile del backend y su servicio en el compose (`docs/10 §8.3`); la interfaz de escucha ya está resuelta.
 - [ ] Decidir WebSocket o SSE antes de implementar TT-39 (Etapa 3).
 - [ ] Plan B para el riesgo R1 (hardware): nodo propio publicando SenML por Wi-Fi, con fecha límite de activación.
 - [ ] Entrevistas: a la espera de los contactos solicitados el 22/09.

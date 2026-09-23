@@ -66,10 +66,24 @@
 | 2–3 | Canal de tiempo real hacia el panel (TT-39): solo `wss` vía proxy; sesión del panel verificada en el apretón de manos (rechazar antes de aceptar); lista blanca de `Origin`; ningún token en la URL; límite de tamaño (≤ 64 KB) y de tasa; todo mensaje entrante se valida. Fuente: OWASP, *WebSocket Security Cheat Sheet* | Etapa 3 |
 | 7 | Sistema de archivos de solo lectura + `tmpfs` donde el servicio lo tolere | Endurecimiento |
 | 7 | Escaneo de vulnerabilidades de imágenes (`docker scout` o Trivy) antes de cada entrega | Etapa 3 |
+| 7 | **Análisis de dependencias (SCA):** `pnpm audit --audit-level=high` en el CI. Estado al 23/09/2026: 22 avisos (10 altos), todos en dependencias transitivas de NestJS y su CLI (`multer`, `path-to-regexp`, `lodash`, `glob`, `picomatch`…); tipos, lint y pruebas estaban en verde, así que «verde» no incluía dependencias. Corrección aplicada el mismo día (probada antes en una copia): actualizar NestJS a 11.2.5 (no a 11.2.6, publicada ese día: pnpm 12 no instala versiones con menos de 24 h por defecto, `minimumReleaseAge`, y esa guardia no se salta) y la CLI a 11.0.24 baja a 7 avisos; tres *overrides* (`ajv ≥ 8.18`, `multer ≥ 2.3`, `picomatch ≥ 4.0.4`) dejan 0, con las 22 pruebas en verde. El paso queda en el CI para que no vuelva a pasar en silencio | ✅ 23/09/2026 |
+| 8 | **Escaneo de secretos** en el CI (`gitleaks`, MIT, con acción oficial `gitleaks/gitleaks-action`), además del `.gitignore` y del hook local: detecta una clave que se cuele en un commit antes de que el repo sea público. Al publicarlo, GitHub activa además su *secret scanning* por defecto | Antes de publicar el repo |
+| 5 | **Análisis estático (SAST)** del backend: reglas de seguridad de ESLint y, cuando el repo sea público, *code scanning* con CodeQL (GitHub lo habilita por defecto en repositorios públicos; en privados exige licencia) | Etapa 3 |
 | 8 | Respaldo diario automático de la base (`pg_dump` a un volumen aparte) + prueba de restauración | Antes de datos reales |
 | 8 | Límite de conexiones y de tamaño de mensaje en el broker (`max_connections`, `message_size_limit`) | Endurecimiento |
 
 ## 5. Operación segura: reglas para no destruir el propio trabajo
+
+**Antes de aceptar un cambio de código** (propio, de una biblioteca, de un ejemplo o de un asistente),
+cinco preguntas; si alguna no tiene respuesta, el cambio no entra:
+
+| # | Pregunta | Dónde se responde en este proyecto |
+|---|---|---|
+| 1 | **Concurrencia:** ¿qué pasa si corre mientras otro está usando los datos? | Índice único `(canal_id, tiempo)` + `ON CONFLICT`; una condición abierta por tipo (`docs/08 §6`) |
+| 2 | **Reejecución y fallo a medias:** ¿qué pasa si corre dos veces o se corta a la mitad? | Inserción idempotente; migraciones repetibles; entrega «al menos una vez» (`docs/10 §4.1`) |
+| 3 | **Verificación:** ¿cómo sé que funcionó, más allá de que no dio error? | Guardianes que se prueban plantando la violación (`verificar-todo.sh`); un archivo generado se abre |
+| 4 | **Entorno hostil:** ¿qué pasa si la base, la red o el broker no están? | Tabla de caídas de `docs/10 §4.1`; pérdida conocida si cae la base (pendiente `manualAck`) |
+| 5 | **Comprensión:** ¿puedo explicar esta línea a otra persona sin releerla? | Los comentarios del backend explican el *porqué*; lo que no se entiende no se acepta |
 
 **Comandos que borran datos** (conocerlos es la primera defensa):
 
