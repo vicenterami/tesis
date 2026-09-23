@@ -10,6 +10,9 @@ import { RecepcionService } from './recepcion.service';
 // «vivo» es salud del enlace, no calidad del dato. Un dispositivo autenticado que manda una trama
 // que ningún adaptador entiende va a cuarentena Y se marca vivo; uno desconocido, ni lo uno ni lo otro.
 describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar', () => {
+  // Las cuarentenas que esta prueba provoca a propósito escriben WARN en el registro. Se dejan ver a
+  // propósito (decisión del 23/09): el ruido de un rechazo es evidencia de que el filtro actúa; silenciarlo
+  // esconde comportamiento.
   const TOPICO = 'sitio/uct/dispositivo/dev-0001/temperatura';
 
   function armar(dispositivo: { id: string; estado: string } | undefined) {
