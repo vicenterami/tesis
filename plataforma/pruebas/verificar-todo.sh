@@ -46,6 +46,15 @@ if grep -rniE "ingesta|heterog[eé]ne" docs/ informe-oficial/*.tex informe-ofici
   fallos=$((fallos+1))
 else echo "OK    sin «ingesta» ni «heterogéneo»"; fi
 
+paso "2d. Variables de entorno: toda variable que lee el backend está declarada en plataforma/.env.example (docs/11 §7)"
+leidas=$(grep -rhoE "(config\.get(OrThrow)?<[a-z]+>\('|process\.env\.)[A-Z_]+" plataforma/backend/src --include=*.ts | grep -v spec | grep -oE "[A-Z_]{3,}$" | grep -vx TZ | sort -u)
+declaradas=$(grep -oE "^#?[A-Z_]+=" plataforma/.env.example | tr -d '#=' | sort -u)
+faltan=$(comm -23 <(echo "$leidas") <(echo "$declaradas"))
+if [ -n "$faltan" ]; then
+  echo "FALLA variables leídas por el código sin declarar en .env.example:"; echo "$faltan" | sed 's/^/  /'
+  fallos=$((fallos+1))
+else echo "OK    $(echo "$leidas" | wc -l) variables leídas, todas declaradas en .env.example"; fi
+
 paso "3. Diagramas: informe = docs = base (generar-figuras.sh --verificar)"
 bash informe-oficial/figuras/generar-figuras.sh --verificar || fallos=$((fallos+1))
 

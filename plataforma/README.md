@@ -33,7 +33,7 @@ openssl rand -base64 24              # generar una clave por variable
 docker run --rm -v "$PWD/mosquitto/config:/c" eclipse-mosquitto:2.0.22 \
   mosquitto_passwd -c -b /c/passwd sonda   'LA_CLAVE_DE_MQTT_SONDA_CLAVE'
 docker run --rm -v "$PWD/mosquitto/config:/c" eclipse-mosquitto:2.0.22 \
-  mosquitto_passwd    -b /c/passwd backend 'OTRA_CLAVE'
+  mosquitto_passwd    -b /c/passwd backend 'LA_CLAVE_DE_MQTT_BACKEND_CLAVE'
 # El archivo queda propiedad de root; el broker corre como uid 1883 y debe poder leerlo:
 docker run --rm -v "$PWD/mosquitto/config:/c" eclipse-mosquitto:2.0.22 \
   sh -c 'chown 1883:1883 /c/passwd && chmod 0640 /c/passwd'
@@ -55,7 +55,7 @@ docker compose exec timescaledb psql -U plataforma -d plataforma \
 Probar el broker (publicar como un dispositivo de prueba requiere crearle usuario en `passwd`):
 
 ```bash
-docker compose exec mosquitto mosquitto_sub -u backend -P 'OTRA_CLAVE' -t 'sitio/#' -v
+docker compose exec mosquitto mosquitto_sub -u backend -P 'LA_CLAVE_DE_MQTT_BACKEND_CLAVE' -t 'sitio/#' -v
 ```
 
 ## Conceptos de Docker que aparecen aquí
