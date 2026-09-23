@@ -23,9 +23,9 @@
 
 \node[caja, below=5mm of br.south, anchor=north, text width=13.2cm, xshift=0.15cm,
       draw=grislinea, fill=grisclaro, font=\scriptsize, align=left]
-  {Los mensajes se organizan en \textbf{tópicos}, con forma de ruta:
-   \texttt{sitio/temuco/invernadero-2/sensor-007/temperatura}\\[3pt]
-   Quien se suscribe a \texttt{sitio/temuco/\#} recibe todo lo del sitio \textbf{sin necesidad de saber
+  {Los mensajes se organizan en \textbf{tópicos}, con forma de ruta. En esta plataforma:
+   \texttt{sitio/\textless sitio\textgreater/dispositivo/\textless id\_fisico\textgreater/\textless magnitud\textgreater}, por ejemplo \texttt{sitio/uct/dispositivo/dev-0001/temperatura}\\[3pt]
+   Quien se suscribe a \texttt{sitio/uct/\#} recibe todo lo del sitio \textbf{sin necesidad de saber
    qué sensores existen}. Añadir un consumidor nuevo no obliga a modificar ningún sensor.};
 
 \end{tikzpicture}}

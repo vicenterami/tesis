@@ -2,32 +2,20 @@
 
 \textbf{Sobre el diseño.} La plataforma quedó descrita desde varias vistas con notaciones reconocidas
 —C4, entidad-relación, secuencias UML— y cada decisión está justificada y trazada a los requerimientos
-que materializa (capítulo~\ref{cap:diseno}). Dos rasgos la distinguen de un panel de visualización: el
-pipeline de seis filtros con cuarentena, que impide que una trama llegue a las series sin autenticarse,
-analizarse, validarse y normalizarse, y el modelo interno único, que hace indistinguibles una trama
-LoRaWAN y una Wi-Fi una vez superado el filtro de análisis.
+que materializa (capítulo~\ref{cap:diseno}): el pipeline de seis filtros con cuarentena, que impide que
+una trama llegue a las series sin validarse, y el modelo interno único, que hace indistinguibles una
+trama LoRaWAN y una Wi-Fi tras el filtro de análisis.
 
 \textbf{Sobre la implementación adelantada.} El pipeline, la normalización de marcas de tiempo, la
 autenticación de la recepción, los umbrales y la API de consulta, previstos para la Etapa~3, están
-implementados y verificados. Implementar temprano obligó a tomar decisiones que en el papel habrían
-quedado ambiguas —la unicidad de una condición por regla, la plausibilidad del reloj de un nodo, la
-entrega «al menos una vez» con inserción idempotente— y a corregir el esquema con migraciones antes de
-que hubiera datos reales. El núcleo mínimo demostrable acotado tras la retroalimentación ya existe.
+implementados y verificados: implementar temprano obligó a decisiones que en el papel habrían quedado
+ambiguas —unicidad de una condición por regla, plausibilidad del reloj, entrega «al menos una vez» con
+inserción idempotente— antes de que hubiera datos reales. El núcleo mínimo demostrable ya existe.
 
-\textbf{Sobre la concordancia.} Las figuras de diseño se generan desde la documentación versionada y,
-el modelo de datos, desde el esquema real de la base; una verificación automática falla si informe,
-documentación o sistema difieren. El método detectó y corrigió cinco discrepancias entre el modelo
-documentado y el implementado. La documentación deja de envejecer: es una proyección del sistema.
+\textbf{Sobre la concordancia y la ligereza.} Las figuras se generan desde la documentación versionada
+y, el modelo de datos, desde el esquema real de la base; una verificación automática falla si informe,
+documentación o sistema difieren, y así detectó y corrigió cinco discrepancias esta etapa. El consumo en reposo es inferior a 100~MB; la comparación formal contra el referente queda para
+el banco de pruebas de la Etapa~4.
 
-\textbf{Sobre la ligereza.} El consumo medido en reposo de base de datos y broker es inferior a
-100~MB, y la suma de techos de los cinco contenedores es de 1,95~GB frente a los 4~GB que exige el
-referente. La comparación formal queda para el banco de pruebas de la Etapa~4, con protocolo escrito
-antes de medir.
-
-\textbf{Sobre la retroalimentación y lo pendiente.} Las seis observaciones del profesor guía sobre la
-Etapa~1 se tradujeron en cambios concretos (sección~\ref{sec:retro}): destinatario único, evidencia
-de las causas, OE1 con un plazo único y medible, alcance en dos niveles y umbrales de validación en OE5. La brecha que
-persiste es el levantamiento directo con las partes interesadas, ahora programado y gestionado vía
-profesor guía. El formato real de las tramas del compañero se fijará con la primera trama en octubre.
-Generalizar la plataforma a otras organizaciones queda fuera del alcance de este trabajo. La Etapa~3 concentra las entrevistas, el aprovisionamiento por API, la identidad de usuarios, la
-entrada HTTP, el cifrado del transporte y las pruebas automatizadas del contrato de trama.
+\textbf{Sobre la retroalimentación.} Las seis observaciones del profesor guía se tradujeron en
+cambios concretos (sección~\ref{sec:retro}); la brecha que persiste son las entrevistas solicitadas, que abren la Etapa~3.

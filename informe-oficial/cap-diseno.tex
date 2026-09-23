@@ -12,9 +12,8 @@ real de la base, de modo que lo descrito aquí es lo que está implementado.
 
 \section{Vista de contenedores y frontera del trabajo}
 
-La figura~\ref{fig:contenedores} muestra las piezas ejecutables y cómo se comunican. La
-\textbf{frontera} con el trabajo del compañero es el tópico MQTT: la red de sensores (nodos, gateway,
-radio) es suya; todo lo que ocurre desde que una trama llega al broker es de este trabajo.
+La figura~\ref{fig:contenedores} muestra las piezas ejecutables y cómo se comunican; la frontera con
+el trabajo del compañero —el tópico MQTT— ya se definió en la sección~\ref{sec:frontera}.
 
 \input{figuras/contenedores}
 
@@ -64,7 +63,7 @@ conecta un sensor sin tocar su red.
 
 La seguridad se diseñó en capas, asumiendo en cada una que la anterior falló: (1)~red: solo 443, 8883
 y 1700/udp publicados; (2)~TLS obligatorio en producción; (3)~identidad: broker sin conexiones anónimas,
-usuario MQTT igual al identificador físico, contraseñas con hash; (4)~lista de control de acceso por
+usuario MQTT igual al identificador físico, contraseñas con hash; (4)~lista de control de acceso (ACL) por
 patrón: cada dispositivo escribe solo bajo su propio identificador, lo que impide la suplantación entre
 nodos; (5)~el pipeline valida y envía a cuarentena; (6)~datos: base sin puerto expuesto, una credencial
 por servicio; (7)~contenedores sin escalada de privilegios, con versión de imagen fijada y techo de
@@ -90,8 +89,12 @@ La figura~\ref{fig:sec-pipeline} detalla el aporte central del trabajo, organiza
 \emph{pipes and filters} \parencite{posa1}. Cada filtro tiene una salida que
 continúa y una de rechazo hacia la cuarentena; ninguna trama llega a las series sin superar los seis.
 El orden importa: autenticar primero evita gastar recursos en tramas de desconocidos; validar antes de
-normalizar evita convertir basura; supervisar después de guardar garantiza que «visto por última vez»
-refleje una lectura real. El filtro de análisis delega en \textbf{adaptadores} intercambiables —SenML
+normalizar evita convertir basura. Los dos últimos filtros trabajan a distinta escala: el de alertas
+evalúa \emph{cada lectura} guardada, porque un umbral se cruza por valor; el de supervisión se ejecuta
+\emph{una vez al cerrar la trama}, porque lo que registra no es un dato sino un hecho del enlace —este
+dispositivo se comunicó—, y por eso marca al dispositivo como visto aunque sus lecturas hayan ido a
+cuarentena: un nodo que publica tramas malformadas está vivo y mal configurado, no en silencio, y
+confundir ambos casos manda al operador a buscar la falla donde no está. El filtro de análisis delega en \textbf{adaptadores} intercambiables —SenML
 \parencite{rfc8428} como contrato nativo y un formato plano para nodos simples—, de modo que admitir el formato de un nuevo
 fabricante es agregar una clase, no modificar el pipeline (RF-04). La entrega desde el broker es
 «al menos una vez»: QoS~1 con sesión persistente, de modo que si el backend cae el broker conserva la
@@ -130,7 +133,7 @@ diseño son: (1)~todo instante se almacena en UTC (\texttt{timestamptz}); (2)~la
 emisor es un instante absoluto, y se acepta solo si es plausible: sin marca, anterior al año 2000 o más
 de dos minutos en el futuro se reemplaza por la hora de recepción, mientras que una marca antigua pero
 válida se respeta, porque un nodo que acumuló lecturas sin cobertura reporta tiempos legítimamente
-viejos; (3)~cada sitio declara su zona con nombre IANA, nunca un desfase fijo; (4)~\textbf{toda pregunta
+viejos; (3)~cada sitio declara su zona con nombre de la base IANA (\emph{Internet Assigned Numbers Authority}), nunca un desfase fijo; (4)~\textbf{toda pregunta
 de «día» se responde dentro de la base, en la zona del sitio}; (5)~la API entrega instantes en ISO~8601
 \parencite{iso8601} con sufijo \texttt{Z} —el perfil de internet RFC~3339 \parencite{rfc3339}—, también los
 que viajan dentro de JSON armado en SQL. Se verificó en la base que
@@ -164,7 +167,7 @@ memoria mínima del servidor sí, y la fija el RNF-17.
 
 Se compararon cinco alternativas de alojamiento que ejecutan el mismo despliegue, con precios
 consultados el 10 de septiembre de 2026 y convertidos con el dólar observado de la fecha
-(cuadro~\ref{tab:alojamiento}, anexo~\ref{anx:evaluacion}). La recomendación es un \textbf{VPS internacional de 2~vCPU y 4~GB} (del
+(cuadro~\ref{tab:alojamiento}, anexo~\ref{anx:evaluacion}). La recomendación es un \textbf{servidor privado virtual (VPS) internacional de 2~vCPU y 4~GB} (del
 orden de CLP~6\,000 mensuales, unos CLP~75\,000 anuales) para la validación y un primer sitio, con un
 VPS nacional como alternativa si el cliente exige datos en Chile; la decisión es reversible en horas
 porque los contenedores no dependen del proveedor. Se descartan una base de datos gestionada aparte y

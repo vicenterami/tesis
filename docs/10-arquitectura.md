@@ -200,8 +200,22 @@ sequenceDiagram
 ```
 
 **Por qué el orden importa:** autenticar primero evita gastar CPU en tramas de desconocidos
-(resistencia a ruido); validar antes de normalizar evita convertir basura; supervisar después de
-guardar garantiza que "visto por última vez" refleje una lectura real, no un intento fallido.
+(resistencia a ruido); validar antes de normalizar evita convertir basura.
+
+**Dos granularidades distintas, y por eso «vivo» significa lo que significa.** Los filtros 1 a 4
+trabajan sobre la trama y sobre cada lectura que contiene; el de alertas evalúa **cada lectura
+guardada**, porque un umbral se cruza por valor, no por trama. El de supervisión, en cambio, se
+ejecuta **una sola vez al cerrar la trama**, porque lo que marca no es un dato sino un hecho del
+enlace: *este dispositivo se comunicó*. De ahí que `visto_por_ultima_vez` se actualice aunque las
+lecturas de esa trama hayan terminado en cuarentena.
+
+La razón es que M4 supervisa la **salud del enlace**, no la calidad del dato. Un nodo que publica
+cada cinco minutos una trama malformada está vivo: su radio, su credencial y su conexión funcionan;
+lo que falla es su firmware o su configuración. Si lo marcáramos «sin comunicación» estaríamos
+levantando una alarma de red por un problema de formato, y el operador buscaría el fallo donde no
+está. Los dos problemas se registran por separado: el silencio, como condición `sin_comunicacion`;
+el formato inválido, en `cuarentena` con su motivo (ver la propuesta de §8 para convertirlo también
+en condición, en lugar de acumular filas).
 
 **Un supervisor aparte, por tiempo:** el filtro 5 solo corre cuando *llega* una trama. Para detectar
 el caso contrario —un dispositivo que **dejó de** transmitir— hay una tarea periódica (cada minuto)
@@ -304,9 +318,57 @@ destruir y recrear sin perder nada, lo que simplifica actualizaciones y pruebas.
 > **Pendiente:** RF-29 (keep-alive y *Last Will* de MQTT) no está trazado porque el cliente MQTT del
 > backend aún no publica testamento (`will`); queda como brecha declarada hasta implementarlo (Etapa 3).
 
-## 8. Pendiente
+## 8. Propuestas abiertas y pendientes
+
+### 8.1 Un dispositivo que comunica pero no entrega datos válidos (propuesta, 23/09/2026)
+
+**El problema.** Hoy un nodo mal configurado que publica cada cinco minutos una trama inválida queda
+«vivo» (correcto: su enlace funciona) pero genera una fila de `cuarentena` cada vez: 288 filas al día,
+105 000 al año, con el mismo motivo y la misma carga cruda. Ensucia la tabla, encarece el diagnóstico
+y hace que lo importante —*este dispositivo lleva días sin entregar un dato usable*— quede enterrado
+entre miles de filas idénticas.
+
+**Por qué no es un estado nuevo del dispositivo.** `dispositivo.estado` (`activo`,
+`mantenimiento`, `baja`) describe la **decisión administrativa** sobre el equipo, no lo que está
+ocurriendo con él. Lo que ocurre se modela como **condición**, igual que `sin_comunicacion` y
+`umbral`: tiene apertura, cierre y duración. Meter «manda basura» dentro de `estado` obligaría a
+responder qué pasa cuando además está en mantenimiento, o cuando manda basura *y* se calla: dos
+hechos ortogonales en un solo campo. La regla del modelo (una sola casa por hecho) dice que van
+separados.
+
+**Propuesta, en tres partes:**
+
+1. **Condición nueva `datos_invalidos`**: se abre cuando un dispositivo acumula *N* tramas
+   consecutivas rechazadas (propuesta: 3) sin ninguna aceptada en medio; se cierra con la primera
+   lectura válida. El panel la muestra junto a las otras condiciones y el operador ve *un* problema,
+   no diez mil filas. Es el mismo patrón que ya se usa para el silencio, así que no agrega conceptos.
+2. **Cuarentena con muestreo, no con acumulación**: guardar íntegras las primeras *k* tramas
+   (propuesta: 5) de cada par (dispositivo, motivo) dentro de una ventana (propuesta: 1 hora) y, a
+   partir de ahí, solo incrementar un contador con la primera y última aparición. Se conserva la
+   evidencia —que es para lo que existe la cuarentena— sin pagar el volumen. Si la ventana se cierra
+   sin tramas nuevas, el ciclo vuelve a empezar.
+3. **Retención**: política de borrado de `cuarentena` a los 30 días, igual que la compresión de
+   `medicion`. Una trama basura de hace dos meses no diagnostica nada.
+
+**Qué decidir antes de implementar:** los tres números (*N* tramas para abrir, *k* muestras por
+ventana, días de retención) y si la condición debe notificar como las demás. Entra en la Etapa 3,
+después del Dockerfile y del proxy. Al aprobarse: primero este documento y el diagrama, después el
+código (regla de concordancia).
+
+### 8.2 Numeración de los filtros 5 y 6 (propuesta, 23/09/2026)
+
+El diagrama numera *5 supervisar* y *6 alertar*, pero la ejecución es la inversa: las alertas se
+evalúan por cada lectura guardada, dentro del bucle, y la supervisión cierra la trama una sola vez al
+final (§4). Propuesta: intercambiar los números —**5 alertar, 6 supervisar**— para que el diagrama
+describa la secuencia real, manteniendo los seis filtros y los módulos M4 y M6 sin cambio. Afecta este
+documento, el diagrama Mermaid, el capítulo de diseño, los comentarios del backend y su README.
+Alternativa si se prefiere no tocar la numeración: dejarla y explicar la granularidad en cada lugar,
+como ya se hace en §4. **Decisión del estudiante.**
+
+### 8.3 Pendientes
 
 - [ ] Confirmar con el compañero el tópico exacto y la forma de su JSON para escribir el adaptador
       (filtro 2) — ver bitácora de acuerdos.
-- [ ] Decidir el proxy inverso definitivo (Caddy por TLS automático vs. Nginx por familiaridad).
-- [ ] Llevar los diagramas a TikZ para el informe de la Etapa 2 con la regla de anchos de `main.tex`.
+- [ ] Decidir el proxy inverso definitivo (Caddy por TLS automático vs. Nginx por familiaridad y por
+      traer limitador de tasa nativo; Caddy no hace TLS para MQTT sin módulo externo).
+- [ ] Dockerfile del backend y su servicio en el compose (hoy solo corren dos contenedores).

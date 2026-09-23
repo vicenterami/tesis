@@ -102,7 +102,7 @@ apropiados.
 | Proveedor | Qué ofrece | Modelo | Qué queda sin cubrir |
 |---|---|---|---|
 | [IoT3.cl](https://iot3.cl/) | Monitoreo y automatización en tiempo real: sensores, controladores y plataforma web. Fuerte en agricultura. | Solución llave en mano por proyecto | Si el hardware ya está instalado y es de otra marca, no hay integración |
-| [ControlTec.cl](https://www.controltec.cl/) (SpA, 2021) | Telemetría industrial inalámbrica: estanques, combustible, climatización. Supervisión desde el celular. | Telemetría de bajo costo, hardware propio | Panel de telemetría acoplado a su hardware, no plataforma de ingesta abierta |
+| [ControlTec.cl](https://www.controltec.cl/) (SpA, 2021) | Telemetría industrial inalámbrica: estanques, combustible, climatización. Supervisión desde el celular. | Telemetría de bajo costo, hardware propio | Panel de telemetría acoplado a su hardware, no plataforma de recepción abierta |
 
 **Ambos venden la solución completa acoplada a su propio hardware.** Ninguno ofrece la **capa de
 gestión desacoplada del equipamiento**: una plataforma neutral que reciba datos de sensores que la
@@ -133,7 +133,7 @@ de proponer un formato nuevo.
 ## 1.7 Delimitación del alcance
 
 **El trabajo abarca:**
-- La plataforma de ingesta, normalización, almacenamiento y gestión de datos de sensores.
+- La plataforma de recepción, normalización, almacenamiento y gestión de datos de sensores.
 - La especificación del protocolo de comunicación sensor ↔ plataforma y su API.
 - Adaptadores para al menos dos transportes distintos, demostrando la capacidad multiprotocolo.
 - El diseño de red asociado: segmentación, seguridad del transporte y monitoreo del estado del enlace.

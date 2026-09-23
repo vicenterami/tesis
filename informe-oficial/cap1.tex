@@ -71,15 +71,12 @@ listas para usar pertenecen a la edición Professional, de pago \parencite{thing
 interfaz y documentación están en inglés. ThingsBoard aplica además el mismo patrón de entrada que
 esta plataforma —un formato JSON propio en un tópico fijo, con conversores para todo lo demás—; la
 diferencia es que aquí el contrato nativo es un \textbf{estándar IETF} y no un formato del producto.
-El trío Node-RED + InfluxDB + Grafana permite prototipos, pero es un conjunto de piezas sin
-aprovisionamiento de dispositivos ni modelo de usuarios: cada instalación resulta artesanal.
+Node-RED + InfluxDB + Grafana permiten prototipos, pero sin aprovisionamiento ni modelo de usuarios: cada instalación resulta artesanal.
 
-Conviene además distinguir esta plataforma de un \textbf{panel de visualización simple}: mostrar en
-pantalla que las tramas llegan es una función de validación de una red de sensores, no el objeto de
-este trabajo. El aporte aquí es la capa que existe \emph{antes} de cualquier gráfico —recepción
-multiprotocolo, pipeline de normalización, supervisión del estado de cada dispositivo, series de
-tiempo y alertas—; el panel es solo uno de sus ocho módulos. Un sistema que se limitara a graficar
-datos ya procesados no resolvería ninguna de las cinco causas del problema.
+Esta plataforma no es un \textbf{panel de visualización simple}: el aporte es la capa que existe
+\emph{antes} de cualquier gráfico —recepción multiprotocolo, normalización, supervisión y alertas—,
+de la que el panel es solo uno de ocho módulos; graficar datos ya procesados no resolvería ninguna
+de las cinco causas del problema.
 
 En la fase previa de este mismo trabajo se evaluó como eje el protocolo de la industria de alarmas
 Contact ID (SIA DC-05); el profesor guía lo descartó por estar orientado a eventos discretos y no a
@@ -120,14 +117,12 @@ funcionales, de carga y de recuperación, para obtener un informe de validación
 de los requerimientos no funcionales —al menos 15 casos de prueba con el 90\,\% aprobados; 50
 mensajes por segundo sin pérdida; latencia de recepción a consulta de 2 segundos o menos en el
 percentil 95; caída detectada en a lo más dos intervalos de reporte; recuperación automática sin
-perder mensajes confirmados; disponibilidad de la recepción del 99\,\% o más, medida en una ventana
-continua de 72 horas; memoria total de 2\,GB o menos (RNF-01 a RNF-06, RNF-17 y RNF-18)—, al 4 de diciembre
-de 2026.
+perder mensajes confirmados; disponibilidad de la recepción del 99\,\% o más en una ventana continua
+de 72 horas; memoria total de 2\,GB o menos—, al 4 de diciembre de 2026.
 \end{itemize}
 
-Los hitos intermedios, las metas numéricas y la evidencia de cada objetivo se detallan en la
-documentación del repositorio y en el seguimiento del capítulo~\ref{cap:metodologia}; el
-cuadro~\ref{tab:trazabilidad} resume el producto verificable de cada uno y su trazabilidad.
+El cuadro~\ref{tab:trazabilidad} resume el producto verificable de cada objetivo y su trazabilidad;
+los hitos y metas numéricas están en el repositorio y en el capítulo~\ref{cap:metodologia}.
 
 \begin{table}[H]
 \centering\footnotesize

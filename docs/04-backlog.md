@@ -1,6 +1,8 @@
 > ⚠️ **ACTUALIZADO AL PIVOTE DEL 02/09/2026:** los elementos ligados a Contact ID se reformularon
-> hacia el contrato SenML/MQTT y el pipeline de normalización. Efecto neto: el núcleo baja de 165 h
-> a ~155 h y la holgura mejora.
+> hacia el contrato SenML/MQTT y el pipeline de normalización. Las cifras vigentes son las de §6.1,
+> calculadas sumando las filas: **63 elementos, 275 h; núcleo 33 elementos, 165 h** (una estimación
+> preliminar de ~155 h del 02/09 quedó superada y se corrigió el 22/09 para que informe y backlog
+> digan lo mismo).
 
 # Backlog del proyecto
 

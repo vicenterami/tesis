@@ -21,8 +21,12 @@ con su motivo, sin contaminar las series.
 broker publica automáticamente si aquel se desconecta sin despedirse: detección de caída inmediata.
 \item[Middleware] Software intermedio entre dos sistemas que no se hablan directo (ChirpStack entre
 la radio y MQTT; la capa de normalización entre los sensores y la base de datos).
-\item[MQTT] \emph{Message Queuing Telemetry Transport}: protocolo de mensajería publicar/suscribir
-sobre TCP/IP, con cabecera de 2 bytes, QoS y testamento. La vía principal de recepción.
+\item[MQTT] Protocolo de mensajería publicar/suscribir sobre TCP/IP, con cabecera fija de 2 bytes,
+calidad de servicio (QoS) y testamento. El nombre no es una sigla: viene de \emph{MQ Telemetry
+Transport}, por la familia de productos donde nació. La vía principal de recepción.
+\item[ACL] \emph{Access Control List}, lista de control de acceso: las reglas del broker que
+definen qué tópicos puede leer o escribir cada usuario. Aquí, cada dispositivo solo puede publicar
+bajo su propio identificador.
 \item[NAT y puertos] El router comparte una dirección pública y bloquea conexiones entrantes no
 solicitadas. Como el sensor siempre inicia la conexión saliente, no se abre ningún puerto (RNF-10).
 \item[Payload] Los bytes de dato útil dentro de un mensaje, descontando las envolturas. Aquí: la
@@ -38,6 +42,8 @@ descartado: obliga a reinventar lo que MQTT ya trae.
 \item[TimescaleDB] Extensión de PostgreSQL para series de tiempo; sigue siendo SQL relacional.
 \item[TLS] \emph{Transport Layer Security}: el cifrado del candado de HTTPS (AES en su interior).
 Se configura en el broker y la API; no se desarrolla.
-\item[Tópico] La «ruta» de un mensaje MQTT: \texttt{sitio/7/dispositivo/12/medicion}. La frontera
-contractual con el trabajo del compañero.
+\item[Tópico] La «ruta» de un mensaje MQTT. En esta plataforma tiene la forma
+\texttt{sitio/\textless sitio\textgreater/dispositivo/\textless id\_fisico\textgreater/\textless magnitud\textgreater};
+por ejemplo \texttt{sitio/uct/dispositivo/dev-0001/temperatura}. Es la frontera contractual con el
+trabajo del compañero.
 \end{description}

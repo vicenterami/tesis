@@ -4,10 +4,10 @@
 \section{Metodología del levantamiento}
 \label{sec:levantamiento}
 
-Cada requerimiento declara su fuente: \textbf{[PO]} solicitud de la organización destinataria
-—«propietario del proyecto» en la terminología de la rúbrica— vía profesor guía; \textbf{[EM]}
-estudio de mercado; \textbf{[BT]} base teórica (RFC 8428, ISO/IEC 25010 \parencite{iso25010}, SWEBOK
-\parencite{swebok}); \textbf{[DP]} derivación del problema. \textbf{Brecha declarada:} falta la
+Cada requerimiento declara su fuente: \textbf{[PO]} solicitud de la organización destinataria vía
+profesor guía; \textbf{[EM]} estudio de mercado; \textbf{[BT]} base teórica (RFC 8428, ISO/IEC 25010
+\parencite{iso25010}, SWEBOK \parencite{swebok}); \textbf{[DP]} derivación del problema.
+\textbf{Brecha declarada:} falta la
 fuente [ENT], entrevistas directas. La evidencia del propietario del problema recogida antes de la
 entrega de la Etapa 1 fue la indicación transmitida por el profesor guía en las reuniones del 17 de
 agosto y del 2 de septiembre, registradas en la bitácora del repositorio; las entrevistas se
@@ -62,7 +62,7 @@ recepción.
 \section{Evaluación de infraestructura}
 \label{sec:infra}
 
-Cada componente se eligió frente a alternativas con una razón determinante (cuadro~\ref{tab:infra}, anexo~\ref{anx:evaluacion}): \textbf{Mosquitto} como broker (implementación en C de unos 10\,MB, con TLS y autenticación; EMQX y HiveMQ apuntan a millones de conexiones); \textbf{TimescaleDB} como persistencia (un solo motor relacional y de series; InfluxDB obligaría a operar dos bases); \textbf{TypeScript con NestJS} en el backend (tipos de la trama definidos una vez para backend y panel, módulos uno a uno con M1--M8); \textbf{ChirpStack} para la rama LoRa (autoalojable, publica en MQTT); \textbf{contenedores Docker} para el despliegue (reproducible con un comando); y \textbf{Svelte con uPlot} para la interfaz, por ligereza. Las matrices de backend y de interfaz, con sus pesos y puntajes, están en el mismo anexo.
+Cada componente se eligió frente a alternativas con una razón determinante (cuadro~\ref{tab:infra}, anexo~\ref{anx:evaluacion}): \textbf{Mosquitto} como broker (implementación en C de unos 10\,MB, con TLS y autenticación; EMQX y HiveMQ apuntan a millones de conexiones); \textbf{TimescaleDB} como persistencia (justificado en la sección~\ref{sec:infra}); \textbf{TypeScript con NestJS} en el backend (tipos de la trama definidos una vez para backend y panel, módulos uno a uno con M1--M8); \textbf{ChirpStack} para la rama LoRa (autoalojable, publica en MQTT); \textbf{contenedores Docker} para el despliegue (reproducible con un comando); y \textbf{Svelte con uPlot} para la interfaz, por ligereza. Las matrices de backend y de interfaz, con sus pesos y puntajes, están en el mismo anexo.
 
 Un requerimiento no funcional propio del enfoque es \textbf{RNF-17}: la plataforma completa debe
 operar en un servidor de 2\,GB de memoria —frente a los 4\,GB o más que exige el referente—, lo que

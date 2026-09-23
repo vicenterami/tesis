@@ -16,13 +16,14 @@ una alternativa a TCP/IP sino un protocolo sobre él, igual que MQTT; la objeci�
 
 \section{Mensajería MQTT}
 
-MQTT (\emph{Message Queuing Telemetry Transport}) aplica el patrón publicar/suscribir a través de un
-intermediario, el \emph{broker} (figura~\ref{fig:mqtt}): los dispositivos publican en \emph{tópicos} y
+MQTT \parencite{mqttoasis} —nombre propio desde su estandarización en OASIS; nació en IBM como
+\emph{MQ Telemetry Transport} y hoy no se desarrolla como sigla— aplica el patrón publicar/suscribir
+a través de un intermediario, el \emph{broker} (figura~\ref{fig:mqtt}): los dispositivos publican en \emph{tópicos} y
 los consumidores suscritos reciben los mensajes en el momento, sin consultar. Cuatro propiedades son
 determinantes para este trabajo: \textbf{el dispositivo inicia la conexión saliente} y la mantiene, por
 lo que no se abren puertos hacia los sensores y el esquema funciona tras NAT (RNF-10); la
-\textbf{calidad de servicio} tiene tres niveles integrados (a lo más una vez, al menos una vez,
-exactamente una vez), sin lógica de reintento propia; el \textbf{testamento} (\emph{Last Will}) hace
+\textbf{calidad de servicio} (\emph{Quality of Service}, QoS) tiene tres niveles integrados (a lo más
+una vez, al menos una vez, exactamente una vez), sin lógica de reintento propia; el \textbf{testamento} (\emph{Last Will}) hace
 que el broker publique un mensaje predefinido si el dispositivo se desconecta sin despedirse, con lo
 que la detección de caída resulta inmediata; y las \textbf{cabeceras de 2 bytes} responden la objeción
 de sobrecarga. Se emplea \textbf{Mosquitto} como broker: implementación en C de consumo mínimo

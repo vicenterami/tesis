@@ -40,6 +40,12 @@ for f in informe-oficial/cap-diseno.tex informe-oficial/anexos/e-seguimiento.tex
   fi
 done
 
+paso "2c. Términos vetados por el profesor guía: cero apariciones en docs e informe"
+if grep -rniE "ingesta|heterog[eé]ne" docs/ informe-oficial/*.tex informe-oficial/anexos/*.tex PLAN-MAESTRO.md 2>/dev/null | grep -v "sin «heterogéneo» ni «ingesta»" | grep -q .; then
+  echo "FALLA aparecen términos vetados:"; grep -rniE "ingesta|heterog[eé]ne" docs/ informe-oficial/*.tex informe-oficial/anexos/*.tex PLAN-MAESTRO.md 2>/dev/null | grep -v "sin «heterogéneo» ni «ingesta»" | cut -c1-120
+  fallos=$((fallos+1))
+else echo "OK    sin «ingesta» ni «heterogéneo»"; fi
+
 paso "3. Diagramas: informe = docs = base (generar-figuras.sh --verificar)"
 bash informe-oficial/figuras/generar-figuras.sh --verificar || fallos=$((fallos+1))
 
