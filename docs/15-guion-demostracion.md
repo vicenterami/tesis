@@ -7,9 +7,18 @@
 
 ## 0. Antes de empezar (5 min, fuera de escena)
 
+**Elegir un solo backend para no chocar en el puerto 3000: A (desarrollo, ve el código en vivo) o B
+(contenedor, evidencia de que el Dockerfile funciona de verdad — mejor si preguntan por el despliegue).**
+
 ```bash
-cd plataforma && docker compose up -d && docker compose ps          # timescaledb y mosquitto: healthy
+cd plataforma && docker compose up -d && docker compose ps          # timescaledb, mosquitto y (B) backend: healthy
+
+# A) desarrollo — el backend corre fuera de Docker, ve cambios de código al vuelo
 cd backend && pnpm start:dev                                        # terminal A: «API escuchando» y «suscrito a sitio/#»
+
+# B) contenedor — usar SOLO si no se levantó con --build arriba; si ya está healthy, no hace falta nada más
+docker compose up -d --build backend && docker compose ps           # «backend … healthy»
+
 bash plataforma/pruebas/verificar-todo.sh                           # terminal B: TODO EN CONCORDANCIA
 export CLAVE_DEV='…'                                                # terminal B: clave del dispositivo de prueba (gestor local)
 ```
@@ -88,6 +97,10 @@ instante termina en `Z`.
 - Ensayar en voz alta la frase difícil (qué pasa si cae la base) hasta que salga sin titubear.
 - Tener lista la respuesta a «¿qué tan confiable es esto?» con el **límite real** (prototipo con un
   nodo, sin TLS aún, comparación con ThingsBoard pendiente para la Etapa 4), no con una defensa.
+- Si preguntan «¿y si la base se cae mientras funciona?»: contarlo, no evitarlo. Se probó apagando la
+  base con la pila en contenedores; se encontró que el barrido de supervisión tumbaba el proceso entero,
+  se corrigió (`docs/10 §4.1`), y se volvió a probar: cero reinicios, el sistema avisa y se recupera solo.
+  Es evidencia de verificación real, no una promesa.
 
 ## Si algo falla en vivo
 

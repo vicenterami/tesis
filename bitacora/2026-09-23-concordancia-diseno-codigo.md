@@ -40,7 +40,7 @@ el navegador (OWASP, documentación de Docker, Node y NestJS).
 
 ## 4. Pendiente
 
-- [ ] Dockerfile del backend y su servicio en el compose (`docs/10 §8.3`); la interfaz de escucha ya está resuelta.
-- [ ] Decidir WebSocket o SSE antes de implementar TT-39 (Etapa 3).
-- [ ] Plan B para el riesgo R1 (hardware): nodo propio publicando SenML por Wi-Fi, con fecha límite de activación.
+- [x] Dockerfile del backend — ver `bitacora/2026-09-23-dockerfile-backend.md`.
+- [ ] Decidir WebSocket o SSE antes de implementar TT-39. Se ve en la Etapa 3, no antes.
+- [x] Plan B para el riesgo R1 — ver `bitacora/2026-09-23-plan-b-r1-y-redistribucion.md`.
 - [ ] Entrevistas: a la espera de los contactos solicitados el 22/09.

@@ -58,8 +58,21 @@ flowchart TB
 
 **Decisiones visibles en el diagrama:**
 
-- **Un solo punto de entrada para personas (443)** y **un solo punto de entrada para máquinas (8883)**.
-  La base de datos y ChirpStack no se exponen a Internet.
+- **Tres puntos de entrada, ninguno más:** 443 para personas, 8883 para dispositivos MQTT, y
+  1700/udp para los *gateways* LoRaWAN — este último **hoy no aplica**: ChirpStack no está desplegado
+  en esta etapa (§8.3), y ese puerto no existe hasta que se agregue. La base de datos y la interfaz de
+  administración de ChirpStack nunca se exponen; su puerto de recepción de *gateways*, cuando exista,
+  sí, porque los *gateways* están en el campo, sin VPN, y deben poder alcanzarlo (RNF-10 al revés: aquí
+  es el servidor el que necesita un puerto abierto, no el dispositivo).
+
+  **Ese puerto es una amenaza real, no solo un trámite de firewall.** El protocolo que usan los
+  *gateways* para hablarle a ChirpStack (*Semtech UDP Packet Forwarder*) **no tiene autenticación ni
+  cifrado**: un *gateway* se identifica con su EUI, un dato público, y cualquiera puede enviar UDP a ese
+  puerto suplantándolo (Semtech/ChirpStack, documentación del *Gateway Bridge*). La defensa no puede ser
+  el protocolo; tiene que ser la capa de alrededor: el contenedor de ChirpStack sin privilegios
+  (`no-new-privileges`, usuario no root, igual que el resto), limitar la tasa de paquetes en el proxy, y
+  no confiar en el EUI recibido para nada que no sea enrutar — la autenticación real de cada nodo sigue
+  ocurriendo más adentro, en el filtro 1 del pipeline, contra el registro de dispositivos.
 - **El navegador nunca toca el broker** (patrón B, `docs/07`): consume la API del backend, que ya
   filtró y normalizó. Así la trama cruda jamás llega al cliente y las credenciales MQTT no viajan en
   JavaScript.
@@ -388,7 +401,7 @@ ocupar más núcleos. No está en el alcance: RNF-17 fija un servidor de 2 GB y 
 
 | Elemento de diseño | Requerimientos que materializa |
 |---|---|
-| Un punto de entrada TLS para máquinas (8883) y otro para personas (443) | RNF-08, RNF-09, RNF-10 |
+| Tres puntos de entrada TLS/UDP: 8883 máquinas, 443 personas, 1700/udp *gateways* (pendiente) | RNF-08, RNF-09, RNF-10 |
 | Adaptadores por origen (filtro 2) | RF-01, RF-02, RF-04 (recepción multiprotocolo) |
 | Cuarentena separada de las series | RF-05, RF-07 |
 | Supervisor periódico de `sin_comunicacion` | RF-24, RF-25, RF-26 |

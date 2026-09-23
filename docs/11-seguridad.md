@@ -13,6 +13,7 @@
 |---|---|---|---|
 | A1 | **Dispositivo malicioso o mal programado** | Un nodo publica en el tópico de otro, inunda el broker, envía valores absurdos | Autenticación + ACL por dispositivo; validación por rango; límites de recursos |
 | A2 | **Acceso externo no autorizado** | Alguien en la red local o en Internet se conecta al broker o a la base | Sin anónimos; puertos no publicados; TLS en producción |
+| A7 | **Suplantación de *gateway* LoRaWAN** | El protocolo *Semtech UDP Packet Forwarder* no autentica: cualquiera con el EUI (público) puede enviar UDP al puerto 1700 haciéndose pasar por un *gateway* | Límite de tasa en el proxy; el filtro 1 del pipeline autentica cada dispositivo de todos modos, contra el registro, no contra lo que diga el *gateway* |
 | A3 | **Servicio comprometido** | Una vulnerabilidad en el broker permite ejecutar código | Contenedor sin escalada de privilegios; usuario no root; red interna aislada |
 | A4 | **Error del operador** | `docker compose down -v` borra los volúmenes con todo el dato | Respaldos automáticos; comandos destructivos con confirmación |
 | A5 | **Fuga de secretos** | Una contraseña termina en el repositorio o en un log | `.gitignore` para secretos; solo hashes en base y broker; plantilla `.env.example` |
@@ -59,6 +60,7 @@
 | Capa | Control | Cuándo |
 |---|---|---|
 | 2 | Proxy con TLS (Caddy) en 443 y 8883; retirar 1883 | Al desplegar en servidor |
+| 2 | Puerto 1700/udp hacia ChirpStack, con límite de tasa en el proxy: el protocolo del *gateway* no trae autenticación propia (EUI público, sin cifrado) | Cuando ChirpStack se despliegue (no antes) |
 | 3 | Credenciales por dispositivo generadas por la plataforma (flujo de alta, docs/10 §3) | Backend |
 | 4 | ACL dinámica: el backend agrega/revoca usuarios del broker al dar de alta/baja | Backend |
 | 6 | Un rol de base de datos para el backend **sin** permiso de `DROP`/`TRUNCATE` | Backend |

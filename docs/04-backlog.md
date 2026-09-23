@@ -457,17 +457,20 @@ la Etapa 3 = **91 h ≈ 54 %**. ✅ El umbral se cumple con cualquiera de las do
 ## 6.5 Qué se recorta y en qué orden
 
 Los 111 h fuera del núcleo se ordenan por valor decreciente. Se ejecutan de arriba hacia abajo, solo
-contra holgura verificada:
+contra holgura verificada. **Corregido el 23/09/2026:** esta tabla incluía HU-11, TT-28, TT-29 y TT-33
+—los cuatro marcados 🎯 (núcleo)— como si fueran recortables, contradiciendo la regla de que el núcleo
+no se recorta bajo ninguna circunstancia. El "Resto" también omitía TT-04, TT-08 a TT-10 y TT-14 a
+TT-15 por un rango escrito a mano e incompleto. Recalculado sumando directamente las filas del backlog
+(30 elementos fuera de núcleo, 111 h exactos, sin excepciones):
 
 | Orden | Elementos | Horas | Valor si se ejecuta |
 |:---:|---|:---:|---|
 | 1 | **HU-04** Adaptador para un formato no SenML | 7 | **Alto** — demuestra la extensibilidad por adaptador (RNF-12), el argumento contra el hardware atado a la plataforma |
-| 2 | **HU-11, HU-12** Aprovisionamiento y agrupación | 8 | Medio-alto — completa la vista de administrador |
+| 2 | **HU-12** Agrupación de dispositivos por sitio y zona | 3 | Medio-alto — completa la vista de administrador |
 | 3 | **HU-24** Notificación de condición crítica | 5 | Medio — funcionalidad esperada de una plataforma de este tipo |
 | 4 | **HU-23** Vista por tecnología de red | 3 | Medio — refuerza el argumento multiprotocolo |
 | 5 | **HU-09** API de consulta externa | 4 | Bajo para la demostración |
-| 6 | Resto (HU-06, 13, 17, 18, 21, 22, 25, TT-03, 23, 24-26, 28-31, 33-39) | 84 | Variable — **nota:** esta lista incluye TT-28 y TT-29,
-  marcados 🎯 (núcleo): no deberían poder recortarse; revisar aparte, pendiente |
+| 6 | Resto (HU-06, 13, 17, 18, 22, 25, TT-03–04, 08–10, 14–15, 23–26, 30–31, 34–39) | 89 | Variable |
 
 > **Lo que no se recorta bajo ninguna circunstancia:** los 34 elementos marcados 🎯. Su ausencia
 > invalidaría la demostración en lugar de reducirla. Si el tiempo no alcanza para el núcleo completo, el
