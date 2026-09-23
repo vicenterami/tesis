@@ -87,7 +87,7 @@ instante termina en `Z`.
 
 ## 6. Cómo se sostiene esto (1 min)
 
-- `pnpm verificar`: tipos, lint y 19 pruebas unitarias en menos de un segundo.
+- `pnpm verificar`: tipos, lint y 29 pruebas unitarias en menos de dos segundos (la cifra exacta la da la salida de `jest`; no la memorices).
 - `verificar-todo.sh`: esquema, migraciones, diagramas del informe y API en concordancia.
 - Las figuras del informe se generan desde la documentación y desde la base real: lo que se muestra es lo que está implementado.
 

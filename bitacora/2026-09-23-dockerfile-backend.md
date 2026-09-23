@@ -1,6 +1,6 @@
 # Dockerfile del backend, probado con fallas reales — 23 de septiembre de 2026
 
-- **Sesión de trabajo individual;** registro de decisiones, no de la jornada. Sonnet 5.
+- **Sesión de trabajo individual;** registro de decisiones, no de la jornada.
 
 ## 1. Qué se hizo
 

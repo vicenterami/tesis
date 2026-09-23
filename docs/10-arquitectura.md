@@ -188,7 +188,9 @@ sequenceDiagram
     participant Q as Cuarentena
 
     MQ->>F1: trama cruda<br/>+ tópico + identidad
-    alt dispositivo desconocido o dado de baja
+    alt tópico fuera del patrón sitio/…/dispositivo/…/…
+        F1->>Q: guarda cruda, motivo "malformada"<br/>(sin identidad: no hay a quién marcar vivo)
+    else dispositivo desconocido o dado de baja
         F1->>Q: guarda cruda, motivo "desconocido"
     else conocido y activo
         F1->>F2: trama + dispositivo
@@ -259,6 +261,10 @@ transporte. Fuente: OASIS, *MQTT Version 5.0*, §4.3 (`mqttoasis` en la bibliogr
 | La misma trama llega **dos veces** (reentrega QoS 1 tras reconexión; nodo que reenvía su cola) | El INSERT es idempotente: índice único `(canal_id, tiempo)` + `ON CONFLICT DO NOTHING`; la repetida se ignora y **no** vuelve a evaluar umbrales | «Al menos una vez» + operación idempotente = efecto de exactamente una |
 | La trama **no trae marca de tiempo** y llega dos veces | Se guarda dos veces: sin marca del emisor no hay forma de saber que es la misma lectura. La hora de recepción se toma en la base con `clock_timestamp()` (microsegundos), así una ráfaga de tramas en cola no colisiona entre sí | Deduplicar exige una identidad; la identidad de una lectura es «canal + instante del emisor». Limitación aceptada: los nodos que quieran «exactamente una» deben marcar `t` (SenML) |
 | Dos gateways LoRaWAN reciben el **mismo uplink** | Lo deduplica ChirpStack por contador de trama antes de publicar | Es responsabilidad del servidor de red, no de la plataforma |
+| El **tópico no cumple el patrón** `sitio/<sitio>/dispositivo/<id>/<magnitud>` | Cuarentena `malformada` con el detalle «tópico fuera del patrón», **antes** del filtro 1; el dispositivo **no** se marca vivo | Sin identidad no hay a quién atribuir la señal de vida; comparte el motivo `malformada` con el filtro 2 y se distingue por el detalle (decisión 23/09: no abrir un cuarto motivo por esto) |
+| **Dos lecturas del mismo canal en la misma trama**, sin marca de tiempo | Se guardan ambas, con instantes de recepción distintos (microsegundos) | Sin marca del emisor no hay identidad de lectura (fila anterior); si un nodo repite un canal por error, corregirlo es del firmware, no de la plataforma. Limitación aceptada el 23/09 |
+| El broker **reentrega muchas veces** de golpe (reconexión con cola larga) | Cada mensaje dispara su propio recorrido del pipeline, sin esperar al anterior; compiten por las 5 conexiones del pool | El INSERT idempotente evita duplicar; lo que falta es *backpressure* (confirmar al broker solo tras escribir, `manualAck`), la misma limitación declarada en «la base cae»: Etapa 3 |
+| Una trama trae **miles de lecturas** | Hoy no hay tope: se procesan todas, en serie | Pendiente (`docs/11 §4`): tope de lecturas por trama en el adaptador y `message_size_limit` en el broker; un sensor no manda miles de lecturas, un atacante sí |
 | Dos **sensores distintos** miden lo mismo cerca | **No es duplicado**: son dos canales, dos series, dos evaluaciones de umbral. Correlacionarlos es una función de análisis futura, no del pipeline | La plataforma registra lo que cada sensor dijo; interpretar es otra capa |
 
 El orden del tiempo no importa para la serie: `medicion` se indexa por `(canal_id, tiempo)`, y una lectura
@@ -492,6 +498,5 @@ diseño (regla de concordancia): tras autenticar, el filtro 6 corre siempre.
       (filtro 2) — ver bitácora de acuerdos.
 - [ ] Decidir el proxy inverso definitivo (Caddy por TLS automático vs. Nginx por familiaridad y por
       traer limitador de tasa nativo; Caddy no hace TLS para MQTT sin módulo externo).
-- [ ] Dockerfile del backend y su servicio en el compose (hoy solo corren dos contenedores). El código ya lee
-      `HTTP_INTERFAZ` (§6, 23/09) y `DB_HOST`/`MQTT_URL`; en el compose van por nombre de servicio (`.env.example`).
+- [x] Dockerfile del backend y su servicio en el compose — hecho el 23/09 (§6; `bitacora/2026-09-23-dockerfile-backend.md`).
 - [ ] Decidir WebSocket o SSE para el canal de tiempo real (§5) antes de implementar TT-39 (Etapa 3).

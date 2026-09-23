@@ -1,6 +1,6 @@
 # Verificación de la bibliografía y cierre del día — 23 de septiembre de 2026
 
-- **Sesión de trabajo individual;** registro de decisiones, no de la jornada. Sonnet 5, esfuerzo medio.
+- **Sesión de trabajo individual;** registro de decisiones, no de la jornada.
 
 ## 1. Qué se hizo
 

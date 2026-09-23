@@ -28,7 +28,7 @@ diseño presenta como construido un despliegue de cinco contenedores cuando hoy 
 directo para el 55 % del criterio de diseño—; (b) el código ejecuta las alertas antes que la
 supervisión, al revés de lo que documenta el diseño.
 
-## 4. Lección de método (agregada a `~/.claude/rules/verificar.md`)
+## 4. Lección de método (registrada en las reglas de trabajo personales, fuera del repositorio)
 
 Cortar página por página a ciegas no funciona: hubo que compilar, ubicar exactamente qué línea
 sobraba en qué página, y cortar ahí. También: un dato con forma de dato real (una MAC de ejemplo con

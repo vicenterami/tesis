@@ -278,11 +278,11 @@ marginal cero para la institución.
 
 | Prioridad | Funcionales | No funcionales | Total |
 |---|:---:|:---:|:---:|
-| **Must** — indispensable para el producto | 35 | 14 | **49** |
+| **Must** — indispensable para el producto | 35 | 16 | **51** |
 | **Should** — importante, postergable | 14 | 2 | **16** |
 | **Could** — deseable | 3 | 0 | **3** |
 | **Won't** — fuera de alcance | — | — | ver 4.3 |
-| **Total catalogado** | **52** | **16** | **68** |
+| **Total catalogado** | **52** | **18** | **70** |
 
 > ⚠️ **Tensión detectada en la priorización, declarada explícitamente.** 49 requerimientos *Must*
 > representan un alcance considerable frente a la restricción **RE-01** (~15 horas semanales) y al
@@ -553,7 +553,7 @@ funcionamiento en navegador móvil (RF-52). Las alternativas a evaluar serán ma
 |---|---|
 | 1 Metodología y fuentes | ✅ Completo, con la brecha de entrevistas declarada |
 | 2 Requerimientos funcionales (52) | ✅ Completo, sujeto a ajuste tras las entrevistas |
-| 3 Requerimientos no funcionales (16) | ✅ Completo |
+| 3 Requerimientos no funcionales (18) | ✅ Completo |
 | 4 Priorización MoSCoW y MVP | ✅ Completo |
 | 5 Matriz de trazabilidad | ✅ Completo, cobertura de las 5 causas verificada |
 | 6 Evaluación de alternativas | ✅ Completo. 6.5 resuelto con la experiencia del desarrollador confirmada; 6.6 diferido a la Etapa 2 |

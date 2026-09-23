@@ -16,8 +16,11 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
   const TOPICO = 'sitio/uct/dispositivo/dev-0001/temperatura';
 
   function armar(dispositivo: { id: string; estado: string } | undefined) {
-    const query = jest.fn((sql: string) => {
+    const canal = { id: 'k1', magnitud: 'temperatura', unidad_canonica: 'Cel', rango_min: -40, rango_max: 85 };
+    const query = jest.fn((sql: string, params?: unknown[]) => {
       if (sql.startsWith('SELECT id, estado FROM dispositivo')) return Promise.resolve({ rows: dispositivo ? [dispositivo] : [], rowCount: dispositivo ? 1 : 0 });
+      // Solo el canal «temperatura» está declarado para el dispositivo de prueba; cualquier otro, no.
+      if (sql.trimStart().startsWith('SELECT c.id, m.codigo AS magnitud')) return Promise.resolve({ rows: params?.[1] === 'temperatura' ? [canal] : [], rowCount: params?.[1] === 'temperatura' ? 1 : 0 });
       return Promise.resolve({ rows: [], rowCount: 1 });
     });
     const pool = { query } as unknown as Pool;
@@ -51,6 +54,52 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
     expect(cuarentenas(query)).toEqual(['desconocido']);
     expect(marcoVisto(query)).toBe(false);
     expect(marcarVivo).not.toHaveBeenCalled();
+  });
+
+  it('filtro 3: canal no declarado → cuarentena "invalida", pero el dispositivo se marca vivo', async () => {
+    const { servicio, query, marcarVivo, evaluar } = armar({ id: 'd1', estado: 'activo' });
+    await servicio.procesar('sitio/uct/dispositivo/dev-0001/presion', Buffer.from('1013'));
+    expect(cuarentenas(query)).toEqual(['invalida']);
+    expect(marcarVivo).toHaveBeenCalledTimes(1);
+    expect(evaluar).not.toHaveBeenCalled();
+  });
+
+  it('filtro 3: unidad no convertible a la canónica → cuarentena "invalida"', async () => {
+    const { servicio, query, evaluar } = armar({ id: 'd1', estado: 'activo' });
+    await servicio.procesar(TOPICO, Buffer.from('{"v":300,"u":"furlongs"}'));
+    expect(cuarentenas(query)).toEqual(['invalida']);
+    expect(evaluar).not.toHaveBeenCalled();
+  });
+
+  it('filtro 3: valor fuera del rango físico del canal → cuarentena "invalida"', async () => {
+    const { servicio, query, evaluar } = armar({ id: 'd1', estado: 'activo' });
+    await servicio.procesar(TOPICO, Buffer.from('500'));
+    expect(cuarentenas(query)).toEqual(['invalida']);
+    expect(evaluar).not.toHaveBeenCalled();
+  });
+
+  it('lectura válida → INSERT en medicion, alerta evaluada una vez, vivo una vez', async () => {
+    const { servicio, query, marcarVivo, evaluar } = armar({ id: 'd1', estado: 'activo' });
+    await servicio.procesar(TOPICO, Buffer.from('22.4'));
+    expect(cuarentenas(query)).toEqual([]);
+    expect(query.mock.calls.some(([sql]) => String(sql).trimStart().startsWith('INSERT INTO medicion'))).toBe(true);
+    expect(evaluar).toHaveBeenCalledTimes(1);
+    expect(marcarVivo).toHaveBeenCalledTimes(1);
+  });
+
+  it('tópico fuera del patrón → cuarentena "malformada" ANTES del filtro 1: sin identidad no hay a quién marcar vivo', async () => {
+    const { servicio, query, marcarVivo } = armar({ id: 'd1', estado: 'activo' });
+    await servicio.procesar('otra/cosa', Buffer.from('22.4'));
+    expect(cuarentenas(query)).toEqual(['malformada']);
+    expect(marcoVisto(query)).toBe(false);
+    expect(marcarVivo).not.toHaveBeenCalled();
+  });
+
+  it('cuerpo vacío → ningún adaptador lo reconoce → cuarentena "malformada", y vivo (el dispositivo sí se autenticó)', async () => {
+    const { servicio, query, marcarVivo } = armar({ id: 'd1', estado: 'activo' });
+    await servicio.procesar(TOPICO, Buffer.alloc(0));
+    expect(cuarentenas(query)).toEqual(['malformada']);
+    expect(marcarVivo).toHaveBeenCalledTimes(1);
   });
 
   it('dispositivo dado de baja → tratado como desconocido', async () => {

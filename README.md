@@ -38,7 +38,7 @@ estado de cada dispositivo y panel de control. Caso de validación: Campus Dr. L
 | Estado de la Etapa 2: avance, backlog, prioridades | [`docs/12-estado-etapa2.md`](docs/12-estado-etapa2.md) |
 | Reglas de tiempo y zonas horarias (UTC, IANA por sitio) | [`docs/13-tiempo-y-zonas-horarias.md`](docs/13-tiempo-y-zonas-horarias.md) |
 | Despliegue, costos y retención (OE4) | [`docs/14-despliegue-y-costos.md`](docs/14-despliegue-y-costos.md) |
-| Fundamentos y glosario para explicar el proyecto | [`docs/GLOSARIO.md`](docs/GLOSARIO.md) |
+| Glosario vigente (términos del informe) | [`informe-oficial/glosario.tex`](informe-oficial/glosario.tex) |
 | Preguntas al profesor guía y guion de entrevistas | [`docs/03-instrumentos-levantamiento.md`](docs/03-instrumentos-levantamiento.md) |
 | Enfoque previo (Contact ID), conservado como evidencia | [`historico/`](historico/README.md) |
 | Qué dijo el profesor y qué se cambió por eso | [`bitacora/`](bitacora/) |

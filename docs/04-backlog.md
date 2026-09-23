@@ -380,41 +380,46 @@ Cuatro semanas por etapa a ~15 horas semanales (restricción RE-01):
 
 | Etapa | Backlog completo | Solo el núcleo | Presupuesto | Holgura (completo) | Holgura (núcleo) |
 |---|:---:|:---:|:---:|:---:|:---:|
-| 1 | 9 h | 4 h | 21 h | +57 % | +81 % |
+| 1 | 9 h | 4 h | 45 h | +80 % | +91 % |
 | 2 | 84 h | 53 h | 60 h | **−40 %** | +12 % |
 | 3 | 85 h | 63 h | 60 h | **−42 %** | **−5 %** |
-| 4 | 99 h | 48 h | 60 h | −65 % | +20 % |
-| **Total** | **277 h** | **168 h** | **201 h** | **−38 %** | **+16 %** |
+| 4 | 99 h | 48 h | 75 h | −32 % | +36 % |
+| 1–4 (`TT-38`, bitácora) | 2 h | — | — | — | — |
+| **Total** | **279 h** | **168 h** | **240 h** | **−16 %** | **+30 %** |
 
-> `TT-38` (2 h, bitácora, Etapa «1–4») no se asigna a una sola etapa y queda fuera de este desglose;
-> se cuenta en el total del backlog (§6.1: 64 elementos, 279 h). Esta tabla ya incorpora, al
+> Presupuesto por etapa según el calendario oficial del 24/08 (§6.2): 45, 60, 60 y 75 h, ~240 h en total.
+> Hasta el 23/09 esta tabla y las de §6.4 y §6.6 seguían con el escenario exigente anterior (21/60/60/60,
+> 201 h) aunque §6.2 ya lo había reemplazado; se propagó hoy (hallazgo de la revisión de concordancia).
+
+> `TT-38` (2 h, bitácora, Etapa «1–4») no se asigna a una sola etapa: va en su propia fila para que el
+> total cuadre con §6.1 (64 elementos, 279 h) sin inflar ninguna etapa. Esta tabla ya incorpora, al
 > 23/09/2026, la redistribución de §6.4 (antes solo escrita, no aplicada a las filas) y la promoción
 > de TT-32 (plan B de R1).
 
 **Dos conclusiones, y la segunda es la que importa:**
 
-1. **El backlog completo excede el presupuesto en un 39 %.** No es viable ejecutarlo entero.
-2. **El núcleo demostrativo sí cabe: 168 h contra 201 disponibles, con 16 % de holgura.** La tesis es
+1. **El backlog completo excede el presupuesto en un 16 %.** No es viable ejecutarlo entero.
+2. **El núcleo demostrativo sí cabe: 168 h contra 240 disponibles, con 30 % de holgura.** La tesis es
    demostrable dentro del plazo — pero **solo si el alcance se limita al núcleo** y los 111 h restantes
    se tratan como alcance opcional, no comprometido.
 
 > **Decisión de planificación derivada:** el **núcleo (168 h) constituye el compromiso**; los 30
 > elementos fuera del núcleo son **alcance condicional**, ejecutables únicamente contra holgura real
 > verificada al cierre de cada etapa. Comprometerse con los 279 h produciría un incumplimiento del
-> 39 % — y la pauta mide el avance como porcentaje de tareas completadas, de modo que un alcance
+> 16 % — y la pauta mide el avance como porcentaje de tareas completadas, de modo que un alcance
 > sobredimensionado penaliza más que un alcance acotado y justificado.
 
 ## 6.4 🔴 Segundo hallazgo: el núcleo estaba mal distribuido en el tiempo (corregido el 23/09/2026)
 
 Aun limitándose al núcleo, la distribución era defectuosa: **la Etapa 3 concentraba 97 h contra 60
-disponibles (−62 %), mientras la Etapa 4 usaba 11 h de 60 (+82 %)**. El problema no era el volumen
+disponibles (−62 %), mientras la Etapa 4 usaba 11 h de 75 (+85 %)**. El problema no era el volumen
 total, era su reparto. La redistribución de más abajo se decidió el 22/09 pero, hasta el 23/09, **nunca
 se aplicó a las filas del backlog**: seguían con Etapa 3, así que esta sección describía una corrección
 de papel, no una real. Se corrigió y se verificó recalculando desde las filas (§6.3).
 
 La causa es que la asignación inicial situó toda la implementación en la Etapa 3, cuando **la pauta solo
 exige el 50 % de la implementación en esa etapa y el 100 % en la Etapa 4**. Reservar la Etapa 4 casi
-íntegramente para validación e informe desaprovecha 49 horas.
+íntegramente para validación e informe desaprovechaba 64 horas.
 
 ### Redistribución correctiva
 
@@ -436,11 +441,11 @@ Se trasladan de la Etapa 3 a la Etapa 4 los siguientes elementos del núcleo (~3
 
 | Etapa | Núcleo | Presupuesto | Holgura |
 |---|:---:|:---:|:---:|
-| 1 | 4 h | 21 h | +81 % |
+| 1 | 4 h | 45 h | +91 % |
 | 2 | 53 h | 60 h | ✅ +12 % |
 | 3 | **63 h** | 60 h | ⚠️ **−5 %** |
-| 4 | **48 h** | 60 h | ✅ +20 % |
-| **Total** | **168 h** | **201 h** | ✅ **+16 %** |
+| 4 | **48 h** | 75 h | ✅ +36 % |
+| **Total** | **168 h** | **240 h** | ✅ **+30 %** |
 
 Los 63 h de la Etapa 3 son 60 h de la redistribución más las 3 h de TT-32 (plan B de R1, agregado el
 23/09). Un −5 % es una sobrecarga real y pequeña (3 h en cuatro semanas): se acepta a conciencia frente
@@ -484,7 +489,7 @@ El riesgo R4 («alcance excesivo para el tiempo disponible») pasa de probabilid
 mantiene bajo control mediante la separación explícita entre **núcleo comprometido** y **alcance
 condicional**, y mediante la revisión de holgura al cierre de cada etapa.
 
-**Reserva para imprevistos:** el 16 % de holgura del núcleo (33 h) constituye la única reserva. No se
+**Reserva para imprevistos:** el 30 % de holgura del núcleo (72 h) constituye la única reserva. No se
 infló ninguna estimación individual: hacerlo habría producido un plan con apariencia de viabilidad sin
 mejorarla, y habría impedido detectar la sobrecarga que esta sección documenta.
 
@@ -519,7 +524,7 @@ no demuestran ninguna.
 | Criterios de aceptación | ✅ Detallados en los elementos del núcleo; deliberadamente sin refinar en el resto |
 | Estimaciones | ✅ 64 elementos estimados, **279 h** en total, sumadas programáticamente |
 | Priorización | ✅ MoSCoW heredado del catálogo, más orden de ejecución justificado |
-| Verificación de viabilidad | 🔴 **Realizada. El backlog completo excede el presupuesto en 39 %; el núcleo cabe con 16 % de holgura. Redistribución correctiva definida** |
+| Verificación de viabilidad | 🔴 **Realizada. El backlog completo excede el presupuesto en 16 %; el núcleo cabe con 30 % de holgura. Redistribución correctiva definida** |
 
 ## Seguimiento de ejecución
 

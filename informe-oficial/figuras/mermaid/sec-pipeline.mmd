@@ -10,7 +10,9 @@ sequenceDiagram
     participant Q as Cuarentena
 
     MQ->>F1: trama cruda<br/>+ tópico + identidad
-    alt dispositivo desconocido o dado de baja
+    alt tópico fuera del patrón sitio/…/dispositivo/…/…
+        F1->>Q: guarda cruda, motivo "malformada"<br/>(sin identidad: no hay a quién marcar vivo)
+    else dispositivo desconocido o dado de baja
         F1->>Q: guarda cruda, motivo "desconocido"
     else conocido y activo
         F1->>F2: trama + dispositivo

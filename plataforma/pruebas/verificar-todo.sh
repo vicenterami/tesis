@@ -22,13 +22,14 @@ docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -U plat
 grep -q FALLA /tmp/vt-sql.txt && fallos=$((fallos+1))
 
 paso "2. Migraciones aplicadas = archivos en db/init (cada NN-*.sql debe estar reflejado en la base)"
-# 02: índice por regla · 03: zona_horaria · 04: iso_utc · 05: convenciones (disparadores actualizado_en, pm2_5) · 06: índice único de medicion
+# 02: índice por regla · 03: zona_horaria · 04: iso_utc · 05: convenciones (disparadores actualizado_en, pm2_5) · 06: índice único de medicion · 07: CHECK de cuarentena.motivo
 docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -U plataforma -d plataforma -tA <<'SQL' | tee /tmp/vt-mig.txt
 SELECT CASE WHEN indexdef LIKE '%COALESCE(regla_id%' THEN 'OK    02 condicion_abierta_unica por regla' ELSE 'FALLA 02 indice viejo' END FROM pg_indexes WHERE indexname='condicion_abierta_unica';
 SELECT CASE WHEN count(*)=1 THEN 'OK    03 sitio.zona_horaria' ELSE 'FALLA 03 falta sitio.zona_horaria' END FROM information_schema.columns WHERE table_name='sitio' AND column_name='zona_horaria';
 SELECT CASE WHEN count(*)=1 THEN 'OK    04 funcion iso_utc' ELSE 'FALLA 04 falta iso_utc' END FROM pg_proc WHERE proname='iso_utc';
 SELECT CASE WHEN count(*)=1 THEN 'OK    06 uq_medicion_canal_tiempo (idempotencia)' ELSE 'FALLA 06 falta el indice unico de medicion' END FROM pg_indexes WHERE indexname='uq_medicion_canal_tiempo' AND indexdef LIKE 'CREATE UNIQUE%';
 SELECT CASE WHEN count(*)>=9 AND (SELECT count(*) FROM magnitud WHERE codigo IN ('pm2_5','pm10'))=2 THEN 'OK    05 convenciones: '||count(*)||' disparadores actualizado_en y pm2_5/pm10' ELSE 'FALLA 05 convenciones incompletas' END FROM pg_trigger WHERE tgname LIKE 'trg_%_actualizado_en';
+SELECT CASE WHEN count(*)=1 THEN 'OK    07 cuarentena.motivo con CHECK (dominio cerrado)' ELSE 'FALLA 07 falta el CHECK de cuarentena.motivo' END FROM pg_constraint WHERE conname='cuarentena_motivo_chk' AND contype='c';
 SQL
 grep -q FALLA /tmp/vt-mig.txt && fallos=$((fallos+1))
 
@@ -47,7 +48,7 @@ if grep -rniE "ingesta|heterog[eé]ne" docs/ informe-oficial/*.tex informe-ofici
 else echo "OK    sin «ingesta» ni «heterogéneo»"; fi
 
 paso "2d. Variables de entorno: toda variable que lee el backend está declarada en plataforma/.env.example (docs/11 §7)"
-leidas=$(grep -rhoE "(config\.get(OrThrow)?<[a-z]+>\('|process\.env\.)[A-Z_]+" plataforma/backend/src --include=*.ts | grep -v spec | grep -oE "[A-Z_]{3,}$" | grep -vx TZ | sort -u)
+leidas=$(grep -rhoE "(config\.get(OrThrow)?(<[^>]+>)?\(\s*'|process\.env\.)[A-Z_]+" plataforma/backend/src --include=*.ts | grep -v spec | grep -oE "[A-Z_]{3,}$" | grep -vx TZ | sort -u)
 declaradas=$(grep -oE "^#?[A-Z_]+=" plataforma/.env.example | tr -d '#=' | sort -u)
 faltan=$(comm -23 <(echo "$leidas") <(echo "$declaradas"))
 if [ -n "$faltan" ]; then
@@ -63,6 +64,14 @@ if grep -q "5/{alertar}" informe-oficial/figuras/pipeline.tex && grep -q "6/{sup
 else
   echo "FALLA el orden de los filtros 5/6 difiere entre pipeline.tex, docs/06 y docs/10"; fallos=$((fallos+1))
 fi
+
+paso "2f. Repositorio público: ningún archivo versionado menciona herramientas de asistencia ni rutas personales"
+# El patrón se arma por partes para que este mismo archivo no lo contenga literal (y no se detecte a sí mismo).
+P="\\bcl""aude\\b|\\bfa""ble\\b|\\bson""net\\b|co-auth""ored-by|asistente de ""ia|modelo de ""lenguaje|~/\\.cl""aude"
+if git ls-files | grep -v "^historico/" | xargs grep -lniE "$P" 2>/dev/null | grep -q .; then
+  echo "FALLA archivos versionados con menciones prohibidas:"; git ls-files | grep -v "^historico/" | xargs grep -lniE "$P" 2>/dev/null | sed 's/^/  /'
+  fallos=$((fallos+1))
+else echo "OK    sin menciones a herramientas ni rutas personales en $(git ls-files | wc -l) archivos versionados"; fi
 
 paso "3. Diagramas: informe = docs = base (generar-figuras.sh --verificar)"
 bash informe-oficial/figuras/generar-figuras.sh --verificar || fallos=$((fallos+1))

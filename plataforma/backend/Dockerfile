@@ -4,7 +4,7 @@
 
 # ── Etapa 1: compilar ─────────────────────────────────────────────────────────────────────────
 # Node completo (con compilador y npm/corepack) SOLO aquí; no viaja a la imagen final.
-FROM node:22-slim AS build
+FROM node:22.23.2-slim AS build
 WORKDIR /app
 RUN corepack enable
 # Copiar antes que el resto: si solo cambia el código, esta capa se reutiliza de caché.
@@ -15,7 +15,7 @@ COPY src ./src
 RUN pnpm build
 
 # ── Etapa 2: imagen que corre ─────────────────────────────────────────────────────────────────
-FROM node:22-slim AS runtime
+FROM node:22.23.2-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 RUN corepack enable

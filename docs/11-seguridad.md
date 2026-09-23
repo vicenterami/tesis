@@ -13,11 +13,11 @@
 |---|---|---|---|
 | A1 | **Dispositivo malicioso o mal programado** | Un nodo publica en el tópico de otro, inunda el broker, envía valores absurdos | Autenticación + ACL por dispositivo; validación por rango; límites de recursos |
 | A2 | **Acceso externo no autorizado** | Alguien en la red local o en Internet se conecta al broker o a la base | Sin anónimos; puertos no publicados; TLS en producción |
-| A7 | **Suplantación de *gateway* LoRaWAN** | El protocolo *Semtech UDP Packet Forwarder* no autentica: cualquiera con el EUI (público) puede enviar UDP al puerto 1700 haciéndose pasar por un *gateway* | Límite de tasa en el proxy; el filtro 1 del pipeline autentica cada dispositivo de todos modos, contra el registro, no contra lo que diga el *gateway* |
 | A3 | **Servicio comprometido** | Una vulnerabilidad en el broker permite ejecutar código | Contenedor sin escalada de privilegios; usuario no root; red interna aislada |
 | A4 | **Error del operador** | `docker compose down -v` borra los volúmenes con todo el dato | Respaldos automáticos; comandos destructivos con confirmación |
 | A5 | **Fuga de secretos** | Una contraseña termina en el repositorio o en un log | `.gitignore` para secretos; solo hashes en base y broker; plantilla `.env.example` |
 | A6 | **Agotamiento de recursos** | Un bug o un ataque consume toda la memoria del servidor | Techo de memoria/CPU por contenedor; el anfitrión sobrevive |
+| A7 | **Suplantación de *gateway* LoRaWAN** | El protocolo *Semtech UDP Packet Forwarder* no autentica: cualquiera con el EUI (público) puede enviar UDP al puerto 1700 haciéndose pasar por un *gateway* | Límite de tasa en el proxy; el filtro 1 del pipeline autentica cada dispositivo de todos modos, contra el registro, no contra lo que diga el *gateway* |
 
 ## 2. Las capas, de afuera hacia adentro
 
@@ -49,11 +49,11 @@
 | 5 | Índice único: una sola condición abierta por tipo | `01-esquema.sql` | ✅ definido |
 | 7 | `security_opt: no-new-privileges` | `docker-compose.yml` | ✅ ambos servicios |
 | 7 | Imágenes con versión exacta (no `latest`) | `docker-compose.yml` | ✅ `2.24.0-pg16`, `2.0.22` |
-| 7 | Límites de memoria y CPU | `docker-compose.yml` | ✅ 768 MB / 256 MB; consumo real ≈ 31 MB + 3 MB |
+| 7 | Límites de memoria y CPU | `docker-compose.yml` | ✅ 768 / 256 / 512 MB (base, broker, backend); verificado con `docker inspect` que el techo se aplica al contenedor (23/09: 536 870 912 bytes para el backend); consumo real en reposo ≈ 26 + 1,5 + 56 MB |
 | 8 | Secretos ignorados por git | `.gitignore` | ✅ `git status` no muestra `.env` ni `passwd` |
 | 5 | Filtro 1 (autenticar) + cuarentena en el backend | `backend/src/recepcion` | ✅ dispositivo con credencial válida pero **no registrado** → cuarentena `desconocido`; registrado → aceptado |
-| 5 | Filtros 2–5 (analizar, validar, normalizar, alertar) y 6 (supervisar) | `backend/src/recepcion`, `alertas`, `supervision` | ✅ 7 casos de formato/rango/unidad a cuarentena; umbral con histéresis; silencio detectado (`docs/12 §2`) |
-| 7 | Dependencias sin scripts de instalación (`ignore-scripts`, `allowBuilds: false`), versiones exactas | `backend/.npmrc`, `pnpm-workspace.yaml` | ✅ pnpm bloqueó 2 scripts; lockfile pasa políticas de cadena de suministro |
+| 5 | Filtros 2–5 (analizar, validar, normalizar, alertar) y 6 (supervisar) | `backend/src/recepcion`, `alertas`, `supervision` | ✅ 40 pruebas unitarias automáticas en el CI: filtro 1 (desconocido, baja), tópico fuera del patrón, filtro 2 (malformada, cuerpo vacío), filtro 3 (canal no declarado, unidad no convertible, fuera de rango), filtro 5 (histéresis: abre a 35, nada a 29, cierra a 27), filtro 6 (vivo aunque haya cuarentena; barrido que no tumba el proceso). Además la tabla manual del README del backend |
+| 7 | Dependencias sin scripts de instalación (`ignore-scripts`, `allowBuilds: false`), versiones exactas | `backend/.npmrc`, `pnpm-workspace.yaml` | ✅ `pnpm ignored-builds` lista 3 paquetes con scripts bloqueados explícitamente (`@nestjs/core`, `@scarf/scarf`, `unrs-resolver`); lockfile pasa políticas de cadena de suministro |
 
 ## 4. Controles pendientes (por tanda)
 
@@ -64,19 +64,20 @@
 | 3 | Credenciales por dispositivo generadas por la plataforma (flujo de alta, docs/10 §3) | Backend |
 | 4 | ACL dinámica: el backend agrega/revoca usuarios del broker al dar de alta/baja | Backend |
 | 6 | Un rol de base de datos para el backend **sin** permiso de `DROP`/`TRUNCATE` | Backend |
+| 5 | ~~`cuarentena.motivo` sin `CHECK`~~ → hecho el 23/09 (migración 07): dominio cerrado como `dispositivo.estado` y `condicion.tipo`, probado insertando un motivo inventado | ✅ |
 | 1 | Backend en contenedor: escucha en la red interna (`HTTP_INTERFAZ=0.0.0.0`) **sin** `ports`; solo el proxy lo alcanza (`docs/10 §6`) | Dockerfile |
 | 2–3 | Canal de tiempo real hacia el panel (TT-39): solo `wss` vía proxy; sesión del panel verificada en el apretón de manos (rechazar antes de aceptar); lista blanca de `Origin`; ningún token en la URL; límite de tamaño (≤ 64 KB) y de tasa; todo mensaje entrante se valida. Fuente: OWASP, *WebSocket Security Cheat Sheet* | Etapa 3 |
 | 7 | Sistema de archivos de solo lectura + `tmpfs` donde el servicio lo tolere | Endurecimiento |
 | 7 | Escaneo de vulnerabilidades de imágenes (`docker scout` o Trivy) antes de cada entrega | Etapa 3 |
-| 7 | **Análisis de dependencias (SCA):** `pnpm audit --audit-level=high` en el CI. Estado al 23/09/2026: 22 avisos (10 altos), todos en dependencias transitivas de NestJS y su CLI (`multer`, `path-to-regexp`, `lodash`, `glob`, `picomatch`…); tipos, lint y pruebas estaban en verde, así que «verde» no incluía dependencias. Corrección aplicada el mismo día (probada antes en una copia): actualizar NestJS a 11.2.5 (no a 11.2.6, publicada ese día: pnpm 12 no instala versiones con menos de 24 h por defecto, `minimumReleaseAge`, y esa guardia no se salta) y la CLI a 11.0.24 baja a 7 avisos; tres *overrides* (`ajv ≥ 8.18`, `multer ≥ 2.3`, `picomatch ≥ 4.0.4`) dejan 0, con las 22 pruebas en verde. El paso queda en el CI para que no vuelva a pasar en silencio | ✅ 23/09/2026 |
+| 7 | **Análisis de dependencias (SCA):** `pnpm audit --audit-level=high` en el CI, sobre todo el árbol (también las herramientas de desarrollo: corren en el portátil y en el CI, y un compromiso ahí también es un compromiso). Estado al 23/09/2026: 22 avisos (10 altos), todos en dependencias transitivas de NestJS y su CLI (`multer`, `path-to-regexp`, `lodash`, `glob`, `picomatch`…); tipos, lint y pruebas estaban en verde, así que «verde» no incluía dependencias. Corrección aplicada el mismo día (probada antes en una copia): actualizar NestJS a 11.2.5 (no a 11.2.6, publicada ese día: pnpm 12 no instala versiones con menos de 24 h por defecto, `minimumReleaseAge`, y esa guardia no se salta) y la CLI a 11.0.24 baja a 7 avisos; tres *overrides* (`ajv ≥ 8.18`, `multer ≥ 2.3`, `picomatch ≥ 4.0.4`) dejan 0, con las 22 pruebas en verde. El paso queda en el CI para que no vuelva a pasar en silencio | ✅ 23/09/2026 |
 | 8 | **Escaneo de secretos** en el CI (`gitleaks`, MIT, con acción oficial `gitleaks/gitleaks-action`), además del `.gitignore` y del hook local: detecta una clave que se cuele en un commit antes de que el repo sea público. Al publicarlo, GitHub activa además su *secret scanning* por defecto | Antes de publicar el repo |
 | 5 | **Análisis estático (SAST)** del backend: reglas de seguridad de ESLint y, cuando el repo sea público, *code scanning* con CodeQL (GitHub lo habilita por defecto en repositorios públicos; en privados exige licencia) | Etapa 3 |
 | 8 | Respaldo diario automático de la base (`pg_dump` a un volumen aparte) + prueba de restauración | Antes de datos reales |
-| 8 | Límite de conexiones y de tamaño de mensaje en el broker (`max_connections`, `message_size_limit`) | Endurecimiento |
+| 8 | Límite de conexiones y de tamaño de mensaje en el broker (`max_connections`, `message_size_limit`) **y tope de lecturas por trama en el adaptador** (una trama con miles de lecturas no es un sensor; hoy se procesan todas en serie, `docs/10 §4.1`) | Endurecimiento |
 
 ## 5. Operación segura: reglas para no destruir el propio trabajo
 
-**Antes de aceptar un cambio de código** (propio, de una biblioteca, de un ejemplo o de un asistente),
+**Antes de aceptar un cambio de código** (propio, de una biblioteca, de un ejemplo o de una herramienta),
 cinco preguntas; si alguna no tiene respuesta, el cambio no entra:
 
 | # | Pregunta | Dónde se responde en este proyecto |
@@ -136,7 +137,7 @@ una advertencia contraria ("owner is not root") porque corre como root: se ignor
 leer `$SYS/#` (estadísticas). No es un dispositivo.
 
 **Cómo se generan.** Las claves reales se producen con un generador criptográfico
-(`openssl rand -base64 24` → 192 bits de entropía), nunca las elige una persona ni un asistente.
+(`openssl rand -base64 24` → 192 bits de entropía), nunca las elige una persona ni una herramienta.
 El archivo `passwd` guarda **hashes PBKDF2-SHA512** (prefijo `$7$` en Mosquitto 2.x) con sal
 aleatoria por entrada: aunque alguien lea el archivo, no obtiene la clave; y dos usuarios con la misma
 clave tienen hashes distintos.

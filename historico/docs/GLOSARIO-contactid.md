@@ -1,3 +1,7 @@
+> **Documento histórico (21/08/2026).** Describe Contact ID como el protocolo del trabajo; ese enfoque se
+> descartó el 02/09/2026 (`bitacora/2026-09-02-reunion-pivote.md`). Se conserva como evidencia. El glosario
+> vigente es `informe-oficial/glosario.tex`. Movido aquí el 23/09/2026.
+
 # Fundamentos y glosario
 
 > **Para qué sirve:** entender y poder **explicar** cada pieza del proyecto. Si no puedes explicarle

@@ -52,5 +52,5 @@ Informe oficial en plantilla del curso, reescrito al pivote. Pendiente que no de
 ## Dónde está cada cosa
 
 `PLAN-MAESTRO.md` método y calendario · `docs/01` problema y objetivos · `docs/02` requerimientos ·
-`docs/04` backlog · `docs/06` evaluación de comunicación · `docs/GLOSARIO.md` conceptos ·
+`docs/04` backlog · `docs/06` evaluación de comunicación · `informe-oficial/glosario.tex` glosario ·
 `bitacora/` reuniones · `informe-oficial/` **el entregable**.

@@ -3,3 +3,9 @@ dist
 *.spec.ts
 coverage
 .git
+# nunca al contexto de build, aunque algún día el Dockerfile use COPY . .
+.env
+.env.*
+*.pem
+*.key
+passwd
