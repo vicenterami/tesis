@@ -6,33 +6,42 @@
 
 \node[filtro, draw=ambar, line width=1pt] (in) at (0,0) {\textbf{trama}\\[2pt]{\footnotesize MQTT · HTTP}};
 
+% Orden REAL de ejecución (docs/10 §4, código en recepcion.service.ts): alertar corre por cada
+% lectura guardada, dentro del bucle; supervisar corre una vez al cerrar la trama. Por eso 5 y 6.
 \foreach \i/\nom/\det in {
-  1/{autenticar}/{TLS + credencial},
+  1/{autenticar}/{¿registrado y activo?},
   2/{analizar}/{¿se puede leer?},
-  3/{validar}/{contra el registro},
-  4/{normalizar}/{al modelo interno},
-  5/{supervisar}/{¿quién calla?},
-  6/{alertar}/{umbrales y caídas}}{
+  3/{validar}/{canal, unidad, rango},
+  4/{normalizar}/{unidad canónica y tiempo},
+  5/{alertar}/{umbral con histéresis, por lectura},
+  6/{supervisar}/{«se comunicó», una vez por trama}}{
   \pgfmathsetmacro\x{\i*2.55}
   \node[filtro] (f\i) at (\x,0) {\textbf{\i}\\ \textbf{\nom}\\[2pt]{\footnotesize \det}};
 }
 \draw[flechagruesa] (in) -- (f1);
 \foreach \i [evaluate=\i as \j using int(\i+1)] in {1,...,5} \draw[flechagruesa] (f\i) -- (f\j);
 
-% destinos, en la fila inferior: cada caída es vertical
-\node[notaaviso, text width=2.7cm, align=center, minimum height=1.1cm] (des) at (2.55,-2.45)
-  {\textbf{desconocido}\\{\footnotesize rechazo + registro}};
-\node[notaaviso, text width=2.7cm, align=center, minimum height=1.1cm] (cua) at (7.65,-2.45)
-  {\textbf{malformada}\\{\footnotesize cuarentena con motivo}};
-\node[filtro, draw=verdeacento, line width=1.1pt, fill=verdeacento!6, minimum height=1.1cm, text width=2.5cm] (db) at (15.3,-2.45)
-  {\textbf{TimescaleDB}\\[2pt]{\footnotesize series de tiempo}};
+% Destinos. Lo rechazado por 1, 2 o 3 va a UNA cuarentena, cruda y con su motivo. La medición
+% aceptada entra a la serie desde 4. Los filtros 5 y 6 abren o cierran condiciones (no series).
+\node[notaaviso, text width=4.2cm, align=center, minimum height=1.1cm] (cua) at (5.1,-2.7)
+  {\textbf{cuarentena} (trama cruda + motivo)\\{\footnotesize desconocido · malformada · inválida}};
+\node[filtro, draw=verdeacento, line width=1.1pt, fill=verdeacento!6, minimum height=1.1cm, text width=2.5cm] (db) at (10.2,-2.7)
+  {\textbf{TimescaleDB}\\[2pt]{\footnotesize medición (serie de tiempo)}};
+\node[filtro, draw=verdeacento, line width=1.1pt, fill=verdeacento!6, minimum height=1.1cm, text width=3.6cm] (cond) at (14.0,-2.7)
+  {\textbf{condiciones y eventos}\\[2pt]{\footnotesize umbral · sin comunicación}};
 
-\draw[flecha, color=ambar] (f1.south) -- (des.north);
-\draw[flecha, color=ambar] (f3.south) -- (cua.north);
-\draw[flechagruesa] (f6.south) -- (db.north);
+\draw[flecha, color=ambar] (f1.south) -- ++(0,-0.55) -| ([xshift=-12mm]cua.north);
+\draw[flecha, color=ambar] (f2.south) -- (cua.north);
+\draw[flecha, color=ambar] (f3.south) -- ++(0,-0.55) -| ([xshift=12mm]cua.north);
+\draw[flechagruesa] (f4.south) -- (db.north);
+\draw[flechagruesa] (f5.south) -- ++(0,-0.55) -| ([xshift=-8mm]cond.north);
+\draw[flechagruesa] (f6.south) -- ++(0,-0.55) -| ([xshift=8mm]cond.north);
 \end{tikzpicture}}
-\caption{El pipeline de tratamiento de tramas, aporte central del trabajo. Cada filtro es
-independiente y verificable por separado; los tres destinos —almacenamiento, cuarentena y registro
-de desconocidos— preservan la evidencia sin contaminar las series.}
+\caption{El pipeline de tratamiento de tramas, aporte central del trabajo, en su orden real de
+ejecución. Cada filtro es independiente y verificable por separado. Lo que rechazan los tres primeros
+va a una cuarentena con la trama cruda y su motivo; la medición aceptada entra a la serie de tiempo
+desde el cuarto; los dos últimos no escriben series sino condiciones: alertar evalúa cada lectura
+guardada, supervisar registra una vez por trama que el dispositivo se comunicó, aunque sus lecturas
+hayan ido a cuarentena.}
 \label{fig:pipeline}
 \end{figure}

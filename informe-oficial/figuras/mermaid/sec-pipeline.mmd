@@ -1,7 +1,7 @@
 sequenceDiagram
     participant MQ as Broker
     participant F1 as 1 Autenticar
-    participant F2 as 2 Analizar (adaptador)
+    participant F2 as 2 Analizar
     participant F3 as 3 Validar
     participant F4 as 4 Normalizar
     participant F5 as 5 Alertar
@@ -9,30 +9,30 @@ sequenceDiagram
     participant DB as TimescaleDB
     participant Q as Cuarentena
 
-    MQ->>F1: trama cruda + tópico + identidad
+    MQ->>F1: trama cruda<br/>+ tópico + identidad
     alt dispositivo desconocido o dado de baja
         F1->>Q: guarda cruda, motivo "desconocido"
     else conocido y activo
         F1->>F2: trama + dispositivo
-        F2->>F2: elige adaptador por origen (SenML nativo / JSON del compañero / ChirpStack)
+        F2->>F2: elige adaptador<br/>por origen (SenML nativo,<br/>JSON del compañero, ChirpStack)
         alt formato irreconocible
             F2->>Q: motivo "malformada"
         else parseada
-            F2->>F3: lecturas {canal, valor, unidad, tiempo}
+            F2->>F3: lecturas {canal,<br/>valor, unidad, tiempo}
             F3->>DB: consulta magnitud (unidad canónica, rango)
             alt fuera de rango, unidad incompatible o canal no declarado
                 F3->>Q: motivo "inválida"
             else válida
                 F3->>F4: lecturas válidas
-                F4->>F4: convierte unidad, ajusta marca de tiempo (sin reloj → hora de recepción)
+                F4->>F4: convierte unidad,<br/>ajusta marca de tiempo<br/>(sin reloj → hora de recepción)
                 F4->>DB: INSERT medicion (hypertable)
-                F4->>F5: cada lectura guardada + reglas de umbral de su canal
+                F4->>F5: cada lectura guardada<br/>+ reglas de umbral<br/>de su canal
                 alt cruza umbral (con histéresis)
                     F5->>DB: abre/cierra condicion, INSERT evento
-                    Note right of F5: notifica al panel (tiempo real) y por correo si está configurado
+                    Note right of F5: notifica al panel<br/>(tiempo real) y por correo<br/>si está configurado
                 end
             end
         end
-        F1->>F6: trama cerrada: el dispositivo autenticado se comunicó (aunque sus lecturas hayan ido a cuarentena)
-        F6->>DB: UPDATE visto_por_ultima_vez · cierra condición "sin_comunicacion" si estaba abierta
+        F1->>F6: trama cerrada: el dispositivo autenticado se comunicó<br/>(aunque sus lecturas hayan ido a cuarentena)
+        F6->>DB: UPDATE visto_por_ultima_vez<br/>· cierra "sin_comunicacion" si estaba abierta
     end

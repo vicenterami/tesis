@@ -7,18 +7,18 @@ sequenceDiagram
     participant Dev as Dispositivo
 
     Admin->>FE: Asistente "nuevo dispositivo"
-    FE->>API: POST /dispositivos {zona, id_fisico, canales[]}
+    FE->>API: POST /dispositivos<br/>{zona, id_fisico, canales[]}
     API->>DB: INSERT dispositivo, canal×N
     API->>API: genera credencial (secreto aleatorio)
     API->>DB: INSERT credencial (solo el hash)
-    API->>MQ: registra usuario MQTT + ACL al tópico del dispositivo
-    API-->>FE: 201 {id, credencial en claro — se muestra UNA vez}
-    FE-->>Admin: Muestra credencial + tópico + ejemplo de trama
-    Admin->>Dev: Carga credencial en el firmware (o la entrega al compañero)
+    API->>MQ: registra usuario MQTT<br/>+ ACL al tópico del dispositivo
+    API-->>FE: 201 {id, credencial en claro<br/>— se muestra UNA vez}
+    FE-->>Admin: Muestra credencial + tópico<br/>+ ejemplo de trama
+    Admin->>Dev: Carga credencial en el firmware<br/>(o la entrega al compañero)
     Dev->>MQ: CONNECT (id_fisico, credencial) · TLS
     MQ->>MQ: valida credencial y ACL
-    Dev->>MQ: PUBLISH sitio/…/dispositivo/<id>/<magnitud>
+    Dev->>MQ: PUBLISH<br/>sitio/…/dispositivo/<id>/<magnitud>
     MQ->>API: entrega la trama (suscriptor)
-    API->>DB: UPDATE dispositivo.visto_por_ultima_vez
+    API->>DB: UPDATE dispositivo<br/>.visto_por_ultima_vez
     API-->>FE: WS "dispositivo en línea"
     FE-->>Admin: Estado: en línea ✅

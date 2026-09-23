@@ -34,7 +34,7 @@ trama SenML.
 \item[Pipeline] Línea de montaje de software: pasos encadenados donde la salida de uno es la entrada
 del siguiente. El de esta plataforma tiene seis filtros (figura~\ref{fig:pipeline}).
 \item[QoS] \emph{Quality of Service} de MQTT: 0 «a lo más una vez», 1 «al menos una vez», 2
-«exactamente una vez».
+«exactamente una vez». La garantía es por salto (cliente–broker), no de extremo a extremo.
 \item[SenML] \emph{Sensor Measurement Lists} (RFC 8428, IETF, gratuito): formato estándar para
 listas de mediciones con identidad, nombre, unidad, valor y tiempo. El contrato nativo de entrada.
 \item[Socket] Conexión TCP cruda entre dos programas, sin protocolo de mensajería encima. Evaluado y

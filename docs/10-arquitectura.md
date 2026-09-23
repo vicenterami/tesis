@@ -11,10 +11,14 @@
 
 ## 1. Vista de contenedores (C4, nivel 2)
 
-Qué piezas ejecutables existen y cómo se hablan. La **frontera** del trabajo es el tópico MQTT: a la
-izquierda está la red de sensores (lado del compañero); a la derecha, la plataforma. Los módulos M1–M8
-son los del análisis de requerimientos (`docs/02` §3); M3 (aprovisionamiento), M7 (seguridad e
-identidad) y M8 (interfaz) no aparecen como cajas porque son transversales o viven en el cliente.
+Qué piezas ejecutables existen y cómo se hablan. La **frontera** del trabajo es el tópico MQTT: de un
+lado, la red de sensores (lado del compañero: nodos, *gateway* y ChirpStack, que aunque se aloja en
+nuestro servidor publica al broker como un productor más); del otro, el broker y el backend. No se
+describe por posición (izquierda/derecha) porque el dibujo lo genera Mermaid y su distribución cambia
+al renderizar; el 23/09/2026 la leyenda del informe decía «a la izquierda… a la derecha» y el dibujo
+mostraba los sensores arriba. Se dibujan los módulos que tocan el dato (M1, M2, M4, M5, M6); M3
+(aprovisionamiento), M7 (seguridad e identidad) y M8 (interfaz) no aparecen como cajas porque son
+transversales o viven en el cliente (`docs/02` §3).
 
 ```mermaid
 flowchart TB
@@ -127,19 +131,19 @@ sequenceDiagram
     participant Dev as Dispositivo
 
     Admin->>FE: Asistente "nuevo dispositivo"
-    FE->>API: POST /dispositivos {zona, id_fisico, canales[]}
+    FE->>API: POST /dispositivos<br/>{zona, id_fisico, canales[]}
     API->>DB: INSERT dispositivo, canal×N
     API->>API: genera credencial (secreto aleatorio)
     API->>DB: INSERT credencial (solo el hash)
-    API->>MQ: registra usuario MQTT + ACL al tópico del dispositivo
-    API-->>FE: 201 {id, credencial en claro — se muestra UNA vez}
-    FE-->>Admin: Muestra credencial + tópico + ejemplo de trama
-    Admin->>Dev: Carga credencial en el firmware (o la entrega al compañero)
+    API->>MQ: registra usuario MQTT<br/>+ ACL al tópico del dispositivo
+    API-->>FE: 201 {id, credencial en claro<br/>— se muestra UNA vez}
+    FE-->>Admin: Muestra credencial + tópico<br/>+ ejemplo de trama
+    Admin->>Dev: Carga credencial en el firmware<br/>(o la entrega al compañero)
     Dev->>MQ: CONNECT (id_fisico, credencial) · TLS
     MQ->>MQ: valida credencial y ACL
-    Dev->>MQ: PUBLISH sitio/…/dispositivo/<id>/<magnitud>
+    Dev->>MQ: PUBLISH<br/>sitio/…/dispositivo/<id>/<magnitud>
     MQ->>API: entrega la trama (suscriptor)
-    API->>DB: UPDATE dispositivo.visto_por_ultima_vez
+    API->>DB: UPDATE dispositivo<br/>.visto_por_ultima_vez
     API-->>FE: WS "dispositivo en línea"
     FE-->>Admin: Estado: en línea ✅
 ```
@@ -162,7 +166,7 @@ Comportamiento del núcleo del trabajo. Cada filtro tiene una salida "feliz" (si
 sequenceDiagram
     participant MQ as Broker
     participant F1 as 1 Autenticar
-    participant F2 as 2 Analizar (adaptador)
+    participant F2 as 2 Analizar
     participant F3 as 3 Validar
     participant F4 as 4 Normalizar
     participant F5 as 5 Alertar
@@ -170,32 +174,32 @@ sequenceDiagram
     participant DB as TimescaleDB
     participant Q as Cuarentena
 
-    MQ->>F1: trama cruda + tópico + identidad
+    MQ->>F1: trama cruda<br/>+ tópico + identidad
     alt dispositivo desconocido o dado de baja
         F1->>Q: guarda cruda, motivo "desconocido"
     else conocido y activo
         F1->>F2: trama + dispositivo
-        F2->>F2: elige adaptador por origen (SenML nativo / JSON del compañero / ChirpStack)
+        F2->>F2: elige adaptador<br/>por origen (SenML nativo,<br/>JSON del compañero, ChirpStack)
         alt formato irreconocible
             F2->>Q: motivo "malformada"
         else parseada
-            F2->>F3: lecturas {canal, valor, unidad, tiempo}
+            F2->>F3: lecturas {canal,<br/>valor, unidad, tiempo}
             F3->>DB: consulta magnitud (unidad canónica, rango)
             alt fuera de rango, unidad incompatible o canal no declarado
                 F3->>Q: motivo "inválida"
             else válida
                 F3->>F4: lecturas válidas
-                F4->>F4: convierte unidad, ajusta marca de tiempo (sin reloj → hora de recepción)
+                F4->>F4: convierte unidad,<br/>ajusta marca de tiempo<br/>(sin reloj → hora de recepción)
                 F4->>DB: INSERT medicion (hypertable)
-                F4->>F5: cada lectura guardada + reglas de umbral de su canal
+                F4->>F5: cada lectura guardada<br/>+ reglas de umbral<br/>de su canal
                 alt cruza umbral (con histéresis)
                     F5->>DB: abre/cierra condicion, INSERT evento
-                    Note right of F5: notifica al panel (tiempo real) y por correo si está configurado
+                    Note right of F5: notifica al panel<br/>(tiempo real) y por correo<br/>si está configurado
                 end
             end
         end
-        F1->>F6: trama cerrada: el dispositivo autenticado se comunicó (aunque sus lecturas hayan ido a cuarentena)
-        F6->>DB: UPDATE visto_por_ultima_vez · cierra condición "sin_comunicacion" si estaba abierta
+        F1->>F6: trama cerrada: el dispositivo autenticado se comunicó<br/>(aunque sus lecturas hayan ido a cuarentena)
+        F6->>DB: UPDATE visto_por_ultima_vez<br/>· cierra "sin_comunicacion" si estaba abierta
     end
 ```
 
@@ -223,6 +227,16 @@ que compara `visto_por_ultima_vez` contra `intervalo_esperado_s` y abre la condi
 `sin_comunicacion`. Sin ella, un sensor caído sería invisible.
 
 ### 4.1 Entrega «al menos una vez», caídas y duplicados (RF-06, RF-10)
+
+**Por qué QoS 1 y no QoS 2.** MQTT ofrece tres niveles: 0 «a lo más una vez» (puede perderse), 1 «al
+menos una vez» (llega, pero puede duplicarse) y 2 «exactamente una vez», con un apretón de cuatro
+paquetes (PUBLISH, PUBREC, PUBREL, PUBCOMP). La garantía de QoS 2 es **por salto, entre un cliente y el
+broker**, no de extremo a extremo: nada en el protocolo sabe si el backend, después de confirmar al
+broker, alcanzó a escribir en la base antes de caerse. Por eso el destino tiene que ser idempotente de
+todos modos (índice único `canal + instante` y `ON CONFLICT DO NOTHING`), y una vez que lo es, QoS 1 da
+el mismo efecto —cada lectura cuenta una sola vez— con la mitad de paquetes por mensaje y sin exigir
+QoS 2 a nodos de pocos recursos. «Exactamente una vez» se logra aquí por diseño del receptor, no por el
+transporte. Fuente: OASIS, *MQTT Version 5.0*, §4.3 (`mqttoasis` en la bibliografía).
 
 | Situación | Qué pasa | Por qué basta |
 |---|---|---|

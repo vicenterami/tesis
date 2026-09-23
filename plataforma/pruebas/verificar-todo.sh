@@ -55,6 +55,15 @@ if [ -n "$faltan" ]; then
   fallos=$((fallos+1))
 else echo "OK    $(echo "$leidas" | wc -l) variables leídas, todas declaradas en .env.example"; fi
 
+paso "2e. Orden de los filtros: la figura TikZ del cap. 3 y docs/06 dicen 5 alertar / 6 supervisar (docs/10 §8.2)"
+if grep -q "5/{alertar}" informe-oficial/figuras/pipeline.tex && grep -q "6/{supervisar}" informe-oficial/figuras/pipeline.tex \
+   && grep -qE "^\s*5 alertar" docs/06-evaluacion-comunicacion.md && grep -qE "^\s*6 supervisar" docs/06-evaluacion-comunicacion.md \
+   && grep -q "participant F5 as 5 Alertar" docs/10-arquitectura.md && grep -q "participant F6 as 6 Supervisar" docs/10-arquitectura.md; then
+  echo "OK    5 alertar / 6 supervisar en pipeline.tex, docs/06 y docs/10"
+else
+  echo "FALLA el orden de los filtros 5/6 difiere entre pipeline.tex, docs/06 y docs/10"; fallos=$((fallos+1))
+fi
+
 paso "3. Diagramas: informe = docs = base (generar-figuras.sh --verificar)"
 bash informe-oficial/figuras/generar-figuras.sh --verificar || fallos=$((fallos+1))
 

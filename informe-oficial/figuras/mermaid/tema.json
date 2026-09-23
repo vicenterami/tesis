@@ -1,48 +1,51 @@
 {
- "theme": "base",
- "themeVariables": {
-  "primaryColor": "#FFFFFF",
-  "primaryBorderColor": "#1F3A5F",
-  "primaryTextColor": "#1F3A5F",
-  "secondaryColor": "#F2F4F3",
-  "tertiaryColor": "#F2F4F3",
-  "lineColor": "#55635B",
-  "clusterBkg": "#F2F4F3",
-  "clusterBorder": "#C9D1CC",
-  "edgeLabelBackground": "#FFFFFF",
-  "actorBorder": "#1F3A5F",
-  "actorBkg": "#FFFFFF",
-  "signalColor": "#55635B",
-  "signalTextColor": "#1F3A5F",
-  "labelBoxBkgColor": "#F2F4F3",
-  "labelBoxBorderColor": "#C9D1CC",
-  "noteBkgColor": "#FFF8EC",
-  "noteBorderColor": "#B06A1F",
-  "attributeBackgroundColorOdd": "#FFFFFF",
-  "attributeBackgroundColorEven": "#F2F4F3",
-  "fontFamily": "Liberation Serif, DejaVu Serif, serif",
-  "fontSize": "15px"
- },
- "flowchart": {
-  "useMaxWidth": false,
-  "htmlLabels": true,
-  "nodeSpacing": 40,
-  "rankSpacing": 50,
-  "curve": "basis"
- },
- "sequence": {
-  "useMaxWidth": false,
-  "mirrorActors": true,
-  "messageMargin": 30,
-  "actorMargin": 60,
-  "bottomMarginAdj": 60,
-  "boxMargin": 12,
-  "diagramMarginY": 20
- },
- "er": {
-  "useMaxWidth": false,
-  "fontSize": 14,
-  "entityPadding": 12,
-  "minEntityWidth": 120
- }
+  "theme": "base",
+  "themeVariables": {
+    "primaryColor": "#FFFFFF",
+    "primaryBorderColor": "#1F3A5F",
+    "primaryTextColor": "#1F3A5F",
+    "secondaryColor": "#F2F4F3",
+    "tertiaryColor": "#F2F4F3",
+    "lineColor": "#55635B",
+    "clusterBkg": "#F2F4F3",
+    "clusterBorder": "#C9D1CC",
+    "edgeLabelBackground": "#FFFFFF",
+    "actorBorder": "#1F3A5F",
+    "actorBkg": "#FFFFFF",
+    "signalColor": "#55635B",
+    "signalTextColor": "#1F3A5F",
+    "labelBoxBkgColor": "#F2F4F3",
+    "labelBoxBorderColor": "#C9D1CC",
+    "noteBkgColor": "#FFF8EC",
+    "noteBorderColor": "#B06A1F",
+    "attributeBackgroundColorOdd": "#FFFFFF",
+    "attributeBackgroundColorEven": "#F2F4F3",
+    "fontFamily": "Liberation Serif, DejaVu Serif, serif",
+    "fontSize": "15px"
+  },
+  "flowchart": {
+    "useMaxWidth": false,
+    "htmlLabels": true,
+    "nodeSpacing": 40,
+    "rankSpacing": 50,
+    "curve": "basis"
+  },
+  "sequence": {
+    "useMaxWidth": false,
+    "mirrorActors": false,
+    "messageMargin": 24,
+    "actorMargin": 36,
+    "width": 120,
+    "boxMargin": 6,
+    "boxTextMargin": 4,
+    "noteMargin": 6,
+    "bottomMarginAdj": 1,
+    "diagramMarginY": 12
+  },
+  "er": {
+    "useMaxWidth": false,
+    "fontSize": 14,
+    "entityPadding": 12,
+    "minEntityWidth": 120
+  }
 }
