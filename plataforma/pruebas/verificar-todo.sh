@@ -26,8 +26,8 @@ paso "2. Migraciones aplicadas = archivos en db/init (cada NN-*.sql debe estar r
 docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -U plataforma -d plataforma -tA <<'SQL' | tee /tmp/vt-mig.txt
 SELECT CASE WHEN indexdef LIKE '%COALESCE(regla_id%' THEN 'OK    02 condicion_abierta_unica por regla' ELSE 'FALLA 02 indice viejo' END FROM pg_indexes WHERE indexname='condicion_abierta_unica';
 SELECT CASE WHEN count(*)=1 THEN 'OK    03 sitio.zona_horaria' ELSE 'FALLA 03 falta sitio.zona_horaria' END FROM information_schema.columns WHERE table_name='sitio' AND column_name='zona_horaria';
-SELECT CASE WHEN count(*)=1 THEN 'OK    04 funcion iso_utc' ELSE 'FALLA 04 falta iso_utc' END FROM pg_proc WHERE proname='iso_utc';
-SELECT CASE WHEN count(*)=1 THEN 'OK    06 uq_medicion_canal_tiempo (idempotencia)' ELSE 'FALLA 06 falta el indice unico de medicion' END FROM pg_indexes WHERE indexname='uq_medicion_canal_tiempo' AND indexdef LIKE 'CREATE UNIQUE%';
+SELECT CASE WHEN count(*)=1 THEN 'OK    04 función iso_utc' ELSE 'FALLA 04 falta iso_utc' END FROM pg_proc WHERE proname='iso_utc'; -- cspell:disable-line
+SELECT CASE WHEN count(*)=1 THEN 'OK    06 uq_medicion_canal_tiempo (idempotencia)' ELSE 'FALLA 06 falta el índice único de medición' END FROM pg_indexes WHERE indexname='uq_medicion_canal_tiempo' AND indexdef LIKE 'CREATE UNIQUE%'; -- cspell:disable-line
 SELECT CASE WHEN count(*)>=9 AND (SELECT count(*) FROM magnitud WHERE codigo IN ('pm2_5','pm10'))=2 THEN 'OK    05 convenciones: '||count(*)||' disparadores actualizado_en y pm2_5/pm10' ELSE 'FALLA 05 convenciones incompletas' END FROM pg_trigger WHERE tgname LIKE 'trg_%_actualizado_en';
 SELECT CASE WHEN count(*)=1 THEN 'OK    07 cuarentena.motivo con CHECK (dominio cerrado)' ELSE 'FALLA 07 falta el CHECK de cuarentena.motivo' END FROM pg_constraint WHERE conname='cuarentena_motivo_chk' AND contype='c';
 SQL
@@ -42,8 +42,8 @@ for f in informe-oficial/cap-diseno.tex informe-oficial/anexos/e-seguimiento.tex
 done
 
 paso "2c. Términos vetados por el profesor guía: cero apariciones en docs e informe"
-if grep -rniE "ingesta|heterog[eé]ne" docs/ informe-oficial/*.tex informe-oficial/anexos/*.tex PLAN-MAESTRO.md 2>/dev/null | grep -v "sin «heterogéneo» ni «ingesta»" | grep -q .; then
-  echo "FALLA aparecen términos vetados:"; grep -rniE "ingesta|heterog[eé]ne" docs/ informe-oficial/*.tex informe-oficial/anexos/*.tex PLAN-MAESTRO.md 2>/dev/null | grep -v "sin «heterogéneo» ni «ingesta»" | cut -c1-120
+if grep -rniE "ingesta|heterog[eé]ne" docs/ informe-oficial/*.tex informe-oficial/anexos/*.tex PLAN-MAESTRO.md 2>/dev/null | grep -v "sin «heterogéneo» ni «ingesta»" | grep -q .; then # cspell:disable-line
+  echo "FALLA aparecen términos vetados:"; grep -rniE "ingesta|heterog[eé]ne" docs/ informe-oficial/*.tex informe-oficial/anexos/*.tex PLAN-MAESTRO.md 2>/dev/null | grep -v "sin «heterogéneo» ni «ingesta»" | cut -c1-120 # cspell:disable-line
   fallos=$((fallos+1))
 else echo "OK    sin «ingesta» ni «heterogéneo»"; fi
 
@@ -67,11 +67,36 @@ fi
 
 paso "2f. Repositorio público: ningún archivo versionado menciona herramientas de asistencia ni rutas personales"
 # El patrón se arma por partes para que este mismo archivo no lo contenga literal (y no se detecte a sí mismo).
-P="\\bcl""aude\\b|\\bfa""ble\\b|\\bson""net\\b|co-auth""ored-by|asistente de ""ia|modelo de ""lenguaje|~/\\.cl""aude"
+P="\\bcl""aude\\b|\\bfa""ble\\b|\\bson""net\\b|co-auth""ored-by|asistente de ""ia|modelo de ""lenguaje|~/\\.cl""aude" # cspell:disable-line
 if git ls-files | grep -v "^historico/" | xargs grep -lniE "$P" 2>/dev/null | grep -q .; then
   echo "FALLA archivos versionados con menciones prohibidas:"; git ls-files | grep -v "^historico/" | xargs grep -lniE "$P" 2>/dev/null | sed 's/^/  /'
   fallos=$((fallos+1))
 else echo "OK    sin menciones a herramientas ni rutas personales en $(git ls-files | wc -l) archivos versionados"; fi
+
+paso "2g. Migraciones citadas en prosa (docs e informe) == archivos NN-*.sql en disco"
+# Hallazgo del 26/09: informe y docs/12 decían «6 migraciones» cuando ya había 7 en disco (la 07 del 23/09).
+n_disco=$(ls plataforma/db/init/*.sql | wc -l)
+citadas=$(grep -rhoE '[0-9]+ migraciones' docs informe-oficial --include=*.md --include=*.tex | grep -oE '^[0-9]+' | sort -u)
+if [ "$citadas" = "$n_disco" ]; then
+  echo "OK    $n_disco migraciones en disco, todas las menciones en prosa dicen $n_disco"
+else
+  echo "FALLA disco tiene $n_disco migraciones; prosa dice: $(echo "$citadas" | tr '\n' ' ')"
+  fallos=$((fallos+1))
+fi
+
+paso "2h. Rutas HTTP citadas en prosa (glosario, docs/10, docs/12, docs/15) == rutas reales del OpenAPI"
+# Hallazgo del 26/09: el glosario citaba GET /mediciones, ruta que nunca existió en el backend.
+rutas_reales=$(jq -r '.paths|keys[]' plataforma/backend/openapi.json | sed -E 's/\{[^}]*\}/{p}/g' | sort -u)
+rutas_citadas=$(grep -rhoE '(GET|POST|PATCH|DELETE) /[a-zA-Z0-9_{}/.\\-]*' informe-oficial docs --include=*.tex --include=*.md \
+  | sed -E 's/^(GET|POST|PATCH|DELETE) //; s/\\\{/{/g; s/\\\}/}/g; s/\{[^}]*\}/{p}/g; s/[.,}]+$//' \
+  | sort -u)
+faltan=$(comm -23 <(echo "$rutas_citadas") <(echo "$rutas_reales"))
+if [ -n "$faltan" ]; then
+  echo "FALLA rutas citadas que no existen en el OpenAPI:"; echo "$faltan" | sed 's/^/  /'
+  fallos=$((fallos+1))
+else
+  echo "OK    $(echo "$rutas_citadas" | grep -c .) rutas citadas en docs e informe, todas existen en el OpenAPI"
+fi
 
 paso "3. Diagramas: informe = docs = base (generar-figuras.sh --verificar)"
 bash informe-oficial/figuras/generar-figuras.sh --verificar || fallos=$((fallos+1))
