@@ -156,6 +156,18 @@ clave tienen hashes distintos.
    para que el healthcheck tome la clave nueva.
 4. Las credenciales de prueba (`dev-*`) se eliminan antes de conectar dispositivos reales.
 
+**Cómo se escribe `passwd` sin romper nada (27/09/2026).** El broker monta su configuración en solo
+lectura, así que `mosquitto_passwd` no puede correr dentro de él. Para dispositivos, un solo comando:
+`bash plataforma/pruebas/clave-dispositivo.sh <id>` (o `--borrar <id>`). La clave se pega en un aviso
+oculto y llega a `mosquitto_passwd` por la entrada estándar, nunca como argumento (no queda en el
+historial de la terminal); el script restituye dueño 1883 y modo 0640, reinicia el broker y
+**verifica** que la clave nueva autentica (o que el dispositivo borrado ya no existe). Corre la
+herramienta en un contenedor auxiliar con `--entrypoint`, y eso no es un detalle: el arranque de la
+imagen, cuando corre como root, hace `chown -R` sobre `/mosquitto`, y montar ahí la carpeta del
+portátil le cambió el dueño a `acl` y `mosquitto.conf` (ocurrió en el ensayo del 27/09; se restituye
+con `sudo chown`). El procedimiento de la puesta en marcha (`plataforma/README.md`) monta en `/c`
+por la misma razón.
+
 **Qué NO es respaldo de credenciales:** el repositorio. Git respalda código y configuración; los
 secretos y los datos se respaldan aparte (`pg_dump` cifrado, gestor de contraseñas).
 

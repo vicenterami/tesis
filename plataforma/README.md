@@ -29,14 +29,20 @@ cd plataforma
 cp .env.example .env                 # editar las claves
 openssl rand -base64 24              # generar una clave por variable
 
-# Contraseñas MQTT (crea el archivo passwd con hash; una línea por usuario)
-docker run --rm -v "$PWD/mosquitto/config:/c" eclipse-mosquitto:2.0.22 \
-  mosquitto_passwd -c -b /c/passwd sonda   'LA_CLAVE_DE_MQTT_SONDA_CLAVE'
-docker run --rm -v "$PWD/mosquitto/config:/c" eclipse-mosquitto:2.0.22 \
-  mosquitto_passwd    -b /c/passwd backend 'LA_CLAVE_DE_MQTT_BACKEND_CLAVE'
+# Contraseñas MQTT (crea el archivo passwd con hash; una línea por usuario). La clave se pega oculta
+# (read -rs) y entra por la entrada estándar: no queda en el historial de la terminal ni en ps.
+# -c CREA el archivo desde cero: solo para el primer usuario de una instalación nueva.
+read -rs -p "clave de sonda (la de .env): " C && echo && printf '%s\n%s\n' "$C" "$C" | \
+  docker run --rm -i -v "$PWD/mosquitto/config:/c" --entrypoint mosquitto_passwd eclipse-mosquitto:2.0.22 -c /c/passwd sonda
+read -rs -p "clave de backend (la de .env): " C && echo && printf '%s\n%s\n' "$C" "$C" | \
+  docker run --rm -i -v "$PWD/mosquitto/config:/c" --entrypoint mosquitto_passwd eclipse-mosquitto:2.0.22 /c/passwd backend
+unset C
 # El archivo queda propiedad de root; el broker corre como uid 1883 y debe poder leerlo:
 docker run --rm -v "$PWD/mosquitto/config:/c" eclipse-mosquitto:2.0.22 \
   sh -c 'chown 1883:1883 /c/passwd && chmod 0640 /c/passwd'
+# Siempre en /c, nunca en /mosquitto: el arranque de la imagen hace chown -R de /mosquitto (docs/11 §7).
+# Claves de DISPOSITIVOS (dev-0001…): un solo comando, con la clave oculta y verificada:
+#   bash pruebas/clave-dispositivo.sh dev-0001
 
 docker compose up -d                 # descarga imágenes, construye el backend, crea red, volúmenes y arranca
 docker compose ps                    # estado y healthchecks
@@ -55,7 +61,7 @@ docker compose exec timescaledb psql -U plataforma -d plataforma \
 Probar el broker (publicar como un dispositivo de prueba requiere crearle usuario en `passwd`):
 
 ```bash
-docker compose exec mosquitto mosquitto_sub -u backend -P 'LA_CLAVE_DE_MQTT_BACKEND_CLAVE' -t 'sitio/#' -v
+read -rs -p "clave de backend: " C && echo && docker compose exec mosquitto mosquitto_sub -u backend -P "$C" -t 'sitio/#' -v; unset C
 ```
 
 Probar el backend contenedorizado (`docker compose ps` debe mostrarlo `healthy`; el override publica su

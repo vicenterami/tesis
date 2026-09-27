@@ -15,8 +15,13 @@ bash plataforma/pruebas/pila.sh encender      # construye, levanta, espera «hea
 bash plataforma/pruebas/semilla-demo.sh       # datos del guion (idempotente): SEMILLA LISTA
 bash plataforma/pruebas/verificar-todo.sh     # TODO EN CONCORDANCIA
 bash plataforma/pruebas/pila.sh logs          # terminal A: registros en vivo, y copia en privado/logs/
-export CLAVE_DEV='…'                          # terminal B: clave del dispositivo de prueba (gestor local)
+read -rs CLAVE_DEV && export CLAVE_DEV        # terminal B: pegar la clave de dev-0001 desde el gestor (no se ve)
 ```
+
+Si la clave de `dev-0001` no está en el gestor o no calza (`not authorised` al publicar), se crea una
+nueva en un paso: `bash plataforma/pruebas/clave-dispositivo.sh dev-0001` (pide la clave oculta,
+reinicia el broker y verifica que autentica; `docs/11 §7`). Hacerlo **antes** de la demostración: el
+reinicio del broker corta la conexión del backend unos segundos.
 
 **Solo si vas a cambiar código en vivo (opcional):** el backend corre en el portátil con recarga
 automática y la base y el broker siguen en Docker. Antes hay que detener el backend del contenedor:
@@ -46,9 +51,11 @@ decenas de MB.
 **Decir:** el contrato nativo es SenML (RFC 8428); el dispositivo publica en su tópico con su credencial.
 
 ```bash
-docker compose exec mosquitto mosquitto_pub -u dev-0001 -P "$CLAVE_DEV" -t sitio/uct/dispositivo/dev-0001/temperatura \
-  -m '[{"bn":"dev-0001","n":"temperatura","u":"Cel","v":22.4}]'
+bash plataforma/pruebas/publicar.sh temperatura '[{"bn":"dev-0001","n":"temperatura","u":"Cel","v":22.4}]'
 ```
+
+(`publicar.sh` publica como `dev-0001` con QoS 1 y la clave de `CLAVE_DEV`; es el mismo `mosquitto_pub`
+de siempre, con menos que teclear en vivo.)
 
 **Ver:** terminal A → `dev-0001: 1/1 lecturas guardadas vía senml`. Luego, en psql:
 
@@ -67,6 +74,9 @@ SELECT tiempo, valor, unidad FROM medicion ORDER BY tiempo DESC LIMIT 1;
 | `{"v":300,"u":"K"}` | **no se rechaza:** se guarda 26,85 Cel | 4 normalizar |
 | en `…/dev-0001/presion`: `1013` | `invalida` · canal no declarado | 3 validar |
 
+Cada fila es `bash plataforma/pruebas/publicar.sh temperatura <carga>`; la última,
+`bash plataforma/pruebas/publicar.sh presion 1013`.
+
 ```sql
 SELECT motivo, topico, left(convert_from(payload_crudo,'UTF8'),30) AS carga, recibido_en FROM cuarentena ORDER BY recibido_en DESC LIMIT 4;
 ```
@@ -80,6 +90,8 @@ SELECT motivo, topico, left(convert_from(payload_crudo,'UTF8'),30) AS carga, rec
 | `35` | `umbral alto cruzado (35 Cel) · condición abierta` |
 | `29` | nada: zona de histéresis |
 | `27` | `valor de vuelta en rango · condición cerrada` |
+
+(Mismo comando: `bash plataforma/pruebas/publicar.sh temperatura 35`, luego `29`, luego `27`.)
 
 **Decir:** el pipeline solo corre cuando llega algo; el silencio lo detecta un supervisor periódico. Si el
 tiempo alcanza: callar y esperar el barrido → `sin comunicación hace N s · condición abierta`; publicar de
@@ -116,6 +128,7 @@ instante termina en `Z`.
 | Síntoma | Causa probable | Salida |
 |---|---|---|
 | `EADDRINUSE` al arrancar | backend huérfano | `ss -ltnp \| grep :3000` → `kill <pid>` |
-| `Connection refused` en mosquitto_pub | pila abajo | `docker compose up -d` |
-| Nada en el log al publicar | credencial o tópico mal | revisar `-u`, `-t`; el broker rechaza sin avisar al cliente |
+| `Connection refused` a secas al publicar | pila abajo | `bash plataforma/pruebas/pila.sh encender` |
+| `Connection Refused: not authorised` | la clave no calza con el broker | `bash plataforma/pruebas/clave-dispositivo.sh dev-0001` (fuera de escena) |
+| `publicado`, pero nada en el log | tópico de otro dispositivo: la ACL lo descarta sin avisar al cliente | revisar que el tópico diga `dev-0001`; `publicar.sh` lo arma solo |
 | Histórico vacío | rango por defecto: últimas 24 h | pasar `desde=` anterior a los datos |

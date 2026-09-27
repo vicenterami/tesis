@@ -98,6 +98,15 @@ else
   echo "OK    $(echo "$rutas_citadas" | grep -c .) rutas citadas en docs e informe, todas existen en el OpenAPI"
 fi
 
+paso "2i. Dueños de la configuración del broker: acl y mosquitto.conf del operador; passwd de uid 1883 y modo 640 (docs/11 §7)"
+# Hallazgo del 27/09: un contenedor auxiliar montado en /mosquitto disparó el chown -R de la imagen y
+# cambió el dueño de acl y mosquitto.conf. Solo se leen metadatos (stat), nunca el contenido de passwd.
+MC="${MOSQ_CONF:-plataforma/mosquitto/config}"; yo=$(id -u); mal=""
+for f in "$MC" "$MC/acl" "$MC/mosquitto.conf"; do [ "$(stat -c %u "$f")" = "$yo" ] || mal="$mal $f(dueño $(stat -c %u "$f"))"; done
+[ "$(stat -c '%u %a' "$MC/passwd" 2>/dev/null)" = "1883 640" ] || mal="$mal passwd($(stat -c '%u %a' "$MC/passwd" 2>/dev/null || echo 'no existe'))"
+if [ -z "$mal" ]; then echo "OK    carpeta, acl y mosquitto.conf del operador; passwd de 1883 con modo 640"
+else echo "FALLA dueños o modos alterados:$mal (restituir: sudo chown \$USER:\$USER; passwd con clave-dispositivo.sh)"; fallos=$((fallos+1)); fi
+
 paso "3. Diagramas: informe = docs = base (generar-figuras.sh --verificar)"
 bash informe-oficial/figuras/generar-figuras.sh --verificar || fallos=$((fallos+1))
 

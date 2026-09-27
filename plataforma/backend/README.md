@@ -61,8 +61,8 @@ primera (deliberado: el pipeline corre en un solo proceso). Detalle en `docs/10 
 Con el backend corriendo, publica como un dispositivo de prueba **no registrado**:
 
 ```bash
-# desde plataforma/
-docker compose exec mosquitto mosquitto_pub -u dev-0001 -P '<clave>' -t sitio/uct/dispositivo/dev-0001/temperatura -m 21.5
+# desde plataforma/ (la clave de dev-0001 se crea con `bash pruebas/clave-dispositivo.sh dev-0001`)
+bash pruebas/publicar.sh temperatura 21.5          # pide la clave oculta si CLAVE_DEV no está exportada
 docker compose exec timescaledb psql -U plataforma -d plataforma -c "SELECT topico, motivo, recibido_en FROM cuarentena ORDER BY recibido_en DESC LIMIT 3;"
 ```
 
