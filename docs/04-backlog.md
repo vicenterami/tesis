@@ -58,19 +58,19 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 
 | Épica | Nombre | Módulos | Objetivo | Etapa | Horas |
 |---|---|---|---|:---:|:---:|
-| **EP-01** | Infraestructura y entorno de desarrollo | — | OE5 | 2 | 14 |
+| **EP-01** | Infraestructura y entorno de desarrollo | — | OE4 | 2 | 14 |
 | **EP-02** | Diseño de arquitectura, red y datos | — | OE3 | 2 | 26 |
 | **EP-03** | Especificación del contrato de trama y adaptadores | M2 | OE2 | 2 | 16 |
-| **EP-04** | Recepción multiprotocolo | M1 | OE5 | 2 · 3 | 26 |
-| **EP-05** | Normalización y máquina de estados | M2 | OE5 | 3 | 19 |
-| **EP-06** | Persistencia y consulta | M5 | OE5 | 2 · 3 | 17 |
-| **EP-07** | Inventario y aprovisionamiento | M3 | OE5 | 3 | 15 |
-| **EP-08** | Supervisión de salud de enlace | M4 | OE5 | 3 | 18 |
-| **EP-09** | Seguridad y multi-tenencia | M7 | OE5 | 3 | 16 |
-| **EP-10** | Interfaz de administración | M8 | OE5 | 3 · 4 | 30 |
-| **EP-11** | Alertas y notificación | M6 | OE5 | 4 | 10 |
-| **EP-12** | Modelo de despliegue y análisis de costos | — | OE4 | 2 | 8 |
-| **EP-13** | Validación y pruebas | — | OE6 | 3 · 4 | 26 |
+| **EP-04** | Recepción multiprotocolo | M1 | OE4 | 2 · 3 | 26 |
+| **EP-05** | Normalización y máquina de estados | M2 | OE4 | 3 | 19 |
+| **EP-06** | Persistencia y consulta | M5 | OE4 | 2 · 4 | 17 |
+| **EP-07** | Inventario y aprovisionamiento | M3 | OE4 | 3 · 4 | 15 |
+| **EP-08** | Supervisión de salud de enlace | M4 | OE4 | 3 · 4 | 18 |
+| **EP-09** | Seguridad y multi-tenencia | M7 | OE4 | 3 · 4 | 20 |
+| **EP-10** | Interfaz de administración | M8 | OE4 | 3 · 4 | 30 |
+| **EP-11** | Alertas y notificación | M6 | OE4 | 4 | 10 |
+| **EP-12** | Modelo de despliegue y análisis de costos | — | OE3 | 2 | 8 |
+| **EP-13** | Validación y pruebas | — | OE5 | 3 · 4 | 26 |
 | **EP-14** | Documentación y entregables académicos | — | todos | 1–4 | 34 |
 
 ---
@@ -120,7 +120,7 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 **TT-07 — criterios de aceptación** 🎯
 
 - Incluye al menos: sitio, zona lógica, dispositivo, tipo de dispositivo, evento, condición abierta, medición, usuario, credencial de recepción.
-- La identidad del dispositivo admite la tripleta `(ACCT, GG, CCC)` con su restricción de unicidad.
+- La identidad del dispositivo es su identificador físico (MAC/DevEUI), con su restricción de unicidad por sitio (RF-20).
 - Los eventos conservan el mensaje original íntegro junto a su interpretación (RF-31).
 - Las mediciones son una tabla optimizada para series de tiempo, con política de retención definida.
 
@@ -136,10 +136,11 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 
 **TT-12 — criterios de aceptación** 🎯
 
-- Cubre al menos 25 códigos de evento con su condición de disparo.
-- Cada entrada indica el transporte de origen, la señal, la condición, el código y el calificador.
-- Los eventos con restauración declaran explícitamente su condición de cierre (`Q=3`).
-- No se introduce ningún código ajeno al estándar DC-05.
+- Cubre el catálogo de magnitudes soportadas (temperatura, humedad, batería…), cada una con su
+  unidad canónica y su condición de disparo.
+- Cada entrada indica la magnitud, la unidad aceptada y el rango válido.
+- Cada umbral declara explícitamente su condición de restauración, no solo la de disparo (RF-14).
+- No se introduce ninguna magnitud fuera del catálogo declarado.
 - Los umbrales incluyen banda de histéresis para evitar oscilación (RF-14).
 
 ## EP-04 · Recepción multiprotocolo
@@ -154,17 +155,17 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 
 **HU-01 — criterios de aceptación** 🎯
 
-- Un `POST` con un mensaje de 16 dígitos y checksum válido responde `202` y persiste el evento.
-- Un mensaje con checksum inválido responde `422`, **no** persiste el evento, y registra el intento con su motivo (RF-05, RF-07).
+- Un `POST` con una trama SenML válida (RFC 8428) responde `202` y persiste la medición.
+- Una trama que no valida contra el esquema SenML responde `422`, **no** persiste la medición, y va a cuarentena con su motivo (RF-05, RF-07).
 - Un mensaje sin credencial válida responde `401` (RF-40).
-- La respuesta incluye la interpretación del mensaje: sitio, zona, dispositivo, código, descripción y estado de la condición (RF-06).
+- La confirmación de recepción usa el mecanismo del transporte: QoS acordado en MQTT, código de respuesta en HTTP (RF-06).
 - Los metadatos del transporte recibidos se almacenan asociados al evento (RF-09).
 - La operación es idempotente: reenviar el mismo evento no lo duplica (RF-10).
 
 **HU-02 — criterios de aceptación** 🎯
 
 - La plataforma recibe el evento a través de la integración del servidor de red, sin conexión directa al nodo.
-- El payload de 8 bytes en BCD se decodifica correctamente a los 16 dígitos.
+- El payload decodificado por ChirpStack se normaliza correctamente al modelo interno (SenML).
 - RSSI, SNR, identificador del nodo y gateway quedan asociados al evento (RF-09).
 - Un evento recibido por dos gateways se almacena una sola vez (RF-10).
 - Un payload de longitud o contenido inválido se rechaza sin interrumpir la recepción de los demás (RNF-07).
@@ -180,10 +181,10 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 
 **HU-05 — criterios de aceptación** 🎯
 
-- Un evento con `Q=1` abre una condición asociada al dispositivo, con su instante de apertura.
-- El mismo código con `Q=3` cierra la condición, registrando su duración.
-- Un `Q=3` sin condición abierta previa se registra como evento huérfano y no genera estado inconsistente.
-- Un `Q=1` repetido sobre una condición ya abierta no crea una segunda: actualiza la existente.
+- Una medición que cruza el umbral de disparo abre una condición asociada al dispositivo, con su instante de apertura (RF-14).
+- Una medición que cruza el umbral de restauración cierra la condición, registrando su duración (RF-25).
+- Una restauración sin condición abierta previa no genera estado inconsistente: se ignora sin error.
+- Un disparo repetido sobre una condición ya abierta no crea una segunda: la existente no se duplica.
 - Es posible consultar todas las condiciones abiertas de un sitio en una sola operación.
 
 ## EP-06 · Persistencia y consulta
@@ -217,8 +218,7 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 
 **HU-11 — criterios de aceptación** 🎯
 
-- El registro asigna la tripleta `(ACCT, GG, CCC)` y valida su unicidad, rechazando duplicados (RF-20).
-- Advierte cuando el espacio de direcciones del sitio se aproxima a su límite.
+- El registro asigna el identificador físico (MAC/DevEUI) y valida su unicidad, rechazando duplicados (RF-20).
 - Deja registro de quién realizó el registro y cuándo (RF-23).
 - Tras el registro, el dispositivo aparece en el inventario y acepta eventos inmediatamente.
 - No requiere intervenir la configuración del servidor de red por separado.
@@ -234,11 +234,11 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 
 **HU-14 — criterios de aceptación** 🎯 — *elemento central de la tesis*
 
-- La plataforma emite el código **381** cuando un dispositivo no reporta durante el número configurado de intervalos.
+- La plataforma abre una condición `sin_comunicacion` cuando un dispositivo no reporta durante el número configurado de intervalos (RF-24).
 - La detección ocurre en **≤ 2 intervalos** de reporte (RNF-03).
 - El intervalo esperado es configurable por dispositivo, no global.
-- Al reaparecer el dispositivo, la condición se cierra con `Q=3` y se registra la duración de la interrupción (RF-25).
-- Los *heartbeat* (códigos 602 y 603) cuentan como evidencia de supervisión activa (RF-29).
+- Al reaparecer el dispositivo, la condición se cierra y se registra la duración de la interrupción (RF-25).
+- El *keep-alive* y el testamento (*Last Will*) de MQTT cuentan como evidencia de supervisión activa (RF-29).
 - La detección funciona con independencia del transporte de llegada del dispositivo.
 - Un dispositivo en mantenimiento no genera esta condición (RF-22).
 
@@ -434,7 +434,7 @@ Se trasladan de la Etapa 3 a la Etapa 4 los siguientes elementos del núcleo (~3
 | **HU-07** Consulta de historial | 4 | El dato se persiste en la Etapa 3; consultarlo puede seguir |
 | **HU-08** Exportación abierta | 4 | Requiere que existan datos acumulados: es natural en la Etapa 4 |
 | **HU-20** Vista de inventario filtrable | 7 | El panel de salud (HU-19) basta para la demostración intermedia |
-| **TT-27** Pruebas del protocolo y validación cruzada | 5 | Corresponde al ciclo de validación de la Etapa 4 |
+| **TT-27** Pruebas automatizadas del contrato de trama (esquema, cuarentena, adaptadores) | 5 | Corresponde al ciclo de validación de la Etapa 4 |
 | **HU-16** Indicador agregado de salud del sitio | 4 | Depende de que la supervisión ya funcione |
 
 **Distribución real del núcleo (recalculada desde las filas el 23/09/2026):**
@@ -452,12 +452,14 @@ Los 63 h de la Etapa 3 son 60 h de la redistribución más las 3 h de TT-32 (pla
 al riesgo de no tener un sensor real para el 30 de octubre, y no se oculta corriendo otro elemento.
 
 **Verificación del umbral de la Etapa 3.** La pauta exige el **50 % de las tareas de implementación**
-completadas. Usando el núcleo completo como base (168 h; **nota**: una versión anterior de este
-párrafo decía «Implementación total (EP-01, 04–11) = 165 h», pero la suma real de esas épicas
-específicas es 118 h, no 165 — el número que sí sostiene el cálculo de abajo es el núcleo completo,
-no ese subconjunto de épicas; pendiente decidir cuál de las dos lecturas es la que se quiere sostener
-ante el profesor guía). Ejecutado al cierre de la Etapa 3: ~28 h adelantadas en la Etapa 2 más 63 h de
-la Etapa 3 = **91 h ≈ 54 %**. ✅ El umbral se cumple con cualquiera de las dos lecturas.
+completadas. La base es el **núcleo completo (168 h)**: es el compromiso declarado en todo el informe
+y el backlog (§6.3, §6.6; cap. 4 del informe), y medir el avance contra la misma cifra que se
+prometió es la única lectura que no exige sostener dos números distintos del mismo compromiso ante el
+profesor guía. **Corregido el 26/09/2026:** una versión anterior de este párrafo comparaba contra
+«Implementación total (EP-01, 04–11) = 165 h»; la suma real de esas épicas completas (núcleo más
+alcance condicional) es **169 h**, no 165 ni 118 — ese subconjunto de épicas no se usa como base,
+precisamente para no tener dos cifras del mismo umbral. Ejecutado al cierre de la Etapa 3: ~28 h
+adelantadas en la Etapa 2 más 63 h de la Etapa 3 = **91 h ≈ 54 %**. ✅ El umbral se cumple.
 
 ## 6.5 Qué se recorta y en qué orden
 
@@ -556,4 +558,4 @@ ejecuta contra la holgura verificada al cierre de cada etapa.
 | 2. Segundo nivel | Exportación en formato abierto | HU-08 | ⬜ E4 |
 | 2. Segundo nivel | Validación formal | TT-27, TT-28, TT-29 | ⬜ E4 |
 
-El criterio de demostración del informe (cap. 5 §5.3) y OE4 (`docs/01`) siguen este orden.
+El criterio de demostración del informe (cap. 5 §5.2) y OE4 (`docs/01`) siguen este orden.

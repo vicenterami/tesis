@@ -1,8 +1,8 @@
 # Informe oficial (el entregable)
 
 Basado en la plantilla oficial del curso (clase `memoir`, bibliografía APA) con la estructura de la
-Figura 3.1 de la guía de Cardiff adaptada a la Etapa 1. Cuerpo ~22 páginas (límite blando: 30);
-el detalle completo va en los anexos y en `docs/` del repositorio.
+Figura 3.1 de la guía de Cardiff, adaptada a la Etapa 2. Cuerpo 30 páginas (límite blando); el
+detalle completo va en los anexos y en `docs/` del repositorio.
 
 ```bash
 cd informe-oficial
@@ -11,15 +11,24 @@ latexmk -pdf -outdir=build main.tex     # SIEMPRE desde esta carpeta, nunca desd
 
 | Archivo | Contenido |
 |---|---|
-| `cap1.tex` | Introducción: problema, estado del arte, objetivos (estructura de la plantilla) |
-| `cap2.tex` | Antecedentes: pila de protocolos, LoRa/LoRaWAN, MQTT, Contact ID |
-| `cap3.tex` | Especificación: requerimientos y evaluación de alternativas |
-| `cap4.tex` | Metodología y planificación verificada |
+| `resumen.tex` | Resumen ejecutivo |
+| `cap1.tex` | Introducción: problema, objetivos (uno general, cinco específicos), trazabilidad |
+| `cap2.tex` | Antecedentes: pila de protocolos, LoRa/LoRaWAN, MQTT, persistencia y seguridad del transporte |
+| `cap3.tex` | Especificación: catálogo de requerimientos, contrato SenML, evaluación de alternativas |
+| `cap-diseno.tex` | Diseño de la plataforma: vistas C4, modelo de datos, red y seguridad, comportamiento, tiempo, despliegue |
+| `cap4.tex` | Backlog, verificación de viabilidad, riesgos |
 | `conclusion.tex` | Conclusiones de la etapa |
-| `anexos/` | Catálogo de 70 requerimientos, backlog de 64 elementos, detalle del protocolo |
+| `glosario.tex` | Glosario de términos y API |
+| `anexos/a-requerimientos.tex` | Catálogo completo: 70 requerimientos (52 RF + 18 RNF) |
+| `anexos/b-backlog.tex` | Backlog completo: 64 elementos en 14 épicas |
+| `anexos/c-evaluacion.tex` | Evaluación detallada de transporte, formato, infraestructura y costos |
+| `anexos/d-contactid.tex` | Camino evaluado y descartado: el protocolo Contact ID |
+| `anexos/e-seguimiento.tex` | Seguimiento y calendario de la Etapa 2 |
+| `anexos/f-figuras.tex` | Figuras complementarias del capítulo de diseño |
 | `referencias.bib` | Bibliografía en biblatex/APA |
 
-La versión extendida de cada sección vive en `docs/`; la primera versión del informe está en `historico/informe-v1/`.
+La versión extendida de cada sección vive en `docs/`; la primera versión del informe (Etapa 1) está
+en `historico/informe-v1/`.
 
 ## Figuras generadas (fuente única)
 

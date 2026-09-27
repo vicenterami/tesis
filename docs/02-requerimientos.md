@@ -1,6 +1,6 @@
 > ⚠️ **ACTUALIZADO AL PIVOTE DEL 02/09/2026:** el contrato de entrada es **SenML (RFC 8428) sobre
 > MQTT**, con HTTP como vía secundaria y adaptadores por formato; Contact ID quedó descartado
-> (evaluación nueva en `docs/06`). «Recepción» se reemplazó por «recepción» en todo el catálogo.
+> (evaluación nueva en `docs/06`). El término anterior se reemplazó por «recepción» en todo el catálogo.
 
 # Análisis de requerimientos
 
@@ -266,7 +266,7 @@ es realmente multiprotocolo: es monoprotocolo con excepciones.
 
 **Justificación de RNF-14 y RNF-15.** Provienen directamente de la indicación del propietario del
 proyecto: plataforma «gratuita o abierta», con la universidad como destinataria. RNF-14 además habilita
-la respuesta a OE4 sobre alojamiento y costo: un sistema que solo funciona en nube propietaria tiene un
+la respuesta a OE3 sobre alojamiento y costo: un sistema que solo funciona en nube propietaria tiene un
 costo de operación irreducible; uno que corre en un servidor propio permite el escenario de costo
 marginal cero para la institución.
 
@@ -284,7 +284,7 @@ marginal cero para la institución.
 | **Won't** — fuera de alcance | — | — | ver 4.3 |
 | **Total catalogado** | **52** | **18** | **70** |
 
-> ⚠️ **Tensión detectada en la priorización, declarada explícitamente.** 49 requerimientos *Must*
+> ⚠️ **Tensión detectada en la priorización, declarada explícitamente.** 51 requerimientos *Must*
 > representan un alcance considerable frente a la restricción **RE-01** (~15 horas semanales) y al
 > riesgo **R4**. La lectura correcta es que los *Must* definen **el producto que la tesis propone**,
 > mientras que el **núcleo demostrativo** de la sección 4.2 —el conjunto mínimo que prueba la
@@ -354,10 +354,9 @@ carece de causa declarada.
 |---|---|---|:---:|
 | **OE1** Caracterizar y levantar requerimientos | — | *este documento* | 1 |
 | **OE2** Especificar el protocolo | M2 | RF-05, RF-06, RF-11, RF-12, RF-16, RNF-13, RNF-16 | 2 |
-| **OE3** Diseñar arquitectura y red | M1, M7 | RF-01…RF-04, RF-40…RF-42, RNF-09, RNF-10, RNF-12 | 2 |
-| **OE4** Despliegue y costo | — | RNF-14, RNF-15 | 2 |
-| **OE5** Implementar la plataforma | M1…M8 | todos los *Must* | 3 · 4 |
-| **OE6** Validar en entorno realista | — | RNF-01…RNF-07 | 4 |
+| **OE3** Diseñar arquitectura, red y despliegue | M1, M7 | RF-01…RF-04, RF-40…RF-42, RNF-09, RNF-10, RNF-12, RNF-14, RNF-15 | 2 |
+| **OE4** Implementar la plataforma | M1…M8 | todos los *Must* | 3 · 4 |
+| **OE5** Validar en entorno realista | — | RNF-01…RNF-07 | 4 |
 
 ## 5.3 Requerimientos que sustentan la diferenciación competitiva
 
@@ -378,9 +377,12 @@ Estos son los requerimientos que ningún competidor regional identificado satisf
 # 6. Evaluación crítica de alternativas de solución
 
 La rúbrica exige «una evaluación crítica de alternativas consideradas y las razones para la selección
-final». La evaluación del **protocolo de comunicación** —la decisión de mayor peso— está desarrollada
-en `historico/docs/05-protocolo-contactid.md`, sección 2, con siete alternativas sobre seis criterios
-ponderados. Esta sección cubre las decisiones restantes de infraestructura.
+final». La evaluación de **transporte y formato de trama** —la decisión de mayor peso, vigente tras
+el pivote del 2 de septiembre— está desarrollada en `docs/06-evaluacion-comunicacion.md` y se resume
+en el capítulo 3 y el anexo C del informe. El camino evaluado y descartado antes del pivote —el
+protocolo Contact ID frente a otros siete formatos de evento, ocho alternativas sobre seis criterios
+ponderados— queda como evidencia en `historico/docs/05-protocolo-contactid.md`, sección 2. Esta
+sección cubre las decisiones restantes de infraestructura.
 
 ## 6.1 Servidor de red LoRaWAN
 
@@ -443,8 +445,8 @@ directa de ello.
 | **L-A** | **Experiencia previa del desarrollador** | **25 %** | Restricción RE-01 y RE-02: un desarrollador único con ~15 h semanales y cuatro entregas evaluadas. El tiempo de aprendizaje se descuenta directamente del tiempo de construcción |
 | **L-B** | **Correspondencia entre estructura del código y arquitectura documentable** | **15 %** | La Etapa 2 asigna el **55 %** a «diseña adecuadamente según estándares de calidad». Si los módulos del código corresponden a los módulos del diseño, los diagramas describen el sistema real en lugar de una idealización |
 | **L-C** | **Generación automática de especificación OpenAPI** | **15 %** | El contrato de la API es entregable de la Etapa 2. Si se genera desde el código, deja de ser trabajo adicional y no puede desincronizarse de la implementación |
-| **L-D** | **Unificación del lenguaje con el frontend** | **15 %** | La interfaz de administración (M8) será una aplicación web. Un solo lenguaje en todo el sistema permite **compartir las definiciones de tipos** del evento Contact ID entre backend y frontend, definiéndolas una sola vez |
-| **L-E** | **Madurez de bibliotecas para MQTT, PostgreSQL/TimescaleDB y manipulación binaria** | **15 %** | RF-02 exige decodificar BCD; RF-03 exige cliente MQTT; toda la persistencia es PostgreSQL |
+| **L-D** | **Unificación del lenguaje con el frontend** | **15 %** | La interfaz de administración (M8) será una aplicación web. Un solo lenguaje en todo el sistema permite **compartir las definiciones de tipos** de la trama SenML y el modelo interno entre backend y frontend, definiéndolas una sola vez |
+| **L-E** | **Madurez de bibliotecas para MQTT, PostgreSQL/TimescaleDB y validación de esquema** | **15 %** | RF-02 exige recibir la rama LoRaWAN (payload que ChirpStack ya decodifica); RF-03 exige cliente MQTT; RF-05 exige validar cada trama contra el esquema SenML; toda la persistencia es PostgreSQL |
 | **L-F** | **Tipado estático** | **10 %** | El sistema manipula mensajes de formato estricto donde un campo mal posicionado es un error silencioso. El tipado traslada esos errores a tiempo de compilación |
 | **L-G** | **Rendimiento en tiempo de ejecución** | **5 %** | Peso bajo deliberadamente: RNF-01 exige 50 eventos/segundo, cifra que **todas** las alternativas alcanzan holgadamente. El cuello de botella del proyecto es el tiempo del desarrollador, no la CPU |
 
@@ -507,12 +509,12 @@ evaluación de la Etapa 2. **Si durante la Etapa 2 la curva de aprendizaje de Ne
 de lo previsto, migrar a Fastify es una desviación aceptable** —el resto del stack no cambia— y quedaría
 documentada como tal.
 
-**Nota sobre la herramienta de verificación en Python.** `historico/herramientas/contactid.py` continúa
-en Python de forma deliberada. Al ser una implementación **independiente** del protocolo, sirve como
-implementación de referencia para **validación cruzada** de la implementación de producción en
-TypeScript: si ambas, escritas en lenguajes distintos y sin código compartido, producen el mismo
-mensaje y el mismo checksum para las mismas entradas, la especificación está correctamente interpretada.
-Esa comprobación se incorpora como caso de prueba en la Etapa 3.
+**Nota histórica sobre la herramienta de verificación en Python.** `historico/herramientas/contactid.py`
+fue la implementación de referencia para validar por comparación cruzada el protocolo Contact ID,
+antes del pivote del 2 de septiembre. Con el protocolo descartado (anexo del camino evaluado y
+descartado, `historico/docs/05`), esa validación cruzada no aplica a la implementación vigente: las
+pruebas automatizadas del contrato de trama SenML (TT-27) verifican la especificación real, no un
+protocolo que ya no se implementa.
 
 ## 6.6 Componentes de la interfaz de administración
 
@@ -559,4 +561,5 @@ funcionamiento en navegador móvil (RF-52). Las alternativas a evaluar serán ma
 | 6 Evaluación de alternativas | ✅ Completo. 6.5 resuelto con la experiencia del desarrollador confirmada; 6.6 diferido a la Etapa 2 |
 | 7 Restricciones y supuestos | ✅ Completo |
 
-**Total catalogado: 70 requerimientos**, frente al mínimo de 20 comprometido en OE1.
+**Total catalogado: 70 requerimientos**, frente a los 20 que definen el núcleo mínimo demostrable
+(sección 4.2): ningún objetivo específico compromete una cifra mínima de requerimientos catalogados.
