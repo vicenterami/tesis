@@ -385,7 +385,22 @@ contenedor escucha en todas las interfaces **del contenedor** (`HTTP_INTERFAZ=0.
 `ports`, y Docker solo hace alcanzables los puertos de un contenedor desde el anfitrión y desde los
 contenedores de su misma red; desde fuera del servidor esa dirección no existe. La conexión a la base
 y al broker usa el nombre del servicio (`DB_HOST=timescaledb`, `MQTT_URL=mqtt://mosquitto:1883`,
-`.env.example`).
+`.env.example`). **La documentación interactiva `/docs` se sirve solo con `HTTP_DOCS=si`** (en
+desarrollo la fija el override de Compose y el `.env`); ausente o vacía, queda apagada: en Internet
+enumeraría las rutas y exige scripts en línea que la política de contenido del backend prohíbe. El
+contrato que se cita es el `openapi.json` versionado (`docs/11 §3`).
+
+**Registros (27/09/2026).** El backend escribe **un evento por línea en JSON** cuando corre en
+contenedor (`LOG_FORMATO=json`, fijado en el archivo base de Compose): cada línea trae nivel,
+contexto (`recepcion`, `broker`, `supervision`…), mensaje e instante, sin códigos de color, de modo
+que se filtra con `jq` o `grep` sin adivinar formatos y cualquier recolector futuro la entiende sin
+configurarlo. Fuera de Docker, en desarrollo, el valor por defecto es texto con color, legible en la
+terminal. Los registros de la pila se guardan con `plataforma/pruebas/pila.sh logs`, que los sigue en
+vivo, los muestra en una línea legible y los copia sin tocar a `privado/logs/` (ignorado por git);
+`pila.sh buscar` y `pila.sh resumen` los consultan. **Un solo backend a la vez**, y no solo por el
+puerto 3000: dos procesos con el mismo `MQTT_CLIENT_ID` se echan mutuamente del broker (lo hace el
+propio protocolo con identificadores duplicados), y si comparten la sesión persistente se reparten los
+mensajes en cola.
 
 **Escalado.** Una sola instancia del backend, a propósito. Con `clientId` fijo y sesión persistente el
 broker conserva la cola mientras el backend está caído (§4.1); dos instancias con el mismo

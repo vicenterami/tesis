@@ -67,7 +67,8 @@ docker compose exec timescaledb psql -U plataforma -d plataforma -c "SELECT topi
 ```
 
 → fila con motivo `desconocido`: el broker aceptó la credencial, pero la plataforma no tiene ese
-dispositivo **dado de alta**. Regístralo y vuelve a publicar:
+dispositivo **dado de alta**. Regístralo y vuelve a publicar (atajo: `bash plataforma/pruebas/semilla-demo.sh`
+hace todos los `INSERT` de esta página de una vez, de forma idempotente, y verifica que quedaron):
 
 ```sql
 INSERT INTO sitio (id, nombre) VALUES ('00000000-0000-0000-0000-000000000001', 'Campus Dr. Luis Rivas del Canto') ON CONFLICT DO NOTHING;

@@ -3,7 +3,7 @@ import { DocumentBuilder, OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
 
 // Contrato de la API (TT-13). Se GENERA desde los decoradores de los controladores: el documento
 // nunca puede describir endpoints que no existen ni omitir los que sí. Dos usos:
-//   · en ejecución, la documentación interactiva en /docs (misma dirección que la API: 127.0.0.1);
+//   · en ejecución, la documentación interactiva en /docs, SOLO con HTTP_DOCS=si (docs/11 §3; main.ts);
 //   · `pnpm openapi` escribe openapi.json al repositorio, para versionar el contrato y citarlo.
 export function construirDocumento(app: INestApplication): OpenAPIObject {
   const config = new DocumentBuilder()

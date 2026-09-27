@@ -11,3 +11,5 @@ services:
   backend:
     ports:
       - "127.0.0.1:3000:3000"   # para probar la imagen contenedorizada desde el equipo (curl, /docs)
+    environment:
+      HTTP_DOCS: "si"           # /docs (Swagger UI) solo en desarrollo; en el servidor no se define (docs/11 §3)

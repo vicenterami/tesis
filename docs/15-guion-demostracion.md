@@ -7,23 +7,32 @@
 
 ## 0. Antes de empezar (5 min, fuera de escena)
 
-**Elegir un solo backend para no chocar en el puerto 3000: A (desarrollo, ve el código en vivo) o B
-(contenedor, evidencia de que el Dockerfile funciona de verdad — mejor si preguntan por el despliegue).**
+**Camino normal: todo en Docker.** Es la misma forma que se despliega en el servidor y demuestra que
+la imagen del backend funciona de verdad. Desde la raíz del repositorio:
 
 ```bash
-cd plataforma && docker compose up -d && docker compose ps          # timescaledb, mosquitto y (B) backend: healthy
+bash plataforma/pruebas/pila.sh encender      # construye, levanta, espera «healthy» y muestra el estado
+bash plataforma/pruebas/semilla-demo.sh       # datos del guion (idempotente): SEMILLA LISTA
+bash plataforma/pruebas/verificar-todo.sh     # TODO EN CONCORDANCIA
+bash plataforma/pruebas/pila.sh logs          # terminal A: registros en vivo, y copia en privado/logs/
+export CLAVE_DEV='…'                          # terminal B: clave del dispositivo de prueba (gestor local)
+```
 
-# A) desarrollo — el backend corre fuera de Docker, ve cambios de código al vuelo
-cd backend && pnpm start:dev                                        # terminal A: «API escuchando» y «suscrito a sitio/#»
+**Solo si vas a cambiar código en vivo (opcional):** el backend corre en el portátil con recarga
+automática y la base y el broker siguen en Docker. Antes hay que detener el backend del contenedor:
+dos backends chocan en el puerto 3000 y, peor, se echan mutuamente del broker porque usan el mismo
+identificador MQTT (`docs/10 §6`). En este modo `/docs` necesita la línea `HTTP_DOCS=si` en
+`plataforma/.env`; en el camino normal no hace falta, la fija el override de Compose.
 
-# B) contenedor — usar SOLO si no se levantó con --build arriba; si ya está healthy, no hace falta nada más
-docker compose up -d --build backend && docker compose ps           # «backend … healthy»
-
-bash plataforma/pruebas/verificar-todo.sh                           # terminal B: TODO EN CONCORDANCIA
-export CLAVE_DEV='…'                                                # terminal B: clave del dispositivo de prueba (gestor local)
+```bash
+docker compose -f plataforma/docker-compose.yml stop backend && cd plataforma/backend && pnpm start:dev
 ```
 
 Abrir en el navegador `http://127.0.0.1:3000/docs` y tener a mano `docker compose exec timescaledb psql -U plataforma -d plataforma`.
+
+**Datos de la demostración en un solo paso** (idempotente; el resultado esperado está en la cabecera del
+archivo): `bash plataforma/pruebas/semilla-demo.sh` carga sitio, zona, `dev-0001`, su canal de temperatura
+y la regla de umbral, y verifica que quedaron. Reemplaza los `INSERT` a mano del README del backend.
 
 ## 1. El problema en una frase (1 min)
 
@@ -87,7 +96,7 @@ instante termina en `Z`.
 
 ## 6. Cómo se sostiene esto (1 min)
 
-- `pnpm verificar`: tipos, lint y 29 pruebas unitarias en menos de dos segundos (la cifra exacta la da la salida de `jest`; no la memorices).
+- `pnpm verificar`: tipos, lint y 49 pruebas unitarias en menos de dos segundos (la cifra exacta la da la salida de `jest`; no la memorices).
 - `verificar-todo.sh`: esquema, migraciones, diagramas del informe y API en concordancia.
 - Las figuras del informe se generan desde la documentación y desde la base real: lo que se muestra es lo que está implementado.
 

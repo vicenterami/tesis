@@ -20,7 +20,8 @@ jobs:
         working-directory: plataforma/backend
     steps:
       - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v4
+      # v6: runtime node24 (GitHub retiró node20 y anotaba «forced to run on Node.js 24» en cada corrida) y pnpm 11.
+      - uses: pnpm/action-setup@v6
         with:
           package_json_file: plataforma/backend/package.json
       - uses: actions/setup-node@v5

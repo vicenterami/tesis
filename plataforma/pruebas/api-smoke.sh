@@ -4,6 +4,9 @@
 # Imprime una línea por caso: OK / FALLA. Sale con código 1 si algo falla.
 set -u
 API="${API:-http://127.0.0.1:3000}"
+# openapi.json versionado: se regenera a mano con `pnpm openapi` (docs/openapi.ts); esta ruta lo ubica
+# relativo al script, no al directorio desde el que se invoque.
+OPENAPI_COMMITTED="${OPENAPI_COMMITTED:-$(dirname "$0")/../backend/openapi.json}"
 fallos=0
 caso() { # nombre · url · expresión python sobre `r` (json) o código HTTP esperado
   local nombre="$1" url="$2" check="$3"
@@ -32,5 +35,24 @@ caso "UUID inválido → 400"                    /dispositivos/no-es-uuid 400
 caso "limite fuera de rango → 400"            "/condiciones?limite=99999" 400
 caso "condiciones abiertas es lista con duracion_s" "/condiciones?abiertas=true" "isinstance(r,list) and all(isinstance(c['duracion_s'],int) for c in r)"
 caso "contrato OpenAPI servido con 6 rutas"      /docs/openapi.json "len(r['paths'])==6 and r['openapi'].startswith('3.')"
+# El servido (generado en caliente desde los decoradores) vs. el versionado en el repo (se
+# desincroniza si alguien cambia una ruta y olvida correr `pnpm openapi` antes de commitear).
+caso "OpenAPI servido == OpenAPI versionado (mismas rutas y métodos)" /docs/openapi.json \
+  "sorted((p,m) for p,ops in r['paths'].items() for m in ops if m in {'get','post','put','patch','delete'}) == sorted((p,m) for p,ops in json.load(open('$OPENAPI_COMMITTED'))['paths'].items() for m in ops if m in {'get','post','put','patch','delete'})"
 caso "cuarentena limitada a 2"                "/cuarentena?limite=2" "isinstance(r,list) and len(r)<=2"
+# Cabeceras de seguridad (docs/11 §3). Se leen con -I; el helper `caso` mira cuerpos, así que van aparte.
+cab=$(curl -s -I --max-time 10 "$API/dispositivos" | tr -d '\r')
+cabecera() { # nombre · regex que debe (o no) aparecer · esperado: si|no
+  local nombre="$1" re="$2" esperado="$3"; local hay=no
+  echo "$cab" | grep -qiE "^$re" && hay=si
+  [ "$hay" = "$esperado" ] && { echo "OK    $nombre"; } || { echo "FALLA $nombre (esperado $esperado, hay $hay)"; fallos=$((fallos+1)); }
+}
+cabecera "sin X-Powered-By (no revela la pila)"                    "x-powered-by:" no
+cabecera "Content-Security-Policy presente y con default-src 'self'" "content-security-policy: .*default-src 'self'" si
+cabecera "X-Content-Type-Options: nosniff"                          "x-content-type-options: *nosniff" si
+cabecera "X-Frame-Options presente"                                 "x-frame-options:" si
+cabecera "Referrer-Policy presente"                                 "referrer-policy:" si
+cabecera "Permissions-Policy niega cámara, micrófono y ubicación"  "permissions-policy: .*camera=\(\)" si
+# HSTS lo pone el proxy, no el backend (una sola capa): aquí debe estar ausente.
+cabecera "sin HSTS en el backend (lo pondrá el proxy TLS)"          "strict-transport-security:" no
 echo; [[ $fallos -eq 0 ]] && echo "TODO OK" || { echo "$fallos caso(s) con falla"; exit 1; }
