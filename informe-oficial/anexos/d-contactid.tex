@@ -16,8 +16,10 @@ la serie, no en el evento. El mensaje de 16 dígitos no transporta valores medid
 las extensiones necesarias para hacerlo desplazaban al protocolo fuera de su dominio de diseño.
 
 \textbf{Lo que el análisis aportó y se conserva:} la restricción de que el silencio de un sensor
-debe detectarse activamente (los códigos de supervisión de la industria de alarmas inspiran los
-requerimientos RF-24 a RF-30, hoy resueltos con el \emph{keep-alive} y el testamento de MQTT); la
+debe detectarse activamente (los códigos de supervisión de la industria de alarmas inspiran la
+familia de requerimientos RF-24 a RF-30; de ellos, RF-24 a RF-26, el supervisor periódico, están
+hoy resueltos, mientras que RF-27 a RF-30 —calidad de enlace, batería, testamento de MQTT e
+indicador agregado— quedan para etapas siguientes); la
 disciplina de evaluar alternativas con criterios ponderados y de verificar afirmaciones con código; y
 la separación lógica entre eventos y telemetría, que sobrevive dentro del modelo interno.
 

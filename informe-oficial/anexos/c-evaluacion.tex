@@ -2,7 +2,7 @@
 \label{anx:evaluacion}
 \small
 
-\section{Pros y contras de cada mecanismo de transporte}
+\section{Módulos de la solución}
 
 \begin{table}[H]
 \centering\footnotesize
@@ -43,7 +43,7 @@ RNF-10).
 \begin{table}[H]
 \centering\footnotesize
 \begin{tablaseg}
-\begin{tabular}{@{}L{2.7cm}C{1.4cm}C{1.4cm}C{1.3cm}C{1.4cm}C{1.5cm}C{1.1cm}C{1.0cm}@{}}
+\begin{tabular}{@{}L{2.7cm}C{1.4cm}C{1.4cm}C{1.3cm}C{1.4cm}C{2.1cm}C{1.1cm}C{1.0cm}@{}}
 \toprule
  & \textbf{Entrega confiable} & \textbf{Detecta caídos} & \textbf{Costo en nodo} & \textbf{Facilidad backend} & \textbf{Sobrecarga mensaje} & \textbf{Tras NAT} & \textbf{Total} \\
  & 25\,\% & 20\,\% & 20\,\% & 15\,\% & 10\,\% & 10\,\% & \\
@@ -57,7 +57,7 @@ Socket TCP propio & 1 & 2 & \textbf{5} & 1 & \textbf{5} & \textbf{5} & 2,60 \\
 \end{tabular}
 \end{tablaseg}
 \caption{Evaluación del mecanismo de transporte (escala 1--5). Los pros y contras en palabras de
-cada alternativa están en el anexo~\ref{anx:evaluacion}.}
+cada alternativa están a continuación.}
 \label{tab:transporte}
 \end{table}
 
@@ -113,7 +113,8 @@ registra y sus tramas ya se entienden.
 
 \section{Arquitecturas de nodo consideradas (lado del compañero)}
 
-\begin{longtable}{@{}L{3.4cm}L{3.2cm}L{3.2cm}L{3.2cm}@{}}
+\begingroup\setlength{\tabcolsep}{4pt}
+\begin{longtable}{@{}L{3.2cm}L{2.9cm}L{2.9cm}L{2.9cm}@{}}
 \filaencab \encab{} & \encab{Puente ESP32} & \encab{Mini-PC de campo} & \encab{Sensor con red propia} \\ \midrule \endhead
 Costo por punto & $\sim$5--10 USD & $\sim$80--200 USD & según fabricante \\
 Consumo & bajo, admite batería & alto, enchufado & variable \\
@@ -123,6 +124,7 @@ Rol propuesto & nodo estándar & banco de pruebas & caso de integración HTTP \\
 \caption{Comparación de arquitecturas de nodo. La decisión es del trabajo coordinado del compañero;
 para esta plataforma todas convergen en el tópico MQTT.}
 \end{longtable}
+\endgroup
 
 \section{Decisiones de infraestructura}
 
@@ -138,11 +140,11 @@ Persistencia & TimescaleDB & Un solo motor relacional y de series; InfluxDB obli
 Backend & TypeScript + NestJS & Tipos de la trama definidos una sola vez para backend y panel; módulos 1:1 con M1--M8; OpenAPI automático \\
 Rama LoRa & ChirpStack & Autoalojable; publica en MQTT: converge a la vía principal \\
 Despliegue & Contenedores Docker & Reproducible con un comando; reinicio automático; la Etapa 4 exige demostrar en condiciones realistas \\
-Interfaz (frontend) & Svelte + uPlot & Artefacto liviano sin \emph{virtual DOM}, coherente con la ligereza objetivo; gráficos de series de tiempo de pocos kilobytes; se confirma en la Etapa 2 (anexo~\ref{anx:evaluacion}) \\
+Interfaz (frontend) & Svelte + uPlot & Artefacto liviano sin \emph{virtual DOM}, coherente con la ligereza objetivo; gráficos de series de tiempo de pocos kilobytes; se confirmó en la Etapa 2 (cuadro~\ref{tab:frontend}) \\
 \bottomrule
 \end{tabular}
 \end{tablaseg}
-\caption{Decisiones de infraestructura. La matriz completa de la tecnología de backend —seis alternativas y siete criterios— está en el anexo~\ref{anx:evaluacion}; el resto, en el repositorio.}
+\caption{Decisiones de infraestructura. La matriz completa de la tecnología de backend —seis alternativas y siete criterios— está en el cuadro~\ref{tab:backend}; el resto, en el repositorio.}
 \label{tab:infra}
 \end{table}
 
@@ -174,15 +176,16 @@ Rust + Axum & 1 & 3 & 3 & 1 & 4 & 5 & 5 & 2,65 \\
 \end{tabular}
 \end{tablaseg}
 \caption{Matriz de tecnología de backend (escala 1--5).}
+\label{tab:backend}
 \end{table}
 
 Se selecciona \textbf{NestJS}: sus módulos corresponden uno a uno con los módulos M1--M8 del
 análisis (los diagramas de la Etapa 2 describirán el código real), y con TypeScript en backend e
 interfaz los tipos de la trama se definen una sola vez para todo el sistema. La diferencia con
 Fastify (0,15) no es decisiva y migrar sería una desviación aceptable si la curva de NestJS
-resultara costosa. \textbf{La interfaz (frontend)} se decide en la Etapa 2, con el diseño de vistas
+resultara costosa. \textbf{La interfaz (frontend)} se decidió en la Etapa 2, con el diseño de vistas
 en mano y tres restricciones ya fijadas: TypeScript, componentes de código abierto y uso en
-navegador móvil; se evaluarán React, Vue y Svelte con una matriz análoga.
+navegador móvil; se evaluaron React, Vue y Svelte con una matriz análoga.
 
 \section{Evaluación de la tecnología de interfaz (frontend)}
 
@@ -209,6 +212,7 @@ Angular (como ThingsBoard) & 1 & 5 & 4 & 2 & 4 & 2,85 \\
 \end{tabular}
 \end{tablaseg}
 \caption{Matriz de tecnología de interfaz (escala 1--5).}
+\label{tab:frontend}
 \end{table}
 
 Se recomienda \textbf{Svelte con uPlot}. Svelte compila a JavaScript mínimo sin \emph{virtual DOM},
@@ -216,7 +220,7 @@ lo que produce artefactos varias veces más livianos que React o Angular —cohe
 que diferencia a la plataforma de ThingsBoard, construido en Angular—; uPlot es una biblioteca de
 gráficos especializada en series de tiempo de unos pocos kilobytes, apropiada para paneles de
 telemetría en navegador móvil. Se mantiene TypeScript, con lo que los tipos del modelo interno se
-comparten entre backend e interfaz. La decisión se confirma en la Etapa 2 con el diseño de las
+comparten entre backend e interfaz. La decisión se confirmó en la Etapa 2 con el diseño de las
 vistas en mano; React queda como alternativa si se prioriza el ecosistema de componentes sobre la
 ligereza.
 
@@ -302,8 +306,11 @@ Esta estimación es preliminar y se somete a medición real en el banco de compa
 es una hipótesis de diseño, no una afirmación cerrada. El riesgo de que TimescaleDB crezca bajo
 carga se controla con políticas de retención y compresión.
 
-\section{Costos de alojamiento (preliminar; el detalle es OE3)}
+\section{Costos de alojamiento (estimación inicial, superada por el cuadro~\ref{tab:alojamiento})}
 
-Servidor virtual arrendado: 6--20 USD/mes (2 vCPU, 4 GB). Mini-PC propio en la organización:
-150--250 USD por única vez. Servidor institucional: sin costo si se dispone. Todos los componentes
-son de código abierto sin licencias.
+Esta fue la primera estimación, anterior a la comparación con precios fechados: servidor virtual
+arrendado, 6--20 USD/mes (2 vCPU, 4 GB); mini-PC propio en la organización, 150--250 USD por única
+vez; servidor institucional, sin costo si se dispone. Todos los componentes son de código abierto
+sin licencias. La cifra que rige hoy es la del cuadro~\ref{tab:alojamiento} y la recomendación del
+capítulo~\ref{cap:diseno}: del orden de CLP~6\,000 mensuales con un VPS internacional de 2~vCPU y
+4~GB, consultada el 10 de septiembre de 2026.

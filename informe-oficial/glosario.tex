@@ -6,7 +6,7 @@
 \item[Adaptador] Pieza de la capa de recepción que traduce un formato de trama no nativo al modelo
 interno. Se escribe uno por formato de fuente, no uno por sensor.
 \item[API REST] Conjunto de puertas HTTP que el backend ofrece a los consumidores (el panel, los
-integradores): \texttt{GET /dispositivos}, \texttt{GET /mediciones}. Vive dentro del backend.
+integradores): \texttt{GET /dispositivos}, \texttt{GET /canales/\{id\}/historico}. Vive dentro del backend.
 \item[Aprovisionamiento (dar de alta)] Registrar un dispositivo en la plataforma antes de que pueda
 publicar: identidad, tipo, ubicación y emisión de su credencial.
 \item[Broker] Intermediario de MQTT: recibe de quienes publican y reparte a quienes se suscribieron.

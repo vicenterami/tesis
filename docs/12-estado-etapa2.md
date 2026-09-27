@@ -13,7 +13,7 @@
 | Documenta en repositorio | 15 % | 🟢 cumplido | Commits descriptivos, docs/07–12, bitácora, READMEs. Mantener el ritmo |
 
 **Prioridad para la nota, en orden:** (1) informe de la Etapa 2 con los diagramas y el diseño
-redactado — es el 55 %; (2) recomendación de despliegue y costos (OE4) — cierra el 10 %; (3) seguir
+redactado — es el 55 %; (2) recomendación de despliegue y costos (OE3) — cierra el 10 %; (3) seguir
 implementando solo lo que **sustente el diseño** (API de consulta, que demuestra `time_bucket`);
 (4) el panel puede esperar a la Etapa 3.
 
@@ -40,7 +40,7 @@ implementando solo lo que **sustente el diseño** (API de consulta, que demuestr
 |---|---|---|---|---|---|
 | TT-01 | Componer el entorno con contenedores: TimescaleDB, Mosquitto y ChirpStack orquestados, con un único comando de arranque | M | 6 | ✅ | docker-compose con TimescaleDB y Mosquitto; ChirpStack diseñado, pendiente de gateway |
 | TT-02 | Inicializar el proyecto TypeScript + NestJS con estructura de módulos correspondiente a M1–M8 | M | 4 | ✅ | backend NestJS con módulos M1, M2, M4, M5, M6 |
-| TT-03 | Configurar verificación automática: tipos, formato y ejecución de pruebas | S | 3 | ✅ | `pnpm verificar`: tsc + ESLint (typescript-eslint, reglas con tipos) + 29 pruebas jest (funciones puras, contrato del pipeline, barrido de supervisión, interfaz de escucha); `pnpm audit` en el CI; guardianes de concordancia en `verificar-todo.sh` |
+| TT-03 | Configurar verificación automática: tipos, formato y ejecución de pruebas | S | 3 | ✅ | `pnpm verificar`: tsc + ESLint (typescript-eslint, reglas con tipos) + 49 pruebas jest (funciones puras, contrato del pipeline, barrido de supervisión, interfaz de escucha); `pnpm audit` en el CI; guardianes de concordancia en `verificar-todo.sh` |
 | TT-04 | Documentar el procedimiento de puesta en marcha en el repositorio | M | 1 | ✅ | READMEs de plataforma y backend |
 | TT-05 | Diagrama de arquitectura de componentes, con los ocho módulos y sus dependencias | M | 5 | ✅ | vista de contenedores C4 (cap. 4) |
 | TT-06 | Diagrama de topología de red con segmentación de dispositivos IoT (RNF-09) y sentido de las conexiones (RNF-10) | M | 6 | ✅ | topología de red (anexo de figuras complementarias) |
@@ -55,7 +55,7 @@ implementando solo lo que **sustente el diseño** (API de consulta, que demuestr
 | TT-15 | Procedimiento de asignación de identidad y gestión de claves AES por sitio | S | 2 | 🟡 | gestión de credenciales documentada (docs/11 §7); claves LoRaWAN dependen de ChirpStack |
 | HU-01 | Como integrador, quiero publicar una trama SenML por MQTT o HTTP, para reportar desde un sensor sin infraestructura intermedia | M | 6 | 🟡 | MQTT sí; HTTP en la Etapa 3 |
 | TT-16 | Validador de esquema SenML y analizador de tramas | M | 3 | ✅ | adaptador SenML |
-| TT-19 | Esquema de base de datos y migraciones versionadas | M | 5 | ✅ | esquema + 6 migraciones (05 convenciones de calidad, 06 clave natural única de la serie) |
+| TT-19 | Esquema de base de datos y migraciones versionadas | M | 5 | ✅ | esquema + 7 migraciones (05 convenciones de calidad, 06 clave natural única de la serie, 07 dominio cerrado de cuarentena.motivo) |
 | TT-24 | Comparar al menos tres alternativas de alojamiento con criterios ponderados | M | 4 | ✅ | `docs/14 §3–§4`: cinco alternativas, seis criterios |
 | TT-25 | Cuantificar el costo mensual y anual de operación en CLP y USD | M | 3 | ✅ | `docs/14 §3`: precios fechados y convertidos con dólar observado |
 | TT-26 | Redactar la recomendación de despliegue justificada | M | 1 | ✅ | `docs/14 §5` y cap. 4 del informe |
@@ -70,7 +70,7 @@ implementando solo lo que **sustente el diseño** (API de consulta, que demuestr
 | TT-17 | Pipeline de normalización al modelo interno (los 6 filtros) con cuarentena | E3 | ✅ | seis filtros verificados |
 | HU-06 | Como administrador de sitio, quiero configurar umbrales por dispositivo, para que se genere un evento cuando una medición los cruce | E3 | 🟡 | motor listo; falta interfaz |
 | TT-18 | Normalización de marcas temporales, tolerando nodos sin reloj confiable | E3 | ✅ | tiempoPlausible |
-| TT-20 | Autenticación de la recepción mediante credencial por sitio | E3 | ✅ | credencial por dispositivo + ACL |
+| TT-20 | Autenticación de la recepción mediante credencial por sitio | E4 | ✅ | credencial por dispositivo + ACL |
 
 **Pendiente para cerrar la etapa:** completar los parciales — TT-35 (pulir informe e incorporar retroalimentación), TT-12 (catálogo con los sensores reales), TT-15 (claves LoRaWAN, depende de ChirpStack) y HU-01 (entrada HTTP, Etapa 3).
 
