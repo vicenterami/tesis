@@ -2,7 +2,8 @@
 # Levantar la pila y leer sus registros sin adivinar (docs/10 §6, docs/15 §0). Desde cualquier carpeta:
 #   bash plataforma/pruebas/pila.sh encender            construye, levanta, espera «healthy», muestra estado
 #   bash plataforma/pruebas/pila.sh estado              contenedores y GET /salud
-#   bash plataforma/pruebas/pila.sh logs [servicio]     sigue en vivo (Ctrl+C sale) y copia a privado/logs/
+#   bash plataforma/pruebas/pila.sh logs [servicio]     sigue en vivo (Ctrl+C sale) y copia a privado/logs/;
+#                                                       oculta el chequeo de salud (PILA_TODO=1 lo muestra)
 #   bash plataforma/pruebas/pila.sh buscar TEXTO [min]  busca TEXTO en los últimos min minutos (30)
 #   bash plataforma/pruebas/pila.sh resumen [min]       qué hizo el backend en los últimos min minutos (60)
 #   bash plataforma/pruebas/pila.sh detener             detiene los contenedores (stop: NO borra nada)
@@ -25,6 +26,10 @@ legible() {
   done
 }
 
+# Quita de la vista el ruido del chequeo de salud: las líneas de `sonda` y el «New connection from»
+# que precede a cada cliente (el cliente real se sigue viendo en su línea «New client connected … u'id'»).
+ruido() { if [ "${PILA_TODO:-0}" = 1 ]; then cat; else grep --line-buffered -vE "sonda|New connection from"; fi; }
+
 case "${1:-}" in
   encender)
     dc up -d --build || exit 1
@@ -39,7 +44,9 @@ case "${1:-}" in
   logs)
     mkdir -p "$LOGS"; f="$LOGS/pila-$(date +%F-%H%M%S).log"
     echo "copia cruda en $f (Ctrl+C para salir)"
-    dc logs -f -t --no-color --since 1m "${@:2}" | tee -a "$f" | legible ;;
+    # El chequeo de salud del broker (usuario `sonda`) se conecta cada 15 s: en la vista se oculta,
+    # en la copia cruda queda todo. PILA_TODO=1 lo muestra también en la vista.
+    dc logs -f -t --no-color --since 1m "${@:2}" | tee -a "$f" | ruido | legible ;;
   buscar)
     [ -n "${2:-}" ] || { echo "uso: pila.sh buscar TEXTO [minutos]"; exit 1; }
     dc logs -t --no-color --since "${3:-30}m" | grep -i -- "$2" | legible ;;

@@ -47,7 +47,17 @@ deliberado (`docker compose restart`).
 | Paso 2i del guardián | Detecta solo lo que pasó hoy: carpeta, `acl` y `mosquitto.conf` deben ser del operador, y `passwd` de uid 1883 con modo 640; lee solo metadatos, nunca el contenido | Con dueños plantados en una carpeta de descarte → falla nombrando cada archivo; con la carpeta real → pasa |
 | `.env.example` | Apuntaba al README del backend, que no explica `mosquitto_passwd`; el que lo explica es `plataforma/README.md` | Texto |
 
-## 4. Pendiente registrado, no resuelto hoy
+## 4. Primer paso del guion, ensayado con la clave nueva
+
+La publicación del paso 2 llegó de punta a punta: `publicado` en el cliente, `1/1 lecturas guardadas vía
+senml` en el backend y la medición de 22,4 Cel en la base. En el mismo instante se cerró sola la
+condición `sin_comunicacion` que `dev-0001` tenía abierta desde el 15/09: la supervisión funcionando sin
+que el guion lo pidiera, útil para mostrar. Dos ajustes de lo visto: `pila.sh logs` oculta de la vista
+el chequeo de salud del broker (una conexión de `sonda` cada 15 s tapaba todo; la copia cruda lo
+conserva, `PILA_TODO=1` lo muestra), y `docs/10 §6` describe ahora los chequeos de salud de los tres
+servicios, que existían pero no estaban en la vista de despliegue.
+
+## 5. Pendiente registrado, no resuelto hoy
 
 Mosquitto 2.0.22 advierte en cada arranque (doce veces en el registro del contenedor, desde antes de
 hoy) que `acl` es legible por todos y que `passwd` no es de root, y que «versiones futuras se negarán a

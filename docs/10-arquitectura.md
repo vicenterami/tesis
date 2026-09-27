@@ -390,6 +390,16 @@ desarrollo la fija el override de Compose y el `.env`); ausente o vacía, queda 
 enumeraría las rutas y exige scripts en línea que la política de contenido del backend prohíbe. El
 contrato que se cita es el `openapi.json` versionado (`docs/11 §3`).
 
+**Chequeos de salud (27/09/2026, se documenta lo que ya existía).** Cada servicio declara cómo se sabe
+que está vivo de verdad, no solo que su proceso existe, y Docker lo pregunta periódicamente: así
+`docker compose ps` muestra `healthy` y el backend **no arranca hasta que la base y el broker lo estén**
+(`depends_on: condition: service_healthy`). La base: `pg_isready` cada 10 s. El broker: el usuario
+interno `sonda` se suscribe cada 15 s a `$SYS/#` (las estadísticas del propio broker) y se desconecta;
+si el broker no responde en 3 s, cuenta como caído. `sonda` tiene el mínimo privilegio posible: solo
+lee `$SYS/#`, no puede publicar ni leer ningún tópico de datos (`acl`, `docs/11 §7`). El backend: su
+imagen llama a `GET /salud`, que confirma también la conexión con la base. Esas conexiones de `sonda`
+son las que aparecen cada 15 s en el registro del broker; `pila.sh logs` las oculta de la vista.
+
 **Registros (27/09/2026).** El backend escribe **un evento por línea en JSON** cuando corre en
 contenedor (`LOG_FORMATO=json`, fijado en el archivo base de Compose): cada línea trae nivel,
 contexto (`recepcion`, `broker`, `supervision`…), mensaje e instante, sin códigos de color, de modo
