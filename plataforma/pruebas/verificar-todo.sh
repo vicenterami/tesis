@@ -104,7 +104,11 @@ fi
 paso "2h. Rutas HTTP citadas en prosa (glosario, docs/10, docs/12, docs/15) == rutas reales del OpenAPI"
 # Hallazgo del 26/09: el glosario citaba GET /mediciones, ruta que nunca existió en el backend.
 rutas_reales=$(jq -r '.paths|keys[]' plataforma/backend/openapi.json | sed -E 's/\{[^}]*\}/{p}/g' | sort -u)
-rutas_citadas=$(grep -rhoE '(GET|POST|PATCH|DELETE) /[a-zA-Z0-9_{}/.\\-]*' informe-oficial docs --include=*.tex --include=*.md \
+# Las figuras (.mmd, fuente en docs/10) también citan rutas y antes no se revisaban (27/09). Se compara la RUTA,
+# no los parámetros de consulta (`?bucket=15m` en vez de `intervalo` pasó y se vio leyendo la figura). Una ruta
+# marcada «(Etapa 3)» en la misma línea está diseñada, no implementada: se acepta.
+rutas_citadas=$(grep -rhE '(GET|POST|PATCH|DELETE) /[a-zA-Z0-9_{}/.\\-]*' informe-oficial docs --include=*.tex --include=*.md --include=*.mmd \
+  | grep -v '(Etapa 3)' | grep -oE '(GET|POST|PATCH|DELETE) /[a-zA-Z0-9_{}/.\\-]*' \
   | sed -E 's/^(GET|POST|PATCH|DELETE) //; s/\\\{/{/g; s/\\\}/}/g; s/\{[^}]*\}/{p}/g; s/[.,}]+$//' \
   | sort -u)
 faltan=$(comm -23 <(echo "$rutas_citadas") <(echo "$rutas_reales"))

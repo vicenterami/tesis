@@ -144,7 +144,7 @@ sequenceDiagram
     participant Dev as Dispositivo
 
     Admin->>FE: Asistente "nuevo dispositivo"
-    FE->>API: POST /dispositivos<br/>{zona, id_fisico, canales[]}
+    FE->>API: POST /dispositivos (Etapa 3)<br/>{zona, id_fisico, canales[]}
     API->>DB: INSERT dispositivo, canal×N
     API->>API: genera credencial (secreto aleatorio)
     API->>DB: INSERT credencial (solo el hash)
@@ -341,7 +341,7 @@ sequenceDiagram
     participant DB as TimescaleDB
 
     U->>FE: abre la vista de un dispositivo
-    FE->>API: GET /canales/{id}/historico?desde=-24h&bucket=15m
+    FE->>API: GET /canales/{id}/historico?desde=<ISO 8601>&intervalo=15 minutes
     API->>DB: SELECT time_bucket('15 min', tiempo), avg(valor) …
     DB-->>API: ~100 puntos agregados
     API-->>FE: [[tiempos],[valores]]

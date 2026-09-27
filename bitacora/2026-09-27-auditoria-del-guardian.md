@@ -31,3 +31,12 @@ comprobaciones. Se agregó la comprobación de la migración 01 (`medicion` es h
   decisión en `docs/11 §4`.
 - **Proxy:** tres lugares daban Caddy por decidido (figura de despliegue, costos, seguridad); la decisión
   sigue abierta en `docs/10 §8`, y la comparación irá al anexo C.
+
+## 4. Cierre: las figuras contra lo aprendido en el día
+Revisadas las seis figuras renderizadas (contenedores, red, despliegue, alta, pipeline, tiempo real)
+contra el código y el contrato. Coherentes con el estado real: ningún proxy dado por decidido; WebSocket
+como opción por defecto, declarada así en `docs/10 §5`. Dos ajustes en la fuente (`docs/10`):
+- Tiempo real: la ruta del histórico mostraba `?bucket=15m`; el parámetro real es `intervalo` y `desde`
+  es ISO 8601. El guardián compara rutas, no parámetros: se vio leyendo la figura.
+- Alta: `POST /dispositivos` es de la Etapa 3 y la figura no lo decía; ahora lo dice, y el guardián 2h
+  revisa también las rutas dentro de las figuras (antes, solo la prosa).
