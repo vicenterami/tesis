@@ -1,6 +1,6 @@
 # Respuesta del compañero sobre sensores y tramas — 10 de septiembre de 2026
 
-- **Con:** Eduardo M., compañero de tesis (trabajos separados y coordinados)
+- **Con:** el compañero de tesis (trabajos separados y coordinados)
 - **Medio:** mensajería; registro del acuerdo técnico, no de la conversación.
 
 ## 1. Lo informado

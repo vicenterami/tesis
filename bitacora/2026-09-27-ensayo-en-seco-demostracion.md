@@ -57,7 +57,34 @@ el chequeo de salud del broker (una conexión de `sonda` cada 15 s tapaba todo; 
 conserva, `PILA_TODO=1` lo muestra), y `docs/10 §6` describe ahora los chequeos de salud de los tres
 servicios, que existían pero no estaban en la vista de despliegue.
 
-## 5. Pendiente registrado, no resuelto hoy
+## 5. Ensayo completo de los pasos 3 y 4 (27/09, tarde)
+
+Con la clave nueva, los pasos 3 y 4 del guion salieron exactamente como están escritos, verificados en
+registros **y** en la base: `abc` → `malformada`; `500` → `invalida` (fuera de rango); `{"v":300,"u":"K"}`
+→ guardada como 26,85 Cel (filtro 4); `1013` en presión → `invalida` (canal no declarado); `35` → condición
+`umbral` abierta; `29` → nada (histéresis); `27` → cerrada a los 22 s; silencio → `sin_comunicacion`
+abierta sola a los 42 s. El broker se revisó contra su configuración real: sin anónimos, ACL de mínimo
+privilegio (cada dispositivo escribe solo bajo su nombre; `backend` solo lee; `sonda` solo estadísticas),
+puertos solo en `127.0.0.1` en desarrollo y ninguno en la forma de producción.
+
+Tres observaciones que no cambian el guion pero sí van a pendientes: (1) el **motivo fino** del rechazo
+(«ningún adaptador reconoce el formato», «fuera de rango: 500 Cel») vive solo en el registro; la tabla
+`cuarentena` guarda la categoría y la trama cruda, no la regla incumplida que `docs/10 §8.1` propone
+guardar; (2) 300 K se guarda como `26.850000000000023`: la **precisión por magnitud** no está definida en
+el modelo (`docs/08`, tabla `magnitud`); (3) todo el ensayo es con **un** dispositivo publicando a mano:
+la carga con muchos nodos y cadencia real es TT-28 (emulador) y TT-29 (≥ 50 eventos/s, RNF-01), Etapa 4.
+
+## 6. Fuga de privacidad encontrada al preparar las entrevistas
+
+Al revisar el material para llevar el martes, el nombre de pila del compañero de la red LoRaWAN apareció
+en seis archivos versionados (RESUMEN.md, cuatro bitácoras, `docs/06`), contra la regla del repositorio
+público. Reemplazado por su rol en los 15 lugares. Como el guardián 2f solo detecta la herramienta y las
+rutas personales, se agregó el paso 2j: lee una lista privada de nombres (fuera del repo, porque
+tenerla dentro sería la fuga) y falla si algún archivo versionado los contiene. Probado con la violación
+presente, sin lista y con el árbol corregido. El nombre sigue en la historia de git y se limpia con el
+resto antes de publicar el repositorio.
+
+## 7. Pendiente registrado, no resuelto hoy
 
 Mosquitto 2.0.22 advierte en cada arranque (doce veces en el registro del contenedor, desde antes de
 hoy) que `acl` es legible por todos y que `passwd` no es de root, y que «versiones futuras se negarán a

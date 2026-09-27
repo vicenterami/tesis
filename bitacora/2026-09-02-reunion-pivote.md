@@ -25,7 +25,7 @@ documentado en el repositorio como camino evaluado y descartado, con su justific
 - **Advertencia explícita del profesor:** si el trabajo se reduce a «solo un dashboard», la
   tesis se rechaza por simpleza. La sustancia debe estar en la plataforma: recepción
   multiprotocolo, normalización de tramas, supervisión, almacenamiento y alertas.
-- El compañero (Eduardo) se orienta a sensores y radio; los sensores concretos están **por
+- El compañero se orienta a sensores y radio; los sensores concretos están **por
   definir entre ambos** (el profesor guía no lo define).
 
 ## 3. Indicaciones de forma y lenguaje
@@ -60,5 +60,5 @@ contras detallados.
 - [ ] Reevaluar el catálogo de requerimientos bajo el nuevo enfoque; reemplazar «ingesta»
       por «recepción/adquisición» en todos los documentos.
 - [ ] Ajustar figuras a norma APA.
-- [ ] Acordar con Eduardo los sensores y el reparto exacto.
+- [ ] Acordar con el compañero los sensores y el reparto exacto.
 - [ ] Documentar el descarte de Contact ID como decisión con evidencia.

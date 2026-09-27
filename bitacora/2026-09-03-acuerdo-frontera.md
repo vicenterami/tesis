@@ -1,15 +1,15 @@
 # Acuerdo de frontera con el compañero de tesis — jueves 3 de septiembre de 2026
 
-- **Con:** Eduardo M., compañero de tesis (trabajos separados y coordinados)
+- **Con:** el compañero de tesis (trabajos separados y coordinados)
 - **Medio:** coordinación por mensajería; registro del acuerdo técnico, no de la conversación.
 
 ## 1. El acuerdo
 
 | Tramo | Responsable | Detalle acordado |
 |---|---|---|
-| Nodo → gateway (radio) | **Eduardo** | LoRaWAN AU915 con activación OTAA, trama estándar en modo *Confirmed Uplink*, payload binario compacto |
-| Decodificación binario → JSON | **Eduardo** | Su decodificador produce un JSON con los tres campos exigidos: identificador del nodo, marca temporal y valor medido |
-| Publicación en MQTT | **Eduardo** | El JSON se publica en el tópico acordado — **esta es la frontera entre ambos trabajos** |
+| Nodo → gateway (radio) | **El compañero** | LoRaWAN AU915 con activación OTAA, trama estándar en modo *Confirmed Uplink*, payload binario compacto |
+| Decodificación binario → JSON | **El compañero** | Su decodificador produce un JSON con los tres campos exigidos: identificador del nodo, marca temporal y valor medido |
+| Publicación en MQTT | **El compañero** | El JSON se publica en el tópico acordado — **esta es la frontera entre ambos trabajos** |
 | Del tópico hacia adentro | **Vicente** | Recepción, adaptación, normalización, almacenamiento, supervisión, alertas y panel |
 
 ## 2. Decisiones de esta plataforma derivadas del acuerdo

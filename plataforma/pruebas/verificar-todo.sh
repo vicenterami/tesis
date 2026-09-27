@@ -107,6 +107,16 @@ for f in "$MC" "$MC/acl" "$MC/mosquitto.conf"; do [ "$(stat -c %u "$f")" = "$yo"
 if [ -z "$mal" ]; then echo "OK    carpeta, acl y mosquitto.conf del operador; passwd de 1883 con modo 640"
 else echo "FALLA dueños o modos alterados:$mal (restituir: sudo chown \$USER:\$USER; passwd con clave-dispositivo.sh)"; fallos=$((fallos+1)); fi
 
+paso "2j. Repositorio público: ningún archivo versionado nombra a personas de la lista privada (privado/nombres-vetados.txt)"
+# La lista vive fuera del repo (un nombre en este script sería la fuga). Una línea por nombre; palabra completa,
+# sin distinguir mayúsculas. Si el archivo no existe, el paso se omite y lo dice.
+NV="${NOMBRES_VETADOS:-privado/nombres-vetados.txt}"
+if [ -s "$NV" ]; then
+  hits=$(git ls-files | grep -v "^historico/" | xargs grep -lniwF -f "$NV" 2>/dev/null)
+  if [ -n "$hits" ]; then echo "FALLA archivos versionados con nombres de la lista privada:"; echo "$hits" | sed 's/^/  /'; fallos=$((fallos+1))
+  else echo "OK    ningún nombre de la lista privada en $(git ls-files | grep -vc '^historico/') archivos versionados"; fi
+else echo "omitido: no existe $NV"; fi
+
 paso "3. Diagramas: informe = docs = base (generar-figuras.sh --verificar)"
 bash informe-oficial/figuras/generar-figuras.sh --verificar || fallos=$((fallos+1))
 

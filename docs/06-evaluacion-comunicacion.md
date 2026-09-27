@@ -127,7 +127,7 @@ Así un sensor nuevo no exige tocar código: se registra, y sus tramas ya se ent
 ## 4. Decisión C — Arquitectura de adquisición y frontera con el compañero
 
 ```
-LADO EDUARDO (hasta el tópico MQTT)
+LADO DEL COMPAÑERO (hasta el tópico MQTT)
   sensor ─serial→ ESP32 ─WiFi→ ┐
   sensor LoRa ─radio→ gateway  │
        └→ ChirpStack ─publica→ ┤
@@ -149,9 +149,9 @@ LADO VICENTE (desde el tópico hacia adentro)
   TimescaleDB ←→ API REST ←→ dashboard
 ```
 
-- **Frontera contractual:** Eduardo entrega mensajes SenML publicados en un tópico MQTT acordado
+- **Frontera contractual:** el compañero entrega mensajes SenML publicados en un tópico MQTT acordado
   (`sitio/<id>/dispositivo/<id>/medicion`). Todo lo anterior al tópico es suyo; todo lo posterior,
-  tuyo. Si Eduardo se atrasa, un **emulador de nodo** publica en el mismo tópico y tu tesis no
+  tuyo. Si el compañero se atrasa, un **emulador de nodo** publica en el mismo tópico y tu tesis no
   depende de él.
 - **ChirpStack y Mosquitto viven en tu servidor** como contenedores junto a la base de datos —
   no son "la nube de alguien": son procesos tuyos. ChirpStack solo existe si la rama LoRa se
@@ -220,6 +220,6 @@ detalle al aprobar esta evaluación.
 
 - [ ] Visto bueno del estudiante a las recomendaciones A (MQTT+HTTP), B (SenML) y C (ESP32 nodo
       estándar + emulador).
-- [ ] Acordar con Eduardo el tópico y la trama de frontera (el «contrato»).
+- [ ] Acordar con el compañero el tópico y la trama de frontera (el «contrato»).
 - [ ] Sensores concretos a usar (decisión conjunta, pendiente del profesor Caro).
 - [ ] Reescribir informe y docs 01/02/04 con el nuevo eje y sin los términos vetados.

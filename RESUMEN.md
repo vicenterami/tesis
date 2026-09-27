@@ -1,6 +1,6 @@
 # Resumen del proyecto
 
-> El documento de cinco minutos. Actualizado: **2 de septiembre de 2026** (pivote incorporado).
+> El documento de cinco minutos. Actualizado: **27 de septiembre de 2026**.
 
 ## La tesis en una frase
 
@@ -34,8 +34,8 @@ indistinguible de la ausencia de novedades.*
 | Broker | Mosquitto | EMQX (sobredimensionado) |
 | Persistencia | TimescaleDB | InfluxDB (dos motores) |
 | Backend | TypeScript + NestJS | Fastify (0,15 menos) |
-| Frontera con Eduardo | **el tópico MQTT** + emulador de respaldo | — |
-| ~~Contact ID~~ | **descartado 02/09** por el profesor guía (eventos vs. monitoreo continuo) | evidencia en `docs/05` y anexo |
+| Frontera con el compañero de la red LoRaWAN | **el tópico MQTT** + emulador de respaldo | — |
+| ~~Contact ID~~ | **descartado 02/09** por el profesor guía (eventos vs. monitoreo continuo) | evidencia en `historico/docs/05` y anexo D del informe |
 
 ## Competencia
 
@@ -44,10 +44,11 @@ inglés, exige ingeniero — se cita y se descarta como base con razones) · Ubi
 datos fuera) · Instacrops/WiseConn (verticales agrícolas con su hardware) · Node-RED+InfluxDB+Grafana
 (kit DIY, no producto).
 
-## Estado (entrega Etapa 1: viernes 4 de septiembre)
+## Estado (entrega Etapa 2: viernes 2 de octubre)
 
-Informe oficial en plantilla del curso, reescrito al pivote. Pendiente que no depende de nadie más:
-**entrevistas** (criterio 1). Guías: `docs/03` (preguntas), `docs/06` (evaluación técnica).
+Informe de 30 páginas con el capítulo de diseño y seis anexos; núcleo construido y ensayado de punta a
+punta (recepción MQTT, seis filtros, supervisión, alertas, API). Pendiente que no depende del código:
+**entrevistas** (observación 1 del profesor guía, 21/09). Guías: `docs/03` (guion), `docs/15` (demostración).
 
 ## Dónde está cada cosa
 
