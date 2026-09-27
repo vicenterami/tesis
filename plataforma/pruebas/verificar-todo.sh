@@ -8,22 +8,30 @@ cd "$(dirname "$0")/../.."
 LOG_DIR="${VERIFICAR_LOG_DIR:-privado/logs}"; mkdir -p "$LOG_DIR"
 exec > >(tee "$LOG_DIR/verificar-$(date +%F-%H%M%S).log") 2>&1
 echo "verificar-todo · $(date -Is) · commit $(git rev-parse --short HEAD 2>/dev/null || echo ?)"
-fallos=0
+fallos=0; omitidos=""
 paso() { echo; echo "══ $1 ══"; }
+# Un paso que no revisó nada no pasa (27/09): con la base inalcanzable, los pasos 1, 2 y 2b salían en
+# verde porque buscaban «FALLA» en una salida vacía. Cada consulta exige su salida de código 0 y un
+# mínimo de líneas OK.
+exige() { # exige ARCHIVO SALIDA_PSQL MINIMO_OK
+  local ok; ok=$(grep -c "^OK" "$1")
+  if [ "$2" -ne 0 ] || [ "$ok" -lt "$3" ]; then echo "FALLA la consulta no corrió o revisó de menos (salida $2, $ok de $3 OK): ¿base inalcanzable?"; return 1; fi
+  ! grep -q FALLA "$1"; }
 
 paso "0. Backend: tipos, lint y pruebas unitarias (pnpm verificar) — no necesita base ni broker"
 # `tsc` con salida 0 no prueba nada si no revisó archivos (tsconfig mal apuntado): se exige un mínimo.
 if command -v pnpm >/dev/null; then (cd plataforma/backend && n=$(pnpm -s exec tsc --listFiles --noEmit 2>/dev/null | grep -c "/src/"); [[ ${n:-0} -ge 10 ]] && echo "tsc revisó $n archivos de src" || { echo "FALLA tsc revisó solo ${n:-0} archivos de src"; exit 1; }) || fallos=$((fallos+1)); fi
-if command -v pnpm >/dev/null; then (cd plataforma/backend && pnpm verificar 2>&1 | grep -E "^\$ |Tests:|error|✖|FAIL"; exit "${PIPESTATUS[0]}") || fallos=$((fallos+1)); else echo "omitida: pnpm no está en el PATH"; fi
+if command -v pnpm >/dev/null; then (cd plataforma/backend && pnpm verificar 2>&1 | grep -E "^\$ |Tests:|error|✖|FAIL"; exit "${PIPESTATUS[0]}") || fallos=$((fallos+1)); else echo "omitida: pnpm no está en el PATH"; omitidos="$omitidos 0"; fi
 
 paso "1. Esquema: guardias de tipo y zonas horarias (db/pruebas/zonas-horarias.sql)"
 docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -U plataforma -d plataforma -v ON_ERROR_STOP=1 -tA -F ' · ' \
   < plataforma/db/pruebas/zonas-horarias.sql | tee /tmp/vt-sql.txt
-grep -q FALLA /tmp/vt-sql.txt && fallos=$((fallos+1))
+exige /tmp/vt-sql.txt "${PIPESTATUS[0]}" 10 || fallos=$((fallos+1))
 
 paso "2. Migraciones aplicadas = archivos en db/init (cada NN-*.sql debe estar reflejado en la base)"
 # 02: índice por regla · 03: zona_horaria · 04: iso_utc · 05: convenciones (disparadores actualizado_en, pm2_5) · 06: índice único de medicion · 07: CHECK de cuarentena.motivo
 docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -U plataforma -d plataforma -tA <<'SQL' | tee /tmp/vt-mig.txt
+SELECT CASE WHEN count(*)=1 THEN 'OK    01 medicion es hypertable (chunks por tiempo)' ELSE 'FALLA 01 medicion no es hypertable' END FROM timescaledb_information.hypertables WHERE hypertable_name='medicion';
 SELECT CASE WHEN indexdef LIKE '%COALESCE(regla_id%' THEN 'OK    02 condicion_abierta_unica por regla' ELSE 'FALLA 02 indice viejo' END FROM pg_indexes WHERE indexname='condicion_abierta_unica';
 SELECT CASE WHEN count(*)=1 THEN 'OK    03 sitio.zona_horaria' ELSE 'FALLA 03 falta sitio.zona_horaria' END FROM information_schema.columns WHERE table_name='sitio' AND column_name='zona_horaria';
 SELECT CASE WHEN count(*)=1 THEN 'OK    04 función iso_utc' ELSE 'FALLA 04 falta iso_utc' END FROM pg_proc WHERE proname='iso_utc'; -- cspell:disable-line
@@ -31,10 +39,16 @@ SELECT CASE WHEN count(*)=1 THEN 'OK    06 uq_medicion_canal_tiempo (idempotenci
 SELECT CASE WHEN count(*)>=9 AND (SELECT count(*) FROM magnitud WHERE codigo IN ('pm2_5','pm10'))=2 THEN 'OK    05 convenciones: '||count(*)||' disparadores actualizado_en y pm2_5/pm10' ELSE 'FALLA 05 convenciones incompletas' END FROM pg_trigger WHERE tgname LIKE 'trg_%_actualizado_en';
 SELECT CASE WHEN count(*)=1 THEN 'OK    07 cuarentena.motivo con CHECK (dominio cerrado)' ELSE 'FALLA 07 falta el CHECK de cuarentena.motivo' END FROM pg_constraint WHERE conname='cuarentena_motivo_chk' AND contype='c';
 SQL
-grep -q FALLA /tmp/vt-mig.txt && fallos=$((fallos+1))
+exige /tmp/vt-mig.txt "${PIPESTATUS[0]}" 7 || fallos=$((fallos+1))
+# Toda migración en disco debe tener su comprobación arriba: una 08 nueva sin comprobación falla aquí,
+# no solo por el conteo en prosa del paso 2g.
+sin_chequeo=$(ls plataforma/db/init/ | grep -oE '^[0-9]{2}' | while read -r nn; do grep -q "^OK    $nn \|^FALLA $nn " /tmp/vt-mig.txt || echo "$nn"; done)
+[ -z "$sin_chequeo" ] || { echo "FALLA migraciones sin comprobación en este paso: $sin_chequeo"; fallos=$((fallos+1)); }
 
 paso "2b. Número de entidades: la base manda; informe y estado deben decir el mismo número"
 n=$(docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -U plataforma -d plataforma -tA -c "SELECT count(*) FROM pg_tables WHERE schemaname='public'")
+# Sin número no hay comparación: antes, con n vacío, «\b entidades» calzaba con cualquier número.
+[[ "$n" =~ ^[0-9]+$ ]] || { echo "FALLA no se pudo contar las tablas en la base (¿base inalcanzable?)"; fallos=$((fallos+1)); n=NINGUNO; }
 for f in informe-oficial/cap-diseno.tex informe-oficial/anexos/e-seguimiento.tex docs/12-estado-etapa2.md docs/08-modelo-datos.md; do
   if grep -qE "[0-9]+ entidades" "$f"; then
     if grep -qE "\b$n entidades" "$f" && ! grep -E "[0-9]+ entidades" "$f" | grep -vqE "\b$n entidades"; then echo "OK    $f dice $n entidades"; else echo "FALLA $f no dice $n entidades: $(grep -oE '[0-9]+ entidades' "$f" | sort -u | tr '\n' ' ')"; fallos=$((fallos+1)); fi
@@ -48,10 +62,13 @@ if grep -rniE "ingesta|heterog[eé]ne" docs/ informe-oficial/*.tex informe-ofici
 else echo "OK    sin «ingesta» ni «heterogéneo»"; fi
 
 paso "2d. Variables de entorno: toda variable que lee el backend está declarada en plataforma/.env.example (docs/11 §7)"
-leidas=$(grep -rhoE "(config\.get(OrThrow)?(<[^>]+>)?\(\s*'|process\.env\.)[A-Z_]+" plataforma/backend/src --include=*.ts | grep -v spec | grep -oE "[A-Z_]{3,}$" | grep -vx TZ | sort -u)
+# Cualquier objeto (config, cfg, this.config) y cualquier comilla: el 27/09 `cfg.get("X")` pasaba sin verse.
+leidas=$(grep -rhoE "(\.get(OrThrow)?(<[^>]+>)?\(\s*['\"\`]|process\.env\.)[A-Z_]+" plataforma/backend/src --include=*.ts | grep -v spec | grep -oE "[A-Z_]{3,}$" | grep -vx TZ | sort -u)
 declaradas=$(grep -oE "^#?[A-Z_]+=" plataforma/.env.example | tr -d '#=' | sort -u)
 faltan=$(comm -23 <(echo "$leidas") <(echo "$declaradas"))
-if [ -n "$faltan" ]; then
+if [ "$(echo "$leidas" | grep -c .)" -lt 10 ]; then
+  echo "FALLA el patrón encontró solo $(echo "$leidas" | grep -c .) variables en el código (se esperan ≥ 10): revisó de menos"; fallos=$((fallos+1))
+elif [ -n "$faltan" ]; then
   echo "FALLA variables leídas por el código sin declarar en .env.example:"; echo "$faltan" | sed 's/^/  /'
   fallos=$((fallos+1))
 else echo "OK    $(echo "$leidas" | wc -l) variables leídas, todas declaradas en .env.example"; fi
@@ -115,12 +132,17 @@ if [ -s "$NV" ]; then
   hits=$(git ls-files | grep -v "^historico/" | xargs grep -lniwF -f "$NV" 2>/dev/null)
   if [ -n "$hits" ]; then echo "FALLA archivos versionados con nombres de la lista privada:"; echo "$hits" | sed 's/^/  /'; fallos=$((fallos+1))
   else echo "OK    ningún nombre de la lista privada en $(git ls-files | grep -vc '^historico/') archivos versionados"; fi
-else echo "omitido: no existe $NV"; fi
+else echo "omitido: no existe $NV"; omitidos="$omitidos 2j"; fi
 
 paso "3. Diagramas: informe = docs = base (generar-figuras.sh --verificar)"
 bash informe-oficial/figuras/generar-figuras.sh --verificar || fallos=$((fallos+1))
 
 paso "4. API (si el backend está corriendo en 127.0.0.1:3000)"
-if curl -s -m 2 http://127.0.0.1:3000/salud >/dev/null; then bash plataforma/pruebas/api-smoke.sh || fallos=$((fallos+1)); else echo "omitida: backend no está corriendo"; fi
+if curl -s -m 2 http://127.0.0.1:3000/salud >/dev/null; then bash plataforma/pruebas/api-smoke.sh || fallos=$((fallos+1)); else echo "omitida: backend no está corriendo"; omitidos="$omitidos 4"; fi
 
-echo; [[ $fallos -eq 0 ]] && echo "TODO EN CONCORDANCIA" || { echo "$fallos bloque(s) con fallas"; exit 1; }
+# «TODO» solo si todo corrió: un paso omitido no se cuenta como aprobado (27/09: con el backend
+# apagado, el guardián decía TODO EN CONCORDANCIA sin haber probado la API). Sale 2 si hubo omisiones.
+echo
+if [[ $fallos -ne 0 ]]; then echo "$fallos bloque(s) con fallas${omitidos:+ · además omitidos:$omitidos}"; exit 1
+elif [[ -n "$omitidos" ]]; then echo "SIN FALLAS, PERO INCOMPLETO: pasos omitidos:$omitidos (no es TODO EN CONCORDANCIA)"; exit 2
+else echo "TODO EN CONCORDANCIA"; fi

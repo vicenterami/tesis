@@ -255,7 +255,7 @@ transporte. Fuente: OASIS, *MQTT Version 5.0*, §4.3 (`mqttoasis` en la bibliogr
 
 | Situación | Qué pasa | Por qué basta |
 |---|---|---|
-| El **backend** cae | El broker conserva en cola los mensajes QoS 1 de `sitio/#` (sesión persistente: `clientId` fijo + `clean: false`, `persistence true` en Mosquitto) y los entrega al reconectar | Nada se pierde mientras el broker viva; `restart: unless-stopped` levanta el backend en segundos |
+| El **backend** cae | El broker conserva en cola los mensajes QoS 1 de `sitio/#` (sesión persistente: `clientId` fijo + `clean: false`, `persistence true` en Mosquitto) y los entrega al reconectar | Nada se pierde mientras el broker viva **y la cola no pase de 1000 mensajes**: es el valor por defecto de `max_queued_messages` en Mosquitto, y los siguientes se descartan en silencio (manual de `mosquitto.conf`). Con el sensor de la demo, cada 5 s, son unos 83 min de backend caído; con 20 sensores cada 60 s, unos 50 min. Fijar el límite según el volumen del sitio queda pendiente (§8); `restart: unless-stopped` levanta el backend en segundos |
 | El **broker** cae | Docker lo reinicia; el backend reintenta cada 2 s. Los nodos Wi-Fi con QoS 1 reintentan la publicación; ChirpStack reintenta según su integración | El broker es la pieza más simple y estable de la pila; su caída es corta |
 | La **base** cae | El INSERT falla, el manejador registra el error y el mensaje ya fue confirmado al broker: **se pierde**. Limitación conocida; en la Etapa 3 se confirma al broker solo después del INSERT (`manualAck`) | Hoy la base y el backend comparten servidor: si cae una, cae todo; el caso relevante es la Etapa 3 |
 | La misma trama llega **dos veces** (reentrega QoS 1 tras reconexión; nodo que reenvía su cola) | El INSERT es idempotente: índice único `(canal_id, tiempo)` + `ON CONFLICT DO NOTHING`; la repetida se ignora y **no** vuelve a evaluar umbrales | «Al menos una vez» + operación idempotente = efecto de exactamente una |
@@ -299,6 +299,37 @@ caído responde `200 ok` igual, porque `BrokerService` reconecta solo y no lo co
 hoy nada depende de que `/salud` refleje el broker, y `BrokerService` ya registra sus propios avisos
 de conexión. Si más adelante el healthcheck del contenedor necesita reflejar también el broker, es un
 cambio de diseño (qué significa «sano»), no una corrección: se decide en `docs/10` primero.
+
+### 4.2 Camino de una consulta: de la petición HTTP a la base y de vuelta
+
+El backend habla con **dos lados**, y cada lado usa su propia pieza:
+
+```
+cliente ──HTTP──► Express ⊂ NestJS ──► servicio ──► pg ──protocolo PostgreSQL──► TimescaleDB
+(navegador, curl)  (API REST)        (consulta.service)  (SQL, puerto 5432)
+```
+
+- **Express** es la biblioteca de servidor HTTP más usada de Node.js; NestJS la usa por debajo
+  (`@nestjs/platform-express`). El proceso de Node es el servidor; Express recibe cada petición y
+  entrega la respuesta. Es **la API**: REST, 6 rutas, descrita en el contrato OpenAPI. Express no toca la base.
+- **`pg`** (node-postgres) es el conductor de la base: mantiene un *pool* de 5 conexiones
+  (`db/db.module.ts`) y envía **SQL directo** con parámetros `$1, $2…`; el valor nunca se pega dentro
+  del texto SQL, lo que evita la inyección. Sin ORM, por la razón de `docs/07` (series de tiempo con
+  `time_bucket`).
+- **El camino de `GET /dispositivos`:** Express recibe la petición → `DispositivosController` (el
+  controlador, `consulta/dispositivos.controller.ts`, método `listar()`) la delega; en las rutas con
+  parámetros (`/dispositivos/{id}`) antes los valida (`consulta/validacion.ts`) → `ConsultaService.dispositivos()`
+  ejecuta el `SELECT` con `pg` → la base responde filas → Nest las convierte a JSON → Express responde.
+- **CORS no se activa, a propósito.** Es una regla del navegador para páginas de *otro* origen; el panel
+  lo servirá el mismo backend (mismo origen, `docs/11 §4`), y sin CORS el navegador bloquea por defecto
+  a cualquier otro sitio. Ni los sensores, ni `curl`, ni la base están sujetos a CORS.
+- **Demo y producción usan el mismo código y el mismo SQL;** solo cambia a dónde llama `pg` (`DB_HOST`):
+
+| Entorno | Backend | Llega a la base por | Puerto 5432 |
+|---|---|---|---|
+| Demo (`pila.sh encender`) | contenedor | nombre `timescaledb` en la red interna | solo hacia `127.0.0.1` (override de desarrollo) |
+| Desarrollo con recarga (`pnpm start`) | fuera de Docker | `127.0.0.1:5432` | ídem |
+| Producción | contenedor | nombre `timescaledb` en la red interna | cerrado: el override no se copia al servidor |
 
 ## 5. Secuencia: panel en tiempo real (patrón B)
 
@@ -348,7 +379,7 @@ flowchart TB
         direction LR
         subgraph SVC["Contenedores (versión fijada · no-new-privileges · reinicio automático)"]
             direction TB
-            C5["proxy<br/>Caddy · TLS automático<br/>límite 0,1 GB · publica 443, 8883, 1700/udp"]
+            C5["proxy<br/>Caddy o Nginx (por decidir) · TLS<br/>límite 0,1 GB · publica 443, 8883, 1700/udp"]
             C1["mosquitto<br/>eclipse-mosquitto 2.0.22<br/>límite 0,25 GB"]
             C2["chirpstack<br/>+ redis propio<br/>límite 0,35 GB"]
             C4["backend<br/>imagen propia: NestJS (Etapa 2); + panel estático cuando exista<br/>límite 0,5 GB · sin estado"]
@@ -544,6 +575,12 @@ diseño (regla de concordancia): tras autenticar, el filtro 6 corre siempre.
 - [ ] Confirmar con el compañero el tópico exacto y la forma de su JSON para escribir el adaptador
       (filtro 2) — ver bitácora de acuerdos.
 - [ ] Decidir el proxy inverso definitivo (Caddy por TLS automático vs. Nginx por familiaridad y por
-      traer limitador de tasa nativo; Caddy no hace TLS para MQTT sin módulo externo).
+      traer limitador de tasa nativo; Caddy no hace TLS para MQTT sin módulo externo). La comparación
+      (opciones evaluadas, criterio, razón de la elección) se registra en el anexo C del informe, como las
+      demás decisiones de infraestructura.
 - [x] Dockerfile del backend y su servicio en el compose — hecho el 23/09 (§6; `bitacora/2026-09-23-dockerfile-backend.md`).
 - [ ] Decidir WebSocket o SSE para el canal de tiempo real (§5) antes de implementar TT-39 (Etapa 3).
+- [ ] Proponer una **unidad de visualización por usuario** (Etapa 3): la base guarda siempre la unidad
+      canónica y el panel convierte al mostrar; no está diseñado todavía.
+- [ ] Fijar `max_queued_messages` del broker según el volumen del sitio (hoy, 1000 por defecto: ~83 min de
+      backend caído con la demo) y alertar cuando la cola se acerque al límite (métricas `$SYS` del broker).

@@ -105,7 +105,11 @@ propios:
 | Zona del dispositivo ≠ zona del dato | La zona se resuelve **al recibir**, una sola vez, y se conserva la trama cruda en cuarentena si hizo falta rechazarla | Dejarlo para el reporte obliga a adivinar después |
 
 Pendiente de decisión (Etapa 3): guardar también `recibido_en` en `medicion` para medir latencia y
-deriva de reloj por dispositivo. Cuesta 8 bytes por fila; da diagnóstico que hoy no existe.
+deriva de reloj por dispositivo. Cuesta 8 bytes por fila; da diagnóstico que hoy no existe. **Hoy la base
+no registra qué hora se usó ni por qué:** la regla 7 lo decide en `recepcion/tiempo.ts`, pero la fila no
+lo dice. Con `recibido_en` queda deducible (si `tiempo = recibido_en`, se usó la de llegada) y la latencia
+se mide como `recibido_en − tiempo` por dispositivo; el **motivo** (sin marca, antes del 2000, en el futuro)
+necesitaría además una columna `origen_tiempo` con dominio cerrado. Se decide junto con la anterior.
 
 ## 5. Señales de alarma en una revisión de código
 

@@ -54,6 +54,13 @@ La virtualización solo aparecería para **simular** un servidor limitado, y par
 límites de recursos de Docker del punto 1 —más simples que administrar una VM—. Se documenta la
 alternativa para justificar por qué no se eligió.
 
+**Qué gana este proyecto en concreto** (el detalle de cada punto vive donde se indica): el mismo
+`docker compose` levanta la pila idéntica en el portátil y en el servidor, con versiones fijadas de cada
+imagen (`docs/10 §6`); el límite de memoria por servicio hace que RNF-17 se **mida** con `docker stats` y
+no se estime (`docs/14`); la red interna deja la base sin ningún puerto hacia afuera (`docs/11 §2`); y
+`restart: unless-stopped` más los chequeos de salud recuperan un servicio caído sin intervención
+(`docs/10 §6`). Para una persona sola sin equipo de operaciones (causa C4), eso es lo que hace viable operar.
+
 ## 4. Pendientes
 
 - [ ] Definir el entorno de referencia exacto (¿límites de Docker o VPS arrendado?) en la Etapa 4.

@@ -140,6 +140,13 @@ En `/docs`:
 - Ensayar en voz alta la frase difícil (qué pasa si cae la base) hasta que salga sin titubear.
 - Tener lista la respuesta a «¿qué tan confiable es esto?» con el **límite real** (prototipo con un
   nodo, sin TLS aún, comparación con ThingsBoard pendiente para la Etapa 4), no con una defensa.
+- Si preguntan «¿por qué solo tercera forma normal?»: más formas normales no es mejor por sí solo; cada una
+  elimina un tipo específico de anomalía, y la 4FN y la 5FN resuelven dependencias multivaluadas o de reunión que
+  aquí no existen. Normalizar más solo agregaría un JOIN a cada consulta (`docs/08 §6`).
+- Si preguntan «¿cómo evitan duplicados si QoS 1 puede repetir?»: QoS 1 asegura que llega al menos una vez; la
+  inserción idempotente (índice único canal + instante, `ON CONFLICT DO NOTHING`) ignora la repetición. El efecto
+  es exactamente una vez con el costo de QoS 1; QoS 2 no bastaría, porque garantiza por salto y no de punta a
+  punta (`docs/10 §4`).
 - Si preguntan «¿y si la base se cae mientras funciona?»: contarlo, no evitarlo. Se probó apagando la
   base con la pila en contenedores; se encontró que el barrido de supervisión tumbaba el proceso entero,
   se corrigió (`docs/10 §4.1`), y se volvió a probar: cero reinicios, el sistema avisa y se recupera solo.

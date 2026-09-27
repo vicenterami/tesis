@@ -42,7 +42,7 @@ panel y corre en el navegador.
 El modelo (figura~\ref{fig:modelo-datos}) tiene 13 entidades y una idea rectora: \textbf{el modelo
 interno es único}. No importa por qué vía ni en qué formato llegó una trama; una vez superado el
 pipeline, todo se guarda con la misma forma. Esa uniformidad es la respuesta a la causa C1 (formatos
-dispares). El esquema está en tercera forma normal: cada hecho vive en una sola tabla y las
+dispares). El esquema está en tercera forma normal, y no más allá porque la cuarta y la quinta resuelven dependencias multivaluadas y de reunión que este modelo no tiene: cada hecho vive en una sola tabla y las
 relaciones muchos a muchos se resuelven con entidades de asociación (\texttt{canal} es dispositivo por
 magnitud; \texttt{usuario\_sitio}, usuario por sitio). Las únicas redundancias son deliberadas y se
 llaman «foto por valor»: la unidad copiada en cada medición y el umbral vigente copiado en cada evento,
@@ -101,7 +101,7 @@ confundir ambos casos manda al operador a buscar la falla donde no está. El fil
 \parencite{rfc8428} como contrato nativo y un formato plano para nodos simples—, de modo que admitir el formato de un nuevo
 fabricante es agregar una clase, no modificar el pipeline (RF-04). La entrega desde el broker es
 «al menos una vez»: QoS~1 con sesión persistente, de modo que si el backend cae el broker conserva la
-cola y la entrega al volver. Eso admite reentregas, y por ello la inserción en la serie es idempotente
+cola, hasta un tope de mensajes, y la entrega al volver. Eso admite reentregas, y por ello la inserción en la serie es idempotente
 sobre la clave natural canal e instante: una lectura repetida se ignora sin volver a evaluar umbrales
 (RF-06, RF-10). No se usa QoS~2: su garantía vale por salto cliente–broker \parencite{mqttoasis}, no
 hasta la base; el receptor debe ser idempotente igual y, con eso, QoS~1 basta.

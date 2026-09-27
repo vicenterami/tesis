@@ -62,7 +62,9 @@
 
 | Capa | Control | Cuándo |
 |---|---|---|
-| 2 | Proxy con TLS (Caddy) en 443 y 8883; retirar 1883 | Al desplegar en servidor |
+| 2 | Proxy con TLS en 443 y 8883; retirar 1883. Caddy o Nginx: decisión abierta en `docs/10 §8` | Al desplegar en servidor |
+| 2–4 | **Límite de tasa en dos capas:** en el proxy, por IP (contra bots); en el backend, `@nestjs/throttler` por usuario y ruta. **Hoy no hay ninguno de los dos**; lo que sí hay son las cabeceras de `helmet` (§3) | Etapa 3, con M7 |
+| 8 | **Telemetría de TimescaleDB:** la extensión trae un trabajo `policy_telemetry` que cada 24 h envía estadísticas de uso a su fabricante (visto en `timescaledb_information.jobs` el 27/09). Decidir si se apaga (`timescaledb.telemetry_level=off`) | Antes de datos reales |
 | 2 | Puerto 1700/udp hacia ChirpStack, con límite de tasa en el proxy: el protocolo del *gateway* no trae autenticación propia (EUI público, sin cifrado) | Cuando ChirpStack se despliegue (no antes) |
 | 3 | Credenciales por dispositivo generadas por la plataforma (flujo de alta, docs/10 §3) | Backend |
 | 4 | ACL dinámica: el backend agrega/revoca usuarios del broker al dar de alta/baja | Backend |
@@ -155,6 +157,14 @@ clave tienen hashes distintos.
 3. `docker compose restart mosquitto` (relee `passwd`); si cambió el `.env`, `docker compose up -d`
    para que el healthcheck tome la clave nueva.
 4. Las credenciales de prueba (`dev-*`) se eliminan antes de conectar dispositivos reales.
+
+**Por qué se muestra una sola vez, y qué pasa si se pierde.** La plataforma guarda solo el hash: la clave
+no existe en ninguna parte del servidor, así que nadie puede «pedirla de nuevo», ni el usuario ni un
+atacante. Si se pierde, se rota; el costo es operativo (reconfigurar el dispositivo), no de seguridad.
+Quién puede rotar es el control que importa: hoy, solo quien tiene acceso a la terminal del servidor; desde
+M7, un usuario con rol de administración y sesión iniciada (RF-44). Cómo decide el broker: al **conectarse**
+un cliente, compara su clave con el hash de `passwd`; en cada **publicación**, consulta la ACL (§3, capa 4),
+y lo no permitido se descarta en silencio.
 
 **Cómo se escribe `passwd` sin romper nada (27/09/2026).** El broker monta su configuración en solo
 lectura, así que `mosquitto_passwd` no puede correr dentro de él. Para dispositivos, un solo comando:
