@@ -13,3 +13,4 @@ services:
       - "127.0.0.1:3000:3000"   # para probar la imagen contenedorizada desde el equipo (curl, /docs)
     environment:
       HTTP_DOCS: "si"           # /docs (Swagger UI) solo en desarrollo; en el servidor no se define (docs/11 §3)
+      SUPERVISION_INTERVALO_S: "5"   # el sensor de la demo reporta cada 5 s: con 60 s tardaría hasta 14 intervalos (docs/10 §4.1)

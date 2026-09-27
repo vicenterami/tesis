@@ -6,6 +6,7 @@
 #                                                       oculta el chequeo de salud (PILA_TODO=1 lo muestra)
 #   bash plataforma/pruebas/pila.sh buscar TEXTO [min]  busca TEXTO en los últimos min minutos (30)
 #   bash plataforma/pruebas/pila.sh resumen [min]       qué hizo el backend en los últimos min minutos (60)
+#   bash plataforma/pruebas/pila.sh sql ["CONSULTA"]    consulta la base (sin texto: consola interactiva, \q sale)
 #   bash plataforma/pruebas/pila.sh detener             detiene los contenedores (stop: NO borra nada)
 # Los instantes se muestran en UTC (sufijo Z), como todo instante de la plataforma (docs/13).
 set -u
@@ -61,8 +62,12 @@ case "${1:-}" in
       "  condiciones:  " + ([.[] | select(.message | test("condición abierta"))] | length | tostring) + " abiertas, "
                          + ([.[] | select(.message | test("condición cerrada"))] | length | tostring) + " cerradas",
       "  errores:      " + ([.[] | select(.level == "error")] | length | tostring)' ;;
+  sql)
+    # La base vive dentro de su contenedor: psql se corre ahí, con el usuario de la plataforma.
+    if [ -n "${2:-}" ]; then dc exec -T timescaledb psql -U plataforma -d plataforma -c "$2"
+    else dc exec timescaledb psql -U plataforma -d plataforma; fi ;;
   detener)
     dc stop ;;
   *)
-    sed -n '2,9p' "$YO"; exit 1 ;;
+    sed -n '2,11p' "$YO"; exit 1 ;;
 esac

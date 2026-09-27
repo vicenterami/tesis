@@ -18,6 +18,9 @@ async function arrancar(): Promise<void> {
   const logger = new ConsoleLogger({ json: registrosEnJson(process.env.LOG_FORMATO), logLevels: ['log', 'warn', 'error'] });
   const app = await NestFactory.create(AppModule, { logger });
   const log = new Logger('arranque');
+  // Apagado ordenado (docs/10 §6): sin esto Nest no escucha SIGTERM, Docker espera 10 s y mata el proceso
+  // (código 137), y los cierres de cada módulo —suscripción al broker, supervisor, pool de la base— no corren.
+  app.enableShutdownHooks();
 
   // Cabeceras de seguridad (docs/11 §3): CSP `default-src 'self'`, X-Frame-Options, nosniff,
   // Referrer-Policy; y helmet retira X-Powered-By. HSTS queda fuera A PROPÓSITO: solo tiene sentido

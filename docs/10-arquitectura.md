@@ -280,6 +280,20 @@ ciclo de reinicios (`docker inspect` mostraba `restarts` subiendo); con `barrido
 informa el problema con honestidad (código 500, no oculta nada) y el siguiente barrido, un minuto
 después, se ejecuta normal en cuanto la base vuelve. Cero reinicios en la prueba repetida.
 
+**Cuánto tarda en detectar un silencio (27/09/2026, medido en el ensayo de la demostración).** El
+barrido abre `sin_comunicacion` cuando el silencio de un dispositivo supera **2 × su intervalo
+esperado**, y corre cada `SUPERVISION_INTERVALO_S` segundos (60 por defecto). La detección tarda, por
+lo tanto, entre 2 intervalos y 2 intervalos **más un período de barrido**. Con los intervalos reales
+del caso (5 a 30 minutos) el exceso es de un minuto, menos de 0,2 intervalos. Con el sensor de la
+demostración, que reporta cada 5 s, un barrido de 60 s tardó entre 25 y 68 s (hasta 14 intervalos):
+por eso el override de desarrollo fija `SUPERVISION_INTERVALO_S=5`. El costo no depende de cuántas
+mediciones haya: cada barrido es **una** consulta sobre la tabla `dispositivo` (decenas a miles de
+filas), no sobre `medicion`; mil dispositivos son una consulta por período, no mil.
+**Decisión pendiente:** RNF-03 dice «≤ 2 intervalos» sin tolerancia, y en rigor el diseño siempre la
+excede por hasta un período de barrido. Dos salidas: declarar la tolerancia en el requerimiento
+(«≤ 2 intervalos + período de barrido») o adelantar el umbral en un período. Se decide antes de la
+prueba formal de la Etapa 4, no en el código de hoy.
+
 **Límite conocido de `/salud` (mismo hallazgo).** El endpoint solo verifica la base; con el broker
 caído responde `200 ok` igual, porque `BrokerService` reconecta solo y no lo consulta. No es un error:
 hoy nada depende de que `/salud` refleje el broker, y `BrokerService` ya registra sus propios avisos
@@ -399,6 +413,14 @@ si el broker no responde en 3 s, cuenta como caído. `sonda` tiene el mínimo pr
 lee `$SYS/#`, no puede publicar ni leer ningún tópico de datos (`acl`, `docs/11 §7`). El backend: su
 imagen llama a `GET /salud`, que confirma también la conexión con la base. Esas conexiones de `sonda`
 son las que aparecen cada 15 s en el registro del broker; `pila.sh logs` las oculta de la vista.
+
+**Apagado ordenado (27/09/2026, hallazgo del ensayo).** Al recibir `SIGTERM` (lo que envía `docker compose
+stop` o un redespliegue) el backend cierra en orden: detiene el supervisor, se desconecta del broker
+—conservando su sesión persistente y su cola— y cierra el pool de la base. Hasta el 27/09 no lo hacía:
+Nest no escucha señales salvo que se active (`enableShutdownHooks()` en `main.ts`), el contenedor
+ignoraba la señal, Docker esperaba 10 s y lo mataba (código 137), y los cierres de cada módulo nunca
+corrían aunque el código los declaraba. Medido: parada en 10,0 s con código 137 antes; en 0,3 s con
+código 0 después, y el broker registra la despedida del cliente.
 
 **Registros (27/09/2026).** El backend escribe **un evento por línea en JSON** cuando corre en
 contenedor (`LOG_FORMATO=json`, fijado en el archivo base de Compose): cada línea trae nivel,

@@ -84,7 +84,39 @@ tenerla dentro sería la fuga) y falla si algún archivo versionado los contiene
 presente, sin lista y con el árbol corregido. El nombre sigue en la historia de git y se limpia con el
 resto antes de publicar el repositorio.
 
-## 7. Pendiente registrado, no resuelto hoy
+## 7. Lo que destapó el ensayo con cronómetro (27/09, tarde)
+
+Al recorrer el guion de corrido, tres cosas no calzaban con la plataforma real:
+
+- **Memoria.** La medición de hoy (base 61 MB, backend 53, broker 8: unos 122 MB) contradecía «inferior a
+  100 MB» del resumen y de la conclusión del informe, que hablaban de la plataforma completa. El capítulo de
+  diseño decía «base y broker» y seguía siendo cierto (69 MB). Corregido a la cifra medida en el resumen, la
+  conclusión, `docs/14` y el resumen de una página; el informe sigue en 30 páginas (la primera redacción lo
+  llevó a 31 por dos líneas y se acortó la frase, no otra parte).
+- **Supervisor.** Con el barrido cada 60 s y el sensor de la demo reportando cada 5 s, la detección de
+  silencio tardó entre 25 y 68 s, muy por encima de «≤ 2 intervalos» (RNF-03). Documentado en `docs/10
+  §4.1` cuánto tarda en general (2 intervalos + un período de barrido) y por qué el costo no crece con los
+  dispositivos; el override de desarrollo barre cada 5 s. La tolerancia de RNF-03 queda como decisión.
+- **El guion** suponía cosas que no decía: cómo consultar la base (vive en su contenedor: nuevo
+  `pila.sh sql`), de dónde sale el UUID del histórico en `/docs`, desde qué carpeta corre `pnpm verificar`,
+  qué sumar en `docker stats`, y el paso de la clave iba después de levantar cuando es lo único que puede
+  cortar la demo. Reordenado; lo de programar con recarga automática pasó a un anexo.
+
+## 8. El backend no se apagaba: lo mataban
+
+En la terminal de registros apareció `exited with code 137` al recrear el backend. Medido: `docker compose
+stop` tardaba 10,0 s y el proceso moría con código 137 (terminado a la fuerza). Causa: Nest no escucha la
+señal de apagado salvo que se active (`enableShutdownHooks()`), así que los cierres ordenados que el código
+declaraba —supervisor, suscripción al broker, pool de la base— nunca corrían, y Docker esperaba su plazo de
+10 s y lo mataba. Con la línea agregada: parada en 0,3 s, código 0, y el broker registra la despedida. La
+sesión con el broker sigue siendo persistente, así que la cola de mensajes QoS 1 se conserva igual.
+Documentado en `docs/10 §6`.
+
+Preguntas del ensayo que destaparon hallazgos, anotados en pendientes: `intervalo_esperado_s` sin
+`CHECK` (se puede guardar 0), las conversiones de unidades cubren solo temperatura, presión y porcentaje,
+`cuarentena` y `evento` sin índice por tiempo, y la idea de sugerir el intervalo al dar de alta.
+
+## 9. Pendiente registrado, no resuelto hoy
 
 Mosquitto 2.0.22 advierte en cada arranque (doce veces en el registro del contenedor, desde antes de
 hoy) que `acl` es legible por todos y que `passwd` no es de root, y que «versiones futuras se negarán a

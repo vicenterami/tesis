@@ -15,7 +15,7 @@ los gigabytes, y de los gigabytes casi todo lo demás. Rubros y qué los mueve:
 
 | Rubro | Qué lo mueve | En esta plataforma |
 |---|---|---|
-| Cómputo (vCPU, memoria) | Procesos que corren y su techo de memoria | 5 contenedores, techo 1,95 GB, consumo en reposo < 100 MB → **el rubro dominante y el más acotado** |
+| Cómputo (vCPU, memoria) | Procesos que corren y su techo de memoria | 5 contenedores, techo 1,95 GB, consumo en reposo ≈ 120 MB medido el 27/09 (base 61, backend 53, broker 8) → **el rubro dominante y el más acotado** |
 | Almacenamiento | Filas × tamaño × retención − compresión | Pequeño (§2) |
 | Base de datos gestionada | Solo si se externaliza | No: TimescaleDB va en el mismo servidor (RNF-17) |
 | Tráfico de salida | GB que salen a Internet | Mínimo: el panel y la API sirven agregados, no datos crudos |
