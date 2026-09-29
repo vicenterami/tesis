@@ -80,11 +80,20 @@ bash plataforma/pruebas/pila.sh sql "SELECT round(valor::numeric,2) AS valor, un
 | en `…/dev-0001/presion`: `1013` | `invalida` · canal no declarado | 3 validar |
 
 Cada fila es `bash plataforma/pruebas/publicar.sh temperatura <carga>`; la última,
-`bash plataforma/pruebas/publicar.sh presion 1013`. Luego:
+`bash plataforma/pruebas/publicar.sh presion 1013`. **La fila del JSON va entre comillas simples**, o la
+terminal se come las llaves y las comillas y llega `v:300` (malformada, no la conversión; pasó en el ensayo del 29/09):
 
 ```bash
-bash plataforma/pruebas/pila.sh sql "SELECT motivo, topico, left(convert_from(payload_crudo,'UTF8'),30) AS carga, recibido_en FROM cuarentena ORDER BY recibido_en DESC LIMIT 4;"
+bash plataforma/pruebas/publicar.sh temperatura '{"v":300,"u":"K"}'
 ```
+
+Luego, las tres rechazadas:
+
+```bash
+bash plataforma/pruebas/pila.sh sql "SELECT motivo, topico, left(convert_from(payload_crudo,'UTF8'),30) AS carga, recibido_en FROM cuarentena ORDER BY recibido_en DESC LIMIT 3;"
+```
+
+Y la que sí entró, convertida a la unidad canónica: `bash plataforma/pruebas/pila.sh sql "SELECT round(valor::numeric,2), unidad FROM medicion ORDER BY tiempo DESC LIMIT 1;"` → `26.85 | Cel`.
 
 ## 4. Alertas con histéresis y supervisión (2 min)
 
