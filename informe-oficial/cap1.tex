@@ -55,33 +55,41 @@ Quedan fuera la fabricación de sensores, la analítica predictiva y el desplieg
 \section{Estado del arte}
 \label{sec:estado-arte}
 
-\textbf{Oferta regional.} IoT3 \parencite{iot3web} y ControlTec \parencite{controltecweb} ofrecen
-monitoreo llave en mano acoplado a su propio hardware: un sensor ya instalado de otra marca no se
-integra. \textbf{Verticales nacionales.} Instacrops \parencite{instacropsweb} y WiseConn
-\parencite{wiseconnweb} son plataformas agrícolas chilenas maduras, también con hardware y
-suscripción propios, orientadas a fruticultura de exportación. \textbf{SaaS internacionales.}
-Ubidots y ThingSpeak cobran por dispositivo y alojan los datos fuera del país.
+Hoy existen sistemas integrados de código abierto para registrar, gestionar y monitorear dispositivos
+IoT, como OpenRemote, Magistrala y ThingsBoard; este último cambió de licencia en septiembre de 2026.
+Existen además soluciones atadas a su propio hardware o a su servicio, como Milesight IoT Cloud o la
+chilena Energetika, y plataformas comerciales en la nube, como Ubidots y TagoIO.
 
-\textbf{El referente de código abierto es ThingsBoard} \parencite{thingsboardmqtt}: plataforma IoT
-autoalojable con paneles, reglas y soporte MQTT/HTTP/CoAP. Se evaluó como posible base y se descartó
-por tres razones: exige 4\,GB o más de memoria; su configuración —cadenas de reglas, decodificadores
-de carga útil, puente manual hacia un servidor LoRaWAN en la edición gratuita— requiere el personal
-técnico del que carece la organización destinataria (la causa C4), mientras que las integraciones
-listas para usar pertenecen a la edición Professional, de pago \parencite{thingsboardpe}; y su
-interfaz y documentación están en inglés. ThingsBoard aplica además el mismo patrón de entrada que
-esta plataforma —un formato JSON propio en un tópico fijo, con conversores para todo lo demás—; la
-diferencia es que aquí el contrato nativo es un \textbf{estándar IETF} y no un formato del producto.
-Node-RED + InfluxDB + Grafana permiten prototipos, pero sin aprovisionamiento ni modelo de usuarios: cada instalación resulta artesanal.
+OpenRemote, bajo licencia AGPL~3.0 \parencite{openremotelicencia}, es el más completo de los abiertos:
+paneles, reglas, alarmas, notificaciones por correo y al celular, llamadas a sistemas externos y mapa,
+e integra redes LoRaWAN a través de ChirpStack; su instalación central exige además un servidor de
+identidad, Keycloak \parencite{openremotedocs}. Magistrala libera su núcleo bajo Apache~2.0
+\parencite{magistralalicencia}, pero deja los paneles, las alarmas, el motor de reglas y los reportes
+fuera de su edición comunitaria \parencite{magistraladocs}. ThingsBoard, el más difundido, distribuye
+desde su versión~4.4 su código bajo la \emph{Business Source License}, que permite el uso gratuito
+con condiciones ---para una institución educativa, hasta 1\,000 dispositivos--- \parencite{thingsboardbusl};
+la versión~4.3 sigue en Apache~2.0 \parencite{thingsboardlicencia43}. Su guía de instalación pide
+4\,GB de memoria para pruebas y 8\,GB para una producción pequeña \parencite{thingsboardinstalacion}.
 
-Esta plataforma no es un \textbf{panel de visualización simple}: el aporte es la capa que existe
-\emph{antes} de cualquier gráfico —recepción multiprotocolo, normalización, supervisión y alertas—,
-de la que el panel es solo uno de ocho módulos; graficar datos ya procesados no resolvería ninguna
-de las cinco causas del problema.
+Milesight IoT Cloud acepta solo productos Milesight conectados a través de sus propias pasarelas, no
+ofrece una API hacia otras plataformas y permite descargar los datos en CSV de a tres meses
+\parencite{milesightfaq}; su plan gratuito admite 10 dispositivos y 2 paneles \parencite{milesightcloud}.
+Energetika ofrece en Chile una plataforma propia, desarrollada y operada por la empresa, que trabaja
+con los sensores que el cliente ya tiene \parencite{energetikaiotify}.
 
-En la fase previa de este mismo trabajo se evaluó como eje el protocolo de la industria de alarmas
-Contact ID (SIA DC-05); el profesor guía lo descartó por estar orientado a eventos discretos y no a
-telemetría continua. El análisis completo y las razones quedan documentados en el
-anexo~\ref{anx:contactid} como evidencia del camino evaluado.
+Ubidots y TagoIO aceptan equipos que no están en su catálogo \parencite{ubidotsdispositivos,tagodecodificador},
+pero alojan los datos en servidores del proveedor, en Estados Unidos o Europa
+\parencite{ubidotsseguridad,tagoapi}, con planes gratuitos de 3 y 5 dispositivos; el de Ubidots, solo
+para uso no comercial y con un mes de retención \parencite{ubidotsstem,tagoprecios}.
+
+Cada grupo resuelve una parte del problema y deja otra: las soluciones del fabricante atan los datos
+a su hardware; las nubes comerciales limitan los dispositivos y guardan los datos fuera de la
+institución; y las abiertas, que se instalan en un servidor propio, exigen componentes adicionales,
+reservan funciones a su edición de pago o condicionan su uso. Este trabajo se ubica en el grupo de
+código abierto, como prototipo: no compite en amplitud de funciones con OpenRemote o ThingsBoard.
+Busca otra cosa: que el personal no técnico de una facultad registre y vigile sus dispositivos y deje
+sus datos listos para investigación, exportables en formato abierto, con independencia del fabricante
+y en la propia institución.
 
 \section{Objetivos}
 \label{sec:objetivos}

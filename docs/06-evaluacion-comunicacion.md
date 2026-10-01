@@ -175,7 +175,7 @@ LADO VICENTE (desde el tópico hacia adentro)
 
 | Competidor | Qué es | Qué NO cubre (tu espacio) |
 |---|---|---|
-| **ThingsBoard** (CE) | ⚠️ **El rival serio**: plataforma IoT open source, autoalojable, MQTT/HTTP/CoAP, dashboards, multi-tenant | Genérica y pesada: curva de aprendizaje alta, en inglés, sobredimensionada para una pyme regional; sin acompañamiento local. **Hay que citarla en el estado del arte antes de que la comisión la nombre** |
+| **ThingsBoard** (CE) | ⚠️ **El rival serio**: plataforma IoT autoalojable, de código abierto hasta la v4.3 (desde la v4.4, del 29/09/2026, Business Source License), MQTT/HTTP/CoAP, dashboards, multi-tenant | Genérica y pesada: curva de aprendizaje alta, en inglés, sobredimensionada para una pyme regional; sin acompañamiento local. **Hay que citarla en el estado del arte antes de que la comisión la nombre** |
 | Node-RED + InfluxDB + Grafana | Trío DIY de prototipado | Es un kit de piezas, no un producto: sin multi-usuario coherente, sin aprovisionamiento, cada instalación es artesanal |
 | **Ubidots** (SaaS) | Plataforma en la nube (Colombia) | De pago por dispositivo; datos fuera del país; gratis solo 3 dispositivos |
 | ThingSpeak (SaaS) | Canales + MATLAB | Orientada a académicos/hobby; límites de tasa; nube ajena |

@@ -39,10 +39,12 @@ indistinguible de la ausencia de novedades.*
 
 ## Competencia
 
-IoT3 y ControlTec (región, solución cerrada) · **ThingsBoard** (open source genérico: pesado, en
-inglés, exige ingeniero — se cita y se descarta como base con razones) · Ubidots/ThingSpeak (SaaS,
-datos fuera) · Instacrops/WiseConn (verticales agrícolas con su hardware) · Node-RED+InfluxDB+Grafana
-(kit DIY, no producto).
+Mapa del informe §1.2 (30/09/2026), solo con hechos citados de fuentes oficiales: **de código abierto,
+autoalojables** — OpenRemote (AGPL 3.0, la más completa), Magistrala (núcleo Apache 2.0; paneles y alarmas
+de pago), ThingsBoard (código abierto hasta la v4.3; desde la v4.4, Business Source License) · **atadas al
+fabricante o al servicio** — Milesight IoT Cloud (solo equipos Milesight), Energetika (Chile) · **nube
+comercial** — Ubidots, TagoIO. Apuesta de este trabajo: fácil de operar para personal no técnico y datos
+listos para investigación, exportables en formato abierto.
 
 ## Estado (entrega Etapa 2: viernes 2 de octubre)
 

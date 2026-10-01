@@ -270,6 +270,13 @@ la respuesta a OE3 sobre alojamiento y costo: un sistema que solo funciona en nu
 costo de operación irreducible; uno que corre en un servidor propio permite el escenario de costo
 marginal cero para la institución.
 
+**Desviación conocida de RNF-15 (declarada el 30/09/2026).** La compresión y los agregados continuos de
+TimescaleDB están bajo la *Timescale License*: gratuita, y su §3.10 permite usarla como base de una
+plataforma IoT, pero no es de código abierto. La indicación original del propietario («gratuita o abierta»)
+se cumple en su primera mitad; la redacción de RNF-15 («exclusivamente de código abierto») no. Se declara en el
+informe (riesgos) y se reevalúa en la Etapa 3 junto con bases de series de tiempo con compresión y licencia
+abierta. La imagen solo Apache de TimescaleDB existe, pero pierde la compresión y las políticas automáticas.
+
 ---
 
 # 4. Priorización y alcance del producto mínimo

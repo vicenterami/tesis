@@ -23,7 +23,7 @@ medición sea interpretable y repetible.
 
 ## 2. La comparación con ThingsBoard debe ser justa y no favorecer a la plataforma propia
 
-El referente de código abierto es **ThingsBoard Community Edition**. La comparación solo tiene valor
+El referente de código abierto es **ThingsBoard Community Edition 4.3** (Apache 2.0; desde la 4.4, del 29/09/2026, pasó a la Business Source License, ver informe §1.2). La comparación solo tiene valor
 si es imparcial y reproducible.
 
 **Reglas del banco de comparación:**

@@ -94,6 +94,12 @@ OE5 \\
 
 El registro de riesgos (cuadro~\ref{tab:riesgos}, anexo~\ref{anx:seguimiento}) mantiene cinco
 riesgos: dos cerrados (ambigüedad de fechas; protocolo inadecuado, materializado y resuelto con el
-pivote a MQTT y SenML), uno confirmado y controlado (alcance excesivo, tratado con el criterio de
+pivote a MQTT y SenML; el análisis de Contact ID está en el anexo~\ref{anx:contactid}), uno confirmado y controlado (alcance excesivo, tratado con el criterio de
 demostración en dos niveles), uno activo (hardware de sensores, mitigado con el emulador de nodo) y
 uno en tratamiento (acceso a partes interesadas, sección~\ref{sec:retro}).
+
+\textbf{Desviación conocida de RNF-15.} La compresión y los agregados continuos de TimescaleDB, que
+usa el diseño, están bajo la \emph{Timescale License}: gratuita y compatible con su uso como base de
+una plataforma IoT \parencite{timescalelicencia}, pero no de código abierto, como exige RNF-15. Se
+declara aquí y se reevalúa en la Etapa~3, junto con bases de series de tiempo con compresión y
+licencia abierta.
