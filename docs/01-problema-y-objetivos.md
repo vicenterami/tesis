@@ -1,5 +1,5 @@
 > ⚠️ **ACTUALIZADO AL PIVOTE DEL 02/09/2026 Y A LA RETROALIMENTACIÓN DEL 21/09/2026.** Título vigente:
-> *Plataforma web para el registro, monitoreo y gestión de datos de sensores* (sin alcance regional en
+> *Sistema integrado para el registro, gestión y monitoreo de dispositivos IoT* (título fijado el 30/09/2026 tras la reunión con el profesor guía; sin alcance regional en
 > el título: la UCT es la única organización destinataria, ver §1.1 y la actualización al final). Se
 > descartó Contact ID (ver `bitacora/2026-09-02-reunion-pivote.md` y `docs/06`); el eje es la telemetría
 > continua y el pipeline de recepción y normalización de tramas. El árbol de causas y efectos sigue vigente.
@@ -157,20 +157,20 @@ específicos que explicitan qué se hace, mediante qué método y con qué resul
 
 ## 2.2 Objetivo general (único)
 
-> **Desarrollar una plataforma web para el registro, monitoreo y gestión de datos de sensores, que reciba las tramas de distintos sensores a través de TCP/IP, las normalice a un
-> modelo interno único, almacene las mediciones como series de tiempo, supervise el estado de cada
-> dispositivo y presente la información en un panel de control, validada con un caso de uso con
-> sensores reales al término del semestre académico 2026.**
+> **Desarrollar un prototipo de sistema integrado para el registro, gestión y monitoreo en tiempo real de
+> dispositivos IoT, con un dashboard que centralice sus datos, estado y alertas, para facilitar su
+> aprovechamiento en actividades de investigación de la Facultad de Ingeniería de la Universidad
+> Católica de Temuco.** (Fijado el 30/09/2026 tras la reunión con el profesor guía del 29/09.)
 
 ## 2.3 Objetivos específicos (5)
 
 | | Objetivo | Método | Resultado verificable | Plazo |
 |---|---|---|---|---|
-| **OE1** | Caracterizar la situación de gestión de datos de sensores en la organización destinataria y establecer sus requerimientos | Revisión de literatura, análisis de la oferta nacional e internacional y entrevistas semiestructuradas a las partes interesadas | **Hito 1 (cumplido):** catálogo preliminar 100 % trazable a las causas, con fuentes secundarias e indicaciones del profesor guía. **Hito 2:** catálogo validado con ≥ 2 entrevistas documentadas (participantes, necesidades, problemas actuales, prioridades), la primera dentro de la Etapa 2 | 4 sep 2026 / 30 oct 2026 |
-| **OE2** | Evaluar y seleccionar el mecanismo de transporte y el formato de trama, y especificar el contrato de entrada y sus adaptadores | Matrices de criterios ponderados con nombre legible (≥ 5 transportes, ≥ 4 formatos); especificación del contrato | Documento de especificación: tópicos, esquema de trama, política de cuarentena y adaptadores | 2 oct 2026 |
-| **OE3** | Diseñar la arquitectura de la plataforma, su modelo de datos y su despliegue con costo cuantificado | Fase *Design* de PPDIOO, notaciones estándar; comparación de ≥ 3 alternativas de alojamiento | ≥ 5 diagramas; modelo de datos ≥ 8 entidades; costo mensual y anual en CLP y USD | 2 oct 2026 |
-| **OE4** | Implementar la plataforma en dos niveles: **núcleo mínimo demostrable** (recepción MQTT, normalización, supervisión de caída, consulta básica por API) y luego HTTP, alertas y panel | Desarrollo incremental guiado por el backlog, versionado en git; el segundo nivel se ejecuta contra la holgura verificada al cierre de cada etapa | Núcleo mínimo con ≥ 1 sensor real de extremo a extremo al 30 oct; segundo nivel al 4 dic | 30 oct / 4 dic 2026 |
-| **OE5** | Validar la plataforma en condiciones que replican el entorno operativo (servidor modesto, no el equipo de desarrollo) | Pruebas funcionales, de carga y de recuperación; comparaciones antes/después; protocolo escrito antes de medir (`docs/09`) | ≥ 15 casos de prueba con ≥ 90 % aprobados · ≥ 50 mensajes/s sin pérdida (RNF-01) · latencia recepción→consulta ≤ 2 s p95 (RNF-02) · caída detectada ≤ 2 intervalos (RNF-03) · recuperación automática tras reinicio sin perder mensajes confirmados (RNF-05/06) · disponibilidad de la recepción ≥ 99 % en 7 días · memoria total ≤ 2 GB (RNF-17) | 4 dic 2026 |
+| **OE1** | Caracterizar las necesidades de la Facultad y establecer sus requerimientos | Revisión de literatura, análisis de la oferta nacional e internacional y entrevistas semiestructuradas a las partes interesadas | **Hito 1 (cumplido):** catálogo preliminar 100 % trazable a las causas, con fuentes secundarias e indicaciones del profesor guía. **Hito 2:** catálogo validado con ≥ 2 entrevistas documentadas (participantes, necesidades, problemas actuales, prioridades), la primera dentro de la Etapa 2 | 4 sep 2026 / 30 oct 2026 |
+| **OE2** | Evaluar y seleccionar el transporte y el formato de los datos, y especificar la recepción | Matrices de criterios ponderados con nombre legible (≥ 5 transportes, ≥ 4 formatos); especificación del contrato | Documento de especificación: tópicos, esquema de trama, política de cuarentena y adaptadores | 2 oct 2026 |
+| **OE3** | Diseñar la arquitectura, el modelo de datos y el despliegue del sistema, con costo cuantificado | Fase *Design* de PPDIOO, notaciones estándar; comparación de ≥ 3 alternativas de alojamiento | ≥ 5 diagramas; modelo de datos ≥ 8 entidades; costo mensual y anual en CLP y USD | 2 oct 2026 |
+| **OE4** | Implementar el sistema en dos niveles: **núcleo mínimo** (recepción, unificación de los datos, supervisión y consulta) y luego registro de dispositivos, alertas y dashboard | Desarrollo incremental guiado por el backlog, versionado en git; el segundo nivel se ejecuta contra la holgura verificada al cierre de cada etapa | Núcleo mínimo con ≥ 1 sensor real de extremo a extremo al 30 oct; segundo nivel al 4 dic | 30 oct / 4 dic 2026 |
+| **OE5** | Validar el sistema en condiciones que replican el entorno operativo (servidor modesto, no el equipo de desarrollo) | Pruebas funcionales, de carga, de recuperación y de uso con personal no técnico de la Facultad; comparaciones antes/después; protocolo escrito antes de medir (`docs/09`) | ≥ 15 casos de prueba con ≥ 90 % aprobados · ≥ 50 mensajes/s sin pérdida (RNF-01) · latencia recepción→consulta ≤ 2 s p95 (RNF-02) · caída detectada ≤ 2 intervalos (RNF-03) · recuperación automática tras reinicio sin perder mensajes confirmados (RNF-05/06) · disponibilidad de la recepción ≥ 99 % en 72 horas (RNF-18) · memoria total ≤ 2 GB (RNF-17), la mitad del servidor recomendado en `docs/14` · prueba de uso con personal no técnico (umbral a fijar en un RNF nuevo, Etapa 3) | 4 dic 2026 |
 
 ## 2.4 Matriz de trazabilidad
 

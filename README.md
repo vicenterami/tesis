@@ -1,7 +1,7 @@
 # Trabajo de Título — INFO-1197
 
-Plataforma web para el registro, monitoreo y gestión de datos de sensores: recepción de tramas por
-TCP/IP (MQTT y HTTP), normalización a un modelo interno único, series de tiempo, supervisión del
+Sistema integrado para el registro, gestión y monitoreo de dispositivos IoT: recepción de tramas por
+MQTT y HTTP, normalización a un modelo interno único, series de tiempo, supervisión del
 estado de cada dispositivo y panel de control. Caso de validación: Campus Dr. Luis Rivas del Canto (UCT).
 
 **Universidad Católica de Temuco** · Profesor guía: Mario · Semestre en curso: agosto – noviembre de 2026

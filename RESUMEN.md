@@ -4,7 +4,7 @@
 
 ## La tesis en una frase
 
-> Una **plataforma web para el registro, monitoreo y gestión de datos de sensores** (caso de validación: Campus Dr. Luis Rivas del Canto de la UCT): recibe
+> Un **sistema integrado para el registro, gestión y monitoreo de dispositivos IoT** (caso de validación: Campus Dr. Luis Rivas del Canto de la UCT): recibe
 > las tramas de distintos sensores por TCP/IP (MQTT como vía principal, HTTP secundaria), las
 > **normaliza a un modelo interno único** mediante un pipeline de filtros, almacena las mediciones
 > como series de tiempo, **supervisa qué dispositivo dejó de reportar**, y lo presenta en un panel.

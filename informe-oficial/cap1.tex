@@ -83,38 +83,33 @@ y en la propia institución.
 \label{sec:objetivos}
 \subsection{Objetivo general}
 \begin{itemize}
-\item Desarrollar una plataforma web para el registro, monitoreo y gestión de datos de sensores,
-que reciba las tramas de distintos sensores a través de TCP/IP, las normalice a un modelo interno
-único, almacene las mediciones como series de tiempo, supervise el estado de cada dispositivo y
-presente la información en un panel de control, validada sobre un caso de uso real en el Campus
-Dr. Luis Rivas del Canto de la Universidad Católica de Temuco al término del semestre académico 2026.
+\item Desarrollar un prototipo de sistema integrado para el registro, gestión y monitoreo en tiempo
+real de dispositivos IoT, con un dashboard que centralice sus datos, estado y alertas, para facilitar
+su aprovechamiento en actividades de investigación de la Facultad de Ingeniería de la Universidad
+Católica de Temuco.
 \end{itemize}
 
 \subsection{Objetivos específicos}
 \begin{itemize}
-\item \textbf{OE1} — Caracterizar la situación de gestión de datos de sensores en la organización
-destinataria, mediante revisión de literatura, análisis de la oferta existente y al menos dos entrevistas
-semiestructuradas documentadas (participantes, necesidades, prioridades), para validar un catálogo
-de requerimientos trazable a las causas del problema, al 30 de octubre de 2026.
-\item \textbf{OE2} — Evaluar y seleccionar el mecanismo de transporte y el formato de trama, y
-especificar el contrato de entrada con sus adaptadores y política de cuarentena, mediante matrices
-de criterios ponderados, para obtener el documento de especificación de la capa de recepción, al 2
-de octubre de 2026.
-\item \textbf{OE3} — Diseñar la arquitectura de la plataforma, su modelo de datos y su despliegue
-con costo cuantificado, mediante la fase \emph{Design} de PPDIOO y la comparación de al menos tres
-alternativas de alojamiento, para obtener los diagramas, el modelo y la recomendación justificada,
-al 2 de octubre de 2026.
-\item \textbf{OE4} — Implementar la plataforma, mediante desarrollo incremental, para obtener
-primero el \textbf{núcleo mínimo demostrable} —recepción por MQTT, normalización, supervisión de
-caída y consulta básica— con un sensor real de extremo a extremo al 30 de octubre de 2026, y luego
-la entrada HTTP, las alertas y el panel de control al 4 de diciembre de 2026.
-\item \textbf{OE5} — Validar la plataforma en un servidor de recursos modestos, mediante pruebas
-funcionales, de carga y de recuperación, para obtener un informe de validación contra los umbrales
-de los requerimientos no funcionales —al menos 15 casos de prueba con el 90\,\% aprobados; 50
-mensajes por segundo sin pérdida; latencia de recepción a consulta de 2 segundos o menos en el
-percentil 95; caída detectada en a lo más dos intervalos de reporte; recuperación automática sin
-perder mensajes confirmados; disponibilidad de la recepción del 99\,\% o más en una ventana continua
-de 72 horas; memoria total de 2\,GB o menos—, al 4 de diciembre de 2026.
+\item \textbf{OE1} — Caracterizar las necesidades de la Facultad mediante revisión de literatura,
+análisis de la oferta y al menos dos entrevistas documentadas, para obtener un catálogo de
+requerimientos validado y trazable a las causas del problema, al 30 de octubre de 2026.
+\item \textbf{OE2} — Evaluar y seleccionar el transporte y el formato de los datos, mediante
+matrices de criterios ponderados, para obtener la especificación de la recepción, al 2 de octubre
+de 2026.
+\item \textbf{OE3} — Diseñar la arquitectura, el modelo de datos y el despliegue del sistema, con
+al menos tres alternativas de alojamiento comparadas por costo, para obtener los diagramas y una
+recomendación justificada, al 2 de octubre de 2026.
+\item \textbf{OE4} — Implementar el sistema de forma incremental: primero un \textbf{núcleo
+mínimo} (recepción, unificación de los datos, supervisión y consulta) con un dispositivo real de
+extremo a extremo, al 30 de octubre de 2026, y luego el registro de dispositivos, las alertas y el
+dashboard, al 4 de diciembre de 2026.
+\item \textbf{OE5} — Validar el sistema en un servidor de recursos modestos, mediante pruebas
+funcionales, de carga, de recuperación y de uso con personal no técnico de la Facultad, contra los
+umbrales de los requerimientos no funcionales: al menos 15 casos con el 90\,\% aprobados, 50 mensajes
+por segundo sin pérdida, latencia de a lo más 2\,s en el percentil~95, caída detectada en dos
+intervalos de reporte, recuperación sin perder mensajes confirmados, disponibilidad del 99\,\% en
+72 horas y memoria de a lo más 2\,GB, la mitad del servidor recomendado, al 4 de diciembre de 2026.
 \end{itemize}
 
 El cuadro~\ref{tab:trazabilidad} resume el producto verificable de cada objetivo y su trazabilidad;

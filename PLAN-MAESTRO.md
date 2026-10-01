@@ -9,8 +9,8 @@
 
 ## 1. Tema y alcance
 
-**Título de trabajo (desde el 02/09):** Plataforma web para el registro, monitoreo y gestión de
-datos de sensores; caso de validación: Campus Dr. Luis Rivas del Canto de la UCT.
+**Título (desde el 30/09, tras la reunión con el profesor guía):** Sistema integrado para el registro, gestión
+y monitoreo de dispositivos IoT; caso de validación: Campus Dr. Luis Rivas del Canto de la UCT.
 
 **Enunciado en una frase:**
 
