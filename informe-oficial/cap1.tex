@@ -4,53 +4,41 @@
 \section{Problema}
 \label{sec:problema}
 
-\textbf{Organización destinataria.} La \textbf{Universidad Católica de Temuco} es la organización
-destinataria y dueña del problema —lo que la rúbrica denomina «propietario del proyecto» en el
-sentido de dueño del problema, no del trabajo—: dispone de sensores y requiere una plataforma donde
-registrarlos, monitorearlos y gestionar sus datos. El caso de validación es el \textbf{Campus Dr.\
-Luis Rivas del Canto}, sede de la Facultad de Ingeniería, donde en paralelo se despliega una red de
-sensores que esta plataforma recibirá y gestionará (sección~\ref{sec:frontera}). El problema se
-centra en esta organización; ninguna otra ha manifestado interés, y la eventual generalización a
-otras queda fuera del alcance de este trabajo.
-
-Adquirir sensores dejó de ser la barrera: un nodo con radio cuesta entre 5 y 30 dólares y la banda
-de 915--928\,MHz es de uso libre en Chile. La dificultad se desplazó hacia el destino de los datos:
-el patrón dominante es la \textbf{telemetría continua} —lecturas cada 5 a 30 minutos— que debe
-recibirse, entenderse, almacenarse y vigilarse.
+% PROVISORIO (01/10/2026): Milesight se cita como ejemplo verificado. Cuando el profesor guía confirme que
+% los equipos adquiridos por la Facultad son Milesight, «Un fabricante de este tipo de equipos, Milesight,»
+% pasa a «El fabricante de los equipos adquiridos por la Facultad, Milesight,» (pendiente 17).
+La Facultad de Ingeniería de la Universidad Católica de Temuco está incorporando dispositivos IoT a su
+campus. Un fabricante de este tipo de equipos, Milesight, entrega su propia plataforma, Milesight IoT
+Cloud, que acepta solo productos de su marca y no ofrece una API para llevar los datos a otros sistemas
+\parencite{milesightfaq}. Con dos marcas hay dos plataformas, y la información queda repartida, sujeta
+a los límites de cada plan y difícil de reunir para investigación.
 
 \begin{quote}
-\textbf{Problema central:} las organizaciones que ya poseen sensores no logran convertir los datos
-que estos generan en información utilizable, porque carecen de una plataforma que unifique la
-recepción, la normalización y la gestión de dispositivos que emiten tramas con formatos distintos.
+\textbf{Problema central:} la organización que ya posee dispositivos IoT no logra convertir sus datos
+en información utilizable, porque carece de un sistema integrado que los registre, reciba y unifique
+sus datos, vigile su estado y los presente en un solo lugar.
 \end{quote}
 
-El análisis identifica cinco causas: \textbf{C1} fragmentación de formatos de trama entre
-fabricantes; \textbf{C2} acoplamiento entre hardware y plataforma; \textbf{C3} costo y dependencia
-de plataformas comerciales en la nube; \textbf{C4} ausencia de capacidad técnica interna; y
-\textbf{C5} falta de visibilidad del estado de la conectividad --- \emph{el silencio de un sensor es
-indistinguible de la ausencia de novedades}. La figura~\ref{fig:arbol} muestra el árbol completo. Para facilitar su
-recuerdo, en adelante se citan con un apodo: \textbf{C1 formatos}, \textbf{C2 hardware},
-\textbf{C3 nube}, \textbf{C4 técnicos}, \textbf{C5 visibilidad}.
+El análisis identifica cinco causas: \textbf{C1 formatos}, cada fabricante emite sus datos en un
+formato distinto; \textbf{C2 hardware}, la plataforma viene atada al equipo; \textbf{C3 nube}, costo
+por dispositivo y datos fuera de la institución; \textbf{C4 técnicos}, no hay personal dedicado a
+operar una plataforma; y \textbf{C5 visibilidad}, el silencio de un dispositivo es indistinguible de
+la ausencia de novedades. La figura~\ref{fig:arbol} muestra el árbol completo.
 
 \input{figuras/arbol}
 
-\textbf{Evidencia de las causas.} Más allá de la oferta comercial revisada en la sección siguiente,
-las causas se respaldan en tres fuentes. La literatura revisa la fragmentación de protocolos y
-formatos como uno de los desafíos centrales del Internet de las Cosas \parencite{alfuqaha2015} y
-documenta que la falta de interoperabilidad y la dependencia de proveedor impiden su adopción a gran
-escala \parencite{noura2019}, lo que sustenta C1, C2 y C3. Los requisitos publicados del referente
-abierto —4\,GB de memoria y configuración manual de reglas y decodificadores— muestran la carga
-técnica que recae en quien lo adopta (C4) \parencite{thingsboardmqtt}, y la cuantificación de costos
-de esta etapa (anexo~\ref{anx:evaluacion}) sitúa la operación propia en $\approx$CLP~6\,000
-mensuales frente a suscripciones por dispositivo. La evidencia directa —necesidades, incidentes,
-dificultades de administración— es el objeto del levantamiento, aún no realizado (§\ref{sec:retro}).
+\textbf{Evidencia.} La literatura identifica la fragmentación de protocolos y formatos como uno de los
+desafíos centrales del Internet de las Cosas \parencite{alfuqaha2015} y documenta que la falta de
+interoperabilidad y la dependencia de proveedor impiden su adopción a gran escala \parencite{noura2019},
+lo que sustenta C1, C2 y C3. La evidencia directa de la Facultad ---necesidades, incidentes y uso
+previsto de los datos--- se está levantando por entrevista (sección~\ref{sec:retro}).
 
-\textbf{Delimitación.} El trabajo abarca la plataforma: recepción de tramas por MQTT y HTTP,
-normalización a un modelo interno, series de tiempo, supervisión del estado de los dispositivos,
-alertas y panel, con el diseño de red y despliegue asociados. La electrónica de los nodos y la radio
-LoRa corresponden al trabajo coordinado de un compañero; \textbf{la frontera contractual es el tópico
-MQTT} (sección~\ref{sec:frontera}) y un emulador de nodo independiza la validación del hardware.
-Quedan fuera la fabricación de sensores, la analítica predictiva y el despliegue productivo a escala.
+\textbf{Organización destinataria y alcance.} La Universidad Católica de Temuco es la dueña del
+problema; el caso de validación es el Campus Dr.\ Luis Rivas del Canto, sede de la Facultad de
+Ingeniería. El trabajo abarca el sistema integrado, desde que un dispositivo IoT se registra hasta que
+sus datos se muestran en el dashboard, incluido el diseño de la red por la que esos datos viajan desde
+el sitio hasta el servidor. Los dispositivos y su radio no son parte de este trabajo. Quedan fuera la
+fabricación de dispositivos y la analítica predictiva.
 
 \section{Estado del arte}
 \label{sec:estado-arte}
