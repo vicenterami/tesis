@@ -1,4 +1,4 @@
-\chapter[Diseño de la plataforma]{Diseño de la plataforma}
+\chapter[Diseño del sistema]{Diseño del sistema}
 \label{cap:diseno}
 
 Este capítulo describe \emph{cómo} la plataforma cumple los requerimientos del capítulo anterior.
@@ -8,7 +8,8 @@ el manejo del tiempo y el despliegue. Las notaciones son las reconocidas en la i
 C4 \parencite{c4brown} para la vista de contenedores, diagramas entidad-relación \parencite{chen1976}
 para los datos y diagramas de secuencia UML \parencite{uml251} para el comportamiento. Las figuras
 se generan automáticamente desde la documentación versionada y, el modelo de datos, desde el esquema
-real de la base, de modo que lo descrito aquí es lo que está implementado.
+real de la base, de modo que informe, documentación y base no pueden diferir; lo que aún no está
+implementado se indica con su etapa.
 
 \section{Vista de contenedores y frontera del trabajo}
 
@@ -79,9 +80,9 @@ que el suscriptor llegue a recibir el mensaje.
 
 \subsection{Aprovisionamiento de un dispositivo}
 
-La figura~\ref{fig:sec-alta} (anexo~\ref{anx:figuras}) describe cómo un dispositivo pasa de desconocido a reconocido. Es el flujo
-que ataca directamente la causa C4: una persona sin perfil técnico da de alta un sensor desde el panel,
-y la plataforma genera la credencial, la muestra \textbf{una sola vez}, guarda solo su hash y registra
+La figura~\ref{fig:sec-alta} (anexo~\ref{anx:figuras}) describe cómo un dispositivo pasa de desconocido a reconocido. Es el flujo,
+diseñado para la Etapa~3, que ataca la causa C4: una persona sin perfil técnico registra un dispositivo
+desde el panel, y el sistema genera la credencial, la muestra \textbf{una sola vez}, guarda solo su hash y registra
 al dispositivo en el broker con una lista de acceso restringida a su propio tópico. El estado «en línea»
 no nace del alta, sino del \textbf{primer mensaje autenticado}.
 
@@ -90,9 +91,10 @@ no nace del alta, sino del \textbf{primer mensaje autenticado}.
 
 La figura~\ref{fig:sec-pipeline} (anexo~\ref{anx:figuras}, apaisada para que se lea) detalla el aporte central del trabajo, organizado según el patrón
 \emph{pipes and filters} \parencite{posa1}. Cada filtro tiene una salida que
-continúa y una de rechazo hacia la cuarentena; ninguna trama llega a las series sin superar los seis.
+continúa y una de rechazo hacia la cuarentena; ninguna lectura llega a las series sin superar los cuatro
+primeros, y los dos últimos no escriben series sino condiciones.
 El orden importa: autenticar primero evita gastar recursos en tramas de desconocidos; validar antes de
-normalizar evita convertir basura. Los dos últimos filtros trabajan a distinta escala: el de alertas
+guardar evita que una lectura imposible llegue a la serie. Los dos últimos filtros trabajan a distinta escala: el de alertas
 evalúa \emph{cada lectura} guardada, porque un umbral se cruza por valor; el de supervisión se ejecuta
 \emph{una vez al cerrar la trama}, porque lo que registra no es un dato sino un hecho del enlace —este
 dispositivo se comunicó—, y por eso marca al dispositivo como visto aunque sus lecturas hayan ido a
@@ -119,7 +121,7 @@ límite no dispare y cierre alertas sin parar.
 
 La figura~\ref{fig:sec-tiemporeal} (anexo~\ref{anx:figuras}) muestra los dos tiempos del panel. El histórico llega
 \textbf{agregado por la base de datos} con \texttt{time\_bucket}: cientos de puntos, no millones. Las lecturas
-nuevas las empuja el backend por un canal autenticado con la sesión del panel, cifrado tras el proxy y con
+nuevas las empujará el backend por un canal autenticado con la sesión del panel, cifrado tras el proxy y con
 lista blanca de origen y límites de tamaño y tasa \parencite{owaspws}; WebSocket o SSE se decide en la
 Etapa~3 y el navegador nunca toca el broker. Toda la consulta valida sus entradas antes de tocar SQL (identificadores, fechas, un intervalo
 tomado de una lista cerrada) y usa parámetros, nunca texto interpolado. El \textbf{contrato de la API se
@@ -154,8 +156,8 @@ fijada, no puede escalar privilegios, se reinicia solo ante fallas y tiene un te
 
 
 La suma de techos es de aproximadamente 1,95~GB, coherente con el RNF-17 (operar en un servidor de
-2~GB). El consumo \textbf{medido} en reposo de la base de datos y el broker es inferior a 100~MB; el
-referente de código abierto exige al menos 4~GB solo para arrancar, según su propia documentación. Los
+2~GB). Esa suma es la del despliegue completo; los tres
+contenedores hoy implementados suman 1,5~GB de techo, y el consumo real se mide en la Etapa~4. Los
 límites cumplen además una segunda función: definen el \textbf{entorno de referencia} del banco de pruebas
 de la Etapa~4, para que la comparación no dependa del equipo de desarrollo.
 

@@ -1,6 +1,6 @@
 \chapter{Conclusiones de la etapa}
 
-\textbf{Sobre el diseño.} La plataforma quedó descrita desde varias vistas con notaciones reconocidas
+\textbf{Sobre el diseño.} El sistema quedó descrito desde varias vistas con notaciones reconocidas
 —C4, entidad-relación, secuencias UML— y cada decisión está justificada y trazada a los requerimientos
 que materializa (capítulo~\ref{cap:diseno}): el pipeline de seis filtros con cuarentena, que impide que
 una trama llegue a las series sin validarse, y el modelo interno único, que hace indistinguibles una
@@ -12,10 +12,10 @@ previstas para la Etapa~4, están implementados y verificados: implementar tempr
 ambiguas —unicidad de una condición por regla, plausibilidad del reloj, entrega «al menos una vez» con
 inserción idempotente— antes de que hubiera datos reales. El núcleo mínimo demostrable ya existe.
 
-\textbf{Sobre la concordancia y la ligereza.} Las figuras se generan desde la documentación versionada
+\textbf{Sobre la concordancia y el consumo.} Las figuras se generan desde la documentación versionada
 y, el modelo de datos, desde el esquema real de la base; una verificación automática falla si informe,
-documentación o sistema difieren, y así detectó y corrigió cinco discrepancias esta etapa. El consumo en reposo medido ronda los 120~MB, frente al límite de 2~GB; la comparación con el referente
-queda para la Etapa~4.
+documentación o sistema difieren, y así detectó y corrigió cinco discrepancias esta etapa. Lo construido consume unos 120~MB en reposo; RNF-17 (2~GB) se valida
+en la Etapa~4.
 
 \textbf{Sobre la retroalimentación.} Las observaciones del profesor guía (Etapa 1 y reunión del 29/09) se
 tradujeron en cambios concretos (sección~\ref{sec:retro}); persiste la entrevista, enviada y sin respuesta.

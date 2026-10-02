@@ -1,6 +1,6 @@
-# Despliegue, costos y retención (TT-24, TT-25, TT-26 — OE4)
+# Despliegue, costos y retención (TT-24, TT-25, TT-26 — OE3)
 
-> **Sustenta:** OE4 (modelo de despliegue y costo de operación) · criterio «avanza en el diseño según
+> **Sustenta:** OE3 (modelo de despliegue y costo de operación) · criterio «avanza en el diseño según
 > backlog» (10 %). Todo precio lleva **proveedor, plan, fecha y fuente**; sin esos datos un número no se
 > sostiene en una defensa. Los precios cambian: antes de contratar se recotiza en la calculadora del
 > proveedor. Versión: 10 de septiembre de 2026.
@@ -76,7 +76,7 @@ reintroduce la causa C4 salvo que lo administre la unidad de TI del campus.
 
 | Criterio | Peso | Por qué |
 |---|---|---|
-| Costo mensual | 30 % | Objetivo explícito del trabajo (OE4, RNF-17: operar barato) |
+| Costo mensual | 30 % | Objetivo explícito del trabajo (OE3, RNF-17: operar barato) |
 | Garantía de disponibilidad | 20 % | Un servicio de monitoreo que se cae no monitorea |
 | Facilidad de operación | 20 % | Causa C4: sin personal técnico |
 | Ubicación de los datos | 15 % | Datos ambientales institucionales; preferencia por jurisdicción nacional si el cliente lo exige |

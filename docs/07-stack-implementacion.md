@@ -21,9 +21,9 @@
 | ThingsBoard «6,5 GB en la capa base» | ❌ **No verificado con fuente primaria**: no se cita hasta confirmarlo. Basta el ≥ 4 GB oficial |
 | TimescaleDB: hypertables particionan por tiempo; `time_bucket` agrega en la BD | ✅ Confirmado | Documentación oficial de TimescaleDB |
 
-**Conclusión sobre el argumento de recursos:** el dato clave para la tesis —ThingsBoard exige
-**≥ 4 GB oficialmente**, y el stack propuesto opera en 2 GB— está **confirmado por la documentación
-oficial de ambos lados**. Es citable sin riesgo.
+**Conclusión sobre el argumento de recursos:** ThingsBoard declara **≥ 4 GB** en su documentación oficial.
+Que el stack propuesto opere en 2 GB (RNF-17) es una **meta que se valida en la Etapa 4**, con la pila completa
+y bajo carga; no es un resultado y no se cita como logro (corregido el 01/10/2026).
 
 ---
 

@@ -1,6 +1,6 @@
 # Contexto de la tesis — punto de partida
 
-> Documento de traspaso. Léelo al iniciar una sesión nueva dedicada a la tesis.
+> **Documento histórico (17/08/2026)**, del punto de partida: plataforma web, Contact ID, competencia regional. Lo vigente está en `RESUMEN.md`, `PLAN-MAESTRO.md` y el informe. Se conserva como registro de cómo empezó el trabajo.
 
 
 ## Idea central

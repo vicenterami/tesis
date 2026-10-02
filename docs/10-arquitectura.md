@@ -173,7 +173,8 @@ sequenceDiagram
 ## 4. Secuencia: recepción de una trama (pipeline de seis filtros)
 
 Comportamiento del núcleo del trabajo. Cada filtro tiene una salida "feliz" (sigue) y una de rechazo
-(cuarentena o descarte), y ninguna trama llega a las series de tiempo sin pasar los seis.
+(cuarentena o descarte), y ninguna lectura llega a las series de tiempo sin pasar los cuatro primeros
+(el 4 la guarda; el 5 y el 6 abren o cierran condiciones).
 
 ```mermaid
 sequenceDiagram
@@ -192,7 +193,7 @@ sequenceDiagram
         F1->>Q: guarda cruda, motivo "malformada"<br/>(sin identidad: no hay a quién marcar vivo)
     else dispositivo desconocido o dado de baja
         F1->>Q: guarda cruda, motivo "desconocido"
-    else conocido y activo
+    else conocido y no dado de baja
         F1->>F2: trama + dispositivo
         F2->>F2: elige adaptador<br/>por origen (SenML nativo,<br/>JSON del compañero, ChirpStack)
         alt formato irreconocible

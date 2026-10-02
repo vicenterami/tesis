@@ -4,7 +4,7 @@ Sistema integrado para el registro, gestión y monitoreo de dispositivos IoT: re
 MQTT y HTTP, normalización a un modelo interno único, series de tiempo, supervisión del
 estado de cada dispositivo y panel de control. Caso de validación: Campus Dr. Luis Rivas del Canto (UCT).
 
-**Universidad Católica de Temuco** · Profesor guía: Mario · Semestre en curso: agosto – noviembre de 2026
+**Universidad Católica de Temuco** · Profesor guía: Mario · Semestre en curso: agosto – diciembre de 2026
 
 ---
 
@@ -17,7 +17,7 @@ estado de cada dispositivo y panel de control. Caso de validación: Campus Dr. L
 | 3 — Mejoras, pruebas y validación preliminar | viernes 30 de octubre de 2026 | ⬜ |
 | 4 — Validación final e informe | viernes 4 de diciembre de 2026 | ⬜ |
 
-**Próximo hito:** revisión con el profesor guía el **miércoles 26 de agosto de 2026**.
+**Próximo hito:** entrega de la Etapa 2, **viernes 2 de octubre de 2026**.
 
 ## Por dónde empezar
 
@@ -37,7 +37,7 @@ estado de cada dispositivo y panel de control. Caso de validación: Campus Dr. L
 | Seguridad en capas: amenazas y controles verificados | [`docs/11-seguridad.md`](docs/11-seguridad.md) |
 | Estado de la Etapa 2: avance, backlog, prioridades | [`docs/12-estado-etapa2.md`](docs/12-estado-etapa2.md) |
 | Reglas de tiempo y zonas horarias (UTC, IANA por sitio) | [`docs/13-tiempo-y-zonas-horarias.md`](docs/13-tiempo-y-zonas-horarias.md) |
-| Despliegue, costos y retención (OE4) | [`docs/14-despliegue-y-costos.md`](docs/14-despliegue-y-costos.md) |
+| Despliegue, costos y retención (OE3) | [`docs/14-despliegue-y-costos.md`](docs/14-despliegue-y-costos.md) |
 | Glosario vigente (términos del informe) | [`informe-oficial/glosario.tex`](informe-oficial/glosario.tex) |
 | Preguntas al profesor guía y guion de entrevistas | [`docs/03-instrumentos-levantamiento.md`](docs/03-instrumentos-levantamiento.md) |
 | Enfoque previo (Contact ID), conservado como evidencia | [`historico/`](historico/README.md) |

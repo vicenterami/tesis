@@ -140,7 +140,7 @@ Persistencia & TimescaleDB & Un solo motor relacional y de series; InfluxDB obli
 Backend & TypeScript + NestJS & Tipos de la trama definidos una sola vez para backend y panel; módulos 1:1 con M1--M8; OpenAPI automático \\
 Rama LoRa & ChirpStack & Autoalojable; publica en MQTT: converge a la vía principal \\
 Despliegue & Contenedores Docker & Reproducible con un comando; reinicio automático; la Etapa 4 exige demostrar en condiciones realistas \\
-Interfaz (frontend) & Svelte + uPlot & Artefacto liviano sin \emph{virtual DOM}, coherente con la ligereza objetivo; gráficos de series de tiempo de pocos kilobytes; se confirmó en la Etapa 2 (cuadro~\ref{tab:frontend}) \\
+Interfaz (frontend) & Svelte + uPlot & Artefacto liviano sin \emph{virtual DOM}, coherente con la meta de RNF-17; gráficos de series de tiempo de pocos kilobytes; se confirmó en la Etapa 2 (cuadro~\ref{tab:frontend}) \\
 \bottomrule
 \end{tabular}
 \end{tablaseg}
@@ -190,8 +190,8 @@ navegador móvil; se evaluaron React, Vue y Svelte con una matriz análoga.
 \section{Evaluación de la tecnología de interfaz (frontend)}
 
 El panel es el único módulo que el usuario final ve, pero \textbf{la restricción dominante de este
-trabajo es la ligereza}: la plataforma debe operar en hardware modesto, por debajo de las
-exigencias del referente (ThingsBoard recomienda 4\,GB de memoria solo para sí mismo). Por ello el
+trabajo es la memoria}: el sistema debe operar en hardware modesto (RNF-17, meta que se valida en la
+Etapa~4). Por ello el
 criterio de mayor peso es el tamaño del artefacto entregado al navegador y el consumo en el
 servidor que lo sirve, seguido de la coherencia con el backend (TypeScript), la disponibilidad de
 componentes de gráficos de series de tiempo, y la experiencia previa.
@@ -216,8 +216,7 @@ Angular (como ThingsBoard) & 1 & 5 & 4 & 2 & 4 & 2,85 \\
 \end{table}
 
 Se recomienda \textbf{Svelte con uPlot}. Svelte compila a JavaScript mínimo sin \emph{virtual DOM},
-lo que produce artefactos varias veces más livianos que React o Angular —coherente con la ligereza
-que diferencia a la plataforma de ThingsBoard, construido en Angular—; uPlot es una biblioteca de
+lo que produce artefactos más livianos que React o Angular —coherente con la meta de RNF-17—; uPlot es una biblioteca de
 gráficos especializada en series de tiempo de unos pocos kilobytes, apropiada para paneles de
 telemetría en navegador móvil. Se mantiene TypeScript, con lo que los tipos del modelo interno se
 comparten entre backend e interfaz. La decisión se confirmó en la Etapa 2 con el diseño de las
@@ -310,7 +309,7 @@ carga se controla con políticas de retención y compresión.
 
 Esta fue la primera estimación, anterior a la comparación con precios fechados: servidor virtual
 arrendado, 6--20 USD/mes (2 vCPU, 4 GB); mini-PC propio en la organización, 150--250 USD por única
-vez; servidor institucional, sin costo si se dispone. Todos los componentes son de código abierto
-sin licencias. La cifra que rige hoy es la del cuadro~\ref{tab:alojamiento} y la recomendación del
+vez; servidor institucional, sin costo si se dispone. Todos los componentes son de código abierto,
+salvo la compresión de TimescaleDB (desviación de RNF-15, capítulo~\ref{cap:metodologia}). La cifra que rige hoy es la del cuadro~\ref{tab:alojamiento} y la recomendación del
 capítulo~\ref{cap:diseno}: del orden de CLP~6\,000 mensuales con un VPS internacional de 2~vCPU y
 4~GB, consultada el 10 de septiembre de 2026.

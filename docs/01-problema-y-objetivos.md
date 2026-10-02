@@ -30,10 +30,10 @@ con lo que el sensor emite.
 
 ## 1.2 Enunciado del problema central
 
-> **La UCT, que ya posee sensores IoT en el Campus Dr. Luis Rivas del Canto, no logra convertir los
-> datos que estos generan en información utilizable, porque carece de una plataforma que unifique la
-> recepción, la normalización y la gestión de dispositivos que se comunican mediante tecnologías y
-> formatos distintos entre sí.**
+> **La organización que ya posee dispositivos IoT no logra convertir sus datos en información utilizable,
+> porque carece de un sistema integrado que los registre, reciba y unifique sus datos, vigile su estado y
+> los presente en un solo lugar.** (Enunciado vigente desde el 01/10/2026, igual al del informe §1.1; el árbol
+> en texto de abajo conserva la redacción anterior: la vigente es la figura 1.1 del informe.)
 
 Formulado desde la perspectiva del afectado: *«tengo los sensores instalados y funcionando, pero no
 tengo dónde recibir sus datos, ni cómo administrarlos, ni cómo saber si siguen reportando».*
@@ -96,6 +96,8 @@ estructura productiva de La Araucanía —predios agrícolas dispersos, agroindu
 instalaciones distribuidas— genera condiciones donde el monitoreo remoto
 tiene valor operativo directo, y donde los sensores de largo alcance y bajo consumo son técnicamente
 apropiados.
+
+> **Nota (01/10/2026):** sección de la Etapa 1, conservada como registro. Sus afirmaciones sobre competidores no tienen fuente verificada y varias quedaron superadas; el estado del arte vigente, con fuentes oficiales, está en el informe §1.2 (`informe-oficial/cap1.tex`). No citarla.
 
 **Vacío en la oferta existente.** El análisis de la oferta regional identifica dos actores:
 

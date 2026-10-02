@@ -133,10 +133,10 @@ pero su valor demostrativo es alto.
 | **RF-29** | El sistema debe **aprovechar el *keep-alive* y el *Last Will* de MQTT** como evidencia de conexión y aviso inmediato de desconexión | [BT] | C5 | **M** |
 | **RF-30** | El sistema debe presentar un **indicador agregado de salud por sitio**: total de dispositivos, en línea, con condición abierta y sin supervisión | [PO] | C4, C5 | **M** |
 
-**Justificación ampliada del módulo M4.** Es el módulo que materializa el aporte diferencial frente a
-la oferta regional. El análisis de mercado muestra que IoT3 y ControlTec presentan **el dato del
-sensor**; ninguna posiciona **el estado del dispositivo y de su enlace** como funcionalidad del
-producto. La causa C5 —el silencio de un sensor es indistinguible de la ausencia de novedades— solo se
+**Justificación ampliada del módulo M4.** Responde directamente a la causa C5. (En la Etapa 1 se justificó
+además como diferencia frente a la oferta regional; no lo es frente a todos los competidores: ThingsBoard, por
+ejemplo, marca como inactivo a un dispositivo sin actividad, según su documentación de *connectivity status*.
+El posicionamiento vigente está en el informe §1.2.) La causa C5 —el silencio de un sensor es indistinguible de la ausencia de novedades— solo se
 resuelve con supervisión activa, no con visualización de mediciones. Todos los requerimientos de este
 módulo salvo uno son *Must*.
 
@@ -367,6 +367,8 @@ carece de causa declarada.
 
 ## 5.3 Requerimientos que sustentan la diferenciación competitiva
 
+> **Nota (01/10/2026):** sección de la Etapa 1, conservada como registro. Sus afirmaciones sobre competidores no tienen fuente verificada y varias quedaron superadas; el estado del arte vigente, con fuentes oficiales, está en el informe §1.2 (`informe-oficial/cap1.tex`). No citarla. Se reescribe en la Etapa 3 como los requerimientos que sustentan la apuesta del trabajo (operación por personal no técnico, datos listos para investigación).
+
 Del análisis de mercado se desprende que el valor diferencial no está distribuido de forma uniforme.
 Estos son los requerimientos que ningún competidor regional identificado satisface:
 
@@ -407,7 +409,7 @@ encaja directamente con RF-02 y RF-03, reduciendo el adaptador de LoRaWAN a un c
 
 | Alternativa | Ventajas | Desventajas | Decisión |
 |---|---|---|---|
-| **TimescaleDB** (extensión de PostgreSQL) | **Un solo motor** para datos relacionales (inventario, sitios, usuarios, condiciones) y series de tiempo. SQL estándar. Licencia abierta | Menos optimizado que InfluxDB en escritura masiva pura | **✅ Seleccionado** |
+| **TimescaleDB** (extensión de PostgreSQL) | **Un solo motor** para datos relacionales (inventario, sitios, usuarios, condiciones) y series de tiempo. SQL estándar. Núcleo Apache 2.0; compresión y agregados continuos bajo la Timescale License (ver la desviación de RNF-15) | Menos optimizado que InfluxDB en escritura masiva pura | **✅ Seleccionado** |
 | InfluxDB | Muy eficiente en series de tiempo | Obliga a operar **dos motores** en paralelo, porque el inventario y la identidad son relacionales | Descartado |
 | PostgreSQL sin extensión | Máxima simplicidad | Sin optimización de series de tiempo ni políticas de retención automáticas | Descartado |
 

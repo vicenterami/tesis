@@ -15,7 +15,7 @@ plataforma/
 ├── pruebas/api-smoke.sh      # prueba de humo de la API (OK/FALLA por caso)
 ├── db/init/                  # esquema y migraciones numeradas; en una instalación nueva corren todas
 │   ├── 01-esquema.sql        #   en orden al primer arranque. En una base existente, cada archivo nuevo
-│   └── 02…05-*.sql           #   se aplica a mano: docker compose exec -T timescaledb psql -U plataforma -d plataforma < db/init/NN-x.sql
+│   └── 02…07-*.sql           #   se aplica a mano: docker compose exec -T timescaledb psql -U plataforma -d plataforma < db/init/NN-x.sql
 └── mosquitto/config/
     ├── mosquitto.conf        # broker sin anónimos, con contraseñas y ACL
     ├── acl                   # cada dispositivo publica solo en su tópico
@@ -101,7 +101,7 @@ Capas, amenazas y controles verificados: `docs/11-seguridad.md`.
 
 ## Próximas tandas
 
-1. ~~Esqueleto del backend~~ hecho: filtro 1 + cuarentena. Siguen los filtros 2–6.
-2. Contenedor del backend en el Compose (imagen propia, multi-etapa con el panel estático).
+1. ~~Esqueleto del backend y filtros 1 a 6~~ hechos.
+2. ~~Contenedor del backend en el Compose~~ hecho (imagen propia multi-etapa); falta el panel estático.
 3. ChirpStack (base aparte en el mismo PostgreSQL + Redis propio) cuando exista el gateway.
-4. Proxy inverso con TLS (Caddy) para 443 y 8883; retirar el puerto 1883 publicado.
+4. Proxy inverso con TLS (Caddy o Nginx, por decidir: `docs/10` §8.3) para 443 y 8883; retirar el puerto 1883 publicado.

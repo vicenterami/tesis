@@ -34,7 +34,7 @@ TT-19 & Esquema de base de datos y migraciones versionadas & 5 & Hecho: esquema 
 TT-24 & Comparar al menos tres alternativas de alojamiento con criterios ponderados & 4 & Hecho: cinco alternativas, seis criterios (cuadro~\ref{tab:alojamiento}) \\
 TT-25 & Cuantificar el costo mensual y anual de operación en CLP y USD & 3 & Hecho: precios fechados, convertidos con dólar observado \\
 TT-26 & Redactar la recomendación de despliegue justificada & 1 & Hecho: VPS de 2 vCPU/4 GB; nacional si se exigen datos en Chile \\
-TT-35 & Documento de diseño de la Etapa 2, con todos los diagramas & 6 & Parcial: borrador completo del informe (30 págs.); falta pulir e incorporar retroalimentación \\
+TT-35 & Documento de diseño de la Etapa 2, con todos los diagramas & 6 & Parcial: borrador completo del informe (30 págs.); retroalimentación incorporada (sección~\ref{sec:retro}); se cierra con la entrega del 2/10 \\
 HU-03 & Publicar eventos en MQTT desde dispositivos que ya usan ese transporte & 4 & \textbf{Adelantado} (plan.\ E3), hecho: publicado y probado con mosquitto\_pub \\
 HU-04 & Adaptador para un formato no SenML (extensibilidad de la recepción) & 7 & \textbf{Adelantado} (plan.\ E4), parcial: adaptador plano; se cierra con la trama real \\
 TT-17 & Pipeline de normalización al modelo interno (seis filtros) con cuarentena & 6 & \textbf{Adelantado} (plan.\ E3), hecho: seis filtros verificados \\
@@ -72,7 +72,7 @@ $\sim$240 horas.}
  & \textbf{Riesgo} & \textbf{Estado} & \textbf{Mitigación} \\
 \midrule
 R1 & Hardware de sensores no disponible & \textbf{En tratamiento} & Emulador de nodo por software para la carga; para el sensor real (TT-32, núcleo), plan B con fecha gatillo 8 de octubre: nodo Wi-Fi propio si no hay confirmación del hardware LoRaWAN del compañero \\
-R2 & Sin acceso a partes interesadas & \textbf{En tratamiento} & Contactos solicitados al profesor guía tras la retroalimentación del 21/09 (sección~\ref{sec:retro}); contingencia documentada: registrar el intento, fuentes externas, informar por escrito \\
+R2 & Sin acceso a partes interesadas & \textbf{En tratamiento} & Contacto obtenido el 29/09 y entrevista enviada ese día, sin respuesta (sección~\ref{sec:retro}); contingencia documentada: registrar el intento, fuentes externas, informar por escrito \\
 R3 & Ambigüedad de fechas & \textbf{Cerrado} & Calendario oficial publicado el 24/08 \\
 R4 & Alcance excesivo & \textbf{Confirmado y controlado} & Núcleo comprometido vs.\ alcance condicional; revisión de holgura por etapa \\
 R5 & Protocolo inadecuado al patrón de uso & \textbf{Cerrado} & Se materializó y resolvió: Contact ID descartado el 02/09; el transporte es MQTT y el formato SenML (sección~\ref{sec:transporte}) \\

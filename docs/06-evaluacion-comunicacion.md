@@ -173,6 +173,8 @@ LADO VICENTE (desde el tópico hacia adentro)
 
 ## 5. Competencia — ampliada, con el elefante incluido
 
+> **Nota (01/10/2026):** sección de la Etapa 1, conservada como registro. Sus afirmaciones sobre competidores no tienen fuente verificada y varias quedaron superadas; el estado del arte vigente, con fuentes oficiales, está en el informe §1.2 (`informe-oficial/cap1.tex`). No citarla.
+
 | Competidor | Qué es | Qué NO cubre (tu espacio) |
 |---|---|---|
 | **ThingsBoard** (CE) | ⚠️ **El rival serio**: plataforma IoT autoalojable, de código abierto hasta la v4.3 (desde la v4.4, del 29/09/2026, Business Source License), MQTT/HTTP/CoAP, dashboards, multi-tenant | Genérica y pesada: curva de aprendizaje alta, en inglés, sobredimensionada para una pyme regional; sin acompañamiento local. **Hay que citarla en el estado del arte antes de que la comisión la nombre** |

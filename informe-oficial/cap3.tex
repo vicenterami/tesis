@@ -10,8 +10,9 @@ profesor guía; \textbf{[EM]} estudio de mercado; \textbf{[BT]} base teórica (R
 \textbf{Brecha declarada:} falta la
 fuente [ENT], entrevistas directas. La evidencia del propietario del problema recogida antes de la
 entrega de la Etapa 1 fue la indicación transmitida por el profesor guía en las reuniones del 17 de
-agosto y del 2 de septiembre, registradas en la bitácora del repositorio; las entrevistas se
-planifican como actividad de las Etapas 2 y 3 (OE1; sección~\ref{sec:retro}).
+agosto y del 2 de septiembre, registradas en la bitácora del repositorio; la entrevista con un
+académico referido por el profesor guía se envió el 29 de septiembre y sigue sin respuesta (OE1;
+sección~\ref{sec:retro}).
 
 \section{Síntesis del catálogo}
 
@@ -22,8 +23,8 @@ ISO/IEC 25010— con prioridad MoSCoW (51 \emph{Must}, 16 \emph{Should}, 3 \emph
 completo está en el anexo~\ref{anx:requerimientos}.
 
 
-\textbf{Decisión:} MQTT como vía principal —QoS y \emph{Last Will} resuelven de fábrica la entrega
-confiable y la detección de caída— y HTTP/REST como vía secundaria para integraciones. El navegador
+\textbf{Decisión:} MQTT como vía principal —su calidad de servicio (QoS) resuelve de fábrica la entrega
+confiable— y HTTP/REST como vía secundaria para integraciones. El navegador
 nunca toca MQTT: consulta la API REST del backend. El socket TCP propio se descarta explícitamente:
 lograría la mínima sobrecarga a costa de reinventar sesiones, confirmaciones y formato.
 
@@ -42,16 +43,16 @@ es que aquí el contrato nativo es un estándar abierto.
 
 El aporte central es el \textbf{pipeline de tratamiento de tramas} (figura~\ref{fig:pipeline}):
 seis filtros independientes y verificables por separado. La identificación de dispositivos combina
-el \textbf{registro} (al dar de alta: identidad, tipo, ubicación, credencial) con la
-\textbf{autoidentificación} de cada trama (el campo \texttt{bn}); el filtro de validación cruza
-ambos.
+el \textbf{registro} (identidad, tipo, ubicación, credencial) con el \textbf{tópico} de cada trama, que
+la lista de control de acceso del broker ata al usuario que la publica; el filtro de autenticación
+cruza ambos.
 
 \input{figuras/pipeline}
 
 El despliegue completo corre como contenedores en un único servidor (figura~\ref{fig:despliegue},
 capítulo~\ref{cap:diseno}), con reinicio automático ante fallas. \textbf{La frontera con el trabajo del compañero es el tópico
 MQTT}: todo lo anterior (sensor, nodo, radio) es de él; todo lo posterior (broker, pipeline, base de
-datos, API, panel), de este trabajo. Un \textbf{emulador de nodo} publica tramas en el mismo tópico,
+datos, API, panel), de este trabajo. Un \textbf{emulador de nodo} (Etapa~4) publicará tramas en el mismo tópico,
 de modo que la validación de la plataforma no depende del hardware ni de terceros. En la rama LoRa, el servidor de red (ChirpStack) correrá en el servidor de la
 plataforma —aunque algunos gateways lo traen embebido— para administrar nodos y claves desde un
 solo punto; el decodificador de binario a JSON es responsabilidad del trabajo del compañero, y su

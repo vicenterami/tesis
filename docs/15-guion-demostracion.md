@@ -44,9 +44,9 @@ abrir la consola interactiva, que se cierra con `\q`).
 
 Sensores de distintos fabricantes, con distintos formatos y relojes poco confiables, y una plataforma que
 debe recibirlos, validarlos, guardarlos como series de tiempo y avisar cuando algo anda mal, con menos de
-2 GB de memoria. Mostrar `docker stats --no-stream` y **decir la suma en voz alta**: la plataforma completa
-ronda los 120 MB en reposo (base ~60, backend ~50, broker ~8; medido el 27/09), frente al límite de 2 GB
-de RNF-17 y a los 4 GB que el referente comercial pide solo para sí.
+2 GB de memoria. Mostrar `docker stats --no-stream` y **decir la suma en voz alta**: lo construido hasta hoy
+ronda los 120 MB en reposo (base ~60, backend ~50, broker ~8; medido el 27/09). RNF-17 (2 GB) se valida en la
+Etapa 4, con la pila completa y bajo carga: no presentarlo como logro.
 
 ## 2. Una trama buena entra (2 min)
 
@@ -69,7 +69,7 @@ bash plataforma/pruebas/pila.sh sql "SELECT round(valor::numeric,2) AS valor, un
 
 ## 3. Los seis filtros rechazan lo que no corresponde (2 min)
 
-**Decir:** nada llega a las series sin pasar los seis filtros —1 autenticar, 2 analizar, 3 validar,
+**Decir:** nada llega a las series sin pasar los cuatro primeros filtros (los dos últimos abren condiciones) —1 autenticar, 2 analizar, 3 validar,
 4 normalizar, 5 alertar, 6 supervisar—; lo rechazado se guarda crudo con su motivo.
 
 | Publicar | Motivo esperado en `cuarentena` | Filtro |

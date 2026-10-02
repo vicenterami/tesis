@@ -3,7 +3,7 @@
 > Documento de gobierno del proyecto. Define **cómo** se trabaja, **cuándo** se entrega y **dónde**
 > vive cada cosa. Se actualiza al cerrar cada etapa.
 >
-> Última actualización: **viernes 21 de agosto de 2026**
+> Última actualización: **jueves 1 de octubre de 2026** (§1). Las secciones de planificación de la Etapa 1 se conservan como registro.
 
 ---
 
@@ -14,10 +14,10 @@ y monitoreo de dispositivos IoT; caso de validación: Campus Dr. Luis Rivas del 
 
 **Enunciado en una frase:**
 
-> Una plataforma abierta (sin costo de licencia) que permite a organizaciones que **ya poseen
-> sensores** de distintos fabricantes —LoRa/LoRaWAN, WiFi, MQTT— **recibir, normalizar, gestionar y explotar**
-> sus datos a través de un **protocolo de comunicación unificado basado en Contact ID (SIA DC-05)**,
-> diseñado bajo la metodología **PPDIOO**.
+> Un prototipo de sistema integrado para el registro, gestión y monitoreo en tiempo real de dispositivos IoT,
+> con un dashboard que centralice sus datos, estado y alertas, para facilitar su aprovechamiento en
+> actividades de investigación de la Facultad de Ingeniería de la UCT, diseñado bajo la metodología **PPDIOO**.
+> (Objetivo general vigente desde el 30/09; el enunciado de agosto, basado en Contact ID, se descartó el 02/09.)
 
 **El problema no es la falta de sensores, es la falta de destino para sus datos.** Quien ya invirtió
 en sensores se encuentra con que cada uno habla distinto y no tiene una plataforma neutral donde
@@ -201,14 +201,14 @@ recuperan.
 
 | Días | Trabajo | Responsable |
 |---|---|---|
-| Lun 17 – mar 18 | Marco: problema, alcance, objetivos SMART, decisión metodológica | Asistente redacta / él valida |
-| **Lun 17 – mar 18** | 📧 **Contactar partes interesadas de la universidad** + confirmar fechas con Mario | **Él** |
-| Mié 19 – jue 20 | Investigación del protocolo: Contact ID vs alternativas + perfil preliminar | Asistente |
-| Vie 21 – dom 23 | Requerimientos funcionales y no funcionales, trazabilidad, alojamiento y costos | Asistente |
-| Lun 24 – mar 25 | Backlog completo con criterios de aceptación y estimaciones | Asistente redacta / él prioriza |
-| **Mié 26** | **Revisión con Mario del borrador completo** | Él |
-| Jue 27 | Incorporar retroalimentación, compilar LaTeX, exportar PDF | Ambos |
-| **Vie 4 sep** | **Entrega** | Él |
+| Lun 17 – mar 18 | Marco: problema, alcance, objetivos SMART, decisión metodológica | Estudiante |
+| **Lun 17 – mar 18** | 📧 **Contactar partes interesadas de la universidad** + confirmar fechas con Mario | **Estudiante** |
+| Mié 19 – jue 20 | Investigación del protocolo: Contact ID vs alternativas + perfil preliminar | Estudiante |
+| Vie 21 – dom 23 | Requerimientos funcionales y no funcionales, trazabilidad, alojamiento y costos | Estudiante |
+| Lun 24 – mar 25 | Backlog completo con criterios de aceptación y estimaciones | Estudiante |
+| **Mié 26** | **Revisión con Mario del borrador completo** | Estudiante y profesor guía |
+| Jue 27 | Incorporar retroalimentación, compilar LaTeX, exportar PDF | Estudiante |
+| **Vie 4 sep** | **Entrega** | Estudiante y profesor guía |
 
 ---
 
