@@ -24,7 +24,7 @@ TT-08 & Diagrama de flujo de recepción, desde la recepción hasta la persistenc
 TT-09 & Diagrama de secuencia del aprovisionamiento de un dispositivo nuevo & 3 & Hecho: secuencia de aprovisionamiento (figura~\ref{fig:sec-alta}) \\
 TT-10 & Registro de decisiones de diseño con su justificación & 2 & Hecho: tablas de decisiones en el cap. 4 y bitácora \\
 TT-11 & Esquema del modelo interno y contrato del tópico MQTT (nombres, unidades, identidad) & 3 & Hecho: docs/08, docs/10 §1; tópico sitio/·/dispositivo/·/magnitud \\
-TT-12 & Catálogo de tipos de sensor y unidades aceptadas, con umbrales de disparo y restauración & 6 & Parcial: 5 magnitudes con rango; ampliar con los sensores reales \\
+TT-12 & Catálogo de tipos de sensor y unidades aceptadas, con umbrales de disparo y restauración & 6 & Parcial: 7 magnitudes con rango; ampliar con los sensores reales \\
 TT-13 & Especificación del contrato de la API en OpenAPI, generada desde el código & 3 & Hecho: generado desde los decoradores; servido en \texttt{/docs} y versionado (\texttt{openapi.json}) \\
 TT-14 & Política de QoS, reintento y cuarentena & 2 & Hecho: QoS 1 con sesión persistente, inserción idempotente, cuarentena con motivo \\
 TT-15 & Procedimiento de asignación de identidad y gestión de claves AES por sitio & 2 & Parcial: gestión de credenciales documentada (docs/11 §7); claves LoRaWAN dependen de ChirpStack \\
@@ -34,7 +34,7 @@ TT-19 & Esquema de base de datos y migraciones versionadas & 5 & Hecho: esquema 
 TT-24 & Comparar al menos tres alternativas de alojamiento con criterios ponderados & 4 & Hecho: cinco alternativas, seis criterios (cuadro~\ref{tab:alojamiento}) \\
 TT-25 & Cuantificar el costo mensual y anual de operación en CLP y USD & 3 & Hecho: precios fechados, convertidos con dólar observado \\
 TT-26 & Redactar la recomendación de despliegue justificada & 1 & Hecho: VPS de 2 vCPU/4 GB; nacional si se exigen datos en Chile \\
-TT-35 & Documento de diseño de la Etapa 2, con todos los diagramas & 6 & Parcial: borrador completo del informe (30 págs.); retroalimentación incorporada (sección~\ref{sec:retro}); se cierra con la entrega del 2/10 \\
+TT-35 & Documento de diseño de la Etapa 2, con todos los diagramas & 6 & Hecho: este informe (30 págs.), con la retroalimentación incorporada (sección~\ref{sec:retro}) \\
 HU-03 & Publicar eventos en MQTT desde dispositivos que ya usan ese transporte & 4 & \textbf{Adelantado} (plan.\ E3), hecho: publicado y probado con mosquitto\_pub \\
 HU-04 & Adaptador para un formato no SenML (extensibilidad de la recepción) & 7 & \textbf{Adelantado} (plan.\ E4), parcial: adaptador plano; se cierra con la trama real \\
 TT-17 & Pipeline de normalización al modelo interno (seis filtros) con cuarentena & 6 & \textbf{Adelantado} (plan.\ E3), hecho: seis filtros verificados \\

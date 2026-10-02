@@ -9,7 +9,7 @@
 |---|---|---|---|
 | Diseña según estándares de calidad | **55 %** | 🟢 avanzado | Diagramas en notación reconocida (C4, UML, ER) generados desde una fuente única e **integrados en el capítulo 4 «Diseño de la plataforma»** del informe (borrador completo, 30 págs. de cuerpo); falta pulir redacción e incorporar la retroalimentación |
 | Incorpora la retroalimentación | 20 % | 🟢 en curso | Recibida el 21/09 (Etapa 1: 6,0). Seis observaciones → seis cambios en el informe (cap. 5 §5.4, cuadro) y en docs/01, 02, 04; bitácora del 21/09. Contactos para entrevistas solicitados el 22/09; falta realizarlas, que es la observación 1 |
-| Avanza en el diseño según backlog | 10 % | 🟢 avanzado | Ver §3: 18/22 ítems de la Etapa 2 hechos, 4 parciales (TT-12, TT-15, HU-01, TT-35); TT-26 ya está hecho |
+| Avanza en el diseño según backlog | 10 % | 🟢 avanzado | Ver §3: 19/22 ítems de la Etapa 2 hechos, 3 parciales (TT-12, TT-15, HU-01; TT-35 se cerró con la entrega del 2/10); TT-26 ya está hecho |
 | Documenta en repositorio | 15 % | 🟢 cumplido | Commits descriptivos, docs/07–12, bitácora, READMEs. Mantener el ritmo |
 
 **Prioridad para la nota, en orden:** (1) informe de la Etapa 2 con los diagramas y el diseño
@@ -49,7 +49,7 @@ implementando solo lo que **sustente el diseño** (API de consulta, que demuestr
 | TT-09 | Diagrama de secuencia del aprovisionamiento de un dispositivo nuevo | M | 3 | ✅ | secuencia de aprovisionamiento (anexo de figuras complementarias) |
 | TT-10 | Registro de decisiones de diseño con su justificación | M | 2 | ✅ | tablas de decisiones en el cap. 4 y bitácora |
 | TT-11 | Esquema del modelo interno y contrato del tópico MQTT (nombres, unidades, identidad) | M | 3 | ✅ | docs/08, docs/10 §1; tópico sitio/·/dispositivo/·/magnitud |
-| TT-12 | Catálogo de tipos de sensor y unidades aceptadas, con umbrales de disparo y restauración | M | 6 | 🟡 | 5 magnitudes con rango; ampliar con los sensores reales |
+| TT-12 | Catálogo de tipos de sensor y unidades aceptadas, con umbrales de disparo y restauración | M | 6 | 🟡 | 7 magnitudes con rango; ampliar con los sensores reales |
 | TT-13 | Especificación del contrato de la API en OpenAPI, generada desde el código | M | 3 | ✅ | `@nestjs/swagger`: `/docs` y `backend/openapi.json` (6 rutas), generado desde los decoradores |
 | TT-14 | Política de QoS, reintento y cuarentena | M | 2 | ✅ | QoS 1 con sesión persistente (cola en el broker si el backend cae); INSERT idempotente sobre `(canal, tiempo)` (migración 06); cuarentena con motivo; `docs/10 §4.1` |
 | TT-15 | Procedimiento de asignación de identidad y gestión de claves AES por sitio | S | 2 | 🟡 | gestión de credenciales documentada (docs/11 §7); claves LoRaWAN dependen de ChirpStack |
@@ -59,7 +59,7 @@ implementando solo lo que **sustente el diseño** (API de consulta, que demuestr
 | TT-24 | Comparar al menos tres alternativas de alojamiento con criterios ponderados | M | 4 | ✅ | `docs/14 §3–§4`: cinco alternativas, seis criterios |
 | TT-25 | Cuantificar el costo mensual y anual de operación en CLP y USD | M | 3 | ✅ | `docs/14 §3`: precios fechados y convertidos con dólar observado |
 | TT-26 | Redactar la recomendación de despliegue justificada | M | 1 | ✅ | `docs/14 §5` y cap. 4 del informe |
-| TT-35 | Documento de diseño de la Etapa 2, con todos los diagramas | M | 6 | 🟡 | borrador completo del informe (30 págs.); falta pulir e incorporar retroalimentación |
+| TT-35 | Documento de diseño de la Etapa 2, con todos los diagramas | M | 6 | ✅ | el informe entregado el 2/10 (30 págs.), con la retroalimentación del 21/09 y del 29/09 incorporada (cap. 5 §5.4) |
 
 **Adelantados desde las Etapas 3 y 4:**
 

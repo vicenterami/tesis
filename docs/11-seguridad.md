@@ -45,7 +45,7 @@
 | 3 | `allow_anonymous false` | `mosquitto.conf` | ✅ publicación anónima → *not authorised* |
 | 3 | Contraseñas con hash (`mosquitto_passwd`) | `passwd` (no versionado) | ✅ clave incorrecta → rechazada |
 | 4 | ACL por patrón `%u` | `acl` | ✅ dev-0001 publicando como dev-0002 → descartado; el backend no lo recibe |
-| 5 | Catálogo de magnitudes con rango físico | `01-esquema.sql` | ✅ 5 magnitudes con `rango_min/max` (el filtro 3 las usará) |
+| 5 | Catálogo de magnitudes con rango físico | `01-esquema.sql` | ✅ 7 magnitudes con `rango_min/max`, que el filtro 3 usa |
 | 5 | Índice único: una sola condición abierta por tipo | `01-esquema.sql` | ✅ definido |
 | 7 | `security_opt: no-new-privileges` | `docker-compose.yml` | ✅ ambos servicios |
 | 7 | Imágenes con versión exacta (no `latest`) | `docker-compose.yml` | ✅ `2.24.0-pg16`, `2.0.22` |
