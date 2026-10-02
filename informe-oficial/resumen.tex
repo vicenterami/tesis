@@ -1,22 +1,28 @@
 \begin{abstract}
 \addcontentsline{toc}{chapter}{Resumen}
-La Universidad Católica de Temuco, como otras organizaciones que ya poseen sensores, no logra
-convertir sus datos en información utilizable: cada dispositivo emite tramas con formatos distintos, las plataformas
-comerciales operan solo con el hardware de su proveedor, y no existe visibilidad del estado de la
-conectividad. Este trabajo desarrolla una plataforma web para el registro, monitoreo y gestión de
-sensores que recibe tramas de telemetría continua a través de TCP/IP —con MQTT como vía principal y
-HTTP como vía secundaria—, las normaliza a un modelo interno único mediante un pipeline de seis
-filtros con cuarentena y adaptadores por formato, almacena las mediciones como series de tiempo,
-supervisa el estado de cada dispositivo y presenta la información en un panel de control, sobre un caso de validación en el Campus Dr. Luis Rivas del Canto de la Universidad Católica de Temuco. El
-contrato nativo de entrada es el estándar abierto SenML (RFC 8428). Esta primera etapa define el
-problema mediante un árbol de causas y efectos, formula un objetivo general y cinco específicos con
-matriz de trazabilidad, cataloga 70 requerimientos justificados por fuente, evalúa cinco mecanismos
-de transporte y cuatro formatos de trama mediante matrices de criterios ponderados —documentando
-además el descarte fundamentado del protocolo Contact ID evaluado en la fase previa— y construye un
-backlog cuya verificación numérica delimitó el compromiso al núcleo demostrativo. La segunda etapa diseña la plataforma desde varias vistas con notaciones reconocidas (C4, entidad-relación, secuencias UML), justifica cada decisión y la traza a los requerimientos, y adelanta la implementación: el pipeline completo, la supervisión de salud, las alertas con histéresis y la API de consulta están construidos y verificados sobre un despliegue en contenedores cuyo consumo en reposo es del orden de 120~MB (medido). Las figuras de diseño se generan desde la documentación versionada y desde el esquema real de la base de datos, con una verificación automática de concordancia entre informe, documentación y sistema.
+\markboth{Resumen}{Resumen}
+La masificación de los dispositivos IoT ha multiplicado las plataformas de fabricante, que pueden
+operar como ecosistemas cerrados: una organización que usa equipos de varias marcas termina con su
+información repartida y sujeta a cada proveedor, una dependencia que la literatura identifica como
+obstáculo para la adopción del Internet de las Cosas. La Facultad de Ingeniería de la Universidad
+Católica de Temuco, que está incorporando estos dispositivos a su campus, necesita reunir esos datos
+en un solo lugar para aprovecharlos en sus investigaciones.
+
+Como propuesta, se desarrolla un prototipo de sistema integrado que administra esos dispositivos y
+presenta en tiempo real, en un dashboard, sus datos, su estado y sus alertas. El trabajo se organiza
+en cuatro etapas con la metodología PPDIOO de Cisco. En la primera se formuló el problema mediante un
+árbol de causas y efectos, se definieron los objetivos con su trazabilidad, se catalogaron 70
+requerimientos y se compararon cinco mecanismos de transporte y cuatro formatos de datos. En la
+segunda se diseñaron el sistema, su red y su despliegue con notaciones reconocidas, y se contrastó
+con las soluciones existentes, de código abierto, de fabricante y en la nube. El trabajo incorporó
+la retroalimentación del profesor guía en cada revisión. Como resultado, ya existe un núcleo
+demostrable que recibe los datos, los unifica en el formato estándar SenML, supervisa si cada
+dispositivo sigue reportando, genera alertas ante valores fuera de rango y permite consultarlos. La
+siguiente etapa incorporará el registro de dispositivos y la interfaz de visualización, y validará
+los requerimientos con la Facultad.
 
 {\bf Palabras Clave:}
-Internet de las Cosas, monitoreo de sensores, telemetría, MQTT, SenML, normalización de tramas,
-series de tiempo, supervisión de dispositivos.
+Internet de las Cosas, sistema integrado, dispositivos IoT, monitoreo en tiempo real, SenML, series
+de tiempo, supervisión de dispositivos.
 \end{abstract}
 \clearpage
