@@ -528,6 +528,26 @@ no demuestran ninguna.
 | Priorización | ✅ MoSCoW heredado del catálogo, más orden de ejecución justificado |
 | Verificación de viabilidad | 🔴 **Realizada. El backlog completo excede el presupuesto en 16 %; el núcleo cabe con 30 % de holgura. Redistribución correctiva definida** |
 
+## 7. Plan de la Etapa 3 ordenado por criterio de la rúbrica (06/10/2026)
+
+La pauta de la Etapa 3 pesa: pruebas iniciales 30 %, retroalimentación 20 %, mejoras del diseño 15 %,
+documentación 15 %, 50 % de implementación 10 %, validación preliminar 10 %. El orden de trabajo sigue ese
+peso, no la numeración de las épicas. Incluye los parciales de la Etapa 2 (TT-12, TT-15, HU-01) y lo que la
+entrevista del 05/10 hizo subir (exportación, estados, correo por silencio) o bajar (tiempo real).
+
+| Peso | Criterio | Qué se hace (ítems) | Horas |
+|---|---|---|---|
+| 30 % | Pruebas iniciales | TT-28 emulador de nodos; TT-27 pruebas del contrato (traída de la Etapa 4); pruebas de carrera (dos tramas del mismo instante, umbral cruzado dos veces; nuevo ítem); TT-36 informe de pruebas | 5 + 4 + 3 + 5 = 17 |
+| 20 % | Retroalimentación | Registrar la retroalimentación del profesor guía sobre la Etapa 2 cuando llegue; incorporar la entrevista (`docs/03 §4`: fuente [ENT] en `docs/02`, citas en `docs/01`, informe) | 4 |
+| 15 % | Mejoras del diseño | Confirmación al broker tras el COMMIT; ACL de `backend` y `sonda`; estado `mantenimiento` sin alertas (RF-22); `ON CONFLICT` al abrir condiciones; SSE decidido; unidades propias; entidad `pasarela`, ubicación y tabla `trama` (`docs/08 §8`), cada una con antes/después | 10 |
+| 15 % | Documentación | `docs/10 §8.4`, `docs/08 §8`, figuras con la segunda ruta de entrada, matriz de la pila (RNF-15), bitácoras | 6 |
+| 10 % | 50 % de implementación | En este orden: HU-08 exportación CSV (traída de la Etapa 4; XLSX candidato) · HU-10 inventario con estados y última actualización · HU-25 destinatarios + correo por silencio (traída) · HU-11 registro de dispositivo · HU-18 sesión y roles · adaptador «milesight» (nuevo) · TT-39 tiempo real como SSE · HU-02 ruta LoRaWAN | 4 + 5 + 3 + 5 + 3 + 4 + 4 + 6 = 34 |
+| 10 % | Validación preliminar | TT-32 extremo a extremo con un equipo real (Milesight o del compañero); TT-12 catálogo con los sensores reales; TT-15 claves | 3 + 3 + 2 = 8 |
+
+**Total: 79 h contra ~60 h disponibles** (§6.2). No cabe todo: los últimos ítems de implementación (SSE, ruta
+LoRaWAN) y HU-19 (panel de salud, 9 h, ya en la Etapa 4) se ejecutan solo contra holgura. La regla sigue
+siendo la de §6.5: se recorta por el final de cada criterio, nunca las pruebas.
+
 ## Seguimiento de ejecución
 
 El estado de cada ítem tocado (hecho / parcial / pendiente, con su evidencia) se lleva en

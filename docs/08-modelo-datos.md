@@ -229,4 +229,29 @@ consistente para reportes.
 - [ ] Políticas de retención en capas y agregados continuos de la hypertable (`docs/14`).
 - [ ] Validar el modelo contra el catálogo de magnitudes real, cuando se acuerden los sensores con el
       compañero.
-- [ ] Llevar el diagrama a la versión TikZ/imagen para el informe LaTeX de la Etapa 2.
+- [x] Llevar el diagrama al informe (generado desde la base real por `generar-figuras.sh`).
+- [ ] **Entidad `pasarela`** (gateway LoRaWAN; decisión del 06/10, `docs/10 §8.4`): `id`, `sitio_id`, identificador
+      físico (EUI o número de serie), nombre, `visto_por_ultima_vez`; `dispositivo.pasarela_id` opcional (un
+      dispositivo puede llegar por celular sin pasarela). Es una entidad, no un atributo del dispositivo, porque
+      una pasarela sirve a muchos dispositivos y tiene estado propio.
+- [ ] **Ubicación geográfica**: `dispositivo.latitud` y `dispositivo.longitud` (`double precision`, opcionales,
+      `CHECK` de rango). Sin PostGIS: no hay consultas espaciales, solo un mapa; se agrega si algún día las hay.
+- [ ] **Tabla `trama`** (trama cruda aceptada; `docs/10 §8.4`): `dispositivo_id`, `recibido_en`, `topico`,
+      `payload bytea`, `adaptador text`. Solo inserción, sin `actualizado_en`; hypertable por `recibido_en` con
+      retención configurable (30 días). La trama es «foto por valor» (§7): nunca se reinterpreta.
+- [ ] **Magnitudes nuevas** del caso de uso (entrevista del 05/10): `radon` (`Bq/m3`, unidad propia: el catálogo
+      es el «application context» de RFC 8428 §4.5.2), `hidrogeno` (`ppm`), `temperatura_suelo` (`Cel`),
+      `humedad_suelo` (unidad por confirmar con el instrumento). Cada una con su rango físico.
+- [ ] **Tercera forma normal, revisada con cada cambio**: al agregar `pasarela` y `trama`, comprobar que ningún
+      atributo dependa de otro que no sea la clave y que no aparezcan dependencias multivaluadas (lo que
+      justificaría 4FN). Si aparecieran, se documenta aquí y se normaliza; mientras no, 3FN basta (§6).
+- [ ] **Hora de medición frente a hora de recepción (pregunta del 06/10/2026).** `medicion.tiempo` guarda el
+      instante de la medición según la regla 7 de `docs/13` (marca del emisor si es plausible; si no, la de
+      recepción), pero la fila **no registra cuál de las dos se usó ni cuánto difieren**. El broker no marca la
+      hora (MQTT no la añade); la hora de llegada al backend hoy solo queda en `cuarentena.recibido_en` y quedará en
+      `trama.recibido_en` (30 días). Propuesta, pendiente de aprobación: `medicion.recibido_en timestamptz` (8 bytes
+      por fila) y `medicion.origen_tiempo` (`dispositivo` | `pasarela` | `recepcion`), con la deriva
+      `recibido_en − tiempo` por dispositivo en la vista de salud (RF-47). Para LoRaWAN, la hora de la pasarela
+      (`time` del mensaje Milesight; `rxInfo` de ChirpStack) es más confiable que la del nodo: el adaptador la
+      declara como `pasarela`. La hora de guardado es la del COMMIT y, con la confirmación tras persistir
+      (`docs/10 §8.4` punto 4), queda a milisegundos de `recibido_en`: no hace falta una cuarta columna.

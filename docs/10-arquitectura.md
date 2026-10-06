@@ -22,21 +22,22 @@ transversales o viven en el cliente (`docs/02` §3).
 
 ```mermaid
 flowchart TB
-    subgraph RED["Red de sensores · lado del compañero"]
+    subgraph RED["Red de sensores · campo (del compañero u otro sitio)"]
         direction LR
-        N1["Nodo sensor LoRa<br/>ESP32 + sensores"] -- "LoRa (radio)" --> GW["Gateway LoRaWAN"]
-        N2["Nodo sensor Wi-Fi<br/>MQTT directo"]
+        N1["Nodo sensor LoRa<br/>ESP32 + sensores"] -- "LoRa (radio)" --> GW["Pasarela LoRaWAN"]
+        N2["Nodo Wi-Fi o celular<br/>MQTT directo"]
     end
 
-    subgraph SRV["Servidor de la plataforma · contenedores Docker"]
+    subgraph SRV["Servidor del sistema · contenedores Docker"]
         direction TB
-        CS["ChirpStack<br/>servidor de red LoRaWAN"]
-        MQ["Mosquitto<br/>broker MQTT · TLS"]
+        RP["Proxy inverso · TLS<br/>único contenedor expuesto<br/>443 personas · 8883 dispositivos · 1700/udp solo ruta A"]
+        CS["ChirpStack<br/>servidor de red LoRaWAN (ruta A, opcional)"]
+        MQ["Mosquitto<br/>broker MQTT"]
         subgraph BE["Backend · NestJS"]
             direction LR
             M1["M1 Recepción<br/>suscriptor MQTT"] --> M2["M2 Normalización<br/>pipeline de 6 filtros"]
             M2 --> M6["M6 Alertas<br/>umbrales, condiciones"] --> M4["M4 Supervisión<br/>de salud"]
-            M5["M5 Persistencia y consulta<br/>API REST + WebSocket"]
+            M5["M5 Persistencia y consulta<br/>API REST + SSE"]
         end
         DB[("TimescaleDB<br/>series de tiempo + tablas relacionales")]
     end
@@ -46,24 +47,51 @@ flowchart TB
         U(["Usuario<br/>navegador"]) --- FE["Panel web<br/>Svelte + uPlot"]
     end
 
-    GW -- "UDP/IP → Internet" --> CS
+    GW -- "ruta A: UDP 1700 (packet forwarder)" --> RP
+    GW -. "ruta B: servidor de red embebido → MQTT/TLS 8883 (por confirmar)" .-> RP
+    N2 -- "MQTT/TLS 8883" --> RP
+    RP -- "UDP 1700 · red interna" --> CS
+    RP -- "MQTT 1883 · red interna" --> MQ
     CS -- "publica JSON decodificado" --> MQ
-    N2 -- "MQTT/TLS 8883" --> MQ
     MQ -- "suscripción sitio/#" --> M1
     M2 -- "INSERT medicion" --> DB
     M6 -- "condiciones, eventos" --> DB
     M5 -- "SQL · time_bucket" --> DB
-    FE -- "HTTPS 443 · REST histórico · WS tiempo real" --> M5
+    FE -- "HTTPS 443 · REST histórico · SSE tiempo real" --> RP
+    RP -- "HTTP 3000 · red interna" --> M5
 ```
 
 **Decisiones visibles en el diagrama:**
 
-- **Tres puntos de entrada, ninguno más:** 443 para personas, 8883 para dispositivos MQTT, y
-  1700/udp para los *gateways* LoRaWAN — este último **hoy no aplica**: ChirpStack no está desplegado
-  en esta etapa (§8.3), y ese puerto no existe hasta que se agregue. La base de datos y la interfaz de
-  administración de ChirpStack nunca se exponen; su puerto de recepción de *gateways*, cuando exista,
-  sí, porque los *gateways* están en el campo, sin VPN, y deben poder alcanzarlo (RNF-10 al revés: aquí
-  es el servidor el que necesita un puerto abierto, no el dispositivo).
+- **Un solo contenedor expuesto (el proxy) y dos puertos siempre, tres a lo sumo:** 443 para personas y
+  8883 para dispositivos MQTT, ambos cifrados y siempre presentes; 1700/udp **solo en la ruta A** (ChirpStack
+  corriendo en este servidor y pasarelas con *Semtech UDP Packet Forwarder*). Si la ruta LoRaWAN real es la B
+  (pasarela con servidor de red embebido, §8.4 punto 2) o la red usa un servidor de red externo, el tercer
+  puerto no existe. Los tres los publica el proxy; ningún otro contenedor lleva `ports`. Hoy 1700/udp **no
+  aplica**: ChirpStack no está desplegado (§8.3). La base de datos y la interfaz de administración de
+  ChirpStack nunca se exponen; su puerto de recepción de pasarelas, cuando exista, sí, porque las pasarelas
+  están en el campo, sin VPN, y deben poder alcanzarlo (RNF-10 al revés: aquí es el servidor el que necesita
+  un puerto abierto, no el dispositivo).
+
+  **Escenarios de entrada contemplados (06/10/2026):**
+
+  | Escenario | Transporte hasta el servidor | Puerto | Pasa por el proxy | Estado |
+  |---|---|---|---|---|
+  | 1. Nodo Wi-Fi (ESP32 u otro) con cliente MQTT | MQTT sobre TLS | 8883 | Sí | Implementado (en desarrollo, 1883 local sin TLS) |
+  | 2. Equipo que solo habla HTTP | HTTPS, `POST` con SenML | 443 | Sí | Diseñado (HU-01, Etapa 3) |
+  | 3. Pasarela LoRaWAN con servidor de red embebido (Milesight UG6x) | MQTT sobre TLS; JSON decodificado en la pasarela | 8883 | Sí | Decidido el 06/10 (ruta B); ruta real por confirmar con el profesor guía |
+  | 4. Pasarela LoRaWAN con *packet forwarder* y ChirpStack en este servidor | Semtech UDP → ChirpStack → MQTT interno | 1700/udp | Sí (UDP) | Ruta A, opcional; ChirpStack no desplegado |
+  | 5. Servidor de red externo (TTN o ChirpStack de la red del campus) | Integración MQTT o HTTP del servidor de red hacia este sistema | 8883 o 443 | Sí | Por evaluar si la red del campus lo usa |
+  | 6. Equipo celular (NB-IoT, LTE-M) con cliente MQTT | MQTT sobre TLS; trama JSON o binaria hexadecimal | 8883 | Sí | Candidato (entrevista del 05/10); adaptador binario pendiente |
+  | 7. Pasarela con *Basics Station* hacia ChirpStack en este servidor | WebSocket sobre TLS (protocolo LNS) | 443 o puerto propio | Sí | No evaluado (por verificar en la documentación del *Gateway Bridge*); evitaría el UDP sin autenticar |
+
+  **¿Y «cualquier dispositivo»?** El sistema no promete entender cualquier aparato; promete dos puertas
+  estándar: MQTT 3.1.1 o 5 sobre TLS 1.2 o superior, y HTTP/1.1 sobre TLS. Es lo que implementan los módulos
+  IoT corrientes (ESP32, pasarelas LoRaWAN, módems celulares); lo que no lo implementa (un microcontrolador
+  sin TLS, un instrumento con salida serie) entra a través de una pasarela que sí lo hace, como ocurre con
+  LoRa. Lo que un dispositivo debe cumplir se escribe en una guía de conexión (nombre del servidor, puerto,
+  raíz de confianza del certificado, tópico, formato) y **se prueba con la matriz de TT-32**: un emulador con
+  TLS (TT-28), una pasarela real y la ruta HTTP. Lo que falle ahí se documenta, no se supone.
 
   **Ese puerto es una amenaza real, no solo un trámite de firewall.** El protocolo que usan los
   *gateways* para hablarle a ChirpStack (*Semtech UDP Packet Forwarder*) **no tiene autenticación ni
@@ -260,6 +288,20 @@ transporte. Fuente: OASIS, *MQTT Version 5.0*, §4.3 (`mqttoasis` en la bibliogr
 | El **broker** cae | Docker lo reinicia; el backend reintenta cada 2 s. Los nodos Wi-Fi con QoS 1 reintentan la publicación; ChirpStack reintenta según su integración | El broker es la pieza más simple y estable de la pila; su caída es corta |
 | La **base** cae | El INSERT falla, el manejador registra el error y el mensaje ya fue confirmado al broker: **se pierde**. Limitación conocida; en la Etapa 3 se confirma al broker solo después del INSERT (`manualAck`) | Hoy la base y el backend comparten servidor: si cae una, cae todo; el caso relevante es la Etapa 3 |
 | La misma trama llega **dos veces** (reentrega QoS 1 tras reconexión; nodo que reenvía su cola) | El INSERT es idempotente: índice único `(canal_id, tiempo)` + `ON CONFLICT DO NOTHING`; la repetida se ignora y **no** vuelve a evaluar umbrales | «Al menos una vez» + operación idempotente = efecto de exactamente una |
+
+**La cola del broker, con números** (verificado el 06/10/2026 en el manual `mosquitto.conf(5)` de la 2.0.22 y en
+`plataforma/mosquitto/config/mosquitto.conf`). Mientras el backend está caído, Mosquitto guarda **por cliente**
+hasta `max_queued_messages` = **1000** mensajes QoS 1 (más `max_inflight_messages` = 20 en vuelo); `max_queued_bytes`
+= 0 (sin tope por tamaño). El archivo de configuración del proyecto **no fija ninguno de los dos**, así que rigen
+esos valores. Al superarse el límite, los mensajes nuevos **se descartan sin aviso al emisor** (el manual lo dice
+en la entrada de `max_queued_bytes`: «messages will be silently dropped»; la de `max_queued_messages` no describe
+el caso) y el único rastro es el contador `$SYS/broker/publish/messages/dropped`. Con una trama cada 5 s por
+dispositivo y 10 dispositivos, 1000 mensajes son **~8 min** de backend caído; con la demo (un dispositivo), ~83 min.
+La persistencia a disco (`persistence true`) se escribe al cerrar y cada `autosave_interval` = **1800 s**: si el
+contenedor del broker muere de golpe, se pierde lo encolado desde el último guardado. Consecuencias de diseño,
+pendientes en §8.3 y en `docs/11 §4`: fijar ambos topes de forma explícita y justificada por sitio; alertar con el
+contador `$SYS` antes de llenar la cola; bajar `autosave_interval` o aceptar la ventana y documentarla; y, en el
+otro extremo, el tope de tamaño por mensaje (`message_size_limit`).
 | La trama **no trae marca de tiempo** y llega dos veces | Se guarda dos veces: sin marca del emisor no hay forma de saber que es la misma lectura. La hora de recepción se toma en la base con `clock_timestamp()` (microsegundos), así una ráfaga de tramas en cola no colisiona entre sí | Deduplicar exige una identidad; la identidad de una lectura es «canal + instante del emisor». Limitación aceptada: los nodos que quieran «exactamente una» deben marcar `t` (SenML) |
 | Dos gateways LoRaWAN reciben el **mismo uplink** | Lo deduplica ChirpStack por contador de trama antes de publicar | Es responsabilidad del servidor de red, no de la plataforma |
 | El **tópico no cumple el patrón** `sitio/<sitio>/dispositivo/<id>/<magnitud>` | Cuarentena `malformada` con el detalle «tópico fuera del patrón», **antes** del filtro 1; el dispositivo **no** se marca vivo | Sin identidad no hay a quién atribuir la señal de vida; comparte el motivo `malformada` con el filtro 2 y se distingue por el detalle (decisión 23/09: no abrir un cuarto motivo por esto) |
@@ -347,9 +389,9 @@ sequenceDiagram
     DB-->>API: ~100 puntos agregados
     API-->>FE: [[tiempos],[valores]]
     FE->>FE: uPlot dibuja el histórico
-    FE->>API: WS suscribe {canal_id}
+    FE->>API: SSE · GET …/eventos (EventSource, misma sesión)
     loop cada trama nueva que pasa el pipeline
-        API-->>FE: WS {canal_id, valor, tiempo}
+        API-->>FE: event: medicion · data: {canal_id, valor, tiempo}
         FE->>FE: uPlot.setData (añade el punto)
     end
 ```
@@ -358,14 +400,15 @@ El histórico viene **agregado por la base de datos** (`time_bucket`), no crudo:
 cientos de puntos, no millones, sin importar cuánto tiempo lleve el sensor transmitiendo.
 
 **El canal de tiempo real es del backend y está autenticado** (decidido el 23/09/2026; TT-39). Corre
-dentro del mismo 443 detrás del proxy (`wss`, nunca `ws`), se abre con la misma sesión del panel y se
-rechaza en el apretón de manos si falta; el backend valida la cabecera `Origin` contra el dominio del
+dentro del mismo 443 detrás del proxy (HTTPS, nunca HTTP), se abre con la misma sesión del panel y se
+rechaza antes del primer evento si falta; el backend valida la cabecera `Origin` contra el dominio del
 panel y limita el tamaño y la tasa de lo que recibe. Son las recomendaciones de OWASP para WebSocket,
 que no trae autenticación propia (`docs/11 §4`). Como el canal es casi unidireccional —el servidor
 empuja, el navegador solo elige qué canal mira—, la alternativa **SSE** (*Server-Sent Events*: HTTP
 unidireccional, reconexión nativa, sin biblioteca extra) es más simple y cabe en el mismo 443.
-**WebSocket frente a SSE queda como decisión abierta para la Etapa 3** (§8.3; los diagramas muestran
-WebSocket como opción por defecto); ninguna de las dos toca el broker.
+**Decidido el 06/10/2026: SSE** (§8.4, punto 1); los diagramas lo muestran así desde esa fecha. Lo que OWASP
+pide para WebSocket se traslada a SSE en lo que aplica: misma sesión (la cookie viaja sola en `EventSource`),
+autorización por canal antes de abrir el flujo y límite de flujos por usuario; ninguna de las dos toca el broker.
 
 > Fuentes (consultadas el 23/09/2026): OWASP, *WebSocket Security Cheat Sheet*,
 > https://cheatsheetseries.owasp.org/cheatsheets/WebSocket_Security_Cheat_Sheet.html · NestJS, *Gateways*
@@ -486,7 +529,7 @@ ocupar más núcleos. No está en el alcance: RNF-17 fija un servidor de 2 GB y 
 
 | Elemento de diseño | Requerimientos que materializa |
 |---|---|
-| Tres puntos de entrada TLS/UDP: 8883 máquinas, 443 personas, 1700/udp *gateways* (pendiente) | RNF-08, RNF-09, RNF-10 |
+| Un solo contenedor expuesto (proxy): 8883 máquinas, 443 personas, 1700/udp pasarelas (solo ruta A) | RNF-08, RNF-09, RNF-10 |
 | Adaptadores por origen (filtro 2) | RF-01, RF-02, RF-04 (recepción multiprotocolo) |
 | Cuarentena separada de las series | RF-05, RF-07 |
 | Supervisor periódico de `sin_comunicacion` | RF-24, RF-25, RF-26 |
@@ -575,13 +618,66 @@ diseño (regla de concordancia): tras autenticar, el filtro 6 corre siempre.
 
 - [ ] Confirmar con el compañero el tópico exacto y la forma de su JSON para escribir el adaptador
       (filtro 2) — ver bitácora de acuerdos.
-- [ ] Decidir el proxy inverso definitivo (Caddy por TLS automático vs. Nginx por familiaridad y por
-      traer limitador de tasa nativo; Caddy no hace TLS para MQTT sin módulo externo). La comparación
-      (opciones evaluadas, criterio, razón de la elección) se registra en el anexo C del informe, como las
-      demás decisiones de infraestructura.
+- [ ] Decidir el proxy inverso definitivo. Candidatos: Caddy, nginx, Traefik, HAProxy y Envoy; se evalúan con
+      registro de evidencia (licencia, TLS automático, proxy TCP para 8883 y UDP para 1700, límite de tasa, SSE
+      sin búfer, mTLS, memoria, imagen oficial) iniciado el 06/10/2026; nada se elige sin ese registro. La
+      comparación (opciones, criterios, razón) se registra en el anexo C del informe, como las demás decisiones
+      de infraestructura.
 - [x] Dockerfile del backend y su servicio en el compose — hecho el 23/09 (§6; `bitacora/2026-09-23-dockerfile-backend.md`).
-- [ ] Decidir WebSocket o SSE para el canal de tiempo real (§5) antes de implementar TT-39 (Etapa 3).
+- [x] Decidir WebSocket o SSE para el canal de tiempo real (§5): **SSE**, decidido el 06/10/2026 (§8.4).
 - [ ] Proponer una **unidad de visualización por usuario** (Etapa 3): la base guarda siempre la unidad
       canónica y el panel convierte al mostrar; no está diseñado todavía.
-- [ ] Fijar `max_queued_messages` del broker según el volumen del sitio (hoy, 1000 por defecto: ~83 min de
-      backend caído con la demo) y alertar cuando la cola se acerque al límite (métricas `$SYS` del broker).
+- [ ] Fijar `max_queued_messages`, `max_queued_bytes` y `autosave_interval` del broker de forma explícita y
+      justificada por sitio (hoy rigen los defectos: 1000 mensajes, sin tope de bytes, guardado cada 1800 s; §4.1)
+      y alertar cuando la cola se acerque al límite o `$SYS/broker/publish/messages/dropped` deje de ser cero.
+
+### 8.4 Decisiones del 06/10/2026 (tras la entrevista y el acceso a la nube de Milesight)
+
+Fuentes: `bitacora/2026-10-05-entrevista-academico-geologia.md`; evidencia verificada en el registro privado
+(gateway Milesight, 137 afirmaciones de documentación oficial). El código sigue a estas decisiones, no al revés.
+
+1. **Canal de tiempo real: SSE (Server-Sent Events), no WebSocket.** El flujo es unidireccional (servidor →
+   navegador), de pocos datos y poco frecuente (el usuario entrevistado mira los datos «un par de veces por
+   semana»). SSE va por HTTP sobre la misma sesión y el mismo proxy que la API, reconecta solo por norma
+   («Clients will reconnect if the connection is closed», HTML Living Standard §9.2.3) y en NestJS es una ruta
+   con `@Sse()` que devuelve un `Observable`. WebSocket queda reservado para cuando el navegador deba enviar
+   órdenes a dispositivos (no está en el catálogo). Límite conocido: con HTTP/1.1 el navegador limita las
+   conexiones por dominio; con HTTP/2 tras el proxy no aplica. TT-39 se implementa como SSE.
+2. **Segunda ruta de entrada LoRaWAN: pasarela con servidor de red embebido → MQTT/TLS 8883 → Mosquitto.**
+   Las pasarelas Milesight UG6x traen servidor de red LoRaWAN y publican a un broker propio (host, puerto,
+   usuario, clave, TLS con CA propia, tópico configurable). ChirpStack deja de ser obligatorio: queda como ruta
+   alternativa si la red del campus usa TTN o un servidor de red externo. La pasarela se autentica en el broker
+   como un dispositivo más (usuario = su identificador, ACL por patrón). Las figuras de contenedores y despliegue
+   se actualizan cuando el profesor guía confirme la ruta real.
+3. **Adaptador «milesight» sobre JSON decodificado en la pasarela.** La pasarela aplica su «Payload Codec» y
+   publica `{"battery":92,"temperature":30.8,"humidity":50.5}` más EUI y nombre si se activa «Metadata». El
+   adaptador traduce ese JSON al modelo interno (`temperature`→temperatura/Cel, `humidity`→humedad/%RH,
+   `battery`→bateria/%EL). **No se copian los decodificadores oficiales** (`Milesight-IoT/SensorDecoders`,
+   GPL-3.0): la decodificación corre en la pasarela. Candidato posterior: adaptador para tramas binarias
+   hexadecimales de equipos celulares (UC300, UC50x) que publican MQTT sin pasarela.
+4. **Confirmación al broker después de persistir.** Hoy el cliente MQTT confirma al recibir; si la base cae, el
+   mensaje confirmado se pierde (§4.1). Se pasa a `handleMessage` de la librería (un mensaje a la vez, «always
+   call callback») y la confirmación (PUBACK) se emite **después del COMMIT**. Con QoS 1 y sesión persistente,
+   un mensaje no confirmado se reentrega al volver; el índice único `(canal, instante)` evita duplicarlo. Esto
+   habilita lotes transaccionales si la carga lo exige (se mide con el emulador, TT-28).
+5. **Trama cruda aceptada, con retención corta.** Además de la cuarentena, se guarda la trama original de
+   cada mensaje aceptado (tabla `trama`, `docs/08 §8`) con retención configurable (variable de entorno,
+   30 días por defecto) para auditoría y re-decodificación si un adaptador tuvo un error.
+6. **Vista pública de solo lectura por enlace, no un tercer rol.** Lo que pide el entrevistado (dashboard
+   simplificado para estudiantes, sin datos crudos) se resuelve con un dashboard publicable: enlace con
+   token, solo lectura, magnitudes y agregación que elige el administrador. Es el patrón de los referentes
+   (por verificar en el registro de patrones) y evita crear cuentas para cada estudiante.
+7. **Unidades propias en el catálogo.** SenML no registra `Bq/m3`; RFC 8428 §4.5.2 deja la interpretación al
+   «application context». El catálogo `magnitud` es ese contexto: una fila por magnitud con su unidad canónica,
+   aunque no esté en el registro IANA. Nuevas magnitudes del caso de uso: radón (`Bq/m3`), hidrógeno (`ppm`),
+   temperatura y humedad del suelo. Agregar una magnitud = una fila + (si hace falta) una conversión en
+   `unidades.ts`, documentada en `docs/13`.
+8. **Entidad pasarela y ubicación geográfica** en el modelo (`docs/08 §8`): el caso de terreno tiene una
+   pasarela por estación y un mapa.
+9. **El proxy entra en la vista de contenedores y los puertos quedan fijados: dos siempre (443 y 8883), 1700/udp
+   solo en la ruta A.** Hasta hoy el proxy aparecía en las vistas de red y de despliegue, pero el diagrama de
+   contenedores mostraba a los dispositivos y al navegador llegando directo al broker y al backend. Los siete
+   escenarios de entrada contemplados y la respuesta a «¿cualquier dispositivo?» están en §2. El proxy se elige
+   con registro de evidencia (§8.3); la decisión se escribe aquí y en el anexo C del informe. Las leyendas del
+   informe que aún dicen «WebSocket» o «ChirpStack correrá en el servidor» se corrigen con la próxima entrega.
+

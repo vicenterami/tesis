@@ -1,19 +1,20 @@
 flowchart TB
-    subgraph RED["Red de sensores · lado del compañero"]
+    subgraph RED["Red de sensores · campo (del compañero u otro sitio)"]
         direction LR
-        N1["Nodo sensor LoRa<br/>ESP32 + sensores"] -- "LoRa (radio)" --> GW["Gateway LoRaWAN"]
-        N2["Nodo sensor Wi-Fi<br/>MQTT directo"]
+        N1["Nodo sensor LoRa<br/>ESP32 + sensores"] -- "LoRa (radio)" --> GW["Pasarela LoRaWAN"]
+        N2["Nodo Wi-Fi o celular<br/>MQTT directo"]
     end
 
-    subgraph SRV["Servidor de la plataforma · contenedores Docker"]
+    subgraph SRV["Servidor del sistema · contenedores Docker"]
         direction TB
-        CS["ChirpStack<br/>servidor de red LoRaWAN"]
-        MQ["Mosquitto<br/>broker MQTT · TLS"]
+        RP["Proxy inverso · TLS<br/>único contenedor expuesto<br/>443 personas · 8883 dispositivos · 1700/udp solo ruta A"]
+        CS["ChirpStack<br/>servidor de red LoRaWAN (ruta A, opcional)"]
+        MQ["Mosquitto<br/>broker MQTT"]
         subgraph BE["Backend · NestJS"]
             direction LR
             M1["M1 Recepción<br/>suscriptor MQTT"] --> M2["M2 Normalización<br/>pipeline de 6 filtros"]
             M2 --> M6["M6 Alertas<br/>umbrales, condiciones"] --> M4["M4 Supervisión<br/>de salud"]
-            M5["M5 Persistencia y consulta<br/>API REST + WebSocket"]
+            M5["M5 Persistencia y consulta<br/>API REST + SSE"]
         end
         DB[("TimescaleDB<br/>series de tiempo + tablas relacionales")]
     end
@@ -23,11 +24,15 @@ flowchart TB
         U(["Usuario<br/>navegador"]) --- FE["Panel web<br/>Svelte + uPlot"]
     end
 
-    GW -- "UDP/IP → Internet" --> CS
+    GW -- "ruta A: UDP 1700 (packet forwarder)" --> RP
+    GW -. "ruta B: servidor de red embebido → MQTT/TLS 8883 (por confirmar)" .-> RP
+    N2 -- "MQTT/TLS 8883" --> RP
+    RP -- "UDP 1700 · red interna" --> CS
+    RP -- "MQTT 1883 · red interna" --> MQ
     CS -- "publica JSON decodificado" --> MQ
-    N2 -- "MQTT/TLS 8883" --> MQ
     MQ -- "suscripción sitio/#" --> M1
     M2 -- "INSERT medicion" --> DB
     M6 -- "condiciones, eventos" --> DB
     M5 -- "SQL · time_bucket" --> DB
-    FE -- "HTTPS 443 · REST histórico · WS tiempo real" --> M5
+    FE -- "HTTPS 443 · REST histórico · SSE tiempo real" --> RP
+    RP -- "HTTP 3000 · red interna" --> M5
