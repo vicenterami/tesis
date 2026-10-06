@@ -83,7 +83,7 @@ flowchart TB
   | 4. Pasarela LoRaWAN con *packet forwarder* y ChirpStack en este servidor | Semtech UDP → ChirpStack → MQTT interno | 1700/udp | Sí (UDP) | Ruta A, opcional; ChirpStack no desplegado |
   | 5. Servidor de red externo (TTN o ChirpStack de la red del campus) | Integración MQTT o HTTP del servidor de red hacia este sistema | 8883 o 443 | Sí | Por evaluar si la red del campus lo usa |
   | 6. Equipo celular (NB-IoT, LTE-M) con cliente MQTT | MQTT sobre TLS; trama JSON o binaria hexadecimal | 8883 | Sí | Candidato (entrevista del 05/10); adaptador binario pendiente |
-  | 7. Pasarela con *Basics Station* hacia ChirpStack en este servidor | WebSocket sobre TLS (protocolo LNS) | 443 o puerto propio | Sí | No evaluado (por verificar en la documentación del *Gateway Bridge*); evitaría el UDP sin autenticar |
+  | 7. Pasarela con *Basics Station* hacia ChirpStack en este servidor | WebSocket sobre TLS (protocolo LNS), con autenticación TLS de servidor y, opcional, de cliente | 443 o puerto propio (por verificar) | Sí | Verificado el 06/10: el *Gateway Bridge* expone un manejador WebSocket para Basics Station y las pasarelas UG65/UG67 lo traen; reemplazaría el UDP sin autenticar de la ruta A |
 
   **¿Y «cualquier dispositivo»?** El sistema no promete entender cualquier aparato; promete dos puertas
   estándar: MQTT 3.1.1 o 5 sobre TLS 1.2 o superior, y HTTP/1.1 sobre TLS. Es lo que implementan los módulos
@@ -620,9 +620,13 @@ diseño (regla de concordancia): tras autenticar, el filtro 6 corre siempre.
       (filtro 2) — ver bitácora de acuerdos.
 - [ ] Decidir el proxy inverso definitivo. Candidatos: Caddy, nginx, Traefik, HAProxy y Envoy; se evalúan con
       registro de evidencia (licencia, TLS automático, proxy TCP para 8883 y UDP para 1700, límite de tasa, SSE
-      sin búfer, mTLS, memoria, imagen oficial) iniciado el 06/10/2026; nada se elige sin ese registro. La
-      comparación (opciones, criterios, razón) se registra en el anexo C del informe, como las demás decisiones
-      de infraestructura.
+      sin búfer, mTLS, memoria, imagen oficial) completado y verificado el 06/10/2026; nada se elige sin ese registro.
+      Tres hechos que cambian el planteo anterior: nginx ya trae ACME nativo en su imagen oficial (el argumento «Caddy
+      por TLS automático» quedó viejo); Caddy solo hace TCP/UDP con un módulo externo no oficial que exige compilar
+      la imagen; HAProxy comunitario no hace proxy UDP (solo su edición de pago). Falta además decidir dónde termina
+      TLS para 8883: en el proxy (ve la IP del proxy, sin identidad por certificado) o en Mosquitto (passthrough por
+      SNI; hay que copiarle los certificados). La comparación (opciones, criterios, razón) se registra en el anexo C
+      del informe, como las demás decisiones de infraestructura.
 - [x] Dockerfile del backend y su servicio en el compose — hecho el 23/09 (§6; `bitacora/2026-09-23-dockerfile-backend.md`).
 - [x] Decidir WebSocket o SSE para el canal de tiempo real (§5): **SSE**, decidido el 06/10/2026 (§8.4).
 - [ ] Proponer una **unidad de visualización por usuario** (Etapa 3): la base guarda siempre la unidad
