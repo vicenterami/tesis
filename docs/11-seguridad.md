@@ -43,6 +43,7 @@
 | 1 | Broker y base publicados solo en `127.0.0.1`, y solo en desarrollo (el archivo base no publica puertos) | `docker-compose.override.yml` | ✅ `docker compose ps` muestra `127.0.0.1:1883` |
 | 1 | Base de datos sin `ports` en la forma de producción | `docker-compose.yml` | ✅ el archivo base no la publica |
 | 3 | `allow_anonymous false` | `mosquitto.conf` | ✅ publicación anónima → *not authorised* |
+| 2 | TLS 1.2+ en el proxy (443 y 8883), HSTS, nada en claro hacia fuera | `proxy/nginx.conf` | ✅ `banco.sh proxy` (07/10): HTTPS → backend, MQTT sobre TLS → medición; sin la CA el cliente rechaza; sin TLS el 8883 rechaza |
 | 3 | Contraseñas con hash (`mosquitto_passwd`) | `passwd` (no versionado) | ✅ clave incorrecta → rechazada |
 | 4 | ACL por patrón `%u` | `acl` | ✅ dev-0001 publicando como dev-0002 → descartado; el backend no lo recibe |
 | 5 | Catálogo de magnitudes con rango físico | `01-esquema.sql` | ✅ 7 magnitudes con `rango_min/max`, que el filtro 3 usa |
@@ -62,7 +63,7 @@
 
 | Capa | Control | Cuándo |
 |---|---|---|
-| 2 | Proxy **nginx** (decidido el 06/10/2026, `docs/10 §8.4` punto 10) con TLS en 443 y 8883: variante A, termina TLS y reenvía por la red interna (HTTP al backend, TCP al broker); retirar 1883; `limit_req` por IP; `ssl_preread` disponible para la variante B | Al desplegar en servidor |
+| 2 | Proxy **nginx** (decidido el 06/10/2026, `docs/10 §8.4` punto 10) con TLS en 443 y 8883, variante A. **Capa implementada el 07/10** (`plataforma/proxy/`: TLS 1.2+, HSTS, registro JSON, resolución dinámica del nombre) y probada de punta a punta en el banco (`banco.sh proxy`). Falta: certificado del servidor (ficha D-06), `limit_req` por IP, y en producción no publicar el 1883 (hoy solo lo publica el override de desarrollo) | Etapa 3 (despliegue) |
 | 2 | **Cola del broker acotada y vigilada:** `max_queued_messages`, `max_queued_bytes` y `autosave_interval` explícitos en `mosquitto.conf` (hoy rigen los defectos: 1000 mensajes, sin tope de bytes, guardado cada 1800 s; los excedentes se descartan sin aviso al emisor); alerta cuando `$SYS/broker/publish/messages/dropped` deje de ser cero (`docs/10 §4.1`) | Etapa 3 |
 | 2–4 | **Límite de tasa en dos capas:** en el proxy, por IP (contra bots); en el backend, `@nestjs/throttler` por usuario y ruta. **Hoy no hay ninguno de los dos**; lo que sí hay son las cabeceras de `helmet` (§3) | Etapa 3, con M7 |
 | 8 | **Telemetría de TimescaleDB:** la extensión trae un trabajo `policy_telemetry` que cada 24 h envía estadísticas de uso a su fabricante (visto en `timescaledb_information.jobs` el 27/09). Decidir si se apaga (`timescaledb.telemetry_level=off`) | Antes de datos reales |

@@ -3,7 +3,7 @@
 // pruebas/banco/evaluar.sql lo cruce con lo que quedó en la base: pérdidas, latencia p95, origen de la marca,
 // falsos positivos de silencio. No usa NestJS ni la base: es un dispositivo, y un dispositivo no ve la base.
 //
-//   pnpm -s emulador semilla --dispositivos 100 [--periodo 2] [--semilla 1] [--sitio banco]   → SQL por stdout
+//   pnpm -s emulador semilla --dispositivos 100 [--periodo 2] [--semilla 1] [--sitio banco] [--intervalo-factor 1]  → SQL
 //   pnpm -s emulador correr --url mqtt://127.0.0.1:1884 --duracion 60 --salida /ruta/envios.csv [opciones]
 //   pnpm -s emulador carrera --url … --dispositivo emu-0003          → las dos pruebas de carrera de docs/04 (×20 y ×5)
 //
@@ -204,7 +204,7 @@ async function carrera(): Promise<void> {
 }
 
 const orden = process.argv[2];
-if (orden === 'semilla') process.stdout.write(semillaSQL(perfiles(opciones), opciones.sitio));
+if (orden === 'semilla') process.stdout.write(semillaSQL(perfiles(opciones), opciones.sitio, num('intervalo-factor', 1)));
 else if (orden === 'correr') void correr().then(() => process.exit(0), (e: Error) => { console.error(e.message); process.exit(1); });
 else if (orden === 'carrera') void carrera().then(() => process.exit(0), (e: Error) => { console.error(e.message); process.exit(1); });
 else { console.error('uso: emulador.ts semilla|correr|carrera [opciones]  (ver cabecera del archivo)'); process.exit(2); }

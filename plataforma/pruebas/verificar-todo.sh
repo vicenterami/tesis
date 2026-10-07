@@ -159,6 +159,16 @@ tope=$(grep -E '^\s*max_packet_size\s+[0-9]+' "$MC/mosquitto.conf" | awk '{print
 if [[ -n "$tope" && "$tope" -le 65536 ]]; then echo "OK    max_packet_size = $tope bytes"
 else echo "FALLA max_packet_size ausente o mayor que 65536 (${tope:-ausente}): el broker acepta mensajes de cualquier tamaño"; fallos=$((fallos+1)); fi
 
+paso "2m. Proxy: nginx.conf válido (nginx -t con la imagen fijada y los certificados de desarrollo)"
+# 07/10: la configuración del proxy se valida sin levantar nada. Si faltan la imagen local o los certificados de desarrollo
+# (bash plataforma/proxy/ca-desarrollo.sh), el paso se omite y lo dice: nunca se da por bueno sin haberlo revisado.
+IMG_PROXY=$(grep -oE 'image: nginx:[^ ]+' plataforma/proxy/compose.proxy.yml | cut -d' ' -f2)
+CERTS_DEV="$PWD/privado/certs-desarrollo"
+if [ -z "$IMG_PROXY" ]; then echo "FALLA compose.proxy.yml sin imagen fijada"; fallos=$((fallos+1))
+elif ! docker image inspect "$IMG_PROXY" >/dev/null 2>&1 || [ ! -f "$CERTS_DEV/servidor.crt" ]; then echo "omitido: falta la imagen $IMG_PROXY o los certificados de desarrollo (bash plataforma/proxy/ca-desarrollo.sh)"; omitidos="$omitidos 2m"
+elif docker run --rm -v "$PWD/plataforma/proxy/nginx.conf:/etc/nginx/nginx.conf:ro" -v "$CERTS_DEV:/certs:ro" "$IMG_PROXY" nginx -t >/tmp/vt-nginx.txt 2>&1; then echo "OK    nginx -t: configuración válida ($IMG_PROXY)"
+else echo "FALLA nginx -t:"; grep -E "emerg|nginx:" /tmp/vt-nginx.txt | sed 's/^/  /'; fallos=$((fallos+1)); fi
+
 paso "3. Diagramas: informe = docs = base (generar-figuras.sh --verificar)"
 bash informe-oficial/figuras/generar-figuras.sh --verificar || fallos=$((fallos+1))
 

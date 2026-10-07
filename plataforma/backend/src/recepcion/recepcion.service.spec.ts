@@ -170,6 +170,14 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
     expect(marcarVivo).toHaveBeenCalledTimes(1);
   });
 
+  it('RF-22: en mantenimiento la lectura se guarda y se marca vivo; el filtro 5 recibe la señal de no abrir alertas', async () => {
+    const { servicio, query, marcarVivo, evaluar } = armar({ id: 'd1', estado: 'mantenimiento' });
+    await servicio.procesar(TOPICO, Buffer.from('35'));
+    expect(query.mock.calls.some(([sql]) => String(sql).trimStart().startsWith('INSERT INTO medicion'))).toBe(true);
+    expect(evaluar).toHaveBeenCalledWith('d1', 'k1', 'dev-0001', 35, 'Cel', true);
+    expect(marcarVivo).toHaveBeenCalledTimes(1);
+  });
+
   it('dispositivo dado de baja → cuarentena "dado_de_baja", no se marca vivo', async () => {
     const { servicio, query, marcarVivo } = armar({ id: 'd9', estado: 'baja' });
     await servicio.procesar(TOPICO, Buffer.from('21.5'));

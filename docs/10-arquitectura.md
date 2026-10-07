@@ -755,6 +755,17 @@ TimescaleDB (8 observaciones), registro de brokers (258 filas).
     (alertas y supervisión): la guarda es el índice, no el `SELECT` previo. Lo que la carrera deja a la vista y no
     se arregla aquí: con procesamiento en paralelo, duplicados simultáneos pueden dejar dos tramas crudas; lo
     resuelve el punto 4, que desde hoy tiene prueba de aceptación (`banco.sh carrera`, trama única).
+21. **RF-22 implementado (07/10/2026):** un dispositivo en `mantenimiento` sigue entregando lecturas (se guardan y lo
+    marcan vivo) pero el filtro 5 **no abre** condiciones de umbral; una ya abierta sí se cierra al volver a rango. El
+    silencio ya excluía a los no activos. El registro del período de mantenimiento llega con M3 (cambio de estado por
+    API → `evento`). Coherente con §8.1: `estado` es la decisión administrativa; lo que ocurre son condiciones.
+22. **Capa del proxy implementada y probada (07/10/2026; `plataforma/proxy/`).** nginx `1.30.5-alpine` (versión fijada),
+    variante A: TLS 1.2+ en 443 → backend y en 8883 (`stream`) → broker; HSTS lo pone el proxy; registro JSON por
+    petición y por conexión (ahí queda la IP real del dispositivo); resolución del nombre del servicio en cada conexión
+    (`resolver 127.0.0.11`), para que recrear un contenedor no deje al proxy apuntando a una IP vieja. Probado de punta a
+    punta en el banco (`banco.sh proxy`, `docs/16 §9`). Por defecto escucha solo en 127.0.0.1 y usa una CA de desarrollo
+    (`proxy/ca-desarrollo.sh`, fuera del repositorio); exponerlo y el certificado real son decisiones del despliegue
+    (ficha D-06: Let's Encrypt por ACME si hay DNS público y puerto 80, CA propia si el servidor es solo de campus).
 
 ## 9. Crecimiento, resiliencia y respaldo (aprobado el 06/10/2026)
 
@@ -856,6 +867,10 @@ construirlo por anticipado. Cada afirmación sobre una herramienta tiene su fuen
   2 de RF-24 produjo **126 alarmas de silencio falsas en 90 s** (una sola trama perdida ya supera dos intervalos cuando
   el intervalo es el periodo redondeado hacia arriba) frente a 4 caídas reales detectadas. Decisión pendiente con el
   profesor guía porque toca RNF-03: factor 3, tolerancia por dispositivo o alarma solo si persiste un barrido.
+- **Medido después, mismo tráfico, con `intervalo_esperado_s = 2 × periodo` (`docs/16 §3`, corrida 4): 5 caídas detectadas y
+  3 alarmas falsas** (antes 108). Sin tocar el código ni RNF-03: el intervalo esperado es el **silencio normal** del
+  dispositivo (periodo más las pérdidas que admite el medio), no su periodo. Falta fijarlo en `docs/08` y en la ayuda del
+  alta (ficha D-02, opción E).
 
 ### 9.7 Compresión con licencia abierta: registrado, no crítico
 

@@ -20,7 +20,7 @@ export class AlertasService {
   private readonly log = new Logger('alertas');
   constructor(@Inject(POOL) private readonly pool: Pool) {}
 
-  async evaluar(dispositivoId: string, canalId: string, idFisico: string, valor: number, unidad: string): Promise<void> {
+  async evaluar(dispositivoId: string, canalId: string, idFisico: string, valor: number, unidad: string, enMantenimiento = false): Promise<void> {
     const reglas = await this.pool.query<Regla>(
       'SELECT id, umbral_alto, umbral_bajo, histeresis FROM regla_umbral WHERE canal_id = $1',
       [canalId],
@@ -34,6 +34,12 @@ export class AlertasService {
         (r.umbral_bajo === null || valor > r.umbral_bajo + r.histeresis);
 
       if (!abierta && (cruzaAlto || cruzaBajo)) {
+        // RF-22: en mantenimiento no se abren condiciones (el estado es la decisión administrativa, docs/10 §8.1);
+        // la lectura igual se guarda y una condición ya abierta sí se cierra al volver a rango (rama siguiente).
+        if (enMantenimiento) {
+          this.log.log(`${idFisico}: umbral cruzado (${valor} ${unidad}) con el equipo en mantenimiento · no se abre condición (RF-22)`);
+          continue;
+        }
         const nueva = await this.abrir(dispositivoId, r.id, { valor, unidad, umbral: cruzaAlto ? r.umbral_alto : r.umbral_bajo });
         if (nueva) this.log.warn(`${idFisico}: umbral ${cruzaAlto ? 'alto' : 'bajo'} cruzado (${valor} ${unidad}) · condición abierta`);
         else this.log.log(`${idFisico}: umbral cruzado (${valor} ${unidad}) · otra trama abrió la condición un instante antes`);

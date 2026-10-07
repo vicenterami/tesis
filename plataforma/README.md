@@ -10,6 +10,7 @@ plataforma/
 ├── docker-compose.yml        # servicios, volúmenes, límites de recursos (forma de PRODUCCIÓN: sin puertos)
 ├── docker-compose.override.yml # SOLO desarrollo: publica 5432 y 1883 en 127.0.0.1 (Compose lo carga solo)
 ├── backend/                  # NestJS: recepción, pipeline, API (ver backend/README.md)
+├── proxy/                    # capa opcional nginx con TLS: compose.proxy.yml, nginx.conf, ca-desarrollo.sh (docs/10 §8.4 decisión 10)
 ├── .env.example              # variables de entorno (copiar a .env; .env NO se versiona)
 ├── db/pruebas/               # pruebas SQL de solo lectura (zonas horarias, guardias) y er-mermaid.sql (ER desde el esquema)
 ├── pruebas/api-smoke.sh      # prueba de humo de la API (OK/FALLA por caso)
@@ -91,7 +92,7 @@ curl http://127.0.0.1:3000/salud    # {"estado":"ok","base":"conectada","tablas"
 
 **Banco de pruebas desechable** (`pruebas/banco/banco.sh`, `docs/16`): una segunda pila Compose (`banco`) con datos en RAM,
 otros puertos y broker sin credenciales, para el emulador de nodos (`backend/src/emulador`, TT-28), la carga (TT-29) y las
-pruebas de carrera: `encender 120` · `carrera` · `correr --duracion 90 --dispositivos 120` · `apagar`.
+pruebas de carrera y la capa TLS: `encender 120` · `carrera` · `correr --duracion 90 --dispositivos 120` · `proxy` · `apagar`.
 
 ```bash
 bash pruebas/verificar-todo.sh     # TODO: guardias de esquema, migraciones aplicadas, diagramas = docs = base, API
@@ -108,4 +109,4 @@ Capas, amenazas y controles verificados: `docs/11-seguridad.md`.
 1. ~~Esqueleto del backend y filtros 1 a 6~~ hechos.
 2. ~~Contenedor del backend en el Compose~~ hecho (imagen propia multi-etapa); falta el panel estático.
 3. ChirpStack (base aparte en el mismo PostgreSQL + Redis propio) cuando exista el gateway.
-4. Proxy inverso con TLS (Caddy o Nginx, por decidir: `docs/10` §8.3) para 443 y 8883; retirar el puerto 1883 publicado.
+4. ~~Proxy inverso con TLS~~ capa nginx hecha (07/10, `proxy/`, probada en el banco con `banco.sh proxy`); falta el certificado real (ficha D-06), `limit_req` y no publicar el 1883 en producción.

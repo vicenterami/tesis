@@ -98,13 +98,16 @@ export function topico(sitio: string, p: Perfil): string {
 
 // Semilla SQL para el banco: sitio, zona, los dispositivos con su intervalo esperado, dos canales cada uno y una
 // regla de umbral alto (30 Cel, histéresis 2) en temperatura. Reejecutable: nada se duplica.
-export function semillaSQL(ps: Perfil[], sitio: string): string {
+// factorIntervalo: cuántas veces el periodo del nodo se declara como `intervalo_esperado_s` (1 = el periodo redondeado
+// hacia arriba, lo más estricto; 2 = el silencio normal admite una trama perdida). Es el experimento de la ficha D-02:
+// el supervisor abre «sin comunicación» al superar 2 × intervalo, así que el factor decide cuántas alarmas son falsas.
+export function semillaSQL(ps: Perfil[], sitio: string, factorIntervalo = 1): string {
   const SITIO = '00000000-0000-0000-0000-00000000ba7c';
   const ZONA = '00000000-0000-0000-0000-00000000ba7d';
   const valores = ps
-    .map((p) => `('${ZONA}', '${p.id}', 'Emulado ${p.id.slice(4)}', ${Math.max(1, Math.ceil(p.periodoS))})`)
+    .map((p) => `('${ZONA}', '${p.id}', 'Emulado ${p.id.slice(4)}', ${Math.max(1, Math.ceil(p.periodoS * factorIntervalo))})`)
     .join(',\n    ');
-  return `-- Semilla del banco de pruebas (generada por emulador.ts semilla): ${ps.length} dispositivos emulados
+  return `-- Semilla del banco de pruebas (generada por emulador.ts semilla): ${ps.length} dispositivos emulados, intervalo = periodo × ${factorIntervalo}
 INSERT INTO sitio (id, nombre, descripcion) VALUES ('${SITIO}', '${sitio}', 'Banco de pruebas desechable (TT-28/TT-29)')
     ON CONFLICT (id) DO NOTHING;
 INSERT INTO zona (id, sitio_id, nombre) VALUES ('${ZONA}', '${SITIO}', 'Emulados') ON CONFLICT (id) DO NOTHING;

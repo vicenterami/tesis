@@ -55,6 +55,15 @@ describe('AlertasService.evaluar: umbral con histéresis', () => {
     expect(insercion).toMatch(/ON CONFLICT[\s\S]*WHERE cerrada_en IS NULL DO NOTHING/);
   });
 
+  it('RF-22: en mantenimiento un cruce de umbral NO abre condición, pero una abierta sí se cierra al volver a rango', async () => {
+    const sinAbrir = armar(false);
+    await sinAbrir.servicio.evaluar('d1', 'k1', 'dev-0001', 35, 'Cel', true);
+    expect(sinAbrir.escrituras).toEqual([]);
+    const cierra = armar(true);
+    await cierra.servicio.evaluar('d1', 'k1', 'dev-0001', 27, 'Cel', true);
+    expect(cierra.escrituras.some((e) => e.startsWith('UPDATE condicion'))).toBe(true);
+  });
+
   it('35 Cel con la condición YA abierta → no la abre dos veces', async () => {
     const { servicio, escrituras } = armar(true);
     await servicio.evaluar('d1', 'k1', 'dev-0001', 35, 'Cel');

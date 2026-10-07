@@ -74,4 +74,11 @@ describe('modelo del emulador (TT-28)', () => {
     const [p1] = perfiles(o); // el intervalo esperado del supervisor es el periodo del nodo redondeado hacia arriba
     expect(sql).toContain(`('00000000-0000-0000-0000-00000000ba7d', 'emu-0001', 'Emulado 0001', ${Math.ceil(p1.periodoS)})`);
   });
+
+  it('el factor de intervalo (experimento D-02) multiplica el periodo antes de redondear', () => {
+    const ps = perfiles(o);
+    const sql = semillaSQL(ps, 'banco', 2);
+    expect(sql).toContain(`'emu-0001', 'Emulado 0001', ${Math.ceil(ps[0].periodoS * 2)})`);
+    expect(sql).toContain('intervalo = periodo × 2');
+  });
 });

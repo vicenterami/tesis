@@ -147,8 +147,8 @@ export class RecepcionService implements OnModuleInit {
         continue; // ya estaba: no se reevalúa el umbral ni se cuenta como nueva
       }
       guardadas++;
-      // ── [5] Alertar: ¿la medición cruza un umbral de este canal? ──
-      await this.alertas.evaluar(dispositivo.id, canal.id, ctx.idFisico, valor, canal.unidad_canonica);
+      // ── [5] Alertar: ¿la medición cruza un umbral de este canal? (en mantenimiento no abre condiciones, RF-22) ──
+      await this.alertas.evaluar(dispositivo.id, canal.id, ctx.idFisico, valor, canal.unidad_canonica, dispositivo.estado === 'mantenimiento');
     }
 
     if (rechazos.length) await this.cuarentena(trama, 'invalida', rechazos.join('; '));

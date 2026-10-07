@@ -91,7 +91,7 @@ El arreglo tiene prueba unitaria en `alertas.service.spec.ts` y `supervision.ser
 |---|---|---|
 | RNF-01: ≥ 50 eventos/s sin pérdida | ✅ 59,7 tramas/s sostenidas 90 s (119 lecturas/s), pico 74/s, 0 perdidas | En el portátil; la cola del broker nunca pasó de 52 mensajes |
 | RNF-02: disponible para consulta ≤ 2 s (p95) | ✅ p95 de recepción 1 ms en paralelo, 3 ms de a uno; la confirmación (COMMIT) va a milisegundos de `recibido_en` | Sin red real ni TLS: en el servidor hay que repetirla |
-| RNF-03: detectar la pérdida de supervisión en ≤ 2 intervalos | ✅ detecta las caídas (3, 4 y 18 verdaderas) **pero con 52, 126 y 108 alarmas falsas** | Ver §6.1: es una decisión de diseño, no un error de código |
+| RNF-03: detectar la pérdida de supervisión en ≤ 2 intervalos | ✅ detecta las caídas (3, 4 y 18 verdaderas) **pero con 52, 126 y 108 alarmas falsas** cuando el intervalo esperado se declara igual al periodo; con `intervalo = 2 × periodo` (corrida 4): 5 verdaderas y **3 falsas** | Ver §6.1: es cómo se declara el intervalo, no un error de código |
 | RNF-17: ≤ 2 GB de RAM | ✅ 174 MiB en total bajo carga (backend 53, base 118, broker 3) | Con los techos de producción activos |
 
 ## 6. Hallazgos y decisiones que abre
@@ -104,6 +104,9 @@ El arreglo tiene prueba unitaria en `alertas.service.spec.ts` y `supervision.ser
    ≈ 1 en 10 000 con 1 % de pérdida), que relaja RNF-03; (b) tolerancia configurable por dispositivo (`docs/10 §9.6`
    ya lo anota como pendiente); (c) mantener 2 intervalos y mostrar la alarma solo si dura más de un barrido. Lo
    decide el estudiante con el profesor guía porque toca un requisito no funcional.
+   **Medido después (corrida 4: mismo tráfico y semilla, `intervalo_esperado_s = 2 × periodo`): 5 caídas detectadas y 3
+   alarmas falsas**, sin tocar el código ni RNF-03. El intervalo esperado debe declararse como el silencio normal del
+   dispositivo (periodo más las pérdidas que admite el medio), no como su periodo: ficha D-02, opción E.
 2. **Trama cruda duplicada ante duplicados concurrentes** (§4): consecuencia del procesamiento en paralelo. La
    decisión 4 (`docs/10 §8.4`: un mensaje a la vez y PUBACK después del COMMIT), implementada el mismo día, la eliminó:
    su prueba de aceptación (`banco.sh carrera`, comprobación (a) de la trama) pasó y la corrida 3 guardó exactamente una
@@ -126,7 +129,25 @@ base del banco no se reinició entre corridas; el supervisor corrió cada 5 s (e
 bash plataforma/pruebas/banco/banco.sh encender 120     # pila aparte, 120 emulados
 bash plataforma/pruebas/banco/banco.sh carrera          # pruebas de carrera (las seis comprobaciones en verde desde el 07/10)
 bash plataforma/pruebas/banco/banco.sh correr --duracion 90 --dispositivos 120
+bash plataforma/pruebas/banco/banco.sh proxy                 # TLS de punta a punta (§9)
 bash plataforma/pruebas/banco/banco.sh apagar
 ```
 Opciones del tráfico (`--periodo`, `--jitter`, `--perdida`, `--deriva`, `--caidas`, `--semilla`) en la cabecera de
 `plataforma/backend/src/emulador/emulador.ts`.
+
+## 9. TLS de punta a punta con el proxy (07/10/2026)
+
+La capa `plataforma/proxy/` (nginx `1.30.5-alpine`, variante A de `docs/10 §8.4` punto 10) se levantó sobre el banco con
+una CA de desarrollo (`proxy/ca-desarrollo.sh`, fuera del repositorio) y se probó lo bueno y lo malo (`banco.sh proxy`):
+
+| Comprobación | Resultado |
+|---|---|
+| HTTPS 8443 → backend (`/salud`), cliente que confía en la CA | ✅ responde el backend |
+| HSTS en la respuesta (lo pone el proxy, no el backend) | ✅ |
+| Cliente **sin** la CA | ✅ rechaza el certificado |
+| MQTT sobre TLS 8884 → broker → pipeline (`mosquitto_pub --cafile`) | ✅ la lectura queda en `medicion` |
+| Conexión **sin** TLS al 8883 | ✅ rechazada |
+| Registro del proxy | una línea JSON por petición y por conexión, con la IP real del cliente |
+
+Lo que esta prueba no cubre: el certificado real del servidor (ficha D-06), el límite de tasa (`docs/11 §4`) y la
+exposición a la red (por defecto el proxy escucha solo en 127.0.0.1).
