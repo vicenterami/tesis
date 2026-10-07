@@ -46,38 +46,40 @@ exactamente una vez. El emulador también lee `$SYS/broker/#` para ver la cola y
 
 ## 3. Corridas
 
-| Medida | Corrida 1: 100 nodos, 60 s | Corrida 2: 120 nodos, 90 s |
-|---|---|---|
-| Tramas publicadas | 3 023 | 5 548 |
-| Tasa media / pico (tramas por segundo) | 48,1 / 63 | **59,7 / 74** |
-| Lecturas publicadas (2 por trama) | 6 046 | 11 096 |
-| Lecturas guardadas con marca plausible / **perdidas** | 5 948 / **0** | 10 944 / **0** |
-| Lecturas de los dos relojes rotos, guardadas con `origen_tiempo = recepcion` | 98 / 98 | 152 / 152 |
-| Sin PUBACK · descartes del broker · cola máxima del broker | 0 · 0 · 52 | 0 · 0 · 52 |
-| PUBACK p50 / p95 / máx (ms) | 0 / 1 / 4 | 0 / 1 / 3 |
-| Latencia envío → recepción en el backend p50 / p95 / máx (ms) | 0 / 1 / 33 | 0 / 1 / 20 |
-| Deriva medida p95 (ms), solo marcas aceptadas | 452 | 670 |
-| Tramas crudas guardadas (`trama`) | 3 029 (incluye 6 de la carrera) | 5 548 |
-| Filas en cuarentena | 0 | 0 |
-| Condiciones `sin_comunicacion` en nodos con caída (verdaderas) / sin caída (**falsas**) | 3 / **52** | 4 / **126** |
-| Condiciones de umbral abiertas (nodos calientes); máximo abiertas a la vez por dispositivo | 11; 1 | 15; 1 |
-| Errores del backend durante la corrida | 0 | 0 |
-| Memoria a mitad de corrida: backend / base / broker (MiB) | 52 / 90 / 3 | 53 / 118 / 3 |
-| CPU a mitad de corrida: backend / base / broker | 5 % / 10 % / 0,7 % | 5 % / 17 % / 0,7 % |
+| Medida | Corrida 1: 100 nodos, 60 s | Corrida 2: 120 nodos, 90 s | Corrida 3: igual que la 2, **con la decisión 4** |
+|---|---|---|---|
+| Tramas publicadas | 3 023 | 5 548 | 5 548 |
+| Tasa media / pico (tramas por segundo) | 48,1 / 63 | **59,7 / 74** | 59,7 / 81 |
+| Lecturas publicadas (2 por trama) | 6 046 | 11 096 | 11 096 |
+| Lecturas guardadas con marca plausible / **perdidas** | 5 948 / **0** | 10 944 / **0** | 10 944 / **0** |
+| Lecturas de los dos relojes rotos, guardadas con `origen_tiempo = recepcion` | 98 / 98 | 152 / 152 | 152 / 152 |
+| Sin PUBACK · descartes del broker · cola máxima del broker | 0 · 0 · 52 | 0 · 0 · 52 | 0 · 0 · 52 |
+| PUBACK p50 / p95 / máx (ms) | 0 / 1 / 4 | 0 / 1 / 3 | 0 / 1 / 3 |
+| Latencia envío → recepción en el backend p50 / p95 / máx (ms) | 0 / 1 / 33 | 0 / 1 / 20 | 0 / 3 / 39 |
+| Deriva medida p95 (ms), solo marcas aceptadas | 452 | 670 | 756 |
+| Tramas crudas guardadas (`trama`) | 3 029 (incluye 6 de la carrera) | 5 548 | 5 548 (ni una duplicada) |
+| Filas en cuarentena | 0 | 0 | 0 |
+| Condiciones `sin_comunicacion` en nodos con caída (verdaderas) / sin caída (**falsas**) | 3 / **52** | 4 / **126** | 18 / **108** |
+| Condiciones de umbral abiertas (nodos calientes); máximo abiertas a la vez por dispositivo | 11; 1 | 15; 1 | 12; 1 |
+| Errores del backend durante la corrida | 0 | 0 | 0 |
+| Memoria a mitad de corrida: backend / base / broker (MiB) | 52 / 90 / 3 | 53 / 118 / 3 | 53 / 103 / 4 |
+| CPU a mitad de corrida: backend / base / broker | 5 % / 10 % / 0,7 % | 5 % / 17 % / 0,7 % | 6 % / 10 % / 0,8 % |
 
-La corrida 2 se hizo sobre la misma base que la 1 (sin reiniciar el banco): el evaluador cuenta solo lo ocurrido desde
-el inicio de la corrida evaluada (condiciones, tramas, cuarentena, eventos).
+La corrida 2 se hizo sobre la misma base que la 1 (sin reiniciar el banco) y sus condiciones se restaron a mano; la 3,
+en un banco nuevo, con el evaluador que cuenta solo lo ocurrido desde el inicio de la corrida (condiciones, tramas,
+cuarentena, eventos). Las corridas 2 y 3 usan la misma semilla: el tráfico es el mismo, cambia cómo lo procesa el backend
+(en paralelo antes, de a uno después). El precio de procesar de a uno se ve en la latencia (p95 de 1 a 3 ms) y en nada más.
 
 ## 4. Pruebas de carrera
 
 Veinte (a) y cinco (b) mensajes se publican seguidos por la **misma conexión**: llegan al backend en el mismo
-milisegundo y el pipeline los procesa a la vez (hoy, cada mensaje corre en paralelo; `docs/10 §8.4` punto 4 lo
-cambiará a uno a la vez).
+milisegundo. Hasta el 07/10 el pipeline los procesaba a la vez (el evento `message` de la librería no espera a nadie);
+desde la decisión 4 (`docs/10 §8.4` punto 4) corren dentro de `handleMessage`, uno a la vez, y el PUBACK sale al terminar.
 
 | Prueba | Esperado | Antes del arreglo | Después |
 |---|---|---|---|
 | (a) La misma lectura ×20 (reentrega QoS 1 extrema) | 1 fila por canal | ✅ 1 fila por canal (índice único `(canal, tiempo)` + `ON CONFLICT`) | ✅ |
-| (a) … y una sola trama cruda | 1 | ❌ 2: con procesamiento concurrente, dos copias distintas «ganan» un canal cada una y las dos guardan su trama | ❌ 2 — **roja a propósito**: es la prueba de aceptación de la decisión 4 (un mensaje a la vez) |
+| (a) … y una sola trama cruda | 1 | ❌ 2: con procesamiento concurrente, dos copias distintas «ganan» un canal cada una y las dos guardan su trama | ✅ 1 con la decisión 4 (quedó roja a propósito hasta implementarla, como su prueba de aceptación) |
 | (b) Cinco lecturas sobre el umbral a la vez | 5 mediciones, **1** condición, 5 tramas, 0 errores | ❌ 1 condición (el índice único parcial aguantó), pero el mensaje que perdió la carrera rompió con 23505 y **abortó a mitad del pipeline**: sin trama cruda ni filtro 6; `manejador falló` en el registro | ✅ todo: el `INSERT` de la condición lleva `ON CONFLICT … DO NOTHING` y «0 filas» se lee como «otra trama la abrió un instante antes» (alertas y supervisión) |
 
 El arreglo tiene prueba unitaria en `alertas.service.spec.ts` y `supervision.service.spec.ts`; quitarle el
@@ -88,8 +90,8 @@ El arreglo tiene prueba unitaria en `alertas.service.spec.ts` y `supervision.ser
 | Requisito | Resultado preliminar | Observación |
 |---|---|---|
 | RNF-01: ≥ 50 eventos/s sin pérdida | ✅ 59,7 tramas/s sostenidas 90 s (119 lecturas/s), pico 74/s, 0 perdidas | En el portátil; la cola del broker nunca pasó de 52 mensajes |
-| RNF-02: disponible para consulta ≤ 2 s (p95) | ✅ p95 de recepción 1 ms; la confirmación (COMMIT) va a milisegundos de `recibido_en` | Sin red real ni TLS: en el servidor hay que repetirla |
-| RNF-03: detectar la pérdida de supervisión en ≤ 2 intervalos | ✅ detecta las caídas (7 verdaderas en las dos corridas) **pero con 178 alarmas falsas en las dos corridas (52 y 126)** | Ver §6.1: es una decisión de diseño, no un error de código |
+| RNF-02: disponible para consulta ≤ 2 s (p95) | ✅ p95 de recepción 1 ms en paralelo, 3 ms de a uno; la confirmación (COMMIT) va a milisegundos de `recibido_en` | Sin red real ni TLS: en el servidor hay que repetirla |
+| RNF-03: detectar la pérdida de supervisión en ≤ 2 intervalos | ✅ detecta las caídas (3, 4 y 18 verdaderas) **pero con 52, 126 y 108 alarmas falsas** | Ver §6.1: es una decisión de diseño, no un error de código |
 | RNF-17: ≤ 2 GB de RAM | ✅ 174 MiB en total bajo carga (backend 53, base 118, broker 3) | Con los techos de producción activos |
 
 ## 6. Hallazgos y decisiones que abre
@@ -102,9 +104,11 @@ El arreglo tiene prueba unitaria en `alertas.service.spec.ts` y `supervision.ser
    ≈ 1 en 10 000 con 1 % de pérdida), que relaja RNF-03; (b) tolerancia configurable por dispositivo (`docs/10 §9.6`
    ya lo anota como pendiente); (c) mantener 2 intervalos y mostrar la alarma solo si dura más de un barrido. Lo
    decide el estudiante con el profesor guía porque toca un requisito no funcional.
-2. **Trama cruda duplicada ante duplicados concurrentes** (§4): consecuencia del procesamiento en paralelo; la
-   decisión 4 (`docs/10 §8.4`: un mensaje a la vez y PUBACK después del COMMIT) la elimina y tiene desde hoy su
-   prueba de aceptación (`banco.sh carrera`, comprobación (a) de la trama).
+2. **Trama cruda duplicada ante duplicados concurrentes** (§4): consecuencia del procesamiento en paralelo. La
+   decisión 4 (`docs/10 §8.4`: un mensaje a la vez y PUBACK después del COMMIT), implementada el mismo día, la eliminó:
+   su prueba de aceptación (`banco.sh carrera`, comprobación (a) de la trama) pasó y la corrida 3 guardó exactamente una
+   trama por mensaje. Si la base no responde, el mensaje se reintenta (1, 2, 4 y 8 s) y, agotados los reintentos, no se
+   confirma y el cliente reconecta para que el broker lo reenvíe (probado con cliente falso en `broker.service.spec.ts`).
 3. **Carrera al abrir condiciones**: corregida (§4). La guarda real es el índice único parcial; el código ya no
    depende de leer antes de escribir.
 4. **Deriva de reloj medible**: la columna `recibido_en` (migración 08) permite ver la deriva por dispositivo
@@ -120,7 +124,7 @@ base del banco no se reinició entre corridas; el supervisor corrió cada 5 s (e
 
 ```
 bash plataforma/pruebas/banco/banco.sh encender 120     # pila aparte, 120 emulados
-bash plataforma/pruebas/banco/banco.sh carrera          # pruebas de carrera: (a) trama cruda queda roja hasta la decisión 4
+bash plataforma/pruebas/banco/banco.sh carrera          # pruebas de carrera (las seis comprobaciones en verde desde el 07/10)
 bash plataforma/pruebas/banco/banco.sh correr --duracion 90 --dispositivos 120
 bash plataforma/pruebas/banco/banco.sh apagar
 ```

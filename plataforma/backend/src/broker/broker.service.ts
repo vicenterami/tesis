@@ -1,8 +1,12 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import mqtt, { MqttClient } from 'mqtt';
+import mqtt, { IPublishPacket, MqttClient, Packet } from 'mqtt';
 
 export type ManejadorTrama = (topico: string, carga: Buffer) => void | Promise<void>;
+
+// Si el pipeline falla (la base no responde), se reintenta el MISMO mensaje con estas esperas antes de rendirse: suman
+// 15 s, menos que el keepalive de 60 s (si el manejador bloqueara más, la librería no leería el PINGRESP y cortaría).
+export const REINTENTOS_MS = [1000, 2000, 4000, 8000];
 
 // Conexión única al broker como usuario "backend" (ACL: lee sitio/#). El envío de órdenes al
 // dispositivo (downlink) está fuera de alcance (docs/02 §4.3).
@@ -41,19 +45,50 @@ export class BrokerService implements OnModuleInit, OnModuleDestroy {
         else this.log.log('suscrito a sitio/#');
       });
     });
-    this.cliente.on('message', (topico, carga) => {
-      for (const m of this.manejadores) {
-        Promise.resolve(m(topico, carga)).catch((e: Error) =>
-          this.log.error(`manejador falló en ${topico}: ${e.message}`),
-        );
-      }
-    });
+    // Decisión 4 (docs/10 §8.4): UN mensaje a la vez y PUBACK después de guardar. Leído en mqtt 5.16
+    // (build/lib/client.js, work()/nextTickWork; handlers/publish.js): los paquetes se procesan de a uno y el siguiente
+    // no se toma hasta que handleMessage llama a su callback; para QoS 1 el PUBACK se envía recién entonces. El evento
+    // 'message' se emite ANTES y no espera a nadie: por eso el pipeline ya no cuelga de él (así N mensajes seguidos
+    // corrían en paralelo, carrera medida el 07/10 en docs/16 §4, y el PUBACK salía antes del INSERT, §4.1).
+    this.cliente.handleMessage = (packet: Packet, cb: (error?: Error) => void) => {
+      if (packet.cmd !== 'publish') return cb();
+      void this.manejar(packet, cb);
+    };
     this.cliente.on('error', (e) => this.log.error(`error MQTT: ${e.message}`));
     this.cliente.on('offline', () => this.log.warn('broker fuera de línea; reintentando'));
   }
 
   alRecibir(manejador: ManejadorTrama): void {
     this.manejadores.push(manejador);
+  }
+
+  // Corre los manejadores en orden y confirma (cb sin error → PUBACK). Si uno falla, reintenta el mismo mensaje con
+  // REINTENTOS_MS; agotados, NO confirma y reconecta: con sesión persistente (clean: false) el broker reenvía lo no
+  // confirmado al volver, y el INSERT idempotente absorbe la repetición. Mientras tanto la cola del broker amortigua
+  // (docs/10 §4.1). Nada se descarta en silencio: cada reintento y la rendición quedan en el registro.
+  async manejar(packet: IPublishPacket, cb: (error?: Error) => void): Promise<void> {
+    const topico = packet.topic.toString();
+    const carga = Buffer.isBuffer(packet.payload) ? packet.payload : Buffer.from(packet.payload);
+    for (let intento = 0; ; intento++) {
+      try {
+        for (const m of this.manejadores) await m(topico, carga);
+        return cb();
+      } catch (e) {
+        const err = e instanceof Error ? e : new Error(String(e));
+        if (intento >= REINTENTOS_MS.length) {
+          this.log.error(`${topico}: falló ${intento + 1} veces (${err.message}); no se confirma al broker y se reconecta para que lo reenvíe`);
+          cb(err);
+          this.cliente?.reconnect();
+          return;
+        }
+        this.log.warn(`${topico}: manejador falló (${err.message}); reintento ${intento + 1}/${REINTENTOS_MS.length} en ${REINTENTOS_MS[intento]} ms`);
+        await this.dormir(REINTENTOS_MS[intento]);
+      }
+    }
+  }
+
+  protected dormir(ms: number): Promise<void> {
+    return new Promise((r) => setTimeout(r, ms));
   }
 
   onModuleDestroy(): void {

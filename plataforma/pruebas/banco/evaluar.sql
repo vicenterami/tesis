@@ -17,7 +17,7 @@ WITH e AS (
   SELECT min(enviado_en) AS t0 FROM banco.envio
 ), nodos AS (
   SELECT d.id, d.id_fisico, d.intervalo_esperado_s,
-         EXISTS (SELECT 1 FROM envio v WHERE v.id = d.id_fisico AND v.estado = 'rafaga') AS tuvo_caida
+         EXISTS (SELECT 1 FROM banco.envio v WHERE v.id = d.id_fisico AND v.estado = 'rafaga') AS tuvo_caida
     FROM dispositivo d WHERE d.id_fisico LIKE 'emu-%'
 )
 SELECT 'lecturas publicadas (filas del CSV con PUBACK pedido)' AS hecho, count(*)::text AS valor, '' AS criterio FROM publicadas

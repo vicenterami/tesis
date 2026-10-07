@@ -192,9 +192,9 @@ async function carrera(): Promise<void> {
   const t = topico(opciones.sitio, p);
   const btA = Math.round(Date.now() / 1000) - 120;
   // (a) la misma lectura VEINTE veces (reentrega QoS 1 extrema): debe quedar UNA fila por canal y UNA trama cruda.
-  // Veinte y no cinco: con el procesamiento concurrente de hoy, cinco copias a veces dejan una sola trama por azar;
-  // con veinte, dos copias distintas ganan cada canal casi siempre y la prueba es determinista (roja hasta la
-  // decisión 4 de docs/10 §8.4: un mensaje a la vez y confirmación tras el COMMIT).
+  // Veinte y no cinco: con procesamiento concurrente (antes de la decisión 4), cinco copias a veces dejaban una sola
+  // trama por azar; con veinte, dos copias distintas ganaban cada canal casi siempre y la prueba era determinista:
+  // roja hasta el 07/10 y verde desde que el broker procesa un mensaje a la vez (docs/10 §8.4 punto 4).
   const mismo = pack(p, btA, { temperatura: 21, humedad: 50 });
   await Promise.all(Array.from({ length: 20 }, () => publicar(c, t, mismo)));
   // (b) cinco lecturas distintas, todas sobre el umbral alto (30), a la vez: debe quedar UNA condición abierta

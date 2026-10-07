@@ -286,7 +286,7 @@ transporte. Fuente: OASIS, *MQTT Version 5.0*, §4.3 (`mqttoasis` en la bibliogr
 |---|---|---|
 | El **backend** cae | El broker conserva en cola los mensajes QoS 1 de `sitio/#` (sesión persistente: `clientId` fijo + `clean: false`, `persistence true` en Mosquitto) y los entrega al reconectar | Nada se pierde mientras el broker viva **y la cola no pase de 1000 mensajes**: es el valor por defecto de `max_queued_messages` en Mosquitto, y los siguientes se descartan en silencio (manual de `mosquitto.conf`). Con el sensor de la demo, cada 5 s, son unos 83 min de backend caído; con 20 sensores cada 60 s, unos 50 min. Fijar el límite según el volumen del sitio queda pendiente (§8); `restart: unless-stopped` levanta el backend en segundos |
 | El **broker** cae | Docker lo reinicia; el backend reintenta cada 2 s. Los nodos Wi-Fi con QoS 1 reintentan la publicación; ChirpStack reintenta según su integración | El broker es la pieza más simple y estable de la pila; su caída es corta |
-| La **base** cae | El INSERT falla, el manejador registra el error y el mensaje ya fue confirmado al broker: **se pierde**. Limitación conocida; en la Etapa 3 se confirma al broker solo después del INSERT (`manualAck`) | Hoy la base y el backend comparten servidor: si cae una, cae todo; el caso relevante es la Etapa 3 |
+| La **base** cae | El INSERT falla; el manejador reintenta el mismo mensaje (1, 2, 4 y 8 s) y, si sigue fallando, **no confirma** al broker y reconecta: con sesión persistente el broker lo reenvía al volver y el índice único absorbe la repetición. Mientras tanto, los demás mensajes esperan en la cola del broker (`max_queued_messages`). Nada se pierde en silencio: cada reintento queda en el registro (decisión 4, 07/10/2026) |
 | La misma trama llega **dos veces** (reentrega QoS 1 tras reconexión; nodo que reenvía su cola) | El INSERT es idempotente: índice único `(canal_id, tiempo)` + `ON CONFLICT DO NOTHING`; la repetida se ignora y **no** vuelve a evaluar umbrales | «Al menos una vez» + operación idempotente = efecto de exactamente una |
 
 **La cola del broker, con números** (verificado el 06/10/2026 en el manual `mosquitto.conf(5)` de la 2.0.22 y en
@@ -306,7 +306,7 @@ otro extremo, el tope de tamaño por mensaje (`message_size_limit`).
 | Dos gateways LoRaWAN reciben el **mismo uplink** | Lo deduplica ChirpStack por contador de trama antes de publicar | Es responsabilidad del servidor de red, no de la plataforma |
 | El **tópico no cumple el patrón** `sitio/<sitio>/dispositivo/<id>/<magnitud>` | Cuarentena `malformada` con el detalle «tópico fuera del patrón», **antes** del filtro 1; el dispositivo **no** se marca vivo | Sin identidad no hay a quién atribuir la señal de vida; comparte el motivo `malformada` con el filtro 2 y se distingue por el detalle (decisión 23/09: no abrir un cuarto motivo por esto) |
 | **Dos lecturas del mismo canal en la misma trama**, sin marca de tiempo | Se guardan ambas, con instantes de recepción distintos (microsegundos) | Sin marca del emisor no hay identidad de lectura (fila anterior); si un nodo repite un canal por error, corregirlo es del firmware, no de la plataforma. Limitación aceptada el 23/09 |
-| El broker **reentrega muchas veces** de golpe (reconexión con cola larga) | Cada mensaje dispara su propio recorrido del pipeline, sin esperar al anterior; compiten por las 5 conexiones del pool | El INSERT idempotente evita duplicar; lo que falta es *backpressure* (confirmar al broker solo tras escribir, `manualAck`), la misma limitación declarada en «la base cae»: Etapa 3 |
+| El broker **reentrega muchas veces** de golpe (reconexión con cola larga) | Desde la decisión 4 los mensajes se procesan **de a uno**, en orden; la cola queda en el broker, no en el backend, y el pool de 5 conexiones no se disputa. El costo es la latencia por mensaje (2–5 ms medidos en el portátil), que acota la tasa máxima a cientos por segundo: por encima de RNF-01 |
 | Una trama trae **miles de lecturas** | Hoy no hay tope: se procesan todas, en serie | Pendiente (`docs/11 §4`): tope de lecturas por trama en el adaptador y `message_size_limit` en el broker; un sensor no manda miles de lecturas, un atacante sí |
 | Dos **sensores distintos** miden lo mismo cerca | **No es duplicado**: son dos canales, dos series, dos evaluaciones de umbral. Correlacionarlos es una función de análisis futura, no del pipeline | La plataforma registra lo que cada sensor dijo; interpretar es otra capa |
 
@@ -664,9 +664,12 @@ Fuentes: `bitacora/2026-10-05-entrevista-academico-geologia.md`; evidencia verif
    `battery`→bateria/%EL). **No se copian los decodificadores oficiales** (`Milesight-IoT/SensorDecoders`,
    GPL-3.0): la decodificación corre en la pasarela. Candidato posterior: adaptador para tramas binarias
    hexadecimales de equipos celulares (UC300, UC50x) que publican MQTT sin pasarela.
-4. **Confirmación al broker después de persistir.** Hoy el cliente MQTT confirma al recibir; si la base cae, el
-   mensaje confirmado se pierde (§4.1). Se pasa a `handleMessage` de la librería (un mensaje a la vez, «always
-   call callback») y la confirmación (PUBACK) se emite **después del COMMIT**. Con QoS 1 y sesión persistente,
+4. **Confirmación al broker después de persistir — implementado el 07/10/2026.** Hasta entonces el cliente MQTT
+   confirmaba al recibir; si la base caía, el mensaje confirmado se perdía (§4.1). El pipeline corre ahora dentro de
+   `handleMessage` de la librería (un mensaje a la vez: la librería no toma el siguiente paquete hasta que se llama su
+   callback) y la confirmación (PUBACK) se emite **después del COMMIT**; si el pipeline falla, se reintenta el mismo
+   mensaje (1, 2, 4 y 8 s) y, agotados, no se confirma y se reconecta para que el broker lo reenvíe. Medido en el banco
+   (`docs/16 §3–4`): misma tasa (59,7 tramas/s), pico 81, p95 1 ms; la prueba de carrera «una sola trama cruda» pasó. Con QoS 1 y sesión persistente,
    un mensaje no confirmado se reentrega al volver; el índice único `(canal, instante)` evita duplicarlo. Esto
    habilita lotes transaccionales si la carga lo exige (se mide con el emulador, TT-28).
 5. **Trama cruda aceptada, con retención corta.** Además de la cuarentena, se guarda la trama original de

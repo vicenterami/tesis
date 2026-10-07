@@ -93,7 +93,7 @@ cinco preguntas; si alguna no tiene respuesta, el cambio no entra:
 | 1 | **Concurrencia:** ¿qué pasa si corre mientras otro está usando los datos? | Índice único `(canal_id, tiempo)` + `ON CONFLICT`; una condición abierta por tipo (`docs/08 §6`) |
 | 2 | **Reejecución y fallo a medias:** ¿qué pasa si corre dos veces o se corta a la mitad? | Inserción idempotente; migraciones repetibles; entrega «al menos una vez» (`docs/10 §4.1`) |
 | 3 | **Verificación:** ¿cómo sé que funcionó, más allá de que no dio error? | Guardianes que se prueban plantando la violación (`verificar-todo.sh`); un archivo generado se abre |
-| 4 | **Entorno hostil:** ¿qué pasa si la base, la red o el broker no están? | Tabla de caídas de `docs/10 §4.1`; pérdida conocida si cae la base (pendiente `manualAck`) |
+| 4 | **Entorno hostil:** ¿qué pasa si la base, la red o el broker no están? | Tabla de caídas de `docs/10 §4.1`; si cae la base: reintentos, sin confirmación y reconexión, el broker reenvía (decisión 4, 07/10; probado con cliente falso en `broker.service.spec.ts`) |
 | 5 | **Comprensión:** ¿puedo explicar esta línea a otra persona sin releerla? | Los comentarios del backend explican el *porqué*; lo que no se entiende no se acepta |
 
 **Comandos que borran datos** (conocerlos es la primera defensa):
