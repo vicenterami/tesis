@@ -24,7 +24,7 @@
 % Destinos. Lo rechazado por 1, 2 o 3 va a UNA cuarentena, cruda y con su motivo. La medición
 % aceptada entra a la serie desde 4. Los filtros 5 y 6 abren o cierran condiciones (no series).
 \node[notaaviso, text width=4.2cm, align=center, minimum height=1.1cm] (cua) at (5.1,-2.7)
-  {\textbf{cuarentena} (trama cruda + motivo)\\{\footnotesize desconocido · malformada · inválida}};
+  {\textbf{cuarentena} (trama cruda + motivo)\\{\footnotesize no registrado · de baja\\malformada · inválida}};
 \node[filtro, draw=verdeacento, line width=1.1pt, fill=verdeacento!6, minimum height=1.1cm, text width=2.5cm] (db) at (10.2,-2.7)
   {\textbf{TimescaleDB}\\[2pt]{\footnotesize medición (serie de tiempo)}};
 \node[filtro, draw=verdeacento, line width=1.1pt, fill=verdeacento!6, minimum height=1.1cm, text width=3.6cm] (cond) at (14.0,-2.7)
@@ -39,7 +39,8 @@
 \end{tikzpicture}}
 \caption{El pipeline de tratamiento de tramas, aporte central del trabajo, en su orden real de
 ejecución. Cada filtro es independiente y verificable por separado. Lo que rechazan los tres primeros
-va a una cuarentena con la trama cruda y su motivo; la medición aceptada entra a la serie de tiempo
+va a una cuarentena con la trama cruda, su motivo y su detalle (lo que no trae credencial ni siquiera
+llega: lo corta antes el broker); la medición aceptada entra a la serie de tiempo
 desde el cuarto; los dos últimos no escriben series sino condiciones: alertar evalúa cada lectura
 guardada, supervisar registra una vez por trama que el dispositivo se comunicó, aunque sus lecturas
 hayan ido a cuarentena.}

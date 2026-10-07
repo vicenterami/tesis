@@ -40,7 +40,7 @@ panel y corre en el navegador.
 
 \section{Modelo de datos}
 
-El modelo (figura~\ref{fig:modelo-datos}) tiene 13 entidades y una idea rectora: \textbf{el modelo
+El modelo (figura~\ref{fig:modelo-datos}) tiene 14 entidades y una idea rectora: \textbf{el modelo
 interno es único}. No importa por qué vía ni en qué formato llegó una trama; una vez superado el
 pipeline, todo se guarda con la misma forma. Esa uniformidad es la respuesta a la causa C1 (formatos
 dispares). El esquema está en tercera forma normal, y no más allá porque la cuarta y la quinta resuelven dependencias multivaluadas y de reunión que este modelo no tiene: cada hecho vive en una sola tabla y las
@@ -52,7 +52,7 @@ para que cambiar un catálogo no reinterprete el pasado.
 \input{figuras/modelo-datos}
 
 
-Las decisiones del modelo y su justificación —por qué la medición cuelga del canal, por qué la credencial es una entidad aparte, por qué la cuarentena no tiene relaciones— se detallan en el cuadro~\ref{tab:decisiones-datos} (anexo~\ref{anx:evaluacion}). Lo que el diagrama no muestra por convención también está diseñado: el esquema sigue un conjunto de \textbf{convenciones de calidad} verificadas contra la base real —toda restricción con nombre explícito y prefijo (\texttt{pk\_}, \texttt{fk\_}, \texttt{uq\_}, \texttt{ck\_}), un índice por cada clave foránea (PostgreSQL no lo crea solo y sin él cada unión recorre la tabla completa), auditoría con \texttt{actualizado\_en} mantenida por disparador en toda tabla mutable, baja lógica en lugar de borrado, dominios cerrados como \texttt{CHECK} y catálogos donde el usuario administra los valores, y comentarios \texttt{COMMENT ON} en las columnas cuya razón de ser no es obvia, de modo que la documentación viaja con la base—. El esquema evoluciona por \textbf{migraciones numeradas} (\texttt{01-esquema}, \texttt{02} unicidad
+Las decisiones del modelo y su justificación —por qué la medición cuelga del canal, por qué la credencial es una entidad aparte, por qué la cuarentena vive aparte de las series— se detallan en el cuadro~\ref{tab:decisiones-datos} (anexo~\ref{anx:evaluacion}). Lo que el diagrama no muestra por convención también está diseñado: el esquema sigue un conjunto de \textbf{convenciones de calidad} verificadas contra la base real —toda restricción con nombre explícito y prefijo (\texttt{pk\_}, \texttt{fk\_}, \texttt{uq\_}, \texttt{ck\_}), un índice por cada clave foránea (PostgreSQL no lo crea solo y sin él cada unión recorre la tabla completa), auditoría con \texttt{actualizado\_en} mantenida por disparador en toda tabla mutable, baja lógica en lugar de borrado, dominios cerrados como \texttt{CHECK} y catálogos donde el usuario administra los valores, y comentarios \texttt{COMMENT ON} en las columnas cuya razón de ser no es obvia, de modo que la documentación viaja con la base—. El esquema evoluciona por \textbf{migraciones numeradas} (\texttt{01-esquema}, \texttt{02} unicidad
 de condición por regla, \texttt{03} zona horaria por sitio, \texttt{04} serialización uniforme de
 instantes, \texttt{05} convenciones de calidad, \texttt{06} clave natural única de la serie, \texttt{07} dominio cerrado de \texttt{cuarentena.motivo}): nunca se edita un archivo ya aplicado. Una instalación nueva ejecuta todas en orden; una
 base existente aplica solo las nuevas.

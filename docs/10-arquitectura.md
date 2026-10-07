@@ -219,8 +219,8 @@ sequenceDiagram
     MQ->>F1: trama cruda<br/>+ tópico + identidad
     alt tópico fuera del patrón sitio/…/dispositivo/…/…
         F1->>Q: guarda cruda, motivo "malformada"<br/>(sin identidad: no hay a quién marcar vivo)
-    else dispositivo desconocido o dado de baja
-        F1->>Q: guarda cruda, motivo "desconocido"
+    else dispositivo no registrado o dado de baja
+        F1->>Q: guarda cruda, motivo "no_registrado" o "dado_de_baja"
     else conocido y no dado de baja
         F1->>F2: trama + dispositivo
         F2->>F2: elige adaptador<br/>por origen (SenML nativo,<br/>JSON del compañero, ChirpStack)
@@ -578,7 +578,7 @@ separados.
    `datos_invalidos` debe aparecer en el panel como las demás (RF-47, RF-48) y notificar (RF-36,
    RF-37), y el aviso debe ser **accionable**, no un código de error. Tres datos, que la plataforma
    ya tiene:
-   - **Qué llegó y qué se esperaba**: el motivo (`malformada`, `invalida`, `desconocido`), una
+   - **Qué llegó y qué se esperaba**: el motivo (`malformada`, `invalida`, `no_registrado`, `dado_de_baja`) y su `detalle`, una
      muestra de la trama cruda y la regla que no se cumplió —«se esperaba un número o un pack SenML;
      llegó `{"temp":"alto"}`», «la unidad `furlongs` no es convertible a `Cel`», «el canal
      `presion` no está declarado para este dispositivo»—. Con eso, quien administra el sensor sabe
@@ -704,7 +704,7 @@ TimescaleDB (8 observaciones), registro de brokers (258 filas).
 11. **Base de datos: edición Apache 2.0 de TimescaleDB** (`timescale/timescaledb:2.24.0-pg16-oss`). Probado con el
     esquema real: fallan solo la compresión y su política, `add_retention_policy` y los agregados continuos; todo lo
     que el sistema usa (hypertable, `time_bucket` con zona, `drop_chunks`) funciona. Se quitan las líneas de
-    compresión del esquema, la retención de `medicion` (2 años), `trama` y `cuarentena` (30 días) la ejecuta una
+    compresión del esquema, la retención de `medicion` (2 años; **corregido por el punto 19: no vence por defecto**), `trama` y `cuarentena` (30 días) la ejecuta una
     tarea programada del backend con `drop_chunks`, y los agregados se materializan por tarea. En desarrollo se
     recrea el volumen (datos de demo); no hay datos reales que migrar. RNF-15 vuelve a cumplirse literalmente
     (`docs/02`, `docs/14 §2`).
@@ -721,6 +721,30 @@ TimescaleDB (8 observaciones), registro de brokers (258 filas).
     humana (decisión pendiente en `docs/08 §8` antes de HU-10); «valor congelado» entra como condición candidata.
 16. **Sección §9 (crecimiento, resiliencia y respaldo) aprobada y escrita el 06/10/2026**, con la corrección de
     RNF-17 (es RAM consumida, no disco) propagada a `docs/02`, `docs/07`, `docs/14`, `docs/15` y al informe.
+
+**Decisiones del 07/10/2026** (al implementar los puntos 11 y 12; probadas en una base desechable con la imagen `-oss`).
+
+17. **`cuarentena` es hypertable** por `recibido_en` (fragmentos de 1 día; clave `(id, recibido_en)`), como `trama`:
+    las dos vencen a los 30 días con `drop_chunks`, que borra archivos enteros sin filas muertas aunque un nodo
+    mal configurado la inunde. Se descartó el `DELETE` por fecha (más simple, pero genera WAL y vacuum) y unificarla
+    con `trama` (cambio mayor del modelo; queda como candidato). Además: **una fila por trama** con todos los
+    porqués en `detalle` (antes, una por lectura mala y el payload repetido; el porqué solo iba al log, que rota);
+    `dispositivo_id` opcional (FK a la clave sustituta, no a la MAC: buscar por dispositivo usa un índice en vez de
+    analizar el texto del tópico fila por fila; un dado de baja queda identificado, señal de que su credencial
+    sigue viva); `origen` con `CHECK`. Lo que no trae credencial no llega a la cuarentena: lo corta el broker.
+18. **TimescaleDB sin trabajos de fondo ni telemetría** (`command` del compose: `max_background_workers=0`,
+    `telemetry_level=off`). En la edición Apache el programador solo corre dos jobs internos: la retención de su
+    propio historial falla con ERROR de licencia en cada corrida, y la telemetría envía a Timescale un informe
+    anónimo de uso. No se pueden apagar uno a uno (`alter_job` y `delete_job` son de la otra licencia). La
+    retención del sistema es la tarea del backend (`RetencionService`); `drop_chunks` es una función y no
+    necesita el programador.
+19. **Tres decisiones del estudiante (07/10, noche).** (a) **Las mediciones no vencen por defecto**: diez años ocupan
+    ≈ 4,6 GB (`docs/14`) y el historial largo es el dato valioso del caso de uso; `RETENCION_MEDICION_DIAS` solo
+    las recorta si se define (mínimo 30). Cada corrida de retención deja una fila en `evento` (tipo `retencion`):
+    borrar es destructivo y su registro no puede vencer antes que los datos. (b) **Tope de 64 KiB por mensaje en
+    el broker** (`max_packet_size`): sin él, Mosquitto 2.0.22 aceptó y entregó 50 MiB (observado); al excederlo
+    corta la conexión y registra «oversize packet». (c) **Motivos que se entienden solos**: `desconocido` se leía
+    como «motivo desconocido» y se separa en `no_registrado` y `dado_de_baja` (migración 09).
 
 ## 9. Crecimiento, resiliencia y respaldo (aprobado el 06/10/2026)
 

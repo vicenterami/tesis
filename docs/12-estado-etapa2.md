@@ -44,7 +44,7 @@ implementando solo lo que **sustente el diseño** (API de consulta, que demuestr
 | TT-04 | Documentar el procedimiento de puesta en marcha en el repositorio | M | 1 | ✅ | READMEs de plataforma y backend |
 | TT-05 | Diagrama de arquitectura de componentes, con los ocho módulos y sus dependencias | M | 5 | ✅ | vista de contenedores C4 (cap. 4) |
 | TT-06 | Diagrama de topología de red con segmentación de dispositivos IoT (RNF-09) y sentido de las conexiones (RNF-10) | M | 6 | ✅ | topología de red (anexo de figuras complementarias) |
-| TT-07 | Modelo de datos entidad-relación con al menos ocho entidades | M | 6 | ✅ | ER de 13 entidades generado desde la base (cap. 4) |
+| TT-07 | Modelo de datos entidad-relación con al menos ocho entidades | M | 6 | ✅ | ER de 14 entidades generado desde la base (cap. 4; `trama` desde la migración 09) |
 | TT-08 | Diagrama de flujo de recepción, desde la recepción hasta la persistencia, para los tres transportes | M | 4 | ✅ | pipeline (fig. 3.1, cap. 3) y secuencia UML apaisada (anexo de figuras); orden real 5 alertar / 6 supervisar desde el 23/09 |
 | TT-09 | Diagrama de secuencia del aprovisionamiento de un dispositivo nuevo | M | 3 | ✅ | secuencia de aprovisionamiento (anexo de figuras complementarias) |
 | TT-10 | Registro de decisiones de diseño con su justificación | M | 2 | ✅ | tablas de decisiones en el cap. 4 y bitácora |
@@ -55,7 +55,7 @@ implementando solo lo que **sustente el diseño** (API de consulta, que demuestr
 | TT-15 | Procedimiento de asignación de identidad y gestión de claves AES por sitio | S | 2 | 🟡 | gestión de credenciales documentada (docs/11 §7); claves LoRaWAN dependen de ChirpStack |
 | HU-01 | Como integrador, quiero publicar una trama SenML por MQTT o HTTP, para reportar desde un sensor sin infraestructura intermedia | M | 6 | 🟡 | MQTT sí; HTTP en la Etapa 3 |
 | TT-16 | Validador de esquema SenML y analizador de tramas | M | 3 | ✅ | adaptador SenML |
-| TT-19 | Esquema de base de datos y migraciones versionadas | M | 5 | ✅ | esquema + 7 migraciones (05 convenciones de calidad, 06 clave natural única de la serie, 07 dominio cerrado de cuarentena.motivo) |
+| TT-19 | Esquema de base de datos y migraciones versionadas | M | 5 | ✅ | esquema + 9 migraciones (05 convenciones de calidad, 06 clave natural única de la serie, 07 dominio cerrado de cuarentena.motivo; Etapa 3: 08 hora de recepción y origen de la marca, 09 trama y cuarentena como hypertables) |
 | TT-24 | Comparar al menos tres alternativas de alojamiento con criterios ponderados | M | 4 | ✅ | `docs/14 §3–§4`: cinco alternativas, seis criterios |
 | TT-25 | Cuantificar el costo mensual y anual de operación en CLP y USD | M | 3 | ✅ | `docs/14 §3`: precios fechados y convertidos con dólar observado |
 | TT-26 | Redactar la recomendación de despliegue justificada | M | 1 | ✅ | `docs/14 §5` y cap. 4 del informe |
@@ -102,7 +102,7 @@ sobrepeso**; la regla sigue siendo agregar dependencias solo con justificación 
 
 | Diagrama | Dónde (se renderiza en GitHub) | En el informe |
 |---|---|---|
-| Entidad-relación (13 entidades) | `docs/08-modelo-datos.md` §3 — **generado desde la base real** | ✅ `figuras/render/modelo-datos.pdf` |
+| Entidad-relación (14 entidades) | `docs/08-modelo-datos.md` §3 — **generado desde la base real** | ✅ `figuras/render/modelo-datos.pdf` |
 | Contenedores C4, topología de red, 3 secuencias UML, despliegue | `docs/10-arquitectura.md` §1–§6 | ✅ `figuras/render/*.pdf`, generados por `generar-figuras.sh` desde la misma fuente; las secuencias van apaisadas en el anexo desde el 23/09 para que se lean |
 | Pipeline de 6 filtros, árbol del problema (Etapa 1) | `informe-oficial/figuras/pipeline.tex`, `arbol.tex` | ✅ TikZ, **a mano**: son las dos únicas figuras sin fuente única; el orden de los filtros en `pipeline.tex` lo vigila el guardián 2e (el 23/09 se encontró desactualizada) |
 

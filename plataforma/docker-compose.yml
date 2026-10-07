@@ -15,8 +15,14 @@ services:
 
   # ── Base de datos de series de tiempo ───────────────────────────────────────
   timescaledb:
-    image: timescale/timescaledb:2.24.0-pg16     # versión fijada: un despliegue reproducible no usa "latest"
+    image: timescale/timescaledb:2.24.0-pg16-oss # versión fijada (nunca "latest"); -oss = edición Apache 2.0 (RNF-15, docs/10 §8.4 punto 11)
     restart: unless-stopped                      # vuelve solo tras un reinicio del servidor
+    # Sin trabajos de fondo de TimescaleDB (docs/10 §8.4 punto 11): en la edición Apache su programador solo corre
+    # dos jobs internos, y no se pueden apagar uno a uno (alter_job y delete_job son de la otra licencia):
+    #  · «Job History Log Retention Policy»: falla con ERROR de licencia en cada corrida (cada 6 h, observado en 2.24);
+    #  · «Telemetry Reporter»: envía a Timescale un informe anónimo de uso cada 24 h; apagado, no sale nada del servidor.
+    # La retención la hace el backend con drop_chunks, que es una función y no necesita el programador.
+    command: ["postgres", "-c", "timescaledb.max_background_workers=0", "-c", "timescaledb.telemetry_level=off"]
     security_opt:
       - no-new-privileges:true                   # un proceso comprometido no puede escalar privilegios
     environment:

@@ -117,8 +117,9 @@ Ambas cosas, combinadas:
    identidad (MAC o ID), su **tipo** (temperatura, luz, ruido…), ubicación y credencial. La
    plataforma sabe *qué esperar* de él.
 2. **Autoidentificación en cada trama:** el mensaje trae la identidad (`bn`) y cada medición trae
-   su nombre y unidad. La plataforma **valida contra el registro**: dispositivo desconocido →
-   rechazado; unidad que no calza con el tipo → cuarentena.
+   su nombre y unidad. La plataforma **valida contra el registro**: sin credencial → lo corta el
+   broker y no llega; con credencial pero sin alta → cuarentena «no_registrado» (o «dado_de_baja»); unidad que no
+   calza con el tipo → cuarentena «invalida», con el detalle de qué falló.
 
 Así un sensor nuevo no exige tocar código: se registra, y sus tramas ya se entienden.
 

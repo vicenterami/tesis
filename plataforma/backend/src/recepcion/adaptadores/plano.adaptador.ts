@@ -11,6 +11,7 @@ import { Adaptador, TramaMalformada } from './adaptador';
 @Injectable()
 export class PlanoAdaptador implements Adaptador {
   readonly nombre = 'plano';
+  readonly origenTiempo = 'dispositivo';
 
   reconoce(ctx: ContextoTrama): boolean {
     const texto = ctx.carga.toString('utf8').trim();

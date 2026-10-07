@@ -5,6 +5,7 @@ import { BrokerModule } from './broker/broker.module';
 import { RecepcionModule } from './recepcion/recepcion.module';
 import { ConsultaModule } from './consulta/consulta.module';
 import { SaludModule } from './salud/salud.module';
+import { RetencionModule } from './retencion/retencion.module';
 
 // Módulo raíz. Cada módulo de aquí corresponde a un módulo funcional del diseño (docs/10 §1):
 //   DbModule        → acceso a TimescaleDB (infraestructura compartida)
@@ -14,6 +15,8 @@ import { SaludModule } from './salud/salud.module';
 //                     umbrales con histéresis → condiciones): por eso no aparecen en `imports` de aquí.
 //   ConsultaModule  → M5 Persistencia y consulta: API de solo lectura para el panel (patrón B)
 //   SaludModule     → endpoint de salud para healthchecks y pruebas
+//   RetencionModule → tarea periódica que borra con drop_chunks lo vencido de medicion, trama y cuarentena
+//                     (docs/10 §8.4 punto 11): la edición Apache de TimescaleDB no trae políticas de retención
 // Los módulos M3 (aprovisionamiento) y M7 (seguridad e identidad) se agregan por tandas; M8 es el panel.
 @Module({
   imports: [
@@ -25,6 +28,7 @@ import { SaludModule } from './salud/salud.module';
     RecepcionModule,
     ConsultaModule,
     SaludModule,
+    RetencionModule,
   ],
 })
 export class AppModule {}

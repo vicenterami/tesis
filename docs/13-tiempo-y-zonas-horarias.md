@@ -104,12 +104,14 @@ propios:
 | La hora repetida al retrasar el reloj | Ninguna clave incluye hora local: `uuid` + `timestamptz` | Con hora local habría dos lecturas «a la misma hora» |
 | Zona del dispositivo ≠ zona del dato | La zona se resuelve **al recibir**, una sola vez, y se conserva la trama cruda en cuarentena si hizo falta rechazarla | Dejarlo para el reporte obliga a adivinar después |
 
-Pendiente de decisión (Etapa 3): guardar también `recibido_en` en `medicion` para medir latencia y
-deriva de reloj por dispositivo. Cuesta 8 bytes por fila; da diagnóstico que hoy no existe. **Hoy la base
-no registra qué hora se usó ni por qué:** la regla 7 lo decide en `recepcion/tiempo.ts`, pero la fila no
-lo dice. Con `recibido_en` queda deducible (si `tiempo = recibido_en`, se usó la de llegada) y la latencia
-se mide como `recibido_en − tiempo` por dispositivo; el **motivo** (sin marca, antes del 2000, en el futuro)
-necesitaría además una columna `origen_tiempo` con dominio cerrado. Se decide junto con la anterior.
+**Hora de recepción (decidido e implementado el 06/10/2026, migración 08; `docs/10 §8.4` punto 12).** Cada fila de
+`medicion` guarda `recibido_en` (llegada al backend, la toma el pipeline al empezar; el broker no marca la hora) y
+`origen_tiempo` con dominio cerrado: `dispositivo` o `pasarela` (lo declara el adaptador cuando la marca es
+plausible) o `recepcion` (la regla 7 la descartó; entonces `tiempo` lo pone la base con `clock_timestamp()`). La deriva
+del reloj se mide como `recibido_en − tiempo` por dispositivo, solo en filas con origen distinto de `recepcion`.
+El **motivo** del descarte (sin marca, antes del 2000, en el futuro) no se guarda por fila: queda en la regla y se
+agrega como columna solo si la vista de salud (RF-47) llega a necesitarlo. Las filas anteriores a la 08 quedan con
+ambas columnas en NULL (origen desconocido, nunca inventado); la restricción rige para toda fila nueva.
 
 ## 5. Señales de alarma en una revisión de código
 

@@ -81,7 +81,7 @@
 | 8 | **Escaneo de secretos** en el CI (`gitleaks`, MIT, con acción oficial `gitleaks/gitleaks-action`), además del `.gitignore` y del hook local: detecta una clave que se cuele en un commit antes de que el repo sea público. Al publicarlo, GitHub activa además su *secret scanning* por defecto | Antes de publicar el repo |
 | 5 | **Análisis estático (SAST)** del backend: reglas de seguridad de ESLint y, cuando el repo sea público, *code scanning* con CodeQL (GitHub lo habilita por defecto en repositorios públicos; en privados exige licencia) | Etapa 3 |
 | 8 | Respaldo diario automático de la base (`pg_dump` a un volumen aparte) + prueba de restauración | Antes de datos reales |
-| 8 | Límite de conexiones y de tamaño de mensaje en el broker (`max_connections`, `message_size_limit`) **y tope de lecturas por trama en el adaptador** (una trama con miles de lecturas no es un sensor; hoy se procesan todas en serie, `docs/10 §4.1`) | Endurecimiento |
+| 8 | Límite de conexiones en el broker (`max_connections`) **y tope de lecturas por trama en el adaptador**. El tope de tamaño **ya rige**: `max_packet_size 65536` (07/10, `docs/10 §8.4` punto 19; guardián paso 2l) (una trama con miles de lecturas no es un sensor; hoy se procesan todas en serie, `docs/10 §4.1`) | Endurecimiento |
 
 ## 5. Operación segura: reglas para no destruir el propio trabajo
 

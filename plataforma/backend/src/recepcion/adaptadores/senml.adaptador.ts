@@ -18,6 +18,7 @@ interface RegistroSenML {
 @Injectable()
 export class SenmlAdaptador implements Adaptador {
   readonly nombre = 'senml';
+  readonly origenTiempo = 'dispositivo';
 
   reconoce(ctx: ContextoTrama): boolean {
     const texto = ctx.carga.toString('utf8').trimStart();

@@ -29,17 +29,19 @@ docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -U plat
 exige /tmp/vt-sql.txt "${PIPESTATUS[0]}" 10 || fallos=$((fallos+1))
 
 paso "2. Migraciones aplicadas = archivos en db/init (cada NN-*.sql debe estar reflejado en la base)"
-# 02: índice por regla · 03: zona_horaria · 04: iso_utc · 05: convenciones (disparadores actualizado_en, pm2_5) · 06: índice único de medicion · 07: CHECK de cuarentena.motivo
+# 02: índice por regla · 03: zona_horaria · 04: iso_utc · 05: convenciones (disparadores actualizado_en, pm2_5) · 06: índice único de medicion · 07: CHECK de cuarentena.motivo · 08: medicion.recibido_en y origen_tiempo · 09: trama y cuarentena como hypertables
 docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -U plataforma -d plataforma -tA <<'SQL' | tee /tmp/vt-mig.txt
 SELECT CASE WHEN count(*)=1 THEN 'OK    01 medicion es hypertable (chunks por tiempo)' ELSE 'FALLA 01 medicion no es hypertable' END FROM timescaledb_information.hypertables WHERE hypertable_name='medicion';
 SELECT CASE WHEN indexdef LIKE '%COALESCE(regla_id%' THEN 'OK    02 condicion_abierta_unica por regla' ELSE 'FALLA 02 indice viejo' END FROM pg_indexes WHERE indexname='condicion_abierta_unica';
 SELECT CASE WHEN count(*)=1 THEN 'OK    03 sitio.zona_horaria' ELSE 'FALLA 03 falta sitio.zona_horaria' END FROM information_schema.columns WHERE table_name='sitio' AND column_name='zona_horaria';
 SELECT CASE WHEN count(*)=1 THEN 'OK    04 función iso_utc' ELSE 'FALLA 04 falta iso_utc' END FROM pg_proc WHERE proname='iso_utc'; -- cspell:disable-line
-SELECT CASE WHEN count(*)=1 THEN 'OK    06 uq_medicion_canal_tiempo (idempotencia)' ELSE 'FALLA 06 falta el índice único de medición' END FROM pg_indexes WHERE indexname='uq_medicion_canal_tiempo' AND indexdef LIKE 'CREATE UNIQUE%'; -- cspell:disable-line
+SELECT CASE WHEN count(*)=1 THEN 'OK    06 uq_medicion_canal_tiempo (idempotencia)' ELSE 'FALLA 06 falta el índice único de medición' END FROM pg_indexes WHERE tablename='medicion' AND indexname='uq_medicion_canal_tiempo' AND indexdef LIKE 'CREATE UNIQUE%'; -- cspell:disable-line
 SELECT CASE WHEN count(*)>=9 AND (SELECT count(*) FROM magnitud WHERE codigo IN ('pm2_5','pm10'))=2 THEN 'OK    05 convenciones: '||count(*)||' disparadores actualizado_en y pm2_5/pm10' ELSE 'FALLA 05 convenciones incompletas' END FROM pg_trigger WHERE tgname LIKE 'trg_%_actualizado_en';
-SELECT CASE WHEN count(*)=1 THEN 'OK    07 cuarentena.motivo con CHECK (dominio cerrado)' ELSE 'FALLA 07 falta el CHECK de cuarentena.motivo' END FROM pg_constraint WHERE conname='cuarentena_motivo_chk' AND contype='c';
+SELECT CASE WHEN count(*)=1 THEN 'OK    07 cuarentena.motivo con CHECK (dominio cerrado)' ELSE 'FALLA 07 falta el CHECK de cuarentena.motivo' END FROM pg_constraint WHERE conname='cuarentena_motivo_chk' AND contype='c' AND conrelid='cuarentena'::regclass; -- desde la 09 es hypertable: cada fragmento lleva su copia
+SELECT CASE WHEN count(*)=2 AND (SELECT count(*) FROM pg_constraint WHERE conname='ck_medicion_recepcion' AND conrelid='medicion'::regclass)=1 THEN 'OK    08 medicion.recibido_en y origen_tiempo con su CHECK' ELSE 'FALLA 08 falta la hora de recepción en medicion' END FROM information_schema.columns WHERE table_name='medicion' AND column_name IN ('recibido_en','origen_tiempo');
+SELECT CASE WHEN count(*)=2 AND (SELECT count(*) FROM information_schema.columns WHERE table_name='cuarentena' AND column_name IN ('detalle','dispositivo_id'))=2 AND (SELECT pg_get_constraintdef(oid) LIKE '%no_registrado%dado_de_baja%' FROM pg_constraint WHERE conname='cuarentena_motivo_chk' AND conrelid='cuarentena'::regclass) THEN 'OK    09 trama y cuarentena son hypertables; cuarentena con detalle, dispositivo_id y motivos no_registrado/dado_de_baja' ELSE 'FALLA 09 trama/cuarentena incompletas' END FROM timescaledb_information.hypertables WHERE hypertable_name IN ('trama','cuarentena');
 SQL
-exige /tmp/vt-mig.txt "${PIPESTATUS[0]}" 7 || fallos=$((fallos+1))
+exige /tmp/vt-mig.txt "${PIPESTATUS[0]}" 9 || fallos=$((fallos+1))
 # Toda migración en disco debe tener su comprobación arriba: una 08 nueva sin comprobación falla aquí,
 # no solo por el conteo en prosa del paso 2g.
 sin_chequeo=$(ls plataforma/db/init/ | grep -oE '^[0-9]{2}' | while read -r nn; do grep -q "^OK    $nn \|^FALLA $nn " /tmp/vt-mig.txt || echo "$nn"; done)
@@ -137,6 +139,25 @@ if [ -s "$NV" ]; then
   if [ -n "$hits" ]; then echo "FALLA archivos versionados con nombres de la lista privada:"; echo "$hits" | sed 's/^/  /'; fallos=$((fallos+1))
   else echo "OK    ningún nombre de la lista privada en $(git ls-files | grep -vc '^historico/') archivos versionados"; fi
 else echo "omitido: no existe $NV"; omitidos="$omitidos 2j"; fi
+
+paso "2k. Edición Apache de TimescaleDB (RNF-15; docs/10 §8.4 punto 11): licencia, imagen, sin compresión, sin jobs ni telemetría"
+# La licencia se lee en la base que corre, no se supone por el compose; y el compose se revisa aparte, porque
+# la imagen completa también puede arrancar con la licencia apache configurada y seguiría sin ser la -oss.
+docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -U plataforma -d plataforma -tA <<'SQL' | tee /tmp/vt-lic.txt
+SELECT CASE WHEN current_setting('timescaledb.license')='apache' THEN 'OK    timescaledb.license = apache' ELSE 'FALLA timescaledb.license = '||current_setting('timescaledb.license')||' (Timescale License): usar la imagen -oss' END;
+SELECT CASE WHEN count(*)=0 THEN 'OK    ninguna hypertable con compresión' ELSE 'FALLA '||count(*)||' hypertable(s) con compresión (Timescale License)' END FROM timescaledb_information.hypertables WHERE compression_enabled;
+SELECT CASE WHEN current_setting('timescaledb.max_background_workers')='0' THEN 'OK    sin trabajos de fondo (el job 3 fallaría con ERROR de licencia cada 6 h)' ELSE 'FALLA timescaledb.max_background_workers = '||current_setting('timescaledb.max_background_workers')||': falta el command del compose' END;
+SELECT CASE WHEN current_setting('timescaledb.telemetry_level')='off' THEN 'OK    telemetría apagada: nada sale del servidor hacia Timescale' ELSE 'FALLA timescaledb.telemetry_level = '||current_setting('timescaledb.telemetry_level') END;
+SQL
+exige /tmp/vt-lic.txt "${PIPESTATUS[0]}" 4 || fallos=$((fallos+1))
+img=$(grep -oE 'timescale/timescaledb:[^ ]+' plataforma/docker-compose.yml)
+if [[ $img == *-oss ]]; then echo "OK    compose usa $img"; else echo "FALLA compose usa ${img:-ninguna imagen de TimescaleDB}: debe terminar en -oss"; fallos=$((fallos+1)); fi
+
+paso "2l. Tope de tamaño por mensaje en el broker (docs/11 §4): max_packet_size presente y <= 64 KiB"
+# Sin tope, Mosquitto 2.0.22 aceptó 50 MiB (observado el 07/10): un dispositivo con credencial podría llenar el disco.
+tope=$(grep -E '^\s*max_packet_size\s+[0-9]+' "$MC/mosquitto.conf" | awk '{print $2}' | tail -1)
+if [[ -n "$tope" && "$tope" -le 65536 ]]; then echo "OK    max_packet_size = $tope bytes"
+else echo "FALLA max_packet_size ausente o mayor que 65536 (${tope:-ausente}): el broker acepta mensajes de cualquier tamaño"; fallos=$((fallos+1)); fi
 
 paso "3. Diagramas: informe = docs = base (generar-figuras.sh --verificar)"
 bash informe-oficial/figuras/generar-figuras.sh --verificar || fallos=$((fallos+1))

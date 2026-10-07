@@ -75,9 +75,8 @@ CREATE TABLE medicion (
 SELECT create_hypertable('medicion', 'tiempo', chunk_time_interval => INTERVAL '7 days');
 CREATE INDEX medicion_canal_tiempo_idx ON medicion (canal_id, tiempo DESC);
 
--- Compresión de fragmentos con más de 30 días (ahorro típico de disco > 90 %).
-ALTER TABLE medicion SET (timescaledb.compress, timescaledb.compress_segmentby = 'canal_id');
-SELECT add_compression_policy('medicion', INTERVAL '30 days');
+-- Sin compresión: es Timescale License y el sistema usa la edición Apache 2.0 (RNF-15; docs/10 §8.4
+-- punto 11). La retención la hace una tarea del backend con drop_chunks, que sí es Apache.
 
 -- ── Reglas, condiciones y eventos ───────────────────────────────────────────
 CREATE TABLE regla_umbral (
@@ -115,7 +114,7 @@ CREATE TABLE cuarentena (
     id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     origen       text NOT NULL,                     -- 'mqtt' | 'http'
     topico       text,
-    motivo       text NOT NULL,                     -- 'desconocido' | 'malformada' | 'invalida'
+    motivo       text NOT NULL,                     -- dominio cerrado: migraciones 07 y 09
     payload_crudo bytea NOT NULL,
     recibido_en  timestamptz NOT NULL DEFAULT now()
 );

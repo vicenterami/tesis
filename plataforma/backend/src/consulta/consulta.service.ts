@@ -100,12 +100,17 @@ export class ConsultaService {
     return r.rows;
   }
 
-  // La carga cruda se devuelve como texto acotado: es para diagnosticar, no para reprocesar.
+  // La carga cruda se devuelve acotada: es para diagnosticar, no para reprocesar. payload_legible (migración 09)
+  // da texto si es UTF-8 y hexadecimal si no: antes, una sola trama binaria hacía fallar la consulta entera.
+  // El detalle dice el porqué concreto («temperatura: 500 Cel fuera del rango físico [-40, 85]»).
   async cuarentena(lim: number) {
     const r = await this.pool.query(`
-      SELECT id, origen, topico, motivo, recibido_en,
-             left(convert_from(payload_crudo, 'UTF8'), 200) AS payload
-        FROM cuarentena ORDER BY recibido_en DESC LIMIT $1`, [lim]);
+      SELECT q.id, q.origen, q.topico, q.motivo, q.detalle, d.id_fisico AS dispositivo, q.recibido_en,
+             p.texto AS payload, p.formato AS payload_formato
+        FROM cuarentena q
+        LEFT JOIN dispositivo d ON d.id = q.dispositivo_id
+        CROSS JOIN LATERAL payload_legible(q.payload_crudo, 200) p
+       ORDER BY q.recibido_en DESC LIMIT $1`, [lim]);
     return r.rows;
   }
 }

@@ -12,8 +12,8 @@ sequenceDiagram
     MQ->>F1: trama cruda<br/>+ tópico + identidad
     alt tópico fuera del patrón sitio/…/dispositivo/…/…
         F1->>Q: guarda cruda, motivo "malformada"<br/>(sin identidad: no hay a quién marcar vivo)
-    else dispositivo desconocido o dado de baja
-        F1->>Q: guarda cruda, motivo "desconocido"
+    else dispositivo no registrado o dado de baja
+        F1->>Q: guarda cruda, motivo "no_registrado" o "dado_de_baja"
     else conocido y no dado de baja
         F1->>F2: trama + dispositivo
         F2->>F2: elige adaptador<br/>por origen (SenML nativo,<br/>JSON del compañero, ChirpStack)

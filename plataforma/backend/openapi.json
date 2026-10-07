@@ -154,7 +154,7 @@
     },
     "/cuarentena": {
       "get": {
-        "description": "Motivo (`desconocido`, `malformada`, `invalida`), tópico y los primeros 200 caracteres de la carga cruda. Para diagnosticar por qué un sensor no aparece.",
+        "description": "Motivo (`no_registrado`, `dado_de_baja`, `malformada`, `invalida`), detalle concreto del rechazo, dispositivo si se identificó, tópico y la carga cruda acotada (texto UTF-8 o, si es binaria, hexadecimal: ver `payload_formato`). Lo que no trae credencial no aparece aquí: lo corta el broker. Para diagnosticar por qué un sensor no aparece.",
         "operationId": "CuarentenaController_listar",
         "parameters": [
           {

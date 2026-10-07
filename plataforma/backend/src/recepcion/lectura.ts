@@ -9,6 +9,11 @@ export interface Lectura {
   tiempo?: Date;         // marca de tiempo del emisor; si falta, se usa la hora de recepción
 }
 
+// Quién puso la marca de tiempo de una lectura (medicion.origen_tiempo, migración 08). El adaptador
+// declara la suya; 'recepcion' no lo declara nadie: lo pone el pipeline cuando descarta la marca por
+// ausente o no plausible (docs/13, regla 7).
+export type OrigenTiempo = 'dispositivo' | 'pasarela' | 'recepcion';
+
 export interface ContextoTrama {
   topico: string;
   idFisico: string;      // del tópico: sitio/<sitio>/dispositivo/<id_fisico>/<magnitud>

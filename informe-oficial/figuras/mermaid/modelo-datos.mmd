@@ -4,10 +4,12 @@ erDiagram
     dispositivo ||--o{ condicion : condicion
     regla_umbral ||--o{ condicion : condicion
     dispositivo ||--o{ credencial : credencial
+    dispositivo ||--o{ cuarentena : cuarentena
     zona ||--o{ dispositivo : dispositivo
     dispositivo ||--o{ evento : evento
     canal ||--o{ medicion : medicion
     canal ||--o{ regla_umbral : regla_umbral
+    dispositivo ||--o{ trama : trama
     sitio ||--o{ usuario_sitio : usuario_sitio
     usuario ||--o{ usuario_sitio : usuario_sitio
     sitio ||--o{ zona : zona
@@ -40,7 +42,9 @@ erDiagram
         text topico
         text motivo
         bytea payload_crudo
-        timestamptz recibido_en
+        timestamptz recibido_en PK
+        text detalle
+        uuid dispositivo_id FK
     }
     dispositivo {
         uuid id PK
@@ -73,6 +77,8 @@ erDiagram
         timestamptz tiempo
         float valor
         text unidad
+        timestamptz recibido_en
+        text origen_tiempo
     }
     regla_umbral {
         uuid id PK
@@ -90,6 +96,14 @@ erDiagram
         text zona_horaria
         timestamptz actualizado_en
         bool activo
+    }
+    trama {
+        uuid id PK
+        uuid dispositivo_id FK
+        timestamptz recibido_en PK
+        text topico
+        bytea payload
+        text adaptador
     }
     usuario {
         uuid id PK

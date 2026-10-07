@@ -15,12 +15,16 @@ import { aCanonica } from './unidades';
 const PATRON_TOPICO = /^sitio\/([^/]+)\/dispositivo\/([^/]+)\/([^/]+)$/;
 
 interface Dispositivo { id: string; estado: 'activo' | 'mantenimiento' | 'baja' }
+// Dominio cerrado: el mismo CHECK de la migración 09. Agregar un motivo exige migración, no solo código.
+type Motivo = 'no_registrado' | 'dado_de_baja' | 'malformada' | 'invalida';
+// Lo que se sabe de la trama al rechazarla. dispositivoId solo existe si el filtro 1 pudo atribuirla.
+interface TramaRecibida { topico: string; carga: Buffer; recibidoEn: Date; dispositivoId?: string }
 interface Canal { id: string; magnitud: string; unidad_canonica: string; rango_min: number | null; rango_max: number | null }
 
 // M1 Recepción + M2 Normalización (pipeline). Los seis filtros: 1 autenticar · 2 analizar · 3 validar ·
 // 4 normalizar · 5 alertar (con AlertasService) · 6 supervisar (con SupervisionService).
 //
-//   trama ─► [1] ¿registrado y activo? ──no──► cuarentena "desconocido"
+//   trama ─► [1] ¿registrado y activo? ──no──► cuarentena "no_registrado" o "dado_de_baja"
 //             │
 //             ▼
 //           [2] ¿algún adaptador la entiende? ──no──► cuarentena "malformada"
@@ -30,6 +34,8 @@ interface Canal { id: string; magnitud: string; unidad_canonica: string; rango_m
 //             │
 //             ▼
 //           [4] convertir a unidad canónica · fijar tiempo · INSERT medicion (hypertable)
+//             │  (rechazos de [3] acumulados → UNA fila de cuarentena con todos los porqués)
+//             │  (si guardó al menos una lectura → INSERT trama cruda, 30 días)
 //             │
 //             ▼
 //           [5] umbrales con histéresis → abre/cierra condición "umbral" (AlertasService)
@@ -60,15 +66,24 @@ export class RecepcionService implements OnModuleInit {
   }
 
   async procesar(topico: string, carga: Buffer): Promise<void> {
+    // La hora de llegada se toma ANTES de consultar la base: es la del mensaje, no la del final del pipeline.
+    const recibidoEn = new Date();
     const partes = PATRON_TOPICO.exec(topico);
-    if (!partes) return this.cuarentena(topico, carga, 'malformada', 'tópico fuera del patrón');
+    const trama: TramaRecibida = { topico, carga, recibidoEn };
+    if (!partes) return this.cuarentena(trama, 'malformada', 'tópico fuera del patrón sitio/<sitio>/dispositivo/<id>/<magnitud>');
     const ctx: ContextoTrama = { topico, idFisico: partes[2], magnitudTopico: partes[3].toLowerCase(), carga };
 
     // ── [1] Autenticar: credencial válida (ya la verificó el broker) ≠ dispositivo dado de alta ──
     const dispositivo = await this.buscarDispositivo(ctx.idFisico);
-    if (!dispositivo || dispositivo.estado === 'baja') {
-      return this.cuarentena(topico, carga, 'desconocido', `id_fisico=${ctx.idFisico}`);
+    // Sin credencial la trama ni siquiera llega aquí: la corta el broker (allow_anonymous false + ACL).
+    // Llega con credencial válida y sin alta, o con alta dada de baja: la clave vive en el passwd del broker
+    // y el alta en la base. Un dado de baja SÍ queda identificado: es la señal de que su clave sigue viva.
+    if (!dispositivo) return this.cuarentena(trama, 'no_registrado', `id_fisico=${ctx.idFisico} sin alta en la plataforma`);
+    if (dispositivo.estado === 'baja') {
+      return this.cuarentena({ ...trama, dispositivoId: dispositivo.id },
+        'dado_de_baja', `id_fisico=${ctx.idFisico}: revocar su credencial en el broker`);
     }
+    trama.dispositivoId = dispositivo.id;
 
     // ── [2] Analizar: el primer adaptador que reconozca el formato la traduce a lecturas ──
     // Una trama que no se entiende va a cuarentena, pero el pipeline NO termina aquí: el dispositivo ya
@@ -78,33 +93,35 @@ export class RecepcionService implements OnModuleInit {
     let lecturas: Lectura[] = [];
     const adaptador = this.adaptadores.find((a) => a.reconoce(ctx));
     if (!adaptador) {
-      await this.cuarentena(topico, carga, 'malformada', 'ningún adaptador reconoce el formato');
+      await this.cuarentena(trama, 'malformada', 'ningún adaptador reconoce el formato (SenML, plano)');
     } else {
       try {
         lecturas = adaptador.analizar(ctx);
       } catch (e) {
         if (!(e instanceof TramaMalformada)) throw e;
-        await this.cuarentena(topico, carga, 'malformada', `${adaptador.nombre}: ${e.message}`);
+        await this.cuarentena(trama, 'malformada', `${adaptador.nombre}: ${e.message}`);
       }
     }
 
     // ── [3] Validar y [4] Normalizar, lectura por lectura ──
-    const recibidoEn = new Date();
+    // Los rechazos se acumulan: una trama con tres lecturas malas deja UNA fila de cuarentena (con su payload
+    // una sola vez) y los tres porqués en el detalle, no tres copias del mismo payload.
+    const rechazos: string[] = [];
     let guardadas = 0;
     let duplicadas = 0;
     for (const l of lecturas) {
       const canal = await this.buscarCanal(dispositivo.id, l.magnitud);
       if (!canal) {
-        await this.cuarentena(topico, carga, 'invalida', `canal no declarado: ${l.magnitud}`);
+        rechazos.push(`${l.magnitud}: canal no declarado para este dispositivo`);
         continue;
       }
       const valor = aCanonica(l.valor, l.unidad, canal.unidad_canonica);
       if (valor === undefined) {
-        await this.cuarentena(topico, carga, 'invalida', `unidad ${l.unidad} no convertible a ${canal.unidad_canonica}`);
+        rechazos.push(`${l.magnitud}: unidad ${l.unidad} no convertible a ${canal.unidad_canonica}`);
         continue;
       }
       if ((canal.rango_min !== null && valor < canal.rango_min) || (canal.rango_max !== null && valor > canal.rango_max)) {
-        await this.cuarentena(topico, carga, 'invalida', `fuera de rango: ${valor} ${canal.unidad_canonica}`);
+        rechazos.push(`${l.magnitud}: ${valor} ${canal.unidad_canonica} fuera del rango físico [${canal.rango_min ?? '−∞'}, ${canal.rango_max ?? '∞'}]`);
         continue;
       }
       const tiempo = tiempoPlausible(l.tiempo, recibidoEn);
@@ -115,11 +132,15 @@ export class RecepcionService implements OnModuleInit {
       // clock_timestamp() (microsegundos) en vez del Date de JavaScript (milisegundos), porque una ráfaga
       // de tramas en cola se procesa en el mismo milisegundo y colisionaría entre sí (visto el 15/09).
       const tiempoDelEmisor = tiempo !== recibidoEn;
+      // recibido_en y origen_tiempo (migración 08): la fila dice de dónde salió `tiempo` y permite medir la
+      // deriva del reloj del emisor (recibido_en − tiempo, RF-47). Con origen 'recepcion' esa deriva no
+      // significa nada (tiempo lo puso la base microsegundos después): la vista de salud la excluye.
       const r = await this.pool.query(
-        `INSERT INTO medicion (canal_id, tiempo, valor, unidad)
-         VALUES ($1, COALESCE($2::timestamptz, clock_timestamp()), $3, $4)
+        `INSERT INTO medicion (canal_id, tiempo, valor, unidad, recibido_en, origen_tiempo)
+         VALUES ($1, COALESCE($2::timestamptz, clock_timestamp()), $3, $4, $5, $6)
          ON CONFLICT (canal_id, tiempo) DO NOTHING`,
-        [canal.id, tiempoDelEmisor ? tiempo : null, valor, canal.unidad_canonica],
+        [canal.id, tiempoDelEmisor ? tiempo : null, valor, canal.unidad_canonica, recibidoEn,
+          tiempoDelEmisor ? adaptador?.origenTiempo : 'recepcion'],
       );
       if (r.rowCount === 0) {
         duplicadas++;
@@ -128,6 +149,16 @@ export class RecepcionService implements OnModuleInit {
       guardadas++;
       // ── [5] Alertar: ¿la medición cruza un umbral de este canal? ──
       await this.alertas.evaluar(dispositivo.id, canal.id, ctx.idFisico, valor, canal.unidad_canonica);
+    }
+
+    if (rechazos.length) await this.cuarentena(trama, 'invalida', rechazos.join('; '));
+    // Trama cruda aceptada (migración 09): solo si dejó al menos una lectura nueva. Una reentrega duplicada
+    // no se vuelve a guardar: su original ya está. Vence a los RETENCION_TRAMA_DIAS (RetencionService).
+    if (guardadas) {
+      await this.pool.query(
+        'INSERT INTO trama (dispositivo_id, recibido_en, topico, payload, adaptador) VALUES ($1, $2, $3, $4, $5)',
+        [dispositivo.id, recibidoEn, topico, carga, adaptador?.nombre],
+      );
     }
 
     // ── [6] Supervisar: el dispositivo dio señales de vida; si estaba "sin comunicación", se cierra ──
@@ -155,13 +186,15 @@ export class RecepcionService implements OnModuleInit {
     return r.rows[0];
   }
 
-  // La trama rechazada se guarda CRUDA con su motivo y un detalle: no contamina las series,
-  // pero permite diagnosticar ("¿por qué el nodo 7 manda basura desde ayer?").
-  private async cuarentena(topico: string, carga: Buffer, motivo: string, detalle: string): Promise<void> {
+  // La trama rechazada se guarda CRUDA con su motivo y su detalle: no contamina las series,
+  // pero permite diagnosticar ("¿por qué el nodo 7 manda basura desde ayer?"). El detalle va a la base
+  // (lo consulta el usuario y no vence con la rotación de logs) y también al log (lo observa el equipo).
+  private async cuarentena(t: TramaRecibida, motivo: Motivo, detalle: string): Promise<void> {
     await this.pool.query(
-      'INSERT INTO cuarentena (origen, topico, motivo, payload_crudo) VALUES ($1, $2, $3, $4)',
-      ['mqtt', topico, motivo, carga],
+      `INSERT INTO cuarentena (origen, topico, motivo, payload_crudo, detalle, dispositivo_id, recibido_en)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      ['mqtt', t.topico, motivo, t.carga, detalle, t.dispositivoId ?? null, t.recibidoEn],
     );
-    this.log.warn(`cuarentena (${motivo}) ${topico} · ${detalle}`);
+    this.log.warn(`cuarentena (${motivo}) ${t.topico} · ${detalle}`);
   }
 }

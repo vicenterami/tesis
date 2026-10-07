@@ -106,8 +106,9 @@ CBOR & Compacto y estándar & Ilegible a ojo; librería adicional en el nodo \\
 \section{Identificación de dispositivos}
 
 El registro (aprovisionamiento) declara identidad, tipo, ubicación y credencial; cada trama se
-autoidentifica con el campo \texttt{bn}. La validación cruza ambos: dispositivo desconocido se
-rechaza y se registra el intento; trama malformada de dispositivo conocido va a cuarentena; unidad
+autoidentifica con el campo \texttt{bn}. La validación cruza ambos: sin credencial, el broker
+corta la conexión; con credencial pero sin alta (o dado de baja), la trama va a cuarentena como
+«no registrado» (o «dado de baja») y queda el intento; trama malformada de dispositivo conocido va a cuarentena; unidad
 que no corresponde al tipo declarado va a cuarentena. Un sensor nuevo no exige tocar código: se
 registra y sus tramas ya se entienden.
 
@@ -234,7 +235,7 @@ ligereza.
 \texttt{magnitud} es un catálogo con unidad canónica y rango físico & Da al filtro de validación un criterio objetivo: un valor fuera de rango o con unidad no convertible va a cuarentena \\
 \texttt{credencial} es una entidad aparte & Permite rotar la credencial sin borrar el dispositivo y conservar el historial \\
 \texttt{condicion} tiene apertura y cierre & Modela un estado con duración (sensor caído de 14:00 a 16:30), no un evento puntual; un índice único impide dos condiciones abiertas del mismo tipo y regla \\
-\texttt{cuarentena} sin relaciones & Lo malformado nunca entra a las series; se conserva crudo para diagnóstico \\
+\texttt{cuarentena} aparte de las series, atribuida al dispositivo cuando se sabe cuál es & Lo rechazado nunca entra a \texttt{medicion}; se conserva crudo, con motivo y detalle, para diagnóstico \\
 \texttt{sitio.zona\_horaria} con nombre IANA & Los filtros por día se resuelven en la zona del sitio dentro de la base (sección~\ref{sec:tiempo}) \\
 \texttt{medicion} como \emph{hypertable} & Particionada por tiempo en fragmentos de siete días; agregación con \texttt{time\_bucket} \\
 \end{tabular}

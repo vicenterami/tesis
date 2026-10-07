@@ -41,7 +41,7 @@ los gigabytes, y de los gigabytes casi todo lo demás. Rubros y qué los mueve:
 | Crudo | Cada lectura, sin comprimir | 2 años | fragmentos de 7 días (ya configurado) |
 | Agregado horario | mín, máx, promedio, cuenta por canal y hora, en la zona del sitio | indefinido | vista materializada refrescada por tarea programada (Etapa 3; el agregado continuo es Timescale License) |
 | Agregado diario | ídem por día | indefinido | vista materializada refrescada por tarea (Etapa 3) |
-| Crudo antiguo | > 2 años | se borra con `drop_chunks` (función Apache) desde una tarea programada del backend, o se exporta a archivo antes | tarea de retención (Etapa 3; la política automática es Timescale License) |
+| Crudo antiguo | no vence por defecto (07/10, `docs/10 §8.4` punto 19) | si se define `RETENCION_MEDICION_DIAS`, se borra con `drop_chunks` (función Apache) desde la tarea de retención del backend; exportar a archivo antes | `RetencionService` (la política automática es Timescale License) |
 
 Con esto, **diez años de operación del escenario ocupan ≈ 4,6 GB sin compresión** (330 MB por año más ≈ 40 % de
 índices). El almacenamiento no es el problema; el consumo de memoria RAM sí: RNF-17 lo acota a 2 GB en un servidor de 4 GB.
@@ -118,5 +118,5 @@ complejidad sin retorno).
 ## 6. Pendiente
 
 - [ ] Recotizar en la calculadora de cada proveedor la semana previa a contratar; registrar fecha.
-- [ ] Vistas materializadas horaria y diaria, y tarea de retención de 2 años con `drop_chunks` (Etapa 3; edición Apache, decisión del 06/10/2026).
+- [ ] Vistas materializadas horaria y diaria (Etapa 3; edición Apache). La tarea de retención ya existe (`RetencionService`, 07/10): `trama` y `cuarentena` a 30 días; mediciones sin límite salvo que se configure.
 - [ ] Medir el consumo real bajo carga en el banco de pruebas (Etapa 4) y contrastar con el plan elegido.

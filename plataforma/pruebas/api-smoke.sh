@@ -20,7 +20,10 @@ caso() { # nombre · url · expresión python sobre `r` (json) o código HTTP es
     else echo "FALLA $nombre (HTTP $code) → ${body:0:160}"; fallos=$((fallos+1)); fi
   fi
 }
-caso "salud responde y ve 13+ tablas"           /salud            "r['estado']=='ok' and r['tablas']>=13"
+# Cuántas tablas debe ver /salud: las que crean las migraciones EN DISCO, no un número escrito a mano (07/10: decía
+# «>= 13» y habría seguido en verde con la tabla 14 sin aplicar). Fuente independiente de la base que se prueba.
+N_ESQUEMA=$(cat "$(dirname "$0")"/../db/init/*.sql | grep -ciE '^\s*CREATE TABLE')
+caso "salud responde y ve las $N_ESQUEMA tablas de las migraciones" /salud "r['estado']=='ok' and r['tablas']==$N_ESQUEMA"
 caso "dispositivos es una lista con zona IANA"  /dispositivos     "isinstance(r,list) and all('/' in d['zona_horaria'] for d in r)"
 caso "fechas de la API terminan en Z"           /dispositivos     "all((d['visto_por_ultima_vez'] or 'Z').endswith('Z') for d in r)"
 CANAL=$(curl -s "$API/dispositivos" | python3 -c "import sys,json; r=json.load(sys.stdin); print(r[0]['canales'][0]['id'] if r and r[0]['canales'] else '')")

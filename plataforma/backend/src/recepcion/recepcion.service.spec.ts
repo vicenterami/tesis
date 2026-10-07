@@ -8,7 +8,7 @@ import { RecepcionService } from './recepcion.service';
 
 // Prueba el CONTRATO del pipeline con la base y los módulos vecinos simulados (docs/10 §4):
 // «vivo» es salud del enlace, no calidad del dato. Un dispositivo autenticado que manda una trama
-// que ningún adaptador entiende va a cuarentena Y se marca vivo; uno desconocido, ni lo uno ni lo otro.
+// que ningún adaptador entiende va a cuarentena Y se marca vivo; uno no registrado, ni lo uno ni lo otro.
 describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar', () => {
   // Las cuarentenas que esta prueba provoca a propósito escriben WARN en el registro. Se dejan ver a
   // propósito (decisión del 23/09): el ruido de un rechazo es evidencia de que el filtro actúa; silenciarlo
@@ -47,11 +47,11 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
     expect(evaluar).not.toHaveBeenCalled(); // sin lecturas no hay umbral que evaluar
   });
 
-  it('dispositivo desconocido → cuarentena "desconocido" y NO se marca vivo (no pasó el filtro 1)', async () => {
+  it('dispositivo no registrado → cuarentena "no_registrado" y NO se marca vivo (no pasó el filtro 1)', async () => {
     const { servicio, query, marcarVivo } = armar(undefined);
     await servicio.procesar(TOPICO, Buffer.from('hola'));
 
-    expect(cuarentenas(query)).toEqual(['desconocido']);
+    expect(cuarentenas(query)).toEqual(['no_registrado']);
     expect(marcoVisto(query)).toBe(false);
     expect(marcarVivo).not.toHaveBeenCalled();
   });
@@ -87,6 +87,74 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
     expect(marcarVivo).toHaveBeenCalledTimes(1);
   });
 
+  // Migración 09: una fila de cuarentena por trama, con detalle y dispositivo; trama cruda si guardó algo.
+  const filasCuarentena = (query: jest.Mock) =>
+    query.mock.calls.filter(([sql]) => String(sql).startsWith('INSERT INTO cuarentena')).map(([, p]) => {
+      const [, , motivo, , detalle, dispositivoId, recibidoEn] = p as unknown[];
+      return { motivo, detalle: detalle as string, dispositivoId, recibidoEn };
+    });
+  const tramas = (query: jest.Mock) =>
+    query.mock.calls.filter(([sql]) => String(sql).startsWith('INSERT INTO trama')).map(([, p]) => p as unknown[]);
+
+  it('dos lecturas inválidas en una trama → UNA fila "invalida" con los dos porqués y el dispositivo', async () => {
+    const { servicio, query } = armar({ id: 'd1', estado: 'activo' });
+    await servicio.procesar(TOPICO, Buffer.from('[{"n":"temperatura","v":500},{"n":"presion","v":1013}]'));
+    const filas = filasCuarentena(query);
+    expect(filas).toHaveLength(1);
+    expect(filas[0].motivo).toBe('invalida');
+    expect(filas[0].detalle).toBe('temperatura: 500 Cel fuera del rango físico [-40, 85]; presion: canal no declarado para este dispositivo');
+    expect(filas[0].dispositivoId).toBe('d1');
+    expect(filas[0].recibidoEn).toBeInstanceOf(Date);
+    expect(tramas(query)).toHaveLength(0); // nada se guardó: no hay trama aceptada
+  });
+
+  it('no registrado → sin dispositivo_id; dado de baja → identificado y con la pista de revocar la credencial', async () => {
+    const noRegistrado = armar(undefined);
+    await noRegistrado.servicio.procesar(TOPICO, Buffer.from('21.5'));
+    expect(filasCuarentena(noRegistrado.query)[0]).toMatchObject({ motivo: 'no_registrado', dispositivoId: null });
+
+    const deBaja = armar({ id: 'd9', estado: 'baja' });
+    await deBaja.servicio.procesar(TOPICO, Buffer.from('21.5'));
+    const fila = filasCuarentena(deBaja.query)[0];
+    expect(fila).toMatchObject({ motivo: 'dado_de_baja', dispositivoId: 'd9' });
+    expect(fila.detalle).toContain('revocar su credencial');
+  });
+
+  it('una lectura buena y una mala → se guarda la trama cruda Y la mala va a cuarentena', async () => {
+    const { servicio, query } = armar({ id: 'd1', estado: 'activo' });
+    await servicio.procesar(TOPICO, Buffer.from('[{"n":"temperatura","v":21},{"n":"presion","v":1013}]'));
+    expect(filasCuarentena(query).map((f) => f.motivo)).toEqual(['invalida']);
+    const t = tramas(query);
+    expect(t).toHaveLength(1);
+    const [dispositivoId, recibidoEn, topico, , adaptador] = t[0];
+    expect({ dispositivoId, topico, adaptador }).toEqual({ dispositivoId: 'd1', topico: TOPICO, adaptador: 'senml' });
+    expect(recibidoEn).toBeInstanceOf(Date);
+  });
+
+  // Migración 08: cada medición dice cuándo llegó y quién puso su marca de tiempo (docs/10 §8.4 punto 12).
+  const insertMedicion = (query: jest.Mock) =>
+    query.mock.calls.find(([sql]) => String(sql).trimStart().startsWith('INSERT INTO medicion'))?.[1] as unknown[];
+
+  it('sin marca del emisor → origen_tiempo "recepcion", tiempo lo pone la base y recibido_en es la llegada', async () => {
+    const { servicio, query } = armar({ id: 'd1', estado: 'activo' });
+    const antes = Date.now();
+    await servicio.procesar(TOPICO, Buffer.from('22.4'));
+    const [, tiempo, , , recibidoEn, origen] = insertMedicion(query);
+    expect(tiempo).toBeNull();
+    expect(origen).toBe('recepcion');
+    expect((recibidoEn as Date).getTime()).toBeGreaterThanOrEqual(antes);
+  });
+
+  it('marca del emisor plausible → origen_tiempo el que declara el adaptador ("dispositivo")', async () => {
+    const { servicio, query } = armar({ id: 'd1', estado: 'activo' });
+    const hace1min = Math.floor(Date.now() / 1000) - 60;
+    await servicio.procesar(TOPICO, Buffer.from(`{"valor":21.5,"tiempo":${hace1min}}`));
+    const [, tiempo, , , recibidoEn, origen] = insertMedicion(query);
+    expect((tiempo as Date).getTime()).toBe(hace1min * 1000);
+    expect(origen).toBe('dispositivo');
+    expect((recibidoEn as Date).getTime()).toBeGreaterThan((tiempo as Date).getTime()); // deriva medible
+  });
+
   it('tópico fuera del patrón → cuarentena "malformada" ANTES del filtro 1: sin identidad no hay a quién marcar vivo', async () => {
     const { servicio, query, marcarVivo } = armar({ id: 'd1', estado: 'activo' });
     await servicio.procesar('otra/cosa', Buffer.from('22.4'));
@@ -102,11 +170,11 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
     expect(marcarVivo).toHaveBeenCalledTimes(1);
   });
 
-  it('dispositivo dado de baja → tratado como desconocido', async () => {
+  it('dispositivo dado de baja → cuarentena "dado_de_baja", no se marca vivo', async () => {
     const { servicio, query, marcarVivo } = armar({ id: 'd9', estado: 'baja' });
     await servicio.procesar(TOPICO, Buffer.from('21.5'));
 
-    expect(cuarentenas(query)).toEqual(['desconocido']);
+    expect(cuarentenas(query)).toEqual(['dado_de_baja']);
     expect(marcarVivo).not.toHaveBeenCalled();
   });
 });

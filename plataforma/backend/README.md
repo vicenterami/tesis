@@ -66,7 +66,7 @@ bash pruebas/publicar.sh temperatura 21.5          # pide la clave oculta si CLA
 docker compose exec timescaledb psql -U plataforma -d plataforma -c "SELECT topico, motivo, recibido_en FROM cuarentena ORDER BY recibido_en DESC LIMIT 3;"
 ```
 
-→ fila con motivo `desconocido`: el broker aceptó la credencial, pero la plataforma no tiene ese
+→ fila con motivo `no_registrado`: el broker aceptó la credencial, pero la plataforma no tiene ese
 dispositivo **dado de alta**. Regístralo y vuelve a publicar (atajo: `bash plataforma/pruebas/semilla-demo.sh`
 hace todos los `INSERT` de esta página de una vez, de forma idempotente, y verifica que quedaron):
 

@@ -30,12 +30,14 @@ uniformidad es la que resuelve la causa C1 (formatos dispares).
 | 8 | **regla_umbral** | Límite que, al cruzarse, abre una condición | Con histéresis (umbral de disparo y de restauración) |
 | 9 | **condicion** | Un estado anómalo abierto de un dispositivo | Se abre y se cierra; guarda inicio, fin y duración |
 | 10 | **evento** | Registro histórico de algo que pasó | Alta, baja, mantenimiento, apertura/cierre de condición |
-| 11 | **cuarentena** | Trama rechazada (malformada o de desconocido) | Se guarda cruda con su motivo; no contamina las series |
+| 11 | **cuarentena** | Trama rechazada por los filtros 1 a 3 (desconocida, malformada o inválida) | Cruda, con motivo y detalle, una fila por trama; no contamina las series. **Hypertable** desde la migración 09 (retención 30 días). Lo que no tiene credencial no llega: lo corta el broker |
 | 12 | **usuario** | Persona que accede a la plataforma | Con hash de contraseña, nunca en claro |
 | 13 | **usuario_sitio** | Qué usuario puede ver qué sitio y con qué rol | Multi-tenencia: aísla los datos entre sitios |
+| 14 | **trama** | Trama cruda de un mensaje aceptado (al menos una lectura guardada) | **Hypertable**, solo inserción, retención 30 días: auditoría y re-decodificación si un adaptador tuvo un error (migración 09) |
 
-Trece entidades (OE3 pide ≥ 8). La tabla de series de tiempo (`medicion`) es la única hypertable; el
-resto son tablas relacionales normales de PostgreSQL.
+14 entidades (OE3 pide ≥ 8). Tres son hypertables, particionadas por tiempo: `medicion` (la serie de tiempo)
+y, desde la migración 09, `trama` y `cuarentena` (para borrar lo vencido por fragmentos enteros con
+`drop_chunks`). El resto son tablas relacionales normales de PostgreSQL.
 
 ## 3. Diagrama entidad-relación
 
@@ -48,10 +50,12 @@ erDiagram
     dispositivo ||--o{ condicion : condicion
     regla_umbral ||--o{ condicion : condicion
     dispositivo ||--o{ credencial : credencial
+    dispositivo ||--o{ cuarentena : cuarentena
     zona ||--o{ dispositivo : dispositivo
     dispositivo ||--o{ evento : evento
     canal ||--o{ medicion : medicion
     canal ||--o{ regla_umbral : regla_umbral
+    dispositivo ||--o{ trama : trama
     sitio ||--o{ usuario_sitio : usuario_sitio
     usuario ||--o{ usuario_sitio : usuario_sitio
     sitio ||--o{ zona : zona
@@ -84,7 +88,9 @@ erDiagram
         text topico
         text motivo
         bytea payload_crudo
-        timestamptz recibido_en
+        timestamptz recibido_en PK
+        text detalle
+        uuid dispositivo_id FK
     }
     dispositivo {
         uuid id PK
@@ -117,6 +123,8 @@ erDiagram
         timestamptz tiempo
         float valor
         text unidad
+        timestamptz recibido_en
+        text origen_tiempo
     }
     regla_umbral {
         uuid id PK
@@ -134,6 +142,14 @@ erDiagram
         text zona_horaria
         timestamptz actualizado_en
         bool activo
+    }
+    trama {
+        uuid id PK
+        uuid dispositivo_id FK
+        timestamptz recibido_en PK
+        text topico
+        bytea payload
+        text adaptador
     }
     usuario {
         uuid id PK
@@ -166,7 +182,7 @@ erDiagram
 | **`magnitud` es un catálogo con unidad canónica y rango** | Permite validar en el pipeline (filtro 3): un valor fuera del rango o con unidad que no calza va a cuarentena |
 | **`credencial` es una entidad aparte, no un campo del dispositivo** | Permite **rotar** la credencial sin borrar ni recrear el dispositivo, y llevar histórico |
 | **`condicion` tiene `abierta_en` y `cerrada_en`** | Modela un estado con duración (sensor caído desde las 14:00, restaurado a las 16:30), no un evento puntual |
-| **`cuarentena` está separada de `medicion`** | Lo malformado nunca entra a las series; se conserva crudo para diagnóstico (resuelve la pregunta de defensa «¿y si mandan cualquier cosa?») |
+| **`cuarentena` está separada de `medicion`, atribuida al dispositivo cuando se sabe cuál es** | Lo rechazado nunca entra a las series; se conserva crudo, con motivo y detalle, para diagnóstico (resuelve la pregunta de defensa «¿y si mandan cualquier cosa?») |
 | **`usuario_sitio` como tabla intermedia con rol** | Multi-tenencia: un usuario ve solo sus sitios; el aislamiento se aplica en la capa de datos (RNF-08/RF-41) |
 | **`sitio.zona_horaria` con nombre IANA** | Los filtros por día se resuelven en la zona del sitio dentro de la base; un desfase fijo fallaría con el horario de verano (`docs/13`) |
 | **Identificadores `uuid`** | Evitan colisiones al fusionar datos de varios sitios y no revelan volumen (a diferencia de un id secuencial) |
@@ -192,7 +208,7 @@ PostgreSQL en producción y se verificaron contra la base real (`plataforma/prue
 | Restricciones con nombre | Toda restricción se nombra con prefijo: `pk_`, `fk_<tabla>_<destino>`, `uq_`, `ck_`, `idx_`, `trg_`, `fn_` | Un nombre autogenerado (`canal_dispositivo_id_fkey`) no dice qué protege ni se puede citar en un informe o en un error | ✅ 32/32 |
 | Índice por cada FK | Cada clave foránea lleva su índice | Postgres no lo crea solo; sin él cada `JOIN` y cada `ON DELETE` recorre la tabla | ✅ 0 FK sin índice |
 | Tipos | `text` (nunca `varchar(n)`), `timestamptz` (nunca `timestamp`), `uuid`, `boolean`. `double precision` **solo** para mediciones físicas, que tienen incertidumbre propia; `numeric(p,s)` para dinero o cantidades exactas (no hay hoy) | Un límite arbitrario obliga a migrar; un `timestamp` sin zona es ambiguo; el flotante binario no sirve para dinero | ✅ |
-| Auditoría | `creado_en` y `actualizado_en` con disparador `trg_<tabla>_actualizado_en` en toda tabla mutable; las de solo inserción (`medicion`, `evento`, `cuarentena`) llevan solo su instante | Saber cuándo cambió algo sin depender de la aplicación. `creado_por`/`actualizado_por` llegarán con M7 (usuarios) | ✅ 9 tablas |
+| Auditoría | `creado_en` y `actualizado_en` con disparador `trg_<tabla>_actualizado_en` en toda tabla mutable; las de solo inserción (`medicion`, `evento`, `cuarentena`, `trama`) llevan solo su instante | Saber cuándo cambió algo sin depender de la aplicación. `creado_por`/`actualizado_por` llegarán con M7 (usuarios) | ✅ 9 tablas |
 | Baja lógica | `dispositivo.estado = 'baja'`, `sitio.activo`, `usuario.activo`, `credencial.activa`; nunca `DELETE` sobre entidades con historia | Conserva la historia y no rompe las filas que referencian el registro | ✅ |
 | Dominios cerrados | Si el **código** interpreta los valores (`estado`, `condicion.tipo`, `rol`, `cuarentena.motivo` desde la migración 07) → `CHECK`. Si el **usuario** los administra (magnitudes) → tabla catálogo con código estable y nombre visible | Un `CHECK` exige `ALTER` para crecer y no guarda etiqueta ni orden; un catálogo para valores que solo entiende el código sería una indirección vacía | ✅ |
 | Foto por valor | Lo que un registro **posee** se copia (`medicion.unidad`, `evento.detalle` con el umbral vigente); lo que **referencia** se lee por FK (`condicion.regla_id` como procedencia) | Cambiar el catálogo o una regla no debe reinterpretar el pasado | ✅ |
@@ -226,7 +242,8 @@ consistente para reportes.
 
 ## 8. Pendiente
 
-- [ ] Retención con `drop_chunks` desde una tarea programada y agregados como vistas materializadas (edición Apache
+- [x] Retención con `drop_chunks` desde una tarea programada (`RetencionService`, 07/10/2026: `trama` y `cuarentena` 30 días;
+      `medicion` sin límite salvo que se defina `RETENCION_MEDICION_DIAS`; cada corrida queda en `evento`; los agregados como vistas materializadas siguen pendientes) y agregados como vistas materializadas (edición Apache
       de TimescaleDB, decisión del 06/10/2026: `docs/14 §2`, `docs/10 §8.4` punto 11).
 - [ ] Validar el modelo contra el catálogo de magnitudes real, cuando se acuerden los sensores con el
       compañero.
@@ -237,7 +254,7 @@ consistente para reportes.
       una pasarela sirve a muchos dispositivos y tiene estado propio.
 - [ ] **Ubicación geográfica**: `dispositivo.latitud` y `dispositivo.longitud` (`double precision`, opcionales,
       `CHECK` de rango). Sin PostGIS: no hay consultas espaciales, solo un mapa; se agrega si algún día las hay.
-- [ ] **Tabla `trama`** (trama cruda aceptada; `docs/10 §8.4`): `dispositivo_id`, `recibido_en`, `topico`,
+- [x] **Tabla `trama`** (implementada en la migración 09, 07/10/2026; trama cruda aceptada; `docs/10 §8.4`): `dispositivo_id`, `recibido_en`, `topico`,
       `payload bytea`, `adaptador text`. Solo inserción, sin `actualizado_en`; hypertable por `recibido_en` con
       retención configurable (30 días). La trama es «foto por valor» (§7): nunca se reinterpreta.
 - [ ] **Magnitudes nuevas** del caso de uso (entrevista del 05/10): `radon` (`Bq/m3`, unidad propia: el catálogo
@@ -255,7 +272,8 @@ consistente para reportes.
       `recibido_en − tiempo` por dispositivo en la vista de salud (RF-47). Para LoRaWAN, la hora de la pasarela
       (`time` del mensaje Milesight; `rxInfo` de ChirpStack) es más confiable que la del nodo: el adaptador la
       declara como `pasarela`. La hora de guardado es la del COMMIT y, con la confirmación tras persistir
-      (`docs/10 §8.4` punto 4), queda a milisegundos de `recibido_en`: no hace falta una cuarta columna.
+      (`docs/10 §8.4` punto 4), queda a milisegundos de `recibido_en`: no hace falta una cuarta columna. **Implementado** en `db/init/08-hora-recepcion.sql`
+      (CHECK `ck_medicion_recepcion`, `NOT VALID`: rige para toda fila nueva; las anteriores quedan NULL).
 - [ ] **Marcas del sistema frente a edición humana** (kit de método, 06/10/2026): `visto_por_ultima_vez` y
       `en_linea` las escribe el supervisor sobre `dispositivo`, y el disparador mueve `actualizado_en` en cada UPDATE.
       Si el panel usa control optimista sobre `dispositivo`, un barrido provocará «otro usuario lo modificó» falsos.
