@@ -22,7 +22,7 @@
 | TimescaleDB: hypertables particionan por tiempo; `time_bucket` agrega en la BD | ✅ Confirmado | Documentación oficial de TimescaleDB |
 
 **Conclusión sobre el argumento de recursos:** ThingsBoard declara **≥ 4 GB** en su documentación oficial.
-Que el stack propuesto opere en 2 GB (RNF-17) es una **meta que se valida en la Etapa 4**, con la pila completa
+Que el stack propuesto consuma a lo más 2 GB de RAM (RNF-17) es una **meta que se valida en la Etapa 4**, con la pila completa
 y bajo carga; no es un resultado y no se cita como logro (corregido el 01/10/2026).
 
 ---

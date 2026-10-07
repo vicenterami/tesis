@@ -155,8 +155,8 @@ backend no guarda estado, por lo que puede recrearse sin pérdida. Cada contened
 fijada, no puede escalar privilegios, se reinicia solo ante fallas y tiene un techo de memoria y CPU.
 
 
-La suma de techos es de aproximadamente 1,95~GB, coherente con el RNF-17 (operar en un servidor de
-2~GB). Esa suma es la del despliegue completo; los tres
+La suma de techos es de aproximadamente 1,95~GB, coherente con el RNF-17 (consumo de a lo más
+2~GB de RAM). Esa suma es la del despliegue completo; los tres
 contenedores hoy implementados suman 1,5~GB de techo, y el consumo real se mide en la Etapa~4. Los
 límites cumplen además una segunda función: definen el \textbf{entorno de referencia} del banco de pruebas
 de la Etapa~4, para que la comparación no dependa del equipo de desarrollo.
@@ -169,7 +169,7 @@ resultan 14\,400 filas diarias y unos 5,3 millones al año, del orden de 330~MB 
 compresión por columnas de TimescaleDB para fragmentos antiguos (razones típicas de 10 a 20 veces) y
 una política en capas —crudo reciente 30 días, crudo comprimido dos años, agregados horarios y diarios
 indefinidos— diez años de operación caben en menos de 1~GB. El almacenamiento no es el problema; la
-memoria mínima del servidor sí, y la fija el RNF-17.
+memoria RAM consumida sí, y la acota el RNF-17.
 
 Se compararon cinco alternativas de alojamiento que ejecutan el mismo despliegue, con precios
 consultados el 10 de septiembre de 2026 y convertidos con el dólar observado de la fecha

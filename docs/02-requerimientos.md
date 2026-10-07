@@ -260,7 +260,7 @@ es realmente multiprotocolo: es monoprotocolo con excepciones.
 |---|---|---|---|:---:|
 | **RNF-14** | El sistema debe poder **desplegarse completo en un único servidor** con recursos modestos, sin dependencia de servicios propietarios de nube | Despliegue verificado en máquina local | [PO] | **M** |
 | **RNF-15** | El sistema debe construirse **exclusivamente con componentes de código abierto**, sin licencias de pago | Inventario de dependencias | [PO] | **M** |
-| **RNF-17** | La plataforma completa (broker, base de datos, backend, interfaz y, de existir, el servidor de red) debe **operar en un servidor de 2 GB de memoria**, por debajo de las exigencias del referente comercial | Medición de consumo en reposo y bajo carga en la Etapa 4 | [DP] [EM] | **M** |
+| **RNF-17** | La plataforma completa (broker, base de datos, backend, interfaz y, de existir, el servidor de red) debe **consumir a lo más 2 GB de memoria RAM**, en reposo y bajo carga, en un servidor de 4 GB (la mitad del servidor recomendado), por debajo del mínimo que declara el referente de código abierto (ThingsBoard CE: 4 GB) | Medición de consumo en reposo y bajo carga en la Etapa 4 (`docker stats`) | [DP] [EM] | **M** |
 | **RNF-18** | La recepción debe tener una **disponibilidad ≥ 99 %** en una ventana continua de 72 horas (≤ 43 min de indisponibilidad) — agregado 22/09/2026 tras la retroalimentación (observación 6), umbral de OE5 que no tenía RNF de respaldo | Emulador publicando cada minuto en el banco de pruebas de la Etapa 4; se cuentan las ventanas sin confirmación | [DP] | **M** |
 | **RNF-16** | La trama nativa debe cumplir **SenML (RFC 8428)**; la rama LoRa, de concretarse, debe caber en el payload disponible del plan regional | Validación de esquema + verificación de tamaño | [BT] | **M** |
 
@@ -283,6 +283,9 @@ El cambio de imagen y de esquema es trabajo de la Etapa 3 (`docs/10 §8.4`, punt
 **RNF-17 (06/10/2026).** Se mantiene como requisito: la memoria es un criterio ponderado al comparar brokers y bases,
 no un veto. Si la evolución del proyecto exigiera superar los 2 GB (por ejemplo, un broker con más capacidades), se
 renegocia con el profesor guía antes de cambiar OE5: los requisitos evolucionan, pero no se incumplen en silencio.
+Redacción corregida el 06/10/2026: decía «operar en un servidor de 2 GB de memoria», ambiguo (¿RAM o disco?) e
+incoherente con OE5 («a lo más 2 GB, la mitad del servidor recomendado»). El límite es de **RAM consumida**; el
+almacenamiento en disco no tiene requisito propio y se dimensiona en `docs/14 §2`.
 
 ---
 

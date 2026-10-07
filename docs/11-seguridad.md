@@ -214,7 +214,8 @@ de desarrollo:
 - [ ] `HTTP_DOCS` ausente o distinto de `si` en el servidor: `/docs` apagada (se verifica con
       `curl -o /dev/null -w '%{http_code}' https://…/docs` → 404).
 - [ ] Rol de base de datos del backend sin `DROP`/`TRUNCATE` (capa 6).
-- [ ] Respaldo automático configurado y **una restauración probada** antes de recibir datos reales.
+- [ ] Respaldo automático configurado (`pg_dump` diario, cifrado, copia fuera del servidor) y **una restauración
+      probada** antes de recibir datos reales; RPO y RTO decididos con el usuario (`docs/10 §9.5`).
 - [ ] Cortafuegos del servidor coordinado con Docker (regla `DOCKER-USER`), documentado en §4.
 - [ ] `docker compose config` en el servidor para revisar la configuración efectiva final: cero
       `ports` salvo los del proxy.

@@ -44,7 +44,7 @@ los gigabytes, y de los gigabytes casi todo lo demás. Rubros y qué los mueve:
 | Crudo antiguo | > 2 años | se borra con `drop_chunks` (función Apache) desde una tarea programada del backend, o se exporta a archivo antes | tarea de retención (Etapa 3; la política automática es Timescale License) |
 
 Con esto, **diez años de operación del escenario ocupan ≈ 4,6 GB sin compresión** (330 MB por año más ≈ 40 % de
-índices). El almacenamiento no es el problema; la memoria mínima del servidor sí, y está fijada por RNF-17 en 2 GB.
+índices). El almacenamiento no es el problema; el consumo de memoria RAM sí: RNF-17 lo acota a 2 GB en un servidor de 4 GB.
 
 **Qué se guarda y qué no.** Un sensor que reporta cada segundo un fenómeno que cambia cada cinco
 minutos multiplica el costo por trescientos sin agregar información. El intervalo lo fija el
@@ -57,7 +57,7 @@ Todas ejecutan el mismo `docker-compose.yml`: la decisión es **reversible**. Pr
 10 de septiembre de 2026; conversión con **dólar observado 925,65 CLP** (9-sep-2026, SII) y **euro
 1 081,86 CLP** (6-sep-2026); se redondea.
 
-| Alt. | Descripción | Plan de referencia (≥ 2 GB, cumple RNF-17) | Costo mensual | Costo anual | Fuente |
+| Alt. | Descripción | Plan de referencia (≥ 4 GB de RAM para un consumo ≤ 2 GB, RNF-17) | Costo mensual | Costo anual | Fuente |
 |---|---|---|---|---|---|
 | **A** | VPS internacional (Europa) | Hetzner CX23, 2 vCPU · 4 GB · 40 GB, o CAX11 ARM 2 vCPU · 4 GB | €5,49–5,99 ≈ **CLP 5 900–6 500** | ≈ CLP 71 000–78 000 | [Hetzner, precios 2026](https://bestusavps.com/reviews/hetzner/); [comparativa](https://www.bitdoze.com/hetzner-cloud-cost-optimized-plans/) |
 | **A'** | VPS internacional (EE. UU.) | DigitalOcean Basic 2 vCPU · 4 GB | USD 24 ≈ **CLP 22 200** | ≈ CLP 266 600 | [DigitalOcean 2026](https://infratally.com/articles/digitalocean-droplet-pricing-guide-2026/) |

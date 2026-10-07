@@ -45,7 +45,7 @@ abrir la consola interactiva, que se cierra con `\q`).
 Sensores de distintos fabricantes, con distintos formatos y relojes poco confiables, y una plataforma que
 debe recibirlos, validarlos, guardarlos como series de tiempo y avisar cuando algo anda mal, con menos de
 2 GB de memoria. Mostrar `docker stats --no-stream` y **decir la suma en voz alta**: lo construido hasta hoy
-ronda los 120 MB en reposo (base ~60, backend ~50, broker ~8; medido el 27/09). RNF-17 (2 GB) se valida en la
+ronda los 120 MB en reposo (base ~60, backend ~50, broker ~8; medido el 27/09). RNF-17 (≤ 2 GB de RAM) se valida en la
 Etapa 4, con la pila completa y bajo carga: no presentarlo como logro.
 
 ## 2. Una trama buena entra (2 min)

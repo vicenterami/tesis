@@ -447,7 +447,7 @@ flowchart TB
 | timescaledb (edición Apache, `-oss`) | **todo el dato** | `unless-stopped` | no |
 | backend | ninguna (sin estado) | `unless-stopped` | no (vía proxy) |
 
-**Suma de límites: ~1,95 GB** — coherente con RNF-17 (operar en ≤ 2 GB en reposo; los límites son
+**Suma de límites: ~1,95 GB** — coherente con RNF-17 (consumo ≤ 2 GB de RAM en reposo y bajo carga; los límites son
 techos, no consumo). Los límites de recursos cumplen doble función: proteger al servidor y ser el
 **entorno de referencia** del banco de pruebas (`docs/09`). **ChirpStack comparte el servidor PostgreSQL** (una base y un rol propios, aislados de la base de la
 plataforma) en lugar de traer un segundo PostgreSQL: ahorra ~100 MB de memoria en reposo, un
@@ -517,7 +517,8 @@ que sí es multihilo, y la carga de RNF-01 (50 eventos/s) se medirá en el banco
 sobre esta única instancia. Si algún día hiciera falta repartir carga entre varias, el camino
 documentado es: suscripciones compartidas de MQTT 5 (`$share/<grupo>/sitio/#`, admitidas por
 Mosquitto) para que las instancias se repartan las tramas, y `cluster` o `worker_threads` de Node para
-ocupar más núcleos. No está en el alcance: RNF-17 fija un servidor de 2 GB y RNF-14 un único servidor.
+ocupar más núcleos. No está en el alcance de esta etapa: RNF-14 fija un único servidor y RNF-17 acota el consumo a
+2 GB de RAM; el camino completo de crecimiento, con su orden y sus criterios, está en §9.
 
 > Fuentes (consultadas el 23/09/2026): Docker, *Networking overview* («ports are not accessible from
 > outside the host» sin `--publish`), https://docs.docker.com/engine/network/ · Node.js, *The Node.js
@@ -634,6 +635,10 @@ diseño (regla de concordancia): tras autenticar, el filtro 6 corre siempre.
 - [ ] Fijar `max_queued_messages`, `max_queued_bytes` y `autosave_interval` del broker de forma explícita y
       justificada por sitio (hoy rigen los defectos: 1000 mensajes, sin tope de bytes, guardado cada 1800 s; §4.1)
       y alertar cuando la cola se acerque al límite o `$SYS/broker/publish/messages/dropped` deje de ser cero.
+- [ ] Emulador (TT-28) con tráfico irregular: periodo propio por dispositivo, variación de latencia, pérdidas, ráfaga
+      con marcas antiguas tras una caída y deriva de reloj (§9.6), para probar picos y no promedios.
+- [ ] Decidir con el usuario la pérdida aceptable (RPO) y el tiempo de recuperación (RTO) antes de datos reales, y
+      montar el respaldo diario con restauración probada (§9.5).
 
 ### 8.4 Decisiones del 06/10/2026 (tras la entrevista y el acceso a la nube de Milesight)
 
@@ -714,4 +719,115 @@ TimescaleDB (8 observaciones), registro de brokers (258 filas).
 15. **Del kit de método (06/10):** toda migración lleva `SET LOCAL lock_timeout = '5s'`; cada barrido del supervisor
     deja una línea de resumen; las marcas que escribe el sistema sobre `dispositivo` no deben parecer una edición
     humana (decisión pendiente en `docs/08 §8` antes de HU-10); «valor congelado» entra como condición candidata.
+16. **Sección §9 (crecimiento, resiliencia y respaldo) aprobada y escrita el 06/10/2026**, con la corrección de
+    RNF-17 (es RAM consumida, no disco) propagada a `docs/02`, `docs/07`, `docs/14`, `docs/15` y al informe.
+
+## 9. Crecimiento, resiliencia y respaldo (aprobado el 06/10/2026)
+
+Esta sección responde a tres preguntas del estudiante: qué pasa si hay que guardar más, cómo y en qué orden
+crece el sistema, y qué guardas evitan perder datos. Está dimensionada para el alcance del trabajo (un sitio,
+decenas de dispositivos, un servidor de 4 GB) y dice qué se haría después, con el criterio para decidirlo, sin
+construirlo por anticipado. Cada afirmación sobre una herramienta tiene su fuente al final.
+
+### 9.1 Qué puede crecer y qué se hace
+
+| Recurso | Señal de que falta | Primero: vertical (misma máquina) | Después: horizontal (más piezas) | Hoy |
+|---|---|---|---|---|
+| **Disco** | El volumen `datos-timescale` se acerca al tope | Disco o partición más grande, sin cambiar nada del sistema; un segundo disco como *tablespace* de PostgreSQL (la función de TimescaleDB que dirige los fragmentos nuevos a otro disco no pasa por el módulo de licencia; la que mueve fragmentos viejos sí es Timescale License y no se usa) | No aplica mientras haya un solo primario; antes se exporta y se borra lo antiguo (`docs/14 §2`) | ≈ 0,46 GB por año en el escenario de 50 canales cada 5 min |
+| **RAM** | `docker stats` cerca de los techos; PostgreSQL con poca caché | Más RAM a la máquina; subir los techos del `compose` y `shared_buffers` | Una réplica de lectura saca del primario las consultas del panel y las exportaciones | ≈ 120 MB en reposo; techo 1,95 GB; límite RNF-17: 2 GB |
+| **CPU del backend** | Latencia de la API sube; la cola del broker crece aunque la base responda | `cluster` o `worker_threads` de Node para usar más núcleos (un proceso de Node ejecuta JavaScript en un solo hilo) | Varias instancias con suscripciones compartidas de MQTT 5 (`$share/<grupo>/sitio/#`) y el barrido del supervisor en una sola (cerrojo en la base) | Una instancia, a propósito (§6) |
+| **Broker** | Conexiones o mensajes por segundo | Más recursos al contenedor | Un broker por sitio enlazados con puentes; la edición abierta de Mosquitto no declara clúster | Un broker, techo 0,25 GB |
+| **Consultas** (panel, vista pública, exportación) | Historial de 30 días tarda más de 3 s (RNF-04) | Índices, agregados materializados por tarea | Réplicas de lectura con la replicación en flujo de PostgreSQL | Sin réplica; agregados pendientes |
+| **Escrituras** | Tramas por segundo sobre RNF-01 (50/s) | Lotes transaccionales (decisión 4), más CPU | No hay particionado entre servidores en TimescaleDB (el modo multinodo se eliminó en la 2.14); el camino sería una base por sitio decidida por la aplicación, o Citus | El caso real (5 a 10 sensores cada minutos) está dos órdenes de magnitud por debajo |
+
+### 9.2 Por qué escala así
+
+1. **El backend no guarda estado**: todo vive en la base. Copiar instancias es trivial. Lo único «con dueño» es
+   la suscripción MQTT (una sesión persistente por `clientId`) y el barrido del supervisor: el broker reparte con
+   `$share` y el barrido corre en una sola instancia mediante un cerrojo (`pg_advisory_lock`). El orden entre
+   tramas del mismo dispositivo deja de estar garantizado entre instancias; la clave única `(canal, tiempo)` sigue
+   evitando duplicados, y la hora de la medición viene en la trama, no del orden de llegada.
+2. **El broker es un punto único por decisión**: RNF-14 pide un servidor y RNF-15 excluye los brokers con clúster
+   (de pago o BSL). Su capacidad sobra para el caso; la cifra de Mosquitto no está declarada por el fabricante y se
+   mide en TT-29.
+3. **La base tiene un solo escritor**: la atomicidad y la clave única dependen de un primario; las lecturas sí se
+   reparten. Es igual en todas las bases SQL evaluadas; las que reparten escrituras entre nodos (ClickHouse,
+   VictoriaMetrics en clúster) piden 8 GB y abandonan SQL o el protocolo de PostgreSQL.
+
+### 9.3 Vertical y horizontal se combinan, en este orden
+
+- **Primero vertical**: no cambia código ni operación; se agota en el tope del servidor o del presupuesto.
+- «Varias réplicas de Docker en la misma máquina» **no es vertical**: es horizontal dentro de la caja. Sirve para que
+  Node use más núcleos y para desplegar sin corte; no da más RAM ni más disco.
+- **Criterio**: cada paso horizontal agrega una pieza que puede fallar (reparto, cerrojo, réplica, conmutación). Se
+  da solo cuando una medición lo pide (RNF-01, RNF-04, RNF-18), nunca por anticipado.
+- **Orden si llegara**: (1) más RAM y CPU; (2) instancias del backend con `$share`; (3) réplica de lectura de
+  PostgreSQL para consultas y exportaciones; (4) un broker por sitio con puentes; (5) una base por sitio.
+
+### 9.4 CAP aplicado: coherente, disponible, tolerante a particiones
+
+- Un solo servidor **no tiene particiones de red internas**: es coherente y está disponible mientras el servidor
+  viva. Su disponibilidad la dan el reinicio automático (RNF-18: 99 % en 72 h) y la cola del broker, que cubre la
+  caída del backend (§4.1).
+- En cuanto hay una réplica aparece la elección. **Síncrona**: la escritura espera a la réplica; coherencia total,
+  pero si la réplica cae, las escrituras se frenan. **Asíncrona**: siempre disponible, pero al fallar el primario se
+  pierden las últimas transacciones no replicadas. Aquí la asíncrona basta: con la confirmación al broker después
+  del COMMIT (decisión 4), lo no confirmado sigue en la cola del broker y se reentrega.
+- **RAID** es redundancia de discos del mismo servidor: capa del proveedor del VPS o del hardware propio
+  (alternativa C de `docs/14`). Protege de un disco roto; no de borrar una tabla, de un error del programa ni de un
+  incendio. No reemplaza al respaldo.
+
+### 9.5 Respaldos: qué pérdida se acepta y qué se protege
+
+- Dos números los decide el usuario antes de recibir datos reales: **RPO** (cuánto dato se puede perder) y **RTO**
+  (cuánto tiempo sin servicio). Las mediciones no se regeneran: aquí el RPO importa más que el RTO.
+- PostgreSQL documenta tres métodos: volcado SQL (`pg_dump`), copia a nivel de archivos y archivado continuo del
+  WAL con recuperación a un punto en el tiempo.
+- **Plan**: en la Etapa 3, `pg_dump` diario comprimido desde un contenedor de tareas, retención de 30 días y una
+  **restauración probada** cada mes con guardia (restaurar en un contenedor desechable y contar filas). RPO = 24 h.
+  Si el usuario no acepta perder un día de mediciones: archivado del WAL con pgBackRest o Barman (código abierto;
+  verificar licencia y RAM antes), RPO de minutos; o una réplica asíncrona en otra máquina, que acorta el RTO pero
+  no protege de errores lógicos.
+- **Seguridad del respaldo**: contiene lo mismo que la base: hashes de contraseñas y de credenciales de
+  dispositivos, correos de usuarios y las mediciones crudas que el entrevistado pidió no publicar antes de su
+  publicación científica. Por eso: cifrado en reposo (`age` o `gpg`, con la clave fuera del servidor), copia fuera
+  del servidor, permisos 600 y acceso restringido. Depende del dato solo en lo legal: con datos personales rige la
+  ley chilena de protección de datos (citar el texto vigente antes de escribirlo en el informe); el cifrado es
+  barato siempre.
+- Un respaldo que no se restauró no es respaldo (`docs/11`, lista de despliegue).
+
+### 9.6 Tramas irregulares: periodos distintos, latencia, ráfagas
+
+- La realidad del campo: cada dispositivo tiene su periodo; las tramas llegan con latencia variable; se pierden; un
+  nodo sin cobertura envía su cola con marcas antiguas; los relojes derivan.
+- Lo que el diseño ya contempla: silencio con tolerancia por dispositivo (RF-24; hoy el factor 2 es fijo, pendiente
+  de ser configurable), marca del emisor si es plausible (`docs/13`, regla 7), idempotencia por `(canal, tiempo)`,
+  y la cola del broker como amortiguador de ráfagas (§4.1).
+- Lo que falta: el emulador (TT-28) con parámetros por dispositivo: periodo, variación de latencia, probabilidad de
+  pérdida, ráfaga tras caída con marcas pasadas, deriva de reloj y dispositivos no sincronizados. Con eso se prueban
+  RNF-01 en picos y no en promedios, los falsos positivos de silencio (RF-24) y el llenado de la cola.
+- Para dimensionar: los promedios de `docs/14` sirven para el disco; los picos, para la cola y la CPU. El pico es la
+  suma de dispositivos cuyos periodos coinciden en el mismo segundo: con periodos distintos la coincidencia es
+  ocasional, pero existe.
+
+### 9.7 Compresión con licencia abierta: registrado, no crítico
+
+Se evalúa en la Etapa 4 con datos del emulador, solo si el disco medido lo exige (umbral propuesto: más de 50 GB
+por año). Candidatos: compresión del sistema de archivos bajo el volumen (btrfs o ZFS con zstd, transparente para
+PostgreSQL; QuestDB documenta ZFS como su vía), tipos más angostos (`real` de 4 bytes si la precisión del sensor lo
+permite), agregados materializados con retención corta del crudo (ya planificado) y extensiones columnares con
+licencia OSI (verificar licencia y memoria).
+
+> Fuentes (consultadas el 06/10/2026): Eclipse Mosquitto, *mosquitto(8)*, suscripciones compartidas («only one
+> client out of the group will receive each message»), https://mosquitto.org/man/mosquitto-8.html · Eclipse
+> Mosquitto, *mosquitto.conf(5)*, puentes («Multiple bridges (connections to other brokers) can be configured») ·
+> PostgreSQL 16, *High Availability, Load Balancing, and Replication* («Streaming replication allows a standby
+> server to stay more up-to-date than is possible with file-based log shipping»),
+> https://www.postgresql.org/docs/16/high-availability.html · PostgreSQL 16, *Backup and Restore* («three
+> fundamentally different approaches… SQL dump, File system level backup, Continuous archiving»),
+> https://www.postgresql.org/docs/16/backup.html · PostgreSQL 16, *Continuous Archiving and Point-in-Time Recovery*,
+> https://www.postgresql.org/docs/16/continuous-archiving.html · TimescaleDB, `CHANGELOG.md` («Multi-node is no
+> longer supported starting with TimescaleDB 2.14») y `src/cross_module_fn.c` (`move_chunk` y las políticas pasan
+> por el módulo con licencia; `attach_tablespace` no), https://github.com/timescale/timescaledb · `docs/14 §2`
+> para los volúmenes; registro privado de bases de series de tiempo (QuestDB y ZFS).
 
