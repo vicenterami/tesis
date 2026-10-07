@@ -771,16 +771,24 @@ construirlo por anticipado. Cada afirmación sobre una herramienta tiene su fuen
   caída del backend (§4.1).
 - En cuanto hay una réplica aparece la elección. **Síncrona**: la escritura espera a la réplica; coherencia total,
   pero si la réplica cae, las escrituras se frenan. **Asíncrona**: siempre disponible, pero al fallar el primario se
-  pierden las últimas transacciones no replicadas. Aquí la asíncrona basta: con la confirmación al broker después
-  del COMMIT (decisión 4), lo no confirmado sigue en la cola del broker y se reentrega.
+  pierden las últimas transacciones no replicadas. **Decisión del estudiante (06/10/2026): asíncrona**, si algún día
+  se agrega una réplica: con la confirmación al broker después del COMMIT (decisión 4), lo no confirmado sigue en la
+  cola del broker y se reentrega, así que la ventana perdida en una conmutación se recupera desde el broker.
 - **RAID** es redundancia de discos del mismo servidor: capa del proveedor del VPS o del hardware propio
   (alternativa C de `docs/14`). Protege de un disco roto; no de borrar una tabla, de un error del programa ni de un
   incendio. No reemplaza al respaldo.
 
 ### 9.5 Respaldos: qué pérdida se acepta y qué se protege
 
-- Dos números los decide el usuario antes de recibir datos reales: **RPO** (cuánto dato se puede perder) y **RTO**
-  (cuánto tiempo sin servicio). Las mediciones no se regeneran: aquí el RPO importa más que el RTO.
+- **Qué garantiza cada cosa.** RNF-05 («ningún evento aceptado y confirmado se pierde ante un reinicio») lo cumplen la
+  transacción, la confirmación al broker tras el COMMIT y la cola del broker: cubre caídas del backend, de la base
+  o del servidor **mientras el disco sobreviva**. El respaldo cubre lo otro: el disco que muere, el proveedor que
+  pierde la máquina, un borrado por error. Ahí lo único que existe es la copia más reciente, y lo que haya entrado
+  después de ella se pierde. Ese tramo es el **RPO** (cuánto dato se acepta perder); el **RTO** es cuánto tiempo sin
+  servicio. «No perder nada» ante la pérdida del disco exige copiar cada escritura a otro lugar en el momento, y
+  eso tiene costo: por eso el número lo decide el usuario antes de recibir datos reales. Las mediciones no se
+  regeneran, así que aquí el RPO importa más que el RTO; atenúa el daño que algunos sensores guardan historial y lo
+  reenvían (los Milesight EM300 traen un arreglo `history` con marcas de tiempo; cómo se solicita, por verificar).
 - PostgreSQL documenta tres métodos: volcado SQL (`pg_dump`), copia a nivel de archivos y archivado continuo del
   WAL con recuperación a un punto en el tiempo.
 - **Plan**: en la Etapa 3, `pg_dump` diario comprimido desde un contenedor de tareas, retención de 30 días y una
