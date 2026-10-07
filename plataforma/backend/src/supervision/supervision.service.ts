@@ -54,7 +54,15 @@ export class SupervisionService implements OnModuleInit, OnModuleDestroy {
                            WHERE c.dispositivo_id = d.id AND c.tipo = 'sin_comunicacion' AND c.cerrada_en IS NULL)`,
     );
     for (const d of caidos.rows) {
-      await this.pool.query("INSERT INTO condicion (dispositivo_id, tipo) VALUES ($1, 'sin_comunicacion')", [d.id]);
+      // Misma guarda que en alertas: el índice único parcial decide; si otro barrido (uno que se alargó más que
+      // el intervalo) la abrió entre el SELECT y este INSERT, aquí no hay error ni evento repetido.
+      const r = await this.pool.query(
+        `INSERT INTO condicion (dispositivo_id, tipo) VALUES ($1, 'sin_comunicacion')
+         ON CONFLICT (dispositivo_id, tipo, COALESCE(regla_id, '00000000-0000-0000-0000-000000000000'::uuid))
+         WHERE cerrada_en IS NULL DO NOTHING`,
+        [d.id],
+      );
+      if (r.rowCount === 0) continue;
       await this.pool.query(
         "INSERT INTO evento (dispositivo_id, tipo, detalle) VALUES ($1, 'condicion_abierta', $2)",
         [d.id, { tipo: 'sin_comunicacion', silencio_s: d.silencio_s }],

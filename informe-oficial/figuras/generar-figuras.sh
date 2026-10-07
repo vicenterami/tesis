@@ -77,4 +77,11 @@ for n in $CAMBIADOS; do
     -i "/in/$n.mmd" -o "/out/$n.png" -c /in/tema.json -w 2000 -b white -q
   echo "render   $n"
 done
+# Legibilidad, medida y no supuesta (07/10): a 13,5 cm de ancho (383,8 pt) la letra del diagrama (≈ 12 pt en el PDF
+# generado) queda en 12 × 383,8 / ancho. Las apaisadas (sec-*) disponen del alto de página: no se estiman aquí.
+for f in "$OUT"/*.pdf; do
+  n=$(basename "$f" .pdf); [[ $n == sec-* ]] && continue
+  ancho=$(pdfinfo "$f" 2>/dev/null | awk '/Page size/{print $3}')
+  [ -n "$ancho" ] && printf 'letra    %-14s ≈ %s pt en el informe (ancho %s pt)\n' "$n" "$(awk -v a="$ancho" 'BEGIN{printf "%.1f", 12*383.8/a}')" "$ancho"
+done
 echo "listo: $OUT/*.pdf (para LaTeX) y privado/previsualizaciones/*.png (para revisar)"

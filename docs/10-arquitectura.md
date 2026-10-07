@@ -745,6 +745,13 @@ TimescaleDB (8 observaciones), registro de brokers (258 filas).
     el broker** (`max_packet_size`): sin él, Mosquitto 2.0.22 aceptó y entregó 50 MiB (observado); al excederlo
     corta la conexión y registra «oversize packet». (c) **Motivos que se entienden solos**: `desconocido` se leía
     como «motivo desconocido» y se separa en `no_registrado` y `dado_de_baja` (migración 09).
+20. **Pruebas iniciales en un banco desechable (07/10/2026; `docs/16`).** Emulador TT-28 con el tráfico de §9.6,
+    carga de 120 nodos (59,7 tramas/s sostenidas, cero pérdidas, 174 MiB en total) y dos pruebas de carrera. La
+    carrera al abrir condiciones existía: dos lecturas sobre el umbral a la vez hacían que la segunda rompiera con
+    23505 y abortara el pipeline a mitad. Se corrige con `ON CONFLICT … DO NOTHING` sobre el índice único parcial
+    (alertas y supervisión): la guarda es el índice, no el `SELECT` previo. Lo que la carrera deja a la vista y no
+    se arregla aquí: con procesamiento en paralelo, duplicados simultáneos pueden dejar dos tramas crudas; lo
+    resuelve el punto 4, que desde hoy tiene prueba de aceptación (`banco.sh carrera`, trama única).
 
 ## 9. Crecimiento, resiliencia y respaldo (aprobado el 06/10/2026)
 
@@ -841,6 +848,11 @@ construirlo por anticipado. Cada afirmación sobre una herramienta tiene su fuen
 - Para dimensionar: los promedios de `docs/14` sirven para el disco; los picos, para la cola y la CPU. El pico es la
   suma de dispositivos cuyos periodos coinciden en el mismo segundo: con periodos distintos la coincidencia es
   ocasional, pero existe.
+- **Medido el 07/10/2026 (`docs/16`):** con 120 nodos de periodos 1–3 s, jitter ± 0,3 s y 1 % de pérdida, el pico fue
+  74 tramas/s sobre una media de 59,7, la cola del broker no pasó de 52 mensajes y no hubo pérdidas. El factor fijo
+  2 de RF-24 produjo **126 alarmas de silencio falsas en 90 s** (una sola trama perdida ya supera dos intervalos cuando
+  el intervalo es el periodo redondeado hacia arriba) frente a 4 caídas reales detectadas. Decisión pendiente con el
+  profesor guía porque toca RNF-03: factor 3, tolerancia por dispositivo o alarma solo si persiste un barrido.
 
 ### 9.7 Compresión con licencia abierta: registrado, no crítico
 

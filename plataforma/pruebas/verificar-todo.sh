@@ -162,6 +162,42 @@ else echo "FALLA max_packet_size ausente o mayor que 65536 (${tope:-ausente}): e
 paso "3. Diagramas: informe = docs = base (generar-figuras.sh --verificar)"
 bash informe-oficial/figuras/generar-figuras.sh --verificar || fallos=$((fallos+1))
 
+paso "3b. Informe: compilado después del último cambio y sano (cero desbordes graves, cero referencias rotas)"
+# 07/10: actualizar.sh marcó un desborde de 53,9 pt y, minutos después, este guardián dijo «TODO EN CONCORDANCIA» porque
+# no miraba el informe. La concordancia incluye el PDF. Si hay fuentes más nuevas que la última compilación, el paso se
+# omite (hay que recompilar) y el total no puede ser verde; nunca se da por bueno un log viejo.
+LOGTEX=informe-oficial/build/main.log
+if [ ! -f "$LOGTEX" ]; then echo "omitido: sin compilación previa → bash informe-oficial/actualizar.sh"; omitidos="$omitidos 3b"
+else
+  nuevas=$( { find informe-oficial -name '*.tex' -newer "$LOGTEX" -not -path '*/build/*'; find informe-oficial/figuras/render -name '*.pdf' -newer "$LOGTEX"; } 2>/dev/null | head -5 | tr '\n' ' ')
+  if [ -n "$nuevas" ]; then echo "omitido: fuentes más nuevas que la última compilación ($nuevas) → bash informe-oficial/actualizar.sh"; omitidos="$omitidos 3b"
+  else python3 informe-oficial/comprobar-compilacion.py || fallos=$((fallos+1)); fi
+fi
+
+paso "3c. Figuras del informe acotadas al ancho de texto (regla del proyecto: ninguna figura excede 13,5 cm)"
+# 07/10: el ER regenerado cambió de proporción y, acotado solo en altura, se salió del margen. Toda inclusión acota
+# el ancho: includegraphics con width en \linewidth/\textwidth (o \textheight si la figura va apaisada) y tikzpicture
+# dentro de \resizebox{…\linewidth}. Se revisa la fuente, no el PDF: así falla antes de compilar.
+python3 - <<'PYG' || fallos=$((fallos+1))
+import re, pathlib, sys
+malas = []; n = 0
+for f in sorted(pathlib.Path('informe-oficial').rglob('*.tex')):
+    if 'build' in f.parts: continue
+    t = f.read_text(errors='ignore'); lineas = t.split('\n'); apaisada = 'sidewaysfigure' in t
+    for i, l in enumerate(lineas, 1):
+        for m in re.finditer(r'\\includegraphics(\[([^\]]*)\])?', l):
+            n += 1; op = m.group(2) or ''
+            ok = re.search(r'width\s*=\s*[\d.]*\\(linewidth|textwidth|columnwidth)', op) or (apaisada and re.search(r'width\s*=\s*[\d.]*\\textheight', op))
+            if not ok: malas.append(f'{f}:{i} includegraphics sin width acotado [{op}]')
+        if '\\begin{tikzpicture}' in l:
+            n += 1; previas = '\n'.join(lineas[max(0, i - 4):i])
+            if not re.search(r'\\resizebox\{[\d.]*\\(linewidth|textwidth)\}', previas): malas.append(f'{f}:{i} tikzpicture fuera de resizebox{{…linewidth}}')
+if n < 5: print(f'FALLA revisó solo {n} inclusiones de figura (se esperan >= 5)'); sys.exit(1)
+if malas:
+    print('FALLA figuras sin acotar al ancho:'); [print('  ' + m) for m in malas]; sys.exit(1)
+print(f'OK    {n} inclusiones de figura acotadas al ancho (includegraphics con width; tikz dentro de resizebox)')
+PYG
+
 paso "4. API (si el backend está corriendo en 127.0.0.1:3000)"
 if curl -s -m 2 http://127.0.0.1:3000/salud >/dev/null; then bash plataforma/pruebas/api-smoke.sh || fallos=$((fallos+1)); else echo "omitida: backend no está corriendo"; omitidos="$omitidos 4"; fi
 

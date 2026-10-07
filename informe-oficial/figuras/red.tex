@@ -1,6 +1,6 @@
 \begin{figure}[!htb]
 \centering
-\includegraphics[height=0.85\textheight,keepaspectratio]{figuras/render/red.pdf}
+\includegraphics[width=\linewidth,height=0.85\textheight,keepaspectratio]{figuras/render/red.pdf}
 \caption{Topología de red y segmentación. Los dispositivos del sitio solo abren conexiones \emph{salientes}: el router del cliente no necesita puertos abiertos ni configuración (RNF-10). En el servidor, únicamente el proxy con TLS es alcanzable desde Internet, en tres puertos: 443, 8883 y 1700/udp (este último, para ChirpStack, aún no desplegado en esta etapa); broker, servidor de red LoRaWAN, backend y base de datos viven en la red interna de los contenedores.}
 \label{fig:red}
 \end{figure}

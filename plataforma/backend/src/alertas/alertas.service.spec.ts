@@ -37,6 +37,24 @@ describe('AlertasService.evaluar: umbral con histéresis', () => {
     expect(escrituras.some((e) => e.startsWith('UPDATE condicion'))).toBe(true);
   });
 
+  // Prueba de carrera del 07/10 (banco): dos lecturas sobre el umbral llegan a la vez; las dos ven «ninguna abierta»
+  // y las dos intentan abrir. La guarda es el índice único parcial: el INSERT con ON CONFLICT devuelve 0 filas a la
+  // segunda, que debe seguir sin error (antes rompía con 23505 y abortaba el pipeline a mitad) y sin evento repetido.
+  it('carrera: otra trama abrió la condición entre el SELECT y el INSERT → sin error ni evento repetido', async () => {
+    const escrituras: string[] = [];
+    const query = jest.fn((sql: string) => {
+      if (sql.startsWith('SELECT id, umbral_alto')) return Promise.resolve({ rows: [regla], rowCount: 1 });
+      if (sql.startsWith('SELECT id FROM condicion')) return Promise.resolve({ rows: [], rowCount: 0 });
+      escrituras.push(sql.trim().split(/\s+/).slice(0, 3).join(' '));
+      return Promise.resolve({ rows: [], rowCount: sql.trim().startsWith('INSERT INTO condicion') ? 0 : 1 });
+    });
+    const servicio = new AlertasService({ query } as unknown as Pool);
+    await expect(servicio.evaluar('d1', 'k1', 'dev-0001', 35, 'Cel')).resolves.toBeUndefined();
+    expect(escrituras).toEqual(['INSERT INTO condicion']);
+    const insercion = query.mock.calls.map(([sql]) => String(sql)).find((s) => s.includes('INSERT INTO condicion'));
+    expect(insercion).toMatch(/ON CONFLICT[\s\S]*WHERE cerrada_en IS NULL DO NOTHING/);
+  });
+
   it('35 Cel con la condición YA abierta → no la abre dos veces', async () => {
     const { servicio, escrituras } = armar(true);
     await servicio.evaluar('d1', 'k1', 'dev-0001', 35, 'Cel');

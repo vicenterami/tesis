@@ -17,7 +17,8 @@
     "test": "jest",
     "typecheck": "tsc --noEmit",
     "verificar": "pnpm typecheck && pnpm lint && pnpm test",
-    "openapi": "nest build && node dist/exportar-openapi.js"
+    "openapi": "nest build && node dist/exportar-openapi.js",
+    "emulador": "ts-node --transpile-only src/emulador/emulador.ts"
   },
   "dependencies": {
     "@nestjs/common": "11.2.5",

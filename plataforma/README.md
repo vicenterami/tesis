@@ -89,6 +89,10 @@ curl http://127.0.0.1:3000/salud    # {"estado":"ok","base":"conectada","tablas"
 
 ## Pruebas semiautomáticas
 
+**Banco de pruebas desechable** (`pruebas/banco/banco.sh`, `docs/16`): una segunda pila Compose (`banco`) con datos en RAM,
+otros puertos y broker sin credenciales, para el emulador de nodos (`backend/src/emulador`, TT-28), la carga (TT-29) y las
+pruebas de carrera: `encender 120` · `carrera` · `correr --duracion 90 --dispositivos 120` · `apagar`.
+
 ```bash
 bash pruebas/verificar-todo.sh     # TODO: guardias de esquema, migraciones aplicadas, diagramas = docs = base, API
 bash pruebas/api-smoke.sh          # solo la API, con el backend corriendo

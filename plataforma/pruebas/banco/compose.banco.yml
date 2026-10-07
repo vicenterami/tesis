@@ -1,0 +1,29 @@
+# Banco de pruebas DESECHABLE (TT-28/TT-29, pruebas de carrera). Se suma al compose base con otro nombre de proyecto,
+# así no toca la pila de desarrollo (volúmenes, puertos ni credenciales):
+#   docker compose -p banco -f docker-compose.yml -f pruebas/banco/compose.banco.yml --env-file <env> up -d --build
+# Lo arma pruebas/banco/banco.sh. Diferencias deliberadas con producción, y solo aquí:
+#   · broker SIN credenciales ni ACL (pruebas/banco/mosquitto): cien dispositivos emulados no justifican cien claves
+#     reales, y escribir claves del broker es tarea de la persona (docs/11 §7). La ACL se prueba aparte (docs/11 §5).
+#   · datos en tmpfs (RAM): nada sobrevive a `down`, no hay volúmenes que borrar ni datos que confundir con los reales.
+#   · puertos en 127.0.0.1 con +1 (3001, 1884, 5433) para convivir con la pila de desarrollo.
+# Los techos de memoria y CPU del compose base se mantienen: el banco mide la plataforma tal como se despliega.
+services:
+  timescaledb:
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - type: tmpfs
+        target: /var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+  mosquitto:
+    ports:
+      - "127.0.0.1:1884:1883"
+    volumes:
+      - ./pruebas/banco/mosquitto:/mosquitto/config:ro
+      - type: tmpfs
+        target: /mosquitto/data
+  backend:
+    ports:
+      - "127.0.0.1:3001:3000"
+    environment:
+      SUPERVISION_INTERVALO_S: "${BANCO_SUPERVISION_INTERVALO_S:-5}"   # los emulados reportan cada pocos segundos

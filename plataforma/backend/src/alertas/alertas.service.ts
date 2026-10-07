@@ -34,8 +34,9 @@ export class AlertasService {
         (r.umbral_bajo === null || valor > r.umbral_bajo + r.histeresis);
 
       if (!abierta && (cruzaAlto || cruzaBajo)) {
-        await this.abrir(dispositivoId, r.id, { valor, unidad, umbral: cruzaAlto ? r.umbral_alto : r.umbral_bajo });
-        this.log.warn(`${idFisico}: umbral ${cruzaAlto ? 'alto' : 'bajo'} cruzado (${valor} ${unidad}) · condición abierta`);
+        const nueva = await this.abrir(dispositivoId, r.id, { valor, unidad, umbral: cruzaAlto ? r.umbral_alto : r.umbral_bajo });
+        if (nueva) this.log.warn(`${idFisico}: umbral ${cruzaAlto ? 'alto' : 'bajo'} cruzado (${valor} ${unidad}) · condición abierta`);
+        else this.log.log(`${idFisico}: umbral cruzado (${valor} ${unidad}) · otra trama abrió la condición un instante antes`);
       } else if (abierta && dentroConHisteresis) {
         await this.cerrar(abierta, dispositivoId, { valor, unidad });
         this.log.log(`${idFisico}: valor de vuelta en rango (${valor} ${unidad}) · condición cerrada`);
@@ -51,15 +52,23 @@ export class AlertasService {
     return r.rows[0]?.id;
   }
 
-  private async abrir(dispositivoId: string, reglaId: string, detalle: object): Promise<void> {
-    await this.pool.query(
-      "INSERT INTO condicion (dispositivo_id, regla_id, tipo) VALUES ($1, $2, 'umbral')",
+  // Abrir es «insertar si no hay otra abierta». La guarda real es el índice único parcial condicion_abierta_unica
+  // (migración 02); el SELECT de condicionAbierta solo ahorra trabajo. Dos lecturas que cruzan el umbral a la vez
+  // (prueba de carrera del 07/10) llegaban aquí las dos: la segunda rompía con 23505 y abortaba el pipeline a mitad,
+  // sin trama cruda ni filtro 6. Con ON CONFLICT la segunda ve que ya está abierta y sigue. Devuelve si la abrió.
+  private async abrir(dispositivoId: string, reglaId: string, detalle: object): Promise<boolean> {
+    const r = await this.pool.query(
+      `INSERT INTO condicion (dispositivo_id, regla_id, tipo) VALUES ($1, $2, 'umbral')
+       ON CONFLICT (dispositivo_id, tipo, COALESCE(regla_id, '00000000-0000-0000-0000-000000000000'::uuid))
+       WHERE cerrada_en IS NULL DO NOTHING`,
       [dispositivoId, reglaId],
     );
+    if (r.rowCount === 0) return false;
     await this.pool.query(
       "INSERT INTO evento (dispositivo_id, tipo, detalle) VALUES ($1, 'condicion_abierta', $2)",
       [dispositivoId, { tipo: 'umbral', ...detalle }],
     );
+    return true;
   }
 
   private async cerrar(condicionId: string, dispositivoId: string, detalle: object): Promise<void> {
