@@ -17,6 +17,7 @@ los gigabytes, y de los gigabytes casi todo lo demás. Rubros y qué los mueve:
 |---|---|---|
 | Cómputo (vCPU, memoria) | Procesos que corren y su techo de memoria | 5 contenedores, techo 1,95 GB, consumo en reposo ≈ 120 MB medido el 27/09 (base 61, backend 53, broker 8) → **el rubro dominante y el más acotado** |
 | Almacenamiento | Filas × tamaño × retención (sin compresión) | Pequeño (§2) |
+| Registros | Rotación de Docker: 10 MB × 5 por servicio (`docs/11 §4`, 07/10/2026) | ≤ 200 MB en total, fijo |
 | Base de datos gestionada | Solo si se externaliza | No: TimescaleDB va en el mismo servidor (RNF-17) |
 | Tráfico de salida | GB que salen a Internet | Mínimo: el panel y la API sirven agregados, no datos crudos |
 | Observabilidad | Logs y métricas por volumen | `docker compose logs` y `docker stats`; sin servicio externo |

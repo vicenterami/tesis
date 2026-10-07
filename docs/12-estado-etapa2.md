@@ -55,7 +55,7 @@ implementando solo lo que **sustente el diseño** (API de consulta, que demuestr
 | TT-15 | Procedimiento de asignación de identidad y gestión de claves AES por sitio | S | 2 | 🟡 | gestión de credenciales documentada (docs/11 §7); claves LoRaWAN dependen de ChirpStack |
 | HU-01 | Como integrador, quiero publicar una trama SenML por MQTT o HTTP, para reportar desde un sensor sin infraestructura intermedia | M | 6 | 🟡 | MQTT sí; HTTP en la Etapa 3 |
 | TT-16 | Validador de esquema SenML y analizador de tramas | M | 3 | ✅ | adaptador SenML |
-| TT-19 | Esquema de base de datos y migraciones versionadas | M | 5 | ✅ | esquema + 9 migraciones (05 convenciones de calidad, 06 clave natural única de la serie, 07 dominio cerrado de cuarentena.motivo; Etapa 3: 08 hora de recepción y origen de la marca, 09 trama y cuarentena como hypertables) |
+| TT-19 | Esquema de base de datos y migraciones versionadas | M | 5 | ✅ | esquema + 10 migraciones (05 convenciones de calidad, 06 clave natural única de la serie, 07 dominio cerrado de cuarentena.motivo; Etapa 3: 08 hora de recepción y origen de la marca, 09 trama y cuarentena como hypertables, 10 semántica del intervalo esperado) |
 | TT-24 | Comparar al menos tres alternativas de alojamiento con criterios ponderados | M | 4 | ✅ | `docs/14 §3–§4`: cinco alternativas, seis criterios |
 | TT-25 | Cuantificar el costo mensual y anual de operación en CLP y USD | M | 3 | ✅ | `docs/14 §3`: precios fechados y convertidos con dólar observado |
 | TT-26 | Redactar la recomendación de despliegue justificada | M | 1 | ✅ | `docs/14 §5` y cap. 4 del informe |

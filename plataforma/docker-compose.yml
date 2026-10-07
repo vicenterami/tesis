@@ -17,6 +17,9 @@ services:
   timescaledb:
     image: timescale/timescaledb:2.24.0-pg16-oss # versión fijada (nunca "latest"); -oss = edición Apache 2.0 (RNF-15, docs/10 §8.4 punto 11)
     restart: unless-stopped                      # vuelve solo tras un reinicio del servidor
+    logging:                                     # registros acotados: 10 MB × 5 por servicio (docs/11 §4; decisión D-04, 07/10/2026)
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
     # Sin trabajos de fondo de TimescaleDB (docs/10 §8.4 punto 11): en la edición Apache su programador solo corre
     # dos jobs internos, y no se pueden apagar uno a uno (alter_job y delete_job son de la otra licencia):
     #  · «Job History Log Retention Policy»: falla con ERROR de licencia en cada corrida (cada 6 h, observado en 2.24);
@@ -48,6 +51,9 @@ services:
   mosquitto:
     image: eclipse-mosquitto:2.0.22
     restart: unless-stopped
+    logging:                                     # registros acotados: 10 MB × 5 por servicio (docs/11 §4; decisión D-04, 07/10/2026)
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
     security_opt:
       - no-new-privileges:true
     # Sin `ports`: en producción el broker se alcanza solo vía proxy TLS (8883).
@@ -71,6 +77,9 @@ services:
     build:
       context: ./backend
     restart: unless-stopped
+    logging:                                     # registros acotados: 10 MB × 5 por servicio (docs/11 §4; decisión D-04, 07/10/2026)
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
     security_opt:
       - no-new-privileges:true
     environment:

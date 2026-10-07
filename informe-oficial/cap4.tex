@@ -20,7 +20,7 @@ de septiembre, 2 de octubre, 30 de octubre y 4 de diciembre, con $\sim$240 horas
 \section{Backlog y verificación de viabilidad}
 \label{sec:backlog}
 
-El backlog contiene \textbf{64 elementos} —25 historias de usuario y 39 tareas técnicas en 14 épicas—
+El backlog contiene \textbf{65 elementos} —25 historias de usuario y 40 tareas técnicas en 14 épicas—
 estimados en horas ideales y reformulados tras el pivote del 2 de septiembre hacia el contrato SenML y
 el pipeline (núcleo demostrativo 168 h; anexo~\ref{anx:backlog}).
 
@@ -34,9 +34,9 @@ alertas por umbral, panel de control y exportación en formato abierto— se eje
 verificada al cierre de cada etapa.
 \end{quote}
 
-La verificación numérica de las estimaciones mostró que \textbf{el backlog completo (279 h) excede
+La verificación numérica de las estimaciones mostró que \textbf{el backlog completo (285 h) excede
 el presupuesto (240 h) y el núcleo demostrativo (168 h) cabe con holgura} (+30\,\%). Por eso
-\textbf{el compromiso es el núcleo} y los 30 elementos restantes son alcance condicional: la pauta
+\textbf{el compromiso es el núcleo} y los 31 elementos restantes son alcance condicional: la pauta
 mide el avance como porcentaje de tareas completadas, y comprometer lo que no se ejecutará bajaría
 ese porcentaje por debajo del umbral. La distribución temporal también se corrigió, trasladando horas
 de la Etapa 3 a la Etapa 4 para cumplir el 50\,\% exigido al 30 de octubre; la validación con un
@@ -129,7 +129,7 @@ El registro de riesgos (cuadro~\ref{tab:riesgos}, anexo~\ref{anx:seguimiento}) m
 riesgos: dos cerrados (ambigüedad de fechas; protocolo inadecuado, materializado y resuelto con el
 pivote a MQTT y SenML; el análisis de Contact ID está en el anexo~\ref{anx:contactid}), uno confirmado y controlado (alcance excesivo, tratado con el criterio de
 demostración en dos niveles), uno activo (hardware de sensores, mitigado con el emulador de nodo) y
-uno en tratamiento (acceso a partes interesadas, sección~\ref{sec:retro}). Se declara además una
-\textbf{desviación conocida de RNF-15}: la compresión de TimescaleDB está bajo la \emph{Timescale
-License}, gratuita y compatible con una plataforma IoT \parencite{timescalelicencia}, pero no de código
-abierto; se reevalúa en la Etapa~3.
+uno en tratamiento (acceso a partes interesadas, sección~\ref{sec:retro}). La
+\textbf{desviación de RNF-15} declarada en la Etapa~2 (la compresión de TimescaleDB está bajo la \emph{Timescale
+License}, no de código abierto \parencite{timescalelicencia}) se resolvió el 06/10 adoptando la edición Apache~2.0,
+que no comprime.

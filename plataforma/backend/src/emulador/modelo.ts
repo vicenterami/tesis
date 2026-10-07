@@ -98,10 +98,10 @@ export function topico(sitio: string, p: Perfil): string {
 
 // Semilla SQL para el banco: sitio, zona, los dispositivos con su intervalo esperado, dos canales cada uno y una
 // regla de umbral alto (30 Cel, histéresis 2) en temperatura. Reejecutable: nada se duplica.
-// factorIntervalo: cuántas veces el periodo del nodo se declara como `intervalo_esperado_s` (1 = el periodo redondeado
-// hacia arriba, lo más estricto; 2 = el silencio normal admite una trama perdida). Es el experimento de la ficha D-02:
-// el supervisor abre «sin comunicación» al superar 2 × intervalo, así que el factor decide cuántas alarmas son falsas.
-export function semillaSQL(ps: Perfil[], sitio: string, factorIntervalo = 1): string {
+// factorIntervalo: cuántas veces el periodo del nodo se declara como `intervalo_esperado_s`. Por defecto 2, que es la
+// semántica decidida (docs/10 §8.4 punto 23: silencio máximo normal = periodo más las pérdidas que admite el medio);
+// 1 es el periodo redondeado hacia arriba, lo más estricto, y sirve para reproducir las alarmas falsas medidas en docs/16.
+export function semillaSQL(ps: Perfil[], sitio: string, factorIntervalo = 2): string {
   const SITIO = '00000000-0000-0000-0000-00000000ba7c';
   const ZONA = '00000000-0000-0000-0000-00000000ba7d';
   const valores = ps

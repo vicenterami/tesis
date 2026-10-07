@@ -309,7 +309,7 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 | **TT-29** | 🎯 Prueba de carga: sostener ≥ 50 eventos/segundo sin pérdida (RNF-01) | M | 4 | 4 |
 | **TT-30** | Prueba de recuperación: ningún evento confirmado se pierde ante reinicio (RNF-05, RNF-06) | M | 4 | 4 |
 | **TT-31** | Batería de al menos 15 casos de prueba funcionales documentados | M | 4 | 5 |
-| **TT-32** | 🎯 Validación de extremo a extremo con al menos un sensor físico | M | 3 | 3 |
+| **TT-32** | 🎯 Validación de extremo a extremo con al menos un sensor físico (plan B activado el 07/10/2026: ESP32 + BME280 por Wi-Fi, sin descartar las pasarelas de la Facultad) | M | 3 | 3 |
 
 > **TT-28 es mitigación del riesgo R1.** El emulador desacopla la validación de la disponibilidad de
 > hardware: permite ejecutar las pruebas de carga y de recuperación sin sensores físicos. El sensor real

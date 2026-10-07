@@ -8,6 +8,9 @@ services:
   proxy:
     image: nginx:1.30.5-alpine          # versión fijada (estable, 26/09/2026); trae stream, HTTP/2, stub_status y el módulo ACME
     restart: unless-stopped
+    logging:                           # registros acotados como el resto (D-04)
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
     security_opt:
       - no-new-privileges:true
     volumes:

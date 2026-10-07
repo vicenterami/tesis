@@ -18,15 +18,16 @@ el trabajo del compañero —el tópico MQTT— ya se definió en la sección~\r
 
 \input{figuras/contenedores}
 
-Tres decisiones quedan visibles en la figura. Primero, hay \textbf{tres puntos de entrada y ninguno
-más}: HTTPS para personas (443), MQTT sobre TLS para dispositivos (8883) y UDP para los \emph{gateways}
-LoRaWAN (1700, cuando ChirpStack exista: no está desplegado en esta etapa). Ese tercer puerto recibe un
+Tres decisiones quedan visibles en la figura. Primero, hay \textbf{dos puntos de entrada siempre y tres a lo
+sumo}: HTTPS para personas (443), MQTT sobre TLS para dispositivos (8883) y, solo si ChirpStack corre en este
+servidor (ruta A), UDP para los \emph{gateways} LoRaWAN (1700); una pasarela con servidor de red embebido entra por
+el 8883 como un dispositivo más (ruta B). Ese tercer puerto recibe un
 protocolo sin autenticación ni cifrado propios (\emph{Semtech UDP Packet Forwarder}), así que la defensa
 la dan el contenedor sin privilegios y el límite de tasa, no el protocolo. La base de datos y la
 consola de administración de ChirpStack nunca se exponen. Segundo, \textbf{el navegador nunca se conecta al
 broker}: consume la API del backend, que ya autenticó, validó y normalizó cada trama. La alternativa
 —suscribir el navegador al broker por WebSocket— habría expuesto el broker a Internet y puesto
-credenciales MQTT en el código del cliente. Tercero, \textbf{ChirpStack es un productor más} hacia el
+credenciales MQTT en el código del cliente. Tercero, \textbf{ChirpStack, si existe, es un productor más} hacia el
 broker: una trama LoRaWAN decodificada y una trama Wi-Fi directa son indistinguibles para la
 plataforma después del filtro de análisis, que es lo que resuelve la causa C2 (hardware atado a la
 plataforma).
@@ -122,8 +123,8 @@ límite no dispare y cierre alertas sin parar.
 La figura~\ref{fig:sec-tiemporeal} (anexo~\ref{anx:figuras}) muestra los dos tiempos del panel. El histórico llega
 \textbf{agregado por la base de datos} con \texttt{time\_bucket}: cientos de puntos, no millones. Las lecturas
 nuevas las empujará el backend por un canal autenticado con la sesión del panel, cifrado tras el proxy y con
-lista blanca de origen y límites de tamaño y tasa \parencite{owaspws}; WebSocket o SSE se decide en la
-Etapa~3 y el navegador nunca toca el broker. Toda la consulta valida sus entradas antes de tocar SQL (identificadores, fechas, un intervalo
+lista blanca de origen y límites de tamaño y tasa \parencite{owaspws}; el canal es SSE (decidido en la
+Etapa~3) y el navegador nunca toca el broker. Toda la consulta valida sus entradas antes de tocar SQL (identificadores, fechas, un intervalo
 tomado de una lista cerrada) y usa parámetros, nunca texto interpolado. El \textbf{contrato de la API se
 genera desde el código}, en OpenAPI 3.0 \parencite{openapi303}, a partir de los decoradores de los controladores, de modo que no
 puede describir rutas inexistentes; se sirve junto a la API y se versiona en el repositorio como el
@@ -165,10 +166,10 @@ de la Etapa~4, para que la comparación no dependa del equipo de desarrollo.
 
 El costo de una plataforma de sensores no lo mueve la cantidad de usuarios sino la \textbf{tasa de
 recepción por la retención}. Para el núcleo demostrativo —50 canales reportando cada cinco minutos—
-resultan 14\,400 filas diarias y unos 5,3 millones al año, del orden de 330~MB sin comprimir; con la
-compresión por columnas de TimescaleDB para fragmentos antiguos (razones típicas de 10 a 20 veces) y
-una política en capas —crudo reciente 30 días, crudo comprimido dos años, agregados horarios y diarios
-indefinidos— diez años de operación caben en menos de 1~GB. El almacenamiento no es el problema; la
+resultan 14\,400 filas diarias y unos 5,3 millones al año, del orden de 330~MB por año; sin compresión
+(la de TimescaleDB es \emph{Timescale License}; se adopta la edición Apache~2.0 por RNF-15) y con una política
+en capas —crudo sin vencimiento mientras el disco lo permita, agregados horarios y diarios— diez años de
+operación caben en unos 4,6~GB. El almacenamiento no es el problema; la
 memoria RAM consumida sí, y la acota el RNF-17.
 
 Se compararon cinco alternativas de alojamiento que ejecutan el mismo despliegue, con precios

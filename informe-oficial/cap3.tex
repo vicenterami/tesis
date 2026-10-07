@@ -53,8 +53,8 @@ El despliegue completo corre como contenedores en un único servidor (figura~\re
 capítulo~\ref{cap:diseno}), con reinicio automático ante fallas. \textbf{La frontera con el trabajo del compañero es el tópico
 MQTT}: todo lo anterior (sensor, nodo, radio) es de él; todo lo posterior (broker, pipeline, base de
 datos, API, panel), de este trabajo. Un \textbf{emulador de nodo} (Etapa~4) publicará tramas en el mismo tópico,
-de modo que la validación de la plataforma no depende del hardware ni de terceros. En la rama LoRa, el servidor de red (ChirpStack) correrá en el servidor de la
-plataforma —aunque algunos gateways lo traen embebido— para administrar nodos y claves desde un
+de modo que la validación de la plataforma no depende del hardware ni de terceros. En la rama LoRa, el servidor de red puede ser el embebido en la pasarela (ruta B, decidida el 06/10) o
+ChirpStack en el servidor de la plataforma (ruta A, opcional) para administrar nodos y claves desde un
 solo punto; el decodificador de binario a JSON es responsabilidad del trabajo del compañero, y su
 JSON de tres campos se convierte al contrato SenML mediante el primer adaptador real de la capa de
 recepción.

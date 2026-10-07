@@ -267,7 +267,7 @@ en condición, en lugar de acumular filas).
 
 **Un supervisor aparte, por tiempo:** el filtro 6 solo corre cuando *llega* una trama. Para detectar
 el caso contrario —un dispositivo que **dejó de** transmitir— hay una tarea periódica (cada minuto)
-que compara `visto_por_ultima_vez` contra `intervalo_esperado_s` y abre la condición
+que compara `visto_por_ultima_vez` contra `intervalo_esperado_s` (el silencio máximo normal declarado, §8.4 punto 23) y abre la condición
 `sin_comunicacion`. Sin ella, un sensor caído sería invisible.
 
 ### 4.1 Entrega «al menos una vez», caídas y duplicados (RF-06, RF-10)
@@ -766,6 +766,11 @@ TimescaleDB (8 observaciones), registro de brokers (258 filas).
     punta en el banco (`banco.sh proxy`, `docs/16 §9`). Por defecto escucha solo en 127.0.0.1 y usa una CA de desarrollo
     (`proxy/ca-desarrollo.sh`, fuera del repositorio); exponerlo y el certificado real son decisiones del despliegue
     (ficha D-06: Let's Encrypt por ACME si hay DNS público y puerto 80, CA propia si el servidor es solo de campus).
+23. **`intervalo_esperado_s` es el silencio máximo normal del dispositivo, no su periodo (decisión del estudiante,
+    07/10/2026, D-02 opción E).** Con 1 % de pérdida, declararlo igual al periodo produjo 108 alarmas de silencio falsas en
+    90 s; declarado como 2 × periodo, 3 (`docs/16 §3 y §6.1`). RNF-03 y el código no cambian: cambia qué número se pone al
+    dar de alta (migración 10 fija la semántica en la base; la ayuda del alta la repetirá). Evolución si algún medio pierde
+    más: tolerancia por dispositivo (opción B).
 
 ## 9. Crecimiento, resiliencia y respaldo (aprobado el 06/10/2026)
 
@@ -869,8 +874,8 @@ construirlo por anticipado. Cada afirmación sobre una herramienta tiene su fuen
   profesor guía porque toca RNF-03: factor 3, tolerancia por dispositivo o alarma solo si persiste un barrido.
 - **Medido después, mismo tráfico, con `intervalo_esperado_s = 2 × periodo` (`docs/16 §3`, corrida 4): 5 caídas detectadas y
   3 alarmas falsas** (antes 108). Sin tocar el código ni RNF-03: el intervalo esperado es el **silencio normal** del
-  dispositivo (periodo más las pérdidas que admite el medio), no su periodo. Falta fijarlo en `docs/08` y en la ayuda del
-  alta (ficha D-02, opción E).
+  dispositivo (periodo más las pérdidas que admite el medio), no su periodo. **Decidido el 07/10/2026** (punto 23 de §8.4;
+  migración 10; `docs/08 §5`).
 
 ### 9.7 Compresión con licencia abierta: registrado, no crítico
 

@@ -29,7 +29,7 @@ docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -U plat
 exige /tmp/vt-sql.txt "${PIPESTATUS[0]}" 10 || fallos=$((fallos+1))
 
 paso "2. Migraciones aplicadas = archivos en db/init (cada NN-*.sql debe estar reflejado en la base)"
-# 02: índice por regla · 03: zona_horaria · 04: iso_utc · 05: convenciones (disparadores actualizado_en, pm2_5) · 06: índice único de medicion · 07: CHECK de cuarentena.motivo · 08: medicion.recibido_en y origen_tiempo · 09: trama y cuarentena como hypertables
+# 02: índice por regla · 03: zona_horaria · 04: iso_utc · 05: convenciones (disparadores actualizado_en, pm2_5) · 06: índice único de medicion · 07: CHECK de cuarentena.motivo · 08: medicion.recibido_en y origen_tiempo · 09: trama y cuarentena como hypertables · 10: semántica de intervalo_esperado_s
 docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -U plataforma -d plataforma -tA <<'SQL' | tee /tmp/vt-mig.txt
 SELECT CASE WHEN count(*)=1 THEN 'OK    01 medicion es hypertable (chunks por tiempo)' ELSE 'FALLA 01 medicion no es hypertable' END FROM timescaledb_information.hypertables WHERE hypertable_name='medicion';
 SELECT CASE WHEN indexdef LIKE '%COALESCE(regla_id%' THEN 'OK    02 condicion_abierta_unica por regla' ELSE 'FALLA 02 indice viejo' END FROM pg_indexes WHERE indexname='condicion_abierta_unica';
@@ -40,8 +40,9 @@ SELECT CASE WHEN count(*)>=9 AND (SELECT count(*) FROM magnitud WHERE codigo IN 
 SELECT CASE WHEN count(*)=1 THEN 'OK    07 cuarentena.motivo con CHECK (dominio cerrado)' ELSE 'FALLA 07 falta el CHECK de cuarentena.motivo' END FROM pg_constraint WHERE conname='cuarentena_motivo_chk' AND contype='c' AND conrelid='cuarentena'::regclass; -- desde la 09 es hypertable: cada fragmento lleva su copia
 SELECT CASE WHEN count(*)=2 AND (SELECT count(*) FROM pg_constraint WHERE conname='ck_medicion_recepcion' AND conrelid='medicion'::regclass)=1 THEN 'OK    08 medicion.recibido_en y origen_tiempo con su CHECK' ELSE 'FALLA 08 falta la hora de recepción en medicion' END FROM information_schema.columns WHERE table_name='medicion' AND column_name IN ('recibido_en','origen_tiempo');
 SELECT CASE WHEN count(*)=2 AND (SELECT count(*) FROM information_schema.columns WHERE table_name='cuarentena' AND column_name IN ('detalle','dispositivo_id'))=2 AND (SELECT pg_get_constraintdef(oid) LIKE '%no_registrado%dado_de_baja%' FROM pg_constraint WHERE conname='cuarentena_motivo_chk' AND conrelid='cuarentena'::regclass) THEN 'OK    09 trama y cuarentena son hypertables; cuarentena con detalle, dispositivo_id y motivos no_registrado/dado_de_baja' ELSE 'FALLA 09 trama/cuarentena incompletas' END FROM timescaledb_information.hypertables WHERE hypertable_name IN ('trama','cuarentena');
+SELECT CASE WHEN col_description('dispositivo'::regclass, (SELECT attnum FROM pg_attribute WHERE attrelid='dispositivo'::regclass AND attname='intervalo_esperado_s')) LIKE 'Silencio máximo normal%' THEN 'OK    10 intervalo_esperado_s documentado como silencio máximo normal (D-02)' ELSE 'FALLA 10 falta el COMMENT de intervalo_esperado_s (aplicar db/init/10-intervalo-esperado.sql)' END;
 SQL
-exige /tmp/vt-mig.txt "${PIPESTATUS[0]}" 9 || fallos=$((fallos+1))
+exige /tmp/vt-mig.txt "${PIPESTATUS[0]}" 10 || fallos=$((fallos+1))
 # Toda migración en disco debe tener su comprobación arriba: una 08 nueva sin comprobación falla aquí,
 # no solo por el conteo en prosa del paso 2g.
 sin_chequeo=$(ls plataforma/db/init/ | grep -oE '^[0-9]{2}' | while read -r nn; do grep -q "^OK    $nn \|^FALLA $nn " /tmp/vt-mig.txt || echo "$nn"; done)
@@ -168,6 +169,17 @@ if [ -z "$IMG_PROXY" ]; then echo "FALLA compose.proxy.yml sin imagen fijada"; f
 elif ! docker image inspect "$IMG_PROXY" >/dev/null 2>&1 || [ ! -f "$CERTS_DEV/servidor.crt" ]; then echo "omitido: falta la imagen $IMG_PROXY o los certificados de desarrollo (bash plataforma/proxy/ca-desarrollo.sh)"; omitidos="$omitidos 2m"
 elif docker run --rm -v "$PWD/plataforma/proxy/nginx.conf:/etc/nginx/nginx.conf:ro" -v "$CERTS_DEV:/certs:ro" "$IMG_PROXY" nginx -t >/tmp/vt-nginx.txt 2>&1; then echo "OK    nginx -t: configuración válida ($IMG_PROXY)"
 else echo "FALLA nginx -t:"; grep -E "emerg|nginx:" /tmp/vt-nginx.txt | sed 's/^/  /'; fallos=$((fallos+1)); fi
+
+paso "2n. Registros acotados: todo servicio del compose y el proxy declaran logging con max-size (docs/11 §4; D-04)"
+# 07/10: sin límite, el chequeo de salud del broker sumaba ≈ 395 MB/año. Se cuenta por archivo: servicios contra bloques logging.
+for f in plataforma/docker-compose.yml plataforma/proxy/compose.proxy.yml; do
+  srv=$(awk '/^services:/{s=1;next} /^[a-z]/{s=0} s && /^  [a-z][a-z-]*:$/' "$f" | wc -l)
+  # Se valida el VALOR, no solo la presencia (07/10: unas comillas escapadas, `\"10m\"`, dejaron la pila sin arrancar y el
+  # conteo decía OK): el daemon exige un tamaño como 10m y un entero para max-file.
+  logs=$(grep -cE 'max-size: "[0-9]+[kmg]", max-file: "[0-9]+"' "$f")
+  if [ "$srv" -ge 1 ] && [ "$srv" = "$logs" ]; then echo "OK    $f: $srv servicio(s), todos con logging acotado y bien formado"
+  else echo "FALLA $f: $srv servicio(s) pero $logs con 'max-size: \"Nm\", max-file: \"N\"' bien formado"; fallos=$((fallos+1)); fi
+done
 
 paso "3. Diagramas: informe = docs = base (generar-figuras.sh --verificar)"
 bash informe-oficial/figuras/generar-figuras.sh --verificar || fallos=$((fallos+1))

@@ -71,14 +71,14 @@ describe('modelo del emulador (TT-28)', () => {
     expect(inserts).toBe(5);
     expect((sql.match(/ON CONFLICT/g) ?? []).length + (sql.match(/NOT EXISTS/g) ?? []).length).toBe(5);
     expect((sql.match(/'emu-\d{4}'/g) ?? []).length).toBe(100);
-    const [p1] = perfiles(o); // el intervalo esperado del supervisor es el periodo del nodo redondeado hacia arriba
-    expect(sql).toContain(`('00000000-0000-0000-0000-00000000ba7d', 'emu-0001', 'Emulado 0001', ${Math.ceil(p1.periodoS)})`);
+    const [p1] = perfiles(o); // por defecto, intervalo esperado = 2 × periodo (silencio máximo normal, docs/10 §8.4 punto 23)
+    expect(sql).toContain(`('00000000-0000-0000-0000-00000000ba7d', 'emu-0001', 'Emulado 0001', ${Math.ceil(p1.periodoS * 2)})`);
   });
 
-  it('el factor de intervalo (experimento D-02) multiplica el periodo antes de redondear', () => {
+  it('el factor de intervalo 1 (el periodo, lo más estricto) reproduce el experimento de las alarmas falsas', () => {
     const ps = perfiles(o);
-    const sql = semillaSQL(ps, 'banco', 2);
-    expect(sql).toContain(`'emu-0001', 'Emulado 0001', ${Math.ceil(ps[0].periodoS * 2)})`);
-    expect(sql).toContain('intervalo = periodo × 2');
+    const sql = semillaSQL(ps, 'banco', 1);
+    expect(sql).toContain(`'emu-0001', 'Emulado 0001', ${Math.ceil(ps[0].periodoS)})`);
+    expect(sql).toContain('intervalo = periodo × 1');
   });
 });
