@@ -270,12 +270,19 @@ la respuesta a OE3 sobre alojamiento y costo: un sistema que solo funciona en nu
 costo de operación irreducible; uno que corre en un servidor propio permite el escenario de costo
 marginal cero para la institución.
 
-**Desviación conocida de RNF-15 (declarada el 30/09/2026).** La compresión y los agregados continuos de
-TimescaleDB están bajo la *Timescale License*: gratuita, y su §3.10 permite usarla como base de una
-plataforma IoT, pero no es de código abierto. La indicación original del propietario («gratuita o abierta»)
-se cumple en su primera mitad; la redacción de RNF-15 («exclusivamente de código abierto») no. Se declara en el
-informe (riesgos) y se reevalúa en la Etapa 3 junto con bases de series de tiempo con compresión y licencia
-abierta. La imagen solo Apache de TimescaleDB existe, pero pierde la compresión y las políticas automáticas.
+**Desviación de RNF-15: declarada el 30/09/2026, resuelta el 06/10/2026.** La compresión, las políticas
+automáticas y los agregados continuos de TimescaleDB están bajo la *Timescale License* (gratuita, «source-available»,
+no de código abierto según la OSI). Tras evaluar nueve bases de series de tiempo y probar la edición Apache 2.0 de
+TimescaleDB con el esquema real (fallan exactamente esas funciones y nada más; laboratorio del 06/10), **se adopta la
+edición Apache** (`timescale/timescaledb:2.24.0-pg16-oss`): hypertables, `time_bucket` con zona nombrada y
+`drop_chunks` son Apache y son lo que el sistema usa. Costo aceptado: sin compresión, el escenario de `docs/14` ocupa
+≈ 330 MB por año más índices (diez años ≈ 4,6 GB); la retención se ejecuta con `drop_chunks` desde una tarea
+programada del backend y los agregados se materializan por tarea. RNF-15 vuelve a cumplirse en su redacción literal.
+El cambio de imagen y de esquema es trabajo de la Etapa 3 (`docs/10 §8.4`, punto 11).
+
+**RNF-17 (06/10/2026).** Se mantiene como requisito: la memoria es un criterio ponderado al comparar brokers y bases,
+no un veto. Si la evolución del proyecto exigiera superar los 2 GB (por ejemplo, un broker con más capacidades), se
+renegocia con el profesor guía antes de cambiar OE5: los requisitos evolucionan, pero no se incumplen en silencio.
 
 ---
 
@@ -409,7 +416,7 @@ encaja directamente con RF-02 y RF-03, reduciendo el adaptador de LoRaWAN a un c
 
 | Alternativa | Ventajas | Desventajas | Decisión |
 |---|---|---|---|
-| **TimescaleDB** (extensión de PostgreSQL) | **Un solo motor** para datos relacionales (inventario, sitios, usuarios, condiciones) y series de tiempo. SQL estándar. Núcleo Apache 2.0; compresión y agregados continuos bajo la Timescale License (ver la desviación de RNF-15) | Menos optimizado que InfluxDB en escritura masiva pura | **✅ Seleccionado** |
+| **TimescaleDB** (extensión de PostgreSQL) | **Un solo motor** para datos relacionales (inventario, sitios, usuarios, condiciones) y series de tiempo. SQL estándar. Edición Apache 2.0 (imagen `-oss`) desde el 06/10/2026: sin compresión ni agregados continuos, que son Timescale License (ver RNF-15) | Menos optimizado que InfluxDB en escritura masiva pura | **✅ Seleccionado** |
 | InfluxDB | Muy eficiente en series de tiempo | Obliga a operar **dos motores** en paralelo, porque el inventario y la identidad son relacionales | Descartado |
 | PostgreSQL sin extensión | Máxima simplicidad | Sin optimización de series de tiempo ni políticas de retención automáticas | Descartado |
 

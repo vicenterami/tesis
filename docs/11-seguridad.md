@@ -62,7 +62,7 @@
 
 | Capa | Control | Cuándo |
 |---|---|---|
-| 2 | Proxy con TLS en 443 y 8883; retirar 1883. Caddy, nginx, Traefik, HAProxy o Envoy: en evaluación con registro de evidencia desde el 06/10; decisión en `docs/10 §8` | Al desplegar en servidor |
+| 2 | Proxy **nginx** (decidido el 06/10/2026, `docs/10 §8.4` punto 10) con TLS en 443 y 8883: variante A, termina TLS y reenvía por la red interna (HTTP al backend, TCP al broker); retirar 1883; `limit_req` por IP; `ssl_preread` disponible para la variante B | Al desplegar en servidor |
 | 2 | **Cola del broker acotada y vigilada:** `max_queued_messages`, `max_queued_bytes` y `autosave_interval` explícitos en `mosquitto.conf` (hoy rigen los defectos: 1000 mensajes, sin tope de bytes, guardado cada 1800 s; los excedentes se descartan sin aviso al emisor); alerta cuando `$SYS/broker/publish/messages/dropped` deje de ser cero (`docs/10 §4.1`) | Etapa 3 |
 | 2–4 | **Límite de tasa en dos capas:** en el proxy, por IP (contra bots); en el backend, `@nestjs/throttler` por usuario y ruta. **Hoy no hay ninguno de los dos**; lo que sí hay son las cabeceras de `helmet` (§3) | Etapa 3, con M7 |
 | 8 | **Telemetría de TimescaleDB:** la extensión trae un trabajo `policy_telemetry` que cada 24 h envía estadísticas de uso a su fabricante (visto en `timescaledb_information.jobs` el 27/09). Decidir si se apaga (`timescaledb.telemetry_level=off`) | Antes de datos reales |

@@ -1,6 +1,6 @@
 > ⚠️ **ACTUALIZADO AL PIVOTE DEL 02/09/2026:** los elementos ligados a Contact ID se reformularon
 > hacia el contrato SenML/MQTT y el pipeline de normalización. Las cifras vigentes son las de §6.1,
-> calculadas sumando las filas: **64 elementos, 279 h; núcleo 34 elementos, 168 h** (una estimación
+> calculadas sumando las filas: **65 elementos, 285 h; núcleo 34 elementos, 168 h** (una estimación
 > preliminar de ~155 h del 02/09 quedó superada y se corrigió el 22/09 para que informe y backlog
 > digan lo mismo; TT-39 agregada el 23/09; TT-32 promovida a núcleo y adelantada a la Etapa 3, y la
 > redistribución de §6.4 —decidida por escrito el 22/09 pero nunca aplicada a las filas— ejecutada,
@@ -298,6 +298,7 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 | **TT-24** | Comparar al menos tres alternativas de alojamiento con criterios ponderados | M | 2 | 4 |
 | **TT-25** | Cuantificar el costo mensual y anual de operación en CLP y USD | M | 2 | 3 |
 | **TT-26** | Redactar la recomendación de despliegue justificada | M | 2 | 1 |
+| **TT-40** | Despliegue comparativo en el banco de pruebas: ThingsBoard CE, OpenRemote y Magistrala con el mismo emulador (TT-28) y las mismas métricas (memoria en reposo y bajo carga, pasos para dar de alta un dispositivo y para una alerta, exportación), con datos propios en vez de cifras declaradas por el fabricante (decisión del 06/10/2026, `docs/10 §8.4` punto 14) | S | 4 | 6 |
 
 ## EP-13 · Validación y pruebas
 
@@ -355,10 +356,10 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 | | Elementos | Horas |
 |---|:---:|:---:|
 | **Núcleo demostrativo** 🎯 | 34 | **168** |
-| Fuera del núcleo | 30 | 111 |
-| **Total del backlog** | **64** | **279** |
+| Fuera del núcleo | 31 | 117 |
+| **Total del backlog** | **65** | **285** |
 
-Por prioridad: **Must** 56 elementos / 253 h · **Should** 7 / 24 h · **Could** 1 / 2 h.
+Por prioridad: **Must** 56 elementos / 253 h · **Should** 8 / 30 h · **Could** 1 / 2 h.
 
 ## 6.2 Presupuesto disponible
 
@@ -383,22 +384,22 @@ Cuatro semanas por etapa a ~15 horas semanales (restricción RE-01):
 | 1 | 9 h | 4 h | 45 h | +80 % | +91 % |
 | 2 | 84 h | 53 h | 60 h | **−40 %** | +12 % |
 | 3 | 85 h | 63 h | 60 h | **−42 %** | **−5 %** |
-| 4 | 99 h | 48 h | 75 h | −32 % | +36 % |
+| 4 | 105 h | 48 h | 75 h | −40 % | +36 % |
 | 1–4 (`TT-38`, bitácora) | 2 h | — | — | — | — |
-| **Total** | **279 h** | **168 h** | **240 h** | **−16 %** | **+30 %** |
+| **Total** | **285 h** | **168 h** | **240 h** | **−19 %** | **+30 %** |
 
 > Presupuesto por etapa según el calendario oficial del 24/08 (§6.2): 45, 60, 60 y 75 h, ~240 h en total.
 > Hasta el 23/09 esta tabla y las de §6.4 y §6.6 seguían con el escenario exigente anterior (21/60/60/60,
 > 201 h) aunque §6.2 ya lo había reemplazado; se propagó hoy (hallazgo de la revisión de concordancia).
 
 > `TT-38` (2 h, bitácora, Etapa «1–4») no se asigna a una sola etapa: va en su propia fila para que el
-> total cuadre con §6.1 (64 elementos, 279 h) sin inflar ninguna etapa. Esta tabla ya incorpora, al
+> total cuadre con §6.1 (65 elementos, 285 h) sin inflar ninguna etapa. Esta tabla ya incorpora, al
 > 23/09/2026, la redistribución de §6.4 (antes solo escrita, no aplicada a las filas) y la promoción
 > de TT-32 (plan B de R1).
 
 **Dos conclusiones, y la segunda es la que importa:**
 
-1. **El backlog completo excede el presupuesto en un 16 %.** No es viable ejecutarlo entero.
+1. **El backlog completo excede el presupuesto en un 19 %.** No es viable ejecutarlo entero.
 2. **El núcleo demostrativo sí cabe: 168 h contra 240 disponibles, con 30 % de holgura.** La tesis es
    demostrable dentro del plazo — pero **solo si el alcance se limita al núcleo** y los 111 h restantes
    se tratan como alcance opcional, no comprometido.
@@ -539,12 +540,12 @@ entrevista del 05/10 hizo subir (exportación, estados, correo por silencio) o b
 |---|---|---|---|
 | 30 % | Pruebas iniciales | TT-28 emulador de nodos; TT-27 pruebas del contrato (traída de la Etapa 4); pruebas de carrera (dos tramas del mismo instante, umbral cruzado dos veces; nuevo ítem); TT-36 informe de pruebas | 5 + 4 + 3 + 5 = 17 |
 | 20 % | Retroalimentación | Registrar la retroalimentación del profesor guía sobre la Etapa 2 cuando llegue; incorporar la entrevista (`docs/03 §4`: fuente [ENT] en `docs/02`, citas en `docs/01`, informe) | 4 |
-| 15 % | Mejoras del diseño | Confirmación al broker tras el COMMIT; ACL de `backend` y `sonda`; estado `mantenimiento` sin alertas (RF-22); `ON CONFLICT` al abrir condiciones; SSE decidido; unidades propias; entidad `pasarela`, ubicación y tabla `trama` (`docs/08 §8`), cada una con antes/después | 10 |
+| 15 % | Mejoras del diseño | Confirmación al broker tras el COMMIT; ACL de `backend` y `sonda`; estado `mantenimiento` sin alertas (RF-22); `ON CONFLICT` al abrir condiciones; SSE decidido; unidades propias; entidad `pasarela`, ubicación y tabla `trama` (`docs/08 §8`), cada una con antes/después; **edición Apache de TimescaleDB y migración 08 con hora de recepción** (`docs/10 §8.4` puntos 11–12, decididos el 06/10) | 13 |
 | 15 % | Documentación | `docs/10 §8.4`, `docs/08 §8`, figuras con la segunda ruta de entrada, matriz de la pila (RNF-15), bitácoras | 6 |
 | 10 % | 50 % de implementación | En este orden: HU-08 exportación CSV (traída de la Etapa 4; XLSX candidato) · HU-10 inventario con estados y última actualización · HU-25 destinatarios + correo por silencio (traída) · HU-11 registro de dispositivo · HU-18 sesión y roles · adaptador «milesight» (nuevo) · TT-39 tiempo real como SSE · HU-02 ruta LoRaWAN | 4 + 5 + 3 + 5 + 3 + 4 + 4 + 6 = 34 |
-| 10 % | Validación preliminar | TT-32 extremo a extremo con un equipo real (Milesight o del compañero); TT-12 catálogo con los sensores reales; TT-15 claves | 3 + 3 + 2 = 8 |
+| 10 % | Validación preliminar | TT-32 extremo a extremo con un equipo real (Milesight o del compañero); TT-12 catálogo con los sensores reales; TT-15 claves; cata de TT-40: levantar ThingsBoard CE en el portátil y medir su memoria | 3 + 3 + 2 + 2 = 10 |
 
-**Total: 79 h contra ~60 h disponibles** (§6.2). No cabe todo: los últimos ítems de implementación (SSE, ruta
+**Total: 84 h contra ~60 h disponibles** (§6.2). No cabe todo: los últimos ítems de implementación (SSE, ruta
 LoRaWAN) y HU-19 (panel de salud, 9 h, ya en la Etapa 4) se ejecutan solo contra holgura. La regla sigue
 siendo la de §6.5: se recorta por el final de cada criterio, nunca las pruebas.
 

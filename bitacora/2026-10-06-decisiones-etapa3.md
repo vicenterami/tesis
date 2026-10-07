@@ -34,3 +34,13 @@ falla) y su entrada en el cuadro de mejoras del informe (antes/después).
 - **Hora de medición frente a hora de recepción**: propuesta en `docs/08 §8` (`medicion.recibido_en` y
   `origen_tiempo`), pendiente de decisión.
 - Figuras regeneradas desde la fuente única; informe recompilado en 30 páginas sin desbordes; guardián en verde.
+
+## Segunda sesión del día (noche): decisiones 10 a 15
+
+Con el registro de evidencia de proxies (cinco candidatos), el laboratorio de la edición Apache de TimescaleDB sobre
+el esquema real y la revisión del kit de método, se fijaron en `docs/10 §8.4`: **nginx** como proxy (variante A: TLS
+en el proxy); **edición Apache 2.0 de TimescaleDB**, que resuelve la desviación de RNF-15 declarada el 30/09 al costo
+de no comprimir (≈ 4,6 GB por diez años del escenario de `docs/14`); **hora de recepción** junto a la de medición en
+la migración 08; **RNF-17 se mantiene** con la memoria como criterio ponderado; y una tarea nueva de **despliegue
+comparativo** (TT-40, Etapa 4) contra ThingsBoard CE, OpenRemote y Magistrala con el mismo emulador. `docs/02`,
+`docs/04`, `docs/08`, `docs/11` y `docs/14` quedaron alineados; la figura de despliegue se regeneró.

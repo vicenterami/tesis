@@ -423,11 +423,11 @@ flowchart TB
         direction LR
         subgraph SVC["Contenedores (versión fijada · no-new-privileges · reinicio automático)"]
             direction TB
-            C5["proxy<br/>Caddy o Nginx (por decidir) · TLS<br/>límite 0,1 GB · publica 443, 8883, 1700/udp"]
+            C5["proxy<br/>nginx (decidido el 06/10) · TLS<br/>límite 0,1 GB · publica 443, 8883 · 1700/udp solo ruta A"]
             C1["mosquitto<br/>eclipse-mosquitto 2.0.22<br/>límite 0,25 GB"]
             C2["chirpstack<br/>+ redis propio<br/>límite 0,35 GB"]
             C4["backend<br/>imagen propia: NestJS (Etapa 2); + panel estático cuando exista<br/>límite 0,5 GB · sin estado"]
-            C3["timescaledb<br/>timescale/timescaledb 2.24.0-pg16<br/>límite 0,75 GB"]
+            C3["timescaledb<br/>timescale/timescaledb 2.24.0-pg16-oss (edición Apache)<br/>límite 0,75 GB"]
         end
         V4[("vol: certificados")]
         V2[("vol: datos-mosquitto")]
@@ -441,10 +441,10 @@ flowchart TB
 
 | Servicio | Persistencia | Reinicio | Expuesto |
 |---|---|---|---|
-| proxy | certificados | `unless-stopped` | 443, 8883, 1700/udp |
+| proxy (nginx) | certificados | `unless-stopped` | 443, 8883; 1700/udp solo ruta A |
 | mosquitto | retenidos + ACL | `unless-stopped` | no (vía proxy) |
 | chirpstack | base `chirpstack` en el mismo PostgreSQL (volumen datos-timescale) + redis | `unless-stopped` | no (vía proxy) |
-| timescaledb | **todo el dato** | `unless-stopped` | no |
+| timescaledb (edición Apache, `-oss`) | **todo el dato** | `unless-stopped` | no |
 | backend | ninguna (sin estado) | `unless-stopped` | no (vía proxy) |
 
 **Suma de límites: ~1,95 GB** — coherente con RNF-17 (operar en ≤ 2 GB en reposo; los límites son
@@ -569,8 +569,8 @@ separados.
    partir de ahí, solo incrementar un contador con la primera y última aparición. Se conserva la
    evidencia —que es para lo que existe la cuarentena— sin pagar el volumen. Si la ventana se cierra
    sin tramas nuevas, el ciclo vuelve a empezar.
-3. **Retención**: política de borrado de `cuarentena` a los 30 días, igual que la compresión de
-   `medicion`. Una trama basura de hace dos meses no diagnostica nada.
+3. **Retención**: borrado de `cuarentena` a los 30 días con `drop_chunks`, desde la misma tarea programada
+   que retiene `trama` y `medicion` (edición Apache: sin políticas automáticas). Una trama basura de hace dos meses no diagnostica nada.
 
 4. **Avisar a quien puede arreglarlo, con lo que necesita para arreglarlo.** Detectar sin notificar
    no sirve: hoy la evidencia queda en una tabla que solo mira quien sabe SQL. La condición
@@ -618,7 +618,7 @@ diseño (regla de concordancia): tras autenticar, el filtro 6 corre siempre.
 
 - [ ] Confirmar con el compañero el tópico exacto y la forma de su JSON para escribir el adaptador
       (filtro 2) — ver bitácora de acuerdos.
-- [ ] Decidir el proxy inverso definitivo. Candidatos: Caddy, nginx, Traefik, HAProxy y Envoy; se evalúan con
+- [x] Decidir el proxy inverso definitivo: **nginx**, 06/10/2026 (§8.4 punto 10). Candidatos: Caddy, nginx, Traefik, HAProxy y Envoy; se evalúan con
       registro de evidencia (licencia, TLS automático, proxy TCP para 8883 y UDP para 1700, límite de tasa, SSE
       sin búfer, mTLS, memoria, imagen oficial) completado y verificado el 06/10/2026; nada se elige sin ese registro.
       Tres hechos que cambian el planteo anterior: nginx ya trae ACME nativo en su imagen oficial (el argumento «Caddy
@@ -684,4 +684,34 @@ Fuentes: `bitacora/2026-10-05-entrevista-academico-geologia.md`; evidencia verif
    escenarios de entrada contemplados y la respuesta a «¿cualquier dispositivo?» están en §2. El proxy se elige
    con registro de evidencia (§8.3); la decisión se escribe aquí y en el anexo C del informe. Las leyendas del
    informe que aún dicen «WebSocket» o «ChirpStack correrá en el servidor» se corrigen con la próxima entrega.
+
+**Decisiones de la noche del 06/10/2026** (tras el registro de proxies, el laboratorio de la edición Apache y la
+revisión del kit de método). Fuentes privadas: registro de proxies (111 filas verificadas), laboratorio de
+TimescaleDB (8 observaciones), registro de brokers (258 filas).
+
+10. **Proxy inverso: nginx, variante A.** Termina TLS en 443 y 8883 y reenvía al backend por HTTP y al broker por
+    TCP en claro (`stream`) dentro de la red interna; `ssl_preread` queda disponible para pasar a la variante B
+    (passthrough por SNI y TLS en Mosquitto) si algún día se exige certificado de cliente. Hechos que decidieron:
+    la imagen oficial trae `stream`, UDP, ACME nativo y `limit_req` sin compilar nada; licencia BSD-2; Caddy solo
+    hace TCP/UDP con un módulo externo no oficial; HAProxy comunitario no hace UDP; Traefik no declara servidor de
+    archivos estáticos. Lo que la variante A pierde (el broker ve la IP del proxy, no la del dispositivo; sin
+    identidad por certificado) queda documentado. La comparación va al anexo C del informe.
+11. **Base de datos: edición Apache 2.0 de TimescaleDB** (`timescale/timescaledb:2.24.0-pg16-oss`). Probado con el
+    esquema real: fallan solo la compresión y su política, `add_retention_policy` y los agregados continuos; todo lo
+    que el sistema usa (hypertable, `time_bucket` con zona, `drop_chunks`) funciona. Se quitan las líneas de
+    compresión del esquema, la retención de `medicion` (2 años), `trama` y `cuarentena` (30 días) la ejecuta una
+    tarea programada del backend con `drop_chunks`, y los agregados se materializan por tarea. En desarrollo se
+    recrea el volumen (datos de demo); no hay datos reales que migrar. RNF-15 vuelve a cumplirse literalmente
+    (`docs/02`, `docs/14 §2`).
+12. **Hora de recepción junto a la de medición:** `medicion.recibido_en` y `medicion.origen_tiempo`
+    (`dispositivo` | `pasarela` | `recepcion`), en la migración 08; los adaptadores declaran el origen; la deriva
+    por dispositivo se muestra en la vista de salud (`docs/08 §8`).
+13. **RNF-17 se mantiene** como requisito; la memoria es criterio ponderado, no veto. Si la evolución exige
+    superarlo se renegocia con el profesor guía antes de cambiar OE5 (`docs/02`).
+14. **Despliegue comparativo** contra ThingsBoard CE, OpenRemote y Magistrala con el mismo emulador y las mismas
+    métricas: tarea TT-40 en la Etapa 4 (`docs/04`), con una cata de dos horas en la Etapa 3 (levantar ThingsBoard
+    CE y medir su memoria) porque el informe hoy cita el «≥ 4 GB» de terceros.
+15. **Del kit de método (06/10):** toda migración lleva `SET LOCAL lock_timeout = '5s'`; cada barrido del supervisor
+    deja una línea de resumen; las marcas que escribe el sistema sobre `dispositivo` no deben parecer una edición
+    humana (decisión pendiente en `docs/08 §8` antes de HU-10); «valor congelado» entra como condición candidata.
 

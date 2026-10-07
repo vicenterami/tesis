@@ -226,7 +226,8 @@ consistente para reportes.
 
 ## 8. Pendiente
 
-- [ ] Políticas de retención en capas y agregados continuos de la hypertable (`docs/14`).
+- [ ] Retención con `drop_chunks` desde una tarea programada y agregados como vistas materializadas (edición Apache
+      de TimescaleDB, decisión del 06/10/2026: `docs/14 §2`, `docs/10 §8.4` punto 11).
 - [ ] Validar el modelo contra el catálogo de magnitudes real, cuando se acuerden los sensores con el
       compañero.
 - [x] Llevar el diagrama al informe (generado desde la base real por `generar-figuras.sh`).
@@ -245,13 +246,18 @@ consistente para reportes.
 - [ ] **Tercera forma normal, revisada con cada cambio**: al agregar `pasarela` y `trama`, comprobar que ningún
       atributo dependa de otro que no sea la clave y que no aparezcan dependencias multivaluadas (lo que
       justificaría 4FN). Si aparecieran, se documenta aquí y se normaliza; mientras no, 3FN basta (§6).
-- [ ] **Hora de medición frente a hora de recepción (pregunta del 06/10/2026).** `medicion.tiempo` guarda el
+- [x] **Hora de medición frente a hora de recepción (decidido el 06/10/2026; `docs/10 §8.4` punto 12; migración 08).** `medicion.tiempo` guarda el
       instante de la medición según la regla 7 de `docs/13` (marca del emisor si es plausible; si no, la de
       recepción), pero la fila **no registra cuál de las dos se usó ni cuánto difieren**. El broker no marca la
       hora (MQTT no la añade); la hora de llegada al backend hoy solo queda en `cuarentena.recibido_en` y quedará en
-      `trama.recibido_en` (30 días). Propuesta, pendiente de aprobación: `medicion.recibido_en timestamptz` (8 bytes
+      `trama.recibido_en` (30 días). Decisión: `medicion.recibido_en timestamptz` (8 bytes
       por fila) y `medicion.origen_tiempo` (`dispositivo` | `pasarela` | `recepcion`), con la deriva
       `recibido_en − tiempo` por dispositivo en la vista de salud (RF-47). Para LoRaWAN, la hora de la pasarela
       (`time` del mensaje Milesight; `rxInfo` de ChirpStack) es más confiable que la del nodo: el adaptador la
       declara como `pasarela`. La hora de guardado es la del COMMIT y, con la confirmación tras persistir
       (`docs/10 §8.4` punto 4), queda a milisegundos de `recibido_en`: no hace falta una cuarta columna.
+- [ ] **Marcas del sistema frente a edición humana** (kit de método, 06/10/2026): `visto_por_ultima_vez` y
+      `en_linea` las escribe el supervisor sobre `dispositivo`, y el disparador mueve `actualizado_en` en cada UPDATE.
+      Si el panel usa control optimista sobre `dispositivo`, un barrido provocará «otro usuario lo modificó» falsos.
+      Decidir antes de HU-10/HU-18: tabla `estado_dispositivo` propia (una fila por dispositivo, sin disparador) o
+      excluir esas columnas del disparador y de la comparación optimista.

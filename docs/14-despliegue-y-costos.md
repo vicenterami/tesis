@@ -16,7 +16,7 @@ los gigabytes, y de los gigabytes casi todo lo demás. Rubros y qué los mueve:
 | Rubro | Qué lo mueve | En esta plataforma |
 |---|---|---|
 | Cómputo (vCPU, memoria) | Procesos que corren y su techo de memoria | 5 contenedores, techo 1,95 GB, consumo en reposo ≈ 120 MB medido el 27/09 (base 61, backend 53, broker 8) → **el rubro dominante y el más acotado** |
-| Almacenamiento | Filas × tamaño × retención − compresión | Pequeño (§2) |
+| Almacenamiento | Filas × tamaño × retención (sin compresión) | Pequeño (§2) |
 | Base de datos gestionada | Solo si se externaliza | No: TimescaleDB va en el mismo servidor (RNF-17) |
 | Tráfico de salida | GB que salen a Internet | Mínimo: el panel y la API sirven agregados, no datos crudos |
 | Observabilidad | Logs y métricas por volumen | `docker compose logs` y `docker stats`; sin servicio externo |
@@ -32,20 +32,19 @@ los gigabytes, y de los gigabytes casi todo lo demás. Rubros y qué los mueve:
 | Filas por año | 14 400 × 365 | ≈ 5,3 millones |
 | Tamaño por fila sin comprimir | `uuid` 16 + `timestamptz` 8 + `float` 8 + `text` ≈ 6 + cabecera ≈ 24 | ≈ 62 B |
 | Crudo por año, sin comprimir | 5,3 M × 62 B | ≈ 330 MB (+ ~40 % de índice) |
-| Crudo por año, comprimido | TimescaleDB comprime por columnas fragmentos antiguos; en series con valores contiguos parecidos la razón típica es 10–20× | ≈ 20–45 MB |
+| Compresión | **No se usa** desde el 06/10/2026: la compresión de TimescaleDB es Timescale License y el sistema adopta la edición Apache (`docs/02`, RNF-15). Diez años del escenario ≈ 3,3 GB + índices ≈ 4,6 GB | — |
 
 **Política en capas** (la parte que hay que decidir **antes** de recibir datos; después es migración):
 
 | Capa | Qué | Retención | Cómo |
 |---|---|---|---|
-| Crudo reciente | Cada lectura, sin comprimir | 30 días | fragmentos de 7 días (ya configurado) |
-| Crudo comprimido | Cada lectura, comprimida por columnas | 2 años | política de compresión a los 30 días (ya configurada) |
-| Agregado horario | mín, máx, promedio, cuenta por canal y hora, en la zona del sitio | indefinido | agregado continuo de TimescaleDB (Etapa 3) |
-| Agregado diario | ídem por día | indefinido | agregado continuo (Etapa 3) |
-| Crudo antiguo | > 2 años | se borra por política de retención, o se exporta a archivo antes | política `drop_chunks` (Etapa 3) |
+| Crudo | Cada lectura, sin comprimir | 2 años | fragmentos de 7 días (ya configurado) |
+| Agregado horario | mín, máx, promedio, cuenta por canal y hora, en la zona del sitio | indefinido | vista materializada refrescada por tarea programada (Etapa 3; el agregado continuo es Timescale License) |
+| Agregado diario | ídem por día | indefinido | vista materializada refrescada por tarea (Etapa 3) |
+| Crudo antiguo | > 2 años | se borra con `drop_chunks` (función Apache) desde una tarea programada del backend, o se exporta a archivo antes | tarea de retención (Etapa 3; la política automática es Timescale License) |
 
-Con esto, **diez años de operación del escenario caben en menos de 1 GB**. El almacenamiento no es
-el problema; la memoria mínima del servidor sí, y está fijada por RNF-17 en 2 GB.
+Con esto, **diez años de operación del escenario ocupan ≈ 4,6 GB sin compresión** (330 MB por año más ≈ 40 % de
+índices). El almacenamiento no es el problema; la memoria mínima del servidor sí, y está fijada por RNF-17 en 2 GB.
 
 **Qué se guarda y qué no.** Un sensor que reporta cada segundo un fenómeno que cambia cada cinco
 minutos multiplica el costo por trescientos sin agregar información. El intervalo lo fija el
@@ -119,5 +118,5 @@ complejidad sin retorno).
 ## 6. Pendiente
 
 - [ ] Recotizar en la calculadora de cada proveedor la semana previa a contratar; registrar fecha.
-- [ ] Agregados continuos horario y diario, y política de retención de 2 años (Etapa 3).
+- [ ] Vistas materializadas horaria y diaria, y tarea de retención de 2 años con `drop_chunks` (Etapa 3; edición Apache, decisión del 06/10/2026).
 - [ ] Medir el consumo real bajo carga en el banco de pruebas (Etapa 4) y contrastar con el plan elegido.
