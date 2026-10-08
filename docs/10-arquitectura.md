@@ -295,6 +295,9 @@ transporte. Fuente: OASIS, *MQTT Version 5.0*, §4.3 (`mqttoasis` en la bibliogr
 | La **base** cae | El INSERT falla; el manejador reintenta el mismo mensaje (1, 2, 4 y 8 s) y, si sigue fallando, **no confirma** al broker y reconecta: con sesión persistente el broker lo reenvía al volver y el índice único absorbe la repetición. Mientras tanto, los demás mensajes esperan en la cola del broker (`max_queued_messages`). Nada se pierde en silencio: cada reintento queda en el registro (decisión 4, 07/10/2026) |
 | La misma trama llega **dos veces** (reentrega QoS 1 tras reconexión; nodo que reenvía su cola) | El INSERT es idempotente: índice único `(canal_id, tiempo)` + `ON CONFLICT DO NOTHING`; la repetida se ignora y **no** vuelve a evaluar umbrales | «Al menos una vez» + operación idempotente = efecto de exactamente una |
 
+**Probado el 08/10/2026 (`docs/16 §11`, con carga):** backend detenido 20 s y base congelada 15 s, cero lecturas perdidas;
+broker reiniciado sin persistencia (banco), 84 perdidas. Falta probar el proxy, el servidor completo y el broker con persistencia.
+
 **La cola del broker, con números** (verificado el 06/10/2026 en el manual `mosquitto.conf(5)` de la 2.0.22 y en
 `plataforma/mosquitto/config/mosquitto.conf`). Mientras el backend está caído, Mosquitto guarda **por cliente**
 hasta `max_queued_messages` = **1000** mensajes QoS 1 (más `max_inflight_messages` = 20 en vuelo); `max_queued_bytes`
@@ -782,9 +785,9 @@ TimescaleDB (8 observaciones), registro de brokers (258 filas).
     (`resolver 127.0.0.11`), para que recrear un contenedor no deje al proxy apuntando a una IP vieja. Probado de punta a
     punta en el banco (`banco.sh proxy`, `docs/16 §9`). Por defecto escucha solo en 127.0.0.1 y usa una CA de desarrollo
     (`proxy/ca-desarrollo.sh`, fuera del repositorio); exponerlo y el certificado real son decisiones del despliegue
-    (ficha D-06: Let's Encrypt por ACME si hay DNS público y puerto 80, CA propia si el servidor es solo de campus).
+    (por decidir: Let's Encrypt por ACME si hay DNS público y puerto 80, CA propia si el servidor es solo de campus).
 23. **`intervalo_esperado_s` es el silencio máximo normal del dispositivo, no su periodo (decisión del estudiante,
-    07/10/2026, D-02 opción E).** Con 1 % de pérdida, declararlo igual al periodo produjo 108 alarmas de silencio falsas en
+    07/10/2026).** Con 1 % de pérdida, declararlo igual al periodo produjo 108 alarmas de silencio falsas en
     90 s; declarado como 2 × periodo, 3 (`docs/16 §3 y §6.1`). RNF-03 y el código no cambian: cambia qué número se pone al
     dar de alta (migración 10 fija la semántica en la base; la ayuda del alta la repetirá). Evolución si algún medio pierde
     más: tolerancia por dispositivo (opción B).

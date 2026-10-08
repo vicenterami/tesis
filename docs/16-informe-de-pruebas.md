@@ -150,7 +150,7 @@ una CA de desarrollo (`proxy/ca-desarrollo.sh`, fuera del repositorio) y se prob
 | Conexión **sin** TLS al 8883 | ✅ rechazada |
 | Registro del proxy | una línea JSON por petición y por conexión, con la IP real del cliente |
 
-Lo que esta prueba no cubre: el certificado real del servidor (ficha D-06), el límite de tasa (`docs/11 §4`) y la
+Lo que esta prueba no cubre: el certificado real del servidor (por decidir, `docs/10 §8.4` punto 22), el límite de tasa (`docs/11 §4`) y la
 exposición a la red (por defecto el proxy escucha solo en 127.0.0.1).
 
 ## 10. Capacidad, picos y saturación (08/10/2026)
@@ -184,3 +184,22 @@ vez, o una pasarela que vacía de golpe lo que guardó durante un corte, `docs/1
 consulte la base; topes de cola explícitos y dimensionados (`max_queued_messages`, `max_queued_bytes`) con alarma sobre el
 contador de descartes; inserción por lotes si hiciera falta más capacidad. Limitaciones: portátil de 16 hilos con el emulador en
 el mismo equipo; el broker del banco va sin credenciales ni persistencia; el servidor real tendrá otra CPU.
+
+## 11. Caídas con carga en curso (TT-30 adelantado, 08/10/2026)
+
+Guion: `pruebas/banco/caidas.sh`. Veinte dispositivos reportan cada 1 s (20 tramas/s, bajo la cola de 1000 del broker, para probar
+la red de seguridad y no el límite de §10). A los 15 s se provoca la falla; la pérdida se evalúa 30 s después de terminar, para
+no confundir atraso con pérdida.
+
+| Falla provocada | Lecturas perdidas | Qué la cubrió | Vuelta |
+|---|---|---|---|
+| Backend detenido 20 s | **0** | El broker guardó la cola de la sesión persistente (QoS 1) y la entregó al volver | `/salud` en 1 s |
+| Base congelada 15 s (`docker pause`) | **0** | Reintentos del pipeline (1, 2, 4 y 8 s) y reenvío del broker de lo no confirmado | inmediata |
+| Broker reiniciado (en el banco, **sin persistencia**) | **84** (≈ 2 s de tráfico) | Nada: lo que estaba en la cola del broker se perdió; emulador y backend reconectaron solos | inmediata |
+
+Ningún contenedor murió por memoria ni tuvo reinicios no pedidos. **Cuidado al leer el contador de descartes del broker:** se
+reinicia con el broker, así que después de un reinicio «0 descartes» no prueba nada; la pérdida la midió el evaluador.
+
+**Lo que falta probar:** el broker de producción (con persistencia y guardado cada 1800 s): un reinicio ordenado guarda la cola
+al cerrar, una muerte brusca pierde lo encolado desde el último guardado (`docs/10 §4.1`); la caída del proxy; la del servidor
+completo; y la caída del backend con más tráfico que la cola (§10 dice que ahí se descarta).

@@ -194,7 +194,7 @@ erDiagram
   `cuarentena` (si no), y actualiza `dispositivo.visto_por_ultima_vez` y las `condicion`.
 - La **API REST** (patrón B) lee de estas tablas para el dashboard: histórico desde `medicion` con
   `time_bucket`, estado desde `dispositivo` y `condicion`.
-- La **supervisión de salud** compara `visto_por_ultima_vez` contra `intervalo_esperado_s` —el **silencio máximo normal** del dispositivo, no su periodo: periodo más las pérdidas que admite el medio, regla práctica 2 × periodo (decisión D-02 del 07/10/2026, `docs/10 §8.4` punto 23, migración 10)— para abrir
+- La **supervisión de salud** compara `visto_por_ultima_vez` contra `intervalo_esperado_s` —el **silencio máximo normal** del dispositivo, no su periodo: periodo más las pérdidas que admite el medio, regla práctica 2 × periodo (decisión del 07/10/2026, `docs/10 §8.4` punto 23, migración 10)— para abrir
   condiciones de tipo `sin_comunicacion`.
 
 ## 6. Convenciones del esquema (aplicadas en la migración 05)

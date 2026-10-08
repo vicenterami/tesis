@@ -1,4 +1,4 @@
--- 10 · Qué significa dispositivo.intervalo_esperado_s (decisión D-02, 07/10/2026; docs/10 §8.4 punto 23; docs/16 §6.1).
+-- 10 · Qué significa dispositivo.intervalo_esperado_s (decisión del 07/10/2026; docs/10 §8.4 punto 23; docs/16 §6.1).
 -- El supervisor abre «sin comunicación» cuando el silencio supera 2 × este valor (RF-24, RNF-03). Medido en el banco con
 -- 1 % de pérdida: declarado igual al periodo de reporte dio 108 alarmas falsas en 90 s; declarado como 2 × periodo, 3.
 -- No cambia el tipo ni el código: fija en la base, donde lo lee cualquiera, qué número hay que poner al dar de alta.

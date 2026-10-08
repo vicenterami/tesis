@@ -40,7 +40,7 @@ SELECT CASE WHEN count(*)>=9 AND (SELECT count(*) FROM magnitud WHERE codigo IN 
 SELECT CASE WHEN count(*)=1 THEN 'OK    07 cuarentena.motivo con CHECK (dominio cerrado)' ELSE 'FALLA 07 falta el CHECK de cuarentena.motivo' END FROM pg_constraint WHERE conname='cuarentena_motivo_chk' AND contype='c' AND conrelid='cuarentena'::regclass; -- desde la 09 es hypertable: cada fragmento lleva su copia
 SELECT CASE WHEN count(*)=2 AND (SELECT count(*) FROM pg_constraint WHERE conname='ck_medicion_recepcion' AND conrelid='medicion'::regclass)=1 THEN 'OK    08 medicion.recibido_en y origen_tiempo con su CHECK' ELSE 'FALLA 08 falta la hora de recepción en medicion' END FROM information_schema.columns WHERE table_name='medicion' AND column_name IN ('recibido_en','origen_tiempo');
 SELECT CASE WHEN count(*)=2 AND (SELECT count(*) FROM information_schema.columns WHERE table_name='cuarentena' AND column_name IN ('detalle','dispositivo_id'))=2 AND (SELECT pg_get_constraintdef(oid) LIKE '%no_registrado%dado_de_baja%' FROM pg_constraint WHERE conname='cuarentena_motivo_chk' AND conrelid='cuarentena'::regclass) THEN 'OK    09 trama y cuarentena son hypertables; cuarentena con detalle, dispositivo_id y motivos no_registrado/dado_de_baja' ELSE 'FALLA 09 trama/cuarentena incompletas' END FROM timescaledb_information.hypertables WHERE hypertable_name IN ('trama','cuarentena');
-SELECT CASE WHEN col_description('dispositivo'::regclass, (SELECT attnum FROM pg_attribute WHERE attrelid='dispositivo'::regclass AND attname='intervalo_esperado_s')) LIKE 'Silencio máximo normal%' THEN 'OK    10 intervalo_esperado_s documentado como silencio máximo normal (D-02)' ELSE 'FALLA 10 falta el COMMENT de intervalo_esperado_s (aplicar db/init/10-intervalo-esperado.sql)' END;
+SELECT CASE WHEN col_description('dispositivo'::regclass, (SELECT attnum FROM pg_attribute WHERE attrelid='dispositivo'::regclass AND attname='intervalo_esperado_s')) LIKE 'Silencio máximo normal%' THEN 'OK    10 intervalo_esperado_s documentado como silencio máximo normal (docs/10 §8.4 punto 23)' ELSE 'FALLA 10 falta el COMMENT de intervalo_esperado_s (aplicar db/init/10-intervalo-esperado.sql)' END;
 SQL
 exige /tmp/vt-mig.txt "${PIPESTATUS[0]}" 10 || fallos=$((fallos+1))
 # Toda migración en disco debe tener su comprobación arriba: una 08 nueva sin comprobación falla aquí,
@@ -170,7 +170,7 @@ elif ! docker image inspect "$IMG_PROXY" >/dev/null 2>&1 || [ ! -f "$CERTS_DEV/s
 elif docker run --rm -v "$PWD/plataforma/proxy/nginx.conf:/etc/nginx/nginx.conf:ro" -v "$CERTS_DEV:/certs:ro" "$IMG_PROXY" nginx -t >/tmp/vt-nginx.txt 2>&1; then echo "OK    nginx -t: configuración válida ($IMG_PROXY)"
 else echo "FALLA nginx -t:"; grep -E "emerg|nginx:" /tmp/vt-nginx.txt | sed 's/^/  /'; fallos=$((fallos+1)); fi
 
-paso "2n. Registros acotados: todo servicio del compose y el proxy declaran logging con max-size (docs/11 §4; D-04)"
+paso "2n. Registros acotados: todo servicio del compose y el proxy declaran logging con max-size (docs/11 §4)"
 # 07/10: sin límite, el chequeo de salud del broker sumaba ≈ 395 MB/año. Se cuenta por archivo: servicios contra bloques logging.
 for f in plataforma/docker-compose.yml plataforma/proxy/compose.proxy.yml; do
   srv=$(awk '/^services:/{s=1;next} /^[a-z]/{s=0} s && /^  [a-z][a-z-]*:$/' "$f" | wc -l)
@@ -197,6 +197,13 @@ for m in malos: print("FALLA", m)
 if not malos: print(f"OK    {n} archivos .tex: cada mención de ChirpStack lo marca como opcional (ruta A)")
 sys.exit(1 if malos else 0)
 PY
+
+paso "2p. Repositorio público: ningún archivo versionado cita fichas privadas (viven en privado/, un lector no las abre)"
+# 08/10: 19 referencias en 12 archivos apuntaban a fichas de decisión privadas (formato D, guion y dos dígitos). Lo público
+# cita lo público: la sección de docs/10 §8.4 o de docs/11 donde quedó la decisión.
+if git grep -n -E 'ficha D-[0-9]{2}|decisi[oó]n D-[0-9]{2}|\bD-[0-9]{2}\b' -- ':!privado' > /tmp/vt-fichas.txt 2>/dev/null; then
+  echo "FALLA archivos públicos que citan fichas privadas:"; cut -c1-160 /tmp/vt-fichas.txt; fallos=$((fallos+1))
+else echo "OK    ningún archivo versionado cita fichas privadas"; fi
 
 paso "3. Diagramas: informe = docs = base (generar-figuras.sh --verificar)"
 bash informe-oficial/figuras/generar-figuras.sh --verificar || fallos=$((fallos+1))

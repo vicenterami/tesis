@@ -1,14 +1,14 @@
 # Capa opcional del proxy inverso (TT-22; docs/10 §8.4 decisión 10, variante A). Se SUMA al compose base:
 #   desarrollo:  docker compose -f docker-compose.yml -f docker-compose.override.yml -f proxy/compose.proxy.yml up -d proxy
 #   banco:       bash pruebas/banco/banco.sh proxy        (puertos 8443/8884/8081, certificados de desarrollo)
-#   servidor:    la misma capa con PROXY_IP=0.0.0.0 y PROXY_CERTS apuntando a los certificados reales (ficha D-06)
+#   servidor:    la misma capa con PROXY_IP=0.0.0.0 y PROXY_CERTS apuntando a los certificados reales (docs/10 §8.4 punto 22)
 # Valores por defecto SEGUROS: escucha solo en 127.0.0.1 y usa la CA de desarrollo; exponer a la red es una decisión
 # explícita en el .env del servidor. El único contenedor con puertos hacia fuera en producción es este (docs/10 §2).
 services:
   proxy:
     image: nginx:1.30.5-alpine          # versión fijada (estable, 26/09/2026); trae stream, HTTP/2, stub_status y el módulo ACME
     restart: unless-stopped
-    logging:                           # registros acotados como el resto (D-04)
+    logging:                           # registros acotados como el resto (docs/11 §4)
       driver: json-file
       options: { max-size: "10m", max-file: "5" }
     security_opt:

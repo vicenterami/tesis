@@ -21,7 +21,7 @@ los gigabytes, y de los gigabytes casi todo lo demás. Rubros y qué los mueve:
 | Base de datos gestionada | Solo si se externaliza | No: TimescaleDB va en el mismo servidor (RNF-17) |
 | Tráfico de salida | GB que salen a Internet | Mínimo: el panel y la API sirven agregados, no datos crudos |
 | Observabilidad | Logs y métricas por volumen | `docker compose logs` y `docker stats`; sin servicio externo |
-| Dominio y TLS | Registro anual; certificados | Dominio ~USD 10–15/año; TLS gratuito (Let's Encrypt por ACME en el proxy) o CA propia si el servidor no es público (ficha D-06) |
+| Dominio y TLS | Registro anual; certificados | Dominio ~USD 10–15/año; TLS gratuito (Let's Encrypt por ACME en el proxy) o CA propia si el servidor no es público (por decidir) |
 
 ## 2. Modelo de volumen y política de retención
 

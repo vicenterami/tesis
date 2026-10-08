@@ -28,7 +28,7 @@ interface Canal { id: string; magnitud: string; unidad_canonica: string; rango_m
 //             │
 //             ▼
 //           [2] ¿algún adaptador la entiende? ──no──► cuarentena "malformada"
-//             │  (SenML nativo · plano · próximamente ChirpStack)
+//             │  (SenML nativo · plano · próximamente el de la pasarela, ruta B)
 //             ▼  lecturas {magnitud, valor, unidad, tiempo}
 //           [3] ¿canal declarado? ¿unidad convertible? ¿valor en rango? ──no──► cuarentena "invalida"
 //             │

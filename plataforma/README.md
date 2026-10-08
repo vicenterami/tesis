@@ -110,4 +110,4 @@ Capas, amenazas y controles verificados: `docs/11-seguridad.md`.
 2. ~~Contenedor del backend en el Compose~~ hecho (imagen propia multi-etapa); falta el panel estático.
 3. ChirpStack (base aparte en el mismo PostgreSQL + Redis propio) **solo si se activa la ruta A**, que es opcional: en la
    prevista (B) la pasarela publica por MQTT/TLS como un dispositivo más (`docs/10 §8.4` punto 2).
-4. ~~Proxy inverso con TLS~~ capa nginx hecha (07/10, `proxy/`, probada en el banco con `banco.sh proxy`); falta el certificado real (ficha D-06), `limit_req` y no publicar el 1883 en producción.
+4. ~~Proxy inverso con TLS~~ capa nginx hecha (07/10, `proxy/`, probada en el banco con `banco.sh proxy`); falta el certificado real (por decidir, `docs/10 §8.4` punto 22), `limit_req` y no publicar el 1883 en producción.

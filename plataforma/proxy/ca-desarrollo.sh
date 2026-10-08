@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# CA de DESARROLLO para probar el proxy con TLS en el portátil (docs/10 §8.4 decisión 10; ficha D-06). NUNCA en producción.
+# CA de DESARROLLO para probar el proxy con TLS en el portátil (docs/10 §8.4 decisiones 10 y 22). NUNCA en producción.
 #   bash plataforma/proxy/ca-desarrollo.sh [carpeta]     → ca.crt, ca.key, servidor.crt, servidor.key (por defecto en
 #                                                          privado/certs-desarrollo, fuera del repositorio y del respaldo)
 # El certificado del servidor vale para localhost, 127.0.0.1 y el nombre de servicio «proxy» (clientes dentro de la red

@@ -1,5 +1,6 @@
 # Despliegue de la plataforma — Etapa 2 (base de datos, broker y backend).
-# El panel, ChirpStack y el proxy TLS se agregan en tandas siguientes, a medida que existan.
+# El proxy TLS es la capa proxy/compose.proxy.yml; el panel se agrega cuando exista, y ChirpStack solo si se
+# activa la ruta A, que es opcional (docs/10 §8.4 punto 2).
 # Este archivo es la FORMA DE PRODUCCIÓN: no publica puertos ni activa nada de desarrollo.
 # Lo propio del portátil (puertos en 127.0.0.1, /docs) vive en docker-compose.override.yml,
 # que Compose suma solo en el equipo de desarrollo y que no se copia al servidor. Cada servicio lleva un techo de memoria y CPU: protege al
@@ -17,7 +18,7 @@ services:
   timescaledb:
     image: timescale/timescaledb:2.24.0-pg16-oss # versión fijada (nunca "latest"); -oss = edición Apache 2.0 (RNF-15, docs/10 §8.4 punto 11)
     restart: unless-stopped                      # vuelve solo tras un reinicio del servidor
-    logging:                                     # registros acotados: 10 MB × 5 por servicio (docs/11 §4; decisión D-04, 07/10/2026)
+    logging:                                     # registros acotados: 10 MB × 5 por servicio (docs/11 §4; 07/10/2026)
       driver: json-file
       options: { max-size: "10m", max-file: "5" }
     # Sin trabajos de fondo de TimescaleDB (docs/10 §8.4 punto 11): en la edición Apache su programador solo corre
@@ -51,7 +52,7 @@ services:
   mosquitto:
     image: eclipse-mosquitto:2.0.22
     restart: unless-stopped
-    logging:                                     # registros acotados: 10 MB × 5 por servicio (docs/11 §4; decisión D-04, 07/10/2026)
+    logging:                                     # registros acotados: 10 MB × 5 por servicio (docs/11 §4; 07/10/2026)
       driver: json-file
       options: { max-size: "10m", max-file: "5" }
     security_opt:
@@ -77,7 +78,7 @@ services:
     build:
       context: ./backend
     restart: unless-stopped
-    logging:                                     # registros acotados: 10 MB × 5 por servicio (docs/11 §4; decisión D-04, 07/10/2026)
+    logging:                                     # registros acotados: 10 MB × 5 por servicio (docs/11 §4; 07/10/2026)
       driver: json-file
       options: { max-size: "10m", max-file: "5" }
     security_opt:
