@@ -6,26 +6,26 @@
 \node[caja, text width=2.5cm, align=center, draw=ambar, line width=1pt] (nodos)
   {\textbf{NODOS}\\ sensores a batería\\ \emph{duermen y despiertan}};
 
-\node[caja, text width=2.6cm, align=center, right=1.5cm of nodos, draw=ambar, line width=1pt] (gw)
+\node[caja, text width=2.6cm, align=center, right=1.7cm of nodos, draw=ambar, line width=1pt] (gw)
   {\textbf{GATEWAY}\\ antena\\ \emph{traductor: no descifra}};
 
-\node[caja, text width=3.0cm, align=center, right=1.5cm of gw, draw=verdeacento, line width=1.1pt,
+\node[caja, text width=3.4cm, align=center, right=1.8cm of gw, draw=verdeacento, line width=1.1pt,
       fill=verdeacento!5] (cs)
-  {\textbf{ChirpStack}\\ servidor de red\\ \emph{descifra, deduplica, administra}};
+  {\textbf{SERVIDOR DE RED}\\ pasarela o ChirpStack\\ \emph{descifra, deduplica, administra}};
 
-\node[caja, text width=2.6cm, align=center, right=1.5cm of cs, draw=azuloscuro, line width=1.1pt,
+\node[caja, text width=2.6cm, align=center, right=1.2cm of cs, draw=azuloscuro, line width=1.1pt,
       fill=azuloscuro!5] (plat)
   {\textbf{SISTEMA}\\ \emph{aporte de este trabajo}};
 
 \draw[flecha] (nodos) -- node[nota, above, font=\scriptsize] {radio LoRa} node[nota, below, font=\scriptsize] {915 MHz} (gw);
-\draw[flecha] (gw) -- node[nota, above, font=\scriptsize] {internet} node[nota, below, font=\scriptsize] {UDP/IP} (cs);
+\draw[flecha] (gw) -- node[nota, above, font=\scriptsize] {UDP/IP (A)} node[nota, below, font=\scriptsize] {interno (B)} (cs);
 \draw[flechagruesa] (cs) -- node[nota, above, font=\scriptsize\bfseries\color{verdeacento}] {MQTT} (plat);
 
-\node[notaaviso, below=5mm of gw.south, anchor=north, text width=13.2cm, xshift=3.2cm,
+\node[notaaviso, below=5mm of gw.south, anchor=north, text width=13.2cm, xshift=2.6cm,
       fill=ambar!6, font=\scriptsize]
-  {\textbf{El cifrado es de extremo a extremo, del nodo al servidor de red.} El gateway solo empaqueta
-   tramas de radio y las reenvía: no posee las claves y no puede leer el contenido. Su única función es
-   escuchar el aire.};
+  {\textbf{El cifrado es de extremo a extremo, del nodo al servidor de red.} La función de gateway solo
+   empaqueta tramas de radio y las reenvía: no posee las claves ni puede leer el contenido. En la ruta B,
+   la prevista, gateway y servidor de red son el mismo equipo.};
 
 \end{tikzpicture}}
 \caption{Cadena de una red LoRaWAN y ubicación del aporte de este trabajo.}

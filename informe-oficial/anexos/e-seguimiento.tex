@@ -13,7 +13,7 @@ del repositorio. El registro vivo se mantiene en el repositorio y este cuadro se
 \filaencab \encab{Ítem} & \encab{Tarea} & \encab{h} & \encab{Estado al cierre} \\ \midrule \endhead
 \multicolumn{4}{r}{\footnotesize\itshape continúa en la página siguiente} \\ \endfoot
 \endlastfoot
-TT-01 & Componer el entorno con contenedores: TimescaleDB, Mosquitto y ChirpStack orquestados, con un único comando de arranque & 6 & Hecho: docker-compose con TimescaleDB y Mosquitto; ChirpStack diseñado, pendiente de gateway \\
+TT-01 & Componer el entorno con contenedores: TimescaleDB y Mosquitto orquestados (ChirpStack, solo si se activa la ruta A), con un único comando de arranque & 6 & Hecho: docker-compose con TimescaleDB y Mosquitto; ChirpStack diseñado, opcional desde la Etapa 3 (ruta A) \\
 TT-02 & Inicializar el proyecto TypeScript + NestJS con estructura de módulos correspondiente a M1–M8 & 4 & Hecho: backend NestJS con módulos M1, M2, M4, M5, M6 \\
 TT-03 & Configurar verificación automática: tipos, formato y ejecución de pruebas & 3 & Hecho: comprobación de tipos, ESLint con reglas tipadas y pruebas unitarias de las funciones puras del pipeline; guardianes de concordancia \\
 TT-04 & Documentar el procedimiento de puesta en marcha en el repositorio & 1 & Hecho: READMEs de plataforma y backend \\
@@ -27,7 +27,7 @@ TT-11 & Esquema del modelo interno y contrato del tópico MQTT (nombres, unidade
 TT-12 & Catálogo de tipos de sensor y unidades aceptadas, con umbrales de disparo y restauración & 6 & Parcial: 7 magnitudes con rango; ampliar con los sensores reales \\
 TT-13 & Especificación del contrato de la API en OpenAPI, generada desde el código & 3 & Hecho: generado desde los decoradores; servido en \texttt{/docs} y versionado (\texttt{openapi.json}) \\
 TT-14 & Política de QoS, reintento y cuarentena & 2 & Hecho: QoS 1 con sesión persistente, inserción idempotente, cuarentena con motivo \\
-TT-15 & Procedimiento de asignación de identidad y gestión de claves AES por sitio & 2 & Parcial: gestión de credenciales documentada (docs/11 §7); claves LoRaWAN dependen de ChirpStack \\
+TT-15 & Procedimiento de asignación de identidad y gestión de claves AES por sitio & 2 & Parcial: gestión de credenciales documentada (docs/11 §7); claves LoRaWAN las guarda el servidor de red (la pasarela en la ruta B, ChirpStack en la A) \\
 HU-01 & Publicar una trama SenML por MQTT o HTTP desde un sensor sin infraestructura intermedia & 6 & Parcial: MQTT sí; HTTP en la Etapa 3 \\
 TT-16 & Validador de esquema SenML y analizador de tramas & 3 & Hecho: adaptador SenML \\
 TT-19 & Esquema de base de datos y migraciones versionadas & 5 & Hecho: esquema + 10 migraciones \\

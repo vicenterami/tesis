@@ -12,8 +12,10 @@
 ## 1. Vista de contenedores (C4, nivel 2)
 
 Qué piezas ejecutables existen y cómo se hablan. La **frontera** del trabajo es el tópico MQTT: de un
-lado, la red de sensores (lado del compañero: nodos, *gateway* y ChirpStack, que aunque se aloja en
-nuestro servidor publica al broker como un productor más); del otro, el broker y el backend. No se
+lado, la red de sensores (lado del compañero: nodos, *gateway* y servidor de red LoRaWAN, que en la ruta
+prevista, la B, va embebido en la pasarela y en la ruta A, opcional, es un ChirpStack que aunque se aloja en
+nuestro servidor publica al broker como un productor más); del otro, el broker y el backend. **En las figuras,
+lo opcional va con borde y flecha punteados** (desde el 07/10/2026). No se
 describe por posición (izquierda/derecha) porque el dibujo lo genera Mermaid y su distribución cambia
 al renderizar; el 23/09/2026 la leyenda del informe decía «a la izquierda… a la derecha» y el dibujo
 mostraba los sensores arriba. Se dibujan los módulos que tocan el dato (M1, M2, M4, M5, M6); M3
@@ -31,7 +33,7 @@ flowchart TB
     subgraph SRV["Servidor del sistema · contenedores Docker"]
         direction TB
         RP["Proxy inverso · TLS<br/>único contenedor expuesto<br/>443 personas · 8883 dispositivos · 1700/udp solo ruta A"]
-        CS["ChirpStack<br/>servidor de red LoRaWAN (ruta A, opcional)"]
+        CS["ChirpStack · servidor de red LoRaWAN<br/>solo ruta A (opcional)"]
         MQ["Mosquitto<br/>broker MQTT"]
         subgraph BE["Backend · NestJS"]
             direction LR
@@ -47,27 +49,29 @@ flowchart TB
         U(["Usuario<br/>navegador"]) --- FE["Panel web<br/>Svelte + uPlot"]
     end
 
-    GW -- "ruta A: UDP 1700 (packet forwarder)" --> RP
-    GW -. "ruta B: servidor de red embebido → MQTT/TLS 8883 (por confirmar)" .-> RP
+    GW -. "ruta A (opcional): UDP 1700, packet forwarder" .-> RP
+    GW -- "ruta B (prevista): servidor de red embebido → MQTT/TLS 8883" --> RP
     N2 -- "MQTT/TLS 8883" --> RP
-    RP -- "UDP 1700 · red interna" --> CS
+    RP -. "UDP 1700 · red interna" .-> CS
     RP -- "MQTT 1883 · red interna" --> MQ
-    CS -- "publica JSON decodificado" --> MQ
+    CS -. "publica JSON decodificado" .-> MQ
     MQ -- "suscripción sitio/#" --> M1
     M2 -- "INSERT medicion" --> DB
     M6 -- "condiciones, eventos" --> DB
     M5 -- "SQL · time_bucket" --> DB
     FE -- "HTTPS 443 · REST histórico · SSE tiempo real" --> RP
     RP -- "HTTP 3000 · red interna" --> M5
+    classDef opcional stroke-dasharray:6 4
+    class CS opcional
 ```
 
 **Decisiones visibles en el diagrama:**
 
 - **Un solo contenedor expuesto (el proxy) y dos puertos siempre, tres a lo sumo:** 443 para personas y
-  8883 para dispositivos MQTT, ambos cifrados y siempre presentes; 1700/udp **solo en la ruta A** (ChirpStack
-  corriendo en este servidor y pasarelas con *Semtech UDP Packet Forwarder*). Si la ruta LoRaWAN real es la B
-  (pasarela con servidor de red embebido, §8.4 punto 2) o la red usa un servidor de red externo, el tercer
-  puerto no existe. Los tres los publica el proxy; ningún otro contenedor lleva `ports`. Hoy 1700/udp **no
+  8883 para dispositivos MQTT, ambos cifrados y siempre presentes; 1700/udp **solo en la ruta A, que es
+  opcional** (ChirpStack corriendo en este servidor y pasarelas con *Semtech UDP Packet Forwarder*). En la ruta
+  prevista, la B (pasarela con servidor de red embebido, §8.4 punto 2), o si la red usa un servidor de red
+  externo, el tercer puerto no existe. Los tres los publica el proxy; ningún otro contenedor lleva `ports`. Hoy 1700/udp **no
   aplica**: ChirpStack no está desplegado (§8.3). La base de datos y la interfaz de administración de
   ChirpStack nunca se exponen; su puerto de recepción de pasarelas, cuando exista, sí, porque las pasarelas
   están en el campo, sin VPN, y deben poder alcanzarlo (RNF-10 al revés: aquí es el servidor el que necesita
@@ -104,8 +108,8 @@ flowchart TB
 - **El navegador nunca toca el broker** (patrón B, `docs/07`): consume la API del backend, que ya
   filtró y normalizó. Así la trama cruda jamás llega al cliente y las credenciales MQTT no viajan en
   JavaScript.
-- **ChirpStack es un productor más** hacia el broker: para la plataforma, una trama LoRaWAN y una
-  trama Wi-Fi son indistinguibles después del filtro 2 (adaptador). Eso es lo que resuelve la causa
+- **La pasarela (ruta B) o ChirpStack (ruta A, si se activa) es un productor más** hacia el broker: para la
+  plataforma, una trama LoRaWAN y una trama Wi-Fi son indistinguibles después del filtro 2 (adaptador). Eso es lo que resuelve la causa
   C2 (hardware atado a la plataforma).
 
 ## 2. Topología de red y segmentación
@@ -125,12 +129,12 @@ flowchart TB
     INET(("Internet"))
 
     subgraph DMZ["Servidor · red pública (expuesta)"]
-        RP["Proxy inverso / TLS\n:443 → panel y API\n:8883 → broker (mTLS opcional)\n:1700/udp → ChirpStack (solo gateway)"]
+        RP["Proxy inverso / TLS\n:443 → panel y API\n:8883 → broker (mTLS opcional)\n:1700/udp → ChirpStack (solo ruta A)"]
     end
 
     subgraph INT["Servidor · red interna Docker (no expuesta)"]
         MQ["Mosquitto :1883"]
-        CS["ChirpStack :8080"]
+        CS["ChirpStack :8080\n(solo ruta A, opcional)"]
         BE["Backend :3000"]
         DB[("TimescaleDB :5432")]
     end
@@ -138,19 +142,21 @@ flowchart TB
     R -- "salientes únicamente" --> INET
     INET --> RP
     RP --> MQ
-    RP --> CS
+    RP -.-> CS
     RP --> BE
-    CS --> MQ
+    CS -.-> MQ
     MQ --> BE
     BE --> DB
 
     NAV(["Navegador del usuario"]) -- "HTTPS :443" --> INET
+    classDef opcional stroke-dasharray:6 4
+    class CS opcional
 ```
 
 | Frontera | Cruza | No cruza | Por qué |
 |---|---|---|---|
 | Sitio → Internet | Conexiones **salientes** de nodos y gateway | Nada entrante | Los dispositivos inician la conexión: no hay que abrir puertos en el router del cliente (RNF-10) |
-| Internet → servidor | 443 (personas), 8883 (dispositivos), 1700/udp (gateway) | 5432, 1883, 8080, 3000 | Solo se expone lo que necesita hablar con el exterior; todo lo demás vive en la red interna de Docker |
+| Internet → servidor | 443 (personas) y 8883 (dispositivos y pasarelas de la ruta B), siempre; 1700/udp (gateway) solo en la ruta A | 5432, 1883, 8080, 3000 | Solo se expone lo que necesita hablar con el exterior; todo lo demás vive en la red interna de Docker |
 | Red interna | Tráfico entre contenedores por nombre de servicio | Acceso desde fuera | La base de datos solo es alcanzable desde el backend |
 
 **Sobre las alternativas descartadas:** exponer el broker por WebSocket al navegador (patrón A)
@@ -303,7 +309,7 @@ pendientes en §8.3 y en `docs/11 §4`: fijar ambos topes de forma explícita y 
 contador `$SYS` antes de llenar la cola; bajar `autosave_interval` o aceptar la ventana y documentarla; y, en el
 otro extremo, el tope de tamaño por mensaje (`message_size_limit`).
 | La trama **no trae marca de tiempo** y llega dos veces | Se guarda dos veces: sin marca del emisor no hay forma de saber que es la misma lectura. La hora de recepción se toma en la base con `clock_timestamp()` (microsegundos), así una ráfaga de tramas en cola no colisiona entre sí | Deduplicar exige una identidad; la identidad de una lectura es «canal + instante del emisor». Limitación aceptada: los nodos que quieran «exactamente una» deben marcar `t` (SenML) |
-| Dos gateways LoRaWAN reciben el **mismo uplink** | Lo deduplica ChirpStack por contador de trama antes de publicar | Es responsabilidad del servidor de red, no de la plataforma |
+| Dos gateways LoRaWAN reciben el **mismo uplink** | Ruta A: lo deduplica ChirpStack por contador de trama antes de publicar. Ruta B: cada pasarela es su propio servidor de red; qué ocurre si dos oyen al mismo nodo **está por verificar** en la documentación del fabricante (07/10/2026) | Es responsabilidad del servidor de red, no de la plataforma |
 | El **tópico no cumple el patrón** `sitio/<sitio>/dispositivo/<id>/<magnitud>` | Cuarentena `malformada` con el detalle «tópico fuera del patrón», **antes** del filtro 1; el dispositivo **no** se marca vivo | Sin identidad no hay a quién atribuir la señal de vida; comparte el motivo `malformada` con el filtro 2 y se distingue por el detalle (decisión 23/09: no abrir un cuarto motivo por esto) |
 | **Dos lecturas del mismo canal en la misma trama**, sin marca de tiempo | Se guardan ambas, con instantes de recepción distintos (microsegundos) | Sin marca del emisor no hay identidad de lectura (fila anterior); si un nodo repite un canal por error, corregirlo es del firmware, no de la plataforma. Limitación aceptada el 23/09 |
 | El broker **reentrega muchas veces** de golpe (reconexión con cola larga) | Desde la decisión 4 los mensajes se procesan **de a uno**, en orden; la cola queda en el broker, no en el backend, y el pool de 5 conexiones no se disputa. El costo es la latencia por mensaje (2–5 ms medidos en el portátil), que acota la tasa máxima a cientos por segundo: por encima de RNF-01 |
@@ -425,31 +431,34 @@ flowchart TB
             direction TB
             C5["proxy<br/>nginx (decidido el 06/10) · TLS<br/>límite 0,1 GB · publica 443, 8883 · 1700/udp solo ruta A"]
             C1["mosquitto<br/>eclipse-mosquitto 2.0.22<br/>límite 0,25 GB"]
-            C2["chirpstack<br/>+ redis propio<br/>límite 0,35 GB"]
+            C2["chirpstack + redis propio<br/>solo ruta A (opcional)<br/>límite 0,35 GB"]
             C4["backend<br/>imagen propia: NestJS (Etapa 2); + panel estático cuando exista<br/>límite 0,5 GB · sin estado"]
             C3["timescaledb<br/>timescale/timescaledb 2.24.0-pg16-oss (edición Apache)<br/>límite 0,75 GB"]
         end
         V4[("vol: certificados")]
         V2[("vol: datos-mosquitto")]
-        V1[("vol: datos-timescale<br/>todo el dato · base «chirpstack» aparte")]
+        V1[("vol: datos-timescale<br/>todo el dato · base «chirpstack» aparte (ruta A)")]
     end
     C5 --- V4
     C1 --- V2
     C3 --- V1
     C2 -. "base propia en el mismo PostgreSQL" .-> C3
+    classDef opcional stroke-dasharray:6 4
+    class C2 opcional
 ```
 
 | Servicio | Persistencia | Reinicio | Expuesto |
 |---|---|---|---|
 | proxy (nginx) | certificados | `unless-stopped` | 443, 8883; 1700/udp solo ruta A |
 | mosquitto | retenidos + ACL | `unless-stopped` | no (vía proxy) |
-| chirpstack | base `chirpstack` en el mismo PostgreSQL (volumen datos-timescale) + redis | `unless-stopped` | no (vía proxy) |
+| chirpstack (solo ruta A, opcional) | base `chirpstack` en el mismo PostgreSQL (volumen datos-timescale) + redis | `unless-stopped` | no (vía proxy) |
 | timescaledb (edición Apache, `-oss`) | **todo el dato** | `unless-stopped` | no |
 | backend | ninguna (sin estado) | `unless-stopped` | no (vía proxy) |
 
-**Suma de límites: ~1,95 GB** — coherente con RNF-17 (consumo ≤ 2 GB de RAM en reposo y bajo carga; los límites son
+**Suma de límites: ~1,6 GB en la ruta prevista (B: proxy, broker, backend y base) y ~1,95 GB si se activa la ruta A
+(más ChirpStack con su Redis)** — ambas coherentes con RNF-17 (consumo ≤ 2 GB de RAM en reposo y bajo carga; los límites son
 techos, no consumo). Los límites de recursos cumplen doble función: proteger al servidor y ser el
-**entorno de referencia** del banco de pruebas (`docs/09`). **ChirpStack comparte el servidor PostgreSQL** (una base y un rol propios, aislados de la base de la
+**entorno de referencia** del banco de pruebas (`docs/09`). **ChirpStack, si se activa, comparte el servidor PostgreSQL** (una base y un rol propios, aislados de la base de la
 plataforma) en lugar de traer un segundo PostgreSQL: ahorra ~100 MB de memoria en reposo, un
 respaldo cubre todo, y la extensión TimescaleDB no interfiere (ChirpStack solo necesita `pg_trgm` y
 `hstore`, presentes en la imagen). Redis sí es propio: ChirpStack lo exige y es pequeño (~10 MB).
@@ -658,6 +667,12 @@ Fuentes: `bitacora/2026-10-05-entrevista-academico-geologia.md`; evidencia verif
    alternativa si la red del campus usa TTN o un servidor de red externo. La pasarela se autentica en el broker
    como un dispositivo más (usuario = su identificador, ACL por patrón). Las figuras de contenedores y despliegue
    se actualizan cuando el profesor guía confirme la ruta real.
+   **Precisión del 07/10/2026.** Si la red del campus usa TTN o un servidor de red externo, eso es el escenario 5 de
+   §2 y tampoco hay ChirpStack en este servidor; la ruta A solo hace falta si las pasarelas no traen servidor de red
+   propio o si se quiere administrar nodos y claves de varias pasarelas desde un solo punto. Desde esa fecha las
+   figuras de contenedores, red y despliegue dibujan la ruta B continua y la ruta A y ChirpStack punteados
+   (opcionales), y el informe lo dice en el marco teórico, en la arquitectura y en el despliegue; si el profesor guía
+   confirma otra ruta, se vuelven a ajustar.
 3. **Adaptador «milesight» sobre JSON decodificado en la pasarela.** La pasarela aplica su «Payload Codec» y
    publica `{"battery":92,"temperature":30.8,"humidity":50.5}` más EUI y nombre si se activa «Metadata». El
    adaptador traduce ese JSON al modelo interno (`temperature`→temperatura/Cel, `humidity`→humedad/%RH,

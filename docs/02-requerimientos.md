@@ -407,13 +407,17 @@ sección cubre las decisiones restantes de infraestructura.
 
 | Alternativa | Ventajas | Desventajas | Decisión |
 |---|---|---|---|
-| **ChirpStack** | Código abierto, autoalojable, publica en MQTT de forma nativa, gestión de dispositivos completa, se ejecuta en un servidor modesto | Requiere operar el componente | **✅ Seleccionado** |
+| Servidor de red embebido en la pasarela (p. ej., Milesight UG65) | Sin contenedor ni puerto extra: la pasarela publica por MQTT sobre TLS al broker como un dispositivo más | Cada pasarela es su propio servidor de red: administración por pasarela; el caso de dos pasarelas que oyen al mismo nodo está por verificar | **✅ Ruta prevista (B), desde el 06/10/2026** (`docs/10 §8.4` punto 2) |
+| **ChirpStack** | Código abierto, autoalojable, publica en MQTT de forma nativa, gestión de dispositivos completa, se ejecuta en un servidor modesto | Requiere operar el componente | **✅ Seleccionado si se necesita un servidor de red propio (ruta A, opcional)** |
 | The Things Stack (open source) | Funcionalmente equivalente, comunidad amplia | Despliegue autoalojado más exigente en recursos | Descartado |
 | The Things Network (servicio público) | Sin operación propia, gratuito | Los datos transitan por infraestructura de terceros: contradice RNF-14 y el control del dato | Descartado |
 | Desarrollo propio | Control total | Reimplementar LoRaWAN no es el aporte de la tesis y consumiría todo el presupuesto de tiempo | Descartado |
 
 **Razón de la selección:** ChirpStack satisface RNF-14 y RNF-15, y su publicación nativa en MQTT
 encaja directamente con RF-02 y RF-03, reduciendo el adaptador de LoRaWAN a un consumidor de tópicos.
+**Actualización del 06/10/2026:** las pasarelas con servidor de red embebido publican al broker por la misma vía
+y sin un contenedor más, así que esa es la ruta prevista (B) y ChirpStack queda para cuando las pasarelas no
+traigan servidor de red propio o se quiera administrar varias desde un punto (ruta A, opcional; `docs/10 §8.4` punto 2).
 
 ## 6.2 Motor de persistencia
 
@@ -465,7 +469,7 @@ directa de ello.
 | **L-B** | **Correspondencia entre estructura del código y arquitectura documentable** | **15 %** | La Etapa 2 asigna el **55 %** a «diseña adecuadamente según estándares de calidad». Si los módulos del código corresponden a los módulos del diseño, los diagramas describen el sistema real en lugar de una idealización |
 | **L-C** | **Generación automática de especificación OpenAPI** | **15 %** | El contrato de la API es entregable de la Etapa 2. Si se genera desde el código, deja de ser trabajo adicional y no puede desincronizarse de la implementación |
 | **L-D** | **Unificación del lenguaje con el frontend** | **15 %** | La interfaz de administración (M8) será una aplicación web. Un solo lenguaje en todo el sistema permite **compartir las definiciones de tipos** de la trama SenML y el modelo interno entre backend y frontend, definiéndolas una sola vez |
-| **L-E** | **Madurez de bibliotecas para MQTT, PostgreSQL/TimescaleDB y validación de esquema** | **15 %** | RF-02 exige recibir la rama LoRaWAN (payload que ChirpStack ya decodifica); RF-03 exige cliente MQTT; RF-05 exige validar cada trama contra el esquema SenML; toda la persistencia es PostgreSQL |
+| **L-E** | **Madurez de bibliotecas para MQTT, PostgreSQL/TimescaleDB y validación de esquema** | **15 %** | RF-02 exige recibir la rama LoRaWAN (payload que el servidor de red ya decodifica: la pasarela en la ruta B o ChirpStack en la A); RF-03 exige cliente MQTT; RF-05 exige validar cada trama contra el esquema SenML; toda la persistencia es PostgreSQL |
 | **L-F** | **Tipado estático** | **10 %** | El sistema manipula mensajes de formato estricto donde un campo mal posicionado es un error silencioso. El tipado traslada esos errores a tiempo de compilación |
 | **L-G** | **Rendimiento en tiempo de ejecución** | **5 %** | Peso bajo deliberadamente: RNF-01 exige 50 eventos/segundo, cifra que **todas** las alternativas alcanzan holgadamente. El cuello de botella del proyecto es el tiempo del desarrollador, no la CPU |
 

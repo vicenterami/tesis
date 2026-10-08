@@ -47,7 +47,7 @@ sensor y verlo graficado.
 **Decisión: Docker sobre el Ubuntu del servidor, no virtualización completa.** Razones: los
 contenedores comparten el núcleo del sistema y consumen una fracción de lo que consume una máquina
 virtual con su propio sistema operativo; es el modo estándar de desplegar este stack (Mosquitto,
-TimescaleDB, ChirpStack, backend); y `docker compose` da un despliegue reproducible con un comando,
+TimescaleDB, backend y, solo en la ruta A, ChirpStack); y `docker compose` da un despliegue reproducible con un comando,
 con reinicio automático ante fallas.
 
 La virtualización solo aparecería para **simular** un servidor limitado, y para eso bastan los

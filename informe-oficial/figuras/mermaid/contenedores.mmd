@@ -8,7 +8,7 @@ flowchart TB
     subgraph SRV["Servidor del sistema · contenedores Docker"]
         direction TB
         RP["Proxy inverso · TLS<br/>único contenedor expuesto<br/>443 personas · 8883 dispositivos · 1700/udp solo ruta A"]
-        CS["ChirpStack<br/>servidor de red LoRaWAN (ruta A, opcional)"]
+        CS["ChirpStack · servidor de red LoRaWAN<br/>solo ruta A (opcional)"]
         MQ["Mosquitto<br/>broker MQTT"]
         subgraph BE["Backend · NestJS"]
             direction LR
@@ -24,15 +24,17 @@ flowchart TB
         U(["Usuario<br/>navegador"]) --- FE["Panel web<br/>Svelte + uPlot"]
     end
 
-    GW -- "ruta A: UDP 1700 (packet forwarder)" --> RP
-    GW -. "ruta B: servidor de red embebido → MQTT/TLS 8883 (por confirmar)" .-> RP
+    GW -. "ruta A (opcional): UDP 1700, packet forwarder" .-> RP
+    GW -- "ruta B (prevista): servidor de red embebido → MQTT/TLS 8883" --> RP
     N2 -- "MQTT/TLS 8883" --> RP
-    RP -- "UDP 1700 · red interna" --> CS
+    RP -. "UDP 1700 · red interna" .-> CS
     RP -- "MQTT 1883 · red interna" --> MQ
-    CS -- "publica JSON decodificado" --> MQ
+    CS -. "publica JSON decodificado" .-> MQ
     MQ -- "suscripción sitio/#" --> M1
     M2 -- "INSERT medicion" --> DB
     M6 -- "condiciones, eventos" --> DB
     M5 -- "SQL · time_bucket" --> DB
     FE -- "HTTPS 443 · REST histórico · SSE tiempo real" --> RP
     RP -- "HTTP 3000 · red interna" --> M5
+    classDef opcional stroke-dasharray:6 4
+    class CS opcional

@@ -181,6 +181,23 @@ for f in plataforma/docker-compose.yml plataforma/proxy/compose.proxy.yml; do
   else echo "FALLA $f: $srv servicio(s) pero $logs con 'max-size: \"Nm\", max-file: \"N\"' bien formado"; fallos=$((fallos+1)); fi
 done
 
+paso "2o. Informe: todo párrafo que nombra ChirpStack lo marca como opcional (ruta A), salvo el de OpenRemote (docs/10 §8.4 punto 2)"
+# 07/10: la decisión del 06/10 dejó ChirpStack como opcional, pero el informe seguía diciendo «un contenedor más en la
+# plataforma», «cinco contenedores» y «tres puertos». Unidad: el párrafo en capítulos y anexos; el archivo en figuras/.
+python3 - <<'PY' || fallos=$((fallos+1))
+import pathlib, re, sys
+malos, n = [], 0
+for f in sorted(pathlib.Path("informe-oficial").glob("**/*.tex")):
+    if "build" in f.parts: continue
+    n += 1; texto = f.read_text()
+    for b in ([texto] if f.parent.name == "figuras" else re.split(r"\n\s*\n", texto)):
+        if "ChirpStack" in b and not re.search(r"ruta A|opcional|\(A\)|OpenRemote", b):
+            malos.append(f"{f}: «{' '.join(b.split())[:110]}…»")
+for m in malos: print("FALLA", m)
+if not malos: print(f"OK    {n} archivos .tex: cada mención de ChirpStack lo marca como opcional (ruta A)")
+sys.exit(1 if malos else 0)
+PY
+
 paso "3. Diagramas: informe = docs = base (generar-figuras.sh --verificar)"
 bash informe-oficial/figuras/generar-figuras.sh --verificar || fallos=$((fallos+1))
 

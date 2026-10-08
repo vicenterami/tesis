@@ -81,7 +81,7 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 
 | ID | Elemento | Prior. | Etapa | Horas |
 |---|---|:---:|:---:|:---:|
-| **TT-01** | 🎯 Componer el entorno con contenedores: TimescaleDB, Mosquitto y ChirpStack orquestados, con un único comando de arranque | M | 2 | **6** |
+| **TT-01** | 🎯 Componer el entorno con contenedores: TimescaleDB y Mosquitto orquestados (ChirpStack, solo si se activa la ruta A), con un único comando de arranque | M | 2 | **6** |
 | **TT-02** | 🎯 Inicializar el proyecto TypeScript + NestJS con estructura de módulos correspondiente a M1–M8 | M | 2 | **4** |
 | **TT-03** | Configurar verificación automática: tipos, formato y ejecución de pruebas | S | 2 | 3 |
 | **TT-04** | Documentar el procedimiento de puesta en marcha en el repositorio | M | 2 | 1 |
@@ -165,7 +165,7 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 **HU-02 — criterios de aceptación** 🎯
 
 - La plataforma recibe el evento a través de la integración del servidor de red, sin conexión directa al nodo.
-- El payload decodificado por ChirpStack se normaliza correctamente al modelo interno (SenML).
+- El payload decodificado por el servidor de red (la pasarela en la ruta B, la prevista; ChirpStack en la ruta A, opcional) se normaliza correctamente al modelo interno (SenML).
 - RSSI, SNR, identificador del nodo y gateway quedan asociados al evento (RF-09).
 - Un evento recibido por dos gateways se almacena una sola vez (RF-10).
 - Un payload de longitud o contenido inválido se rechaza sin interrumpir la recepción de los demás (RNF-07).
@@ -570,7 +570,7 @@ ejecuta contra la holgura verificada al cierre de cada etapa.
 | **1. Núcleo mínimo** | Normalización al modelo interno | TT-16, TT-17, TT-18, TT-19, TT-12 | ✅ (TT-12 parcial: sensores reales) |
 | **1. Núcleo mínimo** | Supervisión de caída | HU-14, HU-05 | ✅ |
 | **1. Núcleo mínimo** | Consulta básica por API | HU-07, TT-13 | ✅ |
-| **1. Núcleo mínimo** | Sensor real de extremo a extremo | HU-02 (vía ChirpStack) o HU-03 con el nodo del compañero | ⬜ octubre |
+| **1. Núcleo mínimo** | Sensor real de extremo a extremo | HU-02 (ruta B: pasarela con servidor de red embebido; ChirpStack solo en la ruta A) o HU-03 con el nodo del compañero | ⬜ octubre |
 | 2. Segundo nivel | Entrada HTTP | HU-01 | ⬜ E3 |
 | 2. Segundo nivel | Alertas por umbral con interfaz | HU-06 | 🟡 motor listo |
 | 2. Segundo nivel | Aprovisionamiento desde la plataforma | HU-10, HU-11 | ⬜ E3 |

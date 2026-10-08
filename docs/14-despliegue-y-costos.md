@@ -15,7 +15,7 @@ los gigabytes, y de los gigabytes casi todo lo demás. Rubros y qué los mueve:
 
 | Rubro | Qué lo mueve | En esta plataforma |
 |---|---|---|
-| Cómputo (vCPU, memoria) | Procesos que corren y su techo de memoria | 5 contenedores, techo 1,95 GB, consumo en reposo ≈ 120 MB medido el 27/09 (base 61, backend 53, broker 8) → **el rubro dominante y el más acotado** |
+| Cómputo (vCPU, memoria) | Procesos que corren y su techo de memoria | 4 contenedores en la ruta prevista (techo 1,6 GB); 5 con ChirpStack si se activa la ruta A (techo 1,95 GB); consumo en reposo ≈ 120 MB medido el 27/09 (base 61, backend 53, broker 8) → **el rubro dominante y el más acotado** |
 | Almacenamiento | Filas × tamaño × retención (sin compresión) | Pequeño (§2) |
 | Registros | Rotación de Docker: 10 MB × 5 por servicio (`docs/11 §4`, 07/10/2026) | ≤ 200 MB en total, fijo |
 | Base de datos gestionada | Solo si se externaliza | No: TimescaleDB va en el mismo servidor (RNF-17) |
@@ -96,7 +96,7 @@ Escala 1–5. Total = Σ (puntaje × peso).
 ## 5. Recomendación (TT-26)
 
 **Para la validación de la Etapa 4 y un piloto de un sitio: alternativa A** (Hetzner CX23 o CAX11):
-cumple RNF-17 con holgura (4 GB para un techo de 1,95 GB), cuesta del orden de **CLP 6 000 al mes
+cumple RNF-17 con holgura (4 GB para un techo de 1,6 GB, o de 1,95 GB con ChirpStack en la ruta A), cuesta del orden de **CLP 6 000 al mes
 (≈ CLP 75 000 al año)** —menos que un plan de telefonía— y la operación se reduce a `docker compose
 up -d`. La plataforma completa cuesta así **menos de la décima parte** de un VPS nacional de similar
 capacidad y una fracción de cualquier licencia comercial del rubro.
@@ -113,7 +113,7 @@ contra una librería C distinta de la de ejecución falla solo en producción. H
 dependencias nativas, así que el riesgo es nulo, pero la regla queda escrita para cuando las haya.
 
 **Lo que no se hace:** contratar una base de datos gestionada aparte (multiplica el costo por 3–5 sin
-necesidad a esta escala), ni Kubernetes (un orquestador para cinco contenedores en un servidor es
+necesidad a esta escala), ni Kubernetes (un orquestador para cuatro o cinco contenedores en un servidor es
 complejidad sin retorno).
 
 ## 6. Pendiente

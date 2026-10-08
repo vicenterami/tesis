@@ -11,16 +11,17 @@ integradores): \texttt{GET /dispositivos}, \texttt{GET /canales/\{id\}/historico
 publicar: identidad, tipo, ubicación y emisión de su credencial.
 \item[Broker] Intermediario de MQTT: recibe de quienes publican y reparte a quienes se suscribieron.
 \textbf{Mosquitto} es la implementación empleada.
-\item[ChirpStack] Servidor de red LoRaWAN (contenedor propio, solo si la rama de radio se concreta):
-descifra, elimina duplicados, administra nodos y publica las mediciones en MQTT.
+\item[ChirpStack] Servidor de red LoRaWAN. En este trabajo es opcional (ruta A): un contenedor propio
+solo si las pasarelas no traen servidor de red embebido. Descifra, elimina duplicados, administra nodos
+y publica las mediciones en MQTT.
 \item[Credencial] Secreto emitido al dar de alta un dispositivo, que demuestra su identidad. La
 dirección MAC identifica; la credencial autentica.
 \item[Cuarentena] Destino de las tramas malformadas de dispositivos conocidos: se guardan crudas,
 con su motivo, sin contaminar las series.
 \item[Last Will (testamento)] Mensaje que el dispositivo deja registrado al conectarse y que el
 broker publica automáticamente si aquel se desconecta sin despedirse: detección de caída inmediata.
-\item[Middleware] Software intermedio entre dos sistemas que no se hablan directo (ChirpStack entre
-la radio y MQTT; la capa de normalización entre los sensores y la base de datos).
+\item[Middleware] Software intermedio entre dos sistemas que no se hablan directo (el servidor de red
+LoRaWAN entre la radio y MQTT; la capa de normalización entre los sensores y la base de datos).
 \item[MQTT] Protocolo de mensajería publicar/suscribir sobre TCP/IP, con cabecera fija de 2 bytes,
 calidad de servicio (QoS) y testamento. El nombre no es una sigla: viene de \emph{MQ Telemetry
 Transport}, por la familia de productos donde nació. La vía principal de recepción.
@@ -35,6 +36,9 @@ trama SenML.
 del siguiente. El de esta plataforma tiene seis filtros (figura~\ref{fig:pipeline}).
 \item[QoS] \emph{Quality of Service} de MQTT: 0 «a lo más una vez», 1 «al menos una vez», 2
 «exactamente una vez». La garantía es por salto (cliente–broker), no de extremo a extremo.
+\item[Ruta A y ruta B] Las dos formas de recibir la red LoRaWAN. B, la prevista: el servidor de red va
+embebido en la pasarela, que publica por MQTT sobre TLS (8883) como un dispositivo más. A, opcional:
+ChirpStack corre en el servidor de la plataforma y las pasarelas le envían por UDP (1700).
 \item[SenML] \emph{Sensor Measurement Lists} (RFC 8428, IETF, gratuito): formato estándar para
 listas de mediciones con identidad, nombre, unidad, valor y tiempo. El contrato nativo de entrada.
 \item[Socket] Conexión TCP cruda entre dos programas, sin protocolo de mensajería encima. Evaluado y

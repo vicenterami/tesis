@@ -127,7 +127,8 @@ docker compose exec timescaledb psql -U plataforma -d plataforma -c "SELECT tipo
 
 `SUPERVISION_INTERVALO_S` en el `.env` cambia la frecuencia del barrido (60 s por defecto).
 
-Pendientes del pipeline: adaptador de ChirpStack; notificación de condiciones al panel (WebSocket) y por correo.
+Pendientes del pipeline: adaptador «milesight» (ruta B, la prevista) y, solo si se activa la ruta A, el de ChirpStack;
+notificación de condiciones al panel (SSE, `docs/10 §8.4` punto 1) y por correo.
 
 ## API de consulta (M5)
 

@@ -53,17 +53,22 @@ El despliegue completo corre como contenedores en un único servidor (figura~\re
 capítulo~\ref{cap:diseno}), con reinicio automático ante fallas. \textbf{La frontera con el trabajo del compañero es el tópico
 MQTT}: todo lo anterior (sensor, nodo, radio) es de él; todo lo posterior (broker, pipeline, base de
 datos, API, panel), de este trabajo. Un \textbf{emulador de nodo} (Etapa~4) publicará tramas en el mismo tópico,
-de modo que la validación de la plataforma no depende del hardware ni de terceros. En la rama LoRa, el servidor de red puede ser el embebido en la pasarela (ruta B, decidida el 06/10) o
-ChirpStack en el servidor de la plataforma (ruta A, opcional) para administrar nodos y claves desde un
-solo punto; el decodificador de binario a JSON es responsabilidad del trabajo del compañero, y su
-JSON de tres campos se convierte al contrato SenML mediante el primer adaptador real de la capa de
-recepción.
+de modo que la validación de la plataforma no depende del hardware ni de terceros.
+
+En la rama LoRa hay dos rutas. La \textbf{ruta B es la prevista}: el servidor de red embebido en la
+pasarela (sección~\ref{sec:rama-radio}) publica por MQTT sobre TLS en el puerto 8883, y la pasarela entra
+como un dispositivo más, sin contenedores ni puertos adicionales. La \textbf{ruta A es opcional}:
+ChirpStack corre en el servidor de la plataforma y las pasarelas le envían por UDP al puerto 1700; solo
+se despliega si las pasarelas no traen servidor de red propio o si se quieren administrar desde un solo
+punto los nodos de varias pasarelas. En ambas, el decodificador de binario a JSON es responsabilidad del
+trabajo del compañero, y su JSON de tres campos se convierte al contrato SenML mediante el primer
+adaptador real de la capa de recepción.
 
 
 \section{Evaluación de infraestructura}
 \label{sec:infra}
 
-Cada componente se eligió frente a alternativas con una razón determinante (cuadro~\ref{tab:infra}, anexo~\ref{anx:evaluacion}): \textbf{Mosquitto} como broker (implementación en C de unos 10\,MB, con TLS y autenticación; EMQX y HiveMQ apuntan a millones de conexiones); \textbf{TimescaleDB} como persistencia (justificado en la sección~\ref{sec:persistencia}); \textbf{TypeScript con NestJS} en el backend (tipos de la trama definidos una vez para backend y panel, módulos uno a uno con M1--M8); \textbf{ChirpStack} para la rama LoRa (autoalojable, publica en MQTT); \textbf{contenedores Docker} para el despliegue (reproducible con un comando); y \textbf{Svelte con uPlot} para la interfaz, por ligereza. Las matrices de backend y de interfaz, con sus pesos y puntajes, están en el mismo anexo.
+Cada componente se eligió frente a alternativas con una razón determinante (cuadro~\ref{tab:infra}, anexo~\ref{anx:evaluacion}): \textbf{Mosquitto} como broker (implementación en C de unos 10\,MB, con TLS y autenticación; EMQX y HiveMQ apuntan a millones de conexiones); \textbf{TimescaleDB} como persistencia (justificado en la sección~\ref{sec:persistencia}); \textbf{TypeScript con NestJS} en el backend (tipos de la trama definidos una vez para backend y panel, módulos uno a uno con M1--M8); \textbf{ChirpStack} para la ruta A de la rama LoRa, solo si se activa (autoalojable, publica en MQTT); \textbf{contenedores Docker} para el despliegue (reproducible con un comando); y \textbf{Svelte con uPlot} para la interfaz, por ligereza. Las matrices de backend y de interfaz, con sus pesos y puntajes, están en el mismo anexo.
 
 Un requerimiento no funcional propio del enfoque es \textbf{RNF-17}: la plataforma completa debe
 consumir a lo más 2\,GB de memoria RAM, la mitad de un servidor de 4\,GB —frente a los 4\,GB o más que

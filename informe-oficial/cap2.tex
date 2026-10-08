@@ -53,15 +53,18 @@ La identidad viaja dentro de la trama (\texttt{bn}) y se cruza con el registro d
 plataforma. Sobre WiFi y cable el tamaño ($\sim$100--200 bytes) es irrelevante y la legibilidad
 facilita la depuración; la compactación binaria solo se justifica en la rama de radio.
 
-\section{La rama de radio: LoRa, LoRaWAN y ChirpStack}
+\section{La rama de radio: LoRa, LoRaWAN y el servidor de red}
+\label{sec:rama-radio}
 
 \textbf{LoRa} es la modulación de radio de largo alcance y bajo consumo; \textbf{LoRaWAN}, el protocolo
 de red sobre ella: registro de nodos, cifrado AES-128 de extremo a extremo y entrega al servidor
 \parencite{rp002}, en Chile sobre la banda libre de 915--928\,MHz \parencite{lorachile}. El
-\emph{gateway} reenvía la radio por IP sin poder descifrarla; \textbf{ChirpStack}, el servidor de red
-—un contenedor más en la plataforma—, descifra, elimina duplicados, administra los nodos y
-\textbf{publica las mediciones en MQTT}: la rama de radio converge a la vía principal sin desarrollo
-adicional (figura~\ref{fig:lorawan}). Esta rama corresponde al trabajo coordinado del compañero.
+\emph{gateway} reenvía la radio sin poder descifrarla; el \textbf{servidor de red} descifra, elimina
+duplicados, administra los nodos y \textbf{publica las mediciones en MQTT}: la rama de radio converge a
+la vía principal sin desarrollo adicional (figura~\ref{fig:lorawan}). Ese servidor puede correr dentro
+de la propia pasarela —la Milesight UG65 trae uno y publica por MQTT con TLS \parencite{milesightug65}—
+o aparte, en un \textbf{ChirpStack}, que en este trabajo es opcional (sección~\ref{sec:frontera}).
+Esta rama corresponde al trabajo coordinado del compañero.
 
 \input{figuras/lorawan}
 

@@ -8,12 +8,12 @@ flowchart TB
     INET(("Internet"))
 
     subgraph DMZ["Servidor · red pública (expuesta)"]
-        RP["Proxy inverso / TLS\n:443 → panel y API\n:8883 → broker (mTLS opcional)\n:1700/udp → ChirpStack (solo gateway)"]
+        RP["Proxy inverso / TLS\n:443 → panel y API\n:8883 → broker (mTLS opcional)\n:1700/udp → ChirpStack (solo ruta A)"]
     end
 
     subgraph INT["Servidor · red interna Docker (no expuesta)"]
         MQ["Mosquitto :1883"]
-        CS["ChirpStack :8080"]
+        CS["ChirpStack :8080\n(solo ruta A, opcional)"]
         BE["Backend :3000"]
         DB[("TimescaleDB :5432")]
     end
@@ -21,10 +21,12 @@ flowchart TB
     R -- "salientes únicamente" --> INET
     INET --> RP
     RP --> MQ
-    RP --> CS
+    RP -.-> CS
     RP --> BE
-    CS --> MQ
+    CS -.-> MQ
     MQ --> BE
     BE --> DB
 
     NAV(["Navegador del usuario"]) -- "HTTPS :443" --> INET
+    classDef opcional stroke-dasharray:6 4
+    class CS opcional

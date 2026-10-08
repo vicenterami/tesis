@@ -5,15 +5,17 @@ flowchart TB
             direction TB
             C5["proxy<br/>nginx (decidido el 06/10) · TLS<br/>límite 0,1 GB · publica 443, 8883 · 1700/udp solo ruta A"]
             C1["mosquitto<br/>eclipse-mosquitto 2.0.22<br/>límite 0,25 GB"]
-            C2["chirpstack<br/>+ redis propio<br/>límite 0,35 GB"]
+            C2["chirpstack + redis propio<br/>solo ruta A (opcional)<br/>límite 0,35 GB"]
             C4["backend<br/>imagen propia: NestJS (Etapa 2); + panel estático cuando exista<br/>límite 0,5 GB · sin estado"]
             C3["timescaledb<br/>timescale/timescaledb 2.24.0-pg16-oss (edición Apache)<br/>límite 0,75 GB"]
         end
         V4[("vol: certificados")]
         V2[("vol: datos-mosquitto")]
-        V1[("vol: datos-timescale<br/>todo el dato · base «chirpstack» aparte")]
+        V1[("vol: datos-timescale<br/>todo el dato · base «chirpstack» aparte (ruta A)")]
     end
     C5 --- V4
     C1 --- V2
     C3 --- V1
     C2 -. "base propia en el mismo PostgreSQL" .-> C3
+    classDef opcional stroke-dasharray:6 4
+    class C2 opcional

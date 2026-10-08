@@ -19,15 +19,14 @@ el trabajo del compañero —el tópico MQTT— ya se definió en la sección~\r
 \input{figuras/contenedores}
 
 Tres decisiones quedan visibles en la figura. Primero, hay \textbf{dos puntos de entrada siempre y tres a lo
-sumo}: HTTPS para personas (443), MQTT sobre TLS para dispositivos (8883) y, solo si ChirpStack corre en este
-servidor (ruta A), UDP para los \emph{gateways} LoRaWAN (1700); una pasarela con servidor de red embebido entra por
-el 8883 como un dispositivo más (ruta B). Ese tercer puerto recibe un
+sumo}: HTTPS para personas (443), MQTT sobre TLS para dispositivos y pasarelas de la ruta B (8883) y, solo
+en la ruta A, opcional y punteada, UDP para los \emph{gateways} LoRaWAN (1700). Ese tercer puerto recibe un
 protocolo sin autenticación ni cifrado propios (\emph{Semtech UDP Packet Forwarder}), así que la defensa
 la dan el contenedor sin privilegios y el límite de tasa, no el protocolo. La base de datos y la
 consola de administración de ChirpStack nunca se exponen. Segundo, \textbf{el navegador nunca se conecta al
 broker}: consume la API del backend, que ya autenticó, validó y normalizó cada trama. La alternativa
 —suscribir el navegador al broker por WebSocket— habría expuesto el broker a Internet y puesto
-credenciales MQTT en el código del cliente. Tercero, \textbf{ChirpStack, si existe, es un productor más} hacia el
+credenciales MQTT en el código del cliente. Tercero, \textbf{el servidor de red LoRaWAN es un productor más} hacia el
 broker: una trama LoRaWAN decodificada y una trama Wi-Fi directa son indistinguibles para la
 plataforma después del filtro de análisis, que es lo que resuelve la causa C2 (hardware atado a la
 plataforma).
@@ -150,15 +149,15 @@ es un dato del sitio, no una constante del programa.
 
 \section{Despliegue y presupuesto de recursos}
 
-La figura~\ref{fig:despliegue} (anexo~\ref{anx:figuras}) muestra el despliegue: un servidor, cinco contenedores y una red interna.
-ChirpStack usa una base propia dentro del mismo PostgreSQL —una instancia menos que mantener— y el
-backend no guarda estado, por lo que puede recrearse sin pérdida. Cada contenedor tiene versión de imagen
+La figura~\ref{fig:despliegue} (anexo~\ref{anx:figuras}) muestra el despliegue: un servidor, una red interna y
+cuatro contenedores —proxy, broker, backend y base de datos—, más ChirpStack solo en la ruta A, con una
+base propia dentro del mismo PostgreSQL. El backend no guarda estado, por lo que puede recrearse sin pérdida. Cada contenedor tiene versión de imagen
 fijada, no puede escalar privilegios, se reinicia solo ante fallas y tiene un techo de memoria y CPU.
 
 
-La suma de techos es de aproximadamente 1,95~GB, coherente con el RNF-17 (consumo de a lo más
-2~GB de RAM). Esa suma es la del despliegue completo; los tres
-contenedores hoy implementados suman 1,5~GB de techo, y el consumo real se mide en la Etapa~4. Los
+La suma de techos es de 1,6~GB en la ruta prevista —los cuatro contenedores ya implementados— y de
+1,95~GB con ChirpStack (ruta A), ambas dentro del RNF-17 (consumo de a lo más 2~GB de RAM); el consumo real se
+mide en la Etapa~4. Los
 límites cumplen además una segunda función: definen el \textbf{entorno de referencia} del banco de pruebas
 de la Etapa~4, para que la comparación no dependa del equipo de desarrollo.
 
