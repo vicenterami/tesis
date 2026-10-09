@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Backend de la plataforma de registro, monitoreo y gestión de datos de sensores",
-  "license": "UNLICENSED",
+  "license": "AGPL-3.0-only",
   "engines": {
     "node": ">=22 <23",
     "pnpm": ">=10"

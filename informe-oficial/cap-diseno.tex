@@ -82,7 +82,7 @@ que el suscriptor llegue a recibir el mensaje.
 
 La figura~\ref{fig:sec-alta} (anexo~\ref{anx:figuras}) describe cómo un dispositivo pasa de desconocido a reconocido. Es el flujo,
 diseñado para la Etapa~3, que ataca la causa C4: una persona sin perfil técnico registra un dispositivo
-desde el panel, y el sistema genera la credencial, la muestra \textbf{una sola vez}, guarda solo su hash y registra
+desde el panel; según la vía declarada, el sistema genera la credencial, la muestra \textbf{una vez}, guarda su hash y registra
 al dispositivo en el broker con una lista de acceso restringida a su propio tópico. El estado «en línea»
 no nace del alta, sino del \textbf{primer mensaje autenticado}.
 
@@ -155,7 +155,7 @@ base propia dentro del mismo PostgreSQL. El backend no guarda estado, por lo que
 fijada, no puede escalar privilegios, se reinicia solo ante fallas y tiene un techo de memoria y CPU.
 
 
-La suma de techos es de 1,6~GB en la ruta prevista —los cuatro contenedores ya implementados— y de
+La suma de techos es de 1,6~GB en la ruta B —los cuatro contenedores ya implementados— y de
 1,95~GB con ChirpStack (ruta A), ambas dentro del RNF-17 (consumo de a lo más 2~GB de RAM); el consumo real se
 mide en la Etapa~4. Los
 límites cumplen además una segunda función: definen el \textbf{entorno de referencia} del banco de pruebas

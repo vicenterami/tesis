@@ -16,7 +16,8 @@ services:
 
   # ── Base de datos de series de tiempo ───────────────────────────────────────
   timescaledb:
-    image: timescale/timescaledb:2.24.0-pg16-oss # versión fijada (nunca "latest"); -oss = edición Apache 2.0 (RNF-15, docs/10 §8.4 punto 11)
+    build: ./db/imagen                           # FROM fijado (nunca "latest") en db/imagen/Dockerfile; -oss = edición Apache 2.0 (RNF-15, docs/10 §8.4 punto 11)
+    image: plataforma-timescaledb:2.30.2-pg16-oss-parches # 2.24.0 → 2.30.2 + parches el 08/10/2026, por seguridad (docs/11 §4)
     restart: unless-stopped                      # vuelve solo tras un reinicio del servidor
     logging:                                     # registros acotados: 10 MB × 5 por servicio (docs/11 §4; 07/10/2026)
       driver: json-file
@@ -50,7 +51,7 @@ services:
 
   # ── Broker MQTT ─────────────────────────────────────────────────────────────
   mosquitto:
-    image: eclipse-mosquitto:2.0.22
+    image: eclipse-mosquitto:2.0.22@sha256:199ea8ef2e35ec2b1b37e59cfd1dbae538ed4dfa4a2251a121a52215a6248a21 # etiqueta legible + digest exacto (docs/11 §4); Dependabot propone los cambios
     restart: unless-stopped
     logging:                                     # registros acotados: 10 MB × 5 por servicio (docs/11 §4; 07/10/2026)
       driver: json-file

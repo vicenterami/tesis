@@ -1,13 +1,21 @@
-# Verificación automática del backend en cada push y pull request (TT-03).
+# Verificación automática del backend en cada push y pull request (TT-03), y una vez por semana.
 # Solo lo que no necesita base ni broker: tipos, lint, pruebas unitarias y auditoría de dependencias. Lo que sí las necesita
 # (esquema, migraciones, API) corre en local con plataforma/pruebas/verificar-todo.sh.
 name: verificar
 on:
   push:
     branches: [main]
-    paths: ['plataforma/backend/**', '.github/workflows/verificar.yml']
+    paths: ['plataforma/backend/**', 'plataforma/pruebas/avisos-dependencias.sh', '.github/workflows/verificar.yml']
   pull_request:
-    paths: ['plataforma/backend/**', '.github/workflows/verificar.yml']
+    paths: ['plataforma/backend/**', 'plataforma/pruebas/avisos-dependencias.sh', '.github/workflows/verificar.yml']
+  # La auditoría cambia aunque el código no (08/10/2026: rojo por avisos publicados después del último push): una corrida
+  # semanal los muestra sin esperar al próximo cambio. También se puede lanzar a mano.
+  schedule:
+    - cron: '17 9 * * 1'
+  workflow_dispatch:
+# Permisos mínimos del token: solo leer el repositorio (la consulta de avisos de GitHub es pública).
+permissions:
+  contents: read
 concurrency:
   group: verificar-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -19,17 +27,28 @@ jobs:
       run:
         working-directory: plataforma/backend
     steps:
-      - uses: actions/checkout@v5
+      # Acciones fijadas por SHA, no por etiqueta: una etiqueta se puede reescribir (marzo de 2026, docs/11 §4).
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       # v6: runtime node24 (GitHub retiró node20 y anotaba «forced to run on Node.js 24» en cada corrida) y pnpm 11.
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
         with:
           package_json_file: plataforma/backend/package.json
-      - uses: actions/setup-node@v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 22
           cache: pnpm
           cache-dependency-path: plataforma/backend/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm verificar
-      # SCA: dependencias con vulnerabilidades conocidas (docs/11 §4). Falla con severidad alta o crítica.
+      # SCA: dependencias con vulnerabilidades conocidas (docs/11 §4). Falla con severidad alta o crítica, salvo las
+      # excepciones declaradas en pnpm-workspace.yaml (audit.ignore: avisos sin versión corregida que no entran a producción).
       - run: pnpm audit --audit-level=high
+      # Lo que va a producción, con nivel moderado: prueba que lo exceptuado no está en la imagen final.
+      - run: pnpm audit --prod --audit-level=moderate
+      # Lo pendiente no se esconde (08/10/2026): cada excepción y cada aviso que no bloquea sale como advertencia amarilla en
+      # la corrida y en su resumen, sin dejarla en rojo. Corre aunque un paso anterior falle, salvo si se canceló la corrida.
+      - name: Dependencias pendientes de resolver (avisa, no bloquea)
+        if: ${{ !cancelled() }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash ../pruebas/avisos-dependencias.sh

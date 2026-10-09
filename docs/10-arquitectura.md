@@ -13,7 +13,7 @@
 
 Qué piezas ejecutables existen y cómo se hablan. La **frontera** del trabajo es el tópico MQTT: de un
 lado, la red de sensores (lado del compañero: nodos, *gateway* y servidor de red LoRaWAN, que en la ruta
-prevista, la B, va embebido en la pasarela y en la ruta A, opcional, es un ChirpStack que aunque se aloja en
+B, la del sistema, va embebido en la pasarela y en la ruta A, opcional, es un ChirpStack que aunque se aloja en
 nuestro servidor publica al broker como un productor más); del otro, el broker y el backend. **En las figuras,
 lo opcional va con borde y flecha punteados** (desde el 07/10/2026). No se
 describe por posición (izquierda/derecha) porque el dibujo lo genera Mermaid y su distribución cambia
@@ -50,7 +50,7 @@ flowchart TB
     end
 
     GW -. "ruta A (opcional): UDP 1700, packet forwarder" .-> RP
-    GW -- "ruta B (prevista): servidor de red embebido → MQTT/TLS 8883" --> RP
+    GW -- "ruta B (la del sistema): servidor de red embebido → MQTT/TLS 8883" --> RP
     N2 -- "MQTT/TLS 8883" --> RP
     RP -. "UDP 1700 · red interna" .-> CS
     RP -- "MQTT 1883 · red interna" --> MQ
@@ -70,7 +70,7 @@ flowchart TB
 - **Un solo contenedor expuesto (el proxy) y dos puertos siempre, tres a lo sumo:** 443 para personas y
   8883 para dispositivos MQTT, ambos cifrados y siempre presentes; 1700/udp **solo en la ruta A, que es
   opcional** (ChirpStack corriendo en este servidor y pasarelas con *Semtech UDP Packet Forwarder*). En la ruta
-  prevista, la B (pasarela con servidor de red embebido, §8.4 punto 2), o si la red usa un servidor de red
+  B, la del sistema (pasarela con servidor de red embebido, §8.4 puntos 2 y 24), o si la red usa un servidor de red
   externo, el tercer puerto no existe. Los tres los publica el proxy; ningún otro contenedor lleva `ports`. Hoy 1700/udp **no
   aplica**: ChirpStack no está desplegado (§8.3). La base de datos y la interfaz de administración de
   ChirpStack nunca se exponen; su puerto de recepción de pasarelas, cuando exista, sí, porque las pasarelas
@@ -177,21 +177,27 @@ sequenceDiagram
     participant MQ as Broker
     participant Dev as Dispositivo
 
-    Admin->>FE: Asistente "nuevo dispositivo"
-    FE->>API: POST /dispositivos (Etapa 3)<br/>{zona, id_fisico, canales[]}
-    API->>DB: INSERT dispositivo, canal×N
-    API->>API: genera credencial (secreto aleatorio)
-    API->>DB: INSERT credencial (solo el hash)
-    API->>MQ: registra usuario MQTT<br/>+ ACL al tópico del dispositivo
-    API-->>FE: 201 {id, credencial en claro<br/>— se muestra UNA vez}
+    Admin->>FE: Asistente "nuevo dispositivo"<br/>(vía, formato y, si es LoRaWAN, su pasarela)
+    FE->>API: POST /dispositivos (Etapa 3)<br/>{zona, id_fisico, via, formato, pasarela?, canales[]}
+    API->>DB: INSERT dispositivo, canal×N,<br/>estado_dispositivo
+    alt vía mqtt
+        API->>API: genera credencial (secreto aleatorio)
+        API->>DB: INSERT credencial (solo el hash)
+        API->>MQ: Dynamic Security: crea el cliente<br/>con su rol (ACL a su tópico)
+    else vía http
+        API->>DB: INSERT credencial (hash del token)
+    else vía lorawan
+        Note over API,MQ: sin credencial propia:<br/>la autentica su pasarela
+    end
+    API-->>FE: 201 {id, datos de conexión}<br/>— la credencial se muestra UNA vez
     FE-->>Admin: Muestra credencial + tópico<br/>+ ejemplo de trama
     Admin->>Dev: Carga credencial en el firmware<br/>(o la entrega al compañero)
     Dev->>MQ: CONNECT (id_fisico, credencial) · TLS
     MQ->>MQ: valida credencial y ACL
     Dev->>MQ: PUBLISH<br/>sitio/…/dispositivo/<id>/<magnitud>
     MQ->>API: entrega la trama (suscriptor)
-    API->>DB: UPDATE dispositivo<br/>.visto_por_ultima_vez
-    API-->>FE: WS "dispositivo en línea"
+    API->>DB: UPDATE estado_dispositivo<br/>.visto_por_ultima_vez
+    API-->>FE: SSE "dispositivo en línea"
     FE-->>Admin: Estado: en línea ✅
 ```
 
@@ -201,6 +207,10 @@ sequenceDiagram
   una contraseña). Si se pierde, se **rota** (nueva fila en `credencial`), no se recupera.
 - La **ACL del broker** limita a cada dispositivo a publicar solo en su propio tópico: un nodo
   comprometido no puede suplantar a otro.
+- **La vía se declara en el alta** (§8.4 punto 25): el pipeline usa el formato declarado en vez de adivinarlo, y un
+  dispositivo LoRaWAN no tiene credencial propia: lo autentica su pasarela, que solo publica por los dispositivos
+  asociados a ella. El camino dibujado después del alta es el de la vía `mqtt`; el aviso al panel va por SSE (§8.4
+  punto 1).
 - El estado "en línea" se deduce del **primer mensaje autenticado**, no de la alta: dar de alta un
   dispositivo que aún no transmite lo deja en "esperando primer contacto".
 
@@ -438,7 +448,7 @@ flowchart TB
             C1["mosquitto<br/>eclipse-mosquitto 2.0.22<br/>límite 0,25 GB"]
             C2["chirpstack + redis propio<br/>solo ruta A (opcional)<br/>límite 0,35 GB"]
             C4["backend<br/>imagen propia: NestJS (Etapa 2); + panel estático cuando exista<br/>límite 0,5 GB · sin estado"]
-            C3["timescaledb<br/>timescale/timescaledb 2.24.0-pg16-oss (edición Apache)<br/>límite 0,75 GB"]
+            C3["timescaledb<br/>timescale/timescaledb 2.30.2-pg16-oss (edición Apache) + parches<br/>límite 0,75 GB"]
         end
         V4[("vol: certificados")]
         V2[("vol: datos-mosquitto")]
@@ -460,7 +470,7 @@ flowchart TB
 | timescaledb (edición Apache, `-oss`) | **todo el dato** | `unless-stopped` | no |
 | backend | ninguna (sin estado) | `unless-stopped` | no (vía proxy) |
 
-**Suma de límites: ~1,6 GB en la ruta prevista (B: proxy, broker, backend y base) y ~1,95 GB si se activa la ruta A
+**Suma de límites: ~1,6 GB en la ruta B (proxy, broker, backend y base) y ~1,95 GB si se activa la ruta A
 (más ChirpStack con su Redis)** — ambas coherentes con RNF-17 (consumo ≤ 2 GB de RAM en reposo y bajo carga; los límites son
 techos, no consumo). Los límites de recursos cumplen doble función: proteger al servidor y ser el
 **entorno de referencia** del banco de pruebas (`docs/09`). **ChirpStack, si se activa, comparte el servidor PostgreSQL** (una base y un rol propios, aislados de la base de la
@@ -470,7 +480,7 @@ respaldo cubre todo, y la extensión TimescaleDB no interfiere (ChirpStack solo 
 El backend **no guarda estado**: se puede
 destruir y recrear sin perder nada, lo que simplifica actualizaciones y pruebas.
 
-**Imagen del backend (23/09/2026).** *Multi-stage*: una etapa `build` con Node 22 completo compila
+**Imagen del backend (23/09/2026; base y limpieza actualizadas el 08/10, `docs/16 §12`).** *Multi-stage*: una etapa `build` con Node 22 y las herramientas de desarrollo compila
 TypeScript a JavaScript (`pnpm build`); la imagen final parte de la variante *slim* de Node 22, copia
 solo `dist/` y las dependencias de producción (`pnpm install --prod --frozen-lockfile`), y no lleva
 compilador, `devDependencies` ni el código fuente. Así la imagen que corre es más chica y no puede
@@ -549,7 +559,7 @@ ocupar más núcleos. No está en el alcance de esta etapa: RNF-14 fija un únic
 | Cuarentena separada de las series | RF-05, RF-07 |
 | Supervisor periódico de `sin_comunicacion` | RF-24, RF-25, RF-26 |
 | Credencial de un solo vistazo + ACL por dispositivo | RF-40, RF-41, RF-42 |
-| Histórico agregado con `time_bucket` + WS del backend | RF-33, RNF-04 |
+| Histórico agregado con `time_bucket` + SSE del backend | RF-33, RNF-04 |
 | Límites de recursos por contenedor | RNF-17, protocolo de validación |
 
 > **Pendiente:** RF-29 (keep-alive y *Last Will* de MQTT) no está trazado porque el cliente MQTT del
@@ -670,7 +680,7 @@ Fuentes: `bitacora/2026-10-05-entrevista-academico-geologia.md`; evidencia verif
    Las pasarelas Milesight UG6x traen servidor de red LoRaWAN y publican a un broker propio (host, puerto,
    usuario, clave, TLS con CA propia, tópico configurable). ChirpStack deja de ser obligatorio: queda como ruta
    alternativa si la red del campus usa TTN o un servidor de red externo. La pasarela se autentica en el broker
-   como un dispositivo más (usuario = su identificador, ACL por patrón). Las figuras de contenedores y despliegue
+   como un dispositivo más (usuario = su identificador, ACL por patrón; precisado el 08/10 en el punto 24: con credencial propia de pasarela y solo por sus dispositivos asociados). Las figuras de contenedores y despliegue
    se actualizan cuando el profesor guía confirme la ruta real.
    **Precisión del 07/10/2026.** Si la red del campus usa TTN o un servidor de red externo, eso es el escenario 5 de
    §2 y tampoco hay ChirpStack en este servidor; la ruta A solo hace falta si las pasarelas no traen servidor de red
@@ -724,7 +734,7 @@ TimescaleDB (8 observaciones), registro de brokers (258 filas).
     hace TCP/UDP con un módulo externo no oficial; HAProxy comunitario no hace UDP; Traefik no declara servidor de
     archivos estáticos. Lo que la variante A pierde (el broker ve la IP del proxy, no la del dispositivo; sin
     identidad por certificado) queda documentado. La comparación va al anexo C del informe.
-11. **Base de datos: edición Apache 2.0 de TimescaleDB** (`timescale/timescaledb:2.24.0-pg16-oss`). Probado con el
+11. **Base de datos: edición Apache 2.0 de TimescaleDB** (`timescale/timescaledb:2.24.0-pg16-oss`; desde el 08/10/2026, `2.30.2-pg16-oss` con parches de seguridad: `docs/16 §12`). Probado con el
     esquema real: fallan solo la compresión y su política, `add_retention_policy` y los agregados continuos; todo lo
     que el sistema usa (hypertable, `time_bucket` con zona, `drop_chunks`) funciona. Se quitan las líneas de
     compresión del esquema, la retención de `medicion` (2 años; **corregido por el punto 19: no vence por defecto**), `trama` y `cuarentena` (30 días) la ejecuta una
@@ -741,7 +751,7 @@ TimescaleDB (8 observaciones), registro de brokers (258 filas).
     CE y medir su memoria) porque el informe hoy cita el «≥ 4 GB» de terceros.
 15. **Del kit de método (06/10):** toda migración lleva `SET LOCAL lock_timeout = '5s'`; cada barrido del supervisor
     deja una línea de resumen; las marcas que escribe el sistema sobre `dispositivo` no deben parecer una edición
-    humana (decisión pendiente en `docs/08 §8` antes de HU-10); «valor congelado» entra como condición candidata.
+    humana (decidido el 08/10: tabla `estado_dispositivo`, punto 27); «valor congelado» entra como condición candidata.
 16. **Sección §9 (crecimiento, resiliencia y respaldo) aprobada y escrita el 06/10/2026**, con la corrección de
     RNF-17 (es RAM consumida, no disco) propagada a `docs/02`, `docs/07`, `docs/14`, `docs/15` y al informe.
 
@@ -779,7 +789,7 @@ TimescaleDB (8 observaciones), registro de brokers (258 filas).
     marcan vivo) pero el filtro 5 **no abre** condiciones de umbral; una ya abierta sí se cierra al volver a rango. El
     silencio ya excluía a los no activos. El registro del período de mantenimiento llega con M3 (cambio de estado por
     API → `evento`). Coherente con §8.1: `estado` es la decisión administrativa; lo que ocurre son condiciones.
-22. **Capa del proxy implementada y probada (07/10/2026; `plataforma/proxy/`).** nginx `1.30.5-alpine` (versión fijada),
+22. **Capa del proxy implementada y probada (07/10/2026; `plataforma/proxy/`).** nginx `1.30.5-alpine` (versión fijada; desde el 08/10/2026 con parches de Alpine en `plataforma/proxy/Dockerfile`, `docs/16 §12`),
     variante A: TLS 1.2+ en 443 → backend y en 8883 (`stream`) → broker; HSTS lo pone el proxy; registro JSON por
     petición y por conexión (ahí queda la IP real del dispositivo); resolución del nombre del servicio en cada conexión
     (`resolver 127.0.0.11`), para que recrear un contenedor no deje al proxy apuntando a una IP vieja. Probado de punta a
@@ -791,6 +801,82 @@ TimescaleDB (8 observaciones), registro de brokers (258 filas).
     90 s; declarado como 2 × periodo, 3 (`docs/16 §3 y §6.1`). RNF-03 y el código no cambian: cambia qué número se pone al
     dar de alta (migración 10 fija la semántica en la base; la ayuda del alta la repetirá). Evolución si algún medio pierde
     más: tolerancia por dispositivo (opción B).
+
+**Decisiones del 08/10/2026** (del estudiante, con evidencia y mediciones: `docs/16 §10–11`, `docs/11 §4`).
+
+24. **LoRaWAN es obligatorio y entra por la ruta B** (pasarela con servidor de red embebido → MQTT/TLS 8883). La ruta B
+    deja de ser «la prevista» y pasa a ser la vía LoRaWAN del sistema: entidad `pasarela` (`docs/08 §8`); la pasarela se
+    autentica en el broker con su propia credencial y solo puede publicar por los dispositivos asociados a ella (filtro
+    1); adaptador de su JSON (punto 3). Se prueba primero con un emulador que publica exactamente el JSON documentado por
+    Milesight y, en terreno, apenas haya una pasarela que alcance al servidor (red del campus o dirección pública). La
+    ruta A (ChirpStack) sigue opcional; investigarla a fondo, con un simulador, sigue siendo prioridad. Las horas de
+    HU-02 se reestiman al planificar esa semana.
+25. **La vía de envío se declara en el alta.** `dispositivo.via` (`mqtt`, `http`, `lorawan`), `dispositivo.formato` (el
+    adaptador: `senml`, `plano`, `milesight`…) y `dispositivo.pasarela_id` (obligatoria si la vía es `lorawan`; la
+    identidad del nodo es su DevEUI en `id_fisico`). El pipeline usa el formato declarado en vez de adivinarlo; si la
+    trama no calza, va a cuarentena con un motivo que se entiende solo. La credencial depende de la vía: `mqtt`, usuario
+    y clave en el broker (punto 26); `http`, un token; `lorawan`, ninguna propia (la autentica su pasarela). El alta y la
+    carga masiva ofrecen la vía en palabras simples y entregan los datos de conexión listos para copiar. El modelo
+    interno sigue siendo único (`docs/08 §1`): cambia cómo se identifica y autentica un dispositivo, no cómo se guarda
+    lo que envía. Modelo en `docs/08 §8`; secuencia en §3.
+26. **Credenciales del broker administradas por el backend con el plugin Dynamic Security de Mosquitto 2.x**,
+    condicionado a una prueba en un contenedor desechable (instalación, administrador inicial y ACL por rol). El backend
+    crea, deshabilita y borra clientes por `$CONTROL/dynamic-security/v1` sin reiniciar el broker: el alta y la baja
+    quedan en un solo flujo y un dispositivo dado de baja pierde su credencial en el acto. Se descartó autenticar
+    contra la base con `mosquitto-go-auth` (archivado en 2025). Si la prueba falla, se vuelve a decidir (`docs/11 §7`).
+27. **Lo que escribe el sistema se separa de lo que edita una persona: tabla `estado_dispositivo`.** El instante de la
+    última trama y lo que anote el supervisor van a una fila por dispositivo, sin disparador de `actualizado_en`;
+    `dispositivo` queda con la configuración humana. Así el bloqueo optimista del punto 28 no da «otro usuario lo
+    cambió» falsos (cada trama movía `actualizado_en`) y las escrituras de cada trama dejan de caer sobre la fila que
+    se edita. Entra en la misma migración que el punto 25 (`docs/08 §8`, pendiente resuelto).
+28. **Panel configurable con bloqueo optimista.** Desde el panel se configuran umbrales e histéresis por canal, e
+    intervalo esperado, estado y nombre por dispositivo. El formulario guarda el `actualizado_en` que leyó y el cambio
+    es `UPDATE … WHERE id = $1 AND actualizado_en = $2`: si otra persona cambió el dato entretanto, responde 409 y el
+    panel pide recargar; nunca se retiene una fila mientras alguien piensa. La validación vive en la misma función que
+    la vista previa. Cada cambio deja un `evento` con quién, qué, antes y después; el «antes» se lee con
+    `SELECT … FOR UPDATE` dentro de la misma transacción (sin eso, dos ediciones simultáneas registran el mismo
+    «antes»). Una condición abierta se reevalúa con la trama siguiente. Va en la segunda pantalla del panel.
+29. **Picos y ataques: nunca una pérdida silenciosa.** Medido (`docs/16 §10`): sin pérdida hasta 409 tramas/s; por
+    encima de unas 490/s, o con un aluvión de peticiones a `/salud`, el broker descartaba sin aviso. Se implementan:
+    límites por IP en el proxy (`limit_req`, `limit_conn`) y un `/salud` público que no consulta la base; topes de cola
+    explícitos en el broker y una alarma (evento y correo) cuando descarta; un tope de tramas por minuto por
+    dispositivo en el filtro 1, con revocación de su credencial (punto 26); y, al desplegar, un cortafuegos con solo
+    443 y 8883 abiertos y bloqueo automático de IP. Escribir en lote, solo si la medición del punto 31 lo pide. Suman
+    robustez si caben: tiempos máximos y un grupo de conexiones propio para la API (la lectura no debe quitarle
+    recursos a la recepción), `max_connections` en el broker, guardado a disco del broker más frecuente y vigilancia
+    externa de `/salud`. Cada medida se vuelve a medir con `capacidad.sh`.
+30. **Observabilidad: toda pérdida hace ruido.** La alarma de descartes del punto 29 (una sola), un resumen de la cola y
+    de los descartes en la API (sin abrir una terminal) y un catálogo de errores (código, causa, qué se registra y qué ve
+    el usuario). La vista por dispositivo, con su historial de eventos y rechazos, llega con el panel. Prometheus y
+    Grafana no entran sin un problema medido que los pida.
+31. **Rendimiento: medir antes de optimizar.** `pg_stat_statements` en el banco con el emulador y
+    `EXPLAIN (ANALYZE, BUFFERS)` de cada consulta de la API con un año de datos, con una ficha por operación (alcance,
+    consultas por petición, volumen, índices, escritura y concurrencia). El resultado va a `docs/16`; si señala dónde se
+    pierde el tiempo, se escribe en lote (punto 29).
+32. **Respaldos: RPO de 24 horas y RTO de una hora** (§9.5): volcado diario cifrado fuera del servidor y una
+    restauración de prueba al mes. Falta confirmar con el académico que perder hasta un día de lecturas es aceptable. El
+    archivado continuo del WAL o una réplica quedan como evolución.
+33. **Licencia del código propio: AGPL-3.0-only.** Quien lo modifique y lo ofrezca por red debe publicar su versión. Las
+    dependencias de producción son todas permisivas y el guardián lo vigila (`docs/02`, RNF-15), así que no imponen
+    otra. Queda por confirmar con la universidad quién es el titular del código.
+34. **Pruebas de caída (TT-30): primera ronda adelantada a la Etapa 3** en `docs/16 §11` (backend y base caídos sin
+    pérdida; el broker reiniciado sin persistencia perdió lo encolado). Falta: proxy, servidor completo y broker con
+    persistencia; TT-30 sigue planificado en la Etapa 4 (`docs/04`) para la ronda completa.
+35. **Vulnerabilidades de dependencias e imágenes corregidas y probadas (08/10/2026):** cifras y residuos
+    en `docs/16 §12`, controles y la excepción en `docs/11 §4`; licencias vigiladas por el guardián (`docs/02`, RNF-15).
+36. **Roles y permisos con un guardia central.** Verificado en el código de ThingsBoard, OpenRemote y Magistrala: la identidad y
+    el alcance salen de la sesión, nunca de la petición; el permiso se comprueba en el servidor antes de escribir; y el alcance
+    va en el WHERE de cada consulta. Aquí: roles por sitio (`usuario_sitio`) con una tabla de permisos por acción comprobada en un
+    solo guardia del backend; el sitio sale de la sesión y entra al WHERE de cada consulta; las ediciones usan bloqueo optimista
+    con 409 (punto 28) y dejan su `evento` con quién. Se prueba con una sesión de cada rol, no solo de administrador. Se
+    implementa con la autenticación (M7).
+37. **Exportación en CSV, XLSX y JSON** (RF-34, HU-08). El académico la pidió «crítica y no negociable» en CSV o XLSX para
+    trabajar en Python, R, MATLAB o QGIS. JSON sale de la misma consulta; XLSX necesita una biblioteca, que se elige con licencia
+    permisiva y sin avisos de seguridad (los revisan el guardián y la auditoría). Solo datos del sitio de quien exporta (RF-41).
+38. **Imágenes fijadas por digest y actualizadas con Dependabot.** Cada `FROM` y la imagen de registro del compose llevan su
+    etiqueta legible y su `@sha256`, el de lo escaneado y probado (paso 2u del guardián). Dependabot propone por pull request
+    las versiones nuevas de imágenes y de acciones del CI, con 7 días de espera desde su publicación; el estudiante revisa y
+    fusiona (`.github/dependabot.yml`, `docs/11 §4`).
 
 ## 9. Crecimiento, resiliencia y respaldo (aprobado el 06/10/2026)
 
@@ -863,6 +949,8 @@ construirlo por anticipado. Cada afirmación sobre una herramienta tiene su fuen
   WAL con recuperación a un punto en el tiempo.
 - **Plan**: en la Etapa 3, `pg_dump` diario comprimido desde un contenedor de tareas, retención de 30 días y una
   **restauración probada** cada mes con guardia (restaurar en un contenedor desechable y contar filas). RPO = 24 h.
+  **Decidido el 08/10/2026: RPO de 24 h y RTO de una hora** (§8.4 punto 32); falta confirmar con el académico que
+  perder hasta un día de lecturas es aceptable.
   Si el usuario no acepta perder un día de mediciones: archivado del WAL con pgBackRest o Barman (código abierto;
   verificar licencia y RAM antes), RPO de minutos; o una réplica asíncrona en otra máquina, que acorta el RTO pero
   no protege de errores lógicos.

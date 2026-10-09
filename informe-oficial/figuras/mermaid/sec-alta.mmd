@@ -6,19 +6,25 @@ sequenceDiagram
     participant MQ as Broker
     participant Dev as Dispositivo
 
-    Admin->>FE: Asistente "nuevo dispositivo"
-    FE->>API: POST /dispositivos (Etapa 3)<br/>{zona, id_fisico, canales[]}
-    API->>DB: INSERT dispositivo, canal×N
-    API->>API: genera credencial (secreto aleatorio)
-    API->>DB: INSERT credencial (solo el hash)
-    API->>MQ: registra usuario MQTT<br/>+ ACL al tópico del dispositivo
-    API-->>FE: 201 {id, credencial en claro<br/>— se muestra UNA vez}
+    Admin->>FE: Asistente "nuevo dispositivo"<br/>(vía, formato y, si es LoRaWAN, su pasarela)
+    FE->>API: POST /dispositivos (Etapa 3)<br/>{zona, id_fisico, via, formato, pasarela?, canales[]}
+    API->>DB: INSERT dispositivo, canal×N,<br/>estado_dispositivo
+    alt vía mqtt
+        API->>API: genera credencial (secreto aleatorio)
+        API->>DB: INSERT credencial (solo el hash)
+        API->>MQ: Dynamic Security: crea el cliente<br/>con su rol (ACL a su tópico)
+    else vía http
+        API->>DB: INSERT credencial (hash del token)
+    else vía lorawan
+        Note over API,MQ: sin credencial propia:<br/>la autentica su pasarela
+    end
+    API-->>FE: 201 {id, datos de conexión}<br/>— la credencial se muestra UNA vez
     FE-->>Admin: Muestra credencial + tópico<br/>+ ejemplo de trama
     Admin->>Dev: Carga credencial en el firmware<br/>(o la entrega al compañero)
     Dev->>MQ: CONNECT (id_fisico, credencial) · TLS
     MQ->>MQ: valida credencial y ACL
     Dev->>MQ: PUBLISH<br/>sitio/…/dispositivo/<id>/<magnitud>
     MQ->>API: entrega la trama (suscriptor)
-    API->>DB: UPDATE dispositivo<br/>.visto_por_ultima_vez
-    API-->>FE: WS "dispositivo en línea"
+    API->>DB: UPDATE estado_dispositivo<br/>.visto_por_ultima_vez
+    API-->>FE: SSE "dispositivo en línea"
     FE-->>Admin: Estado: en línea ✅

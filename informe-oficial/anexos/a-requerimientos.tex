@@ -10,7 +10,7 @@ Catálogo actualizado al pivote del 2 de septiembre (contrato SenML sobre MQTT).
 \begin{longtable}{@{}C{1.3cm}L{6.1cm}L{1.6cm}L{1.2cm}C{0.7cm}@{}}
 \filaencab \encab{ID} & \encab{Requerimiento} & \encab{Fuente} & \encab{Causa} & \encab{Pr.} \\ \midrule \endhead
 \textbf{RF-01} & El sistema debe exponer un punto de recepción \textbf{HTTP} que acepte tramas de medición en \textbf{SenML (RFC 8428)} & [PO] [BT] & C1 & \textbf{M} \\
-\textbf{RF-02} & El sistema debe poder recibir mediciones de la \textbf{rama LoRaWAN} a través del servidor de red, que las publica en MQTT (rama opcional) & [PO] [BT] & C1, C2 & \textbf{M} \\
+\textbf{RF-02} & El sistema debe poder recibir mediciones de la \textbf{rama LoRaWAN} a través del servidor de red, que las publica en MQTT (obligatoria desde el 08/10/2026: ruta B, pasarela con servidor de red embebido) & [PO] [BT] & C1, C2 & \textbf{M} \\
 \textbf{RF-03} & El sistema debe recibir eventos publicados en un \textbf{broker MQTT}, suscribiéndose a los tópicos configurados por sitio & [PO] & C1, C2 & \textbf{M} \\
 \textbf{RF-04} & El sistema debe admitir \textbf{adaptadores de formato por fuente} que traduzcan al modelo interno tramas que no lleguen en SenML, sin modificar el núcleo & [EM] [BT] & C2 & \textbf{S} \\
 \textbf{RF-05} & El sistema debe \textbf{validar cada trama} contra el esquema SenML y contra el registro del dispositivo, rechazando las inválidas sin contaminar las series & [BT] & C1 & \textbf{M} \\
@@ -62,7 +62,7 @@ Catálogo actualizado al pivote del 2 de septiembre (contrato SenML sobre MQTT).
 \textbf{RF-31} & El sistema debe \textbf{almacenar de forma persistente} todo evento aceptado, conservando el mensaje original íntegro junto a su interpretación & [BT] [DP] & C1 & \textbf{M} \\
 \textbf{RF-32} & El sistema debe \textbf{almacenar series de tiempo} de telemetría con valor, unidad y marca temporal & [PO] & C1 & \textbf{M} \\
 \textbf{RF-33} & El sistema debe permitir \textbf{consultar el historial} de eventos y mediciones de un dispositivo en un rango de fechas & [PO] & C4 & \textbf{M} \\
-\textbf{RF-34} & El sistema debe permitir \textbf{exportar} los datos de un sitio en formato abierto (CSV y JSON) & [PO] [EM] & \textbf{C3, C5} & \textbf{M} \\
+\textbf{RF-34} & El sistema debe permitir \textbf{exportar} los datos de un sitio en formatos abiertos (CSV, XLSX y JSON) & [PO] [EM] & \textbf{C3, C5} & \textbf{M} \\
 \textbf{RF-35} & El sistema debe exponer una \textbf{API de consulta} que permita a sistemas externos acceder a los datos del sitio & [PO] & C3 & \textbf{S} \\
 \end{longtable}
 
@@ -116,7 +116,7 @@ Catálogo actualizado al pivote del 2 de septiembre (contrato SenML sobre MQTT).
 \textbf{RNF-13} & La especificación del protocolo debe estar \textbf{documentada de forma independiente} de la implementación & Existencia del documento & [PO] & \textbf{M} \\
 \textbf{RNF-14} & El sistema debe poder \textbf{desplegarse completo en un único servidor} con recursos modestos, sin dependencia de servicios propietarios de nube & Despliegue verificado en máquina local & [PO] & \textbf{M} \\
 \textbf{RNF-15} & El sistema debe construirse \textbf{exclusivamente con componentes de código abierto}, sin licencias de pago & Inventario de dependencias & [PO] & \textbf{M} \\
-\textbf{RNF-16} & La trama nativa debe cumplir \textbf{SenML (RFC 8428)}; la rama LoRa, de concretarse, debe caber en el payload disponible del plan regional & Validación de esquema + verificación de tamaño & [BT] & \textbf{M} \\
-\textbf{RNF-17} & La plataforma completa (broker, base de datos, backend, interfaz y, de existir, el servidor de red) debe \textbf{operar en un servidor de 2\,GB de memoria}, por debajo de las exigencias del referente comercial & Medición de consumo en reposo y bajo carga en la Etapa 4 & [DP] [EM] & \textbf{M} \\
-\textbf{RNF-18} & La recepción debe tener una \textbf{disponibilidad $\geq$ 99\,\%} en una ventana continua de 72 horas ($\leq$ 43 min de indisponibilidad) & Emulador publicando cada minuto; se cuentan las ventanas sin confirmación & [DP] & \textbf{M} \\
+\textbf{RNF-16} & La trama nativa debe cumplir \textbf{SenML (RFC 8428)}; la rama LoRaWAN debe caber en el payload disponible del plan regional & Validación de esquema + verificación de tamaño & [BT] & \textbf{M} \\
+\textbf{RNF-17} & La plataforma completa (broker, base de datos, backend, interfaz y, de existir, el servidor de red) debe \textbf{consumir a lo más 2\,GB de memoria RAM}, en reposo y bajo carga, en un servidor de 4\,GB (la mitad del servidor recomendado), por debajo del mínimo que declara el referente de código abierto (ThingsBoard CE: 4\,GB) & Medición de consumo en reposo y bajo carga en la Etapa 4 (\texttt{docker stats}) & [DP] [EM] & \textbf{M} \\
+\textbf{RNF-18} & La recepción debe tener una \textbf{disponibilidad $\geq$ 99\,\%} en una ventana continua de 72 horas ($\leq$ 43 min de indisponibilidad) --- agregado 22/09/2026 tras la retroalimentación (observación 6), umbral de OE5 que no tenía RNF de respaldo & Emulador publicando cada minuto; se cuentan las ventanas sin confirmación & [DP] & \textbf{M} \\
 \end{longtable}

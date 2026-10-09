@@ -10,6 +10,9 @@ exec > >(tee "$LOG_DIR/verificar-$(date +%F-%H%M%S).log") 2>&1
 echo "verificar-todo · $(date -Is) · commit $(git rev-parse --short HEAD 2>/dev/null || echo ?)"
 fallos=0; omitidos=""
 paso() { echo; echo "══ $1 ══"; }
+# Archivos que entrarían al repositorio: los versionados y los nuevos que git no ignora (08/10: los pasos que solo miraban
+# los versionados no revisaron cinco archivos nuevos antes de su primer commit).
+archivos_repo() { git ls-files --cached --others --exclude-standard; }
 # Un paso que no revisó nada no pasa (27/09): con la base inalcanzable, los pasos 1, 2 y 2b salían en
 # verde porque buscaban «FALLA» en una salida vacía. Cada consulta exige su salida de código 0 y un
 # mínimo de líneas OK.
@@ -88,10 +91,10 @@ fi
 paso "2f. Repositorio público: ningún archivo versionado menciona herramientas de asistencia ni rutas personales"
 # El patrón se arma por partes para que este mismo archivo no lo contenga literal (y no se detecte a sí mismo).
 P="\\bcl""aude\\b|\\bfa""ble\\b|\\bson""net\\b|co-auth""ored-by|asistente de ""ia|modelo de ""lenguaje|~/\\.cl""aude" # cspell:disable-line
-if git ls-files | grep -v "^historico/" | xargs grep -lniE "$P" 2>/dev/null | grep -q .; then
-  echo "FALLA archivos versionados con menciones prohibidas:"; git ls-files | grep -v "^historico/" | xargs grep -lniE "$P" 2>/dev/null | sed 's/^/  /'
+if archivos_repo | grep -v "^historico/" | xargs grep -lniE "$P" 2>/dev/null | grep -q .; then
+  echo "FALLA archivos con menciones prohibidas:"; archivos_repo | grep -v "^historico/" | xargs grep -lniE "$P" 2>/dev/null | sed 's/^/  /'
   fallos=$((fallos+1))
-else echo "OK    sin menciones a herramientas ni rutas personales en $(git ls-files | wc -l) archivos versionados"; fi
+else echo "OK    sin menciones a herramientas ni rutas personales en $(archivos_repo | wc -l) archivos versionados o nuevos"; fi
 
 paso "2g. Migraciones citadas en prosa (docs e informe) == archivos NN-*.sql en disco"
 # Hallazgo del 26/09: informe y docs/12 decían «6 migraciones» cuando ya había 7 en disco (la 07 del 23/09).
@@ -136,9 +139,9 @@ paso "2j. Repositorio público: ningún archivo versionado nombra a personas de 
 # sin distinguir mayúsculas. Si el archivo no existe, el paso se omite y lo dice.
 NV="${NOMBRES_VETADOS:-privado/nombres-vetados.txt}"
 if [ -s "$NV" ]; then
-  hits=$(git ls-files | grep -v "^historico/" | xargs grep -lniwF -f "$NV" 2>/dev/null)
+  hits=$(archivos_repo | grep -v "^historico/" | xargs grep -lniwF -f "$NV" 2>/dev/null)
   if [ -n "$hits" ]; then echo "FALLA archivos versionados con nombres de la lista privada:"; echo "$hits" | sed 's/^/  /'; fallos=$((fallos+1))
-  else echo "OK    ningún nombre de la lista privada en $(git ls-files | grep -vc '^historico/') archivos versionados"; fi
+  else echo "OK    ningún nombre de la lista privada en $(archivos_repo | grep -vc '^historico/') archivos versionados o nuevos"; fi
 else echo "omitido: no existe $NV"; omitidos="$omitidos 2j"; fi
 
 paso "2k. Edición Apache de TimescaleDB (RNF-15; docs/10 §8.4 punto 11): licencia, imagen, sin compresión, sin jobs ni telemetría"
@@ -151,8 +154,18 @@ SELECT CASE WHEN current_setting('timescaledb.max_background_workers')='0' THEN 
 SELECT CASE WHEN current_setting('timescaledb.telemetry_level')='off' THEN 'OK    telemetría apagada: nada sale del servidor hacia Timescale' ELSE 'FALLA timescaledb.telemetry_level = '||current_setting('timescaledb.telemetry_level') END;
 SQL
 exige /tmp/vt-lic.txt "${PIPESTATUS[0]}" 4 || fallos=$((fallos+1))
-img=$(grep -oE 'timescale/timescaledb:[^ ]+' plataforma/docker-compose.yml)
-if [[ $img == *-oss ]]; then echo "OK    compose usa $img"; else echo "FALLA compose usa ${img:-ninguna imagen de TimescaleDB}: debe terminar en -oss"; fallos=$((fallos+1)); fi
+# 08/10: la imagen se construye desde db/imagen/Dockerfile (oficial fijada + parches, docs/11 §4): se revisa su FROM y que
+# el compose la use.
+img=$(grep -oE '^FROM timescale/timescaledb:[^ ]+' plataforma/db/imagen/Dockerfile | cut -d' ' -f2); img=${img%%@*}   # sin el digest
+if [[ $img != *-oss ]]; then echo "FALLA db/imagen/Dockerfile parte de ${img:-ninguna imagen de TimescaleDB}: debe terminar en -oss"; fallos=$((fallos+1))
+elif ! grep -qE '^[[:space:]]+build: \./db/imagen([[:space:]]|$)' plataforma/docker-compose.yml; then echo "FALLA el compose no construye la base desde db/imagen"; fallos=$((fallos+1))
+else echo "OK    la base parte de $img (db/imagen/Dockerfile) y el compose la construye desde ahí"; fi
+# 08/10: al cambiar la versión de la imagen, la extensión de una base existente no se actualiza sola (ALTER EXTENSION).
+v_img=$(sed -nE 's/^FROM timescale\/timescaledb:([0-9.]+)-.*/\1/p' plataforma/db/imagen/Dockerfile)
+v_base=$(docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -X -U plataforma -d plataforma -tAc "SELECT extversion FROM pg_extension WHERE extname='timescaledb'" 2>/dev/null | tr -d '[:space:]')
+if [ -z "$v_base" ]; then echo "FALLA no se pudo leer la versión de la extensión en la base"; fallos=$((fallos+1))
+elif [ "$v_base" != "$v_img" ]; then echo "FALLA la base tiene la extensión $v_base y la imagen trae $v_img: falta ALTER EXTENSION timescaledb UPDATE (docs/11 §8)"; fallos=$((fallos+1))
+else echo "OK    la extensión de la base ($v_base) es la de la imagen"; fi
 
 paso "2l. Tope de tamaño por mensaje en el broker (docs/11 §4): max_packet_size presente y <= 64 KiB"
 # Sin tope, Mosquitto 2.0.22 aceptó 50 MiB (observado el 07/10): un dispositivo con credencial podría llenar el disco.
@@ -160,14 +173,17 @@ tope=$(grep -E '^\s*max_packet_size\s+[0-9]+' "$MC/mosquitto.conf" | awk '{print
 if [[ -n "$tope" && "$tope" -le 65536 ]]; then echo "OK    max_packet_size = $tope bytes"
 else echo "FALLA max_packet_size ausente o mayor que 65536 (${tope:-ausente}): el broker acepta mensajes de cualquier tamaño"; fallos=$((fallos+1)); fi
 
-paso "2m. Proxy: nginx.conf válido (nginx -t con la imagen fijada y los certificados de desarrollo)"
-# 07/10: la configuración del proxy se valida sin levantar nada. Si faltan la imagen local o los certificados de desarrollo
-# (bash plataforma/proxy/ca-desarrollo.sh), el paso se omite y lo dice: nunca se da por bueno sin haberlo revisado.
-IMG_PROXY=$(grep -oE 'image: nginx:[^ ]+' plataforma/proxy/compose.proxy.yml | cut -d' ' -f2)
+paso "2m. Proxy: nginx.conf válido (nginx -t con la imagen del proxy, base fijada + parches, y los certificados de desarrollo)"
+# 07/10: la configuración del proxy se valida sin levantar nada. Si faltan los certificados de desarrollo
+# (bash plataforma/proxy/ca-desarrollo.sh) o la imagen no se puede construir, el paso se omite y lo dice: nunca se da por
+# bueno sin haberlo revisado. 08/10: la imagen es la oficial fijada más parches de Alpine (proxy/Dockerfile; docs/11 §4).
+BASE_PROXY=$(grep -oE '^FROM nginx:[^ ]+' plataforma/proxy/Dockerfile | cut -d' ' -f2)
+IMG_PROXY=plataforma-proxy:verificar
 CERTS_DEV="$PWD/privado/certs-desarrollo"
-if [ -z "$IMG_PROXY" ]; then echo "FALLA compose.proxy.yml sin imagen fijada"; fallos=$((fallos+1))
-elif ! docker image inspect "$IMG_PROXY" >/dev/null 2>&1 || [ ! -f "$CERTS_DEV/servidor.crt" ]; then echo "omitido: falta la imagen $IMG_PROXY o los certificados de desarrollo (bash plataforma/proxy/ca-desarrollo.sh)"; omitidos="$omitidos 2m"
-elif docker run --rm -v "$PWD/plataforma/proxy/nginx.conf:/etc/nginx/nginx.conf:ro" -v "$CERTS_DEV:/certs:ro" "$IMG_PROXY" nginx -t >/tmp/vt-nginx.txt 2>&1; then echo "OK    nginx -t: configuración válida ($IMG_PROXY)"
+if [ -z "$BASE_PROXY" ]; then echo "FALLA proxy/Dockerfile sin imagen base nginx fijada"; fallos=$((fallos+1))
+elif [ ! -f "$CERTS_DEV/servidor.crt" ]; then echo "omitido: faltan los certificados de desarrollo (bash plataforma/proxy/ca-desarrollo.sh)"; omitidos="$omitidos 2m"
+elif ! docker build -q -t "$IMG_PROXY" plataforma/proxy >/tmp/vt-build-proxy.txt 2>&1; then echo "omitido: no se pudo construir la imagen del proxy sobre $BASE_PROXY (¿sin red?): $(tail -1 /tmp/vt-build-proxy.txt)"; omitidos="$omitidos 2m"
+elif docker run --rm -v "$PWD/plataforma/proxy/nginx.conf:/etc/nginx/nginx.conf:ro" -v "$CERTS_DEV:/certs:ro" "$IMG_PROXY" nginx -t >/tmp/vt-nginx.txt 2>&1; then echo "OK    nginx -t: configuración válida ($BASE_PROXY + parches de proxy/Dockerfile)"
 else echo "FALLA nginx -t:"; grep -E "emerg|nginx:" /tmp/vt-nginx.txt | sed 's/^/  /'; fallos=$((fallos+1)); fi
 
 paso "2n. Registros acotados: todo servicio del compose y el proxy declaran logging con max-size (docs/11 §4)"
@@ -201,9 +217,95 @@ PY
 paso "2p. Repositorio público: ningún archivo versionado cita fichas privadas (viven en privado/, un lector no las abre)"
 # 08/10: 19 referencias en 12 archivos apuntaban a fichas de decisión privadas (formato D, guion y dos dígitos). Lo público
 # cita lo público: la sección de docs/10 §8.4 o de docs/11 donde quedó la decisión.
-if git grep -n -E 'ficha D-[0-9]{2}|decisi[oó]n D-[0-9]{2}|\bD-[0-9]{2}\b' -- ':!privado' > /tmp/vt-fichas.txt 2>/dev/null; then
+if git grep --untracked -n -E 'ficha D-[0-9]{2}|decisi[oó]n D-[0-9]{2}|\bD-[0-9]{2}\b' -- ':!privado' > /tmp/vt-fichas.txt 2>/dev/null; then
   echo "FALLA archivos públicos que citan fichas privadas:"; cut -c1-160 /tmp/vt-fichas.txt; fallos=$((fallos+1))
 else echo "OK    ningún archivo versionado cita fichas privadas"; fi
+
+paso "2q. Auditoría de dependencias: cada aviso ignorado (audit.ignore de pnpm-workspace.yaml) sigue sin versión corregida (docs/11 §4)"
+# 08/10: braces no tenía parche y la auditoría lo ignora (la leen igual el CI y el portátil). Una excepción que nadie revisa
+# queda para siempre: este paso consulta la base de avisos de GitHub y falla el día que el aviso tenga versión corregida.
+# Se leen los GHSA fuera de comentarios, así vale con la clave vigente y con el nombre antiguo (`auditConfig.ignoreGhsas`).
+WS="${VERIFICAR_WORKSPACE:-plataforma/backend/pnpm-workspace.yaml}"
+ign=$(grep -v '^[[:space:]]*#' "$WS" 2>/dev/null | grep -oE 'GHSA-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}' | sort -u)
+if [ ! -f "$WS" ]; then echo "FALLA no existe $WS: no se pudo revisar la auditoría"; fallos=$((fallos+1))
+elif [ -z "$ign" ]; then echo "OK    la auditoría no ignora ningún aviso"
+elif ! command -v gh >/dev/null; then echo "omitida: gh no está en el PATH"; omitidos="$omitidos 2q"
+else
+  for g in $ign; do
+    if ! p=$(gh api "/advisories/$g" --jq '[.vulnerabilities[].first_patched_version // empty] | join(", ")' 2>/dev/null); then
+      echo "omitida: no se pudo consultar $g (¿sin red?)"; omitidos="$omitidos 2q"
+    elif [ -n "$p" ]; then echo "FALLA $g ya tiene versión corregida ($p): actualizar y quitar la excepción de pnpm-workspace.yaml y de docs/11 §4"; fallos=$((fallos+1))
+    else echo "AVISO $g sigue sin versión corregida publicada: excepción vigente, pendiente de resolver (no falla)"; fi
+  done
+fi
+
+paso "2r. RNF-15: dependencias de producción del backend con licencia abierta y permisiva (docs/02, RNF-15)"
+# 08/10: una dependencia copyleft (GPL, AGPL) dentro del backend obligaría a distribuir el conjunto bajo una licencia
+# compatible con la suya y cerraría la opción de una licencia comercial adicional; las de fuente disponible (SSPL, BUSL) no
+# son de código abierto (RNF-15) y una desconocida no se puede evaluar. Esta es la lista exacta: lo demás falla y lo decide
+# el estudiante. Una expresión «A OR B» pasa si alguna de las dos está en la lista.
+PERMITIDAS='["MIT","ISC","Apache-2.0","BSD-2-Clause","BSD-3-Clause","0BSD","Python-2.0","CC0-1.0","Unlicense","BlueOak-1.0.0"]'
+if ! command -v pnpm >/dev/null || ! command -v jq >/dev/null; then echo "omitida: falta pnpm o jq"; omitidos="$omitidos 2r"
+elif ! (cd plataforma/backend && pnpm licenses ls --prod --json 2>/dev/null) > /tmp/vt-licencias.json \
+     || ! jq -e 'type == "object"' /tmp/vt-licencias.json >/dev/null 2>&1; then
+  echo "FALLA pnpm licenses no devolvió un resultado legible (¿node_modules sin instalar?)"; fallos=$((fallos+1))
+else
+  n=$(jq '[.[] | length] | add // 0' /tmp/vt-licencias.json)
+  malas=$(jq -r --argjson ok "$PERMITIDAS" 'to_entries[] | select(.key | gsub("[()]"; "") | split(" OR ")
+      | map(. as $x | $ok | index($x)) | any | not) | .key as $l
+    | .value[] | "\(.name)@\(.versions | join(",")) → \($l)"' /tmp/vt-licencias.json)
+  if [ "$n" -lt 50 ]; then echo "FALLA revisó solo $n paquetes de producción (se esperan >= 50)"; fallos=$((fallos+1))
+  elif [ -n "$malas" ]; then echo "FALLA dependencias de producción con licencia fuera de la lista:"; sed 's/^/  /' <<<"$malas"; fallos=$((fallos+1))
+  else echo "OK    $n paquetes de producción con licencia permitida ($(jq -r 'to_entries | map("\(.key) \(.value | length)") | join(", ")' /tmp/vt-licencias.json))"; fi
+fi
+
+paso "2s. Requerimientos: el anexo A del informe dice lo mismo que docs/02 (cada RF y RNF, misma descripción)"
+# 08/10: RF-02, RNF-16 y RNF-17 habían cambiado en docs/02 y no en el anexo. Manda
+# docs/02; se compara la descripción de cada requisito sin el formato (Markdown o LaTeX).
+python3 -I - <<'PY' || fallos=$((fallos+1))
+import re, sys, unicodedata
+def norm(s):
+    s = s.replace('$\\geq$', '≥').replace('$\\leq$', '≤').replace('---', '—').replace('--', '–')
+    s = re.sub(r'\\(textbf|emph|texttt|textit|mbox)\{([^{}]*)\}', r'\2', s)
+    s = s.replace('\\,', ' ').replace('~', ' ').replace('\\%', '%').replace('\\&', '&').replace('\\_', '_')
+    s = re.sub(r'\\[a-zA-Z]+\{?|[{}$]', '', s)
+    s = s.replace('**', '').replace('`', '').replace('*', '')
+    return re.sub(r'\s+', ' ', unicodedata.normalize('NFC', s)).strip().rstrip('.').lower()
+def leer(ruta, patron):
+    d = {}
+    for l in open(ruta, encoding='utf-8'):
+        m = re.match(patron, l)
+        if m: d[m.group(1)] = m.group(2)
+    return d
+md = leer('docs/02-requerimientos.md', r'\|\s*\*\*((?:RF|RNF)-\d+)\*\*\s*\|\s*(.*?)\s*\|')
+tx = leer('informe-oficial/anexos/a-requerimientos.tex', r'\s*\\textbf\{((?:RF|RNF)-\d+)\}\s*&\s*(.*?)\s*&')
+if len(md) < 60: print(f'FALLA revisó solo {len(md)} requisitos de docs/02 (se esperan >= 60)'); sys.exit(1)
+malos = [f'{k}: está solo en {"docs/02" if k in md else "el anexo A"}' for k in sorted(set(md) ^ set(tx))]
+malos += [f'{k}: la descripción difiere entre docs/02 y el anexo A' for k in sorted(set(md) & set(tx)) if norm(md[k]) != norm(tx[k])]
+for m in malos: print('FALLA', m)
+if not malos: print(f'OK    {len(md)} requisitos: el anexo A dice lo mismo que docs/02')
+sys.exit(1 if malos else 0)
+PY
+
+paso "2t. Pruebas unitarias: la cifra citada en docs e informe es la que existe (it( en los *.spec.ts)"
+# 08/10: la misma cifra decía 49, 70 y 78 en distintos documentos. Se cuentan los it( y se compara con cada «N pruebas
+# unitarias» de docs/ (salvo docs/12, el estado fechado de la Etapa 2) y del informe.
+real=$(grep -rhoE '^[[:space:]]*it\(' plataforma/backend/src --include='*.spec.ts' | wc -l)
+citas=$(grep -rnoE '[0-9]+ pruebas unitarias' docs/*.md informe-oficial/*.tex informe-oficial/anexos/*.tex 2>/dev/null | grep -v '^docs/12-')
+malas=$(awk -F: -v r="$real" 'NF { split($3, a, " "); if (a[1] != r) print }' <<<"$citas")
+if [ "$real" -lt 10 ]; then echo "FALLA contó solo $real pruebas (it( en los *.spec.ts)"; fallos=$((fallos+1))
+elif [ -n "$malas" ]; then echo "FALLA cifras de pruebas unitarias distintas de $real:"; sed 's/^/  /' <<<"$malas"; fallos=$((fallos+1))
+else echo "OK    $real pruebas unitarias; $(grep -c . <<<"$citas") cita(s) en docs e informe coinciden"; fi
+
+paso "2u. Imágenes fijadas por digest: cada FROM de los Dockerfile y cada imagen de registro del compose llevan @sha256 (docs/11 §4)"
+# 08/10: una etiqueta puede cambiar de contenido con el mismo nombre (pasó con mosquitto); con el digest, lo desplegado es lo
+# escaneado. Dependabot (.github/dependabot.yml) propone los cambios como pull request.
+sin=$( { grep -HnE '^FROM ' plataforma/backend/Dockerfile plataforma/db/imagen/Dockerfile plataforma/proxy/Dockerfile | grep -v '@sha256:[0-9a-f]\{64\}'
+         grep -HnE '^[[:space:]]+image:[[:space:]]+[a-z0-9./-]+:[^[:space:]]+' plataforma/docker-compose.yml | grep -vE 'plataforma-' | grep -v '@sha256:[0-9a-f]\{64\}'; } )
+total=$(grep -cE '^FROM ' plataforma/backend/Dockerfile plataforma/db/imagen/Dockerfile plataforma/proxy/Dockerfile | awk -F: '{s+=$2} END {print s}')
+if [ "${total:-0}" -lt 4 ]; then echo "FALLA revisó solo ${total:-0} líneas FROM (se esperan >= 4)"; fallos=$((fallos+1))
+elif [ -n "$sin" ]; then echo "FALLA imágenes sin digest:"; sed 's/^/  /' <<<"$sin"; fallos=$((fallos+1))
+else echo "OK    $total FROM y la imagen de registro del compose fijados por digest"; fi
 
 paso "3. Diagramas: informe = docs = base (generar-figuras.sh --verificar)"
 bash informe-oficial/figuras/generar-figuras.sh --verificar || fallos=$((fallos+1))

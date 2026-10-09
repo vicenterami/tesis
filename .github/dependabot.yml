@@ -1,0 +1,27 @@
+# Actualizaciones propuestas como pull request (docs/11 §4). Las imágenes y las acciones están fijadas por digest o SHA: lo
+# desplegado es exactamente lo escaneado y probado, y este archivo hace que los parches lleguen avisados. Nunca fusiona solo:
+# cada PR pasa por el CI y lo revisa y fusiona el estudiante.
+# cooldown: espera 7 días desde que se publica una versión antes de proponerla (lo recién publicado no se instala).
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+  - package-ecosystem: docker
+    directories:
+      - /plataforma/backend
+      - /plataforma/db/imagen
+      - /plataforma/proxy
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+  - package-ecosystem: docker-compose
+    directory: /plataforma
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7

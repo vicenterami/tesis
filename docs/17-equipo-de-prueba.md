@@ -29,24 +29,41 @@ eligieron para que coincidan con el caso de uso levantado:
 | 8 | Radio LoRa **915 MHz** (módulo SX1276/SX1262, o placa ESP32 con LoRa integrada) + antena de 915 MHz | Probar la vía LoRaWAN con un nodo propio | Banda 915 MHz; **nunca transmitir sin antena** | 1 | Solo si hay pasarela |
 | 9 | Batería 18650 con portapilas protegido, o power bank | Demostración «de terreno» sin cable | Protección contra sobredescarga | 1 | Opcional |
 
-## 3. Cotización (8 de octubre de 2026)
+## 3. Cotización (8 de octubre de 2026, revisada en la tarde)
 
-Precios vistos en la página de cada tienda; cada precio se comprobó en el HTML de esa página el mismo día. En las páginas de
-Afel aparecen a la vez «Agotado» y «N en existencias»: **confirmar el stock al comprar**. ✅ = recomendada.
+Siete tiendas chilenas comparadas pieza por pieza. Precio y stock leídos en la página de cada producto (datos estructurados
+de la ficha o texto visible) el mismo día; los de las dos compras de abajo, comprobados uno por uno. MercadoLibre no se pudo
+leer (bloquea las consultas automáticas). **Ninguna tienda publica la tarifa de despacho a regiones**: se calcula en el carro
+con la comuna de destino, así que el costo final se confirma al comprar.
 
-| # | Pieza | Tienda · producto | Precio (CLP) | ¿Cumple? | URL |
-|---|---|---|---|---|---|
-| 2 | Cable micro-USB de datos | ✅ MCI · Cable Micro USB 1 m Mlab | 4 990 | Sí: «transferencia de datos» | https://mcielectronics.cl/shop/product/cable-usb-a-micro-usb-negro/ |
-| 3 | BME280 | ✅ Afel · Sensor Barométrico BME280 | 8 650 | Sí: BME280, con humedad | https://afel.cl/products/sensor-barometrico-bme280 |
-| 4 | Protoboard 830 | ✅ MCI · Protoboard 830 pts MB-102 | 2 990 | Sí | https://mcielectronics.cl/shop/product/protoboard-de-tamano-completo-830pts-mb-102-23380/ |
-| 5 | Dupont macho-macho | ✅ MCI · Pack 40, 20 cm (alternativa: Afel, pack 20, 1 000) | 2 990 | Sí | https://mcielectronics.cl/shop/product/cable-dupont-macho-macho-20cm-pack-40-unidades-2/ |
-| 5 | Dupont macho-hembra | ✅ Afel · Pack 20, 20 cm (MCI: pack 40, la ficha dice 20 y 10 cm) | 1 000 | Sí | https://afel.cl/products/pack-20-cables-de-conexion-macho-hembra |
-| 6 | DS18B20 sumergible | ✅ MCI · DS18B20 resistente al agua, 1 m | 2 690 | Sí: acero, 1 m | https://mcielectronics.cl/shop/product/sensor-de-temperatura-ds18b20-resistente-al-agua-1m-25764/ |
-| 7 | Humedad de suelo capacitivo | — sin opción adecuada: el Sonoff MS01 (12 590) es accesorio de otra marca; el Grove no declara el tipo; el de Afel es resistivo | — | No | — |
-| 8 | Radio LoRa 915 MHz (solo si hay pasarela) | Afel · SX1276 915 MHz + antena helicoidal | 18 000 | Sí: 915 MHz con antena | https://afel.cl/products/modulo-rf-lora-sx1276-915mhz-v2-0-spi-antena-helicoidal |
-| 8 | (alternativas) | MCI · SX1276 915 MHz sin antena declarada (14 990) · MCI · Heltec WiFi LoRa 32 **V2** 915 MHz (35 990) | — | Parcial | — |
-| 9 | Batería protegida | — sin opción con protección declarada | — | No | — |
-| — | Referencia: pasarela LoRaWAN AU915 | MCI · Milesight UG65 4G AU915 (439 990) · UG63 v2 (194 990, AU915 sin confirmar en el SKU) | — | — | — |
+**Recomendada: una sola tienda y un despacho (MechatronicStore), CLP 26 130**, todo en stock. Supera su umbral de envío
+gratis («Envío GRATIS a todo Chile en pedidos web desde $19.990»); confirmar en el carro que aplica al destino elegido.
 
-**Total de lo imprescindible y recomendado con stock confirmable (piezas 2 a 6): CLP 23 310.** Falta un sensor capacitivo de
-suelo genérico (buscar «sensor capacitivo humedad suelo v1.2») y, solo si se confirma una pasarela, la radio de 915 MHz.
+| # | Pieza | Producto | CLP | URL |
+|---|---|---|---|---|
+| 2 | Cable micro-USB de datos | Cable micro USB para cargar y transferir datos (largo no declarado en el texto) | 2 190 | https://www.mechatronicstore.cl/cable-micro-usb-de-datos/ |
+| 3 | BME280 | Sensor BME280, 3,3 V: **elegir la variante «I2C»** (la «I2C/SPI» figura sin stock) | 8 690 | https://www.mechatronicstore.cl/sensor-barometrico-bme280-spi-i2c-3-3v/ |
+| 4 | Protoboard 830 | Breadboard MB102, 830 puntos | 3 790 | https://www.mechatronicstore.cl/breadboard-830-puntos-mb102/ |
+| 5 | Dupont macho-macho | 40 piezas, 20 cm | 2 990 | https://www.mechatronicstore.cl/cable-macho-macho-40-piezas-20cm/ |
+| 5 | Dupont macho-hembra | 40 piezas, 20 cm | 2 990 | https://www.mechatronicstore.cl/cable-macho-hembra-40-piezas-20-cm/ |
+| 6 | DS18B20 sumergible | En tubo de acero (largo no declarado en el texto) | 2 990 | https://www.mechatronicstore.cl/sensor-de-temperatura-ds18b20-tipo-termocupla-arduino-pic/ |
+| 6 | Resistencia de 4,7 kΩ | 1/4 W, por unidad (elegir el valor) | 100 | https://www.mechatronicstore.cl/resistencia/ |
+| 7 | Humedad de suelo **capacitivo** | Analógico capacitivo v1.2, 3,3 a 5,5 V | 2 390 | https://www.mechatronicstore.cl/sensor-de-humedad-del-suelo-analogico-capacitivo-3-3-5-5v/ |
+
+**Alternativa más barata en piezas, con dos despachos: CLP 18 835 más dos envíos.** Altronics: cable plano de 1 m (1 332),
+BME280 (8 236), pack de 10 resistencias de 4,7 kΩ (491) y sensor capacitivo (2 776); Afel: protoboard de 400 (1 500), dupont
+macho-macho y macho-hembra de 20 (1 000 cada uno) y DS18B20 de 1 m en acero (2 500). Conviene solo si los dos envíos suman
+menos de CLP 7 295.
+
+**Trampas comprobadas en las páginas:** el «Cable Micro USB de 80cm» de MCI dice «Solo carga (No datos)»; el «Sensor Humedad
+Suelo Higrometro» de Afel es resistivo («midiendo la conductividad eléctrica entre sus dos sondas»). En las fichas de Afel la
+palabra «Agotado» aparece aunque el producto tenga stock: manda el botón de compra.
+
+**Al recibir:** el BME280 se reconoce por software: su registro de identificación (`0xD0`) vale `0x60`; un BMP280, que se ve
+igual y no mide humedad, devuelve `0x58` (bibliotecas de Adafruit para BME280 y BMP280). La sonda DS18B20 llega sin conector
+(soldar o usar bornera) y necesita la resistencia de 4,7 kΩ entre datos y 3,3 V. El sensor de suelo se alimenta a 3,3 V con el
+ESP32 y se calibra (seco y en agua).
+
+**Piezas 8 y 9** (solo si hay pasarela / opcional), sin cambios respecto de la revisión de la mañana: radio SX1276 de 915 MHz
+con antena helicoidal en Afel, CLP 18 000; batería con protección declarada, sin opción encontrada. Referencia: pasarela
+Milesight UG65 4G AU915 en MCI, CLP 439 990.

@@ -10,10 +10,12 @@ plataforma/
 ├── docker-compose.yml        # servicios, volúmenes, límites de recursos (forma de PRODUCCIÓN: sin puertos)
 ├── docker-compose.override.yml # SOLO desarrollo: publica 5432 y 1883 en 127.0.0.1 (Compose lo carga solo)
 ├── backend/                  # NestJS: recepción, pipeline, API (ver backend/README.md)
-├── proxy/                    # capa opcional nginx con TLS: compose.proxy.yml, nginx.conf, ca-desarrollo.sh (docs/10 §8.4 decisión 10)
+├── proxy/                    # capa opcional nginx con TLS: compose.proxy.yml, nginx.conf, ca-desarrollo.sh, Dockerfile (oficial + parches)
 ├── .env.example              # variables de entorno (copiar a .env; .env NO se versiona)
 ├── db/pruebas/               # pruebas SQL de solo lectura (zonas horarias, guardias) y er-mermaid.sql (ER desde el esquema)
 ├── pruebas/api-smoke.sh      # prueba de humo de la API (OK/FALLA por caso)
+├── pruebas/escanear-imagenes.sh # vulnerabilidades de las imágenes, antes de desplegar (docs/16 §12)
+├── db/imagen/                # Dockerfile de la base: TimescaleDB -oss fijada + parches de seguridad
 ├── db/init/                  # esquema y migraciones numeradas; en una instalación nueva corren todas
 │   ├── 01-esquema.sql        #   en orden al primer arranque. En una base existente, cada archivo nuevo
 │   └── 02…07-*.sql           #   se aplica a mano: docker compose exec -T timescaledb psql -U plataforma -d plataforma < db/init/NN-x.sql
@@ -45,7 +47,7 @@ docker run --rm -v "$PWD/mosquitto/config:/c" eclipse-mosquitto:2.0.22 \
 # Claves de DISPOSITIVOS (dev-0001…): un solo comando, con la clave oculta y verificada:
 #   bash pruebas/clave-dispositivo.sh dev-0001
 
-docker compose up -d                 # descarga imágenes, construye el backend, crea red, volúmenes y arranca
+docker compose up -d                 # descarga imágenes, construye el backend y la base, crea red, volúmenes y arranca
 docker compose ps                    # estado y healthchecks
 docker compose logs -f timescaledb   # ver el esquema aplicándose la primera vez
 docker stats                         # memoria y CPU reales por contenedor
@@ -109,5 +111,5 @@ Capas, amenazas y controles verificados: `docs/11-seguridad.md`.
 1. ~~Esqueleto del backend y filtros 1 a 6~~ hechos.
 2. ~~Contenedor del backend en el Compose~~ hecho (imagen propia multi-etapa); falta el panel estático.
 3. ChirpStack (base aparte en el mismo PostgreSQL + Redis propio) **solo si se activa la ruta A**, que es opcional: en la
-   prevista (B) la pasarela publica por MQTT/TLS como un dispositivo más (`docs/10 §8.4` punto 2).
+   ruta B, la del sistema, la pasarela publica por MQTT/TLS con su propia credencial (`docs/10 §8.4` puntos 2 y 24).
 4. ~~Proxy inverso con TLS~~ capa nginx hecha (07/10, `proxy/`, probada en el banco con `banco.sh proxy`); falta el certificado real (por decidir, `docs/10 §8.4` punto 22), `limit_req` y no publicar el 1883 en producción.

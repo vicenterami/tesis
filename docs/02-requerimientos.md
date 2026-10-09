@@ -81,7 +81,7 @@ Cada requerimiento declara su origen. Se emplean cuatro tipos de fuente, con dis
 | ID | Requerimiento | Fuente | Causa | Prior. |
 |---|---|---|---|:---:|
 | **RF-01** | El sistema debe exponer un punto de recepción **HTTP** que acepte tramas de medición en **SenML (RFC 8428)** | [PO] [BT] | C1 | **M** |
-| **RF-02** | El sistema debe poder recibir mediciones de la **rama LoRaWAN** a través del servidor de red, que las publica en MQTT (rama opcional) | [PO] [BT] | C1, C2 | **M** |
+| **RF-02** | El sistema debe poder recibir mediciones de la **rama LoRaWAN** a través del servidor de red, que las publica en MQTT (obligatoria desde el 08/10/2026: ruta B, pasarela con servidor de red embebido) | [PO] [BT] | C1, C2 | **M** |
 | **RF-03** | El sistema debe recibir eventos publicados en un **broker MQTT**, suscribiéndose a los tópicos configurados por sitio | [PO] | C1, C2 | **M** |
 | **RF-04** | El sistema debe admitir **adaptadores de formato por fuente** que traduzcan al modelo interno tramas que no lleguen en SenML, sin modificar el núcleo | [EM] [BT] | C2 | **S** |
 | **RF-05** | El sistema debe **validar cada trama** contra el esquema SenML y contra el registro del dispositivo, rechazando las inválidas sin contaminar las series | [BT] | C1 | **M** |
@@ -147,7 +147,7 @@ módulo salvo uno son *Must*.
 | **RF-31** | El sistema debe **almacenar de forma persistente** todo evento aceptado, conservando el mensaje original íntegro junto a su interpretación | [BT] [DP] | C1 | **M** |
 | **RF-32** | El sistema debe **almacenar series de tiempo** de telemetría con valor, unidad y marca temporal | [PO] | C1 | **M** |
 | **RF-33** | El sistema debe permitir **consultar el historial** de eventos y mediciones de un dispositivo en un rango de fechas | [PO] | C4 | **M** |
-| **RF-34** | El sistema debe permitir **exportar** los datos de un sitio en formato abierto (CSV y JSON) | [PO] [EM] | **C3, C5** | **M** |
+| **RF-34** | El sistema debe permitir **exportar** los datos de un sitio en formatos abiertos (CSV, XLSX y JSON) | [PO] [EM] | **C3, C5** | **M** |
 | **RF-35** | El sistema debe exponer una **API de consulta** que permita a sistemas externos acceder a los datos del sitio | [PO] | C3 | **S** |
 
 **Justificación ampliada de RF-34.** La exportación en formato abierto no es una comodidad: es el
@@ -262,7 +262,7 @@ es realmente multiprotocolo: es monoprotocolo con excepciones.
 | **RNF-15** | El sistema debe construirse **exclusivamente con componentes de código abierto**, sin licencias de pago | Inventario de dependencias | [PO] | **M** |
 | **RNF-17** | La plataforma completa (broker, base de datos, backend, interfaz y, de existir, el servidor de red) debe **consumir a lo más 2 GB de memoria RAM**, en reposo y bajo carga, en un servidor de 4 GB (la mitad del servidor recomendado), por debajo del mínimo que declara el referente de código abierto (ThingsBoard CE: 4 GB) | Medición de consumo en reposo y bajo carga en la Etapa 4 (`docker stats`) | [DP] [EM] | **M** |
 | **RNF-18** | La recepción debe tener una **disponibilidad ≥ 99 %** en una ventana continua de 72 horas (≤ 43 min de indisponibilidad) — agregado 22/09/2026 tras la retroalimentación (observación 6), umbral de OE5 que no tenía RNF de respaldo | Emulador publicando cada minuto en el banco de pruebas de la Etapa 4; se cuentan las ventanas sin confirmación | [DP] | **M** |
-| **RNF-16** | La trama nativa debe cumplir **SenML (RFC 8428)**; la rama LoRa, de concretarse, debe caber en el payload disponible del plan regional | Validación de esquema + verificación de tamaño | [BT] | **M** |
+| **RNF-16** | La trama nativa debe cumplir **SenML (RFC 8428)**; la rama LoRaWAN debe caber en el payload disponible del plan regional | Validación de esquema + verificación de tamaño | [BT] | **M** |
 
 **Justificación de RNF-14 y RNF-15.** Provienen directamente de la indicación del propietario del
 proyecto: plataforma «gratuita o abierta», con la universidad como destinataria. RNF-14 además habilita
@@ -274,11 +274,18 @@ marginal cero para la institución.
 automáticas y los agregados continuos de TimescaleDB están bajo la *Timescale License* (gratuita, «source-available»,
 no de código abierto según la OSI). Tras evaluar nueve bases de series de tiempo y probar la edición Apache 2.0 de
 TimescaleDB con el esquema real (fallan exactamente esas funciones y nada más; laboratorio del 06/10), **se adopta la
-edición Apache** (`timescale/timescaledb:2.24.0-pg16-oss`): hypertables, `time_bucket` con zona nombrada y
+edición Apache** (`timescale/timescaledb:2.24.0-pg16-oss`; actualizada a `2.30.2` con parches el 08/10/2026, `docs/16 §12`): hypertables, `time_bucket` con zona nombrada y
 `drop_chunks` son Apache y son lo que el sistema usa. Costo aceptado: sin compresión, el escenario de `docs/14` ocupa
 ≈ 330 MB por año más índices (diez años ≈ 4,6 GB); la retención se ejecuta con `drop_chunks` desde una tarea
 programada del backend y los agregados se materializan por tarea. RNF-15 vuelve a cumplirse en su redacción literal.
 El cambio de imagen y de esquema es trabajo de la Etapa 3 (`docs/10 §8.4`, punto 11).
+
+**Verificación automática de RNF-15 (08/10/2026).** El guardián (`plataforma/pruebas/verificar-todo.sh`, paso 2r) revisa
+en cada corrida las licencias de las dependencias de producción del backend (`pnpm licenses ls --prod`) contra una lista
+de licencias abiertas y permisivas (MIT, BSD, Apache, ISC y equivalentes; la lista exacta vive en ese paso). Al 08/10 son
+152 paquetes, todos dentro. Una licencia fuera de la lista hace fallar el paso aunque sea abierta: una dependencia copyleft (GPL, AGPL) dentro del
+backend obligaría a distribuir el conjunto bajo una licencia compatible con la suya y cerraría la opción de una licencia
+comercial adicional; SSPL o BUSL no son de código abierto. Esa decisión se toma a conciencia, no al agregar un paquete.
 
 **RNF-17 (06/10/2026).** Se mantiene como requisito: la memoria es un criterio ponderado al comparar brokers y bases,
 no un veto. Si la evolución del proyecto exigiera superar los 2 GB (por ejemplo, un broker con más capacidades), se
@@ -407,7 +414,7 @@ sección cubre las decisiones restantes de infraestructura.
 
 | Alternativa | Ventajas | Desventajas | Decisión |
 |---|---|---|---|
-| Servidor de red embebido en la pasarela (p. ej., Milesight UG65) | Sin contenedor ni puerto extra: la pasarela publica por MQTT sobre TLS al broker como un dispositivo más | Cada pasarela es su propio servidor de red: administración por pasarela; el caso de dos pasarelas que oyen al mismo nodo está por verificar | **✅ Ruta prevista (B), desde el 06/10/2026** (`docs/10 §8.4` punto 2) |
+| Servidor de red embebido en la pasarela (p. ej., Milesight UG65) | Sin contenedor ni puerto extra: la pasarela publica por MQTT sobre TLS al broker como un cliente más, con su propia credencial | Cada pasarela es su propio servidor de red: administración por pasarela; el caso de dos pasarelas que oyen al mismo nodo está por verificar | **✅ Ruta prevista (B), desde el 06/10/2026** (`docs/10 §8.4` punto 2) |
 | **ChirpStack** | Código abierto, autoalojable, publica en MQTT de forma nativa, gestión de dispositivos completa, se ejecuta en un servidor modesto | Requiere operar el componente | **✅ Seleccionado si se necesita un servidor de red propio (ruta A, opcional)** |
 | The Things Stack (open source) | Funcionalmente equivalente, comunidad amplia | Despliegue autoalojado más exigente en recursos | Descartado |
 | The Things Network (servicio público) | Sin operación propia, gratuito | Los datos transitan por infraestructura de terceros: contradice RNF-14 y el control del dato | Descartado |
@@ -416,7 +423,7 @@ sección cubre las decisiones restantes de infraestructura.
 **Razón de la selección:** ChirpStack satisface RNF-14 y RNF-15, y su publicación nativa en MQTT
 encaja directamente con RF-02 y RF-03, reduciendo el adaptador de LoRaWAN a un consumidor de tópicos.
 **Actualización del 06/10/2026:** las pasarelas con servidor de red embebido publican al broker por la misma vía
-y sin un contenedor más, así que esa es la ruta prevista (B) y ChirpStack queda para cuando las pasarelas no
+y sin un contenedor más, así que esa es la ruta B, la del sistema (obligatoria desde el 08/10/2026, `docs/10 §8.4` punto 24), y ChirpStack queda para cuando las pasarelas no
 traigan servidor de red propio o se quiera administrar varias desde un punto (ruta A, opcional; `docs/10 §8.4` punto 2).
 
 ## 6.2 Motor de persistencia

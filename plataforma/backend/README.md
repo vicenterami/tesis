@@ -127,7 +127,7 @@ docker compose exec timescaledb psql -U plataforma -d plataforma -c "SELECT tipo
 
 `SUPERVISION_INTERVALO_S` en el `.env` cambia la frecuencia del barrido (60 s por defecto).
 
-Pendientes del pipeline: adaptador «milesight» (ruta B, la prevista) y, solo si se activa la ruta A, el de ChirpStack;
+Pendientes del pipeline: adaptador «milesight» (ruta B, la del sistema) y, solo si se activa la ruta A, el de ChirpStack;
 notificación de condiciones al panel (SSE, `docs/10 §8.4` punto 1) y por correo.
 
 ## API de consulta (M5)
@@ -170,7 +170,7 @@ libre en SQL.
 
 ## Imagen del contenedor (`Dockerfile`)
 
-*Multi-stage* (`docs/10 §6`): la etapa `build` usa Node completo para compilar (`pnpm build`); la
+*Multi-stage* (`docs/10 §6`): la etapa `build` usa Node con las herramientas de desarrollo para compilar (`pnpm build`); la
 imagen final (`runtime`) parte de la misma base *slim*, solo lleva `dist/` y las dependencias de
 producción, corre como usuario sin privilegios (`node`) y expone un `HEALTHCHECK` contra `GET /salud`.
 El almacén de pnpm se borra explícitamente tras instalar (`pnpm store prune` no basta: no borra lo que

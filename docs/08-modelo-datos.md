@@ -248,10 +248,16 @@ consistente para reportes.
 - [ ] Validar el modelo contra el catálogo de magnitudes real, cuando se acuerden los sensores con el
       compañero.
 - [x] Llevar el diagrama al informe (generado desde la base real por `generar-figuras.sh`).
-- [ ] **Entidad `pasarela`** (gateway LoRaWAN; decisión del 06/10, `docs/10 §8.4`): `id`, `sitio_id`, identificador
+- [ ] **Entidad `pasarela`** (gateway LoRaWAN; decisión del 06/10, `docs/10 §8.4`; desde el 08/10 es la vía LoRaWAN del sistema, punto 24): `id`, `sitio_id`, identificador
       físico (EUI o número de serie), nombre, `visto_por_ultima_vez`; `dispositivo.pasarela_id` opcional (un
       dispositivo puede llegar por celular sin pasarela). Es una entidad, no un atributo del dispositivo, porque
-      una pasarela sirve a muchos dispositivos y tiene estado propio.
+      una pasarela sirve a muchos dispositivos y tiene estado propio. Se autentica en el broker con su propia
+      credencial y solo publica por los dispositivos asociados a ella (filtro 1).
+- [ ] **Vía, formato y pasarela declarados en el alta** (decidido el 08/10/2026, `docs/10 §8.4` punto 25):
+      `dispositivo.via` (`CHECK`: `mqtt`, `http`, `lorawan`), `dispositivo.formato` (`CHECK`: el código de un
+      adaptador, `senml`, `plano`, `milesight`…; lo interpreta el código, §6) y `dispositivo.pasarela_id` (FK opcional,
+      con un `CHECK` que la exige si la vía es `lorawan`). La credencial depende de la vía (`docs/11 §7`). El modelo
+      interno sigue siendo único (§1): cambia cómo se identifica y autentica un dispositivo, no cómo se guarda.
 - [ ] **Ubicación geográfica**: `dispositivo.latitud` y `dispositivo.longitud` (`double precision`, opcionales,
       `CHECK` de rango). Sin PostGIS: no hay consultas espaciales, solo un mapa; se agrega si algún día las hay.
 - [x] **Tabla `trama`** (implementada en la migración 09, 07/10/2026; trama cruda aceptada; `docs/10 §8.4`): `dispositivo_id`, `recibido_en`, `topico`,
@@ -274,8 +280,12 @@ consistente para reportes.
       declara como `pasarela`. La hora de guardado es la del COMMIT y, con la confirmación tras persistir
       (`docs/10 §8.4` punto 4), queda a milisegundos de `recibido_en`: no hace falta una cuarta columna. **Implementado** en `db/init/08-hora-recepcion.sql`
       (CHECK `ck_medicion_recepcion`, `NOT VALID`: rige para toda fila nueva; las anteriores quedan NULL).
-- [ ] **Marcas del sistema frente a edición humana** (kit de método, 06/10/2026): `visto_por_ultima_vez` y
+- [ ] **Permisos por rol** (decidido el 08/10/2026, `docs/10 §8.4` punto 36): tabla de permisos por acción para los roles de
+      `usuario_sitio`, consultada por un solo guardia del backend; se implementa con la autenticación (M7).
+- [ ] **Marcas del sistema frente a edición humana** (kit de método, 06/10/2026; **decidido el 08/10/2026: tabla `estado_dispositivo`**, `docs/10 §8.4` punto 27, pendiente de migración): `visto_por_ultima_vez` y
       `en_linea` las escribe el supervisor sobre `dispositivo`, y el disparador mueve `actualizado_en` en cada UPDATE.
       Si el panel usa control optimista sobre `dispositivo`, un barrido provocará «otro usuario lo modificó» falsos.
       Decidir antes de HU-10/HU-18: tabla `estado_dispositivo` propia (una fila por dispositivo, sin disparador) o
-      excluir esas columnas del disparador y de la comparación optimista.
+      excluir esas columnas del disparador y de la comparación optimista. Se eligió la tabla: una fila por dispositivo
+      (`dispositivo_id` como clave), sin disparador de `actualizado_en`, con `visto_por_ultima_vez` y lo que anote el
+      supervisor; `dispositivo` queda con lo que edita una persona y deja de recibir una escritura por trama.

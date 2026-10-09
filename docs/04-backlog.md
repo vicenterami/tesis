@@ -165,7 +165,7 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 **HU-02 — criterios de aceptación** 🎯
 
 - La plataforma recibe el evento a través de la integración del servidor de red, sin conexión directa al nodo.
-- El payload decodificado por el servidor de red (la pasarela en la ruta B, la prevista; ChirpStack en la ruta A, opcional) se normaliza correctamente al modelo interno (SenML).
+- El payload decodificado por el servidor de red (la pasarela en la ruta B, la del sistema; ChirpStack en la ruta A, opcional) se normaliza correctamente al modelo interno (SenML).
 - RSSI, SNR, identificador del nodo y gateway quedan asociados al evento (RF-09).
 - Un evento recibido por dos gateways se almacena una sola vez (RF-10).
 - Un payload de longitud o contenido inválido se rechaza sin interrumpir la recepción de los demás (RNF-07).
@@ -193,12 +193,12 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 |---|---|:---:|:---:|:---:|
 | **TT-19** | 🎯 Esquema de base de datos y migraciones versionadas | M | 2 | 5 |
 | **HU-07** | 🎯 **Como usuario de consulta**, quiero ver el historial de eventos y mediciones de un dispositivo en un rango de fechas | M | 4 | 4 |
-| **HU-08** | 🎯 **Como administrador de sitio**, quiero exportar los datos de mi sitio en CSV y JSON, para no depender de la plataforma para conservarlos | M | 4 | **4** |
+| **HU-08** | 🎯 **Como administrador de sitio**, quiero exportar los datos de mi sitio en CSV, XLSX y JSON, para no depender de la plataforma para conservarlos | M | 4 | **4** |
 | **HU-09** | **Como integrador**, quiero consultar los datos del sitio por API, para alimentar sistemas propios | S | 4 | 4 |
 
 **HU-08 — criterios de aceptación** 🎯
 
-- La exportación incluye eventos y mediciones del rango solicitado, en CSV y en JSON.
+- La exportación incluye eventos y mediciones del rango solicitado, en CSV, XLSX y JSON.
 - Los eventos exportados conservan la trama original íntegra (RF-31), no solo su interpretación.
 - La exportación contiene únicamente datos del sitio del solicitante (RF-41).
 - Un archivo exportado puede reimportarse sin pérdida de información.

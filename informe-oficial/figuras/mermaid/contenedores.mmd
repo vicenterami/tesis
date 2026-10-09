@@ -25,7 +25,7 @@ flowchart TB
     end
 
     GW -. "ruta A (opcional): UDP 1700, packet forwarder" .-> RP
-    GW -- "ruta B (prevista): servidor de red embebido → MQTT/TLS 8883" --> RP
+    GW -- "ruta B (la del sistema): servidor de red embebido → MQTT/TLS 8883" --> RP
     N2 -- "MQTT/TLS 8883" --> RP
     RP -. "UDP 1700 · red interna" .-> CS
     RP -- "MQTT 1883 · red interna" --> MQ

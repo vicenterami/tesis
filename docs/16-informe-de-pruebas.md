@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 70 pruebas unitarias, sin matriz formal), TT-30 (recuperación ante
+cubre todavía: TT-27 (contrato de trama: hoy 78 pruebas unitarias, sin matriz formal), TT-30 (recuperación ante
 reinicio), TT-32 (sensor físico). Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -26,7 +26,7 @@ del banco no las verifica.
 ## 2. Emulador de nodos (TT-28)
 
 `plataforma/backend/src/emulador/` hace de N dispositivos MQTT a la vez, con el tráfico irregular que pide
-`docs/10 §9.6`. El modelo (`modelo.ts`, funciones puras con 8 pruebas unitarias) es determinista a partir de una
+`docs/10 §9.6`. El modelo (`modelo.ts`, funciones puras con 9 casos de prueba propios) es determinista a partir de una
 semilla: la misma corrida se repite.
 
 | Parámetro (valor usado) | Qué reproduce |
@@ -203,3 +203,35 @@ reinicia con el broker, así que después de un reinicio «0 descartes» no prue
 **Lo que falta probar:** el broker de producción (con persistencia y guardado cada 1800 s): un reinicio ordenado guarda la cola
 al cerrar, una muerte brusca pierde lo encolado desde el último guardado (`docs/10 §4.1`); la caída del proxy; la del servidor
 completo; y la caída del backend con más tráfico que la cola (§10 dice que ahí se descarta).
+
+## 12. Seguridad de dependencias e imágenes (08/10/2026)
+
+**Por qué.** La verificación automática quedó en rojo desde el 07/10 con el mismo lockfile que había pasado el 27/09: la base
+de avisos de GitHub publicó en esos días avisos contra paquetes que ya estaban: `proxy-addr`, crítico
+(https://github.com/advisories/GHSA-jqcg-44mw-7w3h); `brace-expansion` (https://github.com/advisories/GHSA-qhr7-859c-m2p7 y
+https://github.com/advisories/GHSA-6j4f-fj2g-mc7p); `braces` (https://github.com/advisories/GHSA-vfj7-8cjw-p6xm).
+
+**Dependencias (`pnpm audit`).** De 16 avisos (1 crítico, 7 altos, 8 moderados) a 2, con ocho *overrides* nuevos; las 78
+pruebas unitarias siguen en verde y las licencias de producción no cambiaron (152 paquetes permisivos, paso 2r del guardián).
+Los dos que quedan no tienen versión corregida publicada y solo vienen con jest: `braces` (alto; excepción declarada en
+`audit.ignore`) y `sprintf-js` (moderado, https://github.com/advisories/GHSA-hp3w-g68c-fv3c). Las dependencias de producción,
+auditadas aparte con nivel moderado, no tienen avisos.
+
+**Imágenes** (Trivy 0.74.0 fijado por digest; base de avisos del 08/10/2026; `plataforma/pruebas/escanear-imagenes.sh`).
+Vulnerabilidades críticas / altas:
+
+| Imagen | Antes | Después | Qué se hizo |
+|---|---|---|---|
+| backend | 6 / 67 | 0 / 43 | Base `node:22.23.3-trixie-slim` (Debian 13); sin npm, npx, corepack ni Yarn en la imagen final. Las 43 altas no tienen corrección publicada en Debian |
+| broker | 0 / 2 | 0 / 0 | La misma `eclipse-mosquitto:2.0.22`, reconstruida por su autor con OpenSSL corregido |
+| proxy | 0 / 3 | 0 / 0 | `nginx:1.30.5-alpine` más parches de Alpine (`plataforma/proxy/Dockerfile`) |
+| base | 7 / 100 | 1 / 21 | `timescale/timescaledb:2.24.0-pg16-oss` → `2.30.2-pg16-oss` más parches de Alpine, y sin `timescaledb-parallel-copy` ni `timescaledb-tune`, que el sistema no ejecuta (`plataforma/db/imagen/Dockerfile`). Queda `gosu`, que el arranque usa para bajar privilegios y no recibe datos de afuera |
+
+**Que siga funcionando.** Antes de tocar la base de desarrollo, el banco se levantó desde cero con las imágenes nuevas: todas
+las migraciones, las seis pruebas de carrera, TLS de punta a punta (`banco.sh proxy`) y una carga de 60 s con 100 nodos (48
+tramas/s, pico 65) sin pérdidas y con p95 de 3 ms. Hubo 6 alarmas de silencio falsas; la corrida 4 (§6) dio 3, pero no son
+comparables (otra duración y otra semilla). La base de desarrollo se actualizó con respaldo del volumen y
+`ALTER EXTENSION timescaledb UPDATE`, y el conteo de cada tabla quedó idéntico. Guardián completo en verde.
+
+**Cómo repetirlo:** `bash plataforma/pruebas/escanear-imagenes.sh` (construye con `--pull --no-cache` y sale 1 si queda algo
+con versión corregida publicada fuera de los residuos documentados).

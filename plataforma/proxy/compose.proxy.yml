@@ -6,7 +6,8 @@
 # explícita en el .env del servidor. El único contenedor con puertos hacia fuera en producción es este (docs/10 §2).
 services:
   proxy:
-    image: nginx:1.30.5-alpine          # versión fijada (estable, 26/09/2026); trae stream, HTTP/2, stub_status y el módulo ACME
+    build: ./proxy                       # nginx:1.30.5-alpine fijada (estable, 26/09/2026; stream, HTTP/2, stub_status y ACME)
+    image: plataforma-proxy:1.30.5-alpine-parches   # + parches de Alpine (proxy/Dockerfile; docs/11 §4, 08/10/2026)
     restart: unless-stopped
     logging:                           # registros acotados como el resto (docs/11 §4)
       driver: json-file

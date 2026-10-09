@@ -57,6 +57,13 @@ privado/         (local, no versionada) notas sensibles
 recursos-uct/    (local, no versionada) materiales originales del curso
 ```
 
+## Licencia
+
+El código (`plataforma/`) se publica bajo AGPL-3.0-only (archivo `LICENSE`; decisión del 08/10/2026, `docs/10 §8.4`
+punto 33); la titularidad se confirma con la universidad antes de liberarlo. Los documentos, el informe y las bitácoras no
+tienen todavía una licencia de reutilización (todos los derechos reservados al autor); el logo y la plantilla institucional
+pertenecen a la universidad.
+
 ## Regla de trabajo fundamental
 
 > **Este repositorio es la única fuente de verdad.** Los borradores y las notas sueltas son material
