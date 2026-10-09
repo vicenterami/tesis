@@ -51,7 +51,7 @@ del 2 de septiembre.
 \filaencab \encab{ID} & \encab{Elemento} & \encab{Pr.} & \encab{Etapa} & \encab{Horas} \\ \midrule \endhead
 \textbf{TT-17} & \textbf{(N)}~Pipeline de normalización al modelo interno (los 6 filtros) con cuarentena & M & 3 & 6 \\
 \textbf{HU-05} & \textbf{(N)}~\textbf{Como administrador de sitio}, quiero que la plataforma sepa qué condiciones están abiertas en cada dispositivo, para no tener que deducirlo del historial & M & 3 & 7 \\
-\textbf{HU-06} & \textbf{Como administrador de sitio}, quiero configurar umbrales por dispositivo, para que se genere un evento cuando una medición los cruce & M & 3 & 4 \\
+\textbf{HU-06} & \textbf{Como administrador de sitio}, quiero configurar umbrales por dispositivo, para que se genere un evento cuando una medición los cruce & M & 4 & 4 \\
 \textbf{TT-18} & \textbf{(N)}~Normalización de marcas temporales, tolerando nodos sin reloj confiable & M & 3 & 2 \\
 \end{longtable}
 
@@ -69,7 +69,7 @@ del 2 de septiembre.
 \filaencab \encab{ID} & \encab{Elemento} & \encab{Pr.} & \encab{Etapa} & \encab{Horas} \\ \midrule \endhead
 \textbf{HU-10} & \textbf{(N)}~\textbf{Como administrador de sitio}, quiero ver el inventario de mis dispositivos con su estado y el transporte por el que llegan & M & 3 & 5 \\
 \textbf{HU-11} & \textbf{(N)}~\textbf{Como administrador de sitio}, quiero registrar un dispositivo nuevo desde la plataforma, para no tener que operar la consola del servidor de red & M & 3 & 5 \\
-\textbf{HU-12} & \textbf{Como administrador de sitio}, quiero agrupar dispositivos por sitio y zona lógica, para reconocer mi instalación física & M & 3 & 3 \\
+\textbf{HU-12} & \textbf{Como administrador de sitio}, quiero agrupar dispositivos por sitio y zona lógica, para reconocer mi instalación física & M & 4 & 3 \\
 \textbf{HU-13} & \textbf{Como administrador de sitio}, quiero marcar un dispositivo en mantenimiento, para que no genere alertas mientras lo intervengo & C & 4 & 2 \\
 \end{longtable}
 
@@ -77,9 +77,9 @@ del 2 de septiembre.
 \begin{longtable}{@{}C{1.3cm}L{6.1cm}C{0.9cm}C{1.2cm}C{1.0cm}@{}}
 \filaencab \encab{ID} & \encab{Elemento} & \encab{Pr.} & \encab{Etapa} & \encab{Horas} \\ \midrule \endhead
 \textbf{HU-14} & \textbf{(N)}~\textbf{Como administrador de sitio}, quiero que la plataforma detecte que un dispositivo dejó de reportar, porque el silencio de un sensor es indistinguible de que no haya novedades & M & 3 & 7 \\
-\textbf{HU-15} & \textbf{(N)}~\textbf{Como administrador de sitio}, quiero ver la calidad del enlace de cada dispositivo, para anticipar fallas antes de que ocurran & M & 3 & 4 \\
+\textbf{HU-15} & \textbf{(N)}~\textbf{Como administrador de sitio}, quiero ver la calidad del enlace de cada dispositivo, para anticipar fallas antes de que ocurran & M & 4 & 4 \\
 \textbf{HU-16} & \textbf{(N)}~\textbf{Como administrador de sitio}, quiero un indicador agregado de salud de mi sitio, para saber de un vistazo si algo requiere atención & M & 4 & 4 \\
-\textbf{HU-17} & \textbf{Como administrador de sitio}, quiero saber qué dispositivos tienen la batería baja, para planificar el mantenimiento & M & 3 & 3 \\
+\textbf{HU-17} & \textbf{Como administrador de sitio}, quiero saber qué dispositivos tienen la batería baja, para planificar el mantenimiento & M & 4 & 3 \\
 \end{longtable}
 
 \section{EP-09 --- Seguridad y multi-tenencia}
@@ -88,7 +88,7 @@ del 2 de septiembre.
 \textbf{TT-20} & \textbf{(N)}~Autenticación de la recepción mediante credencial por sitio & M & 4 & 4 \\
 \textbf{TT-21} & \textbf{(N)}~Aislamiento de datos entre sitios, verificado con pruebas & M & 4 & 5 \\
 \textbf{TT-22} & \textbf{(N)}~Cifrado del transporte: TLS para HTTP y MQTT & M & 4 & 4 \\
-\textbf{HU-18} & \textbf{Como administrador de sitio}, quiero iniciar sesión con mis credenciales y que existan roles distintos de administración y consulta & M & 3 & 3 \\
+\textbf{HU-18} & \textbf{Como administrador de sitio}, quiero iniciar sesión con mis credenciales y que existan roles distintos de administración y consulta & M & 4 & 3 \\
 \textbf{TT-39} & Canal de tiempo real autenticado hacia el panel (SSE tras el proxy TLS): sesión verificada al abrir, lista blanca de \texttt{Origin}, límite de tamaño y tasa & M & 3 & 4 \\
 \textbf{TT-40} & Despliegue comparativo en el banco de pruebas: ThingsBoard CE, OpenRemote y Magistrala con el mismo emulador (TT-28) y las mismas métricas, con datos propios en vez de cifras declaradas & S & 4 & 6 \\
 \end{longtable}

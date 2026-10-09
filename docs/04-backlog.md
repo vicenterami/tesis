@@ -176,7 +176,7 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 |---|---|:---:|:---:|:---:|
 | **TT-17** | 🎯 Pipeline de normalización al modelo interno (los 6 filtros) con cuarentena | M | 3 | 6 |
 | **HU-05** | 🎯 **Como administrador de sitio**, quiero que la plataforma sepa qué condiciones están abiertas en cada dispositivo, para no tener que deducirlo del historial | M | 3 | **7** |
-| **HU-06** | **Como administrador de sitio**, quiero configurar umbrales por dispositivo, para que se genere un evento cuando una medición los cruce | M | 3 | 4 |
+| **HU-06** | **Como administrador de sitio**, quiero configurar umbrales por dispositivo, para que se genere un evento cuando una medición los cruce | M | 4 | 4 |
 | **TT-18** | 🎯 Normalización de marcas temporales, tolerando nodos sin reloj confiable | M | 3 | 2 |
 
 **HU-05 — criterios de aceptación** 🎯
@@ -213,7 +213,7 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 |---|---|:---:|:---:|:---:|
 | **HU-10** | 🎯 **Como administrador de sitio**, quiero ver el inventario de mis dispositivos con su estado y el transporte por el que llegan | M | 3 | **5** |
 | **HU-11** | 🎯 **Como administrador de sitio**, quiero registrar un dispositivo nuevo desde la plataforma, para no tener que operar la consola del servidor de red | M | 3 | **5** |
-| **HU-12** | **Como administrador de sitio**, quiero agrupar dispositivos por sitio y zona lógica, para reconocer mi instalación física | M | 3 | 3 |
+| **HU-12** | **Como administrador de sitio**, quiero agrupar dispositivos por sitio y zona lógica, para reconocer mi instalación física | M | 4 | 3 |
 | **HU-13** | **Como administrador de sitio**, quiero marcar un dispositivo en mantenimiento, para que no genere alertas mientras lo intervengo | C | 4 | 2 |
 
 **HU-11 — criterios de aceptación** 🎯
@@ -228,10 +228,9 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 | ID | Elemento | Prior. | Etapa | Horas |
 |---|---|:---:|:---:|:---:|
 | **HU-14** | 🎯 **Como administrador de sitio**, quiero que la plataforma detecte que un dispositivo dejó de reportar, porque el silencio de un sensor es indistinguible de que no haya novedades | M | 3 | **7** |
-| **HU-15** | 🎯 **Como administrador de sitio**, quiero ver la calidad del enlace de cada dispositivo, para anticipar fallas antes de que ocurran | M | 3 | **4** |
+| **HU-15** | 🎯 **Como administrador de sitio**, quiero ver la calidad del enlace de cada dispositivo, para anticipar fallas antes de que ocurran | M | 4 | **4** |
 | **HU-16** | 🎯 **Como administrador de sitio**, quiero un indicador agregado de salud de mi sitio, para saber de un vistazo si algo requiere atención | M | 4 | **4** |
-| **HU-17** | **Como administrador de sitio**, quiero saber qué dispositivos tienen la batería baja, para planificar el mantenimiento | M | 3 | 3 |
-
+| **HU-17** | **Como administrador de sitio**, quiero saber qué dispositivos tienen la batería baja, para planificar el mantenimiento | M | 4 | 3 |
 **HU-14 — criterios de aceptación** 🎯 — *elemento central de la tesis*
 
 - La plataforma abre una condición `sin_comunicacion` cuando un dispositivo no reporta durante el número configurado de intervalos (RF-24).
@@ -249,7 +248,7 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 | **TT-20** | 🎯 Autenticación de la recepción mediante credencial por sitio | M | 4 | 4 |
 | **TT-21** | 🎯 Aislamiento de datos entre sitios, verificado con pruebas | M | 4 | 5 |
 | **TT-22** | 🎯 Cifrado del transporte: TLS para HTTP y MQTT | M | 4 | 4 |
-| **HU-18** | **Como administrador de sitio**, quiero iniciar sesión con mis credenciales y que existan roles distintos de administración y consulta | M | 3 | 3 |
+| **HU-18** | **Como administrador de sitio**, quiero iniciar sesión con mis credenciales y que existan roles distintos de administración y consulta | M | 4 | 3 |
 | **TT-39** | Canal de tiempo real autenticado hacia el panel (SSE tras el proxy TLS, `docs/10 §8.4` punto 1): sesión del panel verificada al abrir, lista blanca de `Origin`, límite de tamaño y tasa (RF-43, RNF-08; `docs/11 §4`) — agregada el 23/09/2026 | M | 3 | 4 |
 
 **TT-32 — criterios de aceptación** 🎯
@@ -383,8 +382,8 @@ Cuatro semanas por etapa a ~15 horas semanales (restricción RE-01):
 |---|:---:|:---:|:---:|:---:|:---:|
 | 1 | 9 h | 4 h | 45 h | +80 % | +91 % |
 | 2 | 84 h | 53 h | 60 h | **−40 %** | +12 % |
-| 3 | 85 h | 63 h | 60 h | **−42 %** | **−5 %** |
-| 4 | 105 h | 48 h | 75 h | −40 % | +36 % |
+| 3 | 68 h | 59 h | 60 h | **−13 %** | +2 % |
+| 4 | 122 h | 52 h | 75 h | **−63 %** | +31 % |
 | 1–4 (`TT-38`, bitácora) | 2 h | — | — | — | — |
 | **Total** | **285 h** | **168 h** | **240 h** | **−19 %** | **+30 %** |
 
@@ -444,13 +443,15 @@ Se trasladan de la Etapa 3 a la Etapa 4 los siguientes elementos del núcleo (~3
 |---|:---:|:---:|:---:|
 | 1 | 4 h | 45 h | +91 % |
 | 2 | 53 h | 60 h | ✅ +12 % |
-| 3 | **63 h** | 60 h | ⚠️ **−5 %** |
-| 4 | **48 h** | 75 h | ✅ +36 % |
+| 3 | **59 h** | 60 h | ✅ +2 % |
+| 4 | **52 h** | 75 h | ✅ +31 % |
 | **Total** | **168 h** | **240 h** | ✅ **+30 %** |
 
 Los 63 h de la Etapa 3 son 60 h de la redistribución más las 3 h de TT-32 (plan B de R1, agregado el
 23/09). Un −5 % es una sobrecarga real y pequeña (3 h en cuatro semanas): se acepta a conciencia frente
-al riesgo de no tener un sensor real para el 30 de octubre, y no se oculta corriendo otro elemento.
+al riesgo de no tener un sensor real para el 30 de octubre, y no se oculta corriendo otro elemento. **08/10/2026:** con el
+corte medido de `docs/18 §3`, HU-06, HU-12, HU-15, HU-17 y HU-18 pasan a la Etapa 4 (17 h; 4 de núcleo, las de HU-15): la
+Etapa 3 queda con 68 h, 59 de núcleo (+2 %).
 
 **Verificación del umbral de la Etapa 3.** La pauta exige el **50 % de las tareas de implementación**
 completadas. La base es el **núcleo completo (168 h)**: es el compromiso declarado en todo el informe
@@ -460,7 +461,7 @@ profesor guía. **Corregido el 26/09/2026:** una versión anterior de este párr
 «Implementación total (EP-01, 04–11) = 165 h»; la suma real de esas épicas completas (núcleo más
 alcance condicional) es **169 h**, no 165 ni 118 — ese subconjunto de épicas no se usa como base,
 precisamente para no tener dos cifras del mismo umbral. Ejecutado al cierre de la Etapa 3: ~28 h
-adelantadas en la Etapa 2 más 63 h de la Etapa 3 = **91 h ≈ 54 %**. ✅ El umbral se cumple.
+adelantadas en la Etapa 2 más 59 h de la Etapa 3 (tras el corte del 08/10) = **87 h ≈ 52 %**. ✅ El umbral se cumple.
 
 ## 6.5 Qué se recorta y en qué orden
 

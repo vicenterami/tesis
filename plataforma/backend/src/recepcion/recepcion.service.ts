@@ -14,7 +14,7 @@ import { aCanonica } from './unidades';
 // Forma del tópico acordada: sitio/<sitio>/dispositivo/<id_fisico>/<magnitud>
 const PATRON_TOPICO = /^sitio\/([^/]+)\/dispositivo\/([^/]+)\/([^/]+)$/;
 
-interface Dispositivo { id: string; estado: 'activo' | 'mantenimiento' | 'baja' }
+interface Dispositivo { id: string; estado: 'activo' | 'mantenimiento' | 'baja'; sitio_codigo: string }
 // Dominio cerrado: el mismo CHECK de la migración 09. Agregar un motivo exige migración, no solo código.
 type Motivo = 'no_registrado' | 'dado_de_baja' | 'malformada' | 'invalida';
 // Lo que se sabe de la trama al rechazarla. dispositivoId solo existe si el filtro 1 pudo atribuirla.
@@ -24,7 +24,7 @@ interface Canal { id: string; magnitud: string; unidad_canonica: string; rango_m
 // M1 Recepción + M2 Normalización (pipeline). Los seis filtros: 1 autenticar · 2 analizar · 3 validar ·
 // 4 normalizar · 5 alertar (con AlertasService) · 6 supervisar (con SupervisionService).
 //
-//   trama ─► [1] ¿registrado y activo? ──no──► cuarentena "no_registrado" o "dado_de_baja"
+//   trama ─► [1] ¿registrado, activo y en su sitio? ──no──► cuarentena "no_registrado" o "dado_de_baja"
 //             │
 //             ▼
 //           [2] ¿algún adaptador la entiende? ──no──► cuarentena "malformada"
@@ -41,7 +41,7 @@ interface Canal { id: string; magnitud: string; unidad_canonica: string; rango_m
 //           [5] umbrales con histéresis → abre/cierra condición "umbral" (AlertasService)
 //             │
 //             ▼
-//           [6] visto_por_ultima_vez = now() · cierra "sin_comunicacion" si estaba abierta
+//           [6] estado_dispositivo.visto_por_ultima_vez = now() · cierra "sin_comunicacion" si estaba abierta
 //               (corre SIEMPRE tras [1], aunque [2] o [3] hayan mandado la trama a cuarentena)
 //               (la APERTURA de "sin_comunicacion" la hace el barrido periódico de SupervisionService)
 @Injectable()
@@ -82,6 +82,13 @@ export class RecepcionService implements OnModuleInit {
     if (dispositivo.estado === 'baja') {
       return this.cuarentena({ ...trama, dispositivoId: dispositivo.id },
         'dado_de_baja', `id_fisico=${ctx.idFisico}: revocar su credencial en el broker`);
+    }
+    // El sitio del tópico debe ser el registrado (08/10, docs/10 §8.4 punto 24): la ACL acepta cualquiera en ese nivel (`+`),
+    // así que lo comprueba el pipeline. Sin esto, un dispositivo podría publicar bajo el sitio de otra sede. No se marca
+    // vivo: no pasó el filtro 1.
+    if (dispositivo.sitio_codigo !== partes[1]) {
+      return this.cuarentena({ ...trama, dispositivoId: dispositivo.id }, 'no_registrado',
+        `id_fisico=${ctx.idFisico} está registrado en el sitio «${dispositivo.sitio_codigo}», no en «${partes[1]}»`);
     }
     trama.dispositivoId = dispositivo.id;
 
@@ -162,7 +169,12 @@ export class RecepcionService implements OnModuleInit {
     }
 
     // ── [6] Supervisar: el dispositivo dio señales de vida; si estaba "sin comunicación", se cierra ──
-    await this.pool.query('UPDATE dispositivo SET visto_por_ultima_vez = now() WHERE id = $1', [dispositivo.id]);
+    // En estado_dispositivo, no en dispositivo: la fila que edita una persona no cambia con cada trama (migración 11).
+    await this.pool.query(
+      `INSERT INTO estado_dispositivo (dispositivo_id, visto_por_ultima_vez) VALUES ($1, now())
+       ON CONFLICT (dispositivo_id) DO UPDATE SET visto_por_ultima_vez = EXCLUDED.visto_por_ultima_vez`,
+      [dispositivo.id],
+    );
     await this.supervision.marcarVivo(dispositivo.id, ctx.idFisico);
     if (guardadas || duplicadas) {
       const dup = duplicadas ? ` · ${duplicadas} duplicada(s) ignorada(s)` : '';
@@ -171,7 +183,12 @@ export class RecepcionService implements OnModuleInit {
   }
 
   private async buscarDispositivo(idFisico: string): Promise<Dispositivo | undefined> {
-    const r = await this.pool.query<Dispositivo>('SELECT id, estado FROM dispositivo WHERE id_fisico = $1', [idFisico]);
+    const r = await this.pool.query<Dispositivo>(
+      `SELECT d.id, d.estado, s.codigo AS sitio_codigo FROM dispositivo d
+         JOIN zona z ON z.id = d.zona_id JOIN sitio s ON s.id = z.sitio_id
+        WHERE d.id_fisico = $1`,
+      [idFisico],
+    );
     return r.rows[0];
   }
 

@@ -20,10 +20,10 @@ uniformidad es la que resuelve la causa C1 (formatos dispares).
 
 | # | Entidad | Qué representa | Notas |
 |---|---|---|---|
-| 1 | **sitio** | Organización o instalación que agrupa dispositivos | Declara su **zona horaria** (IANA); el caso de validación es el Campus Dr. Luis Rivas del Canto |
+| 1 | **sitio** | Organización o instalación que agrupa dispositivos | Declara su **zona horaria** (IANA) y su **código**, el segmento del tópico (`sitio/<codigo>/…`, migración 11); el caso de validación es el Campus Dr. Luis Rivas del Canto (código `uct`) |
 | 2 | **zona** | Subdivisión lógica de un sitio (edificio, sector, sala) | Un sitio tiene muchas zonas |
 | 3 | **magnitud** | Catálogo de lo que se puede medir (temperatura, humedad, nivel…) | Define la unidad canónica y el rango válido |
-| 4 | **dispositivo** | Un nodo físico que reporta (ESP32, sensor LoRa…) | Pertenece a una zona; se identifica por un id físico (MAC/DevEUI) |
+| 4 | **dispositivo** | Un nodo físico que reporta (ESP32, sensor LoRa…) | Pertenece a una zona; se identifica por un id físico (MAC/DevEUI, lista blanca `[a-z0-9-]`); declara su **vía** (mqtt, http, lorawan), su **formato** y, si llega por LoRaWAN, su **pasarela** (migración 11) |
 | 5 | **canal** | Una magnitud concreta que un dispositivo reporta | Un dispositivo puede tener varios canales (temp + humedad) |
 | 6 | **credencial** | Secreto de autenticación de un dispositivo | Permite rotación sin borrar el dispositivo |
 | 7 | **medicion** | Una lectura: valor + unidad + tiempo | **Hypertable** de TimescaleDB (serie de tiempo) |
@@ -34,8 +34,10 @@ uniformidad es la que resuelve la causa C1 (formatos dispares).
 | 12 | **usuario** | Persona que accede a la plataforma | Con hash de contraseña, nunca en claro |
 | 13 | **usuario_sitio** | Qué usuario puede ver qué sitio y con qué rol | Multi-tenencia: aísla los datos entre sitios |
 | 14 | **trama** | Trama cruda de un mensaje aceptado (al menos una lectura guardada) | **Hypertable**, solo inserción, retención 30 días: auditoría y re-decodificación si un adaptador tuvo un error (migración 09) |
+| 15 | **pasarela** | Pasarela LoRaWAN con servidor de red embebido (ruta B) | Una sirve a muchos nodos; su id físico es su usuario del broker, único también frente a los dispositivos (migración 11) |
+| 16 | **estado_dispositivo** | Lo que el sistema escribe sobre cada dispositivo: la última trama aceptada | Una fila por dispositivo y sin `actualizado_en`: la fila de `dispositivo` queda para lo que edita una persona (migración 11) |
 
-14 entidades (OE3 pide ≥ 8). Tres son hypertables, particionadas por tiempo: `medicion` (la serie de tiempo)
+16 entidades (OE3 pide ≥ 8). Tres son hypertables, particionadas por tiempo: `medicion` (la serie de tiempo)
 y, desde la migración 09, `trama` y `cuarentena` (para borrar lo vencido por fragmentos enteros con
 `drop_chunks`). El resto son tablas relacionales normales de PostgreSQL.
 
@@ -51,9 +53,12 @@ erDiagram
     regla_umbral ||--o{ condicion : condicion
     dispositivo ||--o{ credencial : credencial
     dispositivo ||--o{ cuarentena : cuarentena
+    pasarela ||--o{ dispositivo : dispositivo
     zona ||--o{ dispositivo : dispositivo
+    dispositivo ||--o{ estado_dispositivo : estado_dispositivo
     dispositivo ||--o{ evento : evento
     canal ||--o{ medicion : medicion
+    sitio ||--o{ pasarela : pasarela
     canal ||--o{ regla_umbral : regla_umbral
     dispositivo ||--o{ trama : trama
     sitio ||--o{ usuario_sitio : usuario_sitio
@@ -102,6 +107,13 @@ erDiagram
         timestamptz visto_por_ultima_vez
         timestamptz creado_en
         timestamptz actualizado_en
+        text via
+        text formato
+        uuid pasarela_id FK
+    }
+    estado_dispositivo {
+        uuid dispositivo_id PK,FK
+        timestamptz visto_por_ultima_vez
     }
     evento {
         uuid id PK
@@ -126,6 +138,16 @@ erDiagram
         timestamptz recibido_en
         text origen_tiempo
     }
+    pasarela {
+        uuid id PK
+        uuid sitio_id FK
+        text id_fisico
+        text nombre
+        bool activo
+        timestamptz visto_por_ultima_vez
+        timestamptz creado_en
+        timestamptz actualizado_en
+    }
     regla_umbral {
         uuid id PK
         uuid canal_id FK
@@ -142,6 +164,7 @@ erDiagram
         text zona_horaria
         timestamptz actualizado_en
         bool activo
+        text codigo
     }
     trama {
         uuid id PK
@@ -208,7 +231,7 @@ PostgreSQL en producción y se verificaron contra la base real (`plataforma/prue
 | Restricciones con nombre | Toda restricción se nombra con prefijo: `pk_`, `fk_<tabla>_<destino>`, `uq_`, `ck_`, `idx_`, `trg_`, `fn_` | Un nombre autogenerado (`canal_dispositivo_id_fkey`) no dice qué protege ni se puede citar en un informe o en un error | ✅ 32/32 |
 | Índice por cada FK | Cada clave foránea lleva su índice | Postgres no lo crea solo; sin él cada `JOIN` y cada `ON DELETE` recorre la tabla | ✅ 0 FK sin índice |
 | Tipos | `text` (nunca `varchar(n)`), `timestamptz` (nunca `timestamp`), `uuid`, `boolean`. `double precision` **solo** para mediciones físicas, que tienen incertidumbre propia; `numeric(p,s)` para dinero o cantidades exactas (no hay hoy) | Un límite arbitrario obliga a migrar; un `timestamp` sin zona es ambiguo; el flotante binario no sirve para dinero | ✅ |
-| Auditoría | `creado_en` y `actualizado_en` con disparador `trg_<tabla>_actualizado_en` en toda tabla mutable; las de solo inserción (`medicion`, `evento`, `cuarentena`, `trama`) llevan solo su instante | Saber cuándo cambió algo sin depender de la aplicación. `creado_por`/`actualizado_por` llegarán con M7 (usuarios) | ✅ 9 tablas |
+| Auditoría | `creado_en` y `actualizado_en` con disparador `trg_<tabla>_actualizado_en` en toda tabla mutable (salvo `estado_dispositivo`, a propósito: la escribe el sistema en cada trama, `docs/10 §8.4` punto 27); las de solo inserción (`medicion`, `evento`, `cuarentena`, `trama`) llevan solo su instante | Saber cuándo cambió algo sin depender de la aplicación. `creado_por`/`actualizado_por` llegarán con M7 (usuarios) | ✅ 9 tablas |
 | Baja lógica | `dispositivo.estado = 'baja'`, `sitio.activo`, `usuario.activo`, `credencial.activa`; nunca `DELETE` sobre entidades con historia | Conserva la historia y no rompe las filas que referencian el registro | ✅ |
 | Dominios cerrados | Si el **código** interpreta los valores (`estado`, `condicion.tipo`, `rol`, `cuarentena.motivo` desde la migración 07) → `CHECK`. Si el **usuario** los administra (magnitudes) → tabla catálogo con código estable y nombre visible | Un `CHECK` exige `ALTER` para crecer y no guarda etiqueta ni orden; un catálogo para valores que solo entiende el código sería una indirección vacía | ✅ |
 | Foto por valor | Lo que un registro **posee** se copia (`medicion.unidad`, `evento.detalle` con el umbral vigente); lo que **referencia** se lee por FK (`condicion.regla_id` como procedencia) | Cambiar el catálogo o una regla no debe reinterpretar el pasado | ✅ |
@@ -248,12 +271,14 @@ consistente para reportes.
 - [ ] Validar el modelo contra el catálogo de magnitudes real, cuando se acuerden los sensores con el
       compañero.
 - [x] Llevar el diagrama al informe (generado desde la base real por `generar-figuras.sh`).
-- [ ] **Entidad `pasarela`** (gateway LoRaWAN; decisión del 06/10, `docs/10 §8.4`; desde el 08/10 es la vía LoRaWAN del sistema, punto 24): `id`, `sitio_id`, identificador
+- [x] **Entidad `pasarela`** (migración 11, 08/10/2026; gateway LoRaWAN; decisión del 06/10, `docs/10 §8.4`; desde el 08/10 es la vía LoRaWAN del sistema, punto 24): `id`, `sitio_id`, identificador
       físico (EUI o número de serie), nombre, `visto_por_ultima_vez`; `dispositivo.pasarela_id` opcional (un
       dispositivo puede llegar por celular sin pasarela). Es una entidad, no un atributo del dispositivo, porque
       una pasarela sirve a muchos dispositivos y tiene estado propio. Se autentica en el broker con su propia
       credencial y publica solo bajo su tópico, con el DevEUI de cada nodo en el cuerpo (`docs/10 §8.4` punto 24).
-- [ ] **Vía, formato y pasarela declarados en el alta** (decidido el 08/10/2026, `docs/10 §8.4` punto 25):
+- [x] **Vía, formato y pasarela declarados en el alta** (decidido el 08/10/2026, `docs/10 §8.4` punto 25; esquema en la migración 11.
+      Falta que el filtro 2 use el formato declarado: llega con el adaptador de la pasarela, HU-02, y exige separar el
+      dispositivo de la demo, que hoy manda SenML y plano):
       `dispositivo.via` (`CHECK`: `mqtt`, `http`, `lorawan`), `dispositivo.formato` (`CHECK`: el código de un
       adaptador, `senml`, `plano`, `milesight`…; lo interpreta el código, §6) y `dispositivo.pasarela_id` (FK opcional,
       con un `CHECK` que la exige si la vía es `lorawan`). La credencial depende de la vía (`docs/11 §7`). El modelo
@@ -282,7 +307,13 @@ consistente para reportes.
       (CHECK `ck_medicion_recepcion`, `NOT VALID`: rige para toda fila nueva; las anteriores quedan NULL).
 - [ ] **Permisos por rol** (decidido el 08/10/2026, `docs/10 §8.4` punto 36): tabla de permisos por acción para los roles de
       `usuario_sitio`, consultada por un solo guardia del backend; se implementa con la autenticación (M7).
-- [ ] **Marcas del sistema frente a edición humana** (kit de método, 06/10/2026; **decidido el 08/10/2026: tabla `estado_dispositivo`**, `docs/10 §8.4` punto 27, pendiente de migración): `visto_por_ultima_vez` y
+- [x] **Código del sitio e identificador del broker** (migración 11, 08/10/2026; `docs/10 §8.4` punto 24): `sitio.codigo` es el
+      segmento del tópico y el filtro 1 lo compara con el sitio registrado; `id_fisico` lleva la lista blanca `[a-z0-9-]` y es
+      único entre dispositivos y pasarelas (disparador con un bloqueo por identificador, probado con dos altas simultáneas).
+- [ ] **Eliminar `dispositivo.visto_por_ultima_vez`** (DEPRECADA desde la migración 11) en una migración posterior, cuando
+      ningún backend desplegado la lea (convención de deprecación, §6).
+- [x] **Marcas del sistema frente a edición humana** (implementado en la migración 11, 08/10/2026: tabla
+      `estado_dispositivo`; `dispositivo.visto_por_ultima_vez` queda DEPRECADA y se elimina en una migración posterior) (kit de método, 06/10/2026; **decidido el 08/10/2026: tabla `estado_dispositivo`**, `docs/10 §8.4` punto 27, pendiente de migración): `visto_por_ultima_vez` y
       `en_linea` las escribe el supervisor sobre `dispositivo`, y el disparador mueve `actualizado_en` en cada UPDATE.
       Si el panel usa control optimista sobre `dispositivo`, un barrido provocará «otro usuario lo modificó» falsos.
       Decidir antes de HU-10/HU-18: tabla `estado_dispositivo` propia (una fila por dispositivo, sin disparador) o

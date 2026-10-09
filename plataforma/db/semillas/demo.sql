@@ -2,7 +2,7 @@
 -- Reemplaza los INSERT a mano del README del backend con un solo paso verificable.
 --
 -- RESULTADO ESPERADO al terminar (lo comprueba plataforma/pruebas/semilla-demo.sh):
---   sitio        1 fila  'Campus Dr. Luis Rivas del Canto'
+--   sitio        1 fila  'Campus Dr. Luis Rivas del Canto', código 'uct' (el del tópico)
 --   zona         1 fila  'Laboratorio' en ese sitio
 --   dispositivo  1 fila  id_fisico 'dev-0001', estado 'activo', intervalo_esperado_s = 5
 --   canal        1 fila  dev-0001 × 'temperatura'
@@ -14,9 +14,11 @@
 -- Lo que esta semilla NO hace: la credencial MQTT de dev-0001 vive en el passwd del broker (no
 -- versionado); si no existe, crearla con mosquitto_passwd (README del backend).
 
-INSERT INTO sitio (id, nombre)
-  VALUES ('00000000-0000-0000-0000-000000000001', 'Campus Dr. Luis Rivas del Canto')
+INSERT INTO sitio (id, nombre, codigo)
+  VALUES ('00000000-0000-0000-0000-000000000001', 'Campus Dr. Luis Rivas del Canto', 'uct')
   ON CONFLICT DO NOTHING;
+-- El código es el segmento del tópico (sitio/uct/…; migración 11). Una base migrada lo derivó del nombre: se fija aquí.
+UPDATE sitio SET codigo = 'uct' WHERE id = '00000000-0000-0000-0000-000000000001' AND codigo <> 'uct';
 
 INSERT INTO zona (id, sitio_id, nombre)
   VALUES ('00000000-0000-0000-0000-000000000002', '00000000-0000-0000-0000-000000000001', 'Laboratorio')

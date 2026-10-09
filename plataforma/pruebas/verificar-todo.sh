@@ -36,7 +36,7 @@ docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -U plat
 exige "$VT"/sql.txt "${PIPESTATUS[0]}" 10 || fallos=$((fallos+1))
 
 paso "2. Migraciones aplicadas = archivos en db/init (cada NN-*.sql debe estar reflejado en la base)"
-# 02: índice por regla · 03: zona_horaria · 04: iso_utc · 05: convenciones (disparadores actualizado_en, pm2_5) · 06: índice único de medicion · 07: CHECK de cuarentena.motivo · 08: medicion.recibido_en y origen_tiempo · 09: trama y cuarentena como hypertables · 10: semántica de intervalo_esperado_s
+# 02: índice por regla · 03: zona_horaria · 04: iso_utc · 05: convenciones (disparadores actualizado_en, pm2_5) · 06: índice único de medicion · 07: CHECK de cuarentena.motivo · 08: medicion.recibido_en y origen_tiempo · 09: trama y cuarentena como hypertables · 10: semántica de intervalo_esperado_s · 11: vía, pasarela, estado_dispositivo y sitio.codigo
 docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -U plataforma -d plataforma -tA <<'SQL' | tee "$VT"/mig.txt
 SELECT CASE WHEN count(*)=1 THEN 'OK    01 medicion es hypertable (chunks por tiempo)' ELSE 'FALLA 01 medicion no es hypertable' END FROM timescaledb_information.hypertables WHERE hypertable_name='medicion';
 SELECT CASE WHEN indexdef LIKE '%COALESCE(regla_id%' THEN 'OK    02 condicion_abierta_unica por regla' ELSE 'FALLA 02 indice viejo' END FROM pg_indexes WHERE indexname='condicion_abierta_unica';
@@ -48,8 +48,9 @@ SELECT CASE WHEN count(*)=1 THEN 'OK    07 cuarentena.motivo con CHECK (dominio 
 SELECT CASE WHEN count(*)=2 AND (SELECT count(*) FROM pg_constraint WHERE conname='ck_medicion_recepcion' AND conrelid='medicion'::regclass)=1 THEN 'OK    08 medicion.recibido_en y origen_tiempo con su CHECK' ELSE 'FALLA 08 falta la hora de recepción en medicion' END FROM information_schema.columns WHERE table_name='medicion' AND column_name IN ('recibido_en','origen_tiempo');
 SELECT CASE WHEN count(*)=2 AND (SELECT count(*) FROM information_schema.columns WHERE table_name='cuarentena' AND column_name IN ('detalle','dispositivo_id'))=2 AND (SELECT pg_get_constraintdef(oid) LIKE '%no_registrado%dado_de_baja%' FROM pg_constraint WHERE conname='cuarentena_motivo_chk' AND conrelid='cuarentena'::regclass) THEN 'OK    09 trama y cuarentena son hypertables; cuarentena con detalle, dispositivo_id y motivos no_registrado/dado_de_baja' ELSE 'FALLA 09 trama/cuarentena incompletas' END FROM timescaledb_information.hypertables WHERE hypertable_name IN ('trama','cuarentena');
 SELECT CASE WHEN col_description('dispositivo'::regclass, (SELECT attnum FROM pg_attribute WHERE attrelid='dispositivo'::regclass AND attname='intervalo_esperado_s')) LIKE 'Silencio máximo normal%' THEN 'OK    10 intervalo_esperado_s documentado como silencio máximo normal (docs/10 §8.4 punto 23)' ELSE 'FALLA 10 falta el COMMENT de intervalo_esperado_s (aplicar db/init/10-intervalo-esperado.sql)' END;
+SELECT CASE WHEN (SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name IN ('pasarela','estado_dispositivo'))=2 AND (SELECT count(*) FROM information_schema.columns WHERE table_name='dispositivo' AND column_name IN ('via','formato','pasarela_id'))=3 AND (NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dispositivo' AND column_name='visto_por_ultima_vez') OR col_description('dispositivo'::regclass, (SELECT attnum FROM pg_attribute WHERE attrelid='dispositivo'::regclass AND attname='visto_por_ultima_vez')) LIKE 'DEPRECADA%') AND EXISTS (SELECT 1 FROM pg_constraint WHERE conname='uq_sitio_codigo') AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='trg_pasarela_id_fisico_unico') THEN 'OK    11 vía, formato y pasarela; estado_dispositivo; sitio.codigo; identificador único entre dispositivo y pasarela' ELSE 'FALLA 11 falta la migración de vía, pasarela y estado (db/init/11-via-pasarela-estado.sql)' END;
 SQL
-exige "$VT"/mig.txt "${PIPESTATUS[0]}" 10 || fallos=$((fallos+1))
+exige "$VT"/mig.txt "${PIPESTATUS[0]}" 11 || fallos=$((fallos+1))
 # Toda migración en disco debe tener su comprobación arriba: una 08 nueva sin comprobación falla aquí,
 # no solo por el conteo en prosa del paso 2g.
 sin_chequeo=$(ls plataforma/db/init/ | grep -oE '^[0-9]{2}' | while read -r nn; do grep -q "^OK    $nn \|^FALLA $nn " "$VT"/mig.txt || echo "$nn"; done)
@@ -286,8 +287,9 @@ paso "2r. RNF-15: dependencias de producción del backend con licencia abierta y
 # compatible con la suya y cerraría la opción de una licencia comercial adicional; las de fuente disponible (SSPL, BUSL) no
 # son de código abierto (RNF-15) y una desconocida no se puede evaluar. Esta es la lista exacta: lo demás falla y lo decide
 # el estudiante. «A OR B» pasa si una de las dos está en la lista; «A AND B», solo si están las dos (08/10: pako, que trae la
-# exportación a XLSX, es «MIT AND Zlib»); los paréntesis se respetan y una excepción (WITH) no se evalúa: la decide él.
-PERMITIDAS='["MIT","ISC","Apache-2.0","BSD-2-Clause","BSD-3-Clause","0BSD","Python-2.0","CC0-1.0","Unlicense","BlueOak-1.0.0"]'
+# exportación a XLSX, es «MIT AND Zlib»; Zlib, permisiva, entra a la lista el 08/10); los paréntesis se respetan y una
+# excepción (WITH) no se evalúa: la decide él.
+PERMITIDAS='["MIT","ISC","Apache-2.0","BSD-2-Clause","BSD-3-Clause","0BSD","Python-2.0","CC0-1.0","Unlicense","BlueOak-1.0.0","Zlib"]'
 if ! command -v pnpm >/dev/null || ! command -v jq >/dev/null; then echo "omitida: falta pnpm o jq"; omitidos="$omitidos 2r"
 elif ! (cd plataforma/backend && pnpm licenses ls --prod --json 2>/dev/null) > "$VT"/licencias.json \
      || ! jq -e 'type == "object"' "$VT"/licencias.json >/dev/null 2>&1; then

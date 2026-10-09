@@ -108,7 +108,7 @@ export function semillaSQL(ps: Perfil[], sitio: string, factorIntervalo = 2): st
     .map((p) => `('${ZONA}', '${p.id}', 'Emulado ${p.id.slice(4)}', ${Math.max(1, Math.ceil(p.periodoS * factorIntervalo))})`)
     .join(',\n    ');
   return `-- Semilla del banco de pruebas (generada por emulador.ts semilla): ${ps.length} dispositivos emulados, intervalo = periodo × ${factorIntervalo}
-INSERT INTO sitio (id, nombre, descripcion) VALUES ('${SITIO}', '${sitio}', 'Banco de pruebas desechable (TT-28/TT-29)')
+INSERT INTO sitio (id, nombre, codigo, descripcion) VALUES ('${SITIO}', '${sitio}', '${sitio}', 'Banco de pruebas desechable (TT-28/TT-29)')
     ON CONFLICT (id) DO NOTHING;
 INSERT INTO zona (id, sitio_id, nombre) VALUES ('${ZONA}', '${SITIO}', 'Emulados') ON CONFLICT (id) DO NOTHING;
 INSERT INTO dispositivo (zona_id, id_fisico, nombre, intervalo_esperado_s) VALUES

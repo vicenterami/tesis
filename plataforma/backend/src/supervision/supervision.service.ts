@@ -41,15 +41,14 @@ export class SupervisionService implements OnModuleInit, OnModuleDestroy {
   }
 
   async barrer(): Promise<void> {
-    // 1) Dispositivos activos, vistos alguna vez, cuyo silencio supera 2 × intervalo esperado y
+    // 1) Dispositivos activos, vistos alguna vez (tienen fila en estado_dispositivo), cuyo silencio supera 2 × intervalo esperado y
     //    que aún no tienen la condición abierta → abrirla.
     const caidos = await this.pool.query<{ id: string; id_fisico: string; silencio_s: number }>(
       `SELECT d.id, d.id_fisico,
-              EXTRACT(EPOCH FROM now() - d.visto_por_ultima_vez)::int AS silencio_s
-         FROM dispositivo d
+              EXTRACT(EPOCH FROM now() - e.visto_por_ultima_vez)::int AS silencio_s
+         FROM dispositivo d JOIN estado_dispositivo e ON e.dispositivo_id = d.id
         WHERE d.estado = 'activo'
-          AND d.visto_por_ultima_vez IS NOT NULL
-          AND d.visto_por_ultima_vez < now() - (d.intervalo_esperado_s * 2) * INTERVAL '1 second'
+          AND e.visto_por_ultima_vez < now() - (d.intervalo_esperado_s * 2) * INTERVAL '1 second'
           AND NOT EXISTS (SELECT 1 FROM condicion c
                            WHERE c.dispositivo_id = d.id AND c.tipo = 'sin_comunicacion' AND c.cerrada_en IS NULL)`,
     );
@@ -73,9 +72,9 @@ export class SupervisionService implements OnModuleInit, OnModuleDestroy {
     // 2) Red de seguridad: condiciones abiertas de dispositivos que ya volvieron → cerrarlas.
     const recuperados = await this.pool.query<{ id: string; id_fisico: string }>(
       `UPDATE condicion c SET cerrada_en = now()
-         FROM dispositivo d
+         FROM dispositivo d JOIN estado_dispositivo e ON e.dispositivo_id = d.id
         WHERE c.dispositivo_id = d.id AND c.tipo = 'sin_comunicacion' AND c.cerrada_en IS NULL
-          AND d.visto_por_ultima_vez >= now() - (d.intervalo_esperado_s * 2) * INTERVAL '1 second'
+          AND e.visto_por_ultima_vez >= now() - (d.intervalo_esperado_s * 2) * INTERVAL '1 second'
         RETURNING d.id, d.id_fisico`,
     );
     for (const d of recuperados.rows) this.log.log(`${d.id_fisico}: comunicación restablecida · condición cerrada`);

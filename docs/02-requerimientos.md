@@ -283,7 +283,8 @@ El cambio de imagen y de esquema es trabajo de la Etapa 3 (`docs/10 §8.4`, punt
 
 **Verificación automática de RNF-15 (08/10/2026).** El guardián (`plataforma/pruebas/verificar-todo.sh`, paso 2r) revisa
 en cada corrida las licencias de las dependencias de producción del backend (`pnpm licenses ls --prod`) contra una lista
-de licencias abiertas y permisivas (MIT, BSD, Apache, ISC y equivalentes; la lista exacta vive en ese paso). Al 08/10 son
+de licencias abiertas y permisivas (MIT, BSD, Apache, ISC y equivalentes, con Zlib desde el 08/10 porque la trae la exportación a XLSX; la lista exacta vive
+en ese paso). Al 08/10 son
 152 paquetes, todos dentro. Una licencia fuera de la lista hace fallar el paso aunque sea abierta: una dependencia copyleft (GPL, AGPL) dentro del
 backend obligaría a distribuir el conjunto bajo una licencia compatible con la suya y cerraría la opción de una licencia
 comercial adicional; SSPL o BUSL no son de código abierto. Esa decisión se toma a conciencia, no al agregar un paquete.

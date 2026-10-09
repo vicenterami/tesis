@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 78 pruebas unitarias, sin matriz formal) y TT-32 (sensor físico);
+cubre todavía: TT-27 (contrato de trama: hoy 79 pruebas unitarias, sin matriz formal) y TT-32 (sensor físico);
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -236,3 +236,22 @@ comparables (otra duración y otra semilla). La base de desarrollo se actualizó
 
 **Cómo repetirlo:** `bash plataforma/pruebas/escanear-imagenes.sh` (construye con `--pull --no-cache` y sale 1 si queda algo
 con versión corregida publicada fuera de los residuos documentados).
+
+## 13. Migración 11: vía, pasarela, estado y sitio (08/10/2026)
+
+Se probó en bases desechables (contenedores de un solo uso, datos en RAM) antes de tocar la de desarrollo, y de punta a punta
+en el banco.
+
+| Prueba | Resultado |
+|---|---|
+| Base existente (migraciones 01–10 con datos) → 11 | El «visto» se traslada contado (1 antes, 1 después); el código del sitio se deriva del nombre y la semilla lo fija en `uct`; 16 tablas |
+| Instalación nueva (01–11 seguidas) | 16 tablas, cero errores en el arranque |
+| Repetir la migración | No duplica ni pisa: salta lo que existe y conserva el «visto» más reciente (convención de docs/08 §6) |
+| Backend anterior tras migrar | Sigue escribiendo la columna vieja sin fallar: queda DEPRECADA, no se borra |
+| Reglas plantadas | Rechaza: pasarela con el identificador de un dispositivo (y al revés), nodo LoRaWAN sin pasarela, identificador fuera de `[a-z0-9-]`, código de sitio y vía inválidos. Acepta los casos legítimos |
+| Dos altas simultáneas con el mismo identificador (dispositivo y pasarela) | La segunda espera a la primera y se rechaza: queda una sola fila |
+| Banco, 20 nodos emulados, 20 s | 420 tramas, 0 lecturas perdidas, p95 de 3 ms; `estado_dispositivo` con una fila por nodo |
+| Trama con el sitio de otra sede (`sitio/otra-sede/…`) | Cuarentena `no_registrado`: «emu-0001 está registrado en el sitio «banco», no en «otra-sede»» |
+
+**Lo que destapó:** la imagen de la base, levantada sola sin el compose, se caía al arrancar porque su guion de inicio llamaba
+a `timescaledb-tune`, que se había quitado por seguridad; se quitó también el guion (`db/imagen/Dockerfile`).

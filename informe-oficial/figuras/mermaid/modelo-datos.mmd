@@ -5,9 +5,12 @@ erDiagram
     regla_umbral ||--o{ condicion : condicion
     dispositivo ||--o{ credencial : credencial
     dispositivo ||--o{ cuarentena : cuarentena
+    pasarela ||--o{ dispositivo : dispositivo
     zona ||--o{ dispositivo : dispositivo
+    dispositivo ||--o{ estado_dispositivo : estado_dispositivo
     dispositivo ||--o{ evento : evento
     canal ||--o{ medicion : medicion
+    sitio ||--o{ pasarela : pasarela
     canal ||--o{ regla_umbral : regla_umbral
     dispositivo ||--o{ trama : trama
     sitio ||--o{ usuario_sitio : usuario_sitio
@@ -56,6 +59,13 @@ erDiagram
         timestamptz visto_por_ultima_vez
         timestamptz creado_en
         timestamptz actualizado_en
+        text via
+        text formato
+        uuid pasarela_id FK
+    }
+    estado_dispositivo {
+        uuid dispositivo_id PK,FK
+        timestamptz visto_por_ultima_vez
     }
     evento {
         uuid id PK
@@ -80,6 +90,16 @@ erDiagram
         timestamptz recibido_en
         text origen_tiempo
     }
+    pasarela {
+        uuid id PK
+        uuid sitio_id FK
+        text id_fisico
+        text nombre
+        bool activo
+        timestamptz visto_por_ultima_vez
+        timestamptz creado_en
+        timestamptz actualizado_en
+    }
     regla_umbral {
         uuid id PK
         uuid canal_id FK
@@ -96,6 +116,7 @@ erDiagram
         text zona_horaria
         timestamptz actualizado_en
         bool activo
+        text codigo
     }
     trama {
         uuid id PK

@@ -17,6 +17,7 @@ comprobar() { # nombre · consulta que devuelve un número · esperado
   if [ "$real" = "$3" ]; then echo "OK    $1 ($real)"; else echo "FALLA $1: esperado $3, hay ${real:-nada}"; fallos=$((fallos+1)); fi
 }
 comprobar "sitio del campus"        "SELECT count(*) FROM sitio WHERE id='00000000-0000-0000-0000-000000000001'" 1
+comprobar "código del sitio (tópico)" "SELECT codigo FROM sitio WHERE id='00000000-0000-0000-0000-000000000001'" uct
 comprobar "zona Laboratorio"        "SELECT count(*) FROM zona WHERE id='00000000-0000-0000-0000-000000000002'" 1
 comprobar "dispositivo $DISP activo, intervalo 5 s" \
   "SELECT count(*) FROM dispositivo WHERE id_fisico='$DISP' AND estado='activo' AND intervalo_esperado_s=5" 1

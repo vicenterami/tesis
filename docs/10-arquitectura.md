@@ -326,6 +326,7 @@ HTTPS a `/salud` hizo descartar unos 2 800 de un tráfico que sin él se guardab
 | La trama **no trae marca de tiempo** y llega dos veces | Se guarda dos veces: sin marca del emisor no hay forma de saber que es la misma lectura. La hora de recepción se toma en la base con `clock_timestamp()` (microsegundos), así una ráfaga de tramas en cola no colisiona entre sí | Deduplicar exige una identidad; la identidad de una lectura es «canal + instante del emisor». Limitación aceptada: los nodos que quieran «exactamente una» deben marcar `t` (SenML) |
 | Dos gateways LoRaWAN reciben el **mismo uplink** | Ruta A: lo deduplica ChirpStack por contador de trama antes de publicar. Ruta B: cada pasarela es su propio servidor de red; qué ocurre si dos oyen al mismo nodo **está por verificar** en la documentación del fabricante (07/10/2026) | Es responsabilidad del servidor de red, no de la plataforma |
 | El **tópico no cumple el patrón** `sitio/<sitio>/dispositivo/<id>/<magnitud>` | Cuarentena `malformada` con el detalle «tópico fuera del patrón», **antes** del filtro 1; el dispositivo **no** se marca vivo | Sin identidad no hay a quién atribuir la señal de vida; comparte el motivo `malformada` con el filtro 2 y se distingue por el detalle (decisión 23/09: no abrir un cuarto motivo por esto) |
+| El tópico trae un **sitio distinto del registrado** para ese dispositivo | Cuarentena `no_registrado` con el detalle «registrado en el sitio X, no en Y»; el dispositivo **no** se marca vivo: no pasó el filtro 1 | La ACL acepta cualquier sitio en ese nivel (`+`): sin esta comparación, un dispositivo podría publicar bajo el sitio de otra sede (punto 24, migración 11) |
 | **Dos lecturas del mismo canal en la misma trama**, sin marca de tiempo | Se guardan ambas, con instantes de recepción distintos (microsegundos) | Sin marca del emisor no hay identidad de lectura (fila anterior); si un nodo repite un canal por error, corregirlo es del firmware, no de la plataforma. Limitación aceptada el 23/09 |
 | El broker **reentrega muchas veces** de golpe (reconexión con cola larga) | Desde la decisión 4 los mensajes se procesan **de a uno**, en orden; la cola queda en el broker, no en el backend, y el pool de 5 conexiones no se disputa. El costo es la latencia por mensaje (2–5 ms medidos en el portátil), que acota la tasa máxima a cientos por segundo: por encima de RNF-01 |
 | Una trama trae **miles de lecturas** | Hoy no hay tope: se procesan todas, en serie | Pendiente (`docs/11 §4`): tope de lecturas por trama en el adaptador y `message_size_limit` en el broker; un sensor no manda miles de lecturas, un atacante sí |
@@ -812,7 +813,7 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     (https://mosquitto.org/documentation/dynamic-security/). El DevEUI de cada nodo viaja en el cuerpo; el filtro 1 toma
     la pasarela del tópico (no del cuerpo) y solo acepta los nodos asociados a ella en el alta, así que una pasarela
     comprometida no puede publicar como un dispositivo de vía `mqtt`, que tiene su propio tópico. Dos reglas más (08/10,
-    se implementan con la migración 11): la ACL usa `+` en el nivel del sitio, así que el filtro 1 exige que el sitio del
+    implementadas en la migración 11): la ACL usa `+` en el nivel del sitio, así que el filtro 1 exige que el sitio del
     tópico sea el registrado para la pasarela o el dispositivo (hoy no lo compara); y el alta rechaza un identificador que
     otra entidad ya use como usuario del broker o que traiga caracteres fuera de `[a-z0-9-]` (la misma lista blanca de
     `clave-dispositivo.sh`), porque el usuario se sustituye dentro del tópico con `%u`. Al implementarlo, el
@@ -828,7 +829,8 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     y clave en el broker (punto 26); `http`, un token; `lorawan`, ninguna propia (la autentica su pasarela). El alta y la
     carga masiva ofrecen la vía en palabras simples y entregan los datos de conexión listos para copiar. El modelo
     interno sigue siendo único (`docs/08 §1`): cambia cómo se identifica y autentica un dispositivo, no cómo se guarda
-    lo que envía. Modelo en `docs/08 §8`; secuencia en §3.
+    lo que envía. Modelo en `docs/08 §8`; secuencia en §3. Esquema aplicado en la migración 11 (08/10); el filtro 2 todavía
+    prueba los adaptadores en orden: usar el formato declarado llega con HU-02.
 26. **Credenciales del broker administradas por el backend con el plugin Dynamic Security de Mosquitto 2.x**,
     condicionado a una prueba en un contenedor desechable (instalación, administrador inicial y ACL por rol). El backend
     crea, deshabilita y borra clientes por `$CONTROL/dynamic-security/v1` sin reiniciar el broker: el alta y la baja
@@ -838,7 +840,8 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     última trama y lo que anote el supervisor van a una fila por dispositivo, sin disparador de `actualizado_en`;
     `dispositivo` queda con la configuración humana. Así el bloqueo optimista del punto 28 no da «otro usuario lo
     cambió» falsos (cada trama movía `actualizado_en`) y las escrituras de cada trama dejan de caer sobre la fila que
-    se edita. Entra en la misma migración que el punto 25 (`docs/08 §8`, pendiente resuelto).
+    se edita. Implementado en la migración 11 (08/10): el pipeline escribe ahí y `dispositivo.visto_por_ultima_vez` queda
+    DEPRECADA (`docs/08 §8`).
 28. **Panel configurable con bloqueo optimista.** Desde el panel se configuran umbrales e histéresis por canal, e
     intervalo esperado, estado y nombre por dispositivo. El formulario guarda el `actualizado_en` que leyó y el cambio
     es `UPDATE … WHERE id = $1 AND actualizado_en = $2`: si otra persona cambió el dato entretanto, responde 409 y el

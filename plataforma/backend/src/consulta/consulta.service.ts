@@ -15,14 +15,15 @@ export class ConsultaService {
   // (mismo criterio que el supervisor: un mensaje perdido no es una caída; dos seguidos, sí).
   async dispositivos() {
     const r = await this.pool.query(`
-      SELECT d.id, d.id_fisico, d.nombre, d.estado, d.intervalo_esperado_s,
-             d.visto_por_ultima_vez,
-             (d.visto_por_ultima_vez >= now() - d.intervalo_esperado_s * 2 * INTERVAL '1 second') AS en_linea,
+      SELECT d.id, d.id_fisico, d.nombre, d.estado, d.via, d.formato, d.intervalo_esperado_s,
+             e.visto_por_ultima_vez,
+             (e.visto_por_ultima_vez >= now() - d.intervalo_esperado_s * 2 * INTERVAL '1 second') AS en_linea,
              z.nombre AS zona, s.nombre AS sitio, s.zona_horaria,
              (SELECT count(*)::int FROM condicion c WHERE c.dispositivo_id = d.id AND c.cerrada_en IS NULL) AS condiciones_abiertas,
              (SELECT coalesce(json_agg(json_build_object('id', c.id, 'magnitud', c.magnitud_codigo, 'unidad', m.unidad_canonica) ORDER BY c.magnitud_codigo), '[]'::json)
                 FROM canal c JOIN magnitud m ON m.codigo = c.magnitud_codigo WHERE c.dispositivo_id = d.id) AS canales
         FROM dispositivo d
+        LEFT JOIN estado_dispositivo e ON e.dispositivo_id = d.id
         JOIN zona z ON z.id = d.zona_id
         JOIN sitio s ON s.id = z.sitio_id
        ORDER BY s.nombre, z.nombre, d.nombre`);
@@ -31,10 +32,11 @@ export class ConsultaService {
 
   async dispositivo(id: string) {
     const d = await this.pool.query(`
-      SELECT d.id, d.id_fisico, d.nombre, d.estado, d.intervalo_esperado_s, d.visto_por_ultima_vez, d.creado_en,
-             (d.visto_por_ultima_vez >= now() - d.intervalo_esperado_s * 2 * INTERVAL '1 second') AS en_linea,
+      SELECT d.id, d.id_fisico, d.nombre, d.estado, d.via, d.formato, d.intervalo_esperado_s, e.visto_por_ultima_vez, d.creado_en,
+             (e.visto_por_ultima_vez >= now() - d.intervalo_esperado_s * 2 * INTERVAL '1 second') AS en_linea,
              z.nombre AS zona, s.nombre AS sitio, s.zona_horaria
-        FROM dispositivo d JOIN zona z ON z.id = d.zona_id JOIN sitio s ON s.id = z.sitio_id
+        FROM dispositivo d LEFT JOIN estado_dispositivo e ON e.dispositivo_id = d.id
+        JOIN zona z ON z.id = d.zona_id JOIN sitio s ON s.id = z.sitio_id
        WHERE d.id = $1`, [id]);
     if (!d.rows[0]) throw new NotFoundException('dispositivo no encontrado');
 
