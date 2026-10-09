@@ -37,7 +37,7 @@ fi
 caso "UUID inválido → 400"                    /dispositivos/no-es-uuid 400
 caso "limite fuera de rango → 400"            "/condiciones?limite=99999" 400
 caso "condiciones abiertas es lista con duracion_s" "/condiciones?abiertas=true" "isinstance(r,list) and all(isinstance(c['duracion_s'],int) for c in r)"
-caso "contrato OpenAPI servido con 6 rutas"      /docs/openapi.json "len(r['paths'])==6 and r['openapi'].startswith('3.')"
+caso "contrato OpenAPI servido con 7 rutas, con el canal /eventos como text/event-stream" /docs/openapi.json "len(r['paths'])==7 and r['openapi'].startswith('3.') and 'text/event-stream' in r['paths']['/eventos']['get']['responses']['200']['content']"
 # El servido (generado en caliente desde los decoradores) vs. el versionado en el repo (se
 # desincroniza si alguien cambia una ruta y olvida correr `pnpm openapi` antes de commitear).
 caso "OpenAPI servido == OpenAPI versionado (mismas rutas y métodos)" /docs/openapi.json \
@@ -58,4 +58,18 @@ cabecera "Referrer-Policy presente"                                 "referrer-po
 cabecera "Permissions-Policy niega cámara, micrófono y ubicación"  "permissions-policy: .*camera=\(\)" si
 # HSTS lo pone el proxy, no el backend (una sola capa): aquí debe estar ausente.
 cabecera "sin HSTS en el backend (lo pondrá el proxy TLS)"          "strict-transport-security:" no
+# Canal de tiempo real (TT-39, docs/10 §5). Un flujo SSE no termina solo: se leen las cabeceras y curl corta a los 2 s.
+cab=$(curl -s -N --max-time 2 -D - -o /dev/null "$API/eventos" | tr -d '\r')
+cabecera "SSE: /eventos abre un flujo text/event-stream"              "content-type: text/event-stream" si
+cabecera "SSE: le pide al proxy no retenerlo (X-Accel-Buffering: no)" "x-accel-buffering: no" si
+cabecera "SSE: sin CORS (una página de otro sitio no puede leerlo)"   "access-control-allow-origin:" no
+pagina() { # nombre · cabecera que pondría el navegador · código esperado
+  local code; code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 -H "$2" "$API/eventos")
+  [[ "$code" == "$3" ]] && echo "OK    $1" || { echo "FALLA $1 (HTTP $code, esperado $3)"; fallos=$((fallos+1)); }
+}
+pagina "SSE: Origin de otro sitio → 403"                                 "Origin: https://otro.example" 403
+pagina "SSE: Origin igual al propio (mismo host y puerto) → 200"           "Origin: $API" 200
+pagina "SSE: sin Origin pero Sec-Fetch-Site: cross-site (imagen de otro sitio) → 403" "Sec-Fetch-Site: cross-site" 403
+pagina "SSE: Sec-Fetch-Site: same-origin (el propio panel) → 200"          "Sec-Fetch-Site: same-origin" 200
+caso "SSE: filtro que no es un UUID → 400"                      "/eventos?dispositivo=no-es-uuid" 400
 echo; [[ $fallos -eq 0 ]] && echo "TODO OK" || { echo "$fallos caso(s) con falla"; exit 1; }

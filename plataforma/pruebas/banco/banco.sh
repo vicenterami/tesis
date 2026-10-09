@@ -94,12 +94,29 @@ case "${1:-}" in
     hsts=$(curl -s -m 5 -D - -o /dev/null --cacert "$CERTS/ca.crt" https://localhost:8443/salud | grep -ci strict-transport-security)
     [ "$hsts" = 1 ] && echo "OK    HSTS presente (lo pone el proxy)" || { echo "FALLA sin HSTS"; fallos=$((fallos+1)); }
     if curl -s -m 5 -o /dev/null https://localhost:8443/salud 2>/dev/null; then echo "FALLA el certificado se aceptó sin la CA (no debería)"; fallos=$((fallos+1)); else echo "OK    sin la CA el cliente rechaza el certificado"; fi
+    # Canal de tiempo real por el proxy (TT-39): se abre ANTES de publicar, con el Origin del propio panel y filtrado por el
+    # dispositivo que publica (prueba también el filtro), y se espera su medición. Prueba el camino entero hasta el
+    # navegador: si el proxy reenviara el Host sin el puerto ($host) el canal respondería 403, y si retuviera la respuesta
+    # en búfer el evento no llegaría a tiempo.
+    disp_id=$(psql_ -tA -c "SELECT id FROM dispositivo WHERE id_fisico = 'emu-0003'" | tr -d '[:space:]')
+    sse="$PRIV/sse-proxy.txt"; : > "$sse"
+    curl -s -N -m 30 --cacert "$CERTS/ca.crt" -H 'Origin: https://localhost:8443' "https://localhost:8443/eventos?dispositivo=$disp_id" > "$sse" & sse_pid=$!
+    trap 'kill "$sse_pid" 2>/dev/null' EXIT
+    # Listo cuando llega el primer byte: Nest lo escribe (un salto de línea) recién suscrito, no antes. Un sleep fijo
+    # podía publicar antes de la suscripción en un equipo cargado.
+    for _ in $(seq 1 50); do [ -s "$sse" ] && break; sleep 0.2; done
     red=$(docker network ls --format '{{.Name}}' | grep '^banco_default$')
     bt=$(($(date +%s) - 60)); carga="[{\"bn\":\"emu-0003\",\"bt\":$bt,\"n\":\"temperatura\",\"u\":\"Cel\",\"v\":21.5}]"
     if docker run --rm --network "$red" -v "$CERTS:/c:ro" "$IMG_BROKER" mosquitto_pub --cafile /c/ca.crt -h proxy -p 8883 -q 1 -i emu-0003 -u emu-0003 -t sitio/banco/dispositivo/emu-0003/temperatura -m "$carga"; then
       sleep 2; n=$(psql_ -tA -c "SELECT count(*) FROM medicion m JOIN canal c ON c.id=m.canal_id JOIN dispositivo d ON d.id=c.dispositivo_id WHERE d.id_fisico='emu-0003' AND m.tiempo = to_timestamp($bt)" | tr -d '[:space:]')
       [ "$n" = 1 ] && echo "OK    MQTT sobre TLS 8884 → broker → pipeline: la lectura está en medicion" || { echo "FALLA la lectura publicada por TLS no llegó a medicion ($n)"; fallos=$((fallos+1)); }
     else echo "FALLA mosquitto_pub por TLS"; fallos=$((fallos+1)); fi
+    for _ in $(seq 1 20); do grep -q '^event: medicion' "$sse" && break; sleep 0.5; done
+    kill "$sse_pid" 2>/dev/null; wait "$sse_pid" 2>/dev/null
+    if grep -q '^event: medicion' "$sse" && grep -q "\"dispositivo_id\":\"$disp_id\"" "$sse" && grep -q '"valor":21.5' "$sse"; then
+      echo "OK    SSE 8443 → navegador: la medición de emu-0003 llegó por el canal en vivo, filtrada, con el Origin propio y sin búfer"
+    else echo "FALLA SSE 8443: no llegó la medición → $(head -c 160 "$sse")"; fallos=$((fallos+1)); fi
+    rm -f "$sse"
     if docker run --rm --network "$red" "$IMG_BROKER" mosquitto_pub -h proxy -p 8883 -t x -m 1 2>/dev/null; then echo "FALLA el 8883 aceptó una conexión sin TLS"; fallos=$((fallos+1)); else echo "OK    el 8883 rechaza conexiones sin TLS"; fi
     echo "── registro del proxy (JSON, una línea por petición/conexión):"; dcp logs --no-color --since 2m proxy 2>/dev/null | grep -oE '\{.*\}' | head -3
     echo; [ $fallos -eq 0 ] && echo "PROXY OK" || { echo "$fallos comprobación(es) con falla"; exit 1; } ;;

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
+import { TiempoRealModule } from '../tiempo-real/tiempo-real.module';
 import { AlertasService } from './alertas.service';
 
-@Module({ providers: [AlertasService], exports: [AlertasService] })
+@Module({ imports: [TiempoRealModule], providers: [AlertasService], exports: [AlertasService] })
 export class AlertasModule {}

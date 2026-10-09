@@ -8,7 +8,7 @@ sequenceDiagram
 
     Admin->>FE: Asistente "nuevo dispositivo"<br/>(vía, formato y, si es LoRaWAN, su pasarela)
     FE->>API: POST /dispositivos (Etapa 3)<br/>{zona, id_fisico, via, formato, pasarela?, canales[]}
-    API->>DB: INSERT dispositivo, canal×N,<br/>estado_dispositivo
+    API->>DB: INSERT dispositivo, canal×N
     alt vía mqtt
         API->>API: genera credencial (secreto aleatorio)
         API->>DB: INSERT credencial (solo el hash)
@@ -25,6 +25,6 @@ sequenceDiagram
     MQ->>MQ: valida credencial y ACL
     Dev->>MQ: PUBLISH<br/>sitio/…/dispositivo/<id>/<magnitud>
     MQ->>API: entrega la trama (suscriptor)
-    API->>DB: UPDATE estado_dispositivo<br/>.visto_por_ultima_vez
-    API-->>FE: SSE "dispositivo en línea"
+    API->>DB: estado_dispositivo.visto_por_ultima_vez<br/>(la primera trama crea su fila)
+    API-->>FE: SSE «visto» (el panel lo muestra en línea)
     FE-->>Admin: Estado: en línea ✅

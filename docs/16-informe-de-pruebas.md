@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 79 pruebas unitarias, sin matriz formal) y TT-32 (sensor físico);
+cubre todavía: TT-27 (contrato de trama: hoy 107 pruebas unitarias, sin matriz formal) y TT-32 (sensor físico);
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -252,9 +252,40 @@ en el banco.
 | Dos altas simultáneas con el mismo identificador (dispositivo y pasarela) | La segunda espera a la primera y se rechaza: queda una sola fila |
 | Banco, 20 nodos emulados, 20 s | 420 tramas, 0 lecturas perdidas, p95 de 3 ms; `estado_dispositivo` con una fila por nodo |
 | Migración 12 (el CHECK de motivos de cuarentena con el nombre de la convención) | Renombra en la tabla y en sus fragmentos (TimescaleDB lo propaga); repetible; la regla sigue rechazando un motivo inventado |
-| Comprobaciones nuevas del guardián: convenciones (1b) e identidad (1c) | 3 y 6 OK en una instalación nueva; fallan al plantar una restricción sin prefijo o al quitar el disparador de identidad; la de identidad no deja nada en la base (termina en ROLLBACK) |
+| Comprobaciones nuevas del guardián: convenciones (1b) e identidad (1c) | 7 y 7 OK en la base de desarrollo (09/10); fallan al plantar una restricción sin prefijo o al quitar el disparador de identidad; la de identidad no deja nada en la base: termina en ROLLBACK y, desde el 09/10, lo comprueba (con COMMIT plantado sale FALLA) |
+| Repetir las migraciones 07, 09 y 12 (instalación nueva y base anterior a la 12, desechables, 09/10) | La regla de los motivos de cuarentena queda una sola vez, con el nombre de la convención y la lista vigente; repetirlas no la duplica, no la estrecha ni pisa su comentario. Antes, repetir la 09 la duplicaba con el nombre viejo y repetir la 07 intentaba volver a la lista vieja |
+| Convenciones de índices, disparadores, funciones y tipos (paso 1b, desde el 09/10) | En la base, 1 índice, 1 disparador y 3 funciones sin prefijo, escritos como excepciones con su origen; los tipos cumplen. Plantados un índice, un disparador, una función y columnas `varchar` y `timestamp` en una transacción que se deshace: las cuatro comprobaciones fallan |
 | Chequeo previo de la migración 11 | Con un identificador fuera de la lista blanca o un sitio cuyo código derivado no sirve, se detiene antes de tocar nada y dice cuáles son |
 | Trama con el sitio de otra sede (`sitio/otra-sede/…`) | Cuarentena `no_registrado`: «emu-0001 está registrado en el sitio «banco», no en «otra-sede»» |
 
 **Lo que destapó:** la imagen de la base, levantada sola sin el compose, se caía al arrancar porque su guion de inicio llamaba
 a `timescaledb-tune`, que se había quitado por seguridad; se quitó también el guion (`db/imagen/Dockerfile`).
+
+## 14. Canal de tiempo real (TT-39, 09/10/2026)
+
+`GET /eventos` (`docs/10 §5`). 22 pruebas en `eventos.spec.ts` (`backend/src/tiempo-real/`); las del bloque «GET /eventos
+por HTTP» abren HTTP real en 127.0.0.1 con un puerto libre; más las del pipeline, las alertas y el supervisor sobre lo que cada uno anuncia.
+
+| Prueba | Resultado |
+|---|---|
+| Qué recibe cada flujo | Sin filtro, todo; con `?dispositivo=`, solo lo suyo; con `?canal=`, solo las mediciones de ese canal |
+| Qué anuncia el pipeline | Lectura guardada → `medicion` con la marca de tiempo que puso la base, y después `visto`; lectura repetida → solo `visto`; trama en cuarentena → solo `visto`; no registrado o dado de baja → nada |
+| Condiciones | Umbral y sin comunicación: un aviso al abrir y otro al cerrar; ninguno si otra trama u otro barrido la abrió o la cerró un instante antes. La guarda del cierre de umbral se agregó el 09/10: sin ella, dos lecturas que volvían a rango a la vez movían la hora de cierre y repetían el evento y el aviso |
+| Origen | `Origin` de otro sitio o `null` → 403, sin ocupar cupo; sin `Origin` pero `Sec-Fetch-Site: cross-site` (una imagen o un `fetch` «no-cors» de otro sitio) → 403; `same-site` → rechazo; mismo host y puerto, `same-origin` o `none` → 200; sin ninguna de las dos (el propio panel, curl) → 200 |
+| Cupo | Con 50 flujos abiertos → 503; al cerrarse uno, vuelve a admitir; un flujo pedido que nunca se abrió no cuenta |
+| Latido | Uno cada 25 s aunque no haya mediciones |
+| Apagado, en los dos sentidos | Con un flujo abierto, el cierre tarda milisegundos porque se cortan solo las conexiones del canal; sin eso, espera a que el navegador se vaya y la prueba falla por tiempo. Con una petición normal en curso, esta termina y responde antes del cierre. El primer arreglo, cortar todas las conexiones (`forceCloseConnections`), también la cortaba («socket hang up»): se descartó al probar este sentido. Con keep-alive, Node además espera a que venza la conexión ociosa: medido a mano el 09/10 con un servidor Node 22 mínimo: respuesta a los 309 ms y cierre a los 4314 ms, dentro de los 10 s de Docker |
+| nginx: `$host` frente a `$http_host` (contenedor desechable, HTTP/2 y HTTP/1.1) | `$host` quita el puerto (`localhost`); `$http_host` lo conserva (`localhost:18443`). Con el `nginx.conf` del repositorio, el backend recibe `localhost:18443` |
+| Prueba de humo (`api-smoke.sh`) contra el backend completo del banco | Los 8 casos del canal en verde: tipo `text/event-stream`, `X-Accel-Buffering: no`, sin CORS, 403 por `Origin` y por `Sec-Fetch-Site`, 200 con el propio origen y con `same-origin`, y 400 con un filtro inválido. Los dos casos del contrato servido necesitan `/docs`, que el banco no publica: corren en la pila de desarrollo |
+| Banco por el proxy (`banco.sh proxy`): flujo abierto por el 8443 con el `Origin` del propio panel y filtrado por el dispositivo que publica, antes de publicar por MQTT sobre TLS | La medición de ese dispositivo llega por el canal en vivo: dispositivo → broker → pipeline → base → canal → nginx → cliente. Con `$host` plantado en el proxy, 403 «origen no permitido» y el caso falla. Desde el 09/10 espera el primer byte del flujo antes de publicar, en vez de un `sleep` fijo |
+
+Cada protección se probó a mano el 09/10 plantando su violación (un cambio temporal, restaurado y comparado con `cmp`): sin
+cortar las conexiones del canal, cortándolas todas, sin el control de origen, sin `Sec-Fetch-Site`, con el cupo corrido en
+uno y sin la guarda del cierre de condiciones, falla exactamente la prueba que la cubre.
+
+**Lo que destapó:** (1) el proxy reenviaba el `Host` sin el puerto, y en el banco (8443) el canal habría rechazado al propio
+panel; (2) una pestaña abierta retenía el apagado del backend, y el primer arreglo cortaba también lo legítimo; (3) `pnpm openapi` iniciaba la aplicación y se conectaba al
+broker con la identidad del backend: con la pila arriba, el broker debe desconectar al cliente ya conectado con el mismo
+identificador (MQTT 3.1.1, [MQTT-3.1.4-2]), o sea al backend en marcha. Ahora genera el contrato sin iniciarla: no toca la
+base ni el broker, y las 6 rutas que ya existían salen idénticas; (4) una imagen o un `fetch` «no-cors» de otro sitio no manda
+`Origin` y abría el canal: ahora también se mira `Sec-Fetch-Site`; (5) el cierre de una condición de umbral no tenía guarda.

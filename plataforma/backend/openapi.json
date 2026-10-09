@@ -1,6 +1,58 @@
 {
   "openapi": "3.0.0",
   "paths": {
+    "/eventos": {
+      "get": {
+        "description": "Server-Sent Events: medicion, visto y condicion, cada uno cuando ya está guardado, y un latido cada 25 s. Filtros opcionales por dispositivo o por canal. Rechaza una página de otro sitio (403) y, con 50 flujos abiertos, responde 503.",
+        "operationId": "EventosController_flujo",
+        "parameters": [
+          {
+            "name": "dispositivo",
+            "required": false,
+            "in": "query",
+            "description": "UUID del dispositivo: solo sus eventos",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "canal",
+            "required": false,
+            "in": "query",
+            "description": "UUID del canal: solo sus mediciones",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Flujo de eventos: «event:» dice el tipo y «data:» trae el JSON",
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "event: medicion\ndata: {\"tipo\":\"medicion\",\"dispositivo_id\":\"<uuid>\",\"canal_id\":\"<uuid>\",\"valor\":21.5,\"unidad\":\"Cel\",\"tiempo\":\"2026-10-09T15:00:00.000Z\"}\n\nevent: visto\ndata: {\"tipo\":\"visto\",\"dispositivo_id\":\"<uuid>\",\"tiempo\":\"2026-10-09T15:00:00.000Z\"}\n\nevent: condicion\ndata: {\"tipo\":\"condicion\",\"dispositivo_id\":\"<uuid>\",\"condicion\":\"umbral\",\"estado\":\"abierta\"}\n\nevent: latido\ndata: {\"tiempo\":\"2026-10-09T15:00:25.000Z\"}\n\n"
+              }
+            }
+          },
+          "400": {
+            "description": "Filtro que no es un UUID"
+          },
+          "403": {
+            "description": "Página de otro sitio (Origin o Sec-Fetch-Site)"
+          },
+          "503": {
+            "description": "Demasiados flujos abiertos"
+          }
+        },
+        "summary": "Canal de tiempo real (SSE)",
+        "tags": [
+          "tiempo real"
+        ]
+      }
+    },
     "/dispositivos": {
       "get": {
         "description": "Cada dispositivo con su sitio, zona horaria, canales, `en_linea` (última trama hace menos de 2 × intervalo esperado) y número de condiciones abiertas.",
@@ -196,7 +248,7 @@
   },
   "info": {
     "title": "Plataforma de registro, monitoreo y gestión de datos de sensores",
-    "description": "API de consulta (M5) para el panel. Solo lectura. Todos los instantes en ISO 8601 UTC (sufijo Z); las agregaciones por día se calculan en la zona horaria del sitio. Rangos semiabiertos [desde, hasta).",
+    "description": "API de consulta (M5) y canal de tiempo real (SSE) para el panel. Solo lectura. Todos los instantes en ISO 8601 UTC (sufijo Z); las agregaciones por día se calculan en la zona horaria del sitio. Rangos semiabiertos [desde, hasta).",
     "version": "0.1.0",
     "contact": {}
   },
@@ -216,6 +268,10 @@
     {
       "name": "cuarentena",
       "description": "Tramas rechazadas por el pipeline"
+    },
+    {
+      "name": "tiempo real",
+      "description": "Canal SSE hacia el panel: mediciones, señales de vida y condiciones (TT-39)"
     },
     {
       "name": "salud",

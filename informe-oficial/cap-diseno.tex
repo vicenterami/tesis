@@ -121,9 +121,9 @@ límite no dispare y cierre alertas sin parar.
 
 La figura~\ref{fig:sec-tiemporeal} (anexo~\ref{anx:figuras}) muestra los dos tiempos del panel. El histórico llega
 \textbf{agregado por la base de datos} con \texttt{time\_bucket}: cientos de puntos, no millones. Las lecturas
-nuevas las empujará el backend por un canal autenticado con la sesión del panel, cifrado tras el proxy y con
-lista blanca de origen y límites de tamaño y tasa \parencite{owaspws}; el canal es SSE (decidido en la
-Etapa~3) y el navegador nunca toca el broker. Toda la consulta valida sus entradas antes de tocar SQL (identificadores, fechas, un intervalo
+nuevas las empuja el backend por un canal SSE (decidido en la Etapa~3), cifrado tras el proxy, que solo anuncia
+lo ya guardado, rechaza otro origen y limita los flujos abiertos; desde la Etapa~4 se abre con la sesión del
+panel, como recomienda OWASP para WebSocket \parencite{owaspws}. El navegador nunca toca el broker. Toda la consulta valida sus entradas antes de tocar SQL (identificadores, fechas, un intervalo
 tomado de una lista cerrada) y usa parámetros, nunca texto interpolado. El \textbf{contrato de la API se
 genera desde el código}, en OpenAPI 3.0 \parencite{openapi303}, a partir de los decoradores de los controladores, de modo que no
 puede describir rutas inexistentes; se sirve junto a la API y se versiona en el repositorio como el

@@ -10,8 +10,8 @@ sequenceDiagram
     DB-->>API: ~100 puntos agregados
     API-->>FE: [[tiempos],[valores]]
     FE->>FE: uPlot dibuja el histórico
-    FE->>API: SSE · GET …/eventos (EventSource, misma sesión)
-    loop cada trama nueva que pasa el pipeline
-        API-->>FE: event: medicion · data: {canal_id, valor, tiempo}
+    FE->>API: SSE · GET /eventos?canal={id} (EventSource, con la sesión desde M7)
+    loop cada lectura nueva, ya guardada
+        API-->>FE: event: medicion · data: {dispositivo_id, canal_id, valor, unidad, tiempo}
         FE->>FE: uPlot.setData (añade el punto)
     end

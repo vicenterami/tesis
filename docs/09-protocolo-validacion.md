@@ -64,5 +64,5 @@ no se estime (`docs/14`); la red interna deja la base sin ningún puerto hacia a
 ## 4. Pendientes
 
 - [ ] Definir el entorno de referencia exacto (¿límites de Docker o VPS arrendado?) en la Etapa 4.
-- [ ] Escribir los scripts del emulador y del banco de comparación (backlog TT-28, TT-39).
+- [ ] Escribir los scripts del emulador y del banco de comparación (backlog TT-28, TT-40).
 - [ ] Fijar el dataset de prueba (cuántos nodos, qué frecuencia, cuánto tiempo).

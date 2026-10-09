@@ -6,6 +6,7 @@ import { RecepcionModule } from './recepcion/recepcion.module';
 import { ConsultaModule } from './consulta/consulta.module';
 import { SaludModule } from './salud/salud.module';
 import { RetencionModule } from './retencion/retencion.module';
+import { TiempoRealModule } from './tiempo-real/tiempo-real.module';
 
 // Módulo raíz. Cada módulo de aquí corresponde a un módulo funcional del diseño (docs/10 §1):
 //   DbModule        → acceso a TimescaleDB (infraestructura compartida)
@@ -17,6 +18,7 @@ import { RetencionModule } from './retencion/retencion.module';
 //   SaludModule     → endpoint de salud para healthchecks y pruebas
 //   RetencionModule → tarea periódica que borra con drop_chunks lo vencido de medicion, trama y cuarentena
 //                     (docs/10 §8.4 punto 11): la edición Apache de TimescaleDB no trae políticas de retención
+//   TiempoRealModule → canal de tiempo real hacia el panel (SSE, TT-39): GET /eventos
 // Los módulos M3 (aprovisionamiento) y M7 (seguridad e identidad) se agregan por tandas; M8 es el panel.
 @Module({
   imports: [
@@ -29,6 +31,7 @@ import { RetencionModule } from './retencion/retencion.module';
     ConsultaModule,
     SaludModule,
     RetencionModule,
+    TiempoRealModule,
   ],
 })
 export class AppModule {}

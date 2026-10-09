@@ -45,9 +45,12 @@ END $$;
 -- c) detalle, dispositivo, dominio de origen y motivos que se entienden solos (07/10: «desconocido» se leía como
 --    «motivo desconocido»; se separa en no_registrado y dado_de_baja). Lo que no trae credencial no tiene motivo
 --    aquí porque nunca llega: lo corta el broker.
+--    Es la definición vigente de la regla: se quitan sus dos nombres para no duplicarla al repetir la migración. Si una
+--    migración posterior cambia la lista, esta pasa a «crear solo si no existe», como la 07 (docs/08 §6).
 ALTER TABLE cuarentena DROP CONSTRAINT IF EXISTS cuarentena_motivo_chk;
+ALTER TABLE cuarentena DROP CONSTRAINT IF EXISTS ck_cuarentena_motivo;
 UPDATE cuarentena SET motivo = 'no_registrado' WHERE motivo = 'desconocido';
-ALTER TABLE cuarentena ADD CONSTRAINT cuarentena_motivo_chk
+ALTER TABLE cuarentena ADD CONSTRAINT ck_cuarentena_motivo
     CHECK (motivo IN ('no_registrado', 'dado_de_baja', 'malformada', 'invalida'));
 ALTER TABLE cuarentena ADD COLUMN IF NOT EXISTS detalle        text;
 ALTER TABLE cuarentena ADD COLUMN IF NOT EXISTS dispositivo_id uuid;

@@ -74,7 +74,7 @@ el informe**. Hay que elegir conscientemente:
 - **`docker compose up -d --build`** + `restart: unless-stopped` para el arranque y la recuperación
   automática (ya contemplado como RNF de la plataforma).
 - **`docker stats`**: comando para medir el consumo real de cada contenedor — es exactamente el
-  instrumento del banco de comparación contra ThingsBoard (backlog TT-39) de la Etapa 4.
+  instrumento del banco de comparación contra ThingsBoard (backlog TT-40) de la Etapa 4.
 - **Persistencia del driver `pg` sobre TypeORM**: para series de tiempo, SQL directo con `time_bucket`
   es más simple y rápido que un ORM. Decisión de la Etapa 2; coherente con mantener el backend liviano.
 

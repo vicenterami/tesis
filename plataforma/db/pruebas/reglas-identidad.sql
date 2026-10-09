@@ -2,6 +2,9 @@
 -- rechazo de la base. Todo ocurre dentro de una transacción que termina en ROLLBACK: no queda nada en la base.
 -- La corre el guardián (paso 1c). La carrera de dos altas simultáneas no cabe en una sola sesión: se probó a mano (docs/16 §13).
 BEGIN;
+-- Corre contra la base que esté arriba: si otro proceso tiene tomada una fila, se rinde en vez de colgar al guardián.
+SET LOCAL lock_timeout = '2s';
+SET LOCAL statement_timeout = '10s';
 CREATE TEMP TABLE resultado (orden int, linea text) ON COMMIT DROP;
 DO $$
 DECLARE s uuid; z uuid;
@@ -55,3 +58,9 @@ BEGIN
 END $$;
 SELECT linea FROM resultado ORDER BY orden;
 ROLLBACK;
+-- Lo que este archivo promete («no queda nada en la base») se comprueba, no se supone: si alguien cambiara el ROLLBACK por
+-- un COMMIT, aquí sale FALLA.
+SELECT CASE WHEN (SELECT count(*) FROM dispositivo WHERE id_fisico LIKE 'prueba-identidad-%')
+               + (SELECT count(*) FROM pasarela WHERE id_fisico LIKE 'prueba-identidad-%') = 0
+            THEN 'OK    no quedó nada de la prueba en la base'
+            ELSE 'FALLA quedaron filas de la prueba en la base (¿COMMIT en vez de ROLLBACK?)' END;

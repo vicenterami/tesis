@@ -35,19 +35,19 @@ docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -U plat
   < plataforma/db/pruebas/zonas-horarias.sql | tee "$VT"/sql.txt
 exige "$VT"/sql.txt "${PIPESTATUS[0]}" 10 || fallos=$((fallos+1))
 
-paso "1b. Convenciones del esquema en la base real (docs/08 §6): nombres de restricciones, índice por clave foránea, disparadores"
+paso "1b. Convenciones del esquema en la base real (docs/08 §6): nombres de restricciones, índices, disparadores y funciones; índice por clave foránea; tipos"
 # 09/10: docs/08 §6 decía «✅ 32/32» y nadie lo recalculaba; una restricción de las migraciones 07 y 09 no seguía la
 # convención. Ahora lo mide la base, sin cifras escritas a mano.
 docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -X -U plataforma -d plataforma -v ON_ERROR_STOP=1 -tA \
   < plataforma/db/pruebas/convenciones.sql | tee "$VT"/convenciones.txt
-exige "$VT"/convenciones.txt "${PIPESTATUS[0]}" 3 || fallos=$((fallos+1))
+exige "$VT"/convenciones.txt "${PIPESTATUS[0]}" 7 || fallos=$((fallos+1))
 
 paso "1c. Reglas de identidad de la migración 11, plantadas en una transacción que se deshace (docs/10 §8.4 punto 24)"
 # Pasarela y dispositivo no comparten identificador; lista blanca; LoRaWAN exige pasarela; código de sitio válido. Nada
 # queda en la base: el archivo termina en ROLLBACK. La carrera de dos altas simultáneas se probó a mano (docs/16 §13).
 docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -X -U plataforma -d plataforma -v ON_ERROR_STOP=1 -tA \
   < plataforma/db/pruebas/reglas-identidad.sql | tee "$VT"/identidad.txt
-exige "$VT"/identidad.txt "${PIPESTATUS[0]}" 6 || fallos=$((fallos+1))
+exige "$VT"/identidad.txt "${PIPESTATUS[0]}" 7 || fallos=$((fallos+1))
 
 paso "2. Migraciones aplicadas = archivos en db/init (cada NN-*.sql debe estar reflejado en la base)"
 # 02: índice por regla · 03: zona_horaria · 04: iso_utc · 05: convenciones (disparadores actualizado_en, pm2_5) · 06: índice único de medicion · 07: CHECK de cuarentena.motivo · 08: medicion.recibido_en y origen_tiempo · 09: trama y cuarentena como hypertables · 10: semántica de intervalo_esperado_s · 11: vía, pasarela, estado_dispositivo y sitio.codigo · 12: nombre ck_cuarentena_motivo
@@ -399,6 +399,23 @@ if [ "$real" -lt 10 ]; then echo "FALLA contó solo $real pruebas (it( en los *.
 elif [ -z "$citas" ]; then echo "FALLA ninguna cita «N pruebas unitarias» en docs ni en el informe: ¿cambió la redacción? (no revisó nada)"; fallos=$((fallos+1))
 elif [ -n "$malas" ]; then echo "FALLA cifras de pruebas unitarias distintas de $real:"; sed 's/^/  /' <<<"$malas"; fallos=$((fallos+1))
 else echo "OK    $real pruebas unitarias; $(grep -c . <<<"$citas") cita(s) en docs e informe coinciden"; fi
+# 09/10: también la cifra por archivo («N pruebas en `eventos.spec.ts`»), que citan docs/11 y docs/16 y nadie recontaba.
+python3 -I - <<'PY' || fallos=$((fallos+1))
+import re, sys, pathlib
+citas = []
+for f in sorted(pathlib.Path('docs').glob('*.md')) + sorted(pathlib.Path('informe-oficial').glob('*.tex')):
+    if f.name.startswith('12-'): continue
+    for n, linea in enumerate(f.read_text(encoding='utf-8').splitlines(), 1):
+        citas += [(f'{f}:{n}', int(m.group(1)), m.group(2)) for m in re.finditer(r'(\d+) pruebas en `([\w.-]+\.spec\.ts)`', linea)]
+malos = []
+for donde, dice, archivo in citas:
+    rutas = list(pathlib.Path('plataforma/backend/src').rglob(archivo))
+    hay = sum(len(re.findall(r'^\s*it\(', r.read_text(encoding='utf-8'), re.M)) for r in rutas)
+    if len(rutas) != 1 or hay != dice: malos.append(f'{donde}: dice {dice} en {archivo}; hay {hay} ({len(rutas)} archivo(s))')
+for m in malos: print('FALLA', m)
+if not malos: print(f'OK    {len(citas)} cita(s) «N pruebas en archivo.spec.ts» coinciden con sus it(')
+sys.exit(1 if malos else 0)
+PY
 
 paso "2u. Imágenes fijadas por digest: cada FROM, cada imagen de registro de los compose y las que usan guiones y ejemplos (docs/11 §4)"
 # 08/10: una etiqueta puede cambiar de contenido con el mismo nombre (pasó con mosquitto). El digest fija la base; la capa
@@ -482,6 +499,41 @@ malos += [f'{k}: prioridad · etapa · horas difieren: docs/04 {" · ".join(md[k
           for k in sorted(set(md) & set(tx), key=lambda x: int(x[3:])) if md[k][-3:] != tx[k][-3:]]
 for m in malos: print('FALLA', m)
 if not malos: print(f'OK    {len(md)} historias y tareas: el anexo B tiene las mismas, con la misma prioridad, etapa y horas que docs/04')
+sys.exit(1 if malos else 0)
+PY
+
+paso "2w. Estado de la Etapa 3 (docs/18 §2): sus tareas son las de etapa 3 en docs/04, con sus horas, y los totales salen de las filas"
+# 09/10: las sumas de hechos, parciales y pendientes se escribían a mano (docs/18 §5 pedía no hacerlo) y nadie las recalculaba.
+python3 -I - <<'PY' || fallos=$((fallos+1))
+import re, sys
+md = {}
+for l in open('docs/04-backlog.md', encoding='utf-8'):
+    m = re.match(r'\|\s*\*\*((?:HU|TT)-\d+)\*\*\s*\|(.*)\|\s*$', l)
+    if m:
+        c = [x.replace('**', '').strip() for x in m.group(2).split('|')]
+        md[m.group(1)] = (c[-2], c[-1])  # etapa, horas
+t = open('docs/18-estado-etapa3.md', encoding='utf-8').read()
+sec = re.search(r'^## 2\. Tareas de la Etapa 3: (\d+) elementos, (\d+) h.*?$(.*?)^\*\*Pasadas', t, re.M | re.S)
+if not sec: print('FALLA no encontré la tabla de docs/18 §2 (¿cambió su título?)'); sys.exit(1)
+n_decl, h_decl, cuerpo = int(sec.group(1)), int(sec.group(2)), sec.group(3)
+filas = re.findall(r'^\| ((?:HU|TT)-\d+)[^|]*\|[^|]*\| (\d+) \| (✅|🟡|⬜) \|', cuerpo, re.M)
+if len(filas) < 5 or len(md) < 60: print(f'FALLA leí solo {len(filas)} filas de docs/18 §2 y {len(md)} de docs/04'); sys.exit(1)
+malos = []
+resumen = re.search(r'\*\*Hechos: (\d+) \((\d+) h\) · parciales: (\d+) \((\d+) h\) · pendientes: (\d+) \((\d+) h\)\.\*\*', cuerpo)
+if not resumen: malos.append('docs/18 §2: no encontré la línea «Hechos … parciales … pendientes»')
+else:
+    for i, est, nombre in ((1, '✅', 'hechos'), (3, '🟡', 'parciales'), (5, '⬜', 'pendientes')):
+        n = sum(1 for f in filas if f[2] == est); h = sum(int(f[1]) for f in filas if f[2] == est)
+        if (n, h) != (int(resumen.group(i)), int(resumen.group(i + 1))):
+            malos.append(f'docs/18 §2 dice {nombre}: {resumen.group(i)} ({resumen.group(i + 1)} h); las filas suman {n} ({h} h)')
+total_h = sum(int(f[1]) for f in filas)
+if (len(filas), total_h) != (n_decl, h_decl): malos.append(f'docs/18 §2 dice {n_decl} elementos y {h_decl} h; las filas suman {len(filas)} y {total_h} h')
+ids18, etapa3 = {f[0] for f in filas}, {k for k, (e, _) in md.items() if e == '3'}
+malos += [f'{k}: está en docs/18 §2, pero en docs/04 su etapa es {md[k][0] if k in md else "(no existe)"}' for k in sorted(ids18 - etapa3)]
+malos += [f'{k}: docs/04 lo pone en la Etapa 3 y docs/18 §2 no lo lista' for k in sorted(etapa3 - ids18)]
+malos += [f'{f[0]}: docs/18 dice {f[1]} h y docs/04 {md[f[0]][1]} h' for f in filas if f[0] in md and md[f[0]][1] != f[1]]
+for m in malos: print('FALLA', m)
+if not malos: print(f'OK    docs/18 §2: las {len(filas)} tareas de la Etapa 3 son las de docs/04, con sus horas; los totales salen de las filas')
 sys.exit(1 if malos else 0)
 PY
 

@@ -2,6 +2,7 @@ import { Pool } from 'pg';
 import { AlertasService } from '../alertas/alertas.service';
 import { BrokerService } from '../broker/broker.service';
 import { SupervisionService } from '../supervision/supervision.service';
+import { EventoPanel, EventosService } from '../tiempo-real/eventos.service';
 import { PlanoAdaptador } from './adaptadores/plano.adaptador';
 import { SenmlAdaptador } from './adaptadores/senml.adaptador';
 import { RecepcionService } from './recepcion.service';
@@ -14,8 +15,9 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
   // propósito (decisión del 23/09): el ruido de un rechazo es evidencia de que el filtro actúa; silenciarlo
   // esconde comportamiento.
   const TOPICO = 'sitio/uct/dispositivo/dev-0001/temperatura';
+  const T_BASE = new Date('2026-10-09T15:00:00.123456Z'); // la marca que «pone la base» en los RETURNING
 
-  function armar(dispositivo: { id: string; estado: string; sitio_codigo?: string } | undefined) {
+  function armar(dispositivo: { id: string; estado: string; sitio_codigo?: string } | undefined, duplicada = false) {
     const canal = { id: 'k1', magnitud: 'temperatura', unidad_canonica: 'Cel', rango_min: -40, rango_max: 85 };
     const query = jest.fn((sql: string, params?: unknown[]) => {
       // El dispositivo de prueba está registrado en el sitio «uct», el mismo del tópico, salvo que la prueba diga otro.
@@ -24,6 +26,11 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
       }
       // Solo el canal «temperatura» está declarado para el dispositivo de prueba; cualquier otro, no.
       if (sql.trimStart().startsWith('SELECT c.id, m.codigo AS magnitud')) return Promise.resolve({ rows: params?.[1] === 'temperatura' ? [canal] : [], rowCount: params?.[1] === 'temperatura' ? 1 : 0 });
+      // Una lectura repetida (mismo canal y tiempo) no inserta nada: ON CONFLICT DO NOTHING devuelve 0 filas.
+      if (sql.trimStart().startsWith('INSERT INTO medicion')) {
+        return Promise.resolve(duplicada ? { rows: [], rowCount: 0 } : { rows: [{ tiempo: T_BASE }], rowCount: 1 });
+      }
+      if (sql.startsWith('INSERT INTO estado_dispositivo')) return Promise.resolve({ rows: [{ visto_por_ultima_vez: T_BASE }], rowCount: 1 });
       return Promise.resolve({ rows: [], rowCount: 1 });
     });
     const pool = { query } as unknown as Pool;
@@ -32,8 +39,12 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
     const marcarVivo = jest.fn();
     const alertas = { evaluar } as unknown as AlertasService;
     const supervision = { marcarVivo } as unknown as SupervisionService;
-    const servicio = new RecepcionService(pool, broker, alertas, supervision, new SenmlAdaptador(), new PlanoAdaptador());
-    return { servicio, query, marcarVivo, evaluar };
+    // Lo que el pipeline anuncia al panel en vivo (TT-39), en orden.
+    const eventos = new EventosService();
+    const publicados: EventoPanel[] = [];
+    eventos.flujo().subscribe((e) => publicados.push(e));
+    const servicio = new RecepcionService(pool, broker, alertas, supervision, eventos, new SenmlAdaptador(), new PlanoAdaptador());
+    return { servicio, query, marcarVivo, evaluar, publicados };
   }
 
   const cuarentenas = (query: jest.Mock) =>
@@ -198,5 +209,32 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
 
     expect(cuarentenas(query)).toEqual(['dado_de_baja']);
     expect(marcarVivo).not.toHaveBeenCalled();
+  });
+
+  // TT-39: el panel se entera solo de lo que ya está guardado, con la marca de tiempo que puso la base.
+  it('TT-39: lectura guardada → evento "medicion" con la marca de la base, y después "visto"', async () => {
+    const { servicio, publicados } = armar({ id: 'd1', estado: 'activo' });
+    await servicio.procesar(TOPICO, Buffer.from('22.4'));
+    expect(publicados).toEqual([
+      { tipo: 'medicion', dispositivo_id: 'd1', canal_id: 'k1', valor: 22.4, unidad: 'Cel', tiempo: T_BASE.toISOString() },
+      { tipo: 'visto', dispositivo_id: 'd1', tiempo: T_BASE.toISOString() },
+    ]);
+  });
+
+  it('TT-39: lectura repetida → sin evento "medicion" (no hay nada nuevo que dibujar), pero sí "visto"', async () => {
+    const { servicio, publicados } = armar({ id: 'd1', estado: 'activo' }, true);
+    await servicio.procesar(TOPICO, Buffer.from('22.4'));
+    expect(publicados.map((e) => e.tipo)).toEqual(['visto']);
+  });
+
+  it('TT-39: trama en cuarentena → solo "visto"; no registrado o dado de baja → ningún evento', async () => {
+    const malformada = armar({ id: 'd1', estado: 'activo' });
+    await malformada.servicio.procesar(TOPICO, Buffer.from('hola'));
+    expect(malformada.publicados.map((e) => e.tipo)).toEqual(['visto']);
+    for (const dispositivo of [undefined, { id: 'd9', estado: 'baja' }]) {
+      const { servicio, publicados } = armar(dispositivo);
+      await servicio.procesar(TOPICO, Buffer.from('22.4'));
+      expect(publicados).toEqual([]);
+    }
   });
 });

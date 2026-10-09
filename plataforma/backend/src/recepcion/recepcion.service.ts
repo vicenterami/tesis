@@ -4,6 +4,7 @@ import { AlertasService } from '../alertas/alertas.service';
 import { BrokerService } from '../broker/broker.service';
 import { POOL } from '../db/db.module';
 import { SupervisionService } from '../supervision/supervision.service';
+import { EventosService } from '../tiempo-real/eventos.service';
 import { Adaptador, TramaMalformada } from './adaptadores/adaptador';
 import { PlanoAdaptador } from './adaptadores/plano.adaptador';
 import { SenmlAdaptador } from './adaptadores/senml.adaptador';
@@ -54,6 +55,7 @@ export class RecepcionService implements OnModuleInit {
     private readonly broker: BrokerService,
     private readonly alertas: AlertasService,
     private readonly supervision: SupervisionService,
+    private readonly eventos: EventosService,
     senml: SenmlAdaptador,
     plano: PlanoAdaptador,
   ) {
@@ -142,10 +144,11 @@ export class RecepcionService implements OnModuleInit {
       // recibido_en y origen_tiempo (migración 08): la fila dice de dónde salió `tiempo` y permite medir la
       // deriva del reloj del emisor (recibido_en − tiempo, RF-47). Con origen 'recepcion' esa deriva no
       // significa nada (tiempo lo puso la base microsegundos después): la vista de salud la excluye.
-      const r = await this.pool.query(
+      const r = await this.pool.query<{ tiempo: Date }>(
         `INSERT INTO medicion (canal_id, tiempo, valor, unidad, recibido_en, origen_tiempo)
          VALUES ($1, COALESCE($2::timestamptz, clock_timestamp()), $3, $4, $5, $6)
-         ON CONFLICT (canal_id, tiempo) DO NOTHING`,
+         ON CONFLICT (canal_id, tiempo) DO NOTHING
+         RETURNING tiempo`,
         [canal.id, tiempoDelEmisor ? tiempo : null, valor, canal.unidad_canonica, recibidoEn,
           tiempoDelEmisor ? adaptador?.origenTiempo : 'recepcion'],
       );
@@ -154,6 +157,11 @@ export class RecepcionService implements OnModuleInit {
         continue; // ya estaba: no se reevalúa el umbral ni se cuenta como nueva
       }
       guardadas++;
+      // Al panel en vivo (TT-39), ya guardada: el INSERT se confirma solo (sin transacción por trama).
+      this.eventos.publicar({
+        tipo: 'medicion', dispositivo_id: dispositivo.id, canal_id: canal.id, valor, unidad: canal.unidad_canonica,
+        tiempo: r.rows[0].tiempo.toISOString(), // la marca que puso la base, no la de JavaScript
+      });
       // ── [5] Alertar: ¿la medición cruza un umbral de este canal? (en mantenimiento no abre condiciones, RF-22) ──
       await this.alertas.evaluar(dispositivo.id, canal.id, ctx.idFisico, valor, canal.unidad_canonica, dispositivo.estado === 'mantenimiento');
     }
@@ -170,11 +178,16 @@ export class RecepcionService implements OnModuleInit {
 
     // ── [6] Supervisar: el dispositivo dio señales de vida; si estaba "sin comunicación", se cierra ──
     // En estado_dispositivo, no en dispositivo: la fila que edita una persona no cambia con cada trama (migración 11).
-    await this.pool.query(
+    const visto = await this.pool.query<{ visto_por_ultima_vez: Date }>(
       `INSERT INTO estado_dispositivo (dispositivo_id, visto_por_ultima_vez) VALUES ($1, now())
-       ON CONFLICT (dispositivo_id) DO UPDATE SET visto_por_ultima_vez = EXCLUDED.visto_por_ultima_vez`,
+       ON CONFLICT (dispositivo_id) DO UPDATE SET visto_por_ultima_vez = EXCLUDED.visto_por_ultima_vez
+       RETURNING visto_por_ultima_vez`,
       [dispositivo.id],
     );
+    this.eventos.publicar({
+      tipo: 'visto', dispositivo_id: dispositivo.id,
+      tiempo: visto.rows[0].visto_por_ultima_vez.toISOString(),
+    });
     await this.supervision.marcarVivo(dispositivo.id, ctx.idFisico);
     if (guardadas || duplicadas) {
       const dup = duplicadas ? ` · ${duplicadas} duplicada(s) ignorada(s)` : '';

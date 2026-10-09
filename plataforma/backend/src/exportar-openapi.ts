@@ -4,11 +4,12 @@ import { writeFileSync } from 'node:fs';
 import { AppModule } from './app.module';
 import { construirDocumento } from './openapi';
 
-// `pnpm openapi`: levanta la aplicación SIN escuchar en ningún puerto, genera el contrato y lo
-// escribe en openapi.json. Requiere la base y el broker (los módulos se conectan al iniciarse).
+// `pnpm openapi`: arma la aplicación SIN iniciarla ni escuchar en ningún puerto, genera el contrato y lo escribe en
+// openapi.json. El documento sale de los decoradores, así que no hace falta la base ni el broker. Hasta el 09/10 la
+// iniciaba (app.init) y se conectaba al broker con la identidad del backend (clientId fijo): con la pila arriba, el
+// broker debe desconectar al cliente ya conectado con ese mismo id, o sea al backend en marcha (MQTT 3.1.1, [MQTT-3.1.4-2]).
 async function exportar(): Promise<void> {
   const app = await NestFactory.create(AppModule, { logger: ['error'] });
-  await app.init();
   const doc = construirDocumento(app);
   writeFileSync('openapi.json', JSON.stringify(doc, null, 2) + '\n');
   const n = Object.keys(doc.paths).length;

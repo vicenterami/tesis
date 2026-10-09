@@ -20,6 +20,8 @@ src/
 │   ├── adaptadores/           # filtro 2: senml (nativo, RFC 8428) y plano (número o JSON simple)
 │   └── *.spec.ts              # pruebas unitarias de las funciones puras (jest)
 ├── consulta/                  # M5: API de solo lectura (dispositivos, canales, condiciones, cuarentena)
+├── tiempo-real/               # TT-39: canal SSE hacia el panel (GET /eventos) y bus de eventos en memoria
+├── retencion/                 # borra con drop_chunks lo vencido de medicion, trama y cuarentena
 ├── openapi.ts                 # contrato OpenAPI generado desde los decoradores; /docs
 └── salud/salud.controller.ts  # GET /salud
 ```
@@ -128,7 +130,7 @@ docker compose exec timescaledb psql -U plataforma -d plataforma -c "SELECT tipo
 `SUPERVISION_INTERVALO_S` en el `.env` cambia la frecuencia del barrido (60 s por defecto).
 
 Pendientes del pipeline: adaptador «milesight» (ruta B, la del sistema) y, solo si se activa la ruta A, el de ChirpStack;
-notificación de condiciones al panel (SSE, `docs/10 §8.4` punto 1) y por correo.
+notificación de condiciones por correo (al panel ya llegan por el canal en vivo, más abajo).
 
 ## API de consulta (M5)
 
@@ -156,6 +158,18 @@ curl -s "http://127.0.0.1:3000/condiciones?abiertas=true"
 Entradas inválidas responden `400` con el motivo (UUID mal formado, fecha no ISO, intervalo fuera
 de la lista, límite fuera de rango). El intervalo es una **lista cerrada**: nunca se interpola texto
 libre en SQL.
+
+## Canal de tiempo real (TT-39)
+
+`GET /eventos` abre un flujo SSE (`text/event-stream`) que el panel lee con `EventSource`. Cada evento sale después de
+quedar guardado: `medicion` (dispositivo, canal, valor, unidad, tiempo), `visto` (señal de vida) y `condicion` (umbral o
+sin comunicación, abierta o cerrada); además, un `latido` cada 25 s. Filtros opcionales `?dispositivo=` o `?canal=`
+(UUID). Rechaza la petición que el navegador marca como de otro sitio (`Sec-Fetch-Site` u `Origin`, 403) y, con 50
+flujos abiertos, responde 503 (`docs/10 §5`).
+
+```bash
+curl -N http://127.0.0.1:3000/eventos
+```
 
 ## Reglas del proyecto en este código
 

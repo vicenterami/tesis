@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nest
 import { ConfigService } from '@nestjs/config';
 import { Pool } from 'pg';
 import { POOL } from '../db/db.module';
+import { EventosService } from '../tiempo-real/eventos.service';
 
 // M4 Supervisión de salud — filtro 6 completo.
 //
@@ -16,7 +17,11 @@ export class SupervisionService implements OnModuleInit, OnModuleDestroy {
   private readonly log = new Logger('supervision');
   private temporizador?: NodeJS.Timeout;
 
-  constructor(@Inject(POOL) private readonly pool: Pool, private readonly config: ConfigService) {}
+  constructor(
+    @Inject(POOL) private readonly pool: Pool,
+    private readonly config: ConfigService,
+    private readonly eventos: EventosService,
+  ) {}
 
   onModuleInit(): void {
     const cadaSeg = this.config.get<number>('SUPERVISION_INTERVALO_S', 60);
@@ -67,6 +72,7 @@ export class SupervisionService implements OnModuleInit, OnModuleDestroy {
         [d.id, { tipo: 'sin_comunicacion', silencio_s: d.silencio_s }],
       );
       this.log.warn(`${d.id_fisico}: sin comunicación hace ${d.silencio_s} s · condición abierta`);
+      this.eventos.publicar({ tipo: 'condicion', dispositivo_id: d.id, condicion: 'sin_comunicacion', estado: 'abierta' });
     }
 
     // 2) Red de seguridad: condiciones abiertas de dispositivos que ya volvieron → cerrarlas.
@@ -77,7 +83,10 @@ export class SupervisionService implements OnModuleInit, OnModuleDestroy {
           AND e.visto_por_ultima_vez >= now() - (d.intervalo_esperado_s * 2) * INTERVAL '1 second'
         RETURNING d.id, d.id_fisico`,
     );
-    for (const d of recuperados.rows) this.log.log(`${d.id_fisico}: comunicación restablecida · condición cerrada`);
+    for (const d of recuperados.rows) {
+      this.log.log(`${d.id_fisico}: comunicación restablecida · condición cerrada`);
+      this.eventos.publicar({ tipo: 'condicion', dispositivo_id: d.id, condicion: 'sin_comunicacion', estado: 'cerrada' });
+    }
   }
 
   // Lo llama el pipeline en cada trama aceptada: cierra la condición si estaba abierta.
@@ -92,6 +101,7 @@ export class SupervisionService implements OnModuleInit, OnModuleDestroy {
         [dispositivoId, { tipo: 'sin_comunicacion' }],
       );
       this.log.log(`${idFisico}: comunicación restablecida · condición cerrada`);
+      this.eventos.publicar({ tipo: 'condicion', dispositivo_id: dispositivoId, condicion: 'sin_comunicacion', estado: 'cerrada' });
     }
   }
 }

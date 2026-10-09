@@ -1,5 +1,6 @@
 import { ConfigService } from '@nestjs/config';
 import { Pool } from 'pg';
+import { EventoPanel, EventosService } from '../tiempo-real/eventos.service';
 import { SupervisionService } from './supervision.service';
 
 // El barrido corre en un temporizador, sin petición HTTP que atrape un rechazo (a diferencia del
@@ -12,7 +13,7 @@ describe('SupervisionService.barridoSeguro: una base caída no debe tumbar el pr
     );
     const pool = { query } as unknown as Pool;
     const config = { get: () => 60 } as unknown as ConfigService;
-    return new SupervisionService(pool, config);
+    return new SupervisionService(pool, config, new EventosService());
   }
 
   it('la base caída: barridoSeguro NO rechaza (el temporizador puede seguir llamándolo)', async () => {
@@ -36,13 +37,53 @@ describe('SupervisionService.barridoSeguro: una base caída no debe tumbar el pr
       escrituras.push(s.split(/\s+/).slice(0, 3).join(' '));
       return Promise.resolve({ rows: [], rowCount: s.startsWith('INSERT INTO condicion') ? 0 : 1 });
     });
-    const servicio = new SupervisionService({ query } as unknown as Pool, { get: () => 60 } as unknown as ConfigService);
+    const eventos = new EventosService();
+    const publicados: EventoPanel[] = [];
+    eventos.flujo().subscribe((e) => publicados.push(e));
+    const servicio = new SupervisionService({ query } as unknown as Pool, { get: () => 60 } as unknown as ConfigService, eventos);
     await expect(servicio.barrer()).resolves.toBeUndefined();
     expect(escrituras).toEqual(['INSERT INTO condicion']);
+    expect(publicados).toEqual([]); // tampoco un aviso repetido al panel
   });
 
   it('base sana: barridoSeguro no rechaza', async () => {
     const servicio = armar(false);
     await expect(servicio.barridoSeguro()).resolves.toBeUndefined();
+  });
+});
+
+// TT-39: el panel se entera de cada condición «sin comunicación» que se abre o se cierra, después de escribirla.
+describe('SupervisionService: avisa al panel en vivo (TT-39)', () => {
+  const evento = (dispositivo_id: string, estado: 'abierta' | 'cerrada'): EventoPanel =>
+    ({ tipo: 'condicion', dispositivo_id, condicion: 'sin_comunicacion', estado });
+
+  function armar(cierraAlMarcarVivo: boolean) {
+    const query = jest.fn((sql: string) => {
+      const s = sql.trim();
+      if (s.startsWith('SELECT d.id, d.id_fisico')) return Promise.resolve({ rows: [{ id: 'd1', id_fisico: 'dev-0001', silencio_s: 99 }], rowCount: 1 });
+      if (s.startsWith('UPDATE condicion c SET')) return Promise.resolve({ rows: [{ id: 'd2', id_fisico: 'dev-0002' }], rowCount: 1 });
+      if (s.startsWith('UPDATE condicion SET')) return Promise.resolve({ rows: [], rowCount: cierraAlMarcarVivo ? 1 : 0 });
+      return Promise.resolve({ rows: [], rowCount: 1 });
+    });
+    const eventos = new EventosService();
+    const publicados: EventoPanel[] = [];
+    eventos.flujo().subscribe((e) => publicados.push(e));
+    const servicio = new SupervisionService({ query } as unknown as Pool, { get: () => 60 } as unknown as ConfigService, eventos);
+    return { servicio, publicados };
+  }
+
+  it('el barrido abre la de uno y cierra la de otro (red de seguridad) → dos avisos, en ese orden', async () => {
+    const { servicio, publicados } = armar(false);
+    await servicio.barrer();
+    expect(publicados).toEqual([evento('d1', 'abierta'), evento('d2', 'cerrada')]);
+  });
+
+  it('marcarVivo: si cerró una condición avisa; si no había ninguna abierta, calla', async () => {
+    const cierra = armar(true);
+    await cierra.servicio.marcarVivo('d1', 'dev-0001');
+    expect(cierra.publicados).toEqual([evento('d1', 'cerrada')]);
+    const nada = armar(false);
+    await nada.servicio.marcarVivo('d1', 'dev-0001');
+    expect(nada.publicados).toEqual([]);
   });
 });

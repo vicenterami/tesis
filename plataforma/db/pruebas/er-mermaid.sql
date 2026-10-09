@@ -8,7 +8,10 @@ WITH cols AS (
          EXISTS (SELECT 1 FROM information_schema.key_column_usage k JOIN information_schema.table_constraints tc USING (constraint_name, table_schema)
                  WHERE tc.constraint_type='PRIMARY KEY' AND k.table_name=c.table_name AND k.column_name=c.column_name) AS pk,
          EXISTS (SELECT 1 FROM information_schema.key_column_usage k JOIN information_schema.table_constraints tc USING (constraint_name, table_schema)
-                 WHERE tc.constraint_type='FOREIGN KEY' AND k.table_name=c.table_name AND k.column_name=c.column_name) AS fk
+                 WHERE tc.constraint_type='FOREIGN KEY' AND k.table_name=c.table_name AND k.column_name=c.column_name) AS fk,
+         -- Una columna DEPRECADA (su COMMENT lo dice) sigue en la base hasta que una migración la quite: la figura la marca
+         -- para que no se lea como una segunda fuente del mismo dato (docs/08 §6).
+         coalesce(col_description(('public.' || quote_ident(c.table_name))::regclass, c.ordinal_position::int) LIKE 'DEPRECADA%', false) AS deprecada
   FROM information_schema.columns c WHERE c.table_schema='public'
 ), rels AS (
   SELECT DISTINCT tc.table_name AS hija, ccu.table_name AS padre
@@ -20,6 +23,7 @@ SELECT 'erDiagram'
 UNION ALL SELECT '    ' || padre || ' ||--o{ ' || hija || ' : ' || hija FROM rels
 UNION ALL SELECT string_agg(l, E'\n') FROM (
   SELECT '    ' || table_name || ' {' || E'\n' ||
-         string_agg('        ' || tipo || ' ' || column_name || CASE WHEN pk AND fk THEN ' PK,FK' WHEN pk THEN ' PK' WHEN fk THEN ' FK' ELSE '' END, E'\n' ORDER BY ordinal_position)
+         string_agg('        ' || tipo || ' ' || column_name || CASE WHEN pk AND fk THEN ' PK,FK' WHEN pk THEN ' PK' WHEN fk THEN ' FK' ELSE '' END
+                    || CASE WHEN deprecada THEN ' "deprecada"' ELSE '' END, E'\n' ORDER BY ordinal_position)
          || E'\n    }' AS l
   FROM cols GROUP BY table_name ORDER BY table_name) s;

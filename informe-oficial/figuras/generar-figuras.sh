@@ -51,7 +51,8 @@ CAMBIADOS=""
 for f in "$TMP"/*.mmd; do n=$(basename "$f" .mmd)
   if ! diff -q "$f" "$MMD/$n.mmd" >/dev/null 2>&1 || [[ ! -f "$OUT/$n.pdf" ]]; then CAMBIADOS="$CAMBIADOS $n"; fi
 done
-cp "$TMP"/*.mmd "$MMD/"
+# Las fuentes se copian al informe DESPUÉS de renderizar cada una (paso 4). Hasta el 09/10 se copiaban antes: un render que
+# fallaba dejaba la fuente nueva con el PDF viejo, y la corrida siguiente (y --verificar) decía «sin cambios».
 python3 - "$TMP/modelo-datos.mmd" <<'PY'
 import re, sys, pathlib
 er = pathlib.Path(sys.argv[1]).read_text().strip()
@@ -67,16 +68,18 @@ PY
 
 # 4) Render a PDF (vectorial) y PNG (revisión)
 mkdir -p "$OUT" privado/previsualizaciones
+[[ "${1:-}" == "--forzar" ]] && CAMBIADOS=$(cd "$TMP" && ls *.mmd | sed 's/\.mmd$//')
 [[ -z "$CAMBIADOS" ]] && echo "figuras sin cambios: no se vuelve a renderizar (usa --forzar para rehacerlas)"
-[[ "${1:-}" == "--forzar" ]] && CAMBIADOS=$(cd "$MMD" && ls *.mmd | sed 's/\.mmd$//')
+cp "$MMD/tema.json" "$TMP/tema.json"
 for n in $CAMBIADOS; do
-  f="$MMD/$n.mmd"
-  docker run --rm -u "$(id -u):$(id -g)" -v "$PWD/$MMD:/in" -v "$PWD/$OUT:/out" "$IMG" \
+  docker run --rm -u "$(id -u):$(id -g)" -v "$TMP:/in:ro" -v "$PWD/$OUT:/out" "$IMG" \
     -i "/in/$n.mmd" -o "/out/$n.pdf" -c /in/tema.json --pdfFit -q
-  docker run --rm -u "$(id -u):$(id -g)" -v "$PWD/$MMD:/in" -v "$PWD/privado/previsualizaciones:/out" "$IMG" \
+  docker run --rm -u "$(id -u):$(id -g)" -v "$TMP:/in:ro" -v "$PWD/privado/previsualizaciones:/out" "$IMG" \
     -i "/in/$n.mmd" -o "/out/$n.png" -c /in/tema.json -w 2000 -b white -q
+  cp "$TMP/$n.mmd" "$MMD/"   # solo tras renderizarla bien (set -e corta en el primer fallo)
   echo "render   $n"
 done
+cp "$TMP"/*.mmd "$MMD/"   # las que no cambiaron: mismo contenido
 # Legibilidad, medida y no supuesta (07/10): a 13,5 cm de ancho (383,8 pt) la letra del diagrama (≈ 12 pt en el PDF
 # generado) queda en 12 × 383,8 / ancho. Las apaisadas (sec-*) disponen del alto de página: no se estiman aquí.
 for f in "$OUT"/*.pdf; do

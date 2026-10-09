@@ -9,7 +9,7 @@ export function construirDocumento(app: INestApplication): OpenAPIObject {
   const config = new DocumentBuilder()
     .setTitle('Plataforma de registro, monitoreo y gestión de datos de sensores')
     .setDescription(
-      'API de consulta (M5) para el panel. Solo lectura. Todos los instantes en ISO 8601 UTC (sufijo Z); ' +
+      'API de consulta (M5) y canal de tiempo real (SSE) para el panel. Solo lectura. Todos los instantes en ISO 8601 UTC (sufijo Z); ' +
         'las agregaciones por día se calculan en la zona horaria del sitio. Rangos semiabiertos [desde, hasta).',
     )
     .setVersion('0.1.0')
@@ -17,6 +17,7 @@ export function construirDocumento(app: INestApplication): OpenAPIObject {
     .addTag('canales', 'Series de tiempo agregadas por canal')
     .addTag('condiciones', 'Estados anómalos abiertos y cerrados')
     .addTag('cuarentena', 'Tramas rechazadas por el pipeline')
+    .addTag('tiempo real', 'Canal SSE hacia el panel: mediciones, señales de vida y condiciones (TT-39)')
     .addTag('salud', 'Estado del servicio')
     .build();
   return SwaggerModule.createDocument(app, config);

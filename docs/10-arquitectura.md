@@ -179,7 +179,7 @@ sequenceDiagram
 
     Admin->>FE: Asistente "nuevo dispositivo"<br/>(vía, formato y, si es LoRaWAN, su pasarela)
     FE->>API: POST /dispositivos (Etapa 3)<br/>{zona, id_fisico, via, formato, pasarela?, canales[]}
-    API->>DB: INSERT dispositivo, canal×N,<br/>estado_dispositivo
+    API->>DB: INSERT dispositivo, canal×N
     alt vía mqtt
         API->>API: genera credencial (secreto aleatorio)
         API->>DB: INSERT credencial (solo el hash)
@@ -196,8 +196,8 @@ sequenceDiagram
     MQ->>MQ: valida credencial y ACL
     Dev->>MQ: PUBLISH<br/>sitio/…/dispositivo/<id>/<magnitud>
     MQ->>API: entrega la trama (suscriptor)
-    API->>DB: UPDATE estado_dispositivo<br/>.visto_por_ultima_vez
-    API-->>FE: SSE "dispositivo en línea"
+    API->>DB: estado_dispositivo.visto_por_ultima_vez<br/>(la primera trama crea su fila)
+    API-->>FE: SSE «visto» (el panel lo muestra en línea)
     FE-->>Admin: Estado: en línea ✅
 ```
 
@@ -376,7 +376,7 @@ cliente ──HTTP──► Express ⊂ NestJS ──► servicio ──► pg �
 
 - **Express** es la biblioteca de servidor HTTP más usada de Node.js; NestJS la usa por debajo
   (`@nestjs/platform-express`). El proceso de Node es el servidor; Express recibe cada petición y
-  entrega la respuesta. Es **la API**: REST, 6 rutas, descrita en el contrato OpenAPI. Express no toca la base.
+  entrega la respuesta. Es **la API**: 6 rutas REST y el canal SSE `/eventos` (§5), descritos en el contrato OpenAPI. Express no toca la base.
 - **`pg`** (node-postgres) es el conductor de la base: mantiene un *pool* de 5 conexiones
   (`db/db.module.ts`) y envía **SQL directo** con parámetros `$1, $2…`; el valor nunca se pega dentro
   del texto SQL, lo que evita la inyección. Sin ORM, por la razón de `docs/07` (series de tiempo con
@@ -411,9 +411,9 @@ sequenceDiagram
     DB-->>API: ~100 puntos agregados
     API-->>FE: [[tiempos],[valores]]
     FE->>FE: uPlot dibuja el histórico
-    FE->>API: SSE · GET …/eventos (EventSource, misma sesión)
-    loop cada trama nueva que pasa el pipeline
-        API-->>FE: event: medicion · data: {canal_id, valor, tiempo}
+    FE->>API: SSE · GET /eventos?canal={id} (EventSource, con la sesión desde M7)
+    loop cada lectura nueva, ya guardada
+        API-->>FE: event: medicion · data: {dispositivo_id, canal_id, valor, unidad, tiempo}
         FE->>FE: uPlot.setData (añade el punto)
     end
 ```
@@ -421,19 +421,25 @@ sequenceDiagram
 El histórico viene **agregado por la base de datos** (`time_bucket`), no crudo: el navegador recibe
 cientos de puntos, no millones, sin importar cuánto tiempo lleve el sensor transmitiendo.
 
-**El canal de tiempo real es del backend y está autenticado** (decidido el 23/09/2026; TT-39). Corre
-dentro del mismo 443 detrás del proxy (HTTPS, nunca HTTP), se abre con la misma sesión del panel y se
-rechaza antes del primer evento si falta; el backend valida la cabecera `Origin` contra el dominio del
-panel y limita el tamaño y la tasa de lo que recibe. Son las recomendaciones de OWASP para WebSocket,
+**El canal de tiempo real es del backend** (decidido el 23/09/2026; TT-39). **Diseño objetivo, con la sesión
+(M7):** corre dentro del mismo 443 detrás del proxy (HTTPS, nunca HTTP), se abre con la misma sesión del panel y
+se rechaza antes del primer evento si falta; el backend valida el origen de la petición y limita los flujos por
+usuario y su tasa. Son las recomendaciones de OWASP para WebSocket,
 que no trae autenticación propia (`docs/11 §4`). Como el canal es casi unidireccional —el servidor
 empuja, el navegador solo elige qué canal mira—, la alternativa **SSE** (*Server-Sent Events*: HTTP
 unidireccional, reconexión nativa, sin biblioteca extra) es más simple y cabe en el mismo 443.
 **Decidido el 06/10/2026: SSE** (§8.4, punto 1); los diagramas lo muestran así desde esa fecha. Lo que OWASP
 pide para WebSocket se traslada a SSE en lo que aplica: misma sesión (la cookie viaja sola en `EventSource`),
 autorización por canal antes de abrir el flujo y límite de flujos por usuario; ninguna de las dos toca el broker.
-**En la Etapa 3 el canal corre sin sesión, como la API:** solo en la red local (127.0.0.1), con la lista blanca de `Origin`
-y los límites de tamaño y tasa; la sesión se le agrega con M7 (HU-18, Etapa 4, desde el corte del 08/10). Ninguno de los
-dos se publica en Internet antes de eso (`docs/11 §8`).
+**En la Etapa 3 el canal corre sin sesión, como la API:** solo en la red local (127.0.0.1); la sesión se le agrega con M7
+(HU-18, Etapa 4, desde el corte del 08/10). Ninguno de los dos se publica en Internet antes de eso (`docs/11 §8`).
+**Implementado el 09/10 (TT-39):** `GET /eventos`, con filtro opcional `?dispositivo=` o `?canal=` (un UUID; otro valor,
+400). Emite `medicion`, `visto` y `condicion`, cada uno después de quedar guardado en la base, y un `latido` cada 25 s. Se
+rechaza (403) la petición que el navegador marca como de otro sitio: `Sec-Fetch-Site` distinto de `same-origin` o `none`,
+o un `Origin` de otro host o puerto. El panel lo sirve el propio backend y, en desarrollo, Vite le reenvía las peticiones,
+así que no hace falta una lista de orígenes; el proxy reenvía el `Host` con su puerto. Eso no detiene el *DNS rebinding*,
+que para el navegador es el mismo origen (`docs/11 §4`). Con 50 flujos abiertos responde 503; el límite por usuario llega
+con la sesión. Pruebas: `docs/16 §14`.
 
 > Fuentes (consultadas el 23/09/2026): OWASP, *WebSocket Security Cheat Sheet*,
 > https://cheatsheetseries.owasp.org/cheatsheets/WebSocket_Security_Cheat_Sheet.html · NestJS, *Gateways*
@@ -523,7 +529,9 @@ stop` o un redespliegue) el backend cierra en orden: detiene el supervisor, se d
 Nest no escucha señales salvo que se active (`enableShutdownHooks()` en `main.ts`), el contenedor
 ignoraba la señal, Docker esperaba 10 s y lo mataba (código 137), y los cierres de cada módulo nunca
 corrían aunque el código los declaraba. Medido: parada en 10,0 s con código 137 antes; en 0,3 s con
-código 0 después, y el broker registra la despedida del cliente.
+código 0 después, y el broker registra la despedida del cliente. **Desde el 09/10 (TT-39)** además corta las
+conexiones del canal en vivo: un flujo SSE no termina solo y el cierre esperaba a que el navegador se fuera. Corta
+solo esas: una petición normal en curso termina y responde, porque el servidor la espera (`docs/16 §14`).
 
 **Registros (27/09/2026).** El backend escribe **un evento por línea en JSON** cuando corre en
 contenedor (`LOG_FORMATO=json`, fijado en el archivo base de Compose): cada línea trae nivel,
@@ -933,8 +941,10 @@ construirlo por anticipado. Cada afirmación sobre una herramienta tiene su fuen
 ### 9.2 Por qué escala así
 
 1. **El backend no guarda estado**: todo vive en la base. Copiar instancias es trivial. Lo único «con dueño» es
-   la suscripción MQTT (una sesión persistente por `clientId`) y el barrido del supervisor: el broker reparte con
-   `$share` y el barrido corre en una sola instancia mediante un cerrojo (`pg_advisory_lock`). El orden entre
+   la suscripción MQTT (una sesión persistente por `clientId`), el barrido del supervisor y, desde el 09/10, el bus
+   del canal en vivo (§5), que vive en la memoria del proceso: el broker reparte con `$share`, el barrido corre en
+   una sola instancia mediante un cerrojo (`pg_advisory_lock`) y el bus pasaría a `LISTEN/NOTIFY` de PostgreSQL,
+   porque con varias instancias cada una solo avisaría a los navegadores conectados a ella. El orden entre
    tramas del mismo dispositivo deja de estar garantizado entre instancias; la clave única `(canal, tiempo)` sigue
    evitando duplicados, y la hora de la medición viene en la trama, no del orden de llegada.
 2. **El broker es un punto único por decisión**: RNF-14 pide un servidor y RNF-15 excluye los brokers con clúster
