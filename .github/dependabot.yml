@@ -1,6 +1,7 @@
-# Actualizaciones propuestas como pull request (docs/11 §4). Las imágenes y las acciones están fijadas por digest o SHA: lo
-# desplegado es exactamente lo escaneado y probado, y este archivo hace que los parches lleguen avisados. Nunca fusiona solo:
-# cada PR pasa por el CI y lo revisa y fusiona el estudiante.
+# Actualizaciones propuestas como pull request (docs/11 §4). Las imágenes base y las acciones están fijadas por digest o SHA;
+# este archivo hace que las versiones nuevas lleguen avisadas. Nunca fusiona solo: lo revisa y fusiona el estudiante.
+# Ojo: el CI prueba los PR de acciones (las usa), pero NO los de imágenes (no construye imágenes). Antes de fusionar uno de
+# imágenes: `bash plataforma/pruebas/escanear-imagenes.sh` y el banco en local (docs/11 §8).
 # cooldown: espera 7 días desde que se publica una versión antes de proponerla (lo recién publicado no se instala).
 version: 2
 updates:
@@ -19,9 +20,19 @@ updates:
       interval: weekly
     cooldown:
       default-days: 7
+    ignore:
+      # Node se queda en la 22 (package.json: engines >=22 <23); cambiar de versión mayor es una decisión aparte.
+      - dependency-name: "node"
+        update-types: ["version-update:semver-major"]
+      # nginx: la serie par (1.30.x) es la estable; la impar (1.31) es la de desarrollo (mainline).
+      - dependency-name: "nginx"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
   - package-ecosystem: docker-compose
     directory: /plataforma
     schedule:
       interval: weekly
     cooldown:
       default-days: 7
+    ignore:
+      # Imágenes construidas aquí (base y proxy derivados): no existen en ningún registro (08/10: el primer intento falló con 401).
+      - dependency-name: "plataforma-*"

@@ -30,7 +30,7 @@ implementando solo lo que **sustente el diseño** (API de consulta, que demuestr
 | Rotación de credenciales probada | ✅ | claves viejas rechazadas, nuevas aceptadas |
 | Backend en contenedor (Dockerfile multi-stage, usuario sin privilegios, healthcheck a `/salud`) | ✅ 23/09 | `healthy` con la pila completa; probado apagando la base y el broker por separado: cero reinicios, se recupera solo |
 | Dependencias sin vulnerabilidades conocidas (`pnpm audit` en el CI) | ✅ 23/09 | de 22 avisos (10 altos) a 0; NestJS 11.2.5, tres *overrides* documentados (estado al 23/09; desde el 08/10, `docs/16 §12`) |
-| Guardianes de concordancia 2d (variables de entorno), 2e (orden de los filtros), 2f (sin menciones a herramientas en archivos versionados) | ✅ 23/09 | cada uno probado plantando la violación |
+| Guardianes de concordancia 2d (variables de entorno), 2e (orden de los filtros), 2f (sin términos de la lista privada en archivos versionados) | ✅ 23/09 | cada uno probado plantando la violación |
 
 ## 3. Seguimiento del backlog (corte 23 de septiembre)
 

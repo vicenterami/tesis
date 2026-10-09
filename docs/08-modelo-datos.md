@@ -252,7 +252,7 @@ consistente para reportes.
       físico (EUI o número de serie), nombre, `visto_por_ultima_vez`; `dispositivo.pasarela_id` opcional (un
       dispositivo puede llegar por celular sin pasarela). Es una entidad, no un atributo del dispositivo, porque
       una pasarela sirve a muchos dispositivos y tiene estado propio. Se autentica en el broker con su propia
-      credencial y solo publica por los dispositivos asociados a ella (filtro 1).
+      credencial y publica solo bajo su tópico, con el DevEUI de cada nodo en el cuerpo (`docs/10 §8.4` punto 24).
 - [ ] **Vía, formato y pasarela declarados en el alta** (decidido el 08/10/2026, `docs/10 §8.4` punto 25):
       `dispositivo.via` (`CHECK`: `mqtt`, `http`, `lorawan`), `dispositivo.formato` (`CHECK`: el código de un
       adaptador, `senml`, `plano`, `milesight`…; lo interpreta el código, §6) y `dispositivo.pasarela_id` (FK opcional,

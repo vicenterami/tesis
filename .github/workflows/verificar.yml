@@ -43,8 +43,9 @@ jobs:
       # SCA: dependencias con vulnerabilidades conocidas (docs/11 §4). Falla con severidad alta o crítica, salvo las
       # excepciones declaradas en pnpm-workspace.yaml (audit.ignore: avisos sin versión corregida que no entran a producción).
       - run: pnpm audit --audit-level=high
-      # Lo que va a producción, con nivel moderado: prueba que lo exceptuado no está en la imagen final.
-      - run: pnpm audit --prod --audit-level=moderate
+      # Lo que va a producción no puede tener ningún aviso, ni siquiera exceptuado: audit.ignore aplica también con --prod,
+      # así que el código de salida no basta; el metadata del JSON cuenta todo, incluido lo ignorado (08/10/2026).
+      - run: pnpm audit --prod --json | jq -e '.metadata.vulnerabilities | add == 0'
       # Lo pendiente no se esconde (08/10/2026): cada excepción y cada aviso que no bloquea sale como advertencia amarilla en
       # la corrida y en su resumen, sin dejarla en rojo. Corre aunque un paso anterior falle, salvo si se canceló la corrida.
       - name: Dependencias pendientes de resolver (avisa, no bloquea)

@@ -664,9 +664,9 @@ diseño (regla de concordancia): tras autenticar, el filtro 6 corre siempre.
 - [ ] Decidir con el usuario la pérdida aceptable (RPO) y el tiempo de recuperación (RTO) antes de datos reales, y
       montar el respaldo diario con restauración probada (§9.5).
 
-### 8.4 Decisiones del 06/10/2026 (tras la entrevista y el acceso a la nube de Milesight)
+### 8.4 Decisiones de la Etapa 3 (desde el 06/10/2026)
 
-Fuentes: `bitacora/2026-10-05-entrevista-academico-geologia.md`; evidencia verificada en el registro privado
+**Decisiones del 06/10/2026** (tras la entrevista y el acceso a la nube de Milesight). Fuentes: `bitacora/2026-10-05-entrevista-academico-geologia.md`; evidencia verificada en el registro privado
 (gateway Milesight, 137 afirmaciones de documentación oficial). El código sigue a estas decisiones, no al revés.
 
 1. **Canal de tiempo real: SSE (Server-Sent Events), no WebSocket.** El flujo es unidireccional (servidor →
@@ -806,11 +806,17 @@ TimescaleDB (8 observaciones), registro de brokers (258 filas).
 
 24. **LoRaWAN es obligatorio y entra por la ruta B** (pasarela con servidor de red embebido → MQTT/TLS 8883). La ruta B
     deja de ser «la prevista» y pasa a ser la vía LoRaWAN del sistema: entidad `pasarela` (`docs/08 §8`); la pasarela se
-    autentica en el broker con su propia credencial y solo puede publicar por los dispositivos asociados a ella (filtro
-    1); adaptador de su JSON (punto 3). Se prueba primero con un emulador que publica exactamente el JSON documentado por
-    Milesight y, en terreno, apenas haya una pasarela que alcance al servidor (red del campus o dirección pública). La
-    ruta A (ChirpStack) sigue opcional; investigarla a fondo, con un simulador, sigue siendo prioridad. Las horas de
-    HU-02 se reestiman al planificar esa semana.
+    autentica en el broker con su propia credencial y publica solo bajo su tópico, `sitio/<sitio>/pasarela/<id>/<tipo>`
+    (el tópico se configura en la pasarela, uno por tipo de dato: guía de usuario del UG65, v2.14, pp. 34-35), y la ACL
+    de su rol la limita a él con el patrón de usuario `%u`, que Dynamic Security admite en `publishClientSend`
+    (https://mosquitto.org/documentation/dynamic-security/). El DevEUI de cada nodo viaja en el cuerpo; el filtro 1 toma
+    la pasarela del tópico (no del cuerpo) y solo acepta los nodos asociados a ella en el alta, así que una pasarela
+    comprometida no puede publicar como un dispositivo de vía `mqtt`, que tiene su propio tópico. Al implementarlo, el
+    patrón de tópicos de la recepción (§4.1, casos anormales) suma esta forma. Adaptador de su JSON (punto 3). Se prueba
+    primero con un emulador que publica exactamente el JSON documentado por Milesight y, en terreno, apenas haya una
+    pasarela que alcance al servidor (red del campus o dirección pública). La ruta A (ChirpStack) sigue opcional;
+    investigarla a fondo, con un simulador, sigue siendo prioridad. Las horas de HU-02 se reestiman al planificar esa
+    semana.
 25. **La vía de envío se declara en el alta.** `dispositivo.via` (`mqtt`, `http`, `lorawan`), `dispositivo.formato` (el
     adaptador: `senml`, `plano`, `milesight`…) y `dispositivo.pasarela_id` (obligatoria si la vía es `lorawan`; la
     identidad del nodo es su DevEUI en `id_fisico`). El pipeline usa el formato declarado en vez de adivinarlo; si la

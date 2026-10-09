@@ -88,13 +88,20 @@ else
   echo "FALLA el orden de los filtros 5/6 difiere entre pipeline.tex, docs/06 y docs/10"; fallos=$((fallos+1))
 fi
 
-paso "2f. Repositorio público: ningún archivo versionado menciona herramientas de asistencia ni rutas personales"
-# El patrón se arma por partes para que este mismo archivo no lo contenga literal (y no se detecte a sí mismo).
-P="\\bcl""aude\\b|\\bfa""ble\\b|\\bson""net\\b|co-auth""ored-by|asistente de ""ia|modelo de ""lenguaje|~/\\.cl""aude" # cspell:disable-line
-if archivos_repo | grep -v "^historico/" | xargs grep -lniE "$P" 2>/dev/null | grep -q .; then
-  echo "FALLA archivos con menciones prohibidas:"; archivos_repo | grep -v "^historico/" | xargs grep -lniE "$P" 2>/dev/null | sed 's/^/  /'
-  fallos=$((fallos+1))
-else echo "OK    sin menciones a herramientas ni rutas personales en $(archivos_repo | wc -l) archivos versionados o nuevos"; fi
+paso "2f. Repositorio público: ningún archivo versionado o nuevo contiene términos de la lista privada (privado/patrones-vetados.txt)"
+# Los términos viven fuera del repositorio, como los nombres del paso 2j: escritos aquí serían ellos mismos la fuga (08/10).
+# git grep --untracked revisa versionados y nuevos sin romperse con espacios o comillas en los nombres; salida 1 = sin
+# coincidencias; cualquier otra distinta de 0 es un error y falla: un paso que no revisó no pasa.
+PV="${PATRONES_VETADOS:-privado/patrones-vetados.txt}"
+n=$(archivos_repo 2>/dev/null | grep -vc '^historico/')
+if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1 || [ "${n:-0}" -lt 50 ]; then echo "FALLA no se pudieron listar los archivos del repositorio (${n:-0}): ¿git falló?"; fallos=$((fallos+1))
+elif [ ! -s "$PV" ]; then echo "omitido: no existe $PV"; omitidos="$omitidos 2f"
+else
+  git grep --untracked -lniE -f "$PV" -- ':!historico' > /tmp/vt-2f.txt 2>&1; rc=$?
+  if [ "$rc" -eq 0 ]; then echo "FALLA archivos con términos de la lista privada:"; sed 's/^/  /' /tmp/vt-2f.txt; fallos=$((fallos+1))
+  elif [ "$rc" -ne 1 ]; then echo "FALLA git grep falló ($rc): $(head -1 /tmp/vt-2f.txt)"; fallos=$((fallos+1))
+  else echo "OK    ningún término de la lista privada en $n archivos versionados o nuevos"; fi
+fi
 
 paso "2g. Migraciones citadas en prosa (docs e informe) == archivos NN-*.sql en disco"
 # Hallazgo del 26/09: informe y docs/12 decían «6 migraciones» cuando ya había 7 en disco (la 07 del 23/09).
@@ -139,9 +146,11 @@ paso "2j. Repositorio público: ningún archivo versionado nombra a personas de 
 # sin distinguir mayúsculas. Si el archivo no existe, el paso se omite y lo dice.
 NV="${NOMBRES_VETADOS:-privado/nombres-vetados.txt}"
 if [ -s "$NV" ]; then
-  hits=$(archivos_repo | grep -v "^historico/" | xargs grep -lniwF -f "$NV" 2>/dev/null)
-  if [ -n "$hits" ]; then echo "FALLA archivos versionados con nombres de la lista privada:"; echo "$hits" | sed 's/^/  /'; fallos=$((fallos+1))
-  else echo "OK    ningún nombre de la lista privada en $(archivos_repo | grep -vc '^historico/') archivos versionados o nuevos"; fi
+  git grep --untracked -lniwF -f "$NV" -- ':!historico' > /tmp/vt-2j.txt 2>&1; rc=$?
+  n=$(archivos_repo 2>/dev/null | grep -vc '^historico/')
+  if [ "$rc" -eq 0 ]; then echo "FALLA archivos con nombres de la lista privada:"; sed 's/^/  /' /tmp/vt-2j.txt; fallos=$((fallos+1))
+  elif [ "$rc" -ne 1 ] || [ "${n:-0}" -lt 50 ]; then echo "FALLA no se pudo revisar (git grep salió $rc; ${n:-0} archivos)"; fallos=$((fallos+1))
+  else echo "OK    ningún nombre de la lista privada en $n archivos versionados o nuevos"; fi
 else echo "omitido: no existe $NV"; omitidos="$omitidos 2j"; fi
 
 paso "2k. Edición Apache de TimescaleDB (RNF-15; docs/10 §8.4 punto 11): licencia, imagen, sin compresión, sin jobs ni telemetría"
@@ -217,8 +226,9 @@ PY
 paso "2p. Repositorio público: ningún archivo versionado cita fichas privadas (viven en privado/, un lector no las abre)"
 # 08/10: 19 referencias en 12 archivos apuntaban a fichas de decisión privadas (formato D, guion y dos dígitos). Lo público
 # cita lo público: la sección de docs/10 §8.4 o de docs/11 donde quedó la decisión.
-if git grep --untracked -n -E 'ficha D-[0-9]{2}|decisi[oó]n D-[0-9]{2}|\bD-[0-9]{2}\b' -- ':!privado' > /tmp/vt-fichas.txt 2>/dev/null; then
-  echo "FALLA archivos públicos que citan fichas privadas:"; cut -c1-160 /tmp/vt-fichas.txt; fallos=$((fallos+1))
+git grep --untracked -n -E 'ficha D-[0-9]{2}|decisi[oó]n D-[0-9]{2}|\bD-[0-9]{2}\b' -- ':!privado' > /tmp/vt-fichas.txt 2>&1; rc=$?
+if [ "$rc" -eq 0 ]; then echo "FALLA archivos públicos que citan fichas privadas:"; cut -c1-160 /tmp/vt-fichas.txt; fallos=$((fallos+1))
+elif [ "$rc" -ne 1 ]; then echo "FALLA git grep falló ($rc): no se pudo revisar"; fallos=$((fallos+1))
 else echo "OK    ningún archivo versionado cita fichas privadas"; fi
 
 paso "2q. Auditoría de dependencias: cada aviso ignorado (audit.ignore de pnpm-workspace.yaml) sigue sin versión corregida (docs/11 §4)"

@@ -182,8 +182,8 @@ vez, o una pasarela que vacía de golpe lo que guardó durante un corte, `docs/1
 
 **Lo que abre (diseño antes que código):** límite de tasa y de conexiones por IP en el proxy y un `/salud` público que no
 consulte la base; topes de cola explícitos y dimensionados (`max_queued_messages`, `max_queued_bytes`) con alarma sobre el
-contador de descartes; inserción por lotes si hiciera falta más capacidad. Limitaciones: portátil de 16 hilos con el emulador en
-el mismo equipo; el broker del banco va sin credenciales ni persistencia; el servidor real tendrá otra CPU.
+contador de descartes; inserción por lotes si hiciera falta más capacidad. Limitaciones: el emulador corre en el
+mismo equipo de desarrollo que la pila; el broker del banco va sin credenciales ni persistencia; el servidor real tendrá otra CPU.
 
 ## 11. Caídas con carga en curso (TT-30 adelantado, 08/10/2026)
 
@@ -208,14 +208,15 @@ completo; y la caída del backend con más tráfico que la cola (§10 dice que a
 
 **Por qué.** La verificación automática quedó en rojo desde el 07/10 con el mismo lockfile que había pasado el 27/09: la base
 de avisos de GitHub publicó en esos días avisos contra paquetes que ya estaban: `proxy-addr`, crítico
-(https://github.com/advisories/GHSA-jqcg-44mw-7w3h); `brace-expansion` (https://github.com/advisories/GHSA-qhr7-859c-m2p7 y
-https://github.com/advisories/GHSA-6j4f-fj2g-mc7p); `braces` (https://github.com/advisories/GHSA-vfj7-8cjw-p6xm).
+(https://github.com/advisories/GHSA-jqcg-44mw-7w3h); `brace-expansion` (https://github.com/advisories/GHSA-qhr7-859c-m2p7,
+https://github.com/advisories/GHSA-6j4f-fj2g-mc7p y https://github.com/advisories/GHSA-q2hr-2g5m-vwhr, que fija las versiones
+1.1.21, 2.1.7 y 5.0.12); `braces` (https://github.com/advisories/GHSA-vfj7-8cjw-p6xm).
 
 **Dependencias (`pnpm audit`).** De 16 avisos (1 crítico, 7 altos, 8 moderados) a 2, con ocho *overrides* nuevos; las 78
 pruebas unitarias siguen en verde y las licencias de producción no cambiaron (152 paquetes permisivos, paso 2r del guardián).
 Los dos que quedan no tienen versión corregida publicada y solo vienen con jest: `braces` (alto; excepción declarada en
-`audit.ignore`) y `sprintf-js` (moderado, https://github.com/advisories/GHSA-hp3w-g68c-fv3c). Las dependencias de producción,
-auditadas aparte con nivel moderado, no tienen avisos.
+`audit.ignore`) y `sprintf-js` (moderado, https://github.com/advisories/GHSA-hp3w-g68c-fv3c). Las dependencias de producción no
+tienen ningún aviso, ni siquiera exceptuado (el CI lo comprueba aparte).
 
 **Imágenes** (Trivy 0.74.0 fijado por digest; base de avisos del 08/10/2026; `plataforma/pruebas/escanear-imagenes.sh`).
 Vulnerabilidades críticas / altas:
