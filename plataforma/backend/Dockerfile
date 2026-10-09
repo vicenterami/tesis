@@ -6,7 +6,7 @@
 
 # ── Etapa 1: compilar ─────────────────────────────────────────────────────────────────────────
 # Aquí se usan pnpm y las herramientas de desarrollo; de esta etapa solo viaja dist/ a la imagen final.
-FROM node:22.23.3-trixie-slim@sha256:154ba2f4d6fec323d28e4f4bb86bba4677f1223391a1979cf521304e03a98dfa AS build
+FROM node:26.9.0-trixie-slim@sha256:3a771f83944bb763050c23c0225c260638c4b7899e7a72485ef75e5e570499e5 AS build
 WORKDIR /app
 RUN corepack enable
 # Copiar antes que el resto: si solo cambia el código, esta capa se reutiliza de caché.
@@ -17,7 +17,7 @@ COPY src ./src
 RUN pnpm build
 
 # ── Etapa 2: imagen que corre ─────────────────────────────────────────────────────────────────
-FROM node:22.23.3-trixie-slim@sha256:154ba2f4d6fec323d28e4f4bb86bba4677f1223391a1979cf521304e03a98dfa AS runtime
+FROM node:26.9.0-trixie-slim@sha256:3a771f83944bb763050c23c0225c260638c4b7899e7a72485ef75e5e570499e5 AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 RUN corepack enable
