@@ -17,7 +17,7 @@ services:
   # ── Base de datos de series de tiempo ───────────────────────────────────────
   timescaledb:
     build: ./db/imagen                           # FROM fijado (nunca "latest") en db/imagen/Dockerfile; -oss = edición Apache 2.0 (RNF-15, docs/10 §8.4 punto 11)
-    image: plataforma-timescaledb:2.30.2-pg16-oss-parches # 2.24.0 → 2.30.2 + parches el 08/10/2026, por seguridad (docs/11 §4)
+    image: plataforma-timescaledb:local                  # construida aquí: su versión vive solo en el FROM de db/imagen/Dockerfile (docs/11 §8)
     restart: unless-stopped                      # vuelve solo tras un reinicio del servidor
     logging:                                     # registros acotados: 10 MB × 5 por servicio (docs/11 §4; 07/10/2026)
       driver: json-file

@@ -414,7 +414,7 @@ sección cubre las decisiones restantes de infraestructura.
 
 | Alternativa | Ventajas | Desventajas | Decisión |
 |---|---|---|---|
-| Servidor de red embebido en la pasarela (p. ej., Milesight UG65) | Sin contenedor ni puerto extra: la pasarela publica por MQTT sobre TLS al broker como un cliente más, con su propia credencial | Cada pasarela es su propio servidor de red: administración por pasarela; el caso de dos pasarelas que oyen al mismo nodo está por verificar | **✅ Ruta prevista (B), desde el 06/10/2026** (`docs/10 §8.4` punto 2) |
+| Servidor de red embebido en la pasarela (p. ej., Milesight UG65) | Sin contenedor ni puerto extra: la pasarela publica por MQTT sobre TLS al broker como un cliente más, con su propia credencial | Cada pasarela es su propio servidor de red: administración por pasarela; el caso de dos pasarelas que oyen al mismo nodo está por verificar | **✅ Ruta B: la vía LoRaWAN del sistema** (prevista desde el 06/10/2026 y obligatoria desde el 08/10/2026: `docs/10 §8.4` puntos 2 y 24) |
 | **ChirpStack** | Código abierto, autoalojable, publica en MQTT de forma nativa, gestión de dispositivos completa, se ejecuta en un servidor modesto | Requiere operar el componente | **✅ Seleccionado si se necesita un servidor de red propio (ruta A, opcional)** |
 | The Things Stack (open source) | Funcionalmente equivalente, comunidad amplia | Despliegue autoalojado más exigente en recursos | Descartado |
 | The Things Network (servicio público) | Sin operación propia, gratuito | Los datos transitan por infraestructura de terceros: contradice RNF-14 y el control del dato | Descartado |

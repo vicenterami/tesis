@@ -10,6 +10,10 @@ exec > >(tee "$LOG_DIR/verificar-$(date +%F-%H%M%S).log") 2>&1
 echo "verificar-todo · $(date -Is) · commit $(git rev-parse --short HEAD 2>/dev/null || echo ?)"
 fallos=0; omitidos=""
 paso() { echo; echo "══ $1 ══"; }
+# Archivos de trabajo en una carpeta propia de cada corrida, que se borra al salir (08/10: con nombres fijos en /tmp, dos
+# corridas a la vez se pisaban y otro usuario del equipo podía leerlos o reemplazarlos antes de que se usaran).
+VT=$(mktemp -d "${TMPDIR:-/tmp}/verificar.XXXXXX") || { echo "FALLA no se pudo crear la carpeta de trabajo"; exit 1; }
+trap 'rm -rf "$VT"' EXIT
 # Archivos que entrarían al repositorio: los versionados y los nuevos que git no ignora (08/10: los pasos que solo miraban
 # los versionados no revisaron cinco archivos nuevos antes de su primer commit).
 archivos_repo() { git ls-files --cached --others --exclude-standard; }
@@ -28,12 +32,12 @@ if command -v pnpm >/dev/null; then (cd plataforma/backend && pnpm verificar 2>&
 
 paso "1. Esquema: guardias de tipo y zonas horarias (db/pruebas/zonas-horarias.sql)"
 docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -U plataforma -d plataforma -v ON_ERROR_STOP=1 -tA -F ' · ' \
-  < plataforma/db/pruebas/zonas-horarias.sql | tee /tmp/vt-sql.txt
-exige /tmp/vt-sql.txt "${PIPESTATUS[0]}" 10 || fallos=$((fallos+1))
+  < plataforma/db/pruebas/zonas-horarias.sql | tee "$VT"/sql.txt
+exige "$VT"/sql.txt "${PIPESTATUS[0]}" 10 || fallos=$((fallos+1))
 
 paso "2. Migraciones aplicadas = archivos en db/init (cada NN-*.sql debe estar reflejado en la base)"
 # 02: índice por regla · 03: zona_horaria · 04: iso_utc · 05: convenciones (disparadores actualizado_en, pm2_5) · 06: índice único de medicion · 07: CHECK de cuarentena.motivo · 08: medicion.recibido_en y origen_tiempo · 09: trama y cuarentena como hypertables · 10: semántica de intervalo_esperado_s
-docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -U plataforma -d plataforma -tA <<'SQL' | tee /tmp/vt-mig.txt
+docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -U plataforma -d plataforma -tA <<'SQL' | tee "$VT"/mig.txt
 SELECT CASE WHEN count(*)=1 THEN 'OK    01 medicion es hypertable (chunks por tiempo)' ELSE 'FALLA 01 medicion no es hypertable' END FROM timescaledb_information.hypertables WHERE hypertable_name='medicion';
 SELECT CASE WHEN indexdef LIKE '%COALESCE(regla_id%' THEN 'OK    02 condicion_abierta_unica por regla' ELSE 'FALLA 02 indice viejo' END FROM pg_indexes WHERE indexname='condicion_abierta_unica';
 SELECT CASE WHEN count(*)=1 THEN 'OK    03 sitio.zona_horaria' ELSE 'FALLA 03 falta sitio.zona_horaria' END FROM information_schema.columns WHERE table_name='sitio' AND column_name='zona_horaria';
@@ -45,10 +49,10 @@ SELECT CASE WHEN count(*)=2 AND (SELECT count(*) FROM pg_constraint WHERE connam
 SELECT CASE WHEN count(*)=2 AND (SELECT count(*) FROM information_schema.columns WHERE table_name='cuarentena' AND column_name IN ('detalle','dispositivo_id'))=2 AND (SELECT pg_get_constraintdef(oid) LIKE '%no_registrado%dado_de_baja%' FROM pg_constraint WHERE conname='cuarentena_motivo_chk' AND conrelid='cuarentena'::regclass) THEN 'OK    09 trama y cuarentena son hypertables; cuarentena con detalle, dispositivo_id y motivos no_registrado/dado_de_baja' ELSE 'FALLA 09 trama/cuarentena incompletas' END FROM timescaledb_information.hypertables WHERE hypertable_name IN ('trama','cuarentena');
 SELECT CASE WHEN col_description('dispositivo'::regclass, (SELECT attnum FROM pg_attribute WHERE attrelid='dispositivo'::regclass AND attname='intervalo_esperado_s')) LIKE 'Silencio máximo normal%' THEN 'OK    10 intervalo_esperado_s documentado como silencio máximo normal (docs/10 §8.4 punto 23)' ELSE 'FALLA 10 falta el COMMENT de intervalo_esperado_s (aplicar db/init/10-intervalo-esperado.sql)' END;
 SQL
-exige /tmp/vt-mig.txt "${PIPESTATUS[0]}" 10 || fallos=$((fallos+1))
+exige "$VT"/mig.txt "${PIPESTATUS[0]}" 10 || fallos=$((fallos+1))
 # Toda migración en disco debe tener su comprobación arriba: una 08 nueva sin comprobación falla aquí,
 # no solo por el conteo en prosa del paso 2g.
-sin_chequeo=$(ls plataforma/db/init/ | grep -oE '^[0-9]{2}' | while read -r nn; do grep -q "^OK    $nn \|^FALLA $nn " /tmp/vt-mig.txt || echo "$nn"; done)
+sin_chequeo=$(ls plataforma/db/init/ | grep -oE '^[0-9]{2}' | while read -r nn; do grep -q "^OK    $nn \|^FALLA $nn " "$VT"/mig.txt || echo "$nn"; done)
 [ -z "$sin_chequeo" ] || { echo "FALLA migraciones sin comprobación en este paso: $sin_chequeo"; fallos=$((fallos+1)); }
 
 paso "2b. Número de entidades: la base manda; informe y estado deben decir el mismo número"
@@ -97,9 +101,9 @@ n=$(archivos_repo 2>/dev/null | grep -vc '^historico/')
 if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1 || [ "${n:-0}" -lt 50 ]; then echo "FALLA no se pudieron listar los archivos del repositorio (${n:-0}): ¿git falló?"; fallos=$((fallos+1))
 elif [ ! -s "$PV" ]; then echo "omitido: no existe $PV"; omitidos="$omitidos 2f"
 else
-  git grep --untracked -lniE -f "$PV" -- ':!historico' > /tmp/vt-2f.txt 2>&1; rc=$?
-  if [ "$rc" -eq 0 ]; then echo "FALLA archivos con términos de la lista privada:"; sed 's/^/  /' /tmp/vt-2f.txt; fallos=$((fallos+1))
-  elif [ "$rc" -ne 1 ]; then echo "FALLA git grep falló ($rc): $(head -1 /tmp/vt-2f.txt)"; fallos=$((fallos+1))
+  git grep --untracked -lniE -f "$PV" -- ':!historico' > "$VT"/2f.txt 2>&1; rc=$?
+  if [ "$rc" -eq 0 ]; then echo "FALLA archivos con términos de la lista privada:"; sed 's/^/  /' "$VT"/2f.txt; fallos=$((fallos+1))
+  elif [ "$rc" -ne 1 ]; then echo "FALLA git grep falló ($rc): $(head -1 "$VT"/2f.txt)"; fallos=$((fallos+1))
   else echo "OK    ningún término de la lista privada en $n archivos versionados o nuevos"; fi
 fi
 
@@ -146,9 +150,9 @@ paso "2j. Repositorio público: ningún archivo versionado nombra a personas de 
 # sin distinguir mayúsculas. Si el archivo no existe, el paso se omite y lo dice.
 NV="${NOMBRES_VETADOS:-privado/nombres-vetados.txt}"
 if [ -s "$NV" ]; then
-  git grep --untracked -lniwF -f "$NV" -- ':!historico' > /tmp/vt-2j.txt 2>&1; rc=$?
+  git grep --untracked -lniwF -f "$NV" -- ':!historico' > "$VT"/2j.txt 2>&1; rc=$?
   n=$(archivos_repo 2>/dev/null | grep -vc '^historico/')
-  if [ "$rc" -eq 0 ]; then echo "FALLA archivos con nombres de la lista privada:"; sed 's/^/  /' /tmp/vt-2j.txt; fallos=$((fallos+1))
+  if [ "$rc" -eq 0 ]; then echo "FALLA archivos con nombres de la lista privada:"; sed 's/^/  /' "$VT"/2j.txt; fallos=$((fallos+1))
   elif [ "$rc" -ne 1 ] || [ "${n:-0}" -lt 50 ]; then echo "FALLA no se pudo revisar (git grep salió $rc; ${n:-0} archivos)"; fallos=$((fallos+1))
   else echo "OK    ningún nombre de la lista privada en $n archivos versionados o nuevos"; fi
 else echo "omitido: no existe $NV"; omitidos="$omitidos 2j"; fi
@@ -156,13 +160,13 @@ else echo "omitido: no existe $NV"; omitidos="$omitidos 2j"; fi
 paso "2k. Edición Apache de TimescaleDB (RNF-15; docs/10 §8.4 punto 11): licencia, imagen, sin compresión, sin jobs ni telemetría"
 # La licencia se lee en la base que corre, no se supone por el compose; y el compose se revisa aparte, porque
 # la imagen completa también puede arrancar con la licencia apache configurada y seguiría sin ser la -oss.
-docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -U plataforma -d plataforma -tA <<'SQL' | tee /tmp/vt-lic.txt
+docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -U plataforma -d plataforma -tA <<'SQL' | tee "$VT"/lic.txt
 SELECT CASE WHEN current_setting('timescaledb.license')='apache' THEN 'OK    timescaledb.license = apache' ELSE 'FALLA timescaledb.license = '||current_setting('timescaledb.license')||' (Timescale License): usar la imagen -oss' END;
 SELECT CASE WHEN count(*)=0 THEN 'OK    ninguna hypertable con compresión' ELSE 'FALLA '||count(*)||' hypertable(s) con compresión (Timescale License)' END FROM timescaledb_information.hypertables WHERE compression_enabled;
 SELECT CASE WHEN current_setting('timescaledb.max_background_workers')='0' THEN 'OK    sin trabajos de fondo (el job 3 fallaría con ERROR de licencia cada 6 h)' ELSE 'FALLA timescaledb.max_background_workers = '||current_setting('timescaledb.max_background_workers')||': falta el command del compose' END;
 SELECT CASE WHEN current_setting('timescaledb.telemetry_level')='off' THEN 'OK    telemetría apagada: nada sale del servidor hacia Timescale' ELSE 'FALLA timescaledb.telemetry_level = '||current_setting('timescaledb.telemetry_level') END;
 SQL
-exige /tmp/vt-lic.txt "${PIPESTATUS[0]}" 4 || fallos=$((fallos+1))
+exige "$VT"/lic.txt "${PIPESTATUS[0]}" 4 || fallos=$((fallos+1))
 # 08/10: la imagen se construye desde db/imagen/Dockerfile (oficial fijada + parches, docs/11 §4): se revisa su FROM y que
 # el compose la use.
 img=$(grep -oE '^FROM timescale/timescaledb:[^ ]+' plataforma/db/imagen/Dockerfile | cut -d' ' -f2); img=${img%%@*}   # sin el digest
@@ -189,21 +193,28 @@ paso "2m. Proxy: nginx.conf válido (nginx -t con la imagen del proxy, base fija
 BASE_PROXY=$(grep -oE '^FROM nginx:[^ ]+' plataforma/proxy/Dockerfile | cut -d' ' -f2)
 IMG_PROXY=plataforma-proxy:verificar
 CERTS_DEV="$PWD/privado/certs-desarrollo"
+SIN_RED='dial tcp|no such host|name resolution|DNS lookup error|i/o timeout|TLS handshake timeout|network is unreachable|temporary error|transient error|try again later|connection (refused|reset)'
 if [ -z "$BASE_PROXY" ]; then echo "FALLA proxy/Dockerfile sin imagen base nginx fijada"; fallos=$((fallos+1))
 elif [ ! -f "$CERTS_DEV/servidor.crt" ]; then echo "omitido: faltan los certificados de desarrollo (bash plataforma/proxy/ca-desarrollo.sh)"; omitidos="$omitidos 2m"
-elif ! docker build -q -t "$IMG_PROXY" plataforma/proxy >/tmp/vt-build-proxy.txt 2>&1; then echo "omitido: no se pudo construir la imagen del proxy sobre $BASE_PROXY (¿sin red?): $(tail -1 /tmp/vt-build-proxy.txt)"; omitidos="$omitidos 2m"
-elif docker run --rm -v "$PWD/plataforma/proxy/nginx.conf:/etc/nginx/nginx.conf:ro" -v "$CERTS_DEV:/certs:ro" "$IMG_PROXY" nginx -t >/tmp/vt-nginx.txt 2>&1; then echo "OK    nginx -t: configuración válida ($BASE_PROXY + parches de proxy/Dockerfile)"
-else echo "FALLA nginx -t:"; grep -E "emerg|nginx:" /tmp/vt-nginx.txt | sed 's/^/  /'; fallos=$((fallos+1)); fi
+elif ! docker build -q -t "$IMG_PROXY" plataforma/proxy >"$VT"/build-proxy.txt 2>&1; then
+  # 08/10: sin red se omite y lo dice; un Dockerfile roto falla (antes también salía como «¿sin red?» y se omitía).
+  red=$(grep -m1 -iE "$SIN_RED" "$VT"/build-proxy.txt)
+  if [ -n "$red" ]; then echo "omitido: sin red para construir la imagen del proxy sobre $BASE_PROXY: ${red:0:160}"; omitidos="$omitidos 2m"
+  else echo "FALLA no se pudo construir la imagen del proxy sobre $BASE_PROXY:"; tail -3 "$VT"/build-proxy.txt | sed 's/^/  /'; fallos=$((fallos+1)); fi
+elif docker run --rm -v "$PWD/plataforma/proxy/nginx.conf:/etc/nginx/nginx.conf:ro" -v "$CERTS_DEV:/certs:ro" "$IMG_PROXY" nginx -t >"$VT"/nginx.txt 2>&1; then echo "OK    nginx -t: configuración válida ($BASE_PROXY + parches de proxy/Dockerfile)"
+else echo "FALLA nginx -t:"; grep -E "emerg|nginx:" "$VT"/nginx.txt | sed 's/^/  /'; fallos=$((fallos+1)); fi
 
-paso "2n. Registros acotados: todo servicio del compose y el proxy declaran logging con max-size (docs/11 §4)"
+paso "2n. Registros acotados y sin escalada de privilegios: todo servicio del compose y el proxy declaran logging con max-size y no-new-privileges (docs/11 §3–4)"
 # 07/10: sin límite, el chequeo de salud del broker sumaba ≈ 395 MB/año. Se cuenta por archivo: servicios contra bloques logging.
 for f in plataforma/docker-compose.yml plataforma/proxy/compose.proxy.yml; do
   srv=$(awk '/^services:/{s=1;next} /^[a-z]/{s=0} s && /^  [a-z][a-z-]*:$/' "$f" | wc -l)
   # Se valida el VALOR, no solo la presencia (07/10: unas comillas escapadas, `\"10m\"`, dejaron la pila sin arrancar y el
   # conteo decía OK): el daemon exige un tamaño como 10m y un entero para max-file.
   logs=$(grep -cE 'max-size: "[0-9]+[kmg]", max-file: "[0-9]+"' "$f")
-  if [ "$srv" -ge 1 ] && [ "$srv" = "$logs" ]; then echo "OK    $f: $srv servicio(s), todos con logging acotado y bien formado"
-  else echo "FALLA $f: $srv servicio(s) pero $logs con 'max-size: \"Nm\", max-file: \"N\"' bien formado"; fallos=$((fallos+1)); fi
+  # 08/10: también no-new-privileges, que docs/11 §3 daba por puesto en «ambos servicios» cuando ya eran cuatro.
+  nnp=$(grep -cE '^[[:space:]]+- no-new-privileges:true([[:space:]]|$)' "$f")
+  if [ "$srv" -ge 1 ] && [ "$srv" = "$logs" ] && [ "$srv" = "$nnp" ]; then echo "OK    $f: $srv servicio(s), todos con logging acotado y no-new-privileges"
+  else echo "FALLA $f: $srv servicio(s), $logs con 'max-size: \"Nm\", max-file: \"N\"' bien formado y $nnp con no-new-privileges:true"; fallos=$((fallos+1)); fi
 done
 
 paso "2o. Informe: todo párrafo que nombra ChirpStack lo marca como opcional (ruta A), salvo el de OpenRemote (docs/10 §8.4 punto 2)"
@@ -226,8 +237,8 @@ PY
 paso "2p. Repositorio público: ningún archivo versionado cita fichas privadas (viven en privado/, un lector no las abre)"
 # 08/10: 19 referencias en 12 archivos apuntaban a fichas de decisión privadas (formato D, guion y dos dígitos). Lo público
 # cita lo público: la sección de docs/10 §8.4 o de docs/11 donde quedó la decisión.
-git grep --untracked -n -E 'ficha D-[0-9]{2}|decisi[oó]n D-[0-9]{2}|\bD-[0-9]{2}\b' -- ':!privado' > /tmp/vt-fichas.txt 2>&1; rc=$?
-if [ "$rc" -eq 0 ]; then echo "FALLA archivos públicos que citan fichas privadas:"; cut -c1-160 /tmp/vt-fichas.txt; fallos=$((fallos+1))
+git grep --untracked -n -E 'ficha D-[0-9]{2}|decisi[oó]n D-[0-9]{2}|\bD-[0-9]{2}\b' -- ':!privado' > "$VT"/fichas.txt 2>&1; rc=$?
+if [ "$rc" -eq 0 ]; then echo "FALLA archivos públicos que citan fichas privadas:"; cut -c1-160 "$VT"/fichas.txt; fallos=$((fallos+1))
 elif [ "$rc" -ne 1 ]; then echo "FALLA git grep falló ($rc): no se pudo revisar"; fallos=$((fallos+1))
 else echo "OK    ningún archivo versionado cita fichas privadas"; fi
 
@@ -253,25 +264,62 @@ paso "2r. RNF-15: dependencias de producción del backend con licencia abierta y
 # 08/10: una dependencia copyleft (GPL, AGPL) dentro del backend obligaría a distribuir el conjunto bajo una licencia
 # compatible con la suya y cerraría la opción de una licencia comercial adicional; las de fuente disponible (SSPL, BUSL) no
 # son de código abierto (RNF-15) y una desconocida no se puede evaluar. Esta es la lista exacta: lo demás falla y lo decide
-# el estudiante. Una expresión «A OR B» pasa si alguna de las dos está en la lista.
+# el estudiante. «A OR B» pasa si una de las dos está en la lista; «A AND B», solo si están las dos (08/10: pako, que trae la
+# exportación a XLSX, es «MIT AND Zlib»); los paréntesis se respetan y una excepción (WITH) no se evalúa: la decide él.
 PERMITIDAS='["MIT","ISC","Apache-2.0","BSD-2-Clause","BSD-3-Clause","0BSD","Python-2.0","CC0-1.0","Unlicense","BlueOak-1.0.0"]'
 if ! command -v pnpm >/dev/null || ! command -v jq >/dev/null; then echo "omitida: falta pnpm o jq"; omitidos="$omitidos 2r"
-elif ! (cd plataforma/backend && pnpm licenses ls --prod --json 2>/dev/null) > /tmp/vt-licencias.json \
-     || ! jq -e 'type == "object"' /tmp/vt-licencias.json >/dev/null 2>&1; then
+elif ! (cd plataforma/backend && pnpm licenses ls --prod --json 2>/dev/null) > "$VT"/licencias.json \
+     || ! jq -e 'type == "object"' "$VT"/licencias.json >/dev/null 2>&1; then
   echo "FALLA pnpm licenses no devolvió un resultado legible (¿node_modules sin instalar?)"; fallos=$((fallos+1))
 else
-  n=$(jq '[.[] | length] | add // 0' /tmp/vt-licencias.json)
-  malas=$(jq -r --argjson ok "$PERMITIDAS" 'to_entries[] | select(.key | gsub("[()]"; "") | split(" OR ")
-      | map(. as $x | $ok | index($x)) | any | not) | .key as $l
-    | .value[] | "\(.name)@\(.versions | join(",")) → \($l)"' /tmp/vt-licencias.json)
-  if [ "$n" -lt 50 ]; then echo "FALLA revisó solo $n paquetes de producción (se esperan >= 50)"; fallos=$((fallos+1))
+  n=$(jq '[.[] | length] | add // 0' "$VT"/licencias.json)
+  malas=$(PERMITIDAS="$PERMITIDAS" python3 -I - "$VT"/licencias.json <<'PY'
+import json, os, re, sys
+def evalua(expr, ok):
+    toks, pos = re.findall(r'\(|\)|[^\s()]+', expr), 0
+    def prim():
+        nonlocal pos
+        t = toks[pos]; pos += 1
+        if t == '(':
+            v = o()
+            if toks[pos] != ')': raise ValueError(expr)
+            pos += 1; return v
+        if pos < len(toks) and toks[pos] == 'WITH': pos += 2; return False
+        return t in ok
+    def y():
+        nonlocal pos
+        v = prim()
+        while pos < len(toks) and toks[pos] == 'AND': pos += 1; r = prim(); v = v and r
+        return v
+    def o():
+        nonlocal pos
+        v = y()
+        while pos < len(toks) and toks[pos] == 'OR': pos += 1; r = y(); v = v or r
+        return v
+    try:
+        v = o(); return v and pos == len(toks)
+    except (IndexError, ValueError): return False
+# El evaluador se prueba en cada corrida: si se rompe, el paso falla en vez de aprobarlo todo.
+casos = {'MIT': True, '(MIT OR GPL-3.0-or-later)': True, '(MIT AND Zlib)': False, '(MIT OR Apache-2.0) AND Zlib': False,
+         'MIT AND (Apache-2.0 OR GPL-3.0-only)': True, 'GPL-2.0-only WITH Classpath-exception-2.0': False, '(MIT': False}
+mal = [c for c, e in casos.items() if evalua(c, {'MIT', 'Apache-2.0'}) != e]
+if mal: print('autoprueba:', ' · '.join(mal)); sys.exit(2)
+ok = set(json.loads(os.environ['PERMITIDAS']))
+for lic, paquetes in json.load(open(sys.argv[1], encoding='utf-8')).items():
+    if not evalua(lic, ok):
+        for p in paquetes: print(f"{p['name']}@{','.join(p['versions'])} → {lic}")
+PY
+); rc=$?
+  if [ "$rc" -ne 0 ]; then echo "FALLA el evaluador de licencias no corrió o no pasó su autoprueba (salida $rc): $malas"; fallos=$((fallos+1))
+  elif [ "$n" -lt 50 ]; then echo "FALLA revisó solo $n paquetes de producción (se esperan >= 50)"; fallos=$((fallos+1))
   elif [ -n "$malas" ]; then echo "FALLA dependencias de producción con licencia fuera de la lista:"; sed 's/^/  /' <<<"$malas"; fallos=$((fallos+1))
-  else echo "OK    $n paquetes de producción con licencia permitida ($(jq -r 'to_entries | map("\(.key) \(.value | length)") | join(", ")' /tmp/vt-licencias.json))"; fi
+  else echo "OK    $n paquetes de producción con licencia permitida ($(jq -r 'to_entries | map("\(.key) \(.value | length)") | join(", ")' "$VT"/licencias.json))"; fi
 fi
 
-paso "2s. Requerimientos: el anexo A del informe dice lo mismo que docs/02 (cada RF y RNF, misma descripción)"
+paso "2s. Requerimientos: el anexo A del informe dice lo mismo que docs/02 (cada RF y RNF, todas sus columnas, sin repetidos)"
 # 08/10: RF-02, RNF-16 y RNF-17 habían cambiado en docs/02 y no en el anexo. Manda
-# docs/02; se compara la descripción de cada requisito sin el formato (Markdown o LaTeX).
+# docs/02; se compara cada columna de cada requisito sin el formato (Markdown o LaTeX). 08/10: también las columnas que no
+# son la descripción, y un identificador repetido falla (antes el segundo pisaba al primero en silencio).
 python3 -I - <<'PY' || fallos=$((fallos+1))
 import re, sys, unicodedata
 def norm(s):
@@ -281,17 +329,23 @@ def norm(s):
     s = re.sub(r'\\[a-zA-Z]+\{?|[{}$]', '', s)
     s = s.replace('**', '').replace('`', '').replace('*', '')
     return re.sub(r'\s+', ' ', unicodedata.normalize('NFC', s)).strip().rstrip('.').lower()
-def leer(ruta, patron):
-    d = {}
+def leer(ruta, patron, sep):
+    d, rep = {}, []
     for l in open(ruta, encoding='utf-8'):
         m = re.match(patron, l)
-        if m: d[m.group(1)] = m.group(2)
-    return d
-md = leer('docs/02-requerimientos.md', r'\|\s*\*\*((?:RF|RNF)-\d+)\*\*\s*\|\s*(.*?)\s*\|')
-tx = leer('informe-oficial/anexos/a-requerimientos.tex', r'\s*\\textbf\{((?:RF|RNF)-\d+)\}\s*&\s*(.*?)\s*&')
+        if m:
+            if m.group(1) in d: rep.append(m.group(1))
+            d[m.group(1)] = [c.strip() for c in re.split(sep, m.group(2))]
+    return d, rep
+md, rmd = leer('docs/02-requerimientos.md', r'\|\s*\*\*((?:RF|RNF)-\d+)\*\*\s*\|(.*)\|\s*$', r'\|')
+tx, rtx = leer('informe-oficial/anexos/a-requerimientos.tex', r'\s*\\textbf\{((?:RF|RNF)-\d+)\}\s*&(.*?)\\\\\s*$', r'(?<!\\)&')
 if len(md) < 60: print(f'FALLA revisó solo {len(md)} requisitos de docs/02 (se esperan >= 60)'); sys.exit(1)
-malos = [f'{k}: está solo en {"docs/02" if k in md else "el anexo A"}' for k in sorted(set(md) ^ set(tx))]
-malos += [f'{k}: la descripción difiere entre docs/02 y el anexo A' for k in sorted(set(md) & set(tx)) if norm(md[k]) != norm(tx[k])]
+malos = [f'{k}: aparece repetido en docs/02' for k in rmd] + [f'{k}: aparece repetido en el anexo A' for k in rtx]
+malos += [f'{k}: está solo en {"docs/02" if k in md else "el anexo A"}' for k in sorted(set(md) ^ set(tx))]
+for k in sorted(set(md) & set(tx)):
+    if len(md[k]) != len(tx[k]): malos.append(f'{k}: {len(md[k])} columnas en docs/02 y {len(tx[k])} en el anexo A'); continue
+    malos += [f'{k}: la columna {i} difiere · docs/02: «{a[:70]}» · anexo A: «{b[:70]}»'
+              for i, (a, b) in enumerate(zip(md[k], tx[k]), 2) if norm(a) != norm(b)]
 for m in malos: print('FALLA', m)
 if not malos: print(f'OK    {len(md)} requisitos: el anexo A dice lo mismo que docs/02')
 sys.exit(1 if malos else 0)
@@ -304,18 +358,90 @@ real=$(grep -rhoE '^[[:space:]]*it\(' plataforma/backend/src --include='*.spec.t
 citas=$(grep -rnoE '[0-9]+ pruebas unitarias' docs/*.md informe-oficial/*.tex informe-oficial/anexos/*.tex 2>/dev/null | grep -v '^docs/12-')
 malas=$(awk -F: -v r="$real" 'NF { split($3, a, " "); if (a[1] != r) print }' <<<"$citas")
 if [ "$real" -lt 10 ]; then echo "FALLA contó solo $real pruebas (it( en los *.spec.ts)"; fallos=$((fallos+1))
+elif [ -z "$citas" ]; then echo "FALLA ninguna cita «N pruebas unitarias» en docs ni en el informe: ¿cambió la redacción? (no revisó nada)"; fallos=$((fallos+1))
 elif [ -n "$malas" ]; then echo "FALLA cifras de pruebas unitarias distintas de $real:"; sed 's/^/  /' <<<"$malas"; fallos=$((fallos+1))
 else echo "OK    $real pruebas unitarias; $(grep -c . <<<"$citas") cita(s) en docs e informe coinciden"; fi
 
-paso "2u. Imágenes fijadas por digest: cada FROM de los Dockerfile y cada imagen de registro del compose llevan @sha256 (docs/11 §4)"
-# 08/10: una etiqueta puede cambiar de contenido con el mismo nombre (pasó con mosquitto); con el digest, lo desplegado es lo
-# escaneado. Dependabot (.github/dependabot.yml) propone los cambios como pull request.
-sin=$( { grep -HnE '^FROM ' plataforma/backend/Dockerfile plataforma/db/imagen/Dockerfile plataforma/proxy/Dockerfile | grep -v '@sha256:[0-9a-f]\{64\}'
-         grep -HnE '^[[:space:]]+image:[[:space:]]+[a-z0-9./-]+:[^[:space:]]+' plataforma/docker-compose.yml | grep -vE 'plataforma-' | grep -v '@sha256:[0-9a-f]\{64\}'; } )
-total=$(grep -cE '^FROM ' plataforma/backend/Dockerfile plataforma/db/imagen/Dockerfile plataforma/proxy/Dockerfile | awk -F: '{s+=$2} END {print s}')
-if [ "${total:-0}" -lt 4 ]; then echo "FALLA revisó solo ${total:-0} líneas FROM (se esperan >= 4)"; fallos=$((fallos+1))
-elif [ -n "$sin" ]; then echo "FALLA imágenes sin digest:"; sed 's/^/  /' <<<"$sin"; fallos=$((fallos+1))
-else echo "OK    $total FROM y la imagen de registro del compose fijados por digest"; fi
+paso "2u. Imágenes fijadas por digest: cada FROM, cada imagen de registro de los compose y las que usan guiones y ejemplos (docs/11 §4)"
+# 08/10: una etiqueta puede cambiar de contenido con el mismo nombre (pasó con mosquitto). El digest fija la base; la capa
+# de parches (apk upgrade) se resuelve al construir, por eso se escanea lo construido y se despliega eso mismo (docs/11 §8).
+# Las imágenes del compose salen de `docker compose config`, que resuelve comillas, variables y la unión de archivos (antes
+# un grep daba OK con una imagen entre comillas, sin etiqueta o con variable, y miraba un solo archivo); de esa salida solo
+# se leen los nombres de imagen. Guiones (.sh, .yml) y bloques de código de los .md: patrón nombre:versión sin digest.
+# Dependabot (.github/dependabot.yml) propone las versiones nuevas como pull request.
+python3 -I - <<'PY' || fallos=$((fallos+1))
+import json, re, subprocess, sys
+dig = re.compile(r'@sha256:[0-9a-f]{64}$')
+arch = [a for a in subprocess.run(['git', 'ls-files', '--cached', '--others', '--exclude-standard'], capture_output=True,
+        text=True).stdout.split('\n') if a and not a.startswith('historico/')]
+if len(arch) < 50: print(f'FALLA no se pudieron listar los archivos del repositorio ({len(arch)}): ¿git falló?'); sys.exit(1)
+malos, n_from, n_reg, n_arch = [], 0, 0, 0
+# 1. FROM de cada Dockerfile; una etapa anterior del mismo archivo (FROM build) o scratch no es una imagen que bajar.
+for f in [a for a in arch if re.search(r'(^|/)Dockerfile[^/]*$', a)]:
+    etapas = set()
+    for n, l in enumerate(open(f, encoding='utf-8'), 1):
+        m = re.match(r'\s*FROM\s+(?:--platform=\S+\s+)?(\S+)(?:\s+AS\s+(\S+))?', l, re.I)
+        if not m: continue
+        n_from += 1
+        if m.group(1).lower() not in etapas and m.group(1) != 'scratch' and not dig.search(m.group(1)):
+            malos.append(f'{f}:{n}: FROM {m.group(1)}')
+        if m.group(2): etapas.add(m.group(2).lower())
+# 2. Imágenes de registro de cada combinación de compose que se usa; las que tienen build se revisan por su FROM.
+for juego in (['plataforma/docker-compose.yml', 'plataforma/docker-compose.override.yml', 'plataforma/proxy/compose.proxy.yml'],
+              ['plataforma/docker-compose.yml', 'plataforma/pruebas/banco/compose.banco.yml']):
+    p = subprocess.run(['docker', 'compose'] + [x for f in juego for x in ('-f', f)] + ['config', '--format', 'json'],
+                       capture_output=True, text=True)
+    if p.returncode != 0:
+        malos.append(f'docker compose config falló con {" + ".join(juego)}: {(p.stderr.strip().splitlines() or ["?"])[0][:160]}')
+        continue
+    for s, d in json.loads(p.stdout).get('services', {}).items():
+        if d.get('build'): continue
+        n_reg += 1
+        if not dig.search(d.get('image') or ''): malos.append(f'{" + ".join(juego)}: servicio {s}, imagen {d.get("image") or "(ninguna)"}')
+# 3. nombre:versión sin digest en guiones y en bloques de código (sin comentarios; las construidas aquí, plataforma-*, no).
+# Versión con punto (2.0.22), con sufijo (16-alpine) o latest; «4.0f» de un printf o «127.0.0.1:3000» no son imágenes.
+pat = re.compile(r'(?<![\w./@:$-])([a-z0-9][a-z0-9._-]*(?:/[a-z0-9._-]+)*):([0-9]+(?:(?:\.[0-9]+)+(?:-[A-Za-z0-9._-]+)?'
+                 r'|-[A-Za-z][A-Za-z0-9._-]*)|latest)(?![A-Za-z0-9._-])(?!@sha256:[0-9a-f]{64})')
+for f in arch:
+    es_md = f.endswith('.md')
+    if not (es_md or re.search(r'\.(sh|ya?ml)$', f)): continue
+    n_arch += 1; codigo = False
+    for n, l in enumerate(open(f, encoding='utf-8', errors='replace'), 1):
+        if es_md and l.lstrip().startswith('```'): codigo = not codigo; continue
+        if (es_md and not codigo) or l.lstrip().startswith('#'): continue
+        for m in pat.finditer(re.sub(r'\s#.*$', '', l)):
+            if not m.group(1).startswith('plataforma-'): malos.append(f'{f}:{n}: {m.group(0)}')
+if n_from < 4 or n_reg < 1 or n_arch < 20:
+    malos.append(f'revisó de menos: {n_from} FROM (>= 4), {n_reg} imágenes de registro (>= 1), {n_arch} archivos (>= 20)')
+for m in malos: print('FALLA', m)
+if not malos: print(f'OK    {n_from} FROM, {n_reg} imágenes de registro de los compose y {n_arch} guiones y documentos: todo fijado por digest')
+sys.exit(1 if malos else 0)
+PY
+
+paso "2v. Backlog: el anexo B del informe tiene las mismas tareas que docs/04, con la misma prioridad, etapa y horas"
+# 08/10: TT-39 decía «WebSocket o SSE» en docs/04 y SSE en el anexo. La descripción del anexo es un resumen a propósito y se
+# revisa leyendo; lo que no puede diferir son las tareas y sus números. Manda docs/04.
+python3 -I - <<'PY' || fallos=$((fallos+1))
+import re, sys
+def leer(ruta, patron, sep):
+    d, rep = {}, []
+    for l in open(ruta, encoding='utf-8'):
+        m = re.match(patron, l)
+        if m:
+            if m.group(1) in d: rep.append(m.group(1))
+            d[m.group(1)] = [re.sub(r'\*\*|\\textbf\{|\}', '', c).replace('--', '–').strip() for c in re.split(sep, m.group(2))]
+    return d, rep
+md, rmd = leer('docs/04-backlog.md', r'\|\s*\*\*(TT-\d+)\*\*\s*\|(.*)\|\s*$', r'\|')
+tx, rtx = leer('informe-oficial/anexos/b-backlog.tex', r'\s*\\textbf\{(TT-\d+)\}\s*&(.*?)\\\\\s*$', r'(?<!\\)&')
+if len(md) < 30: print(f'FALLA revisó solo {len(md)} tareas de docs/04 (se esperan >= 30)'); sys.exit(1)
+malos = [f'{k}: aparece repetida en docs/04' for k in rmd] + [f'{k}: aparece repetida en el anexo B' for k in rtx]
+malos += [f'{k}: está solo en {"docs/04" if k in md else "el anexo B"}' for k in sorted(set(md) ^ set(tx))]
+malos += [f'{k}: prioridad · etapa · horas difieren: docs/04 {" · ".join(md[k][-3:])}; anexo B {" · ".join(tx[k][-3:])}'
+          for k in sorted(set(md) & set(tx), key=lambda x: int(x[3:])) if md[k][-3:] != tx[k][-3:]]
+for m in malos: print('FALLA', m)
+if not malos: print(f'OK    {len(md)} tareas: el anexo B tiene las mismas, con la misma prioridad, etapa y horas que docs/04')
+sys.exit(1 if malos else 0)
+PY
 
 paso "3. Diagramas: informe = docs = base (generar-figuras.sh --verificar)"
 bash informe-oficial/figuras/generar-figuras.sh --verificar || fallos=$((fallos+1))

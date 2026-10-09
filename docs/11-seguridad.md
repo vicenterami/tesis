@@ -50,8 +50,8 @@
 | 4 | ACL por patrón `%u` | `acl` | ✅ dev-0001 publicando como dev-0002 → descartado; el backend no lo recibe |
 | 5 | Catálogo de magnitudes con rango físico | `01-esquema.sql` | ✅ 7 magnitudes con `rango_min/max`, que el filtro 3 usa |
 | 5 | Índice único: una sola condición abierta por tipo | `01-esquema.sql` | ✅ definido |
-| 7 | `security_opt: no-new-privileges` | `docker-compose.yml` | ✅ ambos servicios |
-| 7 | Imágenes con versión exacta y fijadas por digest (no `latest`) | `docker-compose.yml` y los `Dockerfile` | ✅ base `2.30.2-pg16-oss`, broker `2.0.22`, backend `node:22.23.3-trixie-slim`, proxy `nginx:1.30.5-alpine` (08/10/2026: etiqueta legible + `@sha256`, paso 2u del guardián; Dependabot propone las actualizaciones con 7 días de espera, `.github/dependabot.yml`; escaneo en `docs/16 §12`) |
+| 7 | `security_opt: no-new-privileges` | `docker-compose.yml` y `proxy/compose.proxy.yml` | ✅ todos los servicios (paso 2n del guardián) |
+| 7 | Imágenes con versión exacta y fijadas por digest (no `latest`) | `docker-compose.yml` y los `Dockerfile` | ✅ base `2.30.2-pg16-oss`, broker `2.0.22`, backend `node:22.23.3-trixie-slim`, proxy `nginx:1.30.5-alpine` (08/10/2026: etiqueta legible + `@sha256`, paso 2u del guardián, que también revisa los guiones; Dependabot propone las actualizaciones con 7 días de espera, `.github/dependabot.yml`, y sus PR de imágenes se prueban en local antes de fusionar, porque el CI no construye imágenes; escaneo en `docs/16 §12`) |
 | 7 | Límites de memoria y CPU | `docker-compose.yml` | ✅ 768 / 256 / 512 MB (base, broker, backend); verificado con `docker inspect` que el techo se aplica al contenedor (23/09: 536 870 912 bytes para el backend); consumo real en reposo ≈ 26 + 1,5 + 56 MB |
 | 8 | Secretos ignorados por git | `.gitignore` | ✅ `git status` no muestra `.env` ni `passwd` |
 | 5 | Filtro 1 (autenticar) + cuarentena en el backend | `backend/src/recepcion` | ✅ dispositivo con credencial válida pero **no registrado** → cuarentena `desconocido`; registrado → aceptado |
@@ -229,10 +229,12 @@ de desarrollo:
 - [ ] Respaldo automático configurado (`pg_dump` diario, cifrado, copia fuera del servidor) y **una restauración
       probada** antes de recibir datos reales; RPO y RTO decididos con el usuario (`docs/10 §9.5`).
 - [ ] Cortafuegos del servidor coordinado con Docker (regla `DOCKER-USER`), documentado en §4.
-- [ ] **Escanear las imágenes** (`bash plataforma/pruebas/escanear-imagenes.sh`): cero vulnerabilidades altas o críticas
-      con corrección publicada; lo que no la tenga, anotado en §4 con su porqué.
-- [ ] **Construir con bases frescas** (`docker compose build --pull --no-cache`): la capa de parches de las imágenes
-      derivadas no se rehace sola.
+- [ ] **Construir con bases frescas, escanear y desplegar eso mismo:** `bash plataforma/pruebas/escanear-imagenes.sh`
+      construye con `--pull --no-cache` y escanea: cero vulnerabilidades altas o críticas con corrección publicada; lo que
+      no la tenga, anotado en §4 con su porqué. Enseguida, `docker compose up -d --build`, que reusa las capas recién
+      escaneadas. El digest fija la base, pero la capa de parches (`apk upgrade`) se resuelve al construir: una imagen
+      reconstruida otro día se vuelve a escanear. Lo construido aquí lleva la etiqueta neutra `local`: su versión vive solo
+      en el `FROM` de su Dockerfile.
 - [ ] **Si cambió la versión de TimescaleDB** y la base ya existe: respaldo del volumen con el contenedor detenido →
       levantar solo la base → `psql -X -c "ALTER EXTENSION timescaledb UPDATE;"` → los mismos conteos antes y después.
       El paso 2k del guardián compara la versión de la extensión con la de la imagen.

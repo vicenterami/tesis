@@ -872,17 +872,26 @@ TimescaleDB (8 observaciones), registro de brokers (258 filas).
     en `docs/16 §12`, controles y la excepción en `docs/11 §4`; licencias vigiladas por el guardián (`docs/02`, RNF-15).
 36. **Roles y permisos con un guardia central.** Verificado en el código de ThingsBoard, OpenRemote y Magistrala: la identidad y
     el alcance salen de la sesión, nunca de la petición; el permiso se comprueba en el servidor antes de escribir; y el alcance
-    va en el WHERE de cada consulta. Aquí: roles por sitio (`usuario_sitio`) con una tabla de permisos por acción comprobada en un
+    va en el WHERE de cada consulta. Tres ejemplos, con el commit revisado: el guardia central de ThingsBoard
+    (https://github.com/thingsboard/thingsboard/blob/0439df09f31b0e8101b9f0a6be556c087d86818d/application/src/main/java/org/thingsboard/server/service/security/permission/DefaultAccessControlService.java#L67),
+    el alcance dentro del SQL de OpenRemote
+    (https://github.com/openremote/openremote/blob/26b1692c69ea28a7bf3df54badb138c6fe07029e/manager/src/main/java/org/openremote/manager/asset/AssetStorageService.java#L2095)
+    y el alcance tomado de la sesión en Magistrala
+    (https://github.com/absmach/magistrala/blob/05bc359e5e0c0b1343a963155a87a3d17c641b21/bootstrap/middleware/atom_authorization.go#L28).
+    Aquí: roles por sitio (`usuario_sitio`) con una tabla de permisos por acción comprobada en un
     solo guardia del backend; el sitio sale de la sesión y entra al WHERE de cada consulta; las ediciones usan bloqueo optimista
     con 409 (punto 28) y dejan su `evento` con quién. Se prueba con una sesión de cada rol, no solo de administrador. Se
     implementa con la autenticación (M7).
 37. **Exportación en CSV, XLSX y JSON** (RF-34, HU-08). El académico la pidió «crítica y no negociable» en CSV o XLSX para
     trabajar en Python, R, MATLAB o QGIS. JSON sale de la misma consulta; XLSX necesita una biblioteca, que se elige con licencia
     permisiva y sin avisos de seguridad (los revisan el guardián y la auditoría). Solo datos del sitio de quien exporta (RF-41).
-38. **Imágenes fijadas por digest y actualizadas con Dependabot.** Cada `FROM` y la imagen de registro del compose llevan su
-    etiqueta legible y su `@sha256`, el de lo escaneado y probado (paso 2u del guardián). Dependabot propone por pull request
-    las versiones nuevas de imágenes y de acciones del CI, con 7 días de espera desde su publicación; el estudiante revisa y
-    fusiona (`.github/dependabot.yml`, `docs/11 §4`).
+38. **Imágenes fijadas por digest y actualizadas con Dependabot.** Cada `FROM`, la imagen de registro del compose y las que
+    usan los guiones llevan su etiqueta legible y su `@sha256` (paso 2u del guardián). El digest fija la base; la capa de
+    parches (`apk upgrade`) se resuelve al construir, así que se escanea la imagen construida y se despliega esa misma
+    (`docs/11 §8`). Dependabot propone por pull request las versiones nuevas de imágenes y de acciones del CI, con 7 días
+    de espera desde su publicación; el estudiante revisa y fusiona (`.github/dependabot.yml`, `docs/11 §4`). El CI prueba
+    los de acciones, que usa, pero no los de imágenes, que no construye: antes de fusionar uno de imágenes,
+    `escanear-imagenes.sh` y el banco en local.
 
 ## 9. Crecimiento, resiliencia y respaldo (aprobado el 06/10/2026)
 

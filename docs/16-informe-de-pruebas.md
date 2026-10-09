@@ -3,8 +3,8 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 78 pruebas unitarias, sin matriz formal), TT-30 (recuperación ante
-reinicio), TT-32 (sensor físico). Todo lo de aquí se repite con dos comandos (§8).
+cubre todavía: TT-27 (contrato de trama: hoy 78 pruebas unitarias, sin matriz formal) y TT-32 (sensor físico);
+TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
 

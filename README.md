@@ -14,7 +14,7 @@ estado de cada dispositivo y panel de control. Caso de validación: Campus Dr. L
 |---|---|---|
 | 1 — Problema, objetivos y requerimientos | viernes 4 de septiembre de 2026 | ✅ entregada |
 | 2 — Diseño e implementación inicial | viernes 2 de octubre de 2026 | ✅ entregada — [`bitácora`](bitacora/2026-10-02-entrega-etapa2.md); estado al cierre en [`docs/12`](docs/12-estado-etapa2.md) |
-| 3 — Mejoras, pruebas y validación preliminar | viernes 30 de octubre de 2026 | 🟡 en curso — decisiones en [`docs/10 §8.4`](docs/10-arquitectura.md), pruebas en [`docs/16`](docs/16-informe-de-pruebas.md) |
+| 3 — Mejoras, pruebas y validación preliminar | viernes 30 de octubre de 2026 | 🟡 en curso — ver [`docs/18`](docs/18-estado-etapa3.md) |
 | 4 — Validación final e informe | viernes 4 de diciembre de 2026 | ⬜ |
 
 **Próximo hito:** entrega de la Etapa 3, **viernes 30 de octubre de 2026**.
@@ -36,6 +36,7 @@ estado de cada dispositivo y panel de control. Caso de validación: Campus Dr. L
 | Arquitectura: C4, secuencias, despliegue y decisiones de diseño (§8.4) | [`docs/10-arquitectura.md`](docs/10-arquitectura.md) |
 | Seguridad en capas: amenazas y controles verificados | [`docs/11-seguridad.md`](docs/11-seguridad.md) |
 | Estado al cierre de la Etapa 2: avance, backlog, prioridades | [`docs/12-estado-etapa2.md`](docs/12-estado-etapa2.md) |
+| **Estado de la Etapa 3: avance medido, tareas y lo que falta** | [`docs/18-estado-etapa3.md`](docs/18-estado-etapa3.md) |
 | Reglas de tiempo y zonas horarias (UTC, IANA por sitio) | [`docs/13-tiempo-y-zonas-horarias.md`](docs/13-tiempo-y-zonas-horarias.md) |
 | Despliegue, costos y retención (OE3) | [`docs/14-despliegue-y-costos.md`](docs/14-despliegue-y-costos.md) |
 | Guion de demostración (10 minutos, de punta a punta) | [`docs/15-guion-demostracion.md`](docs/15-guion-demostracion.md) |
@@ -64,7 +65,7 @@ recursos-uct/    (local, no versionada) materiales originales del curso
 
 ## Licencia
 
-El código (`plataforma/`) se publica bajo AGPL-3.0-only (archivo `LICENSE`; decisión del 08/10/2026, `docs/10 §8.4`
+El código (`plataforma/`) se publicará bajo AGPL-3.0-only (archivo `plataforma/LICENSE`; decisión del 08/10/2026, `docs/10 §8.4`
 punto 33); la titularidad se confirma con la universidad antes de liberarlo. Los documentos, el informe y las bitácoras no
 tienen todavía una licencia de reutilización (todos los derechos reservados al autor); el logo y la plantilla institucional
 pertenecen a la universidad.

@@ -29,7 +29,11 @@ jobs:
     steps:
       # Acciones fijadas por SHA, no por etiqueta: una etiqueta se puede reescribir (marzo de 2026, docs/11 §4).
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-      # v6: runtime node24 (GitHub retiró node20 y anotaba «forced to run on Node.js 24» en cada corrida) y pnpm 11.
+        # Sin guardar el token en .git/config: ningún paso escribe en el repositorio (08/10/2026).
+        with:
+          persist-credentials: false
+      # v6: runtime node24 (GitHub retiró node20 y anotaba «forced to run on Node.js 24» en cada corrida). La versión de
+      # pnpm sale de packageManager en package.json, con su hash.
       - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6
         with:
           package_json_file: plataforma/backend/package.json

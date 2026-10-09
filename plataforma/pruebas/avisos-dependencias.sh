@@ -25,7 +25,12 @@ fi
 for g in $(grep -v '^[[:space:]]*#' pnpm-workspace.yaml | grep -oE 'GHSA-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}' | sort -u); do
   d=$(gh api "/advisories/$g" --jq '"\(.vulnerabilities[0].package.name), \(.severity): \(.summary). Versión corregida: \([.vulnerabilities[].first_patched_version // empty] | if length == 0 then "ninguna publicada" else join(", ") end)"' 2>/dev/null) \
     || d="detalle no disponible (sin gh o sin red)"
-  aviso "Excepción vigente $g" "$d. Pendiente de resolver."
+  # Con el parche ya publicado sigue en amarillo, pero lo dice en el título (decidido el 08/10/2026); en local, el paso
+  # 2q del guardián falla hasta que se actualice y se quite la excepción.
+  case "$d" in
+    *"Versión corregida: ninguna publicada"*|"detalle no disponible"*) aviso "Excepción vigente $g" "$d. Pendiente de resolver." ;;
+    *) aviso "HAY PARCHE para la excepción $g" "$d. Actualizar y quitar la excepción de audit.ignore." ;;
+  esac
 done
 if ! command -v pnpm >/dev/null; then
   aviso "Auditoría no hecha" "pnpm no está en el PATH"

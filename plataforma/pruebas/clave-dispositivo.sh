@@ -12,7 +12,9 @@
 # Aquí la carpeta se monta en /c y se entra directo a la herramienta: nada más cambia de dueño.
 set -u
 cd "$(dirname "$0")/.."
-IMG=eclipse-mosquitto:2.0.22
+# La imagen del broker que fija el compose por digest (fuente única): aquí recibe la clave real, nunca por etiqueta.
+IMG=$(grep -oE 'eclipse-mosquitto:[^ ]+@sha256:[0-9a-f]{64}' docker-compose.yml | head -1)
+[ -n "$IMG" ] || { echo "FALLA no encontré la imagen fijada del broker en docker-compose.yml"; exit 1; }
 CONF="$PWD/mosquitto/config"
 herr() { local e="$1"; shift; docker run --rm -i -v "$CONF:/c" --entrypoint "$e" "$IMG" "$@"; }
 

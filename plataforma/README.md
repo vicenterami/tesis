@@ -18,7 +18,7 @@ plataforma/
 ├── db/imagen/                # Dockerfile de la base: TimescaleDB -oss fijada + parches de seguridad
 ├── db/init/                  # esquema y migraciones numeradas; en una instalación nueva corren todas
 │   ├── 01-esquema.sql        #   en orden al primer arranque. En una base existente, cada archivo nuevo
-│   └── 02…07-*.sql           #   se aplica a mano: docker compose exec -T timescaledb psql -U plataforma -d plataforma < db/init/NN-x.sql
+│   └── 02…NN-*.sql           #   se aplica a mano: docker compose exec -T timescaledb psql -U plataforma -d plataforma < db/init/NN-x.sql
 └── mosquitto/config/
     ├── mosquitto.conf        # broker sin anónimos, con contraseñas y ACL
     ├── acl                   # cada dispositivo publica solo en su tópico
@@ -35,13 +35,15 @@ openssl rand -base64 24              # generar una clave por variable
 # Contraseñas MQTT (crea el archivo passwd con hash; una línea por usuario). La clave se pega oculta
 # (read -rs) y entra por la entrada estándar: no queda en el historial de la terminal ni en ps.
 # -c CREA el archivo desde cero: solo para el primer usuario de una instalación nueva.
+# La imagen del broker que fija el compose por digest (aquí recibe las claves: nunca por etiqueta).
+IMG=$(grep -oE 'eclipse-mosquitto:[^ ]+@sha256:[0-9a-f]{64}' docker-compose.yml | head -1)
 read -rs -p "clave de sonda (la de .env): " C && echo && printf '%s\n%s\n' "$C" "$C" | \
-  docker run --rm -i -v "$PWD/mosquitto/config:/c" --entrypoint mosquitto_passwd eclipse-mosquitto:2.0.22 -c /c/passwd sonda
+  docker run --rm -i -v "$PWD/mosquitto/config:/c" --entrypoint mosquitto_passwd "$IMG" -c /c/passwd sonda
 read -rs -p "clave de backend (la de .env): " C && echo && printf '%s\n%s\n' "$C" "$C" | \
-  docker run --rm -i -v "$PWD/mosquitto/config:/c" --entrypoint mosquitto_passwd eclipse-mosquitto:2.0.22 /c/passwd backend
+  docker run --rm -i -v "$PWD/mosquitto/config:/c" --entrypoint mosquitto_passwd "$IMG" /c/passwd backend
 unset C
 # El archivo queda propiedad de root; el broker corre como uid 1883 y debe poder leerlo:
-docker run --rm -v "$PWD/mosquitto/config:/c" eclipse-mosquitto:2.0.22 \
+docker run --rm -v "$PWD/mosquitto/config:/c" "$IMG" \
   sh -c 'chown 1883:1883 /c/passwd && chmod 0640 /c/passwd'
 # Siempre en /c, nunca en /mosquitto: el arranque de la imagen hace chown -R de /mosquitto (docs/11 §7).
 # Claves de DISPOSITIVOS (dev-0001…): un solo comando, con la clave oculta y verificada:
@@ -79,7 +81,7 @@ curl http://127.0.0.1:3000/salud    # {"estado":"ok","base":"conectada","tablas"
 
 | Término | Qué es | Dónde se ve |
 |---|---|---|
-| **Imagen** | Plantilla inmutable con el software instalado (como un ISO) | `image: eclipse-mosquitto:2.0` |
+| **Imagen** | Plantilla inmutable con el software instalado (como un ISO) | `image: eclipse-mosquitto:2.0.22@sha256:…` (etiqueta legible + digest) |
 | **Contenedor** | Una imagen en ejecución, aislada | cada bloque bajo `services:` |
 | **Volumen** | Disco persistente gestionado por Docker; sobrevive al contenedor | `datos-timescale`, `datos-mosquitto` |
 | **Bind mount** | Carpeta del anfitrión montada dentro del contenedor | `./db/init:/docker-entrypoint-initdb.d` |

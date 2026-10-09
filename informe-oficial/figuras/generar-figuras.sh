@@ -9,7 +9,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 MMD=informe-oficial/figuras/mermaid; OUT=informe-oficial/figuras/render
-IMG=minlag/mermaid-cli:11.17.0
+IMG=minlag/mermaid-cli:11.17.0@sha256:a6fb0574dded4086888b5e38476899c9aff8963196f689f11a0f8fceee588ce1   # etiqueta legible + digest (docs/11 §4)
 TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
 
 # 1) Modelo de datos: desde la base (requiere la pila arriba)

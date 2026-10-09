@@ -250,7 +250,7 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 | **TT-21** | 🎯 Aislamiento de datos entre sitios, verificado con pruebas | M | 4 | 5 |
 | **TT-22** | 🎯 Cifrado del transporte: TLS para HTTP y MQTT | M | 4 | 4 |
 | **HU-18** | **Como administrador de sitio**, quiero iniciar sesión con mis credenciales y que existan roles distintos de administración y consulta | M | 3 | 3 |
-| **TT-39** | Canal de tiempo real autenticado hacia el panel (WebSocket o SSE tras el proxy TLS): sesión del panel verificada al abrir, lista blanca de `Origin`, límite de tamaño y tasa (RF-43, RNF-08; `docs/11 §4`) — agregada el 23/09/2026 | M | 3 | 4 |
+| **TT-39** | Canal de tiempo real autenticado hacia el panel (SSE tras el proxy TLS, `docs/10 §8.4` punto 1): sesión del panel verificada al abrir, lista blanca de `Origin`, límite de tamaño y tasa (RF-43, RNF-08; `docs/11 §4`) — agregada el 23/09/2026 | M | 3 | 4 |
 
 **TT-32 — criterios de aceptación** 🎯
 

@@ -9,13 +9,15 @@
 # $SYS/broker/publish/messages/dropped: lo que la cola (max_queued_messages) no pudo guardar se descarta sin aviso.
 set -u
 cd "$(dirname "$0")/../.." || exit 1                    # plataforma/
+IMG_BROKER=$(grep -oE 'eclipse-mosquitto:[^ ]+@sha256:[0-9a-f]{64}' docker-compose.yml | head -1)   # la del compose, fijada por digest
+[ -n "$IMG_BROKER" ] || { echo "FALLA no encontré la imagen fijada del broker en docker-compose.yml"; exit 1; }
 B=pruebas/banco/banco.sh; CERTS="$(pwd)/../privado/certs-desarrollo"
 O="${TMPDIR:-/tmp}/plataforma-capacidad"; rm -rf "$O"; mkdir -p "$O"
-sys() { docker run --rm --network banco_default eclipse-mosquitto:2.0.22 mosquitto_sub -h mosquitto -t "\$SYS/broker/publish/messages/$1" -C 1 -W 20 2>/dev/null; }
+sys() { docker run --rm --network banco_default "$IMG_BROKER" mosquitto_sub -h mosquitto -t "\$SYS/broker/publish/messages/$1" -C 1 -W 20 2>/dev/null; }
 resumen() { grep -E "NO guardadas|p95 \(ms\) \||tramas crudas" "$1" | cut -c1-110; }
 tls() { # tormenta de reconexión: 3 clientes × 150 publicaciones, una conexión TLS nueva por publicación
   for k in 0010 0011 0012; do
-    docker run --rm --network banco_default -v "$CERTS:/c:ro" --entrypoint sh eclipse-mosquitto:2.0.22 -c '
+    docker run --rm --network banco_default -v "$CERTS:/c:ro" --entrypoint sh "$IMG_BROKER" -c '
       i=0; while [ "$i" -lt 150 ]; do bt=$(date +%s)
         mosquitto_pub --cafile /c/ca.crt -h proxy -p 8883 -q 1 -i "$0" -u "$0" -t "sitio/banco/dispositivo/$0/temperatura" \
           -m "[{\"bn\":\"$0\",\"bt\":$bt,\"n\":\"temperatura\",\"u\":\"Cel\",\"v\":21.5}]" || echo FALLA
