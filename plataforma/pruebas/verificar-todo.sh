@@ -92,19 +92,24 @@ else
   echo "FALLA el orden de los filtros 5/6 difiere entre pipeline.tex, docs/06 y docs/10"; fallos=$((fallos+1))
 fi
 
-paso "2f. Repositorio público: ningún archivo versionado o nuevo contiene términos de la lista privada (privado/patrones-vetados.txt)"
-# Los términos viven fuera del repositorio, como los nombres del paso 2j: escritos aquí serían ellos mismos la fuga (08/10).
-# git grep --untracked revisa versionados y nuevos sin romperse con espacios o comillas en los nombres; salida 1 = sin
-# coincidencias; cualquier otra distinta de 0 es un error y falla: un paso que no revisó no pasa.
+paso "2f. Repositorio público: ningún archivo versionado o nuevo contiene términos de la lista privada"
+# Los términos viven fuera del repositorio (PATRONES_VETADOS), como los nombres del paso 2j: escritos aquí serían ellos
+# mismos la fuga (08/10). git grep --untracked revisa versionados y nuevos sin romperse con espacios o comillas en los
+# nombres; salida 1 = sin coincidencias; cualquier otra distinta de 0 es un error y falla: un paso que no revisó no pasa.
+# La lista se normaliza antes de usarla (08/10): con finales de línea de Windows o espacios al final ningún patrón calzaba y
+# el paso daba OK sin revisar; fuera las líneas vacías y los comentarios, y se exige un mínimo. Si git falla, su mensaje no
+# se muestra: podría citar un término de la lista.
 PV="${PATRONES_VETADOS:-privado/patrones-vetados.txt}"
+lista() { tr -d '\r' < "$1" | sed 's/[[:space:]]*$//' | grep -v -e '^$' -e '^#' > "$2"; wc -l < "$2"; }
 n=$(archivos_repo 2>/dev/null | grep -vc '^historico/')
 if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1 || [ "${n:-0}" -lt 50 ]; then echo "FALLA no se pudieron listar los archivos del repositorio (${n:-0}): ¿git falló?"; fallos=$((fallos+1))
-elif [ ! -s "$PV" ]; then echo "omitido: no existe $PV"; omitidos="$omitidos 2f"
+elif [ ! -s "$PV" ]; then echo "omitido: no existe la lista privada de términos"; omitidos="$omitidos 2f"
+elif [ "$(lista "$PV" "$VT"/2f-lista.txt)" -lt 3 ]; then echo "FALLA la lista privada de términos tiene menos de 3 patrones útiles: no revisaría nada"; fallos=$((fallos+1))
 else
-  git grep --untracked -lniE -f "$PV" -- ':!historico' > "$VT"/2f.txt 2>&1; rc=$?
+  git grep --untracked -lniE -f "$VT"/2f-lista.txt -- ':!historico' > "$VT"/2f.txt 2>/dev/null; rc=$?
   if [ "$rc" -eq 0 ]; then echo "FALLA archivos con términos de la lista privada:"; sed 's/^/  /' "$VT"/2f.txt; fallos=$((fallos+1))
-  elif [ "$rc" -ne 1 ]; then echo "FALLA git grep falló ($rc): $(head -1 "$VT"/2f.txt)"; fallos=$((fallos+1))
-  else echo "OK    ningún término de la lista privada en $n archivos versionados o nuevos"; fi
+  elif [ "$rc" -ne 1 ]; then echo "FALLA git grep falló (salida $rc; su mensaje no se muestra porque podría citar la lista)"; fallos=$((fallos+1))
+  else echo "OK    ningún término de la lista privada ($(wc -l < "$VT"/2f-lista.txt) patrones) en $n archivos versionados o nuevos"; fi
 fi
 
 paso "2g. Migraciones citadas en prosa (docs e informe) == archivos NN-*.sql en disco"
@@ -145,17 +150,19 @@ for f in "$MC" "$MC/acl" "$MC/mosquitto.conf"; do [ "$(stat -c %u "$f")" = "$yo"
 if [ -z "$mal" ]; then echo "OK    carpeta, acl y mosquitto.conf del operador; passwd de 1883 con modo 640"
 else echo "FALLA dueños o modos alterados:$mal (restituir: sudo chown \$USER:\$USER; passwd con clave-dispositivo.sh)"; fallos=$((fallos+1)); fi
 
-paso "2j. Repositorio público: ningún archivo versionado nombra a personas de la lista privada (privado/nombres-vetados.txt)"
-# La lista vive fuera del repo (un nombre en este script sería la fuga). Una línea por nombre; palabra completa,
-# sin distinguir mayúsculas. Si el archivo no existe, el paso se omite y lo dice.
+paso "2j. Repositorio público: ningún archivo versionado nombra a personas de la lista privada"
+# La lista vive fuera del repo (NOMBRES_VETADOS; un nombre en este script sería la fuga). Una línea por nombre; palabra
+# completa, sin distinguir mayúsculas. Si el archivo no existe, el paso se omite y lo dice. Se normaliza como la de 2f.
 NV="${NOMBRES_VETADOS:-privado/nombres-vetados.txt}"
-if [ -s "$NV" ]; then
-  git grep --untracked -lniwF -f "$NV" -- ':!historico' > "$VT"/2j.txt 2>&1; rc=$?
+if [ ! -s "$NV" ]; then echo "omitido: no existe la lista privada de nombres"; omitidos="$omitidos 2j"
+elif [ "$(lista "$NV" "$VT"/2j-lista.txt)" -lt 1 ]; then echo "FALLA la lista privada de nombres no tiene ningún nombre útil: no revisaría nada"; fallos=$((fallos+1))
+else
+  git grep --untracked -lniwF -f "$VT"/2j-lista.txt -- ':!historico' > "$VT"/2j.txt 2>/dev/null; rc=$?
   n=$(archivos_repo 2>/dev/null | grep -vc '^historico/')
   if [ "$rc" -eq 0 ]; then echo "FALLA archivos con nombres de la lista privada:"; sed 's/^/  /' "$VT"/2j.txt; fallos=$((fallos+1))
   elif [ "$rc" -ne 1 ] || [ "${n:-0}" -lt 50 ]; then echo "FALLA no se pudo revisar (git grep salió $rc; ${n:-0} archivos)"; fallos=$((fallos+1))
-  else echo "OK    ningún nombre de la lista privada en $n archivos versionados o nuevos"; fi
-else echo "omitido: no existe $NV"; omitidos="$omitidos 2j"; fi
+  else echo "OK    ningún nombre de la lista privada ($(wc -l < "$VT"/2j-lista.txt)) en $n archivos versionados o nuevos"; fi
+fi
 
 paso "2k. Edición Apache de TimescaleDB (RNF-15; docs/10 §8.4 punto 11): licencia, imagen, sin compresión, sin jobs ni telemetría"
 # La licencia se lee en la base que corre, no se supone por el compose; y el compose se revisa aparte, porque
@@ -204,18 +211,32 @@ elif ! docker build -q -t "$IMG_PROXY" plataforma/proxy >"$VT"/build-proxy.txt 2
 elif docker run --rm -v "$PWD/plataforma/proxy/nginx.conf:/etc/nginx/nginx.conf:ro" -v "$CERTS_DEV:/certs:ro" "$IMG_PROXY" nginx -t >"$VT"/nginx.txt 2>&1; then echo "OK    nginx -t: configuración válida ($BASE_PROXY + parches de proxy/Dockerfile)"
 else echo "FALLA nginx -t:"; grep -E "emerg|nginx:" "$VT"/nginx.txt | sed 's/^/  /'; fallos=$((fallos+1)); fi
 
-paso "2n. Registros acotados y sin escalada de privilegios: todo servicio del compose y el proxy declaran logging con max-size y no-new-privileges (docs/11 §3–4)"
-# 07/10: sin límite, el chequeo de salud del broker sumaba ≈ 395 MB/año. Se cuenta por archivo: servicios contra bloques logging.
-for f in plataforma/docker-compose.yml plataforma/proxy/compose.proxy.yml; do
-  srv=$(awk '/^services:/{s=1;next} /^[a-z]/{s=0} s && /^  [a-z][a-z-]*:$/' "$f" | wc -l)
-  # Se valida el VALOR, no solo la presencia (07/10: unas comillas escapadas, `\"10m\"`, dejaron la pila sin arrancar y el
-  # conteo decía OK): el daemon exige un tamaño como 10m y un entero para max-file.
-  logs=$(grep -cE 'max-size: "[0-9]+[kmg]", max-file: "[0-9]+"' "$f")
-  # 08/10: también no-new-privileges, que docs/11 §3 daba por puesto en «ambos servicios» cuando ya eran cuatro.
-  nnp=$(grep -cE '^[[:space:]]+- no-new-privileges:true([[:space:]]|$)' "$f")
-  if [ "$srv" -ge 1 ] && [ "$srv" = "$logs" ] && [ "$srv" = "$nnp" ]; then echo "OK    $f: $srv servicio(s), todos con logging acotado y no-new-privileges"
-  else echo "FALLA $f: $srv servicio(s), $logs con 'max-size: \"Nm\", max-file: \"N\"' bien formado y $nnp con no-new-privileges:true"; fallos=$((fallos+1)); fi
-done
+paso "2n. Registros acotados y sin escalada de privilegios: cada servicio de cada combinación de compose (docs/11 §3–4)"
+# 07/10: sin límite, el chequeo de salud del broker sumaba ≈ 395 MB/año. Se valida el VALOR, no solo la presencia (07/10:
+# unas comillas escapadas, `\"10m\"`, dejaron la pila sin arrancar y el conteo decía OK): el daemon exige un tamaño como 10m
+# y un entero para max-file. 08/10: también no-new-privileges, que docs/11 §3 daba por puesto en «ambos servicios» cuando
+# ya eran cuatro. Se lee la configuración efectiva con `docker compose config`, que entiende sobrescrituras, perfiles y
+# nombres con dígitos (un awk no los contaba), y de su salida, que trae el entorno con claves, solo se miran estos campos.
+python3 -I - <<'PY' || fallos=$((fallos+1))
+import json, re, subprocess, sys
+malos, n = [], 0
+for juego in (['plataforma/docker-compose.yml', 'plataforma/docker-compose.override.yml', 'plataforma/proxy/compose.proxy.yml'],
+              ['plataforma/docker-compose.yml', 'plataforma/pruebas/banco/compose.banco.yml']):
+    p = subprocess.run(['docker', 'compose'] + [x for f in juego for x in ('-f', f)] + ['--profile', '*', 'config', '--format', 'json'],
+                       capture_output=True, text=True)
+    if p.returncode != 0: malos.append(f'docker compose config falló con {" + ".join(juego)} (salida {p.returncode})'); continue
+    for s, d in json.loads(p.stdout).get('services', {}).items():
+        n += 1
+        op = (d.get('logging') or {}).get('options') or {}
+        if not (re.fullmatch(r'[0-9]+[kmg]', str(op.get('max-size', ''))) and re.fullmatch(r'[0-9]+', str(op.get('max-file', '')))):
+            malos.append(f'{juego[-1]}: servicio {s} sin logging acotado y bien formado (max-size {op.get("max-size")!r}, max-file {op.get("max-file")!r})')
+        if 'no-new-privileges:true' not in (d.get('security_opt') or []):
+            malos.append(f'{juego[-1]}: servicio {s} sin no-new-privileges:true')
+if n < 7: malos.append(f'revisó solo {n} servicios (se esperan >= 7: 4 en la pila con el proxy y 3 en el banco)')
+for m in malos: print('FALLA', m)
+if not malos: print(f'OK    {n} servicios en las dos combinaciones de compose: todos con logging acotado y no-new-privileges')
+sys.exit(1 if malos else 0)
+PY
 
 paso "2o. Informe: todo párrafo que nombra ChirpStack lo marca como opcional (ruta A), salvo el de OpenRemote (docs/10 §8.4 punto 2)"
 # 07/10: la decisión del 06/10 dejó ChirpStack como opcional, pero el informe seguía diciendo «un contenedor más en la
@@ -380,6 +401,9 @@ malos, n_from, n_reg, n_arch = [], 0, 0, 0
 for f in [a for a in arch if re.search(r'(^|/)Dockerfile[^/]*$', a)]:
     etapas = set()
     for n, l in enumerate(open(f, encoding='utf-8'), 1):
+        c = re.match(r'\s*COPY\s+(?:--\S+\s+)*?--from=(\S+)', l, re.I)   # COPY --from=imagen:versión también baja una imagen
+        if c and c.group(1).lower() not in etapas and not c.group(1).isdigit() and not dig.search(c.group(1)):
+            malos.append(f'{f}:{n}: COPY --from={c.group(1)}')
         m = re.match(r'\s*FROM\s+(?:--platform=\S+\s+)?(\S+)(?:\s+AS\s+(\S+))?', l, re.I)
         if not m: continue
         n_from += 1
@@ -389,19 +413,20 @@ for f in [a for a in arch if re.search(r'(^|/)Dockerfile[^/]*$', a)]:
 # 2. Imágenes de registro de cada combinación de compose que se usa; las que tienen build se revisan por su FROM.
 for juego in (['plataforma/docker-compose.yml', 'plataforma/docker-compose.override.yml', 'plataforma/proxy/compose.proxy.yml'],
               ['plataforma/docker-compose.yml', 'plataforma/pruebas/banco/compose.banco.yml']):
-    p = subprocess.run(['docker', 'compose'] + [x for f in juego for x in ('-f', f)] + ['config', '--format', 'json'],
+    p = subprocess.run(['docker', 'compose'] + [x for f in juego for x in ('-f', f)] + ['--profile', '*', 'config', '--format', 'json'],
                        capture_output=True, text=True)
     if p.returncode != 0:
-        malos.append(f'docker compose config falló con {" + ".join(juego)}: {(p.stderr.strip().splitlines() or ["?"])[0][:160]}')
+        malos.append(f'docker compose config falló con {" + ".join(juego)} (salida {p.returncode})')
         continue
     for s, d in json.loads(p.stdout).get('services', {}).items():
         if d.get('build'): continue
         n_reg += 1
         if not dig.search(d.get('image') or ''): malos.append(f'{" + ".join(juego)}: servicio {s}, imagen {d.get("image") or "(ninguna)"}')
 # 3. nombre:versión sin digest en guiones y en bloques de código (sin comentarios; las construidas aquí, plataforma-*, no).
-# Versión con punto (2.0.22), con sufijo (16-alpine) o latest; «4.0f» de un printf o «127.0.0.1:3000» no son imágenes.
+# Versión con punto (2.0.22), con sufijo (16-alpine) o una etiqueta con nombre conocida (latest, stable, alpine…);
+# «4.0f» de un printf o «127.0.0.1:3000» no son imágenes. Una imagen sin etiqueta en un `docker run` no se detecta: se lee.
 pat = re.compile(r'(?<![\w./@:$-])([a-z0-9][a-z0-9._-]*(?:/[a-z0-9._-]+)*):([0-9]+(?:(?:\.[0-9]+)+(?:-[A-Za-z0-9._-]+)?'
-                 r'|-[A-Za-z][A-Za-z0-9._-]*)|latest)(?![A-Za-z0-9._-])(?!@sha256:[0-9a-f]{64})')
+                 r'|-[A-Za-z][A-Za-z0-9._-]*)|latest|edge|stable|mainline|alpine|slim|lts)(?![A-Za-z0-9._-])(?!@sha256:[0-9a-f]{64})')
 for f in arch:
     es_md = f.endswith('.md')
     if not (es_md or re.search(r'\.(sh|ya?ml)$', f)): continue
@@ -418,7 +443,7 @@ if not malos: print(f'OK    {n_from} FROM, {n_reg} imágenes de registro de los 
 sys.exit(1 if malos else 0)
 PY
 
-paso "2v. Backlog: el anexo B del informe tiene las mismas tareas que docs/04, con la misma prioridad, etapa y horas"
+paso "2v. Backlog: el anexo B del informe tiene las mismas historias y tareas que docs/04, con la misma prioridad, etapa y horas"
 # 08/10: TT-39 decía «WebSocket o SSE» en docs/04 y SSE en el anexo. La descripción del anexo es un resumen a propósito y se
 # revisa leyendo; lo que no puede diferir son las tareas y sus números. Manda docs/04.
 python3 -I - <<'PY' || fallos=$((fallos+1))
@@ -431,15 +456,15 @@ def leer(ruta, patron, sep):
             if m.group(1) in d: rep.append(m.group(1))
             d[m.group(1)] = [re.sub(r'\*\*|\\textbf\{|\}', '', c).replace('--', '–').strip() for c in re.split(sep, m.group(2))]
     return d, rep
-md, rmd = leer('docs/04-backlog.md', r'\|\s*\*\*(TT-\d+)\*\*\s*\|(.*)\|\s*$', r'\|')
-tx, rtx = leer('informe-oficial/anexos/b-backlog.tex', r'\s*\\textbf\{(TT-\d+)\}\s*&(.*?)\\\\\s*$', r'(?<!\\)&')
-if len(md) < 30: print(f'FALLA revisó solo {len(md)} tareas de docs/04 (se esperan >= 30)'); sys.exit(1)
+md, rmd = leer('docs/04-backlog.md', r'\|\s*\*\*((?:HU|TT)-\d+)\*\*\s*\|(.*)\|\s*$', r'\|')
+tx, rtx = leer('informe-oficial/anexos/b-backlog.tex', r'\s*\\textbf\{((?:HU|TT)-\d+)\}\s*&(.*?)\\\\\s*$', r'(?<!\\)&')
+if len(md) < 60: print(f'FALLA revisó solo {len(md)} elementos de docs/04 (se esperan >= 60)'); sys.exit(1)
 malos = [f'{k}: aparece repetida en docs/04' for k in rmd] + [f'{k}: aparece repetida en el anexo B' for k in rtx]
 malos += [f'{k}: está solo en {"docs/04" if k in md else "el anexo B"}' for k in sorted(set(md) ^ set(tx))]
 malos += [f'{k}: prioridad · etapa · horas difieren: docs/04 {" · ".join(md[k][-3:])}; anexo B {" · ".join(tx[k][-3:])}'
           for k in sorted(set(md) & set(tx), key=lambda x: int(x[3:])) if md[k][-3:] != tx[k][-3:]]
 for m in malos: print('FALLA', m)
-if not malos: print(f'OK    {len(md)} tareas: el anexo B tiene las mismas, con la misma prioridad, etapa y horas que docs/04')
+if not malos: print(f'OK    {len(md)} historias y tareas: el anexo B tiene las mismas, con la misma prioridad, etapa y horas que docs/04')
 sys.exit(1 if malos else 0)
 PY
 

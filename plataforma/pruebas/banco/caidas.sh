@@ -12,7 +12,7 @@ set -u
 cd "$(dirname "$0")/../.." || exit 1                    # plataforma/
 IMG_BROKER=$(grep -oE 'eclipse-mosquitto:[^ ]+@sha256:[0-9a-f]{64}' docker-compose.yml | head -1)   # la del compose, fijada por digest
 [ -n "$IMG_BROKER" ] || { echo "FALLA no encontré la imagen fijada del broker en docker-compose.yml"; exit 1; }
-B=pruebas/banco/banco.sh; O="${TMPDIR:-/tmp}/plataforma-caidas"; rm -rf "$O"; mkdir -p "$O"
+B=pruebas/banco/banco.sh; O=$(mktemp -d "${TMPDIR:-/tmp}/plataforma-caidas.XXXXXX") || exit 1   # carpeta nueva y privada por corrida (08/10)
 sys() { docker run --rm --network banco_default "$IMG_BROKER" mosquitto_sub -h mosquitto -t "\$SYS/broker/publish/messages/$1" -C 1 -W 20 2>/dev/null; }
 hasta_salud() { local t0=$SECONDS; for _ in $(seq 1 60); do curl -s -m 2 http://127.0.0.1:3001/salud | grep -q '"estado":"ok"' && { echo $((SECONDS - t0)); return; }; sleep 1; done; echo "más de 60"; }
 escenario() { # nombre falla_inicio falla_fin segundos_de_caída

@@ -348,7 +348,7 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 # 6. Verificación de viabilidad del alcance
 
 > Todas las cifras de esta sección se obtuvieron **sumando programáticamente** las estimaciones de los
-> 64 elementos del backlog, no estimando el total a ojo. El procedimiento es reproducible sobre este
+> 65 elementos del backlog, no estimando el total a ojo. El procedimiento es reproducible sobre este
 > mismo documento.
 
 ## 6.1 Esfuerzo estimado
@@ -404,10 +404,10 @@ Cuatro semanas por etapa a ~15 horas semanales (restricción RE-01):
    demostrable dentro del plazo — pero **solo si el alcance se limita al núcleo** y los 111 h restantes
    se tratan como alcance opcional, no comprometido.
 
-> **Decisión de planificación derivada:** el **núcleo (168 h) constituye el compromiso**; los 30
+> **Decisión de planificación derivada:** el **núcleo (168 h) constituye el compromiso**; los 31
 > elementos fuera del núcleo son **alcance condicional**, ejecutables únicamente contra holgura real
-> verificada al cierre de cada etapa. Comprometerse con los 279 h produciría un incumplimiento del
-> 16 % — y la pauta mide el avance como porcentaje de tareas completadas, de modo que un alcance
+> verificada al cierre de cada etapa. Comprometerse con las 285 h produciría un incumplimiento del
+> 19 % — y la pauta mide el avance como porcentaje de tareas completadas, de modo que un alcance
 > sobredimensionado penaliza más que un alcance acotado y justificado.
 
 ## 6.4 🔴 Segundo hallazgo: el núcleo estaba mal distribuido en el tiempo (corregido el 23/09/2026)
@@ -525,9 +525,9 @@ no demuestran ninguna.
 | Tareas técnicas | ✅ 39 |
 | Elementos del núcleo demostrativo | ✅ 34 elementos, 168 h |
 | Criterios de aceptación | ✅ Detallados en los elementos del núcleo; deliberadamente sin refinar en el resto |
-| Estimaciones | ✅ 64 elementos estimados, **279 h** en total, sumadas programáticamente |
+| Estimaciones | ✅ 65 elementos estimados, **285 h** en total, sumadas programáticamente |
 | Priorización | ✅ MoSCoW heredado del catálogo, más orden de ejecución justificado |
-| Verificación de viabilidad | 🔴 **Realizada. El backlog completo excede el presupuesto en 16 %; el núcleo cabe con 30 % de holgura. Redistribución correctiva definida** |
+| Verificación de viabilidad | 🔴 **Realizada. El backlog completo excede el presupuesto en 19 %; el núcleo cabe con 30 % de holgura. Redistribución correctiva definida** |
 
 ## 7. Plan de la Etapa 3 ordenado por criterio de la rúbrica (06/10/2026)
 
@@ -546,7 +546,8 @@ entrevista del 05/10 hizo subir (exportación, estados, correo por silencio) o b
 | 10 % | Validación preliminar | TT-32 extremo a extremo con un equipo real (Milesight o del compañero); TT-12 catálogo con los sensores reales; TT-15 claves; cata de TT-40: levantar ThingsBoard CE en el portátil y medir su memoria | 3 + 3 + 2 + 2 = 10 |
 
 **Total: 84 h contra ~60 h disponibles** (§6.2). No cabe todo: los últimos ítems de implementación (SSE, ruta
-LoRaWAN) y HU-19 (panel de salud, 9 h, ya en la Etapa 4) se ejecutan solo contra holgura. La regla sigue
+LoRaWAN) y HU-19 (panel de salud, 9 h) se ejecutan solo contra holgura; qué pasa a la Etapa 4 se decide con el corte medido de
+`docs/18 §3`. La regla sigue
 siendo la de §6.5: se recorta por el final de cada criterio, nunca las pruebas.
 
 ## Seguimiento de ejecución

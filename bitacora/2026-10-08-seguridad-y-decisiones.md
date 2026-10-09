@@ -21,7 +21,7 @@
    tabla idéntico antes y después. Antes, la pila completa se probó desde cero en el banco: migraciones, pruebas de
    carrera, TLS de punta a punta y una carga de 60 s sin pérdida.
 4. **Licencias:** el guardián revisa ahora las licencias de las dependencias de producción (RNF-15): todas permisivas.
-   El código propio se publica bajo AGPL-3.0-only; la titularidad se confirma con la universidad.
+   El código propio se publicará bajo AGPL-3.0-only; la titularidad se confirma con la universidad.
 
 ## Decisiones escritas en el diseño (`docs/10 §8.4`, puntos 24 a 38)
 - LoRaWAN es obligatorio y entra por la pasarela con servidor de red embebido (ruta B); la ruta A sigue opcional.

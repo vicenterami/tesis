@@ -35,7 +35,7 @@ estado de cada dispositivo y panel de control. Caso de validación: Campus Dr. L
 | Protocolo de validación y banco de comparación | [`docs/09-protocolo-validacion.md`](docs/09-protocolo-validacion.md) |
 | Arquitectura: C4, secuencias, despliegue y decisiones de diseño (§8.4) | [`docs/10-arquitectura.md`](docs/10-arquitectura.md) |
 | Seguridad en capas: amenazas y controles verificados | [`docs/11-seguridad.md`](docs/11-seguridad.md) |
-| Estado al cierre de la Etapa 2: avance, backlog, prioridades | [`docs/12-estado-etapa2.md`](docs/12-estado-etapa2.md) |
+| Estado de la Etapa 2 (corte del 23/09): avance, backlog, prioridades | [`docs/12-estado-etapa2.md`](docs/12-estado-etapa2.md) |
 | **Estado de la Etapa 3: avance medido, tareas y lo que falta** | [`docs/18-estado-etapa3.md`](docs/18-estado-etapa3.md) |
 | Reglas de tiempo y zonas horarias (UTC, IANA por sitio) | [`docs/13-tiempo-y-zonas-horarias.md`](docs/13-tiempo-y-zonas-horarias.md) |
 | Despliegue, costos y retención (OE3) | [`docs/14-despliegue-y-costos.md`](docs/14-despliegue-y-costos.md) |

@@ -12,7 +12,7 @@ cd "$(dirname "$0")/../.." || exit 1                    # plataforma/
 IMG_BROKER=$(grep -oE 'eclipse-mosquitto:[^ ]+@sha256:[0-9a-f]{64}' docker-compose.yml | head -1)   # la del compose, fijada por digest
 [ -n "$IMG_BROKER" ] || { echo "FALLA no encontré la imagen fijada del broker en docker-compose.yml"; exit 1; }
 B=pruebas/banco/banco.sh; CERTS="$(pwd)/../privado/certs-desarrollo"
-O="${TMPDIR:-/tmp}/plataforma-capacidad"; rm -rf "$O"; mkdir -p "$O"
+O=$(mktemp -d "${TMPDIR:-/tmp}/plataforma-capacidad.XXXXXX") || exit 1   # carpeta nueva y privada por corrida (08/10)
 sys() { docker run --rm --network banco_default "$IMG_BROKER" mosquitto_sub -h mosquitto -t "\$SYS/broker/publish/messages/$1" -C 1 -W 20 2>/dev/null; }
 resumen() { grep -E "NO guardadas|p95 \(ms\) \||tramas crudas" "$1" | cut -c1-110; }
 tls() { # tormenta de reconexión: 3 clientes × 150 publicaciones, una conexión TLS nueva por publicación

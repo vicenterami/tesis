@@ -7,7 +7,8 @@
 #   bash plataforma/pruebas/avisos-dependencias.sh
 set -u
 n=0
-resumen() { [ -n "${GITHUB_STEP_SUMMARY:-}" ] && printf '%s\n' "$1" >> "$GITHUB_STEP_SUMMARY"; return 0; }
+# El resumen es Markdown: un < o > del texto de un aviso no debe convertirse en HTML.
+resumen() { local s=${1//</&lt;}; s=${s//>/&gt;}; [ -n "${GITHUB_STEP_SUMMARY:-}" ] && printf '%s\n' "$s" >> "$GITHUB_STEP_SUMMARY"; return 0; }
 # Los comandos de GitHub exigen codificar %, \r y \n en el mensaje; y además : y , en el título.
 cod() { local s=${1//'%'/'%25'}; s=${s//$'\r'/'%0D'}; s=${s//$'\n'/'%0A'}; printf '%s' "$s"; }
 aviso() { # título · detalle
@@ -28,7 +29,8 @@ for g in $(grep -v '^[[:space:]]*#' pnpm-workspace.yaml | grep -oE 'GHSA-[a-z0-9
   # Con el parche ya publicado sigue en amarillo, pero lo dice en el título (decidido el 08/10/2026); en local, el paso
   # 2q del guardián falla hasta que se actualice y se quite la excepción.
   case "$d" in
-    *"Versión corregida: ninguna publicada"*|"detalle no disponible"*) aviso "Excepción vigente $g" "$d. Pendiente de resolver." ;;
+    "detalle no disponible"*) aviso "Excepción sin verificar $g" "$d: no se supo si ya hay parche; revisar a mano (en local, paso 2q)." ;;
+    *"Versión corregida: ninguna publicada"*) aviso "Excepción vigente $g" "$d. Pendiente de resolver." ;;
     *) aviso "HAY PARCHE para la excepción $g" "$d. Actualizar y quitar la excepción de audit.ignore." ;;
   esac
 done

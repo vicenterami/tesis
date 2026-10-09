@@ -2,8 +2,10 @@
 # Escanea las imágenes de la pila buscando vulnerabilidades conocidas (docs/11 §4; resultados en docs/16 §12). Antes de
 # desplegar y al cambiar una imagen. Construye con `--pull --no-cache` y baja de nuevo las imágenes de registro, para escanear
 # lo que se desplegaría hoy (una etiqueta puede reconstruirse con parches y la capa de parches no se rehace sola).
-# Trivy (Apache-2.0) fijado por digest: las versiones 0.69.4 a 0.69.6 fueron comprometidas en marzo de 2026
-# (https://github.com/advisories/GHSA-69fq-xp46-6x23) y sus propios avisos están corregidos desde 0.72.0. Corre desechable:
+# Trivy (Apache-2.0: https://github.com/aquasecurity/trivy/blob/main/LICENSE) fijado por digest. En marzo de 2026 se
+# publicaron versiones maliciosas: la 0.69.4 (binarios e imágenes) y las imágenes 0.69.5 y 0.69.6 de Docker Hub
+# (https://github.com/advisories/GHSA-69fq-xp46-6x23); sus propios avisos están corregidos desde 0.72.0. Dependabot no ve
+# este digest: se revisa a mano cada mes (docs/11 §4). Corre desechable:
 # cada imagen entra como archivo, solo lectura, sin acceso a Docker, sin privilegios, con el usuario de quien lo corre y solo
 # el escáner de vulnerabilidades (no el de secretos).
 # Sale 1 si alguna imagen tiene vulnerabilidades altas o críticas con versión corregida publicada (hay algo que hacer), si

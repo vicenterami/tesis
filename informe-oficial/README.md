@@ -20,7 +20,7 @@ latexmk -pdf -outdir=build main.tex     # SIEMPRE desde esta carpeta, nunca desd
 | `conclusion.tex` | Conclusiones de la etapa |
 | `glosario.tex` | Glosario de términos y API |
 | `anexos/a-requerimientos.tex` | Catálogo completo: 70 requerimientos (52 RF + 18 RNF) |
-| `anexos/b-backlog.tex` | Backlog completo: 64 elementos en 14 épicas |
+| `anexos/b-backlog.tex` | Backlog completo: 65 elementos (25 historias y 40 tareas) en 14 épicas |
 | `anexos/c-evaluacion.tex` | Evaluación detallada de transporte, formato, infraestructura y costos |
 | `anexos/d-contactid.tex` | Camino evaluado y descartado: el protocolo Contact ID |
 | `anexos/e-seguimiento.tex` | Seguimiento y calendario de la Etapa 2 |

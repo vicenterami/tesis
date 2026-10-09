@@ -9,13 +9,16 @@
 #   bash plataforma/pruebas/banco/banco.sh proxy               levanta la capa TLS (proxy/compose.proxy.yml) sobre el banco y la prueba
 #   bash plataforma/pruebas/banco/banco.sh estado | logs [servicio] | sql ["CONSULTA"]
 #   bash plataforma/pruebas/banco/banco.sh apagar              baja todo; los datos estaban en RAM, no queda nada
-# Credenciales: de descarte, generadas en cada «encender» y escritas fuera del repo (${TMPDIR:-/tmp}/plataforma-banco.env),
+# Credenciales: de descarte, generadas en cada «encender» y escritas fuera del repo, en una carpeta propia con permisos 700,
 # nunca impresas. El broker del banco no las verifica. Requiere pnpm en plataforma/backend (el emulador corre en el host).
 set -u
 YO="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"   # ruta absoluta: sigue valiendo tras el cd (lección de pila.sh)
 cd "$(dirname "$0")/../.."                 # plataforma/
-ENV="${TMPDIR:-/tmp}/plataforma-banco.env"
-CSV="${TMPDIR:-/tmp}/plataforma-banco-envios.csv"
+# Carpeta propia y privada (08/10): con nombres fijos en /tmp, otro usuario del equipo podía adelantarse con un enlace y
+# desviar las claves generadas. Las rutas son fijas dentro de ella porque encender, correr y apagar las comparten.
+PRIV="${XDG_RUNTIME_DIR:-$HOME/.cache}/plataforma-banco"; mkdir -p "$PRIV" && chmod 700 "$PRIV" || { echo "FALLA no se pudo preparar $PRIV"; exit 1; }
+ENV="$PRIV/banco.env"
+CSV="$PRIV/envios.csv"
 CERTS="$(pwd)/../privado/certs-desarrollo"
 IMG_BROKER=$(grep -oE 'eclipse-mosquitto:[^ ]+@sha256:[0-9a-f]{64}' docker-compose.yml | head -1)   # la del compose, fijada por digest
 [ -n "$IMG_BROKER" ] || { echo "FALLA no encontré la imagen fijada del broker en docker-compose.yml"; exit 1; }

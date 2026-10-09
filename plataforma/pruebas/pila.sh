@@ -33,11 +33,16 @@ ruido() { if [ "${PILA_TODO:-0}" = 1 ]; then cat; else grep --line-buffered -vE 
 
 case "${1:-}" in
   encender)
+    t0=$SECONDS
     dc up -d --build || exit 1
     echo "esperando «healthy» (máx. 90 s)…"
-    for _ in $(seq 1 30); do
-      [ -z "$(dc ps --format '{{.Status}}' | grep -v '(healthy)')" ] && break; sleep 3
+    sano=0
+    for _ in $(seq 1 90); do
+      [ -z "$(dc ps --format '{{.Status}}' | grep -v '(healthy)')" ] && { sano=1; break; }; sleep 1
     done
+    # Cuánto tardó, medido cada vez (08/10/2026: con la pila detenida, ≈ 21 s hasta todo «healthy»; solo el backend, ≈ 5 s).
+    if [ "$sano" = 1 ]; then echo "pila sana en $((SECONDS - t0)) s (construcción incluida)"
+    else echo "AVISO tras $((SECONDS - t0)) s hay servicios sin «healthy»: revisar con «pila.sh estado» y «pila.sh logs»"; fi
     bash "$YO" estado ;;
   estado)
     dc ps --format 'table {{.Service}}\t{{.Status}}\t{{.Ports}}'

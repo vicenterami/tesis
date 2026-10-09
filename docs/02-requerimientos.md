@@ -271,8 +271,9 @@ costo de operación irreducible; uno que corre en un servidor propio permite el 
 marginal cero para la institución.
 
 **Desviación de RNF-15: declarada el 30/09/2026, resuelta el 06/10/2026.** La compresión, las políticas
-automáticas y los agregados continuos de TimescaleDB están bajo la *Timescale License* (gratuita, «source-available»,
-no de código abierto según la OSI). Tras evaluar nueve bases de series de tiempo y probar la edición Apache 2.0 de
+automáticas y los agregados continuos de TimescaleDB están bajo la *Timescale License* (gratuita y de fuente disponible,
+https://github.com/timescale/timescaledb/blob/main/tsl/LICENSE-TIMESCALE; no figura entre las licencias aprobadas por la
+OSI, https://opensource.org/licenses, consultada el 08/10/2026). Tras evaluar nueve bases de series de tiempo y probar la edición Apache 2.0 de
 TimescaleDB con el esquema real (fallan exactamente esas funciones y nada más; laboratorio del 06/10), **se adopta la
 edición Apache** (`timescale/timescaledb:2.24.0-pg16-oss`; actualizada a `2.30.2` con parches el 08/10/2026, `docs/16 §12`): hypertables, `time_bucket` con zona nombrada y
 `drop_chunks` son Apache y son lo que el sistema usa. Costo aceptado: sin compresión, el escenario de `docs/14` ocupa

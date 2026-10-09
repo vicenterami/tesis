@@ -11,9 +11,9 @@
 |---|---|---|---|
 | Retroalimentación | 20 % | 🟡 | Al 8/10 no hay observaciones escritas del profesor guía sobre la entrega del 2/10. Sí se incorporó la entrevista del 5/10 (`bitacora/2026-10-05-entrevista-academico-geologia.md`) en las decisiones del 6 y del 8/10 (`docs/10 §8.4`). Falta: recibir e incorporar la retroalimentación de la Etapa 2. |
 | Mejoras | 15 % | 🟢 | Decisiones de diseño del 6, 7 y 8/10 (`docs/10 §8.4`); proxy TLS (`docs/16 §9`); dependencias e imágenes sin vulnerabilidades altas o críticas corregibles (`docs/16 §12`). |
-| 50 % de la implementación | 10 % | 🟡 | Núcleo: 17 de 34 elementos hechos (80 de 168 h, 48 %) y 4 parciales (21 h). Todo el backlog: 27 de 65 (109 de 285 h, 38 %) y 10 parciales (46 h). Cifras calculadas desde las filas de `docs/04` con los estados de `docs/12 §3` y de §2. |
+| 50 % de la implementación | 10 % | 🟡 | Núcleo: 17 de 34 elementos hechos (80 de 168 h, 48 %) y 5 parciales (25 h). Todo el backlog: 28 de 65 (114 de 285 h, 40 %) y 12 parciales (52 h). Cifras calculadas desde las filas de `docs/04`, con los estados de `docs/12 §3`, de §2 y de la Etapa 1 (al final de §2). |
 | Pruebas iniciales | 30 % | 🟢 | `docs/16`: emulador, carga (59,7 tramas/s sin pérdida), carreras, TLS, capacidad y picos, caídas con carga, dependencias e imágenes; 78 pruebas unitarias. Falta: la matriz formal del contrato de trama (TT-27) y el broker de producción en las caídas (`docs/16 §11`). |
-| Validación preliminar | 10 % | ⬜ | Sensor físico de extremo a extremo (TT-32): la placa ESP32 llega desde el 9/10 y los sensores, comprados el 8/10, están por llegar (`docs/17`). |
+| Validación preliminar | 10 % | ⬜ | Sensor físico de extremo a extremo (TT-32): equipo adquirido, fecha de llegada por confirmar (`docs/17`). |
 | Documentación | 15 % | 🟡 | Documentos en concordancia (guardián `plataforma/pruebas/verificar-todo.sh`). Falta el capítulo de pruebas y validación del informe (TT-36). |
 
 ## 2. Tareas de la Etapa 3: 18 elementos, 85 h
@@ -43,8 +43,10 @@
 
 **Adelantados de la Etapa 4:** TT-20 (autenticación de la recepción) ✅ (`docs/12 §3`); TT-29 (carga) ✅ preliminar
 (`docs/16 §5`); TT-22 (TLS) 🟡: MQTT por el proxy, probado en el banco (`docs/16 §9`); TT-30 (recuperación) 🟡: falta el
-broker de producción (`docs/16 §11`). **Pendiente de la Etapa 2:** HU-01 🟡: la recepción por MQTT funciona; la recepción
-por HTTP (RF-01) no está construida.
+broker de producción (`docs/16 §11`); HU-04 (adaptador de otro formato) 🟡: adaptador plano, se cierra con la trama real
+(`docs/12 §3`). **Pendiente de la Etapa 2:** HU-01 🟡: la recepción por MQTT funciona; la recepción por HTTP (RF-01) no
+está construida. **Etapa 1:** TT-34 (documento de la etapa) ✅, entregado el 4/09; TT-33 (entrevistas) 🟡: una, el 5/10
+(`bitacora/2026-10-05-entrevista-academico-geologia.md`), falta consolidar; TT-38 (bitácora) 🟡: continua hasta la Etapa 4.
 
 ## 3. ¿Cabe lo que falta? — medición
 
@@ -53,8 +55,8 @@ Quedan 37 h pendientes y 17 h parciales. La capacidad declarada es de unas 15 h 
 HU-10 5, HU-11 5, HU-15 4, HU-19 9, TT-32 3).
 
 **Propuesta, pendiente de decisión del estudiante:** en la Etapa 3, el núcleo salvo HU-15 (necesita tráfico de radio
-real), más TT-39 (el panel necesita su canal) y TT-36 (es el entregable): unas 33 h, con margen para revisión y
-correcciones. A la Etapa 4: HU-15, HU-17, HU-18 (con M7) y las interfaces de HU-06 y HU-12.
+real), más TT-39 (el panel necesita su canal) y TT-36 (es el entregable): 37 h según las filas (algo menos, porque HU-10 y
+TT-36 ya están empezadas), con unas 8 h de margen para revisión y correcciones. A la Etapa 4: HU-15, HU-17, HU-18 (con M7) y las interfaces de HU-06 y HU-12.
 
 ## 4. Lo que frena hoy
 

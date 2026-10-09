@@ -666,8 +666,8 @@ diseño (regla de concordancia): tras autenticar, el filtro 6 corre siempre.
 
 ### 8.4 Decisiones de la Etapa 3 (desde el 06/10/2026)
 
-**Decisiones del 06/10/2026** (tras la entrevista y el acceso a la nube de Milesight). Fuentes: `bitacora/2026-10-05-entrevista-academico-geologia.md`; evidencia verificada en el registro privado
-(gateway Milesight, 137 afirmaciones de documentación oficial). El código sigue a estas decisiones, no al revés.
+**Decisiones del 06/10/2026** (tras la entrevista y el acceso a la nube de Milesight). Fuentes: `bitacora/2026-10-05-entrevista-academico-geologia.md`; evidencia verificada en la documentación oficial
+del fabricante de la pasarela (137 afirmaciones, en un registro del autor que no se incluye en el repositorio). El código sigue a estas decisiones, no al revés.
 
 1. **Canal de tiempo real: SSE (Server-Sent Events), no WebSocket.** El flujo es unidireccional (servidor →
    navegador), de pocos datos y poco frecuente (el usuario entrevistado mira los datos «un par de veces por
@@ -724,8 +724,8 @@ diseño (regla de concordancia): tras autenticar, el filtro 6 corre siempre.
    informe que aún dicen «WebSocket» o «ChirpStack correrá en el servidor» se corrigen con la próxima entrega.
 
 **Decisiones de la noche del 06/10/2026** (tras el registro de proxies, el laboratorio de la edición Apache y la
-revisión del kit de método). Fuentes privadas: registro de proxies (111 filas verificadas), laboratorio de
-TimescaleDB (8 observaciones), registro de brokers (258 filas).
+revisión del kit de método). Fuentes: registros de evidencia del autor, no incluidos en el
+repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 observaciones) y brokers (258 filas).
 
 10. **Proxy inverso: nginx, variante A.** Termina TLS en 443 y 8883 y reenvía al backend por HTTP y al broker por
     TCP en claro (`stream`) dentro de la red interna; `ssl_preread` queda disponible para pasar a la variante B
@@ -811,7 +811,11 @@ TimescaleDB (8 observaciones), registro de brokers (258 filas).
     de su rol la limita a él con el patrón de usuario `%u`, que Dynamic Security admite en `publishClientSend`
     (https://mosquitto.org/documentation/dynamic-security/). El DevEUI de cada nodo viaja en el cuerpo; el filtro 1 toma
     la pasarela del tópico (no del cuerpo) y solo acepta los nodos asociados a ella en el alta, así que una pasarela
-    comprometida no puede publicar como un dispositivo de vía `mqtt`, que tiene su propio tópico. Al implementarlo, el
+    comprometida no puede publicar como un dispositivo de vía `mqtt`, que tiene su propio tópico. Dos reglas más (08/10,
+    se implementan con la migración 11): la ACL usa `+` en el nivel del sitio, así que el filtro 1 exige que el sitio del
+    tópico sea el registrado para la pasarela o el dispositivo (hoy no lo compara); y el alta rechaza un identificador que
+    otra entidad ya use como usuario del broker o que traiga caracteres fuera de `[a-z0-9-]` (la misma lista blanca de
+    `clave-dispositivo.sh`), porque el usuario se sustituye dentro del tópico con `%u`. Al implementarlo, el
     patrón de tópicos de la recepción (§4.1, casos anormales) suma esta forma. Adaptador de su JSON (punto 3). Se prueba
     primero con un emulador que publica exactamente el JSON documentado por Milesight y, en terreno, apenas haya una
     pasarela que alcance al servidor (red del campus o dirección pública). La ruta A (ChirpStack) sigue opcional;
@@ -1019,5 +1023,5 @@ licencia OSI (verificar licencia y memoria).
 > https://www.postgresql.org/docs/16/continuous-archiving.html · TimescaleDB, `CHANGELOG.md` («Multi-node is no
 > longer supported starting with TimescaleDB 2.14») y `src/cross_module_fn.c` (`move_chunk` y las políticas pasan
 > por el módulo con licencia; `attach_tablespace` no), https://github.com/timescale/timescaledb · `docs/14 §2`
-> para los volúmenes; registro privado de bases de series de tiempo (QuestDB y ZFS).
+> para los volúmenes; registro de evidencia del autor, no incluido en el repositorio (bases de series de tiempo: QuestDB y ZFS).
 
