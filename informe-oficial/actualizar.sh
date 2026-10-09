@@ -47,6 +47,9 @@ else
     if cambios HEAD privado/previsualizaciones/informe-cambios-sin-commitear.pdf; then
       echo "   y privado/previsualizaciones/informe-cambios-sin-commitear.pdf (contra el último commit)"
     else echo "AVISO no se pudo generar el PDF de cambios contra HEAD"; fi
+  else
+    # Sin cambios por commitear, el PDF anterior mostraría cambios que ya están en el commit: se quita para no confundir.
+    rm -f privado/previsualizaciones/informe-cambios-sin-commitear.pdf
   fi
 fi
 [[ $fallos -eq 0 ]] && echo "TODO OK — revisa el PDF y luego commitea" || { echo "$fallos paso(s) con falla"; exit 1; }

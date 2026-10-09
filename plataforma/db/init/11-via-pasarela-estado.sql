@@ -14,8 +14,31 @@
 -- Base existente:
 --   docker compose exec -T timescaledb psql -X -U plataforma -d plataforma -v ON_ERROR_STOP=1 < db/init/11-via-pasarela-estado.sql
 -- Después, la semilla de la demo (pruebas/semilla-demo.sh): fija en «uct» el código del sitio de la demo.
+-- Orden recomendado: detener el backend, migrar y levantar el nuevo. Si el anterior siguió corriendo después de migrar,
+-- repetir la migración tras levantar el nuevo: copia el «visto» más reciente de la columna vieja (es repetible).
 BEGIN;
 SET LOCAL lock_timeout = '5s';
+
+-- Antes de tocar nada (revisión del 09/10): lo que haría fallar la migración a mitad de camino se detecta aquí y se explica.
+DO $$
+DECLARE malos text;
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_dispositivo_id_fisico') THEN
+    SELECT string_agg(id_fisico, ', ') INTO malos FROM dispositivo WHERE id_fisico !~ '^[a-z0-9][a-z0-9-]{2,62}$';
+    IF malos IS NOT NULL THEN
+      RAISE EXCEPTION 'id_fisico fuera de la lista blanca [a-z0-9-], de 3 a 63 caracteres: %. Corregirlos (minúsculas, sin «_» ni «:») y repetir la migración', malos;
+    END IF;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'sitio' AND column_name = 'codigo') THEN
+    SELECT string_agg(nombre || ' → «' || c || '»', ', ') INTO malos
+      FROM (SELECT nombre, left(trim(both '-' from regexp_replace(lower(nombre), '[^a-z0-9]+', '-', 'g')), 63) AS c FROM sitio) x
+     WHERE c !~ '^[a-z0-9][a-z0-9-]{1,62}$' OR c IN (SELECT left(trim(both '-' from regexp_replace(lower(nombre), '[^a-z0-9]+', '-', 'g')), 63)
+                                                    FROM sitio GROUP BY 1 HAVING count(*) > 1);
+    IF malos IS NOT NULL THEN
+      RAISE EXCEPTION 'el código derivado del nombre de estos sitios no sirve (vacío, corto o repetido): %. Agregar sitio.codigo a mano con un valor válido y repetir la migración', malos;
+    END IF;
+  END IF;
+END $$;
 
 -- Código del sitio. En una base existente se deriva del nombre; la semilla de la demo lo fija en «uct». Si dos sitios
 -- dieran el mismo código, la migración se detiene entera (uq_sitio_codigo) y no queda a medias.
@@ -104,15 +127,17 @@ COMMENT ON COLUMN estado_dispositivo.visto_por_ultima_vez IS 'Derivado: última 
 DO $$
 DECLARE n_antes int; n_despues int;
 BEGIN
-  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'dispositivo' AND column_name = 'visto_por_ultima_vez') THEN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'dispositivo'
+                                                        AND column_name = 'visto_por_ultima_vez') THEN
     EXECUTE 'SELECT count(*) FROM dispositivo WHERE visto_por_ultima_vez IS NOT NULL' INTO n_antes;
     EXECUTE 'INSERT INTO estado_dispositivo (dispositivo_id, visto_por_ultima_vez)
                SELECT id, visto_por_ultima_vez FROM dispositivo WHERE visto_por_ultima_vez IS NOT NULL
              ON CONFLICT (dispositivo_id) DO UPDATE
                SET visto_por_ultima_vez = greatest(estado_dispositivo.visto_por_ultima_vez, EXCLUDED.visto_por_ultima_vez)';
-    SELECT count(*) INTO n_despues FROM estado_dispositivo;
-    RAISE NOTICE 'visto trasladado: % dispositivo(s) con visto antes; % fila(s) en estado_dispositivo después', n_antes, n_despues;
-    IF n_despues < n_antes THEN RAISE EXCEPTION 'el traslado perdió filas (% antes, % después)', n_antes, n_despues; END IF;
+    EXECUTE 'SELECT count(*) FROM estado_dispositivo e JOIN dispositivo d ON d.id = e.dispositivo_id WHERE d.visto_por_ultima_vez IS NOT NULL'
+      INTO n_despues;
+    RAISE NOTICE 'visto trasladado: % dispositivo(s) con visto antes; % con su fila en estado_dispositivo después', n_antes, n_despues;
+    IF n_despues <> n_antes THEN RAISE EXCEPTION 'el traslado no cuadra (% con visto antes, % trasladados)', n_antes, n_despues; END IF;
     EXECUTE $c$COMMENT ON COLUMN dispositivo.visto_por_ultima_vez IS
       'DEPRECADA el 08/10/2026: la reemplaza estado_dispositivo.visto_por_ultima_vez (migración 11). El backend ya no la escribe; se elimina en una migración posterior.'$c$;
   END IF;

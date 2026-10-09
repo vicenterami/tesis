@@ -22,7 +22,7 @@
 
 | Ítem | Tarea | h | Estado | Evidencia o lo que falta |
 |---|---|---|---|---|
-| HU-02 🎯 | Eventos LoRaWAN en la plataforma | 6 | ⬜ | Diseño: ruta B con tópico propio de la pasarela y adaptador de su JSON (`docs/10 §8.4` puntos 3 y 24). Hecho el 08/10: entidad `pasarela` y reglas del filtro 1 (migración 11, `docs/16 §13`). Falta: el adaptador y la prueba con el emulador. |
+| HU-02 🎯 | Eventos LoRaWAN en la plataforma | 6 | ⬜ | Diseño: ruta B con tópico propio de la pasarela y adaptador de su JSON (`docs/10 §8.4` puntos 3 y 24). Hecho el 08/10: la entidad `pasarela` en la base y la comparación del sitio del tópico para los dispositivos (migración 11, `docs/16 §13`). Falta: el adaptador y la prueba con el emulador. |
 | HU-03 🎯 | Publicar eventos en MQTT | 4 | ✅ | `docs/12 §3`; el emulador y el banco publican por MQTT (`docs/16 §2`). |
 | TT-17 🎯 | Pipeline de seis filtros con cuarentena | 6 | ✅ | `docs/12 §3` (seis filtros verificados). |
 | HU-05 🎯 | Condiciones abiertas por dispositivo | 7 | ✅ | Una condición abierta por regla (migración 02), `GET /condiciones`, pruebas de carrera (`docs/16 §4`). |
@@ -30,7 +30,7 @@
 | HU-10 🎯 | Inventario con estado y vía de envío | 5 | 🟡 | `GET /dispositivos` con la vía y el formato (migración 11); falta declararlos en el alta y la vista del panel. |
 | HU-11 🎯 | Registrar un dispositivo desde la plataforma | 5 | ⬜ | Alta por API con Dynamic Security (`docs/10 §8.4` puntos 25 y 26), después de su prueba en un contenedor desechable. |
 | HU-14 🎯 | Detectar que un dispositivo dejó de reportar | 7 | ✅ | Filtro 6 (`supervision.service.ts`), intervalo esperado por dispositivo (migración 10), medición en `docs/16 §5`. |
-| TT-39 | Canal de tiempo real (SSE) | 4 | ⬜ | Decidido (`docs/10 §8.4` punto 1); sin código. |
+| TT-39 | Canal de tiempo real (SSE) | 4 | ⬜ | Decidido (`docs/10 §8.4` punto 1). En esta etapa, sin sesión y solo en la red local, como la API: la sesión llega con HU-18 (`docs/10 §5`). Sin código. |
 | HU-19 🎯 | Panel de salud con semáforo | 9 | ⬜ | Sin código del panel. |
 | TT-28 🎯 | Emulador de nodos | 5 | ✅ | `docs/16 §2`. |
 | TT-32 🎯 | Sensor físico de extremo a extremo | 3 | ⬜ | Equipo comprado (`docs/17`). |

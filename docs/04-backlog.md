@@ -249,7 +249,7 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 | **TT-21** | 🎯 Aislamiento de datos entre sitios, verificado con pruebas | M | 4 | 5 |
 | **TT-22** | 🎯 Cifrado del transporte: TLS para HTTP y MQTT | M | 4 | 4 |
 | **HU-18** | **Como administrador de sitio**, quiero iniciar sesión con mis credenciales y que existan roles distintos de administración y consulta | M | 4 | 3 |
-| **TT-39** | Canal de tiempo real autenticado hacia el panel (SSE tras el proxy TLS, `docs/10 §8.4` punto 1): sesión del panel verificada al abrir, lista blanca de `Origin`, límite de tamaño y tasa (RF-43, RNF-08; `docs/11 §4`) — agregada el 23/09/2026 | M | 3 | 4 |
+| **TT-39** | Canal de tiempo real autenticado hacia el panel (SSE tras el proxy TLS, `docs/10 §8.4` punto 1): sesión del panel verificada al abrir (desde M7, en la Etapa 4; antes, solo en la red local, `docs/10 §5`), lista blanca de `Origin`, límite de tamaño y tasa (RF-43, RNF-08; `docs/11 §4`) — agregada el 23/09/2026 | M | 3 | 4 |
 
 **TT-32 — criterios de aceptación** 🎯
 
@@ -447,11 +447,10 @@ Se trasladan de la Etapa 3 a la Etapa 4 los siguientes elementos del núcleo (~3
 | 4 | **52 h** | 75 h | ✅ +31 % |
 | **Total** | **168 h** | **240 h** | ✅ **+30 %** |
 
-Los 63 h de la Etapa 3 son 60 h de la redistribución más las 3 h de TT-32 (plan B de R1, agregado el
-23/09). Un −5 % es una sobrecarga real y pequeña (3 h en cuatro semanas): se acepta a conciencia frente
-al riesgo de no tener un sensor real para el 30 de octubre, y no se oculta corriendo otro elemento. **08/10/2026:** con el
-corte medido de `docs/18 §3`, HU-06, HU-12, HU-15, HU-17 y HU-18 pasan a la Etapa 4 (17 h; 4 de núcleo, las de HU-15): la
-Etapa 3 queda con 68 h, 59 de núcleo (+2 %).
+Desde el corte del 08/10 (`docs/18 §3`), la Etapa 3 tiene **59 h de núcleo frente a 60 disponibles (+2 %)**: HU-06,
+HU-12, HU-15, HU-17 y HU-18 pasaron a la Etapa 4 (17 h; 4 de núcleo, las de HU-15). Antes del corte eran 63 h (−5 %): las 60 h
+de la redistribución del 23/09 más las 3 h de TT-32 (plan B de R1), una sobrecarga aceptada entonces frente al riesgo de no
+tener un sensor real para el 30 de octubre.
 
 **Verificación del umbral de la Etapa 3.** La pauta exige el **50 % de las tareas de implementación**
 completadas. La base es el **núcleo completo (168 h)**: es el compromiso declarado en todo el informe
@@ -531,6 +530,9 @@ no demuestran ninguna.
 | Verificación de viabilidad | 🔴 **Realizada. El backlog completo excede el presupuesto en 19 %; el núcleo cabe con 30 % de holgura. Redistribución correctiva definida** |
 
 ## 7. Plan de la Etapa 3 ordenado por criterio de la rúbrica (06/10/2026)
+
+> **Superado en parte por el corte del 08/10/2026** (`docs/18 §3`): HU-06, HU-12, HU-15, HU-17 y HU-18 pasaron a la Etapa 4.
+> Esta tabla queda como el plan del 06/10; el vigente, con su estado medido, es el de `docs/18`.
 
 La pauta de la Etapa 3 pesa: pruebas iniciales 30 %, retroalimentación 20 %, mejoras del diseño 15 %,
 documentación 15 %, 50 % de implementación 10 %, validación preliminar 10 %. El orden de trabajo sigue ese

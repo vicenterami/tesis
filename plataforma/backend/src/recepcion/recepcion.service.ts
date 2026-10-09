@@ -88,7 +88,7 @@ export class RecepcionService implements OnModuleInit {
     // vivo: no pasó el filtro 1.
     if (dispositivo.sitio_codigo !== partes[1]) {
       return this.cuarentena({ ...trama, dispositivoId: dispositivo.id }, 'no_registrado',
-        `id_fisico=${ctx.idFisico} está registrado en el sitio «${dispositivo.sitio_codigo}», no en «${partes[1]}»`);
+        `id_fisico=${ctx.idFisico} está registrado en el sitio «${dispositivo.sitio_codigo}», no en «${partes[1].slice(0, 64)}»`);
     }
     trama.dispositivoId = dispositivo.id;
 

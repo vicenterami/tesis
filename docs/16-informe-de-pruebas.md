@@ -213,7 +213,7 @@ https://github.com/advisories/GHSA-6j4f-fj2g-mc7p y https://github.com/advisorie
 1.1.21, 2.1.7 y 5.0.12); `braces` (https://github.com/advisories/GHSA-vfj7-8cjw-p6xm).
 
 **Dependencias (`pnpm audit`).** De 16 avisos (1 crítico, 7 altos, 8 moderados) a 2, con ocho *overrides* nuevos; las 78
-pruebas unitarias siguen en verde y las licencias de producción no cambiaron (152 paquetes permisivos, paso 2r del guardián).
+pruebas unitarias de ese día siguen en verde y las licencias de producción no cambiaron (152 paquetes permisivos, paso 2r del guardián).
 Los dos que quedan no tienen versión corregida publicada y solo vienen con jest: `braces` (alto; excepción declarada en
 `audit.ignore`) y `sprintf-js` (moderado, https://github.com/advisories/GHSA-hp3w-g68c-fv3c). Las dependencias de producción no
 tienen ningún aviso, ni siquiera exceptuado (el CI lo comprueba aparte).
@@ -251,6 +251,9 @@ en el banco.
 | Reglas plantadas | Rechaza: pasarela con el identificador de un dispositivo (y al revés), nodo LoRaWAN sin pasarela, identificador fuera de `[a-z0-9-]`, código de sitio y vía inválidos. Acepta los casos legítimos |
 | Dos altas simultáneas con el mismo identificador (dispositivo y pasarela) | La segunda espera a la primera y se rechaza: queda una sola fila |
 | Banco, 20 nodos emulados, 20 s | 420 tramas, 0 lecturas perdidas, p95 de 3 ms; `estado_dispositivo` con una fila por nodo |
+| Migración 12 (el CHECK de motivos de cuarentena con el nombre de la convención) | Renombra en la tabla y en sus fragmentos (TimescaleDB lo propaga); repetible; la regla sigue rechazando un motivo inventado |
+| Comprobaciones nuevas del guardián: convenciones (1b) e identidad (1c) | 3 y 6 OK en una instalación nueva; fallan al plantar una restricción sin prefijo o al quitar el disparador de identidad; la de identidad no deja nada en la base (termina en ROLLBACK) |
+| Chequeo previo de la migración 11 | Con un identificador fuera de la lista blanca o un sitio cuyo código derivado no sirve, se detiene antes de tocar nada y dice cuáles son |
 | Trama con el sitio de otra sede (`sitio/otra-sede/…`) | Cuarentena `no_registrado`: «emu-0001 está registrado en el sitio «banco», no en «otra-sede»» |
 
 **Lo que destapó:** la imagen de la base, levantada sola sin el compose, se caía al arrancar porque su guion de inicio llamaba

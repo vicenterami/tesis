@@ -53,9 +53,9 @@ implementando solo lo que **sustente el diseño** (API de consulta, que demuestr
 | TT-13 | Especificación del contrato de la API en OpenAPI, generada desde el código | M | 3 | ✅ | `@nestjs/swagger`: `/docs` y `backend/openapi.json` (6 rutas), generado desde los decoradores |
 | TT-14 | Política de QoS, reintento y cuarentena | M | 2 | ✅ | QoS 1 con sesión persistente (cola en el broker si el backend cae); INSERT idempotente sobre `(canal, tiempo)` (migración 06); cuarentena con motivo; `docs/10 §4.1` |
 | TT-15 | Procedimiento de asignación de identidad y gestión de claves AES por sitio | S | 2 | 🟡 | gestión de credenciales documentada (docs/11 §7); claves LoRaWAN dependen de ChirpStack |
-| HU-01 | Como integrador, quiero publicar una trama SenML por MQTT o HTTP, para reportar desde un sensor sin infraestructura intermedia | M | 6 | 🟡 | MQTT sí; HTTP en la Etapa 3 |
+| HU-01 | Como integrador, quiero publicar una trama SenML por MQTT o HTTP, para reportar desde un sensor sin infraestructura intermedia | M | 6 | 🟡 | MQTT sí; HTTP en la Etapa 3 si queda tiempo, si no en la 4 |
 | TT-16 | Validador de esquema SenML y analizador de tramas | M | 3 | ✅ | adaptador SenML |
-| TT-19 | Esquema de base de datos y migraciones versionadas | M | 5 | ✅ | esquema + 11 migraciones (05 convenciones de calidad, 06 clave natural única de la serie, 07 dominio cerrado de cuarentena.motivo; Etapa 3: 08 hora de recepción y origen de la marca, 09 trama y cuarentena como hypertables, 10 semántica del intervalo esperado) |
+| TT-19 | Esquema de base de datos y migraciones versionadas | M | 5 | ✅ | esquema + 12 migraciones (05 convenciones de calidad, 06 clave natural única de la serie, 07 dominio cerrado de cuarentena.motivo; Etapa 3: 08 hora de recepción y origen de la marca, 09 trama y cuarentena como hypertables, 10 semántica del intervalo esperado) |
 | TT-24 | Comparar al menos tres alternativas de alojamiento con criterios ponderados | M | 4 | ✅ | `docs/14 §3–§4`: cinco alternativas, seis criterios |
 | TT-25 | Cuantificar el costo mensual y anual de operación en CLP y USD | M | 3 | ✅ | `docs/14 §3`: precios fechados y convertidos con dólar observado |
 | TT-26 | Redactar la recomendación de despliegue justificada | M | 1 | ✅ | `docs/14 §5` y cap. 4 del informe |
@@ -68,7 +68,7 @@ implementando solo lo que **sustente el diseño** (API de consulta, que demuestr
 | HU-03 | Como integrador, quiero publicar eventos en MQTT, para integrar dispositivos que ya usan ese transporte | E3 | ✅ | publicado y probado con mosquitto_pub |
 | HU-04 | Como integrador, quiero un adaptador para un formato no SenML, para demostrar la extensibilidad de la capa de recepción | E4 | 🟡 | adaptador plano; se cierra con la trama real |
 | TT-17 | Pipeline de normalización al modelo interno (los 6 filtros) con cuarentena | E3 | ✅ | seis filtros verificados |
-| HU-06 | Como administrador de sitio, quiero configurar umbrales por dispositivo, para que se genere un evento cuando una medición los cruce | E3 | 🟡 | motor listo; falta interfaz |
+| HU-06 | Como administrador de sitio, quiero configurar umbrales por dispositivo, para que se genere un evento cuando una medición los cruce | E4 (desde el 08/10) | 🟡 | motor listo; falta interfaz |
 | TT-18 | Normalización de marcas temporales, tolerando nodos sin reloj confiable | E3 | ✅ | tiempoPlausible |
 | TT-20 | Autenticación de la recepción mediante credencial por sitio | E4 | ✅ | credencial por dispositivo + ACL |
 

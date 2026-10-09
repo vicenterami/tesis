@@ -36,5 +36,5 @@ sequenceDiagram
             end
         end
         F1->>F6: trama cerrada: el dispositivo autenticado se comunicó<br/>(aunque sus lecturas hayan ido a cuarentena)
-        F6->>DB: UPDATE visto_por_ultima_vez<br/>· cierra "sin_comunicacion" si estaba abierta
+        F6->>DB: estado_dispositivo.visto_por_ultima_vez = now()<br/>· cierra "sin_comunicacion" si estaba abierta
     end

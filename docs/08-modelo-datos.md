@@ -35,7 +35,7 @@ uniformidad es la que resuelve la causa C1 (formatos dispares).
 | 13 | **usuario_sitio** | Qué usuario puede ver qué sitio y con qué rol | Multi-tenencia: aísla los datos entre sitios |
 | 14 | **trama** | Trama cruda de un mensaje aceptado (al menos una lectura guardada) | **Hypertable**, solo inserción, retención 30 días: auditoría y re-decodificación si un adaptador tuvo un error (migración 09) |
 | 15 | **pasarela** | Pasarela LoRaWAN con servidor de red embebido (ruta B) | Una sirve a muchos nodos; su id físico es su usuario del broker, único también frente a los dispositivos (migración 11) |
-| 16 | **estado_dispositivo** | Lo que el sistema escribe sobre cada dispositivo: la última trama aceptada | Una fila por dispositivo y sin `actualizado_en`: la fila de `dispositivo` queda para lo que edita una persona (migración 11) |
+| 16 | **estado_dispositivo** | Lo que el sistema escribe sobre cada dispositivo: la última trama aceptada | Una fila por dispositivo y sin `actualizado_en`: la fila de `dispositivo` queda para lo que edita una persona (migración 11). Se borra en cascada con su dispositivo: es un derivado, sin historia propia |
 
 16 entidades (OE3 pide ≥ 8). Tres son hypertables, particionadas por tiempo: `medicion` (la serie de tiempo)
 y, desde la migración 09, `trama` y `cuarentena` (para borrar lo vencido por fragmentos enteros con
@@ -214,10 +214,10 @@ erDiagram
 ## 5. Cómo se conecta con el resto del diseño
 
 - El **pipeline de recepción** (`docs/06`) escribe en `medicion` (si la trama es válida) o en
-  `cuarentena` (si no), y actualiza `dispositivo.visto_por_ultima_vez` y las `condicion`.
+  `cuarentena` (si no), y actualiza `estado_dispositivo.visto_por_ultima_vez` y las `condicion`.
 - La **API REST** (patrón B) lee de estas tablas para el dashboard: histórico desde `medicion` con
-  `time_bucket`, estado desde `dispositivo` y `condicion`.
-- La **supervisión de salud** compara `visto_por_ultima_vez` contra `intervalo_esperado_s` —el **silencio máximo normal** del dispositivo, no su periodo: periodo más las pérdidas que admite el medio, regla práctica 2 × periodo (decisión del 07/10/2026, `docs/10 §8.4` punto 23, migración 10)— para abrir
+  `time_bucket`, estado desde `dispositivo`, `estado_dispositivo` y `condicion`.
+- La **supervisión de salud** compara `estado_dispositivo.visto_por_ultima_vez` contra `intervalo_esperado_s` —el **silencio máximo normal** del dispositivo, no su periodo: periodo más las pérdidas que admite el medio, regla práctica 2 × periodo (decisión del 07/10/2026, `docs/10 §8.4` punto 23, migración 10)— para abrir
   condiciones de tipo `sin_comunicacion`.
 
 ## 6. Convenciones del esquema (aplicadas en la migración 05)
@@ -228,10 +228,10 @@ PostgreSQL en producción y se verificaron contra la base real (`plataforma/prue
 | Convención | Regla | Por qué | Estado |
 |---|---|---|---|
 | Nombres | Español, `snake_case`, singular; PK `id` (uuid) salvo catálogos con código natural (`magnitud.codigo`) | Consistencia con el dominio del informe | ✅ |
-| Restricciones con nombre | Toda restricción se nombra con prefijo: `pk_`, `fk_<tabla>_<destino>`, `uq_`, `ck_`, `idx_`, `trg_`, `fn_` | Un nombre autogenerado (`canal_dispositivo_id_fkey`) no dice qué protege ni se puede citar en un informe o en un error | ✅ 32/32 |
-| Índice por cada FK | Cada clave foránea lleva su índice | Postgres no lo crea solo; sin él cada `JOIN` y cada `ON DELETE` recorre la tabla | ✅ 0 FK sin índice |
+| Restricciones con nombre | Toda restricción se nombra con prefijo: `pk_`, `fk_<tabla>_<destino>`, `uq_`, `ck_`, `idx_`, `trg_`, `fn_` | Un nombre autogenerado (`canal_dispositivo_id_fkey`) no dice qué protege ni se puede citar en un informe o en un error | ✅ paso 1b del guardián |
+| Índice por cada FK | Cada clave foránea lleva su índice | Postgres no lo crea solo; sin él cada `JOIN` y cada `ON DELETE` recorre la tabla | ✅ paso 1b del guardián |
 | Tipos | `text` (nunca `varchar(n)`), `timestamptz` (nunca `timestamp`), `uuid`, `boolean`. `double precision` **solo** para mediciones físicas, que tienen incertidumbre propia; `numeric(p,s)` para dinero o cantidades exactas (no hay hoy) | Un límite arbitrario obliga a migrar; un `timestamp` sin zona es ambiguo; el flotante binario no sirve para dinero | ✅ |
-| Auditoría | `creado_en` y `actualizado_en` con disparador `trg_<tabla>_actualizado_en` en toda tabla mutable (salvo `estado_dispositivo`, a propósito: la escribe el sistema en cada trama, `docs/10 §8.4` punto 27); las de solo inserción (`medicion`, `evento`, `cuarentena`, `trama`) llevan solo su instante | Saber cuándo cambió algo sin depender de la aplicación. `creado_por`/`actualizado_por` llegarán con M7 (usuarios) | ✅ 9 tablas |
+| Auditoría | `creado_en` y `actualizado_en` con disparador `trg_<tabla>_actualizado_en` en toda tabla mutable (salvo `estado_dispositivo`, a propósito: la escribe el sistema en cada trama, `docs/10 §8.4` punto 27); las de solo inserción (`medicion`, `evento`, `cuarentena`, `trama`) llevan solo su instante | Saber cuándo cambió algo sin depender de la aplicación. `creado_por`/`actualizado_por` llegarán con M7 (usuarios) | ✅ paso 1b del guardián |
 | Baja lógica | `dispositivo.estado = 'baja'`, `sitio.activo`, `usuario.activo`, `credencial.activa`; nunca `DELETE` sobre entidades con historia | Conserva la historia y no rompe las filas que referencian el registro | ✅ |
 | Dominios cerrados | Si el **código** interpreta los valores (`estado`, `condicion.tipo`, `rol`, `cuarentena.motivo` desde la migración 07) → `CHECK`. Si el **usuario** los administra (magnitudes) → tabla catálogo con código estable y nombre visible | Un `CHECK` exige `ALTER` para crecer y no guarda etiqueta ni orden; un catálogo para valores que solo entiende el código sería una indirección vacía | ✅ |
 | Foto por valor | Lo que un registro **posee** se copia (`medicion.unidad`, `evento.detalle` con el umbral vigente); lo que **referencia** se lee por FK (`condicion.regla_id` como procedencia) | Cambiar el catálogo o una regla no debe reinterpretar el pasado | ✅ |
@@ -276,9 +276,9 @@ consistente para reportes.
       dispositivo puede llegar por celular sin pasarela). Es una entidad, no un atributo del dispositivo, porque
       una pasarela sirve a muchos dispositivos y tiene estado propio. Se autentica en el broker con su propia
       credencial y publica solo bajo su tópico, con el DevEUI de cada nodo en el cuerpo (`docs/10 §8.4` punto 24).
-- [x] **Vía, formato y pasarela declarados en el alta** (decidido el 08/10/2026, `docs/10 §8.4` punto 25; esquema en la migración 11.
-      Falta que el filtro 2 use el formato declarado: llega con el adaptador de la pasarela, HU-02, y exige separar el
-      dispositivo de la demo, que hoy manda SenML y plano):
+- [ ] **Declarar vía, formato y pasarela en el alta (HU-11) y que el filtro 2 use el formato declarado (HU-02)**, lo que exige
+      separar el dispositivo de la demo, que hoy manda SenML y plano.
+- [x] **Vía, formato y pasarela: el esquema** (decidido el 08/10/2026, `docs/10 §8.4` punto 25; migración 11):
       `dispositivo.via` (`CHECK`: `mqtt`, `http`, `lorawan`), `dispositivo.formato` (`CHECK`: el código de un
       adaptador, `senml`, `plano`, `milesight`…; lo interpreta el código, §6) y `dispositivo.pasarela_id` (FK opcional,
       con un `CHECK` que la exige si la vía es `lorawan`). La credencial depende de la vía (`docs/11 §7`). El modelo
@@ -309,14 +309,21 @@ consistente para reportes.
       `usuario_sitio`, consultada por un solo guardia del backend; se implementa con la autenticación (M7).
 - [x] **Código del sitio e identificador del broker** (migración 11, 08/10/2026; `docs/10 §8.4` punto 24): `sitio.codigo` es el
       segmento del tópico y el filtro 1 lo compara con el sitio registrado; `id_fisico` lleva la lista blanca `[a-z0-9-]` y es
-      único entre dispositivos y pasarelas (disparador con un bloqueo por identificador, probado con dos altas simultáneas).
+      único entre dispositivos y pasarelas (disparador con un bloqueo por identificador; las reglas las comprueba el guardián, paso 1c, y la carrera de dos altas
+      simultáneas se probó a mano, `docs/16 §13`).
+- [ ] **Historial de ubicaciones** (decidido el 09/10/2026, `docs/10 §8.4` punto 39): tabla `ubicacion_dispositivo`
+      (`dispositivo_id`, `zona_id`, `desde`, `hasta`), con una sola ubicación vigente por dispositivo; las consultas por sitio
+      filtran la historia por período. Se implementa con la pantalla de mudanza (HU-12, Etapa 4).
+- [ ] **Estado de la pasarela**: `pasarela.visto_por_ultima_vez` vive en una tabla editable con disparador; cuando se
+      supervise la pasarela (HU-02), pasa a una tabla de estado, como la del dispositivo (punto 27).
+- [ ] **Motivo de cuarentena propio para el sitio ajeno** (`sitio_ajeno`; hoy cae en `no_registrado` con el detalle) y
+      **nombres reservados del broker** (`backend`, `sonda`, `admin`) fuera de `id_fisico` (revisión del 09/10): en la
+      próxima migración de esquema.
 - [ ] **Eliminar `dispositivo.visto_por_ultima_vez`** (DEPRECADA desde la migración 11) en una migración posterior, cuando
       ningún backend desplegado la lea (convención de deprecación, §6).
-- [x] **Marcas del sistema frente a edición humana** (implementado en la migración 11, 08/10/2026: tabla
-      `estado_dispositivo`; `dispositivo.visto_por_ultima_vez` queda DEPRECADA y se elimina en una migración posterior) (kit de método, 06/10/2026; **decidido el 08/10/2026: tabla `estado_dispositivo`**, `docs/10 §8.4` punto 27, pendiente de migración): `visto_por_ultima_vez` y
-      `en_linea` las escribe el supervisor sobre `dispositivo`, y el disparador mueve `actualizado_en` en cada UPDATE.
-      Si el panel usa control optimista sobre `dispositivo`, un barrido provocará «otro usuario lo modificó» falsos.
-      Decidir antes de HU-10/HU-18: tabla `estado_dispositivo` propia (una fila por dispositivo, sin disparador) o
-      excluir esas columnas del disparador y de la comparación optimista. Se eligió la tabla: una fila por dispositivo
-      (`dispositivo_id` como clave), sin disparador de `actualizado_en`, con `visto_por_ultima_vez` y lo que anote el
-      supervisor; `dispositivo` queda con lo que edita una persona y deja de recibir una escritura por trama.
+- [x] **Marcas del sistema frente a edición humana** (decidido el 08/10/2026, `docs/10 §8.4` punto 27; implementado en la
+      migración 11): el sistema escribía `visto_por_ultima_vez` sobre `dispositivo` y el disparador movía `actualizado_en`
+      en cada trama; con bloqueo optimista en el panel, cada barrido habría dado «otro usuario lo modificó» falsos. Se
+      eligió una tabla propia, `estado_dispositivo` (una fila por dispositivo, sin disparador de `actualizado_en`);
+      `dispositivo` queda con lo que edita una persona. `dispositivo.visto_por_ultima_vez` quedó DEPRECADA y se elimina en
+      una migración posterior.

@@ -259,7 +259,7 @@ sequenceDiagram
             end
         end
         F1->>F6: trama cerrada: el dispositivo autenticado se comunicó<br/>(aunque sus lecturas hayan ido a cuarentena)
-        F6->>DB: UPDATE visto_por_ultima_vez<br/>· cierra "sin_comunicacion" si estaba abierta
+        F6->>DB: estado_dispositivo.visto_por_ultima_vez = now()<br/>· cierra "sin_comunicacion" si estaba abierta
     end
 ```
 
@@ -270,7 +270,7 @@ sequenceDiagram
 trabajan sobre la trama y sobre cada lectura que contiene; el de alertas evalúa **cada lectura
 guardada**, porque un umbral se cruza por valor, no por trama. El de supervisión, en cambio, se
 ejecuta **una sola vez al cerrar la trama**, porque lo que marca no es un dato sino un hecho del
-enlace: *este dispositivo se comunicó*. De ahí que `visto_por_ultima_vez` se actualice aunque las
+enlace: *este dispositivo se comunicó*. De ahí que `estado_dispositivo.visto_por_ultima_vez` se actualice aunque las
 lecturas de esa trama hayan terminado en cuarentena.
 
 La razón es que M4 supervisa la **salud del enlace**, no la calidad del dato. Un nodo que publica
@@ -431,6 +431,9 @@ unidireccional, reconexión nativa, sin biblioteca extra) es más simple y cabe 
 **Decidido el 06/10/2026: SSE** (§8.4, punto 1); los diagramas lo muestran así desde esa fecha. Lo que OWASP
 pide para WebSocket se traslada a SSE en lo que aplica: misma sesión (la cookie viaja sola en `EventSource`),
 autorización por canal antes de abrir el flujo y límite de flujos por usuario; ninguna de las dos toca el broker.
+**En la Etapa 3 el canal corre sin sesión, como la API:** solo en la red local (127.0.0.1), con la lista blanca de `Origin`
+y los límites de tamaño y tasa; la sesión se le agrega con M7 (HU-18, Etapa 4, desde el corte del 08/10). Ninguno de los
+dos se publica en Internet antes de eso (`docs/11 §8`).
 
 > Fuentes (consultadas el 23/09/2026): OWASP, *WebSocket Security Cheat Sheet*,
 > https://cheatsheetseries.owasp.org/cheatsheets/WebSocket_Security_Cheat_Sheet.html · NestJS, *Gateways*
@@ -812,11 +815,12 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     de su rol la limita a él con el patrón de usuario `%u`, que Dynamic Security admite en `publishClientSend`
     (https://mosquitto.org/documentation/dynamic-security/). El DevEUI de cada nodo viaja en el cuerpo; el filtro 1 toma
     la pasarela del tópico (no del cuerpo) y solo acepta los nodos asociados a ella en el alta, así que una pasarela
-    comprometida no puede publicar como un dispositivo de vía `mqtt`, que tiene su propio tópico. Dos reglas más (08/10,
-    implementadas en la migración 11): la ACL usa `+` en el nivel del sitio, así que el filtro 1 exige que el sitio del
-    tópico sea el registrado para la pasarela o el dispositivo (hoy no lo compara); y el alta rechaza un identificador que
-    otra entidad ya use como usuario del broker o que traiga caracteres fuera de `[a-z0-9-]` (la misma lista blanca de
-    `clave-dispositivo.sh`), porque el usuario se sustituye dentro del tópico con `%u`. Al implementarlo, el
+    comprometida no puede publicar como un dispositivo de vía `mqtt`, que tiene su propio tópico. Dos reglas más (08/10):
+    la ACL usa `+` en el nivel del sitio, así que el filtro 1 exige que el sitio del tópico sea el registrado
+    (implementado para los dispositivos en la migración 11; para la pasarela llega con HU-02); y el identificador del
+    broker es único entre dispositivos y pasarelas y usa la lista blanca `[a-z0-9-]` de `clave-dispositivo.sh`, porque se
+    sustituye dentro del tópico con `%u` (la base lo exige desde la migración 11; el alta, HU-11, dará el mensaje claro).
+    Al implementarlo, el
     patrón de tópicos de la recepción (§4.1, casos anormales) suma esta forma. Adaptador de su JSON (punto 3). Se prueba
     primero con un emulador que publica exactamente el JSON documentado por Milesight y, en terreno, apenas haya una
     pasarela que alcance al servidor (red del campus o dirección pública). La ruta A (ChirpStack) sigue opcional;
@@ -899,6 +903,14 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     de espera desde su publicación; el estudiante revisa y fusiona (`.github/dependabot.yml`, `docs/11 §4`). El CI prueba
     los de acciones, que usa, pero no los de imágenes, que no construye: antes de fusionar uno de imágenes,
     `escanear-imagenes.sh` y el banco en local.
+39. **Mudar un dispositivo de zona o de sitio, con historial de ubicaciones** (decidido el 09/10/2026). Hoy, cambiar
+    `dispositivo.zona_id` muda el dispositivo, pero las mediciones no guardan dónde estaba: toda su historia pasaría a
+    verla el sitio nuevo, y eso choca con el aislamiento entre sitios (RF-41). Se agrega `ubicacion_dispositivo`
+    (`dispositivo_id`, `zona_id`, `desde`, `hasta`), con una sola ubicación vigente por dispositivo: mudar cierra la
+    vigente, abre otra y deja un `evento`. Las consultas por sitio filtran la historia por período, así cada sitio ve solo
+    lo medido mientras el equipo estuvo con él. Si el equipo cambia de sitio, también cambia su tópico
+    (`sitio/<nuevo>/…`, punto 24), y la pantalla de mudanza lo entrega listo para copiar. Esquema en una migración
+    posterior, junto con esa pantalla (HU-12, Etapa 4).
 
 ## 9. Crecimiento, resiliencia y respaldo (aprobado el 06/10/2026)
 
