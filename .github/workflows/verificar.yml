@@ -28,7 +28,7 @@ jobs:
         working-directory: plataforma/backend
     steps:
       # Acciones fijadas por SHA, no por etiqueta: una etiqueta se puede reescribir (marzo de 2026, docs/11 §4).
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         # Sin guardar el token en .git/config: ningún paso escribe en el repositorio (08/10/2026).
         with:
           persist-credentials: false
