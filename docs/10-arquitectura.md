@@ -376,7 +376,7 @@ cliente ──HTTP──► Express ⊂ NestJS ──► servicio ──► pg �
 
 - **Express** es la biblioteca de servidor HTTP más usada de Node.js; NestJS la usa por debajo
   (`@nestjs/platform-express`). El proceso de Node es el servidor; Express recibe cada petición y
-  entrega la respuesta. Es **la API**: 6 rutas REST y el canal SSE `/eventos` (§5), descritos en el contrato OpenAPI. Express no toca la base.
+  entrega la respuesta. Es **la API**: 7 rutas REST y el canal SSE `/eventos` (§5), descritos en el contrato OpenAPI. Express no toca la base.
 - **`pg`** (node-postgres) es el conductor de la base: mantiene un *pool* de 5 conexiones
   (`db/db.module.ts`) y envía **SQL directo** con parámetros `$1, $2…`; el valor nunca se pega dentro
   del texto SQL, lo que evita la inyección. Sin ORM, por la razón de `docs/07` (series de tiempo con
@@ -433,6 +433,16 @@ pide para WebSocket se traslada a SSE en lo que aplica: misma sesión (la cookie
 autorización por canal antes de abrir el flujo y límite de flujos por usuario; ninguna de las dos toca el broker.
 **En la Etapa 3 el canal corre sin sesión, como la API:** solo en la red local (127.0.0.1); la sesión se le agrega con M7
 (HU-18, Etapa 4, desde el corte del 08/10). Ninguno de los dos se publica en Internet antes de eso (`docs/11 §8`).
+**Exportación (RF-34, implementada el 12/10/2026; HU-08 adelantada a la Etapa 3):** `GET /dispositivos/{id}/exportar?formato=csv|json
+&desde&hasta` escribe las mediciones crudas del dispositivo fila a fila al responder, por tandas de 10 000 con paginación por
+clave `(tiempo, canal_id)`; el instante viaja como texto exacto de la base (microsegundos) y es la clave de la tanda siguiente.
+CSV estándar (coma, punto decimal, UTF-8, CRLF, cabecera `tiempo_utc,magnitud,valor,unidad,canal_id`; todo texto que empiece
+con `=`, `+`, `-`, `@`, tabulador o retorno se protege con apóstrofo contra la inyección de fórmulas) o JSON como lista.
+Descarga con nombre saneado; `Cache-Control: no-store`; rango acotado (desde el año 2000, hasta un día en el futuro); como
+mucho dos exportaciones simultáneas por proceso (429) y 30 s de tope por consulta en una conexión propia, para no quedarse con
+el pool de la recepción; cada escritura espera `drain` (contrapresión); un error a mitad de flujo corta la conexión y queda en
+el registro. XLSX y la exportación por sitio con rol llegan con la sesión (`docs/20`). Pruebas: `docs/16 §19`.
+
 **Implementado el 09/10 (TT-39):** `GET /eventos`, con filtro opcional `?dispositivo=` o `?canal=` (un UUID; otro valor,
 400). Emite `medicion`, `visto` y `condicion`, cada uno después de quedar guardado en la base, y un `latido` cada 25 s. Se
 rechaza (403) la petición que el navegador marca como de otro sitio: `Sec-Fetch-Site` distinto de `same-origin` o `none`,

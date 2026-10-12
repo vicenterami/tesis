@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 136 pruebas unitarias, sin matriz formal) y TT-32 (sensor físico);
+cubre todavía: TT-27 (contrato de trama: hoy 138 pruebas unitarias, sin matriz formal) y TT-32 (sensor físico);
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -295,7 +295,7 @@ base ni el broker, y las 6 rutas que ya existían salen idénticas; (4) una imag
 
 `docs/10 §8.4` punto 40; controles en `docs/11 §3`. Backend: 19 pruebas nuevas en `arranque.spec.ts` (lista y su validación, forma
 del `Host`, rechazo, avisos acotados); con el rechazo anulado a mano (cambio temporal, restaurado y comparado con `cmp`) fallan
-exactamente las 3 que lo cubren. Pila de desarrollo reconstruida y `api-smoke.sh` con 6 casos nuevos (136 pruebas unitarias en total). Proxy sobre el
+exactamente las 3 que lo cubren. Pila de desarrollo reconstruida y `api-smoke.sh` con 6 casos nuevos (126 pruebas del backend en ese momento). Proxy sobre el
 banco (`banco.sh proxy`, puertos 8443 y 8081, `PROXY_NOMBRE` sin definir = `localhost`):
 
 | Comprobación | Resultado |
@@ -333,7 +333,7 @@ el alto conocido de `braces` y un moderado de `sprintf-js`, los dos solo por Jes
 | 20 pruebas del panel (vitest): estado visual (cuatro reglas y su orden), «en línea» con la regla de la API, orden de atención, «hace cuánto», hora local con UTC, cliente HTTP con acciones por código, canal en vivo (reconexión 1-2-4 s, plazo sin latido, cierre limpio) | ✅ todas |
 | 3 de ellas por el DOM (jsdom): un dispositivo en mantenimiento con condición abierta aparece «Inactivo» y **no** «Alerta»; orden Sin señal → Alerta → Normal → Inactivo; conteos; una ficha filtra y vuelve a mostrar; vacío y error con su acción | ✅ |
 | `svelte-check` sobre 320 archivos | 0 errores, 0 avisos |
-| Build real: `index.html` 0,45 KB, un paquete JS de 47 KB (18,7 KB comprimido), CSS 1,8 KB; sin `.map` | ✅ |
+| Build real (tramo 2): `index.html` 0,45 KB, un paquete JS de 47 KB (18,7 KB comprimido), CSS 1,8 KB; sin `.map` | ✅ |
 | Imagen del backend reconstruida: el panel compilado en la etapa de build; en la imagen final solo `panel/dist`, y `node_modules` sin `svelte` (6 entradas, solo producción del backend) | ✅ (`--filter` en la instalación de producción) |
 | `pruebas/panel-desarrollo.sh`, con el servidor de Vite real: `/panel/` servido; `Origin` propio por el 5173 → 200 y otro → 403 (el reenvío conserva el `Host`); primer byte del canal en menos de 5 s y latido a los 25 s (no retiene el flujo) | ✅ (11 comprobaciones; 12 desde el tramo 3, con «el 5173 queda libre») |
 | El mismo guion contra el build servido por el backend: `/panel/` con la CSP estricta, paquete con hash 200, `.map` 404, sin scripts en línea | ✅ |
@@ -350,8 +350,9 @@ y `dist` de la raíz: sin las entradas del panel, `COPY panel` habría metido al
 
 `docs/19` (pantalla P3, HU-21 adelantada a la Etapa 3 por decisión del 12/10). Para alimentarla, la API ganó el filtro
 `?dispositivo=<uuid>` en `GET /condiciones` y `GET /cuarentena` (UUID validado; otro valor → 400; contrato regenerado y comparado
-con el versionado en el humo). uPlot 1.6.32 (MIT, 576 días publicado) entra como dependencia de producción del panel; el paquete
-JS pasa de 47 a 109 KB (44 KB comprimido).
+con el versionado en el humo). uPlot 1.6.32 (MIT, 576 días publicado) entra como dependencia de producción del panel. Medido con el build real: el paquete
+quedó en dos fragmentos, el del panel de 61 KB (23 KB comprimido) y el de uPlot de 51 KB (22 KB comprimido), que solo se descarga
+al abrir una ficha; el inventario pasó de 44 a 23 KB comprimidos.
 
 | Comprobación | Resultado |
 |---|---|
@@ -386,8 +387,8 @@ rango a medida por fechas (HU-07) queda para la Etapa 4.
 Condición de la decisión del 08/10 (`docs/10 §8.4` punto 26): antes de que el backend administre credenciales del broker, una
 prueba en un contenedor desechable con identidades de descarte. `plataforma/pruebas/lab-dynsec.sh` levanta la misma imagen
 fijada del compose con el plugin activado y, en un solo guion que no imprime ningún secreto, crea un rol con ACL de publicación
-al tópico propio (`%u`), un cliente de descarte, y prueba el ciclo completo. Lo ejecuta la persona (ninguna clave del broker, ni
-de descarte, la escribe el asistente de desarrollo: regla del proyecto desde el 27/09) y la salida se pega aquí.
+al tópico propio (`%u`), un cliente de descarte, y prueba el ciclo completo. Los secretos los genera y los usa el propio guion en
+la máquina de quien lo ejecuta y nunca se imprimen (regla del proyecto desde el 27/09); la salida se pega aquí.
 
 **Primera corrida (12/10, plugin + `password_file` + `acl_file` en el mismo listener):**
 
@@ -414,11 +415,29 @@ archivo niega. La hipótesis, por confirmar con la segunda corrida: el chequeo d
 el plugin lo haya permitido, así que **`acl_file` y el plugin no conviven para el control de acceso**. La segunda versión del
 guion corre tres fases (solo plugin; plugin + `password_file`; los tres) para separar autenticación de control de acceso.
 
+**Segunda corrida (12/10, tres fases):**
+
 | Fase | Pregunta | Medido |
 |---|---|---|
-| A · solo el plugin | ¿El rol con `%u` limita al tópico propio y el ciclo de vida completo funciona? | pendiente |
-| B · plugin + `password_file` | ¿Un usuario del archivo conecta? ¿Quién le limita el tópico si no hay `acl_file`? | pendiente |
-| C · los tres | ¿Se repite el rechazo de la primera corrida? | pendiente |
+| A · solo el plugin | ¿El rol con `%u` limita al tópico propio y el ciclo de vida completo funciona? | ❌ el cliente del plugin recibe `RC:135` **también en su propio tópico** (la hipótesis del `acl_file` era incorrecta); ✅ desconocido rechazado, deshabilitar/rehabilitar, rotar, borrar, persistencia, 0 reinicios |
+| B · plugin + `password_file` | ¿Un usuario del archivo conecta? ¿Quién le limita el tópico si no hay `acl_file`? | ✅ conecta; ❌ no publica en ningún tópico: el plugin decide la ACL también para los usuarios del archivo, y por defecto niega |
+| C · los tres | ¿Se repite el rechazo? | el cliente del plugin sigue en `RC:135`; el usuario del archivo publica en su tópico (`RC:16`) y no en ajeno (`RC:135`): el `acl_file` sí le concede acceso |
+
+**Lectura corregida.** Lo que falla no es la convivencia sino el **patrón `%u` en la ACL del rol**: en la imagen fijada
+(2.0.22) no autorizó ni con el plugin solo. La documentación que describe `%c` y `%u` en las ACL (registro DS-06) corresponde a la
+rama nueva del broker; para esta versión no está declarado. La tercera versión del guion prueba en la fase A tres formas de ACL
+en roles distintos (tópico literal, `%u`, `%c`, esta última con identificador de cliente fijo) para saber qué sostiene el broker.
+Si el literal funciona, el backend crea **un rol por dispositivo con su tópico literal** (lo que ya hace el `acl_file` de hoy,
+pero sin reiniciar): no hace falta el patrón. La convivencia queda así: la autenticación por archivo sigue (fase B conecta), pero
+la ACL la decide el plugin para todos (fase B niega), salvo lo que el `acl_file` conceda (fase C). Consecuencia probable: migrar
+todos los usuarios al plugin y retirar los dos archivos, como ya prevé el punto 41.
+
+| Tercera corrida | Pregunta | Medido |
+|---|---|---|
+| ACL con tópico literal | ¿Autoriza el propio y niega el ajeno? | pendiente |
+| ACL con `%u` | ¿Sustituye el usuario en 2.0.22? | pendiente |
+| ACL con `%c` (identificador de cliente fijo) | ¿Sustituye el identificador en 2.0.22? | pendiente |
+| Lo mismo contra Mosquitto 2.1.2-alpine (publicada el 18/09/2026; la línea 2.1 solo existe en Alpine, por eso el robot de dependencias no la propone) | ¿La línea nueva sustituye los patrones y conviven los archivos? Decide si se cambia de versión (`docs/11 §4`) | pendiente |
 
 **Consecuencia según el resultado** (`docs/10 §8.4` punto 41): si A funciona y C no, los usuarios actuales del archivo (el del
 backend, el de la sonda y los de desarrollo) migran al plugin con HU-11, `acl_file` y `password_file` desaparecen del broker, y el
@@ -427,17 +446,23 @@ guion de claves de desarrollo pasa a hablar con el plugin.
 ## 19. Exportación de mediciones crudas en CSV y JSON (12/10/2026)
 
 RF-34 y HU-08, adelantada a la Etapa 3 (`docs/18 §3`): lo que el académico entrevistado llamó «crítico y no negociable».
-`GET /dispositivos/{id}/exportar?formato=csv|json&desde&hasta` escribe fila a fila al responder, por tandas de 10 000 con
-paginación por clave `(tiempo, canal_id)` sobre el índice de `medicion`: un rango de años no cabe en memoria y tampoco hace falta.
+`GET /dispositivos/{id}/exportar?formato=csv\|json&desde&hasta` escribe fila a fila al responder, por tandas de 10 000 con
+paginación por clave `(tiempo, canal_id)` (el plan de esa consulta se mide en el banco antes de afirmar qué índice usa: pendiente):
+un rango de años no cabe en memoria y tampoco hace falta.
 CSV estándar (coma, punto decimal, UTF-8, CRLF, cabecera fija) para R, Python y QGIS; JSON como lista. Sin sesión hasta M7,
 como toda la API (`docs/11 §4`); XLSX y la exportación por sitio con rol llegan con la sesión.
 
 | Comprobación | Resultado |
 |---|---|
-| 6 pruebas en `exportar.spec.ts` (funciones puras): fila CSV, celdas con coma, comillas y saltos de línea, protección contra inyección de fórmulas (`=`, `+`, `@` al inicio; un número negativo no se toca), JSON por fila, nombre del archivo saneado, formato por defecto y rechazo de uno desconocido o repetido | ✅ |
-| Humo (pila de desarrollo): cabecera fija del CSV, descarga con nombre `.csv` (`Content-Disposition`), JSON como lista con `tiempo_utc` y `valor`, formato desconocido → 400, `desde` posterior a `hasta` → 400, dispositivo inexistente → 404; contrato servido con 8 rutas igual al versionado | ✅ (6 casos nuevos) |
-| 404 antes de escribir cabeceras; si el cliente corta la descarga, se deja de consultar (`res.destroyed`) | ✅ (lectura del código; sin prueba de corte) |
+| 8 pruebas en `exportar.spec.ts` (funciones puras): fila CSV con el instante exacto (microsegundos), celdas con coma, comillas y saltos de línea, protección contra inyección de fórmulas en toda columna de texto (`=`, `+`, `-`, `@`, tabulador, retorno), columna numérica, rango razonable, JSON por fila, nombre del archivo saneado, formato por defecto y rechazo de uno desconocido o repetido | ✅ |
+| Humo (pila de desarrollo): cabecera fija del CSV, descarga con nombre `.csv` (`Content-Disposition`), primera fila con instante de seis decimales (microsegundos: con milisegundos la última fila de cada tanda se repetía en la siguiente), JSON como lista con `tiempo_utc` y `valor`, formato desconocido → 400, `desde` posterior a `hasta` → 400, dispositivo inexistente → 404; contrato servido con 8 rutas igual al versionado | ✅ (7 casos nuevos) |
+| 404 antes de escribir cabeceras; si el cliente corta la descarga, se deja de consultar (`res.destroyed`); un error a mitad de flujo corta la conexión y queda en el registro; contrapresión por `drain`; como mucho 2 simultáneas (429) y 30 s por consulta | ✅ (lectura del código; sin prueba de corte ni de cliente lento) |
 
-**Lo que no cubre:** un rango de años con millones de filas no se midió (el banco tiene minutos de datos); la variante para
-Excel en español (punto y coma, coma decimal) y el XLSX quedan con la sesión; sin pantalla todavía (P8 de `docs/19`).
+**Correcciones del mismo día (12/10):** la primera versión paginaba con un `Date` de JavaScript (milisegundos) y la base guarda
+microsegundos: la última fila de cada tanda se habría repetido en la siguiente; el instante viaja ahora como texto exacto. Se
+agregaron el tope de simultáneas, el tope por consulta, la contrapresión, el corte ante error y la protección de fórmulas en
+toda columna de texto (antes se eximía lo que empezaba con `-` y un dígito).
+**Lo que no cubre:** un rango de años con millones de filas no se midió (el banco tiene minutos de datos); el plan de la consulta
+de tandas no está medido; la variante para Excel en español (punto y coma, coma decimal) y el XLSX quedan con la sesión; sin
+pantalla todavía (P8 de `docs/19`); no hay prueba automática del corte por el cliente ni del cliente lento.
 

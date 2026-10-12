@@ -167,8 +167,8 @@ describir rutas que no existen. Con el backend corriendo, la documentación inte
 | `GET /dispositivos` | inventario: estado, `en_linea`, última vista, canales, condiciones abiertas | `en_linea` = visto hace menos de 2 × intervalo esperado |
 | `GET /dispositivos/:id` | ficha: canales con reglas y última medición, condiciones abiertas | 404 si no existe |
 | `GET /canales/:id/historico?desde&hasta&intervalo` | `{tiempos[], valores[], muestras[]}` agregado con `time_bucket(…, zona_del_sitio)` | por defecto 24 h cada `15 minutes`; intervalos: 1 minute, 5 minutes, 15 minutes, 1 hour, 6 hours, 1 day; rango `[desde, hasta)` |
-| `GET /condiciones?abiertas=true|false&limite&dispositivo` | condiciones con `duracion_s`, dispositivo y regla | sin `abiertas`: todas; `dispositivo` (UUID): solo las suyas (12/10) |
-| `GET /dispositivos/:id/exportar?formato=csv|json&desde&hasta` | mediciones crudas del dispositivo en el rango, en flujo por tandas; CSV estándar (coma, punto decimal, UTF-8, CRLF) o JSON por fila | RF-34 (12/10); XLSX en la Etapa 4 |
+| `GET /condiciones?abiertas=true\|false&limite&dispositivo` | condiciones con `duracion_s`, dispositivo y regla | sin `abiertas`: todas; `dispositivo` (UUID): solo las suyas (12/10) |
+| `GET /dispositivos/:id/exportar?formato=csv\|json&desde&hasta` | mediciones crudas del dispositivo en el rango, en flujo por tandas; CSV estándar (coma, punto decimal, UTF-8, CRLF) o JSON por fila | RF-34 (12/10); XLSX en la Etapa 4 |
 | `GET /cuarentena?limite&dispositivo` | últimas tramas rechazadas con motivo y carga (200 caracteres) | diagnóstico |
 
 ```bash

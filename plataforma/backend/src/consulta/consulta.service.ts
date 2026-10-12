@@ -119,27 +119,37 @@ export class ConsultaService {
   }
 
   // Mediciones crudas de un dispositivo en [desde, hasta), por tandas (RF-34): nunca todo el rango en memoria. Paginación por
-  // clave (tiempo, canal_id) sobre el índice (canal_id, tiempo): cada tanda es una consulta corta, y el llamador escribe cada
-  // fila al flujo de salida. Un rango de años se exporta igual, solo tarda más.
+  // clave (tiempo, canal_id): el tiempo viaja y vuelve como TEXTO exacto de la base (microsegundos); si pasara por un Date de
+  // JavaScript (milisegundos), la última fila de cada tanda se repetiría en la siguiente. Una conexión propia con un tope de
+  // 30 s por consulta, para que una exportación larga no se quede con el pool de la recepción; el plan de la consulta se mide
+  // en el banco antes de afirmar nada sobre índices (pendiente). El llamador escribe cada fila al flujo de salida.
   async *mediciones(dispositivoId: string, desde: Date, hasta: Date, tanda = 10_000): AsyncGenerator<FilaExportada> {
-    let ultimoTiempo: Date | null = null;
-    let ultimoCanal: string | null = null;
-    for (;;) {
-      const r = await this.pool.query<FilaExportada>(
-        `SELECT m.tiempo, c.magnitud_codigo AS magnitud, m.valor, m.unidad, m.canal_id
-           FROM medicion m JOIN canal c ON c.id = m.canal_id
-          WHERE c.dispositivo_id = $1 AND m.tiempo >= $2 AND m.tiempo < $3
-            AND ($4::timestamptz IS NULL OR (m.tiempo, m.canal_id) > ($4::timestamptz, $5::uuid))
-          ORDER BY m.tiempo, m.canal_id LIMIT $6`,
-        [dispositivoId, desde, hasta, ultimoTiempo, ultimoCanal, tanda],
-      );
-      const filas: FilaExportada[] = r.rows;
-      for (const fila of filas) yield fila;
-      if (filas.length < tanda) return;
-      const ultima = filas[filas.length - 1];
-      if (ultima === undefined) return;
-      ultimoTiempo = ultima.tiempo;
-      ultimoCanal = ultima.canal_id;
+    const cliente = await this.pool.connect();
+    try {
+      await cliente.query('SET statement_timeout TO 30000');
+      let ultimoTiempo: string | null = null;
+      let ultimoCanal: string | null = null;
+      for (;;) {
+        const r = await cliente.query<FilaExportada>(
+          `SELECT to_char(m.tiempo AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS tiempo_utc,
+                  c.magnitud_codigo AS magnitud, m.valor, m.unidad, m.canal_id
+             FROM medicion m JOIN canal c ON c.id = m.canal_id
+            WHERE c.dispositivo_id = $1 AND m.tiempo >= $2 AND m.tiempo < $3
+              AND ($4::text IS NULL OR (m.tiempo, m.canal_id) > ($4::timestamptz, $5::uuid))
+            ORDER BY m.tiempo, m.canal_id LIMIT $6`,
+          [dispositivoId, desde, hasta, ultimoTiempo, ultimoCanal, tanda],
+        );
+        const filas: FilaExportada[] = r.rows;
+        for (const fila of filas) yield fila;
+        if (filas.length < tanda) return;
+        const ultima = filas[filas.length - 1];
+        if (ultima === undefined) return;
+        ultimoTiempo = ultima.tiempo_utc;
+        ultimoCanal = ultima.canal_id;
+      }
+    } finally {
+      await cliente.query('RESET statement_timeout').catch(() => undefined);
+      cliente.release();
     }
   }
 

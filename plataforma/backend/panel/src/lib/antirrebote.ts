@@ -1,4 +1,4 @@
-// Antirrebote con un solo vuelo (revisión del 12/10): varios eventos seguidos (un sensor que oscila sobre su umbral abre y
+// Antirrebote con un solo vuelo (12/10): varios eventos seguidos (un sensor que oscila sobre su umbral abre y
 // cierra condiciones muchas veces por segundo) producen UNA consulta como mucho cada `ms`, y nunca dos a la vez: si llega
 // otro aviso mientras una consulta está en vuelo, se anota y se repite una sola vez al terminar. Así una pestaña no
 // amplifica hacia la base, y la respuesta más vieja nunca pisa a la más nueva (siempre hay una sola en curso).
@@ -53,6 +53,7 @@ export function porLotes<T>(entregar: (lote: T[]) => void, ms = 250): { agregar:
     },
     cancelar() {
       if (temporizador !== null) clearTimeout(temporizador);
+      temporizador = null;
       lote = [];
     },
   };

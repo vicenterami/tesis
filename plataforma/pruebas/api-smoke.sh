@@ -60,6 +60,9 @@ if [ -n "$DISP" ]; then
   exp=$(curl -s -D - -m 20 "$API/dispositivos/$DISP/exportar?formato=csv" | tr -d '\r')
   grep -q "^tiempo_utc,magnitud,valor,unidad,canal_id$" <<<"$exp" && echo "OK    exportar csv: cabecera fija" || { echo "FALLA exportar csv: sin cabecera → $(head -c 160 <<<"$exp")"; fallos=$((fallos+1)); }
   grep -qi "^content-disposition: attachment; filename=\".*\.csv\"$" <<<"$exp" && echo "OK    exportar csv: descarga con nombre .csv" || { echo "FALLA exportar csv: sin Content-Disposition"; fallos=$((fallos+1)); }
+  # El instante viaja como texto exacto de la base (6 decimales): con milisegundos, la última fila de cada tanda se repetía.
+  fila1=$(curl -s -m 20 "$API/dispositivos/$DISP/exportar?formato=csv&desde=2026-01-01T00:00:00Z" | sed -n 2p)
+  if [ -z "$fila1" ]; then echo "OK    exportar csv: sin filas en el rango (no se puede comprobar el instante)"; elif grep -qE "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}Z," <<<"$fila1"; then echo "OK    exportar csv: instante con microsegundos"; else echo "FALLA exportar csv: instante sin microsegundos → ${fila1:0:60}"; fallos=$((fallos+1)); fi
   caso "exportar json: lista de filas con tiempo_utc y valor" "/dispositivos/$DISP/exportar?formato=json&desde=2026-01-01T00:00:00Z" "isinstance(r,list) and all('tiempo_utc' in x and 'valor' in x for x in r)"
   caso "exportar con formato desconocido → 400" "/dispositivos/$DISP/exportar?formato=xlsx" 400
   caso "exportar con desde posterior a hasta → 400" "/dispositivos/$DISP/exportar?desde=2026-10-02T00:00:00Z&hasta=2026-10-01T00:00:00Z" 400

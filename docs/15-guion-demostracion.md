@@ -128,6 +128,13 @@ pasó a «Alerta» con el 35, a «Sin señal» al callarlo y volvió a «Normal�
 en vivo. Ahora, lo que hay detrás: lo que el panel muestra sale de esta API, que cualquier sistema puede consumir. Y el contrato OpenAPI se genera
 desde el código, así que no puede describir rutas que no existen.
 
+**Exportar (1 min, lo «no negociable» del entrevistado):** en la terminal B, descargar el CSV crudo del dispositivo de la demo y
+mirar sus tres primeras líneas (instantes en UTC con microsegundos, punto decimal, una fila por lectura):
+
+```bash
+curl -s -OJ "http://127.0.0.1:3000/dispositivos/$(curl -s http://127.0.0.1:3000/dispositivos | python3 -c 'import sys,json; print(json.load(sys.stdin)[0]["id"])')/exportar?formato=csv" && head -3 dev-*.csv
+```
+
 En `/docs`:
 
 1. `GET /dispositivos` → **Try it out** → **Execute**. Mostrar `estado`, `en_linea`, `condiciones_abiertas`
@@ -140,7 +147,7 @@ En `/docs`:
 
 ## 6. Cómo se sostiene esto (1 min)
 
-- `cd plataforma/backend && pnpm verificar`: tipos, lint y 136 pruebas unitarias en menos de dos segundos
+- `cd plataforma/backend && pnpm verificar`: tipos, lint y 138 pruebas unitarias en menos de dos segundos
   (la cifra exacta la da la salida de `jest`; no la memorices). Los avisos de cuarentena que aparecen
   mientras corre son de las pruebas, a propósito.
 - `bash plataforma/pruebas/verificar-todo.sh`: esquema, migraciones, diagramas del informe, API y

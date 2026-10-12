@@ -290,6 +290,18 @@ if [ "$rc" -eq 0 ]; then echo "FALLA archivos públicos que citan fichas privada
 elif [ "$rc" -ne 1 ]; then echo "FALLA git grep falló ($rc): no se pudo revisar"; fallos=$((fallos+1))
 else echo "OK    ningún archivo versionado cita fichas privadas"; fi
 
+paso "2x. Repositorio público: ningún archivo versionado nombra al asistente, a revisores o a modelos (12/10)"
+# 12/10: una revisión encontró «la escribe el asistente de desarrollo» en docs/16 y en un guion, y «revisión del 12/10» en
+# comentarios del código; el guardián 2f solo mira la lista privada de nombres. Lo público cuenta lo encontrado como corrección.
+# «asistente de registro» (RF-50, HU-22) es legítimo y queda fuera del patrón.
+# «revisión del DD/MM» a secas se permite (es una corrección fechada); lo que no: nombrar al asistente, a revisores sin contexto
+# o a lentes en paralelo. Los nombres de modelos, herramientas y frases vetadas los vigila el paso 2f con la lista privada.
+# Este archivo queda fuera porque cita los patrones.
+git grep --untracked -n -i -E 'asistente de desarrollo|asistente de (ia|inteligencia)|\brevisor(es)? sin contexto|\blentes? en paralelo' -- ':!privado' ':!plataforma/pruebas/verificar-todo.sh' > "$VT"/asistente.txt 2>&1; rc=$?
+if [ "$rc" -eq 0 ]; then echo "FALLA archivos públicos que nombran al asistente, a revisores o a modelos:"; cut -c1-160 "$VT"/asistente.txt; fallos=$((fallos+1))
+elif [ "$rc" -ne 1 ]; then echo "FALLA git grep falló ($rc): no se pudo revisar"; fallos=$((fallos+1))
+else echo "OK    ningún archivo versionado nombra al asistente, a revisores ni a modelos"; fi
+
 paso "2q. Auditoría de dependencias: cada aviso ignorado (audit.ignore de pnpm-workspace.yaml) sigue sin versión corregida (docs/11 §4)"
 # 08/10: braces no tenía parche y la auditoría lo ignora (la leen igual el CI y el portátil). Una excepción que nadie revisa
 # queda para siempre: este paso consulta la base de avisos de GitHub y falla el día que el aviso tenga versión corregida.

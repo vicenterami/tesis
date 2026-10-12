@@ -1,9 +1,10 @@
 <script lang="ts">
   // Gráfico de un canal con uPlot (docs/07, docs/19 P3): dos series sobre el mismo eje de tiempo, «promedio» del histórico
   // agregado y «lectura actual» con lo que llega en vivo. Las horas del eje van en la zona del sitio (docs/13).
-  // uPlot se carga aquí con import dinámico: el inventario (la pantalla de entrada, también en móvil) no descarga sus ~45 KB.
+  // uPlot se carga aquí con import dinámico: el inventario (la pantalla de entrada, también en móvil) no descarga sus 51 KB.
   // El gráfico se crea UNA vez por montaje y después solo recibe datos (`setData`): sin `untrack`, el efecto que lo crea
-  // dependería de `series` y lo destruiría y recrearía en cada lote de lecturas (revisión del 12/10).
+  // dependería de `series` y lo destruiría y recrearía en cada lote de lecturas. Título, unidad y zona se leen al crear: quien
+  // cambie de canal debe montar un componente nuevo (la ficha lo hace con {#key}).
   import { untrack } from 'svelte';
   import type uPlotTipo from 'uplot';
   import 'uplot/dist/uPlot.min.css';

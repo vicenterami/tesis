@@ -35,7 +35,7 @@
   const canalActual = $derived(d?.canales.find((c) => c.id === canalElegido) ?? null);
 
   // Las condiciones ABIERTAS se piden completas (hasta 500), aparte de las 50 más recientes: una sin_comunicacion vieja no
-  // puede quedar fuera por 50 cierres y aperturas de umbral posteriores (revisión del 12/10). Se unen sin repetir.
+  // puede quedar fuera por 50 cierres y aperturas de umbral posteriores (12/10). Se unen sin repetir.
   async function cargarCondiciones(): Promise<Condicion[]> {
     const [abiertasTodas, recientes] = await Promise.all([
       obtener<Condicion[]>(`/condiciones?dispositivo=${encodeURIComponent(id)}&abiertas=true&limite=500`),
@@ -69,7 +69,7 @@
     }
   }
 
-  // Dos clics seguidos de rango o canal pueden responder en orden inverso: solo la última petición pedida escribe (revisión 12/10).
+  // Dos clics seguidos de rango o canal pueden responder en orden inverso: solo la última petición pedida escribe (12/10).
   let generacion = 0;
   async function cargarHistorico(): Promise<void> {
     if (canalElegido === null) return;
@@ -186,7 +186,10 @@
     {:else if historico !== null && historico.puntos === 0 && series[0].length === 0}
       <p class="vacio">Sin mediciones en este rango.</p>
     {/if}
-    <Grafico {series} unidad={canalActual.unidad} zona={d.zona_horaria} titulo={`${canalActual.magnitud_nombre} (${canalActual.unidad})`} />
+    <!-- {#key}: el gráfico se crea una vez por canal; al cambiar de canal se recrea con su título y su unidad -->
+    {#key canalActual.id}
+      <Grafico {series} unidad={canalActual.unidad} zona={d.zona_horaria} titulo={`${canalActual.magnitud_nombre} (${canalActual.unidad})`} />
+    {/key}
   {/if}
 
   <h3>Condiciones</h3>

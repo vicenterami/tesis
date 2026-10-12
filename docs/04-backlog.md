@@ -425,7 +425,7 @@ exige el 50 % de la implementación en esa etapa y el 100 % en la Etapa 4**. Res
 
 ### Redistribución correctiva
 
-Se trasladan de la Etapa 3 a la Etapa 4 los siguientes elementos del núcleo (~30 h; eran ~37 con HU-20, que volvió a la Etapa 3 el 12/10), escogidos porque
+Se trasladan de la Etapa 3 a la Etapa 4 los siguientes elementos del núcleo (~26 h; eran ~37 con HU-20 y HU-08, que volvieron a la Etapa 3 el 12/10), escogidos porque
 **no forman parte de la cadena mínima que hay que demostrar funcionando al cierre de la Etapa 3**:
 
 | Elemento | Horas | Por qué puede esperar |

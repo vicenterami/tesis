@@ -11,7 +11,7 @@ const TIPOS = ['medicion', 'visto', 'condicion', 'latido'] as const;
 // El tipo lo dice el nombre del evento SSE (`event:`), que el backend pone en los cuatro casos; los datos lo repiten en
 // medicion, visto y condicion, pero el latido trae solo {tiempo} (eventos.controller.ts). El emisor es nuestro backend,
 // pero un proxy intermedio o una versión vieja pueden mandar algo distinto: lo que no tenga la forma esperada se descarta
-// sin romper la pantalla (revisión del 12/10). Se mira lo que el panel usa.
+// sin romper la pantalla (12/10). Se mira lo que el panel usa.
 export function esEventoVivo(tipo: string, x: unknown): x is Omit<EventoVivo, 'tipo'> {
   if (typeof x !== 'object' || x === null) return false;
   const e = x as Record<string, unknown>;

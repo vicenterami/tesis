@@ -1,13 +1,19 @@
-import { BadRequestException, Controller, Get, Param, Query, Res } from '@nestjs/common';
+import { BadRequestException, Controller, Get, HttpException, HttpStatus, Logger, Param, Query, Res } from '@nestjs/common';
+import { once } from 'node:events';
 import { ApiBadRequestResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiProduces, ApiQuery, ApiTags } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { ConsultaService } from './consulta.service';
-import { CABECERA_CSV, FORMATOS, filaCsv, filaJson, formato, nombreDeArchivo } from './exportar';
+import { CABECERA_CSV, FORMATOS, filaCsv, filaJson, formato, nombreDeArchivo, rangoRazonable } from './exportar';
+
+// Exportaciones simultáneas admitidas por proceso: cada una ocupa una conexión a la base durante toda la descarga.
+export const MAX_EXPORTACIONES = 2;
 import { fecha, uuid } from './validacion';
 
 @ApiTags('dispositivos')
 @Controller('dispositivos')
 export class DispositivosController {
+  private readonly log = new Logger('exportar');
+  private exportacionesEnCurso = 0;
   constructor(private readonly consulta: ConsultaService) {}
 
   // Inventario con estado: base de la vista "salud del sitio" (HU-19).
@@ -58,23 +64,38 @@ export class DispositivosController {
     }
     const h = fecha(hasta, new Date(), 'hasta');
     const d = fecha(desde, new Date(h.getTime() - 30 * 86_400_000), 'desde');
-    if (d >= h) throw new BadRequestException('desde debe ser anterior a hasta');
+    const motivo = rangoRazonable(d, h);
+    if (motivo !== null) throw new BadRequestException(motivo);
     const { id_fisico } = await this.consulta.identidad(dispositivoId); // 404 antes de escribir cabeceras
+    if (this.exportacionesEnCurso >= MAX_EXPORTACIONES) {
+      throw new HttpException(`hay ${MAX_EXPORTACIONES} exportaciones en curso; inténtalo en un momento`, HttpStatus.TOO_MANY_REQUESTS);
+    }
+    this.exportacionesEnCurso++;
     res.setHeader('Content-Type', fmt === 'csv' ? 'text/csv; charset=utf-8' : 'application/json; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${nombreDeArchivo(id_fisico, d, h, fmt)}"`);
     res.setHeader('Cache-Control', 'no-store');
-    if (fmt === 'csv') res.write(CABECERA_CSV + '\r\n');
-    else res.write('[');
-    let primera = true;
-    for await (const fila of this.consulta.mediciones(dispositivoId, d, h)) {
-      if (fmt === 'csv') res.write(filaCsv(fila));
-      else {
-        res.write((primera ? '' : ',') + '\n' + filaJson(fila));
+    // Cada escritura respeta la contrapresión: si el socket está lleno, se espera `drain` antes de pedir la siguiente tanda,
+    // así un cliente lento no hace que Node acumule el archivo entero en memoria.
+    const escribir = async (trozo: string): Promise<void> => {
+      if (!res.write(trozo)) await once(res, 'drain');
+    };
+    try {
+      await escribir(fmt === 'csv' ? CABECERA_CSV + '\r\n' : '[');
+      let primera = true;
+      for await (const fila of this.consulta.mediciones(dispositivoId, d, h)) {
+        if (res.destroyed) return; // el cliente cortó la descarga: se deja de consultar
+        await escribir(fmt === 'csv' ? filaCsv(fila) : (primera ? '' : ',') + '\n' + filaJson(fila));
         primera = false;
       }
-      if (res.destroyed) return; // el cliente cortó la descarga: se deja de consultar
+      if (fmt === 'json') await escribir('\n]\n');
+      res.end();
+    } catch (e) {
+      // Las cabeceras ya salieron: no hay cómo responder un error limpio. Se corta la conexión para que el cliente vea un
+      // archivo incompleto en vez de uno que parece entero, y queda en el registro.
+      this.log.error(`exportación interrumpida (${id_fisico}): ${(e as Error).message}`);
+      res.destroy(e as Error);
+    } finally {
+      this.exportacionesEnCurso--;
     }
-    if (fmt === 'json') res.write('\n]\n');
-    res.end();
   }
 }

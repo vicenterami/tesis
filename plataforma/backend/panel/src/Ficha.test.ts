@@ -4,12 +4,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Condicion, DispositivoFicha, Historico, TramaRechazada } from './lib/modelo';
 
 // uPlot dibuja en un canvas, que jsdom no tiene: se sustituye por un doble que registra datos y tamaño.
-const graficos: { datos: unknown; destruido: boolean }[] = [];
+const graficos: { datos: unknown; destruido: boolean; titulo: string }[] = [];
 vi.mock('uplot', () => {
   class UPlotFalso {
-    constructor(_o: unknown, datos: unknown, el: HTMLElement) {
+    constructor(o: { title: string }, datos: unknown, el: HTMLElement) {
       el.appendChild(document.createElement('canvas'));
-      graficos.push({ datos, destruido: false });
+      graficos.push({ datos, destruido: false, titulo: o.title });
     }
     setData(d: unknown): void { graficos[graficos.length - 1]!.datos = d; }
     setSize(): void {}
@@ -157,6 +157,26 @@ describe('Ficha (P3): identidad, canales, gráfico, condiciones y rechazadas, le
     expect(peticiones.filter((p) => p === `/dispositivos/${ID}`).length).toBe(fichaAntes + 1);
     expect(peticiones.filter((p) => p.startsWith('/canales/')).length).toBe(histAntes + 1);
     await waitFor(() => expect(document.querySelector('[data-canal]')?.getAttribute('data-canal')).toBe('en_vivo'));
+  });
+
+  it('cambiar de canal recrea el gráfico con el título y la unidad del canal nuevo y pide su histórico', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (ruta: string) => {
+      peticiones.push(ruta);
+      if (ruta === `/dispositivos/${ID}`) return new Response(JSON.stringify(ficha));
+      if (ruta.startsWith('/condiciones?')) return new Response(JSON.stringify([]));
+      if (ruta.startsWith('/cuarentena?')) return new Response(JSON.stringify([]));
+      if (ruta.startsWith('/canales/c-temp/historico')) return new Response(JSON.stringify(historico));
+      if (ruta.startsWith('/canales/c-hum/historico')) return new Response(JSON.stringify({ ...historico, canal_id: 'c-hum', magnitud: 'humedad', unidad: '%RH', tiempos: [1], valores: [55], muestras: [1], puntos: 1 }));
+      return new Response('', { status: 404 });
+    }));
+    render(Ficha, { id: ID });
+    await waitFor(() => expect(graficos).toHaveLength(1));
+    expect(graficos[0]!.titulo).toBe('Temperatura (Cel)');
+    document.querySelector<HTMLButtonElement>('[data-canal-id="c-hum"]')!.click();
+    await waitFor(() => expect(graficos).toHaveLength(2));
+    expect(graficos[0]!.destruido).toBe(true);
+    expect(graficos[1]!.titulo).toBe('Humedad (%RH)'); // el título lleva magnitud y unidad; la etiqueta va en la tarjeta
+    await waitFor(() => expect(graficos[1]!.datos).toEqual([[1], [55], [null]]));
   });
 
   it('un id que no existe → mensaje con la acción de volver al inventario, sin gráfico', async () => {
