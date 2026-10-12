@@ -16,9 +16,9 @@
 | Validación preliminar | 10 % | ⬜ | Sensor físico de extremo a extremo (TT-32): la placa ESP32 ya llegó (12/10); los sensores y el cableado están en tránsito; guía de manejo seguro escrita (`docs/17 §3–4`). |
 | Documentación | 15 % | 🟡 | Documentos en concordancia (guardián `plataforma/pruebas/verificar-todo.sh`). Falta el capítulo de pruebas y validación del informe (TT-36). |
 
-## 2. Tareas de la Etapa 3: 13 elementos, 68 h (tras el corte del 08/10, §3)
+## 2. Tareas de la Etapa 3: 15 elementos, 82 h (tras el corte del 08/10 y el adelanto del 12/10, §3)
 
-**Hechos: 6 (31 h) · parciales: 3 (14 h) · pendientes: 4 (23 h).**
+**Hechos: 6 (31 h) · parciales: 5 (30 h) · pendientes: 4 (21 h).**
 
 | Ítem | Tarea | h | Estado | Evidencia o lo que falta |
 |---|---|---|---|---|
@@ -31,7 +31,9 @@
 | HU-11 🎯 | Registrar un dispositivo desde la plataforma | 5 | ⬜ | Alta por API con Dynamic Security (`docs/10 §8.4` puntos 25 y 26), después de su prueba en un contenedor desechable. |
 | HU-14 🎯 | Detectar que un dispositivo dejó de reportar | 7 | ✅ | Filtro 6 (`supervision.service.ts`), intervalo esperado por dispositivo (migración 10), medición en `docs/16 §5`. |
 | TT-39 | Canal de tiempo real (SSE) | 4 | 🟡 | Hecho el 09/10 en el backend: `GET /eventos` con mediciones, señales de vida y condiciones, cada una ya guardada (`docs/10 §5`, `docs/16 §14`). En esta etapa, sin sesión y solo en la red local, como la API. 12/10: lista de nombres de host contra el *DNS rebinding* en el backend y en el proxy (`docs/10 §8.4` punto 40). Falta: la sesión, que llega con HU-18 (Etapa 4). |
-| HU-19 🎯 | Panel de salud con semáforo | 9 | ⬜ | Sin código del panel. |
+| HU-19 🎯 | Panel de salud con semáforo | 9 | 🟡 | Tramo 2 hecho el 12/10: pantalla P2 (`docs/19`) con el estado visual en cuatro valores, conteos, tabla y actualización por el canal en vivo; servida por el backend en `/panel` y comprobada con el servidor de Vite real (`docs/16 §16`). Falta: verla con el sensor físico y la demostración. |
+| HU-20 🎯 | Inventario filtrable por sitio, zona, estado y vía | 7 | 🟡 | Adelantada de la Etapa 4 el 12/10 (§3). Tramo 2: filtro por estado (fichas), zona, vía y búsqueda, en el panel; falta el filtro por sitio (un solo sitio hoy) y la prueba con varios. |
+| HU-21 🎯 | Ficha del dispositivo: condiciones, historial y serie | 7 | ⬜ | Adelantada de la Etapa 4 el 12/10 (§3); pantalla P3 (`docs/19`): histórico agregado con uPlot y en vivo. |
 | TT-28 🎯 | Emulador de nodos | 5 | ✅ | `docs/16 §2`. |
 | TT-32 🎯 | Sensor físico de extremo a extremo | 3 | ⬜ | Equipo comprado (`docs/17`). |
 | TT-36 | Informe de pruebas y validación preliminar | 5 | 🟡 | `docs/16` (preliminar); falta el capítulo del informe. |
@@ -56,6 +58,12 @@ y TT-36 (es el entregable). Pasan a la Etapa 4 HU-15, HU-17, HU-18 (con M7) y la
 de la Etapa 3 son ahora 37 h según las filas (algo menos, porque HU-10 y TT-36 ya están empezadas), con unas 8 h de margen. La
 recepción por HTTP (RF-01) entra en esta etapa solo si sobra tiempo; si no, en la Etapa 4. Las filas de `docs/04` y del anexo B
 ya dicen la etapa nueva (paso 2v del guardián).
+
+**Adelanto decidido por el estudiante el 12/10:** HU-20 y HU-21 (7 h cada una) pasan de la Etapa 4 a la 3, para que el panel
+muestre, además del semáforo (HU-19), el inventario filtrable y la ficha con gráfico (`docs/19`). Lo que falta de la Etapa 3 son
+ahora 51 h según las filas (37 pendientes y 14 parciales) frente a unas 38 h disponibles hasta el 30/10 (15 h por semana): **no
+cabe todo, y se sabe**. Orden fijado: TT-36 (el entregable), HU-19 y HU-11, después HU-21 y HU-20; lo que no esté hecho el 27/10
+vuelve a la Etapa 4 con su registro aquí y en `docs/04`.
 
 ## 4. Lo que frena hoy
 

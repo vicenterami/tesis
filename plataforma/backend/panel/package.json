@@ -1,0 +1,27 @@
+{
+  "name": "panel",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Panel del sistema (Svelte + Vite), servido por el backend en /panel (docs/19)",
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "test": "vitest run",
+    "verificar": "pnpm check && pnpm test && pnpm build"
+  },
+  "dependencies": {
+    "svelte": "5.57.1"
+  },
+  "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "7.3.1",
+    "@testing-library/svelte": "5.4.2",
+    "jsdom": "30.1.2",
+    "svelte-check": "4.7.6",
+    "typescript": "5.9.2",
+    "vite": "8.3.2",
+    "vitest": "5.0.3"
+  }
+}

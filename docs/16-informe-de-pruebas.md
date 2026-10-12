@@ -320,3 +320,29 @@ el conteo de los callados, en el backend y en el canal en vivo (3 pruebas); (3) 
 validarse: el backend rechaza al arrancar un `HTTP_HOSTS` sin forma de nombre y, por `depends_on`, el proxy no arranca (2 pruebas).
 Limitación conocida del banco: la redirección del 8081 va a `https://localhost/` (443), no al 8443, porque nginx redirige sin el
 puerto; en el servidor, 80 → 443, que es el caso real.
+
+## 16. Panel, tramo 2: esqueleto, inventario con semáforo y reenvío de desarrollo (12/10/2026)
+
+`docs/19` (pantalla P2) y `docs/10 §8.4` (panel en `backend/panel/`, mismo workspace de pnpm, servido por el backend en `/panel`).
+Versiones elegidas con al menos siete días de publicadas (Svelte 5.57.1, Vite 8.3.2, Vitest 5.0.3; `docs/11 §4`); ninguna
+dependencia ejecutó scripts de instalación (`ignore-scripts`). Auditoría del workspace: cero avisos en producción; en desarrollo,
+el alto conocido de `braces` y un moderado de `sprintf-js`, los dos solo por Jest y sin parche publicado.
+
+| Comprobación | Resultado |
+|---|---|
+| 20 pruebas del panel (vitest): estado visual (cuatro reglas y su orden), «en línea» con la regla de la API, orden de atención, «hace cuánto», hora local con UTC, cliente HTTP con acciones por código, canal en vivo (reconexión 1-2-4 s, plazo sin latido, cierre limpio) | ✅ todas |
+| 4 de ellas por el DOM (jsdom): un dispositivo en mantenimiento con condición abierta aparece «Inactivo» y **no** «Alerta»; orden Sin señal → Alerta → Normal → Inactivo; conteos; una ficha filtra y vuelve a mostrar; vacío y error con su acción | ✅ |
+| `svelte-check` sobre 320 archivos | 0 errores, 0 avisos |
+| Build real: `index.html` 0,45 KB, un paquete JS de 47 KB (18,7 KB comprimido), CSS 1,8 KB; sin `.map` | ✅ |
+| Imagen del backend reconstruida: el panel compilado en la etapa de build; en la imagen final solo `panel/dist`, y `node_modules` sin `svelte` (6 entradas, solo producción del backend) | ✅ (`--filter` en la instalación de producción) |
+| `pruebas/panel-desarrollo.sh`, con el servidor de Vite real: `/panel/` servido; `Origin` propio por el 5173 → 200 y otro → 403 (el reenvío conserva el `Host`); primer byte del canal en menos de 5 s y latido a los 25 s (no retiene el flujo) | ✅ (11 comprobaciones) |
+| El mismo guion contra el build servido por el backend: `/panel/` con la CSP estricta, paquete con hash 200, `.map` 404, sin scripts en línea | ✅ |
+
+**Hallazgos:** (1) Vitest cargaba la versión de servidor de Svelte y `onMount` no existía: lo resuelve el plugin de pruebas de
+Testing Library (`svelteTesting`), que fuerza la resolución de navegador; (2) Vite trae su propia lista de nombres de host
+(`server.allowedHosts`, desde la 6.0.9, por el mismo *DNS rebinding* del punto 40) y corta un `Host` ajeno con 403 antes de
+reenviar: el caso del guion acepta ese 403 o el 421 del backend, nunca un 200; (3) `.dockerignore` solo excluía `node_modules`
+y `dist` de la raíz: sin las entradas del panel, `COPY panel` habría metido al contexto de build sus dependencias enlazadas.
+**Lo que no cubre todavía:** ninguna prueba abre el panel en un navegador real (las del DOM corren en jsdom); la demostración
+(`docs/15`) lo hace a mano; una prueba con navegador llega con la ficha (tramo 3), que es donde hay gráfico.
+

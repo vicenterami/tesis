@@ -24,6 +24,21 @@ src/
 ├── retencion/                 # borra con drop_chunks lo vencido de medicion, trama y cuarentena
 ├── openapi.ts                 # contrato OpenAPI generado desde los decoradores; /docs
 └── salud/salud.controller.ts  # GET /salud
+panel/                         # el panel (Svelte + Vite; docs/19): paquete del mismo workspace de pnpm
+├── src/Inventario.svelte      # P2: inventario con semáforo, conteos, filtros y canal en vivo
+├── src/lib/                   # estado visual, cliente HTTP, canal en vivo con reconexión, tiempo
+├── src/**/*.test.ts           # pruebas (vitest; las de pantalla, por el DOM con jsdom)
+└── vite.config.ts             # base /panel/, reenvío al backend en desarrollo, build sin .map
+```
+
+## Panel (docs/19)
+
+El backend lo sirve compilado en `/panel` (`main.ts`, `useStaticAssets`); la imagen lo compila en su etapa de build. En desarrollo:
+
+```
+pnpm --filter panel dev        # Vite en http://127.0.0.1:5173/panel/, reenvía la API y /eventos al backend (3000) sin cambiar el Host
+pnpm --filter panel verificar  # svelte-check + vitest + vite build (también lo corre `pnpm verificar` desde aquí)
+bash ../pruebas/panel-desarrollo.sh   # con la pila arriba: el reenvío conserva el Host y no retiene el canal; el build servido lleva la CSP
 ```
 
 ## Verificación automática (TT-03)

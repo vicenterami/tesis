@@ -1,3 +1,7 @@
+# Paquetes del workspace (docs/10 §8.4, decisión del 09/10/2026): el panel vive aquí dentro y comparte lockfile, .npmrc,
+# auditoría y guardián con el backend; lo sirve el backend en /panel.
+packages:
+  - panel
 # Decisión explícita sobre scripts de instalación de dependencias (pnpm >= 10 exige declararla;
 # desde pnpm 11 la opción se llama `allowBuilds`). `false` = el paquete se instala pero su script
 # de instalación NO se ejecuta. Ninguno de estos lo necesita:

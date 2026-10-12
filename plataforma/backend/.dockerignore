@@ -9,3 +9,7 @@ coverage
 *.pem
 *.key
 passwd
+# El panel (docs/19) se compila dentro de la imagen: ni sus dependencias ni un build viejo del equipo entran al contexto.
+panel/node_modules
+panel/dist
+**/*.test.ts

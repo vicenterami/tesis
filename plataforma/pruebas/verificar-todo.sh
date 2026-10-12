@@ -322,6 +322,10 @@ elif ! (cd plataforma/backend && pnpm licenses ls --prod --json 2>/dev/null) > "
   echo "FALLA pnpm licenses no devolvió un resultado legible (¿node_modules sin instalar?)"; fallos=$((fallos+1))
 else
   n=$(jq '[.[] | length] | add // 0' "$VT"/licencias.json)
+  # 12/10: el panel es un paquete del mismo workspace y `pnpm licenses` en la raíz ya lista sus dependencias de producción
+  # (svelte y las suyas). Se exige verlas: si el panel saliera del workspace, este paso dejaría de cubrirlo en silencio.
+  if ! jq -e '[.[][] | .name] | index("svelte")' "$VT"/licencias.json >/dev/null; then
+    echo "FALLA el listado de licencias no incluye al panel (svelte): ¿salió del workspace de pnpm?"; fallos=$((fallos+1)); fi
   malas=$(PERMITIDAS="$PERMITIDAS" python3 -I - "$VT"/licencias.json <<'PY'
 import json, os, re, sys
 def evalua(expr, ok):

@@ -5,6 +5,9 @@ process.env.TZ = 'UTC';
 
 import { ConsoleLogger, Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import type { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
@@ -16,7 +19,7 @@ import { configurarOpenApi } from './openapi';
 async function arrancar(): Promise<void> {
   // Registros (docs/10 §6): en contenedor, un evento JSON por línea (LOG_FORMATO=json); en desarrollo, texto.
   const logger = new ConsoleLogger({ json: registrosEnJson(process.env.LOG_FORMATO), logLevels: ['log', 'warn', 'error'] });
-  const app = await NestFactory.create(AppModule, { logger });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { logger });
   const log = new Logger('arranque');
   // Apagado ordenado (docs/10 §6): sin esto Nest no escucha SIGTERM, Docker espera 10 s y mata el proceso
   // (código 137), y los cierres de cada módulo —suscripción al broker, supervisor, pool de la base— no corren.
@@ -56,6 +59,17 @@ async function arrancar(): Promise<void> {
     );
     configurarOpenApi(app); // contrato OpenAPI generado desde el código, servido en /docs
     log.warn('documentación interactiva /docs ACTIVA (HTTP_DOCS=si): solo para desarrollo');
+  }
+
+  // El panel (docs/19), compilado por Vite, se sirve como archivos estáticos bajo /panel (docs/10 §8.4): mismo origen que
+  // la API, así no hace falta CORS y la sesión (Etapa 4) valdrá para los dos. Ruta: backend/panel/dist, tanto desde dist/
+  // (compilado) como desde src/ (desarrollo con --watch); en la imagen, /app/panel/dist. Si no está construido, /panel
+  // responde 404 y se avisa al arrancar: la API sigue funcionando sin él.
+  const panel = join(__dirname, '..', 'panel', 'dist');
+  if (existsSync(join(panel, 'index.html'))) {
+    app.useStaticAssets(panel, { prefix: '/panel/', index: 'index.html' });
+  } else {
+    log.warn(`panel no construido (${panel}): /panel responderá 404; construirlo con pnpm --filter panel build`);
   }
 
   const puerto = Number(process.env.HTTP_PUERTO ?? 3000);

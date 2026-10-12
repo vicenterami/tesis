@@ -497,9 +497,11 @@ compilador, `devDependencies` ni el código fuente. Así la imagen que corre es 
 usarse para reconstruir nada por dentro. Corre como usuario **sin privilegios** (`USER node`, ya en la
 imagen oficial), con `security_opt: no-new-privileges` en el compose. El `HEALTHCHECK` llama a
 `GET /salud` (ya implementado, `src/salud`): confirma que el proceso responde y que su conexión a la
-base está viva, no solo que el proceso existe. El **panel Svelte no existe aún en el código** (Etapa
-3): la imagen de hoy sirve solo la API; cuando el panel exista, una etapa adicional lo compila y el
-backend estático lo sirve, sin cambiar esta estructura.
+base está viva, no solo que el proceso existe. **El panel (`docs/19`) se compila en la misma etapa de
+build con Vite y el backend lo sirve como archivos estáticos bajo `/panel`** (desde el 12/10/2026, tramo 2):
+mismo origen que la API, sin CORS; a la imagen final viaja solo su resultado (HTML, un paquete con hash y
+su CSS), sin la fuente ni sus dependencias (`--filter` en la instalación de producción). En desarrollo, el
+servidor de Vite reenvía la API y el canal en vivo al backend conservando el `Host` (`docs/11 §3`).
 
 **Dónde escucha el backend** (decidido el 23/09/2026; el código sigue a este texto). Fuera de Docker,
 en desarrollo, escucha solo en `127.0.0.1` (variable `HTTP_INTERFAZ`, valor por defecto). Dentro del

@@ -118,8 +118,12 @@ no alcanza: `pila.sh sql "SELECT tipo, abierta_en, cerrada_en FROM condicion ORD
 
 ## 5. La API y su contrato (2 min)
 
-**Decir:** el panel es de la Etapa 3; hoy lo que vería el cliente es esto, la API que el panel va a
-consumir. Y el contrato OpenAPI se genera desde el código, así que no puede describir rutas que no existen.
+**Antes (desde el 12/10, 1 min):** abrir `http://127.0.0.1:3000/panel/`: el inventario con el semáforo en cuatro estados
+(`docs/19`), las fichas con el conteo, y «en vivo: conectado». Dejar la pestaña abierta: en el paso 4, el dispositivo pasará a
+«Sin señal» y volverá a «Normal» sin recargar. La ficha del dispositivo llega con el tramo 3.
+
+**Decir:** lo que el panel muestra sale de esta API, que cualquier sistema puede consumir. Y el contrato OpenAPI se genera
+desde el código, así que no puede describir rutas que no existen.
 
 En `/docs`:
 
