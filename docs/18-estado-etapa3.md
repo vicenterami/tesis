@@ -12,7 +12,7 @@
 | Retroalimentación | 20 % | 🟡 | Al 8/10 no hay observaciones escritas del profesor guía sobre la entrega del 2/10. Sí se incorporó la entrevista del 5/10 (`bitacora/2026-10-05-entrevista-academico-geologia.md`) en las decisiones del 6 y del 8/10 (`docs/10 §8.4`). Falta: recibir e incorporar la retroalimentación de la Etapa 2. |
 | Mejoras | 15 % | 🟢 | Decisiones de diseño del 6, 7 y 8/10 (`docs/10 §8.4`); proxy TLS (`docs/16 §9`); dependencias e imágenes sin vulnerabilidades altas o críticas corregibles (`docs/16 §12`). |
 | 50 % de la implementación | 10 % | 🟡 | Núcleo: 17 de 34 elementos hechos (80 de 168 h, 48 %) y 5 parciales (25 h). Todo el backlog: 28 de 65 (114 de 285 h, 40 %) y 13 parciales (56 h). Cifras calculadas desde las filas de `docs/04`, con los estados de `docs/12 §3`, de §2 y de la Etapa 1 (al final de §2). |
-| Pruebas iniciales | 30 % | 🟢 | `docs/16`: emulador, carga (59,7 tramas/s sin pérdida), carreras, TLS, capacidad y picos, caídas con carga, dependencias e imágenes; 107 pruebas unitarias. Falta: la matriz formal del contrato de trama (TT-27) y el broker de producción en las caídas (`docs/16 §11`). |
+| Pruebas iniciales | 30 % | 🟢 | `docs/16`: emulador, carga (59,7 tramas/s sin pérdida), carreras, TLS, capacidad y picos, caídas con carga, dependencias e imágenes; 121 pruebas unitarias. Falta: la matriz formal del contrato de trama (TT-27) y el broker de producción en las caídas (`docs/16 §11`). |
 | Validación preliminar | 10 % | ⬜ | Sensor físico de extremo a extremo (TT-32): equipo adquirido, fecha de llegada por confirmar (`docs/17`). |
 | Documentación | 15 % | 🟡 | Documentos en concordancia (guardián `plataforma/pruebas/verificar-todo.sh`). Falta el capítulo de pruebas y validación del informe (TT-36). |
 
@@ -30,7 +30,7 @@
 | HU-10 🎯 | Inventario con estado y vía de envío | 5 | 🟡 | `GET /dispositivos` con la vía y el formato (migración 11); falta declararlos en el alta y la vista del panel. |
 | HU-11 🎯 | Registrar un dispositivo desde la plataforma | 5 | ⬜ | Alta por API con Dynamic Security (`docs/10 §8.4` puntos 25 y 26), después de su prueba en un contenedor desechable. |
 | HU-14 🎯 | Detectar que un dispositivo dejó de reportar | 7 | ✅ | Filtro 6 (`supervision.service.ts`), intervalo esperado por dispositivo (migración 10), medición en `docs/16 §5`. |
-| TT-39 | Canal de tiempo real (SSE) | 4 | 🟡 | Hecho el 09/10 en el backend: `GET /eventos` con mediciones, señales de vida y condiciones, cada una ya guardada (`docs/10 §5`, `docs/16 §14`). En esta etapa, sin sesión y solo en la red local, como la API. Falta: la sesión, que llega con HU-18 (Etapa 4). |
+| TT-39 | Canal de tiempo real (SSE) | 4 | 🟡 | Hecho el 09/10 en el backend: `GET /eventos` con mediciones, señales de vida y condiciones, cada una ya guardada (`docs/10 §5`, `docs/16 §14`). En esta etapa, sin sesión y solo en la red local, como la API. 12/10: lista de nombres de host contra el *DNS rebinding* en el backend y en el proxy (`docs/10 §8.4` punto 40). Falta: la sesión, que llega con HU-18 (Etapa 4). |
 | HU-19 🎯 | Panel de salud con semáforo | 9 | ⬜ | Sin código del panel. |
 | TT-28 🎯 | Emulador de nodos | 5 | ✅ | `docs/16 §2`. |
 | TT-32 🎯 | Sensor físico de extremo a extremo | 3 | ⬜ | Equipo comprado (`docs/17`). |

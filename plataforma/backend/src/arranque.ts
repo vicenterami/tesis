@@ -21,3 +21,41 @@ export function servirDocumentacion(valor: string | undefined): boolean {
 export function registrosEnJson(valor: string | undefined): boolean {
   return (valor ?? '').trim().toLowerCase() === 'json';
 }
+
+// ── Nombres de host permitidos (docs/11 §3; docs/10 §8.4 punto 40, decidido el 09/10/2026) ──────────────────────────
+// Contra el DNS rebinding: una página maliciosa hace que su propio nombre resuelva a 127.0.0.1 y, como
+// para el navegador sigue siendo su mismo origen, no la delatan ni Origin ni Sec-Fetch-Site; pero la
+// petición llega con SU nombre en `Host`. Se compara ese nombre con una lista fija y lo demás se
+// responde 421 (Misdirected Request). Solo el nombre, sin el puerto: el ataque cambia el nombre, y el
+// puerto ya varía por entorno (3000, 5173 tras Vite, 8443 en el banco, 443 en el servidor); exigirlo
+// sería una variable más por ambiente, lo que la decisión del 09/10 evitó para Origin. En el proxy, el
+// `server_name` de nginx compara igual (sin puerto): las dos capas hacen lo mismo.
+
+// Siempre aceptados: los nombres de loopback. Solo llegan desde el propio equipo o contenedor (el
+// HEALTHCHECK del Dockerfile, el operador con curl, el proxy por la red interna), y una página ajena
+// no puede hacer que el navegador los escriba en Host: para él, «localhost» es el equipo de la víctima.
+export const HOSTS_LOCALES: readonly string[] = ['localhost', '127.0.0.1'];
+
+// HTTP_HOSTS suma el nombre real del servidor (varios, separados por coma o espacio). Ausente o vacía =
+// solo los locales, que es lo correcto en desarrollo y en el banco. Un IPv6 va entre corchetes ([::1]).
+export function hostsPermitidos(valor: string | undefined): ReadonlySet<string> {
+  const extra = (valor ?? '').split(/[\s,]+/).map((h) => h.trim().toLowerCase()).filter((h) => h !== '');
+  return new Set([...HOSTS_LOCALES, ...extra]);
+}
+
+// Forma de un `Host` según RFC 9110 §7.2: nombre o IPv4, o IPv6 entre corchetes, y un puerto opcional.
+// Cualquier otra cosa (vacío, «usuario@», barras, espacios) se trata como ilegible, no se intenta arreglar.
+const FORMA_HOST = /^(\[[0-9a-f:.]+\]|[a-z0-9.-]+)(:[0-9]{1,5})?$/i;
+
+// Nombre del `Host` en minúsculas y sin puerto, o undefined si no viene o es ilegible.
+export function nombreDeHost(host: string | undefined): string | undefined {
+  const m = FORMA_HOST.exec((host ?? '').trim());
+  return m ? m[1].toLowerCase() : undefined;
+}
+
+// Por qué se rechaza la petición, o null si el Host está en la lista. El texto va al registro, acotado.
+export function rechazoDeHost(host: string | undefined, permitidos: ReadonlySet<string>): string | null {
+  const nombre = nombreDeHost(host);
+  if (nombre === undefined) return `Host ausente o ilegible: ${String(host).slice(0, 80)}`;
+  return permitidos.has(nombre) ? null : `Host ${nombre.slice(0, 80)} no está en la lista`;
+}

@@ -66,6 +66,12 @@ igual y no mide humedad, devuelve `0x58` (bibliotecas de Adafruit para BME280 y 
 (soldar o usar bornera) y necesita la resistencia de 4,7 kΩ entre datos y 3,3 V. El sensor de suelo se alimenta a 3,3 V con el
 ESP32 y se calibra (seco y en agua).
 
+**Recepción (anotado el 12/10/2026).** La placa ESP32 (pieza 1, comprada aparte el 07/10) ya llegó: módulo ESP-WROOM-32, 38 pines,
+convertidor USB-serie CH9102F (en Linux lo atiende el núcleo sin instalar nada; al conectarla, `dmesg` dice si aparece como
+`/dev/ttyUSB0` o `/dev/ttyACM0`, y el usuario debe pertenecer al grupo `dialout`). El pedido de las piezas 2 a 7 (una tienda, un
+despacho; CLP 26 530 con cinco resistencias de 4,7 kΩ) está en tránsito. Al llegar el BME280, lo primero es leer su registro de
+identificación (párrafo anterior).
+
 **Piezas 8 y 9** (solo si hay pasarela / opcional), sin cambios respecto de la revisión de la mañana: radio SX1276 de 915 MHz
 con antena helicoidal en Afel, CLP 18 000; batería con protección declarada, sin opción encontrada. Referencia: pasarela
 Milesight UG65 4G AU915 en MCI, CLP 439 990.

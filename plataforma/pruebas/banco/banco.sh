@@ -118,6 +118,17 @@ case "${1:-}" in
     else echo "FALLA SSE 8443: no llegó la medición → $(head -c 160 "$sse")"; fallos=$((fallos+1)); fi
     rm -f "$sse"
     if docker run --rm --network "$red" "$IMG_BROKER" mosquitto_pub -h proxy -p 8883 -t x -m 1 2>/dev/null; then echo "FALLA el 8883 aceptó una conexión sin TLS"; fallos=$((fallos+1)); else echo "OK    el 8883 rechaza conexiones sin TLS"; fi
+    # Lista de nombres de host (docs/10 §8.4 punto 40, 12/10): el proxy atiende solo PROXY_NOMBRE (aquí, localhost). Un nombre ajeno en
+    # el SNI, o una conexión por IP sin SNI, no recibe ni el certificado; con el SNI propio y un Host ajeno, 421 de nginx (el servidor
+    # que elige el Host es el que rechaza saludos, sin llegar al backend); en el 80, la conexión se corta sin respuesta (444).
+    if curl -s -m 5 -o /dev/null --cacert "$CERTS/ca.crt" --resolve ataque.example:8443:127.0.0.1 https://ataque.example:8443/salud 2>/dev/null; then echo "FALLA el 8443 atendió un nombre ajeno (DNS rebinding)"; fallos=$((fallos+1)); else echo "OK    el 8443 rechaza el saludo TLS de un nombre ajeno (sin entregar el certificado)"; fi
+    code=$(curl -s -m 5 -o /dev/null -w '%{http_code}' --cacert "$CERTS/ca.crt" -H 'Host: ataque.example' https://localhost:8443/salud)
+    [ "$code" = 421 ] && echo "OK    Host ajeno con el SNI propio → 421" || { echo "FALLA Host ajeno con el SNI propio → HTTP $code (esperado 421)"; fallos=$((fallos+1)); }
+    if curl -sk -m 5 -o /dev/null https://127.0.0.1:8443/salud 2>/dev/null; then echo "FALLA el 8443 atendió por IP sin SNI"; fallos=$((fallos+1)); else echo "OK    por IP sin SNI el saludo se rechaza (el chequeo de salud pide por el nombre con --resolve)"; fi
+    code=$(curl -s -m 5 -o /dev/null -w '%{http_code}' -H 'Host: ataque.example' http://localhost:8081/)
+    [ "$code" = 000 ] && echo "OK    el 80 corta sin respuesta un Host ajeno (444)" || { echo "FALLA el 80 respondió $code a un Host ajeno"; fallos=$((fallos+1)); }
+    code=$(curl -s -m 5 -o /dev/null -w '%{http_code}' http://localhost:8081/)
+    [ "$code" = 301 ] && echo "OK    el 80 redirige a HTTPS el nombre propio" || { echo "FALLA el 80 respondió $code al nombre propio (esperado 301)"; fallos=$((fallos+1)); }
     echo "── registro del proxy (JSON, una línea por petición/conexión):"; dcp logs --no-color --since 2m proxy 2>/dev/null | grep -oE '\{.*\}' | head -3
     echo; [ $fallos -eq 0 ] && echo "PROXY OK" || { echo "$fallos comprobación(es) con falla"; exit 1; } ;;
   apagar) dcp down 2>/dev/null || dc down; rm -f "$ENV" ;;

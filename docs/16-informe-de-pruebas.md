@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 107 pruebas unitarias, sin matriz formal) y TT-32 (sensor físico);
+cubre todavía: TT-27 (contrato de trama: hoy 121 pruebas unitarias, sin matriz formal) y TT-32 (sensor físico);
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -289,3 +289,25 @@ broker con la identidad del backend: con la pila arriba, el broker debe desconec
 identificador (MQTT 3.1.1, [MQTT-3.1.4-2]), o sea al backend en marcha. Ahora genera el contrato sin iniciarla: no toca la
 base ni el broker, y las 6 rutas que ya existían salen idénticas; (4) una imagen o un `fetch` «no-cors» de otro sitio no manda
 `Origin` y abría el canal: ahora también se mira `Sec-Fetch-Site`; (5) el cierre de una condición de umbral no tenía guarda.
+
+## 15. Lista de nombres de host contra el *DNS rebinding* (12/10/2026)
+
+`docs/10 §8.4` punto 40; controles en `docs/11 §3`. Backend: 14 pruebas nuevas en `arranque.spec.ts` (lista, forma del `Host`,
+rechazo); con el rechazo anulado a mano (cambio temporal, restaurado y comparado con `cmp`) fallan exactamente las 3 que lo
+cubren. Pila de desarrollo reconstruida y `api-smoke.sh` con 5 casos nuevos (121 pruebas unitarias en total). Proxy sobre el
+banco (`banco.sh proxy`, puertos 8443 y 8081, `PROXY_NOMBRE` sin definir = `localhost`):
+
+| Comprobación | Resultado |
+|---|---|
+| Backend, `Host: ataque.example:3000` (una página ajena cuyo nombre resolvió a 127.0.0.1) | 421 sin llegar a ninguna ruta; un WARN acotado en el registro |
+| Backend, `Host: localhost.ataque.example`, `usuario@localhost`, sin `Host` | 421: comparación exacta y lo ilegible no se arregla |
+| Backend, `Host: localhost:5173` (Vite) y `127.0.0.1:3000` | 200: el puerto no cuenta |
+| Proxy, nombre ajeno en el SNI (`--resolve ataque.example:8443:127.0.0.1`) | saludo TLS rechazado («tlsv1 unrecognized name»): ni certificado ni respuesta |
+| Proxy, SNI del nombre propio y `Host: ataque.example` | 421 de nginx: el servidor que elige el `Host` es el que rechaza saludos; no llega al backend |
+| Proxy, por IP sin SNI (`https://127.0.0.1:8443`) | saludo TLS rechazado; por eso el chequeo de salud del proxy pide por el nombre con `--resolve` |
+| Proxy, puerto 80 con `Host` ajeno | conexión cerrada sin respuesta (444); con el nombre propio, 301 a HTTPS |
+| Proxy, nombre propio (`https://localhost:8443/salud`) y el canal en vivo por el 8443 | 200, y la medición sigue llegando por el canal: los 6 casos de §9 y §14 en verde con la plantilla y el chequeo de salud nuevos |
+| Guardián 2m | renderiza la plantilla con un nombre de prueba y exige `server_name` en 443 y 80, `ssl_reject_handshake` y `Host $http_host`; sin eso, `nginx -t` habría validado la configuración de fábrica de la imagen si la plantilla no se procesara |
+
+Lo que no cubre: un cliente que no es un navegador (curl) manda el `Host` que quiera; lo cubre la sesión (Etapa 4). El registro
+del proxy deja una línea por intento (estado 421 o 444) con la IP de origen.

@@ -72,4 +72,15 @@ pagina "SSE: Origin igual al propio (mismo host y puerto) → 200"           "Or
 pagina "SSE: sin Origin pero Sec-Fetch-Site: cross-site (imagen de otro sitio) → 403" "Sec-Fetch-Site: cross-site" 403
 pagina "SSE: Sec-Fetch-Site: same-origin (el propio panel) → 200"          "Sec-Fetch-Site: same-origin" 200
 caso "SSE: filtro que no es un UUID → 400"                      "/eventos?dispositivo=no-es-uuid" 400
+# Lista de nombres de host (docs/11 §3, docs/10 §8.4 punto 40): una página que hace DNS rebinding llega con SU nombre en Host, aunque apunte a
+# 127.0.0.1; el backend responde 421 antes de cualquier ruta. El puerto no cuenta; los nombres locales siempre pasan.
+conhost() { # nombre · valor de Host · código esperado (en /salud, la ruta más barata)
+  local code; code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 -H "Host: $2" "$API/salud")
+  [[ "$code" == "$3" ]] && echo "OK    $1" || { echo "FALLA $1 (HTTP $code, esperado $3)"; fallos=$((fallos+1)); }
+}
+conhost "Host: nombre de una página ajena (DNS rebinding) → 421"      "ataque.example:3000" 421
+conhost "Host: subdominio que termina en localhost → 421"             "localhost.ataque.example" 421
+conhost "Host: localhost con otro puerto (Vite, banco) → 200"         "localhost:5173" 200
+conhost "Host: 127.0.0.1 en mayúsculas y con puerto → 200"            "127.0.0.1:3000" 200
+conhost "Host: ilegible (usuario@) → 421"                             "usuario@localhost" 421
 echo; [[ $fallos -eq 0 ]] && echo "TODO OK" || { echo "$fallos caso(s) con falla"; exit 1; }

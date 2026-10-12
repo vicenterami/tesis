@@ -209,7 +209,7 @@ tope=$(grep -E '^\s*max_packet_size\s+[0-9]+' "$MC/mosquitto.conf" | awk '{print
 if [[ -n "$tope" && "$tope" -le 65536 ]]; then echo "OK    max_packet_size = $tope bytes"
 else echo "FALLA max_packet_size ausente o mayor que 65536 (${tope:-ausente}): el broker acepta mensajes de cualquier tamaño"; fallos=$((fallos+1)); fi
 
-paso "2m. Proxy: nginx.conf válido (nginx -t con la imagen del proxy, base fijada + parches, y los certificados de desarrollo)"
+paso "2m. Proxy: la plantilla nginx.conf renderizada y válida (nginx -T con la imagen del proxy, base fijada + parches, y los certificados de desarrollo)"
 # 07/10: la configuración del proxy se valida sin levantar nada. Si faltan los certificados de desarrollo
 # (bash plataforma/proxy/ca-desarrollo.sh) o la imagen no se puede construir, el paso se omite y lo dice: nunca se da por
 # bueno sin haberlo revisado. 08/10: la imagen es la oficial fijada más parches de Alpine (proxy/Dockerfile; docs/11 §4).
@@ -224,8 +224,17 @@ elif ! docker build -q -t "$IMG_PROXY" plataforma/proxy >"$VT"/build-proxy.txt 2
   red=$(grep -m1 -iE "$SIN_RED" "$VT"/build-proxy.txt)
   if [ -n "$red" ]; then echo "omitido: sin red para construir la imagen del proxy sobre $BASE_PROXY: ${red:0:160}"; omitidos="$omitidos 2m"
   else echo "FALLA no se pudo construir la imagen del proxy sobre $BASE_PROXY:"; tail -3 "$VT"/build-proxy.txt | sed 's/^/  /'; fallos=$((fallos+1)); fi
-elif docker run --rm -v "$PWD/plataforma/proxy/nginx.conf:/etc/nginx/nginx.conf:ro" -v "$CERTS_DEV:/certs:ro" "$IMG_PROXY" nginx -t >"$VT"/nginx.txt 2>&1; then echo "OK    nginx -t: configuración válida ($BASE_PROXY + parches de proxy/Dockerfile)"
-else echo "FALLA nginx -t:"; grep -E "emerg|nginx:" "$VT"/nginx.txt | sed 's/^/  /'; fallos=$((fallos+1)); fi
+# 12/10: nginx.conf es una plantilla (PROXY_NOMBRE, docs/11 §3): se monta como la monta el compose y la imagen la renderiza al
+# arrancar. Se usa -T (imprime lo que rige) y se comprueba que lo renderizado sea NUESTRA configuración con el nombre puesto:
+# si la plantilla no se procesara, nginx -t validaría la configuración de fábrica de la imagen y pasaría igual.
+elif docker run --rm -v "$PWD/plataforma/proxy/nginx.conf:/plantilla/nginx.conf.template:ro" -v "$CERTS_DEV:/certs:ro" \
+       -e NGINX_ENVSUBST_TEMPLATE_DIR=/plantilla -e NGINX_ENVSUBST_OUTPUT_DIR=/etc/nginx -e NGINX_ENVSUBST_FILTER=^PROXY_ \
+       -e PROXY_NOMBRE=prueba.example "$IMG_PROXY" nginx -T >"$VT"/nginx.txt 2>&1; then
+  if [ "$(grep -c 'server_name prueba.example;' "$VT"/nginx.txt)" = 2 ] && grep -q 'ssl_reject_handshake on;' "$VT"/nginx.txt \
+     && grep -q 'proxy_set_header   Host \$http_host;' "$VT"/nginx.txt && ! grep -q '\${PROXY_NOMBRE}' "$VT"/nginx.txt; then
+    echo "OK    nginx -T: plantilla renderizada y válida ($BASE_PROXY + parches): server_name en 443 y 80, saludo TLS rechazado para otros nombres"
+  else echo "FALLA nginx -T pasó pero lo renderizado no es la plantilla con el nombre puesto (¿se montó en /etc/nginx/nginx.conf?)"; fallos=$((fallos+1)); fi
+else echo "FALLA nginx -T:"; grep -E "emerg|nginx:" "$VT"/nginx.txt | sed 's/^/  /'; fallos=$((fallos+1)); fi
 
 paso "2n. Registros acotados y sin escalada de privilegios: cada servicio de cada combinación de compose (docs/11 §3–4)"
 # 07/10: sin límite, el chequeo de salud del broker sumaba ≈ 395 MB/año. Se valida el VALOR, no solo la presencia (07/10:

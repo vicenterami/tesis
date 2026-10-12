@@ -438,7 +438,7 @@ autorización por canal antes de abrir el flujo y límite de flujos por usuario;
 rechaza (403) la petición que el navegador marca como de otro sitio: `Sec-Fetch-Site` distinto de `same-origin` o `none`,
 o un `Origin` de otro host o puerto. El panel lo sirve el propio backend y, en desarrollo, Vite le reenvía las peticiones,
 así que no hace falta una lista de orígenes; el proxy reenvía el `Host` con su puerto. Eso no detiene el *DNS rebinding*,
-que para el navegador es el mismo origen (`docs/11 §4`). Con 50 flujos abiertos responde 503; el límite por usuario llega
+que para el navegador es el mismo origen: lo detiene la lista de nombres de host en `Host` (§8.4 punto 40, `docs/11 §3`). Con 50 flujos abiertos responde 503; el límite por usuario llega
 con la sesión. Pruebas: `docs/16 §14`.
 
 > Fuentes (consultadas el 23/09/2026): OWASP, *WebSocket Security Cheat Sheet*,
@@ -511,7 +511,9 @@ y al broker usa el nombre del servicio (`DB_HOST=timescaledb`, `MQTT_URL=mqtt://
 `.env.example`). **La documentación interactiva `/docs` se sirve solo con `HTTP_DOCS=si`** (en
 desarrollo la fija el override de Compose y el `.env`); ausente o vacía, queda apagada: en Internet
 enumeraría las rutas y exige scripts en línea que la política de contenido del backend prohíbe. El
-contrato que se cita es el `openapi.json` versionado (`docs/11 §3`).
+contrato que se cita es el `openapi.json` versionado (`docs/11 §3`). **Toda petición debe traer en `Host` un nombre de la
+lista permitida** (`localhost`, `127.0.0.1` y los de `HTTP_HOSTS`; §8.4 punto 40): cualquier otro recibe 421 antes de
+llegar a una ruta. En contenedor, el compose toma `HTTP_HOSTS` del mismo `PROXY_NOMBRE` que atiende el proxy.
 
 **Chequeos de salud (27/09/2026, se documenta lo que ya existía).** Cada servicio declara cómo se sabe
 que está vivo de verdad, no solo que su proceso existe, y Docker lo pregunta periódicamente: así
@@ -919,6 +921,20 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     lo medido mientras el equipo estuvo con él. Si el equipo cambia de sitio, también cambia su tópico
     (`sitio/<nuevo>/…`, punto 24), y la pantalla de mudanza lo entrega listo para copiar. Esquema en una migración
     posterior, junto con esa pantalla (HU-12, Etapa 4).
+40. **Lista de nombres de host permitidos, contra el *DNS rebinding*** (decidido el 09/10/2026, implementado el 12/10).
+    El control de origen del canal en vivo (§5) no detiene a una página maliciosa que hace que su propio nombre resuelva a
+    127.0.0.1: para el navegador sigue siendo su mismo origen, no manda `Origin` y marca `same-origin`, pero la petición
+    llega con SU nombre en `Host`. Dos capas con la misma lista. El backend acepta siempre `localhost` y `127.0.0.1` (solo
+    llegan desde el propio equipo o contenedor: el chequeo de salud, el operador, el proxy por la red interna; una página
+    ajena no puede hacer que el navegador los escriba, porque para él «localhost» es el equipo de la víctima) más los
+    nombres de `HTTP_HOSTS`, y responde 421 a cualquier otro `Host` antes de llegar a una ruta. El proxy atiende solo el
+    nombre público (`PROXY_NOMBRE`, un `server_name` explícito): para cualquier otro rechaza el saludo TLS en 443 (sin
+    entregar siquiera el certificado) y cierra la conexión en 80. Se compara el nombre, no el puerto: el ataque cambia el
+    nombre, y el puerto varía por entorno (3000, 5173 tras Vite, 8443 en el banco, 443 en el servidor); exigirlo sería una
+    variable más por ambiente, justo lo que se evitó para `Origin`. Una sola variable en el `.env` del servidor
+    (`PROXY_NOMBRE`) alimenta las dos capas. Lo que no cubre: un cliente que no es un navegador manda el `Host` que quiera;
+    eso lo cubre la sesión (M7, Etapa 4), que también corta el *rebinding* porque la página atacante no tiene la cookie.
+    Pruebas: `docs/16 §15`; controles: `docs/11 §3`.
 
 ## 9. Crecimiento, resiliencia y respaldo (aprobado el 06/10/2026)
 

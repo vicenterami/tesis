@@ -8,7 +8,7 @@ import { NestFactory } from '@nestjs/core';
 import type { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
-import { interfazDeEscucha, registrosEnJson, servirDocumentacion } from './arranque';
+import { hostsPermitidos, interfazDeEscucha, rechazoDeHost, registrosEnJson, servirDocumentacion } from './arranque';
 import { configurarOpenApi } from './openapi';
 
 // Punto de entrada. Levanta la aplicación Nest: al iniciarse, cada módulo se conecta a lo suyo
@@ -32,6 +32,17 @@ async function arrancar(): Promise<void> {
     next();
   });
 
+  // Lista de nombres de host (docs/11 §3, docs/10 §8.4 punto 40): toda petición cuyo `Host` no sea uno de los locales ni uno
+  // de HTTP_HOSTS recibe 421 y no llega a ninguna ruta. Es lo que detiene el DNS rebinding, que el control
+  // de origen del canal en vivo no cubre (eventos.controller.ts). El rechazo se registra como WARN, acotado.
+  const permitidos = hostsPermitidos(process.env.HTTP_HOSTS);
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const rechazo = rechazoDeHost(req.headers.host, permitidos);
+    if (rechazo === null) return next();
+    log.warn(`petición rechazada (421): ${rechazo}`);
+    res.status(421).json({ statusCode: 421, message: 'host no permitido' });
+  });
+
   // Documentación interactiva solo si se pide (HTTP_DOCS=si). Swagger UI trae scripts en línea, así
   // que SOLO bajo /docs la CSP los permite; el resto de la API conserva la política estricta.
   if (servirDocumentacion(process.env.HTTP_DOCS)) {
@@ -51,7 +62,7 @@ async function arrancar(): Promise<void> {
   // proxy lo alcance por la red interna, y sin `ports` en el compose esa dirección no existe fuera del servidor.
   const interfaz = interfazDeEscucha(process.env.HTTP_INTERFAZ);
   await app.listen(puerto, interfaz);
-  log.log(`API escuchando en http://${interfaz}:${puerto}`);
+  log.log(`API escuchando en http://${interfaz}:${puerto}; Host aceptados: ${[...permitidos].join(', ')}`);
 }
 
 void arrancar();

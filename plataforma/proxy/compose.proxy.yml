@@ -14,8 +14,16 @@ services:
       options: { max-size: "10m", max-file: "5" }
     security_opt:
       - no-new-privileges:true
+    environment:
+      # Nombre público que atiende (docs/11 §3, docs/10 §8.4 punto 40): la imagen oficial lo sustituye en la plantilla al arrancar
+      # (/docker-entrypoint.d/20-envsubst-on-templates.sh) y escribe /etc/nginx/nginx.conf. Solo PROXY_*: las variables de
+      # nginx ($host, $status…) no se tocan. El backend recibe el mismo nombre en HTTP_HOSTS (docker-compose.yml).
+      PROXY_NOMBRE: ${PROXY_NOMBRE:-localhost}
+      NGINX_ENVSUBST_TEMPLATE_DIR: /plantilla
+      NGINX_ENVSUBST_OUTPUT_DIR: /etc/nginx
+      NGINX_ENVSUBST_FILTER: ^PROXY_
     volumes:
-      - ./proxy/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./proxy/nginx.conf:/plantilla/nginx.conf.template:ro
       - ${PROXY_CERTS:-../privado/certs-desarrollo}:/certs:ro   # servidor.crt y servidor.key (ca.crt para los clientes)
     ports:
       - "${PROXY_IP:-127.0.0.1}:${PROXY_HTTPS:-443}:443"      # personas: API, panel, SSE
@@ -27,7 +35,8 @@ services:
       mosquitto:
         condition: service_healthy
     healthcheck:                         # «¿termina TLS y llega al backend?» (-k: comprueba el camino, no la cadena de confianza)
-      test: ["CMD", "curl", "-fsk", "-o", "/dev/null", "https://127.0.0.1/salud"]
+      # Con el nombre público (--resolve lo lleva a 127.0.0.1): por IP, sin SNI, el proxy rechaza el saludo a propósito.
+      test: ["CMD", "curl", "-fsk", "--resolve", "${PROXY_NOMBRE:-localhost}:443:127.0.0.1", "-o", "/dev/null", "https://${PROXY_NOMBRE:-localhost}/salud"]
       interval: 15s
       timeout: 5s
       retries: 3
