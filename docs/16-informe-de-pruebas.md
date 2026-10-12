@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 130 pruebas unitarias, sin matriz formal) y TT-32 (sensor físico);
+cubre todavía: TT-27 (contrato de trama: hoy 136 pruebas unitarias, sin matriz formal) y TT-32 (sensor físico);
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -295,7 +295,7 @@ base ni el broker, y las 6 rutas que ya existían salen idénticas; (4) una imag
 
 `docs/10 §8.4` punto 40; controles en `docs/11 §3`. Backend: 19 pruebas nuevas en `arranque.spec.ts` (lista y su validación, forma
 del `Host`, rechazo, avisos acotados); con el rechazo anulado a mano (cambio temporal, restaurado y comparado con `cmp`) fallan
-exactamente las 3 que lo cubren. Pila de desarrollo reconstruida y `api-smoke.sh` con 6 casos nuevos (130 pruebas unitarias en total). Proxy sobre el
+exactamente las 3 que lo cubren. Pila de desarrollo reconstruida y `api-smoke.sh` con 6 casos nuevos (136 pruebas unitarias en total). Proxy sobre el
 banco (`banco.sh proxy`, puertos 8443 y 8081, `PROXY_NOMBRE` sin definir = `localhost`):
 
 | Comprobación | Resultado |
@@ -381,28 +381,63 @@ canal, la lectura en vivo, la pausa y el antirrebote se prueban con un `EventSou
 cortando el backend ni publicando por MQTT; los puntos del gráfico se comprueban contra un doble de uPlot, no en un canvas; el
 rango a medida por fechas (HU-07) queda para la Etapa 4.
 
-## 18. Credenciales del broker con el plugin Dynamic Security: laboratorio desechable (preparado el 12/10/2026)
+## 18. Credenciales del broker con el plugin Dynamic Security: laboratorio desechable (12/10/2026)
 
 Condición de la decisión del 08/10 (`docs/10 §8.4` punto 26): antes de que el backend administre credenciales del broker, una
 prueba en un contenedor desechable con identidades de descarte. `plataforma/pruebas/lab-dynsec.sh` levanta la misma imagen
 fijada del compose con el plugin activado y, en un solo guion que no imprime ningún secreto, crea un rol con ACL de publicación
-al tópico propio (`%u`), un cliente de descarte, y prueba: publicar en el tópico propio y en uno ajeno, un usuario desconocido,
-la convivencia con `password_file` + `acl_file` (lo que la documentación oficial no declara), deshabilitar, rehabilitar, rotar
-la clave y borrar, la persistencia en el JSON del plugin y que el broker nunca se reinició.
+al tópico propio (`%u`), un cliente de descarte, y prueba el ciclo completo. Lo ejecuta la persona (ninguna clave del broker, ni
+de descarte, la escribe el asistente de desarrollo: regla del proyecto desde el 27/09) y la salida se pega aquí.
+
+**Primera corrida (12/10, plugin + `password_file` + `acl_file` en el mismo listener):**
 
 | Comprobación | Esperado | Medido |
 |---|---|---|
-| Publicar en el tópico propio | `PUBACK RC:0` | pendiente |
-| Publicar en tópico ajeno | `PUBACK RC:135` (no autorizado, MQTT 5) | pendiente |
-| Usuario desconocido | conexión rechazada | pendiente |
-| Usuario de `password_file` con `acl_file`, mismo listener | `RC:0` en su tópico, `RC:135` en ajeno (convivencia) | pendiente |
-| Cliente deshabilitado | conexión rechazada; rehabilitado → `RC:0` | pendiente |
-| Clave rotada | vieja rechazada, nueva `RC:0` | pendiente |
-| Cliente borrado | conexión rechazada; el JSON vuelve a un solo cliente | pendiente |
-| Reinicios del broker durante todo lo anterior | 0 | pendiente |
-| Intentos fallidos | solo en el log del broker (sin parche en la base) | pendiente |
+| Cliente del plugin: conectar con su clave | acepta | ✅ acepta (los rechazos de abajo son de publicación, no de conexión) |
+| Publicar en el tópico propio (`%u`) | aceptada | ❌ **no autorizada** |
+| Publicar en tópico ajeno | no autorizada | ✅ |
+| Usuario desconocido | conexión rechazada | ✅ |
+| Usuario de `password_file` con `acl_file`: su tópico / ajeno | aceptada / no autorizada | ✅ `RC:16` (aceptada, sin suscriptores) / ✅ |
+| Deshabilitar → conectar; rehabilitar | rechazada; aceptada | ✅ rechazada; conecta pero sigue sin poder publicar (lo mismo de arriba) |
+| Rotar la clave: vieja / nueva | rechazada / aceptada | ✅ / conecta, sin poder publicar |
+| Borrar el cliente → conectar; el JSON vuelve a un cliente | rechazada; 1 cliente, 2 roles | ✅ / ✅ |
+| Reinicios del broker | 0 | ✅ 0 |
+| Intentos fallidos | solo en el log del broker | ✅ 9 líneas en el log; nada en la base (como dice el registro de evidencia) |
+| Avisos al arrancar | ninguno | ⚠️ `passwd` con permisos de lectura para todos y dueño distinto de `mosquitto` («versiones futuras lo rechazarán»): el guion ya lo corrige (dueño 1883, modo 640) |
+| `mosquitto_ctrl` sin cifrado | — | ⚠️ aviso en cada orden: las claves nuevas viajan en claro; en el sistema el administrador será el backend por la red interna de Docker, igual que hoy sus propias credenciales, y se anota en `docs/11 §4` |
 
-El guion lo ejecuta la persona (ninguna clave del broker, ni de descarte, la escribe el asistente de desarrollo; es una regla
-del proyecto desde el 27/09) y la salida se pega aquí. De su resultado depende si los usuarios actuales de `password_file`
-(`backend`, `sonda`, los `dev-*`) se quedan hasta la Etapa 4 o migran al plugin con HU-11 (`docs/10 §8.4` punto 41).
+**Lectura.** El plugin hace todo lo que el diseño necesita (crear, limitar por rol, deshabilitar, rotar, borrar, persistir, sin
+reiniciar), **pero un cliente del plugin no pudo publicar ni en su propio tópico mientras `acl_file` estaba configurado**. La
+documentación oficial del broker dice que «los chequeos del plugin corren antes que los incorporados» y que con `acl_file` «solo
+los tópicos listados tienen acceso» (`mosquitto.conf(5)`, consultado el 12/10); no dice qué pasa cuando el plugin permite y el
+archivo niega. La hipótesis, por confirmar con la segunda corrida: el chequeo del `acl_file` niega a quien no figura en él aunque
+el plugin lo haya permitido, así que **`acl_file` y el plugin no conviven para el control de acceso**. La segunda versión del
+guion corre tres fases (solo plugin; plugin + `password_file`; los tres) para separar autenticación de control de acceso.
+
+| Fase | Pregunta | Medido |
+|---|---|---|
+| A · solo el plugin | ¿El rol con `%u` limita al tópico propio y el ciclo de vida completo funciona? | pendiente |
+| B · plugin + `password_file` | ¿Un usuario del archivo conecta? ¿Quién le limita el tópico si no hay `acl_file`? | pendiente |
+| C · los tres | ¿Se repite el rechazo de la primera corrida? | pendiente |
+
+**Consecuencia según el resultado** (`docs/10 §8.4` punto 41): si A funciona y C no, los usuarios actuales del archivo (el del
+backend, el de la sonda y los de desarrollo) migran al plugin con HU-11, `acl_file` y `password_file` desaparecen del broker, y el
+guion de claves de desarrollo pasa a hablar con el plugin.
+
+## 19. Exportación de mediciones crudas en CSV y JSON (12/10/2026)
+
+RF-34 y HU-08, adelantada a la Etapa 3 (`docs/18 §3`): lo que el académico entrevistado llamó «crítico y no negociable».
+`GET /dispositivos/{id}/exportar?formato=csv|json&desde&hasta` escribe fila a fila al responder, por tandas de 10 000 con
+paginación por clave `(tiempo, canal_id)` sobre el índice de `medicion`: un rango de años no cabe en memoria y tampoco hace falta.
+CSV estándar (coma, punto decimal, UTF-8, CRLF, cabecera fija) para R, Python y QGIS; JSON como lista. Sin sesión hasta M7,
+como toda la API (`docs/11 §4`); XLSX y la exportación por sitio con rol llegan con la sesión.
+
+| Comprobación | Resultado |
+|---|---|
+| 6 pruebas en `exportar.spec.ts` (funciones puras): fila CSV, celdas con coma, comillas y saltos de línea, protección contra inyección de fórmulas (`=`, `+`, `@` al inicio; un número negativo no se toca), JSON por fila, nombre del archivo saneado, formato por defecto y rechazo de uno desconocido o repetido | ✅ |
+| Humo (pila de desarrollo): cabecera fija del CSV, descarga con nombre `.csv` (`Content-Disposition`), JSON como lista con `tiempo_utc` y `valor`, formato desconocido → 400, `desde` posterior a `hasta` → 400, dispositivo inexistente → 404; contrato servido con 8 rutas igual al versionado | ✅ (6 casos nuevos) |
+| 404 antes de escribir cabeceras; si el cliente corta la descarga, se deja de consultar (`res.destroyed`) | ✅ (lectura del código; sin prueba de corte) |
+
+**Lo que no cubre:** un rango de años con millones de filas no se midió (el banco tiene minutos de datos); la variante para
+Excel en español (punto y coma, coma decimal) y el XLSX quedan con la sesión; sin pantalla todavía (P8 de `docs/19`).
 

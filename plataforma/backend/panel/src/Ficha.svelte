@@ -4,7 +4,7 @@
   // /condiciones?dispositivo=, /cuarentena?dispositivo= y el canal en vivo filtrado por dispositivo.
   import { onMount } from 'svelte';
   import Grafico from './Grafico.svelte';
-  import { ErrorApi, obtener } from './lib/api';
+  import { mensajeError, obtener } from './lib/api';
   import { enLinea, estadoVisual, ROTULO } from './lib/estado-visual';
   import { RANGOS, RANGO_POR_DEFECTO, agregarLectura, formatearValor, rotuloIntervalo, seriesDesdeHistorico, urlHistorico, ventana, type ClaveRango, type Series } from './lib/grafico';
   import type { Condicion, DispositivoFicha, EventoVivo, Historico, TramaRechazada } from './lib/modelo';
@@ -28,6 +28,7 @@
   let errorHistorico = $state<string | null>(null);
 
   const abiertas = $derived(condiciones.filter((c) => c.cerrada_en === null));
+  const ordenadas = $derived([...abiertas, ...condiciones.filter((c) => c.cerrada_en !== null)]);
   const estado = $derived(
     d === null ? null : estadoVisual({ estado: d.estado, en_linea: enLinea(d.visto_por_ultima_vez, d.intervalo_esperado_s, ahora) }, abiertas.map((c) => c.tipo)),
   );
@@ -64,20 +65,25 @@
       canalElegido ??= ficha.canales[0]?.id ?? null;
       error = null;
     } catch (e) {
-      error = e instanceof ErrorApi ? `${e.message}: ${e.accion}` : 'sin conexión con el servicio';
+      error = mensajeError(e);
     }
   }
 
+  // Dos clics seguidos de rango o canal pueden responder en orden inverso: solo la última petición pedida escribe (revisión 12/10).
+  let generacion = 0;
   async function cargarHistorico(): Promise<void> {
     if (canalElegido === null) return;
     const v = ventana(rangoElegido, new Date());
+    const mia = ++generacion;
     try {
       const h = await obtener<Historico>(urlHistorico(canalElegido, v.desde, v.hasta, v.intervalo));
+      if (mia !== generacion) return;
       historico = h;
       series = seriesDesdeHistorico(h);
       errorHistorico = null;
     } catch (e) {
-      errorHistorico = e instanceof ErrorApi ? `${e.message}: ${e.accion}` : 'sin conexión con el servicio';
+      if (mia !== generacion) return;
+      errorHistorico = mensajeError(e);
     }
   }
 
@@ -191,7 +197,7 @@
       <table>
         <thead><tr><th scope="col">Tipo</th><th scope="col">Magnitud</th><th scope="col">Abierta</th><th scope="col">Duración</th><th scope="col">Estado</th></tr></thead>
         <tbody>
-          {#each [...abiertas, ...condiciones.filter((c) => c.cerrada_en !== null)] as c (c.id)}
+          {#each ordenadas as c (c.id)}
             <tr data-condicion={c.cerrada_en === null ? 'abierta' : 'cerrada'}>
               <td>{c.tipo}</td>
               <td>{c.magnitud ?? '—'}</td>

@@ -193,7 +193,7 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 |---|---|:---:|:---:|:---:|
 | **TT-19** | 🎯 Esquema de base de datos y migraciones versionadas | M | 2 | 5 |
 | **HU-07** | 🎯 **Como usuario de consulta**, quiero ver el historial de eventos y mediciones de un dispositivo en un rango de fechas | M | 4 | 4 |
-| **HU-08** | 🎯 **Como administrador de sitio**, quiero exportar los datos de mi sitio en CSV, XLSX y JSON, para no depender de la plataforma para conservarlos | M | 4 | **4** |
+| **HU-08** | 🎯 **Como administrador de sitio**, quiero exportar los datos de mi sitio en CSV, XLSX y JSON, para no depender de la plataforma para conservarlos | M | 3 | **4** |
 | **HU-09** | **Como integrador**, quiero consultar los datos del sitio por API, para alimentar sistemas propios | S | 4 | 4 |
 
 **HU-08 — criterios de aceptación** 🎯
@@ -382,13 +382,13 @@ Cuatro semanas por etapa a ~15 horas semanales (restricción RE-01):
 |---|:---:|:---:|:---:|:---:|:---:|
 | 1 | 9 h | 4 h | 45 h | +80 % | +91 % |
 | 2 | 84 h | 53 h | 60 h | **−40 %** | +12 % |
-| 3 | 82 h | 73 h | 60 h | **−37 %** | **−22 %** |
-| 4 | 108 h | 38 h | 75 h | **−44 %** | +49 % |
+| 3 | 86 h | 77 h | 60 h | **−43 %** | **−28 %** |
+| 4 | 104 h | 34 h | 75 h | **−39 %** | +55 % |
 | 1–4 (`TT-38`, bitácora) | 2 h | — | — | — | — |
 | **Total** | **285 h** | **168 h** | **240 h** | **−19 %** | **+30 %** |
 
 > Presupuesto por etapa según el calendario oficial del 24/08 (§6.2): 45, 60, 60 y 75 h, ~240 h en total.
-> 12/10/2026: HU-20 y HU-21 (14 h del núcleo) pasaron de la Etapa 4 a la 3 por decisión del estudiante (`docs/18 §3`): la
+> 12/10/2026: HU-20, HU-21 y HU-08 (18 h del núcleo) pasaron de la Etapa 4 a la 3 por decisión del estudiante (`docs/18 §3`): la
 > Etapa 3 queda sobre su presupuesto también en el núcleo; lo que no alcance vuelve a la Etapa 4 el 27/10.
 > Hasta el 23/09 esta tabla y las de §6.4 y §6.6 seguían con el escenario exigente anterior (21/60/60/60,
 > 201 h) aunque §6.2 ya lo había reemplazado; se propagó hoy (hallazgo de la revisión de concordancia).
@@ -434,7 +434,6 @@ Se trasladan de la Etapa 3 a la Etapa 4 los siguientes elementos del núcleo (~3
 | **TT-21** Aislamiento entre sitios | 5 | Ídem; se valida con pruebas en la Etapa 4 |
 | **TT-22** Cifrado TLS del transporte | 4 | Ídem |
 | **HU-07** Consulta de historial | 4 | El dato se persiste en la Etapa 3; consultarlo puede seguir |
-| **HU-08** Exportación abierta | 4 | Requiere que existan datos acumulados: es natural en la Etapa 4 |
 | **TT-27** Pruebas automatizadas del contrato de trama (esquema, cuarentena, adaptadores) | 5 | Corresponde al ciclo de validación de la Etapa 4 |
 | **HU-16** Indicador agregado de salud del sitio | 4 | Depende de que la supervisión ya funcione |
 
@@ -444,12 +443,12 @@ Se trasladan de la Etapa 3 a la Etapa 4 los siguientes elementos del núcleo (~3
 |---|:---:|:---:|:---:|
 | 1 | 4 h | 45 h | +91 % |
 | 2 | 53 h | 60 h | ✅ +12 % |
-| 3 | **73 h** | 60 h | **−22 %** |
-| 4 | **38 h** | 75 h | ✅ +49 % |
+| 3 | **77 h** | 60 h | **−28 %** |
+| 4 | **34 h** | 75 h | ✅ +55 % |
 | **Total** | **168 h** | **240 h** | ✅ **+30 %** |
 
 Desde el corte del 08/10 (`docs/18 §3`), la Etapa 3 tenía **59 h de núcleo frente a 60 disponibles (+2 %)**; con el adelanto
-del 12/10 (HU-20 y HU-21, 14 h de núcleo, `docs/18 §3`) queda en **73 h (−22 %)**, una sobrecarga decidida a sabiendas: lo que no
+del 12/10 (HU-20, HU-21 y HU-08, 18 h de núcleo, `docs/18 §3`) queda en **77 h (−28 %)**, una sobrecarga decidida a sabiendas: lo que no
 alcance vuelve a la Etapa 4 el 27/10. En el corte del 08/10, HU-06,
 HU-12, HU-15, HU-17 y HU-18 pasaron a la Etapa 4 (17 h; 4 de núcleo, las de HU-15). Antes del corte eran 63 h (−5 %): las 60 h
 de la redistribución del 23/09 más las 3 h de TT-32 (plan B de R1), una sobrecarga aceptada entonces frente al riesgo de no
@@ -463,8 +462,8 @@ profesor guía. **Corregido el 26/09/2026:** una versión anterior de este párr
 «Implementación total (EP-01, 04–11) = 165 h»; la suma real de esas épicas completas (núcleo más
 alcance condicional) es **169 h**, no 165 ni 118 — ese subconjunto de épicas no se usa como base,
 precisamente para no tener dos cifras del mismo umbral. Ejecutado al cierre de la Etapa 3: ~28 h
-adelantadas en la Etapa 2 más 73 h de la Etapa 3 (tras el corte del 08/10 y el adelanto del 12/10) = **101 h ≈ 60 %**; si HU-20 y
-HU-21 no alcanzan y vuelven a la Etapa 4, son 87 h ≈ 52 %. ✅ El umbral se cumple en los dos casos.
+adelantadas en la Etapa 2 más 77 h de la Etapa 3 (tras el corte del 08/10 y el adelanto del 12/10) = **105 h ≈ 63 %**; si HU-20,
+HU-21 y HU-08 no alcanzan y vuelven a la Etapa 4, son 87 h ≈ 52 %. ✅ El umbral se cumple en los dos casos.
 
 ## 6.5 Qué se recorta y en qué orden
 
@@ -584,7 +583,7 @@ ejecuta contra la holgura verificada al cierre de cada etapa.
 | 2. Segundo nivel | Aprovisionamiento desde la plataforma | HU-10, HU-11 | ⬜ E3 |
 | 2. Segundo nivel | Cifrado del transporte | TT-22 | ⬜ E3 |
 | 2. Segundo nivel | Panel de control | HU-19, HU-20, HU-21 | ⬜ E3 |
-| 2. Segundo nivel | Exportación en formato abierto | HU-08 | ⬜ E4 |
+| 2. Segundo nivel | Exportación en formato abierto | HU-08 | 🟡 E3 (CSV y JSON el 12/10; XLSX en la E4) |
 | 2. Segundo nivel | Validación formal | TT-27, TT-28, TT-29 | ⬜ E4 |
 
 El criterio de demostración del informe (cap. 5 §5.2) y OE4 (`docs/01`) siguen este orden.

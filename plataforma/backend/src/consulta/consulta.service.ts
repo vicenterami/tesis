@@ -1,4 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
+import type { FilaExportada } from './exportar';
 import { Pool } from 'pg';
 import { POOL } from '../db/db.module';
 import { Intervalo } from './validacion';
@@ -108,6 +109,38 @@ export class ConsultaService {
         ${filtro}
        ORDER BY c.abierta_en DESC LIMIT $1`, parametros);
     return r.rows;
+  }
+
+  // Identidad mínima de un dispositivo para la exportación (404 si no existe).
+  async identidad(dispositivoId: string): Promise<{ id_fisico: string }> {
+    const r = await this.pool.query<{ id_fisico: string }>('SELECT id_fisico FROM dispositivo WHERE id = $1', [dispositivoId]);
+    if (!r.rows[0]) throw new NotFoundException('dispositivo no encontrado');
+    return r.rows[0];
+  }
+
+  // Mediciones crudas de un dispositivo en [desde, hasta), por tandas (RF-34): nunca todo el rango en memoria. Paginación por
+  // clave (tiempo, canal_id) sobre el índice (canal_id, tiempo): cada tanda es una consulta corta, y el llamador escribe cada
+  // fila al flujo de salida. Un rango de años se exporta igual, solo tarda más.
+  async *mediciones(dispositivoId: string, desde: Date, hasta: Date, tanda = 10_000): AsyncGenerator<FilaExportada> {
+    let ultimoTiempo: Date | null = null;
+    let ultimoCanal: string | null = null;
+    for (;;) {
+      const r = await this.pool.query<FilaExportada>(
+        `SELECT m.tiempo, c.magnitud_codigo AS magnitud, m.valor, m.unidad, m.canal_id
+           FROM medicion m JOIN canal c ON c.id = m.canal_id
+          WHERE c.dispositivo_id = $1 AND m.tiempo >= $2 AND m.tiempo < $3
+            AND ($4::timestamptz IS NULL OR (m.tiempo, m.canal_id) > ($4::timestamptz, $5::uuid))
+          ORDER BY m.tiempo, m.canal_id LIMIT $6`,
+        [dispositivoId, desde, hasta, ultimoTiempo, ultimoCanal, tanda],
+      );
+      const filas: FilaExportada[] = r.rows;
+      for (const fila of filas) yield fila;
+      if (filas.length < tanda) return;
+      const ultima = filas[filas.length - 1];
+      if (ultima === undefined) return;
+      ultimoTiempo = ultima.tiempo;
+      ultimoCanal = ultima.canal_id;
+    }
   }
 
   // La carga cruda se devuelve acotada: es para diagnosticar, no para reprocesar. payload_legible (migración 09)

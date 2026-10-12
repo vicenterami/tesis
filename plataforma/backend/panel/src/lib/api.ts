@@ -19,6 +19,15 @@ const ACCIONES: Readonly<Record<number, string>> = {
   503: 'el servicio está saturado; se reintenta solo',
 };
 
+// Las condiciones abiertas se piden completas, hasta el máximo de la API; el panel avisa si llega al tope (docs/19 §2).
+export const LIMITE_ABIERTAS = 500;
+export const URL_ABIERTAS = `/condiciones?abiertas=true&limite=${LIMITE_ABIERTAS}`;
+
+// Texto para la persona a partir de cualquier error de carga: el de la API con su acción, o la falta de conexión.
+export function mensajeError(e: unknown): string {
+  return e instanceof ErrorApi ? `${e.message}: ${e.accion}` : 'sin conexión con el servicio';
+}
+
 export function accionPara(codigo: number): string {
   return ACCIONES[codigo] ?? 'inténtalo de nuevo en un momento';
 }

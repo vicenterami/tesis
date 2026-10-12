@@ -91,6 +91,7 @@ describe('Ficha (P3): identidad, canales, gráfico, condiciones y rechazadas, le
   it('pide el histórico del primer canal con el rango por defecto (24 h, 15 minutes) y se lo entrega al gráfico', async () => {
     render(Ficha, { id: ID });
     await waitFor(() => expect(document.querySelector('[data-historico]')).toBeTruthy());
+    await waitFor(() => expect(graficos).toHaveLength(1));
     expect(peticiones.filter((p) => p.startsWith('/condiciones?')).sort()).toEqual([`/condiciones?dispositivo=${ID}&abiertas=true&limite=500`, `/condiciones?dispositivo=${ID}&limite=50`]);
     const url = peticiones.find((p) => p.startsWith('/canales/c-temp/historico'))!;
     expect(url).toContain('intervalo=15+minutes');
@@ -150,9 +151,12 @@ describe('Ficha (P3): identidad, canales, gráfico, condiciones y rechazadas, le
     await vi.advanceTimersByTimeAsync(1000); // primer reintento
     const nueva = FuenteControlable.instancias[1]!;
     nueva.abrir();
-    await waitFor(() => expect(peticiones.filter((p) => p === `/dispositivos/${ID}`).length).toBe(fichaAntes + 1));
-    await waitFor(() => expect(peticiones.filter((p) => p.startsWith('/canales/')).length).toBe(histAntes + 1));
-    expect(document.querySelector('[data-canal]')?.getAttribute('data-canal')).toBe('en_vivo');
+    // Bajo temporizadores simulados, waitFor solo despierta con mutaciones del DOM: aquí no las hay (los datos son los mismos),
+    // así que se vacían las promesas pendientes a mano antes de mirar.
+    await vi.advanceTimersByTimeAsync(10);
+    expect(peticiones.filter((p) => p === `/dispositivos/${ID}`).length).toBe(fichaAntes + 1);
+    expect(peticiones.filter((p) => p.startsWith('/canales/')).length).toBe(histAntes + 1);
+    await waitFor(() => expect(document.querySelector('[data-canal]')?.getAttribute('data-canal')).toBe('en_vivo'));
   });
 
   it('un id que no existe → mensaje con la acción de volver al inventario, sin gráfico', async () => {

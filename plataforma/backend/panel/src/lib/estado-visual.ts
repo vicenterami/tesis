@@ -40,10 +40,10 @@ export function conteoPorEstado(estados: readonly EstadoVisual[]): Record<Estado
   return c;
 }
 
-// Primero por estado (orden de atención), después por nombre, sin distinguir mayúsculas ni acentos.
+// Primero por estado (orden de atención), después por nombre, sin distinguir mayúsculas ni acentos. El comparador de
+// textos se crea una vez (con `localeCompare` se creaba uno por comparación: con 500 dispositivos son miles por reordenamiento).
+const RANGO: Readonly<Record<EstadoVisual, number>> = { sin_senal: 0, alerta: 1, normal: 2, inactivo: 3 };
+const comparadorDeNombres = new Intl.Collator('es', { sensitivity: 'base' });
 export function compararAtencion(a: { estado: EstadoVisual; nombre: string }, b: { estado: EstadoVisual; nombre: string }): number {
-  const pa = ORDEN_ATENCION.indexOf(a.estado);
-  const pb = ORDEN_ATENCION.indexOf(b.estado);
-  if (pa !== pb) return pa - pb;
-  return a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' });
+  return RANGO[a.estado] - RANGO[b.estado] || comparadorDeNombres.compare(a.nombre, b.nombre);
 }

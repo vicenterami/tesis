@@ -37,7 +37,7 @@ fi
 caso "UUID inválido → 400"                    /dispositivos/no-es-uuid 400
 caso "limite fuera de rango → 400"            "/condiciones?limite=99999" 400
 caso "condiciones abiertas es lista con duracion_s" "/condiciones?abiertas=true" "isinstance(r,list) and all(isinstance(c['duracion_s'],int) for c in r)"
-caso "contrato OpenAPI servido con 7 rutas, con el canal /eventos como text/event-stream" /docs/openapi.json "len(r['paths'])==7 and r['openapi'].startswith('3.') and 'text/event-stream' in r['paths']['/eventos']['get']['responses']['200']['content']"
+caso "contrato OpenAPI servido con 8 rutas, con el canal /eventos como text/event-stream" /docs/openapi.json "len(r['paths'])==8 and r['openapi'].startswith('3.') and 'text/event-stream' in r['paths']['/eventos']['get']['responses']['200']['content']"
 # El servido (generado en caliente desde los decoradores) vs. el versionado en el repo (se
 # desincroniza si alguien cambia una ruta y olvida correr `pnpm openapi` antes de commitear).
 caso "OpenAPI servido == OpenAPI versionado (mismas rutas y métodos)" /docs/openapi.json \
@@ -55,6 +55,16 @@ caso "cuarentena con dispositivo que no es UUID → 400"  "/cuarentena?dispositi
 # Nest usa el analizador «simple» de consultas: `?x=a&x=b` llega como arreglo (`?x[]=a` NO: queda como clave literal).
 caso "parámetro repetido (llega como arreglo) → 400, no 500" "/cuarentena?dispositivo=$DISP&dispositivo=$DISP" 400
 caso "limite repetido → 400"                            "/condiciones?limite=5&limite=6" 400
+# Exportación (RF-34, HU-08; 12/10): CSV estándar con cabecera fija y descarga; JSON como lista; formato o fechas inválidos → 400.
+if [ -n "$DISP" ]; then
+  exp=$(curl -s -D - -m 20 "$API/dispositivos/$DISP/exportar?formato=csv" | tr -d '\r')
+  grep -q "^tiempo_utc,magnitud,valor,unidad,canal_id$" <<<"$exp" && echo "OK    exportar csv: cabecera fija" || { echo "FALLA exportar csv: sin cabecera → $(head -c 160 <<<"$exp")"; fallos=$((fallos+1)); }
+  grep -qi "^content-disposition: attachment; filename=\".*\.csv\"$" <<<"$exp" && echo "OK    exportar csv: descarga con nombre .csv" || { echo "FALLA exportar csv: sin Content-Disposition"; fallos=$((fallos+1)); }
+  caso "exportar json: lista de filas con tiempo_utc y valor" "/dispositivos/$DISP/exportar?formato=json&desde=2026-01-01T00:00:00Z" "isinstance(r,list) and all('tiempo_utc' in x and 'valor' in x for x in r)"
+  caso "exportar con formato desconocido → 400" "/dispositivos/$DISP/exportar?formato=xlsx" 400
+  caso "exportar con desde posterior a hasta → 400" "/dispositivos/$DISP/exportar?desde=2026-10-02T00:00:00Z&hasta=2026-10-01T00:00:00Z" 400
+fi
+caso "exportar un dispositivo inexistente → 404" "/dispositivos/00000000-0000-4000-8000-000000000000/exportar" 404
 # Cabeceras de seguridad (docs/11 §3). Se leen con -I; el helper `caso` mira cuerpos, así que van aparte.
 cab=$(curl -s -I --max-time 10 "$API/dispositivos" | tr -d '\r')
 cabecera() { # nombre · regex que debe (o no) aparecer · esperado: si|no

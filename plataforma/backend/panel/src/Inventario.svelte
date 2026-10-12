@@ -2,12 +2,12 @@
   // Pantalla P2 (docs/19 §4): inventario con semáforo (HU-19) y filtros (HU-20). Datos: GET /dispositivos y
   // GET /condiciones?abiertas=true; se actualiza con el canal en vivo sin repedir el inventario.
   import { onMount } from 'svelte';
-  import { ErrorApi, obtener } from './lib/api';
+  import { LIMITE_ABIERTAS, URL_ABIERTAS, mensajeError, obtener } from './lib/api';
   import { compararAtencion, conteoPorEstado, enLinea, estadoVisual, ORDEN_ATENCION, ROTULO, type EstadoVisual } from './lib/estado-visual';
   import type { Condicion, DispositivoInventario, EventoVivo, TipoCondicion } from './lib/modelo';
   import { haceCuanto, horaLocal } from './lib/tiempo';
   import { RECONECTADO, abrirCanal, type EstadoCanal } from './lib/vivo';
-  import { antirrebote } from './lib/antirrebote';
+  import { antirrebote, porLotes } from './lib/antirrebote';
 
   let dispositivos = $state<DispositivoInventario[]>([]);
   let abiertas = $state<Condicion[]>([]);
@@ -28,12 +28,10 @@
   });
   const filas = $derived(
     dispositivos
-      .map((d) => ({
-        d,
-        enLinea: enLinea(d.visto_por_ultima_vez, d.intervalo_esperado_s, ahora),
-        tipos: tiposPorDispositivo.get(d.id) ?? [],
-      }))
-      .map((f) => ({ ...f, estado: estadoVisual({ estado: f.d.estado, en_linea: f.enLinea }, f.tipos), nombre: f.d.nombre }))
+      .map((d) => {
+        const tipos = tiposPorDispositivo.get(d.id) ?? [];
+        return { d, tipos, nombre: d.nombre, estado: estadoVisual({ estado: d.estado, en_linea: enLinea(d.visto_por_ultima_vez, d.intervalo_esperado_s, ahora) }, tipos) };
+      })
       .sort(compararAtencion),
   );
   const conteo = $derived(conteoPorEstado(filas.map((f) => f.estado)));
@@ -53,13 +51,13 @@
     try {
       const [d, c] = await Promise.all([
         obtener<DispositivoInventario[]>('/dispositivos'),
-        obtener<Condicion[]>('/condiciones?abiertas=true&limite=500'),
+        obtener<Condicion[]>(URL_ABIERTAS),
       ]);
       dispositivos = d;
       abiertas = c;
       error = null;
     } catch (e) {
-      error = e instanceof ErrorApi ? `${e.message}: ${e.accion}` : 'sin conexión con el servicio; se reintenta al recargar';
+      error = mensajeError(e);
     } finally {
       cargado = true;
     }
@@ -69,13 +67,18 @@
   // las condiciones abiertas (una consulta chica), nunca el inventario entero; `medicion` no cambia esta pantalla.
   // Las condiciones se repiden con antirrebote: muchos avisos seguidos → una consulta por segundo, nunca dos en vuelo.
   const repedirAbiertas = antirrebote(() =>
-    obtener<Condicion[]>('/condiciones?abiertas=true&limite=500')
+    obtener<Condicion[]>(URL_ABIERTAS)
       .then((c) => (abiertas = c))
       .catch(() => undefined),
   );
+  // Los «visto» llegan con cada trama: se aplican por lotes (un recorrido del inventario cada 250 ms como mucho).
+  const vistos = porLotes<{ id: string; tiempo: string }>((lote) => {
+    const ultimo = new Map(lote.map((v) => [v.id, v.tiempo]));
+    dispositivos = dispositivos.map((d) => (ultimo.has(d.id) ? { ...d, visto_por_ultima_vez: ultimo.get(d.id)! } : d));
+  });
   function alEvento(e: EventoVivo): void {
     if (e.tipo === 'visto') {
-      dispositivos = dispositivos.map((d) => (d.id === e.dispositivo_id ? { ...d, visto_por_ultima_vez: e.tiempo } : d));
+      vistos.agregar({ id: e.dispositivo_id, tiempo: e.tiempo });
     } else if (e.tipo === 'condicion') {
       repedirAbiertas.pedir();
     }
@@ -93,6 +96,7 @@
     return () => {
       clearInterval(reloj);
       repedirAbiertas.cancelar();
+      vistos.cancelar();
       c.cerrar();
     };
   });
@@ -125,8 +129,8 @@
   <span data-visibles>{visibles.length} de {filas.length}</span>
 </div>
 
-{#if abiertas.length >= 500}
-  <p class="error" role="status">Hay 500 condiciones abiertas o más: el semáforo puede quedar incompleto para algunos dispositivos. Revisa la lista de condiciones.</p>
+{#if abiertas.length >= LIMITE_ABIERTAS}
+  <p class="error" role="status">Hay {LIMITE_ABIERTAS} condiciones abiertas o más: el semáforo puede quedar incompleto para algunos dispositivos. Revisa la lista de condiciones.</p>
 {/if}
 {#if error !== null}
   <p class="error" role="alert">{error}</p>

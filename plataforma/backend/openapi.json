@@ -98,6 +98,69 @@
         ]
       }
     },
+    "/dispositivos/{id}/exportar": {
+      "get": {
+        "description": "CSV estándar (coma, punto decimal, UTF-8, CRLF; cabecera `tiempo_utc,magnitud,valor,unidad,canal_id`) o JSON (lista de objetos con los mismos campos), en flujo por tandas. Rango semiabierto [desde, hasta); por defecto, los últimos 30 días. Instantes en UTC (ISO 8601).",
+        "operationId": "DispositivosController_exportar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "UUID del dispositivo",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "formato",
+            "required": false,
+            "in": "query",
+            "description": "csv (por defecto) o json",
+            "schema": {
+              "enum": [
+                "csv",
+                "json"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "desde",
+            "required": false,
+            "in": "query",
+            "description": "ISO 8601; por defecto hasta − 30 días",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": false,
+            "in": "query",
+            "description": "ISO 8601; por defecto ahora",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Archivo descargable (Content-Disposition: attachment)"
+          },
+          "400": {
+            "description": "UUID, fecha o formato inválidos"
+          },
+          "404": {
+            "description": "Dispositivo inexistente"
+          }
+        },
+        "summary": "Exportar las mediciones crudas de un dispositivo",
+        "tags": [
+          "dispositivos"
+        ]
+      }
+    },
     "/canales/{id}/historico": {
       "get": {
         "description": "Promedio por intervalo calculado con time_bucket EN LA ZONA HORARIA DEL SITIO. Formato columnar para uPlot: `tiempos` (segundos Unix), `valores`, `muestras` (cuántas lecturas hay detrás de cada promedio). Rango semiabierto [desde, hasta). Por defecto: últimas 24 h cada 15 minutos.",
