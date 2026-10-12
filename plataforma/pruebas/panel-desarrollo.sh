@@ -3,7 +3,7 @@
 #   (a) conserva el Host (el backend compara Origin con Host en el canal en vivo: por el 5173 debe dar 200 con el Origin
 #       propio y 403 con otro); (b) no retiene los eventos del canal (el primer byte llega enseguida y el latido, a los 25 s);
 #   (c) el panel se sirve bajo /panel/. Y, con el build real servido por el backend: /panel/ con la CSP del backend, los
-#   archivos con hash y ningún .map publicado (docs/11 §4). Requiere la pila de desarrollo arriba (backend en 127.0.0.1:3000).
+#   archivos con hash y ningún .map publicado (docs/11 §3). Requiere la pila de desarrollo arriba (backend en 127.0.0.1:3000).
 # Uso: bash plataforma/pruebas/panel-desarrollo.sh [rapido]   (rapido: no espera el latido de 25 s)
 set -u
 cd "$(dirname "$0")/../backend/panel" || exit 1
@@ -32,7 +32,7 @@ for _ in $(seq 1 20); do [ -s "$T/sse" ] && break; sleep 0.25; done
 if [ "${1:-}" != rapido ]; then wait "$SSE_PID" 2>/dev/null; grep -q "event: latido" "$T/sse" && ok "latido recibido a través de Vite (30 s de escucha)" || falla "sin latido en 30 s a través de Vite"; else kill "$SSE_PID" 2>/dev/null; fi
 kill "$VITE_PID" 2>/dev/null; wait "$VITE_PID" 2>/dev/null; VITE_PID=
 sleep 0.5; [ "$(ss -ltn 2>/dev/null | grep -c ':5173 ')" = 0 ] && ok "Vite terminado: el 5173 queda libre" || falla "el 5173 sigue ocupado tras matar a Vite"
-# Build real servido por el backend (docs/11 §4): CSP del backend, archivos con hash, sin .map.
+# Build real servido por el backend (docs/11 §3): CSP del backend, archivos con hash, sin .map.
 cab=$(curl -s -D - -o "$T/index.html" -m 5 "$API/panel/" | tr -d '\r')
 grep -q '<div id="app">' "$T/index.html" && ok "el backend sirve /panel/ (build real)" || falla "el backend no sirvió /panel/ (¿construido? pnpm --filter panel build y reconstruir la imagen)"
 grep -qi "content-security-policy: .*default-src 'self'" <<<"$cab" && ok "/panel/ lleva la CSP del backend" || falla "/panel/ sin CSP"

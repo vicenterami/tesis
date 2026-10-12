@@ -69,7 +69,8 @@ export interface CanalFicha {
   ultima_medicion: { valor: number; tiempo: string } | null;
 }
 
-// GET /dispositivos/{id}: lo mismo que el inventario más `creado_en`, y los canales con reglas y última lectura.
+// GET /dispositivos/{id}: los campos del inventario más `creado_en`, con los canales ampliados (reglas y última lectura); su
+// `condiciones_abiertas` es una lista de filas, no un número, y la ficha no la usa (pide /condiciones): por eso se omite.
 export interface DispositivoFicha extends Omit<DispositivoInventario, 'canales' | 'condiciones_abiertas'> {
   creado_en: string;
   canales: CanalFicha[];

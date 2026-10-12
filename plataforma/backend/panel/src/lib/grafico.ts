@@ -57,6 +57,14 @@ export function agregarLectura(s: Series, tiempoIso: string, valor: number, maxV
   return [tiempos, promedio, actual];
 }
 
+// El intervalo de la API, en palabras del panel.
+const ROTULO_INTERVALO: Readonly<Record<string, string>> = {
+  '1 minute': '1 minuto', '5 minutes': '5 minutos', '15 minutes': '15 minutos', '1 hour': '1 hora', '6 hours': '6 horas', '1 day': '1 día',
+};
+export function rotuloIntervalo(intervalo: string): string {
+  return ROTULO_INTERVALO[intervalo] ?? intervalo;
+}
+
 // Valor con su unidad, con tres decimales como mucho y coma decimal (es-CL).
 export function formatearValor(valor: number | null, unidad: string): string {
   if (valor === null) return '—';

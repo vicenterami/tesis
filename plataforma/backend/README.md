@@ -25,9 +25,14 @@ src/
 ├── openapi.ts                 # contrato OpenAPI generado desde los decoradores; /docs
 └── salud/salud.controller.ts  # GET /salud
 panel/                         # el panel (Svelte + Vite; docs/19): paquete del mismo workspace de pnpm
+├── index.html, src/main.ts    # entrada (sin scripts en línea: la CSP del backend los prohíbe)
+├── src/App.svelte             # ruteo por fragmento (#/ inventario, #/dispositivos/<id> ficha) y estado del servicio
 ├── src/Inventario.svelte      # P2: inventario con semáforo, conteos, filtros y canal en vivo
-├── src/Ficha.svelte           # P3: identidad, canales, gráfico (uPlot, Grafico.svelte) que sigue en vivo, condiciones, rechazadas
-├── src/lib/                   # estado visual, cliente HTTP, canal en vivo con reconexión, datos del gráfico, tiempo
+├── src/Ficha.svelte           # P3: identidad, canales, gráfico que sigue en vivo, condiciones, rechazadas
+├── src/Grafico.svelte         # el gráfico uPlot (promedio del histórico y lectura actual en series aparte)
+├── src/app.css                # estilos propios, sin biblioteca de componentes
+├── public/avisos-de-terceros.txt  # avisos MIT de svelte y uPlot, servidos con el build
+├── src/lib/                   # estado visual, cliente HTTP, canal en vivo con reconexión, datos del gráfico, antirrebote y lotes, tiempo
 ├── src/**/*.test.ts           # pruebas (vitest; las de pantalla, por el DOM con jsdom)
 └── vite.config.ts             # base /panel/, reenvío al backend en desarrollo, build sin .map
 ```
@@ -162,8 +167,8 @@ describir rutas que no existen. Con el backend corriendo, la documentación inte
 | `GET /dispositivos` | inventario: estado, `en_linea`, última vista, canales, condiciones abiertas | `en_linea` = visto hace menos de 2 × intervalo esperado |
 | `GET /dispositivos/:id` | ficha: canales con reglas y última medición, condiciones abiertas | 404 si no existe |
 | `GET /canales/:id/historico?desde&hasta&intervalo` | `{tiempos[], valores[], muestras[]}` agregado con `time_bucket(…, zona_del_sitio)` | por defecto 24 h cada `15 minutes`; intervalos: 1 minute, 5 minutes, 15 minutes, 1 hour, 6 hours, 1 day; rango `[desde, hasta)` |
-| `GET /condiciones?abiertas=true|false&limite` | condiciones con `duracion_s`, dispositivo y regla | sin `abiertas`: todas |
-| `GET /cuarentena?limite` | últimas tramas rechazadas con motivo y carga (200 caracteres) | diagnóstico |
+| `GET /condiciones?abiertas=true|false&limite&dispositivo` | condiciones con `duracion_s`, dispositivo y regla | sin `abiertas`: todas; `dispositivo` (UUID): solo las suyas (12/10) |
+| `GET /cuarentena?limite&dispositivo` | últimas tramas rechazadas con motivo y carga (200 caracteres) | diagnóstico |
 
 ```bash
 curl -s http://127.0.0.1:3000/dispositivos | python3 -m json.tool

@@ -408,13 +408,13 @@ sequenceDiagram
     U->>FE: abre la vista de un dispositivo
     FE->>API: GET /canales/{id}/historico?desde=<ISO 8601>&intervalo=15 minutes
     API->>DB: SELECT time_bucket('15 min', tiempo), avg(valor) …
-    DB-->>API: ~100 puntos agregados
+    DB-->>API: 60 a 170 puntos agregados (según el rango)
     API-->>FE: [[tiempos],[valores]]
     FE->>FE: uPlot dibuja el histórico
-    FE->>API: SSE · GET /eventos?canal={id} (EventSource, con la sesión desde M7)
+    FE->>API: SSE · GET /eventos?dispositivo={id} (EventSource, con la sesión desde M7)
     loop cada lectura nueva, ya guardada
         API-->>FE: event: medicion · data: {dispositivo_id, canal_id, valor, unidad, tiempo}
-        FE->>FE: uPlot.setData (añade el punto)
+        FE->>FE: uPlot.setData (la lectura en vivo, en una serie aparte del promedio)
     end
 ```
 
@@ -944,6 +944,18 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     (`PROXY_NOMBRE`) alimenta las dos capas. Lo que no cubre: un cliente que no es un navegador manda el `Host` que quiera;
     eso lo cubre la sesión (M7, Etapa 4), que también corta el *rebinding* porque la página atacante no tiene la cookie.
     Pruebas: `docs/16 §15`; controles: `docs/11 §3`.
+41. **Alta por API en la Etapa 3, antes de la sesión: clave de administrador por cabecera** (decidido el 12/10/2026). HU-11
+    (`POST /dispositivos`, §3) es la primera ruta que escribe y crea credenciales del broker, y la sesión (M7) llega en la
+    Etapa 4. Hasta entonces, toda ruta que escribe exige la cabecera `X-Clave-Admin` con el valor de `HTTP_CLAVE_ADMIN` del
+    `.env` (la escribe la persona; ausente = las rutas que escriben responden 503 «sin administrador configurado», nunca
+    quedan abiertas); sin la cabecera o con otro valor, 401, con un aviso acotado en el registro como los del `Host`. La
+    comparación es de tiempo constante. Con M7 la cabecera se reemplaza por la cookie de sesión y el rol de administrador
+    del sitio (punto 36); la clave de administrador pasa a crear el primer usuario y se retira. La credencial del dispositivo
+    se **muestra una sola vez** en la respuesta del alta y no se vuelve a leer: la base guarda solo su hash (`credencial`) y el
+    broker, lo que su plugin necesita; perderla es rotarla (§3). El backend es el administrador del plugin Dynamic Security
+    (punto 26) con una identidad propia distinta de la que usa para recibir tramas; qué pasa con los usuarios que hoy viven en
+    `password_file` (`backend`, `sonda`, los `dev-*` de desarrollo) lo decide el laboratorio `pruebas/lab-dynsec.sh`
+    (`docs/16 §18`): si conviven, se quedan hasta la Etapa 4; si no, migran al plugin en la misma tanda.
 
 ## 9. Crecimiento, resiliencia y respaldo (aprobado el 06/10/2026)
 

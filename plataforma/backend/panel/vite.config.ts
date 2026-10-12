@@ -3,7 +3,7 @@ import { svelteTesting } from '@testing-library/svelte/vite';
 import { defineConfig } from 'vitest/config';
 
 // Panel del sistema (docs/19). En producción lo sirve el backend bajo /panel (docs/10 §8.4): por eso `base`. En
-// desarrollo, Vite atiende en 5173 y REENVÍA la API y el canal en vivo al backend (docs/11 §4): el navegador ve un solo
+// desarrollo, Vite atiende en 5173 y REENVÍA la API y el canal en vivo al backend (docs/11 §3): el navegador ve un solo
 // origen y no hace falta CORS en ningún ambiente. `changeOrigin` queda en falso (su valor por defecto) a propósito: el
 // backend recibe `Host: localhost:5173`, que está en su lista de nombres (docs/10 §8.4 punto 40) y es lo que compara con
 // `Origin` en el canal en vivo (docs/10 §5). Que el reenvío conserve el Host y no retenga los eventos se comprueba con
@@ -17,7 +17,7 @@ export default defineConfig({
   // svelteTesting: en las pruebas, Vitest debe resolver la versión de NAVEGADOR de Svelte (sin él carga la de servidor y
   // onMount no existe); también limpia el DOM entre pruebas.
   plugins: [svelte(), svelteTesting()],
-  build: { outDir: 'dist', emptyOutDir: true, sourcemap: false }, // sin .map publicados (docs/11 §4)
+  build: { outDir: 'dist', emptyOutDir: true, sourcemap: false }, // sin .map publicados (docs/11 §3)
   server: {
     host: '127.0.0.1',
     port: 5173,

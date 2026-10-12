@@ -6,7 +6,8 @@
   import { compararAtencion, conteoPorEstado, enLinea, estadoVisual, ORDEN_ATENCION, ROTULO, type EstadoVisual } from './lib/estado-visual';
   import type { Condicion, DispositivoInventario, EventoVivo, TipoCondicion } from './lib/modelo';
   import { haceCuanto, horaLocal } from './lib/tiempo';
-  import { abrirCanal, type EstadoCanal } from './lib/vivo';
+  import { RECONECTADO, abrirCanal, type EstadoCanal } from './lib/vivo';
+  import { antirrebote } from './lib/antirrebote';
 
   let dispositivos = $state<DispositivoInventario[]>([]);
   let abiertas = $state<Condicion[]>([]);
@@ -66,13 +67,17 @@
 
   // Qué hace cada evento del canal (docs/19 F3): `visto` mueve «hace cuánto» y recalcula en línea; `condicion` repide solo
   // las condiciones abiertas (una consulta chica), nunca el inventario entero; `medicion` no cambia esta pantalla.
+  // Las condiciones se repiden con antirrebote: muchos avisos seguidos → una consulta por segundo, nunca dos en vuelo.
+  const repedirAbiertas = antirrebote(() =>
+    obtener<Condicion[]>('/condiciones?abiertas=true&limite=500')
+      .then((c) => (abiertas = c))
+      .catch(() => undefined),
+  );
   function alEvento(e: EventoVivo): void {
     if (e.tipo === 'visto') {
       dispositivos = dispositivos.map((d) => (d.id === e.dispositivo_id ? { ...d, visto_por_ultima_vez: e.tiempo } : d));
     } else if (e.tipo === 'condicion') {
-      void obtener<Condicion[]>('/condiciones?abiertas=true&limite=500')
-        .then((c) => (abiertas = c))
-        .catch(() => undefined);
+      repedirAbiertas.pedir();
     }
   }
 
@@ -81,12 +86,13 @@
     const reloj = setInterval(() => (ahora = new Date()), 10_000);
     // Al volver de una reconexión se repide todo (docs/19 F4): el canal no guarda cola y pudo perder visto o condicion.
     const c = abrirCanal('/eventos', alEvento, (estado, motivo) => {
-      if (canal === 'reconectando' && estado === 'en_vivo') void cargar();
+      if (estado === 'en_vivo' && motivo === RECONECTADO) void cargar();
       canal = estado;
-      motivoCanal = motivo;
+      motivoCanal = estado === 'en_vivo' ? undefined : motivo;
     });
     return () => {
       clearInterval(reloj);
+      repedirAbiertas.cancelar();
       c.cerrar();
     };
   });
@@ -119,6 +125,9 @@
   <span data-visibles>{visibles.length} de {filas.length}</span>
 </div>
 
+{#if abiertas.length >= 500}
+  <p class="error" role="status">Hay 500 condiciones abiertas o más: el semáforo puede quedar incompleto para algunos dispositivos. Revisa la lista de condiciones.</p>
+{/if}
 {#if error !== null}
   <p class="error" role="alert">{error}</p>
 {:else if !cargado}

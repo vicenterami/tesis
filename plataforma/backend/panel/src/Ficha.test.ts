@@ -41,18 +41,32 @@ const rechazadas: TramaRechazada[] = [
 ];
 const historico: Historico = { canal_id: 'c-temp', magnitud: 'temperatura', unidad: 'Cel', zona_horaria: 'America/Santiago', intervalo: '15 minutes', desde: 'x', hasta: 'y', puntos: 2, tiempos: [1760270400, 1760271300], valores: [20, 21], muestras: [3, 3] };
 
-class FuenteInerte { readyState = 1; onopen = null; onerror = null; addEventListener(): void {} close(): void {} }
+// EventSource controlable: la prueba emite eventos y simula la caída y la reapertura.
+class FuenteControlable {
+  static instancias: FuenteControlable[] = [];
+  readyState = 1;
+  onopen: ((ev: Event) => void) | null = null;
+  onerror: ((ev: Event) => void) | null = null;
+  private oyentes = new Map<string, (ev: MessageEvent) => void>();
+  constructor() { FuenteControlable.instancias.push(this); }
+  addEventListener(tipo: string, f: (ev: MessageEvent) => void): void { this.oyentes.set(tipo, f); }
+  close(): void { this.readyState = 2; }
+  emitir(tipo: string, data: object): void { this.oyentes.get(tipo)?.({ data: JSON.stringify(data) } as MessageEvent); }
+  abrir(): void { this.readyState = 1; this.onopen?.(new Event('open')); }
+  caer(): void { this.readyState = 2; this.onerror?.(new Event('error')); }
+}
 const peticiones: string[] = [];
 
 beforeEach(() => {
   graficos.length = 0;
   peticiones.length = 0;
   vi.useFakeTimers({ now: AHORA, toFake: ['Date', 'setInterval', 'clearInterval', 'setTimeout', 'clearTimeout'] });
-  vi.stubGlobal('EventSource', FuenteInerte);
+  FuenteControlable.instancias.length = 0;
+  vi.stubGlobal('EventSource', FuenteControlable);
   vi.stubGlobal('fetch', vi.fn(async (ruta: string) => {
     peticiones.push(ruta);
     if (ruta === `/dispositivos/${ID}`) return new Response(JSON.stringify(ficha));
-    if (ruta.startsWith('/condiciones?')) return new Response(JSON.stringify(condiciones));
+    if (ruta.startsWith('/condiciones?')) return new Response(JSON.stringify(ruta.includes('abiertas=true') ? condiciones.filter((c) => c.cerrada_en === null) : condiciones));
     if (ruta.startsWith('/cuarentena?')) return new Response(JSON.stringify(rechazadas));
     if (ruta.startsWith('/canales/c-temp/historico')) return new Response(JSON.stringify(historico));
     return new Response('', { status: 404 });
@@ -77,6 +91,7 @@ describe('Ficha (P3): identidad, canales, gráfico, condiciones y rechazadas, le
   it('pide el histórico del primer canal con el rango por defecto (24 h, 15 minutes) y se lo entrega al gráfico', async () => {
     render(Ficha, { id: ID });
     await waitFor(() => expect(document.querySelector('[data-historico]')).toBeTruthy());
+    expect(peticiones.filter((p) => p.startsWith('/condiciones?')).sort()).toEqual([`/condiciones?dispositivo=${ID}&abiertas=true&limite=500`, `/condiciones?dispositivo=${ID}&limite=50`]);
     const url = peticiones.find((p) => p.startsWith('/canales/c-temp/historico'))!;
     expect(url).toContain('intervalo=15+minutes');
     expect(url).toContain('desde=2026-10-11T15%3A00%3A00.000Z');
@@ -91,6 +106,53 @@ describe('Ficha (P3): identidad, canales, gráfico, condiciones y rechazadas, le
     expect(filas.map((f) => f.getAttribute('data-condicion'))).toEqual(['abierta', 'cerrada']);
     expect(screen.getByText('invalida')).toBeTruthy();
     expect(document.querySelector('details pre')?.textContent).toBe('{"v":500}');
+  });
+
+  it('una medición en vivo del canal visible actualiza la tarjeta y entra al gráfico en un lote (250 ms); en pausa, no', async () => {
+    render(Ficha, { id: ID });
+    await waitFor(() => expect(document.querySelector('[data-historico]')).toBeTruthy());
+    const fuente = FuenteControlable.instancias[0]!;
+    fuente.abrir();
+    fuente.emitir('medicion', { dispositivo_id: ID, canal_id: 'c-temp', valor: 23.25, unidad: 'Cel', tiempo: '2026-10-12T15:00:05Z' });
+    fuente.emitir('medicion', { dispositivo_id: 'otro-dispositivo', canal_id: 'c-temp', valor: 99, unidad: 'Cel', tiempo: '2026-10-12T15:00:06Z' }); // ajeno: se descarta
+    await waitFor(() => expect(document.querySelector('[data-ultima]')?.textContent).toBe('23,25 Cel'));
+    expect(graficos.at(-1)?.datos).toEqual([[1760270400, 1760271300], [20, 21], [null, null]]); // todavía no: va por lotes
+    await vi.advanceTimersByTimeAsync(250);
+    expect((graficos.at(-1)?.datos as number[][])[2]).toEqual([null, null, 23.25]);
+    screen.getByRole('button', { name: 'Pausar' }).click();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Reanudar' })).toBeTruthy());
+    fuente.emitir('medicion', { dispositivo_id: ID, canal_id: 'c-temp', valor: 30, unidad: 'Cel', tiempo: '2026-10-12T15:00:07Z' });
+    await vi.advanceTimersByTimeAsync(250);
+    expect(document.querySelector('[data-ultima]')?.textContent).toBe('23,25 Cel');
+    expect((graficos.at(-1)?.datos as number[][])[2]).toEqual([null, null, 23.25]);
+  });
+
+  it('un aviso de condición repide las condiciones con antirrebote: diez avisos → una consulta', async () => {
+    render(Ficha, { id: ID });
+    await waitFor(() => expect(document.querySelector('[data-historico]')).toBeTruthy());
+    const antes = peticiones.filter((p) => p.startsWith('/condiciones?')).length;
+    const fuente = FuenteControlable.instancias[0]!;
+    fuente.abrir();
+    for (let i = 0; i < 10; i++) fuente.emitir('condicion', { dispositivo_id: ID, condicion: 'umbral', estado: 'abierta' });
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(peticiones.filter((p) => p.startsWith('/condiciones?')).length - antes).toBe(2); // abiertas + recientes: una tanda
+  });
+
+  it('al reconectar tras una caída (F4) se repide todo: ficha, condiciones, rechazadas e histórico', async () => {
+    render(Ficha, { id: ID });
+    await waitFor(() => expect(document.querySelector('[data-historico]')).toBeTruthy());
+    const fichaAntes = peticiones.filter((p) => p === `/dispositivos/${ID}`).length;
+    const histAntes = peticiones.filter((p) => p.startsWith('/canales/')).length;
+    const fuente = FuenteControlable.instancias[0]!;
+    fuente.abrir();
+    fuente.caer();
+    await waitFor(() => expect(document.querySelector('[data-canal]')?.getAttribute('data-canal')).toBe('reconectando'));
+    await vi.advanceTimersByTimeAsync(1000); // primer reintento
+    const nueva = FuenteControlable.instancias[1]!;
+    nueva.abrir();
+    await waitFor(() => expect(peticiones.filter((p) => p === `/dispositivos/${ID}`).length).toBe(fichaAntes + 1));
+    await waitFor(() => expect(peticiones.filter((p) => p.startsWith('/canales/')).length).toBe(histAntes + 1));
+    expect(document.querySelector('[data-canal]')?.getAttribute('data-canal')).toBe('en_vivo');
   });
 
   it('un id que no existe → mensaje con la acción de volver al inventario, sin gráfico', async () => {

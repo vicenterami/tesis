@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RANGOS, agregarLectura, formatearValor, seriesDesdeHistorico, urlHistorico, ventana } from './grafico';
+import { RANGOS, agregarLectura, formatearValor, rotuloIntervalo, seriesDesdeHistorico, urlHistorico, ventana } from './grafico';
 
 describe('ventana y URL del histórico (docs/19 P3)', () => {
   const ahora = new Date('2026-10-12T15:00:00Z');
@@ -34,6 +34,10 @@ describe('series: histórico agregado y lecturas en vivo aparte', () => {
     expect(s[0]).toEqual([1, 12, 13, 14]);
     expect(s[1]).toEqual([10, null, null, null]);
     expect(s[2]).toEqual([null, 2, 3, 4]);
+  });
+  it('el intervalo de la API se muestra en español', () => {
+    expect(rotuloIntervalo('15 minutes')).toBe('15 minutos');
+    expect(rotuloIntervalo('1 day')).toBe('1 día');
   });
   it('formatea con coma decimal y la unidad; nulo → raya', () => {
     expect(formatearValor(21.456789, 'Cel')).toBe('21,457 Cel');

@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 126 pruebas unitarias, sin matriz formal) y TT-32 (sensor físico);
+cubre todavía: TT-27 (contrato de trama: hoy 130 pruebas unitarias, sin matriz formal) y TT-32 (sensor físico);
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -295,7 +295,7 @@ base ni el broker, y las 6 rutas que ya existían salen idénticas; (4) una imag
 
 `docs/10 §8.4` punto 40; controles en `docs/11 §3`. Backend: 19 pruebas nuevas en `arranque.spec.ts` (lista y su validación, forma
 del `Host`, rechazo, avisos acotados); con el rechazo anulado a mano (cambio temporal, restaurado y comparado con `cmp`) fallan
-exactamente las 3 que lo cubren. Pila de desarrollo reconstruida y `api-smoke.sh` con 6 casos nuevos (126 pruebas unitarias en total). Proxy sobre el
+exactamente las 3 que lo cubren. Pila de desarrollo reconstruida y `api-smoke.sh` con 6 casos nuevos (130 pruebas unitarias en total). Proxy sobre el
 banco (`banco.sh proxy`, puertos 8443 y 8081, `PROXY_NOMBRE` sin definir = `localhost`):
 
 | Comprobación | Resultado |
@@ -324,7 +324,7 @@ puerto; en el servidor, 80 → 443, que es el caso real.
 ## 16. Panel, tramo 2: esqueleto, inventario con semáforo y reenvío de desarrollo (12/10/2026)
 
 `docs/19` (pantalla P2) y `docs/10 §8.4` (panel en `backend/panel/`, mismo workspace de pnpm, servido por el backend en `/panel`).
-Versiones elegidas con al menos siete días de publicadas (Svelte 5.57.1, Vite 8.3.2, Vitest 5.0.3; `docs/11 §3`, fila del robot de dependencias); ninguna
+Versiones elegidas con al menos siete días de publicadas (Svelte 5.57.1, Vite 8.3.2, Vitest 5.0.3; `docs/11 §3`, fila de imágenes fijadas por digest y robot de dependencias: siete días de espera); ninguna
 dependencia ejecutó scripts de instalación (`ignore-scripts`). Auditoría del workspace: cero avisos en producción; en desarrollo,
 el alto conocido de `braces` y un moderado de `sprintf-js`, los dos solo por Jest y sin parche publicado.
 
@@ -355,18 +355,54 @@ JS pasa de 47 a 109 KB (44 KB comprimido).
 
 | Comprobación | Resultado |
 |---|---|
-| 34 pruebas del panel (14 nuevas): ventana y URL del histórico por rango, series del gráfico (histórico agregado y lecturas en vivo aparte; inserción en orden; tope de 500 puntos en vivo que nunca borra el histórico), formato con coma decimal, forma de cada evento del canal (el latido trae solo `tiempo`), filtros del inventario por vía, zona y búsqueda | ✅ todas |
-| 8 por el DOM (jsdom; uPlot sustituido por un doble que registra los datos): la ficha muestra identidad, estado visual (condición abierta y en línea → «Alerta»), una tarjeta por canal con última lectura y umbrales; pide el histórico del primer canal con el rango por defecto (24 h, 15 minutos) y se lo entrega al gráfico; condiciones abiertas primero; trama rechazada plegada; un id inexistente → mensaje con la acción y sin gráfico | ✅ |
+| 43 pruebas del panel (23 nuevas): ventana y URL del histórico por rango, series del gráfico (histórico agregado y lecturas en vivo aparte; inserción en orden; tope de 500 puntos en vivo que nunca borra el histórico), formato con coma decimal, forma de cada evento del canal (el latido trae solo `tiempo`), filtros del inventario por vía, zona y búsqueda | ✅ todas |
+| 11 por el DOM (jsdom; uPlot sustituido por un doble que registra los datos): la ficha muestra identidad, estado visual (condición abierta y en línea → «Alerta»), una tarjeta por canal con última lectura y umbrales; pide las condiciones abiertas completas y las recientes, y el histórico del primer canal con el rango por defecto (24 h, 15 minutos) que entrega al gráfico; condiciones abiertas primero; trama rechazada plegada; una medición en vivo actualiza la tarjeta y entra al gráfico en un lote de 250 ms, una de otro dispositivo se descarta y en pausa nada cambia; diez avisos de condición → una sola tanda de consultas (antirrebote); al reconectar tras una caída se repide la ficha y el histórico; un id inexistente → mensaje con la acción y sin gráfico | ✅ |
 | Humo de la API: condiciones filtradas por dispositivo (todas suyas), cuarentena filtrada, valores que no son UUID → 400; contrato servido igual al versionado | ✅ (4 casos nuevos) |
 | Imagen reconstruida; `panel-desarrollo.sh` completo (12 comprobaciones, incluida la terminación de Vite) | ✅ `PANEL OK` |
 | Ficha con datos reales de la pila de desarrollo (`curl`): canal de temperatura con su última lectura; 2 condiciones del dispositivo, todas suyas | ✅ |
 
-**Corregido tras la revisión del tramo 2 (mismo día):** el lector del canal exigía `tipo` dentro de los datos y descartaba el
+**Correcciones del tramo 2 (mismo día):** el lector del canal exigía `tipo` dentro de los datos y descartaba el
 latido; el inventario pedía las condiciones con el límite por defecto (50), insuficiente para el semáforo con muchas abiertas
 (ahora 500); al reconectar no se repedía nada (ahora inventario y ficha repiden todo); el guion mataba a `pnpm` y dejaba a Vite
 vivo en el 5173 (se vio con `ss`; ahora lanza el binario y comprueba el puerto); `.dockerignore` sin `**/` dejaba entrar
 `panel/.env` o una llave al contexto de build.
+**Correcciones de la revisión del tramo 3 (mismo día):** (1) el repedido al reconectar nunca se disparaba: el canal pasa por
+«conectando» antes de «en vivo», así que comparar con el estado anterior no servía; ahora el canal avisa «reconectado» al abrir
+tras una caída y la prueba cubre la secuencia real; (2) la ficha pedía solo las 50 condiciones más recientes para decidir el
+estado: una `sin_comunicacion` vieja quedaba fuera tras 50 aperturas y cierres de umbral; ahora pide las abiertas completas
+(hasta 500) aparte de las recientes, y el inventario avisa si llega al tope; (3) cada aviso de condición repedía la lista y
+cada lectura redibujaba el gráfico: antirrebote de 1 s con un solo vuelo y lotes de 250 ms; (4) un parámetro repetido
+(`?dispositivo=a&dispositivo=b`) llega como arreglo y daba 500: toda validación exige texto y responde 400 (4 pruebas, 2 casos
+de humo); (5) la ficha descarta eventos de otro dispositivo aunque el canal venga filtrado, y un `valor` infinito se rechaza;
+(6) los avisos de copyright de `svelte` y `uPlot`, que Vite quita del código, viajan en `/panel/avisos-de-terceros.txt`; (7) el
+diagrama de tiempo real de `docs/10 §5` decía `?canal=` y «añade el punto»: ahora `?dispositivo=` y la lectura en vivo aparte.
 **Lo que no cubre:** ningún navegador real (jsdom; el gráfico se mira a mano en la demostración, `docs/15`); la reconexión del
-canal se prueba con un `EventSource` falso y temporizadores simulados, no cortando el backend; el rango a medida por fechas
-(HU-07) queda para la Etapa 4.
+canal, la lectura en vivo, la pausa y el antirrebote se prueban con un `EventSource` falso y temporizadores simulados, no
+cortando el backend ni publicando por MQTT; los puntos del gráfico se comprueban contra un doble de uPlot, no en un canvas; el
+rango a medida por fechas (HU-07) queda para la Etapa 4.
+
+## 18. Credenciales del broker con el plugin Dynamic Security: laboratorio desechable (preparado el 12/10/2026)
+
+Condición de la decisión del 08/10 (`docs/10 §8.4` punto 26): antes de que el backend administre credenciales del broker, una
+prueba en un contenedor desechable con identidades de descarte. `plataforma/pruebas/lab-dynsec.sh` levanta la misma imagen
+fijada del compose con el plugin activado y, en un solo guion que no imprime ningún secreto, crea un rol con ACL de publicación
+al tópico propio (`%u`), un cliente de descarte, y prueba: publicar en el tópico propio y en uno ajeno, un usuario desconocido,
+la convivencia con `password_file` + `acl_file` (lo que la documentación oficial no declara), deshabilitar, rehabilitar, rotar
+la clave y borrar, la persistencia en el JSON del plugin y que el broker nunca se reinició.
+
+| Comprobación | Esperado | Medido |
+|---|---|---|
+| Publicar en el tópico propio | `PUBACK RC:0` | pendiente |
+| Publicar en tópico ajeno | `PUBACK RC:135` (no autorizado, MQTT 5) | pendiente |
+| Usuario desconocido | conexión rechazada | pendiente |
+| Usuario de `password_file` con `acl_file`, mismo listener | `RC:0` en su tópico, `RC:135` en ajeno (convivencia) | pendiente |
+| Cliente deshabilitado | conexión rechazada; rehabilitado → `RC:0` | pendiente |
+| Clave rotada | vieja rechazada, nueva `RC:0` | pendiente |
+| Cliente borrado | conexión rechazada; el JSON vuelve a un solo cliente | pendiente |
+| Reinicios del broker durante todo lo anterior | 0 | pendiente |
+| Intentos fallidos | solo en el log del broker (sin parche en la base) | pendiente |
+
+El guion lo ejecuta la persona (ninguna clave del broker, ni de descarte, la escribe el asistente de desarrollo; es una regla
+del proyecto desde el 27/09) y la salida se pega aquí. De su resultado depende si los usuarios actuales de `password_file`
+(`backend`, `sonda`, los `dev-*`) se quedan hasta la Etapa 4 o migran al plugin con HU-11 (`docs/10 §8.4` punto 41).
 

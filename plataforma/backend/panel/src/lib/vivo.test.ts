@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ESPERA_MAX_MS, SIN_LATIDO_MS, abrirCanal, esEventoVivo, esperaReintento, type FuenteDeEventos } from './vivo';
+import { ESPERA_MAX_MS, RECONECTADO, SIN_LATIDO_MS, abrirCanal, esEventoVivo, esperaReintento, type FuenteDeEventos } from './vivo';
 
 // EventSource falso: registra oyentes y deja disparar eventos y errores a mano.
 class FuenteFalsa implements FuenteDeEventos {
@@ -45,6 +45,7 @@ describe('esEventoVivo: un evento sin la forma esperada se descarta, no rompe la
     expect(esEventoVivo('visto', { dispositivo_id: 'd' })).toBe(false);
     expect(esEventoVivo('otro', { dispositivo_id: 'd', tiempo: 't' })).toBe(false);
     expect(esEventoVivo('medicion', { dispositivo_id: 'd', canal_id: 'c', valor: '1.5', tiempo: 't' })).toBe(false);
+    expect(esEventoVivo('medicion', { dispositivo_id: 'd', canal_id: 'c', valor: Infinity, tiempo: 't' })).toBe(false); // 1e999 en JSON
     expect(esEventoVivo('visto', 'texto')).toBe(false);
     expect(esEventoVivo('latido', null)).toBe(false);
   });
@@ -101,6 +102,19 @@ describe('abrirCanal (docs/19 F4)', () => {
     creadas[2]!.fallarCerrado();
     vi.advanceTimersByTime(1000);
     expect(creadas).toHaveLength(4); // tras abrir bien, la espera vuelve a 1 s
+    c.cerrar();
+  });
+
+  it('la secuencia real es reconectando → conectando → en_vivo; al volver, el motivo es «reconectado» (F4: la pantalla repide)', () => {
+    const estados: string[] = [];
+    const c = abrirCanal('/eventos', () => undefined, (s, m) => estados.push(m === undefined ? s : `${s}:${m}`), crear);
+    creadas[0]!.abrir();
+    creadas[0]!.fallarCerrado();
+    vi.advanceTimersByTime(1000);
+    creadas[1]!.abrir();
+    expect(estados).toEqual(['conectando', 'en_vivo', 'reconectando:el servidor rechazó o cerró el canal', 'conectando', `en_vivo:${RECONECTADO}`]);
+    creadas[1]!.emitir('latido', { tiempo: 't' });
+    expect(estados.at(-1)).toBe(`en_vivo:${RECONECTADO}`); // un latido no vuelve a avisar
     c.cerrar();
   });
 

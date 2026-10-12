@@ -20,16 +20,18 @@
    `bash plataforma/pruebas/clave-dispositivo.sh dev-0001` (pide la clave oculta, reinicia el broker y
    verifica que autentica; `docs/11 §7`). Se hace **antes de todo lo demás**: el reinicio del broker corta
    la conexión del backend unos segundos.
-2. **Abrir el panel** en una pestaña y dejarla: `http://127.0.0.1:3000/panel/` (inventario con semáforo; lo sirve el backend ya
-   construido en la imagen; si el backend corre fuera de Docker, antes `pnpm --filter panel build`). Durante el paso 4 se
-   verá cambiar el estado sin recargar, y en la ficha del dispositivo, el gráfico con la lectura en vivo.
-2b. **Levantar, cargar datos y verificar:**
+2. **Levantar, cargar datos y verificar:**
 
 ```bash
 bash plataforma/pruebas/pila.sh encender      # construye, levanta, espera «healthy» y muestra el estado
 bash plataforma/pruebas/semilla-demo.sh       # datos del guion (idempotente): SEMILLA LISTA
 bash plataforma/pruebas/verificar-todo.sh     # TODO EN CONCORDANCIA
 ```
+
+2b. **Abrir el panel** en una pestaña y dejarla: `http://127.0.0.1:3000/panel/` (inventario con semáforo; lo sirve el backend ya
+   construido en la imagen; si el backend corre fuera de Docker, antes `pnpm --filter panel build`). Entrar a la ficha de
+   `dev-0001` (su nombre en la tabla) y volver al inventario: durante el paso 4 se verá cambiar el estado sin recargar y, en la
+   ficha, el gráfico con la lectura en vivo.
 
 3. **Dos terminales y el navegador:**
 
@@ -138,7 +140,7 @@ En `/docs`:
 
 ## 6. Cómo se sostiene esto (1 min)
 
-- `cd plataforma/backend && pnpm verificar`: tipos, lint y 126 pruebas unitarias en menos de dos segundos
+- `cd plataforma/backend && pnpm verificar`: tipos, lint y 130 pruebas unitarias en menos de dos segundos
   (la cifra exacta la da la salida de `jest`; no la memorices). Los avisos de cuarentena que aparecen
   mientras corre son de las pruebas, a propósito.
 - `bash plataforma/pruebas/verificar-todo.sh`: esquema, migraciones, diagramas del informe, API y

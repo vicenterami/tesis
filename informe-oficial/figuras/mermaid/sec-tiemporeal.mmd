@@ -7,11 +7,11 @@ sequenceDiagram
     U->>FE: abre la vista de un dispositivo
     FE->>API: GET /canales/{id}/historico?desde=<ISO 8601>&intervalo=15 minutes
     API->>DB: SELECT time_bucket('15 min', tiempo), avg(valor) …
-    DB-->>API: ~100 puntos agregados
+    DB-->>API: 60 a 170 puntos agregados (según el rango)
     API-->>FE: [[tiempos],[valores]]
     FE->>FE: uPlot dibuja el histórico
-    FE->>API: SSE · GET /eventos?canal={id} (EventSource, con la sesión desde M7)
+    FE->>API: SSE · GET /eventos?dispositivo={id} (EventSource, con la sesión desde M7)
     loop cada lectura nueva, ya guardada
         API-->>FE: event: medicion · data: {dispositivo_id, canal_id, valor, unidad, tiempo}
-        FE->>FE: uPlot.setData (añade el punto)
+        FE->>FE: uPlot.setData (la lectura en vivo, en una serie aparte del promedio)
     end

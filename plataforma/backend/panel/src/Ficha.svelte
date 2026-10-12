@@ -6,10 +6,11 @@
   import Grafico from './Grafico.svelte';
   import { ErrorApi, obtener } from './lib/api';
   import { enLinea, estadoVisual, ROTULO } from './lib/estado-visual';
-  import { RANGOS, RANGO_POR_DEFECTO, agregarLectura, formatearValor, seriesDesdeHistorico, urlHistorico, ventana, type ClaveRango, type Series } from './lib/grafico';
+  import { RANGOS, RANGO_POR_DEFECTO, agregarLectura, formatearValor, rotuloIntervalo, seriesDesdeHistorico, urlHistorico, ventana, type ClaveRango, type Series } from './lib/grafico';
   import type { Condicion, DispositivoFicha, EventoVivo, Historico, TramaRechazada } from './lib/modelo';
   import { haceCuanto, horaLocal } from './lib/tiempo';
-  import { abrirCanal, type EstadoCanal } from './lib/vivo';
+  import { RECONECTADO, abrirCanal, type EstadoCanal } from './lib/vivo';
+  import { antirrebote, porLotes } from './lib/antirrebote';
 
   let { id }: { id: string } = $props();
 
@@ -32,11 +33,29 @@
   );
   const canalActual = $derived(d?.canales.find((c) => c.id === canalElegido) ?? null);
 
+  // Las condiciones ABIERTAS se piden completas (hasta 500), aparte de las 50 más recientes: una sin_comunicacion vieja no
+  // puede quedar fuera por 50 cierres y aperturas de umbral posteriores (revisión del 12/10). Se unen sin repetir.
+  async function cargarCondiciones(): Promise<Condicion[]> {
+    const [abiertasTodas, recientes] = await Promise.all([
+      obtener<Condicion[]>(`/condiciones?dispositivo=${encodeURIComponent(id)}&abiertas=true&limite=500`),
+      obtener<Condicion[]>(`/condiciones?dispositivo=${encodeURIComponent(id)}&limite=50`),
+    ]);
+    const vistas = new Set(abiertasTodas.map((c) => c.id));
+    return [...abiertasTodas, ...recientes.filter((c) => !vistas.has(c.id))];
+  }
+  const repedirCondiciones = antirrebote(() => cargarCondiciones().then((c) => (condiciones = c)).catch(() => undefined));
+  // Las lecturas en vivo se aplican por lotes: un redibujo del gráfico cada 250 ms como mucho, no uno por lectura.
+  const lecturas = porLotes<{ tiempo: string; valor: number }>((lote) => {
+    let s = series;
+    for (const l of lote) s = agregarLectura(s, l.tiempo, l.valor);
+    series = s;
+  });
+
   async function cargar(): Promise<void> {
     try {
       const [ficha, conds, rech] = await Promise.all([
         obtener<DispositivoFicha>(`/dispositivos/${encodeURIComponent(id)}`),
-        obtener<Condicion[]>(`/condiciones?dispositivo=${encodeURIComponent(id)}&limite=50`),
+        cargarCondiciones(),
         obtener<TramaRechazada[]>(`/cuarentena?dispositivo=${encodeURIComponent(id)}&limite=20`),
       ]);
       d = ficha;
@@ -63,23 +82,21 @@
   }
 
   // Al reconectar se repide el histórico del rango visible: el canal no guarda cola (docs/19 F4).
-  function alEstadoCanal(s: EstadoCanal): void {
-    const volvio = canal === 'reconectando' && s === 'en_vivo';
+  function alEstadoCanal(s: EstadoCanal, motivo?: string): void {
     canal = s;
-    if (volvio) void cargar().then(cargarHistorico);
+    if (s === 'en_vivo' && motivo === RECONECTADO) void cargar().then(cargarHistorico);
   }
 
   function alEvento(e: EventoVivo): void {
     if (pausado || d === null) return;
+    if (e.tipo !== 'latido' && e.dispositivo_id !== id) return; // el canal viene filtrado, pero no se confía en eso
     if (e.tipo === 'visto') {
       d = { ...d, visto_por_ultima_vez: e.tiempo };
     } else if (e.tipo === 'medicion') {
       d = { ...d, canales: d.canales.map((c) => (c.id === e.canal_id ? { ...c, ultima_medicion: { valor: e.valor, tiempo: e.tiempo } } : c)) };
-      if (e.canal_id === canalElegido) series = agregarLectura(series, e.tiempo, e.valor);
+      if (e.canal_id === canalElegido) lecturas.agregar({ tiempo: e.tiempo, valor: e.valor });
     } else if (e.tipo === 'condicion') {
-      void obtener<Condicion[]>(`/condiciones?dispositivo=${encodeURIComponent(id)}&limite=50`)
-        .then((c) => (condiciones = c))
-        .catch(() => undefined);
+      repedirCondiciones.pedir();
     }
   }
 
@@ -98,6 +115,8 @@
     const c = abrirCanal(`/eventos?dispositivo=${encodeURIComponent(id)}`, alEvento, alEstadoCanal);
     return () => {
       clearInterval(reloj);
+      repedirCondiciones.cancelar();
+      lecturas.cancelar();
       c.cerrar();
     };
   });
@@ -153,7 +172,7 @@
         <button type="button" aria-pressed={rangoElegido === r.clave} onclick={() => elegirRango(r.clave)}>{r.rotulo}</button>
       {/each}
       {#if historico !== null}
-        <span class="vivo" data-historico>{historico.puntos} puntos, promedio por {historico.intervalo}; en vivo, cada lectura aparte</span>
+        <span class="vivo" data-historico>{historico.puntos} puntos, promedio por {rotuloIntervalo(historico.intervalo)}; en vivo, cada lectura aparte</span>
       {/if}
     </div>
     {#if errorHistorico !== null}

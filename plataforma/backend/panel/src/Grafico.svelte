@@ -18,7 +18,7 @@
       series: [
         {},
         { label: 'promedio', stroke: '#0b3954', width: 2, value: (_u, v) => (v === null ? '—' : `${v} ${unidad}`) },
-        { label: 'actual', stroke: '#c0392b', width: 0, points: { show: true, size: 6 }, value: (_u, v) => (v === null ? '—' : `${v} ${unidad}`) },
+        { label: 'lectura actual', stroke: '#c0392b', width: 0, points: { show: true, size: 6 }, value: (_u, v) => (v === null ? '—' : `${v} ${unidad}`) },
       ],
       axes: [{}, { label: unidad }],
     };

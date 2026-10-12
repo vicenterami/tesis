@@ -18,7 +18,7 @@ export function esEventoVivo(tipo: string, x: unknown): x is Omit<EventoVivo, 't
   switch (tipo) {
     case 'latido': return typeof e.tiempo === 'string';
     case 'visto': return typeof e.dispositivo_id === 'string' && typeof e.tiempo === 'string';
-    case 'medicion': return typeof e.dispositivo_id === 'string' && typeof e.canal_id === 'string' && typeof e.valor === 'number' && typeof e.tiempo === 'string';
+    case 'medicion': return typeof e.dispositivo_id === 'string' && typeof e.canal_id === 'string' && typeof e.valor === 'number' && Number.isFinite(e.valor) && typeof e.tiempo === 'string';
     case 'condicion': return typeof e.dispositivo_id === 'string' && typeof e.condicion === 'string' && (e.estado === 'abierta' || e.estado === 'cerrada');
     default: return false;
   }
@@ -34,6 +34,8 @@ function decodificar(tipo: string, texto: unknown): EventoVivo | null {
 }
 
 export type EstadoCanal = 'conectando' | 'en_vivo' | 'reconectando';
+// Al volver a «en_vivo» después de una caída, el motivo es «reconectado»: la pantalla repide lo que muestra (docs/19 F4).
+export const RECONECTADO = 'reconectado';
 
 // Lo mínimo que usamos de EventSource; el EventSource real lo cumple y las pruebas usan uno falso.
 export interface FuenteDeEventos {
@@ -62,6 +64,7 @@ export function abrirCanal(
   let fuente: FuenteDeEventos | null = null;
   let intento = 0;
   let cerrado = false;
+  let caido = false; // hubo una caída desde la última apertura buena
   let vigilante: ReturnType<typeof setTimeout> | null = null;
   let reintento: ReturnType<typeof setTimeout> | null = null;
 
@@ -75,6 +78,7 @@ export function abrirCanal(
     if (vigilante !== null) clearTimeout(vigilante);
     fuente?.close();
     fuente = null;
+    caido = true;
     alEstado('reconectando', motivo);
     reintento = setTimeout(abrir, esperaReintento(intento++));
   };
@@ -86,14 +90,19 @@ export function abrirCanal(
     fuente = f;
     f.onopen = () => {
       intento = 0;
-      alEstado('en_vivo');
+      const volvio = caido;
+      caido = false;
+      alEstado('en_vivo', volvio ? RECONECTADO : undefined);
       armarVigilante();
     };
     f.onerror = () => {
       // Cerrado por el servidor (403, 503, respuesta inválida): el navegador no reintenta; lo hacemos nosotros.
       // En otro estado, el navegador ya está reintentando solo (corte de red): solo se avisa.
       if (f.readyState === CERRADO) reconectar('el servidor rechazó o cerró el canal');
-      else alEstado('reconectando', 'sin red');
+      else {
+        caido = true; // el navegador reintenta solo; al reabrir, también se repide
+        alEstado('reconectando', 'sin red');
+      }
     };
     for (const tipo of TIPOS) {
       f.addEventListener(tipo, (ev) => {

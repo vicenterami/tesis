@@ -44,7 +44,7 @@ función que lo calcula es una sola, con prueba unitaria por cada fila de la tab
 |---|---|---|---|---|---|---|
 | P1 | **Resumen del sitio** | Conteo por estado visual (los cuatro), condiciones abiertas, últimas tramas rechazadas, estado del servicio | Ir a cada lista filtrada | `GET /dispositivos`, `GET /condiciones?abiertas=true`, `GET /cuarentena?limite=5`, `GET /salud` | RF-30, HU-16 | Etapa 4 (`docs/04`); los conteos por estado ya aparecen en P2 desde la Etapa 3 |
 | P2 | **Inventario** | Tabla: estado visual, nombre, identificador físico, vía, zona, última trama (hace cuánto), condiciones abiertas; filtros por estado, zona y vía con conteo | Abrir la ficha; filtrar; buscar por nombre o identificador | `GET /dispositivos` y `GET /condiciones?abiertas=true&limite=500` (el tipo de cada condición abierta decide el estado, §2; filtra el panel: hoy la API no filtra) | Semáforo y tabla: RF-47, RF-48, HU-10, HU-19. Filtros y búsqueda: RF-51, HU-20 (adelantada a la Etapa 3 el 12/10) | Etapa 3, tramo 2 |
-| P3 | **Ficha del dispositivo** | Identidad (nombre, identificador, vía, formato, zona, sitio, intervalo esperado, desde cuándo); estado visual; por canal: última lectura con unidad y reglas de umbral; gráfico histórico por canal (rango y agregación elegibles) que sigue en vivo; condiciones abiertas y cerradas del dispositivo; sus tramas rechazadas | Cambiar canal, rango e intervalo; pausar el vivo; ir a configurar (P6) o a mudar (Etapa 4) | `GET /dispositivos/{id}`, `GET /canales/{id}/historico?desde&hasta&intervalo`, `GET /eventos?dispositivo=`, `GET /condiciones`, `GET /cuarentena` | RF-33, RF-49, HU-21 (adelantada a la Etapa 3 el 12/10, con sus 7 h); el rango a medida por fechas es HU-07 (Etapa 4) | Etapa 3, tramo 3 |
+| P3 | **Ficha del dispositivo** | Identidad (nombre, identificador, vía, formato, zona, sitio, intervalo esperado, desde cuándo); estado visual; por canal: última lectura con unidad y reglas de umbral; gráfico histórico por canal (rango elegible; la agregación la fija el rango) que sigue en vivo; condiciones abiertas y cerradas del dispositivo; sus tramas rechazadas | Cambiar canal y rango (el intervalo lo fija cada rango); pausar el vivo; ir a configurar (P6) o a mudar (Etapa 4) | `GET /dispositivos/{id}`, `GET /canales/{id}/historico?desde&hasta&intervalo`, `GET /eventos?dispositivo=`, `GET /condiciones?dispositivo=&abiertas=true&limite=500` (todas las abiertas) más `?dispositivo=&limite=50` (las recientes), `GET /cuarentena?dispositivo=&limite=20` | RF-33, RF-49 (identidad, condiciones y serie; su «historial de eventos» queda con la Etapa 4), HU-21 (adelantada a la Etapa 3 el 12/10, con sus 7 h); el rango a medida por fechas es HU-07 (Etapa 4) | Etapa 3, tramo 3 |
 | P4 | **Condiciones** | Lista con tipo, dispositivo, magnitud y umbral, abierta en, duración; filtro abiertas / todas | Abrir la ficha del dispositivo | `GET /condiciones?abiertas&limite` | HU-05, RF-24 | Etapa 4 (lista sobre lo que la API ya devuelve) |
 | P5 | **Cuarentena** | Últimas tramas rechazadas: cuándo, por qué (`no_registrado`, `dado_de_baja`, `malformada`, `invalida`), detalle, dispositivo si se conoce, la trama cruda plegada | Copiar la trama; ir al alta si el motivo es `no_registrado` | `GET /cuarentena?limite` | RF-11 a RF-13 | Etapa 4 (lista sobre lo que la API ya devuelve) |
 | P6 | **Configurar dispositivo y canales** | Nombre, estado (activo / mantenimiento), intervalo esperado; por canal, umbral alto, umbral bajo, histéresis | Guardar con bloqueo optimista; validación en vivo (bajo < alto, histéresis dentro de la banda, rango de la magnitud) | **Propuesta:** `PATCH /dispositivos/{id}`, `PUT /canales/{id}/reglas` | HU-06, HU-13, punto 28 | Etapa 4 (exige sesión) |
@@ -69,7 +69,8 @@ retengan.
 
 **P3 Ficha (tramo 3, Etapa 3; es HU-21, adelantada el 12/10).** Cabecera con nombre, estado visual y los datos de identidad en dos columnas (una en móvil). Después,
 una tarjeta por canal: magnitud, última lectura con unidad y hace cuánto, reglas de umbral si existen. Debajo, el gráfico del
-canal elegido: rango (última hora, 24 h, 7 días, 30 días, a medida) e intervalo de agregación de la lista cerrada de la API;
+canal elegido: rango (última hora, 24 h, 7 días, 30 días; el rango a medida por fechas es HU-07, Etapa 4), cada uno con un intervalo de
+agregación fijo de la lista cerrada de la API (1 minuto, 15 minutos, 1 hora, 6 horas);
 el panel pide el histórico y abre el canal en vivo filtrado por dispositivo; cada `medicion` nueva del canal visible se añade al
 final sin repedir el histórico; cada `visto` actualiza «hace cuánto»; cada `condicion` actualiza la lista de condiciones y el
 estado visual. Si el gráfico muestra un intervalo agregado (por ejemplo, promedios por hora), el punto en vivo se dibuja aparte,
@@ -102,8 +103,9 @@ condición y el estado vuelve a «Normal».
 
 **F4 · El canal en vivo se cae.** `EventSource` reintenta solo ante un corte de red, no ante un 503 (cupo lleno) ni un 403.
 El panel envuelve el canal: si recibe 503 o 403, o si pasan 60 s sin latido (el backend manda uno cada 25 s), cierra y vuelve
-a abrir con espera de 1, 2, 4… hasta 30 s, y muestra «en vivo: reconectando» en la cabecera. Al reconectar, repide el
-histórico del rango visible, porque pudo perder mediciones mientras estuvo caído: el canal no guarda cola.
+a abrir con espera de 1, 2, 4… hasta 30 s, y muestra «en vivo: reconectando» en la cabecera. Al reconectar, repide todo lo
+que la pantalla muestra (inventario y condiciones en P2; ficha, condiciones, rechazadas e histórico del rango visible en P3),
+porque pudo perder eventos mientras estuvo caído: el canal no guarda cola.
 
 **F5 · Exportar (Etapa 4).** Elegir sitio, rango, magnitudes y formato; el panel muestra cuántas filas serán antes de
 descargar; la descarga exige rol de administrador; la vista pública nunca ofrece exportar (punto 6).
@@ -119,7 +121,11 @@ descargar; la descarga exige rol de administrador; la vista pública nunca ofrec
   Corren sobre el código fuente en jsdom; el build que sirve el backend se comprueba aparte con `pruebas/panel-desarrollo.sh`
   (cabeceras, CSP, paquete con hash, sin `.map`); una prueba con navegador real no existe todavía (`docs/16`).
 - **Un solo cliente HTTP** en el panel, que añade el prefijo de la API, interpreta los códigos y expone el 409 como tal.
-- **Rendimiento:** el histórico llega agregado (cientos de puntos); uPlot dibuja; el vivo añade al final; en P2 la tabla se
+- **Nada se repide por cada evento:** un aviso de condición pide la lista con antirrebote (una consulta por segundo como mucho,
+  nunca dos en vuelo) y las lecturas en vivo se aplican por lotes (un redibujo cada 250 ms como mucho). Un dispositivo que
+  oscila o un emisor malicioso no multiplican consultas a la base ni redibujos. La ficha descarta eventos de otro dispositivo
+  aunque el canal venga filtrado.
+- **Rendimiento:** el histórico llega agregado (entre 60 y 170 puntos según el rango); uPlot dibuja; el vivo añade al final; en P2 la tabla se
   recalcula solo con los eventos recibidos, no repidiendo el inventario cada vez.
 
 ## 7. Trazabilidad y prueba de cada pantalla
