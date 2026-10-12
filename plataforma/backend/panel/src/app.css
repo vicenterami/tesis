@@ -27,3 +27,18 @@ th { background: #eef2f4; font-weight: 600; }
 .filtros label { display: inline-flex; gap: 0.3rem; align-items: center; }
 .filtros input, .filtros select { font: inherit; padding: 0.25rem 0.4rem; }
 @media (max-width: 700px) { main { padding: 0.5rem; } th, td { padding: 0.35rem 0.4rem; } }
+/* Ficha (P3) */
+.ficha-cabecera { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0.5rem; }
+.ficha-cabecera h2 { margin: 0.2rem 0; }
+.identidad { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 0.4rem 1rem; margin: 0.5rem 0 1rem; }
+.identidad dt { font-size: 0.8rem; color: #52606d; }
+.identidad dd { margin: 0; }
+.canales { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 0.5rem; }
+.canales .canal { width: 100%; text-align: left; font: inherit; background: #fff; border: 1px solid #c5cdd3; border-radius: 6px; padding: 0.6rem; cursor: pointer; display: grid; gap: 0.15rem; }
+.canales .canal[aria-pressed='true'] { outline: 3px solid #0b3954; }
+.canales .lectura { font-size: 1.4rem; font-weight: 700; }
+.canales .reglas { font-size: 0.8rem; color: #52606d; }
+.grafico { background: #fff; border: 1px solid #e3e8eb; border-radius: 6px; padding: 0.25rem; margin-bottom: 1rem; min-height: 290px; }
+.rechazadas { list-style: none; padding: 0; }
+.rechazadas li { background: #fff; border-bottom: 1px solid #e3e8eb; padding: 0.4rem 0.6rem; }
+.rechazadas pre { white-space: pre-wrap; word-break: break-all; font-size: 0.8rem; background: #f0f3f5; padding: 0.4rem; }

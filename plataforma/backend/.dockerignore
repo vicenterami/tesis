@@ -1,14 +1,16 @@
 node_modules
 dist
-*.spec.ts
-coverage
+**/*.spec.ts
+**/coverage
+**/*.log
 .git
-# nunca al contexto de build, aunque algún día el Dockerfile use COPY . .
-.env
-.env.*
-*.pem
-*.key
-passwd
+# nunca al contexto de build, aunque algún día el Dockerfile use COPY . . Con `**/` valen también en subcarpetas (panel/):
+# sin eso, un patrón solo rige en la raíz del contexto (revisión del 12/10/2026).
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/passwd
 # El panel (docs/19) se compila dentro de la imagen: ni sus dependencias ni un build viejo del equipo entran al contexto.
 panel/node_modules
 panel/dist

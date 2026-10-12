@@ -1,7 +1,205 @@
 <script lang="ts">
-  // Pantalla P3 (docs/19): se construye en el tramo 3. Hasta entonces, un marcador para que el enlace del inventario
-  // tenga destino y la ruta exista.
+  // Pantalla P3 (docs/19 §4): identidad, estado visual, una tarjeta por canal, gráfico histórico que sigue en vivo,
+  // condiciones del dispositivo y sus tramas rechazadas. Datos: GET /dispositivos/{id}, /canales/{id}/historico,
+  // /condiciones?dispositivo=, /cuarentena?dispositivo= y el canal en vivo filtrado por dispositivo.
+  import { onMount } from 'svelte';
+  import Grafico from './Grafico.svelte';
+  import { ErrorApi, obtener } from './lib/api';
+  import { enLinea, estadoVisual, ROTULO } from './lib/estado-visual';
+  import { RANGOS, RANGO_POR_DEFECTO, agregarLectura, formatearValor, seriesDesdeHistorico, urlHistorico, ventana, type ClaveRango, type Series } from './lib/grafico';
+  import type { Condicion, DispositivoFicha, EventoVivo, Historico, TramaRechazada } from './lib/modelo';
+  import { haceCuanto, horaLocal } from './lib/tiempo';
+  import { abrirCanal, type EstadoCanal } from './lib/vivo';
+
   let { id }: { id: string } = $props();
+
+  let d = $state<DispositivoFicha | null>(null);
+  let condiciones = $state<Condicion[]>([]);
+  let rechazadas = $state<TramaRechazada[]>([]);
+  let error = $state<string | null>(null);
+  let ahora = $state(new Date());
+  let canal = $state<EstadoCanal>('conectando');
+  let pausado = $state(false);
+  let canalElegido = $state<string | null>(null);
+  let rangoElegido = $state<ClaveRango>(RANGO_POR_DEFECTO);
+  let series = $state<Series>([[], [], []]);
+  let historico = $state<Historico | null>(null);
+  let errorHistorico = $state<string | null>(null);
+
+  const abiertas = $derived(condiciones.filter((c) => c.cerrada_en === null));
+  const estado = $derived(
+    d === null ? null : estadoVisual({ estado: d.estado, en_linea: enLinea(d.visto_por_ultima_vez, d.intervalo_esperado_s, ahora) }, abiertas.map((c) => c.tipo)),
+  );
+  const canalActual = $derived(d?.canales.find((c) => c.id === canalElegido) ?? null);
+
+  async function cargar(): Promise<void> {
+    try {
+      const [ficha, conds, rech] = await Promise.all([
+        obtener<DispositivoFicha>(`/dispositivos/${encodeURIComponent(id)}`),
+        obtener<Condicion[]>(`/condiciones?dispositivo=${encodeURIComponent(id)}&limite=50`),
+        obtener<TramaRechazada[]>(`/cuarentena?dispositivo=${encodeURIComponent(id)}&limite=20`),
+      ]);
+      d = ficha;
+      condiciones = conds;
+      rechazadas = rech;
+      canalElegido ??= ficha.canales[0]?.id ?? null;
+      error = null;
+    } catch (e) {
+      error = e instanceof ErrorApi ? `${e.message}: ${e.accion}` : 'sin conexión con el servicio';
+    }
+  }
+
+  async function cargarHistorico(): Promise<void> {
+    if (canalElegido === null) return;
+    const v = ventana(rangoElegido, new Date());
+    try {
+      const h = await obtener<Historico>(urlHistorico(canalElegido, v.desde, v.hasta, v.intervalo));
+      historico = h;
+      series = seriesDesdeHistorico(h);
+      errorHistorico = null;
+    } catch (e) {
+      errorHistorico = e instanceof ErrorApi ? `${e.message}: ${e.accion}` : 'sin conexión con el servicio';
+    }
+  }
+
+  // Al reconectar se repide el histórico del rango visible: el canal no guarda cola (docs/19 F4).
+  function alEstadoCanal(s: EstadoCanal): void {
+    const volvio = canal === 'reconectando' && s === 'en_vivo';
+    canal = s;
+    if (volvio) void cargar().then(cargarHistorico);
+  }
+
+  function alEvento(e: EventoVivo): void {
+    if (pausado || d === null) return;
+    if (e.tipo === 'visto') {
+      d = { ...d, visto_por_ultima_vez: e.tiempo };
+    } else if (e.tipo === 'medicion') {
+      d = { ...d, canales: d.canales.map((c) => (c.id === e.canal_id ? { ...c, ultima_medicion: { valor: e.valor, tiempo: e.tiempo } } : c)) };
+      if (e.canal_id === canalElegido) series = agregarLectura(series, e.tiempo, e.valor);
+    } else if (e.tipo === 'condicion') {
+      void obtener<Condicion[]>(`/condiciones?dispositivo=${encodeURIComponent(id)}&limite=50`)
+        .then((c) => (condiciones = c))
+        .catch(() => undefined);
+    }
+  }
+
+  function elegirCanal(cid: string): void {
+    canalElegido = cid;
+    void cargarHistorico();
+  }
+  function elegirRango(r: ClaveRango): void {
+    rangoElegido = r;
+    void cargarHistorico();
+  }
+
+  onMount(() => {
+    void cargar().then(cargarHistorico);
+    const reloj = setInterval(() => (ahora = new Date()), 10_000);
+    const c = abrirCanal(`/eventos?dispositivo=${encodeURIComponent(id)}`, alEvento, alEstadoCanal);
+    return () => {
+      clearInterval(reloj);
+      c.cerrar();
+    };
+  });
 </script>
 
-<p class="vacio">Ficha del dispositivo <code>{id}</code>: en construcción (tramo 3). <a href="#/">Volver al inventario</a></p>
+<p><a href="#/">← Inventario</a></p>
+{#if error !== null}
+  <p class="error" role="alert">{error}</p>
+{:else if d === null || estado === null}
+  <p class="vacio">Cargando…</p>
+{:else}
+  <header class="ficha-cabecera">
+    <h2>{d.nombre} <span class="estado {estado}" data-estado={estado}>{ROTULO[estado]}</span></h2>
+    <p class="vivo {canal}" data-canal={canal}>
+      en vivo: {canal === 'en_vivo' ? (pausado ? 'en pausa' : 'conectado') : canal === 'conectando' ? 'conectando…' : 'reconectando'}
+      <button type="button" onclick={() => (pausado = !pausado)} aria-pressed={pausado}>{pausado ? 'Reanudar' : 'Pausar'}</button>
+    </p>
+  </header>
+  <dl class="identidad">
+    <div><dt>Identificador</dt><dd><code>{d.id_fisico}</code></dd></div>
+    <div><dt>Vía · formato</dt><dd>{d.via} · {d.formato}</dd></div>
+    <div><dt>Sitio · zona</dt><dd>{d.sitio} · {d.zona}</dd></div>
+    <div><dt>Intervalo esperado</dt><dd>{d.intervalo_esperado_s} s</dd></div>
+    <div><dt>Última trama</dt><dd title={d.visto_por_ultima_vez === null ? '' : horaLocal(d.visto_por_ultima_vez, d.zona_horaria)}>{haceCuanto(d.visto_por_ultima_vez, ahora)}</dd></div>
+    <div><dt>Registrado</dt><dd title={horaLocal(d.creado_en, d.zona_horaria)}>{haceCuanto(d.creado_en, ahora)}</dd></div>
+  </dl>
+
+  <h3>Canales</h3>
+  {#if d.canales.length === 0}
+    <p class="vacio">Sin canales: este dispositivo no declara magnitudes todavía.</p>
+  {:else}
+    <ul class="canales">
+      {#each d.canales as c (c.id)}
+        <li>
+          <button type="button" class="canal" aria-pressed={c.id === canalElegido} onclick={() => elegirCanal(c.id)} data-canal-id={c.id}>
+            <strong>{c.magnitud_nombre}{c.etiqueta === null ? '' : ` · ${c.etiqueta}`}</strong>
+            <span class="lectura" data-ultima>{formatearValor(c.ultima_medicion?.valor ?? null, c.unidad)}</span>
+            <span class="vivo">{c.ultima_medicion === null ? 'sin lecturas' : haceCuanto(c.ultima_medicion.tiempo, ahora)}</span>
+            {#if c.reglas !== null && c.reglas.length > 0}
+              <span class="reglas">umbrales: {c.reglas.map((r) => `${r.umbral_bajo ?? '—'} a ${r.umbral_alto ?? '—'} (histéresis ${r.histeresis ?? 0})`).join('; ')}</span>
+            {:else}
+              <span class="reglas">sin umbrales</span>
+            {/if}
+          </button>
+        </li>
+      {/each}
+    </ul>
+  {/if}
+
+  {#if canalActual !== null}
+    <div class="filtros" role="group" aria-label="Rango del gráfico">
+      {#each RANGOS as r (r.clave)}
+        <button type="button" aria-pressed={rangoElegido === r.clave} onclick={() => elegirRango(r.clave)}>{r.rotulo}</button>
+      {/each}
+      {#if historico !== null}
+        <span class="vivo" data-historico>{historico.puntos} puntos, promedio por {historico.intervalo}; en vivo, cada lectura aparte</span>
+      {/if}
+    </div>
+    {#if errorHistorico !== null}
+      <p class="error" role="alert">{errorHistorico}</p>
+    {:else if historico !== null && historico.puntos === 0 && series[0].length === 0}
+      <p class="vacio">Sin mediciones en este rango.</p>
+    {/if}
+    <Grafico {series} unidad={canalActual.unidad} zona={d.zona_horaria} titulo={`${canalActual.magnitud_nombre} (${canalActual.unidad})`} />
+  {/if}
+
+  <h3>Condiciones</h3>
+  {#if condiciones.length === 0}
+    <p class="vacio">Sin condiciones registradas.</p>
+  {:else}
+    <div class="tabla">
+      <table>
+        <thead><tr><th scope="col">Tipo</th><th scope="col">Magnitud</th><th scope="col">Abierta</th><th scope="col">Duración</th><th scope="col">Estado</th></tr></thead>
+        <tbody>
+          {#each [...abiertas, ...condiciones.filter((c) => c.cerrada_en !== null)] as c (c.id)}
+            <tr data-condicion={c.cerrada_en === null ? 'abierta' : 'cerrada'}>
+              <td>{c.tipo}</td>
+              <td>{c.magnitud ?? '—'}</td>
+              <td title={horaLocal(c.abierta_en, d.zona_horaria)}>{haceCuanto(c.abierta_en, ahora)}</td>
+              <td>{Math.round(c.duracion_s / 60)} min</td>
+              <td>{c.cerrada_en === null ? 'abierta' : 'cerrada'}</td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    </div>
+  {/if}
+
+  <h3>Tramas rechazadas</h3>
+  {#if rechazadas.length === 0}
+    <p class="vacio">Ninguna trama de este dispositivo fue a cuarentena.</p>
+  {:else}
+    <ul class="rechazadas">
+      {#each rechazadas as t (t.id)}
+        <li>
+          <span title={horaLocal(t.recibido_en, d.zona_horaria)}>{haceCuanto(t.recibido_en, ahora)}</span> · <strong>{t.motivo}</strong>
+          {#if t.detalle !== null}· {t.detalle}{/if}
+          {#if t.payload !== null}
+            <details><summary>trama ({t.payload_formato ?? 'texto'})</summary><pre>{t.payload}</pre></details>
+          {/if}
+        </li>
+      {/each}
+    </ul>
+  {/if}
+{/if}

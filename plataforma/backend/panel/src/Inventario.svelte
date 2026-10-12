@@ -52,7 +52,7 @@
     try {
       const [d, c] = await Promise.all([
         obtener<DispositivoInventario[]>('/dispositivos'),
-        obtener<Condicion[]>('/condiciones?abiertas=true'),
+        obtener<Condicion[]>('/condiciones?abiertas=true&limite=500'),
       ]);
       dispositivos = d;
       abiertas = c;
@@ -70,7 +70,7 @@
     if (e.tipo === 'visto') {
       dispositivos = dispositivos.map((d) => (d.id === e.dispositivo_id ? { ...d, visto_por_ultima_vez: e.tiempo } : d));
     } else if (e.tipo === 'condicion') {
-      void obtener<Condicion[]>('/condiciones?abiertas=true')
+      void obtener<Condicion[]>('/condiciones?abiertas=true&limite=500')
         .then((c) => (abiertas = c))
         .catch(() => undefined);
     }
@@ -79,7 +79,9 @@
   onMount(() => {
     void cargar();
     const reloj = setInterval(() => (ahora = new Date()), 10_000);
+    // Al volver de una reconexión se repide todo (docs/19 F4): el canal no guarda cola y pudo perder visto o condicion.
     const c = abrirCanal('/eventos', alEvento, (estado, motivo) => {
+      if (canal === 'reconectando' && estado === 'en_vivo') void cargar();
       canal = estado;
       motivoCanal = motivo;
     });
@@ -122,7 +124,7 @@
 {:else if !cargado}
   <p class="vacio">Cargando…</p>
 {:else if filas.length === 0}
-  <p class="vacio">Sin dispositivos registrados. El alta se hace por la API (docs/10 §5); el primero aparecerá aquí al registrarse.</p>
+  <p class="vacio">Sin dispositivos registrados. El alta se hace por la API (docs/10 §8.4, punto 25); el primero aparecerá aquí al registrarse.</p>
 {:else if visibles.length === 0}
   <p class="vacio">Ningún dispositivo coincide con el filtro.</p>
 {:else}

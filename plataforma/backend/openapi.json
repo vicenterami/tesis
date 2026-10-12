@@ -191,6 +191,15 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "dispositivo",
+            "required": false,
+            "in": "query",
+            "description": "UUID del dispositivo: solo sus condiciones (ficha del panel)",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -214,6 +223,15 @@
             "required": false,
             "in": "query",
             "description": "1–500, por defecto 50",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "dispositivo",
+            "required": false,
+            "in": "query",
+            "description": "UUID del dispositivo: solo lo rechazado que se le atribuyó (ficha del panel)",
             "schema": {
               "type": "string"
             }

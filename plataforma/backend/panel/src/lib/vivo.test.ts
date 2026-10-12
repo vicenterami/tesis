@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ESPERA_MAX_MS, SIN_LATIDO_MS, abrirCanal, esperaReintento, type FuenteDeEventos } from './vivo';
+import { ESPERA_MAX_MS, SIN_LATIDO_MS, abrirCanal, esEventoVivo, esperaReintento, type FuenteDeEventos } from './vivo';
 
 // EventSource falso: registra oyentes y deja disparar eventos y errores a mano.
 class FuenteFalsa implements FuenteDeEventos {
@@ -20,7 +20,10 @@ class FuenteFalsa implements FuenteDeEventos {
     this.onopen?.(new Event('open'));
   }
   emitir(tipo: string, data: object): void {
-    this.oyentes.get(tipo)?.({ data: JSON.stringify(data) } as MessageEvent);
+    this.oyenteCrudo(tipo, JSON.stringify(data));
+  }
+  oyenteCrudo(tipo: string, data: string): void {
+    this.oyentes.get(tipo)?.({ data } as MessageEvent);
   }
   fallarCerrado(): void {
     this.readyState = 2;
@@ -31,6 +34,28 @@ class FuenteFalsa implements FuenteDeEventos {
 describe('esperaReintento: 1, 2, 4, 8, 16, 30, 30… segundos', () => {
   it('crece al doble y se detiene en 30 s', () =>
     expect([0, 1, 2, 3, 4, 5, 9].map(esperaReintento)).toEqual([1000, 2000, 4000, 8000, 16_000, ESPERA_MAX_MS, ESPERA_MAX_MS]));
+});
+
+describe('esEventoVivo: un evento sin la forma esperada se descarta, no rompe la pantalla', () => {
+  it('acepta los cuatro tipos con sus campos (el latido solo trae tiempo); rechaza sin tiempo, tipo desconocido, valor que no es número, o no objeto', () => {
+    expect(esEventoVivo('visto', { tipo: 'visto', dispositivo_id: 'd', tiempo: 't' })).toBe(true);
+    expect(esEventoVivo('medicion', { dispositivo_id: 'd', canal_id: 'c', valor: 1.5, unidad: 'Cel', tiempo: 't' })).toBe(true);
+    expect(esEventoVivo('condicion', { dispositivo_id: 'd', condicion: 'umbral', estado: 'abierta' })).toBe(true);
+    expect(esEventoVivo('latido', { tiempo: 't' })).toBe(true); // como lo manda el backend, sin «tipo» en los datos
+    expect(esEventoVivo('visto', { dispositivo_id: 'd' })).toBe(false);
+    expect(esEventoVivo('otro', { dispositivo_id: 'd', tiempo: 't' })).toBe(false);
+    expect(esEventoVivo('medicion', { dispositivo_id: 'd', canal_id: 'c', valor: '1.5', tiempo: 't' })).toBe(false);
+    expect(esEventoVivo('visto', 'texto')).toBe(false);
+    expect(esEventoVivo('latido', null)).toBe(false);
+  });
+  it('un latido llega al panel con su tipo puesto por el nombre del evento', () => {
+    const eventos: unknown[] = [];
+    const creadas: FuenteFalsa[] = [];
+    const c = abrirCanal('/eventos', (e) => eventos.push(e), () => undefined, () => { const f = new FuenteFalsa(); creadas.push(f); return f; });
+    creadas[0]!.emitir('latido', { tiempo: 't' });
+    expect(eventos).toEqual([{ tipo: 'latido', tiempo: 't' }]);
+    c.cerrar();
+  });
 });
 
 describe('abrirCanal (docs/19 F4)', () => {
@@ -52,6 +77,8 @@ describe('abrirCanal (docs/19 F4)', () => {
     const c = abrirCanal('/eventos', (e) => eventos.push(e), (s) => estados.push(s), crear);
     creadas[0]!.abrir();
     creadas[0]!.emitir('visto', { tipo: 'visto', dispositivo_id: 'd1', tiempo: 't' });
+    creadas[0]!.emitir('visto', { tipo: 'visto', dispositivo_id: 'd1' }); // sin tiempo: se descarta
+    creadas[0]!.oyenteCrudo('visto', 'esto no es JSON'); // ilegible: se descarta, sin excepción
     expect(eventos).toEqual([{ tipo: 'visto', dispositivo_id: 'd1', tiempo: 't' }]);
     expect(estados).toEqual(['conectando', 'en_vivo']);
     c.cerrar();

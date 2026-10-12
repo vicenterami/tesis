@@ -75,6 +75,35 @@ describe('Inventario (P2): semáforo, orden y filtros leídos del DOM', () => {
     await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(5));
   });
 
+  it('los filtros por vía y zona y la búsqueda reducen la tabla; la hora exacta va en el título de «hace cuánto»', async () => {
+    render(Inventario);
+    await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(5));
+    const via = screen.getByLabelText('Vía') as HTMLSelectElement;
+    via.value = 'http';
+    via.dispatchEvent(new Event('change'));
+    await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(2));
+    expect(screen.getAllByRole('row')[1]!.textContent).toContain('Azotea');
+    via.value = '';
+    via.dispatchEvent(new Event('change'));
+    const zona = screen.getByLabelText('Zona') as HTMLSelectElement;
+    zona.value = 'Terreno';
+    zona.dispatchEvent(new Event('change'));
+    await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(2));
+    expect(screen.getAllByRole('row')[1]!.textContent).toContain('Pozo');
+    zona.value = '';
+    zona.dispatchEvent(new Event('change'));
+    const buscar = screen.getByLabelText('Buscar') as HTMLInputElement;
+    buscar.value = 'dev-0002';
+    buscar.dispatchEvent(new Event('input'));
+    await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(2));
+    expect(screen.getAllByRole('row')[1]!.textContent).toContain('Bodega');
+    buscar.value = '';
+    buscar.dispatchEvent(new Event('input'));
+    await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(5));
+    const celda = screen.getByText('hace 1 h');
+    expect(celda.getAttribute('title')).toContain('(2026-10-12T14:00:00.000Z UTC)');
+  });
+
   it('sin dispositivos: el vacío explica qué hacer; con error de la API: el mensaje trae la acción', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify([]))));
     render(Inventario);

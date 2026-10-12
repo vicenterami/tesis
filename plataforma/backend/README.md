@@ -26,7 +26,8 @@ src/
 └── salud/salud.controller.ts  # GET /salud
 panel/                         # el panel (Svelte + Vite; docs/19): paquete del mismo workspace de pnpm
 ├── src/Inventario.svelte      # P2: inventario con semáforo, conteos, filtros y canal en vivo
-├── src/lib/                   # estado visual, cliente HTTP, canal en vivo con reconexión, tiempo
+├── src/Ficha.svelte           # P3: identidad, canales, gráfico (uPlot, Grafico.svelte) que sigue en vivo, condiciones, rechazadas
+├── src/lib/                   # estado visual, cliente HTTP, canal en vivo con reconexión, datos del gráfico, tiempo
 ├── src/**/*.test.ts           # pruebas (vitest; las de pantalla, por el DOM con jsdom)
 └── vite.config.ts             # base /panel/, reenvío al backend en desarrollo, build sin .map
 ```
@@ -200,8 +201,7 @@ curl -N http://127.0.0.1:3000/eventos
 ## Imagen del contenedor (`Dockerfile`)
 
 *Multi-stage* (`docs/10 §6`): la etapa `build` usa Node con las herramientas de desarrollo para compilar (`pnpm build`); la
-imagen final (`runtime`) parte de la misma base *slim*, solo lleva `dist/` y las dependencias de
-producción, corre como usuario sin privilegios (`node`) y expone un `HEALTHCHECK` contra `GET /salud`.
-El almacén de pnpm se borra explícitamente tras instalar (`pnpm store prune` no basta: no borra lo que
-sigue referenciado). El panel Svelte no existe todavía en el código: cuando exista, se agrega como una
-etapa más sin cambiar esta estructura.
+imagen final (`runtime`) parte de la misma base *slim*, lleva `dist/`, `panel/dist/` (el panel compilado por Vite en la misma
+etapa de build, `docs/19`) y solo las dependencias de producción del backend (`--filter`: `svelte` no viaja), corre como
+usuario sin privilegios (`node`) y expone un `HEALTHCHECK` contra `GET /salud`. El almacén de pnpm se borra explícitamente
+tras instalar (`pnpm store prune` no basta: no borra lo que sigue referenciado).

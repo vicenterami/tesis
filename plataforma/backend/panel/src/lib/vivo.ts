@@ -8,6 +8,31 @@ export const SIN_LATIDO_MS = 60_000;
 const CERRADO = 2; // EventSource.CLOSED, sin depender del global (las pruebas corren sin navegador)
 const TIPOS = ['medicion', 'visto', 'condicion', 'latido'] as const;
 
+// El tipo lo dice el nombre del evento SSE (`event:`), que el backend pone en los cuatro casos; los datos lo repiten en
+// medicion, visto y condicion, pero el latido trae solo {tiempo} (eventos.controller.ts). El emisor es nuestro backend,
+// pero un proxy intermedio o una versión vieja pueden mandar algo distinto: lo que no tenga la forma esperada se descarta
+// sin romper la pantalla (revisión del 12/10). Se mira lo que el panel usa.
+export function esEventoVivo(tipo: string, x: unknown): x is Omit<EventoVivo, 'tipo'> {
+  if (typeof x !== 'object' || x === null) return false;
+  const e = x as Record<string, unknown>;
+  switch (tipo) {
+    case 'latido': return typeof e.tiempo === 'string';
+    case 'visto': return typeof e.dispositivo_id === 'string' && typeof e.tiempo === 'string';
+    case 'medicion': return typeof e.dispositivo_id === 'string' && typeof e.canal_id === 'string' && typeof e.valor === 'number' && typeof e.tiempo === 'string';
+    case 'condicion': return typeof e.dispositivo_id === 'string' && typeof e.condicion === 'string' && (e.estado === 'abierta' || e.estado === 'cerrada');
+    default: return false;
+  }
+}
+
+function decodificar(tipo: string, texto: unknown): EventoVivo | null {
+  try {
+    const x: unknown = JSON.parse(String(texto));
+    return esEventoVivo(tipo, x) ? ({ ...x, tipo } as EventoVivo) : null;
+  } catch {
+    return null;
+  }
+}
+
 export type EstadoCanal = 'conectando' | 'en_vivo' | 'reconectando';
 
 // Lo mínimo que usamos de EventSource; el EventSource real lo cumple y las pruebas usan uno falso.
@@ -72,8 +97,9 @@ export function abrirCanal(
     };
     for (const tipo of TIPOS) {
       f.addEventListener(tipo, (ev) => {
-        armarVigilante();
-        alEvento(JSON.parse(ev.data as string) as EventoVivo);
+        armarVigilante(); // cualquier mensaje del servidor, válido o no, prueba que el canal vive
+        const e = decodificar(tipo, ev.data);
+        if (e !== null) alEvento(e);
       });
     }
   };

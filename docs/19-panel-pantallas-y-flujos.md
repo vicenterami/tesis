@@ -32,6 +32,10 @@ el modelo de datos.
 | **Alerta** | hay una condición abierta de tipo `umbral`, `bateria` o `manipulacion` | Reporta, pero algo está fuera de lo normal |
 | **Normal** | ninguna de las anteriores | Reporta a tiempo y dentro de rango |
 
+`en_linea` lo trae la API, pero el panel lo recalcula con la misma regla (visto dentro de 2 × intervalo esperado) para que cambie
+con cada `visto` del canal en vivo y con el paso del tiempo sin repedir el inventario; sin ninguna trama todavía es nulo y el
+dispositivo se muestra **Normal** hasta la primera.
+
 El estado nunca se comunica solo por color: lleva su palabra al lado (accesibilidad, y porque los colores se imprimen mal). La
 función que lo calcula es una sola, con prueba unitaria por cada fila de la tabla y por el orden entre filas.
 
@@ -39,8 +43,8 @@ función que lo calcula es una sola, con prueba unitaria por cada fila de la tab
 | # | Pantalla | Qué muestra | Acciones | Datos (ruta real o propuesta) | Requisitos | Cuándo |
 |---|---|---|---|---|---|---|
 | P1 | **Resumen del sitio** | Conteo por estado visual (los cuatro), condiciones abiertas, últimas tramas rechazadas, estado del servicio | Ir a cada lista filtrada | `GET /dispositivos`, `GET /condiciones?abiertas=true`, `GET /cuarentena?limite=5`, `GET /salud` | RF-30, HU-16 | Etapa 4 (`docs/04`); los conteos por estado ya aparecen en P2 desde la Etapa 3 |
-| P2 | **Inventario** | Tabla: estado visual, nombre, identificador físico, vía, zona, última trama (hace cuánto), condiciones abiertas; filtros por estado, zona y vía con conteo | Abrir la ficha; filtrar; buscar por nombre o identificador | `GET /dispositivos` (filtra el panel: hoy la API no filtra) | Semáforo y tabla: RF-47, RF-48, HU-10, HU-19. Filtros y búsqueda: RF-51, HU-20 (adelantada a la Etapa 3 el 12/10), HU-23 | Etapa 3, tramo 2 |
-| P3 | **Ficha del dispositivo** | Identidad (nombre, identificador, vía, formato, zona, sitio, intervalo esperado, desde cuándo); estado visual; por canal: última lectura con unidad y reglas de umbral; gráfico histórico por canal (rango y agregación elegibles) que sigue en vivo; condiciones abiertas y cerradas del dispositivo; sus tramas rechazadas | Cambiar canal, rango e intervalo; pausar el vivo; ir a configurar (P6) o a mudar (Etapa 4) | `GET /dispositivos/{id}`, `GET /canales/{id}/historico?desde&hasta&intervalo`, `GET /eventos?dispositivo=`, `GET /condiciones`, `GET /cuarentena` | RF-33, RF-49, HU-07, HU-21 (adelantada a la Etapa 3 el 12/10, con sus 7 h) | Etapa 3, tramo 3 |
+| P2 | **Inventario** | Tabla: estado visual, nombre, identificador físico, vía, zona, última trama (hace cuánto), condiciones abiertas; filtros por estado, zona y vía con conteo | Abrir la ficha; filtrar; buscar por nombre o identificador | `GET /dispositivos` y `GET /condiciones?abiertas=true&limite=500` (el tipo de cada condición abierta decide el estado, §2; filtra el panel: hoy la API no filtra) | Semáforo y tabla: RF-47, RF-48, HU-10, HU-19. Filtros y búsqueda: RF-51, HU-20 (adelantada a la Etapa 3 el 12/10) | Etapa 3, tramo 2 |
+| P3 | **Ficha del dispositivo** | Identidad (nombre, identificador, vía, formato, zona, sitio, intervalo esperado, desde cuándo); estado visual; por canal: última lectura con unidad y reglas de umbral; gráfico histórico por canal (rango y agregación elegibles) que sigue en vivo; condiciones abiertas y cerradas del dispositivo; sus tramas rechazadas | Cambiar canal, rango e intervalo; pausar el vivo; ir a configurar (P6) o a mudar (Etapa 4) | `GET /dispositivos/{id}`, `GET /canales/{id}/historico?desde&hasta&intervalo`, `GET /eventos?dispositivo=`, `GET /condiciones`, `GET /cuarentena` | RF-33, RF-49, HU-21 (adelantada a la Etapa 3 el 12/10, con sus 7 h); el rango a medida por fechas es HU-07 (Etapa 4) | Etapa 3, tramo 3 |
 | P4 | **Condiciones** | Lista con tipo, dispositivo, magnitud y umbral, abierta en, duración; filtro abiertas / todas | Abrir la ficha del dispositivo | `GET /condiciones?abiertas&limite` | HU-05, RF-24 | Etapa 4 (lista sobre lo que la API ya devuelve) |
 | P5 | **Cuarentena** | Últimas tramas rechazadas: cuándo, por qué (`no_registrado`, `dado_de_baja`, `malformada`, `invalida`), detalle, dispositivo si se conoce, la trama cruda plegada | Copiar la trama; ir al alta si el motivo es `no_registrado` | `GET /cuarentena?limite` | RF-11 a RF-13 | Etapa 4 (lista sobre lo que la API ya devuelve) |
 | P6 | **Configurar dispositivo y canales** | Nombre, estado (activo / mantenimiento), intervalo esperado; por canal, umbral alto, umbral bajo, histéresis | Guardar con bloqueo optimista; validación en vivo (bajo < alto, histéresis dentro de la banda, rango de la magnitud) | **Propuesta:** `PATCH /dispositivos/{id}`, `PUT /canales/{id}/reglas` | HU-06, HU-13, punto 28 | Etapa 4 (exige sesión) |
@@ -58,8 +62,8 @@ para después de la Etapa 4 si sobra tiempo), compartir dispositivos entre cuent
 visual, que al pulsarlas filtran la tabla (misma leyenda que en P1 y P3). Columnas: estado visual, nombre, identificador físico,
 vía, zona, última trama como «hace 3 min» con la hora exacta al pasar el cursor, condiciones abiertas. Orden por defecto: los
 que requieren atención primero (Sin señal, Alerta, luego Normal, luego Inactivo), y dentro de cada grupo por nombre. Filtros
-por zona y vía con conteo y búsqueda por texto: HU-20, en el mismo tramo (adelantada el 12/10). Vacío: «Sin dispositivos registrados» con el enlace al alta por API (`docs/10
-§5`). Esta pantalla es la que comprueba el reenvío de Vite en desarrollo (`docs/11 §4`): una petición real a la API y una al
+por zona y vía con conteo y búsqueda por texto: HU-20, en el mismo tramo (adelantada el 12/10). Vacío: «Sin dispositivos registrados» con la referencia al alta por API (`docs/10
+§3` y §8.4 punto 25). Esta pantalla es la que comprueba el reenvío de Vite en desarrollo (`docs/11 §4`): una petición real a la API y una al
 canal en vivo, y se mira en el backend que el `Host` llegue con el puerto del servidor de desarrollo y que los eventos no se
 retengan.
 
@@ -110,9 +114,10 @@ descargar; la descarga exige rol de administrador; la vista pública nunca ofrec
 - **Vacíos con camino:** ninguna lista queda en blanco; dice qué significa estar vacía y qué hacer.
 - **Sin scripts en línea** ni recursos externos: la CSP del backend (`docs/11`) prohíbe ambos; fuentes y estilos van en el
   paquete del panel. Los `.map` no se publican.
-- **Pruebas por el DOM, en los dos sentidos, con el build que sirve el backend** (no solo el servidor de desarrollo): lo que
-  debe mostrarse se lee del DOM (textos, conteos, filas), lo que debe frenarse se comprueba que no aparece; y una prueba
-  de que el estado visual de cada fila coincide con la función de la §2.
+- **Pruebas por el DOM, en los dos sentidos**: lo que debe mostrarse se lee del DOM (textos, conteos, filas), lo que debe
+  frenarse se comprueba que no aparece; y una prueba de que el estado visual de cada fila coincide con la función de la §2.
+  Corren sobre el código fuente en jsdom; el build que sirve el backend se comprueba aparte con `pruebas/panel-desarrollo.sh`
+  (cabeceras, CSP, paquete con hash, sin `.map`); una prueba con navegador real no existe todavía (`docs/16`).
 - **Un solo cliente HTTP** en el panel, que añade el prefijo de la API, interpreta los códigos y expone el 409 como tal.
 - **Rendimiento:** el histórico llega agregado (cientos de puntos); uPlot dibuja; el vivo añade al final; en P2 la tabla se
   recalcula solo con los eventos recibidos, no repidiendo el inventario cada vez.
@@ -121,7 +126,7 @@ descargar; la descarga exige rol de administrador; la vista pública nunca ofrec
 | Pantalla | Requisitos | Entra en | Cómo se prueba |
 |---|---|---|---|
 | P2 Inventario con semáforo y filtros | RF-47, RF-48, RF-51, HU-10, HU-19, HU-20 | Tramo 2 (Etapa 3) | Semilla conocida → conteos y filas en el DOM; un dispositivo en mantenimiento aparece «Inactivo»; filtro por vía reduce la tabla; el reenvío de Vite conserva el `Host` y no retiene el canal (`pruebas/panel-desarrollo.sh`, `docs/16 §16`) |
-| P3 Ficha | RF-33, RF-49, HU-07, HU-21 | Tramo 3 (Etapa 3) | Histórico: los puntos del DOM coinciden con `/historico`; vivo: publicar una trama por MQTT y verla aparecer sin recargar; reconexión: apagar el backend 5 s y ver «reconectando» y luego la medición perdida tras repedir |
+| P3 Ficha | RF-33, RF-49, HU-21 | Tramo 3 (Etapa 3) | Histórico: los puntos del DOM coinciden con `/historico`; vivo: publicar una trama por MQTT y verla aparecer sin recargar; reconexión: apagar el backend 5 s y ver «reconectando» y luego la medición perdida tras repedir |
 | P4 Condiciones, P5 Cuarentena | HU-05, RF-11 a RF-13, RF-24 | Etapa 4 | Trama fuera de rango → fila en P4 en vivo; trama de un desconocido → fila en P5 con motivo `no_registrado` |
 | P1 Resumen | RF-30, HU-16 | Etapa 4 | Los cuatro conteos suman el total del inventario; cambian en vivo con F3 |
 | P6 a P10 | HU-06, HU-08, HU-11, HU-13, HU-18, HU-22; RF-34, RF-43, RF-44, RF-50 | Etapa 4 |

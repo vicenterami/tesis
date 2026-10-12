@@ -6,7 +6,7 @@ flowchart TB
             C5["proxy<br/>nginx (decidido el 06/10) · TLS<br/>límite 0,1 GB · publica 443, 8883 · 1700/udp solo ruta A"]
             C1["mosquitto<br/>eclipse-mosquitto 2.0.22<br/>límite 0,25 GB"]
             C2["chirpstack + redis propio<br/>solo ruta A (opcional)<br/>límite 0,35 GB"]
-            C4["backend<br/>imagen propia: NestJS (Etapa 2); + panel estático cuando exista<br/>límite 0,5 GB · sin estado"]
+            C4["backend<br/>imagen propia: NestJS + panel estático en /panel (12/10)<br/>límite 0,5 GB · sin estado"]
             C3["timescaledb<br/>timescale/timescaledb 2.30.2-pg16-oss (edición Apache) + parches<br/>límite 0,75 GB"]
         end
         V4[("vol: certificados")]

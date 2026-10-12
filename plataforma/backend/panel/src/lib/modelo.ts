@@ -49,5 +49,55 @@ export interface Salud {
 export type EventoVivo =
   | { tipo: 'medicion'; dispositivo_id: string; canal_id: string; valor: number; unidad: string; tiempo: string }
   | { tipo: 'visto'; dispositivo_id: string; tiempo: string }
-  | { tipo: 'condicion'; dispositivo_id: string; condicion: string; estado: 'abierta' | 'cerrada' }
+  | { tipo: 'condicion'; dispositivo_id: string; condicion: TipoCondicion | string; estado: 'abierta' | 'cerrada' }
   | { tipo: 'latido'; tiempo: string };
+
+export interface ReglaUmbral {
+  id: string;
+  umbral_alto: number | null;
+  umbral_bajo: number | null;
+  histeresis: number | null;
+}
+
+export interface CanalFicha {
+  id: string;
+  magnitud: string;
+  magnitud_nombre: string;
+  unidad: string;
+  etiqueta: string | null;
+  reglas: ReglaUmbral[] | null;
+  ultima_medicion: { valor: number; tiempo: string } | null;
+}
+
+// GET /dispositivos/{id}: lo mismo que el inventario más `creado_en`, y los canales con reglas y última lectura.
+export interface DispositivoFicha extends Omit<DispositivoInventario, 'canales' | 'condiciones_abiertas'> {
+  creado_en: string;
+  canales: CanalFicha[];
+}
+
+// GET /canales/{id}/historico: columnar, listo para uPlot (tiempos en segundos Unix).
+export interface Historico {
+  canal_id: string;
+  magnitud: string;
+  unidad: string;
+  zona_horaria: string;
+  intervalo: string;
+  desde: string;
+  hasta: string;
+  puntos: number;
+  tiempos: number[];
+  valores: number[];
+  muestras: number[];
+}
+
+export interface TramaRechazada {
+  id: string;
+  origen: string;
+  topico: string | null;
+  motivo: 'no_registrado' | 'dado_de_baja' | 'malformada' | 'invalida';
+  detalle: string | null;
+  dispositivo: string | null;
+  recibido_en: string;
+  payload: string | null;
+  payload_formato: string | null;
+}

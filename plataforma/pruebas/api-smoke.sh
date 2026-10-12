@@ -43,6 +43,14 @@ caso "contrato OpenAPI servido con 7 rutas, con el canal /eventos como text/even
 caso "OpenAPI servido == OpenAPI versionado (mismas rutas y métodos)" /docs/openapi.json \
   "sorted((p,m) for p,ops in r['paths'].items() for m in ops if m in {'get','post','put','patch','delete'}) == sorted((p,m) for p,ops in json.load(open('$OPENAPI_COMMITTED'))['paths'].items() for m in ops if m in {'get','post','put','patch','delete'})"
 caso "cuarentena limitada a 2"                "/cuarentena?limite=2" "isinstance(r,list) and len(r)<=2"
+# Filtro por dispositivo (ficha del panel, docs/19 P3; 12/10): solo lo de ese dispositivo, y un valor que no es UUID → 400.
+DISP=$(curl -s "$API/dispositivos" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0]['id'] if d else '')")
+if [ -n "$DISP" ]; then
+  caso "condiciones filtradas por dispositivo: todas de ese dispositivo" "/condiciones?dispositivo=$DISP" "isinstance(r,list) and all(c['dispositivo_id']=='$DISP' for c in r)"
+  caso "cuarentena filtrada por dispositivo: lista (sin dueño ajeno)" "/cuarentena?dispositivo=$DISP&limite=5" "isinstance(r,list) and len(r)<=5"
+fi
+caso "condiciones con dispositivo que no es UUID → 400" "/condiciones?dispositivo=dev-0001" 400
+caso "cuarentena con dispositivo que no es UUID → 400"  "/cuarentena?dispositivo=x" 400
 # Cabeceras de seguridad (docs/11 §3). Se leen con -I; el helper `caso` mira cuerpos, así que van aparte.
 cab=$(curl -s -I --max-time 10 "$API/dispositivos" | tr -d '\r')
 cabecera() { # nombre · regex que debe (o no) aparecer · esperado: si|no

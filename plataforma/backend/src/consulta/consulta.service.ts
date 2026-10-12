@@ -86,8 +86,16 @@ export class ConsultaService {
     };
   }
 
-  async condiciones(abiertas: boolean | undefined, lim: number) {
-    const filtro = abiertas === undefined ? '' : abiertas ? 'WHERE c.cerrada_en IS NULL' : 'WHERE c.cerrada_en IS NOT NULL';
+  // `dispositivoId` (opcional, ya validado como UUID por el controlador): solo las de ese dispositivo (ficha del panel, docs/19 P3).
+  async condiciones(abiertas: boolean | undefined, lim: number, dispositivoId?: string) {
+    const condiciones: string[] = [];
+    const parametros: unknown[] = [lim];
+    if (abiertas !== undefined) condiciones.push(abiertas ? 'c.cerrada_en IS NULL' : 'c.cerrada_en IS NOT NULL');
+    if (dispositivoId !== undefined) {
+      parametros.push(dispositivoId);
+      condiciones.push(`c.dispositivo_id = $${parametros.length}`);
+    }
+    const filtro = condiciones.length === 0 ? '' : `WHERE ${condiciones.join(' AND ')}`;
     const r = await this.pool.query(`
       SELECT c.id, c.tipo, c.abierta_en, c.cerrada_en,
              extract(epoch FROM coalesce(c.cerrada_en, now()) - c.abierta_en)::int AS duracion_s,
@@ -98,21 +106,25 @@ export class ConsultaService {
         LEFT JOIN regla_umbral r ON r.id = c.regla_id
         LEFT JOIN canal ca ON ca.id = r.canal_id
         ${filtro}
-       ORDER BY c.abierta_en DESC LIMIT $1`, [lim]);
+       ORDER BY c.abierta_en DESC LIMIT $1`, parametros);
     return r.rows;
   }
 
   // La carga cruda se devuelve acotada: es para diagnosticar, no para reprocesar. payload_legible (migración 09)
   // da texto si es UTF-8 y hexadecimal si no: antes, una sola trama binaria hacía fallar la consulta entera.
   // El detalle dice el porqué concreto («temperatura: 500 Cel fuera del rango físico [-40, 85]»).
-  async cuarentena(lim: number) {
+  // `dispositivoId` (opcional, UUID validado): solo lo rechazado de ese dispositivo (las de `no_registrado` no tienen dueño).
+  async cuarentena(lim: number, dispositivoId?: string) {
+    const filtro = dispositivoId === undefined ? '' : 'WHERE q.dispositivo_id = $2';
+    const parametros = dispositivoId === undefined ? [lim] : [lim, dispositivoId];
     const r = await this.pool.query(`
       SELECT q.id, q.origen, q.topico, q.motivo, q.detalle, d.id_fisico AS dispositivo, q.recibido_en,
              p.texto AS payload, p.formato AS payload_formato
         FROM cuarentena q
         LEFT JOIN dispositivo d ON d.id = q.dispositivo_id
         CROSS JOIN LATERAL payload_legible(q.payload_crudo, 200) p
-       ORDER BY q.recibido_en DESC LIMIT $1`, [lim]);
+        ${filtro}
+       ORDER BY q.recibido_en DESC LIMIT $1`, parametros);
     return r.rows;
   }
 }

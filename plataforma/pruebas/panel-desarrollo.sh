@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Comprueba, con el servidor de desarrollo de Vite real, lo que docs/11 §4 promete del reenvío al backend (12/10/2026):
+# Comprueba, con el servidor de desarrollo de Vite real, lo que docs/11 §3 promete del reenvío al backend (12/10/2026):
 #   (a) conserva el Host (el backend compara Origin con Host en el canal en vivo: por el 5173 debe dar 200 con el Origin
 #       propio y 403 con otro); (b) no retiene los eventos del canal (el primer byte llega enseguida y el latido, a los 25 s);
 #   (c) el panel se sirve bajo /panel/. Y, con el build real servido por el backend: /panel/ con la CSP del backend, los
@@ -11,7 +11,8 @@ API="${API:-http://127.0.0.1:3000}"; DEV="http://127.0.0.1:5173"; fallos=0
 ok() { echo "OK    $1"; }; falla() { echo "FALLA $1"; fallos=$((fallos+1)); }
 curl -fs -m 5 "$API/salud" >/dev/null || { echo "FALLA el backend no responde en $API"; exit 1; }
 T=$(mktemp -d); trap 'kill "${VITE_PID:-}" 2>/dev/null; rm -rf "$T"' EXIT
-pnpm exec vite --logLevel error > "$T/vite.log" 2>&1 & VITE_PID=$!
+# El binario directo, no `pnpm exec`: así $! es el PID de Vite y el trap lo mata de verdad (revisión del 12/10).
+node_modules/.bin/vite --logLevel error > "$T/vite.log" 2>&1 & VITE_PID=$!
 for _ in $(seq 1 40); do curl -s -o /dev/null -m 1 "$DEV/panel/" && break; sleep 0.25; done
 curl -s -m 5 "$DEV/panel/" | grep -q '<div id="app">' && ok "Vite sirve el panel en /panel/" || falla "Vite no sirvió /panel/ ($(tail -2 "$T/vite.log"))"
 # (a) Host conservado: Origin propio por el 5173 → 200; otro origen → 403. Si Vite cambiara el Host (changeOrigin), el
@@ -30,6 +31,7 @@ for _ in $(seq 1 20); do [ -s "$T/sse" ] && break; sleep 0.25; done
 [ -s "$T/sse" ] && ok "canal en vivo por el 5173: primer byte en menos de 5 s (sin búfer)" || falla "canal en vivo por el 5173: nada en 5 s (¿Vite retiene el flujo?)"
 if [ "${1:-}" != rapido ]; then wait "$SSE_PID" 2>/dev/null; grep -q "event: latido" "$T/sse" && ok "latido recibido a través de Vite (30 s de escucha)" || falla "sin latido en 30 s a través de Vite"; else kill "$SSE_PID" 2>/dev/null; fi
 kill "$VITE_PID" 2>/dev/null; wait "$VITE_PID" 2>/dev/null; VITE_PID=
+sleep 0.5; [ "$(ss -ltn 2>/dev/null | grep -c ':5173 ')" = 0 ] && ok "Vite terminado: el 5173 queda libre" || falla "el 5173 sigue ocupado tras matar a Vite"
 # Build real servido por el backend (docs/11 §4): CSP del backend, archivos con hash, sin .map.
 cab=$(curl -s -D - -o "$T/index.html" -m 5 "$API/panel/" | tr -d '\r')
 grep -q '<div id="app">' "$T/index.html" && ok "el backend sirve /panel/ (build real)" || falla "el backend no sirvió /panel/ (¿construido? pnpm --filter panel build y reconstruir la imagen)"

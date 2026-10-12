@@ -20,7 +20,10 @@
    `bash plataforma/pruebas/clave-dispositivo.sh dev-0001` (pide la clave oculta, reinicia el broker y
    verifica que autentica; `docs/11 §7`). Se hace **antes de todo lo demás**: el reinicio del broker corta
    la conexión del backend unos segundos.
-2. **Levantar, cargar datos y verificar:**
+2. **Abrir el panel** en una pestaña y dejarla: `http://127.0.0.1:3000/panel/` (inventario con semáforo; lo sirve el backend ya
+   construido en la imagen; si el backend corre fuera de Docker, antes `pnpm --filter panel build`). Durante el paso 4 se
+   verá cambiar el estado sin recargar, y en la ficha del dispositivo, el gráfico con la lectura en vivo.
+2b. **Levantar, cargar datos y verificar:**
 
 ```bash
 bash plataforma/pruebas/pila.sh encender      # construye, levanta, espera «healthy» y muestra el estado
@@ -118,11 +121,9 @@ no alcanza: `pila.sh sql "SELECT tipo, abierta_en, cerrada_en FROM condicion ORD
 
 ## 5. La API y su contrato (2 min)
 
-**Antes (desde el 12/10, 1 min):** abrir `http://127.0.0.1:3000/panel/`: el inventario con el semáforo en cuatro estados
-(`docs/19`), las fichas con el conteo, y «en vivo: conectado». Dejar la pestaña abierta: en el paso 4, el dispositivo pasará a
-«Sin señal» y volverá a «Normal» sin recargar. La ficha del dispositivo llega con el tramo 3.
-
-**Decir:** lo que el panel muestra sale de esta API, que cualquier sistema puede consumir. Y el contrato OpenAPI se genera
+**Decir (con el panel ya abierto desde §0):** lo que acaba de pasar en el paso 4 se vio en el panel sin recargar: el dispositivo
+pasó a «Alerta» con el 35, a «Sin señal» al callarlo y volvió a «Normal»; y su ficha muestra el gráfico del canal con la lectura
+en vivo. Ahora, lo que hay detrás: lo que el panel muestra sale de esta API, que cualquier sistema puede consumir. Y el contrato OpenAPI se genera
 desde el código, así que no puede describir rutas que no existen.
 
 En `/docs`:
