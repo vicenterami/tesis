@@ -8,7 +8,7 @@ import { NestFactory } from '@nestjs/core';
 import type { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
-import { hostsPermitidos, interfazDeEscucha, rechazoDeHost, registrosEnJson, servirDocumentacion } from './arranque';
+import { AvisosAcotados, hostsPermitidos, interfazDeEscucha, rechazoDeHost, registrosEnJson, servirDocumentacion } from './arranque';
 import { configurarOpenApi } from './openapi';
 
 // Punto de entrada. Levanta la aplicación Nest: al iniciarse, cada módulo se conecta a lo suyo
@@ -35,11 +35,13 @@ async function arrancar(): Promise<void> {
   // Lista de nombres de host (docs/11 §3, docs/10 §8.4 punto 40): toda petición cuyo `Host` no sea uno de los locales ni uno
   // de HTTP_HOSTS recibe 421 y no llega a ninguna ruta. Es lo que detiene el DNS rebinding, que el control
   // de origen del canal en vivo no cubre (eventos.controller.ts). El rechazo se registra como WARN, acotado.
-  const permitidos = hostsPermitidos(process.env.HTTP_HOSTS);
+  const permitidos = hostsPermitidos(process.env.HTTP_HOSTS); // un valor malformado detiene el arranque, a propósito
+  const avisos = new AvisosAcotados();
   app.use((req: Request, res: Response, next: NextFunction) => {
     const rechazo = rechazoDeHost(req.headers.host, permitidos);
     if (rechazo === null) return next();
-    log.warn(`petición rechazada (421): ${rechazo}`);
+    const aviso = avisos.registrar(rechazo);
+    if (aviso !== null) log.warn(`petición rechazada (421): ${aviso}`);
     res.status(421).json({ statusCode: 421, message: 'host no permitido' });
   });
 

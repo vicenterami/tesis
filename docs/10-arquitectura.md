@@ -810,6 +810,8 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     punta en el banco (`banco.sh proxy`, `docs/16 §9`). Por defecto escucha solo en 127.0.0.1 y usa una CA de desarrollo
     (`proxy/ca-desarrollo.sh`, fuera del repositorio); exponerlo y el certificado real son decisiones del despliegue
     (por decidir: Let's Encrypt por ACME si hay DNS público y puerto 80, CA propia si el servidor es solo de campus).
+    Desde el 12/10/2026 el `nginx.conf` es una plantilla con el nombre público (`PROXY_NOMBRE`) y la interfaz de
+    publicación va por tipo de cliente (`PROXY_IP_DISPOSITIVOS`, `PROXY_IP_PERSONAS`): punto 40 y `docs/11 §7`.
 23. **`intervalo_esperado_s` es el silencio máximo normal del dispositivo, no su periodo (decisión del estudiante,
     07/10/2026).** Con 1 % de pérdida, declararlo igual al periodo produjo 108 alarmas de silencio falsas en
     90 s; declarado como 2 × periodo, 3 (`docs/16 §3 y §6.1`). RNF-03 y el código no cambian: cambia qué número se pone al
@@ -925,11 +927,16 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     El control de origen del canal en vivo (§5) no detiene a una página maliciosa que hace que su propio nombre resuelva a
     127.0.0.1: para el navegador sigue siendo su mismo origen, no manda `Origin` y marca `same-origin`, pero la petición
     llega con SU nombre en `Host`. Dos capas con la misma lista. El backend acepta siempre `localhost` y `127.0.0.1` (solo
-    llegan desde el propio equipo o contenedor: el chequeo de salud, el operador, el proxy por la red interna; una página
-    ajena no puede hacer que el navegador los escriba, porque para él «localhost» es el equipo de la víctima) más los
+    llegan desde el propio equipo o contenedor: el chequeo de salud y el operador; el proxy no, porque reenvía el nombre
+    público que mandó el cliente, y por eso ese nombre entra por `HTTP_HOSTS`; una página ajena no puede hacer que el
+    navegador los escriba, porque para él «localhost» es el equipo de la víctima) más los
     nombres de `HTTP_HOSTS`, y responde 421 a cualquier otro `Host` antes de llegar a una ruta. El proxy atiende solo el
-    nombre público (`PROXY_NOMBRE`, un `server_name` explícito): para cualquier otro rechaza el saludo TLS en 443 (sin
-    entregar siquiera el certificado) y cierra la conexión en 80. Se compara el nombre, no el puerto: el ataque cambia el
+    nombre público (`PROXY_NOMBRE`, un `server_name` explícito): con otro nombre en el SNI, o por IP sin SNI, rechaza el
+    saludo TLS en 443 sin entregar siquiera el certificado; con el SNI propio pero otro `Host`, responde 421 sin llegar
+    al backend; en 80 cierra la conexión sin respuesta. Un valor de `PROXY_NOMBRE` sin forma de nombre (`;`, llaves,
+    espacios) detiene el arranque del backend, que lo recibe como `HTTP_HOSTS`, y con él el del proxy: se lee en el
+    registro en vez de pegarse en la plantilla de nginx. Cada rechazo deja un WARN acotado: uno por motivo y por minuto,
+    con cuántos se callaron. Se compara el nombre, no el puerto: el ataque cambia el
     nombre, y el puerto varía por entorno (3000, 5173 tras Vite, 8443 en el banco, 443 en el servidor); exigirlo sería una
     variable más por ambiente, justo lo que se evitó para `Origin`. Una sola variable en el `.env` del servidor
     (`PROXY_NOMBRE`) alimenta las dos capas. Lo que no cubre: un cliente que no es un navegador manda el `Host` que quiera;

@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 121 pruebas unitarias, sin matriz formal) y TT-32 (sensor físico);
+cubre todavía: TT-27 (contrato de trama: hoy 126 pruebas unitarias, sin matriz formal) y TT-32 (sensor físico);
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -151,7 +151,8 @@ una CA de desarrollo (`proxy/ca-desarrollo.sh`, fuera del repositorio) y se prob
 | Registro del proxy | una línea JSON por petición y por conexión, con la IP real del cliente |
 
 Lo que esta prueba no cubre: el certificado real del servidor (por decidir, `docs/10 §8.4` punto 22), el límite de tasa (`docs/11 §4`) y la
-exposición a la red (por defecto el proxy escucha solo en 127.0.0.1).
+exposición a la red (por defecto el proxy escucha solo en 127.0.0.1; desde el 12/10, una interfaz por tipo de cliente y solo el nombre
+público: §15).
 
 ## 10. Capacidad, picos y saturación (08/10/2026)
 
@@ -292,9 +293,9 @@ base ni el broker, y las 6 rutas que ya existían salen idénticas; (4) una imag
 
 ## 15. Lista de nombres de host contra el *DNS rebinding* (12/10/2026)
 
-`docs/10 §8.4` punto 40; controles en `docs/11 §3`. Backend: 14 pruebas nuevas en `arranque.spec.ts` (lista, forma del `Host`,
-rechazo); con el rechazo anulado a mano (cambio temporal, restaurado y comparado con `cmp`) fallan exactamente las 3 que lo
-cubren. Pila de desarrollo reconstruida y `api-smoke.sh` con 5 casos nuevos (121 pruebas unitarias en total). Proxy sobre el
+`docs/10 §8.4` punto 40; controles en `docs/11 §3`. Backend: 19 pruebas nuevas en `arranque.spec.ts` (lista y su validación, forma
+del `Host`, rechazo, avisos acotados); con el rechazo anulado a mano (cambio temporal, restaurado y comparado con `cmp`) fallan
+exactamente las 3 que lo cubren. Pila de desarrollo reconstruida y `api-smoke.sh` con 6 casos nuevos (126 pruebas unitarias en total). Proxy sobre el
 banco (`banco.sh proxy`, puertos 8443 y 8081, `PROXY_NOMBRE` sin definir = `localhost`):
 
 | Comprobación | Resultado |
@@ -311,3 +312,11 @@ banco (`banco.sh proxy`, puertos 8443 y 8081, `PROXY_NOMBRE` sin definir = `loca
 
 Lo que no cubre: un cliente que no es un navegador (curl) manda el `Host` que quiera; lo cubre la sesión (Etapa 4). El registro
 del proxy deja una línea por intento (estado 421 o 444) con la IP de origen.
+
+**Revisión del 12/10 sobre este cambio (corregido el mismo día):** (1) el texto de `docs/10` y `docs/11` decía «saludo rechazado»
+para todo nombre ajeno, pero con el SNI propio y otro `Host` lo que hay es el 421 de nginx (medido arriba): texto corregido; (2)
+un cliente local que insista con un `Host` ajeno escribía una línea WARN por petición: ahora un aviso por motivo y por minuto con
+el conteo de los callados, en el backend y en el canal en vivo (3 pruebas); (3) `PROXY_NOMBRE` llegaba a la plantilla de nginx sin
+validarse: el backend rechaza al arrancar un `HTTP_HOSTS` sin forma de nombre y, por `depends_on`, el proxy no arranca (2 pruebas).
+Limitación conocida del banco: la redirección del 8081 va a `https://localhost/` (443), no al 8443, porque nginx redirige sin el
+puerto; en el servidor, 80 → 443, que es el caso real.

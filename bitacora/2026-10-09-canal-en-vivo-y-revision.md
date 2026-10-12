@@ -1,8 +1,8 @@
 # Canal de tiempo real, revisión y decisiones del panel — 9 de octubre de 2026
 
 - **Sesión de trabajo individual.** Se construyó el canal en vivo hacia el panel (TT-39), se revisó todo lo cambiado desde
-  la revisión anterior en cuatro frentes (seguridad; código frente a arquitectura; documentos frente a informe; privacidad
-  y licencias) y se cerraron cinco decisiones del panel. Cada protección se probó plantando su violación: un cambio
+  la revisión anterior (seguridad, código frente a arquitectura, documentos frente a informe) y se cerraron cinco
+  decisiones del panel. Cada protección se probó plantando su violación: un cambio
   temporal, restaurado y comparado con `cmp`, que hace fallar exactamente la prueba que la cubre (`docs/16 §14`).
 
 ## Canal en vivo (`GET /eventos`, `docs/10 §5`)
@@ -22,7 +22,7 @@
   Exportar el contrato OpenAPI iniciaba la aplicación entera y, con la pila arriba, el broker desconectaba al backend en
   marcha por compartir identificador (MQTT 3.1.1, [MQTT-3.1.4-2]); ahora se genera sin iniciarla.
 
-## Revisión en cuatro frentes: 28 correcciones
+## Revisión: 28 correcciones
 - **Seguridad:** `Sec-Fetch-Site` (arriba); el tope de flujos documentado como cota; contrapresión frente a un cliente lento
   documentada (`send_timeout` del proxy); el control de origen **no detiene el *DNS rebinding***, y el texto público dejó de
   prometerlo; la prueba de las reglas de identidad lleva tiempos de espera y comprueba que no queda nada; el banco espera el
@@ -38,7 +38,6 @@
   2t y 2w, probados plantando un total falso); `docs/12` contaba 6 rutas y omitía dos migraciones; el modelo ER marcaba como
   normal una columna deprecada (el generador lee ahora el `COMMENT`); comentarios y leyendas desalineados con el proxy; la
   matriz de acceso rotulada en la etapa equivocada.
-- **Privacidad y licencias:** sin hallazgos útiles (tres descartados con evidencia).
 - De paso: el generador de figuras copiaba las fuentes antes de renderizar y un render fallido dejaba fuente nueva con PDF
   viejo; ahora copia solo tras renderizar bien (probado con un diagrama roto: en Mermaid, un `;` corta un mensaje).
 

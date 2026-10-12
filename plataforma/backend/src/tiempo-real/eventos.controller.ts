@@ -6,6 +6,7 @@ import type { Request } from 'express';
 import type { IncomingHttpHeaders } from 'node:http';
 import type { Socket } from 'node:net';
 import { Observable, defer, finalize, interval, map, merge } from 'rxjs';
+import { AvisosAcotados } from '../arranque';
 import { uuid } from '../consulta/validacion';
 import { EventosService } from './eventos.service';
 
@@ -24,6 +25,7 @@ export class EventosController implements BeforeApplicationShutdown {
   private readonly log = new Logger('tiempo-real');
   private abiertos = 0;
   private readonly conexiones = new Set<Socket>();
+  private readonly avisos = new AvisosAcotados(); // un WARN por motivo y por minuto (docs/11 §3)
 
   constructor(private readonly eventos: EventosService) {}
 
@@ -62,7 +64,8 @@ export class EventosController implements BeforeApplicationShutdown {
   ): Observable<MessageEvent> {
     const rechazo = rechazoDeOrigen(req.headers);
     if (rechazo !== null) {
-      this.log.warn(`flujo rechazado: ${rechazo}`);
+      const aviso = this.avisos.registrar(rechazo);
+      if (aviso !== null) this.log.warn(`flujo rechazado: ${aviso}`);
       throw new ForbiddenException('origen no permitido');
     }
     const filtro = {
@@ -109,8 +112,8 @@ export class EventosController implements BeforeApplicationShutdown {
 //    mandan Origin (Fetch Standard, «append a request `Origin` header»), pero sí esta cabecera. curl no la manda.
 //  · Origin: si viene, debe ser el mismo host y puerto de la petición. Sin lista de orígenes: el panel lo sirve este
 //    backend; en desarrollo, Vite le reenvía las peticiones sin cambiar el Host, y el proxy reenvía el Host con su puerto.
-// No cubre el DNS rebinding: para el navegador, esa página es el mismo origen. Lo detiene una lista de nombres de host
-// permitidos o la sesión (docs/11 §4).
+// No cubre el DNS rebinding: para el navegador, esa página es el mismo origen. Lo detiene la lista de nombres de host de
+// arranque.ts (421 antes de llegar aquí, docs/11 §3) y, en la Etapa 4, la sesión (docs/11 §4).
 export function rechazoDeOrigen(cabeceras: IncomingHttpHeaders): string | null {
   const sitio = cabeceras['sec-fetch-site'];
   if (sitio !== undefined && sitio !== 'same-origin' && sitio !== 'none') return `Sec-Fetch-Site ${String(sitio).slice(0, 20)}`;

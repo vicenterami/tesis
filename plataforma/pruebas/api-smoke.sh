@@ -81,6 +81,7 @@ conhost() { # nombre · valor de Host · código esperado (en /salud, la ruta m�
 conhost "Host: nombre de una página ajena (DNS rebinding) → 421"      "ataque.example:3000" 421
 conhost "Host: subdominio que termina en localhost → 421"             "localhost.ataque.example" 421
 conhost "Host: localhost con otro puerto (Vite, banco) → 200"         "localhost:5173" 200
-conhost "Host: 127.0.0.1 en mayúsculas y con puerto → 200"            "127.0.0.1:3000" 200
+conhost "Host: 127.0.0.1 con puerto → 200"                            "127.0.0.1:3000" 200
+conhost "Host: LOCALHOST en mayúsculas → 200"                         "LOCALHOST:3000" 200
 conhost "Host: ilegible (usuario@) → 421"                             "usuario@localhost" 421
 echo; [[ $fallos -eq 0 ]] && echo "TODO OK" || { echo "$fallos caso(s) con falla"; exit 1; }

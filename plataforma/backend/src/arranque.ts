@@ -32,19 +32,26 @@ export function registrosEnJson(valor: string | undefined): boolean {
 // `server_name` de nginx compara igual (sin puerto): las dos capas hacen lo mismo.
 
 // Siempre aceptados: los nombres de loopback. Solo llegan desde el propio equipo o contenedor (el
-// HEALTHCHECK del Dockerfile, el operador con curl, el proxy por la red interna), y una página ajena
-// no puede hacer que el navegador los escriba en Host: para él, «localhost» es el equipo de la víctima.
+// HEALTHCHECK del Dockerfile y el operador con curl; el proxy NO: reenvía el nombre público que mandó el
+// cliente, y por eso ese nombre entra por HTTP_HOSTS), y una página ajena no puede hacer que el navegador
+// los escriba en Host: para él, «localhost» es el equipo de la víctima.
 export const HOSTS_LOCALES: readonly string[] = ['localhost', '127.0.0.1'];
 
 // HTTP_HOSTS suma el nombre real del servidor (varios, separados por coma o espacio). Ausente o vacía =
 // solo los locales, que es lo correcto en desarrollo y en el banco. Un IPv6 va entre corchetes ([::1]).
+// Un nombre que no tenga forma de host (`;`, llaves, espacios, un salto de línea) detiene el arranque: el valor viene
+// de PROXY_NOMBRE en el .env del servidor y nginx lo pega en su plantilla sin validarlo; si el backend no arranca, el
+// proxy (que depende de él) tampoco, y el error se lee en el registro en vez de inyectarse en la configuración.
 export function hostsPermitidos(valor: string | undefined): ReadonlySet<string> {
   const extra = (valor ?? '').split(/[\s,]+/).map((h) => h.trim().toLowerCase()).filter((h) => h !== '');
+  const malo = extra.find((h) => !FORMA_NOMBRE.test(h));
+  if (malo !== undefined) throw new Error(`HTTP_HOSTS: «${malo.slice(0, 80)}» no tiene forma de nombre de host`);
   return new Set([...HOSTS_LOCALES, ...extra]);
 }
 
 // Forma de un `Host` según RFC 9110 §7.2: nombre o IPv4, o IPv6 entre corchetes, y un puerto opcional.
 // Cualquier otra cosa (vacío, «usuario@», barras, espacios) se trata como ilegible, no se intenta arreglar.
+const FORMA_NOMBRE = /^(\[[0-9a-f:.]+\]|[a-z0-9.-]+)$/i;
 const FORMA_HOST = /^(\[[0-9a-f:.]+\]|[a-z0-9.-]+)(:[0-9]{1,5})?$/i;
 
 // Nombre del `Host` en minúsculas y sin puerto, o undefined si no viene o es ilegible.
@@ -58,4 +65,27 @@ export function rechazoDeHost(host: string | undefined, permitidos: ReadonlySet<
   const nombre = nombreDeHost(host);
   if (nombre === undefined) return `Host ausente o ilegible: ${String(host).slice(0, 80)}`;
   return permitidos.has(nombre) ? null : `Host ${nombre.slice(0, 80)} no está en la lista`;
+}
+
+// Avisos acotados (docs/11 §3): un rechazo se registra como WARN la primera vez y, después, a lo más una vez por
+// ventana y por motivo, con cuántos se callaron. Sin esto, un cliente local que insista con un Host ajeno (o una página
+// que abra el canal mil veces) escribe una línea por petición y la rotación de 10 MB × 5 descarta lo útil. Se silencia
+// la repetición, no el hecho: el conteo sale en el aviso siguiente. Cota de memoria: con más de 1 000 motivos
+// distintos (un atacante que varíe el nombre) se olvida todo y se empieza de nuevo.
+export class AvisosAcotados {
+  private readonly vistos = new Map<string, { desde: number; callados: number }>();
+  constructor(private readonly ventanaMs = 60_000) {}
+
+  // Texto a registrar ahora, o null si este motivo ya se avisó dentro de la ventana.
+  registrar(motivo: string, ahora = Date.now()): string | null {
+    const v = this.vistos.get(motivo);
+    if (v !== undefined && ahora - v.desde < this.ventanaMs) {
+      v.callados++;
+      return null;
+    }
+    const callados = v?.callados ?? 0;
+    if (this.vistos.size >= 1000) this.vistos.clear();
+    this.vistos.set(motivo, { desde: ahora, callados: 0 });
+    return callados > 0 ? `${motivo} (y ${callados} más en el último minuto)` : motivo;
+  }
 }

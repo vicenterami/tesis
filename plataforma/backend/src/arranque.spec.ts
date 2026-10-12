@@ -1,4 +1,4 @@
-import { HOSTS_LOCALES, hostsPermitidos, interfazDeEscucha, nombreDeHost, rechazoDeHost, registrosEnJson, servirDocumentacion } from './arranque';
+import { AvisosAcotados, HOSTS_LOCALES, hostsPermitidos, interfazDeEscucha, nombreDeHost, rechazoDeHost, registrosEnJson, servirDocumentacion } from './arranque';
 
 describe('registrosEnJson (docs/10 §6): JSON en contenedor, texto en desarrollo', () => {
   it('sin variable → texto', () => expect(registrosEnJson(undefined)).toBe(false));
@@ -38,6 +38,33 @@ describe('hostsPermitidos (docs/11 §3, docs/10 §8.4 punto 40): los locales sie
     const h = hostsPermitidos('a.example, b.example c.example');
     expect(h.size).toBe(HOSTS_LOCALES.length + 3);
     expect(h.has('c.example')).toBe(true);
+  });
+  it('un valor sin forma de nombre (inyección en la plantilla de nginx, PROXY_NOMBRE con «;» o llaves) → el arranque falla', () => {
+    for (const v of ['a.example;', 'a.example{', 'a.example/x', 'usuario@a.example']) expect(() => hostsPermitidos(v)).toThrow('HTTP_HOSTS');
+  });
+  it('IPv6 entre corchetes → se acepta', () => expect(hostsPermitidos('[::1]').has('[::1]')).toBe(true));
+});
+
+describe('AvisosAcotados: un WARN por motivo y por minuto, con el conteo de los callados', () => {
+  it('la primera vez se registra; dentro de la ventana se calla; pasada la ventana vuelve con el conteo', () => {
+    const a = new AvisosAcotados(60_000);
+    expect(a.registrar('Host x', 0)).toBe('Host x');
+    expect(a.registrar('Host x', 1_000)).toBeNull();
+    expect(a.registrar('Host x', 59_999)).toBeNull();
+    expect(a.registrar('Host x', 60_000)).toBe('Host x (y 2 más en el último minuto)');
+    expect(a.registrar('Host x', 120_000)).toBe('Host x');
+  });
+  it('motivos distintos no se tapan entre sí', () => {
+    const a = new AvisosAcotados(60_000);
+    expect(a.registrar('Host x', 0)).toBe('Host x');
+    expect(a.registrar('Host y', 0)).toBe('Host y');
+  });
+  it('más de 1 000 motivos distintos (un atacante que varía el nombre) → se olvida todo, nunca crece sin cota', () => {
+    const a = new AvisosAcotados(60_000);
+    for (let i = 0; i < 1000; i++) a.registrar(`Host ${i}`, 0);
+    expect(a.registrar('Host 0', 1)).toBeNull();
+    expect(a.registrar('Host nuevo', 2)).toBe('Host nuevo'); // el 1 001.º vacía el mapa…
+    expect(a.registrar('Host 0', 3)).toBe('Host 0'); // …y «Host 0» vuelve a registrarse
   });
 });
 

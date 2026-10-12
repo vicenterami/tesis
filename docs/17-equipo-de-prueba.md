@@ -3,7 +3,7 @@
 > **Sustenta:** TT-32 (sensor físico de extremo a extremo, `docs/04`), escenarios 1 y 3 de `docs/10 §2`, validación
 > preliminar de la Etapa 3. Versión: 8 de octubre de 2026. Los precios son una cotización con fecha, no un compromiso.
 >
-> **Estado (08/10/2026):** equipo adquirido; fecha de llegada por confirmar.
+> **Estado (12/10/2026):** placa ESP32 recibida; piezas 2 a 7 en tránsito (§3). Guía de manejo seguro en §4.
 
 ## 1. Para qué sirve y por qué estas piezas
 

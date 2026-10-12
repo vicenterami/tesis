@@ -144,10 +144,12 @@ paso "2h. Rutas HTTP citadas en prosa (glosario, docs/10, docs/12, docs/15) == r
 rutas_reales=$(jq -r '.paths|keys[]' plataforma/backend/openapi.json | sed -E 's/\{[^}]*\}/{p}/g' | sort -u)
 # Las figuras (.mmd, fuente en docs/10) también citan rutas y antes no se revisaban (27/09). Se compara la RUTA,
 # no los parámetros de consulta (`?bucket=15m` en vez de `intervalo` pasó y se vio leyendo la figura). Una ruta
-# marcada «(Etapa 3)» en la misma línea está diseñada, no implementada: se acepta.
-rutas_citadas=$(grep -rhE '(GET|POST|PATCH|DELETE) /[a-zA-Z0-9_{}/.\\-]*' informe-oficial docs --include=*.tex --include=*.md --include=*.mmd \
-  | grep -v '(Etapa 3)' | grep -oE '(GET|POST|PATCH|DELETE) /[a-zA-Z0-9_{}/.\\-]*' \
-  | sed -E 's/^(GET|POST|PATCH|DELETE) //; s/\\\{/{/g; s/\\\}/}/g; s/\{[^}]*\}/{p}/g; s/[.,}]+$//' \
+# marcada «(Etapa 3)», «(Etapa 4)» o «Propuesta» en la misma línea está diseñada, no implementada: se acepta (docs/19 cita
+# así las rutas que el panel necesitará). 12/10: una ruta que termina en parámetro (`/x/{id}`) perdía la llave final al
+# quitar la `}` de un \texttt{…} y fallaba siempre; ahora el parámetro se protege antes de limpiar el final.
+rutas_citadas=$(grep -rhE '(GET|POST|PUT|PATCH|DELETE) /[a-zA-Z0-9_{}/.\\-]*' informe-oficial docs --include=*.tex --include=*.md --include=*.mmd \
+  | grep -vE '\(Etapa [34]\)|Propuesta' | grep -oE '(GET|POST|PUT|PATCH|DELETE) /[a-zA-Z0-9_{}/.\\-]*' \
+  | sed -E 's/^(GET|POST|PUT|PATCH|DELETE) //; s/\\\{/{/g; s/\\\}/}/g; s/\{[^}]*\}/@P@/g; s/[.,}]+$//; s/@P@/{p}/g' \
   | sort -u)
 faltan=$(comm -23 <(echo "$rutas_citadas") <(echo "$rutas_reales"))
 if [ -n "$faltan" ]; then
