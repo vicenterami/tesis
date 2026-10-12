@@ -222,7 +222,10 @@ de desarrollo:
 - [ ] **No copiar `docker-compose.override.yml`**: es el archivo que publica 5432 y 1883 en
       desarrollo. Sin él, el archivo base no publica ningún puerto (forma de producción).
 - [ ] **Eliminar los usuarios y dispositivos de prueba** (`dev-*`) de `passwd` y de la base.
-- [ ] Proxy TLS en 443 y 8883 antes de exponer nada a Internet (capa 2).
+- [ ] Proxy TLS en 443 y 8883 antes de exponer nada a Internet (capa 2). En el `.env` del servidor: `PROXY_NOMBRE` con el
+      nombre público (el del certificado; alimenta el `server_name` del proxy y la lista de `Host` del backend, §3) y
+      `PROXY_IP_DISPOSITIVOS=0.0.0.0` para publicar 8883; `PROXY_IP_PERSONAS` queda en 127.0.0.1 hasta M7 (12/10/2026:
+      antes una sola variable publicaba los tres puertos y esta lista no se podía cumplir).
 - [ ] **La API no se publica en 443 mientras no exija credencial** (M7, RF-43): hoy `/dispositivos`
       responde sin sesión por diseño (consulta de solo lectura), y eso es correcto en `127.0.0.1`,
       no en Internet. Hasta M7, el proxy expone solo 8883 y 1700/udp.

@@ -75,3 +75,65 @@ identificación (párrafo anterior).
 **Piezas 8 y 9** (solo si hay pasarela / opcional), sin cambios respecto de la revisión de la mañana: radio SX1276 de 915 MHz
 con antena helicoidal en Afel, CLP 18 000; batería con protección declarada, sin opción encontrada. Referencia: pasarela
 Milesight UG65 4G AU915 en MCI, CLP 439 990.
+
+## 4. Seguridad al manipular el equipo de prueba (12/10/2026)
+
+Todo lo de esta lista funciona a **5 V por USB y a 3,3 V en los sensores**. Nada del proyecto se conecta a la red de 220 V: lo
+único enchufado al tomacorriente es el cargador del computador, con su certificación. A esas tensiones **no existe riesgo de
+electrocución**; el riesgo real es otro: **quemar la placa, un sensor o el puerto USB del computador** por un cable mal puesto.
+Esta sección dice cómo evitarlo. Cifras de la hoja de datos del fabricante (ESP32 Series Datasheet v5.3, tablas 3-1, 5-1, 5-2 y
+5-3, consultada el 12/10/2026); lo que la hoja no trata se marca.
+
+### 4.1 Lo que daña la placa o el computador, y la regla que lo evita
+| # | Qué pasa | Por qué | Regla |
+|---|---|---|---|
+| 1 | Cortocircuito entre `3V3` (o `5V`/`VIN`) y `GND` | El regulador de la placa o el puerto USB entregan toda la corriente que pueden y se calientan | Cablear **siempre con el USB desconectado**; antes de conectar, mirar que ningún cable rojo toque uno negro ni una fila compartida de la protoboard |
+| 2 | 5 V en un pin de señal (GPIO) | La hoja de datos admite en una entrada hasta `VDD + 0,3 V`, o sea **3,6 V** con 3,3 V de alimentación (tabla 5-3); los pines de alimentación del chip toleran como máximo 3,6 V (tabla 5-1) | El pin `5V`/`VIN` solo alimenta; **nunca** va a un GPIO ni a `3V3`. Los tres sensores de esta lista se alimentan de `3V3` |
+| 3 | Demasiada corriente por un pin | Por pin, la hoja de datos da 40 mA de fuente y 28 mA de sumidero (tabla 5-3) y 1 200 mA acumulados en todos los IO (tabla 5-1) | Regla práctica del proyecto: **nada que pida más de 12 mA de un pin**; un LED siempre con resistencia (≥ 220 Ω); motores, relés, bombas o tiras LED **jamás** desde un GPIO ni desde el USB del computador |
+| 4 | Dos alimentaciones a la vez | USB y `VIN` juntos ponen dos fuentes en paralelo contra el mismo regulador | Una sola fuente: durante toda la Etapa 3, el USB del computador |
+| 5 | Sensor conectado al revés | Un sensor con `VCC` y `GND` invertidos consume corriente y se calienta en segundos | Confirmar la polaridad **tres veces** contra la serigrafía del sensor antes de dar corriente; el DS18B20 sin conector es el más fácil de invertir |
+| 6 | Agua en la electrónica | La placa y las cabezas de los sensores no son estancas | Solo la punta del sensor de suelo entra en tierra o agua; la zona de los componentes queda seca. El DS18B20 en tubo de acero es el único sumergible |
+| 7 | Electricidad estática | Un chispazo imperceptible puede dañar un pin | Tocar algo metálico grande antes de tomar la placa; guardarla en su bolsa antiestática; evitar alfombra y ropa sintética al manipular |
+| 8 | Sobrecargar el puerto USB del computador | La hoja de datos pide una fuente capaz de **0,5 A** (tabla 5-2); un puerto USB común entrega eso, suficiente para el ESP32 con Wi-Fi y estos tres sensores, no para nada más | Solo la placa y los sensores de esta lista cuelgan del USB; para proteger el computador, un concentrador USB con fuente propia o un cargador de celular certificado (la programación sigue por el computador) |
+| 9 | Cables sueltos con la placa encendida | Un cable Dupont que cae sobre dos pines hace un corto | Nunca cambiar cables con el USB conectado; un cambio = desconectar, cablear, revisar, conectar |
+
+### 4.2 Rutina de cada sesión de laboratorio
+1. USB desconectado. Placa sobre la protoboard (no sobre una mesa metálica ni sobre papeles con grapas).
+2. Cablear según el diagrama de la sesión: primero `GND` común, después `3V3` a cada `VCC`, al final las señales.
+3. Revisar con la lista: ¿ningún rojo con negro? ¿nada en `5V`/`VIN`? ¿polaridad de cada sensor confirmada? ¿los extremos de los
+   Dupont no se tocan entre sí?
+4. Conectar el USB y mirar 10 segundos: el LED de alimentación encendido, **nada tibio, ningún olor**. Si algo se calienta o huele,
+   desconectar el USB de inmediato y buscar el error con la placa fría.
+5. Comprobar que el sistema la ve (`dmesg` justo después de conectar: aparece como `/dev/ttyUSB0` o `/dev/ttyACM0`; el usuario
+   debe estar en el grupo `dialout`).
+6. Al terminar: desconectar el USB antes de desarmar; sensores de vuelta a su bolsa.
+
+### 4.3 Pines del ESP32 que se evitan o se cuidan
+- **Pines de arranque (tabla 3-1):** `GPIO0`, `GPIO2`, `GPIO5`, `GPIO12` (MTDI) y `GPIO15` (MTDO) deciden cómo arranca el chip. Un
+  sensor conectado ahí puede impedir que la placa arranque o que se programe. No se usan para sensores en este proyecto.
+- **Pines de solo entrada:** `GPIO34` a `GPIO39` no tienen etapa de salida ni resistencias internas de polarización (nota de la
+  tabla IO_MUX); sirven para leer, nunca para encender nada, y necesitan resistencia externa si se usan como entrada digital.
+- **Pines de la memoria flash:** los rotulados `CLK`, `CMD`, `D0`–`D3` (`SD_CLK`, `SD_CMD`, `SD_DATA_0..3`, que en el módulo van a la
+  flash interna) no se conectan a nada. Esto lo declara la hoja de datos del módulo ESP32-WROOM-32, que se cita al hacer el
+  laboratorio (TT-32).
+- **Conversor analógico:** el sensor de suelo se lee en un pin del ADC1 (`GPIO32` a `GPIO39`). La documentación de ESP-IDF indica
+  que el ADC2 no está disponible mientras el Wi-Fi está activo; la hoja de datos no lo trata, así que **se comprueba en el
+  laboratorio** midiendo con Wi-Fi conectado.
+- **I2C (BME280):** por defecto en Arduino-ESP32, `SDA = GPIO21` y `SCL = GPIO22`. **1-Wire (DS18B20):** cualquier GPIO de salida (por
+  ejemplo `GPIO4`), con la resistencia de 4,7 kΩ entre datos y `3V3`.
+
+### 4.4 Cada sensor, sin dañarlo
+| Sensor | Alimentación | Señal | Cuidados |
+|---|---|---|---|
+| BME280 (I2C, 3,3 V) | `3V3` y `GND` | `SDA` → GPIO21, `SCL` → GPIO22 | Comprobar primero el registro de identificación (§3: `0x60` BME280, `0x58` BMP280). Dirección I2C `0x76` o `0x77` según el módulo: se lee con un barrido I2C, no se adivina |
+| DS18B20 (tubo de acero) | `3V3` y `GND` | datos → GPIO4 con 4,7 kΩ a `3V3` | Tres cables sin conector: identificar `GND`, `DQ` y `VDD` por su color según el vendedor **y verificarlo con la hoja de datos del sensor** antes de dar corriente; soldar o usar bornera, nunca cables enroscados a mano |
+| Humedad de suelo capacitivo (3,3–5,5 V) | `3V3` y `GND` | salida analógica → GPIO34 (ADC1) | Alimentado a 3,3 V su salida nunca supera 3,3 V, seguro para el pin. Se calibra con dos lecturas: al aire (seco) y en un vaso de agua (solo la punta, hasta la línea marcada) |
+
+**Lo que no se compra ni se conecta en esta etapa:** baterías de litio (el único elemento de esta lista con riesgo de incendio;
+si alguna vez se usa, con placa de protección y cargador dedicados), fuentes de 220 V, relés, motores. Si el proyecto los
+necesitara, se escribe antes aquí cómo se manejan.
+
+**Fuentes.** Espressif, *ESP32 Series Datasheet* v5.3 (consultada el 12/10/2026): tabla 5-1 (tensión máxima en pines de
+alimentación −0,3 a 3,6 V; corriente acumulada de salida 1 200 mA), tabla 5-2 (alimentación recomendada 3,0–3,6 V; fuente de
+0,5 A), tabla 5-3 (VIH máx. VDD + 0,3 V; IOH 40 mA; IOL 28 mA), tabla 3-1 (pines de arranque), nota de la tabla IO_MUX (GPIO34–39
+solo entrada). Lo del ADC2 y los pines de la flash: por verificar con la fuente al hacer el laboratorio (marcado arriba).

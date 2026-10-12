@@ -1,7 +1,9 @@
 # Capa opcional del proxy inverso (TT-22; docs/10 §8.4 decisión 10, variante A). Se SUMA al compose base:
 #   desarrollo:  docker compose -f docker-compose.yml -f docker-compose.override.yml -f proxy/compose.proxy.yml up -d proxy
 #   banco:       bash pruebas/banco/banco.sh proxy        (puertos 8443/8884/8081, certificados de desarrollo)
-#   servidor:    la misma capa con PROXY_IP=0.0.0.0 y PROXY_CERTS apuntando a los certificados reales (docs/10 §8.4 punto 22)
+#   servidor:    la misma capa con PROXY_CERTS apuntando a los certificados reales (docs/10 §8.4 punto 22), PROXY_NOMBRE con el
+#                nombre público, PROXY_IP_DISPOSITIVOS=0.0.0.0 (8883) y, SOLO cuando la API exija credencial (M7, docs/11 §7),
+#                PROXY_IP_PERSONAS=0.0.0.0 (443 y 80). Dos variables porque docs/11 manda publicar 8883 antes que 443.
 # Valores por defecto SEGUROS: escucha solo en 127.0.0.1 y usa la CA de desarrollo; exponer a la red es una decisión
 # explícita en el .env del servidor. El único contenedor con puertos hacia fuera en producción es este (docs/10 §2).
 services:
@@ -26,9 +28,9 @@ services:
       - ./proxy/nginx.conf:/plantilla/nginx.conf.template:ro
       - ${PROXY_CERTS:-../privado/certs-desarrollo}:/certs:ro   # servidor.crt y servidor.key (ca.crt para los clientes)
     ports:
-      - "${PROXY_IP:-127.0.0.1}:${PROXY_HTTPS:-443}:443"      # personas: API, panel, SSE
-      - "${PROXY_IP:-127.0.0.1}:${PROXY_MQTTS:-8883}:8883"    # dispositivos: MQTT sobre TLS
-      - "${PROXY_IP:-127.0.0.1}:${PROXY_HTTP:-80}:80"         # solo redirección a HTTPS (y reto ACME si se elige)
+      - "${PROXY_IP_PERSONAS:-127.0.0.1}:${PROXY_HTTPS:-443}:443"       # personas: API, panel, SSE (a Internet solo desde M7)
+      - "${PROXY_IP_DISPOSITIVOS:-127.0.0.1}:${PROXY_MQTTS:-8883}:8883" # dispositivos: MQTT sobre TLS
+      - "${PROXY_IP_PERSONAS:-127.0.0.1}:${PROXY_HTTP:-80}:80"          # solo redirección a HTTPS (y reto ACME si se elige)
     depends_on:
       backend:
         condition: service_healthy
