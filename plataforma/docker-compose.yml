@@ -51,7 +51,7 @@ services:
 
   # ── Broker MQTT ─────────────────────────────────────────────────────────────
   mosquitto:
-    image: eclipse-mosquitto:2.0.22@sha256:199ea8ef2e35ec2b1b37e59cfd1dbae538ed4dfa4a2251a121a52215a6248a21 # etiqueta legible + digest exacto (docs/11 §4); Dependabot propone los cambios
+    image: eclipse-mosquitto:2.1.2-alpine@sha256:38c0da4f2ef84284d47b3b3eeea1cb3bdeabe81ee10caf0cd5c5ff61ee3ea408 # etiqueta legible + digest exacto (docs/11 §4); Dependabot propone los cambios
     restart: unless-stopped
     logging:                                     # registros acotados: 10 MB × 5 por servicio (docs/11 §4; 07/10/2026)
       driver: json-file
@@ -62,7 +62,7 @@ services:
     # Para desarrollo local, los puertos se publican en docker-compose.override.yml.
     volumes:
       - ./mosquitto/config:/mosquitto/config:ro
-      - datos-mosquitto:/mosquitto/data                    # mensajes retenidos y sesiones
+      - datos-mosquitto:/mosquitto/data                    # sesiones, retenidos y dynamic-security.json (credenciales y ACL del plugin; va en el respaldo)
     healthcheck:
       test: ["CMD-SHELL", "mosquitto_sub -t '$$SYS/#' -C 1 -i sonda -W 3 -u ${MQTT_SONDA_USUARIO} -P ${MQTT_SONDA_CLAVE} >/dev/null || exit 1"]
       interval: 15s
@@ -91,6 +91,9 @@ services:
       DB_HOST: timescaledb                        # nombre del servicio en la red interna (docs/10 §6)
       MQTT_URL: mqtt://mosquitto:1883
       MQTT_BACKEND_CLAVE: ${MQTT_BACKEND_CLAVE}
+      MQTT_ADMIN_CLAVE: ${MQTT_ADMIN_CLAVE:-}          # administrador del plugin del broker (docs/10 §8.4 punto 41); vacío = alta por API en 503
+      MQTT_SONDA_USUARIO: ${MQTT_SONDA_USUARIO:-sonda}   # nombre reservado: ningún dispositivo puede llamarse como la sonda
+      HTTP_CLAVE_ADMIN: ${HTTP_CLAVE_ADMIN:-}          # clave de las rutas que escriben, por cabecera (punto 41); vacío = 503, nunca abiertas
       HTTP_INTERFAZ: 0.0.0.0                       # todas las interfaces DEL CONTENEDOR; sin `ports` no se ve desde fuera
       HTTP_HOSTS: ${PROXY_NOMBRE:-}                # el nombre público del proxy, además de localhost y 127.0.0.1 (docs/11 §3, docs/10 §8.4 punto 40); vacío en desarrollo
       LOG_FORMATO: json                            # un evento JSON por línea, sin color (docs/10 §6)

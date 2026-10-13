@@ -78,8 +78,8 @@ export class RecepcionService implements OnModuleInit {
     // ── [1] Autenticar: credencial válida (ya la verificó el broker) ≠ dispositivo dado de alta ──
     const dispositivo = await this.buscarDispositivo(ctx.idFisico);
     // Sin credencial la trama ni siquiera llega aquí: la corta el broker (allow_anonymous false + ACL).
-    // Llega con credencial válida y sin alta, o con alta dada de baja: la clave vive en el passwd del broker
-    // y el alta en la base. Un dado de baja SÍ queda identificado: es la señal de que su clave sigue viva.
+    // Llega con credencial válida y sin alta, o con alta dada de baja: la clave vive en el plugin del broker (docs/10 §8.4
+    // punto 42) y el alta en la base. Un dado de baja SÍ queda identificado: es la señal de que su clave sigue viva.
     if (!dispositivo) return this.cuarentena(trama, 'no_registrado', `id_fisico=${ctx.idFisico} sin alta en la plataforma`);
     if (dispositivo.estado === 'baja') {
       return this.cuarentena({ ...trama, dispositivoId: dispositivo.id },

@@ -8,7 +8,8 @@ export type ManejadorTrama = (topico: string, carga: Buffer) => void | Promise<v
 // 15 s, menos que el keepalive de 60 s (si el manejador bloqueara más, la librería no leería el PINGRESP y cortaría).
 export const REINTENTOS_MS = [1000, 2000, 4000, 8000];
 
-// Conexión única al broker como usuario "backend" (ACL: lee sitio/#). El envío de órdenes al
+// Conexión al broker como usuario "backend" (rol `recepcion` del plugin: lee sitio/#; docs/10 §8.4 punto 42). La administración
+// del plugin va por otra identidad y otra conexión (dynsec.service.ts), como manda el punto 41. El envío de órdenes al
 // dispositivo (downlink) está fuera de alcance (docs/02 §4.3).
 // El resto de la aplicación no toca MQTT directamente: se registra como "manejador" y recibe
 // cada trama con su tópico. Así el transporte queda aislado del pipeline (M1 → M2).

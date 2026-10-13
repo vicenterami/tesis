@@ -11,8 +11,8 @@
 -- Con eso, el guion de docs/15 sale como está escrito: 22.4 se guarda; 35 abre la condición de umbral;
 -- 29 no la toca (histéresis); 27 la cierra; callar más de 10 s abre sin_comunicacion.
 --
--- Lo que esta semilla NO hace: la credencial MQTT de dev-0001 vive en el passwd del broker (no
--- versionado); si no existe, crearla con mosquitto_passwd (README del backend).
+-- Lo que esta semilla NO hace: la credencial MQTT de dev-0001 vive en el plugin de seguridad del broker (volumen de datos,
+-- no versionado); si no existe, crearla con `bash pruebas/broker-cliente.sh dev-0001` (docs/11 §7).
 
 INSERT INTO sitio (id, nombre, codigo)
   VALUES ('00000000-0000-0000-0000-000000000001', 'Campus Dr. Luis Rivas del Canto', 'uct')

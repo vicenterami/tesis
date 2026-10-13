@@ -22,6 +22,12 @@ services:
       - ./pruebas/banco/mosquitto:/mosquitto/config:ro
       - type: tmpfs
         target: /mosquitto/data
+    environment:
+      MQTT_ADMIN_CLAVE: ${MQTT_ADMIN_CLAVE}
+    # El banco nace de cero cada vez (datos en RAM): el archivo del plugin de seguridad se crea aquí mismo, antes de arrancar el
+    # broker, con el administrador del banco (clave de descarte de banco.env). Los roles y clientes los crea `banco.sh encender`
+    # por mosquitto_ctrl. `$$` es `$` para Compose. En la pila real lo hace una vez pruebas/broker-inicializar.sh (docs/11 §7).
+    command: ["sh", "-c", "{ [ -f /mosquitto/data/dynamic-security.json ] || mosquitto_ctrl dynsec init /mosquitto/data/dynamic-security.json backend-admin \"$$MQTT_ADMIN_CLAVE\"; } && chown mosquitto:mosquitto /mosquitto/data/dynamic-security.json && exec mosquitto -c /mosquitto/config/mosquitto.conf"]
   backend:
     ports:
       - "127.0.0.1:3001:3000"

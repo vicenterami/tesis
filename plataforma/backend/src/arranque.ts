@@ -89,3 +89,20 @@ export class AvisosAcotados {
     return callados > 0 ? `${motivo} (y ${callados} más en el último minuto)` : motivo;
   }
 }
+
+// Clave de administrador de las rutas que escriben, mientras no hay sesión (docs/10 §8.4 punto 41; docs/11 §3). Ausente o
+// vacía: esas rutas responden 503, nunca quedan abiertas. Definida pero corta: el arranque falla, a propósito; una clave
+// débil expuesta a la red es peor que ninguna. Mínimo 24 caracteres: lo que da `openssl rand -base64 24` son 32.
+export const CLAVE_ADMIN_MINIMO = 24;
+// Misma política para toda clave de administración que llega por el entorno (también MQTT_ADMIN_CLAVE, la del plugin del broker).
+export function claveOpcional(nombre: string, valor: string | undefined): string | undefined {
+  const v = (valor ?? '').trim();
+  if (v === '') return undefined;
+  if (v.length < CLAVE_ADMIN_MINIMO) {
+    throw new Error(`${nombre} tiene ${v.length} caracteres; se exigen ${CLAVE_ADMIN_MINIMO} o más (openssl rand -base64 24)`);
+  }
+  return v;
+}
+export function claveAdmin(valor: string | undefined): string | undefined {
+  return claveOpcional('HTTP_CLAVE_ADMIN', valor);
+}

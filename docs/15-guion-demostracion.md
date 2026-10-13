@@ -17,9 +17,9 @@
 
 1. **La clave primero, porque es lo único que puede cortar la demo.** Si la clave de `dev-0001` no está
    en el gestor o no calza (al publicar sale `not authorised`), se crea una nueva:
-   `bash plataforma/pruebas/clave-dispositivo.sh dev-0001` (pide la clave oculta, reinicia el broker y
-   verifica que autentica; `docs/11 §7`). Se hace **antes de todo lo demás**: el reinicio del broker corta
-   la conexión del backend unos segundos.
+   `bash plataforma/pruebas/broker-cliente.sh dev-0001` (pide la clave oculta, la aplica en el plugin del broker sin reiniciar nada y
+   verifica que autentica; `docs/11 §7`). Se hace **antes de todo lo demás** para no descubrirlo en escena; no
+   reinicia nada: el plugin aplica la clave en el acto.
 2. **Levantar, cargar datos y verificar:**
 
 ```bash
@@ -147,7 +147,7 @@ En `/docs`:
 
 ## 6. Cómo se sostiene esto (1 min)
 
-- `cd plataforma/backend && pnpm verificar`: tipos, lint y 138 pruebas unitarias en menos de dos segundos
+- `cd plataforma/backend && pnpm verificar`: tipos, lint y 172 pruebas unitarias en menos de dos segundos
   (la cifra exacta la da la salida de `jest`; no la memorices). Los avisos de cuarentena que aparecen
   mientras corre son de las pruebas, a propósito.
 - `bash plataforma/pruebas/verificar-todo.sh`: esquema, migraciones, diagramas del informe, API y
@@ -181,7 +181,7 @@ En `/docs`:
 |---|---|---|
 | `EADDRINUSE` al arrancar | backend huérfano | `ss -ltnp \| grep :3000` → `kill <pid>` |
 | `Connection refused` a secas al publicar | pila abajo | `bash plataforma/pruebas/pila.sh encender` |
-| `Connection Refused: not authorised` | la clave no calza con el broker | `bash plataforma/pruebas/clave-dispositivo.sh dev-0001` (fuera de escena) |
+| `Connection Refused: not authorised` | la clave no calza con el broker | `bash plataforma/pruebas/broker-cliente.sh dev-0001` (fuera de escena) |
 | `publicado`, pero nada en el log | tópico de otro dispositivo: la ACL lo descarta sin avisar al cliente | revisar que el tópico diga `dev-0001`; `publicar.sh` lo arma solo |
 | Histórico vacío | rango por defecto: últimas 24 h | pasar `desde=` anterior a los datos |
 | `/docs` responde 404 | falta `HTTP_DOCS=si` (solo pasa fuera de Docker) | ver el anexo de abajo |

@@ -159,14 +159,23 @@ else
   echo "OK    $(echo "$rutas_citadas" | grep -c .) rutas citadas en docs e informe, todas existen en el OpenAPI"
 fi
 
-paso "2i. Dueños de la configuración del broker: acl y mosquitto.conf del operador; passwd de uid 1883 y modo 640 (docs/11 §7)"
-# Hallazgo del 27/09: un contenedor auxiliar montado en /mosquitto disparó el chown -R de la imagen y
-# cambió el dueño de acl y mosquitto.conf. Solo se leen metadatos (stat), nunca el contenido de passwd.
-MC="${MOSQ_CONF:-plataforma/mosquitto/config}"; yo=$(id -u); mal=""
-for f in "$MC" "$MC/acl" "$MC/mosquitto.conf"; do [ "$(stat -c %u "$f")" = "$yo" ] || mal="$mal $f(dueño $(stat -c %u "$f"))"; done
-[ "$(stat -c '%u %a' "$MC/passwd" 2>/dev/null)" = "1883 640" ] || mal="$mal passwd($(stat -c '%u %a' "$MC/passwd" 2>/dev/null || echo 'no existe'))"
-if [ -z "$mal" ]; then echo "OK    carpeta, acl y mosquitto.conf del operador; passwd de 1883 con modo 640"
-else echo "FALLA dueños o modos alterados:$mal (restituir: sudo chown \$USER:\$USER; passwd con clave-dispositivo.sh)"; fallos=$((fallos+1)); fi
+paso "2i. Credenciales del broker en el plugin Dynamic Security: configuración, archivo del plugin (1883/600) y roles y clientes del sistema (docs/10 §8.4 punto 42; docs/11 §7)"
+# Hasta el 12/10 vivían en passwd y acl (hallazgo del 27/09: un chown -R les cambiaba el dueño). Ahora el broker no debe leer
+# archivos de claves, el JSON del plugin vive en el volumen de datos con dueño 1883 y modo 600, y deben existir los roles
+# admin/recepcion/sonda/dispositivo y los clientes backend-admin/backend/sonda. Solo nombres (grep -o), nunca hashes.
+MC="${MOSQ_CONF:-plataforma/mosquitto/config}"; mal=""
+[ "$(stat -c %u "$MC/mosquitto.conf")" = "$(id -u)" ] || mal="$mal mosquitto.conf(dueño $(stat -c %u "$MC/mosquitto.conf"))"
+grep -qE '^\s*(password_file|acl_file)' "$MC/mosquitto.conf" && mal="$mal mosquitto.conf-lee-archivos-de-claves"
+grep -qE '^\s*plugin_opt_config_file\s+/mosquitto/data/dynamic-security.json' "$MC/mosquitto.conf" || mal="$mal mosquitto.conf-sin-plugin"
+[ -e "$MC/acl" ] && mal="$mal acl-todavia-en-config"
+j=$(cd plataforma && docker compose exec -T mosquitto stat -c '%u %a' /mosquitto/data/dynamic-security.json 2>/dev/null); [ "$j" = "1883 600" ] || mal="$mal archivo-del-plugin(${j:-ausente})"
+n=$(cd plataforma && docker compose exec -T mosquitto sh -c 'tr -d " \t" < /mosquitto/data/dynamic-security.json | grep -oE "\"(rolename|username)\":\"[a-z-]+\""' 2>/dev/null)
+for e in rolename:admin rolename:recepcion rolename:sonda rolename:dispositivo username:backend-admin username:backend username:sonda; do
+  grep -qF "\"${e%%:*}\":\"${e#*:}\"" <<<"$n" || mal="$mal falta-${e#*:}"
+done
+if [ -z "$mal" ]; then echo "OK    mosquitto.conf sin passwd/acl y con el plugin; archivo del plugin de 1883 con modo 600; roles y clientes del sistema presentes"
+else echo "FALLA broker:$mal (inicializar o reparar con bash plataforma/pruebas/broker-inicializar.sh)"; fallos=$((fallos+1)); fi
+[ -e "$MC/passwd" ] && echo "AVISO $MC/passwd ya no lo lee el broker: bórralo cuando quieras"
 
 paso "2j. Repositorio público: ningún archivo versionado nombra a personas de la lista privada"
 # La lista vive fuera del repo (NOMBRES_VETADOS; un nombre en este script sería la fuga). Una línea por nombre; palabra
@@ -290,17 +299,18 @@ if [ "$rc" -eq 0 ]; then echo "FALLA archivos públicos que citan fichas privada
 elif [ "$rc" -ne 1 ]; then echo "FALLA git grep falló ($rc): no se pudo revisar"; fallos=$((fallos+1))
 else echo "OK    ningún archivo versionado cita fichas privadas"; fi
 
-paso "2x. Repositorio público: ningún archivo versionado nombra al asistente, a revisores o a modelos (12/10)"
-# 12/10: una revisión encontró «la escribe el asistente de desarrollo» en docs/16 y en un guion, y «revisión del 12/10» en
-# comentarios del código; el guardián 2f solo mira la lista privada de nombres. Lo público cuenta lo encontrado como corrección.
-# «asistente de registro» (RF-50, HU-22) es legítimo y queda fuera del patrón.
-# «revisión del DD/MM» a secas se permite (es una corrección fechada); lo que no: nombrar al asistente, a revisores sin contexto
-# o a lentes en paralelo. Los nombres de modelos, herramientas y frases vetadas los vigila el paso 2f con la lista privada.
-# Este archivo queda fuera porque cita los patrones.
-git grep --untracked -n -i -E 'asistente de desarrollo|asistente de (ia|inteligencia)|\brevisor(es)? sin contexto|\blentes? en paralelo' -- ':!privado' ':!plataforma/pruebas/verificar-todo.sh' > "$VT"/asistente.txt 2>&1; rc=$?
-if [ "$rc" -eq 0 ]; then echo "FALLA archivos públicos que nombran al asistente, a revisores o a modelos:"; cut -c1-160 "$VT"/asistente.txt; fallos=$((fallos+1))
-elif [ "$rc" -ne 1 ]; then echo "FALLA git grep falló ($rc): no se pudo revisar"; fallos=$((fallos+1))
-else echo "OK    ningún archivo versionado nombra al asistente, a revisores ni a modelos"; fi
+paso "2x. Repositorio público: ningún archivo versionado trae las menciones vetadas de la lista privada (12/10)"
+# La lista (expresiones regulares, una por línea, sin distinguir mayúsculas) vive fuera del repo, como la de nombres del paso
+# 2f: así el guardián no cita lo que busca. Si el archivo no existe o está vacío, el paso se omite y lo dice.
+MV="${MENCIONES_VETADAS:-privado/menciones-vetadas.txt}"
+if [ ! -s "$MV" ]; then echo "AVISO sin lista $MV: paso omitido"
+else
+  patron=$(grep -v '^\s*#' "$MV" | grep -v '^\s*$' | paste -sd '|')
+  git grep --untracked -n -i -E "$patron" -- ':!privado' > "$VT"/menciones.txt 2>&1; rc=$?
+  if [ "$rc" -eq 0 ]; then echo "FALLA archivos públicos con menciones vetadas:"; cut -c1-160 "$VT"/menciones.txt; fallos=$((fallos+1))
+  elif [ "$rc" -ne 1 ]; then echo "FALLA git grep falló ($rc): no se pudo revisar"; fallos=$((fallos+1))
+  else echo "OK    ningún archivo versionado trae menciones vetadas ($(grep -cv '^\s*#\|^\s*$' "$MV") patrones)"; fi
+fi
 
 paso "2q. Auditoría de dependencias: cada aviso ignorado (audit.ignore de pnpm-workspace.yaml) sigue sin versión corregida (docs/11 §4)"
 # 08/10: braces no tenía parche y la auditoría lo ignora (la leen igual el CI y el portátil). Una excepción que nadie revisa
@@ -452,7 +462,7 @@ paso "2u. Imágenes fijadas por digest: cada FROM, cada imagen de registro de lo
 # se leen los nombres de imagen. Guiones (.sh, .yml) y bloques de código de los .md: patrón nombre:versión sin digest.
 # Dependabot (.github/dependabot.yml) propone las versiones nuevas como pull request.
 python3 -I - <<'PY' || fallos=$((fallos+1))
-import json, re, subprocess, sys
+import json, re, subprocess, sys, os
 dig = re.compile(r'@sha256:[0-9a-f]{64}$')
 arch = [a for a in subprocess.run(['git', 'ls-files', '--cached', '--others', '--exclude-standard'], capture_output=True,
         text=True).stdout.split('\n') if a and not a.startswith('historico/')]
@@ -489,6 +499,7 @@ for juego in (['plataforma/docker-compose.yml', 'plataforma/docker-compose.overr
 pat = re.compile(r'(?<![\w./@:$-])([a-z0-9][a-z0-9._-]*(?:/[a-z0-9._-]+)*):([0-9]+(?:(?:\.[0-9]+)+(?:-[A-Za-z0-9._-]+)?'
                  r'|-[A-Za-z][A-Za-z0-9._-]*)|latest|edge|stable|mainline|alpine|slim|lts)(?![A-Za-z0-9._-])(?!@sha256:[0-9a-f]{64})')
 for f in arch:
+    if not os.path.isfile(f): continue  # borrado del árbol pero aún en el índice (git rm pendiente): no hay qué leer
     es_md = f.endswith('.md')
     if not (es_md or re.search(r'\.(sh|ya?ml)$', f)): continue
     n_arch += 1; codigo = False

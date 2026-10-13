@@ -67,6 +67,144 @@
         "tags": [
           "dispositivos"
         ]
+      },
+      "post": {
+        "description": "Crea el dispositivo, sus canales y, según la vía, su credencial: `mqtt` crea el usuario en el broker (plugin Dynamic Security) y devuelve la clave UNA sola vez; `http` devuelve un token (la recepción por HTTP llega en una tanda posterior); `lorawan` no tiene credencial propia (la autentica su pasarela). Todo o nada: si el broker no acepta, nada queda creado. Mientras no hay sesión, exige la cabecera `X-Clave-Admin` (docs/10 §8.4 punto 41).",
+        "operationId": "AltaController_crear",
+        "parameters": [
+          {
+            "name": "X-Clave-Admin",
+            "in": "header",
+            "description": "Clave de administrador (HTTP_CLAVE_ADMIN del servidor)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "id_fisico",
+                  "nombre",
+                  "zona_id",
+                  "via",
+                  "intervalo_esperado_s",
+                  "canales"
+                ],
+                "properties": {
+                  "id_fisico": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9][a-z0-9-]{2,62}$",
+                    "description": "Identificador físico; también el usuario del broker"
+                  },
+                  "nombre": {
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  "zona_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "via": {
+                    "type": "string",
+                    "enum": [
+                      "mqtt",
+                      "http",
+                      "lorawan"
+                    ]
+                  },
+                  "formato": {
+                    "type": "string",
+                    "enum": [
+                      "senml",
+                      "plano",
+                      "milesight"
+                    ],
+                    "default": "senml"
+                  },
+                  "pasarela_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "nullable": true,
+                    "description": "Obligatoria si la vía es lorawan; prohibida si no"
+                  },
+                  "intervalo_esperado_s": {
+                    "type": "integer",
+                    "minimum": 5,
+                    "maximum": 86400
+                  },
+                  "canales": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 20,
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "magnitud"
+                      ],
+                      "properties": {
+                        "magnitud": {
+                          "type": "string",
+                          "description": "Código del catálogo (temperatura, humedad, …)"
+                        },
+                        "etiqueta": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 40
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "id_fisico": "nodo-01",
+                  "nombre": "Invernadero norte",
+                  "zona_id": "00000000-0000-0000-0000-000000000002",
+                  "via": "mqtt",
+                  "intervalo_esperado_s": 60,
+                  "canales": [
+                    {
+                      "magnitud": "temperatura"
+                    },
+                    {
+                      "magnitud": "humedad",
+                      "etiqueta": "suelo"
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Dispositivo creado; `conexion` trae la credencial (una sola vez), el tópico y una trama de ejemplo"
+          },
+          "400": {
+            "description": "Cuerpo inválido: `message` es la lista de motivos"
+          },
+          "401": {
+            "description": "Cabecera X-Clave-Admin ausente o incorrecta"
+          },
+          "409": {
+            "description": "El id_fisico ya existe (en la base o, huérfano, en el broker)"
+          },
+          "502": {
+            "description": "El broker no aceptó la credencial; nada quedó creado"
+          },
+          "503": {
+            "description": "Sin clave de administrador configurada, o sin conexión de administración con el broker"
+          }
+        },
+        "summary": "Dar de alta un dispositivo",
+        "tags": [
+          "dispositivos"
+        ]
       }
     },
     "/dispositivos/{id}": {

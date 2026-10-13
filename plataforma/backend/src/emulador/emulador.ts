@@ -42,7 +42,9 @@ const url = arg('url', 'mqtt://127.0.0.1:1884');
 
 function conectar(id: string): Promise<MqttClient> {
   return new Promise((resolver, rechazar) => {
-    const c = mqtt.connect(url, { clientId: id, username: id, clean: true, reconnectPeriod: 1000, connectTimeout: 10_000 });
+    // Sin usuario: el broker del banco admite anónimos y, con el plugin de seguridad activo, un usuario sin clave se rechaza
+    // (medido el 12/10, docs/16 §20). El pipeline identifica al emulado por el tópico, no por el usuario.
+    const c = mqtt.connect(url, { clientId: id, clean: true, reconnectPeriod: 1000, connectTimeout: 10_000 });
     c.once('connect', () => resolver(c));
     c.once('error', rechazar);
   });

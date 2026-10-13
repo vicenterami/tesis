@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 138 pruebas unitarias, sin matriz formal) y TT-32 (sensor físico);
+cubre todavía: TT-27 (contrato de trama: hoy 172 pruebas unitarias, sin matriz formal) y TT-32 (sensor físico);
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -225,7 +225,7 @@ Vulnerabilidades críticas / altas:
 | Imagen | Antes | Después | Qué se hizo |
 |---|---|---|---|
 | backend | 6 / 67 | 0 / 43 | Base `node:22.23.3-trixie-slim` (Debian 13); sin npm, npx, corepack ni Yarn en la imagen final. Las 43 altas no tienen corrección publicada en Debian |
-| broker | 0 / 2 | 0 / 0 | La misma `eclipse-mosquitto:2.0.22`, reconstruida por su autor con OpenSSL corregido |
+| broker | 0 / 2 | 0 / 0 | La misma `eclipse-mosquitto:2.0.22`, reconstruida por su autor con OpenSSL corregido (08/10; hoy 2.1.2-alpine, §20) |
 | proxy | 0 / 3 | 0 / 0 | `nginx:1.30.5-alpine` más parches de Alpine (`plataforma/proxy/Dockerfile`) |
 | base | 7 / 100 | 1 / 21 | `timescale/timescaledb:2.24.0-pg16-oss` → `2.30.2-pg16-oss` más parches de Alpine, y sin `timescaledb-parallel-copy` ni `timescaledb-tune`, que el sistema no ejecuta (`plataforma/db/imagen/Dockerfile`). Queda `gosu`, que el arranque usa para bajar privilegios y no recibe datos de afuera |
 
@@ -432,16 +432,30 @@ pero sin reiniciar): no hace falta el patrón. La convivencia queda así: la aut
 la ACL la decide el plugin para todos (fase B niega), salvo lo que el `acl_file` conceda (fase C). Consecuencia probable: migrar
 todos los usuarios al plugin y retirar los dos archivos, como ya prevé el punto 41.
 
-| Tercera corrida | Pregunta | Medido |
-|---|---|---|
-| ACL con tópico literal | ¿Autoriza el propio y niega el ajeno? | pendiente |
-| ACL con `%u` | ¿Sustituye el usuario en 2.0.22? | pendiente |
-| ACL con `%c` (identificador de cliente fijo) | ¿Sustituye el identificador en 2.0.22? | pendiente |
-| Lo mismo contra Mosquitto 2.1.2-alpine (publicada el 18/09/2026; la línea 2.1 solo existe en Alpine, por eso el robot de dependencias no la propone) | ¿La línea nueva sustituye los patrones y conviven los archivos? Decide si se cambia de versión (`docs/11 §4`) | pendiente |
+**Tercera corrida (12/10), contra las dos versiones:**
 
-**Consecuencia según el resultado** (`docs/10 §8.4` punto 41): si A funciona y C no, los usuarios actuales del archivo (el del
-backend, el de la sonda y los de desarrollo) migran al plugin con HU-11, `acl_file` y `password_file` desaparecen del broker, y el
-guion de claves de desarrollo pasa a hablar con el plugin.
+| Comprobación (fase A, solo el plugin) | Mosquitto 2.0.22 | Mosquitto 2.1.2-alpine (18/09/2026) |
+|---|---|---|
+| ACL con tópico literal: propio / ajeno | ✅ `RC:16` / `RC:135` | ✅ `RC:16` / `RC:135` |
+| ACL con `%u` (usuario): propio / ajeno | ❌ `RC:135` / `RC:135` (no sustituye) | ✅ `RC:16` / `RC:135` |
+| ACL con `%c` (identificador de cliente): propio / ajeno | ❌ `RC:135` / `RC:135` | ✅ `RC:16` / `RC:135` |
+| Desconocido, deshabilitar, rehabilitar, rotar, borrar; 0 reinicios | ✅ todo | ✅ todo |
+| Fase B (plugin + `password_file`): el usuario del archivo conecta pero el plugin le niega todo tópico | igual en las dos | igual en las dos |
+| Fase C (los tres): el `acl_file` le concede su tópico al usuario del archivo; el cliente del plugin sigue bien | igual en las dos | igual en las dos |
+
+**Conclusiones.** (1) El plugin sirve en las dos versiones; (2) en 2.0.22 la ACL de cada dispositivo debe ser su tópico literal
+(un rol por dispositivo); en 2.1.2 basta un rol con patrón, como describe la documentación actual; (3) no hay convivencia útil:
+con el plugin activo, la ACL de todos la decide el plugin (salvo lo que un `acl_file` conceda aparte), así que todos los
+usuarios del broker migran al plugin y los dos archivos se retiran (`docs/10 §8.4` punto 42). Decisión del 12/10 (criterio del
+estudiante: la versión más nueva que convenza, con licencia y seguridad revisadas): **adoptar 2.1.2-alpine fijada por digest**,
+después de escanear la imagen (`escanear-imagenes.sh`) y repetir el banco con TLS. Nota del guion: el conteo «roles 2» tras
+borrar el rol de prueba es correcto (el rol `admin` y la referencia a él en el cliente administrador); el guion lo decía mal.
+
+**Resultado (12/10, noche):** A funciona y los archivos no conviven de forma útil → migración hecha en la misma tanda (`docs/10
+§8.4` punto 42): `password_file` y `acl_file` fuera de `mosquitto.conf`, `acl` fuera del repo, todos los usuarios en el plugin
+(`pruebas/broker-inicializar.sh`, `broker-cliente.sh`, `lib-dynsec.sh`), guardián 2i reescrito. Escaneo de
+`eclipse-mosquitto:2.1.2-alpine` por digest: **0 críticas, 0 altas** (`escanear-imagenes.sh`); banco con TLS repetido sobre 2.1.2
+y el plugin: 11 de 11 (`banco.sh proxy`); emulador y alta por API: §20.
 
 ## 19. Exportación de mediciones crudas en CSV y JSON (12/10/2026)
 
@@ -466,3 +480,50 @@ toda columna de texto (antes se eximía lo que empezaba con `-` y un dígito).
 de tandas no está medido; la variante para Excel en español (punto y coma, coma decimal) y el XLSX quedan con la sesión; sin
 pantalla todavía (P8 de `docs/19`); no hay prueba automática del corte por el cliente ni del cliente lento.
 
+## 20. Alta por API y migración del broker al plugin (12/10/2026)
+
+HU-11 (`POST /dispositivos`; `docs/10 §3` y `§8.4` puntos 41 y 42; controles en `docs/11 §3`). Qué se probó y cómo:
+
+| Comprobación | Resultado |
+|---|---|
+| Unitarias, sin broker ni base: 6 pruebas en `dynsec.spec.ts` (orden con correlación, error del plugin, sin respuesta en el plazo, respuestas ajenas e ilegibles ignoradas, cancelación al caer la conexión, el secreto no viaja en el error); 4 en `credenciales.spec.ts` (secreto de 32 caracteres base64url, `scrypt` con sal, hash de otra forma rechazado, comparación en tiempo constante y costo del hash medido: falla si alguien bajara N); 5 en `alta.dto.spec.ts` (forma del identificador igual a la de la base, nombres reservados y el de la sonda, campos que solo pone el sistema, vía y pasarela, canales); 5 en `clave-admin.guard.spec.ts` (incluida la cabecera repetida tal como la une Node); 10 en `alta.service.spec.ts` (BEGIN → … → `createClient` → COMMIT; 502 con ROLLBACK si el broker no responde y orden de borrado por si el cliente llegó a crearse; un rechazo explícito del plugin no borra nada; 409 por huérfano, sin borrar el ajeno, y por clave duplicada sin tocar el broker; borrado en el broker si la base no confirma; 503 sin administración antes de abrir la transacción; 429 con dos altas en curso; lorawan sin credencial y con pasarela del mismo sitio; 400 por zona o magnitud antes de insertar) | ✅ 172 en total (`pnpm test`) |
+| `pruebas/lab-dynsec-anonimos.sh` (laboratorio versionado, un contenedor efímero; corrido el 12/10): el archivo del plugin con dueño `root` deja al plugin vacío y rechaza hasta al administrador; con el dueño correcto y el acceso por defecto abierto, un cliente anónimo publica (`RC:16`); un cliente que manda **usuario sin clave** se rechaza aunque los anónimos estén permitidos; el rol `recepcion` recibe lo que publican los anónimos; `setDefaultACLAccess` se escribe `allow|deny`, no `true|false`; `mosquitto_ctrl` no admite un archivo de opciones | ✅ 6 de 6; por eso el emulador conecta sin usuario y el guion fija dueño 1883 |
+| `banco.sh alta` (banco con el plugin, 20 emulados): POST con la clave → 201; credencial de 32 caracteres y tópico en la respuesta; `Cache-Control: no-store`; el dispositivo nuevo publica en su tópico (`RC:0`) y la lectura llega a `medicion`; con su credencial, publicar como otro → `RC:135`; con otra clave, no conecta; repetir el alta → 409; sin cabecera → 401; con cabecera incorrecta → 401; cuerpo inválido → 400; lorawan sin pasarela → 400; `credencial.hash` empieza por `scrypt$` y el secreto en claro no está en ninguna fila; evento `alta`; `GET /dispositivos` lo lista con vía `mqtt` y en línea; la credencial no aparece en el registro del backend; un anónimo (emulado) no puede dar órdenes al plugin (`RC:135` en `$CONTROL`); el usuario `backend` (rol `recepcion`) no puede publicar como dispositivo (`RC:135`) | ✅ 19 de 19 |
+| Primera corrida de ese banco: «publicar como otro» dio `RC:0`, porque el banco abría el acceso por defecto para los anónimos y el rol `dispositivo` solo tenía su regla de permiso | corregido dos veces: primero negaciones explícitas en el rol; después (revisión del mismo día) el banco dejó de abrir el defecto: los emulados entran por el grupo anónimo del plugin con un rol `emulado`, todos los roles llevan negaciones explícitas (`#` y `$CONTROL/#`) y el acceso por defecto se fija en deny; así el banco prueba la misma ACL que el servidor |
+| `banco.sh correr --dispositivos 20 --duracion 15` con el plugin (emulados anónimos): 282 mediciones con la marca del nodo, 0 en cuarentena, latencia p95 3 ms | ✅ sin pérdida |
+| `banco.sh proxy` sobre Mosquitto 2.1.2 y el plugin: HTTPS, HSTS, MQTT sobre TLS → medición, SSE, 8883 sin TLS rechazado, nombres ajenos rechazados | ✅ 11 de 11 |
+| Humo contra el banco: `POST /dispositivos` sin cabecera, con otra y con la cabecera repetida → 401 (en la pila de desarrollo, 503 mientras no haya clave) | ✅ |
+| Escaneo de `eclipse-mosquitto:2.1.2-alpine` por digest | ✅ 0 críticas, 0 altas |
+
+**Qué cambia de 2.0.22 a 2.1.2 y si desmiente algo ya probado** (registro de cambios oficial, leído el 12/10/2026; evidencia DS-08):
+(1) `max_packet_size` pasa de «sin límite» a 2 000 000 bytes por defecto; aquí rige el tope explícito de 65 536, así que la prueba
+del 07/10 (50 MiB aceptados sin tope) describe un comportamiento que la 2.1 ya no tiene por defecto, y la decisión de fijar el
+tope sigue vigente. (2) `allow_duplicate_messages` pasa a `true` por defecto: solo afecta a un cliente con suscripciones que se
+solapan; el backend tiene una sola (`sitio/#`) y la administradora otra distinta, sin solape. (3) `acl_file` y `password_file`
+quedan declaradas obsoletas en favor de plugins: la migración de §20 va en la dirección de la versión. (4) El plugin de seguridad
+sustituye `%c` y `%u`: lo que midió el laboratorio. (5) 2.1.2 prohíbe `persistence true` junto con un plugin de persistencia:
+el de seguridad no lo es, y el broker arranca con `persistence true` (comprobado en la pila de desarrollo y en el banco).
+(6) Los valores por defecto de la cola (`max_queued_messages` 1000, `max_inflight_messages` 20, `max_queued_bytes` sin tope,
+`autosave_interval` 1800 s) siguen iguales en el manual vigente, así que `docs/10 §4.1` sigue valiendo. Novedad útil:
+`global_max_connections` (por defecto ilimitado) para el pendiente de `docs/11 §4` sobre el límite de conexiones.
+
+**Correcciones de la revisión del mismo día (12/10, noche; 40 hallazgos de tres lentes, 39 aplicados):** la administración del broker
+se declara disponible solo después de suscribirse a las respuestas (antes, una orden en la ventana entre conectar y suscribirse
+habría dejado un cliente huérfano); un error ambiguo del broker (sin respuesta, conexión perdida) ordena borrar el cliente por si
+llegó a crearse, y un rechazo explícito no borra nada; como mucho dos altas a la vez (429) e `idle_in_transaction_session_timeout`
+de 15 s, porque la espera al broker ocurre entre sentencias y retiene una conexión del pool de 5; `scrypt` asíncrono (no detiene la
+recepción de tramas) y `verificarScrypt` con bordes (sal o clave cortas, parámetros fuera de rango: `false`, nunca lanza); la
+cabecera repetida llega unida por «, » (así la entrega Node) y se prueba así; el error 23514 ya no devuelve el detalle crudo de la
+base; `MQTT_ADMIN_CLAVE` con el mismo mínimo de 24 caracteres; el nombre de la sonda (configurable) también reservado; el guion de
+inicialización verifica cada clave del sistema entrando al broker (antes imprimía «OK» aunque el plugin respondiera error), recrea
+el broker solo si el que corre no acepta al administrador y rota la clave del administrador con `MQTT_ADMIN_CLAVE_ANTERIOR`; la
+verificación de una credencial usa un identificador de cliente propio (con el del dispositivo expulsaba su sesión); el banco pasa
+los secretos a `curl`, `psql` y `grep` por la entrada estándar.
+
+**Lo que no cubre:** la pila de desarrollo se migra con `broker-inicializar.sh` (lo corre el operador; hasta reconstruir el backend,
+el guardián 2i falla y los casos del alta del humo responden 404, a propósito); la baja y la rotación por API (HU-12, HU-13) tienen las órdenes escritas pero
+no la ruta; la vía `http` guarda el hash del token aunque la recepción por HTTP no exista aún; no hay prueba automática de dos
+altas simultáneas del mismo identificador (las serializa el bloqueo por identificador del disparador de la migración 11, no
+ejercitado en concurrencia); un cliente huérfano en el broker se reporta (409 con el remedio) y no se corrige solo; la credencial
+viaja en claro dentro de la respuesta HTTP, por lo que fuera de la red local la ruta exige el proxy TLS; no hay límite de tasa en el
+proxy para `POST /dispositivos` (pendiente de `docs/11 §4`: el tope de dos altas y la clave de 24 caracteres acotan el daño).

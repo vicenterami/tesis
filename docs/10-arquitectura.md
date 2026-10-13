@@ -189,6 +189,7 @@ sequenceDiagram
     else vía lorawan
         Note over API,MQ: sin credencial propia:<br/>la autentica su pasarela
     end
+    API->>DB: INSERT evento «alta» y COMMIT<br/>(todo o nada: si la base no confirma,<br/>deleteClient en el broker)
     API-->>FE: 201 {id, datos de conexión}<br/>— la credencial se muestra UNA vez
     FE-->>Admin: Muestra credencial + tópico<br/>+ ejemplo de trama
     Admin->>Dev: Carga credencial en el firmware<br/>(o la entrega al compañero)
@@ -206,7 +207,9 @@ sequenceDiagram
 - La credencial **se muestra una sola vez** y en la base solo queda su **hash** (misma política que
   una contraseña). Si se pierde, se **rota** (nueva fila en `credencial`), no se recupera.
 - La **ACL del broker** limita a cada dispositivo a publicar solo en su propio tópico: un nodo
-  comprometido no puede suplantar a otro.
+  comprometido no puede suplantar a otro. Desde el 12/10/2026 es un rol del plugin Dynamic Security (`dispositivo`: publica solo
+  en `sitio/+/dispositivo/%u/+` y tiene denegado todo lo demás, incluida cualquier suscripción) que el backend asigna al crear el
+  cliente, en el mismo comando (§8.4 punto 42).
 - **La vía se declara en el alta** (§8.4 punto 25): el pipeline usa el formato declarado en vez de adivinarlo, y un
   dispositivo LoRaWAN no tiene credencial propia: lo autentica su pasarela, que solo publica por los dispositivos
   asociados a ella. El camino dibujado después del alta es el de la vía `mqtt`; el aviso al panel va por SSE (§8.4
@@ -308,7 +311,7 @@ transporte. Fuente: OASIS, *MQTT Version 5.0*, §4.3 (`mqttoasis` en la bibliogr
 **Probado el 08/10/2026 (`docs/16 §11`, con carga):** backend detenido 20 s y base congelada 15 s, cero lecturas perdidas;
 broker reiniciado sin persistencia (banco), 84 perdidas. Falta probar el proxy, el servidor completo y el broker con persistencia.
 
-**La cola del broker, con números** (verificado el 06/10/2026 en el manual `mosquitto.conf(5)` de la 2.0.22 y en
+**La cola del broker, con números** (verificado el 06/10/2026 en el manual `mosquitto.conf(5)` de la 2.0.22, y de nuevo el 12/10/2026 en el manual vigente de la 2.1 con los mismos valores por defecto, y en
 `plataforma/mosquitto/config/mosquitto.conf`). Mientras el backend está caído, Mosquitto guarda **por cliente**
 hasta `max_queued_messages` = **1000** mensajes QoS 1 (más `max_inflight_messages` = 20 en vuelo); `max_queued_bytes`
 = 0 (sin tope por tamaño). El archivo de configuración del proyecto **no fija ninguno de los dos**, así que rigen
@@ -465,7 +468,7 @@ flowchart TB
         subgraph SVC["Contenedores (versión fijada · no-new-privileges · reinicio automático)"]
             direction TB
             C5["proxy<br/>nginx (decidido el 06/10) · TLS<br/>límite 0,1 GB · publica 443, 8883 · 1700/udp solo ruta A"]
-            C1["mosquitto<br/>eclipse-mosquitto 2.0.22<br/>límite 0,25 GB"]
+            C1["mosquitto<br/>eclipse-mosquitto 2.1.2-alpine<br/>límite 0,25 GB"]
             C2["chirpstack + redis propio<br/>solo ruta A (opcional)<br/>límite 0,35 GB"]
             C4["backend<br/>imagen propia: NestJS + panel estático en /panel (12/10)<br/>límite 0,5 GB · sin estado"]
             C3["timescaledb<br/>timescale/timescaledb 2.30.2-pg16-oss (edición Apache) + parches<br/>límite 0,75 GB"]
@@ -842,8 +845,8 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     comprometida no puede publicar como un dispositivo de vía `mqtt`, que tiene su propio tópico. Dos reglas más (08/10):
     la ACL usa `+` en el nivel del sitio, así que el filtro 1 exige que el sitio del tópico sea el registrado
     (implementado para los dispositivos en la migración 11; para la pasarela llega con HU-02); y el identificador del
-    broker es único entre dispositivos y pasarelas y usa la lista blanca `[a-z0-9-]` de `clave-dispositivo.sh`, porque se
-    sustituye dentro del tópico con `%u` (la base lo exige desde la migración 11; el alta, HU-11, dará el mensaje claro).
+    broker es único entre dispositivos y pasarelas y usa la lista blanca `[a-z0-9-]` (`FORMA_ID_FISICO` en `alta.dto.ts`; la misma en `broker-cliente.sh` y en la migración 11), porque se
+    sustituye dentro del tópico con `%u` (la base lo exige desde la migración 11; el alta, HU-11, da el mensaje claro desde el 12/10).
     Al implementarlo, el
     patrón de tópicos de la recepción (§4.1, casos anormales) suma esta forma. Adaptador de su JSON (punto 3). Se prueba
     primero con un emulador que publica exactamente el JSON documentado por Milesight y, en terreno, apenas haya una
@@ -964,8 +967,61 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     se **muestra una sola vez** en la respuesta del alta y no se vuelve a leer: la base guarda solo su hash (`credencial`) y el
     broker, lo que su plugin necesita; perderla es rotarla (§3). El backend es el administrador del plugin Dynamic Security
     (punto 26) con una identidad propia distinta de la que usa para recibir tramas; qué pasa con los usuarios que hoy viven en
-    `password_file` (`backend`, `sonda`, los `dev-*` de desarrollo) lo decide el laboratorio `pruebas/lab-dynsec.sh`
-    (`docs/16 §18`): si conviven, se quedan hasta la Etapa 4; si no, migran al plugin en la misma tanda.
+    `password_file` (`backend`, `sonda`, los `dev-*` de desarrollo) lo decidió el laboratorio `pruebas/lab-dynsec.sh`
+    (`docs/16 §18`): no conviven, y migraron al plugin en la misma tanda (punto 42). **Implementado el
+    12/10 (noche):** `POST /dispositivos` (`backend/src/alta/`); guardia `X-Clave-Admin` de tiempo constante sobre hashes (clave
+    de 24 caracteres o más: una más corta detiene el arranque; ausente, 503); credencial de 24 bytes aleatorios (base64url)
+    mostrada una vez con `Cache-Control: no-store` y guardada en `credencial` solo como `scrypt` (N = 2¹⁵); dispositivo,
+    canales, hash y evento en una transacción, con el cliente del broker creado dentro de ella (`createClient` con su rol en un
+    solo comando: todo o nada; sin respuesta del broker en 5 s, nada queda creado y se ordena borrar el cliente por si llegó a
+    crearse; si la base no confirma después, el cliente se borra; como mucho dos altas a la vez, 429 la tercera); identidad administradora `backend-admin` con conexión propia y sesión limpia (`broker/dynsec.service.ts`), distinta
+    de `backend`. El laboratorio mostró que los archivos no conviven con el plugin: punto 42.
+42. **Todos los usuarios del broker viven en el plugin Dynamic Security; `password_file` y `acl_file` se retiran** (decidido y
+    hecho el 12/10/2026 con el laboratorio de `docs/16 §18`: con el plugin activo, la ACL de todos la decide el plugin, así que
+    no hay convivencia útil con los archivos). El archivo del plugin (`dynamic-security.json`) vive en el volumen de datos del
+    broker, con dueño 1883 y modo 600, y va dentro del respaldo (`docs/11 §7`). Lo inicializa una vez
+    `pruebas/broker-inicializar.sh` a partir del `.env`: administrador `backend-admin` (clave `MQTT_ADMIN_CLAVE`), roles
+    `recepcion` (cliente `backend`: se suscribe y recibe `sitio/#`), `sonda` (chequeo de salud: `$SYS/#`) y `dispositivo`
+    (publica solo en `sitio/+/dispositivo/%u/+`); los tres roles llevan negaciones explícitas (publicar en cualquier otro tópico y
+    en `$CONTROL`, suscribirse a cualquiera) y el acceso por defecto del plugin se fija en deny, así que ningún rol depende de él,
+    y los clientes `backend` y `sonda`, cuya clave verifica entrando al broker. Repetirlo con un `.env` cambiado rota las claves de
+    `backend` y `sonda`; la del administrador se rota poniendo la vigente en `MQTT_ADMIN_CLAVE_ANTERIOR` y la nueva en
+    `MQTT_ADMIN_CLAVE`. Mosquitto y su plugin: «dual licensed under the Eclipse Public License 2.0 OR the Eclipse Distribution
+    License 1.0» (LICENSE.txt del repositorio oficial, leído el 12/10/2026). El backend crea el cliente de cada dispositivo en el alta (punto 41) y lo borrará o rotará con las
+    órdenes ya escritas en `broker/dynsec.ts` (HU-12, HU-13); a mano, `pruebas/broker-cliente.sh` (demo y emergencias). Se adopta
+    Mosquitto **2.1.2-alpine** fijada por digest (0 vulnerabilidades altas o críticas en el escaneo del 12/10): en 2.0.22 el patrón
+    `%u` no sustituía y habría exigido un rol por dispositivo. El banco de pruebas corre el mismo plugin, con los mismos roles y
+    el mismo acceso por defecto; los emulados, sin usuario, entran por el grupo anónimo del plugin con un rol `emulado` que solo
+    publica bajo `sitio/+/dispositivo/+/+` (un cliente que manda usuario sin clave se rechaza aunque los anónimos estén permitidos:
+    `pruebas/lab-dynsec-anonimos.sh`), y prueba el alta de punta a punta (`banco.sh alta`, `docs/16 §20`).
+43. **Observabilidad y auditoría de operaciones: tres destinos, una regla** (decidido el 12/10/2026; diseño antes del código).
+    La regla, tomada de la práctica profesional: cada dato va a donde está quien lo necesita de vuelta. **(1) Base de datos, lo
+    que el administrador recupera:** una hypertable `auditoria` con una fila por petición HTTP (instante, `usuario_id` cuando haya
+    sesión, método, ruta normalizada, recurso, código, duración en ms, bytes, `id_peticion`, origen truncado a /24 en IPv4 y /48 en
+    IPv6, porque la dirección completa es un dato personal y el bloqueo por IP se lleva en memoria con la exacta); se excluyen
+    `/salud` (lo pide el chequeo cada 10 s) y los latidos del canal en vivo (el flujo deja una fila al abrirse y otra al cerrarse,
+    con su duración). Con 10 usuarios y 500 peticiones diarias son 5 000 filas por día: trivial. Se suman `acceso` (`docs/20`) y
+    `metrica_broker`: una muestra por minuto de los contadores `$SYS` del broker que el manual documenta
+    (`publish/messages/dropped`, `store/messages/count`, `store/messages/bytes`, `clients/connected`, `heap/current`), tomada por
+    la conexión administradora (su rol ya lee `$SYS/#`). Retención: **90 días** para las tres, con `drop_chunks` como las tramas.
+    Lectura: `GET /auditoria` (Etapa 4) solo para el rol administrador y, para analizar fuera, un rol de base de **solo lectura**
+    (el mismo pendiente de `docs/11 §4`) al que puede conectarse Grafana (AGPL, sin costo) o un cuaderno; ninguna herramienta
+    externa corre en el servidor (RNF-17). **(2) Registros, lo que el operador observa:** siguen siendo un JSON por línea acotado por
+    Docker (§6), con `id_peticion` en toda línea que nazca de una petición; el proxy genera ese identificador (`$request_id`) y lo
+    reenvía en una cabecera, así una línea del proxy, una del backend y la fila de `auditoria` se cruzan por el mismo valor. Lo que
+    escribe (alta, baja, rotación) y todo error dejan una línea con conteos e identificadores, nunca datos de la persona ni
+    secretos; las lecturas no se registran (están en la tabla). **(3) Métricas, los números en el tiempo:** sin Prometheus; los
+    números viven en `metrica_broker` y en `GET /salud` ampliado (cola del broker, descartes, conexiones, flujos abiertos, altas en
+    curso). **Qué pasa cuando la base cae:** el middleware nunca bloquea la petición: las filas se acumulan en memoria (cola de
+    1 000, vaciada cada 5 s) y, si se llena, se descartan las más viejas **contando** lo descartado en una línea de registro (ruido,
+    no silencio); el pipeline de tramas sigue como en §4.1 (sin confirmar al broker, que las guarda). **La cola del broker, con
+    topes explícitos y alarma:** `max_queued_messages 10000`, `max_queued_bytes 20971520` (20 MB) y `autosave_interval 300` en
+    `mosquitto.conf` (hoy rigen 1000, sin tope y 1800 s): con 50 dispositivos cada 5 s son ≈ 17 min de backend caído antes de perder
+    algo, bajo el techo de 256 MB del contenedor; cuando `publish/messages/dropped` crece entre dos muestras, o `store/messages/count`
+    supera el 80 % del tope, se abre una condición del sistema (nueva, sin dispositivo) que viaja por el canal en vivo y se cierra
+    sola al normalizarse. Orden de implementación: topes y muestreo con alarma en la Etapa 3 (protegen datos: 2 h); `auditoria`,
+    middleware e `id_peticion` al abrir la Etapa 4 junto con la sesión (3 h), porque «quién» necesita el usuario; la ruta de lectura (Etapa 4)
+    y la pantalla después. Se mide la sobrecarga del middleware en el banco antes de dejarlo (`docs/16`).
 
 ## 9. Crecimiento, resiliencia y respaldo (aprobado el 06/10/2026)
 

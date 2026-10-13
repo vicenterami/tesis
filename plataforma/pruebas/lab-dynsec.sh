@@ -6,6 +6,8 @@
 # B) plugin + password_file (sin acl_file) · C) plugin + password_file + acl_file.
 # Identidades de descarte; los secretos se generan aquí, se usan en esta misma invocación y nunca se imprimen; el contenedor y la
 # carpeta temporal se borran al salir. Lo ejecuta la persona a cargo del broker (regla del 27/09: los secretos no salen de aquí).
+# Límite conocido: aquí las claves de descarte pasan como argumentos de `docker exec` (visibles en `ps` mientras corre); los
+# guiones de operación las pasan por la entrada estándar (lib-dynsec.sh). La segunda parte del laboratorio: lab-dynsec-anonimos.sh.
 # Uso, desde cualquier carpeta:   bash plataforma/pruebas/lab-dynsec.sh
 #   contra otra versión del broker: IMG=eclipse-mosquitto:2.1.2-alpine@sha256:<digest> bash plataforma/pruebas/lab-dynsec.sh
 # Corridas anteriores (12/10/2026): con un rol cuya ACL usaba el patrón %u, el cliente del plugin autenticaba pero no podía

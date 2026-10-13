@@ -1,4 +1,4 @@
-import { AvisosAcotados, HOSTS_LOCALES, hostsPermitidos, interfazDeEscucha, nombreDeHost, rechazoDeHost, registrosEnJson, servirDocumentacion } from './arranque';
+import { AvisosAcotados, claveAdmin, claveOpcional, HOSTS_LOCALES, hostsPermitidos, interfazDeEscucha, nombreDeHost, rechazoDeHost, registrosEnJson, servirDocumentacion } from './arranque';
 
 describe('registrosEnJson (docs/10 §6): JSON en contenedor, texto en desarrollo', () => {
   it('sin variable → texto', () => expect(registrosEnJson(undefined)).toBe(false));
@@ -102,4 +102,16 @@ describe('rechazoDeHost: solo pasan los nombres de la lista; el puerto no cuenta
   });
   it('el motivo va acotado: un Host de 500 caracteres no llena el registro', () =>
     expect(rechazoDeHost('a'.repeat(500) + '.example', lista)!.length).toBeLessThan(120));
+});
+
+describe('claveAdmin (docs/10 §8.4 punto 41): ausente = 503 en las rutas que escriben; corta = no arranca', () => {
+  it('ausente, vacía o solo espacios → undefined (las rutas responden 503, nunca quedan abiertas)', () => {
+    for (const v of [undefined, '', '   ']) expect(claveAdmin(v)).toBeUndefined();
+  });
+  it('23 caracteres → el arranque falla con el largo en el mensaje', () => expect(() => claveAdmin('a'.repeat(23))).toThrow('23 caracteres'));
+  it('24 o más → se acepta, sin espacios alrededor', () => expect(claveAdmin(' ' + 'a'.repeat(24) + ' ')).toBe('a'.repeat(24)));
+  it('la clave del administrador del broker sigue la misma política, con su nombre en el mensaje', () => {
+    expect(() => claveOpcional('MQTT_ADMIN_CLAVE', 'corta')).toThrow('MQTT_ADMIN_CLAVE tiene 5 caracteres');
+    expect(claveOpcional('MQTT_ADMIN_CLAVE', undefined)).toBeUndefined();
+  });
 });

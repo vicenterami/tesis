@@ -18,6 +18,7 @@ sequenceDiagram
     else vía lorawan
         Note over API,MQ: sin credencial propia:<br/>la autentica su pasarela
     end
+    API->>DB: INSERT evento «alta» y COMMIT<br/>(todo o nada: si la base no confirma,<br/>deleteClient en el broker)
     API-->>FE: 201 {id, datos de conexión}<br/>— la credencial se muestra UNA vez
     FE-->>Admin: Muestra credencial + tópico<br/>+ ejemplo de trama
     Admin->>Dev: Carga credencial en el firmware<br/>(o la entrega al compañero)

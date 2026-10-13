@@ -2,8 +2,9 @@
 
 > Borrador del 12/10/2026 para decidir sobre texto antes de programar (regla de concordancia: manda el diseño documentado).
 > Cubre M7 (sesión del panel), HU-18, RF-41 (aislamiento entre sitios), RF-43 (autenticar usuarios), RF-44 (dos roles), RF-46
-> (bitácora de accesos) y la vista pública por enlace (`docs/10 §8.4` punto 6). Lo que ya estaba decidido se cita; lo que falta
-> decidir va marcado **[por decidir]** y tiene su opción recomendada.
+> (bitácora de accesos) y la vista pública por enlace (`docs/10 §8.4` punto 6). Lo que ya estaba decidido se cita; lo que faltaba
+> decidir (hash, cabecera anti-CSRF, destino de la clave de administrador, clave temporal, tiempos de sesión, retención de accesos,
+> flujos por usuario) quedó decidido el 12/10/2026 y aparece con su fecha.
 
 ## 1. Lo ya decidido que aquí se respeta
 | Decisión | Dónde | Consecuencia |
@@ -25,7 +26,7 @@
   caracteres). Índice por `usuario_id` y por `expira_en` (limpieza).
 - `acceso` (nueva, RF-46): `instante`, `usuario_id` (nulo si el usuario no existe), `email_intentado` (acotado), `ip`, `resultado`
   (`ok`, `clave_incorrecta`, `bloqueado`, `inactivo`, `cierre`), `sesion_id`. Hypertable con retención (`RetencionService`,
-  90 días **[por decidir]**).
+  **90 días**, la misma que la auditoría de operaciones de `docs/10 §8.4` punto 43; decidido el 12/10/2026).
 - `enlace_publico` (nueva): `id`, `sitio_id`, `token_hash`, `magnitudes` (lista), `intervalo` (de la lista cerrada), `creado_por`,
   `expira_en`, `revocado_en`.
 
@@ -33,33 +34,42 @@
 - **Qué viaja:** una cookie `sesion` con 32 bytes aleatorios en base64url; en la base queda su hash. Sin JWT: con un solo
   servidor (RNF-14) no hay nada que ganar firmando, y una sesión en la base se **revoca de verdad** al cerrar (en diseños con un
   token corto y otro largo, cerrar sesión suele dejar vivo el largo si su `path` no llega a la ruta de cierre).
-- **Vida:** se renueva con cada petición (`ultima_actividad`); vence a las **12 h sin actividad** y a los **7 días** desde que se
-  creó, lo que ocurra primero **[por decidir: cifras]**. Al vencer, 401 y el panel vuelve al inicio de sesión guardando la ruta.
+- **Vida (decidido el 12/10/2026):** se renueva con cada petición (`ultima_actividad`); vence a los **30 minutos sin actividad** y a
+  las **8 horas** desde que se creó, lo que ocurra primero. Son los topes que recomienda la hoja de sesiones de OWASP (inactividad de
+  15 a 30 minutos para aplicaciones de riesgo bajo; absoluto «between 4 and 8 hours»): una jornada de trabajo exige entrar una vez.
+  El panel renueva solo mientras la persona interactúa (un `GET /sesion` (Etapa 4) liviano, como mucho cada 5 minutos, al mover el ratón o
+  teclear); una pantalla fija sin nadie delante vence, y para una pantalla de sala está la vista pública por enlace (§7). Al vencer,
+  401 y el panel vuelve al inicio de sesión guardando la ruta. El identificador de sesión (32 bytes, 256 bits de entropía; OWASP
+  exige al menos 64) se **regenera** al iniciar sesión y al cambiar la clave, nunca se reutiliza uno anterior.
 - **Flags:** `HttpOnly; Secure; SameSite=Lax; Path=/`. `Secure` siempre; en desarrollo el panel va por `http://127.0.0.1` y el
   navegador acepta `Secure` en `localhost`/loopback **(verificar en el tramo que lo implemente: Chrome y Firefox lo tratan como
   contexto seguro; si uno no, variable explícita `HTTP_COOKIE_SEGURA=no` solo en desarrollo, nunca derivada de `NODE_ENV`)**.
 - **Cierre (Etapa 4):** `DELETE /sesion` marca `revocada_en` y borra la cookie; «cerrar en todos lados» revoca todas las del usuario.
 - **El canal en vivo** (`GET /eventos`) exige la misma cookie: `EventSource` la manda solo al mismo origen. Con sesión, el canal
-  filtra por los sitios del usuario y el tope de flujos pasa a ser **por usuario** (5 **[por decidir]**).
+  filtra por los sitios del usuario y el tope de flujos pasa a ser **por usuario** (**5**, decidido el 12/10/2026: cinco pestañas
+  abiertas de una misma persona; el tope global de 50 se mantiene).
 - **Descargas** (exportación): con sesión en la base no hay «token corto vencido»: un enlace normal a `/dispositivos/{id}/exportar`
   funciona mientras la sesión viva; si venció, el backend responde 401 y el panel muestra el inicio de sesión. No viaja ningún
   token en la URL.
 
 ## 4. Claves y bloqueos
 - **Hash:** `scrypt` de `node:crypto` (N = 2¹⁷, r = 8, p = 1, 64 bytes, sal de 16 bytes por usuario), comparación de tiempo
-  constante. **[por decidir (a)]:** `scrypt` sin dependencias frente a `argon2id`, que exige un paquete con binario nativo y un
-  script de instalación (hoy todos están prohibidos por `ignore-scripts`). Recomendado: `scrypt`; se documenta el costo medido
-  (objetivo: 100–300 ms por verificación en el servidor de referencia).
+  constante. **Decidido el 12/10/2026: `scrypt`** sin dependencias (frente a `argon2id`, que exige un paquete con binario nativo y un
+  script de instalación, prohibidos por `ignore-scripts`). La función ya existe en `backend/src/alta/credenciales.ts` (la usa la
+  credencial de los dispositivos con N = 2¹⁵); para personas, N = 2¹⁷ y se documenta el costo medido (objetivo: 100–300 ms por
+  verificación en el servidor de referencia).
 - **Reglas de la clave:** mínimo 12 caracteres, sin máximo bajo (hasta 128), sin exigir símbolos; se rechaza si aparece en una
   lista corta de claves comunes incluida en el repositorio. Una clave nueva no puede ser igual a la anterior.
 - **Intentos fallidos:** por usuario, 5 en 15 minutos → bloqueo de 1 minuto, después 5, después 15 (creciente); por IP, 50 en
   15 minutos → 429. El mensaje al cliente es el mismo para usuario inexistente, clave mala y usuario inactivo («credenciales
   no válidas»), y la respuesta tarda lo mismo (se calcula el hash aunque el usuario no exista). Todo intento va a `acceso`.
 - **Primer administrador (Etapa 4):** `POST /usuarios` con la clave de administrador del punto 41 solo mientras no exista ningún usuario
-  administrador; después esa ruta exige sesión de administrador y la variable se retira del `.env` **[por decidir (c): ¿o
-  queda como «llave de emergencia» rotada y guardada fuera del servidor?]**.
+  administrador; después esa ruta exige sesión de administrador y la variable **se retira** del `.env` (decidido el 12/10/2026:
+  no queda como llave de emergencia; si se pierde el último administrador, se crea otro desde la terminal del servidor, que ya
+  equivale a root).
 - **Olvidé mi clave:** sin correo saliente en la Etapa 4, el administrador del sitio asigna una clave temporal (se muestra una
-  vez, como la credencial de un dispositivo) y el usuario debe cambiarla al entrar **[por decidir (d)]**.
+  vez, como la credencial de un dispositivo) y el usuario debe cambiarla al entrar; la temporal **vence a las 24 h** (decidido el
+  12/10/2026; la vigencia se prueba con reloj simulado y se corrobora con el instante guardado).
 - **Alta de usuarios:** solo un administrador; sin registro abierto. Un usuario se desactiva, no se borra (su rastro en
   `evento` y `acceso` lo necesita).
 
@@ -72,7 +82,8 @@
 - **Un recurso de otro sitio responde 404, no 403**: no se revela que existe (RF-41). El 403 queda para «es tu sitio pero tu
   rol no puede».
 - **CSRF:** `SameSite=Lax` cubre las navegaciones; además, toda ruta que escribe exige la cabecera `X-Pedido: panel`, que un
-  formulario de otro sitio no puede poner y el cliente HTTP del panel pone siempre **[por decidir (b): sí/no]**.
+  formulario de otro sitio no puede poner y el cliente HTTP del panel pone siempre (decidido el 12/10/2026: **sí**; hoy ese papel
+  lo cumple `X-Clave-Admin` en la única ruta que escribe).
 - La clave de administrador del punto 41 pasa por el mismo guardia como un «usuario del sistema» con rol de administrador en
   todos los sitios, hasta que se retira.
 

@@ -37,12 +37,22 @@ fi
 caso "UUID inválido → 400"                    /dispositivos/no-es-uuid 400
 caso "limite fuera de rango → 400"            "/condiciones?limite=99999" 400
 caso "condiciones abiertas es lista con duracion_s" "/condiciones?abiertas=true" "isinstance(r,list) and all(isinstance(c['duracion_s'],int) for c in r)"
-caso "contrato OpenAPI servido con 8 rutas, con el canal /eventos como text/event-stream" /docs/openapi.json "len(r['paths'])==8 and r['openapi'].startswith('3.') and 'text/event-stream' in r['paths']['/eventos']['get']['responses']['200']['content']"
+caso "contrato OpenAPI servido con 8 rutas (9 operaciones: POST /dispositivos incluido), con el canal /eventos como text/event-stream" /docs/openapi.json "len(r['paths'])==8 and sum(1 for p in r['paths'].values() for m in p if m in {'get','post','put','patch','delete'})==9 and 'post' in r['paths']['/dispositivos'] and r['openapi'].startswith('3.') and 'text/event-stream' in r['paths']['/eventos']['get']['responses']['200']['content']"
 # El servido (generado en caliente desde los decoradores) vs. el versionado en el repo (se
 # desincroniza si alguien cambia una ruta y olvida correr `pnpm openapi` antes de commitear).
 caso "OpenAPI servido == OpenAPI versionado (mismas rutas y métodos)" /docs/openapi.json \
   "sorted((p,m) for p,ops in r['paths'].items() for m in ops if m in {'get','post','put','patch','delete'}) == sorted((p,m) for p,ops in json.load(open('$OPENAPI_COMMITTED'))['paths'].items() for m in ops if m in {'get','post','put','patch','delete'})"
 caso "cuarentena limitada a 2"                "/cuarentena?limite=2" "isinstance(r,list) and len(r)<=2"
+# Alta por API (HU-11, docs/10 §8.4 punto 41): sin la cabecera, 401 (clave configurada) o 503 (sin configurar); nunca 2xx ni 404.
+# Con clave incorrecta, lo mismo. El alta completa, con el broker y la base, la prueba el banco (banco.sh alta): aquí no se
+# crea ningún dispositivo en la pila de desarrollo.
+post_code() { curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' "$@" "$API/dispositivos"; }
+code=$(post_code -d '{}')
+[[ "$code" == 401 || "$code" == 503 ]] && echo "OK    POST /dispositivos sin X-Clave-Admin → $code" || { echo "FALLA POST /dispositivos sin clave → HTTP $code (esperado 401 o 503)"; fallos=$((fallos+1)); }
+code=$(post_code -H 'X-Clave-Admin: no-es-la-clave-de-nadie-123456' -d '{}')
+[[ "$code" == 401 || "$code" == 503 ]] && echo "OK    POST /dispositivos con clave incorrecta → $code" || { echo "FALLA POST /dispositivos con clave incorrecta → HTTP $code (esperado 401 o 503)"; fallos=$((fallos+1)); }
+code=$(post_code -H 'X-Clave-Admin: a' -H 'X-Clave-Admin: b' -d '{}')
+[[ "$code" == 401 || "$code" == 503 ]] && echo "OK    POST /dispositivos con la cabecera repetida → $code" || { echo "FALLA cabecera repetida → HTTP $code"; fallos=$((fallos+1)); }
 # Filtro por dispositivo (ficha del panel, docs/19 P3; 12/10): solo lo de ese dispositivo, y un valor que no es UUID → 400.
 DISP=$(curl -s "$API/dispositivos" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0]['id'] if d else '')")
 DISP_FIS=$(curl -s "$API/dispositivos" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0]['id_fisico'] if d else '')")

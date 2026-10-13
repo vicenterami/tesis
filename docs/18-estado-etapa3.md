@@ -11,14 +11,14 @@
 |---|---|---|---|
 | Retroalimentación | 20 % | 🟡 | Al 8/10 no hay observaciones escritas del profesor guía sobre la entrega del 2/10. Sí se incorporó la entrevista del 5/10 (`bitacora/2026-10-05-entrevista-academico-geologia.md`) en las decisiones del 6 y del 8/10 (`docs/10 §8.4`). Falta: recibir e incorporar la retroalimentación de la Etapa 2. |
 | Mejoras | 15 % | 🟢 | Decisiones de diseño del 6, 7 y 8/10 (`docs/10 §8.4`); proxy TLS (`docs/16 §9`); dependencias e imágenes sin vulnerabilidades altas o críticas corregibles (`docs/16 §12`). |
-| 50 % de la implementación | 10 % | 🟡 | Núcleo: 17 de 34 elementos hechos (80 de 168 h, 48 %) y 9 parciales (52 h; el 12/10 entraron HU-19, HU-20 y HU-21 con el panel, y HU-08 con la exportación). Todo el backlog: 28 de 65 (114 de 285 h, 40 %) y 17 parciales (83 h). Cifras calculadas desde las filas de `docs/04`, con los estados de `docs/12 §3`, de §2 y de la Etapa 1 (al final de §2). |
-| Pruebas iniciales | 30 % | 🟢 | `docs/16`: emulador, carga (59,7 tramas/s sin pérdida), carreras, TLS, capacidad y picos, caídas con carga, dependencias e imágenes; 138 pruebas unitarias. Falta: la matriz formal del contrato de trama (TT-27) y el broker de producción en las caídas (`docs/16 §11`). |
+| 50 % de la implementación | 10 % | 🟡 | Núcleo: 19 de 34 elementos hechos (90 de 168 h, 54 %) y 8 parciales (47 h; el 12/10 entraron HU-19, HU-20 y HU-21 con el panel, HU-08 con la exportación, y HU-10 y HU-11 con el alta por API). Todo el backlog: 30 de 65 (124 de 285 h, 44 %) y 16 parciales (78 h). Cifras calculadas desde las filas de `docs/04`, con los estados de `docs/12 §3`, de §2 y de la Etapa 1 (al final de §2). |
+| Pruebas iniciales | 30 % | 🟢 | `docs/16`: emulador, carga (59,7 tramas/s sin pérdida), carreras, TLS, capacidad y picos, caídas con carga, dependencias e imágenes; 172 pruebas unitarias. Falta: la matriz formal del contrato de trama (TT-27) y el broker de producción en las caídas (`docs/16 §11`). |
 | Validación preliminar | 10 % | ⬜ | Sensor físico de extremo a extremo (TT-32): la placa ESP32 ya llegó (12/10); los sensores y el cableado están en tránsito; guía de manejo seguro escrita (`docs/17 §3–4`). |
 | Documentación | 15 % | 🟡 | Documentos en concordancia (guardián `plataforma/pruebas/verificar-todo.sh`). Falta el capítulo de pruebas y validación del informe (TT-36). |
 
 ## 2. Tareas de la Etapa 3: 16 elementos, 86 h (tras el corte del 08/10 y los adelantos del 12/10, §3)
 
-**Hechos: 6 (31 h) · parciales: 7 (41 h) · pendientes: 3 (14 h).**
+**Hechos: 8 (41 h) · parciales: 6 (36 h) · pendientes: 2 (9 h).**
 
 | Ítem | Tarea | h | Estado | Evidencia o lo que falta |
 |---|---|---|---|---|
@@ -27,8 +27,8 @@
 | TT-17 🎯 | Pipeline de seis filtros con cuarentena | 6 | ✅ | `docs/12 §3` (seis filtros verificados). |
 | HU-05 🎯 | Condiciones abiertas por dispositivo | 7 | ✅ | Una condición abierta por regla (migración 02), `GET /condiciones`, pruebas de carrera (`docs/16 §4`). |
 | TT-18 🎯 | Marcas de tiempo de nodos sin reloj confiable | 2 | ✅ | `docs/12 §3`. |
-| HU-10 🎯 | Inventario con estado y vía de envío | 5 | 🟡 | `GET /dispositivos` con la vía y el formato (migración 11) y la vista del panel (P2, 12/10); falta declararlos en el alta (HU-11). |
-| HU-11 🎯 | Registrar un dispositivo desde la plataforma | 5 | ⬜ | Alta por API con Dynamic Security (`docs/10 §8.4` puntos 25 y 26), después de su prueba en un contenedor desechable. |
+| HU-10 🎯 | Inventario con estado y vía de envío | 5 | ✅ | `GET /dispositivos` con la vía y el formato (migración 11), la vista del panel (P2, 12/10) y, desde el alta por API (HU-11, 12/10), la vía y el formato declarados al registrar. |
+| HU-11 🎯 | Registrar un dispositivo desde la plataforma | 5 | ✅ | Alta por API hecha el 12/10: `POST /dispositivos` con clave de administrador, credencial mostrada una vez y cliente creado en el plugin del broker, todo o nada (`docs/16 §20`). El criterio «quién lo registró» (RF-23) llega con la sesión (HU-18): hoy el evento guarda el instante y el origen (API con clave de administrador). La pantalla (P7) es HU-22, Etapa 4. |
 | HU-14 🎯 | Detectar que un dispositivo dejó de reportar | 7 | ✅ | Filtro 6 (`supervision.service.ts`), intervalo esperado por dispositivo (migración 10), medición en `docs/16 §5`. |
 | TT-39 | Canal de tiempo real (SSE) | 4 | 🟡 | Hecho el 09/10 en el backend: `GET /eventos` con mediciones, señales de vida y condiciones, cada una ya guardada (`docs/10 §5`, `docs/16 §14`). En esta etapa, sin sesión y solo en la red local, como la API. 12/10: lista de nombres de host contra el *DNS rebinding* en el backend y en el proxy (`docs/10 §8.4` punto 40). Falta: la sesión, que llega con HU-18 (Etapa 4). |
 | HU-19 🎯 | Panel de salud con semáforo | 9 | 🟡 | Tramo 2 hecho el 12/10: pantalla P2 (`docs/19`) con el estado visual en cuatro valores, conteos, tabla y actualización por el canal en vivo; servida por el backend en `/panel` y comprobada con el servidor de Vite real (`docs/16 §16`). Falta: verla con el sensor físico y la demostración. |
@@ -63,7 +63,7 @@ ya dicen la etapa nueva (paso 2v del guardián).
 **Adelantos decididos por el estudiante el 12/10:** HU-20 y HU-21 (7 h cada una) pasan de la Etapa 4 a la 3, para que el panel
 muestre, además del semáforo (HU-19), el inventario filtrable y la ficha con gráfico (`docs/19`); y HU-08 (4 h), porque la
 exportación es lo que el académico entrevistado llamó «no negociable» (CSV y JSON ahora; XLSX con la sesión). Lo que falta de la
-Etapa 3 son ahora 55 h según las filas (14 pendientes y 41 parciales al cierre del 12/10, §2) frente a unas 38 h disponibles hasta el 30/10 (15 h por semana): **no
+Etapa 3 son ahora 45 h según las filas (9 pendientes y 36 parciales al cierre del 12/10, §2) frente a unas 38 h disponibles hasta el 30/10 (15 h por semana): **no
 cabe todo, y se sabe**. Orden fijado: TT-36 (el entregable), HU-19 y HU-11, después HU-21 y HU-20; lo que no esté hecho el 27/10
 vuelve a la Etapa 4 con su registro aquí y en `docs/04`.
 

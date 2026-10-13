@@ -11,7 +11,7 @@ import { join } from 'node:path';
 import type { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
-import { AvisosAcotados, hostsPermitidos, interfazDeEscucha, rechazoDeHost, registrosEnJson, servirDocumentacion } from './arranque';
+import { AvisosAcotados, hostsPermitidos, interfazDeEscucha, rechazoDeHost, registrosEnJson, servirDocumentacion, claveAdmin } from './arranque';
 import { configurarOpenApi } from './openapi';
 
 // Punto de entrada. Levanta la aplicación Nest: al iniciarse, cada módulo se conecta a lo suyo
@@ -39,6 +39,9 @@ async function arrancar(): Promise<void> {
   // de HTTP_HOSTS recibe 421 y no llega a ninguna ruta. Es lo que detiene el DNS rebinding, que el control
   // de origen del canal en vivo no cubre (eventos.controller.ts). El rechazo se registra como WARN, acotado.
   const permitidos = hostsPermitidos(process.env.HTTP_HOSTS); // un valor malformado detiene el arranque, a propósito
+  // Clave de administrador de las rutas que escriben (docs/10 §8.4 punto 41): se valida aquí para que una clave corta
+  // detenga el arranque; la guardia (alta/clave-admin.guard.ts) la vuelve a leer por ConfigService.
+  if (claveAdmin(process.env.HTTP_CLAVE_ADMIN) === undefined) log.warn('HTTP_CLAVE_ADMIN ausente: las rutas que escriben (alta) responden 503');
   const avisos = new AvisosAcotados();
   app.use((req: Request, res: Response, next: NextFunction) => {
     const rechazo = rechazoDeHost(req.headers.host, permitidos);

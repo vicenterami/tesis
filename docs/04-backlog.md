@@ -402,7 +402,7 @@ Cuatro semanas por etapa a ~15 horas semanales (restricción RE-01):
 
 1. **El backlog completo excede el presupuesto en un 19 %.** No es viable ejecutarlo entero.
 2. **El núcleo demostrativo sí cabe: 168 h contra 240 disponibles, con 30 % de holgura.** La tesis es
-   demostrable dentro del plazo — pero **solo si el alcance se limita al núcleo** y los 111 h restantes
+   demostrable dentro del plazo — pero **solo si el alcance se limita al núcleo** y los 117 h restantes
    se tratan como alcance opcional, no comprometido.
 
 > **Decisión de planificación derivada:** el **núcleo (168 h) constituye el compromiso**; los 31
@@ -467,12 +467,12 @@ HU-21 y HU-08 no alcanzan y vuelven a la Etapa 4, son 87 h ≈ 52 %. ✅ El umbr
 
 ## 6.5 Qué se recorta y en qué orden
 
-Los 111 h fuera del núcleo se ordenan por valor decreciente. Se ejecutan de arriba hacia abajo, solo
+Los 117 h fuera del núcleo se ordenan por valor decreciente. Se ejecutan de arriba hacia abajo, solo
 contra holgura verificada. **Corregido el 23/09/2026:** esta tabla incluía HU-11, TT-28, TT-29 y TT-33
 —los cuatro marcados 🎯 (núcleo)— como si fueran recortables, contradiciendo la regla de que el núcleo
 no se recorta bajo ninguna circunstancia. El "Resto" también omitía TT-04, TT-08 a TT-10 y TT-14 a
 TT-15 por un rango escrito a mano e incompleto. Recalculado sumando directamente las filas del backlog
-(30 elementos fuera de núcleo, 111 h exactos, sin excepciones):
+(31 elementos fuera de núcleo, 117 h exactos, sin excepciones):
 
 | Orden | Elementos | Horas | Valor si se ejecuta |
 |:---:|---|:---:|---|
@@ -544,7 +544,7 @@ entrevista del 05/10 hizo subir (exportación, estados, correo por silencio) o b
 
 | Peso | Criterio | Qué se hace (ítems) | Horas |
 |---|---|---|---|
-| 30 % | Pruebas iniciales | TT-28 emulador de nodos ✅ (07/10); pruebas de carrera ✅ (07/10: misma lectura ×20 y umbral ×5; destaparon y corrigieron la carrera al abrir condiciones); TT-29 carga ✅ preliminar (59,7 tramas/s sostenidas 90 s sin pérdida, en el portátil); TT-27 pruebas del contrato (parcial: 70 unitarias, sin matriz); TT-36 informe de pruebas → `docs/16` (preliminar). Falta: repetir en el servidor con TLS | 5 + 4 + 3 + 5 = 17 |
+| 30 % | Pruebas iniciales | TT-28 emulador de nodos ✅ (07/10); pruebas de carrera ✅ (07/10: misma lectura ×20 y umbral ×5; destaparon y corrigieron la carrera al abrir condiciones); TT-29 carga ✅ preliminar (59,7 tramas/s sostenidas 90 s sin pérdida, en el portátil); TT-27 pruebas del contrato (parcial: 172 unitarias, sin matriz); TT-36 informe de pruebas → `docs/16` (preliminar). Falta: repetir en el servidor con TLS | 5 + 4 + 3 + 5 = 17 |
 | 20 % | Retroalimentación | Registrar la retroalimentación del profesor guía sobre la Etapa 2 cuando llegue; incorporar la entrevista (`docs/03 §4`: fuente [ENT] en `docs/02`, citas en `docs/01`, informe) | 4 |
 | 15 % | Mejoras del diseño | Confirmación al broker tras el COMMIT; ACL de `backend` y `sonda`; estado `mantenimiento` sin alertas (RF-22) ✅ (07/10: no abre condiciones, sí las cierra; el registro del período llega con M3); `ON CONFLICT` al abrir condiciones ✅ (07/10); SSE decidido; unidades propias; entidad `pasarela`, ubicación y tabla `trama` (`docs/08 §8`), cada una con antes/después; **edición Apache de TimescaleDB y migración 08 con hora de recepción** (`docs/10 §8.4` puntos 11–12, decididos el 06/10) | 13 |
 | 15 % | Documentación | `docs/10 §8.4`, `docs/08 §8`, figuras con la segunda ruta de entrada, matriz de la pila (RNF-15), bitácoras | 6 |
@@ -580,9 +580,9 @@ ejecuta contra la holgura verificada al cierre de cada etapa.
 | **1. Núcleo mínimo** | Sensor real de extremo a extremo | HU-02 (ruta B: pasarela con servidor de red embebido; ChirpStack solo en la ruta A) o HU-03 con el nodo del compañero | ⬜ octubre |
 | 2. Segundo nivel | Entrada HTTP | HU-01 | ⬜ E3 |
 | 2. Segundo nivel | Alertas por umbral con interfaz | HU-06 | 🟡 motor listo |
-| 2. Segundo nivel | Aprovisionamiento desde la plataforma | HU-10, HU-11 | ⬜ E3 |
+| 2. Segundo nivel | Aprovisionamiento desde la plataforma | HU-10, HU-11 | ✅ 12/10 (API; la pantalla es HU-22, E4) |
 | 2. Segundo nivel | Cifrado del transporte | TT-22 | ⬜ E3 |
-| 2. Segundo nivel | Panel de control | HU-19, HU-20, HU-21 | ⬜ E3 |
+| 2. Segundo nivel | Panel de control | HU-19, HU-20, HU-21 | 🟡 12/10 (P2 y P3 hechas; HU-20 parcial) |
 | 2. Segundo nivel | Exportación en formato abierto | HU-08 | 🟡 E3 (CSV y JSON el 12/10; XLSX en la E4) |
 | 2. Segundo nivel | Validación formal | TT-27, TT-28, TT-29 | ⬜ E4 |
 

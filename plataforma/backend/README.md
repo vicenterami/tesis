@@ -21,6 +21,8 @@ src/
 │   └── *.spec.ts              # pruebas unitarias de las funciones puras (jest)
 ├── consulta/                  # M5: API de solo lectura (dispositivos, canales, condiciones, cuarentena)
 ├── tiempo-real/               # TT-39: canal SSE hacia el panel (GET /eventos) y bus de eventos en memoria
+├── alta/                      # HU-11: POST /dispositivos (guardia X-Clave-Admin, validación, transacción + cliente del broker, scrypt)
+├── broker/dynsec*.ts          # administración del plugin Dynamic Security por $CONTROL (identidad backend-admin, conexión propia)
 ├── retencion/                 # borra con drop_chunks lo vencido de medicion, trama y cuarentena
 ├── openapi.ts                 # contrato OpenAPI generado desde los decoradores; /docs
 └── salud/salud.controller.ts  # GET /salud
@@ -84,7 +86,7 @@ primera (deliberado: el pipeline corre en un solo proceso). Detalle en `docs/10 
 Con el backend corriendo, publica como un dispositivo de prueba **no registrado**:
 
 ```bash
-# desde plataforma/ (la clave de dev-0001 se crea con `bash pruebas/clave-dispositivo.sh dev-0001`)
+# desde plataforma/ (la clave de dev-0001 se crea con `bash pruebas/broker-cliente.sh dev-0001`)
 bash pruebas/publicar.sh temperatura 21.5          # pide la clave oculta si CLAVE_DEV no está exportada
 docker compose exec timescaledb psql -U plataforma -d plataforma -c "SELECT topico, motivo, recibido_en FROM cuarentena ORDER BY recibido_en DESC LIMIT 3;"
 ```
@@ -170,6 +172,7 @@ describir rutas que no existen. Con el backend corriendo, la documentación inte
 | `GET /condiciones?abiertas=true\|false&limite&dispositivo` | condiciones con `duracion_s`, dispositivo y regla | sin `abiertas`: todas; `dispositivo` (UUID): solo las suyas (12/10) |
 | `GET /dispositivos/:id/exportar?formato=csv\|json&desde&hasta` | mediciones crudas del dispositivo en el rango, en flujo por tandas; CSV estándar (coma, punto decimal, UTF-8, CRLF) o JSON por fila | RF-34 (12/10); XLSX en la Etapa 4 |
 | `GET /cuarentena?limite&dispositivo` | últimas tramas rechazadas con motivo y carga (200 caracteres) | diagnóstico |
+| `POST /dispositivos` (cabecera `X-Clave-Admin`) | alta: dispositivo, canales, credencial (mostrada una vez) y cliente del broker, todo o nada | 201 con `conexion` (usuario, credencial, tópico, trama de ejemplo); 400 lista de motivos; 401; 409 existe; 502 el broker no aceptó; 503 sin clave o sin broker |
 
 ```bash
 curl -s http://127.0.0.1:3000/dispositivos | python3 -m json.tool
