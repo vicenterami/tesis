@@ -13,6 +13,9 @@ DC="${BASE_DC:-docker compose}"
 C=$(leer_env "$ENVF" DB_APP_CLAVE)
 [ -n "$C" ] && [ "$C" != CAMBIAR_ESTA_CLAVE ] || { echo "FALLA DB_APP_CLAVE vacía o sin cambiar en $ENVF"; exit 1; }
 [ ${#C} -ge 24 ] || { echo "FALLA DB_APP_CLAVE tiene ${#C} caracteres; se exigen 24 o más"; exit 1; }
+# Solo el alfabeto de `openssl rand -base64`: una comilla o una barra invertida romperían la línea de psql de abajo y el error
+# podría mostrar la clave.
+[[ "$C" =~ ^[A-Za-z0-9+/=_-]+$ ]] || { echo "FALLA DB_APP_CLAVE tiene caracteres fuera de A-Z a-z 0-9 + / = _ - (usar openssl rand -base64 24)"; exit 1; }
 DUENO=$(leer_env "$ENVF" DB_USUARIO); BASE=$(leer_env "$ENVF" DB_NOMBRE)
 $DC exec -T timescaledb psql -X -U "$DUENO" -d "$BASE" -tAq -c "SELECT 1 FROM pg_roles WHERE rolname='plataforma_app'" | grep -q 1 \
   || { echo "FALLA no existe el rol plataforma_app: aplicar antes db/init/14-rol-aplicacion.sql"; exit 1; }
@@ -28,8 +31,8 @@ r=$(PGPASSWORD="clave-equivocada-de-prueba-xxxxxx" $DC exec -T -e PGPASSWORD tim
 grep -q 'password authentication failed' <<<"$r" && ok "con otra clave NO entra (la verificación de arriba de verdad prueba la clave)" || falla "con otra clave: ${r:0:80}"
 [ "$(como_app "SELECT rolsuper FROM pg_roles WHERE rolname = current_user")" = f ] && ok "no es superusuario" || falla "es superusuario"
 r=$(como_app 'SELECT count(*) FROM dispositivo'); [[ "$r" =~ ^[0-9]+$ ]] && ok "lee (SELECT dispositivo: $r)" || falla "no lee: $r"
-for s in 'DELETE FROM evento WHERE false' 'TRUNCATE trama' 'DROP TABLE trama' 'CREATE TABLE intrusa (x int)' 'ALTER TABLE dispositivo ADD COLUMN x int' \
-         "SELECT drop_chunks('trama'::regclass, older_than => now() - INTERVAL '3650 days')" "SELECT fn_retencion_drop_chunks('dispositivo', 30)" "SELECT fn_retencion_drop_chunks('medicion', 7)"; do
+for s in 'DELETE FROM evento WHERE false' 'UPDATE evento SET tipo = tipo WHERE false' 'UPDATE medicion SET valor = valor WHERE false' 'INSERT INTO magnitud (codigo, nombre, unidad_canonica) VALUES (null, null, null)' 'TRUNCATE trama' 'DROP TABLE trama' 'CREATE TABLE intrusa (x int)' 'ALTER TABLE dispositivo ADD COLUMN x int' \
+         "SELECT drop_chunks('trama'::regclass, older_than => now() - INTERVAL '3650 days')" "SELECT fn_retencion_drop_chunks('dispositivo', 30)" "SELECT fn_retencion_drop_chunks('medicion', 7)" "SELECT fn_retencion_drop_chunks('trama', 3)"; do
   r=$(como_app "$s"); grep -qiE 'permission denied|must be owner|lista blanca|plazo válido' <<<"$r" && ok "rechazado: $s" || falla "NO rechazado: $s → ${r:0:80}"
 done
 r=$(como_app "SELECT fn_retencion_drop_chunks('trama', 3650)"); [[ "$r" =~ ^[0-9]+$ ]] && ok "la retención sí puede recortar por su función ($r fragmentos)" || falla "la retención no puede recortar: ${r:0:100}"

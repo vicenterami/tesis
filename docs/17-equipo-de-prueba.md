@@ -21,8 +21,8 @@ eligieron para que coincidan con el caso de uso levantado:
 
 | # | Pieza | Para qué | Qué verificar al comprar | Cant. | Prioridad |
 |---|---|---|---|---|---|
-| 1 | Placa ESP32 DevKit (ESP-WROOM-32, conversor USB CH9102F) | Microcontrolador con Wi-Fi y TLS | — (ya comprada) | 1 | — |
-| 2 | Cable micro-USB **de datos** | Programar y alimentar la placa | Que diga «datos» o «sincronización»: muchos cables solo cargan y el computador no ve la placa | 1 | Imprescindible |
+| 1 | Placa ESP32 DevKit (ESP-WROOM-32, 38 pines, **conector USB tipo C**, conversor USB-serie Silicon Labs CP2102; leído en la placa el 14/10) | Microcontrolador con Wi-Fi y TLS | — (ya comprada) | 1 | — |
+| 2 | Cable **USB tipo C de datos** (a USB-A, o tipo C a tipo C si la placa enciende con él) | Programar y alimentar la placa | Que transfiera datos: muchos cables solo cargan y el computador no ve la placa. **Corrección del 14/10:** aquí decía micro-USB, sin haber revisado el conector de la placa comprada, que es tipo C | 1 | Imprescindible |
 | 3 | Módulo **BME280** (I2C, 3,3 V) | Presión, temperatura y humedad del aire | Que diga BME280: el BMP280 se ve igual y **no mide humedad** | 1 | Imprescindible |
 | 4 | Protoboard de 400 u 830 puntos | Conectar sin soldar | — | 1 | Imprescindible |
 | 5 | Cables dupont macho-macho y macho-hembra (20 cm) | Conexiones | Paquetes de 20 o 40 | 1 + 1 | Imprescindible |
@@ -43,7 +43,7 @@ gratis («Envío GRATIS a todo Chile en pedidos web desde $19.990»); confirmar 
 
 | # | Pieza | Producto | CLP | URL |
 |---|---|---|---|---|
-| 2 | Cable micro-USB de datos | Cable micro USB para cargar y transferir datos (largo no declarado en el texto) | 2 190 | https://www.mechatronicstore.cl/cable-micro-usb-de-datos/ |
+| 2 | ~~Cable micro-USB de datos~~ **error: la placa es tipo C** | Cable micro USB para cargar y transferir datos (largo no declarado en el texto); el correcto, «Cable USB Tipo C a USB Tipo A 1mt», CLP 2 190, no declara en su página si transfiere datos (leído el 14/10) | 2 190 | https://www.mechatronicstore.cl/cable-micro-usb-de-datos/ |
 | 3 | BME280 | Sensor BME280, 3,3 V: **elegir la variante «I2C»** (la «I2C/SPI» figura sin stock) | 8 690 | https://www.mechatronicstore.cl/sensor-barometrico-bme280-spi-i2c-3-3v/ |
 | 4 | Protoboard 830 | Breadboard MB102, 830 puntos | 3 790 | https://www.mechatronicstore.cl/breadboard-830-puntos-mb102/ |
 | 5 | Dupont macho-macho | 40 piezas, 20 cm | 2 990 | https://www.mechatronicstore.cl/cable-macho-macho-40-piezas-20cm/ |
@@ -67,7 +67,7 @@ igual y no mide humedad, devuelve `0x58` (bibliotecas de Adafruit para BME280 y 
 ESP32 y se calibra (seco y en agua).
 
 **Recepción (anotado el 12/10/2026).** La placa ESP32 (pieza 1, comprada aparte el 07/10) ya llegó: módulo ESP-WROOM-32, 38 pines,
-convertidor USB-serie CH9102F (en Linux lo atiende el núcleo sin instalar nada; al conectarla, `dmesg` dice si aparece como
+convertidor USB-serie Silicon Labs CP2102 y conector tipo C (corregido el 14/10 leyendo la placa: antes decía CH9102F y micro-USB; en Linux lo atiende el controlador `cp210x` del núcleo sin instalar nada; al conectarla, `dmesg` dice si aparece como
 `/dev/ttyUSB0` o `/dev/ttyACM0`, y el usuario debe pertenecer al grupo `dialout`). El pedido de las piezas 2 a 7 (una tienda, un
 despacho; CLP 26 530 con cinco resistencias de 4,7 kΩ) está en tránsito. Al llegar el BME280, lo primero es leer su registro de
 identificación (párrafo anterior).

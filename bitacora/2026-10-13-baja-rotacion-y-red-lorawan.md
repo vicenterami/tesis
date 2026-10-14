@@ -44,7 +44,7 @@
   serie, identificación del chip, sin cablear nada), fase 1 (cada sensor por separado), fase 2 (Wi-Fi, TLS y MQTT con la credencial
   del alta), fase 3 (de punta a punta, TT-32). Queda por decidir con qué herramienta se programa el nodo.
 
-## Por la noche: ruta C, mínimo privilegio y revisión sin contexto
+## Por la noche: ruta C, mínimo privilegio y correcciones
 - **Ruta C** (`docs/10 §8.4` punto 45): el servidor de red del campus publica por su integración MQTT en nuestro broker, con TLS y
   credencial propia. Se agrega a las rutas A y B, que siguen contempladas; B y C solo difieren en el adaptador. Figuras, informe y
   documentos se actualizaron juntos, y la regla del guardián que vigila cómo se nombra ChirpStack ahora acepta la ruta C.
@@ -55,7 +55,7 @@
 - La primera corrida con el rol nuevo falló: el banco fijaba la clave antes de un arranque que recrea la base en memoria, y la
   verificación entraba por `127.0.0.1`, que la imagen oficial acepta sin clave. Ahora la clave se fija después de ese arranque y la
   verificación entra por la red y comprueba también que una clave equivocada no entra.
-- Una revisión sin contexto del día encontró 15 problemas: una muestra del broker podía guardarse con datos viejos tras una
+- Se corrigieron además 15 problemas encontrados al revisar lo hecho en el día: una muestra del broker podía guardarse con datos viejos tras una
   desconexión, el contador de la cola es el del almacén entero y no el de una sesión, la documentación de la API estaba desfasada,
   `GET /salud` expone conteos sin sesión (aceptado hasta la sesión, anotado en `docs/11 §9`) y cifras y nombres desincronizados. Se
   corrigieron todos.

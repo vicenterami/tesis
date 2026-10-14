@@ -593,7 +593,7 @@ de la semilla tiene cliente en el broker.
 
 ## 24. Rol de la aplicación con mínimo privilegio (13/10/2026)
 
-Migración 14 (`docs/10 §8.4` punto 44; `docs/11 §4` fila 6 y §9). El backend entra como `plataforma_app`: solo SELECT, INSERT y UPDATE;
+Migración 14 (`docs/10 §8.4` punto 44; `docs/11 §4` fila 6 y §9). El backend entra como `plataforma_app`: SELECT en todo, INSERT en 11 tablas y UPDATE en 5;
 la retención usa la función `fn_retencion_drop_chunks` del dueño.
 
 | Comprobación | Resultado |

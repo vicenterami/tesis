@@ -228,6 +228,12 @@ persona y cifrado por SSH. Así se cumplen R1 y R2 del punto 44 sin exponer nada
    combinada de `docs/16 §10`. El límite de tasa por IP está pendiente (`docs/11 §4`).
 6. **Navegador y proxy hablan HTTP/2; proxy y backend, HTTP/1.1.** HTTP/2 (`http2 on`) lleva muchas peticiones y flujos por una
    sola conexión del navegador. Hacia el backend va una conexión por petición o por flujo, dentro del mismo servidor.
+   **Por qué no HTTP/2 también hacia el backend** (14/10/2026). Lo nuevo no es mejor por ser nuevo: es mejor si resuelve un
+   problema que tenemos. nginx podría hacerlo (`proxy_http_version 2`, desde la versión 1.29.4 según su documentación; usamos la
+   1.30.5), pero el backend corre sobre Express, que habla HTTP/1.1. Lo que gana HTTP/2 es multiplexar sobre redes con latencia, y
+   el tramo proxy→backend no sale del servidor: abrir una conexión ahí es casi gratis (medido: cada flujo SSE abierto cuesta del
+   orden de 0,1 a 0,2 MiB, `docs/16 §25`). Cambiarlo exigiría otro servidor HTTP en el backend sin ganancia medible. Se revisa si
+   el backend pasa a otra máquina o si los flujos simultáneos llegan a miles.
 7. **El 1700/udp (ruta A) no está configurado hoy.** Cuando exista, irá en el bloque `stream` con `listen 1700 udp`. UDP no tiene
    conexión: el proxy reenvía cada datagrama a ChirpStack y recuerda de quién vino para devolverle la respuesta.
 
@@ -897,12 +903,12 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     nunca, salvo que se configure (decisión del 07/10, abajo). **Cómo se cambia:** una línea en el `.env`
     (`RETENCION_TRAMA_DIAS`, `RETENCION_CUARENTENA_DIAS`, `RETENCION_METRICA_BROKER_DIAS`, `RETENCION_MEDICION_DIAS`) y reiniciar el
     backend; el compose la pasa sola desde el 14/10. Una pantalla para el administrador queda para la Etapa 4, con la sesión.
-    **Quién fija los mínimos y por qué:** 30 días para las mediciones y 1 día para lo demás. Están escritos en dos lugares que el
-    backend no puede cambiar: el código (`PLAZOS` en `retencion.service.ts`) y la función de la base `fn_retencion_drop_chunks`
-    (migración 14), que el rol de la aplicación solo puede ejecutar. Bajarlos exige cambiar el código y aplicar una migración con
-    el dueño de la base; eso deja rastro en el repositorio y no lo puede hacer un `.env` equivocado ni un backend comprometido. El
-    de 30 días protege de un error de tipeo («7» por «730») que borraría años de series; el de 1 día solo impide un 0, que
-    vaciaría la tabla entera. Las tramas y la cuarentena son copias de diagnóstico, no el dato: perderlas antes no pierde mediciones.
+    **Quién fija los mínimos y por qué** (precisado el 14/10/2026): 30 días para las mediciones y 7 para lo demás. La barrera que
+    el backend no puede saltarse es la función de la base `fn_retencion_drop_chunks` (migración 14), que el rol de la aplicación
+    solo puede ejecutar; el mismo mínimo en el código (`PLAZOS` en `retencion.service.ts`) solo atrapa antes un `.env` equivocado.
+    Bajarlos exige cambiar la migración y aplicarla con el dueño de la base, lo que deja rastro en el repositorio. El de 30 días
+    protege de un error de tipeo («7» por «730») que borraría años de series. El de 7 días impide que un backend comprometido
+    borre la última semana de tramas, cuarentena y métricas del broker, que es justo la que serviría para investigarlo.
     **Tres decisiones del estudiante (07/10, noche).** (a) **Las mediciones no vencen por defecto**: diez años ocupan
     ≈ 4,6 GB (`docs/14`) y el historial largo es el dato valioso del caso de uso; `RETENCION_MEDICION_DIAS` solo
     las recorta si se define (mínimo 30). Cada corrida de retención deja una fila en `evento` (tipo `retencion`):
@@ -1151,7 +1157,8 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     Los registros de Mosquitto y de los demás servicios no viajan: quedan en el disco del servidor (§6); si algún día se
     centralizan, ese envío cumple R1 y R2. Hecho el 13/10 en el broker: el rol `admin` del plugin, que de fábrica lee todo,
     quedó acotado a `$CONTROL/dynamic-security/#` y `$SYS/#` (pendiente 87, probado en el banco). En la base, hecho el 13/10
-    (migración 14): el backend entra como `plataforma_app`, que solo lee, inserta y actualiza (ni DELETE, ni TRUNCATE, ni DDL);
+    (migración 14): el backend entra como `plataforma_app`, que lee todo, inserta solo en las 11 tablas donde el código inserta y actualiza solo en
+    5 (ni DELETE, ni TRUNCATE, ni DDL; `evento`, `medicion` y `trama` no se pueden reescribir, solo agregar);
     el dueño queda para migraciones y semillas. La retención, que usa `drop_chunks` y este exige ser dueño de la hypertable, pasa
     por una sola función del dueño (`fn_retencion_drop_chunks`, `SECURITY DEFINER`, lista blanca de cuatro tablas, mínimo de días,
     `search_path` fijo) que la aplicación solo puede ejecutar. Se eligió así frente a un proceso aparte con el dueño (un

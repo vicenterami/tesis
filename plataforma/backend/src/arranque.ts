@@ -111,7 +111,8 @@ export function claveAdmin(valor: string | undefined): string | undefined {
 // qué hacer, en vez de fallar después con un «password authentication failed» que no explica nada.
 export function claveApp(valor: string | undefined): string {
   const v = claveOpcional('DB_APP_CLAVE', valor);
-  if (v === undefined || v === 'CAMBIAR_ESTA_CLAVE') {
+  // El valor de ejemplo del .env.example (18 caracteres) ya lo rechaza el mínimo de largo de claveOpcional.
+  if (v === undefined) {
     throw new Error('DB_APP_CLAVE vacía o sin cambiar: escribirla en el .env (24 caracteres o más) y correr pruebas/base-rol-app.sh');
   }
   return v;

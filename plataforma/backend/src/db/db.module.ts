@@ -19,7 +19,7 @@ export const POOL = 'POOL_POSTGRES';
           host: config.get<string>('DB_HOST', '127.0.0.1'),
           port: config.get<number>('DB_PUERTO', 5432),
           database: config.getOrThrow<string>('DB_NOMBRE'),
-          // El rol de la aplicación, no el dueño (migración 14; docs/10 §8.4 punto 44): solo SELECT, INSERT y UPDATE.
+          // El rol de la aplicación, no el dueño (migración 14; docs/10 §8.4 punto 44): SELECT en todo, INSERT en 11 tablas y UPDATE en 5.
           user: config.get<string>('DB_APP_USUARIO', 'plataforma_app'), // el nombre que crea la migración 14
           password: config.get<string>('DB_APP_CLAVE', ''), // validada al arrancar (main.ts, claveApp)
           max: 5,

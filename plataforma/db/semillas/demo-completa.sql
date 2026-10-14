@@ -44,8 +44,10 @@ DELETE FROM dispositivo WHERE id IN (SELECT id FROM semilla_lista);   -- canal, 
 DELETE FROM pasarela   WHERE id_fisico IN ('demo-pasarela-01', 'demo-pasarela-02');
 DELETE FROM condicion_sistema WHERE detalle->>'origen' = 'semilla';
 -- Muestras sembradas del broker: su huella es clientes_conectados = 14 y memoria_bytes = 880000 a la vez (una muestra real con
--- esos dos valores exactos es improbable). Sin esto, correr la semilla a otra hora acumulaba 7 filas por corrida (revisión 13/10).
-DELETE FROM metrica_broker WHERE clientes_conectados = 14 AND memoria_bytes = 880000;
+-- esos valores exactos a la vez es improbable). Sin esto, correr la semilla a otra hora acumulaba 7 filas por corrida (corrección
+-- del 13/10). La huella son cuatro columnas, no dos, para no borrar por accidente una muestra real.
+DELETE FROM metrica_broker WHERE clientes_conectados = 14 AND memoria_bytes = 880000 AND mensajes_descartados IN (0, 1200)
+  AND bytes_en_cola IN (420, 610000, 1450000);
 
 -- ── 1. Sitios, zonas y pasarelas ────────────────────────────────────────────────────────────────────────────────────
 INSERT INTO sitio (id, nombre, codigo, zona_horaria) VALUES

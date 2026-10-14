@@ -24,10 +24,11 @@ const ESPERA_INICIAL_MS = 60_000;
 export const PLAZOS: Plazo[] = [
   // Si se define, el mínimo protege de un error de tipeo («7» por «730») que borraría años de series.
   { tabla: 'medicion', variable: 'RETENCION_MEDICION_DIAS', porDefecto: null, minimo: 30 },
-  { tabla: 'trama', variable: 'RETENCION_TRAMA_DIAS', porDefecto: 30, minimo: 1 },
-  { tabla: 'cuarentena', variable: 'RETENCION_CUARENTENA_DIAS', porDefecto: 30, minimo: 1 },
+  // 7 días como mínimo, igual que la función de la base (migración 14): la última semana de diagnóstico no se borra.
+  { tabla: 'trama', variable: 'RETENCION_TRAMA_DIAS', porDefecto: 30, minimo: 7 },
+  { tabla: 'cuarentena', variable: 'RETENCION_CUARENTENA_DIAS', porDefecto: 30, minimo: 7 },
   // Muestras por minuto de los contadores $SYS del broker (docs/10 §8.4 punto 43, migración 13): 90 días.
-  { tabla: 'metrica_broker', variable: 'RETENCION_METRICA_BROKER_DIAS', porDefecto: 90, minimo: 1 },
+  { tabla: 'metrica_broker', variable: 'RETENCION_METRICA_BROKER_DIAS', porDefecto: 90, minimo: 7 },
 ];
 
 // Ausente → valor por defecto. Presente pero vacía o no entera → error al arrancar, nunca un 0 silencioso:

@@ -59,7 +59,9 @@ case "${1:-}" in
     # vuelve a inicializar: fijada antes, la clave se perdía (13/10). Sin clave el backend no queda «healthy». Se espera a que las migraciones terminen (existe el rol) y se
     # fija su clave de descarte con el mismo guion que usa la persona, que además prueba lo permitido y lo prohibido.
     for _ in $(seq 1 30); do psql_ -tAq -c "SELECT 1 FROM pg_roles WHERE rolname='plataforma_app'" 2>/dev/null | grep -q 1 && break; sleep 2; done
-    BASE_ENV="$ENV" BASE_DC="docker compose -p banco -f docker-compose.yml -f pruebas/banco/compose.banco.yml --env-file $ENV" bash pruebas/base-rol-app.sh | tail -1 || exit 1
+    BASE_ENV="$ENV" BASE_DC="docker compose -p banco -f docker-compose.yml -f pruebas/banco/compose.banco.yml --env-file $ENV" bash pruebas/base-rol-app.sh > "$PRIV/rol-app.txt" 2>&1 \
+      || { echo "FALLA el rol de la aplicación:"; grep FALLA "$PRIV/rol-app.txt"; exit 1; }   # antes «| tail -1 || exit 1» nunca fallaba
+    tail -1 "$PRIV/rol-app.txt"; rm -f "${PRIV:?}/rol-app.txt"
     echo "esperando «healthy» (máx. 90 s)…"
     for _ in $(seq 1 30); do [ -z "$(dc ps --format '{{.Status}}' | grep -v '(healthy)')" ] && break; sleep 3; done
     bash "$YO" estado

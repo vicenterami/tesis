@@ -117,12 +117,12 @@ describe('claveAdmin (docs/10 §8.4 punto 41): ausente = 503 en las rutas que es
   });
 });
 
-describe('claveApp (DB_APP_CLAVE, migración 14): obligatoria, de 24 caracteres o más y nunca la del ejemplo', () => {
+describe('claveApp (DB_APP_CLAVE, migración 14): obligatoria y de 24 caracteres o más (la del ejemplo es más corta)', () => {
   it('ausente, vacía, corta o «CAMBIAR_ESTA_CLAVE» → el backend no arranca, con el remedio en el mensaje; válida → se usa', () => {
     expect(() => claveApp(undefined)).toThrow(/base-rol-app\.sh/);
     expect(() => claveApp('  ')).toThrow(/DB_APP_CLAVE vacía/);
     expect(() => claveApp('corta')).toThrow(/24 o más/);
-    expect(() => claveApp('CAMBIAR_ESTA_CLAVE_x'.slice(0, 18))).toThrow();
+    expect(() => claveApp('CAMBIAR_ESTA_CLAVE')).toThrow(/24 o más/); // el valor de ejemplo del .env.example
     expect(claveApp('x'.repeat(32))).toBe('x'.repeat(32));
   });
 });

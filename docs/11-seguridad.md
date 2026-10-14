@@ -79,7 +79,7 @@
 | 2 | Puerto 1700/udp hacia ChirpStack, con límite de tasa en el proxy: el protocolo del *gateway* no trae autenticación propia (EUI público, sin cifrado) | Cuando ChirpStack se despliegue (no antes) |
 | 3 | ~~Credenciales por dispositivo generadas por la plataforma (flujo de alta, docs/10 §3)~~ → hecho el 12/10/2026 (`POST /dispositivos`, §3) | ✅ |
 | 4 | ~~ACL dinámica: el backend agrega/revoca usuarios del broker al dar de alta/baja~~ → el alta, hecha el 12/10/2026 (plugin Dynamic Security, `docs/10 §8.4` punto 42); la baja y la rotación por API, con las mismas órdenes, el 13/10/2026 (`DELETE /dispositivos/{id}`, `POST /dispositivos/{id}/credencial`; `docs/10 §3`) | ✅ |
-| 6 | ~~Un rol de base de datos para el backend **sin** permiso de `DROP`/`TRUNCATE`~~ → hecho el 13/10/2026: `plataforma_app`, solo SELECT, INSERT y UPDATE (migración 14, §9) | ✅ |
+| 6 | ~~Un rol de base de datos para el backend **sin** permiso de `DROP`/`TRUNCATE`~~ → hecho el 13/10/2026: `plataforma_app`, SELECT en todo, INSERT en 11 tablas y UPDATE en 5 (migración 14, §9) | ✅ |
 | 5 | ~~`cuarentena.motivo` sin `CHECK`~~ → hecho el 23/09 (migración 07): dominio cerrado como `dispositivo.estado` y `condicion.tipo`, probado insertando un motivo inventado | ✅ |
 | 1 | Backend en contenedor: escucha en la red interna (`HTTP_INTERFAZ=0.0.0.0`) **sin** `ports`; solo el proxy lo alcanza (`docs/10 §6`) | Dockerfile |
 | 2–3 | Canal de tiempo real hacia el panel (TT-39; **SSE**, decidido el 06/10/2026, `docs/10 §8.4`), **lo que falta** (lo que ya rige está en §3): solo HTTPS vía proxy al publicarlo, con la misma cookie de sesión que la API (el navegador la envía sola en `EventSource`); autorización por canal antes de enviar el primer evento; ningún token en la URL; límite de flujos abiertos por usuario y de tasa. Al ser unidireccional, no hay mensajes entrantes que validar. Lo de OWASP para WebSocket (*WebSocket Security Cheat Sheet*) queda para el caso en que se agregue uno | Etapa 4, con M7 (HU-18) |
@@ -167,8 +167,8 @@ nombres, nunca hashes.
 leer `$SYS/#` (estadísticas; rol `sonda`). No es un dispositivo.
 
 **Cómo se generan.** Las claves del sistema se producen con un generador criptográfico (`openssl rand -base64 24` → 192 bits de
-entropía) y las de los dispositivos las genera el backend (24 bytes aleatorios, base64url); nunca las elige una persona ni una
-herramienta. El plugin guarda **hashes PBKDF2-SHA512** con sal aleatoria por cliente (`encoded_password` en su archivo): aunque
+entropía) y las de los dispositivos las genera el backend (24 bytes aleatorios, base64url); nunca las inventa una persona: la del rol de la
+aplicación (`DB_APP_CLAVE`) la genera `openssl` y la persona solo la pega en el `.env`. El plugin guarda **hashes PBKDF2-SHA512** con sal aleatoria por cliente (`encoded_password` en su archivo): aunque
 alguien lea el archivo, no obtiene la clave, y dos clientes con la misma clave tienen hashes distintos. La base guarda, además,
 `scrypt` del secreto de cada dispositivo (`credencial.hash`): es lo que verificará la vía HTTP y lo que permite auditar sin tocar
 el broker.
@@ -179,7 +179,8 @@ el broker.
 2. Si es de `sonda` o `backend`: actualizar `.env` y repetir `bash pruebas/broker-inicializar.sh`, que fija en el plugin la clave
    del `.env` y comprueba que entra; después `docker compose up -d` para que el chequeo de salud y el backend tomen la nueva. Si es
    de `backend-admin`: la vigente va a `MQTT_ADMIN_CLAVE_ANTERIOR` y la nueva a `MQTT_ADMIN_CLAVE`; el guion entra con la anterior,
-   fija la nueva y avisa que se borre la anterior del `.env`.
+   fija la nueva y avisa que se borre la anterior del `.env`. Si es la del rol de la aplicación (`DB_APP_CLAVE`): cambiarla en el
+   `.env`, correr `bash plataforma/pruebas/base-rol-app.sh` (la fija en la base y prueba que entra) y reiniciar el backend.
 3. Si es de un dispositivo: `bash pruebas/broker-cliente.sh <id>` (sin reiniciar nada: el plugin la aplica en el acto) y el
    firmware; por la API, `POST /dispositivos/{id}/credencial` (13/10/2026) devuelve la nueva una sola vez y deja sin efecto la anterior.
 4. Las credenciales de prueba (`dev-*`) se eliminan con `--borrar` antes de conectar dispositivos reales.
