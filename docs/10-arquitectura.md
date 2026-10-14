@@ -25,17 +25,32 @@ transversales o viven en el cliente (`docs/02` §3).
 
 ```mermaid
 flowchart TB
-    subgraph RED["Red de sensores · campo (del compañero u otro sitio)"]
+    subgraph CLI["Cliente"]
+        direction TB
+        U(["Usuario<br/>navegador"]) --- FE["Panel web<br/>Svelte + uPlot"]
+    end
+
+    subgraph TLS["Entran por MQTT/TLS 8883 · cada uno con su credencial"]
         direction LR
-        N1["Nodo sensor LoRa<br/>ESP32 + sensores"] -- "LoRa (radio)" --> GW["Pasarela LoRaWAN"]
         N2["Nodo Wi-Fi o celular<br/>MQTT directo"]
-        NS["Servidor de red externo<br/>ChirpStack del campus (ruta C)"]
+        subgraph RB["Ruta B"]
+            direction TB
+            NB["Nodos LoRa"] -- "radio LoRa" --> GB["Pasarela con servidor<br/>de red embebido"]
+        end
+        subgraph RC["Ruta C · red del campus"]
+            direction TB
+            NC["Nodos LoRa"] -- "radio LoRa" --> GC["Pasarela del campus"] -- "UDP 1700<br/>red del campus" --> NS["Servidor de red externo<br/>ChirpStack institucional"]
+        end
+    end
+
+    subgraph RA["Ruta A · opcional"]
+        direction TB
+        NA["Nodos LoRa"] -- "radio LoRa" --> GA["Pasarela con<br/>packet forwarder"]
     end
 
     subgraph SRV["Servidor del sistema · contenedores Docker"]
         direction TB
-        RP["Proxy inverso · TLS<br/>único contenedor expuesto<br/>443 personas · 8883 dispositivos · 1700/udp solo ruta A"]
-        CS["ChirpStack · servidor de red LoRaWAN<br/>solo ruta A (opcional)"]
+        RP["Proxy inverso · TLS<br/>único contenedor expuesto<br/>443 personas · 8883 MQTT · 1700/udp solo ruta A"]
         MQ["Mosquitto<br/>broker MQTT"]
         subgraph BE["Backend · NestJS"]
             direction LR
@@ -44,29 +59,24 @@ flowchart TB
             M5["M5 Persistencia y consulta<br/>API REST + SSE"]
         end
         DB[("TimescaleDB<br/>series de tiempo + tablas relacionales")]
+        CS["ChirpStack propio<br/>solo ruta A (opcional)"]
     end
 
-    subgraph CLI["Cliente"]
-        direction LR
-        U(["Usuario<br/>navegador"]) --- FE["Panel web<br/>Svelte + uPlot"]
-    end
-
-    GW -. "ruta A (opcional): UDP 1700, packet forwarder" .-> RP
-    GW -- "ruta B: servidor de red embebido → MQTT/TLS 8883" --> RP
-    GW -- "ruta C: UDP 1700 a la red del campus" --> NS
-    NS -- "ruta C: integración MQTT/TLS 8883" --> RP
+    FE -- "HTTPS 443 · REST y SSE" --> RP
     N2 -- "MQTT/TLS 8883" --> RP
-    RP -. "UDP 1700 · red interna" .-> CS
+    GB -- "MQTT/TLS 8883" --> RP
+    NS -- "MQTT/TLS 8883<br/>integración MQTT" --> RP
+    GA -. "UDP 1700 por Internet<br/>o la red del campus" .-> RP
+    RP -- "HTTP 3000 · red interna" --> M5
     RP -- "MQTT 1883 · red interna" --> MQ
+    RP -. "UDP 1700 · red interna" .-> CS
     CS -. "publica JSON decodificado" .-> MQ
     MQ -- "suscripción sitio/#" --> M1
     M2 -- "INSERT medicion" --> DB
     M6 -- "condiciones, eventos" --> DB
     M5 -- "SQL · time_bucket" --> DB
-    FE -- "HTTPS 443 · REST histórico · SSE tiempo real" --> RP
-    RP -- "HTTP 3000 · red interna" --> M5
     classDef opcional stroke-dasharray:6 4
-    class CS opcional
+    class CS,GA,NA opcional
 ```
 
 **Decisiones visibles en el diagrama:**
@@ -125,32 +135,32 @@ dispositivos para no requerir NAT — RNF-10).
 
 ```mermaid
 flowchart TB
-    subgraph CAMPO["Segmento de campo (sitio del cliente)"]
-        S1["Nodos LoRa"] -- radio --> G["Gateway"]
+    subgraph CAMPO["Segmento de campo (sitio del cliente o red del campus)"]
+        S1["Nodos LoRa"] -- radio --> G["Pasarela LoRaWAN"]
         S2["Nodos Wi-Fi"] --> R["Router del sitio\n(NAT, sin puertos abiertos)"]
-        G --> R
-        G -- "UDP 1700 (ruta C)" --> NSE["Servidor de red externo\nChirpStack del campus (ruta C)"]
+        G -- "ruta B: MQTT/TLS 8883\nruta A: UDP 1700" --> R
+        G -- "ruta C: UDP 1700" --> NSE["Servidor de red externo\nChirpStack del campus (ruta C)"]
         NSE -- "MQTT/TLS 8883, saliente" --> R
     end
 
-    INET(("Internet"))
+    INET(("Internet\no red del campus"))
 
     subgraph DMZ["Servidor · red pública (expuesta)"]
-        RP["Proxy inverso / TLS\n:443 → panel y API\n:8883 → broker (mTLS opcional)\n:1700/udp → ChirpStack (solo ruta A)"]
+        RP["Proxy inverso / TLS\n:443 → panel y API\n:8883 → broker\n:1700/udp → ChirpStack (solo ruta A)"]
     end
 
     subgraph INT["Servidor · red interna Docker (no expuesta)"]
         MQ["Mosquitto :1883"]
-        CS["ChirpStack :8080\n(solo ruta A, opcional)"]
         BE["Backend :3000"]
         DB[("TimescaleDB :5432")]
+        CS["ChirpStack :8080\n(solo ruta A, opcional)"]
     end
 
     R -- "salientes únicamente" --> INET
-    INET --> RP
-    RP --> MQ
-    RP -.-> CS
-    RP --> BE
+    INET -- "443 · 8883 · 1700/udp (ruta A)" --> RP
+    RP -- "1883" --> MQ
+    RP -- "3000" --> BE
+    RP -. "1700/udp" .-> CS
     CS -.-> MQ
     MQ --> BE
     BE --> DB
@@ -191,6 +201,35 @@ flowchart TB
   dispositivo; `lorawan`, el nodo se autentica ante su servidor de red con sus claves LoRaWAN, y el intermediario que nos publica
   (pasarela de la ruta B o servidor de red de la ruta C) entra con su usuario y clave. Registrar cualquiera es lo mismo: el alta
   declara la vía y el formato, y devuelve lo que corresponde. Sumar un medio nuevo es sumar un adaptador, no rehacer el sistema.
+
+**¿Puede una persona entrar directo a la base? (14/10/2026)** Sí, sin abrir ningún puerto. El rol limitado `plataforma_app` es
+solo para el backend; quien administra entra como dueño y sin límites. En desarrollo: `bash plataforma/pruebas/pila.sh sql`
+(consola dentro del contenedor) o el puerto 5432, publicado solo en `127.0.0.1` del portátil. En el servidor, la base no publica
+puertos: se entra por SSH y `docker compose exec`, o con un túnel SSH (`ssh -L 5432:…`) que deja el puerto en la máquina de la
+persona y cifrado por SSH. Así se cumplen R1 y R2 del punto 44 sin exponer nada. Para analizar sin riesgo de cambiar datos
+(Grafana, un cuaderno) se agregará un rol de solo lectura, pendiente con la auditoría (punto 43, Etapa 4).
+
+**Cómo sabe el proxy a dónde mandar cada cosa, y cómo vuelve la respuesta (14/10/2026; configuración real en
+`plataforma/proxy/nginx.conf`):**
+
+1. **Por el puerto en que llega.** nginx escucha en 443, 8883 y 80, y cada puerto tiene su propio bloque de configuración. No
+   adivina: lo que entra por el 8883 va siempre al broker y lo que entra por el 443 va siempre al backend.
+2. **En el 8883 no lee el contenido.** El bloque `stream` trabaja con TCP: descifra el TLS y copia los bytes tal cual a
+   `mosquitto:1883`. No entiende MQTT ni lo necesita; quien autentica y aplica la ACL es el broker.
+3. **En el 443 sí lee la petición.** El bloque `http` descifra el TLS y lee la petición HTTP. Solo acepta el nombre del servidor
+   (`PROXY_NOMBRE`): con otro nombre rechaza el saludo TLS. Todo lo aceptado va a `backend:3000`, que separa la API, el panel
+   (`/panel`) y el canal en vivo (`/eventos`) por la ruta. El 80 solo redirige a HTTPS.
+4. **La respuesta vuelve por el mismo camino.** Cada cliente abre una conexión con el proxy, y el proxy abre otra con el servicio
+   interno. nginx copia en los dos sentidos mientras ambas viven, así que no hay una «dirección de vuelta» que calcular. Así recibe
+   cada usuario su panel, sus datos y su flujo en vivo, y cada dispositivo los acuses de recibo del broker.
+5. **Por qué no se satura.** nginx atiende muchas conexiones con pocos procesos, sin un hilo por conexión: un proceso por núcleo
+   (`worker_processes auto`), hasta 1024 conexiones cada uno (`worker_connections`). Los plazos son de 5 s para conectar al
+   servicio y de 1 h para las conexiones largas (MQTT y SSE), y el contenedor tiene un techo de 100 MB. Medido: 30 MiB en la carga
+   combinada de `docs/16 §10`. El límite de tasa por IP está pendiente (`docs/11 §4`).
+6. **Navegador y proxy hablan HTTP/2; proxy y backend, HTTP/1.1.** HTTP/2 (`http2 on`) lleva muchas peticiones y flujos por una
+   sola conexión del navegador. Hacia el backend va una conexión por petición o por flujo, dentro del mismo servidor.
+7. **El 1700/udp (ruta A) no está configurado hoy.** Cuando exista, irá en el bloque `stream` con `listen 1700 udp`. UDP no tiene
+   conexión: el proxy reenvía cada datagrama a ChirpStack y recuerda de quién vino para devolverle la respuesta.
 
 **Sobre las alternativas descartadas:** exponer el broker por WebSocket al navegador (patrón A)
 habría abierto un puerto más y puesto credenciales en el cliente; una VPN habría exigido
@@ -744,8 +783,18 @@ del fabricante de la pasarela (137 afirmaciones, en un registro del autor que no
    semana»). SSE va por HTTP sobre la misma sesión y el mismo proxy que la API, reconecta solo por norma
    («Clients will reconnect if the connection is closed», HTML Living Standard §9.2.3) y en NestJS es una ruta
    con `@Sse()` que devuelve un `Observable`. WebSocket queda reservado para cuando el navegador deba enviar
-   órdenes a dispositivos (no está en el catálogo). Límite conocido: con HTTP/1.1 el navegador limita las
-   conexiones por dominio; con HTTP/2 tras el proxy no aplica. TT-39 se implementa como SSE.
+   órdenes a dispositivos (no está en el catálogo). Límite conocido, precisado el 14/10/2026: sin HTTP/2 el navegador
+   abre como mucho **6** conexiones SSE por dominio, sumando todas sus pestañas; con HTTP/2 el número de flujos simultáneos se
+   negocia, 100 por defecto (MDN, página `EventSource`, leída el 14/10/2026). Entre el navegador y nuestro proxy va HTTP/2 (`http2 on`
+   en `nginx.conf`), así que ese límite no nos afecta. Del proxy al backend va HTTP/1.1, una conexión por flujo dentro del mismo
+   servidor, y el backend acota a 50 flujos (`MAX_FLUJOS`). TT-39 se implementa como SSE.
+   **WebSocket no queda descartado** (precisión del 14/10/2026). No abre otro puerto: usa el 443 con TLS («port 443 for WebSocket
+   connections tunneled over Transport Layer Security», RFC 6455 §1.7), porque su saludo es una petición HTTP de cambio de protocolo
+   (*Upgrade*). Tampoco pide claves nuevas: el mismo certificado y la misma cookie de sesión. Para agregarlo hace falta un bloque
+   `location` en el proxy que pase las cabeceras `Upgrade` y `Connection`; el actual las quita, porque el SSE no las usa.
+   **¿Es SSE más barato que WebSocket?** Por conexión, no de forma inherente: los dos mantienen una conexión TCP abierta. SSE gana en
+   simpleza, porque es HTTP normal, reconecta solo y pasa por proxies sin configuración especial; WebSocket gana cuando hay que
+   mandar datos del navegador al servidor. El costo del SSE bajo carga se midió el 14/10 (`docs/16 §25`).
 2. **Segunda ruta de entrada LoRaWAN: pasarela con servidor de red embebido → MQTT/TLS 8883 → Mosquitto.**
    Las pasarelas Milesight UG6x traen servidor de red LoRaWAN y publican a un broker propio (host, puerto,
    usuario, clave, TLS con CA propia, tópico configurable). ChirpStack deja de ser obligatorio: queda como ruta
@@ -758,6 +807,8 @@ del fabricante de la pasarela (137 afirmaciones, en un registro del autor que no
    figuras de contenedores, red y despliegue dibujan la ruta B continua y la ruta A y ChirpStack punteados
    (opcionales), y el informe lo dice en el marco teórico, en la arquitectura y en el despliegue; si el profesor guía
    confirma otra ruta, se vuelven a ajustar.
+   **Precisión del 13/10/2026:** la red del campus confirmó un servidor de red externo, la ruta C (punto 45); las figuras de
+   contenedores y red la dibujan desde ese día, y el 14/10 se reordenaron por vía de entrada.
 3. **Adaptador «milesight» sobre JSON decodificado en la pasarela.** La pasarela aplica su «Payload Codec» y
    publica `{"battery":92,"temperature":30.8,"humidity":50.5}` más EUI y nombre si se activa «Metadata». El
    adaptador traduce ese JSON al modelo interno (`temperature`→temperatura/Cel, `humidity`→humedad/%RH,
@@ -841,7 +892,18 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     anónimo de uso. No se pueden apagar uno a uno (`alter_job` y `delete_job` son de la otra licencia). La
     retención del sistema es la tarea del backend (`RetencionService`); `drop_chunks` es una función y no
     necesita el programador.
-19. **Tres decisiones del estudiante (07/10, noche).** (a) **Las mediciones no vencen por defecto**: diez años ocupan
+19. **Limpieza programada** (nombre para el usuario desde el 14/10/2026; en el código y en la base se llama «retención»). Cada 24 h el
+    backend borra los fragmentos vencidos: tramas crudas y cuarentena a los 30 días, métricas del broker a los 90, y las mediciones
+    nunca, salvo que se configure (decisión del 07/10, abajo). **Cómo se cambia:** una línea en el `.env`
+    (`RETENCION_TRAMA_DIAS`, `RETENCION_CUARENTENA_DIAS`, `RETENCION_METRICA_BROKER_DIAS`, `RETENCION_MEDICION_DIAS`) y reiniciar el
+    backend; el compose la pasa sola desde el 14/10. Una pantalla para el administrador queda para la Etapa 4, con la sesión.
+    **Quién fija los mínimos y por qué:** 30 días para las mediciones y 1 día para lo demás. Están escritos en dos lugares que el
+    backend no puede cambiar: el código (`PLAZOS` en `retencion.service.ts`) y la función de la base `fn_retencion_drop_chunks`
+    (migración 14), que el rol de la aplicación solo puede ejecutar. Bajarlos exige cambiar el código y aplicar una migración con
+    el dueño de la base; eso deja rastro en el repositorio y no lo puede hacer un `.env` equivocado ni un backend comprometido. El
+    de 30 días protege de un error de tipeo («7» por «730») que borraría años de series; el de 1 día solo impide un 0, que
+    vaciaría la tabla entera. Las tramas y la cuarentena son copias de diagnóstico, no el dato: perderlas antes no pierde mediciones.
+    **Tres decisiones del estudiante (07/10, noche).** (a) **Las mediciones no vencen por defecto**: diez años ocupan
     ≈ 4,6 GB (`docs/14`) y el historial largo es el dato valioso del caso de uso; `RETENCION_MEDICION_DIAS` solo
     las recorta si se define (mínimo 30). Cada corrida de retención deja una fila en `evento` (tipo `retencion`):
     borrar es destructivo y su registro no puede vencer antes que los datos. (b) **Tope de 64 KiB por mensaje en

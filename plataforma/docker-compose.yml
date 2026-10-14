@@ -90,6 +90,16 @@ services:
       # escribe la persona en el .env y la fija en la base `pruebas/base-rol-app.sh`; vacía, el backend no arranca y dice por qué.
       DB_APP_USUARIO: plataforma_app
       DB_APP_CLAVE: ${DB_APP_CLAVE:-}
+      # Limpieza programada y cola vigilada (14/10): sin valor aquí, Compose pasa cada una SOLO si está definida en el .env (si no,
+      # no llega y rige el valor por defecto del código). Así se cambian editando el .env y reiniciando el backend, sin tocar
+      # este archivo, y una variable vacía sigue deteniendo el arranque (nunca un 0 silencioso). Comprobado con `docker compose config`.
+      RETENCION_MEDICION_DIAS:
+      RETENCION_TRAMA_DIAS:
+      RETENCION_CUARENTENA_DIAS:
+      RETENCION_METRICA_BROKER_DIAS:
+      RETENCION_INTERVALO_H:
+      METRICA_BROKER_INTERVALO_S:
+      METRICA_BROKER_COLA_TOPE:
       DB_HOST: timescaledb                        # nombre del servicio en la red interna (docs/10 §6)
       MQTT_URL: mqtt://mosquitto:1883
       MQTT_BACKEND_CLAVE: ${MQTT_BACKEND_CLAVE}

@@ -16,8 +16,9 @@
 # Las credenciales de DISPOSITIVOS no van aquí: las crea el backend en el alta (POST /dispositivos) o, a mano,
 # pruebas/broker-cliente.sh (demo y emergencias).
 set -u
-cd "$(dirname "$0")/.." || exit 1                 # plataforma/
-. "$(dirname "$0")/lib-dynsec.sh"
+AQUI=$(cd "$(dirname "$0")" && pwd) || exit 1      # ruta absoluta del guion: funciona desde cualquier carpeta (14/10)
+cd "$AQUI/.." || exit 1                           # plataforma/
+. "$AQUI/lib-dynsec.sh"
 [ -f .env ] || { echo "FALLA falta plataforma/.env (copiar .env.example y completar)"; exit 1; }
 DYN_ADMIN=$(leer_env .env MQTT_ADMIN_CLAVE); BACKEND=$(leer_env .env MQTT_BACKEND_CLAVE); SONDA=$(leer_env .env MQTT_SONDA_CLAVE)
 ANTERIOR=$(leer_env .env MQTT_ADMIN_CLAVE_ANTERIOR)

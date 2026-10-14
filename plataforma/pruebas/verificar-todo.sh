@@ -216,6 +216,21 @@ if [ -z "$v_base" ]; then echo "FALLA no se pudo leer la versión de la extensi�
 elif [ "$v_base" != "$v_img" ]; then echo "FALLA la base tiene la extensión $v_base y la imagen trae $v_img: falta ALTER EXTENSION timescaledb UPDATE (docs/11 §8)"; fallos=$((fallos+1))
 else echo "OK    la extensión de la base ($v_base) es la de la imagen"; fi
 
+paso "2y. Guiones: ninguno carga una biblioteca con una ruta relativa a \$0 después de cambiar de carpeta (14/10)"
+# 14/10: base-rol-app.sh, broker-cliente.sh y broker-inicializar.sh hacían `cd "$(dirname "$0")/.."` y después
+# `. "$(dirname "$0")/lib-dynsec.sh"`: solo funcionaban llamados desde plataforma/. Ahora se usa una ruta absoluta ($AQUI).
+malos=$(grep -lE '^\. "\$\(dirname "\$0"\)' plataforma/pruebas/*.sh plataforma/pruebas/banco/*.sh 2>/dev/null)
+if [ -n "$malos" ]; then echo "FALLA cargan con ruta relativa a \$0 (fallan según desde dónde se llamen):"; echo "$malos" | sed 's/^/  /'; fallos=$((fallos+1))
+else echo "OK    ningún guion carga lib-dynsec.sh con una ruta relativa a \$0"; fi
+
+paso "2z. Limpieza programada y cola vigilada: toda variable RETENCION_* y METRICA_BROKER_* del .env.example llega al backend por el compose (14/10)"
+# Hasta el 14/10 el compose no las reenviaba: cambiarlas en el .env no tenía efecto y nadie lo notaba.
+faltan=$(grep -oE '^#?(RETENCION|METRICA_BROKER)_[A-Z_]+' plataforma/.env.example | tr -d '#' | sort -u | while read -r v; do grep -qE "^\s+$v:" plataforma/docker-compose.yml || echo "$v"; done)
+n=$(grep -cE '^#?(RETENCION|METRICA_BROKER)_[A-Z_]+=' plataforma/.env.example)
+if [ "$n" -lt 5 ]; then echo "FALLA solo $n variables RETENCION_/METRICA_BROKER_ en .env.example: revisó de menos"; fallos=$((fallos+1))
+elif [ -n "$faltan" ]; then echo "FALLA declaradas en .env.example pero el compose no las pasa al backend: $(echo $faltan)"; fallos=$((fallos+1))
+else echo "OK    las $n variables de limpieza y cola llegan al backend por el compose"; fi
+
 paso "2l. Topes del broker (docs/11 §4; docs/10 §8.4 punto 43): max_packet_size <= 64 KiB; cola 10000 mensajes / 20 MB en la pila y el banco; autosave 300 s; el backend lee el mismo tope"
 # Sin tope, Mosquitto 2.0.22 aceptó 50 MiB (observado el 07/10): un dispositivo con credencial podría llenar el disco.
 tope=$(grep -E '^\s*max_packet_size\s+[0-9]+' "$MC/mosquitto.conf" | awk '{print $2}' | tail -1)

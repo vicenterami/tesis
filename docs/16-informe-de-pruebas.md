@@ -606,3 +606,21 @@ la retención usa la función `fn_retencion_drop_chunks` del dueño.
 **Lo que no cubre:** el dueño `plataforma` sigue siendo superusuario (lo crea así la imagen oficial; separarlo es de la Etapa 4); la
 pila de desarrollo usa el rol nuevo recién cuando la persona escribe `DB_APP_CLAVE` y corre `base-rol-app.sh`.
 
+## 25. Costo del canal en vivo (SSE) bajo carga (14/10/2026)
+
+Pregunta del estudiante: ¿cuánto consume el tiempo real y es más barato que WebSocket? Banco con 20 emulados (1 trama cada 2 s
+cada uno, unos 10 por segundo), 35 s por corrida, muestras de `docker stats` del backend cada 4 s (techo 512 MiB, 0,5 CPU).
+
+| Situación | CPU media del backend (máx.) | Memoria máx. del backend |
+|---|---|---|
+| Reposo, sin carga ni flujos | 6,8 % (una muestra, al arrancar) | 44,6 MiB |
+| 50 flujos SSE abiertos, sin carga | 0,1 % | 53,0 MiB |
+| 20 emulados, sin flujos | 3,8 % (8,0 %) | 51,0 MiB |
+| 20 emulados y 50 flujos SSE (cada uno recibió los 724 eventos de medición, 216 KB) | 5,2 % (8,0 %) | 56,0 MiB |
+
+**Lo que muestran:** cada flujo abierto cuesta del orden de 0,1 a 0,2 MiB, y repartir cada evento a 50 flujos suma alrededor de un
+punto y medio de CPU. El flujo número 51 recibe 503 (`MAX_FLUJOS`), y el emulador no perdió ninguna lectura. WebSocket no se midió
+porque no está implementado; por conexión mantiene lo mismo, una conexión TCP abierta, así que no se espera una diferencia de
+orden. La elección de SSE se sostiene por simpleza, no por costo (`docs/10 §8.4` punto 1). Limitaciones: emulador y pila en el
+mismo equipo; flujos sin filtro (cada uno recibe todo); sin proxy de por medio.
+

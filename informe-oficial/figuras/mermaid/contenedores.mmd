@@ -1,15 +1,30 @@
 flowchart TB
-    subgraph RED["Red de sensores · campo (del compañero u otro sitio)"]
+    subgraph CLI["Cliente"]
+        direction TB
+        U(["Usuario<br/>navegador"]) --- FE["Panel web<br/>Svelte + uPlot"]
+    end
+
+    subgraph TLS["Entran por MQTT/TLS 8883 · cada uno con su credencial"]
         direction LR
-        N1["Nodo sensor LoRa<br/>ESP32 + sensores"] -- "LoRa (radio)" --> GW["Pasarela LoRaWAN"]
         N2["Nodo Wi-Fi o celular<br/>MQTT directo"]
-        NS["Servidor de red externo<br/>ChirpStack del campus (ruta C)"]
+        subgraph RB["Ruta B"]
+            direction TB
+            NB["Nodos LoRa"] -- "radio LoRa" --> GB["Pasarela con servidor<br/>de red embebido"]
+        end
+        subgraph RC["Ruta C · red del campus"]
+            direction TB
+            NC["Nodos LoRa"] -- "radio LoRa" --> GC["Pasarela del campus"] -- "UDP 1700<br/>red del campus" --> NS["Servidor de red externo<br/>ChirpStack institucional"]
+        end
+    end
+
+    subgraph RA["Ruta A · opcional"]
+        direction TB
+        NA["Nodos LoRa"] -- "radio LoRa" --> GA["Pasarela con<br/>packet forwarder"]
     end
 
     subgraph SRV["Servidor del sistema · contenedores Docker"]
         direction TB
-        RP["Proxy inverso · TLS<br/>único contenedor expuesto<br/>443 personas · 8883 dispositivos · 1700/udp solo ruta A"]
-        CS["ChirpStack · servidor de red LoRaWAN<br/>solo ruta A (opcional)"]
+        RP["Proxy inverso · TLS<br/>único contenedor expuesto<br/>443 personas · 8883 MQTT · 1700/udp solo ruta A"]
         MQ["Mosquitto<br/>broker MQTT"]
         subgraph BE["Backend · NestJS"]
             direction LR
@@ -18,26 +33,21 @@ flowchart TB
             M5["M5 Persistencia y consulta<br/>API REST + SSE"]
         end
         DB[("TimescaleDB<br/>series de tiempo + tablas relacionales")]
+        CS["ChirpStack propio<br/>solo ruta A (opcional)"]
     end
 
-    subgraph CLI["Cliente"]
-        direction LR
-        U(["Usuario<br/>navegador"]) --- FE["Panel web<br/>Svelte + uPlot"]
-    end
-
-    GW -. "ruta A (opcional): UDP 1700, packet forwarder" .-> RP
-    GW -- "ruta B: servidor de red embebido → MQTT/TLS 8883" --> RP
-    GW -- "ruta C: UDP 1700 a la red del campus" --> NS
-    NS -- "ruta C: integración MQTT/TLS 8883" --> RP
+    FE -- "HTTPS 443 · REST y SSE" --> RP
     N2 -- "MQTT/TLS 8883" --> RP
-    RP -. "UDP 1700 · red interna" .-> CS
+    GB -- "MQTT/TLS 8883" --> RP
+    NS -- "MQTT/TLS 8883<br/>integración MQTT" --> RP
+    GA -. "UDP 1700 por Internet<br/>o la red del campus" .-> RP
+    RP -- "HTTP 3000 · red interna" --> M5
     RP -- "MQTT 1883 · red interna" --> MQ
+    RP -. "UDP 1700 · red interna" .-> CS
     CS -. "publica JSON decodificado" .-> MQ
     MQ -- "suscripción sitio/#" --> M1
     M2 -- "INSERT medicion" --> DB
     M6 -- "condiciones, eventos" --> DB
     M5 -- "SQL · time_bucket" --> DB
-    FE -- "HTTPS 443 · REST histórico · SSE tiempo real" --> RP
-    RP -- "HTTP 3000 · red interna" --> M5
     classDef opcional stroke-dasharray:6 4
-    class CS opcional
+    class CS,GA,NA opcional

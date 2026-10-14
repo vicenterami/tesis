@@ -5,8 +5,9 @@
 #   bash plataforma/pruebas/base-rol-app.sh            pila de desarrollo
 #   BASE_DC="docker compose -p banco …" bash …         otro proyecto (lo usa banco.sh)
 set -u
-cd "$(dirname "$0")/.." || exit 1                 # plataforma/
-. "$(dirname "$0")/lib-dynsec.sh"                 # leer_env
+AQUI=$(cd "$(dirname "$0")" && pwd) || exit 1      # ruta absoluta del guion: funciona desde cualquier carpeta (14/10)
+cd "$AQUI/.." || exit 1                           # plataforma/
+. "$AQUI/lib-dynsec.sh"
 ENVF="${BASE_ENV:-.env}"
 DC="${BASE_DC:-docker compose}"
 C=$(leer_env "$ENVF" DB_APP_CLAVE)

@@ -9,8 +9,9 @@
 # La clave la genera el gestor de contraseñas u `openssl rand -base64 24`; entra por la entrada estándar: no queda en el
 # historial ni en el ps del equipo. Nunca se imprime.
 set -u
-cd "$(dirname "$0")/.." || exit 1                 # plataforma/
-. "$(dirname "$0")/lib-dynsec.sh"
+AQUI=$(cd "$(dirname "$0")" && pwd) || exit 1      # ruta absoluta del guion: funciona desde cualquier carpeta (14/10)
+cd "$AQUI/.." || exit 1                           # plataforma/
+. "$AQUI/lib-dynsec.sh"
 [ -f .env ] || { echo "FALLA falta plataforma/.env"; exit 1; }
 DYN_ADMIN=$(leer_env .env MQTT_ADMIN_CLAVE)
 SONDA_U=$(leer_env .env MQTT_SONDA_USUARIO); SONDA_U=${SONDA_U:-sonda}   # el usuario de la sonda es configurable: también reservado

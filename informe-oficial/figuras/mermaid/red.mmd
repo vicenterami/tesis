@@ -1,30 +1,30 @@
 flowchart TB
-    subgraph CAMPO["Segmento de campo (sitio del cliente)"]
-        S1["Nodos LoRa"] -- radio --> G["Gateway"]
+    subgraph CAMPO["Segmento de campo (sitio del cliente o red del campus)"]
+        S1["Nodos LoRa"] -- radio --> G["Pasarela LoRaWAN"]
         S2["Nodos Wi-Fi"] --> R["Router del sitio\n(NAT, sin puertos abiertos)"]
-        G --> R
-        G -- "UDP 1700 (ruta C)" --> NSE["Servidor de red externo\nChirpStack del campus (ruta C)"]
+        G -- "ruta B: MQTT/TLS 8883\nruta A: UDP 1700" --> R
+        G -- "ruta C: UDP 1700" --> NSE["Servidor de red externo\nChirpStack del campus (ruta C)"]
         NSE -- "MQTT/TLS 8883, saliente" --> R
     end
 
-    INET(("Internet"))
+    INET(("Internet\no red del campus"))
 
     subgraph DMZ["Servidor · red pública (expuesta)"]
-        RP["Proxy inverso / TLS\n:443 → panel y API\n:8883 → broker (mTLS opcional)\n:1700/udp → ChirpStack (solo ruta A)"]
+        RP["Proxy inverso / TLS\n:443 → panel y API\n:8883 → broker\n:1700/udp → ChirpStack (solo ruta A)"]
     end
 
     subgraph INT["Servidor · red interna Docker (no expuesta)"]
         MQ["Mosquitto :1883"]
-        CS["ChirpStack :8080\n(solo ruta A, opcional)"]
         BE["Backend :3000"]
         DB[("TimescaleDB :5432")]
+        CS["ChirpStack :8080\n(solo ruta A, opcional)"]
     end
 
     R -- "salientes únicamente" --> INET
-    INET --> RP
-    RP --> MQ
-    RP -.-> CS
-    RP --> BE
+    INET -- "443 · 8883 · 1700/udp (ruta A)" --> RP
+    RP -- "1883" --> MQ
+    RP -- "3000" --> BE
+    RP -. "1700/udp" .-> CS
     CS -.-> MQ
     MQ --> BE
     BE --> DB
