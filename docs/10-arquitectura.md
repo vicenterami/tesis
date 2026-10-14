@@ -784,7 +784,8 @@ diseño (regla de concordancia): tras autenticar, el filtro 6 corre siempre.
 **Decisiones del 06/10/2026** (tras la entrevista y el acceso a la nube de Milesight). Fuentes: `bitacora/2026-10-05-entrevista-academico-geologia.md`; evidencia verificada en la documentación oficial
 del fabricante de la pasarela (137 afirmaciones, en un registro del autor que no se incluye en el repositorio). El código sigue a estas decisiones, no al revés.
 
-1. **Canal de tiempo real: SSE (Server-Sent Events), no WebSocket.** El flujo es unidireccional (servidor →
+1. **Canal de tiempo real: SSE (Server-Sent Events), no WebSocket** (rige hasta que se implemente la migración decidida el 14/10/2026,
+   punto 46). El flujo es unidireccional (servidor →
    navegador), de pocos datos y poco frecuente (el usuario entrevistado mira los datos «un par de veces por
    semana»). SSE va por HTTP sobre la misma sesión y el mismo proxy que la API, reconecta solo por norma
    («Clients will reconnect if the connection is closed», HTML Living Standard §9.2.3) y en NestJS es una ruta
@@ -1181,6 +1182,22 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     (ChirpStack, sus claves de nodos y su decodificador) lo administra la institución; lo nuestro empieza en el broker. Falta:
     adaptador `chirpstack` contra el JSON del evento `up` documentado, migración del formato, rol `pasarela`, emulador y la
     prueba real cuando el servidor sea alcanzable desde la red del campus.
+
+46. **El canal en vivo del panel migra de SSE a WebSocket** (decidido el 14/10/2026 por el estudiante; **diseño, aún no
+    implementado**: hasta que el código cambie, el canal en servicio es el SSE de `/eventos` y el punto 1 sigue rigiendo).
+    Motivo: dejar el canal listo para ida y vuelta (órdenes desde el panel, edición en vivo) con el estándar más usado para tiempo
+    real. Lo que NO motiva el cambio: el rendimiento por conexión, que es del mismo orden en ambos (`docs/16 §25`); por eso se
+    medirá WebSocket con la misma prueba y se comparará antes de retirar el SSE. Alcance: solo el canal del panel; MQTT sigue para
+    los dispositivos y REST para consultar y escribir. Lo que el diseño debe resolver antes del código, cada cosa con su prueba:
+    (a) **mismo puerto y mismo certificado**: 443 con `Upgrade` (RFC 6455 §1.7), en un bloque `location` propio del proxy que pase
+    `Upgrade` y `Connection`; (b) **verificación del `Origin` en el saludo**, porque un WebSocket no está protegido por CORS y una
+    página ajena podría abrirlo con la cookie de la víctima (lo mismo que hoy hace `/eventos` con el SSE); (c) **sesión**: la misma
+    cookie que la API cuando exista M7, y hasta entonces lectura sin sesión, como hoy; (d) **latido y reconexión**: ping/pong
+    periódico y reconexión con espera creciente en el cliente, que el SSE traía por norma y WebSocket no; (e) **contrapresión y
+    límites**: tope de conexiones (hoy `MAX_FLUJOS` = 50), tope de mensajes en cola por cliente y cierre del que no lee; (f) **mismo
+    bus**: la pasarela WebSocket se cuelga de `EventosService`, sin tocar el pipeline; (g) **mensajes del navegador**: por ahora
+    solo suscribirse a un dispositivo o canal; cualquier orden a un dispositivo sigue pasando por la API con su guardia. Pruebas:
+    las 22 del canal pasan a WebSocket, el humo y el banco miden lo mismo que `docs/16 §25`, y el panel (P2, P3) cambia de cliente.
 
 ## 9. Crecimiento, resiliencia y respaldo (aprobado el 06/10/2026)
 
