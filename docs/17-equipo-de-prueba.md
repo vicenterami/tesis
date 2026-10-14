@@ -76,6 +76,12 @@ identificación (párrafo anterior).
 con antena helicoidal en Afel, CLP 18 000; batería con protección declarada, sin opción encontrada. Referencia: pasarela
 Milesight UG65 4G AU915 en MCI, CLP 439 990.
 
+**Primera conexión (14/10/2026).** La placa se reconoce como `/dev/ttyUSB0` con el controlador `cp210x` del núcleo, sin instalar
+nada. `esptool` 5.5.0 identifica un ESP32-D0WD-V3 (revisión 3.1, doble núcleo, 240 MHz, Wi-Fi y Bluetooth), cristal de 40 MHz y
+memoria flash de 4 MB. Dos hallazgos para quien repita: de tres cables tipo C, dos eran solo de carga (sirvió uno de tipo C a tipo C, así que esta placa sí enciende con él) (el LED enciende y el sistema
+no ve nada; se prueba cada cable con un teléfono, mirando `journalctl -k -f`), y a la velocidad por defecto la comunicación falló;
+con `--baud 115200` funcionó siempre.
+
 ## 4. Seguridad al manipular el equipo de prueba (12/10/2026)
 
 Todo lo de esta lista funciona a **5 V por USB y a 3,3 V en los sensores**. Nada del proyecto se conecta a la red de 220 V: lo
