@@ -21,7 +21,7 @@ eligieron para que coincidan con el caso de uso levantado:
 
 | # | Pieza | Para qué | Qué verificar al comprar | Cant. | Prioridad |
 |---|---|---|---|---|---|
-| 1 | Placa ESP32 DevKit (ESP-WROOM-32, 38 pines, **conector USB tipo C**, conversor USB-serie Silicon Labs CP2102; leído en la placa el 14/10) | Microcontrolador con Wi-Fi y TLS | — (ya comprada) | 1 | — |
+| 1 | Placa ESP32 DevKit (módulo ESP32-WROOM-32 o 32E por confirmar en su tapa: el chip leído, ESP32-D0WD-V3, es el del 32E; 38 pines, **conector USB tipo C**, conversor USB-serie Silicon Labs CP2102; leído en la placa el 14/10) | Microcontrolador con Wi-Fi y TLS | — (ya comprada) | 1 | — |
 | 2 | Cable **USB tipo C de datos** (a USB-A, o tipo C a tipo C si la placa enciende con él) | Programar y alimentar la placa | Que transfiera datos: muchos cables solo cargan y el computador no ve la placa. **Corrección del 14/10:** aquí decía micro-USB, sin haber revisado el conector de la placa comprada, que es tipo C | 1 | Imprescindible |
 | 3 | Módulo **BME280** (I2C, 3,3 V) | Presión, temperatura y humedad del aire | Que diga BME280: el BMP280 se ve igual y **no mide humedad** | 1 | Imprescindible |
 | 4 | Protoboard de 400 u 830 puntos | Conectar sin soldar | — | 1 | Imprescindible |
@@ -120,7 +120,8 @@ Esta sección dice cómo evitarlo. Cifras de la hoja de datos del fabricante (ES
 - **Pines de solo entrada:** `GPIO34` a `GPIO39` no tienen etapa de salida ni resistencias internas de polarización (nota de la
   tabla IO_MUX); sirven para leer, nunca para encender nada, y necesitan resistencia externa si se usan como entrada digital.
 - **Pines de la memoria flash:** los rotulados `CLK`, `CMD`, `D0`–`D3` (`SD_CLK`, `SD_CMD`, `SD_DATA_0..3`, que en el módulo van a la
-  flash interna) no se conectan a nada. Esto lo declara la hoja de datos del módulo ESP32-WROOM-32, que se cita al hacer el
+  flash interna) no se conectan a nada. Esto lo declara la hoja de datos del módulo (ESP32-WROOM-32, o la del 32E si la tapa lo confirma; la del 32 original está
+  marcada «Not Recommended For New Designs»), que se cita al hacer el
   laboratorio (TT-32).
 - **Conversor analógico:** el sensor de suelo se lee en un pin del ADC1 (`GPIO32` a `GPIO39`). La documentación de ESP-IDF indica
   que el ADC2 no está disponible mientras el Wi-Fi está activo; la hoja de datos no lo trata, así que **se comprueba en el
