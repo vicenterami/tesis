@@ -37,6 +37,7 @@ openssl rand -base64 24              # generar una clave por variable
 # aplica una rotación. Las claves entran al contenedor por la entrada estándar: ni historial ni ps del equipo.
 bash pruebas/broker-inicializar.sh
 # Credencial del dispositivo de la demo (dev-0001; la semilla lo crea en la base sin credencial): clave oculta y verificada.
+# Semilla para probar el panel con todos los estados, vías y condiciones: bash pruebas/semilla-demo.sh --completa (docs/16 §23).
 # Los dispositivos nuevos se dan de alta por la API (POST /dispositivos con X-Clave-Admin): la credencial se muestra una vez.
 bash pruebas/broker-cliente.sh dev-0001
 

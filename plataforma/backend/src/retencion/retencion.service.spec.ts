@@ -35,14 +35,14 @@ describe('RetencionService', () => {
     return { servicio: new RetencionService(pool, config), query, release, consultas, registrar };
   }
 
-  it('por defecto las mediciones NO se tocan: solo trama y cuarentena, y la corrida lo deja escrito', async () => {
+  it('por defecto las mediciones NO se tocan: solo trama, cuarentena y metrica_broker, y la corrida lo deja escrito', async () => {
     const { servicio, query, release, consultas, registrar } = armar();
     await servicio.corridaSegura();
     expect(query.mock.calls.filter(([sql]) => String(sql).includes('drop_chunks')).map(([, p]) => p)).toEqual([
-      ['trama', 30], ['cuarentena', 30],
+      ['trama', 30], ['cuarentena', 30], ['metrica_broker', 90],
     ]);
-    expect(consultas.filter((c) => c.includes('lock_timeout'))).toHaveLength(2);
-    expect(release).toHaveBeenCalledTimes(2);
+    expect(consultas.filter((c) => c.includes('lock_timeout'))).toHaveLength(3);
+    expect(release).toHaveBeenCalledTimes(3);
     // Borrar es destructivo: la corrida queda en la base, no solo en el log que vence (kit, concurrencia §6).
     expect(registrar).toHaveBeenCalledTimes(1);
     const [sql, params] = registrar.mock.calls[0];
@@ -58,10 +58,10 @@ describe('RetencionService', () => {
     const { servicio, query, consultas, release } = armar(undefined, { RETENCION_MEDICION_DIAS: '730' });
     await servicio.corridaSegura();
     expect(query.mock.calls.filter(([sql]) => String(sql).includes('drop_chunks')).map(([, p]) => p)).toEqual([
-      ['medicion', 730], ['trama', 30], ['cuarentena', 30],
+      ['medicion', 730], ['trama', 30], ['cuarentena', 30], ['metrica_broker', 90],
     ]);
-    expect(consultas.filter((c) => c.includes('lock_timeout'))).toHaveLength(3);
-    expect(release).toHaveBeenCalledTimes(3);
+    expect(consultas.filter((c) => c.includes('lock_timeout'))).toHaveLength(4);
+    expect(release).toHaveBeenCalledTimes(4);
   });
 
   it('al arrancar NO borra nada de inmediato: un proceso de corta vida (pnpm openapi) se cierra antes', async () => {
@@ -78,7 +78,7 @@ describe('RetencionService', () => {
       await jest.advanceTimersByTimeAsync(59_000);
       expect(largo.query).not.toHaveBeenCalled();
       await jest.advanceTimersByTimeAsync(1_000);
-      expect(largo.consultas.filter((c) => c.includes('drop_chunks'))).toHaveLength(2);
+      expect(largo.consultas.filter((c) => c.includes('drop_chunks'))).toHaveLength(3);
       largo.servicio.onModuleDestroy();
     } finally {
       jest.useRealTimers();
@@ -90,7 +90,7 @@ describe('RetencionService', () => {
     await expect(servicio.corridaSegura()).resolves.toBeUndefined();
     expect(query.mock.calls.filter(([sql]) => String(sql) === 'ROLLBACK')).toHaveLength(1);
     expect(query.mock.calls.filter(([, p]) => p?.[0] === 'cuarentena')).toHaveLength(1);
-    expect(release).toHaveBeenCalledTimes(2);
+    expect(release).toHaveBeenCalledTimes(3);
     expect(registrar.mock.calls[0][1]?.[0]).toMatchObject({ fragmentos_borrados: { trama: 'error' }, fallos: 1 });
   });
 });

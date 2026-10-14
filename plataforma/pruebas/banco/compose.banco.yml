@@ -33,3 +33,4 @@ services:
       - "127.0.0.1:3001:3000"
     environment:
       SUPERVISION_INTERVALO_S: "${BANCO_SUPERVISION_INTERVALO_S:-5}"   # los emulados reportan cada pocos segundos
+      METRICA_BROKER_INTERVALO_S: "10"   # la cola vigilada se prueba en segundos, no en minutos (banco.sh cola; docs/16 §22)

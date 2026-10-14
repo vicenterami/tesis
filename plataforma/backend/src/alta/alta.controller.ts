@@ -1,15 +1,18 @@
-import { Body, Controller, HttpCode, Post, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, HttpCode, Param, Post, Res, UseGuards } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
-  ApiBadRequestResponse, ApiBody, ApiConflictResponse, ApiCreatedResponse, ApiHeader, ApiOperation, ApiResponse, ApiTags, ApiUnauthorizedResponse,
+  ApiBadRequestResponse, ApiBody, ApiConflictResponse, ApiCreatedResponse, ApiHeader, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiResponse, ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { AltaValidada, FORMATOS, FORMA_ID_FISICO, MAX_CANALES, VIAS, validarAlta } from './alta.dto';
-import { AltaService, DispositivoCreado } from './alta.service';
+import { AltaService, CredencialRotada, DispositivoCreado, DispositivoDadoDeBaja } from './alta.service';
 import { ClaveAdminGuard } from './clave-admin.guard';
+import { uuid } from '../consulta/validacion';
 
-// POST /dispositivos (HU-11, RF-50; docs/10 §3, §8.4 punto 41; docs/19 P7 «Propuesta»). La guardia corre antes que la
-// validación: sin la clave no se aprende ni la forma del cuerpo.
+// Aprovisionamiento por API (docs/10 §3, §8.4 puntos 41 y 42; docs/19 P7 «Propuesta»): POST /dispositivos (HU-11, RF-19),
+// DELETE /dispositivos/{id} (baja) y POST /dispositivos/{id}/credencial (rotación, RF-45). La guardia corre antes que la
+// validación: sin la clave no se aprende ni la forma del cuerpo ni si el identificador existe.
 @ApiTags('dispositivos')
 @Controller('dispositivos')
 @UseGuards(ClaveAdminGuard)
@@ -61,5 +64,52 @@ export class AltaController {
     const a: AltaValidada = validarAlta(cuerpo, this.reservados);
     res.setHeader('Cache-Control', 'no-store'); // la respuesta lleva una credencial: ningún proxy ni navegador la guarda
     return this.alta.crear(a);
+  }
+
+  @Delete(':id')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Dar de baja un dispositivo',
+    description:
+      'Baja lógica: `estado = baja`, credenciales revocadas, condiciones abiertas cerradas y evento `baja`, en una transacción; si la vía es ' +
+      '`mqtt`, el cliente se borra del broker dentro de ella (un cliente que el broker ya no tiene cuenta como borrado). La fila y su historial ' +
+      'quedan; lo que llegue después va a cuarentena como `dado_de_baja`. Exige la cabecera `X-Clave-Admin` (docs/10 §3).',
+  })
+  @ApiHeader({ name: 'X-Clave-Admin', required: true, description: 'Clave de administrador (HTTP_CLAVE_ADMIN del servidor)' })
+  @ApiParam({ name: 'id', description: 'UUID del dispositivo' })
+  @ApiOkResponse({ description: 'Dado de baja: estado anterior, credenciales revocadas y condiciones cerradas' })
+  @ApiBadRequestResponse({ description: 'UUID inválido' })
+  @ApiUnauthorizedResponse({ description: 'Cabecera X-Clave-Admin ausente o incorrecta' })
+  @ApiNotFoundResponse({ description: 'No existe' })
+  @ApiConflictResponse({ description: 'Ya estaba dado de baja' })
+  @ApiResponse({ status: 502, description: 'El broker no confirmó el borrado del cliente; nada cambió en la base' })
+  @ApiResponse({ status: 503, description: 'Sin clave de administrador configurada, sin conexión de administración con el broker, u otra operación sobre el mismo dispositivo en curso' })
+  darDeBaja(@Param('id') id: string): Promise<DispositivoDadoDeBaja> {
+    return this.alta.darDeBaja(uuid(id, 'dispositivo'));
+  }
+
+  @Post(':id/credencial')
+  @HttpCode(201)
+  @ApiOperation({
+    summary: 'Rotar la credencial de un dispositivo',
+    description:
+      'La credencial perdida no se recupera: se reemplaza. Nueva fila en `credencial` (la anterior queda inactiva), evento `rotacion` y, si la ' +
+      'vía es `mqtt`, `setClientPassword` en el broker dentro de la transacción (si el broker no tenía al cliente, se crea con su rol). ' +
+      'Devuelve la credencial nueva UNA sola vez. La anterior deja de valer al confirmar; una sesión MQTT ya abierta sigue hasta que ' +
+      'el dispositivo reconecte. Si la respuesta no llega, repetir: la anterior puede haber dejado de valer. Exige `X-Clave-Admin`.',
+  })
+  @ApiHeader({ name: 'X-Clave-Admin', required: true, description: 'Clave de administrador (HTTP_CLAVE_ADMIN del servidor)' })
+  @ApiParam({ name: 'id', description: 'UUID del dispositivo' })
+  @ApiCreatedResponse({ description: 'Credencial rotada; `conexion` trae la nueva (una sola vez), el tópico y una trama de ejemplo' })
+  @ApiBadRequestResponse({ description: 'UUID inválido, o dispositivo lorawan (sin credencial propia)' })
+  @ApiUnauthorizedResponse({ description: 'Cabecera X-Clave-Admin ausente o incorrecta' })
+  @ApiNotFoundResponse({ description: 'No existe' })
+  @ApiConflictResponse({ description: 'Está dado de baja' })
+  @ApiResponse({ status: 502, description: 'El broker no confirmó la clave nueva; nada cambió en la base (repetir la rotación)' })
+  @ApiResponse({ status: 503, description: 'Sin clave de administrador configurada, sin conexión de administración con el broker, u otra operación sobre el mismo dispositivo en curso' })
+  async rotar(@Param('id') id: string, @Res({ passthrough: true }) res: Response): Promise<CredencialRotada> {
+    const dispositivoId = uuid(id, 'dispositivo');
+    res.setHeader('Cache-Control', 'no-store'); // la respuesta lleva una credencial: ningún proxy ni navegador la guarda
+    return this.alta.rotarCredencial(dispositivoId);
   }
 }

@@ -36,9 +36,11 @@ uniformidad es la que resuelve la causa C1 (formatos dispares).
 | 14 | **trama** | Trama cruda de un mensaje aceptado (al menos una lectura guardada) | **Hypertable**, solo inserción, retención 30 días: auditoría y re-decodificación si un adaptador tuvo un error (migración 09) |
 | 15 | **pasarela** | Pasarela LoRaWAN con servidor de red embebido (ruta B) | Una sirve a muchos nodos; su id físico es su usuario del broker, único también frente a los dispositivos (migración 11) |
 | 16 | **estado_dispositivo** | Lo que el sistema escribe sobre cada dispositivo: la última trama aceptada | Una fila por dispositivo y sin `actualizado_en`: la fila de `dispositivo` queda para lo que edita una persona (migración 11). Se borra en cascada con su dispositivo: es un derivado, sin historia propia |
+| 17 | **metrica_broker** | Una muestra por minuto de los contadores `$SYS` del broker: descartes acumulados, mensajes y bytes en cola, clientes conectados, memoria | **Hypertable**, retención 90 días; la toma la conexión administradora del backend (migración 13, `docs/10 §8.4` punto 43) |
+| 18 | **condicion_sistema** | Un estado anómalo de la plataforma, sin dispositivo (`broker_descarte`: el broker descarta o la cola pasa el 80 % del tope) | Misma forma que `condicion` (abierta/cerrada, una abierta por tipo); se abre y se cierra sola desde el muestreo del broker (migración 13) |
 
-16 entidades (OE3 pide ≥ 8). Tres son hypertables, particionadas por tiempo: `medicion` (la serie de tiempo)
-y, desde la migración 09, `trama` y `cuarentena` (para borrar lo vencido por fragmentos enteros con
+18 entidades (OE3 pide ≥ 8). Cuatro son hypertables, particionadas por tiempo: `medicion` (la serie de tiempo),
+desde la migración 09 `trama` y `cuarentena`, y desde la 13 `metrica_broker` (para borrar lo vencido por fragmentos enteros con
 `drop_chunks`). El resto son tablas relacionales normales de PostgreSQL.
 
 ## 3. Diagrama entidad-relación
@@ -76,6 +78,13 @@ erDiagram
         uuid dispositivo_id FK
         uuid regla_id FK
         text tipo
+        timestamptz abierta_en
+        timestamptz cerrada_en
+    }
+    condicion_sistema {
+        uuid id PK
+        text tipo
+        jsonb detalle
         timestamptz abierta_en
         timestamptz cerrada_en
     }
@@ -137,6 +146,14 @@ erDiagram
         text unidad
         timestamptz recibido_en
         text origen_tiempo
+    }
+    metrica_broker {
+        timestamptz tiempo PK
+        bigint mensajes_descartados
+        int mensajes_en_cola
+        bigint bytes_en_cola
+        int clientes_conectados
+        bigint memoria_bytes
     }
     pasarela {
         uuid id PK
@@ -255,6 +272,7 @@ Tres tipos de dato que se confunden y que aquí tienen destino distinto:
 |---|---|---|---|
 | **Derivado al leer** | `en_linea` (¿última trama hace menos de 2 × intervalo?) | se calcula en la consulta, no se guarda | cada lectura de la API; nunca escribe |
 | **Persistido por proceso** | `condicion` tipo `sin_comunicacion` | fila en `condicion`, la abre el barrido periódico (M4) | cada 60 s, una sola vez por transición |
+| **Persistido por proceso** | `condicion_sistema` tipo `broker_descarte` y las muestras de `metrica_broker` | las escribe el muestreo de la cola del broker (`docs/10 §8.4` punto 43) | cada 60 s; abre al descartar o al 80 % de la cola, cierra tras dos muestras normales |
 | **Exigido en la transición** | «un dispositivo dado de baja no acepta tramas» | el pipeline lo evalúa contra el dato del momento | en cada trama |
 | **Foto** | `evento.detalle` (valor y umbral al dispararse), `medicion.unidad` | columna copiada | una vez, al ocurrir |
 

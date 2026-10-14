@@ -234,6 +234,57 @@
         "tags": [
           "dispositivos"
         ]
+      },
+      "delete": {
+        "description": "Baja lógica: `estado = baja`, credenciales revocadas, condiciones abiertas cerradas y evento `baja`, en una transacción; si la vía es `mqtt`, el cliente se borra del broker dentro de ella (un cliente que el broker ya no tiene cuenta como borrado). La fila y su historial quedan; lo que llegue después va a cuarentena como `dado_de_baja`. Exige la cabecera `X-Clave-Admin` (docs/10 §3).",
+        "operationId": "AltaController_darDeBaja",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "UUID del dispositivo",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Clave-Admin",
+            "in": "header",
+            "description": "Clave de administrador (HTTP_CLAVE_ADMIN del servidor)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dado de baja: estado anterior, credenciales revocadas y condiciones cerradas"
+          },
+          "400": {
+            "description": "UUID inválido"
+          },
+          "401": {
+            "description": "Cabecera X-Clave-Admin ausente o incorrecta"
+          },
+          "404": {
+            "description": "No existe"
+          },
+          "409": {
+            "description": "Ya estaba dado de baja"
+          },
+          "502": {
+            "description": "El broker no confirmó el borrado del cliente; nada cambió en la base"
+          },
+          "503": {
+            "description": "Sin clave de administrador configurada, sin conexión de administración con el broker, u otra operación sobre el mismo dispositivo en curso"
+          }
+        },
+        "summary": "Dar de baja un dispositivo",
+        "tags": [
+          "dispositivos"
+        ]
       }
     },
     "/dispositivos/{id}/exportar": {
@@ -461,6 +512,59 @@
         "summary": "Estado del servicio y de su conexión a la base",
         "tags": [
           "salud"
+        ]
+      }
+    },
+    "/dispositivos/{id}/credencial": {
+      "post": {
+        "description": "La credencial perdida no se recupera: se reemplaza. Nueva fila en `credencial` (la anterior queda inactiva), evento `rotacion` y, si la vía es `mqtt`, `setClientPassword` en el broker dentro de la transacción (si el broker no tenía al cliente, se crea con su rol). Devuelve la credencial nueva UNA sola vez. La anterior deja de valer al confirmar; una sesión MQTT ya abierta sigue hasta que el dispositivo reconecte. Si la respuesta no llega, repetir: la anterior puede haber dejado de valer. Exige `X-Clave-Admin`.",
+        "operationId": "AltaController_rotar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "UUID del dispositivo",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Clave-Admin",
+            "in": "header",
+            "description": "Clave de administrador (HTTP_CLAVE_ADMIN del servidor)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Credencial rotada; `conexion` trae la nueva (una sola vez), el tópico y una trama de ejemplo"
+          },
+          "400": {
+            "description": "UUID inválido, o dispositivo lorawan (sin credencial propia)"
+          },
+          "401": {
+            "description": "Cabecera X-Clave-Admin ausente o incorrecta"
+          },
+          "404": {
+            "description": "No existe"
+          },
+          "409": {
+            "description": "Está dado de baja"
+          },
+          "502": {
+            "description": "El broker no confirmó la clave nueva; nada cambió en la base (repetir la rotación)"
+          },
+          "503": {
+            "description": "Sin clave de administrador configurada, sin conexión de administración con el broker, u otra operación sobre el mismo dispositivo en curso"
+          }
+        },
+        "summary": "Rotar la credencial de un dispositivo",
+        "tags": [
+          "dispositivos"
         ]
       }
     }

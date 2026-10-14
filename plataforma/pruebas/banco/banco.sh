@@ -8,6 +8,7 @@
 #   bash plataforma/pruebas/banco/banco.sh evaluar [csv]       vuelve a cruzar un CSV de envíos con la base
 #   bash plataforma/pruebas/banco/banco.sh proxy               levanta la capa TLS (proxy/compose.proxy.yml) sobre el banco y la prueba
 #   bash plataforma/pruebas/banco/banco.sh alta                alta por API de punta a punta: POST → credencial → publica → medicion (HU-11)
+#   bash plataforma/pruebas/banco/banco.sh cola                cola del broker vigilada: backend detenido + 200 emulados → descartes → condición broker_descarte (docs/16 §22)
 #   bash plataforma/pruebas/banco/banco.sh estado | logs [servicio] | sql ["CONSULTA"]
 #   bash plataforma/pruebas/banco/banco.sh apagar              baja todo; los datos estaban en RAM, no queda nada
 # Credenciales: de descarte, generadas en cada «encender» y escritas fuera del repo, en una carpeta propia con permisos 700,
@@ -195,8 +196,74 @@ case "${1:-}" in
     n=$(psql_ -tA -c "SELECT count(*) FROM evento e JOIN dispositivo d ON d.id=e.dispositivo_id WHERE d.id_fisico='$id' AND e.tipo='alta'" | tr -d '[:space:]'); [ "$n" = 1 ] && ok "evento «alta» registrado" || falla "evento alta: $n"
     curl -s http://127.0.0.1:3001/dispositivos | python3 -c "import sys,json; sys.exit(0 if any(d['id_fisico']=='$id' and d['via']=='mqtt' and d['en_linea'] for d in json.load(sys.stdin)) else 1)" && ok "GET /dispositivos lo lista con vía mqtt y en línea" || falla "no aparece en el inventario, o no en línea"
     n=$(dc logs --no-color --since 3m backend 2>/dev/null | grep -cF -f <(printf '%s\n' "$CRED")); [ "$n" = 0 ] && ok "la credencial no aparece en el registro del backend" || falla "la credencial se escribió en el registro"
-    unset CRED
+    # ── Rotación (POST /dispositivos/{id}/credencial, 13/10; docs/10 §3): la clave anterior deja de valer, la nueva publica,
+    # en la base queda una fila activa y otra inactiva, y el evento «rotacion».
+    uid=$(python3 -c "import sys,json; print(json.load(sys.stdin)['id'])" <<<"$body")
+    rot() { local u=$1; shift; printf 'X-Clave-Admin: %s\n' "$CLAVE" | curl -s -m 10 -w '\n%{http_code}' -X POST -H @- "$@" "http://127.0.0.1:3001/dispositivos/$u/credencial"; }
+    r=$(rot "$uid" -D "$PRIV/rot-cabeceras.txt"); code=${r##*$'\n'}; body2=${r%$'\n'*}
+    [ "$code" = 201 ] && ok "POST /dispositivos/{id}/credencial con la clave → 201" || { echo "FALLA rotación → HTTP $code: ${body2:0:200}"; exit 1; }
+    CRED2=$(python3 -c "import sys,json; print(json.load(sys.stdin)['conexion']['credencial'])" <<<"$body2")
+    [ ${#CRED2} = 32 ] && [ "$CRED2" != "$CRED" ] && ok "la rotación devuelve una credencial nueva (32 caracteres, distinta; no se imprime)" || falla "credencial rotada: ${#CRED2} caracteres"
+    grep -qi '^cache-control: no-store' "$PRIV/rot-cabeceras.txt" && ok "la respuesta de la rotación lleva Cache-Control: no-store" || falla "rotación sin no-store"; rm -f "$PRIV/rot-cabeceras.txt"
+    r=$(pub "$CRED" "$topico" "$carga"); [[ "$r" == *"Connection error"* ]] && ok "con la credencial ANTERIOR el broker ya no lo deja conectar" || falla "la credencial anterior sigue valiendo: $r"
+    r=$(pub "$CRED2" "$topico" "$carga"); [[ "$r" == *"RC:0"* || "$r" == *"RC:16"* ]] && ok "con la credencial NUEVA publica en su tópico ($r)" || falla "publicar con la nueva: $r"
+    n=$(psql_ -tA -c "SELECT count(*) FILTER (WHERE activa) || '/' || count(*) FROM credencial cr JOIN dispositivo d ON d.id=cr.dispositivo_id WHERE d.id_fisico='$id'" | tr -d '[:space:]')
+    [ "$n" = "1/2" ] && ok "en la base: 2 filas de credencial, 1 activa (la anterior quedó inactiva)" || falla "filas de credencial activas/total: $n (esperado 1/2)"
+    n=$(psql_ -tA -c "SELECT count(*) FROM evento e JOIN dispositivo d ON d.id=e.dispositivo_id WHERE d.id_fisico='$id' AND e.tipo='rotacion'" | tr -d '[:space:]'); [ "$n" = 1 ] && ok "evento «rotacion» registrado" || falla "evento rotacion: $n"
+    code=$(curl -s -m 10 -o /dev/null -w '%{http_code}' -X POST "http://127.0.0.1:3001/dispositivos/$uid/credencial"); [ "$code" = 401 ] && ok "rotación sin X-Clave-Admin → 401" || falla "rotación sin clave → $code"
+    # ── Baja (DELETE /dispositivos/{id}): estado baja, cliente borrado del broker (la clave nueva ya no entra), credenciales
+    # inactivas, evento «baja», inventario con estado baja; repetir → 409; un UUID que no existe → 404; rotar un dado de baja → 409.
+    del() { local u=$1; shift; printf 'X-Clave-Admin: %s\n' "$CLAVE" | curl -s -m 10 -w '\n%{http_code}' -X DELETE -H @- "$@" "http://127.0.0.1:3001/dispositivos/$u"; }
+    r=$(del "$uid"); code=${r##*$'\n'}; body3=${r%$'\n'*}
+    [ "$code" = 200 ] && ok "DELETE /dispositivos/{id} con la clave → 200" || { echo "FALLA baja → HTTP $code: ${body3:0:200}"; exit 1; }
+    python3 -c "import sys,json; r=json.load(sys.stdin); sys.exit(0 if r['estado']=='baja' and r['estado_anterior']=='activo' and r['credenciales_revocadas']==1 else 1)" <<<"$body3" && ok "la respuesta dice estado baja, antes activo, 1 credencial revocada" || falla "respuesta de la baja: ${body3:0:160}"
+    r=$(pub "$CRED2" "$topico" "$carga"); [[ "$r" == *"Connection error"* ]] && ok "dado de baja, el broker ya no acepta su credencial (cliente borrado)" || falla "el dado de baja sigue entrando: $r"
+    n=$(psql_ -tA -c "SELECT d.estado || ' ' || (SELECT count(*) FROM credencial cr WHERE cr.dispositivo_id=d.id AND cr.activa) FROM dispositivo d WHERE d.id_fisico='$id'" | tr -d '[:space:]')
+    [ "$n" = "baja0" ] && ok "en la base: estado baja y 0 credenciales activas" || falla "estado/credenciales activas: $n (esperado baja 0)"
+    n=$(psql_ -tA -c "SELECT count(*) FROM evento e JOIN dispositivo d ON d.id=e.dispositivo_id WHERE d.id_fisico='$id' AND e.tipo='baja'" | tr -d '[:space:]'); [ "$n" = 1 ] && ok "evento «baja» registrado" || falla "evento baja: $n"
+    curl -s http://127.0.0.1:3001/dispositivos | python3 -c "import sys,json; sys.exit(0 if any(d['id_fisico']=='$id' and d['estado']=='baja' for d in json.load(sys.stdin)) else 1)" && ok "GET /dispositivos lo sigue listando, con estado baja (historial conservado)" || falla "no aparece con estado baja"
+    code=$(del "$uid" | tail -1); [ "$code" = 409 ] && ok "repetir la baja → 409" || falla "repetir la baja → $code"
+    code=$(rot "$uid" | tail -1); [ "$code" = 409 ] && ok "rotar un dado de baja → 409" || falla "rotar dado de baja → $code"
+    code=$(del "00000000-0000-4000-8000-000000000000" | tail -1); [ "$code" = 404 ] && ok "dar de baja un UUID inexistente → 404" || falla "baja inexistente → $code"
+    code=$(curl -s -m 10 -o /dev/null -w '%{http_code}' -X DELETE "http://127.0.0.1:3001/dispositivos/$uid"); [ "$code" = 401 ] && ok "baja sin X-Clave-Admin → 401" || falla "baja sin clave → $code"
+    n=$(dc logs --no-color --since 3m backend 2>/dev/null | grep -cF -f <(printf '%s\n' "${CRED2:-sin-credencial-rotada}")); [ "$n" = 0 ] && ok "la credencial rotada no aparece en el registro del backend" || falla "la credencial rotada se escribió en el registro"
+    unset CRED CRED2
     echo; [ $fallos -eq 0 ] && echo "ALTA OK" || { echo "$fallos comprobación(es) con falla"; exit 1; } ;;
+  cola)
+    # Cola del broker vigilada (docs/10 §8.4 punto 43; docs/16 §22): PLANTAR la violación. Con el backend detenido, 200 emulados a
+    # 1 trama/s durante 70 s (≈ 14 000 mensajes) desbordan la cola de la sesión persistente del backend (tope 10 000): el broker
+    # descarta en silencio para el emisor. Al volver, la primera muestra compara con la última guardada y abre broker_descarte;
+    # cuando la cola se vacía y no hay descartes nuevos en dos muestras seguidas, la cierra sola. En el banco la muestra corre
+    # cada 10 s (compose.banco.yml). Comprobaciones: /salud trae los contadores; el contador de descartes creció (el tope rige);
+    # la condición abierta con motivo «descartes», su evento y el aviso en /salud; muestras en metrica_broker; cierre automático.
+    fallos=0; ok() { echo "OK    $1"; }; falla() { echo "FALLA $1"; fallos=$((fallos+1)); }
+    salud() { curl -s -m 3 http://127.0.0.1:3001/salud; }
+    campo() { python3 -c "import sys,json; v=json.load(sys.stdin)['broker']['$1']; print('' if v is None else v)"; }
+    d0=$(salud | campo mensajes_descartados)
+    [ -n "$d0" ] && ok "GET /salud trae los contadores \$SYS del broker (descartados hasta ahora: $d0)" || { echo "FALLA /salud sin contadores del broker (¿la administradora no lee \$SYS?)"; exit 1; }
+    # Sin una muestra guardada ANTES de la caída no hay con qué comparar al volver (la primera muestra de un proceso sin historia
+    # fija la referencia y no alarma): se espera a que exista (primera corrida del 13/10: faltaba y la alarma nunca se abrió).
+    ultima=""; for _ in $(seq 1 8); do ultima=$(salud | campo ultima_muestra); [ -n "$ultima" ] && break; sleep 5; done
+    [ -n "$ultima" ] && ok "muestra de referencia guardada antes de la caída ($ultima)" || { echo "FALLA sin muestra de referencia a los 40 s: no se puede plantar la violación"; exit 1; }
+    dc stop backend >/dev/null 2>&1 && ok "backend detenido: el broker encola para su sesión persistente"
+    emu correr --url mqtt://127.0.0.1:1884 --dispositivos 200 --periodo 1 --duracion 70 --perdida 0 --caidas 0 --sin-sys --salida "$CSV" >/dev/null 2>&1 && ok "200 emulados a 1 trama/s durante 70 s con el backend caído (≈ 14 000 mensajes contra un tope de 10 000)" || falla "el emulador no terminó bien"
+    dc start backend >/dev/null 2>&1
+    for _ in $(seq 1 30); do [ -n "$(dc ps --format '{{.Status}}' backend | grep healthy)" ] && break; sleep 3; done
+    [ -n "$(dc ps --format '{{.Status}}' backend | grep healthy)" ] && ok "backend de vuelta (healthy)" || { echo "FALLA el backend no volvió a healthy"; exit 1; }
+    abierta=""; for _ in $(seq 1 9); do sleep 5; abierta=$(salud | campo condicion_abierta); [ -n "$abierta" ] && break; done
+    abrio=$abierta
+    [ "$abierta" = broker_descarte ] && ok "condición del sistema broker_descarte ABIERTA al volver (la ve GET /salud)" || falla "sin condición abierta a los 45 s (condicion_abierta=«$abierta»)"
+    d1=$(salud | campo mensajes_descartados)
+    [ -n "$d1" ] && [ "$d1" -gt "$d0" ] && ok "el broker descartó $((d1 - d0)) mensajes: el tope de 10 000 rige y el contador \$SYS lo delata" || falla "descartes $d0 → ${d1:-?}: el tope no actuó o el contador no llegó"
+    m=$(psql_ -tA -c "SELECT detalle->'motivos' FROM condicion_sistema WHERE tipo='broker_descarte' ORDER BY abierta_en DESC LIMIT 1" | tr -d '[:space:]')
+    [[ "$m" == *descartes* ]] && ok "condicion_sistema: fila broker_descarte con motivo «descartes» ($m)" || falla "fila de condicion_sistema: «$m»"
+    n=$(psql_ -tA -c "SELECT count(*) FROM evento WHERE tipo='condicion_abierta' AND detalle->>'tipo'='broker_descarte'" | tr -d '[:space:]'); [ "$n" -ge 1 ] && ok "evento condicion_abierta (broker_descarte) registrado" || falla "evento de apertura: $n"
+    n=$(psql_ -tA -c "SELECT count(*) FROM metrica_broker" | tr -d '[:space:]'); [ "$n" -ge 2 ] && ok "metrica_broker tiene $n muestras" || falla "muestras en metrica_broker: $n"
+    for _ in $(seq 1 14); do sleep 5; abierta=$(salud | campo condicion_abierta); [ -z "$abierta" ] && break; done
+    # Solo cuenta como cierre si antes se abrió: un «vacío» desde el principio no prueba nada.
+    [ "$abrio" = broker_descarte ] && [ -z "$abierta" ] && ok "se cerró sola al vaciarse la cola sin descartes nuevos (dos muestras normales)" || falla "no se cerró sola (abrió: «${abrio:-no}», ahora: «$abierta»)"
+    n=$(psql_ -tA -c "SELECT count(*) FROM condicion_sistema WHERE tipo='broker_descarte' AND cerrada_en IS NOT NULL" | tr -d '[:space:]'); [ "$n" -ge 1 ] && ok "condicion_sistema: cerrada_en escrito y evento de cierre" || falla "cierre en la base: $n"
+    echo; [ $fallos -eq 0 ] && echo "COLA OK" || { echo "$fallos comprobación(es) con falla"; exit 1; } ;;
   apagar) dcp down 2>/dev/null || dc down; rm -f "$ENV" ;;
   *) sed -n 2,12p "$YO"; exit 2 ;;
 esac

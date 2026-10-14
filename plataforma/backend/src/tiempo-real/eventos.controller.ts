@@ -50,6 +50,7 @@ export class EventosController implements BeforeApplicationShutdown {
           '"unidad":"Cel","tiempo":"2026-10-09T15:00:00.000Z"}\n\n' +
           'event: visto\ndata: {"tipo":"visto","dispositivo_id":"<uuid>","tiempo":"2026-10-09T15:00:00.000Z"}\n\n' +
           'event: condicion\ndata: {"tipo":"condicion","dispositivo_id":"<uuid>","condicion":"umbral","estado":"abierta"}\n\n' +
+          'event: sistema\ndata: {"tipo":"sistema","condicion":"broker_descarte","estado":"abierta","motivos":["descartes"],"mensajes_en_cola":120,"descartes_delta":57}\n\n' +
           'event: latido\ndata: {"tiempo":"2026-10-09T15:00:25.000Z"}\n\n',
       },
     },

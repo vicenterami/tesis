@@ -8,7 +8,9 @@ import { Observable, Subject, filter } from 'rxjs';
 export type EventoPanel =
   | { tipo: 'medicion'; dispositivo_id: string; canal_id: string; valor: number; unidad: string; tiempo: string }
   | { tipo: 'visto'; dispositivo_id: string; tiempo: string }
-  | { tipo: 'condicion'; dispositivo_id: string; condicion: 'umbral' | 'sin_comunicacion'; estado: 'abierta' | 'cerrada' };
+  | { tipo: 'condicion'; dispositivo_id: string; condicion: 'umbral' | 'sin_comunicacion'; estado: 'abierta' | 'cerrada' }
+  // Condición del sistema, sin dispositivo (docs/10 §8.4 punto 43): solo la reciben los flujos sin filtro (la vista general).
+  | { tipo: 'sistema'; condicion: 'broker_descarte'; estado: 'abierta' | 'cerrada'; motivos: string[]; mensajes_en_cola: number; descartes_delta: number };
 
 export interface FiltroEventos {
   dispositivo?: string;
@@ -26,7 +28,7 @@ export class EventosService {
   // Sin filtro, todo; con dispositivo, solo los suyos; con canal, solo las mediciones de ese canal.
   flujo(f: FiltroEventos = {}): Observable<EventoPanel> {
     return this.bus.pipe(
-      filter((e) => !f.dispositivo || e.dispositivo_id === f.dispositivo),
+      filter((e) => !f.dispositivo || (e.tipo !== 'sistema' && e.dispositivo_id === f.dispositivo)),
       filter((e) => !f.canal || (e.tipo === 'medicion' && e.canal_id === f.canal)),
     );
   }

@@ -52,7 +52,7 @@
   2.1.2 por digest. El diseño de sesión, usuarios y permisos queda como borrador (`docs/20`) para la Etapa 4.
 
 ## Pendientes
-- [ ] Baja y rotación por API (HU-12, HU-13) sobre las órdenes ya escritas; prueba de dos altas simultáneas.
+- [x] Baja y rotación por API sobre las órdenes ya escritas (hechas el 13/10; en el backlog HU-12 y HU-13 son otras historias: el nombre se corrigió). Pendiente: prueba de dos altas simultáneas.
 - [ ] Observabilidad y auditoría de operaciones: diseño antes del código (tabla de auditoría y middleware).
 - [ ] Semilla de demostración completa, con el resultado esperado escrito en su cabecera y todos los estados, vías y
   condiciones, para encontrar errores del panel y del backend antes que el usuario.

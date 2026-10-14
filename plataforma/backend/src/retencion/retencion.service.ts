@@ -17,7 +17,7 @@ import { POOL } from '../db/db.module';
 // (docs/14) y el historial largo es el dato valioso del caso de uso. Solo se recortan si se define la variable.
 // porDefecto null = sin límite: la tabla no se toca.
 export interface Limite<D extends number | null = number> { variable: string; porDefecto: D; minimo: number }
-export interface Plazo extends Limite<number | null> { tabla: 'medicion' | 'trama' | 'cuarentena' }
+export interface Plazo extends Limite<number | null> { tabla: 'medicion' | 'trama' | 'cuarentena' | 'metrica_broker' }
 
 const ESPERA_INICIAL_MS = 60_000;
 
@@ -26,6 +26,8 @@ export const PLAZOS: Plazo[] = [
   { tabla: 'medicion', variable: 'RETENCION_MEDICION_DIAS', porDefecto: null, minimo: 30 },
   { tabla: 'trama', variable: 'RETENCION_TRAMA_DIAS', porDefecto: 30, minimo: 1 },
   { tabla: 'cuarentena', variable: 'RETENCION_CUARENTENA_DIAS', porDefecto: 30, minimo: 1 },
+  // Muestras por minuto de los contadores $SYS del broker (docs/10 §8.4 punto 43, migración 13): 90 días.
+  { tabla: 'metrica_broker', variable: 'RETENCION_METRICA_BROKER_DIAS', porDefecto: 90, minimo: 1 },
 ];
 
 // Ausente → valor por defecto. Presente pero vacía o no entera → error al arrancar, nunca un 0 silencioso:

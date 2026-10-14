@@ -20,7 +20,7 @@ import { AltaModule } from './alta/alta.module';
 //   RetencionModule → tarea periódica que borra con drop_chunks lo vencido de medicion, trama y cuarentena
 //                     (docs/10 §8.4 punto 11): la edición Apache de TimescaleDB no trae políticas de retención
 //   TiempoRealModule → canal de tiempo real hacia el panel (SSE, TT-39): GET /eventos
-//   AltaModule      → M3 Aprovisionamiento, primera parte (HU-11): POST /dispositivos con clave de administrador por cabecera
+//   AltaModule      → M3 Aprovisionamiento (HU-11): POST /dispositivos, DELETE /dispositivos/{id} y POST /dispositivos/{id}/credencial, con clave de administrador por cabecera
 //                     (docs/10 §8.4 punto 41) y la credencial del broker creada en el plugin (punto 42)
 // M7 (seguridad e identidad: sesión y usuarios, docs/20) llega en la Etapa 4; M8 es el panel (backend/panel).
 @Module({

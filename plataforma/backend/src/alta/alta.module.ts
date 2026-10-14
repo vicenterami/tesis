@@ -4,6 +4,6 @@ import { DbModule } from '../db/db.module';
 import { AltaController } from './alta.controller';
 import { AltaService } from './alta.service';
 
-// M3 Aprovisionamiento, primera parte (docs/10 §1 y §3): el alta por API. La baja y la rotación llegan con HU-12 y HU-13.
-@Module({ imports: [DbModule, BrokerModule], controllers: [AltaController], providers: [AltaService] })
+// M3 Aprovisionamiento por API (docs/10 §1 y §3): alta (HU-11), baja y rotación de la credencial (sin historia propia: completan HU-11).
+@Module({ imports: [DbModule, BrokerModule], controllers: [AltaController], providers: [AltaService], exports: [AltaService] })
 export class AltaModule {}

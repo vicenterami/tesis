@@ -31,6 +31,13 @@ erDiagram
         timestamptz abierta_en
         timestamptz cerrada_en
     }
+    condicion_sistema {
+        uuid id PK
+        text tipo
+        jsonb detalle
+        timestamptz abierta_en
+        timestamptz cerrada_en
+    }
     credencial {
         uuid id PK
         uuid dispositivo_id FK
@@ -89,6 +96,14 @@ erDiagram
         text unidad
         timestamptz recibido_en
         text origen_tiempo
+    }
+    metrica_broker {
+        timestamptz tiempo PK
+        bigint mensajes_descartados
+        int mensajes_en_cola
+        bigint bytes_en_cola
+        int clientes_conectados
+        bigint memoria_bytes
     }
     pasarela {
         uuid id PK

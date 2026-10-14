@@ -21,11 +21,12 @@ src/
 │   └── *.spec.ts              # pruebas unitarias de las funciones puras (jest)
 ├── consulta/                  # M5: API de solo lectura (dispositivos, canales, condiciones, cuarentena)
 ├── tiempo-real/               # TT-39: canal SSE hacia el panel (GET /eventos) y bus de eventos en memoria
-├── alta/                      # HU-11: POST /dispositivos (guardia X-Clave-Admin, validación, transacción + cliente del broker, scrypt)
-├── broker/dynsec*.ts          # administración del plugin Dynamic Security por $CONTROL (identidad backend-admin, conexión propia)
+├── alta/                      # HU-11: POST /dispositivos, DELETE /dispositivos/:id y POST /dispositivos/:id/credencial (guardia X-Clave-Admin, validación, transacción + cliente del broker, scrypt)
+├── broker/dynsec*.ts          # administración del plugin Dynamic Security por $CONTROL (identidad backend-admin, conexión propia); recibe los contadores $SYS
+├── broker/metricas*.ts        # cola del broker vigilada: muestra por minuto en metrica_broker y condición del sistema broker_descarte (docs/10 §8.4 punto 43)
 ├── retencion/                 # borra con drop_chunks lo vencido de medicion, trama y cuarentena
 ├── openapi.ts                 # contrato OpenAPI generado desde los decoradores; /docs
-└── salud/salud.controller.ts  # GET /salud
+└── salud/salud.controller.ts  # GET /salud: base, cola del broker (descartes, condición abierta) y aprovisionamiento en curso
 panel/                         # el panel (Svelte + Vite; docs/19): paquete del mismo workspace de pnpm
 ├── index.html, src/main.ts    # entrada (sin scripts en línea: la CSP del backend los prohíbe)
 ├── src/App.svelte             # ruteo por fragmento (#/ inventario, #/dispositivos/<id> ficha) y estado del servicio
@@ -173,6 +174,8 @@ describir rutas que no existen. Con el backend corriendo, la documentación inte
 | `GET /dispositivos/:id/exportar?formato=csv\|json&desde&hasta` | mediciones crudas del dispositivo en el rango, en flujo por tandas; CSV estándar (coma, punto decimal, UTF-8, CRLF) o JSON por fila | RF-34 (12/10); XLSX en la Etapa 4 |
 | `GET /cuarentena?limite&dispositivo` | últimas tramas rechazadas con motivo y carga (200 caracteres) | diagnóstico |
 | `POST /dispositivos` (cabecera `X-Clave-Admin`) | alta: dispositivo, canales, credencial (mostrada una vez) y cliente del broker, todo o nada | 201 con `conexion` (usuario, credencial, tópico, trama de ejemplo); 400 lista de motivos; 401; 409 existe; 502 el broker no aceptó; 503 sin clave o sin broker |
+| `DELETE /dispositivos/:id` (cabecera `X-Clave-Admin`) | baja lógica: `estado = baja`, credenciales inactivas, condiciones abiertas cerradas, evento `baja`, cliente borrado del broker; todo o nada | 200; 404 si no existe; 409 si ya estaba de baja (13/10) |
+| `POST /dispositivos/:id/credencial` (cabecera `X-Clave-Admin`) | rotación: credencial nueva (mostrada una vez), la anterior inactiva, evento `rotacion`, `setClientPassword` en el broker; todo o nada | 201 con `conexion`; 409 de baja; 400 lorawan; si la respuesta no llega, repetir (13/10) |
 
 ```bash
 curl -s http://127.0.0.1:3000/dispositivos | python3 -m json.tool

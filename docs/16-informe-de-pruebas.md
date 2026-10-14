@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 172 pruebas unitarias, sin matriz formal) y TT-32 (sensor físico);
+cubre todavía: TT-27 (contrato de trama: hoy 192 pruebas unitarias, sin matriz formal) y TT-32 (sensor físico);
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -521,9 +521,73 @@ verificación de una credencial usa un identificador de cliente propio (con el d
 los secretos a `curl`, `psql` y `grep` por la entrada estándar.
 
 **Lo que no cubre:** la pila de desarrollo se migra con `broker-inicializar.sh` (lo corre el operador; hasta reconstruir el backend,
-el guardián 2i falla y los casos del alta del humo responden 404, a propósito); la baja y la rotación por API (HU-12, HU-13) tienen las órdenes escritas pero
-no la ruta; la vía `http` guarda el hash del token aunque la recepción por HTTP no exista aún; no hay prueba automática de dos
+el guardián 2i falla y los casos del alta del humo responden 404, a propósito); la baja y la rotación por API llegaron el 13/10 (§21); la vía `http` guarda el hash del token aunque la recepción por HTTP no exista aún; no hay prueba automática de dos
 altas simultáneas del mismo identificador (las serializa el bloqueo por identificador del disparador de la migración 11, no
 ejercitado en concurrencia); un cliente huérfano en el broker se reporta (409 con el remedio) y no se corrige solo; la credencial
 viaja en claro dentro de la respuesta HTTP, por lo que fuera de la red local la ruta exige el proxy TLS; no hay límite de tasa en el
 proxy para `POST /dispositivos` (pendiente de `docs/11 §4`: el tope de dos altas y la clave de 24 caracteres acotan el daño).
+
+## 21. Baja y rotación de la credencial por API (13/10/2026)
+
+`DELETE /dispositivos/{id}` y `POST /dispositivos/{id}/credencial` (`docs/10 §3`; sin historia de usuario propia: completan HU-11 y
+RF-45; controles en `docs/11 §3`). Qué se probó y cómo:
+
+| Comprobación | Resultado |
+|---|---|
+| Unitarias, sin broker ni base: 13 pruebas en `baja-rotacion.spec.ts`. Baja: `FOR UPDATE` → estado → credenciales inactivas → condiciones cerradas → evento → `deleteClient` → COMMIT; 409 si ya estaba de baja y 404 si no existe, sin escribir ni tocar el broker; «not found» del plugin cuenta como borrado y se confirma; sin respuesta → 502 con ROLLBACK y nada que deshacer; vía `http` sin orden al broker; vía `mqtt` sin administración → 503 antes de escribir. Rotación: fila nueva con `scrypt` y la anterior inactiva, `setClientPassword` con el secreto antes del COMMIT, el secreto no está en ningún parámetro SQL, `conexion` con tópico y ejemplo como en el alta; 409 de baja y 400 lorawan sin escribir; «not found» → `createClient` con su rol; sin respuesta → 502 con «repetir la rotación»; la base no confirma → 500 con el mismo remedio; 429 con dos operaciones en curso, también para baja y rotación | ✅ 185 en total (`pnpm test`) |
+| `banco.sh alta` ampliado (20 emulados; las 19 comprobaciones del alta y 19 nuevas): rotación → 201 con credencial nueva de 32 caracteres y `Cache-Control: no-store`; con la anterior el broker no deja conectar; con la nueva publica (`RC:0`); 2 filas de `credencial`, 1 activa; evento `rotacion`; sin cabecera → 401. Baja → 200 con estado anterior y credenciales revocadas; con la credencial nueva ya no conecta (cliente borrado); estado `baja` y 0 activas; evento `baja`; el inventario lo lista con estado `baja`; repetir la baja → 409; rotar un dado de baja → 409; UUID inexistente → 404; sin cabecera → 401; ninguna de las dos credenciales aparece en el registro del backend | ✅ 38 de 38 |
+| Humo (`api-smoke.sh`): `DELETE` y `POST …/credencial` sin cabecera → 401 (503 sin clave configurada), antes de mirar el UUID; OpenAPI con 9 rutas y 11 operaciones | ✅ |
+
+**Decisiones de implementación (se cambian si no convencen):** la baja cierra las condiciones abiertas, porque nada más iba a
+cerrarlas (el supervisor solo mira `activo` y el dispositivo no volverá a mandar un valor normal); un cliente que el broker ya no
+tiene cuenta como borrado, así una baja repetida tras un corte termina igual que la primera; la rotación crea el cliente si el
+broker no lo tenía (rotar es la reparación del huérfano al revés: la base lo tiene y el broker no); el tope de dos operaciones a
+la vez pasa a cubrir alta, baja y rotación; la fila bloqueada con `FOR UPDATE` ordena dos operaciones sobre el mismo dispositivo
+(`lock_timeout` de 5 s → 503 con «reintentar»).
+
+**Lo que no cubre:** si rotar expulsa una sesión MQTT ya abierta no se midió (el plugin cambia la clave; el banco prueba conexiones
+nuevas), y tampoco si la baja la expulsa al borrar el cliente; no hay «reactivar» un dado de baja (el identificador queda ocupado
+por su historial: un equipo que vuelve se da de alta con otro); el estado `mantenimiento` solo se escribe por SQL hasta la pantalla
+P6 (Etapa 4); la rotación por `http` guarda el hash del token sin que exista aún la recepción por HTTP.
+
+## 22. Cola del broker vigilada: topes, muestreo de `$SYS` y alarma (13/10/2026)
+
+`docs/10 §8.4` punto 43 (la parte de la Etapa 3); migración 13 (`metrica_broker`, `condicion_sistema`); `broker/metricas*.ts`;
+controles en `docs/11 §4` fila 2. Qué se probó y cómo:
+
+| Comprobación | Resultado |
+|---|---|
+| Unitarias, sin broker ni base: 7 pruebas en `metricas.spec.ts`. Lectura de `$SYS` solo con enteros; muestra incompleta (falta un contador) → nada se guarda; regla: descartes que crecen entre muestras, cola al 80 % de un tope configurable (`METRICA_BROKER_COLA_TOPE`), contador que baja = broker reiniciado, no descarte; sin muestra anterior solo cuenta la cola. Servicio: guarda la muestra; con descartes abre `broker_descarte` con su evento y el aviso `sistema` por el canal en vivo; no abre dos veces; una muestra normal no cierra, la segunda sí; al arrancar retoma la última muestra guardada (descartes durante una caída del backend se notan al volver) y la condición que quedó abierta; un tope inválido impide arrancar | ✅ 192 en total (`pnpm test`) |
+| `banco.sh cola` (plantar la violación: backend detenido, 200 emulados a 1 trama/s durante 70 s contra la cola de 10 000 de la sesión persistente): `/salud` trae los contadores; el contador de descartes creció (el tope rige); al volver el backend, condición abierta con motivo «descartes», evento y aviso en `/salud`; muestras en `metrica_broker`; cierre automático al vaciarse la cola. Segunda corrida: 4 773 descartes contados, condición abierta con motivo «descartes», evento de apertura, cierre solo tras dos muestras normales y evento de cierre | ✅ 12 de 12 |
+| Guardián 2l ampliado: `max_queued_messages 10000` y `max_queued_bytes 20971520` en la pila y en el banco, `autosave_interval 300` en la pila, y el tope del backend (`COLA_TOPE_POR_DEFECTO`) igual al del broker; probado plantando 9000 en una copia | ✅ |
+
+**Hallazgo de la primera corrida del banco (13/10):** el tope actuó (4 779 descartes contados por `$SYS`) y hubo muestras, pero la
+condición no se abrió: el backend se detuvo antes de que existiera una muestra guardada, y la primera muestra de un proceso sin
+historia fija la referencia sin alarmar (así se evita una alarma falsa en el primer arranque). Dos correcciones a la prueba, no al
+código: espera la muestra de referencia antes de detener el backend, y «se cerró sola» solo cuenta si antes se abrió (la
+primera versión daba OK con una condición que nunca existió). Límite documentado: los descartes anteriores a la primera muestra
+de la historia no se ven.
+
+**Lo que no cubre:** la alarma llega como mucho un intervalo después (60 s en el servidor; 10 s en el banco); los descartes
+ocurridos con el backend caído se ven al volver, no durante (nadie muestrea mientras tanto); el panel todavía no dibuja el evento
+`sistema` (P4, Etapa 4); `max_queued_bytes` no se ejercitó por bytes (las tramas del emulador son chicas y el tope de mensajes
+gana); la memoria del broker (`heap/current`) puede venir vacía si la imagen no la publica.
+
+## 23. Semilla de demostración completa (13/10/2026)
+
+`db/semillas/demo-completa.sql` + `pruebas/semilla-demo.sh --completa`: once dispositivos que cubren los tres estados, las tres
+vías, los cuatro tipos de condición (abiertas y cerradas), los cuatro motivos de cuarentena más uno por HTTP, un dispositivo nunca
+visto, identificadores en los límites (3 y 63 caracteres), un nombre de 80 con acentos, un segundo sitio en otra zona horaria, una
+pasarela inactiva, 30 días de mediciones con un hueco y un pico, y métricas del broker con una condición del sistema cerrada. La
+cabecera del archivo dice qué debe quedar y qué debe mostrar cada pantalla; el guion lo comprueba.
+
+| Comprobación | Resultado |
+|---|---|
+| Aplicada dos veces seguidas: mismos conteos (reconstruye su escenario y no toca `dev-0001` ni dispositivos reales) | ✅ |
+| 16 comprobaciones en la base (estados, vías, en línea 8 / fuera 2 / nunca visto 1, condiciones, cuarentena, 2 019 mediciones de `demo-aire-01`, un solo pico, ninguna medición fuera de rango, límites, zona horaria, credenciales no verificables) y `en_linea` de los once en `GET /dispositivos` | ✅ 17 de 17 |
+| Plantado: un dispositivo silencioso marcado como visto ahora → la comprobación de la API falla nombrándolo | ✅ falla como debe |
+
+**Lo que no cubre:** el recorrido del panel con esta semilla (siguiente paso: anotar cada diferencia como hallazgo); los que
+reportan cada 300 s pasan a «sin comunicación» a los 10 min porque nadie publica (está escrito en la cabecera); ningún dispositivo
+de la semilla tiene cliente en el broker.
+

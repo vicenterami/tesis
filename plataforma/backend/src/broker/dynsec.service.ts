@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import mqtt, { MqttClient } from 'mqtt';
 import { claveOpcional } from '../arranque';
 import { AdministradorDynsec, ErrorDynsec, OrdenDynsec, RespuestaDynsec, TOPICO_RESPUESTAS, USUARIO_ADMIN } from './dynsec';
+import { Contador, TOPICOS_SYS, valorSys } from './metricas';
 
 // Segunda conexión al broker, como `backend-admin`, solo para administrar el plugin de seguridad (docs/10 §8.4 punto 41: una
 // identidad distinta de la que recibe tramas, con el rol `admin` del plugin). Sesión limpia: una respuesta a una orden que ya
@@ -14,6 +15,9 @@ export class DynsecService implements OnModuleInit, OnModuleDestroy {
   private cliente?: MqttClient;
   private listo = false; // suscrito a las respuestas: antes de eso una orden saldría y su respuesta se perdería
   private readonly admin = new AdministradorDynsec((topico, carga) => this.publicar(topico, carga));
+  // Último valor de cada contador $SYS (docs/10 §8.4 punto 43): el rol admin del plugin ya lee $SYS/#. Lo muestrea MetricasBrokerService.
+  private readonly ultimas = new Map<Contador, number>();
+  private readonly porTopico = new Map<string, Contador>(Object.entries(TOPICOS_SYS).map(([k, t]) => [t, k as Contador]));
 
   constructor(private readonly config: ConfigService) {}
 
@@ -26,6 +30,7 @@ export class DynsecService implements OnModuleInit, OnModuleDestroy {
     const url = this.config.get<string>('MQTT_URL', 'mqtt://127.0.0.1:1883');
     this.cliente = mqtt.connect(url, { username: USUARIO_ADMIN, password: clave, clientId: USUARIO_ADMIN, clean: true, reconnectPeriod: 2000 });
     this.cliente.on('connect', () => {
+      this.ultimas.clear(); // un valor viejo (de antes de reconectar) no sirve de muestra
       this.cliente?.subscribe(TOPICO_RESPUESTAS, { qos: 1 }, (err) => {
         if (err) this.log.error(`no se pudo suscribir a las respuestas del plugin: ${err.message}`);
         else {
@@ -33,9 +38,17 @@ export class DynsecService implements OnModuleInit, OnModuleDestroy {
           this.log.log(`administración del broker lista (${USUARIO_ADMIN})`);
         }
       });
+      // Los contadores $SYS llegan cada sys_interval (10 s por defecto); si la suscripción falla, el muestreo avisa «sin muestra».
+      this.cliente?.subscribe(Object.values(TOPICOS_SYS), { qos: 0 }, (err) => {
+        if (err) this.log.error(`no se pudo suscribir a los contadores $SYS del broker: ${err.message}`);
+      });
     });
     this.cliente.on('message', (topico, carga) => {
-      if (topico === TOPICO_RESPUESTAS) this.admin.recibir(carga.toString('utf8'));
+      if (topico === TOPICO_RESPUESTAS) return this.admin.recibir(carga.toString('utf8'));
+      const contador = this.porTopico.get(topico);
+      if (contador === undefined) return;
+      const v = valorSys(carga.toString('utf8'));
+      if (v !== null) this.ultimas.set(contador, v);
     });
     this.cliente.on('offline', () => {
       this.listo = false;
@@ -52,6 +65,15 @@ export class DynsecService implements OnModuleInit, OnModuleDestroy {
   // broker no se escribe nada; sin suscripción, una orden saldría y su respuesta no llegaría (cliente huérfano).
   get disponible(): boolean {
     return this.cliente?.connected === true && this.listo;
+  }
+
+  get conectado(): boolean {
+    return this.cliente?.connected === true;
+  }
+
+  // Copia de los últimos contadores $SYS recibidos (vacía si no hay conexión o aún no llegaron).
+  contadores(): ReadonlyMap<Contador, number> {
+    return new Map(this.ultimas);
   }
 
   ordenar(ordenes: OrdenDynsec[]): Promise<RespuestaDynsec[]> {

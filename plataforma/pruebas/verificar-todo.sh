@@ -50,7 +50,7 @@ docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -X -U p
 exige "$VT"/identidad.txt "${PIPESTATUS[0]}" 7 || fallos=$((fallos+1))
 
 paso "2. Migraciones aplicadas = archivos en db/init (cada NN-*.sql debe estar reflejado en la base)"
-# 02: índice por regla · 03: zona_horaria · 04: iso_utc · 05: convenciones (disparadores actualizado_en, pm2_5) · 06: índice único de medicion · 07: CHECK de cuarentena.motivo · 08: medicion.recibido_en y origen_tiempo · 09: trama y cuarentena como hypertables · 10: semántica de intervalo_esperado_s · 11: vía, pasarela, estado_dispositivo y sitio.codigo · 12: nombre ck_cuarentena_motivo
+# 02: índice por regla · 03: zona_horaria · 04: iso_utc · 05: convenciones (disparadores actualizado_en, pm2_5) · 06: índice único de medicion · 07: CHECK de cuarentena.motivo · 08: medicion.recibido_en y origen_tiempo · 09: trama · 13: metrica_broker (hypertable) y condicion_sistema y cuarentena como hypertables · 10: semántica de intervalo_esperado_s · 11: vía, pasarela, estado_dispositivo y sitio.codigo · 12: nombre ck_cuarentena_motivo
 docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -U plataforma -d plataforma -tA <<'SQL' | tee "$VT"/mig.txt
 SELECT CASE WHEN count(*)=1 THEN 'OK    01 medicion es hypertable (chunks por tiempo)' ELSE 'FALLA 01 medicion no es hypertable' END FROM timescaledb_information.hypertables WHERE hypertable_name='medicion';
 SELECT CASE WHEN indexdef LIKE '%COALESCE(regla_id%' THEN 'OK    02 condicion_abierta_unica por regla' ELSE 'FALLA 02 indice viejo' END FROM pg_indexes WHERE indexname='condicion_abierta_unica';
@@ -64,8 +64,9 @@ SELECT CASE WHEN count(*)=2 AND (SELECT count(*) FROM information_schema.columns
 SELECT CASE WHEN col_description('dispositivo'::regclass, (SELECT attnum FROM pg_attribute WHERE attrelid='dispositivo'::regclass AND attname='intervalo_esperado_s')) LIKE 'Silencio máximo normal%' THEN 'OK    10 intervalo_esperado_s documentado como silencio máximo normal (docs/10 §8.4 punto 23)' ELSE 'FALLA 10 falta el COMMENT de intervalo_esperado_s (aplicar db/init/10-intervalo-esperado.sql)' END;
 SELECT CASE WHEN (SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name IN ('pasarela','estado_dispositivo'))=2 AND (SELECT count(*) FROM information_schema.columns WHERE table_name='dispositivo' AND column_name IN ('via','formato','pasarela_id'))=3 AND (NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='dispositivo' AND column_name='visto_por_ultima_vez') OR col_description('dispositivo'::regclass, (SELECT attnum FROM pg_attribute WHERE attrelid='dispositivo'::regclass AND attname='visto_por_ultima_vez')) LIKE 'DEPRECADA%') AND EXISTS (SELECT 1 FROM pg_constraint WHERE conname='uq_sitio_codigo') AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='trg_pasarela_id_fisico_unico') THEN 'OK    11 vía, formato y pasarela; estado_dispositivo; sitio.codigo; identificador único entre dispositivo y pasarela' ELSE 'FALLA 11 falta la migración de vía, pasarela y estado (db/init/11-via-pasarela-estado.sql)' END;
 SELECT CASE WHEN EXISTS (SELECT 1 FROM pg_constraint WHERE conname='ck_cuarentena_motivo' AND conrelid='cuarentena'::regclass) AND NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='cuarentena_motivo_chk') THEN 'OK    12 ck_cuarentena_motivo: el CHECK de motivos con el nombre de la convención' ELSE 'FALLA 12 falta renombrar cuarentena_motivo_chk (db/init/12-convenciones-cuarentena.sql)' END;
+SELECT CASE WHEN (SELECT count(*) FROM timescaledb_information.hypertables WHERE hypertable_name='metrica_broker')=1 AND (SELECT count(*) FROM pg_indexes WHERE tablename='condicion_sistema' AND indexname='uq_condicion_sistema_abierta')=1 AND (SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname='ck_condicion_sistema_tipo') LIKE '%broker_descarte%' THEN 'OK    13 metrica_broker es hypertable; condicion_sistema con una abierta por tipo y dominio cerrado' ELSE 'FALLA 13 falta metrica_broker (hypertable) o condicion_sistema (índice único parcial o CHECK)' END;
 SQL
-exige "$VT"/mig.txt "${PIPESTATUS[0]}" 12 || fallos=$((fallos+1))
+exige "$VT"/mig.txt "${PIPESTATUS[0]}" 13 || fallos=$((fallos+1))
 # Toda migración en disco debe tener su comprobación arriba: una 08 nueva sin comprobación falla aquí,
 # no solo por el conteo en prosa del paso 2g.
 sin_chequeo=$(ls plataforma/db/init/ | grep -oE '^[0-9]{2}' | while read -r nn; do grep -q "^OK    $nn \|^FALLA $nn " "$VT"/mig.txt || echo "$nn"; done)
@@ -214,11 +215,26 @@ if [ -z "$v_base" ]; then echo "FALLA no se pudo leer la versión de la extensi�
 elif [ "$v_base" != "$v_img" ]; then echo "FALLA la base tiene la extensión $v_base y la imagen trae $v_img: falta ALTER EXTENSION timescaledb UPDATE (docs/11 §8)"; fallos=$((fallos+1))
 else echo "OK    la extensión de la base ($v_base) es la de la imagen"; fi
 
-paso "2l. Tope de tamaño por mensaje en el broker (docs/11 §4): max_packet_size presente y <= 64 KiB"
+paso "2l. Topes del broker (docs/11 §4; docs/10 §8.4 punto 43): max_packet_size <= 64 KiB; cola 10000 mensajes / 20 MB en la pila y el banco; autosave 300 s; el backend lee el mismo tope"
 # Sin tope, Mosquitto 2.0.22 aceptó 50 MiB (observado el 07/10): un dispositivo con credencial podría llenar el disco.
 tope=$(grep -E '^\s*max_packet_size\s+[0-9]+' "$MC/mosquitto.conf" | awk '{print $2}' | tail -1)
 if [[ -n "$tope" && "$tope" -le 65536 ]]; then echo "OK    max_packet_size = $tope bytes"
 else echo "FALLA max_packet_size ausente o mayor que 65536 (${tope:-ausente}): el broker acepta mensajes de cualquier tamaño"; fallos=$((fallos+1)); fi
+# 13/10: la cola por cliente con topes explícitos (antes regían 1000 mensajes y sin tope de bytes) en la pila Y en el banco,
+# que la prueba plantando la violación (banco.sh cola); y el número que el backend usa para avisar al 80 % debe ser el mismo.
+opcion_conf() { grep -E "^\s*$2\s+[0-9]+" "$1" | awk '{print $2}' | tail -1; }
+q_pila=""
+for conf in "$MC/mosquitto.conf" plataforma/pruebas/banco/mosquitto/mosquitto.conf; do
+  q=$(opcion_conf "$conf" max_queued_messages); b=$(opcion_conf "$conf" max_queued_bytes); [ "$conf" = "$MC/mosquitto.conf" ] && q_pila=$q
+  if [ "$q" = 10000 ] && [ "$b" = 20971520 ]; then echo "OK    $conf: max_queued_messages 10000, max_queued_bytes 20971520"
+  else echo "FALLA $conf: max_queued_messages=${q:-ausente}, max_queued_bytes=${b:-ausente} (esperado 10000 y 20971520; docs/10 §8.4 punto 43)"; fallos=$((fallos+1)); fi
+done
+a=$(opcion_conf "$MC/mosquitto.conf" autosave_interval)
+if [ "$a" = 300 ]; then echo "OK    autosave_interval 300 s en la pila (antes 1800: ventana de pérdida si el contenedor muere de golpe)"
+else echo "FALLA autosave_interval=${a:-ausente} en la pila (esperado 300)"; fallos=$((fallos+1)); fi
+tope_backend=$(grep -oE 'COLA_TOPE_POR_DEFECTO = [0-9]+' plataforma/backend/src/broker/metricas.ts | grep -oE '[0-9]+$')
+if [ -n "$tope_backend" ] && [ "$tope_backend" = "$q_pila" ]; then echo "OK    el backend (COLA_TOPE_POR_DEFECTO = $tope_backend) y mosquitto.conf dicen el mismo tope de cola"
+else echo "FALLA el backend avisa sobre un tope de ${tope_backend:-ausente} y mosquitto.conf fija ${q_pila:-ausente}: dos fuentes de verdad"; fallos=$((fallos+1)); fi
 
 paso "2m. Proxy: la plantilla nginx.conf renderizada y válida (nginx -T con la imagen del proxy, base fijada + parches, y los certificados de desarrollo)"
 # 07/10: la configuración del proxy se valida sin levantar nada. Si faltan los certificados de desarrollo

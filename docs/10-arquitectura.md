@@ -206,6 +206,16 @@ sequenceDiagram
 
 - La credencial **se muestra una sola vez** y en la base solo queda su **hash** (misma política que
   una contraseña). Si se pierde, se **rota** (nueva fila en `credencial`), no se recupera.
+- **Baja y rotación por la misma API** (hechas el 13/10/2026; sin historia de usuario propia: completan HU-11 y RF-45).
+  `DELETE /dispositivos/{id}` es una baja lógica: `estado = baja`, credenciales inactivas, condiciones abiertas cerradas (nada
+  más iba a cerrarlas: el supervisor solo mira `activo`) y evento `baja`, en una transacción, con el cliente del broker borrado
+  dentro de ella; la fila y su historial quedan, y lo que llegue después por otra vía va a cuarentena como `dado_de_baja`.
+  `POST /dispositivos/{id}/credencial` rota: nueva fila en `credencial` (la anterior inactiva), evento `rotacion` y
+  `setClientPassword` antes de confirmar; si el broker no tenía al cliente, se crea con su rol (rotar es también la
+  reparación). Repetir cualquiera de las dos tras un corte deja el mismo estado final: una baja repetida responde 409 y un
+  cliente ya borrado cuenta como borrado; una rotación cuya respuesta se perdió se repite (la clave anterior puede haber
+  dejado de valer; la nueva nunca se mostró). Las tres rutas comparten la guardia (§8.4 punto 41), el tope de dos operaciones
+  a la vez y el bloqueo de la fila (`FOR UPDATE`) que ordena dos operaciones sobre el mismo dispositivo.
 - La **ACL del broker** limita a cada dispositivo a publicar solo en su propio tópico: un nodo
   comprometido no puede suplantar a otro. Desde el 12/10/2026 es un rol del plugin Dynamic Security (`dispositivo`: publica solo
   en `sitio/+/dispositivo/%u/+` y tiene denegado todo lo demás, incluida cualquier suscripción) que el backend asigna al crear el
@@ -313,17 +323,15 @@ broker reiniciado sin persistencia (banco), 84 perdidas. Falta probar el proxy, 
 
 **La cola del broker, con números** (verificado el 06/10/2026 en el manual `mosquitto.conf(5)` de la 2.0.22, y de nuevo el 12/10/2026 en el manual vigente de la 2.1 con los mismos valores por defecto, y en
 `plataforma/mosquitto/config/mosquitto.conf`). Mientras el backend está caído, Mosquitto guarda **por cliente**
-hasta `max_queued_messages` = **1000** mensajes QoS 1 (más `max_inflight_messages` = 20 en vuelo); `max_queued_bytes`
-= 0 (sin tope por tamaño). El archivo de configuración del proyecto **no fija ninguno de los dos**, así que rigen
-esos valores. Al superarse el límite, los mensajes nuevos **se descartan sin aviso al emisor** (el manual lo dice
+hasta `max_queued_messages` = **10 000** mensajes QoS 1 (más `max_inflight_messages` = 20 en vuelo) o `max_queued_bytes`
+= **20 MB**, fijados el 13/10/2026 en `mosquitto.conf` (§8.4 punto 43; Mosquitto trae 1000 y sin tope de bytes). Al superarse el límite, los mensajes nuevos **se descartan sin aviso al emisor** (el manual lo dice
 en la entrada de `max_queued_bytes`: «messages will be silently dropped»; la de `max_queued_messages` no describe
 el caso) y el único rastro es el contador `$SYS/broker/publish/messages/dropped`. Con una trama cada 5 s por
-dispositivo y 10 dispositivos, 1000 mensajes son **~8 min** de backend caído; con la demo (un dispositivo), ~83 min.
-La persistencia a disco (`persistence true`) se escribe al cerrar y cada `autosave_interval` = **1800 s**: si el
-contenedor del broker muere de golpe, se pierde lo encolado desde el último guardado. Consecuencias de diseño,
-pendientes en §8.3 y en `docs/11 §4`: fijar ambos topes de forma explícita y justificada por sitio; alertar con el
-contador `$SYS` antes de llenar la cola; bajar `autosave_interval` o aceptar la ventana y documentarla; y, en el
-otro extremo, el tope de tamaño por mensaje (`message_size_limit`).
+dispositivo y 50 dispositivos, 10 000 mensajes son **≈ 17 min** de backend caído; con la demo (un dispositivo), ≈ 14 h.
+La persistencia a disco (`persistence true`) se escribe al cerrar y cada `autosave_interval` = **300 s** (fijado el 13/10/2026; Mosquitto trae 1800): si el
+contenedor del broker muere de golpe, se pierde lo encolado desde el último guardado. Consecuencias de diseño, **hechas el 13/10/2026** (§8.4 punto 43, migración 13): topes explícitos, una muestra por minuto del
+contador `$SYS` en `metrica_broker` y la condición del sistema `broker_descarte`, que se abre al descartar o al llenar el 80 % de
+la cola, viaja por el canal en vivo y se cierra sola; el tope de tamaño por mensaje rige desde el 07/10 (`max_packet_size`).
 **Medido el 08/10/2026 (`docs/16 §10`):** a 815 tramas/s el broker descartó 10 169 mensajes, y un ataque de solo peticiones
 HTTPS a `/salud` hizo descartar unos 2 800 de un tráfico que sin él se guardaba entero. La pérdida silenciosa ya no es teórica.
 | La trama **no trae marca de tiempo** y llega dos veces | Se guarda dos veces: sin marca del emisor no hay forma de saber que es la misma lectura. La hora de recepción se toma en la base con `clock_timestamp()` (microsegundos), así una ráfaga de tramas en cola no colisiona entre sí | Deduplicar exige una identidad; la identidad de una lectura es «canal + instante del emisor». Limitación aceptada: los nodos que quieran «exactamente una» deben marcar `t` (SenML) |
@@ -685,8 +693,8 @@ diseño (regla de concordancia): tras autenticar, el filtro 6 corre siempre.
 - [x] Decidir WebSocket o SSE para el canal de tiempo real (§5): **SSE**, decidido el 06/10/2026 (§8.4).
 - [ ] Proponer una **unidad de visualización por usuario** (Etapa 3): la base guarda siempre la unidad
       canónica y el panel convierte al mostrar; no está diseñado todavía.
-- [ ] Fijar `max_queued_messages`, `max_queued_bytes` y `autosave_interval` del broker de forma explícita y
-      justificada por sitio (hoy rigen los defectos: 1000 mensajes, sin tope de bytes, guardado cada 1800 s; §4.1)
+- [x] Fijar `max_queued_messages`, `max_queued_bytes` y `autosave_interval` del broker de forma explícita y
+      justificada (hecho el 13/10/2026: 10 000 mensajes, 20 MB, 300 s, con alarma; §8.4 punto 43)
       y alertar cuando la cola se acerque al límite o `$SYS/broker/publish/messages/dropped` deje de ser cero.
 - [ ] Emulador (TT-28) con tráfico irregular: periodo propio por dispositivo, variación de latencia, pérdidas, ráfaga
       con marcas antiguas tras una caída y deriva de reloj (§9.6), para probar picos y no promedios.
@@ -988,7 +996,7 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     `backend` y `sonda`; la del administrador se rota poniendo la vigente en `MQTT_ADMIN_CLAVE_ANTERIOR` y la nueva en
     `MQTT_ADMIN_CLAVE`. Mosquitto y su plugin: «dual licensed under the Eclipse Public License 2.0 OR the Eclipse Distribution
     License 1.0» (LICENSE.txt del repositorio oficial, leído el 12/10/2026). El backend crea el cliente de cada dispositivo en el alta (punto 41) y lo borrará o rotará con las
-    órdenes ya escritas en `broker/dynsec.ts` (HU-12, HU-13); a mano, `pruebas/broker-cliente.sh` (demo y emergencias). Se adopta
+    órdenes de `broker/dynsec.ts` (baja y rotación por API, hechas el 13/10/2026: §3); a mano, `pruebas/broker-cliente.sh` (demo y emergencias). Se adopta
     Mosquitto **2.1.2-alpine** fijada por digest (0 vulnerabilidades altas o críticas en el escaneo del 12/10): en 2.0.22 el patrón
     `%u` no sustituía y habría exigido un rol por dispositivo. El banco de pruebas corre el mismo plugin, con los mismos roles y
     el mismo acceso por defecto; los emulados, sin usuario, entran por el grupo anónimo del plugin con un rol `emulado` que solo
@@ -1016,12 +1024,20 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     1 000, vaciada cada 5 s) y, si se llena, se descartan las más viejas **contando** lo descartado en una línea de registro (ruido,
     no silencio); el pipeline de tramas sigue como en §4.1 (sin confirmar al broker, que las guarda). **La cola del broker, con
     topes explícitos y alarma:** `max_queued_messages 10000`, `max_queued_bytes 20971520` (20 MB) y `autosave_interval 300` en
-    `mosquitto.conf` (hoy rigen 1000, sin tope y 1800 s): con 50 dispositivos cada 5 s son ≈ 17 min de backend caído antes de perder
+    `mosquitto.conf` (aplicados el 13/10/2026; antes regían 1000, sin tope y 1800 s): con 50 dispositivos cada 5 s son ≈ 17 min de backend caído antes de perder
     algo, bajo el techo de 256 MB del contenedor; cuando `publish/messages/dropped` crece entre dos muestras, o `store/messages/count`
     supera el 80 % del tope, se abre una condición del sistema (nueva, sin dispositivo) que viaja por el canal en vivo y se cierra
     sola al normalizarse. Orden de implementación: topes y muestreo con alarma en la Etapa 3 (protegen datos: 2 h); `auditoria`,
     middleware e `id_peticion` al abrir la Etapa 4 junto con la sesión (3 h), porque «quién» necesita el usuario; la ruta de lectura (Etapa 4)
-    y la pantalla después. Se mide la sobrecarga del middleware en el banco antes de dejarlo (`docs/16`).
+    y la pantalla después. Se mide la sobrecarga del middleware en el banco antes de dejarlo (`docs/16`). **Hecho el 13/10/2026 (la parte de la Etapa 3):**
+    topes en `mosquitto.conf` y en el banco; migración 13 (`metrica_broker`, hypertable con retención de 90 días, y
+    `condicion_sistema`); `broker/metricas.service.ts` muestrea cada `METRICA_BROKER_INTERVALO_S` (60 s) los contadores que recibe
+    la conexión administradora, abre `broker_descarte` cuando el contador de descartes crece o la cola llega al 80 % de
+    `METRICA_BROKER_COLA_TOPE` (el mismo número que `max_queued_messages`: lo comprueba el guardián 2l), la cierra tras dos
+    muestras normales y, al arrancar, compara con la última muestra guardada, así un descarte ocurrido con el backend caído se
+    nota al volver; el evento `sistema` viaja por el canal en vivo (solo a los flujos sin filtro) y `GET /salud` muestra cola,
+    descartes, conexiones, condición abierta y operaciones de aprovisionamiento en curso. Probado plantando la violación en el
+    banco (`banco.sh cola`, `docs/16 §22`).
 
 ## 9. Crecimiento, resiliencia y respaldo (aprobado el 06/10/2026)
 

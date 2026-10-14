@@ -137,3 +137,12 @@ necesitara, se escribe antes aquí cómo se manejan.
 alimentación −0,3 a 3,6 V; corriente acumulada de salida 1 200 mA), tabla 5-2 (alimentación recomendada 3,0–3,6 V; fuente de
 0,5 A), tabla 5-3 (VIH máx. VDD + 0,3 V; IOH 40 mA; IOL 28 mA), tabla 3-1 (pines de arranque), nota de la tabla IO_MUX (GPIO34–39
 solo entrada). Lo del ADC2 y los pines de la flash: por verificar con la fuente al hacer el laboratorio (marcado arriba).
+
+## 5. Herramienta del firmware (decidida el 13/10/2026)
+
+El nodo se programa con **PlatformIO Core** (línea de comandos) y el framework **Arduino-ESP32**: el archivo `platformio.ini`
+versionado fija la plataforma y cada biblioteca, así cualquiera reproduce el firmware sin un entorno gráfico. Alternativas
+consideradas: `arduino-cli` (mismo framework, versiones fijadas por comandos en vez de un archivo) y MicroPython (ciclo más corto,
+pero el TLS con CA propia no está verificado para esta placa). Las versiones exactas de la plataforma, del framework y de cada
+biblioteca se anotan aquí el día de instalarlas, desde su documentación oficial. Llegada de las piezas 2 a 7: 13/10/2026.
+
