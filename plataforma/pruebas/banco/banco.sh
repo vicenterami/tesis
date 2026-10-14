@@ -185,6 +185,10 @@ case "${1:-}" in
     r=$(pub "clave-equivocada-de-prueba-123456" "$topico" "$carga"); [[ "$r" == *"Connection error"* ]] && ok "con otra clave el broker no lo deja conectar" || falla "con otra clave: $r"
     r=$(pub_anon '$CONTROL/dynamic-security/v1' '{"commands":[{"command":"listClients"}]}'); [[ "$r" == *"RC:135"* ]] && ok "un anónimo (emulado) NO puede dar órdenes al plugin (RC:135)" || falla "anónimo contra \$CONTROL: $r"
     r=$(pub_como backend "$(leer MQTT_BACKEND_CLAVE)" "$topico" "$carga"); [[ "$r" == *"RC:135"* ]] && ok "el usuario backend (rol recepcion) NO puede publicar como dispositivo (RC:135)" || falla "backend publicando: $r"
+    # Mínimo privilegio del administrador (pendiente 87): backend-admin lee $SYS pero ya no puede suscribirse a las tramas.
+    sub_admin() { printf '%s\n' "$(leer MQTT_ADMIN_CLAVE)" | docker run --rm -i --network "$red" "$IMG_BROKER" sh -c 'IFS= read -r C; mosquitto_sub -V mqttv5 -d -h mosquitto -i "verif-admin-$$" -u backend-admin -P "$C" -t "$1" -W 2 -C 1 2>&1' sh "$1" | grep -oE "Subscribed \(mid: [0-9]+\): [0-9]+" | head -1; }
+    r=$(sub_admin 'sitio/#'); [[ "$r" == *": 135" ]] && ok "backend-admin NO puede suscribirse a sitio/# (135; mínimo privilegio)" || falla "backend-admin suscrito a sitio/#: «$r»"
+    r=$(sub_admin '$SYS/broker/clients/connected'); [[ "$r" == *": 0" ]] && ok "backend-admin SÍ lee \$SYS (lo necesita el muestreo de la cola)" || falla "backend-admin y \$SYS: «$r»"
     code=$(post_admin -d "$cuerpo" | tail -1); [ "$code" = 409 ] && ok "repetir el mismo alta → 409" || falla "repetir el alta → $code"
     code=$(post -d "$cuerpo" | tail -1); [ "$code" = 401 ] && ok "sin X-Clave-Admin → 401" || falla "sin clave → $code"
     code=$(post -H "X-Clave-Admin: no-es-la-clave-de-nadie-123456" -d "$cuerpo" | tail -1); [ "$code" = 401 ] && ok "con clave incorrecta → 401" || falla "clave incorrecta → $code"

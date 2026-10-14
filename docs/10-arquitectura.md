@@ -1039,6 +1039,24 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     descartes, conexiones, condición abierta y operaciones de aprovisionamiento en curso. Probado plantando la violación en el
     banco (`banco.sh cola`, `docs/16 §22`).
 
+44. **Identidad, cifrado y mínimo privilegio en cada tramo: una regla para todos** (decidido el 13/10/2026, a pregunta del
+    estudiante: «si algo usa usuario y cifrado, ¿no deberían todos?»). Tres reglas, con su porqué, y la tabla de cada tramo en
+    `docs/11 §9`. **(R1) Identidad propia y mínimo privilegio en todo tramo, interno o externo, sin excepción:** cada componente
+    entra con su usuario y solo puede lo que su función exige (dispositivo: publicar en su tópico; recepción: leer `sitio/#`;
+    administrador del broker: órdenes al plugin y `$SYS`; sonda: `$SYS`; base: el rol de la aplicación sin permisos de dueño).
+    Porqué: si una pieza se compromete, el daño queda acotado a lo que esa identidad podía hacer, y cada acción tiene un
+    responsable en los registros. **(R2) Cifrado obligatorio en todo tramo que sale del servidor** (Internet, la red del campus o
+    cualquier red física): TLS en 443 y 8883, terminado en el proxy; vale también para lo que venga después (un ChirpStack externo
+    que publica, un colector de registros, una herramienta que lea la base). Porqué: fuera del servidor no controlamos quién mira
+    el cable. **(R3) Dentro del servidor, entre contenedores de la red interna de Docker, sin cifrado:** ningún puerto interno se
+    publica (solo el proxy); ese tráfico no sale de la memoria del sistema operativo, y quien pudiera leerlo ya es administrador
+    del servidor y leería también las claves y la base. Cifrarlo exigiría un certificado por servicio y su rotación sin cerrar
+    una amenaza real. **Cuándo cambia R3:** el día que un componente se mude a otra máquina, ese tramo pasa a R2 sin discusión.
+    Los registros de Mosquitto y de los demás servicios no viajan: quedan en el disco del servidor (§6); si algún día se
+    centralizan, ese envío cumple R1 y R2. Hecho el 13/10 en el broker: el rol `admin` del plugin, que de fábrica lee todo,
+    quedó acotado a `$CONTROL/dynamic-security/#` y `$SYS/#` (pendiente 87, probado en el banco). Falta en la base: el backend
+    entra como dueño y superusuario (`docs/11 §4` fila 6), lo que viola R1 hasta que exista el rol de la aplicación.
+
 ## 9. Crecimiento, resiliencia y respaldo (aprobado el 06/10/2026)
 
 Esta sección responde a tres preguntas del estudiante: qué pasa si hay que guardar más, cómo y en qué orden

@@ -221,6 +221,26 @@ secretos y los datos se respaldan aparte (`pg_dump` cifrado, gestor de contrase�
 - Todo lo que se pega en un servicio externo sale de la máquina: se aplica el mismo criterio que para
   publicarlo.
 
+## 9. Identidad, cifrado y mínimo privilegio por tramo (13/10/2026; regla en `docs/10 §8.4` punto 44)
+
+R1: identidad propia y mínimo privilegio siempre. R2: TLS en todo tramo que sale del servidor. R3: sin TLS dentro de la red
+interna de Docker, porque no sale del servidor (cambia a R2 si un componente se muda de máquina).
+
+| Tramo | Identidad (R1) | Puede (y nada más) | Cifrado | Estado |
+|---|---|---|---|---|
+| Dispositivo → proxy 8883 → broker | usuario y clave propios por dispositivo | publicar en `sitio/+/dispositivo/<su usuario>/+` | TLS hasta el proxy (R2); interno en claro (R3) | ✅ |
+| Pasarela o servidor de red externo → proxy 8883 → broker | usuario propio por pasarela | publicar bajo su propio árbol (rol `pasarela`, con la ruta LoRaWAN real, por decidir) | TLS (R2) | ⏳ |
+| Persona → proxy 443 → backend | hoy: clave de administrador solo en las rutas que escriben; con la sesión (M7), usuario y rol | lo que su rol permita (`docs/20`) | HTTPS (R2) | 🟡 lecturas sin sesión hasta M7 |
+| Backend → broker (`backend`) | usuario propio | recibir `sitio/#`; nada más | interno (R3) | ✅ |
+| Backend → broker (`backend-admin`) | usuario propio, conexión aparte | órdenes al plugin y leer `$SYS/#` (acotado el 13/10; antes leía todo) | interno (R3) | ✅ |
+| Chequeo de salud → broker (`sonda`) | usuario propio | leer `$SYS/#` | interno (R3) | ✅ |
+| Backend → base | **hoy el dueño `plataforma`, superusuario** | todo: viola R1 | interno (R3) | ❌ fila 6 de §4, pendiente antes de desplegar |
+| Registros de los servicios | — | no viajan: Docker los guarda rotados en el disco del servidor (`docs/10 §6`) | no aplica | ✅ |
+| Herramienta de análisis futura (Grafana, cuaderno) | rol de base de solo lectura | `SELECT` | TLS si está fuera del servidor (R2) | ⏳ Etapa 4 |
+
+Al cambiar las ACL de un rol, el plugin desconecta a los clientes que lo usan para que reconecten con los permisos nuevos:
+observado el 13/10 al acotar `admin` (el backend volvió a estar listo en 2 s, sin intervención).
+
 ## 8. Lista de verificación antes de desplegar en un servidor
 
 Lo que se hizo en desarrollo **no** se traslada tal cual. Antes del primer despliegue fuera del equipo

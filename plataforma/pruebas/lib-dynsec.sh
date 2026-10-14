@@ -54,7 +54,25 @@ rol() {
 # sus negaciones EXPLÍCITAS (publicar en cualquier otro tópico y en $CONTROL, suscribirse a cualquiera) y el acceso por defecto
 # del plugin se fija en deny: así el banco prueba la misma ACL que corre en el servidor (docs/16 §20). «$CONTROL/#» va aparte
 # porque «#» no cubre los tópicos que empiezan con «$».
+# Mínimo privilegio también para el administrador (13/10/2026, pendiente 87; docs/11 §7). `dynsec init` crea el rol `admin` con
+# permiso de suscribirse y recibir TODO (`#`), y backend-admin solo necesita dos cosas: dar órdenes al plugin
+# ($CONTROL/dynamic-security/#) y leer los contadores del broker ($SYS/#). Se quitan las tres ACL amplias; como el acceso por
+# defecto de suscripción es deny (abajo), backend-admin ya no puede suscribirse a sitio/# ni a nada fuera de esos dos árboles.
+# Idempotente: solo quita lo que el rol todavía tiene (getRole), así repetir el inicializador no da error.
+acotar_admin() {
+  local actual tipo
+  actual=$(ctrl getRole admin) || return 1
+  for tipo in subscribePattern publishClientReceive unsubscribePattern; do
+    if grep -qE "^\s*(ACLs:)?\s*$tipo\s*:\s*allow\s*:\s*#\s" <<<"$actual"; then
+      exigir "removeRoleACL admin $tipo #" ctrl removeRoleACL admin "$tipo" '#' || return 1
+    fi
+  done
+  if grep -qE ":\s*#\s" <<<"$(ctrl getRole admin)"; then echo "FALLA el rol admin sigue con una ACL sobre #"; return 1; fi
+  return 0
+}
+
 roles_del_sistema() {
+  acotar_admin || return 1
   exigir "setDefaultACLAccess publishClientSend" ctrl setDefaultACLAccess publishClientSend deny || return 1
   exigir "setDefaultACLAccess subscribe" ctrl setDefaultACLAccess subscribe deny || return 1
   rol recepcion   subscribePattern 'sitio/#' allow  publishClientReceive 'sitio/#' allow \
