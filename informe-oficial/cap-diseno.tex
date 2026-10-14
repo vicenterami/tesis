@@ -19,7 +19,7 @@ el trabajo del compañero —el tópico MQTT— ya se definió en la sección~\r
 \input{figuras/contenedores}
 
 Tres decisiones quedan visibles en la figura. Primero, hay \textbf{dos puntos de entrada siempre y tres a lo
-sumo}: HTTPS para personas (443), MQTT sobre TLS para dispositivos y pasarelas de la ruta B (8883) y, solo
+sumo}: HTTPS para personas (443), MQTT sobre TLS para dispositivos y pasarelas de las rutas B y C (8883) y, solo
 en la ruta A, opcional y punteada, UDP para los \emph{gateways} LoRaWAN (1700). Ese tercer puerto recibe un
 protocolo sin autenticación ni cifrado propios (\emph{Semtech UDP Packet Forwarder}), así que la defensa
 la dan el contenedor sin privilegios y el límite de tasa, no el protocolo. La base de datos y la

@@ -2,7 +2,7 @@
 -- docs/10 §8.4 puntos 24, 25 y 27; modelo en docs/08 §2 y §8).
 --   · sitio.codigo: el segmento del tópico (sitio/<codigo>/…). La ACL deja pasar cualquier sitio en ese nivel (+), así que
 --     el filtro 1 exige que coincida con el sitio registrado del dispositivo (punto 24).
---   · pasarela: la vía LoRaWAN del sistema (ruta B). Su id_fisico es también su usuario del broker.
+--   · pasarela: la vía LoRaWAN del sistema (ruta B; desde el 13/10 también el servidor de red externo de la ruta C). Su id_fisico es también su usuario del broker.
 --   · dispositivo.via, .formato y .pasarela_id, obligatoria si la vía es lorawan (punto 25).
 --   · estado_dispositivo: lo que el sistema escribe en cada trama sale de la fila que edita una persona (punto 27). Sin
 --     disparador de actualizado_en, a propósito: es la excepción declarada a la convención de auditoría (docs/08 §6).

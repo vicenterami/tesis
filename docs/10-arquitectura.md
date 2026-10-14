@@ -13,8 +13,9 @@
 
 Qué piezas ejecutables existen y cómo se hablan. La **frontera** del trabajo es el tópico MQTT: de un
 lado, la red de sensores (lado del compañero: nodos, *gateway* y servidor de red LoRaWAN, que en la ruta
-B, la del sistema, va embebido en la pasarela y en la ruta A, opcional, es un ChirpStack que aunque se aloja en
-nuestro servidor publica al broker como un productor más); del otro, el broker y el backend. **En las figuras,
+B va embebido en la pasarela, en la ruta C es un servidor de red externo, como el ChirpStack de la red del campus, y en la
+ruta A, opcional, es un ChirpStack que aunque se aloja en nuestro servidor publica al broker como un productor más; B y C
+entran igual, por MQTT/TLS 8883 con credencial propia, y solo cambia el adaptador); del otro, el broker y el backend. **En las figuras,
 lo opcional va con borde y flecha punteados** (desde el 07/10/2026). No se
 describe por posición (izquierda/derecha) porque el dibujo lo genera Mermaid y su distribución cambia
 al renderizar; el 23/09/2026 la leyenda del informe decía «a la izquierda… a la derecha» y el dibujo
@@ -28,6 +29,7 @@ flowchart TB
         direction LR
         N1["Nodo sensor LoRa<br/>ESP32 + sensores"] -- "LoRa (radio)" --> GW["Pasarela LoRaWAN"]
         N2["Nodo Wi-Fi o celular<br/>MQTT directo"]
+        NS["Servidor de red externo<br/>ChirpStack del campus (ruta C)"]
     end
 
     subgraph SRV["Servidor del sistema · contenedores Docker"]
@@ -50,7 +52,9 @@ flowchart TB
     end
 
     GW -. "ruta A (opcional): UDP 1700, packet forwarder" .-> RP
-    GW -- "ruta B (la del sistema): servidor de red embebido → MQTT/TLS 8883" --> RP
+    GW -- "ruta B: servidor de red embebido → MQTT/TLS 8883" --> RP
+    GW -- "ruta C: UDP 1700 a la red del campus" --> NS
+    NS -- "ruta C: integración MQTT/TLS 8883" --> RP
     N2 -- "MQTT/TLS 8883" --> RP
     RP -. "UDP 1700 · red interna" .-> CS
     RP -- "MQTT 1883 · red interna" --> MQ
@@ -70,8 +74,9 @@ flowchart TB
 - **Un solo contenedor expuesto (el proxy) y dos puertos siempre, tres a lo sumo:** 443 para personas y
   8883 para dispositivos MQTT, ambos cifrados y siempre presentes; 1700/udp **solo en la ruta A, que es
   opcional** (ChirpStack corriendo en este servidor y pasarelas con *Semtech UDP Packet Forwarder*). En la ruta
-  B, la del sistema (pasarela con servidor de red embebido, §8.4 puntos 2 y 24), o si la red usa un servidor de red
-  externo, el tercer puerto no existe. Los tres los publica el proxy; ningún otro contenedor lleva `ports`. Hoy 1700/udp **no
+  B (pasarela con servidor de red embebido, §8.4 puntos 2 y 24) y en la ruta C (servidor de red externo, como el
+  ChirpStack de la red del campus, §8.4 punto 45), el tercer puerto no existe en este servidor: en la C el 1700 llega al
+  servidor de red del campus, no al nuestro. Los tres los publica el proxy; ningún otro contenedor lleva `ports`. Hoy 1700/udp **no
   aplica**: ChirpStack no está desplegado (§8.3). La base de datos y la interfaz de administración de
   ChirpStack nunca se exponen; su puerto de recepción de pasarelas, cuando exista, sí, porque las pasarelas
   están en el campo, sin VPN, y deben poder alcanzarlo (RNF-10 al revés: aquí es el servidor el que necesita
@@ -85,7 +90,7 @@ flowchart TB
   | 2. Equipo que solo habla HTTP | HTTPS, `POST` con SenML | 443 | Sí | Diseñado (HU-01, Etapa 3) |
   | 3. Pasarela LoRaWAN con servidor de red embebido (Milesight UG6x) | MQTT sobre TLS; JSON decodificado en la pasarela | 8883 | Sí | Decidido el 06/10 (ruta B); ruta real por confirmar con el profesor guía |
   | 4. Pasarela LoRaWAN con *packet forwarder* y ChirpStack en este servidor | Semtech UDP → ChirpStack → MQTT interno | 1700/udp | Sí (UDP) | Ruta A, opcional; ChirpStack no desplegado |
-  | 5. Servidor de red externo (TTN o ChirpStack de la red del campus) | Integración MQTT o HTTP del servidor de red hacia este sistema | 8883 o 443 | Sí | Por evaluar si la red del campus lo usa |
+  | 5. Servidor de red externo (TTN o ChirpStack de la red del campus) | Integración MQTT del servidor de red hacia este sistema | 8883 | Sí | **Ruta C, confirmada el 13/10/2026: la red del campus usa ChirpStack v4 con una pasarela Milesight UG63** (§8.4 punto 45); adaptador `chirpstack` pendiente |
   | 6. Equipo celular (NB-IoT, LTE-M) con cliente MQTT | MQTT sobre TLS; trama JSON o binaria hexadecimal | 8883 | Sí | Candidato (entrevista del 05/10); adaptador binario pendiente |
   | 7. Pasarela con *Basics Station* hacia ChirpStack en este servidor | WebSocket sobre TLS (protocolo LNS), con autenticación TLS de servidor y, opcional, de cliente | 443 o puerto propio (por verificar) | Sí | Verificado el 06/10: el *Gateway Bridge* expone un manejador WebSocket para Basics Station y las pasarelas UG65/UG67 lo traen; reemplazaría el UDP sin autenticar de la ruta A |
 
@@ -124,6 +129,8 @@ flowchart TB
         S1["Nodos LoRa"] -- radio --> G["Gateway"]
         S2["Nodos Wi-Fi"] --> R["Router del sitio\n(NAT, sin puertos abiertos)"]
         G --> R
+        G -- "UDP 1700 (ruta C)" --> NSE["Servidor de red externo\nChirpStack del campus (ruta C)"]
+        NSE -- "MQTT/TLS 8883, saliente" --> R
     end
 
     INET(("Internet"))
@@ -156,8 +163,34 @@ flowchart TB
 | Frontera | Cruza | No cruza | Por qué |
 |---|---|---|---|
 | Sitio → Internet | Conexiones **salientes** de nodos y gateway | Nada entrante | Los dispositivos inician la conexión: no hay que abrir puertos en el router del cliente (RNF-10) |
-| Internet → servidor | 443 (personas) y 8883 (dispositivos y pasarelas de la ruta B), siempre; 1700/udp (gateway) solo en la ruta A | 5432, 1883, 8080, 3000 | Solo se expone lo que necesita hablar con el exterior; todo lo demás vive en la red interna de Docker |
+| Internet → servidor | 443 (personas) y 8883 (dispositivos, pasarelas de la ruta B y servidores de red externos de la ruta C), siempre; 1700/udp (gateway) solo en la ruta A | 5432, 1883, 8080, 3000 | Solo se expone lo que necesita hablar con el exterior; todo lo demás vive en la red interna de Docker |
 | Red interna | Tráfico entre contenedores por nombre de servicio | Acceso desde fuera | La base de datos solo es alcanzable desde el backend |
+
+**Conceptos de la entrada, sin ambigüedad (13/10/2026, a pregunta del estudiante):**
+
+- **Pasarela (*gateway*) LoRaWAN.** Un equipo con radio que escucha a los nodos y reenvía lo que oye por IP (cable, Wi-Fi o
+  celular). No tiene las claves de los nodos ni lee el contenido: el cifrado va del nodo al servidor de aplicación (TS001-1.0.4).
+  Contempladas: la **Milesight UG63 Mini** de la red del campus (8 canales, AU915 sub-banda 2, según su administrador) y las
+  UG65/UG67, evaluadas con su documentación. Sirve para que sensores sin IP, a kilómetros y a batería, lleguen a la red.
+- **Servidor de red LoRaWAN.** El programa que recibe lo que reenvían las pasarelas, quita duplicados (varias pasarelas pueden oír
+  al mismo nodo), maneja el ingreso de cada nodo a la red y sus claves, descifra y entrega cada lectura decodificada en JSON.
+  Siempre existe; lo que cambia es quién lo corre: la propia pasarela (ruta B), la institución (ruta C: el **ChirpStack v4** del
+  campus, que administra su encargado y no nosotros; es un servicio aparte con el que solo acordamos a qué broker publica, con qué
+  CA y con qué credencial) o nosotros (ruta A, opcional).
+- **UDP.** Protocolo de transporte sin conexión: envía y no espera confirmación ni reordena. Es simple y liviano; el *Semtech UDP
+  Packet Forwarder* lo usa entre la pasarela y el servidor de red, sin autenticación ni cifrado propios. Por eso el 1700/udp solo
+  se abre si el servidor de red es nuestro (ruta A) y es una amenaza registrada (`docs/11 §1`).
+- **Proxy inverso.** Recibe conexiones desde fuera y las entrega a un servicio interno. Sabe a dónde mandarlas por su
+  configuración: por **puerto** (`plataforma/proxy/nginx.conf`: el 8883 va al broker en su bloque `stream`, que trabaja con TCP y
+  termina TLS; el 443 va al backend en su bloque `http`, que entiende HTTP) y, dentro del 443, por **nombre** (solo `PROXY_NOMBRE`;
+  otro nombre se rechaza). Existen también el proxy directo (*forward*: lleva a los usuarios de una red hacia Internet, como el
+  de una empresa) y el transparente (intercepta sin que el cliente lo sepa); aquí solo hace falta recibir, así que se usa solo el
+  inverso, y un único producto (nginx, decisión 10) cubre las dos capas. Pasan por él los dispositivos MQTT, las pasarelas de la
+  ruta B, el servidor de red externo de la ruta C y las personas; la pasarela de la ruta C nunca nos habla a nosotros.
+- **Toda vía entra con credencial propia y cifrada** (punto 44): `mqtt`, usuario y clave por dispositivo; `http`, un token por
+  dispositivo; `lorawan`, el nodo se autentica ante su servidor de red con sus claves LoRaWAN, y el intermediario que nos publica
+  (pasarela de la ruta B o servidor de red de la ruta C) entra con su usuario y clave. Registrar cualquiera es lo mismo: el alta
+  declara la vía y el formato, y devuelve lo que corresponde. Sumar un medio nuevo es sumar un adaptador, no rehacer el sistema.
 
 **Sobre las alternativas descartadas:** exponer el broker por WebSocket al navegador (patrón A)
 habría abierto un puerto más y puesto credenciales en el cliente; una VPN habría exigido
@@ -501,7 +534,7 @@ flowchart TB
 | timescaledb (edición Apache, `-oss`) | **todo el dato** | `unless-stopped` | no |
 | backend | ninguna (sin estado) | `unless-stopped` | no (vía proxy) |
 
-**Suma de límites: ~1,6 GB en la ruta B (proxy, broker, backend y base) y ~1,95 GB si se activa la ruta A
+**Suma de límites: ~1,6 GB en las rutas B y C (proxy, broker, backend y base) y ~1,95 GB si se activa la ruta A
 (más ChirpStack con su Redis)** — ambas coherentes con RNF-17 (consumo ≤ 2 GB de RAM en reposo y bajo carga; los límites son
 techos, no consumo). Los límites de recursos cumplen doble función: proteger al servidor y ser el
 **entorno de referencia** del banco de pruebas (`docs/09`). **ChirpStack, si se activa, comparte el servidor PostgreSQL** (una base y un rol propios, aislados de la base de la
@@ -843,7 +876,7 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
 
 **Decisiones del 08/10/2026** (del estudiante, con evidencia y mediciones: `docs/16 §10–11`, `docs/11 §4`).
 
-24. **LoRaWAN es obligatorio y entra por la ruta B** (pasarela con servidor de red embebido → MQTT/TLS 8883). La ruta B
+24. **LoRaWAN es obligatorio y entra por la ruta B** (desde el 13/10/2026, también por la ruta C: punto 45) (pasarela con servidor de red embebido → MQTT/TLS 8883). La ruta B
     deja de ser «la prevista» y pasa a ser la vía LoRaWAN del sistema: entidad `pasarela` (`docs/08 §8`); la pasarela se
     autentica en el broker con su propia credencial y publica solo bajo su tópico, `sitio/<sitio>/pasarela/<id>/<tipo>`
     (el tópico se configura en la pasarela, uno por tipo de dato: guía de usuario del UG65, v2.14, pp. 34-35), y la ACL
@@ -1056,6 +1089,21 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     centralizan, ese envío cumple R1 y R2. Hecho el 13/10 en el broker: el rol `admin` del plugin, que de fábrica lee todo,
     quedó acotado a `$CONTROL/dynamic-security/#` y `$SYS/#` (pendiente 87, probado en el banco). Falta en la base: el backend
     entra como dueño y superusuario (`docs/11 §4` fila 6), lo que viola R1 hasta que exista el rol de la aplicación.
+
+45. **Ruta C: servidor de red externo, la de la red del campus** (decidido el 13/10/2026 con las respuestas del compañero; evidencia
+    en el registro privado RC-01 a RC-13; se agrega, no reemplaza). La red LoRaWAN del campus usa una pasarela Milesight UG63 que
+    envía por UDP 1700 a un ChirpStack v4 de la institución; ese ChirpStack publica cada lectura decodificada por su integración
+    MQTT. La ruta C hace que esa integración publique en nuestro broker por 8883 con TLS (su configuración admite una CA propia:
+    `ca_cert` en `[integration.mqtt]`, documentación oficial de ChirpStack) y con una credencial propia que le da nuestro alta,
+    como a cualquier pasarela (rol `pasarela`, entidad `pasarela`), bajo `sitio/<sitio>/pasarela/<id>/…` (plantilla `event_topic`,
+    misma documentación). **Las tres rutas quedan contempladas:** A (ChirpStack propio en este servidor, opcional), B (servidor de
+    red embebido en la pasarela) y C (servidor de red externo); B y C son las del sistema, entran por el mismo punto y solo cambia
+    el adaptador (`milesight` o `chirpstack`, que se declara en el alta). Porqué C y no A para el campus: un nodo LoRaWAN se une a
+    un solo servidor de red, y la pasarela del campus ya envía al institucional; un ChirpStack nuestro solo serviría con pasarela y
+    nodos propios. La ruta C no abre el 1700/udp en nuestro servidor ni suma contenedores (RNF-17). Lo que no administramos
+    (ChirpStack, sus claves de nodos y su decodificador) lo administra la institución; lo nuestro empieza en el broker. Falta:
+    adaptador `chirpstack` contra el JSON del evento `up` documentado, migración del formato, rol `pasarela`, emulador y la
+    prueba real cuando el servidor sea alcanzable desde la red del campus.
 
 ## 9. Crecimiento, resiliencia y respaldo (aprobado el 06/10/2026)
 

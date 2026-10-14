@@ -3,6 +3,8 @@ flowchart TB
         S1["Nodos LoRa"] -- radio --> G["Gateway"]
         S2["Nodos Wi-Fi"] --> R["Router del sitio\n(NAT, sin puertos abiertos)"]
         G --> R
+        G -- "UDP 1700 (ruta C)" --> NSE["Servidor de red externo\nChirpStack del campus (ruta C)"]
+        NSE -- "MQTT/TLS 8883, saliente" --> R
     end
 
     INET(("Internet"))

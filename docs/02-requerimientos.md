@@ -425,7 +425,7 @@ sección cubre las decisiones restantes de infraestructura.
 **Razón de la selección:** ChirpStack satisface RNF-14 y RNF-15, y su publicación nativa en MQTT
 encaja directamente con RF-02 y RF-03, reduciendo el adaptador de LoRaWAN a un consumidor de tópicos.
 **Actualización del 06/10/2026:** las pasarelas con servidor de red embebido publican al broker por la misma vía
-y sin un contenedor más, así que esa es la ruta B, la del sistema (obligatoria desde el 08/10/2026, `docs/10 §8.4` punto 24), y ChirpStack queda para cuando las pasarelas no
+y sin un contenedor más, así que esa es la ruta B (obligatoria desde el 08/10/2026, `docs/10 §8.4` punto 24; desde el 13/10 se suma la ruta C, servidor de red externo como el ChirpStack del campus, punto 45), y ChirpStack queda para cuando las pasarelas no
 traigan servidor de red propio o se quiera administrar varias desde un punto (ruta A, opcional; `docs/10 §8.4` punto 2).
 
 ## 6.2 Motor de persistencia

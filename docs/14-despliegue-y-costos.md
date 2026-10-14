@@ -15,7 +15,7 @@ los gigabytes, y de los gigabytes casi todo lo demás. Rubros y qué los mueve:
 
 | Rubro | Qué lo mueve | En esta plataforma |
 |---|---|---|
-| Cómputo (vCPU, memoria) | Procesos que corren y su techo de memoria | 4 contenedores en la ruta B (techo 1,6 GB); 5 con ChirpStack si se activa la ruta A (techo 1,95 GB); consumo en reposo ≈ 120 MB medido el 27/09 (base 61, backend 53, broker 8) → **el rubro dominante y el más acotado** |
+| Cómputo (vCPU, memoria) | Procesos que corren y su techo de memoria | 4 contenedores en las rutas B y C (techo 1,6 GB); 5 con ChirpStack si se activa la ruta A (techo 1,95 GB); consumo en reposo ≈ 120 MB medido el 27/09 (base 61, backend 53, broker 8) → **el rubro dominante y el más acotado** |
 | Almacenamiento | Filas × tamaño × retención (sin compresión) | Pequeño (§2) |
 | Registros | Rotación de Docker: 10 MB × 5 por servicio (`docs/11 §4`, 07/10/2026) | ≤ 200 MB en total, fijo |
 | Base de datos gestionada | Solo si se externaliza | No: TimescaleDB va en el mismo servidor (RNF-17) |

@@ -165,7 +165,7 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 **HU-02 — criterios de aceptación** 🎯
 
 - La plataforma recibe el evento a través de la integración del servidor de red, sin conexión directa al nodo.
-- El payload decodificado por el servidor de red (la pasarela en la ruta B, la del sistema; ChirpStack en la ruta A, opcional) se normaliza correctamente al modelo interno (SenML).
+- El payload decodificado por el servidor de red (la pasarela en la ruta B; el servidor de red externo en la ruta C, la del campus; ChirpStack propio en la ruta A, opcional) se normaliza correctamente al modelo interno (SenML).
 - RSSI, SNR, identificador del nodo y gateway quedan asociados al evento (RF-09).
 - Un evento recibido por dos gateways se almacena una sola vez (RF-10).
 - Un payload de longitud o contenido inválido se rechaza sin interrumpir la recepción de los demás (RNF-07).

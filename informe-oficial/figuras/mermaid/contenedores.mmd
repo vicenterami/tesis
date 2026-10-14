@@ -3,6 +3,7 @@ flowchart TB
         direction LR
         N1["Nodo sensor LoRa<br/>ESP32 + sensores"] -- "LoRa (radio)" --> GW["Pasarela LoRaWAN"]
         N2["Nodo Wi-Fi o celular<br/>MQTT directo"]
+        NS["Servidor de red externo<br/>ChirpStack del campus (ruta C)"]
     end
 
     subgraph SRV["Servidor del sistema · contenedores Docker"]
@@ -25,7 +26,9 @@ flowchart TB
     end
 
     GW -. "ruta A (opcional): UDP 1700, packet forwarder" .-> RP
-    GW -- "ruta B (la del sistema): servidor de red embebido → MQTT/TLS 8883" --> RP
+    GW -- "ruta B: servidor de red embebido → MQTT/TLS 8883" --> RP
+    GW -- "ruta C: UDP 1700 a la red del campus" --> NS
+    NS -- "ruta C: integración MQTT/TLS 8883" --> RP
     N2 -- "MQTT/TLS 8883" --> RP
     RP -. "UDP 1700 · red interna" .-> CS
     RP -- "MQTT 1883 · red interna" --> MQ
