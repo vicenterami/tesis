@@ -1,4 +1,5 @@
-import { AvisosAcotados, claveAdmin, claveOpcional, HOSTS_LOCALES, hostsPermitidos, interfazDeEscucha, nombreDeHost, rechazoDeHost, registrosEnJson, servirDocumentacion } from './arranque';
+import {
+  claveApp, AvisosAcotados, claveAdmin, claveOpcional, HOSTS_LOCALES, hostsPermitidos, interfazDeEscucha, nombreDeHost, rechazoDeHost, registrosEnJson, servirDocumentacion } from './arranque';
 
 describe('registrosEnJson (docs/10 §6): JSON en contenedor, texto en desarrollo', () => {
   it('sin variable → texto', () => expect(registrosEnJson(undefined)).toBe(false));
@@ -115,3 +116,14 @@ describe('claveAdmin (docs/10 §8.4 punto 41): ausente = 503 en las rutas que es
     expect(claveOpcional('MQTT_ADMIN_CLAVE', undefined)).toBeUndefined();
   });
 });
+
+describe('claveApp (DB_APP_CLAVE, migración 14): obligatoria, de 24 caracteres o más y nunca la del ejemplo', () => {
+  it('ausente, vacía, corta o «CAMBIAR_ESTA_CLAVE» → el backend no arranca, con el remedio en el mensaje; válida → se usa', () => {
+    expect(() => claveApp(undefined)).toThrow(/base-rol-app\.sh/);
+    expect(() => claveApp('  ')).toThrow(/DB_APP_CLAVE vacía/);
+    expect(() => claveApp('corta')).toThrow(/24 o más/);
+    expect(() => claveApp('CAMBIAR_ESTA_CLAVE_x'.slice(0, 18))).toThrow();
+    expect(claveApp('x'.repeat(32))).toBe('x'.repeat(32));
+  });
+});
+

@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 192 pruebas unitarias, sin matriz formal) y TT-32 (sensor físico);
+cubre todavía: TT-27 (contrato de trama: hoy 193 pruebas unitarias, sin matriz formal) y TT-32 (sensor físico);
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -201,7 +201,7 @@ no confundir atraso con pérdida.
 Ningún contenedor murió por memoria ni tuvo reinicios no pedidos. **Cuidado al leer el contador de descartes del broker:** se
 reinicia con el broker, así que después de un reinicio «0 descartes» no prueba nada; la pérdida la midió el evaluador.
 
-**Lo que falta probar:** el broker de producción (con persistencia y guardado cada 1800 s): un reinicio ordenado guarda la cola
+**Lo que falta probar:** el broker de producción (con persistencia y guardado cada 1800 s en esa fecha; 300 s desde el 13/10): un reinicio ordenado guarda la cola
 al cerrar, una muerte brusca pierde lo encolado desde el último guardado (`docs/10 §4.1`); la caída del proxy; la del servidor
 completo; y la caída del backend con más tráfico que la cola (§10 dice que ahí se descarta).
 
@@ -535,7 +535,7 @@ RF-45; controles en `docs/11 §3`). Qué se probó y cómo:
 | Comprobación | Resultado |
 |---|---|
 | Unitarias, sin broker ni base: 13 pruebas en `baja-rotacion.spec.ts`. Baja: `FOR UPDATE` → estado → credenciales inactivas → condiciones cerradas → evento → `deleteClient` → COMMIT; 409 si ya estaba de baja y 404 si no existe, sin escribir ni tocar el broker; «not found» del plugin cuenta como borrado y se confirma; sin respuesta → 502 con ROLLBACK y nada que deshacer; vía `http` sin orden al broker; vía `mqtt` sin administración → 503 antes de escribir. Rotación: fila nueva con `scrypt` y la anterior inactiva, `setClientPassword` con el secreto antes del COMMIT, el secreto no está en ningún parámetro SQL, `conexion` con tópico y ejemplo como en el alta; 409 de baja y 400 lorawan sin escribir; «not found» → `createClient` con su rol; sin respuesta → 502 con «repetir la rotación»; la base no confirma → 500 con el mismo remedio; 429 con dos operaciones en curso, también para baja y rotación | ✅ 185 en total (`pnpm test`) |
-| `banco.sh alta` ampliado (20 emulados; las 19 comprobaciones del alta y 19 nuevas): rotación → 201 con credencial nueva de 32 caracteres y `Cache-Control: no-store`; con la anterior el broker no deja conectar; con la nueva publica (`RC:0`); 2 filas de `credencial`, 1 activa; evento `rotacion`; sin cabecera → 401. Baja → 200 con estado anterior y credenciales revocadas; con la credencial nueva ya no conecta (cliente borrado); estado `baja` y 0 activas; evento `baja`; el inventario lo lista con estado `baja`; repetir la baja → 409; rotar un dado de baja → 409; UUID inexistente → 404; sin cabecera → 401; ninguna de las dos credenciales aparece en el registro del backend | ✅ 38 de 38 |
+| `banco.sh alta` ampliado (20 emulados; las 19 comprobaciones del alta, 19 nuevas y, desde la tarde, 2 de mínimo privilegio: el administrador del broker ya no puede suscribirse a `sitio/#` (135) y sí a `$SYS`): rotación → 201 con credencial nueva de 32 caracteres y `Cache-Control: no-store`; con la anterior el broker no deja conectar; con la nueva publica (`RC:0`); 2 filas de `credencial`, 1 activa; evento `rotacion`; sin cabecera → 401. Baja → 200 con estado anterior y credenciales revocadas; con la credencial nueva ya no conecta (cliente borrado); estado `baja` y 0 activas; evento `baja`; el inventario lo lista con estado `baja`; repetir la baja → 409; rotar un dado de baja → 409; UUID inexistente → 404; sin cabecera → 401; ninguna de las dos credenciales aparece en el registro del backend | ✅ 40 de 40 |
 | Humo (`api-smoke.sh`): `DELETE` y `POST …/credencial` sin cabecera → 401 (503 sin clave configurada), antes de mirar el UUID; OpenAPI con 9 rutas y 11 operaciones | ✅ |
 
 **Decisiones de implementación (se cambian si no convencen):** la baja cierra las condiciones abiertas, porque nada más iba a
@@ -584,10 +584,25 @@ cabecera del archivo dice qué debe quedar y qué debe mostrar cada pantalla; el
 | Comprobación | Resultado |
 |---|---|
 | Aplicada dos veces seguidas: mismos conteos (reconstruye su escenario y no toca `dev-0001` ni dispositivos reales) | ✅ |
-| 16 comprobaciones en la base (estados, vías, en línea 8 / fuera 2 / nunca visto 1, condiciones, cuarentena, 2 019 mediciones de `demo-aire-01`, un solo pico, ninguna medición fuera de rango, límites, zona horaria, credenciales no verificables) y `en_linea` de los once en `GET /dispositivos` | ✅ 17 de 17 |
+| 15 comprobaciones en la base (estados, vías, en línea 8 / fuera 2 / nunca visto 1, condiciones, cuarentena, 2 019 mediciones de `demo-aire-01`, un solo pico, ninguna medición fuera de rango, límites, zona horaria, credenciales no verificables) y `en_linea` de los once en `GET /dispositivos` | ✅ 16 de 16 |
 | Plantado: un dispositivo silencioso marcado como visto ahora → la comprobación de la API falla nombrándolo | ✅ falla como debe |
 
 **Lo que no cubre:** el recorrido del panel con esta semilla (siguiente paso: anotar cada diferencia como hallazgo); los que
 reportan cada 300 s pasan a «sin comunicación» a los 10 min porque nadie publica (está escrito en la cabecera); ningún dispositivo
 de la semilla tiene cliente en el broker.
+
+## 24. Rol de la aplicación con mínimo privilegio (13/10/2026)
+
+Migración 14 (`docs/10 §8.4` punto 44; `docs/11 §4` fila 6 y §9). El backend entra como `plataforma_app`: solo SELECT, INSERT y UPDATE;
+la retención usa la función `fn_retencion_drop_chunks` del dueño.
+
+| Comprobación | Resultado |
+|---|---|
+| `pruebas/base-rol-app.sh` (banco desde cero): entra por la red con su clave; con otra clave no entra; no es superusuario; lee; se rechazan DELETE, TRUNCATE, DROP, CREATE, ALTER, `drop_chunks` directo, la función con una tabla fuera de la lista y con 7 días para las mediciones; la función recorta `trama` | ✅ |
+| Con el rol nuevo, en el banco: `banco.sh alta` 40 de 40; pipeline con 20 emulados sin pérdida; humo de la API (lecturas, exportación, SSE, cabeceras, guardias); la retención real a los 60 s con 0 fallos; `banco.sh cola`; las sesiones del backend en la base son todas de `plataforma_app` | ✅ (en el humo fallan solo los 2 casos de `/docs`, que el banco no publica) |
+| Guardián, paso 2: el rol no es superusuario ni tiene DELETE o TRUNCATE en ninguna tabla, y la función es `SECURITY DEFINER` y no ejecutable por cualquiera | ✅ |
+| Primera corrida: el alta dio 500 («password authentication failed»). Dos causas: el banco fijaba la clave antes de un `up` que recrea la base en memoria, y la verificación entraba por `127.0.0.1`, que `pg_hba.conf` de la imagen oficial acepta sin clave (`trust`) | corregido: la clave se fija después de ese arranque y se verifica por la IP de la red, más una clave equivocada que debe fallar |
+
+**Lo que no cubre:** el dueño `plataforma` sigue siendo superusuario (lo crea así la imagen oficial; separarlo es de la Etapa 4); la
+pila de desarrollo usa el rol nuevo recién cuando la persona escribe `DB_APP_CLAVE` y corre `base-rol-app.sh`.
 

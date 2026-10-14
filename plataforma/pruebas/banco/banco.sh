@@ -36,7 +36,7 @@ emu() { (cd backend && pnpm -s exec ts-node --transpile-only src/emulador/emulad
 case "${1:-}" in
   encender)
     umask 077
-    { echo "DB_NOMBRE=plataforma"; echo "DB_USUARIO=plataforma"; echo "DB_CLAVE=$(openssl rand -base64 24)"
+    { echo "DB_NOMBRE=plataforma"; echo "DB_USUARIO=plataforma"; echo "DB_CLAVE=$(openssl rand -base64 24)"; echo "DB_APP_CLAVE=$(openssl rand -base64 24)"
       echo "MQTT_BACKEND_CLAVE=$(openssl rand -base64 24)"; echo "MQTT_SONDA_USUARIO=sonda"; echo "MQTT_SONDA_CLAVE=$(openssl rand -base64 24)"
       echo "MQTT_ADMIN_CLAVE=$(openssl rand -base64 24)"; echo "HTTP_CLAVE_ADMIN=$(openssl rand -base64 24)"   # administrador del plugin y clave del alta (docs/10 §8.4 punto 41)
       # capa TLS opcional (banco.sh proxy): puertos +1 y certificados de desarrollo
@@ -55,6 +55,11 @@ case "${1:-}" in
     exigir "createGroup anonimos" ctrl createGroup anonimos && exigir "addGroupRole anonimos emulado" ctrl addGroupRole anonimos emulado && exigir "setAnonymousGroup anonimos" ctrl setAnonymousGroup anonimos || exit 1
     echo "plugin del broker listo: roles $(ctrl listRoles | tr '\n' ' ')· clientes $(ctrl listClients | tr '\n' ' ')· anónimos = grupo con rol emulado (solo en el banco)"
     dc up -d --build || exit 1
+    # Rol de la aplicación (migración 14): el backend entra con él. Va DESPUÉS de este `up`, que recrea la base (en RAM) y la
+    # vuelve a inicializar: fijada antes, la clave se perdía (13/10). Sin clave el backend no queda «healthy». Se espera a que las migraciones terminen (existe el rol) y se
+    # fija su clave de descarte con el mismo guion que usa la persona, que además prueba lo permitido y lo prohibido.
+    for _ in $(seq 1 30); do psql_ -tAq -c "SELECT 1 FROM pg_roles WHERE rolname='plataforma_app'" 2>/dev/null | grep -q 1 && break; sleep 2; done
+    BASE_ENV="$ENV" BASE_DC="docker compose -p banco -f docker-compose.yml -f pruebas/banco/compose.banco.yml --env-file $ENV" bash pruebas/base-rol-app.sh | tail -1 || exit 1
     echo "esperando «healthy» (máx. 90 s)…"
     for _ in $(seq 1 30); do [ -z "$(dc ps --format '{{.Status}}' | grep -v '(healthy)')" ] && break; sleep 3; done
     bash "$YO" estado

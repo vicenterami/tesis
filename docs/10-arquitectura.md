@@ -346,7 +346,7 @@ transporte. Fuente: OASIS, *MQTT Version 5.0*, §4.3 (`mqttoasis` en la bibliogr
 
 | Situación | Qué pasa | Por qué basta |
 |---|---|---|
-| El **backend** cae | El broker conserva en cola los mensajes QoS 1 de `sitio/#` (sesión persistente: `clientId` fijo + `clean: false`, `persistence true` en Mosquitto) y los entrega al reconectar | Nada se pierde mientras el broker viva **y la cola no pase de 1000 mensajes**: es el valor por defecto de `max_queued_messages` en Mosquitto, y los siguientes se descartan en silencio (manual de `mosquitto.conf`). Con el sensor de la demo, cada 5 s, son unos 83 min de backend caído; con 20 sensores cada 60 s, unos 50 min. Fijar el límite según el volumen del sitio queda pendiente (§8); `restart: unless-stopped` levanta el backend en segundos |
+| El **backend** cae | El broker conserva en cola los mensajes QoS 1 de `sitio/#` (sesión persistente: `clientId` fijo + `clean: false`, `persistence true` en Mosquitto) y los entrega al reconectar | Nada se pierde mientras el broker viva **y la cola no pase de 10 000 mensajes o 20 MB** (`max_queued_messages` y `max_queued_bytes`, fijados el 13/10/2026, §8.4 punto 43; los siguientes se descartan en silencio y lo delata la condición `broker_descarte`). Con el sensor de la demo, cada 5 s, son unas 14 h de backend caído; con 20 sensores cada 60 s, unas 8 h; `restart: unless-stopped` levanta el backend en segundos |
 | El **broker** cae | Docker lo reinicia; el backend reintenta cada 2 s. Los nodos Wi-Fi con QoS 1 reintentan la publicación; ChirpStack reintenta según su integración | El broker es la pieza más simple y estable de la pila; su caída es corta |
 | La **base** cae | El INSERT falla; el manejador reintenta el mismo mensaje (1, 2, 4 y 8 s) y, si sigue fallando, **no confirma** al broker y reconecta: con sesión persistente el broker lo reenvía al volver y el índice único absorbe la repetición. Mientras tanto, los demás mensajes esperan en la cola del broker (`max_queued_messages`). Nada se pierde en silencio: cada reintento queda en el registro (decisión 4, 07/10/2026) |
 | La misma trama llega **dos veces** (reentrega QoS 1 tras reconexión; nodo que reenvía su cola) | El INSERT es idempotente: índice único `(canal_id, tiempo)` + `ON CONFLICT DO NOTHING`; la repetida se ignora y **no** vuelve a evaluar umbrales | «Al menos una vez» + operación idempotente = efecto de exactamente una |
@@ -1059,7 +1059,8 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     topes explícitos y alarma:** `max_queued_messages 10000`, `max_queued_bytes 20971520` (20 MB) y `autosave_interval 300` en
     `mosquitto.conf` (aplicados el 13/10/2026; antes regían 1000, sin tope y 1800 s): con 50 dispositivos cada 5 s son ≈ 17 min de backend caído antes de perder
     algo, bajo el techo de 256 MB del contenedor; cuando `publish/messages/dropped` crece entre dos muestras, o `store/messages/count`
-    supera el 80 % del tope, se abre una condición del sistema (nueva, sin dispositivo) que viaja por el canal en vivo y se cierra
+    supera el 80 % del tope (ese contador es el almacén entero del broker, no solo la cola del backend: puede avisar de más, nunca de
+    menos; la señal autoritativa de pérdida son los descartes), se abre una condición del sistema (nueva, sin dispositivo) que viaja por el canal en vivo y se cierra
     sola al normalizarse. Orden de implementación: topes y muestreo con alarma en la Etapa 3 (protegen datos: 2 h); `auditoria`,
     middleware e `id_peticion` al abrir la Etapa 4 junto con la sesión (3 h), porque «quién» necesita el usuario; la ruta de lectura (Etapa 4)
     y la pantalla después. Se mide la sobrecarga del middleware en el banco antes de dejarlo (`docs/16`). **Hecho el 13/10/2026 (la parte de la Etapa 3):**
@@ -1087,8 +1088,15 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     una amenaza real. **Cuándo cambia R3:** el día que un componente se mude a otra máquina, ese tramo pasa a R2 sin discusión.
     Los registros de Mosquitto y de los demás servicios no viajan: quedan en el disco del servidor (§6); si algún día se
     centralizan, ese envío cumple R1 y R2. Hecho el 13/10 en el broker: el rol `admin` del plugin, que de fábrica lee todo,
-    quedó acotado a `$CONTROL/dynamic-security/#` y `$SYS/#` (pendiente 87, probado en el banco). Falta en la base: el backend
-    entra como dueño y superusuario (`docs/11 §4` fila 6), lo que viola R1 hasta que exista el rol de la aplicación.
+    quedó acotado a `$CONTROL/dynamic-security/#` y `$SYS/#` (pendiente 87, probado en el banco). En la base, hecho el 13/10
+    (migración 14): el backend entra como `plataforma_app`, que solo lee, inserta y actualiza (ni DELETE, ni TRUNCATE, ni DDL);
+    el dueño queda para migraciones y semillas. La retención, que usa `drop_chunks` y este exige ser dueño de la hypertable, pasa
+    por una sola función del dueño (`fn_retencion_drop_chunks`, `SECURITY DEFINER`, lista blanca de cuatro tablas, mínimo de días,
+    `search_path` fijo) que la aplicación solo puede ejecutar. Se eligió así frente a un proceso aparte con el dueño (un
+    contenedor más, RNF-17) porque la única puerta con permiso de dueño queda en diez líneas revisables. Probado en el banco:
+    `pruebas/base-rol-app.sh` (lo permitido entra y lo prohibido se rechaza) y la API completa, el alta, el pipeline, la cola y
+    la retención con el rol nuevo (`docs/16 §24`). Riesgo que queda: el dueño sigue siendo superusuario (la imagen oficial lo crea
+    así); separarlo es de la Etapa 4.
 
 45. **Ruta C: servidor de red externo, la de la red del campus** (decidido el 13/10/2026 con las respuestas del compañero; evidencia
     en el registro privado RC-01 a RC-13; se agrega, no reemplaza). La red LoRaWAN del campus usa una pasarela Milesight UG63 que

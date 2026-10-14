@@ -114,7 +114,8 @@ export class RetencionService implements OnModuleInit, OnModuleDestroy {
       await cliente.query('BEGIN');
       await cliente.query("SET LOCAL lock_timeout = '5s'");
       const r = await cliente.query<{ n: string }>(
-        'SELECT count(*) AS n FROM drop_chunks($1::regclass, older_than => now() - make_interval(days => $2))',
+        // drop_chunks exige ser dueño de la hypertable; la aplicación no lo es (migración 14): lo hace la función acotada del dueño.
+        'SELECT fn_retencion_drop_chunks($1, $2) AS n',
         [tabla, dias],
       );
       await cliente.query('COMMIT');

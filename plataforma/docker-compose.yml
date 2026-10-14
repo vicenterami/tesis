@@ -86,8 +86,10 @@ services:
       - no-new-privileges:true
     environment:
       DB_NOMBRE: ${DB_NOMBRE}
-      DB_USUARIO: ${DB_USUARIO}
-      DB_CLAVE: ${DB_CLAVE}
+      # El backend entra con el rol de la aplicación (migración 14), nunca con el dueño de la base (docs/10 §8.4 punto 44). La clave la
+      # escribe la persona en el .env y la fija en la base `pruebas/base-rol-app.sh`; vacía, el backend no arranca y dice por qué.
+      DB_APP_USUARIO: plataforma_app
+      DB_APP_CLAVE: ${DB_APP_CLAVE:-}
       DB_HOST: timescaledb                        # nombre del servicio en la red interna (docs/10 §6)
       MQTT_URL: mqtt://mosquitto:1883
       MQTT_BACKEND_CLAVE: ${MQTT_BACKEND_CLAVE}

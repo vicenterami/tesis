@@ -52,11 +52,13 @@ export class DynsecService implements OnModuleInit, OnModuleDestroy {
     });
     this.cliente.on('offline', () => {
       this.listo = false;
+      this.ultimas.clear(); // sin conexión, los contadores viejos no son una muestra (revisión del 13/10)
       this.log.warn('administración del broker fuera de línea; reintentando');
       this.admin.cancelarTodo('broker fuera de línea');
     });
     this.cliente.on('close', () => {
       this.listo = false;
+      this.ultimas.clear();
     });
     this.cliente.on('error', (e) => this.log.error(`administración del broker: ${e.message}`));
   }

@@ -139,7 +139,7 @@ para esta plataforma todas convergen en el tópico MQTT.}
 Broker MQTT & Mosquitto & C, $\sim$10\,MB de RAM, TLS y autenticación; EMQX/HiveMQ apuntan a millones de conexiones: desproporcionados \\
 Persistencia & TimescaleDB & Un solo motor relacional y de series; InfluxDB obligaría a operar dos bases \\
 Backend & TypeScript + NestJS & Tipos de la trama definidos una sola vez para backend y panel; módulos 1:1 con M1--M8; OpenAPI automático \\
-Rama LoRa & Servidor de red de la pasarela; ChirpStack, opcional & Rutas B y C: la pasarela o el servidor de red del campus publican en MQTT sin contenedor ni puerto extra. Ruta A: ChirpStack, autoalojable, publica en MQTT. Ambas convergen a la vía principal \\
+Rama LoRa & Servidor de red de la pasarela; ChirpStack, opcional & Rutas B y C: la pasarela o el servidor de red del campus publican en MQTT sin contenedor ni puerto extra. Ruta A: ChirpStack, autoalojable, publica en MQTT. Todas convergen a la vía principal \\
 Despliegue & Contenedores Docker & Reproducible con un comando; reinicio automático; la Etapa 4 exige demostrar en condiciones realistas \\
 Interfaz (frontend) & Svelte + uPlot & Artefacto liviano sin \emph{virtual DOM}, coherente con la meta de RNF-17; gráficos de series de tiempo de pocos kilobytes; se confirmó en la Etapa 2 (cuadro~\ref{tab:frontend}) \\
 \bottomrule

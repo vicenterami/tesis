@@ -24,7 +24,7 @@ src/
 ├── alta/                      # HU-11: POST /dispositivos, DELETE /dispositivos/:id y POST /dispositivos/:id/credencial (guardia X-Clave-Admin, validación, transacción + cliente del broker, scrypt)
 ├── broker/dynsec*.ts          # administración del plugin Dynamic Security por $CONTROL (identidad backend-admin, conexión propia); recibe los contadores $SYS
 ├── broker/metricas*.ts        # cola del broker vigilada: muestra por minuto en metrica_broker y condición del sistema broker_descarte (docs/10 §8.4 punto 43)
-├── retencion/                 # borra con drop_chunks lo vencido de medicion, trama y cuarentena
+├── retencion/                 # borra lo vencido de medicion, trama, cuarentena y metrica_broker por la función acotada fn_retencion_drop_chunks (migración 14)
 ├── openapi.ts                 # contrato OpenAPI generado desde los decoradores; /docs
 └── salud/salud.controller.ts  # GET /salud: base, cola del broker (descartes, condición abierta) y aprovisionamiento en curso
 panel/                         # el panel (Svelte + Vite; docs/19): paquete del mismo workspace de pnpm
@@ -153,7 +153,7 @@ docker compose exec timescaledb psql -U plataforma -d plataforma -c "SELECT tipo
 
 `SUPERVISION_INTERVALO_S` en el `.env` cambia la frecuencia del barrido (60 s por defecto).
 
-Pendientes del pipeline: adaptador «milesight» (ruta B, la del sistema) y, solo si se activa la ruta A, el de ChirpStack;
+Pendientes del pipeline: adaptador «milesight» (ruta B) y «chirpstack» (ruta C, la red del campus; el mismo sirve si se activa la ruta A);
 notificación de condiciones por correo (al panel ya llegan por el canal en vivo, más abajo).
 
 ## API de consulta (M5)

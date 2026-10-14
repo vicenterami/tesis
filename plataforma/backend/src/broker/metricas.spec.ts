@@ -116,5 +116,8 @@ describe('MetricasBrokerService: muestra, abre con descartes, cierra tras dos mu
     expect(sql).toHaveLength(0);
     expect(servicio.estado().ultima_muestra).toBeNull();
     expect(() => armar({ tope: '0' })).toThrow(/METRICA_BROKER_COLA_TOPE/);
+    const desconectado = { conectado: false, disponible: false, contadores: () => new Map([['mensajes_descartados', 9], ['mensajes_en_cola', 0], ['bytes_en_cola', 0], ['clientes_conectados', 1]]) } as unknown as DynsecService;
+    const s3 = new MetricasBrokerService({ query: () => Promise.reject(new Error('no debía consultar')) } as unknown as Pool, desconectado, new EventosService(), { get: () => undefined } as unknown as ConfigService);
+    expect(await s3.muestrear(new Date())).toBeNull(); // contadores viejos con el broker caído: ni se guardan ni se evalúan
   });
 });

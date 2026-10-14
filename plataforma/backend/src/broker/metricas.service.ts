@@ -65,6 +65,7 @@ export class MetricasBrokerService implements OnModuleInit, OnModuleDestroy {
 
   // Una muestra: persistir, comparar con la anterior (la última guardada, si este proceso acaba de arrancar), abrir o cerrar.
   async muestrear(ahora: Date): Promise<Evaluacion | null> {
+    if (!this.dynsec.conectado) return null; // sin conexión no hay datos frescos: no se guarda ni se evalúa nada rancio
     const m = armarMuestra(this.dynsec.contadores(), ahora);
     if (m === null) {
       if (this.dynsec.conectado) this.log.warn('sin muestra del broker: los contadores $SYS aún no llegaron (¿sys_interval, o el rol no lee $SYS/#?)');

@@ -33,7 +33,7 @@
                 "schema": {
                   "type": "string"
                 },
-                "example": "event: medicion\ndata: {\"tipo\":\"medicion\",\"dispositivo_id\":\"<uuid>\",\"canal_id\":\"<uuid>\",\"valor\":21.5,\"unidad\":\"Cel\",\"tiempo\":\"2026-10-09T15:00:00.000Z\"}\n\nevent: visto\ndata: {\"tipo\":\"visto\",\"dispositivo_id\":\"<uuid>\",\"tiempo\":\"2026-10-09T15:00:00.000Z\"}\n\nevent: condicion\ndata: {\"tipo\":\"condicion\",\"dispositivo_id\":\"<uuid>\",\"condicion\":\"umbral\",\"estado\":\"abierta\"}\n\nevent: latido\ndata: {\"tiempo\":\"2026-10-09T15:00:25.000Z\"}\n\n"
+                "example": "event: medicion\ndata: {\"tipo\":\"medicion\",\"dispositivo_id\":\"<uuid>\",\"canal_id\":\"<uuid>\",\"valor\":21.5,\"unidad\":\"Cel\",\"tiempo\":\"2026-10-09T15:00:00.000Z\"}\n\nevent: visto\ndata: {\"tipo\":\"visto\",\"dispositivo_id\":\"<uuid>\",\"tiempo\":\"2026-10-09T15:00:00.000Z\"}\n\nevent: condicion\ndata: {\"tipo\":\"condicion\",\"dispositivo_id\":\"<uuid>\",\"condicion\":\"umbral\",\"estado\":\"abierta\"}\n\nevent: sistema\ndata: {\"tipo\":\"sistema\",\"condicion\":\"broker_descarte\",\"estado\":\"abierta\",\"motivos\":[\"descartes\"],\"mensajes_en_cola\":120,\"descartes_delta\":57}\n\nevent: latido\ndata: {\"tiempo\":\"2026-10-09T15:00:25.000Z\"}\n\n"
               }
             }
           },
@@ -194,6 +194,9 @@
           "409": {
             "description": "El id_fisico ya existe (en la base o, huérfano, en el broker)"
           },
+          "429": {
+            "description": "Ya hay 2 operaciones de aprovisionamiento en curso (alta, baja o rotación); reintentar en un momento"
+          },
           "502": {
             "description": "El broker no aceptó la credencial; nada quedó creado"
           },
@@ -273,6 +276,9 @@
           },
           "409": {
             "description": "Ya estaba dado de baja"
+          },
+          "429": {
+            "description": "Ya hay 2 operaciones de aprovisionamiento en curso (alta, baja o rotación); reintentar en un momento"
           },
           "502": {
             "description": "El broker no confirmó el borrado del cliente; nada cambió en la base"
@@ -506,10 +512,10 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": "{ estado, base, tablas }"
+            "description": "{ estado, base, tablas, broker: { conectado, administracion, ultima_muestra, mensajes_descartados, mensajes_en_cola, bytes_en_cola, clientes_conectados, cola_tope, condicion_abierta }, aprovisionamiento_en_curso }"
           }
         },
-        "summary": "Estado del servicio y de su conexión a la base",
+        "summary": "Estado del servicio, de su conexión a la base y de la cola del broker",
         "tags": [
           "salud"
         ]
@@ -554,6 +560,9 @@
           },
           "409": {
             "description": "Está dado de baja"
+          },
+          "429": {
+            "description": "Ya hay 2 operaciones de aprovisionamiento en curso (alta, baja o rotación); reintentar en un momento"
           },
           "502": {
             "description": "El broker no confirmó la clave nueva; nada cambió en la base (repetir la rotación)"

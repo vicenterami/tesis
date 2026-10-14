@@ -11,7 +11,7 @@ import { join } from 'node:path';
 import type { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
-import { AvisosAcotados, hostsPermitidos, interfazDeEscucha, rechazoDeHost, registrosEnJson, servirDocumentacion, claveAdmin } from './arranque';
+import { AvisosAcotados, hostsPermitidos, interfazDeEscucha, rechazoDeHost, registrosEnJson, servirDocumentacion, claveAdmin, claveApp } from './arranque';
 import { configurarOpenApi } from './openapi';
 
 // Punto de entrada. Levanta la aplicación Nest: al iniciarse, cada módulo se conecta a lo suyo
@@ -21,6 +21,10 @@ async function arrancar(): Promise<void> {
   const logger = new ConsoleLogger({ json: registrosEnJson(process.env.LOG_FORMATO), logLevels: ['log', 'warn', 'error'] });
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { logger });
   const log = new Logger('arranque');
+  // Sin la clave del rol de la aplicación (migración 14) el servidor no arranca y dice qué hacer. Después de crear la aplicación
+  // (ConfigModule ya cargó el .env en una ejecución local) y no en el módulo de la base, para que `pnpm openapi`, que arma la
+  // aplicación sin base, no la necesite. El pool no abre conexiones hasta la primera consulta.
+  claveApp(process.env.DB_APP_CLAVE);
   // Apagado ordenado (docs/10 §6): sin esto Nest no escucha SIGTERM, Docker espera 10 s y mata el proceso
   // (código 137), y los cierres de cada módulo —suscripción al broker, supervisor, pool de la base— no corren.
   app.enableShutdownHooks();

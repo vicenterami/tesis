@@ -106,3 +106,14 @@ export function claveOpcional(nombre: string, valor: string | undefined): string
 export function claveAdmin(valor: string | undefined): string | undefined {
   return claveOpcional('HTTP_CLAVE_ADMIN', valor);
 }
+
+// Clave del rol de la aplicación en la base (migración 14; docs/10 §8.4 punto 44). Obligatoria: sin ella el backend no arranca y dice
+// qué hacer, en vez de fallar después con un «password authentication failed» que no explica nada.
+export function claveApp(valor: string | undefined): string {
+  const v = claveOpcional('DB_APP_CLAVE', valor);
+  if (v === undefined || v === 'CAMBIAR_ESTA_CLAVE') {
+    throw new Error('DB_APP_CLAVE vacía o sin cambiar: escribirla en el .env (24 caracteres o más) y correr pruebas/base-rol-app.sh');
+  }
+  return v;
+}
+

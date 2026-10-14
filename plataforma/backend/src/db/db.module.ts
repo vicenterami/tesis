@@ -19,8 +19,9 @@ export const POOL = 'POOL_POSTGRES';
           host: config.get<string>('DB_HOST', '127.0.0.1'),
           port: config.get<number>('DB_PUERTO', 5432),
           database: config.getOrThrow<string>('DB_NOMBRE'),
-          user: config.getOrThrow<string>('DB_USUARIO'),
-          password: config.getOrThrow<string>('DB_CLAVE'),
+          // El rol de la aplicación, no el dueño (migración 14; docs/10 §8.4 punto 44): solo SELECT, INSERT y UPDATE.
+          user: config.get<string>('DB_APP_USUARIO', 'plataforma_app'), // el nombre que crea la migración 14
+          password: config.get<string>('DB_APP_CLAVE', ''), // validada al arrancar (main.ts, claveApp)
           max: 5,
         });
         pool.on('error', (e) => new Logger('db').error(`error en el pool: ${e.message}`));

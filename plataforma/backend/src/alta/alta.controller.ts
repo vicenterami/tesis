@@ -11,7 +11,8 @@ import { ClaveAdminGuard } from './clave-admin.guard';
 import { uuid } from '../consulta/validacion';
 
 // Aprovisionamiento por API (docs/10 §3, §8.4 puntos 41 y 42; docs/19 P7 «Propuesta»): POST /dispositivos (HU-11, RF-19),
-// DELETE /dispositivos/{id} (baja) y POST /dispositivos/{id}/credencial (rotación, RF-45). La guardia corre antes que la
+// DELETE /dispositivos/{id} (baja) y POST /dispositivos/{id}/credencial (rotación por dispositivo; RF-45 pide rotar la credencial de recepción de un SITIO sin
+// interrumpir el servicio, que aún no existe: esta la interrumpe para ese dispositivo hasta que cargue la nueva). La guardia corre antes que la
 // validación: sin la clave no se aprende ni la forma del cuerpo ni si el identificador existe.
 @ApiTags('dispositivos')
 @Controller('dispositivos')
@@ -60,6 +61,7 @@ export class AltaController {
   @ApiConflictResponse({ description: 'El id_fisico ya existe (en la base o, huérfano, en el broker)' })
   @ApiResponse({ status: 502, description: 'El broker no aceptó la credencial; nada quedó creado' })
   @ApiResponse({ status: 503, description: 'Sin clave de administrador configurada, o sin conexión de administración con el broker' })
+  @ApiResponse({ status: 429, description: 'Ya hay 2 operaciones de aprovisionamiento en curso (alta, baja o rotación); reintentar en un momento' })
   async crear(@Body() cuerpo: unknown, @Res({ passthrough: true }) res: Response): Promise<DispositivoCreado> {
     const a: AltaValidada = validarAlta(cuerpo, this.reservados);
     res.setHeader('Cache-Control', 'no-store'); // la respuesta lleva una credencial: ningún proxy ni navegador la guarda
@@ -84,6 +86,7 @@ export class AltaController {
   @ApiConflictResponse({ description: 'Ya estaba dado de baja' })
   @ApiResponse({ status: 502, description: 'El broker no confirmó el borrado del cliente; nada cambió en la base' })
   @ApiResponse({ status: 503, description: 'Sin clave de administrador configurada, sin conexión de administración con el broker, u otra operación sobre el mismo dispositivo en curso' })
+  @ApiResponse({ status: 429, description: 'Ya hay 2 operaciones de aprovisionamiento en curso (alta, baja o rotación); reintentar en un momento' })
   darDeBaja(@Param('id') id: string): Promise<DispositivoDadoDeBaja> {
     return this.alta.darDeBaja(uuid(id, 'dispositivo'));
   }
@@ -107,6 +110,7 @@ export class AltaController {
   @ApiConflictResponse({ description: 'Está dado de baja' })
   @ApiResponse({ status: 502, description: 'El broker no confirmó la clave nueva; nada cambió en la base (repetir la rotación)' })
   @ApiResponse({ status: 503, description: 'Sin clave de administrador configurada, sin conexión de administración con el broker, u otra operación sobre el mismo dispositivo en curso' })
+  @ApiResponse({ status: 429, description: 'Ya hay 2 operaciones de aprovisionamiento en curso (alta, baja o rotación); reintentar en un momento' })
   async rotar(@Param('id') id: string, @Res({ passthrough: true }) res: Response): Promise<CredencialRotada> {
     const dispositivoId = uuid(id, 'dispositivo');
     res.setHeader('Cache-Control', 'no-store'); // la respuesta lleva una credencial: ningún proxy ni navegador la guarda

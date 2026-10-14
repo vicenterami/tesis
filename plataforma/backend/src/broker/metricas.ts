@@ -13,7 +13,10 @@ export type Contador = keyof typeof TOPICOS_SYS;
 export const OBLIGATORIOS: Contador[] = ['mensajes_descartados', 'mensajes_en_cola', 'bytes_en_cola', 'clientes_conectados'];
 
 // Tope de la cola por cliente que fija mosquitto.conf (`max_queued_messages 10000`): el guardián 2l comprueba que los dos
-// números coincidan. Por encima del 80 % se avisa antes de perder.
+// números coincidan. Ojo: `store/messages/count` cuenta el almacén ENTERO del broker (todas las sesiones y los retenidos),
+// no la cola de la sesión del backend; como esa cola está contenida en el total, «total < 80 % del tope» garantiza que la del
+// backend también lo está. Al revés no: con muchos retenidos o muchas sesiones puede avisar de más (falso positivo, nunca
+// silencio). La señal autoritativa de pérdida es el contador de descartes.
 export const COLA_TOPE_POR_DEFECTO = 10000;
 export const FRACCION_AVISO = 0.8;
 

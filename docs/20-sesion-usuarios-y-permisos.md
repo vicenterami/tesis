@@ -94,7 +94,7 @@
 | `POST /sesion`, `DELETE /sesion` (Etapa 4) | 200 / 401 | 200 | 200 | — |
 | `GET /dispositivos`, `GET /dispositivos/{id}`, `GET /canales/{id}/historico`, `GET /condiciones`, `GET /cuarentena`, `GET /eventos` | 401 | 200 (solo sus sitios en la lista; filtro por sitio en el `WHERE`) | 200 | 404 |
 | `GET /dispositivos/{id}/exportar` | 401 | 403 (exportar exige administrador: punto 6, datos crudos no públicos) | 200 | 404 |
-| `POST /dispositivos` (Etapa 3), `PATCH /dispositivos/{id}`, `PUT /canales/{id}/reglas`, mudanza (Etapa 4) | 401 | 403 | 200 / 409 | 404 |
+| `POST /dispositivos`, `DELETE /dispositivos/{id}`, `POST /dispositivos/{id}/credencial` (Etapa 3), `PATCH /dispositivos/{id}`, `PUT /canales/{id}/reglas`, mudanza (Etapa 4) | 401 | 403 | 200 / 409 | 404 |
 | `POST /usuarios`, `PATCH /usuarios/{id}`, enlaces públicos (Etapa 4) | 401 | 403 | 200 | 404 |
 
 ## 7. Vista pública por enlace
