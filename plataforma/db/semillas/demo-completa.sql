@@ -7,7 +7,7 @@
 -- RESULTADO ESPERADO al terminar (lo comprueba semilla-demo.sh --completa; «ahora» = el momento de la corrida):
 --   sitios     2: «uct» (America/Santiago) y «magallanes» (America/Punta_Arenas: otra zona horaria, sin horario de verano)
 --   zonas      Laboratorio (de demo.sql), Invernadero y Parcela norte en uct; Caseta en magallanes
---   pasarelas  2 en uct: demo-pasarela-01 activa y demo-pasarela-02 INACTIVA (un alta lorawan con ella debe dar 400)
+--   pasarelas  2 en uct, ambas formato milesight (migración 15): demo-pasarela-01 activa y demo-pasarela-02 INACTIVA (un alta lorawan con ella debe dar 400)
 --   dispositivos de la semilla: 11
 --     id_fisico            vía/formato        estado         en_linea  abiertas  qué prueba
 --     demo-aire-01         mqtt/senml         activo         sí        0         30 días por hora, hueco de 2 días, un pico de 38,5 °C con su condición cerrada; 2 credenciales (1 rotada)
@@ -58,9 +58,9 @@ INSERT INTO zona (id, sitio_id, nombre) VALUES
   ('00000000-0000-0000-0000-0000000000a3', '00000000-0000-0000-0000-000000000001', 'Parcela norte'),
   ('00000000-0000-0000-0000-0000000000a4', '00000000-0000-0000-0000-0000000000a1', 'Caseta')
   ON CONFLICT DO NOTHING;
-INSERT INTO pasarela (sitio_id, id_fisico, nombre, activo) VALUES
-  ('00000000-0000-0000-0000-000000000001', 'demo-pasarela-01', 'Pasarela de demostración (techo del pabellón)', true),
-  ('00000000-0000-0000-0000-000000000001', 'demo-pasarela-02', 'Pasarela retirada', false);
+INSERT INTO pasarela (sitio_id, id_fisico, nombre, activo, formato) VALUES
+  ('00000000-0000-0000-0000-000000000001', 'demo-pasarela-01', 'Pasarela de demostración (techo del pabellón)', true, 'milesight'),
+  ('00000000-0000-0000-0000-000000000001', 'demo-pasarela-02', 'Pasarela retirada', false, 'milesight');
 
 -- ── 2. Dispositivos ─────────────────────────────────────────────────────────────────────────────────────────────────
 INSERT INTO dispositivo (zona_id, id_fisico, nombre, estado, intervalo_esperado_s, via, formato, pasarela_id, creado_en)

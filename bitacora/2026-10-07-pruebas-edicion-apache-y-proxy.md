@@ -1,6 +1,6 @@
 # Pruebas iniciales, edición Apache y proxy — 7 de octubre de 2026
 
-- **Sesión de trabajo individual** (noche del 6 y día 7); origen: las decisiones 10 a 15 del 06/10. Todo el código
+- **Sesión de trabajo individual** (6 y 7 de octubre); origen: las decisiones 10 a 15 del 06/10. Todo el código
   siguió al diseño documentado; cada cambio entró con su prueba y con la violación plantada para ver la falla.
 
 ## Implementado (detalle en `docs/10 §8.4`, puntos 16 a 23; `docs/16`)

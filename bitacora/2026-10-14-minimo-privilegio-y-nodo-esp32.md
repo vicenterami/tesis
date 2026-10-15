@@ -1,6 +1,6 @@
 # Mínimo privilegio en la base, figuras por vía de entrada y primera conexión del nodo ESP32 — 14 de octubre de 2026
 
-- **Sesión de trabajo individual (madrugada).** Se terminó el rol de la aplicación con mínimo privilegio, se reorganizaron las
+- **Sesión de trabajo individual.** Se terminó el rol de la aplicación con mínimo privilegio, se reorganizaron las
   figuras de contenedores y red por vía de entrada, se midió el costo del canal en vivo y se conectó por primera vez la placa del
   nodo de prueba. Lo medido está en `docs/16 §24` y `§25`; la placa, en `docs/17 §3`.
 

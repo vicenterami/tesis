@@ -10,9 +10,13 @@ sequenceDiagram
     participant Q as Cuarentena
 
     MQ->>F1: trama cruda<br/>+ tópico + identidad
-    alt tópico fuera del patrón sitio/…/dispositivo/…/…
+    alt tópico fuera de los dos patrones<br/>(…/dispositivo/id/magnitud, …/pasarela/id/deveui/evento)
         F1->>Q: guarda cruda, motivo "malformada"<br/>(sin identidad: no hay a quién marcar vivo)
-    else dispositivo no registrado o dado de baja
+    else pasarela no registrada, inactiva o de otro sitio
+        F1->>Q: guarda cruda, motivo "no_registrado"
+    else evento de pasarela distinto de "up"
+        Note right of F1: se cuenta en el registro<br/>(no es trama: no se escribe)
+    else dispositivo no registrado, dado de baja<br/>o nodo ajeno a su pasarela
         F1->>Q: guarda cruda, motivo "no_registrado" o "dado_de_baja"
     else conocido y no dado de baja
         F1->>F2: trama + dispositivo

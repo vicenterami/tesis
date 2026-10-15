@@ -34,7 +34,7 @@
 | Verificación automática también en el servidor de integración, con tiempo máximo | `.github/workflows/verificar.yml` |
 | Hábitos de demostración: «datos de prueba» antes del número; el límite real como respuesta | `docs/15` |
 
-## 4. Laboratorio de entrega (15/09, madrugada) y un error que solo se ve ejecutando
+## 4. Laboratorio de entrega (15/09) y un error que solo se ve ejecutando
 
 Con el backend apagado se publicaron dos tramas; al encenderlo, el broker entregó ambas (la cola
 persistente funciona). Pero la segunda se descartó como «duplicada»: ninguna traía marca de tiempo,

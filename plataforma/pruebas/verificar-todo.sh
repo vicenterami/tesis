@@ -42,12 +42,12 @@ docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -X -U p
   < plataforma/db/pruebas/convenciones.sql | tee "$VT"/convenciones.txt
 exige "$VT"/convenciones.txt "${PIPESTATUS[0]}" 7 || fallos=$((fallos+1))
 
-paso "1c. Reglas de identidad de la migración 11, plantadas en una transacción que se deshace (docs/10 §8.4 punto 24)"
+paso "1c. Reglas de identidad de las migraciones 11 y 15, plantadas en una transacción que se deshace (docs/10 §8.4 puntos 24 y 47)"
 # Pasarela y dispositivo no comparten identificador; lista blanca; LoRaWAN exige pasarela; código de sitio válido. Nada
 # queda en la base: el archivo termina en ROLLBACK. La carrera de dos altas simultáneas se probó a mano (docs/16 §13).
 docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -X -U plataforma -d plataforma -v ON_ERROR_STOP=1 -tA \
   < plataforma/db/pruebas/reglas-identidad.sql | tee "$VT"/identidad.txt
-exige "$VT"/identidad.txt "${PIPESTATUS[0]}" 7 || fallos=$((fallos+1))
+exige "$VT"/identidad.txt "${PIPESTATUS[0]}" 12 || fallos=$((fallos+1))
 
 paso "2. Migraciones aplicadas = archivos en db/init (cada NN-*.sql debe estar reflejado en la base)"
 # 02: índice por regla · 03: zona_horaria · 04: iso_utc · 05: convenciones (disparadores actualizado_en, pm2_5) · 06: índice único de medicion · 07: CHECK de cuarentena.motivo · 08: medicion.recibido_en y origen_tiempo · 09: trama y cuarentena como hypertables · 10: semántica de intervalo_esperado_s · 11: vía, pasarela, estado_dispositivo y sitio.codigo · 12: nombre ck_cuarentena_motivo
@@ -66,8 +66,9 @@ SELECT CASE WHEN (SELECT count(*) FROM information_schema.tables WHERE table_sch
 SELECT CASE WHEN EXISTS (SELECT 1 FROM pg_constraint WHERE conname='ck_cuarentena_motivo' AND conrelid='cuarentena'::regclass) AND NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='cuarentena_motivo_chk') THEN 'OK    12 ck_cuarentena_motivo: el CHECK de motivos con el nombre de la convención' ELSE 'FALLA 12 falta renombrar cuarentena_motivo_chk (db/init/12-convenciones-cuarentena.sql)' END;
 SELECT CASE WHEN (SELECT count(*) FROM timescaledb_information.hypertables WHERE hypertable_name='metrica_broker')=1 AND (SELECT count(*) FROM pg_indexes WHERE tablename='condicion_sistema' AND indexname='uq_condicion_sistema_abierta')=1 AND (SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname='ck_condicion_sistema_tipo') LIKE '%broker_descarte%' THEN 'OK    13 metrica_broker es hypertable; condicion_sistema con una abierta por tipo y dominio cerrado' ELSE 'FALLA 13 falta metrica_broker (hypertable) o condicion_sistema (índice único parcial o CHECK)' END;
 SELECT CASE WHEN (SELECT count(*) FROM pg_roles WHERE rolname='plataforma_app' AND NOT rolsuper AND NOT rolcreaterole AND NOT rolcreatedb)=1 AND NOT EXISTS (SELECT 1 FROM information_schema.role_table_grants WHERE grantee='plataforma_app' AND privilege_type IN ('DELETE','TRUNCATE','REFERENCES','TRIGGER')) AND NOT has_table_privilege('plataforma_app', 'evento', 'UPDATE') AND NOT has_table_privilege('plataforma_app', 'medicion', 'UPDATE') AND NOT has_table_privilege('plataforma_app', 'magnitud', 'INSERT') AND has_table_privilege('plataforma_app', 'estado_dispositivo', 'UPDATE') AND (SELECT prosecdef FROM pg_proc WHERE proname='fn_retencion_drop_chunks') AND NOT has_function_privilege('public', 'fn_retencion_drop_chunks(text,integer)', 'EXECUTE') THEN 'OK    14 plataforma_app sin superusuario, sin DELETE/TRUNCATE, sin reescribir evento ni medicion; fn_retencion_drop_chunks SECURITY DEFINER y no ejecutable por PUBLIC' ELSE 'FALLA 14 rol de la aplicación con más permisos de los debidos, o falta la función de retención' END;
+SELECT CASE WHEN (SELECT is_nullable='NO' AND column_default IS NULL FROM information_schema.columns WHERE table_name='pasarela' AND column_name='formato') AND (SELECT pg_get_constraintdef(oid) LIKE '%chirpstack%' FROM pg_constraint WHERE conname='ck_dispositivo_formato' AND conrelid='dispositivo'::regclass) AND EXISTS (SELECT 1 FROM pg_constraint WHERE conname='ck_dispositivo_via_formato' AND conrelid='dispositivo'::regclass) AND EXISTS (SELECT 1 FROM pg_constraint WHERE conname='fk_dispositivo_pasarela_formato' AND conrelid='dispositivo'::regclass AND contype='f' AND confupdtype='c') THEN 'OK    15 pasarela.formato declarado (sin valor por defecto) y heredado por sus nodos (clave foránea compuesta en cascada)' ELSE 'FALLA 15 falta pasarela.formato o la herencia del formato (migración 15)' END;
 SQL
-exige "$VT"/mig.txt "${PIPESTATUS[0]}" 14 || fallos=$((fallos+1))
+exige "$VT"/mig.txt "${PIPESTATUS[0]}" 15 || fallos=$((fallos+1))
 # Toda migración en disco debe tener su comprobación arriba: una 08 nueva sin comprobación falla aquí,
 # no solo por el conteo en prosa del paso 2g.
 sin_chequeo=$(ls plataforma/db/init/ | grep -oE '^[0-9]{2}' | while read -r nn; do grep -q "^OK    $nn \|^FALLA $nn " "$VT"/mig.txt || echo "$nn"; done)
@@ -130,6 +131,13 @@ else
   else echo "OK    ningún término de la lista privada ($(wc -l < "$VT"/2f-lista.txt) patrones) en $n archivos versionados o nuevos"; fi
 fi
 
+paso "2f2. Bitácoras sin horario personal: ni «(madrugada)» ni «(tarde…)» ni «(noche)» (revisión del 15/10)"
+# La regla de privacidad prohíbe horarios personales en el repositorio; las bitácoras los dejaban en el título de la sesión.
+horarios=$(grep -nE '\((madrugada|tarde|noche)[^)]*\)|, (madrugada|tarde|noche)\)' bitacora/*.md)
+nb=$(ls bitacora/*.md | wc -l)
+if [ -n "$horarios" ]; then echo "FALLA bitácoras con horario personal:"; echo "$horarios" | cut -c1-120 | sed 's/^/  /'; fallos=$((fallos+1))
+else echo "OK    $nb bitácoras revisadas, ninguna dice a qué hora se trabajó"; fi
+
 paso "2g. Migraciones citadas en prosa (docs e informe) == archivos NN-*.sql en disco"
 # Hallazgo del 26/09: informe y docs/12 decían «6 migraciones» cuando ya había 7 en disco (la 07 del 23/09).
 n_disco=$(ls plataforma/db/init/*.sql | wc -l)
@@ -139,6 +147,16 @@ if [ "$citadas" = "$n_disco" ]; then
 else
   echo "FALLA disco tiene $n_disco migraciones; prosa dice: $(echo "$citadas" | tr '\n' ' ')"
   fallos=$((fallos+1))
+fi
+# 15/10 (revisión del diseño): el conteo no ve «migración 15» escrita antes de que exista el archivo. Ninguna prosa cita una
+# migración posterior a la última en disco, salvo en una línea que diga «prevista» (diseño escrito antes del código).
+ultima=$(ls plataforma/db/init/ | grep -oE '^[0-9]{2}' | sort -n | tail -1)
+futuras=$(grep -rnoE 'migraci[oó]n [0-9]{2}\b' docs informe-oficial --include=*.md --include=*.tex | grep -v prevista \
+  | while IFS= read -r m; do nn=${m##* }; [ "$((10#$nn))" -gt "$((10#${ultima:-0}))" ] && echo "$m"; done)
+if [ -n "$futuras" ]; then
+  echo "FALLA prosa que cita una migración posterior a la última en disco ($ultima):"; echo "$futuras" | sed 's/^/  /'; fallos=$((fallos+1))
+else
+  echo "OK    ninguna prosa cita una migración posterior a la $ultima"
 fi
 
 paso "2h. Rutas HTTP citadas en prosa (glosario, docs/10, docs/12, docs/15) == rutas reales del OpenAPI"
@@ -161,19 +179,28 @@ else
   echo "OK    $(echo "$rutas_citadas" | grep -c .) rutas citadas en docs e informe, todas existen en el OpenAPI"
 fi
 # 15/10: una ruta diseñada y aún no servida se cita con la marca «(ruta prevista)» en la misma línea (p. ej. `POST /pasarelas`
-# (ruta prevista)); se acepta sin existir, pero la excepción se vacía sola: si esa ruta YA existe en el OpenAPI, la marca venció
-# y el guardián exige quitarla (lección del kit: guardianes con excepciones que se vacían). Las marcas «(Etapa 3/4)» y «Propuesta»
-# siguen siendo de pantallas y propuestas (docs/19, docs/20): citan rutas que pueden existir, así que no se les exige nada.
-rutas_marcadas=$(grep -rhE '(GET|POST|PUT|PATCH|DELETE) /[a-zA-Z0-9_{}/.\\-]*' informe-oficial docs --include=*.tex --include=*.md --include=*.mmd \
-  | grep -E '\(ruta prevista\)' | grep -oE '(GET|POST|PUT|PATCH|DELETE) /[a-zA-Z0-9_{}/.\\-]*' \
-  | sed -E 's/^(GET|POST|PUT|PATCH|DELETE) //; s/\\\{/{/g; s/\\\}/}/g; s/\{[^}]*\}/@P@/g; s/[.,}]+$//; s/@P@/{p}/g' \
-  | sort -u)
-vencidas=$(comm -12 <(echo "$rutas_marcadas") <(echo "$rutas_reales"))
-if [ -n "$vencidas" ]; then
-  echo "FALLA rutas marcadas «(ruta prevista)» que ya existen en el OpenAPI: quitar la marca"; echo "$vencidas" | sed 's/^/  /'
+# (ruta prevista)); se acepta sin existir, pero la excepción se vacía sola: si ese VERBO y esa ruta ya existen en el OpenAPI, la
+# marca venció y el guardián exige quitarla (lección del kit de método: guardianes con excepciones que se vacían). Revisión del
+# 15/10: (a) la marca exime la línea entera, así que una línea marcada lleva UNA sola ruta (con dos, la no prevista se saltaba el
+# chequeo de arriba); (b) se compara verbo y ruta, no solo la ruta: que exista GET /x no vence la marca de POST /x. Las marcas
+# «(Etapa 3/4)» y «Propuesta» son de pantallas y propuestas (docs/19, docs/20): citan rutas que pueden existir, sin exigencia.
+lineas_marcadas=$(grep -rnE '\(ruta prevista\)' informe-oficial docs --include=*.tex --include=*.md --include=*.mmd)
+dobles=$(printf '%s\n' "$lineas_marcadas" | grep . | while IFS= read -r l; do
+  k=$(grep -oE '(GET|POST|PUT|PATCH|DELETE) /' <<<"$l" | wc -l); [ "$k" -eq 1 ] || echo "$(cut -d: -f1,2 <<<"$l") ($k rutas)"; done)
+metodos_reales=$(jq -r '.paths|to_entries[]|.key as $p|.value|keys[]|select(test("^(get|post|put|patch|delete)$"))|ascii_upcase+" "+$p' \
+  plataforma/backend/openapi.json | sed -E 's/\{[^}]*\}/{p}/g' | sort -u)
+rutas_marcadas=$(printf '%s\n' "$lineas_marcadas" | grep -oE '(GET|POST|PUT|PATCH|DELETE) /[a-zA-Z0-9_{}/.\\-]*' \
+  | sed -E 's/\\\{/{/g; s/\\\}/}/g; s/\{[^}]*\}/@P@/g; s/[.,}]+$//; s/@P@/{p}/g' | sort -u)
+vencidas=$(comm -12 <(echo "$rutas_marcadas") <(echo "$metodos_reales"))
+if [ -n "$dobles" ]; then
+  echo "FALLA línea marcada «(ruta prevista)» con más de una ruta (la marca exime la línea entera):"; echo "$dobles" | sed 's/^/  /'
   fallos=$((fallos+1))
-else
-  echo "OK    $(echo "$rutas_marcadas" | grep -c .) ruta(s) marcadas «(ruta prevista)» y ninguna existe todavía en el OpenAPI: $(echo "$rutas_marcadas" | tr '\n' ' ')"
+fi
+if [ -n "$vencidas" ]; then
+  echo "FALLA rutas marcadas «(ruta prevista)» que ya existen en el OpenAPI con ese verbo: quitar la marca"; echo "$vencidas" | sed 's/^/  /'
+  fallos=$((fallos+1))
+elif [ -z "$dobles" ]; then
+  echo "OK    $(echo "$rutas_marcadas" | grep -c .) ruta(s) marcadas «(ruta prevista)», una por línea, ninguna servida todavía: $(echo "$rutas_marcadas" | tr '\n' ' ')"
 fi
 
 paso "2i. Credenciales del broker en el plugin Dynamic Security: configuración, archivo del plugin (1883/600) y roles y clientes del sistema (docs/10 §8.4 punto 42; docs/11 §7)"

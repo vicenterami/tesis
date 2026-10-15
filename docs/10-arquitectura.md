@@ -330,9 +330,13 @@ sequenceDiagram
     participant Q as Cuarentena
 
     MQ->>F1: trama cruda<br/>+ tópico + identidad
-    alt tópico fuera del patrón sitio/…/dispositivo/…/…
+    alt tópico fuera de los dos patrones<br/>(…/dispositivo/id/magnitud, …/pasarela/id/deveui/evento)
         F1->>Q: guarda cruda, motivo "malformada"<br/>(sin identidad: no hay a quién marcar vivo)
-    else dispositivo no registrado o dado de baja
+    else pasarela no registrada, inactiva o de otro sitio
+        F1->>Q: guarda cruda, motivo "no_registrado"
+    else evento de pasarela distinto de "up"
+        Note right of F1: se cuenta en el registro<br/>(no es trama: no se escribe)
+    else dispositivo no registrado, dado de baja<br/>o nodo ajeno a su pasarela
         F1->>Q: guarda cruda, motivo "no_registrado" o "dado_de_baja"
     else conocido y no dado de baja
         F1->>F2: trama + dispositivo
@@ -423,8 +427,8 @@ HTTPS a `/salud` hizo descartar unos 2 800 de un tráfico que sin él se guardab
 | El **tópico no cumple ninguno de los dos patrones** (`sitio/<sitio>/dispositivo/<id>/<magnitud>`; `sitio/<sitio>/pasarela/<id>/<deveui>/<evento>` desde §8.4 punto 47) | Cuarentena `malformada` con el detalle «tópico fuera del patrón», **antes** del filtro 1; el dispositivo **no** se marca vivo | Sin identidad no hay a quién atribuir la señal de vida; comparte el motivo `malformada` con el filtro 2 y se distingue por el detalle (decisión 23/09: no abrir un cuarto motivo por esto) |
 | El tópico trae un **sitio distinto del registrado** para ese dispositivo | Cuarentena `no_registrado` con el detalle «registrado en el sitio X, no en Y»; el dispositivo **no** se marca vivo: no pasó el filtro 1 | La ACL acepta cualquier sitio en ese nivel (`+`): sin esta comparación, un dispositivo podría publicar bajo el sitio de otra sede (punto 24, migración 11) |
 | El tópico es de **pasarela** y la pasarela no está registrada, está inactiva o es de otro sitio (§8.4 punto 47) | Cuarentena `no_registrado` con el detalle («pasarela X sin alta», «inactiva», «registrada en el sitio X, no en Y»); nadie se marca vivo | La ACL acota a la pasarela a su propio árbol (`%u`), pero no sabe de altas ni de sitios: eso lo sabe la base (§8.4 puntos 24 y 47) |
-| El tópico es de pasarela y el **DevEUI no está asociado a esa pasarela** en el alta, o el nodo está dado de baja | Cuarentena `no_registrado` («DevEUI X no está asociado a la pasarela Y») o `dado_de_baja`; la pasarela sí se marca vista, el nodo no | Una pasarela comprometida no puede publicar por nodos ajenos (A9 de `docs/11`); un nodo nuevo que aún no se dio de alta queda a la vista en la cuarentena |
-| El evento de la pasarela **no es `up`** (`join`, `ack`, `status`, `log`, `location`, o un tipo de dato de Milesight que no es el uplink) | Se cuenta en el registro y marca a la pasarela como vista; no es trama ni va a cuarentena | No es un dato de sensor; llevarlo al historial del dispositivo es de la Etapa 4 (HU-15; §8.4 punto 47) |
+| El tópico es de pasarela y el **DevEUI no está asociado a esa pasarela** en el alta, o el nodo está dado de baja | Cuarentena `no_registrado` («DevEUI X no está asociado a la pasarela Y») o `dado_de_baja`; nadie se marca vivo: el nodo no pasó el filtro 1 | Una pasarela comprometida no puede publicar por nodos ajenos (A9 de `docs/11`); un nodo nuevo que aún no se dio de alta queda a la vista en la cuarentena |
+| El evento de la pasarela **no es `up`** (`join`, `ack`, `status`, `log`, `location`, o un tipo de dato de Milesight que no es el uplink) | Se cuenta en el registro; no es trama, no va a cuarentena y no se escribe en la base (punto 27: la fila de la pasarela la edita una persona) | No es un dato de sensor; llevarlo al historial del dispositivo es de la Etapa 4 (HU-15; §8.4 punto 47) |
 | La trama **no calza con el formato declarado** (SenML a un dispositivo `plano`, un `up` sin `object`, un JSON de Milesight sin códec) | Cuarentena `malformada` con el detalle «formato declarado X: …» y, en LoRaWAN, qué activar (decodificador en ChirpStack; códec y Metadata en la pasarela); el dispositivo se marca vivo | Desde §8.4 punto 47 el filtro 2 no adivina: el formato lo declara el alta del dispositivo o, en la vía `lorawan`, su pasarela |
 | El **DevEUI del cuerpo no coincide con el del tópico** | Cuarentena `malformada` («DevEUI del cuerpo X ≠ tópico Y»); el nodo del tópico no se marca vivo | Señal de configuración cruzada en el servidor de red; nunca se atribuye un dato a un nodo por el cuerpo solo |
 | **Dos lecturas del mismo canal en la misma trama**, sin marca de tiempo | Se guardan ambas, con instantes de recepción distintos (microsegundos) | Sin marca del emisor no hay identidad de lectura (fila anterior); si un nodo repite un canal por error, corregirlo es del firmware, no de la plataforma. Limitación aceptada el 23/09 |
@@ -981,8 +985,9 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     y clave en el broker (punto 26); `http`, un token; `lorawan`, ninguna propia (la autentica su pasarela). El alta y la
     carga masiva ofrecen la vía en palabras simples y entregan los datos de conexión listos para copiar. El modelo
     interno sigue siendo único (`docs/08 §1`): cambia cómo se identifica y autentica un dispositivo, no cómo se guarda
-    lo que envía. Modelo en `docs/08 §8`; secuencia en §3. Esquema aplicado en la migración 11 (08/10); desde el punto 47 (15/10) el filtro 2 usa el
-    formato declarado y, en la vía `lorawan`, el formato lo fija la pasarela y el nodo lo hereda.
+    lo que envía. Modelo en `docs/08 §8`; secuencia en §3. Esquema aplicado en la migración 11 (08/10); con el punto 47 (15/10; en implementación) el filtro 2 pasa a usar
+    el formato declarado: `senml` o `plano` para un dispositivo directo; en la vía `lorawan`, el de su pasarela, que el nodo hereda
+    (migración 15).
 26. **Credenciales del broker administradas por el backend con el plugin Dynamic Security de Mosquitto 2.x**,
     condicionado a una prueba en un contenedor desechable (instalación, administrador inicial y ACL por rol). El backend
     crea, deshabilita y borra clientes por `$CONTROL/dynamic-security/v1` sin reiniciar el broker: el alta y la baja
@@ -999,8 +1004,8 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     es `UPDATE … WHERE id = $1 AND actualizado_en = $2`: si otra persona cambió el dato entretanto, responde 409 y el
     panel pide recargar; nunca se retiene una fila mientras alguien piensa. La validación vive en la misma función que
     la vista previa. Cada cambio deja un `evento` con quién, qué, antes y después; el «antes» se lee con
-    `SELECT … FOR UPDATE` dentro de la misma transacción (sin eso, dos ediciones simultáneas registran el mismo
-    «antes»). Una condición abierta se reevalúa con la trama siguiente. Va en la segunda pantalla del panel.
+    `SELECT … FOR NO KEY UPDATE` dentro de la misma transacción (sin eso, dos ediciones simultáneas registran el mismo
+    «antes»; `NO KEY` porque ninguna edición cambia una clave y así las tramas del dispositivo no esperan: `docs/16 §26`). Una condición abierta se reevalúa con la trama siguiente. Va en la segunda pantalla del panel.
 29. **Picos y ataques: nunca una pérdida silenciosa.** Medido (`docs/16 §10`): sin pérdida hasta 409 tramas/s; por
     encima de unas 490/s, o con un aluvión de peticiones a `/salud`, el broker descartaba sin aviso. Se implementan:
     límites por IP en el proxy (`limit_req`, `limit_conn`) y un `/salud` público que no consulta la base; topes de cola
@@ -1197,7 +1202,8 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
 46. **El canal en vivo del panel migra de SSE a WebSocket** (decidido el 14/10/2026 por el estudiante; **diseño, aún no
     implementado**: hasta que el código cambie, el canal en servicio es el SSE de `/eventos` y el punto 1 sigue rigiendo).
     Motivo: dejar el canal listo para ida y vuelta (órdenes desde el panel, edición en vivo) con el estándar más usado para tiempo
-    real. Lo que NO motiva el cambio: el rendimiento por conexión, que es del mismo orden en ambos (`docs/16 §25`); por eso se
+    real. Lo que NO motiva el cambio: el rendimiento por conexión, que se espera del mismo orden en ambos (no medido: `docs/16 §25`
+    midió solo el SSE); por eso se
     medirá WebSocket con la misma prueba y se comparará antes de retirar el SSE. Alcance: solo el canal del panel; MQTT sigue para
     los dispositivos y REST para consultar y escribir. Lo que el diseño debe resolver antes del código, cada cosa con su prueba:
     (a) **mismo puerto y mismo certificado**: 443 con `Upgrade` (RFC 6455 §1.7), en un bloque `location` propio del proxy que pase
@@ -1211,27 +1217,39 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     las 22 del canal pasan a WebSocket, el humo y el banco miden lo mismo que `docs/16 §25`, y el panel (P2, P3) cambia de cliente.
 
 47. **Adaptadores LoRaWAN: despacho por el formato declarado, tópico de pasarela y mapa de claves** (decidido el 15/10/2026 con las
-    fuentes oficiales de ChirpStack v4 y de la pasarela Milesight UG63, registro privado CS-01…11 y B-42…50; **en implementación**).
-    Las rutas B y C entran por el mismo tópico, `sitio/<sitio>/pasarela/<id_pasarela>/<deveui>/<evento>`: ChirpStack lo produce con
-    su plantilla `event_topic` y la pasarela Milesight con el comodín `$devEUI`. El filtro 1 toma del tópico la pasarela (registrada,
-    activa y del sitio) y el nodo (su DevEUI en `id_fisico`, asociado a esa pasarela en el alta); solo el evento `up` sigue al
-    filtro 2; los demás (`join`, `ack`, `status`…) se cuentan y marcan a la pasarela como vista. **El formato lo declara la pasarela**
-    (`pasarela.formato`: `milesight` o `chirpstack`, migración 15) y sus nodos lo heredan en el alta; el filtro 2 usa el formato
-    declarado para todos los dispositivos (se termina de aplicar el punto 25): una trama que no calza va a cuarentena `malformada`
-    diciendo qué formato se esperaba. El adaptador `chirpstack` lee `deviceInfo.devEui` (debe coincidir con el tópico), `time`
-    (marca del servidor de red, regla 17 de `docs/13`) y las claves de `object`; el `milesight`, el JSON con códec y Metadata
-    (`devEUI` más los valores decodificados; sin códec, cuarentena «activar Payload Codec y Metadata»). Las claves decodificadas
-    se traducen a magnitudes con un **mapa** único, en la unidad canónica del catálogo, consumido por una sola función
-    (`resolverClave`) que los adaptadores reciben: **hoy el mapa vive en el código** (`mapa-claves.ts`: `temperature` →
-    temperatura, `humidity` → humedad, `battery` → batería, `pressure` → presión), porque solo hay dos decodificadores que
-    importen y nadie puede editar el catálogo todavía; **pasa al catálogo** (`magnitud.alias`, sembrado desde esa misma lista) cuando
-    el panel administre magnitudes (Etapa 4, pantalla de configuración de `docs/19`): es la regla de `docs/08 §4`, y la función
-    cambia de implementación sin tocar los adaptadores. Lo que no está en el mapa se ignora y se cuenta. `rssi` y `snr` quedan en la
-    trama cruda para HU-15. La pasarela se da de alta, rota y da de baja por API (`/pasarelas`), con credencial propia y rol
-    `pasarela`: publica solo bajo su árbol y se suscribe solo a su subárbol de comandos, porque la integración de ChirpStack se
-    suscribe a él (registro privado CS-08). Se prueba con el emulador (JSON exacto de ambas fuentes), en el banco
-    (`banco.sh lorawan`) y en terreno apenas una pasarela alcance al servidor (`docs/14`; prueba en la misma red local prevista
-    para la semana del 20/10/2026).
+    fuentes oficiales de ChirpStack v4 y de la pasarela Milesight UG63, registro privado CS-01…11 y B-42…50; **en implementación**:
+    lo que sigue es lo que el código debe cumplir). Las rutas B y C entran por el mismo tópico,
+    `sitio/<sitio>/pasarela/<id_pasarela>/<deveui>/<evento>`: ChirpStack lo produce con su plantilla `event_topic` y la pasarela
+    Milesight con el comodín `$devEUI`. **Orden del filtro 1 para ese tópico:** (i) la pasarela debe estar registrada, activa y en
+    el sitio del tópico; si no, cuarentena `no_registrado` con cualquier evento, porque es una credencial publicando donde no le
+    corresponde (señal de seguridad, no de datos); (ii) un evento distinto de `up` (`join`, `ack`, `status`…) se cuenta en el
+    registro y termina ahí, sin escribir en la base: la «última vez vista» de una pasarela se deriva de sus nodos, porque escribirla
+    en `pasarela` con cada trama movería el `actualizado_en` de una fila que edita una persona, lo que prohíbe el punto 27 (un estado
+    propio, si hace falta, llega con HU-15); (iii) en un `up`, el DevEUI del tópico, en minúsculas como exige `id_fisico`, debe ser
+    un nodo asociado a esa pasarela y no dado de baja; si no, cuarentena `no_registrado` o `dado_de_baja`. Recién entonces sigue el
+    filtro 2. **El formato lo declara la pasarela** (`pasarela.formato`: `milesight` o `chirpstack`, migración 15) y el nodo lo copia
+    al darse de alta: la base garantiza que sean iguales con una clave foránea compuesta `(pasarela_id, formato)` →
+    `pasarela (id, formato)` en cascada, y un dispositivo directo (`mqtt`, `http`) solo puede declarar `senml` o `plano`. El filtro 2
+    usa el formato declarado para todos los dispositivos (con este punto se termina de aplicar el 25): una trama que no calza va a
+    cuarentena `malformada` diciendo qué formato se esperaba. El adaptador `chirpstack` lee `deviceInfo.devEui` (en minúsculas; si no
+    coincide con el tópico, cuarentena `malformada` y el nodo no se marca vivo: §4.1), `time` (marca del servidor de red, regla 17 de
+    `docs/13`) y las claves de `object`; el `milesight`, el JSON con códec y Metadata (`devEUI` más los valores decodificados; sin
+    códec, cuarentena «activar Payload Codec y Metadata»). Las claves decodificadas se traducen a magnitudes con un **mapa** único,
+    en la unidad canónica del catálogo, consumido por una sola función (`resolverClave`) que los adaptadores reciben: **hoy el mapa
+    vive en el código** (`mapa-claves.ts`: `temperature` → temperatura, `humidity` → humedad, `battery` → batería, `pressure` →
+    presión), porque solo hay dos decodificadores que importen y nadie puede editar el catálogo todavía; **pasa al catálogo**
+    (`magnitud.alias`, sembrado desde esa misma lista) cuando el panel administre magnitudes (Etapa 4, pantalla de configuración de
+    `docs/19`): es la regla de `docs/08 §4`, y la función cambia de implementación sin tocar los adaptadores. Una clave que no está en
+    el mapa se ignora y se cuenta en la línea de registro de la trama; un `up` sin ninguna clave del mapa va a cuarentena
+    `malformada` («ninguna clave conocida») y el nodo se marca vivo, como con cualquier trama malformada de un dispositivo
+    autenticado (§4). `rssi` y `snr` quedan en la trama cruda para HU-15. La pasarela se da de alta, rota y da de baja por API
+    (`/pasarelas`), con credencial propia y rol `pasarela`: publica solo bajo su árbol y se suscribe solo a su subárbol de comandos.
+    La suscripción se permite porque la configuración oficial de ChirpStack dice del tópico de comandos «This is the topic on which
+    the MQTT subscribes for receiving (enqueue) commands» (https://www.chirpstack.io/docs/chirpstack/configuration.html, consultada
+    el 15/10/2026); cómo reacciona si se le niega no está documentado y queda por probar. Se prueba con el emulador (JSON exacto de
+    ambas fuentes), en el banco (`banco.sh lorawan`) y en terreno apenas una pasarela alcance al servidor (`docs/14`; prueba en la
+    misma red local prevista para la semana del 20/10/2026). **La prueba en terreno entra por el 8883 del proxy, con TLS y la CA
+    propia** (regla R2 del punto 44), nunca por el 1883: por ahí la credencial de la pasarela viajaría en claro por la red.
 
 ## 9. Crecimiento, resiliencia y respaldo (aprobado el 06/10/2026)
 

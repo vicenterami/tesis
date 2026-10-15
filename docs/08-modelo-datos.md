@@ -23,7 +23,7 @@ uniformidad es la que resuelve la causa C1 (formatos dispares).
 | 1 | **sitio** | Organización o instalación que agrupa dispositivos | Declara su **zona horaria** (IANA) y su **código**, el segmento del tópico (`sitio/<codigo>/…`, migración 11); el caso de validación es el Campus Dr. Luis Rivas del Canto (código `uct`) |
 | 2 | **zona** | Subdivisión lógica de un sitio (edificio, sector, sala) | Un sitio tiene muchas zonas |
 | 3 | **magnitud** | Catálogo de lo que se puede medir (temperatura, humedad, nivel…) | Define la unidad canónica y el rango válido |
-| 4 | **dispositivo** | Un nodo físico que reporta (ESP32, sensor LoRa…) | Pertenece a una zona; se identifica por un id físico (MAC/DevEUI, lista blanca `[a-z0-9-]`); declara su **vía** (mqtt, http, lorawan), su **formato** (`senml`, `plano`, `milesight`, `chirpstack`; en la vía lorawan lo hereda de su pasarela) y, si llega por LoRaWAN, su **pasarela** (migraciones 11 y 15) |
+| 4 | **dispositivo** | Un nodo físico que reporta (ESP32, sensor LoRa…) | Pertenece a una zona; se identifica por un id físico (MAC/DevEUI, lista blanca `[a-z0-9-]`); declara su **vía** (mqtt, http, lorawan), su **formato** (`senml` o `plano` si llega directo; en la vía lorawan, el de su pasarela: `milesight` o `chirpstack`) y, si llega por LoRaWAN, su **pasarela** (migraciones 11 y 15) |
 | 5 | **canal** | Una magnitud concreta que un dispositivo reporta | Un dispositivo puede tener varios canales (temp + humedad) |
 | 6 | **credencial** | Secreto de autenticación de un dispositivo | Permite rotación sin borrar el dispositivo |
 | 7 | **medicion** | Una lectura: valor + unidad + tiempo | **Hypertable** de TimescaleDB (serie de tiempo) |
@@ -34,7 +34,7 @@ uniformidad es la que resuelve la causa C1 (formatos dispares).
 | 12 | **usuario** | Persona que accede a la plataforma | Con hash de contraseña, nunca en claro |
 | 13 | **usuario_sitio** | Qué usuario puede ver qué sitio y con qué rol | Multi-tenencia: aísla los datos entre sitios |
 | 14 | **trama** | Trama cruda de un mensaje aceptado (al menos una lectura guardada) | **Hypertable**, solo inserción, retención 30 días: auditoría y re-decodificación si un adaptador tuvo un error (migración 09) |
-| 15 | **pasarela** | Quien publica en nombre de los nodos LoRaWAN: una pasarela con servidor de red embebido (ruta B) o un servidor de red externo (ruta C, `docs/10 §8.4` punto 45) | Una sirve a muchos nodos; su id físico es su usuario del broker, único también frente a los dispositivos (migración 11); **declara el formato** de lo que publica (`milesight` o `chirpstack`, migración 15) y sus nodos lo heredan (`docs/10 §8.4` punto 47) |
+| 15 | **pasarela** | Quien publica en nombre de los nodos LoRaWAN: una pasarela con servidor de red embebido (ruta B) o un servidor de red externo (ruta C, `docs/10 §8.4` punto 45) | Una sirve a muchos nodos; su id físico es su usuario del broker, único también frente a los dispositivos (migración 11); **declara el formato** de lo que publica (`milesight` o `chirpstack`, migración 15) y sus nodos lo heredan: lo garantiza la base con una clave foránea compuesta `(pasarela_id, formato)` en cascada (`docs/10 §8.4` punto 47) |
 | 16 | **estado_dispositivo** | Lo que el sistema escribe sobre cada dispositivo: la última trama aceptada | Una fila por dispositivo y sin `actualizado_en`: la fila de `dispositivo` queda para lo que edita una persona (migración 11). Se borra en cascada con su dispositivo: es un derivado, sin historia propia |
 | 17 | **metrica_broker** | Una muestra por minuto de los contadores `$SYS` del broker: descartes acumulados, mensajes y bytes en cola, clientes conectados, memoria | **Hypertable**, retención 90 días; la toma la conexión administradora del backend (migración 13, `docs/10 §8.4` punto 43) |
 | 18 | **condicion_sistema** | Un estado anómalo de la plataforma, sin dispositivo (`broker_descarte`: el broker descarta o la cola pasa el 80 % del tope) | Misma forma que `condicion` (abierta/cerrada, una abierta por tipo); se abre y se cierra sola desde el muestreo del broker (migración 13) |
@@ -117,7 +117,7 @@ erDiagram
         timestamptz creado_en
         timestamptz actualizado_en
         text via
-        text formato
+        text formato FK
         uuid pasarela_id FK
     }
     estado_dispositivo {
@@ -164,6 +164,7 @@ erDiagram
         timestamptz visto_por_ultima_vez
         timestamptz creado_en
         timestamptz actualizado_en
+        text formato
     }
     regla_umbral {
         uuid id PK
@@ -254,7 +255,7 @@ PostgreSQL en producción y se verificaron contra la base real (`plataforma/prue
 | Foto por valor | Lo que un registro **posee** se copia (`medicion.unidad`, `evento.detalle` con el umbral vigente); lo que **referencia** se lee por FK (`condicion.regla_id` como procedencia) | Cambiar el catálogo o una regla no debe reinterpretar el pasado | ✅ |
 | JSON solo para fotos | `jsonb` únicamente para capturar un contenido tal como fue (`evento.detalle`); nunca para datos de dominio consultables | Lo consultable va en columnas con tipo y FK | ✅ |
 | Ledger sobre contador | Las series (`medicion`) y los hechos (`evento`, `condicion`) son registros que se acumulan; `visto_por_ultima_vez` es un derivado recalculable, no la fuente | Un contador se corrompe en silencio; un registro se audita y se recalcula | ✅ |
-| Comentarios en el modelo | `COMMENT ON` en toda columna cuya razón de ser no es obvia (qué es, quién la escribe, qué no hacer con ella) | El comentario viaja con la base y lo ve quien lea el esquema sin abrir el informe | ✅ 10 comentarios |
+| Comentarios en el modelo | `COMMENT ON` en toda columna cuya razón de ser no es obvia (qué es, quién la escribe, qué no hacer con ella) | El comentario viaja con la base y lo ve quien lea el esquema sin abrir el informe | ✅ cada migración comenta sus columnas (el conteo lo da la base: `pg_description`; el «10» escrito a mano el 23/09 llevaba semanas desactualizado) |
 | Migraciones idempotentes | Cada `NN-*.sql` puede reejecutarse sin duplicar ni pisar nada (`IF NOT EXISTS`, `ON CONFLICT DO NOTHING`, `CREATE OR REPLACE`). Una regla que redefinen varias migraciones: la última la reemplaza y las anteriores solo la crean si no existe (los motivos de cuarentena: 07, 09 y 12) | Permite aplicar el mismo archivo en cualquier ambiente sin miedo | ✅ 02–06; 07, 09, 11 y 12 repetidas en bases desechables (08 y 09/10, `docs/16 §13`) |
 | Tercera forma normal | Cada hecho vive en una sola tabla; las relaciones muchos a muchos se resuelven con entidades de asociación con identidad propia (`canal` = dispositivo × magnitud, `usuario_sitio` = usuario × sitio); ningún atributo depende de otro que no sea la clave | Sin redundancia no hay anomalías de actualización: cambiar el nombre de un dispositivo se hace en una fila. **¿Por qué no más allá?** Más formas normales no es mejor por sí solo: cada una elimina un tipo específico de anomalía. La 4FN y la 5FN resuelven dependencias multivaluadas o de reunión, que en este modelo no existen; no aportarían nada y cada tabla extra agregaría un JOIN a cada consulta. No es una ley universal: es que aquí no están las anomalías que esas formas resuelven | ✅ |
 | Redundancia solo como foto | Las únicas copias son las «fotos por valor» (fila anterior): están **desnormalizadas a propósito** porque el pasado no debe reinterpretarse | Una desnormalización se documenta con su razón; si no tiene razón, es un error | ✅ |
@@ -338,8 +339,9 @@ consistente para reportes.
 - [ ] **Historial de ubicaciones** (decidido el 09/10/2026, `docs/10 §8.4` punto 39): tabla `ubicacion_dispositivo`
       (`dispositivo_id`, `zona_id`, `desde`, `hasta`), con una sola ubicación vigente por dispositivo; las consultas por sitio
       filtran la historia por período. Se implementa con la pantalla de mudanza (HU-12, Etapa 4).
-- [ ] **Estado de la pasarela**: `pasarela.visto_por_ultima_vez` vive en una tabla editable con disparador; cuando se
-      supervise la pasarela (HU-02), pasa a una tabla de estado, como la del dispositivo (punto 27).
+- [ ] **Estado de la pasarela**: `pasarela.visto_por_ultima_vez` vive en una tabla editable con disparador. Por eso la recepción
+      LoRaWAN (HU-02, `docs/10 §8.4` punto 47) no la escribe: la «última vez vista» de una pasarela se deriva de sus nodos. Cuando se
+      supervise la pasarela por sí misma (HU-15), pasa a una tabla de estado, como la del dispositivo (punto 27).
 - [ ] **Motivo de cuarentena propio para el sitio ajeno** (`sitio_ajeno`; hoy cae en `no_registrado` con el detalle) y
       **nombres reservados del broker** (`backend`, `sonda`, `admin`) fuera de `id_fisico` (revisión del 09/10): en la
       próxima migración de esquema.

@@ -35,7 +35,7 @@ falla) y su entrada en el cuadro de mejoras del informe (antes/después).
   `origen_tiempo`), pendiente de decisión.
 - Figuras regeneradas desde la fuente única; informe recompilado en 30 páginas sin desbordes; guardián en verde.
 
-## Segunda sesión del día (noche): decisiones 10 a 15
+## Segunda sesión del día: decisiones 10 a 15
 
 Con el registro de evidencia de proxies (cinco candidatos), el laboratorio de la edición Apache de TimescaleDB sobre
 el esquema real y la revisión del kit de método, se fijaron en `docs/10 §8.4`: **nginx** como proxy (variante A: TLS

@@ -534,7 +534,7 @@ RF-45; controles en `docs/11 §3`). Qué se probó y cómo:
 
 | Comprobación | Resultado |
 |---|---|
-| Unitarias, sin broker ni base: 13 pruebas en `baja-rotacion.spec.ts`. Baja: `FOR NO KEY UPDATE` → estado → credenciales inactivas → condiciones cerradas → evento → `deleteClient` → COMMIT; 409 si ya estaba de baja y 404 si no existe, sin escribir ni tocar el broker; «not found» del plugin cuenta como borrado y se confirma; sin respuesta → 502 con ROLLBACK y nada que deshacer; vía `http` sin orden al broker; vía `mqtt` sin administración → 503 antes de escribir. Rotación: fila nueva con `scrypt` y la anterior inactiva, `setClientPassword` con el secreto antes del COMMIT, el secreto no está en ningún parámetro SQL, `conexion` con tópico y ejemplo como en el alta; 409 de baja y 400 lorawan sin escribir; «not found» → `createClient` con su rol; sin respuesta → 502 con «repetir la rotación»; la base no confirma → 500 con el mismo remedio; 429 con dos operaciones en curso, también para baja y rotación | ✅ 185 en total (`pnpm test`) |
+| Unitarias, sin broker ni base: 13 pruebas en `baja-rotacion.spec.ts`. Baja: `FOR NO KEY UPDATE` → estado → credenciales inactivas → condiciones cerradas → evento → `deleteClient` → COMMIT; 409 si ya estaba de baja y 404 si no existe, sin escribir ni tocar el broker; «not found» del plugin cuenta como borrado y se confirma; sin respuesta → 502 con ROLLBACK y nada que deshacer; vía `http` sin orden al broker; vía `mqtt` sin administración → 503 antes de escribir. Rotación: fila nueva con `scrypt` y la anterior inactiva, `setClientPassword` con el secreto antes del COMMIT, el secreto no está en ningún parámetro SQL, `conexion` con tópico y ejemplo como en el alta; 409 de baja y 400 lorawan sin escribir; «not found» → `createClient` con su rol; sin respuesta → 502 con «repetir la rotación»; la base no confirma → 500 con el mismo remedio; 429 con dos operaciones en curso, también para baja y rotación | ✅ 185 en total al 13/10 (`pnpm test`; 193 al 15/10) |
 | `banco.sh alta` ampliado (20 emulados; las 19 comprobaciones del alta, 19 nuevas y, desde la tarde, 2 de mínimo privilegio: el administrador del broker ya no puede suscribirse a `sitio/#` (135) y sí a `$SYS`): rotación → 201 con credencial nueva de 32 caracteres y `Cache-Control: no-store`; con la anterior el broker no deja conectar; con la nueva publica (`RC:0`); 2 filas de `credencial`, 1 activa; evento `rotacion`; sin cabecera → 401. Baja → 200 con estado anterior y credenciales revocadas; con la credencial nueva ya no conecta (cliente borrado); estado `baja` y 0 activas; evento `baja`; el inventario lo lista con estado `baja`; repetir la baja → 409; rotar un dado de baja → 409; UUID inexistente → 404; sin cabecera → 401; ninguna de las dos credenciales aparece en el registro del backend | ✅ 40 de 40 |
 | Humo (`api-smoke.sh`): `DELETE` y `POST …/credencial` sin cabecera → 401 (503 sin clave configurada), antes de mirar el UUID; OpenAPI con 9 rutas y 11 operaciones | ✅ |
 
@@ -632,16 +632,23 @@ broker (hasta 5 s). Cada trama y cada evento del mismo dispositivo insertan una 
 `FOR KEY SHARE` y `FOR NO KEY UPDATE` no. Como la recepción procesa un mensaje a la vez (`docs/10 §8.4` decisión 4), una trama
 que espera retiene a las de todos los dispositivos.
 
-**Medición** (dos sesiones `psql` contra la base de desarrollo, todo en transacciones que terminan en `ROLLBACK`; la sesión A
-retiene la fila 4 s, la B inserta una trama hija con `lock_timeout = '1s'`):
+**Medición** (`plataforma/pruebas/medir-bloqueo-fila.sh`, contra la base de desarrollo; dos sesiones, todo en transacciones que
+terminan en `ROLLBACK` y el guion comprueba al final que no quedó ninguna fila; la sesión A toma la fila y duerme, la B espera a verla
+dormida, es decir, con la fila ya tomada, e inserta una trama hija con `lock_timeout = '1s'`; el tiempo de B lo mide la base con
+`clock_timestamp()`; tres corridas el 15/10/2026):
 
-| Bloqueo en A | Inserción en B | Tiempo |
+| Bloqueo en A | Inserción en B | Tiempo, en la base |
 |---|---|---|
-| `FOR UPDATE` | cancelada por `lock_timeout` («while locking tuple … FOR KEY SHARE») | 1 069 ms |
-| `FOR NO KEY UPDATE` | entra sin esperar | 68 ms |
-| ninguno (control) | entra | — |
+| `FOR UPDATE` | espera y la cancela el `lock_timeout` | 1 019 a 1 021 ms |
+| `FOR NO KEY UPDATE` | entra sin esperar | 18 a 22 ms |
+
+La primera medición del día, a mano, dio 1 069 y 68 ms: medía con el reloj del equipo, que suma el arranque del contenedor. Al
+convertirla en guion apareció otro error de medición: la sesión B podía correr antes de que A tomara la fila, y entonces «entraba sin
+esperar» por el motivo equivocado. Por eso B espera a ver a A dormida antes de insertar. El guion también exige que el código diga
+`FOR NO KEY UPDATE OF d`; plantado el modo anterior, sale con falla.
 
 **Corrección.** `FOR NO KEY UPDATE OF d` en `AltaService.bloquear`: dos bajas o rotaciones del mismo dispositivo siguen
 ordenándose (ese modo choca consigo mismo) y ninguna de las dos cambia la clave de la fila. Las pruebas de
-`baja-rotacion.spec.ts` exigen el modo nuevo y fallan con el anterior. Queda para el banco: una rotación durante la carga,
-midiendo que el p95 de la recepción no cambia.
+`baja-rotacion.spec.ts` exigen el modo nuevo y fallan con el anterior, pero solo comprueban el texto de la consulta; lo que prueba
+el comportamiento es el guion de arriba. Queda para el banco: una rotación durante la carga, midiendo que el p95 de la recepción no
+cambia.

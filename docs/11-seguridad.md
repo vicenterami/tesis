@@ -161,8 +161,9 @@ a propósito.
 con la misma guardia y el mismo todo-o-nada que un dispositivo, y reciben usuario (su identificador) y clave una sola vez. Su rol
 `pasarela` publica solo bajo `sitio/+/pasarela/%u/#` y **puede suscribirse solo a su subárbol de comandos**
 (`sitio/+/pasarela/%u/+/command/#`): la integración MQTT de ChirpStack se suscribe a su tópico de comandos aunque nunca se le mande
-nada (documentación oficial de ChirpStack, registro privado CS-08) y negárselo la dejaría reintentando; todo lo demás, negado
-explícito. Baja y rotación con las mismas órdenes que un dispositivo; al dar de baja una pasarela, sus nodos quedan sin quien publique
+nada («This is the topic on which the MQTT subscribes for receiving (enqueue) commands»,
+https://www.chirpstack.io/docs/chirpstack/configuration.html, consultada el 15/10/2026); cómo reacciona si se le niega no está
+documentado, así que se le permite y queda por probar en terreno; todo lo demás, negado explícito. Baja y rotación con las mismas órdenes que un dispositivo; al dar de baja una pasarela, sus nodos quedan sin quien publique
 por ellos y lo que llegue va a cuarentena.
 
 **Permisos del archivo del plugin:** dueño `mosquitto` (uid 1883) y modo **0600**: el plugin lo reescribe en cada cambio, así que

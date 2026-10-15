@@ -1,6 +1,6 @@
 # Baja y rotación de credencial por API, respuestas sobre la red LoRaWAN del campus y recepción del equipo de prueba — 13 de octubre de 2026
 
-- **Sesión de trabajo individual (tarde-noche).** Se completó el aprovisionamiento por API con la baja y la rotación de la
+- **Sesión de trabajo individual.** Se completó el aprovisionamiento por API con la baja y la rotación de la
   credencial, probadas con pruebas unitarias y de punta a punta en el banco; llegaron las respuestas del compañero a cargo de
   la red LoRaWAN del campus, que cambian la ruta prevista; y llegaron las piezas del nodo de prueba (`docs/17`). Lo medido está
   en `docs/16 §21`.

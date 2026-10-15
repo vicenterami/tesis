@@ -66,7 +66,7 @@ igual y no mide humedad, devuelve `0x58` (bibliotecas de Adafruit para BME280 y 
 (soldar o usar bornera) y necesita la resistencia de 4,7 kΩ entre datos y 3,3 V. El sensor de suelo se alimenta a 3,3 V con el
 ESP32 y se calibra (seco y en agua).
 
-**Recepción (anotado el 12/10/2026).** La placa ESP32 (pieza 1, comprada aparte el 07/10) ya llegó: módulo ESP-WROOM-32, 38 pines,
+**Recepción (anotado el 12/10/2026).** La placa ESP32 (pieza 1, comprada aparte el 07/10) ya llegó: el vendedor la describía con módulo ESP-WROOM-32 (el 14/10 la serigrafía mostró un módulo genérico: fila 1), 38 pines,
 convertidor USB-serie Silicon Labs CP2102 y conector tipo C (corregido el 14/10 leyendo la placa: antes decía CH9102F y micro-USB; en Linux lo atiende el controlador `cp210x` del núcleo sin instalar nada; al conectarla, `dmesg` dice si aparece como
 `/dev/ttyUSB0` o `/dev/ttyACM0`, y el usuario debe pertenecer al grupo `dialout`). El pedido de las piezas 2 a 7 (una tienda, un
 despacho; CLP 26 530 con cinco resistencias de 4,7 kΩ) está en tránsito. Al llegar el BME280, lo primero es leer su registro de
@@ -78,9 +78,9 @@ Milesight UG65 4G AU915 en MCI, CLP 439 990.
 
 **Primera conexión (14/10/2026).** La placa se reconoce como `/dev/ttyUSB0` con el controlador `cp210x` del núcleo, sin instalar
 nada. `esptool` 5.5.0 identifica un ESP32-D0WD-V3 (revisión 3.1, doble núcleo, 240 MHz, Wi-Fi y Bluetooth), cristal de 40 MHz y
-memoria flash de 4 MB. Dos hallazgos para quien repita: de tres cables tipo C, dos eran solo de carga (sirvió uno de tipo C a tipo C, así que esta placa sí enciende con él) (el LED enciende y el sistema
-no ve nada; se prueba cada cable con un teléfono, mirando `journalctl -k -f`), y a la velocidad por defecto la comunicación falló;
-con `--baud 115200` funcionó siempre.
+memoria flash de 4 MB. Dos hallazgos para quien repita. De tres cables tipo C, dos eran solo de carga: con ellos el LED enciende y el sistema no ve nada
+(se prueba cada cable con un teléfono, mirando `journalctl -k -f`); sirvió uno de tipo C a tipo C. Y a la velocidad por defecto
+la comunicación falló; con `--baud 115200` funcionó siempre.
 
 ## 4. Seguridad al manipular el equipo de prueba (12/10/2026)
 

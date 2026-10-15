@@ -57,7 +57,7 @@ el chequeo de salud del broker (una conexión de `sonda` cada 15 s tapaba todo; 
 conserva, `PILA_TODO=1` lo muestra), y `docs/10 §6` describe ahora los chequeos de salud de los tres
 servicios, que existían pero no estaban en la vista de despliegue.
 
-## 5. Ensayo completo de los pasos 3 y 4 (27/09, tarde)
+## 5. Ensayo completo de los pasos 3 y 4 (27/09)
 
 Con la clave nueva, los pasos 3 y 4 del guion salieron exactamente como están escritos, verificados en
 registros **y** en la base: `abc` → `malformada`; `500` → `invalida` (fuera de rango); `{"v":300,"u":"K"}`
@@ -84,7 +84,7 @@ tenerla dentro sería la fuga) y falla si algún archivo versionado los contiene
 presente, sin lista y con el árbol corregido. El nombre sigue en la historia de git y se limpia con el
 resto antes de publicar el repositorio.
 
-## 7. Lo que destapó el ensayo con cronómetro (27/09, tarde)
+## 7. Lo que destapó el ensayo con cronómetro (27/09)
 
 Al recorrer el guion de corrido, tres cosas no calzaban con la plataforma real:
 
