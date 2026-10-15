@@ -54,6 +54,7 @@ erDiagram
     dispositivo ||--o{ condicion : condicion
     regla_umbral ||--o{ condicion : condicion
     dispositivo ||--o{ credencial : credencial
+    pasarela ||--o{ credencial : credencial
     dispositivo ||--o{ cuarentena : cuarentena
     pasarela ||--o{ dispositivo : dispositivo
     zona ||--o{ dispositivo : dispositivo
@@ -95,6 +96,7 @@ erDiagram
         bool activa
         timestamptz creada_en
         timestamptz actualizado_en
+        uuid pasarela_id FK
     }
     cuarentena {
         uuid id PK
