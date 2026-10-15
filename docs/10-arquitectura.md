@@ -500,6 +500,32 @@ cliente ──HTTP──► Express ⊂ NestJS ──► servicio ──► pg �
 | Desarrollo con recarga (`pnpm start`) | fuera de Docker | `127.0.0.1:5432` | ídem |
 | Producción | contenedor | nombre `timescaledb` en la red interna | cerrado: el override no se copia al servidor |
 
+
+### 4.3 Secuencias en el tiempo: una trama falla, y después qué (15/10/2026)
+
+Las tablas de arriba miran una trama a la vez. Lo que un operador vive son secuencias: una trama mala y después buenas, buenas y
+después silencio, silencio y después basura. Esta tabla dice qué hace hoy el sistema en cada una, verificado en el código
+(`RecepcionService`, `SupervisionService`, `AlertasService`), y dónde queda un hueco. Dos reglas lo explican casi todo: «vivo» es
+salud del enlace, no calidad del dato (§4), y una condición de umbral solo la abre o la cierra una lectura guardada.
+
+| # | Secuencia | Qué hace hoy | Hueco |
+|---|---|---|---|
+| 1 | Una trama malformada y después tramas buenas (un reinicio del nodo a mitad de envío, un error pasajero del firmware) | La mala va a cuarentena `malformada` con su carga cruda (30 días); el dispositivo queda vivo; las siguientes se guardan; no se abre ninguna condición | Ninguno: se perdió esa lectura y queda la evidencia |
+| 2 | Interferencia de radio o de red | En LoRaWAN la integridad se protege en el aire (TS001-1.0.4) y la verifica el servidor de red antes de publicar; en Wi-Fi o celular, TCP y TLS detectan la corrupción y retransmiten. Para este sistema una trama dañada en el camino se ve como una que no llegó (fila 4), no como una malformada | Ninguno propio: si la pérdida es frecuente, la mide el compañero en terreno (PL) y se ajusta el intervalo esperado |
+| 3 | Una racha de tramas malas y después vuelve a estar bien | Cada mala, a cuarentena; vivo todo el tiempo; al volver se guardan; ninguna condición se abrió | El operador no se entera mientras dura, salvo que mire la cuarentena (§8.1, propuesta) |
+| 4 | Funcionaba bien y después silencio total | El barrido periódico (`SUPERVISION_INTERVALO_S`: 60 s; 5 s en la demostración) abre `sin_comunicacion` cuando el silencio supera dos veces `intervalo_esperado_s` (RNF-03); se cierra con la siguiente trama autenticada | Ninguno |
+| 5 | Silencio y después vuelve mandando basura | `sin_comunicacion` se cierra, porque el enlace volvió, y no queda ninguna condición sobre los datos: el panel lo muestra «en línea» sin lecturas nuevas | Sí: es el caso más engañoso (§8.1) |
+| 6 | Solo basura durante días | Vivo, sin condiciones; la cuarentena acumula una fila por trama y la limpieza programada las borra a los 30 días | Sí (§8.1) |
+| 7 | «Casi bien»: una trama con lecturas buenas y malas | Las buenas se guardan; las malas van a una sola fila de cuarentena `invalida` con todos los motivos | Ninguno |
+| 8 | Un valor posible pero falso (un 25,3 que llega como 2,53, dentro del rango físico) | Se guarda como real; solo lo detectaría un umbral configurado | Sí: una regla de salto brusco es candidata desde la entrevista del 05/10, sin diseñar |
+| 9 | Un umbral abierto y después silencio o basura | La condición de umbral queda abierta con su último valor, porque solo una lectura guardada la reevalúa; si calla, se suma `sin_comunicacion` | Ninguno: es lo correcto, el último dato conocido seguía fuera de rango |
+| 10 | Reconexión con reentrega de lo encolado | Lo repetido con la misma marca del emisor cuenta una vez (RF-10, §4.1) | Ninguno |
+| 11 | LoRaWAN: un `up` sin objeto decodificado, o sin ninguna clave del mapa | Cuarentena `malformada` con qué activar o qué faltó; el nodo vivo (punto 47) | El de la fila 6, si se repite |
+
+Los huecos de las filas 3, 5 y 6 son el mismo: **un dispositivo que se comunica pero no entrega datos válidos**. La condición que los
+cubre está propuesta desde el 23/09 en §8.1 y queda pendiente de decisión: si se abre por un número de tramas seguidas rechazadas o
+por tiempo sin ninguna lectura guardada, con la misma tolerancia que el silencio.
+
 ## 5. Secuencia: panel en tiempo real (patrón B)
 
 ```mermaid
@@ -1173,7 +1199,7 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     una amenaza real. **Cuándo cambia R3:** el día que un componente se mude a otra máquina, ese tramo pasa a R2 sin discusión.
     Los registros de Mosquitto y de los demás servicios no viajan: quedan en el disco del servidor (§6); si algún día se
     centralizan, ese envío cumple R1 y R2. Hecho el 13/10 en el broker: el rol `admin` del plugin, que de fábrica lee todo,
-    quedó acotado a `$CONTROL/dynamic-security/#` y `$SYS/#` (pendiente 87, probado en el banco). En la base, hecho el 13/10
+    quedó acotado a `$CONTROL/dynamic-security/#` y `$SYS/#` (probado en el banco). En la base, hecho el 13/10
     (migración 14): el backend entra como `plataforma_app`, que lee todo, inserta solo en las 11 tablas donde el código inserta y actualiza solo en
     5 (ni DELETE, ni TRUNCATE, ni DDL; `evento`, `medicion` y `trama` no se pueden reescribir, solo agregar);
     el dueño queda para migraciones y semillas. La retención, que usa `drop_chunks` y este exige ser dueño de la hypertable, pasa

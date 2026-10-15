@@ -1,4 +1,4 @@
--- Semilla de demostración COMPLETA (pendiente 78; kit metodo/probar-sin-miedo.md §2: escenarios con el resultado esperado escrito
+-- Semilla de demostración COMPLETA (kit de método, probar-sin-miedo §2: escenarios con el resultado esperado escrito
 -- aquí, nunca datos armados a mano). Se aplica DESPUÉS de demo.sql: `bash plataforma/pruebas/semilla-demo.sh --completa`.
 -- Reconstruye su escenario en cada corrida: borra y vuelve a crear SOLO los 11 dispositivos de la lista de abajo (nunca dev-0001
 -- ni uno real), con sus canales, mediciones, tramas, cuarentena, condiciones, eventos y credenciales. Correrla dos veces el mismo
@@ -16,7 +16,7 @@
 --     demo-mantenimiento   mqtt/senml         mantenimiento  sí        0         batería y RSSI; el supervisor no lo mira
 --     demo-baja            mqtt/senml         baja           no        0         credencial inactiva, cuarentena «dado_de_baja», condición cerrada al darlo de baja
 --     demo-http-01         http/senml         activo         null      0         nunca visto: «esperando la primera trama»
---     demo-lora-01         lorawan/milesight  activo         sí        0         con pasarela; intervalo 300 s (5 × 60 s, pendiente 85)
+--     demo-lora-01         lorawan/milesight  activo         sí        0         con pasarela; intervalo 300 s (5 × 60 s; por revisar: la alarma abre a 2 × intervalo)
 --     demo-lora-02         lorawan/milesight  activo         sí        1 batería condición de batería abierta (ningún código la abre aún) y manipulación cerrada
 --     d03                  mqtt/plano         activo         sí        0         identificador de 3 caracteres (mínimo) y nombre de 1 («Ñ»)
 --     demo-identificador-e…  mqtt/senml         activo         sí        0         identificador de 63 caracteres (máximo) y nombre de 80 con acentos

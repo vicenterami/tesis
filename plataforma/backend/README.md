@@ -17,7 +17,7 @@ src/
 │   ├── lectura.ts             # la unidad que viaja por el pipeline: {magnitud, valor, unidad, tiempo}
 │   ├── tiempo.ts              # plausibilidad de la marca de tiempo del emisor (filtro 4, docs/13 regla 7)
 │   ├── unidades.ts            # conversiones a la unidad canónica (filtro 4)
-│   ├── adaptadores/           # filtro 2: senml (nativo, RFC 8428) y plano (número o JSON simple)
+│   ├── adaptadores/           # filtro 2: senml (nativo, RFC 8428), plano (número o JSON simple), chirpstack y milesight (LoRaWAN, punto 47)
 │   └── *.spec.ts              # pruebas unitarias de las funciones puras (jest)
 ├── consulta/                  # M5: API de solo lectura (dispositivos, canales, condiciones, cuarentena)
 ├── tiempo-real/               # TT-39: canal SSE hacia el panel (GET /eventos) y bus de eventos en memoria

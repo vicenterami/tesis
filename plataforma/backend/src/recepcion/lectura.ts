@@ -19,4 +19,9 @@ export interface ContextoTrama {
   idFisico: string;      // del tópico: sitio/<sitio>/dispositivo/<id_fisico>/<magnitud>
   magnitudTopico: string;
   carga: Buffer;
+  // Del tópico de pasarela (sitio/<s>/pasarela/<id>/<deveui>/<evento>, docs/10 §8.4 punto 47): el adaptador exige que el DevEUI
+  // del cuerpo sea este. En el tópico de un dispositivo directo no existe.
+  deveui?: string;
+  // Salida del adaptador: claves del JSON decodificado que no están en el mapa (se cuentan en la línea de registro de la trama).
+  ignoradas?: string[];
 }

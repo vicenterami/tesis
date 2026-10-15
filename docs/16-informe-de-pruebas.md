@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 200 pruebas unitarias, sin matriz formal) y TT-32 (sensor físico);
+cubre todavía: TT-27 (contrato de trama: hoy 214 pruebas unitarias, sin matriz formal) y TT-32 (sensor físico);
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -674,3 +674,28 @@ uno `lorawan` no lo envía en el alta: copia el de su pasarela (la base exige qu
 Pruebas unitarias en `recepcion.service.spec.ts`, `alta.dto.spec.ts` y `alta.service.spec.ts`: 200 en total (`pnpm test`). Plantado: con
 el despacho anterior (el primer adaptador que reconozca) fallan las tres pruebas de recepción que dependen del formato declarado. La
 demostración (`docs/15` §3) suma la fila del número suelto a un dispositivo SenML.
+
+## 28. Adaptadores LoRaWAN contra el JSON oficial (15/10/2026)
+
+**Qué se probó** (`docs/10 §8.4` punto 47; `lorawan.spec.ts`, 14 pruebas). Los adaptadores `chirpstack` y `milesight` con el JSON de las
+fuentes oficiales: el ejemplo del evento `up` de la documentación de ChirpStack v4, con un `object` agregado, y la forma con códec y
+Metadata de la guía de Milesight. Los identificadores con prefijo de un fabricante real del ejemplo se reemplazaron por valores
+sintéticos.
+
+| Caso | Resultado |
+|---|---|
+| `up` con `object` (`temperature`, `humidity`) | dos lecturas en la unidad canónica, con la marca del servidor de red (`+00:00` con nanosegundos → milisegundos) |
+| Una clave fuera del mapa (`battery_voltage`) junto a una conocida | la conocida se guarda; la otra se anota para la línea de registro |
+| Solo claves fuera del mapa | `malformada` «ninguna clave conocida (llegaron: battery_voltage)» |
+| `up` sin `object` | `malformada` «el perfil del dispositivo en ChirpStack no tiene decodificador» |
+| DevEUI del cuerpo distinto del tópico | `IdentidadCruzada`, una malformada que no marca vivo; en mayúsculas cuenta como igual |
+| Clave conocida con un valor que no es número | `malformada` «temperature: no es un número» |
+| Hora sin zona | sin marca: rige la hora de recepción (Node la interpretaría en la zona del proceso: `docs/13` regla 17) |
+| Milesight con códec y Metadata | tres lecturas, los metadatos no cuentan como claves ignoradas, sin marca de tiempo |
+| Milesight sin códec (`data`, `fPort`, `rxInfo`) | `malformada` «activar Payload Codec y Metadata» |
+| Milesight con códec y sin Metadata | `malformada` «sin devEUI: activar Metadata» |
+
+**El mapa contra el catálogo.** Una prueba lee las migraciones (`INSERT INTO magnitud`) y exige que cada destino del mapa sea una magnitud
+del catálogo con esa unidad canónica, y otra exige que el catálogo se haya leído (siete magnitudes o más), para que la primera no pase sin
+revisar nada. Plantado: con `pressure` apuntando a una magnitud inexistente falla una; sin comparar el DevEUI fallan dos. Total: 214
+pruebas. Falta la conexión con el filtro 1 (tópico de pasarela) y la prueba de punta a punta en el banco.

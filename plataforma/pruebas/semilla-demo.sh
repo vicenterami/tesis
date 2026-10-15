@@ -2,7 +2,7 @@
 # Carga la semilla de demostración (db/semillas/demo.sql) y verifica que quedó lo que su cabecera promete.
 #   bash plataforma/pruebas/semilla-demo.sh             la mínima del guion de docs/15 (dev-0001)
 #   bash plataforma/pruebas/semilla-demo.sh --completa  además db/semillas/demo-completa.sql: todos los estados, vías, condiciones y
-#                                                       límites, con el resultado esperado en su cabecera (pendiente 78); la aplica
+#                                                       límites, con el resultado esperado en su cabecera; la aplica
 #                                                       DOS veces y exige el mismo resultado (reconstruye su escenario, no acumula)
 # Requiere la pila arriba (docker compose up -d en plataforma/). Idempotente: correrla dos veces da lo mismo.
 # Para probar que la verificación de verdad verifica: SEMILLA_DISPOSITIVO=dev-9999 bash … → debe FALLAR.

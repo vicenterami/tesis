@@ -368,10 +368,11 @@ PY
 paso "2p. Repositorio público: ningún archivo versionado cita fichas privadas (viven en privado/, un lector no las abre)"
 # 08/10: 19 referencias en 12 archivos apuntaban a fichas de decisión privadas (formato D, guion y dos dígitos). Lo público
 # cita lo público: la sección de docs/10 §8.4 o de docs/11 donde quedó la decisión.
-git grep --untracked -n -E 'ficha D-[0-9]{2}|decisi[oó]n D-[0-9]{2}|\bD-[0-9]{2}\b' -- ':!privado' > "$VT"/fichas.txt 2>&1; rc=$?
-if [ "$rc" -eq 0 ]; then echo "FALLA archivos públicos que citan fichas privadas:"; cut -c1-160 "$VT"/fichas.txt; fallos=$((fallos+1))
+# 15/10: lo mismo con los pendientes privados (la palabra y su número): siete referencias en seis archivos, quitadas y vigiladas.
+git grep --untracked -n -E 'ficha D-[0-9]{2}|decisi[oó]n D-[0-9]{2}|\bD-[0-9]{2}\b|\bpendientes? [0-9]{1,3}\b' -- ':!privado' ':!historico' > "$VT"/fichas.txt 2>&1; rc=$?
+if [ "$rc" -eq 0 ]; then echo "FALLA archivos públicos que citan fichas o pendientes privados:"; cut -c1-160 "$VT"/fichas.txt; fallos=$((fallos+1))
 elif [ "$rc" -ne 1 ]; then echo "FALLA git grep falló ($rc): no se pudo revisar"; fallos=$((fallos+1))
-else echo "OK    ningún archivo versionado cita fichas privadas"; fi
+else echo "OK    ningún archivo versionado cita fichas ni pendientes privados"; fi
 
 paso "2x. Repositorio público: ningún archivo versionado trae las menciones vetadas de la lista privada (12/10)"
 # La lista (expresiones regulares, una por línea, sin distinguir mayúsculas) vive fuera del repo, como la de nombres del paso
