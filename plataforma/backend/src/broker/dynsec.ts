@@ -13,6 +13,8 @@ export const ESPERA_RESPUESTA_MS = 5000;
 export const USUARIO_ADMIN = 'backend-admin';
 // El rol que limita a cada dispositivo a su propio tópico (`sitio/+/dispositivo/%u/+`); lo crea `pruebas/broker-inicializar.sh`.
 export const ROL_DISPOSITIVO = 'dispositivo';
+// Pasarela o servidor de red externo (rutas B y C, docs/10 §8.4 punto 47): publica bajo su árbol, se suscribe a sus comandos.
+export const ROL_PASARELA = 'pasarela';
 
 export interface OrdenDynsec {
   command: string;
@@ -119,8 +121,14 @@ export class AdministradorDynsec {
 
 // Las órdenes del alta, la baja y la rotación (docs/10 §3). El alta es UNA orden: `createClient` admite los roles en el
 // mismo comando, así el cliente nace con su ACL o no nace (si el rol no existiera, el plugin rechaza todo el comando).
+export function ordenesAlta(usuario: string, clave: string, rol: string): OrdenDynsec[] {
+  return [{ command: 'createClient', username: usuario, password: clave, roles: [{ rolename: rol, priority: 1 }] }];
+}
 export function ordenesAltaDispositivo(usuario: string, clave: string): OrdenDynsec[] {
-  return [{ command: 'createClient', username: usuario, password: clave, roles: [{ rolename: ROL_DISPOSITIVO, priority: 1 }] }];
+  return ordenesAlta(usuario, clave, ROL_DISPOSITIVO);
+}
+export function ordenesAltaPasarela(usuario: string, clave: string): OrdenDynsec[] {
+  return ordenesAlta(usuario, clave, ROL_PASARELA);
 }
 export function ordenBaja(usuario: string): OrdenDynsec[] {
   return [{ command: 'deleteClient', username: usuario }];

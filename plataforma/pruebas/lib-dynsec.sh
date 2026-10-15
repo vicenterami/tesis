@@ -79,6 +79,11 @@ roles_del_sistema() {
                   publishClientSend '#' deny  publishClientSend '$CONTROL/#' deny  subscribePattern '#' deny  subscribeLiteral '#' deny || return 1
   rol sonda       subscribePattern '$SYS/#' allow  publishClientReceive '$SYS/#' allow \
                   publishClientSend '#' deny  publishClientSend '$CONTROL/#' deny  subscribePattern '#' deny  subscribeLiteral '#' deny || return 1
+  # Pasarela o servidor de red externo (docs/10 §8.4 punto 47): publica bajo su árbol y se suscribe SOLO a su subárbol de comandos,
+  # porque la integración MQTT de ChirpStack se suscribe a su tópico de comandos aunque nunca se le mande nada.
+  rol pasarela    publishClientSend 'sitio/+/pasarela/%u/#' allow  subscribePattern 'sitio/+/pasarela/%u/+/command/#' allow \
+                  publishClientReceive 'sitio/+/pasarela/%u/+/command/#' allow \
+                  publishClientSend '#' deny  publishClientSend '$CONTROL/#' deny  subscribePattern '#' deny  subscribeLiteral '#' deny || return 1
   rol dispositivo publishClientSend 'sitio/+/dispositivo/%u/+' allow \
                   publishClientSend '#' deny  publishClientSend '$CONTROL/#' deny  subscribePattern '#' deny  subscribeLiteral '#' deny || return 1
 }

@@ -42,12 +42,12 @@ docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -X -U p
   < plataforma/db/pruebas/convenciones.sql | tee "$VT"/convenciones.txt
 exige "$VT"/convenciones.txt "${PIPESTATUS[0]}" 7 || fallos=$((fallos+1))
 
-paso "1c. Reglas de identidad de las migraciones 11 y 15, plantadas en una transacción que se deshace (docs/10 §8.4 puntos 24 y 47)"
+paso "1c. Reglas de identidad de las migraciones 11, 15 y 16, plantadas en una transacción que se deshace (docs/10 §8.4 puntos 24 y 47)"
 # Pasarela y dispositivo no comparten identificador; lista blanca; LoRaWAN exige pasarela; código de sitio válido. Nada
 # queda en la base: el archivo termina en ROLLBACK. La carrera de dos altas simultáneas se probó a mano (docs/16 §13).
 docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -X -U plataforma -d plataforma -v ON_ERROR_STOP=1 -tA \
   < plataforma/db/pruebas/reglas-identidad.sql | tee "$VT"/identidad.txt
-exige "$VT"/identidad.txt "${PIPESTATUS[0]}" 12 || fallos=$((fallos+1))
+exige "$VT"/identidad.txt "${PIPESTATUS[0]}" 15 || fallos=$((fallos+1))
 
 paso "2. Migraciones aplicadas = archivos en db/init (cada NN-*.sql debe estar reflejado en la base)"
 # 02: índice por regla · 03: zona_horaria · 04: iso_utc · 05: convenciones (disparadores actualizado_en, pm2_5) · 06: índice único de medicion · 07: CHECK de cuarentena.motivo · 08: medicion.recibido_en y origen_tiempo · 09: trama y cuarentena como hypertables · 10: semántica de intervalo_esperado_s · 11: vía, pasarela, estado_dispositivo y sitio.codigo · 12: nombre ck_cuarentena_motivo
@@ -67,8 +67,9 @@ SELECT CASE WHEN EXISTS (SELECT 1 FROM pg_constraint WHERE conname='ck_cuarenten
 SELECT CASE WHEN (SELECT count(*) FROM timescaledb_information.hypertables WHERE hypertable_name='metrica_broker')=1 AND (SELECT count(*) FROM pg_indexes WHERE tablename='condicion_sistema' AND indexname='uq_condicion_sistema_abierta')=1 AND (SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname='ck_condicion_sistema_tipo') LIKE '%broker_descarte%' THEN 'OK    13 metrica_broker es hypertable; condicion_sistema con una abierta por tipo y dominio cerrado' ELSE 'FALLA 13 falta metrica_broker (hypertable) o condicion_sistema (índice único parcial o CHECK)' END;
 SELECT CASE WHEN (SELECT count(*) FROM pg_roles WHERE rolname='plataforma_app' AND NOT rolsuper AND NOT rolcreaterole AND NOT rolcreatedb)=1 AND NOT EXISTS (SELECT 1 FROM information_schema.role_table_grants WHERE grantee='plataforma_app' AND privilege_type IN ('DELETE','TRUNCATE','REFERENCES','TRIGGER')) AND NOT has_table_privilege('plataforma_app', 'evento', 'UPDATE') AND NOT has_table_privilege('plataforma_app', 'medicion', 'UPDATE') AND NOT has_table_privilege('plataforma_app', 'magnitud', 'INSERT') AND has_table_privilege('plataforma_app', 'estado_dispositivo', 'UPDATE') AND (SELECT prosecdef FROM pg_proc WHERE proname='fn_retencion_drop_chunks') AND NOT has_function_privilege('public', 'fn_retencion_drop_chunks(text,integer)', 'EXECUTE') THEN 'OK    14 plataforma_app sin superusuario, sin DELETE/TRUNCATE, sin reescribir evento ni medicion; fn_retencion_drop_chunks SECURITY DEFINER y no ejecutable por PUBLIC' ELSE 'FALLA 14 rol de la aplicación con más permisos de los debidos, o falta la función de retención' END;
 SELECT CASE WHEN (SELECT is_nullable='NO' AND column_default IS NULL FROM information_schema.columns WHERE table_name='pasarela' AND column_name='formato') AND (SELECT pg_get_constraintdef(oid) LIKE '%chirpstack%' FROM pg_constraint WHERE conname='ck_dispositivo_formato' AND conrelid='dispositivo'::regclass) AND EXISTS (SELECT 1 FROM pg_constraint WHERE conname='ck_dispositivo_via_formato' AND conrelid='dispositivo'::regclass) AND EXISTS (SELECT 1 FROM pg_constraint WHERE conname='fk_dispositivo_pasarela_formato' AND conrelid='dispositivo'::regclass AND contype='f' AND confupdtype='c') THEN 'OK    15 pasarela.formato declarado (sin valor por defecto) y heredado por sus nodos (clave foránea compuesta en cascada)' ELSE 'FALLA 15 falta pasarela.formato o la herencia del formato (migración 15)' END;
+SELECT CASE WHEN EXISTS (SELECT 1 FROM pg_constraint WHERE conname='ck_credencial_titular' AND conrelid='credencial'::regclass) AND (SELECT is_nullable='YES' FROM information_schema.columns WHERE table_name='credencial' AND column_name='dispositivo_id') AND has_table_privilege('plataforma_app', 'pasarela', 'INSERT') AND has_table_privilege('plataforma_app', 'pasarela', 'UPDATE') THEN 'OK    16 credencial con un titular (dispositivo o pasarela) y la aplicación escribe pasarelas' ELSE 'FALLA 16 falta la credencial de pasarela o el permiso de la aplicación (migración 16)' END;
 SQL
-exige "$VT"/mig.txt "${PIPESTATUS[0]}" 15 || fallos=$((fallos+1))
+exige "$VT"/mig.txt "${PIPESTATUS[0]}" 16 || fallos=$((fallos+1))
 # Toda migración en disco debe tener su comprobación arriba: una 08 nueva sin comprobación falla aquí,
 # no solo por el conteo en prosa del paso 2g.
 sin_chequeo=$(ls plataforma/db/init/ | grep -oE '^[0-9]{2}' | while read -r nn; do grep -q "^OK    $nn \|^FALLA $nn " "$VT"/mig.txt || echo "$nn"; done)
@@ -206,7 +207,7 @@ fi
 paso "2i. Credenciales del broker en el plugin Dynamic Security: configuración, archivo del plugin (1883/600) y roles y clientes del sistema (docs/10 §8.4 punto 42; docs/11 §7)"
 # Hasta el 12/10 vivían en passwd y acl (hallazgo del 27/09: un chown -R les cambiaba el dueño). Ahora el broker no debe leer
 # archivos de claves, el JSON del plugin vive en el volumen de datos con dueño 1883 y modo 600, y deben existir los roles
-# admin/recepcion/sonda/dispositivo y los clientes backend-admin/backend/sonda. Solo nombres (grep -o), nunca hashes.
+# admin/recepcion/sonda/dispositivo/pasarela (la última desde el 15/10) y los clientes backend-admin/backend/sonda. Solo nombres (grep -o), nunca hashes.
 MC="${MOSQ_CONF:-plataforma/mosquitto/config}"; mal=""
 [ "$(stat -c %u "$MC/mosquitto.conf")" = "$(id -u)" ] || mal="$mal mosquitto.conf(dueño $(stat -c %u "$MC/mosquitto.conf"))"
 grep -qE '^\s*(password_file|acl_file)' "$MC/mosquitto.conf" && mal="$mal mosquitto.conf-lee-archivos-de-claves"
@@ -214,7 +215,7 @@ grep -qE '^\s*plugin_opt_config_file\s+/mosquitto/data/dynamic-security.json' "$
 [ -e "$MC/acl" ] && mal="$mal acl-todavia-en-config"
 j=$(cd plataforma && docker compose exec -T mosquitto stat -c '%u %a' /mosquitto/data/dynamic-security.json 2>/dev/null); [ "$j" = "1883 600" ] || mal="$mal archivo-del-plugin(${j:-ausente})"
 n=$(cd plataforma && docker compose exec -T mosquitto sh -c 'tr -d " \t" < /mosquitto/data/dynamic-security.json | grep -oE "\"(rolename|username)\":\"[a-z-]+\""' 2>/dev/null)
-for e in rolename:admin rolename:recepcion rolename:sonda rolename:dispositivo username:backend-admin username:backend username:sonda; do
+for e in rolename:admin rolename:recepcion rolename:sonda rolename:dispositivo rolename:pasarela username:backend-admin username:backend username:sonda; do
   grep -qF "\"${e%%:*}\":\"${e#*:}\"" <<<"$n" || mal="$mal falta-${e#*:}"
 done
 if [ -z "$mal" ]; then echo "OK    mosquitto.conf sin passwd/acl y con el plugin; archivo del plugin de 1883 con modo 600; roles y clientes del sistema presentes"

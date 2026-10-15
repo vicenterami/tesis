@@ -4,10 +4,11 @@ import {
 } from '@nestjs/common';
 import type { Pool, PoolClient } from 'pg';
 import { POOL } from '../db/db.module';
-import { ErrorDynsec, ordenBaja, ordenRotacion, ordenesAltaDispositivo } from '../broker/dynsec';
+import { ErrorDynsec, ROL_DISPOSITIVO, ROL_PASARELA, ordenBaja, ordenRotacion, ordenesAlta, ordenesAltaDispositivo, ordenesAltaPasarela } from '../broker/dynsec';
 import { DynsecService } from '../broker/dynsec.service';
 import { AltaValidada, Formato, Via } from './alta.dto';
 import { generarSecreto, hashScrypt } from './credenciales';
+import { FormatoPasarela, PasarelaValidada } from './pasarela.dto';
 
 export interface CanalCreado {
   id: string;
@@ -59,6 +60,54 @@ export interface DispositivoDadoDeBaja {
   dado_de_baja_en: string;
 }
 // Resultado de la rotación (docs/10 §3): la credencial nueva se muestra UNA vez; la anterior deja de valer al confirmar.
+// Pasarelas (rutas B y C, docs/10 §8.4 punto 47). La conexión trae el puerto con TLS, el usuario, la credencial (una sola vez) y las
+// plantillas de tópico del formato declarado, listas para copiar en ChirpStack o en la pasarela Milesight.
+export interface ConexionPasarela {
+  usuario: string;
+  credencial: string;
+  puerto: number;
+  publica_en: string;
+  comandos: string;
+  plantillas: Record<string, string>;
+  nota: string;
+}
+export interface PasarelaCreada {
+  id: string;
+  id_fisico: string;
+  nombre: string;
+  sitio_codigo: string;
+  formato: FormatoPasarela;
+  activo: true;
+  creado_en: string;
+  conexion: ConexionPasarela;
+}
+export interface PasarelaDadaDeBaja {
+  id: string;
+  id_fisico: string;
+  activo: false;
+  credenciales_revocadas: number;
+  nodos_sin_pasarela: number;
+  dada_de_baja_en: string;
+}
+export interface CredencialPasarelaRotada {
+  id: string;
+  id_fisico: string;
+  rotada_en: string;
+  conexion: ConexionPasarela;
+}
+export interface PasarelaListada {
+  id: string;
+  id_fisico: string;
+  nombre: string;
+  sitio_codigo: string;
+  formato: FormatoPasarela;
+  activo: boolean;
+  nodos: number;
+  vista_por_ultima_vez: string | null;
+  creado_en: string;
+}
+interface PasarelaBloqueada { id: string; id_fisico: string; activo: boolean; formato: FormatoPasarela; sitio_codigo: string }
+
 export interface CredencialRotada {
   id: string;
   id_fisico: string;
@@ -231,6 +280,139 @@ export class AltaService {
     }
   }
 
+  // Alta de una pasarela: la misma forma que la de un dispositivo (todo o nada; el cliente del broker nace con su rol en una orden).
+  async crearPasarela(p: PasarelaValidada): Promise<PasarelaCreada> {
+    if (!this.dynsec.disponible) throw this.sinBroker();
+    const c = await this.tomar();
+    let enBroker = false;
+    try {
+      await this.abrir(c);
+      const s = await c.query<{ codigo: string; activo: boolean }>('SELECT codigo, activo FROM sitio WHERE id = $1', [p.sitio_id]);
+      if (s.rows.length === 0) throw new BadRequestException(['sitio_id no existe']);
+      if (!s.rows[0].activo) throw new BadRequestException(['el sitio está inactivo']);
+      const r = await c.query<{ id: string; creado_en: Date }>(
+        'INSERT INTO pasarela (sitio_id, id_fisico, nombre, formato) VALUES ($1, $2, $3, $4) RETURNING id, creado_en',
+        [p.sitio_id, p.id_fisico, p.nombre, p.formato],
+      );
+      const id = r.rows[0].id;
+      const secreto = generarSecreto();
+      await c.query('INSERT INTO credencial (pasarela_id, hash) VALUES ($1, $2)', [id, await hashScrypt(secreto)]); // nunca el secreto
+      await c.query('INSERT INTO evento (dispositivo_id, tipo, detalle) VALUES (NULL, $1, $2)', [
+        'pasarela_alta', JSON.stringify({ pasarela_id: id, id_fisico: p.id_fisico, formato: p.formato, origen: 'api' }),
+      ]);
+      await this.dynsec.ordenar(ordenesAltaPasarela(p.id_fisico, secreto));
+      enBroker = true;
+      await c.query('COMMIT');
+      this.log.log(`alta de pasarela: ${p.id_fisico} (${p.formato}) en el sitio ${s.rows[0].codigo}`);
+      return {
+        id, id_fisico: p.id_fisico, nombre: p.nombre, sitio_codigo: s.rows[0].codigo, formato: p.formato, activo: true,
+        creado_en: r.rows[0].creado_en.toISOString(), conexion: this.conexionPasarela(p.formato, s.rows[0].codigo, p.id_fisico, secreto),
+      };
+    } catch (e) {
+      await c.query('ROLLBACK').catch(() => undefined);
+      if (enBroker || (e instanceof ErrorDynsec && e.ambiguo)) await this.deshacerEnBroker(p.id_fisico);
+      throw this.traducir(e, p.id_fisico, 'alta');
+    } finally {
+      this.soltar(c);
+    }
+  }
+
+  // Baja de una pasarela: `activo = false`, credenciales revocadas, evento y cliente borrado del broker, en una transacción. Sus nodos
+  // quedan sin quien publique por ellos; lo que llegue con una credencial vieja va a cuarentena («pasarela inactiva»).
+  async darDeBajaPasarela(id: string): Promise<PasarelaDadaDeBaja> {
+    const c = await this.tomar();
+    let idFisico = id;
+    try {
+      await this.abrir(c);
+      const p = await this.bloquearPasarela(c, id);
+      idFisico = p.id_fisico;
+      if (!p.activo) throw new ConflictException(`la pasarela «${p.id_fisico}» ya está dada de baja`);
+      if (!this.dynsec.disponible) throw this.sinBroker();
+      await c.query('UPDATE pasarela SET activo = false WHERE id = $1', [id]);
+      const cred = await c.query('UPDATE credencial SET activa = false WHERE pasarela_id = $1 AND activa', [id]);
+      const nodos = await c.query<{ n: string }>("SELECT count(*) AS n FROM dispositivo WHERE pasarela_id = $1 AND estado <> 'baja'", [id]);
+      const ev = await c.query<{ ocurrido_en: Date }>('INSERT INTO evento (dispositivo_id, tipo, detalle) VALUES (NULL, $1, $2) RETURNING ocurrido_en', [
+        'pasarela_baja', JSON.stringify({ pasarela_id: id, id_fisico: p.id_fisico, credenciales_revocadas: cred.rowCount ?? 0, origen: 'api' }),
+      ]);
+      await this.borrarEnBroker(p.id_fisico);
+      await c.query('COMMIT');
+      this.log.log(`baja de pasarela: ${p.id_fisico} (${cred.rowCount ?? 0} credencial(es) revocada(s), ${nodos.rows[0].n} nodo(s) sin pasarela)`);
+      return {
+        id, id_fisico: p.id_fisico, activo: false, credenciales_revocadas: cred.rowCount ?? 0, nodos_sin_pasarela: Number(nodos.rows[0].n),
+        dada_de_baja_en: ev.rows[0].ocurrido_en.toISOString(),
+      };
+    } catch (e) {
+      await c.query('ROLLBACK').catch(() => undefined);
+      throw this.traducir(e, idFisico, 'baja');
+    } finally {
+      this.soltar(c);
+    }
+  }
+
+  // Rotación de la credencial de una pasarela: la misma que la de un dispositivo (rotar también repara un cliente que falta).
+  async rotarPasarela(id: string): Promise<CredencialPasarelaRotada> {
+    const c = await this.tomar();
+    let idFisico = id;
+    try {
+      await this.abrir(c);
+      const p = await this.bloquearPasarela(c, id);
+      idFisico = p.id_fisico;
+      if (!p.activo) throw new ConflictException(`la pasarela «${p.id_fisico}» está dada de baja: no se rota su credencial`);
+      if (!this.dynsec.disponible) throw this.sinBroker();
+      const secreto = generarSecreto();
+      await c.query('UPDATE credencial SET activa = false WHERE pasarela_id = $1 AND activa', [id]);
+      await c.query('INSERT INTO credencial (pasarela_id, hash) VALUES ($1, $2)', [id, await hashScrypt(secreto)]); // nunca el secreto
+      const ev = await c.query<{ ocurrido_en: Date }>('INSERT INTO evento (dispositivo_id, tipo, detalle) VALUES (NULL, $1, $2) RETURNING ocurrido_en', [
+        'pasarela_rotacion', JSON.stringify({ pasarela_id: id, id_fisico: p.id_fisico, origen: 'api' }),
+      ]);
+      await this.rotarEnBroker(p.id_fisico, secreto, ROL_PASARELA);
+      await c.query('COMMIT');
+      this.log.log(`rotación de pasarela: ${p.id_fisico}`);
+      return { id, id_fisico: p.id_fisico, rotada_en: ev.rows[0].ocurrido_en.toISOString(), conexion: this.conexionPasarela(p.formato, p.sitio_codigo, p.id_fisico, secreto) };
+    } catch (e) {
+      await c.query('ROLLBACK').catch(() => undefined);
+      throw this.traducir(e, idFisico, 'rotación');
+    } finally {
+      this.soltar(c);
+    }
+  }
+
+  // Lista de pasarelas con sus nodos y la última vez vista, derivada de ellos (la recepción no escribe la fila de la pasarela: punto 27).
+  async listarPasarelas(): Promise<PasarelaListada[]> {
+    const r = await this.pool.query<{ id: string; id_fisico: string; nombre: string; sitio_codigo: string; formato: FormatoPasarela; activo: boolean; nodos: string; vista: Date | null; creado_en: Date }>(
+      `SELECT p.id, p.id_fisico, p.nombre, s.codigo AS sitio_codigo, p.formato, p.activo, p.creado_en,
+              count(d.id) FILTER (WHERE d.estado <> 'baja') AS nodos, max(e.visto_por_ultima_vez) AS vista
+         FROM pasarela p JOIN sitio s ON s.id = p.sitio_id
+         LEFT JOIN dispositivo d ON d.pasarela_id = p.id LEFT JOIN estado_dispositivo e ON e.dispositivo_id = d.id
+        GROUP BY p.id, s.codigo ORDER BY p.id_fisico`,
+    );
+    return r.rows.map((x) => ({
+      id: x.id, id_fisico: x.id_fisico, nombre: x.nombre, sitio_codigo: x.sitio_codigo, formato: x.formato, activo: x.activo,
+      nodos: Number(x.nodos), vista_por_ultima_vez: x.vista ? x.vista.toISOString() : null, creado_en: x.creado_en.toISOString(),
+    }));
+  }
+
+  private async bloquearPasarela(c: PoolClient, id: string): Promise<PasarelaBloqueada> {
+    const r = await c.query<PasarelaBloqueada>(
+      `SELECT p.id, p.id_fisico, p.activo, p.formato, s.codigo AS sitio_codigo
+         FROM pasarela p JOIN sitio s ON s.id = p.sitio_id WHERE p.id = $1 FOR NO KEY UPDATE OF p`,
+      [id],
+    );
+    if (r.rows.length === 0) throw new NotFoundException('pasarela no encontrada');
+    return r.rows[0];
+  }
+
+  private conexionPasarela(formato: FormatoPasarela, codigo: string, idFisico: string, secreto: string): ConexionPasarela {
+    const base = `sitio/${codigo}/pasarela/${idFisico}`;
+    const plantillas: Record<string, string> = formato === 'chirpstack'
+      ? { event_topic: `${base}/{{dev_eui}}/{{event}}`, command_topic: `${base}/{{dev_eui}}/command/{{command}}` }
+      : { uplink: `${base}/$devEUI/up` };
+    return {
+      usuario: idFisico, credencial: secreto, puerto: 8883, publica_en: `${base}/<deveui>/<evento>`, comandos: `${base}/<deveui>/command/#`, plantillas,
+      nota: 'MQTT sobre TLS con la CA del servidor; la credencial solo se muestra ahora (docs/10 §8.4 punto 47)',
+    };
+  }
+
   private async tomar(): Promise<PoolClient> {
     if (this.enCurso >= MAX_ALTAS_EN_CURSO) throw new HttpException(`hay ${MAX_ALTAS_EN_CURSO} operaciones de aprovisionamiento en curso; inténtalo en un momento`, HttpStatus.TOO_MANY_REQUESTS);
     this.enCurso++;
@@ -328,13 +510,13 @@ export class AltaService {
   }
 
   // Rotación: si el broker no conoce al cliente, se crea con su rol (reparación de un huérfano al revés).
-  private async rotarEnBroker(idFisico: string, secreto: string): Promise<void> {
+  private async rotarEnBroker(idFisico: string, secreto: string, rol: string = ROL_DISPOSITIVO): Promise<void> {
     try {
       await this.dynsec.ordenar(ordenRotacion(idFisico, secreto));
     } catch (e) {
       if (!(e instanceof ErrorDynsec) || e.ambiguo || !/not found/i.test(e.message)) throw e;
       this.log.warn(`rotación de ${idFisico}: el broker no tenía ese cliente; se crea con su rol`);
-      await this.dynsec.ordenar(ordenesAltaDispositivo(idFisico, secreto));
+      await this.dynsec.ordenar(ordenesAlta(idFisico, secreto, rol));
     }
   }
 

@@ -302,7 +302,7 @@ sequenceDiagram
   cliente, en el mismo comando (§8.4 punto 42).
 - **La vía se declara en el alta** (§8.4 punto 25): el pipeline usa el formato declarado en vez de adivinarlo, y un
   dispositivo LoRaWAN no tiene credencial propia: lo autentica su pasarela, que solo publica por los dispositivos
-  asociados a ella. **La pasarela se registra por API** (`POST /pasarelas` (ruta prevista), §8.4 punto 47): misma guardia y mismo todo-o-nada
+  asociados a ella. **La pasarela se registra por API** (`POST /pasarelas`, §8.4 punto 47): misma guardia y mismo todo-o-nada
   que el dispositivo (fila, cliente del broker con rol `pasarela` en una orden, evento, credencial mostrada una sola vez); declara
   el **formato** de lo que publica (`milesight` o `chirpstack`) y sus nodos lo heredan en el alta; rotación y baja con las mismas
   órdenes, y la baja deja a sus nodos sin quien publique por ellos (lo que llegue va a cuarentena `no_registrado`, «pasarela
@@ -538,7 +538,7 @@ manda basura, la alerta queda abierta con su último valor (§4.3, fila 9).
 **Lo que falta**, y responde a la pregunta del estudiante del 15/10 («¿y si fue un falso positivo, o algo extraordinario, y después todo
 vuelve a la normalidad?»):
 
-| Necesidad | Hoy | Propuesta (pendiente de decisión) |
+| Necesidad | Hoy | Decidido el 15/10/2026 (punto 49; se implementa si sobra tiempo antes del 30/10, si no en la Etapa 4) |
 |---|---|---|
 | Avisar fuera del panel cuando se abre | No hay envío (RF-36 y RF-37, HU-24 y HU-25) | Correo a los destinatarios del sitio, agrupado en una ventana (RF-38) |
 | **Avisar que volvió a la normalidad** | Solo el evento y el panel en vivo; ningún requisito lo pide | El cierre también se notifica, con el resumen del episodio: duración, valor extremo y cuántas lecturas fuera, todo derivado de la serie sin guardar nada nuevo (la regla de `docs/08 §6`: el registro manda sobre el contador) |
@@ -1226,7 +1226,7 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     centralizan, ese envío cumple R1 y R2. Hecho el 13/10 en el broker: el rol `admin` del plugin, que de fábrica lee todo,
     quedó acotado a `$CONTROL/dynamic-security/#` y `$SYS/#` (probado en el banco). En la base, hecho el 13/10
     (migración 14): el backend entra como `plataforma_app`, que lee todo, inserta solo en las 11 tablas donde el código inserta y actualiza solo en
-    5 (ni DELETE, ni TRUNCATE, ni DDL; `evento`, `medicion` y `trama` no se pueden reescribir, solo agregar);
+    5 (12 y 6 desde la migración 16: `pasarela`, para su alta y su baja por API; ni DELETE, ni TRUNCATE, ni DDL; `evento`, `medicion` y `trama` no se pueden reescribir, solo agregar);
     el dueño queda para migraciones y semillas. La retención, que usa `drop_chunks` y este exige ser dueño de la hypertable, pasa
     por una sola función del dueño (`fn_retencion_drop_chunks`, `SECURITY DEFINER`, lista blanca de cuatro tablas, mínimo de días,
     `search_path` fijo) que la aplicación solo puede ejecutar. Se eligió así frente a un proceso aparte con el dueño (un
@@ -1269,8 +1269,8 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
 
 47. **Adaptadores LoRaWAN: despacho por el formato declarado, tópico de pasarela y mapa de claves** (decidido el 15/10/2026 con las
     fuentes oficiales de ChirpStack v4 y de la pasarela Milesight UG63, registro privado CS-01…11 y B-42…50; **en implementación**:
-    lo que sigue es lo que el código debe cumplir; hechos el 15/10 los adaptadores y el filtro 1 de pasarela, `docs/16 §28–§29`;
-    faltan el alta de pasarelas por API, su rol en el broker y el banco). Las rutas B y C entran por el mismo tópico,
+    lo que sigue es lo que el código debe cumplir; hechos el 15/10 los adaptadores, el filtro 1 de pasarela y el alta, la baja y la rotación de
+    pasarelas por API con su rol en el broker, `docs/16 §28–§30`; falta la prueba de punta a punta en el banco). Las rutas B y C entran por el mismo tópico,
     `sitio/<sitio>/pasarela/<id_pasarela>/<deveui>/<evento>`: ChirpStack lo produce con su plantilla `event_topic` y la pasarela
     Milesight con el comodín `$devEUI`. **Orden del filtro 1 para ese tópico:** (i) la pasarela debe estar registrada, activa y en
     el sitio del tópico; si no, cuarentena `no_registrado` con cualquier evento, porque es una credencial publicando donde no le
@@ -1296,6 +1296,11 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     `malformada` («ninguna clave conocida») y el nodo se marca vivo, como con cualquier trama malformada de un dispositivo
     autenticado (§4). `rssi` y `snr` quedan en la trama cruda para HU-15. La pasarela se da de alta, rota y da de baja por API
     (`/pasarelas`), con credencial propia y rol `pasarela`: publica solo bajo su árbol y se suscribe solo a su subárbol de comandos.
+    La credencial de una pasarela vive en la misma tabla que la de un dispositivo, con un titular y solo uno (migración 16), y la
+    aplicación gana `INSERT` y `UPDATE` en `pasarela` para el alta y la baja; los eventos llevan `dispositivo_id` nulo y la pasarela en el
+    detalle (`pasarela_alta`, `pasarela_baja`, `pasarela_rotacion`). La respuesta del alta trae la conexión lista para copiar según el
+    formato: para ChirpStack, `event_topic` y `command_topic`; para Milesight, el tópico del uplink con `$devEUI`. `GET /pasarelas`
+    lista cada una con sus nodos y la última vez vista, derivada de ellos.
     La suscripción se permite porque la configuración oficial de ChirpStack dice del tópico de comandos «This is the topic on which
     the MQTT subscribes for receiving (enqueue) commands» (https://www.chirpstack.io/docs/chirpstack/configuration.html, consultada
     el 15/10/2026); cómo reacciona si se le niega no está documentado y queda por probar. Se prueba con el emulador (JSON exacto de
@@ -1313,6 +1318,14 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     con unas 0,1 alarmas falsas por nodo y día si la pérdida en terreno llega al 10 %; con 300 s tardaría 10 minutos. La cuenta supone
     pérdidas independientes y se revisa cuando el compañero mida la pérdida real. El intervalo es un dato del dispositivo, editable
     desde el panel (§4.4, regla de parámetros del usuario).
+
+49. **Ciclo de vida de una alerta: aviso de cierre, retardo de activación y reconocimiento** (decidido el 15/10/2026 por el estudiante;
+    **diseño, se implementa solo si sobra tiempo antes del 30/10, si no en la Etapa 4**; la tabla de §4.4). (a) El cierre de una condición
+    también se notifica, con el resumen del episodio (duración, valor extremo y lecturas fuera), derivado de la serie sin guardar nada
+    nuevo (RF-36). (b) Cada regla de umbral tiene un retardo de activación, 0 por defecto, que es el comportamiento de hoy: la condición
+    se abre solo si el valor sigue fuera ese tiempo (RF-14). (c) Una alerta se reconoce diciendo quién, cuándo y qué fue: real, falso
+    positivo o mantenimiento no avisado; necesita la sesión (M7) para el «quién» y nunca borra datos (RF-39). Los tres parámetros son
+    del usuario y se editan desde el panel (regla de §4.4).
 
 ## 9. Crecimiento, resiliencia y respaldo (aprobado el 06/10/2026)
 

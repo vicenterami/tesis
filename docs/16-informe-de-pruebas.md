@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 222 pruebas unitarias, sin matriz formal) y TT-32 (sensor físico);
+cubre todavía: TT-27 (contrato de trama: hoy 230 pruebas unitarias, sin matriz formal) y TT-32 (sensor físico);
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -721,3 +721,25 @@ tópico; un formato de pasarela solo se acepta por el tópico de pasarela y uno 
 Plantado, una falla por vez y restaurando el archivo original: sin pasar el DevEUI a minúsculas, con los eventos distintos de `up`
 siguiendo al pipeline, y sin el retorno temprano de la identidad cruzada; cada uno hace fallar su prueba. Total: 222 pruebas. Falta el alta de
 pasarelas por API, su rol en el broker y la prueba de punta a punta en el banco.
+
+## 30. Pasarelas por API y su credencial (15/10/2026)
+
+**Qué cambió** (`docs/10 §3` y §8.4 punto 47; migración 16). `POST /pasarelas`, `DELETE /pasarelas/{id}` y `POST /pasarelas/{id}/credencial`,
+con la clave de administrador y el mismo todo o nada que los dispositivos; `GET /pasarelas` de lectura. La credencial de una pasarela vive
+en `credencial` con un titular y solo uno, y la aplicación puede insertar y actualizar pasarelas. El rol `pasarela` del broker publica bajo
+su árbol y se suscribe solo a su subárbol de comandos.
+
+| Prueba | Resultado |
+|---|---|
+| Alta | pasarela, hash de su credencial, evento con `dispositivo_id` nulo y cliente con rol `pasarela` antes del COMMIT; el secreto en ningún parámetro SQL; plantillas `event_topic` y `command_topic` (ChirpStack) o el uplink con `$devEUI` (Milesight) |
+| Sitio inexistente o inactivo | 400 sin tocar el broker; sin administración del broker, 503 |
+| El broker no responde | ROLLBACK y orden de borrar el cliente por si llegó a crearse |
+| Baja | bloqueo `FOR NO KEY UPDATE`, `activo = false`, credenciales revocadas, nodos contados, `deleteClient` antes del COMMIT |
+| Baja o rotación de una dada de baja, o de una inexistente | 409 o 404 |
+| Rotación | la anterior inactiva, la nueva con su hash, `setClientPassword` antes del COMMIT, mismas plantillas |
+| Migración 16 en una base desde cero | credencial sin titular o con dos, rechazada; la de una pasarela, aceptada; sin la regla fallan los dos casos (plantado) |
+| Prueba de humo | contrato con 12 rutas y 15 operaciones; las tres rutas de pasarela que escriben, 401 o 503 sin la clave |
+
+Unitarias en `pasarelas.spec.ts` (8). Plantado, restaurando el archivo original: con el rol de dispositivo para una pasarela falla el alta, y
+con `FOR UPDATE` falla la baja. Total: 230 pruebas. Falta la prueba de punta a punta en el banco: alta real, publicación con la credencial,
+la ACL del rol y la recepción por el filtro 1.

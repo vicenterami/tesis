@@ -1,4 +1,4 @@
--- Reglas de identidad de las migraciones 11 y 15 (docs/10 §8.4 puntos 24 y 47), plantadas: cada caso intenta lo prohibido y espera el
+-- Reglas de identidad de las migraciones 11, 15 y 16 (docs/10 §8.4 puntos 24 y 47), plantadas: cada caso intenta lo prohibido y espera el
 -- rechazo de la base. Todo ocurre dentro de una transacción que termina en ROLLBACK: no queda nada en la base.
 -- La corre el guardián (paso 1c). La carrera de dos altas simultáneas no cabe en una sola sesión: se probó a mano (docs/16 §13).
 BEGIN;
@@ -97,6 +97,28 @@ BEGIN
       ELSE 'FALLA el nodo no siguió a su pasarela: quedó en ' || coalesce(f, 'nada') END);
   EXCEPTION WHEN OTHERS THEN
     INSERT INTO resultado VALUES (11, 'FALLA no se pudo corregir el formato de la pasarela: ' || SQLERRM);
+  END;
+  -- Migración 16: una credencial tiene un titular y solo uno (un dispositivo o una pasarela).
+  BEGIN
+    INSERT INTO credencial (hash) VALUES ('x');
+    INSERT INTO resultado VALUES (12, 'FALLA se aceptó una credencial sin titular');
+  EXCEPTION WHEN check_violation THEN
+    INSERT INTO resultado VALUES (12, 'OK    credencial sin titular: rechazada');
+  END;
+  BEGIN
+    INSERT INTO credencial (dispositivo_id, pasarela_id, hash)
+      SELECT (SELECT id FROM dispositivo WHERE id_fisico = 'prueba-identidad-d'), id, 'x' FROM pasarela WHERE id_fisico = 'prueba-identidad-p';
+    INSERT INTO resultado VALUES (13, 'FALLA se aceptó una credencial con dos titulares');
+  EXCEPTION WHEN check_violation THEN
+    GET STACKED DIAGNOSTICS restriccion = CONSTRAINT_NAME;
+    INSERT INTO resultado VALUES (13, CASE WHEN restriccion = 'ck_credencial_titular' THEN 'OK    credencial con dos titulares: rechazada'
+      ELSE 'FALLA credencial con dos titulares rechazada por otra regla: ' || restriccion END);
+  END;
+  BEGIN
+    INSERT INTO credencial (pasarela_id, hash) SELECT id, 'x' FROM pasarela WHERE id_fisico = 'prueba-identidad-p';
+    INSERT INTO resultado VALUES (14, 'OK    credencial de una pasarela: aceptada');
+  EXCEPTION WHEN OTHERS THEN
+    INSERT INTO resultado VALUES (14, 'FALLA se rechazó la credencial legítima de una pasarela: ' || SQLERRM);
   END;
 END $$;
 SELECT linea FROM resultado ORDER BY orden;

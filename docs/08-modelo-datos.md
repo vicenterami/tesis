@@ -25,7 +25,7 @@ uniformidad es la que resuelve la causa C1 (formatos dispares).
 | 3 | **magnitud** | Catálogo de lo que se puede medir (temperatura, humedad, nivel…) | Define la unidad canónica y el rango válido |
 | 4 | **dispositivo** | Un nodo físico que reporta (ESP32, sensor LoRa…) | Pertenece a una zona; se identifica por un id físico (MAC/DevEUI, lista blanca `[a-z0-9-]`); declara su **vía** (mqtt, http, lorawan), su **formato** (`senml` o `plano` si llega directo; en la vía lorawan, el de su pasarela: `milesight` o `chirpstack`) y, si llega por LoRaWAN, su **pasarela** (migraciones 11 y 15) |
 | 5 | **canal** | Una magnitud concreta que un dispositivo reporta | Un dispositivo puede tener varios canales (temp + humedad) |
-| 6 | **credencial** | Secreto de autenticación de un dispositivo | Permite rotación sin borrar el dispositivo |
+| 6 | **credencial** | Secreto de autenticación de un dispositivo o de una pasarela (exactamente uno de los dos es su titular, migración 16) | Permite rotación sin borrar al titular |
 | 7 | **medicion** | Una lectura: valor + unidad + tiempo | **Hypertable** de TimescaleDB (serie de tiempo) |
 | 8 | **regla_umbral** | Límite que, al cruzarse, abre una condición | Con histéresis (umbral de disparo y de restauración) |
 | 9 | **condicion** | Un estado anómalo abierto de un dispositivo | Se abre y se cierra; guarda inicio, fin y duración |
@@ -339,6 +339,9 @@ consistente para reportes.
 - [ ] **Historial de ubicaciones** (decidido el 09/10/2026, `docs/10 §8.4` punto 39): tabla `ubicacion_dispositivo`
       (`dispositivo_id`, `zona_id`, `desde`, `hasta`), con una sola ubicación vigente por dispositivo; las consultas por sitio
       filtran la historia por período. Se implementa con la pantalla de mudanza (HU-12, Etapa 4).
+- [ ] **Alertas (decidido el 15/10/2026, `docs/10 §8.4` punto 49; si sobra tiempo, si no Etapa 4):** `regla_umbral.retardo_s` (entero ≥ 0,
+      0 por defecto) y una tabla de reconocimientos (condición, usuario, instante, clasificación con `CHECK`: `real`, `falso_positivo`,
+      `mantenimiento_no_avisado`). El resumen del episodio no se guarda: se deriva de `medicion` entre `abierta_en` y `cerrada_en`.
 - [ ] **Estado de la pasarela**: `pasarela.visto_por_ultima_vez` vive en una tabla editable con disparador. Por eso la recepción
       LoRaWAN (HU-02, `docs/10 §8.4` punto 47) no la escribe: la «última vez vista» de una pasarela se deriva de sus nodos. Cuando se
       supervise la pasarela por sí misma (HU-15), pasa a una tabla de estado, como la del dispositivo (punto 27).

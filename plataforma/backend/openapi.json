@@ -576,6 +576,185 @@
           "dispositivos"
         ]
       }
+    },
+    "/pasarelas": {
+      "get": {
+        "description": "Cada pasarela con su formato, su estado, sus nodos y la última vez vista, derivada de ellos.",
+        "operationId": "PasarelasController_listar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Lista de pasarelas"
+          }
+        },
+        "summary": "Listar pasarelas",
+        "tags": [
+          "pasarelas"
+        ]
+      },
+      "post": {
+        "description": "Crea la pasarela, su credencial (solo el hash en la base) y su cliente del broker con el rol `pasarela`, todo o nada. La respuesta trae, UNA sola vez, la credencial y las plantillas de tópico del formato declarado (ChirpStack: `event_topic` y `command_topic`; Milesight: el tópico del uplink con `$devEUI`). Sus nodos se dan de alta con `POST /dispositivos` y `via = lorawan`. Exige `X-Clave-Admin`.",
+        "operationId": "PasarelasController_crear",
+        "parameters": [
+          {
+            "name": "X-Clave-Admin",
+            "in": "header",
+            "description": "Clave de administrador (HTTP_CLAVE_ADMIN del servidor)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "id_fisico",
+                  "nombre",
+                  "sitio_id",
+                  "formato"
+                ],
+                "properties": {
+                  "id_fisico": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9][a-z0-9-]{2,62}$",
+                    "description": "Identificador de la pasarela; también su usuario del broker"
+                  },
+                  "nombre": {
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  "sitio_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  },
+                  "formato": {
+                    "type": "string",
+                    "enum": [
+                      "milesight",
+                      "chirpstack"
+                    ],
+                    "description": "Lo que publica: servidor de red embebido (milesight) o ChirpStack"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Pasarela creada; `conexion` trae la credencial (una sola vez) y las plantillas de tópico"
+          },
+          "400": {
+            "description": "Cuerpo inválido, sitio inexistente o inactivo"
+          },
+          "401": {
+            "description": "Cabecera X-Clave-Admin ausente o incorrecta"
+          },
+          "409": {
+            "description": "El id_fisico ya existe (pasarela o dispositivo, o huérfano en el broker)"
+          },
+          "429": {
+            "description": "Ya hay 2 operaciones de aprovisionamiento en curso; reintentar en un momento"
+          },
+          "502": {
+            "description": "El broker no aceptó la credencial; nada quedó creado"
+          },
+          "503": {
+            "description": "Sin clave de administrador configurada, o sin conexión de administración con el broker"
+          }
+        },
+        "summary": "Dar de alta una pasarela o un servidor de red externo",
+        "tags": [
+          "pasarelas"
+        ]
+      }
+    },
+    "/pasarelas/{id}": {
+      "delete": {
+        "description": "`activo = false`, credenciales revocadas, evento y cliente borrado del broker, en una transacción. Exige `X-Clave-Admin`.",
+        "operationId": "PasarelasController_darDeBaja",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "UUID de la pasarela",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Clave-Admin",
+            "in": "header",
+            "description": "Clave de administrador (HTTP_CLAVE_ADMIN del servidor)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Dada de baja: credenciales revocadas y nodos que quedan sin pasarela"
+          },
+          "404": {
+            "description": "No existe"
+          },
+          "409": {
+            "description": "Ya estaba dada de baja"
+          }
+        },
+        "summary": "Dar de baja una pasarela",
+        "tags": [
+          "pasarelas"
+        ]
+      }
+    },
+    "/pasarelas/{id}/credencial": {
+      "post": {
+        "description": "Credencial nueva (una sola vez), la anterior inactiva y `setClientPassword` en el broker. Exige `X-Clave-Admin`.",
+        "operationId": "PasarelasController_rotar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "UUID de la pasarela",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Clave-Admin",
+            "in": "header",
+            "description": "Clave de administrador (HTTP_CLAVE_ADMIN del servidor)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Credencial rotada; `conexion` trae la nueva y las plantillas de tópico"
+          },
+          "404": {
+            "description": "No existe"
+          },
+          "409": {
+            "description": "Está dada de baja"
+          }
+        },
+        "summary": "Rotar la credencial de una pasarela",
+        "tags": [
+          "pasarelas"
+        ]
+      }
     }
   },
   "info": {

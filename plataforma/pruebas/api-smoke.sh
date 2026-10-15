@@ -37,7 +37,7 @@ fi
 caso "UUID inválido → 400"                    /dispositivos/no-es-uuid 400
 caso "limite fuera de rango → 400"            "/condiciones?limite=99999" 400
 caso "condiciones abiertas es lista con duracion_s" "/condiciones?abiertas=true" "isinstance(r,list) and all(isinstance(c['duracion_s'],int) for c in r)"
-caso "contrato OpenAPI servido con 9 rutas (11 operaciones: alta, baja y rotación incluidas), con el canal /eventos como text/event-stream" /docs/openapi.json "len(r['paths'])==9 and sum(1 for p in r['paths'].values() for m in p if m in {'get','post','put','patch','delete'})==11 and 'post' in r['paths']['/dispositivos'] and 'delete' in r['paths']['/dispositivos/{id}'] and 'post' in r['paths']['/dispositivos/{id}/credencial'] and r['openapi'].startswith('3.') and 'text/event-stream' in r['paths']['/eventos']['get']['responses']['200']['content']"
+caso "contrato OpenAPI servido con 12 rutas (15 operaciones: alta, baja y rotación de dispositivos y de pasarelas incluidas), con el canal /eventos como text/event-stream" /docs/openapi.json "len(r['paths'])==12 and sum(1 for p in r['paths'].values() for m in p if m in {'get','post','put','patch','delete'})==15 and 'post' in r['paths']['/dispositivos'] and 'delete' in r['paths']['/dispositivos/{id}'] and 'post' in r['paths']['/dispositivos/{id}/credencial'] and r['openapi'].startswith('3.') and 'text/event-stream' in r['paths']['/eventos']['get']['responses']['200']['content']"
 # El servido (generado en caliente desde los decoradores) vs. el versionado en el repo (se
 # desincroniza si alguien cambia una ruta y olvida correr `pnpm openapi` antes de commitear).
 caso "OpenAPI servido == OpenAPI versionado (mismas rutas y métodos)" /docs/openapi.json \
@@ -58,6 +58,12 @@ code=$(curl -s -o /dev/null -w '%{http_code}' -X DELETE "$API/dispositivos/no-es
 [[ "$code" == 401 || "$code" == 503 ]] && echo "OK    DELETE /dispositivos/{id} sin X-Clave-Admin → $code (antes de mirar el UUID)" || { echo "FALLA DELETE sin clave → HTTP $code (esperado 401 o 503)"; fallos=$((fallos+1)); }
 code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$API/dispositivos/no-es-uuid/credencial")
 [[ "$code" == 401 || "$code" == 503 ]] && echo "OK    POST /dispositivos/{id}/credencial sin X-Clave-Admin → $code" || { echo "FALLA rotación sin clave → HTTP $code (esperado 401 o 503)"; fallos=$((fallos+1)); }
+# Pasarelas (docs/10 §8.4 punto 47, 15/10): la lista es de lectura; las tres rutas que escriben exigen la clave, antes de mirar el UUID.
+caso "pasarelas es una lista con formato y nodos" /pasarelas "isinstance(r,list) and all(p['formato'] in ('milesight','chirpstack') and isinstance(p['nodos'],int) for p in r)"
+for ruta in "POST /pasarelas" "DELETE /pasarelas/no-es-uuid" "POST /pasarelas/no-es-uuid/credencial"; do
+  code=$(curl -s -o /dev/null -w '%{http_code}' -X "${ruta%% *}" -H 'Content-Type: application/json' -d '{}' "$API${ruta#* }")
+  [[ "$code" == 401 || "$code" == 503 ]] && echo "OK    $ruta sin X-Clave-Admin → $code" || { echo "FALLA $ruta sin clave → HTTP $code (esperado 401 o 503)"; fallos=$((fallos+1)); }
+done
 # Filtro por dispositivo (ficha del panel, docs/19 P3; 12/10): solo lo de ese dispositivo, y un valor que no es UUID → 400.
 DISP=$(curl -s "$API/dispositivos" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0]['id'] if d else '')")
 DISP_FIS=$(curl -s "$API/dispositivos" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0]['id_fisico'] if d else '')")
