@@ -512,10 +512,10 @@ salud del enlace, no calidad del dato (§4), y una condición de umbral solo la 
 |---|---|---|---|
 | 1 | Una trama malformada y después tramas buenas (un reinicio del nodo a mitad de envío, un error pasajero del firmware) | La mala va a cuarentena `malformada` con su carga cruda (30 días); el dispositivo queda vivo; las siguientes se guardan; no se abre ninguna condición | Ninguno: se perdió esa lectura y queda la evidencia |
 | 2 | Interferencia de radio o de red | En LoRaWAN la integridad se protege en el aire (TS001-1.0.4) y la verifica el servidor de red antes de publicar; en Wi-Fi o celular, TCP y TLS detectan la corrupción y retransmiten. Para este sistema una trama dañada en el camino se ve como una que no llegó (fila 4), no como una malformada | Ninguno propio: si la pérdida es frecuente, la mide el compañero en terreno (PL) y se ajusta el intervalo esperado |
-| 3 | Una racha de tramas malas y después vuelve a estar bien | Cada mala, a cuarentena; vivo todo el tiempo; al volver se guardan; ninguna condición se abrió | El operador no se entera mientras dura, salvo que mire la cuarentena (§8.1, propuesta) |
+| 3 | Una racha de tramas malas y después vuelve a estar bien | Cada mala, a cuarentena; vivo todo el tiempo; al volver se guardan; ninguna condición se abrió | El operador no se entera mientras dura, salvo que mire la cuarentena: lo cubre `datos_invalidos` (punto 48) |
 | 4 | Funcionaba bien y después silencio total | El barrido periódico (`SUPERVISION_INTERVALO_S`: 60 s; 5 s en la demostración) abre `sin_comunicacion` cuando el silencio supera dos veces `intervalo_esperado_s` (RNF-03); se cierra con la siguiente trama autenticada | Ninguno |
-| 5 | Silencio y después vuelve mandando basura | `sin_comunicacion` se cierra, porque el enlace volvió, y no queda ninguna condición sobre los datos: el panel lo muestra «en línea» sin lecturas nuevas | Sí: es el caso más engañoso (§8.1) |
-| 6 | Solo basura durante días | Vivo, sin condiciones; la cuarentena acumula una fila por trama y la limpieza programada las borra a los 30 días | Sí (§8.1) |
+| 5 | Silencio y después vuelve mandando basura | `sin_comunicacion` se cierra, porque el enlace volvió, y no queda ninguna condición sobre los datos: el panel lo muestra «en línea» sin lecturas nuevas | Sí: es el caso más engañoso; lo cubre `datos_invalidos` (punto 48) |
+| 6 | Solo basura durante días | Vivo, sin condiciones; la cuarentena acumula una fila por trama y la limpieza programada las borra a los 30 días | Sí; lo cubre `datos_invalidos` (punto 48) |
 | 7 | «Casi bien»: una trama con lecturas buenas y malas | Las buenas se guardan; las malas van a una sola fila de cuarentena `invalida` con todos los motivos | Ninguno |
 | 8 | Un valor posible pero falso (un 25,3 que llega como 2,53, dentro del rango físico) | Se guarda como real; solo lo detectaría un umbral configurado | Sí: una regla de salto brusco es candidata desde la entrevista del 05/10, sin diseñar |
 | 9 | Un umbral abierto y después silencio o basura | La condición de umbral queda abierta con su último valor, porque solo una lectura guardada la reevalúa; si calla, se suma `sin_comunicacion` | Ninguno: es lo correcto, el último dato conocido seguía fuera de rango |
@@ -523,8 +523,33 @@ salud del enlace, no calidad del dato (§4), y una condición de umbral solo la 
 | 11 | LoRaWAN: un `up` sin objeto decodificado, o sin ninguna clave del mapa | Cuarentena `malformada` con qué activar o qué faltó; el nodo vivo (punto 47) | El de la fila 6, si se repite |
 
 Los huecos de las filas 3, 5 y 6 son el mismo: **un dispositivo que se comunica pero no entrega datos válidos**. La condición que los
-cubre está propuesta desde el 23/09 en §8.1 y queda pendiente de decisión: si se abre por un número de tramas seguidas rechazadas o
-por tiempo sin ninguna lectura guardada, con la misma tolerancia que el silencio.
+cubre, propuesta desde el 23/09 en §8.1, quedó decidida el 15/10/2026 (punto 48): por tiempo, con la misma tolerancia que el silencio.
+
+
+### 4.4 Ciclo de vida de una alerta de umbral: abrir, avisar, volver a la normalidad (15/10/2026)
+
+**Hoy, verificado en `AlertasService`.** Una alerta de umbral es una **condición** con apertura y cierre, no un mensaje suelto. Se abre con
+la primera lectura guardada que cruza el umbral, salvo con el equipo en mantenimiento (RF-22), y deja un evento `condicion_abierta` con el
+valor y el umbral más un aviso en vivo al panel. Se cierra **sola** cuando una lectura vuelve más adentro que el umbral menos la
+histéresis, y deja `condicion_cerrada` con el valor de vuelta más otro aviso al panel. La histéresis evita el «abre, cierra, abre» de un
+valor que oscila en el borde. De cada episodio queda el inicio, el fin y la duración, y las lecturas siguen en la serie. Si el nodo calla o
+manda basura, la alerta queda abierta con su último valor (§4.3, fila 9).
+
+**Lo que falta**, y responde a la pregunta del estudiante del 15/10 («¿y si fue un falso positivo, o algo extraordinario, y después todo
+vuelve a la normalidad?»):
+
+| Necesidad | Hoy | Propuesta (pendiente de decisión) |
+|---|---|---|
+| Avisar fuera del panel cuando se abre | No hay envío (RF-36 y RF-37, HU-24 y HU-25) | Correo a los destinatarios del sitio, agrupado en una ventana (RF-38) |
+| **Avisar que volvió a la normalidad** | Solo el evento y el panel en vivo; ningún requisito lo pide | El cierre también se notifica, con el resumen del episodio: duración, valor extremo y cuántas lecturas fuera, todo derivado de la serie sin guardar nada nuevo (la regla de `docs/08 §6`: el registro manda sobre el contador) |
+| Un pico aislado que no es real (ruido, golpe, un error del sensor dentro del rango físico) | Abre con una sola lectura | **Retardo de activación por regla**: abrir solo si el valor sigue fuera durante un tiempo configurable; 0 por defecto, que es el comportamiento de hoy. Es el equivalente en el tiempo de lo que la histéresis hace en el valor |
+| Separar un falso positivo de algo extraordinario | No hay forma | **Reconocer** la alerta (RF-39) diciendo quién, cuándo y qué fue: real, falso positivo o mantenimiento no avisado. Queda en el historial; los datos no se borran nunca |
+| Un evento extraordinario se pierde entre lecturas normales | La serie lo conserva; nada lo destaca | El resumen del episodio (fila 2) y la vista de condiciones del panel (P4) con su valor extremo |
+
+**Regla para todo parámetro que dependa del usuario** (15/10/2026, a pedido del estudiante): umbral, histéresis, retardo de activación,
+intervalo esperado, aviso de cierre y destinatarios viven en la base, en la regla, el dispositivo o el sitio, nunca en el `.env`, para que
+el panel los edite sin tocar el servidor (pantalla de configuración, `docs/19`; con bloqueo optimista, punto 28). Lo que queda en el `.env`
+es del operador del servidor: el periodo del barrido, los topes de memoria y las claves.
 
 ## 5. Secuencia: panel en tiempo real (patrón B)
 
@@ -723,7 +748,7 @@ ocupar más núcleos. No está en el alcance de esta etapa: RNF-14 fija un únic
 
 ## 8. Propuestas abiertas y pendientes
 
-### 8.1 Un dispositivo que comunica pero no entrega datos válidos (propuesta, 23/09/2026)
+### 8.1 Un dispositivo que comunica pero no entrega datos válidos (propuesta, 23/09/2026; la parte 1 se decidió el 15/10/2026 por tiempo, no por conteo: §8.4 punto 48)
 
 **El problema.** Hoy un nodo mal configurado que publica cada cinco minutos una trama inválida queda
 «vivo» (correcto: su enlace funciona) pero genera una fila de `cuarentena` cada vez: 288 filas al día,
@@ -1244,7 +1269,8 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
 
 47. **Adaptadores LoRaWAN: despacho por el formato declarado, tópico de pasarela y mapa de claves** (decidido el 15/10/2026 con las
     fuentes oficiales de ChirpStack v4 y de la pasarela Milesight UG63, registro privado CS-01…11 y B-42…50; **en implementación**:
-    lo que sigue es lo que el código debe cumplir). Las rutas B y C entran por el mismo tópico,
+    lo que sigue es lo que el código debe cumplir; hechos el 15/10 los adaptadores y el filtro 1 de pasarela, `docs/16 §28–§29`;
+    faltan el alta de pasarelas por API, su rol en el broker y el banco). Las rutas B y C entran por el mismo tópico,
     `sitio/<sitio>/pasarela/<id_pasarela>/<deveui>/<evento>`: ChirpStack lo produce con su plantilla `event_topic` y la pasarela
     Milesight con el comodín `$devEUI`. **Orden del filtro 1 para ese tópico:** (i) la pasarela debe estar registrada, activa y en
     el sitio del tópico; si no, cuarentena `no_registrado` con cualquier evento, porque es una credencial publicando donde no le
@@ -1276,6 +1302,17 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     ambas fuentes), en el banco (`banco.sh lorawan`) y en terreno apenas una pasarela alcance al servidor (`docs/14`; prueba en la
     misma red local prevista para la semana del 20/10/2026). **La prueba en terreno entra por el 8883 del proxy, con TLS y la CA
     propia** (regla R2 del punto 44), nunca por el 1883: por ahí la credencial de la pasarela viajaría en claro por la red.
+
+48. **Condición `datos_invalidos` e intervalo esperado de los nodos LoRaWAN** (decidido el 15/10/2026 por el estudiante; **diseño, se
+    implementa después del bloque LoRaWAN**). Un dispositivo vivo que no guarda ninguna lectura en dos veces su `intervalo_esperado_s`
+    abre `datos_invalidos`, la misma tolerancia que el silencio (RNF-03); se cierra con la primera lectura guardada. Lo hace el mismo
+    barrido que `sin_comunicacion`, con la hora de la última lectura guardada en `estado_dispositivo` (lo escribe el sistema, punto 27); el
+    `CHECK` de `condicion.tipo` se amplía en su migración. Se eligió el tiempo y no el conteo de tramas rechazadas porque el mismo número
+    de tramas son segundos en un nodo Wi-Fi y minutos en uno LoRaWAN. Cubre las filas 3, 5 y 6 de §4.3. **Intervalo esperado de un nodo
+    LoRaWAN que reporta cada 60 s: 180 s**, con lo que la alarma de silencio abre a los 6 minutos; con 120 s abriría a los 4 minutos pero
+    con unas 0,1 alarmas falsas por nodo y día si la pérdida en terreno llega al 10 %; con 300 s tardaría 10 minutos. La cuenta supone
+    pérdidas independientes y se revisa cuando el compañero mida la pérdida real. El intervalo es un dato del dispositivo, editable
+    desde el panel (§4.4, regla de parámetros del usuario).
 
 ## 9. Crecimiento, resiliencia y respaldo (aprobado el 06/10/2026)
 

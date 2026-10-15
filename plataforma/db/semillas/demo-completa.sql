@@ -16,7 +16,7 @@
 --     demo-mantenimiento   mqtt/senml         mantenimiento  sí        0         batería y RSSI; el supervisor no lo mira
 --     demo-baja            mqtt/senml         baja           no        0         credencial inactiva, cuarentena «dado_de_baja», condición cerrada al darlo de baja
 --     demo-http-01         http/senml         activo         null      0         nunca visto: «esperando la primera trama»
---     demo-lora-01         lorawan/milesight  activo         sí        0         con pasarela; intervalo 300 s (5 × 60 s; por revisar: la alarma abre a 2 × intervalo)
+--     demo-lora-01         lorawan/milesight  activo         sí        0         con pasarela; intervalo 180 s (3 × 60 s: la alarma abre a 2 × intervalo, 6 min)
 --     demo-lora-02         lorawan/milesight  activo         sí        1 batería condición de batería abierta (ningún código la abre aún) y manipulación cerrada
 --     d03                  mqtt/plano         activo         sí        0         identificador de 3 caracteres (mínimo) y nombre de 1 («Ñ»)
 --     demo-identificador-e…  mqtt/senml         activo         sí        0         identificador de 63 caracteres (máximo) y nombre de 80 con acentos
@@ -28,7 +28,7 @@
 -- semáforo según la tabla, demo-http-01 como «esperando la primera trama», demo-baja y demo-mantenimiento distinguibles; P3 ficha de
 -- demo-aire-01 con el hueco y el pico en el rango de 30 días y de demo-mag-01 con la hora de Punta Arenas; nombres largos sin romper
 -- la tabla; P4 condiciones con los 4 tipos (dos de ellos, batería y manipulación, que el backend todavía no abre).
--- Ventanas que cambian solas: lora-01 y lora-02 (intervalo 300 s) pasan a «sin comunicación» a los 10 min, y los de 3 600 s a las
+-- Ventanas que cambian solas: lora-01 y lora-02 (intervalo 180 s) pasan a «sin comunicación» a los 6 min, y los de 3 600 s a las
 -- 2 h, porque nadie publica; volver a correr la semilla los deja en línea otra vez.
 
 BEGIN;
@@ -72,8 +72,8 @@ FROM (VALUES
   ('00000000-0000-0000-0000-0000000000a3', 'demo-mantenimiento', 'Nodo en mantenimiento',         'mantenimiento', 3600, 'mqtt',    'senml',     NULL, 12),
   ('00000000-0000-0000-0000-0000000000a3', 'demo-baja',          'Nodo retirado',                 'baja',          3600, 'mqtt',    'senml',     NULL, 25),
   ('00000000-0000-0000-0000-000000000002', 'demo-http-01',       'Nodo por HTTP recién instalado','activo',         600, 'http',    'senml',     NULL,  0),
-  ('00000000-0000-0000-0000-0000000000a3', 'demo-lora-01',       'LoRaWAN parcela norte',         'activo',         300, 'lorawan', 'milesight', 'demo-pasarela-01', 10),
-  ('00000000-0000-0000-0000-0000000000a3', 'demo-lora-02',       'LoRaWAN con batería baja',      'activo',         300, 'lorawan', 'milesight', 'demo-pasarela-01', 10),
+  ('00000000-0000-0000-0000-0000000000a3', 'demo-lora-01',       'LoRaWAN parcela norte',         'activo',         180, 'lorawan', 'milesight', 'demo-pasarela-01', 10),
+  ('00000000-0000-0000-0000-0000000000a3', 'demo-lora-02',       'LoRaWAN con batería baja',      'activo',         180, 'lorawan', 'milesight', 'demo-pasarela-01', 10),
   ('00000000-0000-0000-0000-000000000002', 'd03',              'Ñ',                             'activo',        3600, 'mqtt',    'plano',     NULL,  5),
   ('00000000-0000-0000-0000-000000000002', 'demo-identificador-en-el-limite-de-sesenta-y-tres-caracteres-ok', 'Estación del pabellón de Química — sensor con ñ, tildes, «comillas» y señal débi', 'activo', 3600, 'mqtt', 'senml', NULL, 5),
   ('00000000-0000-0000-0000-0000000000a4', 'demo-mag-01',        'Calidad del aire, Magallanes',  'activo',        3600, 'mqtt',    'senml',     NULL,  8)
