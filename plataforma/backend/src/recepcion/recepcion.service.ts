@@ -6,6 +6,9 @@ import { POOL } from '../db/db.module';
 import { SupervisionService } from '../supervision/supervision.service';
 import { EventosService } from '../tiempo-real/eventos.service';
 import { Adaptador, TramaMalformada } from './adaptadores/adaptador';
+import { ChirpstackAdaptador } from './adaptadores/chirpstack.adaptador';
+import { IdentidadCruzada } from './adaptadores/lorawan';
+import { MilesightAdaptador } from './adaptadores/milesight.adaptador';
 import { PlanoAdaptador } from './adaptadores/plano.adaptador';
 import { SenmlAdaptador } from './adaptadores/senml.adaptador';
 import { ContextoTrama, Lectura } from './lectura';
@@ -14,8 +17,13 @@ import { aCanonica } from './unidades';
 
 // Forma del tópico acordada: sitio/<sitio>/dispositivo/<id_fisico>/<magnitud>
 const PATRON_TOPICO = /^sitio\/([^/]+)\/dispositivo\/([^/]+)\/([^/]+)$/;
+// Tópico de pasarela (rutas B y C, docs/10 §8.4 punto 47): sitio/<sitio>/pasarela/<id_pasarela>/<deveui>/<evento>
+const PATRON_PASARELA = /^sitio\/([^/]+)\/pasarela\/([^/]+)\/([^/]+)\/([^/]+)$/;
+// Formatos que solo llegan por el tópico de su pasarela (el nodo lorawan los hereda de ella: migración 15).
+const FORMATOS_PASARELA = new Set(['milesight', 'chirpstack']);
 
-interface Dispositivo { id: string; estado: 'activo' | 'mantenimiento' | 'baja'; formato: string; sitio_codigo: string }
+interface Dispositivo { id: string; estado: 'activo' | 'mantenimiento' | 'baja'; formato: string; pasarela_id: string | null; sitio_codigo: string }
+interface Pasarela { id: string; activo: boolean; sitio_codigo: string }
 // Dominio cerrado: el mismo CHECK de la migración 09. Agregar un motivo exige migración, no solo código.
 type Motivo = 'no_registrado' | 'dado_de_baja' | 'malformada' | 'invalida';
 // Lo que se sabe de la trama al rechazarla. dispositivoId solo existe si el filtro 1 pudo atribuirla.
@@ -59,8 +67,10 @@ export class RecepcionService implements OnModuleInit {
     private readonly eventos: EventosService,
     senml: SenmlAdaptador,
     plano: PlanoAdaptador,
+    chirpstack: ChirpstackAdaptador,
+    milesight: MilesightAdaptador,
   ) {
-    this.adaptadores = new Map<string, Adaptador>([senml, plano].map((a) => [a.nombre, a]));
+    this.adaptadores = new Map<string, Adaptador>([senml, plano, chirpstack, milesight].map((a) => [a.nombre, a]));
   }
 
   onModuleInit(): void {
@@ -70,9 +80,14 @@ export class RecepcionService implements OnModuleInit {
   async procesar(topico: string, carga: Buffer): Promise<void> {
     // La hora de llegada se toma ANTES de consultar la base: es la del mensaje, no la del final del pipeline.
     const recibidoEn = new Date();
-    const partes = PATRON_TOPICO.exec(topico);
     const trama: TramaRecibida = { topico, carga, recibidoEn };
-    if (!partes) return this.cuarentena(trama, 'malformada', 'tópico fuera del patrón sitio/<sitio>/dispositivo/<id>/<magnitud>');
+    const dePasarela = PATRON_PASARELA.exec(topico);
+    if (dePasarela) return this.procesarDePasarela(trama, dePasarela);
+    const partes = PATRON_TOPICO.exec(topico);
+    if (!partes) {
+      return this.cuarentena(trama, 'malformada',
+        'tópico fuera de los dos patrones: sitio/<sitio>/dispositivo/<id>/<magnitud> o sitio/<sitio>/pasarela/<id>/<deveui>/<evento>');
+    }
     const ctx: ContextoTrama = { topico, idFisico: partes[2], magnitudTopico: partes[3].toLowerCase(), carga };
 
     // ── [1] Autenticar: credencial válida (ya la verificó el broker) ≠ dispositivo dado de alta ──
@@ -93,6 +108,41 @@ export class RecepcionService implements OnModuleInit {
         `id_fisico=${ctx.idFisico} está registrado en el sitio «${dispositivo.sitio_codigo}», no en «${partes[1].slice(0, 64)}»`);
     }
     trama.dispositivoId = dispositivo.id;
+    return this.filtros2a6(trama, ctx, dispositivo, false);
+  }
+
+  // Rutas B y C (docs/10 §8.4 punto 47). Orden del filtro 1: (i) la pasarela registrada, activa y del sitio del tópico, si no
+  // cuarentena con cualquier evento (una credencial publicando donde no le corresponde); (ii) un evento distinto de «up» se cuenta y
+  // termina, sin escribir en la base (punto 27); (iii) el DevEUI del tópico, en minúsculas, debe ser un nodo asociado a esa pasarela.
+  private async procesarDePasarela(trama: TramaRecibida, partes: RegExpExecArray): Promise<void> {
+    const [, sitio, idPasarela, deveuiTopico, evento] = partes;
+    const pasarela = await this.buscarPasarela(idPasarela);
+    if (!pasarela) return this.cuarentena(trama, 'no_registrado', `pasarela ${idPasarela.slice(0, 64)} sin alta en la plataforma`);
+    if (!pasarela.activo) return this.cuarentena(trama, 'no_registrado', `pasarela ${idPasarela.slice(0, 64)} inactiva: revocar su credencial en el broker`);
+    if (pasarela.sitio_codigo !== sitio) {
+      return this.cuarentena(trama, 'no_registrado',
+        `pasarela ${idPasarela.slice(0, 64)} está registrada en el sitio «${pasarela.sitio_codigo}», no en «${sitio.slice(0, 64)}»`);
+    }
+    if (evento !== 'up') {
+      this.log.log(`pasarela ${idPasarela}: evento «${evento.slice(0, 32)}» de ${deveuiTopico.slice(0, 32)} · contado, no se guarda (docs/10 §8.4 punto 47)`);
+      return;
+    }
+    const deveui = deveuiTopico.toLowerCase();
+    const nodo = await this.buscarDispositivo(deveui);
+    if (!nodo || nodo.pasarela_id !== pasarela.id) {
+      return this.cuarentena(trama, 'no_registrado', `DevEUI ${deveui.slice(0, 32)} no está asociado a la pasarela ${idPasarela.slice(0, 64)}`);
+    }
+    if (nodo.estado === 'baja') {
+      return this.cuarentena({ ...trama, dispositivoId: nodo.id }, 'dado_de_baja', `DevEUI ${deveui}: dado de baja`);
+    }
+    trama.dispositivoId = nodo.id;
+    const ctx: ContextoTrama = { topico: trama.topico, idFisico: deveui, magnitudTopico: '', carga: trama.carga, deveui };
+    return this.filtros2a6(trama, ctx, nodo, true);
+  }
+
+  // Filtros 2 a 6, comunes a las dos formas de tópico: el dispositivo ya pasó el filtro 1.
+  private async filtros2a6(trama: TramaRecibida, ctx: ContextoTrama, dispositivo: Dispositivo, dePasarela: boolean): Promise<void> {
+    const { topico, carga, recibidoEn } = trama;
 
     // ── [2] Analizar: el adaptador del formato declarado en el alta la traduce a lecturas (punto 47: no se adivina) ──
     // Una trama que no se entiende va a cuarentena, pero el pipeline NO termina aquí: el dispositivo ya
@@ -100,7 +150,9 @@ export class RecepcionService implements OnModuleInit {
     // no calidad del dato; un nodo mal configurado está vivo, no en silencio). Con lecturas vacías, los
     // filtros 3 a 5 simplemente no tienen nada que hacer.
     let lecturas: Lectura[] = [];
-    const adaptador = this.adaptadores.get(dispositivo.formato);
+    // Un formato de pasarela solo llega por el tópico de su pasarela, y uno directo solo por el del dispositivo.
+    const formatoEnSuTopico = FORMATOS_PASARELA.has(dispositivo.formato) === dePasarela;
+    const adaptador = formatoEnSuTopico ? this.adaptadores.get(dispositivo.formato) : undefined;
     if (!adaptador) {
       await this.cuarentena(trama, 'malformada', `formato declarado ${dispositivo.formato}: no se recibe por este tópico`);
     } else if (!adaptador.reconoce(ctx)) {
@@ -111,6 +163,8 @@ export class RecepcionService implements OnModuleInit {
       } catch (e) {
         if (!(e instanceof TramaMalformada)) throw e;
         await this.cuarentena(trama, 'malformada', `formato declarado ${adaptador.nombre}: ${e.message}`);
+        // DevEUI del cuerpo distinto del tópico: no hay certeza de que la trama sea del nodo, así que no se marca vivo (§4.1).
+        if (e instanceof IdentidadCruzada) return;
       }
     }
 
@@ -193,13 +247,22 @@ export class RecepcionService implements OnModuleInit {
     await this.supervision.marcarVivo(dispositivo.id, ctx.idFisico);
     if (guardadas || duplicadas) {
       const dup = duplicadas ? ` · ${duplicadas} duplicada(s) ignorada(s)` : '';
-      this.log.log(`${ctx.idFisico}: ${guardadas}/${lecturas.length} lecturas guardadas vía ${adaptador?.nombre}${dup}`);
+      const ign = ctx.ignoradas?.length ? ` · ${ctx.ignoradas.length} clave(s) fuera del mapa: ${ctx.ignoradas.slice(0, 5).join(', ')}` : '';
+      this.log.log(`${ctx.idFisico}: ${guardadas}/${lecturas.length} lecturas guardadas vía ${adaptador?.nombre}${dup}${ign}`);
     }
+  }
+
+  private async buscarPasarela(idFisico: string): Promise<Pasarela | undefined> {
+    const r = await this.pool.query<Pasarela>(
+      'SELECT p.id, p.activo, s.codigo AS sitio_codigo FROM pasarela p JOIN sitio s ON s.id = p.sitio_id WHERE p.id_fisico = $1',
+      [idFisico],
+    );
+    return r.rows[0];
   }
 
   private async buscarDispositivo(idFisico: string): Promise<Dispositivo | undefined> {
     const r = await this.pool.query<Dispositivo>(
-      `SELECT d.id, d.estado, d.formato, s.codigo AS sitio_codigo FROM dispositivo d
+      `SELECT d.id, d.estado, d.formato, d.pasarela_id, s.codigo AS sitio_codigo FROM dispositivo d
          JOIN zona z ON z.id = d.zona_id JOIN sitio s ON s.id = z.sitio_id
         WHERE d.id_fisico = $1`,
       [idFisico],

@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 214 pruebas unitarias, sin matriz formal) y TT-32 (sensor físico);
+cubre todavía: TT-27 (contrato de trama: hoy 222 pruebas unitarias, sin matriz formal) y TT-32 (sensor físico);
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -699,3 +699,25 @@ sintéticos.
 del catálogo con esa unidad canónica, y otra exige que el catálogo se haya leído (siete magnitudes o más), para que la primera no pase sin
 revisar nada. Plantado: con `pressure` apuntando a una magnitud inexistente falla una; sin comparar el DevEUI fallan dos. Total: 214
 pruebas. Falta la conexión con el filtro 1 (tópico de pasarela) y la prueba de punta a punta en el banco.
+
+## 29. Filtro 1 para el tópico de pasarela (15/10/2026)
+
+**Qué cambió** (`docs/10 §8.4` punto 47, §4.1 y §4.3). La recepción acepta `sitio/<sitio>/pasarela/<id>/<deveui>/<evento>` además del tópico
+de dispositivo, con el orden del diseño: primero la pasarela (registrada, activa, del sitio del tópico), después el evento (solo `up`
+sigue) y por último el nodo (su DevEUI en minúsculas, asociado a esa pasarela). Los filtros 2 a 6 son los mismos para las dos formas de
+tópico; un formato de pasarela solo se acepta por el tópico de pasarela y uno directo solo por el de dispositivo.
+
+| Prueba (`recepcion.service.spec.ts`, con dobles) | Resultado |
+|---|---|
+| `up` de un nodo asociado | lectura guardada, trama cruda con el adaptador `chirpstack`, nodo vivo |
+| Evento `join` | se cuenta en el registro; ninguna escritura en la base |
+| Pasarela sin alta, inactiva o de otro sitio | `no_registrado` con el motivo, con cualquier evento; nadie vivo |
+| DevEUI asociado a otra pasarela | `no_registrado` «DevEUI … no está asociado a la pasarela …» |
+| DevEUI en mayúsculas en el tópico | se busca en minúsculas y entra |
+| DevEUI del cuerpo distinto del tópico | `malformada`; el nodo no se marca vivo |
+| `up` sin ninguna clave del mapa | `malformada`; el nodo sí se marca vivo (dispositivo autenticado) |
+| Formato directo por el tópico de pasarela | `malformada` «no se recibe por este tópico» |
+
+Plantado, una falla por vez y restaurando el archivo original: sin pasar el DevEUI a minúsculas, con los eventos distintos de `up`
+siguiendo al pipeline, y sin el retorno temprano de la identidad cruzada; cada uno hace fallar su prueba. Total: 222 pruebas. Falta el alta de
+pasarelas por API, su rol en el broker y la prueba de punta a punta en el banco.

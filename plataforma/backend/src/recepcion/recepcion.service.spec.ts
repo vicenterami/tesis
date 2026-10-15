@@ -3,6 +3,9 @@ import { AlertasService } from '../alertas/alertas.service';
 import { BrokerService } from '../broker/broker.service';
 import { SupervisionService } from '../supervision/supervision.service';
 import { EventoPanel, EventosService } from '../tiempo-real/eventos.service';
+import { ChirpstackAdaptador } from './adaptadores/chirpstack.adaptador';
+import { resolverClave } from './adaptadores/mapa-claves';
+import { MilesightAdaptador } from './adaptadores/milesight.adaptador';
 import { PlanoAdaptador } from './adaptadores/plano.adaptador';
 import { SenmlAdaptador } from './adaptadores/senml.adaptador';
 import { RecepcionService } from './recepcion.service';
@@ -18,12 +21,17 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
   const T_BASE = new Date('2026-10-09T15:00:00.123456Z'); // la marca que «pone la base» en los RETURNING
 
   // El dispositivo de prueba declara «plano» salvo que la prueba diga otro formato (despacho por formato: docs/10 §8.4 punto 47).
-  function armar(dispositivo: { id: string; estado: string; sitio_codigo?: string; formato?: string } | undefined, duplicada = false) {
+  type Disp = { id: string; estado: string; sitio_codigo?: string; formato?: string; pasarela_id?: string | null };
+  type Pas = { id: string; activo: boolean; sitio_codigo: string };
+  function armar(dispositivo: Disp | undefined, duplicada = false, pasarela?: Pas) {
     const canal = { id: 'k1', magnitud: 'temperatura', unidad_canonica: 'Cel', rango_min: -40, rango_max: 85 };
     const query = jest.fn((sql: string, params?: unknown[]) => {
       // El dispositivo de prueba está registrado en el sitio «uct», el mismo del tópico, salvo que la prueba diga otro.
-      if (sql.startsWith('SELECT d.id, d.estado, d.formato, s.codigo AS sitio_codigo FROM dispositivo')) {
-        return Promise.resolve({ rows: dispositivo ? [{ sitio_codigo: 'uct', formato: 'plano', ...dispositivo }] : [], rowCount: dispositivo ? 1 : 0 });
+      if (sql.startsWith('SELECT d.id, d.estado, d.formato, d.pasarela_id, s.codigo AS sitio_codigo FROM dispositivo')) {
+        return Promise.resolve({ rows: dispositivo ? [{ sitio_codigo: 'uct', formato: 'plano', pasarela_id: null, ...dispositivo }] : [], rowCount: dispositivo ? 1 : 0 });
+      }
+      if (sql.startsWith('SELECT p.id, p.activo, s.codigo AS sitio_codigo FROM pasarela')) {
+        return Promise.resolve({ rows: pasarela ? [pasarela] : [], rowCount: pasarela ? 1 : 0 });
       }
       // Solo el canal «temperatura» está declarado para el dispositivo de prueba; cualquier otro, no.
       if (sql.trimStart().startsWith('SELECT c.id, m.codigo AS magnitud')) return Promise.resolve({ rows: params?.[1] === 'temperatura' ? [canal] : [], rowCount: params?.[1] === 'temperatura' ? 1 : 0 });
@@ -44,7 +52,8 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
     const eventos = new EventosService();
     const publicados: EventoPanel[] = [];
     eventos.flujo().subscribe((e) => publicados.push(e));
-    const servicio = new RecepcionService(pool, broker, alertas, supervision, eventos, new SenmlAdaptador(), new PlanoAdaptador());
+    const servicio = new RecepcionService(pool, broker, alertas, supervision, eventos, new SenmlAdaptador(), new PlanoAdaptador(),
+      new ChirpstackAdaptador(resolverClave), new MilesightAdaptador(resolverClave));
     return { servicio, query, marcarVivo, evaluar, publicados };
   }
 
@@ -266,6 +275,71 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
       await servicio.procesar(TOPICO, Buffer.from('{"devEUI":"x","temperature":21}'));
       expect(cuarentenas(query)).toEqual(['malformada']);
       expect(detalleCuarentena(query)).toBe('formato declarado milesight: no se recibe por este tópico');
+    });
+  });
+  describe('tópico de pasarela: rutas B y C (docs/10 §8.4 punto 47 y §4.1)', () => {
+    const PAS: Pas = { id: 'p1', activo: true, sitio_codigo: 'uct' };
+    const NODO: Disp = { id: 'n1', estado: 'activo', formato: 'chirpstack', pasarela_id: 'p1' };
+    const T_UP = 'sitio/uct/pasarela/chirpstack-campus/0101010101010101/up';
+    const up = (devEui = '0101010101010101', objeto: object = { temperature: 21.5 }) =>
+      Buffer.from(JSON.stringify({ time: '2026-10-15T12:00:00Z', deviceInfo: { devEui }, object: objeto }));
+    const escrituras = (query: jest.Mock) => query.mock.calls.filter(([sql]) => /^\s*(INSERT|UPDATE)/.test(String(sql)));
+    const detalle = (query: jest.Mock) => (query.mock.calls.find(([sql]) => String(sql).startsWith('INSERT INTO cuarentena'))?.[1] as unknown[])?.[4];
+
+    it('un «up» de un nodo asociado → lectura guardada, trama cruda con su adaptador y nodo vivo', async () => {
+      const { servicio, query, marcarVivo } = armar(NODO, false, PAS);
+      await servicio.procesar(T_UP, up());
+      expect(cuarentenas(query)).toEqual([]);
+      expect(query.mock.calls.some(([sql]) => String(sql).trimStart().startsWith('INSERT INTO medicion'))).toBe(true);
+      const trama = query.mock.calls.find(([sql]) => String(sql).startsWith('INSERT INTO trama'))?.[1] as unknown[];
+      expect(trama[4]).toBe('chirpstack');
+      expect(marcarVivo).toHaveBeenCalledWith('n1', '0101010101010101');
+    });
+    it('un evento distinto de «up» (join) se cuenta y termina: no escribe nada en la base (punto 27)', async () => {
+      const { servicio, query, marcarVivo } = armar(NODO, false, PAS);
+      await servicio.procesar('sitio/uct/pasarela/chirpstack-campus/0101010101010101/join', Buffer.from('{}'));
+      expect(escrituras(query)).toEqual([]);
+      expect(marcarVivo).not.toHaveBeenCalled();
+    });
+    it('pasarela sin alta, inactiva o de otro sitio → no_registrado con cualquier evento, y nadie vivo', async () => {
+      for (const [pas, texto] of [[undefined, 'sin alta'], [{ ...PAS, activo: false }, 'inactiva'], [{ ...PAS, sitio_codigo: 'otra' }, 'registrada en el sitio «otra»']] as const) {
+        const { servicio, query, marcarVivo } = armar(NODO, false, pas);
+        await servicio.procesar('sitio/uct/pasarela/chirpstack-campus/0101010101010101/join', up());
+        expect(cuarentenas(query)).toEqual(['no_registrado']);
+        expect(detalle(query)).toContain(texto);
+        expect(marcarVivo).not.toHaveBeenCalled();
+      }
+    });
+    it('DevEUI no asociado a esa pasarela (o un dispositivo directo con ese id) → no_registrado', async () => {
+      const { servicio, query } = armar({ ...NODO, pasarela_id: 'otra' }, false, PAS);
+      await servicio.procesar(T_UP, up());
+      expect(cuarentenas(query)).toEqual(['no_registrado']);
+      expect(detalle(query)).toBe('DevEUI 0101010101010101 no está asociado a la pasarela chirpstack-campus');
+    });
+    it('el DevEUI del tópico se busca en minúsculas, la forma de id_fisico', async () => {
+      const { servicio, query } = armar(NODO, false, PAS);
+      // Un DevEUI con letras (sintético): en mayúsculas en el tópico y en minúsculas en el cuerpo, es el mismo nodo.
+      await servicio.procesar('sitio/uct/pasarela/chirpstack-campus/A1B2C3D4E5F60708/up', up('a1b2c3d4e5f60708'));
+      const busqueda = query.mock.calls.find(([sql]) => String(sql).startsWith('SELECT d.id'))?.[1] as unknown[];
+      expect(busqueda[0]).toBe('a1b2c3d4e5f60708');
+      expect(cuarentenas(query)).toEqual([]);
+    });
+    it('DevEUI del cuerpo distinto del tópico → malformada y el nodo NO se marca vivo', async () => {
+      const { servicio, query, marcarVivo } = armar(NODO, false, PAS);
+      await servicio.procesar(T_UP, up('ffffffffffffffff'));
+      expect(cuarentenas(query)).toEqual(['malformada']);
+      expect(marcarVivo).not.toHaveBeenCalled();
+    });
+    it('un «up» sin ninguna clave del mapa → malformada, y el nodo vivo (es un dispositivo autenticado)', async () => {
+      const { servicio, query, marcarVivo } = armar(NODO, false, PAS);
+      await servicio.procesar(T_UP, up(undefined, { battery_voltage: 3.6 }));
+      expect(cuarentenas(query)).toEqual(['malformada']);
+      expect(marcarVivo).toHaveBeenCalledWith('n1', '0101010101010101');
+    });
+    it('un formato directo por el tópico de pasarela → malformada «no se recibe por este tópico»', async () => {
+      const { servicio, query } = armar({ ...NODO, formato: 'senml' }, false, PAS);
+      await servicio.procesar(T_UP, Buffer.from('[{"n":"temperatura","v":1}]'));
+      expect(detalle(query)).toBe('formato declarado senml: no se recibe por este tópico');
     });
   });
 });
