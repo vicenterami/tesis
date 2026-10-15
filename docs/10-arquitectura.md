@@ -1270,7 +1270,7 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
 47. **Adaptadores LoRaWAN: despacho por el formato declarado, tópico de pasarela y mapa de claves** (decidido el 15/10/2026 con las
     fuentes oficiales de ChirpStack v4 y de la pasarela Milesight UG63, registro privado CS-01…11 y B-42…50; **en implementación**:
     lo que sigue es lo que el código debe cumplir; hechos el 15/10 los adaptadores, el filtro 1 de pasarela y el alta, la baja y la rotación de
-    pasarelas por API con su rol en el broker, `docs/16 §28–§30`; falta la prueba de punta a punta en el banco). Las rutas B y C entran por el mismo tópico,
+    pasarelas por API con su rol en el broker, `docs/16 §28–§31`, probados de punta a punta en el banco; falta la prueba en terreno). Las rutas B y C entran por el mismo tópico,
     `sitio/<sitio>/pasarela/<id_pasarela>/<deveui>/<evento>`: ChirpStack lo produce con su plantilla `event_topic` y la pasarela
     Milesight con el comodín `$devEUI`. **Orden del filtro 1 para ese tópico:** (i) la pasarela debe estar registrada, activa y en
     el sitio del tópico; si no, cuarentena `no_registrado` con cualquier evento, porque es una credencial publicando donde no le

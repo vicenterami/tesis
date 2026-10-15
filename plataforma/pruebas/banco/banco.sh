@@ -8,6 +8,7 @@
 #   bash plataforma/pruebas/banco/banco.sh evaluar [csv]       vuelve a cruzar un CSV de envíos con la base
 #   bash plataforma/pruebas/banco/banco.sh proxy               levanta la capa TLS (proxy/compose.proxy.yml) sobre el banco y la prueba
 #   bash plataforma/pruebas/banco/banco.sh alta                alta por API de punta a punta: POST → credencial → publica → medicion (HU-11)
+#   bash plataforma/pruebas/banco/banco.sh lorawan             rutas B y C de punta a punta: alta de pasarela → publica como ella → medicion; ACL del rol pasarela; rotación y baja
 #   bash plataforma/pruebas/banco/banco.sh cola                cola del broker vigilada: backend detenido + 200 emulados → descartes → condición broker_descarte (docs/16 §22)
 #   bash plataforma/pruebas/banco/banco.sh estado | logs [servicio] | sql ["CONSULTA"]
 #   bash plataforma/pruebas/banco/banco.sh apagar              baja todo; los datos estaban en RAM, no queda nada
@@ -240,6 +241,68 @@ case "${1:-}" in
     n=$(dc logs --no-color --since 3m backend 2>/dev/null | grep -cF -f <(printf '%s\n' "${CRED2:-sin-credencial-rotada}")); [ "$n" = 0 ] && ok "la credencial rotada no aparece en el registro del backend" || falla "la credencial rotada se escribió en el registro"
     unset CRED CRED2
     echo; [ $fallos -eq 0 ] && echo "ALTA OK" || { echo "$fallos comprobación(es) con falla"; exit 1; } ;;
+  lorawan)
+    # Rutas B y C de punta a punta (docs/10 §8.4 punto 47; docs/16 §31): alta de una pasarela ChirpStack y de su nodo por API, publicación con
+    # la credencial de la pasarela y el JSON del evento «up» de ChirpStack v4, la ACL real del rol pasarela, los rechazos del filtro 1,
+    # una pasarela Milesight con códec, rotación y baja. Los secretos viajan por la entrada estándar, nunca por argumentos.
+    CLAVE=$(leer HTTP_CLAVE_ADMIN); fallos=0; n=$(date +%s | tail -c 5)
+    ok() { echo "OK    $1"; }; falla() { echo "FALLA $1"; fallos=$((fallos+1)); }
+    api() { local m=$1 r=$2; shift 2; printf 'X-Clave-Admin: %s\n' "$CLAVE" | curl -s -m 10 -w '\n%{http_code}' -X "$m" -H @- -H 'Content-Type: application/json' "$@" "http://127.0.0.1:3001$r"; }
+    json() { python3 -c "import sys,json; v=json.load(sys.stdin); print(eval(sys.argv[1]))" "$1"; }
+    red=$(docker network ls --format '{{.Name}}' | grep '^banco_default$')
+    pub() { printf '%s\n' "$2" | docker run --rm -i --network "$red" "$IMG_BROKER" sh -c 'IFS= read -r C; mosquitto_pub -V mqttv5 -d -h mosquitto -q 1 -i "lw-$$" -u "$1" -P "$C" -t "$2" -m "$3" 2>&1' sh "$1" "$3" "$4" | grep -oE "PUBACK \(Mid: [0-9]+, RC:[0-9]+\)|Connection error: .*" | head -1; }
+    sub() { printf '%s\n' "$2" | docker run --rm -i --network "$red" "$IMG_BROKER" sh -c 'IFS= read -r C; mosquitto_sub -V mqttv5 -d -h mosquitto -i "lws-$$" -u "$1" -P "$C" -t "$2" -W 2 -C 1 2>&1' sh "$1" "$3" | grep -oE "Subscribed \(mid: [0-9]+\): [0-9]+" | head -1; }
+    pub_anon() { docker run --rm --network "$red" "$IMG_BROKER" mosquitto_pub -V mqttv5 -d -h mosquitto -q 1 -i "lwa-$$" -t "$1" -m "$2" 2>&1 | grep -oE "PUBACK \(Mid: [0-9]+, RC:[0-9]+\)|Connection error: .*" | head -1; }
+    cuarentena() { psql_ -tA -c "SELECT motivo || ' · ' || left(detalle, 90) FROM cuarentena WHERE topico = '$1' ORDER BY recibido_en DESC LIMIT 1"; }
+    read -r sitio_id sitio zona < <(psql_ -tA -F ' ' -c "SELECT s.id, s.codigo, z.id FROM sitio s JOIN zona z ON z.sitio_id = s.id ORDER BY s.codigo LIMIT 1")
+    # ── ChirpStack (ruta C) ──
+    pid="cs-banco-$n"; r=$(api POST /pasarelas -d "{\"id_fisico\":\"$pid\",\"nombre\":\"ChirpStack del banco\",\"sitio_id\":\"$sitio_id\",\"formato\":\"chirpstack\"}")
+    code=${r##*$'\n'}; body=${r%$'\n'*}; [ "$code" = 201 ] && ok "POST /pasarelas (chirpstack) → 201" || { echo "FALLA POST /pasarelas → $code: ${body:0:200}"; exit 1; }
+    PCRED=$(json "v['conexion']['credencial']" <<<"$body"); pasarela=$(json "v['id']" <<<"$body")
+    [ "$(json "v['conexion']['plantillas']['event_topic']" <<<"$body")" = "sitio/$sitio/pasarela/$pid/{{dev_eui}}/{{event}}" ] && ok "la respuesta trae la credencial (no se imprime) y el event_topic para ChirpStack" || falla "plantilla event_topic"
+    deveui=$(openssl rand -hex 8); r=$(api POST /dispositivos -d "{\"id_fisico\":\"$deveui\",\"nombre\":\"Nodo LoRaWAN del banco\",\"zona_id\":\"$zona\",\"via\":\"lorawan\",\"pasarela_id\":\"$pasarela\",\"intervalo_esperado_s\":180,\"canales\":[{\"magnitud\":\"temperatura\"}]}")
+    code=${r##*$'\n'}; [ "$code" = 201 ] && [ "$(json "v['formato']" <<<"${r%$'\n'*}")" = chirpstack ] && ok "alta del nodo lorawan → 201, con el formato de su pasarela (chirpstack)" || falla "alta del nodo → $code"
+    base="sitio/$sitio/pasarela/$pid"; t_up=$(date -u -d '-30 seconds' +%Y-%m-%dT%H:%M:%S.000000000+00:00)
+    up() { printf '{"deduplicationId":"3ac7e3c4-4401-4b8d-9386-a5c902f9202d","time":"%s","deviceInfo":{"deviceName":"banco","devEui":"%s"},"fPort":1,"data":"qg==","rxInfo":[{"gatewayId":"aaaaaaaaaaaaaaaa","rssi":-36,"snr":10.5}],"object":%s}' "$t_up" "$1" "$2"; }
+    r=$(pub "$pid" "$PCRED" "$base/$deveui/up" "$(up "$deveui" '{"temperature":21.5,"battery_voltage":3.6}')"); [[ "$r" == *"RC:0"* || "$r" == *"RC:16"* ]] && ok "la pasarela publica el «up» en su árbol ($r)" || falla "publicar el up: $r"
+    sleep 2; r=$(psql_ -tA -c "SELECT count(*) || ' ' || coalesce(max(m.origen_tiempo),'-') FROM medicion m JOIN canal c ON c.id=m.canal_id JOIN dispositivo d ON d.id=c.dispositivo_id WHERE d.id_fisico='$deveui'")
+    [ "$r" = "1 pasarela" ] && ok "la lectura está en medicion con la marca del servidor de red (origen pasarela)" || falla "medicion del nodo: «$r» (esperado «1 pasarela»)"
+    r=$(pub "$pid" "$PCRED" "$base/$deveui/join" '{}'); sleep 1; [ -z "$(cuarentena "$base/$deveui/join")" ] && ok "un evento join se cuenta y no deja cuarentena" || falla "el join dejó cuarentena"
+    otro=$(openssl rand -hex 8); r=$(pub "$pid" "$PCRED" "$base/$otro/up" "$(up "$otro" '{"temperature":20}')"); sleep 1
+    [[ "$(cuarentena "$base/$otro/up")" == no_registrado* ]] && ok "un DevEUI no asociado a la pasarela → cuarentena no_registrado" || falla "DevEUI ajeno: $(cuarentena "$base/$otro/up")"
+    visto0=$(psql_ -tA -c "SELECT e.visto_por_ultima_vez FROM estado_dispositivo e JOIN dispositivo d ON d.id=e.dispositivo_id WHERE d.id_fisico='$deveui'")
+    r=$(pub "$pid" "$PCRED" "$base/$deveui/up" "$(up "ffffffffffffffff" '{"temperature":20}')"); sleep 1
+    visto1=$(psql_ -tA -c "SELECT e.visto_por_ultima_vez FROM estado_dispositivo e JOIN dispositivo d ON d.id=e.dispositivo_id WHERE d.id_fisico='$deveui'")
+    [[ "$(cuarentena "$base/$deveui/up")" == malformada*DevEUI* ]] && [ "$visto0" = "$visto1" ] && ok "DevEUI del cuerpo distinto del tópico → malformada, y el nodo no se marca vivo" || falla "DevEUI cruzado: $(cuarentena "$base/$deveui/up") · visto $visto0 → $visto1"
+    r=$(pub "$pid" "$PCRED" "$base/$deveui/up" '[{"n":"temperatura","v":1}]'); sleep 1
+    [[ "$(cuarentena "$base/$deveui/up")" == *"formato declarado chirpstack: la trama no tiene esa forma"* ]] && ok "SenML bajo una pasarela chirpstack → malformada con el formato esperado" || falla "SenML bajo pasarela: $(cuarentena "$base/$deveui/up")"
+    r=$(pub "$pid" "$PCRED" "sitio/$sitio/pasarela/otra-pasarela/$deveui/up" '{}'); [[ "$r" == *"RC:135"* ]] && ok "con su credencial NO publica en el árbol de otra pasarela (RC:135)" || falla "árbol ajeno: $r"
+    r=$(pub "$pid" "$PCRED" "sitio/$sitio/dispositivo/$deveui/temperatura" '1'); [[ "$r" == *"RC:135"* ]] && ok "con su credencial NO publica como un dispositivo directo (RC:135)" || falla "tópico de dispositivo: $r"
+    r=$(sub "$pid" "$PCRED" "$base/+/command/+"); [[ "$r" =~ :\ [0-2]$ ]] && ok "se suscribe a su subárbol de comandos, como pide ChirpStack ($r)" || falla "suscripción a sus comandos: «$r»"
+    r=$(sub "$pid" "$PCRED" "sitio/$sitio/pasarela/otra-pasarela/+/command/+"); [[ "$r" == *": 135" ]] && ok "NO se suscribe a los comandos de otra pasarela (135)" || falla "comandos ajenos: «$r»"
+    r=$(sub "$pid" "$PCRED" 'sitio/#'); [[ "$r" == *": 135" ]] && ok "NO se suscribe a todo el sitio (135)" || falla "suscripción a sitio/#: «$r»"
+    r=$(pub_anon "$base/$deveui/up" '{}'); [[ "$r" == *"RC:135"* ]] && ok "un emulado (rol de dispositivo) NO publica en el árbol de una pasarela (RC:135)" || falla "anónimo en árbol de pasarela: $r"
+    # ── Milesight con códec (ruta B) ──
+    mid="ug63-banco-$n"; r=$(api POST /pasarelas -d "{\"id_fisico\":\"$mid\",\"nombre\":\"UG63 del banco\",\"sitio_id\":\"$sitio_id\",\"formato\":\"milesight\"}")
+    code=${r##*$'\n'}; body=${r%$'\n'*}; MCRED=$(json "v['conexion']['credencial']" <<<"$body"); mpas=$(json "v['id']" <<<"$body")
+    [ "$code" = 201 ] && [ "$(json "v['conexion']['plantillas']['uplink']" <<<"$body")" = "sitio/$sitio/pasarela/$mid/\$devEUI/up" ] && ok "POST /pasarelas (milesight) → 201 con el tópico del uplink con \$devEUI" || falla "pasarela milesight → $code"
+    mdev=$(openssl rand -hex 8); r=$(api POST /dispositivos -d "{\"id_fisico\":\"$mdev\",\"nombre\":\"EM300 del banco\",\"zona_id\":\"$zona\",\"via\":\"lorawan\",\"pasarela_id\":\"$mpas\",\"intervalo_esperado_s\":180,\"canales\":[{\"magnitud\":\"temperatura\"},{\"magnitud\":\"humedad\"},{\"magnitud\":\"bateria\"}]}")
+    r=$(pub "$mid" "$MCRED" "sitio/$sitio/pasarela/$mid/$mdev/up" "{\"devEUI\":\"$mdev\",\"deviceName\":\"EM300\",\"applicationID\":\"1\",\"battery\":92,\"temperature\":30.8,\"humidity\":50.5}"); sleep 2
+    r=$(psql_ -tA -c "SELECT count(*) || ' ' || string_agg(DISTINCT m.origen_tiempo, ',') FROM medicion m JOIN canal c ON c.id=m.canal_id JOIN dispositivo d ON d.id=c.dispositivo_id WHERE d.id_fisico='$mdev'")
+    [ "$r" = "3 recepcion" ] && ok "Milesight con códec y Metadata → 3 lecturas con la hora de recepción (sin hora civil)" || falla "lecturas Milesight: «$r» (esperado «3 recepcion»)"
+    r=$(pub "$mid" "$MCRED" "sitio/$sitio/pasarela/$mid/$mdev/up" "{\"applicationID\":\"3\",\"devEUI\":\"$mdev\",\"fCnt\":1,\"fPort\":85,\"data\":\"/wv//wEB\",\"rxInfo\":[]}"); sleep 1
+    [[ "$(cuarentena "sitio/$sitio/pasarela/$mid/$mdev/up")" == *"activar Payload Codec"* ]] && ok "Milesight sin códec → malformada que dice qué activar" || falla "sin códec: $(cuarentena "sitio/$sitio/pasarela/$mid/$mdev/up")"
+    # ── Rotación y baja de la pasarela ChirpStack ──
+    r=$(api POST "/pasarelas/$pasarela/credencial"); code=${r##*$'\n'}; PCRED2=$(json "v['conexion']['credencial']" <<<"${r%$'\n'*}")
+    [ "$code" = 201 ] && [ "${#PCRED2}" = 32 ] && [ "$PCRED2" != "$PCRED" ] && ok "rotación → 201 con una credencial nueva (no se imprime)" || falla "rotación → $code"
+    r=$(pub "$pid" "$PCRED" "$base/$deveui/up" "$(up "$deveui" '{"temperature":22}')"); [[ "$r" == *"Connection error"* ]] && ok "con la credencial ANTERIOR la pasarela ya no entra" || falla "la anterior sigue valiendo: $r"
+    r=$(pub "$pid" "$PCRED2" "$base/$deveui/up" "$(up "$deveui" '{"temperature":22}')"); [[ "$r" == *"RC:0"* || "$r" == *"RC:16"* ]] && ok "con la credencial NUEVA publica ($r)" || falla "con la nueva: $r"
+    r=$(api DELETE "/pasarelas/$pasarela"); code=${r##*$'\n'}; [ "$code" = 200 ] && [ "$(json "v['nodos_sin_pasarela']" <<<"${r%$'\n'*}")" = 1 ] && ok "baja → 200, con 1 nodo que queda sin pasarela" || falla "baja → $code: ${r:0:160}"
+    r=$(pub "$pid" "$PCRED2" "$base/$deveui/up" "$(up "$deveui" '{"temperature":22}')"); [[ "$r" == *"Connection error"* ]] && ok "dada de baja, el broker ya no acepta su credencial" || falla "la dada de baja sigue entrando: $r"
+    curl -s http://127.0.0.1:3001/pasarelas | python3 -c "import sys,json; sys.exit(0 if any(p['id_fisico']=='$pid' and not p['activo'] for p in json.load(sys.stdin)) else 1)" && ok "GET /pasarelas la lista inactiva (historial conservado)" || falla "no aparece inactiva"
+    k=$(dc logs --no-color --since 5m backend 2>/dev/null | grep -cF -f <(printf '%s\n' "${PCRED:-sin}" "${PCRED2:-sin}" "${MCRED:-sin}")); [ "$k" = 0 ] && ok "ninguna credencial de pasarela aparece en el registro del backend" || falla "una credencial se escribió en el registro"
+    unset PCRED PCRED2 MCRED
+    echo; [ $fallos -eq 0 ] && echo "LORAWAN OK" || { echo "$fallos comprobación(es) con falla"; exit 1; } ;;
   cola)
     # Cola del broker vigilada (docs/10 §8.4 punto 43; docs/16 §22): PLANTAR la violación. Con el backend detenido, 200 emulados a
     # 1 trama/s durante 70 s (≈ 14 000 mensajes) desbordan la cola de la sesión persistente del backend (tope 10 000): el broker

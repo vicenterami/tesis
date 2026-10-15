@@ -275,7 +275,7 @@ interna de Docker, porque no sale del servidor (cambia a R2 si un componente se 
 | Tramo | Identidad (R1) | Puede (y nada más) | Cifrado | Estado |
 |---|---|---|---|---|
 | Dispositivo → proxy 8883 → broker | usuario y clave propios por dispositivo | publicar en `sitio/+/dispositivo/<su usuario>/+` | TLS hasta el proxy (R2); interno en claro (R3) | ✅ |
-| Pasarela o servidor de red externo → proxy 8883 → broker | usuario propio por pasarela (`POST /pasarelas`) | publicar bajo su propio árbol y suscribirse solo a su subárbol de comandos (rol `pasarela`, `docs/10 §8.4` punto 47) | TLS (R2) | 🟡 alta, rol y filtro 1 hechos el 15/10; falta probar la ACL en el banco |
+| Pasarela o servidor de red externo → proxy 8883 → broker | usuario propio por pasarela (`POST /pasarelas`) | publicar bajo su propio árbol y suscribirse solo a su subárbol de comandos (rol `pasarela`, `docs/10 §8.4` punto 47) | TLS (R2) | ✅ 15/10: alta, rol y filtro 1 probados en el banco (`docs/16 §31`); TLS con una pasarela real, en terreno |
 | Persona → proxy 443 → backend | hoy: clave de administrador solo en las rutas que escriben; con la sesión (M7), usuario y rol | lo que su rol permita (`docs/20`) | HTTPS (R2) | 🟡 lecturas sin sesión hasta M7 |
 | Backend → broker (`backend`) | usuario propio | recibir `sitio/#`; nada más | interno (R3) | ✅ |
 | Backend → broker (`backend-admin`) | usuario propio, conexión aparte | órdenes al plugin y leer `$SYS/#` (acotado el 13/10; antes leía todo) | interno (R3) | ✅ |

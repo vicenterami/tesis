@@ -743,3 +743,28 @@ su árbol y se suscribe solo a su subárbol de comandos.
 Unitarias en `pasarelas.spec.ts` (8). Plantado, restaurando el archivo original: con el rol de dispositivo para una pasarela falla el alta, y
 con `FOR UPDATE` falla la baja. Total: 230 pruebas. Falta la prueba de punta a punta en el banco: alta real, publicación con la credencial,
 la ACL del rol y la recepción por el filtro 1.
+
+## 31. Rutas B y C de punta a punta en el banco (15/10/2026)
+
+**Cómo** (`bash plataforma/pruebas/banco/banco.sh lorawan`). Contra el banco desechable, con el broker, el plugin de seguridad y la base
+reales: se da de alta por API una pasarela ChirpStack, un nodo y una pasarela Milesight, y se publica con la credencial de cada pasarela el
+JSON de su fuente oficial (evento `up` de ChirpStack v4; uplink con códec y Metadata de Milesight). Los secretos viajan por la entrada
+estándar. Resultado: **25 de 25 comprobaciones, «LORAWAN OK»**.
+
+| Comprobación | Resultado |
+|---|---|
+| Alta de la pasarela ChirpStack y de su nodo | 201; el nodo con el formato `chirpstack` de su pasarela; la respuesta con el `event_topic` |
+| `up` publicado en su árbol | aceptado; la lectura en `medicion` con origen `pasarela` |
+| `join` | sin cuarentena; DevEUI no asociado → `no_registrado`; DevEUI cruzado → `malformada` y el nodo no se marca vivo; SenML bajo la pasarela → `malformada` |
+| ACL del rol `pasarela` | no publica en el árbol de otra pasarela ni como dispositivo directo (RC:135); se suscribe a su subárbol de comandos (código 0) y no a los de otra ni a todo el sitio (135); un emulado no publica en su árbol (RC:135) |
+| Pasarela Milesight | 201 con el tópico del uplink con `$devEUI`; con códec y Metadata, 3 lecturas con la hora de recepción; sin códec, `malformada` que dice qué activar |
+| Rotación | la credencial anterior ya no entra; la nueva publica |
+| Baja | 200 con un nodo sin pasarela; el broker rechaza su credencial; `GET /pasarelas` la lista inactiva |
+| Registro del backend | ninguna credencial de pasarela escrita |
+
+**Plantado.** En el broker del banco se quitó al rol `pasarela` el permiso de suscribirse a su subárbol de comandos: la prueba dio una falla;
+restaurado, «LORAWAN OK». Al escribir el plantado, dos intentos no llegaron a aplicarse (el guion no cargaba la orden que quita el
+permiso) y la prueba seguía en verde: ahora el plantado exige que la orden se cumpla antes de mirar el resultado.
+
+**Lo que no prueba.** La radio, la pasarela física y el ChirpStack institucional: eso es la prueba en terreno (`docs/10 §8.4` punto 47). Lo
+que sí deja probado es todo lo que pasa desde que un mensaje llega al broker con la credencial de una pasarela.
