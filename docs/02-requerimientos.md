@@ -105,7 +105,7 @@ pero su valor demostrativo es alto.
 | **RF-11** | El sistema debe **normalizar toda trama aceptada al modelo interno único** (dispositivo, magnitud, unidad, valor, marca temporal), venga de la vía y formato que venga | [PO] [BT] | C1 | **M** |
 | **RF-12** | El sistema debe mantener **condiciones abiertas y cerradas** por dispositivo: el cruce de umbral abre la condición y la vuelta al rango la cierra | [BT] | C1, C5 | **M** |
 | **RF-13** | El sistema debe **generar eventos por umbral** cuando una medición cruce un límite configurado | [PO] | C1 | **M** |
-| **RF-14** | El sistema debe permitir **configurar umbrales de disparo y de restauración por dispositivo**, con banda de histéresis para evitar oscilación | [BT] | C5 | **S** |
+| **RF-14** | El sistema debe permitir **configurar umbrales de disparo y de restauración por dispositivo**, con banda de histéresis para evitar oscilación y un retardo de activación opcional contra picos aislados (0 por defecto) | [BT] | C5 | **S** |
 | **RF-15** | El sistema debe **correlacionar eventos con telemetría** mediante el identificador del dispositivo (`bn` / `id_fisico`) y la marca temporal, para reconstruir el contexto de un evento | [DP] | C1 | **S** |
 | **RF-16** | El sistema debe **normalizar las marcas temporales** a un huso único, tolerando que el nodo no disponga de reloj confiable y usando la hora de recepción cuando corresponda | [BT] | C1 | **M** |
 | **RF-17** | El sistema debe **resolver la identidad del dispositivo** desde los metadatos del transporte cuando el mensaje no la incluya explícitamente | [DP] | C1 | **M** |
@@ -159,10 +159,10 @@ resolver. Es *Must* por coherencia con la propuesta de valor.
 
 | ID | Requerimiento | Fuente | Causa | Prior. |
 |---|---|---|---|:---:|
-| **RF-36** | El sistema debe **notificar** cuando se abra una condición de severidad configurada como notificable | [PO] | C5 | **M** |
+| **RF-36** | El sistema debe **notificar** cuando se abra una condición de severidad configurada como notificable, y cuando se cierre, con el resumen del episodio (duración y valor extremo) | [PO] | C5 | **M** |
 | **RF-37** | El sistema debe permitir **configurar los destinatarios** de notificación por sitio | [PO] | C4 | **S** |
 | **RF-38** | El sistema debe **agrupar notificaciones repetidas** del mismo dispositivo en una ventana temporal, para evitar saturación | [BT] | C5 | **S** |
-| **RF-39** | El sistema debe permitir **reconocer una alerta**, registrando quién y cuándo | [BT] | C5 | **C** |
+| **RF-39** | El sistema debe permitir **reconocer una alerta**, registrando quién, cuándo y qué fue (real, falso positivo o mantenimiento no avisado) | [BT] | C5 | **C** |
 
 ## M7 — Seguridad, identidad y multi-tenencia
 
