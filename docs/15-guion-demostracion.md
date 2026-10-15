@@ -79,23 +79,24 @@ bash plataforma/pruebas/pila.sh sql "SELECT round(valor::numeric,2) AS valor, un
 
 | Publicar | Motivo esperado en `cuarentena` | Filtro |
 |---|---|---|
-| `abc` | `malformada` | 2 analizar |
-| `500` | `invalida` · fuera de rango (la temperatura físicamente posible va de −40 a 85) | 3 validar |
-| `{"v":300,"u":"K"}` | **no se rechaza:** se guarda 26,85 Cel | 4 normalizar |
-| en `…/dev-0001/presion`: `1013` | `invalida` · canal no declarado | 3 validar |
+| `abc` | `malformada` · «formato declarado senml: la trama no tiene esa forma» | 2 analizar |
+| `21.5` | `malformada` · el número suelto es del formato plano y `dev-0001` declaró SenML al darse de alta: el sistema no adivina el formato (`docs/10 §8.4` punto 47) | 2 analizar |
+| `[{"n":"temperatura","v":500}]` | `invalida` · fuera de rango (la temperatura físicamente posible va de −40 a 85) | 3 validar |
+| `[{"n":"temperatura","u":"K","v":300}]` | **no se rechaza:** se guarda 26,85 Cel | 4 normalizar |
+| en `…/dev-0001/presion`: `[{"n":"presion","v":1013}]` | `invalida` · canal no declarado | 3 validar |
 
 Cada fila es `bash plataforma/pruebas/publicar.sh temperatura <carga>`; la última,
-`bash plataforma/pruebas/publicar.sh presion 1013`. **La fila del JSON va entre comillas simples**, o la
-terminal se come las llaves y las comillas y llega `v:300` (malformada, no la conversión; pasó en el ensayo del 29/09):
+`bash plataforma/pruebas/publicar.sh presion '[{"n":"presion","v":1013}]'`. **Las filas con JSON van entre comillas simples**, o la
+terminal se come las llaves y las comillas (pasó en el ensayo del 29/09):
 
 ```bash
-bash plataforma/pruebas/publicar.sh temperatura '{"v":300,"u":"K"}'
+bash plataforma/pruebas/publicar.sh temperatura '[{"n":"temperatura","u":"K","v":300}]'
 ```
 
-Luego, las tres rechazadas:
+Luego, las cuatro rechazadas:
 
 ```bash
-bash plataforma/pruebas/pila.sh sql "SELECT motivo, topico, left(convert_from(payload_crudo,'UTF8'),30) AS carga, recibido_en FROM cuarentena ORDER BY recibido_en DESC LIMIT 3;"
+bash plataforma/pruebas/pila.sh sql "SELECT motivo, topico, left(convert_from(payload_crudo,'UTF8'),30) AS carga, recibido_en FROM cuarentena ORDER BY recibido_en DESC LIMIT 4;"
 ```
 
 Y la que sí entró, convertida a la unidad canónica: `bash plataforma/pruebas/pila.sh sql "SELECT round(valor::numeric,2), unidad FROM medicion ORDER BY tiempo DESC LIMIT 1;"` → `26.85 | Cel`.
@@ -109,11 +110,11 @@ apague la alerta una y otra vez.
 
 | Publicar | Log del backend |
 |---|---|
-| `35` | `umbral alto cruzado (35 Cel) · condición abierta` |
-| `29` | nada: zona de histéresis |
-| `27` | `valor de vuelta en rango · condición cerrada` |
+| `[{"n":"temperatura","v":35}]` | `umbral alto cruzado (35 Cel) · condición abierta` |
+| `[{"n":"temperatura","v":29}]` | nada: zona de histéresis |
+| `[{"n":"temperatura","v":27}]` | `valor de vuelta en rango · condición cerrada` |
 
-(Mismo comando: `bash plataforma/pruebas/publicar.sh temperatura 35`, luego `29`, luego `27`.)
+(Mismo comando: `bash plataforma/pruebas/publicar.sh temperatura '[{"n":"temperatura","v":35}]'`, luego con `29`, luego con `27`.)
 
 **Decir:** el pipeline solo corre cuando llega algo; el silencio lo detecta un supervisor periódico.
 Callar unos 15 s → `sin comunicación hace N s · condición abierta`; publicar de nuevo → `comunicación
@@ -147,7 +148,7 @@ En `/docs`:
 
 ## 6. Cómo se sostiene esto (1 min)
 
-- `cd plataforma/backend && pnpm verificar`: tipos, lint y 193 pruebas unitarias en menos de dos segundos
+- `cd plataforma/backend && pnpm verificar`: tipos, lint y 200 pruebas unitarias en menos de dos segundos
   (la cifra exacta la da la salida de `jest`; no la memorices). Los avisos de cuarentena que aparecen
   mientras corre son de las pruebas, a propósito.
 - `bash plataforma/pruebas/verificar-todo.sh`: esquema, migraciones, diagramas del informe, API y

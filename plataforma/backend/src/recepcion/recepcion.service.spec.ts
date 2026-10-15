@@ -17,12 +17,13 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
   const TOPICO = 'sitio/uct/dispositivo/dev-0001/temperatura';
   const T_BASE = new Date('2026-10-09T15:00:00.123456Z'); // la marca que «pone la base» en los RETURNING
 
-  function armar(dispositivo: { id: string; estado: string; sitio_codigo?: string } | undefined, duplicada = false) {
+  // El dispositivo de prueba declara «plano» salvo que la prueba diga otro formato (despacho por formato: docs/10 §8.4 punto 47).
+  function armar(dispositivo: { id: string; estado: string; sitio_codigo?: string; formato?: string } | undefined, duplicada = false) {
     const canal = { id: 'k1', magnitud: 'temperatura', unidad_canonica: 'Cel', rango_min: -40, rango_max: 85 };
     const query = jest.fn((sql: string, params?: unknown[]) => {
       // El dispositivo de prueba está registrado en el sitio «uct», el mismo del tópico, salvo que la prueba diga otro.
-      if (sql.startsWith('SELECT d.id, d.estado, s.codigo AS sitio_codigo FROM dispositivo')) {
-        return Promise.resolve({ rows: dispositivo ? [{ sitio_codigo: 'uct', ...dispositivo }] : [], rowCount: dispositivo ? 1 : 0 });
+      if (sql.startsWith('SELECT d.id, d.estado, d.formato, s.codigo AS sitio_codigo FROM dispositivo')) {
+        return Promise.resolve({ rows: dispositivo ? [{ sitio_codigo: 'uct', formato: 'plano', ...dispositivo }] : [], rowCount: dispositivo ? 1 : 0 });
       }
       // Solo el canal «temperatura» está declarado para el dispositivo de prueba; cualquier otro, no.
       if (sql.trimStart().startsWith('SELECT c.id, m.codigo AS magnitud')) return Promise.resolve({ rows: params?.[1] === 'temperatura' ? [canal] : [], rowCount: params?.[1] === 'temperatura' ? 1 : 0 });
@@ -122,7 +123,7 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
     query.mock.calls.filter(([sql]) => String(sql).startsWith('INSERT INTO trama')).map(([, p]) => p as unknown[]);
 
   it('dos lecturas inválidas en una trama → UNA fila "invalida" con los dos porqués y el dispositivo', async () => {
-    const { servicio, query } = armar({ id: 'd1', estado: 'activo' });
+    const { servicio, query } = armar({ id: 'd1', estado: 'activo', formato: 'senml' });
     await servicio.procesar(TOPICO, Buffer.from('[{"n":"temperatura","v":500},{"n":"presion","v":1013}]'));
     const filas = filasCuarentena(query);
     expect(filas).toHaveLength(1);
@@ -146,7 +147,7 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
   });
 
   it('una lectura buena y una mala → se guarda la trama cruda Y la mala va a cuarentena', async () => {
-    const { servicio, query } = armar({ id: 'd1', estado: 'activo' });
+    const { servicio, query } = armar({ id: 'd1', estado: 'activo', formato: 'senml' });
     await servicio.procesar(TOPICO, Buffer.from('[{"n":"temperatura","v":21},{"n":"presion","v":1013}]'));
     expect(filasCuarentena(query).map((f) => f.motivo)).toEqual(['invalida']);
     const t = tramas(query);
@@ -236,5 +237,35 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
       await servicio.procesar(TOPICO, Buffer.from('22.4'));
       expect(publicados).toEqual([]);
     }
+  });
+  describe('filtro 2: despacho por el formato declarado (docs/10 §8.4 puntos 25 y 47)', () => {
+    const detalleCuarentena = (query: jest.Mock) =>
+      (query.mock.calls.find(([sql]) => String(sql).startsWith('INSERT INTO cuarentena'))?.[1] as unknown[])?.[4];
+    it('SenML a un dispositivo que declaró plano → malformada «la trama no tiene esa forma», sin lecturas, y vivo', async () => {
+      const { servicio, query, marcarVivo } = armar({ id: 'd1', estado: 'activo', formato: 'plano' });
+      await servicio.procesar(TOPICO, Buffer.from('[{"n":"temperatura","v":21}]'));
+      expect(cuarentenas(query)).toEqual(['malformada']);
+      expect(detalleCuarentena(query)).toBe('formato declarado plano: la trama no tiene esa forma');
+      expect(query.mock.calls.some(([sql]) => String(sql).trimStart().startsWith('INSERT INTO medicion'))).toBe(false);
+      expect(marcarVivo).toHaveBeenCalledWith('d1', 'dev-0001');
+    });
+    it('plano a un dispositivo que declaró senml → malformada, aunque el adaptador plano la habría entendido', async () => {
+      const { servicio, query } = armar({ id: 'd1', estado: 'activo', formato: 'senml' });
+      await servicio.procesar(TOPICO, Buffer.from('22.4'));
+      expect(cuarentenas(query)).toEqual(['malformada']);
+      expect(detalleCuarentena(query)).toBe('formato declarado senml: la trama no tiene esa forma');
+    });
+    it('el mismo SenML a un dispositivo que declaró senml → guardado', async () => {
+      const { servicio, query } = armar({ id: 'd1', estado: 'activo', formato: 'senml' });
+      await servicio.procesar(TOPICO, Buffer.from('[{"n":"temperatura","v":21}]'));
+      expect(cuarentenas(query)).toEqual([]);
+      expect(query.mock.calls.some(([sql]) => String(sql).trimStart().startsWith('INSERT INTO medicion'))).toBe(true);
+    });
+    it('un formato de pasarela por el tópico de un dispositivo directo → malformada «no se recibe por este tópico»', async () => {
+      const { servicio, query } = armar({ id: 'd1', estado: 'activo', formato: 'milesight' });
+      await servicio.procesar(TOPICO, Buffer.from('{"devEUI":"x","temperature":21}'));
+      expect(cuarentenas(query)).toEqual(['malformada']);
+      expect(detalleCuarentena(query)).toBe('formato declarado milesight: no se recibe por este tópico');
+    });
   });
 });

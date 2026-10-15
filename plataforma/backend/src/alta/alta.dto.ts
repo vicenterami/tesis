@@ -4,7 +4,11 @@
 import { BadRequestException } from '@nestjs/common';
 
 export const VIAS = ['mqtt', 'http', 'lorawan'] as const;
-export const FORMATOS = ['senml', 'plano', 'milesight'] as const;
+// Formatos que declara un dispositivo directo (mqtt, http). Uno lorawan no declara formato: hereda el de su pasarela
+// (milesight o chirpstack), y la base lo garantiza (fk_dispositivo_pasarela_formato y ck_dispositivo_via_formato, migración 15).
+export const FORMATOS_DIRECTOS = ['senml', 'plano'] as const;
+export const FORMATOS_PASARELA = ['milesight', 'chirpstack'] as const;
+export const FORMATOS = [...FORMATOS_DIRECTOS, ...FORMATOS_PASARELA] as const;
 export type Via = (typeof VIAS)[number];
 export type Formato = (typeof FORMATOS)[number];
 
@@ -25,7 +29,7 @@ export interface AltaValidada {
   nombre: string;
   zona_id: string;
   via: Via;
-  formato: Formato;
+  formato: Formato | null; // null en lorawan: lo pone el servicio desde la pasarela
   pasarela_id: string | null;
   intervalo_esperado_s: number;
   canales: CanalAlta[];
@@ -64,7 +68,12 @@ export function validarAlta(cuerpo: unknown, reservadosExtra: readonly string[] 
   const nombre = m.texto(c.nombre, 'nombre', 1, 80);
   const zona_id = m.uuid(c.zona_id, 'zona_id');
   const via = m.opcion(c.via, 'via', VIAS, 'mqtt');
-  const formato = c.formato === undefined ? 'senml' : m.opcion(c.formato, 'formato', FORMATOS, 'senml');
+  let formato: Formato | null = null;
+  if (via === 'lorawan') {
+    if (c.formato !== undefined) m.lista.push('formato: un dispositivo lorawan no lo declara, hereda el de su pasarela');
+  } else {
+    formato = c.formato === undefined ? 'senml' : m.opcion(c.formato, 'formato', FORMATOS_DIRECTOS, 'senml');
+  }
   const pasarela_id = c.pasarela_id === undefined || c.pasarela_id === null ? null : m.uuid(c.pasarela_id, 'pasarela_id');
   if (via === 'lorawan' && pasarela_id === null) m.lista.push('un dispositivo lorawan necesita pasarela_id');
   if (via !== 'lorawan' && pasarela_id !== null) m.lista.push('pasarela_id solo aplica a la vía lorawan');

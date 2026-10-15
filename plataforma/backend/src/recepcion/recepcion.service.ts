@@ -15,7 +15,7 @@ import { aCanonica } from './unidades';
 // Forma del tópico acordada: sitio/<sitio>/dispositivo/<id_fisico>/<magnitud>
 const PATRON_TOPICO = /^sitio\/([^/]+)\/dispositivo\/([^/]+)\/([^/]+)$/;
 
-interface Dispositivo { id: string; estado: 'activo' | 'mantenimiento' | 'baja'; sitio_codigo: string }
+interface Dispositivo { id: string; estado: 'activo' | 'mantenimiento' | 'baja'; formato: string; sitio_codigo: string }
 // Dominio cerrado: el mismo CHECK de la migración 09. Agregar un motivo exige migración, no solo código.
 type Motivo = 'no_registrado' | 'dado_de_baja' | 'malformada' | 'invalida';
 // Lo que se sabe de la trama al rechazarla. dispositivoId solo existe si el filtro 1 pudo atribuirla.
@@ -28,8 +28,8 @@ interface Canal { id: string; magnitud: string; unidad_canonica: string; rango_m
 //   trama ─► [1] ¿registrado, activo y en su sitio? ──no──► cuarentena "no_registrado" o "dado_de_baja"
 //             │
 //             ▼
-//           [2] ¿algún adaptador la entiende? ──no──► cuarentena "malformada"
-//             │  (SenML nativo · plano · próximamente el de la pasarela, ruta B)
+//           [2] ¿la entiende el adaptador de su formato declarado? ──no──► cuarentena "malformada"
+//             │  (senml nativo · plano; milesight y chirpstack, de la pasarela: docs/10 §8.4 punto 47)
 //             ▼  lecturas {magnitud, valor, unidad, tiempo}
 //           [3] ¿canal declarado? ¿unidad convertible? ¿valor en rango? ──no──► cuarentena "invalida"
 //             │
@@ -48,7 +48,8 @@ interface Canal { id: string; magnitud: string; unidad_canonica: string; rango_m
 @Injectable()
 export class RecepcionService implements OnModuleInit {
   private readonly log = new Logger('recepcion');
-  private readonly adaptadores: Adaptador[];
+  // Uno por formato declarado (docs/10 §8.4 puntos 25 y 47): el filtro 2 no adivina, usa el del alta.
+  private readonly adaptadores: Map<string, Adaptador>;
 
   constructor(
     @Inject(POOL) private readonly pool: Pool,
@@ -59,8 +60,7 @@ export class RecepcionService implements OnModuleInit {
     senml: SenmlAdaptador,
     plano: PlanoAdaptador,
   ) {
-    // Orden de prueba: del más específico al más genérico.
-    this.adaptadores = [senml, plano];
+    this.adaptadores = new Map<string, Adaptador>([senml, plano].map((a) => [a.nombre, a]));
   }
 
   onModuleInit(): void {
@@ -94,21 +94,23 @@ export class RecepcionService implements OnModuleInit {
     }
     trama.dispositivoId = dispositivo.id;
 
-    // ── [2] Analizar: el primer adaptador que reconozca el formato la traduce a lecturas ──
+    // ── [2] Analizar: el adaptador del formato declarado en el alta la traduce a lecturas (punto 47: no se adivina) ──
     // Una trama que no se entiende va a cuarentena, pero el pipeline NO termina aquí: el dispositivo ya
     // se autenticó, así que el filtro 6 debe marcarlo vivo igual (docs/10 §4: «vivo» es salud del enlace,
     // no calidad del dato; un nodo mal configurado está vivo, no en silencio). Con lecturas vacías, los
     // filtros 3 a 5 simplemente no tienen nada que hacer.
     let lecturas: Lectura[] = [];
-    const adaptador = this.adaptadores.find((a) => a.reconoce(ctx));
+    const adaptador = this.adaptadores.get(dispositivo.formato);
     if (!adaptador) {
-      await this.cuarentena(trama, 'malformada', 'ningún adaptador reconoce el formato (SenML, plano)');
+      await this.cuarentena(trama, 'malformada', `formato declarado ${dispositivo.formato}: no se recibe por este tópico`);
+    } else if (!adaptador.reconoce(ctx)) {
+      await this.cuarentena(trama, 'malformada', `formato declarado ${dispositivo.formato}: la trama no tiene esa forma`);
     } else {
       try {
         lecturas = adaptador.analizar(ctx);
       } catch (e) {
         if (!(e instanceof TramaMalformada)) throw e;
-        await this.cuarentena(trama, 'malformada', `${adaptador.nombre}: ${e.message}`);
+        await this.cuarentena(trama, 'malformada', `formato declarado ${adaptador.nombre}: ${e.message}`);
       }
     }
 
@@ -197,7 +199,7 @@ export class RecepcionService implements OnModuleInit {
 
   private async buscarDispositivo(idFisico: string): Promise<Dispositivo | undefined> {
     const r = await this.pool.query<Dispositivo>(
-      `SELECT d.id, d.estado, s.codigo AS sitio_codigo FROM dispositivo d
+      `SELECT d.id, d.estado, d.formato, s.codigo AS sitio_codigo FROM dispositivo d
          JOIN zona z ON z.id = d.zona_id JOIN sitio s ON s.id = z.sitio_id
         WHERE d.id_fisico = $1`,
       [idFisico],

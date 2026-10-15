@@ -26,6 +26,12 @@ describe('validarAlta (HU-11): el cuerpo limpio o los motivos', () => {
     expect(motivos({ ...bueno, estado: 'activo' })).toEqual(['campo no admitido: estado']);
     expect(motivos({ ...bueno, credencial: 'x' })).toEqual(['campo no admitido: credencial']);
   });
+  it('formato según la vía (migración 15): directo senml o plano; lorawan no lo declara, lo hereda de su pasarela', () => {
+    expect(validarAlta({ ...bueno, formato: 'plano' }).formato).toBe('plano');
+    expect(motivos({ ...bueno, formato: 'milesight' })).toEqual(expect.arrayContaining([expect.stringContaining('formato debe ser una de: senml, plano')]));
+    expect(validarAlta({ ...bueno, via: 'lorawan', pasarela_id: Z }).formato).toBeNull();
+    expect(motivos({ ...bueno, via: 'lorawan', pasarela_id: Z, formato: 'milesight' })).toEqual(expect.arrayContaining([expect.stringContaining('hereda el de su pasarela')]));
+  });
   it('la vía manda sobre la pasarela: lorawan la exige; las otras la prohíben', () => {
     expect(motivos({ ...bueno, via: 'lorawan' })).toEqual(expect.arrayContaining([expect.stringContaining('pasarela_id')]));
     expect(motivos({ ...bueno, pasarela_id: Z })).toEqual(expect.arrayContaining([expect.stringContaining('solo aplica')]));

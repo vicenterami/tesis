@@ -120,10 +120,12 @@ export class AltaService {
     try {
       await this.abrir(c);
       const sitio = await this.sitioDe(c, a);
+      // Un nodo lorawan copia el formato de su pasarela (la base exige que sean iguales: migración 15); uno directo trae el suyo.
+      const formato: Formato = a.formato ?? sitio.formatoPasarela ?? 'senml';
       const unidades = await this.unidadesDe(c, a);
       const d = await c.query<{ id: string; creado_en: Date }>(
         'INSERT INTO dispositivo (zona_id, id_fisico, nombre, intervalo_esperado_s, via, formato, pasarela_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, creado_en',
-        [a.zona_id, a.id_fisico, a.nombre, a.intervalo_esperado_s, a.via, a.formato, a.pasarela_id],
+        [a.zona_id, a.id_fisico, a.nombre, a.intervalo_esperado_s, a.via, formato, a.pasarela_id],
       );
       const id = d.rows[0].id;
       const canales: CanalCreado[] = [];
@@ -134,17 +136,17 @@ export class AltaService {
       const secreto = a.via === 'lorawan' ? null : generarSecreto(); // la pasarela autentica a los lorawan (docs/10 §3)
       if (secreto !== null) await c.query('INSERT INTO credencial (dispositivo_id, hash) VALUES ($1, $2)', [id, await hashScrypt(secreto)]); // nunca el secreto
       await c.query('INSERT INTO evento (dispositivo_id, tipo, detalle) VALUES ($1, $2, $3)', [
-        id, 'alta', JSON.stringify({ via: a.via, formato: a.formato, canales: a.canales.map((k) => k.magnitud), origen: 'api' }),
+        id, 'alta', JSON.stringify({ via: a.via, formato, canales: a.canales.map((k) => k.magnitud), origen: 'api' }),
       ]);
       if (a.via === 'mqtt' && secreto !== null) {
         await this.dynsec.ordenar(ordenesAltaDispositivo(a.id_fisico, secreto));
         enBroker = true;
       }
       await c.query('COMMIT');
-      this.log.log(`alta: ${a.id_fisico} (${a.via}/${a.formato}, ${canales.length} canal(es)) en el sitio ${sitio.codigo}`);
+      this.log.log(`alta: ${a.id_fisico} (${a.via}/${formato}, ${canales.length} canal(es)) en el sitio ${sitio.codigo}`);
       return {
         id, id_fisico: a.id_fisico, nombre: a.nombre, estado: 'activo', zona_id: a.zona_id, sitio_codigo: sitio.codigo, via: a.via,
-        formato: a.formato, intervalo_esperado_s: a.intervalo_esperado_s, creado_en: d.rows[0].creado_en.toISOString(), canales,
+        formato, intervalo_esperado_s: a.intervalo_esperado_s, creado_en: d.rows[0].creado_en.toISOString(), canales,
         conexion: this.conexion(a.via, a.id_fisico, sitio.codigo, canales, secreto, a.pasarela_id),
       };
     } catch (e) {
@@ -279,15 +281,16 @@ export class AltaService {
   }
 
   // La zona existe y, si hay pasarela, es del mismo sitio y está activa. Lo que falta aquí es 400: es un dato del cuerpo.
-  private async sitioDe(c: PoolClient, a: AltaValidada): Promise<{ id: string; codigo: string }> {
+  private async sitioDe(c: PoolClient, a: AltaValidada): Promise<{ id: string; codigo: string; formatoPasarela: Formato | null }> {
     const z = await c.query<{ sitio_id: string; codigo: string }>('SELECT z.sitio_id, s.codigo FROM zona z JOIN sitio s ON s.id = z.sitio_id WHERE z.id = $1', [a.zona_id]);
     if (z.rows.length === 0) throw new BadRequestException(['zona_id no existe']);
-    const sitio = { id: z.rows[0].sitio_id, codigo: z.rows[0].codigo };
+    const sitio: { id: string; codigo: string; formatoPasarela: Formato | null } = { id: z.rows[0].sitio_id, codigo: z.rows[0].codigo, formatoPasarela: null };
     if (a.pasarela_id !== null) {
-      const p = await c.query<{ sitio_id: string; activo: boolean }>('SELECT sitio_id, activo FROM pasarela WHERE id = $1', [a.pasarela_id]);
+      const p = await c.query<{ sitio_id: string; activo: boolean; formato: Formato }>('SELECT sitio_id, activo, formato FROM pasarela WHERE id = $1', [a.pasarela_id]);
       if (p.rows.length === 0) throw new BadRequestException(['pasarela_id no existe']);
       if (p.rows[0].sitio_id !== sitio.id) throw new BadRequestException(['la pasarela pertenece a otro sitio']);
       if (!p.rows[0].activo) throw new BadRequestException(['la pasarela está inactiva']);
+      sitio.formatoPasarela = p.rows[0].formato;
     }
     return sitio;
   }
@@ -362,6 +365,8 @@ export class AltaService {
       case '23505': // unique_violation: id_fisico en dispositivo, o en pasarela (disparador de la migración 11)
         return new ConflictException(`id_fisico «${idFisico}» ya existe`);
       case '23503': // foreign_key_violation: la zona o la pasarela desaparecieron entre la comprobación y el INSERT
+        // …o el formato de la pasarela cambió entre la lectura y el INSERT (fk_dispositivo_pasarela_formato, migración 15).
+        if (pg.constraint === 'fk_dispositivo_pasarela_formato') return new ConflictException('el formato de la pasarela cambió durante el alta: repetirla');
         return new BadRequestException(['zona_id o pasarela_id no existe']);
       case '23514': // check_violation: la base exige algo que el validador no cubrió; el detalle (trae la fila) va al registro, no a la API
         this.log.warn(`${op} de ${idFisico}: la base rechazó la fila (${pg.constraint ?? 'restricción'}): ${pg.detail ?? pg.message}`);

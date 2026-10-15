@@ -122,10 +122,10 @@
                     "type": "string",
                     "enum": [
                       "senml",
-                      "plano",
-                      "milesight"
+                      "plano"
                     ],
-                    "default": "senml"
+                    "default": "senml",
+                    "description": "Solo vías mqtt y http; un dispositivo lorawan no lo envía: hereda el de su pasarela"
                   },
                   "pasarela_id": {
                     "type": "string",

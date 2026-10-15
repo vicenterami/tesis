@@ -112,17 +112,21 @@ INSERT INTO canal (dispositivo_id, magnitud_codigo)
 
 ## Probar los filtros 2–4
 
-Con el canal declarado, publica estos casos y observa el log del backend y la tabla `medicion`:
+Con el canal declarado, publica estos casos y observa el log del backend y la tabla `medicion`. El filtro 2 usa el
+formato que el dispositivo declaró al darse de alta (`dev-0001`: `senml`, el valor por defecto; `docs/10 §8.4` punto 47):
+no prueba adaptadores al azar.
 
 | Cuerpo publicado en `…/dev-0001/temperatura` | Adaptador | Resultado |
 |---|---|---|
-| `21.5` | plano | guardada: 21,5 Cel |
 | `[{"bn":"dev-0001","n":"temperatura","u":"Cel","v":22.1}]` | senml | guardada: 22,1 Cel |
-| `{"v":300,"u":"K"}` | plano | guardada **convertida**: 26,85 Cel |
-| `500` | plano | cuarentena `invalida` · fuera de rango (−40…85) |
-| `abc` | ninguno | cuarentena `malformada` |
-| `{"v":20,"u":"furlongs"}` | plano | cuarentena `invalida` · unidad no convertible |
-| en `…/dev-0001/presion`: `1013` | plano | cuarentena `invalida` · canal no declarado |
+| `[{"n":"temperatura","u":"K","v":300}]` | senml | guardada **convertida**: 26,85 Cel |
+| `[{"n":"temperatura","v":500}]` | senml | cuarentena `invalida` · fuera de rango (−40…85) |
+| `[{"n":"temperatura","u":"furlongs","v":20}]` | senml | cuarentena `invalida` · unidad no convertible |
+| `abc` | senml | cuarentena `malformada` · «formato declarado senml: la trama no tiene esa forma» |
+| `21.5` | senml | cuarentena `malformada` · el número suelto es del formato `plano`, que `dev-0001` no declaró |
+| en `…/dev-0001/presion`: `[{"n":"presion","v":1013}]` | senml | cuarentena `invalida` · canal no declarado |
+
+El formato `plano` (un número o `{"v":…,"u":…}`) se prueba con un dispositivo que lo declare en el alta (`"formato": "plano"`).
 
 ```bash
 docker compose exec timescaledb psql -U plataforma -d plataforma -c "SELECT m.codigo, x.valor, x.unidad, x.tiempo FROM medicion x JOIN canal c ON c.id=x.canal_id JOIN magnitud m ON m.codigo=c.magnitud_codigo ORDER BY x.tiempo DESC LIMIT 5;"

@@ -20,7 +20,7 @@ const alta = (extra: Partial<AltaValidada> = {}): AltaValidada => ({
 });
 
 // Base y broker falsos: se registra cada consulta en orden y se responde según su prefijo.
-function armar(opciones: { insertFalla?: string; commitFalla?: boolean; brokerFalla?: Error; disponible?: boolean; pasarela?: { sitio_id: string; activo: boolean } | null } = {}) {
+function armar(opciones: { insertFalla?: string; insertRestriccion?: string; commitFalla?: boolean; brokerFalla?: Error; disponible?: boolean; pasarela?: { sitio_id: string; activo: boolean; formato?: string } | null } = {}) {
   const sql: string[] = [];
   const params: unknown[][] = [];
   let canal = 0;
@@ -30,10 +30,10 @@ function armar(opciones: { insertFalla?: string; commitFalla?: boolean; brokerFa
       sql.push(texto);
       params.push(p);
       if (texto.startsWith('SELECT z.sitio_id')) return { rows: p[0] === Z ? [{ sitio_id: 'S1', codigo: 'uct' }] : [] };
-      if (texto.startsWith('SELECT sitio_id, activo FROM pasarela')) return { rows: opciones.pasarela === null ? [] : [opciones.pasarela ?? { sitio_id: 'S1', activo: true }] };
+      if (texto.startsWith('SELECT sitio_id, activo, formato FROM pasarela')) return { rows: opciones.pasarela === null ? [] : [{ formato: 'milesight', ...(opciones.pasarela ?? { sitio_id: 'S1', activo: true }) }] };
       if (texto.startsWith('SELECT codigo, unidad_canonica')) return { rows: [{ codigo: 'humedad', unidad_canonica: '%RH' }, { codigo: 'temperatura', unidad_canonica: 'Cel' }] };
       if (texto.startsWith('INSERT INTO dispositivo')) {
-        if (opciones.insertFalla !== undefined) throw Object.assign(new Error('duplicate key'), { code: opciones.insertFalla });
+        if (opciones.insertFalla !== undefined) throw Object.assign(new Error('duplicate key'), { code: opciones.insertFalla, constraint: opciones.insertRestriccion });
         return { rows: [{ id: 'D1', creado_en: new Date('2026-10-12T20:00:00Z') }] };
       }
       if (texto.startsWith('INSERT INTO canal')) return { rows: [{ id: `C${++canal}` }] };
@@ -128,13 +128,29 @@ describe('AltaService.crear (HU-11): todo o nada entre la base y el broker', () 
 
   it('lorawan: sin credencial ni broker; la pasarela debe existir, estar activa y ser del mismo sitio', async () => {
     const { servicio, sql, ordenes } = armar();
-    const r = await servicio.crear(alta({ via: 'lorawan', pasarela_id: P }));
+    const r = await servicio.crear(alta({ via: 'lorawan', formato: null, pasarela_id: P }));
     expect(r.conexion.via).toBe('lorawan');
+    expect(r.formato).toBe('milesight'); // lo copió de la pasarela: el nodo lorawan no declara formato (migración 15)
     expect(sql.some((s) => s.startsWith('INSERT INTO credencial'))).toBe(false);
     expect(ordenes).toHaveLength(0);
-    expect(await motivosDe(armar({ pasarela: null }).servicio.crear(alta({ via: 'lorawan', pasarela_id: P })))).toEqual(['pasarela_id no existe']);
-    expect(await motivosDe(armar({ pasarela: { sitio_id: 'OTRO', activo: true } }).servicio.crear(alta({ via: 'lorawan', pasarela_id: P })))).toEqual(['la pasarela pertenece a otro sitio']);
-    expect(await motivosDe(armar({ pasarela: { sitio_id: 'S1', activo: false } }).servicio.crear(alta({ via: 'lorawan', pasarela_id: P })))).toEqual(['la pasarela está inactiva']);
+    expect(await motivosDe(armar({ pasarela: null }).servicio.crear(alta({ via: 'lorawan', formato: null, pasarela_id: P })))).toEqual(['pasarela_id no existe']);
+    expect(await motivosDe(armar({ pasarela: { sitio_id: 'OTRO', activo: true } }).servicio.crear(alta({ via: 'lorawan', formato: null, pasarela_id: P })))).toEqual(['la pasarela pertenece a otro sitio']);
+    expect(await motivosDe(armar({ pasarela: { sitio_id: 'S1', activo: false } }).servicio.crear(alta({ via: 'lorawan', formato: null, pasarela_id: P })))).toEqual(['la pasarela está inactiva']);
+  });
+
+  it('lorawan: el nodo copia el formato de su pasarela (chirpstack) en el INSERT, el evento y la respuesta', async () => {
+    const { servicio, sql, params } = armar({ pasarela: { sitio_id: 'S1', activo: true, formato: 'chirpstack' } });
+    const r = await servicio.crear(alta({ via: 'lorawan', formato: null, pasarela_id: P }));
+    const i = sql.findIndex((s) => s.startsWith('INSERT INTO dispositivo'));
+    expect(params[i][5]).toBe('chirpstack');
+    const e = sql.findIndex((s) => s.startsWith('INSERT INTO evento'));
+    expect(JSON.parse(params[e][2] as string).formato).toBe('chirpstack');
+    expect(r.formato).toBe('chirpstack');
+  });
+
+  it('la FK compuesta (el formato de la pasarela cambió entre la lectura y el INSERT) → 409 con el remedio', async () => {
+    const { servicio } = armar({ insertFalla: '23503', insertRestriccion: 'fk_dispositivo_pasarela_formato' });
+    await expect(servicio.crear(alta({ via: 'lorawan', formato: null, pasarela_id: P }))).rejects.toThrow('el formato de la pasarela cambió durante el alta');
   });
 
   it('zona inexistente o magnitud fuera del catálogo → 400 antes de insertar nada', async () => {

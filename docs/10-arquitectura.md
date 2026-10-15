@@ -985,7 +985,7 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     y clave en el broker (punto 26); `http`, un token; `lorawan`, ninguna propia (la autentica su pasarela). El alta y la
     carga masiva ofrecen la vía en palabras simples y entregan los datos de conexión listos para copiar. El modelo
     interno sigue siendo único (`docs/08 §1`): cambia cómo se identifica y autentica un dispositivo, no cómo se guarda
-    lo que envía. Modelo en `docs/08 §8`; secuencia en §3. Esquema aplicado en la migración 11 (08/10); con el punto 47 (15/10; en implementación) el filtro 2 pasa a usar
+    lo que envía. Modelo en `docs/08 §8`; secuencia en §3. Esquema aplicado en la migración 11 (08/10); desde el 15/10 (punto 47) el filtro 2 usa
     el formato declarado: `senml` o `plano` para un dispositivo directo; en la vía `lorawan`, el de su pasarela, que el nodo hereda
     (migración 15).
 26. **Credenciales del broker administradas por el backend con el plugin Dynamic Security de Mosquitto 2.x**,
@@ -1230,8 +1230,8 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     filtro 2. **El formato lo declara la pasarela** (`pasarela.formato`: `milesight` o `chirpstack`, migración 15) y el nodo lo copia
     al darse de alta: la base garantiza que sean iguales con una clave foránea compuesta `(pasarela_id, formato)` →
     `pasarela (id, formato)` en cascada, y un dispositivo directo (`mqtt`, `http`) solo puede declarar `senml` o `plano`. El filtro 2
-    usa el formato declarado para todos los dispositivos (con este punto se termina de aplicar el 25): una trama que no calza va a
-    cuarentena `malformada` diciendo qué formato se esperaba. El adaptador `chirpstack` lee `deviceInfo.devEui` (en minúsculas; si no
+    usa el formato declarado para todos los dispositivos (con este punto se termina de aplicar el 25; hecho el 15/10 para los
+    dispositivos directos, `docs/16 §27`): una trama que no calza va a cuarentena `malformada` diciendo qué formato se esperaba. El adaptador `chirpstack` lee `deviceInfo.devEui` (en minúsculas; si no
     coincide con el tópico, cuarentena `malformada` y el nodo no se marca vivo: §4.1), `time` (marca del servidor de red, regla 17 de
     `docs/13`) y las claves de `object`; el `milesight`, el JSON con códec y Metadata (`devEUI` más los valores decodificados; sin
     códec, cuarentena «activar Payload Codec y Metadata»). Las claves decodificadas se traducen a magnitudes con un **mapa** único,

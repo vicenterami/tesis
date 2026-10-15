@@ -511,6 +511,8 @@ elif [ -z "$citas" ]; then echo "FALLA ninguna cita «N pruebas unitarias» en d
 elif [ -n "$malas" ]; then echo "FALLA cifras de pruebas unitarias distintas de $real:"; sed 's/^/  /' <<<"$malas"; fallos=$((fallos+1))
 else echo "OK    $real pruebas unitarias; $(grep -c . <<<"$citas") cita(s) en docs e informe coinciden"; fi
 # 09/10: también la cifra por archivo («N pruebas en `eventos.spec.ts`»), que citan docs/11 y docs/16 y nadie recontaba.
+# 15/10: la forma corta («…, 5 en `alta.dto.spec.ts`») no se vigila a propósito: también cuenta subconjuntos («4 en `arranque.spec.ts`»
+# son las de la clave, de 37) y aparece en secciones fechadas con la cifra de ese día. Quien la escribe la recuenta a mano.
 python3 -I - <<'PY' || fallos=$((fallos+1))
 import re, sys, pathlib
 citas = []

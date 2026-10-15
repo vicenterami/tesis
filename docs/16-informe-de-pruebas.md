@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 193 pruebas unitarias, sin matriz formal) y TT-32 (sensor físico);
+cubre todavía: TT-27 (contrato de trama: hoy 200 pruebas unitarias, sin matriz formal) y TT-32 (sensor físico);
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -652,3 +652,25 @@ ordenándose (ese modo choca consigo mismo) y ninguna de las dos cambia la clave
 `baja-rotacion.spec.ts` exigen el modo nuevo y fallan con el anterior, pero solo comprueban el texto de la consulta; lo que prueba
 el comportamiento es el guion de arriba. Queda para el banco: una rotación durante la carga, midiendo que el p95 de la recepción no
 cambia.
+
+## 27. El filtro 2 usa el formato declarado en el alta (15/10/2026)
+
+**Qué cambió** (`docs/10 §8.4` puntos 25 y 47; migración 15). Hasta el 14/10 el filtro 2 probaba los adaptadores en orden y se quedaba
+con el primero que reconociera la trama: un dispositivo dado de alta como `senml` podía mandar un número suelto y se guardaba como
+`plano`. Desde el 15/10 usa el adaptador del formato que declaró el dispositivo; un dispositivo directo declara `senml` o `plano`, y
+uno `lorawan` no lo envía en el alta: copia el de su pasarela (la base exige que sean iguales).
+
+| Prueba | Resultado |
+|---|---|
+| SenML a un dispositivo que declaró `plano` | cuarentena `malformada` «formato declarado plano: la trama no tiene esa forma», sin lecturas, dispositivo vivo |
+| Un número suelto a uno que declaró `senml` (el adaptador `plano` la habría entendido) | cuarentena `malformada` «formato declarado senml: la trama no tiene esa forma» |
+| El mismo SenML a uno que declaró `senml` | guardada |
+| Un formato de pasarela (`milesight`) por el tópico de un dispositivo directo | cuarentena `malformada` «formato declarado milesight: no se recibe por este tópico» |
+| Alta `mqtt` con `formato: milesight` | 400 «formato debe ser una de: senml, plano» |
+| Alta `lorawan` con `formato` | 400 «un dispositivo lorawan no lo declara, hereda el de su pasarela» |
+| Alta `lorawan` sin `formato` y pasarela `chirpstack` | el INSERT, el evento y la respuesta llevan `chirpstack` |
+| La pasarela cambia de formato entre la lectura y el INSERT (clave foránea compuesta) | 409 «el formato de la pasarela cambió durante el alta: repetirla» |
+
+Pruebas unitarias en `recepcion.service.spec.ts`, `alta.dto.spec.ts` y `alta.service.spec.ts`: 200 en total (`pnpm test`). Plantado: con
+el despacho anterior (el primer adaptador que reconozca) fallan las tres pruebas de recepción que dependen del formato declarado. La
+demostración (`docs/15` §3) suma la fila del número suelto a un dispositivo SenML.

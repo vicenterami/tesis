@@ -295,9 +295,9 @@ consistente para reportes.
       dispositivo puede llegar por celular sin pasarela). Es una entidad, no un atributo del dispositivo, porque
       una pasarela sirve a muchos dispositivos y tiene estado propio. Se autentica en el broker con su propia
       credencial y publica solo bajo su tópico, con el DevEUI de cada nodo en el cuerpo (`docs/10 §8.4` punto 24).
-- [~] **Declarar vía, formato y pasarela en el alta (HU-11, hecho el 12/10) y que el filtro 2 use el formato declarado (HU-02; diseño del
-      15/10, `docs/10 §8.4` punto 47; código en curso)**, lo que exige separar el dispositivo de la demo, que hoy manda SenML y plano
-      (`dev-0002`, declarado `plano`).
+- [x] **Declarar vía, formato y pasarela en el alta (HU-11, hecho el 12/10) y que el filtro 2 use el formato declarado** (15/10,
+      `docs/10 §8.4` punto 47, `docs/16 §27`): un dispositivo directo declara `senml` o `plano`; uno lorawan no lo envía y copia el de su
+      pasarela. La demostración pasó a publicar solo SenML, que es lo que declara `dev-0001` (`docs/15` §3 y §4).
 - [ ] **Alias de claves en el catálogo (`magnitud.alias`), Etapa 4, obligatorio** (decidido el 15/10/2026; `docs/10 §8.4` punto 47). Hoy
       el mapa «clave del JSON decodificado → magnitud» vive en el código (`mapa-claves.ts`) detrás de una sola función (`resolverClave`),
       porque solo hay dos decodificadores que importen y nadie puede editar el catálogo hasta que el panel lo administre. Entonces el
