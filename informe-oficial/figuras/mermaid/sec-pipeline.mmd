@@ -16,8 +16,8 @@ sequenceDiagram
         F1->>Q: guarda cruda, motivo "no_registrado" o "dado_de_baja"
     else conocido y no dado de baja
         F1->>F2: trama + dispositivo
-        F2->>F2: elige adaptador<br/>por origen (SenML nativo,<br/>JSON del compañero, ChirpStack)
-        alt formato irreconocible
+        F2->>F2: elige el adaptador del<br/>formato declarado (senml, plano,<br/>milesight, chirpstack)
+        alt no calza con el formato declarado
             F2->>Q: motivo "malformada"
         else parseada
             F2->>F3: lecturas {canal,<br/>valor, unidad, tiempo}

@@ -23,7 +23,7 @@ uniformidad es la que resuelve la causa C1 (formatos dispares).
 | 1 | **sitio** | Organización o instalación que agrupa dispositivos | Declara su **zona horaria** (IANA) y su **código**, el segmento del tópico (`sitio/<codigo>/…`, migración 11); el caso de validación es el Campus Dr. Luis Rivas del Canto (código `uct`) |
 | 2 | **zona** | Subdivisión lógica de un sitio (edificio, sector, sala) | Un sitio tiene muchas zonas |
 | 3 | **magnitud** | Catálogo de lo que se puede medir (temperatura, humedad, nivel…) | Define la unidad canónica y el rango válido |
-| 4 | **dispositivo** | Un nodo físico que reporta (ESP32, sensor LoRa…) | Pertenece a una zona; se identifica por un id físico (MAC/DevEUI, lista blanca `[a-z0-9-]`); declara su **vía** (mqtt, http, lorawan), su **formato** y, si llega por LoRaWAN, su **pasarela** (migración 11) |
+| 4 | **dispositivo** | Un nodo físico que reporta (ESP32, sensor LoRa…) | Pertenece a una zona; se identifica por un id físico (MAC/DevEUI, lista blanca `[a-z0-9-]`); declara su **vía** (mqtt, http, lorawan), su **formato** (`senml`, `plano`, `milesight`, `chirpstack`; en la vía lorawan lo hereda de su pasarela) y, si llega por LoRaWAN, su **pasarela** (migraciones 11 y 15) |
 | 5 | **canal** | Una magnitud concreta que un dispositivo reporta | Un dispositivo puede tener varios canales (temp + humedad) |
 | 6 | **credencial** | Secreto de autenticación de un dispositivo | Permite rotación sin borrar el dispositivo |
 | 7 | **medicion** | Una lectura: valor + unidad + tiempo | **Hypertable** de TimescaleDB (serie de tiempo) |
@@ -34,7 +34,7 @@ uniformidad es la que resuelve la causa C1 (formatos dispares).
 | 12 | **usuario** | Persona que accede a la plataforma | Con hash de contraseña, nunca en claro |
 | 13 | **usuario_sitio** | Qué usuario puede ver qué sitio y con qué rol | Multi-tenencia: aísla los datos entre sitios |
 | 14 | **trama** | Trama cruda de un mensaje aceptado (al menos una lectura guardada) | **Hypertable**, solo inserción, retención 30 días: auditoría y re-decodificación si un adaptador tuvo un error (migración 09) |
-| 15 | **pasarela** | Quien publica en nombre de los nodos LoRaWAN: una pasarela con servidor de red embebido (ruta B) o un servidor de red externo (ruta C, `docs/10 §8.4` punto 45) | Una sirve a muchos nodos; su id físico es su usuario del broker, único también frente a los dispositivos (migración 11) |
+| 15 | **pasarela** | Quien publica en nombre de los nodos LoRaWAN: una pasarela con servidor de red embebido (ruta B) o un servidor de red externo (ruta C, `docs/10 §8.4` punto 45) | Una sirve a muchos nodos; su id físico es su usuario del broker, único también frente a los dispositivos (migración 11); **declara el formato** de lo que publica (`milesight` o `chirpstack`, migración 15) y sus nodos lo heredan (`docs/10 §8.4` punto 47) |
 | 16 | **estado_dispositivo** | Lo que el sistema escribe sobre cada dispositivo: la última trama aceptada | Una fila por dispositivo y sin `actualizado_en`: la fila de `dispositivo` queda para lo que edita una persona (migración 11). Se borra en cascada con su dispositivo: es un derivado, sin historia propia |
 | 17 | **metrica_broker** | Una muestra por minuto de los contadores `$SYS` del broker: descartes acumulados, mensajes y bytes en cola, clientes conectados, memoria | **Hypertable**, retención 90 días; la toma la conexión administradora del backend (migración 13, `docs/10 §8.4` punto 43) |
 | 18 | **condicion_sistema** | Un estado anómalo de la plataforma, sin dispositivo (`broker_descarte`: el broker descarta o la cola pasa el 80 % del tope) | Misma forma que `condicion` (abierta/cerrada, una abierta por tipo); se abre y se cierra sola desde el muestreo del broker (migración 13) |
@@ -294,11 +294,17 @@ consistente para reportes.
       dispositivo puede llegar por celular sin pasarela). Es una entidad, no un atributo del dispositivo, porque
       una pasarela sirve a muchos dispositivos y tiene estado propio. Se autentica en el broker con su propia
       credencial y publica solo bajo su tópico, con el DevEUI de cada nodo en el cuerpo (`docs/10 §8.4` punto 24).
-- [ ] **Declarar vía, formato y pasarela en el alta (HU-11) y que el filtro 2 use el formato declarado (HU-02)**, lo que exige
-      separar el dispositivo de la demo, que hoy manda SenML y plano.
+- [~] **Declarar vía, formato y pasarela en el alta (HU-11, hecho el 12/10) y que el filtro 2 use el formato declarado (HU-02; diseño del
+      15/10, `docs/10 §8.4` punto 47; código en curso)**, lo que exige separar el dispositivo de la demo, que hoy manda SenML y plano
+      (`dev-0002`, declarado `plano`).
+- [ ] **Alias de claves en el catálogo (`magnitud.alias`), Etapa 4, obligatorio** (decidido el 15/10/2026; `docs/10 §8.4` punto 47). Hoy
+      el mapa «clave del JSON decodificado → magnitud» vive en el código (`mapa-claves.ts`) detrás de una sola función (`resolverClave`),
+      porque solo hay dos decodificadores que importen y nadie puede editar el catálogo hasta que el panel lo administre. Entonces el
+      mapa pasa a una columna `alias text[]` del catálogo, sembrada desde la misma lista del código, y la función lee de la base: los
+      adaptadores no cambian. Es la regla de §4: lo que administra el usuario vive en un catálogo.
 - [x] **Vía, formato y pasarela: el esquema** (decidido el 08/10/2026, `docs/10 §8.4` punto 25; migración 11):
       `dispositivo.via` (`CHECK`: `mqtt`, `http`, `lorawan`), `dispositivo.formato` (`CHECK`: el código de un
-      adaptador, `senml`, `plano`, `milesight`…; lo interpreta el código, §6) y `dispositivo.pasarela_id` (FK opcional,
+      adaptador: `senml`, `plano`, `milesight` y, desde la migración 15, `chirpstack`; lo interpreta el código, §6) y `dispositivo.pasarela_id` (FK opcional,
       con un `CHECK` que la exige si la vía es `lorawan`). La credencial depende de la vía (`docs/11 §7`). El modelo
       interno sigue siendo único (§1): cambia cómo se identifica y autentica un dispositivo, no cómo se guarda.
 - [ ] **Ubicación geográfica**: `dispositivo.latitud` y `dispositivo.longitud` (`double precision`, opcionales,

@@ -19,7 +19,7 @@
 | A6 | **Agotamiento de recursos** | Un bug o un ataque consume toda la memoria del servidor | Techo de memoria/CPU por contenedor; el anfitrión sobrevive |
 | A7 | **Suplantación de *gateway* LoRaWAN** | El protocolo *Semtech UDP Packet Forwarder* no autentica: cualquiera con el EUI (público) puede enviar UDP al puerto 1700 haciéndose pasar por un *gateway* | Límite de tasa en el proxy; el filtro 1 del pipeline autentica cada dispositivo de todos modos, contra el registro, no contra lo que diga el *gateway* |
 | A8 | **Backend con permisos de administración del broker** (desde la decisión de credenciales, `docs/10 §8.4` punto 26) | Quien compromete el backend crea o cambia clientes y ACL del broker y suplanta a cualquier dispositivo o pasarela | Identidad de administración distinta de la de lectura, con ACL solo sobre `$CONTROL/#`; archivo del plugin con modo 0600, en el volumen de datos y dentro del respaldo (§7) |
-| A9 | **Pasarela comprometida (ruta B)** | Publica con su credencial lecturas falsas por muchos dispositivos a la vez | La pasarela publica solo bajo su tópico (`sitio/<s>/pasarela/<id>/…`, ACL con `%u`) y el filtro 1 toma su identidad del tópico y solo acepta los nodos asociados a ella en el alta (`docs/10 §8.4` punto 24): no puede hacerse pasar por un dispositivo de otra vía, y un sitio ajeno o un identificador ya usado se rechazan; revocar su credencial corta a todos de una vez; lo rechazado queda en la cuarentena |
+| A9 | **Pasarela comprometida (ruta B)** | Publica con su credencial lecturas falsas por muchos dispositivos a la vez | La pasarela publica solo bajo su tópico (`sitio/<s>/pasarela/<id>/…`, ACL con `%u`) y el filtro 1 toma su identidad del tópico y solo acepta los nodos asociados a ella en el alta (`docs/10 §8.4` puntos 24 y 47): no puede hacerse pasar por un dispositivo de otra vía, y un sitio ajeno o un identificador ya usado se rechazan; revocar su credencial corta a todos de una vez; lo rechazado queda en la cuarentena |
 
 ## 2. Las capas, de afuera hacia adentro
 
@@ -157,6 +157,14 @@ que administra el broker (`backend-admin`, rol `admin` del plugin) es distinta d
 en el volumen de datos con dueño 1883 y modo 600 y va dentro del respaldo (amenaza A8, §1). Sin ese archivo el broker no arranca,
 a propósito.
 
+**Pasarelas y servidores de red externos** (`docs/10 §8.4` punto 47, 15/10/2026; en implementación): se registran por `POST /pasarelas` (ruta prevista)
+con la misma guardia y el mismo todo-o-nada que un dispositivo, y reciben usuario (su identificador) y clave una sola vez. Su rol
+`pasarela` publica solo bajo `sitio/+/pasarela/%u/#` y **puede suscribirse solo a su subárbol de comandos**
+(`sitio/+/pasarela/%u/+/command/#`): la integración MQTT de ChirpStack se suscribe a su tópico de comandos aunque nunca se le mande
+nada (documentación oficial de ChirpStack, registro privado CS-08) y negárselo la dejaría reintentando; todo lo demás, negado
+explícito. Baja y rotación con las mismas órdenes que un dispositivo; al dar de baja una pasarela, sus nodos quedan sin quien publique
+por ellos y lo que llegue va a cuarentena.
+
 **Permisos del archivo del plugin:** dueño `mosquitto` (uid 1883) y modo **0600**: el plugin lo reescribe en cada cambio, así que
 debe ser suyo. Con dueño `root` el plugin arranca con una configuración vacía y rechaza a todos, hasta al administrador
 (observado el 12/10 en un contenedor desechable: «Not authorized» sin más pistas en el registro). El guardián (paso 2i) comprueba
@@ -266,7 +274,7 @@ interna de Docker, porque no sale del servidor (cambia a R2 si un componente se 
 | Tramo | Identidad (R1) | Puede (y nada más) | Cifrado | Estado |
 |---|---|---|---|---|
 | Dispositivo → proxy 8883 → broker | usuario y clave propios por dispositivo | publicar en `sitio/+/dispositivo/<su usuario>/+` | TLS hasta el proxy (R2); interno en claro (R3) | ✅ |
-| Pasarela o servidor de red externo → proxy 8883 → broker | usuario propio por pasarela | publicar bajo su propio árbol (rol `pasarela`, con la ruta LoRaWAN real, por decidir) | TLS (R2) | ⏳ |
+| Pasarela o servidor de red externo → proxy 8883 → broker | usuario propio por pasarela (`POST /pasarelas` (ruta prevista)) | publicar bajo su propio árbol y suscribirse solo a su subárbol de comandos (rol `pasarela`, `docs/10 §8.4` punto 47) | TLS (R2) | ⏳ en implementación (15/10) |
 | Persona → proxy 443 → backend | hoy: clave de administrador solo en las rutas que escriben; con la sesión (M7), usuario y rol | lo que su rol permita (`docs/20`) | HTTPS (R2) | 🟡 lecturas sin sesión hasta M7 |
 | Backend → broker (`backend`) | usuario propio | recibir `sitio/#`; nada más | interno (R3) | ✅ |
 | Backend → broker (`backend-admin`) | usuario propio, conexión aparte | órdenes al plugin y leer `$SYS/#` (acotado el 13/10; antes leía todo) | interno (R3) | ✅ |

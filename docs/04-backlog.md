@@ -169,6 +169,7 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 - RSSI, SNR, identificador del nodo y gateway quedan asociados al evento (RF-09).
 - Un evento recibido por dos gateways se almacena una sola vez (RF-10).
 - Un payload de longitud o contenido inválido se rechaza sin interrumpir la recepción de los demás (RNF-07).
+- La pasarela o el servidor de red externo se registra por API con credencial propia y declara el formato de sus tramas; sus nodos lo heredan en el alta (15/10/2026, `docs/10 §8.4` punto 47).
 
 ## EP-05 · Normalización y máquina de estados
 

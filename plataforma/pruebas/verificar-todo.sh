@@ -150,7 +150,7 @@ rutas_reales=$(jq -r '.paths|keys[]' plataforma/backend/openapi.json | sed -E 's
 # así las rutas que el panel necesitará). 12/10: una ruta que termina en parámetro (`/x/{id}`) perdía la llave final al
 # quitar la `}` de un \texttt{…} y fallaba siempre; ahora el parámetro se protege antes de limpiar el final.
 rutas_citadas=$(grep -rhE '(GET|POST|PUT|PATCH|DELETE) /[a-zA-Z0-9_{}/.\\-]*' informe-oficial docs --include=*.tex --include=*.md --include=*.mmd \
-  | grep -vE '\(Etapa [34]\)|Propuesta' | grep -oE '(GET|POST|PUT|PATCH|DELETE) /[a-zA-Z0-9_{}/.\\-]*' \
+  | grep -vE '\(Etapa [34]\)|Propuesta|\(ruta prevista\)' | grep -oE '(GET|POST|PUT|PATCH|DELETE) /[a-zA-Z0-9_{}/.\\-]*' \
   | sed -E 's/^(GET|POST|PUT|PATCH|DELETE) //; s/\\\{/{/g; s/\\\}/}/g; s/\{[^}]*\}/@P@/g; s/[.,}]+$//; s/@P@/{p}/g' \
   | sort -u)
 faltan=$(comm -23 <(echo "$rutas_citadas") <(echo "$rutas_reales"))
@@ -159,6 +159,21 @@ if [ -n "$faltan" ]; then
   fallos=$((fallos+1))
 else
   echo "OK    $(echo "$rutas_citadas" | grep -c .) rutas citadas en docs e informe, todas existen en el OpenAPI"
+fi
+# 15/10: una ruta diseñada y aún no servida se cita con la marca «(ruta prevista)» en la misma línea (p. ej. `POST /pasarelas`
+# (ruta prevista)); se acepta sin existir, pero la excepción se vacía sola: si esa ruta YA existe en el OpenAPI, la marca venció
+# y el guardián exige quitarla (lección del kit: guardianes con excepciones que se vacían). Las marcas «(Etapa 3/4)» y «Propuesta»
+# siguen siendo de pantallas y propuestas (docs/19, docs/20): citan rutas que pueden existir, así que no se les exige nada.
+rutas_marcadas=$(grep -rhE '(GET|POST|PUT|PATCH|DELETE) /[a-zA-Z0-9_{}/.\\-]*' informe-oficial docs --include=*.tex --include=*.md --include=*.mmd \
+  | grep -E '\(ruta prevista\)' | grep -oE '(GET|POST|PUT|PATCH|DELETE) /[a-zA-Z0-9_{}/.\\-]*' \
+  | sed -E 's/^(GET|POST|PUT|PATCH|DELETE) //; s/\\\{/{/g; s/\\\}/}/g; s/\{[^}]*\}/@P@/g; s/[.,}]+$//; s/@P@/{p}/g' \
+  | sort -u)
+vencidas=$(comm -12 <(echo "$rutas_marcadas") <(echo "$rutas_reales"))
+if [ -n "$vencidas" ]; then
+  echo "FALLA rutas marcadas «(ruta prevista)» que ya existen en el OpenAPI: quitar la marca"; echo "$vencidas" | sed 's/^/  /'
+  fallos=$((fallos+1))
+else
+  echo "OK    $(echo "$rutas_marcadas" | grep -c .) ruta(s) marcadas «(ruta prevista)» y ninguna existe todavía en el OpenAPI: $(echo "$rutas_marcadas" | tr '\n' ' ')"
 fi
 
 paso "2i. Credenciales del broker en el plugin Dynamic Security: configuración, archivo del plugin (1883/600) y roles y clientes del sistema (docs/10 §8.4 punto 42; docs/11 §7)"
