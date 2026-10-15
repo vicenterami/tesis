@@ -293,7 +293,9 @@ sequenceDiagram
   reparación). Repetir cualquiera de las dos tras un corte deja el mismo estado final: una baja repetida responde 409 y un
   cliente ya borrado cuenta como borrado; una rotación cuya respuesta se perdió se repite (la clave anterior puede haber
   dejado de valer; la nueva nunca se mostró). Las tres rutas comparten la guardia (§8.4 punto 41), el tope de dos operaciones
-  a la vez y el bloqueo de la fila (`FOR UPDATE`) que ordena dos operaciones sobre el mismo dispositivo.
+  a la vez y el bloqueo de la fila (`FOR NO KEY UPDATE`) que ordena dos operaciones sobre el mismo dispositivo sin frenar las
+  tramas y eventos que la referencian por clave foránea (con `FOR UPDATE` esperaban hasta 5 s, lo que dura la espera al broker, y
+  como la recepción procesa un mensaje a la vez, esperaban las de todos los dispositivos; medido el 15/10/2026, `docs/16 §26`).
 - La **ACL del broker** limita a cada dispositivo a publicar solo en su propio tópico: un nodo
   comprometido no puede suplantar a otro. Desde el 12/10/2026 es un rol del plugin Dynamic Security (`dispositivo`: publica solo
   en `sitio/+/dispositivo/%u/+` y tiene denegado todo lo demás, incluida cualquier suscripción) que el backend asigna al crear el

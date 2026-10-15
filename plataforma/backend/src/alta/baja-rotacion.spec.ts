@@ -49,12 +49,12 @@ function armar(opciones: {
 const comandos = (ordenes: OrdenDynsec[][]) => ordenes.map((o) => o[0].command);
 
 describe('AltaService.darDeBaja: estado baja, credenciales revocadas, condiciones cerradas y cliente borrado, todo o nada', () => {
-  it('vía mqtt: FOR UPDATE → UPDATE estado → credenciales inactivas → condiciones cerradas → evento → deleteClient → COMMIT', async () => {
+  it('vía mqtt: FOR NO KEY UPDATE → UPDATE estado → credenciales inactivas → condiciones cerradas → evento → deleteClient → COMMIT', async () => {
     const { servicio, sql, params, ordenes, cliente } = armar();
     const r = await servicio.darDeBaja(ID);
     expect(sql[0]).toBe('BEGIN');
     expect(sql.at(-1)).toBe('COMMIT');
-    expect(sql.find((s) => s.startsWith('SELECT d.id'))).toContain('FOR UPDATE OF d');
+    expect(sql.find((s) => s.startsWith('SELECT d.id'))).toContain('FOR NO KEY UPDATE OF d');
     const i = sql.findIndex((s) => s.startsWith('UPDATE dispositivo SET estado'));
     expect(params[i]).toEqual([ID, 'baja']);
     expect(sql.some((s) => s.startsWith('UPDATE credencial SET activa = false'))).toBe(true);
@@ -119,7 +119,7 @@ describe('AltaService.rotarCredencial: nueva fila con hash, la anterior inactiva
     const r = await servicio.rotarCredencial(ID);
     expect(sql[0]).toBe('BEGIN');
     expect(sql.at(-1)).toBe('COMMIT');
-    expect(sql.find((s) => s.startsWith('SELECT d.id'))).toContain('FOR UPDATE OF d');
+    expect(sql.find((s) => s.startsWith('SELECT d.id'))).toContain('FOR NO KEY UPDATE OF d');
     const iInactiva = sql.findIndex((s) => s.startsWith('UPDATE credencial SET activa = false'));
     const iNueva = sql.findIndex((s) => s.startsWith('INSERT INTO credencial'));
     const iOrden = sql.findIndex((s) => s === 'COMMIT');

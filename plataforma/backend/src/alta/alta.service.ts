@@ -74,7 +74,8 @@ interface ErrorPg {
   constraint?: string;
   message: string;
 }
-// La fila que bloquea la baja y la rotación: nadie más la toca hasta confirmar (FOR UPDATE).
+// La fila que bloquea la baja y la rotación: ninguna otra baja o rotación la toca hasta confirmar (FOR NO KEY UPDATE: las tramas
+// y eventos que la referencian por clave foránea siguen entrando; con FOR UPDATE esperaban mientras se esperaba al broker, 15/10).
 interface FilaBloqueada {
   id: string;
   id_fisico: string;
@@ -95,7 +96,7 @@ export const MAX_ALTAS_EN_CURSO = 2;
 // falla, la transacción se deshace; si la base falla al confirmar después de tocar el broker, se deja el broker como estaba
 // cuando se puede (alta: se borra el cliente) o se dice qué repetir cuando no (rotación: la clave anterior puede ya no valer).
 // Dos operaciones simultáneas sobre el mismo dispositivo: la base las serializa (bloqueo por identificador del disparador de
-// la migración 11 en el alta; FOR UPDATE de la fila en la baja y la rotación) y la segunda recibe 409 o espera su turno.
+// la migración 11 en el alta; FOR NO KEY UPDATE de la fila en la baja y la rotación) y la segunda recibe 409 o espera su turno.
 @Injectable()
 export class AltaService {
   private readonly log = new Logger('alta');
@@ -255,12 +256,13 @@ export class AltaService {
     return new ServiceUnavailableException('sin conexión de administración con el broker (MQTT_ADMIN_CLAVE): nada cambió');
   }
 
-  // La fila del dispositivo, bloqueada hasta confirmar: dos bajas o rotaciones a la vez se ordenan, no se cruzan.
+  // La fila del dispositivo, bloqueada hasta confirmar: dos bajas o rotaciones a la vez se ordenan, no se cruzan. NO KEY porque
+  // ninguna cambia la clave: una inserción hija (trama, evento: FOR KEY SHARE) no espera; con FOR UPDATE esperaba hasta 5 s.
   private async bloquear(c: PoolClient, id: string): Promise<FilaBloqueada> {
     const r = await c.query<FilaBloqueada>(
       `SELECT d.id, d.id_fisico, d.estado, d.via, d.pasarela_id, s.codigo AS sitio_codigo
          FROM dispositivo d JOIN zona z ON z.id = d.zona_id JOIN sitio s ON s.id = z.sitio_id
-        WHERE d.id = $1 FOR UPDATE OF d`,
+        WHERE d.id = $1 FOR NO KEY UPDATE OF d`,
       [id],
     );
     if (r.rows.length === 0) throw new NotFoundException('dispositivo no encontrado');
