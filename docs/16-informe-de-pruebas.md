@@ -917,8 +917,12 @@ descarte. La configuración con la credencial vive en la carpeta privada del ban
 | ¿La baja de la pasarela corta el puente? | Sí: el broker desconecta al cliente | — |
 | ¿La credencial aparece en el registro del backend? | No | — |
 
-Resultado: **10 de 10, «PUENTE OK»**. Lo que no prueba: la pasarela real ni el Mosquitto del operador; la conexión por IP
-(`CA_IP_EXTRA`) en vez de por nombre, que se ensaya en la pila de desarrollo.
+Resultado: **10 de 10, «PUENTE OK»**. **Por dirección IP** (`banco.sh puente ip`), como se conectará la pasarela del campus al
+portátil en la red local: un certificado de descarte con la IP en el SAN (`CA_IP_EXTRA`), el proxy publicado solo en ella
+(`PROXY_IP_DISPOSITIVOS`) y el puente conectándose por IP con verificación. Se usa `127.0.0.2`, otra dirección de *loopback*: la misma
+mecánica sin exponer nada a la red. 11 de 11; plantado un certificado **sin** la IP, el puente no se conecta («A TLS error occurred»).
+Al terminar, el proxy vuelve a sus certificados y a su dirección. Lo que no prueba: la pasarela real, el Mosquitto del operador ni la
+red de la facultad (la IP del portátil allí se conoce el mismo día).
 
 **Migraciones** (`banco.sh migraciones`, al final de cada `banco.sh encender`; `docs/08 §6`). Con la base recién creada, se reaplican
 de la 02 a la 17 y se compara un resumen del esquema completo (`pg_dump -s`: tablas, restricciones, índices, permisos y comentarios)
