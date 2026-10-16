@@ -415,6 +415,19 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
       expect(marcarVivo).toHaveBeenCalledWith('n1', '0101010101010101');
       expect(fcntGuardado(query)).toBeNull(); // COALESCE conserva el que había
     });
+    it('una trama que repite el fCnt pero el adaptador no entiende → malformada, y NO se anota como repetida (revisión del 16/10)', async () => {
+      const log = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+      try {
+        const corta = { devEUI: '0101010101010101', fCnt: 142, fPort: 1, data: 'AgAAAI8HGBmY', rxInfo: [] }; // 9 bytes
+        const { servicio, query, marcarVivo } = armar({ ...NODO, formato: 'milesight', decodificador: 'campus-heltec-v3-v1', ultimo_fcnt: '142' }, false, PAS);
+        await servicio.procesar(T_NATIVO, Buffer.from(JSON.stringify(corta)));
+        expect(cuarentenas(query)).toEqual(['malformada']);
+        expect(log.mock.calls.map((c) => String(c[0])).some((l) => l.includes('trama repetida'))).toBe(false);
+        expect(marcarVivo).toHaveBeenCalled();
+      } finally {
+        log.mockRestore();
+      }
+    });
     it('un fCnt menor (re-unión a la red) o mayor → se guarda y el contador pasa a ser el de esta trama', async () => {
       for (const fCnt of [3, 143]) {
         const { servicio, query } = armar({ ...NODO, ultimo_fcnt: '142' }, false, PAS);

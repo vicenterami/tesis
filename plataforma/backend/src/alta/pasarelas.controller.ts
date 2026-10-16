@@ -36,7 +36,8 @@ export class PasarelasController {
     description:
       'Crea la pasarela, su credencial (solo el hash en la base) y su cliente del broker con el rol `pasarela`, todo o nada. La respuesta ' +
       'trae, UNA sola vez, la credencial y las plantillas de tópico del formato declarado (ChirpStack: `event_topic` y `command_topic`; ' +
-      'Milesight: el tópico del uplink con `$devEUI`). Sus nodos se dan de alta con `POST /dispositivos` y `via = lorawan`. Exige `X-Clave-Admin`.',
+      'Milesight: el tópico del uplink con `$devEUI` y, para mantener el tópico nativo de la pasarela, la línea del puente de Mosquitto ' +
+      'en `puente_mosquitto`). Sus nodos se dan de alta con `POST /dispositivos` y `via = lorawan` (con `decodificador` si la pasarela entrega la trama sin decodificar). Exige `X-Clave-Admin`.',
   })
   @ApiHeader({ name: 'X-Clave-Admin', required: true, description: 'Clave de administrador (HTTP_CLAVE_ADMIN del servidor)' })
   @ApiBody({

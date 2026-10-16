@@ -58,7 +58,7 @@ interface Canal { id: string; magnitud: string; unidad_canonica: string; rango_m
 //           [5] umbrales con histéresis → abre/cierra condición "umbral" (AlertasService)
 //             │
 //             ▼
-//           [6] estado_dispositivo.visto_por_ultima_vez = now() · cierra "sin_comunicacion" si estaba abierta
+//           [6] estado_dispositivo.visto_por_ultima_vez = now() · ultimo_fcnt si guardó alguna lectura · cierra "sin_comunicacion"
 //               (corre SIEMPRE tras [1], aunque [2] o [3] hayan mandado la trama a cuarentena)
 //               (la APERTURA de "sin_comunicacion" la hace el barrido periódico de SupervisionService)
 @Injectable()
@@ -183,6 +183,8 @@ export class RecepcionService implements OnModuleInit {
         lecturas = adaptador.analizar(ctx);
       } catch (e) {
         if (!(e instanceof TramaMalformada)) throw e;
+        // El contador pudo anotarse antes de fallar (p. ej. data corta): una trama que no se entendió no es «la repetida» (§4.1).
+        ctx.fcnt = undefined;
         await this.cuarentena(trama, 'malformada', `formato declarado ${adaptador.nombre}: ${e.message}`);
         // El cuerpo no deja verificar el DevEUI (otro, ausente o ilegible): no hay certeza de que sea del nodo, no se marca vivo (§4.1).
         if (e instanceof IdentidadNoVerificada) return;

@@ -24,9 +24,11 @@ sequenceDiagram
         alt no calza con el formato declarado
             F2->>Q: motivo "malformada"
         else parseada
-            F2->>F3: lecturas {canal,<br/>valor, unidad, tiempo}
+            F2->>F3: lecturas {canal,<br/>valor, unidad, tiempo}<br/>(+ fCnt si es LoRaWAN)
             F3->>DB: consulta magnitud (unidad canónica, rango)
-            alt fuera de rango, unidad incompatible o canal no declarado
+            alt mismo fCnt que la última trama guardada
+                Note right of F3: se descarta y se anota<br/>(no es cuarentena)
+            else fuera de rango, unidad incompatible o canal no declarado
                 F3->>Q: motivo "inválida"
             else válida
                 F3->>F4: lecturas válidas
@@ -40,5 +42,5 @@ sequenceDiagram
             end
         end
         F1->>F6: trama cerrada: el dispositivo autenticado se comunicó<br/>(aunque sus lecturas hayan ido a cuarentena)
-        F6->>DB: estado_dispositivo.visto_por_ultima_vez = now()<br/>· cierra "sin_comunicacion" si estaba abierta
+        F6->>DB: estado_dispositivo.visto_por_ultima_vez = now()<br/>· ultimo_fcnt si guardó alguna lectura<br/>· cierra "sin_comunicacion" si estaba abierta
     end

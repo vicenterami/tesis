@@ -78,7 +78,7 @@ describe('AltaService: pasarelas (rutas B y C)', () => {
     const r = await armar().servicio.crearPasarela(validarPasarela({ ...cuerpo, id_fisico: 'ug63-campus', formato: 'milesight' }));
     expect(r.conexion.plantillas).toEqual({
       uplink: 'sitio/uct/pasarela/ug63-campus/$devEUI/up',
-      puente_mosquitto: 'topic device/# out 1 application/<app>/ sitio/uct/pasarela/ug63-campus/',
+      puente_mosquitto: 'topic device/+/event/# out 1 application/<app>/ sitio/uct/pasarela/ug63-campus/',
     });
   });
   it('alta: sitio inexistente o inactivo → 400 sin tocar el broker; sin administración del broker → 503', async () => {

@@ -3,8 +3,9 @@
 y verificar-todo.sh (paso 3b: la concordancia incluye el PDF, no solo docs y base).
 
 Imprime una línea con: desbordes > 6 pt por página del cuerpo, referencias sin resolver, etiquetas duplicadas y
-páginas del cuerpo. Sale 1 si hay un desborde > 12 pt, una referencia rota o una etiqueta duplicada; los desbordes
-entre 6 y 12 pt se muestran pero no bloquean (avisos conocidos de longtable en los anexos).
+páginas del cuerpo. Sale 1 si hay un desborde > 6 pt, una referencia rota o una etiqueta duplicada: es la regla del
+proyecto (cero desbordes > 6 pt). Hasta el 16/10/2026 los de 6 a 12 pt no bloqueaban («avisos conocidos de longtable»)
+y así pasó en verde uno nuevo de 7,4 pt en el anexo de pruebas; ese día no quedaba ninguno conocido.
 Uso: python3 informe-oficial/comprobar-compilacion.py [carpeta_build]
 """
 import re
@@ -26,7 +27,4 @@ toc = (build / 'main.toc').read_text(errors='ignore')
 g = re.search(r'Glosario\}\{(\d+)\}', toc)
 cuerpo = int(g.group(1)) - 1 if g else '?'
 print(f"desbordes >6pt: {hits if hits else 'ninguno'} · refs sin resolver: {refs} · etiquetas duplicadas: {multi} · cuerpo: {cuerpo} págs (límite blando 30)")
-graves = {k: v for k, v in hits.items() if max(v) > 12}
-if hits and not graves:
-    print('  (desbordes menores a 12 pt: avisos conocidos de longtable en anexos; no bloquean)')
-sys.exit(0 if not graves and refs == 0 and multi == 0 else 1)
+sys.exit(0 if not hits and refs == 0 and multi == 0 else 1)

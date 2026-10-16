@@ -409,10 +409,11 @@ export class AltaService {
     const plantillas: Record<string, string> = formato === 'chirpstack'
       ? { event_topic: `${base}/{{dev_eui}}/{{event}}`, command_topic: `${base}/{{dev_eui}}/command/{{command}}` }
       // Milesight: el tópico del uplink si se configura en la pasarela, o la línea del puente de Mosquitto si se mantiene el tópico nativo
-      // de la pasarela y se reenvía desde otro broker (docs/10 §8.4 punto 47); <app> es el identificador de su aplicación.
-      : { uplink: `${base}/$devEUI/up`, puente_mosquitto: `topic device/# out 1 application/<app>/ ${base}/` };
+      // de la pasarela y se reenvía desde otro broker (docs/10 §8.4 punto 47); <app> es el nivel que trae su tópico. Solo los eventos:
+      // con device/# se reenviaría también cualquier otro subárbol (comandos), que aquí solo sería cuarentena.
+      : { uplink: `${base}/$devEUI/up`, puente_mosquitto: `topic device/+/event/# out 1 application/<app>/ ${base}/` };
     return {
-      usuario: idFisico, credencial: secreto, puerto: 8883, publica_en: `${base}/<deveui>/<evento>`, comandos: `${base}/<deveui>/command/#`, plantillas,
+      usuario: idFisico, credencial: secreto, puerto: 8883, publica_en: `${base}/<deveui>/<evento> o ${base}/device/<deveui>/event/<evento>`, comandos: `${base}/<deveui>/command/#`, plantillas,
       nota: 'MQTT sobre TLS con la CA del servidor; la credencial solo se muestra ahora (docs/10 §8.4 punto 47)',
     };
   }
