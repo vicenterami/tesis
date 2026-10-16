@@ -112,8 +112,9 @@ export class RecepcionService implements OnModuleInit {
   }
 
   // Rutas B y C (docs/10 §8.4 punto 47). Orden del filtro 1: (i) la pasarela registrada, activa y del sitio del tópico, si no
-  // cuarentena con cualquier evento (una credencial publicando donde no le corresponde); (ii) un evento distinto de «up» se cuenta y
-  // termina, sin escribir en la base (punto 27); (iii) el DevEUI del tópico, en minúsculas, debe ser un nodo asociado a esa pasarela.
+  // cuarentena con cualquier evento (una credencial publicando donde no le corresponde); (ii) un evento distinto de «up» se anota en el
+  // registro de depuración y termina, sin escribir en la base (punto 27); (iii) el DevEUI del tópico, en minúsculas, debe
+  // ser un nodo asociado a esa pasarela.
   private async procesarDePasarela(trama: TramaRecibida, partes: RegExpExecArray): Promise<void> {
     const [, sitio, idPasarela, deveuiTopico, evento] = partes;
     const pasarela = await this.buscarPasarela(idPasarela);
@@ -162,6 +163,8 @@ export class RecepcionService implements OnModuleInit {
       await this.cuarentena(trama, 'malformada', `formato declarado ${dispositivo.formato}: no se recibe por este tópico`);
     } else if (!adaptador.reconoce(ctx)) {
       await this.cuarentena(trama, 'malformada', `formato declarado ${dispositivo.formato}: la trama no tiene esa forma`);
+      // Por el tópico de pasarela, una trama que ni siquiera tiene la forma no identifica al nodo: no se marca vivo (§4.1).
+      if (dePasarela) return;
     } else {
       try {
         lecturas = adaptador.analizar(ctx);

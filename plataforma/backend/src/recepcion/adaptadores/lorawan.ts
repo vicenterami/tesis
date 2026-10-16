@@ -6,10 +6,14 @@ import { ResolverClave } from './mapa-claves';
 // decodificadas se traducen con el mapa único.
 
 // El DevEUI del cuerpo no es el del tópico: configuración cruzada en el servidor de red (o una pasarela que publica por otro).
-// Es una trama malformada, pero el nodo del tópico NO se marca vivo: no hay certeza de que la trama sea suya (docs/10 §4.1).
+// Es una trama malformada, pero el nodo del tópico NO se marca vivo: no hay certeza de que la trama sea suya (docs/10 §4.1). Lo mismo
+// cuando el cuerpo no trae con qué identificarlo (sin DevEUI): sin identidad verificada no hay señal de vida (revisión del 15/10).
 export class IdentidadCruzada extends TramaMalformada {}
 
 const MAX_LISTA = 10; // claves que se nombran en un motivo: una trama con mil claves no vuelve entera en el detalle
+const MAX_CLAVE = 32; // y cada una recortada y sin caracteres de control: no alarga el detalle ni falsifica líneas del registro
+const limpia = (k: string): string =>
+  Array.from(k.slice(0, MAX_CLAVE), (c) => (c.charCodeAt(0) < 32 || c.charCodeAt(0) === 127 ? '?' : c)).join('');
 
 export function objetoJson(texto: string): Record<string, unknown> {
   let v: unknown;
@@ -24,7 +28,7 @@ export function objetoJson(texto: string): Record<string, unknown> {
 
 // El DevEUI se compara en minúsculas, la forma que exige `id_fisico` (la base y el alta solo admiten [a-z0-9-]).
 export function exigirDevEui(cuerpo: unknown, ctx: ContextoTrama, campo: string): void {
-  if (typeof cuerpo !== 'string' || cuerpo.trim() === '') throw new TramaMalformada(`sin ${campo}`);
+  if (typeof cuerpo !== 'string' || cuerpo.trim() === '') throw new IdentidadCruzada(`sin ${campo}`);
   // Sin DevEUI en el tópico no hay con qué comparar: se rechaza (cerrado por omisión), aunque hoy el despacho no lo permita.
   if (ctx.deveui === undefined) throw new TramaMalformada('sin DevEUI en el tópico: solo se recibe por el tópico de su pasarela');
   const delCuerpo = cuerpo.trim().toLowerCase();
@@ -43,10 +47,15 @@ export function lecturasDe(valores: Record<string, unknown>, resolver: ResolverC
     if (excluir.has(clave)) continue;
     const destino = resolver(clave);
     if (!destino) {
-      ignoradas.push(clave);
+      ignoradas.push(limpia(clave));
       continue;
     }
-    if (typeof valor !== 'number' || !Number.isFinite(valor)) throw new TramaMalformada(`${clave}: no es un número`);
+    if (typeof valor !== 'number' || !Number.isFinite(valor)) throw new TramaMalformada(`${limpia(clave)}: no es un número`);
+    // Dos claves que apuntan a la misma magnitud (un sinónimo, otra mayúscula): vale la primera; la otra se anota como ignorada.
+    if (lecturas.some((l) => l.magnitud === destino.magnitud)) {
+      ignoradas.push(`${limpia(clave)} (repetida)`);
+      continue;
+    }
     lecturas.push({ magnitud: destino.magnitud, valor, unidad: destino.unidad, tiempo });
   }
   ctx.ignoradas = ignoradas;

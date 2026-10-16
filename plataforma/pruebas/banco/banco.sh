@@ -267,7 +267,7 @@ case "${1:-}" in
     r=$(pub "$pid" "$PCRED" "$base/$deveui/up" "$(up "$deveui" '{"temperature":21.5,"battery_voltage":3.6}')"); [[ "$r" == *"RC:0"* || "$r" == *"RC:16"* ]] && ok "la pasarela publica el «up» en su árbol ($r)" || falla "publicar el up: $r"
     sleep 2; r=$(psql_ -tA -c "SELECT count(*) || ' ' || coalesce(max(m.origen_tiempo),'-') FROM medicion m JOIN canal c ON c.id=m.canal_id JOIN dispositivo d ON d.id=c.dispositivo_id WHERE d.id_fisico='$deveui'")
     [ "$r" = "1 pasarela" ] && ok "la lectura está en medicion con la marca del servidor de red (origen pasarela)" || falla "medicion del nodo: «$r» (esperado «1 pasarela»)"
-    r=$(pub "$pid" "$PCRED" "$base/$deveui/join" '{}'); sleep 1; [ -z "$(cuarentena "$base/$deveui/join")" ] && ok "un evento join se cuenta y no deja cuarentena" || falla "el join dejó cuarentena"
+    r=$(pub "$pid" "$PCRED" "$base/$deveui/join" '{}'); sleep 1; [ -z "$(cuarentena "$base/$deveui/join")" ] && ok "un evento join se anota y no deja cuarentena" || falla "el join dejó cuarentena"
     otro=$(openssl rand -hex 8); r=$(pub "$pid" "$PCRED" "$base/$otro/up" "$(up "$otro" '{"temperature":20}')"); sleep 1
     [[ "$(cuarentena "$base/$otro/up")" == no_registrado* ]] && ok "un DevEUI no asociado a la pasarela → cuarentena no_registrado" || falla "DevEUI ajeno: $(cuarentena "$base/$otro/up")"
     visto0=$(psql_ -tA -c "SELECT e.visto_por_ultima_vez FROM estado_dispositivo e JOIN dispositivo d ON d.id=e.dispositivo_id WHERE d.id_fisico='$deveui'")
@@ -280,8 +280,9 @@ case "${1:-}" in
     r=$(pub "$pid" "$PCRED" "sitio/$sitio/dispositivo/$deveui/temperatura" '1'); [[ "$r" == *"RC:135"* ]] && ok "con su credencial NO publica como un dispositivo directo (RC:135)" || falla "tópico de dispositivo: $r"
     r=$(sub "$pid" "$PCRED" "$base/+/command/+"); [[ "$r" =~ :\ [0-2]$ ]] && ok "se suscribe a su subárbol de comandos, como pide ChirpStack ($r)" || falla "suscripción a sus comandos: «$r»"
     r=$(sub "$pid" "$PCRED" "sitio/$sitio/pasarela/otra-pasarela/+/command/+"); [[ "$r" == *": 135" ]] && ok "NO se suscribe a los comandos de otra pasarela (135)" || falla "comandos ajenos: «$r»"
+    r=$(pub "$pid" "$PCRED" "$base/$deveui/command/down" '{}'); [[ "$r" == *"RC:135"* ]] && ok "NO publica en su propio subárbol de comandos (sin bucle; RC:135)" || falla "publica en sus comandos: $r"
     r=$(sub "$pid" "$PCRED" 'sitio/#'); [[ "$r" == *": 135" ]] && ok "NO se suscribe a todo el sitio (135)" || falla "suscripción a sitio/#: «$r»"
-    r=$(pub_anon "$base/$deveui/up" '{}'); [[ "$r" == *"RC:135"* ]] && ok "un emulado (rol de dispositivo) NO publica en el árbol de una pasarela (RC:135)" || falla "anónimo en árbol de pasarela: $r"
+    r=$(pub_anon "$base/$deveui/up" '{}'); [[ "$r" == *"RC:135"* ]] && ok "un emulado (anónimo del banco) NO publica en el árbol de una pasarela (RC:135)" || falla "anónimo en árbol de pasarela: $r"
     # ── Milesight con códec (ruta B) ──
     mid="ug63-banco-$n"; r=$(api POST /pasarelas -d "{\"id_fisico\":\"$mid\",\"nombre\":\"UG63 del banco\",\"sitio_id\":\"$sitio_id\",\"formato\":\"milesight\"}")
     code=${r##*$'\n'}; body=${r%$'\n'*}; MCRED=$(json "v['conexion']['credencial']" <<<"$body"); mpas=$(json "v['id']" <<<"$body")

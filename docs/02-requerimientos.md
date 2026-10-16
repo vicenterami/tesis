@@ -159,7 +159,7 @@ resolver. Es *Must* por coherencia con la propuesta de valor.
 
 | ID | Requerimiento | Fuente | Causa | Prior. |
 |---|---|---|---|:---:|
-| **RF-36** | El sistema debe **notificar** cuando se abra una condición de severidad configurada como notificable, y cuando se cierre, con el resumen del episodio (duración y valor extremo) | [PO] | C5 | **M** |
+| **RF-36** | El sistema debe **notificar** cuando se abra una condición de severidad configurada como notificable, y cuando se cierre, con el resumen del episodio (duración, valor extremo y lecturas fuera) | [PO] | C5 | **M** |
 | **RF-37** | El sistema debe permitir **configurar los destinatarios** de notificación por sitio | [PO] | C4 | **S** |
 | **RF-38** | El sistema debe **agrupar notificaciones repetidas** del mismo dispositivo en una ventana temporal, para evitar saturación | [BT] | C5 | **S** |
 | **RF-39** | El sistema debe permitir **reconocer una alerta**, registrando quién, cuándo y qué fue (real, falso positivo o mantenimiento no avisado) | [BT] | C5 | **C** |

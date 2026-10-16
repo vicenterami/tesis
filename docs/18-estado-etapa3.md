@@ -1,4 +1,4 @@
-# Estado de la Etapa 3 — actualizado al 12 de octubre de 2026
+# Estado de la Etapa 3 — actualizado al 15 de octubre de 2026
 
 > Entrega: **viernes 30 de octubre de 2026**. Se actualiza al cerrar cada bloque de trabajo. Las tareas, sus horas y su
 > etapa salen de `docs/04` (manda el backlog); la rúbrica, de `referencias/materiales-curso.md`; cada estado, de la
@@ -12,17 +12,17 @@
 | Retroalimentación | 20 % | 🟡 | Al 8/10 no hay observaciones escritas del profesor guía sobre la entrega del 2/10. Sí se incorporó la entrevista del 5/10 (`bitacora/2026-10-05-entrevista-academico-geologia.md`) en las decisiones del 6 y del 8/10 (`docs/10 §8.4`). Falta: recibir e incorporar la retroalimentación de la Etapa 2. |
 | Mejoras | 15 % | 🟢 | Decisiones de diseño del 6, 7 y 8/10 (`docs/10 §8.4`); proxy TLS (`docs/16 §9`); dependencias e imágenes sin vulnerabilidades altas o críticas corregibles (`docs/16 §12`). |
 | 50 % de la implementación | 10 % | 🟡 | Núcleo: 19 de 34 elementos hechos (90 de 168 h, 54 %) y 8 parciales (47 h; el 12/10 entraron HU-19, HU-20 y HU-21 con el panel, HU-08 con la exportación, y HU-10 y HU-11 con el alta por API). Todo el backlog: 30 de 65 (124 de 285 h, 44 %) y 16 parciales (78 h). Cifras calculadas desde las filas de `docs/04`, con los estados de `docs/12 §3`, de §2 y de la Etapa 1 (al final de §2). |
-| Pruebas iniciales | 30 % | 🟢 | `docs/16`: emulador, carga (59,7 tramas/s sin pérdida), carreras, TLS, capacidad y picos, caídas con carga, dependencias e imágenes; 234 pruebas unitarias. Falta: la matriz formal del contrato de trama (TT-27) y el broker de producción en las caídas (`docs/16 §11`). |
+| Pruebas iniciales | 30 % | 🟢 | `docs/16`: emulador, carga (59,7 tramas/s sin pérdida), carreras, TLS, capacidad y picos, caídas con carga, dependencias e imágenes; 238 pruebas unitarias. Falta: la matriz formal del contrato de trama (TT-27) y el broker de producción en las caídas (`docs/16 §11`). |
 | Validación preliminar | 10 % | ⬜ | Sensor físico de extremo a extremo (TT-32): la placa ESP32 ya llegó (12/10); los sensores y el cableado están en tránsito; guía de manejo seguro escrita (`docs/17 §3–4`). |
 | Documentación | 15 % | 🟡 | Documentos en concordancia (guardián `plataforma/pruebas/verificar-todo.sh`). Falta el capítulo de pruebas y validación del informe (TT-36). |
 
 ## 2. Tareas de la Etapa 3: 16 elementos, 86 h (tras el corte del 08/10 y los adelantos del 12/10, §3)
 
-**Hechos: 8 (41 h) · parciales: 6 (36 h) · pendientes: 2 (9 h).**
+**Hechos: 8 (41 h) · parciales: 7 (42 h) · pendientes: 1 (3 h).**
 
 | Ítem | Tarea | h | Estado | Evidencia o lo que falta |
 |---|---|---|---|---|
-| HU-02 🎯 | Eventos LoRaWAN en la plataforma | 6 | ⬜ | Diseño: ruta B con tópico propio de la pasarela y adaptador de su JSON (`docs/10 §8.4` puntos 3 y 24). Hecho el 08/10: la entidad `pasarela` en la base y la comparación del sitio del tópico para los dispositivos (migración 11, `docs/16 §13`). **Hecho en el banco el 15/10** (`docs/10 §8.4` punto 47; formato declarado, adaptadores, filtro 1 de pasarela, pasarelas por API y su rol, `docs/16 §27–§31`; falta la prueba en terreno): adaptadores `chirpstack` y `milesight`, tópico de pasarela, `/pasarelas` por API con rol propio, emulador y `banco.sh lorawan`; horas: 6 (HU-02) + 4 (adaptador «milesight»). Para la Etapa 4: el mapa de claves pasa al catálogo (`magnitud.alias`). |
+| HU-02 🎯 | Eventos LoRaWAN en la plataforma | 6 | 🟡 | Diseño: ruta B con tópico propio de la pasarela y adaptador de su JSON (`docs/10 §8.4` puntos 3 y 24). Hecho el 08/10: la entidad `pasarela` en la base y la comparación del sitio del tópico para los dispositivos (migración 11, `docs/16 §13`). **Hecho en el banco el 15/10** (`docs/10 §8.4` punto 47; formato declarado, adaptadores, filtro 1 de pasarela, pasarelas por API y su rol, `docs/16 §27–§31`; falta la prueba en terreno): adaptadores `chirpstack` y `milesight`, tópico de pasarela, `/pasarelas` por API con rol propio y `banco.sh lorawan` con el JSON de las fuentes oficiales (el emulador TT-28 no publica LoRaWAN todavía); falta además asociar RSSI y SNR al evento (criterio de `docs/04`, con HU-15); horas: 6 (HU-02) + 4 (adaptador «milesight»). Para la Etapa 4: el mapa de claves pasa al catálogo (`magnitud.alias`). |
 | HU-03 🎯 | Publicar eventos en MQTT | 4 | ✅ | `docs/12 §3`; el emulador y el banco publican por MQTT (`docs/16 §2`). |
 | TT-17 🎯 | Pipeline de seis filtros con cuarentena | 6 | ✅ | `docs/12 §3` (seis filtros verificados). |
 | HU-05 🎯 | Condiciones abiertas por dispositivo | 7 | ✅ | Una condición abierta por regla (migración 02), `GET /condiciones`, pruebas de carrera (`docs/16 §4`). |

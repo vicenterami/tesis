@@ -296,7 +296,7 @@ consistente para reportes.
       físico (EUI o número de serie), nombre, `visto_por_ultima_vez`; `dispositivo.pasarela_id` opcional (un
       dispositivo puede llegar por celular sin pasarela). Es una entidad, no un atributo del dispositivo, porque
       una pasarela sirve a muchos dispositivos y tiene estado propio. Se autentica en el broker con su propia
-      credencial y publica solo bajo su tópico, con el DevEUI de cada nodo en el cuerpo (`docs/10 §8.4` punto 24).
+      credencial y publica solo bajo su tópico, con el DevEUI de cada nodo en el tópico y en el cuerpo (`docs/10 §8.4` puntos 24 y 47).
 - [x] **Declarar vía, formato y pasarela en el alta (HU-11, hecho el 12/10) y que el filtro 2 use el formato declarado** (15/10,
       `docs/10 §8.4` punto 47, `docs/16 §27`): un dispositivo directo declara `senml` o `plano`; uno lorawan no lo envía y copia el de su
       pasarela. La demostración pasó a publicar solo SenML, que es lo que declara `dev-0001` (`docs/15` §3 y §4).

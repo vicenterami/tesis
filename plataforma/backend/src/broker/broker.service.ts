@@ -69,6 +69,13 @@ export class BrokerService implements OnModuleInit, OnModuleDestroy {
   // (docs/10 §4.1). Nada se descarta en silencio: cada reintento y la rendición quedan en el registro.
   async manejar(packet: IPublishPacket, cb: (error?: Error) => void): Promise<void> {
     const topico = packet.topic.toString();
+    // Un mensaje retenido llega con retain = 1 solo cuando el broker lo reentrega al suscribirse (al arrancar o reconectar); el envío
+    // original llegó antes con retain = 0 y ya se procesó. Reprocesarlo guardaba la misma lectura otra vez con la hora de recepción y
+    // marcaba vivo a un nodo callado (medido en el banco el 15/10: 1 lectura → 2 tras reiniciar el backend). Se confirma y se descarta.
+    if (packet.retain) {
+      this.log.warn(`${topico}: mensaje retenido reentregado al suscribirse; ya se procesó cuando llegó, se descarta`);
+      return cb();
+    }
     const carga = Buffer.isBuffer(packet.payload) ? packet.payload : Buffer.from(packet.payload);
     for (let intento = 0; ; intento++) {
       try {

@@ -30,6 +30,10 @@ GRANT INSERT ON dispositivo, canal, credencial, medicion, trama, cuarentena, eve
 GRANT UPDATE ON dispositivo, credencial, condicion, estado_dispositivo, condicion_sistema TO plataforma_app;
 -- Las tablas que creen migraciones futuras (siempre las crea el dueño) nacen solo legibles: la migración que las crea dice qué
 -- más necesita la aplicación (mínimo privilegio por defecto, no por excepción).
+-- Desde la migración 16, también la pasarela (alta y baja por API): se repite aquí porque el REVOKE ALL de arriba los borraría si esta
+-- migración se reejecuta después de la 16 (revisión del 15/10). Solo la columna activo, nunca el formato ni el sitio.
+GRANT INSERT ON pasarela TO plataforma_app;
+GRANT UPDATE (activo) ON pasarela TO plataforma_app;
 ALTER DEFAULT PRIVILEGES FOR ROLE plataforma IN SCHEMA public REVOKE INSERT, UPDATE ON TABLES FROM plataforma_app;
 ALTER DEFAULT PRIVILEGES FOR ROLE plataforma IN SCHEMA public GRANT SELECT ON TABLES TO plataforma_app;
 

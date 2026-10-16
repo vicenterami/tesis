@@ -6,7 +6,7 @@
 
 Revisión con seis lentes independientes (rúbrica, redes, arquitectura de software, redacción,
 coherencia numérica, retroalimentación del profesor guía) sobre el informe compilado, cada hallazgo
-verificado por dos escépticos aparte antes de contar. Detalle completo en `privado/REVISION-ETAPA2.md`
+verificado dos veces antes de contar; el detalle quedó en notas locales del autor
 (no versionado: contiene decisiones a medio tomar).
 
 ## 2. Decisiones tomadas
@@ -23,7 +23,7 @@ verificado por dos escépticos aparte antes de contar. Detalle completo en `priv
 
 ## 3. Pendiente (decisiones del estudiante, no aplicadas)
 
-Diez puntos detallados en `privado/REVISION-ETAPA2.md`; los dos de mayor peso: (a) el capítulo de
+Diez puntos; los dos de mayor peso: (a) el capítulo de
 diseño presenta como construido un despliegue de cinco contenedores cuando hoy corren dos —riesgo
 directo para el 55 % del criterio de diseño—; (b) el código ejecuta las alertas antes que la
 supervisión, al revés de lo que documenta el diseño.

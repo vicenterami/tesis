@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ContextoTrama, Lectura } from '../lectura';
 import { Adaptador, TramaMalformada } from './adaptador';
-import { exigirDevEui, lecturasDe, objetoJson } from './lorawan';
+import { IdentidadCruzada, exigirDevEui, lecturasDe, objetoJson } from './lorawan';
 import { RESOLVER_CLAVE } from './mapa-claves';
 import type { ResolverClave } from './mapa-claves';
 
@@ -26,11 +26,12 @@ export class MilesightAdaptador implements Adaptador {
 
   analizar(ctx: ContextoTrama): Lectura[] {
     const cuerpo = objetoJson(ctx.carga.toString('utf8'));
+    // La identidad primero: sin devEUI (o con otro) no hay certeza de que la trama sea del nodo y no se marca vivo.
+    if (!('devEUI' in cuerpo)) throw new IdentidadCruzada('sin devEUI: activar Metadata en la aplicación de la pasarela');
+    exigirDevEui(cuerpo.devEUI, ctx, 'devEUI');
     if (typeof cuerpo.data === 'string' && ('fPort' in cuerpo || 'rxInfo' in cuerpo)) {
       throw new TramaMalformada('llegó sin decodificar: activar Payload Codec y Metadata en la aplicación de la pasarela');
     }
-    if (!('devEUI' in cuerpo)) throw new TramaMalformada('sin devEUI: activar Metadata en la aplicación de la pasarela');
-    exigirDevEui(cuerpo.devEUI, ctx, 'devEUI');
     return lecturasDe(cuerpo, this.resolver, ctx, undefined, METADATOS);
   }
 }

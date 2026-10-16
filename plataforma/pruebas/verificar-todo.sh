@@ -372,7 +372,7 @@ paso "2p. Repositorio público: ningún archivo versionado cita fichas privadas 
 # cita lo público: la sección de docs/10 §8.4 o de docs/11 donde quedó la decisión.
 # 15/10: lo mismo con los pendientes privados (la palabra y su número): siete referencias en seis archivos, quitadas y vigiladas; y
 # con el «registro» de evidencia privado: lo público cita la URL de la fuente, no el registro donde se anotó.
-git grep --untracked -n -E 'ficha D-[0-9]{2}|decisi[oó]n D-[0-9]{2}|\bD-[0-9]{2}\b|\bpendientes? [0-9]{1,3}\b|registro privad[o]' -- ':!privado' ':!historico' > "$VT"/fichas.txt 2>&1; rc=$?
+git grep --untracked -n -E 'ficha D-[0-9]{2}|decisi[oó]n D-[0-9]{2}|\bD-[0-9]{2}\b|\bpendientes? [0-9]{1,3}\b|registro privad[o]|privad[o]/[A-Z]' -- ':!privado' ':!historico' > "$VT"/fichas.txt 2>&1; rc=$?
 if [ "$rc" -eq 0 ]; then echo "FALLA archivos públicos que citan fichas o pendientes privados:"; cut -c1-160 "$VT"/fichas.txt; fallos=$((fallos+1))
 elif [ "$rc" -ne 1 ]; then echo "FALLA git grep falló ($rc): no se pudo revisar"; fallos=$((fallos+1))
 else echo "OK    ningún archivo versionado cita fichas ni pendientes privados"; fi

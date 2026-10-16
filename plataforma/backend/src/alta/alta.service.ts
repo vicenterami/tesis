@@ -318,7 +318,8 @@ export class AltaService {
   }
 
   // Baja de una pasarela: `activo = false`, credenciales revocadas, evento y cliente borrado del broker, en una transacción. Sus nodos
-  // quedan sin quien publique por ellos; lo que llegue con una credencial vieja va a cuarentena («pasarela inactiva»).
+  // quedan sin quien publique por ellos: el broker borra su cliente y corta la sesión abierta; si algo llegara igual, el filtro 1 lo
+  // manda a cuarentena («pasarela inactiva»).
   async darDeBajaPasarela(id: string): Promise<PasarelaDadaDeBaja> {
     const c = await this.tomar();
     let idFisico = id;

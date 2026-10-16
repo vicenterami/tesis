@@ -98,9 +98,9 @@ flowchart TB
   |---|---|---|---|---|
   | 1. Nodo Wi-Fi (ESP32 u otro) con cliente MQTT | MQTT sobre TLS | 8883 | Sí | Implementado (en desarrollo, 1883 local sin TLS) |
   | 2. Equipo que solo habla HTTP | HTTPS, `POST` con SenML | 443 | Sí | Diseñado (HU-01, Etapa 3) |
-  | 3. Pasarela LoRaWAN con servidor de red embebido (Milesight UG6x) | MQTT sobre TLS; JSON decodificado en la pasarela | 8883 | Sí | Ruta B; el 15/10/2026 la red del campus ofreció reenviar desde el servidor embebido de su UG63 para una prueba; adaptador `milesight` en implementación (§8.4 punto 47) |
+  | 3. Pasarela LoRaWAN con servidor de red embebido (Milesight UG6x) | MQTT sobre TLS; JSON decodificado en la pasarela | 8883 | Sí | Ruta B; el 15/10/2026 la red del campus ofreció reenviar desde el servidor embebido de su UG63 para una prueba; adaptador `milesight` hecho y probado en el banco (§8.4 punto 47, `docs/16 §31`); falta en terreno |
   | 4. Pasarela LoRaWAN con *packet forwarder* y ChirpStack en este servidor | Semtech UDP → ChirpStack → MQTT interno | 1700/udp | Sí (UDP) | Ruta A, opcional; ChirpStack no desplegado |
-  | 5. Servidor de red externo (TTN o ChirpStack de la red del campus) | Integración MQTT del servidor de red hacia este sistema | 8883 | Sí | **Ruta C, confirmada el 13/10/2026: la red del campus usa ChirpStack v4 con una pasarela Milesight UG63** (§8.4 punto 45); adaptador `chirpstack` en implementación (§8.4 punto 47) |
+  | 5. Servidor de red externo (TTN o ChirpStack de la red del campus) | Integración MQTT del servidor de red hacia este sistema | 8883 | Sí | **Ruta C, confirmada el 13/10/2026: la red del campus usa ChirpStack v4 con una pasarela Milesight UG63** (§8.4 punto 45); adaptador `chirpstack` hecho y probado en el banco (§8.4 punto 47, `docs/16 §31`); falta en terreno |
   | 6. Equipo celular (NB-IoT, LTE-M) con cliente MQTT | MQTT sobre TLS; trama JSON o binaria hexadecimal | 8883 | Sí | Candidato (entrevista del 05/10); adaptador binario pendiente |
   | 7. Pasarela con *Basics Station* hacia ChirpStack en este servidor | WebSocket sobre TLS (protocolo LNS), con autenticación TLS de servidor y, opcional, de cliente | 443 o puerto propio (por verificar) | Sí | Verificado el 06/10: el *Gateway Bridge* expone un manejador WebSocket para Basics Station y las pasarelas UG65/UG67 lo traen; reemplazaría el UDP sin autenticar de la ruta A |
 
@@ -256,7 +256,7 @@ sequenceDiagram
     participant Dev as Dispositivo
 
     Admin->>FE: Asistente "nuevo dispositivo"<br/>(vía, formato y, si es LoRaWAN, su pasarela)
-    FE->>API: POST /dispositivos (Etapa 3)<br/>{zona, id_fisico, via, formato, pasarela?, canales[]}
+    FE->>API: POST /dispositivos (Etapa 3)<br/>{zona, id_fisico, via, formato? (solo directo), pasarela?, canales[]}
     API->>DB: INSERT dispositivo, canal×N
     alt vía mqtt
         API->>API: genera credencial (secreto aleatorio)
@@ -305,8 +305,8 @@ sequenceDiagram
   asociados a ella. **La pasarela se registra por API** (`POST /pasarelas`, §8.4 punto 47): misma guardia y mismo todo-o-nada
   que el dispositivo (fila, cliente del broker con rol `pasarela` en una orden, evento, credencial mostrada una sola vez); declara
   el **formato** de lo que publica (`milesight` o `chirpstack`) y sus nodos lo heredan en el alta; rotación y baja con las mismas
-  órdenes, y la baja deja a sus nodos sin quien publique por ellos (lo que llegue va a cuarentena `no_registrado`, «pasarela
-  inactiva»). El camino dibujado después del alta es el de la vía `mqtt`; el aviso al panel va por SSE (§8.4
+  órdenes, y la baja deja a sus nodos sin quien publique por ellos: el broker borra su cliente y corta la sesión abierta (medido en el
+  banco, `docs/16 §33`), y si algo llegara igual, el filtro 1 lo manda a cuarentena `no_registrado` («pasarela inactiva»). El camino dibujado después del alta es el de la vía `mqtt`; el aviso al panel va por SSE (§8.4
   punto 1).
 - El estado "en línea" se deduce del **primer mensaje autenticado**, no de la alta: dar de alta un
   dispositivo que aún no transmite lo deja en "esperando primer contacto".
@@ -480,7 +480,7 @@ cliente ──HTTP──► Express ⊂ NestJS ──► servicio ──► pg �
 
 - **Express** es la biblioteca de servidor HTTP más usada de Node.js; NestJS la usa por debajo
   (`@nestjs/platform-express`). El proceso de Node es el servidor; Express recibe cada petición y
-  entrega la respuesta. Es **la API**: 7 rutas REST y el canal SSE `/eventos` (§5), descritos en el contrato OpenAPI. Express no toca la base.
+  entrega la respuesta. Es **la API**: 11 rutas REST (14 operaciones) y el canal SSE `/eventos` (§5), descritos en el contrato OpenAPI. Express no toca la base.
 - **`pg`** (node-postgres) es el conductor de la base: mantiene un *pool* de 5 conexiones
   (`db/db.module.ts`) y envía **SQL directo** con parámetros `$1, $2…`; el valor nunca se pega dentro
   del texto SQL, lo que evita la inyección. Sin ORM, por la razón de `docs/07` (series de tiempo con
@@ -768,7 +768,7 @@ separados.
 
 1. **Condición nueva `datos_invalidos`**: se abre cuando un dispositivo acumula *N* tramas
    consecutivas rechazadas (propuesta: 3) sin ninguna aceptada en medio; se cierra con la primera
-   lectura válida. El panel la muestra junto a las otras condiciones y el operador ve *un* problema,
+   lectura válida. *(Superado el 15/10/2026: se decidió por tiempo, no por conteo; ver §8.4 punto 48.)* El panel la muestra junto a las otras condiciones y el operador ve *un* problema,
    no diez mil filas. Es el mismo patrón que ya se usa para el silencio, así que no agrega conceptos.
 2. **Cuarentena con muestreo, no con acumulación**: guardar íntegras las primeras *k* tramas
    (propuesta: 5) de cada par (dispositivo, motivo) dentro de una ventana (propuesta: 1 hora) y, a
@@ -1020,12 +1020,12 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     la pasarela del tópico (no del cuerpo) y solo acepta los nodos asociados a ella en el alta, así que una pasarela
     comprometida no puede publicar como un dispositivo de vía `mqtt`, que tiene su propio tópico. Dos reglas más (08/10):
     la ACL usa `+` en el nivel del sitio, así que el filtro 1 exige que el sitio del tópico sea el registrado
-    (implementado para los dispositivos en la migración 11; para la pasarela llega con HU-02); y el identificador del
+    (implementado para los dispositivos en la migración 11 y para la pasarela el 15/10, punto 47); y el identificador del
     broker es único entre dispositivos y pasarelas y usa la lista blanca `[a-z0-9-]` (`FORMA_ID_FISICO` en `alta.dto.ts`; la misma en `broker-cliente.sh` y en la migración 11), porque se
     sustituye dentro del tópico con `%u` (la base lo exige desde la migración 11; el alta, HU-11, da el mensaje claro desde el 12/10).
-    Al implementarlo, el
-    patrón de tópicos de la recepción (§4.1, casos anormales) suma esta forma. Adaptador de su JSON (punto 3). Se prueba
-    primero con un emulador que publica exactamente el JSON documentado por Milesight y, en terreno, apenas haya una
+    Desde el 15/10 el
+    tópico vigente es `sitio/<sitio>/pasarela/<id>/<deveui>/<evento>` y la implementación, sus pruebas y su banco están en el
+    punto 47; falta la prueba en terreno, apenas haya una
     pasarela que alcance al servidor (red del campus o dirección pública). La ruta A (ChirpStack) sigue opcional;
     investigarla a fondo, con un simulador, sigue siendo prioridad. Las horas de HU-02 se reestiman al planificar esa
     semana.
@@ -1239,15 +1239,15 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     agrega, no reemplaza). La red LoRaWAN del campus usa una pasarela Milesight UG63 que
     envía por UDP 1700 a un ChirpStack v4 de la institución; ese ChirpStack publica cada lectura decodificada por su integración
     MQTT. La ruta C hace que esa integración publique en nuestro broker por 8883 con TLS (su configuración admite una CA propia:
-    `ca_cert` en `[integration.mqtt]`, documentación oficial de ChirpStack) y con una credencial propia que le da nuestro alta,
+    `ca_cert` en `[integration.mqtt]`, https://www.chirpstack.io/docs/chirpstack/configuration.html) y con una credencial propia que le da nuestro alta,
     como a cualquier pasarela (rol `pasarela`, entidad `pasarela`), bajo `sitio/<sitio>/pasarela/<id>/…` (plantilla `event_topic`,
     misma documentación). **Las tres rutas quedan contempladas:** A (ChirpStack propio en este servidor, opcional), B (servidor de
     red embebido en la pasarela) y C (servidor de red externo); B y C son las del sistema, entran por el mismo punto y solo cambia
     el adaptador (`milesight` o `chirpstack`, que se declara en el alta). Porqué C y no A para el campus: un nodo LoRaWAN se une a
     un solo servidor de red, y la pasarela del campus ya envía al institucional; un ChirpStack nuestro solo serviría con pasarela y
     nodos propios. La ruta C no abre el 1700/udp en nuestro servidor ni suma contenedores (RNF-17). Lo que no administramos
-    (ChirpStack, sus claves de nodos y su decodificador) lo administra la institución; lo nuestro empieza en el broker. Falta:
-    adaptador `chirpstack` contra el JSON del evento `up` documentado, migración del formato, rol `pasarela`, emulador y la
+    (ChirpStack, sus claves de nodos y su decodificador) lo administra la institución; lo nuestro empieza en el broker. Hecho el
+    15/10/2026 (punto 47, `docs/16 §31`): adaptador `chirpstack`, migraciones 15 y 16, rol `pasarela` y prueba en el banco; falta la
     prueba real cuando el servidor sea alcanzable desde la red del campus.
 
 46. **El canal en vivo del panel migra de SSE a WebSocket** (decidido el 14/10/2026 por el estudiante; **diseño, aún no
@@ -1293,7 +1293,8 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     `docs/19`): es la regla de `docs/08 §4`, y la función cambia de implementación sin tocar los adaptadores. Una clave que no está en
     el mapa se ignora y se cuenta en la línea de registro de la trama; un `up` sin ninguna clave del mapa va a cuarentena
     `malformada` («ninguna clave conocida») y el nodo se marca vivo, como con cualquier trama malformada de un dispositivo
-    autenticado (§4). `rssi` y `snr` quedan en la trama cruda para HU-15. La pasarela se da de alta, rota y da de baja por API
+    autenticado (§4). En la ruta C, `rssi` y `snr` del `rxInfo` quedan en la trama cruda para HU-15
+    (solo si la trama dejó alguna lectura); con códec y Metadata, la ruta B no los trae (por verificar con la pasarela real). La pasarela se da de alta, rota y da de baja por API
     (`/pasarelas`), con credencial propia y rol `pasarela`: publica solo bajo su árbol y se suscribe solo a su subárbol de comandos.
     La credencial de una pasarela vive en la misma tabla que la de un dispositivo, con un titular y solo uno (migración 16), y la
     aplicación gana `INSERT` en `pasarela` y `UPDATE` solo de su columna `activo`, para el alta y la baja; los eventos llevan `dispositivo_id` nulo y la pasarela en el
@@ -1302,8 +1303,7 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     lista cada una con sus nodos y la última vez vista, derivada de ellos.
     La suscripción se permite porque la configuración oficial de ChirpStack dice del tópico de comandos «This is the topic on which
     the MQTT subscribes for receiving (enqueue) commands» (https://www.chirpstack.io/docs/chirpstack/configuration.html, consultada
-    el 15/10/2026); cómo reacciona si se le niega no está documentado y queda por probar. Se prueba con el emulador (JSON exacto de
-    ambas fuentes), en el banco (`banco.sh lorawan`) y en terreno apenas una pasarela alcance al servidor (`docs/14`; prueba en la
+    el 15/10/2026); cómo reacciona si se le niega no está documentado y queda por probar. Se prueba con el JSON exacto de ambas fuentes, en el banco (`banco.sh lorawan`) y en terreno apenas una pasarela alcance al servidor (`docs/14`; prueba en la
     misma red local prevista para la semana del 20/10/2026). **La prueba en terreno entra por el 8883 del proxy, con TLS y la CA
     propia** (regla R2 del punto 44), nunca por el 1883: por ahí la credencial de la pasarela viajaría en claro por la red. Para una
     pasarela en la misma red local que se conecta por IP, el certificado de desarrollo admite esa dirección (`CA_IP_EXTRA` en

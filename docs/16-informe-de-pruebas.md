@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 234 pruebas unitarias, sin matriz formal) y TT-32 (sensor físico);
+cubre todavía: TT-27 (contrato de trama: hoy 238 pruebas unitarias, sin matriz formal) y TT-32 (sensor físico);
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -749,7 +749,7 @@ la ACL del rol y la recepción por el filtro 1.
 **Cómo** (`bash plataforma/pruebas/banco/banco.sh lorawan`). Contra el banco desechable, con el broker, el plugin de seguridad y la base
 reales: se da de alta por API una pasarela ChirpStack, un nodo y una pasarela Milesight, y se publica con la credencial de cada pasarela el
 JSON de su fuente oficial (evento `up` de ChirpStack v4; uplink con códec y Metadata de Milesight). Los secretos viajan por la entrada
-estándar. Resultado: **25 de 25 comprobaciones, «LORAWAN OK»**; 26 de 26 desde la corrección de §32.
+estándar. Resultado: **25 de 25 comprobaciones, «LORAWAN OK»**; 26 de 26 desde la corrección de §32 y 27 de 27 desde la de §33.
 
 | Comprobación | Resultado |
 |---|---|
@@ -781,9 +781,38 @@ corregirlos. Los que cambian el comportamiento, cada uno con su prueba y plantad
 | El filtro 1 de pasarela compara también el sitio del nodo con el del tópico (defensa en profundidad) | `recepcion.service.spec.ts`; plantado sin la comparación, falla |
 | Un adaptador LoRaWAN sin DevEUI en el tópico rechaza la trama en vez de omitir la comparación | `lorawan.spec.ts`; plantado con la comparación abierta, falla |
 | Los eventos distintos de `up` se anotan en el registro de depuración (antes en el informativo, que con muchos nodos se llenaba); la prosa dice «se anota», no «se cuenta» | lectura del código y de `docs/10` |
-| `medir-bloqueo-fila.sh` exige `--desarrollo` y verifica también el bloqueo de la pasarela | sin la bandera no corre; con ella, «BLOQUEO DE FILA OK» |
+| `medir-bloqueo-fila.sh` exige `--desarrollo` y exige también en el código el bloqueo de la pasarela (la medición con dos sesiones sigue siendo la del dispositivo) | sin la bandera no corre; con ella, «BLOQUEO DE FILA OK» |
 
 Además: nuevas pruebas del 409 por identificador repetido y del nodo dado de baja por el tópico de su pasarela; mensajes de alta que
 nombran la pasarela; fuentes públicas con URL y cita en el punto 47, en lugar de remitir a evidencia no publicada; estados unificados en `docs/10`,
 `docs/11` y `docs/13`; y en el repositorio público, cero horarios en las bitácoras y cero referencias a registros privados, con los
 chequeos 2f2 y 2p ampliados y plantados. Total: 234 pruebas.
+
+## 33. Seguridad, concordancia y privacidad del bloque LoRaWAN: lo medido y lo corregido (15/10/2026)
+
+Tres revisiones del bloque completo, una por ángulo. Ningún hallazgo alto: ninguna pasarela puede publicar ni leer fuera de su árbol ni
+hacerse pasar por un nodo de otra pasarela o de otro sitio. Lo que se midió en el banco en vez de suponerlo:
+
+| Pregunta | Medido | Consecuencia |
+|---|---|---|
+| ¿La rotación de la credencial corta una sesión MQTT ya abierta con la clave anterior? | Sí: con una sesión viva (control previo), el broker la cierra al rotar («Not authorized») | Nada que corregir; una clave filtrada deja de servir al rotar |
+| ¿Y la baja? | Sí, la cierra igual | Ídem |
+| ¿Un mensaje publicado con retención se vuelve a procesar? | Sí: 1 lectura al publicarlo, 2 tras reiniciar el backend (el broker se lo reentrega al suscribirse) | **Corregido:** el backend confirma y descarta todo mensaje que llega con la marca de retenido, que solo aparece en esa reentrega; prueba unitaria y plantado |
+
+Corregido además: un cuerpo sin DevEUI, o que no tiene la forma del formato, ya no marca vivo al nodo por el tópico de pasarela (sin
+identidad verificada no hay señal de vida); dos claves que apuntan a la misma magnitud dejan una sola lectura; las claves desconocidas
+se recortan y se limpian de caracteres de control antes de ir al detalle o al registro; la pasarela no puede publicar en su propio
+subárbol de comandos (el banco lo comprueba: RC:135); reejecutar la migración 14 ya no borra los permisos sobre `pasarela`; y en los
+documentos, el estado de HU-02, las filas de entradas de `docs/10`, el conteo de rutas de la API, el motivo `no_registrado` de
+`docs/11`, el punto 24, el diagrama del alta y RF-36. Total: 238 pruebas.
+
+**Límites que quedan, con su porqué:**
+- **Sin tope por emisor.** Una pasarela comprometida puede llenar la cuarentena con tramas de DevEUI inventados (cada una con su carga
+  cruda, 30 días) y el registro con avisos. Los topes de `docs/10 §8.4` punto 29 siguen pendientes; se resuelve con la decisión de
+  límites del proxy y del filtro 1.
+- **Marcas antiguas aceptadas.** Un servidor de red puede mandar `time` de hace días: la regla 7 de `docs/13` los acepta a propósito,
+  porque una pasarela sin red guarda hasta 500 paquetes y los reenvía después. Acotar el pasado para el origen `pasarela` es una
+  decisión pendiente.
+- **Alta repetida con un error ambiguo del broker.** Si el broker no confirma a tiempo el alta A y, entretanto, el alta B del mismo
+  identificador crea su cliente, el borrado de A puede llegarle después: B queda con una credencial que el broker no tiene. Falla
+  cerrado (no entra nadie) y la rotación lo repara.

@@ -76,6 +76,6 @@ Verificación: guardián completo, 47 pasos, `TODO EN CONCORDANCIA` tras cada bl
 ## 5. Pendiente para la próxima sesión
 
 Lo que no se tocó hoy por estar fuera de esta revisión (no son hallazgos nuevos, son los pendientes
-ya registrados en `privado/PENDIENTES-LOCALES.md`): el Bloque B (kit portable contra el código,
+ya registrados): el contraste de las lecciones de método con el código (
 seguridad HTTP/CORS/CSP), la lectura crítica desde 4.2, y las decisiones propias del texto de Rust
 y la fecha gatillo del plan B.

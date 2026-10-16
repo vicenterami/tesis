@@ -84,6 +84,8 @@ roles_del_sistema() {
   rol pasarela    publishClientSend 'sitio/+/pasarela/%u/#' allow  subscribePattern 'sitio/+/pasarela/%u/+/command/#' allow \
                   publishClientReceive 'sitio/+/pasarela/%u/+/command/#' allow \
                   publishClientSend '#' deny  publishClientSend '$CONTROL/#' deny  subscribePattern '#' deny  subscribeLiteral '#' deny || return 1
+  # Sin bucle: no publica en su propio subárbol de comandos (lo recibe); prioridad 2, por encima de su permiso de publicar (1).
+  exigir "addRoleACL pasarela deny command" ctrl addRoleACL pasarela publishClientSend 'sitio/+/pasarela/%u/+/command/#' deny 2 || return 1
   rol dispositivo publishClientSend 'sitio/+/dispositivo/%u/+' allow \
                   publishClientSend '#' deny  publishClientSend '$CONTROL/#' deny  subscribePattern '#' deny  subscribeLiteral '#' deny || return 1
 }

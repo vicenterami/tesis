@@ -9,8 +9,11 @@ export interface DestinoClave {
   unidad: string; // unidad en que llega el valor (la canónica de esa magnitud)
 }
 
-// Claves en minúsculas. Fuentes: decodificadores oficiales de Milesight (EM300-TH: temperature °C, humidity %RH, battery %; solo
-// leídos, GPL-3.0, nunca copiados) y la forma habitual en ChirpStack; los sinónimos en español, para decodificadores propios.
+// Claves en minúsculas. Fuentes: el ejemplo de la guía oficial del códec de Milesight (temperature, humidity, battery:
+// https://support.milesight-iot.com/support/solutions/articles/73000600064-how-to-use-payload-codec-on-milesight-gateway) y los
+// decodificadores oficiales (https://github.com/Milesight-IoT/SensorDecoders, GPL-3.0: solo leídos, nunca copiados). Qué claves trae el
+// `object` de ChirpStack lo decide el decodificador de cada perfil: no declarado hasta ver una trama real. Sinónimos en español para
+// decodificadores propios.
 export const CLAVES: Readonly<Record<string, DestinoClave>> = {
   temperature: { magnitud: 'temperatura', unidad: 'Cel' },
   temperatura: { magnitud: 'temperatura', unidad: 'Cel' },

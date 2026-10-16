@@ -295,7 +295,7 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
       expect(trama[4]).toBe('chirpstack');
       expect(marcarVivo).toHaveBeenCalledWith('n1', '0101010101010101');
     });
-    it('un evento distinto de «up» (join) se cuenta y termina: no escribe nada en la base (punto 27)', async () => {
+    it('un evento distinto de «up» (join) se anota y termina: no escribe nada en la base (punto 27)', async () => {
       const { servicio, query, marcarVivo } = armar(NODO, false, PAS);
       await servicio.procesar('sitio/uct/pasarela/chirpstack-campus/0101010101010101/join', Buffer.from('{}'));
       expect(escrituras(query)).toEqual([]);
@@ -311,10 +311,12 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
       }
     });
     it('DevEUI no asociado a esa pasarela (o un dispositivo directo con ese id) → no_registrado', async () => {
-      const { servicio, query } = armar({ ...NODO, pasarela_id: 'otra' }, false, PAS);
-      await servicio.procesar(T_UP, up());
-      expect(cuarentenas(query)).toEqual(['no_registrado']);
-      expect(detalle(query)).toBe('DevEUI 0101010101010101 no está asociado a la pasarela chirpstack-campus');
+      for (const ajeno of [{ ...NODO, pasarela_id: 'otra' }, { ...NODO, formato: 'senml', pasarela_id: null }]) {
+        const { servicio, query } = armar(ajeno, false, PAS);
+        await servicio.procesar(T_UP, up());
+        expect(cuarentenas(query)).toEqual(['no_registrado']);
+        expect(detalle(query)).toBe('DevEUI 0101010101010101 no está asociado a la pasarela chirpstack-campus');
+      }
     });
     it('el DevEUI del tópico se busca en minúsculas, la forma de id_fisico', async () => {
       const { servicio, query } = armar(NODO, false, PAS);
@@ -347,6 +349,14 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
       await servicio.procesar(T_UP, up());
       expect(cuarentenas(query)).toEqual(['no_registrado']);
       expect(detalle(query)).toContain('registrado en el sitio «otra»');
+    });
+    it('cuerpo sin DevEUI o que ni siquiera tiene la forma del formato → malformada y el nodo NO se marca vivo', async () => {
+      for (const cuerpo of [JSON.stringify({ deviceInfo: {}, object: { temperature: 20 } }), '[1]']) {
+        const { servicio, query, marcarVivo } = armar(NODO, false, PAS);
+        await servicio.procesar(T_UP, Buffer.from(cuerpo));
+        expect(cuarentenas(query)).toEqual(['malformada']);
+        expect(marcarVivo).not.toHaveBeenCalled();
+      }
     });
     it('un formato directo por el tópico de pasarela → malformada «no se recibe por este tópico»', async () => {
       const { servicio, query } = armar({ ...NODO, formato: 'senml' }, false, PAS);

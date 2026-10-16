@@ -32,6 +32,17 @@ describe('BrokerService: un mensaje a la vez y PUBACK después de guardar (decis
     expect(mockCliente.on.mock.calls.map(([ev]) => ev)).not.toContain('message');
   });
 
+  it('un mensaje retenido reentregado al suscribirse (retain = 1) se confirma sin procesar: ya se procesó al llegar', async () => {
+    const { servicio, handle } = armar();
+    const vistos: string[] = [];
+    servicio.alRecibir(async (_t, c) => { vistos.push(c.toString()); await Promise.resolve(); });
+    const cb = jest.fn();
+    handle({ ...publish('sitio/x/pasarela/p/d/up', 'R'), retain: true }, cb);
+    await new Promise((r) => setTimeout(r, 0));
+    expect(cb).toHaveBeenCalledWith();
+    expect(vistos).toEqual([]);
+  });
+
   it('el callback (PUBACK) se llama solo cuando el manejador terminó; los mensajes van en orden', async () => {
     const { servicio, handle } = armar();
     const orden: string[] = [];

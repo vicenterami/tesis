@@ -7,7 +7,7 @@ sequenceDiagram
     participant Dev as Dispositivo
 
     Admin->>FE: Asistente "nuevo dispositivo"<br/>(vía, formato y, si es LoRaWAN, su pasarela)
-    FE->>API: POST /dispositivos (Etapa 3)<br/>{zona, id_fisico, via, formato, pasarela?, canales[]}
+    FE->>API: POST /dispositivos (Etapa 3)<br/>{zona, id_fisico, via, formato? (solo directo), pasarela?, canales[]}
     API->>DB: INSERT dispositivo, canal×N
     alt vía mqtt
         API->>API: genera credencial (secreto aleatorio)

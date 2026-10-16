@@ -95,6 +95,16 @@ describe('ChirpstackAdaptador (evento up de ChirpStack v4)', () => {
     // Ojo: ctx(cuerpo, undefined) activaría el valor por defecto del parámetro; se arma el contexto sin DevEUI a propósito.
     expect(() => a.analizar({ ...ctx(eventoUp()), deveui: undefined })).toThrow('sin DevEUI en el tópico');
   });
+  it('dos claves que apuntan a la misma magnitud → vale la primera; la otra se anota como repetida', () => {
+    const c = ctx(eventoUp({ object: { temperature: 20, Temperatura: 99 } }));
+    expect(a.analizar(c)).toHaveLength(1);
+    expect(c.ignoradas).toEqual(['Temperatura (repetida)']);
+  });
+  it('una clave larga o con saltos de línea se recorta y se limpia antes de ir al detalle o al registro', () => {
+    const c = ctx(eventoUp({ object: { temperature: 20, ['x\n'.repeat(40)]: 1 } }));
+    a.analizar(c);
+    expect(c.ignoradas?.[0]).toBe('x?'.repeat(16));
+  });
   it('JSON inválido o que no es objeto → TramaMalformada', () => {
     expect(() => a.analizar(ctx('{"deviceInfo":'))).toThrow(TramaMalformada);
     expect(() => a.analizar(ctx('[1]'))).toThrow(TramaMalformada);
@@ -103,7 +113,9 @@ describe('ChirpstackAdaptador (evento up de ChirpStack v4)', () => {
 
 describe('MilesightAdaptador (servidor de red embebido, con códec y Metadata)', () => {
   const a = new MilesightAdaptador(resolverClave);
-  // Forma de la guía oficial de códec con Metadata (devEUI, deviceName, applicationID más los valores decodificados).
+  // Forma de la guía oficial de códec con Metadata (devEUI, deviceName, applicationID más los valores decodificados):
+  // https://support.milesight-iot.com/support/solutions/articles/73000600064-how-to-use-payload-codec-on-milesight-gateway (15/10/2026).
+  // El de «sin códec» sigue la tabla del uplink: https://www.milesight.com/docs/en/mini-gateway/application-guide/uplink-data.html
   const conCodec = (extra: Record<string, unknown> = {}) =>
     JSON.stringify({ devEUI: DEVEUI, deviceName: 'EM300', applicationID: '1', battery: 92, temperature: 30.8, humidity: 50.5, ...extra });
   it('lecturas de los valores decodificados; los metadatos no cuentan como claves ignoradas; sin marca de tiempo', () => {
