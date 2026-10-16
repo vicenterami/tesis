@@ -224,6 +224,41 @@ comparten entre backend e interfaz. La decisión se confirmó en la Etapa 2 con 
 vistas en mano; React queda como alternativa si se prioriza el ecosistema de componentes sobre la
 ligereza.
 
+\section{Manejo del tiempo y zonas horarias}
+\label{sec:tiempo}
+
+Chile alterna entre UTC$-$4 y UTC$-$3 y la fecha del cambio la fija el gobierno cada año; un sistema que
+mezcle horas locales con UTC produce mediciones «movidas» y días con horas de menos. Las reglas de
+diseño son: (1)~todo instante se almacena en UTC (\texttt{timestamptz}); (2)~la marca de tiempo del
+emisor es un instante absoluto, y se acepta solo si es plausible: sin marca, anterior al año 2000 o más
+de dos minutos en el futuro se reemplaza por la hora de recepción, mientras que una marca antigua pero
+válida se respeta, porque un nodo que acumuló lecturas sin cobertura reporta tiempos legítimamente
+viejos; (3)~cada sitio declara su zona con nombre de la base IANA (\emph{Internet Assigned Numbers Authority}), nunca un desfase fijo; (4)~\textbf{toda pregunta
+de «día» se responde dentro de la base, en la zona del sitio}; (5)~la API entrega instantes en ISO~8601
+\parencite{iso8601} con sufijo \texttt{Z} —el perfil de internet RFC~3339 \parencite{rfc3339}—, también los
+que viajan dentro de JSON armado en SQL. Se verificó en la base que
+el día de Santiago comienza a las 04:00~UTC en invierno y a las 03:00~UTC en verano, que el domingo del
+cambio de hora dura 23 horas, y que un sitio en otra zona horaria funciona con el mismo código: la zona
+es un dato del sitio, no una constante del programa.
+
+\section{Alojamiento, costo de operación y retención}
+
+El costo de una plataforma de sensores no lo mueve la cantidad de usuarios sino la \textbf{tasa de
+recepción por la retención}. Para el núcleo demostrativo —50 canales reportando cada cinco minutos—
+resultan 14\,400 filas diarias y unos 5,3 millones al año, del orden de 330~MB por año; sin compresión
+(la de TimescaleDB es \emph{Timescale License}; se adopta la edición Apache~2.0 por RNF-15) y con una política
+en capas —crudo sin vencimiento mientras el disco lo permita, agregados horarios y diarios— diez años de
+operación caben en unos 4,6~GB. El almacenamiento no es el problema; la
+memoria RAM consumida sí, y la acota el RNF-17.
+
+Se compararon cinco alternativas de alojamiento que ejecutan el mismo despliegue, con precios
+consultados el 10 de septiembre de 2026 y convertidos con el dólar observado de la fecha
+(cuadro~\ref{tab:alojamiento}). La recomendación es un \textbf{servidor privado virtual (VPS) internacional de 2~vCPU y 4~GB} (del
+orden de CLP~6\,000 mensuales, unos CLP~75\,000 anuales) para la validación y un primer sitio, con un
+VPS nacional como alternativa si el cliente exige datos en Chile; la decisión es reversible en horas
+porque los contenedores no dependen del proveedor. Se descartan una base de datos gestionada aparte y
+un orquestador: complejidad y costo sin retorno a esta escala.
+
 \section{Cuadros del capítulo de diseño}
 
 \begin{table}[H]
@@ -304,13 +339,13 @@ debe operar en un servidor de 2\,GB de memoria, lo que se verifica empíricament
 
 Esta estimación es preliminar y se somete a medición real en el banco de comparación de la Etapa 4:
 es una hipótesis de diseño, no una afirmación cerrada. El riesgo de que TimescaleDB crezca bajo
-carga se controla con políticas de retención y compresión.
+carga se controla con políticas de retención y agregados (la compresión quedó fuera con la edición Apache~2.0).
 
 \section{Costos de alojamiento (estimación inicial, superada por el cuadro~\ref{tab:alojamiento})}
 
 Esta fue la primera estimación, anterior a la comparación con precios fechados: servidor virtual
 arrendado, 6--20 USD/mes (2 vCPU, 4 GB); mini-PC propio en la organización, 150--250 USD por única
 vez; servidor institucional, sin costo si se dispone. Todos los componentes son de código abierto,
-salvo la compresión de TimescaleDB (desviación de RNF-15, capítulo~\ref{cap:metodologia}). La cifra que rige hoy es la del cuadro~\ref{tab:alojamiento} y la recomendación del
+y la compresión de TimescaleDB, que no lo es, quedó fuera el 6 de octubre al adoptar la edición Apache~2.0 (capítulo~\ref{cap:metodologia}). La cifra que rige hoy es la del cuadro~\ref{tab:alojamiento} y la recomendación del
 capítulo~\ref{cap:diseno}: del orden de CLP~6\,000 mensuales con un VPS internacional de 2~vCPU y
 4~GB, consultada el 10 de septiembre de 2026.

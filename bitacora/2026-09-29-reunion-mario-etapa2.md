@@ -1,12 +1,12 @@
 # Reunión con el profesor guía — martes 29 de septiembre de 2026
 
 - **Profesor guía:** Mario
-- **Modalidad:** presencial, en su oficina (viaje a Temuco)
+- **Modalidad:** presencial, en su oficina
 - **Etapa en curso:** 2 (entrega oficial el viernes 2 de octubre) | **Fase PPDIOO:** Design
 
 ## 1. Qué se presentó
 - El borrador del informe de la Etapa 2 (30 páginas) y la demostración de la plataforma según `docs/15`,
-  ensayada esa misma mañana (registros y consultas en `privado/`, fuera del repositorio).
+  ensayada esa misma mañana (registros y consultas guardados localmente, fuera del repositorio).
 - La situación de las entrevistas (observación 1 de la Etapa 1): sin contactos hasta hoy.
 
 ## 2. Retroalimentación recibida

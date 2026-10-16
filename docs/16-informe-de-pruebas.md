@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 238 pruebas unitarias, sin matriz formal) y TT-32 (sensor físico);
+cubre todavía: TT-27 (contrato de trama: hoy 240 pruebas unitarias, sin matriz formal) y TT-32 (sensor físico);
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -451,7 +451,7 @@ estudiante: la versión más nueva que convenza, con licencia y seguridad revisa
 después de escanear la imagen (`escanear-imagenes.sh`) y repetir el banco con TLS. Nota del guion: el conteo «roles 2» tras
 borrar el rol de prueba es correcto (el rol `admin` y la referencia a él en el cliente administrador); el guion lo decía mal.
 
-**Resultado (12/10, noche):** A funciona y los archivos no conviven de forma útil → migración hecha en la misma tanda (`docs/10
+**Resultado (12/10):** A funciona y los archivos no conviven de forma útil → migración hecha en la misma tanda (`docs/10
 §8.4` punto 42): `password_file` y `acl_file` fuera de `mosquitto.conf`, `acl` fuera del repo, todos los usuarios en el plugin
 (`pruebas/broker-inicializar.sh`, `broker-cliente.sh`, `lib-dynsec.sh`), guardián 2i reescrito. Escaneo de
 `eclipse-mosquitto:2.1.2-alpine` por digest: **0 críticas, 0 altas** (`escanear-imagenes.sh`); banco con TLS repetido sobre 2.1.2
@@ -507,7 +507,7 @@ el de seguridad no lo es, y el broker arranca con `persistence true` (comprobado
 `autosave_interval` 1800 s) siguen iguales en el manual vigente, así que `docs/10 §4.1` sigue valiendo. Novedad útil:
 `global_max_connections` (por defecto ilimitado) para el pendiente de `docs/11 §4` sobre el límite de conexiones.
 
-**Correcciones de la revisión del mismo día (12/10, noche; 40 hallazgos de tres lentes, 39 aplicados):** la administración del broker
+**Correcciones de la revisión del mismo día (12/10; 40 hallazgos de tres lentes, 39 aplicados):** la administración del broker
 se declara disponible solo después de suscribirse a las respuestas (antes, una orden en la ventana entre conectar y suscribirse
 habría dejado un cliente huérfano); un error ambiguo del broker (sin respuesta, conexión perdida) ordena borrar el cliente por si
 llegó a crearse, y un rechazo explícito no borra nada; como mucho dos altas a la vez (429) e `idle_in_transaction_session_timeout`
@@ -688,7 +688,7 @@ sintéticos.
 | Una clave fuera del mapa (`battery_voltage`) junto a una conocida | la conocida se guarda; la otra se anota para la línea de registro |
 | Solo claves fuera del mapa | `malformada` «ninguna clave conocida (llegaron: battery_voltage)» |
 | `up` sin `object` | `malformada` «el perfil del dispositivo en ChirpStack no tiene decodificador» |
-| DevEUI del cuerpo distinto del tópico | `IdentidadCruzada`, una malformada que no marca vivo; en mayúsculas cuenta como igual |
+| DevEUI del cuerpo distinto del tópico | `IdentidadCruzada` (desde §34, `IdentidadNoVerificada`), una malformada que no marca vivo; en mayúsculas cuenta como igual |
 | Clave conocida con un valor que no es número | `malformada` «temperature: no es un número» |
 | Hora sin zona | sin marca: rige la hora de recepción (Node la interpretaría en la zona del proceso: `docs/13` regla 17) |
 | Milesight con códec y Metadata | tres lecturas, los metadatos no cuentan como claves ignoradas, sin marca de tiempo |
@@ -749,7 +749,7 @@ la ACL del rol y la recepción por el filtro 1.
 **Cómo** (`bash plataforma/pruebas/banco/banco.sh lorawan`). Contra el banco desechable, con el broker, el plugin de seguridad y la base
 reales: se da de alta por API una pasarela ChirpStack, un nodo y una pasarela Milesight, y se publica con la credencial de cada pasarela el
 JSON de su fuente oficial (evento `up` de ChirpStack v4; uplink con códec y Metadata de Milesight). Los secretos viajan por la entrada
-estándar. Resultado: **25 de 25 comprobaciones, «LORAWAN OK»**; 26 de 26 desde la corrección de §32 y 27 de 27 desde la de §33.
+estándar. Resultado: **25 de 25 comprobaciones, «LORAWAN OK»**; 26 de 26 desde la corrección de §32, 27 de 27 desde la de §33 y 35 de 35 desde la de §34.
 
 | Comprobación | Resultado |
 |---|---|
@@ -816,3 +816,27 @@ documentos, el estado de HU-02, las filas de entradas de `docs/10`, el conteo de
 - **Alta repetida con un error ambiguo del broker.** Si el broker no confirma a tiempo el alta A y, entretanto, el alta B del mismo
   identificador crea su cliente, el borrado de A puede llegarle después: B queda con una credencial que el broker no tiene. Falla
   cerrado (no entra nadie) y la rotación lo repara.
+
+## 34. Segunda revisión del bloque LoRaWAN: lo verificado y lo corregido (15/10/2026)
+
+Tres revisiones independientes (seguridad, concordancia y privacidad) sobre las correcciones de §33. Cada hallazgo se verificó en el
+código o en la fuente antes de corregirlo; los que admitían una prueba se plantaron primero (la prueba falla con el código anterior).
+
+| Pregunta | Medido o verificado | Consecuencia |
+|---|---|---|
+| ¿Un JSON roto por el tópico de una pasarela marca vivo al nodo? | Sí: el adaptador lo rechazaba como una malformada común y el filtro 6 corría igual | **Corregido:** un cuerpo ilegible tampoco deja verificar el DevEUI; va a cuarentena y no hay señal de vida (`docs/10 §4.1`) |
+| ¿Y un nodo de formato directo asociado a una pasarela? | Hoy no puede existir (clave foránea compuesta de la migración 15), pero ese camino marcaba vivo | **Corregido** como defensa en profundidad, con su prueba unitaria |
+| ¿Se pierde un mensaje retenido publicado con el backend caído? | No, con la sesión persistente: la copia de la cola llega con la marca en cero y se guarda una vez, y la copia retenida que el broker reentrega al reconectar se descarta. Sin el descarte (plantado): **2 lecturas** en vez de 1 | Se pierde solo si el backend no tenía sesión (primer arranque, sesión perdida): límite aceptado (`docs/10 §8.4` punto 50) |
+| ¿Sirve `retain_available false` para que nadie publique con retención? | El broker desconecta a quien lo haga, pero su código (versión 2.1.2) muestra que también deja de retener sus contadores `$SYS`, que publica solo cuando cambian: al reconectar, el backend no tendría el contador de descartes | **Descartado.** Queda el descarte del backend; su condición (suscripción MQTT 3.1.1 sin *Retain As Published*) tiene una prueba unitaria, plantada con las dos variantes |
+| ¿La integración MQTT de ChirpStack publica con retención? | No: `publish(topic, self.qos, false, b)` en su código fuente | Nada que cambiar en la ruta C |
+| ¿Las claves desconocidas quedan limpias de todo lo invisible? | No del todo: quedaban los controles C1, los que invierten la dirección del texto y los separadores de línea, y el recorte podía partir un emoji | **Corregido:** fuera las categorías de control y formato de Unicode, y recorte por caracteres |
+
+**Banco:** el corte de la sesión al rotar y al dar de baja y los dos casos de retención eran mediciones a mano; ahora son comprobaciones
+de `banco.sh lorawan`, con una sesión de control que prueba que la detección ve una sesión viva: **35 de 35, «LORAWAN OK»**. Con las
+dos fallas plantadas (JSON roto que marca vivo y retenido sin descartar), el banco da 4 comprobaciones con falla. Método: el plantado
+se hace apagando y encendiendo el banco; reconstruir solo su backend recreó la base, que vive en memoria, y se perdió la siembra.
+
+Corregido además en los documentos: el avance del núcleo en `docs/18` (9 parciales y 53 h, no 8 y 47 h: faltaba HU-02), el permiso
+del rol `pasarela` en `docs/11`, la fila de mensajes retenidos de `docs/10 §4.1`, la cabecera de la migración 14 y menciones de la hora
+del día. El guardián suma tres pasos: el horario personal en todo archivo versionado, el avance calculado desde las filas y el conteo de
+este banco frente a lo que cita este documento. Total: 240 pruebas unitarias.

@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ContextoTrama, Lectura } from '../lectura';
 import { Adaptador, TramaMalformada } from './adaptador';
-import { IdentidadCruzada, exigirDevEui, lecturasDe, objetoJson } from './lorawan';
+import { IdentidadNoVerificada, exigirDevEui, lecturasDe, objetoJson } from './lorawan';
 import { RESOLVER_CLAVE } from './mapa-claves';
 import type { ResolverClave } from './mapa-claves';
 
@@ -28,7 +28,7 @@ export class ChirpstackAdaptador implements Adaptador {
   analizar(ctx: ContextoTrama): Lectura[] {
     const evento = objetoJson(ctx.carga.toString('utf8'));
     const info = evento.deviceInfo;
-    if (typeof info !== 'object' || info === null) throw new IdentidadCruzada('sin deviceInfo');
+    if (typeof info !== 'object' || info === null) throw new IdentidadNoVerificada('sin deviceInfo');
     exigirDevEui((info as Record<string, unknown>).devEui, ctx, 'deviceInfo.devEui');
     const objeto = evento.object;
     if (typeof objeto !== 'object' || objeto === null || Array.isArray(objeto)) {

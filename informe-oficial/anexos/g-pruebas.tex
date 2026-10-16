@@ -1,0 +1,33 @@
+\chapter{Detalle de las pruebas}
+\label{anx:pruebas}
+\small
+\setlength{\tabcolsep}{4pt}
+
+Cada fila resume una sección de la documentación de pruebas del repositorio (\texttt{docs/16}; la columna «§» da su
+número), con su resultado y el comando que la repite. Los guiones viven en \texttt{plataforma/pruebas/}; las 240
+pruebas unitarias corren con \texttt{pnpm verificar} y el verificador de concordancia con \texttt{verificar-todo.sh}.
+
+\begin{longtable}{@{}L{0.8cm}L{3.2cm}L{4.2cm}L{3.8cm}@{}}
+\caption{Pruebas de la Etapa 3: qué se probó, qué resultó y cómo se repite.}\label{tab:pruebas-detalle}\\
+\filaencab \encab{§} & \encab{Prueba (fecha)} & \encab{Resultado} & \encab{Se repite con} \\ \midrule \endfirsthead
+\filaencab \encab{§} & \encab{Prueba (fecha)} & \encab{Resultado} & \encab{Se repite con} \\ \midrule \endhead
+\multicolumn{4}{r}{\footnotesize\itshape continúa en la página siguiente} \\ \endfoot
+\endlastfoot
+1--8 & Carga con el emulador (120 nodos, 90~s) y carreras (07/10) & 59,7 tramas/s sin pérdida, p95 de 3~ms; la misma lectura 20 veces deja una fila y una trama; cinco sobre el umbral, una condición & {\footnotesize \texttt{banco.sh correr}, \texttt{banco.sh carrera}} \\
+9 & TLS de punta a punta con el proxy (07/10) & HTTPS y MQTT sobre TLS llegan a la base; sin la CA o sin TLS, rechazado & {\footnotesize \texttt{banco.sh proxy}} \\
+10 & Capacidad, picos y saturación (08/10) & Sin pérdida hasta 409 tramas/s; el límite es la CPU de la base; más arriba, descartes que solo delata el contador del broker & {\footnotesize \texttt{capacidad.sh}} \\
+11 & Caídas con carga en curso (08/10) & Backend detenido 20~s y base congelada 15~s: 0 lecturas perdidas; broker sin persistencia: 84 & {\footnotesize \texttt{caidas.sh}} \\
+12 & Dependencias e imágenes (08/10) & De 16 avisos a 2, sin corrección publicada y solo de desarrollo; imágenes sin vulnerabilidades corregibles fuera de residuos documentados & {\footnotesize \texttt{pnpm audit}, \texttt{escanear-imagenes.sh}} \\
+13 & Migración de vía, pasarela y sitio (08/10) & Base existente, base nueva y repetición: sin pérdida ni duplicados & a mano, en bases desechables \\
+14 & Canal en vivo (SSE) (09/10) & Cada flujo recibe solo lo suyo; un aviso al abrir y otro al cerrar cada condición & {\footnotesize \texttt{eventos.spec.ts}, \texttt{api-smoke.sh}} \\
+15 & Nombres de host contra el \emph{DNS rebinding} (12/10) & Un nombre ajeno se rechaza con 421 & {\footnotesize \texttt{api-smoke.sh}} \\
+16--17 & Panel: semáforo, inventario y ficha con gráfico (12/10) & Pruebas del panel en verde; el gráfico se descarga solo al abrir una ficha & {\footnotesize \texttt{vitest}, \texttt{panel-desarrollo.sh}} \\
+18 & Plugin de credenciales del broker (12/10) & El plugin y los archivos de claves no conviven: todo pasó al plugin & {\footnotesize \texttt{lab-dynsec.sh}} \\
+19 & Exportación CSV y JSON (12/10) & Por tandas de 10\,000 filas, sin cargar el rango en memoria & {\footnotesize \texttt{exportar.spec.ts}} \\
+20--21 & Alta, baja y rotación por API (12--13/10) & Todo o nada con el broker; credencial mostrada una vez; la anterior deja de valer & {\footnotesize \texttt{banco.sh alta}} \\
+22 & Cola del broker vigilada (13/10) & Con el backend detenido, el tope rige y la alarma abre y se cierra sola & {\footnotesize \texttt{banco.sh cola}} \\
+24 & Mínimo privilegio de la aplicación en la base (13/10) & No puede borrar, vaciar ni cambiar el esquema, y el sistema funciona igual & {\footnotesize \texttt{base-rol-app.sh}} \\
+25 & Costo del canal en vivo (14/10) & 50 flujos abiertos: entre 5 y 8~MiB más de memoria & a mano \\
+26 & Bloqueo de fila en la baja y la rotación (15/10) & La recepción esperaba hasta 1\,019~ms; con el bloqueo más débil entra en 18 a 22~ms & {\footnotesize \texttt{medir-bloqueo-fila.sh}} \\
+27--34 & LoRaWAN: formato declarado, adaptadores, pasarelas por API, rutas B y C (15/10) & JSON oficial del ChirpStack del campus (ruta C) y de la pasarela Milesight (ruta B): 35 de 35 comprobaciones; las fallas plantadas se detectan & {\footnotesize \texttt{banco.sh lorawan}, \texttt{lorawan.spec.ts}} \\
+\end{longtable}

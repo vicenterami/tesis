@@ -2,7 +2,8 @@
 -- Hasta aquí el backend entraba como `plataforma`, dueño de todo y superusuario: podía borrar tablas, cambiar el esquema o leer
 -- cualquier cosa del servidor de base de datos. Desde esta migración entra como `plataforma_app`, que solo puede LEER, INSERTAR y
 -- ACTUALIZAR filas, y cada permiso solo en las tablas donde el código lo usa (contado el 14/10 en backend/src): ni DELETE, ni
--- TRUNCATE, ni DROP, ni ALTER, ni crear nada; UPDATE solo en 5 tablas e INSERT solo en 11. Así `evento`, el registro de lo que
+-- TRUNCATE, ni DROP, ni ALTER, ni crear nada; UPDATE solo en 5 tablas y en la columna `activo` de `pasarela`, e INSERT
+-- solo en 12 (`pasarela` desde la migración 16). Así `evento`, el registro de lo que
 -- pasó (incluidas las corridas de limpieza), y las series (`medicion`, `trama`) no se pueden reescribir: solo agregar. El dueño `plataforma` queda para migraciones y semillas.
 --   · La retención usa drop_chunks, que exige ser DUEÑO de la hypertable (verificado: «must be owner of hypertable»). En vez de darle
 --     propiedad a la aplicación, una sola función del dueño, SECURITY DEFINER, hace eso y nada más: lista blanca de tablas, mínimo de

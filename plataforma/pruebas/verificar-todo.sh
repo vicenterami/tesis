@@ -132,13 +132,18 @@ else
   else echo "OK    ningún término de la lista privada ($(wc -l < "$VT"/2f-lista.txt) patrones) en $n archivos versionados o nuevos"; fi
 fi
 
-paso "2f2. Bitácoras sin horario personal: ni «(madrugada)» ni «(tarde…)» ni «(noche)» (revisión del 15/10)"
+paso "2f2. Sin horario personal: ni las bitácoras ni ningún archivo versionado dicen a qué hora del día se trabajó (revisiones del 15/10)"
 # La regla de privacidad prohíbe horarios personales en el repositorio; las bitácoras los dejaban en el título de la sesión.
 # 15/10, segunda revisión: también «por la noche», «de madrugada» y una hora del reloj («a las 23:20»), que el primer patrón no veía.
-horarios=$(grep -niE '\((madrugada|tarde|noche)[^)]*\)|, (madrugada|tarde|noche)\)|por la (noche|tarde|mañana)|de madrugada|a las [0-9]{1,2}:[0-9]{2}' bitacora/*.md)
-nb=$(ls bitacora/*.md | wc -l)
-if [ -n "$horarios" ]; then echo "FALLA bitácoras con horario personal:"; echo "$horarios" | cut -c1-120 | sed 's/^/  /'; fallos=$((fallos+1))
-else echo "OK    $nb bitácoras revisadas, ninguna dice a qué hora se trabajó"; fi
+# 15/10, tercera revisión: lo mismo fuera de las bitácoras («12/10, noche», «la noche del 06/10», «la misma noche», en docs/10, 11 y 16).
+# Fuera de las bitácoras no se busca la hora del reloj: los ejemplos de zonas horarias la usan a propósito («a las 23:30 del 4-sep»).
+DIA='\((madrugada|tarde|noche)[^)]*\)|, (madrugada|tarde|noche)\)|por la (noche|tarde|mañana)|de madrugada|\b(la|esa|misma) (noche|madrugada)\b|\b(esa|misma) tarde\b|[0-9]{1,2}/[0-9]{1,2}(/[0-9]{4})?,? (noche|madrugada|tarde)\b'
+horarios=$(grep -niE "$DIA|a las [0-9]{1,2}:[0-9]{2}" bitacora/*.md)
+git grep --untracked -n -i -E "$DIA" -- ':!privado' ':!bitacora' ':!plataforma/pruebas/verificar-todo.sh' ':!*.pdf' > "$VT"/horarios.txt 2>&1; rc=$?
+nb=$(ls bitacora/*.md | wc -l); na=$(git ls-files | wc -l)
+if [ "$rc" -gt 1 ]; then echo "FALLA git grep falló ($rc): no se pudo revisar"; fallos=$((fallos+1))
+elif [ -n "$horarios" ] || [ "$rc" -eq 0 ]; then echo "FALLA horario personal en archivos versionados:"; { echo "$horarios"; cat "$VT"/horarios.txt; } | grep . | cut -c1-120 | sed 's/^/  /'; fallos=$((fallos+1))
+else echo "OK    $nb bitácoras y $na archivos versionados revisados: ninguno dice a qué hora del día se trabajó"; fi
 
 paso "2g. Migraciones citadas en prosa (docs e informe) == archivos NN-*.sql en disco"
 # Hallazgo del 26/09: informe y docs/12 decían «6 migraciones» cuando ya había 7 en disco (la 07 del 23/09).
@@ -654,6 +659,74 @@ for m in malos: print('FALLA', m)
 if not malos: print(f'OK    docs/18 §2: las {len(filas)} tareas de la Etapa 3 son las de docs/04, con sus horas; los totales salen de las filas')
 sys.exit(1 if malos else 0)
 PY
+
+paso "2w2. Avance de la implementación (docs/18 §1): hechos y parciales del núcleo y del backlog salen de las filas"
+# 15/10: la fila decía 8 parciales (47 h) cuando HU-02 ya era parcial: eran 9 (53 h). Estado de cada ítem: docs/12 §3 (Etapa 2) y,
+# encima, docs/18 §2 (notas y tabla, lo más reciente); horas y núcleo (🎯) de docs/04. Un ítem sin estado en ninguna parte es pendiente.
+python3 -I - <<'PY' || fallos=$((fallos+1))
+import re, sys
+md = {}
+for l in open('docs/04-backlog.md', encoding='utf-8'):
+    m = re.match(r'\|\s*\*\*((?:HU|TT)-\d+)\*\*\s*\|(.*)\|\s*$', l)
+    if m:
+        c = [x.replace('**', '').strip() for x in m.group(2).split('|')]
+        md[m.group(1)] = ('🎯' in c[0], int(c[-1]))
+t12 = open('docs/12-estado-etapa2.md', encoding='utf-8').read()
+t18 = open('docs/18-estado-etapa3.md', encoding='utf-8').read()
+try:
+    s3 = t12.split('\n## 3.')[1].split('\n## 4.')[0]
+    tabla, notas = t18.split('\n## 2.')[1].split('\n## 3.')[0].split('**Pasadas', 1)
+except (IndexError, ValueError):
+    print('FALLA no encontré docs/12 §3 o la tabla y las notas de docs/18 §2 (¿cambiaron sus títulos?)'); sys.exit(1)
+est = dict(re.findall(r'^\| ((?:HU|TT)-\d+) \|.*?\| (✅|🟡|⬜) \|', s3, re.M))
+est.update(re.findall(r'\b((?:HU|TT)-\d+)\b[^;✅🟡⬜]{0,80}?(✅|🟡|⬜)', notas))
+est.update(re.findall(r'^\| ((?:HU|TT)-\d+)[^|]*\|[^|]*\| \d+ \| (✅|🟡|⬜) \|', tabla, re.M))
+if len(md) < 60 or len(est) < 30: print(f'FALLA leí {len(md)} ítems de docs/04 y {len(est)} estados (¿cambió el formato?)'); sys.exit(1)
+def cuenta(solo_nucleo):
+    filas = [(k, h) for k, (n, h) in md.items() if n or not solo_nucleo]
+    hechos = [h for k, h in filas if est.get(k) == '✅']; parc = [h for k, h in filas if est.get(k) == '🟡']
+    tot = sum(h for _, h in filas)
+    return (len(hechos), len(filas), sum(hechos), tot, round(100 * sum(hechos) / tot), len(parc), sum(parc))
+malos = []
+for nombre, rx, solo in (('Núcleo', r'Núcleo: (\d+) de (\d+) elementos hechos \((\d+) de (\d+) h, (\d+) %\) y (\d+) parciales \((\d+) h', True),
+                         ('Todo el backlog', r'Todo el backlog: (\d+) de (\d+) \((\d+) de (\d+) h, (\d+) %\) y (\d+) parciales \((\d+) h', False)):
+    m = re.search(rx, t18)
+    if not m: malos.append(f'docs/18 §1: no encontré la cifra «{nombre}: …» (¿cambió la redacción?)'); continue
+    dicho, real = tuple(int(x) for x in m.groups()), cuenta(solo)
+    if dicho != real: malos.append(f'docs/18 §1 {nombre}: dice {dicho}; las filas dan {real} (hechos, total, h hechas, h totales, %, parciales, h parciales)')
+# 15/10: el informe (cap. de metodología y anexo de seguimiento) repite esas cifras y el estado de la Etapa 3: deben salir de las mismas filas.
+f18 = dict((k, (int(h), e)) for k, h, e in re.findall(r'^\| ((?:HU|TT)-\d+)[^|]*\|[^|]*\| (\d+) \| (✅|🟡|⬜) \|', tabla, re.M))
+e3 = {s: (sum(1 for h, e in f18.values() if e == s), sum(h for h, e in f18.values() if e == s)) for s in '✅🟡⬜'}
+tex = re.sub(r'\s+', ' ', open('informe-oficial/cap4.tex', encoding='utf-8').read())
+m = re.search(r'De los (\d+) elementos de la Etapa~3 \((\d+)~h\), (\d+) están hechos \((\d+)~h\), (\d+) parciales \((\d+)~h\) y (\d+) pendientes? \((\d+)~h\); en todo el proyecto, (\d+) de (\d+) elementos del núcleo hechos \((\d+) de (\d+)~h, (\d+)\\,\\%\) y (\d+) parciales \((\d+)~h\)', tex)
+if not m: malos.append('informe (cap4.tex): no encontré la frase del seguimiento de la Etapa 3 (¿cambió la redacción?)')
+else:
+    n = cuenta(True)
+    real = (len(f18), sum(h for h, _ in f18.values()), *e3['✅'], *e3['🟡'], *e3['⬜'], n[0], n[1], n[2], n[3], n[4], n[5], n[6])
+    if tuple(int(x) for x in m.groups()) != real: malos.append(f'informe (cap4.tex): dice {tuple(int(x) for x in m.groups())}; las filas dan {real}')
+es = open('informe-oficial/anexos/e-seguimiento.tex', encoding='utf-8').read()
+if '\\label{tab:seguimiento3}' not in es: malos.append('informe: no encontré el cuadro tab:seguimiento3 en el anexo de seguimiento')
+else:
+    bloque = es.split('\\label{tab:seguimiento3}', 1)[1].split('\\end{longtable}', 1)[0]
+    pal = {'Hecho': '✅', 'Parcial': '🟡', 'Pendiente': '⬜'}
+    ftex = dict((k, (int(h), pal[e])) for k, h, e in re.findall(r'^((?:HU|TT)-\d+) & [^&]* & (\d+) & (Hecho|Parcial|Pendiente)', bloque, re.M))
+    if ftex != f18:
+        dif = sorted(set(ftex.items()) ^ set(f18.items()))
+        malos.append(f'informe: el cuadro de la Etapa 3 del anexo difiere de docs/18 §2 en {dif}')
+for m in malos: print('FALLA', m)
+if not malos: print(f'OK    docs/18 §1 e informe: núcleo {cuenta(True)[0]} hechos y {cuenta(True)[5]} parciales; backlog {cuenta(False)[0]} y {cuenta(False)[5]}; Etapa 3 y su cuadro del anexo, desde las filas')
+sys.exit(1 if malos else 0)
+PY
+
+paso "2w3. Banco LoRaWAN: el conteo que cita docs/16 es el de comprobaciones del caso lorawan de banco.sh"
+# 15/10: docs/10 citaba «medido en el banco» para dos mediciones que el banco no repetía; desde entonces son comprobaciones del caso,
+# y el número que dice docs/16 debe ser el del guion (cada «ok "» del caso es una comprobación).
+nl=$(awk '/^  lorawan\)/,/LORAWAN OK/' plataforma/pruebas/banco/banco.sh | grep -c ' ok "')
+if [ "$nl" -lt 10 ]; then echo "FALLA leí solo $nl comprobaciones en el caso lorawan de banco.sh (¿cambió su forma?)"; fallos=$((fallos+1))
+elif ! grep -q "$nl de $nl desde" docs/16-informe-de-pruebas.md; then echo "FALLA banco.sh lorawan tiene $nl comprobaciones y docs/16 no cita «$nl de $nl desde …»"; fallos=$((fallos+1))
+elif viejas=$(grep -noE '[0-9]+ de [0-9]+ comprobaciones' informe-oficial/cap-pruebas.tex informe-oficial/anexos/g-pruebas.tex | grep -v ":$nl de $nl comprobaciones"); [ -n "$viejas" ]; then echo "FALLA el informe cita otro conteo del banco LoRaWAN (son $nl): $viejas"; fallos=$((fallos+1))
+elif ! grep -q "$nl de $nl comprobaciones" informe-oficial/cap-pruebas.tex; then echo "FALLA el capítulo de pruebas no cita «$nl de $nl comprobaciones» (¿cambió la redacción?)"; fallos=$((fallos+1))
+else echo "OK    banco.sh lorawan tiene $nl comprobaciones; docs/16 y el informe citan «$nl de $nl»"; fi
 
 paso "3. Diagramas: informe = docs = base (generar-figuras.sh --verificar)"
 bash informe-oficial/figuras/generar-figuras.sh --verificar || fallos=$((fallos+1))

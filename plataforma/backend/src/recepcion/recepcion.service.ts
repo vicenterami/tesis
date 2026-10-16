@@ -7,7 +7,7 @@ import { SupervisionService } from '../supervision/supervision.service';
 import { EventosService } from '../tiempo-real/eventos.service';
 import { Adaptador, TramaMalformada } from './adaptadores/adaptador';
 import { ChirpstackAdaptador } from './adaptadores/chirpstack.adaptador';
-import { IdentidadCruzada } from './adaptadores/lorawan';
+import { IdentidadNoVerificada } from './adaptadores/lorawan';
 import { MilesightAdaptador } from './adaptadores/milesight.adaptador';
 import { PlanoAdaptador } from './adaptadores/plano.adaptador';
 import { SenmlAdaptador } from './adaptadores/senml.adaptador';
@@ -161,6 +161,9 @@ export class RecepcionService implements OnModuleInit {
     const adaptador = formatoEnSuTopico ? this.adaptadores.get(dispositivo.formato) : undefined;
     if (!adaptador) {
       await this.cuarentena(trama, 'malformada', `formato declarado ${dispositivo.formato}: no se recibe por este tópico`);
+      // Por el tópico de pasarela sin un adaptador de pasarela nadie verificó el DevEUI: no se marca vivo (§4.1). Hoy lo impide la
+      // clave foránea compuesta de la migración 15; esto cierra el camino si esa regla cambiara (defensa en profundidad).
+      if (dePasarela) return;
     } else if (!adaptador.reconoce(ctx)) {
       await this.cuarentena(trama, 'malformada', `formato declarado ${dispositivo.formato}: la trama no tiene esa forma`);
       // Por el tópico de pasarela, una trama que ni siquiera tiene la forma no identifica al nodo: no se marca vivo (§4.1).
@@ -171,8 +174,8 @@ export class RecepcionService implements OnModuleInit {
       } catch (e) {
         if (!(e instanceof TramaMalformada)) throw e;
         await this.cuarentena(trama, 'malformada', `formato declarado ${adaptador.nombre}: ${e.message}`);
-        // DevEUI del cuerpo distinto del tópico: no hay certeza de que la trama sea del nodo, así que no se marca vivo (§4.1).
-        if (e instanceof IdentidadCruzada) return;
+        // El cuerpo no deja verificar el DevEUI (otro, ausente o ilegible): no hay certeza de que sea del nodo, no se marca vivo (§4.1).
+        if (e instanceof IdentidadNoVerificada) return;
       }
     }
 

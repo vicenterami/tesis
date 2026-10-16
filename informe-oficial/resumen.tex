@@ -14,12 +14,13 @@ en cuatro etapas con la metodología PPDIOO de Cisco. En la primera se formuló 
 árbol de causas y efectos, se definieron los objetivos con su trazabilidad, se catalogaron 70
 requerimientos y se compararon cinco mecanismos de transporte y cuatro formatos de datos. En la
 segunda se diseñaron el sistema, su red y su despliegue con notaciones reconocidas, y se contrastó
-con las soluciones existentes, de código abierto, de fabricante y en la nube. El trabajo incorporó
-la retroalimentación del profesor guía en cada revisión. Como resultado, ya existe un núcleo
-demostrable que recibe los datos en el formato estándar SenML o los traduce desde otros, los unifica, supervisa si cada
-dispositivo sigue reportando, genera alertas ante valores fuera de rango y permite consultarlos. La
-siguiente etapa incorporará el registro de dispositivos y la interfaz de visualización, y validará
-los requerimientos con la Facultad.
+con las soluciones existentes, de código abierto, de fabricante y en la nube. En la tercera se implementó y probó
+más de la mitad del núcleo: el sistema registra dispositivos con credencial propia, recibe sus datos por MQTT y por
+LoRaWAN en el formato estándar SenML o los traduce desde otros, los unifica, supervisa si cada dispositivo sigue
+reportando, genera alertas ante valores fuera de rango y los muestra en un panel en vivo; en un banco de pruebas
+sostuvo 59,7 eventos por segundo sin pérdida, por sobre los 50 exigidos. El trabajo incorporó la retroalimentación del
+profesor guía y una entrevista con un académico de la Facultad. La siguiente etapa validará el sistema con un sensor
+físico y en el servidor de referencia, e incorporará la sesión y los roles.
 
 {\bf Palabras Clave:}
 Internet de las Cosas, sistema integrado, dispositivos IoT, monitoreo en tiempo real, SenML, series

@@ -1,4 +1,5 @@
 import { ConfigService } from '@nestjs/config';
+import mqtt from 'mqtt';
 import type { IPublishPacket } from 'mqtt';
 import { BrokerService, REINTENTOS_MS } from './broker.service';
 
@@ -41,6 +42,15 @@ describe('BrokerService: un mensaje a la vez y PUBACK después de guardar (decis
     await new Promise((r) => setTimeout(r, 0));
     expect(cb).toHaveBeenCalledWith();
     expect(vistos).toEqual([]);
+  });
+
+  it('el descarte vale porque la conexión es MQTT 3.1.1 y la suscripción no pide «Retain As Published» (docs/10 §8.4 punto 50)', () => {
+    armar();
+    const opciones = (mqtt.connect as jest.Mock).mock.calls.at(-1)?.[1] as { protocolVersion?: number };
+    expect(opciones.protocolVersion ?? 4).toBe(4); // con 5 y rap, el envío en vivo llegaría con retain = 1 y se perdería
+    const conectar = mockCliente.on.mock.calls.find(([ev]) => ev === 'connect')?.[1] as () => void;
+    conectar();
+    expect(mockCliente.subscribe).toHaveBeenCalledWith('sitio/#', { qos: 1 }, expect.any(Function));
   });
 
   it('el callback (PUBACK) se llama solo cuando el manejador terminó; los mensajes van en orden', async () => {

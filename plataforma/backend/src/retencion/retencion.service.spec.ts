@@ -43,7 +43,7 @@ describe('RetencionService', () => {
     ]);
     expect(consultas.filter((c) => c.includes('lock_timeout'))).toHaveLength(3);
     expect(release).toHaveBeenCalledTimes(3);
-    // Borrar es destructivo: la corrida queda en la base, no solo en el log que vence (kit, concurrencia §6).
+    // Borrar es destructivo: la corrida queda en la base, no solo en el log que vence.
     expect(registrar).toHaveBeenCalledTimes(1);
     const [sql, params] = registrar.mock.calls[0];
     expect(sql).toContain("'retencion'");

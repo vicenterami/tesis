@@ -70,8 +70,10 @@ export class BrokerService implements OnModuleInit, OnModuleDestroy {
   async manejar(packet: IPublishPacket, cb: (error?: Error) => void): Promise<void> {
     const topico = packet.topic.toString();
     // Un mensaje retenido llega con retain = 1 solo cuando el broker lo reentrega al suscribirse (al arrancar o reconectar); el envío
-    // original llegó antes con retain = 0 y ya se procesó. Reprocesarlo guardaba la misma lectura otra vez con la hora de recepción y
-    // marcaba vivo a un nodo callado (medido en el banco el 15/10: 1 lectura → 2 tras reiniciar el backend). Se confirma y se descarta.
+    // original llegó antes con retain = 0 y ya se procesó. Vale porque la suscripción es MQTT 3.1.1 (el valor por defecto de mqtt.js):
+    // en MQTT 5 con «Retain As Published» el envío en vivo traería retain = 1 y se descartaría (docs/10 §8.4 punto 50). Reprocesarlo
+    // guardaba la misma lectura otra vez con la hora de recepción y marcaba vivo a un nodo callado (medido en el banco el 15/10:
+    // 1 lectura → 2 tras reiniciar el backend). Se confirma y se descarta; `banco.sh lorawan` lo comprueba en cada corrida.
     if (packet.retain) {
       this.log.warn(`${topico}: mensaje retenido reentregado al suscribirse; ya se procesó cuando llegó, se descarta`);
       return cb();

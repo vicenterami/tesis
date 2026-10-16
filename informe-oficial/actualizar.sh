@@ -28,14 +28,17 @@ echo "══ 4. privado/previsualizaciones/informe-borrador.pdf actualizado ═�
 # 5. Cambios visibles (08/10/2026): lo borrado en rojo tachado y lo nuevo en azul, para revisar de un vistazo qué cambió.
 # La base es la última entrega (cambiar al entregar la siguiente etapa). Se arma en una carpeta desechable con la versión
 # de la base (git archive, solo lectura) y la actual; un fallo aquí avisa pero no cuenta como falla del informe.
+# 15/10: latexdiff marca mal un borrado grande que cruza un \\textbf y pdflatex se detiene; se fuerza (-f) y se avisa, porque
+# este PDF es solo una ayuda para revisar: la compilación que vale es la del paso 2.
 BASE_CAMBIOS="${BASE_CAMBIOS:-bc7cfdf}"   # entrega de la Etapa 2, 02/10/2026
 cambios() { # cambios BASE SALIDA
   local T r; T=$(mktemp -d) || return 1; mkdir -p "$T/viejo" "$T/nuevo"
   git archive "$1" informe-oficial | tar -x -C "$T/viejo" && cp -r informe-oficial "$T/nuevo/" && rm -rf "$T/nuevo/informe-oficial/build" \
     && latexdiff --flatten --graphics-markup=0 --math-markup=whole -c "PICTUREENV=(?:picture|tikzpicture|DIFnomarkup)[\w\d*@]*" \
          "$T/viejo/informe-oficial/main.tex" "$T/nuevo/informe-oficial/main.tex" > "$T/nuevo/informe-oficial/cambios.tex" 2>/dev/null \
-    && ( cd "$T/nuevo/informe-oficial" && latexmk -pdf -interaction=nonstopmode -outdir=build-cambios cambios.tex > /dev/null 2>&1 ) \
-    && cp "$T/nuevo/informe-oficial/build-cambios/cambios.pdf" "$2"; r=$?; rm -rf "$T"; return $r; }
+    && { ( cd "$T/nuevo/informe-oficial" && latexmk -f -pdf -interaction=nonstopmode -outdir=build-cambios cambios.tex > /dev/null 2>&1 ) \
+         || echo "AVISO el PDF de cambios salió con errores de marcado de latexdiff (un borrado grande dentro de \\textbf); el informe sí está bien"; } \
+    && [ -s "$T/nuevo/informe-oficial/build-cambios/cambios.pdf" ] && cp "$T/nuevo/informe-oficial/build-cambios/cambios.pdf" "$2"; r=$?; rm -rf "$T"; return $r; }
 if [[ " $* " == *" --sin-cambios "* ]]; then echo "══ 5. cambios visibles: omitido (--sin-cambios) ══"
 elif ! command -v latexdiff >/dev/null; then echo "══ 5. cambios visibles: omitido, falta latexdiff (sudo apt install latexdiff) ══"
 elif ! git cat-file -e "$BASE_CAMBIOS^{commit}" 2>/dev/null; then echo "AVISO la base $BASE_CAMBIOS no es un commit de este repositorio"

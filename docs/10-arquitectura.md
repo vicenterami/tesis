@@ -305,8 +305,8 @@ sequenceDiagram
   asociados a ella. **La pasarela se registra por API** (`POST /pasarelas`, §8.4 punto 47): misma guardia y mismo todo-o-nada
   que el dispositivo (fila, cliente del broker con rol `pasarela` en una orden, evento, credencial mostrada una sola vez); declara
   el **formato** de lo que publica (`milesight` o `chirpstack`) y sus nodos lo heredan en el alta; rotación y baja con las mismas
-  órdenes, y la baja deja a sus nodos sin quien publique por ellos: el broker borra su cliente y corta la sesión abierta (medido en el
-  banco, `docs/16 §33`), y si algo llegara igual, el filtro 1 lo manda a cuarentena `no_registrado` («pasarela inactiva»). El camino dibujado después del alta es el de la vía `mqtt`; el aviso al panel va por SSE (§8.4
+  órdenes, y la baja deja a sus nodos sin quien publique por ellos: el broker borra su cliente y corta la sesión abierta (lo comprueba
+  `banco.sh lorawan`, `docs/16 §34`), y si algo llegara igual, el filtro 1 lo manda a cuarentena `no_registrado` («pasarela inactiva»). El camino dibujado después del alta es el de la vía `mqtt`; el aviso al panel va por SSE (§8.4
   punto 1).
 - El estado "en línea" se deduce del **primer mensaje autenticado**, no de la alta: dar de alta un
   dispositivo que aún no transmite lo deja en "esperando primer contacto".
@@ -429,10 +429,11 @@ HTTPS a `/salud` hizo descartar unos 2 800 de un tráfico que sin él se guardab
 | El tópico es de **pasarela** y la pasarela no está registrada, está inactiva o es de otro sitio (§8.4 punto 47) | Cuarentena `no_registrado` con el detalle («pasarela X sin alta», «inactiva», «registrada en el sitio X, no en Y»); nadie se marca vivo | La ACL acota a la pasarela a su propio árbol (`%u`), pero no sabe de altas ni de sitios: eso lo sabe la base (§8.4 puntos 24 y 47) |
 | El tópico es de pasarela y el **DevEUI no está asociado a esa pasarela** en el alta, o el nodo está dado de baja | Cuarentena `no_registrado` («DevEUI X no está asociado a la pasarela Y») o `dado_de_baja`; nadie se marca vivo: el nodo no pasó el filtro 1 | Una pasarela comprometida no puede publicar por nodos ajenos (A9 de `docs/11`); un nodo nuevo que aún no se dio de alta queda a la vista en la cuarentena |
 | El evento de la pasarela **no es `up`** (`join`, `ack`, `status`, `log`, `location`, o un tipo de dato de Milesight que no es el uplink) | Se anota en el registro de depuración del backend; no es trama, no va a cuarentena y no se escribe en la base (punto 27: la fila de la pasarela la edita una persona) | No es un dato de sensor; llevarlo al historial del dispositivo es de la Etapa 4 (HU-15; §8.4 punto 47) |
-| La trama **no calza con el formato declarado** (SenML a un dispositivo `plano`, un `up` sin `object`, un JSON de Milesight sin códec) | Cuarentena `malformada` con el detalle «formato declarado X: …» y, en LoRaWAN, qué activar (decodificador en ChirpStack; códec y Metadata en la pasarela); el dispositivo se marca vivo | Desde §8.4 punto 47 el filtro 2 no adivina: el formato lo declara el alta del dispositivo o, en la vía `lorawan`, su pasarela |
-| El **DevEUI del cuerpo no coincide con el del tópico** | Cuarentena `malformada` («DevEUI del cuerpo X ≠ tópico Y»); el nodo del tópico no se marca vivo | Señal de configuración cruzada en el servidor de red; nunca se atribuye un dato a un nodo por el cuerpo solo |
+| La trama **no calza con el formato declarado** (SenML a un dispositivo `plano`, un `up` sin `object`, un JSON de Milesight sin códec) | Cuarentena `malformada` con el detalle «formato declarado X: …» y, en LoRaWAN, qué activar (decodificador en ChirpStack; códec y Metadata en la pasarela); el dispositivo se marca vivo si su identidad quedó verificada: siempre por su propio tópico, que el broker autenticó, y por el de una pasarela solo si el cuerpo trae el DevEUI del tópico (sí en un `up` sin `object` y en un JSON de Milesight sin códec; lo que no deja verificarlo, en la fila siguiente) | Desde §8.4 punto 47 el filtro 2 no adivina: el formato lo declara el alta del dispositivo o, en la vía `lorawan`, su pasarela |
+| Por el tópico de una pasarela, el cuerpo **no deja verificar el DevEUI**: no coincide con el del tópico, no lo trae, no es un objeto JSON o no tiene la forma del formato declarado | Cuarentena `malformada` («DevEUI del cuerpo X ≠ tópico Y», «sin devEUI: activar Metadata…», «JSON inválido», «la trama no tiene esa forma»); el nodo del tópico **no** se marca vivo | La pasarela está autenticada y el nodo no: sin el DevEUI del cuerpo no hay certeza de que la trama sea suya, así que no es señal de vida del nodo (revisiones del 15/10). Es señal de configuración cruzada en el servidor de red; nunca se atribuye un dato a un nodo por el cuerpo solo |
 | **Dos lecturas del mismo canal en la misma trama**, sin marca de tiempo | Se guardan ambas, con instantes de recepción distintos (microsegundos) | Sin marca del emisor no hay identidad de lectura (fila anterior); si un nodo repite un canal por error, corregirlo es del firmware, no de la plataforma. Limitación aceptada el 23/09 |
 | El broker **reentrega muchas veces** de golpe (reconexión con cola larga) | Desde la decisión 4 los mensajes se procesan **de a uno**, en orden; la cola queda en el broker, no en el backend, y el pool de 5 conexiones no se disputa. El costo es la latencia por mensaje (2–5 ms medidos en el portátil), que acota la tasa máxima a cientos por segundo: por encima de RNF-01 |
+| Un emisor publica con **retención** (`retain`) | Llega una vez en vivo y se procesa. El broker además lo guarda y lo reentrega, con la marca de retenido, a cada suscripción nueva: el backend confirma esa copia sin procesarla y lo anota en el registro (§8.4 punto 50) | Procesar la copia guardaba la misma lectura otra vez con otra hora de recepción (medido: 1 lectura → 2). Límite aceptado: lo publicado con retención mientras el backend no tenía sesión en el broker (primer arranque, sesión perdida) se pierde; ningún componente del sistema publica con retención |
 | Una trama trae **miles de lecturas** | Hoy no hay tope: se procesan todas, en serie | Pendiente (`docs/11 §4`): tope de lecturas por trama en el adaptador y `message_size_limit` en el broker; un sensor no manda miles de lecturas, un atacante sí |
 | Dos **sensores distintos** miden lo mismo cerca | **No es duplicado**: son dos canales, dos series, dos evaluaciones de umbral. Correlacionarlos es una función de análisis futura, no del pipeline | La plataforma registra lo que cada sensor dijo; interpretar es otra capa |
 
@@ -480,7 +481,7 @@ cliente ──HTTP──► Express ⊂ NestJS ──► servicio ──► pg �
 
 - **Express** es la biblioteca de servidor HTTP más usada de Node.js; NestJS la usa por debajo
   (`@nestjs/platform-express`). El proceso de Node es el servidor; Express recibe cada petición y
-  entrega la respuesta. Es **la API**: 11 rutas REST (14 operaciones) y el canal SSE `/eventos` (§5), descritos en el contrato OpenAPI. Express no toca la base.
+  entrega la respuesta. Es **la API**: 11 rutas REST (14 operaciones) y el canal SSE `/eventos` (§5), descritos en el contrato OpenAPI (12 rutas y 15 operaciones contando `/eventos`). Express no toca la base.
 - **`pg`** (node-postgres) es el conductor de la base: mantiene un *pool* de 5 conexiones
   (`db/db.module.ts`) y envía **SQL directo** con parámetros `$1, $2…`; el valor nunca se pega dentro
   del texto SQL, lo que evita la inyección. Sin ORM, por la razón de `docs/07` (series de tiempo con
@@ -640,7 +641,7 @@ flowchart TB
 | Servicio | Persistencia | Reinicio | Expuesto |
 |---|---|---|---|
 | proxy (nginx) | certificados | `unless-stopped` | 443, 8883; 1700/udp solo ruta A |
-| mosquitto | retenidos + ACL | `unless-stopped` | no (vía proxy) |
+| mosquitto | cola de la sesión persistente del backend, retenidos y ACL | `unless-stopped` | no (vía proxy) |
 | chirpstack (solo ruta A, opcional) | base `chirpstack` en el mismo PostgreSQL (volumen datos-timescale) + redis | `unless-stopped` | no (vía proxy) |
 | timescaledb (edición Apache, `-oss`) | **todo el dato** | `unless-stopped` | no |
 | backend | ninguna (sin estado) | `unless-stopped` | no (vía proxy) |
@@ -917,7 +918,7 @@ del fabricante de la pasarela (137 afirmaciones, en un registro del autor que no
    con registro de evidencia (§8.3); la decisión se escribe aquí y en el anexo C del informe. Las leyendas del
    informe que aún dicen «WebSocket» o «ChirpStack correrá en el servidor» se corrigen con la próxima entrega.
 
-**Decisiones de la noche del 06/10/2026** (tras el registro de proxies, el laboratorio de la edición Apache y la
+**Más decisiones del 06/10/2026** (tras el registro de proxies, el laboratorio de la edición Apache y la
 revisión de las lecciones de método). Fuentes: registros de evidencia del autor, no incluidos en el
 repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 observaciones) y brokers (258 filas).
 
@@ -976,7 +977,7 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     Bajarlos exige cambiar la migración y aplicarla con el dueño de la base, lo que deja rastro en el repositorio. El de 30 días
     protege de un error de tipeo («7» por «730») que borraría años de series. El de 7 días impide que un backend comprometido
     borre la última semana de tramas, cuarentena y métricas del broker, que es justo la que serviría para investigarlo.
-    **Tres decisiones del estudiante (07/10, noche).** (a) **Las mediciones no vencen por defecto**: diez años ocupan
+    **Tres decisiones del estudiante (07/10).** (a) **Las mediciones no vencen por defecto**: diez años ocupan
     ≈ 4,6 GB (`docs/14`) y el historial largo es el dato valioso del caso de uso; `RETENCION_MEDICION_DIAS` solo
     las recorta si se define (mínimo 30). Cada corrida de retención deja una fila en `evento` (tipo `retencion`):
     borrar es destructivo y su registro no puede vencer antes que los datos. (b) **Tope de 64 KiB por mensaje en
@@ -1013,7 +1014,7 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
 
 24. **LoRaWAN es obligatorio y entra por la ruta B** (desde el 13/10/2026, también por la ruta C: punto 45) (pasarela con servidor de red embebido → MQTT/TLS 8883). La ruta B
     deja de ser «la prevista» y pasa a ser la vía LoRaWAN del sistema: entidad `pasarela` (`docs/08 §8`); la pasarela se
-    autentica en el broker con su propia credencial y publica solo bajo su tópico, `sitio/<sitio>/pasarela/<id>/<tipo>`
+    autentica en el broker con su propia credencial y publica solo bajo su tópico (forma del 08/10, superada al final de este punto), `sitio/<sitio>/pasarela/<id>/<tipo>`
     (el tópico se configura en la pasarela, uno por tipo de dato: guía de usuario del UG65, v2.14, pp. 34-35), y la ACL
     de su rol la limita a él con el patrón de usuario `%u`, que Dynamic Security admite en `publishClientSend`
     (https://mosquitto.org/documentation/dynamic-security/). El DevEUI de cada nodo viaja en el cuerpo (y, desde el punto 47, también en el tópico); el filtro 1 toma
@@ -1146,7 +1147,7 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     (punto 26) con una identidad propia distinta de la que usa para recibir tramas; qué pasa con los usuarios que hoy viven en
     `password_file` (`backend`, `sonda`, los `dev-*` de desarrollo) lo decidió el laboratorio `pruebas/lab-dynsec.sh`
     (`docs/16 §18`): no conviven, y migraron al plugin en la misma tanda (punto 42). **Implementado el
-    12/10 (noche):** `POST /dispositivos` (`backend/src/alta/`); guardia `X-Clave-Admin` de tiempo constante sobre hashes (clave
+    12/10:** `POST /dispositivos` (`backend/src/alta/`); guardia `X-Clave-Admin` de tiempo constante sobre hashes (clave
     de 24 caracteres o más: una más corta detiene el arranque; ausente, 503); credencial de 24 bytes aleatorios (base64url)
     mostrada una vez con `Cache-Control: no-store` y guardada en `credencial` solo como `scrypt` (N = 2¹⁵); dispositivo,
     canales, hash y evento en una transacción, con el cliente del broker creado dentro de ella (`createClient` con su rol en un
@@ -1283,7 +1284,8 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     `pasarela (id, formato)` en cascada, y un dispositivo directo (`mqtt`, `http`) solo puede declarar `senml` o `plano`. El filtro 2
     usa el formato declarado para todos los dispositivos (con este punto se termina de aplicar el 25; hecho el 15/10 para los
     dispositivos directos, `docs/16 §27`): una trama que no calza va a cuarentena `malformada` diciendo qué formato se esperaba. El adaptador `chirpstack` lee `deviceInfo.devEui` (en minúsculas; si no
-    coincide con el tópico, cuarentena `malformada` y el nodo no se marca vivo: §4.1), `time` (marca del servidor de red, regla 17 de
+    coincide con el tópico, cuarentena `malformada` y el nodo no se marca vivo; lo mismo si el cuerpo no trae el DevEUI, no es un
+    objeto JSON o no tiene la forma del formato, porque sin identidad verificada no hay señal de vida: §4.1), `time` (marca del servidor de red, regla 17 de
     `docs/13`) y las claves de `object`; el `milesight`, el JSON con códec y Metadata (`devEUI` más los valores decodificados; sin
     códec, cuarentena «activar Payload Codec y Metadata»). Las claves decodificadas se traducen a magnitudes con un **mapa** único,
     en la unidad canónica del catálogo, consumido por una sola función (`resolverClave`) que los adaptadores reciben: **hoy el mapa
@@ -1291,11 +1293,12 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     presión), porque solo hay dos decodificadores que importen y nadie puede editar el catálogo todavía; **pasa al catálogo**
     (`magnitud.alias`, sembrado desde esa misma lista) cuando el panel administre magnitudes (Etapa 4, pantalla de configuración de
     `docs/19`): es la regla de `docs/08 §4`, y la función cambia de implementación sin tocar los adaptadores. Una clave que no está en
-    el mapa se ignora y se cuenta en la línea de registro de la trama; un `up` sin ninguna clave del mapa va a cuarentena
+    el mapa se ignora y se nombra en la línea de registro de la trama (cuántas y las cinco primeras); un `up` sin ninguna clave del mapa va a cuarentena
     `malformada` («ninguna clave conocida») y el nodo se marca vivo, como con cualquier trama malformada de un dispositivo
     autenticado (§4). En la ruta C, `rssi` y `snr` del `rxInfo` quedan en la trama cruda para HU-15
     (solo si la trama dejó alguna lectura); con códec y Metadata, la ruta B no los trae (por verificar con la pasarela real). La pasarela se da de alta, rota y da de baja por API
-    (`/pasarelas`), con credencial propia y rol `pasarela`: publica solo bajo su árbol y se suscribe solo a su subárbol de comandos.
+    (`/pasarelas`), con credencial propia y rol `pasarela`: publica solo bajo su árbol, salvo en su subárbol de comandos (una negación de prioridad
+    mayor: no puede mandarse órdenes a sí misma), y se suscribe solo a ese subárbol.
     La credencial de una pasarela vive en la misma tabla que la de un dispositivo, con un titular y solo uno (migración 16), y la
     aplicación gana `INSERT` en `pasarela` y `UPDATE` solo de su columna `activo`, para el alta y la baja; los eventos llevan `dispositivo_id` nulo y la pasarela en el
     detalle (`pasarela_alta`, `pasarela_baja`, `pasarela_rotacion`). La respuesta del alta trae la conexión lista para copiar según el
@@ -1333,6 +1336,25 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     se abre solo si el valor sigue fuera ese tiempo (RF-14). (c) Una alerta se reconoce diciendo quién, cuándo y qué fue: real, falso
     positivo o mantenimiento no avisado; necesita la sesión (M7) para el «quién» y nunca borra datos (RF-39). Los tres parámetros son
     del usuario y se editan desde el panel (regla de §4.4).
+50. **Mensajes retenidos: el backend procesa el envío en vivo y descarta la copia guardada** (15/10/2026, tras la revisión de
+    seguridad del bloque LoRaWAN; `docs/16 §33–§34`). Un mensaje publicado con `retain` llega al backend una vez en vivo con la
+    marca de retenido en cero, porque se suscribe con MQTT 3.1.1 (en MQTT 5 habría que no pedir *Retain As Published*); el broker
+    además lo guarda y lo reentrega, con la marca en uno, a cada suscripción nueva, y el backend lo procesaba otra vez al reconectar
+    (medido: 1 lectura → 2). Desde el 15/10 esa copia se confirma sin procesar y queda un aviso en el registro. Con la sesión
+    persistente, lo publicado mientras el backend está caído llega por la cola con la marca en cero y se procesa una sola vez
+    (`banco.sh lorawan`). **Límite aceptado:** lo publicado con retención cuando el backend no tiene sesión (primer arranque,
+    sesión perdida) se pierde. Ningún componente del sistema publica con retención: el backend y el emulador no la piden, la
+    integración MQTT de ChirpStack v4 tampoco (`self.client.publish(topic, self.qos, false, b)`,
+    https://github.com/chirpstack/chirpstack/blob/972bcec436dd/chirpstack/src/integration/mqtt.rs, consultado el 15/10/2026) y en
+    la pasarela Milesight es una opción por tópico que se deja apagada («Enable to set the latest message of this topic as retain
+    message», https://resource.milesight.com/milesight/iot/document/ug65-user-guide-en.pdf, p. 35). **Alternativa descartada:**
+    `retain_available false`, con la que el broker desconecta a quien publique con retención («If a client publishes a message with
+    the retain bit set, it will be disconnected if this is set to false»,
+    https://github.com/eclipse-mosquitto/mosquitto/blob/v2.1.2/mosquitto.conf). El código de esa versión muestra que la opción también
+    quita la retención a los contadores `$SYS` del propio broker (`db__messages_easy_queue`, `src/database.c`), que se publican
+    solo cuando cambian (`src/sys_tree.c`): al reconectarse, el backend no recibiría el contador de descartes hasta el próximo
+    descarte y la alarma de la cola (punto 43) quedaría sin muestra. Queda abierto el tope: una credencial válida puede dejar
+    retenidos en muchos tópicos y el broker los guarda sin límite; entra con el tope por emisor (`docs/11 §4`, fila 8).
 
 ## 9. Crecimiento, resiliencia y respaldo (aprobado el 06/10/2026)
 

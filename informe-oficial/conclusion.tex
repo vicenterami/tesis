@@ -1,21 +1,20 @@
 \chapter{Conclusiones de la etapa}
 
-\textbf{Sobre el diseño.} El sistema quedó descrito desde varias vistas con notaciones reconocidas
-—C4, entidad-relación, secuencias UML— y cada decisión está justificada y trazada a los requerimientos
-que materializa (capítulo~\ref{cap:diseno}): el pipeline de seis filtros con cuarentena, que impide que
-una trama llegue a las series sin validarse, y el modelo interno único, que hace indistinguibles una
-trama LoRaWAN y una Wi-Fi tras el filtro de análisis.
+\textbf{Sobre la implementación.} Más de la mitad del núcleo está hecha, medida en horas, y funciona de extremo a
+extremo: registro por API con credencial propia, recepción por MQTT con TLS y por las dos rutas LoRaWAN, pipeline de
+seis filtros con cuarentena, supervisión del silencio, alertas por umbral, consulta, exportación y panel en vivo
+(capítulo~\ref{cap:pruebas}).
 
-\textbf{Sobre la implementación adelantada.} El pipeline, la normalización de marcas de tiempo y los
-umbrales, previstos para la Etapa~3, junto con la autenticación de la recepción y la API de consulta,
-previstas para la Etapa~4, están implementados y verificados: implementar temprano obligó a decisiones que en el papel habrían quedado
-ambiguas —unicidad de una condición por regla, plausibilidad del reloj, entrega «al menos una vez» con
-inserción idempotente— antes de que hubiera datos reales. El núcleo mínimo demostrable ya existe.
+\textbf{Sobre las pruebas.} Los requisitos medibles de esta etapa se cumplen en el banco: 59,7 tramas por segundo sin
+pérdida frente a las 50 exigidas, un p95 de 3~ms frente a 2~s, toda caída detectada con 3 alarmas falsas y ninguna
+lectura perdida ante caídas del backend y de la base. Además, las pruebas corrigieron el diseño en cinco puntos.
 
-\textbf{Sobre la concordancia y el consumo.} Las figuras se generan desde la documentación versionada
-y, el modelo de datos, desde el esquema real de la base; una verificación automática falla si informe,
-documentación o sistema difieren, y así detectó y corrigió cinco discrepancias esta etapa. Lo construido consume unos 120~MB en reposo; RNF-17 (2~GB de RAM) se valida
-en la Etapa~4.
+\textbf{Sobre la concordancia y el consumo.} Figuras y modelo de datos se generan desde la documentación y el esquema
+real; un verificador de más de 150 comprobaciones falla si informe, documentación o sistema difieren, y cada
+comprobación nueva se prueba antes contra el error plantado. Bajo carga, lo construido consume 174~MiB; RNF-17 (2~GB)
+se valida en la Etapa~4.
 
-\textbf{Sobre la retroalimentación.} Las observaciones del profesor guía (Etapa 1 y reunión del 29/09) se
-tradujeron en cambios concretos (sección~\ref{sec:retro}); persiste la entrevista, enviada y sin respuesta.
+\textbf{Sobre la retroalimentación y lo que sigue.} Las observaciones de la Etapa~1 y del 29 de septiembre están
+incorporadas y la entrevista del 5 de octubre adelantó la exportación (sección~\ref{sec:retro}); las de la entrega de
+la Etapa~2 se incorporarán al recibirlas. Faltan el sensor físico y la prueba con la pasarela del campus; la Etapa~4
+suma la sesión y los roles y valida el sistema en el servidor de referencia.

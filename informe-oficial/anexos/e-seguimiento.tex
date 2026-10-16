@@ -1,11 +1,12 @@
-\chapter[Seguimiento del backlog]{Seguimiento del backlog en la Etapa 2}
+\chapter[Seguimiento del backlog]{Seguimiento del backlog en las Etapas 2 y 3}
 \label{anx:seguimiento}
 \small
 \setlength{\tabcolsep}{4pt}
 
 Estado de cada ítem planificado para la Etapa 2 al cierre de la etapa, más los ítems de las Etapas 3 y 4
-que se adelantaron. La evidencia remite a las figuras del capítulo~\ref{cap:diseno} y a la documentación
-del repositorio. El registro vivo se mantiene en el repositorio y este cuadro se genera desde él.
+que se adelantaron, y estado de los elementos de la Etapa 3 al 15 de octubre. La evidencia remite a las figuras
+del capítulo~\ref{cap:diseno}, al capítulo~\ref{cap:pruebas} y a la documentación del repositorio, donde vive el
+registro (\texttt{docs/12} y \texttt{docs/18}); un verificador comprueba que estado y horas de estos cuadros coincidan con él.
 
 \begin{longtable}{@{}L{1.2cm}L{4.6cm}C{0.6cm}L{5.4cm}@{}}
 \caption{Backlog de la Etapa 2 frente a lo ejecutado, con los ítems adelantados.}\label{tab:seguimiento}\\
@@ -43,6 +44,97 @@ TT-18 & Normalización de marcas temporales, tolerando nodos sin reloj confiable
 TT-20 & Autenticación de la recepción mediante credencial por sitio & 4 & \textbf{Adelantado} (plan.\ E4), hecho: credencial por dispositivo + ACL \\
 \end{longtable}
 
+
+\begin{longtable}{@{}L{1.2cm}L{4.6cm}C{0.6cm}L{5.4cm}@{}}
+\caption{Elementos de la Etapa 3 al 15 de octubre (tras el corte del 8/10 y los adelantos del 12/10).}\label{tab:seguimiento3}\\
+\filaencab \encab{Ítem} & \encab{Tarea} & \encab{h} & \encab{Estado al 15/10} \\ \midrule \endfirsthead
+\filaencab \encab{Ítem} & \encab{Tarea} & \encab{h} & \encab{Estado al 15/10} \\ \midrule \endhead
+\multicolumn{4}{r}{\footnotesize\itshape continúa en la página siguiente} \\ \endfoot
+\endlastfoot
+HU-02 & Eventos LoRaWAN en la plataforma & 6 & Parcial: adaptadores del ChirpStack del campus (ruta C) y de la pasarela Milesight (ruta B), tópico de pasarela y pasarelas por API, probados en el banco con el JSON oficial; falta la prueba en terreno y asociar RSSI y SNR (HU-15) \\
+HU-03 & Publicar eventos en MQTT & 4 & Hecho: publicado y probado por MQTT \\
+TT-17 & Pipeline de seis filtros con cuarentena & 6 & Hecho: seis filtros verificados \\
+HU-05 & Condiciones abiertas por dispositivo & 7 & Hecho: una condición abierta por regla; pruebas de carrera \\
+TT-18 & Marcas de tiempo de nodos sin reloj confiable & 2 & Hecho: marca del emisor solo si es plausible \\
+HU-10 & Inventario con estado y vía de envío & 5 & Hecho: vía y formato en la API y en el panel \\
+HU-11 & Registrar un dispositivo desde la plataforma & 5 & Hecho: alta, baja y rotación por API, todo o nada con el broker \\
+HU-14 & Detectar que un dispositivo dejó de reportar & 7 & Hecho: supervisor con intervalo por dispositivo, medido \\
+TT-39 & Canal de tiempo real (SSE) & 4 & Parcial: canal en vivo hecho; falta la sesión (Etapa 4) \\
+HU-19 & Panel de salud con semáforo & 9 & Parcial: pantalla hecha; falta verla con el sensor físico \\
+HU-20 & Inventario filtrable por sitio, zona, estado y vía & 7 & Parcial (adelantada): filtros por estado, zona, vía y búsqueda; falta el de sitio \\
+HU-08 & Exportar los datos en CSV, XLSX y JSON & 4 & Parcial (adelantada): CSV y JSON; XLSX con la sesión \\
+HU-21 & Ficha del dispositivo: condiciones, historial y serie & 7 & Parcial (adelantada): ficha con gráfico; falta el rango a medida \\
+TT-28 & Emulador de nodos & 5 & Hecho: emulador de nodos para carga y pruebas \\
+TT-32 & Sensor físico de extremo a extremo & 3 & Pendiente: placa recibida; sensores en tránsito \\
+TT-36 & Informe de pruebas y validación preliminar & 5 & Parcial: capítulo~\ref{cap:pruebas} y documentación de pruebas \\
+\end{longtable}
+
+\section*{Retroalimentación de las Etapas 1 y 2}
+
+\begin{table}[H]
+\centering\footnotesize
+\begin{tablaseg}
+\begin{tabular}{@{}L{4.1cm}L{6.0cm}L{2.5cm}@{}}
+\toprule
+\textbf{Observación} & \textbf{Cambio realizado} & \textbf{Dónde} \\
+\midrule
+Diagnóstico directo con la organización destinataria pendiente; sin percepción de las partes interesadas &
+Contacto obtenido por el profesor guía el 29/09: un académico de la UCT que incorporará dispositivos IoT. Entrevista enviada por correo ese mismo día (diez preguntas: magnitudes, cantidad, uso de los datos, tiempo real, alertas, exportación), respondida el 5/10: habilita la fuente [ENT] (sección~\ref{sec:retro}) &
+OE1; §\ref{sec:levantamiento}; R2 \\
+Se alterna entre organizaciones de La Araucanía y la UCT como destinatario &
+El problema se centra solo en la UCT, con el campus como caso de validación; ninguna otra organización ha manifestado interés y la generalización queda fuera del alcance &
+§\ref{sec:problema}; resumen \\
+Causas respaldadas solo con la oferta comercial &
+Párrafo de evidencia con literatura sobre interoperabilidad y dependencia de proveedor (C1 a C3); la carga técnica de las alternativas (C4) pasa al estado del arte y los costos al anexo~\ref{anx:evaluacion}; la evidencia directa se asigna al levantamiento &
+§\ref{sec:problema}; §\ref{sec:estado-arte} \\
+OE1 fija el levantamiento al 4 de septiembre pero se declara pendiente &
+OE1 con plazo al 30 de octubre; la evidencia recogida antes del 4 de septiembre (indicaciones del profesor guía, mercado, base teórica) queda explicitada en §\ref{sec:levantamiento} y el catálogo se valida con las entrevistas &
+§\ref{sec:objetivos} \\
+Alcance funcional comprometido demasiado amplio &
+Criterio de demostración en dos niveles (§\ref{sec:backlog}): el núcleo mínimo demostrable primero, el resto contra holgura; OE4 reescrito en ese orden &
+OE4; §\ref{sec:backlog} \\
+OE5 sin umbrales de validación &
+OE5 con umbrales explícitos —casos de prueba, carga, latencia, detección de caída, recuperación, disponibilidad, memoria— tomados de los requerimientos no funcionales &
+OE5 \\
+\bottomrule
+\end{tabular}
+\end{tablaseg}
+\caption{Observaciones del profesor guía sobre la Etapa 1 y cambios derivados en la Etapa 2.}
+\label{tab:retro}
+\end{table}
+
+\begin{table}[H]
+\centering\footnotesize
+\begin{tablaseg}
+\begin{tabular}{@{}L{4.1cm}L{6.0cm}L{2.5cm}@{}}
+\toprule
+\textbf{Observación (29/09)} & \textbf{Cambio realizado} & \textbf{Dónde} \\
+\midrule
+«Plataforma web» se lee como una página; es un sistema integrado &
+Título: \emph{Sistema integrado para el registro, gestión y monitoreo de dispositivos IoT} &
+Portada \\
+Objetivo general largo y con detalle técnico (TCP/IP) &
+Reescrito sin detalle técnico y con el para quién (investigación de la Facultad); 82 a 47 palabras &
+§\ref{sec:objetivos} \\
+Objetivos específicos extensos y dispersos &
+Los cinco conservan número y trazabilidad, 23\,\% más cortos; OE4 suma el registro de dispositivos y OE5 mantiene sus umbrales &
+§\ref{sec:objetivos} \\
+El problema debe entenderse desde el primer párrafo &
+La sección abre con el problema y un caso verificado; sin detalle de hardware ni protocolos; alcance desde el registro hasta el dashboard &
+§\ref{sec:problema} \\
+Estado del arte poco claro; no se identifican los competidores &
+Tres grupos con afirmaciones citadas de fuentes oficiales, y la ubicación de este trabajo frente a ellos &
+§\ref{sec:estado-arte} \\
+Resumen extenso y poco claro &
+Reescrito en dos párrafos: problema, propuesta, método, resultado y siguiente etapa; 344 a 263 palabras &
+Resumen \\
+\bottomrule
+\end{tabular}
+\end{tablaseg}
+\caption{Observaciones del profesor guía en la reunión del 29 de septiembre y cambios derivados.}
+\label{tab:retro2}
+\end{table}
+
 \section*{Calendario oficial}
 
 \begin{table}[H]
@@ -71,11 +163,12 @@ $\sim$240 horas.}
 \toprule
  & \textbf{Riesgo} & \textbf{Estado} & \textbf{Mitigación} \\
 \midrule
-R1 & Hardware de sensores no disponible & \textbf{En tratamiento} & Emulador de nodo por software para la carga; para el sensor real (TT-32, núcleo), plan B con fecha gatillo 8 de octubre: nodo Wi-Fi propio si no hay confirmación del hardware LoRaWAN del compañero \\
-R2 & Sin acceso a partes interesadas & \textbf{En tratamiento} & Contacto obtenido el 29/09 y entrevista enviada ese día, sin respuesta (sección~\ref{sec:retro}); contingencia documentada: registrar el intento, fuentes externas, informar por escrito \\
+R1 & Hardware de sensores no disponible & \textbf{En tratamiento} & Emulador de nodo por software para la carga; para el sensor real (TT-32, núcleo), plan B activado el 8/10: nodo Wi-Fi propio, con la placa recibida el 12/10 y los sensores en tránsito \\
+R2 & Sin acceso a partes interesadas & \textbf{En tratamiento} & Entrevista respondida el 5/10 (sección~\ref{sec:retro}); falta la segunda (OE1) \\
 R3 & Ambigüedad de fechas & \textbf{Cerrado} & Calendario oficial publicado el 24/08 \\
 R4 & Alcance excesivo & \textbf{Confirmado y controlado} & Núcleo comprometido vs.\ alcance condicional; revisión de holgura por etapa \\
 R5 & Protocolo inadecuado al patrón de uso & \textbf{Cerrado} & Se materializó y resolvió: Contact ID descartado el 02/09; el transporte es MQTT y el formato SenML (sección~\ref{sec:transporte}) \\
+R6 & Recepción LoRaWAN en terreno sin una pasarela que alcance el servidor & \textbf{En tratamiento} & Banco de pruebas con el JSON oficial; prueba en la misma red local que la pasarela del campus; servidor alcanzable desde el campus, por gestionar \\
 \bottomrule
 \end{tabular}
 \caption{Registro de riesgos.}

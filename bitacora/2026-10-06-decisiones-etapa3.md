@@ -21,7 +21,7 @@
 El código se cambia **después** de estas decisiones, cada una con su prueba (plantar la violación, ver la
 falla) y su entrada en el cuadro de mejoras del informe (antes/después).
 
-## Añadido la misma noche
+## Añadido el mismo día
 
 - **El proxy inverso entra en la vista de contenedores** (`docs/10 §2`, figura 4.1): es el único contenedor expuesto.
   Puertos fijados por escenario: 443 y 8883 siempre; 1700/udp solo si ChirpStack corre en este servidor (ruta A).
@@ -38,7 +38,7 @@ falla) y su entrada en el cuadro de mejoras del informe (antes/después).
 ## Segunda sesión del día: decisiones 10 a 15
 
 Con el registro de evidencia de proxies (cinco candidatos), el laboratorio de la edición Apache de TimescaleDB sobre
-el esquema real y la revisión del kit de método, se fijaron en `docs/10 §8.4`: **nginx** como proxy (variante A: TLS
+el esquema real y la revisión de las lecciones de método, se fijaron en `docs/10 §8.4`: **nginx** como proxy (variante A: TLS
 en el proxy); **edición Apache 2.0 de TimescaleDB**, que resuelve la desviación de RNF-15 declarada el 30/09 al costo
 de no comprimir (≈ 4,6 GB por diez años del escenario de `docs/14`); **hora de recepción** junto a la de medición en
 la migración 08; **RNF-17 se mantiene** con la memoria como criterio ponderado; y una tarea nueva de **despliegue

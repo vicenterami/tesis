@@ -254,6 +254,13 @@ case "${1:-}" in
     sub() { printf '%s\n' "$2" | docker run --rm -i --network "$red" "$IMG_BROKER" sh -c 'IFS= read -r C; mosquitto_sub -V mqttv5 -d -h mosquitto -i "lws-$$" -u "$1" -P "$C" -t "$2" -W 2 -C 1 2>&1' sh "$1" "$3" | grep -oE "Subscribed \(mid: [0-9]+\): [0-9]+" | head -1; }
     pub_anon() { docker run --rm --network "$red" "$IMG_BROKER" mosquitto_pub -V mqttv5 -d -h mosquitto -q 1 -i "lwa-$$" -t "$1" -m "$2" 2>&1 | grep -oE "PUBACK \(Mid: [0-9]+, RC:[0-9]+\)|Connection error: .*" | head -1; }
     cuarentena() { psql_ -tA -c "SELECT motivo || ' · ' || left(detalle, 90) FROM cuarentena WHERE topico = '$1' ORDER BY recibido_en DESC LIMIT 1"; }
+    visto() { psql_ -tA -c "SELECT e.visto_por_ultima_vez FROM estado_dispositivo e JOIN dispositivo d ON d.id=e.dispositivo_id WHERE d.id_fisico='$1'"; }
+    lecturas() { psql_ -tA -c "SELECT count(*) FROM medicion m JOIN canal c ON c.id=m.canal_id JOIN dispositivo d ON d.id=c.dispositivo_id WHERE d.id_fisico='$1'"; }
+    pub_r() { printf '%s\n' "$2" | docker run --rm -i --network "$red" "$IMG_BROKER" sh -c 'IFS= read -r C; mosquitto_pub -V mqttv5 -d -h mosquitto -q 1 -r -i "lwr-$$" -u "$1" -P "$C" -t "$2" -m "$3" 2>&1' sh "$1" "$3" "$4" | grep -oE "PUBACK \(Mid: [0-9]+, RC:[0-9]+\)|Connection error: .*" | head -1; }
+    # Una sesión larga (20 s) con la credencial de la pasarela, en esta misma shell para poder esperarla: ¿la corta la rotación o la baja?
+    abrir_sesion() { printf '%s\n' "$2" | docker run --rm -i --network "$red" "$IMG_BROKER" sh -c 'IFS= read -r C; mosquitto_sub -V mqttv5 -h mosquitto -i "lwl-$$" -u "$1" -P "$C" -t "$2" -W 20' sh "$1" "$3" >/dev/null 2>&1 & S_PID=$!; sleep 3; }
+    sesion_viva() { kill -0 "$S_PID" 2>/dev/null; }
+    cerrar_sesion() { kill "$S_PID" 2>/dev/null; wait "$S_PID" 2>/dev/null; }
     read -r sitio_id sitio zona < <(psql_ -tA -F ' ' -c "SELECT s.id, s.codigo, z.id FROM sitio s JOIN zona z ON z.sitio_id = s.id ORDER BY s.codigo LIMIT 1")
     # ── ChirpStack (ruta C) ──
     pid="cs-banco-$n"; r=$(api POST /pasarelas -d "{\"id_fisico\":\"$pid\",\"nombre\":\"ChirpStack del banco\",\"sitio_id\":\"$sitio_id\",\"formato\":\"chirpstack\"}")
@@ -270,9 +277,9 @@ case "${1:-}" in
     r=$(pub "$pid" "$PCRED" "$base/$deveui/join" '{}'); sleep 1; [ -z "$(cuarentena "$base/$deveui/join")" ] && ok "un evento join se anota y no deja cuarentena" || falla "el join dejó cuarentena"
     otro=$(openssl rand -hex 8); r=$(pub "$pid" "$PCRED" "$base/$otro/up" "$(up "$otro" '{"temperature":20}')"); sleep 1
     [[ "$(cuarentena "$base/$otro/up")" == no_registrado* ]] && ok "un DevEUI no asociado a la pasarela → cuarentena no_registrado" || falla "DevEUI ajeno: $(cuarentena "$base/$otro/up")"
-    visto0=$(psql_ -tA -c "SELECT e.visto_por_ultima_vez FROM estado_dispositivo e JOIN dispositivo d ON d.id=e.dispositivo_id WHERE d.id_fisico='$deveui'")
+    visto0=$(visto "$deveui")
     r=$(pub "$pid" "$PCRED" "$base/$deveui/up" "$(up "ffffffffffffffff" '{"temperature":20}')"); sleep 1
-    visto1=$(psql_ -tA -c "SELECT e.visto_por_ultima_vez FROM estado_dispositivo e JOIN dispositivo d ON d.id=e.dispositivo_id WHERE d.id_fisico='$deveui'")
+    visto1=$(visto "$deveui")
     [[ "$(cuarentena "$base/$deveui/up")" == malformada*DevEUI* ]] && [ "$visto0" = "$visto1" ] && ok "DevEUI del cuerpo distinto del tópico → malformada, y el nodo no se marca vivo" || falla "DevEUI cruzado: $(cuarentena "$base/$deveui/up") · visto $visto0 → $visto1"
     r=$(pub "$pid" "$PCRED" "$base/$deveui/up" '[{"n":"temperatura","v":1}]'); sleep 1
     [[ "$(cuarentena "$base/$deveui/up")" == *"formato declarado chirpstack: la trama no tiene esa forma"* ]] && ok "SenML bajo una pasarela chirpstack → malformada con el formato esperado" || falla "SenML bajo pasarela: $(cuarentena "$base/$deveui/up")"
@@ -293,12 +300,30 @@ case "${1:-}" in
     [ "$r" = "3 recepcion" ] && ok "Milesight con códec y Metadata → 3 lecturas con la hora de recepción (sin hora civil)" || falla "lecturas Milesight: «$r» (esperado «3 recepcion»)"
     r=$(pub "$mid" "$MCRED" "sitio/$sitio/pasarela/$mid/$mdev/up" "{\"applicationID\":\"3\",\"devEUI\":\"$mdev\",\"fCnt\":1,\"fPort\":85,\"data\":\"/wv//wEB\",\"rxInfo\":[]}"); sleep 1
     [[ "$(cuarentena "sitio/$sitio/pasarela/$mid/$mdev/up")" == *"activar Payload Codec"* ]] && ok "Milesight sin códec → malformada que dice qué activar" || falla "sin códec: $(cuarentena "sitio/$sitio/pasarela/$mid/$mdev/up")"
+    visto0=$(visto "$mdev"); r=$(pub "$mid" "$MCRED" "sitio/$sitio/pasarela/$mid/$mdev/up" '{"devEUI": roto'); sleep 1; visto1=$(visto "$mdev")
+    [[ "$(cuarentena "sitio/$sitio/pasarela/$mid/$mdev/up")" == *"JSON inválido"* ]] && [ "$visto0" = "$visto1" ] && ok "JSON roto por el tópico de la pasarela → malformada, y el nodo NO se marca vivo (sin DevEUI legible)" || falla "JSON roto: $(cuarentena "sitio/$sitio/pasarela/$mid/$mdev/up") · visto $visto0 → $visto1"
+    # ── Mensajes retenidos (docs/10 §8.4 punto 50): en vivo se procesan una vez; la copia que el broker reentrega al suscribirse, no ──
+    mdev2=$(openssl rand -hex 8); r=$(api POST /dispositivos -d "{\"id_fisico\":\"$mdev2\",\"nombre\":\"EM300 retenido\",\"zona_id\":\"$zona\",\"via\":\"lorawan\",\"pasarela_id\":\"$mpas\",\"intervalo_esperado_s\":180,\"canales\":[{\"magnitud\":\"temperatura\"}]}")
+    n0=$(lecturas "$mdev"); r=$(pub_r "$mid" "$MCRED" "sitio/$sitio/pasarela/$mid/$mdev/up" "{\"devEUI\":\"$mdev\",\"temperature\":25.5}"); sleep 2; n1=$(lecturas "$mdev")
+    [ "$n1" = $((n0 + 1)) ] && ok "un «up» retenido con el backend conectado se guarda una vez ($n0 → $n1 lecturas; llega con retain = 0)" || falla "retenido en vivo: $n0 → $n1 ($r)"
+    dc stop backend >/dev/null 2>&1
+    r=$(pub_r "$mid" "$MCRED" "sitio/$sitio/pasarela/$mid/$mdev2/up" "{\"devEUI\":\"$mdev2\",\"temperature\":26.5}")
+    dc start backend >/dev/null 2>&1; for _ in $(seq 1 20); do curl -sf -m 2 -o /dev/null http://127.0.0.1:3001/salud && break; sleep 2; done; sleep 4
+    n2=$(lecturas "$mdev"); m=$(lecturas "$mdev2")
+    [ "$n2" = "$n1" ] && ok "al reconectar el backend, la copia retenida NO se reprocesa ($n1 → $n2 lecturas)" || falla "la copia retenida se reprocesó: $n1 → $n2"
+    [ "$m" = 1 ] && ok "lo publicado con retención con el backend caído llega por la cola de su sesión y se guarda una vez ($m)" || falla "retenido con el backend caído: $m lecturas (esperado 1)"
+    k=$(dc logs --no-color --since 1m backend 2>/dev/null | grep -c "mensaje retenido reentregado"); [ "$k" -ge 2 ] && ok "el backend anota cada copia retenida que descarta ($k avisos)" || falla "avisos de retenido: $k (esperado ≥ 2)"
     # ── Rotación y baja de la pasarela ChirpStack ──
+    abrir_sesion "$pid" "$PCRED" "$base/+/command/+"; sesion_viva && ok "control: una sesión con la credencial vigente abre y sigue abierta" || falla "la sesión de control no abrió"
     r=$(api POST "/pasarelas/$pasarela/credencial"); code=${r##*$'\n'}; PCRED2=$(json "v['conexion']['credencial']" <<<"${r%$'\n'*}")
+    sleep 4; if sesion_viva; then falla "la sesión abierta con la credencial anterior SIGUE abierta tras rotar"; cerrar_sesion; else ok "la rotación corta la sesión que estaba abierta con la credencial anterior"; wait "$S_PID" 2>/dev/null; fi
     [ "$code" = 201 ] && [ "${#PCRED2}" = 32 ] && [ "$PCRED2" != "$PCRED" ] && ok "rotación → 201 con una credencial nueva (no se imprime)" || falla "rotación → $code"
     r=$(pub "$pid" "$PCRED" "$base/$deveui/up" "$(up "$deveui" '{"temperature":22}')"); [[ "$r" == *"Connection error"* ]] && ok "con la credencial ANTERIOR la pasarela ya no entra" || falla "la anterior sigue valiendo: $r"
     r=$(pub "$pid" "$PCRED2" "$base/$deveui/up" "$(up "$deveui" '{"temperature":22}')"); [[ "$r" == *"RC:0"* || "$r" == *"RC:16"* ]] && ok "con la credencial NUEVA publica ($r)" || falla "con la nueva: $r"
-    r=$(api DELETE "/pasarelas/$pasarela"); code=${r##*$'\n'}; [ "$code" = 200 ] && [ "$(json "v['nodos_sin_pasarela']" <<<"${r%$'\n'*}")" = 1 ] && ok "baja → 200, con 1 nodo que queda sin pasarela" || falla "baja → $code: ${r:0:160}"
+    abrir_sesion "$pid" "$PCRED2" "$base/+/command/+"
+    r=$(api DELETE "/pasarelas/$pasarela"); code=${r##*$'\n'}
+    sleep 4; if sesion_viva; then falla "la sesión abierta SIGUE abierta tras la baja"; cerrar_sesion; else ok "la baja corta la sesión que estaba abierta"; wait "$S_PID" 2>/dev/null; fi
+    [ "$code" = 200 ] && [ "$(json "v['nodos_sin_pasarela']" <<<"${r%$'\n'*}")" = 1 ] && ok "baja → 200, con 1 nodo que queda sin pasarela" || falla "baja → $code: ${r:0:160}"
     r=$(pub "$pid" "$PCRED2" "$base/$deveui/up" "$(up "$deveui" '{"temperature":22}')"); [[ "$r" == *"Connection error"* ]] && ok "dada de baja, el broker ya no acepta su credencial" || falla "la dada de baja sigue entrando: $r"
     curl -s http://127.0.0.1:3001/pasarelas | python3 -c "import sys,json; sys.exit(0 if any(p['id_fisico']=='$pid' and not p['activo'] for p in json.load(sys.stdin)) else 1)" && ok "GET /pasarelas la lista inactiva (historial conservado)" || falla "no aparece inactiva"
     r=$(api POST /dispositivos -d "{\"id_fisico\":\"$(openssl rand -hex 8)\",\"nombre\":\"Nodo tardío\",\"zona_id\":\"$zona\",\"via\":\"lorawan\",\"pasarela_id\":\"$pasarela\",\"intervalo_esperado_s\":180,\"canales\":[{\"magnitud\":\"temperatura\"}]}")

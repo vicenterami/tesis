@@ -3,7 +3,7 @@ import { join } from 'node:path';
 import { ContextoTrama } from '../lectura';
 import { TramaMalformada } from './adaptador';
 import { ChirpstackAdaptador } from './chirpstack.adaptador';
-import { IdentidadCruzada } from './lorawan';
+import { IdentidadNoVerificada } from './lorawan';
 import { CLAVES, resolverClave } from './mapa-claves';
 import { MilesightAdaptador } from './milesight.adaptador';
 
@@ -83,8 +83,8 @@ describe('ChirpstackAdaptador (evento up de ChirpStack v4)', () => {
     delete sinObjeto.object;
     expect(() => a.analizar(ctx(JSON.stringify(sinObjeto)))).toThrow('sin object: el perfil del dispositivo en ChirpStack no tiene decodificador');
   });
-  it('DevEUI del cuerpo distinto del tópico → IdentidadCruzada (una malformada que no marca vivo); mayúsculas no cuentan', () => {
-    expect(() => a.analizar(ctx(eventoUp(), 'ffffffffffffffff'))).toThrow(IdentidadCruzada);
+  it('DevEUI del cuerpo distinto del tópico → IdentidadNoVerificada (una malformada que no marca vivo); mayúsculas no cuentan', () => {
+    expect(() => a.analizar(ctx(eventoUp(), 'ffffffffffffffff'))).toThrow(IdentidadNoVerificada);
     expect(a.analizar(ctx(eventoUp(), DEVEUI.toUpperCase()))).toHaveLength(2);
   });
   it('una clave conocida con un valor que no es número → malformada; una hora sin zona → sin marca (rige la recepción)', () => {
@@ -105,9 +105,15 @@ describe('ChirpstackAdaptador (evento up de ChirpStack v4)', () => {
     a.analizar(c);
     expect(c.ignoradas?.[0]).toBe('x?'.repeat(16));
   });
-  it('JSON inválido o que no es objeto → TramaMalformada', () => {
-    expect(() => a.analizar(ctx('{"deviceInfo":'))).toThrow(TramaMalformada);
-    expect(() => a.analizar(ctx('[1]'))).toThrow(TramaMalformada);
+  it('también los controles C1, los de dirección del texto y los separadores de línea; el recorte no parte un carácter', () => {
+    const c = ctx(eventoUp({ object: { temperature: 20, '\u202Eevil\u0085x\u2028y\u2066': 1, ['a'.repeat(31) + '😀z']: 1 } }));
+    a.analizar(c);
+    expect(c.ignoradas).toEqual(['?evil?x?y?', 'a'.repeat(31) + '😀']);
+  });
+  it('JSON inválido o que no es objeto → IdentidadNoVerificada: sin cuerpo legible no hay DevEUI que verificar', () => {
+    expect(() => a.analizar(ctx('{"deviceInfo":'))).toThrow(IdentidadNoVerificada);
+    expect(() => a.analizar(ctx('[1]'))).toThrow(IdentidadNoVerificada);
+    expect(IdentidadNoVerificada.prototype).toBeInstanceOf(TramaMalformada); // sigue siendo una malformada: va a cuarentena
   });
 });
 
@@ -134,7 +140,8 @@ describe('MilesightAdaptador (servidor de red embebido, con códec y Metadata)',
   it('con códec pero sin Metadata (no hay devEUI) → malformada que dice qué activar', () => {
     expect(() => a.analizar(ctx('{"battery":92,"temperature":30.8}'))).toThrow('sin devEUI: activar Metadata');
   });
-  it('DevEUI cruzado → IdentidadCruzada', () => {
-    expect(() => a.analizar(ctx(conCodec(), 'ffffffffffffffff'))).toThrow(IdentidadCruzada);
+  it('DevEUI cruzado o JSON roto → IdentidadNoVerificada', () => {
+    expect(() => a.analizar(ctx(conCodec(), 'ffffffffffffffff'))).toThrow(IdentidadNoVerificada);
+    expect(() => a.analizar(ctx('{"devEUI":'))).toThrow(IdentidadNoVerificada);
   });
 });

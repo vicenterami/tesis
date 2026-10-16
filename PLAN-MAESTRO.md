@@ -99,13 +99,8 @@ superar cómodamente ese umbral, no para maximizar ambición.
 
 ### Presupuesto de tiempo real
 
-Jornada laboral completa de lunes a viernes. El tiempo de tesis es:
-
-| Franja | Horas | Uso previsto |
-|---|---|---|
-| Tardes hábiles (L-V) | ~2,5 h × 5 = **12,5 h** | Validación, decisiones, redacción corta, commits |
-| Sábado y domingo | ~4 h × 2 = **8 h** | Bloques de trabajo profundo: construcción, pruebas |
-| **Total semanal realista** | **14-16 h** | |
+Jornada laboral completa. El tiempo de tesis es de **14-16 h por semana**, en bloques cortos (validación, decisiones,
+redacción, commits) y bloques largos de trabajo profundo (construcción, pruebas).
 
 De aquí al 4 de diciembre (calendario oficial): ~14,5 semanas ≈ **215 horas**. Es un presupuesto suficiente **si no se
 desperdicia en rehacer trabajo perdido entre dispositivos** — de ahí la sección 4.

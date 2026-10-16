@@ -9,12 +9,12 @@
 
 | Criterio de la rúbrica | Peso | Estado | Evidencia y lo que falta |
 |---|---|---|---|
-| Retroalimentación | 20 % | 🟡 | Al 8/10 no hay observaciones escritas del profesor guía sobre la entrega del 2/10. Sí se incorporó la entrevista del 5/10 (`bitacora/2026-10-05-entrevista-academico-geologia.md`) en las decisiones del 6 y del 8/10 (`docs/10 §8.4`). Falta: recibir e incorporar la retroalimentación de la Etapa 2. |
+| Retroalimentación | 20 % | 🟡 | Al 15/10 no hay observaciones escritas del profesor guía sobre la entrega del 2/10; se le pedirán en una reunión presencial la semana del 20/10. Sí se incorporó la entrevista del 5/10 (`bitacora/2026-10-05-entrevista-academico-geologia.md`) en las decisiones del 6 y del 8/10 (`docs/10 §8.4`). Falta: recibir e incorporar la retroalimentación de la Etapa 2. |
 | Mejoras | 15 % | 🟢 | Decisiones de diseño del 6, 7 y 8/10 (`docs/10 §8.4`); proxy TLS (`docs/16 §9`); dependencias e imágenes sin vulnerabilidades altas o críticas corregibles (`docs/16 §12`). |
-| 50 % de la implementación | 10 % | 🟡 | Núcleo: 19 de 34 elementos hechos (90 de 168 h, 54 %) y 8 parciales (47 h; el 12/10 entraron HU-19, HU-20 y HU-21 con el panel, HU-08 con la exportación, y HU-10 y HU-11 con el alta por API). Todo el backlog: 30 de 65 (124 de 285 h, 44 %) y 16 parciales (78 h). Cifras calculadas desde las filas de `docs/04`, con los estados de `docs/12 §3`, de §2 y de la Etapa 1 (al final de §2). |
-| Pruebas iniciales | 30 % | 🟢 | `docs/16`: emulador, carga (59,7 tramas/s sin pérdida), carreras, TLS, capacidad y picos, caídas con carga, dependencias e imágenes; 238 pruebas unitarias. Falta: la matriz formal del contrato de trama (TT-27) y el broker de producción en las caídas (`docs/16 §11`). |
+| 50 % de la implementación | 10 % | 🟡 | Núcleo: 19 de 34 elementos hechos (90 de 168 h, 54 %) y 9 parciales (53 h: HU-01, HU-02, HU-08, HU-19, HU-20, HU-21, TT-12, TT-22 y TT-33). Todo el backlog: 30 de 65 (124 de 285 h, 44 %) y 17 parciales (84 h). Cifras calculadas desde las filas de `docs/04`, con los estados de `docs/12 §3`, de §2 y de la Etapa 1 (al final de §2). |
+| Pruebas iniciales | 30 % | 🟢 | `docs/16`: emulador, carga (59,7 tramas/s sin pérdida), carreras, TLS, capacidad y picos, caídas con carga, dependencias e imágenes, LoRaWAN por pasarela en el banco (`docs/16 §31–§34`); 240 pruebas unitarias. Falta: la matriz formal del contrato de trama (TT-27) y el broker de producción en las caídas (`docs/16 §11`). |
 | Validación preliminar | 10 % | ⬜ | Sensor físico de extremo a extremo (TT-32): la placa ESP32 ya llegó (12/10); los sensores y el cableado están en tránsito; guía de manejo seguro escrita (`docs/17 §3–4`). |
-| Documentación | 15 % | 🟡 | Documentos en concordancia (guardián `plataforma/pruebas/verificar-todo.sh`). Falta el capítulo de pruebas y validación del informe (TT-36). |
+| Documentación | 15 % | 🟡 | Documentos en concordancia (guardián `plataforma/pruebas/verificar-todo.sh`). El 15/10 el informe ganó el capítulo «Implementación y pruebas iniciales» y el anexo con el detalle de las pruebas (TT-36); falta incorporar la retroalimentación de la Etapa 2 y la revisión de entrega. |
 
 ## 2. Tareas de la Etapa 3: 16 elementos, 86 h (tras el corte del 08/10 y los adelantos del 12/10, §3)
 
@@ -37,7 +37,7 @@
 | HU-21 🎯 | Ficha del dispositivo: condiciones, historial y serie | 7 | 🟡 | Adelantada de la Etapa 4 el 12/10 (§3). Tramo 3 hecho el 12/10: pantalla P3 (`docs/19`) con identidad, tarjetas por canal, gráfico uPlot del histórico agregado que sigue en vivo, condiciones y tramas rechazadas del dispositivo (`docs/16 §17`). Falta: el rango a medida por fechas (HU-07, Etapa 4) y una prueba con navegador real. |
 | TT-28 🎯 | Emulador de nodos | 5 | ✅ | `docs/16 §2`. |
 | TT-32 🎯 | Sensor físico de extremo a extremo | 3 | ⬜ | Equipo comprado (`docs/17`). |
-| TT-36 | Informe de pruebas y validación preliminar | 5 | 🟡 | `docs/16` (preliminar); falta el capítulo del informe. |
+| TT-36 | Informe de pruebas y validación preliminar | 5 | 🟡 | `docs/16` y, desde el 15/10, el capítulo 5 del informe con el anexo de pruebas; falta la versión de entrega (retroalimentación de la Etapa 2; sensor físico y prueba en terreno si llegan a tiempo). |
 
 
 **Pasadas a la Etapa 4 el 08/10** (§3): HU-06 Umbrales por dispositivo (4 h, 🟡); HU-12 Agrupar por sitio y zona (3 h,
@@ -69,10 +69,11 @@ vuelve a la Etapa 4 con su registro aquí y en `docs/04`.
 
 ## 4. Lo que frena hoy
 
-- La retroalimentación de la Etapa 2 todavía no llega; las consultas al profesor guía están en preparación.
+- La retroalimentación de la Etapa 2 todavía no llega; las consultas al profesor guía están listas para la reunión presencial de la semana del 20/10.
 - El sensor físico (TT-32) depende de que llegue el equipo.
 - La recepción LoRaWAN en terreno (HU-02) necesita una pasarela que alcance el servidor (`docs/10 §8.4` punto 24); mientras
-  tanto se prueba con el emulador del JSON documentado por el fabricante.
+  tanto se prueba en el banco con el JSON exacto de las fuentes oficiales (`banco.sh lorawan`, `docs/16 §31`); la prueba en la
+  misma red que la pasarela del campus está prevista para la semana del 20/10.
 
 ## 5. Cómo se mantiene
 

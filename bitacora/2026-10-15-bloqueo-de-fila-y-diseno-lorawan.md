@@ -37,8 +37,28 @@
 - El guardián que compara las rutas citadas en la prosa con las que sirve la API acepta ahora una ruta marcada «(ruta prevista)» y
   exige quitar la marca en cuanto la ruta existe: la excepción se vacía sola. Probado plantando una marca vencida y una ruta inexistente.
 
+## Dos revisiones del bloque terminado (`docs/16 §33–§34`)
+- Sin identidad verificada no hay señal de vida: por el tópico de una pasarela, un cuerpo con otro DevEUI, sin DevEUI o ilegible va a
+  cuarentena y no marca vivo al nodo.
+- Un mensaje retenido se procesa una vez; la copia que el broker reentrega al reconectar se descarta. Se evaluó prohibir la retención en
+  el broker y se descartó: el código de Mosquitto muestra que también dejaría sin retener sus propios contadores, de los que depende la
+  alarma de la cola. Lección: antes de cambiar una opción global, buscar en el código fuente todo lo que la lee.
+- Lo que se medía a mano (corte de sesión al rotar y al dar de baja, retenidos) pasó al banco, y cada comprobación nueva se probó
+  plantando la falla.
+
+## Informe de la Etapa 3: capítulo de pruebas (TT-36)
+- Capítulo nuevo «Implementación y pruebas iniciales»: estado por módulo, método en cuatro niveles, resultados por requisito,
+  lo que las pruebas cambiaron del diseño, validación preliminar y limitaciones; y un anexo con cada prueba y cómo repetirla.
+- Para hacerle espacio sin pasar de 30 páginas: el tiempo, el alojamiento y la trazabilidad pasaron al anexo de evaluación, y
+  los cuadros de retroalimentación de las Etapas 1 y 2, al de seguimiento, que suma el cuadro de la Etapa 3. Medido después de
+  cada cambio: 27 páginas tras las mudanzas, 32 con el primer borrador del capítulo (dos cuadros fijos dejaban medias páginas
+  vacías) y 30 al compactarlo.
+- Al día: seguimiento, retroalimentación con la entrevista del 5/10, riesgos, conclusiones y resumen. El guardián compara con
+  sus fuentes las cifras que el informe repite: avance, cuadro de la Etapa 3 y conteo del banco.
+
 ## Pendientes
-- [ ] Migración 15, despacho por formato, adaptadores `chirpstack` y `milesight`, pasarelas por API, emulador y `banco.sh lorawan`.
-- [ ] Laboratorio de la prueba en la misma red local (por el 8883 del proxy, con TLS), ensayado antes de la prueba.
-- [ ] Capítulo de pruebas del informe.
+- [x] Migración 15, despacho por formato, adaptadores `chirpstack` y `milesight`, pasarelas por API y `banco.sh lorawan` (`docs/16 §28–§34`);
+  el emulador sigue sin publicar LoRaWAN: el banco usa el JSON de las fuentes oficiales.
+- [ ] Laboratorio de la prueba en la misma red local (por el 8883 del proxy, con TLS): escrito; falta ensayarlo antes de la prueba.
+- [x] Capítulo de pruebas del informe (falta la versión de entrega: retroalimentación de la Etapa 2 y entrevista en el catálogo).
 - [ ] Mapa de claves al catálogo de magnitudes (Etapa 4, obligatorio).

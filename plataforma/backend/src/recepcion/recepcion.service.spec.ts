@@ -350,18 +350,20 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
       expect(cuarentenas(query)).toEqual(['no_registrado']);
       expect(detalle(query)).toContain('registrado en el sitio «otra»');
     });
-    it('cuerpo sin DevEUI o que ni siquiera tiene la forma del formato → malformada y el nodo NO se marca vivo', async () => {
-      for (const cuerpo of [JSON.stringify({ deviceInfo: {}, object: { temperature: 20 } }), '[1]']) {
+    it('cuerpo sin DevEUI, JSON roto o sin la forma del formato → malformada y el nodo NO se marca vivo (revisiones del 15/10)', async () => {
+      for (const cuerpo of [JSON.stringify({ deviceInfo: {}, object: { temperature: 20 } }), '[1]', '{"deviceInfo": roto']) {
         const { servicio, query, marcarVivo } = armar(NODO, false, PAS);
         await servicio.procesar(T_UP, Buffer.from(cuerpo));
         expect(cuarentenas(query)).toEqual(['malformada']);
         expect(marcarVivo).not.toHaveBeenCalled();
       }
     });
-    it('un formato directo por el tópico de pasarela → malformada «no se recibe por este tópico»', async () => {
-      const { servicio, query } = armar({ ...NODO, formato: 'senml' }, false, PAS);
+    it('un formato directo por el tópico de pasarela → malformada «no se recibe por este tópico», y el nodo NO se marca vivo', async () => {
+      // Hoy la clave foránea compuesta de la migración 15 lo impide; si se relajara, el filtro 2 no debe abrir una señal de vida.
+      const { servicio, query, marcarVivo } = armar({ ...NODO, formato: 'senml' }, false, PAS);
       await servicio.procesar(T_UP, Buffer.from('[{"n":"temperatura","v":1}]'));
       expect(detalle(query)).toBe('formato declarado senml: no se recibe por este tópico');
+      expect(marcarVivo).not.toHaveBeenCalled();
     });
   });
 });
