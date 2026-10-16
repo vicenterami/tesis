@@ -7,7 +7,7 @@
 - **Estado del backlog de la etapa:** 19 de 22 ítems completos; parciales TT-12 (catálogo con sensores reales,
   pendiente de confirmar el hardware), TT-15 (claves LoRaWAN, dependen de ChirpStack) y HU-01 (entrada HTTP, Etapa 3).
 - **Retroalimentación incorporada:** Etapa 1 (21/09) y reunión del 29/09, ambas con cuadro de cambios en §5.4.
-- **Pendiente externo:** el académico contactado el 29/09 no respondió; se informó al profesor guía (docs/03 §5).
+- **Pendiente externo:** el Académico/Investigador en Ingeniería Civil Geológica contactado el 29/09 no respondió; se informó al profesor guía (docs/03 §5).
   El fabricante de los equipos de la Facultad sigue sin confirmar; el informe lo cita como ejemplo verificado.
 - **Lo diferido a la Etapa 3** (revisión exhaustiva del 01/10): ajustes de código y documentación que exigían
   rediseño; se abordan al inicio de la etapa, empezando por la ACL del broker y el tratamiento del estado

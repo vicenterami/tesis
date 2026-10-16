@@ -67,8 +67,8 @@ recursos-uct/    (local, no versionada) materiales originales del curso
 
 El código (`plataforma/`) se publicará bajo AGPL-3.0-only (archivo `plataforma/LICENSE`; decisión del 08/10/2026, `docs/10 §8.4`
 punto 33); la titularidad se confirma con la universidad antes de liberarlo. Los documentos, el informe y las bitácoras no
-tienen todavía una licencia de reutilización (todos los derechos reservados al autor); el logo y la plantilla institucional
-pertenecen a la universidad.
+tienen todavía una licencia de reutilización (todos los derechos reservados al autor); la plantilla institucional
+pertenece a la universidad, y su logo no se versiona (la portada lo usa si está en disco).
 
 ## Regla de trabajo fundamental
 

@@ -119,9 +119,9 @@ describe('ChirpstackAdaptador (evento up de ChirpStack v4)', () => {
     }
   });
   it('los espacios invisibles y los rellenos también se marcan; el espacio común se respeta', () => {
-    const c = ctx(eventoUp({ object: { temperature: 20, 'a\u00A0b\u3164c\u2800d': 1, 'battery voltage': 3.6 } }));
+    const c = ctx(eventoUp({ object: { temperature: 20, 'a\u00A0b\u3164c\u2800d\u180Be\u{E0100}f': 1, 'battery voltage': 3.6 } }));
     a.analizar(c);
-    expect(c.ignoradas).toEqual(['a?b?c?d', 'battery voltage']);
+    expect(c.ignoradas).toEqual(['a?b?c?d?e?f', 'battery voltage']);
   });
   it('también los controles C1, los de dirección del texto y los separadores de línea; el recorte no parte un carácter', () => {
     const c = ctx(eventoUp({ object: { temperature: 20, '\u202Eevil\u0085x\u2028y\u2066': 1, ['a'.repeat(31) + '😀z']: 1 } }));

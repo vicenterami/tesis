@@ -46,9 +46,7 @@ sensor físico (TT-32) se adelantó al núcleo de esa misma etapa, para que el o
 \section{Seguimiento del backlog en la Etapa 3}
 \label{sec:seguimiento}
 
-La pauta evalúa en esta etapa el avance de la implementación. De los 16 elementos de la Etapa~3 (86~h), 8 están hechos
-(41~h), 7 parciales (42~h) y 1 pendiente (3~h); en todo el proyecto, 19 de 34 elementos del núcleo hechos (90 de 168~h,
-54\,\%) y 9 parciales (53~h): más de la mitad del núcleo, medido en horas. El cuadro~\ref{tab:seguimiento3}
+La pauta evalúa en esta etapa el avance de la implementación. De los 16 elementos de la Etapa~3 (86~h), 8 están hechos (41~h), 8 parciales (45~h) y ninguno pendiente; en todo el proyecto, 19 de 34 elementos del núcleo hechos (90 de 168~h, 54\,\%) y 10 parciales (56~h): más de la mitad del núcleo, medido en horas. El cuadro~\ref{tab:seguimiento3}
 (anexo~\ref{anx:seguimiento}) detalla cada elemento, junto al cierre de la Etapa~2 (cuadro~\ref{tab:seguimiento}).
 
 \section{Retroalimentación y cambios derivados}
@@ -56,7 +54,7 @@ La pauta evalúa en esta etapa el avance de la implementación. De los 16 elemen
 
 Las observaciones del profesor guía sobre la Etapa~1 (21 de septiembre) y las de la reunión del 29 de septiembre, seis
 cada una, se tradujeron en cambios concretos, registrados uno a uno en los cuadros~\ref{tab:retro} y~\ref{tab:retro2}
-(anexo~\ref{anx:seguimiento}). La entrevista con un académico de la Facultad, enviada el 29 de septiembre, se respondió
+(anexo~\ref{anx:seguimiento}). La entrevista con un Académico/Investigador en Ingeniería Civil Geológica, enviada el 29 de septiembre, se respondió
 el 5 de octubre y habilita la fuente [ENT]: valida los adaptadores por formato, el historial, la detección de silencio
 y los roles; pide exportar «la data cruda (en .CSV o .XLSX)», algo «absolutamente crítico y no negociable», lo que
 adelantó la exportación (HU-08) a esta etapa; y relativiza el tiempo real: para saber que un equipo «tiene batería y
@@ -69,8 +67,7 @@ El registro de riesgos (cuadro~\ref{tab:riesgos}, anexo~\ref{anx:seguimiento}) t
 cerrados (ambigüedad de fechas; protocolo inadecuado, materializado y resuelto con el pivote a MQTT y SenML; el
 análisis de Contact ID está en el anexo~\ref{anx:contactid}), uno confirmado y controlado (alcance excesivo, tratado
 con el criterio de demostración en dos niveles) y tres en tratamiento: el acceso a partes interesadas (una entrevista
-respondida; falta la segunda, sección~\ref{sec:retro}), el hardware de sensores (la placa llegó el 12 de octubre y los
-sensores están en tránsito; mitigado con el emulador de nodo) y la recepción LoRaWAN en terreno, que necesita una
+respondida; falta la segunda, sección~\ref{sec:retro}), el hardware de sensores (las piezas llegaron el 13 de octubre y la placa ya se reconoce; falta cablearlas; mitigado con el emulador de nodo) y la recepción LoRaWAN en terreno, que necesita una
 pasarela que alcance el servidor (mitigada con el banco de pruebas y una prueba en la misma red local). La
 \textbf{desviación de RNF-15} declarada en la Etapa~2 (la compresión de TimescaleDB está bajo la \emph{Timescale
 License}, no de código abierto \parencite{timescalelicencia}) se resolvió el 06/10 adoptando la edición Apache~2.0,

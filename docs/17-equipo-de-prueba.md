@@ -1,9 +1,10 @@
 # Equipo de prueba: nodo propio para TT-32 (Wi-Fi y, si hay pasarela, LoRaWAN)
 
 > **Sustenta:** TT-32 (sensor físico de extremo a extremo, `docs/04`), escenarios 1 y 3 de `docs/10 §2`, validación
-> preliminar de la Etapa 3. Versión: 8 de octubre de 2026. Los precios son una cotización con fecha, no un compromiso.
+> preliminar de la Etapa 3. Versión: 8 de octubre de 2026; estado del equipo al 14 de octubre. Los precios son una cotización con fecha, no un compromiso.
 >
-> **Estado (12/10/2026):** placa ESP32 recibida; piezas 2 a 7 en tránsito (§3). Guía de manejo seguro en §4.
+> **Estado (14/10/2026):** todo el equipo recibido: la placa, anotada el 12/10, y las piezas 2 a 7, el 13/10 (§3). Fase 0 completa el
+> 14/10: la placa se reconoce y se identificó (§3, primera conexión). Falta la fase 1: cablear los sensores. Guía de manejo seguro en §4.
 
 ## 1. Para qué sirve y por qué estas piezas
 
@@ -11,7 +12,7 @@ El sistema no fabrica sensores: recibe de los que ya existen. El nodo propio es 
 con hardware real que la recepción, la validación, las alertas y la supervisión funcionan de punta a punta. Las piezas se
 eligieron para que coincidan con el caso de uso levantado:
 
-- **Variables:** la entrevista al académico declara como necesarias, para corregir las mediciones de gases, la presión
+- **Variables:** la entrevista al Académico/Investigador en Ingeniería Civil Geológica declara como necesarias, para corregir las mediciones de gases, la presión
   atmosférica, la temperatura del aire y del suelo y la humedad del suelo (`docs/03`). El nodo mide exactamente esas.
 - **Vías:** Wi-Fi (escenario 1) desde el primer día; LoRaWAN por la pasarela (escenario 3) solo si hay una pasarela al
   alcance, porque la radio sola no entrega datos a nadie.
@@ -68,8 +69,7 @@ ESP32 y se calibra (seco y en agua).
 
 **Recepción (anotado el 12/10/2026).** La placa ESP32 (pieza 1, comprada aparte el 07/10) ya llegó: el vendedor la describía con módulo ESP-WROOM-32 (el 14/10 la serigrafía mostró un módulo genérico: fila 1), 38 pines,
 convertidor USB-serie Silicon Labs CP2102 y conector tipo C (corregido el 14/10 leyendo la placa: antes decía CH9102F y micro-USB; en Linux lo atiende el controlador `cp210x` del núcleo sin instalar nada; al conectarla, `dmesg` dice si aparece como
-`/dev/ttyUSB0` o `/dev/ttyACM0`, y el usuario debe pertenecer al grupo `dialout`). El pedido de las piezas 2 a 7 (una tienda, un
-despacho; CLP 26 530 con cinco resistencias de 4,7 kΩ) está en tránsito. Al llegar el BME280, lo primero es leer su registro de
+`/dev/ttyUSB0` o `/dev/ttyACM0`, y el usuario debe pertenecer al grupo `dialout`). El pedido de las piezas 2 a 7 (una tienda, un despacho; CLP 26 530 con cinco resistencias de 4,7 kΩ) llegó completo el 13/10/2026; el cable era micro-USB y no sirve para esta placa (fila 2 de la cotización). Al llegar el BME280, lo primero es leer su registro de
 identificación (párrafo anterior).
 
 **Piezas 8 y 9** (solo si hay pasarela / opcional), sin cambios respecto de la revisión de la mañana: radio SX1276 de 915 MHz

@@ -1,4 +1,5 @@
-// Exportación de mediciones crudas (RF-34, HU-08; docs/19 P8): lo que el académico entrevistado llamó «crítico y no negociable».
+// Exportación de mediciones crudas (RF-34, HU-08; docs/19 P8): lo que el Académico/Investigador en Ingeniería Civil
+// Geológica entrevistado llamó «crítico y no negociable».
 // Funciones puras, con prueba; el controlador solo las encadena sobre un flujo (nunca arma todo el archivo en memoria).
 
 export const FORMATOS = ['csv', 'json'] as const;

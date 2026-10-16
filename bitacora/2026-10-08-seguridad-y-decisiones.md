@@ -32,11 +32,11 @@
 - Picos y ataques: nunca una pérdida silenciosa (límites en el proxy, topes de cola y alarma en el broker, tope por
   dispositivo); observabilidad, rendimiento medido antes de optimizar y respaldos (RPO de 24 h, RTO de una hora).
 - Roles por sitio con un guardia central de permisos, según lo que hacen los tres referentes abiertos en su código.
-- Exportación en CSV, XLSX y JSON, lo que el académico entrevistado calificó de no negociable.
+- Exportación en CSV, XLSX y JSON, lo que el Académico/Investigador en Ingeniería Civil Geológica entrevistado calificó de no negociable.
 - Imágenes fijadas por su huella (digest), con las actualizaciones propuestas para revisión y una semana de espera.
 - De paso se corrigió un diagrama que seguía mostrando WebSocket donde se había decidido SSE.
 
 ## Pendiente
 - Migración con la vía declarada, la pasarela y el estado del dispositivo; prueba del plugin de credenciales; alta por API.
-- Exportación de datos y correo por silencio, lo que el académico entrevistado pidió con más fuerza.
+- Exportación de datos y correo por silencio, lo que el Académico/Investigador en Ingeniería Civil Geológica entrevistado pidió con más fuerza.
 - Laboratorio del nodo de prueba propio (ESP32) y la validación en terreno.

@@ -96,10 +96,10 @@ export class RecepcionService implements OnModuleInit {
     // Sin credencial la trama ni siquiera llega aquí: la corta el broker (allow_anonymous false + ACL).
     // Llega con credencial válida y sin alta, o con alta dada de baja: la clave vive en el plugin del broker (docs/10 §8.4
     // punto 42) y el alta en la base. Un dado de baja SÍ queda identificado: es la señal de que su clave sigue viva.
-    if (!dispositivo) return this.cuarentena(trama, 'no_registrado', `id_fisico=${ctx.idFisico} sin alta en la plataforma`);
+    if (!dispositivo) return this.cuarentena(trama, 'no_registrado', `id_fisico=${limpia(ctx.idFisico, 64)} sin alta en la plataforma`);
     if (dispositivo.estado === 'baja') {
       return this.cuarentena({ ...trama, dispositivoId: dispositivo.id },
-        'dado_de_baja', `id_fisico=${ctx.idFisico}: revocar su credencial en el broker`);
+        'dado_de_baja', `id_fisico=${limpia(ctx.idFisico, 64)}: revocar su credencial en el broker`);
     }
     // El sitio del tópico debe ser el registrado (08/10, docs/10 §8.4 punto 24): la ACL acepta cualquiera en ese nivel (`+`),
     // así que lo comprueba el pipeline. Sin esto, un dispositivo podría publicar bajo el sitio de otra sede. No se marca
@@ -302,6 +302,7 @@ export class RecepcionService implements OnModuleInit {
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       ['mqtt', t.topico, motivo, t.carga, detalle, t.dispositivoId ?? null, t.recibidoEn],
     );
-    this.log.warn(`cuarentena (${motivo}) ${t.topico} · ${detalle}`);
+    // El tópico crudo queda en su columna como evidencia; al registro va limpio (revisión del 15/10).
+    this.log.warn(`cuarentena (${motivo}) ${limpia(t.topico, 256)} · ${detalle}`);
   }
 }

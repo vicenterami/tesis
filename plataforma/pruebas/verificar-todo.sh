@@ -700,12 +700,13 @@ f18 = dict((k, (int(h), e)) for k, h, e in re.findall(r'^\| ((?:HU|TT)-\d+)[^|]*
 if len(f18) < 10: malos.append(f'docs/18 §2: leí solo {len(f18)} filas de la tabla (¿cambió su forma?)')
 e3 = {s: (sum(1 for h, e in f18.values() if e == s), sum(h for h, e in f18.values() if e == s)) for s in '✅🟡⬜'}
 tex = re.sub(r'\s+', ' ', open('informe-oficial/cap4.tex', encoding='utf-8').read())
-m = re.search(r'De los (\d+) elementos de la Etapa~3 \((\d+)~h\), (\d+) están hechos \((\d+)~h\), (\d+) parciales \((\d+)~h\) y (\d+) pendientes? \((\d+)~h\); en todo el proyecto, (\d+) de (\d+) elementos del núcleo hechos \((\d+) de (\d+)~h, (\d+)\\,\\%\) y (\d+) parciales \((\d+)~h\)', tex)
+m = re.search(r'De los (\d+) elementos de la Etapa~3 \((\d+)~h\), (\d+) están hechos \((\d+)~h\), (\d+) parciales \((\d+)~h\) y (?:(\d+) pendientes? \((\d+)~h\)|ninguno pendiente); en todo el proyecto, (\d+) de (\d+) elementos del núcleo hechos \((\d+) de (\d+)~h, (\d+)\\,\\%\) y (\d+) parciales \((\d+)~h\)', tex)
 if not m: malos.append('informe (cap4.tex): no encontré la frase del seguimiento de la Etapa 3 (¿cambió la redacción?)')
 else:
     n = cuenta(True)
     real = (len(f18), sum(h for h, _ in f18.values()), *e3['✅'], *e3['🟡'], *e3['⬜'], n[0], n[1], n[2], n[3], n[4], n[5], n[6])
-    if tuple(int(x) for x in m.groups()) != real: malos.append(f'informe (cap4.tex): dice {tuple(int(x) for x in m.groups())}; las filas dan {real}')
+    dicho = tuple(int(x) if x is not None else 0 for x in m.groups())  # «ninguno pendiente» = 0 elementos y 0 h
+    if dicho != real: malos.append(f'informe (cap4.tex): dice {dicho}; las filas dan {real}')
 es = open('informe-oficial/anexos/e-seguimiento.tex', encoding='utf-8').read()
 if '\\label{tab:seguimiento3}' not in es: malos.append('informe: no encontré el cuadro tab:seguimiento3 en el anexo de seguimiento')
 else:
@@ -749,12 +750,19 @@ malos, n_pasos, n_panel = [], 0, 0
 for f in fuentes:
     if f.name.startswith('12-'): continue
     t = re.sub(r'\s+', ' ', f.read_text(encoding='utf-8'))
-    for m in re.finditer(r'(\d+) pasos que comparan|verificador de (\d+) pasos', t):
-        n_pasos += 1; dice = int(m.group(1) or m.group(2))
+    for m in re.finditer(r'(\d+) pasos que comparan|verificador de (\d+) pasos|por sus pasos \((\d+)\)', t):
+        n_pasos += 1; dice = int(m.group(1) or m.group(2) or m.group(3))
         if dice != pasos: malos.append(f'{f}: dice {dice} pasos del verificador; hay {pasos}')
     for m in re.finditer(r'(\d+) del panel', t):
         n_panel += 1
         if int(m.group(1)) != panel: malos.append(f'{f}: dice {m.group(1)} pruebas del panel; hay {panel}')
+import subprocess
+rastreados = [pathlib.Path(p) for p in subprocess.run(['git', 'ls-files', '*.ts', '*.sh', '*.sql', '*.yml'], capture_output=True, text=True).stdout.split()]
+for f in [*pathlib.Path('docs').glob('*.md'), *pathlib.Path('bitacora').glob('*.md'), *pathlib.Path('informe-oficial').glob('*.tex'), *pathlib.Path('informe-oficial/anexos').glob('*.tex'), *rastreados]:
+    if f.name == 'verificar-todo.sh' or not f.is_file(): continue
+    for n, linea in enumerate(f.read_text(encoding='utf-8').splitlines(), 1):
+        # 15/10: el entrevistado se nombra como se autodefinió («Académico/Investigador en Ingeniería Civil Geológica»), decisión del estudiante.
+        if re.search(r'\b(el|al|un|del) académico\b', linea): malos.append(f'{f}:{n}: nombrar al entrevistado como se autodefinió')
 if n_pasos == 0 or n_panel == 0: malos.append(f'no encontré citas de los pasos ({n_pasos}) o de las pruebas del panel ({n_panel}): ¿cambió la redacción?')
 for f in [*pathlib.Path('docs').glob('*.md'), pathlib.Path('README.md'), pathlib.Path('RESUMEN.md'), pathlib.Path('PLAN-MAESTRO.md')]:
     for n, linea in enumerate(f.read_text(encoding='utf-8').splitlines(), 1):

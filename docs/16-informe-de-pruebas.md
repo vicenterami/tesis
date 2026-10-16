@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 243 pruebas unitarias del backend y 44 del panel, sin matriz formal) y TT-32 (sensor físico);
+cubre todavía: TT-27 (contrato de trama: hoy 244 pruebas unitarias del backend y 44 del panel, sin matriz formal) y TT-32 (sensor físico);
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -459,7 +459,7 @@ y el plugin: 11 de 11 (`banco.sh proxy`); emulador y alta por API: §20.
 
 ## 19. Exportación de mediciones crudas en CSV y JSON (12/10/2026)
 
-RF-34 y HU-08, adelantada a la Etapa 3 (`docs/18 §3`): lo que el académico entrevistado llamó «crítico y no negociable».
+RF-34 y HU-08, adelantada a la Etapa 3 (`docs/18 §3`): lo que el Académico/Investigador en Ingeniería Civil Geológica entrevistado llamó «crítico y no negociable».
 `GET /dispositivos/{id}/exportar?formato=csv\|json&desde&hasta` escribe fila a fila al responder, por tandas de 10 000 con
 paginación por clave `(tiempo, canal_id)` (el plan de esa consulta se mide en el banco antes de afirmar qué índice usa: pendiente):
 un rango de años no cabe en memoria y tampoco hace falta.
@@ -839,7 +839,7 @@ se hace apagando y encendiendo el banco; reconstruir solo su backend recreó la 
 Corregido además en los documentos: el avance del núcleo en `docs/18` (9 parciales y 53 h, no 8 y 47 h: faltaba HU-02), el permiso
 del rol `pasarela` en `docs/11`, la fila de mensajes retenidos de `docs/10 §4.1`, la cabecera de la migración 14 y menciones de la hora
 del día. El guardián suma tres pasos: el horario personal en todo archivo versionado, el avance calculado desde las filas y el conteo de
-este banco frente a lo que cita este documento. Total: 240 pruebas.
+este banco frente a lo que cita este documento. Total entonces: 240 pruebas.
 
 ## 35. Tercera revisión: el capítulo de pruebas del informe y lo que trajo (15/10/2026)
 
@@ -848,9 +848,9 @@ Cada hallazgo se verificó en el código o en la fuente; los de código se plant
 
 | Pregunta | Medido o verificado | Consecuencia |
 |---|---|---|
-| ¿Un DevEUI con un salto de línea en el cuerpo llega al registro? | Sí: el motivo lo copiaba tal cual. El broker rechaza los caracteres de control en el tópico (validación UTF-8 de Mosquitto 2.1.2), no en el cuerpo | **Corregido:** el DevEUI del cuerpo se compara solo si es ASCII `[0-9a-z-]` (así tampoco calza una letra Unicode que en minúsculas se vuelve ASCII, como el signo Kelvin), y todo texto de afuera pasa por una sola limpieza (`recepcion/texto.ts`): controles, separadores salvo el espacio y rellenos invisibles |
+| ¿Un DevEUI con un salto de línea en el cuerpo llega al registro? | Sí: el motivo lo copiaba tal cual. El broker rechaza los caracteres de control en el tópico (validación UTF-8 de Mosquitto 2.1.2), no en el cuerpo | **Corregido:** el DevEUI del cuerpo se compara solo si es ASCII (letras, dígitos y guion) (así tampoco calza una letra Unicode que en minúsculas se vuelve ASCII, como el signo Kelvin), y todo texto de afuera pasa por una sola limpieza (`recepcion/texto.ts`): controles, separadores salvo el espacio y rellenos invisibles |
 | ¿Los segmentos del tópico van limpios al detalle de la cuarentena? | No: solo se recortaban | **Corregido** con la misma limpieza |
-| ¿La prueba de que la baja corta la sesión comprobaba que la sesión había abierto? | No tenía control, y el de la rotación solo miraba que el proceso siguiera vivo | **Corregido:** la evidencia es el registro del broker, no la salida del cliente, que la retiene en su búfer hasta terminar: la sesión cuenta como abierta si el broker registró su conexión, y como cortada si el broker la desconectó «por acción administrativa» antes de su plazo y la sesión se había suscrito |
+| ¿La prueba de que la baja corta la sesión comprobaba que la sesión había abierto? | No tenía control; y el control de la rotación solo comprobaba que el proceso cliente siguiera vivo, no que el broker lo hubiera aceptado | **Corregido:** la evidencia es el registro del broker: la salida de `mosquitto_sub` queda en un búfer hasta que el programa termina, así que no sirve para saber si ya se suscribió; la sesión cuenta como abierta si el broker registró su conexión, y como cortada si el broker la desconectó «por acción administrativa» antes de su plazo y la sesión se había suscrito |
 | ¿Las comprobaciones de retenidos y de «no marca vivo» podían dar verde sin que el backend hubiera procesado nada? | Sí: esperaban un tiempo fijo, y dos «visto» vacíos se daban por iguales | **Corregido:** se espera a ver lo que debía ocurrir (la lectura de la cola, los avisos, la cuarentena con su motivo) y el «visto» no puede estar vacío |
 | ¿La conexión MQTT 3.1.1, de la que depende el descarte de retenidos, era explícita? | No: venía del valor por defecto de la librería | **Corregido:** explícita, y la prueba la fija |
 
@@ -858,4 +858,10 @@ En el informe: el plan B de R1 se activó el 7/10 (no el 8/10); el bloqueo de fi
 segundo medido era el tope de la prueba, §26); las conclusiones separan lo que se cumple de lo parcial; el verificador se cita
 por sus pasos (38) y las pruebas del panel (44) junto a las del backend; los documentos nombran los anexos en vez de citar una
 letra que cambia al insertar uno. El guardián vigila esas cifras (paso 2w4) y sus pasos 2f2, 2w2 y 2w3 ya no pueden pasar sin
-revisar nada. **Banco:** 36 de 36, «LORAWAN OK». Total: 243 pruebas unitarias del backend y 44 del panel.
+revisar nada. **Banco:** 36 de 36, «LORAWAN OK».
+
+**Revisión general de lo anterior (15/10):** el id del tópico directo y las líneas del registro que citan el tópico también pasan por
+la limpieza (el tópico crudo queda en su columna de la cuarentena como evidencia); se suman a los rellenos los selectores de variación
+que faltaban; el informe dice ahora que el JSON del banco es el de la documentación oficial de ChirpStack v4 y de Milesight, no el
+que publica el ChirpStack del campus, todavía no probado; y el guardián busca el nombre del entrevistado también en el código.
+Total: 244 pruebas unitarias del backend y 44 del panel.

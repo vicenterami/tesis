@@ -33,7 +33,7 @@ M8 Panel & Semáforo, inventario filtrable, ficha con gráfico & Filtro por siti
 
 \section{Método de prueba}
 
-Se prueba en cuatro niveles, todos repetibles con un comando. Las 243 pruebas unitarias del backend y las 44 del panel corren sin base ni broker,
+Se prueba en cuatro niveles, todos repetibles con un comando. Las 244 pruebas unitarias del backend y las 44 del panel corren sin base ni broker,
 junto con tipos estrictos y análisis estático: cada una fija una regla de diseño en forma ejecutable. \textbf{Banco
 desechable}: una segunda pila con base, broker con su plugin de seguridad, backend y proxy reales, datos en memoria y un
 emulador de nodos (TT-28) que imita relojes rotos, pérdidas y deriva; sobre él corren casos fijos de carga, carreras,
@@ -77,8 +77,6 @@ tiene topes de cola y una alarma sobre su contador. Dar de baja un dispositivo p
 
 \section{Validación preliminar y limitaciones}
 
-El sistema funciona de extremo a extremo con nodos emulados y con el JSON exacto que publican el ChirpStack del campus (ruta C) y la
-pasarela Milesight (ruta B) según sus fuentes oficiales: registro por API, publicación con la credencial entregada, medición guardada y
-panel en vivo. Falta el sensor físico (TT-32: la placa llegó el 12 de
-octubre y los sensores están en tránsito) y la prueba con la pasarela del campus en la misma red local, prevista para la
+El sistema funciona de extremo a extremo con nodos emulados y con el JSON que describe la documentación oficial de ChirpStack v4 (ruta C) y de la pasarela Milesight (ruta B): registro por API, publicación con la credencial entregada, medición guardada y
+panel en vivo. Falta el sensor físico (TT-32: las piezas llegaron el 13 de octubre y la placa ya se reconoce; falta cablear los sensores) y la prueba con la pasarela del campus en la misma red local, prevista para la
 semana del 20 de octubre. Las corridas son de minutos y en un portátil; RNF-17 y las 72~horas de RNF-18 se validan en la Etapa~4, en el servidor de referencia. Falta un tope de tramas por emisor.

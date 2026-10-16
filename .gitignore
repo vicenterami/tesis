@@ -47,6 +47,9 @@ Thumbs.db
 # ── Local, nunca versionar ────────────────────────
 privado/
 recursos-uct/
+# Logo del departamento: viene de la plantilla del curso (recursos-uct/), no es nuestro para redistribuir (15/10/2026).
+# La portada lo usa si está en disco y compila sin él.
+informe-oficial/images/Logo_depto_ing_informatica.png
 referencias/*.pdf
 informe-oficial/build/
 

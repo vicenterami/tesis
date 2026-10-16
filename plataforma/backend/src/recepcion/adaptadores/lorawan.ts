@@ -36,7 +36,7 @@ export function exigirDevEui(cuerpo: unknown, ctx: ContextoTrama, campo: string)
   // Sin DevEUI en el tópico no hay con qué comparar: se rechaza (cerrado por omisión), aunque hoy el despacho no lo permita.
   if (ctx.deveui === undefined) throw new TramaMalformada('sin DevEUI en el tópico: solo se recibe por el tópico de su pasarela');
   const delCuerpo = cuerpo.trim();
-  if (!FORMA_DEVEUI.test(delCuerpo)) throw new IdentidadNoVerificada(`${campo} con caracteres fuera de [0-9a-z-]: ${limpia(delCuerpo)}`);
+  if (!FORMA_DEVEUI.test(delCuerpo)) throw new IdentidadNoVerificada(`${campo} con caracteres que no son letras ASCII, dígitos ni guion: ${limpia(delCuerpo)}`);
   if (delCuerpo.toLowerCase() !== ctx.deveui.toLowerCase()) {
     throw new IdentidadNoVerificada(`DevEUI del cuerpo ${delCuerpo.toLowerCase().slice(0, 32)} ≠ tópico ${limpia(ctx.deveui.toLowerCase())}`);
   }

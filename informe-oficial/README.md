@@ -1,7 +1,7 @@
 # Informe oficial (el entregable)
 
 Basado en la plantilla oficial del curso (clase `memoir`, bibliografía APA) con la estructura de la
-Figura 3.1 de la guía de Cardiff, adaptada a la Etapa 2. Cuerpo 30 páginas (límite blando); el
+Figura 3.1 de la guía de Cardiff, adaptada a la Etapa 3. Cuerpo 30 páginas (límite blando); el
 detalle completo va en los anexos y en `docs/` del repositorio.
 
 ```bash
@@ -15,17 +15,22 @@ latexmk -pdf -outdir=build main.tex     # SIEMPRE desde esta carpeta, nunca desd
 | `cap1.tex` | Introducción: problema, objetivos (uno general, cinco específicos), trazabilidad |
 | `cap2.tex` | Antecedentes: pila de protocolos, LoRa/LoRaWAN, MQTT, persistencia y seguridad del transporte |
 | `cap3.tex` | Especificación: catálogo de requerimientos, contrato SenML, evaluación de alternativas |
-| `cap-diseno.tex` | Diseño de la plataforma: vistas C4, modelo de datos, red y seguridad, comportamiento, tiempo, despliegue |
-| `cap4.tex` | Backlog, verificación de viabilidad, riesgos |
+| `cap-diseno.tex` | Diseño de la plataforma: vistas C4, modelo de datos, red y seguridad, comportamiento, despliegue |
+| `cap-pruebas.tex` | Implementación y pruebas iniciales: estado por módulo, método, resultados por requisito, validación preliminar |
+| `cap4.tex` | Metodología: backlog, viabilidad, seguimiento, retroalimentación y riesgos |
 | `conclusion.tex` | Conclusiones de la etapa |
 | `glosario.tex` | Glosario de términos y API |
 | `anexos/a-requerimientos.tex` | Catálogo completo: 70 requerimientos (52 RF + 18 RNF) |
 | `anexos/b-backlog.tex` | Backlog completo: 65 elementos (25 historias y 40 tareas) en 14 épicas |
-| `anexos/c-evaluacion.tex` | Evaluación detallada de transporte, formato, infraestructura y costos |
+| `anexos/c-evaluacion.tex` | Evaluación detallada de transporte, formato, infraestructura, tiempo y alojamiento |
 | `anexos/d-contactid.tex` | Camino evaluado y descartado: el protocolo Contact ID |
-| `anexos/e-seguimiento.tex` | Seguimiento y calendario de la Etapa 2 |
+| `anexos/e-seguimiento.tex` | Seguimiento de las Etapas 2 y 3, retroalimentación, calendario y riesgos |
+| `anexos/g-pruebas.tex` | Detalle de cada prueba y cómo repetirla |
 | `anexos/f-figuras.tex` | Figuras complementarias del capítulo de diseño |
 | `referencias.bib` | Bibliografía en biblatex/APA |
+
+El logo del departamento (`images/Logo_depto_ing_informatica.png`) no se versiona porque es de la plantilla del curso: quien
+tenga la plantilla lo copia ahí; sin él, la portada compila sin logo.
 
 La versión extendida de cada sección vive en `docs/`; la primera versión del informe (Etapa 1) está
 en `historico/informe-v1/`.

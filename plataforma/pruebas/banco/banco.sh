@@ -260,14 +260,14 @@ case "${1:-}" in
     # Una sesión larga (20 s) con la credencial de la pasarela, en esta misma shell para poder esperarla: ¿la corta la rotación o la baja?
     # Evidencia positiva (revisión del 15/10), del registro del broker y no de la salida del cliente (mosquitto_sub la retiene en su búfer
     # hasta terminar): la sesión cuenta como abierta si el broker registró su conexión con su identificador único, y como cortada si el
-    # broker la desconectó «por acción administrativa» antes de su plazo de 20 s y su salida muestra que se había suscrito. --init hace
+    # broker la desconectó «por acción administrativa» antes de su plazo de 30 s y su salida muestra que se había suscrito. --init hace
     # que matarla termine el contenedor.
     bitacora_broker() { dc logs --no-color --since 2m mosquitto 2>/dev/null; }
     abrir_sesion() { S_ID="lwl-$RANDOM$RANDOM"; : > "$PRIV/sesion.log"
-      printf '%s\n' "$2" | docker run --rm -i --init --network "$red" "$IMG_BROKER" sh -c 'IFS= read -r C; mosquitto_sub -V mqttv5 -d -h mosquitto -i "$3" -u "$1" -P "$C" -t "$2" -W 20' sh "$1" "$3" "$S_ID" > "$PRIV/sesion.log" 2>&1 & S_PID=$!; S_T0=$SECONDS
+      printf '%s\n' "$2" | docker run --rm -i --init --network "$red" "$IMG_BROKER" sh -c 'IFS= read -r C; mosquitto_sub -V mqttv5 -d -h mosquitto -i "$3" -u "$1" -P "$C" -t "$2" -W 30' sh "$1" "$3" "$S_ID" > "$PRIV/sesion.log" 2>&1 & S_PID=$!; S_T0=$SECONDS
       for _ in $(seq 1 20); do bitacora_broker | grep -q "as $S_ID (" && break; sleep 0.5; done; sleep 1; }
     sesion_suscrita() { kill -0 "$S_PID" 2>/dev/null && bitacora_broker | grep -q "as $S_ID ("; }
-    sesion_cortada() { ! kill -0 "$S_PID" 2>/dev/null && [ $((SECONDS - S_T0)) -lt 18 ] && bitacora_broker | grep -q "Client $S_ID \[.*\] disconnected: administrative action" && grep -qE 'Subscribed \(mid: [0-9]+\): [0-2]$' "$PRIV/sesion.log"; }
+    sesion_cortada() { ! kill -0 "$S_PID" 2>/dev/null && [ $((SECONDS - S_T0)) -lt 28 ] && bitacora_broker | grep -q "Client $S_ID \[.*\] disconnected: administrative action" && grep -qE 'Subscribed \(mid: [0-9]+\): [0-2]$' "$PRIV/sesion.log"; }
     cerrar_sesion() { kill "$S_PID" 2>/dev/null; wait "$S_PID" 2>/dev/null; }
     # Espera a que la cuarentena del tópico muestre el motivo esperado (en vez de un sleep fijo) y deja medio segundo al filtro 6.
     esperar_cuarentena() { local c=""; for _ in $(seq 1 20); do c=$(cuarentena "$1"); [[ "$c" == $2 ]] && break; sleep 0.25; done; sleep 0.5; printf '%s' "$c"; }
@@ -339,6 +339,8 @@ case "${1:-}" in
     sesion_suscrita && { control=1; ok "control: antes de la baja, una sesión con la credencial nueva se conecta"; } || falla "la sesión de control antes de la baja no se conectó"
     r=$(api DELETE "/pasarelas/$pasarela"); code=${r##*$'\n'}
     sleep 4; if [ "$control" = 1 ]; then if sesion_cortada; then ok "la baja corta la sesión suscrita (el broker la desconecta por acción administrativa)"; wait "$S_PID" 2>/dev/null; else falla "la sesión no se cortó tras la baja: $(tail -2 "$PRIV/sesion.log" | tr '\n' ' ')"; cerrar_sesion; fi; else cerrar_sesion; fi
+    # La salida de la sesión no debe traer ninguna credencial (se cuenta sin imprimirla).
+    k=$(grep -cF -f <(printf '%s\n' "${PCRED:-sin}" "${PCRED2:-sin}") "$PRIV/sesion.log"); [ "$k" = 0 ] || falla "una credencial aparece en la salida de la sesión larga"
     rm -f "$PRIV/sesion.log"
     [ "$code" = 200 ] && [ "$(json "v['nodos_sin_pasarela']" <<<"${r%$'\n'*}")" = 1 ] && ok "baja → 200, con 1 nodo que queda sin pasarela" || falla "baja → $code: ${r:0:160}"
     r=$(pub "$pid" "$PCRED2" "$base/$deveui/up" "$(up "$deveui" '{"temperature":22}')"); [[ "$r" == *"Connection error"* ]] && ok "dada de baja, el broker ya no acepta su credencial" || falla "la dada de baja sigue entrando: $r"

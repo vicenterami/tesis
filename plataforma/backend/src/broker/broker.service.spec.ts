@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import mqtt from 'mqtt';
 import type { IPublishPacket } from 'mqtt';
@@ -38,10 +39,13 @@ describe('BrokerService: un mensaje a la vez y PUBACK después de guardar (decis
     const vistos: string[] = [];
     servicio.alRecibir(async (_t, c) => { vistos.push(c.toString()); await Promise.resolve(); });
     const cb = jest.fn();
-    handle({ ...publish('sitio/x/pasarela/p/d/up', 'R'), retain: true }, cb);
+    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    handle({ ...publish('sitio/x/pasarela/p/d\u202E/up', 'R'), retain: true }, cb);
     await new Promise((r) => setTimeout(r, 0));
     expect(cb).toHaveBeenCalledWith();
     expect(vistos).toEqual([]);
+    expect(String(warn.mock.calls[0]?.[0])).not.toMatch(/\u202E/); // el tópico va limpio al registro (revisión del 15/10)
+    warn.mockRestore();
   });
 
   it('el descarte vale porque la conexión es MQTT 3.1.1 y la suscripción no pide «Retain As Published» (docs/10 §8.4 punto 50)', () => {

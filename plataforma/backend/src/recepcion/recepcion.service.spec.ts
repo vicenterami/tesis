@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { Pool } from 'pg';
 import { AlertasService } from '../alertas/alertas.service';
 import { BrokerService } from '../broker/broker.service';
@@ -356,6 +357,19 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
         await servicio.procesar(T_UP, Buffer.from(cuerpo));
         expect(cuarentenas(query)).toEqual(['malformada']);
         expect(marcarVivo).not.toHaveBeenCalled();
+      }
+    });
+    it('también el id del tópico directo y la línea del registro de la cuarentena se limpian (revisión del 15/10)', async () => {
+      const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+      try {
+        const { servicio, query } = armar(undefined);
+        await servicio.procesar('sitio/uct/dispositivo/de\u202Ev-0001/temperatura', Buffer.from('21.5'));
+        expect(detalle(query)).toBe('id_fisico=de?v-0001 sin alta en la plataforma');
+        const linea = warn.mock.calls.map((c) => String(c[0])).find((l) => l.startsWith('cuarentena'));
+        expect(linea).toBeDefined();
+        expect(linea).not.toMatch(/\u202E/);
+      } finally {
+        warn.mockRestore();
       }
     });
     it('los segmentos del tópico se limpian antes de ir al detalle o al registro (revisión del 15/10)', async () => {

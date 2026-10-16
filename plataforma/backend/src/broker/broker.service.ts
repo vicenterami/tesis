@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import mqtt, { IPublishPacket, MqttClient, Packet } from 'mqtt';
+import { limpia } from '../recepcion/texto';
 
 export type ManejadorTrama = (topico: string, carga: Buffer) => void | Promise<void>;
 
@@ -77,7 +78,7 @@ export class BrokerService implements OnModuleInit, OnModuleDestroy {
     // guardaba la misma lectura otra vez con la hora de recepción y marcaba vivo a un nodo callado (medido en el banco el 15/10:
     // 1 lectura → 2 tras reiniciar el backend). Se confirma y se descarta; `banco.sh lorawan` lo comprueba en cada corrida.
     if (packet.retain) {
-      this.log.warn(`${topico}: mensaje retenido reentregado al suscribirse; ya se procesó cuando llegó, se descarta`);
+      this.log.warn(`${limpia(topico, 256)}: mensaje retenido reentregado al suscribirse; ya se procesó cuando llegó, se descarta`);
       return cb();
     }
     const carga = Buffer.isBuffer(packet.payload) ? packet.payload : Buffer.from(packet.payload);
@@ -88,12 +89,12 @@ export class BrokerService implements OnModuleInit, OnModuleDestroy {
       } catch (e) {
         const err = e instanceof Error ? e : new Error(String(e));
         if (intento >= REINTENTOS_MS.length) {
-          this.log.error(`${topico}: falló ${intento + 1} veces (${err.message}); no se confirma al broker y se reconecta para que lo reenvíe`);
+          this.log.error(`${limpia(topico, 256)}: falló ${intento + 1} veces (${err.message}); no se confirma al broker y se reconecta para que lo reenvíe`);
           cb(err);
           this.cliente?.reconnect();
           return;
         }
-        this.log.warn(`${topico}: manejador falló (${err.message}); reintento ${intento + 1}/${REINTENTOS_MS.length} en ${REINTENTOS_MS[intento]} ms`);
+        this.log.warn(`${limpia(topico, 256)}: manejador falló (${err.message}); reintento ${intento + 1}/${REINTENTOS_MS.length} en ${REINTENTOS_MS[intento]} ms`);
         await this.dormir(REINTENTOS_MS[intento]);
       }
     }

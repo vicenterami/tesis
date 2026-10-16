@@ -4,7 +4,7 @@
 \setlength{\tabcolsep}{4pt}
 
 Cada fila resume una sección de la documentación de pruebas del repositorio (\texttt{docs/16}; la columna «§» da su
-número), con su resultado y el comando que la repite. Los guiones viven en \texttt{plataforma/pruebas/}; las 243 pruebas unitarias del backend y las 44 del panel corren con \texttt{pnpm verificar} y el verificador de concordancia con \texttt{verificar-todo.sh}.
+número), con su resultado y el comando que la repite. Los guiones viven en \texttt{plataforma/pruebas/}; las 244 pruebas unitarias del backend y las 44 del panel corren con \texttt{pnpm verificar} y el verificador de concordancia con \texttt{verificar-todo.sh}.
 
 \begin{longtable}{@{}L{0.8cm}L{3.2cm}L{4.2cm}L{3.8cm}@{}}
 \caption{Pruebas de la Etapa 3: qué se probó, qué resultó y cómo se repite.}\label{tab:pruebas-detalle}\\
@@ -28,5 +28,5 @@ número), con su resultado y el comando que la repite. Los guiones viven en \tex
 24 & Mínimo privilegio de la aplicación en la base (13/10) & No puede borrar, vaciar ni cambiar el esquema, y el sistema funciona igual & {\footnotesize \texttt{base-rol-app.sh}} \\
 25 & Costo del canal en vivo (14/10) & 50 flujos abiertos: entre 5 y 8~MiB más de memoria & a mano \\
 26 & Bloqueo de fila en la baja y la rotación (15/10) & La recepción podía esperar hasta 5~s (medido con un tope de 1~s: 1\,019~ms); con el bloqueo más débil, 18 a 22~ms & {\footnotesize \texttt{medir-bloqueo-fila.sh}} \\
-27--34 & LoRaWAN: formato declarado, adaptadores, pasarelas por API, rutas B y C (15/10) & JSON oficial del ChirpStack del campus (ruta C) y de la pasarela Milesight (ruta B): 36 de 36 comprobaciones; las fallas plantadas se detectan & {\footnotesize \texttt{banco.sh lorawan}, \texttt{lorawan.spec.ts}} \\
+27--34 & LoRaWAN: formato declarado, adaptadores, pasarelas por API, rutas B y C (15/10) & JSON de la documentación oficial de ChirpStack v4 (ruta C) y de la pasarela Milesight (ruta B): 36 de 36 comprobaciones; las fallas plantadas se detectan & {\footnotesize \texttt{banco.sh lorawan}, \texttt{lorawan.spec.ts}} \\
 \end{longtable}
