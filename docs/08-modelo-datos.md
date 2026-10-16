@@ -23,7 +23,7 @@ uniformidad es la que resuelve la causa C1 (formatos dispares).
 | 1 | **sitio** | Organización o instalación que agrupa dispositivos | Declara su **zona horaria** (IANA) y su **código**, el segmento del tópico (`sitio/<codigo>/…`, migración 11); el caso de validación es el Campus Dr. Luis Rivas del Canto (código `uct`) |
 | 2 | **zona** | Subdivisión lógica de un sitio (edificio, sector, sala) | Un sitio tiene muchas zonas |
 | 3 | **magnitud** | Catálogo de lo que se puede medir (temperatura, humedad, nivel…) | Define la unidad canónica y el rango válido |
-| 4 | **dispositivo** | Un nodo físico que reporta (ESP32, sensor LoRa…) | Pertenece a una zona; se identifica por un id físico (MAC/DevEUI, lista blanca `[a-z0-9-]`); declara su **vía** (mqtt, http, lorawan), su **formato** (`senml` o `plano` si llega directo; en la vía lorawan, el de su pasarela: `milesight` o `chirpstack`) y, si llega por LoRaWAN, su **pasarela** (migraciones 11 y 15) |
+| 4 | **dispositivo** | Un nodo físico que reporta (ESP32, sensor LoRa…) | Pertenece a una zona; se identifica por un id físico (MAC/DevEUI, lista blanca `[a-z0-9-]`); declara su **vía** (mqtt, http, lorawan), su **formato** (`senml` o `plano` si llega directo; en la vía lorawan, el de su pasarela: `milesight` o `chirpstack`) y, si llega por LoRaWAN, su **pasarela** (migraciones 11 y 15) y, si su pasarela entrega la trama sin decodificar, su **perfil de decodificación** (`decodificador`, migración 17) |
 | 5 | **canal** | Una magnitud concreta que un dispositivo reporta | Un dispositivo puede tener varios canales (temp + humedad) |
 | 6 | **credencial** | Secreto de autenticación de un dispositivo o de una pasarela (exactamente uno de los dos es su titular, migración 16) | Permite rotación sin borrar al titular |
 | 7 | **medicion** | Una lectura: valor + unidad + tiempo | **Hypertable** de TimescaleDB (serie de tiempo) |
@@ -35,7 +35,7 @@ uniformidad es la que resuelve la causa C1 (formatos dispares).
 | 13 | **usuario_sitio** | Qué usuario puede ver qué sitio y con qué rol | Multi-tenencia: aísla los datos entre sitios |
 | 14 | **trama** | Trama cruda de un mensaje aceptado (al menos una lectura guardada) | **Hypertable**, solo inserción, retención 30 días: auditoría y re-decodificación si un adaptador tuvo un error (migración 09) |
 | 15 | **pasarela** | Quien publica en nombre de los nodos LoRaWAN: una pasarela con servidor de red embebido (ruta B) o un servidor de red externo (ruta C, `docs/10 §8.4` punto 45) | Una sirve a muchos nodos; su id físico es su usuario del broker, único también frente a los dispositivos (migración 11); **declara el formato** de lo que publica (`milesight` o `chirpstack`, migración 15) y sus nodos lo heredan: lo garantiza la base con una clave foránea compuesta `(pasarela_id, formato)` en cascada (`docs/10 §8.4` punto 47) |
-| 16 | **estado_dispositivo** | Lo que el sistema escribe sobre cada dispositivo: la última trama aceptada | Una fila por dispositivo y sin `actualizado_en`: la fila de `dispositivo` queda para lo que edita una persona (migración 11). Se borra en cascada con su dispositivo: es un derivado, sin historia propia |
+| 16 | **estado_dispositivo** | Lo que el sistema escribe sobre cada dispositivo: la última trama aceptada | Una fila por dispositivo y sin `actualizado_en`: la fila de `dispositivo` queda para lo que edita una persona (migración 11). Se borra en cascada con su dispositivo: es un derivado, sin historia propia. Desde la migración 17 guarda también el contador de la última trama LoRaWAN guardada (`ultimo_fcnt`), con el que el filtro 3 descarta la repetida (`docs/10 §4.1`) |
 | 17 | **metrica_broker** | Una muestra por minuto de los contadores `$SYS` del broker: descartes acumulados, mensajes y bytes en cola, clientes conectados, memoria | **Hypertable**, retención 90 días; la toma la conexión administradora del backend (migración 13, `docs/10 §8.4` punto 43) |
 | 18 | **condicion_sistema** | Un estado anómalo de la plataforma, sin dispositivo (`broker_descarte`: el broker descarta o la cola pasa el 80 % del tope) | Misma forma que `condicion` (abierta/cerrada, una abierta por tipo); se abre y se cierra sola desde el muestreo del broker (migración 13) |
 
@@ -121,10 +121,12 @@ erDiagram
         text via
         text formato FK
         uuid pasarela_id FK
+        text decodificador
     }
     estado_dispositivo {
         uuid dispositivo_id PK,FK
         timestamptz visto_por_ultima_vez
+        bigint ultimo_fcnt
     }
     evento {
         uuid id PK
@@ -315,6 +317,11 @@ consistente para reportes.
 - [x] **Tabla `trama`** (implementada en la migración 09, 07/10/2026; trama cruda aceptada; `docs/10 §8.4`): `dispositivo_id`, `recibido_en`, `topico`,
       `payload bytea`, `adaptador text`. Solo inserción, sin `actualizado_en`; hypertable por `recibido_en` con
       retención configurable (30 días). La trama es «foto por valor» (§7): nunca se reinterpreta.
+- [x] **Perfil de decodificación y contador de trama** (migración 17, 16/10/2026; `docs/10 §8.4` punto 47 y §4.1): `dispositivo.decodificador`
+      (texto, nulo; `CHECK` contra la lista de perfiles del código, `campus-heltec-v3-v1`, y otro que lo admite solo en la vía `lorawan`),
+      `estado_dispositivo.ultimo_fcnt` (`bigint`, nulo, de 0 a 2³²−1: el contador de 32 bits del servidor de red) y la magnitud
+      `tension` (`V`, de 0 a 5), la tensión de batería que reportan los nodos de la red del campus. Los perfiles pasan al catálogo
+      editable en la Etapa 4, como el mapa de claves.
 - [ ] **Magnitudes nuevas** del caso de uso (entrevista del 05/10): `radon` (`Bq/m3`, unidad propia: el catálogo
       es el «application context» de RFC 8428 §4.5.2), `hidrogeno` (`ppm`), `temperatura_suelo` (`Cel`),
       `humedad_suelo` (unidad por confirmar con el instrumento). Cada una con su rango físico.

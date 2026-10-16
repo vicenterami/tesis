@@ -32,6 +32,13 @@ describe('validarAlta (HU-11): el cuerpo limpio o los motivos', () => {
     expect(validarAlta({ ...bueno, via: 'lorawan', pasarela_id: Z }).formato).toBeNull();
     expect(motivos({ ...bueno, via: 'lorawan', pasarela_id: Z, formato: 'milesight' })).toEqual(expect.arrayContaining([expect.stringContaining('hereda el de su pasarela')]));
   });
+  it('decodificador (migración 17): solo en la vía lorawan y de la lista de perfiles; ausente o nulo → null', () => {
+    expect(validarAlta({ ...bueno, via: 'lorawan', pasarela_id: Z, decodificador: 'campus-heltec-v3-v1' }).decodificador).toBe('campus-heltec-v3-v1');
+    expect(validarAlta({ ...bueno, via: 'lorawan', pasarela_id: Z }).decodificador).toBeNull();
+    expect(validarAlta({ ...bueno, decodificador: null }).decodificador).toBeNull();
+    expect(motivos({ ...bueno, decodificador: 'campus-heltec-v3-v1' })).toEqual(['decodificador solo aplica a la vía lorawan']);
+    expect(motivos({ ...bueno, via: 'lorawan', pasarela_id: Z, decodificador: 'otro' })).toEqual(['decodificador debe ser una de: campus-heltec-v3-v1']);
+  });
   it('la vía manda sobre la pasarela: lorawan la exige; las otras la prohíben', () => {
     expect(motivos({ ...bueno, via: 'lorawan' })).toEqual(expect.arrayContaining([expect.stringContaining('pasarela_id')]));
     expect(motivos({ ...bueno, pasarela_id: Z })).toEqual(expect.arrayContaining([expect.stringContaining('solo aplica')]));

@@ -6,6 +6,7 @@ import { ChirpstackAdaptador } from './chirpstack.adaptador';
 import { IdentidadNoVerificada } from './lorawan';
 import { CLAVES, resolverClave } from './mapa-claves';
 import { MilesightAdaptador } from './milesight.adaptador';
+import { PERFILES, decodificar } from './perfiles';
 
 // Adaptadores LoRaWAN (docs/10 §8.4 punto 47) contra el JSON de las fuentes oficiales.
 // Identificadores: el DevEUI 0101010101010101 es el del ejemplo oficial de ChirpStack (sintético). El gatewayId del ejemplo y el
@@ -161,5 +162,120 @@ describe('MilesightAdaptador (servidor de red embebido, con códec y Metadata)',
   it('DevEUI cruzado o JSON roto → IdentidadNoVerificada', () => {
     expect(() => a.analizar(ctx(conCodec(), 'ffffffffffffffff'))).toThrow(IdentidadNoVerificada);
     expect(() => a.analizar(ctx('{"devEUI":'))).toThrow(IdentidadNoVerificada);
+  });
+});
+
+// Captura real de la pasarela UG65 del campus (15/10/2026, `mosquitto_sub -v` en su broker; docs/10 §8.4 punto 47), saneada: el
+// devEUI, el EUI de la pasarela (rxInfo[].mac, con prefijo de fabricante) y el nombre del nodo se reemplazaron por sintéticos. Se omite
+// `cellularIP`: tiene forma de dirección IP y el adaptador no la usa. Todo lo demás es literal, `data` incluida.
+const CAPTURA_UG65 = {
+  applicationID: '3', applicationName: 'app-de-prueba', data: 'AgAAAI8HGBmYrw==', devEUI: DEVEUI, deviceName: 'nodo-2', fCnt: 142, fPort: 1,
+  gatewayTime: '2026-10-15T12:34:56-03:00',
+  rxInfo: [{ altitude: 0, gpsEnable: false, latitude: 0, loRaSNR: 10.2, longitude: 0, mac: 'aaaaaaaaaaaaaaaa', name: 'Local Gateway', rssi: -46, time: '2026-10-15T15:34:56.340333Z' }],
+  time: '2026-10-15T15:34:56.340333Z',
+  txInfo: { adr: true, codeRate: '4/5', dataRate: { bandwidth: 125, modulation: 'LORA', spreadFactor: 7 }, frequency: 917000000 },
+};
+const PERFIL = 'campus-heltec-v3-v1';
+const conPerfil = (cuerpo: object, perfil: string | undefined = PERFIL): ContextoTrama => ({ ...ctx(JSON.stringify(cuerpo)), decodificador: perfil });
+// Los 10 bytes del perfil con los valores que se quieran probar (nodo 2, secuencia 143).
+const datos = (centesimasC: number, centesimasHR: number, bateria: number): string => {
+  const b = Buffer.alloc(10);
+  b.writeUInt8(2, 0); b.writeUInt32BE(143, 1); b.writeInt16BE(centesimasC, 5); b.writeUInt16BE(centesimasHR, 7); b.writeUInt8(bateria, 9);
+  return b.toString('base64');
+};
+
+describe('perfil campus-heltec-v3-v1 con la captura de la UG65 del campus (migración 17; docs/10 §8.4 punto 47 y §4.1)', () => {
+  const a = new MilesightAdaptador(resolverClave);
+  it('la captura con perfil → 18,16 °C, 65,52 % y 3,75 V con la marca del servidor de red; fCnt anotado; nada ignorado', () => {
+    const c = conPerfil(CAPTURA_UG65);
+    const t = new Date('2026-10-15T15:34:56.340Z');
+    expect(a.analizar(c)).toEqual([
+      { magnitud: 'temperatura', valor: 18.16, unidad: 'Cel', tiempo: t },
+      { magnitud: 'humedad', valor: 65.52, unidad: '%RH', tiempo: t },
+      { magnitud: 'tension', valor: 3.75, unidad: 'V', tiempo: t },
+    ]);
+    expect(c.fcnt).toBe(142);
+    expect(c.ignoradas).toEqual([]);
+  });
+  it('la misma captura sin perfil → malformada que dice qué activar o declarar, y el DevEUI ya verificado (no es IdentidadNoVerificada)', () => {
+    let e: unknown;
+    // Sin decodificador a propósito: conPerfil(cuerpo, undefined) activaría el valor por defecto del parámetro.
+    try { a.analizar(ctx(JSON.stringify(CAPTURA_UG65))); } catch (x) { e = x; }
+    expect(e).toBeInstanceOf(TramaMalformada);
+    expect(e).not.toBeInstanceOf(IdentidadNoVerificada);
+    expect((e as Error).message).toContain('activar Payload Codec y Metadata en la aplicación de la pasarela, o declarar el perfil de decodificación del nodo');
+  });
+  it('temperatura bajo cero (entero con signo) y los extremos de la batería', () => {
+    const [temp, , tension] = a.analizar(conPerfil({ ...CAPTURA_UG65, data: datos(-525, 0, 0) }));
+    expect(temp.valor).toBe(-5.25);
+    expect(tension.valor).toBe(2);
+    expect(a.analizar(conPerfil({ ...CAPTURA_UG65, data: datos(0, 10000, 255) }))[2].valor).toBe(4.55);
+  });
+  it('time sin zona → sin marca (rige la recepción); sin time, igual', () => {
+    expect(a.analizar(conPerfil({ ...CAPTURA_UG65, time: '2026-10-15T15:34:56' }))[0].tiempo).toBeUndefined();
+    const sinTime: Record<string, unknown> = { ...CAPTURA_UG65 };
+    delete sinTime.time;
+    expect(a.analizar(conPerfil(sinTime))[0].tiempo).toBeUndefined();
+  });
+  it('data que no es base64 estricto o no mide 10 bytes → malformada (el nodo se marcará vivo: su DevEUI ya se verificó)', () => {
+    for (const [data, motivo] of [['AgAAAI8HGBmY', '10 bytes y llegaron 9'], ['AgAAAI8HGBmYrw', 'no es base64'], ['AgAAAI8H GBmYrw==', 'no es base64'], ['', 'no es base64']] as const) {
+      let e: unknown;
+      try { a.analizar(conPerfil({ ...CAPTURA_UG65, data, fPort: 1 })); } catch (x) { e = x; }
+      expect(e).toBeInstanceOf(TramaMalformada);
+      expect(e).not.toBeInstanceOf(IdentidadNoVerificada);
+      expect((e as Error).message).toContain(motivo);
+    }
+  });
+  it('fCnt fuera de 0..2³²−1, no entero o como texto → malformada; ausente → la trama sigue, sin contador', () => {
+    for (const fCnt of [-1, 1.5, '142', 2 ** 32]) {
+      expect(() => a.analizar(conPerfil({ ...CAPTURA_UG65, fCnt }))).toThrow('fCnt no es un entero entre 0 y 4294967295');
+    }
+    const sinFcnt: Record<string, unknown> = { ...CAPTURA_UG65 };
+    delete sinFcnt.fCnt;
+    const c = conPerfil(sinFcnt);
+    expect(a.analizar(c)).toHaveLength(3);
+    expect(c.fcnt).toBeUndefined();
+    const max = conPerfil({ ...CAPTURA_UG65, fCnt: 2 ** 32 - 1 });
+    a.analizar(max);
+    expect(max.fcnt).toBe(4294967295);
+  });
+  it('un perfil que el código no conoce (base sin migrar, perfil retirado) → malformada que lo nombra, limpio', () => {
+    expect(() => a.analizar(conPerfil(CAPTURA_UG65, 'otro\nperfil'))).toThrow('perfil de decodificación desconocido: otro?perfil');
+  });
+  it('el DevEUI se verifica antes de decodificar: con otro DevEUI → IdentidadNoVerificada aunque haya perfil', () => {
+    expect(() => a.analizar(conPerfil({ ...CAPTURA_UG65, devEUI: 'ffffffffffffffff' }))).toThrow(IdentidadNoVerificada);
+  });
+  it('ChirpStack sin object y con perfil → decodifica data con la marca del evento y anota fCnt; con object, el perfil no se usa', () => {
+    const cs = new ChirpstackAdaptador(resolverClave);
+    const sinObjeto = JSON.parse(eventoUp({ data: CAPTURA_UG65.data, fCnt: 7 })) as Record<string, unknown>;
+    delete sinObjeto.object;
+    const c = conPerfil(sinObjeto);
+    expect(cs.analizar(c).map((l) => [l.magnitud, l.valor, l.tiempo?.toISOString()])).toEqual([
+      ['temperatura', 18.16, '2022-07-18T09:34:15.775Z'], ['humedad', 65.52, '2022-07-18T09:34:15.775Z'], ['tension', 3.75, '2022-07-18T09:34:15.775Z'],
+    ]);
+    expect(c.fcnt).toBe(7);
+    expect(cs.analizar(conPerfil(JSON.parse(eventoUp()) as object))).toHaveLength(2); // temperature y humidity del object
+    expect(() => cs.analizar(ctx(JSON.stringify(sinObjeto)))).toThrow('ni el nodo un perfil de decodificación');
+  });
+});
+
+describe('perfiles: la lista del código es la del CHECK y cada lectura existe en el catálogo (migración 17)', () => {
+  const sql = readdirSync(join(__dirname, '../../../../db/init')).filter((x) => x.endsWith('.sql')).sort()
+    .map((f) => readFileSync(join(__dirname, '../../../../db/init', f), 'utf8')).join('\n');
+  it('PERFILES == el dominio de ck_dispositivo_decodificador en la última migración que lo define', () => {
+    const definiciones = [...sql.matchAll(/ADD CONSTRAINT ck_dispositivo_decodificador CHECK \(decodificador IN \(([^)]*)\)\)/g)];
+    expect(definiciones.length).toBeGreaterThanOrEqual(1);
+    const enLaBase = [...definiciones[definiciones.length - 1][1].matchAll(/'([^']+)'/g)].map((m) => m[1]).sort();
+    expect([...PERFILES].sort()).toEqual(enLaBase);
+  });
+  it('cada lectura del perfil → una magnitud del catálogo con su unidad canónica (si no, iría a cuarentena «canal no declarado»)', () => {
+    const catalogo = new Map<string, string>();
+    for (const bloque of sql.match(/INSERT INTO magnitud[\s\S]*?;/g) ?? []) {
+      for (const m of bloque.matchAll(/\(\s*'([a-z0-9_]+)',\s*'[^']*',\s*'([^']+)'/g)) catalogo.set(m[1], m[2]);
+    }
+    const malas = PERFILES.flatMap((p) => decodificar(p, CAPTURA_UG65.data, undefined))
+      .filter((l) => catalogo.get(l.magnitud) !== l.unidad).map((l) => `${l.magnitud} (${l.unidad})`);
+    expect(catalogo.get('tension')).toBe('V');
+    expect(malas).toEqual([]);
   });
 });

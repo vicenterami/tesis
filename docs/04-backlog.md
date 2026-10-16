@@ -168,6 +168,8 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 - El payload decodificado por el servidor de red (la pasarela en la ruta B; el servidor de red externo en la ruta C, la del campus; ChirpStack propio en la ruta A, opcional) se normaliza correctamente al modelo interno (SenML).
 - RSSI, SNR, identificador del nodo y gateway quedan asociados al evento (RF-09).
 - Un evento recibido por dos gateways se almacena una sola vez (RF-10).
+- Una trama LoRaWAN que repite el contador de trama (`fCnt`) de la última guardada del nodo se descarta sin ir a cuarentena, y el nodo se marca vivo (RF-10; 16/10/2026, `docs/10 §4.1`).
+- Un uplink que la pasarela entrega sin decodificar se decodifica con el perfil declarado en el alta del nodo, si lo tiene; si no, va a cuarentena diciendo qué activar (RF-04; 16/10/2026, `docs/10 §8.4` punto 47).
 - Un payload de longitud o contenido inválido se rechaza sin interrumpir la recepción de los demás (RNF-07).
 - La pasarela o el servidor de red externo se registra por API con credencial propia y declara el formato de sus tramas; sus nodos lo heredan en el alta (15/10/2026, `docs/10 §8.4` punto 47).
 

@@ -98,6 +98,10 @@ paneles instalados **sin modificarlos** convierte al parque existente en fuente 
 exigir su reemplazo. Se prioriza como *Should* y no *Must* porque el MVP puede demostrarse sin él,
 pero su valor demostrativo es alto.
 
+**Cómo se cumple RF-10 (16/10/2026).** Una lectura se identifica por «canal + instante del emisor» (índice único de `medicion`), y una
+trama LoRaWAN además por el contador de trama del nodo (`fCnt`): la que repite el de la última guardada se descarta. La deduplicación
+entre pasarelas que oyen el mismo uplink la hace el servidor de red (`docs/10 §4.1`).
+
 ## M2 — Normalización de eventos y telemetría
 
 | ID | Requerimiento | Fuente | Causa | Prior. |

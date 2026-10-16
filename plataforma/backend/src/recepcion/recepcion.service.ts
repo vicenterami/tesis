@@ -18,12 +18,18 @@ import { aCanonica } from './unidades';
 
 // Forma del tópico acordada: sitio/<sitio>/dispositivo/<id_fisico>/<magnitud>
 const PATRON_TOPICO = /^sitio\/([^/]+)\/dispositivo\/([^/]+)\/([^/]+)$/;
-// Tópico de pasarela (rutas B y C, docs/10 §8.4 punto 47): sitio/<sitio>/pasarela/<id_pasarela>/<deveui>/<evento>
-const PATRON_PASARELA = /^sitio\/([^/]+)\/pasarela\/([^/]+)\/([^/]+)\/([^/]+)$/;
+// Tópico de pasarela (rutas B y C, docs/10 §8.4 punto 47): sitio/<sitio>/pasarela/<id_pasarela>/<deveui>/<evento>, o su forma
+// nativa sitio/<sitio>/pasarela/<id_pasarela>/device/<deveui>/event/<evento> (16/10): la que deja un puente de Mosquitto al cambiar
+// el prefijo application/<app>/ de la pasarela Milesight por el nuestro, porque el puente no reordena tópicos.
+const PATRON_PASARELA = /^sitio\/([^/]+)\/pasarela\/([^/]+)\/(?:device\/([^/]+)\/event\/([^/]+)|([^/]+)\/([^/]+))$/;
 // Formatos que solo llegan por el tópico de su pasarela (el nodo lorawan los hereda de ella: migración 15).
 const FORMATOS_PASARELA = new Set(['milesight', 'chirpstack']);
 
-interface Dispositivo { id: string; estado: 'activo' | 'mantenimiento' | 'baja'; formato: string; pasarela_id: string | null; sitio_codigo: string }
+interface Dispositivo {
+  id: string; estado: 'activo' | 'mantenimiento' | 'baja'; formato: string; pasarela_id: string | null; sitio_codigo: string;
+  decodificador: string | null; // perfil de decodificación (migración 17)
+  ultimo_fcnt: string | null; // bigint: node-postgres lo entrega como texto (cabe en un número: 32 bits)
+}
 interface Pasarela { id: string; activo: boolean; sitio_codigo: string }
 // Dominio cerrado: el mismo CHECK de la migración 09. Agregar un motivo exige migración, no solo código.
 type Motivo = 'no_registrado' | 'dado_de_baja' | 'malformada' | 'invalida';
@@ -40,7 +46,8 @@ interface Canal { id: string; magnitud: string; unidad_canonica: string; rango_m
 //           [2] ¿la entiende el adaptador de su formato declarado? ──no──► cuarentena "malformada"
 //             │  (senml nativo · plano; milesight y chirpstack, de la pasarela: docs/10 §8.4 punto 47)
 //             ▼  lecturas {magnitud, valor, unidad, tiempo}
-//           [3] ¿canal declarado? ¿unidad convertible? ¿valor en rango? ──no──► cuarentena "invalida"
+//           [3] ¿repite el fCnt de la última trama LoRaWAN guardada? ──sí──► se descarta y se anota (no es cuarentena)
+//             │  ¿canal declarado? ¿unidad convertible? ¿valor en rango? ──no──► cuarentena "invalida"
 //             │
 //             ▼
 //           [4] convertir a unidad canónica · fijar tiempo · INSERT medicion (hypertable)
@@ -87,7 +94,7 @@ export class RecepcionService implements OnModuleInit {
     const partes = PATRON_TOPICO.exec(topico);
     if (!partes) {
       return this.cuarentena(trama, 'malformada',
-        'tópico fuera de los dos patrones: sitio/<sitio>/dispositivo/<id>/<magnitud> o sitio/<sitio>/pasarela/<id>/<deveui>/<evento>');
+        'tópico fuera de los dos patrones: sitio/<sitio>/dispositivo/<id>/<magnitud> o sitio/<sitio>/pasarela/<id>/[device/]<deveui>/[event/]<evento>');
     }
     const ctx: ContextoTrama = { topico, idFisico: partes[2], magnitudTopico: partes[3].toLowerCase(), carga };
 
@@ -117,7 +124,9 @@ export class RecepcionService implements OnModuleInit {
   // registro de depuración y termina, sin escribir en la base (punto 27); (iii) el DevEUI del tópico, en minúsculas, debe
   // ser un nodo asociado a esa pasarela.
   private async procesarDePasarela(trama: TramaRecibida, partes: RegExpExecArray): Promise<void> {
-    const [, sitio, idPasarela, deveuiTopico, evento] = partes;
+    const [sitio, idPasarela] = [partes[1], partes[2]];
+    const deveuiTopico = partes[3] ?? partes[5]; // forma nativa (device/<deveui>/event/<evento>) o la propia (<deveui>/<evento>)
+    const evento = partes[4] ?? partes[6];
     const pasarela = await this.buscarPasarela(idPasarela);
     if (!pasarela) return this.cuarentena(trama, 'no_registrado', `pasarela ${limpia(idPasarela, 64)} sin alta en la plataforma`);
     if (!pasarela.activo) return this.cuarentena(trama, 'no_registrado', `pasarela ${limpia(idPasarela, 64)} inactiva: revocar su credencial en el broker`);
@@ -143,7 +152,7 @@ export class RecepcionService implements OnModuleInit {
       return this.cuarentena({ ...trama, dispositivoId: nodo.id }, 'no_registrado', `DevEUI ${deveui} está registrado en el sitio «${nodo.sitio_codigo}», no en «${limpia(sitio, 64)}»`);
     }
     trama.dispositivoId = nodo.id;
-    const ctx: ContextoTrama = { topico: trama.topico, idFisico: deveui, magnitudTopico: '', carga: trama.carga, deveui };
+    const ctx: ContextoTrama = { topico: trama.topico, idFisico: deveui, magnitudTopico: '', carga: trama.carga, deveui, decodificador: nodo.decodificador ?? undefined };
     return this.filtros2a6(trama, ctx, nodo, true);
   }
 
@@ -179,6 +188,13 @@ export class RecepcionService implements OnModuleInit {
         if (e instanceof IdentidadNoVerificada) return;
       }
     }
+
+    // ── [3] Validar: una trama LoRaWAN que repite el contador de trama de la última guardada es la misma trama (docs/10 §4.1) ──
+    // Se descarta entera, sin cuarentena; el nodo sí se marca vivo (llegó por su pasarela con su DevEUI verificado). Un contador
+    // menor se acepta: vuelve a cero cuando el nodo se une otra vez a la red. Leer, comparar y escribir sin bloqueo basta porque
+    // los mensajes se procesan de a uno (decisión 4, BrokerService).
+    const repetida = ctx.fcnt !== undefined && dispositivo.ultimo_fcnt !== null && Number(dispositivo.ultimo_fcnt) === ctx.fcnt;
+    if (repetida) lecturas = [];
 
     // ── [3] Validar y [4] Normalizar, lectura por lectura ──
     // Los rechazos se acumulan: una trama con tres lecturas malas deja UNA fila de cuarentena (con su payload
@@ -246,17 +262,21 @@ export class RecepcionService implements OnModuleInit {
 
     // ── [6] Supervisar: el dispositivo dio señales de vida; si estaba "sin comunicación", se cierra ──
     // En estado_dispositivo, no en dispositivo: la fila que edita una persona no cambia con cada trama (migración 11).
+    // El contador de trama se guarda aquí, DESPUÉS de las lecturas y solo si dejó alguna nueva (migración 17): si el proceso se corta
+    // antes, la reentrega vuelve a pasar el filtro 3 y la absorbe el índice único de medicion, en vez de perderse (docs/10 §4.1).
     const visto = await this.pool.query<{ visto_por_ultima_vez: Date }>(
-      `INSERT INTO estado_dispositivo (dispositivo_id, visto_por_ultima_vez) VALUES ($1, now())
-       ON CONFLICT (dispositivo_id) DO UPDATE SET visto_por_ultima_vez = EXCLUDED.visto_por_ultima_vez
+      `INSERT INTO estado_dispositivo (dispositivo_id, visto_por_ultima_vez, ultimo_fcnt) VALUES ($1, now(), $2)
+       ON CONFLICT (dispositivo_id) DO UPDATE SET visto_por_ultima_vez = EXCLUDED.visto_por_ultima_vez,
+         ultimo_fcnt = COALESCE(EXCLUDED.ultimo_fcnt, estado_dispositivo.ultimo_fcnt)
        RETURNING visto_por_ultima_vez`,
-      [dispositivo.id],
+      [dispositivo.id, guardadas && ctx.fcnt !== undefined ? ctx.fcnt : null],
     );
     this.eventos.publicar({
       tipo: 'visto', dispositivo_id: dispositivo.id,
       tiempo: visto.rows[0].visto_por_ultima_vez.toISOString(),
     });
     await this.supervision.marcarVivo(dispositivo.id, ctx.idFisico);
+    if (repetida) this.log.log(`${ctx.idFisico}: trama repetida (fCnt ${ctx.fcnt}, el de la última guardada) · descartada vía ${adaptador?.nombre}`);
     if (guardadas || duplicadas) {
       const dup = duplicadas ? ` · ${duplicadas} duplicada(s) ignorada(s)` : '';
       const ign = ctx.ignoradas?.length ? ` · ${ctx.ignoradas.length} clave(s) fuera del mapa: ${ctx.ignoradas.slice(0, 5).join(', ')}` : '';
@@ -274,8 +294,9 @@ export class RecepcionService implements OnModuleInit {
 
   private async buscarDispositivo(idFisico: string): Promise<Dispositivo | undefined> {
     const r = await this.pool.query<Dispositivo>(
-      `SELECT d.id, d.estado, d.formato, d.pasarela_id, s.codigo AS sitio_codigo FROM dispositivo d
+      `SELECT d.id, d.estado, d.formato, d.pasarela_id, s.codigo AS sitio_codigo, d.decodificador, e.ultimo_fcnt FROM dispositivo d
          JOIN zona z ON z.id = d.zona_id JOIN sitio s ON s.id = z.sitio_id
+         LEFT JOIN estado_dispositivo e ON e.dispositivo_id = d.id
         WHERE d.id_fisico = $1`,
       [idFisico],
     );

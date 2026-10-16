@@ -8,7 +8,7 @@
 #   bash plataforma/pruebas/banco/banco.sh evaluar [csv]       vuelve a cruzar un CSV de envíos con la base
 #   bash plataforma/pruebas/banco/banco.sh proxy               levanta la capa TLS (proxy/compose.proxy.yml) sobre el banco y la prueba
 #   bash plataforma/pruebas/banco/banco.sh alta                alta por API de punta a punta: POST → credencial → publica → medicion (HU-11)
-#   bash plataforma/pruebas/banco/banco.sh lorawan             rutas B y C de punta a punta: alta de pasarela → publica como ella → medicion; ACL del rol pasarela; rotación y baja
+#   bash plataforma/pruebas/banco/banco.sh lorawan             rutas B y C de punta a punta: alta de pasarela → publica como ella → medicion; ACL del rol pasarela; perfil, sufijo nativo y fCnt; rotación y baja
 #   bash plataforma/pruebas/banco/banco.sh cola                cola del broker vigilada: backend detenido + 200 emulados → descartes → condición broker_descarte (docs/16 §22)
 #   bash plataforma/pruebas/banco/banco.sh estado | logs [servicio] | sql ["CONSULTA"]
 #   bash plataforma/pruebas/banco/banco.sh apagar              baja todo; los datos estaban en RAM, no queda nada
@@ -312,6 +312,31 @@ case "${1:-}" in
     [[ "$(cuarentena "sitio/$sitio/pasarela/$mid/$mdev/up")" == *"activar Payload Codec"* ]] && ok "Milesight sin códec → malformada que dice qué activar" || falla "sin códec: $(cuarentena "sitio/$sitio/pasarela/$mid/$mdev/up")"
     visto0=$(visto "$mdev"); r=$(pub "$mid" "$MCRED" "sitio/$sitio/pasarela/$mid/$mdev/up" '{"devEUI": roto'); c=$(esperar_cuarentena "sitio/$sitio/pasarela/$mid/$mdev/up" '*JSON inválido*'); visto1=$(visto "$mdev")
     [[ "$c" == *"JSON inválido"* ]] && [ -n "$visto0" ] && [ "$visto0" = "$visto1" ] && ok "JSON roto por el tópico de la pasarela → malformada, y el nodo NO se marca vivo (sin DevEUI legible)" || falla "JSON roto: $(cuarentena "sitio/$sitio/pasarela/$mid/$mdev/up") · visto $visto0 → $visto1"
+    # ── Milesight sin códec con perfil de decodificación, por el sufijo nativo y con fCnt (migración 17; docs/10 §8.4 punto 47 y §4.1) ──
+    # La forma de la captura saneada de la UG65 del campus (`data` de 10 bytes: 18,16 °C, 65,52 %, 3,75 V), publicada como la deja un
+    # puente de Mosquitto: …/pasarela/<id>/device/<deveui>/event/up. Después, el mismo fCnt con otra hora, uno nuevo y una data corta.
+    [ "$(json "v['conexion']['plantillas']['puente_mosquitto']" <<<"$body")" = "topic device/# out 1 application/<app>/ sitio/$sitio/pasarela/$mid/" ] && ok "la respuesta del alta milesight trae la línea del puente de Mosquitto para el tópico nativo" || falla "plantilla puente_mosquitto"
+    r=$(api POST /dispositivos -d "{\"id_fisico\":\"$(openssl rand -hex 8)\",\"nombre\":\"Directo con perfil\",\"zona_id\":\"$zona\",\"via\":\"mqtt\",\"decodificador\":\"campus-heltec-v3-v1\",\"intervalo_esperado_s\":60,\"canales\":[{\"magnitud\":\"temperatura\"}]}")
+    [ "${r##*$'\n'}" = 400 ] && [[ "${r%$'\n'*}" == *"decodificador solo aplica a la vía lorawan"* ]] && ok "un perfil de decodificación en un dispositivo mqtt → 400 que lo explica" || falla "perfil en mqtt: ${r:0:160}"
+    udev=$(openssl rand -hex 8); r=$(api POST /dispositivos -d "{\"id_fisico\":\"$udev\",\"nombre\":\"Nodo del campus (captura)\",\"zona_id\":\"$zona\",\"via\":\"lorawan\",\"pasarela_id\":\"$mpas\",\"decodificador\":\"campus-heltec-v3-v1\",\"intervalo_esperado_s\":180,\"canales\":[{\"magnitud\":\"temperatura\"},{\"magnitud\":\"humedad\"},{\"magnitud\":\"tension\"}]}")
+    code=${r##*$'\n'}; [ "$code" = 201 ] && [ "$(json "v['decodificador']" <<<"${r%$'\n'*}")" = campus-heltec-v3-v1 ] && ok "alta del nodo con el perfil campus-heltec-v3-v1 y el canal tension → 201" || falla "alta con perfil → $code: ${r:0:160}"
+    nativo="sitio/$sitio/pasarela/$mid/device/$udev/event/up"
+    sincodec() { printf '{"applicationID":"3","applicationName":"app-de-prueba","data":"%s","devEUI":"%s","deviceName":"nodo-2","fCnt":%s,"fPort":1,"rxInfo":[{"loRaSNR":10.2,"mac":"aaaaaaaaaaaaaaaa","name":"Local Gateway","rssi":-46,"time":"%s"}],"time":"%s","txInfo":{"frequency":917000000}}' "$1" "$udev" "$2" "$3" "$3"; }
+    t1=$(date -u -d '-30 seconds' +%Y-%m-%dT%H:%M:%S.340333Z); t2=$(date -u -d '-20 seconds' +%Y-%m-%dT%H:%M:%S.340333Z); t3=$(date -u -d '-10 seconds' +%Y-%m-%dT%H:%M:%S.340333Z)
+    valores() { psql_ -tA -c "SELECT count(*) || ' ' || string_agg(DISTINCT m.origen_tiempo, ',') || ' ' || string_agg(c.magnitud_codigo || '=' || m.valor, ',' ORDER BY m.tiempo, c.magnitud_codigo) FROM medicion m JOIN canal c ON c.id=m.canal_id JOIN dispositivo d ON d.id=c.dispositivo_id WHERE d.id_fisico='$udev'"; }
+    r=$(pub "$mid" "$MCRED" "$nativo" "$(sincodec AgAAAI8HGBmYrw== 142 "$t1")"); sleep 2
+    [ "$(valores)" = "3 pasarela humedad=65.52,temperatura=18.16,tension=3.75" ] && ok "la captura por el sufijo nativo → 18,16 °C, 65,52 % y 3,75 V con la marca del servidor de red (origen pasarela)" || falla "captura decodificada: «$(valores)»"
+    visto0=$(visto "$udev"); sleep 1.1
+    r=$(pub "$mid" "$MCRED" "$nativo" "$(sincodec AgAAAI8HGBmYrw== 142 "$t2")"); sleep 2; visto1=$(visto "$udev")
+    k=$(dc logs --no-color --since 1m backend 2>/dev/null | grep -c "$udev: trama repetida (fCnt 142")
+    [ "$(valores | cut -d' ' -f1)" = 3 ] && [ -z "$(cuarentena "$nativo")" ] && [ "$k" -ge 1 ] && [ "$visto0" != "$visto1" ] && ok "el mismo fCnt con OTRA hora → descartada: sin lecturas nuevas ni cuarentena, anotada en el registro y el nodo vivo" || falla "fCnt repetido: $(valores) · cuarentena «$(cuarentena "$nativo")» · avisos $k · visto $visto0 → $visto1"
+    r=$(pub "$mid" "$MCRED" "$nativo" "$(sincodec AgAAAJAHMBmYsA== 143 "$t3")"); sleep 2
+    f=$(psql_ -tA -c "SELECT e.ultimo_fcnt FROM estado_dispositivo e JOIN dispositivo d ON d.id=e.dispositivo_id WHERE d.id_fisico='$udev'")
+    [ "$(valores | cut -d' ' -f1)" = 6 ] && [ "$f" = 143 ] && ok "un fCnt nuevo → 3 lecturas más, y estado_dispositivo.ultimo_fcnt = 143" || falla "fCnt nuevo: $(valores) · ultimo_fcnt «$f»"
+    visto0=$(visto "$udev"); sleep 1.1
+    r=$(pub "$mid" "$MCRED" "$nativo" "$(sincodec AgAAAI8HGBmY 144 "$t3")"); c=$(esperar_cuarentena "$nativo" 'malformada*10 bytes*'); visto1=$(visto "$udev")
+    # El ayudante recorta el detalle a 90 caracteres: «…llegaron 9» queda fuera; el texto entero lo prueba lorawan.spec.ts.
+    [[ "$c" == malformada*"se esperaban 10 bytes"* ]] && [ "$visto0" != "$visto1" ] && ok "una data de 9 bytes → malformada que lo dice, y el nodo vivo (su DevEUI se verificó)" || falla "data corta: «$c» · visto $visto0 → $visto1"
     # ── Mensajes retenidos (docs/10 §8.4 punto 50): en vivo se procesan una vez; la copia que el broker reentrega al suscribirse, no ──
     mdev2=$(openssl rand -hex 8); r=$(api POST /dispositivos -d "{\"id_fisico\":\"$mdev2\",\"nombre\":\"EM300 retenido\",\"zona_id\":\"$zona\",\"via\":\"lorawan\",\"pasarela_id\":\"$mpas\",\"intervalo_esperado_s\":180,\"canales\":[{\"magnitud\":\"temperatura\"}]}")
     n0=$(lecturas "$mdev"); r=$(pub_r "$mid" "$MCRED" "sitio/$sitio/pasarela/$mid/$mdev/up" "{\"devEUI\":\"$mdev\",\"temperature\":25.5}"); sleep 2; n1=$(lecturas "$mdev")

@@ -10,7 +10,7 @@ sequenceDiagram
     participant Q as Cuarentena
 
     MQ->>F1: trama cruda<br/>+ tópico + identidad
-    alt tópico fuera de los dos patrones<br/>(…/dispositivo/id/magnitud, …/pasarela/id/deveui/evento)
+    alt tópico fuera de los dos patrones<br/>(…/dispositivo/id/magnitud, …/pasarela/id/[device/]deveui/[event/]evento)
         F1->>Q: guarda cruda, motivo "malformada"<br/>(sin identidad: no hay a quién marcar vivo)
     else pasarela no registrada, inactiva o de otro sitio
         F1->>Q: guarda cruda, motivo "no_registrado"

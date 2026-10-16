@@ -61,8 +61,9 @@ como un cliente más del broker, con su propia credencial, sin contenedores ni p
 ChirpStack corre en el servidor de la plataforma y las pasarelas le envían por UDP al puerto 1700; solo
 se despliega si las pasarelas no traen servidor de red propio o si se quieren administrar desde un solo
 punto los nodos de varias pasarelas. En las tres, el decodificador de binario a JSON corre en el servidor de
-red (la pasarela o ChirpStack) y lo administra quien opera la red; el JSON documentado de cada uno se
-traduce al modelo interno por el adaptador que la pasarela declara al registrarse.
+red (la pasarela o ChirpStack) y lo administra quien opera la red; si este entrega la trama sin decodificar,
+como la pasarela del campus, la decodifica la plataforma con un perfil declarado en el alta del nodo. El JSON
+se traduce al modelo interno por el adaptador que la pasarela declara al registrarse.
 
 
 \section{Evaluación de infraestructura}

@@ -20,7 +20,7 @@ M1 Recepción & MQTT con credencial propia y TLS; LoRaWAN por la pasarela (ruta 
 M2 Normalización & Seis filtros con cuarentena; formato declarado en el alta & Contrato formal (TT-27) \\
 M3 Registro & Alta, baja y rotación por API, todo o nada; pasarelas & Pantalla (Etapa~4) \\
 M4 Supervisión & Silencio según el intervalo esperado de cada uno & Batería; enlace \\
-M5 Series & TimescaleDB, 16 migraciones, API, CSV y JSON, canal en vivo & XLSX; rango a medida \\
+M5 Series & TimescaleDB, 17 migraciones, API, CSV y JSON, canal en vivo & XLSX; rango a medida \\
 M6 Alertas & Umbral con histéresis; alarma de la cola del broker & Notificación \\
 M7 Seguridad & Claves con hash, ACL por rol, mínimo privilegio & Sesión y roles \\
 M8 Panel & Semáforo, inventario filtrable, ficha con gráfico & Filtro por sitio \\
@@ -33,7 +33,7 @@ M8 Panel & Semáforo, inventario filtrable, ficha con gráfico & Filtro por siti
 
 \section{Método de prueba}
 
-Se prueba en cuatro niveles, todos repetibles con un comando. Las 244 pruebas unitarias del backend y las 44 del panel corren sin base ni broker,
+Se prueba en cuatro niveles, todos repetibles con un comando. Las 262 pruebas unitarias del backend y las 44 del panel corren sin base ni broker,
 junto con tipos estrictos y análisis estático: cada una fija una regla de diseño en forma ejecutable. \textbf{Banco
 desechable}: una segunda pila con base, broker con su plugin de seguridad, backend y proxy reales, datos en memoria y un
 emulador de nodos (TT-28) que imita relojes rotos, pérdidas y deriva; sobre él corren casos fijos de carga, carreras,
@@ -60,7 +60,7 @@ RF-10 & La misma lectura ×20 a la vez & Una fila por canal y una trama cruda & 
 RF-12 & Cinco sobre el umbral a la vez & Una condición, sin errores & Cumple \\
 RF-05 y RF-07 & Malformadas, sin alta, otro sitio & Cuarentena con motivo; ninguna señal de vida falsa & Cumple \\
 RF-40, RF-42 & Credencial ajena; sin CA; sin TLS & Rechazadas; claves con hash (RNF-08) & Cumple \\
-RF-02 & JSON oficial de los fabricantes & 36 de 36 comprobaciones & Parcial \\
+RF-02 & JSON oficial de los fabricantes y captura real del campus & 43 de 43 comprobaciones & Parcial \\
 RNF-17 & Carga sostenida y pico & 174 y 324~MiB en total & Preliminar \\
 \bottomrule
 \end{tabular}

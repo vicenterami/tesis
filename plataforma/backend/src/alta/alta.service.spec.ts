@@ -15,7 +15,7 @@ const motivosDe = async (p: Promise<unknown>): Promise<string[]> => {
 const Z = '11111111-1111-4111-8111-111111111111';
 const P = '22222222-2222-4222-8222-222222222222';
 const alta = (extra: Partial<AltaValidada> = {}): AltaValidada => ({
-  id_fisico: 'nodo-01', nombre: 'Nodo', zona_id: Z, via: 'mqtt', formato: 'senml', pasarela_id: null, intervalo_esperado_s: 60,
+  id_fisico: 'nodo-01', nombre: 'Nodo', zona_id: Z, via: 'mqtt', formato: 'senml', pasarela_id: null, decodificador: null, intervalo_esperado_s: 60,
   canales: [{ magnitud: 'temperatura', etiqueta: null }, { magnitud: 'humedad', etiqueta: 'suelo' }], ...extra,
 });
 

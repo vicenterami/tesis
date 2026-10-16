@@ -6,6 +6,7 @@ import {
 } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { AltaValidada, FORMATOS_DIRECTOS, FORMA_ID_FISICO, MAX_CANALES, VIAS, validarAlta } from './alta.dto';
+import { PERFILES } from '../recepcion/adaptadores/perfiles';
 import { AltaService, CredencialRotada, DispositivoCreado, DispositivoDadoDeBaja } from './alta.service';
 import { ClaveAdminGuard } from './clave-admin.guard';
 import { uuid } from '../consulta/validacion';
@@ -46,6 +47,7 @@ export class AltaController {
         via: { type: 'string', enum: [...VIAS] },
         formato: { type: 'string', enum: [...FORMATOS_DIRECTOS], default: 'senml', description: 'Solo vías mqtt y http; un dispositivo lorawan no lo envía: hereda el de su pasarela' },
         pasarela_id: { type: 'string', format: 'uuid', nullable: true, description: 'Obligatoria si la vía es lorawan; prohibida si no' },
+        decodificador: { type: 'string', enum: [...PERFILES], nullable: true, description: 'Solo vía lorawan: perfil con que la plataforma decodifica la carga cuando la pasarela la entrega sin decodificar' },
         intervalo_esperado_s: { type: 'integer', minimum: 5, maximum: 86400 },
         canales: {
           type: 'array', minItems: 1, maxItems: MAX_CANALES,

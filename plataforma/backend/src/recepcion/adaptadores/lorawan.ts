@@ -42,6 +42,22 @@ export function exigirDevEui(cuerpo: unknown, ctx: ContextoTrama, campo: string)
   }
 }
 
+// Hora del servidor de red (regla 17 de docs/13): RFC 3339 con zona. Una hora sin zona no se adivina: sin marca, rige la recepción.
+const ZONA_RFC3339 = /(Z|[+-]\d{2}:\d{2})$/;
+export function tiempoDe(v: unknown): Date | undefined {
+  if (typeof v !== 'string' || !ZONA_RFC3339.test(v)) return undefined;
+  const d = new Date(v);
+  return Number.isNaN(d.getTime()) ? undefined : d;
+}
+
+// Contador de trama del uplink (`fCnt`, 32 bits sin signo en el servidor de red; docs/10 §4.1). Ausente: no hay con qué deduplicar
+// y la trama sigue (el JSON de Protocol Buffers omite el valor 0). Presente y con otra forma: la trama no es lo que dice ser.
+export function anotarFcnt(v: unknown, ctx: ContextoTrama): void {
+  if (v === undefined) return;
+  if (typeof v !== 'number' || !Number.isInteger(v) || v < 0 || v > 0xffffffff) throw new TramaMalformada('fCnt no es un entero entre 0 y 4294967295');
+  ctx.fcnt = v;
+}
+
 // Traduce las claves conocidas a lecturas; las desconocidas se anotan en ctx.ignoradas para la línea de registro de la trama.
 // Una clave conocida con un valor que no es un número finito es un error del decodificador: la trama va a cuarentena entera.
 export function lecturasDe(valores: Record<string, unknown>, resolver: ResolverClave, ctx: ContextoTrama, tiempo: Date | undefined,

@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 244 pruebas unitarias del backend y 44 del panel, sin matriz formal) y TT-32 (sensor físico);
+cubre todavía: TT-27 (contrato de trama: hoy 262 pruebas unitarias del backend y 44 del panel, sin matriz formal) y TT-32 (sensor físico);
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -749,7 +749,7 @@ la ACL del rol y la recepción por el filtro 1.
 **Cómo** (`bash plataforma/pruebas/banco/banco.sh lorawan`). Contra el banco desechable, con el broker, el plugin de seguridad y la base
 reales: se da de alta por API una pasarela ChirpStack, un nodo y una pasarela Milesight, y se publica con la credencial de cada pasarela el
 JSON de su fuente oficial (evento `up` de ChirpStack v4; uplink con códec y Metadata de Milesight). Los secretos viajan por la entrada
-estándar. Resultado: **25 de 25 comprobaciones, «LORAWAN OK»**; 26 de 26 desde la corrección de §32, 27 de 27 desde la de §33, 35 de 35 desde la de §34 y 36 de 36 desde la de §35.
+estándar. Resultado: **25 de 25 comprobaciones, «LORAWAN OK»**; 26 de 26 desde la corrección de §32, 27 de 27 desde la de §33, 35 de 35 desde la de §34, 36 de 36 desde la de §35 y 43 de 43 desde la de §36.
 
 | Comprobación | Resultado |
 |---|---|
@@ -864,4 +864,33 @@ revisar nada. **Banco:** 36 de 36, «LORAWAN OK».
 la limpieza (el tópico crudo queda en su columna de la cuarentena como evidencia); se suman a los rellenos los selectores de variación
 que faltaban; el informe dice ahora que el JSON del banco es el de la documentación oficial de ChirpStack v4 y de Milesight, no el
 que publica el ChirpStack del campus, todavía no probado; y el guardián busca el nombre del entrevistado también en el código.
-Total: 244 pruebas unitarias del backend y 44 del panel.
+Total: 262 pruebas unitarias del backend y 44 del panel.
+
+## 36. La trama real de la pasarela del campus: sufijo nativo, perfil de decodificación y contador de trama (16/10/2026)
+
+**Qué cambió** (`docs/10 §8.4` punto 47 y §4.1; migración 17). La captura del broker de la red del campus (15/10) mostró que su
+pasarela UG65 publica el uplink sin decodificar (`data` de 10 bytes en base64), con `time` en UTC con zona y `fCnt`, en su tópico
+nativo. Desde ahora: (i) el filtro 1 acepta también `sitio/<sitio>/pasarela/<id>/device/<deveui>/event/<evento>`, la forma que deja
+un puente de Mosquitto al cambiar el prefijo, y el alta de una pasarela `milesight` trae esa línea del puente; (ii) un nodo
+LoRaWAN puede declarar un perfil de decodificación (`dispositivo.decodificador`) y el adaptador decodifica `data` con él (primer
+perfil: `campus-heltec-v3-v1`; magnitud nueva `tension`, en V); (iii) en esa forma, `time` con zona es la marca del servidor de red;
+(iv) el filtro 3 descarta la trama que repite el `fCnt` de la última guardada del nodo (`estado_dispositivo.ultimo_fcnt`).
+
+| Pregunta | Medido o verificado | Consecuencia |
+|---|---|---|
+| ¿El perfil decodifica la trama real? | Sí: los 10 bytes de la captura, con los identificadores reemplazados por sintéticos, dan 18,16 °C, 65,52 % y 3,75 V con la marca `2026-10-15T15:34:56.340Z`; una temperatura bajo cero sale con signo (−5,25 °C) y la batería va de 2,00 a 4,55 V | Pruebas unitarias en `lorawan.spec.ts`; en el banco, las tres lecturas con origen `pasarela` |
+| ¿Una `data` corrupta pasa como otros bytes? | No: `Buffer.from(…, 'base64')` ignora en silencio lo que no es base64, por eso se exige base64 estricto antes de decodificar; 9 bytes, sin relleno o con un espacio → `malformada` que lo dice, y el nodo se marca vivo (su DevEUI ya se verificó) | Probado en la unidad y en el banco |
+| ¿Sin perfil sigue el comportamiento anterior? | Sí: `malformada` «activar Payload Codec y Metadata…, o declarar el perfil de decodificación del nodo»; en ChirpStack sin `object`, lo mismo con su texto | Probado |
+| ¿La lista de perfiles del código es la del `CHECK`? | Una prueba lee la última migración que define `ck_dispositivo_decodificador` y compara; otra exige que cada lectura del perfil exista en el catálogo con su unidad canónica | Plantado: un perfil más en el código hace fallar las dos |
+| ¿La trama repetida con otra hora se descarta? | En el banco, la captura por el sufijo nativo y otra vez con el mismo `fCnt` y 10 s después: 3 lecturas, ninguna cuarentena, la línea «trama repetida (fCnt 142…)» en el registro y el nodo vivo; con `fCnt` 143, 3 lecturas más y `ultimo_fcnt` = 143 | Plantado en la unidad: sin la comparación, falla la prueba de la repetida |
+| ¿Un corte a mitad pierde la reentrega? | El contador se guarda en el filtro 6, después de las lecturas y solo si dejó alguna nueva; si la trama no guardó nada (repetida por canal + instante, o sin `fCnt`), el contador no cambia | Plantado: guardarlo siempre hace fallar dos pruebas |
+| ¿Un `fCnt` menor se rechaza? | No: se acepta y pasa a ser el último (el contador vuelve a cero cuando el nodo se une otra vez a la red); fuera de 0..2³²−1, no entero o como texto → `malformada` | Probado |
+| ¿Una forma a medias del tópico entra? | No: `…/device/<deveui>/up` y `…/<deveui>/event/up` → `malformada` «tópico fuera de los dos patrones», sin marcar vivo a nadie | Probado |
+| ¿La base cierra lo mismo que el código? | Casos 15 a 19 de `reglas-identidad.sql`: perfil en un dispositivo `mqtt` y perfil fuera de la lista, rechazados por su restricción; perfil legítimo aceptado; contador 2³² rechazado y 2³²−1 aceptado. El alta da el mensaje claro antes («decodificador solo aplica a la vía lorawan») | Guardián, pasos 1c y 2 |
+
+La migración se aplicó desde cero en el banco y dos veces seguidas en la base de desarrollo, sin cambios en la segunda. **Pruebas:**
+262 unitarias del backend (18 nuevas). **Banco:** 43 de 43, «LORAWAN OK» (7 comprobaciones nuevas: la línea del puente, el perfil
+rechazado en `mqtt`, el alta con perfil, la captura decodificada, el `fCnt` repetido, el nuevo y la `data` corta).
+**Lo que no prueba todavía:** la pasarela real ni el puente de Mosquitto (prueba en la misma red local prevista para el 20/10/2026);
+un `fCnt` igual a 0 en ChirpStack, que el JSON de Protocol Buffers omite, no se deduplica; una repetición no consecutiva (N, N+1, N)
+pasa el filtro 3 y solo la absorbe el índice único si trae la misma hora (`docs/10 §4.1`).

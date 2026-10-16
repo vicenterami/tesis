@@ -43,6 +43,7 @@ export interface DispositivoCreado {
   sitio_codigo: string;
   via: Via;
   formato: Formato;
+  decodificador: string | null;
   intervalo_esperado_s: number;
   creado_en: string;
   canales: CanalCreado[];
@@ -173,8 +174,8 @@ export class AltaService {
       const formato: Formato = a.formato ?? sitio.formatoPasarela ?? 'senml';
       const unidades = await this.unidadesDe(c, a);
       const d = await c.query<{ id: string; creado_en: Date }>(
-        'INSERT INTO dispositivo (zona_id, id_fisico, nombre, intervalo_esperado_s, via, formato, pasarela_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, creado_en',
-        [a.zona_id, a.id_fisico, a.nombre, a.intervalo_esperado_s, a.via, formato, a.pasarela_id],
+        'INSERT INTO dispositivo (zona_id, id_fisico, nombre, intervalo_esperado_s, via, formato, pasarela_id, decodificador) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, creado_en',
+        [a.zona_id, a.id_fisico, a.nombre, a.intervalo_esperado_s, a.via, formato, a.pasarela_id, a.decodificador],
       );
       const id = d.rows[0].id;
       const canales: CanalCreado[] = [];
@@ -185,7 +186,7 @@ export class AltaService {
       const secreto = a.via === 'lorawan' ? null : generarSecreto(); // la pasarela autentica a los lorawan (docs/10 §3)
       if (secreto !== null) await c.query('INSERT INTO credencial (dispositivo_id, hash) VALUES ($1, $2)', [id, await hashScrypt(secreto)]); // nunca el secreto
       await c.query('INSERT INTO evento (dispositivo_id, tipo, detalle) VALUES ($1, $2, $3)', [
-        id, 'alta', JSON.stringify({ via: a.via, formato, canales: a.canales.map((k) => k.magnitud), origen: 'api' }),
+        id, 'alta', JSON.stringify({ via: a.via, formato, decodificador: a.decodificador, canales: a.canales.map((k) => k.magnitud), origen: 'api' }),
       ]);
       if (a.via === 'mqtt' && secreto !== null) {
         await this.dynsec.ordenar(ordenesAltaDispositivo(a.id_fisico, secreto));
@@ -195,7 +196,7 @@ export class AltaService {
       this.log.log(`alta: ${a.id_fisico} (${a.via}/${formato}, ${canales.length} canal(es)) en el sitio ${sitio.codigo}`);
       return {
         id, id_fisico: a.id_fisico, nombre: a.nombre, estado: 'activo', zona_id: a.zona_id, sitio_codigo: sitio.codigo, via: a.via,
-        formato, intervalo_esperado_s: a.intervalo_esperado_s, creado_en: d.rows[0].creado_en.toISOString(), canales,
+        formato, decodificador: a.decodificador, intervalo_esperado_s: a.intervalo_esperado_s, creado_en: d.rows[0].creado_en.toISOString(), canales,
         conexion: this.conexion(a.via, a.id_fisico, sitio.codigo, canales, secreto, a.pasarela_id),
       };
     } catch (e) {
@@ -407,7 +408,9 @@ export class AltaService {
     const base = `sitio/${codigo}/pasarela/${idFisico}`;
     const plantillas: Record<string, string> = formato === 'chirpstack'
       ? { event_topic: `${base}/{{dev_eui}}/{{event}}`, command_topic: `${base}/{{dev_eui}}/command/{{command}}` }
-      : { uplink: `${base}/$devEUI/up` };
+      // Milesight: el tópico del uplink si se configura en la pasarela, o la línea del puente de Mosquitto si se mantiene el tópico nativo
+      // de la pasarela y se reenvía desde otro broker (docs/10 §8.4 punto 47); <app> es el identificador de su aplicación.
+      : { uplink: `${base}/$devEUI/up`, puente_mosquitto: `topic device/# out 1 application/<app>/ ${base}/` };
     return {
       usuario: idFisico, credencial: secreto, puerto: 8883, publica_en: `${base}/<deveui>/<evento>`, comandos: `${base}/<deveui>/command/#`, plantillas,
       nota: 'MQTT sobre TLS con la CA del servidor; la credencial solo se muestra ahora (docs/10 §8.4 punto 47)',

@@ -133,6 +133,14 @@
                     "nullable": true,
                     "description": "Obligatoria si la vía es lorawan; prohibida si no"
                   },
+                  "decodificador": {
+                    "type": "string",
+                    "enum": [
+                      "campus-heltec-v3-v1"
+                    ],
+                    "nullable": true,
+                    "description": "Solo vía lorawan: perfil con que la plataforma decodifica la carga cuando la pasarela la entrega sin decodificar"
+                  },
                   "intervalo_esperado_s": {
                     "type": "integer",
                     "minimum": 5,

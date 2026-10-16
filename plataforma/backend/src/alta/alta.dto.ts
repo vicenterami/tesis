@@ -2,6 +2,7 @@
 // contrario. Devuelve el cuerpo limpio o lanza 400 con la lista de motivos. Lo que solo pone el sistema (estado inicial,
 // instantes, credencial) no está en el tipo de entrada: ningún cliente puede mandarlo.
 import { BadRequestException } from '@nestjs/common';
+import { PERFILES, Perfil } from '../recepcion/adaptadores/perfiles';
 
 export const VIAS = ['mqtt', 'http', 'lorawan'] as const;
 // Formatos que declara un dispositivo directo (mqtt, http). Uno lorawan no declara formato: hereda el de su pasarela
@@ -31,6 +32,7 @@ export interface AltaValidada {
   via: Via;
   formato: Formato | null; // null en lorawan: lo pone el servicio desde la pasarela
   pasarela_id: string | null;
+  decodificador: Perfil | null; // solo lorawan: perfil de decodificación cuando la pasarela entrega la trama sin decodificar (migración 17)
   intervalo_esperado_s: number;
   canales: CanalAlta[];
 }
@@ -77,6 +79,12 @@ export function validarAlta(cuerpo: unknown, reservadosExtra: readonly string[] 
   const pasarela_id = c.pasarela_id === undefined || c.pasarela_id === null ? null : m.uuid(c.pasarela_id, 'pasarela_id');
   if (via === 'lorawan' && pasarela_id === null) m.lista.push('un dispositivo lorawan necesita pasarela_id');
   if (via !== 'lorawan' && pasarela_id !== null) m.lista.push('pasarela_id solo aplica a la vía lorawan');
+  // El mismo dominio que ck_dispositivo_decodificador y ck_dispositivo_decodificador_via (migración 17), con el mensaje claro.
+  let decodificador: Perfil | null = null;
+  if (c.decodificador !== undefined && c.decodificador !== null) {
+    if (via !== 'lorawan') m.lista.push('decodificador solo aplica a la vía lorawan');
+    else decodificador = m.opcion(c.decodificador, 'decodificador', PERFILES, PERFILES[0]);
+  }
   const intervalo = c.intervalo_esperado_s;
   const intervaloValido = typeof intervalo === 'number' && Number.isInteger(intervalo) && intervalo >= 5 && intervalo <= 86_400;
   if (!intervaloValido) m.lista.push('intervalo_esperado_s debe ser un entero entre 5 y 86400 (segundos)');
@@ -98,8 +106,8 @@ export function validarAlta(cuerpo: unknown, reservadosExtra: readonly string[] 
       canales.push({ magnitud, etiqueta });
     }
   }
-  const permitidas = new Set(['id_fisico', 'nombre', 'zona_id', 'via', 'formato', 'pasarela_id', 'intervalo_esperado_s', 'canales']);
+  const permitidas = new Set(['id_fisico', 'nombre', 'zona_id', 'via', 'formato', 'pasarela_id', 'decodificador', 'intervalo_esperado_s', 'canales']);
   for (const k of Object.keys(c)) if (!permitidas.has(k)) m.lista.push(`campo no admitido: ${k}`);
   if (m.lista.length > 0) throw new BadRequestException(m.lista);
-  return { id_fisico, nombre, zona_id, via, formato, pasarela_id, intervalo_esperado_s: intervalo as number, canales };
+  return { id_fisico, nombre, zona_id, via, formato, pasarela_id, decodificador, intervalo_esperado_s: intervalo as number, canales };
 }

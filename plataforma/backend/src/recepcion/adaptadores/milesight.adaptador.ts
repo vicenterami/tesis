@@ -1,16 +1,18 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { ContextoTrama, Lectura } from '../lectura';
 import { Adaptador, TramaMalformada } from './adaptador';
-import { IdentidadNoVerificada, exigirDevEui, lecturasDe, objetoJson } from './lorawan';
+import { IdentidadNoVerificada, anotarFcnt, exigirDevEui, lecturasDe, objetoJson, tiempoDe } from './lorawan';
 import { RESOLVER_CLAVE } from './mapa-claves';
 import type { ResolverClave } from './mapa-claves';
+import { decodificar } from './perfiles';
 
-// Uplink del servidor de red embebido de una pasarela Milesight (UG63 y familia; ruta B; docs/10 §8.4 punto 47), con «Payload
-// Codec» y «Metadata» activados: el mensaje es lo que devuelve el decodificador más devEUI, deviceName y applicationID. Ejemplo:
-//   {"devEUI":"…","deviceName":"EM300","applicationID":"1","temperature":30.8,"humidity":50.5,"battery":92}
-// Sin códec llega otra forma (data en base64, fPort, rxInfo): no se decodifica aquí y va a cuarentena diciendo qué activar.
-// Hora: con códec no hay hora civil y sin códec llega sin zona (docs/13, regla 17): el adaptador no entrega marca, así que siempre rige
-// la hora de recepción. `origenTiempo` dice qué origen tendría una marca si la entregara (la de la pasarela); hoy no se usa.
+// Uplink del servidor de red embebido de una pasarela Milesight (UG63, UG65 y familia; ruta B; docs/10 §8.4 punto 47). Dos formas:
+//   con «Payload Codec» y «Metadata»: lo que devuelve el decodificador más devEUI, deviceName y applicationID. Ejemplo:
+//     {"devEUI":"…","deviceName":"EM300","applicationID":"1","temperature":30.8,"humidity":50.5,"battery":92}
+//   sin códec (la de la UG65 del campus, captura del 15/10): data en base64, fPort, fCnt, rxInfo y time. Se decodifica con el perfil
+//     del nodo (migración 17); si no tiene, va a cuarentena diciendo qué activar.
+// Hora: con códec no hay hora civil (el `time` del objeto LoRa cuenta desde que arrancó el reenviador de paquetes) y rige la de
+// recepción; sin códec, `time` con zona es la marca del servidor de red y sin zona no se adivina (docs/13, regla 17).
 const METADATOS = new Set(['devEUI', 'deviceName', 'applicationID', 'applicationName']);
 
 @Injectable()
@@ -30,7 +32,12 @@ export class MilesightAdaptador implements Adaptador {
     if (!('devEUI' in cuerpo)) throw new IdentidadNoVerificada('sin devEUI: activar Metadata en la aplicación de la pasarela');
     exigirDevEui(cuerpo.devEUI, ctx, 'devEUI');
     if (typeof cuerpo.data === 'string' && ('fPort' in cuerpo || 'rxInfo' in cuerpo)) {
-      throw new TramaMalformada('llegó sin decodificar: activar Payload Codec y Metadata en la aplicación de la pasarela');
+      if (!ctx.decodificador) {
+        throw new TramaMalformada('llegó sin decodificar: activar Payload Codec y Metadata en la aplicación de la pasarela, o declarar el perfil de decodificación del nodo');
+      }
+      anotarFcnt(cuerpo.fCnt, ctx);
+      ctx.ignoradas = [];
+      return decodificar(ctx.decodificador, cuerpo.data, tiempoDe(cuerpo.time));
     }
     return lecturasDe(cuerpo, this.resolver, ctx, undefined, METADATOS);
   }

@@ -22,6 +22,11 @@ export interface ContextoTrama {
   // Del tópico de pasarela (sitio/<s>/pasarela/<id>/<deveui>/<evento>, docs/10 §8.4 punto 47): el adaptador exige que el DevEUI
   // del cuerpo sea este. En el tópico de un dispositivo directo no existe.
   deveui?: string;
+  // Perfil de decodificación del nodo (dispositivo.decodificador, migración 17): con él, un adaptador de pasarela decodifica la
+  // `data` en base64 cuando la pasarela la entrega sin decodificar (docs/10 §8.4 punto 47).
+  decodificador?: string;
+  // Salida del adaptador: el contador de trama LoRaWAN (fCnt), con el que el filtro 3 descarta la trama repetida (docs/10 §4.1).
+  fcnt?: number;
   // Salida del adaptador: claves del JSON decodificado que no están en el mapa (la línea de registro de la trama dice cuántas y nombra las cinco primeras).
   ignoradas?: string[];
 }

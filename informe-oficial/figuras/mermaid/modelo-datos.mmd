@@ -71,10 +71,12 @@ erDiagram
         text via
         text formato FK
         uuid pasarela_id FK
+        text decodificador
     }
     estado_dispositivo {
         uuid dispositivo_id PK,FK
         timestamptz visto_por_ultima_vez
+        bigint ultimo_fcnt
     }
     evento {
         uuid id PK

@@ -1,4 +1,4 @@
--- Reglas de identidad de las migraciones 11, 15 y 16 (docs/10 §8.4 puntos 24 y 47), plantadas: cada caso intenta lo prohibido y espera el
+-- Reglas de identidad de las migraciones 11, 15, 16 y 17 (docs/10 §8.4 puntos 24 y 47; §4.1), plantadas: cada caso intenta lo prohibido y espera el
 -- rechazo de la base. Todo ocurre dentro de una transacción que termina en ROLLBACK: no queda nada en la base.
 -- La corre el guardián (paso 1c). La carrera de dos altas simultáneas no cabe en una sola sesión: se probó a mano (docs/16 §13).
 BEGIN;
@@ -119,6 +119,45 @@ BEGIN
     INSERT INTO resultado VALUES (14, 'OK    credencial de una pasarela: aceptada');
   EXCEPTION WHEN OTHERS THEN
     INSERT INTO resultado VALUES (14, 'FALLA se rechazó la credencial legítima de una pasarela: ' || SQLERRM);
+  END;
+  -- Migración 17: el perfil de decodificación solo en la vía lorawan y de la lista; el contador de trama cabe en 32 bits sin signo.
+  BEGIN
+    UPDATE dispositivo SET decodificador = 'campus-heltec-v3-v1' WHERE id_fisico = 'prueba-identidad-d';
+    INSERT INTO resultado VALUES (15, 'FALLA un dispositivo directo aceptó un perfil de decodificación');
+  EXCEPTION WHEN check_violation THEN
+    GET STACKED DIAGNOSTICS restriccion = CONSTRAINT_NAME;
+    INSERT INTO resultado VALUES (15, CASE WHEN restriccion = 'ck_dispositivo_decodificador_via' THEN 'OK    perfil de decodificación en un dispositivo mqtt: rechazado'
+      ELSE 'FALLA perfil en un dispositivo mqtt rechazado por otra regla: ' || restriccion END);
+  END;
+  BEGIN
+    UPDATE dispositivo SET decodificador = 'perfil-inexistente' WHERE id_fisico = 'prueba-identidad-n';
+    INSERT INTO resultado VALUES (16, 'FALLA se aceptó un perfil que no está en la lista');
+  EXCEPTION WHEN check_violation THEN
+    GET STACKED DIAGNOSTICS restriccion = CONSTRAINT_NAME;
+    INSERT INTO resultado VALUES (16, CASE WHEN restriccion = 'ck_dispositivo_decodificador' THEN 'OK    perfil fuera de la lista: rechazado'
+      ELSE 'FALLA perfil fuera de la lista rechazado por otra regla: ' || restriccion END);
+  END;
+  BEGIN
+    UPDATE dispositivo SET decodificador = 'campus-heltec-v3-v1' WHERE id_fisico = 'prueba-identidad-n';
+    INSERT INTO resultado VALUES (17, 'OK    perfil campus-heltec-v3-v1 en un nodo lorawan: aceptado');
+  EXCEPTION WHEN OTHERS THEN
+    INSERT INTO resultado VALUES (17, 'FALLA se rechazó un perfil legítimo en un nodo lorawan: ' || SQLERRM);
+  END;
+  BEGIN
+    INSERT INTO estado_dispositivo (dispositivo_id, visto_por_ultima_vez, ultimo_fcnt)
+      SELECT id, now(), 4294967296 FROM dispositivo WHERE id_fisico = 'prueba-identidad-n';
+    INSERT INTO resultado VALUES (18, 'FALLA se aceptó un contador de trama de más de 32 bits');
+  EXCEPTION WHEN check_violation THEN
+    GET STACKED DIAGNOSTICS restriccion = CONSTRAINT_NAME;
+    INSERT INTO resultado VALUES (18, CASE WHEN restriccion = 'ck_estado_dispositivo_ultimo_fcnt' THEN 'OK    contador de trama 2^32: rechazado'
+      ELSE 'FALLA contador 2^32 rechazado por otra regla: ' || restriccion END);
+  END;
+  BEGIN
+    INSERT INTO estado_dispositivo (dispositivo_id, visto_por_ultima_vez, ultimo_fcnt)
+      SELECT id, now(), 4294967295 FROM dispositivo WHERE id_fisico = 'prueba-identidad-n';
+    INSERT INTO resultado VALUES (19, 'OK    contador de trama 2^32 - 1: aceptado');
+  EXCEPTION WHEN OTHERS THEN
+    INSERT INTO resultado VALUES (19, 'FALLA se rechazó el contador máximo legítimo: ' || SQLERRM);
   END;
 END $$;
 SELECT linea FROM resultado ORDER BY orden;

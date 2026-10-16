@@ -22,14 +22,15 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
   const T_BASE = new Date('2026-10-09T15:00:00.123456Z'); // la marca que «pone la base» en los RETURNING
 
   // El dispositivo de prueba declara «plano» salvo que la prueba diga otro formato (despacho por formato: docs/10 §8.4 punto 47).
-  type Disp = { id: string; estado: string; sitio_codigo?: string; formato?: string; pasarela_id?: string | null };
+  type Disp = { id: string; estado: string; sitio_codigo?: string; formato?: string; pasarela_id?: string | null; decodificador?: string | null; ultimo_fcnt?: string | null };
   type Pas = { id: string; activo: boolean; sitio_codigo: string };
   function armar(dispositivo: Disp | undefined, duplicada = false, pasarela?: Pas) {
     const canal = { id: 'k1', magnitud: 'temperatura', unidad_canonica: 'Cel', rango_min: -40, rango_max: 85 };
     const query = jest.fn((sql: string, params?: unknown[]) => {
       // El dispositivo de prueba está registrado en el sitio «uct», el mismo del tópico, salvo que la prueba diga otro.
-      if (sql.startsWith('SELECT d.id, d.estado, d.formato, d.pasarela_id, s.codigo AS sitio_codigo FROM dispositivo')) {
-        return Promise.resolve({ rows: dispositivo ? [{ sitio_codigo: 'uct', formato: 'plano', pasarela_id: null, ...dispositivo }] : [], rowCount: dispositivo ? 1 : 0 });
+      if (sql.startsWith('SELECT d.id, d.estado, d.formato, d.pasarela_id, s.codigo AS sitio_codigo, d.decodificador, e.ultimo_fcnt FROM dispositivo')) {
+        const fila = { sitio_codigo: 'uct', formato: 'plano', pasarela_id: null, decodificador: null, ultimo_fcnt: null, ...dispositivo };
+        return Promise.resolve({ rows: dispositivo ? [fila] : [], rowCount: dispositivo ? 1 : 0 });
       }
       if (sql.startsWith('SELECT p.id, p.activo, s.codigo AS sitio_codigo FROM pasarela')) {
         return Promise.resolve({ rows: pasarela ? [pasarela] : [], rowCount: pasarela ? 1 : 0 });
@@ -377,6 +378,77 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
       await servicio.procesar('sitio/u\u202Ect/pasarela/chirpstack-campus/0101010101010101/up', up());
       expect(cuarentenas(query)).toEqual(['no_registrado']);
       expect(detalle(query)).toContain('no en «u?ct»');
+    });
+    // Forma nativa de la pasarela Milesight bajo nuestro árbol (16/10): lo que deja el puente de Mosquitto al cambiar el prefijo.
+    const T_NATIVO = 'sitio/uct/pasarela/ug65-campus/device/0101010101010101/event/up';
+    const conFcnt = (fCnt: number) => Buffer.from(JSON.stringify({ time: '2026-10-15T12:00:00Z', fCnt, deviceInfo: { devEui: '0101010101010101' }, object: { temperature: 21.5 } }));
+    const medicionesDe = (query: jest.Mock) => query.mock.calls.filter(([sql]) => String(sql).trimStart().startsWith('INSERT INTO medicion'));
+    const fcntGuardado = (query: jest.Mock) => (query.mock.calls.find(([sql]) => String(sql).startsWith('INSERT INTO estado_dispositivo'))?.[1] as unknown[])?.[1];
+    it('sufijo nativo device/<deveui>/event/up → el mismo filtro 1 y la lectura guardada; event/join → nada escrito', async () => {
+      const { servicio, query, marcarVivo } = armar(NODO, false, PAS);
+      await servicio.procesar(T_NATIVO, up());
+      expect(cuarentenas(query)).toEqual([]);
+      expect(medicionesDe(query)).toHaveLength(1);
+      const busqueda = query.mock.calls.find(([sql]) => String(sql).startsWith('SELECT d.id'))?.[1] as unknown[];
+      expect(busqueda[0]).toBe('0101010101010101');
+      expect(marcarVivo).toHaveBeenCalledWith('n1', '0101010101010101');
+      const join = armar(NODO, false, PAS);
+      await join.servicio.procesar(T_NATIVO.replace('/event/up', '/event/join'), Buffer.from('{}'));
+      expect(escrituras(join.query)).toEqual([]);
+    });
+    it('una forma a medias (device/<deveui>/up, o <deveui>/event/up) → malformada «tópico fuera de los dos patrones»', async () => {
+      for (const t of ['sitio/uct/pasarela/ug65-campus/device/0101010101010101/up', 'sitio/uct/pasarela/ug65-campus/0101010101010101/event/up']) {
+        const { servicio, query, marcarVivo } = armar(NODO, false, PAS);
+        await servicio.procesar(t, up());
+        expect(cuarentenas(query)).toEqual(['malformada']);
+        expect(detalle(query)).toContain('tópico fuera de los dos patrones');
+        expect(marcarVivo).not.toHaveBeenCalled();
+      }
+    });
+    it('el mismo fCnt que la última trama guardada → descartada sin cuarentena ni lecturas, nodo vivo y contador intacto', async () => {
+      const { servicio, query, marcarVivo, evaluar } = armar({ ...NODO, ultimo_fcnt: '142' }, false, PAS);
+      await servicio.procesar(T_UP, conFcnt(142));
+      expect(medicionesDe(query)).toHaveLength(0);
+      expect(cuarentenas(query)).toEqual([]);
+      expect(query.mock.calls.some(([sql]) => String(sql).startsWith('INSERT INTO trama'))).toBe(false);
+      expect(evaluar).not.toHaveBeenCalled();
+      expect(marcarVivo).toHaveBeenCalledWith('n1', '0101010101010101');
+      expect(fcntGuardado(query)).toBeNull(); // COALESCE conserva el que había
+    });
+    it('un fCnt menor (re-unión a la red) o mayor → se guarda y el contador pasa a ser el de esta trama', async () => {
+      for (const fCnt of [3, 143]) {
+        const { servicio, query } = armar({ ...NODO, ultimo_fcnt: '142' }, false, PAS);
+        await servicio.procesar(T_UP, conFcnt(fCnt));
+        expect(medicionesDe(query)).toHaveLength(1);
+        expect(fcntGuardado(query)).toBe(fCnt);
+      }
+    });
+    it('el contador solo se guarda si la trama dejó alguna lectura nueva: repetida por canal + instante, o sin fCnt → no cambia', async () => {
+      const dup = armar({ ...NODO, ultimo_fcnt: '10' }, true, PAS); // ON CONFLICT DO NOTHING: nada nuevo
+      await dup.servicio.procesar(T_UP, conFcnt(11));
+      expect(fcntGuardado(dup.query)).toBeNull();
+      const sinFcnt = armar(NODO, false, PAS);
+      await sinFcnt.servicio.procesar(T_UP, up());
+      expect(fcntGuardado(sinFcnt.query)).toBeNull();
+      const primera = armar(NODO, false, PAS); // nodo sin contador guardado todavía
+      await primera.servicio.procesar(T_UP, conFcnt(0));
+      expect(fcntGuardado(primera.query)).toBe(0);
+    });
+    it('el perfil del alta llega al adaptador: la captura saneada de la UG65 por el sufijo nativo → 18,16 °C guardados con su marca', async () => {
+      const captura = { devEUI: '0101010101010101', fCnt: 142, fPort: 1, data: 'AgAAAI8HGBmYrw==', rxInfo: [], time: '2026-10-15T15:34:56.340333Z' };
+      const { servicio, query, marcarVivo } = armar({ ...NODO, formato: 'milesight', decodificador: 'campus-heltec-v3-v1' }, false, PAS);
+      await servicio.procesar(T_NATIVO, Buffer.from(JSON.stringify(captura)));
+      const [fila] = medicionesDe(query).map(([, params]) => params as unknown[]);
+      expect(fila.slice(1, 4)).toEqual([new Date('2026-10-15T15:34:56.340Z'), 18.16, 'Cel']);
+      expect(fila[5]).toBe('pasarela');
+      // El canal de prueba solo declara temperatura: humedad y tensión van a «invalida», que es lo que haría un alta incompleta.
+      expect(cuarentenas(query)).toEqual(['invalida']);
+      expect(fcntGuardado(query)).toBe(142);
+      expect(marcarVivo).toHaveBeenCalled();
+      const sinPerfil = armar({ ...NODO, formato: 'milesight' }, false, PAS);
+      await sinPerfil.servicio.procesar(T_NATIVO, Buffer.from(JSON.stringify(captura)));
+      expect(detalle(sinPerfil.query)).toContain('declarar el perfil de decodificación del nodo');
+      expect(sinPerfil.marcarVivo).toHaveBeenCalled(); // su DevEUI se verificó
     });
     it('un formato directo por el tópico de pasarela → malformada «no se recibe por este tópico», y el nodo NO se marca vivo', async () => {
       // Hoy la clave foránea compuesta de la migración 15 lo impide; si se relajara, el filtro 2 no debe abrir una señal de vida.
