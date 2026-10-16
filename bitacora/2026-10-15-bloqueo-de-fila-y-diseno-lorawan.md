@@ -72,8 +72,5 @@
 - Prueba acordada para el martes 20/10 en la misma red local de la facultad. Camino elegido: un puente desde su broker hacia el
   nuestro por 8883 con TLS, autenticado como la pasarela, para que sus datos sigan llegando a su panel y a nosotros una copia. Se
   descartó un broker público de un proveedor (sin autenticación) y, por ahora, un envío HTTP a una dirección pública que no existe.
-- La forma del mensaje que describió (valores bajo `object`, `battery_pct`) difiere de la guía del fabricante y de su propio primer
-  mensaje; probada con un identificador sintético, el adaptador la rechaza. Antes del martes se pide una captura real y se amplía el
-  adaptador (`docs/10 §8.4` punto 47, nota del 15/10). Lección: un mensaje escrito en un chat no es una captura.
-- Su panel muestra cada trama dos veces y la misma calidad de señal en todas: dos preguntas más, y una decisión abierta sobre
-  deduplicar por contador de trama.
+- La forma del mensaje que describió primero difería de la guía del fabricante y de su propio mensaje anterior; la captura real, pedida ese mismo día, mostró una tercera: la pasarela publica la trama binaria sin decodificar, con marca de tiempo UTC con zona (la regla 17 de `docs/13` decía que venía sin zona: corregida). Antes del martes: decodificación por perfil de dispositivo y sufijo nativo en el tópico de pasarela (`docs/10 §8.4` punto 47, nota del 15/10). Lección: un mensaje escrito en un chat no es una captura; se decide contra la salida literal del broker.
+- Su panel mostraba cada trama dos veces y la misma calidad de señal en todas: resultó una doble suscripción de su cliente y un valor por defecto de su script, ya corregidos por él; con la marca de tiempo del mensaje, la identidad de lectura existente ya deduplica una reentrega.
