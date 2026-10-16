@@ -15,7 +15,7 @@ sequenceDiagram
     else pasarela no registrada, inactiva o de otro sitio
         F1->>Q: guarda cruda, motivo "no_registrado"
     else evento de pasarela distinto de "up"
-        Note right of F1: se cuenta en el registro<br/>(no es trama: no se escribe)
+        Note right of F1: se anota en el registro<br/>(no es trama: no se escribe)
     else dispositivo no registrado, dado de baja<br/>o nodo ajeno a su pasarela
         F1->>Q: guarda cruda, motivo "no_registrado" o "dado_de_baja"
     else conocido y no dado de baja

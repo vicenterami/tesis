@@ -91,6 +91,10 @@ describe('ChirpstackAdaptador (evento up de ChirpStack v4)', () => {
     expect(() => a.analizar(ctx(eventoUp({ object: { temperature: 'n/a' } })))).toThrow('temperature: no es un número');
     expect(a.analizar(ctx(eventoUp({ time: '2022-07-18T09:34:15' }))) [0].tiempo).toBeUndefined();
   });
+  it('sin DevEUI en el tópico (un tópico directo) → malformada: cerrado por omisión', () => {
+    // Ojo: ctx(cuerpo, undefined) activaría el valor por defecto del parámetro; se arma el contexto sin DevEUI a propósito.
+    expect(() => a.analizar({ ...ctx(eventoUp()), deveui: undefined })).toThrow('sin DevEUI en el tópico');
+  });
   it('JSON inválido o que no es objeto → TramaMalformada', () => {
     expect(() => a.analizar(ctx('{"deviceInfo":'))).toThrow(TramaMalformada);
     expect(() => a.analizar(ctx('[1]'))).toThrow(TramaMalformada);

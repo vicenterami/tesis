@@ -9,7 +9,8 @@ import type { ResolverClave } from './mapa-claves';
 // Codec» y «Metadata» activados: el mensaje es lo que devuelve el decodificador más devEUI, deviceName y applicationID. Ejemplo:
 //   {"devEUI":"…","deviceName":"EM300","applicationID":"1","temperature":30.8,"humidity":50.5,"battery":92}
 // Sin códec llega otra forma (data en base64, fPort, rxInfo): no se decodifica aquí y va a cuarentena diciendo qué activar.
-// Hora: con códec no hay hora civil y sin códec llega sin zona (docs/13, regla 17): siempre rige la hora de recepción.
+// Hora: con códec no hay hora civil y sin códec llega sin zona (docs/13, regla 17): el adaptador no entrega marca, así que siempre rige
+// la hora de recepción. `origenTiempo` dice qué origen tendría una marca si la entregara (la de la pasarela); hoy no se usa.
 const METADATOS = new Set(['devEUI', 'deviceName', 'applicationID', 'applicationName']);
 
 @Injectable()

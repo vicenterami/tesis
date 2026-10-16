@@ -468,10 +468,13 @@ export class AltaService {
     if (z.rows.length === 0) throw new BadRequestException(['zona_id no existe']);
     const sitio: { id: string; codigo: string; formatoPasarela: Formato | null } = { id: z.rows[0].sitio_id, codigo: z.rows[0].codigo, formatoPasarela: null };
     if (a.pasarela_id !== null) {
-      const p = await c.query<{ sitio_id: string; activo: boolean; formato: Formato }>('SELECT sitio_id, activo, formato FROM pasarela WHERE id = $1', [a.pasarela_id]);
+      // FOR SHARE: una baja de la pasarela en curso (FOR NO KEY UPDATE) espera a este alta o este alta espera a la baja; sin el
+      // bloqueo, un nodo podía quedar asociado a una pasarela recién dada de baja (revisión del 15/10).
+      const p = await c.query<{ sitio_id: string; activo: boolean; formato: Formato; id_fisico: string }>(
+        'SELECT sitio_id, activo, formato, id_fisico FROM pasarela WHERE id = $1 FOR SHARE', [a.pasarela_id]);
       if (p.rows.length === 0) throw new BadRequestException(['pasarela_id no existe']);
-      if (p.rows[0].sitio_id !== sitio.id) throw new BadRequestException(['la pasarela pertenece a otro sitio']);
-      if (!p.rows[0].activo) throw new BadRequestException(['la pasarela está inactiva']);
+      if (p.rows[0].sitio_id !== sitio.id) throw new BadRequestException([`la pasarela ${p.rows[0].id_fisico} pertenece a otro sitio`]);
+      if (!p.rows[0].activo) throw new BadRequestException([`la pasarela ${p.rows[0].id_fisico} está dada de baja`]);
       sitio.formatoPasarela = p.rows[0].formato;
     }
     return sitio;

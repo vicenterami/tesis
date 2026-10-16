@@ -30,7 +30,7 @@ function armar(opciones: { insertFalla?: string; insertRestriccion?: string; com
       sql.push(texto);
       params.push(p);
       if (texto.startsWith('SELECT z.sitio_id')) return { rows: p[0] === Z ? [{ sitio_id: 'S1', codigo: 'uct' }] : [] };
-      if (texto.startsWith('SELECT sitio_id, activo, formato FROM pasarela')) return { rows: opciones.pasarela === null ? [] : [{ formato: 'milesight', ...(opciones.pasarela ?? { sitio_id: 'S1', activo: true }) }] };
+      if (texto.startsWith('SELECT sitio_id, activo, formato, id_fisico FROM pasarela')) return { rows: opciones.pasarela === null ? [] : [{ formato: 'milesight', id_fisico: 'pas-01', ...(opciones.pasarela ?? { sitio_id: 'S1', activo: true }) }] };
       if (texto.startsWith('SELECT codigo, unidad_canonica')) return { rows: [{ codigo: 'humedad', unidad_canonica: '%RH' }, { codigo: 'temperatura', unidad_canonica: 'Cel' }] };
       if (texto.startsWith('INSERT INTO dispositivo')) {
         if (opciones.insertFalla !== undefined) throw Object.assign(new Error('duplicate key'), { code: opciones.insertFalla, constraint: opciones.insertRestriccion });
@@ -131,11 +131,12 @@ describe('AltaService.crear (HU-11): todo o nada entre la base y el broker', () 
     const r = await servicio.crear(alta({ via: 'lorawan', formato: null, pasarela_id: P }));
     expect(r.conexion.via).toBe('lorawan');
     expect(r.formato).toBe('milesight'); // lo copió de la pasarela: el nodo lorawan no declara formato (migración 15)
+    expect(sql.find((s) => s.startsWith('SELECT sitio_id, activo, formato, id_fisico FROM pasarela'))).toContain('FOR SHARE'); // no se cruza con una baja
     expect(sql.some((s) => s.startsWith('INSERT INTO credencial'))).toBe(false);
     expect(ordenes).toHaveLength(0);
     expect(await motivosDe(armar({ pasarela: null }).servicio.crear(alta({ via: 'lorawan', formato: null, pasarela_id: P })))).toEqual(['pasarela_id no existe']);
-    expect(await motivosDe(armar({ pasarela: { sitio_id: 'OTRO', activo: true } }).servicio.crear(alta({ via: 'lorawan', formato: null, pasarela_id: P })))).toEqual(['la pasarela pertenece a otro sitio']);
-    expect(await motivosDe(armar({ pasarela: { sitio_id: 'S1', activo: false } }).servicio.crear(alta({ via: 'lorawan', formato: null, pasarela_id: P })))).toEqual(['la pasarela está inactiva']);
+    expect(await motivosDe(armar({ pasarela: { sitio_id: 'OTRO', activo: true } }).servicio.crear(alta({ via: 'lorawan', formato: null, pasarela_id: P })))).toEqual(['la pasarela pas-01 pertenece a otro sitio']);
+    expect(await motivosDe(armar({ pasarela: { sitio_id: 'S1', activo: false } }).servicio.crear(alta({ via: 'lorawan', formato: null, pasarela_id: P })))).toEqual(['la pasarela pas-01 está dada de baja']);
   });
 
   it('lorawan: el nodo copia el formato de su pasarela (chirpstack) en el INSERT, el evento y la respuesta', async () => {

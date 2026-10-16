@@ -67,7 +67,7 @@ SELECT CASE WHEN EXISTS (SELECT 1 FROM pg_constraint WHERE conname='ck_cuarenten
 SELECT CASE WHEN (SELECT count(*) FROM timescaledb_information.hypertables WHERE hypertable_name='metrica_broker')=1 AND (SELECT count(*) FROM pg_indexes WHERE tablename='condicion_sistema' AND indexname='uq_condicion_sistema_abierta')=1 AND (SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname='ck_condicion_sistema_tipo') LIKE '%broker_descarte%' THEN 'OK    13 metrica_broker es hypertable; condicion_sistema con una abierta por tipo y dominio cerrado' ELSE 'FALLA 13 falta metrica_broker (hypertable) o condicion_sistema (índice único parcial o CHECK)' END;
 SELECT CASE WHEN (SELECT count(*) FROM pg_roles WHERE rolname='plataforma_app' AND NOT rolsuper AND NOT rolcreaterole AND NOT rolcreatedb)=1 AND NOT EXISTS (SELECT 1 FROM information_schema.role_table_grants WHERE grantee='plataforma_app' AND privilege_type IN ('DELETE','TRUNCATE','REFERENCES','TRIGGER')) AND NOT has_table_privilege('plataforma_app', 'evento', 'UPDATE') AND NOT has_table_privilege('plataforma_app', 'medicion', 'UPDATE') AND NOT has_table_privilege('plataforma_app', 'magnitud', 'INSERT') AND has_table_privilege('plataforma_app', 'estado_dispositivo', 'UPDATE') AND (SELECT prosecdef FROM pg_proc WHERE proname='fn_retencion_drop_chunks') AND NOT has_function_privilege('public', 'fn_retencion_drop_chunks(text,integer)', 'EXECUTE') THEN 'OK    14 plataforma_app sin superusuario, sin DELETE/TRUNCATE, sin reescribir evento ni medicion; fn_retencion_drop_chunks SECURITY DEFINER y no ejecutable por PUBLIC' ELSE 'FALLA 14 rol de la aplicación con más permisos de los debidos, o falta la función de retención' END;
 SELECT CASE WHEN (SELECT is_nullable='NO' AND column_default IS NULL FROM information_schema.columns WHERE table_name='pasarela' AND column_name='formato') AND (SELECT pg_get_constraintdef(oid) LIKE '%chirpstack%' FROM pg_constraint WHERE conname='ck_dispositivo_formato' AND conrelid='dispositivo'::regclass) AND EXISTS (SELECT 1 FROM pg_constraint WHERE conname='ck_dispositivo_via_formato' AND conrelid='dispositivo'::regclass) AND EXISTS (SELECT 1 FROM pg_constraint WHERE conname='fk_dispositivo_pasarela_formato' AND conrelid='dispositivo'::regclass AND contype='f' AND confupdtype='c') THEN 'OK    15 pasarela.formato declarado (sin valor por defecto) y heredado por sus nodos (clave foránea compuesta en cascada)' ELSE 'FALLA 15 falta pasarela.formato o la herencia del formato (migración 15)' END;
-SELECT CASE WHEN EXISTS (SELECT 1 FROM pg_constraint WHERE conname='ck_credencial_titular' AND conrelid='credencial'::regclass) AND (SELECT is_nullable='YES' FROM information_schema.columns WHERE table_name='credencial' AND column_name='dispositivo_id') AND has_table_privilege('plataforma_app', 'pasarela', 'INSERT') AND has_table_privilege('plataforma_app', 'pasarela', 'UPDATE') THEN 'OK    16 credencial con un titular (dispositivo o pasarela) y la aplicación escribe pasarelas' ELSE 'FALLA 16 falta la credencial de pasarela o el permiso de la aplicación (migración 16)' END;
+SELECT CASE WHEN EXISTS (SELECT 1 FROM pg_constraint WHERE conname='ck_credencial_titular' AND conrelid='credencial'::regclass) AND (SELECT is_nullable='YES' FROM information_schema.columns WHERE table_name='credencial' AND column_name='dispositivo_id') AND has_table_privilege('plataforma_app', 'pasarela', 'INSERT') AND has_column_privilege('plataforma_app', 'pasarela', 'activo', 'UPDATE') AND NOT has_column_privilege('plataforma_app', 'pasarela', 'formato', 'UPDATE') AND NOT has_column_privilege('plataforma_app', 'pasarela', 'sitio_id', 'UPDATE') THEN 'OK    16 credencial con un titular (dispositivo o pasarela); la aplicación inserta pasarelas y solo cambia su columna activo' ELSE 'FALLA 16 falta la credencial de pasarela o el permiso de la aplicación (migración 16)' END;
 SQL
 exige "$VT"/mig.txt "${PIPESTATUS[0]}" 16 || fallos=$((fallos+1))
 # Toda migración en disco debe tener su comprobación arriba: una 08 nueva sin comprobación falla aquí,
@@ -134,7 +134,8 @@ fi
 
 paso "2f2. Bitácoras sin horario personal: ni «(madrugada)» ni «(tarde…)» ni «(noche)» (revisión del 15/10)"
 # La regla de privacidad prohíbe horarios personales en el repositorio; las bitácoras los dejaban en el título de la sesión.
-horarios=$(grep -nE '\((madrugada|tarde|noche)[^)]*\)|, (madrugada|tarde|noche)\)' bitacora/*.md)
+# 15/10, segunda revisión: también «por la noche», «de madrugada» y una hora del reloj («a las 23:20»), que el primer patrón no veía.
+horarios=$(grep -niE '\((madrugada|tarde|noche)[^)]*\)|, (madrugada|tarde|noche)\)|por la (noche|tarde|mañana)|de madrugada|a las [0-9]{1,2}:[0-9]{2}' bitacora/*.md)
 nb=$(ls bitacora/*.md | wc -l)
 if [ -n "$horarios" ]; then echo "FALLA bitácoras con horario personal:"; echo "$horarios" | cut -c1-120 | sed 's/^/  /'; fallos=$((fallos+1))
 else echo "OK    $nb bitácoras revisadas, ninguna dice a qué hora se trabajó"; fi
@@ -181,7 +182,7 @@ else
 fi
 # 15/10: una ruta diseñada y aún no servida se cita con la marca «(ruta prevista)» en la misma línea (p. ej. `POST /pasarelas`
 # (ruta prevista)); se acepta sin existir, pero la excepción se vacía sola: si ese VERBO y esa ruta ya existen en el OpenAPI, la
-# marca venció y el guardián exige quitarla (lección del kit de método: guardianes con excepciones que se vacían). Revisión del
+# marca venció y el guardián exige quitarla (regla de los guardianes: una excepción se vacía sola). Revisión del
 # 15/10: (a) la marca exime la línea entera, así que una línea marcada lleva UNA sola ruta (con dos, la no prevista se saltaba el
 # chequeo de arriba); (b) se compara verbo y ruta, no solo la ruta: que exista GET /x no vence la marca de POST /x. Las marcas
 # «(Etapa 3/4)» y «Propuesta» son de pantallas y propuestas (docs/19, docs/20): citan rutas que pueden existir, sin exigencia.
@@ -369,8 +370,9 @@ PY
 paso "2p. Repositorio público: ningún archivo versionado cita fichas privadas (viven en privado/, un lector no las abre)"
 # 08/10: 19 referencias en 12 archivos apuntaban a fichas de decisión privadas (formato D, guion y dos dígitos). Lo público
 # cita lo público: la sección de docs/10 §8.4 o de docs/11 donde quedó la decisión.
-# 15/10: lo mismo con los pendientes privados (la palabra y su número): siete referencias en seis archivos, quitadas y vigiladas.
-git grep --untracked -n -E 'ficha D-[0-9]{2}|decisi[oó]n D-[0-9]{2}|\bD-[0-9]{2}\b|\bpendientes? [0-9]{1,3}\b' -- ':!privado' ':!historico' > "$VT"/fichas.txt 2>&1; rc=$?
+# 15/10: lo mismo con los pendientes privados (la palabra y su número): siete referencias en seis archivos, quitadas y vigiladas; y
+# con el «registro» de evidencia privado: lo público cita la URL de la fuente, no el registro donde se anotó.
+git grep --untracked -n -E 'ficha D-[0-9]{2}|decisi[oó]n D-[0-9]{2}|\bD-[0-9]{2}\b|\bpendientes? [0-9]{1,3}\b|registro privad[o]' -- ':!privado' ':!historico' > "$VT"/fichas.txt 2>&1; rc=$?
 if [ "$rc" -eq 0 ]; then echo "FALLA archivos públicos que citan fichas o pendientes privados:"; cut -c1-160 "$VT"/fichas.txt; fallos=$((fallos+1))
 elif [ "$rc" -ne 1 ]; then echo "FALLA git grep falló ($rc): no se pudo revisar"; fallos=$((fallos+1))
 else echo "OK    ningún archivo versionado cita fichas ni pendientes privados"; fi

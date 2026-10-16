@@ -25,8 +25,10 @@ export function objetoJson(texto: string): Record<string, unknown> {
 // El DevEUI se compara en minúsculas, la forma que exige `id_fisico` (la base y el alta solo admiten [a-z0-9-]).
 export function exigirDevEui(cuerpo: unknown, ctx: ContextoTrama, campo: string): void {
   if (typeof cuerpo !== 'string' || cuerpo.trim() === '') throw new TramaMalformada(`sin ${campo}`);
+  // Sin DevEUI en el tópico no hay con qué comparar: se rechaza (cerrado por omisión), aunque hoy el despacho no lo permita.
+  if (ctx.deveui === undefined) throw new TramaMalformada('sin DevEUI en el tópico: solo se recibe por el tópico de su pasarela');
   const delCuerpo = cuerpo.trim().toLowerCase();
-  if (ctx.deveui !== undefined && delCuerpo !== ctx.deveui.toLowerCase()) {
+  if (delCuerpo !== ctx.deveui.toLowerCase()) {
     throw new IdentidadCruzada(`DevEUI del cuerpo ${delCuerpo.slice(0, 32)} ≠ tópico ${ctx.deveui.toLowerCase().slice(0, 32)}`);
   }
 }

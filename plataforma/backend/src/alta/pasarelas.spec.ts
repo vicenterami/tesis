@@ -11,7 +11,7 @@ const S = '55555555-5555-4555-8555-555555555555';
 const P = '66666666-6666-4666-8666-666666666666';
 const cuerpo = { id_fisico: 'chirpstack-campus', nombre: 'ChirpStack del campus', sitio_id: S, formato: 'chirpstack' };
 
-function armar(opciones: { sitio?: { codigo: string; activo: boolean } | null; fila?: { activo: boolean; formato?: string } | null; brokerFalla?: Error; disponible?: boolean } = {}) {
+function armar(opciones: { sitio?: { codigo: string; activo: boolean } | null; fila?: { activo: boolean; formato?: string } | null; brokerFalla?: Error; disponible?: boolean; insertFalla?: string } = {}) {
   const sql: string[] = [];
   const params: unknown[][] = [];
   const cliente = {
@@ -20,7 +20,10 @@ function armar(opciones: { sitio?: { codigo: string; activo: boolean } | null; f
       sql.push(texto);
       params.push(p);
       if (texto.startsWith('SELECT codigo, activo FROM sitio')) return { rows: opciones.sitio === null ? [] : [opciones.sitio ?? { codigo: 'uct', activo: true }] };
-      if (texto.startsWith('INSERT INTO pasarela')) return { rows: [{ id: P, creado_en: new Date('2026-10-15T23:00:00Z') }] };
+      if (texto.startsWith('INSERT INTO pasarela')) {
+        if (opciones.insertFalla) throw Object.assign(new Error('duplicate key'), { code: opciones.insertFalla });
+        return { rows: [{ id: P, creado_en: new Date('2026-10-15T23:00:00Z') }] };
+      }
       if (texto.trimStart().startsWith('SELECT p.id, p.id_fisico, p.activo')) {
         return { rows: opciones.fila === null ? [] : [{ id: P, id_fisico: 'chirpstack-campus', sitio_codigo: 'uct', formato: 'chirpstack', ...(opciones.fila ?? { activo: true }) }] };
       }
@@ -89,6 +92,11 @@ describe('AltaService: pasarelas (rutas B y C)', () => {
     expect(sql).toContain('ROLLBACK');
     expect(sql).not.toContain('COMMIT');
     expect(ordenes.map((o) => o[0].command)).toEqual(['createClient', 'deleteClient']);
+  });
+  it('alta con un identificador ya usado (por una pasarela o un dispositivo) → 409, sin tocar el broker', async () => {
+    const { servicio, ordenes } = armar({ insertFalla: '23505' });
+    await expect(servicio.crearPasarela(validarPasarela(cuerpo))).rejects.toThrow(ConflictException);
+    expect(ordenes).toHaveLength(0);
   });
   it('baja: activo = false, credenciales revocadas, nodos contados, evento y deleteClient ANTES del COMMIT', async () => {
     const { servicio, sql, ordenes } = armar();

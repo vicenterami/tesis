@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 230 pruebas unitarias, sin matriz formal) y TT-32 (sensor físico);
+cubre todavía: TT-27 (contrato de trama: hoy 234 pruebas unitarias, sin matriz formal) y TT-32 (sensor físico);
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -632,7 +632,7 @@ broker (hasta 5 s). Cada trama y cada evento del mismo dispositivo insertan una 
 `FOR KEY SHARE` y `FOR NO KEY UPDATE` no. Como la recepción procesa un mensaje a la vez (`docs/10 §8.4` decisión 4), una trama
 que espera retiene a las de todos los dispositivos.
 
-**Medición** (`plataforma/pruebas/medir-bloqueo-fila.sh`, contra la base de desarrollo; dos sesiones, todo en transacciones que
+**Medición** (`plataforma/pruebas/medir-bloqueo-fila.sh --desarrollo`, solo contra la base de desarrollo; dos sesiones, todo en transacciones que
 terminan en `ROLLBACK` y el guion comprueba al final que no quedó ninguna fila; la sesión A toma la fila y duerme, la B espera a verla
 dormida, es decir, con la fila ya tomada, e inserta una trama hija con `lock_timeout = '1s'`; el tiempo de B lo mide la base con
 `clock_timestamp()`; tres corridas el 15/10/2026):
@@ -710,7 +710,7 @@ tópico; un formato de pasarela solo se acepta por el tópico de pasarela y uno 
 | Prueba (`recepcion.service.spec.ts`, con dobles) | Resultado |
 |---|---|
 | `up` de un nodo asociado | lectura guardada, trama cruda con el adaptador `chirpstack`, nodo vivo |
-| Evento `join` | se cuenta en el registro; ninguna escritura en la base |
+| Evento `join` | se anota en el registro de depuración; ninguna escritura en la base |
 | Pasarela sin alta, inactiva o de otro sitio | `no_registrado` con el motivo, con cualquier evento; nadie vivo |
 | DevEUI asociado a otra pasarela | `no_registrado` «DevEUI … no está asociado a la pasarela …» |
 | DevEUI en mayúsculas en el tópico | se busca en minúsculas y entra |
@@ -749,7 +749,7 @@ la ACL del rol y la recepción por el filtro 1.
 **Cómo** (`bash plataforma/pruebas/banco/banco.sh lorawan`). Contra el banco desechable, con el broker, el plugin de seguridad y la base
 reales: se da de alta por API una pasarela ChirpStack, un nodo y una pasarela Milesight, y se publica con la credencial de cada pasarela el
 JSON de su fuente oficial (evento `up` de ChirpStack v4; uplink con códec y Metadata de Milesight). Los secretos viajan por la entrada
-estándar. Resultado: **25 de 25 comprobaciones, «LORAWAN OK»**.
+estándar. Resultado: **25 de 25 comprobaciones, «LORAWAN OK»**; 26 de 26 desde la corrección de §32.
 
 | Comprobación | Resultado |
 |---|---|
@@ -768,3 +768,22 @@ permiso) y la prueba seguía en verde: ahora el plantado exige que la orden se c
 
 **Lo que no prueba.** La radio, la pasarela física y el ChirpStack institucional: eso es la prueba en terreno (`docs/10 §8.4` punto 47). Lo
 que sí deja probado es todo lo que pasa desde que un mensaje llega al broker con la credencial de una pasarela.
+
+## 32. Correcciones al cierre del bloque LoRaWAN (15/10/2026)
+
+Una revisión del bloque completo (de `docs/10 §8.4` punto 47 al banco) encontró 16 puntos; todos se verificaron en el código antes de
+corregirlos. Los que cambian el comportamiento, cada uno con su prueba y plantado:
+
+| Corrección | Prueba |
+|---|---|
+| El alta de un nodo lee su pasarela con `FOR SHARE`: ya no puede cruzarse con la baja de esa pasarela y dejar un nodo asociado a una pasarela dada de baja | `alta.service.spec.ts` exige el bloqueo; el banco da de alta un nodo contra la pasarela ya dada de baja → 400 «la pasarela … está dada de baja» (26 de 26) |
+| La aplicación actualiza solo la columna `activo` de `pasarela` (migración 16): un error no puede cambiar su sitio, su identificador ni su formato, que se propaga a los nodos | guardián (paso 2): `UPDATE` en `activo` sí, en `formato` y `sitio_id` no; la baja del banco funciona con ese permiso |
+| El filtro 1 de pasarela compara también el sitio del nodo con el del tópico (defensa en profundidad) | `recepcion.service.spec.ts`; plantado sin la comparación, falla |
+| Un adaptador LoRaWAN sin DevEUI en el tópico rechaza la trama en vez de omitir la comparación | `lorawan.spec.ts`; plantado con la comparación abierta, falla |
+| Los eventos distintos de `up` se anotan en el registro de depuración (antes en el informativo, que con muchos nodos se llenaba); la prosa dice «se anota», no «se cuenta» | lectura del código y de `docs/10` |
+| `medir-bloqueo-fila.sh` exige `--desarrollo` y verifica también el bloqueo de la pasarela | sin la bandera no corre; con ella, «BLOQUEO DE FILA OK» |
+
+Además: nuevas pruebas del 409 por identificador repetido y del nodo dado de baja por el tópico de su pasarela; mensajes de alta que
+nombran la pasarela; fuentes públicas con URL y cita en el punto 47, en lugar de remitir a evidencia no publicada; estados unificados en `docs/10`,
+`docs/11` y `docs/13`; y en el repositorio público, cero horarios en las bitácoras y cero referencias a registros privados, con los
+chequeos 2f2 y 2p ampliados y plantados. Total: 234 pruebas.

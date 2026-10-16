@@ -1,7 +1,7 @@
 # Decisiones de diseño para la Etapa 3 — 6 de octubre de 2026
 
 - **Sesión de trabajo individual;** origen: la entrevista del 05/10 y el acceso a la nube del fabricante de los
-  equipos de la Facultad (evaluada con capturas; evidencia en el registro privado).
+  equipos de la Facultad (evaluada con capturas).
 
 ## Decisiones (detalle y fuentes en `docs/10 §8.4` y `docs/08 §8`)
 1. Tiempo real por **SSE**, no WebSocket: flujo unidireccional y poco frecuente; reconexión por norma; misma

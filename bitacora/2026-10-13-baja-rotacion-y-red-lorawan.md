@@ -14,7 +14,7 @@
   antes de confirmar. Si el broker no tenía al cliente, se crea con su rol: rotar es también la reparación. Si la respuesta no
   llega, se repite la rotación: la clave anterior puede haber dejado de valer y la nueva nunca se mostró.
 - Las tres rutas comparten la guardia por cabecera, el tope de dos operaciones a la vez y el bloqueo de la fila del dispositivo.
-- Pruebas: 13 unitarias nuevas (185 en total); el banco pasó de 19 a 38 comprobaciones (40 por la noche, con las de mínimo privilegio) (con la credencial anterior el broker ya
+- Pruebas: 13 unitarias nuevas (185 en total); el banco pasó de 19 a 38 comprobaciones (40 al cierre, con las de mínimo privilegio) (con la credencial anterior el broker ya
   no deja conectar, con la nueva publica, dado de baja no entra, 409/404/401 en cada borde); humo con las dos rutas sin cabecera.
 - Corrección de nombre: estas dos tareas figuraban como «HU-12» y «HU-13» en el diseño, la seguridad, el informe de pruebas y la
   bitácora del 12/10; en el backlog esas historias son agrupar por sitio y zona y marcar en mantenimiento. Se corrigió en los
@@ -34,7 +34,7 @@
   integración MQTT admite `ca_cert`, `tls_cert` y `tls_key`, y que el tópico de eventos es una plantilla configurable
   (`event_topic`); la opción `topic_prefix` que citaba un resumen de su respuesta no existe en la configuración de ChirpStack.
 - Consecuencia: la red del campus no usa la ruta B decidida el 08/10 ni la ruta A (un ChirpStack nuestro), sino un servidor de
-  red externo. Por la noche se decidió agregarla como **ruta C** sin quitar las otras dos (abajo). Sigue bloqueando que el servidor
+  red externo. Después se decidió agregarla como **ruta C** sin quitar las otras dos (abajo). Sigue bloqueando que el servidor
   sea alcanzable desde esa red.
 
 ## Equipo de prueba recibido
@@ -44,7 +44,7 @@
   serie, identificación del chip, sin cablear nada), fase 1 (cada sensor por separado), fase 2 (Wi-Fi, TLS y MQTT con la credencial
   del alta), fase 3 (de punta a punta, TT-32). Queda por decidir con qué herramienta se programa el nodo.
 
-## Por la noche: ruta C, mínimo privilegio y correcciones
+## Ruta C, mínimo privilegio y correcciones
 - **Ruta C** (`docs/10 §8.4` punto 45): el servidor de red del campus publica por su integración MQTT en nuestro broker, con TLS y
   credencial propia. Se agrega a las rutas A y B, que siguen contempladas; B y C solo difieren en el adaptador. Figuras, informe y
   documentos se actualizaron juntos, y la regla del guardián que vigila cómo se nombra ChirpStack ahora acepta la ruta C.

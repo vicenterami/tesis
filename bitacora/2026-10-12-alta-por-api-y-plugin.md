@@ -2,7 +2,7 @@
 
 - **Sesión de trabajo individual (día completo).** Se cerró la lista de nombres de host contra el *DNS rebinding* (backend y
   proxy), se construyeron los tramos 2 y 3 del panel (inventario con semáforo y ficha con gráfico), la exportación en CSV y
-  JSON, y, por la noche, el alta de dispositivos por API (HU-11) con la migración de todas las credenciales del broker al plugin
+  JSON, y el alta de dispositivos por API (HU-11) con la migración de todas las credenciales del broker al plugin
   Dynamic Security de Mosquitto, adoptando la versión 2.1.2. Cada bloque terminó con una revisión de lo cambiado desde tres
   ángulos (seguridad, concordancia entre documentos, código y configuración, y privacidad) y con las correcciones aplicadas
   antes de seguir. Lo medido está en `docs/16 §15` a `§20`.

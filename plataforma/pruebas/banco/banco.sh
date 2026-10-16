@@ -300,6 +300,8 @@ case "${1:-}" in
     r=$(api DELETE "/pasarelas/$pasarela"); code=${r##*$'\n'}; [ "$code" = 200 ] && [ "$(json "v['nodos_sin_pasarela']" <<<"${r%$'\n'*}")" = 1 ] && ok "baja → 200, con 1 nodo que queda sin pasarela" || falla "baja → $code: ${r:0:160}"
     r=$(pub "$pid" "$PCRED2" "$base/$deveui/up" "$(up "$deveui" '{"temperature":22}')"); [[ "$r" == *"Connection error"* ]] && ok "dada de baja, el broker ya no acepta su credencial" || falla "la dada de baja sigue entrando: $r"
     curl -s http://127.0.0.1:3001/pasarelas | python3 -c "import sys,json; sys.exit(0 if any(p['id_fisico']=='$pid' and not p['activo'] for p in json.load(sys.stdin)) else 1)" && ok "GET /pasarelas la lista inactiva (historial conservado)" || falla "no aparece inactiva"
+    r=$(api POST /dispositivos -d "{\"id_fisico\":\"$(openssl rand -hex 8)\",\"nombre\":\"Nodo tardío\",\"zona_id\":\"$zona\",\"via\":\"lorawan\",\"pasarela_id\":\"$pasarela\",\"intervalo_esperado_s\":180,\"canales\":[{\"magnitud\":\"temperatura\"}]}")
+    [ "${r##*$'\n'}" = 400 ] && [[ "${r%$'\n'*}" == *"$pid está dada de baja"* ]] && ok "alta de un nodo con la pasarela dada de baja → 400 que la nombra" || falla "nodo con pasarela de baja: ${r:0:160}"
     k=$(dc logs --no-color --since 5m backend 2>/dev/null | grep -cF -f <(printf '%s\n' "${PCRED:-sin}" "${PCRED2:-sin}" "${MCRED:-sin}")); [ "$k" = 0 ] && ok "ninguna credencial de pasarela aparece en el registro del backend" || falla "una credencial se escribió en el registro"
     unset PCRED PCRED2 MCRED
     echo; [ $fallos -eq 0 ] && echo "LORAWAN OK" || { echo "$fallos comprobación(es) con falla"; exit 1; } ;;

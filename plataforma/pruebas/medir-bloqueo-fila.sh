@@ -4,15 +4,20 @@
 # inserta una trama de ese dispositivo con lock_timeout de 1 s. Todo ocurre en transacciones que terminan en ROLLBACK, y al final
 # se comprueba que no quedó ninguna fila de la prueba. Lo esperado: con FOR UPDATE, B se cancela por el lock_timeout (la clave
 # foránea pide FOR KEY SHARE sobre la fila del padre); con FOR NO KEY UPDATE, B entra sin esperar. Sale 1 si algo no da lo esperado.
-#   bash plataforma/pruebas/medir-bloqueo-fila.sh
+#   bash plataforma/pruebas/medir-bloqueo-fila.sh --desarrollo
+# Solo en la pila de desarrollo: retiene la fila de un dispositivo real hasta 8 s, y la recepción procesa un mensaje a la vez (frena a
+# todos mientras dura). Sin --desarrollo no corre (revisión del 15/10).
 set -u
+[ "${1:-}" = --desarrollo ] || { echo "FALLA falta --desarrollo: este guion retiene una fila hasta 8 s y frena la recepción; solo en la pila de desarrollo"; exit 1; }
 cd "$(dirname "$0")/.." || exit 1   # plataforma/
 DC=${BASE_DC:-docker compose}
 q() { $DC exec -T timescaledb sh -c 'exec psql -X -q -U "$POSTGRES_USER" -d "$POSTGRES_DB" "$@"' sh "$@"; }
 fallos=0; ok() { echo "OK    $1"; }; falla() { echo "FALLA $1"; fallos=$((fallos+1)); }
 
-grep -q 'FOR NO KEY UPDATE OF d' backend/src/alta/alta.service.ts && ok "el código bloquea con FOR NO KEY UPDATE (alta.service.ts)" \
-  || falla "alta.service.ts ya no bloquea con FOR NO KEY UPDATE"
+grep -q 'FOR NO KEY UPDATE OF d' backend/src/alta/alta.service.ts && ok "el código bloquea el dispositivo con FOR NO KEY UPDATE (alta.service.ts)" \
+  || falla "alta.service.ts ya no bloquea el dispositivo con FOR NO KEY UPDATE"
+grep -q 'FOR NO KEY UPDATE OF p' backend/src/alta/alta.service.ts && ok "el código bloquea la pasarela con FOR NO KEY UPDATE (alta.service.ts)" \
+  || falla "alta.service.ts ya no bloquea la pasarela con FOR NO KEY UPDATE"
 ID=$(q -Atc "SELECT id FROM dispositivo ORDER BY id LIMIT 1" 2>/dev/null)
 [[ "$ID" =~ ^[0-9a-f-]{36}$ ]] || { echo "FALLA no hay dispositivo en la base (¿pila apagada o sin semilla?)"; exit 1; }
 TRAMA="INSERT INTO trama (dispositivo_id, recibido_en, topico, payload, adaptador) VALUES ('$ID', now(), 'prueba/bloqueo-fila', '\\x00', 'senml')"

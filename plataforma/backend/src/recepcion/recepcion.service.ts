@@ -124,7 +124,8 @@ export class RecepcionService implements OnModuleInit {
         `pasarela ${idPasarela.slice(0, 64)} está registrada en el sitio «${pasarela.sitio_codigo}», no en «${sitio.slice(0, 64)}»`);
     }
     if (evento !== 'up') {
-      this.log.log(`pasarela ${idPasarela}: evento «${evento.slice(0, 32)}» de ${deveuiTopico.slice(0, 32)} · contado, no se guarda (docs/10 §8.4 punto 47)`);
+      // Depuración, no información: ChirpStack emite status, ack y log por cada nodo, y con muchos nodos llenarían el registro.
+      this.log.debug(`pasarela ${idPasarela}: evento «${evento.slice(0, 32)}» de ${deveuiTopico.slice(0, 32)} · no se guarda (docs/10 §8.4 punto 47)`);
       return;
     }
     const deveui = deveuiTopico.toLowerCase();
@@ -134,6 +135,10 @@ export class RecepcionService implements OnModuleInit {
     }
     if (nodo.estado === 'baja') {
       return this.cuarentena({ ...trama, dispositivoId: nodo.id }, 'dado_de_baja', `DevEUI ${deveui}: dado de baja`);
+    }
+    // El nodo y su pasarela son del mismo sitio por el alta; se comprueba igual (defensa en profundidad, revisión del 15/10).
+    if (nodo.sitio_codigo !== sitio) {
+      return this.cuarentena({ ...trama, dispositivoId: nodo.id }, 'no_registrado', `DevEUI ${deveui} está registrado en el sitio «${nodo.sitio_codigo}», no en «${sitio.slice(0, 64)}»`);
     }
     trama.dispositivoId = nodo.id;
     const ctx: ContextoTrama = { topico: trama.topico, idFisico: deveui, magnitudTopico: '', carga: trama.carga, deveui };

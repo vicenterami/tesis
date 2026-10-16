@@ -336,6 +336,18 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
       expect(cuarentenas(query)).toEqual(['malformada']);
       expect(marcarVivo).toHaveBeenCalledWith('n1', '0101010101010101');
     });
+    it('nodo dado de baja por el tópico de su pasarela → dado_de_baja, y no vivo', async () => {
+      const { servicio, query, marcarVivo } = armar({ ...NODO, estado: 'baja' }, false, PAS);
+      await servicio.procesar(T_UP, up());
+      expect(cuarentenas(query)).toEqual(['dado_de_baja']);
+      expect(marcarVivo).not.toHaveBeenCalled();
+    });
+    it('nodo de otro sitio que el del tópico → no_registrado (defensa en profundidad)', async () => {
+      const { servicio, query } = armar({ ...NODO, sitio_codigo: 'otra' }, false, PAS);
+      await servicio.procesar(T_UP, up());
+      expect(cuarentenas(query)).toEqual(['no_registrado']);
+      expect(detalle(query)).toContain('registrado en el sitio «otra»');
+    });
     it('un formato directo por el tópico de pasarela → malformada «no se recibe por este tópico»', async () => {
       const { servicio, query } = armar({ ...NODO, formato: 'senml' }, false, PAS);
       await servicio.procesar(T_UP, Buffer.from('[{"n":"temperatura","v":1}]'));

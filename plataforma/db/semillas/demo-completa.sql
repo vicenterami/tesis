@@ -1,4 +1,4 @@
--- Semilla de demostración COMPLETA (kit de método, probar-sin-miedo §2: escenarios con el resultado esperado escrito
+-- Semilla de demostración COMPLETA (escenarios con el resultado esperado escrito en la cabecera: escenarios con el resultado esperado escrito
 -- aquí, nunca datos armados a mano). Se aplica DESPUÉS de demo.sql: `bash plataforma/pruebas/semilla-demo.sh --completa`.
 -- Reconstruye su escenario en cada corrida: borra y vuelve a crear SOLO los 11 dispositivos de la lista de abajo (nunca dev-0001
 -- ni uno real), con sus canales, mediciones, tramas, cuarentena, condiciones, eventos y credenciales. Correrla dos veces el mismo
