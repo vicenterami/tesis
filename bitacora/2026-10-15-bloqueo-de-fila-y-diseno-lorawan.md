@@ -65,3 +65,15 @@
 - [ ] Laboratorio de la prueba en la misma red local (por el 8883 del proxy, con TLS): escrito; falta ensayarlo antes de la prueba.
 - [x] Capítulo de pruebas del informe (falta la versión de entrega: retroalimentación de la Etapa 2 y entrevista en el catálogo).
 - [ ] Mapa de claves al catálogo de magnitudes (Etapa 4, obligatorio).
+
+## Respuestas del compañero a cargo de la red LoRaWAN (15/10)
+- La pasarela es una UG65 con el servidor de red embebido y un decodificador cargado; dos nodos reportan cada 60 s temperatura,
+  humedad y batería; él administra un Mosquitto y un ChirpStack v4 propios. Mario decidirá si ChirpStack sigue.
+- Prueba acordada para el martes 20/10 en la misma red local de la facultad. Camino elegido: un puente desde su broker hacia el
+  nuestro por 8883 con TLS, autenticado como la pasarela, para que sus datos sigan llegando a su panel y a nosotros una copia. Se
+  descartó un broker público de un proveedor (sin autenticación) y, por ahora, un envío HTTP a una dirección pública que no existe.
+- La forma del mensaje que describió (valores bajo `object`, `battery_pct`) difiere de la guía del fabricante y de su propio primer
+  mensaje; probada con un identificador sintético, el adaptador la rechaza. Antes del martes se pide una captura real y se amplía el
+  adaptador (`docs/10 §8.4` punto 47, nota del 15/10). Lección: un mensaje escrito en un chat no es una captura.
+- Su panel muestra cada trama dos veces y la misma calidad de señal en todas: dos preguntas más, y una decisión abierta sobre
+  deduplicar por contador de trama.

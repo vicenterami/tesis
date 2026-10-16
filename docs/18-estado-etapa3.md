@@ -72,8 +72,7 @@ vuelve a la Etapa 4 con su registro aquí y en `docs/04`.
 - La retroalimentación de la Etapa 2 todavía no llega; las consultas al profesor guía están listas para la reunión presencial de la semana del 20/10.
 - El sensor físico (TT-32) ya tiene su equipo: falta cablear los sensores y publicar hasta el panel (fase 1).
 - La recepción LoRaWAN en terreno (HU-02) necesita una pasarela que alcance el servidor (`docs/10 §8.4` punto 24); mientras
-  tanto se prueba en el banco con el JSON exacto de las fuentes oficiales (`banco.sh lorawan`, `docs/16 §31`); la prueba en la
-  misma red que la pasarela del campus está prevista para la semana del 20/10.
+  tanto se prueba en el banco con el JSON exacto de las fuentes oficiales (`banco.sh lorawan`, `docs/16 §31`); la prueba en la misma red que la pasarela del campus está acordada para el martes 20/10 con el compañero a cargo; su pasarela es una UG65 con servidor embebido y dos nodos reportando cada 60 s, y el adaptador se ajusta antes a la forma real de su mensaje (`docs/10 §8.4` punto 47, nota del 15/10).
 
 ## 5. Cómo se mantiene
 
