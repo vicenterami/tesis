@@ -9,6 +9,8 @@
 #   bash plataforma/pruebas/banco/banco.sh proxy               levanta la capa TLS (proxy/compose.proxy.yml) sobre el banco y la prueba
 #   bash plataforma/pruebas/banco/banco.sh alta                alta por API de punta a punta: POST → credencial → publica → medicion (HU-11)
 #   bash plataforma/pruebas/banco/banco.sh lorawan             rutas B y C de punta a punta: alta de pasarela → publica como ella → medicion; ACL del rol pasarela; perfil, sufijo nativo y fCnt; rotación y baja
+#   bash plataforma/pruebas/banco/banco.sh migraciones         reaplica las migraciones 02 a la última y exige el mismo esquema y catálogo (idempotencia; corre al final de «encender»)
+#   bash plataforma/pruebas/banco/banco.sh puente              puente de Mosquitto como el de la red del campus: su broker reenvía el tópico nativo por TLS al proxy → medicion
 #   bash plataforma/pruebas/banco/banco.sh cola                cola del broker vigilada: backend detenido + 200 emulados → descartes → condición broker_descarte (docs/16 §22)
 #   bash plataforma/pruebas/banco/banco.sh estado | logs [servicio] | sql ["CONSULTA"]
 #   bash plataforma/pruebas/banco/banco.sh apagar              baja todo; los datos estaban en RAM, no queda nada
@@ -67,7 +69,31 @@ case "${1:-}" in
     for _ in $(seq 1 30); do [ -z "$(dc ps --format '{{.Status}}' | grep -v '(healthy)')" ] && break; sleep 3; done
     bash "$YO" estado
     n="${2:-100}"
-    emu semilla --dispositivos "$n" --intervalo-factor "${3:-2}" | psql_ -q && echo "sembrados $n dispositivos emulados (emu-0001…emu-$(printf '%04d' "$n")), intervalo = periodo × ${3:-2}" ;;
+    emu semilla --dispositivos "$n" --intervalo-factor "${3:-2}" | psql_ -q && echo "sembrados $n dispositivos emulados (emu-0001…emu-$(printf '%04d' "$n")), intervalo = periodo × ${3:-2}"
+    bash "$YO" migraciones ;;
+  migraciones)
+    # Idempotencia de las migraciones (convención de docs/08 §6), comprobada en cada «encender» y no a mano (revisión del 16/10): con la
+    # base recién creada, se reaplican de la 02 a la última y el esquema (tablas, restricciones, índices, permisos, comentarios) y el
+    # catálogo de magnitudes deben quedar idénticos. «Sin error» no basta: una migración puede correr dos veces y cambiar algo. La 01
+    # es el esquema base, no se escribió para repetirse. Se hace aquí, en la base desechable del banco, y no en el guardián: reaplicar
+    # en la base de desarrollo la escribiría en cada corrida y bloquearía tablas mientras el backend guarda.
+    # MIG_DIR (por defecto db/init) solo existe para plantar una migración no idempotente y ver que esto falla.
+    dir="${MIG_DIR:-db/init}"; fallos=0
+    # Fuera del volcado: el token aleatorio de \restrict y los fragmentos de TimescaleDB (_timescaledb_internal), que nacen cuando el
+    # backend guarda datos entre las dos fotos (medido el 16/10: una muestra del broker creó uno) y no dependen de las migraciones.
+    # Se compara ordenado por líneas: el primer fragmento de una tabla cambia la posición en que pg_dump la escribe (medido el mismo
+    # día), y un orden distinto no es un esquema distinto; una restricción agregada o renombrada sí cambia el conjunto de líneas.
+    foto() { { dc exec -T timescaledb pg_dump -s -N _timescaledb_internal -U plataforma plataforma 2>/dev/null | grep -vE '^\\(un)?restrict '
+               psql_ -tA -c "SELECT codigo, unidad_canonica, rango_min, rango_max FROM magnitud ORDER BY codigo"; } | LC_ALL=C sort | sha256sum | cut -c1-16; }
+    antes=$(foto); n=0
+    for f in "$dir"/[0-9][0-9]-*.sql; do
+      [ "$(basename "$f")" = 01-esquema.sql ] && continue
+      if psql_ -X -q < "$f" >/dev/null 2>"$PRIV/mig.err"; then n=$((n+1)); else echo "FALLA $(basename "$f") no se puede reaplicar: $(grep -m1 ERROR "$PRIV/mig.err")"; fallos=$((fallos+1)); fi
+    done; rm -f "$PRIV/mig.err"
+    despues=$(foto)
+    [ "$n" -ge 16 ] || { echo "FALLA solo se reaplicaron $n migraciones (¿cambió la carpeta?)"; fallos=$((fallos+1)); }
+    [ "$antes" = "$despues" ] && echo "OK    $n migraciones reaplicadas sin error y sin cambiar el esquema ni el catálogo (idempotentes)" || { echo "FALLA reaplicar cambió el esquema o el catálogo ($antes → $despues)"; fallos=$((fallos+1)); }
+    [ $fallos -eq 0 ] || exit 1 ;;
   estado)
     dc ps --format 'table {{.Service}}\t{{.Status}}\t{{.Ports}}'
     printf 'GET /salud (banco, 3001) → '; curl -s -m 3 http://127.0.0.1:3001/salud || echo "sin respuesta"; echo ;;
@@ -375,6 +401,63 @@ case "${1:-}" in
     k=$(dc logs --no-color --since 5m backend 2>/dev/null | grep -cF -f <(printf '%s\n' "${PCRED:-sin}" "${PCRED2:-sin}" "${MCRED:-sin}")); [ "$k" = 0 ] && ok "ninguna credencial de pasarela aparece en el registro del backend" || falla "una credencial se escribió en el registro"
     unset PCRED PCRED2 MCRED
     echo; [ $fallos -eq 0 ] && echo "LORAWAN OK" || { echo "$fallos comprobación(es) con falla"; exit 1; } ;;
+  puente)
+    # Ensayo del puente de la red del campus (docs/10 §8.4 punto 47; docs/16 §37): un segundo Mosquitto hace de broker del operador
+    # (anónimo, como el suyo) y reenvía con un bloque «connection» como el del archivo de ejemplo, por TLS al 8883 del proxy, con
+    # verificación del certificado y autenticado como la pasarela. Se publica la captura saneada en su tópico NATIVO y se espera la
+    # lectura en medicion. La configuración lleva la credencial de la pasarela: vive en la carpeta privada del banco, sale de una
+    # sola invocación y se borra al final con la pasarela (de descarte). El broker del operador corre con el usuario del equipo y su
+    # carpeta montada en /c (nunca en /mosquitto: su entrypoint cambia dueños, docs/11 §7).
+    CLAVE=$(leer HTTP_CLAVE_ADMIN); fallos=0; n=$(date +%s | tail -c 5)
+    ok() { echo "OK    $1"; }; falla() { echo "FALLA $1"; fallos=$((fallos+1)); }
+    api() { local m=$1 r=$2; shift 2; printf 'X-Clave-Admin: %s\n' "$CLAVE" | curl -s -m 10 -w '\n%{http_code}' -X "$m" -H @- -H 'Content-Type: application/json' "$@" "http://127.0.0.1:3001$r"; }
+    json() { python3 -c "import sys,json; v=json.load(sys.stdin); print(eval(sys.argv[1]))" "$1"; }
+    [ -f "$CERTS/ca.crt" ] || bash proxy/ca-desarrollo.sh "$CERTS"
+    dcp up -d proxy >/dev/null 2>&1 || { echo "FALLA no se levantó el proxy"; exit 1; }
+    for _ in $(seq 1 20); do [ "$(dcp ps --format '{{.Status}}' proxy | grep -c healthy)" = 1 ] && break; sleep 2; done
+    red=$(docker network ls --format '{{.Name}}' | grep '^banco_default$')
+    read -r sitio_id sitio zona < <(psql_ -tA -F ' ' -c "SELECT s.id, s.codigo, z.id FROM sitio s JOIN zona z ON z.sitio_id = s.id ORDER BY s.codigo LIMIT 1")
+    pid="ug65-puente-$n"; r=$(api POST /pasarelas -d "{\"id_fisico\":\"$pid\",\"nombre\":\"UG65 del ensayo del puente\",\"sitio_id\":\"$sitio_id\",\"formato\":\"milesight\"}")
+    code=${r##*$'\n'}; body=${r%$'\n'*}; [ "$code" = 201 ] || { echo "FALLA POST /pasarelas → $code"; exit 1; }
+    pas=$(json "v['id']" <<<"$body"); linea=$(json "v['conexion']['plantillas']['puente_mosquitto']" <<<"$body")
+    udev=$(openssl rand -hex 8); r=$(api POST /dispositivos -d "{\"id_fisico\":\"$udev\",\"nombre\":\"Nodo del ensayo del puente\",\"zona_id\":\"$zona\",\"via\":\"lorawan\",\"pasarela_id\":\"$pas\",\"decodificador\":\"campus-heltec-v3-v1\",\"intervalo_esperado_s\":180,\"canales\":[{\"magnitud\":\"temperatura\"},{\"magnitud\":\"humedad\"},{\"magnitud\":\"tension\"}]}")
+    [ "${r##*$'\n'}" = 201 ] && ok "pasarela milesight y nodo con perfil dados de alta" || falla "alta del nodo → ${r##*$'\n'}"
+    # La configuración del broker del operador: el bloque del archivo de ejemplo, con la línea «topic» tal como la entrega el alta
+    # (cambiando <app> por la aplicación de la captura) y la credencial, escrita sin pasar por la línea de comandos.
+    cfg="$PRIV/puente"; rm -rf "$cfg"; mkdir -p "$cfg"; cp "$CERTS/ca.crt" "$cfg/ca.crt"
+    ( umask 077; { echo "listener 1883"; echo "allow_anonymous true"; echo "persistence false"
+        echo "connection hacia-plataforma"; echo "address proxy:8883"; echo "bridge_cafile /c/ca.crt"; echo "bridge_insecure false"
+        echo "remote_clientid $pid"; echo "remote_username $pid"; printf 'remote_password %s\n' "$(json "v['conexion']['credencial']" <<<"$body")"
+        echo "cleansession false"; echo "notifications false"; echo "start_type automatic"; echo "restart_timeout 2 10"
+        echo "${linea/<app>/app-de-prueba}"; } > "$cfg/mosquitto.conf" )
+    unset body r
+    [[ "$linea" == "topic device/+/event/# out 1 application/<app>/ sitio/$sitio/pasarela/$pid/" ]] && ok "la línea del puente que entrega el alta es la que se usa ($linea)" || falla "línea del puente: $linea"
+    docker rm -f banco-puente >/dev/null 2>&1
+    docker run -d --name banco-puente --network "$red" --user "$(id -u):$(id -g)" -v "$cfg:/c:ro" --entrypoint mosquitto "$IMG_BROKER" -c /c/mosquitto.conf >/dev/null || falla "no arrancó el broker del operador"
+    trap 'docker rm -f banco-puente >/dev/null 2>&1; rm -rf "${PRIV:?}/puente"' EXIT
+    conectado=0; for _ in $(seq 1 30); do dc logs --no-color --since 2m mosquitto 2>/dev/null | grep -q "as $pid (" && { conectado=1; break; }; sleep 1; done
+    [ "$conectado" = 1 ] && ok "el puente entró a nuestro broker como la pasarela, por el 8883 del proxy con TLS y el certificado verificado" || falla "el puente no se conectó: $(docker logs banco-puente 2>&1 | tail -2 | tr '\n' ' ')"
+    lec() { psql_ -tA -c "SELECT count(*) || ' ' || coalesce(string_agg(c.magnitud_codigo || '=' || m.valor, ',' ORDER BY c.magnitud_codigo), '') FROM medicion m JOIN canal c ON c.id=m.canal_id JOIN dispositivo d ON d.id=c.dispositivo_id WHERE d.id_fisico='$udev'"; }
+    pub_local() { docker run --rm --network "$red" "$IMG_BROKER" mosquitto_pub -h banco-puente -q 1 -t "$1" -m "$2"; }
+    t=$(date -u -d '-20 seconds' +%Y-%m-%dT%H:%M:%S.340333Z)
+    pub_local "application/app-de-prueba/device/$udev/event/up" "{\"applicationID\":\"3\",\"data\":\"AgAAAI8HGBmYrw==\",\"devEUI\":\"$udev\",\"deviceName\":\"nodo-2\",\"fCnt\":142,\"fPort\":1,\"rxInfo\":[{\"rssi\":-46,\"loRaSNR\":10.2}],\"time\":\"$t\"}"
+    for _ in $(seq 1 20); do [ "$(lec | cut -d' ' -f1)" = 3 ] && break; sleep 0.5; done
+    [ "$(lec)" = "3 humedad=65.52,temperatura=18.16,tension=3.75" ] && ok "la captura publicada en el tópico nativo del operador llegó por el puente: 18,16 °C, 65,52 % y 3,75 V" || falla "lecturas por el puente: «$(lec)»"
+    r=$(psql_ -tA -c "SELECT topico FROM trama t JOIN dispositivo d ON d.id=t.dispositivo_id WHERE d.id_fisico='$udev' LIMIT 1")
+    [ "$r" = "sitio/$sitio/pasarela/$pid/device/$udev/event/up" ] && ok "llegó con solo el prefijo cambiado (sufijo nativo): $r" || falla "tópico recibido: «$r»"
+    pub_local "application/app-de-prueba/device/$udev/command/down" '{"x":1}'; sleep 2
+    k=$(psql_ -tA -c "SELECT count(*) FROM cuarentena WHERE topico LIKE 'sitio/$sitio/pasarela/$pid/device/%/command/%'")
+    [ "$k" = 0 ] && ok "un comando en el broker del operador NO cruza el puente (solo device/+/event/#)" || falla "cruzaron $k comando(s)"
+    otro=$(openssl rand -hex 8); pub_local "application/app-de-prueba/device/$otro/event/up" "{\"devEUI\":\"$otro\",\"data\":\"AgAAAI8HGBmYrw==\",\"fPort\":1}"
+    c=""; for _ in $(seq 1 20); do c=$(psql_ -tA -c "SELECT motivo FROM cuarentena WHERE topico = 'sitio/$sitio/pasarela/$pid/device/$otro/event/up'"); [ -n "$c" ] && break; sleep 0.5; done
+    [ "$c" = no_registrado ] && ok "lo que un anónimo publique en su broker cruza como la pasarela, y el filtro 1 lo frena si el DevEUI no está dado de alta (riesgo anotado)" || falla "DevEUI ajeno por el puente: «$c»"
+    # La baja de la pasarela es también la limpieza: revoca la credencial y el broker corta el puente.
+    r=$(api DELETE "/pasarelas/$pas"); [ "${r##*$'\n'}" = 200 ] && ok "baja de la pasarela de descarte (credencial revocada)" || falla "baja → ${r##*$'\n'}"
+    cortado=0; for _ in $(seq 1 15); do dc logs --no-color --since 1m mosquitto 2>/dev/null | grep -q "Client $pid .*disconnected" && { cortado=1; break; }; sleep 1; done
+    [ "$cortado" = 1 ] && ok "al dar de baja la pasarela, nuestro broker corta el puente" || falla "el puente siguió conectado tras la baja"
+    k=$(dc logs --no-color --since 5m backend 2>/dev/null | grep -cF -f <(sed -n 's/^remote_password //p' "$cfg/mosquitto.conf")); [ "$k" = 0 ] && ok "la credencial del puente no aparece en el registro del backend" || falla "la credencial aparece en el registro"
+    docker rm -f banco-puente >/dev/null 2>&1; rm -rf "${PRIV:?}/puente"; trap - EXIT
+    echo; [ $fallos -eq 0 ] && echo "PUENTE OK" || { echo "$fallos comprobación(es) con falla"; exit 1; } ;;
   cola)
     # Cola del broker vigilada (docs/10 §8.4 punto 43; docs/16 §22): PLANTAR la violación. Con el backend detenido, 200 emulados a
     # 1 trama/s durante 70 s (≈ 14 000 mensajes) desbordan la cola de la sesión persistente del backend (tope 10 000): el broker

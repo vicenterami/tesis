@@ -900,3 +900,37 @@ regenerada la figura); una trama que repetía el `fCnt` y el adaptador no entend
 va solo a `malformada`; prueba nueva, plantada); la línea del puente reenviaba todo `device/#`, comandos incluidos, y ahora solo
 `device/+/event/#`; la descripción de `POST /pasarelas` nombra la línea del puente; el informe dice «la forma de la captura,
 saneada», porque el banco no pasó por la pasarela real.
+
+## 37. El puente de la red del campus y la idempotencia de las migraciones, en el banco (16/10/2026)
+
+**Puente** (`banco.sh puente`; `docs/10 §8.4` punto 47). Un segundo Mosquitto hace de broker del operador de la red: anónimo, como
+el suyo, y con un bloque `connection` como el del ejemplo que se le entrega, con la línea `topic` tal cual la devuelve el alta de la
+pasarela, TLS hacia el 8883 del proxy con verificación del certificado (`bridge_insecure false`) y la credencial de una pasarela de
+descarte. La configuración con la credencial vive en la carpeta privada del banco, la escribe una sola invocación y se borra al final.
+
+| Pregunta | Medido | Plantado |
+|---|---|---|
+| ¿El puente entra como la pasarela, por TLS verificado? | Sí: nuestro broker registra su conexión con el usuario de la pasarela | Con otra CA en el broker del operador: «A TLS error occurred» y no se conecta |
+| ¿La captura publicada en el tópico nativo llega a `medicion`? | Sí: 18,16 °C, 65,52 % y 3,75 V; la trama cruda muestra `…/pasarela/<id>/device/<deveui>/event/up`, solo con el prefijo cambiado | — |
+| ¿Un comando del broker del operador cruza? | No: la línea reenvía solo `device/+/event/#` | Con `device/#`, el comando cruza y deja una cuarentena |
+| ¿Lo que publique un anónimo en el broker del operador nos llega? | Sí, como la pasarela: es el riesgo de un broker sin autenticación. El filtro 1 lo frena si el DevEUI no está dado de alta (`no_registrado`) | — |
+| ¿La baja de la pasarela corta el puente? | Sí: el broker desconecta al cliente | — |
+| ¿La credencial aparece en el registro del backend? | No | — |
+
+Resultado: **10 de 10, «PUENTE OK»**. Lo que no prueba: la pasarela real ni el Mosquitto del operador; la conexión por IP
+(`CA_IP_EXTRA`) en vez de por nombre, que se ensaya en la pila de desarrollo.
+
+**Migraciones** (`banco.sh migraciones`, al final de cada `banco.sh encender`; `docs/08 §6`). Con la base recién creada, se reaplican
+de la 02 a la 17 y se compara un resumen del esquema completo (`pg_dump -s`: tablas, restricciones, índices, permisos y comentarios)
+y del catálogo de magnitudes. **La primera corrida encontró un error real:** las 16 se reaplicaban sin error, pero el esquema
+cambiaba. La 05 renombraba toda restricción cuyo nombre no fuera el que ella calcula, también las que una migración posterior nombró a
+propósito: reaplicada después de la 08, la 13, la 15 y la 16, cambiaba `ck_medicion_recepcion`, `ck_credencial_titular`,
+`fk_dispositivo_pasarela_formato` y las de `metrica_broker`, y esas migraciones, al no encontrar su nombre, duplicaban la restricción.
+**Corregido:** la 05 renombra solo los nombres sin prefijo (los que inventa Postgres). Una instalación nueva queda idéntica a la de
+antes de la corrección, la base de desarrollo no tenía duplicados (consultado) y la 05 vieja, plantada, hace fallar la comprobación.
+«Sin error» no basta: lo prueba este caso. Tres detalles del volcado, medidos: lleva una línea `\restrict` con un token aleatorio
+(se excluye); los fragmentos de TimescaleDB nacen cuando el backend guarda datos entre las dos fotos (se excluye su esquema interno);
+y el primer fragmento de una tabla cambia el orden en que `pg_dump` la escribe (se compara el conjunto de líneas, ordenado).
+Resultado: 16 de 16 reaplicadas sin cambios en `encender` y en tres corridas más, separadas por 30 s con el backend guardando. Se hace en el banco y no en el
+guardián porque reaplicar en la base de desarrollo la escribiría en cada corrida y bloquearía tablas mientras el backend guarda.
+

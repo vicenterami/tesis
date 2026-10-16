@@ -1334,6 +1334,9 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     por el mismo camino que el mapa de claves. (iii) **Hora:** en la forma sin códec, `time` con zona es la marca del servidor de red
     (regla 17 de `docs/13`, origen `pasarela`); sin zona, rige la hora de recepción. (iv) **Contador de trama:** el `fCnt` del uplink
     (Milesight y ChirpStack) viaja con la trama y el filtro 3 descarta la que repite el de la última guardada del nodo (§4.1).
+    **El puente se ensaya en el banco** (`banco.sh puente`, `docs/16 §37`): un segundo Mosquitto, anónimo como el del operador, con esa
+    línea y TLS verificado hacia el 8883 del proxy; la captura publicada en su tópico nativo llega a `medicion`, un comando no cruza y
+    la baja de la pasarela corta el puente.
     **Fuentes** (consultadas el 15/10/2026): el evento `up` de ChirpStack, su codificación JSON («JSON based on the Protocol Buffers JSON
     mapping») y los campos `deviceInfo.devEui`, `time`, `object` y `rxInfo`, en https://www.chirpstack.io/docs/chirpstack/integrations/events.html; la integración MQTT publica JSON por defecto
     («json=true», https://www.chirpstack.io/docs/chirpstack/configuration.html); el uplink de la pasarela Milesight y el comodín
