@@ -158,9 +158,12 @@ else
 fi
 # 15/10 (revisión del diseño): el conteo no ve «migración 15» escrita antes de que exista el archivo. Ninguna prosa cita una
 # migración posterior a la última en disco, salvo en una línea que diga «prevista» (diseño escrito antes del código).
+# 16/10: con `grep -o` la línea quedaba recortada al propio «migración NN» y la excepción «prevista» no se veía nunca; se lee la línea
+# entera, se descartan las que dicen «prevista» y recién entonces se extraen los números. Probado plantando «migración 18» sin la marca.
 ultima=$(ls plataforma/db/init/ | grep -oE '^[0-9]{2}' | sort -n | tail -1)
-futuras=$(grep -rnoE 'migraci[oó]n [0-9]{2}\b' docs informe-oficial --include=*.md --include=*.tex | grep -v prevista \
-  | while IFS= read -r m; do nn=${m##* }; [ "$((10#$nn))" -gt "$((10#${ultima:-0}))" ] && echo "$m"; done)
+futuras=$(grep -rnE 'migraci[oó]n [0-9]{2}\b' docs informe-oficial --include=*.md --include=*.tex | grep -v prevista \
+  | while IFS= read -r l; do d=${l%%:*}; r=${l#*:}; n=${r%%:*}; for nn in $(grep -oE 'migraci[oó]n [0-9]{2}\b' <<<"${r#*:}" | grep -oE '[0-9]{2}$'); do
+      [ "$((10#$nn))" -gt "$((10#${ultima:-0}))" ] && echo "$d:$n:migración $nn"; done; done)
 if [ -n "$futuras" ]; then
   echo "FALLA prosa que cita una migración posterior a la última en disco ($ultima):"; echo "$futuras" | sed 's/^/  /'; fallos=$((fallos+1))
 else
