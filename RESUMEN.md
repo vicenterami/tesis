@@ -35,7 +35,7 @@ indistinguible de la ausencia de novedades.*
 | Persistencia | TimescaleDB | InfluxDB (dos motores) |
 | Backend | TypeScript + NestJS | Fastify (0,15 menos) |
 | Frontera con el compañero de la red LoRaWAN | **el tópico MQTT** + emulador de respaldo | — |
-| ~~Contact ID~~ | **descartado 02/09** por el profesor guía (eventos vs. monitoreo continuo) | evidencia en `historico/docs/05` y anexo D del informe |
+| ~~Contact ID~~ | **descartado 02/09** por el profesor guía (eventos vs. monitoreo continuo) | evidencia en `historico/docs/05` y anexo «Camino descartado: Contact ID» del informe |
 
 ## Competencia
 

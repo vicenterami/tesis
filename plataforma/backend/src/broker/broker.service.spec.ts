@@ -47,7 +47,7 @@ describe('BrokerService: un mensaje a la vez y PUBACK después de guardar (decis
   it('el descarte vale porque la conexión es MQTT 3.1.1 y la suscripción no pide «Retain As Published» (docs/10 §8.4 punto 50)', () => {
     armar();
     const opciones = (mqtt.connect as jest.Mock).mock.calls.at(-1)?.[1] as { protocolVersion?: number };
-    expect(opciones.protocolVersion ?? 4).toBe(4); // con 5 y rap, el envío en vivo llegaría con retain = 1 y se perdería
+    expect(opciones.protocolVersion).toBe(4); // explícito: con 5 y rap, el envío en vivo llegaría con retain = 1 y se perdería
     const conectar = mockCliente.on.mock.calls.find(([ev]) => ev === 'connect')?.[1] as () => void;
     conectar();
     expect(mockCliente.subscribe).toHaveBeenCalledWith('sitio/#', { qos: 1 }, expect.any(Function));

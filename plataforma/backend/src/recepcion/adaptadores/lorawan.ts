@@ -1,4 +1,5 @@
 import { ContextoTrama, Lectura } from '../lectura';
+import { limpia } from '../texto';
 import { TramaMalformada } from './adaptador';
 import { ResolverClave } from './mapa-claves';
 
@@ -11,12 +12,8 @@ import { ResolverClave } from './mapa-claves';
 export class IdentidadNoVerificada extends TramaMalformada {}
 
 const MAX_LISTA = 10; // claves que se nombran en un motivo: una trama con mil claves no vuelve entera en el detalle
-const MAX_CLAVE = 32; // y cada una recortada y sin caracteres de control: no alarga el detalle ni falsifica líneas del registro
-// Recorte por caracteres, no por unidades UTF-16 (un emoji no queda partido), y fuera todo lo invisible o de control: C0 y C1,
-// formato (incluidos los que invierten la dirección del texto), sustitutos sueltos y los separadores de línea y de párrafo.
-const INVISIBLE = /[\p{C}\u2028\u2029]/u;
-const limpia = (k: string): string =>
-  Array.from(k).slice(0, MAX_CLAVE).map((c) => (INVISIBLE.test(c) ? '?' : c)).join('');
+const MAX_CLAVE = 32; // y cada una recortada y sin nada invisible (../texto): no alarga el detalle ni falsifica líneas del registro
+const limpiaClave = (k: string): string => limpia(k, MAX_CLAVE);
 
 // Solo la usan los adaptadores de pasarela: un cuerpo ilegible no trae DevEUI, así que tampoco identifica al nodo del tópico.
 export function objetoJson(texto: string): Record<string, unknown> {
@@ -30,14 +27,18 @@ export function objetoJson(texto: string): Record<string, unknown> {
   return v as Record<string, unknown>;
 }
 
-// El DevEUI se compara en minúsculas, la forma que exige `id_fisico` (la base y el alta solo admiten [a-z0-9-]).
+// El DevEUI se compara en minúsculas, la forma que exige `id_fisico` (la base y el alta solo admiten [a-z0-9-]). Solo se compara si
+// es ASCII con esa forma: así ningún carácter de control llega al motivo, y una letra Unicode que al pasar a minúsculas se vuelve
+// ASCII (el signo Kelvin pasa a «k») no calza con otro nodo (revisión del 15/10).
+const FORMA_DEVEUI = /^[0-9A-Za-z-]{1,64}$/;
 export function exigirDevEui(cuerpo: unknown, ctx: ContextoTrama, campo: string): void {
   if (typeof cuerpo !== 'string' || cuerpo.trim() === '') throw new IdentidadNoVerificada(`sin ${campo}`);
   // Sin DevEUI en el tópico no hay con qué comparar: se rechaza (cerrado por omisión), aunque hoy el despacho no lo permita.
   if (ctx.deveui === undefined) throw new TramaMalformada('sin DevEUI en el tópico: solo se recibe por el tópico de su pasarela');
-  const delCuerpo = cuerpo.trim().toLowerCase();
-  if (delCuerpo !== ctx.deveui.toLowerCase()) {
-    throw new IdentidadNoVerificada(`DevEUI del cuerpo ${delCuerpo.slice(0, 32)} ≠ tópico ${ctx.deveui.toLowerCase().slice(0, 32)}`);
+  const delCuerpo = cuerpo.trim();
+  if (!FORMA_DEVEUI.test(delCuerpo)) throw new IdentidadNoVerificada(`${campo} con caracteres fuera de [0-9a-z-]: ${limpia(delCuerpo)}`);
+  if (delCuerpo.toLowerCase() !== ctx.deveui.toLowerCase()) {
+    throw new IdentidadNoVerificada(`DevEUI del cuerpo ${delCuerpo.toLowerCase().slice(0, 32)} ≠ tópico ${limpia(ctx.deveui.toLowerCase())}`);
   }
 }
 
@@ -51,13 +52,13 @@ export function lecturasDe(valores: Record<string, unknown>, resolver: ResolverC
     if (excluir.has(clave)) continue;
     const destino = resolver(clave);
     if (!destino) {
-      ignoradas.push(limpia(clave));
+      ignoradas.push(limpiaClave(clave));
       continue;
     }
-    if (typeof valor !== 'number' || !Number.isFinite(valor)) throw new TramaMalformada(`${limpia(clave)}: no es un número`);
+    if (typeof valor !== 'number' || !Number.isFinite(valor)) throw new TramaMalformada(`${limpiaClave(clave)}: no es un número`);
     // Dos claves que apuntan a la misma magnitud (un sinónimo, otra mayúscula): vale la primera; la otra se anota como ignorada.
     if (lecturas.some((l) => l.magnitud === destino.magnitud)) {
-      ignoradas.push(`${limpia(clave)} (repetida)`);
+      ignoradas.push(`${limpiaClave(clave)} (repetida)`);
       continue;
     }
     lecturas.push({ magnitud: destino.magnitud, valor, unidad: destino.unidad, tiempo });

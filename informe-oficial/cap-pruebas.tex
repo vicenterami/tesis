@@ -2,8 +2,7 @@
 \label{cap:pruebas}
 
 Este capítulo responde a la Etapa~3: qué está implementado, cómo se prueba, qué resultó frente a los requerimientos y
-qué falta validar. Cada corrida, con su guion y cómo repetirla, está en el anexo~\ref{anx:pruebas} y en la
-documentación de pruebas del repositorio (\texttt{docs/16}).
+qué falta validar. Cada corrida y cómo repetirla está en el anexo~\ref{anx:pruebas} y en \texttt{docs/16}.
 
 \section{Qué está implementado}
 
@@ -34,13 +33,12 @@ M8 Panel & Semáforo, inventario filtrable, ficha con gráfico & Filtro por siti
 
 \section{Método de prueba}
 
-Se prueba en cuatro niveles, todos repetibles con un comando. Las 240 pruebas unitarias corren sin base ni broker,
+Se prueba en cuatro niveles, todos repetibles con un comando. Las 243 pruebas unitarias del backend y las 44 del panel corren sin base ni broker,
 junto con tipos estrictos y análisis estático: cada una fija una regla de diseño en forma ejecutable. \textbf{Banco
 desechable}: una segunda pila con base, broker con su plugin de seguridad, backend y proxy reales, datos en memoria y un
 emulador de nodos (TT-28) que imita relojes rotos, pérdidas y deriva; sobre él corren casos fijos de carga, carreras,
 caídas, TLS, alta por API, LoRaWAN y cola del broker. \textbf{Laboratorios de un solo uso}, para decidir entre
-alternativas antes de implementar. \textbf{Verificador de concordancia}: más de 150 comprobaciones que comparan informe,
-documentación, base y API. Una prueba vale solo si falla ante la falla: cada comprobación nueva se ejecuta primero contra
+alternativas antes de implementar. \textbf{Verificador de concordancia}: 38 pasos que comparan informe, documentación, base y API. Una prueba vale solo si falla ante la falla: cada comprobación nueva se ejecuta primero contra
 el error \emph{plantado} (quitar la cláusula que evita duplicados hace caer la prueba de carrera).
 
 \section{Resultados frente a los requerimientos}
@@ -62,13 +60,12 @@ RF-10 & La misma lectura ×20 a la vez & Una fila por canal y una trama cruda & 
 RF-12 & Cinco sobre el umbral a la vez & Una condición, sin errores & Cumple \\
 RF-05 y RF-07 & Malformadas, sin alta, otro sitio & Cuarentena con motivo; ninguna señal de vida falsa & Cumple \\
 RF-40, RF-42 & Credencial ajena; sin CA; sin TLS & Rechazadas; claves con hash (RNF-08) & Cumple \\
-RF-02 & JSON oficial de los fabricantes & 35 de 35 comprobaciones & Parcial \\
+RF-02 & JSON oficial de los fabricantes & 36 de 36 comprobaciones & Parcial \\
 RNF-17 & Carga sostenida y pico & 174 y 324~MiB en total & Preliminar \\
 \bottomrule
 \end{tabular}
 \end{tablaseg}
-\caption{Resultados preliminares frente a los requerimientos. «Parcial»: falta el broker de producción (RNF-05) o la
-prueba en terreno (RF-02).}
+\caption{Resultados preliminares frente a los requerimientos. «Parcial»: falta el broker de producción (RNF-05) o el terreno (RF-02); RNF-02, medido sin red real, se repite en el servidor.}
 \label{tab:resultados}
 \end{table}
 
@@ -76,8 +73,7 @@ Las pruebas cambiaron el diseño, no solo lo confirmaron. Las 108 alarmas falsas
 RNF-03, al declarar el intervalo esperado como el silencio normal (dos periodos) y no como el periodo. Bajo
 duplicados simultáneos se guardaba dos veces la trama cruda y una condición abortaba el pipeline: ahora se procesa un
 mensaje a la vez y se confirma al broker después de guardar. Sobre la capacidad, el broker descartaba sin aviso: hoy
-tiene topes de cola y una alarma sobre su contador. Dar de baja un dispositivo frenaba un segundo la recepción de sus
-tramas; con un bloqueo de fila más débil, 20~ms. Y un mensaje retenido se guardaba otra vez al reconectar el backend.
+tiene topes de cola y una alarma sobre su contador. Dar de baja un dispositivo podía frenar hasta 5~s la recepción de sus tramas; con un bloqueo de fila más débil, 20~ms. Y un mensaje retenido se guardaba otra vez al reconectar el backend.
 
 \section{Validación preliminar y limitaciones}
 
@@ -85,5 +81,4 @@ El sistema funciona de extremo a extremo con nodos emulados y con el JSON exacto
 pasarela Milesight (ruta B) según sus fuentes oficiales: registro por API, publicación con la credencial entregada, medición guardada y
 panel en vivo. Falta el sensor físico (TT-32: la placa llegó el 12 de
 octubre y los sensores están en tránsito) y la prueba con la pasarela del campus en la misma red local, prevista para la
-semana del 20 de octubre. Las corridas son de minutos, en un portátil y con el emulador en el mismo equipo; RNF-17 y las
-72~horas de RNF-18 se validan en la Etapa~4, en el servidor de referencia, y falta un tope de tramas por emisor.
+semana del 20 de octubre. Las corridas son de minutos y en un portátil; RNF-17 y las 72~horas de RNF-18 se validan en la Etapa~4, en el servidor de referencia. Falta un tope de tramas por emisor.

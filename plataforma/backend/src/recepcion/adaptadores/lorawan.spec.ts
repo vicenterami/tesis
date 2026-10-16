@@ -105,6 +105,24 @@ describe('ChirpstackAdaptador (evento up de ChirpStack v4)', () => {
     a.analizar(c);
     expect(c.ignoradas?.[0]).toBe('x?'.repeat(16));
   });
+  it('un DevEUI del cuerpo con controles o fuera de ASCII → IdentidadNoVerificada, y el motivo no los repite (revisión del 15/10)', () => {
+    for (const devEui of ['0101\n\u202E0101010101', '\u212A101010101010101']) {
+      let motivo = '';
+      try {
+        a.analizar(ctx(eventoUp({ deviceInfo: { deviceName: 'banco', devEui } })));
+      } catch (e) {
+        expect(e).toBeInstanceOf(IdentidadNoVerificada);
+        motivo = (e as Error).message;
+      }
+      expect(motivo).not.toBe('');
+      expect(motivo).not.toMatch(/[\n\u202E]/);
+    }
+  });
+  it('los espacios invisibles y los rellenos también se marcan; el espacio común se respeta', () => {
+    const c = ctx(eventoUp({ object: { temperature: 20, 'a\u00A0b\u3164c\u2800d': 1, 'battery voltage': 3.6 } }));
+    a.analizar(c);
+    expect(c.ignoradas).toEqual(['a?b?c?d', 'battery voltage']);
+  });
   it('también los controles C1, los de dirección del texto y los separadores de línea; el recorte no parte un carácter', () => {
     const c = ctx(eventoUp({ object: { temperature: 20, '\u202Eevil\u0085x\u2028y\u2066': 1, ['a'.repeat(31) + '😀z']: 1 } }));
     a.analizar(c);

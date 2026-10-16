@@ -55,6 +55,9 @@
   vacías) y 30 al compactarlo.
 - Al día: seguimiento, retroalimentación con la entrevista del 5/10, riesgos, conclusiones y resumen. El guardián compara con
   sus fuentes las cifras que el informe repite: avance, cuadro de la Etapa 3 y conteo del banco.
+- Revisado el capítulo con el resto del bloque (`docs/16 §35`): el DevEUI del cuerpo y los segmentos del tópico se limpian antes
+  de ir al registro, el banco toma como evidencia de una sesión el registro del broker, y las conclusiones separan lo que se cumple
+  de lo parcial. El guardián, al sumar un paso, detectó que el informe citaba un número de pasos ya viejo.
 
 ## Pendientes
 - [x] Migración 15, despacho por formato, adaptadores `chirpstack` y `milesight`, pasarelas por API y `banco.sh lorawan` (`docs/16 §28–§34`);

@@ -13,6 +13,7 @@ import { PlanoAdaptador } from './adaptadores/plano.adaptador';
 import { SenmlAdaptador } from './adaptadores/senml.adaptador';
 import { ContextoTrama, Lectura } from './lectura';
 import { tiempoPlausible } from './tiempo';
+import { limpia } from './texto';
 import { aCanonica } from './unidades';
 
 // Forma del tópico acordada: sitio/<sitio>/dispositivo/<id_fisico>/<magnitud>
@@ -105,7 +106,7 @@ export class RecepcionService implements OnModuleInit {
     // vivo: no pasó el filtro 1.
     if (dispositivo.sitio_codigo !== partes[1]) {
       return this.cuarentena({ ...trama, dispositivoId: dispositivo.id }, 'no_registrado',
-        `id_fisico=${ctx.idFisico} está registrado en el sitio «${dispositivo.sitio_codigo}», no en «${partes[1].slice(0, 64)}»`);
+        `id_fisico=${ctx.idFisico} está registrado en el sitio «${dispositivo.sitio_codigo}», no en «${limpia(partes[1], 64)}»`);
     }
     trama.dispositivoId = dispositivo.id;
     return this.filtros2a6(trama, ctx, dispositivo, false);
@@ -118,28 +119,28 @@ export class RecepcionService implements OnModuleInit {
   private async procesarDePasarela(trama: TramaRecibida, partes: RegExpExecArray): Promise<void> {
     const [, sitio, idPasarela, deveuiTopico, evento] = partes;
     const pasarela = await this.buscarPasarela(idPasarela);
-    if (!pasarela) return this.cuarentena(trama, 'no_registrado', `pasarela ${idPasarela.slice(0, 64)} sin alta en la plataforma`);
-    if (!pasarela.activo) return this.cuarentena(trama, 'no_registrado', `pasarela ${idPasarela.slice(0, 64)} inactiva: revocar su credencial en el broker`);
+    if (!pasarela) return this.cuarentena(trama, 'no_registrado', `pasarela ${limpia(idPasarela, 64)} sin alta en la plataforma`);
+    if (!pasarela.activo) return this.cuarentena(trama, 'no_registrado', `pasarela ${limpia(idPasarela, 64)} inactiva: revocar su credencial en el broker`);
     if (pasarela.sitio_codigo !== sitio) {
       return this.cuarentena(trama, 'no_registrado',
-        `pasarela ${idPasarela.slice(0, 64)} está registrada en el sitio «${pasarela.sitio_codigo}», no en «${sitio.slice(0, 64)}»`);
+        `pasarela ${limpia(idPasarela, 64)} está registrada en el sitio «${pasarela.sitio_codigo}», no en «${limpia(sitio, 64)}»`);
     }
     if (evento !== 'up') {
       // Depuración, no información: ChirpStack emite status, ack y log por cada nodo, y con muchos nodos llenarían el registro.
-      this.log.debug(`pasarela ${idPasarela}: evento «${evento.slice(0, 32)}» de ${deveuiTopico.slice(0, 32)} · no se guarda (docs/10 §8.4 punto 47)`);
+      this.log.debug(`pasarela ${limpia(idPasarela, 64)}: evento «${limpia(evento)}» de ${limpia(deveuiTopico)} · no se guarda (docs/10 §8.4 punto 47)`);
       return;
     }
     const deveui = deveuiTopico.toLowerCase();
     const nodo = await this.buscarDispositivo(deveui);
     if (!nodo || nodo.pasarela_id !== pasarela.id) {
-      return this.cuarentena(trama, 'no_registrado', `DevEUI ${deveui.slice(0, 32)} no está asociado a la pasarela ${idPasarela.slice(0, 64)}`);
+      return this.cuarentena(trama, 'no_registrado', `DevEUI ${limpia(deveui)} no está asociado a la pasarela ${limpia(idPasarela, 64)}`);
     }
     if (nodo.estado === 'baja') {
       return this.cuarentena({ ...trama, dispositivoId: nodo.id }, 'dado_de_baja', `DevEUI ${deveui}: dado de baja`);
     }
     // El nodo y su pasarela son del mismo sitio por el alta; se comprueba igual (defensa en profundidad, revisión del 15/10).
     if (nodo.sitio_codigo !== sitio) {
-      return this.cuarentena({ ...trama, dispositivoId: nodo.id }, 'no_registrado', `DevEUI ${deveui} está registrado en el sitio «${nodo.sitio_codigo}», no en «${sitio.slice(0, 64)}»`);
+      return this.cuarentena({ ...trama, dispositivoId: nodo.id }, 'no_registrado', `DevEUI ${deveui} está registrado en el sitio «${nodo.sitio_codigo}», no en «${limpia(sitio, 64)}»`);
     }
     trama.dispositivoId = nodo.id;
     const ctx: ContextoTrama = { topico: trama.topico, idFisico: deveui, magnitudTopico: '', carga: trama.carga, deveui };

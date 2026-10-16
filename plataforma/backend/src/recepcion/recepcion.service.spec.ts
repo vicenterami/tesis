@@ -358,6 +358,12 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
         expect(marcarVivo).not.toHaveBeenCalled();
       }
     });
+    it('los segmentos del tópico se limpian antes de ir al detalle o al registro (revisión del 15/10)', async () => {
+      const { servicio, query } = armar(NODO, false, PAS);
+      await servicio.procesar('sitio/u\u202Ect/pasarela/chirpstack-campus/0101010101010101/up', up());
+      expect(cuarentenas(query)).toEqual(['no_registrado']);
+      expect(detalle(query)).toContain('no en «u?ct»');
+    });
     it('un formato directo por el tópico de pasarela → malformada «no se recibe por este tópico», y el nodo NO se marca vivo', async () => {
       // Hoy la clave foránea compuesta de la migración 15 lo impide; si se relajara, el filtro 2 no debe abrir una señal de vida.
       const { servicio, query, marcarVivo } = armar({ ...NODO, formato: 'senml' }, false, PAS);

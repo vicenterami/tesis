@@ -2,7 +2,7 @@
 
 > **Qué es esto:** verificación de las decisiones de implementación para el diseño de la Etapa 2.
 > Cada afirmación se contrasta con su fuente primaria (documentación oficial o repositorio del
-> proyecto), no con IA. Lo no verificable se marca como pendiente.
+> proyecto), nunca con resúmenes de segunda mano. Lo no verificable se marca como pendiente.
 > **Regla:** las cifras de terceros solo entran al informe si están confirmadas por fuente primaria.
 > Versión: 4 de septiembre de 2026.
 

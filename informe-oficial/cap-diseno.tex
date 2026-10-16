@@ -80,9 +80,7 @@ que el suscriptor llegue a recibir el mensaje.
 
 \subsection{Aprovisionamiento de un dispositivo}
 
-La figura~\ref{fig:sec-alta} (anexo~\ref{anx:figuras}) describe cómo un dispositivo pasa de desconocido a reconocido. Es el flujo,
-diseñado para la Etapa~3, que ataca la causa C4: una persona sin perfil técnico registra un dispositivo
-desde el panel; según la vía declarada, el sistema genera la credencial, la muestra \textbf{una vez}, guarda su hash y registra
+La figura~\ref{fig:sec-alta} (anexo~\ref{anx:figuras}) describe cómo un dispositivo pasa de desconocido a reconocido. Es el flujo que ataca la causa C4: una persona sin perfil técnico registra un dispositivo, hoy por la API y desde el panel en la Etapa~4; según la vía declarada, el sistema genera la credencial, la muestra \textbf{una vez}, guarda su hash y registra
 al dispositivo en el broker con una lista de acceso restringida a su propio tópico. El estado «en línea»
 no nace del alta, sino del \textbf{primer mensaje autenticado}.
 
@@ -150,7 +148,7 @@ anexo~\ref{anx:evaluacion} (cuadro~\ref{tab:alojamiento}).
 
 \textbf{Tiempo.} Todo instante se guarda en UTC y cada sitio declara su zona por nombre (\texttt{America/Santiago}):
 como Chile cambia de hora por decreto, toda pregunta de «día» se responde dentro de la base, en la zona del sitio
-(reglas y verificación en la sección~\ref{sec:tiempo}).
+(reglas y verificación en el anexo~\ref{anx:evaluacion}, sección~\ref{sec:tiempo}).
 
 \textbf{Trazabilidad.} Cada elemento de diseño materializa requerimientos del catálogo
 (cuadro~\ref{tab:trazabilidad-diseno}, anexo~\ref{anx:evaluacion}); RF-29 queda pendiente: el backend aún no

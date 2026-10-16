@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 240 pruebas unitarias, sin matriz formal) y TT-32 (sensor físico);
+cubre todavía: TT-27 (contrato de trama: hoy 243 pruebas unitarias del backend y 44 del panel, sin matriz formal) y TT-32 (sensor físico);
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -593,7 +593,7 @@ de la semilla tiene cliente en el broker.
 
 ## 24. Rol de la aplicación con mínimo privilegio (13/10/2026)
 
-Migración 14 (`docs/10 §8.4` punto 44; `docs/11 §4` fila 6 y §9). El backend entra como `plataforma_app`: SELECT en todo, INSERT en 11 tablas y UPDATE en 5;
+Migración 14 (`docs/10 §8.4` punto 44; `docs/11 §4` fila 6 y §9). El backend entra como `plataforma_app`: SELECT en todo, INSERT en 11 tablas y UPDATE en 5 (desde la migración 16, también INSERT en `pasarela` y UPDATE de su columna `activo`, §30);
 la retención usa la función `fn_retencion_drop_chunks` del dueño.
 
 | Comprobación | Resultado |
@@ -749,7 +749,7 @@ la ACL del rol y la recepción por el filtro 1.
 **Cómo** (`bash plataforma/pruebas/banco/banco.sh lorawan`). Contra el banco desechable, con el broker, el plugin de seguridad y la base
 reales: se da de alta por API una pasarela ChirpStack, un nodo y una pasarela Milesight, y se publica con la credencial de cada pasarela el
 JSON de su fuente oficial (evento `up` de ChirpStack v4; uplink con códec y Metadata de Milesight). Los secretos viajan por la entrada
-estándar. Resultado: **25 de 25 comprobaciones, «LORAWAN OK»**; 26 de 26 desde la corrección de §32, 27 de 27 desde la de §33 y 35 de 35 desde la de §34.
+estándar. Resultado: **25 de 25 comprobaciones, «LORAWAN OK»**; 26 de 26 desde la corrección de §32, 27 de 27 desde la de §33, 35 de 35 desde la de §34 y 36 de 36 desde la de §35.
 
 | Comprobación | Resultado |
 |---|---|
@@ -839,4 +839,23 @@ se hace apagando y encendiendo el banco; reconstruir solo su backend recreó la 
 Corregido además en los documentos: el avance del núcleo en `docs/18` (9 parciales y 53 h, no 8 y 47 h: faltaba HU-02), el permiso
 del rol `pasarela` en `docs/11`, la fila de mensajes retenidos de `docs/10 §4.1`, la cabecera de la migración 14 y menciones de la hora
 del día. El guardián suma tres pasos: el horario personal en todo archivo versionado, el avance calculado desde las filas y el conteo de
-este banco frente a lo que cita este documento. Total: 240 pruebas unitarias.
+este banco frente a lo que cita este documento. Total: 240 pruebas.
+
+## 35. Tercera revisión: el capítulo de pruebas del informe y lo que trajo (15/10/2026)
+
+El bloque (correcciones de §34 y capítulo 5 del informe) se revisó desde tres ángulos: seguridad, concordancia y privacidad.
+Cada hallazgo se verificó en el código o en la fuente; los de código se plantaron antes de corregir.
+
+| Pregunta | Medido o verificado | Consecuencia |
+|---|---|---|
+| ¿Un DevEUI con un salto de línea en el cuerpo llega al registro? | Sí: el motivo lo copiaba tal cual. El broker rechaza los caracteres de control en el tópico (validación UTF-8 de Mosquitto 2.1.2), no en el cuerpo | **Corregido:** el DevEUI del cuerpo se compara solo si es ASCII `[0-9a-z-]` (así tampoco calza una letra Unicode que en minúsculas se vuelve ASCII, como el signo Kelvin), y todo texto de afuera pasa por una sola limpieza (`recepcion/texto.ts`): controles, separadores salvo el espacio y rellenos invisibles |
+| ¿Los segmentos del tópico van limpios al detalle de la cuarentena? | No: solo se recortaban | **Corregido** con la misma limpieza |
+| ¿La prueba de que la baja corta la sesión comprobaba que la sesión había abierto? | No tenía control, y el de la rotación solo miraba que el proceso siguiera vivo | **Corregido:** la evidencia es el registro del broker, no la salida del cliente, que la retiene en su búfer hasta terminar: la sesión cuenta como abierta si el broker registró su conexión, y como cortada si el broker la desconectó «por acción administrativa» antes de su plazo y la sesión se había suscrito |
+| ¿Las comprobaciones de retenidos y de «no marca vivo» podían dar verde sin que el backend hubiera procesado nada? | Sí: esperaban un tiempo fijo, y dos «visto» vacíos se daban por iguales | **Corregido:** se espera a ver lo que debía ocurrir (la lectura de la cola, los avisos, la cuarentena con su motivo) y el «visto» no puede estar vacío |
+| ¿La conexión MQTT 3.1.1, de la que depende el descarte de retenidos, era explícita? | No: venía del valor por defecto de la librería | **Corregido:** explícita, y la prueba la fija |
+
+En el informe: el plan B de R1 se activó el 7/10 (no el 8/10); el bloqueo de fila podía frenar la recepción hasta 5 s (el
+segundo medido era el tope de la prueba, §26); las conclusiones separan lo que se cumple de lo parcial; el verificador se cita
+por sus pasos (38) y las pruebas del panel (44) junto a las del backend; los documentos nombran los anexos en vez de citar una
+letra que cambia al insertar uno. El guardián vigila esas cifras (paso 2w4) y sus pasos 2f2, 2w2 y 2w3 ya no pueden pasar sin
+revisar nada. **Banco:** 36 de 36, «LORAWAN OK». Total: 243 pruebas unitarias del backend y 44 del panel.

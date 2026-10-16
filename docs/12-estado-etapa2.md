@@ -117,7 +117,7 @@ falla si informe, docs y base difieren. Sin dibujos a mano: sin solapes ni colum
 2. **Formato real del compañero**: respondió el 10/09 — sensores de temperatura y material particulado;
    primeras tramas en octubre (Etapa 3). El adaptador se cierra con la trama real. **Plan B (23/09)**: si al
    8 de octubre no hay hardware LoRaWAN confirmado, un nodo Wi-Fi propio cubre el sensor real que OE4
-   promete para el 30 de octubre (`docs/04` §6.5, anexo E, riesgo R1).
+   promete para el 30 de octubre (`docs/04` §6.5, registro de riesgos del anexo de seguimiento, riesgo R1).
 3. **Decisiones de Etapa 3 que ya tienen tarea reservada**: WebSocket o SSE (TT-39), proxy TLS.
 4. Tiempo: ~15 h semanales; el informe de la Etapa 2 necesita al menos 12 h de redacción y figuras.
 

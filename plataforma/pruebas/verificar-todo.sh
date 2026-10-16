@@ -141,7 +141,8 @@ DIA='\((madrugada|tarde|noche)[^)]*\)|, (madrugada|tarde|noche)\)|por la (noche|
 horarios=$(grep -niE "$DIA|a las [0-9]{1,2}:[0-9]{2}" bitacora/*.md)
 git grep --untracked -n -i -E "$DIA" -- ':!privado' ':!bitacora' ':!plataforma/pruebas/verificar-todo.sh' ':!*.pdf' > "$VT"/horarios.txt 2>&1; rc=$?
 nb=$(ls bitacora/*.md | wc -l); na=$(git ls-files | wc -l)
-if [ "$rc" -gt 1 ]; then echo "FALLA git grep falló ($rc): no se pudo revisar"; fallos=$((fallos+1))
+if [ "$nb" -lt 1 ]; then echo "FALLA no encontré bitácoras (¿cambió la carpeta?): no se revisó nada"; fallos=$((fallos+1))
+elif [ "$rc" -gt 1 ]; then echo "FALLA git grep falló ($rc): no se pudo revisar"; fallos=$((fallos+1))
 elif [ -n "$horarios" ] || [ "$rc" -eq 0 ]; then echo "FALLA horario personal en archivos versionados:"; { echo "$horarios"; cat "$VT"/horarios.txt; } | grep . | cut -c1-120 | sed 's/^/  /'; fallos=$((fallos+1))
 else echo "OK    $nb bitácoras y $na archivos versionados revisados: ninguno dice a qué hora del día se trabajó"; fi
 
@@ -696,6 +697,7 @@ for nombre, rx, solo in (('Núcleo', r'Núcleo: (\d+) de (\d+) elementos hechos 
     if dicho != real: malos.append(f'docs/18 §1 {nombre}: dice {dicho}; las filas dan {real} (hechos, total, h hechas, h totales, %, parciales, h parciales)')
 # 15/10: el informe (cap. de metodología y anexo de seguimiento) repite esas cifras y el estado de la Etapa 3: deben salir de las mismas filas.
 f18 = dict((k, (int(h), e)) for k, h, e in re.findall(r'^\| ((?:HU|TT)-\d+)[^|]*\|[^|]*\| (\d+) \| (✅|🟡|⬜) \|', tabla, re.M))
+if len(f18) < 10: malos.append(f'docs/18 §2: leí solo {len(f18)} filas de la tabla (¿cambió su forma?)')
 e3 = {s: (sum(1 for h, e in f18.values() if e == s), sum(h for h, e in f18.values() if e == s)) for s in '✅🟡⬜'}
 tex = re.sub(r'\s+', ' ', open('informe-oficial/cap4.tex', encoding='utf-8').read())
 m = re.search(r'De los (\d+) elementos de la Etapa~3 \((\d+)~h\), (\d+) están hechos \((\d+)~h\), (\d+) parciales \((\d+)~h\) y (\d+) pendientes? \((\d+)~h\); en todo el proyecto, (\d+) de (\d+) elementos del núcleo hechos \((\d+) de (\d+)~h, (\d+)\\,\\%\) y (\d+) parciales \((\d+)~h\)', tex)
@@ -721,12 +723,46 @@ PY
 paso "2w3. Banco LoRaWAN: el conteo que cita docs/16 es el de comprobaciones del caso lorawan de banco.sh"
 # 15/10: docs/10 citaba «medido en el banco» para dos mediciones que el banco no repetía; desde entonces son comprobaciones del caso,
 # y el número que dice docs/16 debe ser el del guion (cada «ok "» del caso es una comprobación).
-nl=$(awk '/^  lorawan\)/,/LORAWAN OK/' plataforma/pruebas/banco/banco.sh | grep -c ' ok "')
-if [ "$nl" -lt 10 ]; then echo "FALLA leí solo $nl comprobaciones en el caso lorawan de banco.sh (¿cambió su forma?)"; fallos=$((fallos+1))
+# 15/10, tercera revisión: el rango termina en la línea que imprime «LORAWAN OK» (si falta, falla en vez de contar hasta el final),
+# se cuentan apariciones y no líneas, y los dos archivos del informe deben existir.
+rango=$(awk '/^  lorawan\)/{f=1} f{print} f && /echo "LORAWAN OK"/{exit}' plataforma/pruebas/banco/banco.sh)
+nl=$(grep -o ' ok "' <<<"$rango" | wc -l)
+if ! grep -q 'echo "LORAWAN OK"' <<<"$rango"; then echo "FALLA no encontré el final del caso lorawan en banco.sh"; fallos=$((fallos+1))
+elif ! [ -f informe-oficial/cap-pruebas.tex ] || ! [ -f informe-oficial/anexos/g-pruebas.tex ]; then echo "FALLA falta el capítulo o el anexo de pruebas del informe"; fallos=$((fallos+1))
+elif [ "$nl" -lt 10 ]; then echo "FALLA leí solo $nl comprobaciones en el caso lorawan de banco.sh (¿cambió su forma?)"; fallos=$((fallos+1))
 elif ! grep -q "$nl de $nl desde" docs/16-informe-de-pruebas.md; then echo "FALLA banco.sh lorawan tiene $nl comprobaciones y docs/16 no cita «$nl de $nl desde …»"; fallos=$((fallos+1))
 elif viejas=$(grep -noE '[0-9]+ de [0-9]+ comprobaciones' informe-oficial/cap-pruebas.tex informe-oficial/anexos/g-pruebas.tex | grep -v ":$nl de $nl comprobaciones"); [ -n "$viejas" ]; then echo "FALLA el informe cita otro conteo del banco LoRaWAN (son $nl): $viejas"; fallos=$((fallos+1))
 elif ! grep -q "$nl de $nl comprobaciones" informe-oficial/cap-pruebas.tex; then echo "FALLA el capítulo de pruebas no cita «$nl de $nl comprobaciones» (¿cambió la redacción?)"; fallos=$((fallos+1))
 else echo "OK    banco.sh lorawan tiene $nl comprobaciones; docs/16 y el informe citan «$nl de $nl»"; fi
+
+paso "2w4. Cifras del método en el informe y los documentos: pasos del verificador, pruebas del panel y anexos citados por nombre"
+# 15/10, tercera revisión: el informe decía «más de 150 comprobaciones» sin fuente y contaba las pruebas del backend sin las del
+# panel; y cuatro documentos citaban anexos por una letra que cambió al insertar uno. Se cuentan los pasos de este guion y las
+# pruebas del panel, y en los documentos los anexos se nombran (la letra la pone LaTeX y cambia).
+python3 -I - <<'PY' || fallos=$((fallos+1))
+import re, sys, pathlib
+pasos = len(re.findall(r'^paso "', pathlib.Path('plataforma/pruebas/verificar-todo.sh').read_text(encoding='utf-8'), re.M))
+panel = sum(len(re.findall(r'\b(?:it|test)\(', p.read_text(encoding='utf-8'))) for p in pathlib.Path('plataforma/backend/panel/src').rglob('*.test.ts'))
+if pasos < 20 or panel < 10: print(f'FALLA conté {pasos} pasos y {panel} pruebas del panel (¿cambió la forma?)'); sys.exit(1)
+fuentes = [*pathlib.Path('informe-oficial').glob('*.tex'), *pathlib.Path('informe-oficial/anexos').glob('*.tex'), *pathlib.Path('docs').glob('*.md')]
+malos, n_pasos, n_panel = [], 0, 0
+for f in fuentes:
+    if f.name.startswith('12-'): continue
+    t = re.sub(r'\s+', ' ', f.read_text(encoding='utf-8'))
+    for m in re.finditer(r'(\d+) pasos que comparan|verificador de (\d+) pasos', t):
+        n_pasos += 1; dice = int(m.group(1) or m.group(2))
+        if dice != pasos: malos.append(f'{f}: dice {dice} pasos del verificador; hay {pasos}')
+    for m in re.finditer(r'(\d+) del panel', t):
+        n_panel += 1
+        if int(m.group(1)) != panel: malos.append(f'{f}: dice {m.group(1)} pruebas del panel; hay {panel}')
+if n_pasos == 0 or n_panel == 0: malos.append(f'no encontré citas de los pasos ({n_pasos}) o de las pruebas del panel ({n_panel}): ¿cambió la redacción?')
+for f in [*pathlib.Path('docs').glob('*.md'), pathlib.Path('README.md'), pathlib.Path('RESUMEN.md'), pathlib.Path('PLAN-MAESTRO.md')]:
+    for n, linea in enumerate(f.read_text(encoding='utf-8').splitlines(), 1):
+        if re.search(r'\banexos? [A-H]\b', linea): malos.append(f'{f}:{n}: cita un anexo por letra (usar su nombre)')
+for m in malos: print('FALLA', m)
+if not malos: print(f'OK    {pasos} pasos y {panel} pruebas del panel, como dicen el informe y los documentos; ningún anexo citado por letra')
+sys.exit(1 if malos else 0)
+PY
 
 paso "3. Diagramas: informe = docs = base (generar-figuras.sh --verificar)"
 bash informe-oficial/figuras/generar-figuras.sh --verificar || fallos=$((fallos+1))

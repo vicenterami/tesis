@@ -33,6 +33,8 @@ export class BrokerService implements OnModuleInit, OnModuleDestroy {
       // primera: es deliberado, el pipeline debe correr en un solo proceso.
       clientId: this.config.get<string>('MQTT_CLIENT_ID', 'backend'),
       clean: false,
+      // MQTT 3.1.1 explícito: un envío en vivo llega con retain = 0, y el descarte de retenidos de abajo depende de eso (punto 50).
+      protocolVersion: 4,
       reconnectPeriod: 2000, // si el broker cae, reintenta cada 2 s (RNF de recuperación)
     });
 

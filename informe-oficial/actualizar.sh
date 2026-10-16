@@ -37,8 +37,12 @@ cambios() { # cambios BASE SALIDA
     && latexdiff --flatten --graphics-markup=0 --math-markup=whole -c "PICTUREENV=(?:picture|tikzpicture|DIFnomarkup)[\w\d*@]*" \
          "$T/viejo/informe-oficial/main.tex" "$T/nuevo/informe-oficial/main.tex" > "$T/nuevo/informe-oficial/cambios.tex" 2>/dev/null \
     && { ( cd "$T/nuevo/informe-oficial" && latexmk -f -pdf -interaction=nonstopmode -outdir=build-cambios cambios.tex > /dev/null 2>&1 ) \
-         || echo "AVISO el PDF de cambios salió con errores de marcado de latexdiff (un borrado grande dentro de \\textbf); el informe sí está bien"; } \
-    && [ -s "$T/nuevo/informe-oficial/build-cambios/cambios.pdf" ] && cp "$T/nuevo/informe-oficial/build-cambios/cambios.pdf" "$2"; r=$?; rm -rf "$T"; return $r; }
+         || { cp "$T/nuevo/informe-oficial/build-cambios/cambios.log" "${2%.pdf}.log" 2>/dev/null
+              echo "AVISO el PDF de cambios salió con errores (registro en ${2%.pdf}.log); el informe vale por el paso 2, que compiló aparte"; }; } \
+    && [ -s "$T/nuevo/informe-oficial/build-cambios/cambios.pdf" ] && cp "$T/nuevo/informe-oficial/build-cambios/cambios.pdf" "$2" \
+    && { pc=$(pdfinfo "$2" 2>/dev/null | awk '/^Pages/{print $2}'); pm=$(pdfinfo informe-oficial/build/main.pdf 2>/dev/null | awk '/^Pages/{print $2}')
+         [ "${pc:-0}" -ge "${pm:-1}" ] || echo "AVISO el PDF de cambios tiene ${pc:-0} páginas y el informe ${pm:-?}: puede estar incompleto"; }
+  r=$?; rm -rf "$T"; return $r; }
 if [[ " $* " == *" --sin-cambios "* ]]; then echo "══ 5. cambios visibles: omitido (--sin-cambios) ══"
 elif ! command -v latexdiff >/dev/null; then echo "══ 5. cambios visibles: omitido, falta latexdiff (sudo apt install latexdiff) ══"
 elif ! git cat-file -e "$BASE_CAMBIOS^{commit}" 2>/dev/null; then echo "AVISO la base $BASE_CAMBIOS no es un commit de este repositorio"

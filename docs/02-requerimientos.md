@@ -407,7 +407,7 @@ Estos son los requerimientos que ningún competidor regional identificado satisf
 La rúbrica exige «una evaluación crítica de alternativas consideradas y las razones para la selección
 final». La evaluación de **transporte y formato de trama** —la decisión de mayor peso, vigente tras
 el pivote del 2 de septiembre— está desarrollada en `docs/06-evaluacion-comunicacion.md` y se resume
-en el capítulo 3 y el anexo C del informe. El camino evaluado y descartado antes del pivote —el
+en el capítulo 3 y el anexo de evaluación del informe. El camino evaluado y descartado antes del pivote —el
 protocolo Contact ID frente a otros siete formatos de evento, ocho alternativas sobre seis criterios
 ponderados— queda como evidencia en `historico/docs/05-protocolo-contactid.md`, sección 2. Esta
 sección cubre las decisiones restantes de infraestructura.
