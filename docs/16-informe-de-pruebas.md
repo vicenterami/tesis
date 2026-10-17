@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 263 pruebas unitarias del backend y 44 del panel, sin matriz formal) y TT-32 (sensor físico);
+cubre todavía: TT-27 (contrato de trama: hoy 264 pruebas unitarias del backend y 44 del panel, sin matriz formal) y TT-32 (sensor físico);
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -864,7 +864,7 @@ revisar nada. **Banco:** 36 de 36, «LORAWAN OK».
 la limpieza (el tópico crudo queda en su columna de la cuarentena como evidencia); se suman a los rellenos los selectores de variación
 que faltaban; el informe dice ahora que el JSON del banco es el de la documentación oficial de ChirpStack v4 y de Milesight, no el
 que publica el ChirpStack del campus, todavía no probado; y el guardián busca el nombre del entrevistado también en el código.
-Total: 263 pruebas unitarias del backend y 44 del panel.
+Total: 264 pruebas unitarias del backend y 44 del panel.
 
 ## 36. La trama real de la pasarela del campus: sufijo nativo, perfil de decodificación y contador de trama (16/10/2026)
 
@@ -942,4 +942,21 @@ La foto incluye también los trabajos de TimescaleDB y el catálogo completo, y 
 vez de comparar dos vacíos (plantado: base detenida → «la foto del esquema salió casi vacía»). Resultado: 16 de 16 reaplicadas sin
 cambios en `encender` y en tres corridas más lanzadas a mano, separadas por 30 s con el backend guardando. Se hace en el banco y no en el
 guardián porque reaplicar en la base de desarrollo la escribiría en cada corrida y bloquearía tablas mientras el backend guarda.
+
+## 38. Suelo del nodo propio: magnitudes y calibración por canal (migración 18, 16/10/2026)
+
+**Qué cambió** (`docs/10 §8.4` punto 51). Dos magnitudes, `temperatura_suelo` (Cel, −55 a 125, el rango del DS18B20 en su hoja de datos)
+y `humedad_suelo` (V, 0 a 3,3: la tensión cruda del sensor capacitivo; el porcentaje se calcula), y la calibración por canal
+(`canal.escala_cero`, `canal.escala_cien`). La unidad es V y no mV porque SenML desaconseja los prefijos (RFC 8428) y registra «mV» solo
+como unidad secundaria (RFC 8798); un emisor que mande `mV` se convierte (1/1000).
+
+| Pregunta | Medido o verificado |
+|---|---|
+| ¿La calibración exige las dos escalas, distintas? | Casos 20 a 22 de `reglas-identidad.sql`: una sola escala y el 0 % igual al 100 %, rechazadas por `ck_canal_escala`; la del suelo (0 % al aire 2,65 V, 100 % en agua 1,20 V, con el 100 % por debajo), aceptada |
+| ¿`mV` se convierte bien? | 2650 mV → 2,65 V (prueba unitaria); plantado un factor de 1/100, la prueba falla. V a mV no se inventa |
+| ¿La migración se aplica desde cero y se repite sin cambiar nada? | `banco.sh encender`: la base nueva la trae; las 17 reaplicables, idempotentes |
+| ¿En la base de desarrollo cambió solo lo esperado? | Aplicada dos veces; la foto del esquema antes y después difiere solo en las dos columnas, la restricción, sus dos comentarios y las dos magnitudes |
+
+**Lo que falta:** el porcentaje en la API de consulta y en el panel (entra con HU-21) y el permiso de la aplicación para editar la
+calibración (se concede cuando exista la ruta que la edita: mínimo privilegio). **Pruebas:** 264 unitarias del backend.
 

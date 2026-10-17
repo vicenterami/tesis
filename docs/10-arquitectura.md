@@ -1382,6 +1382,25 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     descarte y la alarma de la cola (punto 43) quedaría sin muestra. Queda abierto el tope: una credencial válida puede dejar
     retenidos en muchos tópicos y el broker los guarda sin límite; entra con el tope por emisor (`docs/11 §4`, fila 8).
 
+51. **Suelo del nodo propio: se guarda la medida cruda y el porcentaje se calcula con una calibración por canal** (decidido el
+    16/10/2026 por el estudiante; migración 18; el detalle de la calibración, por criterio técnico). El sensor capacitivo de humedad
+    de suelo entrega una tensión, no un porcentaje: **se guarda esa tensión**, y el % se calcula al consultar o al mostrar. Si la
+    calibración se corrige, la serie guardada no cambia: el % se recalcula. **La tensión se guarda en V, no en mV:** el catálogo usa
+    las unidades de SenML, que desaconseja los prefijos («Use of System of Units (SI) prefixes such as "k" before the unit is not
+    recommended», RFC 8428, reglas de unidades, regla 4) y registra «mV» solo como unidad secundaria que SenML 10 no usa directamente
+    («SenML version 10 [RFC8428] does not provide for the direct use of these secondary units», RFC 8798 §1; ambos consultados y
+    descargados el 16/10/2026). Un emisor que mande `mV` se acepta y se convierte (1/1000, la misma tabla del RFC 8798).
+    **Magnitudes nuevas:** `temperatura_suelo` (Cel, de −55 a 125 °C, el rango de medida del DS18B20 según su hoja de datos) y
+    `humedad_suelo` (V, de 0 a 3,3: la alimentación del sensor; el de referencia entrega de 0 a 3,0 V).
+    **Calibración genérica por canal:** dos columnas de `canal`, `escala_cero` y `escala_cien`, el valor de la magnitud que corresponde
+    al 0 % y al 100 %; las dos o ninguna, y distintas. Para el suelo: la tensión en agua es el 100 % y la tensión al aire el 0 % (el
+    sensor capacitivo baja con el agua: `escala_cien` < `escala_cero` es válido). El porcentaje es `100 × (v − cero) / (cien − cero)`,
+    recortado a [0, 100]. Sirve para cualquier sensor que se lleve a porcentaje con una recta, no solo para el suelo. **Dónde se calcula:**
+    en la API de consulta, junto al valor crudo, y el panel lo muestra (código pendiente: entra con el cierre de HU-21). **Cada cuánto
+    publica el nodo:** 60 s por ahora (constante del firmware) y el intervalo esperado del dispositivo es editable (`§4.4`); cambiarlo en
+    remoto, con un comando del broker al nodo, exige que el dispositivo se suscriba a su subárbol de comandos (cambio de la ACL del rol
+    `dispositivo`) y se diseña aquí antes de hacerlo.
+
 ## 9. Crecimiento, resiliencia y respaldo (aprobado el 06/10/2026)
 
 Esta sección responde a tres preguntas del estudiante: qué pasa si hay que guardar más, cómo y en qué orden

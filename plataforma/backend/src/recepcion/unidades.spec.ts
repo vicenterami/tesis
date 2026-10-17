@@ -20,6 +20,10 @@ describe('aCanonica', () => {
     expect(aCanonica(55, '%', '%RH')).toBe(55);
     expect(aCanonica(87, '%', '%EL')).toBe(87);
   });
+  it('mV (unidad secundaria de SenML, RFC 8798) a V, la canónica de la humedad de suelo; V a mV no se inventa', () => {
+    expect(aCanonica(2650, 'mV', 'V')).toBe(2.65);
+    expect(aCanonica(2.65, 'V', 'mV')).toBeUndefined();
+  });
   it('pareja desconocida → undefined (mejor rechazar que adivinar)', () => {
     expect(aCanonica(20, 'furlongs', 'Cel')).toBeUndefined();
     expect(aCanonica(20, 'Cel', 'hPa')).toBeUndefined();

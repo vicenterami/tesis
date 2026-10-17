@@ -10,6 +10,9 @@ const CONVERSIONES: Record<string, (v: number) => number> = {
   'bar→hPa': (v) => v * 1000,
   '%→%RH': (v) => v,   // porcentaje genérico usado como humedad relativa
   '%→%EL': (v) => v,   // porcentaje genérico usado como nivel de batería
+  // «mV» es unidad secundaria de SenML (RFC 8798: 1/1000 de V), que SenML 10 no usa directamente; se acepta y se guarda en V,
+  // la canónica (docs/10 §8.4 punto 51).
+  'mV→V': (v) => v / 1000,
 };
 
 // Devuelve el valor en la unidad canónica, o undefined si no sabe convertir.

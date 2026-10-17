@@ -73,6 +73,8 @@ erDiagram
         text magnitud_codigo FK
         text etiqueta
         timestamptz actualizado_en
+        float escala_cero
+        float escala_cien
     }
     condicion {
         uuid id PK
@@ -322,9 +324,11 @@ consistente para reportes.
       `estado_dispositivo.ultimo_fcnt` (`bigint`, nulo, de 0 a 2³²−1: el contador de 32 bits del servidor de red) y la magnitud
       `tension` (`V`, de 0 a 5), la tensión de batería que reportan los nodos de la red del campus. Los perfiles pasan al catálogo
       editable en la Etapa 4, como el mapa de claves.
+- [x] **Suelo del nodo propio** (migración 18, 16/10/2026; `docs/10 §8.4` punto 51): `temperatura_suelo` (`Cel`, −55 a 125) y
+      `humedad_suelo` (`V`, 0 a 3,3: la tensión cruda del sensor capacitivo; el % se calcula), y la calibración por canal
+      `canal.escala_cero` y `canal.escala_cien` (las dos o ninguna, distintas).
 - [ ] **Magnitudes nuevas** del caso de uso (entrevista del 05/10): `radon` (`Bq/m3`, unidad propia: el catálogo
-      es el «application context» de RFC 8428 §4.5.2), `hidrogeno` (`ppm`), `temperatura_suelo` (`Cel`),
-      `humedad_suelo` (unidad por confirmar con el instrumento). Cada una con su rango físico.
+      es el «application context» de RFC 8428 §4.5.2) e `hidrogeno` (`ppm`). Cada una con su rango físico.
 - [ ] **Tercera forma normal, revisada con cada cambio**: al agregar `pasarela` y `trama`, comprobar que ningún
       atributo dependa de otro que no sea la clave y que no aparezcan dependencias multivaluadas (lo que
       justificaría 4FN). Si aparecieran, se documenta aquí y se normaliza; mientras no, 3FN basta (§6).

@@ -1,4 +1,4 @@
--- Reglas de identidad de las migraciones 11, 15, 16 y 17 (docs/10 §8.4 puntos 24 y 47; §4.1), plantadas: cada caso intenta lo prohibido y espera el
+-- Reglas de identidad de las migraciones 11, 15, 16, 17 y 18 (docs/10 §8.4 puntos 24 y 47; §4.1), plantadas: cada caso intenta lo prohibido y espera el
 -- rechazo de la base. Todo ocurre dentro de una transacción que termina en ROLLBACK: no queda nada en la base.
 -- La corre el guardián (paso 1c). La carrera de dos altas simultáneas no cabe en una sola sesión: se probó a mano (docs/16 §13).
 BEGIN;
@@ -158,6 +158,32 @@ BEGIN
     INSERT INTO resultado VALUES (19, 'OK    contador de trama 2^32 - 1: aceptado');
   EXCEPTION WHEN OTHERS THEN
     INSERT INTO resultado VALUES (19, 'FALLA se rechazó el contador máximo legítimo: ' || SQLERRM);
+  END;
+  -- Migración 18: la calibración de un canal lleva las dos escalas o ninguna, y distintas (docs/10 §8.4 punto 51).
+  BEGIN
+    INSERT INTO canal (dispositivo_id, magnitud_codigo, escala_cero)
+      SELECT id, 'humedad_suelo', 2.65 FROM dispositivo WHERE id_fisico = 'prueba-identidad-d';
+    INSERT INTO resultado VALUES (20, 'FALLA se aceptó una calibración con una sola escala');
+  EXCEPTION WHEN check_violation THEN
+    GET STACKED DIAGNOSTICS restriccion = CONSTRAINT_NAME;
+    INSERT INTO resultado VALUES (20, CASE WHEN restriccion = 'ck_canal_escala' THEN 'OK    calibración con una sola escala: rechazada'
+      ELSE 'FALLA calibración con una sola escala rechazada por otra regla: ' || restriccion END);
+  END;
+  BEGIN
+    INSERT INTO canal (dispositivo_id, magnitud_codigo, escala_cero, escala_cien)
+      SELECT id, 'humedad_suelo', 2.65, 2.65 FROM dispositivo WHERE id_fisico = 'prueba-identidad-d';
+    INSERT INTO resultado VALUES (21, 'FALLA se aceptó una calibración con el 0 % igual al 100 %');
+  EXCEPTION WHEN check_violation THEN
+    GET STACKED DIAGNOSTICS restriccion = CONSTRAINT_NAME;
+    INSERT INTO resultado VALUES (21, CASE WHEN restriccion = 'ck_canal_escala' THEN 'OK    calibración con el 0 % igual al 100 %: rechazada'
+      ELSE 'FALLA calibración degenerada rechazada por otra regla: ' || restriccion END);
+  END;
+  BEGIN
+    INSERT INTO canal (dispositivo_id, magnitud_codigo, escala_cero, escala_cien)
+      SELECT id, 'humedad_suelo', 2.65, 1.20 FROM dispositivo WHERE id_fisico = 'prueba-identidad-d';
+    INSERT INTO resultado VALUES (22, 'OK    calibración del suelo (0 % al aire 2,65 V, 100 % en agua 1,20 V): aceptada');
+  EXCEPTION WHEN OTHERS THEN
+    INSERT INTO resultado VALUES (22, 'FALLA se rechazó una calibración legítima: ' || SQLERRM);
   END;
 END $$;
 SELECT linea FROM resultado ORDER BY orden;

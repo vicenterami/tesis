@@ -1,10 +1,11 @@
 # Equipo de prueba: nodo propio para TT-32 (Wi-Fi y, si hay pasarela, LoRaWAN)
 
 > **Sustenta:** TT-32 (sensor físico de extremo a extremo, `docs/04`), escenarios 1 y 3 de `docs/10 §2`, validación
-> preliminar de la Etapa 3. Versión: 8 de octubre de 2026; estado del equipo al 14 de octubre. Los precios son una cotización con fecha, no un compromiso.
+> preliminar de la Etapa 3. Versión: 8 de octubre de 2026; estado al 16 de octubre. Los precios son una cotización con fecha, no un compromiso.
 >
 > **Estado (14/10/2026):** todo el equipo recibido: la placa, anotada el 12/10, y las piezas 2 a 7, el 13/10 (§3). Fase 0 completa el
-> 14/10: la placa se reconoce y se identificó (§3, primera conexión). Falta la fase 1: cablear los sensores. Guía de manejo seguro en §4.
+> 14/10: la placa se reconoce y se identificó (§3, primera conexión). **16/10:** firmware de la fase 1 (diagnóstico de los sensores) listo
+> y compilado, versiones fijadas (§5) y fases descritas (§6); falta ejecutarla con el hardware: cablear y medir. Guía de manejo seguro en §4.
 
 ## 1. Para qué sirve y por qué estas piezas
 
@@ -159,15 +160,19 @@ publicadas hace más de dos semanas; licencias leídas en los archivos de cada p
 | Pieza | Versión | Publicada | Licencia |
 |---|---|---|---|
 | PlatformIO Core | 6.2.0 | 05/09/2026 | Apache 2.0 |
-| Plataforma `platformio/espressif32` | 7.1.3 | 11/09/2026 | (trae el núcleo `framework-arduinoespressif32` 4.20017.260907) |
+| Plataforma `platformio/espressif32` | 7.1.3 | 11/09/2026 | (herramienta de compilación) |
+| Núcleo Arduino-ESP32 (`framework-arduinoespressif32`, lo trae la plataforma) | 4.20017.260907 | — | LGPL-2.1-or-later (su `package.json`, sus cabeceras y su repositorio oficial) |
+| Bibliotecas Wi-Fi precompiladas de Espressif (las enlaza el núcleo) | las de la plataforma | — | Apache 2.0 (repositorio oficial `esp32-wifi-lib`) |
 | Adafruit BME280 Library | 2.3.0 | 30/04/2025 | BSD |
 | Adafruit Unified Sensor | 1.1.15 | 06/01/2025 | Apache 2.0 |
 | Adafruit BusIO | 1.17.4 | 22/09/2025 | MIT |
 | OneWire (Paul Stoffregen) | 2.3.8 | 08/02/2024 | permiso estilo MIT en el código fuente (sin archivo de licencia) |
 | DallasTemperature | 4.0.6 | 24/01/2026 | MIT |
 
-Todas abiertas y permisivas (RNF-15). El firmware de diagnóstico compila sin avisos con `-Wall -Wextra` (13,5 % de la RAM, 58,5 %
-de la memoria de programa).
+Todas de código abierto y sin costo (RNF-15); la del núcleo es LGPL, no permisiva: lo que pide al distribuir un binario y los avisos
+de copyright de cada paquete están en `plataforma/firmware/AVISOS-DE-TERCEROS.md`. Medido el 16/10/2026 con `pio run -e diagnostico`
+en un entorno aislado: compila sin avisos con `-Wall -Wextra`, 13,5 % de la RAM y 58,6 % de la memoria de programa (se repite en el
+paso 1 del laboratorio de la fase 1).
 
 ## 6. Firmware por fases (16/10/2026)
 
@@ -176,7 +181,11 @@ Dos fases, para que una falla diga dónde está: si la fase 1 no ve un sensor, e
 - **Fase 1, diagnóstico** (`pio run -e diagnostico`, `src/diagnostico.cpp`): solo puerto serie, Wi-Fi apagado. Barre el bus I2C y lee el
   registro de identificación `0xD0` del módulo de aire (`0x60` BME280, `0x58` BMP280, que no mide humedad: §2); cuenta las sondas
   DS18B20 y lee la primera; lee el sensor de suelo en mV (promedio de 16) para anotar el valor al aire y con la punta en agua, que son
-  los dos extremos de su calibración. No imprime identificadores de hardware: la dirección ROM de la sonda es única, como una MAC.
+  los dos extremos de su calibración, y avisa si la lectura pasa de 2450 mV: con la atenuación de mayor rango el ADC es preciso de 150 a
+  2450 mV (±60 mV) y empeora por encima (ESP32 Series Datasheet v5.3, tabla de características del ADC), mientras el sensor de
+  referencia entrega hasta 3,0 V (SEN0193). Si el valor al aire pasa de 2450 mV, se decide con el dato medido si se agrega un divisor
+  de tensión o se acepta la menor precisión en el extremo seco. Distingue el valor de arranque de la sonda (+85 °C, antes de su primera
+  conversión) de una lectura real. No imprime identificadores de hardware: la dirección ROM de la sonda es única, como una MAC.
 - **Fase 2, publicación**: Wi-Fi, TLS con la CA propia, MQTT con la credencial del alta y SenML en `sitio/<sitio>/dispositivo/<id>/<magnitud>`,
   con la marca de tiempo del nodo sincronizada por NTP (regla 7 de `docs/13`). Antes de publicar el suelo hacen falta sus magnitudes en el
   catálogo (`temperatura_suelo`, `humedad_suelo`: `docs/08 §8`) y la curva de calibración de la fase 1. Se diseña aquí antes de escribirla;

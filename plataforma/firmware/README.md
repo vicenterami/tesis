@@ -8,7 +8,8 @@ capacitivo de humedad de suelo. Piezas, seguridad y pines: `docs/17`. Diseño po
 | `diagnostico` | Fase 1: identifica el módulo de aire (registro `0xD0`), lee la sonda y el suelo por el puerto serie, sin Wi-Fi | Listo |
 | (fase 2) | Wi-Fi, TLS con la CA propia, MQTT y SenML hacia la plataforma | Por diseñar en `docs/17 §6` |
 
-Requiere PlatformIO Core 6.2.0; las versiones de la plataforma y de cada biblioteca están fijadas en `platformio.ini`.
+Requiere PlatformIO Core 6.2.0 (`pip install platformio==6.2.0`; no se fija en `platformio.ini`); las versiones de la plataforma
+y de cada biblioteca sí están fijadas ahí. Licencias y avisos de copyright de terceros: `AVISOS-DE-TERCEROS.md`.
 
 ```
 pio run -e diagnostico -t upload && pio device monitor
