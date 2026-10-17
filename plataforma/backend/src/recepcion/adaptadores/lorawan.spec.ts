@@ -156,6 +156,15 @@ describe('MilesightAdaptador (servidor de red embebido, con códec y Metadata)',
     const sinCodec = JSON.stringify({ applicationID: '3', devEUI: DEVEUI, fCnt: 1, fPort: 85, data: '/wv//wEB', time: '2025-04-12T02:56:19', rxInfo: [] });
     expect(() => a.analizar(ctx(sinCodec))).toThrow('llegó sin decodificar: activar Payload Codec y Metadata');
   });
+  it('con códec: si la trama trae fCnt se anota para deduplicar y no cuenta como clave ignorada; si no lo trae, sin contador', () => {
+    const c = ctx(conCodec({ fCnt: 77 }));
+    expect(a.analizar(c)).toHaveLength(3);
+    expect(c.fcnt).toBe(77);
+    expect(c.ignoradas).toEqual([]);
+    const sin = ctx(conCodec());
+    a.analizar(sin);
+    expect(sin.fcnt).toBeUndefined();
+  });
   it('con códec pero sin Metadata (no hay devEUI) → malformada que dice qué activar', () => {
     expect(() => a.analizar(ctx('{"battery":92,"temperature":30.8}'))).toThrow('sin devEUI: activar Metadata');
   });

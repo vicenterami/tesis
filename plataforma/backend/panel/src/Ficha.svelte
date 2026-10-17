@@ -99,7 +99,7 @@
     if (e.tipo === 'visto') {
       d = { ...d, visto_por_ultima_vez: e.tiempo };
     } else if (e.tipo === 'medicion') {
-      d = { ...d, canales: d.canales.map((c) => (c.id === e.canal_id ? { ...c, ultima_medicion: { valor: e.valor, tiempo: e.tiempo } } : c)) };
+      d = { ...d, canales: d.canales.map((c) => (c.id === e.canal_id ? { ...c, ultima_medicion: { valor: e.valor, tiempo: e.tiempo, porcentaje: e.porcentaje ?? null } } : c)) };
       if (e.canal_id === canalElegido) lecturas.agregar({ tiempo: e.tiempo, valor: e.valor });
     } else if (e.tipo === 'condicion') {
       repedirCondiciones.pedir();
@@ -160,6 +160,10 @@
           <button type="button" class="canal" aria-pressed={c.id === canalElegido} onclick={() => elegirCanal(c.id)} data-canal-id={c.id}>
             <strong>{c.magnitud_nombre}{c.etiqueta === null ? '' : ` · ${c.etiqueta}`}</strong>
             <span class="lectura" data-ultima>{formatearValor(c.ultima_medicion?.valor ?? null, c.unidad)}</span>
+            <!-- «es un número», no «no es null»: un evento sin el campo (un backend anterior) no debe romper la tarjeta -->
+            {#if typeof c.ultima_medicion?.porcentaje === 'number'}
+              <span class="porcentaje" data-porcentaje>{c.ultima_medicion.porcentaje.toLocaleString('es-CL')} % según su calibración</span>
+            {/if}
             <span class="vivo">{c.ultima_medicion === null ? 'sin lecturas' : haceCuanto(c.ultima_medicion.tiempo, ahora)}</span>
             {#if c.reglas !== null && c.reglas.length > 0}
               <span class="reglas">umbrales: {c.reglas.map((r) => `${r.umbral_bajo ?? '—'} a ${r.umbral_alto ?? '—'} (histéresis ${r.histeresis ?? 0})`).join('; ')}</span>

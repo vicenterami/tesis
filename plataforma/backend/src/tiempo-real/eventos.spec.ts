@@ -9,7 +9,7 @@ import { TiempoRealModule } from './tiempo-real.module';
 
 // TT-39 · Canal de tiempo real del panel (docs/10 §5). Primero las piezas sueltas; al final, el canal por HTTP real.
 const SIN_ORIGEN = { headers: {} } as unknown as Request; // el propio panel, curl u otro servidor: sin Origin
-const M1: EventoPanel = { tipo: 'medicion', dispositivo_id: 'd1', canal_id: 'k1', valor: 21.5, unidad: 'Cel', tiempo: '2026-10-09T15:00:00.000Z' };
+const M1: EventoPanel = { tipo: 'medicion', dispositivo_id: 'd1', canal_id: 'k1', valor: 21.5, unidad: 'Cel', tiempo: '2026-10-09T15:00:00.000Z', porcentaje: null };
 
 describe('EventosService: qué recibe cada flujo', () => {
   it('sin filtro → todo; por dispositivo → solo los suyos; por canal → solo las mediciones de ese canal', () => {

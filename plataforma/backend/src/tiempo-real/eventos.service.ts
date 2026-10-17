@@ -6,7 +6,8 @@ import { Observable, Subject, filter } from 'rxjs';
 // evento nunca anuncia algo que la base no tiene. Un solo proceso de backend (docs/10 §9): si algún día hay varios,
 // el bus pasa a la base (LISTEN/NOTIFY) sin cambiar a quien lo usa.
 export type EventoPanel =
-  | { tipo: 'medicion'; dispositivo_id: string; canal_id: string; valor: number; unidad: string; tiempo: string }
+  // porcentaje: con la calibración del canal (docs/10 §8.4 punto 51); null sin calibración. El panel no repite la cuenta.
+  | { tipo: 'medicion'; dispositivo_id: string; canal_id: string; valor: number; unidad: string; tiempo: string; porcentaje: number | null }
   | { tipo: 'visto'; dispositivo_id: string; tiempo: string }
   | { tipo: 'condicion'; dispositivo_id: string; condicion: 'umbral' | 'sin_comunicacion'; estado: 'abierta' | 'cerrada' }
   // Condición del sistema, sin dispositivo (docs/10 §8.4 punto 43): solo la reciben los flujos sin filtro (la vista general).

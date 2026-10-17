@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 268 pruebas unitarias del backend y 44 del panel, sin matriz formal) y TT-32 (sensor físico);
+cubre todavía: TT-27 (contrato de trama: hoy 270 pruebas unitarias del backend y 46 del panel, sin matriz formal) y TT-32 (sensor físico);
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -856,7 +856,7 @@ Cada hallazgo se verificó en el código o en la fuente; los de código se plant
 
 En el informe: el plan B de R1 se activó el 7/10 (no el 8/10); el bloqueo de fila podía frenar la recepción hasta 5 s (el
 segundo medido era el tope de la prueba, §26); las conclusiones separan lo que se cumple de lo parcial; el verificador se cita
-por sus pasos (hoy 39) y las pruebas del panel (44) junto a las del backend; los documentos nombran los anexos en vez de citar una
+por sus pasos (hoy 39) y las pruebas del panel (46) junto a las del backend; los documentos nombran los anexos en vez de citar una
 letra que cambia al insertar uno. El guardián vigila esas cifras (paso 2w4) y sus pasos 2f2, 2w2 y 2w3 ya no pueden pasar sin
 revisar nada. **Banco:** 36 de 36, «LORAWAN OK».
 
@@ -864,7 +864,7 @@ revisar nada. **Banco:** 36 de 36, «LORAWAN OK».
 la limpieza (el tópico crudo queda en su columna de la cuarentena como evidencia); se suman a los rellenos los selectores de variación
 que faltaban; el informe dice ahora que el JSON del banco es el de la documentación oficial de ChirpStack v4 y de Milesight, no el
 que publica el ChirpStack del campus, todavía no probado; y el guardián busca el nombre del entrevistado también en el código.
-Total: 268 pruebas unitarias del backend y 44 del panel.
+Total: 270 pruebas unitarias del backend y 46 del panel.
 
 ## 36. La trama real de la pasarela del campus: sufijo nativo, perfil de decodificación y contador de trama (16/10/2026)
 
@@ -940,7 +940,8 @@ antes de la corrección, la base de desarrollo no tenía duplicados (consultado)
 y el primer fragmento de una tabla cambia el orden en que `pg_dump` la escribe (se compara el conjunto de líneas, ordenado).
 La foto incluye también los trabajos de TimescaleDB y el catálogo completo, y si sale casi vacía (base caída) la comprobación falla en
 vez de comparar dos vacíos (plantado: base detenida → «la foto del esquema salió casi vacía»). Resultado: 16 de 16 reaplicadas sin
-cambios en `encender` y en tres corridas más lanzadas a mano, separadas por 30 s con el backend guardando. Se hace en el banco y no en el
+cambios en `encender` y en tres corridas más lanzadas a mano, separadas por 30 s con el backend guardando (medido antes de la 18;
+desde la §38 son 17). Se hace en el banco y no en el
 guardián porque reaplicar en la base de desarrollo la escribiría en cada corrida y bloquearía tablas mientras el backend guarda.
 
 ## 38. Suelo del nodo propio: magnitudes y calibración por canal (migración 18, 16/10/2026)
@@ -960,6 +961,8 @@ como unidad secundaria (RFC 8798); un emisor que mande `mV` se convierte (1/1000
 | ¿La calibración admite NaN o infinito? | Ya no: la primera versión los aceptaba (comprobado en el banco: `NaN` e `Infinity` entraban) y el % habría salido basura. La regla exige escalas finitas; casos 23 y 24, plantados. Al reescribirla se perdió el `IS NOT NULL` explícito y el caso 20 lo detectó al instante: con una sola escala, la comparación da «desconocido» y un `CHECK` así se da por cumplido; restituido |
 | ¿La API entrega el %? | Una sola función (`consulta/escala.ts`, con pruebas: extremos, recta invertida, recorte, sin calibración, NaN, infinito y división por cero) y la usan la ficha y el histórico. En el banco, con una calibración puesta en la base, la última humedad (65,52) sale 32,8 % en la ficha y en el histórico, y un canal sin calibración trae `null` (`banco.sh lorawan`) |
 
-**Lo que falta:** mostrar el % en el panel y la ruta para editar la calibración, con su permiso (se concede cuando exista la ruta: mínimo
-privilegio) y la validación de que las escalas caigan en el rango de la magnitud. **Pruebas:** 268 unitarias del backend.
+| ¿El panel lo muestra sin repetir la cuenta? | El evento `medicion` del canal en vivo trae `porcentaje`, calculado en la recepción con la misma función (prueba: calibración 0–50 y lectura 22,4 → 44,8 %); la ficha lo muestra junto al valor crudo solo si es un número, así un evento sin el campo no rompe la tarjeta (prueba del panel; plantado a mano el 16/10: si la ficha no copia el campo, falla) |
+
+**Lo que falta:** la ruta para editar la calibración, con su permiso (se concede cuando exista la ruta: mínimo
+privilegio) y la validación de que las escalas caigan en el rango de la magnitud. **Pruebas:** 270 unitarias del backend y 46 del panel.
 

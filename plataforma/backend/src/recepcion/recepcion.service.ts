@@ -15,6 +15,7 @@ import { ContextoTrama, Lectura } from './lectura';
 import { tiempoPlausible } from './tiempo';
 import { limpia } from './texto';
 import { aCanonica } from './unidades';
+import { porcentaje } from '../consulta/escala';
 
 // Forma del tópico acordada: sitio/<sitio>/dispositivo/<id_fisico>/<magnitud>
 const PATRON_TOPICO = /^sitio\/([^/]+)\/dispositivo\/([^/]+)\/([^/]+)$/;
@@ -35,7 +36,7 @@ interface Pasarela { id: string; activo: boolean; sitio_codigo: string }
 type Motivo = 'no_registrado' | 'dado_de_baja' | 'malformada' | 'invalida';
 // Lo que se sabe de la trama al rechazarla. dispositivoId solo existe si el filtro 1 pudo atribuirla.
 interface TramaRecibida { topico: string; carga: Buffer; recibidoEn: Date; dispositivoId?: string }
-interface Canal { id: string; magnitud: string; unidad_canonica: string; rango_min: number | null; rango_max: number | null }
+interface Canal { id: string; magnitud: string; unidad_canonica: string; rango_min: number | null; rango_max: number | null; escala_cero: number | null; escala_cien: number | null }
 
 // M1 Recepción + M2 Normalización (pipeline). Los seis filtros: 1 autenticar · 2 analizar · 3 validar ·
 // 4 normalizar · 5 alertar (con AlertasService) · 6 supervisar (con SupervisionService).
@@ -247,6 +248,7 @@ export class RecepcionService implements OnModuleInit {
       this.eventos.publicar({
         tipo: 'medicion', dispositivo_id: dispositivo.id, canal_id: canal.id, valor, unidad: canal.unidad_canonica,
         tiempo: r.rows[0].tiempo.toISOString(), // la marca que puso la base, no la de JavaScript
+        porcentaje: porcentaje(valor, canal.escala_cero ?? null, canal.escala_cien ?? null),
       });
       // ── [5] Alertar: ¿la medición cruza un umbral de este canal? (en mantenimiento no abre condiciones, RF-22) ──
       await this.alertas.evaluar(dispositivo.id, canal.id, ctx.idFisico, valor, canal.unidad_canonica, dispositivo.estado === 'mantenimiento');
@@ -308,7 +310,7 @@ export class RecepcionService implements OnModuleInit {
   // El canal une dispositivo + magnitud y trae del catálogo la unidad canónica y el rango válido.
   private async buscarCanal(dispositivoId: string, magnitud: string): Promise<Canal | undefined> {
     const r = await this.pool.query<Canal>(
-      `SELECT c.id, m.codigo AS magnitud, m.unidad_canonica, m.rango_min, m.rango_max
+      `SELECT c.id, m.codigo AS magnitud, m.unidad_canonica, m.rango_min, m.rango_max, c.escala_cero, c.escala_cien
          FROM canal c JOIN magnitud m ON m.codigo = c.magnitud_codigo
         WHERE c.dispositivo_id = $1 AND c.magnitud_codigo = $2`,
       [dispositivoId, magnitud],

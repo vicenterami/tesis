@@ -24,8 +24,9 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
   // El dispositivo de prueba declara «plano» salvo que la prueba diga otro formato (despacho por formato: docs/10 §8.4 punto 47).
   type Disp = { id: string; estado: string; sitio_codigo?: string; formato?: string; pasarela_id?: string | null; decodificador?: string | null; ultimo_fcnt?: string | null };
   type Pas = { id: string; activo: boolean; sitio_codigo: string };
-  function armar(dispositivo: Disp | undefined, duplicada = false, pasarela?: Pas) {
-    const canal = { id: 'k1', magnitud: 'temperatura', unidad_canonica: 'Cel', rango_min: -40, rango_max: 85 };
+  // escala: la calibración del canal (migración 18); por defecto, sin calibración.
+  function armar(dispositivo: Disp | undefined, duplicada = false, pasarela?: Pas, escala: { cero: number; cien: number } | null = null) {
+    const canal = { id: 'k1', magnitud: 'temperatura', unidad_canonica: 'Cel', rango_min: -40, rango_max: 85, escala_cero: escala?.cero ?? null, escala_cien: escala?.cien ?? null };
     const query = jest.fn((sql: string, params?: unknown[]) => {
       // El dispositivo de prueba está registrado en el sitio «uct», el mismo del tópico, salvo que la prueba diga otro.
       if (sql.startsWith('SELECT d.id, d.estado, d.formato, d.pasarela_id, s.codigo AS sitio_codigo, d.decodificador, e.ultimo_fcnt FROM dispositivo')) {
@@ -228,11 +229,19 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
     const { servicio, publicados } = armar({ id: 'd1', estado: 'activo' });
     await servicio.procesar(TOPICO, Buffer.from('22.4'));
     expect(publicados).toEqual([
-      { tipo: 'medicion', dispositivo_id: 'd1', canal_id: 'k1', valor: 22.4, unidad: 'Cel', tiempo: T_BASE.toISOString() },
+      { tipo: 'medicion', dispositivo_id: 'd1', canal_id: 'k1', valor: 22.4, unidad: 'Cel', tiempo: T_BASE.toISOString(), porcentaje: null },
       { tipo: 'visto', dispositivo_id: 'd1', tiempo: T_BASE.toISOString() },
     ]);
   });
 
+  it('el evento «medicion» trae el porcentaje con la calibración del canal (docs/10 §8.4 punto 51), con la misma función que la API', async () => {
+    const { servicio, publicados, query } = armar({ id: 'd1', estado: 'activo' }, false, undefined, { cero: 0, cien: 50 });
+    await servicio.procesar(TOPICO, Buffer.from('22.4'));
+    expect(publicados[0]).toMatchObject({ tipo: 'medicion', valor: 22.4, porcentaje: 44.8 });
+    // El simulador entrega las escalas aunque la consulta no las pida: se exige que la consulta real las pida (revisión del 16/10).
+    const sqlCanal = query.mock.calls.map(([sql]) => String(sql)).find((sql) => sql.trimStart().startsWith('SELECT c.id, m.codigo AS magnitud'));
+    expect(sqlCanal).toMatch(/c\.escala_cero, c\.escala_cien/);
+  });
   it('TT-39: lectura repetida → sin evento "medicion" (no hay nada nuevo que dibujar), pero sí "visto"', async () => {
     const { servicio, publicados } = armar({ id: 'd1', estado: 'activo' }, true);
     await servicio.procesar(TOPICO, Buffer.from('22.4'));

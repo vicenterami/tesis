@@ -5,7 +5,9 @@
 >
 > **Estado (14/10/2026):** todo el equipo recibido: la placa, anotada el 12/10, y las piezas 2 a 7, el 13/10 (§3). Fase 0 completa el
 > 14/10: la placa se reconoce y se identificó (§3, primera conexión). **16/10:** firmware de la fase 1 (diagnóstico de los sensores) listo
-> y compilado, versiones fijadas (§5) y fases descritas (§6); falta ejecutarla con el hardware: cablear y medir. Guía de manejo seguro en §4.
+> y compilado, versiones fijadas (§5) y fases descritas (§6); la identificación de la placa se repitió con el mismo resultado (chip
+> ESP32-D0WD-V3, cristal 40 MHz, flash 4 MB), que coincide con la definición `esp32dev` del firmware. Falta ejecutar la fase 1 con el
+> hardware: cablear y medir. Guía de manejo seguro en §4.
 
 ## 1. Para qué sirve y por qué estas piezas
 

@@ -28,7 +28,7 @@ const ficha: DispositivoFicha = {
   visto_por_ultima_vez: '2026-10-12T14:59:30Z', en_linea: true, zona: 'Lab', sitio: 'Campus', zona_horaria: 'America/Santiago',
   creado_en: '2026-10-01T12:00:00Z',
   canales: [
-    { id: 'c-temp', magnitud: 'temperatura', magnitud_nombre: 'Temperatura', unidad: 'Cel', etiqueta: null, reglas: [{ id: 'r1', umbral_alto: 30, umbral_bajo: 5, histeresis: 0.5 }], ultima_medicion: { valor: 21.5, tiempo: '2026-10-12T14:59:30Z' } },
+    { id: 'c-temp', magnitud: 'temperatura', magnitud_nombre: 'Temperatura', unidad: 'Cel', etiqueta: null, reglas: [{ id: 'r1', umbral_alto: 30, umbral_bajo: 5, histeresis: 0.5 }], ultima_medicion: { valor: 21.5, tiempo: '2026-10-12T14:59:30Z', porcentaje: null } },
     { id: 'c-hum', magnitud: 'humedad', magnitud_nombre: 'Humedad', unidad: '%RH', etiqueta: 'suelo', reglas: null, ultima_medicion: null },
   ],
 };
@@ -128,6 +128,25 @@ describe('Ficha (P3): identidad, canales, gráfico, condiciones y rechazadas, le
     expect((graficos.at(-1)?.datos as number[][])[2]).toEqual([null, null, 23.25]);
   });
 
+  it('el porcentaje calibrado (docs/10 §8.4 punto 51) aparece solo si el canal lo trae; un evento sin el campo no rompe la tarjeta', async () => {
+    render(Ficha, { id: ID });
+    await waitFor(() => expect(document.querySelector('[data-historico]')).toBeTruthy());
+    expect(document.querySelector('[data-porcentaje]')).toBeNull(); // la ficha de prueba no tiene calibración
+    const fuente = FuenteControlable.instancias[0]!;
+    fuente.abrir();
+    fuente.emitir('medicion', { dispositivo_id: ID, canal_id: 'c-temp', valor: 23.25, unidad: 'Cel', tiempo: '2026-10-12T15:00:05Z', porcentaje: 32.8 });
+    await waitFor(() => expect(document.querySelector('[data-porcentaje]')?.textContent).toBe('32,8 % según su calibración'));
+    fuente.emitir('medicion', { dispositivo_id: ID, canal_id: 'c-temp', valor: 24, unidad: 'Cel', tiempo: '2026-10-12T15:00:10Z' });
+    await waitFor(() => expect(document.querySelector('[data-ultima]')?.textContent).toBe('24 Cel'));
+    expect(document.querySelector('[data-porcentaje]')).toBeNull();
+  });
+  it('el porcentaje que llega en la carga de la ficha (GET /dispositivos/{id}) también se muestra', async () => {
+    const calibrada = { ...ficha, canales: ficha.canales.map((c) => (c.id === 'c-temp' ? { ...c, ultima_medicion: { valor: 21.5, tiempo: '2026-10-12T14:59:30Z', porcentaje: 61.4 } } : c)) };
+    const base = globalThis.fetch; // el simulador del beforeEach: solo la ficha cambia
+    vi.stubGlobal('fetch', vi.fn(async (ruta: string) => (ruta === `/dispositivos/${ID}` ? new Response(JSON.stringify(calibrada)) : base(ruta))));
+    render(Ficha, { id: ID });
+    await waitFor(() => expect(document.querySelector('[data-porcentaje]')?.textContent).toBe('61,4 % según su calibración'));
+  });
   it('un aviso de condición repide las condiciones con antirrebote: diez avisos → una consulta', async () => {
     render(Ficha, { id: ID });
     await waitFor(() => expect(document.querySelector('[data-historico]')).toBeTruthy());

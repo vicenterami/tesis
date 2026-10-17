@@ -12,7 +12,7 @@
 | Retroalimentación | 20 % | 🟡 | Al 15/10 no hay observaciones escritas del profesor guía sobre la entrega del 2/10; se le pedirán en una reunión presencial la semana del 20/10. Sí se incorporó la entrevista del 5/10 (`bitacora/2026-10-05-entrevista-academico-geologia.md`) en las decisiones del 6 y del 8/10 (`docs/10 §8.4`). Falta: recibir e incorporar la retroalimentación de la Etapa 2. |
 | Mejoras | 15 % | 🟢 | Decisiones de diseño del 6, 7 y 8/10 (`docs/10 §8.4`); proxy TLS (`docs/16 §9`); dependencias e imágenes sin vulnerabilidades altas o críticas corregibles (`docs/16 §12`). |
 | 50 % de la implementación | 10 % | 🟡 | Núcleo: 19 de 34 elementos hechos (90 de 168 h, 54 %) y 10 parciales (56 h: HU-01, HU-02, HU-08, HU-19, HU-20, HU-21, TT-12, TT-22, TT-32 y TT-33). Todo el backlog: 30 de 65 (124 de 285 h, 44 %) y 18 parciales (87 h). Cifras calculadas desde las filas de `docs/04`, con los estados de `docs/12 §3`, de §2 y de la Etapa 1 (al final de §2). |
-| Pruebas iniciales | 30 % | 🟢 | `docs/16`: emulador, carga (59,7 tramas/s sin pérdida), carreras, TLS, capacidad y picos, caídas con carga, dependencias e imágenes, LoRaWAN por pasarela en el banco (`docs/16 §31–§34`); 268 pruebas unitarias del backend y 44 del panel. Falta: la matriz formal del contrato de trama (TT-27) y el broker de producción en las caídas (`docs/16 §11`). |
+| Pruebas iniciales | 30 % | 🟢 | `docs/16`: emulador, carga (59,7 tramas/s sin pérdida), carreras, TLS, capacidad y picos, caídas con carga, dependencias e imágenes, LoRaWAN por pasarela en el banco (`docs/16 §31–§34`); 270 pruebas unitarias del backend y 46 del panel. Falta: la matriz formal del contrato de trama (TT-27) y el broker de producción en las caídas (`docs/16 §11`). |
 | Validación preliminar | 10 % | 🟡 | Sensor físico de extremo a extremo (TT-32): todas las piezas llegaron el 13/10 y la placa se reconoció e identificó el 14/10 (`docs/17 §3`); falta la fase 1, cablear los sensores y publicar hasta el panel; guía de manejo seguro escrita (`docs/17 §4`). |
 | Documentación | 15 % | 🟡 | Documentos en concordancia (guardián `plataforma/pruebas/verificar-todo.sh`). El 15/10 el informe ganó el capítulo «Implementación y pruebas iniciales» y el anexo con el detalle de las pruebas (TT-36); falta incorporar la retroalimentación de la Etapa 2 y la revisión de entrega. |
 
@@ -85,7 +85,7 @@ siga sin terminar y que sus horas sean las de `docs/04`: un elemento que se cier
 |---|---|---|---|---|
 | 1 | HU-02 Eventos LoRaWAN | 6 | 🟡 | La prueba en la misma red que la pasarela del campus (20/10); lo demás está probado en el banco (`docs/16 §31`, §36 y §37) |
 | 2 | TT-32 Sensor físico de extremo a extremo | 3 | 🟡 | Fase 1 (diagnóstico de los sensores, firmware listo y compilado) y fase 2 (publicar por MQTT con TLS hasta el panel) (`docs/17 §6`) |
-| 3 | HU-21 Ficha del dispositivo | 7 | 🟡 | Una prueba con navegador real; el rango a medida por fechas es HU-07 |
+| 3 | HU-21 Ficha del dispositivo | 7 | 🟡 | Una prueba con navegador real (el % calibrado ya está en la ficha, 16/10: `docs/16 §38`); el rango a medida por fechas es HU-07 |
 | 4 | HU-20 Inventario filtrable | 7 | 🟡 | El filtro por sitio y la prueba con varios sitios |
 | 5 | HU-19 Panel de salud con semáforo | 9 | 🟡 | Verlo con el sensor físico y en la demostración |
 | 6 | HU-01 SenML por MQTT o HTTP | 6 | 🟡 | La recepción por HTTP (RF-01), base también del envío HTTP desde la pasarela (`docs/10 §8.4` punto 47) |

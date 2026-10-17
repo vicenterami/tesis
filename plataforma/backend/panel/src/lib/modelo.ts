@@ -47,7 +47,7 @@ export interface Salud {
 }
 
 export type EventoVivo =
-  | { tipo: 'medicion'; dispositivo_id: string; canal_id: string; valor: number; unidad: string; tiempo: string }
+  | { tipo: 'medicion'; dispositivo_id: string; canal_id: string; valor: number; unidad: string; tiempo: string; porcentaje?: number | null } // opcional: un backend anterior no lo manda
   | { tipo: 'visto'; dispositivo_id: string; tiempo: string }
   | { tipo: 'condicion'; dispositivo_id: string; condicion: TipoCondicion | string; estado: 'abierta' | 'cerrada' }
   | { tipo: 'latido'; tiempo: string };
@@ -66,7 +66,8 @@ export interface CanalFicha {
   unidad: string;
   etiqueta: string | null;
   reglas: ReglaUmbral[] | null;
-  ultima_medicion: { valor: number; tiempo: string } | null;
+  // porcentaje: con la calibración del canal (docs/10 §8.4 punto 51); null sin calibración
+  ultima_medicion: { valor: number; tiempo: string; porcentaje: number | null } | null;
 }
 
 // GET /dispositivos/{id}: los campos del inventario más `creado_en`, con los canales ampliados (reglas y última lectura); su

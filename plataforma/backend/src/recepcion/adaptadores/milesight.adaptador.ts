@@ -13,7 +13,9 @@ import { decodificar } from './perfiles';
 //     del nodo (migración 17); si no tiene, va a cuarentena diciendo qué activar.
 // Hora: con códec no hay hora civil (el `time` del objeto LoRa cuenta desde que arrancó el reenviador de paquetes) y rige la de
 // recepción; sin códec, `time` con zona es la marca del servidor de red y sin zona no se adivina (docs/13, regla 17).
-const METADATOS = new Set(['devEUI', 'deviceName', 'applicationID', 'applicationName']);
+// fCnt no es metadato de Metadata (que agrega devEUI, deviceName y applicationID), pero si un decodificador lo deja, se usa para
+// deduplicar y no se nombra como clave desconocida (revisión del 16/10).
+const METADATOS = new Set(['devEUI', 'deviceName', 'applicationID', 'applicationName', 'fCnt']);
 
 @Injectable()
 export class MilesightAdaptador implements Adaptador {
@@ -39,6 +41,7 @@ export class MilesightAdaptador implements Adaptador {
       ctx.ignoradas = [];
       return decodificar(ctx.decodificador, cuerpo.data, tiempoDe(cuerpo.time));
     }
+    anotarFcnt(cuerpo.fCnt, ctx);
     return lecturasDe(cuerpo, this.resolver, ctx, undefined, METADATOS);
   }
 }
