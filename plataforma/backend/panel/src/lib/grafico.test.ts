@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { RANGOS, agregarLectura, formatearValor, rotuloIntervalo, seriesDesdeHistorico, urlHistorico, ventana } from './grafico';
+import { EJE_TIEMPO, NOMBRES_FECHA, RANGOS, SELLO_LEYENDA, agregarLectura, formatearValor, rotuloIntervalo, seriesDesdeHistorico, urlHistorico, ventana } from './grafico';
 
 describe('ventana y URL del histórico (docs/19 P3)', () => {
   const ahora = new Date('2026-10-12T15:00:00Z');
@@ -42,5 +42,22 @@ describe('series: histórico agregado y lecturas en vivo aparte', () => {
   it('formatea con coma decimal y la unidad; nulo → raya', () => {
     expect(formatearValor(21.456789, 'Cel')).toBe('21,457 Cel');
     expect(formatearValor(null, 'Cel')).toBe('—');
+  });
+});
+
+describe('fechas y horas del gráfico en español y 24 h (docs/19 §6)', () => {
+  // Con la función de formato real de uPlot 1.6.32: las plantillas de EJE_TIEMPO y SELLO_LEYENDA deben dar 24 h y meses en español.
+  const d = new Date(2026, 9, 16, 21, 30); // 16 de octubre, 21:30 (hora local del proceso de prueba: aquí solo importa el formato)
+  it('el eje por minutos dice 21:30, no 9:30pm; la leyenda trae día/mes/año y hora en 24 h', async () => {
+    const { default: uPlot } = await import('uplot');
+    const minutos = EJE_TIEMPO.find((f) => f[0] === 60)!;
+    expect(uPlot.fmtDate(minutos[1] as string, NOMBRES_FECHA)(d)).toBe('21:30');
+    expect(uPlot.fmtDate(SELLO_LEYENDA, NOMBRES_FECHA)(d)).toBe('16/10/2026 21:30');
+    const meses = EJE_TIEMPO.find((f) => f[0] === 28 * 24 * 3600)!;
+    expect(uPlot.fmtDate(meses[1] as string, NOMBRES_FECHA)(d)).toBe('oct');
+  });
+  it('ninguna plantilla usa la hora de 12 h ni am/pm', () => {
+    const textos = [SELLO_LEYENDA, ...EJE_TIEMPO.flatMap((f) => f.filter((x): x is string => typeof x === 'string'))];
+    expect(textos.filter((t) => /\{h\}|\{aa\}|\{AA\}/.test(t))).toEqual([]);
   });
 });

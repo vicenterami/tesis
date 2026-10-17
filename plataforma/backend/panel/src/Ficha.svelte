@@ -5,7 +5,7 @@
   import { onMount } from 'svelte';
   import Grafico from './Grafico.svelte';
   import { mensajeError, obtener } from './lib/api';
-  import { enLinea, estadoVisual, ROTULO } from './lib/estado-visual';
+  import { enLinea, estadoVisual, ROTULO, rotuloCondicion } from './lib/estado-visual';
   import { RANGOS, RANGO_POR_DEFECTO, agregarLectura, formatearValor, rotuloIntervalo, seriesDesdeHistorico, urlHistorico, ventana, type ClaveRango, type Series } from './lib/grafico';
   import type { Condicion, DispositivoFicha, EventoVivo, Historico, TramaRechazada } from './lib/modelo';
   import { haceCuanto, horaLocal } from './lib/tiempo';
@@ -206,7 +206,7 @@
         <tbody>
           {#each ordenadas as c (c.id)}
             <tr data-condicion={c.cerrada_en === null ? 'abierta' : 'cerrada'}>
-              <td>{c.tipo}</td>
+              <td>{rotuloCondicion(c.tipo)}</td>
               <td>{c.magnitud ?? '—'}</td>
               <td title={horaLocal(c.abierta_en, d.zona_horaria)}>{haceCuanto(c.abierta_en, ahora)}</td>
               <td>{Math.round(c.duracion_s / 60)} min</td>

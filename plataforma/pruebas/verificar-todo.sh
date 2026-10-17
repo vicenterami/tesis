@@ -748,7 +748,9 @@ paso "2w4. Cifras del método en el informe y los documentos: pasos del verifica
 python3 -I - <<'PY' || fallos=$((fallos+1))
 import re, sys, pathlib
 pasos = len(re.findall(r'^paso "', pathlib.Path('plataforma/pruebas/verificar-todo.sh').read_text(encoding='utf-8'), re.M))
-panel = sum(len(re.findall(r'\b(?:it|test)\(', p.read_text(encoding='utf-8'))) for p in pathlib.Path('plataforma/backend/panel/src').rglob('*.test.ts'))
+# 16/10: sin el (?<![.\w]) contaba también «/…/.test(texto)» (el método de las expresiones regulares) como una prueba: 50 en vez de 49.
+# No cuenta it.each(, it.skip( ni test.only(: hoy no hay ninguno en el panel; si aparecen, ampliar la expresión.
+panel = sum(len(re.findall(r'(?<![.\w])(?:it|test)\(', p.read_text(encoding='utf-8'))) for p in pathlib.Path('plataforma/backend/panel/src').rglob('*.test.ts'))
 if pasos < 20 or panel < 10: print(f'FALLA conté {pasos} pasos y {panel} pruebas del panel (¿cambió la forma?)'); sys.exit(1)
 fuentes = [*pathlib.Path('informe-oficial').glob('*.tex'), *pathlib.Path('informe-oficial/anexos').glob('*.tex'), *pathlib.Path('docs').glob('*.md')]
 malos, n_pasos, n_panel = [], 0, 0
@@ -814,6 +816,15 @@ elif (int(m.group(1)), int(m.group(2))) != (len(filas), sum(int(h) for _, h, _ i
 if malos: print('FALLA lo que falta del núcleo no cuadra:'); [print('  ' + x) for x in malos]; sys.exit(1)
 print(f'OK    docs/18 §5: {len(filas)} elementos del núcleo sin terminar, con sus horas y su estado; ninguno terminado sigue en la lista')
 PY
+
+paso "2y2. Sintaxis de los guiones: bash -n de cada *.sh versionado o nuevo (no ignorado)"
+# 16/10: una línea de comentario sin «#» dejó banco.sh entero sin interpretarse y el guardián no lo veía (solo lo vio la siguiente
+# corrida del banco). bash -n no ejecuta nada: solo lee el guion.
+malos=""; n=0
+while IFS= read -r g; do n=$((n+1)); bash -n "$g" 2>/dev/null || malos="$malos $g"; done < <(git ls-files -co --exclude-standard '*.sh')
+if [ "$n" -lt 15 ]; then echo "FALLA revisé solo $n guiones (¿cambió el listado?)"; fallos=$((fallos+1))
+elif [ -n "$malos" ]; then echo "FALLA guiones con error de sintaxis:$malos"; fallos=$((fallos+1))
+else echo "OK    $n guiones con la sintaxis de bash correcta (bash -n)"; fi
 
 paso "3. Diagramas: informe = docs = base (generar-figuras.sh --verificar)"
 bash informe-oficial/figuras/generar-figuras.sh --verificar || fallos=$((fallos+1))

@@ -12,6 +12,7 @@
 #   bash plataforma/pruebas/banco/banco.sh migraciones         reaplica las migraciones 02 a la última y exige el mismo esquema y catálogo (idempotencia; corre al final de «encender»)
 #   bash plataforma/pruebas/banco/banco.sh puente [ip]         puente de Mosquitto como el de la red del campus: su broker reenvía el tópico nativo por TLS al proxy → medicion
 #                                                              (con «ip», por dirección IP, como en la red del campus: certificado con CA_IP_EXTRA y proxy publicado solo en esa IP)
+#   bash plataforma/pruebas/banco/banco.sh navegador           pantalla P3 en Firefox real con Playwright: puntos contra /historico, vivo sin recargar, caída y vuelta (docs/16 §39)
 #   bash plataforma/pruebas/banco/banco.sh cola                cola del broker vigilada: backend detenido + 200 emulados → descartes → condición broker_descarte (docs/16 §22)
 #   bash plataforma/pruebas/banco/banco.sh estado | logs [servicio] | sql ["CONSULTA"]
 #   bash plataforma/pruebas/banco/banco.sh apagar              baja todo; los datos estaban en RAM, no queda nada
@@ -499,6 +500,24 @@ case "${1:-}" in
     k=$(dc logs --no-color --since 5m backend 2>/dev/null | grep -cF -f <(sed -n 's/^remote_password //p' "$cfg/mosquitto.conf")); [ "$k" = 0 ] && ok "la credencial del puente no aparece en el registro del backend" || falla "la credencial aparece en el registro"
     trap - EXIT; limpiar
     echo; [ $fallos -eq 0 ] && echo "PUENTE OK" || { echo "$fallos comprobación(es) con falla"; exit 1; } ;;
+  navegador)
+    # P3 en un navegador real (docs/19 §6 y §7; docs/16 §39). Playwright (dependencia de desarrollo del panel, versión fijada) maneja
+    # Firefox; su navegador se descarga una vez a ~/.cache/ms-playwright (311 MB medidos el 16/10) con «playwright install», desde el servidor de Playwright, sin una
+    # huella que el guion compare (la versión del navegador la fija la de Playwright). Se siembran tres lecturas
+    # pasadas de emu-0001 para que el histórico tenga puntos, y la prueba detiene y arranca el backend del banco. La captura queda en la
+    # carpeta privada del banco, nunca en el repositorio.
+    [ "$(dc ps --format '{{.Status}}' backend | grep -c healthy)" = 1 ] || { echo "FALLA el banco no está arriba: «banco.sh encender» primero"; exit 1; }
+    (cd backend/panel && pnpm -s exec playwright install firefox >/dev/null) || { echo "FALLA no se pudo preparar Firefox para Playwright"; exit 1; }
+    red=$(docker network ls --format '{{.Name}}' | grep '^banco_default$')
+    read -r did sitio < <(psql_ -tA -F ' ' -c "SELECT d.id, s.codigo FROM dispositivo d JOIN zona z ON z.id = d.zona_id JOIN sitio s ON s.id = z.sitio_id WHERE d.id_fisico = 'emu-0001'")
+    cid=$(psql_ -tA -c "SELECT c.id FROM canal c JOIN dispositivo d ON d.id = c.dispositivo_id WHERE d.id_fisico = 'emu-0001' AND c.magnitud_codigo = 'temperatura'")
+    [ -n "$did" ] && [ -n "$cid" ] || { echo "FALLA no está emu-0001 con su canal de temperatura (¿«encender» sin emulados?)"; exit 1; }
+    for m in 50 35 20; do t=$(($(date +%s) - m * 60))
+      docker run --rm --network "$red" "$IMG_BROKER" mosquitto_pub -h mosquitto -q 1 -t "sitio/$sitio/dispositivo/emu-0001/temperatura" \
+        -m "[{\"bn\":\"emu-0001\",\"bt\":$t,\"n\":\"temperatura\",\"u\":\"Cel\",\"v\":2$((m / 10)).5}]"; done
+    sleep 2
+    (cd backend/panel && node e2e/p3.mjs http://127.0.0.1:3001 "$did" "$cid" emu-0001 "$sitio" "$red" "$IMG_BROKER" banco-backend-1 "$PRIV/p3.png")
+    r=$?; echo "captura: $PRIV/p3.png"; exit $r ;;
   cola)
     # Cola del broker vigilada (docs/10 §8.4 punto 43; docs/16 §22): PLANTAR la violación. Con el backend detenido, 200 emulados a
     # 1 trama/s durante 70 s (≈ 14 000 mensajes) desbordan la cola de la sesión persistente del backend (tope 10 000): el broker

@@ -47,3 +47,13 @@ const comparadorDeNombres = new Intl.Collator('es', { sensitivity: 'base' });
 export function compararAtencion(a: { estado: EstadoVisual; nombre: string }, b: { estado: EstadoVisual; nombre: string }): number {
   return RANGO[a.estado] - RANGO[b.estado] || comparadorDeNombres.compare(a.nombre, b.nombre);
 }
+
+// Lo que una persona lee en vez del código del tipo de condición (docs/19 §6: ningún código interno a la vista).
+export const ROTULO_CONDICION: Readonly<Record<string, string>> = {
+  sin_comunicacion: 'Sin comunicación',
+  umbral: 'Umbral',
+  bateria: 'Batería',
+  manipulacion: 'Manipulación',
+};
+export const rotuloCondicion = (tipo: string): string => ROTULO_CONDICION[tipo] ?? tipo;
+

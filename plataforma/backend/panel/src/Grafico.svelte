@@ -8,7 +8,7 @@
   import { untrack } from 'svelte';
   import type uPlotTipo from 'uplot';
   import 'uplot/dist/uPlot.min.css';
-  import type { Series } from './lib/grafico';
+  import { EJE_TIEMPO, NOMBRES_FECHA, SELLO_LEYENDA, type Series } from './lib/grafico';
 
   let { series, unidad, zona, titulo }: { series: Series; unidad: string; zona: string; titulo: string } = $props();
   let contenedor: HTMLDivElement | undefined = $state();
@@ -21,12 +21,13 @@
       width: ancho,
       height: 280,
       tzDate: (ts) => UPlot.tzDate(new Date(ts * 1000), zona),
+      fmtDate: (tpl) => UPlot.fmtDate(tpl, NOMBRES_FECHA), // meses y días en español (docs/19 §6)
       series: [
-        {},
+        { label: 'Hora', value: SELLO_LEYENDA },
         { label: 'promedio', stroke: '#0b3954', width: 2, value: (_u, v) => (v === null ? '—' : `${v} ${unidad}`) },
         { label: 'lectura actual', stroke: '#c0392b', width: 0, points: { show: true, size: 6 }, value: (_u, v) => (v === null ? '—' : `${v} ${unidad}`) },
       ],
-      axes: [{}, { label: unidad }],
+      axes: [{ values: EJE_TIEMPO }, { label: unidad }],
     };
   }
 

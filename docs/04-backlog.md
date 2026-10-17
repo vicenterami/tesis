@@ -585,7 +585,7 @@ ejecuta contra la holgura verificada al cierre de cada etapa.
 | 2. Segundo nivel | Alertas por umbral con interfaz | HU-06 | 🟡 motor listo |
 | 2. Segundo nivel | Aprovisionamiento desde la plataforma | HU-10, HU-11 | ✅ 12/10 (API; la pantalla es HU-22, E4) |
 | 2. Segundo nivel | Cifrado del transporte | TT-22 | ⬜ E3 |
-| 2. Segundo nivel | Panel de control | HU-19, HU-20, HU-21 | 🟡 12/10 (P2 y P3 hechas; HU-20 parcial) |
+| 2. Segundo nivel | Panel de control | HU-19, HU-20, HU-21 | 🟡 12/10 (P2 y P3 hechas; HU-20 parcial); HU-21 cerrada el 16/10 (estado al día: `docs/18`) |
 | 2. Segundo nivel | Exportación en formato abierto | HU-08 | 🟡 E3 (CSV y JSON el 12/10; XLSX en la E4) |
 | 2. Segundo nivel | Validación formal | TT-27, TT-28, TT-29 | ⬜ E4 |
 

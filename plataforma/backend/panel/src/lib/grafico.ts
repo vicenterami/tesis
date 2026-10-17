@@ -1,3 +1,4 @@
+import type uPlot from 'uplot';
 import type { Historico } from './modelo';
 
 // Datos del gráfico de la ficha (docs/19 P3): el histórico llega agregado por la base (cientos de puntos) y lo que llega en
@@ -70,3 +71,28 @@ export function formatearValor(valor: number | null, unidad: string): string {
   if (valor === null) return '—';
   return `${new Intl.NumberFormat('es-CL', { maximumFractionDigits: 3 }).format(valor)} ${unidad}`;
 }
+
+// Fechas y horas como se leen en Chile (docs/19 §6): 24 h y meses en español. uPlot trae por defecto el formato en inglés de 12 h
+// («9:30pm», «Time»), lo que se vio en la primera prueba con navegador real (16/10). Plantillas de `uPlot.fmtDate` (1.6.32): {H} es la
+// hora de 0 a 23, {mm} los minutos, {D}/{M} día y mes, {MMM} el mes abreviado.
+export const NOMBRES_FECHA = {
+  MMMM: ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'],
+  MMM: ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sept', 'oct', 'nov', 'dic'],
+  WWWW: ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'],
+  WWW: ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'],
+};
+// Eje de tiempo: la misma tabla que trae uPlot (paso del eje, rótulo por defecto, y el que se agrega al cambiar de año, mes o día),
+// con las horas en 24 h y la fecha como día/mes. Los pasos van en segundos: la serie usa segundos Unix.
+const H = 3600;
+const D = 24 * H;
+const NL = '\n';
+export const EJE_TIEMPO: uPlot.Axis.TimeValuesConfig = [
+  [365 * D, '{YYYY}', null, null, null, null, null, null, 1],
+  [28 * D, '{MMM}', NL + '{YYYY}', null, null, null, null, null, 1],
+  [D, '{D}/{M}', NL + '{YYYY}', null, null, null, null, null, 1],
+  [H, '{H}:00', NL + '{D}/{M}/{YY}', null, NL + '{D}/{M}', null, null, null, 1],
+  [60, '{H}:{mm}', NL + '{D}/{M}/{YY}', null, NL + '{D}/{M}', null, null, null, 1],
+  [1, ':{ss}', NL + '{D}/{M}/{YY} {H}:{mm}', null, NL + '{D}/{M} {H}:{mm}', null, NL + '{H}:{mm}', null, 1],
+];
+// La leyenda del instante bajo el cursor.
+export const SELLO_LEYENDA = '{D}/{M}/{YYYY} {H}:{mm}';

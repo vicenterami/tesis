@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { compararAtencion, conteoPorEstado, enLinea, estadoVisual } from './estado-visual';
+import { compararAtencion, conteoPorEstado, enLinea, estadoVisual, rotuloCondicion } from './estado-visual';
+import type { TipoCondicion } from './modelo';
 
 describe('estadoVisual (docs/19 §2): la primera regla que aplica manda', () => {
   it('mantenimiento o baja → Inactivo, aunque tenga condiciones abiertas o esté fuera de línea', () => {
@@ -44,5 +45,13 @@ describe('conteo y orden de atención', () => {
     expect(filas.sort(compararAtencion).map((f) => `${f.estado}:${f.nombre}`)).toEqual([
       'sin_senal:z', 'alerta:b', 'normal:ambiente', 'normal:Único', 'inactivo:a',
     ]);
+  });
+});
+
+describe('rótulo de cada tipo de condición (docs/19 §6: ningún código interno a la vista)', () => {
+  it('cada tipo del modelo tiene su texto; uno desconocido se muestra tal cual, sin romper', () => {
+    const tipos: TipoCondicion[] = ['sin_comunicacion', 'umbral', 'bateria', 'manipulacion'];
+    expect(tipos.map(rotuloCondicion)).toEqual(['Sin comunicación', 'Umbral', 'Batería', 'Manipulación']);
+    expect(rotuloCondicion('nuevo_tipo')).toBe('nuevo_tipo');
   });
 });

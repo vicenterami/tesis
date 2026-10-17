@@ -119,7 +119,14 @@ descargar; la descarga exige rol de administrador; la vista pública nunca ofrec
 - **Pruebas por el DOM, en los dos sentidos**: lo que debe mostrarse se lee del DOM (textos, conteos, filas), lo que debe
   frenarse se comprueba que no aparece; y una prueba de que el estado visual de cada fila coincide con la función de la §2.
   Corren sobre el código fuente en jsdom; el build que sirve el backend se comprueba aparte con `pruebas/panel-desarrollo.sh`
-  (cabeceras, CSP, paquete con hash, sin `.map`); una prueba con navegador real no existe todavía (`docs/16`).
+  (cabeceras, CSP, paquete con hash, sin `.map`). **Con navegador real** (desde el 16/10/2026, `docs/16 §39`): `banco.sh navegador`
+  abre el build que sirve el banco en Firefox con Playwright (dependencia de desarrollo del panel, versión fijada) y recorre P3 según
+  la fila de §7: los puntos del gráfico contra `/historico`, una trama publicada por MQTT que aparece sin recargar y la caída del
+  backend («reconectando» y, al volver, la lectura publicada durante la caída); deja una captura para mirarla. jsdom no dibuja: lo
+  que solo se ve en pantalla (formatos, textos del gráfico) se revisa en esa captura.
+- **Fechas, horas y textos para personas:** horas en formato de 24 h y meses en español en ejes, leyendas y tablas, siempre en la zona
+  del sitio (regla 6 de `docs/13`); ningún código interno a la vista (`sin_comunicacion` se muestra «Sin comunicación»). Lo encontró la
+  primera prueba con navegador real: el gráfico mostraba «9:30pm» y «Time» (los valores por defecto de uPlot, en inglés).
 - **Un solo cliente HTTP** en el panel, que añade el prefijo de la API, interpreta los códigos y expone el 409 como tal.
 - **Nada se repide por cada evento:** un aviso de condición pide la lista con antirrebote (una consulta por segundo como mucho,
   nunca dos en vuelo) y las lecturas en vivo se aplican por lotes (un redibujo cada 250 ms como mucho). Un dispositivo que
@@ -132,7 +139,7 @@ descargar; la descarga exige rol de administrador; la vista pública nunca ofrec
 | Pantalla | Requisitos | Entra en | Cómo se prueba |
 |---|---|---|---|
 | P2 Inventario con semáforo y filtros | RF-47, RF-48, RF-51, HU-10, HU-19, HU-20 | Tramo 2 (Etapa 3) | Semilla conocida → conteos y filas en el DOM; un dispositivo en mantenimiento aparece «Inactivo»; filtro por vía reduce la tabla; el reenvío de Vite conserva el `Host` y no retiene el canal (`pruebas/panel-desarrollo.sh`, `docs/16 §16`) |
-| P3 Ficha | RF-33, RF-49, HU-21 | Tramo 3 (Etapa 3) | Histórico: los puntos del DOM coinciden con `/historico`; vivo: publicar una trama por MQTT y verla aparecer sin recargar; reconexión: apagar el backend 5 s y ver «reconectando» y luego la medición perdida tras repedir |
+| P3 Ficha | RF-33, RF-49, HU-21 | Tramo 3 (Etapa 3); prueba con navegador real el 16/10 | `banco.sh navegador` (Firefox con Playwright): los puntos del gráfico (texto y `data-puntos`) son los de `/historico`; una trama publicada por MQTT aparece en su tarjeta sin recargar; con el backend detenido se ve «reconectando», se publica una lectura durante la caída y, al volver, la tarjeta la muestra, la página repide el histórico (se ve la petición) y el canal vuelve a «conectado»; sin errores de JavaScript; la captura revisa lo que se dibuja en el lienzo (eje en 24 h) |
 | P4 Condiciones, P5 Cuarentena | HU-05, RF-11 a RF-13, RF-24 | Etapa 4 | Trama fuera de rango → fila en P4 en vivo; trama de un desconocido → fila en P5 con motivo `no_registrado` |
 | P1 Resumen | RF-30, HU-16 | Etapa 4 | Los cuatro conteos suman el total del inventario; cambian en vivo con F3 |
 | P8 Exportar (API) | RF-34, HU-08 | Etapa 3 (12/10): 6 pruebas de las funciones puras y 7 casos de humo; la pantalla, el XLSX y la exportación por sitio, en la Etapa 4 |

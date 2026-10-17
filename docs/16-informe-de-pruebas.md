@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 270 pruebas unitarias del backend y 46 del panel, sin matriz formal) y TT-32 (sensor físico);
+cubre todavía: TT-27 (contrato de trama: hoy 270 pruebas unitarias del backend y 49 del panel, sin matriz formal) y TT-32 (sensor físico);
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -343,7 +343,7 @@ Testing Library (`svelteTesting`), que fuerza la resolución de navegador; (2) V
 (`server.allowedHosts`, desde la 6.0.9, por el mismo *DNS rebinding* del punto 40) y corta un `Host` ajeno con 403 antes de
 reenviar: el caso del guion acepta ese 403 o el 421 del backend, nunca un 200; (3) `.dockerignore` solo excluía `node_modules`
 y `dist` de la raíz: sin las entradas del panel, `COPY panel` habría metido al contexto de build sus dependencias enlazadas.
-**Lo que no cubre todavía:** ninguna prueba abre el panel en un navegador real (las del DOM corren en jsdom); la demostración
+**Lo que no cubre todavía (hasta el 12/10; desde el 16/10, ver §39):** ninguna prueba abre el panel en un navegador real (las del DOM corren en jsdom); la demostración
 (`docs/15`) lo hace a mano; una prueba con navegador llega con la ficha (tramo 3), que es donde hay gráfico.
 
 ## 17. Panel, tramo 3: ficha del dispositivo con gráfico (12/10/2026)
@@ -856,7 +856,7 @@ Cada hallazgo se verificó en el código o en la fuente; los de código se plant
 
 En el informe: el plan B de R1 se activó el 7/10 (no el 8/10); el bloqueo de fila podía frenar la recepción hasta 5 s (el
 segundo medido era el tope de la prueba, §26); las conclusiones separan lo que se cumple de lo parcial; el verificador se cita
-por sus pasos (hoy 39) y las pruebas del panel (46) junto a las del backend; los documentos nombran los anexos en vez de citar una
+por sus pasos (hoy 40) y las pruebas del panel (49) junto a las del backend; los documentos nombran los anexos en vez de citar una
 letra que cambia al insertar uno. El guardián vigila esas cifras (paso 2w4) y sus pasos 2f2, 2w2 y 2w3 ya no pueden pasar sin
 revisar nada. **Banco:** 36 de 36, «LORAWAN OK».
 
@@ -864,7 +864,7 @@ revisar nada. **Banco:** 36 de 36, «LORAWAN OK».
 la limpieza (el tópico crudo queda en su columna de la cuarentena como evidencia); se suman a los rellenos los selectores de variación
 que faltaban; el informe dice ahora que el JSON del banco es el de la documentación oficial de ChirpStack v4 y de Milesight, no el
 que publica el ChirpStack del campus, todavía no probado; y el guardián busca el nombre del entrevistado también en el código.
-Total: 270 pruebas unitarias del backend y 46 del panel.
+Total: 270 pruebas unitarias del backend y 49 del panel.
 
 ## 36. La trama real de la pasarela del campus: sufijo nativo, perfil de decodificación y contador de trama (16/10/2026)
 
@@ -964,5 +964,36 @@ como unidad secundaria (RFC 8798); un emisor que mande `mV` se convierte (1/1000
 | ¿El panel lo muestra sin repetir la cuenta? | El evento `medicion` del canal en vivo trae `porcentaje`, calculado en la recepción con la misma función (prueba: calibración 0–50 y lectura 22,4 → 44,8 %); la ficha lo muestra junto al valor crudo solo si es un número, así un evento sin el campo no rompe la tarjeta (prueba del panel; plantado a mano el 16/10: si la ficha no copia el campo, falla) |
 
 **Lo que falta:** la ruta para editar la calibración, con su permiso (se concede cuando exista la ruta: mínimo
-privilegio) y la validación de que las escalas caigan en el rango de la magnitud. **Pruebas:** 270 unitarias del backend y 46 del panel.
+privilegio) y la validación de que las escalas caigan en el rango de la magnitud. **Pruebas:** 270 unitarias del backend y 49 del panel.
+
+## 39. La ficha del dispositivo en un navegador real (16/10/2026)
+
+**Qué es** (`docs/19 §6` y §7, fila P3; cierra HU-21). `banco.sh navegador` abre el panel que sirve el banco en Firefox, manejado por
+Playwright 1.63.0 (Apache 2.0; dependencia de desarrollo del panel, versión fijada, publicada hace más de un mes; su Firefox se
+descarga una vez, 311 MB medidos), y recorre P3 con las
+manos de una persona: elige el canal con un clic, compara, publica, detiene el backend. Siembra tres lecturas pasadas para que el
+histórico tenga puntos y deja una captura en la carpeta privada del banco. Guion: `plataforma/backend/panel/e2e/p3.mjs`.
+
+| Comprobación | Resultado |
+|---|---|
+| Los puntos del gráfico (texto y gráfico) son los de `/historico` | ✅ |
+| La leyenda del tiempo dice «Hora» y el gráfico no trae am/pm ni «Time» en su texto | ✅ (el eje se dibuja en un lienzo y no se puede leer como texto: su formato de 24 h se revisó en la captura) |
+| Una trama publicada por MQTT aparece en su tarjeta sin recargar | ✅ |
+| Con el backend detenido, la ficha dice «reconectando»; al volver, muestra la lectura publicada durante la caída, repide el histórico (se ve la petición) y vuelve a «conectado» | ✅ |
+| Sin errores de JavaScript en la página | ✅ |
+
+Resultado: **9 de 9, «P3 NAVEGADOR OK»**, tres corridas seguidas (salidas guardadas fuera del repositorio). **Plantado:** sin el repedido al reconectar (reconstruida la imagen
+del banco), fallan dos comprobaciones: la lectura de la caída no aparece y el histórico no se pide de nuevo.
+
+**Lo que trajo el navegador real**, que jsdom no muestra porque no dibuja: el eje del gráfico decía «9:30pm» y la leyenda «Time» (los
+valores por defecto de uPlot, en inglés de 12 h), y la tabla de condiciones mostraba el código `sin_comunicacion`. **Corregido:** horas
+en 24 h y meses en español con la función de formato de uPlot (prueba con esa misma función: 21:30, «16/10/2026 21:30», «oct», y
+ninguna plantilla de 12 h), y un rótulo legible por tipo de condición (prueba). **Dos errores de la propia prueba, encontrados al
+repetirla:** la ficha abre el primer canal en orden alfabético (humedad) y la prueba comparaba con el histórico de la temperatura; y dos
+lecturas publicadas en el mismo segundo eran, por la regla de idempotencia (`docs/10 §4.1`), la misma lectura, así que la segunda se
+ignoraba: la prueba publica ahora con milisegundos. **Del guardián:** contaba como prueba del panel el `.test(` de una expresión
+regular (50 en vez de 49); corregido. Y no revisaba la sintaxis de los guiones: una línea de comentario sin `#` dejó `banco.sh` sin
+interpretarse y solo lo delató la siguiente corrida; desde ahora el paso 2y2 corre `bash -n` sobre cada guion (plantado uno roto: falla).
+**De la revisión del tramo:** si la publicación fallaba con el backend detenido, el banco quedaba con el backend apagado (ahora se
+arranca siempre); las comprobaciones del estado en vivo y de la leyenda se acotan a su elemento. **Pruebas:** 270 del backend y 49 del panel.
 
