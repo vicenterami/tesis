@@ -153,3 +153,32 @@ consideradas: `arduino-cli` (mismo framework, versiones fijadas por comandos en 
 pero el TLS con CA propia no está verificado para esta placa). Las versiones exactas de la plataforma, del framework y de cada
 biblioteca se anotan aquí el día de instalarlas, desde su documentación oficial. Llegada de las piezas 2 a 7: 13/10/2026.
 
+**Versiones fijadas el 16/10/2026** (`plataforma/firmware/platformio.ini`; fechas del registro oficial de PlatformIO, todas
+publicadas hace más de dos semanas; licencias leídas en los archivos de cada paquete):
+
+| Pieza | Versión | Publicada | Licencia |
+|---|---|---|---|
+| PlatformIO Core | 6.2.0 | 05/09/2026 | Apache 2.0 |
+| Plataforma `platformio/espressif32` | 7.1.3 | 11/09/2026 | (trae el núcleo `framework-arduinoespressif32` 4.20017.260907) |
+| Adafruit BME280 Library | 2.3.0 | 30/04/2025 | BSD |
+| Adafruit Unified Sensor | 1.1.15 | 06/01/2025 | Apache 2.0 |
+| Adafruit BusIO | 1.17.4 | 22/09/2025 | MIT |
+| OneWire (Paul Stoffregen) | 2.3.8 | 08/02/2024 | permiso estilo MIT en el código fuente (sin archivo de licencia) |
+| DallasTemperature | 4.0.6 | 24/01/2026 | MIT |
+
+Todas abiertas y permisivas (RNF-15). El firmware de diagnóstico compila sin avisos con `-Wall -Wextra` (13,5 % de la RAM, 58,5 %
+de la memoria de programa).
+
+## 6. Firmware por fases (16/10/2026)
+
+Dos fases, para que una falla diga dónde está: si la fase 1 no ve un sensor, el problema es el sensor o su cableado, nunca la red.
+
+- **Fase 1, diagnóstico** (`pio run -e diagnostico`, `src/diagnostico.cpp`): solo puerto serie, Wi-Fi apagado. Barre el bus I2C y lee el
+  registro de identificación `0xD0` del módulo de aire (`0x60` BME280, `0x58` BMP280, que no mide humedad: §2); cuenta las sondas
+  DS18B20 y lee la primera; lee el sensor de suelo en mV (promedio de 16) para anotar el valor al aire y con la punta en agua, que son
+  los dos extremos de su calibración. No imprime identificadores de hardware: la dirección ROM de la sonda es única, como una MAC.
+- **Fase 2, publicación**: Wi-Fi, TLS con la CA propia, MQTT con la credencial del alta y SenML en `sitio/<sitio>/dispositivo/<id>/<magnitud>`,
+  con la marca de tiempo del nodo sincronizada por NTP (regla 7 de `docs/13`). Antes de publicar el suelo hacen falta sus magnitudes en el
+  catálogo (`temperatura_suelo`, `humedad_suelo`: `docs/08 §8`) y la curva de calibración de la fase 1. Se diseña aquí antes de escribirla;
+  la credencial y la red Wi-Fi viven en un archivo local que git ignora, nunca en el código.
+

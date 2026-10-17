@@ -84,7 +84,7 @@ siga sin terminar y que sus horas sean las de `docs/04`: un elemento que se cier
 | Orden | Elemento | Horas | Estado | Qué falta |
 |---|---|---|---|---|
 | 1 | HU-02 Eventos LoRaWAN | 6 | 🟡 | La prueba en la misma red que la pasarela del campus (20/10); lo demás está probado en el banco (`docs/16 §31`, §36 y §37) |
-| 2 | TT-32 Sensor físico de extremo a extremo | 3 | 🟡 | Fase 1: cablear los sensores y publicar por MQTT con TLS hasta el panel (`docs/17`) |
+| 2 | TT-32 Sensor físico de extremo a extremo | 3 | 🟡 | Fase 1 (diagnóstico de los sensores, firmware listo y compilado) y fase 2 (publicar por MQTT con TLS hasta el panel) (`docs/17 §6`) |
 | 3 | HU-21 Ficha del dispositivo | 7 | 🟡 | Una prueba con navegador real; el rango a medida por fechas es HU-07 |
 | 4 | HU-20 Inventario filtrable | 7 | 🟡 | El filtro por sitio y la prueba con varios sitios |
 | 5 | HU-19 Panel de salud con semáforo | 9 | 🟡 | Verlo con el sensor físico y en la demostración |
