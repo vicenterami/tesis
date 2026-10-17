@@ -1408,6 +1408,22 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     remoto, con un comando del broker al nodo, exige que el dispositivo se suscriba a su subárbol de comandos (cambio de la ACL del rol
     `dispositivo`) y se diseña aquí antes de hacerlo.
 
+52. **Recepción por HTTP (RF-01, HU-01): propuesta del 16/10/2026, pendiente de la decisión del estudiante; sin código todavía.**
+    El alta de un dispositivo de vía `http` ya entrega un token y la base guarda solo su huella `scrypt` (`credencial`, §8.4 punto 25);
+    falta la ruta que lo recibe. Propuesta: (i) **`POST /recepcion/{id_fisico}`** (ruta prevista), aparte de las rutas de administración y consulta,
+    con el token en **`Authorization: Bearer <token>`** (RFC 6750) y el cuerpo en SenML JSON o en `plano`, según el formato declarado en
+    el alta. (ii) **La misma tubería:** el filtro 1 autentica con la huella (comparación en tiempo constante) y comprueba que el
+    dispositivo sea de vía `http` y no esté de baja; después corren los mismos filtros 2 a 6 que en MQTT, y la recepción por MQTT no
+    cambia. (iii) **Respuestas** (RF-06): **202** con el resumen (lecturas guardadas, repetidas y rechazadas con su porqué) si hubo al menos
+    una lectura válida o repetida; **422** si la trama no se entiende o ninguna lectura es válida (y va a cuarentena con `origen = http`,
+    RF-07); **401**, igual para un dispositivo desconocido, de otra vía, dado de baja o con el token equivocado (no revela cuál de los
+    cuatro); **413** sobre 64 KiB, el mismo tope que el broker (`max_packet_size`); **415** si no es JSON ni texto. (iv) **Tope de
+    intentos:** verificar `scrypt` cuesta CPU a propósito, y sin tope bastaría mandar tokens falsos para saturar el backend; se propone
+    cortar con **429** a una dirección que acumule fallos de autenticación, y a un dispositivo que mande más de una trama por segundo (el
+    intervalo mínimo del alta es 5 s, así que uno legítimo queda muy por debajo). (v) **Metadatos del transporte** (RF-09): la trama
+    cruda guarda la ruta y el origen `http`. (vi) **Prueba:** unitarias de la ruta y de cada respuesta, y `banco.sh http` de punta a
+    punta, junto con `lorawan`, `puente` y `alta`, que deben seguir en verde (la prueba en la red del campus es por MQTT).
+
 ## 9. Crecimiento, resiliencia y respaldo (aprobado el 06/10/2026)
 
 Esta sección responde a tres preguntas del estudiante: qué pasa si hay que guardar más, cómo y en qué orden
