@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 270 pruebas unitarias del backend y 52 del panel, sin matriz formal) y TT-32 (sensor físico);
+cubre todavía: TT-27 (contrato de trama: hoy 291 pruebas unitarias del backend y 52 del panel, sin matriz formal) y TT-32 (sensor físico);
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -521,7 +521,7 @@ verificación de una credencial usa un identificador de cliente propio (con el d
 los secretos a `curl`, `psql` y `grep` por la entrada estándar.
 
 **Lo que no cubre:** la pila de desarrollo se migra con `broker-inicializar.sh` (lo corre el operador; hasta reconstruir el backend,
-el guardián 2i falla y los casos del alta del humo responden 404, a propósito); la baja y la rotación por API llegaron el 13/10 (§21); la vía `http` guarda el hash del token aunque la recepción por HTTP no exista aún; no hay prueba automática de dos
+el guardián 2i falla y los casos del alta del humo responden 404, a propósito); la baja y la rotación por API llegaron el 13/10 (§21); la vía `http` guarda el hash del token aunque la recepción por HTTP no exista aún (llegó el 16/10, §41); no hay prueba automática de dos
 altas simultáneas del mismo identificador (las serializa el bloqueo por identificador del disparador de la migración 11, no
 ejercitado en concurrencia); un cliente huérfano en el broker se reporta (409 con el remedio) y no se corrige solo; la credencial
 viaja en claro dentro de la respuesta HTTP, por lo que fuera de la red local la ruta exige el proxy TLS; no hay límite de tasa en el
@@ -548,7 +548,7 @@ la vez pasa a cubrir alta, baja y rotación; la fila bloqueada con `FOR NO KEY U
 **Lo que no cubre:** si rotar expulsa una sesión MQTT ya abierta no se midió (el plugin cambia la clave; el banco prueba conexiones
 nuevas), y tampoco si la baja la expulsa al borrar el cliente; no hay «reactivar» un dado de baja (el identificador queda ocupado
 por su historial: un equipo que vuelve se da de alta con otro); el estado `mantenimiento` solo se escribe por SQL hasta la pantalla
-P6 (Etapa 4); la rotación por `http` guarda el hash del token sin que exista aún la recepción por HTTP.
+P6 (Etapa 4); la rotación por `http` guarda el hash del token sin que exista aún la recepción por HTTP (llegó el 16/10, §41).
 
 ## 22. Cola del broker vigilada: topes, muestreo de `$SYS` y alarma (13/10/2026)
 
@@ -864,7 +864,7 @@ revisar nada. **Banco:** 36 de 36, «LORAWAN OK».
 la limpieza (el tópico crudo queda en su columna de la cuarentena como evidencia); se suman a los rellenos los selectores de variación
 que faltaban; el informe dice ahora que el JSON del banco es el de la documentación oficial de ChirpStack v4 y de Milesight, no el
 que publica el ChirpStack del campus, todavía no probado; y el guardián busca el nombre del entrevistado también en el código.
-Total: 270 pruebas unitarias del backend y 52 del panel.
+Total: 270 del backend y 52 del panel.
 
 ## 36. La trama real de la pasarela del campus: sufijo nativo, perfil de decodificación y contador de trama (16/10/2026)
 
@@ -1018,3 +1018,48 @@ zona no es de él, vuelve a «todas»). Con un solo sitio no aparecen: no inform
 tiene `creado_en` (se supuso sin mirar el esquema); el segundo, porque la extracción del id tomó la línea de guiones del encabezado de
 `psql`. Ninguno era del sistema.
 
+
+## 41. La recepción por HTTP (16/10/2026)
+
+**Qué cambió** (`docs/10 §8.4` punto 52; cierra HU-01, RF-01). `POST /recepcion/{idFisico}` recibe una trama de un dispositivo de vía
+`http` con el token que entregó el alta en `Authorization: Bearer`. El cuerpo llega crudo, hasta 64 KiB (el mismo tope del broker), y
+pasa por los mismos filtros 2 a 6 que una trama MQTT; el filtro 1 compara el token con la huella `scrypt` de la credencial activa. Un
+dispositivo que no existe se verifica igual, contra una huella de relleno: el tiempo de respuesta no dice qué identificadores existen.
+Los topes salen del costo medido en el portátil: 65 ms por verificación y 57 por segundo con los 4 hilos de Node.
+
+| Comprobación (`banco.sh http`, de punta a punta; dos corridas seguidas) | Resultado |
+|---|---|
+| Alta de dos dispositivos de vía http por la API, cada uno con su token (no se imprime) | ✅ |
+| SenML válida → 202 con el resumen, y la lectura en `medicion` | ✅ |
+| La trama cruda guarda la ruta HTTP y el adaptador (RF-09) | ✅ |
+| La misma trama antes de un segundo → 429; pasado el segundo → 202 con 1 repetida, sin duplicar la lectura (RF-10) | ✅ |
+| Una trama que no se entiende → 422 con el motivo, y a cuarentena con origen `http`; ninguna lectura válida (fuera de rango) → 422 | ✅ |
+| Formato plano con `?magnitud=` → 202 y la lectura en `medicion` | ✅ |
+| Un cuerpo que no es JSON ni texto → 415; más de 64 KiB → 413 | ✅ |
+| La ruta en mayúsculas → 202 con el cuerpo leído (antes de la revisión llegaba vacío) | ✅ |
+| Por el proxy, una dirección falsa en `X-Forwarded-For` no se cree (el registro anota la que vio el proxy) | ✅ |
+| Token malo, dispositivo desconocido, sin cabecera y token de otro dispositivo → el mismo 401 | ✅ |
+| A los 5 fallos de autenticación la dirección queda bloqueada (429), incluso con un token bueno | ✅ |
+| Al reiniciar el backend la dirección queda libre; dado de baja por la API, su token ya no entra (401) | ✅ |
+| Ningún token aparece en el registro del backend | ✅ |
+| La vía MQTT no cambió: en el mismo banco, `lorawan`, `puente`, `puente` con dirección y `alta`, después de las correcciones | ✅ |
+
+| Pruebas unitarias (`backend/src/recepcion/http/`) | Resultado |
+|---|---|
+| Topes con un reloj de mentira: bloqueo a los 5 fallos y su vencimiento, ventana de 60 s, IPv6 por /64, tope de direcciones sin soltar un bloqueo vigente, cupo de 2, una trama por segundo | ✅ (6) |
+| Filtro 1 HTTP: token correcto; equivocado, de otra vía, de baja o sin credencial activa → no; desconocido → no, y verifica igual; la consulta lleva tiempo máximo; un fallo al calcular la huella de relleno no queda guardado | ✅ (5) |
+| Controlador: 202, 401 sin tocar la base, 415 antes que el token, 422 y 202 según el resumen, bloqueo por dirección, ritmo, 503 con el cupo lleno, cupo liberado si la verificación lanza, id con salto de línea saneado en el registro, baja | ✅ (10) |
+| Plantado: verificar solo si el dispositivo existe (sin huella de relleno) · aceptar un dispositivo de vía mqtt · quitar el ritmo · no contar una trama solo repetida como útil | cada uno hace fallar su prueba |
+| Plantado (tras la revisión): IPv6 sin agrupar · no soltar direcciones sobre el tope · registro sin sanear · guardar el fallo de la huella de relleno · consulta sin tiempo máximo · liberar el cupo sin `finally` | cada uno hace fallar su prueba |
+
+**Lo que no cubre:** el tiempo de `scrypt` (65 ms y 57 por segundo) se midió a mano, sin guion en el repositorio; el 503 y el tiempo
+máximo de la consulta se prueban solo en unitarias, no en el banco; el banco llega al backend en HTTP sin TLS por 127.0.0.1 (el token
+viajaría en claro sin el proxy: en producción el backend no publica puertos y se entra por el proxy con TLS, `docs/10 §2`); y quedan los límites conocidos de
+`docs/10 §8.4` punto 52 (vii): bloqueo por dirección detrás de un NAT, cuarentena sin cuota por dispositivo y `X-Forwarded-For` desde
+otro contenedor de la red interna.
+
+**Pruebas:** 291 del backend y 52 del panel. **Tres tropiezos de la prueba de punta a punta, ninguno del sistema:** `curl -G` mueve el
+cuerpo a la URL, así que el `?magnitud=` del formato plano va escrito en la URL; la prueba del bloqueo suponía que la dirección partía
+sin fallos, cuando las comprobaciones anteriores del 401 ya sumaban algunos (ahora envía hasta recibir el 429); y suponía que el backend
+ve 127.0.0.1, cuando ve una sola dirección de la red de Docker para las peticiones directas y las del proxy: una corrida dejaba fallos
+vivos para la siguiente, así que el caso reinicia el backend al empezar (los contadores viven en su memoria).

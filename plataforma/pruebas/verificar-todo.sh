@@ -148,6 +148,16 @@ elif [ "$rc" -gt 1 ]; then echo "FALLA git grep falló ($rc): no se pudo revisar
 elif [ -n "$horarios" ] || [ "$rc" -eq 0 ]; then echo "FALLA horario personal en archivos versionados:"; { echo "$horarios"; cat "$VT"/horarios.txt; } | grep . | cut -c1-120 | sed 's/^/  /'; fallos=$((fallos+1))
 else echo "OK    $nb bitácoras y $na archivos versionados revisados: ninguno dice a qué hora del día se trabajó"; fi
 
+paso "2f3. Sin direcciones IPv4 reales: solo loopback, 0.0.0.0 y las de documentación (RFC 5737) en archivos versionados o nuevos"
+# 16/10: una prueba del banco usaba la dirección de un resolvedor público real como dirección falsa, y unitarias, una de red privada;
+# ningún paso lo veía. Una dirección con forma real es un dato real a efectos de la regla: los ejemplos van en 192.0.2.0/24,
+# 198.51.100.0/24 o 203.0.113.0/24. Se cuentan las encontradas: si el patrón no encuentra ninguna (ni 127.0.0.1), no revisó nada.
+git grep --untracked -I -n -o -E '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' -- ':!privado' ':!historico' ':!*.pdf' > "$VT"/ipv4.txt 2>&1; rc=$?
+total=$(wc -l < "$VT"/ipv4.txt); ajenas=$(grep -vE ':(127\.[0-9]+\.[0-9]+\.[0-9]+|0\.0\.0\.0|192\.0\.2\.[0-9]+|198\.51\.100\.[0-9]+|203\.0\.113\.[0-9]+)$' "$VT"/ipv4.txt)
+if [ "$rc" -gt 1 ] || [ "$total" -lt 1 ]; then echo "FALLA git grep falló ($rc) o no encontró ninguna dirección: no se revisó nada"; fallos=$((fallos+1))
+elif [ -n "$ajenas" ]; then echo "FALLA direcciones IPv4 que no son de loopback ni de documentación:"; echo "$ajenas" | cut -c1-120 | sed 's/^/  /'; fallos=$((fallos+1))
+else echo "OK    $total direcciones IPv4 en archivos versionados o nuevos: todas de loopback, 0.0.0.0 o de documentación"; fi
+
 paso "2g. Migraciones citadas en prosa (docs e informe) == archivos NN-*.sql en disco"
 # Hallazgo del 26/09: informe y docs/12 decían «6 migraciones» cuando ya había 7 en disco (la 07 del 23/09).
 n_disco=$(ls plataforma/db/init/*.sql | wc -l)

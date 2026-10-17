@@ -11,8 +11,8 @@
 |---|---|---|---|
 | Retroalimentación | 20 % | 🟡 | Al 15/10 no hay observaciones escritas del profesor guía sobre la entrega del 2/10; se le pedirán en una reunión presencial la semana del 20/10. Sí se incorporó la entrevista del 5/10 (`bitacora/2026-10-05-entrevista-academico-geologia.md`) en las decisiones del 6 y del 8/10 (`docs/10 §8.4`). Falta: recibir e incorporar la retroalimentación de la Etapa 2. |
 | Mejoras | 15 % | 🟢 | Decisiones de diseño del 6, 7 y 8/10 (`docs/10 §8.4`); proxy TLS (`docs/16 §9`); dependencias e imágenes sin vulnerabilidades altas o críticas corregibles (`docs/16 §12`). |
-| 50 % de la implementación | 10 % | 🟡 | Núcleo: 21 de 34 elementos hechos (104 de 168 h, 62 %) y 8 parciales (42 h: HU-01, HU-02, HU-08, HU-19, TT-12, TT-22, TT-32 y TT-33). Todo el backlog: 32 de 65 (138 de 285 h, 48 %) y 16 parciales (73 h). Cifras calculadas desde las filas de `docs/04`, con los estados de `docs/12 §3`, de §2 y de la Etapa 1 (al final de §2). |
-| Pruebas iniciales | 30 % | 🟢 | `docs/16`: emulador, carga (59,7 tramas/s sin pérdida), carreras, TLS, capacidad y picos, caídas con carga, dependencias e imágenes, LoRaWAN por pasarela en el banco (`docs/16 §31–§34`); 270 pruebas unitarias del backend y 52 del panel. Falta: la matriz formal del contrato de trama (TT-27) y el broker de producción en las caídas (`docs/16 §11`). |
+| 50 % de la implementación | 10 % | 🟡 | Núcleo: 22 de 34 elementos hechos (110 de 168 h, 65 %) y 7 parciales (36 h: HU-02, HU-08, HU-19, TT-12, TT-22, TT-32 y TT-33). Todo el backlog: 33 de 65 (144 de 285 h, 51 %) y 15 parciales (67 h). Cifras calculadas desde las filas de `docs/04`, con los estados de `docs/12 §3`, de §2 y de la Etapa 1 (al final de §2). |
+| Pruebas iniciales | 30 % | 🟢 | `docs/16`: emulador, carga (59,7 tramas/s sin pérdida), carreras, TLS, capacidad y picos, caídas con carga, dependencias e imágenes, LoRaWAN por pasarela en el banco (`docs/16 §31–§34`); 291 pruebas unitarias del backend y 52 del panel. Falta: la matriz formal del contrato de trama (TT-27) y el broker de producción en las caídas (`docs/16 §11`). |
 | Validación preliminar | 10 % | 🟡 | Sensor físico de extremo a extremo (TT-32): todas las piezas llegaron el 13/10 y la placa se reconoció e identificó el 14/10 (`docs/17 §3`); falta la fase 1, cablear los sensores y publicar hasta el panel; guía de manejo seguro escrita (`docs/17 §4`). |
 | Documentación | 15 % | 🟡 | Documentos en concordancia (guardián `plataforma/pruebas/verificar-todo.sh`). El 15/10 el informe ganó el capítulo «Implementación y pruebas iniciales» y el anexo con el detalle de las pruebas (TT-36); falta incorporar la retroalimentación de la Etapa 2 y la revisión de entrega. |
 
@@ -46,8 +46,8 @@
 **Adelantados de la Etapa 4:** TT-20 (autenticación de la recepción) ✅ (`docs/12 §3`); TT-29 (carga) ✅ preliminar
 (`docs/16 §5`); TT-22 (TLS) 🟡: MQTT por el proxy, probado en el banco (`docs/16 §9`), y el canal en vivo por HTTPS (`docs/16 §14`); TT-30 (recuperación) 🟡: falta el
 broker de producción (`docs/16 §11`); HU-04 (adaptador de otro formato) 🟡: adaptador plano, se cierra con la trama real
-(`docs/12 §3`). **Pendiente de la Etapa 2:** HU-01 🟡: la recepción por MQTT funciona; la recepción por HTTP (RF-01) no
-está construida. **Etapa 1:** TT-34 (documento de la etapa) ✅, entregado el 4/09; TT-33 (entrevistas) 🟡: una, el 5/10
+(`docs/12 §3`). **Pendiente de la Etapa 2, cerrado el 16/10:** HU-01 ✅: a la recepción por MQTT se suma la recepción por HTTP (RF-01),
+con los mismos filtros, token del alta y topes medidos (`docs/10 §8.4` punto 52, `docs/16 §41`). **Etapa 1:** TT-34 (documento de la etapa) ✅, entregado el 4/09; TT-33 (entrevistas) 🟡: una, el 5/10
 (`bitacora/2026-10-05-entrevista-academico-geologia.md`), falta consolidar; TT-38 (bitácora) 🟡: continua hasta la Etapa 4.
 
 ## 3. ¿Cabe lo que falta? — medición y corte (decidido el 08/10)
@@ -57,7 +57,7 @@ Con las 18 tareas originales (85 h) quedaban 37 h pendientes y 17 h parciales fr
 08/10:** quedan en la Etapa 3 el núcleo (salvo HU-15, que necesita tráfico de radio real), TT-39 (el panel necesita su canal)
 y TT-36 (es el entregable). Pasan a la Etapa 4 HU-15, HU-17, HU-18 (con M7) y las interfaces de HU-06 y HU-12. Lo que falta
 de la Etapa 3 son ahora 37 h según las filas (algo menos, porque HU-10 y TT-36 ya están empezadas), con unas 8 h de margen. La
-recepción por HTTP (RF-01) entra en esta etapa solo si sobra tiempo; si no, en la Etapa 4. Las filas de `docs/04` y del anexo del backlog
+recepción por HTTP (RF-01) entra en esta etapa solo si sobra tiempo; si no, en la Etapa 4 (entró: el 16/10, §2). Las filas de `docs/04` y del anexo del backlog
 ya dicen la etapa nueva (paso 2v del guardián).
 
 **Adelantos decididos por el estudiante el 12/10:** HU-20 y HU-21 (7 h cada una) pasan de la Etapa 4 a la 3, para que el panel
@@ -79,26 +79,25 @@ vuelve a la Etapa 4 con su registro aquí y en `docs/04`.
 El estado de cada elemento manda en §1 y §2; esta lista ordena lo que falta. El guardián (paso 2w5) comprueba que cada elemento
 siga sin terminar y que sus horas sean las de `docs/04`: un elemento que se cierra se quita de aquí en el mismo cambio.
 
-**Núcleo (🎯): 13 elementos, 64 h.** Ocho parciales y cinco sin empezar, en el orden de trabajo:
+**Núcleo (🎯): 12 elementos, 58 h.** Siete parciales y cinco sin empezar, en el orden de trabajo:
 
 | Orden | Elemento | Horas | Estado | Qué falta |
 |---|---|---|---|---|
 | 1 | HU-02 Eventos LoRaWAN | 6 | 🟡 | La prueba en la misma red que la pasarela del campus (20/10); lo demás está probado en el banco (`docs/16 §31`, §36 y §37) |
 | 2 | TT-32 Sensor físico de extremo a extremo | 3 | 🟡 | Fase 1 (diagnóstico de los sensores, firmware listo y compilado) y fase 2 (publicar por MQTT con TLS hasta el panel) (`docs/17 §6`) |
 | 3 | HU-19 Panel de salud con semáforo | 9 | 🟡 | Verlo con el sensor físico y en la demostración |
-| 4 | HU-01 SenML por MQTT o HTTP | 6 | 🟡 | La recepción por HTTP (RF-01), base también del envío HTTP desde la pasarela (`docs/10 §8.4` punto 47) |
-| 5 | HU-08 Exportar en CSV, XLSX y JSON | 4 | 🟡 | XLSX y la exportación por sitio con rol: necesita la sesión (HU-18) |
-| 6 | TT-22 Cifrado del transporte | 4 | 🟡 | El broker de producción con certificado real (`docs/14`) |
-| 7 | TT-12 Catálogo de sensores y unidades | 6 | 🟡 | El catálogo editable con umbrales; con él, los alias de claves y los perfiles de decodificación (`docs/08 §8`) |
-| 8 | TT-33 Entrevistas | 4 | 🟡 | Más entrevistas: hay una (5/10) |
-| 9 | TT-21 Aislamiento entre sitios | 5 | ⬜ | Todo; necesita la sesión y los roles por sitio (`docs/20`) |
-| 10 | TT-27 Pruebas del contrato de trama | 5 | ⬜ | La matriz formal (esquema, cuarentena, adaptadores) |
-| 11 | HU-07 Historial por rango de fechas | 4 | ⬜ | Todo |
-| 12 | HU-15 Calidad del enlace | 4 | ⬜ | Todo; necesita tráfico LoRaWAN real (`rssi` y `snr` ya quedan en la trama cruda) |
-| 13 | HU-16 Indicador de salud del sitio | 4 | ⬜ | Todo |
+| 4 | HU-08 Exportar en CSV, XLSX y JSON | 4 | 🟡 | XLSX y la exportación por sitio con rol: necesita la sesión (HU-18) |
+| 5 | TT-22 Cifrado del transporte | 4 | 🟡 | El broker de producción con certificado real (`docs/14`) |
+| 6 | TT-12 Catálogo de sensores y unidades | 6 | 🟡 | El catálogo editable con umbrales; con él, los alias de claves y los perfiles de decodificación (`docs/08 §8`) |
+| 7 | TT-33 Entrevistas | 4 | 🟡 | Más entrevistas: hay una (5/10) |
+| 8 | TT-21 Aislamiento entre sitios | 5 | ⬜ | Todo; necesita la sesión y los roles por sitio (`docs/20`) |
+| 9 | TT-27 Pruebas del contrato de trama | 5 | ⬜ | La matriz formal (esquema, cuarentena, adaptadores) |
+| 10 | HU-07 Historial por rango de fechas | 4 | ⬜ | Todo |
+| 11 | HU-15 Calidad del enlace | 4 | ⬜ | Todo; necesita tráfico LoRaWAN real (`rssi` y `snr` ya quedan en la trama cruda) |
+| 12 | HU-16 Indicador de salud del sitio | 4 | ⬜ | Todo |
 
-Del 1 al 4 suman 24 h y hasta el 30/10 caben unas 30 junto con el informe. Del 5 en adelante, Etapa 4. (HU-21 y HU-20 se cerraron
-el 16/10: `docs/16 §39` y §40.)
+Del 1 al 3 suman 18 h y hasta el 30/10 caben unas 30 junto con el informe. Del 4 en adelante, Etapa 4. (HU-21, HU-20 y HU-01 se
+cerraron el 16/10: `docs/16 §39`, §40 y §41.)
 
 **Fuera del núcleo, también comprometido**, cada uno con diseño antes del código:
 

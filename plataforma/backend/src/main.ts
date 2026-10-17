@@ -33,6 +33,19 @@ async function arrancar(): Promise<void> {
   // Referrer-Policy; y helmet retira X-Powered-By. HSTS queda fuera A PROPÓSITO: solo tiene sentido
   // detrás de TLS y lo pondrá una sola capa (el proxy) cuando exista; dos capas serían dos fuentes.
   app.use(helmet({ strictTransportSecurity: false }));
+  // La dirección del cliente (la usan los topes de la recepción por HTTP, docs/10 §8.4 punto 52): detrás del proxy, todas las
+  // peticiones llegan desde él; el proxy la manda en X-Forwarded-For, reemplazándola (proxy/nginx.conf). Se confía en esa cabecera
+  // solo si la petición viene de loopback o de una red privada, que es por donde llega el proxy (el puerto se publica en 127.0.0.1).
+  app.set('trust proxy', 'loopback, uniquelocal');
+  // El cuerpo de la recepción por HTTP llega crudo, como por MQTT, y con el mismo tope que el broker (max_packet_size, 64 KiB). Va
+  // antes del lector de JSON que Nest agrega al iniciar: para /recepcion manda este. Un cuerpo de más responde 413 en JSON.
+  // Sin distinguir mayúsculas, como el enrutador de Express: con startsWith, /RECEPCION/… llegaba a la ruta con el cuerpo de JSON.
+  app.useBodyParser('raw', { type: (req: Request) => /^\/recepcion\//i.test(req.url ?? ''), limit: 64 * 1024 });
+  app.use('/recepcion', (err: { status?: number; type?: string }, _req: Request, res: Response, next: NextFunction) => {
+    if (err?.type === 'entity.too.large') return void res.status(413).json({ statusCode: 413, message: 'trama de más de 64 KiB' });
+    if (err) return void res.status(400).json({ statusCode: 400, message: 'cuerpo ilegible' });
+    next();
+  });
   // helmet no emite Permissions-Policy; la API no usa cámara, micrófono ni ubicación.
   app.use((_req: Request, res: Response, next: NextFunction) => {
     res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');

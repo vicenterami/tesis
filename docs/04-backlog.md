@@ -581,7 +581,7 @@ ejecuta contra la holgura verificada al cierre de cada etapa.
 | **1. Núcleo mínimo** | Supervisión de caída | HU-14, HU-05 | ✅ |
 | **1. Núcleo mínimo** | Consulta básica por API | HU-07, TT-13 | ✅ |
 | **1. Núcleo mínimo** | Sensor real de extremo a extremo | HU-02 (ruta B: pasarela con servidor de red embebido; ChirpStack solo en la ruta A) o HU-03 con el nodo del compañero | ⬜ octubre |
-| 2. Segundo nivel | Entrada HTTP | HU-01 | ⬜ E3 |
+| 2. Segundo nivel | Entrada HTTP | HU-01 | ✅ 16/10 (`docs/16 §41`) |
 | 2. Segundo nivel | Alertas por umbral con interfaz | HU-06 | 🟡 motor listo |
 | 2. Segundo nivel | Aprovisionamiento desde la plataforma | HU-10, HU-11 | ✅ 12/10 (API; la pantalla es HU-22, E4) |
 | 2. Segundo nivel | Cifrado del transporte | TT-22 | ⬜ E3 |

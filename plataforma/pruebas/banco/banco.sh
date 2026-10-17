@@ -12,6 +12,7 @@
 #   bash plataforma/pruebas/banco/banco.sh migraciones         reaplica las migraciones 02 a la última y exige el mismo esquema y catálogo (idempotencia; corre al final de «encender»)
 #   bash plataforma/pruebas/banco/banco.sh puente [ip]         puente de Mosquitto como el de la red del campus: su broker reenvía el tópico nativo por TLS al proxy → medicion
 #                                                              (con «ip», por dirección IP, como en la red del campus: certificado con CA_IP_EXTRA y proxy publicado solo en esa IP)
+#   bash plataforma/pruebas/banco/banco.sh http                recepción por HTTP (HU-01): 202, 401, 413, 415, 422 con cuarentena, la baja, los dos topes por petición y la dirección tras el proxy
 #   bash plataforma/pruebas/banco/banco.sh navegador           pantalla P3 en Firefox real con Playwright: puntos contra /historico, vivo sin recargar, caída y vuelta (docs/16 §39)
 #   bash plataforma/pruebas/banco/banco.sh cola                cola del broker vigilada: backend detenido + 200 emulados → descartes → condición broker_descarte (docs/16 §22)
 #   bash plataforma/pruebas/banco/banco.sh estado | logs [servicio] | sql ["CONSULTA"]
@@ -500,6 +501,77 @@ case "${1:-}" in
     k=$(dc logs --no-color --since 5m backend 2>/dev/null | grep -cF -f <(sed -n 's/^remote_password //p' "$cfg/mosquitto.conf")); [ "$k" = 0 ] && ok "la credencial del puente no aparece en el registro del backend" || falla "la credencial aparece en el registro"
     trap - EXIT; limpiar
     echo; [ $fallos -eq 0 ] && echo "PUENTE OK" || { echo "$fallos comprobación(es) con falla"; exit 1; } ;;
+  http)
+    # Recepción por HTTP (RF-01, HU-01; docs/10 §8.4 punto 52; docs/16 §41). Alta de un dispositivo de vía http por la API (entrega un
+    # token), y cada respuesta: 202 con la lectura en medicion, 401 sin revelar el motivo, 413, 415, 422 con su cuarentena de origen http,
+    # el formato plano con ?magnitud=, la ruta en mayúsculas, la baja, dos topes (una trama por segundo y 5 fallos por dirección; el cupo
+    # de 2 verificaciones a la vez lo prueba recepcion-http.controller.spec.ts) y que, a través del proxy, una dirección falsa en
+    # X-Forwarded-For no se cree. Los tokens viajan por la entrada estándar de curl, nunca por argumentos.
+    CLAVE=$(leer HTTP_CLAVE_ADMIN); fallos=0; n=$(date +%s | tail -c 5)
+    ok() { echo "OK    $1"; }; falla() { echo "FALLA $1"; fallos=$((fallos+1)); }
+    api() { local m=$1 r=$2; shift 2; printf 'X-Clave-Admin: %s\n' "$CLAVE" | curl -s -m 10 -w '\n%{http_code}' -X "$m" -H @- -H 'Content-Type: application/json' "$@" "http://127.0.0.1:3001$r"; }
+    json() { python3 -c "import sys,json; v=json.load(sys.stdin); print(eval(sys.argv[1]))" "$1"; }
+    # enviar <token> <id> <tipo> <cuerpo> [extra curl]: código y cuerpo de la respuesta (el token entra por la entrada estándar)
+    enviar() { local tk=$1 id=$2 tipo=$3 cuerpo=$4; shift 4; printf 'Authorization: Bearer %s\n' "$tk" | curl -s -m 10 -w '\n%{http_code}' -H @- -H "Content-Type: $tipo" --data-binary "$cuerpo" "$@" "http://127.0.0.1:3001/recepcion/$id"; }
+    codigo() { printf '%s' "${1##*$'\n'}"; }; cuerpo() { printf '%s' "${1%$'\n'*}"; }
+    # Los contadores de fallos viven en la memoria del backend y una corrida anterior pudo dejar fallos dentro de la ventana de 60 s
+    # (o la dirección bloqueada): se parte de cero reiniciándolo, en vez de suponer cuántos quedaron.
+    dc restart backend >/dev/null 2>&1; for _ in $(seq 1 30); do [ "$(dc ps --format '{{.Status}}' backend | grep -c healthy)" = 1 ] && break; sleep 2; done
+    zona=$(psql_ -tA -c "SELECT id FROM zona ORDER BY id LIMIT 1")
+    hid="http-$n"; r=$(api POST /dispositivos -d "{\"id_fisico\":\"$hid\",\"nombre\":\"Nodo HTTP del banco\",\"zona_id\":\"$zona\",\"via\":\"http\",\"intervalo_esperado_s\":60,\"canales\":[{\"magnitud\":\"temperatura\"}]}")
+    [ "$(codigo "$r")" = 201 ] || { echo "FALLA alta del dispositivo http → $(codigo "$r")"; exit 1; }
+    TK=$(json "v['conexion']['token']" <<<"$(cuerpo "$r")"); HUID=$(json "v['id']" <<<"$(cuerpo "$r")"); unset r
+    pid="plano-$n"; r=$(api POST /dispositivos -d "{\"id_fisico\":\"$pid\",\"nombre\":\"Nodo HTTP plano\",\"zona_id\":\"$zona\",\"via\":\"http\",\"formato\":\"plano\",\"intervalo_esperado_s\":60,\"canales\":[{\"magnitud\":\"humedad\"}]}")
+    TKP=$(json "v['conexion']['token']" <<<"$(cuerpo "$r")"); unset r
+    [ "${#TK}" = 32 ] && [ "${#TKP}" = 32 ] && ok "alta de dos dispositivos de vía http por la API: cada uno con su token (no se imprime)" || falla "tokens del alta"
+    lec() { psql_ -tA -c "SELECT count(*) FROM medicion m JOIN canal c ON c.id=m.canal_id JOIN dispositivo d ON d.id=c.dispositivo_id WHERE d.id_fisico='$1'"; }
+    t=$(date +%s); senml="[{\"bn\":\"$hid\",\"bt\":$t,\"n\":\"temperatura\",\"u\":\"Cel\",\"v\":21.5}]"
+    r=$(enviar "$TK" "$hid" application/senml+json "$senml")
+    [ "$(codigo "$r")" = 202 ] && [ "$(json "v['guardadas']" <<<"$(cuerpo "$r")")" = 1 ] && [ "$(lec "$hid")" = 1 ] && ok "SenML válida → 202 con el resumen, y la lectura en medicion" || falla "válida: $(codigo "$r") $(cuerpo "$r") · lecturas $(lec "$hid")"
+    q=$(psql_ -tA -c "SELECT t.topico || ' ' || t.adaptador FROM trama t JOIN dispositivo d ON d.id=t.dispositivo_id WHERE d.id_fisico='$hid'")
+    [ "$q" = "/recepcion/$hid senml" ] && ok "la trama cruda guarda la ruta HTTP y el adaptador (RF-09)" || falla "trama cruda: «$q»"
+    r=$(enviar "$TK" "$hid" application/senml+json "$senml"); [ "$(codigo "$r")" = 429 ] && ok "la misma trama antes de un segundo → 429 (una trama por segundo por dispositivo)" || falla "ritmo: $(codigo "$r")"
+    sleep 1.1; r=$(enviar "$TK" "$hid" application/json "$senml")
+    [ "$(codigo "$r")" = 202 ] && [ "$(json "v['repetidas']" <<<"$(cuerpo "$r")")" = 1 ] && [ "$(lec "$hid")" = 1 ] && ok "la misma trama otra vez (pasado el segundo) → 202 con 1 repetida, sin duplicar la lectura (idempotente, RF-10)" || falla "repetida: $(codigo "$r") $(cuerpo "$r")"
+    sleep 1.1; r=$(enviar "$TK" "$hid" application/json 'hola')
+    q=$(psql_ -tA -c "SELECT origen || ' ' || motivo FROM cuarentena WHERE topico = '/recepcion/$hid' ORDER BY recibido_en DESC LIMIT 1")
+    [ "$(codigo "$r")" = 422 ] && [ "$q" = "http malformada" ] && ok "una trama que no se entiende → 422 con el motivo, y a cuarentena con origen http" || falla "malformada: $(codigo "$r") · cuarentena «$q»"
+    sleep 1.1; r=$(enviar "$TK" "$hid" application/json "[{\"bn\":\"$hid\",\"bt\":$((t+5)),\"n\":\"temperatura\",\"u\":\"Cel\",\"v\":999}]")
+    [ "$(codigo "$r")" = 422 ] && [[ "$(cuerpo "$r")" == *"fuera del rango"* ]] && ok "ninguna lectura válida (fuera de rango) → 422 con el porqué" || falla "fuera de rango: $(codigo "$r") $(cuerpo "$r")"
+    r=$(enviar "$TKP" "$pid?magnitud=humedad" text/plain '55.5')
+    [ "$(codigo "$r")" = 202 ] && [ "$(lec "$pid")" = 1 ] && ok "formato plano con ?magnitud= → 202 y la lectura en medicion" || falla "plano: $(codigo "$r") $(cuerpo "$r")"
+    r=$(enviar "$TK" "$hid" application/xml '<a/>'); [ "$(codigo "$r")" = 415 ] && ok "un cuerpo que no es JSON ni texto → 415" || falla "xml: $(codigo "$r")"
+    head -c 70000 /dev/zero | tr '\0' 'a' > "$PRIV/grande.txt"
+    r=$(printf 'Authorization: Bearer %s\n' "$TK" | curl -s -m 10 -w '\n%{http_code}' -H @- -H 'Content-Type: text/plain' --data-binary @"$PRIV/grande.txt" "http://127.0.0.1:3001/recepcion/$hid"); rm -f "$PRIV/grande.txt"
+    [ "$(codigo "$r")" = 413 ] && ok "más de 64 KiB → 413 (el tope del broker)" || falla "grande: $(codigo "$r")"
+    # La ruta en mayúsculas llega al mismo controlador (Express no distingue): el cuerpo debe llegar crudo igual, no vacío.
+    sleep 1.1; r=$(printf 'Authorization: Bearer %s\n' "$TK" | curl -s -m 10 -w '\n%{http_code}' -H @- -H 'Content-Type: application/json' --data-binary "[{\"bn\":\"$hid\",\"bt\":$((t+10)),\"n\":\"temperatura\",\"u\":\"Cel\",\"v\":22}]" "http://127.0.0.1:3001/RECEPCION/$hid")
+    [ "$(codigo "$r")" = 202 ] && [ "$(lec "$hid")" = 2 ] && ok "la ruta en mayúsculas → 202 con el cuerpo leído (el lector crudo no distingue mayúsculas)" || falla "mayúsculas: $(codigo "$r") $(cuerpo "$r")"
+    # A través del proxy, la dirección que cuenta es la que ve el proxy: una dirección falsa en X-Forwarded-For no se cree.
+    [ -f "$CERTS/ca.crt" ] || bash proxy/ca-desarrollo.sh "$CERTS"
+    dcp up -d proxy >/dev/null 2>&1; for _ in $(seq 1 20); do [ "$(dcp ps --format '{{.Status}}' proxy | grep -c healthy)" = 1 ] && break; sleep 2; done
+    curl -s -m 10 -o /dev/null --cacert "$CERTS/ca.crt" -H 'Authorization: Bearer xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' -H 'X-Forwarded-For: 203.0.113.7' -H 'Content-Type: application/json' -d '[]' "https://localhost:8443/recepcion/$hid"
+    sleep 1; linea=$(dc logs --no-color --since 1m backend 2>/dev/null | grep 'recepción HTTP rechazada (401)' | tail -1)
+    [ -n "$linea" ] && [[ "$linea" != *"203.0.113.7"* ]] && ok "por el proxy, una dirección falsa en X-Forwarded-For no se cree (el registro anota la que vio el proxy)" || falla "dirección tras el proxy: «${linea:0:160}»"
+    # Mismo 401 para todo motivo: token malo, dispositivo desconocido, sin cabecera, y el token de otro dispositivo.
+    c1=$(codigo "$(enviar xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx "$hid" application/json '[]')"); c2=$(codigo "$(enviar xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx nadie-0001 application/json '[]')")
+    c3=$(curl -s -m 10 -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -d '[]' "http://127.0.0.1:3001/recepcion/$hid"); c4=$(codigo "$(enviar "$TKP" "$hid" application/json '[]')")
+    [ "$c1$c2$c3$c4" = 401401401401 ] && ok "token malo, dispositivo desconocido, sin cabecera y token de otro dispositivo → el mismo 401" || falla "401: $c1 $c2 $c3 $c4"
+    # Fallos desde la misma dirección hasta que llegue el bloqueo: debe llegar a más tardar en el quinto de la ventana (ya hay al menos
+    # cuatro arriba: no se supone cuántos había antes, el mismo backend pudo recibir otros). Bloqueada, ni el token bueno entra.
+    intentos=0; c=401; while [ "$c" = 401 ] && [ $intentos -lt 6 ]; do c=$(codigo "$(enviar xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx "$hid" application/json '[]')"); intentos=$((intentos+1)); done
+    sleep 1.1; c6=$(codigo "$(enviar "$TKP" "$pid?magnitud=humedad" text/plain '56.5')") # el plano sigue activo: su token es bueno
+    [ "$c" = 429 ] && [ $intentos -le 2 ] && [ "$c6" = 429 ] && ok "a los 5 fallos de autenticación la dirección queda bloqueada (429), incluso con el token bueno" || falla "bloqueo por fallos: $c tras $intentos intento(s) más; con el token bueno $c6"
+    # Los contadores viven en la memoria del proceso (docs/10 §8.4 punto 52): al reiniciar el backend, la dirección queda libre. Dado de
+    # baja por la API, su token ya no entra (401, como cualquier otro motivo). Va al final: el backend ve una sola dirección para las
+    # peticiones directas y las del proxy (la de la red de Docker, no 127.0.0.1), así que cada 401 de arriba cuenta para el bloqueo.
+    dc restart backend >/dev/null 2>&1; for _ in $(seq 1 30); do [ "$(dc ps --format '{{.Status}}' backend | grep -c healthy)" = 1 ] && break; sleep 2; done
+    code=$(printf 'X-Clave-Admin: %s\n' "$CLAVE" | curl -s -m 10 -o /dev/null -w '%{http_code}' -X DELETE -H @- "http://127.0.0.1:3001/dispositivos/$HUID")
+    r=$(enviar "$TK" "$hid" application/json "$senml")
+    [ "$code" = 200 ] && [ "$(codigo "$r")" = 401 ] && ok "tras reiniciar, la dirección queda libre; y dado de baja por la API, su token ya no entra (401)" || falla "baja: DELETE $code, envío $(codigo "$r")"
+    k=$(dc logs --no-color --since 10m backend 2>/dev/null | grep -cF -f <(printf '%s\n' "${TK:-sin}" "${TKP:-sin}")); [ "$k" = 0 ] && ok "ningún token aparece en el registro del backend" || falla "un token aparece en el registro"
+    unset TK TKP CLAVE
+    echo; [ $fallos -eq 0 ] && echo "HTTP OK" || { echo "$fallos comprobación(es) con falla"; exit 1; } ;;
   navegador)
     # P3 en un navegador real (docs/19 §6 y §7; docs/16 §39). Playwright (dependencia de desarrollo del panel, versión fijada) maneja
     # Firefox; su navegador se descarga una vez a ~/.cache/ms-playwright (311 MB medidos el 16/10) con «playwright install», desde el servidor de Playwright, sin una

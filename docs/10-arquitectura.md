@@ -97,7 +97,7 @@ flowchart TB
   | Escenario | Transporte hasta el servidor | Puerto | Pasa por el proxy | Estado |
   |---|---|---|---|---|
   | 1. Nodo Wi-Fi (ESP32 u otro) con cliente MQTT | MQTT sobre TLS | 8883 | Sí | Implementado (en desarrollo, 1883 local sin TLS) |
-  | 2. Equipo que solo habla HTTP | HTTPS, `POST` con SenML | 443 | Sí | Diseñado (HU-01, Etapa 3) |
+  | 2. Equipo que solo habla HTTP | HTTPS, `POST` con SenML | 443 | Sí | Implementado el 16/10/2026 (HU-01, §8.4 punto 52); en el banco, por el proxy con TLS |
   | 3. Pasarela LoRaWAN con servidor de red embebido (Milesight UG6x) | MQTT sobre TLS; JSON decodificado en la pasarela | 8883 | Sí | Ruta B; el 15/10/2026 la red del campus ofreció reenviar desde el servidor embebido de su UG63 para una prueba; adaptador `milesight` hecho y probado en el banco (§8.4 punto 47, `docs/16 §31`); falta en terreno |
   | 4. Pasarela LoRaWAN con *packet forwarder* y ChirpStack en este servidor | Semtech UDP → ChirpStack → MQTT interno | 1700/udp | Sí (UDP) | Ruta A, opcional; ChirpStack no desplegado |
   | 5. Servidor de red externo (TTN o ChirpStack de la red del campus) | Integración MQTT del servidor de red hacia este sistema | 8883 | Sí | **Ruta C, confirmada el 13/10/2026: la red del campus usa ChirpStack v4 con una pasarela Milesight UG63** (§8.4 punto 45); adaptador `chirpstack` hecho y probado en el banco (§8.4 punto 47, `docs/16 §31`); falta en terreno |
@@ -1289,7 +1289,7 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     dispositivos directos, `docs/16 §27`): una trama que no calza va a cuarentena `malformada` diciendo qué formato se esperaba. El adaptador `chirpstack` lee `deviceInfo.devEui` (en minúsculas; si no
     coincide con el tópico, cuarentena `malformada` y el nodo no se marca vivo; lo mismo si el cuerpo no trae el DevEUI, no es un
     objeto JSON o no tiene la forma del formato, porque sin identidad verificada no hay señal de vida: §4.1), `time` (marca del servidor de red, regla 17 de
-    `docs/13`) y las claves de `object`; el `milesight`, el JSON con códec y Metadata (`devEUI` más los valores decodificados; sin códec, cuarentena «activar Payload Codec y Metadata»). **Nota del 15/10/2026:** la pasarela del campus es hoy una UG65 (misma familia que la UG63 documentada) con el servidor embebido y un decodificador cargado; la captura real de su broker (15/10, `mosquitto_sub -v`) muestra el uplink **sin códec** de la guía del fabricante (https://www.milesight.com/docs/en/mini-gateway/application-guide/uplink-data.html): `data` en base64 (una trama propia de 10 bytes: identificador del nodo, secuencia, temperatura ×100, humedad ×100 y tensión de batería), `fCnt`, `rxInfo` con `rssi` y `loRaSNR` reales, y `time` en UTC **con zona** (regla 17 de `docs/13`, corregida ese día), en el tópico nativo `application/<app>/device/<DevEUI>/event/up`. Dos consecuencias de la captura, decididas con el estudiante antes de la prueba en la misma red local del martes 20/10/2026 y descritas en el párrafo siguiente junto con una tercera decisión del 16/10, el contador de trama: el filtro 1 admite también el sufijo nativo `device/<DevEUI>/event/<evento>` bajo el árbol de la pasarela, para que un puente de Mosquitto reenvíe con solo cambiar el prefijo (el puente no reordena tópicos), y la trama binaria se decodifica con un perfil por dispositivo (migración 17), porque la pasarela no aplica su códec a lo que publica y activarlo cambiaría el mensaje que hoy consumen otros sistemas de la red. El envío HTTP desde la pasarela a un servidor propio (la vía `http` del diseño, RF-01) queda como meta para cuando exista un servidor alcanzable: mismo cuerpo JSON, misma decodificación. Para recibir de su red sin exponer nada a Internet, el camino acordado es ese puente desde su broker hacia el nuestro por 8883 con TLS, autenticado como la pasarela; un broker público de un proveedor, sin autenticación, queda descartado (RF-40, RF-42). Las claves decodificadas se traducen a magnitudes con un **mapa** único,
+    `docs/13`) y las claves de `object`; el `milesight`, el JSON con códec y Metadata (`devEUI` más los valores decodificados; sin códec, cuarentena «activar Payload Codec y Metadata»). **Nota del 15/10/2026:** la pasarela del campus es hoy una UG65 (misma familia que la UG63 documentada) con el servidor embebido y un decodificador cargado; la captura real de su broker (15/10, `mosquitto_sub -v`) muestra el uplink **sin códec** de la guía del fabricante (https://www.milesight.com/docs/en/mini-gateway/application-guide/uplink-data.html): `data` en base64 (una trama propia de 10 bytes: identificador del nodo, secuencia, temperatura ×100, humedad ×100 y tensión de batería), `fCnt`, `rxInfo` con `rssi` y `loRaSNR` reales, y `time` en UTC **con zona** (regla 17 de `docs/13`, corregida ese día), en el tópico nativo `application/<app>/device/<DevEUI>/event/up`. Dos consecuencias de la captura, decididas con el estudiante antes de la prueba en la misma red local del martes 20/10/2026 y descritas en el párrafo siguiente junto con una tercera decisión del 16/10, el contador de trama: el filtro 1 admite también el sufijo nativo `device/<DevEUI>/event/<evento>` bajo el árbol de la pasarela, para que un puente de Mosquitto reenvíe con solo cambiar el prefijo (el puente no reordena tópicos), y la trama binaria se decodifica con un perfil por dispositivo (migración 17), porque la pasarela no aplica su códec a lo que publica y activarlo cambiaría el mensaje que hoy consumen otros sistemas de la red. El envío HTTP desde la pasarela a un servidor propio (la vía `http` del diseño, RF-01) queda como meta para cuando exista un servidor alcanzable: mismo cuerpo JSON, misma decodificación. La ruta HTTP construida el 16/10 (punto 52) recibe de dispositivos; la pasarela necesitará además autenticarse como pasarela por esa vía. Para recibir de su red sin exponer nada a Internet, el camino acordado es ese puente desde su broker hacia el nuestro por 8883 con TLS, autenticado como la pasarela; un broker público de un proveedor, sin autenticación, queda descartado (RF-40, RF-42). Las claves decodificadas se traducen a magnitudes con un **mapa** único,
     en la unidad canónica del catálogo, consumido por una sola función (`resolverClave`) que los adaptadores reciben: **hoy el mapa
     vive en el código** (`mapa-claves.ts`: `temperature` → temperatura, `humidity` → humedad, `battery` → batería, `pressure` →
     presión), porque solo hay dos decodificadores que importen y nadie puede editar el catálogo todavía; **pasa al catálogo**
@@ -1408,21 +1408,32 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     remoto, con un comando del broker al nodo, exige que el dispositivo se suscriba a su subárbol de comandos (cambio de la ACL del rol
     `dispositivo`) y se diseña aquí antes de hacerlo.
 
-52. **Recepción por HTTP (RF-01, HU-01): propuesta del 16/10/2026, pendiente de la decisión del estudiante; sin código todavía.**
-    El alta de un dispositivo de vía `http` ya entrega un token y la base guarda solo su huella `scrypt` (`credencial`, §8.4 punto 25);
-    falta la ruta que lo recibe. Propuesta: (i) **`POST /recepcion/{id_fisico}`** (ruta prevista), aparte de las rutas de administración y consulta,
-    con el token en **`Authorization: Bearer <token>`** (RFC 6750) y el cuerpo en SenML JSON o en `plano`, según el formato declarado en
-    el alta. (ii) **La misma tubería:** el filtro 1 autentica con la huella (comparación en tiempo constante) y comprueba que el
-    dispositivo sea de vía `http` y no esté de baja; después corren los mismos filtros 2 a 6 que en MQTT, y la recepción por MQTT no
-    cambia. (iii) **Respuestas** (RF-06): **202** con el resumen (lecturas guardadas, repetidas y rechazadas con su porqué) si hubo al menos
-    una lectura válida o repetida; **422** si la trama no se entiende o ninguna lectura es válida (y va a cuarentena con `origen = http`,
-    RF-07); **401**, igual para un dispositivo desconocido, de otra vía, dado de baja o con el token equivocado (no revela cuál de los
-    cuatro); **413** sobre 64 KiB, el mismo tope que el broker (`max_packet_size`); **415** si no es JSON ni texto. (iv) **Tope de
-    intentos:** verificar `scrypt` cuesta CPU a propósito, y sin tope bastaría mandar tokens falsos para saturar el backend; se propone
-    cortar con **429** a una dirección que acumule fallos de autenticación, y a un dispositivo que mande más de una trama por segundo (el
-    intervalo mínimo del alta es 5 s, así que uno legítimo queda muy por debajo). (v) **Metadatos del transporte** (RF-09): la trama
-    cruda guarda la ruta y el origen `http`. (vi) **Prueba:** unitarias de la ruta y de cada respuesta, y `banco.sh http` de punta a
-    punta, junto con `lorawan`, `puente` y `alta`, que deben seguir en verde (la prueba en la red del campus es por MQTT).
+52. **Recepción por HTTP (RF-01, HU-01): decidido el 16/10/2026.** El alta de un dispositivo
+    de vía `http` entrega un token y la base guarda solo su huella `scrypt` (`credencial`, §8.4 punto 25). (i) **`POST /recepcion/{id_fisico}`**,
+    aparte de las rutas de administración y consulta, con el token en **`Authorization: Bearer <token>`** (RFC 6750) y el cuerpo en
+    SenML JSON o, si el formato declarado es `plano`, un número con la magnitud en `?magnitud=`. (ii) **La misma tubería:** el filtro 1
+    busca el dispositivo con su credencial activa y compara la huella (`scrypt` y comparación en tiempo constante; si el dispositivo no
+    existe se calcula igual una huella, para que el tiempo de respuesta no revele cuáles existen); después corren los mismos filtros 2 a 6
+    que en MQTT. La recepción por MQTT no cambia. (iii) **Respuestas** (RF-06): **202** con el resumen (lecturas guardadas, repetidas y
+    rechazadas con su porqué) si hubo al menos una lectura válida o repetida; **422** si la trama no se entiende o ninguna lectura es
+    válida, y va a cuarentena con `origen = http` (RF-07); **401** igual para un dispositivo desconocido, de otra vía, dado de baja o con
+    el token equivocado; **413** sobre 64 KiB, el tope del broker (`max_packet_size`); **415** si no es JSON ni texto; **400** si el lector no puede leer el cuerpo (por ejemplo, una codificación declarada que no es la suya). La ruta no distingue mayúsculas, como el enrutador de Express, y el lector del cuerpo crudo tampoco. (iv) **Topes**, con
+    el costo medido el 16/10/2026 en el portátil: una verificación de `scrypt` (N = 2¹⁵, r = 8) tarda **65 ms** y el *pool* de 4 hilos de
+    Node llega a **57 por segundo** (medido a mano, sin guion en el repositorio). Por eso: **(a)** una dirección con **5 fallos de autenticación en 60 s queda bloqueada 60 s** (429; una IPv6 se cuenta por su prefijo /64, y con más de 10 000 direcciones vivas se sueltan las cuentas más antiguas, nunca un bloqueo vigente):
+    con una sola dirección, un atacante cuesta a lo más 5 × 65 ms por minuto; **(b)** como mucho **2 verificaciones a la vez** (503 con
+    `Retry-After` si llega una tercera; la consulta de la credencial tiene un tiempo máximo de 5 s, para que una base colgada no retenga el cupo): nunca se ocupa más de la mitad del *pool* y caben unas 30 por segundo, que cubren unos 150
+    dispositivos que manden cada 5 s (el mínimo del alta); **(c)** cada dispositivo, como mucho **una trama aceptada por segundo** (429).
+    Un ataque desde muchas direcciones lo frena (b), no (a): limitarlo antes de llegar al backend es tarea del proxy (`docs/11 §4`). Los
+    contadores viven en la memoria del proceso: se reinician con él (aceptado). **La dirección del cliente** la da el proxy en
+    `X-Forwarded-For` (la reemplaza, no la agrega: `proxy/nginx.conf`); el backend confía en esa cabecera solo si la petición llega desde
+    una dirección de *loopback* o de red privada, que es por donde llega el proxy (el puerto 3000 se publica solo en 127.0.0.1).
+    (v) **Metadatos del transporte** (RF-09): la trama cruda guarda la ruta (`/recepcion/<id>` en su columna `topico`; ningún tópico que acepta el filtro 1 de MQTT empieza con `/`: todos empiezan con `sitio/`) y la cuarentena, además, el origen `http`. (vi) **Prueba:**
+    unitarias de la ruta, de los topes y de cada respuesta, y `banco.sh http` de punta a punta, con `lorawan`, `puente` y `alta` en verde
+    (la prueba en la red del campus es por MQTT). (vii) **Límites conocidos** (revisión del 16/10): el bloqueo es por dirección, así que
+    un dispositivo con el token equivocado detrás de la misma dirección pública que otros (un NAT) los bloquea también por 60 s; la
+    cuarentena no tiene cuota por dispositivo (uno con token válido puede llenarla a una trama por segundo: es el tope por emisor de
+    §4.1, por diseñar); y dentro de la red de Compose, otro contenedor que llegue al backend sin pasar por el proxy podría poner una
+    `X-Forwarded-For` falsa (hacia fuera, el backend solo se publica en 127.0.0.1).
 
 ## 9. Crecimiento, resiliencia y respaldo (aprobado el 06/10/2026)
 

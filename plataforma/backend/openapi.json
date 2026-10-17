@@ -53,6 +53,69 @@
         ]
       }
     },
+    "/recepcion/{idFisico}": {
+      "post": {
+        "description": "Para dispositivos de vía `http`. El token que entregó el alta va en `Authorization: Bearer`. El cuerpo, SenML JSON (o, si el formato declarado es `plano`, un número con la magnitud en `?magnitud=`), hasta 64 KiB. Pasa por los mismos filtros que una trama MQTT.",
+        "operationId": "RecepcionHttpController_recibir",
+        "parameters": [
+          {
+            "name": "idFisico",
+            "required": true,
+            "in": "path",
+            "description": "Identificador físico del dispositivo (el del alta)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "magnitud",
+            "required": false,
+            "in": "query",
+            "description": "Solo para el formato plano: qué mide el número",
+            "schema": {}
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "Bearer <token del alta>",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Recibida: al menos una lectura válida o repetida; trae el resumen"
+          },
+          "400": {
+            "description": "Cuerpo ilegible (por ejemplo, una codificación declarada que no es la del cuerpo)"
+          },
+          "401": {
+            "description": "Sin token válido para ese dispositivo (no dice el motivo)"
+          },
+          "413": {
+            "description": "Más de 64 KiB"
+          },
+          "415": {
+            "description": "No es JSON ni texto"
+          },
+          "422": {
+            "description": "No se entiende o ninguna lectura es válida; queda en cuarentena"
+          },
+          "429": {
+            "description": "Demasiados fallos desde esta dirección, o más de una trama por segundo del dispositivo"
+          },
+          "503": {
+            "description": "Verificación de tokens saturada; reintentar"
+          }
+        },
+        "summary": "Recibir una trama por HTTP",
+        "tags": [
+          "recepcion"
+        ]
+      }
+    },
     "/dispositivos": {
       "get": {
         "description": "Cada dispositivo con su sitio y zona (nombres, y `sitio_codigo` y `zona_id` para filtrar: los nombres pueden repetirse), zona horaria, canales, `en_linea` (última trama hace menos de 2 × intervalo esperado) y número de condiciones abiertas.",

@@ -1,5 +1,5 @@
 import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { Pool } from 'pg';
+import { Pool, type QueryConfig } from 'pg';
 import { AlertasService } from '../alertas/alertas.service';
 import { BrokerService } from '../broker/broker.service';
 import { POOL } from '../db/db.module';
@@ -16,6 +16,8 @@ import { tiempoPlausible } from './tiempo';
 import { limpia } from './texto';
 import { aCanonica } from './unidades';
 import { porcentaje } from '../consulta/escala';
+import { hashScrypt, verificarScrypt } from '../alta/credenciales';
+import { randomBytes } from 'node:crypto';
 
 // Forma del tópico acordada: sitio/<sitio>/dispositivo/<id_fisico>/<magnitud>
 const PATRON_TOPICO = /^sitio\/([^/]+)\/dispositivo\/([^/]+)\/([^/]+)$/;
@@ -35,7 +37,11 @@ interface Pasarela { id: string; activo: boolean; sitio_codigo: string }
 // Dominio cerrado: el mismo CHECK de la migración 09. Agregar un motivo exige migración, no solo código.
 type Motivo = 'no_registrado' | 'dado_de_baja' | 'malformada' | 'invalida';
 // Lo que se sabe de la trama al rechazarla. dispositivoId solo existe si el filtro 1 pudo atribuirla.
-interface TramaRecibida { topico: string; carga: Buffer; recibidoEn: Date; dispositivoId?: string }
+interface TramaRecibida { topico: string; carga: Buffer; recibidoEn: Date; dispositivoId?: string; origen?: 'mqtt' | 'http' }
+// Lo que pasó con una trama después del filtro 1 (lo usa la recepción por HTTP para responder; la de MQTT no lo necesita).
+export interface ResumenTrama { guardadas: number; duplicadas: number; rechazos: string[]; malformada: string | null; repetida: boolean }
+// Lo que el filtro 1 de la vía HTTP necesita: el dispositivo, su vía, su estado y la huella de su credencial activa.
+interface CredencialHttp { id: string; via: string; estado: string; hash: string | null }
 interface Canal { id: string; magnitud: string; unidad_canonica: string; rango_min: number | null; rango_max: number | null; escala_cero: number | null; escala_cien: number | null }
 
 // M1 Recepción + M2 Normalización (pipeline). Los seis filtros: 1 autenticar · 2 analizar · 3 validar ·
@@ -117,7 +123,7 @@ export class RecepcionService implements OnModuleInit {
         `id_fisico=${ctx.idFisico} está registrado en el sitio «${dispositivo.sitio_codigo}», no en «${limpia(partes[1], 64)}»`);
     }
     trama.dispositivoId = dispositivo.id;
-    return this.filtros2a6(trama, ctx, dispositivo, false);
+    await this.filtros2a6(trama, ctx, dispositivo, false); // MQTT no responde al emisor: el resumen no se usa
   }
 
   // Rutas B y C (docs/10 §8.4 punto 47). Orden del filtro 1: (i) la pasarela registrada, activa y del sitio del tópico, si no
@@ -154,12 +160,14 @@ export class RecepcionService implements OnModuleInit {
     }
     trama.dispositivoId = nodo.id;
     const ctx: ContextoTrama = { topico: trama.topico, idFisico: deveui, magnitudTopico: '', carga: trama.carga, deveui, decodificador: nodo.decodificador ?? undefined };
-    return this.filtros2a6(trama, ctx, nodo, true);
+    await this.filtros2a6(trama, ctx, nodo, true);
   }
 
   // Filtros 2 a 6, comunes a las dos formas de tópico: el dispositivo ya pasó el filtro 1.
-  private async filtros2a6(trama: TramaRecibida, ctx: ContextoTrama, dispositivo: Dispositivo, dePasarela: boolean): Promise<void> {
+  private async filtros2a6(trama: TramaRecibida, ctx: ContextoTrama, dispositivo: Dispositivo, dePasarela: boolean): Promise<ResumenTrama> {
     const { topico, carga, recibidoEn } = trama;
+    let malformada: string | null = null;
+    const sinLecturas = (): ResumenTrama => ({ guardadas: 0, duplicadas: 0, rechazos: [], malformada, repetida: false });
 
     // ── [2] Analizar: el adaptador del formato declarado en el alta la traduce a lecturas (punto 47: no se adivina) ──
     // Una trama que no se entiende va a cuarentena, pero el pipeline NO termina aquí: el dispositivo ya
@@ -171,14 +179,16 @@ export class RecepcionService implements OnModuleInit {
     const formatoEnSuTopico = FORMATOS_PASARELA.has(dispositivo.formato) === dePasarela;
     const adaptador = formatoEnSuTopico ? this.adaptadores.get(dispositivo.formato) : undefined;
     if (!adaptador) {
-      await this.cuarentena(trama, 'malformada', `formato declarado ${dispositivo.formato}: no se recibe por este tópico`);
+      malformada = `formato declarado ${dispositivo.formato}: no se recibe por este tópico`;
+      await this.cuarentena(trama, 'malformada', malformada);
       // Por el tópico de pasarela sin un adaptador de pasarela nadie verificó el DevEUI: no se marca vivo (§4.1). Hoy lo impide la
       // clave foránea compuesta de la migración 15; esto cierra el camino si esa regla cambiara (defensa en profundidad).
-      if (dePasarela) return;
+      if (dePasarela) return sinLecturas();
     } else if (!adaptador.reconoce(ctx)) {
-      await this.cuarentena(trama, 'malformada', `formato declarado ${dispositivo.formato}: la trama no tiene esa forma`);
+      malformada = `formato declarado ${dispositivo.formato}: la trama no tiene esa forma`;
+      await this.cuarentena(trama, 'malformada', malformada);
       // Por el tópico de pasarela, una trama que ni siquiera tiene la forma no identifica al nodo: no se marca vivo (§4.1).
-      if (dePasarela) return;
+      if (dePasarela) return sinLecturas();
     } else {
       try {
         lecturas = adaptador.analizar(ctx);
@@ -186,9 +196,10 @@ export class RecepcionService implements OnModuleInit {
         if (!(e instanceof TramaMalformada)) throw e;
         // El contador pudo anotarse antes de fallar (p. ej. data corta): una trama que no se entendió no es «la repetida» (§4.1).
         ctx.fcnt = undefined;
-        await this.cuarentena(trama, 'malformada', `formato declarado ${adaptador.nombre}: ${e.message}`);
+        malformada = `formato declarado ${adaptador.nombre}: ${e.message}`;
+        await this.cuarentena(trama, 'malformada', malformada);
         // El cuerpo no deja verificar el DevEUI (otro, ausente o ilegible): no hay certeza de que sea del nodo, no se marca vivo (§4.1).
-        if (e instanceof IdentidadNoVerificada) return;
+        if (e instanceof IdentidadNoVerificada) return sinLecturas();
       }
     }
 
@@ -286,6 +297,50 @@ export class RecepcionService implements OnModuleInit {
       const ign = ctx.ignoradas?.length ? ` · ${ctx.ignoradas.length} clave(s) fuera del mapa: ${ctx.ignoradas.slice(0, 5).join(', ')}` : '';
       this.log.log(`${ctx.idFisico}: ${guardadas}/${lecturas.length} lecturas guardadas vía ${adaptador?.nombre}${dup}${ign}`);
     }
+    return { guardadas, duplicadas, rechazos, malformada, repetida };
+  }
+
+  // ── Vía HTTP (docs/10 §8.4 punto 52): el filtro 1 con el token y, después, los mismos filtros 2 a 6 que en MQTT ──
+  // Devuelve el id del dispositivo si el token es el de su credencial activa, el dispositivo es de vía http y no está de baja;
+  // si no, null, por cualquiera de esos motivos (la respuesta no dice cuál). Si el dispositivo no existe se calcula igual una huella,
+  // para que el tiempo de respuesta no revele cuáles existen.
+  async autenticarHttp(idFisico: string, token: string): Promise<string | null> {
+    // Con tiempo máximo: una consulta colgada retendría uno de los 2 cupos de verificación (topes.ts) y, con dos, toda la vía HTTP.
+    // pg lo lee de la consulta (`config.query_timeout`, pg 8.23 lib/client.js), aunque sus tipos no lo declaren.
+    const consulta: QueryConfig & { query_timeout: number } = {
+      text: `SELECT d.id, d.via, d.estado, c.hash FROM dispositivo d
+               LEFT JOIN credencial c ON c.dispositivo_id = d.id AND c.activa
+              WHERE d.id_fisico = $1 ORDER BY c.creada_en DESC NULLS LAST LIMIT 1`,
+      values: [idFisico],
+      query_timeout: 5_000,
+    };
+    const r = await this.pool.query<CredencialHttp>(consulta);
+    const fila = r.rows[0];
+    const valida = await verificarScrypt(token, fila?.hash ?? (await this.huellaDeRelleno()));
+    if (!fila || !fila.hash || !valida || fila.via !== 'http' || fila.estado === 'baja') return null;
+    return fila.id;
+  }
+
+  // La trama ya autenticada: la misma tubería que en MQTT. `magnitud` la usa el formato `plano` (un número solo no dice qué mide).
+  async procesarHttp(idFisico: string, carga: Buffer, magnitud: string | undefined): Promise<ResumenTrama | null> {
+    const recibidoEn = new Date();
+    const topico = `/recepcion/${idFisico}`;
+    const dispositivo = await this.buscarDispositivo(idFisico);
+    if (!dispositivo || dispositivo.estado === 'baja') return null; // se dio de baja entre la autenticación y aquí
+    const trama: TramaRecibida = { topico, carga, recibidoEn, dispositivoId: dispositivo.id, origen: 'http' };
+    const ctx: ContextoTrama = { topico, idFisico, magnitudTopico: (magnitud ?? '').toLowerCase(), carga };
+    return this.filtros2a6(trama, ctx, dispositivo, false);
+  }
+
+  // Una huella válida de un secreto que nadie conoce: verificar contra ella cuesta lo mismo que contra una real.
+  private rellenoHuella: Promise<string> | null = null;
+  private huellaDeRelleno(): Promise<string> {
+    // Si falla, no se guarda el fallo: la próxima vez se intenta de nuevo (si no, todo desconocido daría 500 hasta reiniciar).
+    this.rellenoHuella ??= hashScrypt(randomBytes(24).toString('base64url')).catch((e: unknown) => {
+      this.rellenoHuella = null;
+      throw e;
+    });
+    return this.rellenoHuella;
   }
 
   private async buscarPasarela(idFisico: string): Promise<Pasarela | undefined> {
@@ -325,7 +380,7 @@ export class RecepcionService implements OnModuleInit {
     await this.pool.query(
       `INSERT INTO cuarentena (origen, topico, motivo, payload_crudo, detalle, dispositivo_id, recibido_en)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      ['mqtt', t.topico, motivo, t.carga, detalle, t.dispositivoId ?? null, t.recibidoEn],
+      [t.origen ?? 'mqtt', t.topico, motivo, t.carga, detalle, t.dispositivoId ?? null, t.recibidoEn],
     );
     // El tópico crudo queda en su columna como evidencia; al registro va limpio (revisión del 15/10).
     this.log.warn(`cuarentena (${motivo}) ${limpia(t.topico, 256)} · ${detalle}`);
