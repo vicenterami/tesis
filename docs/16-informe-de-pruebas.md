@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 264 pruebas unitarias del backend y 44 del panel, sin matriz formal) y TT-32 (sensor físico);
+cubre todavía: TT-27 (contrato de trama: hoy 268 pruebas unitarias del backend y 44 del panel, sin matriz formal) y TT-32 (sensor físico);
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -749,7 +749,7 @@ la ACL del rol y la recepción por el filtro 1.
 **Cómo** (`bash plataforma/pruebas/banco/banco.sh lorawan`). Contra el banco desechable, con el broker, el plugin de seguridad y la base
 reales: se da de alta por API una pasarela ChirpStack, un nodo y una pasarela Milesight, y se publica con la credencial de cada pasarela el
 JSON de su fuente oficial (evento `up` de ChirpStack v4; uplink con códec y Metadata de Milesight). Los secretos viajan por la entrada
-estándar. Resultado: **25 de 25 comprobaciones, «LORAWAN OK»**; 26 de 26 desde la corrección de §32, 27 de 27 desde la de §33, 35 de 35 desde la de §34, 36 de 36 desde la de §35 y 43 de 43 desde la de §36.
+estándar. Resultado: **25 de 25 comprobaciones, «LORAWAN OK»**; 26 de 26 desde la corrección de §32, 27 de 27 desde la de §33, 35 de 35 desde la de §34, 36 de 36 desde la de §35, 43 de 43 desde la de §36 y 44 de 44 desde la de §38.
 
 | Comprobación | Resultado |
 |---|---|
@@ -864,7 +864,7 @@ revisar nada. **Banco:** 36 de 36, «LORAWAN OK».
 la limpieza (el tópico crudo queda en su columna de la cuarentena como evidencia); se suman a los rellenos los selectores de variación
 que faltaban; el informe dice ahora que el JSON del banco es el de la documentación oficial de ChirpStack v4 y de Milesight, no el
 que publica el ChirpStack del campus, todavía no probado; y el guardián busca el nombre del entrevistado también en el código.
-Total: 264 pruebas unitarias del backend y 44 del panel.
+Total: 268 pruebas unitarias del backend y 44 del panel.
 
 ## 36. La trama real de la pasarela del campus: sufijo nativo, perfil de decodificación y contador de trama (16/10/2026)
 
@@ -953,10 +953,13 @@ como unidad secundaria (RFC 8798); un emisor que mande `mV` se convierte (1/1000
 | Pregunta | Medido o verificado |
 |---|---|
 | ¿La calibración exige las dos escalas, distintas? | Casos 20 a 22 de `reglas-identidad.sql`: una sola escala y el 0 % igual al 100 %, rechazadas por `ck_canal_escala`; la del suelo (0 % al aire 2,65 V, 100 % en agua 1,20 V, con el 100 % por debajo), aceptada |
-| ¿`mV` se convierte bien? | 2650 mV → 2,65 V (prueba unitaria); plantado un factor de 1/100, la prueba falla. V a mV no se inventa |
+| ¿`mV` se convierte bien? | 2650 mV → 2,65 V (prueba unitaria); plantado a mano el 16/10 un factor de 1/100, la prueba falla. V a mV no se inventa |
 | ¿La migración se aplica desde cero y se repite sin cambiar nada? | `banco.sh encender`: la base nueva la trae; las 17 reaplicables, idempotentes |
 | ¿En la base de desarrollo cambió solo lo esperado? | Aplicada dos veces; la foto del esquema antes y después difiere solo en las dos columnas, la restricción, sus dos comentarios y las dos magnitudes |
 
-**Lo que falta:** el porcentaje en la API de consulta y en el panel (entra con HU-21) y el permiso de la aplicación para editar la
-calibración (se concede cuando exista la ruta que la edita: mínimo privilegio). **Pruebas:** 264 unitarias del backend.
+| ¿La calibración admite NaN o infinito? | Ya no: la primera versión los aceptaba (comprobado en el banco: `NaN` e `Infinity` entraban) y el % habría salido basura. La regla exige escalas finitas; casos 23 y 24, plantados. Al reescribirla se perdió el `IS NOT NULL` explícito y el caso 20 lo detectó al instante: con una sola escala, la comparación da «desconocido» y un `CHECK` así se da por cumplido; restituido |
+| ¿La API entrega el %? | Una sola función (`consulta/escala.ts`, con pruebas: extremos, recta invertida, recorte, sin calibración, NaN, infinito y división por cero) y la usan la ficha y el histórico. En el banco, con una calibración puesta en la base, la última humedad (65,52) sale 32,8 % en la ficha y en el histórico, y un canal sin calibración trae `null` (`banco.sh lorawan`) |
+
+**Lo que falta:** mostrar el % en el panel y la ruta para editar la calibración, con su permiso (se concede cuando exista la ruta: mínimo
+privilegio) y la validación de que las escalas caigan en el rango de la magnitud. **Pruebas:** 268 unitarias del backend.
 

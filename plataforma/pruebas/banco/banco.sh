@@ -364,6 +364,15 @@ case "${1:-}" in
     r=$(pub "$mid" "$MCRED" "$nativo" "$(sincodec AgAAAJAHMBmYsA== 143 "$t3")"); sleep 2
     f=$(psql_ -tA -c "SELECT e.ultimo_fcnt FROM estado_dispositivo e JOIN dispositivo d ON d.id=e.dispositivo_id WHERE d.id_fisico='$udev'")
     [ "$(valores | cut -d' ' -f1)" = 6 ] && [ "$f" = 143 ] && ok "un fCnt nuevo → 3 lecturas más, y estado_dispositivo.ultimo_fcnt = 143" || falla "fCnt nuevo: $(valores) · ultimo_fcnt «$f»"
+    # Porcentaje con la calibración del canal (docs/10 §8.4 punto 51): se calibra la humedad del nodo con 0 % = 0 y 100 % = 200 (una
+    # escala cualquiera, para ver la cuenta); la última lectura (65,52) debe salir 32,8 % en la ficha y en el histórico. La ruta que
+    # edita la calibración aún no existe: se pone en la base, como lo haría una migración de datos.
+    psql_ -q -c "UPDATE canal SET escala_cero = 0, escala_cien = 200 FROM dispositivo d WHERE canal.dispositivo_id = d.id AND d.id_fisico = '$udev' AND canal.magnitud_codigo = 'humedad'"
+    did=$(psql_ -tA -c "SELECT id FROM dispositivo WHERE id_fisico = '$udev'"); cid=$(psql_ -tA -c "SELECT c.id FROM canal c JOIN dispositivo d ON d.id = c.dispositivo_id WHERE d.id_fisico = '$udev' AND c.magnitud_codigo = 'humedad'")
+    p=$(curl -s -m 5 "http://127.0.0.1:3001/dispositivos/$did" | python3 -c "import sys,json; c=[k for k in json.load(sys.stdin)['canales'] if k['magnitud']=='humedad'][0]; print(c['ultima_medicion']['porcentaje'])")
+    q=$(curl -s -m 5 "http://127.0.0.1:3001/canales/$cid/historico?intervalo=1%20minute&desde=$(date -u -d '-10 minutes' +%Y-%m-%dT%H:%M:%SZ)" | python3 -c "import sys,json; v=json.load(sys.stdin); print(v['escala'], v['porcentajes'])")
+    t=$(curl -s -m 5 "http://127.0.0.1:3001/dispositivos/$did" | python3 -c "import sys,json; c=[k for k in json.load(sys.stdin)['canales'] if k['magnitud']=='temperatura'][0]; print(c['ultima_medicion']['porcentaje'])")
+    [ "$p" = 32.8 ] && [[ "$q" == "{'cero': 0, 'cien': 200}"* ]] && [[ "$q" == *32.8* ]] && [ "$t" = None ] && ok "con calibración, la ficha y el histórico traen el % (65,52 → 32,8 %); sin calibración, null" || falla "porcentaje: ficha «$p» · histórico «$q» · sin calibración «$t»"
     visto0=$(visto "$udev"); sleep 1.1
     r=$(pub "$mid" "$MCRED" "$nativo" "$(sincodec AgAAAI8HGBmY 144 "$t3")"); c=$(esperar_cuarentena "$nativo" 'malformada*10 bytes*'); visto1=$(visto "$udev")
     # El ayudante recorta el detalle a 90 caracteres: «…llegaron 9» queda fuera; el texto entero lo prueba lorawan.spec.ts.

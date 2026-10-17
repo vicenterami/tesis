@@ -1391,12 +1391,16 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     («SenML version 10 [RFC8428] does not provide for the direct use of these secondary units», RFC 8798 §1; ambos consultados y
     descargados el 16/10/2026). Un emisor que mande `mV` se acepta y se convierte (1/1000, la misma tabla del RFC 8798).
     **Magnitudes nuevas:** `temperatura_suelo` (Cel, de −55 a 125 °C, el rango de medida del DS18B20 según su hoja de datos) y
-    `humedad_suelo` (V, de 0 a 3,3: la alimentación del sensor; el de referencia entrega de 0 a 3,0 V).
+    `humedad_suelo` (V, de 0 a 3,3: la tensión de salida del sensor, que se alimenta a 3,3 V; el de referencia entrega de 0 a 3,0 V).
     **Calibración genérica por canal:** dos columnas de `canal`, `escala_cero` y `escala_cien`, el valor de la magnitud que corresponde
-    al 0 % y al 100 %; las dos o ninguna, y distintas. Para el suelo: la tensión en agua es el 100 % y la tensión al aire el 0 % (el
+    al 0 % y al 100 %; las dos o ninguna, finitas y distintas (`NaN` e infinitos se rechazan). Para el suelo: la tensión en agua es el 100 % y la tensión al aire el 0 % (el
     sensor capacitivo baja con el agua: `escala_cien` < `escala_cero` es válido). El porcentaje es `100 × (v − cero) / (cien − cero)`,
     recortado a [0, 100]. Sirve para cualquier sensor que se lleve a porcentaje con una recta, no solo para el suelo. **Dónde se calcula:**
-    en la API de consulta, junto al valor crudo, y el panel lo muestra (código pendiente: entra con el cierre de HU-21). **Cada cuánto
+    en la API de consulta, junto al valor crudo, y el panel lo muestra: la ficha (`GET /dispositivos/{id}`) trae por canal
+    `escala_cero`, `escala_cien` y, en su última medición, `porcentaje`; el histórico (`GET /canales/{id}/historico`) trae `escala` y
+    `porcentajes`, uno por punto, calculado sobre cada promedio (en una recta, el % del promedio es el promedio de los %, salvo donde actúa
+    el recorte a [0, 100]). Sin calibración, `porcentaje` y `porcentajes` son `null`. Redondeo a una décima. Una sola función calcula
+    el % (`consulta/escala.ts`) y la usan las dos rutas. **Cada cuánto
     publica el nodo:** 60 s por ahora (constante del firmware) y el intervalo esperado del dispositivo es editable (`§4.4`); cambiarlo en
     remoto, con un comando del broker al nodo, exige que el dispositivo se suscriba a su subárbol de comandos (cambio de la ACL del rol
     `dispositivo`) y se diseña aquí antes de hacerlo.

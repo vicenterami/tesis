@@ -2,6 +2,7 @@ import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import type { FilaExportada } from './exportar';
 import { Pool } from 'pg';
 import { POOL } from '../db/db.module';
+import { porcentaje } from './escala';
 import { Intervalo } from './validacion';
 
 // Consultas de lectura. SQL explícito y parametrizado ($1, $2…): se lee, se audita, se explica.
@@ -43,6 +44,7 @@ export class ConsultaService {
 
     const canales = await this.pool.query(`
       SELECT c.id, c.magnitud_codigo AS magnitud, m.nombre AS magnitud_nombre, m.unidad_canonica AS unidad, c.etiqueta,
+             c.escala_cero, c.escala_cien,
              (SELECT json_agg(json_build_object('id', r.id, 'umbral_alto', r.umbral_alto, 'umbral_bajo', r.umbral_bajo, 'histeresis', r.histeresis))
                 FROM regla_umbral r WHERE r.canal_id = c.id) AS reglas,
              (SELECT json_build_object('valor', x.valor, 'tiempo', iso_utc(x.tiempo)) FROM medicion x
@@ -54,20 +56,26 @@ export class ConsultaService {
       SELECT id, tipo, regla_id, abierta_en, cerrada_en FROM condicion
        WHERE dispositivo_id = $1 AND cerrada_en IS NULL ORDER BY abierta_en DESC`, [id]);
 
-    return { ...d.rows[0], canales: canales.rows, condiciones_abiertas: condiciones.rows };
+    // El % de la última medición, con la calibración del canal (punto 51); sin calibración, null.
+    const conPorcentaje = canales.rows.map((k: { escala_cero: number | null; escala_cien: number | null; ultima_medicion: { valor: number } | null }) => ({
+      ...k,
+      ultima_medicion: k.ultima_medicion && { ...k.ultima_medicion, porcentaje: porcentaje(k.ultima_medicion.valor, k.escala_cero, k.escala_cien) },
+    }));
+    return { ...d.rows[0], canales: conPorcentaje, condiciones_abiertas: condiciones.rows };
   }
 
   // Histórico agregado por la base de datos con time_bucket EN LA ZONA DEL SITIO (docs/13, regla 4).
   // Devuelve el formato columnar que uPlot consume directo: tiempos en segundos Unix y valores.
   // Rango semiabierto [desde, hasta) — regla 8.
   async historico(canalId: string, desde: Date, hasta: Date, intervalo: Intervalo) {
-    const c = await this.pool.query<{ zona_horaria: string; magnitud: string; unidad: string }>(`
-      SELECT s.zona_horaria, c.magnitud_codigo AS magnitud, m.unidad_canonica AS unidad
+    const c = await this.pool.query<{ zona_horaria: string; magnitud: string; unidad: string; escala_cero: number | null; escala_cien: number | null }>(`
+      SELECT s.zona_horaria, c.magnitud_codigo AS magnitud, m.unidad_canonica AS unidad, c.escala_cero, c.escala_cien
         FROM canal c JOIN magnitud m ON m.codigo = c.magnitud_codigo
         JOIN dispositivo d ON d.id = c.dispositivo_id JOIN zona z ON z.id = d.zona_id JOIN sitio s ON s.id = z.sitio_id
        WHERE c.id = $1`, [canalId]);
     if (!c.rows[0]) throw new NotFoundException('canal no encontrado');
-    const { zona_horaria, magnitud, unidad } = c.rows[0];
+    const { zona_horaria, magnitud, unidad, escala_cero, escala_cien } = c.rows[0];
+    const calibrado = escala_cero !== null && escala_cien !== null;
 
     // El intervalo viene de una lista cerrada (validacion.ts), por eso puede ir como parámetro ::interval.
     const r = await this.pool.query<{ t: string; v: number; n: number }>(`
@@ -84,6 +92,9 @@ export class ConsultaService {
       tiempos: r.rows.map((x) => Number(x.t)),
       valores: r.rows.map((x) => x.v),
       muestras: r.rows.map((x) => x.n),
+      // Punto 51: el % de cada promedio, con la calibración del canal; sin calibración, null (no un arreglo de nulos).
+      escala: calibrado ? { cero: escala_cero, cien: escala_cien } : null,
+      porcentajes: calibrado ? r.rows.map((x) => porcentaje(x.v, escala_cero, escala_cien)) : null,
     };
   }
 

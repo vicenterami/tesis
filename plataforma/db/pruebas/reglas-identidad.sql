@@ -7,7 +7,7 @@ SET LOCAL lock_timeout = '2s';
 SET LOCAL statement_timeout = '10s';
 CREATE TEMP TABLE resultado (orden int, linea text) ON COMMIT DROP;
 DO $$
-DECLARE s uuid; z uuid; restriccion text; f text;
+DECLARE s uuid; z uuid; restriccion text; f text; filas int;
 BEGIN
   SELECT id INTO s FROM sitio ORDER BY id LIMIT 1;
   SELECT id INTO z FROM zona WHERE sitio_id = s ORDER BY id LIMIT 1;
@@ -177,11 +177,37 @@ BEGIN
     GET STACKED DIAGNOSTICS restriccion = CONSTRAINT_NAME;
     INSERT INTO resultado VALUES (21, CASE WHEN restriccion = 'ck_canal_escala' THEN 'OK    calibración con el 0 % igual al 100 %: rechazada'
       ELSE 'FALLA calibración degenerada rechazada por otra regla: ' || restriccion END);
+  WHEN OTHERS THEN  -- p. ej. si el caso 20 dejó su fila por una regresión: el canal es único por dispositivo y magnitud
+    INSERT INTO resultado VALUES (21, 'FALLA calibración degenerada: error inesperado: ' || SQLERRM);
+  END;
+  BEGIN
+    INSERT INTO canal (dispositivo_id, magnitud_codigo, escala_cero, escala_cien)
+      SELECT id, 'humedad_suelo', 'NaN', 1.20 FROM dispositivo WHERE id_fisico = 'prueba-identidad-d';
+    INSERT INTO resultado VALUES (23, 'FALLA se aceptó una calibración con NaN');
+  EXCEPTION WHEN check_violation THEN
+    GET STACKED DIAGNOSTICS restriccion = CONSTRAINT_NAME;
+    INSERT INTO resultado VALUES (23, CASE WHEN restriccion = 'ck_canal_escala' THEN 'OK    calibración con NaN: rechazada'
+      ELSE 'FALLA calibración con NaN rechazada por otra regla: ' || restriccion END);
+  WHEN OTHERS THEN
+    INSERT INTO resultado VALUES (23, 'FALLA calibración con NaN: error inesperado: ' || SQLERRM);
+  END;
+  BEGIN
+    INSERT INTO canal (dispositivo_id, magnitud_codigo, escala_cero, escala_cien)
+      SELECT id, 'humedad_suelo', 2.65, '-Infinity' FROM dispositivo WHERE id_fisico = 'prueba-identidad-d';
+    INSERT INTO resultado VALUES (24, 'FALLA se aceptó una calibración infinita');
+  EXCEPTION WHEN check_violation THEN
+    GET STACKED DIAGNOSTICS restriccion = CONSTRAINT_NAME;
+    INSERT INTO resultado VALUES (24, CASE WHEN restriccion = 'ck_canal_escala' THEN 'OK    calibración con un infinito: rechazada'
+      ELSE 'FALLA calibración infinita rechazada por otra regla: ' || restriccion END);
+  WHEN OTHERS THEN
+    INSERT INTO resultado VALUES (24, 'FALLA calibración infinita: error inesperado: ' || SQLERRM);
   END;
   BEGIN
     INSERT INTO canal (dispositivo_id, magnitud_codigo, escala_cero, escala_cien)
       SELECT id, 'humedad_suelo', 2.65, 1.20 FROM dispositivo WHERE id_fisico = 'prueba-identidad-d';
-    INSERT INTO resultado VALUES (22, 'OK    calibración del suelo (0 % al aire 2,65 V, 100 % en agua 1,20 V): aceptada');
+    GET DIAGNOSTICS filas = ROW_COUNT;  -- un INSERT … SELECT sin filas no da error: se exige que haya insertado una
+    INSERT INTO resultado VALUES (22, CASE WHEN filas = 1 THEN 'OK    calibración del suelo (0 % al aire 2,65 V, 100 % en agua 1,20 V): aceptada'
+      ELSE 'FALLA la calibración legítima no insertó ninguna fila' END);
   EXCEPTION WHEN OTHERS THEN
     INSERT INTO resultado VALUES (22, 'FALLA se rechazó una calibración legítima: ' || SQLERRM);
   END;

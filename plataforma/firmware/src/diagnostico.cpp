@@ -88,8 +88,8 @@ void loop() {
   }
   sondas.requestTemperatures();
   const float tSuelo = sondas.getTempCByIndex(0);
-  if (tSuelo == DEVICE_DISCONNECTED_C) Serial.print(" | suelo: sin sonda (¿falta la resistencia de 4,7 kΩ a 3V3?)");
-  else if (tSuelo == DS18B20_ARRANQUE_C) Serial.print(" | suelo: 85,00 °C = valor de arranque, sin conversión (¿alimentación débil?)");
+  if (tSuelo == DEVICE_DISCONNECTED_C) Serial.print(" | suelo: sin lectura válida (sonda ausente o error de CRC: ¿falta la resistencia de 4,7 kΩ a 3V3?)");
+  else if (tSuelo == DS18B20_ARRANQUE_C) Serial.print(" | suelo: 85,00 °C: o el valor de arranque, sin conversión (¿alimentación débil?), o de verdad 85 °C");
   else Serial.printf(" | suelo: %.2f °C", tSuelo);
   uint32_t suma = 0;
   for (int i = 0; i < 16; i++) suma += analogReadMilliVolts(PIN_SUELO);
