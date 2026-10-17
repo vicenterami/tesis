@@ -55,7 +55,7 @@
     },
     "/dispositivos": {
       "get": {
-        "description": "Cada dispositivo con su sitio, zona horaria, canales, `en_linea` (última trama hace menos de 2 × intervalo esperado) y número de condiciones abiertas.",
+        "description": "Cada dispositivo con su sitio y zona (nombres, y `sitio_codigo` y `zona_id` para filtrar: los nombres pueden repetirse), zona horaria, canales, `en_linea` (última trama hace menos de 2 × intervalo esperado) y número de condiciones abiertas.",
         "operationId": "DispositivosController_listar",
         "parameters": [],
         "responses": {

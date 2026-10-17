@@ -1,5 +1,6 @@
-// Lo que devuelve la API (plataforma/backend/openapi.json y consulta.service.ts) y lo que emite el canal en vivo
-// (eventos.service.ts). Los nombres son los de las columnas: el panel no renombra nada.
+// Lo que devuelve la API (consulta.service.ts: la forma la fijan sus consultas; openapi.json describe las rutas pero no el cuerpo de
+// cada respuesta) y lo que emite el canal en vivo (eventos.service.ts). Los nombres son los de las columnas: el panel no renombra nada.
+// El panel y la API van siempre juntos (el backend sirve el panel desde la misma imagen): no se tolera un backend de otra versión.
 export type EstadoAdministrativo = 'activo' | 'mantenimiento' | 'baja';
 export type TipoCondicion = 'sin_comunicacion' | 'umbral' | 'bateria' | 'manipulacion';
 
@@ -22,6 +23,9 @@ export interface DispositivoInventario {
   zona: string;
   sitio: string;
   zona_horaria: string;
+  // Para filtrar (docs/19 P2): únicos, a diferencia de los nombres.
+  sitio_codigo: string;
+  zona_id: string;
   condiciones_abiertas: number;
   canales: CanalResumen[];
 }

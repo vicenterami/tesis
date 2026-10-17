@@ -18,7 +18,7 @@ export class DispositivosController {
 
   // Inventario con estado: base de la vista "salud del sitio" (HU-19).
   @Get()
-  @ApiOperation({ summary: 'Inventario de dispositivos con estado', description: 'Cada dispositivo con su sitio, zona horaria, canales, `en_linea` (última trama hace menos de 2 × intervalo esperado) y número de condiciones abiertas.' })
+  @ApiOperation({ summary: 'Inventario de dispositivos con estado', description: 'Cada dispositivo con su sitio y zona (nombres, y `sitio_codigo` y `zona_id` para filtrar: los nombres pueden repetirse), zona horaria, canales, `en_linea` (última trama hace menos de 2 × intervalo esperado) y número de condiciones abiertas.' })
   @ApiOkResponse({ description: 'Lista de dispositivos' })
   listar() { return this.consulta.dispositivos(); }
 

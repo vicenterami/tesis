@@ -9,12 +9,12 @@ const AHORA = new Date('2026-10-12T15:00:00Z');
 const base = (p: Partial<DispositivoInventario>): DispositivoInventario => ({
   id: '00000000-0000-4000-8000-000000000001', id_fisico: 'dev-0001', nombre: 'Sensor', estado: 'activo', via: 'mqtt',
   formato: 'senml', intervalo_esperado_s: 60, visto_por_ultima_vez: '2026-10-12T14:59:30Z', en_linea: true, zona: 'Lab',
-  sitio: 'Campus', zona_horaria: 'America/Santiago', condiciones_abiertas: 0, canales: [], ...p,
+  sitio: 'Campus', sitio_codigo: 'uct', zona_id: 'z-lab', zona_horaria: 'America/Santiago', condiciones_abiertas: 0, canales: [], ...p,
 });
 const dispositivos: DispositivoInventario[] = [
   base({ id: '00000000-0000-4000-8000-000000000001', nombre: 'Invernadero', id_fisico: 'dev-0001' }),
   base({ id: '00000000-0000-4000-8000-000000000002', nombre: 'Bodega', id_fisico: 'dev-0002', estado: 'mantenimiento', condiciones_abiertas: 1 }),
-  base({ id: '00000000-0000-4000-8000-000000000003', nombre: 'Pozo', id_fisico: 'dev-0003', visto_por_ultima_vez: '2026-10-12T14:00:00Z', en_linea: false, zona: 'Terreno' }),
+  base({ id: '00000000-0000-4000-8000-000000000003', nombre: 'Pozo', id_fisico: 'dev-0003', visto_por_ultima_vez: '2026-10-12T14:00:00Z', en_linea: false, zona: 'Terreno', zona_id: 'z-terreno' }),
   base({ id: '00000000-0000-4000-8000-000000000004', nombre: 'Azotea', id_fisico: 'dev-0004', condiciones_abiertas: 1, via: 'http' }),
 ];
 let abiertas: Condicion[] = [
@@ -86,7 +86,7 @@ describe('Inventario (P2): semáforo, orden y filtros leídos del DOM', () => {
     via.value = '';
     via.dispatchEvent(new Event('change'));
     const zona = screen.getByLabelText('Zona') as HTMLSelectElement;
-    zona.value = 'Terreno';
+    zona.value = 'z-terreno';
     zona.dispatchEvent(new Event('change'));
     await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(2));
     expect(screen.getAllByRole('row')[1]!.textContent).toContain('Pozo');
@@ -104,6 +104,50 @@ describe('Inventario (P2): semáforo, orden y filtros leídos del DOM', () => {
     expect(celda.getAttribute('title')).toContain('(2026-10-12T14:00:00.000Z UTC)');
   });
 
+  it('con un solo sitio no aparecen ni el filtro por sitio ni la columna Sitio (no informan nada)', async () => {
+    render(Inventario);
+    await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(5));
+    expect(screen.queryByLabelText('Sitio')).toBeNull();
+    expect(screen.queryByRole('columnheader', { name: 'Sitio' })).toBeNull();
+  });
+  it('varios sitios (docs/19 P2): filtro por sitio y columna; dos sedes con una zona del mismo nombre no se confunden', async () => {
+    // Una segunda sede con una zona que también se llama «Lab»: se distingue por su id, no por el nombre.
+    const conNorte = [...dispositivos, base({ id: '00000000-0000-4000-8000-000000000005', nombre: 'Estación norte', id_fisico: 'nor-0001', sitio: 'Sede Norte', sitio_codigo: 'norte', zona_id: 'z-lab-norte' })];
+    vi.stubGlobal('fetch', vi.fn(async (ruta: string) => (ruta === '/dispositivos' ? new Response(JSON.stringify(conNorte)) : ruta.startsWith('/condiciones') ? new Response(JSON.stringify(abiertas)) : new Response('', { status: 404 }))));
+    render(Inventario);
+    await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(6));
+    expect(screen.getByRole('columnheader', { name: 'Sitio' })).toBeTruthy();
+    const zona = screen.getByLabelText('Zona') as HTMLSelectElement;
+    // Sin sitio elegido, cada zona lleva el nombre de su sitio: las dos «Lab» quedan distinguibles.
+    expect([...zona.options].map((o) => o.textContent)).toEqual(['todas', 'Campus · Lab', 'Campus · Terreno', 'Sede Norte · Lab']);
+    zona.value = 'z-lab'; // la «Lab» del campus
+    zona.dispatchEvent(new Event('change'));
+    await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(4)); // Invernadero, Bodega, Azotea; no la de la sede norte
+    expect(screen.queryByText('Estación norte')).toBeNull();
+    const sitio = screen.getByLabelText('Sitio') as HTMLSelectElement;
+    sitio.value = 'norte';
+    sitio.dispatchEvent(new Event('change'));
+    // La zona elegida no es de la sede norte: vuelve a «todas»; quedan solo los dispositivos de esa sede, y la zona sin prefijo.
+    await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(2));
+    expect(screen.getAllByRole('row')[1]!.textContent).toContain('Estación norte');
+    expect(zona.value).toBe('');
+    expect([...zona.options].map((o) => o.textContent)).toEqual(['todas', 'Lab']);
+    expect(document.querySelector('[data-visibles]')?.textContent).toBe('1 de 5');
+    // Combinado con la búsqueda: la sede norte y un texto que no está en ella → 0 de 5 y el vacío lo dice.
+    const buscar = screen.getByLabelText('Buscar') as HTMLInputElement;
+    buscar.value = 'Invernadero';
+    buscar.dispatchEvent(new Event('input'));
+    await waitFor(() => expect(document.querySelector('[data-visibles]')?.textContent).toBe('0 de 5'));
+    expect(screen.getByText('Ningún dispositivo coincide con el filtro.')).toBeTruthy();
+  });
+  it('dos sitios con el mismo nombre se distinguen por su código (el nombre no es único; el código sí)', async () => {
+    const gemelos = [base({}), base({ id: '00000000-0000-4000-8000-000000000009', nombre: 'Otro', id_fisico: 'otr-0001', sitio_codigo: 'campus-2', zona_id: 'z-lab-2' })];
+    vi.stubGlobal('fetch', vi.fn(async (ruta: string) => (ruta === '/dispositivos' ? new Response(JSON.stringify(gemelos)) : ruta.startsWith('/condiciones') ? new Response(JSON.stringify(abiertas)) : new Response('', { status: 404 }))));
+    render(Inventario);
+    await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(3));
+    const sitio = screen.getByLabelText('Sitio') as HTMLSelectElement;
+    expect([...sitio.options].map((o) => o.textContent)).toEqual(['todos', 'Campus (uct)', 'Campus (campus-2)']);
+  });
   it('sin dispositivos: el vacío explica qué hacer; con error de la API: el mensaje trae la acción', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify([]))));
     render(Inventario);

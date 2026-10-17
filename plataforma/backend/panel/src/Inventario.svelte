@@ -17,7 +17,8 @@
   let canal = $state<EstadoCanal>('conectando');
   let motivoCanal = $state<string | undefined>(undefined);
   let filtroEstado = $state<EstadoVisual | null>(null);
-  let filtroZona = $state('');
+  let filtroSitio = $state(''); // código del sitio
+  let filtroZona = $state(''); // id de la zona
   let filtroVia = $state('');
   let busqueda = $state('');
 
@@ -35,12 +36,32 @@
       .sort(compararAtencion),
   );
   const conteo = $derived(conteoPorEstado(filas.map((f) => f.estado)));
-  const zonas = $derived([...new Set(dispositivos.map((d) => d.zona))].sort());
+  // Varios sitios (docs/19 P2): se filtra por el código del sitio y el id de la zona, nunca por el nombre (dos sedes pueden tener una
+  // zona con el mismo nombre); la zona se elige dentro del sitio elegido. Con un solo sitio, ni el filtro ni la columna aparecen.
+  const sitios = $derived(
+    [...new Map(dispositivos.map((d) => [d.sitio_codigo, d.sitio])).entries()].map(([codigo, nombre]) => ({ codigo, nombre })).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es')),
+  );
+  // El nombre de un sitio no es único (el código sí): si dos se llaman igual, se distinguen por su código (revisión del 16/10).
+  const nombreRepetido = $derived(new Set(sitios.filter((s, i) => sitios.findIndex((t) => t.nombre === s.nombre) !== i).map((s) => s.nombre)));
+  const rotuloSitio = (codigo: string, nombre: string): string => (nombreRepetido.has(nombre) ? `${nombre} (${codigo})` : nombre);
+  const variosSitios = $derived(sitios.length > 1);
+  const zonas = $derived(
+    [...new Map(dispositivos.filter((d) => filtroSitio === '' || d.sitio_codigo === filtroSitio).map((d) => [d.zona_id, { id: d.zona_id, nombre: d.zona, sitio: rotuloSitio(d.sitio_codigo, d.sitio) }])).values()]
+      .map((z) => ({ id: z.id, rotulo: variosSitios && filtroSitio === '' ? `${z.sitio} · ${z.nombre}` : z.nombre }))
+      .sort((a, b) => a.rotulo.localeCompare(b.rotulo, 'es')),
+  );
+  // Si se cambia de sitio y la zona elegida no es de ese sitio, la zona vuelve a «todas»; y si el sitio elegido ya no está en el
+  // inventario (se recargó al reconectar), el sitio también: un filtro sin su control a la vista ocultaría filas sin aviso.
+  $effect(() => {
+    if (filtroSitio !== '' && !sitios.some((s) => s.codigo === filtroSitio)) filtroSitio = '';
+    if (filtroZona !== '' && !zonas.some((z) => z.id === filtroZona)) filtroZona = '';
+  });
   const vias = $derived([...new Set(dispositivos.map((d) => d.via))].sort());
   const visibles = $derived(
     filas.filter((f) => {
       if (filtroEstado !== null && f.estado !== filtroEstado) return false;
-      if (filtroZona !== '' && f.d.zona !== filtroZona) return false;
+      if (filtroSitio !== '' && f.d.sitio_codigo !== filtroSitio) return false;
+      if (filtroZona !== '' && f.d.zona_id !== filtroZona) return false;
       if (filtroVia !== '' && f.d.via !== filtroVia) return false;
       const q = busqueda.trim().toLowerCase();
       return q === '' || f.d.nombre.toLowerCase().includes(q) || f.d.id_fisico.toLowerCase().includes(q);
@@ -123,7 +144,10 @@
 </ul>
 
 <div class="filtros">
-  <label>Zona <select bind:value={filtroZona}><option value="">todas</option>{#each zonas as z (z)}<option value={z}>{z}</option>{/each}</select></label>
+  {#if variosSitios}
+    <label>Sitio <select bind:value={filtroSitio}><option value="">todos</option>{#each sitios as s (s.codigo)}<option value={s.codigo}>{rotuloSitio(s.codigo, s.nombre)}</option>{/each}</select></label>
+  {/if}
+  <label>Zona <select bind:value={filtroZona}><option value="">todas</option>{#each zonas as z (z.id)}<option value={z.id}>{z.rotulo}</option>{/each}</select></label>
   <label>Vía <select bind:value={filtroVia}><option value="">todas</option>{#each vias as v (v)}<option value={v}>{v}</option>{/each}</select></label>
   <label>Buscar <input type="search" bind:value={busqueda} placeholder="nombre o identificador" /></label>
   <span data-visibles>{visibles.length} de {filas.length}</span>
@@ -146,7 +170,7 @@
       <thead>
         <tr>
           <th scope="col">Estado</th><th scope="col">Nombre</th><th scope="col">Identificador</th><th scope="col">Vía</th>
-          <th scope="col">Zona</th><th scope="col">Última trama</th><th scope="col">Condiciones abiertas</th>
+          {#if variosSitios}<th scope="col">Sitio</th>{/if}<th scope="col">Zona</th><th scope="col">Última trama</th><th scope="col">Condiciones abiertas</th>
         </tr>
       </thead>
       <tbody>
@@ -156,6 +180,7 @@
             <td><a href={`#/dispositivos/${f.d.id}`}>{f.d.nombre}</a></td>
             <td><code>{f.d.id_fisico}</code></td>
             <td>{f.d.via}</td>
+            {#if variosSitios}<td>{rotuloSitio(f.d.sitio_codigo, f.d.sitio)}</td>{/if}
             <td>{f.d.zona}</td>
             <td title={f.d.visto_por_ultima_vez === null ? '' : horaLocal(f.d.visto_por_ultima_vez, f.d.zona_horaria)}>
               {haceCuanto(f.d.visto_por_ultima_vez, ahora)}

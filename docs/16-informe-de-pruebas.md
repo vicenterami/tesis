@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 270 pruebas unitarias del backend y 49 del panel, sin matriz formal) y TT-32 (sensor físico);
+cubre todavía: TT-27 (contrato de trama: hoy 270 pruebas unitarias del backend y 52 del panel, sin matriz formal) y TT-32 (sensor físico);
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -856,7 +856,7 @@ Cada hallazgo se verificó en el código o en la fuente; los de código se plant
 
 En el informe: el plan B de R1 se activó el 7/10 (no el 8/10); el bloqueo de fila podía frenar la recepción hasta 5 s (el
 segundo medido era el tope de la prueba, §26); las conclusiones separan lo que se cumple de lo parcial; el verificador se cita
-por sus pasos (hoy 40) y las pruebas del panel (49) junto a las del backend; los documentos nombran los anexos en vez de citar una
+por sus pasos (hoy 40) y las pruebas del panel (52) junto a las del backend; los documentos nombran los anexos en vez de citar una
 letra que cambia al insertar uno. El guardián vigila esas cifras (paso 2w4) y sus pasos 2f2, 2w2 y 2w3 ya no pueden pasar sin
 revisar nada. **Banco:** 36 de 36, «LORAWAN OK».
 
@@ -864,7 +864,7 @@ revisar nada. **Banco:** 36 de 36, «LORAWAN OK».
 la limpieza (el tópico crudo queda en su columna de la cuarentena como evidencia); se suman a los rellenos los selectores de variación
 que faltaban; el informe dice ahora que el JSON del banco es el de la documentación oficial de ChirpStack v4 y de Milesight, no el
 que publica el ChirpStack del campus, todavía no probado; y el guardián busca el nombre del entrevistado también en el código.
-Total: 270 pruebas unitarias del backend y 49 del panel.
+Total: 270 pruebas unitarias del backend y 52 del panel.
 
 ## 36. La trama real de la pasarela del campus: sufijo nativo, perfil de decodificación y contador de trama (16/10/2026)
 
@@ -964,7 +964,7 @@ como unidad secundaria (RFC 8798); un emisor que mande `mV` se convierte (1/1000
 | ¿El panel lo muestra sin repetir la cuenta? | El evento `medicion` del canal en vivo trae `porcentaje`, calculado en la recepción con la misma función (prueba: calibración 0–50 y lectura 22,4 → 44,8 %); la ficha lo muestra junto al valor crudo solo si es un número, así un evento sin el campo no rompe la tarjeta (prueba del panel; plantado a mano el 16/10: si la ficha no copia el campo, falla) |
 
 **Lo que falta:** la ruta para editar la calibración, con su permiso (se concede cuando exista la ruta: mínimo
-privilegio) y la validación de que las escalas caigan en el rango de la magnitud. **Pruebas:** 270 unitarias del backend y 49 del panel.
+privilegio) y la validación de que las escalas caigan en el rango de la magnitud. **Pruebas:** 270 unitarias del backend y 52 del panel.
 
 ## 39. La ficha del dispositivo en un navegador real (16/10/2026)
 
@@ -995,5 +995,26 @@ ignoraba: la prueba publica ahora con milisegundos. **Del guardián:** contaba c
 regular (50 en vez de 49); corregido. Y no revisaba la sintaxis de los guiones: una línea de comentario sin `#` dejó `banco.sh` sin
 interpretarse y solo lo delató la siguiente corrida; desde ahora el paso 2y2 corre `bash -n` sobre cada guion (plantado uno roto: falla).
 **De la revisión del tramo:** si la publicación fallaba con el backend detenido, el banco quedaba con el backend apagado (ahora se
-arranca siempre); las comprobaciones del estado en vivo y de la leyenda se acotan a su elemento. **Pruebas:** 270 del backend y 49 del panel.
+arranca siempre); las comprobaciones del estado en vivo y de la leyenda se acotan a su elemento. **Pruebas:** 270 del backend y 52 del panel.
+
+## 40. El inventario con varios sitios (16/10/2026)
+
+**Qué cambió** (`docs/19` P2; cierra HU-20). `GET /dispositivos` y `GET /dispositivos/{id}` entregan también el código del sitio y el
+id de la zona; el inventario filtra por ellos, nunca por el nombre, porque dos sedes pueden tener una zona con el mismo nombre. Con más
+de un sitio aparecen el filtro por sitio y la columna Sitio, y la zona se elige dentro del sitio elegido (si se cambia de sitio y la
+zona no es de él, vuelve a «todas»). Con un solo sitio no aparecen: no informan nada.
+
+| Comprobación | Resultado |
+|---|---|
+| Un solo sitio: ni filtro ni columna | ✅ (prueba del panel) |
+| Dos sedes con una zona «Lab» cada una: sin sitio elegido, las zonas se distinguen por su sitio («Campus · Lab», «Sede Norte · Lab»); elegir la del campus no trae la de la otra sede; al cambiar a la otra sede, la zona vuelve a «todas» y solo quedan sus dispositivos | ✅ (prueba del panel) |
+| Combinado con la búsqueda, el conteo «N de M» dice lo que queda (1 de 5; con un texto ajeno, 0 de 5 y el vacío lo explica) | ✅ (prueba del panel) |
+| Dos sitios con el mismo nombre (el nombre no es único; el código sí) se distinguen por su código: «Campus (uct)», «Campus (campus-2)» | ✅ (prueba del panel) |
+| Si el sitio elegido desaparece del inventario al recargar, el filtro vuelve a «todos» (un filtro sin su control a la vista ocultaría filas) | ✅ (código; revisión del 16/10) |
+| Plantado: agrupar las zonas por nombre en vez de por id | la prueba de varios sitios falla |
+| Contra la base del banco: una segunda sede con una zona «Emulados» y un dispositivo | la API entrega las dos zonas con el mismo nombre y distinto id, y la ficha trae su sitio y su zona |
+
+**Pruebas:** 270 del backend y 52 del panel. **Un tropiezo de la medición:** el primer intento de crear la sede falló porque `zona` no
+tiene `creado_en` (se supuso sin mirar el esquema); el segundo, porque la extracción del id tomó la línea de guiones del encabezado de
+`psql`. Ninguno era del sistema.
 
