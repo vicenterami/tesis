@@ -12,14 +12,17 @@
 #   bash plataforma/pruebas/banco/banco.sh migraciones         reaplica las migraciones 02 a la última y exige el mismo esquema y catálogo (idempotencia; corre al final de «encender»)
 #   bash plataforma/pruebas/banco/banco.sh puente [ip]         puente de Mosquitto como el de la red del campus: su broker reenvía el tópico nativo por TLS al proxy → medicion
 #                                                              (con «ip», por dirección IP, como en la red del campus: certificado con CA_IP_EXTRA y proxy publicado solo en esa IP)
-#   bash plataforma/pruebas/banco/banco.sh http                recepción por HTTP (HU-01): 202, 401, 413, 415, 422 con cuarentena, la baja, los dos topes por petición y la dirección tras el proxy
+#   bash plataforma/pruebas/banco/banco.sh http                recepción por HTTP (HU-01): 202, 401, 413, 415, 422 con cuarentena, la baja, los topes (par, dirección, caché, ritmo) y la dirección con el secreto del proxy
+#   bash plataforma/pruebas/banco/banco.sh tope                tope por emisor en las dos vías (docs/10 §8.4 punto 53): presupuesto de lecturas por HTTP y cuota de cuarentena por MQTT
 #   bash plataforma/pruebas/banco/banco.sh navegador           pantalla P3 en Firefox real con Playwright: puntos contra /historico, vivo sin recargar, caída y vuelta (docs/16 §39)
 #   bash plataforma/pruebas/banco/banco.sh cola                cola del broker vigilada: backend detenido + 200 emulados → descartes → condición broker_descarte (docs/16 §22)
 #   bash plataforma/pruebas/banco/banco.sh estado | logs [servicio] | sql ["CONSULTA"]
 #   bash plataforma/pruebas/banco/banco.sh apagar              baja todo; los datos estaban en RAM, no queda nada
 # Credenciales: de descarte, generadas en cada «encender» y escritas fuera del repo, en una carpeta propia con permisos 700,
 # nunca impresas. El broker del banco corre el mismo plugin de seguridad que el real (docs/10 §8.4 punto 42) y deja publicar
-# a los anónimos (los emulados). Requiere pnpm en plataforma/backend (el emulador corre en el host).
+# a los anónimos (los emulados). Requiere pnpm en plataforma/backend (el emulador corre en el host). Límite aceptado (17/10):
+# mosquitto_pub recibe la clave por argumento (-P) dentro de su contenedor, visible en «ps» del equipo unos segundos; son
+# credenciales de descarte, y el cliente no sabe leerla de la entrada estándar.
 set -u
 YO="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"   # ruta absoluta: sigue valiendo tras el cd (lección de pila.sh)
 cd "$(dirname "$0")/../.."                 # plataforma/
@@ -46,7 +49,7 @@ case "${1:-}" in
       echo "MQTT_BACKEND_CLAVE=$(openssl rand -base64 24)"; echo "MQTT_SONDA_USUARIO=sonda"; echo "MQTT_SONDA_CLAVE=$(openssl rand -base64 24)"
       echo "MQTT_ADMIN_CLAVE=$(openssl rand -base64 24)"; echo "HTTP_CLAVE_ADMIN=$(openssl rand -base64 24)"   # administrador del plugin y clave del alta (docs/10 §8.4 punto 41)
       # capa TLS opcional (banco.sh proxy): puertos +1 y certificados de desarrollo
-      echo "PROXY_IP_PERSONAS=127.0.0.1"; echo "PROXY_IP_DISPOSITIVOS=127.0.0.1"; echo "PROXY_HTTPS=8443"; echo "PROXY_MQTTS=8884"; echo "PROXY_HTTP=8081"; echo "PROXY_CERTS=$CERTS"; } > "$ENV"
+      echo "PROXY_SECRETO=$(openssl rand -base64 24)"; echo "PROXY_IP_PERSONAS=127.0.0.1"; echo "PROXY_IP_DISPOSITIVOS=127.0.0.1"; echo "PROXY_HTTPS=8443"; echo "PROXY_MQTTS=8884"; echo "PROXY_HTTP=8081"; echo "PROXY_CERTS=$CERTS"; } > "$ENV"
     DYN_ADMIN=$(leer MQTT_ADMIN_CLAVE)
     # Primero la base y el broker solos: el backend espera a que el broker esté sano, y no lo estará hasta que exista la sonda.
     dc up -d timescaledb mosquitto || exit 1
@@ -70,6 +73,8 @@ case "${1:-}" in
     tail -1 "$PRIV/rol-app.txt"; rm -f "${PRIV:?}/rol-app.txt"
     echo "esperando «healthy» (máx. 90 s)…"
     for _ in $(seq 1 30); do [ -z "$(dc ps --format '{{.Status}}' | grep -v '(healthy)')" ] && break; sleep 3; done
+    # Sin NET_RAW (docs/10 §8.4 punto 52; 17/10): se lee del contenedor en marcha, no del archivo. El backend suelta todas.
+    for s in timescaledb mosquitto backend; do caps=$(dc ps -q "$s" | xargs -r docker inspect -f '{{.HostConfig.CapDrop}}'); [[ "$caps" == *NET_RAW* || "$caps" == *ALL* ]] && echo "OK    $s sin NET_RAW (cap_drop $caps)" || echo "FALLA $s conserva NET_RAW (cap_drop $caps)"; done
     bash "$YO" estado
     n="${2:-100}"
     emu semilla --dispositivos "$n" --intervalo-factor "${3:-2}" | psql_ -q && echo "sembrados $n dispositivos emulados (emu-0001…emu-$(printf '%04d' "$n")), intervalo = periodo × ${3:-2}"
@@ -544,24 +549,41 @@ case "${1:-}" in
     head -c 70000 /dev/zero | tr '\0' 'a' > "$PRIV/grande.txt"
     r=$(printf 'Authorization: Bearer %s\n' "$TK" | curl -s -m 10 -w '\n%{http_code}' -H @- -H 'Content-Type: text/plain' --data-binary @"$PRIV/grande.txt" "http://127.0.0.1:3001/recepcion/$hid"); rm -f "$PRIV/grande.txt"
     [ "$(codigo "$r")" = 413 ] && ok "más de 64 KiB → 413 (el tope del broker)" || falla "grande: $(codigo "$r")"
+    r=$(printf 'Authorization: Bearer %s\n' "$TK" | curl -s -m 10 -w '\n%{http_code}' -H @- -H 'Content-Type: application/json' -H 'Content-Encoding: gzip' --data-binary 'no-es-gzip' "http://127.0.0.1:3001/recepcion/$hid")
+    [ "$(codigo "$r")" = 400 ] && ok "un cuerpo que el lector no puede leer (Content-Encoding: gzip sin gzip) → 400" || falla "cuerpo ilegible: $(codigo "$r") $(cuerpo "$r" | cut -c1-120)"
     # La ruta en mayúsculas llega al mismo controlador (Express no distingue): el cuerpo debe llegar crudo igual, no vacío.
     sleep 1.1; r=$(printf 'Authorization: Bearer %s\n' "$TK" | curl -s -m 10 -w '\n%{http_code}' -H @- -H 'Content-Type: application/json' --data-binary "[{\"bn\":\"$hid\",\"bt\":$((t+10)),\"n\":\"temperatura\",\"u\":\"Cel\",\"v\":22}]" "http://127.0.0.1:3001/RECEPCION/$hid")
     [ "$(codigo "$r")" = 202 ] && [ "$(lec "$hid")" = 2 ] && ok "la ruta en mayúsculas → 202 con el cuerpo leído (el lector crudo no distingue mayúsculas)" || falla "mayúsculas: $(codigo "$r") $(cuerpo "$r")"
     # A través del proxy, la dirección que cuenta es la que ve el proxy: una dirección falsa en X-Forwarded-For no se cree.
     [ -f "$CERTS/ca.crt" ] || bash proxy/ca-desarrollo.sh "$CERTS"
     dcp up -d proxy >/dev/null 2>&1; for _ in $(seq 1 20); do [ "$(dcp ps --format '{{.Status}}' proxy | grep -c healthy)" = 1 ] && break; sleep 2; done
+    caps=$(dcp ps -q proxy | xargs -r docker inspect -f '{{.HostConfig.CapDrop}}'); [[ "$caps" == *NET_RAW* ]] && ok "el proxy corre sin NET_RAW (cap_drop $caps) y sano" || falla "el proxy conserva NET_RAW: $caps"
     curl -s -m 10 -o /dev/null --cacert "$CERTS/ca.crt" -H 'Authorization: Bearer xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' -H 'X-Forwarded-For: 203.0.113.7' -H 'Content-Type: application/json' -d '[]' "https://localhost:8443/recepcion/$hid"
     sleep 1; linea=$(dc logs --no-color --since 1m backend 2>/dev/null | grep 'recepción HTTP rechazada (401)' | tail -1)
     [ -n "$linea" ] && [[ "$linea" != *"203.0.113.7"* ]] && ok "por el proxy, una dirección falsa en X-Forwarded-For no se cree (el registro anota la que vio el proxy)" || falla "dirección tras el proxy: «${linea:0:160}»"
+    # La dirección del cliente con el secreto del proxy (punto 52): directo al backend, X-Forwarded-For solo se cree si viene con
+    # X-Proxy-Secreto; el registro de los 401 anota la dirección que se creyó (el secreto entra por la entrada estándar de curl).
+    printf 'X-Proxy-Secreto: %s\n' "$(leer PROXY_SECRETO)" | curl -s -m 10 -o /dev/null -H @- -H 'X-Forwarded-For: 203.0.113.9' -H 'Content-Type: application/json' -H 'Authorization: Bearer xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' -d '[]' "http://127.0.0.1:3001/recepcion/secreto-0001"
+    curl -s -m 10 -o /dev/null -H 'X-Forwarded-For: 203.0.113.8' -H 'Content-Type: application/json' -H 'Authorization: Bearer xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' -d '[]' "http://127.0.0.1:3001/recepcion/secreto-0002"
+    sleep 1; reg=$(dc logs --no-color --since 2m backend 2>/dev/null | grep 'rechazada (401)')
+    [[ "$reg" == *"401 desde 203.0.113.9"* ]] && [[ "$reg" != *"203.0.113.8"* ]] && ok "con el secreto del proxy se cree X-Forwarded-For (el registro anota 203.0.113.9); sin él, no (203.0.113.8 no aparece)" || falla "secreto del proxy: «${reg:0:300}»"
     # Mismo 401 para todo motivo: token malo, dispositivo desconocido, sin cabecera, y el token de otro dispositivo.
     c1=$(codigo "$(enviar xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx "$hid" application/json '[]')"); c2=$(codigo "$(enviar xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx nadie-0001 application/json '[]')")
     c3=$(curl -s -m 10 -o /dev/null -w '%{http_code}' -H 'Content-Type: application/json' -d '[]' "http://127.0.0.1:3001/recepcion/$hid"); c4=$(codigo "$(enviar "$TKP" "$hid" application/json '[]')")
     [ "$c1$c2$c3$c4" = 401401401401 ] && ok "token malo, dispositivo desconocido, sin cabecera y token de otro dispositivo → el mismo 401" || falla "401: $c1 $c2 $c3 $c4"
-    # Fallos desde la misma dirección hasta que llegue el bloqueo: debe llegar a más tardar en el quinto de la ventana (ya hay al menos
-    # cuatro arriba: no se supone cuántos había antes, el mismo backend pudo recibir otros). Bloqueada, ni el token bueno entra.
+    # (b) Bloqueo por par dirección + dispositivo (punto 52): fallos con el id del nodo http hasta el 429 (a más tardar en el quinto de la
+    # ventana; arriba ya hubo dos comprobados con ese id: el de sin cabecera no cuenta). Bloqueado el par, ni su token bueno entra; el vecino
+    # (el plano, misma dirección) sigue entrando.
     intentos=0; c=401; while [ "$c" = 401 ] && [ $intentos -lt 6 ]; do c=$(codigo "$(enviar xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx "$hid" application/json '[]')"); intentos=$((intentos+1)); done
-    sleep 1.1; c6=$(codigo "$(enviar "$TKP" "$pid?magnitud=humedad" text/plain '56.5')") # el plano sigue activo: su token es bueno
-    [ "$c" = 429 ] && [ $intentos -le 2 ] && [ "$c6" = 429 ] && ok "a los 5 fallos de autenticación la dirección queda bloqueada (429), incluso con el token bueno" || falla "bloqueo por fallos: $c tras $intentos intento(s) más; con el token bueno $c6"
+    c6=$(codigo "$(enviar "$TK" "$hid" application/json "$senml")")
+    sleep 1.1; c7=$(codigo "$(enviar "$TKP" "$pid?magnitud=humedad" text/plain '56.5')")
+    [ "$c" = 429 ] && [ $intentos -le 4 ] && [ "$c6" = 429 ] && [ "$c7" = 202 ] && ok "a los 5 fallos del par dirección + dispositivo, ese par queda bloqueado (429) incluso con su token bueno, y el vecino de la misma dirección sigue entrando (202)" || falla "bloqueo por par: $c tras $intentos intento(s) más; con el token bueno $c6; el vecino $c7"
+    # (c) Tope grueso por dirección: 50 fallos con identificadores distintos (5 por par; lo ya bloqueado no suma) bloquean 60 s las
+    # verificaciones con scrypt desde la dirección; el plano, con su token ya verificado (caché), sigue entrando sin scrypt.
+    for n2 in $(seq 1 10); do for _ in 1 2 3 4 5; do enviar xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx "fantasma-$n2" application/json '[]' >/dev/null; done; done
+    c8=$(codigo "$(enviar xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx fantasma-99 application/json '[]')")
+    sleep 1.1; c9=$(codigo "$(enviar "$TKP" "$pid?magnitud=humedad" text/plain '57.5')")
+    [ "$c8" = 429 ] && [ "$c9" = 202 ] && ok "a los 50 fallos desde la dirección, con cualquier identificador, las verificaciones con scrypt se bloquean (429); el token en caché sigue entrando (202)" || falla "tope grueso: identificador nuevo $c8; en caché $c9"
     # Los contadores viven en la memoria del proceso (docs/10 §8.4 punto 52): al reiniciar el backend, la dirección queda libre. Dado de
     # baja por la API, su token ya no entra (401, como cualquier otro motivo). Va al final: el backend ve una sola dirección para las
     # peticiones directas y las del proxy (la de la red de Docker, no 127.0.0.1), así que cada 401 de arriba cuenta para el bloqueo.
@@ -572,6 +594,55 @@ case "${1:-}" in
     k=$(dc logs --no-color --since 10m backend 2>/dev/null | grep -cF -f <(printf '%s\n' "${TK:-sin}" "${TKP:-sin}")); [ "$k" = 0 ] && ok "ningún token aparece en el registro del backend" || falla "un token aparece en el registro"
     unset TK TKP CLAVE
     echo; [ $fallos -eq 0 ] && echo "HTTP OK" || { echo "$fallos comprobación(es) con falla"; exit 1; } ;;
+  tope)
+    # Tope por emisor (docs/10 §8.4 punto 53; docs/16 §42), de punta a punta en las dos vías. Por HTTP, el presupuesto de lecturas de la
+    # hora: un dispositivo de 1 canal cada 86 400 s tiene 600 (el mínimo); una trama de 601 no cabe → 422 con el motivo, cuarentena «tope»
+    # y condición «tope_superado»; una chica sí cabe (la condición sigue abierta en la misma hora); la condición se cierra con la primera
+    # trama dentro del presupuesto de una hora posterior, que aquí se adelanta en la base. Por MQTT, la cuota de cuarentena: 62 tramas
+    # malformadas → 60 filas y 2 solo contadas. Los contadores se leen de estado_dispositivo (migración 19).
+    CLAVE=$(leer HTTP_CLAVE_ADMIN); fallos=0; n=$(date +%s | tail -c 5)
+    ok() { echo "OK    $1"; }; falla() { echo "FALLA $1"; fallos=$((fallos+1)); }
+    api() { local m=$1 r=$2; shift 2; printf 'X-Clave-Admin: %s\n' "$CLAVE" | curl -s -m 10 -w '\n%{http_code}' -X "$m" -H @- -H 'Content-Type: application/json' "$@" "http://127.0.0.1:3001$r"; }
+    json() { python3 -c "import sys,json; v=json.load(sys.stdin); print(eval(sys.argv[1]))" "$1"; }
+    enviar() { local tk=$1 id=$2 tipo=$3 cuerpo=$4; shift 4; printf 'Authorization: Bearer %s\n' "$tk" | curl -s -m 20 -w '\n%{http_code}' -H @- -H "Content-Type: $tipo" --data-binary "$cuerpo" "$@" "http://127.0.0.1:3001/recepcion/$id"; }
+    codigo() { printf '%s' "${1##*$'\n'}"; }; cuerpo() { printf '%s' "${1%$'\n'*}"; }
+    dc restart backend >/dev/null 2>&1; for _ in $(seq 1 30); do [ "$(dc ps --format '{{.Status}}' backend | grep -c healthy)" = 1 ] && break; sleep 2; done
+    zona=$(psql_ -tA -c "SELECT id FROM zona ORDER BY id LIMIT 1")
+    tid="tope-$n"; r=$(api POST /dispositivos -d "{\"id_fisico\":\"$tid\",\"nombre\":\"Nodo del tope\",\"zona_id\":\"$zona\",\"via\":\"http\",\"intervalo_esperado_s\":86400,\"canales\":[{\"magnitud\":\"temperatura\"}]}")
+    [ "$(codigo "$r")" = 201 ] || { echo "FALLA alta del dispositivo http → $(codigo "$r")"; exit 1; }
+    TK=$(json "v['conexion']['token']" <<<"$(cuerpo "$r")"); TUID=$(json "v['id']" <<<"$(cuerpo "$r")"); unset r
+    estado() { psql_ -tA -c "SELECT ventana_lecturas || '/' || ventana_cuarentena || '/' || ventana_sobre_tope || '/' || ventana_omitidas FROM estado_dispositivo WHERE dispositivo_id = '$1'"; }
+    abiertas() { curl -s "http://127.0.0.1:3001/condiciones?abiertas=true&dispositivo=$1" | json "','.join(sorted(c['tipo'] for c in v))"; }
+    bt=$(date +%s)
+    grande=$(python3 -c "import json,sys; bt=int(sys.argv[1]); print(json.dumps([{'bn':sys.argv[2],'bt':bt,'n':'temperatura','u':'Cel','v':20+(i%50)/10,'t':-i} for i in range(601)]))" "$bt" "$tid")
+    r=$(enviar "$TK" "$tid" application/senml+json "$grande")
+    [ "$(codigo "$r")" = 422 ] && [[ "$(cuerpo "$r")" == *"tope de 600 lecturas por hora superado: 0 ya aceptadas"* ]] && ok "601 lecturas contra un presupuesto de 600 (1 canal cada 86 400 s → el mínimo) → 422 con el motivo" || falla "601 lecturas: $(codigo "$r") $(cuerpo "$r" | cut -c1-200)"
+    q=$(psql_ -tA -c "SELECT motivo FROM cuarentena WHERE dispositivo_id = '$TUID' ORDER BY recibido_en DESC LIMIT 1"); [ "$q" = tope ] && ok "la trama quedó en cuarentena con motivo «tope»" || falla "motivo en cuarentena: «$q»"
+    a=$(abiertas "$TUID"); [ "$a" = tope_superado ] && ok "condición tope_superado abierta (GET /condiciones?abiertas=true)" || falla "condiciones abiertas: «$a»"
+    e=$(estado "$TUID"); [ "$e" = "0/1/1/0" ] && ok "estado_dispositivo: 0 lecturas, 1 en cuarentena, 1 sobre el tope, 0 omitidas" || falla "contadores: «$e»"
+    sleep 1.1; r=$(enviar "$TK" "$tid" application/senml+json "[{\"bn\":\"$tid\",\"bt\":$((bt+1)),\"n\":\"temperatura\",\"u\":\"Cel\",\"v\":21}]")
+    [ "$(codigo "$r")" = 202 ] && [ "$(abiertas "$TUID")" = tope_superado ] && ok "una trama chica sí cabe (202) y, en la misma hora, la condición sigue abierta" || falla "trama chica: $(codigo "$r"); abiertas «$(abiertas "$TUID")»"
+    sleep 1.1; r=$(enviar "$TK" "$tid" application/senml+json "$grande")
+    k=$(psql_ -tA -c "SELECT count(*) FROM condicion WHERE dispositivo_id = '$TUID' AND tipo = 'tope_superado'")
+    [ "$(codigo "$r")" = 422 ] && [ "$k" = 1 ] && [ "$(estado "$TUID")" = "1/2/2/0" ] && ok "otra grande → 422 otra vez, sin segunda condición; contadores 1/2/2/0" || falla "segunda grande: $(codigo "$r"); condiciones $k; contadores «$(estado "$TUID")»"
+    # Hora siguiente, adelantada en la base: la primera trama dentro del presupuesto cierra la condición y reemplaza los contadores.
+    psql_ -q -c "UPDATE estado_dispositivo SET ventana_inicio = ventana_inicio - interval '1 hour' WHERE dispositivo_id = '$TUID'"
+    sleep 1.1; r=$(enviar "$TK" "$tid" application/senml+json "[{\"bn\":\"$tid\",\"bt\":$((bt+2)),\"n\":\"temperatura\",\"u\":\"Cel\",\"v\":22}]")
+    ev=$(psql_ -tA -c "SELECT count(*) FROM evento WHERE dispositivo_id = '$TUID' AND tipo = 'condicion_cerrada' AND detalle->>'tipo' = 'tope_superado'")
+    [ "$(codigo "$r")" = 202 ] && [ "$(abiertas "$TUID")" = "" ] && [ "$ev" = 1 ] && [ "$(estado "$TUID")" = "1/0/0/0" ] && ok "en la hora siguiente, la primera trama que cabe cierra la condición (evento condicion_cerrada) y los contadores empiezan de cero: 1/0/0/0" || falla "cierre: $(codigo "$r"); abiertas «$(abiertas "$TUID")»; eventos de cierre $ev; contadores «$(estado "$TUID")»"
+    # Cuota de cuarentena por MQTT: alta de un dispositivo mqtt (senml), 62 tramas que no son JSON por su tópico.
+    mid="topemq-$n"; r=$(api POST /dispositivos -d "{\"id_fisico\":\"$mid\",\"nombre\":\"Nodo de la cuota\",\"zona_id\":\"$zona\",\"via\":\"mqtt\",\"intervalo_esperado_s\":60,\"canales\":[{\"magnitud\":\"temperatura\"}]}")
+    [ "$(codigo "$r")" = 201 ] || { echo "FALLA alta del dispositivo mqtt → $(codigo "$r")"; exit 1; }
+    CRED=$(json "v['conexion']['credencial']" <<<"$(cuerpo "$r")"); topico=$(json "v['conexion']['ejemplo']['topico']" <<<"$(cuerpo "$r")"); MUID=$(json "v['id']" <<<"$(cuerpo "$r")"); unset r
+    red=$(docker network ls --format '{{.Name}}' | grep '^banco_default$')
+    { printf '%s\n' "$CRED"; for i in $(seq 1 62); do echo "basura-$i"; done; } | docker run --rm -i --network "$red" "$IMG_BROKER" sh -c 'IFS= read -r C; mosquitto_pub -V mqttv5 -h mosquitto -q 1 -i "cuota-$$" -u "$1" -P "$C" -t "$2" -l' sh "$mid" "$topico"
+    for _ in $(seq 1 30); do [ "$(psql_ -tA -c "SELECT ventana_cuarentena + ventana_omitidas FROM estado_dispositivo WHERE dispositivo_id = '$MUID'")" = 62 ] && break; sleep 1; done
+    filas=$(psql_ -tA -c "SELECT count(*) FROM cuarentena WHERE dispositivo_id = '$MUID'"); e=$(estado "$MUID")
+    [ "$filas" = 60 ] && [ "$e" = "0/60/0/2" ] && ok "62 tramas malformadas por MQTT → 60 filas en cuarentena (la cuota de la hora) y 2 solo contadas: contadores 0/60/0/2" || falla "cuota por MQTT: $filas filas; contadores «$e»"
+    k=$(dc logs --no-color --since 5m backend 2>/dev/null | grep -c "cuota de 60 tramas por hora alcanzada"); [ "$k" = 1 ] && ok "el registro lo dice una sola vez (la primera omitida)" || falla "avisos de cuota en el registro: $k"
+    k=$(dc logs --no-color --since 10m backend 2>/dev/null | grep -cF -f <(printf '%s\n' "${TK:-sin}" "${CRED:-sin}")); [ "$k" = 0 ] && ok "ni el token ni la credencial aparecen en el registro del backend" || falla "un secreto aparece en el registro"
+    unset TK CRED CLAVE
+    echo; [ $fallos -eq 0 ] && echo "TOPE OK" || { echo "$fallos comprobación(es) con falla"; exit 1; } ;;
   navegador)
     # P3 en un navegador real (docs/19 §6 y §7; docs/16 §39). Playwright (dependencia de desarrollo del panel, versión fijada) maneja
     # Firefox; su navegador se descarga una vez a ~/.cache/ms-playwright (311 MB medidos el 16/10) con «playwright install», desde el servidor de Playwright, sin una

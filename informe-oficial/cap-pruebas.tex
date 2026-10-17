@@ -17,28 +17,28 @@ está hecho en un 54\,\% (sección~\ref{sec:seguimiento}).
 \textbf{Módulo} & \textbf{Implementado y probado} & \textbf{Falta} \\
 \midrule
 M1 Recepción & MQTT (con TLS) y HTTP, con credencial propia; LoRaWAN por la pasarela (ruta B) y el ChirpStack del campus (ruta C) & Terreno \\
-M2 Normalización & Seis filtros con cuarentena; formato declarado en el alta & Contrato formal (TT-27) \\
+M2 Normalización & Seis filtros con cuarentena; formato declarado en el alta; tope por emisor & Contrato formal (TT-27) \\
 M3 Registro & Alta, baja y rotación por API, todo o nada; pasarelas & Pantalla (Etapa~4) \\
 M4 Supervisión & Silencio según el intervalo esperado de cada uno & Batería; enlace \\
-M5 Series & TimescaleDB, 18 migraciones, API, CSV y JSON, canal en vivo & XLSX; rango a medida \\
+M5 Series & TimescaleDB, 19 migraciones, API, CSV y JSON, canal en vivo & XLSX; rango a medida \\
 M6 Alertas & Umbral con histéresis; alarma de la cola del broker & Notificación \\
-M7 Seguridad & Claves con hash, ACL por rol, mínimo privilegio & Sesión y roles \\
+M7 Seguridad & Claves con hash, ACL por rol, mínimo privilegio, sin \texttt{NET\_RAW} & Sesión y roles \\
 M8 Panel & Semáforo, inventario filtrable, ficha con gráfico & Sensor físico \\
 \bottomrule
 \end{tabular}
 \end{tablaseg}
-\caption{Estado de la implementación por módulo al 16 de octubre de 2026.}
+\caption{Estado de la implementación por módulo al 17 de octubre de 2026.}
 \label{tab:implementado}
 \end{table}
 
 \section{Método de prueba}
 
-Se prueba en cuatro niveles, todos repetibles con un comando. Las 291 pruebas unitarias del backend y las 52 del panel corren sin base ni broker,
+Se prueba en cuatro niveles, todos repetibles con un comando. Las 324 pruebas unitarias del backend y las 52 del panel corren sin base ni broker,
 junto con tipos estrictos y análisis estático: cada una fija una regla de diseño en forma ejecutable. \textbf{Banco
 desechable}: una segunda pila con base, broker con su plugin de seguridad, backend y proxy reales, datos en memoria y un
 emulador de nodos (TT-28) que imita relojes rotos, pérdidas y deriva; sobre él corren casos fijos de carga, carreras,
 caídas, TLS, alta por API, LoRaWAN y cola del broker. \textbf{Laboratorios de un solo uso}, para decidir entre
-alternativas antes de implementar. \textbf{Verificador de concordancia}: 41 pasos que comparan informe, documentación, base y API. Una prueba vale solo si falla ante la falla: cada comprobación nueva se ejecuta primero contra
+alternativas antes de implementar. \textbf{Verificador de concordancia}: 44 pasos que comparan informe, documentación, base y API. Una prueba vale solo si falla ante la falla: cada comprobación nueva se ejecuta primero contra
 el error \emph{plantado} (quitar la cláusula que evita duplicados hace caer la prueba de carrera).
 
 \section{Resultados frente a los requerimientos}

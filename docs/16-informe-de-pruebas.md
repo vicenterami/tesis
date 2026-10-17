@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 291 pruebas unitarias del backend y 52 del panel, sin matriz formal) y TT-32 (sensor físico);
+cubre todavía: TT-27 (contrato de trama: hoy 324 pruebas unitarias del backend y 52 del panel, sin matriz formal) y TT-32 (sensor físico);
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -357,21 +357,21 @@ al abrir una ficha; el inventario pasó de 44 a 23 KB comprimidos.
 | Comprobación | Resultado |
 |---|---|
 | 43 pruebas del panel (23 nuevas): ventana y URL del histórico por rango, series del gráfico (histórico agregado y lecturas en vivo aparte; inserción en orden; tope de 500 puntos en vivo que nunca borra el histórico), formato con coma decimal, forma de cada evento del canal (el latido trae solo `tiempo`), filtros del inventario por vía, zona y búsqueda | ✅ todas |
-| 11 por el DOM (jsdom; uPlot sustituido por un doble que registra los datos): la ficha muestra identidad, estado visual (condición abierta y en línea → «Alerta»), una tarjeta por canal con última lectura y umbrales; pide las condiciones abiertas completas y las recientes, y el histórico del primer canal con el rango por defecto (24 h, 15 minutos) que entrega al gráfico; condiciones abiertas primero; trama rechazada plegada; una medición en vivo actualiza la tarjeta y entra al gráfico en un lote de 250 ms, una de otro dispositivo se descarta y en pausa nada cambia; diez avisos de condición → una sola tanda de consultas (antirrebote); al reconectar tras una caída se repide la ficha y el histórico; un id inexistente → mensaje con la acción y sin gráfico | ✅ |
+| 11 por el DOM (jsdom; uPlot sustituido por un doble que registra los datos): la ficha muestra identidad, estado visual (condición abierta y en línea → «Alerta»), una tarjeta por canal con última lectura y umbrales; pide las condiciones abiertas completas y las recientes, y el histórico del primer canal con el rango por defecto (24 h, 15 minutos) que entrega al gráfico; condiciones abiertas primero; trama rechazada plegada; una medición en vivo actualiza la tarjeta y entra al gráfico en un lote de 250 ms, una de otro dispositivo se descarta y en pausa nada cambia; diez avisos de condición → una sola tanda de consultas (antirrebote); al reconectar tras una caída se repite la ficha y el histórico; un id inexistente → mensaje con la acción y sin gráfico | ✅ |
 | Humo de la API: condiciones filtradas por dispositivo (todas suyas), cuarentena filtrada, valores que no son UUID → 400; contrato servido igual al versionado | ✅ (4 casos nuevos) |
 | Imagen reconstruida; `panel-desarrollo.sh` completo (12 comprobaciones, incluida la terminación de Vite) | ✅ `PANEL OK` |
 | Ficha con datos reales de la pila de desarrollo (`curl`): canal de temperatura con su última lectura; 2 condiciones del dispositivo, todas suyas | ✅ |
 
 **Correcciones del tramo 2 (mismo día):** el lector del canal exigía `tipo` dentro de los datos y descartaba el
 latido; el inventario pedía las condiciones con el límite por defecto (50), insuficiente para el semáforo con muchas abiertas
-(ahora 500); al reconectar no se repedía nada (ahora inventario y ficha repiden todo); el guion mataba a `pnpm` y dejaba a Vite
+(ahora 500); al reconectar no se repetía nada (ahora inventario y ficha repiten todo); el guion mataba a `pnpm` y dejaba a Vite
 vivo en el 5173 (se vio con `ss`; ahora lanza el binario y comprueba el puerto); `.dockerignore` sin `**/` dejaba entrar
 `panel/.env` o una llave al contexto de build.
-**Correcciones de la revisión del tramo 3 (mismo día):** (1) el repedido al reconectar nunca se disparaba: el canal pasa por
+**Correcciones de la revisión del tramo 3 (mismo día):** (1) el repetido al reconectar nunca se disparaba: el canal pasa por
 «conectando» antes de «en vivo», así que comparar con el estado anterior no servía; ahora el canal avisa «reconectado» al abrir
 tras una caída y la prueba cubre la secuencia real; (2) la ficha pedía solo las 50 condiciones más recientes para decidir el
 estado: una `sin_comunicacion` vieja quedaba fuera tras 50 aperturas y cierres de umbral; ahora pide las abiertas completas
-(hasta 500) aparte de las recientes, y el inventario avisa si llega al tope; (3) cada aviso de condición repedía la lista y
+(hasta 500) aparte de las recientes, y el inventario avisa si llega al tope; (3) cada aviso de condición repetía la lista y
 cada lectura redibujaba el gráfico: antirrebote de 1 s con un solo vuelo y lotes de 250 ms; (4) un parámetro repetido
 (`?dispositivo=a&dispositivo=b`) llega como arreglo y daba 500: toda validación exige texto y responde 400 (4 pruebas, 2 casos
 de humo); (5) la ficha descarta eventos de otro dispositivo aunque el canal venga filtrado, y un `valor` infinito se rechaza;
@@ -874,11 +874,11 @@ nativo. Desde ahora: (i) el filtro 1 acepta también `sitio/<sitio>/pasarela/<id
 un puente de Mosquitto al cambiar el prefijo, y el alta de una pasarela `milesight` trae esa línea del puente; (ii) un nodo
 LoRaWAN puede declarar un perfil de decodificación (`dispositivo.decodificador`) y el adaptador decodifica `data` con él (primer
 perfil: `campus-heltec-v3-v1`; magnitud nueva `tension`, en V); (iii) en esa forma, `time` con zona es la marca del servidor de red;
-(iv) el filtro 3 descarta la trama que repite el `fCnt` de la última guardada del nodo (`estado_dispositivo.ultimo_fcnt`).
+(iv) el filtro 3 descarta la trama que repite el `fCnt` de la última guardada del nodo (`estado_dispositivo.ultimo_fcnt`); revisado el 17/10 (§42): el 0 y el ausente no se comparan, y una trama sin contador lo borra.
 
 | Pregunta | Medido o verificado | Consecuencia |
 |---|---|---|
-| ¿El perfil decodifica la trama real? | Sí: los 10 bytes de la captura, con los identificadores reemplazados por sintéticos, dan 18,16 °C, 65,52 % y 3,75 V con la marca `2026-10-15T15:34:56.340Z`; una temperatura bajo cero sale con signo (−5,25 °C) y la batería va de 2,00 a 4,55 V | Pruebas unitarias en `lorawan.spec.ts`; en el banco, las tres lecturas con origen `pasarela` |
+| ¿El perfil decodifica la trama real? | Sí: los 10 bytes de la captura, con los identificadores reemplazados por sintéticos, dan 18,16 °C, 65,52 % y 3,75 V con la marca `2026-10-15T15:34:56.340Z` (sintética, como los identificadores); una temperatura bajo cero sale con signo (−5,25 °C) y la batería va de 2,00 a 4,55 V | Pruebas unitarias en `lorawan.spec.ts`; en el banco, las tres lecturas con origen `pasarela` |
 | ¿Una `data` corrupta pasa como otros bytes? | No: `Buffer.from(…, 'base64')` ignora en silencio lo que no es base64, por eso se exige base64 estricto antes de decodificar; 9 bytes, sin relleno o con un espacio → `malformada` que lo dice, y el nodo se marca vivo (su DevEUI ya se verificó) | Probado en la unidad y en el banco |
 | ¿Sin perfil sigue el comportamiento anterior? | Sí: `malformada` «activar Payload Codec y Metadata…, o declarar el perfil de decodificación del nodo»; en ChirpStack sin `object`, lo mismo con su texto | Probado |
 | ¿La lista de perfiles del código es la del `CHECK`? | Una prueba lee la última migración que define `ck_dispositivo_decodificador` y compara; otra exige que cada lectura del perfil exista en el catálogo con su unidad canónica | Plantado: un perfil más en el código hace fallar las dos |
@@ -979,10 +979,10 @@ histórico tenga puntos y deja una captura en la carpeta privada del banco. Guio
 | Los puntos del gráfico (texto y gráfico) son los de `/historico` | ✅ |
 | La leyenda del tiempo dice «Hora» y el gráfico no trae am/pm ni «Time» en su texto | ✅ (el eje se dibuja en un lienzo y no se puede leer como texto: su formato de 24 h se revisó en la captura) |
 | Una trama publicada por MQTT aparece en su tarjeta sin recargar | ✅ |
-| Con el backend detenido, la ficha dice «reconectando»; al volver, muestra la lectura publicada durante la caída, repide el histórico (se ve la petición) y vuelve a «conectado» | ✅ |
+| Con el backend detenido, la ficha dice «reconectando»; al volver, muestra la lectura publicada durante la caída, repite el histórico (se ve la petición) y vuelve a «conectado» | ✅ |
 | Sin errores de JavaScript en la página | ✅ |
 
-Resultado: **9 de 9, «P3 NAVEGADOR OK»**, tres corridas seguidas (salidas guardadas fuera del repositorio). **Plantado:** sin el repedido al reconectar (reconstruida la imagen
+Resultado: **9 de 9, «P3 NAVEGADOR OK»**, tres corridas seguidas (salidas guardadas fuera del repositorio). **Plantado:** sin el repetido al reconectar (reconstruida la imagen
 del banco), fallan dos comprobaciones: la lectura de la caída no aparece y el histórico no se pide de nuevo.
 
 **Lo que trajo el navegador real**, que jsdom no muestra porque no dibuja: el eje del gráfico decía «9:30pm» y la leyenda «Time» (los
@@ -1012,7 +1012,7 @@ zona no es de él, vuelve a «todas»). Con un solo sitio no aparecen: no inform
 | Dos sitios con el mismo nombre (el nombre no es único; el código sí) se distinguen por su código: «Campus (uct)», «Campus (campus-2)» | ✅ (prueba del panel) |
 | Si el sitio elegido desaparece del inventario al recargar, el filtro vuelve a «todos» (un filtro sin su control a la vista ocultaría filas) | ✅ (código; revisión del 16/10) |
 | Plantado: agrupar las zonas por nombre en vez de por id | la prueba de varios sitios falla |
-| Contra la base del banco: una segunda sede con una zona «Emulados» y un dispositivo | la API entrega las dos zonas con el mismo nombre y distinto id, y la ficha trae su sitio y su zona |
+| Contra la base del banco: una segunda sede con una zona «Emulados» y un dispositivo (a mano, con `psql`; no la repite ningún guion) | la API entrega las dos zonas con el mismo nombre y distinto id, y la ficha trae su sitio y su zona |
 
 **Pruebas:** 270 del backend y 52 del panel. **Un tropiezo de la medición:** el primer intento de crear la sede falló porque `zona` no
 tiene `creado_en` (se supuso sin mirar el esquema); el segundo, porque la extracción del id tomó la línea de guiones del encabezado de
@@ -1036,6 +1036,7 @@ Los topes salen del costo medido en el portátil: 65 ms por verificación y 57 p
 | Una trama que no se entiende → 422 con el motivo, y a cuarentena con origen `http`; ninguna lectura válida (fuera de rango) → 422 | ✅ |
 | Formato plano con `?magnitud=` → 202 y la lectura en `medicion` | ✅ |
 | Un cuerpo que no es JSON ni texto → 415; más de 64 KiB → 413 | ✅ |
+| Un cuerpo que el lector no puede leer (`Content-Encoding: gzip` sin gzip) → 400 | ✅ |
 | La ruta en mayúsculas → 202 con el cuerpo leído (antes de la revisión llegaba vacío) | ✅ |
 | Por el proxy, una dirección falsa en `X-Forwarded-For` no se cree (el registro anota la que vio el proxy) | ✅ |
 | Token malo, dispositivo desconocido, sin cabecera y token de otro dispositivo → el mismo 401 | ✅ |
@@ -1063,3 +1064,63 @@ cuerpo a la URL, así que el `?magnitud=` del formato plano va escrito en la URL
 sin fallos, cuando las comprobaciones anteriores del 401 ya sumaban algunos (ahora envía hasta recibir el 429); y suponía que el backend
 ve 127.0.0.1, cuando ve una sola dirección de la red de Docker para las peticiones directas y las del proxy: una corrida dejaba fallos
 vivos para la siguiente, así que el caso reinicia el backend al empezar (los contadores viven en su memoria).
+
+## 42. Topes por emisor, dirección del cliente y lo que dejó la revisión del día anterior (17/10/2026)
+
+**Qué cambió** (`docs/10 §8.4` puntos 52 y 53; `docs/11 §3`; migración 19). En la vía HTTP: caché de verificaciones (un token ya
+verificado contra la misma huella no vuelve a pagar `scrypt`), bloqueo por par dirección + dispositivo (5 fallos en 60 s → 60 s), tope
+grueso por dirección (50 fallos en 60 s → 60 s solo para las verificaciones con `scrypt`), y la dirección del cliente creída de
+`X-Forwarded-For` solo con el secreto compartido del proxy (`X-Proxy-Secreto`); `trust proxy` apagado. En todas las vías: tope por
+emisor en `filtros2a6` (presupuesto de lecturas por hora, cuota de 60 tramas en cuarentena por dispositivo y hora, condición
+`tope_superado`, contadores persistentes en `estado_dispositivo`). En los cuatro contenedores, sin `NET_RAW`. Y la regla del contador de
+trama corregida (`docs/10 §4.1`): el 0 y el ausente no se comparan; una trama guardada sin contador lo borra; el contador avanza también
+cuando la reentrega encuentra las lecturas ya guardadas.
+
+| Comprobación (`banco.sh tope`, de punta a punta, en las dos vías) | Resultado |
+|---|---|
+| Dispositivo HTTP de 1 canal cada 86 400 s (presupuesto: el mínimo, 600); una trama SenML de 601 lecturas → 422 con el motivo («tope de 600 lecturas por hora superado: 0 ya aceptadas …») | ✅ |
+| La trama queda en cuarentena con motivo `tope`; la condición `tope_superado` aparece en `GET /condiciones?abiertas=true`; `estado_dispositivo`: 0 lecturas, 1 en cuarentena, 1 sobre el tope, 0 omitidas | ✅ |
+| Una trama chica sí cabe (202) y, en la misma hora, la condición sigue abierta; otra grande → 422 otra vez, sin segunda condición; contadores 1/2/2/0 | ✅ |
+| Hora siguiente (adelantada en la base): la primera trama que cabe cierra la condición (evento `condicion_cerrada`) y los contadores empiezan de cero: 1/0/0/0 | ✅ |
+| Por MQTT, 62 tramas malformadas de un dispositivo recién dado de alta → 60 filas en cuarentena y 2 solo contadas (0/60/0/2); el registro lo dice una sola vez | ✅ |
+| Ni el token ni la credencial aparecen en el registro del backend | ✅ |
+
+| Comprobación (`banco.sh http`, lo nuevo del 17/10; las 16 del 16/10 siguen en verde) | Resultado |
+|---|---|
+| Con el secreto del proxy se cree `X-Forwarded-For` (el registro anota la dirección presentada); sin el secreto, no | ✅ |
+| A los 5 fallos del par dirección + dispositivo, ese par queda bloqueado (429) incluso con su token bueno; el vecino de la misma dirección sigue entrando (202) | ✅ |
+| A los 50 fallos desde la dirección con identificadores distintos, las verificaciones con `scrypt` se bloquean (429); el dispositivo con el token en caché sigue entrando (202) | ✅ |
+| Los cuatro contenedores sanos sin `NET_RAW` (`banco.sh encender`); `lorawan` (44 de 44), `alta`, `puente` y `puente` por dirección en verde después de los cambios: la vía MQTT del martes no cambió | ✅ |
+
+| Pruebas unitarias | Resultado |
+|---|---|
+| Verificación con caché (`verificacion.spec.ts`): una sola `scrypt` para dos tramas; token equivocado de un dispositivo en caché → `scrypt` y no; rotación; otra vía, baja o sin credencial → no; inexistente → no con relleno; cupo lleno → saturado, liberado aunque la verificación lance; tope de entradas; pista por identificador | ✅ (9) |
+| Dirección del cliente (`direccion.spec.ts`): sin secreto → la del socket; con el secreto → la primera de `X-Forwarded-For`; distinto, de otro largo o ausente → la del socket, sin lanzar, y la cabecera queda marcada como ignorada | ✅ (4) |
+| Controlador: orden de comprobaciones, caché sin cupo ni bloqueo, par, tope grueso (lo ya bloqueado no suma; en caché pasa; una dirección bloqueada no consulta la base salvo con la pista), un 401 sin comprobar no cuenta, ritmo, 503 sin contar como fallo, secreto, `X-Forwarded-For` sin secreto anotada una vez, esquema `bearer`, registro saneado, aviso de arranque sin `PROXY_SECRETO` | ✅ (16) |
+| Tope por emisor (`recepcion.service.spec.ts` y `cuota.spec.ts`): presupuesto desde canales e intervalo, trama que no cabe rechazada entera con condición, las lecturas inválidas también consumen presupuesto, ventana nueva que cierra (y una que empieza sin lecturas, que deja el cierre al barrido), cuota de cuarentena, vía HTTP (y de a una por identificador), vía directa sin alta, vía de pasarela, DevEUI desconocido y las tres salidas sin DevEUI verificable con la cuota en memoria de la pasarela | ✅ (15) |
+| Supervisión (`supervision.service.spec.ts`): el barrido cierra una `tope_superado` cuando la fila de estado ya muestra una hora nueva dentro del presupuesto, con evento y aviso | ✅ (1) |
+| Contador de trama: el 0 tras una re-unión se guarda; sin contador se borra; con las lecturas ya guardadas avanza; rechazada entera no cambia | ✅ (2) |
+| Plantadas (catorce): presupuesto con `>=` · condición que no se abre · cuota que no se aplica · condición que no se cierra · caché ignorada · verificación que no recuerda · secreto sin comparar · las tres salidas de pasarela con la cuota del nodo · presupuesto solo por aceptadas · dirección bloqueada sin pista · barrido que no cierra · `X-Forwarded-For` ignorada sin aviso | cada una hace fallar su prueba |
+
+**Lo que dejó la revisión del 16/10** (una revisión independiente, sin el contexto del día; cada hallazgo se verificó en el archivo antes de corregir): el contador
+de trama 0 (arriba); `::FFFF:` en mayúsculas caía en otro cubo; el esquema `bearer` en minúsculas daba 401 (RFC 9110 lo admite); un conteo
+escrito a mano en la prueba de humo (12 rutas) quedó atrás con la ruta nueva; licencias del firmware incompletas (aviso de Dallas
+Semiconductor en OneWire, copyright real de Unified Sensor, seis identificadores en el SDK del núcleo); «compila sin avisos» cuando la
+biblioteca OneWire emite dos del preprocesador; marcas de tiempo de la captura real en pruebas y prosa, reemplazadas por sintéticas;
+erratas; un README con pendientes ya hechos. Dos hallazgos se descartaron: eran instantáneas fechadas de secciones anteriores.
+
+**Lo que dejó la revisión de cierre del 17/10** (tres miradas independientes sobre el trabajo del día; cada hallazgo verificado en el
+archivo y, los de lógica, reproducidos antes de corregir): por el tópico de una pasarela, las tramas sin DevEUI verificable salían antes
+de escribir la fila de estado y la cuota de cuarentena no se les aplicaba (ahora cuentan en la cuota en memoria de la pasarela); la
+condición `tope_superado` podía quedar abierta para siempre si la hora nueva empezaba con una trama sin lecturas (ahora la cierra el
+barrido); las lecturas inválidas no consumían presupuesto aunque cada una cuesta una consulta; dos tramas HTTP solapadas del mismo
+dispositivo leían la misma foto del presupuesto (ahora van de a una); una dirección bloqueada seguía gastando una consulta por petición
+(ahora, sin la pista del identificador, no consulta); los 401 sin comprobar contaban para los bloqueos; sin `PROXY_SECRETO`, un externo
+podía bloquear a cualquier dispositivo HTTP (ahora el proxy no arranca sin él, y una `X-Forwarded-For` sin secreto se anota); `cap_drop`
+figuraba como probado y solo estaba configurado (ahora lo inspecciona el banco y lo lee el guardián); las figuras PDF versionadas traían
+la hora del render en sus metadatos (guardián 2f4); y textos: el nombre de la aplicación del campus en el banco, el aviso de Derek
+Yerger en OneWire, cifras y referencias cruzadas.
+
+**Lo que no cubre:** el 503 del cupo se prueba solo en unitarias; el bloqueo grueso, en el banco con 10 identificadores × 5 fallos
+(≈ 3,3 s de `scrypt`), no con una carga real; la cuota de la pasarela para tramas sin DevEUI verificable, en unitarias; el cierre de la condición se prueba adelantando la ventana en la base, no esperando una hora; la cuota en memoria
+de lo que el filtro 1 rechaza se prueba en unitarias, no en el banco. **Pruebas:** 324 del backend (33 nuevas) y 52 del panel.

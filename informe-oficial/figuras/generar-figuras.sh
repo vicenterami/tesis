@@ -74,6 +74,10 @@ cp "$MMD/tema.json" "$TMP/tema.json"
 for n in $CAMBIADOS; do
   docker run --rm -u "$(id -u):$(id -g)" -v "$TMP:/in:ro" -v "$PWD/$OUT:/out" "$IMG" \
     -i "/in/$n.mmd" -o "/out/$n.pdf" -c /in/tema.json --pdfFit -q
+  # Sin fecha ni hora en los metadatos (17/10): Chromium escribe CreationDate y ModDate, y un PDF versionado no debe decir a qué hora
+  # se trabajó (guardián 2f4). Ghostscript lo reescribe sin fechas, sin ID y sin XMP: mismo dibujo, mismo tamaño de página, misma fuente.
+  # Rutas absolutas: con -dSAFER, Ghostscript no abre un archivo de salida dado con ruta relativa fuera de la carpeta actual.
+  abs=$(realpath "$OUT"); gs -q -o "$abs/$n.sinfecha.pdf" -sDEVICE=pdfwrite -dOmitInfoDate=true -dOmitID=true -dOmitXMP=true "$abs/$n.pdf" && mv "$abs/$n.sinfecha.pdf" "$abs/$n.pdf"
   docker run --rm -u "$(id -u):$(id -g)" -v "$TMP:/in:ro" -v "$PWD/privado/previsualizaciones:/out" "$IMG" \
     -i "/in/$n.mmd" -o "/out/$n.png" -c /in/tema.json -w 2000 -b white -q
   cp "$TMP/$n.mmd" "$MMD/"   # solo tras renderizarla bien (set -e corta en el primer fallo)

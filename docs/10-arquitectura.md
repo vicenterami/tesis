@@ -97,7 +97,7 @@ flowchart TB
   | Escenario | Transporte hasta el servidor | Puerto | Pasa por el proxy | Estado |
   |---|---|---|---|---|
   | 1. Nodo Wi-Fi (ESP32 u otro) con cliente MQTT | MQTT sobre TLS | 8883 | Sí | Implementado (en desarrollo, 1883 local sin TLS) |
-  | 2. Equipo que solo habla HTTP | HTTPS, `POST` con SenML | 443 | Sí | Implementado el 16/10/2026 (HU-01, §8.4 punto 52); en el banco, por el proxy con TLS |
+  | 2. Equipo que solo habla HTTP | HTTPS, `POST` con SenML | 443 | Sí | Implementado el 16/10/2026 (HU-01, §8.4 punto 52); en el banco, directo al backend y una comprobación por el proxy con TLS |
   | 3. Pasarela LoRaWAN con servidor de red embebido (Milesight UG6x) | MQTT sobre TLS; JSON decodificado en la pasarela | 8883 | Sí | Ruta B; el 15/10/2026 la red del campus ofreció reenviar desde el servidor embebido de su UG63 para una prueba; adaptador `milesight` hecho y probado en el banco (§8.4 punto 47, `docs/16 §31`); falta en terreno |
   | 4. Pasarela LoRaWAN con *packet forwarder* y ChirpStack en este servidor | Semtech UDP → ChirpStack → MQTT interno | 1700/udp | Sí (UDP) | Ruta A, opcional; ChirpStack no desplegado |
   | 5. Servidor de red externo (TTN o ChirpStack de la red del campus) | Integración MQTT del servidor de red hacia este sistema | 8883 | Sí | **Ruta C, confirmada el 13/10/2026: la red del campus usa ChirpStack v4 con una pasarela Milesight UG63** (§8.4 punto 45); adaptador `chirpstack` hecho y probado en el banco (§8.4 punto 47, `docs/16 §31`); falta en terreno |
@@ -425,7 +425,7 @@ la cola, viaja por el canal en vivo y se cierra sola; el tope de tamaño por men
 **Medido el 08/10/2026 (`docs/16 §10`):** a 815 tramas/s el broker descartó 10 169 mensajes, y un ataque de solo peticiones
 HTTPS a `/salud` hizo descartar unos 2 800 de un tráfico que sin él se guardaba entero. La pérdida silenciosa ya no es teórica.
 | La trama **no trae marca de tiempo** y llega dos veces | Se guarda dos veces: sin marca del emisor no hay forma de saber que es la misma lectura. La hora de recepción se toma en la base con `clock_timestamp()` (microsegundos), así una ráfaga de tramas en cola no colisiona entre sí | Deduplicar exige una identidad; la identidad de una lectura es «canal + instante del emisor». Limitación aceptada: los nodos que quieran «exactamente una» deben marcar `t` (SenML). Una trama LoRaWAN tiene además su contador (fila siguiente) |
-| Una trama **LoRaWAN** llega otra vez con el **mismo contador de trama** (`fCnt`): una pasarela o un script que republica, una reentrega con otra hora (16/10/2026, §8.4 punto 47) | Filtro 3: si el `fCnt` es igual al de la última trama guardada del nodo (`estado_dispositivo.ultimo_fcnt`, migración 17), la trama se descarta entera: no va a cuarentena, se anota en el registro y el nodo se marca vivo, porque llegó por su pasarela con su DevEUI verificado. Un `fCnt` **menor** se acepta: el contador vuelve a cero cuando el nodo se une otra vez a la red (OTAA). Un `fCnt` ausente (el JSON de Protocol Buffers de ChirpStack omite el 0) se trata como «sin contador»: no se compara ni cambia el guardado. Una trama que repite el contador pero el adaptador no entiende va a cuarentena `malformada`, no se cuenta como repetida. El contador se actualiza en el filtro 6, después de guardar, y solo si la trama dejó al menos una lectura nueva | Complementa la identidad «canal + instante»: deduplica aunque la copia traiga otra hora, como hacen los servidores de red con el mismo contador. Si el proceso se corta entre guardar y actualizar el contador, la reentrega vuelve a pasar y la absorbe el índice único: no se pierde nada. Compara solo con la última: una repetición no consecutiva (N, N+1, N) pasa, y la absorbe el índice si trae la misma hora. Límite aceptado: una trama repetida que no guardó ninguna lectura vuelve a cuarentena. Leer, comparar y escribir sin bloqueo es correcto porque los mensajes se procesan de a uno (decisión 4); con procesamiento en paralelo haría falta una comparación atómica. Riesgo aceptado: una trama antigua reentregada fuera de orden se acepta (un contador menor parece una re-unión) y deja ese contador como el último; su eventual repetición posterior ya no se descarta por contador, solo por el índice si trae la misma hora |
+| Una trama **LoRaWAN** llega otra vez con el **mismo contador de trama** (`fCnt`): una pasarela o un script que republica, una reentrega con otra hora (16/10/2026, §8.4 punto 47) | Filtro 3: si el `fCnt` es igual al de la última trama guardada del nodo (`estado_dispositivo.ultimo_fcnt`, migración 17), la trama se descarta entera: no va a cuarentena, se anota en el registro y el nodo se marca vivo, porque llegó por su pasarela con su DevEUI verificado. Un `fCnt` **menor** se acepta: el contador vuelve a cero cuando el nodo se une otra vez a la red (OTAA). El `fCnt` **0 nunca se compara** (revisión del 17/10/2026): es la primera trama de cada unión, y la sesión anterior pudo terminar también en 0; de él protege el índice único si trae la misma hora. Un `fCnt` **ausente** (el JSON de Protocol Buffers de ChirpStack omite el 0) no se compara y, si la trama dejó huella, **borra** el contador guardado: la sesión nueva empieza sin contador, en vez de heredar el de la anterior y descartar por error su trama 1. Una trama que repite el contador pero el adaptador no entiende va a cuarentena `malformada`, no se cuenta como repetida. El contador se actualiza en el filtro 6, después de guardar, y solo si la trama dejó huella: al menos una lectura nueva o ya guardada (así una reentrega del broker tras un corte también lo avanza, revisión del 17/10) | Complementa la identidad «canal + instante»: deduplica aunque la copia traiga otra hora, como hacen los servidores de red con el mismo contador. Si el proceso se corta entre guardar y actualizar el contador, la reentrega vuelve a pasar, la absorbe el índice único y esa vez sí avanza el contador: no se pierde nada ni queda atrasado. Compara solo con la última: una repetición no consecutiva (N, N+1, N) pasa, y la absorbe el índice si trae la misma hora. Límite aceptado: una trama repetida que no guardó ninguna lectura vuelve a cuarentena. Leer, comparar y escribir sin bloqueo es correcto porque los mensajes se procesan de a uno (decisión 4); con procesamiento en paralelo haría falta una comparación atómica. Riesgo aceptado: una trama antigua reentregada fuera de orden se acepta (un contador menor parece una re-unión) y deja ese contador como el último; su eventual repetición posterior ya no se descarta por contador, solo por el índice si trae la misma hora |
 | Dos gateways LoRaWAN reciben el **mismo uplink** | Rutas A y C: lo deduplica ChirpStack antes de publicar (el evento `up` trae `deduplicationId`: https://www.chirpstack.io/docs/chirpstack/integrations/events.html, consultada el 15/10/2026). Ruta B: cada pasarela es su propio servidor de red; qué ocurre si dos oyen al mismo nodo **está por verificar** en la documentación del fabricante (07/10/2026) | Es responsabilidad del servidor de red, no de la plataforma |
 | El **tópico no cumple ninguno de los dos patrones** (`sitio/<sitio>/dispositivo/<id>/<magnitud>`; `sitio/<sitio>/pasarela/<id>/<deveui>/<evento>` desde §8.4 punto 47, o su forma nativa `…/pasarela/<id>/device/<deveui>/event/<evento>` desde el 16/10) | Cuarentena `malformada` con el detalle «tópico fuera del patrón», **antes** del filtro 1; el dispositivo **no** se marca vivo | Sin identidad no hay a quién atribuir la señal de vida; comparte el motivo `malformada` con el filtro 2 y se distingue por el detalle (decisión 23/09: no abrir un cuarto motivo por esto) |
 | El tópico trae un **sitio distinto del registrado** para ese dispositivo | Cuarentena `no_registrado` con el detalle «registrado en el sitio X, no en Y»; el dispositivo **no** se marca vivo: no pasó el filtro 1 | La ACL acepta cualquier sitio en ese nivel (`+`): sin esta comparación, un dispositivo podría publicar bajo el sitio de otra sede (punto 24, migración 11) |
@@ -437,7 +437,7 @@ HTTPS a `/salud` hizo descartar unos 2 800 de un tráfico que sin él se guardab
 | **Dos lecturas del mismo canal en la misma trama**, sin marca de tiempo | Se guardan ambas, con instantes de recepción distintos (microsegundos) | Sin marca del emisor no hay identidad de lectura (fila anterior); si un nodo repite un canal por error, corregirlo es del firmware, no de la plataforma. Limitación aceptada el 23/09 |
 | El broker **reentrega muchas veces** de golpe (reconexión con cola larga) | Desde la decisión 4 los mensajes se procesan **de a uno**, en orden; la cola queda en el broker, no en el backend, y el pool de 5 conexiones no se disputa. El costo es la latencia por mensaje (2–5 ms medidos en el portátil), que acota la tasa máxima a cientos por segundo: por encima de RNF-01 |
 | Un emisor publica con **retención** (`retain`) | Llega una vez en vivo y se procesa. El broker además lo guarda y lo reentrega, con la marca de retenido, a cada suscripción nueva: el backend confirma esa copia sin procesarla y lo anota en el registro (§8.4 punto 50) | Procesar la copia guardaba la misma lectura otra vez con otra hora de recepción (medido: 1 lectura → 2). Límite aceptado: lo publicado con retención mientras el backend no tenía sesión en el broker (primer arranque, sesión perdida) se pierde; ningún componente del sistema publica con retención |
-| Una trama trae **miles de lecturas** | Hoy no hay tope: se procesan todas, en serie | Pendiente (`docs/11 §4`): tope de lecturas por trama en el adaptador y `message_size_limit` en el broker; un sensor no manda miles de lecturas, un atacante sí |
+| Un emisor manda **más lecturas de las que caben** en su presupuesto de la hora (una trama con miles de lecturas, o miles de tramas) | La trama que no cabe se rechaza entera: cuarentena `tope` y condición `tope_superado`; las rechazadas más allá de la cuota de la hora solo se cuentan (§8.4 punto 53, 17/10/2026) | Un sensor no manda miles de lecturas; un error o un atacante sí. El tope es por emisor y por hora, no por trama, porque lo que hay que acotar es la escritura |
 | Dos **sensores distintos** miden lo mismo cerca | **No es duplicado**: son dos canales, dos series, dos evaluaciones de umbral. Correlacionarlos es una función de análisis futura, no del pipeline | La plataforma registra lo que cada sensor dijo; interpretar es otra capa |
 
 El orden del tiempo no importa para la serie: `medicion` se indexa por `(canal_id, tiempo)`, y una lectura
@@ -484,7 +484,7 @@ cliente ──HTTP──► Express ⊂ NestJS ──► servicio ──► pg �
 
 - **Express** es la biblioteca de servidor HTTP más usada de Node.js; NestJS la usa por debajo
   (`@nestjs/platform-express`). El proceso de Node es el servidor; Express recibe cada petición y
-  entrega la respuesta. Es **la API**: 11 rutas REST (14 operaciones) y el canal SSE `/eventos` (§5), descritos en el contrato OpenAPI (12 rutas y 15 operaciones contando `/eventos`). Express no toca la base.
+  entrega la respuesta. Es **la API**: 12 rutas REST (15 operaciones, la recepción por HTTP incluida) y el canal SSE `/eventos` (§5), descritos en el contrato OpenAPI (13 rutas y 16 operaciones contando `/eventos`). Express no toca la base.
 - **`pg`** (node-postgres) es el conductor de la base: mantiene un *pool* de 5 conexiones
   (`db/db.module.ts`) y envía **SQL directo** con parámetros `$1, $2…`; el valor nunca se pega dentro
   del texto SQL, lo que evita la inyección. Sin ORM, por la razón de `docs/07` (series de tiempo con
@@ -1334,7 +1334,7 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     por el mismo camino que el mapa de claves. (iii) **Hora:** en la forma sin códec, `time` con zona es la marca del servidor de red
     (regla 17 de `docs/13`, origen `pasarela`); sin zona, rige la hora de recepción. (iv) **Contador de trama:** el `fCnt` del uplink
     (Milesight y ChirpStack) viaja con la trama cuando la trae y el filtro 3 descarta la que repite el de la última guardada del nodo
-    (§4.1); el uplink con códec y Metadata de Milesight normalmente no lo trae (Metadata agrega DevEUI, nombre y aplicación), y si lo
+    (§4.1; el 0 y el ausente no se comparan); el uplink con códec y Metadata de Milesight normalmente no lo trae (Metadata agrega DevEUI, nombre y aplicación), y si lo
     trae, se usa igual y no cuenta como clave desconocida.
     **El puente se ensaya en el banco** (`banco.sh puente`, `docs/16 §37`): un segundo Mosquitto, anónimo como el del operador, con esa
     línea y TLS verificado hacia el 8883 del proxy; la captura publicada en su tópico nativo llega a `medicion`, un comando no cruza y
@@ -1419,21 +1419,71 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     válida, y va a cuarentena con `origen = http` (RF-07); **401** igual para un dispositivo desconocido, de otra vía, dado de baja o con
     el token equivocado; **413** sobre 64 KiB, el tope del broker (`max_packet_size`); **415** si no es JSON ni texto; **400** si el lector no puede leer el cuerpo (por ejemplo, una codificación declarada que no es la suya). La ruta no distingue mayúsculas, como el enrutador de Express, y el lector del cuerpo crudo tampoco. (iv) **Topes**, con
     el costo medido el 16/10/2026 en el portátil: una verificación de `scrypt` (N = 2¹⁵, r = 8) tarda **65 ms** y el *pool* de 4 hilos de
-    Node llega a **57 por segundo** (medido a mano, sin guion en el repositorio). Por eso: **(a)** una dirección con **5 fallos de autenticación en 60 s queda bloqueada 60 s** (429; una IPv6 se cuenta por su prefijo /64, y con más de 10 000 direcciones vivas se sueltan las cuentas más antiguas, nunca un bloqueo vigente):
-    con una sola dirección, un atacante cuesta a lo más 5 × 65 ms por minuto; **(b)** como mucho **2 verificaciones a la vez** (503 con
-    `Retry-After` si llega una tercera; la consulta de la credencial tiene un tiempo máximo de 5 s, para que una base colgada no retenga el cupo): nunca se ocupa más de la mitad del *pool* y caben unas 30 por segundo, que cubren unos 150
-    dispositivos que manden cada 5 s (el mínimo del alta); **(c)** cada dispositivo, como mucho **una trama aceptada por segundo** (429).
-    Un ataque desde muchas direcciones lo frena (b), no (a): limitarlo antes de llegar al backend es tarea del proxy (`docs/11 §4`). Los
-    contadores viven en la memoria del proceso: se reinician con él (aceptado). **La dirección del cliente** la da el proxy en
-    `X-Forwarded-For` (la reemplaza, no la agrega: `proxy/nginx.conf`); el backend confía en esa cabecera solo si la petición llega desde
-    una dirección de *loopback* o de red privada, que es por donde llega el proxy (el puerto 3000 se publica solo en 127.0.0.1).
-    (v) **Metadatos del transporte** (RF-09): la trama cruda guarda la ruta (`/recepcion/<id>` en su columna `topico`; ningún tópico que acepta el filtro 1 de MQTT empieza con `/`: todos empiezan con `sitio/`) y la cuarentena, además, el origen `http`. (vi) **Prueba:**
-    unitarias de la ruta, de los topes y de cada respuesta, y `banco.sh http` de punta a punta, con `lorawan`, `puente` y `alta` en verde
-    (la prueba en la red del campus es por MQTT). (vii) **Límites conocidos** (revisión del 16/10): el bloqueo es por dirección, así que
-    un dispositivo con el token equivocado detrás de la misma dirección pública que otros (un NAT) los bloquea también por 60 s; la
-    cuarentena no tiene cuota por dispositivo (uno con token válido puede llenarla a una trama por segundo: es el tope por emisor de
-    §4.1, por diseñar); y dentro de la red de Compose, otro contenedor que llegue al backend sin pasar por el proxy podría poner una
-    `X-Forwarded-For` falsa (hacia fuera, el backend solo se publica en 127.0.0.1).
+    Node llega a **57 por segundo** (medido a mano, sin guion en el repositorio). Ese costo es deliberado (una huella lenta protege los
+    tokens si alguien llega a leer la base), pero no debe pagarse en cada trama ni dejar que un desconocido lo gaste por los demás. Por eso,
+    desde el 17/10/2026 (lo que la revisión del 16/10 encontró, decidido ese día): **(a) caché de verificaciones:** tras una verificación
+    correcta, el backend guarda en memoria, por dispositivo, la huella contra la que verificó y el resumen SHA-256 del token; en la trama
+    siguiente, si la huella activa en la base es la misma y el resumen coincide (comparación en tiempo constante), el token se da por
+    verificado sin `scrypt`. Una rotación cambia la huella y deja esa entrada sin efecto sola; una baja se ve antes (la base se consulta en
+    cada trama); un token equivocado nunca entra a la caché y cuesta `scrypt` igual que antes, así que el tiempo de un fallo no cambia y
+    sigue sin revelar qué identificadores existen. A lo más una entrada por dispositivo de vía `http` que haya autenticado (tope de
+    10 000; se sueltan las más antiguas). **(b) Bloqueo por par dirección + dispositivo:** 5 fallos de autenticación en 60 s desde una
+    misma dirección para un mismo identificador bloquean ese par 60 s (429 con `Retry-After`); un vecino detrás de la misma dirección
+    pública (un NAT) con su token bueno sigue entrando. **(c) Tope grueso por dirección:** 50 fallos en 60 s desde una dirección, con
+    cualquier identificador, bloquean 60 s las verificaciones con `scrypt` desde esa dirección (429); las tramas con el token en caché no
+    lo sufren, porque no cuestan nada. Un fallo cuenta para (b) y (c) solo si llegó a comprobarse: lo que ya está bloqueado se rechaza
+    antes y no suma; así, quien usa una dirección gasta a lo más 50 × 65 ms ≈ 3,3 s de CPU por minuto. **(d) Cupo:** como mucho
+    2 verificaciones con `scrypt` a la vez (503 con `Retry-After` si llega una tercera; la consulta de la credencial corre fuera del cupo y con un tiempo
+    máximo de 5 s, para que una base colgada no deje peticiones colgadas): nunca se ocupa más de la mitad del *pool*, y solo lo necesitan la
+    primera trama de cada dispositivo tras arrancar o rotar y los tokens equivocados. **(e) Ritmo:** cada dispositivo, como mucho una
+    trama aceptada por segundo (429); el presupuesto por hora lo pone el tope por emisor (punto 53), común a todas las vías. Una IPv6 se
+    cuenta por su prefijo /64 (lo que recibe un solo equipo) y, con más de 10 000 claves vivas, se sueltan las cuentas más antiguas, nunca
+    un bloqueo vigente. Los contadores de (b) a (e) y la caché viven en la memoria del proceso: se reinician con él (aceptado: el proceso
+    es uno, decisión 4). Orden de las comprobaciones: par bloqueado → tipo de contenido → forma del token y del identificador → credencial
+    y caché → dirección bloqueada → cupo → `scrypt` → ritmo → filtros 2 a 6. **La dirección del cliente** la da el proxy en
+    `X-Forwarded-For` (la reemplaza, no la agrega: `proxy/nginx.conf`) junto con la cabecera `X-Proxy-Secreto`, un secreto compartido
+    (`PROXY_SECRETO` en el `.env`: 24 caracteres o más, el mismo para el proxy y el backend; lo escribe la persona, como las demás claves).
+    Con la capa del proxy es **obligatorio**: sin él, el proxy no arranca (revisión del 17/10: sin secreto, todas las peticiones
+    compartirían la dirección del proxy y un externo podría bloquear a cualquier dispositivo con cinco tokens falsos). El backend cree en
+    `X-Forwarded-For` solo si ese secreto coincide (comparación en tiempo constante); si no coincide, cuenta la dirección del *socket* y lo
+    anota en el registro (acotado): así se nota una rotación a medias; sin secreto configurado, lo dice al arrancar. Así, otro contenedor de la red interna que llegara al backend sin
+    pasar por el proxy no puede suplantar una dirección; y como suplantar en la red de Docker exige la capacidad `NET_RAW`, los cuatro
+    contenedores la sueltan (`cap_drop`, `docs/11 §3`; el guardián 2m2 lo comprueba en el compose y el banco en los contenedores). Antes (16/10) se confiaba en toda dirección de *loopback* o de red privada: era más
+    amplio de lo necesario. (v) **Metadatos del transporte** (RF-09): la trama cruda guarda la ruta (`/recepcion/<id>` en su columna
+    `topico`; ningún tópico que acepta el filtro 1 de MQTT empieza con `/`: todos empiezan con `sitio/`) y la cuarentena, además, el
+    origen `http`. (vi) **Prueba:** unitarias de la ruta, de la caché, de los topes y de cada respuesta, y `banco.sh http` de punta a
+    punta, con `lorawan`, `puente` y `alta` en verde (la prueba en la red del campus es por MQTT). (vii) **Lo que la revisión del 16/10
+    encontró y cómo quedó el 17/10:** el bloqueo por dirección castigaba a los vecinos de un NAT → (b) y (c); la cuarentena no tenía cuota
+    por dispositivo → punto 53; la confianza en toda red privada → el secreto compartido y `cap_drop`.
+
+53. **Tope por emisor, para todas las vías (decidido el 17/10/2026; cierra lo pendiente de §4.1 y de `docs/11 §4`, fila 8).** Regla:
+    **toda vía de entrada tiene tope, y superarlo se avisa con su motivo.** Un emisor autenticado (un dispositivo por MQTT o HTTP, una
+    pasarela por sus nodos) no puede, ni por error ni por mala intención, llenar la base ni la cuarentena. (i) **Dónde vive:** en
+    `filtros2a6`, el tramo del pipeline por el que pasan las tres vías (MQTT directo, MQTT por pasarela y HTTP) después del filtro 1: una
+    vía nueva que no entre por ahí no tendría tope, así que el guardián (paso 2z2) comprueba que las vías que lista `docs/11 §3` sean
+    exactamente las que llaman a `filtros2a6`, y hay una prueba unitaria por vía. (ii) **Presupuesto de lecturas por hora**, por
+    dispositivo: `max(TOPE_LECTURAS_MINIMO, TOPE_LECTURAS_FACTOR × canales × ⌈3600 / intervalo_esperado_s⌉)`, con 600 y 10 por defecto
+    (variables de entorno validadas al arrancar, como las de retención). Para un nodo con 3 canales cada 60 s son 1800 lecturas por hora,
+    diez veces lo normal: cubre un reenvío de cola tras una caída sin dejar pasar un chorro. La ventana es la hora del reloj, en UTC (de 10:00 a
+    10:59): simple de razonar, y lo peor que admite son dos presupuestos seguidos en el cambio de hora. Una trama cuyas lecturas no caben
+    en lo que queda del presupuesto **se rechaza entera** (no se guardan lecturas parciales: una serie a medias confunde más que un hueco),
+    va a cuarentena con el motivo nuevo `tope` y el detalle (tope, lecturas ya aceptadas en la hora, lecturas de la trama) y abre la
+    condición **`tope_superado`** del dispositivo (una sola mientras dure; evento `condicion_abierta` y aviso al panel, como las demás).
+    El dispositivo sigue marcándose vivo: el tope habla de volumen, no de salud del enlace. La condición se cierra sola con la primera
+    trama que entra dentro del presupuesto en una hora posterior. (iii) **Cuota de cuarentena**, por dispositivo y hora: las primeras
+    `TOPE_CUARENTENA_HORA` tramas rechazadas (60 por defecto) se guardan completas, como evidencia; las siguientes solo se cuentan, y el
+    registro lo dice una vez por hora. Con tramas de 64 KiB, lo peor son ≈ 3,9 MB (3,75 MiB) por dispositivo y hora. Lo que el filtro 1 rechaza no
+    tiene fila de estado (nadie lo dio de alta), y lo que por el tópico de una pasarela no deja verificar el DevEUI no marca vivo al nodo
+    ni escribe la suya: su cuota vive en memoria, por emisor autenticado (la pasarela, o el identificador del tópico directo), con el
+    mismo número; un tópico fuera de los dos patrones, sin identidad que usar, cae en una cuota compartida. (iv) **Contadores persistentes:** en `estado_dispositivo`
+    (migración 19): `ventana_inicio`, `ventana_lecturas`, `ventana_cuarentena`, `ventana_sobre_tope` y `ventana_omitidas`; los lee la
+    misma consulta del filtro 1 y los escribe el mismo `INSERT … ON CONFLICT` del filtro 6 (se suman si la ventana es la misma, se
+    reemplazan si cambió): ninguna consulta más por trama, sobreviven a un reinicio y los incrementos son atómicos aunque algún día haya más de un
+    proceso. La decisión (¿cabe?) se toma sobre la foto que trae la fila: por MQTT las tramas van de a una (decisión 4) y por HTTP las de
+    un mismo identificador se encolan en memoria y entran de a una, leyendo la fila recién cuando les toca. (v) **Lo que no cubre:** un emisor que manda 64 KiB de basura por trama gasta CPU del adaptador antes de contarse (acotado
+    por el tamaño y, en HTTP, por el ritmo); el broker sigue sin tope de mensajes retenidos (`docs/11 §4`, fila 8). (vi) **Prueba:**
+    unitarias del presupuesto, de la cuota, del cierre y de las tres vías; `banco.sh tope` de punta a punta (HTTP para el presupuesto,
+    MQTT para la cuota, y el cierre adelantando la ventana en la base); `docs/16 §42`.
 
 ## 9. Crecimiento, resiliencia y respaldo (aprobado el 06/10/2026)
 

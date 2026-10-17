@@ -157,8 +157,8 @@ docker compose exec timescaledb psql -U plataforma -d plataforma -c "SELECT tipo
 
 `SUPERVISION_INTERVALO_S` en el `.env` cambia la frecuencia del barrido (60 s por defecto).
 
-Pendientes del pipeline: adaptador «milesight» (ruta B) y «chirpstack» (ruta C, la red del campus; el mismo sirve si se activa la ruta A);
-notificación de condiciones por correo (al panel ya llegan por el canal en vivo, más abajo).
+Pendiente del pipeline: la notificación de condiciones por correo (al panel ya llegan por el canal en vivo, más abajo). Los adaptadores
+«milesight» (ruta B) y «chirpstack» (ruta C) existen desde el 15/10/2026 y los prueba el banco (`banco.sh lorawan`).
 
 ## API de consulta (M5)
 
@@ -179,6 +179,9 @@ describir rutas que no existen. Con el backend corriendo, la documentación inte
 | `GET /cuarentena?limite&dispositivo` | últimas tramas rechazadas con motivo y carga (200 caracteres) | diagnóstico |
 | `POST /dispositivos` (cabecera `X-Clave-Admin`) | alta: dispositivo, canales, credencial (mostrada una vez) y cliente del broker, todo o nada | 201 con `conexion` (usuario, credencial, tópico, trama de ejemplo); 400 lista de motivos; 401; 409 existe; 502 el broker no aceptó; 503 sin clave o sin broker |
 | `DELETE /dispositivos/:id` (cabecera `X-Clave-Admin`) | baja lógica: `estado = baja`, credenciales inactivas, condiciones abiertas cerradas, evento `baja`, cliente borrado del broker; todo o nada | 200; 404 si no existe; 409 si ya estaba de baja (13/10) |
+| `POST /recepcion/:idFisico` (cabecera `Authorization: Bearer`) | recepción por HTTP (HU-01): 202 con el resumen, 401, 413, 415, 422, 429, 503 (`docs/10 §8.4` punto 52) | dispositivos de vía `http` |
+| `GET /pasarelas`, `POST /pasarelas`, `DELETE /pasarelas/:id`, `POST /pasarelas/:id/credencial` (las que escriben, con `X-Clave-Admin`) | pasarelas LoRaWAN: inventario, alta con credencial del broker, baja y rotación (`docs/10 §8.4` punto 47) | 401 o 503 sin la clave |
+| `GET /salud` | estado del backend, la base y el broker (cola, descartes, condición del sistema) | lo usa el `HEALTHCHECK` |
 | `POST /dispositivos/:id/credencial` (cabecera `X-Clave-Admin`) | rotación: credencial nueva (mostrada una vez), la anterior inactiva, evento `rotacion`, `setClientPassword` en el broker; todo o nada | 201 con `conexion`; 409 de baja; 400 lorawan; si la respuesta no llega, repetir (13/10) |
 
 ```bash

@@ -176,7 +176,7 @@ describe('MilesightAdaptador (servidor de red embebido, con códec y Metadata)',
 
 // Captura real de la pasarela UG65 del campus (15/10/2026, `mosquitto_sub -v` en su broker; docs/10 §8.4 punto 47), saneada: el
 // devEUI, el EUI de la pasarela (rxInfo[].mac, con prefijo de fabricante) y el nombre del nodo se reemplazaron por sintéticos. Se omite
-// `cellularIP`: tiene forma de dirección IP y el adaptador no la usa. Todo lo demás es literal, `data` incluida.
+// `cellularIP`: tiene forma de dirección IP y el adaptador no la usa. Las marcas de tiempo también son sintéticas (misma forma y misma zona). Todo lo demás es literal, `data` incluida.
 const CAPTURA_UG65 = {
   applicationID: '3', applicationName: 'app-de-prueba', data: 'AgAAAI8HGBmYrw==', devEUI: DEVEUI, deviceName: 'nodo-2', fCnt: 142, fPort: 1,
   gatewayTime: '2026-10-15T12:34:56-03:00',

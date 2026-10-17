@@ -30,6 +30,8 @@ services:
     command: ["postgres", "-c", "timescaledb.max_background_workers=0", "-c", "timescaledb.telemetry_level=off"]
     security_opt:
       - no-new-privileges:true                   # un proceso comprometido no puede escalar privilegios
+    cap_drop:
+      - NET_RAW                                  # sin sockets crudos no se suplanta una dirección en la red interna (docs/10 §8.4 punto 52)
     environment:
       POSTGRES_DB: ${DB_NOMBRE}
       POSTGRES_USER: ${DB_USUARIO}
@@ -58,6 +60,8 @@ services:
       options: { max-size: "10m", max-file: "5" }
     security_opt:
       - no-new-privileges:true
+    cap_drop:
+      - NET_RAW                                  # ídem: la suplantación en la red de Docker exige esta capacidad
     # Sin `ports`: en producción el broker se alcanza solo vía proxy TLS (8883).
     # Para desarrollo local, los puertos se publican en docker-compose.override.yml.
     volumes:
@@ -84,6 +88,8 @@ services:
       options: { max-size: "10m", max-file: "5" }
     security_opt:
       - no-new-privileges:true
+    cap_drop:
+      - ALL                                      # corre como `node` y no necesita ninguna capacidad (NET_RAW incluida)
     environment:
       DB_NOMBRE: ${DB_NOMBRE}
       # El backend entra con el rol de la aplicación (migración 14), nunca con el dueño de la base (docs/10 §8.4 punto 44). La clave la
@@ -100,6 +106,13 @@ services:
       RETENCION_INTERVALO_H:
       METRICA_BROKER_INTERVALO_S:
       METRICA_BROKER_COLA_TOPE:
+      # Tope por emisor (docs/10 §8.4 punto 53, 17/10): mismo mecanismo, con los valores por defecto del código si no están en el .env.
+      TOPE_LECTURAS_FACTOR:
+      TOPE_LECTURAS_MINIMO:
+      TOPE_CUARENTENA_HORA:
+      # El mismo secreto que el proxy pone en X-Proxy-Secreto (punto 52): solo con él el backend cree la dirección de X-Forwarded-For.
+      # Ausente, el backend lo avisa al arrancar y usa la dirección del socket; presente y corto, no arranca.
+      PROXY_SECRETO:
       DB_HOST: timescaledb                        # nombre del servicio en la red interna (docs/10 §6)
       MQTT_URL: mqtt://mosquitto:1883
       MQTT_BACKEND_CLAVE: ${MQTT_BACKEND_CLAVE}

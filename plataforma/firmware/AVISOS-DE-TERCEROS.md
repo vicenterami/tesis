@@ -2,21 +2,21 @@
 
 El código propio de esta carpeta es AGPL-3.0-only, como el resto de la plataforma (`../LICENSE`). El firmware compilado incluye
 además el software de terceros de esta tabla, cada uno con su licencia. Qué hay que entregar con un binario, más abajo.
-Licencias leídas el 16/10/2026 en los archivos de cada paquete descargado por PlatformIO (`pio run` los deja en `.pio/libdeps/` y en
+Licencias leídas el 16/10/2026 y revisadas el 17/10/2026 en los archivos de cada paquete descargado por PlatformIO (`pio run` los deja en `.pio/libdeps/` y en
 su carpeta de paquetes, donde se pueden volver a leer) y, para el núcleo, también en su repositorio oficial.
 
 | Paquete | Versión | Licencia | Aviso de copyright (tal como lo trae el paquete) | Origen |
 |---|---|---|---|---|
 | Núcleo Arduino-ESP32 (`framework-arduinoespressif32`) | 4.20017.260907 (con la plataforma `espressif32` 7.1.3) | LGPL-2.1-or-later | Según cada archivo fuente | https://github.com/espressif/arduino-esp32 |
-| Bibliotecas Wi-Fi precompiladas de Espressif (las enlaza el núcleo) | las de la plataforma | Apache 2.0 (repositorio oficial `esp32-wifi-lib`) | Espressif Systems | https://github.com/espressif/esp32-wifi-lib |
+| Bibliotecas Wi-Fi precompiladas de Espressif (las enlaza el núcleo) | las de la plataforma | Apache 2.0 en su repositorio (`esp32-wifi-lib`). Las cabeceras del SDK que trae el núcleo (`tools/sdk/esp32/include`) declaran, contadas el 17/10/2026 con `SPDX-License-Identifier`: Apache-2.0 (417), Apache-2.0 OR GPL-2.0-or-later (96), BSD-2-Clause (39), BSD-3-Clause (3), ISC (2) y BSD-2-Clause-FreeBSD AND Apache-2.0 (1) | Espressif Systems | https://github.com/espressif/esp32-wifi-lib |
 | Adafruit BME280 Library | 2.3.0 | BSD | Copyright (c) 2015, Limor Fried & Kevin Townsend for Adafruit Industries | https://github.com/adafruit/Adafruit_BME280_Library |
-| Adafruit Unified Sensor | 1.1.15 | Apache 2.0 (sin archivo NOTICE) | Adafruit Industries | https://github.com/adafruit/Adafruit_Sensor |
+| Adafruit Unified Sensor | 1.1.15 | Apache 2.0 (sin archivo NOTICE) | Copyright (C) 2008 The Android Open Source Project (cabecera de `Adafruit_Sensor.h`; la actualización es de K. Townsend, Adafruit Industries) | https://github.com/adafruit/Adafruit_Sensor |
 | Adafruit BusIO | 1.17.4 | MIT | Copyright (c) 2017 Adafruit Industries | https://github.com/adafruit/Adafruit_BusIO |
-| OneWire | 2.3.8 | permiso estilo MIT, en `OneWire.cpp` (sin archivo de licencia) | Copyright (c) 2007, Jim Studt (original old version - many contributors since) | https://github.com/PaulStoffregen/OneWire |
+| OneWire | 2.3.8 | permiso estilo MIT, en `OneWire.cpp` (sin archivo de licencia); el código de CRC trae además el aviso y el permiso de Dallas Semiconductor, con una cláusula de nombre | Copyright (c) 2007, Jim Studt (original old version - many contributors since); «(copyleft) 2006 by Derek Yerger - Free to distribute freely.»; Copyright (C) 2000 Dallas Semiconductor Corporation, All Rights Reserved (código de CRC) | https://github.com/PaulStoffregen/OneWire |
 | DallasTemperature | 4.0.6 | MIT | Copyright (c) 2024 Miles Burton | https://github.com/milesburton/Arduino-Temperature-Control-Library |
 
 **Antes de distribuir un binario** (no se distribuye ninguno hoy): acompañarlo de este archivo, de una copia del texto de cada licencia
-(LGPL-2.1, Apache 2.0, BSD y MIT, tal como vienen en cada paquete o en su repositorio) y, por la LGPL, del código fuente del núcleo
+(LGPL-2.1, Apache 2.0, BSD-2, BSD-3, ISC y MIT, tal como vienen en cada paquete o en su repositorio; y, si se usa la opción GPL-2.0-or-later de las cabeceras duales del SDK, también esa) y, por la LGPL, del código fuente del núcleo
 en la versión usada o una oferta escrita de entregarlo; el `platformio.ini` fija esa versión (la plataforma `espressif32` 7.1.3 trae el
 núcleo `4.20017.260907+sha.dcc1105b`: su versión lleva el identificador del commit del repositorio oficial).
 
@@ -43,6 +43,34 @@ NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE
 LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+```
+
+**Aviso de Dallas Semiconductor en OneWire** (código de CRC, `OneWire.cpp`; debe acompañar las copias, y su última cláusula limita el uso del nombre):
+
+```
+Copyright (C) 2000 Dallas Semiconductor Corporation, All Rights Reserved.
+
+Permission is hereby granted, free of charge, to any person obtaining a
+copy of this software and associated documentation files (the "Software"),
+to deal in the Software without restriction, including without limitation
+the rights to use, copy, modify, merge, publish, distribute, sublicense,
+and/or sell copies of the Software, and to permit persons to whom the
+Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included
+in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY,  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL DALLAS SEMICONDUCTOR BE LIABLE FOR ANY CLAIM, DAMAGES
+OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
+
+Except as contained in this notice, the name of Dallas Semiconductor
+shall not be used except as stated in the Dallas Semiconductor
+Branding Policy.
 ```
 
 **LGPL del núcleo.** Al distribuir un binario que enlaza una biblioteca LGPL, esa licencia pide permitir que quien lo reciba vuelva a

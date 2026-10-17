@@ -87,6 +87,26 @@ export class SupervisionService implements OnModuleInit, OnModuleDestroy {
       this.log.log(`${d.id_fisico}: comunicación restablecida · condición cerrada`);
       this.eventos.publicar({ tipo: 'condicion', dispositivo_id: d.id, condicion: 'sin_comunicacion', estado: 'cerrada' });
     }
+
+    // 3) Tope por emisor (docs/10 §8.4 punto 53): una condición abierta cuyo dispositivo ya muestra una hora posterior dentro del
+    //    presupuesto (lecturas y ninguna trama sobre el tope). El pipeline la cierra con la primera trama que cabe en la hora nueva; si esa
+    //    hora empezó con tramas sin lecturas, la fila ya no dice «sobre el tope» y solo este barrido la cierra (revisión del 17/10).
+    const dentro = await this.pool.query<{ id: string; id_fisico: string }>(
+      `UPDATE condicion tc SET cerrada_en = now()
+         FROM dispositivo d JOIN estado_dispositivo e ON e.dispositivo_id = d.id
+        WHERE tc.dispositivo_id = d.id AND tc.tipo = 'tope_superado' AND tc.cerrada_en IS NULL
+          AND e.ventana_inicio > date_trunc('hour', tc.abierta_en AT TIME ZONE 'UTC') AT TIME ZONE 'UTC'
+          AND e.ventana_sobre_tope = 0 AND e.ventana_lecturas > 0
+        RETURNING d.id, d.id_fisico`,
+    );
+    for (const d of dentro.rows) {
+      await this.pool.query(
+        "INSERT INTO evento (dispositivo_id, tipo, detalle) VALUES ($1, 'condicion_cerrada', $2)",
+        [d.id, { tipo: 'tope_superado', por: 'barrido' }],
+      );
+      this.log.log(`${d.id_fisico}: de vuelta dentro del presupuesto de la hora · condición cerrada por el barrido`);
+      this.eventos.publicar({ tipo: 'condicion', dispositivo_id: d.id, condicion: 'tope_superado', estado: 'cerrada' });
+    }
   }
 
   // Lo llama el pipeline en cada trama aceptada: cierra la condición si estaba abierta.
@@ -102,6 +122,40 @@ export class SupervisionService implements OnModuleInit, OnModuleDestroy {
       );
       this.log.log(`${idFisico}: comunicación restablecida · condición cerrada`);
       this.eventos.publicar({ tipo: 'condicion', dispositivo_id: dispositivoId, condicion: 'sin_comunicacion', estado: 'cerrada' });
+    }
+  }
+
+  // Tope por emisor (docs/10 §8.4 punto 53): la abre el pipeline al rechazar la trama que no cabe en el presupuesto de lecturas de la
+  // hora (una sola vez por ventana: el índice único parcial decide, como en las demás) y la cierra la primera trama que entra dentro
+  // del presupuesto en una hora posterior. Es una condición del dispositivo, no del enlace: el dispositivo sigue vivo.
+  async abrirTope(dispositivoId: string, idFisico: string, detalle: object): Promise<void> {
+    const r = await this.pool.query(
+      `INSERT INTO condicion (dispositivo_id, tipo) VALUES ($1, 'tope_superado')
+       ON CONFLICT (dispositivo_id, tipo, COALESCE(regla_id, '00000000-0000-0000-0000-000000000000'::uuid))
+       WHERE cerrada_en IS NULL DO NOTHING`,
+      [dispositivoId],
+    );
+    if (r.rowCount === 0) return;
+    await this.pool.query(
+      "INSERT INTO evento (dispositivo_id, tipo, detalle) VALUES ($1, 'condicion_abierta', $2)",
+      [dispositivoId, { tipo: 'tope_superado', ...detalle }],
+    );
+    this.log.warn(`${idFisico}: tope por emisor superado · condición abierta`);
+    this.eventos.publicar({ tipo: 'condicion', dispositivo_id: dispositivoId, condicion: 'tope_superado', estado: 'abierta' });
+  }
+
+  async cerrarTope(dispositivoId: string, idFisico: string, detalle: object): Promise<void> {
+    const r = await this.pool.query(
+      "UPDATE condicion SET cerrada_en = now() WHERE dispositivo_id = $1 AND tipo = 'tope_superado' AND cerrada_en IS NULL",
+      [dispositivoId],
+    );
+    if (r.rowCount) {
+      await this.pool.query(
+        "INSERT INTO evento (dispositivo_id, tipo, detalle) VALUES ($1, 'condicion_cerrada', $2)",
+        [dispositivoId, { tipo: 'tope_superado', ...detalle }],
+      );
+      this.log.log(`${idFisico}: de vuelta dentro del presupuesto de la hora · condición cerrada`);
+      this.eventos.publicar({ tipo: 'condicion', dispositivo_id: dispositivoId, condicion: 'tope_superado', estado: 'cerrada' });
     }
   }
 }

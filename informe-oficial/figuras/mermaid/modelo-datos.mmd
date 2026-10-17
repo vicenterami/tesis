@@ -79,6 +79,11 @@ erDiagram
         uuid dispositivo_id PK,FK
         timestamptz visto_por_ultima_vez
         bigint ultimo_fcnt
+        timestamptz ventana_inicio
+        int ventana_lecturas
+        int ventana_cuarentena
+        int ventana_sobre_tope
+        int ventana_omitidas
     }
     evento {
         uuid id PK

@@ -29,7 +29,7 @@ el modelo de datos.
 |---|---|---|
 | **Inactivo** | `estado` es `mantenimiento` o `baja` | Nadie espera datos de él; no genera alertas (RF-22) |
 | **Sin señal** | hay una condición `sin_comunicacion` abierta, o `en_linea` es falso | Dejó de reportar más allá de su intervalo esperado (RF-24) |
-| **Alerta** | hay una condición abierta de tipo `umbral`, `bateria` o `manipulacion` | Reporta, pero algo está fuera de lo normal |
+| **Alerta** | hay una condición abierta de tipo `umbral`, `bateria`, `manipulacion` o `tope_superado` (manda más de lo que cabe en su hora, `docs/10 §8.4` punto 53) | Reporta, pero algo está fuera de lo normal |
 | **Normal** | ninguna de las anteriores | Reporta a tiempo y dentro de rango |
 
 `en_linea` lo trae la API, pero el panel lo recalcula con la misma regla (visto dentro de 2 × intervalo esperado) para que cambie
@@ -106,7 +106,7 @@ condición y el estado vuelve a «Normal».
 
 **F4 · El canal en vivo se cae.** `EventSource` reintenta solo ante un corte de red, no ante un 503 (cupo lleno) ni un 403.
 El panel envuelve el canal: si recibe 503 o 403, o si pasan 60 s sin latido (el backend manda uno cada 25 s), cierra y vuelve
-a abrir con espera de 1, 2, 4… hasta 30 s, y muestra «en vivo: reconectando» en la cabecera. Al reconectar, repide todo lo
+a abrir con espera de 1, 2, 4… hasta 30 s, y muestra «en vivo: reconectando» en la cabecera. Al reconectar, repite todo lo
 que la pantalla muestra (inventario y condiciones en P2; ficha, condiciones, rechazadas e histórico del rango visible en P3),
 porque pudo perder eventos mientras estuvo caído: el canal no guarda cola.
 
@@ -131,7 +131,7 @@ descargar; la descarga exige rol de administrador; la vista pública nunca ofrec
   del sitio (regla 6 de `docs/13`); ningún código interno a la vista (`sin_comunicacion` se muestra «Sin comunicación»). Lo encontró la
   primera prueba con navegador real: el gráfico mostraba «9:30pm» y «Time» (los valores por defecto de uPlot, en inglés).
 - **Un solo cliente HTTP** en el panel, que añade el prefijo de la API, interpreta los códigos y expone el 409 como tal.
-- **Nada se repide por cada evento:** un aviso de condición pide la lista con antirrebote (una consulta por segundo como mucho,
+- **Nada se repite por cada evento:** un aviso de condición pide la lista con antirrebote (una consulta por segundo como mucho,
   nunca dos en vuelo) y las lecturas en vivo se aplican por lotes (un redibujo cada 250 ms como mucho). Un dispositivo que
   oscila o un emisor malicioso no multiplican consultas a la base ni redibujos. La ficha descarta eventos de otro dispositivo
   aunque el canal venga filtrado.
@@ -142,7 +142,7 @@ descargar; la descarga exige rol de administrador; la vista pública nunca ofrec
 | Pantalla | Requisitos | Entra en | Cómo se prueba |
 |---|---|---|---|
 | P2 Inventario con semáforo y filtros | RF-47, RF-48, RF-51, HU-10, HU-19, HU-20 | Tramo 2 (Etapa 3) | Semilla conocida → conteos y filas en el DOM; un dispositivo en mantenimiento aparece «Inactivo»; filtro por vía reduce la tabla; el reenvío de Vite conserva el `Host` y no retiene el canal (`pruebas/panel-desarrollo.sh`, `docs/16 §16`); varios sitios: dos sitios con una zona del mismo nombre, el filtro por sitio y la zona dentro del sitio (16/10) |
-| P3 Ficha | RF-33, RF-49, HU-21 | Tramo 3 (Etapa 3); prueba con navegador real el 16/10 | `banco.sh navegador` (Firefox con Playwright): los puntos del gráfico (texto y `data-puntos`) son los de `/historico`; una trama publicada por MQTT aparece en su tarjeta sin recargar; con el backend detenido se ve «reconectando», se publica una lectura durante la caída y, al volver, la tarjeta la muestra, la página repide el histórico (se ve la petición) y el canal vuelve a «conectado»; sin errores de JavaScript; la captura revisa lo que se dibuja en el lienzo (eje en 24 h) |
+| P3 Ficha | RF-33, RF-49, HU-21 | Tramo 3 (Etapa 3); prueba con navegador real el 16/10 | `banco.sh navegador` (Firefox con Playwright): los puntos del gráfico (texto y `data-puntos`) son los de `/historico`; una trama publicada por MQTT aparece en su tarjeta sin recargar; con el backend detenido se ve «reconectando», se publica una lectura durante la caída y, al volver, la tarjeta la muestra, la página repite el histórico (se ve la petición) y el canal vuelve a «conectado»; sin errores de JavaScript; la captura revisa lo que se dibuja en el lienzo (eje en 24 h) |
 | P4 Condiciones, P5 Cuarentena | HU-05, RF-11 a RF-13, RF-24 | Etapa 4 | Trama fuera de rango → fila en P4 en vivo; trama de un desconocido → fila en P5 con motivo `no_registrado` |
 | P1 Resumen | RF-30, HU-16 | Etapa 4 | Los cuatro conteos suman el total del inventario; cambian en vivo con F3 |
 | P8 Exportar (API) | RF-34, HU-08 | Etapa 3 (12/10): 6 pruebas de las funciones puras y 7 casos de humo; la pantalla, el XLSX y la exportación por sitio, en la Etapa 4 |

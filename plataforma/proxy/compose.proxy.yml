@@ -16,11 +16,17 @@ services:
       options: { max-size: "10m", max-file: "5" }
     security_opt:
       - no-new-privileges:true
+    cap_drop:
+      - NET_RAW                          # como el resto: sin suplantación en la red interna (docs/10 §8.4 punto 52)
     environment:
       # Nombre público que atiende (docs/11 §3, docs/10 §8.4 punto 40): la imagen oficial lo sustituye en la plantilla al arrancar
       # (/docker-entrypoint.d/20-envsubst-on-templates.sh) y escribe /etc/nginx/nginx.conf. Solo PROXY_*: las variables de
       # nginx ($host, $status…) no se tocan. El backend recibe el mismo nombre en HTTP_HOSTS (docker-compose.yml).
       PROXY_NOMBRE: ${PROXY_NOMBRE:-localhost}
+      # Secreto compartido con el backend (docs/10 §8.4 punto 52): va en la cabecera X-Proxy-Secreto de cada petición reenviada; con él
+      # el backend cree la dirección del cliente de X-Forwarded-For. Obligatorio con esta capa (17/10): sin secreto todas las
+      # peticiones compartirían la dirección del proxy y un externo podría bloquear a cualquier dispositivo con cinco tokens falsos.
+      PROXY_SECRETO: ${PROXY_SECRETO:?define PROXY_SECRETO en el .env (openssl rand -base64 24), el mismo para el backend}
       NGINX_ENVSUBST_TEMPLATE_DIR: /plantilla
       NGINX_ENVSUBST_OUTPUT_DIR: /etc/nginx
       NGINX_ENVSUBST_FILTER: ^PROXY_

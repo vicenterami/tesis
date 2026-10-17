@@ -30,12 +30,12 @@ uniformidad es la que resuelve la causa C1 (formatos dispares).
 | 8 | **regla_umbral** | Límite que, al cruzarse, abre una condición | Con histéresis (umbral de disparo y de restauración) |
 | 9 | **condicion** | Un estado anómalo abierto de un dispositivo | Se abre y se cierra; guarda inicio, fin y duración |
 | 10 | **evento** | Registro histórico de algo que pasó | Alta, baja, mantenimiento, apertura/cierre de condición |
-| 11 | **cuarentena** | Trama rechazada por los filtros 1 a 3 (desconocida, malformada o inválida) | Cruda, con motivo y detalle, una fila por trama; no contamina las series. **Hypertable** desde la migración 09 (retención 30 días). Lo que no tiene credencial no llega: lo corta el broker |
+| 11 | **cuarentena** | Trama rechazada por los filtros 1 a 3 (desconocida, malformada o inválida) o por el tope por emisor (`tope`: no cabía en el presupuesto de lecturas de la hora, migración 19) | Cruda, con motivo y detalle, una fila por trama; no contamina las series. **Hypertable** desde la migración 09 (retención 30 días). Por dispositivo y hora se guardan completas las primeras `TOPE_CUARENTENA_HORA` (60); las demás solo se cuentan (`docs/10 §8.4` punto 53). Lo que no tiene credencial no llega: lo corta el broker |
 | 12 | **usuario** | Persona que accede a la plataforma | Con hash de contraseña, nunca en claro |
 | 13 | **usuario_sitio** | Qué usuario puede ver qué sitio y con qué rol | Multi-tenencia: aísla los datos entre sitios |
 | 14 | **trama** | Trama cruda de un mensaje aceptado (al menos una lectura guardada) | **Hypertable**, solo inserción, retención 30 días: auditoría y re-decodificación si un adaptador tuvo un error (migración 09) |
 | 15 | **pasarela** | Quien publica en nombre de los nodos LoRaWAN: una pasarela con servidor de red embebido (ruta B) o un servidor de red externo (ruta C, `docs/10 §8.4` punto 45) | Una sirve a muchos nodos; su id físico es su usuario del broker, único también frente a los dispositivos (migración 11); **declara el formato** de lo que publica (`milesight` o `chirpstack`, migración 15) y sus nodos lo heredan: lo garantiza la base con una clave foránea compuesta `(pasarela_id, formato)` en cascada (`docs/10 §8.4` punto 47) |
-| 16 | **estado_dispositivo** | Lo que el sistema escribe sobre cada dispositivo: la última trama aceptada | Una fila por dispositivo y sin `actualizado_en`: la fila de `dispositivo` queda para lo que edita una persona (migración 11). Se borra en cascada con su dispositivo: es un derivado, sin historia propia. Desde la migración 17 guarda también el contador de la última trama LoRaWAN guardada (`ultimo_fcnt`), con el que el filtro 3 descarta la repetida (`docs/10 §4.1`) |
+| 16 | **estado_dispositivo** | Lo que el sistema escribe sobre cada dispositivo: la última trama aceptada | Una fila por dispositivo y sin `actualizado_en`: la fila de `dispositivo` queda para lo que edita una persona (migración 11). Se borra en cascada con su dispositivo: es un derivado, sin historia propia. Desde la migración 17 guarda también el contador de la última trama LoRaWAN guardada (`ultimo_fcnt`), con el que el filtro 3 descarta la repetida (`docs/10 §4.1`); desde la 19, los contadores de la hora en curso del tope por emisor (`ventana_inicio`, `ventana_lecturas`, `ventana_cuarentena`, `ventana_sobre_tope`, `ventana_omitidas`), que el filtro 6 escribe en el mismo `INSERT … ON CONFLICT` (`docs/10 §8.4` punto 53) |
 | 17 | **metrica_broker** | Una muestra por minuto de los contadores `$SYS` del broker: descartes acumulados, mensajes y bytes en cola, clientes conectados, memoria | **Hypertable**, retención 90 días; la toma la conexión administradora del backend (migración 13, `docs/10 §8.4` punto 43) |
 | 18 | **condicion_sistema** | Un estado anómalo de la plataforma, sin dispositivo (`broker_descarte`: el broker descarta o la cola pasa el 80 % del tope) | Misma forma que `condicion` (abierta/cerrada, una abierta por tipo); se abre y se cierra sola desde el muestreo del broker (migración 13) |
 
@@ -129,6 +129,11 @@ erDiagram
         uuid dispositivo_id PK,FK
         timestamptz visto_por_ultima_vez
         bigint ultimo_fcnt
+        timestamptz ventana_inicio
+        int ventana_lecturas
+        int ventana_cuarentena
+        int ventana_sobre_tope
+        int ventana_omitidas
     }
     evento {
         uuid id PK
@@ -279,6 +284,7 @@ Tres tipos de dato que se confunden y que aquí tienen destino distinto:
 |---|---|---|---|
 | **Derivado al leer** | `en_linea` (¿última trama hace menos de 2 × intervalo?) | se calcula en la consulta, no se guarda | cada lectura de la API; nunca escribe |
 | **Persistido por proceso** | `condicion` tipo `sin_comunicacion` | fila en `condicion`, la abre el barrido periódico (M4) | cada 60 s, una sola vez por transición |
+| **Persistido por trama** | `condicion` tipo `tope_superado` y los contadores `ventana_*` de `estado_dispositivo` | los escribe el pipeline (filtros 3 y 6) al rechazar una trama que no cabe en el presupuesto de la hora y al cerrar la hora dentro del presupuesto (`docs/10 §8.4` punto 53) | en cada trama; la condición, una sola vez por transición |
 | **Persistido por proceso** | `condicion_sistema` tipo `broker_descarte` y las muestras de `metrica_broker` | las escribe el muestreo de la cola del broker (`docs/10 §8.4` punto 43) | cada 60 s; abre al descartar o al 80 % de la cola, cierra tras dos muestras normales |
 | **Exigido en la transición** | «un dispositivo dado de baja no acepta tramas» | el pipeline lo evalúa contra el dato del momento | en cada trama |
 | **Foto** | `evento.detalle` (valor y umbral al dispararse), `medicion.unidad` | columna copiada | una vez, al ocurrir |

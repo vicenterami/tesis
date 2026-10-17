@@ -1,8 +1,10 @@
-import { Inject, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import { Inject, Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Pool, type QueryConfig } from 'pg';
 import { AlertasService } from '../alertas/alertas.service';
 import { BrokerService } from '../broker/broker.service';
 import { POOL } from '../db/db.module';
+import { leerEntero } from '../retencion/retencion.service';
 import { SupervisionService } from '../supervision/supervision.service';
 import { EventosService } from '../tiempo-real/eventos.service';
 import { Adaptador, TramaMalformada } from './adaptadores/adaptador';
@@ -11,13 +13,12 @@ import { IdentidadNoVerificada } from './adaptadores/lorawan';
 import { MilesightAdaptador } from './adaptadores/milesight.adaptador';
 import { PlanoAdaptador } from './adaptadores/plano.adaptador';
 import { SenmlAdaptador } from './adaptadores/senml.adaptador';
+import { ContadorCuota, CuotaPorEmisor, inicioDeVentana } from './cuota';
 import { ContextoTrama, Lectura } from './lectura';
 import { tiempoPlausible } from './tiempo';
 import { limpia } from './texto';
 import { aCanonica } from './unidades';
 import { porcentaje } from '../consulta/escala';
-import { hashScrypt, verificarScrypt } from '../alta/credenciales';
-import { randomBytes } from 'node:crypto';
 
 // Forma del tópico acordada: sitio/<sitio>/dispositivo/<id_fisico>/<magnitud>
 const PATRON_TOPICO = /^sitio\/([^/]+)\/dispositivo\/([^/]+)\/([^/]+)$/;
@@ -32,16 +33,19 @@ interface Dispositivo {
   id: string; estado: 'activo' | 'mantenimiento' | 'baja'; formato: string; pasarela_id: string | null; sitio_codigo: string;
   decodificador: string | null; // perfil de decodificación (migración 17)
   ultimo_fcnt: string | null; // bigint: node-postgres lo entrega como texto (cabe en un número: 32 bits)
+  // Tope por emisor (migración 19; docs/10 §8.4 punto 53): lo que fija el presupuesto de la hora y los contadores de la hora en curso.
+  intervalo_esperado_s: number; canales: number;
+  ventana_inicio: Date | null; ventana_lecturas: number; ventana_cuarentena: number; ventana_sobre_tope: number; ventana_omitidas: number;
 }
 interface Pasarela { id: string; activo: boolean; sitio_codigo: string }
-// Dominio cerrado: el mismo CHECK de la migración 09. Agregar un motivo exige migración, no solo código.
-type Motivo = 'no_registrado' | 'dado_de_baja' | 'malformada' | 'invalida';
+// Dominio cerrado: el mismo CHECK de la migración 19 (antes 09). Agregar un motivo exige migración, no solo código.
+type Motivo = 'no_registrado' | 'dado_de_baja' | 'malformada' | 'invalida' | 'tope';
 // Lo que se sabe de la trama al rechazarla. dispositivoId solo existe si el filtro 1 pudo atribuirla.
 interface TramaRecibida { topico: string; carga: Buffer; recibidoEn: Date; dispositivoId?: string; origen?: 'mqtt' | 'http' }
 // Lo que pasó con una trama después del filtro 1 (lo usa la recepción por HTTP para responder; la de MQTT no lo necesita).
 export interface ResumenTrama { guardadas: number; duplicadas: number; rechazos: string[]; malformada: string | null; repetida: boolean }
 // Lo que el filtro 1 de la vía HTTP necesita: el dispositivo, su vía, su estado y la huella de su credencial activa.
-interface CredencialHttp { id: string; via: string; estado: string; hash: string | null }
+export interface CredencialHttp { id: string; via: string; estado: string; hash: string | null }
 interface Canal { id: string; magnitud: string; unidad_canonica: string; rango_min: number | null; rango_max: number | null; escala_cero: number | null; escala_cien: number | null }
 
 // M1 Recepción + M2 Normalización (pipeline). Los seis filtros: 1 autenticar · 2 analizar · 3 validar ·
@@ -73,6 +77,10 @@ export class RecepcionService implements OnModuleInit {
   private readonly log = new Logger('recepcion');
   // Uno por formato declarado (docs/10 §8.4 puntos 25 y 47): el filtro 2 no adivina, usa el del alta.
   private readonly adaptadores: Map<string, Adaptador>;
+  // Tope por emisor (docs/10 §8.4 punto 53): presupuesto de lecturas por hora y cuota de cuarentena, configurables y validados al
+  // arrancar como los plazos de retención. Lo que el filtro 1 rechaza no tiene fila de estado: su cuota vive en memoria por emisor.
+  private readonly topes: { factor: number; minimo: number; cuarentenaHora: number };
+  private readonly cuotaSinAlta = new CuotaPorEmisor();
 
   constructor(
     @Inject(POOL) private readonly pool: Pool,
@@ -84,8 +92,14 @@ export class RecepcionService implements OnModuleInit {
     plano: PlanoAdaptador,
     chirpstack: ChirpstackAdaptador,
     milesight: MilesightAdaptador,
+    @Optional() config?: ConfigService,
   ) {
     this.adaptadores = new Map<string, Adaptador>([senml, plano, chirpstack, milesight].map((a) => [a.nombre, a]));
+    this.topes = {
+      factor: leerEntero(config?.get<string>('TOPE_LECTURAS_FACTOR'), { variable: 'TOPE_LECTURAS_FACTOR', porDefecto: 10, minimo: 1 }),
+      minimo: leerEntero(config?.get<string>('TOPE_LECTURAS_MINIMO'), { variable: 'TOPE_LECTURAS_MINIMO', porDefecto: 600, minimo: 1 }),
+      cuarentenaHora: leerEntero(config?.get<string>('TOPE_CUARENTENA_HORA'), { variable: 'TOPE_CUARENTENA_HORA', porDefecto: 60, minimo: 1 }),
+    };
   }
 
   onModuleInit(): void {
@@ -100,8 +114,10 @@ export class RecepcionService implements OnModuleInit {
     if (dePasarela) return this.procesarDePasarela(trama, dePasarela);
     const partes = PATRON_TOPICO.exec(topico);
     if (!partes) {
+      // Sin identidad en el tópico, una sola cuota compartida: es ruido, y el broker ya exige credencial para publicar.
       return this.cuarentena(trama, 'malformada',
-        'tópico fuera de los dos patrones: sitio/<sitio>/dispositivo/<id>/<magnitud> o sitio/<sitio>/pasarela/<id>/[device/]<deveui>/[event/]<evento>');
+        'tópico fuera de los dos patrones: sitio/<sitio>/dispositivo/<id>/<magnitud> o sitio/<sitio>/pasarela/<id>/[device/]<deveui>/[event/]<evento>',
+        this.cuotaSinAlta.contador('sin-patron', recibidoEn));
     }
     const ctx: ContextoTrama = { topico, idFisico: partes[2], magnitudTopico: partes[3].toLowerCase(), carga };
 
@@ -110,17 +126,18 @@ export class RecepcionService implements OnModuleInit {
     // Sin credencial la trama ni siquiera llega aquí: la corta el broker (allow_anonymous false + ACL).
     // Llega con credencial válida y sin alta, o con alta dada de baja: la clave vive en el plugin del broker (docs/10 §8.4
     // punto 42) y el alta en la base. Un dado de baja SÍ queda identificado: es la señal de que su clave sigue viva.
-    if (!dispositivo) return this.cuarentena(trama, 'no_registrado', `id_fisico=${limpia(ctx.idFisico, 64)} sin alta en la plataforma`);
+    const cuota = this.cuotaSinAlta.contador(`id:${limpia(ctx.idFisico, 64)}`, recibidoEn); // el emisor, por su identificador
+    if (!dispositivo) return this.cuarentena(trama, 'no_registrado', `id_fisico=${limpia(ctx.idFisico, 64)} sin alta en la plataforma`, cuota);
     if (dispositivo.estado === 'baja') {
       return this.cuarentena({ ...trama, dispositivoId: dispositivo.id },
-        'dado_de_baja', `id_fisico=${limpia(ctx.idFisico, 64)}: revocar su credencial en el broker`);
+        'dado_de_baja', `id_fisico=${limpia(ctx.idFisico, 64)}: revocar su credencial en el broker`, cuota);
     }
     // El sitio del tópico debe ser el registrado (08/10, docs/10 §8.4 punto 24): la ACL acepta cualquiera en ese nivel (`+`),
     // así que lo comprueba el pipeline. Sin esto, un dispositivo podría publicar bajo el sitio de otra sede. No se marca
     // vivo: no pasó el filtro 1.
     if (dispositivo.sitio_codigo !== partes[1]) {
       return this.cuarentena({ ...trama, dispositivoId: dispositivo.id }, 'no_registrado',
-        `id_fisico=${ctx.idFisico} está registrado en el sitio «${dispositivo.sitio_codigo}», no en «${limpia(partes[1], 64)}»`);
+        `id_fisico=${ctx.idFisico} está registrado en el sitio «${dispositivo.sitio_codigo}», no en «${limpia(partes[1], 64)}»`, cuota);
     }
     trama.dispositivoId = dispositivo.id;
     await this.filtros2a6(trama, ctx, dispositivo, false); // MQTT no responde al emisor: el resumen no se usa
@@ -135,11 +152,12 @@ export class RecepcionService implements OnModuleInit {
     const deveuiTopico = partes[3] ?? partes[5]; // forma nativa (device/<deveui>/event/<evento>) o la propia (<deveui>/<evento>)
     const evento = partes[4] ?? partes[6];
     const pasarela = await this.buscarPasarela(idPasarela);
-    if (!pasarela) return this.cuarentena(trama, 'no_registrado', `pasarela ${limpia(idPasarela, 64)} sin alta en la plataforma`);
-    if (!pasarela.activo) return this.cuarentena(trama, 'no_registrado', `pasarela ${limpia(idPasarela, 64)} inactiva: revocar su credencial en el broker`);
+    const cuota = this.cuotaSinAlta.contador(`pasarela:${limpia(idPasarela, 64)}`, trama.recibidoEn); // el emisor es la pasarela
+    if (!pasarela) return this.cuarentena(trama, 'no_registrado', `pasarela ${limpia(idPasarela, 64)} sin alta en la plataforma`, cuota);
+    if (!pasarela.activo) return this.cuarentena(trama, 'no_registrado', `pasarela ${limpia(idPasarela, 64)} inactiva: revocar su credencial en el broker`, cuota);
     if (pasarela.sitio_codigo !== sitio) {
       return this.cuarentena(trama, 'no_registrado',
-        `pasarela ${limpia(idPasarela, 64)} está registrada en el sitio «${pasarela.sitio_codigo}», no en «${limpia(sitio, 64)}»`);
+        `pasarela ${limpia(idPasarela, 64)} está registrada en el sitio «${pasarela.sitio_codigo}», no en «${limpia(sitio, 64)}»`, cuota);
     }
     if (evento !== 'up') {
       // Depuración, no información: ChirpStack emite status, ack y log por cada nodo, y con muchos nodos llenarían el registro.
@@ -149,25 +167,37 @@ export class RecepcionService implements OnModuleInit {
     const deveui = deveuiTopico.toLowerCase();
     const nodo = await this.buscarDispositivo(deveui);
     if (!nodo || nodo.pasarela_id !== pasarela.id) {
-      return this.cuarentena(trama, 'no_registrado', `DevEUI ${limpia(deveui)} no está asociado a la pasarela ${limpia(idPasarela, 64)}`);
+      return this.cuarentena(trama, 'no_registrado', `DevEUI ${limpia(deveui)} no está asociado a la pasarela ${limpia(idPasarela, 64)}`, cuota);
     }
     if (nodo.estado === 'baja') {
-      return this.cuarentena({ ...trama, dispositivoId: nodo.id }, 'dado_de_baja', `DevEUI ${deveui}: dado de baja`);
+      return this.cuarentena({ ...trama, dispositivoId: nodo.id }, 'dado_de_baja', `DevEUI ${deveui}: dado de baja`, cuota);
     }
     // El nodo y su pasarela son del mismo sitio por el alta; se comprueba igual (defensa en profundidad, revisión del 15/10).
     if (nodo.sitio_codigo !== sitio) {
-      return this.cuarentena({ ...trama, dispositivoId: nodo.id }, 'no_registrado', `DevEUI ${deveui} está registrado en el sitio «${nodo.sitio_codigo}», no en «${limpia(sitio, 64)}»`);
+      return this.cuarentena({ ...trama, dispositivoId: nodo.id }, 'no_registrado', `DevEUI ${deveui} está registrado en el sitio «${nodo.sitio_codigo}», no en «${limpia(sitio, 64)}»`, cuota);
     }
     trama.dispositivoId = nodo.id;
     const ctx: ContextoTrama = { topico: trama.topico, idFisico: deveui, magnitudTopico: '', carga: trama.carga, deveui, decodificador: nodo.decodificador ?? undefined };
-    await this.filtros2a6(trama, ctx, nodo, true);
+    await this.filtros2a6(trama, ctx, nodo, true, cuota);
   }
 
   // Filtros 2 a 6, comunes a las dos formas de tópico: el dispositivo ya pasó el filtro 1.
-  private async filtros2a6(trama: TramaRecibida, ctx: ContextoTrama, dispositivo: Dispositivo, dePasarela: boolean): Promise<ResumenTrama> {
+  // `cuotaPasarela`: por el tópico de una pasarela, la trama cuyo cuerpo no deja verificar el DevEUI no marca vivo al nodo ni escribe su
+  // fila de estado; su cuarentena cuenta en la cuota en memoria de la pasarela, el emisor que sí se autenticó (docs/10 §8.4 punto 53).
+  private async filtros2a6(trama: TramaRecibida, ctx: ContextoTrama, dispositivo: Dispositivo, dePasarela: boolean, cuotaPasarela?: ContadorCuota): Promise<ResumenTrama> {
     const { topico, carga, recibidoEn } = trama;
     let malformada: string | null = null;
     const sinLecturas = (): ResumenTrama => ({ guardadas: 0, duplicadas: 0, rechazos: [], malformada, repetida: false });
+    // ── Tope por emisor (docs/10 §8.4 punto 53): la ventana es la hora del reloj y sus contadores vienen en la fila de estado ──
+    // Si la fila es de otra hora, se parte de cero; el filtro 6 escribe los nuevos valores en el mismo INSERT de siempre.
+    const ventanaInicio = inicioDeVentana(recibidoEn);
+    const mismaVentana = dispositivo.ventana_inicio !== null && dispositivo.ventana_inicio.getTime() === ventanaInicio.getTime();
+    const antes = mismaVentana
+      ? { lecturas: dispositivo.ventana_lecturas, cuarentena: dispositivo.ventana_cuarentena, sobreTope: dispositivo.ventana_sobre_tope, omitidas: dispositivo.ventana_omitidas }
+      : { lecturas: 0, cuarentena: 0, sobreTope: 0, omitidas: 0 };
+    const cuota: ContadorCuota = { guardadas: antes.cuarentena, omitidas: antes.omitidas };
+    const cuotaSinIdentidad = cuotaPasarela ?? cuota; // cuando el nodo no se marca vivo, la fila de estado no se escribe
+    let sobreTope = 0;
 
     // ── [2] Analizar: el adaptador del formato declarado en el alta la traduce a lecturas (punto 47: no se adivina) ──
     // Una trama que no se entiende va a cuarentena, pero el pipeline NO termina aquí: el dispositivo ya
@@ -180,13 +210,13 @@ export class RecepcionService implements OnModuleInit {
     const adaptador = formatoEnSuTopico ? this.adaptadores.get(dispositivo.formato) : undefined;
     if (!adaptador) {
       malformada = `formato declarado ${dispositivo.formato}: no se recibe por este tópico`;
-      await this.cuarentena(trama, 'malformada', malformada);
+      await this.cuarentena(trama, 'malformada', malformada, dePasarela ? cuotaSinIdentidad : cuota);
       // Por el tópico de pasarela sin un adaptador de pasarela nadie verificó el DevEUI: no se marca vivo (§4.1). Hoy lo impide la
       // clave foránea compuesta de la migración 15; esto cierra el camino si esa regla cambiara (defensa en profundidad).
       if (dePasarela) return sinLecturas();
     } else if (!adaptador.reconoce(ctx)) {
       malformada = `formato declarado ${dispositivo.formato}: la trama no tiene esa forma`;
-      await this.cuarentena(trama, 'malformada', malformada);
+      await this.cuarentena(trama, 'malformada', malformada, dePasarela ? cuotaSinIdentidad : cuota);
       // Por el tópico de pasarela, una trama que ni siquiera tiene la forma no identifica al nodo: no se marca vivo (§4.1).
       if (dePasarela) return sinLecturas();
     } else {
@@ -197,18 +227,42 @@ export class RecepcionService implements OnModuleInit {
         // El contador pudo anotarse antes de fallar (p. ej. data corta): una trama que no se entendió no es «la repetida» (§4.1).
         ctx.fcnt = undefined;
         malformada = `formato declarado ${adaptador.nombre}: ${e.message}`;
-        await this.cuarentena(trama, 'malformada', malformada);
         // El cuerpo no deja verificar el DevEUI (otro, ausente o ilegible): no hay certeza de que sea del nodo, no se marca vivo (§4.1).
-        if (e instanceof IdentidadNoVerificada) return sinLecturas();
+        const sinIdentidad = e instanceof IdentidadNoVerificada;
+        await this.cuarentena(trama, 'malformada', malformada, sinIdentidad ? cuotaSinIdentidad : cuota);
+        if (sinIdentidad) return sinLecturas();
       }
     }
 
     // ── [3] Validar: una trama LoRaWAN que repite el contador de trama de la última guardada es la misma trama (docs/10 §4.1) ──
     // Se descarta entera, sin cuarentena; el nodo sí se marca vivo (llegó por su pasarela con su DevEUI verificado). Un contador
-    // menor se acepta: vuelve a cero cuando el nodo se une otra vez a la red. Leer, comparar y escribir sin bloqueo basta porque
-    // los mensajes se procesan de a uno (decisión 4, BrokerService).
-    const repetida = ctx.fcnt !== undefined && dispositivo.ultimo_fcnt !== null && Number(dispositivo.ultimo_fcnt) === ctx.fcnt;
+    // menor se acepta: vuelve a cero cuando el nodo se une otra vez a la red; y el 0 nunca se compara, porque es la primera trama de
+    // cada unión y la sesión anterior pudo terminar también en 0 (revisión del 17/10). Leer, comparar y escribir sin bloqueo basta
+    // porque los mensajes se procesan de a uno (decisión 4, BrokerService).
+    const repetida = ctx.fcnt !== undefined && ctx.fcnt !== 0 && dispositivo.ultimo_fcnt !== null && Number(dispositivo.ultimo_fcnt) === ctx.fcnt;
     if (repetida) lecturas = [];
+
+    // ── [3] Validar: ¿cabe la trama en el presupuesto de lecturas de la hora? (tope por emisor, docs/10 §8.4 punto 53) ──
+    // Se rechaza entera: una serie a medias confunde más que un hueco. La condición se abre una vez por ventana y la cierra la
+    // primera trama que entra dentro del presupuesto en una hora posterior. El dispositivo se marca vivo igual: es volumen, no enlace.
+    const tope = this.presupuesto(dispositivo);
+    let rechazoTope: string | null = null;
+    if (lecturas.length > 0 && antes.lecturas + lecturas.length > tope) {
+      const trae = lecturas.length;
+      rechazoTope = `tope de ${tope} lecturas por hora superado: ${antes.lecturas} ya aceptadas desde las ${ventanaInicio.toISOString().slice(11, 16)} UTC y la trama trae ${trae}; se rechaza entera`;
+      await this.cuarentena(trama, 'tope', rechazoTope, cuota);
+      sobreTope = 1;
+      lecturas = [];
+      if (antes.sobreTope === 0) {
+        await this.supervision.abrirTope(dispositivo.id, ctx.idFisico, { tope, aceptadas: antes.lecturas, trama: trae, ventana: ventanaInicio.toISOString() });
+      }
+    } else if (!mismaVentana && lecturas.length > 0) {
+      // Hora nueva y la trama cabe: si había condición abierta, se cierra (un UPDATE por dispositivo y hora; sin condición no hace nada).
+      // Si la hora nueva empezó con tramas sin lecturas, este camino no corre: la cierra el barrido de supervisión (revisión del 17/10).
+      await this.supervision.cerrarTope(dispositivo.id, ctx.idFisico, { ventana: ventanaInicio.toISOString(), rechazadas_hora_anterior: dispositivo.ventana_sobre_tope });
+    }
+    // Contra el presupuesto cuentan las lecturas examinadas, válidas o no: cada una cuesta una consulta (revisión del 17/10).
+    const examinadas = lecturas.length;
 
     // ── [3] Validar y [4] Normalizar, lectura por lectura ──
     // Los rechazos se acumulan: una trama con tres lecturas malas deja UNA fila de cuarentena (con su payload
@@ -265,7 +319,7 @@ export class RecepcionService implements OnModuleInit {
       await this.alertas.evaluar(dispositivo.id, canal.id, ctx.idFisico, valor, canal.unidad_canonica, dispositivo.estado === 'mantenimiento');
     }
 
-    if (rechazos.length) await this.cuarentena(trama, 'invalida', rechazos.join('; '));
+    if (rechazos.length) await this.cuarentena(trama, 'invalida', rechazos.join('; '), cuota);
     // Trama cruda aceptada (migración 09): solo si dejó al menos una lectura nueva. Una reentrega duplicada
     // no se vuelve a guardar: su original ya está. Vence a los RETENCION_TRAMA_DIAS (RetencionService).
     if (guardadas) {
@@ -277,14 +331,23 @@ export class RecepcionService implements OnModuleInit {
 
     // ── [6] Supervisar: el dispositivo dio señales de vida; si estaba "sin comunicación", se cierra ──
     // En estado_dispositivo, no en dispositivo: la fila que edita una persona no cambia con cada trama (migración 11).
-    // El contador de trama se guarda aquí, DESPUÉS de las lecturas y solo si dejó alguna nueva (migración 17): si el proceso se corta
-    // antes, la reentrega vuelve a pasar el filtro 3 y la absorbe el índice único de medicion, en vez de perderse (docs/10 §4.1).
+    // El contador de trama se guarda aquí, DESPUÉS de las lecturas y solo si la trama dejó huella (alguna lectura nueva o ya guardada,
+    // migración 17): si el proceso se corta antes, la reentrega vuelve a pasar el filtro 3, la absorbe el índice único de medicion y esa
+    // vez sí avanza el contador (docs/10 §4.1). Sin contador en la trama, se borra: la sesión nueva no hereda el de la anterior.
+    // Los contadores de la hora (migración 19) van en el mismo INSERT: se suman si la ventana es la misma, se reemplazan si cambió.
     const visto = await this.pool.query<{ visto_por_ultima_vez: Date }>(
-      `INSERT INTO estado_dispositivo (dispositivo_id, visto_por_ultima_vez, ultimo_fcnt) VALUES ($1, now(), $2)
+      `INSERT INTO estado_dispositivo (dispositivo_id, visto_por_ultima_vez, ultimo_fcnt, ventana_inicio, ventana_lecturas, ventana_cuarentena, ventana_sobre_tope, ventana_omitidas)
+       VALUES ($1, now(), $2, $3, $4, $5, $6, $7)
        ON CONFLICT (dispositivo_id) DO UPDATE SET visto_por_ultima_vez = EXCLUDED.visto_por_ultima_vez,
-         ultimo_fcnt = COALESCE(EXCLUDED.ultimo_fcnt, estado_dispositivo.ultimo_fcnt)
+         ultimo_fcnt = CASE WHEN $8 THEN EXCLUDED.ultimo_fcnt ELSE estado_dispositivo.ultimo_fcnt END,
+         ventana_inicio = EXCLUDED.ventana_inicio,
+         ventana_lecturas = CASE WHEN estado_dispositivo.ventana_inicio = EXCLUDED.ventana_inicio THEN estado_dispositivo.ventana_lecturas + EXCLUDED.ventana_lecturas ELSE EXCLUDED.ventana_lecturas END,
+         ventana_cuarentena = CASE WHEN estado_dispositivo.ventana_inicio = EXCLUDED.ventana_inicio THEN estado_dispositivo.ventana_cuarentena + EXCLUDED.ventana_cuarentena ELSE EXCLUDED.ventana_cuarentena END,
+         ventana_sobre_tope = CASE WHEN estado_dispositivo.ventana_inicio = EXCLUDED.ventana_inicio THEN estado_dispositivo.ventana_sobre_tope + EXCLUDED.ventana_sobre_tope ELSE EXCLUDED.ventana_sobre_tope END,
+         ventana_omitidas = CASE WHEN estado_dispositivo.ventana_inicio = EXCLUDED.ventana_inicio THEN estado_dispositivo.ventana_omitidas + EXCLUDED.ventana_omitidas ELSE EXCLUDED.ventana_omitidas END
        RETURNING visto_por_ultima_vez`,
-      [dispositivo.id, guardadas && ctx.fcnt !== undefined ? ctx.fcnt : null],
+      [dispositivo.id, ctx.fcnt ?? null, ventanaInicio, examinadas,
+        cuota.guardadas - antes.cuarentena, sobreTope, cuota.omitidas - antes.omitidas, guardadas + duplicadas > 0],
     );
     this.eventos.publicar({
       tipo: 'visto', dispositivo_id: dispositivo.id,
@@ -297,16 +360,14 @@ export class RecepcionService implements OnModuleInit {
       const ign = ctx.ignoradas?.length ? ` · ${ctx.ignoradas.length} clave(s) fuera del mapa: ${ctx.ignoradas.slice(0, 5).join(', ')}` : '';
       this.log.log(`${ctx.idFisico}: ${guardadas}/${lecturas.length} lecturas guardadas vía ${adaptador?.nombre}${dup}${ign}`);
     }
-    return { guardadas, duplicadas, rechazos, malformada, repetida };
+    return { guardadas, duplicadas, rechazos: rechazoTope !== null ? [rechazoTope, ...rechazos] : rechazos, malformada, repetida };
   }
 
-  // ── Vía HTTP (docs/10 §8.4 punto 52): el filtro 1 con el token y, después, los mismos filtros 2 a 6 que en MQTT ──
-  // Devuelve el id del dispositivo si el token es el de su credencial activa, el dispositivo es de vía http y no está de baja;
-  // si no, null, por cualquiera de esos motivos (la respuesta no dice cuál). Si el dispositivo no existe se calcula igual una huella,
-  // para que el tiempo de respuesta no revele cuáles existen.
-  async autenticarHttp(idFisico: string, token: string): Promise<string | null> {
-    // Con tiempo máximo: una consulta colgada retendría uno de los 2 cupos de verificación (topes.ts) y, con dos, toda la vía HTTP.
-    // pg lo lee de la consulta (`config.query_timeout`, pg 8.23 lib/client.js), aunque sus tipos no lo declaren.
+  // ── Vía HTTP (docs/10 §8.4 punto 52): el filtro 1 lo hace la capa HTTP (http/verificacion.ts) con lo que esta consulta entrega ──
+  // El dispositivo, su vía, su estado y la huella de su credencial activa (o sin fila si no existe). Corre fuera del cupo de scrypt;
+  // con tiempo máximo, para que una base colgada no deje peticiones colgadas. pg lo lee de la consulta (`config.query_timeout`,
+  // pg 8.23 lib/client.js), aunque sus tipos no lo declaren.
+  async credencialHttp(idFisico: string): Promise<CredencialHttp | undefined> {
     const consulta: QueryConfig & { query_timeout: number } = {
       text: `SELECT d.id, d.via, d.estado, c.hash FROM dispositivo d
                LEFT JOIN credencial c ON c.dispositivo_id = d.id AND c.activa
@@ -315,32 +376,31 @@ export class RecepcionService implements OnModuleInit {
       query_timeout: 5_000,
     };
     const r = await this.pool.query<CredencialHttp>(consulta);
-    const fila = r.rows[0];
-    const valida = await verificarScrypt(token, fila?.hash ?? (await this.huellaDeRelleno()));
-    if (!fila || !fila.hash || !valida || fila.via !== 'http' || fila.estado === 'baja') return null;
-    return fila.id;
+    return r.rows[0];
   }
 
   // La trama ya autenticada: la misma tubería que en MQTT. `magnitud` la usa el formato `plano` (un número solo no dice qué mide).
+  // Una trama a la vez por identificador (docs/10 §8.4 punto 53 (iv)): el presupuesto de la hora se decide sobre los contadores que
+  // trae la fila de estado, y dos tramas solapadas del mismo dispositivo leerían la misma foto. Por MQTT ya van de a una (decisión 4).
+  private readonly enCursoHttp = new Map<string, Promise<ResumenTrama | null>>();
   async procesarHttp(idFisico: string, carga: Buffer, magnitud: string | undefined): Promise<ResumenTrama | null> {
     const recibidoEn = new Date();
     const topico = `/recepcion/${idFisico}`;
-    const dispositivo = await this.buscarDispositivo(idFisico);
-    if (!dispositivo || dispositivo.estado === 'baja') return null; // se dio de baja entre la autenticación y aquí
-    const trama: TramaRecibida = { topico, carga, recibidoEn, dispositivoId: dispositivo.id, origen: 'http' };
-    const ctx: ContextoTrama = { topico, idFisico, magnitudTopico: (magnitud ?? '').toLowerCase(), carga };
-    return this.filtros2a6(trama, ctx, dispositivo, false);
-  }
-
-  // Una huella válida de un secreto que nadie conoce: verificar contra ella cuesta lo mismo que contra una real.
-  private rellenoHuella: Promise<string> | null = null;
-  private huellaDeRelleno(): Promise<string> {
-    // Si falla, no se guarda el fallo: la próxima vez se intenta de nuevo (si no, todo desconocido daría 500 hasta reiniciar).
-    this.rellenoHuella ??= hashScrypt(randomBytes(24).toString('base64url')).catch((e: unknown) => {
-      this.rellenoHuella = null;
-      throw e;
-    });
-    return this.rellenoHuella;
+    const trabajo = async (): Promise<ResumenTrama | null> => {
+      const dispositivo = await this.buscarDispositivo(idFisico); // se lee recién cuando le toca: contadores frescos
+      if (!dispositivo || dispositivo.estado === 'baja') return null; // se dio de baja entre la autenticación y aquí
+      const trama: TramaRecibida = { topico, carga, recibidoEn, dispositivoId: dispositivo.id, origen: 'http' };
+      const ctx: ContextoTrama = { topico, idFisico, magnitudTopico: (magnitud ?? '').toLowerCase(), carga };
+      return this.filtros2a6(trama, ctx, dispositivo, false);
+    };
+    const anterior = this.enCursoHttp.get(idFisico) ?? Promise.resolve(null);
+    const propia = anterior.then(trabajo, trabajo); // después de la anterior, termine como termine
+    this.enCursoHttp.set(idFisico, propia);
+    try {
+      return await propia;
+    } finally {
+      if (this.enCursoHttp.get(idFisico) === propia) this.enCursoHttp.delete(idFisico);
+    }
   }
 
   private async buscarPasarela(idFisico: string): Promise<Pasarela | undefined> {
@@ -353,7 +413,11 @@ export class RecepcionService implements OnModuleInit {
 
   private async buscarDispositivo(idFisico: string): Promise<Dispositivo | undefined> {
     const r = await this.pool.query<Dispositivo>(
-      `SELECT d.id, d.estado, d.formato, d.pasarela_id, s.codigo AS sitio_codigo, d.decodificador, e.ultimo_fcnt FROM dispositivo d
+      `SELECT d.id, d.estado, d.formato, d.pasarela_id, s.codigo AS sitio_codigo, d.decodificador, e.ultimo_fcnt, d.intervalo_esperado_s,
+              (SELECT count(*)::int FROM canal c WHERE c.dispositivo_id = d.id) AS canales, e.ventana_inicio,
+              COALESCE(e.ventana_lecturas, 0) AS ventana_lecturas, COALESCE(e.ventana_cuarentena, 0) AS ventana_cuarentena,
+              COALESCE(e.ventana_sobre_tope, 0) AS ventana_sobre_tope, COALESCE(e.ventana_omitidas, 0) AS ventana_omitidas
+         FROM dispositivo d
          JOIN zona z ON z.id = d.zona_id JOIN sitio s ON s.id = z.sitio_id
          LEFT JOIN estado_dispositivo e ON e.dispositivo_id = d.id
         WHERE d.id_fisico = $1`,
@@ -376,13 +440,31 @@ export class RecepcionService implements OnModuleInit {
   // La trama rechazada se guarda CRUDA con su motivo y su detalle: no contamina las series,
   // pero permite diagnosticar ("¿por qué el nodo 7 manda basura desde ayer?"). El detalle va a la base
   // (lo consulta el usuario y no vence con la rotación de logs) y también al log (lo observa el equipo).
-  private async cuarentena(t: TramaRecibida, motivo: Motivo, detalle: string): Promise<void> {
+  // Con cuota (docs/10 §8.4 punto 53 (iii)): por emisor y hora se guardan completas las primeras TOPE_CUARENTENA_HORA; las demás
+  // solo se cuentan, y el registro lo dice una vez por hora (la primera omitida). Sin contador (ninguna vía lo omite hoy), sin cuota.
+  private async cuarentena(t: TramaRecibida, motivo: Motivo, detalle: string, cuota?: ContadorCuota): Promise<void> {
+    if (cuota !== undefined && cuota.guardadas >= this.topes.cuarentenaHora) {
+      cuota.omitidas++;
+      if (cuota.omitidas === 1) {
+        this.log.warn(`cuarentena (${motivo}) ${limpia(t.topico, 256)} · ${detalle} · cuota de ${this.topes.cuarentenaHora} tramas por hora ` +
+          'alcanzada: las siguientes de este emisor solo se cuentan hasta la próxima hora');
+      }
+      return;
+    }
     await this.pool.query(
       `INSERT INTO cuarentena (origen, topico, motivo, payload_crudo, detalle, dispositivo_id, recibido_en)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [t.origen ?? 'mqtt', t.topico, motivo, t.carga, detalle, t.dispositivoId ?? null, t.recibidoEn],
     );
+    if (cuota !== undefined) cuota.guardadas++;
     // El tópico crudo queda en su columna como evidencia; al registro va limpio (revisión del 15/10).
     this.log.warn(`cuarentena (${motivo}) ${limpia(t.topico, 256)} · ${detalle}`);
+  }
+
+  // Presupuesto de lecturas por hora (docs/10 §8.4 punto 53 (ii)): lo normal del dispositivo, por diez (cubre un reenvío de cola
+  // tras una caída), y nunca menos que el mínimo (un dispositivo lento también puede reenviar su cola).
+  private presupuesto(d: Dispositivo): number {
+    const porHora = Math.ceil(3600 / Math.max(1, d.intervalo_esperado_s));
+    return Math.max(this.topes.minimo, this.topes.factor * Math.max(1, d.canales) * porHora);
   }
 }

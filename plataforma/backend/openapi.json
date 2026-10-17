@@ -101,10 +101,10 @@
             "description": "No es JSON ni texto"
           },
           "422": {
-            "description": "No se entiende o ninguna lectura es válida; queda en cuarentena"
+            "description": "No se entiende, ninguna lectura es válida o no cabe en el presupuesto de la hora; queda en cuarentena"
           },
           "429": {
-            "description": "Demasiados fallos desde esta dirección, o más de una trama por segundo del dispositivo"
+            "description": "Demasiados fallos de autenticación (para este dispositivo desde esta dirección, o desde esta dirección con cualquier dispositivo), o más de una trama por segundo del dispositivo"
           },
           "503": {
             "description": "Verificación de tokens saturada; reintentar"

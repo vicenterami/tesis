@@ -9,7 +9,7 @@ export type EventoPanel =
   // porcentaje: con la calibración del canal (docs/10 §8.4 punto 51); null sin calibración. El panel no repite la cuenta.
   | { tipo: 'medicion'; dispositivo_id: string; canal_id: string; valor: number; unidad: string; tiempo: string; porcentaje: number | null }
   | { tipo: 'visto'; dispositivo_id: string; tiempo: string }
-  | { tipo: 'condicion'; dispositivo_id: string; condicion: 'umbral' | 'sin_comunicacion'; estado: 'abierta' | 'cerrada' }
+  | { tipo: 'condicion'; dispositivo_id: string; condicion: 'umbral' | 'sin_comunicacion' | 'tope_superado'; estado: 'abierta' | 'cerrada' }
   // Condición del sistema, sin dispositivo (docs/10 §8.4 punto 43): solo la reciben los flujos sin filtro (la vista general).
   | { tipo: 'sistema'; condicion: 'broker_descarte'; estado: 'abierta' | 'cerrada'; motivos: string[]; mensajes_en_cola: number; descartes_delta: number };
 

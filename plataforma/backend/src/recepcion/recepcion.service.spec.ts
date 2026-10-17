@@ -1,4 +1,5 @@
 import { Logger } from '@nestjs/common';
+import type { ConfigService } from '@nestjs/config';
 import { Pool } from 'pg';
 import { AlertasService } from '../alertas/alertas.service';
 import { BrokerService } from '../broker/broker.service';
@@ -9,6 +10,7 @@ import { resolverClave } from './adaptadores/mapa-claves';
 import { MilesightAdaptador } from './adaptadores/milesight.adaptador';
 import { PlanoAdaptador } from './adaptadores/plano.adaptador';
 import { SenmlAdaptador } from './adaptadores/senml.adaptador';
+import { inicioDeVentana } from './cuota';
 import { RecepcionService } from './recepcion.service';
 
 // Prueba el CONTRATO del pipeline con la base y los módulos vecinos simulados (docs/10 §4):
@@ -22,15 +24,18 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
   const T_BASE = new Date('2026-10-09T15:00:00.123456Z'); // la marca que «pone la base» en los RETURNING
 
   // El dispositivo de prueba declara «plano» salvo que la prueba diga otro formato (despacho por formato: docs/10 §8.4 punto 47).
-  type Disp = { id: string; estado: string; sitio_codigo?: string; formato?: string; pasarela_id?: string | null; decodificador?: string | null; ultimo_fcnt?: string | null };
+  type Disp = { id: string; estado: string; sitio_codigo?: string; formato?: string; pasarela_id?: string | null; decodificador?: string | null; ultimo_fcnt?: string | null;
+    intervalo_esperado_s?: number; canales?: number; ventana_inicio?: Date | null; ventana_lecturas?: number; ventana_cuarentena?: number; ventana_sobre_tope?: number; ventana_omitidas?: number };
   type Pas = { id: string; activo: boolean; sitio_codigo: string };
   // escala: la calibración del canal (migración 18); por defecto, sin calibración.
-  function armar(dispositivo: Disp | undefined, duplicada = false, pasarela?: Pas, escala: { cero: number; cien: number } | null = null) {
+  // topes: las variables del tope por emisor (docs/10 §8.4 punto 53); por defecto, los valores de producción.
+  function armar(dispositivo: Disp | undefined, duplicada = false, pasarela?: Pas, escala: { cero: number; cien: number } | null = null, topes: Record<string, string> = {}) {
     const canal = { id: 'k1', magnitud: 'temperatura', unidad_canonica: 'Cel', rango_min: -40, rango_max: 85, escala_cero: escala?.cero ?? null, escala_cien: escala?.cien ?? null };
     const query = jest.fn((sql: string, params?: unknown[]) => {
       // El dispositivo de prueba está registrado en el sitio «uct», el mismo del tópico, salvo que la prueba diga otro.
-      if (sql.startsWith('SELECT d.id, d.estado, d.formato, d.pasarela_id, s.codigo AS sitio_codigo, d.decodificador, e.ultimo_fcnt FROM dispositivo')) {
-        const fila = { sitio_codigo: 'uct', formato: 'plano', pasarela_id: null, decodificador: null, ultimo_fcnt: null, ...dispositivo };
+      if (sql.startsWith('SELECT d.id, d.estado, d.formato, d.pasarela_id, s.codigo AS sitio_codigo, d.decodificador, e.ultimo_fcnt, d.intervalo_esperado_s')) {
+        const fila = { sitio_codigo: 'uct', formato: 'plano', pasarela_id: null, decodificador: null, ultimo_fcnt: null, intervalo_esperado_s: 60, canales: 1,
+          ventana_inicio: null, ventana_lecturas: 0, ventana_cuarentena: 0, ventana_sobre_tope: 0, ventana_omitidas: 0, ...dispositivo };
         return Promise.resolve({ rows: dispositivo ? [fila] : [], rowCount: dispositivo ? 1 : 0 });
       }
       if (sql.startsWith('SELECT p.id, p.activo, s.codigo AS sitio_codigo FROM pasarela')) {
@@ -49,15 +54,18 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
     const broker = { alRecibir: jest.fn() } as unknown as BrokerService;
     const evaluar = jest.fn();
     const marcarVivo = jest.fn();
+    const abrirTope = jest.fn();
+    const cerrarTope = jest.fn();
     const alertas = { evaluar } as unknown as AlertasService;
-    const supervision = { marcarVivo } as unknown as SupervisionService;
+    const supervision = { marcarVivo, abrirTope, cerrarTope } as unknown as SupervisionService;
     // Lo que el pipeline anuncia al panel en vivo (TT-39), en orden.
     const eventos = new EventosService();
     const publicados: EventoPanel[] = [];
     eventos.flujo().subscribe((e) => publicados.push(e));
+    const config = { get: (clave: string) => topes[clave] } as unknown as ConfigService;
     const servicio = new RecepcionService(pool, broker, alertas, supervision, eventos, new SenmlAdaptador(), new PlanoAdaptador(),
-      new ChirpstackAdaptador(resolverClave), new MilesightAdaptador(resolverClave));
-    return { servicio, query, marcarVivo, evaluar, publicados };
+      new ChirpstackAdaptador(resolverClave), new MilesightAdaptador(resolverClave), config);
+    return { servicio, query, marcarVivo, abrirTope, cerrarTope, evaluar, publicados };
   }
 
   const cuarentenas = (query: jest.Mock) =>
@@ -306,6 +314,33 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
       expect(trama[4]).toBe('chirpstack');
       expect(marcarVivo).toHaveBeenCalledWith('n1', '0101010101010101');
     });
+    it('la vía de pasarela pasa por el mismo tope por emisor: con el presupuesto de la hora agotado, el «up» se rechaza entero con «tope»', async () => {
+      const { servicio, query, marcarVivo, abrirTope } = armar({ ...NODO, intervalo_esperado_s: 3600, canales: 1, ventana_inicio: inicioDeVentana(new Date()), ventana_lecturas: 600 }, false, PAS);
+      await servicio.procesar(T_UP, up());
+      expect(cuarentenas(query)).toEqual(['tope']);
+      expect(query.mock.calls.some(([sql]) => String(sql).trimStart().startsWith('INSERT INTO medicion'))).toBe(false);
+      expect(abrirTope).toHaveBeenCalledWith('n1', '0101010101010101', expect.objectContaining({ tope: 600 }));
+      expect(marcarVivo).toHaveBeenCalled();
+    });
+    it('las tres salidas sin DevEUI verificado (JSON roto, DevEUI distinto del tópico, formato directo bajo la pasarela) cuentan en la cuota de la pasarela, no en la fila del nodo: con cuota 2, la tercera no se guarda y el nodo no se marca vivo', async () => {
+      const casos: [Disp, Buffer][] = [
+        [NODO, Buffer.from('{no es json')], // la trama no tiene la forma del formato
+        [NODO, up('0202020202020202')], // el adaptador la entiende, pero el DevEUI del cuerpo no es el del tópico
+        [{ ...NODO, formato: 'senml' }, Buffer.from('[{"n":"temperatura","v":1}]')], // un formato directo no se recibe por este tópico
+      ];
+      for (const [nodo, cuerpo] of casos) {
+        const { servicio, query, marcarVivo } = armar(nodo, false, PAS, null, { TOPE_CUARENTENA_HORA: '2' });
+        for (let i = 0; i < 3; i++) await servicio.procesar(T_UP, cuerpo);
+        expect(cuarentenas(query)).toEqual(['malformada', 'malformada']);
+        expect(marcarVivo).not.toHaveBeenCalled();
+        expect(query.mock.calls.some(([sql]) => String(sql).startsWith('INSERT INTO estado_dispositivo'))).toBe(false);
+      }
+    });
+    it('un DevEUI desconocido tiene cuota en memoria por pasarela: con cuota 2, la tercera trama no se guarda', async () => {
+      const { servicio, query } = armar({ ...NODO, pasarela_id: 'otra' }, false, PAS, null, { TOPE_CUARENTENA_HORA: '2' });
+      for (let i = 0; i < 3; i++) await servicio.procesar(T_UP, up());
+      expect(cuarentenas(query)).toEqual(['no_registrado', 'no_registrado']);
+    });
     it('un evento distinto de «up» (join) se anota y termina: no escribe nada en la base (punto 27)', async () => {
       const { servicio, query, marcarVivo } = armar(NODO, false, PAS);
       await servicio.procesar('sitio/uct/pasarela/chirpstack-campus/0101010101010101/join', Buffer.from('{}'));
@@ -392,7 +427,11 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
     const T_NATIVO = 'sitio/uct/pasarela/ug65-campus/device/0101010101010101/event/up';
     const conFcnt = (fCnt: number) => Buffer.from(JSON.stringify({ time: '2026-10-15T12:00:00Z', fCnt, deviceInfo: { devEui: '0101010101010101' }, object: { temperature: 21.5 } }));
     const medicionesDe = (query: jest.Mock) => query.mock.calls.filter(([sql]) => String(sql).trimStart().startsWith('INSERT INTO medicion'));
-    const fcntGuardado = (query: jest.Mock) => (query.mock.calls.find(([sql]) => String(sql).startsWith('INSERT INTO estado_dispositivo'))?.[1] as unknown[])?.[1];
+    // Lo que el INSERT de estado deja en ultimo_fcnt: el valor si la trama dejó huella ($8), «borrado» si la dejó sin contador, «sin cambio» si no.
+    const fcntGuardado = (query: jest.Mock) => {
+      const p = query.mock.calls.find(([sql]) => String(sql).startsWith('INSERT INTO estado_dispositivo'))?.[1] as unknown[] | undefined;
+      return p === undefined || !p[7] ? 'sin cambio' : (p[1] ?? 'borrado');
+    };
     it('sufijo nativo device/<deveui>/event/up → el mismo filtro 1 y la lectura guardada; event/join → nada escrito', async () => {
       const { servicio, query, marcarVivo } = armar(NODO, false, PAS);
       await servicio.procesar(T_NATIVO, up());
@@ -422,7 +461,7 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
       expect(query.mock.calls.some(([sql]) => String(sql).startsWith('INSERT INTO trama'))).toBe(false);
       expect(evaluar).not.toHaveBeenCalled();
       expect(marcarVivo).toHaveBeenCalledWith('n1', '0101010101010101');
-      expect(fcntGuardado(query)).toBeNull(); // COALESCE conserva el que había
+      expect(fcntGuardado(query)).toBe('sin cambio'); // el SQL conserva el que había
     });
     it('una trama que repite el fCnt pero el adaptador no entiende → malformada, y NO se anota como repetida (revisión del 16/10)', async () => {
       const log = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
@@ -445,16 +484,27 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
         expect(fcntGuardado(query)).toBe(fCnt);
       }
     });
-    it('el contador solo se guarda si la trama dejó alguna lectura nueva: repetida por canal + instante, o sin fCnt → no cambia', async () => {
-      const dup = armar({ ...NODO, ultimo_fcnt: '10' }, true, PAS); // ON CONFLICT DO NOTHING: nada nuevo
+    it('el contador se escribe cuando la trama dejó huella: con fCnt, ese valor (también si las lecturas ya estaban: reentrega tras un corte); sin fCnt, se borra; rechazada entera, no cambia', async () => {
+      const dup = armar({ ...NODO, ultimo_fcnt: '10' }, true, PAS); // ON CONFLICT DO NOTHING: ya estaban, pero la trama es la 11
       await dup.servicio.procesar(T_UP, conFcnt(11));
-      expect(fcntGuardado(dup.query)).toBeNull();
-      const sinFcnt = armar(NODO, false, PAS);
+      expect(fcntGuardado(dup.query)).toBe(11);
+      const sinFcnt = armar({ ...NODO, ultimo_fcnt: '10' }, false, PAS); // ChirpStack omite el 0: sesión nueva, sin contador
       await sinFcnt.servicio.procesar(T_UP, up());
-      expect(fcntGuardado(sinFcnt.query)).toBeNull();
+      expect(fcntGuardado(sinFcnt.query)).toBe('borrado');
       const primera = armar(NODO, false, PAS); // nodo sin contador guardado todavía
       await primera.servicio.procesar(T_UP, conFcnt(0));
       expect(fcntGuardado(primera.query)).toBe(0);
+      const rechazada = armar({ ...NODO, ultimo_fcnt: '10' }, false, PAS); // 999 Cel: fuera de rango, ninguna lectura guardada
+      await rechazada.servicio.procesar(T_UP, up('0101010101010101', { temperature: 999 }));
+      expect(cuarentenas(rechazada.query)).toEqual(['invalida']);
+      expect(fcntGuardado(rechazada.query)).toBe('sin cambio');
+    });
+    it('el fCnt 0 nunca se compara: tras una re-unión, la trama 0 se guarda aunque la última guardada también fuera la 0 (revisión del 17/10)', async () => {
+      const { servicio, query, marcarVivo } = armar({ ...NODO, ultimo_fcnt: '0' }, false, PAS);
+      await servicio.procesar(T_UP, conFcnt(0));
+      expect(medicionesDe(query)).toHaveLength(1);
+      expect(fcntGuardado(query)).toBe(0);
+      expect(marcarVivo).toHaveBeenCalled();
     });
     it('el perfil del alta llega al adaptador: la captura saneada de la UG65 por el sufijo nativo → 18,16 °C guardados con su marca', async () => {
       const captura = { devEUI: '0101010101010101', fCnt: 142, fPort: 1, data: 'AgAAAI8HGBmYrw==', rxInfo: [], time: '2026-10-15T15:34:56.340333Z' };
@@ -478,6 +528,119 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
       await servicio.procesar(T_UP, Buffer.from('[{"n":"temperatura","v":1}]'));
       expect(detalle(query)).toBe('formato declarado senml: no se recibe por este tópico');
       expect(marcarVivo).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('tope por emisor (docs/10 §8.4 punto 53): presupuesto de lecturas por hora y cuota de cuarentena, en todas las vías', () => {
+    // La ventana es la hora del reloj en que corre la prueba (el pipeline usa «ahora»); solo en el instante exacto del cambio de hora
+    // esta fila quedaría en la hora anterior, y entonces la prueba se repite.
+    const VENTANA = inicioDeVentana(new Date());
+    const HORA_ANTERIOR = new Date(VENTANA.getTime() - 3_600_000);
+    const DOS = Buffer.from('[{"n":"temperatura","v":21},{"n":"temperatura","v":22}]');
+    const UNA = Buffer.from('[{"n":"temperatura","v":21}]');
+    const estado = (query: jest.Mock) => query.mock.calls.find(([sql]) => String(sql).startsWith('INSERT INTO estado_dispositivo'))?.[1] as unknown[];
+    const mediciones = (query: jest.Mock) => query.mock.calls.filter(([sql]) => String(sql).trimStart().startsWith('INSERT INTO medicion')).length;
+    // Un dispositivo SenML con 1 canal cada 3600 s: presupuesto = max(600, 10 × 1 × 1) = 600 lecturas por hora.
+    const LENTO: Disp = { id: 'd1', estado: 'activo', formato: 'senml', intervalo_esperado_s: 3600, canales: 1 };
+
+    it('la trama que no cabe en el presupuesto se rechaza entera: cuarentena «tope», condición abierta, ninguna medición, vivo igual, y el INSERT de estado suma 1 sobre el tope', async () => {
+      const { servicio, query, marcarVivo, abrirTope, cerrarTope } = armar({ ...LENTO, ventana_inicio: VENTANA, ventana_lecturas: 599 });
+      await servicio.procesar(TOPICO, DOS);
+      expect(cuarentenas(query)).toEqual(['tope']);
+      expect(mediciones(query)).toBe(0);
+      expect(abrirTope).toHaveBeenCalledWith('d1', 'dev-0001', expect.objectContaining({ tope: 600, aceptadas: 599, trama: 2 }));
+      expect(cerrarTope).not.toHaveBeenCalled();
+      expect(marcarVivo).toHaveBeenCalled();
+      expect(estado(query).slice(2, 7)).toEqual([VENTANA, 0, 1, 1, 0]); // ventana, lecturas, cuarentena (la fila «tope»), sobre el tope, omitidas
+    });
+    it('dentro del presupuesto se guarda y el INSERT de estado suma las lecturas aceptadas; con el tope ya superado en la hora no se abre otra condición', async () => {
+      const dentro = armar({ ...LENTO, ventana_inicio: VENTANA, ventana_lecturas: 599 });
+      await dentro.servicio.procesar(TOPICO, UNA);
+      expect(cuarentenas(dentro.query)).toEqual([]);
+      expect(mediciones(dentro.query)).toBe(1);
+      expect(estado(dentro.query).slice(2, 7)).toEqual([VENTANA, 1, 0, 0, 0]);
+      const otraVez = armar({ ...LENTO, ventana_inicio: VENTANA, ventana_lecturas: 600, ventana_sobre_tope: 1 });
+      await otraVez.servicio.procesar(TOPICO, UNA);
+      expect(cuarentenas(otraVez.query)).toEqual(['tope']);
+      expect(otraVez.abrirTope).not.toHaveBeenCalled(); // ya estaba abierta en esta ventana
+    });
+    it('en una hora nueva los contadores viejos no cuentan y, si había tope superado, la condición se cierra', async () => {
+      const { servicio, query, cerrarTope, abrirTope } = armar({ ...LENTO, ventana_inicio: HORA_ANTERIOR, ventana_lecturas: 999, ventana_sobre_tope: 2 });
+      await servicio.procesar(TOPICO, UNA);
+      expect(mediciones(query)).toBe(1);
+      expect(cerrarTope).toHaveBeenCalledWith('d1', 'dev-0001', expect.objectContaining({ rechazadas_hora_anterior: 2 }));
+      expect(abrirTope).not.toHaveBeenCalled();
+      expect(estado(query).slice(2, 7)).toEqual([VENTANA, 1, 0, 0, 0]); // la ventana nueva reemplaza a la vieja (lo decide el SQL)
+    });
+    it('las lecturas inválidas también consumen presupuesto (cada una costó una consulta): dos de un canal no declarado suman 2 examinadas y 1 fila de cuarentena', async () => {
+      const { servicio, query } = armar({ ...LENTO, ventana_inicio: VENTANA, ventana_lecturas: 10 });
+      await servicio.procesar(TOPICO, Buffer.from('[{"n":"humedad","v":50},{"n":"humedad","v":51}]'));
+      expect(cuarentenas(query)).toEqual(['invalida']);
+      expect(mediciones(query)).toBe(0);
+      expect(estado(query).slice(2, 7)).toEqual([VENTANA, 2, 1, 0, 0]);
+    });
+    it('si la hora nueva empieza con una trama sin lecturas, el pipeline no cierra la condición (la cerrará el barrido de supervisión)', async () => {
+      const { servicio, query, cerrarTope } = armar({ ...LENTO, ventana_inicio: HORA_ANTERIOR, ventana_sobre_tope: 2 });
+      await servicio.procesar(TOPICO, Buffer.from('hola')); // formato senml: no es JSON
+      expect(cuarentenas(query)).toEqual(['malformada']);
+      expect(cerrarTope).not.toHaveBeenCalled();
+      expect(estado(query).slice(2, 7)).toEqual([VENTANA, 0, 1, 0, 0]); // la fila ya no dice «sobre el tope»
+    });
+    it('el presupuesto sale del dispositivo: 3 canales cada 60 s → 10 × 3 × 60 = 1800; con el mínimo bajo, 1799 + 2 no cabe y 1798 + 2 sí', async () => {
+      const RAPIDO: Disp = { id: 'd1', estado: 'activo', formato: 'senml', intervalo_esperado_s: 60, canales: 3 };
+      const no = armar({ ...RAPIDO, ventana_inicio: VENTANA, ventana_lecturas: 1799 }, false, undefined, null, { TOPE_LECTURAS_MINIMO: '1' });
+      await no.servicio.procesar(TOPICO, DOS);
+      expect(cuarentenas(no.query)).toEqual(['tope']);
+      const si = armar({ ...RAPIDO, ventana_inicio: VENTANA, ventana_lecturas: 1798 }, false, undefined, null, { TOPE_LECTURAS_MINIMO: '1' });
+      await si.servicio.procesar(TOPICO, DOS);
+      expect(cuarentenas(si.query)).toEqual([]);
+      expect(mediciones(si.query)).toBe(2);
+    });
+    it('cuota de cuarentena: con la cuota de la hora llena, una trama rechazada solo se cuenta (ninguna fila) y queda en omitidas; vivo igual', async () => {
+      const llena = armar({ id: 'd1', estado: 'activo', ventana_inicio: VENTANA, ventana_cuarentena: 2 }, false, undefined, null, { TOPE_CUARENTENA_HORA: '2' });
+      await llena.servicio.procesar(TOPICO, Buffer.from('hola')); // formato plano: no es un número
+      expect(cuarentenas(llena.query)).toEqual([]);
+      expect(estado(llena.query).slice(2, 7)).toEqual([VENTANA, 0, 0, 0, 1]);
+      expect(llena.marcarVivo).toHaveBeenCalled();
+      const conSitio = armar({ id: 'd1', estado: 'activo', ventana_inicio: VENTANA, ventana_cuarentena: 1 }, false, undefined, null, { TOPE_CUARENTENA_HORA: '2' });
+      await conSitio.servicio.procesar(TOPICO, Buffer.from('hola'));
+      expect(cuarentenas(conSitio.query)).toEqual(['malformada']);
+      expect(estado(conSitio.query).slice(2, 7)).toEqual([VENTANA, 0, 1, 0, 0]);
+    });
+    it('por HTTP, dos tramas del mismo identificador van de a una: la segunda lee la fila de estado recién cuando la primera terminó', async () => {
+      const { servicio, query } = armar({ ...LENTO, ventana_inicio: VENTANA, ventana_lecturas: 0 });
+      let soltar!: () => void;
+      const traba = new Promise<void>((r) => (soltar = r));
+      const original = query.getMockImplementation() as (sql: string, params?: unknown[]) => Promise<unknown>;
+      let primeraInsercion = true;
+      (query as jest.Mock).mockImplementation((sql: string, params?: unknown[]) => {
+        if (String(sql).trimStart().startsWith('INSERT INTO medicion') && primeraInsercion) { primeraInsercion = false; return traba.then(() => original(sql, params)); }
+        return original(sql, params);
+      });
+      const a = servicio.procesarHttp('dev-0001', UNA, undefined);
+      await new Promise((r) => setImmediate(r));
+      const b = servicio.procesarHttp('dev-0001', UNA, undefined);
+      await new Promise((r) => setImmediate(r));
+      const lecturasDeEstado = () => query.mock.calls.filter(([sql]) => String(sql).startsWith('SELECT d.id, d.estado, d.formato')).length;
+      expect(lecturasDeEstado()).toBe(1); // la segunda todavía no leyó: espera a la primera
+      soltar();
+      await Promise.all([a, b]);
+      expect(lecturasDeEstado()).toBe(2);
+      expect(mediciones(query)).toBe(2);
+    });
+    it('la vía HTTP pasa por el mismo tope: el resumen trae el motivo para el 422', async () => {
+      const { servicio, query } = armar({ ...LENTO, ventana_inicio: VENTANA, ventana_lecturas: 599 });
+      const r = await servicio.procesarHttp('dev-0001', DOS, undefined);
+      expect(r?.guardadas).toBe(0);
+      expect(r?.rechazos[0]).toMatch(/^tope de 600 lecturas por hora superado: 599 ya aceptadas/);
+      expect(cuarentenas(query)).toEqual(['tope']);
+    });
+    it('lo que el filtro 1 rechaza tiene cuota en memoria por emisor: con cuota 2, la tercera trama de un identificador sin alta no se guarda', async () => {
+      const { servicio, query } = armar(undefined, false, undefined, null, { TOPE_CUARENTENA_HORA: '2' });
+      for (let i = 0; i < 3; i++) await servicio.procesar(TOPICO, UNA);
+      expect(cuarentenas(query)).toEqual(['no_registrado', 'no_registrado']);
+      await servicio.procesar('sitio/uct/dispositivo/dev-0002/temperatura', UNA); // otro emisor, otra cuota
+      expect(cuarentenas(query)).toHaveLength(3);
     });
   });
 });

@@ -9,6 +9,9 @@ LOG_DIR="${VERIFICAR_LOG_DIR:-privado/logs}"; mkdir -p "$LOG_DIR"
 exec > >(tee "$LOG_DIR/verificar-$(date +%F-%H%M%S).log") 2>&1
 echo "verificar-todo · $(date -Is) · commit $(git rev-parse --short HEAD 2>/dev/null || echo ?)"
 fallos=0; omitidos=""
+# 17/10: la capa del proxy exige PROXY_SECRETO (compose.proxy.yml, `:?`). Los pasos que resuelven la configuración con
+# `docker compose config` no levantan nada: les basta un valor de lectura, que no es una credencial ni se escribe en ningún lado.
+export PROXY_SECRETO="${PROXY_SECRETO:-solo-para-leer-la-configuracion-resuelta}"
 paso() { echo; echo "══ $1 ══"; }
 # Archivos de trabajo en una carpeta propia de cada corrida, que se borra al salir (08/10: con nombres fijos en /tmp, dos
 # corridas a la vez se pisaban y otro usuario del equipo podía leerlos o reemplazarlos antes de que se usaran).
@@ -42,12 +45,12 @@ docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -X -U p
   < plataforma/db/pruebas/convenciones.sql | tee "$VT"/convenciones.txt
 exige "$VT"/convenciones.txt "${PIPESTATUS[0]}" 7 || fallos=$((fallos+1))
 
-paso "1c. Reglas de identidad de las migraciones 11, 15, 16, 17 y 18, plantadas en una transacción que se deshace (docs/10 §8.4 puntos 24 y 47)"
+paso "1c. Reglas de identidad de las migraciones 11, 15, 16, 17, 18 y 19, plantadas en una transacción que se deshace (docs/10 §8.4 puntos 24 y 47)"
 # Pasarela y dispositivo no comparten identificador; lista blanca; LoRaWAN exige pasarela; código de sitio válido. Nada
 # queda en la base: el archivo termina en ROLLBACK. La carrera de dos altas simultáneas se probó a mano (docs/16 §13).
 docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -X -U plataforma -d plataforma -v ON_ERROR_STOP=1 -tA \
   < plataforma/db/pruebas/reglas-identidad.sql | tee "$VT"/identidad.txt
-exige "$VT"/identidad.txt "${PIPESTATUS[0]}" 25 || fallos=$((fallos+1))
+exige "$VT"/identidad.txt "${PIPESTATUS[0]}" 29 || fallos=$((fallos+1))
 
 paso "2. Migraciones aplicadas = archivos en db/init (cada NN-*.sql debe estar reflejado en la base)"
 # 02: índice por regla · 03: zona_horaria · 04: iso_utc · 05: convenciones (disparadores actualizado_en, pm2_5) · 06: índice único de medicion · 07: CHECK de cuarentena.motivo · 08: medicion.recibido_en y origen_tiempo · 09: trama y cuarentena como hypertables · 10: semántica de intervalo_esperado_s · 11: vía, pasarela, estado_dispositivo y sitio.codigo · 12: nombre ck_cuarentena_motivo
@@ -70,8 +73,9 @@ SELECT CASE WHEN (SELECT is_nullable='NO' AND column_default IS NULL FROM inform
 SELECT CASE WHEN EXISTS (SELECT 1 FROM pg_constraint WHERE conname='ck_credencial_titular' AND conrelid='credencial'::regclass) AND (SELECT is_nullable='YES' FROM information_schema.columns WHERE table_name='credencial' AND column_name='dispositivo_id') AND has_table_privilege('plataforma_app', 'pasarela', 'INSERT') AND has_column_privilege('plataforma_app', 'pasarela', 'activo', 'UPDATE') AND NOT has_column_privilege('plataforma_app', 'pasarela', 'formato', 'UPDATE') AND NOT has_column_privilege('plataforma_app', 'pasarela', 'sitio_id', 'UPDATE') THEN 'OK    16 credencial con un titular (dispositivo o pasarela); la aplicación inserta pasarelas y solo cambia su columna activo' ELSE 'FALLA 16 falta la credencial de pasarela o el permiso de la aplicación (migración 16)' END;
 SELECT CASE WHEN EXISTS (SELECT 1 FROM pg_constraint WHERE conname='ck_dispositivo_decodificador' AND conrelid='dispositivo'::regclass) AND EXISTS (SELECT 1 FROM pg_constraint WHERE conname='ck_dispositivo_decodificador_via' AND conrelid='dispositivo'::regclass) AND (SELECT data_type='bigint' FROM information_schema.columns WHERE table_name='estado_dispositivo' AND column_name='ultimo_fcnt') AND EXISTS (SELECT 1 FROM pg_constraint WHERE conname='ck_estado_dispositivo_ultimo_fcnt') AND EXISTS (SELECT 1 FROM magnitud WHERE codigo='tension' AND unidad_canonica='V') THEN 'OK    17 dispositivo.decodificador (lista y solo lorawan), estado_dispositivo.ultimo_fcnt (32 bits) y la magnitud tension (V)' ELSE 'FALLA 17 falta el perfil de decodificación, el contador de trama o la magnitud tension (migración 17)' END;
 SELECT CASE WHEN (SELECT count(*) FROM magnitud WHERE (codigo, unidad_canonica) IN (('temperatura_suelo','Cel'),('humedad_suelo','V')))=2 AND (SELECT count(*) FROM information_schema.columns WHERE table_name='canal' AND column_name IN ('escala_cero','escala_cien') AND data_type='double precision')=2 AND (SELECT pg_get_constraintdef(oid) LIKE '%Infinity%' FROM pg_constraint WHERE conname='ck_canal_escala' AND conrelid='canal'::regclass) THEN 'OK    18 magnitudes del suelo (temperatura_suelo en Cel, humedad_suelo en V) y la calibración por canal con su CHECK (finitas y distintas)' ELSE 'FALLA 18 faltan las magnitudes del suelo o la calibración del canal (migración 18)' END;
+SELECT CASE WHEN (SELECT count(*) FROM information_schema.columns WHERE table_name='estado_dispositivo' AND column_name IN ('ventana_inicio','ventana_lecturas','ventana_cuarentena','ventana_sobre_tope','ventana_omitidas'))=5 AND (SELECT pg_get_constraintdef(oid) LIKE '%''tope''%' FROM pg_constraint WHERE conname='ck_cuarentena_motivo' AND conrelid='cuarentena'::regclass) AND (SELECT pg_get_constraintdef(oid) LIKE '%tope_superado%' FROM pg_constraint WHERE conname='ck_condicion_tipo' AND conrelid='condicion'::regclass) AND EXISTS (SELECT 1 FROM pg_constraint WHERE conname='ck_estado_dispositivo_ventana' AND conrelid='estado_dispositivo'::regclass) THEN 'OK    19 contadores ventana_* en estado_dispositivo con su CHECK, motivo tope y condición tope_superado' ELSE 'FALLA 19 falta el tope por emisor (contadores ventana_*, motivo tope o condición tope_superado)' END;
 SQL
-exige "$VT"/mig.txt "${PIPESTATUS[0]}" 18 || fallos=$((fallos+1))
+exige "$VT"/mig.txt "${PIPESTATUS[0]}" 19 || fallos=$((fallos+1))
 # Toda migración en disco debe tener su comprobación arriba: una 08 nueva sin comprobación falla aquí,
 # no solo por el conteo en prosa del paso 2g.
 sin_chequeo=$(ls plataforma/db/init/ | grep -oE '^[0-9]{2}' | while read -r nn; do grep -q "^OK    $nn \|^FALLA $nn " "$VT"/mig.txt || echo "$nn"; done)
@@ -157,6 +161,14 @@ total=$(wc -l < "$VT"/ipv4.txt); ajenas=$(grep -vE ':(127\.[0-9]+\.[0-9]+\.[0-9]
 if [ "$rc" -gt 1 ] || [ "$total" -lt 1 ]; then echo "FALLA git grep falló ($rc) o no encontró ninguna dirección: no se revisó nada"; fallos=$((fallos+1))
 elif [ -n "$ajenas" ]; then echo "FALLA direcciones IPv4 que no son de loopback ni de documentación:"; echo "$ajenas" | cut -c1-120 | sed 's/^/  /'; fallos=$((fallos+1))
 else echo "OK    $total direcciones IPv4 en archivos versionados o nuevos: todas de loopback, 0.0.0.0 o de documentación"; fi
+
+paso "2f4. Sin hora de trabajo en los metadatos: ningún PDF versionado trae CreationDate ni ModDate (17/10)"
+# Chromium (mermaid-cli) escribe la fecha y la hora del render en el Info del PDF: un horario personal dentro de un binario versionado,
+# que 2f2 no ve porque mira prosa. El guion de figuras las quita con Ghostscript; aquí se revisan todos los PDF versionados, contándolos.
+n=0; con_fecha=""; while read -r f; do n=$((n+1)); pdfinfo "$f" 2>/dev/null | grep -qE '^(Creation|Mod)Date' && con_fecha="$con_fecha $f"; done < <(git ls-files '*.pdf')
+if [ "$n" -lt 1 ]; then echo "FALLA no hay PDF versionados: no se revisó nada"; fallos=$((fallos+1))
+elif [ -n "$con_fecha" ]; then echo "FALLA PDF versionados con fecha y hora en sus metadatos:$con_fecha"; fallos=$((fallos+1))
+else echo "OK    $n PDF versionados sin fecha ni hora en sus metadatos"; fi
 
 paso "2g. Migraciones citadas en prosa (docs e informe) == archivos NN-*.sql en disco"
 # Hallazgo del 26/09: informe y docs/12 decían «6 migraciones» cuando ya había 7 en disco (la 07 del 23/09).
@@ -288,13 +300,31 @@ malos=$(grep -lE '^\. "\$\(dirname "\$0"\)' plataforma/pruebas/*.sh plataforma/p
 if [ -n "$malos" ]; then echo "FALLA cargan con ruta relativa a \$0 (fallan según desde dónde se llamen):"; echo "$malos" | sed 's/^/  /'; fallos=$((fallos+1))
 else echo "OK    ningún guion carga lib-dynsec.sh con una ruta relativa a \$0"; fi
 
-paso "2z. Limpieza programada y cola vigilada: toda variable RETENCION_* y METRICA_BROKER_* del .env.example llega al backend por el compose (14/10)"
+paso "2z. Toda variable RETENCION_*, METRICA_BROKER_*, TOPE_* y PROXY_SECRETO del .env.example llega al backend por el compose (14/10; topes y secreto del proxy, 17/10)"
 # Hasta el 14/10 el compose no las reenviaba: cambiarlas en el .env no tenía efecto y nadie lo notaba.
-faltan=$(grep -oE '^#?(RETENCION|METRICA_BROKER)_[A-Z_]+' plataforma/.env.example | tr -d '#' | sort -u | while read -r v; do grep -qE "^\s+$v:" plataforma/docker-compose.yml || echo "$v"; done)
-n=$(grep -cE '^#?(RETENCION|METRICA_BROKER)_[A-Z_]+=' plataforma/.env.example)
-if [ "$n" -lt 5 ]; then echo "FALLA solo $n variables RETENCION_/METRICA_BROKER_ en .env.example: revisó de menos"; fallos=$((fallos+1))
+faltan=$(grep -oE '^#?((RETENCION|METRICA_BROKER|TOPE)_[A-Z_]+|PROXY_SECRETO)' plataforma/.env.example | tr -d '#' | sort -u | while read -r v; do grep -qE "^\s+$v:" plataforma/docker-compose.yml || echo "$v"; done)
+n=$(grep -cE '^#?((RETENCION|METRICA_BROKER|TOPE)_[A-Z_]+|PROXY_SECRETO)=' plataforma/.env.example)
+if [ "$n" -lt 9 ]; then echo "FALLA solo $n variables RETENCION_/METRICA_BROKER_/TOPE_/PROXY_SECRETO en .env.example: revisó de menos"; fallos=$((fallos+1))
 elif [ -n "$faltan" ]; then echo "FALLA declaradas en .env.example pero el compose no las pasa al backend: $(echo $faltan)"; fallos=$((fallos+1))
-else echo "OK    las $n variables de limpieza y cola llegan al backend por el compose"; fi
+else echo "OK    las $n variables de limpieza, cola, topes y secreto del proxy llegan al backend por el compose"; fi
+
+paso "2z2. Tope por emisor: las vías que docs/11 §3 declara con tope son exactamente las que entran por filtros2a6 (docs/10 §8.4 punto 53)"
+# 17/10: el tope vive en filtros2a6; una vía nueva que no pase por ahí no tendría tope. La fila de docs/11 nombra las vías; el código
+# llama a filtros2a6 una vez por vía. Si alguien agrega una vía (o una llamada) sin tocar la otra casa, aquí falla.
+vias=$(grep -oE 'Vías con tope: [^;|]+' docs/11-seguridad.md | head -1 | sed -E 's/^Vías con tope: //; s/ y /, /g' | tr ',' '\n' | grep -c .)
+llamadas=$(grep -cE 'this\.filtros2a6\(' plataforma/backend/src/recepcion/recepcion.service.ts) # con await (MQTT) o con return (HTTP); la definición no cuenta
+if [ "$vias" -lt 3 ] || [ "$llamadas" -lt 1 ]; then echo "FALLA no pude contar (vías=$vias, llamadas=$llamadas): revisó de menos"; fallos=$((fallos+1))
+elif [ "$vias" != "$llamadas" ]; then echo "FALLA docs/11 §3 declara $vias vías con tope y recepcion.service.ts entra a filtros2a6 desde $llamadas lugares"; fallos=$((fallos+1))
+else echo "OK    $vias vías con tope (docs/11 §3) = $llamadas entradas a filtros2a6"; fi
+
+paso "2m2. Sin NET_RAW en los cuatro servicios: cap_drop en el compose base y en la capa del proxy (docs/10 §8.4 punto 52, 17/10)"
+# Suplantar una dirección dentro de la red de Docker exige NET_RAW y ningún servicio la necesita. Se lee la configuración resuelta por
+# Compose (con el .env.example: aquí no se lee el .env real) y se exige NET_RAW o ALL en cap_drop de cada uno de los cuatro.
+faltan=$(docker compose -f plataforma/docker-compose.yml -f plataforma/proxy/compose.proxy.yml --env-file plataforma/.env.example config --format json 2>/dev/null \
+  | python3 -c "import sys,json; s=json.load(sys.stdin).get('services',{}); print(' '.join(n for n in ['timescaledb','mosquitto','backend','proxy'] if not ({'NET_RAW','ALL'} & set(s.get(n,{}).get('cap_drop') or []))))")
+if [ $? -ne 0 ]; then echo "FALLA no pude leer la configuración resuelta de Compose"; fallos=$((fallos+1))
+elif [ -n "$faltan" ]; then echo "FALLA servicios que conservan NET_RAW: $faltan"; fallos=$((fallos+1))
+else echo "OK    los cuatro servicios sueltan NET_RAW (el backend, todas las capacidades)"; fi
 
 paso "2l. Topes del broker (docs/11 §4; docs/10 §8.4 punto 43): max_packet_size <= 64 KiB; cola 10000 mensajes / 20 MB en la pila y el banco; autosave 300 s; el backend lee el mismo tope"
 # Sin tope, Mosquitto 2.0.22 aceptó 50 MiB (observado el 07/10): un dispositivo con credencial podría llenar el disco.
@@ -337,10 +367,11 @@ elif ! docker build -q -t "$IMG_PROXY" plataforma/proxy >"$VT"/build-proxy.txt 2
 # si la plantilla no se procesara, nginx -t validaría la configuración de fábrica de la imagen y pasaría igual.
 elif docker run --rm -v "$PWD/plataforma/proxy/nginx.conf:/plantilla/nginx.conf.template:ro" -v "$CERTS_DEV:/certs:ro" \
        -e NGINX_ENVSUBST_TEMPLATE_DIR=/plantilla -e NGINX_ENVSUBST_OUTPUT_DIR=/etc/nginx -e NGINX_ENVSUBST_FILTER=^PROXY_ \
-       -e PROXY_NOMBRE=prueba.example "$IMG_PROXY" nginx -T >"$VT"/nginx.txt 2>&1; then
+       -e PROXY_NOMBRE=prueba.example -e PROXY_SECRETO=secreto-de-prueba-solo-para-renderizar "$IMG_PROXY" nginx -T >"$VT"/nginx.txt 2>&1; then
   if [ "$(grep -c 'server_name prueba.example;' "$VT"/nginx.txt)" = 2 ] && grep -q 'ssl_reject_handshake on;' "$VT"/nginx.txt \
-     && grep -q 'proxy_set_header   Host \$http_host;' "$VT"/nginx.txt && ! grep -q '\${PROXY_NOMBRE}' "$VT"/nginx.txt; then
-    echo "OK    nginx -T: plantilla renderizada y válida ($BASE_PROXY + parches): server_name en 443 y 80, saludo TLS rechazado para otros nombres"
+     && grep -q 'proxy_set_header   Host \$http_host;' "$VT"/nginx.txt && ! grep -q '\${PROXY_NOMBRE}' "$VT"/nginx.txt \
+     && grep -q 'X-Proxy-Secreto "secreto-de-prueba-solo-para-renderizar"' "$VT"/nginx.txt; then
+    echo "OK    nginx -T: plantilla renderizada y válida ($BASE_PROXY + parches): server_name en 443 y 80, saludo TLS rechazado para otros nombres, secreto del proxy en la cabecera"
   else echo "FALLA nginx -T pasó pero lo renderizado no es la plantilla con el nombre puesto (¿se montó en /etc/nginx/nginx.conf?)"; fallos=$((fallos+1)); fi
 else echo "FALLA nginx -T:"; grep -E "emerg|nginx:" "$VT"/nginx.txt | sed 's/^/  /'; fallos=$((fallos+1)); fi
 

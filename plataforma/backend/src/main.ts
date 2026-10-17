@@ -33,10 +33,8 @@ async function arrancar(): Promise<void> {
   // Referrer-Policy; y helmet retira X-Powered-By. HSTS queda fuera A PROPÓSITO: solo tiene sentido
   // detrás de TLS y lo pondrá una sola capa (el proxy) cuando exista; dos capas serían dos fuentes.
   app.use(helmet({ strictTransportSecurity: false }));
-  // La dirección del cliente (la usan los topes de la recepción por HTTP, docs/10 §8.4 punto 52): detrás del proxy, todas las
-  // peticiones llegan desde él; el proxy la manda en X-Forwarded-For, reemplazándola (proxy/nginx.conf). Se confía en esa cabecera
-  // solo si la petición viene de loopback o de una red privada, que es por donde llega el proxy (el puerto se publica en 127.0.0.1).
-  app.set('trust proxy', 'loopback, uniquelocal');
+  // La dirección del cliente la resuelve la recepción por HTTP con el secreto compartido del proxy (recepcion/http/direccion.ts,
+  // docs/10 §8.4 punto 52): Express no debe creer X-Forwarded-For por sí solo, así que `trust proxy` queda apagado (su valor por defecto).
   // El cuerpo de la recepción por HTTP llega crudo, como por MQTT, y con el mismo tope que el broker (max_packet_size, 64 KiB). Va
   // antes del lector de JSON que Nest agrega al iniciar: para /recepcion manda este. Un cuerpo de más responde 413 en JSON.
   // Sin distinguir mayúsculas, como el enrutador de Express: con startsWith, /RECEPCION/… llegaba a la ruta con el cuerpo de JSON.

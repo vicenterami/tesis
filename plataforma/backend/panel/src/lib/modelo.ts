@@ -2,7 +2,7 @@
 // cada respuesta) y lo que emite el canal en vivo (eventos.service.ts). Los nombres son los de las columnas: el panel no renombra nada.
 // El panel y la API van siempre juntos (el backend sirve el panel desde la misma imagen): no se tolera un backend de otra versión.
 export type EstadoAdministrativo = 'activo' | 'mantenimiento' | 'baja';
-export type TipoCondicion = 'sin_comunicacion' | 'umbral' | 'bateria' | 'manipulacion';
+export type TipoCondicion = 'sin_comunicacion' | 'umbral' | 'bateria' | 'manipulacion' | 'tope_superado';
 
 export interface CanalResumen {
   id: string;
@@ -100,7 +100,7 @@ export interface TramaRechazada {
   id: string;
   origen: string;
   topico: string | null;
-  motivo: 'no_registrado' | 'dado_de_baja' | 'malformada' | 'invalida';
+  motivo: 'no_registrado' | 'dado_de_baja' | 'malformada' | 'invalida' | 'tope';
   detalle: string | null;
   dispositivo: string | null;
   recibido_en: string;

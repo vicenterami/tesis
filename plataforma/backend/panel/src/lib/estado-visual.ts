@@ -14,7 +14,8 @@ export const ROTULO: Readonly<Record<EstadoVisual, string>> = {
 // Orden de atención en las listas: lo que requiere acción primero (docs/19 §4).
 export const ORDEN_ATENCION: readonly EstadoVisual[] = ['sin_senal', 'alerta', 'normal', 'inactivo'];
 
-const TIPOS_DE_ALERTA: readonly TipoCondicion[] = ['umbral', 'bateria', 'manipulacion'];
+// tope_superado (docs/10 §8.4 punto 53) es una alerta del dispositivo, no del enlace: manda más de lo que cabe en su hora.
+const TIPOS_DE_ALERTA: readonly TipoCondicion[] = ['umbral', 'bateria', 'manipulacion', 'tope_superado'];
 
 export function estadoVisual(
   d: Pick<DispositivoInventario, 'estado' | 'en_linea'>,
@@ -54,6 +55,7 @@ export const ROTULO_CONDICION: Readonly<Record<string, string>> = {
   umbral: 'Umbral',
   bateria: 'Batería',
   manipulacion: 'Manipulación',
+  tope_superado: 'Tope superado',
 };
 export const rotuloCondicion = (tipo: string): string => ROTULO_CONDICION[tipo] ?? tipo;
 

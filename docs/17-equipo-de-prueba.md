@@ -164,17 +164,18 @@ publicadas hace más de dos semanas; licencias leídas en los archivos de cada p
 | PlatformIO Core | 6.2.0 | 05/09/2026 | Apache 2.0 |
 | Plataforma `platformio/espressif32` | 7.1.3 | 11/09/2026 | (herramienta de compilación) |
 | Núcleo Arduino-ESP32 (`framework-arduinoespressif32`, lo trae la plataforma) | 4.20017.260907 | — | LGPL-2.1-or-later (su `package.json`, sus cabeceras y su repositorio oficial) |
-| Bibliotecas Wi-Fi precompiladas de Espressif (las enlaza el núcleo) | las de la plataforma | — | Apache 2.0 (repositorio oficial `esp32-wifi-lib`) |
+| Bibliotecas Wi-Fi precompiladas de Espressif (las enlaza el núcleo) | las de la plataforma | — | Apache 2.0 en su repositorio (`esp32-wifi-lib`); las cabeceras del SDK que trae el núcleo mezclan seis identificadores, contados el 17/10/2026 (`AVISOS-DE-TERCEROS.md`) |
 | Adafruit BME280 Library | 2.3.0 | 30/04/2025 | BSD |
 | Adafruit Unified Sensor | 1.1.15 | 06/01/2025 | Apache 2.0 |
 | Adafruit BusIO | 1.17.4 | 22/09/2025 | MIT |
-| OneWire (Paul Stoffregen) | 2.3.8 | 08/02/2024 | permiso estilo MIT en el código fuente (sin archivo de licencia) |
+| OneWire (Paul Stoffregen) | 2.3.8 | 08/02/2024 | permiso estilo MIT en el código fuente (sin archivo de licencia), más el aviso de Dallas Semiconductor del código de CRC, con cláusula de nombre |
 | DallasTemperature | 4.0.6 | 24/01/2026 | MIT |
 
 Todas de código abierto y sin costo (RNF-15); la del núcleo es LGPL, no permisiva: lo que pide al distribuir un binario y los avisos
-de copyright de cada paquete están en `plataforma/firmware/AVISOS-DE-TERCEROS.md`. Medido el 16/10/2026 con `pio run -e diagnostico`
-en un entorno aislado: compila sin avisos con `-Wall -Wextra`, 13,5 % de la RAM y 58,6 % de la memoria de programa (se repite en el
-paso 1 del laboratorio de la fase 1).
+de copyright de cada paquete están en `plataforma/firmware/AVISOS-DE-TERCEROS.md`. Medido el 17/10/2026 con `pio run -e diagnostico`
+en el equipo del estudiante (83 min la primera vez: descarga la plataforma, el compilador y las bibliotecas): 13,5 % de la RAM (44 152 bytes)
+y 58,5 % de la memoria de programa (766 861 bytes). Nuestro código compila sin avisos con `-Wall -Wextra`; la biblioteca OneWire 2.3.8
+emite dos avisos del preprocesador (`#undef` con paréntesis en `OneWire.cpp`), ajenos a nuestro código y sin efecto en el binario.
 
 ## 6. Firmware por fases (16/10/2026)
 
@@ -186,7 +187,7 @@ Dos fases, para que una falla diga dónde está: si la fase 1 no ve un sensor, e
   los dos extremos de su calibración, y avisa si la lectura pasa de 2450 mV: con la atenuación de mayor rango el ADC es preciso de 150 a
   2450 mV (±60 mV) y empeora por encima (ESP32 Series Datasheet v5.3, tabla de características del ADC), mientras el sensor de
   referencia entrega hasta 3,0 V (SEN0193). Si el valor al aire pasa de 2450 mV, se decide con el dato medido si se agrega un divisor
-  de tensión o se acepta la menor precisión en el extremo seco. Distingue el valor de arranque de la sonda (+85 °C, antes de su primera
+  de tensión o se acepta la menor precisión en el extremo seco. Avisa de la ambigüedad del valor de arranque de la sonda (+85 °C, antes de su primera
   conversión) de una lectura real. No imprime identificadores de hardware: la dirección ROM de la sonda es única, como una MAC.
 - **Fase 2, publicación**: Wi-Fi, TLS con la CA propia, MQTT con la credencial del alta y SenML en `sitio/<sitio>/dispositivo/<id>/<magnitud>`,
   con la marca de tiempo del nodo sincronizada por NTP (regla 7 de `docs/13`). Antes de publicar el suelo hacen falta sus magnitudes en el

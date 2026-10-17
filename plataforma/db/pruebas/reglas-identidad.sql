@@ -1,4 +1,4 @@
--- Reglas de identidad de las migraciones 11, 15, 16, 17 y 18 (docs/10 §8.4 puntos 24 y 47; §4.1), plantadas: cada caso intenta lo prohibido y espera el
+-- Reglas de identidad de las migraciones 11, 15, 16, 17, 18 y 19 (docs/10 §8.4 puntos 24, 47 y 53; §4.1), plantadas: cada caso intenta lo prohibido y espera el
 -- rechazo de la base. Todo ocurre dentro de una transacción que termina en ROLLBACK: no queda nada en la base.
 -- La corre el guardián (paso 1c). La carrera de dos altas simultáneas no cabe en una sola sesión: se probó a mano (docs/16 §13).
 BEGIN;
@@ -210,6 +210,44 @@ BEGIN
       ELSE 'FALLA la calibración legítima no insertó ninguna fila' END);
   EXCEPTION WHEN OTHERS THEN
     INSERT INTO resultado VALUES (22, 'FALLA se rechazó una calibración legítima: ' || SQLERRM);
+  END;
+  -- Migración 19 (tope por emisor): el motivo «tope» y la condición «tope_superado» entran; un motivo ajeno y unos contadores sin ventana, no.
+  BEGIN
+    INSERT INTO cuarentena (origen, topico, motivo, payload_crudo, recibido_en)
+      VALUES ('http', '/recepcion/prueba-identidad-d', 'tope', '\x00'::bytea, now());
+    INSERT INTO resultado VALUES (25, 'OK    cuarentena con motivo tope (migración 19): aceptada');
+  EXCEPTION WHEN OTHERS THEN
+    INSERT INTO resultado VALUES (25, 'FALLA se rechazó el motivo tope: ' || SQLERRM);
+  END;
+  BEGIN
+    INSERT INTO cuarentena (origen, topico, motivo, payload_crudo, recibido_en)
+      VALUES ('http', '/recepcion/prueba-identidad-d', 'otro', '\x00'::bytea, now());
+    INSERT INTO resultado VALUES (26, 'FALLA se aceptó un motivo fuera del dominio de cuarentena');
+  EXCEPTION WHEN check_violation THEN
+    GET STACKED DIAGNOSTICS restriccion = CONSTRAINT_NAME;
+    INSERT INTO resultado VALUES (26, CASE WHEN restriccion = 'ck_cuarentena_motivo' THEN 'OK    motivo fuera del dominio de cuarentena: rechazado'
+      ELSE 'FALLA motivo rechazado por otra regla: ' || restriccion END);
+  WHEN OTHERS THEN
+    INSERT INTO resultado VALUES (26, 'FALLA motivo fuera del dominio: error inesperado: ' || SQLERRM);
+  END;
+  BEGIN
+    INSERT INTO condicion (dispositivo_id, tipo) SELECT id, 'tope_superado' FROM dispositivo WHERE id_fisico = 'prueba-identidad-d';
+    GET DIAGNOSTICS filas = ROW_COUNT;
+    INSERT INTO resultado VALUES (27, CASE WHEN filas = 1 THEN 'OK    condición tope_superado (migración 19): aceptada'
+      ELSE 'FALLA la condición tope_superado no insertó ninguna fila' END);
+  EXCEPTION WHEN OTHERS THEN
+    INSERT INTO resultado VALUES (27, 'FALLA se rechazó la condición tope_superado: ' || SQLERRM);
+  END;
+  BEGIN
+    INSERT INTO estado_dispositivo (dispositivo_id, visto_por_ultima_vez, ventana_lecturas)
+      SELECT id, now(), 5 FROM dispositivo WHERE id_fisico = 'prueba-identidad-d';
+    INSERT INTO resultado VALUES (28, 'FALLA se aceptaron contadores de la ventana sin inicio de ventana');
+  EXCEPTION WHEN check_violation THEN
+    GET STACKED DIAGNOSTICS restriccion = CONSTRAINT_NAME;
+    INSERT INTO resultado VALUES (28, CASE WHEN restriccion = 'ck_estado_dispositivo_ventana' THEN 'OK    contadores de la ventana sin inicio: rechazados'
+      ELSE 'FALLA contadores rechazados por otra regla: ' || restriccion END);
+  WHEN OTHERS THEN
+    INSERT INTO resultado VALUES (28, 'FALLA contadores sin ventana: error inesperado: ' || SQLERRM);
   END;
 END $$;
 SELECT linea FROM resultado ORDER BY orden;

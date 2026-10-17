@@ -4,18 +4,22 @@
 export type Reloj = () => number;
 
 // Una dirección IPv6 se cuenta por su prefijo /64, lo que suele recibir un solo equipo: con una dirección por petición dentro de él,
-// un mismo atacante esquivaría el bloqueo. IPv4, tal cual.
+// un mismo atacante esquivaría el bloqueo. IPv4 (también la mapeada en IPv6, `::ffff:a.b.c.d`), tal cual.
 export function claveDeDireccion(direccion: string): string {
-  const ip = direccion.startsWith('::ffff:') ? direccion.slice(7) : direccion;
+  const d = direccion.toLowerCase(); // «::FFFF:» en mayúsculas es la misma dirección (revisión del 17/10)
+  const ip = d.startsWith('::ffff:') ? d.slice(7) : d;
   if (!ip.includes(':')) return ip;
-  const [izq, der = ''] = ip.toLowerCase().split('::');
+  const [izq, der = ''] = ip.split('::');
   const a = izq ? izq.split(':') : [], b = der ? der.split(':') : [];
   const grupos = ip.includes('::') ? [...a, ...Array<string>(Math.max(0, 8 - a.length - b.length)).fill('0'), ...b] : a;
   return grupos.slice(0, 4).map((g) => g.replace(/^0+(?=.)/, '')).join(':') + '::/64';
 }
 
-// (a) Una dirección con `maxFallos` fallos de autenticación dentro de `ventanaMs` queda bloqueada `bloqueoMs`.
-export class FallosPorDireccion {
+// (b) y (c) Una clave con `maxFallos` fallos de autenticación dentro de `ventanaMs` queda bloqueada `bloqueoMs`. El controlador usa
+// dos instancias: una por par dirección + dispositivo (5 fallos: un vecino detrás del mismo NAT no paga por otro) y una gruesa por
+// dirección (50 fallos, cualquier identificador: cuánta CPU de scrypt puede gastar una dirección por minuto). La clave la arma quien
+// llama (la dirección ya normalizada con claveDeDireccion).
+export class FallosPorClave {
   private readonly fallos = new Map<string, number[]>();
   private readonly bloqueadas = new Map<string, number>();
   private ultimaPoda = -Infinity;
@@ -28,27 +32,25 @@ export class FallosPorDireccion {
     private readonly maxClaves = 10_000,
   ) {}
 
-  // Milisegundos que le quedan de bloqueo a la dirección; 0 si no está bloqueada.
-  bloqueo(direccion: string): number {
-    direccion = claveDeDireccion(direccion);
-    const hasta = this.bloqueadas.get(direccion);
+  // Milisegundos que le quedan de bloqueo a la clave; 0 si no está bloqueada.
+  bloqueo(clave: string): number {
+    const hasta = this.bloqueadas.get(clave);
     if (hasta === undefined) return 0;
     const resto = hasta - this.ahora();
     if (resto > 0) return resto;
-    this.bloqueadas.delete(direccion);
+    this.bloqueadas.delete(clave);
     return 0;
   }
 
-  registrarFallo(direccion: string): void {
-    direccion = claveDeDireccion(direccion);
+  registrarFallo(clave: string): void {
     const t = this.ahora();
-    const recientes = (this.fallos.get(direccion) ?? []).filter((x) => t - x < this.ventanaMs);
+    const recientes = (this.fallos.get(clave) ?? []).filter((x) => t - x < this.ventanaMs);
     recientes.push(t);
     if (recientes.length >= this.maxFallos) {
-      this.bloqueadas.set(direccion, t + this.bloqueoMs);
-      this.fallos.delete(direccion);
+      this.bloqueadas.set(clave, t + this.bloqueoMs);
+      this.fallos.delete(clave);
     } else {
-      this.fallos.set(direccion, recientes);
+      this.fallos.set(clave, recientes);
     }
     this.podar(t);
   }
@@ -74,7 +76,8 @@ export class FallosPorDireccion {
   }
 }
 
-// (b) Como mucho `max` verificaciones de scrypt a la vez: nunca más de la mitad del pool de hilos.
+// (d) Como mucho `max` verificaciones de scrypt a la vez: nunca más de la mitad del pool de hilos. Solo las pagan la primera trama de
+// cada dispositivo tras arrancar o rotar y los tokens equivocados: las demás las resuelve la caché (verificacion.ts).
 export class Cupo {
   private enCurso = 0;
   constructor(private readonly max = 2) {}
@@ -88,7 +91,8 @@ export class Cupo {
   }
 }
 
-// (c) Cada dispositivo, como mucho una trama aceptada cada `intervaloMs` (el intervalo mínimo del alta es 5 s).
+// (e) Cada dispositivo, como mucho una trama aceptada cada `intervaloMs` (el intervalo mínimo del alta es 5 s). El presupuesto por
+// hora, común a todas las vías, es el tope por emisor del pipeline (docs/10 §8.4 punto 53).
 export class RitmoPorDispositivo {
   private readonly ultima = new Map<string, number>();
   constructor(

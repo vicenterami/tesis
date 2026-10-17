@@ -58,7 +58,7 @@ try {
   ok('el canal en vivo dice «conectado»');
   publicar(27.5);
   await lecturaEs('27,5 Cel', 15000).then(() => ok('una trama publicada por MQTT aparece en su tarjeta sin recargar (27,5 Cel)'), () => falla('la lectura en vivo no apareció'));
-  // 4. Caída del backend: «reconectando»; lo publicado mientras tanto aparece al volver, porque la ficha se repide (docs/19 F4).
+  // 4. Caída del backend: «reconectando»; lo publicado mientras tanto aparece al volver, porque la ficha se repite (docs/19 F4).
   const historicosAntes = pedidosHistorico;
   docker('stop', backend);
   try {
@@ -69,7 +69,7 @@ try {
   }
   await lecturaEs('28,25 Cel', 60000).then(() => ok('al volver el backend, la ficha muestra la lectura publicada durante la caída (28,25 Cel)'), () => falla('la lectura de la caída no apareció'));
   await textoVisible('en vivo: conectado', 30000).then(() => ok('y el canal vuelve a «conectado»'), () => falla('el canal no volvió a «conectado»'));
-  // Al reconectar también se repide el histórico con una ventana nueva: debe traer las lecturas recién guardadas (más puntos que
+  // Al reconectar también se repite el histórico con una ventana nueva: debe traer las lecturas recién guardadas (más puntos que
   // antes). Sin esperarlo, la captura salía antes de esa respuesta y parecía que faltaban (visto en la primera corrida, 16/10).
   // Se comprueba por la petición que hace la página (no por el número de puntos, que no sube si las lecturas nuevas caen en un bloque
   // de 15 minutos que ya existía) y después que el texto diga los puntos que la API tiene ahora.
@@ -78,7 +78,7 @@ try {
   await pagina.waitForTimeout(500);
   const ahoraApi = await (await fetch(`${BASE}/canales/${canalId}/historico`)).json();
   const textoAhora = await pagina.textContent('[data-historico]');
-  if (pedidosHistorico > historicosAntes && textoAhora.startsWith(`${ahoraApi.puntos} puntos`)) ok(`al volver, la página repidió el histórico y muestra lo que la API tiene ahora (${ahoraApi.puntos} puntos)`);
+  if (pedidosHistorico > historicosAntes && textoAhora.startsWith(`${ahoraApi.puntos} puntos`)) ok(`al volver, la página repitió el histórico y muestra lo que la API tiene ahora (${ahoraApi.puntos} puntos)`);
   else falla(`histórico tras la caída: ${pedidosHistorico - historicosAntes} pedido(s) nuevo(s), texto «${textoAhora}», API ${ahoraApi.puntos}`);
   await pagina.screenshot({ path: captura, fullPage: true });
   if (errores.length === 0) ok('sin errores de JavaScript en la página'); else falla(`errores en la página: ${errores.join(' | ')}`);
