@@ -856,7 +856,7 @@ Cada hallazgo se verificó en el código o en la fuente; los de código se plant
 
 En el informe: el plan B de R1 se activó el 7/10 (no el 8/10); el bloqueo de fila podía frenar la recepción hasta 5 s (el
 segundo medido era el tope de la prueba, §26); las conclusiones separan lo que se cumple de lo parcial; el verificador se cita
-por sus pasos (38) y las pruebas del panel (44) junto a las del backend; los documentos nombran los anexos en vez de citar una
+por sus pasos (hoy 39) y las pruebas del panel (44) junto a las del backend; los documentos nombran los anexos en vez de citar una
 letra que cambia al insertar uno. El guardián vigila esas cifras (paso 2w4) y sus pasos 2f2, 2w2 y 2w3 ya no pueden pasar sin
 revisar nada. **Banco:** 36 de 36, «LORAWAN OK».
 
@@ -910,9 +910,9 @@ descarte. La configuración con la credencial vive en la carpeta privada del ban
 
 | Pregunta | Medido | Plantado |
 |---|---|---|
-| ¿El puente entra como la pasarela, por TLS verificado? | Sí: nuestro broker registra su conexión con el usuario de la pasarela | Con otra CA en el broker del operador: «A TLS error occurred» y no se conecta |
+| ¿El puente entra como la pasarela, por TLS verificado? | Sí: nuestro broker registra su conexión con el id de cliente y el usuario de la pasarela; la verificación del certificado se prueba plantando | A mano: con otra CA en el broker del operador, «A TLS error occurred» y no se conecta |
 | ¿La captura publicada en el tópico nativo llega a `medicion`? | Sí: 18,16 °C, 65,52 % y 3,75 V; la trama cruda muestra `…/pasarela/<id>/device/<deveui>/event/up`, solo con el prefijo cambiado | — |
-| ¿Un comando del broker del operador cruza? | No: la línea reenvía solo `device/+/event/#` | Con `device/#`, el comando cruza y deja una cuarentena |
+| ¿Un comando del broker del operador cruza? | No: la línea reenvía solo `device/+/event/#` | A mano: con `device/#`, el comando cruza y deja una cuarentena |
 | ¿Lo que publique un anónimo en el broker del operador nos llega? | Sí, como la pasarela: es el riesgo de un broker sin autenticación. El filtro 1 lo frena si el DevEUI no está dado de alta (`no_registrado`) | — |
 | ¿La baja de la pasarela corta el puente? | Sí: el broker desconecta al cliente | — |
 | ¿La credencial aparece en el registro del backend? | No | — |
@@ -920,21 +920,26 @@ descarte. La configuración con la credencial vive en la carpeta privada del ban
 Resultado: **10 de 10, «PUENTE OK»**. **Por dirección IP** (`banco.sh puente ip`), como se conectará la pasarela del campus al
 portátil en la red local: un certificado de descarte con la IP en el SAN (`CA_IP_EXTRA`), el proxy publicado solo en ella
 (`PROXY_IP_DISPOSITIVOS`) y el puente conectándose por IP con verificación. Se usa `127.0.0.2`, otra dirección de *loopback*: la misma
-mecánica sin exponer nada a la red. 11 de 11; plantado un certificado **sin** la IP, el puente no se conecta («A TLS error occurred»).
-Al terminar, el proxy vuelve a sus certificados y a su dirección. Lo que no prueba: la pasarela real, el Mosquitto del operador ni la
+mecánica sin exponer nada a la red. 11 de 11; plantado a mano un certificado **sin** la IP, el puente no se conecta («A TLS error occurred»).
+**Limpieza:** una sola función, registrada apenas se toca el proxy, borra el broker del operador y su configuración con la credencial,
+revoca la pasarela de descarte si sigue activa y devuelve el proxy a sus certificados y a su dirección, avisando si no puede. Plantado
+a mano: un corte antes de crear la pasarela deja el proxy restituido y nada en disco; un corte justo después la deja revocada (inactiva
+y sin claves activas). Si el backend no está sano, el proxy no puede volver y la limpieza lo avisa y conserva los certificados de descarte. Lo que no prueba: la pasarela real, el Mosquitto del operador ni la
 red de la facultad (la IP del portátil allí se conoce el mismo día).
 
-**Migraciones** (`banco.sh migraciones`, al final de cada `banco.sh encender`; `docs/08 §6`). Con la base recién creada, se reaplican
+**Migraciones** (`banco.sh migraciones`, al final de cada `banco.sh encender`; `docs/08 §6`). En `encender`, con la base recién creada (suelto, sobre la que haya), se reaplican
 de la 02 a la 17 y se compara un resumen del esquema completo (`pg_dump -s`: tablas, restricciones, índices, permisos y comentarios)
 y del catálogo de magnitudes. **La primera corrida encontró un error real:** las 16 se reaplicaban sin error, pero el esquema
 cambiaba. La 05 renombraba toda restricción cuyo nombre no fuera el que ella calcula, también las que una migración posterior nombró a
 propósito: reaplicada después de la 08, la 13, la 15 y la 16, cambiaba `ck_medicion_recepcion`, `ck_credencial_titular`,
 `fk_dispositivo_pasarela_formato` y las de `metrica_broker`, y esas migraciones, al no encontrar su nombre, duplicaban la restricción.
-**Corregido:** la 05 renombra solo los nombres sin prefijo (los que inventa Postgres). Una instalación nueva queda idéntica a la de
+**Corregido:** la 05 renombra solo los nombres con la forma que pone Postgres cuando nadie nombra la restricción (`<tabla>_pkey`, `_fkey`, `_key`, `_check`, sin prefijo); un nombre elegido por una migración se respeta. Una instalación nueva queda idéntica a la de
 antes de la corrección, la base de desarrollo no tenía duplicados (consultado) y la 05 vieja, plantada, hace fallar la comprobación.
 «Sin error» no basta: lo prueba este caso. Tres detalles del volcado, medidos: lleva una línea `\restrict` con un token aleatorio
 (se excluye); los fragmentos de TimescaleDB nacen cuando el backend guarda datos entre las dos fotos (se excluye su esquema interno);
 y el primer fragmento de una tabla cambia el orden en que `pg_dump` la escribe (se compara el conjunto de líneas, ordenado).
-Resultado: 16 de 16 reaplicadas sin cambios en `encender` y en tres corridas más, separadas por 30 s con el backend guardando. Se hace en el banco y no en el
+La foto incluye también los trabajos de TimescaleDB y el catálogo completo, y si sale casi vacía (base caída) la comprobación falla en
+vez de comparar dos vacíos (plantado: base detenida → «la foto del esquema salió casi vacía»). Resultado: 16 de 16 reaplicadas sin
+cambios en `encender` y en tres corridas más lanzadas a mano, separadas por 30 s con el backend guardando. Se hace en el banco y no en el
 guardián porque reaplicar en la base de desarrollo la escribiría en cada corrida y bloquearía tablas mientras el backend guarda.
 

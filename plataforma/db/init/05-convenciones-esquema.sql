@@ -9,8 +9,9 @@
 --   f) catálogo: magnitudes de material particulado (sensores del primer nodo del compañero).
 -- Base existente: docker compose exec -T timescaledb psql -U plataforma -d plataforma < db/init/05-convenciones-esquema.sql
 
--- a) renombrar restricciones autogeneradas a la convención. Solo las que no llevan prefijo (las que nombró Postgres): un nombre
---    con prefijo lo eligió una migración y otras lo buscan por él. Hasta el 16/10/2026 se renombraba también ese, y reaplicar la 05
+-- a) renombrar restricciones autogeneradas a la convención. Solo las que tienen la forma de los nombres que pone Postgres cuando
+--    nadie nombra la restricción (<tabla>_pkey, <tabla>_<col>_fkey, _key, _check) y ningún prefijo: un nombre elegido por una
+--    migración, con prefijo o sin él, se respeta, porque otras lo buscan por él. Hasta el 16/10/2026 se renombraba también ese, y reaplicar la 05
 --    después de la 08, 13, 15 y 16 cambiaba sus nombres y esas migraciones, al no encontrarlos, duplicaban la restricción
 --    (lo encontró banco.sh migraciones; docs/16 §37).
 DO $$
@@ -22,7 +23,7 @@ BEGIN
               FROM unnest(c.conkey) WITH ORDINALITY k(attnum, ord)
               JOIN pg_attribute a ON a.attrelid = c.conrelid AND a.attnum = k.attnum) AS cols
       FROM pg_constraint c JOIN pg_namespace n ON n.oid = c.connamespace
-     WHERE n.nspname = 'public' AND c.contype IN ('p','f','u','c') AND c.conname !~ '^(pk|fk|uq|ck)_'
+     WHERE n.nspname = 'public' AND c.contype IN ('p','f','u','c') AND c.conname !~ '^(pk|fk|uq|ck)_' AND c.conname ~ '_(pkey|fkey|key|check)$'
   LOOP
     nuevo := CASE r.contype
       WHEN 'p' THEN 'pk_' || r.tabla

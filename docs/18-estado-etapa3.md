@@ -74,7 +74,50 @@ vuelve a la Etapa 4 con su registro aquí y en `docs/04`.
 - La recepción LoRaWAN en terreno (HU-02) necesita una pasarela que alcance el servidor (`docs/10 §8.4` punto 24); mientras
   tanto se prueba en el banco con el JSON exacto de las fuentes oficiales (`banco.sh lorawan`, `docs/16 §31`); la prueba en la misma red que la pasarela del campus está acordada para el martes 20/10 con el compañero a cargo; su pasarela es una UG65 con servidor embebido y dos nodos reportando cada 60 s, y el adaptador se ajusta antes a la forma real de su mensaje (`docs/10 §8.4` punto 47, nota del 15/10).
 
-## 5. Cómo se mantiene
+## 5. Lo que falta del núcleo y lo que viene después (16/10/2026)
+
+El estado de cada elemento manda en §1 y §2; esta lista ordena lo que falta. El guardián (paso 2w5) comprueba que cada elemento
+siga sin terminar y que sus horas sean las de `docs/04`: un elemento que se cierra se quita de aquí en el mismo cambio.
+
+**Núcleo (🎯): 15 elementos, 78 h.** Diez parciales y cinco sin empezar, en el orden de trabajo:
+
+| Orden | Elemento | Horas | Estado | Qué falta |
+|---|---|---|---|---|
+| 1 | HU-02 Eventos LoRaWAN | 6 | 🟡 | La prueba en la misma red que la pasarela del campus (20/10); lo demás está probado en el banco (`docs/16 §31`, §36 y §37) |
+| 2 | TT-32 Sensor físico de extremo a extremo | 3 | 🟡 | Fase 1: cablear los sensores y publicar por MQTT con TLS hasta el panel (`docs/17`) |
+| 3 | HU-21 Ficha del dispositivo | 7 | 🟡 | Una prueba con navegador real; el rango a medida por fechas es HU-07 |
+| 4 | HU-20 Inventario filtrable | 7 | 🟡 | El filtro por sitio y la prueba con varios sitios |
+| 5 | HU-19 Panel de salud con semáforo | 9 | 🟡 | Verlo con el sensor físico y en la demostración |
+| 6 | HU-01 SenML por MQTT o HTTP | 6 | 🟡 | La recepción por HTTP (RF-01), base también del envío HTTP desde la pasarela (`docs/10 §8.4` punto 47) |
+| 7 | HU-08 Exportar en CSV, XLSX y JSON | 4 | 🟡 | XLSX y la exportación por sitio con rol: necesita la sesión (HU-18) |
+| 8 | TT-22 Cifrado del transporte | 4 | 🟡 | El broker de producción con certificado real (`docs/14`) |
+| 9 | TT-12 Catálogo de sensores y unidades | 6 | 🟡 | El catálogo editable con umbrales; con él, los alias de claves y los perfiles de decodificación (`docs/08 §8`) |
+| 10 | TT-33 Entrevistas | 4 | 🟡 | Más entrevistas: hay una (5/10) |
+| 11 | TT-21 Aislamiento entre sitios | 5 | ⬜ | Todo; necesita la sesión y los roles por sitio (`docs/20`) |
+| 12 | TT-27 Pruebas del contrato de trama | 5 | ⬜ | La matriz formal (esquema, cuarentena, adaptadores) |
+| 13 | HU-07 Historial por rango de fechas | 4 | ⬜ | Todo |
+| 14 | HU-15 Calidad del enlace | 4 | ⬜ | Todo; necesita tráfico LoRaWAN real (`rssi` y `snr` ya quedan en la trama cruda) |
+| 15 | HU-16 Indicador de salud del sitio | 4 | ⬜ | Todo |
+
+Del 1 al 6 suman 38 h y hasta el 30/10 caben unas 30 junto con el informe: el 6 puede quedar en la Etapa 4 si el 1 al 5 se alargan.
+Del 7 en adelante, Etapa 4.
+
+**Fuera del núcleo, también comprometido**, cada uno con diseño antes del código:
+
+| Tema | Dónde está decidido o pedido | Estado |
+|---|---|---|
+| Canal en vivo por WebSocket en vez de SSE | `docs/10 §8.4` punto 46 | Diseño; sin código |
+| Sesión, usuarios y roles | HU-18, `docs/20` | Diseño; sin código |
+| Vista pública de solo lectura por enlace (quien solo mira, sin cuenta) | `docs/10 §8.4` punto 6, pantalla P9 de `docs/19`, `docs/20 §7` | Diseño |
+| Pantallas para investigadores (exportación, series) y para quien solo observa | Entrevista del 5/10; `docs/19` | Parte hecha (P2, P3, exportación); el resto con la sesión |
+| Configuración por el usuario (umbrales, destinatarios de avisos) | HU-06, HU-25 | Sin código |
+| Envío HTTP desde la pasarela a un servidor propio | `docs/10 §8.4` punto 47 | Meta, cuando haya servidor |
+| Cargas masivas (alta de muchos dispositivos de una vez) | Sin elemento propio en el backlog | Se diseña y se agrega al backlog |
+| Registros técnicos que no se pierden al recrear un contenedor, y catálogo de errores | `docs/11 §4` (rotación hecha) | Por diseñar |
+| Tope por emisor y tope de lecturas por trama | `docs/10 §4.1`, `docs/11 §4` | Por diseñar |
+| Procesamiento en paralelo con comparación atómica del contador de trama | `docs/10 §4.1` | Por diseñar; hoy se procesa de a uno |
+
+## 6. Cómo se mantiene
 
 Al cerrar cada bloque: se actualiza el estado de §2 con su evidencia y se recalculan las cifras de §1 y §3 desde las filas
 de `docs/04`, sin sumar a mano.

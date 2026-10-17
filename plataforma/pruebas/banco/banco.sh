@@ -2,7 +2,7 @@
 # Banco de pruebas DESECHABLE para TT-28 (emulador), TT-29 (carga) y las pruebas de carrera (docs/04 §rúbrica).
 # Levanta una segunda pila aparte (proyecto Compose «banco») sin tocar la de desarrollo: otros puertos, datos en RAM,
 # broker sin credenciales (ver pruebas/banco/compose.banco.yml). Desde cualquier carpeta:
-#   bash plataforma/pruebas/banco/banco.sh encender [N] [F]    levanta y siembra N emulados (100) con intervalo = periodo × F (2; con 1 se reproducen las alarmas falsas)
+#   bash plataforma/pruebas/banco/banco.sh encender [N] [F]    levanta y siembra N emulados (100) con intervalo = periodo × F (2; con 1 se reproducen las alarmas falsas); termina con «migraciones»
 #   bash plataforma/pruebas/banco/banco.sh correr [opciones]   corre el emulador contra el banco y evalúa (ver emulador.ts)
 #   bash plataforma/pruebas/banco/banco.sh carrera [disp]      las dos pruebas de carrera: mismo instante ×20 y umbral ×5 (docs/16 §4)
 #   bash plataforma/pruebas/banco/banco.sh evaluar [csv]       vuelve a cruzar un CSV de envíos con la base
@@ -11,7 +11,7 @@
 #   bash plataforma/pruebas/banco/banco.sh lorawan             rutas B y C de punta a punta: alta de pasarela → publica como ella → medicion; ACL del rol pasarela; perfil, sufijo nativo y fCnt; rotación y baja
 #   bash plataforma/pruebas/banco/banco.sh migraciones         reaplica las migraciones 02 a la última y exige el mismo esquema y catálogo (idempotencia; corre al final de «encender»)
 #   bash plataforma/pruebas/banco/banco.sh puente [ip]         puente de Mosquitto como el de la red del campus: su broker reenvía el tópico nativo por TLS al proxy → medicion
-#                                                              (con «ip», por dirección IP como el martes: certificado con CA_IP_EXTRA y proxy publicado solo en esa IP)
+#                                                              (con «ip», por dirección IP, como en la red del campus: certificado con CA_IP_EXTRA y proxy publicado solo en esa IP)
 #   bash plataforma/pruebas/banco/banco.sh cola                cola del broker vigilada: backend detenido + 200 emulados → descartes → condición broker_descarte (docs/16 §22)
 #   bash plataforma/pruebas/banco/banco.sh estado | logs [servicio] | sql ["CONSULTA"]
 #   bash plataforma/pruebas/banco/banco.sh apagar              baja todo; los datos estaban en RAM, no queda nada
@@ -85,13 +85,17 @@ case "${1:-}" in
     # Se compara ordenado por líneas: el primer fragmento de una tabla cambia la posición en que pg_dump la escribe (medido el mismo
     # día), y un orden distinto no es un esquema distinto; una restricción agregada o renombrada sí cambia el conjunto de líneas.
     foto() { { dc exec -T timescaledb pg_dump -s -N _timescaledb_internal -U plataforma plataforma 2>/dev/null | grep -vE '^\\(un)?restrict '
-               psql_ -tA -c "SELECT codigo, unidad_canonica, rango_min, rango_max FROM magnitud ORDER BY codigo"; } | LC_ALL=C sort | sha256sum | cut -c1-16; }
-    antes=$(foto); n=0
+               psql_ -tA -c "SELECT * FROM magnitud ORDER BY codigo"
+               psql_ -tA -c "SELECT hypertable_name, proc_name, schedule_interval, config FROM timescaledb_information.jobs ORDER BY 1, 2"; } > "$PRIV/foto.txt"
+      # Una foto vacía (base caída, usuario equivocado) daría dos resúmenes iguales y un «OK» sin haber revisado nada (revisión del 16/10).
+      [ "$(grep -c '^CREATE TABLE' "$PRIV/foto.txt")" -ge 15 ] || { echo "FALLA la foto del esquema salió casi vacía: no se puede comparar" >&2; rm -f "$PRIV/foto.txt"; exit 1; }
+      LC_ALL=C sort "$PRIV/foto.txt" | sha256sum | cut -c1-16; rm -f "$PRIV/foto.txt"; }
+    antes=$(foto) || exit 1; n=0
     for f in "$dir"/[0-9][0-9]-*.sql; do
       [ "$(basename "$f")" = 01-esquema.sql ] && continue
       if psql_ -X -q < "$f" >/dev/null 2>"$PRIV/mig.err"; then n=$((n+1)); else echo "FALLA $(basename "$f") no se puede reaplicar: $(grep -m1 ERROR "$PRIV/mig.err")"; fallos=$((fallos+1)); fi
     done; rm -f "$PRIV/mig.err"
-    despues=$(foto)
+    despues=$(foto) || exit 1
     [ "$n" -ge 16 ] || { echo "FALLA solo se reaplicaron $n migraciones (¿cambió la carpeta?)"; fallos=$((fallos+1)); }
     [ "$antes" = "$despues" ] && echo "OK    $n migraciones reaplicadas sin error y sin cambiar el esquema ni el catálogo (idempotentes)" || { echo "FALLA reaplicar cambió el esquema o el catálogo ($antes → $despues)"; fallos=$((fallos+1)); }
     [ $fallos -eq 0 ] || exit 1 ;;
@@ -412,7 +416,7 @@ case "${1:-}" in
     # Variante «ip» (docs/10 §8.4 punto 47): la pasarela del campus se conectará al portátil por su dirección IP en la red local, así que
     # el certificado debe incluirla (CA_IP_EXTRA) y el proxy publicarse solo en ella (PROXY_IP_DISPOSITIVOS). Se ensaya con 127.0.0.2,
     # otra dirección de loopback que Linux atiende sin configurar nada: la misma mecánica, sin exponer nada a la red. Usa una CA de
-    # descarte en la carpeta privada del banco (no toca privado/certs-desarrollo) y al final devuelve el proxy a sus certificados.
+    # descarte en la carpeta privada del banco (no toca la CA de desarrollo) y al final devuelve el proxy a sus certificados.
     CLAVE=$(leer HTTP_CLAVE_ADMIN); fallos=0; n=$(date +%s | tail -c 5); modo="${2:-nombre}"
     ok() { echo "OK    $1"; }; falla() { echo "FALLA $1"; fallos=$((fallos+1)); }
     api() { local m=$1 r=$2; shift 2; printf 'X-Clave-Admin: %s\n' "$CLAVE" | curl -s -m 10 -w '\n%{http_code}' -X "$m" -H @- -H 'Content-Type: application/json' "$@" "http://127.0.0.1:3001$r"; }
@@ -428,6 +432,16 @@ case "${1:-}" in
       dcp up -d proxy >/dev/null 2>&1 || { echo "FALLA no se levantó el proxy"; exit 1; }
       destino="proxy:8883"; ca_puente="$CERTS/ca.crt"
     fi
+    # Una sola limpieza, registrada apenas se tocó el proxy (revisión del 16/10: antes se registraba tarde y un corte temprano dejaba el
+    # proxy en la IP de prueba y la pasarela de descarte activa): borra el broker del operador y su configuración con la credencial,
+    # revoca la pasarela si sigue activa y devuelve el proxy a sus certificados, avisando si no puede.
+    pas=""; revocada=0
+    restaurar_proxy() { [ "$modo" = ip ] || return 0
+      if dcp up -d --force-recreate proxy >/dev/null 2>&1; then rm -rf "${PRIV:?}/certs-ip"
+      else echo "FALLA no se pudo devolver el proxy a sus certificados: repetir «banco.sh proxy» o «banco.sh apagar»"; fi; }
+    limpiar() { docker rm -f banco-puente >/dev/null 2>&1; rm -rf "${PRIV:?}/puente"
+      [ -n "$pas" ] && [ "$revocada" = 0 ] && api DELETE "/pasarelas/$pas" >/dev/null 2>&1; restaurar_proxy; }
+    trap limpiar EXIT
     for _ in $(seq 1 20); do [ "$(dcp ps --format '{{.Status}}' proxy | grep -c healthy)" = 1 ] && break; sleep 2; done
     red=$(docker network ls --format '{{.Name}}' | grep '^banco_default$')
     read -r sitio_id sitio zona < <(psql_ -tA -F ' ' -c "SELECT s.id, s.codigo, z.id FROM sitio s JOIN zona z ON z.sitio_id = s.id ORDER BY s.codigo LIMIT 1")
@@ -438,9 +452,10 @@ case "${1:-}" in
     [ "${r##*$'\n'}" = 201 ] && ok "pasarela milesight y nodo con perfil dados de alta" || falla "alta del nodo → ${r##*$'\n'}"
     # La configuración del broker del operador: el bloque del archivo de ejemplo, con la línea «topic» tal como la entrega el alta
     # (cambiando <app> por la aplicación de la captura) y la credencial, escrita sin pasar por la línea de comandos.
-    cfg="$PRIV/puente"; rm -rf "$cfg"; mkdir -p "$cfg"; cp "$ca_puente" "$cfg/ca.crt"
+    cfg="$PRIV/puente"; rm -rf "$cfg"; mkdir -p "$cfg"; cp "$ca_puente" "$cfg/ca.crt"   # la credencial se escribe ya con la limpieza registrada
     # Por IP, el broker del operador corre en la red del equipo (como su portátil en la red de la facultad): escucha en un puerto propio
-    # de loopback para no chocar con el broker de la pila de desarrollo.
+    # de loopback para no chocar con el broker de la pila de desarrollo. Es anónimo como el del operador: cualquier usuario de este equipo
+    # podría publicar en él durante la prueba y cruzaría como la pasarela; riesgo aceptado (dura segundos y el filtro 1 exige DevEUI dado de alta).
     if [ "$modo" = ip ]; then escucha="listener 18830 127.0.0.1"; red_op=host; h_op=127.0.0.1; p_op=18830; else escucha="listener 1883"; red_op="$red"; h_op=banco-puente; p_op=1883; fi
     ( umask 077; { echo "$escucha"; echo "allow_anonymous true"; echo "persistence false"
         echo "connection hacia-plataforma"; echo "address $destino"; echo "bridge_cafile /c/ca.crt"; echo "bridge_insecure false"
@@ -451,9 +466,8 @@ case "${1:-}" in
     [[ "$linea" == "topic device/+/event/# out 1 application/<app>/ sitio/$sitio/pasarela/$pid/" ]] && ok "la línea del puente que entrega el alta es la que se usa ($linea)" || falla "línea del puente: $linea"
     docker rm -f banco-puente >/dev/null 2>&1
     docker run -d --name banco-puente --network "$red_op" --user "$(id -u):$(id -g)" -v "$cfg:/c:ro" --entrypoint mosquitto "$IMG_BROKER" -c /c/mosquitto.conf >/dev/null || falla "no arrancó el broker del operador"
-    restaurar_proxy() { [ "$modo" = ip ] && { dcp up -d --force-recreate proxy >/dev/null 2>&1; rm -rf "${PRIV:?}/certs-ip"; }; }
-    trap 'docker rm -f banco-puente >/dev/null 2>&1; rm -rf "${PRIV:?}/puente"; restaurar_proxy' EXIT
-    conectado=0; for _ in $(seq 1 30); do dc logs --no-color --since 2m mosquitto 2>/dev/null | grep -q "as $pid (" && { conectado=1; break; }; sleep 1; done
+    # El registro del broker trae el id de cliente y el usuario («as <id> (… u'<usuario>')»): se exigen los dos.
+    conectado=0; for _ in $(seq 1 30); do dc logs --no-color --since 2m mosquitto 2>/dev/null | grep -q "as $pid (.*u'$pid')" && { conectado=1; break; }; sleep 1; done
     [ "$conectado" = 1 ] && ok "el puente entró a nuestro broker como la pasarela, por $destino (proxy) con TLS y el certificado verificado" || falla "el puente no se conectó: $(docker logs banco-puente 2>&1 | tail -2 | tr '\n' ' ')"
     lec() { psql_ -tA -c "SELECT count(*) || ' ' || coalesce(string_agg(c.magnitud_codigo || '=' || m.valor, ',' ORDER BY c.magnitud_codigo), '') FROM medicion m JOIN canal c ON c.id=m.canal_id JOIN dispositivo d ON d.id=c.dispositivo_id WHERE d.id_fisico='$udev'"; }
     pub_local() { docker run --rm --network "$red_op" "$IMG_BROKER" mosquitto_pub -h "$h_op" -p "$p_op" -q 1 -t "$1" -m "$2"; }
@@ -470,11 +484,11 @@ case "${1:-}" in
     c=""; for _ in $(seq 1 20); do c=$(psql_ -tA -c "SELECT motivo FROM cuarentena WHERE topico = 'sitio/$sitio/pasarela/$pid/device/$otro/event/up'"); [ -n "$c" ] && break; sleep 0.5; done
     [ "$c" = no_registrado ] && ok "lo que un anónimo publique en su broker cruza como la pasarela, y el filtro 1 lo frena si el DevEUI no está dado de alta (riesgo anotado)" || falla "DevEUI ajeno por el puente: «$c»"
     # La baja de la pasarela es también la limpieza: revoca la credencial y el broker corta el puente.
-    r=$(api DELETE "/pasarelas/$pas"); [ "${r##*$'\n'}" = 200 ] && ok "baja de la pasarela de descarte (credencial revocada)" || falla "baja → ${r##*$'\n'}"
+    r=$(api DELETE "/pasarelas/$pas"); [ "${r##*$'\n'}" = 200 ] && { revocada=1; ok "baja de la pasarela de descarte (credencial revocada)"; } || falla "baja → ${r##*$'\n'}"
     cortado=0; for _ in $(seq 1 15); do dc logs --no-color --since 1m mosquitto 2>/dev/null | grep -q "Client $pid .*disconnected" && { cortado=1; break; }; sleep 1; done
     [ "$cortado" = 1 ] && ok "al dar de baja la pasarela, nuestro broker corta el puente" || falla "el puente siguió conectado tras la baja"
     k=$(dc logs --no-color --since 5m backend 2>/dev/null | grep -cF -f <(sed -n 's/^remote_password //p' "$cfg/mosquitto.conf")); [ "$k" = 0 ] && ok "la credencial del puente no aparece en el registro del backend" || falla "la credencial aparece en el registro"
-    docker rm -f banco-puente >/dev/null 2>&1; rm -rf "${PRIV:?}/puente"; restaurar_proxy; trap - EXIT
+    trap - EXIT; limpiar
     echo; [ $fallos -eq 0 ] && echo "PUENTE OK" || { echo "$fallos comprobación(es) con falla"; exit 1; } ;;
   cola)
     # Cola del broker vigilada (docs/10 §8.4 punto 43; docs/16 §22): PLANTAR la violación. Con el backend detenido, 200 emulados a

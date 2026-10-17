@@ -776,6 +776,44 @@ if not malos: print(f'OK    {pasos} pasos y {panel} pruebas del panel, como dice
 sys.exit(1 if malos else 0)
 PY
 
+paso "2w5. Lo que falta del núcleo (docs/18 §5): la lista tiene todo el núcleo sin terminar, con sus horas de docs/04 y su estado"
+# 16/10: la tabla del plan se escribió a mano; sin esto, un elemento que se cierra (o cambia de horas) sigue en la lista sin que nadie lo
+# note. El estado sale del mismo cálculo que 2w2 (docs/12 §3 y, encima, docs/18 §2).
+python3 -I - <<'PY' || fallos=$((fallos+1))
+import re, sys
+md = {}
+for l in open('docs/04-backlog.md', encoding='utf-8'):
+    m = re.match(r'\|\s*\*\*((?:HU|TT)-\d+)\*\*\s*\|(.*)\|\s*$', l)
+    if m:
+        c = [x.replace('**', '').strip() for x in m.group(2).split('|')]
+        md[m.group(1)] = ('🎯' in c[0], int(c[-1]))
+t12 = open('docs/12-estado-etapa2.md', encoding='utf-8').read(); t18 = open('docs/18-estado-etapa3.md', encoding='utf-8').read()
+try:
+    s3 = t12.split('\n## 3.')[1].split('\n## 4.')[0]
+    tabla, notas = t18.split('\n## 2.')[1].split('\n## 3.')[0].split('**Pasadas', 1)
+    falta = t18.split('\n## 5.')[1].split('\n## 6.')[0].split('**Fuera del núcleo')[0]
+except (IndexError, ValueError):
+    print('FALLA no encontré docs/12 §3, docs/18 §2 o docs/18 §5 (¿cambiaron sus títulos?)'); sys.exit(1)
+est = dict(re.findall(r'^\| ((?:HU|TT)-\d+) \|.*?\| (✅|🟡|⬜) \|', s3, re.M))
+est.update(re.findall(r'\b((?:HU|TT)-\d+)\b[^;✅🟡⬜]{0,80}?(✅|🟡|⬜)', notas))
+est.update(re.findall(r'^\| ((?:HU|TT)-\d+)[^|]*\|[^|]*\| \d+ \| (✅|🟡|⬜) \|', tabla, re.M))
+filas = re.findall(r'^\| \d+ \| ((?:HU|TT)-\d+)[^|]*\| (\d+) \| (✅|🟡|⬜) \|', falta, re.M)
+if len(filas) < 1: print('FALLA leí 0 filas en docs/18 §5 (¿cambió su forma?)'); sys.exit(1)
+malos = []
+listados = {k for k, _, _ in filas}
+for k, h, e in filas:
+    if k not in md or not md[k][0]: malos.append(f'{k}: no es del núcleo en docs/04')
+    elif int(h) != md[k][1]: malos.append(f'{k}: {h} h en docs/18 §5 y {md[k][1]} h en docs/04')
+    if est.get(k, '⬜') != e: malos.append(f'{k}: docs/18 §5 dice {e} y el estado es {est.get(k, "⬜")}')
+for k, (n, _) in md.items():
+    if n and est.get(k, '⬜') != '✅' and k not in listados: malos.append(f'{k}: del núcleo y sin terminar, pero no está en docs/18 §5')
+m = re.search(r'Núcleo \(🎯\)\*\*?: (\d+) elementos, (\d+) h', falta) or re.search(r'Núcleo \(🎯\): (\d+) elementos, (\d+) h', falta)
+if not m: malos.append('docs/18 §5: no encontré «Núcleo (🎯): N elementos, H h»')
+elif (int(m.group(1)), int(m.group(2))) != (len(filas), sum(int(h) for _, h, _ in filas)): malos.append(f'docs/18 §5 dice {m.group(1)} elementos y {m.group(2)} h; la tabla suma {len(filas)} y {sum(int(h) for _, h, _ in filas)}')
+if malos: print('FALLA lo que falta del núcleo no cuadra:'); [print('  ' + x) for x in malos]; sys.exit(1)
+print(f'OK    docs/18 §5: {len(filas)} elementos del núcleo sin terminar, con sus horas y su estado; ninguno terminado sigue en la lista')
+PY
+
 paso "3. Diagramas: informe = docs = base (generar-figuras.sh --verificar)"
 bash informe-oficial/figuras/generar-figuras.sh --verificar || fallos=$((fallos+1))
 
