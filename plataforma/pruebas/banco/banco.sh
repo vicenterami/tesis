@@ -600,7 +600,7 @@ case "${1:-}" in
     # suelo por SQL (la API aún no la recibe), y EL MISMO pack que arma src/nodo.cpp publicado con QoS 1 por 1884 con la credencial del
     # alta → una trama, seis mediciones con la hora del bt y origen «dispositivo», humedad_suelo guardada en V y su porcentaje en la ficha;
     # un pack sin bt → seis mediciones con la hora de recepción; un pack con un sensor omitido (sin temperatura_suelo) → cinco.
-    CLAVE=$(leer HTTP_CLAVE_ADMIN); fallos=0; n=$(date +%s | tail -c 5); id="nodo-$n"
+    CLAVE=$(leer HTTP_CLAVE_ADMIN); fallos=0; n=$(date +%s%N | tail -c 8); id="nodo-$n"   # sufijo con nanosegundos: dos corridas seguidas no repiten id (409)
     ok() { echo "OK    $1"; }; falla() { echo "FALLA $1"; fallos=$((fallos+1)); }
     api() { local m=$1 r=$2; shift 2; printf 'X-Clave-Admin: %s\n' "$CLAVE" | curl -s -m 10 -w '\n%{http_code}' -X "$m" -H @- -H 'Content-Type: application/json' "$@" "http://127.0.0.1:3001$r"; }
     json() { python3 -c "import sys,json; v=json.load(sys.stdin); print(eval(sys.argv[1]))" "$1"; }
@@ -632,16 +632,18 @@ case "${1:-}" in
     p=$(curl -s -m 5 "http://127.0.0.1:3001/dispositivos/$NUID" | json "[k for k in v['canales'] if k['magnitud']=='humedad_suelo'][0]['ultima_medicion']['porcentaje']")
     [ "$p" = 0.6 ] && ok "la ficha trae el porcentaje calculado con la calibración: 2,199 V → 0,6 % (sensor al aire)" || falla "porcentaje en la ficha: «$p»"
     rs=$(curl -s -m 5 "http://127.0.0.1:3001/dispositivos/$NUID" | json "[k for k in v['canales'] if k['magnitud']=='rssi'][0]['ultima_medicion']['valor']")
-    [ "$rs" = -61 ] && ok "la intensidad Wi-Fi (rssi, dBm) llegó como séptima magnitud del catálogo" || falla "rssi en la ficha: «$rs»"
+    [ "$rs" = -61 ] && ok "la intensidad Wi-Fi (rssi, dBm) llegó como magnitud del catálogo" || falla "rssi en la ficha: «$rs»"
     curl -s http://127.0.0.1:3001/dispositivos | python3 -c "import sys,json; sys.exit(0 if any(d['id_fisico']=='$id' and d['en_linea'] for d in json.load(sys.stdin)) else 1)" && ok "el inventario lo muestra en línea" || falla "no aparece en línea en el inventario"
     # Sin hora NTP el firmware omite bt: el backend pone la hora de recepción (docs/13 regla 7).
     r=$(pub "${pack/\"bt\":$bt,/}"); [[ "$r" == *"RC:0"* || "$r" == *"RC:16"* ]] || falla "publicar sin bt: $r"
     espera "m.origen_tiempo = 'recepcion'" 6 && ok "el mismo pack sin bt → seis mediciones con la hora de recepción (origen «recepcion»)" || falla "sin bt: $(cuenta "m.origen_tiempo = 'recepcion'") con origen recepcion"
     # Un sensor que no respondió en el ciclo se omite del pack (docs/17 §6.2): las demás lecturas entran igual.
-    bt2=$((bt + 60)); r=$(pub "$(python3 -c "import json,sys; p=json.loads(sys.argv[1]); p[0]['bt']=int(sys.argv[2]); print(json.dumps([x for x in p if x['n']!='temperatura_suelo']))" "$pack" "$bt2")")
+    bt2=$((bt - 60)); r=$(pub "$(python3 -c "import json,sys; p=json.loads(sys.argv[1]); p[0]['bt']=int(sys.argv[2]); print(json.dumps([x for x in p if x['n']!='temperatura_suelo']))" "$pack" "$bt2")")
     [[ "$r" == *"RC:0"* || "$r" == *"RC:16"* ]] || falla "publicar con un sensor omitido: $r"
     espera "m.tiempo = to_timestamp($bt2)" 5 && ok "un pack con la sonda omitida → cinco mediciones (las demás no se pierden)" || falla "sensor omitido: $(cuenta "m.tiempo = to_timestamp($bt2)") mediciones"
     n=$(dc logs --no-color --since 3m backend 2>/dev/null | grep -cF -f <(printf '%s\n' "$CRED")); [ "$n" = 0 ] && ok "la credencial no aparece en el registro del backend" || falla "la credencial se escribió en el registro"
+    r=$(api DELETE "/dispositivos/$NUID"); [ "$(codigo "$r")" = 200 ] && ok "baja del nodo de prueba: no queda activo ni con credencial vigente" || falla "baja → $(codigo "$r")"
+    unset CRED
     echo; [ $fallos -eq 0 ] && echo "NODO OK" || { echo "$fallos comprobación(es) con falla"; exit 1; } ;;
   tope)
     # Tope por emisor (docs/10 §8.4 punto 53; docs/16 §42), de punta a punta en las dos vías. Por HTTP, el presupuesto de lecturas de la

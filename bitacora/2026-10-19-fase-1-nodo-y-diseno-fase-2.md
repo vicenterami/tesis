@@ -29,6 +29,17 @@ y su **contrato se probó sin la placa en el banco** (`banco.sh nodo`, `docs/16 
 → seis mediciones con la hora del `bt`, porcentaje en la ficha, pack sin `bt` → hora de recepción, pack con un sensor omitido → cinco.
 La prueba con la placa queda para la sesión siguiente, con laboratorio guiado.
 
+## Revisión de cierre del bloque (hallazgos verificados antes de corregir)
+
+Doce hallazgos, ninguno de seguridad alto, todos ciertos y corregidos el mismo día: el firmware publicaba en ráfaga los ciclos
+perdidos tras un corte (ahora se pierden, como dice el diseño); «con hora» se decidía por la fecha del reloj, que sobrevive a un
+reinicio por software sin resincronizar (ahora solo cuando SNTP avisa); el saludo TLS podía bloquear dos minutos (tope de 10 s); el
+esquema de cableado tenía el cable a tierra saliendo del pin P35 en vez del GND (la ficha cuenta los pines desde la antena y el esquema
+desde el USB: el mismo número, otro pin); el suelo y la intensidad Wi-Fi nunca se omitían aunque el documento lo prometiera; el banco
+no daba de baja su dispositivo de prueba; y tres afirmaciones se verificaron contra la fuente (la comparación del nombre en mbedTLS
+2.28.7, descargada; el tiempo de espera del constructor de TLS, que era 30 s y no 0; y el riesgo de que, sin revisar fechas, un
+certificado vencido se acepte, anotado como control pendiente en `docs/11 §4`).
+
 ## Pendiente que deja
 
 La calibración por canal se fija por SQL porque el alta no recibe `escala_cero`/`escala_cien`: admitirlas en la API es un cambio chico

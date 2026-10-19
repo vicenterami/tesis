@@ -1148,7 +1148,7 @@ aire mal asentado dio «nadie responde» hasta presionarlo parejo.
 
 ## 44. Contrato del nodo propio (fase 2) probado en el banco sin la placa (19/10/2026)
 
-**Qué se probó** (`docs/17 §6.2`; `banco.sh nodo`, 15 de 15 comprobaciones). El firmware de la fase 2 (`src/nodo.cpp`, entorno `nodo`)
+**Qué se probó** (`docs/17 §6.2`; `banco.sh nodo`, 16 de 16 comprobaciones). El firmware de la fase 2 (`src/nodo.cpp`, entorno `nodo`)
 compila con la plataforma y las bibliotecas fijadas (RAM 14,6 %, flash 72,0 %); su contrato con la plataforma se probó de punta a punta
 en el banco publicando con `mosquitto_pub` exactamente lo que el firmware arma, con QoS 1 y la credencial del alta:
 
@@ -1157,10 +1157,10 @@ en el banco publicando con `mosquitto_pub` exactamente lo que el firmware arma, 
 | Alta por API con los seis canales del nodo (`temperatura`, `humedad`, `presion`, `temperatura_suelo`, `humedad_suelo`, `rssi`; vía `mqtt`, `senml`, 60 s) → 201; el tópico del alta es el que arma el firmware (`…/<id>/temperatura`) | ✅ |
 | Calibración del suelo por SQL (2,205 V = 0 %, 1,170 V = 100 %, los extremos de la fase 1) | ✅ |
 | El pack de seis registros mide 263 bytes (la biblioteca del firmware se instancia con 512; su tope por defecto, 128, no alcanzaría) | ✅ |
-| Publicado con QoS 1 (`PUBACK … RC:0`) → **una trama**, seis mediciones con la hora del `bt` y origen de tiempo `dispositivo`; `humedad_suelo` guardada en V tal cual (2,199); la ficha trae el porcentaje con la calibración (0,6 %, sensor al aire) y `rssi` como séptima magnitud; el inventario lo muestra en línea | ✅ |
+| Publicado con QoS 1 (`PUBACK … RC:0`) → **una trama**, seis mediciones con la hora del `bt` y origen de tiempo `dispositivo`; `humedad_suelo` guardada en V tal cual (2,199); la ficha trae el porcentaje con la calibración (0,6 %, sensor al aire) y `rssi` como magnitud del catálogo; el inventario lo muestra en línea | ✅ |
 | El mismo pack **sin `bt`** (nodo sin hora NTP) → seis mediciones con la hora de recepción (origen `recepcion`) | ✅ |
 | Un pack con la sonda **omitida** (sensor que no respondió en el ciclo) → cinco mediciones: las demás no se pierden | ✅ (la primera corrida del caso falló por una publicación sobrante en la prueba misma, que entregaba seis; corregida la prueba, cinco) |
-| La credencial no aparece en el registro del backend | ✅ |
+| La credencial no aparece en el registro del backend; al final, baja del dispositivo de prueba (credencial revocada) | ✅ |
 
 **Lo que no cubre:** Wi-Fi, TLS desde la placa, NTP y el ciclo de 60 s con los sensores: es la sesión con hardware, con laboratorio guiado
 (la verificación TLS equivalente desde el portátil es `openssl s_client … -verify_hostname proxy` → «Verify return code: 0 (ok)»).

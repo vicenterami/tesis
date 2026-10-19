@@ -22,5 +22,8 @@ sitio, el `id_fisico` y la credencial que devolvió el alta (`POST /dispositivos
 pio run -e nodo -t upload && pio device monitor
 ```
 
+El binario compilado (`.pio/build/nodo/firmware.bin`, `.elf`) lleva esos secretos en claro: no se entrega, no se sube ni se adjunta
+a nada (`.pio/` está ignorado por git).
+
 Esquema de cableado de la fase 1, editable en diagrams.net (archivo `.drawio`, sin comprimir): `cableado-fase-1.drawio`. Se abre con
 «Archivo → Abrir desde → Dispositivo» o arrastrándolo al lienzo; exportar a PNG para una figura.

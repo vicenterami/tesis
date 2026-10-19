@@ -11,6 +11,7 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #include <time.h>
+#include <esp_sntp.h>
 #include <math.h>
 #include "secretos.h"
 
@@ -23,6 +24,7 @@ static constexpr int MQTT_KEEPALIVE_S = 60;
 static constexpr int MQTT_TIMEOUT_MS = 5000;         // espera del PUBACK (QoS 1) y de la respuesta al CONNECT
 static constexpr float DS18B20_ARRANQUE_C = 85.0F;   // valor de arranque de la sonda, antes de su primera conversión (hoja de Maxim)
 static const char *NOMBRE_DEL_SERVIDOR = "proxy";    // entrada DNS del SAN del certificado del proxy (proxy/ca-desarrollo.sh)
+static constexpr uint32_t SUELO_MINIMO_MV = 100;    // un sensor sin alimentación da 0 V; por debajo de 150 mV el ADC tampoco es preciso
 static constexpr size_t TAM_PACK = 512;              // el pack de seis registros mide ≈ 260 bytes (263 medidos en el banco)
 
 static WiFiClientSecure tls;
@@ -35,7 +37,11 @@ static char topico[160];
 static uint32_t ciclo = 0, publicados = 0, fallidos = 0;
 static uint32_t proximoCicloMs = 0, proximoIntentoMs = 0, esperaReintentoMs = 5000;
 
-static bool horaPuesta() { return time(nullptr) >= HORA_MINIMA; }  // solo NTP pone el reloj aquí: si está puesto, es real
+// «Con hora» solo cuando SNTP avisó que sincronizó (su callback): el reloj del sistema puede sobrevivir a un reinicio por software sin
+// volver a sincronizar, y «una fecha posterior a 2000» no bastaría para asegurar que la marca bt es real.
+static volatile bool horaNtp = false;
+static void alSincronizar(struct timeval *) { horaNtp = true; }
+static bool horaPuesta() { return horaNtp && time(nullptr) >= HORA_MINIMA; }
 
 static bool conectarWifi() {
   if (WiFi.status() == WL_CONNECTED) return true;
@@ -62,7 +68,8 @@ static bool conectarBroker() {
   IPAddress ip;
   if (!ip.fromString(MQTT_HOST) && WiFi.hostByName(MQTT_HOST, ip) != 1) { Serial.println("MQTT: no se resolvió la dirección del proxy"); return false; }
   tls.stop();
-  tls.setTimeout(10);  // segundos: el constructor pone 0, que start_ssl_client toma como 30 000 ms
+  tls.setTimeout(10);           // segundos para el socket (el constructor pone 30 s)
+  tls.setHandshakeTimeout(10);  // segundos para el saludo TLS (el constructor pone 120 s): un servidor que acepta TCP y calla no bloquea 2 min
   if (!tls.connect(ip, MQTT_PUERTO, NOMBRE_DEL_SERVIDOR, CA_PEM, nullptr, nullptr)) {
     char detalle[96];
     tls.lastError(detalle, sizeof(detalle));
@@ -108,15 +115,14 @@ static int armarPack(char *pack, size_t &largo) {
   largo = 0;
   if (!agregar(pack, largo, "[")) return 0;
   auto registro = [&](const char *n, const char *u, const char *valorFmt, double v) {
-    if (registros == 0) {
-      if (!agregar(pack, largo, "{\"bn\":\"%s\",", DISPOSITIVO_ID)) return;
-      if (horaPuesta() && !agregar(pack, largo, "\"bt\":%ld,", static_cast<long>(time(nullptr)))) return;
-    } else if (!agregar(pack, largo, ",{")) {
-      return;
-    }
+    const size_t antes = largo;  // si el registro no cabe, el pack vuelve a como estaba (nunca un bn o un bt a medias)
+    bool cabe = registros == 0
+      ? agregar(pack, largo, "{\"bn\":\"%s\",", DISPOSITIVO_ID) && (!horaPuesta() || agregar(pack, largo, "\"bt\":%ld,", static_cast<long>(time(nullptr))))
+      : agregar(pack, largo, ",{");
     char cuerpo[64];
     snprintf(cuerpo, sizeof(cuerpo), valorFmt, v);
-    if (agregar(pack, largo, "\"n\":\"%s\",\"u\":\"%s\",\"v\":%s}", n, u, cuerpo)) registros++;
+    cabe = cabe && agregar(pack, largo, "\"n\":\"%s\",\"u\":\"%s\",\"v\":%s}", n, u, cuerpo);
+    if (cabe) registros++; else largo = antes;
   };
   if (hayBme) {
     const float t = bme.readTemperature(), h = bme.readHumidity(), p = bme.readPressure() / 100.0F;
@@ -134,8 +140,10 @@ static int armarPack(char *pack, size_t &largo) {
   else Serial.print("sonda: sin lectura válida, omitida · ");
   uint32_t suma = 0;
   for (int i = 0; i < 16; i++) suma += analogReadMilliVolts(PIN_SUELO);
-  registro("humedad_suelo", "V", "%.3f", (suma / 16) / 1000.0);  // en V, no mV (docs/10 §8.4 punto 51)
-  registro("rssi", "dBm", "%.0f", static_cast<double>(WiFi.RSSI()));
+  const uint32_t mv = suma / 16;
+  if (mv >= SUELO_MINIMO_MV) registro("humedad_suelo", "V", "%.3f", mv / 1000.0);  // en V, no mV (docs/10 §8.4 punto 51)
+  else Serial.print("suelo: por debajo de 100 mV (sin alimentación o desconectado), omitido · ");
+  if (WiFi.status() == WL_CONNECTED) registro("rssi", "dBm", "%.0f", static_cast<double>(WiFi.RSSI()));
   if (!agregar(pack, largo, "]")) return 0;
   return registros;
 }
@@ -155,6 +163,7 @@ void setup() {
   analogReadResolution(12);
   analogSetPinAttenuation(PIN_SUELO, ADC_11db);  // preciso de 150 a 2450 mV (docs/17 §6)
   tls.setCACert(CA_PEM);
+  sntp_set_time_sync_notification_cb(alSincronizar);  // antes de configTime: así ninguna sincronización pasa sin aviso
   proximoCicloMs = millis();
 }
 
@@ -163,6 +172,9 @@ void loop() {
   if (!asegurarConexion()) { delay(200); return; }
   if (static_cast<int32_t>(millis() - proximoCicloMs) < 0) { delay(50); return; }
   proximoCicloMs += PERIODO_S * 1000UL;
+  // Tras un corte más largo que un periodo (Wi-Fi o broker caídos), los ciclos perdidos no se recuperan en ráfaga: se pierden, como
+  // dice docs/17 §6.2 (sin cola), y el siguiente se agenda a un periodo desde ahora.
+  if (static_cast<int32_t>(millis() - proximoCicloMs) >= 0) proximoCicloMs = millis() + PERIODO_S * 1000UL;
   ciclo++;
   static char pack[TAM_PACK];
   size_t largo = 0;
