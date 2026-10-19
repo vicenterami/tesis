@@ -6,7 +6,7 @@ capacitivo de humedad de suelo. Piezas, seguridad y pines: `docs/17`. Diseño po
 | Entorno | Qué hace | Estado |
 |---|---|---|
 | `diagnostico` | Fase 1: identifica el módulo de aire (registro `0xD0`), lee la sonda y el suelo por el puerto serie, sin Wi-Fi | Listo |
-| (fase 2) | Wi-Fi, TLS con la CA propia, MQTT y SenML hacia la plataforma | Por diseñar en `docs/17 §6` |
+| `nodo` | Fase 2: Wi-Fi, TLS con la CA propia, MQTT con QoS 1 y un pack SenML cada 60 s hacia la plataforma (`docs/17 §6.2`) | Compila; contrato probado en el banco (`docs/16 §44`); con la placa, pendiente |
 
 Requiere PlatformIO Core 6.2.0 (`pip install platformio==6.2.0`; no se fija en `platformio.ini`); las versiones de la plataforma
 y de cada biblioteca sí están fijadas ahí. Licencias y avisos de copyright de terceros: `AVISOS-DE-TERCEROS.md`.
@@ -15,4 +15,12 @@ y de cada biblioteca sí están fijadas ahí. Licencias y avisos de copyright de
 pio run -e diagnostico -t upload && pio device monitor
 ```
 
-Los datos de la red Wi-Fi y la credencial del dispositivo (fase 2) irán en `include/secretos.h`, que git ignora.
+Fase 2: copiar `include/secretos.h.ejemplo` a `include/secretos.h` (git lo ignora) y completar la red Wi-Fi, la dirección del proxy, el
+sitio, el `id_fisico` y la credencial que devolvió el alta (`POST /dispositivos`, seis canales) y la CA de desarrollo; después:
+
+```
+pio run -e nodo -t upload && pio device monitor
+```
+
+Esquema de cableado de la fase 1, editable en diagrams.net (archivo `.drawio`, sin comprimir): `cableado-fase-1.drawio`. Se abre con
+«Archivo → Abrir desde → Dispositivo» o arrastrándolo al lienzo; exportar a PNG para una figura.

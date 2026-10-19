@@ -13,7 +13,7 @@
 | Mejoras | 15 % | 🟢 | Decisiones de diseño del 6, 7 y 8/10 (`docs/10 §8.4`); proxy TLS (`docs/16 §9`); dependencias e imágenes sin vulnerabilidades altas o críticas corregibles (`docs/16 §12`). |
 | 50 % de la implementación | 10 % | 🟡 | Núcleo: 22 de 34 elementos hechos (110 de 168 h, 65 %) y 7 parciales (36 h: HU-02, HU-08, HU-19, TT-12, TT-22, TT-32 y TT-33). Todo el backlog: 33 de 65 (144 de 285 h, 51 %) y 15 parciales (67 h). Cifras calculadas desde las filas de `docs/04`, con los estados de `docs/12 §3`, de §2 y de la Etapa 1 (al final de §2). |
 | Pruebas iniciales | 30 % | 🟢 | `docs/16`: emulador, carga (59,7 tramas/s sin pérdida), carreras, TLS, capacidad y picos, caídas con carga, dependencias e imágenes, LoRaWAN por pasarela en el banco (`docs/16 §31–§34`); 324 pruebas unitarias del backend y 52 del panel. Falta: la matriz formal del contrato de trama (TT-27) y el broker de producción en las caídas (`docs/16 §11`). |
-| Validación preliminar | 10 % | 🟡 | Sensor físico de extremo a extremo (TT-32): todas las piezas llegaron el 13/10 y la placa se reconoció e identificó el 14/10 (`docs/17 §3`); falta la fase 1, cablear los sensores y publicar hasta el panel; guía de manejo seguro escrita (`docs/17 §4`). |
+| Validación preliminar | 10 % | 🟡 | Sensor físico de extremo a extremo (TT-32): todas las piezas llegaron el 13/10, la placa se reconoció el 14/10 y la fase 1 se cerró el 19/10 con los tres sensores verificados (`docs/16 §43`); falta la fase 2, publear los sensores y publicar hasta el panel; guía de manejo seguro escrita (`docs/17 §4`). |
 | Documentación | 15 % | 🟡 | Documentos en concordancia (guardián `plataforma/pruebas/verificar-todo.sh`). El 15/10 el informe ganó el capítulo «Implementación y pruebas iniciales» y el anexo con el detalle de las pruebas (TT-36); falta incorporar la retroalimentación de la Etapa 2 y la revisión de entrega. |
 
 ## 2. Tareas de la Etapa 3: 16 elementos, 86 h (tras el corte del 08/10 y los adelantos del 12/10, §3)
@@ -36,7 +36,7 @@
 | HU-08 🎯 | Exportar los datos en CSV, XLSX y JSON | 4 | 🟡 | Adelantada de la Etapa 4 el 12/10 (§3). CSV estándar y JSON por dispositivo y rango, en flujo por tandas (`GET /dispositivos/{id}/exportar`, `docs/16 §19`); XLSX y la exportación por sitio con rol, en la Etapa 4 con la sesión. |
 | HU-21 🎯 | Ficha del dispositivo: condiciones, historial y serie | 7 | ✅ | Adelantada de la Etapa 4 el 12/10 (§3). Tramo 3 hecho el 12/10: pantalla P3 (`docs/19`) con identidad, tarjetas por canal, gráfico uPlot del histórico agregado que sigue en vivo, condiciones y tramas rechazadas del dispositivo (`docs/16 §17`). **Prueba con navegador real hecha el 16/10** (`banco.sh navegador`: Firefox con Playwright, puntos del gráfico contra `/historico`, vivo sin recargar, caída y vuelta; `docs/16 §39`) y el % calibrado (`docs/16 §38`). El rango a medida por fechas es HU-07 (Etapa 4). |
 | TT-28 🎯 | Emulador de nodos | 5 | ✅ | `docs/16 §2`. |
-| TT-32 🎯 | Sensor físico de extremo a extremo | 3 | 🟡 | Las piezas llegaron el 13/10 y la placa se reconoció e identificó el 14/10 (fase 0, `docs/17 §3`). Falta la fase 1: cablear los sensores y publicar por MQTT con TLS hasta el panel. |
+| TT-32 🎯 | Sensor físico de extremo a extremo | 3 | 🟡 | Fase 0 el 14/10 (`docs/17 §3`) y fase 1 cerrada el 19/10: los tres sensores miden con hardware real y el suelo quedó calibrado (`docs/16 §43`). Falta la fase 2: publicar por MQTT con TLS hasta el panel (diseño en `docs/17 §6.2`; el firmware `nodo` compila y su contrato está probado en el banco, `docs/16 §44`). |
 | TT-36 | Informe de pruebas y validación preliminar | 5 | 🟡 | `docs/16` y, desde el 15/10, el capítulo 5 del informe con el anexo de pruebas; falta la versión de entrega (retroalimentación de la Etapa 2; sensor físico y prueba en terreno si llegan a tiempo). |
 
 
@@ -70,7 +70,7 @@ vuelve a la Etapa 4 con su registro aquí y en `docs/04`.
 ## 4. Lo que frena hoy
 
 - La retroalimentación de la Etapa 2 todavía no llega; las consultas al profesor guía están listas para la reunión presencial de la semana del 20/10.
-- El sensor físico (TT-32) ya tiene su equipo: falta cablear los sensores y publicar hasta el panel (fase 1).
+- El sensor físico (TT-32) ya mide con hardware real (fase 1 cerrada el 19/10): falta publicar hasta el panel (fase 2, diseñada en `docs/17 §6`).
 - La recepción LoRaWAN en terreno (HU-02) necesita una pasarela que alcance el servidor (`docs/10 §8.4` punto 24); mientras
   tanto se prueba en el banco con el JSON exacto de las fuentes oficiales (`banco.sh lorawan`, `docs/16 §31`); la prueba en la misma red que la pasarela del campus está acordada para el martes 20/10 con el compañero a cargo; su pasarela es una UG65 con servidor embebido y dos nodos reportando cada 60 s, y el adaptador se ajusta antes a la forma real de su mensaje (`docs/10 §8.4` punto 47, nota del 15/10).
 
@@ -84,7 +84,7 @@ siga sin terminar y que sus horas sean las de `docs/04`: un elemento que se cier
 | Orden | Elemento | Horas | Estado | Qué falta |
 |---|---|---|---|---|
 | 1 | HU-02 Eventos LoRaWAN | 6 | 🟡 | La prueba en la misma red que la pasarela del campus (20/10); lo demás está probado en el banco (`docs/16 §31`, §36 y §37) |
-| 2 | TT-32 Sensor físico de extremo a extremo | 3 | 🟡 | Fase 1 (diagnóstico de los sensores, firmware listo y compilado) y fase 2 (publicar por MQTT con TLS hasta el panel) (`docs/17 §6`) |
+| 2 | TT-32 Sensor físico de extremo a extremo | 3 | 🟡 | Fase 1 cerrada el 19/10 (los tres sensores verificados y el suelo calibrado: `docs/16 §43`); falta la fase 2 (publicar por MQTT con TLS hasta el panel) (`docs/17 §6`) |
 | 3 | HU-19 Panel de salud con semáforo | 9 | 🟡 | Verlo con el sensor físico y en la demostración |
 | 4 | HU-08 Exportar en CSV, XLSX y JSON | 4 | 🟡 | XLSX y la exportación por sitio con rol: necesita la sesión (HU-18) |
 | 5 | TT-22 Cifrado del transporte | 4 | 🟡 | El broker de producción con certificado real (`docs/14`) |

@@ -67,6 +67,9 @@ void setup() {
   delay(1500);  // tiempo para abrir el monitor después de grabar
   WiFi.mode(WIFI_OFF);
   Serial.println("\n=== Diagnóstico de sensores (fase 1) ===");
+  // El cristal que la placa usa de verdad (lo lee el núcleo al arrancar): esptool lo estima desde la velocidad de la conexión y el
+  // 18/10 dijo 26 MHz con advertencia cuando la fase 0 había dicho 40; esta línea zanja la duda sin depender de la conexión.
+  Serial.printf("— Cristal: %u MHz (medido por la placa al arrancar)\n", getXtalFrequencyMhz());
   Wire.begin(PIN_SDA, PIN_SCL);
   revisarI2c();
   sondas.begin();

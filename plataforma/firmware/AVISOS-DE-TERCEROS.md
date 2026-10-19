@@ -2,7 +2,7 @@
 
 El código propio de esta carpeta es AGPL-3.0-only, como el resto de la plataforma (`../LICENSE`). El firmware compilado incluye
 además el software de terceros de esta tabla, cada uno con su licencia. Qué hay que entregar con un binario, más abajo.
-Licencias leídas el 16/10/2026 y revisadas el 17/10/2026 en los archivos de cada paquete descargado por PlatformIO (`pio run` los deja en `.pio/libdeps/` y en
+Licencias leídas el 16/10/2026, revisadas el 17/10/2026 y ampliadas el 19/10/2026 (fase 2) en los archivos de cada paquete descargado por PlatformIO (`pio run` los deja en `.pio/libdeps/` y en
 su carpeta de paquetes, donde se pueden volver a leer) y, para el núcleo, también en su repositorio oficial.
 
 | Paquete | Versión | Licencia | Aviso de copyright (tal como lo trae el paquete) | Origen |
@@ -14,6 +14,7 @@ su carpeta de paquetes, donde se pueden volver a leer) y, para el núcleo, tambi
 | Adafruit BusIO | 1.17.4 | MIT | Copyright (c) 2017 Adafruit Industries | https://github.com/adafruit/Adafruit_BusIO |
 | OneWire | 2.3.8 | permiso estilo MIT, en `OneWire.cpp` (sin archivo de licencia); el código de CRC trae además el aviso y el permiso de Dallas Semiconductor, con una cláusula de nombre | Copyright (c) 2007, Jim Studt (original old version - many contributors since); «(copyleft) 2006 by Derek Yerger - Free to distribute freely.»; Copyright (C) 2000 Dallas Semiconductor Corporation, All Rights Reserved (código de CRC) | https://github.com/PaulStoffregen/OneWire |
 | DallasTemperature | 4.0.6 | MIT | Copyright (c) 2024 Miles Burton | https://github.com/milesburton/Arduino-Temperature-Control-Library |
+| MQTT (arduino-mqtt; fase 2) | 2.5.3 | MIT (`LICENSE.md` del paquete); incluye el cliente `lwmqtt` del mismo autor en `src/lwmqtt/` | Copyright (c) 2015 Joël Gähwiler | https://github.com/256dpi/arduino-mqtt |
 
 **Antes de distribuir un binario** (no se distribuye ninguno hoy): acompañarlo de este archivo, de una copia del texto de cada licencia
 (LGPL-2.1, Apache 2.0, BSD-2, BSD-3, ISC y MIT, tal como vienen en cada paquete o en su repositorio; y, si se usa la opción GPL-2.0-or-later de las cabeceras duales del SDK, también esa) y, por la LGPL, del código fuente del núcleo

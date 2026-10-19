@@ -14,6 +14,7 @@
 #                                                              (con «ip», por dirección IP, como en la red del campus: certificado con CA_IP_EXTRA y proxy publicado solo en esa IP)
 #   bash plataforma/pruebas/banco/banco.sh http                recepción por HTTP (HU-01): 202, 401, 413, 415, 422 con cuarentena, la baja, los topes (par, dirección, caché, ritmo) y la dirección con el secreto del proxy
 #   bash plataforma/pruebas/banco/banco.sh tope                tope por emisor en las dos vías (docs/10 §8.4 punto 53): presupuesto de lecturas por HTTP y cuota de cuarentena por MQTT
+#   bash plataforma/pruebas/banco/banco.sh nodo                contrato del nodo ESP32 (fase 2, docs/17 §6.2) sin la placa: alta con seis canales, calibración, el pack del firmware con QoS 1 → medicion y ficha
 #   bash plataforma/pruebas/banco/banco.sh navegador           pantalla P3 en Firefox real con Playwright: puntos contra /historico, vivo sin recargar, caída y vuelta (docs/16 §39)
 #   bash plataforma/pruebas/banco/banco.sh cola                cola del broker vigilada: backend detenido + 200 emulados → descartes → condición broker_descarte (docs/16 §22)
 #   bash plataforma/pruebas/banco/banco.sh estado | logs [servicio] | sql ["CONSULTA"]
@@ -594,6 +595,54 @@ case "${1:-}" in
     k=$(dc logs --no-color --since 10m backend 2>/dev/null | grep -cF -f <(printf '%s\n' "${TK:-sin}" "${TKP:-sin}")); [ "$k" = 0 ] && ok "ningún token aparece en el registro del backend" || falla "un token aparece en el registro"
     unset TK TKP CLAVE
     echo; [ $fallos -eq 0 ] && echo "HTTP OK" || { echo "$fallos comprobación(es) con falla"; exit 1; } ;;
+  nodo)
+    # Contrato del nodo propio (fase 2, docs/17 §6.2; docs/16 §44), sin la placa: alta con los seis canales del nodo, calibración del
+    # suelo por SQL (la API aún no la recibe), y EL MISMO pack que arma src/nodo.cpp publicado con QoS 1 por 1884 con la credencial del
+    # alta → una trama, seis mediciones con la hora del bt y origen «dispositivo», humedad_suelo guardada en V y su porcentaje en la ficha;
+    # un pack sin bt → seis mediciones con la hora de recepción; un pack con un sensor omitido (sin temperatura_suelo) → cinco.
+    CLAVE=$(leer HTTP_CLAVE_ADMIN); fallos=0; n=$(date +%s | tail -c 5); id="nodo-$n"
+    ok() { echo "OK    $1"; }; falla() { echo "FALLA $1"; fallos=$((fallos+1)); }
+    api() { local m=$1 r=$2; shift 2; printf 'X-Clave-Admin: %s\n' "$CLAVE" | curl -s -m 10 -w '\n%{http_code}' -X "$m" -H @- -H 'Content-Type: application/json' "$@" "http://127.0.0.1:3001$r"; }
+    json() { python3 -c "import sys,json; v=json.load(sys.stdin); print(eval(sys.argv[1]))" "$1"; }
+    codigo() { printf '%s' "${1##*$'\n'}"; }; cuerpo() { printf '%s' "${1%$'\n'*}"; }
+    zona=$(psql_ -tA -c "SELECT id FROM zona ORDER BY id LIMIT 1")
+    canales='[{"magnitud":"temperatura"},{"magnitud":"humedad"},{"magnitud":"presion"},{"magnitud":"temperatura_suelo"},{"magnitud":"humedad_suelo"},{"magnitud":"rssi"}]'
+    r=$(api POST /dispositivos -d "{\"id_fisico\":\"$id\",\"nombre\":\"Nodo propio (contrato de la fase 2)\",\"zona_id\":\"$zona\",\"via\":\"mqtt\",\"formato\":\"senml\",\"intervalo_esperado_s\":60,\"canales\":$canales}")
+    [ "$(codigo "$r")" = 201 ] && ok "alta del nodo por API con los seis canales (vía mqtt, senml, 60 s) → 201" || { echo "FALLA alta → $(codigo "$r"): $(cuerpo "$r" | head -c 200)"; exit 1; }
+    CRED=$(json "v['conexion']['credencial']" <<<"$(cuerpo "$r")"); NUID=$(json "v['id']" <<<"$(cuerpo "$r")"); topico=$(json "v['conexion']['ejemplo']['topico']" <<<"$(cuerpo "$r")"); unset r
+    [ "$topico" = "sitio/banco/dispositivo/$id/temperatura" ] && ok "el tópico del alta es el que arma el firmware (…/<id>/temperatura)" || falla "tópico «$topico»"
+    psql_ -q -c "UPDATE canal SET escala_cero = 2.205, escala_cien = 1.170 WHERE dispositivo_id = '$NUID' AND magnitud_codigo = 'humedad_suelo'"
+    e=$(psql_ -tA -c "SELECT escala_cero || '/' || escala_cien FROM canal WHERE dispositivo_id = '$NUID' AND magnitud_codigo = 'humedad_suelo'")
+    [ "$e" = "2.205/1.17" ] && ok "calibración del suelo fijada por SQL (2,205 V = 0 %, 1,170 V = 100 %: la de la fase 1)" || falla "calibración: «$e»"
+    red=$(docker network ls --format '{{.Name}}' | grep '^banco_default$')
+    # El nodo publica con clientId = usuario = id_fisico y QoS 1; la credencial entra por stdin (nunca por argv).
+    pub() { printf '%s\n' "$CRED" | docker run --rm -i --network "$red" "$IMG_BROKER" sh -c 'IFS= read -r C; mosquitto_pub -V mqttv5 -d -h mosquitto -q 1 -i "$1" -u "$1" -P "$C" -t "$2" -m "$3" 2>&1' sh "$id" "$topico" "$1" | grep -oE "PUBACK \(Mid: [0-9]+, RC:[0-9]+\)|Connection error: .*" | head -1; }
+    cuenta() { psql_ -tA -c "SELECT count(*) FROM medicion m JOIN canal c ON c.id = m.canal_id WHERE c.dispositivo_id = '$NUID' AND $1"; }
+    espera() { for _ in $(seq 1 20); do [ "$(cuenta "$1")" = "$2" ] && return 0; sleep 1; done; return 1; }
+    bt=$(( $(date +%s) - 5 ))
+    pack="[{\"bn\":\"$id\",\"bt\":$bt,\"n\":\"temperatura\",\"u\":\"Cel\",\"v\":20.64},{\"n\":\"humedad\",\"u\":\"%RH\",\"v\":61.3},{\"n\":\"presion\",\"u\":\"hPa\",\"v\":984.33},{\"n\":\"temperatura_suelo\",\"u\":\"Cel\",\"v\":20.25},{\"n\":\"humedad_suelo\",\"u\":\"V\",\"v\":2.199},{\"n\":\"rssi\",\"u\":\"dBm\",\"v\":-61}]"
+    [ ${#pack} -lt 512 ] && ok "el pack de seis registros mide ${#pack} bytes (< 512, el tamaño con que el firmware instancia la biblioteca)" || falla "pack de ${#pack} bytes"
+    r=$(pub "$pack"); [[ "$r" == *"RC:0"* || "$r" == *"RC:16"* ]] && ok "publica el pack con QoS 1 y la credencial del alta ($r)" || falla "publicar: $r"
+    espera "m.tiempo = to_timestamp($bt)" 6 && ok "seis mediciones con la hora del bt (una por magnitud)" || falla "mediciones en bt: $(cuenta "m.tiempo = to_timestamp($bt)")"
+    o=$(psql_ -tA -c "SELECT string_agg(DISTINCT m.origen_tiempo, ',') FROM medicion m JOIN canal c ON c.id = m.canal_id WHERE c.dispositivo_id = '$NUID' AND m.tiempo = to_timestamp($bt)")
+    [ "$o" = dispositivo ] && ok "su origen de tiempo es «dispositivo» (la marca vino en el pack)" || falla "origen_tiempo: «$o»"
+    v=$(psql_ -tA -c "SELECT m.valor FROM medicion m JOIN canal c ON c.id = m.canal_id WHERE c.dispositivo_id = '$NUID' AND c.magnitud_codigo = 'humedad_suelo' AND m.tiempo = to_timestamp($bt)")
+    [ "$v" = 2.199 ] && ok "humedad_suelo guardada en V tal cual (2,199), sin convertir a porcentaje (docs/10 §8.4 punto 51)" || falla "humedad_suelo: «$v»"
+    t=$(psql_ -tA -c "SELECT count(*) FROM trama WHERE dispositivo_id = '$NUID'"); [ "$t" = 1 ] && ok "una sola trama para las seis lecturas" || falla "tramas: $t"
+    p=$(curl -s -m 5 "http://127.0.0.1:3001/dispositivos/$NUID" | json "[k for k in v['canales'] if k['magnitud']=='humedad_suelo'][0]['ultima_medicion']['porcentaje']")
+    [ "$p" = 0.6 ] && ok "la ficha trae el porcentaje calculado con la calibración: 2,199 V → 0,6 % (sensor al aire)" || falla "porcentaje en la ficha: «$p»"
+    rs=$(curl -s -m 5 "http://127.0.0.1:3001/dispositivos/$NUID" | json "[k for k in v['canales'] if k['magnitud']=='rssi'][0]['ultima_medicion']['valor']")
+    [ "$rs" = -61 ] && ok "la intensidad Wi-Fi (rssi, dBm) llegó como séptima magnitud del catálogo" || falla "rssi en la ficha: «$rs»"
+    curl -s http://127.0.0.1:3001/dispositivos | python3 -c "import sys,json; sys.exit(0 if any(d['id_fisico']=='$id' and d['en_linea'] for d in json.load(sys.stdin)) else 1)" && ok "el inventario lo muestra en línea" || falla "no aparece en línea en el inventario"
+    # Sin hora NTP el firmware omite bt: el backend pone la hora de recepción (docs/13 regla 7).
+    r=$(pub "${pack/\"bt\":$bt,/}"); [[ "$r" == *"RC:0"* || "$r" == *"RC:16"* ]] || falla "publicar sin bt: $r"
+    espera "m.origen_tiempo = 'recepcion'" 6 && ok "el mismo pack sin bt → seis mediciones con la hora de recepción (origen «recepcion»)" || falla "sin bt: $(cuenta "m.origen_tiempo = 'recepcion'") con origen recepcion"
+    # Un sensor que no respondió en el ciclo se omite del pack (docs/17 §6.2): las demás lecturas entran igual.
+    bt2=$((bt + 60)); r=$(pub "$(python3 -c "import json,sys; p=json.loads(sys.argv[1]); p[0]['bt']=int(sys.argv[2]); print(json.dumps([x for x in p if x['n']!='temperatura_suelo']))" "$pack" "$bt2")")
+    [[ "$r" == *"RC:0"* || "$r" == *"RC:16"* ]] || falla "publicar con un sensor omitido: $r"
+    espera "m.tiempo = to_timestamp($bt2)" 5 && ok "un pack con la sonda omitida → cinco mediciones (las demás no se pierden)" || falla "sensor omitido: $(cuenta "m.tiempo = to_timestamp($bt2)") mediciones"
+    n=$(dc logs --no-color --since 3m backend 2>/dev/null | grep -cF -f <(printf '%s\n' "$CRED")); [ "$n" = 0 ] && ok "la credencial no aparece en el registro del backend" || falla "la credencial se escribió en el registro"
+    echo; [ $fallos -eq 0 ] && echo "NODO OK" || { echo "$fallos comprobación(es) con falla"; exit 1; } ;;
   tope)
     # Tope por emisor (docs/10 §8.4 punto 53; docs/16 §42), de punta a punta en las dos vías. Por HTTP, el presupuesto de lecturas de la
     # hora: un dispositivo de 1 canal cada 86 400 s tiene 600 (el mínimo); una trama de 601 no cabe → 422 con el motivo, cuarentena «tope»

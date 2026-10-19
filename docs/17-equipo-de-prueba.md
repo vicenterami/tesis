@@ -179,6 +179,21 @@ emite dos avisos del preprocesador (`#undef` con paréntesis en `OneWire.cpp`), 
 
 ## 6. Firmware por fases (16/10/2026)
 
+> **Fase 1 cerrada el 19/10/2026 (primera corriente el 18/10):** la placa es una NodeMCU ESP-32S V1.1 de 38 pines; sus pines confirmados contra
+> la serigrafía (`3V3` y `P34` en la fila del `5V`; `P4`, `P21` y `P22` en la fila del `CLK`); grabación con `pio run -e diagnostico -t upload`
+> en 37 s (`Chip is ESP32-D0WD-V3`, `Hash of data verified`). Resultado del diagnóstico: la **sonda DS18B20 responde y mide** (pasos de
+> 0,06 °C; en agua fría bajó de 21,3 a 18,0 °C y volvió a subir), el **sensor de suelo da 2205 mV al aire y ≈ 1170 mV con la punta en agua** (±3 mV; los dos
+> extremos de su calibración, `escala_cero` 2,205 V y `escala_cien` 1,170 V; ambos dentro del rango preciso del ADC: no hace falta divisor)
+> y el **módulo de aire**, que en la primera corriente no respondía (`FALLA nadie responde`) porque estaba mal asentado en el protoboard,
+> **responde al reasentarlo**: `0x76`, registro `0xD0 = 0x60 → BME280`, con 20,95 °C, 60,5 %HR y 984,3 hPa (presión absoluta coherente
+> con la altura de Temuco). Los tres sensores verificados: la fase 2 puede empezar. esptool estimó el cristal en 26 MHz (el 14/10 dijo
+> 40); la estimación depende de la velocidad de la conexión, y el mensaje de arranque de la ROM salió legible a 115200, lo que solo
+> ocurre con 40 MHz; el firmware imprime desde el 19/10 el valor que la placa lee al arrancar, y dijo `40 MHz`. Al dar corriente se vio dos veces un bucle de
+> reinicios (`rst:` repetido) que se estabilizó solo: alimentación inestable en el arranque (cable o puerto USB), a vigilar; el monitor
+> serie quedó configurado para no mover las líneas de reset de la placa (`platformio.ini`).
+> Esquema de cableado editable (diagrams.net): `plataforma/firmware/cableado-fase-1.drawio`, con los 38 pines de la placa tal como están
+> impresos, los seis usados, los tres sensores, la resistencia y las columnas del protoboard.
+
 Dos fases, para que una falla diga dónde está: si la fase 1 no ve un sensor, el problema es el sensor o su cableado, nunca la red.
 
 - **Fase 1, diagnóstico** (`pio run -e diagnostico`, `src/diagnostico.cpp`): solo puerto serie, Wi-Fi apagado. Barre el bus I2C y lee el
@@ -189,8 +204,33 @@ Dos fases, para que una falla diga dónde está: si la fase 1 no ve un sensor, e
   referencia entrega hasta 3,0 V (SEN0193). Si el valor al aire pasa de 2450 mV, se decide con el dato medido si se agrega un divisor
   de tensión o se acepta la menor precisión en el extremo seco. Avisa de la ambigüedad del valor de arranque de la sonda (+85 °C, antes de su primera
   conversión) de una lectura real. No imprime identificadores de hardware: la dirección ROM de la sonda es única, como una MAC.
-- **Fase 2, publicación**: Wi-Fi, TLS con la CA propia, MQTT con la credencial del alta y SenML en `sitio/<sitio>/dispositivo/<id>/<magnitud>`,
-  con la marca de tiempo del nodo sincronizada por NTP (regla 7 de `docs/13`). Antes de publicar el suelo hacen falta sus magnitudes en el
-  catálogo (`temperatura_suelo`, `humedad_suelo`: `docs/08 §8`) y la curva de calibración de la fase 1. Se diseña aquí antes de escribirla;
-  la credencial y la red Wi-Fi viven en un archivo local que git ignora, nunca en el código.
+- **Fase 2, publicación** (`pio run -e nodo`, `src/nodo.cpp`): Wi-Fi, TLS con la CA propia, MQTT con la credencial del alta y SenML en
+  `sitio/<sitio>/dispositivo/<id>/<magnitud>`, con la marca de tiempo del nodo sincronizada por NTP (regla 7 de `docs/13`). Las magnitudes
+  del suelo ya están en el catálogo (migración 18) y la calibración salió de la fase 1. Diseño en §6.2; la credencial y la red Wi-Fi viven
+  en `include/secretos.h`, que git ignora (plantilla versionada `secretos.h.ejemplo`), nunca en el código.
+
+### 6.2 Diseño de la fase 2 (19/10/2026; escrito antes del código, regla de concordancia de `docs/10`)
+
+Qué hace el nodo, en orden: conecta el Wi-Fi; pide la hora por NTP con espera acotada; abre TLS contra el proxy (8883) verificando el
+certificado con la CA propia; se autentica en el broker con el usuario y la credencial del alta; y cada **60 s** (el intervalo esperado del
+alta y el que fija `docs/10 §8.4` punto 51) lee los tres sensores y publica **un pack SenML** con QoS 1. Las decisiones, cada una con su porqué:
+
+| Decisión | Qué se hace | Por qué |
+|---|---|---|
+| Biblioteca MQTT | `256dpi/MQTT` 2.5.3 (arduino-mqtt, MIT; envuelve `lwmqtt`, MQTT 3.1.1) | `docs/10 §8.4` fija **QoS 1** para los nodos Wi-Fi y el pipeline deduplica la reentrega; la biblioteca más difundida (`PubSubClient` 2.8) solo publica con QoS 0, así que se descarta. Publicada el 16/04/2026 (más de dos semanas antes de fijarla), licencia leída en el paquete (`AVISOS-DE-TERCEROS.md`) |
+| TLS | `WiFiClientSecure` del núcleo (mbedTLS 2.28.7), CA propia (`ca.crt` de `proxy/ca-desarrollo.sh`, pegada en `secretos.h`), TLS 1.2 o superior (el proxy no acepta menos) | La misma CA y el mismo 8883 que usa la pasarela del campus (`docs/10 §8.4` punto 47): un solo punto de entrada para dispositivos |
+| Identidad del servidor | El nodo se conecta a la **IP** del portátil pero verifica el certificado contra el nombre **`proxy`**, que el certificado del servidor ya trae en su SAN (`ca-desarrollo.sh`): `WiFiClientSecure::connect(ip, 8883, "proxy", CA, …)` y luego `MQTTClient::connect(id, usuario, clave, skip = true)`, que reutiliza esa conexión ya abierta en vez de abrir otra | mbedTLS 2.28 compara el nombre esperado **solo con las entradas DNS** del SAN, no con las IP: verificar «la IP del portátil» fallaría aunque el certificado la trajera (`CA_IP_EXTRA`, que sí necesita la pasarela porque su cliente es otro). Con una CA privada que solo emite el certificado del proxy, verificar «`proxy`» firmado por esa CA es exactamente la identidad que la CA certifica. El nodo no necesita reemitir el certificado al cambiar de red: basta la IP nueva en `secretos.h` |
+| Fechas del certificado | No se exige reloj para TLS | El núcleo compila mbedTLS sin `MBEDTLS_HAVE_TIME_DATE` (verificado en su `sdkconfig`): no revisa las fechas de validez, así el nodo conecta aunque arranque sin hora |
+| Hora de las lecturas | NTP (`configTime`, servidor en `secretos.h`) con espera de hasta 10 s al arrancar y reintento en segundo plano. **Con hora, el pack lleva `bt`** (segundos Unix); **sin hora, no lleva `bt`** y el backend pone la hora de recepción (`docs/13` regla 7) | Jamás una hora inventada: la de compilación, por ejemplo, daría marcas «antiguas pero posteriores al 2000», que el backend respeta por diseño (un nodo que vuelve de un corte reporta tiempos viejos legítimos) y guardaría lecturas con hora falsa. Que la hora venga solo de NTP es lo que hace fiable la regla «si hay `bt`, es real» |
+| Forma del pack | Un pack por ciclo bajo `sitio/<sitio>/dispositivo/<id>/temperatura`: `[{"bn":"<id>","bt":<s>,"n":"temperatura","u":"Cel","v":20.64},{"n":"humedad","u":"%RH","v":61.3},{"n":"presion","u":"hPa","v":984.3},{"n":"temperatura_suelo","u":"Cel","v":20.25},{"n":"humedad_suelo","u":"V","v":2.199},{"n":"rssi","u":"dBm","v":-61}]` (263 bytes medidos en el banco; la biblioteca se instancia con 512) | Es el contrato nativo (`docs/10`, adaptador `senml`): la magnitud del tópico solo manda cuando un registro no trae `n`, y aquí todos lo traen, como el emulador. Una trama = una fila en `trama` con sus seis lecturas, y el tope por emisor cuenta lecturas, no tramas. El suelo va en **V** (punto 51); `rssi` es la intensidad Wi-Fi en dBm, séptima magnitud del catálogo, para ver la salud del enlace en el panel |
+| Sensor que falla en un ciclo | Su registro **se omite** del pack; si no queda ninguno, no se publica y se anota por serie | Un `v` no numérico vuelve malformada la trama entera (adaptador `senml`) y mandaría a cuarentena también las lecturas buenas |
+| Canales del alta | Seis, en este orden: `temperatura`, `humedad`, `presion`, `temperatura_suelo`, `humedad_suelo`, `rssi`; vía `mqtt`, formato `senml`, `intervalo_esperado_s` 60; después del alta, la calibración del canal `humedad_suelo`: `escala_cero` 2,205 y `escala_cien` 1,170 (fase 1) | El alta de hoy no recibe `escala_*` (las «edita una persona», migración 18): se fijan por SQL hasta que la API las admita (pendiente anotado) |
+| Reconexión | Wi-Fi caído: reintento con espera creciente (5 → 60 s); broker caído: reconexión antes del ciclo siguiente; **sin cola** de lecturas en esta fase (lo que no se publica en su ciclo se pierde) | La cola en memoria y la reentrega de lo acumulado son una mejora aparte; el intervalo esperado y el barrido de supervisión ya muestran el corte como `sin_senal` |
+| Qué imprime por serie | El pack, el resultado de cada publicación (QoS 1: `publicado` solo tras el PUBACK) y la razón de cada fallo; **nunca** la clave, la MAC ni la IP | Las pegadas del monitor terminan en bitácoras: no deben traer identificadores de red ni secretos |
+
+**Verificación, en dos partes.** (1) **Sin hardware, hoy:** el firmware compila (`pio run -e nodo`) y el **contrato se prueba en el banco**
+(`banco.sh nodo`, `docs/16 §44`): alta con los seis canales, calibración por SQL, el mismo pack que arma el firmware publicado con QoS 1
+→ seis mediciones con la hora del `bt`, `humedad_suelo` guardada en V y su porcentaje en la ficha, un pack sin `bt` → hora de recepción,
+y un pack con un sensor omitido → cinco mediciones. (2) **Con la placa (próxima sesión, laboratorio guiado):** secretos, alta real,
+grabar, monitor, el dispositivo en línea en el panel y las seis series en su ficha (HU-19 con el sensor físico).
 

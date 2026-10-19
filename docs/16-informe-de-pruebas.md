@@ -1124,3 +1124,43 @@ Yerger en OneWire, cifras y referencias cruzadas.
 **Lo que no cubre:** el 503 del cupo se prueba solo en unitarias; el bloqueo grueso, en el banco con 10 identificadores × 5 fallos
 (≈ 3,3 s de `scrypt`), no con una carga real; la cuota de la pasarela para tramas sin DevEUI verificable, en unitarias; el cierre de la condición se prueba adelantando la ventana en la base, no esperando una hora; la cuota en memoria
 de lo que el filtro 1 rechaza se prueba en unitarias, no en el banco. **Pruebas:** 324 del backend (33 nuevas) y 52 del panel.
+
+## 43. Fase 1 del nodo propio: diagnóstico de los tres sensores con hardware real (18 y 19/10/2026)
+
+**Qué se probó** (`docs/17 §6`, fase 1; cierra la mitad de TT-32). La placa NodeMCU ESP-32S V1.1 con el módulo de aire GY-BME280 (I2C), la
+sonda DS18B20 (1-Wire con resistencia de 4,7 kΩ) y el sensor capacitivo de suelo v1.2 (ADC), cableados en protoboard según
+`plataforma/firmware/cableado-fase-1.drawio`, con el firmware `diagnostico` (`pio run -e diagnostico -t upload`). Resultados leídos por el
+puerto serie a 115200:
+
+| Comprobación | Resultado |
+|---|---|
+| Grabación por `esptool` (puerto `ttyUSB0`, `cp210x`): `Chip is ESP32-D0WD-V3`, `Hash of data verified`, `[SUCCESS]` en 37 s | ✅ |
+| Barrido I2C: `responde 0x76`, registro `0xD0 = 0x60 → BME280`; lecturas 20,95 °C · 60,5 %HR · 984,3 hPa (presión absoluta coherente con la altura del lugar) | ✅ (tras reasentar el módulo: con los pines flojos, `FALLA nadie responde`) |
+| 1-Wire: `1 sonda(s) DS18B20`; mide con pasos de 0,06 °C (12 bits) y sigue la temperatura real: 21,3 → 18,0 °C en agua fría → 23,6 °C en la mano | ✅ |
+| Sensor de suelo: al aire **2205 mV** (±3), con la punta en agua **≈ 1170 mV** (1167–1173); ambos dentro del rango preciso del ADC (150–2450 mV): no hace falta divisor; valores de `escala_cero` y `escala_cien` para el alta | ✅ |
+| Cristal: `esptool` estimó 26 MHz con advertencia el 18/10 (el 14/10 y el 19/10 dijo 40: estima por la velocidad de la conexión); el mensaje de arranque de la ROM salió legible a 115200, lo que solo ocurre con 40 MHz; y el firmware imprime desde el 19/10 el valor que la placa lee al arrancar: `— Cristal: 40 MHz` | ✅ 40 MHz |
+| Al dar corriente, dos veces un bucle de reinicios (`rst:` repetido unos segundos) que se estabilizó solo; el monitor serie con las líneas de reset inactivas (`monitor_dtr`/`monitor_rts = 0`) deja que la placa arranque y se reinicia con `EN` | observado; a vigilar (cable o puerto USB) |
+
+**Lo que no cubre:** la lectura con Wi-Fi encendido (`docs/17 §4.3`), que es de la fase 2; la calibración se tomó en agua de la llave y al aire
+de la pieza, no en suelo real (los dos extremos del sensor, no del terreno). **Tropiezos, ninguno del sistema:** la primera prueba en
+agua se hizo con la sonda de temperatura en vez del sensor de humedad (sirvió para ver que la sonda mide de verdad), y el módulo de
+aire mal asentado dio «nadie responde» hasta presionarlo parejo.
+
+## 44. Contrato del nodo propio (fase 2) probado en el banco sin la placa (19/10/2026)
+
+**Qué se probó** (`docs/17 §6.2`; `banco.sh nodo`, 15 de 15 comprobaciones). El firmware de la fase 2 (`src/nodo.cpp`, entorno `nodo`)
+compila con la plataforma y las bibliotecas fijadas (RAM 14,6 %, flash 72,0 %); su contrato con la plataforma se probó de punta a punta
+en el banco publicando con `mosquitto_pub` exactamente lo que el firmware arma, con QoS 1 y la credencial del alta:
+
+| Comprobación | Resultado |
+|---|---|
+| Alta por API con los seis canales del nodo (`temperatura`, `humedad`, `presion`, `temperatura_suelo`, `humedad_suelo`, `rssi`; vía `mqtt`, `senml`, 60 s) → 201; el tópico del alta es el que arma el firmware (`…/<id>/temperatura`) | ✅ |
+| Calibración del suelo por SQL (2,205 V = 0 %, 1,170 V = 100 %, los extremos de la fase 1) | ✅ |
+| El pack de seis registros mide 263 bytes (la biblioteca del firmware se instancia con 512; su tope por defecto, 128, no alcanzaría) | ✅ |
+| Publicado con QoS 1 (`PUBACK … RC:0`) → **una trama**, seis mediciones con la hora del `bt` y origen de tiempo `dispositivo`; `humedad_suelo` guardada en V tal cual (2,199); la ficha trae el porcentaje con la calibración (0,6 %, sensor al aire) y `rssi` como séptima magnitud; el inventario lo muestra en línea | ✅ |
+| El mismo pack **sin `bt`** (nodo sin hora NTP) → seis mediciones con la hora de recepción (origen `recepcion`) | ✅ |
+| Un pack con la sonda **omitida** (sensor que no respondió en el ciclo) → cinco mediciones: las demás no se pierden | ✅ (la primera corrida del caso falló por una publicación sobrante en la prueba misma, que entregaba seis; corregida la prueba, cinco) |
+| La credencial no aparece en el registro del backend | ✅ |
+
+**Lo que no cubre:** Wi-Fi, TLS desde la placa, NTP y el ciclo de 60 s con los sensores: es la sesión con hardware, con laboratorio guiado
+(la verificación TLS equivalente desde el portátil es `openssl s_client … -verify_hostname proxy` → «Verify return code: 0 (ok)»).
