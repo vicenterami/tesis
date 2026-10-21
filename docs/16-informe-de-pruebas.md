@@ -731,7 +731,7 @@ su árbol y se suscribe solo a su subárbol de comandos.
 
 | Prueba | Resultado |
 |---|---|
-| Alta | pasarela, hash de su credencial, evento con `dispositivo_id` nulo y cliente con rol `pasarela` antes del COMMIT; el secreto en ningún parámetro SQL; plantillas `event_topic` y `command_topic` (ChirpStack) o el uplink con `$devEUI` (Milesight) |
+| Alta | pasarela, hash de su credencial, evento con `dispositivo_id` nulo y cliente con rol `pasarela` antes del COMMIT; el secreto en ningún parámetro SQL; plantillas `event_topic` y `command_topic` (ChirpStack) o el uplink con `$deveui` (Milesight) |
 | Sitio inexistente o inactivo | 400 sin tocar el broker; sin administración del broker, 503 |
 | El broker no responde | ROLLBACK y orden de borrar el cliente por si llegó a crearse |
 | Baja | bloqueo `FOR NO KEY UPDATE`, `activo = false`, credenciales revocadas, nodos contados, `deleteClient` antes del COMMIT |
@@ -757,7 +757,7 @@ estándar. Resultado: **25 de 25 comprobaciones, «LORAWAN OK»**; 26 de 26 desd
 | `up` publicado en su árbol | aceptado; la lectura en `medicion` con origen `pasarela` |
 | `join` | sin cuarentena; DevEUI no asociado → `no_registrado`; DevEUI cruzado → `malformada` y el nodo no se marca vivo; SenML bajo la pasarela → `malformada` |
 | ACL del rol `pasarela` | no publica en el árbol de otra pasarela ni como dispositivo directo (RC:135); se suscribe a su subárbol de comandos (código 0) y no a los de otra ni a todo el sitio (135); un emulado no publica en su árbol (RC:135) |
-| Pasarela Milesight | 201 con el tópico del uplink con `$devEUI`; con códec y Metadata, 3 lecturas con la hora de recepción; sin códec, `malformada` que dice qué activar |
+| Pasarela Milesight | 201 con el tópico del uplink con `$deveui` (minúsculas desde el 20/10, `§45`); con códec y Metadata, 3 lecturas con la hora de recepción; sin códec, `malformada` que dice qué activar |
 | Rotación | la credencial anterior ya no entra; la nueva publica |
 | Baja | 200 con un nodo sin pasarela; el broker rechaza su credencial; `GET /pasarelas` la lista inactiva |
 | Registro del backend | ninguna credencial de pasarela escrita |

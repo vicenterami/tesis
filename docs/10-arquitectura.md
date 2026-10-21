@@ -1275,7 +1275,7 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     fuentes oficiales de ChirpStack v4 y de la pasarela Milesight UG63, al final del punto; **implementado y probado de punta a punta en
     el banco el 15/10**, `docs/16 §28–§31`; falta la prueba en terreno). Las rutas B y C entran por el mismo tópico,
     `sitio/<sitio>/pasarela/<id_pasarela>/<deveui>/<evento>`: ChirpStack lo produce con su plantilla `event_topic` y la pasarela
-    Milesight con el comodín `$devEUI`. **Orden del filtro 1 para ese tópico:** (i) la pasarela debe estar registrada, activa y en
+    Milesight con el comodín `$deveui` (en minúsculas: en la prueba de campo del 20/10/2026 la UG65 publicó `$devEUI` literal y solo sustituyó `$deveui`; su guía lo escribe así, evidencia B-12). **Orden del filtro 1 para ese tópico:** (i) la pasarela debe estar registrada, activa y en
     el sitio del tópico; si no, cuarentena `no_registrado` con cualquier evento, porque es una credencial publicando donde no le
     corresponde (señal de seguridad, no de datos); (ii) un evento distinto de `up` (`join`, `ack`, `status`…) se anota en el
     registro de depuración y termina ahí, sin escribir en la base: la «última vez vista» de una pasarela se deriva de sus nodos, porque escribirla
@@ -1304,7 +1304,7 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     La credencial de una pasarela vive en la misma tabla que la de un dispositivo, con un titular y solo uno (migración 16), y la
     aplicación gana `INSERT` en `pasarela` y `UPDATE` solo de su columna `activo`, para el alta y la baja; los eventos llevan `dispositivo_id` nulo y la pasarela en el
     detalle (`pasarela_alta`, `pasarela_baja`, `pasarela_rotacion`). La respuesta del alta trae la conexión lista para copiar según el
-    formato: para ChirpStack, `event_topic` y `command_topic`; para Milesight, el tópico del uplink con `$devEUI`. `GET /pasarelas`
+    formato: para ChirpStack, `event_topic` y `command_topic`; para Milesight, el tópico del uplink con `$deveui`. `GET /pasarelas`
     lista cada una con sus nodos y la última vez vista, derivada de ellos.
     La suscripción se permite porque la configuración oficial de ChirpStack dice del tópico de comandos «This is the topic on which
     the MQTT subscribes for receiving (enqueue) commands» (https://www.chirpstack.io/docs/chirpstack/configuration.html, consultada

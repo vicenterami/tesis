@@ -74,10 +74,10 @@ describe('AltaService: pasarelas (rutas B y C)', () => {
     });
     expect(JSON.parse(params[i('INSERT INTO evento')][1] as string)).toMatchObject({ pasarela_id: P, formato: 'chirpstack' });
   });
-  it('alta milesight: la plantilla es el uplink con $devEUI, y la línea del puente de Mosquitto para el tópico nativo (16/10)', async () => {
+  it('alta milesight: la plantilla es el uplink con $deveui (minúsculas: lo que la UG65 sustituye), y la línea del puente de Mosquitto para el tópico nativo (16/10)', async () => {
     const r = await armar().servicio.crearPasarela(validarPasarela({ ...cuerpo, id_fisico: 'ug63-campus', formato: 'milesight' }));
     expect(r.conexion.plantillas).toEqual({
-      uplink: 'sitio/uct/pasarela/ug63-campus/$devEUI/up',
+      uplink: 'sitio/uct/pasarela/ug63-campus/$deveui/up',
       puente_mosquitto: 'topic device/+/event/# out 1 application/<app>/ sitio/uct/pasarela/ug63-campus/',
     });
   });
