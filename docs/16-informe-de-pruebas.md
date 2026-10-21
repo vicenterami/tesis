@@ -1164,3 +1164,23 @@ en el banco publicando con `mosquitto_pub` exactamente lo que el firmware arma, 
 
 **Lo que no cubre:** Wi-Fi, TLS desde la placa, NTP y el ciclo de 60 s con los sensores: es la sesión con hardware, con laboratorio guiado
 (la verificación TLS equivalente desde el portátil es `openssl s_client … -verify_hostname proxy` → «Verify return code: 0 (ok)»).
+
+## 45. Prueba de campo con la red LoRaWAN del campus (20/10/2026)
+
+**Qué se probó** (`docs/10 §8.4` punto 47, ruta B, camino 2; bitácora del 20/10). Pasarela Milesight UG65 con servidor de red
+embebido, dos nodos Heltec LoRa 32 V3 (AU915), el portátil con la pila completa en la misma red local y la pasarela sin internet.
+
+| Comprobación | Resultado |
+|---|---|
+| Certificado del servidor con la IP del portátil (`CA_IP_EXTRA`), proxy en 8883, `openssl s_client … -verify_ip` → «0 (ok)» | ✅ |
+| La UG65 conecta por TLS verificando nuestra CA («Self signed certificates», solo `ca.crt`), con usuario y credencial del alta por API, QoS 1, sin retención; estado «MQTT Connected» | ✅ |
+| Alta por API de la pasarela (`formato milesight`) y de los dos nodos por DevEUI con el perfil `campus-heltec-v3-v1` | ✅ |
+| Tópico con `$devEUI` (mayúsculas): la pasarela lo publica literal → cuarentena `no_registrado` con la carga completa (≈ 25 tramas); con `$deveui` (minúsculas, documentación de la UG65) entra todo | ✅ el rechazo es el correcto; la plantilla del alta se corrige |
+| Tramas reales: «3/3 lecturas guardadas vía milesight» por nodo cada ≈ 17 s; 810 mediciones en 3 h, origen de tiempo `pasarela`; inventario en verde y ficha con las tres series | ✅ |
+| Reloj de la pasarela 4 días atrasado: mediciones fechadas el 16/10 (regla 17), ficha «última trama: ahora» / «medición hace 4 d», histórico de la última hora vacío; corregida la hora en la pasarela, `max(tiempo)` = `max(recibido_en)` | ✅ visible por diseño; falta tolerancia de desvío |
+| La pasarela dejó de reenviar 27 min (destino cambiado y sesión cerrada): `sin_comunicacion` abierta en los dos nodos a los 6 min y cerrada sola al volver | ✅ |
+| Exportación CSV de la ficha (`GET /dispositivos/{id}/exportar`): 280 líneas | ✅ |
+| Un segundo destino en la UG65 solo puede ser HTTP/HTTPS (MQTT deshabilitado): la vía E (HTTP de pasarela) pasa a ser necesaria para coexistir con otro broker | observado |
+
+**Lo que no cubre:** la ruta C (ChirpStack) y la coexistencia por puente desde el Mosquitto del compañero (no se logró en su equipo).
+Las tramas reales quedan en la base del portátil y no se exportan al repositorio.
