@@ -4,9 +4,10 @@ flowchart TB
         U(["Usuario<br/>navegador"]) --- FE["Panel web<br/>Svelte + uPlot"]
     end
 
-    subgraph TLS["Entran por MQTT/TLS 8883 · cada uno con su credencial"]
+    subgraph TLS["Entran por TLS · cada uno con su credencial"]
         direction LR
         N2["Nodo Wi-Fi o celular<br/>MQTT directo"]
+        N3["Equipo que solo habla HTTP<br/>nodo 4G o sistema de terceros<br/>POST con token"]
         subgraph RB["Ruta B"]
             direction TB
             NB["Nodos LoRa"] -- "radio LoRa" --> GB["Pasarela con servidor<br/>de red embebido"]
@@ -24,7 +25,7 @@ flowchart TB
 
     subgraph SRV["Servidor del sistema · contenedores Docker"]
         direction TB
-        RP["Proxy inverso · TLS<br/>único contenedor expuesto<br/>443 personas · 8883 MQTT · 1700/udp solo ruta A"]
+        RP["Proxy inverso · TLS<br/>único contenedor expuesto<br/>443 personas y HTTP de equipos · 8883 MQTT · 1700/udp solo ruta A"]
         MQ["Mosquitto<br/>broker MQTT"]
         subgraph BE["Backend · NestJS"]
             direction LR
@@ -38,10 +39,13 @@ flowchart TB
 
     FE -- "HTTPS 443 · REST y SSE" --> RP
     N2 -- "MQTT/TLS 8883" --> RP
+    N3 -- "HTTPS 443 · POST /recepcion/{id}" --> RP
     GB -- "MQTT/TLS 8883" --> RP
+    GB -. "prevista: reporte HTTPS 443<br/>segundo destino de la pasarela" .-> RP
     NS -- "MQTT/TLS 8883<br/>integración MQTT" --> RP
     GA -. "UDP 1700 por Internet<br/>o la red del campus" .-> RP
-    RP -- "HTTP 3000 · red interna" --> M5
+    RP -- "HTTP 3000 · red interna<br/>API, panel y SSE" --> M5
+    RP -- "HTTP 3000 · red interna<br/>POST /recepcion/{id} → filtro 1" --> M1
     RP -- "MQTT 1883 · red interna" --> MQ
     RP -. "UDP 1700 · red interna" .-> CS
     CS -. "publica JSON decodificado" .-> MQ

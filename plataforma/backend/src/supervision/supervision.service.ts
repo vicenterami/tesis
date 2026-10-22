@@ -158,4 +158,39 @@ export class SupervisionService implements OnModuleInit, OnModuleDestroy {
       this.eventos.publicar({ tipo: 'condicion', dispositivo_id: dispositivoId, condicion: 'tope_superado', estado: 'cerrada' });
     }
   }
+
+  // Reloj de la pasarela desviado (docs/10 §8.4 punto 54; docs/13 regla 18): la abre el pipeline cuando la marca de la pasarela difiere
+  // más de 10 min de la llegada (la medición queda fechada por la recepción) y la cierra la primera trama del mismo dispositivo con marca
+  // de pasarela plausible. Es del dispositivo cuya trama llegó: el modelo no tiene estado propio de pasarela. El detalle lleva la
+  // pasarela, el desvío en segundos (negativo = atrasada) y la marca recibida.
+  async abrirRelojDesviado(dispositivoId: string, idFisico: string, detalle: object): Promise<void> {
+    const r = await this.pool.query(
+      `INSERT INTO condicion (dispositivo_id, tipo) VALUES ($1, 'reloj_desviado')
+       ON CONFLICT (dispositivo_id, tipo, COALESCE(regla_id, '00000000-0000-0000-0000-000000000000'::uuid))
+       WHERE cerrada_en IS NULL DO NOTHING`,
+      [dispositivoId],
+    );
+    if (r.rowCount === 0) return;
+    await this.pool.query(
+      "INSERT INTO evento (dispositivo_id, tipo, detalle) VALUES ($1, 'condicion_abierta', $2)",
+      [dispositivoId, { tipo: 'reloj_desviado', ...detalle }],
+    );
+    this.log.warn(`${idFisico}: reloj de la pasarela desviado · se usa la hora de recepción · condición abierta`);
+    this.eventos.publicar({ tipo: 'condicion', dispositivo_id: dispositivoId, condicion: 'reloj_desviado', estado: 'abierta' });
+  }
+
+  async cerrarRelojDesviado(dispositivoId: string, idFisico: string, detalle: object): Promise<void> {
+    const r = await this.pool.query(
+      "UPDATE condicion SET cerrada_en = now() WHERE dispositivo_id = $1 AND tipo = 'reloj_desviado' AND cerrada_en IS NULL",
+      [dispositivoId],
+    );
+    if (r.rowCount) {
+      await this.pool.query(
+        "INSERT INTO evento (dispositivo_id, tipo, detalle) VALUES ($1, 'condicion_cerrada', $2)",
+        [dispositivoId, { tipo: 'reloj_desviado', ...detalle }],
+      );
+      this.log.log(`${idFisico}: la marca de la pasarela volvió a ser plausible · condición cerrada`);
+      this.eventos.publicar({ tipo: 'condicion', dispositivo_id: dispositivoId, condicion: 'reloj_desviado', estado: 'cerrada' });
+    }
+  }
 }

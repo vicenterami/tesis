@@ -17,6 +17,10 @@ describe('estadoVisual (docs/19 §2): la primera regla que aplica manda', () => 
     expect(estadoVisual({ estado: 'activo', en_linea: true }, ['manipulacion'])).toBe('alerta');
     expect(estadoVisual({ estado: 'activo', en_linea: true }, ['tope_superado'])).toBe('alerta');
   });
+  it('reloj_desviado abierta, en línea → Alerta (los datos entran, fechados por la recepción); Sin señal manda sobre ella', () => {
+    expect(estadoVisual({ estado: 'activo', en_linea: true }, ['reloj_desviado'])).toBe('alerta');
+    expect(estadoVisual({ estado: 'activo', en_linea: true }, ['reloj_desviado', 'sin_comunicacion'])).toBe('sin_senal');
+  });
   it('activo, en línea y sin condiciones → Normal; sin tramas aún (null) también, hasta que haya datos', () => {
     expect(estadoVisual({ estado: 'activo', en_linea: true }, [])).toBe('normal');
     expect(estadoVisual({ estado: 'activo', en_linea: null }, [])).toBe('normal');
@@ -51,8 +55,8 @@ describe('conteo y orden de atención', () => {
 
 describe('rótulo de cada tipo de condición (docs/19 §6: ningún código interno a la vista)', () => {
   it('cada tipo del modelo tiene su texto; uno desconocido se muestra tal cual, sin romper', () => {
-    const tipos: TipoCondicion[] = ['sin_comunicacion', 'umbral', 'bateria', 'manipulacion', 'tope_superado'];
-    expect(tipos.map(rotuloCondicion)).toEqual(['Sin comunicación', 'Umbral', 'Batería', 'Manipulación', 'Tope superado']);
+    const tipos: TipoCondicion[] = ['sin_comunicacion', 'umbral', 'bateria', 'manipulacion', 'tope_superado', 'reloj_desviado'];
+    expect(tipos.map(rotuloCondicion)).toEqual(['Sin comunicación', 'Umbral', 'Batería', 'Manipulación', 'Tope superado', 'Reloj de pasarela desviado']);
     expect(rotuloCondicion('nuevo_tipo')).toBe('nuevo_tipo');
   });
 });

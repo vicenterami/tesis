@@ -30,9 +30,10 @@ flowchart TB
         U(["Usuario<br/>navegador"]) --- FE["Panel web<br/>Svelte + uPlot"]
     end
 
-    subgraph TLS["Entran por MQTT/TLS 8883 · cada uno con su credencial"]
+    subgraph TLS["Entran por TLS · cada uno con su credencial"]
         direction LR
         N2["Nodo Wi-Fi o celular<br/>MQTT directo"]
+        N3["Equipo que solo habla HTTP<br/>nodo 4G o sistema de terceros<br/>POST con token"]
         subgraph RB["Ruta B"]
             direction TB
             NB["Nodos LoRa"] -- "radio LoRa" --> GB["Pasarela con servidor<br/>de red embebido"]
@@ -50,7 +51,7 @@ flowchart TB
 
     subgraph SRV["Servidor del sistema · contenedores Docker"]
         direction TB
-        RP["Proxy inverso · TLS<br/>único contenedor expuesto<br/>443 personas · 8883 MQTT · 1700/udp solo ruta A"]
+        RP["Proxy inverso · TLS<br/>único contenedor expuesto<br/>443 personas y HTTP de equipos · 8883 MQTT · 1700/udp solo ruta A"]
         MQ["Mosquitto<br/>broker MQTT"]
         subgraph BE["Backend · NestJS"]
             direction LR
@@ -64,10 +65,13 @@ flowchart TB
 
     FE -- "HTTPS 443 · REST y SSE" --> RP
     N2 -- "MQTT/TLS 8883" --> RP
+    N3 -- "HTTPS 443 · POST /recepcion/{id}" --> RP
     GB -- "MQTT/TLS 8883" --> RP
+    GB -. "prevista: reporte HTTPS 443<br/>segundo destino de la pasarela" .-> RP
     NS -- "MQTT/TLS 8883<br/>integración MQTT" --> RP
     GA -. "UDP 1700 por Internet<br/>o la red del campus" .-> RP
-    RP -- "HTTP 3000 · red interna" --> M5
+    RP -- "HTTP 3000 · red interna<br/>API, panel y SSE" --> M5
+    RP -- "HTTP 3000 · red interna<br/>POST /recepcion/{id} → filtro 1" --> M1
     RP -- "MQTT 1883 · red interna" --> MQ
     RP -. "UDP 1700 · red interna" .-> CS
     CS -. "publica JSON decodificado" .-> MQ
@@ -81,8 +85,8 @@ flowchart TB
 
 **Decisiones visibles en el diagrama:**
 
-- **Un solo contenedor expuesto (el proxy) y dos puertos siempre, tres a lo sumo:** 443 para personas y
-  8883 para dispositivos MQTT, ambos cifrados y siempre presentes; 1700/udp **solo en la ruta A, que es
+- **Un solo contenedor expuesto (el proxy) y dos puertos siempre, tres a lo sumo:** 443 para personas y para los
+  equipos que envían por HTTP (`POST /recepcion/{id_fisico}`, punto 52), y 8883 para dispositivos y pasarelas MQTT, ambos cifrados y siempre presentes; 1700/udp **solo en la ruta A, que es
   opcional** (ChirpStack corriendo en este servidor y pasarelas con *Semtech UDP Packet Forwarder*). En la ruta
   B (pasarela con servidor de red embebido, §8.4 puntos 2 y 24) y en la ruta C (servidor de red externo, como el
   ChirpStack de la red del campus, §8.4 punto 45), el tercer puerto no existe en este servidor: en la C el 1700 llega al
@@ -98,11 +102,18 @@ flowchart TB
   |---|---|---|---|---|
   | 1. Nodo Wi-Fi (ESP32 u otro) con cliente MQTT | MQTT sobre TLS | 8883 | Sí | Implementado (en desarrollo, 1883 local sin TLS) |
   | 2. Equipo que solo habla HTTP | HTTPS, `POST` con SenML | 443 | Sí | Implementado el 16/10/2026 (HU-01, §8.4 punto 52); en el banco, directo al backend y una comprobación por el proxy con TLS |
-  | 3. Pasarela LoRaWAN con servidor de red embebido (Milesight UG6x) | MQTT sobre TLS; JSON decodificado en la pasarela | 8883 | Sí | Ruta B; el 15/10/2026 la red del campus ofreció reenviar desde el servidor embebido de su UG63 para una prueba; adaptador `milesight` hecho y probado en el banco (§8.4 punto 47, `docs/16 §31`); falta en terreno |
+  | 3. Pasarela LoRaWAN con servidor de red embebido (Milesight UG6x) | MQTT sobre TLS; JSON decodificado en la pasarela | 8883 | Sí | Ruta B; el 15/10/2026 la red del campus ofreció reenviar desde el servidor embebido de su UG63 para una prueba; adaptador `milesight` hecho y probado en el banco (§8.4 punto 47, `docs/16 §31`); **probada en terreno el 20/10/2026** con la pasarela UG65 del campus (`docs/16 §45`) |
   | 4. Pasarela LoRaWAN con *packet forwarder* y ChirpStack en este servidor | Semtech UDP → ChirpStack → MQTT interno | 1700/udp | Sí (UDP) | Ruta A, opcional; ChirpStack no desplegado |
   | 5. Servidor de red externo (TTN o ChirpStack de la red del campus) | Integración MQTT del servidor de red hacia este sistema | 8883 | Sí | **Ruta C, confirmada el 13/10/2026: la red del campus usa ChirpStack v4 con una pasarela Milesight UG63** (§8.4 punto 45); adaptador `chirpstack` hecho y probado en el banco (§8.4 punto 47, `docs/16 §31`); falta en terreno |
   | 6. Equipo celular (NB-IoT, LTE-M) con cliente MQTT | MQTT sobre TLS; trama JSON o binaria hexadecimal | 8883 | Sí | Candidato (entrevista del 05/10); adaptador binario pendiente |
   | 7. Pasarela con *Basics Station* hacia ChirpStack en este servidor | WebSocket sobre TLS (protocolo LNS), con autenticación TLS de servidor y, opcional, de cliente | 443 o puerto propio (por verificar) | Sí | Verificado el 06/10: el *Gateway Bridge* expone un manejador WebSocket para Basics Station y las pasarelas UG65/UG67 lo traen; reemplazaría el UDP sin autenticar de la ruta A |
+  | 8. Pasarela LoRaWAN con servidor de red embebido, por su **reporte HTTP(S)** (segundo destino de la aplicación) | HTTPS, `POST` con el mismo JSON del uplink y cabeceras de autenticación | 443 | Sí | **Prevista** (22/10/2026): en terreno (20/10) la UG65 admitió un solo destino MQTT por aplicación y el segundo solo por HTTP(S); es la forma de convivir con el broker del operador sin tocarlo. Exige verificar la autenticación del reporte (cabeceras nombre/valor según la guía de Milesight) y un servidor con dirección pública. Punteada en las figuras |
+
+  **Vías dibujadas en las figuras (22/10/2026):** (1) dispositivo directo por MQTT sobre TLS, 8883 (escenarios 1 y 6); (2) dispositivo directo
+  por HTTP sobre TLS, 443 (escenario 2); (3) LoRaWAN → pasarela → MQTT sobre TLS, 8883 (escenarios 3 y 5, rutas B y C); (4) prevista y
+  punteada, pasarela → HTTPS 443 (escenario 8). Las personas entran siempre por 443. El 1700/udp (escenario 4, ruta A) se dibuja punteado y,
+  cuando se active, **solo en una red local**: el reenvío Semtech UDP no autentica ni cifra el transporte (la carga LoRaWAN sí va cifrada e
+  íntegra de extremo a extremo); en producción corresponde *Basics Station* (escenario 7, WebSocket con TLS) o la vía MQTT con TLS (`docs/11 §1`).
 
   **¿Y «cualquier dispositivo»?** El sistema no promete entender cualquier aparato; promete dos puertas
   estándar: MQTT 3.1.1 o 5 sobre TLS 1.2 o superior, y HTTP/1.1 sobre TLS. Es lo que implementan los módulos
@@ -138,7 +149,9 @@ flowchart TB
     subgraph CAMPO["Segmento de campo (sitio del cliente o red del campus)"]
         S1["Nodos LoRa"] -- radio --> G["Pasarela LoRaWAN"]
         S2["Nodos Wi-Fi"] --> R["Router del sitio\n(NAT, sin puertos abiertos)"]
+        S3["Equipo que solo habla HTTP\n(nodo 4G o sistema de terceros)"] -- "HTTPS 443, saliente" --> R
         G -- "ruta B: MQTT/TLS 8883\nruta A: UDP 1700" --> R
+        G -. "prevista: reporte HTTPS 443\n(segundo destino de la pasarela)" .-> R
         G -- "ruta C: UDP 1700" --> NSE["Servidor de red externo\nChirpStack del campus (ruta C)"]
         NSE -- "MQTT/TLS 8883, saliente" --> R
     end
@@ -146,7 +159,7 @@ flowchart TB
     INET(("Internet\no red del campus"))
 
     subgraph DMZ["Servidor · red pública (expuesta)"]
-        RP["Proxy inverso / TLS\n:443 → panel y API\n:8883 → broker\n:1700/udp → ChirpStack (solo ruta A)"]
+        RP["Proxy inverso / TLS\n:443 → panel, API y recepción HTTP\n:8883 → broker\n:1700/udp → ChirpStack (solo ruta A)"]
     end
 
     subgraph INT["Servidor · red interna Docker (no expuesta)"]
@@ -230,12 +243,22 @@ persona y cifrado por SSH. Así se cumplen R1 y R2 del punto 44 sin exponer nada
    sola conexión del navegador. Hacia el backend va una conexión por petición o por flujo, dentro del mismo servidor.
    **Por qué no HTTP/2 también hacia el backend** (14/10/2026). Lo nuevo no es mejor por ser nuevo: es mejor si resuelve un
    problema que tenemos. nginx podría hacerlo (`proxy_http_version 2`, desde la versión 1.29.4 según su documentación; usamos la
-   1.30.5), pero el backend corre sobre Express, que habla HTTP/1.1. Lo que gana HTTP/2 es multiplexar sobre redes con latencia, y
+   1.30.6), pero el backend corre sobre Express, que habla HTTP/1.1. Lo que gana HTTP/2 es multiplexar sobre redes con latencia, y
    el tramo proxy→backend no sale del servidor: abrir una conexión ahí es casi gratis (medido: cada flujo SSE abierto cuesta del
    orden de 0,1 a 0,2 MiB, `docs/16 §25`). Cambiarlo exigiría otro servidor HTTP en el backend sin ganancia medible. Se revisa si
    el backend pasa a otra máquina o si los flujos simultáneos llegan a miles.
 7. **El 1700/udp (ruta A) no está configurado hoy.** Cuando exista, irá en el bloque `stream` con `listen 1700 udp`. UDP no tiene
    conexión: el proxy reenvía cada datagrama a ChirpStack y recuerda de quién vino para devolverle la respuesta.
+
+8. **Límite de tasa por dirección en el proxy (22/10/2026; `docs/11 §3`, `docs/16 §47`).** En el 443, `limit_req` de 100 peticiones/s con
+   ráfaga 200 para todo el tráfico (el doble de los 50 eventos/s de RNF-01, que una pasarela o un NAT puede enviar por HTTP desde una sola
+   dirección) y de 5/s con ráfaga 10 para los métodos que escriben sobre `/dispositivos` y `/pasarelas` (frena también a quien intente
+   adivinar la clave de administrador); el exceso recibe 429 y queda en el registro. En el 8883, `limit_conn` de 100 sesiones simultáneas por
+   dirección (el doble de los 50 canales del caso de validación); la 101 se corta antes del saludo TLS. En HTTP, además, `limit_conn` de
+   100 peticiones en curso por dirección (el límite de tasa cuenta inicios, no duración) y de 20 flujos del canal en vivo `/eventos` por
+   dirección (10 pantallas con dos pestañas; el backend admite 50 flujos en total, §5). La zona de administración no distingue mayúsculas,
+   como el enrutador de Express (punto 52). El chequeo de salud (127.0.0.1) queda exento. Lo que distingue dispositivos detrás de una misma
+   dirección sigue siendo el tope por emisor del backend (punto 53).
 
 **Sobre las alternativas descartadas:** exponer el broker por WebSocket al navegador (patrón A)
 habría abierto un puerto más y puesto credenciales en el cliente; una VPN habría exigido
@@ -437,6 +460,7 @@ HTTPS a `/salud` hizo descartar unos 2 800 de un tráfico que sin él se guardab
 | **Dos lecturas del mismo canal en la misma trama**, sin marca de tiempo | Se guardan ambas, con instantes de recepción distintos (microsegundos) | Sin marca del emisor no hay identidad de lectura (fila anterior); si un nodo repite un canal por error, corregirlo es del firmware, no de la plataforma. Limitación aceptada el 23/09 |
 | El broker **reentrega muchas veces** de golpe (reconexión con cola larga) | Desde la decisión 4 los mensajes se procesan **de a uno**, en orden; la cola queda en el broker, no en el backend, y el pool de 5 conexiones no se disputa. El costo es la latencia por mensaje (2–5 ms medidos en el portátil), que acota la tasa máxima a cientos por segundo: por encima de RNF-01 |
 | Un emisor publica con **retención** (`retain`) | Llega una vez en vivo y se procesa. El broker además lo guarda y lo reentrega, con la marca de retenido, a cada suscripción nueva: el backend confirma esa copia sin procesarla y lo anota en el registro (§8.4 punto 50) | Procesar la copia guardaba la misma lectura otra vez con otra hora de recepción (medido: 1 lectura → 2). Límite aceptado: lo publicado con retención mientras el backend no tenía sesión en el broker (primer arranque, sesión perdida) se pierde; ningún componente del sistema publica con retención |
+| La marca de tiempo de una **pasarela** difiere en más de 10 minutos de la hora de recepción (reloj de la pasarela sin NTP, 20/10/2026) | Se usa la hora de recepción (`origen_tiempo = recepcion`) y se abre la condición `reloj_desviado` del dispositivo, con la pasarela y el desvío en el evento; se cierra sola con la primera trama de ese dispositivo con marca de pasarela plausible (§8.4 punto 54) | La pasarela publica en línea: si su marca se aleja tanto de la llegada, falla su reloj. La marca de un **dispositivo** antigua se sigue respetando (cola sin cobertura, `docs/13` regla 7) |
 | Un emisor manda **más lecturas de las que caben** en su presupuesto de la hora (una trama con miles de lecturas, o miles de tramas) | La trama que no cabe se rechaza entera: cuarentena `tope` y condición `tope_superado`; las rechazadas más allá de la cuota de la hora solo se cuentan (§8.4 punto 53, 17/10/2026) | Un sensor no manda miles de lecturas; un error o un atacante sí. El tope es por emisor y por hora, no por trama, porque lo que hay que acotar es la escritura |
 | Dos **sensores distintos** miden lo mismo cerca | **No es duplicado**: son dos canales, dos series, dos evaluaciones de umbral. Correlacionarlos es una función de análisis futura, no del pipeline | La plataforma registra lo que cada sensor dijo; interpretar es otra capa |
 
@@ -879,7 +903,7 @@ del fabricante de la pasarela (137 afirmaciones, en un registro del autor que no
    como un dispositivo más (usuario = su identificador, ACL por patrón; precisado el 08/10 en el punto 24: con credencial propia de pasarela y solo por sus dispositivos asociados). Las figuras de contenedores y despliegue
    se actualizan cuando el profesor guía confirme la ruta real.
    **Precisión del 07/10/2026.** Si la red del campus usa TTN o un servidor de red externo, eso es el escenario 5 de
-   §2 y tampoco hay ChirpStack en este servidor; la ruta A solo hace falta si las pasarelas no traen servidor de red
+   §1 y tampoco hay ChirpStack en este servidor; la ruta A solo hace falta si las pasarelas no traen servidor de red
    propio o si se quiere administrar nodos y claves de varias pasarelas desde un solo punto. Desde esa fecha las
    figuras de contenedores, red y despliegue dibujan la ruta B continua y la ruta A y ChirpStack punteados
    (opcionales), y el informe lo dice en el marco teórico, en la arquitectura y en el despliegue; si el profesor guía
@@ -917,7 +941,7 @@ del fabricante de la pasarela (137 afirmaciones, en un registro del autor que no
 9. **El proxy entra en la vista de contenedores y los puertos quedan fijados: dos siempre (443 y 8883), 1700/udp
    solo en la ruta A.** Hasta hoy el proxy aparecía en las vistas de red y de despliegue, pero el diagrama de
    contenedores mostraba a los dispositivos y al navegador llegando directo al broker y al backend. Los siete
-   escenarios de entrada contemplados y la respuesta a «¿cualquier dispositivo?» están en §2. El proxy se elige
+   escenarios de entrada contemplados y la respuesta a «¿cualquier dispositivo?» están en §1. El proxy se elige
    con registro de evidencia (§8.3); la decisión se escribe aquí y en el anexo de evaluación del informe. Las leyendas del
    informe que aún dicen «WebSocket» o «ChirpStack correrá en el servidor» se corrigen con la próxima entrega.
 
@@ -998,7 +1022,7 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     marcan vivo) pero el filtro 5 **no abre** condiciones de umbral; una ya abierta sí se cierra al volver a rango. El
     silencio ya excluía a los no activos. El registro del período de mantenimiento llega con M3 (cambio de estado por
     API → `evento`). Coherente con §8.1: `estado` es la decisión administrativa; lo que ocurre son condiciones.
-22. **Capa del proxy implementada y probada (07/10/2026; `plataforma/proxy/`).** nginx `1.30.5-alpine` (versión fijada; desde el 08/10/2026 con parches de Alpine en `plataforma/proxy/Dockerfile`, `docs/16 §12`),
+22. **Capa del proxy implementada y probada (07/10/2026; `plataforma/proxy/`).** nginx `1.30.5-alpine` (desde el 22/10/2026, `1.30.6-alpine` por el parche de seguridad de nginx; versión fijada; desde el 08/10/2026 con parches de Alpine en `plataforma/proxy/Dockerfile`, `docs/16 §12`),
     variante A: TLS 1.2+ en 443 → backend y en 8883 (`stream`) → broker; HSTS lo pone el proxy; registro JSON por
     petición y por conexión (ahí queda la IP real del dispositivo); resolución del nombre del servicio en cada conexión
     (`resolver 127.0.0.11`), para que recrear un contenedor no deje al proxy apuntando a una IP vieja. Probado de punta a
@@ -1484,6 +1508,28 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     por el tamaño y, en HTTP, por el ritmo); el broker sigue sin tope de mensajes retenidos (`docs/11 §4`, fila 8). (vi) **Prueba:**
     unitarias del presupuesto, de la cuota, del cierre y de las tres vías; `banco.sh tope` de punta a punta (HTTP para el presupuesto,
     MQTT para la cuota, y el cierre adelantando la ventana en la base); `docs/16 §42`.
+54. **Tolerancia de desvío de la marca de pasarela y condición `reloj_desviado` (decidido el 21/10/2026).** Origen: en la prueba de
+    campo del 20/10 (`docs/16 §45`) la pasarela UG65 no tenía NTP y su reloj iba 4 días atrasado; las reglas 7 y 17 de `docs/13` respetaron su marca y 810 mediciones quedaron fechadas 4 días antes: el panel decía «última trama: ahora» y «medición hace 4 d», y el histórico
+    de la última hora salió vacío. (i) **Regla:** solo para marcas con `origen_tiempo = pasarela` (adaptadores `milesight` y
+    `chirpstack`), si la marca está más de **10 minutos atrasada** o más de **2 minutos adelantada** respecto de la hora de recepción (hacia el
+    futuro, el mismo tope de la regla 7: toda marca de pasarela que se reemplaza avisa; revisión del 22/10), la marca se descarta: `tiempo` lo pone la base y la fila queda con
+    `origen_tiempo = recepcion`. La pasarela publica en línea, no acumula: si su marca se aleja tanto de la llegada, lo que falla es su
+    reloj, no una lectura antigua. Para `origen_tiempo = dispositivo` nada cambia (una marca antigua se respeta: cola sin cobertura), y la
+    tolerancia de 2 minutos hacia el futuro sigue igual para todos (`docs/13` reglas 7 y 18). (ii) **Qué se guarda:** la condición
+    **`reloj_desviado`** del **dispositivo** cuya trama llegó con la marca desviada (no hay estado propio de pasarela en el modelo y
+    `condicion` es por dispositivo, como `sin_comunicacion` y `tope_superado`); una sola abierta a la vez (índice único parcial
+    `condicion_abierta_unica`); el evento `condicion_abierta` lleva en `detalle` la pasarela (`id_fisico`), `desvio_s` (entero con signo:
+    negativo = atrasada) y `marca_pasarela` (ISO 8601); aviso al panel, que la muestra como **Alerta** (`docs/19`): los datos siguen
+    entrando, pero fechados por la recepción. Migración 20 (`condicion.tipo` admite `reloj_desviado`). (iii) **Cierre:** sola, con la
+    primera trama de ese mismo dispositivo cuya marca de pasarela es plausible (evento `condicion_cerrada`). (iv) **Costo:** ninguna
+    consulta más por trama en régimen: la consulta del filtro 1 trae si el dispositivo tiene `reloj_desviado` abierta, así que se escribe
+    solo en la transición (abrir cuando no estaba abierta; cerrar cuando lo estaba). (v) **Lo que no cubre:** una marca de pasarela atrasada menos de 10 minutos se respeta tal cual (adelantada más de 2 min, la
+    reemplaza la regla 7 y también abre la condición: revisión del 22/10); la condición se abre por nodo, no por pasarela (el modelo no
+    tiene estado propio de pasarela): una pasarela desviada con N nodos abre N condiciones, y se cierran una a una; si la pasarela deja de
+    incluir marca (o la manda sin zona), no abre ni cierra nada y una condición abierta queda así hasta la siguiente marca plausible; las
+    tramas descartadas antes del filtro 4 (contador repetido, tope) no cuentan. La lectura de «abierta» en el filtro 1 no se cruza con
+    otra trama del mismo nodo porque se procesan de a una (MQTT en serie, decisión 4; HTTP de a una por identificador, punto 52). (vi) **Prueba:** unitarias en `tiempo.spec.ts`, `recepcion.service.spec.ts`, `supervision.service.spec.ts` y
+    `estado-visual.test.ts`; `banco.sh lorawan` de punta a punta; `docs/16 §46`.
 
 ## 9. Crecimiento, resiliencia y respaldo (aprobado el 06/10/2026)
 

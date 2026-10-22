@@ -1,13 +1,11 @@
 \chapter{Implementación y pruebas iniciales}
 \label{cap:pruebas}
 
-Este capítulo responde a la Etapa~3: qué está implementado, cómo se prueba, qué resultó frente a los requerimientos y
-qué falta validar. Cada corrida y cómo repetirla está en el anexo~\ref{anx:pruebas} y en \texttt{docs/16}.
+Qué está implementado, cómo se prueba, qué resultó y qué falta validar; cada corrida y cómo repetirla, en el anexo~\ref{anx:pruebas} y \texttt{docs/16}.
 
 \section{Qué está implementado}
 
-El cuadro~\ref{tab:implementado} resume cada módulo (cuadro~\ref{tab:modulos}). Medido en horas, el núcleo demostrable
-está hecho en un 54\,\% (sección~\ref{sec:seguimiento}).
+El cuadro~\ref{tab:implementado} resume cada módulo; en horas, el núcleo demostrable está hecho en un 65\,\% (sección~\ref{sec:seguimiento}).
 
 \begin{table}[tb]
 \centering\footnotesize
@@ -16,30 +14,28 @@ está hecho en un 54\,\% (sección~\ref{sec:seguimiento}).
 \toprule
 \textbf{Módulo} & \textbf{Implementado y probado} & \textbf{Falta} \\
 \midrule
-M1 Recepción & MQTT (con TLS) y HTTP, con credencial propia; LoRaWAN por la pasarela (ruta B) y el ChirpStack del campus (ruta C) & Terreno \\
+M1 Recepción & MQTT (con TLS) y HTTP, con credencial propia; LoRaWAN por la pasarela del campus (ruta B, en terreno) y ChirpStack (ruta C) & Ruta C en terreno \\
 M2 Normalización & Seis filtros con cuarentena; formato declarado en el alta; tope por emisor & Contrato formal (TT-27) \\
 M3 Registro & Alta, baja y rotación por API, todo o nada; pasarelas & Pantalla (Etapa~4) \\
 M4 Supervisión & Silencio según el intervalo esperado de cada uno & Batería; enlace \\
-M5 Series & TimescaleDB, 19 migraciones, API, CSV y JSON, canal en vivo & XLSX; rango a medida \\
+M5 Series & TimescaleDB, 20 migraciones, API, CSV y JSON, canal en vivo & XLSX; rango a medida \\
 M6 Alertas & Umbral con histéresis; alarma de la cola del broker & Notificación \\
 M7 Seguridad & Claves con hash, ACL por rol, mínimo privilegio, sin \texttt{NET\_RAW} & Sesión y roles \\
-M8 Panel & Semáforo, inventario filtrable, ficha con gráfico & Sensor físico \\
+M8 Panel & Semáforo, inventario filtrable, ficha con gráfico & Nodo propio en vivo \\
 \bottomrule
 \end{tabular}
 \end{tablaseg}
-\caption{Estado de la implementación por módulo al 17 de octubre de 2026.}
+\caption{Estado de la implementación por módulo al 22 de octubre de 2026.}
 \label{tab:implementado}
 \end{table}
 
 \section{Método de prueba}
 
-Se prueba en cuatro niveles, todos repetibles con un comando. Las 324 pruebas unitarias del backend y las 52 del panel corren sin base ni broker,
+Se prueba en tres niveles, todos repetibles con un comando. Las 338 pruebas unitarias del backend y las 53 del panel corren sin base ni broker,
 junto con tipos estrictos y análisis estático: cada una fija una regla de diseño en forma ejecutable. \textbf{Banco
 desechable}: una segunda pila con base, broker con su plugin de seguridad, backend y proxy reales, datos en memoria y un
 emulador de nodos (TT-28) que imita relojes rotos, pérdidas y deriva; sobre él corren casos fijos de carga, carreras,
-caídas, TLS, alta por API, LoRaWAN y cola del broker. \textbf{Laboratorios de un solo uso}, para decidir entre
-alternativas antes de implementar. \textbf{Verificador de concordancia}: 44 pasos que comparan informe, documentación, base y API. Una prueba vale solo si falla ante la falla: cada comprobación nueva se ejecuta primero contra
-el error \emph{plantado} (quitar la cláusula que evita duplicados hace caer la prueba de carrera).
+caídas, TLS, alta por API, LoRaWAN y cola del broker. \textbf{Verificador de concordancia}: 44 pasos que comparan informe, documentación, base y API. Otra recorre, por dispositivo, inventario, ficha, histórico, exportación, condiciones y cuarentena: toda serie es consultable. Cada comprobación nueva se ejecuta primero contra el error \emph{plantado}: una prueba vale solo si falla ante la falla.
 
 \section{Resultados frente a los requerimientos}
 
@@ -60,12 +56,12 @@ RF-10 & La misma lectura ×20 a la vez & Una fila por canal y una trama cruda & 
 RF-12 & Cinco sobre el umbral a la vez & Una condición, sin errores & Cumple \\
 RF-05 y RF-07 & Malformadas, sin alta, otro sitio & Cuarentena con motivo; ninguna señal de vida falsa & Cumple \\
 RF-40, RF-42 & Credencial ajena; sin CA; sin TLS & Rechazadas; claves con hash (RNF-08) & Cumple \\
-RF-02 & JSON oficial de los fabricantes y forma de la captura del campus, saneada & 44 de 44 comprobaciones & Parcial \\
-RNF-17 & Carga sostenida y pico & 174 y 324~MiB en total & Preliminar \\
+RF-02 & JSON oficial de los fabricantes; pasarela real del campus & 46 de 46 comprobaciones; en terreno, 810 mediciones de dos nodos & Cumple \\
+RNF-17 & Carga sostenida y pico & 174~MiB (sin proxy) y 324~MiB (pico, con proxy) & Preliminar \\
 \bottomrule
 \end{tabular}
 \end{tablaseg}
-\caption{Resultados preliminares frente a los requerimientos. «Parcial»: falta el broker de producción (RNF-05) o el terreno (RF-02); RNF-02, medido sin red real, se repite en el servidor.}
+\caption{Resultados preliminares frente a los requerimientos. «Parcial»: falta el broker de producción (RNF-05); RNF-02, medido sin red real, se repite en el servidor.}
 \label{tab:resultados}
 \end{table}
 
@@ -73,9 +69,10 @@ Las pruebas cambiaron el diseño, no solo lo confirmaron. Las 108 alarmas falsas
 RNF-03, al declarar el intervalo esperado como el silencio normal (dos periodos) y no como el periodo. Bajo
 duplicados simultáneos se guardaba dos veces la trama cruda y una condición abortaba el pipeline: ahora se procesa un
 mensaje a la vez y se confirma al broker después de guardar. Sobre la capacidad, el broker descartaba sin aviso: hoy
-tiene topes de cola y una alarma sobre su contador. Dar de baja un dispositivo podía frenar hasta 5~s la recepción de sus tramas; con un bloqueo de fila más débil, 20~ms. Y un mensaje retenido se guardaba otra vez al reconectar el backend.
+tiene topes de cola y una alarma sobre su contador. Dar de baja un dispositivo frenaba hasta 5~s la recepción de sus tramas; hoy, 20~ms.
 
 \section{Validación preliminar y limitaciones}
 
-El sistema funciona de extremo a extremo con nodos emulados y con el JSON que describe la documentación oficial de ChirpStack v4 (ruta C) y de la pasarela Milesight (ruta B): registro por API, publicación con la credencial entregada, medición guardada y
-panel en vivo. Falta el sensor físico (TT-32: las piezas llegaron el 13 de octubre y la placa ya se reconoce; falta cablear los sensores) y la prueba con la pasarela del campus en la misma red local, acordada para el 20 de octubre. Las corridas son de minutos y en un portátil; RNF-17 y las 72~horas de RNF-18 se validan en la Etapa~4, en el servidor de referencia. Falta un tope de tramas por emisor.
+El sistema funciona de extremo a extremo con nodos emulados, con el nodo propio (sensores reales; contrato en el banco) y con la red LoRaWAN del campus: el 20 de octubre la pasarela real publicó por TLS con la credencial de la API y
+dos nodos entraron de punta a punta, 810 mediciones en tres horas. Un reloj de pasarela cuatro días atrasado se resolvió con una tolerancia y una condición propia. La misma serie de 180 lecturas entró completa por las tres vías (MQTT, HTTP en packs de 1, 10 y 60, y pasarela): 0 pérdidas, 0 duplicados y p95 de 4 a 157~ms; por HTTP, el ritmo de una trama por segundo hace que el pack de 1 tarde 194~s y el de 60, 5,6~s. Falta la corrida larga del nodo propio por Wi-Fi,
+el servidor de referencia (RNF-17 y las 72~horas de RNF-18, Etapa~4) y la ruta C en terreno.

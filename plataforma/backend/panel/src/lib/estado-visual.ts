@@ -15,7 +15,8 @@ export const ROTULO: Readonly<Record<EstadoVisual, string>> = {
 export const ORDEN_ATENCION: readonly EstadoVisual[] = ['sin_senal', 'alerta', 'normal', 'inactivo'];
 
 // tope_superado (docs/10 §8.4 punto 53) es una alerta del dispositivo, no del enlace: manda más de lo que cabe en su hora.
-const TIPOS_DE_ALERTA: readonly TipoCondicion[] = ['umbral', 'bateria', 'manipulacion', 'tope_superado'];
+// reloj_desviado (punto 54) también: los datos siguen entrando, pero fechados por la recepción porque el reloj de su pasarela se desvió.
+const TIPOS_DE_ALERTA: readonly TipoCondicion[] = ['umbral', 'bateria', 'manipulacion', 'tope_superado', 'reloj_desviado'];
 
 export function estadoVisual(
   d: Pick<DispositivoInventario, 'estado' | 'en_linea'>,
@@ -56,6 +57,7 @@ export const ROTULO_CONDICION: Readonly<Record<string, string>> = {
   bateria: 'Batería',
   manipulacion: 'Manipulación',
   tope_superado: 'Tope superado',
+  reloj_desviado: 'Reloj de pasarela desviado',
 };
 export const rotuloCondicion = (tipo: string): string => ROTULO_CONDICION[tipo] ?? tipo;
 

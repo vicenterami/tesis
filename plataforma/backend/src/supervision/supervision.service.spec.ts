@@ -98,3 +98,43 @@ describe('SupervisionService: avisa al panel en vivo (TT-39)', () => {
     expect(nada.publicados).toEqual([]);
   });
 });
+
+// Reloj de la pasarela desviado (docs/10 §8.4 punto 54): la abre y la cierra el pipeline; escribe y avisa solo en la transición.
+describe('SupervisionService: condición reloj_desviado', () => {
+  function armar(filasCondicion: number) {
+    const query = jest.fn((sql: string, _params?: unknown[]) =>
+      Promise.resolve({ rows: [], rowCount: /^\s*(INSERT INTO condicion|UPDATE condicion)/.test(sql) ? filasCondicion : 1 }));
+    const eventos = new EventosService();
+    const publicados: EventoPanel[] = [];
+    eventos.flujo().subscribe((e) => publicados.push(e));
+    const servicio = new SupervisionService({ query } as unknown as Pool, { get: () => 60 } as unknown as ConfigService, eventos);
+    return { servicio, query, publicados };
+  }
+  const DETALLE = { pasarela: 'ug65-campus', desvio_s: -345600, marca_pasarela: '2026-10-16T15:00:00.000Z' };
+
+  it('abrir: inserta la condición, anota el evento con pasarela, desvío y marca, y avisa al panel', async () => {
+    const { servicio, query, publicados } = armar(1);
+    await servicio.abrirRelojDesviado('n1', '0101010101010101', DETALLE);
+    expect(String(query.mock.calls[0][0])).toContain("VALUES ($1, 'reloj_desviado')");
+    expect(query.mock.calls[1][1]).toEqual(['n1', { tipo: 'reloj_desviado', ...DETALLE }]);
+    expect(String(query.mock.calls[1][0])).toContain("'condicion_abierta'");
+    expect(publicados).toEqual([{ tipo: 'condicion', dispositivo_id: 'n1', condicion: 'reloj_desviado', estado: 'abierta' }]);
+  });
+  it('abrir con una ya abierta (el índice único devuelve 0 filas) → sin evento ni aviso repetidos', async () => {
+    const { servicio, query, publicados } = armar(0);
+    await servicio.abrirRelojDesviado('n1', '0101010101010101', DETALLE);
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(publicados).toEqual([]);
+  });
+  it('cerrar: actualiza la abierta, anota condicion_cerrada y avisa; sin ninguna abierta, calla', async () => {
+    const { servicio, query, publicados } = armar(1);
+    await servicio.cerrarRelojDesviado('n1', '0101010101010101', { pasarela: 'ug65-campus' });
+    expect(String(query.mock.calls[0][0])).toContain("tipo = 'reloj_desviado' AND cerrada_en IS NULL");
+    expect(query.mock.calls[1][1]).toEqual(['n1', { tipo: 'reloj_desviado', pasarela: 'ug65-campus' }]);
+    expect(publicados).toEqual([{ tipo: 'condicion', dispositivo_id: 'n1', condicion: 'reloj_desviado', estado: 'cerrada' }]);
+    const nada = armar(0);
+    await nada.servicio.cerrarRelojDesviado('n1', '0101010101010101', { pasarela: 'ug65-campus' });
+    expect(nada.query).toHaveBeenCalledTimes(1);
+    expect(nada.publicados).toEqual([]);
+  });
+});

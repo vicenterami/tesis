@@ -1,6 +1,6 @@
 > ⚠️ **ACTUALIZADO AL PIVOTE DEL 02/09/2026:** los elementos ligados a Contact ID se reformularon
 > hacia el contrato SenML/MQTT y el pipeline de normalización. Las cifras vigentes son las de §6.1,
-> calculadas sumando las filas: **65 elementos, 285 h; núcleo 34 elementos, 168 h** (una estimación
+> calculadas sumando las filas: **66 elementos, 287 h; núcleo 34 elementos, 168 h** (una estimación
 > preliminar de ~155 h del 02/09 quedó superada y se corrigió el 22/09 para que informe y backlog
 > digan lo mismo; TT-39 agregada el 23/09; TT-32 promovida a núcleo y adelantada a la Etapa 3, y la
 > redistribución de §6.4 —decidida por escrito el 22/09 pero nunca aplicada a las filas— ejecutada,
@@ -301,6 +301,7 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 | **TT-25** | Cuantificar el costo mensual y anual de operación en CLP y USD | M | 2 | 3 |
 | **TT-26** | Redactar la recomendación de despliegue justificada | M | 2 | 1 |
 | **TT-40** | Despliegue comparativo en el banco de pruebas: ThingsBoard CE, OpenRemote y Magistrala con el mismo emulador (TT-28) y las mismas métricas (memoria en reposo y bajo carga, pasos para dar de alta un dispositivo y para una alerta, exportación), con datos propios en vez de cifras declaradas por el fabricante (decisión del 06/10/2026, `docs/10 §8.4` punto 14) | S | 4 | 6 |
+| **TT-41** | Diseño del despliegue en Kubernetes: equivalencias Compose → k3s, estado por pieza (qué escala y qué no), N réplicas con suscripciones compartidas y respaldos (`docs/14 §6`) | C | 3 | 2 |
 
 ## EP-13 · Validación y pruebas
 
@@ -350,7 +351,7 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 # 6. Verificación de viabilidad del alcance
 
 > Todas las cifras de esta sección se obtuvieron **sumando programáticamente** las estimaciones de los
-> 65 elementos del backlog, no estimando el total a ojo. El procedimiento es reproducible sobre este
+> 66 elementos del backlog, no estimando el total a ojo. El procedimiento es reproducible sobre este
 > mismo documento.
 
 ## 6.1 Esfuerzo estimado
@@ -358,10 +359,10 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 | | Elementos | Horas |
 |---|:---:|:---:|
 | **Núcleo demostrativo** 🎯 | 34 | **168** |
-| Fuera del núcleo | 31 | 117 |
-| **Total del backlog** | **65** | **285** |
+| Fuera del núcleo | 32 | 119 |
+| **Total del backlog** | **66** | **287** |
 
-Por prioridad: **Must** 56 elementos / 253 h · **Should** 8 / 30 h · **Could** 1 / 2 h.
+Por prioridad: **Must** 56 elementos / 253 h · **Should** 8 / 30 h · **Could** 2 / 4 h.
 
 ## 6.2 Presupuesto disponible
 
@@ -385,10 +386,10 @@ Cuatro semanas por etapa a ~15 horas semanales (restricción RE-01):
 |---|:---:|:---:|:---:|:---:|:---:|
 | 1 | 9 h | 4 h | 45 h | +80 % | +91 % |
 | 2 | 84 h | 53 h | 60 h | **−40 %** | +12 % |
-| 3 | 86 h | 77 h | 60 h | **−43 %** | **−28 %** |
+| 3 | 88 h | 77 h | 60 h | **−47 %** | **−28 %** |
 | 4 | 104 h | 34 h | 75 h | **−39 %** | +55 % |
 | 1–4 (`TT-38`, bitácora) | 2 h | — | — | — | — |
-| **Total** | **285 h** | **168 h** | **240 h** | **−19 %** | **+30 %** |
+| **Total** | **287 h** | **168 h** | **240 h** | **−20 %** | **+30 %** |
 
 > Presupuesto por etapa según el calendario oficial del 24/08 (§6.2): 45, 60, 60 y 75 h, ~240 h en total.
 > 12/10/2026: HU-20, HU-21 y HU-08 (18 h del núcleo) pasaron de la Etapa 4 a la 3 por decisión del estudiante (`docs/18 §3`): la
@@ -397,21 +398,21 @@ Cuatro semanas por etapa a ~15 horas semanales (restricción RE-01):
 > 201 h) aunque §6.2 ya lo había reemplazado; se propagó hoy (hallazgo de la revisión de concordancia).
 
 > `TT-38` (2 h, bitácora, Etapa «1–4») no se asigna a una sola etapa: va en su propia fila para que el
-> total cuadre con §6.1 (65 elementos, 285 h) sin inflar ninguna etapa. Esta tabla ya incorpora, al
+> total cuadre con §6.1 (66 elementos, 287 h) sin inflar ninguna etapa. Esta tabla ya incorpora, al
 > 23/09/2026, la redistribución de §6.4 (antes solo escrita, no aplicada a las filas) y la promoción
 > de TT-32 (plan B de R1).
 
 **Dos conclusiones, y la segunda es la que importa:**
 
-1. **El backlog completo excede el presupuesto en un 19 %.** No es viable ejecutarlo entero.
+1. **El backlog completo excede el presupuesto en un 20 %.** No es viable ejecutarlo entero.
 2. **El núcleo demostrativo sí cabe: 168 h contra 240 disponibles, con 30 % de holgura.** La tesis es
-   demostrable dentro del plazo — pero **solo si el alcance se limita al núcleo** y los 117 h restantes
+   demostrable dentro del plazo — pero **solo si el alcance se limita al núcleo** y los 119 h restantes
    se tratan como alcance opcional, no comprometido.
 
-> **Decisión de planificación derivada:** el **núcleo (168 h) constituye el compromiso**; los 31
+> **Decisión de planificación derivada:** el **núcleo (168 h) constituye el compromiso**; los 32
 > elementos fuera del núcleo son **alcance condicional**, ejecutables únicamente contra holgura real
-> verificada al cierre de cada etapa. Comprometerse con las 285 h produciría un incumplimiento del
-> 19 % — y la pauta mide el avance como porcentaje de tareas completadas, de modo que un alcance
+> verificada al cierre de cada etapa. Comprometerse con las 287 h produciría un incumplimiento del
+> 20 % — y la pauta mide el avance como porcentaje de tareas completadas, de modo que un alcance
 > sobredimensionado penaliza más que un alcance acotado y justificado.
 
 ## 6.4 🔴 Segundo hallazgo: el núcleo estaba mal distribuido en el tiempo (corregido el 23/09/2026)
@@ -470,12 +471,12 @@ HU-21 y HU-08 no alcanzan y vuelven a la Etapa 4, son 87 h ≈ 52 %. ✅ El umbr
 
 ## 6.5 Qué se recorta y en qué orden
 
-Los 117 h fuera del núcleo se ordenan por valor decreciente. Se ejecutan de arriba hacia abajo, solo
+Los 119 h fuera del núcleo se ordenan por valor decreciente. Se ejecutan de arriba hacia abajo, solo
 contra holgura verificada. **Corregido el 23/09/2026:** esta tabla incluía HU-11, TT-28, TT-29 y TT-33
 —los cuatro marcados 🎯 (núcleo)— como si fueran recortables, contradiciendo la regla de que el núcleo
 no se recorta bajo ninguna circunstancia. El "Resto" también omitía TT-04, TT-08 a TT-10 y TT-14 a
 TT-15 por un rango escrito a mano e incompleto. Recalculado sumando directamente las filas del backlog
-(31 elementos fuera de núcleo, 117 h exactos, sin excepciones):
+(32 elementos fuera de núcleo, 119 h exactos, sin excepciones; recalculado el 22/10/2026 al sumar TT-40 y TT-41: el «Resto» llevaba 89 h cuando las filas daban 95 y hoy dan 97):
 
 | Orden | Elementos | Horas | Valor si se ejecuta |
 |:---:|---|:---:|---|
@@ -484,7 +485,7 @@ TT-15 por un rango escrito a mano e incompleto. Recalculado sumando directamente
 | 3 | **HU-24** Notificación de condición crítica | 5 | Medio — funcionalidad esperada de una plataforma de este tipo |
 | 4 | **HU-23** Vista por tecnología de red | 3 | Medio — refuerza el argumento multiprotocolo |
 | 5 | **HU-09** API de consulta externa | 4 | Bajo para la demostración |
-| 6 | Resto (HU-06, 13, 17, 18, 22, 25, TT-03–04, 08–10, 14–15, 23–26, 30–31, 34–39) | 89 | Variable |
+| 6 | Resto (HU-06, 13, 17, 18, 22, 25, TT-03–04, 08–10, 14–15, 23–26, 30–31, 34–41) | 97 | Variable |
 
 > **Lo que no se recorta bajo ninguna circunstancia:** los 34 elementos marcados 🎯. Su ausencia
 > invalidaría la demostración en lugar de reducirla. Si el tiempo no alcanza para el núcleo completo, el
@@ -531,7 +532,7 @@ no demuestran ninguna.
 | Tareas técnicas | ✅ 39 |
 | Elementos del núcleo demostrativo | ✅ 34 elementos, 168 h |
 | Criterios de aceptación | ✅ Detallados en los elementos del núcleo; deliberadamente sin refinar en el resto |
-| Estimaciones | ✅ 65 elementos estimados, **285 h** en total, sumadas programáticamente |
+| Estimaciones | ✅ 66 elementos estimados, **287 h** en total, sumadas programáticamente |
 | Priorización | ✅ MoSCoW heredado del catálogo, más orden de ejecución justificado |
 | Verificación de viabilidad | 🔴 **Realizada. El backlog completo excede el presupuesto en 19 %; el núcleo cabe con 30 % de holgura. Redistribución correctiva definida** |
 

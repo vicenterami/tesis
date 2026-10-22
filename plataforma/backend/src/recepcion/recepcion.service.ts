@@ -15,7 +15,7 @@ import { PlanoAdaptador } from './adaptadores/plano.adaptador';
 import { SenmlAdaptador } from './adaptadores/senml.adaptador';
 import { ContadorCuota, CuotaPorEmisor, inicioDeVentana } from './cuota';
 import { ContextoTrama, Lectura } from './lectura';
-import { tiempoPlausible } from './tiempo';
+import { desvioDePasarela, tiempoPlausible } from './tiempo';
 import { limpia } from './texto';
 import { aCanonica } from './unidades';
 import { porcentaje } from '../consulta/escala';
@@ -36,12 +36,16 @@ interface Dispositivo {
   // Tope por emisor (migración 19; docs/10 §8.4 punto 53): lo que fija el presupuesto de la hora y los contadores de la hora en curso.
   intervalo_esperado_s: number; canales: number;
   ventana_inicio: Date | null; ventana_lecturas: number; ventana_cuarentena: number; ventana_sobre_tope: number; ventana_omitidas: number;
+  // ¿Tiene abierta la condición reloj_desviado? (docs/10 §8.4 punto 54): la trae la misma consulta del filtro 1, así abrir y cerrar
+  // escriben solo en la transición, sin una consulta más por trama.
+  reloj_desviado: boolean;
 }
 interface Pasarela { id: string; activo: boolean; sitio_codigo: string }
 // Dominio cerrado: el mismo CHECK de la migración 19 (antes 09). Agregar un motivo exige migración, no solo código.
 type Motivo = 'no_registrado' | 'dado_de_baja' | 'malformada' | 'invalida' | 'tope';
 // Lo que se sabe de la trama al rechazarla. dispositivoId solo existe si el filtro 1 pudo atribuirla.
-interface TramaRecibida { topico: string; carga: Buffer; recibidoEn: Date; dispositivoId?: string; origen?: 'mqtt' | 'http' }
+// pasarela: el id_fisico de la pasarela que la publicó (rutas B y C), para el detalle de reloj_desviado (docs/10 §8.4 punto 54).
+interface TramaRecibida { topico: string; carga: Buffer; recibidoEn: Date; dispositivoId?: string; origen?: 'mqtt' | 'http'; pasarela?: string }
 // Lo que pasó con una trama después del filtro 1 (lo usa la recepción por HTTP para responder; la de MQTT no lo necesita).
 export interface ResumenTrama { guardadas: number; duplicadas: number; rechazos: string[]; malformada: string | null; repetida: boolean }
 // Lo que el filtro 1 de la vía HTTP necesita: el dispositivo, su vía, su estado y la huella de su credencial activa.
@@ -177,6 +181,7 @@ export class RecepcionService implements OnModuleInit {
       return this.cuarentena({ ...trama, dispositivoId: nodo.id }, 'no_registrado', `DevEUI ${deveui} está registrado en el sitio «${nodo.sitio_codigo}», no en «${limpia(sitio, 64)}»`, cuota);
     }
     trama.dispositivoId = nodo.id;
+    trama.pasarela = idPasarela;
     const ctx: ContextoTrama = { topico: trama.topico, idFisico: deveui, magnitudTopico: '', carga: trama.carga, deveui, decodificador: nodo.decodificador ?? undefined };
     await this.filtros2a6(trama, ctx, nodo, true, cuota);
   }
@@ -264,6 +269,25 @@ export class RecepcionService implements OnModuleInit {
     // Contra el presupuesto cuentan las lecturas examinadas, válidas o no: cada una cuesta una consulta (revisión del 17/10).
     const examinadas = lecturas.length;
 
+    // ── [4] Desvío del reloj de la pasarela (docs/10 §8.4 punto 54; docs/13 regla 18) ──
+    // Una marca de pasarela a más de 10 min de la llegada se reemplaza por la hora de recepción (abajo, tiempoPlausible) y abre la
+    // condición reloj_desviado del nodo; la primera marca de pasarela plausible la cierra. Solo se escribe en la transición: la
+    // consulta del filtro 1 ya dice si estaba abierta.
+    if (adaptador?.origenTiempo === 'pasarela' && lecturas.length > 0) {
+      const desviada = lecturas.find((l) => desvioDePasarela(l.tiempo, recibidoEn, 'pasarela') !== undefined);
+      if (desviada?.tiempo) {
+        if (!dispositivo.reloj_desviado) {
+          await this.supervision.abrirRelojDesviado(dispositivo.id, ctx.idFisico, {
+            pasarela: trama.pasarela ?? null,
+            desvio_s: Math.round((desviada.tiempo.getTime() - recibidoEn.getTime()) / 1000),
+            marca_pasarela: desviada.tiempo.toISOString(),
+          });
+        }
+      } else if (dispositivo.reloj_desviado && lecturas.some((l) => l.tiempo && tiempoPlausible(l.tiempo, recibidoEn, 'pasarela') === l.tiempo)) {
+        await this.supervision.cerrarRelojDesviado(dispositivo.id, ctx.idFisico, { pasarela: trama.pasarela ?? null });
+      }
+    }
+
     // ── [3] Validar y [4] Normalizar, lectura por lectura ──
     // Los rechazos se acumulan: una trama con tres lecturas malas deja UNA fila de cuarentena (con su payload
     // una sola vez) y los tres porqués en el detalle, no tres copias del mismo payload.
@@ -285,7 +309,7 @@ export class RecepcionService implements OnModuleInit {
         rechazos.push(`${l.magnitud}: ${valor} ${canal.unidad_canonica} fuera del rango físico [${canal.rango_min ?? '−∞'}, ${canal.rango_max ?? '∞'}]`);
         continue;
       }
-      const tiempo = tiempoPlausible(l.tiempo, recibidoEn);
+      const tiempo = tiempoPlausible(l.tiempo, recibidoEn, adaptador?.origenTiempo);
       // Idempotente: la misma lectura (canal + instante) puede llegar dos veces con QoS 1 —reentrega
       // tras una reconexión, o un nodo que reenvía su cola— y debe contar una sola vez (RF-10).
       // La deduplicación solo tiene sentido si el INSTANTE LO PUSO EL EMISOR. Si la marca no es plausible
@@ -416,7 +440,8 @@ export class RecepcionService implements OnModuleInit {
       `SELECT d.id, d.estado, d.formato, d.pasarela_id, s.codigo AS sitio_codigo, d.decodificador, e.ultimo_fcnt, d.intervalo_esperado_s,
               (SELECT count(*)::int FROM canal c WHERE c.dispositivo_id = d.id) AS canales, e.ventana_inicio,
               COALESCE(e.ventana_lecturas, 0) AS ventana_lecturas, COALESCE(e.ventana_cuarentena, 0) AS ventana_cuarentena,
-              COALESCE(e.ventana_sobre_tope, 0) AS ventana_sobre_tope, COALESCE(e.ventana_omitidas, 0) AS ventana_omitidas
+              COALESCE(e.ventana_sobre_tope, 0) AS ventana_sobre_tope, COALESCE(e.ventana_omitidas, 0) AS ventana_omitidas,
+              EXISTS (SELECT 1 FROM condicion rc WHERE rc.dispositivo_id = d.id AND rc.tipo = 'reloj_desviado' AND rc.cerrada_en IS NULL) AS reloj_desviado
          FROM dispositivo d
          JOIN zona z ON z.id = d.zona_id JOIN sitio s ON s.id = z.sitio_id
          LEFT JOIN estado_dispositivo e ON e.dispositivo_id = d.id

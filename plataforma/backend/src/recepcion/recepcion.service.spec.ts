@@ -25,7 +25,8 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
 
   // El dispositivo de prueba declara «plano» salvo que la prueba diga otro formato (despacho por formato: docs/10 §8.4 punto 47).
   type Disp = { id: string; estado: string; sitio_codigo?: string; formato?: string; pasarela_id?: string | null; decodificador?: string | null; ultimo_fcnt?: string | null;
-    intervalo_esperado_s?: number; canales?: number; ventana_inicio?: Date | null; ventana_lecturas?: number; ventana_cuarentena?: number; ventana_sobre_tope?: number; ventana_omitidas?: number };
+    intervalo_esperado_s?: number; canales?: number; ventana_inicio?: Date | null; ventana_lecturas?: number; ventana_cuarentena?: number; ventana_sobre_tope?: number; ventana_omitidas?: number;
+    reloj_desviado?: boolean };
   type Pas = { id: string; activo: boolean; sitio_codigo: string };
   // escala: la calibración del canal (migración 18); por defecto, sin calibración.
   // topes: las variables del tope por emisor (docs/10 §8.4 punto 53); por defecto, los valores de producción.
@@ -35,7 +36,7 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
       // El dispositivo de prueba está registrado en el sitio «uct», el mismo del tópico, salvo que la prueba diga otro.
       if (sql.startsWith('SELECT d.id, d.estado, d.formato, d.pasarela_id, s.codigo AS sitio_codigo, d.decodificador, e.ultimo_fcnt, d.intervalo_esperado_s')) {
         const fila = { sitio_codigo: 'uct', formato: 'plano', pasarela_id: null, decodificador: null, ultimo_fcnt: null, intervalo_esperado_s: 60, canales: 1,
-          ventana_inicio: null, ventana_lecturas: 0, ventana_cuarentena: 0, ventana_sobre_tope: 0, ventana_omitidas: 0, ...dispositivo };
+          ventana_inicio: null, ventana_lecturas: 0, ventana_cuarentena: 0, ventana_sobre_tope: 0, ventana_omitidas: 0, reloj_desviado: false, ...dispositivo };
         return Promise.resolve({ rows: dispositivo ? [fila] : [], rowCount: dispositivo ? 1 : 0 });
       }
       if (sql.startsWith('SELECT p.id, p.activo, s.codigo AS sitio_codigo FROM pasarela')) {
@@ -56,8 +57,10 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
     const marcarVivo = jest.fn();
     const abrirTope = jest.fn();
     const cerrarTope = jest.fn();
+    const abrirRelojDesviado = jest.fn();
+    const cerrarRelojDesviado = jest.fn();
     const alertas = { evaluar } as unknown as AlertasService;
-    const supervision = { marcarVivo, abrirTope, cerrarTope } as unknown as SupervisionService;
+    const supervision = { marcarVivo, abrirTope, cerrarTope, abrirRelojDesviado, cerrarRelojDesviado } as unknown as SupervisionService;
     // Lo que el pipeline anuncia al panel en vivo (TT-39), en orden.
     const eventos = new EventosService();
     const publicados: EventoPanel[] = [];
@@ -65,7 +68,7 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
     const config = { get: (clave: string) => topes[clave] } as unknown as ConfigService;
     const servicio = new RecepcionService(pool, broker, alertas, supervision, eventos, new SenmlAdaptador(), new PlanoAdaptador(),
       new ChirpstackAdaptador(resolverClave), new MilesightAdaptador(resolverClave), config);
-    return { servicio, query, marcarVivo, abrirTope, cerrarTope, evaluar, publicados };
+    return { servicio, query, marcarVivo, abrirTope, cerrarTope, abrirRelojDesviado, cerrarRelojDesviado, evaluar, publicados };
   }
 
   const cuarentenas = (query: jest.Mock) =>
@@ -509,7 +512,15 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
     it('el perfil del alta llega al adaptador: la captura saneada de la UG65 por el sufijo nativo → 18,16 °C guardados con su marca', async () => {
       const captura = { devEUI: '0101010101010101', fCnt: 142, fPort: 1, data: 'AgAAAI8HGBmYrw==', rxInfo: [], time: '2026-10-15T15:34:56.340333Z' };
       const { servicio, query, marcarVivo } = armar({ ...NODO, formato: 'milesight', decodificador: 'campus-heltec-v3-v1' }, false, PAS);
-      await servicio.procesar(T_NATIVO, Buffer.from(JSON.stringify(captura)));
+      // La captura es del 15/10: el reloj de la prueba se fija a su minuto, porque una marca de pasarela a más de 10 min de la llegada ya
+      // no se respeta (docs/13 regla 18). Solo se finge la fecha; temporizadores y promesas siguen siendo los reales.
+      jest.useFakeTimers({ now: new Date('2026-10-15T15:35:00Z'), doNotFake: ['nextTick', 'setImmediate', 'clearImmediate', 'setInterval',
+        'clearInterval', 'setTimeout', 'clearTimeout', 'queueMicrotask', 'hrtime', 'performance'] });
+      try {
+        await servicio.procesar(T_NATIVO, Buffer.from(JSON.stringify(captura)));
+      } finally {
+        jest.useRealTimers();
+      }
       const [fila] = medicionesDe(query).map(([, params]) => params as unknown[]);
       expect(fila.slice(1, 4)).toEqual([new Date('2026-10-15T15:34:56.340Z'), 18.16, 'Cel']);
       expect(fila[5]).toBe('pasarela');
@@ -641,6 +652,63 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
       expect(cuarentenas(query)).toEqual(['no_registrado', 'no_registrado']);
       await servicio.procesar('sitio/uct/dispositivo/dev-0002/temperatura', UNA); // otro emisor, otra cuota
       expect(cuarentenas(query)).toHaveLength(3);
+    });
+  });
+
+  describe('desvío del reloj de la pasarela (docs/10 §8.4 punto 54; docs/13 regla 18)', () => {
+    const PAS: Pas = { id: 'p1', activo: true, sitio_codigo: 'uct' };
+    const NODO: Disp = { id: 'n1', estado: 'activo', formato: 'chirpstack', pasarela_id: 'p1' };
+    const T_UP = 'sitio/uct/pasarela/chirpstack-campus/0101010101010101/up';
+    const DIA = 86_400_000;
+    const up = (time: string) => Buffer.from(JSON.stringify({ time, deviceInfo: { devEui: '0101010101010101' }, object: { temperature: 21.5 } }));
+    const medicion = (query: jest.Mock) =>
+      query.mock.calls.find(([sql]) => String(sql).trimStart().startsWith('INSERT INTO medicion'))?.[1] as unknown[];
+
+    it('marca de pasarela 4 días atrasada → tiempo de la base, origen «recepcion» y se abre reloj_desviado con pasarela, desvío y marca', async () => {
+      const { servicio, query, abrirRelojDesviado, cerrarRelojDesviado } = armar(NODO, false, PAS);
+      const marca = new Date(Date.now() - 4 * DIA).toISOString();
+      await servicio.procesar(T_UP, up(marca));
+      const fila = medicion(query);
+      expect(fila[1]).toBeNull(); // COALESCE($2, clock_timestamp()): la hora la pone la base
+      expect(fila[5]).toBe('recepcion');
+      expect(abrirRelojDesviado).toHaveBeenCalledTimes(1);
+      const [id, idFisico, detalle] = abrirRelojDesviado.mock.calls[0] as [string, string, { pasarela: string; desvio_s: number; marca_pasarela: string }];
+      expect([id, idFisico, detalle.pasarela, detalle.marca_pasarela]).toEqual(['n1', '0101010101010101', 'chirpstack-campus', marca]);
+      expect(Number.isInteger(detalle.desvio_s)).toBe(true);
+      expect(Math.abs(detalle.desvio_s + 4 * 86_400)).toBeLessThanOrEqual(1); // negativo: atrasada
+      expect(cerrarRelojDesviado).not.toHaveBeenCalled();
+    });
+    it('con reloj_desviado ya abierta, otra marca desviada → no vuelve a escribir la condición (solo en la transición)', async () => {
+      const { servicio, query, abrirRelojDesviado, cerrarRelojDesviado } = armar({ ...NODO, reloj_desviado: true }, false, PAS);
+      await servicio.procesar(T_UP, up(new Date(Date.now() - 4 * DIA).toISOString()));
+      expect(medicion(query)[5]).toBe('recepcion');
+      expect(abrirRelojDesviado).not.toHaveBeenCalled();
+      expect(cerrarRelojDesviado).not.toHaveBeenCalled();
+    });
+    it('marca de pasarela 9 min atrás → se respeta con origen «pasarela» y no abre nada', async () => {
+      const { servicio, query, abrirRelojDesviado, cerrarRelojDesviado } = armar(NODO, false, PAS);
+      const marca = new Date(Date.now() - 9 * 60_000);
+      await servicio.procesar(T_UP, up(marca.toISOString()));
+      expect(medicion(query).slice(1, 2)).toEqual([marca]);
+      expect(medicion(query)[5]).toBe('pasarela');
+      expect(abrirRelojDesviado).not.toHaveBeenCalled();
+      expect(cerrarRelojDesviado).not.toHaveBeenCalled(); // no había ninguna abierta: ni una consulta
+    });
+    it('con reloj_desviado abierta, una marca de pasarela plausible → la cierra', async () => {
+      const { servicio, query, abrirRelojDesviado, cerrarRelojDesviado } = armar({ ...NODO, reloj_desviado: true }, false, PAS);
+      await servicio.procesar(T_UP, up(new Date(Date.now() - 5_000).toISOString()));
+      expect(medicion(query)[5]).toBe('pasarela');
+      expect(cerrarRelojDesviado).toHaveBeenCalledWith('n1', '0101010101010101', { pasarela: 'chirpstack-campus' });
+      expect(abrirRelojDesviado).not.toHaveBeenCalled();
+    });
+    it('una marca de DISPOSITIVO 4 días atrás → se respeta (cola sin cobertura) y no toca reloj_desviado', async () => {
+      const { servicio, query, abrirRelojDesviado, cerrarRelojDesviado } = armar({ id: 'd1', estado: 'activo', formato: 'senml', reloj_desviado: true });
+      const t = Math.floor((Date.now() - 4 * DIA) / 1000);
+      await servicio.procesar('sitio/uct/dispositivo/dev-0001/temperatura', Buffer.from(JSON.stringify([{ n: 'temperatura', u: 'Cel', v: 21.5, t }])));
+      expect(medicion(query)[1]).toEqual(new Date(t * 1000));
+      expect(medicion(query)[5]).toBe('dispositivo');
+      expect(abrirRelojDesviado).not.toHaveBeenCalled();
+      expect(cerrarRelojDesviado).not.toHaveBeenCalled();
     });
   });
 });

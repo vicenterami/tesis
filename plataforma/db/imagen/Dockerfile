@@ -9,6 +9,6 @@
 # Queda, documentado: gosu (el arranque lo usa para bajar privilegios). Cuando la imagen oficial se reconstruya con los
 # parches, este archivo vuelve a ser casi solo el FROM.
 FROM timescale/timescaledb:2.30.2-pg16-oss@sha256:df09d239ecc10f30dcd03165b9d8d61e30ef6465af05bceb9ab20f1c7e0f3469
-RUN apk upgrade --no-cache pyc python3 python3-pyc python3-pycache-pyc0 zlib \
+RUN apk upgrade --no-cache pyc python3 python3-pyc python3-pycache-pyc0 zlib libexpat \
     && rm -f /usr/local/bin/timescaledb-parallel-copy /usr/local/bin/timescaledb-tune \
              /docker-entrypoint-initdb.d/001_timescaledb_tune.sh

@@ -113,10 +113,73 @@ contra una librería C distinta de la de ejecución falla solo en producción. H
 dependencias nativas, así que el riesgo es nulo, pero la regla queda escrita para cuando las haya.
 
 **Lo que no se hace:** contratar una base de datos gestionada aparte (multiplica el costo por 3–5 sin
-necesidad a esta escala), ni Kubernetes (un orquestador para cuatro o cinco contenedores en un servidor es
-complejidad sin retorno).
+necesidad a esta escala), ni Kubernetes por ahora (un orquestador para cuatro o cinco contenedores en un servidor es
+complejidad sin retorno; el diseño para cuando exista un clúster está en §6).
 
-## 6. Pendiente
+## 6. Despliegue en Kubernetes: qué significa aquí y cuándo (decidido el 21/10/2026)
+
+**La pregunta** que motivó esta sección: «usar el estándar de contenedores para pasar el sistema a Kubernetes, balancear carga, escalar
+ante picos y respaldar». **Hecho verificable:** las imágenes que construye `docker compose build` ya son imágenes **OCI** (*Open
+Container Initiative*: el estándar de imagen y de *runtime* que Kubernetes ejecuta con `containerd`). No hay otro estándar que adoptar.
+Lo que falta no es el formato, sino (a) la **descripción del despliegue** (hoy, Compose) y (b) el **diseño del estado** para que más de
+una réplica del backend no se pise. La decisión: **A ahora, B diseñada** (decisión del 21/10/2026).
+
+### 6.1 Lo que impone el estado de cada pieza
+| Pieza | ¿Con estado? | Por qué | En Kubernetes |
+|---|---|---|---|
+| Proxy (nginx) | No | no guarda nada entre peticiones; cualquier réplica atiende cualquier conexión | `Deployment`, N réplicas; puede escalar con `HorizontalPodAutoscaler` sin diseño nuevo |
+| Backend (NestJS) | **Hoy sí** | topes por par y por dirección, caché de verificaciones, cupo de `scrypt` y `enCursoHttp` viven en la memoria del proceso (`docs/10 §8.4` puntos 52 y 53), y hay **una sola suscripción MQTT con sesión persistente** (`clientId` fijo, `clean: false`, MQTT 3.1.1) | `Deployment` con **una réplica** (opción A) y sondas `liveness`/`readiness` sobre `/salud`; N réplicas solo con la opción B |
+| Mosquitto | Sí | `mosquitto.db` (sesiones persistentes, mensajes en cola) y `dynamic-security.json` (credenciales y ACL) | `StatefulSet` de 1 réplica con volumen persistente; sin réplicas (un broker en clúster es otra pieza: `docs/10 §8.4` punto 10) |
+| TimescaleDB | Sí | todo el dato | `StatefulSet` de 1 réplica con volumen persistente; respaldo con `CronJob` (`pg_dump`) y retención (§2); réplica de lectura asíncrona solo si §9.4 de `docs/10` lo pide |
+
+**Vocabulario.** *Con estado*: la pieza guarda datos que no pueden perderse entre peticiones. *Sin estado*: cualquier réplica atiende
+cualquier petición. *`StatefulSet`*: objeto de Kubernetes para piezas con estado (identidad fija y volumen propio por réplica).
+*`Deployment`*: réplicas intercambiables. *Sesión persistente* son dos cosas distintas: la del **broker** (el broker guarda suscripciones
+y mensajes si el backend cae) y la de **personas** (`docs/20`: cookie `HttpOnly` + `SameSite`).
+
+### 6.2 Opción A (ahora): Compose en un servidor; Kubernetes solo como diseño
+Los cuatro contenedores en un servidor con `docker compose up -d` (§5) siguen siendo la recomendación para la Etapa 4 y el piloto, por
+tres hechos: (1) **el orquestador cuesta memoria**: la distribución ligera k3s declara como mínimo para un nodo servidor **2 núcleos y 2 GB
+de RAM** (y 1 núcleo y 512 MB por nodo agente), según su documentación oficial (docs.k3s.io, *Requirements*, leída el 22/10/2026), es
+decir, tanto como el techo completo de RNF-17 para la plataforma entera; en el plan de 4 GB de §5 cabrían ambos, pero sin la holgura que
+§5 reserva; (2) **no hay segundo nodo**: balancear y tolerar la caída de un nodo exige al menos dos máquinas, y la Facultad ofrece una (M7);
+(3) **lo que Kubernetes daría gratis ya está resuelto a esta escala**: reinicio automático (`restart: unless-stopped`), sondas de salud
+(`healthcheck` de cada servicio), límites de memoria y CPU, secretos fuera del repositorio y registros acotados (`docs/11 §4`). Lo que sí
+se deja escrito, para que el paso sea mecánico cuando haya clúster, es la **tabla de equivalencias** entre lo que hoy declara Compose y
+el objeto de Kubernetes que lo reemplaza:
+
+| Hoy (Compose) | Kubernetes (k3s de un nodo o el clúster institucional) |
+|---|---|
+| `services.proxy` con `ports: 443, 8883, 80` | `Deployment` + `Service` tipo `LoadBalancer` (o `Ingress` solo para 443; el 8883 es TCP crudo y va por `Service`, no por `Ingress`) |
+| `services.backend` | `Deployment` (1 réplica), `readinessProbe`/`livenessProbe` → `GET /salud`, `resources.limits` = los de `docs/10 §6` |
+| `services.mosquitto`, `services.timescaledb` | `StatefulSet` (1 réplica cada uno) + `PersistentVolumeClaim` por volumen de Compose |
+| `.env` | `Secret` (las mismas variables; el `PROXY_SECRETO` y las claves se escriben una vez, nunca en el manifiesto versionado) |
+| `proxy/nginx.conf`, `mosquitto/config/mosquitto.conf` | `ConfigMap` montado en la misma ruta |
+| `restart: unless-stopped`, `healthcheck` | `restartPolicy: Always` + sondas |
+| `security_opt: no-new-privileges`, `cap_drop` | `securityContext` (`allowPrivilegeEscalation: false`, `capabilities.drop`) |
+| respaldo manual de la base (§2) | `CronJob` con `pg_dump` y retención de 7 diarios y 4 semanales (§2) |
+| `docker compose logs` | registros por `stdout` igual; la recolección (Loki u otra) es decisión del clúster, no del sistema |
+
+Distribución y licencias: **k3s** y **Helm** son Apache-2.0 (archivo `LICENSE` de cada repositorio oficial, leído el 22/10/2026),
+compatibles con la AGPL-3.0 del sistema; un *chart* de Helm es opcional y se escribiría a partir de esta tabla.
+
+### 6.3 Opción B (diseñada para la Etapa 4): N réplicas del backend
+Para que varias réplicas no dupliquen tramas ni partan los topes, hacen falta cuatro cambios, cada uno con diseño antes de código:
+1. **Suscripciones compartidas de MQTT 5** (`$share/<grupo>/sitio/#`): el broker entrega cada mensaje a **una sola** réplica del grupo, así
+   no se paga el doble. Mosquitto 2.x las soporta; nuestro cliente se conecta hoy **a propósito en MQTT 3.1.1** (`protocolVersion: 4`,
+   fijado con una prueba y su motivo en `broker.service.spec.ts`): pasar a 5 es un cambio con pruebas, no un interruptor.
+2. **Lo que vive en memoria pasa a un lugar compartido** (Redis, o una tabla con `UPDATE … RETURNING`): topes por par y por dirección,
+   caché de verificaciones, cupo y `enCursoHttp`. Redis suma una pieza y memoria (RNF-17): se mide antes de elegir.
+3. **La comparación del contador de trama se vuelve atómica en SQL** (`docs/10 §4.1` ya lo anota: «procesamiento en paralelo con comparación
+   atómica del contador»), porque dos réplicas pueden recibir dos tramas del mismo nodo a la vez.
+4. **Lo que no cambia** y por eso B es viable: la consistencia la da la base, no el backend (transacciones; índice único `(canal_id, tiempo)`
+   con `ON CONFLICT DO NOTHING`; `FOR NO KEY UPDATE` en el alta y la baja). El orden de llegada entre réplicas no está garantizado y la base
+   lo absorbe. Pros: paralelismo real, caída de una réplica sin corte. Contras: una pieza más, MQTT 5 en el cliente, pruebas nuevas.
+
+**Qué se actualiza al pasar a B:** `docs/10` (§4.1, §6 y punto nuevo en §8.4), `docs/07` (Redis si entra), `docs/11 §4` (una réplica
+menos no es un riesgo nuevo, pero Redis sí tiene su fila), `docs/04` (elemento de la Etapa 4) y este documento.
+
+## 7. Pendiente
 
 - [ ] Recotizar en la calculadora de cada proveedor la semana previa a contratar; registrar fecha.
 - [ ] Vistas materializadas horaria y diaria (Etapa 3; edición Apache). La tarea de retención ya existe (`RetencionService`, 07/10): `trama` y `cuarentena` a 30 días; mediciones sin límite salvo que se configure.

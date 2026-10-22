@@ -295,6 +295,20 @@ Nube gratuita (ARM) & 2 OCPU · 12 GB, sin garantía de capacidad & CLP 0 & 3,05
 \label{tab:alojamiento}
 \end{table}
 
+{\scriptsize\setlength{\tabcolsep}{3pt}
+\begin{longtable}{@{}L{1.9cm}L{1.9cm}L{1.9cm}L{1.9cm}L{1.9cm}L{1.9cm}@{}}
+\caption{Cuatro referentes y este sistema en siete criterios, con la documentación oficial de cada uno leída el 22 de octubre de 2026 (una fila por afirmación con cita literal, URL y fecha, y la lista de páginas revisadas, en \texttt{docs/01} del repositorio; ThingsBoard CE: guías de la v4.3.1.7, última publicada v4.4.0.1; OpenRemote: documentación 1.32.0). «No declarado»: no aparece en las páginas revisadas, no que no exista. Las negaciones sobre Milesight IoT Cloud citan su FAQ oficial: «can only work with all Milesight LoRaWAN products», «provide API to connect to other platform or database? Not support now».}\label{tab:referentes-datos}\\
+\filaencab \encab{Criterio} & \encab{ThingsBoard CE} & \encab{OpenRemote} & \encab{Magistrala} & \encab{Milesight IoT Cloud} & \encab{Este sistema} \\ \midrule \endfirsthead
+\filaencab \encab{Criterio} & \encab{ThingsBoard CE} & \encab{OpenRemote} & \encab{Magistrala} & \encab{Milesight IoT Cloud} & \encab{Este sistema} \\ \midrule \endhead
+\scriptsize RAM mínima declarada & \scriptsize 4 GB (PoC) y 8 GB (producción pequeña), guía v4.3.1.7; 4.4: no declarado & \scriptsize Instancia central: no declarado; pasarela de borde: 2 o 4 GB & \scriptsize No declarado & \scriptsize No declarado (servicio en la nube) & \scriptsize $\leq$ 2 GB (RNF-17); medido en el banco: 174 MiB sostenido sin el proxy, 324 MiB en pico con él \\
+\scriptsize Vías de entrada & \scriptsize MQTT, HTTP, CoAP y LwM2M; LoRaWAN solo por integración de la edición de pago & \scriptsize HTTP, MQTT y WebSocket; agentes LoRaWAN, Modbus, SNMP, TCP, UDP & \scriptsize HTTP, MQTT, CoAP y WebSocket; adaptador LoRa obsoleto & \scriptsize Solo equipos Milesight, por sus pasarelas & \scriptsize MQTT sobre TLS, HTTPS con token, LoRaWAN por pasarela (ruta B) o ChirpStack (ruta C) \\
+\scriptsize Pasos de alta de un dispositivo (guía oficial) & \scriptsize 2 subpasos; el primero, 5 acciones & \scriptsize 5 pasos (tutorial MQTT) & \scriptsize 5 secciones sin numerar; guardar mensajes exige una regla de la edición de pago & \scriptsize 3 pasos; «no admite otras marcas» & \scriptsize 1 llamada a la API, todo o nada con el broker; credencial una sola vez \\
+\scriptsize Formatos de trama & \scriptsize JSON y Protobuf; SenML no declarado & \scriptsize JSON por atributo; SenML no declarado & \scriptsize SenML, JSON y CBOR & \scriptsize No declarado & \scriptsize SenML nativo; plano; Milesight y ChirpStack con perfil de decodificación \\
+\scriptsize Licencia & \scriptsize BUSL-1.1 desde la 4.4 (Apache-2.0 a los cuatro años); $\leq$ 4.3: Apache-2.0 & \scriptsize AGPL-3.0, con licencia comercial opcional & \scriptsize Apache-2.0 (núcleo); interfaz web: contradictoria & \scriptsize No declarada & \scriptsize AGPL-3.0 \\
+\scriptsize TLS y credencial por dispositivo & \scriptsize TLS en 8883; token, usuario o X.509 por dispositivo; ACL por tópico no declarada & \scriptsize TLS en 8883; usuario de servicio o X.509 por cliente; ACL por tópico no declarada & \scriptsize TLS y DTLS; identificador y secreto por dispositivo; permiso por canal, no por tópico & \scriptsize Certificado y OAuth 2.0 (AWS) en 8883; por dispositivo: no declarado & \scriptsize TLS 1.2+ en 443 y 8883; credencial y ACL por dispositivo: publica solo bajo su identificador \\
+\scriptsize Exportación & \scriptsize CSV, XLS y XLSX por widget; API de series & \scriptsize ZIP por API; CSV hasta 1 M de datos; SQL & \scriptsize CSV en la interfaz; API de mensajes por canal & \scriptsize CSV, 3 meses por descarga; sin API hacia terceros & \scriptsize CSV y JSON por dispositivo y rango, en flujo; histórico por canal \\
+\end{longtable}}
+
 \begin{table}[H]
 \centering\small
 \begin{tablaseg}

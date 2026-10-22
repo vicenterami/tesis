@@ -1,6 +1,6 @@
 # Equipo de prueba: nodo propio para TT-32 (Wi-Fi y, si hay pasarela, LoRaWAN)
 
-> **Sustenta:** TT-32 (sensor físico de extremo a extremo, `docs/04`), escenarios 1 y 3 de `docs/10 §2`, validación
+> **Sustenta:** TT-32 (sensor físico de extremo a extremo, `docs/04`), escenarios 1 y 3 de `docs/10 §1`, validación
 > preliminar de la Etapa 3. Versión: 8 de octubre de 2026; estado al 16 de octubre. Los precios son una cotización con fecha, no un compromiso.
 >
 > **Estado (14/10/2026):** todo el equipo recibido: la placa, anotada el 12/10, y las piezas 2 a 7, el 13/10 (§3). Fase 0 completa el

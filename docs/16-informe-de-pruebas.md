@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 324 pruebas unitarias del backend y 52 del panel, sin matriz formal) y TT-32 (sensor físico);
+cubre todavía: TT-27 (contrato de trama: hoy 338 pruebas unitarias del backend y 53 del panel, sin matriz formal) y TT-32 (sensor físico);
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -237,6 +237,16 @@ comparables (otra duración y otra semilla). La base de desarrollo se actualizó
 
 **Cómo repetirlo:** `bash plataforma/pruebas/escanear-imagenes.sh` (construye con `--pull --no-cache` y sale 1 si queda algo
 con versión corregida publicada fuera de los residuos documentados).
+
+**Escaneo del 22/10/2026** (tras el parche de seguridad de Node del 21/10: `node:22.23.3` → `22.23.4-trixie-slim`, digest nuevo en las dos
+etapas del Dockerfile; mismo guion, bases frescas con `--pull --no-cache`):
+
+| Imagen | Críticas / altas | Con corrección publicada | Qué se hizo |
+|---|---|---|---|
+| backend | 0 / 43 | 0 | Node 22.23.4 (`node --version` en el contenedor reconstruido); las 43 altas siguen sin corrección en Debian 13 |
+| proxy | 0 / 0 | 0 | `libx11` (1.8.13 → 1.8.14) se sumó a la lista de parches de Alpine, y las tres altas de nginx (CVE-2026-15176, -93479, -97205; 1.30.5 → 1.30.6) no se parchan con `apk` (el paquete oficial viene del repositorio de nginx, no del de Alpine): el `FROM` subió a `nginx:1.30.6-alpine`, publicada el mismo 22/10 (decisión del día: un parche de seguridad del propio servidor no espera los 7 días de la cadena de suministro; se fija por digest y se escanea antes de usarla) |
+| base | 1 / 25 | 0 | `libexpat` (2.8.5 → 2.9.0) se sumó a la lista de parches; lo que queda está en `gosu` (binario de Go precompilado, residuo documentado en `docs/11 §4`) |
+| broker | 0 / 0 | 0 | sin cambios |
 
 ## 13. Migración 11: vía, pasarela, estado y sitio (08/10/2026)
 
@@ -749,7 +759,7 @@ la ACL del rol y la recepción por el filtro 1.
 **Cómo** (`bash plataforma/pruebas/banco/banco.sh lorawan`). Contra el banco desechable, con el broker, el plugin de seguridad y la base
 reales: se da de alta por API una pasarela ChirpStack, un nodo y una pasarela Milesight, y se publica con la credencial de cada pasarela el
 JSON de su fuente oficial (evento `up` de ChirpStack v4; uplink con códec y Metadata de Milesight). Los secretos viajan por la entrada
-estándar. Resultado: **25 de 25 comprobaciones, «LORAWAN OK»**; 26 de 26 desde la corrección de §32, 27 de 27 desde la de §33, 35 de 35 desde la de §34, 36 de 36 desde la de §35, 43 de 43 desde la de §36 y 44 de 44 desde la de §38.
+estándar. Resultado: **25 de 25 comprobaciones, «LORAWAN OK»**; 26 de 26 desde la corrección de §32, 27 de 27 desde la de §33, 35 de 35 desde la de §34, 36 de 36 desde la de §35, 43 de 43 desde la de §36, 44 de 44 desde la de §38 y 46 de 46 desde la de §46.
 
 | Comprobación | Resultado |
 |---|---|
@@ -811,8 +821,8 @@ documentos, el estado de HU-02, las filas de entradas de `docs/10`, el conteo de
   cruda, 30 días) y el registro con avisos. Los topes de `docs/10 §8.4` punto 29 siguen pendientes; se resuelve con la decisión de
   límites del proxy y del filtro 1.
 - **Marcas antiguas aceptadas.** Un servidor de red puede mandar `time` de hace días: la regla 7 de `docs/13` los acepta a propósito,
-  porque una pasarela sin red guarda hasta 500 paquetes y los reenvía después. Acotar el pasado para el origen `pasarela` es una
-  decisión pendiente.
+  porque una pasarela sin red guarda hasta 500 paquetes y los reenvía después. Acotar el pasado para el origen `pasarela` quedó
+  decidido el 21/10 y hecho el 22/10 (regla 18 de `docs/13`, §46): más de 10 min atrasada, hora de recepción y condición `reloj_desviado`.
 - **Alta repetida con un error ambiguo del broker.** Si el broker no confirma a tiempo el alta A y, entretanto, el alta B del mismo
   identificador crea su cliente, el borrado de A puede llegarle después: B queda con una credencial que el broker no tiene. Falla
   cerrado (no entra nadie) y la rotación lo repara.
@@ -864,7 +874,7 @@ revisar nada. **Banco:** 36 de 36, «LORAWAN OK».
 la limpieza (el tópico crudo queda en su columna de la cuarentena como evidencia); se suman a los rellenos los selectores de variación
 que faltaban; el informe dice ahora que el JSON del banco es el de la documentación oficial de ChirpStack v4 y de Milesight, no el
 que publica el ChirpStack del campus, todavía no probado; y el guardián busca el nombre del entrevistado también en el código.
-Total: 270 del backend y 52 del panel.
+Total: 270 del backend y 53 del panel.
 
 ## 36. La trama real de la pasarela del campus: sufijo nativo, perfil de decodificación y contador de trama (16/10/2026)
 
@@ -964,7 +974,7 @@ como unidad secundaria (RFC 8798); un emisor que mande `mV` se convierte (1/1000
 | ¿El panel lo muestra sin repetir la cuenta? | El evento `medicion` del canal en vivo trae `porcentaje`, calculado en la recepción con la misma función (prueba: calibración 0–50 y lectura 22,4 → 44,8 %); la ficha lo muestra junto al valor crudo solo si es un número, así un evento sin el campo no rompe la tarjeta (prueba del panel; plantado a mano el 16/10: si la ficha no copia el campo, falla) |
 
 **Lo que falta:** la ruta para editar la calibración, con su permiso (se concede cuando exista la ruta: mínimo
-privilegio) y la validación de que las escalas caigan en el rango de la magnitud. **Pruebas:** 270 unitarias del backend y 52 del panel.
+privilegio) y la validación de que las escalas caigan en el rango de la magnitud. **Pruebas:** 270 unitarias del backend y 53 del panel.
 
 ## 39. La ficha del dispositivo en un navegador real (16/10/2026)
 
@@ -995,7 +1005,7 @@ ignoraba: la prueba publica ahora con milisegundos. **Del guardián:** contaba c
 regular (50 en vez de 49); corregido. Y no revisaba la sintaxis de los guiones: una línea de comentario sin `#` dejó `banco.sh` sin
 interpretarse y solo lo delató la siguiente corrida; desde ahora el paso 2y2 corre `bash -n` sobre cada guion (plantado uno roto: falla).
 **De la revisión del tramo:** si la publicación fallaba con el backend detenido, el banco quedaba con el backend apagado (ahora se
-arranca siempre); las comprobaciones del estado en vivo y de la leyenda se acotan a su elemento. **Pruebas:** 270 del backend y 52 del panel.
+arranca siempre); las comprobaciones del estado en vivo y de la leyenda se acotan a su elemento. **Pruebas:** 270 del backend y 53 del panel.
 
 ## 40. El inventario con varios sitios (16/10/2026)
 
@@ -1014,7 +1024,7 @@ zona no es de él, vuelve a «todas»). Con un solo sitio no aparecen: no inform
 | Plantado: agrupar las zonas por nombre en vez de por id | la prueba de varios sitios falla |
 | Contra la base del banco: una segunda sede con una zona «Emulados» y un dispositivo (a mano, con `psql`; no la repite ningún guion) | la API entrega las dos zonas con el mismo nombre y distinto id, y la ficha trae su sitio y su zona |
 
-**Pruebas:** 270 del backend y 52 del panel. **Un tropiezo de la medición:** el primer intento de crear la sede falló porque `zona` no
+**Pruebas:** 270 del backend y 53 del panel. **Un tropiezo de la medición:** el primer intento de crear la sede falló porque `zona` no
 tiene `creado_en` (se supuso sin mirar el esquema); el segundo, porque la extracción del id tomó la línea de guiones del encabezado de
 `psql`. Ninguno era del sistema.
 
@@ -1059,7 +1069,7 @@ viajaría en claro sin el proxy: en producción el backend no publica puertos y 
 `docs/10 §8.4` punto 52 (vii): bloqueo por dirección detrás de un NAT, cuarentena sin cuota por dispositivo y `X-Forwarded-For` desde
 otro contenedor de la red interna.
 
-**Pruebas:** 291 del backend y 52 del panel. **Tres tropiezos de la prueba de punta a punta, ninguno del sistema:** `curl -G` mueve el
+**Pruebas:** 291 del backend y 53 del panel. **Tres tropiezos de la prueba de punta a punta, ninguno del sistema:** `curl -G` mueve el
 cuerpo a la URL, así que el `?magnitud=` del formato plano va escrito en la URL; la prueba del bloqueo suponía que la dirección partía
 sin fallos, cuando las comprobaciones anteriores del 401 ya sumaban algunos (ahora envía hasta recibir el 429); y suponía que el backend
 ve 127.0.0.1, cuando ve una sola dirección de la red de Docker para las peticiones directas y las del proxy: una corrida dejaba fallos
@@ -1123,7 +1133,7 @@ Yerger en OneWire, cifras y referencias cruzadas.
 
 **Lo que no cubre:** el 503 del cupo se prueba solo en unitarias; el bloqueo grueso, en el banco con 10 identificadores × 5 fallos
 (≈ 3,3 s de `scrypt`), no con una carga real; la cuota de la pasarela para tramas sin DevEUI verificable, en unitarias; el cierre de la condición se prueba adelantando la ventana en la base, no esperando una hora; la cuota en memoria
-de lo que el filtro 1 rechaza se prueba en unitarias, no en el banco. **Pruebas:** 324 del backend (33 nuevas) y 52 del panel.
+de lo que el filtro 1 rechaza se prueba en unitarias, no en el banco. **Pruebas:** 324 del backend (33 nuevas) y 53 del panel.
 
 ## 43. Fase 1 del nodo propio: diagnóstico de los tres sensores con hardware real (18 y 19/10/2026)
 
@@ -1177,10 +1187,181 @@ embebido, dos nodos Heltec LoRa 32 V3 (AU915), el portátil con la pila completa
 | Alta por API de la pasarela (`formato milesight`) y de los dos nodos por DevEUI con el perfil `campus-heltec-v3-v1` | ✅ |
 | Tópico con `$devEUI` (mayúsculas): la pasarela lo publica literal → cuarentena `no_registrado` con la carga completa (≈ 25 tramas); con `$deveui` (minúsculas, documentación de la UG65) entra todo | ✅ el rechazo es el correcto; la plantilla del alta se corrige |
 | Tramas reales: «3/3 lecturas guardadas vía milesight» por nodo cada ≈ 17 s; 810 mediciones en 3 h, origen de tiempo `pasarela`; inventario en verde y ficha con las tres series | ✅ |
-| Reloj de la pasarela 4 días atrasado: mediciones fechadas el 16/10 (regla 17), ficha «última trama: ahora» / «medición hace 4 d», histórico de la última hora vacío; corregida la hora en la pasarela, `max(tiempo)` = `max(recibido_en)` | ✅ visible por diseño; falta tolerancia de desvío |
+| Reloj de la pasarela 4 días atrasado: mediciones fechadas el 16/10 (regla 17), ficha «última trama: ahora» / «medición hace 4 d», histórico de la última hora vacío; corregida la hora en la pasarela, `max(tiempo)` = `max(recibido_en)` | ✅ visible por diseño; falta tolerancia de desvío (resuelta en §46) |
 | La pasarela dejó de reenviar 27 min (destino cambiado y sesión cerrada): `sin_comunicacion` abierta en los dos nodos a los 6 min y cerrada sola al volver | ✅ |
 | Exportación CSV de la ficha (`GET /dispositivos/{id}/exportar`): 280 líneas | ✅ |
 | Un segundo destino en la UG65 solo puede ser HTTP/HTTPS (MQTT deshabilitado): la vía E (HTTP de pasarela) pasa a ser necesaria para coexistir con otro broker | observado |
 
 **Lo que no cubre:** la ruta C (ChirpStack) y la coexistencia por puente desde el Mosquitto del compañero (no se logró en su equipo).
 Las tramas reales quedan en la base del portátil y no se exportan al repositorio.
+
+## 46. Tolerancia de desvío de la marca de pasarela (22/10/2026)
+
+**Qué se probó** (`docs/10 §8.4` punto 54; `docs/13` regla 18; migración 20). Origen: en §45 la UG65 sin NTP fechó 810 mediciones
+4 días antes. Desde ahora, una marca con origen `pasarela` a más de 10 minutos de la hora de recepción se reemplaza por la hora de
+recepción (`origen_tiempo = recepcion`) y abre la condición `reloj_desviado` del nodo; la primera marca de pasarela plausible la cierra.
+Una marca de dispositivo antigua se sigue respetando.
+
+**Método.** Pruebas unitarias del filtro 4, del pipeline con la base simulada y del servicio de supervisión; la migración aplicada dos
+veces sobre la base de desarrollo y sus reglas plantadas en `reglas-identidad.sql`; y `banco.sh lorawan` de punta a punta sobre un banco
+recién encendido (que aplica `db/init` desde cero y reaplica las migraciones 02 a 20): la pasarela Milesight del banco publica la
+captura del campus por el sufijo nativo con `time` 4 días atrás, y después con la hora actual.
+
+| Caso | Dónde | Resultado |
+|---|---|---|
+| Pasarela 4 días atrás → hora de recepción, desvío negativo | `tiempo.spec.ts` | ✅ |
+| Pasarela 9 min atrás → se respeta; justo 10 min se respeta, 10 min y 1 s no | `tiempo.spec.ts` | ✅ |
+| Dispositivo 4 días atrás → se respeta (cola sin cobertura) | `tiempo.spec.ts` y `recepcion.service.spec.ts` | ✅ |
+| Más de 2 min en el futuro → hora de recepción para los dos orígenes; la pasarela abre la condición desde ahí (hasta 2 min, deriva normal: nada) | `tiempo.spec.ts` | ✅ |
+| Pipeline: marca desviada → `tiempo` lo pone la base, origen `recepcion` y se abre `reloj_desviado` con pasarela, `desvio_s` y `marca_pasarela` | `recepcion.service.spec.ts` | ✅ |
+| Pipeline: con la condición ya abierta, otra marca desviada no vuelve a escribirla; una plausible la cierra; sin condición abierta, una plausible no consulta nada | `recepcion.service.spec.ts` | ✅ |
+| Abrir y cerrar con evento y aviso al panel; una ya abierta (índice único) o nada que cerrar → sin evento ni aviso | `supervision.service.spec.ts` | ✅ |
+| `reloj_desviado` es Alerta en el panel, con el rótulo «Reloj de pasarela desviado» | `estado-visual.test.ts` | ✅ |
+| Migración 20 aplicada dos veces sobre la base de desarrollo: la segunda termina igual, sin error | `db/init/20-reloj-desviado.sql` | ✅ |
+| `condicion` acepta `reloj_desviado` y rechaza un tipo ajeno por `ck_condicion_tipo` | `reglas-identidad.sql`, casos 29 y 30 (31 OK de 31) | ✅ |
+| Banco: `time` 4 días atrás → 3 lecturas fechadas por la recepción y `reloj_desviado` abierta; el evento trae la pasarela, la marca y `desvio_s` = −345601 | `banco.sh lorawan` | ✅ |
+| Banco: con la hora actual → 3 lecturas con origen `pasarela` y la condición cerrada sola | `banco.sh lorawan` | ✅ |
+
+**Resultado.** Pruebas unitarias: 338 del backend (14 nuevas) y 53 del panel (1 nueva), todas en verde con `pnpm verificar`. Banco
+`lorawan`: 46/46. Al plantar la violación (la regla 18 desactivada en `tiempo.ts`) fallan 5 pruebas de `src/recepcion`.
+
+**Lo que no cubre:** una marca de pasarela atrasada menos de 10 minutos se respeta tal cual (adelantada más de 2 min, la reemplaza la
+regla 7 y también abre la condición: revisión del 22/10, antes quedaba en silencio); la condición se abre por nodo, no por pasarela (el
+modelo no tiene estado propio de pasarela), así que una pasarela desviada con varios nodos abre una condición en cada uno. Si la pasarela
+deja de incluir marca (o la manda sin zona), no abre ni cierra nada: una condición abierta queda así hasta la siguiente marca plausible.
+Las tramas de un dispositivo se procesan de a una (MQTT en serie; HTTP de a una por identificador), así que la lectura del estado
+«abierta» en el filtro 1 no se cruza con otra trama del mismo nodo.
+
+## 47. Límite de tasa por dirección en el proxy (22/10/2026)
+
+**Qué cambió** (`plataforma/proxy/nginx.conf`; `docs/11 §3` y §4). Hasta hoy el proxy no limitaba nada por dirección: lo único que frenaba
+el abuso eran los topes propios del backend para la recepción por HTTP (`docs/10 §8.4` puntos 52 y 53). Ahora el proxy tiene cinco controles,
+todos por dirección del socket (`$binary_remote_addr`; no hay otro proxy delante, así que `$remote_addr` es la del cliente):
+una zona general y una de administración en el 443 (`limit_req`, exceso → **429**), y un tope de sesiones simultáneas en el 8883
+(`limit_conn`). Los rechazos quedan en el registro de errores del proxy (`limit_req_log_level warn`, `limit_conn_log_level warn`).
+La dirección 127.0.0.1 del propio contenedor (el chequeo de salud, cada 15 s) queda exenta: una clave vacía no se cuenta.
+
+**Números y fundamento** (el porqué también está en los comentarios del archivo):
+
+| Control | Valor | Fundamento |
+|---|---|---|
+| `limit_req` general (443) | 100 r/s, ráfaga 200 sin espera | RNF-01 exige 50 eventos/s (`docs/02`). Por HTTP un NAT o una pasarela envía desde **una** dirección las tramas de todos sus dispositivos, y cada dispositivo manda a lo más 1 trama aceptada por segundo (`docs/10 §8.4` punto 52 e): 50 dispositivos detrás de una dirección dan 50 r/s. 100 r/s es el doble. La ráfaga de 200 son 4 s del ritmo de RNF-01: cubre la cola que los 50 canales reenvían tras una caída (`docs/02`, fundamento de RNF-01) y la carga de una pantalla del panel |
+| `limit_req` de administración (443) | 5 r/s, ráfaga 10, solo `POST/PUT/PATCH/DELETE` sobre `/dispositivos` y `/pasarelas` | El backend ya admite a lo más 2 altas a la vez (`docs/10 §3`, 429); un lote de 10 seguidos cubre dar de alta un sitio a mano o con un guion, y quien intente adivinar `X-Clave-Admin` tiene a lo más 5 intentos por segundo y por dirección. La recepción (`POST /recepcion/{id}`) no entra: cuenta solo en la zona general |
+| `limit_conn` (8883) | 100 sesiones simultáneas por dirección | Cada nodo mantiene una sesión MQTT; el caso de validación tiene 50 canales (`docs/02`), a lo más 50 nodos de un canal tras un mismo NAT: el doble de holgura. Techo del proceso: `worker_connections 1024`, dos por sesión (cliente y broker) ≈ 512 por worker, así que una sola dirección no lo satura (hacen falta 6) |
+| `limit_conn` HTTP (443) | 100 peticiones en curso por dirección | Revisión del 22/10: `limit_req` cuenta inicios, no duración; sin esto una dirección abre 200 peticiones lentas y agota `worker_connections`. Mismo fundamento que el 8883 |
+| `limit_conn` de `/eventos` (443) | 20 flujos SSE por dirección | 10 pantallas abiertas detrás de un NAT con dos pestañas cada una; el backend admite 50 flujos en total (`docs/10 §5`): una dirección ya no puede tomarlos todos |
+
+**Método.** `pruebas/banco/proxy-limites.sh` sobre la capa TLS del banco (`banco.sh proxy`, proyecto `banco`, 8443 y 8884, certificados de
+desarrollo). Cada límite se prueba **plantando la violación** y **comprobando lo legítimo**. Las ráfagas usan una sola invocación de `curl`
+con rango (`?r=[1-600]`), que reutiliza la conexión; las sesiones MQTT/TLS son 100 `openssl s_client` con la entrada abierta, desde una sola
+dirección (la puerta de enlace de Docker, como los nodos de un NAT), más un contenedor desechable en otra dirección.
+
+| Comprobación | Resultado medido (22/10/2026) |
+|---|---|
+| 600 peticiones seguidas a `/salud` desde una dirección | 233 con 200 y 367 con 429 (esperado 200 a 260 pasan: la ráfaga más lo que el ritmo deja entrar) |
+| 4 s después, una petición sola | 200 |
+| Lo legítimo: 250 `POST /recepcion/{id}` a 50/s (RNF-01, un NAT con 50 dispositivos), 5 s | 0 con 429; las 250 llegaron al backend (401: el dispositivo no existe) |
+| 40 `POST /dispositivos` seguidos | 11 llegaron al backend (401 sin clave) y 29 con 429 |
+| 40 `DELETE /pasarelas/{id}` seguidos | 429 en las 40 (el cubo de administración seguía lleno de la prueba anterior; confirma que cubre DELETE y `/pasarelas`) |
+| Lo legítimo: 40 `GET /dispositivos` y 40 `POST /recepcion/{id}` seguidos | 0 con 429 en ambos (no son administración y caben en la ráfaga general) |
+| 4 s después, un `POST /dispositivos` solo | 401 (llega al backend; sin la clave no es 201) |
+| 99 sesiones TLS abiertas al 8884 desde una dirección (contadas por el apretón terminado, «Verify return code: 0», no por el proceso) | las 99 vivas; la sesión 100 entra |
+| La sesión 101 desde la misma dirección, con la centésima abierta | rechazada antes del apretón TLS; línea nueva «limiting connections by zone» en el registro desde la marca de tiempo previa; las 100 de abajo siguen vivas |
+| 40 `POST` seguidos a `/DISPOSITIVOS` (la ruta en mayúsculas) | 429 (la zona no distingue mayúsculas, como el enrutador de Express) |
+| 20 flujos SSE a `/eventos` desde una dirección; el 21.º; una petición normal; al cerrar los flujos | las 20 abiertas; el 21.º recibe 429; `/salud` responde 200 (el tope es solo de `/eventos`); la dirección vuelve a abrir un flujo |
+| Con los 20 abiertos, `/Eventos` y `/eventos/` (variantes que Express también sirve) | 429 en las dos: la `location` es una expresión regular, no una ruta exacta |
+| Con esa dirección al tope, `mosquitto_pub` QoS 1 desde otra dirección | publicó y la lectura está en `medicion` (el límite es por dirección) |
+| Al cerrar las 100 sesiones | la misma dirección vuelve a conectar |
+| `banco.sh proxy` (la capa completa) y `nginx -t` en el contenedor | 11 «OK» y «PROXY OK»; sintaxis correcta; el chequeo de salud sigue «healthy» |
+
+Resultado del guion: **22/22** tras la revisión del 22/10 (antes 15/15: la comprobación de «100 sesiones vivas» contaba subprocesos, no apretones TLS, y se rehízo; se sumaron las mayúsculas, `/eventos` con sus variantes `/Eventos` y `/eventos/`, que Express también sirve y que una `location =` dejaba fuera del tope, y el tope HTTP). Primera corrida: 13/15, por dos errores del propio guion (la recepción exige `Content-Type` y el 404 de un GET
+se contó como éxito; las sesiones no se cerraban al terminar), corregidos y repetidos.
+
+**Limitaciones.** (1) Los límites son por dirección: una pasarela con miles de dispositivos detrás de una sola dirección que supere 100 r/s
+sostenidos o 100 sesiones MQTT se verá limitada (no es el caso de validación; el valor se sube en `nginx.conf` con su fundamento). (2) Detrás de un
+NAT, un dispositivo abusivo consume el cupo de sus vecinos: es el costo de limitar por dirección, y el tope por emisor del backend (punto 53) sigue
+siendo el que distingue dispositivos. (3) El tope de 100 peticiones HTTP en curso por dirección no se planta en el banco: no hay forma legítima de sostener más de 100 (el canal en vivo lo
+acota el backend a 50 flujos); se comprueba por configuración (`nginx -t` y `nginx -T`) y por el tope de 20 de `/eventos`, que sí se planta. (4) Una IPv6 cuenta por dirección completa, no por prefijo /64: quien rote direcciones dentro de su /64
+evade `limit_req`; el backend sí cuenta por /64 (punto 52). (5) La prueba se hizo desde una sola máquina y sin medir el costo de CPU del proxy
+con los límites activos; el límite de memoria del proxy (100 MB) no se tocó y las zonas ocupan 10 MB + 4 × 1 MB (general, administración, 8883, HTTP y `/eventos`) (`limit_req_zone`/`limit_conn_zone`) como máximo. (6) `@nestjs/throttler`
+(por usuario y ruta, en el backend) sigue pendiente con M7.
+
+
+## 48. Cualquier trama y cualquier serie de cualquier sensor es consultable (22/10/2026)
+
+**Qué garantiza y cómo se prueba** (`pruebas/banco/consultable.sh`; RF de consulta y exportación de `docs/02`). Para **cada** dispositivo que
+lista la API recorre el camino completo del panel: inventario → ficha → histórico de **cada canal** en los cuatro rangos (1 h, 24 h, 7 d, 30 d con
+sus pasos) → exportación CSV y JSON del último mes → condiciones → cuarentena. Falla si alguna ruta responde con error o con una forma que no
+es la del contrato (el histórico es un objeto con `puntos`, `tiempos` y `valores` del mismo largo), o si un dispositivo visto en las últimas
+24 h devuelve vacío el histórico de 24 h en todos sus canales. Un dispositivo sin mediciones recientes (recién dado de alta) devuelve series
+vacías y se cuenta aparte: no es una falla. Sirve contra la pila de desarrollo o contra el banco (`consultable.sh <URL>`).
+
+| Corrida | Resultado |
+|---|---|
+| Pila de desarrollo, 15 dispositivos de la semilla y de las corridas | **104 OK, 0 FALLA**; 15 sin mediciones en las últimas 24 h (semilla antigua) |
+| Banco (`banco.sh consultable`), 100 dispositivos emulados recién encendidos | **757 OK, 0 FALLA**; 100 sin mediciones en las últimas 24 h (no es falla) |
+
+**Qué dice exactamente:** hoy, sin usuarios, quien llega al panel ve todo lo consultable; con la sesión (HU-18, `docs/20`) la garantía pasa a
+ser «cualquier dato de su sitio». No cubre la trama cruda directamente (`trama`, 30 días): se ve por la cuarentena y por el histórico, no
+por una ruta propia.
+
+
+## 49. La misma serie por las tres vías: latencia, pérdidas, duplicados y consumo (22/10/2026)
+
+**Qué compara y cómo** (`pruebas/banco/vias.sh`, caso `banco.sh vias`; RNF-02, RF-10, `docs/10 §8.4` puntos 47, 52 e y 53). Una serie
+determinista (semilla fija, 60 instantes × 3 canales: temperatura °C, humedad %, tensión V, las magnitudes del caso `lorawan`) entra al banco
+por cinco emisores dados de alta por la API, todos con intervalo esperado de 60 s:
+
+- **MQTT** (`vias-mqtt-*`, SenML): 60 mensajes de 3 lecturas, uno por segundo, en **una** sesión (`mosquitto_pub -l`, QoS 1), para que el
+  arranque del cliente no entre en la latencia.
+- **HTTP** (`vias-http-1-*`, `-10-*`, `-60-*`, SenML): la misma serie en packs de 1, 10 y 60 lecturas por `POST /recepcion/{id}` (180, 18 y 3
+  POST), con un POST a lo más por segundo por dispositivo (el ritmo del punto 52 e), contado desde la respuesta anterior.
+- **Pasarela** Milesight sin códec (`vias-pasarela-*` con su nodo `vias-nodo-*`, perfil `campus-heltec-v3-v1`): 60 tramas de 10 bytes por el
+  sufijo nativo, `fCnt` creciente y `time` = ahora, una por segundo, en una sesión.
+
+Cada trama lleva su marca = hora de envío (`bt` en SenML, `time` en la pasarela); la **latencia** es `recibido_en − marca` (el mismo reloj:
+backend y guion corren en el mismo equipo). En los packs HTTP cada lectura lleva además `t` negativo hasta la hora de su instante, en una
+línea fija de un instante por segundo. **Duplicados a propósito:** las 10 primeras tramas de cada vía se envían dos veces (MQTT, el mismo
+mensaje; HTTP, el mismo POST; pasarela, el mismo `fCnt` y los mismos bytes); en los packs de 60 son las 3. Cada lectura enviada se anota en
+el guion y se busca en `medicion` por canal y hora (±5 ms). La memoria y la CPU del contenedor del backend se toman con
+`docker stats --no-stream` cada 5 s, antes, durante cada vía y al final.
+
+**Resultado medido** (22/10/2026, banco encendido con 5 emulados sembrados y sin tráfico; tercera corrida del guion):
+
+| Vía | Enviadas | Guardadas | Perdidas | Filas de más por duplicados | Latencia p50 / p95 / máx (ms) | Envío (s) | Backend: MiB máx | CPU máx (%) | Muestras |
+|---|---|---|---|---|---|---|---|---|---|
+| MQTT (SenML, 3 lecturas por mensaje) | 180 | 180 | 0 | 0 | 4 / 4 / 5 | 59,3 | 59,9 | 0,3 | 12 |
+| HTTP, pack de 1 | 180 | 180 | 0 | 0 | 15 / 17 / 141 | 194,2 | 60,5 | 0,5 | 39 |
+| HTTP, pack de 10 | 180 | 180 | 0 | 0 | 27 / 153 / 153 | 28,2 | 60,8 | 9,0 | 6 |
+| HTTP, pack de 60 | 180 | 180 | 0 | 0 | 84 / 157 / 157 | 5,6 | 60,1 | 1,3 | 1 |
+| Pasarela (10 bytes, `fCnt`) | 180 | 180 | 0 | 0 | 3 / 4 / 4 | 59,2 | 60,6 | 0,3 | 12 |
+
+Backend antes: 59,6 MiB y 0,0 % de CPU; al final, 59,4 MiB y 0,0 %. Los cinco emisores dejan la **misma** secuencia de valores por canal
+(misma huella en los cinco). Los 10 POST repetidos del pack de 1 y del de 10, y los 3 del de 60, responden 202 con `repetidas` igual al
+tamaño del pack; las 10 tramas repetidas de la pasarela se descartan por el `fCnt` y quedan anotadas en el registro (10 avisos). Ningún 429
+por el ritmo. Guion: **28/28** («VIAS OK»), sin reinicios ni OOM del backend y sin secretos en su registro; al final da de baja los cinco
+emisores y la pasarela.
+
+**Lectura.** (1) Las tres vías cumplen RNF-02 con holgura (p95 máximo 157 ms, en el pack de 60). (2) El tiempo del pack de 1 (194 s) **no**
+es latencia: lo fija el ritmo de una trama por segundo por dispositivo (190 POST con los repetidos); para enviar muchas lecturas por HTTP el
+emisor debe agruparlas, y el pack de 60 termina en 5,6 s. (3) En un pack, `recibido_en` es una sola hora para toda la trama: la latencia
+crece con el tamaño (procesar 60 lecturas en una trama), y el p50 del pack de 60 sale de solo 3 tramas. (4) La memoria del backend no se
+mueve con ninguna vía a este ritmo (59–61 MiB de 512 MiB de techo).
+
+**Corridas previas y lo que corrigieron del guion** (no del sistema). Primera: 25/28. Por HTTP, el guion medía la espera del ritmo dentro
+de la latencia (armaba el pack antes de esperar: p50 ≈ 1 050 ms) y espaciaba los POST 1,05 s desde el **inicio** del anterior, que no basta:
+el backend anota la trama al procesarla, y 30 POST recibieron 429 (10 lecturas se perdieron porque el guion dejaba de reintentar tras 20 rechazos). Ahora espera 1 s
+desde la respuesta anterior y arma el pack después. En la pasarela, la marca `time` salía corrida hasta 0,9 s: en este equipo `date` es la
+versión de uutils (0.10.0), que lee mal las fracciones con ceros a la izquierda (`date -d @…698.011` da …698,110); el guion toma ahora la hora
+de `EPOCHREALTIME` de bash. Segunda: 27/28; con horas relativas a cada pack, un instante partido entre dos packs (10 no es múltiplo de 3)
+quedaba antes que el anterior y la secuencia por canal no coincidía; las horas de los instantes van ahora en una línea fija.
+
+**Lo que no cubre.** (1) Red real y TLS: todo corre en el banco, directo a 1884 y 3001, sin el proxy ni la red del campus; la latencia
+medida es la del sistema en el equipo, no la de un enlace. (2) Una sola corrida medida por vía y a ritmo bajo (1 trama por segundo por
+emisor): no es una prueba de carga (esa es §10). (3) La pasarela se emula con `mosquitto_pub`, sin la UG65 ni el aire LoRa. (4) `docker stats`
+muestrea cada 5 s y tarda en responder: el pack de 60 (5,6 s) tiene una sola muestra, y un pico más breve que el intervalo no se ve.
+(5) El ritmo de una trama por segundo es solo de HTTP; en MQTT y en la pasarela el mismo emisor podría enviar más rápido.
+
+**Qué mide la latencia y qué no:** `recibido_en − marca de la trama` es el tramo envío → recepción confirmada en la base. RNF-02 habla de
+recepción → disponible para consulta; ese tramo (la consulta misma) se mide aparte (§3 y §25) y aquí no se suma. Las tres vías cumplen el
+tope de 2 s en el tramo medido.

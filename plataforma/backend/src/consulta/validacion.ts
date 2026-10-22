@@ -25,8 +25,15 @@ export function uuid(valor: unknown, nombre = 'id'): string {
 export function fecha(valor: unknown, porDefecto: Date, nombre: string): Date {
   const v = texto(valor, nombre);
   if (v === undefined) return porDefecto;
+  // Solo ISO 8601 con fecha completa: JavaScript también acepta «2026/02/30» o «Feb 30 2026» y los corre al 2 de marzo sin avisar;
+  // una hora 24:00 la mueve al día siguiente. Lo que no tenga esta forma es 400, aunque new Date() lo entendiera.
+  if (!/^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2}))?$/.test(v) || /T24:/.test(v)) throw new BadRequestException(`${nombre} debe ser una fecha ISO 8601`);
   const d = new Date(v);
   if (Number.isNaN(d.getTime())) throw new BadRequestException(`${nombre} debe ser una fecha ISO 8601`);
+  // Un día que no existe (2026-02-30) pasa el análisis: JavaScript lo corre al 2 de marzo sin avisar. La parte de fecha se valida
+  // de ida y vuelta (docs/13, regla 16; lección del 22/10/2026): construida al mediodía UTC debe volver igual.
+  const ymd = /^(\d{4}-\d{2}-\d{2})/.exec(v)?.[1];
+  if (ymd && new Date(`${ymd}T12:00:00Z`).toISOString().slice(0, 10) !== ymd) throw new BadRequestException(`${nombre}: el día ${ymd} no existe`);
   return d;
 }
 

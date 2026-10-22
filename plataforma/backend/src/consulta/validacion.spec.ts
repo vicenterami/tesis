@@ -24,5 +24,9 @@ describe('validacion: parámetros de consulta', () => {
     expect(fecha(undefined, d, 'desde')).toBe(d);
     expect(fecha('2026-10-12T15:00:00Z', d, 'desde').toISOString()).toBe('2026-10-12T15:00:00.000Z');
     for (const v of ['ayer', ['2026-10-12']]) expect(() => fecha(v, d, 'desde')).toThrow(BadRequestException);
+    // un día que no existe: JavaScript lo correría al 2 de marzo sin avisar; la validación de ida y vuelta lo rechaza (22/10)
+    expect(() => fecha('2026-02-30T12:00:00Z', d, 'desde')).toThrow(/no existe/);
+    expect(fecha('2028-02-29T00:00:00Z', d, 'desde').toISOString()).toBe('2028-02-29T00:00:00.000Z'); // bisiesto real: pasa
+    for (const v of ['2026/02/30', 'Feb 30 2026', '2026-01-01T24:00:00Z', '+010000-01-01T00:00:00Z']) expect(() => fecha(v, d, 'desde')).toThrow(BadRequestException); // formas que JavaScript entiende y corre
   });
 });

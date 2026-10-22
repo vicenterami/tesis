@@ -12,6 +12,8 @@
 #   bash plataforma/pruebas/banco/banco.sh migraciones         reaplica las migraciones 02 a la última y exige el mismo esquema y catálogo (idempotencia; corre al final de «encender»)
 #   bash plataforma/pruebas/banco/banco.sh puente [ip]         puente de Mosquitto como el de la red del campus: su broker reenvía el tópico nativo por TLS al proxy → medicion
 #                                                              (con «ip», por dirección IP, como en la red del campus: certificado con CA_IP_EXTRA y proxy publicado solo en esa IP)
+#   bash plataforma/pruebas/banco/banco.sh consultable         para cada dispositivo: inventario → ficha → histórico (4 rangos) → exportar → condiciones → cuarentena (docs/16 §48)
+#   bash plataforma/pruebas/banco/banco.sh vias                la misma serie por MQTT, HTTP (packs de 1, 10 y 60) y pasarela: pérdidas, duplicados, latencia y consumo del backend (docs/16 §49)
 #   bash plataforma/pruebas/banco/banco.sh http                recepción por HTTP (HU-01): 202, 401, 413, 415, 422 con cuarentena, la baja, los topes (par, dirección, caché, ritmo) y la dirección con el secreto del proxy
 #   bash plataforma/pruebas/banco/banco.sh tope                tope por emisor en las dos vías (docs/10 §8.4 punto 53): presupuesto de lecturas por HTTP y cuota de cuarentena por MQTT
 #   bash plataforma/pruebas/banco/banco.sh nodo                contrato del nodo ESP32 (fase 2, docs/17 §6.2) sin la placa: alta con seis canales, calibración, el pack del firmware con QoS 1 → medicion y ficha
@@ -199,6 +201,8 @@ case "${1:-}" in
     code=$(curl -s -m 5 -o /dev/null -w '%{http_code}' http://localhost:8081/)
     [ "$code" = 301 ] && echo "OK    el 80 redirige a HTTPS el nombre propio" || { echo "FALLA el 80 respondió $code al nombre propio (esperado 301)"; fallos=$((fallos+1)); }
     echo "── registro del proxy (JSON, una línea por petición/conexión):"; dcp logs --no-color --since 2m proxy 2>/dev/null | grep -oE '\{.*\}' | head -3
+    # Límites por dirección (docs/11 §3, docs/16 §47): plantando la violación y comprobando lo legítimo; ≈ 60 s, con set -e por dentro
+    bash "$(dirname "$YO")/proxy-limites.sh" || fallos=$((fallos+1))
     echo; [ $fallos -eq 0 ] && echo "PROXY OK" || { echo "$fallos comprobación(es) con falla"; exit 1; } ;;
   alta)
     # Alta por API de punta a punta (HU-11; docs/10 §3 y §8.4 puntos 41 y 42; docs/16 §20): POST con la clave de administrador
@@ -342,7 +346,7 @@ case "${1:-}" in
     # ── Milesight con códec (ruta B) ──
     mid="ug63-banco-$n"; r=$(api POST /pasarelas -d "{\"id_fisico\":\"$mid\",\"nombre\":\"UG63 del banco\",\"sitio_id\":\"$sitio_id\",\"formato\":\"milesight\"}")
     code=${r##*$'\n'}; body=${r%$'\n'*}; MCRED=$(json "v['conexion']['credencial']" <<<"$body"); mpas=$(json "v['id']" <<<"$body")
-    [ "$code" = 201 ] && [ "$(json "v['conexion']['plantillas']['uplink']" <<<"$body")" = "sitio/$sitio/pasarela/$mid/\$devEUI/up" ] && ok "POST /pasarelas (milesight) → 201 con el tópico del uplink con \$devEUI" || falla "pasarela milesight → $code"
+    [ "$code" = 201 ] && [ "$(json "v['conexion']['plantillas']['uplink']" <<<"$body")" = "sitio/$sitio/pasarela/$mid/\$deveui/up" ] && ok "POST /pasarelas (milesight) → 201 con el tópico del uplink con \$deveui (en minúsculas: la UG65 publica \$devEUI literal, docs/16 §45)" || falla "pasarela milesight → $code"
     mdev=$(openssl rand -hex 8); r=$(api POST /dispositivos -d "{\"id_fisico\":\"$mdev\",\"nombre\":\"EM300 del banco\",\"zona_id\":\"$zona\",\"via\":\"lorawan\",\"pasarela_id\":\"$mpas\",\"intervalo_esperado_s\":180,\"canales\":[{\"magnitud\":\"temperatura\"},{\"magnitud\":\"humedad\"},{\"magnitud\":\"bateria\"}]}")
     r=$(pub "$mid" "$MCRED" "sitio/$sitio/pasarela/$mid/$mdev/up" "{\"devEUI\":\"$mdev\",\"deviceName\":\"EM300\",\"applicationID\":\"1\",\"battery\":92,\"temperature\":30.8,\"humidity\":50.5}"); sleep 2
     r=$(psql_ -tA -c "SELECT count(*) || ' ' || string_agg(DISTINCT m.origen_tiempo, ',') FROM medicion m JOIN canal c ON c.id=m.canal_id JOIN dispositivo d ON d.id=c.dispositivo_id WHERE d.id_fisico='$mdev'")
@@ -385,6 +389,21 @@ case "${1:-}" in
     r=$(pub "$mid" "$MCRED" "$nativo" "$(sincodec AgAAAI8HGBmY 144 "$t3")"); c=$(esperar_cuarentena "$nativo" 'malformada*10 bytes*'); visto1=$(visto "$udev")
     # El ayudante recorta el detalle a 90 caracteres: «…llegaron 9» queda fuera; el texto entero lo prueba lorawan.spec.ts.
     [[ "$c" == malformada*"se esperaban 10 bytes"* ]] && [ "$visto0" != "$visto1" ] && ok "una data de 9 bytes → malformada que lo dice, y el nodo vivo (su DevEUI se verificó)" || falla "data corta: «$c» · visto $visto0 → $visto1"
+    # ── Reloj de la pasarela desviado (docs/10 §8.4 punto 54; docs/13 regla 18; docs/16 §46) ──
+    # La UG65 del campus llegó con el reloj 4 días atrasado (20/10): una marca de pasarela a más de 10 min de la llegada se reemplaza por la
+    # hora de recepción y abre reloj_desviado del nodo, con la pasarela y el desvío; la primera marca plausible la cierra.
+    reloj() { psql_ -tA -c "SELECT count(*) FILTER (WHERE co.cerrada_en IS NULL) || ' ' || count(*) FILTER (WHERE co.cerrada_en IS NOT NULL) FROM condicion co JOIN dispositivo d ON d.id = co.dispositivo_id WHERE d.id_fisico = '$udev' AND co.tipo = 'reloj_desviado'"; }
+    recientes() { psql_ -tA -c "SELECT count(*) || ' ' || coalesce(string_agg(DISTINCT m.origen_tiempo, ','), '-') FROM medicion m JOIN canal c ON c.id=m.canal_id JOIN dispositivo d ON d.id=c.dispositivo_id WHERE d.id_fisico='$udev' AND m.recibido_en >= '$t0'::timestamptz"; }   # desde que se publicó la trama (t0), no una ventana deslizante que una máquina lenta puede perder
+    t_atras=$(date -u -d '-4 days' +%Y-%m-%dT%H:%M:%S.000000Z)
+    t0=$(date -u +%Y-%m-%dT%H:%M:%S.%6NZ); r=$(pub "$mid" "$MCRED" "$nativo" "$(sincodec AgAAAJAHMBmYsA== 145 "$t_atras")"); sleep 2
+    a=$(recientes); e=$(reloj)
+    d=$(psql_ -tA -c "SELECT (ev.detalle->>'desvio_s') || ' ' || (ev.detalle->>'pasarela') || ' ' || left(ev.detalle->>'marca_pasarela', 19) FROM evento ev JOIN dispositivo dd ON dd.id = ev.dispositivo_id WHERE dd.id_fisico = '$udev' AND ev.tipo = 'condicion_abierta' AND ev.detalle->>'tipo' = 'reloj_desviado' ORDER BY ev.ocurrido_en DESC LIMIT 1")
+    ds=${d%% *}
+    [ "$a" = "3 recepcion" ] && [ "$e" = "1 0" ] && [ "${ds:-0}" -le -345590 ] && [ "${ds:-0}" -ge -345610 ] && [[ "$d" == *" $mid ${t_atras:0:19}" ]] && ok "marca de pasarela 4 días atrasada → 3 lecturas fechadas por la recepción y reloj_desviado abierta (desvío $ds s, la pasarela y la marca en el evento)" || falla "reloj atrasado: lecturas «$a» · condición abierta/cerrada «$e» · evento «$d»"
+    sleep 3.1   # el ritmo por emisor admite una trama aceptada por segundo (docs/10 §8.4 punto 52 e); con menos, la segunda se rechazaría
+    t0=$(date -u +%Y-%m-%dT%H:%M:%S.%6NZ); r=$(pub "$mid" "$MCRED" "$nativo" "$(sincodec AgAAAJAHMBmYsA== 146 "$(date -u +%Y-%m-%dT%H:%M:%S.000000Z)")"); sleep 2
+    a=$(recientes); e=$(reloj)
+    [ "$a" = "3 pasarela" ] && [ "$e" = "0 1" ] && ok "con la hora de la pasarela corregida → 3 lecturas con su marca (origen pasarela) y reloj_desviado cerrada sola" || falla "reloj corregido: lecturas «$a» · condición abierta/cerrada «$e»"
     # ── Mensajes retenidos (docs/10 §8.4 punto 50): en vivo se procesan una vez; la copia que el broker reentrega al suscribirse, no ──
     mdev2=$(openssl rand -hex 8); r=$(api POST /dispositivos -d "{\"id_fisico\":\"$mdev2\",\"nombre\":\"EM300 retenido\",\"zona_id\":\"$zona\",\"via\":\"lorawan\",\"pasarela_id\":\"$mpas\",\"intervalo_esperado_s\":180,\"canales\":[{\"magnitud\":\"temperatura\"}]}")
     n0=$(lecturas "$mdev"); r=$(pub_r "$mid" "$MCRED" "sitio/$sitio/pasarela/$mid/$mdev/up" "{\"devEUI\":\"$mdev\",\"temperature\":25.5}"); sleep 2; n1=$(lecturas "$mdev")
@@ -747,6 +766,8 @@ case "${1:-}" in
     [ "$abrio" = broker_descarte ] && [ -z "$abierta" ] && ok "se cerró sola al vaciarse la cola sin descartes nuevos (dos muestras normales)" || falla "no se cerró sola (abrió: «${abrio:-no}», ahora: «$abierta»)"
     n=$(psql_ -tA -c "SELECT count(*) FROM condicion_sistema WHERE tipo='broker_descarte' AND cerrada_en IS NOT NULL" | tr -d '[:space:]'); [ "$n" -ge 1 ] && ok "condicion_sistema: cerrada_en escrito y evento de cierre" || falla "cierre en la base: $n"
     echo; [ $fallos -eq 0 ] && echo "COLA OK" || { echo "$fallos comprobación(es) con falla"; exit 1; } ;;
+  consultable) bash "$(dirname "$YO")/consultable.sh" http://127.0.0.1:3001 ;;   # docs/16 §48: todo dispositivo del banco es consultable de punta a punta
+  vias) bash "$(dirname "$YO")/vias.sh" ;;   # docs/16 §49: la misma serie por las tres vías; mide pérdidas, duplicados, latencia y consumo
   apagar) dcp down 2>/dev/null || dc down; rm -f "$ENV" ;;
-  *) sed -n 2,12p "$YO"; exit 2 ;;
+  *) sed -n '2,/^[^#]/p' "$YO" | grep '^#'; exit 2 ;;   # toda la ayuda del encabezado, no solo las primeras líneas
 esac

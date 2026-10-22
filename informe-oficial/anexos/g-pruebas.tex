@@ -4,7 +4,7 @@
 \setlength{\tabcolsep}{4pt}
 
 Cada fila resume una sección de la documentación de pruebas del repositorio (\texttt{docs/16}; la columna «§» da su
-número), con su resultado y el comando que la repite. Los guiones viven en \texttt{plataforma/pruebas/}; las 324 pruebas unitarias del backend y las 52 del panel corren con \texttt{pnpm verificar} y el verificador de concordancia con \texttt{verificar-todo.sh}.
+número), con su resultado y el comando que la repite. Los guiones viven en \texttt{plataforma/pruebas/}; las 338 pruebas unitarias del backend y las 53 del panel corren con \texttt{pnpm verificar} y el verificador de concordancia con \texttt{verificar-todo.sh}.
 
 \begin{longtable}{@{}L{0.8cm}L{3.2cm}L{4.2cm}L{3.8cm}@{}}
 \caption{Pruebas de la Etapa 3: qué se probó, qué resultó y cómo se repite.}\label{tab:pruebas-detalle}\\
@@ -28,10 +28,14 @@ número), con su resultado y el comando que la repite. Los guiones viven en \tex
 24 & Mínimo privilegio de la aplicación en la base (13/10) & No puede borrar, vaciar ni cambiar el esquema, y el sistema funciona igual & {\footnotesize \texttt{base-rol-app.sh}} \\
 25 & Costo del canal en vivo (14/10) & 50 flujos abiertos: entre 5 y 8~MiB más de memoria & a mano \\
 26 & Bloqueo de fila en la baja y la rotación (15/10) & La recepción podía esperar hasta 5~s (medido con un tope de 1~s: 1\,019~ms); con el bloqueo más débil, 18 a 22~ms & {\footnotesize \texttt{medir-bloqueo-fila.sh}} \\
-27--34\newline y 36 & LoRaWAN: formato declarado, adaptadores, pasarelas por API, rutas B y C (15/10); perfil de decodificación y contador de trama (16/10) & JSON de la documentación oficial de ChirpStack v4 (ruta C) y de la pasarela Milesight (ruta B), y la forma de la captura de la pasarela del campus, con identificadores sintéticos: 44 de 44 comprobaciones; las fallas plantadas se detectan & {\footnotesize \texttt{banco.sh lorawan}, \texttt{lorawan.spec.ts}} \\
+27--34\newline y 36 & LoRaWAN: formato declarado, adaptadores, pasarelas por API, rutas B y C (15/10); perfil de decodificación y contador de trama (16/10) & JSON de la documentación oficial de ChirpStack v4 (ruta C) y de la pasarela Milesight (ruta B), y la forma de la captura de la pasarela del campus, con identificadores sintéticos: 46 de 46 comprobaciones; las fallas plantadas se detectan & {\footnotesize \texttt{banco.sh lorawan}, \texttt{lorawan.spec.ts}} \\
 41 & Recepción por HTTP (16/10) & 202, 401 igual para todo motivo, 413, 415, 422 y 429; bloqueo a los 5 fallos; la vía MQTT sin cambios; las fallas plantadas se detectan & {\footnotesize \texttt{banco.sh http}, pruebas de \texttt{recepcion/http}} \\
 42 & Topes y revisión del día anterior (17/10) & Tope por emisor (HTTP y MQTT en el banco; la vía de pasarela, el contador de trama 0 y el ausente, en unitarias): 601 lecturas contra 600 → 422, cuarentena y condición; 62 tramas malformadas → 60 guardadas y 2 contadas; en HTTP, caché de verificaciones, bloqueo por par y por dirección, secreto del proxy & {\footnotesize \texttt{banco.sh tope}, \texttt{banco.sh http}} \\
 43 & Nodo propio, fase 1 (18--19/10) & Los tres sensores responden con hardware real: BME280 (0x76), DS18B20 (12 bits), suelo 2205 mV al aire y $\approx$ 1170 mV en agua; cristal 40 MHz & {\footnotesize \texttt{pio run -e diagnostico -t upload}} \\
 44 & Nodo propio, fase 2 (19/10) & El firmware \texttt{nodo} compila y su contrato pasa en el banco sin la placa: alta con seis canales, pack SenML con QoS 1 → seis mediciones, porcentaje del suelo en la ficha, sin \texttt{bt} → hora de recepción, sensor omitido → cinco & {\footnotesize \texttt{banco.sh nodo}} \\
 45 & Prueba de campo LoRaWAN (20/10) & Pasarela Milesight real con TLS y credencial por API; dos nodos de punta a punta (810 mediciones en 3 h); cuarentena ante tópico mal formado; reloj de la pasarela visible; \texttt{sin\_comunicacion} abierta y cerrada sola & {\footnotesize en terreno} \\
+46 & Tolerancia de desvío de la marca de pasarela (22/10) & 14 unitarias nuevas; banco LoRaWAN 46 de 46 con el reloj cuatro días atrás y su corrección & \texttt{banco.sh lorawan} \\
+47 & Límite de tasa por dirección en el proxy (22/10) & 22 de 22 plantando cada violación: 429 en ráfaga, administración y mayúsculas; sesión 101 y flujo 21 cortados & \texttt{banco.sh proxy} \\
+48 & Todo dispositivo consultable de punta a punta (22/10) & 104 de 104 en la pila; 757 de 757 en el banco & \texttt{banco.sh consultable} \\
+49 & La misma serie por las tres vías: pérdidas, duplicados, latencia y consumo (22/10) & 28 de 28: 0 perdidas y 0 filas de más en 5 emisores; p95 de 4 a 157~ms; backend $\leq$ 60,8~MiB & \texttt{banco.sh vias} \\
 \end{longtable}

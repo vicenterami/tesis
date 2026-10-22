@@ -29,7 +29,7 @@ el modelo de datos.
 |---|---|---|
 | **Inactivo** | `estado` es `mantenimiento` o `baja` | Nadie espera datos de él; no genera alertas (RF-22) |
 | **Sin señal** | hay una condición `sin_comunicacion` abierta, o `en_linea` es falso | Dejó de reportar más allá de su intervalo esperado (RF-24) |
-| **Alerta** | hay una condición abierta de tipo `umbral`, `bateria`, `manipulacion` o `tope_superado` (manda más de lo que cabe en su hora, `docs/10 §8.4` punto 53) | Reporta, pero algo está fuera de lo normal |
+| **Alerta** | hay una condición abierta de tipo `umbral`, `bateria`, `manipulacion`, `tope_superado` (manda más de lo que cabe en su hora, `docs/10 §8.4` punto 53) o `reloj_desviado` («Reloj de pasarela desviado»: los datos siguen entrando, pero fechados por la recepción, `docs/10 §8.4` punto 54) | Reporta, pero algo está fuera de lo normal |
 | **Normal** | ninguna de las anteriores | Reporta a tiempo y dentro de rango |
 
 `en_linea` lo trae la API, pero el panel lo recalcula con la misma regla (visto dentro de 2 × intervalo esperado) para que cambie

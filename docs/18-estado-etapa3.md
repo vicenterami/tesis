@@ -11,14 +11,14 @@
 |---|---|---|---|
 | Retroalimentación | 20 % | 🟡 | Al 15/10 no hay observaciones escritas del profesor guía sobre la entrega del 2/10; se le pedirán en una reunión presencial la semana del 20/10. Sí se incorporó la entrevista del 5/10 (`bitacora/2026-10-05-entrevista-academico-geologia.md`) en las decisiones del 6 y del 8/10 (`docs/10 §8.4`). Falta: recibir e incorporar la retroalimentación de la Etapa 2. |
 | Mejoras | 15 % | 🟢 | Decisiones de diseño del 6, 7 y 8/10 (`docs/10 §8.4`); proxy TLS (`docs/16 §9`); dependencias e imágenes sin vulnerabilidades altas o críticas corregibles (`docs/16 §12`). |
-| 50 % de la implementación | 10 % | 🟡 | Núcleo: 22 de 34 elementos hechos (110 de 168 h, 65 %) y 7 parciales (36 h: HU-02, HU-08, HU-19, TT-12, TT-22, TT-32 y TT-33). Todo el backlog: 33 de 65 (144 de 285 h, 51 %) y 15 parciales (67 h). Cifras calculadas desde las filas de `docs/04`, con los estados de `docs/12 §3`, de §2 y de la Etapa 1 (al final de §2). |
-| Pruebas iniciales | 30 % | 🟢 | `docs/16`: emulador, carga (59,7 tramas/s sin pérdida), carreras, TLS, capacidad y picos, caídas con carga, dependencias e imágenes, LoRaWAN por pasarela en el banco (`docs/16 §31–§34`); 324 pruebas unitarias del backend y 52 del panel. Falta: la matriz formal del contrato de trama (TT-27) y el broker de producción en las caídas (`docs/16 §11`). |
+| 50 % de la implementación | 10 % | 🟡 | Núcleo: 22 de 34 elementos hechos (110 de 168 h, 65 %) y 7 parciales (36 h: HU-02, HU-08, HU-19, TT-12, TT-22, TT-32 y TT-33). Todo el backlog: 34 de 66 (146 de 287 h, 51 %) y 15 parciales (67 h). Cifras calculadas desde las filas de `docs/04`, con los estados de `docs/12 §3`, de §2 y de la Etapa 1 (al final de §2). |
+| Pruebas iniciales | 30 % | 🟢 | `docs/16`: emulador, carga (59,7 tramas/s sin pérdida), carreras, TLS, capacidad y picos, caídas con carga, dependencias e imágenes, LoRaWAN por pasarela en el banco (`docs/16 §31–§34`); 338 pruebas unitarias del backend y 53 del panel. Falta: la matriz formal del contrato de trama (TT-27) y el broker de producción en las caídas (`docs/16 §11`). |
 | Validación preliminar | 10 % | 🟡 | Sensor físico de extremo a extremo (TT-32): todas las piezas llegaron el 13/10, la placa se reconoció el 14/10 y la fase 1 se cerró el 19/10 con los tres sensores verificados (`docs/16 §43`); falta la fase 2: publicar hasta el panel; guía de manejo seguro escrita (`docs/17 §4`). **Validación en terreno hecha el 20/10: red LoRaWAN real del campus publicando en el sistema (`docs/16 §45`).** |
 | Documentación | 15 % | 🟡 | Documentos en concordancia (guardián `plataforma/pruebas/verificar-todo.sh`). El 15/10 el informe ganó el capítulo «Implementación y pruebas iniciales» y el anexo con el detalle de las pruebas (TT-36); falta incorporar la retroalimentación de la Etapa 2 y la revisión de entrega. |
 
-## 2. Tareas de la Etapa 3: 16 elementos, 86 h (tras el corte del 08/10 y los adelantos del 12/10, §3)
+## 2. Tareas de la Etapa 3: 17 elementos, 88 h (tras el corte del 08/10 y los adelantos del 12/10, §3)
 
-**Hechos: 10 (55 h) · parciales: 6 (31 h) · pendientes: 0 (0 h).**
+**Hechos: 11 (57 h) · parciales: 6 (31 h) · pendientes: 0 (0 h).**
 
 | Ítem | Tarea | h | Estado | Evidencia o lo que falta |
 |---|---|---|---|---|
@@ -38,6 +38,7 @@
 | TT-28 🎯 | Emulador de nodos | 5 | ✅ | `docs/16 §2`. |
 | TT-32 🎯 | Sensor físico de extremo a extremo | 3 | 🟡 | Fase 0 el 14/10 (`docs/17 §3`) y fase 1 cerrada el 19/10: los tres sensores miden con hardware real y el suelo quedó calibrado (`docs/16 §43`). Falta la fase 2: publicar por MQTT con TLS hasta el panel (diseño en `docs/17 §6.2`; el firmware `nodo` compila y su contrato está probado en el banco, `docs/16 §44`). |
 | TT-36 | Informe de pruebas y validación preliminar | 5 | 🟡 | `docs/16` y, desde el 15/10, el capítulo 5 del informe con el anexo de pruebas; falta la versión de entrega (retroalimentación de la Etapa 2; sensor físico y prueba en terreno si llegan a tiempo). |
+| TT-41 | Diseño del despliegue en Kubernetes | 2 | ✅ | Hecho el 22/10: `docs/14 §6` (equivalencias Compose → k3s, estado por pieza, opción B con suscripciones compartidas y respaldos); la implementación espera un clúster (M7). |
 
 
 **Pasadas a la Etapa 4 el 08/10** (§3): HU-06 Umbrales por dispositivo (4 h, 🟡); HU-12 Agrupar por sitio y zona (3 h,
