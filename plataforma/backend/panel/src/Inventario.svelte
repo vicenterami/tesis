@@ -1,13 +1,17 @@
 <script lang="ts">
   // Pantalla P2 (docs/19 §4): inventario con semáforo (HU-19) y filtros (HU-20). Datos: GET /dispositivos y
   // GET /condiciones?abiertas=true; se actualiza con el canal en vivo sin repedir el inventario.
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { LIMITE_ABIERTAS, URL_ABIERTAS, mensajeError, obtener } from './lib/api';
   import { compararAtencion, conteoPorEstado, enLinea, estadoVisual, ORDEN_ATENCION, ROTULO, type EstadoVisual } from './lib/estado-visual';
   import type { Condicion, DispositivoInventario, EventoVivo, TipoCondicion } from './lib/modelo';
   import { haceCuanto, horaLocal } from './lib/tiempo';
   import { RECONECTADO, abrirCanal, type EstadoCanal } from './lib/vivo';
   import { antirrebote, porLotes } from './lib/antirrebote';
+  import { SIN_FILTROS, fragmentoInventario, type FiltrosInventario } from './lib/vista';
+
+  // filtros: la vista inicial que trae la URL (docs/19 §4, incremento 1, punto 1); alCambiarVista la escribe (App.svelte).
+  let { filtros = SIN_FILTROS, alCambiarVista = () => {} }: { filtros?: FiltrosInventario; alCambiarVista?: (fragmento: string) => void } = $props();
 
   let dispositivos = $state<DispositivoInventario[]>([]);
   let abiertas = $state<Condicion[]>([]);
@@ -16,11 +20,13 @@
   let ahora = $state(new Date());
   let canal = $state<EstadoCanal>('conectando');
   let motivoCanal = $state<string | undefined>(undefined);
-  let filtroEstado = $state<EstadoVisual | null>(null);
-  let filtroSitio = $state(''); // código del sitio
-  let filtroZona = $state(''); // id de la zona
-  let filtroVia = $state('');
-  let busqueda = $state('');
+  // Estado inicial desde la URL (se lee una vez; los cambios posteriores los aplica el efecto de más abajo).
+  const inicial = untrack(() => filtros);
+  let filtroEstado = $state<EstadoVisual | null>(inicial.estado);
+  let filtroSitio = $state(inicial.sitio); // código del sitio
+  let filtroZona = $state(inicial.zona); // id de la zona
+  let filtroVia = $state(inicial.via);
+  let busqueda = $state(inicial.q);
 
   const tiposPorDispositivo = $derived.by(() => {
     const m = new Map<string, TipoCondicion[]>();
@@ -52,10 +58,32 @@
   );
   // Si se cambia de sitio y la zona elegida no es de ese sitio, la zona vuelve a «todas»; y si el sitio elegido ya no está en el
   // inventario (se recargó al reconectar), el sitio también: un filtro sin su control a la vista ocultaría filas sin aviso.
+  // Solo con el inventario cargado: antes, la lista de sitios está vacía y borraría el sitio o la zona que trae la URL.
   $effect(() => {
+    if (!cargado) return;
     if (filtroSitio !== '' && !sitios.some((s) => s.codigo === filtroSitio)) filtroSitio = '';
     if (filtroZona !== '' && !zonas.some((z) => z.id === filtroZona)) filtroZona = '';
+    if (filtroVia !== '' && !vias.includes(filtroVia)) filtroVia = ''; // una vía que no está en el inventario (URL ajena) tampoco se queda sin su control a la vista
   });
+  // Los filtros van a la URL con replaceState (App.svelte), una vez cargado (y depurado) el inventario.
+  $effect(() => {
+    const f = { estado: filtroEstado, sitio: filtroSitio, zona: filtroZona, via: filtroVia, q: busqueda };
+    if (!cargado) return;
+    untrack(() => alCambiarVista(fragmentoInventario(f))); // sin depender de las props (vienen de la URL); ver Ficha.svelte
+  });
+  // La URL cambió desde fuera (atrás, un enlace): se reaplica; si es la que escribió esta pantalla, no cambia nada.
+  $effect(() => {
+    const f = filtros;
+    untrack(() => {
+      if (filtroEstado !== f.estado) filtroEstado = f.estado;
+      if (filtroSitio !== f.sitio) filtroSitio = f.sitio;
+      if (filtroZona !== f.zona) filtroZona = f.zona;
+      if (filtroVia !== f.via) filtroVia = f.via;
+      if (busqueda !== f.q) busqueda = f.q;
+    });
+  });
+  // Reloj de pasarela desviado (punto 4): la condición abierta de cada dispositivo, para decirlo en palabras en su fila.
+  const relojPorDispositivo = $derived(new Map(abiertas.filter((c) => c.tipo === 'reloj_desviado').map((c) => [c.dispositivo_id, c])));
   const vias = $derived([...new Set(dispositivos.map((d) => d.via))].sort());
   const visibles = $derived(
     filas.filter((f) => {
@@ -176,7 +204,13 @@
       <tbody>
         {#each visibles as f (f.d.id)}
           <tr data-estado={f.estado} data-id={f.d.id}>
-            <td><span class="estado {f.estado}">{ROTULO[f.estado]}</span></td>
+            <td>
+              <span class="estado {f.estado}">{ROTULO[f.estado]}</span>
+              {#if relojPorDispositivo.has(f.d.id)}
+                {@const r = relojPorDispositivo.get(f.d.id)!}
+                <span class="vivo" data-reloj-desviado>Reloj de pasarela desviado: las mediciones se fechan al llegar · <span title={horaLocal(r.abierta_en, f.d.zona_horaria)}>{haceCuanto(r.abierta_en, ahora)}</span></span>
+              {/if}
+            </td>
             <td><a href={`#/dispositivos/${f.d.id}`}>{f.d.nombre}</a></td>
             <td><code>{f.d.id_fisico}</code></td>
             <td>{f.d.via}</td>

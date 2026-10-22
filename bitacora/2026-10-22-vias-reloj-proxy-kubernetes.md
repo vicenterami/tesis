@@ -39,10 +39,25 @@ en verde y el cuerpo del informe (sin anexos) en las 30 páginas que fija la pau
   proxy, `libexpat` en la base), sumadas a sus listas; `docs/16 §12`. De paso, la API rechaza un día que no existe (`2026-02-30`),
   que JavaScript corría al 2 de marzo sin avisar: validación de ida y vuelta, con prueba.
 
+- **Primer incremento del panel** (`docs/19 §4`, «Incremento 1 de P2 y P3»; `docs/16 §50`), diseñado después de comparar con citas
+  oficiales qué hacen ThingsBoard, OpenRemote, Magistrala y Milesight IoT Cloud en tres problemas que la prueba de campo dejó a la vista:
+  la vista vive en la URL y se restaura al volver o compartir el enlace; un rango sin datos lo dice y lleva a la última medición con un
+  clic (nunca amplía el rango solo); la ficha muestra el intervalo observado junto al esperado (`intervalo_observado_s`, mediana de las
+  últimas 20 tramas: el nodo de campo da 17 s frente a 3 min declarados) y avisa cuando difieren por más del doble; el reloj de pasarela
+  desviado se lee en palabras; «en vivo» muestra hace cuánto llegó la última lectura. 342 pruebas del backend y 76 del panel; navegador real
+  9/9 con captura.
+- **Resumen de corrida larga** (`pruebas/corrida-larga.sh`): lecturas por canal, intervalo entre lecturas, huecos, alarmas de silencio y valores
+  mínimo, máximo y último, para la corrida de 24 h del nodo propio, que se hace en el portátil sin servidor.
+
 ## Lo que quedó a la vista
 - La plantilla del alta de pasarelas se corrigió a `$deveui` el 20/10, pero el banco seguía esperando `$devEUI`: la comprobación se actualizó.
 - Una pasarela desviada con varios nodos abre una condición por nodo (el modelo no tiene estado propio de pasarela); si deja de mandar marca,
   la condición abierta no se cierra sola. Ambos límites quedaron escritos en `docs/10` punto 54 y `docs/16 §46`.
+- La revisión de cierre del incremento del panel encontró que el verificador de concordancia forzaba el conteo actual de pruebas del panel
+  también en las secciones fechadas de `docs/16`, y que así se había reescrito la historia («270 del backend y 76 del panel» nunca existió):
+  se restauraron las cifras de cada fecha y el paso 2w4 ahora exige el conteo actual solo en la cabecera y en la última sección, probado
+  plantando un conteo falso. También: la vía de la URL se depura como el sitio y la zona, y el contrato de `intervalo_observado_s` dice
+  «tramas retenidas» en vez de «30 días».
 - La revisión de cierre del bloque dejó tres correcciones de peso: la prueba de «100 sesiones vivas» contaba subprocesos y no apretones TLS
   (rehecha: 99 sesiones, la 100 entra, la 101 se corta y el proxy lo anota); la zona de administración distinguía mayúsculas y Express no
   (`POST /DISPOSITIVOS` la esquivaba); y faltaba un tope de conexiones HTTP y de flujos `/eventos` por dirección (100 y 20). Queda para la

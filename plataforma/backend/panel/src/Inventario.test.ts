@@ -148,6 +148,30 @@ describe('Inventario (P2): semáforo, orden y filtros leídos del DOM', () => {
     const sitio = screen.getByLabelText('Sitio') as HTMLSelectElement;
     expect([...sitio.options].map((o) => o.textContent)).toEqual(['todos', 'Campus (uct)', 'Campus (campus-2)']);
   });
+  it('reloj_desviado abierto (docs/19 §4, incremento 1, punto 4): la fila lo dice en palabras con su hace cuánto, y al cerrarse desaparece sin recargar', async () => {
+    let conReloj: Condicion[] = [{ id: 'c9', tipo: 'reloj_desviado', abierta_en: '2026-10-12T13:00:00Z', cerrada_en: null, duracion_s: 7200, dispositivo_id: '00000000-0000-4000-8000-000000000001', id_fisico: 'dev-0001', dispositivo: 'Invernadero', umbral_alto: null, umbral_bajo: null, magnitud: null }];
+    const oyentes = new Map<string, (ev: MessageEvent) => void>();
+    class Fuente { readyState = 1; onopen: ((e: Event) => void) | null = null; onerror = null; addEventListener(t: string, f: (ev: MessageEvent) => void): void { oyentes.set(t, f); } close(): void {} }
+    vi.stubGlobal('EventSource', Fuente);
+    let inventarios = 0;
+    vi.stubGlobal('fetch', vi.fn(async (ruta: string) => {
+      if (ruta === '/dispositivos') { inventarios++; return new Response(JSON.stringify(dispositivos)); }
+      return new Response(JSON.stringify(ruta.startsWith('/condiciones') ? conReloj : []));
+    }));
+    render(Inventario);
+    await waitFor(() => expect(document.querySelector('[data-reloj-desviado]')).toBeTruthy());
+    const fila = document.querySelector('[data-reloj-desviado]')!.closest('tr')!;
+    expect(fila.getAttribute('data-estado')).toBe('alerta');
+    expect(fila.querySelector('[data-reloj-desviado]')!.textContent!.replace(/\s+/g, ' ').trim()).toBe('Reloj de pasarela desviado: las mediciones se fechan al llegar · hace 2 h');
+    expect(document.querySelectorAll('[data-reloj-desviado]')).toHaveLength(1); // solo en su fila
+    conReloj = [];
+    oyentes.get('condicion')!({ data: JSON.stringify({ dispositivo_id: '00000000-0000-4000-8000-000000000001', condicion: 'reloj_desviado', estado: 'cerrada' }) } as MessageEvent);
+    await vi.advanceTimersByTimeAsync(1000);
+    await waitFor(() => expect(document.querySelector('[data-reloj-desviado]')).toBeNull());
+    expect(document.querySelector('[data-id="00000000-0000-4000-8000-000000000001"]')?.getAttribute('data-estado')).toBe('normal');
+    expect(inventarios).toBe(1); // sin recargar el inventario
+  });
+
   it('sin dispositivos: el vacío explica qué hacer; con error de la API: el mensaje trae la acción', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify([]))));
     render(Inventario);

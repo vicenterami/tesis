@@ -18,6 +18,14 @@ export function rango(clave: ClaveRango) {
   return RANGOS.find((r) => r.clave === clave) ?? RANGOS[1];
 }
 
+// El menor rango cuya ventana (terminando en «ahora») contiene el instante; null si ninguno (más de 30 días: el panel no lo
+// dibuja, docs/19 §4, incremento 1, punto 2). Lo usa el botón «Ver la última medición»: el rango nunca cambia sin clic.
+export function rangoQueContiene(iso: string, ahora: Date): ClaveRango | null {
+  const edad = ahora.getTime() - Date.parse(iso);
+  if (!Number.isFinite(edad)) return null;
+  return RANGOS.find((r) => edad <= r.ms)?.clave ?? null;
+}
+
 // Ventana [desde, hasta) que pide el panel para un rango, terminando en «ahora».
 export function ventana(clave: ClaveRango, ahora: Date): { desde: Date; hasta: Date; intervalo: string } {
   const r = rango(clave);

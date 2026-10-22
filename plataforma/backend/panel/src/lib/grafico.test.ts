@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EJE_TIEMPO, NOMBRES_FECHA, RANGOS, SELLO_LEYENDA, agregarLectura, formatearValor, rotuloIntervalo, seriesDesdeHistorico, urlHistorico, ventana } from './grafico';
+import { EJE_TIEMPO, NOMBRES_FECHA, RANGOS, SELLO_LEYENDA, agregarLectura, formatearValor, rangoQueContiene, rotuloIntervalo, seriesDesdeHistorico, urlHistorico, ventana } from './grafico';
 
 describe('ventana y URL del histórico (docs/19 P3)', () => {
   const ahora = new Date('2026-10-12T15:00:00Z');
@@ -59,5 +59,17 @@ describe('fechas y horas del gráfico en español y 24 h (docs/19 §6)', () => {
   it('ninguna plantilla usa la hora de 12 h ni am/pm', () => {
     const textos = [SELLO_LEYENDA, ...EJE_TIEMPO.flatMap((f) => f.filter((x): x is string => typeof x === 'string'))];
     expect(textos.filter((t) => /\{h\}|\{aa\}|\{AA\}/.test(t))).toEqual([]);
+  });
+});
+
+describe('rangoQueContiene: el menor rango que dibuja la última medición (docs/19 §4, incremento 1, punto 2)', () => {
+  const ahora = new Date('2026-10-12T15:00:00Z');
+  it('elige el menor de la lista cerrada; más de 30 días → ninguno', () => {
+    expect(rangoQueContiene('2026-10-12T14:30:00Z', ahora)).toBe('1h');
+    expect(rangoQueContiene('2026-10-12T10:00:00Z', ahora)).toBe('24h');
+    expect(rangoQueContiene('2026-10-08T15:00:00Z', ahora)).toBe('7d');
+    expect(rangoQueContiene('2026-09-20T15:00:00Z', ahora)).toBe('30d');
+    expect(rangoQueContiene('2026-09-01T15:00:00Z', ahora)).toBeNull();
+    expect(rangoQueContiene('no es fecha', ahora)).toBeNull();
   });
 });

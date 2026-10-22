@@ -283,7 +283,7 @@
     },
     "/dispositivos/{id}": {
       "get": {
-        "description": "Canales con sus reglas de umbral y última medición, y condiciones abiertas.",
+        "description": "Canales con sus reglas de umbral y última medición, y condiciones abiertas. `intervalo_observado_s` (entero o null): mediana, en segundos, de las diferencias entre los instantes de recepción (truncados al segundo) de las últimas 20 tramas del dispositivo; null con menos de 3 instantes o sin tramas retenidas (RETENCION_TRAMA_DIAS, 30 días por defecto). Informa: la alarma de silencio usa `intervalo_esperado_s`.",
         "operationId": "DispositivosController_detalle",
         "parameters": [
           {
@@ -664,7 +664,7 @@
         ]
       },
       "post": {
-        "description": "Crea la pasarela, su credencial (solo el hash en la base) y su cliente del broker con el rol `pasarela`, todo o nada. La respuesta trae, UNA sola vez, la credencial y las plantillas de tópico del formato declarado (ChirpStack: `event_topic` y `command_topic`; Milesight: el tópico del uplink con `$devEUI` y, para mantener el tópico nativo de la pasarela, la línea del puente de Mosquitto en `puente_mosquitto`). Sus nodos se dan de alta con `POST /dispositivos` y `via = lorawan` (con `decodificador` si la pasarela entrega la trama sin decodificar). Exige `X-Clave-Admin`.",
+        "description": "Crea la pasarela, su credencial (solo el hash en la base) y su cliente del broker con el rol `pasarela`, todo o nada. La respuesta trae, UNA sola vez, la credencial y las plantillas de tópico del formato declarado (ChirpStack: `event_topic` y `command_topic`; Milesight: el tópico del uplink con `$deveui` (minúsculas: es lo que la pasarela sustituye) y, para mantener el tópico nativo de la pasarela, la línea del puente de Mosquitto en `puente_mosquitto`). Sus nodos se dan de alta con `POST /dispositivos` y `via = lorawan` (con `decodificador` si la pasarela entrega la trama sin decodificar). Exige `X-Clave-Admin`.",
         "operationId": "PasarelasController_crear",
         "parameters": [
           {

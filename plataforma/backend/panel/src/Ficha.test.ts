@@ -26,7 +26,7 @@ const AHORA = new Date('2026-10-12T15:00:00Z');
 const ficha: DispositivoFicha = {
   id: ID, id_fisico: 'dev-0001', nombre: 'Invernadero', estado: 'activo', via: 'mqtt', formato: 'senml', intervalo_esperado_s: 60,
   visto_por_ultima_vez: '2026-10-12T14:59:30Z', en_linea: true, zona: 'Lab', sitio: 'Campus', zona_horaria: 'America/Santiago', sitio_codigo: 'uct', zona_id: 'z-lab',
-  creado_en: '2026-10-01T12:00:00Z',
+  creado_en: '2026-10-01T12:00:00Z', intervalo_observado_s: 60,
   canales: [
     { id: 'c-temp', magnitud: 'temperatura', magnitud_nombre: 'Temperatura', unidad: 'Cel', etiqueta: null, reglas: [{ id: 'r1', umbral_alto: 30, umbral_bajo: 5, histeresis: 0.5 }], ultima_medicion: { valor: 21.5, tiempo: '2026-10-12T14:59:30Z', porcentaje: null } },
     { id: 'c-hum', magnitud: 'humedad', magnitud_nombre: 'Humedad', unidad: '%RH', etiqueta: 'suelo', reglas: null, ultima_medicion: null },
@@ -203,5 +203,123 @@ describe('Ficha (P3): identidad, canales, gráfico, condiciones y rechazadas, le
     render(Ficha, { id: ID });
     await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('vuelve al inventario'));
     expect(graficos).toHaveLength(0);
+  });
+});
+
+// Incremento 1 (docs/19 §4, puntos 2 a 5), por el DOM y en los dos sentidos.
+describe('Ficha (P3), incremento 1: rango vacío, intervalo observado, reloj de pasarela y «en vivo» con prueba', () => {
+  // La ficha con otra última medición del canal visible y un histórico vacío; el resto, el simulador del beforeEach.
+  function conUltima(tiempo: string | null, extra: Partial<DispositivoFicha> = {}, puntos = 0): void {
+    const f: DispositivoFicha = { ...ficha, ...extra, canales: ficha.canales.map((c) => (c.id === 'c-temp' ? { ...c, ultima_medicion: tiempo === null ? null : { valor: 20, tiempo, porcentaje: null } } : c)) };
+    const base = globalThis.fetch;
+    vi.stubGlobal('fetch', vi.fn(async (ruta: string) => {
+      if (ruta === `/dispositivos/${ID}`) { peticiones.push(ruta); return new Response(JSON.stringify(f)); }
+      if (ruta.startsWith('/canales/c-temp/historico')) {
+        peticiones.push(ruta);
+        return new Response(JSON.stringify(puntos === 0 ? { ...historico, puntos: 0, tiempos: [], valores: [], muestras: [] } : historico));
+      }
+      return base(ruta);
+    }));
+  }
+  const vacio = (): string => document.querySelector('[data-rango-vacio]')?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+
+  it('rango vacío con última medición hace 4 d: lo dice con fecha y hora del sitio, y el botón elige 7 días solo al pulsarlo', async () => {
+    conUltima('2026-10-08T15:00:00Z');
+    render(Ficha, { id: ID });
+    await waitFor(() => expect(document.querySelector('[data-rango-vacio]')).toBeTruthy());
+    expect(vacio()).toContain('Sin mediciones en este rango; la última es de hace 4 d (8 de octubre de 2026, 12:00)');
+    const boton = screen.getByRole('button', { name: 'Ver la última medición' });
+    // Nunca cambia el rango sin clic: sigue en 24 h y no se pidió otro histórico.
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(screen.getByRole('button', { name: '24 horas' }).getAttribute('aria-pressed')).toBe('true');
+    expect(peticiones.filter((p) => p.startsWith('/canales/'))).toHaveLength(1);
+    boton.click();
+    await waitFor(() => expect(screen.getByRole('button', { name: '7 días' }).getAttribute('aria-pressed')).toBe('true'));
+    expect(peticiones.filter((p) => p.startsWith('/canales/')).at(-1)).toContain('intervalo=1+hour');
+  });
+
+  it('con puntos en el rango no aparece ni el texto ni el botón', async () => {
+    conUltima('2026-10-08T15:00:00Z', {}, 2);
+    render(Ficha, { id: ID });
+    await waitFor(() => expect(document.querySelector('[data-historico]')?.textContent).toContain('2 puntos'));
+    expect(document.querySelector('[data-rango-vacio]')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Ver la última medición' })).toBeNull();
+  });
+
+  it('última medición de hace más de 30 días: remite a exportar, sin botón; sin ninguna medición, solo «sin mediciones»', async () => {
+    conUltima('2026-08-01T15:00:00Z');
+    render(Ficha, { id: ID });
+    await waitFor(() => expect(document.querySelector('[data-rango-vacio]')).toBeTruthy());
+    expect(vacio()).toContain('El panel no dibuja más de 30 días: para verla, exporta sus mediciones.');
+    expect(screen.getByRole('link', { name: 'exporta sus mediciones' }).getAttribute('href')).toMatch(new RegExp(`^/dispositivos/${ID}/exportar\\?formato=csv&desde=2026-07-25`));
+    expect(screen.queryByRole('button', { name: 'Ver la última medición' })).toBeNull();
+    cleanup();
+    conUltima(null);
+    render(Ficha, { id: ID });
+    await waitFor(() => expect(vacio()).toBe('Sin mediciones en este rango.'));
+    expect(screen.queryByRole('button', { name: 'Ver la última medición' })).toBeNull();
+  });
+
+  it('intervalo observado junto al esperado, con sus dos avisos, sin aviso dentro de la banda y el caso sin datos', async () => {
+    const casos: [number | null, number, string, string | null][] = [
+      [17, 180, 'reporta cada ≈ 17 s (esperado 3 min)', 'más seguido de lo declarado: revisa el intervalo esperado'],
+      [600, 180, 'reporta cada ≈ 10 min (esperado 3 min)', 'más lento de lo declarado: revisa el intervalo esperado'],
+      [200, 180, 'reporta cada ≈ 3,3 min (esperado 3 min)', null],
+      [null, 180, 'intervalo observado: sin datos suficientes (esperado 3 min)', null],
+    ];
+    for (const [observado, esperado, texto, aviso] of casos) {
+      conUltima('2026-10-12T14:59:30Z', { intervalo_observado_s: observado, intervalo_esperado_s: esperado }, 2);
+      render(Ficha, { id: ID });
+      await waitFor(() => expect(document.querySelector('[data-intervalo]')).toBeTruthy());
+      expect(document.querySelector('[data-intervalo]')!.textContent!.replace(/\s+/g, ' ')).toContain(texto);
+      expect(document.querySelector('[data-aviso-intervalo]')?.textContent ?? null).toBe(aviso);
+      cleanup();
+    }
+  });
+
+  it('la condición reloj_desviado abierta se dice en palabras con su hace cuánto, y al cerrarse desaparece sin recargar', async () => {
+    let reloj: Condicion[] = [{ ...condiciones[1]!, id: 'k3', tipo: 'reloj_desviado', abierta_en: '2026-10-12T14:40:00Z', magnitud: null }];
+    const base = globalThis.fetch;
+    vi.stubGlobal('fetch', vi.fn(async (ruta: string) => (ruta.startsWith('/condiciones?') ? new Response(JSON.stringify(reloj)) : base(ruta))));
+    render(Ficha, { id: ID });
+    await waitFor(() => expect(document.querySelector('[data-reloj-desviado]')).toBeTruthy());
+    expect(document.querySelector('[data-reloj-desviado]')!.textContent!.replace(/\s+/g, ' ').trim()).toBe('Reloj de pasarela desviado: las mediciones se fechan al llegar · hace 20 min');
+    expect(document.querySelector('[data-estado]')?.getAttribute('data-estado')).toBe('alerta');
+    reloj = [{ ...reloj[0]!, cerrada_en: '2026-10-12T15:00:00Z' }];
+    const fuente = FuenteControlable.instancias[0]!;
+    fuente.abrir();
+    fuente.emitir('condicion', { dispositivo_id: ID, condicion: 'reloj_desviado', estado: 'cerrada' });
+    await vi.advanceTimersByTimeAsync(1000);
+    await waitFor(() => expect(document.querySelector('[data-reloj-desviado]')).toBeNull());
+    expect(document.querySelector('[data-estado]')?.getAttribute('data-estado')).toBe('normal');
+  });
+
+  it('«última lectura hace N s» del canal visible; con el canal en vivo y más de 2 intervalos sin lecturas, «conectado, sin lecturas»', async () => {
+    render(Ficha, { id: ID });
+    await waitFor(() => expect(document.querySelector('[data-historico]')).toBeTruthy());
+    const enVivo = (): string => document.querySelector('[data-en-vivo]')!.textContent!.trim();
+    const ultima = (): string => document.querySelector('[data-ultima-lectura]')!.textContent!.replace(/\s+/g, ' ').trim();
+    const fuente = FuenteControlable.instancias[0]!;
+    fuente.abrir();
+    await waitFor(() => expect(enVivo()).toBe('en vivo: conectado'));
+    expect(ultima()).toBe('· última lectura hace 30 s'); // 14:59:30, ahora 15:00:00
+    // Pasan 130 s (intervalo esperado 60 s) con latidos pero sin lecturas: el canal vive, el nodo calla.
+    for (let i = 0; i < 13; i++) {
+      fuente.emitir('latido', { tiempo: new Date().toISOString() });
+      await vi.advanceTimersByTimeAsync(10_000);
+    }
+    expect(enVivo()).toBe('en vivo: conectado, sin lecturas');
+    expect(ultima()).toBe('· última lectura hace 2 min');
+    fuente.emitir('medicion', { dispositivo_id: ID, canal_id: 'c-temp', valor: 22, unidad: 'Cel', tiempo: new Date().toISOString() });
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect(enVivo()).toBe('en vivo: conectado');
+    expect(ultima()).toBe('· última lectura hace 10 s');
+    // Una lectura de OTRO canal no cuenta para el visible.
+    for (let i = 0; i < 13; i++) {
+      fuente.emitir('latido', { tiempo: new Date().toISOString() });
+      if (i % 3 === 0) fuente.emitir('medicion', { dispositivo_id: ID, canal_id: 'c-hum', valor: 50, unidad: '%RH', tiempo: new Date().toISOString() });
+      await vi.advanceTimersByTimeAsync(10_000);
+    }
+    expect(enVivo()).toBe('en vivo: conectado, sin lecturas');
   });
 });

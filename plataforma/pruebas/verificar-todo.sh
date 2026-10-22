@@ -798,7 +798,12 @@ fuentes = [*pathlib.Path('informe-oficial').glob('*.tex'), *pathlib.Path('inform
 malos, n_pasos, n_panel = [], 0, 0
 for f in fuentes:
     if f.name.startswith('12-'): continue
-    t = re.sub(r'\s+', ' ', f.read_text(encoding='utf-8'))
+    crudo = f.read_text(encoding='utf-8')
+    if f.name.startswith('16-'):
+        # 22/10: docs/16 es un registro fechado; cada sección conserva el conteo de su día. Rige el actual solo en la cabecera
+        # (antes de la primera «## N.») y en la última sección (la del cambio vigente).
+        partes = re.split(r'(?m)^(?=## \d+\. )', crudo); crudo = partes[0] + (partes[-1] if len(partes) > 1 else '')
+    t = re.sub(r'\s+', ' ', crudo)
     for m in re.finditer(r'(\d+) pasos que comparan|verificador de (\d+) pasos|por sus pasos \((\d+)\)', t):
         n_pasos += 1; dice = int(m.group(1) or m.group(2) or m.group(3))
         if dice != pasos: malos.append(f'{f}: dice {dice} pasos del verificador; hay {pasos}')

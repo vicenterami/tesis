@@ -80,6 +80,39 @@ estado visual. Si el gráfico muestra un intervalo agregado (por ejemplo, promed
 como «lectura actual», para no mezclar un valor crudo con promedios. Botón «pausar en vivo». Al final, condiciones del
 dispositivo (abiertas arriba) y sus tramas rechazadas.
 
+**Incremento 1 de P2 y P3 (decidido el 21/10/2026 y diseñado el 22/10; antes del código, como manda la regla de concordancia).**
+Qué lo motiva: la prueba de campo del 20/10 (`docs/16 §45`) dejó un gráfico de 1 h vacío con «última medición hace 4 d», un intervalo real de
+17 s frente a 180 s declarados y un reloj de pasarela que nadie vio hasta mirar la base. Antes de diseñar se comparó, con citas de la
+documentación oficial (registro de evidencia del proyecto, 30 filas), qué hacen ThingsBoard CE, OpenRemote, Magistrala y Milesight IoT Cloud
+en tres problemas: **(a)** ThingsBoard declara que el rango cambiado en vista se pierde al recargar y que el guardado exige editar el tablero;
+las otras tres no declaran persistencia ni indicador de «en vivo» (Magistrala sí muestra una señal en el widget en vivo). **(b)** Ninguna
+declara aviso, marcador ni ampliación automática cuando el dato cae fuera del rango mostrado; ThingsBoard lo trata como falla a diagnosticar
+(«la ventana no cubre el período con datos»). **(c)** ThingsBoard marca inactividad tras 600 s por defecto, ajustable por dispositivo, y
+guarda la última actividad; Milesight cuenta la desconexión en múltiplos (3) del intervalo de reporte configurado; ninguna de las cuatro
+declara intervalo observado ni desvío de reloj. Lo que se toma, lo que no y lo que es propio:
+1. **La vista vive en la URL y se restaura.** `#/dispositivos/<id>?canal=<uuid>&rango=24h` y `#/?estado=alerta&sitio=&zona=&via=&q=`: al
+   cargar o al cambiar el fragmento, el panel lee esos parámetros; al cambiar canal, rango o filtros, los escribe con `replaceState` (sin
+   ensuciar el historial del navegador). Un enlace compartido abre la misma vista; «atrás» vuelve a la pantalla anterior. Se toma el
+   problema que ThingsBoard reconoce (se pierde al recargar) y se resuelve sin cuentas ni tableros editables, que son de la Etapa 4. No se
+   toma «guardar como predeterminado»: exige sesión.
+2. **Un rango sin datos lo dice y lleva al dato.** Si el histórico del rango está vacío y el canal tiene última medición, el gráfico muestra
+   «Sin mediciones en este rango; la última es de hace N (fecha y hora en la zona del sitio)» y un botón «Ver la última medición» que elige
+   el menor rango de la lista cerrada que la contiene; si es anterior a 30 días, dice que el panel no la dibuja y remite a Exportar. **No**
+   se amplía el rango solo (ninguna referencia lo hace y cambiaría el gráfico sin que la persona lo pida).
+3. **Intervalo observado junto al esperado.** `GET /dispositivos/{id}` entrega `intervalo_observado_s`: la mediana de las diferencias entre
+   las últimas 20 filas de `trama` del dispositivo (instantes distintos de `recibido_en`; esa tabla tiene el índice por dispositivo y recepción), nulo con menos de 3 o sin tramas retenidas (`RETENCION_TRAMA_DIAS`, 30 días por defecto). P3 lo muestra en
+   la cabecera, «reporta cada ≈ 17 s (esperado 3 min)»: las duraciones se escriben para personas (segundos hasta 2 min, minutos hasta 1 h, horas después), y avisa en texto cuando el observado es menor que la mitad o mayor que el doble del
+   esperado: «más seguido / más lento de lo declarado: revisa el intervalo esperado» (P6, Etapa 4; hoy por API). La alarma de silencio
+   sigue usando solo el esperado (`docs/10 §4.1` y §4.3): el observado informa, no decide. Es terreno propio: ninguna referencia lo declara.
+4. **Reloj de pasarela desviado, en palabras.** La condición `reloj_desviado` (`docs/10 §8.4` punto 54) aparece como alerta (en P3 un aviso bajo la cabecera; en P2 una línea bajo el estado de la fila)
+   «Reloj de pasarela desviado: las mediciones se fechan al llegar», con el hace cuánto; al cerrarse sola, desaparece sin recargar. Propio.
+5. **«En vivo» con prueba.** Junto a «en vivo: conectado», P3 muestra «última lectura hace N s» del canal visible; si pasan más de dos
+   intervalos esperados sin lectura con el canal conectado, el texto pasa a «conectado, sin lecturas» (el canal vive, el nodo calla). Toma
+   la señal explícita de Magistrala y la hace verificable.
+Pruebas (§6): por el DOM, ida y vuelta URL ↔ estado en P2 y P3, el texto y el botón del rango vacío, el intervalo con sus dos avisos, la alerta
+del reloj; en el backend, unitaria del contrato y de las piezas de la consulta (OpenAPI regenerado); la mediana se contrasta en la base, porque las unitarias corren sin ella. Lo que no entra en este incremento: filtros guardados por
+persona, rango a medida (HU-07) y la administración de pasarelas (incremento 3).
+
 **P4 Condiciones y P5 Cuarentena (Etapa 4).** Dos listas con filtro y paginación por `limite`; cada fila lleva a la ficha. En
 P5 la trama cruda va plegada (es texto largo) con un botón de copiar.
 
@@ -143,6 +176,7 @@ descargar; la descarga exige rol de administrador; la vista pública nunca ofrec
 |---|---|---|---|
 | P2 Inventario con semáforo y filtros | RF-47, RF-48, RF-51, HU-10, HU-19, HU-20 | Tramo 2 (Etapa 3) | Semilla conocida → conteos y filas en el DOM; un dispositivo en mantenimiento aparece «Inactivo»; filtro por vía reduce la tabla; el reenvío de Vite conserva el `Host` y no retiene el canal (`pruebas/panel-desarrollo.sh`, `docs/16 §16`); varios sitios: dos sitios con una zona del mismo nombre, el filtro por sitio y la zona dentro del sitio (16/10) |
 | P3 Ficha | RF-33, RF-49, HU-21 | Tramo 3 (Etapa 3); prueba con navegador real el 16/10 | `banco.sh navegador` (Firefox con Playwright): los puntos del gráfico (texto y `data-puntos`) son los de `/historico`; una trama publicada por MQTT aparece en su tarjeta sin recargar; con el backend detenido se ve «reconectando», se publica una lectura durante la caída y, al volver, la tarjeta la muestra, la página repite el histórico (se ve la petición) y el canal vuelve a «conectado»; sin errores de JavaScript; la captura revisa lo que se dibuja en el lienzo (eje en 24 h) |
+| P2 y P3, incremento 1: vista en la URL, rango vacío, intervalo observado, reloj de pasarela, «en vivo» con prueba | RF-33, RF-47, RF-49, HU-20, HU-21 | Etapa 3 (22/10/2026) | `docs/16 §50`: 23 pruebas nuevas del panel por el DOM y de funciones puras (ida y vuelta URL ↔ estado en P2 y P3 con valor inválido y `hashchange` externo, texto y botón del rango vacío y su ausencia con puntos, el intervalo con sus dos avisos y el nulo, la alerta del reloj que aparece y se va sin recargar, «conectado, sin lecturas») y 4 del backend (contrato de `intervalo_observado_s`, `openapi.json` regenerado); la mediana, contrastada en la base de desarrollo; el paquete servido, con `pruebas/panel-desarrollo.sh` |
 | P4 Condiciones, P5 Cuarentena | HU-05, RF-11 a RF-13, RF-24 | Etapa 4 | Trama fuera de rango → fila en P4 en vivo; trama de un desconocido → fila en P5 con motivo `no_registrado` |
 | P1 Resumen | RF-30, HU-16 | Etapa 4 | Los cuatro conteos suman el total del inventario; cambian en vivo con F3 |
 | P8 Exportar (API) | RF-34, HU-08 | Etapa 3 (12/10): 6 pruebas de las funciones puras y 7 casos de humo; la pantalla, el XLSX y la exportación por sitio, en la Etapa 4 |

@@ -9,6 +9,21 @@ import { Intervalo } from './validacion';
 // Las fechas salen como Date → JSON las serializa en ISO 8601 con 'Z' (UTC), regla 5 de docs/13.
 // Cuando la fecha va DENTRO de un JSON armado en SQL (json_agg/json_build_object) se usa iso_utc():
 // sin ella Postgres emite '+00:00' y la API mezclaría dos formatos.
+// Intervalo observado (docs/19 §4, incremento 1, punto 3): la mediana, en segundos enteros, de las diferencias entre los
+// instantes de recepción (`trama.recibido_en` truncado al segundo, distintos) de las últimas 20 tramas del dispositivo; nulo con
+// menos de 3 instantes (menos de 2 diferencias). Sobre `trama` (una fila por mensaje con al menos una lectura guardada) y su índice
+// (dispositivo_id, recibido_en DESC): lee 20 filas, no el historial. La trama vence a los 30 días (RETENCION_TRAMA_DIAS): un
+// dispositivo callado desde antes da nulo. Informa, no decide: la alarma de silencio sigue usando el intervalo esperado.
+// Va como subconsulta de la ficha: ninguna ida más a la base por petición.
+export const SQL_INTERVALO_OBSERVADO = `(
+             SELECT CASE WHEN count(*) >= 2 THEN round(percentile_cont(0.5) WITHIN GROUP (ORDER BY w.dif))::int END
+               FROM (SELECT extract(epoch FROM u.t - lag(u.t) OVER (ORDER BY u.t)) AS dif
+                       FROM (SELECT DISTINCT date_trunc('second', x.recibido_en) AS t
+                               FROM (SELECT tr.recibido_en FROM trama tr
+                                      WHERE tr.dispositivo_id = d.id
+                                      ORDER BY tr.recibido_en DESC LIMIT 20) x) u) w
+              WHERE w.dif IS NOT NULL)`;
+
 @Injectable()
 export class ConsultaService {
   constructor(@Inject(POOL) private readonly pool: Pool) {}
@@ -38,7 +53,8 @@ export class ConsultaService {
     const d = await this.pool.query(`
       SELECT d.id, d.id_fisico, d.nombre, d.estado, d.via, d.formato, d.intervalo_esperado_s, e.visto_por_ultima_vez, d.creado_en,
              (e.visto_por_ultima_vez >= now() - d.intervalo_esperado_s * 2 * INTERVAL '1 second') AS en_linea,
-             z.nombre AS zona, s.nombre AS sitio, s.zona_horaria, s.codigo AS sitio_codigo, z.id AS zona_id
+             z.nombre AS zona, s.nombre AS sitio, s.zona_horaria, s.codigo AS sitio_codigo, z.id AS zona_id,
+             ${SQL_INTERVALO_OBSERVADO} AS intervalo_observado_s
         FROM dispositivo d LEFT JOIN estado_dispositivo e ON e.dispositivo_id = d.id
         JOIN zona z ON z.id = d.zona_id JOIN sitio s ON s.id = z.sitio_id
        WHERE d.id = $1`, [id]);

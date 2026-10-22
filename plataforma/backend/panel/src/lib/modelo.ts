@@ -78,6 +78,8 @@ export interface CanalFicha {
 // `condiciones_abiertas` es una lista de filas, no un número, y la ficha no la usa (pide /condiciones): por eso se omite.
 export interface DispositivoFicha extends Omit<DispositivoInventario, 'canales' | 'condiciones_abiertas'> {
   creado_en: string;
+  // Mediana de los intervalos entre las últimas 20 tramas, en segundos; null con menos de 3 (docs/19 §4, incremento 1, punto 3).
+  intervalo_observado_s: number | null;
   canales: CanalFicha[];
 }
 

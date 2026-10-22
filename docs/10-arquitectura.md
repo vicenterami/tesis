@@ -517,6 +517,10 @@ cliente ──HTTP──► Express ⊂ NestJS ──► servicio ──► pg �
   controlador, `consulta/dispositivos.controller.ts`, método `listar()`) la delega; en las rutas con
   parámetros (`/dispositivos/{id}`) antes los valida (`consulta/validacion.ts`) → `ConsultaService.dispositivos()`
   ejecuta el `SELECT` con `pg` → la base responde filas → Nest las convierte a JSON → Express responde.
+- **La ficha `GET /dispositivos/{id}`** trae además `intervalo_observado_s` (22/10/2026, `docs/19 §4`, incremento 1): la mediana, en
+  segundos enteros, de las diferencias entre los `recibido_en` de las últimas 20 filas de `trama` del dispositivo (por su índice
+  `(dispositivo_id, recibido_en DESC)`), calculada por una subconsulta de la misma consulta (sin una ida más a la base); nulo con menos
+  de 3 instantes o si no quedan tramas retenidas (`RETENCION_TRAMA_DIAS`, 30 días por defecto). Informa; la alarma de silencio usa solo el intervalo esperado (§4.1 y §4.3).
 - **CORS no se activa, a propósito.** Es una regla del navegador para páginas de *otro* origen; el panel
   lo servirá el mismo backend (mismo origen, `docs/11 §4`), y sin CORS el navegador bloquea por defecto
   a cualquier otro sitio. Ni los sensores, ni `curl`, ni la base están sujetos a CORS.

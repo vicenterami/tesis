@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 338 pruebas unitarias del backend y 53 del panel, sin matriz formal) y TT-32 (sensor físico);
+cubre todavía: TT-27 (contrato de trama: hoy 342 pruebas unitarias del backend y 76 del panel, sin matriz formal) y TT-32 (sensor físico);
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -874,7 +874,7 @@ revisar nada. **Banco:** 36 de 36, «LORAWAN OK».
 la limpieza (el tópico crudo queda en su columna de la cuarentena como evidencia); se suman a los rellenos los selectores de variación
 que faltaban; el informe dice ahora que el JSON del banco es el de la documentación oficial de ChirpStack v4 y de Milesight, no el
 que publica el ChirpStack del campus, todavía no probado; y el guardián busca el nombre del entrevistado también en el código.
-Total: 270 del backend y 53 del panel.
+Total: 270 del backend y 52 del panel.
 
 ## 36. La trama real de la pasarela del campus: sufijo nativo, perfil de decodificación y contador de trama (16/10/2026)
 
@@ -974,7 +974,7 @@ como unidad secundaria (RFC 8798); un emisor que mande `mV` se convierte (1/1000
 | ¿El panel lo muestra sin repetir la cuenta? | El evento `medicion` del canal en vivo trae `porcentaje`, calculado en la recepción con la misma función (prueba: calibración 0–50 y lectura 22,4 → 44,8 %); la ficha lo muestra junto al valor crudo solo si es un número, así un evento sin el campo no rompe la tarjeta (prueba del panel; plantado a mano el 16/10: si la ficha no copia el campo, falla) |
 
 **Lo que falta:** la ruta para editar la calibración, con su permiso (se concede cuando exista la ruta: mínimo
-privilegio) y la validación de que las escalas caigan en el rango de la magnitud. **Pruebas:** 270 unitarias del backend y 53 del panel.
+privilegio) y la validación de que las escalas caigan en el rango de la magnitud. **Pruebas:** 270 unitarias del backend y 52 del panel.
 
 ## 39. La ficha del dispositivo en un navegador real (16/10/2026)
 
@@ -1005,7 +1005,7 @@ ignoraba: la prueba publica ahora con milisegundos. **Del guardián:** contaba c
 regular (50 en vez de 49); corregido. Y no revisaba la sintaxis de los guiones: una línea de comentario sin `#` dejó `banco.sh` sin
 interpretarse y solo lo delató la siguiente corrida; desde ahora el paso 2y2 corre `bash -n` sobre cada guion (plantado uno roto: falla).
 **De la revisión del tramo:** si la publicación fallaba con el backend detenido, el banco quedaba con el backend apagado (ahora se
-arranca siempre); las comprobaciones del estado en vivo y de la leyenda se acotan a su elemento. **Pruebas:** 270 del backend y 53 del panel.
+arranca siempre); las comprobaciones del estado en vivo y de la leyenda se acotan a su elemento. **Pruebas:** 270 del backend y 52 del panel.
 
 ## 40. El inventario con varios sitios (16/10/2026)
 
@@ -1024,7 +1024,7 @@ zona no es de él, vuelve a «todas»). Con un solo sitio no aparecen: no inform
 | Plantado: agrupar las zonas por nombre en vez de por id | la prueba de varios sitios falla |
 | Contra la base del banco: una segunda sede con una zona «Emulados» y un dispositivo (a mano, con `psql`; no la repite ningún guion) | la API entrega las dos zonas con el mismo nombre y distinto id, y la ficha trae su sitio y su zona |
 
-**Pruebas:** 270 del backend y 53 del panel. **Un tropiezo de la medición:** el primer intento de crear la sede falló porque `zona` no
+**Pruebas:** 270 del backend y 52 del panel. **Un tropiezo de la medición:** el primer intento de crear la sede falló porque `zona` no
 tiene `creado_en` (se supuso sin mirar el esquema); el segundo, porque la extracción del id tomó la línea de guiones del encabezado de
 `psql`. Ninguno era del sistema.
 
@@ -1069,7 +1069,7 @@ viajaría en claro sin el proxy: en producción el backend no publica puertos y 
 `docs/10 §8.4` punto 52 (vii): bloqueo por dirección detrás de un NAT, cuarentena sin cuota por dispositivo y `X-Forwarded-For` desde
 otro contenedor de la red interna.
 
-**Pruebas:** 291 del backend y 53 del panel. **Tres tropiezos de la prueba de punta a punta, ninguno del sistema:** `curl -G` mueve el
+**Pruebas:** 291 del backend y 52 del panel. **Tres tropiezos de la prueba de punta a punta, ninguno del sistema:** `curl -G` mueve el
 cuerpo a la URL, así que el `?magnitud=` del formato plano va escrito en la URL; la prueba del bloqueo suponía que la dirección partía
 sin fallos, cuando las comprobaciones anteriores del 401 ya sumaban algunos (ahora envía hasta recibir el 429); y suponía que el backend
 ve 127.0.0.1, cuando ve una sola dirección de la red de Docker para las peticiones directas y las del proxy: una corrida dejaba fallos
@@ -1133,7 +1133,7 @@ Yerger en OneWire, cifras y referencias cruzadas.
 
 **Lo que no cubre:** el 503 del cupo se prueba solo en unitarias; el bloqueo grueso, en el banco con 10 identificadores × 5 fallos
 (≈ 3,3 s de `scrypt`), no con una carga real; la cuota de la pasarela para tramas sin DevEUI verificable, en unitarias; el cierre de la condición se prueba adelantando la ventana en la base, no esperando una hora; la cuota en memoria
-de lo que el filtro 1 rechaza se prueba en unitarias, no en el banco. **Pruebas:** 324 del backend (33 nuevas) y 53 del panel.
+de lo que el filtro 1 rechaza se prueba en unitarias, no en el banco. **Pruebas:** 324 del backend (33 nuevas) y 52 del panel.
 
 ## 43. Fase 1 del nodo propio: diagnóstico de los tres sensores con hardware real (18 y 19/10/2026)
 
@@ -1365,3 +1365,63 @@ muestrea cada 5 s y tarda en responder: el pack de 60 (5,6 s) tiene una sola mue
 **Qué mide la latencia y qué no:** `recibido_en − marca de la trama` es el tramo envío → recepción confirmada en la base. RNF-02 habla de
 recepción → disponible para consulta; ese tramo (la consulta misma) se mide aparte (§3 y §25) y aquí no se suma. Las tres vías cumplen el
 tope de 2 s en el tramo medido.
+
+## 50. Primer incremento del panel: la vista en la URL, rangos vacíos, intervalo observado, reloj y «en vivo» (22/10/2026)
+
+**Qué se prueba** (`docs/19 §4`, «Incremento 1 de P2 y P3»; lo motivó la prueba de campo de §45): los cinco puntos del diseño, con
+pruebas por el DOM en los dos sentidos (`docs/19 §6`) y, en el backend, el contrato del campo nuevo de `GET /dispositivos/{id}`.
+
+**Método.** (1) **Backend:** `intervalo_observado_s` es una subconsulta de la consulta de la ficha (`consulta.service.ts`,
+`SQL_INTERVALO_OBSERVADO`): las 20 filas más recientes de `trama` del dispositivo (una por mensaje con al menos una lectura guardada),
+leídas por su índice `(dispositivo_id, recibido_en DESC)`; sus `recibido_en` truncados al segundo y distintos, las diferencias entre
+consecutivos y su mediana redondeada a segundos enteros; nulo con menos de 3 instantes. Una primera versión lo calculaba sobre `medicion`
+unida a `canal`, con un atajo por canal porque esa tabla solo tiene índice por `(canal_id, tiempo DESC)`; se cambió a `trama`, que es
+exacta (una fila es una trama) y lee 20 filas. La prueba del contrato usa un doble de `pool` (como las demás del backend); la mediana se
+contrastó en la base de desarrollo con un cálculo independiente y con un caso sintético.
+(2) **Panel:** funciones puras nuevas (`lib/vista.ts` para leer y escribir la vista en el fragmento; `duracion`, `fechaHora` y
+`haceSegundos` en `lib/tiempo.ts`; `rangoQueContiene` en `lib/grafico.ts`) con sus unitarias, y pruebas de componente en jsdom que montan
+`App`, `Ficha` e `Inventario` con la API y el canal en vivo simulados. (3) **Violaciones plantadas**, para ver que las pruebas fallan:
+`LIMIT 21` en la subconsulta (falla 1 prueba del backend), `pushState` en lugar de `replaceState` (fallan 2 de ida y vuelta) y un efecto
+que amplía el rango solo cuando está vacío (falla la del rango vacío); restauradas, todas en verde. (4) La pila de desarrollo,
+reconstruida (`pila.sh encender`), consultada con `curl`, y el paquete servido revisado con `pruebas/panel-desarrollo.sh`.
+
+| Punto del diseño | Prueba | Dónde |
+|---|---|---|
+| 1. Vista en la URL | Lectura y escritura del fragmento; rango desconocido, canal que no es UUID, estado desconocido e id que no es UUID → valor por defecto | `lib/vista.test.ts` (4) |
+| 1. P3 | La URL fija canal y rango al abrir (se pide ese histórico); elegir rango y canal reescribe la URL sin sumar entradas al historial; un `hashchange` externo se reaplica (otro canal y otro rango, con su histórico); valores inválidos o un canal de otro dispositivo → primer canal y 24 h, y la URL queda corregida | `App.test.ts` (4) |
+| 1. P2 | La URL fija vía y búsqueda; cambiarlas las escribe y sin filtros queda `#/`, sin entradas nuevas en el historial; un `hashchange` externo se reaplica; estado, sitio y zona inexistentes → tabla completa y `#/`; abrir la ficha y volver «atrás» restaura los filtros | `App.test.ts` (4) |
+| 2. Rango vacío | Con la última medición hace 4 d: «Sin mediciones en este rango; la última es de hace 4 d (8 de octubre de 2026, 12:00)», el rango no cambia sin clic (30 s después sigue en 24 h y sin otra petición) y el botón elige 7 días; con puntos, ni texto ni botón; anterior a 30 días, remite a exportar y no hay botón; sin ninguna medición, solo «Sin mediciones en este rango.» | `Ficha.test.ts` (3), `lib/grafico.test.ts` (1), `lib/tiempo.test.ts` (1, fecha y hora) |
+| 3. Intervalo observado | «reporta cada ≈ 17 s (esperado 3 min)» con «más seguido de lo declarado…»; 600 s con «más lento…»; 200 s sin aviso; nulo → «intervalo observado: sin datos suficientes» | `Ficha.test.ts` (1), `lib/tiempo.test.ts` (1, duraciones); backend `consulta.service.spec.ts` (4) |
+| 4. Reloj de pasarela | P3: la condición abierta se lee «Reloj de pasarela desviado: las mediciones se fechan al llegar · hace 20 min» y el estado es Alerta; un evento `condicion` cerrada la quita sin recargar y el estado vuelve a Normal. P2: lo mismo en la fila del dispositivo, solo en ella, sin repedir el inventario | `Ficha.test.ts` (1), `Inventario.test.ts` (1) |
+| 5. «En vivo» con prueba | «última lectura hace 30 s» del canal visible; con latidos y sin lecturas durante más de 2 intervalos esperados, «conectado, sin lecturas»; una lectura lo devuelve a «conectado» («hace 10 s»); las lecturas de otro canal no cuentan para el visible | `Ficha.test.ts` (1), `lib/tiempo.test.ts` (1, «hace N s») |
+
+**Resultados.** Backend (`pnpm verificar`): **342** pruebas en 30 suites (antes 338 en 29), tipos y lint sin errores. Panel: **76** pruebas en
+10 archivos (antes 53 en 8), `svelte-check` con 331 archivos y 0 errores, y el build. Base de desarrollo: para el nodo de la prueba de campo
+(§45), la subconsulta sobre `trama` da **17 s** (178 tramas guardadas; la versión sobre `medicion`, también 17) y el cálculo independiente
+sobre sus 20 instantes más recientes, 19 diferencias entre 16 y 19 s con mediana 17; el caso sintético (instantes a 0, 10, 27 y 60 s, dos de ellos en el mismo segundo) da 17. `curl` contra la pila
+reconstruida: el nodo de §45 → `intervalo_esperado_s` 180 e `intervalo_observado_s` 17; `demo-silencioso` → 300 y `null`, porque la semilla de demostración escribe
+mediciones pero no filas de `trama` (con la versión sobre `medicion` daba 3600); `demo-aire-01`, con 3 tramas, → 3600; `dev-0001` (una
+trama) → `null`. `pruebas/panel-desarrollo.sh`: «PANEL OK» (12 comprobaciones), y el paquete servido contiene
+los textos nuevos.
+
+**Dos tropiezos, corregidos antes de cerrar.** (1) El efecto de la ficha que escribe la vista en la URL leía la prop `id`, que deriva de la
+ruta: un cambio externo del fragmento lo hacía reescribir la vista anterior antes de que se aplicara la nueva. Lo encontró la prueba del
+`hashchange` externo; ahora ese efecto depende solo del canal, del rango y de que la ficha esté cargada. (2) En las pruebas de `App`,
+dos montajes seguidos del gráfico con la importación dinámica de uPlot en vuelo escapaban al doble y cargaban el uPlot real, que sin
+navegador falla («matchMedia is not a function»); las pruebas esperan ahora a que exista el gráfico antes de cambiar de canal o salir.
+
+**Decisiones de implementación dentro del diseño.** Las duraciones se escriben para personas con una sola regla (segundos hasta 2 min,
+minutos hasta 1 h, horas después): el ejemplo del diseño «(esperado 180 s)» se lee «(esperado 3 min)». El caso anterior a 30 días remite a
+la exportación por API con un enlace (la semana que precede a la última medición), porque la pantalla P8 es de la Etapa 4. «Conectado, sin
+lecturas» se cuenta con el reloj del navegador desde que el canal pasó a «en vivo» o desde la última lectura llegada del canal visible, lo
+más reciente, no con la marca de la medición (que puede venir de un reloj desviado). En P2 la alerta del reloj va bajo el estado, en la fila.
+
+**Con navegador real** (`banco.sh encender 5`, imagen reconstruida con este incremento, y `banco.sh navegador`): **9/9** («P3 NAVEGADOR
+OK», sin errores de JavaScript). La captura muestra en la cabecera «en vivo: conectado · última lectura hace 0 s» y «reporta cada ≈ 3 s
+(esperado 5 s)», sin aviso (3 s no es menor que la mitad de 5). El recorrido de Playwright no ejercita todavía los textos nuevos: se leen en
+la captura; las comprobaciones automáticas son las de jsdom.
+
+**Lo que no cubre.** (1) El recorrido en Firefox no prueba la URL, el rango vacío ni el reloj desviado; solo se ven en jsdom y en la captura.
+(2) La mediana se prueba en la base contra datos reales y un caso sintético, no con una prueba automática contra una base (las
+unitarias del backend corren sin base). (3) `trama` vence a los 30 días (`RETENCION_TRAMA_DIAS`): un dispositivo callado desde antes da nulo,
+y los datos cargados sin pasar por la recepción (semillas) no cuentan.
