@@ -8,9 +8,12 @@ packages:
 #   @nestjs/core  → su postinstall solo imprime un mensaje de donación
 #   unrs-resolver → su postinstall descarga un binario; pnpm ya lo instala como dependencia opcional
 #   @scarf/scarf  → telemetría: su postinstall avisa a un servidor externo de la instalación; bloqueado
+#   @parcel/watcher → (23/10/2026, llega con la actualización de jest) su postinstall compila un módulo nativo solo si falta el
+#                   binario; pnpm ya instala el binario de la plataforma como dependencia opcional
 # Si una dependencia futura lo requiere de verdad, se pone en `true` con el porqué al lado.
 allowBuilds:
   '@nestjs/core': false
+  '@parcel/watcher': false
   '@scarf/scarf': false
   unrs-resolver: false
 # Versiones corregidas de dependencias transitivas con avisos de seguridad (docs/11 §4): el 23/09/2026 ajv, multer y
