@@ -30,7 +30,8 @@ export class DispositivosController {
       'Canales con sus reglas de umbral y última medición, y condiciones abiertas. `intervalo_observado_s` (entero o null): mediana, ' +
       'en segundos, de las diferencias entre los instantes de recepción (truncados al segundo) de las últimas 20 tramas del ' +
       'dispositivo; null con menos de 3 instantes o sin tramas retenidas (RETENCION_TRAMA_DIAS, 30 días por defecto). Informa: la alarma de silencio ' +
-      'usa `intervalo_esperado_s`.',
+      'usa `intervalo_esperado_s`. Por canal: `escala_cero` y `escala_cien` (calibración; null sin ella), `porcentaje` en la última ' +
+      'medición, y `actualizado_en` (ISO 8601 UTC con microsegundos), el que se manda tal cual en `PATCH /canales/{id}` (bloqueo optimista).',
   })
   @ApiParam({ name: 'id', description: 'UUID del dispositivo' })
   @ApiOkResponse({ description: 'Ficha del dispositivo' })

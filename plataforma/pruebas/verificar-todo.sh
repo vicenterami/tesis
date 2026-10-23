@@ -45,12 +45,12 @@ docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -X -U p
   < plataforma/db/pruebas/convenciones.sql | tee "$VT"/convenciones.txt
 exige "$VT"/convenciones.txt "${PIPESTATUS[0]}" 7 || fallos=$((fallos+1))
 
-paso "1c. Reglas de identidad de las migraciones 11, 15, 16, 17, 18, 19 y 20, plantadas en una transacción que se deshace (docs/10 §8.4 puntos 24 y 47)"
+paso "1c. Reglas de identidad de las migraciones 11, 15, 16, 17, 18, 19, 20 y 21, plantadas en una transacción que se deshace (docs/10 §8.4 puntos 24 y 47)"
 # Pasarela y dispositivo no comparten identificador; lista blanca; LoRaWAN exige pasarela; código de sitio válido. Nada
 # queda en la base: el archivo termina en ROLLBACK. La carrera de dos altas simultáneas se probó a mano (docs/16 §13).
 docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -X -U plataforma -d plataforma -v ON_ERROR_STOP=1 -tA \
   < plataforma/db/pruebas/reglas-identidad.sql | tee "$VT"/identidad.txt
-exige "$VT"/identidad.txt "${PIPESTATUS[0]}" 31 || fallos=$((fallos+1))
+exige "$VT"/identidad.txt "${PIPESTATUS[0]}" 33 || fallos=$((fallos+1))
 
 paso "2. Migraciones aplicadas = archivos en db/init (cada NN-*.sql debe estar reflejado en la base)"
 # 02: índice por regla · 03: zona_horaria · 04: iso_utc · 05: convenciones (disparadores actualizado_en, pm2_5) · 06: índice único de medicion · 07: CHECK de cuarentena.motivo · 08: medicion.recibido_en y origen_tiempo · 09: trama y cuarentena como hypertables · 10: semántica de intervalo_esperado_s · 11: vía, pasarela, estado_dispositivo y sitio.codigo · 12: nombre ck_cuarentena_motivo
@@ -75,8 +75,9 @@ SELECT CASE WHEN EXISTS (SELECT 1 FROM pg_constraint WHERE conname='ck_dispositi
 SELECT CASE WHEN (SELECT count(*) FROM magnitud WHERE (codigo, unidad_canonica) IN (('temperatura_suelo','Cel'),('humedad_suelo','V')))=2 AND (SELECT count(*) FROM information_schema.columns WHERE table_name='canal' AND column_name IN ('escala_cero','escala_cien') AND data_type='double precision')=2 AND (SELECT pg_get_constraintdef(oid) LIKE '%Infinity%' FROM pg_constraint WHERE conname='ck_canal_escala' AND conrelid='canal'::regclass) THEN 'OK    18 magnitudes del suelo (temperatura_suelo en Cel, humedad_suelo en V) y la calibración por canal con su CHECK (finitas y distintas)' ELSE 'FALLA 18 faltan las magnitudes del suelo o la calibración del canal (migración 18)' END;
 SELECT CASE WHEN (SELECT count(*) FROM information_schema.columns WHERE table_name='estado_dispositivo' AND column_name IN ('ventana_inicio','ventana_lecturas','ventana_cuarentena','ventana_sobre_tope','ventana_omitidas'))=5 AND (SELECT pg_get_constraintdef(oid) LIKE '%''tope''%' FROM pg_constraint WHERE conname='ck_cuarentena_motivo' AND conrelid='cuarentena'::regclass) AND (SELECT pg_get_constraintdef(oid) LIKE '%tope_superado%' FROM pg_constraint WHERE conname='ck_condicion_tipo' AND conrelid='condicion'::regclass) AND EXISTS (SELECT 1 FROM pg_constraint WHERE conname='ck_estado_dispositivo_ventana' AND conrelid='estado_dispositivo'::regclass) THEN 'OK    19 contadores ventana_* en estado_dispositivo con su CHECK, motivo tope y condición tope_superado' ELSE 'FALLA 19 falta el tope por emisor (contadores ventana_*, motivo tope o condición tope_superado)' END;
 SELECT CASE WHEN (SELECT pg_get_constraintdef(oid) LIKE '%reloj_desviado%' FROM pg_constraint WHERE conname='ck_condicion_tipo' AND conrelid='condicion'::regclass) THEN 'OK    20 condición reloj_desviado (desvío del reloj de la pasarela)' ELSE 'FALLA 20 falta la condición reloj_desviado (migración 20)' END;
+SELECT CASE WHEN EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='trg_canal_actualizado_en' AND tgrelid='canal'::regclass AND tgenabled <> 'D') AND col_description('canal'::regclass, (SELECT attnum FROM pg_attribute WHERE attrelid='canal'::regclass AND attname='actualizado_en')) LIKE '%bloqueo optimista%' AND has_column_privilege('plataforma_app', 'canal', 'escala_cero', 'UPDATE') AND has_column_privilege('plataforma_app', 'canal', 'escala_cien', 'UPDATE') AND NOT has_column_privilege('plataforma_app', 'canal', 'actualizado_en', 'UPDATE') AND NOT has_column_privilege('plataforma_app', 'canal', 'dispositivo_id', 'UPDATE') AND NOT has_column_privilege('plataforma_app', 'canal', 'magnitud_codigo', 'UPDATE') THEN 'OK    21 canal.actualizado_en con su disparador y documentado como bloqueo optimista; la aplicación solo actualiza escala_cero y escala_cien' ELSE 'FALLA 21 falta el disparador o el comentario de canal.actualizado_en, o el permiso de la calibración no es el justo (migración 21)' END;
 SQL
-exige "$VT"/mig.txt "${PIPESTATUS[0]}" 20 || fallos=$((fallos+1))
+exige "$VT"/mig.txt "${PIPESTATUS[0]}" 21 || fallos=$((fallos+1))
 # Toda migración en disco debe tener su comprobación arriba: una 08 nueva sin comprobación falla aquí,
 # no solo por el conteo en prosa del paso 2g.
 sin_chequeo=$(ls plataforma/db/init/ | grep -oE '^[0-9]{2}' | while read -r nn; do grep -q "^OK    $nn \|^FALLA $nn " "$VT"/mig.txt || echo "$nn"; done)

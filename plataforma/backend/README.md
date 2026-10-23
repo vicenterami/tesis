@@ -21,7 +21,7 @@ src/
 │   └── *.spec.ts              # pruebas unitarias de las funciones puras (jest)
 ├── consulta/                  # M5: API de solo lectura (dispositivos, canales, condiciones, cuarentena)
 ├── tiempo-real/               # TT-39: canal SSE hacia el panel (GET /eventos) y bus de eventos en memoria
-├── alta/                      # HU-11: POST /dispositivos, DELETE /dispositivos/:id y POST /dispositivos/:id/credencial (guardia X-Clave-Admin, validación, transacción + cliente del broker, scrypt)
+├── alta/                      # HU-11: POST /dispositivos, DELETE /dispositivos/:id y POST /dispositivos/:id/credencial (guardia X-Clave-Admin, validación, transacción + cliente del broker, scrypt); PATCH /canales/:id (calibración)
 ├── broker/dynsec*.ts          # administración del plugin Dynamic Security por $CONTROL (identidad backend-admin, conexión propia); recibe los contadores $SYS
 ├── broker/metricas*.ts        # cola del broker vigilada: muestra por minuto en metrica_broker y condición del sistema broker_descarte (docs/10 §8.4 punto 43)
 ├── retencion/                 # borra lo vencido de medicion, trama, cuarentena y metrica_broker por la función acotada fn_retencion_drop_chunks (migración 14)
@@ -182,6 +182,7 @@ describir rutas que no existen. Con el backend corriendo, la documentación inte
 | `POST /recepcion/:idFisico` (cabecera `Authorization: Bearer`) | recepción por HTTP (HU-01): 202 con el resumen, 401, 413, 415, 422, 429, 503 (`docs/10 §8.4` punto 52) | dispositivos de vía `http` |
 | `GET /pasarelas`, `POST /pasarelas`, `DELETE /pasarelas/:id`, `POST /pasarelas/:id/credencial` (las que escriben, con `X-Clave-Admin`) | pasarelas LoRaWAN: inventario, alta con credencial del broker, baja y rotación (`docs/10 §8.4` punto 47) | 401 o 503 sin la clave |
 | `GET /salud` | estado del backend, la base y el broker (cola, descartes, condición del sistema) | lo usa el `HEALTHCHECK` |
+| `PATCH /canales/:id` (cabecera `X-Clave-Admin`) | calibración: `{escala_cero, escala_cien, actualizado_en}` (las dos con valor, o las dos `null` para quitarla), evento `canal_calibrado` (`docs/10 §8.4` punto 51) | 200 con el canal y su `actualizado_en` nuevo; 400 motivos; 404; 409 si otro lo cambió desde la ficha (bloqueo optimista, 22/10) |
 | `POST /dispositivos/:id/credencial` (cabecera `X-Clave-Admin`) | rotación: credencial nueva (mostrada una vez), la anterior inactiva, evento `rotacion`, `setClientPassword` en el broker; todo o nada | 201 con `conexion`; 409 de baja; 400 lorawan; si la respuesta no llega, repetir (13/10) |
 
 ```bash

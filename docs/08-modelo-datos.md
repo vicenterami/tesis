@@ -29,7 +29,7 @@ uniformidad es la que resuelve la causa C1 (formatos dispares).
 | 7 | **medicion** | Una lectura: valor + unidad + tiempo | **Hypertable** de TimescaleDB (serie de tiempo) |
 | 8 | **regla_umbral** | Límite que, al cruzarse, abre una condición | Con histéresis (umbral de disparo y de restauración) |
 | 9 | **condicion** | Un estado anómalo abierto de un dispositivo | Se abre y se cierra; guarda inicio, fin y duración |
-| 10 | **evento** | Registro histórico de algo que pasó | Alta, baja, mantenimiento, apertura/cierre de condición |
+| 10 | **evento** | Registro histórico de algo que pasó | Alta, baja, mantenimiento, apertura/cierre de condición, calibración de un canal (`canal_calibrado`) |
 | 11 | **cuarentena** | Trama rechazada por los filtros 1 a 3 (desconocida, malformada o inválida) o por el tope por emisor (`tope`: no cabía en el presupuesto de lecturas de la hora, migración 19) | Cruda, con motivo y detalle, una fila por trama; no contamina las series. **Hypertable** desde la migración 09 (retención 30 días). Por dispositivo y hora se guardan completas las primeras `TOPE_CUARENTENA_HORA` (60); las demás solo se cuentan (`docs/10 §8.4` punto 53). Lo que no tiene credencial no llega: lo corta el broker |
 | 12 | **usuario** | Persona que accede a la plataforma | Con hash de contraseña, nunca en claro |
 | 13 | **usuario_sitio** | Qué usuario puede ver qué sitio y con qué rol | Multi-tenencia: aísla los datos entre sitios |
@@ -334,6 +334,11 @@ consistente para reportes.
 - [x] **Suelo del nodo propio** (migración 18, 16/10/2026; `docs/10 §8.4` punto 51): `temperatura_suelo` (`Cel`, −55 a 125) y
       `humedad_suelo` (`V`, 0 a 3,3: la tensión cruda del sensor capacitivo; el % se calcula), y la calibración por canal
       `canal.escala_cero` y `canal.escala_cien` (las dos o ninguna, distintas).
+- [x] **Calibración por API con bloqueo optimista** (migración 21, 22/10/2026; `docs/10 §8.4` punto 51 (ii) a (iv); `docs/16 §51`):
+      `canal.actualizado_en` (`timestamptz NOT NULL DEFAULT now()`, con el disparador `trg_canal_actualizado_en` que lo pone en `now()` en
+      cada `UPDATE`; ambos existían desde la migración 05, que la 21 asegura y documenta) es la marca que exige `PATCH /canales/{id}`, y
+      `plataforma_app` recibe `UPDATE` solo en `escala_cero` y `escala_cien`. Cada cambio deja un `evento` de tipo **`canal_calibrado`** del
+      dispositivo, con la foto `{canal_id, magnitud, antes: {cero, cien}, despues: {cero, cien}, origen: 'api'}` (§7: foto por valor).
 - [ ] **Magnitudes nuevas** del caso de uso (entrevista del 05/10): `radon` (`Bq/m3`, unidad propia: el catálogo
       es el «application context» de RFC 8428 §4.5.2) e `hidrogeno` (`ppm`). Cada una con su rango físico.
 - [ ] **Tercera forma normal, revisada con cada cambio**: al agregar `pasarela` y `trama`, comprobar que ningún

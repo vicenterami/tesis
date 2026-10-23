@@ -126,7 +126,10 @@ no alcanza: `pila.sh sql "SELECT tipo, abierta_en, cerrada_en FROM condicion ORD
 
 **Decir (con el panel ya abierto desde §0):** lo que acaba de pasar en el paso 4 se vio en el panel sin recargar: el dispositivo
 pasó a «Alerta» con el 35, a «Sin señal» al callarlo y volvió a «Normal»; y su ficha muestra el gráfico del canal con la lectura
-en vivo. Ahora, lo que hay detrás: lo que el panel muestra sale de esta API, que cualquier sistema puede consumir. Y el contrato OpenAPI se genera
+en vivo. **Tres gestos rápidos en la ficha (desde el 22/10):** copiar la URL y abrirla en otra pestaña (la vista vuelve igual:
+canal y rango viajan en el enlace); elegir «última hora» en un canal sin datos recientes («Sin mediciones en este rango; la última es de
+hace…» y el botón «Ver la última medición» lleva al rango que sí la contiene); y leer en la cabecera «reporta cada ≈ 5 s (esperado 5 s)» junto
+a «en vivo: conectado · última lectura hace N s». Ahora, lo que hay detrás: lo que el panel muestra sale de esta API, que cualquier sistema puede consumir. Y el contrato OpenAPI se genera
 desde el código, así que no puede describir rutas que no existen.
 
 **Exportar (1 min, lo «no negociable» del entrevistado):** en la terminal B, descargar el CSV crudo del dispositivo de la demo y
@@ -148,7 +151,7 @@ En `/docs`:
 
 ## 6. Cómo se sostiene esto (1 min)
 
-- `cd plataforma/backend && pnpm verificar`: tipos, lint y 342 pruebas unitarias en unos segundos
+- `cd plataforma/backend && pnpm verificar`: tipos, lint y 355 pruebas unitarias en unos segundos
   (la cifra exacta la da la salida de `jest`; no la memorices). Los avisos de cuarentena que aparecen
   mientras corre son de las pruebas, a propósito.
 - `bash plataforma/pruebas/verificar-todo.sh`: esquema, migraciones, diagramas del informe, API y

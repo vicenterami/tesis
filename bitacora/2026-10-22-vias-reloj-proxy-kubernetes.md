@@ -16,7 +16,7 @@ en verde y el cuerpo del informe (sin anexos) en las 30 páginas que fija la pau
   antigua se sigue respetando (cola sin cobertura).
 - **Límite de tasa por dirección en el proxy** (`proxy/nginx.conf`, `docs/11 §3`, `docs/16 §47`): 100 r/s con ráfaga 200 en el 443 (el doble de
   RNF-01 desde una sola dirección), 5 r/s con ráfaga 10 para los métodos que escriben sobre `/dispositivos` y `/pasarelas`, y 100 sesiones
-  por dirección en el 8883; `pruebas/banco/proxy-limites.sh` planta cada violación y comprueba lo legítimo (15/15; 22/22 tras la revisión de cierre).
+  por dirección en el 8883; `pruebas/banco/proxy-limites.sh` planta cada violación y comprueba lo legítimo (15/15; 23/23 tras la revisión de cierre).
 - **Despliegue en Kubernetes como diseño** (`docs/14 §6`, TT-41): las imágenes ya son OCI; lo que faltaba era el estado por pieza y las
   equivalencias Compose → k3s. Hecho verificado en la documentación oficial: k3s exige 2 GB para el nodo servidor, tanto como el techo de
   RNF-17, así que Compose en un servidor sigue siendo la recomendación y el clúster queda diseñado (N réplicas con suscripciones compartidas).
@@ -46,6 +46,10 @@ en verde y el cuerpo del informe (sin anexos) en las 30 páginas que fija la pau
   últimas 20 tramas: el nodo de campo da 17 s frente a 3 min declarados) y avisa cuando difieren por más del doble; el reloj de pasarela
   desviado se lee en palabras; «en vivo» muestra hace cuánto llegó la última lectura. 342 pruebas del backend y 76 del panel; navegador real
   9/9 con captura.
+- **Calibración por la API** (`docs/10 §8.4` punto 51, `docs/16 §51`): `PATCH /canales/{id}` fija `escala_cero` y `escala_cien` con la clave de
+  administrador y bloqueo optimista por `actualizado_en` (409 si alguien cambió la fila entretanto; 200 sin escribir si nada cambia), las escalas
+  también en el alta, evento `canal_calibrado`; migración 21 y permiso mínimo para la aplicación. El banco del nodo propio calibra por la API
+  y ve el % en la ficha, el histórico y el canal en vivo; la ruta entra en la zona estricta del proxy.
 - **Resumen de corrida larga** (`pruebas/corrida-larga.sh`): lecturas por canal, intervalo entre lecturas, huecos, alarmas de silencio y valores
   mínimo, máximo y último, para la corrida de 24 h del nodo propio, que se hace en el portátil sin servidor.
 

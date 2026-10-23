@@ -1,4 +1,4 @@
--- Reglas de identidad de las migraciones 11, 15, 16, 17, 18, 19 y 20 (docs/10 §8.4 puntos 24, 47, 53 y 54; §4.1), plantadas: cada caso intenta lo prohibido y espera el
+-- Reglas de identidad de las migraciones 11, 15, 16, 17, 18, 19, 20 y 21 (docs/10 §8.4 puntos 24, 47, 51, 53 y 54; §4.1), plantadas: cada caso intenta lo prohibido y espera el
 -- rechazo de la base. Todo ocurre dentro de una transacción que termina en ROLLBACK: no queda nada en la base.
 -- La corre el guardián (paso 1c). La carrera de dos altas simultáneas no cabe en una sola sesión: se probó a mano (docs/16 §13).
 BEGIN;
@@ -267,6 +267,34 @@ BEGIN
       ELSE 'FALLA tipo rechazado por otra regla: ' || restriccion END);
   WHEN OTHERS THEN
     INSERT INTO resultado VALUES (30, 'FALLA tipo fuera del dominio: error inesperado: ' || SQLERRM);
+  END;
+  -- Migración 21 (calibración por API, docs/10 §8.4 punto 51): el disparador pone actualizado_en en cada UPDATE, aunque el UPDATE traiga
+  -- otro valor (dentro de esta transacción now() no cambia: por eso se planta un valor viejo y se exige que el disparador lo reemplace);
+  -- y el CHECK de la 18 también rechaza un UPDATE que deje una sola escala. Usan el canal de suelo del caso 22.
+  BEGIN
+    UPDATE canal SET escala_cero = 2.205, escala_cien = 1.170, actualizado_en = '2000-01-01T00:00:00Z'
+      WHERE magnitud_codigo = 'humedad_suelo' AND dispositivo_id = (SELECT id FROM dispositivo WHERE id_fisico = 'prueba-identidad-d');
+    GET DIAGNOSTICS filas = ROW_COUNT;
+    SELECT CASE WHEN c.actualizado_en = now() THEN 'si' ELSE 'no' END INTO f FROM canal c JOIN dispositivo d ON d.id = c.dispositivo_id
+     WHERE d.id_fisico = 'prueba-identidad-d' AND c.magnitud_codigo = 'humedad_suelo';
+    INSERT INTO resultado VALUES (31, CASE WHEN filas = 1 AND f = 'si' THEN 'OK    el disparador pone actualizado_en en now() en cada UPDATE del canal (migración 21)'
+      WHEN filas <> 1 THEN 'FALLA el UPDATE del canal no tocó ninguna fila (¿falló el caso 22?)'
+      ELSE 'FALLA actualizado_en conservó el valor que traía el UPDATE: falta el disparador' END);
+  EXCEPTION WHEN OTHERS THEN
+    INSERT INTO resultado VALUES (31, 'FALLA UPDATE de la calibración: error inesperado: ' || SQLERRM);
+  END;
+  BEGIN
+    UPDATE canal SET escala_cien = NULL
+      WHERE magnitud_codigo = 'humedad_suelo' AND dispositivo_id = (SELECT id FROM dispositivo WHERE id_fisico = 'prueba-identidad-d');
+    GET DIAGNOSTICS filas = ROW_COUNT;
+    INSERT INTO resultado VALUES (32, CASE WHEN filas = 1 THEN 'FALLA un UPDATE dejó la calibración con una sola escala'
+      ELSE 'FALLA el UPDATE de una sola escala no tocó ninguna fila (¿falló el caso 22?)' END);
+  EXCEPTION WHEN check_violation THEN
+    GET STACKED DIAGNOSTICS restriccion = CONSTRAINT_NAME;
+    INSERT INTO resultado VALUES (32, CASE WHEN restriccion = 'ck_canal_escala' THEN 'OK    un UPDATE que deja una sola escala: rechazado'
+      ELSE 'FALLA UPDATE de una sola escala rechazado por otra regla: ' || restriccion END);
+  WHEN OTHERS THEN
+    INSERT INTO resultado VALUES (32, 'FALLA UPDATE de una sola escala: error inesperado: ' || SQLERRM);
   END;
 END $$;
 SELECT linea FROM resultado ORDER BY orden;

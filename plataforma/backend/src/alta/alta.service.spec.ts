@@ -16,7 +16,7 @@ const Z = '11111111-1111-4111-8111-111111111111';
 const P = '22222222-2222-4222-8222-222222222222';
 const alta = (extra: Partial<AltaValidada> = {}): AltaValidada => ({
   id_fisico: 'nodo-01', nombre: 'Nodo', zona_id: Z, via: 'mqtt', formato: 'senml', pasarela_id: null, decodificador: null, intervalo_esperado_s: 60,
-  canales: [{ magnitud: 'temperatura', etiqueta: null }, { magnitud: 'humedad', etiqueta: 'suelo' }], ...extra,
+  canales: [{ magnitud: 'temperatura', etiqueta: null, escala_cero: null, escala_cien: null }, { magnitud: 'humedad', etiqueta: 'suelo', escala_cero: null, escala_cien: null }], ...extra,
 });
 
 // Base y broker falsos: se registra cada consulta en orden y se responde según su prefijo.
@@ -154,10 +154,19 @@ describe('AltaService.crear (HU-11): todo o nada entre la base y el broker', () 
     await expect(servicio.crear(alta({ via: 'lorawan', formato: null, pasarela_id: P }))).rejects.toThrow('el formato de la pasarela cambió durante el alta');
   });
 
+  it('calibración en el alta (punto 51 (i)): el INSERT del canal guarda las escalas y la respuesta las devuelve', async () => {
+    const { servicio, sql, params } = armar();
+    const r = await servicio.crear(alta({ canales: [{ magnitud: 'humedad', etiqueta: null, escala_cero: 2.205, escala_cien: 1.17 }, { magnitud: 'temperatura', etiqueta: null, escala_cero: null, escala_cien: null }] }));
+    const ins = sql.map((s, i) => [s, params[i]] as const).filter(([s]) => s.startsWith('INSERT INTO canal'));
+    expect(ins[0][0]).toContain('escala_cero, escala_cien');
+    expect(ins.map(([, p]) => p.slice(3))).toEqual([[2.205, 1.17], [null, null]]);
+    expect(r.canales.map((c) => [c.escala_cero, c.escala_cien])).toEqual([[2.205, 1.17], [null, null]]);
+  });
+
   it('zona inexistente o magnitud fuera del catálogo → 400 antes de insertar nada', async () => {
     const { servicio, sql } = armar();
     await expect(servicio.crear(alta({ zona_id: '33333333-3333-4333-8333-333333333333' }))).rejects.toBeInstanceOf(BadRequestException);
-    expect(await motivosDe(servicio.crear(alta({ canales: [{ magnitud: 'radiacion', etiqueta: null }] })))).toEqual(['magnitud desconocida: radiacion (catálogo: humedad, temperatura)']);
+    expect(await motivosDe(servicio.crear(alta({ canales: [{ magnitud: 'radiacion', etiqueta: null, escala_cero: null, escala_cien: null }] })))).toEqual(['magnitud desconocida: radiacion (catálogo: humedad, temperatura)']);
     expect(sql.some((s) => s.startsWith('INSERT'))).toBe(false);
   });
 });

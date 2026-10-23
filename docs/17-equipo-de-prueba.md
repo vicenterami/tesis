@@ -229,7 +229,7 @@ alta y el que fija `docs/10 §8.4` punto 51) lee los tres sensores y publica **u
 | Qué imprime por serie | El pack, el resultado de cada publicación (QoS 1: `publicado` solo tras el PUBACK) y la razón de cada fallo; **nunca** la clave, la MAC ni la IP | Las pegadas del monitor terminan en bitácoras: no deben traer identificadores de red ni secretos |
 
 **Verificación, en dos partes.** (1) **Sin hardware, hoy:** el firmware compila (`pio run -e nodo`) y el **contrato se prueba en el banco**
-(`banco.sh nodo`, `docs/16 §44`): alta con los seis canales, calibración por SQL, el mismo pack que arma el firmware publicado con QoS 1
+(`banco.sh nodo`, `docs/16 §44`): alta con los seis canales, calibración por la API (`PATCH /canales/{id}`, `docs/10 §8.4` punto 51), el mismo pack que arma el firmware publicado con QoS 1
 → seis mediciones con la hora del `bt`, `humedad_suelo` guardada en V y su porcentaje en la ficha, un pack sin `bt` → hora de recepción,
 y un pack con un sensor omitido → cinco mediciones. (2) **Con la placa (próxima sesión, laboratorio guiado):** secretos, alta real,
 grabar, monitor, el dispositivo en línea en el panel y las seis series en su ficha (HU-19 con el sensor físico).

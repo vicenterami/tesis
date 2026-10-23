@@ -12,7 +12,7 @@ describe('validarAlta (HU-11): el cuerpo limpio o los motivos', () => {
     const v = validarAlta(bueno);
     expect(v.id_fisico).toBe('nodo-01');
     expect(v.formato).toBe('senml');
-    expect(v.canales).toEqual([{ magnitud: 'temperatura', etiqueta: null }, { magnitud: 'humedad', etiqueta: 'suelo' }]);
+    expect(v.canales).toEqual([{ magnitud: 'temperatura', etiqueta: null, escala_cero: null, escala_cien: null }, { magnitud: 'humedad', etiqueta: 'suelo', escala_cero: null, escala_cien: null }]);
     expect(v.pasarela_id).toBeNull();
   });
   it('rechaza nombres reservados del broker, identificadores con otra forma y campos que solo pone el sistema', () => {
@@ -49,6 +49,17 @@ describe('validarAlta (HU-11): el cuerpo limpio o los motivos', () => {
     expect(motivos({ ...bueno, intervalo_esperado_s: '60' })).toEqual(expect.arrayContaining([expect.stringContaining('intervalo')]));
     expect(motivos({ ...bueno, canales: [] })).toEqual(expect.arrayContaining([expect.stringContaining('canales')]));
     expect(motivos({ ...bueno, canales: [{ magnitud: 'temperatura' }, { magnitud: 'Temperatura' }] })).toEqual(expect.arrayContaining([expect.stringContaining('repetida')]));
+  });
+  it('calibración en el alta (punto 51 (i)): las dos escalas o ninguna, finitas y distintas; el orden no importa', () => {
+    const suelo = (k: Record<string, unknown>) => ({ ...bueno, canales: [{ magnitud: 'humedad_suelo', ...k }] });
+    expect(validarAlta(suelo({ escala_cero: 2.205, escala_cien: 1.17 })).canales[0]).toEqual({ magnitud: 'humedad_suelo', etiqueta: null, escala_cero: 2.205, escala_cien: 1.17 });
+    expect(validarAlta(suelo({ escala_cero: null, escala_cien: null })).canales[0]).toMatchObject({ escala_cero: null, escala_cien: null });
+    expect(motivos(suelo({ escala_cero: 2.205 }))).toEqual([expect.stringContaining('canales[0].escala_cero y escala_cien van juntas')]);
+    expect(motivos(suelo({ escala_cero: null, escala_cien: 1.17 }))).toEqual([expect.stringContaining('van juntas')]);
+    expect(motivos(suelo({ escala_cero: 1.5, escala_cien: 1.5 }))).toEqual([expect.stringContaining('canales[0].escala_cero y escala_cien deben ser distintas')]);
+    expect(motivos(suelo({ escala_cero: Number.NaN, escala_cien: 1 }))).toEqual(['canales[0].escala_cero debe ser un número finito']);
+    expect(motivos(suelo({ escala_cero: 0, escala_cien: JSON.parse('1e400') as number }))).toEqual(['canales[0].escala_cien debe ser un número finito']); // JSON da Infinity
+    expect(motivos(suelo({ escala_cero: '2.2', escala_cien: 1 }))).toEqual(['canales[0].escala_cero debe ser un número finito']);
   });
   it('lo que no es un objeto, o una lista, es 400 con un solo motivo', () => {
     expect(motivos('texto')).toEqual(['el cuerpo debe ser un objeto JSON']);

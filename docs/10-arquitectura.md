@@ -252,7 +252,7 @@ persona y cifrado por SSH. Así se cumplen R1 y R2 del punto 44 sin exponer nada
 
 8. **Límite de tasa por dirección en el proxy (22/10/2026; `docs/11 §3`, `docs/16 §47`).** En el 443, `limit_req` de 100 peticiones/s con
    ráfaga 200 para todo el tráfico (el doble de los 50 eventos/s de RNF-01, que una pasarela o un NAT puede enviar por HTTP desde una sola
-   dirección) y de 5/s con ráfaga 10 para los métodos que escriben sobre `/dispositivos` y `/pasarelas` (frena también a quien intente
+   dirección) y de 5/s con ráfaga 10 para los métodos que escriben sobre `/dispositivos`, `/pasarelas` y `/canales` (frena también a quien intente
    adivinar la clave de administrador); el exceso recibe 429 y queda en el registro. En el 8883, `limit_conn` de 100 sesiones simultáneas por
    dirección (el doble de los 50 canales del caso de validación); la 101 se corta antes del saludo TLS. En HTTP, además, `limit_conn` de
    100 peticiones en curso por dirección (el límite de tasa cuenta inicios, no duración) y de 20 flujos del canal en vivo `/eventos` por
@@ -508,7 +508,7 @@ cliente ──HTTP──► Express ⊂ NestJS ──► servicio ──► pg �
 
 - **Express** es la biblioteca de servidor HTTP más usada de Node.js; NestJS la usa por debajo
   (`@nestjs/platform-express`). El proceso de Node es el servidor; Express recibe cada petición y
-  entrega la respuesta. Es **la API**: 12 rutas REST (15 operaciones, la recepción por HTTP incluida) y el canal SSE `/eventos` (§5), descritos en el contrato OpenAPI (13 rutas y 16 operaciones contando `/eventos`). Express no toca la base.
+  entrega la respuesta. Es **la API**: 13 rutas REST (16 operaciones, la recepción por HTTP incluida) y el canal SSE `/eventos` (§5), descritos en el contrato OpenAPI (14 rutas y 17 operaciones contando `/eventos`). Express no toca la base.
 - **`pg`** (node-postgres) es el conductor de la base: mantiene un *pool* de 5 conexiones
   (`db/db.module.ts`) y envía **SQL directo** con parámetros `$1, $2…`; el valor nunca se pega dentro
   del texto SQL, lo que evita la inyección. Sin ORM, por la razón de `docs/07` (series de tiempo con
@@ -521,6 +521,7 @@ cliente ──HTTP──► Express ⊂ NestJS ──► servicio ──► pg �
   segundos enteros, de las diferencias entre los `recibido_en` de las últimas 20 filas de `trama` del dispositivo (por su índice
   `(dispositivo_id, recibido_en DESC)`), calculada por una subconsulta de la misma consulta (sin una ida más a la base); nulo con menos
   de 3 instantes o si no quedan tramas retenidas (`RETENCION_TRAMA_DIAS`, 30 días por defecto). Informa; la alarma de silencio usa solo el intervalo esperado (§4.1 y §4.3).
+  Por canal trae también `actualizado_en`, con microsegundos, que se devuelve tal cual en **`PATCH /canales/{id}`** (calibración con bloqueo optimista, clave de administrador; §8.4 punto 51).
 - **CORS no se activa, a propósito.** Es una regla del navegador para páginas de *otro* origen; el panel
   lo servirá el mismo backend (mismo origen, `docs/11 §4`), y sin CORS el navegador bloquea por defecto
   a cualquier otro sitio. Ni los sensores, ni `curl`, ni la base están sujetos a CORS.
@@ -1434,7 +1435,24 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     histórico y la recepción. **Cada cuánto
     publica el nodo:** 60 s por ahora (decidido; la constante llega con el firmware de la fase 2, `docs/17 §6`) y el intervalo esperado del dispositivo es editable (`§4.4`); cambiarlo en
     remoto, con un comando del broker al nodo, exige que el dispositivo se suscriba a su subárbol de comandos (cambio de la ACL del rol
-    `dispositivo`) y se diseña aquí antes de hacerlo.
+    `dispositivo`) y se diseña aquí antes de hacerlo. **Calibración por API (decidido el 22/10/2026; hasta hoy solo por SQL, `docs/16 §43`):**
+    (i) en el alta, `canales[]` admite `escala_cero` y `escala_cien` con la misma regla de la migración 18 (las dos o ninguna, finitas,
+    distintas; con una sola o iguales, 400 con el motivo, antes de tocar la base); (ii) **`PATCH /canales/{id}`**, con la clave de
+    administrador como toda ruta que escribe (punto 41), cuerpo `{escala_cero, escala_cien, actualizado_en}`: las dos con valor para
+    calibrar, las dos `null` para quitar la calibración; `actualizado_en` es el que entregó la ficha (**bloqueo optimista**: el `UPDATE`
+    exige `actualizado_en = $enviado` y, si no afecta filas pero el canal existe, 409 «alguien lo cambió a las HH:MM; recarga», como el punto 28 para el
+    panel); respuesta 200 con el canal y su `actualizado_en` nuevo; 404 si el canal no existe; si las escalas enviadas son las vigentes, 200 sin escribir
+    ni evento, con el `actualizado_en` intacto (un reintento idéntico no mueve la marca). (iii) **`canal.actualizado_en`** (`timestamptz NOT NULL DEFAULT now()` y un disparador `BEFORE UPDATE` que lo pone en `now()`, para que
+    también la vía por SQL y cualquier escritor futuro lo mantengan; al implementarlo se vio que la columna y el disparador ya existían desde la
+    migración 05, que los puso en toda tabla mutable: la migración 21 los asegura con la misma forma, los documenta como marca del bloqueo y da a
+    `plataforma_app`, que no podía actualizar `canal`, `UPDATE` solo en `escala_cero` y `escala_cien`); la ficha lo entrega por canal como texto
+    ISO 8601 UTC **con microsegundos**, que el cliente devuelve tal cual (un `Date` de JavaScript los perdería y el bloqueo daría 409 siempre). (iv) **Rastro:** evento `canal_calibrado` del dispositivo con
+    `{canal_id, magnitud, antes: {cero, cien}, despues: {cero, cien}, origen: 'api'}`. (v) **Efecto:** nada guardado se reescribe; el %
+    de la ficha, del histórico y del canal en vivo sale con la escala vigente en la siguiente consulta o lectura (una sola función, `consulta/escala.ts`).
+    (vi) **Prueba:** unitarias del DTO y del 409 con dobles; en el banco (`banco.sh nodo`), calibrar por API el canal de suelo del contrato del
+    nodo y ver el % en la ficha, el histórico y el evento en vivo; `docs/16 §51`. (vii) **Lo que no restringe:** se admite calibrar un canal de un
+    dispositivo dado de baja (sus datos siguen siendo consultables y la escala solo afecta a la consulta) y el `PATCH` no entra en el cupo de dos
+    operaciones de aprovisionamiento (punto 42), porque no espera al broker; sí entra en la zona de tasa de administración del proxy (§2 punto 8).
 
 52. **Recepción por HTTP (RF-01, HU-01): decidido el 16/10/2026.** El alta de un dispositivo
     de vía `http` entrega un token y la base guarda solo su huella `scrypt` (`credencial`, §8.4 punto 25). (i) **`POST /recepcion/{id_fisico}`**,

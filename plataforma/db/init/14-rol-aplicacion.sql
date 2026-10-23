@@ -35,6 +35,13 @@ GRANT UPDATE ON dispositivo, credencial, condicion, estado_dispositivo, condicio
 -- migración se reejecuta después de la 16 (revisión del 15/10). Solo la columna activo, nunca el formato ni el sitio.
 GRANT INSERT ON pasarela TO plataforma_app;
 GRANT UPDATE (activo) ON pasarela TO plataforma_app;
+-- Desde la migración 21, la calibración del canal (PATCH /canales/{id}): solo escala_cero y escala_cien. Las columnas nacen en la 18,
+-- después de esta: en un contenedor nuevo la 21 da el permiso; aquí se repite solo si ya existen (reejecución en una base existente).
+DO $$ BEGIN
+  IF (SELECT count(*) FROM information_schema.columns WHERE table_name = 'canal' AND column_name IN ('escala_cero', 'escala_cien')) = 2 THEN
+    GRANT UPDATE (escala_cero, escala_cien) ON canal TO plataforma_app;
+  END IF;
+END $$;
 ALTER DEFAULT PRIVILEGES FOR ROLE plataforma IN SCHEMA public REVOKE INSERT, UPDATE ON TABLES FROM plataforma_app;
 ALTER DEFAULT PRIVILEGES FOR ROLE plataforma IN SCHEMA public GRANT SELECT ON TABLES TO plataforma_app;
 

@@ -3,6 +3,7 @@ import type { FilaExportada } from './exportar';
 import { Pool } from 'pg';
 import { POOL } from '../db/db.module';
 import { porcentaje } from './escala';
+import { isoUs } from '../db/iso-us';
 import { Intervalo } from './validacion';
 
 // Consultas de lectura. SQL explícito y parametrizado ($1, $2…): se lee, se audita, se explica.
@@ -63,6 +64,8 @@ export class ConsultaService {
     const canales = await this.pool.query(`
       SELECT c.id, c.magnitud_codigo AS magnitud, m.nombre AS magnitud_nombre, m.unidad_canonica AS unidad, c.etiqueta,
              c.escala_cero, c.escala_cien,
+             -- Marca del bloqueo optimista de PATCH /canales/{id} (punto 51): con microsegundos, como texto, para devolverla tal cual.
+             ${isoUs('c.actualizado_en')} AS actualizado_en,
              (SELECT json_agg(json_build_object('id', r.id, 'umbral_alto', r.umbral_alto, 'umbral_bajo', r.umbral_bajo, 'histeresis', r.histeresis))
                 FROM regla_umbral r WHERE r.canal_id = c.id) AS reglas,
              (SELECT json_build_object('valor', x.valor, 'tiempo', iso_utc(x.tiempo)) FROM medicion x

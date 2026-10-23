@@ -37,7 +37,7 @@ fi
 caso "UUID inválido → 400"                    /dispositivos/no-es-uuid 400
 caso "limite fuera de rango → 400"            "/condiciones?limite=99999" 400
 caso "condiciones abiertas es lista con duracion_s" "/condiciones?abiertas=true" "isinstance(r,list) and all(isinstance(c['duracion_s'],int) for c in r)"
-caso "contrato OpenAPI servido con 13 rutas (16 operaciones: alta, baja y rotación de dispositivos y de pasarelas, y la recepción por HTTP incluidas), con el canal /eventos como text/event-stream" /docs/openapi.json "len(r['paths'])==13 and sum(1 for p in r['paths'].values() for m in p if m in {'get','post','put','patch','delete'})==16 and 'post' in r['paths']['/dispositivos'] and 'delete' in r['paths']['/dispositivos/{id}'] and 'post' in r['paths']['/dispositivos/{id}/credencial'] and r['openapi'].startswith('3.') and 'text/event-stream' in r['paths']['/eventos']['get']['responses']['200']['content']"
+caso "contrato OpenAPI servido con 14 rutas (17 operaciones: alta, baja y rotación de dispositivos y de pasarelas, la calibración de un canal y la recepción por HTTP incluidas), con el canal /eventos como text/event-stream" /docs/openapi.json "len(r['paths'])==14 and sum(1 for p in r['paths'].values() for m in p if m in {'get','post','put','patch','delete'})==17 and 'post' in r['paths']['/dispositivos'] and 'delete' in r['paths']['/dispositivos/{id}'] and 'post' in r['paths']['/dispositivos/{id}/credencial'] and 'patch' in r['paths']['/canales/{id}'] and r['openapi'].startswith('3.') and 'text/event-stream' in r['paths']['/eventos']['get']['responses']['200']['content']"
 # El servido (generado en caliente desde los decoradores) vs. el versionado en el repo (se
 # desincroniza si alguien cambia una ruta y olvida correr `pnpm openapi` antes de commitear).
 caso "OpenAPI servido == OpenAPI versionado (mismas rutas y métodos)" /docs/openapi.json \
@@ -60,7 +60,8 @@ code=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$API/dispositivos/no-es-u
 [[ "$code" == 401 || "$code" == 503 ]] && echo "OK    POST /dispositivos/{id}/credencial sin X-Clave-Admin → $code" || { echo "FALLA rotación sin clave → HTTP $code (esperado 401 o 503)"; fallos=$((fallos+1)); }
 # Pasarelas (docs/10 §8.4 punto 47, 15/10): la lista es de lectura; las tres rutas que escriben exigen la clave, antes de mirar el UUID.
 caso "pasarelas es una lista con formato y nodos" /pasarelas "isinstance(r,list) and all(p['formato'] in ('milesight','chirpstack') and isinstance(p['nodos'],int) for p in r)"
-for ruta in "POST /pasarelas" "DELETE /pasarelas/no-es-uuid" "POST /pasarelas/no-es-uuid/credencial"; do
+# La calibración de un canal (docs/10 §8.4 punto 51, 22/10) también escribe: la misma guardia, antes de mirar el UUID.
+for ruta in "POST /pasarelas" "DELETE /pasarelas/no-es-uuid" "POST /pasarelas/no-es-uuid/credencial" "PATCH /canales/no-es-uuid"; do
   code=$(curl -s -o /dev/null -w '%{http_code}' -X "${ruta%% *}" -H 'Content-Type: application/json' -d '{}' "$API${ruta#* }")
   [[ "$code" == 401 || "$code" == 503 ]] && echo "OK    $ruta sin X-Clave-Admin → $code" || { echo "FALLA $ruta sin clave → HTTP $code (esperado 401 o 503)"; fallos=$((fallos+1)); }
 done

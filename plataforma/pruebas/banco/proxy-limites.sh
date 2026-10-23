@@ -46,6 +46,9 @@ cod=$(rafaga -X DELETE "$URL/pasarelas/x?r=[1-40]")
 n429=$(cuenta 429 "$cod")
 [ "$n429" -gt 0 ] && ok "40 DELETE /pasarelas/x seguidos: $n429 con 429 (la zona cubre DELETE y /pasarelas)" || falla "DELETE /pasarelas sin ningún 429"
 # mayúsculas: Express enruta sin distinguirlas (docs/10 §8.4 punto 52), así que la zona tampoco debe distinguirlas (revisión del 22/10)
+cod=$(rafaga -X PATCH -H 'Content-Type: application/json' -d '{}' "$URL/canales/x?r=[1-40]"); n429=$(cuenta 429 "$cod")
+[ "$n429" -gt 0 ] && ok "40 PATCH /canales/x seguidos: $n429 con 429 (la calibración por API también es administración)" || falla "PATCH /canales esquivó la zona de administración (0 con 429)"
+sleep 4
 cod=$(rafaga -X POST "$URL/DISPOSITIVOS?r=[1-40]"); n429=$(cuenta 429 "$cod")
 [ "$n429" -gt 0 ] && ok "40 POST /DISPOSITIVOS (mayúsculas) seguidos: $n429 con 429 (la zona no distingue mayúsculas, como Express)" || falla "POST /DISPOSITIVOS esquivó la zona de administración (0 con 429)"
 # lo legítimo: lecturas y recepción NO sufren el límite estricto, aunque se pidan igual de rápido

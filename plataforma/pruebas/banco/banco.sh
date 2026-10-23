@@ -16,7 +16,7 @@
 #   bash plataforma/pruebas/banco/banco.sh vias                la misma serie por MQTT, HTTP (packs de 1, 10 y 60) y pasarela: pérdidas, duplicados, latencia y consumo del backend (docs/16 §49)
 #   bash plataforma/pruebas/banco/banco.sh http                recepción por HTTP (HU-01): 202, 401, 413, 415, 422 con cuarentena, la baja, los topes (par, dirección, caché, ritmo) y la dirección con el secreto del proxy
 #   bash plataforma/pruebas/banco/banco.sh tope                tope por emisor en las dos vías (docs/10 §8.4 punto 53): presupuesto de lecturas por HTTP y cuota de cuarentena por MQTT
-#   bash plataforma/pruebas/banco/banco.sh nodo                contrato del nodo ESP32 (fase 2, docs/17 §6.2) sin la placa: alta con seis canales, calibración, el pack del firmware con QoS 1 → medicion y ficha
+#   bash plataforma/pruebas/banco/banco.sh nodo                contrato del nodo ESP32 (fase 2, docs/17 §6.2) sin la placa: alta con seis canales, calibración por API (400, 200, 409), el pack del firmware con QoS 1 → medicion, ficha, histórico y en vivo
 #   bash plataforma/pruebas/banco/banco.sh navegador           pantalla P3 en Firefox real con Playwright: puntos contra /historico, vivo sin recargar, caída y vuelta (docs/16 §39)
 #   bash plataforma/pruebas/banco/banco.sh cola                cola del broker vigilada: backend detenido + 200 emulados → descartes → condición broker_descarte (docs/16 §22)
 #   bash plataforma/pruebas/banco/banco.sh estado | logs [servicio] | sql ["CONSULTA"]
@@ -616,8 +616,10 @@ case "${1:-}" in
     echo; [ $fallos -eq 0 ] && echo "HTTP OK" || { echo "$fallos comprobación(es) con falla"; exit 1; } ;;
   nodo)
     # Contrato del nodo propio (fase 2, docs/17 §6.2; docs/16 §44), sin la placa: alta con los seis canales del nodo, calibración del
-    # suelo por SQL (la API aún no la recibe), y EL MISMO pack que arma src/nodo.cpp publicado con QoS 1 por 1884 con la credencial del
-    # alta → una trama, seis mediciones con la hora del bt y origen «dispositivo», humedad_suelo guardada en V y su porcentaje en la ficha;
+    # suelo por API (PATCH /canales/{id} con bloqueo optimista, docs/10 §8.4 punto 51; docs/16 §51: 400 con una sola escala, 200, 409 con el
+    # actualizado_en viejo, evento canal_calibrado), y EL MISMO pack que arma src/nodo.cpp publicado con QoS 1 por 1884 con la credencial del
+    # alta → una trama, seis mediciones con la hora del bt y origen «dispositivo», humedad_suelo guardada en V y su porcentaje en la ficha,
+    # el histórico y el evento en vivo del canal;
     # un pack sin bt → seis mediciones con la hora de recepción; un pack con un sensor omitido (sin temperatura_suelo) → cinco.
     CLAVE=$(leer HTTP_CLAVE_ADMIN); fallos=0; n=$(date +%s%N | tail -c 8); id="nodo-$n"   # sufijo con nanosegundos: dos corridas seguidas no repiten id (409)
     ok() { echo "OK    $1"; }; falla() { echo "FALLA $1"; fallos=$((fallos+1)); }
@@ -630,9 +632,28 @@ case "${1:-}" in
     [ "$(codigo "$r")" = 201 ] && ok "alta del nodo por API con los seis canales (vía mqtt, senml, 60 s) → 201" || { echo "FALLA alta → $(codigo "$r"): $(cuerpo "$r" | head -c 200)"; exit 1; }
     CRED=$(json "v['conexion']['credencial']" <<<"$(cuerpo "$r")"); NUID=$(json "v['id']" <<<"$(cuerpo "$r")"); topico=$(json "v['conexion']['ejemplo']['topico']" <<<"$(cuerpo "$r")"); unset r
     [ "$topico" = "sitio/banco/dispositivo/$id/temperatura" ] && ok "el tópico del alta es el que arma el firmware (…/<id>/temperatura)" || falla "tópico «$topico»"
-    psql_ -q -c "UPDATE canal SET escala_cero = 2.205, escala_cien = 1.170 WHERE dispositivo_id = '$NUID' AND magnitud_codigo = 'humedad_suelo'"
-    e=$(psql_ -tA -c "SELECT escala_cero || '/' || escala_cien FROM canal WHERE dispositivo_id = '$NUID' AND magnitud_codigo = 'humedad_suelo'")
-    [ "$e" = "2.205/1.17" ] && ok "calibración del suelo fijada por SQL (2,205 V = 0 %, 1,170 V = 100 %: la de la fase 1)" || falla "calibración: «$e»"
+    # Calibración por API (punto 51): el canal y su actualizado_en salen de la ficha, como los tendría el panel.
+    f=$(curl -s -m 5 "http://127.0.0.1:3001/dispositivos/$NUID")
+    SCID=$(json "[k for k in v['canales'] if k['magnitud']=='humedad_suelo'][0]['id']" <<<"$f"); AT=$(json "[k for k in v['canales'] if k['magnitud']=='humedad_suelo'][0]['actualizado_en']" <<<"$f")
+    [ -n \"$SCID\" ] && [ -n \"$AT\" ] || { falla \"la ficha no trae el canal de suelo o su actualizado_en\"; exit 1; }   # sin ellos, lo que sigue no prueba nada
+    [[ "$AT" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:]{8}\.[0-9]{6}Z$ ]] && ok "la ficha entrega el actualizado_en del canal con microsegundos ($AT)" || falla "actualizado_en en la ficha: «$AT»"
+    r=$(api PATCH "/canales/$SCID" -d "{\"escala_cero\":2.205,\"escala_cien\":null,\"actualizado_en\":\"$AT\"}")
+    [ "$(codigo "$r")" = 400 ] && [[ "$(cuerpo "$r")" == *"van juntas"* ]] && ok "PATCH con una sola escala → 400 con el motivo, sin tocar la base" || falla "una sola escala → $(codigo "$r"): $(cuerpo "$r" | head -c 160)"
+    code=$(curl -s -m 5 -o /dev/null -w '%{http_code}' -X PATCH -H 'Content-Type: application/json' -d "{\"escala_cero\":2.205,\"escala_cien\":1.17,\"actualizado_en\":\"$AT\"}" "http://127.0.0.1:3001/canales/$SCID")
+    [ "$code" = 401 ] && ok "PATCH sin X-Clave-Admin → 401" || falla "PATCH sin clave → $code"
+    r=$(api PATCH "/canales/$SCID" -d "{\"escala_cero\":2.205,\"escala_cien\":1.17,\"actualizado_en\":\"$AT\"}")
+    e=$(json "f\"{v['escala_cero']}/{v['escala_cien']}/{v['actualizado_en']!='$AT'}\"" <<<"$(cuerpo "$r")" 2>/dev/null)
+    [ "$(codigo "$r")" = 200 ] && [ "$e" = "2.205/1.17/True" ] && ok "PATCH con el actualizado_en de la ficha → 200: 2,205 V = 0 %, 1,170 V = 100 % (la de la fase 1), con un actualizado_en nuevo" || falla "calibrar → $(codigo "$r"): «$e»"
+    r=$(api PATCH "/canales/$SCID" -d "{\"escala_cero\":2.3,\"escala_cien\":1.1,\"actualizado_en\":\"$AT\"}")
+    [ "$(codigo "$r")" = 409 ] && [[ "$(cuerpo "$r")" == *"alguien lo cambió a las"* ]] && ok "un segundo PATCH con el actualizado_en viejo → 409 «alguien lo cambió a las HH:MM…; recarga»" || falla "actualizado_en viejo → $(codigo "$r"): $(cuerpo "$r" | head -c 160)"
+    e=$(psql_ -tA -c "SELECT escala_cero || '/' || escala_cien FROM canal WHERE id = '$SCID'")
+    ev=$(psql_ -tA -c "SELECT count(*) FILTER (WHERE detalle = jsonb_build_object('canal_id', '$SCID', 'magnitud', 'humedad_suelo', 'antes', jsonb_build_object('cero', NULL, 'cien', NULL), 'despues', jsonb_build_object('cero', 2.205, 'cien', 1.17), 'origen', 'api')) || '/' || count(*) FROM evento WHERE dispositivo_id = '$NUID' AND tipo = 'canal_calibrado'")
+    [ "$e" = "2.205/1.17" ] && [ "$ev" = "1/1" ] && ok "la base quedó con la calibración del 200 (el 409 no cambió nada) y un solo evento canal_calibrado con antes y después" || falla "base: escala «$e», eventos canal_calibrado «$ev»"
+    # El evento en vivo del canal (SSE, directo al backend), abierto antes de publicar.
+    sse="$PRIV/sse-nodo.txt"; : > "$sse"
+    curl -s -N -m 40 "http://127.0.0.1:3001/eventos?canal=$SCID" > "$sse" & sse_pid=$!
+    trap 'kill "$sse_pid" 2>/dev/null' EXIT
+    sleep 1   # el flujo no escribe nada hasta el primer evento (o el latido, a los 25 s): se le da un segundo para suscribirse
     red=$(docker network ls --format '{{.Name}}' | grep '^banco_default$')
     # El nodo publica con clientId = usuario = id_fisico y QoS 1; la credencial entra por stdin (nunca por argv).
     pub() { printf '%s\n' "$CRED" | docker run --rm -i --network "$red" "$IMG_BROKER" sh -c 'IFS= read -r C; mosquitto_pub -V mqttv5 -d -h mosquitto -q 1 -i "$1" -u "$1" -P "$C" -t "$2" -m "$3" 2>&1' sh "$id" "$topico" "$1" | grep -oE "PUBACK \(Mid: [0-9]+, RC:[0-9]+\)|Connection error: .*" | head -1; }
@@ -650,6 +671,12 @@ case "${1:-}" in
     t=$(psql_ -tA -c "SELECT count(*) FROM trama WHERE dispositivo_id = '$NUID'"); [ "$t" = 1 ] && ok "una sola trama para las seis lecturas" || falla "tramas: $t"
     p=$(curl -s -m 5 "http://127.0.0.1:3001/dispositivos/$NUID" | json "[k for k in v['canales'] if k['magnitud']=='humedad_suelo'][0]['ultima_medicion']['porcentaje']")
     [ "$p" = 0.6 ] && ok "la ficha trae el porcentaje calculado con la calibración: 2,199 V → 0,6 % (sensor al aire)" || falla "porcentaje en la ficha: «$p»"
+    q=$(curl -s -m 5 "http://127.0.0.1:3001/canales/$SCID/historico?intervalo=1%20minute&desde=$(date -u -d "@$((bt - 1))" +%Y-%m-%dT%H:%M:%SZ)" | json "f\"{v['escala']}|{v['porcentajes']}\"")
+    [[ "$q" == "{'cero': 2.205, 'cien': 1.17}|[0.6"* ]] && ok "el histórico del canal trae la escala vigente y el porcentaje de cada punto (0,6 %)" || falla "histórico: «$q»"
+    for _ in $(seq 1 20); do grep -q '^event: medicion' "$sse" && break; sleep 0.5; done
+    kill "$sse_pid" 2>/dev/null; wait "$sse_pid" 2>/dev/null; trap - EXIT
+    s=$(grep -m1 '^data: .*"tipo":"medicion"' "$sse" | sed 's/^data: //' | json "f\"{v['canal_id']}|{v['valor']}|{v['porcentaje']}\"" 2>/dev/null); rm -f "$sse"
+    [ "$s" = "$SCID|2.199|0.6" ] && ok "el evento en vivo del canal (SSE medicion) trae el porcentaje con la calibración de la API: 0,6 %" || falla "evento en vivo: «$s»"
     rs=$(curl -s -m 5 "http://127.0.0.1:3001/dispositivos/$NUID" | json "[k for k in v['canales'] if k['magnitud']=='rssi'][0]['ultima_medicion']['valor']")
     [ "$rs" = -61 ] && ok "la intensidad Wi-Fi (rssi, dBm) llegó como magnitud del catálogo" || falla "rssi en la ficha: «$rs»"
     curl -s http://127.0.0.1:3001/dispositivos | python3 -c "import sys,json; sys.exit(0 if any(d['id_fisico']=='$id' and d['en_linea'] for d in json.load(sys.stdin)) else 1)" && ok "el inventario lo muestra en línea" || falla "no aparece en línea en el inventario"

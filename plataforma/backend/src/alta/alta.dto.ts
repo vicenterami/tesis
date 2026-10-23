@@ -24,6 +24,8 @@ export const MAX_CANALES = 20;
 export interface CanalAlta {
   magnitud: string;
   etiqueta: string | null;
+  escala_cero: number | null; // calibración lineal a porcentaje (migración 18; docs/10 §8.4 punto 51): las dos o ninguna
+  escala_cien: number | null;
 }
 export interface AltaValidada {
   id_fisico: string;
@@ -58,6 +60,30 @@ class Motivos {
     this.lista.push(`${nombre} debe ser una de: ${opciones.join(', ')}`);
     return porDefecto;
   }
+}
+
+// La regla de ck_canal_escala (migración 18), con el motivo claro y antes de tocar la base: las dos escalas o ninguna (ausente o null),
+// números finitos (JSON.parse convierte 1e400 en Infinity) y distintas. Devuelve el par o null si alguna no sirve (el motivo queda en la lista).
+export function validarEscalas(cero: unknown, cien: unknown, prefijo: string, motivos: string[]): { escala_cero: number | null; escala_cien: number | null } | null {
+  const ninguna = (v: unknown): boolean => v === undefined || v === null;
+  if (ninguna(cero) && ninguna(cien)) return { escala_cero: null, escala_cien: null };
+  if (ninguna(cero) || ninguna(cien)) {
+    motivos.push(`${prefijo}escala_cero y escala_cien van juntas: las dos con valor para calibrar, o las dos null para quitar la calibración`);
+    return null;
+  }
+  let bien = true;
+  for (const [nombre, v] of [['escala_cero', cero], ['escala_cien', cien]] as const) {
+    if (typeof v !== 'number' || !Number.isFinite(v)) {
+      motivos.push(`${prefijo}${nombre} debe ser un número finito`);
+      bien = false;
+    }
+  }
+  if (!bien) return null;
+  if (cero === cien) {
+    motivos.push(`${prefijo}escala_cero y escala_cien deben ser distintas (el 0 % y el 100 % no pueden ser el mismo valor)`);
+    return null;
+  }
+  return { escala_cero: cero as number, escala_cien: cien as number };
 }
 
 export function validarAlta(cuerpo: unknown, reservadosExtra: readonly string[] = []): AltaValidada {
@@ -103,7 +129,8 @@ export function validarAlta(cuerpo: unknown, reservadosExtra: readonly string[] 
       if (vistas.has(magnitud)) m.lista.push(`canales[${i}].magnitud repetida: ${magnitud}`);
       vistas.add(magnitud);
       const etiqueta = kk.etiqueta === undefined || kk.etiqueta === null ? null : m.texto(kk.etiqueta, `canales[${i}].etiqueta`, 1, 40);
-      canales.push({ magnitud, etiqueta });
+      const escalas = validarEscalas(kk.escala_cero, kk.escala_cien, `canales[${i}].`, m.lista) ?? { escala_cero: null, escala_cien: null };
+      canales.push({ magnitud, etiqueta, ...escalas });
     }
   }
   const permitidas = new Set(['id_fisico', 'nombre', 'zona_id', 'via', 'formato', 'pasarela_id', 'decodificador', 'intervalo_esperado_s', 'canales']);

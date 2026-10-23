@@ -7,6 +7,8 @@ import { POOL } from '../db/db.module';
 import { ErrorDynsec, ROL_DISPOSITIVO, ROL_PASARELA, ordenBaja, ordenRotacion, ordenesAlta, ordenesAltaDispositivo, ordenesAltaPasarela } from '../broker/dynsec';
 import { DynsecService } from '../broker/dynsec.service';
 import { AltaValidada, Formato, Via } from './alta.dto';
+import { CalibracionValidada } from './calibracion.dto';
+import { isoUs } from '../db/iso-us';
 import { generarSecreto, hashScrypt } from './credenciales';
 import { FormatoPasarela, PasarelaValidada } from './pasarela.dto';
 
@@ -15,7 +17,22 @@ export interface CanalCreado {
   magnitud: string;
   unidad: string;
   etiqueta: string | null;
+  escala_cero: number | null;
+  escala_cien: number | null;
 }
+// Resultado de PATCH /canales/{id} (docs/10 §8.4 punto 51 (ii)): el canal con su calibración vigente y su `actualizado_en` nuevo, en
+// ISO 8601 UTC con microsegundos (el que hay que mandar en el próximo cambio).
+export interface CanalCalibrado {
+  id: string;
+  dispositivo_id: string;
+  magnitud: string;
+  unidad: string;
+  etiqueta: string | null;
+  escala_cero: number | null;
+  escala_cien: number | null;
+  actualizado_en: string;
+}
+interface CanalBloqueado { id: string; dispositivo_id: string; magnitud: string; unidad: string; etiqueta: string | null; escala_cero: number | null; escala_cien: number | null; actualizado_en: string }
 // Lo que el dispositivo necesita para conectarse, según su vía (docs/10 §3). La credencial aparece aquí UNA vez.
 export interface ConexionMqtt {
   via: 'mqtt';
@@ -134,7 +151,7 @@ interface FilaBloqueada {
   pasarela_id: string | null;
   sitio_codigo: string;
 }
-type Operacion = 'alta' | 'baja' | 'rotación';
+type Operacion = 'alta' | 'baja' | 'rotación' | 'calibración';
 
 // Operaciones de escritura simultáneas admitidas por proceso (alta, baja o rotación): cada una retiene una conexión del pool
 // (de 5, compartido con la recepción de tramas) mientras espera al broker (hasta 5 s). Más que esto, 429: el pool no se agota
@@ -180,8 +197,11 @@ export class AltaService {
       const id = d.rows[0].id;
       const canales: CanalCreado[] = [];
       for (const k of a.canales) {
-        const r = await c.query<{ id: string }>('INSERT INTO canal (dispositivo_id, magnitud_codigo, etiqueta) VALUES ($1, $2, $3) RETURNING id', [id, k.magnitud, k.etiqueta]);
-        canales.push({ id: r.rows[0].id, magnitud: k.magnitud, unidad: unidades.get(k.magnitud) ?? '', etiqueta: k.etiqueta });
+        const r = await c.query<{ id: string }>(
+          'INSERT INTO canal (dispositivo_id, magnitud_codigo, etiqueta, escala_cero, escala_cien) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+          [id, k.magnitud, k.etiqueta, k.escala_cero, k.escala_cien],
+        );
+        canales.push({ id: r.rows[0].id, magnitud: k.magnitud, unidad: unidades.get(k.magnitud) ?? '', etiqueta: k.etiqueta, escala_cero: k.escala_cero, escala_cien: k.escala_cien });
       }
       const secreto = a.via === 'lorawan' ? null : generarSecreto(); // la pasarela autentica a los lorawan (docs/10 §3)
       if (secreto !== null) await c.query('INSERT INTO credencial (dispositivo_id, hash) VALUES ($1, $2)', [id, await hashScrypt(secreto)]); // nunca el secreto
@@ -278,6 +298,62 @@ export class AltaService {
       throw this.traducir(e, idFisico, 'rotación');
     } finally {
       this.soltar(c);
+    }
+  }
+
+  // Calibración de un canal por API (docs/10 §8.4 punto 51 (ii) a (v)), con BLOQUEO OPTIMISTA: el cambio exige el `actualizado_en` que
+  // entregó la ficha; si otro lo cambió entretanto (la API, la vía por SQL: el disparador de la migración 05 lo pone en cada UPDATE), 409
+  // con la hora del cambio, como hará el panel configurable (docs/19). La fila se lee bloqueada (FOR NO KEY UPDATE: las mediciones que la referencian siguen
+  // entrando) para que «antes» sea exactamente lo que el UPDATE reemplaza; el evento `canal_calibrado` va en la misma transacción. Nada
+  // guardado se reescribe: el % sale con la escala vigente en la siguiente consulta o lectura (consulta/escala.ts). No pasa por el cupo de
+  // las operaciones de aprovisionamiento: no espera al broker y dura lo que dos sentencias.
+  async calibrar(id: string, cal: CalibracionValidada): Promise<CanalCalibrado> {
+    const c = await this.pool.connect();
+    try {
+      await this.abrir(c);
+      const a = await c.query<CanalBloqueado>(
+        `SELECT c.id, c.dispositivo_id, c.magnitud_codigo AS magnitud, m.unidad_canonica AS unidad, c.etiqueta, c.escala_cero, c.escala_cien,
+                ${isoUs('c.actualizado_en')} AS actualizado_en
+           FROM canal c JOIN magnitud m ON m.codigo = c.magnitud_codigo WHERE c.id = $1 FOR NO KEY UPDATE OF c`,
+        [id],
+      );
+      const antes = a.rows[0];
+      if (antes === undefined) throw new NotFoundException('canal no encontrado');
+      if (antes.escala_cero === cal.escala_cero && antes.escala_cien === cal.escala_cien) {
+        // Nada que cambiar: sin UPDATE ni evento, y actualizado_en sigue siendo el vigente (revisión del 22/10: un reintento idéntico
+        // no debe mover la marca ni llenar el rastro).
+        await c.query('COMMIT');
+        return { id: antes.id, dispositivo_id: antes.dispositivo_id, magnitud: antes.magnitud, unidad: antes.unidad, etiqueta: antes.etiqueta,
+                 escala_cero: antes.escala_cero, escala_cien: antes.escala_cien, actualizado_en: antes.actualizado_en };
+      }
+      const u = await c.query<CanalCalibrado>(
+        `UPDATE canal c SET escala_cero = $2, escala_cien = $3 FROM magnitud m
+          WHERE c.id = $1 AND c.actualizado_en = $4::timestamptz AND m.codigo = c.magnitud_codigo
+          RETURNING c.id, c.dispositivo_id, c.magnitud_codigo AS magnitud, m.unidad_canonica AS unidad, c.etiqueta, c.escala_cero, c.escala_cien,
+                    ${isoUs('c.actualizado_en')} AS actualizado_en`,
+        [id, cal.escala_cero, cal.escala_cien, cal.actualizado_en],
+      );
+      const despues = u.rows[0];
+      if (despues === undefined) {
+        throw new ConflictException({
+          statusCode: 409, error: 'Conflict', actualizado_en: antes.actualizado_en,
+          message: `alguien lo cambió a las ${antes.actualizado_en.slice(11, 16)} UTC (${antes.actualizado_en}); recarga`,
+        });
+      }
+      await c.query('INSERT INTO evento (dispositivo_id, tipo, detalle) VALUES ($1, $2, $3)', [
+        antes.dispositivo_id, 'canal_calibrado', JSON.stringify({
+          canal_id: id, magnitud: antes.magnitud, antes: { cero: antes.escala_cero, cien: antes.escala_cien },
+          despues: { cero: despues.escala_cero, cien: despues.escala_cien }, origen: 'api',
+        }),
+      ]);
+      await c.query('COMMIT');
+      this.log.log(`calibración: canal ${id} (${antes.magnitud}) ${antes.escala_cero ?? '—'}/${antes.escala_cien ?? '—'} → ${despues.escala_cero ?? '—'}/${despues.escala_cien ?? '—'}`);
+      return despues;
+    } catch (e) {
+      await c.query('ROLLBACK').catch(() => undefined);
+      throw this.traducir(e, id, 'calibración');
+    } finally {
+      c.release();
     }
   }
 
@@ -461,7 +537,7 @@ export class AltaService {
 
   private async canalesDe(c: PoolClient, id: string): Promise<CanalCreado[]> {
     const r = await c.query<CanalCreado>(
-      `SELECT c.id, c.magnitud_codigo AS magnitud, m.unidad_canonica AS unidad, c.etiqueta
+      `SELECT c.id, c.magnitud_codigo AS magnitud, m.unidad_canonica AS unidad, c.etiqueta, c.escala_cero, c.escala_cien
          FROM canal c JOIN magnitud m ON m.codigo = c.magnitud_codigo WHERE c.dispositivo_id = $1 ORDER BY c.magnitud_codigo`,
       [id],
     );
@@ -562,6 +638,10 @@ export class AltaService {
       case '23514': // check_violation: la base exige algo que el validador no cubrió; el detalle (trae la fila) va al registro, no a la API
         this.log.warn(`${op} de ${idFisico}: la base rechazó la fila (${pg.constraint ?? 'restricción'}): ${pg.detail ?? pg.message}`);
         return new BadRequestException([`la base rechazó la ${op}: no cumple ${pg.constraint ?? 'una restricción'}`]);
+      case '22007': // invalid_datetime_format
+      case '22008': // datetime_field_overflow (un año o una hora que JavaScript admite y la base no)
+      case '22P02': // invalid_text_representation
+        return new BadRequestException(['actualizado_en no es una fecha que la base acepte']);
       case '55P03': // lock_not_available
       case '57014': // query_canceled (statement_timeout)
       case '25P03': // idle_in_transaction_session_timeout

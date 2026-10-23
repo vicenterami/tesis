@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 342 pruebas unitarias del backend y 76 del panel, sin matriz formal) y TT-32 (sensor físico);
+cubre todavía: TT-27 (contrato de trama: hoy 355 pruebas unitarias del backend y 76 del panel, sin matriz formal) y TT-32 (sensor físico);
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -1246,7 +1246,7 @@ La dirección 127.0.0.1 del propio contenedor (el chequeo de salud, cada 15 s) q
 | Control | Valor | Fundamento |
 |---|---|---|
 | `limit_req` general (443) | 100 r/s, ráfaga 200 sin espera | RNF-01 exige 50 eventos/s (`docs/02`). Por HTTP un NAT o una pasarela envía desde **una** dirección las tramas de todos sus dispositivos, y cada dispositivo manda a lo más 1 trama aceptada por segundo (`docs/10 §8.4` punto 52 e): 50 dispositivos detrás de una dirección dan 50 r/s. 100 r/s es el doble. La ráfaga de 200 son 4 s del ritmo de RNF-01: cubre la cola que los 50 canales reenvían tras una caída (`docs/02`, fundamento de RNF-01) y la carga de una pantalla del panel |
-| `limit_req` de administración (443) | 5 r/s, ráfaga 10, solo `POST/PUT/PATCH/DELETE` sobre `/dispositivos` y `/pasarelas` | El backend ya admite a lo más 2 altas a la vez (`docs/10 §3`, 429); un lote de 10 seguidos cubre dar de alta un sitio a mano o con un guion, y quien intente adivinar `X-Clave-Admin` tiene a lo más 5 intentos por segundo y por dirección. La recepción (`POST /recepcion/{id}`) no entra: cuenta solo en la zona general |
+| `limit_req` de administración (443) | 5 r/s, ráfaga 10, solo `POST/PUT/PATCH/DELETE` sobre `/dispositivos`, `/pasarelas` y `/canales` | El backend ya admite a lo más 2 altas a la vez (`docs/10 §3`, 429); un lote de 10 seguidos cubre dar de alta un sitio a mano o con un guion, y quien intente adivinar `X-Clave-Admin` tiene a lo más 5 intentos por segundo y por dirección. La recepción (`POST /recepcion/{id}`) no entra: cuenta solo en la zona general |
 | `limit_conn` (8883) | 100 sesiones simultáneas por dirección | Cada nodo mantiene una sesión MQTT; el caso de validación tiene 50 canales (`docs/02`), a lo más 50 nodos de un canal tras un mismo NAT: el doble de holgura. Techo del proceso: `worker_connections 1024`, dos por sesión (cliente y broker) ≈ 512 por worker, así que una sola dirección no lo satura (hacen falta 6) |
 | `limit_conn` HTTP (443) | 100 peticiones en curso por dirección | Revisión del 22/10: `limit_req` cuenta inicios, no duración; sin esto una dirección abre 200 peticiones lentas y agota `worker_connections`. Mismo fundamento que el 8883 |
 | `limit_conn` de `/eventos` (443) | 20 flujos SSE por dirección | 10 pantallas abiertas detrás de un NAT con dos pestañas cada una; el backend admite 50 flujos en total (`docs/10 §5`): una dirección ya no puede tomarlos todos |
@@ -1268,13 +1268,14 @@ dirección (la puerta de enlace de Docker, como los nodos de un NAT), más un co
 | 99 sesiones TLS abiertas al 8884 desde una dirección (contadas por el apretón terminado, «Verify return code: 0», no por el proceso) | las 99 vivas; la sesión 100 entra |
 | La sesión 101 desde la misma dirección, con la centésima abierta | rechazada antes del apretón TLS; línea nueva «limiting connections by zone» en el registro desde la marca de tiempo previa; las 100 de abajo siguen vivas |
 | 40 `POST` seguidos a `/DISPOSITIVOS` (la ruta en mayúsculas) | 429 (la zona no distingue mayúsculas, como el enrutador de Express) |
+| 40 `PATCH /canales/{id}` seguidos | 429 (la calibración por API es administración y cuenta en la zona estricta) |
 | 20 flujos SSE a `/eventos` desde una dirección; el 21.º; una petición normal; al cerrar los flujos | las 20 abiertas; el 21.º recibe 429; `/salud` responde 200 (el tope es solo de `/eventos`); la dirección vuelve a abrir un flujo |
 | Con los 20 abiertos, `/Eventos` y `/eventos/` (variantes que Express también sirve) | 429 en las dos: la `location` es una expresión regular, no una ruta exacta |
 | Con esa dirección al tope, `mosquitto_pub` QoS 1 desde otra dirección | publicó y la lectura está en `medicion` (el límite es por dirección) |
 | Al cerrar las 100 sesiones | la misma dirección vuelve a conectar |
 | `banco.sh proxy` (la capa completa) y `nginx -t` en el contenedor | 11 «OK» y «PROXY OK»; sintaxis correcta; el chequeo de salud sigue «healthy» |
 
-Resultado del guion: **22/22** tras la revisión del 22/10 (antes 15/15: la comprobación de «100 sesiones vivas» contaba subprocesos, no apretones TLS, y se rehízo; se sumaron las mayúsculas, `/eventos` con sus variantes `/Eventos` y `/eventos/`, que Express también sirve y que una `location =` dejaba fuera del tope, y el tope HTTP). Primera corrida: 13/15, por dos errores del propio guion (la recepción exige `Content-Type` y el 404 de un GET
+Resultado del guion: **23/23** tras la revisión del 22/10 (más `PATCH /canales/{id}`, que también cuenta en la zona de administración) (antes 15/15: la comprobación de «100 sesiones vivas» contaba subprocesos, no apretones TLS, y se rehízo; se sumaron las mayúsculas, `/eventos` con sus variantes `/Eventos` y `/eventos/`, que Express también sirve y que una `location =` dejaba fuera del tope, y el tope HTTP). Primera corrida: 13/15, por dos errores del propio guion (la recepción exige `Content-Type` y el 404 de un GET
 se contó como éxito; las sesiones no se cerraban al terminar), corregidos y repetidos.
 
 **Limitaciones.** (1) Los límites son por dirección: una pasarela con miles de dispositivos detrás de una sola dirección que supere 100 r/s
@@ -1425,3 +1426,45 @@ la captura; las comprobaciones automáticas son las de jsdom.
 (2) La mediana se prueba en la base contra datos reales y un caso sintético, no con una prueba automática contra una base (las
 unitarias del backend corren sin base). (3) `trama` vence a los 30 días (`RETENCION_TRAMA_DIAS`): un dispositivo callado desde antes da nulo,
 y los datos cargados sin pasar por la recepción (semillas) no cuentan.
+
+## 51. Calibración por API con bloqueo optimista (22/10/2026)
+
+**Qué se prueba** (`docs/10 §8.4` punto 51 (i) a (vi)): que la calibración de un canal deje de hacerse por SQL (§43, §44) y pase por la
+API con la misma regla de la migración 18, con la clave de administrador (punto 41), sin pisar un cambio ajeno (bloqueo optimista) y con
+rastro en `evento`; y que el porcentaje de la ficha, del histórico y del canal en vivo salga con la escala nueva sin reescribir nada guardado.
+
+**Método.** (1) **Base:** la migración 21 (`db/init/21-canal-actualizado-en.sql`) aplicada dos veces sobre la base de desarrollo; dos casos
+nuevos en `db/pruebas/reglas-identidad.sql` (31 y 32) y la comprobación 21 del paso 2 del guardián. Al implementarla se vio que
+`canal.actualizado_en` y su disparador ya existían desde la migración 05 (`\d canal` en la base de desarrollo): la 21 los asegura con la misma
+forma, los documenta como marca del bloqueo y da a `plataforma_app` `UPDATE` solo en `escala_cero` y `escala_cien` (antes no podía actualizar
+`canal`: `has_table_privilege` daba falso). Como el `REVOKE ALL` de la migración 14 borraría ese permiso al reejecutarla, la 14 lo repite si
+las columnas existen. (2) **Backend:** `validarEscalas` (una sola regla para el alta y el `PATCH`), `validarCalibracion`, `AltaService.calibrar`
+y `CanalesAdminController`, con unitarias sobre dobles de `pool` (sin base). El `actualizado_en` viaja como texto ISO 8601 UTC con
+microsegundos, armado por la base (`db/iso-us.ts`) y devuelto tal cual: un `Date` de JavaScript solo guarda milisegundos y el bloqueo daría
+409 siempre. (3) **Violación plantada:** el disparador deshabilitado dentro de una transacción que se deshace → el caso 31 da «FALLA
+actualizado_en conservó el valor que traía el UPDATE: falta el disparador»; restaurado (sigue habilitado), en verde. (4) **Banco:**
+`banco.sh encender 5` (imagen reconstruida; reaplica las migraciones 02 a 21) y `banco.sh nodo`, que ahora calibra el canal de suelo por
+`PATCH` en vez de por SQL. (5) **Pila de desarrollo:** `pila.sh encender` y un `PATCH` real sobre el canal `humedad` de `demo-suelo-01`, que
+se dejó como estaba (sin calibración) al final.
+
+| Comprobación | Dónde | Resultado |
+|---|---|---|
+| Migración 21 aplicada dos veces sobre la base de desarrollo: las dos terminan en `COMMIT`, salida 0 | `psql -v ON_ERROR_STOP=1` | ✅ |
+| Reaplicar las migraciones 02 a 21 sobre la base recién creada no cambia el esquema ni el catálogo (permisos incluidos) | `banco.sh migraciones` (las 20 de la 02 a la 21, reaplicadas) | ✅ |
+| El disparador pone `actualizado_en` en `now()` en un `UPDATE` que traía otro valor; un `UPDATE` que deja una sola escala lo rechaza `ck_canal_escala` | `reglas-identidad.sql`, casos 31 y 32 (33 OK de 33) | ✅ |
+| `plataforma_app` actualiza `escala_cero` y `escala_cien`, y no `actualizado_en`, `dispositivo_id` ni `magnitud_codigo`; el disparador habilitado y la columna documentada | `verificar-todo.sh` paso 2, comprobación 21 (corrida sola) | ✅ |
+| Alta: una sola escala, iguales, `NaN`, infinito (el `1e400` de JSON) o texto → 400 con el motivo; las dos o ninguna → el `INSERT` las guarda y la respuesta las devuelve | `alta.dto.spec.ts` (1), `alta.service.spec.ts` (1) | ✅ |
+| `PATCH`: una sola escala, iguales, no finitas, sin `actualizado_en` o con más de 6 decimales, campos ajenos → 400; las dos `null` quitan la calibración | `calibracion.spec.ts` (5) | ✅ |
+| `PATCH` con el `actualizado_en` vigente: fila bloqueada (`FOR NO KEY UPDATE`), `UPDATE … AND actualizado_en = $4::timestamptz`, evento `canal_calibrado` con `antes` y `despues` en la misma transacción, 200 con el canal y el `actualizado_en` nuevo; con uno viejo, 409 «alguien lo cambió a las HH:MM UTC (…); recarga» con el vigente, `ROLLBACK` y sin evento; canal inexistente → 404 sin `UPDATE`; `ck_canal_escala` → 400 y `lock_timeout` → 503; la guardia de la clave en el controlador y el UUID validado antes del servicio | `calibracion.spec.ts` (6) | ✅ |
+| Banco, de punta a punta: la ficha entrega `actualizado_en` con microsegundos; `PATCH` con una sola escala → 400; sin `X-Clave-Admin` → 401; con el de la ficha → 200 (2,205 V = 0 %, 1,170 V = 100 %); el segundo con el viejo → 409; la base queda con la calibración del 200 y un solo evento `canal_calibrado`; tras publicar el pack del nodo, 0,6 % en la ficha, en el histórico (`escala` y `porcentajes`) y en el evento `medicion` del canal en vivo (SSE) | `banco.sh nodo` | ✅ **23/23** («NODO OK») |
+| Pila de desarrollo: `PATCH` con el `actualizado_en` de la ficha → **200**; el segundo con el viejo → **409**; una sola escala → **400**; quitar la calibración → **200**; dos eventos `canal_calibrado` del canal | `curl` contra `127.0.0.1:3000`, clave leída del `.env` sin imprimirla | ✅ |
+| Contrato: 14 rutas y 17 operaciones; `PATCH /canales/{id}` con un identificador que no es UUID y sin la clave → 401, antes de mirar el UUID | `api-smoke.sh` («TODO OK») | ✅ |
+
+**Resultados.** Backend (`pnpm verificar`): **355** pruebas en 31 suites (antes 342 en 30), tipos y lint sin errores; panel sin cambios
+(76 pruebas; `svelte-check` con 331 archivos y 0 errores). `openapi.json` regenerado con `pnpm openapi`: 14 rutas (antes 13).
+
+**Lo que no cubre.** (1) El proxy sí cuenta `PATCH /canales/{id}` en la zona de tasa de administración desde el mismo día (§47, 23/23);
+lo que no se mide aquí es el ritmo de la zona bajo carga mixta. (2) El panel todavía no calibra: la ficha ya entrega
+`actualizado_en`, y la pantalla que lo use es de otro bloque. (3) Dos `PATCH` simultáneos con el mismo `actualizado_en` no se probaron en
+paralelo contra una base: el segundo espera el bloqueo de la fila y, al reevaluar el `WHERE`, no encuentra la marca (409); se sostiene en el
+comportamiento de `READ COMMITTED` de PostgreSQL, no en una medición.

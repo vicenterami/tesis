@@ -283,7 +283,7 @@
     },
     "/dispositivos/{id}": {
       "get": {
-        "description": "Canales con sus reglas de umbral y última medición, y condiciones abiertas. `intervalo_observado_s` (entero o null): mediana, en segundos, de las diferencias entre los instantes de recepción (truncados al segundo) de las últimas 20 tramas del dispositivo; null con menos de 3 instantes o sin tramas retenidas (RETENCION_TRAMA_DIAS, 30 días por defecto). Informa: la alarma de silencio usa `intervalo_esperado_s`.",
+        "description": "Canales con sus reglas de umbral y última medición, y condiciones abiertas. `intervalo_observado_s` (entero o null): mediana, en segundos, de las diferencias entre los instantes de recepción (truncados al segundo) de las últimas 20 tramas del dispositivo; null con menos de 3 instantes o sin tramas retenidas (RETENCION_TRAMA_DIAS, 30 días por defecto). Informa: la alarma de silencio usa `intervalo_esperado_s`. Por canal: `escala_cero` y `escala_cien` (calibración; null sin ella), `porcentaje` en la última medición, y `actualizado_en` (ISO 8601 UTC con microsegundos), el que se manda tal cual en `PATCH /canales/{id}` (bloqueo optimista).",
         "operationId": "DispositivosController_detalle",
         "parameters": [
           {
@@ -824,6 +824,93 @@
         "summary": "Rotar la credencial de una pasarela",
         "tags": [
           "pasarelas"
+        ]
+      }
+    },
+    "/canales/{id}": {
+      "patch": {
+        "description": "Fija `escala_cero` y `escala_cien`, el valor de la magnitud que corresponde al 0 % y al 100 % (las dos con valor), o las quita (las dos null). Las dos o ninguna, números finitos y distintas; `escala_cien` < `escala_cero` es válido (sensor que baja al crecer lo medido). **Bloqueo optimista:** `actualizado_en` es el que entregó la ficha (`GET /dispositivos/{id}`) para este canal, tal cual (trae microsegundos); si el canal cambió desde entonces, 409 con la hora del cambio y el `actualizado_en` vigente. Deja el evento `canal_calibrado` del dispositivo con la escala anterior y la nueva. Nada guardado se reescribe: el porcentaje de la ficha, del histórico y del canal en vivo sale con la escala vigente desde la siguiente consulta o lectura. Exige `X-Clave-Admin` (docs/10 §8.4 punto 51).",
+        "operationId": "CanalesAdminController_calibrar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "UUID del canal",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Clave-Admin",
+            "in": "header",
+            "description": "Clave de administrador (HTTP_CLAVE_ADMIN del servidor)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "escala_cero",
+                  "escala_cien",
+                  "actualizado_en"
+                ],
+                "properties": {
+                  "escala_cero": {
+                    "type": "number",
+                    "nullable": true,
+                    "description": "Valor de la magnitud (unidad canónica) que corresponde al 0 %; null con escala_cien null quita la calibración"
+                  },
+                  "escala_cien": {
+                    "type": "number",
+                    "nullable": true,
+                    "description": "Valor que corresponde al 100 %; distinto de escala_cero"
+                  },
+                  "actualizado_en": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,6})?(Z|[+-]\\d{2}:\\d{2})$",
+                    "description": "El `actualizado_en` del canal en la ficha, tal cual (ISO 8601 UTC con microsegundos)"
+                  }
+                },
+                "example": {
+                  "escala_cero": 2.205,
+                  "escala_cien": 1.17,
+                  "actualizado_en": "2026-10-22T18:04:31.123456Z"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Canal calibrado: `id`, `dispositivo_id`, `magnitud`, `unidad`, `etiqueta`, `escala_cero`, `escala_cien` y el `actualizado_en` nuevo (el que va en el próximo cambio)"
+          },
+          "400": {
+            "description": "UUID inválido, o cuerpo inválido (una sola escala, iguales, no finitas, sin actualizado_en): `message` es la lista de motivos"
+          },
+          "401": {
+            "description": "Cabecera X-Clave-Admin ausente o incorrecta"
+          },
+          "404": {
+            "description": "El canal no existe"
+          },
+          "409": {
+            "description": "«alguien lo cambió a las HH:MM UTC (…); recarga»: el canal cambió desde la ficha enviada; `actualizado_en` trae el vigente"
+          },
+          "503": {
+            "description": "Sin clave de administrador configurada, u otra operación sobre el mismo canal en curso"
+          }
+        },
+        "summary": "Calibrar un canal (o quitar su calibración)",
+        "tags": [
+          "canales"
         ]
       }
     }
