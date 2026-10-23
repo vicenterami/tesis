@@ -36,3 +36,17 @@ updates:
     ignore:
       # Imágenes construidas aquí (base y proxy derivados): no existen en ningún registro (08/10: el primer intento falló con 401).
       - dependency-name: "plataforma-*"
+  # Dependencias de Node: backend y panel son un solo workspace con un solo pnpm-lock.yaml en /plataforma/backend (23/10/2026).
+  # Hasta hoy nadie proponía versiones nuevas de npm: el CI avisaba recién cuando un aviso de seguridad lo ponía en rojo
+  # (23/10: vite 8.3.2, aviso publicado después de la última corrida). Las versiones se escriben exactas (save-exact).
+  - package-ecosystem: npm
+    directory: /plataforma/backend
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      # Un PR por semana con todos los parches y versiones menores; las mayores van sueltas y se deciden una a una.
+      menores-y-parches:
+        update-types: ["minor", "patch"]
+    open-pull-requests-limit: 5

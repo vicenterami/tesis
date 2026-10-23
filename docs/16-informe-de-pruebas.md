@@ -334,7 +334,7 @@ puerto; en el servidor, 80 → 443, que es el caso real.
 ## 16. Panel, tramo 2: esqueleto, inventario con semáforo y reenvío de desarrollo (12/10/2026)
 
 `docs/19` (pantalla P2) y `docs/10 §8.4` (panel en `backend/panel/`, mismo workspace de pnpm, servido por el backend en `/panel`).
-Versiones elegidas con al menos siete días de publicadas (Svelte 5.57.1, Vite 8.3.2, Vitest 5.0.3; `docs/11 §3`, fila de imágenes fijadas por digest y robot de dependencias: siete días de espera); ninguna
+Versiones elegidas con al menos siete días de publicadas (Svelte 5.57.1, Vite 8.3.2 (8.3.5 desde el 23/10/2026 por el aviso GHSA-587h-7wmj-h5pm, corregido desde 8.3.3), Vitest 5.0.3; `docs/11 §3`, fila de imágenes fijadas por digest y robot de dependencias: siete días de espera); ninguna
 dependencia ejecutó scripts de instalación (`ignore-scripts`). Auditoría del workspace: cero avisos en producción; en desarrollo,
 el alto conocido de `braces` y un moderado de `sprintf-js`, los dos solo por Jest y sin parche publicado.
 
