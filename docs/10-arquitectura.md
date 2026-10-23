@@ -522,6 +522,11 @@ cliente ──HTTP──► Express ⊂ NestJS ──► servicio ──► pg �
   `(dispositivo_id, recibido_en DESC)`), calculada por una subconsulta de la misma consulta (sin una ida más a la base); nulo con menos
   de 3 instantes o si no quedan tramas retenidas (`RETENCION_TRAMA_DIAS`, 30 días por defecto). Informa; la alarma de silencio usa solo el intervalo esperado (§4.1 y §4.3).
   Por canal trae también `actualizado_en`, con microsegundos, que se devuelve tal cual en **`PATCH /canales/{id}`** (calibración con bloqueo optimista, clave de administrador; §8.4 punto 51).
+- **El histórico `GET /canales/{id}/historico` tiene tope de cubos** (22/10/2026, `docs/19 §4`, incremento 2, punto 4): si la ventana
+  dividida por el intervalo da más de 5 000 cubos, responde 400 **antes de consultar** (`consulta/validacion.ts`, `exigirTopeCubos`); un año
+  cada minuto serían 525 600; y también si abarca más de 366 días, porque el tope de cubos acota la respuesta y no las filas leídas
+  (5 000 días a un cubo por día las leerían todas; para más de un año está la exportación). El panel nunca arma una petición así (ofrece hasta 2 500 puntos), pero la API es pública. Toda resolución lee
+  las filas crudas del rango; el costo de cada combinación está medido en `docs/16 §52`.
 - **CORS no se activa, a propósito.** Es una regla del navegador para páginas de *otro* origen; el panel
   lo servirá el mismo backend (mismo origen, `docs/11 §4`), y sin CORS el navegador bloquea por defecto
   a cualquier otro sitio. Ni los sensores, ni `curl`, ni la base están sujetos a CORS.
@@ -596,7 +601,7 @@ sequenceDiagram
     U->>FE: abre la vista de un dispositivo
     FE->>API: GET /canales/{id}/historico?desde=<ISO 8601>&intervalo=15 minutes
     API->>DB: SELECT time_bucket('15 min', tiempo), avg(valor) …
-    DB-->>API: 60 a 170 puntos agregados (según el rango)
+    DB-->>API: 60 a 170 puntos agregados según el rango (hasta 2 500 con una resolución elegida)
     API-->>FE: [[tiempos],[valores]]
     FE->>FE: uPlot dibuja el histórico
     FE->>API: SSE · GET /eventos?dispositivo={id} (EventSource, con la sesión desde M7)

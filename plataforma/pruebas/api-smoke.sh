@@ -33,6 +33,8 @@ if [[ -n "$CANAL" ]]; then
   caso "última medición dentro de JSON también termina en Z" "/dispositivos/$(curl -s "$API/dispositivos" | python3 -c "import sys,json; print(json.load(sys.stdin)[0]['id'])")" "all((c['ultima_medicion'] or {}).get('tiempo','Z').endswith('Z') for c in r['canales'])"
   caso "intervalo fuera de la lista → 400"   "/canales/$CANAL/historico?intervalo=1%20year" 400
   caso "fecha no ISO → 400"                  "/canales/$CANAL/historico?desde=ayer" 400
+  caso "ventana de más de 5 000 cubos → 400"  "/canales/$CANAL/historico?intervalo=1%20minute&desde=2026-09-01T00:00:00Z" 400
+  caso "ventana de más de 366 días → 400"     "/canales/$CANAL/historico?intervalo=1%20day&desde=2025-01-01T00:00:00Z" 400
 fi
 caso "UUID inválido → 400"                    /dispositivos/no-es-uuid 400
 caso "limite fuera de rango → 400"            "/condiciones?limite=99999" 400

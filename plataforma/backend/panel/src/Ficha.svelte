@@ -4,12 +4,15 @@
   // /condiciones?dispositivo=, /cuarentena?dispositivo= y el canal en vivo filtrado por dispositivo.
   import { onMount, untrack } from 'svelte';
   import Grafico from './Grafico.svelte';
+  import SelectorRango from './SelectorRango.svelte';
+  import ZonaSitio from './ZonaSitio.svelte';
   import { mensajeError, obtener } from './lib/api';
   import { enLinea, estadoVisual, ROTULO, rotuloCondicion } from './lib/estado-visual';
-  import { RANGOS, RANGO_POR_DEFECTO, agregarLectura, formatearValor, rango as datosRango, rangoQueContiene, rotuloIntervalo, seriesDesdeHistorico, urlHistorico, ventana, type ClaveRango, type Series } from './lib/grafico';
+  import { RANGO_POR_DEFECTO, agregarLectura, formatearValor, rango as datosRango, rangoQueContiene, resolucionValida, resumenRango, rotuloIntervalo, seriesDesdeHistorico, urlHistorico, ventana, type ClaveRango, type ClaveResolucion, type Series } from './lib/grafico';
   import type { Condicion, DispositivoFicha, EventoVivo, Historico, TramaRechazada } from './lib/modelo';
   import { duracion, fechaHora, haceCuanto, haceSegundos, horaLocal } from './lib/tiempo';
-  import { fragmentoFicha } from './lib/vista';
+  import { fragmentoComparar, fragmentoFicha } from './lib/vista';
+  import { recordarMarcados } from './lib/comparar';
   import { RECONECTADO, abrirCanal, type EstadoCanal } from './lib/vivo';
   import { antirrebote, porLotes } from './lib/antirrebote';
 
@@ -19,8 +22,9 @@
     id,
     canal: canalInicial = null,
     rango: rangoInicial = null,
+    res: resInicial = null,
     alCambiarVista = () => {},
-  }: { id: string; canal?: string | null; rango?: ClaveRango | null; alCambiarVista?: (fragmento: string) => void } = $props();
+  }: { id: string; canal?: string | null; rango?: ClaveRango | null; res?: ClaveResolucion | null; alCambiarVista?: (fragmento: string) => void } = $props();
 
   let d = $state<DispositivoFicha | null>(null);
   let condiciones = $state<Condicion[]>([]);
@@ -32,6 +36,8 @@
   // Estado inicial desde la URL: se lee una vez aquí; los cambios posteriores de la URL los aplica el efecto de más abajo.
   let canalElegido = $state<string | null>(untrack(() => canalInicial));
   let rangoElegido = $state<ClaveRango>(untrack(() => rangoInicial) ?? RANGO_POR_DEFECTO);
+  // Resolución (incremento 2, punto 4): null = «auto»; una que no sirve para el rango vuelve a «auto».
+  let resElegida = $state<ClaveResolucion | null>(untrack(() => resolucionValida(rangoInicial ?? RANGO_POR_DEFECTO, resInicial)));
   let listo = $state(false); // la ficha cargó y el canal elegido está validado contra sus canales
   // «En vivo» con prueba (punto 5): cuándo pasó el canal a en_vivo y cuándo llegó (reloj local) la última lectura de cada canal.
   let enVivoDesde = $state<number | null>(null);
@@ -39,6 +45,11 @@
   let series = $state<Series>([[], [], []]);
   let historico = $state<Historico | null>(null);
   let errorHistorico = $state<string | null>(null);
+  // Cambio de rango sin pantalla en blanco (incremento 2, punto 2): canal, rango y resolución ELEGIDOS son lo que se pidió (los
+  // botones los marcan); `mostrada` es lo que el gráfico dibuja, de la última respuesta buena. Mientras llega la nueva, el gráfico
+  // conserva la anterior y dice «cargando…»; con error, la conserva y la URL sigue diciendo lo que se ve.
+  let mostrada = $state<{ canal: string; rango: ClaveRango; res: ClaveResolucion | null; desde: Date; hasta: Date } | null>(null);
+  let cargando = $state(false);
 
   const abiertas = $derived(condiciones.filter((c) => c.cerrada_en === null));
   const ordenadas = $derived([...abiertas, ...condiciones.filter((c) => c.cerrada_en !== null)]);
@@ -46,8 +57,11 @@
     d === null ? null : estadoVisual({ estado: d.estado, en_linea: enLinea(d.visto_por_ultima_vez, d.intervalo_esperado_s, ahora) }, abiertas.map((c) => c.tipo)),
   );
   const canalActual = $derived(d?.canales.find((c) => c.id === canalElegido) ?? null);
+  const canalMostrado = $derived(mostrada === null ? null : (d?.canales.find((c) => c.id === mostrada!.canal) ?? null));
+  const resumen = $derived(historico === null ? null : resumenRango(historico.valores));
+  const ventanaGrafico = $derived(mostrada === null ? null : { desde: mostrada.desde.getTime() / 1000, hasta: mostrada.hasta.getTime() / 1000 });
   // Reloj de pasarela desviado (punto 4): la condición abierta, en palabras, con su hace cuánto. Al cerrarse, el aviso `condicion`
-  // repide las condiciones y desaparece sin recargar.
+  // vuelve a pedir las condiciones y desaparece sin recargar.
   const relojDesviado = $derived(abiertas.find((c) => c.tipo === 'reloj_desviado') ?? null);
   // Intervalo observado frente al esperado (punto 3): informa, no decide (la alarma de silencio usa solo el esperado).
   const avisoIntervalo = $derived.by(() => {
@@ -57,7 +71,7 @@
     return null;
   });
   // Rango vacío (punto 2): el menor rango que contiene la última medición del canal; null si tiene más de 30 días.
-  const rangoConLaUltima = $derived(canalActual?.ultima_medicion ? rangoQueContiene(canalActual.ultima_medicion.tiempo, ahora) : null);
+  const rangoConLaUltima = $derived(canalMostrado?.ultima_medicion ? rangoQueContiene(canalMostrado.ultima_medicion.tiempo, ahora) : null);
   // «Conectado, sin lecturas»: con el canal en vivo, más de 2 intervalos esperados sin una lectura del canal visible (contados con
   // el reloj del navegador desde que el canal está en vivo o desde la última lectura llegada, lo más reciente).
   const sinLecturas = $derived.by(() => {
@@ -105,23 +119,32 @@
 
   // Dos clics seguidos de rango o canal pueden responder en orden inverso: solo la última petición pedida escribe (12/10).
   let generacion = 0;
+  let abortarHistorico: AbortController | null = null; // la petición anterior se cancela, no solo se ignora (revisión del 22/10)
   async function cargarHistorico(): Promise<void> {
     if (canalElegido === null) return;
-    const v = ventana(rangoElegido, new Date());
+    const pedido = { canal: canalElegido, rango: rangoElegido, res: resElegida };
+    const v = ventana(pedido.rango, new Date(), pedido.res);
     const mia = ++generacion;
+    abortarHistorico?.abort();
+    const ctl = new AbortController();
+    abortarHistorico = ctl;
+    cargando = true;
     try {
-      const h = await obtener<Historico>(urlHistorico(canalElegido, v.desde, v.hasta, v.intervalo));
+      const h = await obtener<Historico>(urlHistorico(pedido.canal, v.desde, v.hasta, v.intervalo), ctl.signal);
       if (mia !== generacion) return;
       historico = h;
       series = seriesDesdeHistorico(h);
+      mostrada = { ...pedido, desde: v.desde, hasta: v.hasta };
       errorHistorico = null;
     } catch (e) {
       if (mia !== generacion) return;
-      errorHistorico = mensajeError(e);
+      errorHistorico = mensajeError(e); // la serie anterior se queda: el error se dice, no se dibuja como vacío
+    } finally {
+      if (mia === generacion) cargando = false;
     }
   }
 
-  // Al reconectar se repide el histórico del rango visible: el canal no guarda cola (docs/19 F4).
+  // Al reconectar se vuelve a pedir el histórico del rango visible: el canal no guarda cola (docs/19 F4).
   function alEstadoCanal(s: EstadoCanal, motivo?: string): void {
     canal = s;
     enVivoDesde = s === 'en_vivo' ? Date.now() : null;
@@ -136,7 +159,7 @@
     } else if (e.tipo === 'medicion') {
       d = { ...d, canales: d.canales.map((c) => (c.id === e.canal_id ? { ...c, ultima_medicion: { valor: e.valor, tiempo: e.tiempo, porcentaje: e.porcentaje ?? null } } : c)) };
       llegadas = { ...llegadas, [e.canal_id]: Date.now() };
-      if (e.canal_id === canalElegido) lecturas.agregar({ tiempo: e.tiempo, valor: e.valor });
+      if (e.canal_id === mostrada?.canal) lecturas.agregar({ tiempo: e.tiempo, valor: e.valor }); // la serie es la del canal dibujado
     } else if (e.tipo === 'condicion') {
       repedirCondiciones.pedir();
     }
@@ -148,15 +171,21 @@
   }
   function elegirRango(r: ClaveRango): void {
     rangoElegido = r;
+    resElegida = resolucionValida(r, resElegida); // la resolución elegida se conserva si sirve para el rango nuevo
+    void cargarHistorico();
+  }
+  function elegirRes(r: ClaveResolucion | null): void {
+    resElegida = resolucionValida(rangoElegido, r);
     void cargarHistorico();
   }
 
-  // La vista va a la URL (punto 1) cuando cambia el canal o el rango, una vez validado el canal. Depende solo de esos dos y de
-  // `listo`: ni de `d` (los eventos en vivo lo reescriben) ni de las props, que vienen de la URL; si dependiera de ellas, un cambio
-  // externo del fragmento lo haría reescribir la vista anterior antes de que el efecto siguiente aplicara la nueva.
+  // La vista va a la URL (punto 1) cuando cambia lo que el gráfico MUESTRA (incremento 2, punto 2: con error, la URL no se toca). Depende
+  // solo de `mostrada` y de `listo`: ni de `d` (los eventos en vivo lo reescriben) ni de las props, que vienen de la URL; si dependiera
+  // de ellas, un cambio externo del fragmento lo haría reescribir la vista anterior antes de que el efecto siguiente aplicara la nueva.
   $effect(() => {
-    const f = fragmentoFicha(untrack(() => id), canalElegido, rangoElegido);
-    if (!listo) return;
+    const m = mostrada;
+    if (!listo || m === null) return;
+    const f = fragmentoFicha(untrack(() => id), m.canal, m.rango, m.res);
     untrack(() => alCambiarVista(f));
   });
   // La URL cambió desde fuera (atrás, un enlace): se reaplica. Si coincide con lo que ya se muestra (la escribió esta misma
@@ -164,12 +193,14 @@
   $effect(() => {
     const r = rangoInicial ?? RANGO_POR_DEFECTO;
     const c = canalInicial;
+    const x = resolucionValida(r, resInicial);
     untrack(() => {
       if (!listo || d === null) return;
       const canalNuevo = c !== null && d.canales.some((k) => k.id === c) ? c : (d.canales[0]?.id ?? null);
-      if (r === rangoElegido && canalNuevo === canalElegido) return;
+      if (r === rangoElegido && canalNuevo === canalElegido && x === resElegida) return;
       rangoElegido = r;
       canalElegido = canalNuevo;
+      resElegida = x;
       void cargarHistorico();
     });
   });
@@ -180,6 +211,16 @@
     const q = new URLSearchParams({ formato: 'csv', desde: new Date(hasta.getTime() - 7 * 86_400_000).toISOString(), hasta: hasta.toISOString() });
     return `/dispositivos/${encodeURIComponent(id)}/exportar?${q.toString()}`;
   }
+  // «Descargar CSV de este rango» (incremento 2, punto 6): la ventana que el gráfico muestra, tal cual. Es un enlace a la API, no la
+  // pantalla P8 (Etapa 4).
+  function urlExportarVentana(desde: Date, hasta: Date): string {
+    const q = new URLSearchParams({ formato: 'csv', desde: desde.toISOString(), hasta: hasta.toISOString() });
+    return `/dispositivos/${encodeURIComponent(id)}/exportar?${q.toString()}`;
+  }
+  // P3b con este dispositivo marcado y la magnitud del canal visible (incremento 2, punto 5).
+  function irAComparar(): void {
+    recordarMarcados([id]);
+  }
 
   onMount(() => {
     void cargar().then(cargarHistorico);
@@ -187,6 +228,7 @@
     const c = abrirCanal(`/eventos?dispositivo=${encodeURIComponent(id)}`, alEvento, alEstadoCanal);
     return () => {
       clearInterval(reloj);
+      abortarHistorico?.abort();
       repedirCondiciones.cancelar();
       lecturas.cancelar();
       c.cerrar();
@@ -218,6 +260,7 @@
         reporta cada ≈ {duracion(d.intervalo_observado_s)} (esperado {duracion(d.intervalo_esperado_s)}){#if avisoIntervalo !== null}; <strong data-aviso-intervalo>{avisoIntervalo}</strong>{/if}
       {/if}
     </p>
+    <div class="zona-sitio"><ZonaSitio zona={d.zona_horaria} /></div>
     {#if relojDesviado !== null}
       <p class="error" role="status" data-reloj-desviado>
         Reloj de pasarela desviado: las mediciones se fechan al llegar · <span title={horaLocal(relojDesviado.abierta_en, d.zona_horaria)}>{haceCuanto(relojDesviado.abierta_en, ahora)}</span>
@@ -260,37 +303,49 @@
   {/if}
 
   {#if canalActual !== null}
-    <div class="filtros" role="group" aria-label="Rango del gráfico">
-      {#each RANGOS as r (r.clave)}
-        <button type="button" aria-pressed={rangoElegido === r.clave} onclick={() => elegirRango(r.clave)}>{r.rotulo}</button>
-      {/each}
-      {#if historico !== null}
+    <!-- Rango y resolución (incremento 2, puntos 2 y 4): mientras llega el histórico, el grupo queda ocupado y el texto dice «cargando…» -->
+    <div class="filtros" role="group" aria-label="Rango del gráfico" aria-busy={cargando} data-cargando={cargando}>
+      <SelectorRango rango={rangoElegido} res={resElegida} alElegirRango={elegirRango} alElegirRes={elegirRes} />
+      {#if cargando}
+        <span class="vivo" data-cargando-texto>cargando…</span>
+      {:else if historico !== null}
         <span class="vivo" data-historico>{historico.puntos} puntos, promedio por {rotuloIntervalo(historico.intervalo)}; en vivo, cada lectura aparte</span>
       {/if}
+      <a href={fragmentoComparar([id], canalActual.magnitud, rangoElegido, resElegida)} onclick={irAComparar} data-ir-comparar>Comparar con otros dispositivos</a>
     </div>
     {#if errorHistorico !== null}
-      <p class="error" role="alert">{errorHistorico}</p>
-    {:else if historico !== null && historico.puntos === 0 && series[0].length === 0}
-      {#if canalActual.ultima_medicion === null}
+      <p class="error" role="alert">{errorHistorico} <button type="button" onclick={() => void cargarHistorico()} data-reintentar>Reintentar</button></p>
+    {/if}
+    {#if canalMostrado !== null && mostrada !== null && historico !== null && historico.puntos === 0 && series[0].length === 0}
+      {#if canalMostrado.ultima_medicion === null}
         <p class="vacio" data-rango-vacio>Sin mediciones en este rango.</p>
       {:else}
-        <!-- Un rango sin datos lo dice y lleva al dato (punto 2); nunca se amplía solo: el rango cambia con el clic -->
+        <!-- Un rango sin datos lo dice y lleva al dato (incremento 1, punto 2); nunca se amplía solo: el rango cambia con el clic -->
         <p class="vacio" data-rango-vacio>
-          Sin mediciones en este rango; la última es de {haceCuanto(canalActual.ultima_medicion.tiempo, ahora)}
-          (<span title={horaLocal(canalActual.ultima_medicion.tiempo, d.zona_horaria)}>{fechaHora(canalActual.ultima_medicion.tiempo, d.zona_horaria)}</span>).
+          Sin mediciones en este rango; la última es de {haceCuanto(canalMostrado.ultima_medicion.tiempo, ahora)}
+          (<span title={horaLocal(canalMostrado.ultima_medicion.tiempo, d.zona_horaria)}>{fechaHora(canalMostrado.ultima_medicion.tiempo, d.zona_horaria)}</span>).
           {#if rangoConLaUltima === null}
-            El panel no dibuja más de 30 días: para verla, <a href={urlExportar(canalActual.ultima_medicion.tiempo)}>exporta sus mediciones</a>.
-          {:else if rangoConLaUltima !== rangoElegido}
+            El panel no dibuja más de 30 días: para verla, <a href={urlExportar(canalMostrado.ultima_medicion.tiempo)}>exporta sus mediciones</a>.
+          {:else if rangoConLaUltima !== mostrada.rango}
             <button type="button" onclick={() => rangoConLaUltima !== null && elegirRango(rangoConLaUltima)} data-ver-ultima>Ver la última medición</button>
             <span class="vivo">({datosRango(rangoConLaUltima).rotulo})</span>
           {/if}
         </p>
       {/if}
     {/if}
-    <!-- {#key}: el gráfico se crea una vez por canal; al cambiar de canal se recrea con su título y su unidad -->
-    {#key canalActual.id}
-      <Grafico {series} unidad={canalActual.unidad} zona={d.zona_horaria} titulo={`${canalActual.magnitud_nombre} (${canalActual.unidad})`} />
-    {/key}
+    {#if canalMostrado !== null && mostrada !== null}
+      <!-- {#key}: el gráfico se crea una vez por canal DIBUJADO; al llegar el histórico de otro canal se recrea con su título y unidad -->
+      {#key canalMostrado.id}
+        <Grafico {series} unidad={canalMostrado.unidad} zona={d.zona_horaria} titulo={`${canalMostrado.magnitud_nombre} (${canalMostrado.unidad})`} ventana={ventanaGrafico} />
+      {/key}
+      <!-- Lo que el rango ya sabe (incremento 2, punto 6): sobre los promedios recibidos, y así se nombra -->
+      <p class="resumen-rango vivo">
+        {#if resumen !== null}
+          <span data-resumen-rango>en este rango: mín {formatearValor(resumen.min, canalMostrado.unidad)} · máx {formatearValor(resumen.max, canalMostrado.unidad)} · promedio de los {resumen.n} promedios dibujados {formatearValor(resumen.promedio, canalMostrado.unidad)}</span>
+        {/if}
+        <a href={urlExportarVentana(mostrada.desde, mostrada.hasta)} data-csv-rango>Descargar CSV de este rango</a>
+      </p>
+    {/if}
   {/if}
 
   <h3>Condiciones</h3>

@@ -1,7 +1,7 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ConsultaService } from './consulta.service';
 import { ApiBadRequestResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiQuery, ApiTags } from '@nestjs/swagger';
-import { INTERVALOS, fecha, intervalo, uuid } from './validacion';
+import { INTERVALOS, MAX_CUBOS, MAX_DIAS_VENTANA, exigirTopeCubos, fecha, intervalo, uuid } from './validacion';
 
 @ApiTags('canales')
 @Controller('canales')
@@ -16,14 +16,15 @@ export class CanalesController {
     description:
       'Promedio por intervalo calculado con time_bucket EN LA ZONA HORARIA DEL SITIO. Formato columnar para uPlot: ' +
       '`tiempos` (segundos Unix), `valores`, `muestras` (cuántas lecturas hay detrás de cada promedio). Rango semiabierto [desde, hasta). ' +
-      'Por defecto: últimas 24 h cada 15 minutos.',
+      'Por defecto: últimas 24 h cada 15 minutos. Una ventana que daría más de ' + MAX_CUBOS + ' cubos (ventana ÷ intervalo) se rechaza con 400 ' +
+      'antes de consultar (docs/19 §4, incremento 2, punto 4).',
   })
   @ApiParam({ name: 'id', description: 'UUID del canal' })
   @ApiQuery({ name: 'desde', required: false, description: 'ISO 8601; por defecto hasta − 24 h' })
   @ApiQuery({ name: 'hasta', required: false, description: 'ISO 8601; por defecto ahora' })
   @ApiQuery({ name: 'intervalo', required: false, enum: INTERVALOS, description: 'Lista cerrada: nunca texto libre en SQL' })
   @ApiOkResponse({ description: 'Serie agregada' })
-  @ApiBadRequestResponse({ description: 'UUID, fecha o intervalo inválidos' })
+  @ApiBadRequestResponse({ description: `UUID, fecha o intervalo inválidos, o una ventana de más de ${MAX_DIAS_VENTANA} días o de más de ${MAX_CUBOS} cubos` })
   @ApiNotFoundResponse({ description: 'Canal inexistente' })
   historico(
     @Param('id') id: string,
@@ -33,6 +34,8 @@ export class CanalesController {
   ) {
     const h = fecha(hasta, new Date(), 'hasta');
     const d = fecha(desde, new Date(h.getTime() - 24 * 3600 * 1000), 'desde');
-    return this.consulta.historico(uuid(id, 'canal'), d, h, intervalo(inter));
+    const i = intervalo(inter);
+    exigirTopeCubos(d, h, i); // antes de tocar la base: el costo se acota en la entrada
+    return this.consulta.historico(uuid(id, 'canal'), d, h, i);
   }
 }

@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 355 pruebas unitarias del backend y 76 del panel, sin matriz formal) y TT-32 (sensor físico);
+cubre todavía: TT-27 (contrato de trama: hoy 357 pruebas unitarias del backend y 102 del panel, sin matriz formal) y TT-32 (sensor físico);
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -1393,7 +1393,7 @@ reconstruida (`pila.sh encender`), consultada con `curl`, y el paquete servido r
 | 1. P2 | La URL fija vía y búsqueda; cambiarlas las escribe y sin filtros queda `#/`, sin entradas nuevas en el historial; un `hashchange` externo se reaplica; estado, sitio y zona inexistentes → tabla completa y `#/`; abrir la ficha y volver «atrás» restaura los filtros | `App.test.ts` (4) |
 | 2. Rango vacío | Con la última medición hace 4 d: «Sin mediciones en este rango; la última es de hace 4 d (8 de octubre de 2026, 12:00)», el rango no cambia sin clic (30 s después sigue en 24 h y sin otra petición) y el botón elige 7 días; con puntos, ni texto ni botón; anterior a 30 días, remite a exportar y no hay botón; sin ninguna medición, solo «Sin mediciones en este rango.» | `Ficha.test.ts` (3), `lib/grafico.test.ts` (1), `lib/tiempo.test.ts` (1, fecha y hora) |
 | 3. Intervalo observado | «reporta cada ≈ 17 s (esperado 3 min)» con «más seguido de lo declarado…»; 600 s con «más lento…»; 200 s sin aviso; nulo → «intervalo observado: sin datos suficientes» | `Ficha.test.ts` (1), `lib/tiempo.test.ts` (1, duraciones); backend `consulta.service.spec.ts` (4) |
-| 4. Reloj de pasarela | P3: la condición abierta se lee «Reloj de pasarela desviado: las mediciones se fechan al llegar · hace 20 min» y el estado es Alerta; un evento `condicion` cerrada la quita sin recargar y el estado vuelve a Normal. P2: lo mismo en la fila del dispositivo, solo en ella, sin repedir el inventario | `Ficha.test.ts` (1), `Inventario.test.ts` (1) |
+| 4. Reloj de pasarela | P3: la condición abierta se lee «Reloj de pasarela desviado: las mediciones se fechan al llegar · hace 20 min» y el estado es Alerta; un evento `condicion` cerrada la quita sin recargar y el estado vuelve a Normal. P2: lo mismo en la fila del dispositivo, solo en ella, sin volver a pedir el inventario | `Ficha.test.ts` (1), `Inventario.test.ts` (1) |
 | 5. «En vivo» con prueba | «última lectura hace 30 s» del canal visible; con latidos y sin lecturas durante más de 2 intervalos esperados, «conectado, sin lecturas»; una lectura lo devuelve a «conectado» («hace 10 s»); las lecturas de otro canal no cuentan para el visible | `Ficha.test.ts` (1), `lib/tiempo.test.ts` (1, «hace N s») |
 
 **Resultados.** Backend (`pnpm verificar`): **342** pruebas en 30 suites (antes 338 en 29), tipos y lint sin errores. Panel: **76** pruebas en
@@ -1468,3 +1468,94 @@ lo que no se mide aquí es el ritmo de la zona bajo carga mixta. (2) El panel to
 `actualizado_en`, y la pantalla que lo use es de otro bloque. (3) Dos `PATCH` simultáneos con el mismo `actualizado_en` no se probaron en
 paralelo contra una base: el segundo espera el bloqueo de la fila y, al reevaluar el `WHERE`, no encuentra la marca (409); se sostiene en el
 comportamiento de `READ COMMITTED` de PostgreSQL, no en una medición.
+
+## 52. Segundo incremento del panel: leyenda, cambio de rango sin blanco, hora del sitio, resolución elegible y comparación (22/10/2026)
+
+**Qué se prueba** (`docs/19 §4`, «Incremento 2 de P3 y P2»): los seis puntos del diseño, con pruebas por el DOM y de funciones puras, un
+recorrido con navegador real que se corrió primero contra el build anterior del panel (para ver que detecta la falta) y después contra el
+nuevo, y la medición del costo de cada resolución antes de ofrecerla (punto 4).
+
+**Método.** (1) **Backend:** `GET /canales/{id}/historico` rechaza con 400, antes de consultar, una ventana de más de 5 000 cubos (ventana ÷
+intervalo) o, desde la revisión del mismo día, de más de 366 días (`consulta/validacion.ts`, `exigirTopeCubos`); contrato en el decorador OpenAPI y `openapi.json` regenerado; un caso nuevo en
+`pruebas/api-smoke.sh`. (2) **Panel:** funciones puras nuevas (`resolucionesAdmisibles`, `resumenRango`, `alinearSeries` en `lib/grafico.ts`;
+`desfase` y `relojSitio` en `lib/tiempo.ts`; la URL de P3b en `lib/vista.ts`) y componentes nuevos (`ZonaSitio`, `SelectorRango`,
+`Comparar` = P3b), probados en jsdom con la API y el canal en vivo simulados. (3) **Violaciones plantadas:** sin la llamada al tope en el
+controlador, falla 1 prueba del backend; con huecos `undefined` en la alineación y el máximo de puntos en 5 000, fallan 4 pruebas en el panel;
+restauradas, todas en verde. (4) **Navegador real** (`banco.sh encender 5` y `banco.sh navegador`): el recorrido de `e2e/p3.mjs` suma las
+comprobaciones del diseño; se corrió primero con el paquete del panel anterior a este incremento copiado en el backend del banco (la API ya
+con el tope), después con el nuevo, en Firefox y en Chromium (`NAVEGADOR=chromium`). (5) **Medición** en el banco, nunca en la pila de
+desarrollo: una serie sembrada de 30 días a una lectura cada 10 s (259 200 filas) en el canal de temperatura de `emu-0004`; para cada rango ×
+resolución ofrecida, la mediana de 10 peticiones HTTP (`curl`, `time_total`, tras una de calentamiento), los bytes de la respuesta y, de la
+misma consulta que hace el servicio, `EXPLAIN (ANALYZE, BUFFERS)` (filas leídas por los nodos hoja, mediana de 3 ejecuciones, bloques).
+
+| Punto del diseño | Prueba | Dónde |
+|---|---|---|
+| 1. La leyenda informa | Clic en «promedio» y en «lectura actual»: ningún `u-off` y los mismos puntos; con el cursor, la leyenda sigue dando el valor | navegador (3) |
+| 2. Cambio sin blanco | Al cambiar de rango, la serie anterior se conserva con «cargando…» y el grupo ocupado; con la respuesta, se reemplaza y recién entonces se escribe la URL; con error, la serie y la URL siguen, aparece «Reintentar» y recupera; rango vacío con el gráfico sin puntos; cada rango, resolución y tarjeta de canal deja la ficha en su URL con puntos o con el mensaje de vacío; «Ver la última medición» lleva a 24 h | `Ficha.test.ts` (3), navegador (11) |
+| 3. Hora del sitio y aviso | Desfase de Santiago en verano (UTC−03:00) e invierno (UTC−04:00), Madrid (UTC+02:00 y UTC+01:00), UTC, India (UTC+05:30) y sin `longOffset`; reloj con segundos; aviso solo con el navegador en otra zona; en P2 una zona o «N zonas horarias» | `lib/tiempo.test.ts` (3), `ZonaSitio.test.ts` (2), `Ficha.test.ts` (1), `Inventario.test.ts` (1), navegador (2) |
+| 4. Resolución elegible | Admisibles por rango (30 días desde 1 h, 7 días desde 5 min, 24 h desde 1 min); la elegida va en la URL y vuelve a «auto» si el rango nuevo no la admite; la de la URL se aplica; tope de 5 000 cubos (borde exacto) | `lib/grafico.test.ts` (2), `lib/vista.test.ts` (1), `Ficha.test.ts` (2), backend `validacion.spec.ts` (2), navegador (4) |
+| 5. Comparar (P3b) | URL de ida y vuelta con ids inválidos, repetidos y más de 6; alineación con hueco `null`; una serie por dispositivo con la misma ventana e intervalo; «sin canal de X», «unidad distinta (K)», «ya no existe», menos de 2, ninguno que la mida; una sola conexión a `GET /eventos` y la fila al día sin recargar; casillas y «Comparar (N)» en P2 | `lib/vista.test.ts` (2), `lib/grafico.test.ts` (2), `Comparar.test.ts` (4), `Inventario.test.ts` (1), navegador (3) |
+| 6. Lo que el rango ya sabe | Mín, máx y promedio de los promedios (sin nulos); enlace a `GET /dispositivos/{id}/exportar` con la ventana visible, que responde 200 con el CSV | `lib/grafico.test.ts` (1), `Ficha.test.ts` (1), navegador (1) |
+
+**El recorrido con navegador, antes y después** (el anterior es el paquete del panel previo a este incremento; un paso que se corta cuenta
+como una falla y los demás siguen):
+
+| Comprobación | Antes | Después |
+|---|---|---|
+| Las 9 del recorrido anterior (puntos contra `/historico`, formatos, vivo, caída y vuelta, sin errores de JavaScript) | OK | OK |
+| Clic en «promedio» de la leyenda | FALLA: 1 fila `u-off` | OK |
+| Clic en «lectura actual» de la leyenda | FALLA: 2 filas `u-off` | OK |
+| La leyenda sigue el cursor | OK | OK |
+| Cada uno de los 4 rangos deja la ficha en su URL con puntos o vacío | OK (4) | OK (4) |
+| Las resoluciones de cada rango (4 comprobaciones) | FALLA (4): no hay selector | OK (4: 4, 6, 6 y 4 opciones) |
+| Las tarjetas de canal | OK | OK |
+| Resumen del rango y CSV | FALLA: no existen | OK |
+| «Última hora» vacía: mensaje y gráfico sin puntos | OK (el lienzo, en blanco: sin eje) | OK (el eje de la ventana pedida, en la captura) |
+| «Ver la última medición» lleva a 24 h en la misma ficha | OK | OK |
+| Navegador en Europe/Madrid: hora del sitio y aviso | FALLA: no existe | OK |
+| Navegador en la zona del sitio: hora, sin aviso | (no se llegó) | OK |
+| P3b: dos series con puntos desde «Comparar (2)»; «7 días» conserva la pantalla; la fila en vivo sin recargar | FALLA: no hay casillas (1) | OK (3) |
+| **Total** | **17 de 26 OK, 9 fallan** | **29 de 29 OK** (Firefox v155.0 y Chromium v153.0.8010.12) |
+
+**Medición rango × resolución** (antes = las cuatro combinaciones fijas, marcadas «fija»; después = todas las que se ofrecen):
+
+| Rango | Resolución | | Puntos | HTTP, mediana (ms) | Bytes | Filas leídas | SQL (ms) | Bloques |
+|---|---|---|---|---|---|---|---|---|
+| 1 hora | 1 min | fija | 60 | 2,8 | 1 490 | 356 | 0,6 | 49 |
+| 1 hora | 5 min | | 13 | 2,6 | 572 | 356 | 0,6 | 49 |
+| 1 hora | 15 min | | 5 | 2,6 | 405 | 356 | 0,6 | 49 |
+| 24 horas | 1 min | | 1 440 | 9,4 | 28 837 | 8 636 | 7,1 | 108 |
+| 24 horas | 5 min | | 289 | 7,0 | 6 333 | 8 636 | 5,6 | 108 |
+| 24 horas | 15 min | fija | 97 | 6,7 | 2 331 | 8 636 | 5,7 | 108 |
+| 24 horas | 1 h | | 25 | 6,5 | 848 | 8 636 | 5,2 | 108 |
+| 24 horas | 6 h | | 5 | 6,6 | 412 | 8 636 | 5,3 | 108 |
+| 7 días | 5 min | | 2 017 | 51,9 | 42 446 | 60 478 | 19,8 | 809 |
+| 7 días | 15 min | | 673 | 44,7 | 14 377 | 60 478 | 18,8 | 809 |
+| 7 días | 1 h | fija | 169 | 40,8 | 4 000 | 60 478 | 18,5 | 809 |
+| 7 días | 6 h | | 29 | 41,5 | 959 | 60 475 | 19,5 | 809 |
+| 7 días | 1 día | | 8 | 41,5 | 477 | 60 475 | 18,8 | 809 |
+| 30 días | 1 h | | 721 | 179,4 | 16 078 | 259 195 | 130,4 | 2 965 |
+| 30 días | 6 h | fija | 121 | 147,2 | 3 056 | 259 195 | 125,5 | 2 965 |
+| 30 días | 1 día | | 31 | 180,9 | 999 | 259 195 | 128,3 | 2 965 |
+
+Una segunda corrida completa dio lo mismo salvo el tiempo HTTP de 30 días, que osciló entre 147 y 181 ms sin relación con la resolución
+(esa vez la fija midió 181 ms y la de 1 día 147): en ese rango la diferencia entre resoluciones es ruido. Los puntos son uno más que la
+ventana ÷ intervalo cuando la ventana no empieza en el borde de un cubo. **Conclusión:** toda resolución de un rango lee las mismas filas
+crudas (salvo dos o tres por el borde del cubo), así que la más fina cuesta, frente a la fija, 1,4 veces el tiempo en 24 h (9,4 frente a 6,7 ms), 1,3 veces en 7 días (52 frente a
+41 ms) y lo mismo dentro del ruido en 30 días, y entre 5 y 12 veces los bytes (como mucho 42 KB): el costo lo pone el rango, no la
+resolución. El tope del servidor se comprobó también contra la API del banco: 7 días cada minuto (10 080 cubos) → 400 con el motivo; 5 000
+cubos exactos → 200; 5 001 → 400.
+
+**Resultados.** Backend (`pnpm verificar`): **357** pruebas en 31 suites (antes 355), tipos y lint sin errores. Panel: **102** pruebas en 12
+archivos (antes 76 en 10), `svelte-check` con 337 archivos y 0 errores, y el build. Navegador: **29 de 29** en Firefox y en Chromium.
+
+**Tropiezos, corregidos antes de cerrar.** (1) La primera corrida de P3b falló 2 de 29: con dos emulados que miden temperatura y humedad, la
+magnitud por defecto (la más común, a igual cuenta la primera por nombre) fue humedad, que no tenía lecturas; es lo que el diseño pide, así
+que el recorrido elige la temperatura en el selector, como lo haría una persona. (2) En jsdom, un `change` sin `bubbles` no llega al
+manejador del selector: Svelte 5 delega ese evento en la raíz del documento.
+
+**Lo que no cubre.** (1) La medición es de un portátil con la base en RAM y un solo canal con datos; con muchos canales la caché de la base
+se reparte. (2) Los agregados continuos de TimescaleDB, que bajarían las filas leídas en 7 y 30 días, no se midieron: quedan como mejora
+aparte. (3) El eje de la ventana vacía y los colores de P3b se revisan en las capturas, no con una comprobación automática. (4) La comparación
+dibuja como mucho 6 dispositivos de un mismo sitio o de sitios con la misma zona en el eje; con varias zonas, el eje va en la del primero.
+

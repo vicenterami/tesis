@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { duracion, fechaHora, haceCuanto, haceSegundos, horaLocal } from './tiempo';
+import { desfase, duracion, fechaHora, haceCuanto, haceSegundos, horaLocal, relojSitio } from './tiempo';
 
 describe('haceCuanto', () => {
   const ahora = new Date('2026-10-12T15:00:00Z');
@@ -34,3 +34,34 @@ describe('duracion, fechaHora y haceSegundos: textos para personas (docs/19 §6)
     expect(haceSegundos('2026-10-12T14:50:00Z', ahora)).toBe('hace 10 min');
   });
 });
+
+// Incremento 2, punto 3 (docs/13 regla 6): el desfase sale del nombre IANA en el instante dado, nunca fijo.
+describe('desfase y reloj del sitio', () => {
+  it('Santiago en verano (UTC−03:00) y en invierno (UTC−04:00); Madrid el 22/10/2026 (UTC+02:00); UTC; India con media hora', () => {
+    expect(desfase('America/Santiago', new Date('2026-01-15T12:00:00Z'))).toBe('UTC\u221203:00');
+    expect(desfase('America/Santiago', new Date('2026-07-15T12:00:00Z'))).toBe('UTC\u221204:00');
+    expect(desfase('America/Santiago', new Date('2026-10-22T12:00:00Z'))).toBe('UTC\u221203:00');
+    expect(desfase('Europe/Madrid', new Date('2026-10-22T12:00:00Z'))).toBe('UTC+02:00');
+    expect(desfase('Europe/Madrid', new Date('2026-12-22T12:00:00Z'))).toBe('UTC+01:00');
+    expect(desfase('UTC', new Date('2026-10-22T12:00:00Z'))).toBe('UTC+00:00');
+    expect(desfase('Asia/Kolkata', new Date('2026-10-22T12:00:00Z'))).toBe('UTC+05:30');
+  });
+  it('sin «longOffset» (navegador antiguo) se calcula igual', () => {
+    const Original = Intl.DateTimeFormat;
+    const Falso = function (this: unknown, l?: string | string[], o?: Intl.DateTimeFormatOptions) {
+      if (o?.timeZoneName === 'longOffset') throw new RangeError('timeZoneName');
+      return new Original(l, o);
+    } as unknown as typeof Intl.DateTimeFormat;
+    Intl.DateTimeFormat = Falso;
+    try {
+      expect(desfase('America/Santiago', new Date('2026-07-15T12:00:00Z'))).toBe('UTC\u221204:00');
+      expect(desfase('America/New_York', new Date('2026-07-15T12:00:00Z'))).toBe('UTC\u221204:00'); // «short» da «EDT»: se calcula de las partes
+    } finally {
+      Intl.DateTimeFormat = Original;
+    }
+  });
+  it('el reloj del sitio, con segundos y en 24 h', () => {
+    expect(relojSitio('America/Santiago', new Date('2026-10-23T00:58:07Z'))).toBe('22/10/2026 21:58:07');
+  });
+});
+

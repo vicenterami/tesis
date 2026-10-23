@@ -17,7 +17,8 @@
 #   bash plataforma/pruebas/banco/banco.sh http                recepción por HTTP (HU-01): 202, 401, 413, 415, 422 con cuarentena, la baja, los topes (par, dirección, caché, ritmo) y la dirección con el secreto del proxy
 #   bash plataforma/pruebas/banco/banco.sh tope                tope por emisor en las dos vías (docs/10 §8.4 punto 53): presupuesto de lecturas por HTTP y cuota de cuarentena por MQTT
 #   bash plataforma/pruebas/banco/banco.sh nodo                contrato del nodo ESP32 (fase 2, docs/17 §6.2) sin la placa: alta con seis canales, calibración por API (400, 200, 409), el pack del firmware con QoS 1 → medicion, ficha, histórico y en vivo
-#   bash plataforma/pruebas/banco/banco.sh navegador           pantalla P3 en Firefox real con Playwright: puntos contra /historico, vivo sin recargar, caída y vuelta (docs/16 §39)
+#   bash plataforma/pruebas/banco/banco.sh navegador           P3, P3b y P2 en un navegador real con Playwright: puntos contra /historico, vivo sin recargar, caída y vuelta (docs/16 §39);
+#                                                              leyenda, rangos, resoluciones, rango vacío, zona horaria y comparación (docs/16 §52). NAVEGADOR=firefox (por defecto) o chromium
 #   bash plataforma/pruebas/banco/banco.sh cola                cola del broker vigilada: backend detenido + 200 emulados → descartes → condición broker_descarte (docs/16 §22)
 #   bash plataforma/pruebas/banco/banco.sh estado | logs [servicio] | sql ["CONSULTA"]
 #   bash plataforma/pruebas/banco/banco.sh apagar              baja todo; los datos estaban en RAM, no queda nada
@@ -745,19 +746,29 @@ case "${1:-}" in
     # Firefox; su navegador se descarga una vez a ~/.cache/ms-playwright (311 MB medidos el 16/10) con «playwright install», desde el servidor de Playwright, sin una
     # huella que el guion compare (la versión del navegador la fija la de Playwright). Se siembran tres lecturas
     # pasadas de emu-0001 para que el histórico tenga puntos, y la prueba detiene y arranca el backend del banco. La captura queda en la
-    # carpeta privada del banco, nunca en el repositorio.
+    # carpeta privada del banco, nunca en el repositorio. Incremento 2 (docs/19 §4): tres lecturas de emu-0002 (la comparación P3b) y una
+    # sola de emu-0003, de hace 3 h (su «última hora» queda vacía y «Ver la última medición» lleva a «24 horas»); necesita «encender 3» o más.
+    # NAVEGADOR=firefox (por defecto) o chromium: se prepara el que corresponda.
+    NAVEGADOR="${NAVEGADOR:-firefox}"
+    case "$NAVEGADOR" in firefox|chromium) ;; *) echo "FALLA NAVEGADOR=$NAVEGADOR: firefox o chromium"; exit 2 ;; esac
     [ "$(dc ps --format '{{.Status}}' backend | grep -c healthy)" = 1 ] || { echo "FALLA el banco no está arriba: «banco.sh encender» primero"; exit 1; }
-    (cd backend/panel && pnpm -s exec playwright install firefox >/dev/null) || { echo "FALLA no se pudo preparar Firefox para Playwright"; exit 1; }
+    (cd backend/panel && pnpm -s exec playwright install "$NAVEGADOR" >/dev/null) || { echo "FALLA no se pudo preparar $NAVEGADOR para Playwright"; exit 1; }
     red=$(docker network ls --format '{{.Name}}' | grep '^banco_default$')
     read -r did sitio < <(psql_ -tA -F ' ' -c "SELECT d.id, s.codigo FROM dispositivo d JOIN zona z ON z.id = d.zona_id JOIN sitio s ON s.id = z.sitio_id WHERE d.id_fisico = 'emu-0001'")
     cid=$(psql_ -tA -c "SELECT c.id FROM canal c JOIN dispositivo d ON d.id = c.dispositivo_id WHERE d.id_fisico = 'emu-0001' AND c.magnitud_codigo = 'temperatura'")
     [ -n "$did" ] && [ -n "$cid" ] || { echo "FALLA no está emu-0001 con su canal de temperatura (¿«encender» sin emulados?)"; exit 1; }
-    for m in 50 35 20; do t=$(($(date +%s) - m * 60))
-      docker run --rm --network "$red" "$IMG_BROKER" mosquitto_pub -h mosquitto -q 1 -t "sitio/$sitio/dispositivo/emu-0001/temperatura" \
-        -m "[{\"bn\":\"emu-0001\",\"bt\":$t,\"n\":\"temperatura\",\"u\":\"Cel\",\"v\":2$((m / 10)).5}]"; done
+    disp() { psql_ -tA -c "SELECT id FROM dispositivo WHERE id_fisico = '$1'"; }
+    did2=$(disp emu-0002); did3=$(disp emu-0003)
+    cid3=$(psql_ -tA -c "SELECT c.id FROM canal c JOIN dispositivo d ON d.id = c.dispositivo_id WHERE d.id_fisico = 'emu-0003' AND c.magnitud_codigo = 'temperatura'")
+    [ -n "$did2" ] && [ -n "$did3" ] && [ -n "$cid3" ] || { echo "FALLA faltan emu-0002 o emu-0003 con temperatura (¿«encender» con menos de 3?)"; exit 1; }
+    pub() { docker run --rm --network "$red" "$IMG_BROKER" mosquitto_pub -h mosquitto -q 1 -t "sitio/$sitio/dispositivo/$1/temperatura" \
+        -m "[{\"bn\":\"$1\",\"bt\":$(($(date +%s) - $2 * 60)),\"n\":\"temperatura\",\"u\":\"Cel\",\"v\":$3}]"; }
+    for m in 50 35 20; do pub emu-0001 "$m" "2$((m / 10)).5"; pub emu-0002 "$m" "1$((m / 10)).25"; done
+    pub emu-0003 180 19.5
     sleep 2
-    (cd backend/panel && node e2e/p3.mjs http://127.0.0.1:3001 "$did" "$cid" emu-0001 "$sitio" "$red" "$IMG_BROKER" banco-backend-1 "$PRIV/p3.png")
-    r=$?; echo "captura: $PRIV/p3.png"; exit $r ;;
+    (cd backend/panel && NAVEGADOR="$NAVEGADOR" E2E_DISP2="$did2" E2E_ID2=emu-0002 E2E_DISP_VACIO="$did3" E2E_CANAL_VACIO="$cid3" \
+      node e2e/p3.mjs http://127.0.0.1:3001 "$did" "$cid" emu-0001 "$sitio" "$red" "$IMG_BROKER" banco-backend-1 "$PRIV/p3.png")
+    r=$?; echo "capturas: $PRIV/p3.png, p3-vacio.png y p3-p3b.png"; exit $r ;;
   cola)
     # Cola del broker vigilada (docs/10 §8.4 punto 43; docs/16 §22): PLANTAR la violación. Con el backend detenido, 200 emulados a
     # 1 trama/s durante 70 s (≈ 14 000 mensajes) desbordan la cola de la sesión persistente del backend (tope 10 000): el broker

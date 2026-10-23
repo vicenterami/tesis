@@ -26,10 +26,44 @@ export function rangoQueContiene(iso: string, ahora: Date): ClaveRango | null {
   return RANGOS.find((r) => edad <= r.ms)?.clave ?? null;
 }
 
-// Ventana [desde, hasta) que pide el panel para un rango, terminando en «ahora».
-export function ventana(clave: ClaveRango, ahora: Date): { desde: Date; hasta: Date; intervalo: string } {
+// Resoluciones elegibles (docs/19 §4, incremento 2, punto 4): las de la lista cerrada de la API. «auto» (null) es la fija de cada
+// rango, la de RANGOS. Se ofrecen solo las que dan entre 2 y 2 500 puntos para el rango elegido: 30 días admite desde 1 h, 7 días
+// desde 5 min, 24 h desde 1 min. El servidor rechaza más de 5 000 cubos (validacion.ts); el panel nunca arma una petición así.
+export const RESOLUCIONES = [
+  { clave: '1m', rotulo: '1 min', s: 60, intervalo: '1 minute' },
+  { clave: '5m', rotulo: '5 min', s: 300, intervalo: '5 minutes' },
+  { clave: '15m', rotulo: '15 min', s: 900, intervalo: '15 minutes' },
+  { clave: '1h', rotulo: '1 h', s: 3600, intervalo: '1 hour' },
+  { clave: '6h', rotulo: '6 h', s: 21_600, intervalo: '6 hours' },
+  { clave: '1d', rotulo: '1 día', s: 86_400, intervalo: '1 day' },
+] as const;
+export type ClaveResolucion = (typeof RESOLUCIONES)[number]['clave'];
+export const MIN_PUNTOS = 2;
+export const MAX_PUNTOS = 2500;
+
+export function resolucion(clave: ClaveResolucion) {
+  return RESOLUCIONES.find((r) => r.clave === clave)!;
+}
+// Cuántos cubos da un rango con una resolución (ventana ÷ intervalo): la cuenta que también hace el servidor.
+export function puntosDe(clave: ClaveRango, res: ClaveResolucion): number {
+  return Math.ceil(rango(clave).ms / 1000 / resolucion(res).s);
+}
+export function resolucionesAdmisibles(clave: ClaveRango): ClaveResolucion[] {
+  return RESOLUCIONES.filter((r) => {
+    const n = puntosDe(clave, r.clave);
+    return n >= MIN_PUNTOS && n <= MAX_PUNTOS;
+  }).map((r) => r.clave);
+}
+// Una resolución que no sirve para el rango (de una URL ajena, o tras cambiar de rango) vuelve a «auto»: nunca se adivina otra.
+export function resolucionValida(clave: ClaveRango, res: ClaveResolucion | null): ClaveResolucion | null {
+  return res !== null && resolucionesAdmisibles(clave).includes(res) ? res : null;
+}
+
+// Ventana [desde, hasta) que pide el panel para un rango, terminando en «ahora»; con resolución elegida, su intervalo.
+export function ventana(clave: ClaveRango, ahora: Date, res: ClaveResolucion | null = null): { desde: Date; hasta: Date; intervalo: string } {
   const r = rango(clave);
-  return { desde: new Date(ahora.getTime() - r.ms), hasta: ahora, intervalo: r.intervalo };
+  const intervalo = res === null ? r.intervalo : resolucion(res).intervalo;
+  return { desde: new Date(ahora.getTime() - r.ms), hasta: ahora, intervalo };
 }
 
 // La URL se arma con los parámetros codificados; el id del canal viene de la API y aun así se codifica.
@@ -104,3 +138,38 @@ export const EJE_TIEMPO: uPlot.Axis.TimeValuesConfig = [
 ];
 // La leyenda del instante bajo el cursor.
 export const SELLO_LEYENDA = '{D}/{M}/{YYYY} {H}:{mm}';
+
+// Lo que el rango ya sabe (docs/19 §4, incremento 2, punto 6): mínimo, máximo y promedio de los PROMEDIOS recibidos. Es un promedio
+// de promedios (cada cubo pesa lo mismo, tenga 1 o 360 lecturas) y así se nombra en pantalla. null si no hay ninguno.
+export function resumenRango(valores: readonly (number | null)[]): { n: number; min: number; max: number; promedio: number } | null {
+  const v = valores.filter((x): x is number => x !== null && Number.isFinite(x));
+  if (v.length === 0) return null;
+  let min = v[0]!;
+  let max = v[0]!;
+  let suma = 0;
+  for (const x of v) {
+    if (x < min) min = x;
+    if (x > max) max = x;
+    suma += x;
+  }
+  return { n: v.length, min, max, promedio: suma / v.length };
+}
+
+// Varias series en un eje de tiempo común (P3b, punto 5): la unión ordenada de los instantes y, por serie, su valor o null donde
+// no tiene cubo. Se usa null y no `uPlot.join` (que existe en 1.6.32): join deja `undefined` en los huecos de alineación, y uPlot
+// une la línea por encima de un `undefined`; el diseño pide hueco, que en uPlot es null.
+export function alinearSeries(series: readonly { tiempos: readonly number[]; valores: readonly (number | null)[] }[]): [number[], ...(number | null)[][]] {
+  const tiempos = [...new Set(series.flatMap((s) => s.tiempos))].sort((a, b) => a - b);
+  const indice = new Map(tiempos.map((t, i) => [t, i]));
+  const columnas = series.map((s) => {
+    const col: (number | null)[] = tiempos.map(() => null);
+    s.tiempos.forEach((t, i) => (col[indice.get(t)!] = s.valores[i] ?? null));
+    return col;
+  });
+  return [tiempos, ...columnas];
+}
+
+// Paleta fija de 6 colores distinguibles para P3b (Okabe e Ito, 2008, «Color Universal Design»: pensada para quien no distingue rojo y verde), en orden fijo: el
+// primer dispositivo de la URL siempre lleva el primero.
+export const PALETA = ['#0072b2', '#d55e00', '#009e73', '#cc79a7', '#e69f00', '#56b4e9'] as const;
+

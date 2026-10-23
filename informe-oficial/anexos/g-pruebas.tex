@@ -4,7 +4,7 @@
 \setlength{\tabcolsep}{4pt}
 
 Cada fila resume una sección de la documentación de pruebas del repositorio (\texttt{docs/16}; la columna «§» da su
-número), con su resultado y el comando que la repite. Los guiones viven en \texttt{plataforma/pruebas/}; las 355 pruebas unitarias del backend y las 76 del panel corren con \texttt{pnpm verificar} y el verificador de concordancia con \texttt{verificar-todo.sh}.
+número), con su resultado y el comando que la repite. Los guiones viven en \texttt{plataforma/pruebas/}; las 357 pruebas unitarias del backend y las 102 del panel corren con \texttt{pnpm verificar} y el verificador de concordancia con \texttt{verificar-todo.sh}.
 
 \begin{longtable}{@{}L{0.8cm}L{3.2cm}L{4.2cm}L{3.8cm}@{}}
 \caption{Pruebas de la Etapa 3: qué se probó, qué resultó y cómo se repite.}\label{tab:pruebas-detalle}\\
@@ -38,4 +38,7 @@ número), con su resultado y el comando que la repite. Los guiones viven en \tex
 47 & Límite de tasa por dirección en el proxy (22/10) & 23 de 23 plantando cada violación: 429 en ráfaga, administración y mayúsculas; sesión 101 y flujo 21 cortados & \texttt{banco.sh proxy} \\
 48 & Todo dispositivo consultable de punta a punta (22/10) & 104 de 104 en la pila; 757 de 757 en el banco & \texttt{banco.sh consultable} \\
 49 & La misma serie por las tres vías: pérdidas, duplicados, latencia y consumo (22/10) & 28 de 28: 0 perdidas y 0 filas de más en 5 emisores; p95 de 4 a 157~ms; backend $\leq$ 60,8~MiB & \texttt{banco.sh vias} \\
+50 & Primer incremento del panel (22/10) & 23 pruebas nuevas por el DOM y de funciones puras: vista en la URL (ida y vuelta, valor inválido, cambio externo), rango vacío con «Ver la última medición», intervalo observado con sus dos avisos, reloj de pasarela, «en vivo» con prueba & \texttt{pnpm verificar} \\
+51 & Calibración por API con bloqueo optimista (22/10) & 17 unitarias nuevas sobre dobles de la base; en el banco y en la pila: 200 con el sello vigente, 409 con el viejo, 400 con una sola escala, 200 al quitar la calibración & \texttt{banco.sh nodo} \\
+52 & Segundo incremento del panel (22/10) & 26 pruebas nuevas del panel y 2 del backend; navegador 29 de 29 en Firefox y en Chromium (9 fallaban con el panel anterior); costo medido de cada resolución por rango & \texttt{banco.sh navegador} \\
 \end{longtable}

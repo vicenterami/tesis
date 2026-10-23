@@ -7,7 +7,7 @@ sequenceDiagram
     U->>FE: abre la vista de un dispositivo
     FE->>API: GET /canales/{id}/historico?desde=<ISO 8601>&intervalo=15 minutes
     API->>DB: SELECT time_bucket('15 min', tiempo), avg(valor) …
-    DB-->>API: 60 a 170 puntos agregados (según el rango)
+    DB-->>API: 60 a 170 puntos agregados según el rango (hasta 2 500 con una resolución elegida)
     API-->>FE: [[tiempos],[valores]]
     FE->>FE: uPlot dibuja el histórico
     FE->>API: SSE · GET /eventos?dispositivo={id} (EventSource, con la sesión desde M7)

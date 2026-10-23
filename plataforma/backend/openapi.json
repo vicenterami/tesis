@@ -429,7 +429,7 @@
     },
     "/canales/{id}/historico": {
       "get": {
-        "description": "Promedio por intervalo calculado con time_bucket EN LA ZONA HORARIA DEL SITIO. Formato columnar para uPlot: `tiempos` (segundos Unix), `valores`, `muestras` (cuántas lecturas hay detrás de cada promedio). Rango semiabierto [desde, hasta). Por defecto: últimas 24 h cada 15 minutos.",
+        "description": "Promedio por intervalo calculado con time_bucket EN LA ZONA HORARIA DEL SITIO. Formato columnar para uPlot: `tiempos` (segundos Unix), `valores`, `muestras` (cuántas lecturas hay detrás de cada promedio). Rango semiabierto [desde, hasta). Por defecto: últimas 24 h cada 15 minutos. Una ventana que daría más de 5000 cubos (ventana ÷ intervalo) se rechaza con 400 antes de consultar (docs/19 §4, incremento 2, punto 4).",
         "operationId": "CanalesController_historico",
         "parameters": [
           {
@@ -482,7 +482,7 @@
             "description": "Serie agregada"
           },
           "400": {
-            "description": "UUID, fecha o intervalo inválidos"
+            "description": "UUID, fecha o intervalo inválidos, o una ventana de más de 366 días o de más de 5000 cubos"
           },
           "404": {
             "description": "Canal inexistente"
@@ -875,7 +875,7 @@
                   },
                   "actualizado_en": {
                     "type": "string",
-                    "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d{1,6})?(Z|[+-]\\d{2}:\\d{2})$",
+                    "pattern": "^(?:19|20)\\d{2}-\\d{2}-\\d{2}T(?:[01]\\d|2[0-3]):\\d{2}:\\d{2}(\\.\\d{1,6})?(Z|[+-]\\d{2}:\\d{2})$",
                     "description": "El `actualizado_en` del canal en la ficha, tal cual (ISO 8601 UTC con microsegundos)"
                   }
                 },
@@ -916,8 +916,8 @@
     }
   },
   "info": {
-    "title": "Plataforma de registro, monitoreo y gestión de datos de sensores",
-    "description": "API de consulta (M5) y canal de tiempo real (SSE) para el panel. Solo lectura. Todos los instantes en ISO 8601 UTC (sufijo Z); las agregaciones por día se calculan en la zona horaria del sitio. Rangos semiabiertos [desde, hasta).",
+    "title": "Registro, gestión y monitoreo de dispositivos IoT",
+    "description": "API del sistema: consulta (M5) y canal de tiempo real (SSE) para el panel; recepción de tramas por HTTP; administración (alta, baja, rotación de credenciales y calibración) con la clave de administración. Todos los instantes en ISO 8601 UTC (sufijo Z); las agregaciones por día se calculan en la zona horaria del sitio. Rangos semiabiertos [desde, hasta).",
     "version": "0.1.0",
     "contact": {}
   },
@@ -928,7 +928,7 @@
     },
     {
       "name": "canales",
-      "description": "Series de tiempo agregadas por canal"
+      "description": "Series de tiempo agregadas por canal y calibración"
     },
     {
       "name": "condiciones",
@@ -945,6 +945,14 @@
     {
       "name": "salud",
       "description": "Estado del servicio"
+    },
+    {
+      "name": "recepcion",
+      "description": "Recepción de tramas por HTTP (vía http)"
+    },
+    {
+      "name": "pasarelas",
+      "description": "Pasarelas y servidores de red externos (rutas B y C)"
     }
   ],
   "servers": [],

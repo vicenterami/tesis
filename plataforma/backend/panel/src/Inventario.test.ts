@@ -182,3 +182,40 @@ describe('Inventario (P2): semáforo, orden y filtros leídos del DOM', () => {
     await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('saturado'));
   });
 });
+
+// Incremento 2 (docs/19 §4, puntos 3 y 5): hora del sitio con una sola zona, aviso con varias, y las casillas «comparar».
+describe('Inventario (P2), incremento 2: zona horaria y casillas para comparar', () => {
+  it('una sola zona entre las filas: la hora del sitio; con dos zonas: «2 zonas horarias»', async () => {
+    render(Inventario);
+    await waitFor(() => expect(document.querySelector('[data-hora-sitio]')).toBeTruthy());
+    expect(document.querySelector('[data-hora-sitio]')!.textContent).toContain('Hora en el sitio: 12/10/2026 12:00:00 · America/Santiago (UTC−03:00)');
+    cleanup();
+    const otra = [...dispositivos, base({ id: '00000000-0000-4000-8000-000000000005', nombre: 'Madrid', id_fisico: 'dev-0005', zona_horaria: 'Europe/Madrid', sitio_codigo: 'mad', sitio: 'Madrid', zona_id: 'z-mad' })];
+    vi.stubGlobal('fetch', vi.fn(async (ruta: string) => new Response(JSON.stringify(ruta === '/dispositivos' ? otra : abiertas))));
+    render(Inventario);
+    await waitFor(() => expect(document.querySelector('[data-hora-sitio]')?.textContent).toBe('2 zonas horarias: cada fila va en la de su sitio'));
+    expect(document.querySelector('[data-aviso-zona]')).toBeNull();
+  });
+
+  it('«Comparar (N)» se activa con 2 a 6 marcadas y lleva a P3b con los marcados en orden', async () => {
+    render(Inventario);
+    await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(5));
+    const boton = (): HTMLButtonElement => document.querySelector<HTMLButtonElement>('[data-comparar]')!;
+    expect(boton().textContent).toBe('Comparar (0)');
+    expect(boton().disabled).toBe(true);
+    screen.getByRole('checkbox', { name: 'comparar Invernadero' }).click();
+    await waitFor(() => expect(boton().textContent).toBe('Comparar (1)'));
+    expect(boton().disabled).toBe(true);
+    screen.getByRole('checkbox', { name: 'comparar Pozo' }).click();
+    await waitFor(() => expect(boton().disabled).toBe(false));
+    boton().click();
+    expect(window.location.hash).toBe('#/comparar?dispositivos=00000000-0000-4000-8000-000000000001,00000000-0000-4000-8000-000000000003&rango=24h');
+    // Las casillas se recuerdan en la sesión: al volver al inventario siguen marcadas.
+    cleanup();
+    render(Inventario);
+    await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(5));
+    expect((screen.getByRole('checkbox', { name: 'comparar Invernadero' }) as HTMLInputElement).checked).toBe(true);
+    expect(boton().textContent).toBe('Comparar (2)');
+    window.location.hash = '';
+  });
+});

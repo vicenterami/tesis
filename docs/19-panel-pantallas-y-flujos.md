@@ -33,7 +33,7 @@ el modelo de datos.
 | **Normal** | ninguna de las anteriores | Reporta a tiempo y dentro de rango |
 
 `en_linea` lo trae la API, pero el panel lo recalcula con la misma regla (visto dentro de 2 × intervalo esperado) para que cambie
-con cada `visto` del canal en vivo y con el paso del tiempo sin repedir el inventario; sin ninguna trama todavía es nulo y el
+con cada `visto` del canal en vivo y con el paso del tiempo sin volver a pedir el inventario; sin ninguna trama todavía es nulo y el
 dispositivo se muestra **Normal** hasta la primera.
 
 El estado nunca se comunica solo por color: lleva su palabra al lado (accesibilidad, y porque los colores se imprimen mal). La
@@ -45,6 +45,7 @@ función que lo calcula es una sola, con prueba unitaria por cada fila de la tab
 | P1 | **Resumen del sitio** | Conteo por estado visual (los cuatro), condiciones abiertas, últimas tramas rechazadas, estado del servicio | Ir a cada lista filtrada | `GET /dispositivos`, `GET /condiciones?abiertas=true`, `GET /cuarentena?limite=5`, `GET /salud` | RF-30, HU-16 | Etapa 4 (`docs/04`); los conteos por estado ya aparecen en P2 desde la Etapa 3 |
 | P2 | **Inventario** | Tabla: estado visual, nombre, identificador físico, vía, zona, última trama (hace cuánto), condiciones abiertas; filtros por estado, sitio (si hay más de uno), zona y vía con conteo | Abrir la ficha; filtrar; buscar por nombre o identificador | `GET /dispositivos` y `GET /condiciones?abiertas=true&limite=500` (el tipo de cada condición abierta decide el estado, §2; filtra el panel: hoy la API no filtra) | Semáforo y tabla: RF-47, RF-48, HU-10, HU-19. Filtros y búsqueda: RF-51, HU-20 (adelantada a la Etapa 3 el 12/10) | Etapa 3, tramo 2 |
 | P3 | **Ficha del dispositivo** | Identidad (nombre, identificador, vía, formato, zona, sitio, intervalo esperado, desde cuándo); estado visual; por canal: última lectura con unidad y, si el canal tiene calibración, su porcentaje (`docs/10 §8.4` punto 51), y reglas de umbral; gráfico histórico por canal (rango elegible; la agregación la fija el rango) que sigue en vivo; condiciones abiertas y cerradas del dispositivo; sus tramas rechazadas | Cambiar canal y rango (el intervalo lo fija cada rango); pausar el vivo; ir a configurar (P6) o a mudar (Etapa 4) | `GET /dispositivos/{id}`, `GET /canales/{id}/historico?desde&hasta&intervalo`, `GET /eventos?dispositivo=`, `GET /condiciones?dispositivo=&abiertas=true&limite=500` (todas las abiertas) más `?dispositivo=&limite=50` (las recientes), `GET /cuarentena?dispositivo=&limite=20` | RF-33, RF-49 (identidad, condiciones y serie; su «historial de eventos» queda con la Etapa 4), HU-21 (adelantada a la Etapa 3 el 12/10, con sus 7 h); el rango a medida por fechas es HU-07 (Etapa 4) | Etapa 3, tramo 3 |
+| P3b | **Comparar dispositivos** (`#/comparar`; incremento 2) | La misma magnitud de 2 a 6 dispositivos en un gráfico de historia (promedios por cubo; misma ventana y resolución que P3) y, debajo, la tabla en tiempo real con la última lectura, hace cuánto y el estado de cada uno; selector de magnitud; entradas desde las casillas de P2 y el enlace de P3 | Abrir la ficha de cada dispositivo; volver al inventario con las casillas marcadas | `GET /dispositivos/{id}` por dispositivo, `GET /canales/{id}/historico`, `GET /condiciones?abiertas`, `GET /eventos` | — | — |
 | P4 | **Condiciones** | Lista con tipo, dispositivo, magnitud y umbral, abierta en, duración; filtro abiertas / todas; al cerrarse, el resumen del episodio, y el reconocimiento con su clasificación (`docs/10 §8.4` punto 49) | Abrir la ficha del dispositivo | `GET /condiciones?abiertas&limite` | HU-05, RF-24 | Etapa 4 (lista sobre lo que la API ya devuelve) |
 | P5 | **Cuarentena** | Últimas tramas rechazadas: cuándo, por qué (`no_registrado`, `dado_de_baja`, `malformada`, `invalida`), detalle, dispositivo si se conoce, la trama cruda plegada | Copiar la trama; ir al alta si el motivo es `no_registrado` | `GET /cuarentena?limite` | RF-11 a RF-13 | Etapa 4 (lista sobre lo que la API ya devuelve) |
 | P6 | **Configurar dispositivo y canales** | Nombre, estado (activo / mantenimiento), intervalo esperado; por canal, umbral alto, umbral bajo, histéresis | Guardar con bloqueo optimista; validación en vivo (bajo < alto, histéresis dentro de la banda, rango de la magnitud) | **Propuesta:** `PATCH /dispositivos/{id}`, `PUT /canales/{id}/reglas` | HU-06, HU-13, punto 28 | Etapa 4 (exige sesión) |
@@ -75,7 +76,7 @@ una tarjeta por canal: magnitud, última lectura con unidad y hace cuánto, regl
 canal elegido: rango (última hora, 24 h, 7 días, 30 días; el rango a medida por fechas es HU-07, Etapa 4), cada uno con un intervalo de
 agregación fijo de la lista cerrada de la API (1 minuto, 15 minutos, 1 hora, 6 horas);
 el panel pide el histórico y abre el canal en vivo filtrado por dispositivo; cada `medicion` nueva del canal visible se añade al
-final sin repedir el histórico; cada `visto` actualiza «hace cuánto»; cada `condicion` actualiza la lista de condiciones y el
+final sin volver a pedir el histórico; cada `visto` actualiza «hace cuánto»; cada `condicion` actualiza la lista de condiciones y el
 estado visual. Si el gráfico muestra un intervalo agregado (por ejemplo, promedios por hora), el punto en vivo se dibuja aparte,
 como «lectura actual», para no mezclar un valor crudo con promedios. Botón «pausar en vivo». Al final, condiciones del
 dispositivo (abiertas arriba) y sus tramas rechazadas.
@@ -112,6 +113,78 @@ declara intervalo observado ni desvío de reloj. Lo que se toma, lo que no y lo 
 Pruebas (§6): por el DOM, ida y vuelta URL ↔ estado en P2 y P3, el texto y el botón del rango vacío, el intervalo con sus dos avisos, la alerta
 del reloj; en el backend, unitaria del contrato y de las piezas de la consulta (OpenAPI regenerado); la mediana se contrasta en la base, porque las unitarias corren sin ella. Lo que no entra en este incremento: filtros guardados por
 persona, rango a medida (HU-07) y la administración de pasarelas (incremento 3).
+
+**Incremento 2 de P3 y P2: leyenda sin sorpresas, cambio de rango sin pantalla en blanco, hora del sitio, resolución elegible y
+comparación entre nodos (diseñado el 22/10/2026, antes del código, como manda la regla de concordancia).** Qué lo motiva: al revisar la
+ficha con los datos reales del 20/10, un clic en «promedio» o en «lectura actual» de la leyenda ocultaba esa serie (uPlot lo hace por
+defecto al pulsar una leyenda) y se leía como pérdida de datos; un rango sin datos dejaba el gráfico vacío sin decir por qué (lo resolvió
+el incremento 1); ninguna pantalla decía en qué zona horaria ni qué hora era en el sitio (`docs/13` regla 6 lo pide y estaba pendiente); y
+los nodos solo se veían de a uno. Referentes (registro de evidencia del proyecto, fuera del repositorio; fuentes oficiales leídas el 22/10/2026:
+https://thingsboard.io/docs/user-guide/time-window/ · https://www.absmach.eu/docs/magistrala/user-guide/dashboards/widgets/ ·
+https://support.milesight-iot.com/support/solutions/articles/73000603114-milesight-iot-cloud-faq): ThingsBoard y Magistrala separan «tiempo real» de
+«historia» (P-TB-04, P-MG-03); Milesight deja elegir el rango del eje X con el eje Y fijo (P-MS-03); ninguna de las cuatro declara comparación
+de dispositivos en un gráfico ni aviso por la zona del navegador (no declarado, que no es lo mismo que inexistente).
+1. **La leyenda informa, no apaga.** Las filas de la leyenda de uPlot dejan de recibir eventos de puntero: el clic no oculta ninguna serie,
+   y la leyenda sigue mostrando el valor de cada serie bajo el cursor. Si algún día hace falta ocultar una serie, será un control propio con
+   estado visible, nunca un clic silencioso. Prueba con navegador: clic en «promedio» y en «lectura actual» → el número de puntos no cambia y
+   ninguna fila de la leyenda queda marcada como apagada.
+2. **Cambiar rango, canal o resolución nunca deja el gráfico en blanco sin decirlo.** Mientras llega el histórico nuevo, el gráfico conserva
+   la serie anterior y el texto de puntos dice «cargando…» (el grupo de botones queda marcado ocupado); con respuesta, la reemplaza; con error,
+   conserva la anterior, muestra el error con un botón «Reintentar» y no toca la URL; con rango vacío, muestra el mensaje del incremento 1 y
+   un gráfico sin puntos pero con el eje de tiempo de la ventana pedida, para que se vea *qué* ventana está vacía. Ninguno de estos clics
+   cambia de pantalla: la URL sigue siendo la de la ficha. Prueba con navegador: cada botón de rango, «Ver la última medición», cada resolución
+   y cada tarjeta de canal; tras cada clic, la ficha sigue siendo la misma (`location.hash`), y el gráfico tiene puntos o el mensaje de rango
+   vacío, nunca ninguno de los dos.
+3. **Hora del sitio y aviso de zona (cierra la regla 6 de `docs/13`).** Bajo la cabecera de P3: «Hora en el sitio: 22/10/2026 21:58:07 ·
+   America/Santiago (UTC−03:00)», con segundos y al día cada segundo; el desfase se calcula del nombre IANA al instante actual (cambia con el
+   horario de verano) y nunca se escribe fijo. Si la zona del navegador es otra: «Tu navegador está en Europe/Madrid (UTC+02:00); todas las
+   horas de esta pantalla van en la zona del sitio». En P2, con una sola zona entre los dispositivos listados, la misma línea; con varias, «N
+   zonas horarias: cada fila va en la de su sitio» (la hora exacta por fila ya está al pasar el cursor). Prueba: unitaria del desfase (zona e
+   instante → «UTC−03:00», «UTC+02:00», y una fecha de invierno y otra de verano de Chile); con navegador, el contexto de Playwright fijado en
+   otra zona muestra el aviso y, fijado en la del sitio, no.
+4. **Resolución elegible, con el costo medido antes de ofrecerla.** Junto a los rangos, un selector «resolución»: «auto» (la fija de cada
+   rango, la de hoy) y las de la lista cerrada de la API (1 min, 5 min, 15 min, 1 h, 6 h, 1 día) que den entre 2 y 2 500 puntos para el rango
+   elegido (30 días admite desde 1 h; 7 días desde 5 min; 24 h desde 1 min). La resolución va en la URL (`&res=5m`) solo cuando no es «auto»;
+   el texto bajo los botones dice «N puntos, promedio por X». El servidor rechaza con 400, antes de consultar, una petición a
+   `GET /canales/{id}/historico` que produciría más de 5 000 cubos (ventana ÷ intervalo) o que abarque más de 366 días (el tope de cubos acota la respuesta, no las filas
+   leídas): el panel nunca la arma, pero la API es pública.
+   Medición (`docs/16 §52`, en el banco, con una serie sembrada de 30 días a una lectura cada 10 s): para cada rango × resolución ofrecida,
+   tiempo de respuesta (mediana de 10 peticiones), filas leídas (`EXPLAIN (ANALYZE, BUFFERS)`) y bytes de la respuesta; el «antes» son las
+   cuatro combinaciones fijas de hoy. La tabla debe responder cuánto cuesta la resolución más fina de cada rango frente a la fija. Los
+   agregados continuos de TimescaleDB quedan como mejora aparte, también medida: hoy toda resolución lee las filas crudas.
+5. **Comparar nodos: la misma magnitud de varios dispositivos en un gráfico (P3b).** Pantalla
+   `#/comparar?dispositivos=<uuid>,<uuid>&magnitud=temperatura&rango=24h[&res=5m]` (de 2 a 6 dispositivos). Entradas: en P2, una casilla
+   «comparar» por fila y el botón «Comparar (N)», activo con 2 a 6 marcadas; en P3, el enlace «Comparar con otros dispositivos», que abre P3b
+   con este dispositivo marcado y la magnitud del canal visible. Arriba, el selector de magnitud (las que tienen los dispositivos marcados; por
+   defecto la más común) y los mismos rango y resolución de P3. El gráfico dibuja una serie por dispositivo (su canal de esa magnitud; paleta
+   fija de 6 colores distinguibles) alineadas por cubo de tiempo (las peticiones comparten ventana e intervalo; donde un dispositivo no tiene
+   cubo, hueco), con la unidad de la primera serie en el eje; un dispositivo sin canal de esa magnitud o con otra unidad aparece en la lista
+   como «sin canal de X» o «unidad distinta (K): no se dibuja», nunca se omite en silencio. Debajo, la tabla en vivo: dispositivo · última
+   lectura · hace cuánto · estado visual, con el canal `GET /eventos` sin filtro y filtrado en el cliente por el conjunto marcado (una sola
+   conexión, no una por dispositivo: el proxy acota las conexiones a ese canal). El gráfico de P3b es **historia** (se vuelve a pedir al cambiar rango,
+   resolución o magnitud y con el botón «Actualizar»; en vivo no se le agregan puntos crudos: P3 ya separa promedio de lectura actual, y seis
+   series crudas más confundirían) y la tabla es el **tiempo real**: la separación que ThingsBoard y Magistrala declaran (P-TB-04, P-MG-03), hecha
+   explícita en pantalla. Vacíos: con menos de 2 dispositivos, «Marca al menos dos dispositivos en el inventario»; sin ningún canal de la
+   magnitud, «Ninguno de los marcados mide X»; en el selector, una magnitud que
+   ninguno mide se lista como «X (ninguno la mide)»; un dispositivo dado de baja mientras se mira, «ya no existe»; un rango sin cubos en
+   todos los dibujados, «Ninguno de los dibujados tiene mediciones de X en este rango». Prueba con navegador: dos emulados del banco con temperatura → dos series con puntos y la
+   leyenda con los dos nombres; el cambio de rango conserva la pantalla; una trama MQTT de uno de ellos actualiza su fila sin recargar.
+6. **Lo que el rango ya sabe, dicho.** Bajo el gráfico de P3: «en este rango: mín · máx · promedio de los puntos dibujados» (calculado en el
+   cliente sobre los promedios recibidos: es un promedio de promedios y así se nombra) y el enlace «Descargar CSV de este rango» a
+   `GET /dispositivos/{id}/exportar` con la ventana visible (la pantalla P8 sigue en la Etapa 4; un enlace no es la pantalla).
+Pruebas (§6): las de navegador se suman al recorrido de `banco.sh navegador` (el mismo arranque de Firefox); por el DOM y funciones puras:
+resoluciones admisibles por rango, desfase de zona, alineación de series y lectura y escritura de la URL de P3b. Lo que no entra: rango a
+medida por fechas (HU-07), tableros guardados por persona, y una serie en miniatura por fila en P2 (una petición por fila: se mide antes).
+**Hecho el 22/10/2026 (`docs/16 §52`).** Medido en el banco con la serie de 30 días a una lectura cada 10 s: toda resolución de un rango lee
+las mismas filas crudas salvo dos o tres por el borde del cubo (≈ 8 600 en 24 h, 60 500 en 7 días y 259 200 en 30 días; la tabla exacta
+está en `docs/16 §52`), así que la resolución más fina cuesta poco más en tiempo
+que la fija (24 h cada minuto, 9,4 ms frente a 6,7 ms; 7 días cada 5 min, 52 ms frente a 41 ms; 30 días cada hora, lo mismo que cada 6 h
+dentro del ruido) y de 5 a 12 veces más en bytes (como mucho 42 KB): se ofrecen todas las que el diseño admite. Decisiones dentro del
+diseño: el eje de tiempo de P3 y P3b muestra siempre la ventana pedida (también con puntos, no solo vacía; se amplía si un cubo empieza
+antes o una lectura en vivo llega después); con error, los botones quedan en lo pedido y la URL en lo dibujado; las casillas de P2 se
+recuerdan mientras dura la sesión del navegador (así el enlace de P3 y el vacío de P3b llevan a P2 con ese dispositivo ya marcado); a igual
+cuenta, la magnitud por defecto de P3b es la primera por nombre; un dispositivo tiene como mucho un canal por magnitud (restricción única
+de `canal`), así que «su canal de esa magnitud» es uno solo.
 
 **P4 Condiciones y P5 Cuarentena (Etapa 4).** Dos listas con filtro y paginación por `limite`; cada fila lleva a la ficha. En
 P5 la trama cruda va plegada (es texto largo) con un botón de copiar.
@@ -158,7 +231,9 @@ descargar; la descarga exige rol de administrador; la vista pública nunca ofrec
   (cabeceras, CSP, paquete con hash, sin `.map`). **Con navegador real** (desde el 16/10/2026, `docs/16 §39`): `banco.sh navegador`
   abre el build que sirve el banco en Firefox con Playwright (dependencia de desarrollo del panel, versión fijada) y recorre P3 según
   la fila de §7: los puntos del gráfico contra `/historico`, una trama publicada por MQTT que aparece sin recargar y la caída del
-  backend («reconectando» y, al volver, la lectura publicada durante la caída); deja una captura para mirarla. jsdom no dibuja: lo
+  backend («reconectando» y, al volver, la lectura publicada durante la caída); desde el incremento 2 recorre también la leyenda, cada rango y
+  resolución, el rango vacío, el aviso de zona (con el contexto del navegador en otra zona) y P3b desde P2 (`docs/16 §52`); deja capturas para
+  mirarlas. El navegador se elige con `NAVEGADOR=firefox` (por defecto) o `NAVEGADOR=chromium`. jsdom no dibuja: lo
   que solo se ve en pantalla (formatos, textos del gráfico) se revisa en esa captura.
 - **Fechas, horas y textos para personas:** horas en formato de 24 h y meses en español en ejes, leyendas y tablas, siempre en la zona
   del sitio (regla 6 de `docs/13`); ningún código interno a la vista (`sin_comunicacion` se muestra «Sin comunicación»). Lo encontró la
@@ -168,7 +243,7 @@ descargar; la descarga exige rol de administrador; la vista pública nunca ofrec
   nunca dos en vuelo) y las lecturas en vivo se aplican por lotes (un redibujo cada 250 ms como mucho). Un dispositivo que
   oscila o un emisor malicioso no multiplican consultas a la base ni redibujos. La ficha descarta eventos de otro dispositivo
   aunque el canal venga filtrado.
-- **Rendimiento:** el histórico llega agregado (entre 60 y 170 puntos según el rango); uPlot dibuja; el vivo añade al final; en P2 la tabla se
+- **Rendimiento:** el histórico llega agregado (en resolución «auto», entre 60 y 170 puntos según el rango; con una resolución elegida, hasta 2 500); uPlot dibuja; el vivo añade al final; en P2 la tabla se
   recalcula solo con los eventos recibidos, no repidiendo el inventario cada vez.
 
 ## 7. Trazabilidad y prueba de cada pantalla
@@ -177,6 +252,7 @@ descargar; la descarga exige rol de administrador; la vista pública nunca ofrec
 | P2 Inventario con semáforo y filtros | RF-47, RF-48, RF-51, HU-10, HU-19, HU-20 | Tramo 2 (Etapa 3) | Semilla conocida → conteos y filas en el DOM; un dispositivo en mantenimiento aparece «Inactivo»; filtro por vía reduce la tabla; el reenvío de Vite conserva el `Host` y no retiene el canal (`pruebas/panel-desarrollo.sh`, `docs/16 §16`); varios sitios: dos sitios con una zona del mismo nombre, el filtro por sitio y la zona dentro del sitio (16/10) |
 | P3 Ficha | RF-33, RF-49, HU-21 | Tramo 3 (Etapa 3); prueba con navegador real el 16/10 | `banco.sh navegador` (Firefox con Playwright): los puntos del gráfico (texto y `data-puntos`) son los de `/historico`; una trama publicada por MQTT aparece en su tarjeta sin recargar; con el backend detenido se ve «reconectando», se publica una lectura durante la caída y, al volver, la tarjeta la muestra, la página repite el histórico (se ve la petición) y el canal vuelve a «conectado»; sin errores de JavaScript; la captura revisa lo que se dibuja en el lienzo (eje en 24 h) |
 | P2 y P3, incremento 1: vista en la URL, rango vacío, intervalo observado, reloj de pasarela, «en vivo» con prueba | RF-33, RF-47, RF-49, HU-20, HU-21 | Etapa 3 (22/10/2026) | `docs/16 §50`: 23 pruebas nuevas del panel por el DOM y de funciones puras (ida y vuelta URL ↔ estado en P2 y P3 con valor inválido y `hashchange` externo, texto y botón del rango vacío y su ausencia con puntos, el intervalo con sus dos avisos y el nulo, la alerta del reloj que aparece y se va sin recargar, «conectado, sin lecturas») y 4 del backend (contrato de `intervalo_observado_s`, `openapi.json` regenerado); la mediana, contrastada en la base de desarrollo; el paquete servido, con `pruebas/panel-desarrollo.sh` |
+| P3 y P2, incremento 2: leyenda informativa, cambio de rango sin blanco, hora del sitio, resolución elegible, comparación entre nodos (P3b), resumen y CSV del rango | RF-33, RF-34, RF-47, RF-49, HU-20, HU-21 | Etapa 3 (22/10/2026) | `docs/16 §52`: con navegador real (29 comprobaciones en Firefox y en Chromium; contra el build anterior, 9 fallan), los clics de leyenda, rango, resolución, «Ver la última medición» y canal dejan la ficha en su URL con puntos o con el mensaje de vacío; el aviso de zona con el contexto del navegador en otra zona; P3b con dos emulados; por el DOM y funciones puras (26 pruebas nuevas del panel): resoluciones por rango, desfase, alineación, URL de P3b; 2 del backend (tope de 5 000 cubos); medición rango × resolución antes y después |
 | P4 Condiciones, P5 Cuarentena | HU-05, RF-11 a RF-13, RF-24 | Etapa 4 | Trama fuera de rango → fila en P4 en vivo; trama de un desconocido → fila en P5 con motivo `no_registrado` |
 | P1 Resumen | RF-30, HU-16 | Etapa 4 | Los cuatro conteos suman el total del inventario; cambian en vivo con F3 |
 | P8 Exportar (API) | RF-34, HU-08 | Etapa 3 (12/10): 6 pruebas de las funciones puras y 7 casos de humo; la pantalla, el XLSX y la exportación por sitio, en la Etapa 4 |

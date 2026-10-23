@@ -44,6 +44,27 @@ export function intervalo(valor: unknown): Intervalo {
   throw new BadRequestException(`intervalo debe ser uno de: ${INTERVALOS.join(', ')}`);
 }
 
+// Segundos de cada intervalo de la lista cerrada (1 día = 86 400 s: el tope es una cota de costo, no un calendario; un día de
+// cambio de hora tiene 23 o 25 h y no mueve la cuenta de forma que importe).
+export const SEGUNDOS_INTERVALO: Readonly<Record<Intervalo, number>> = {
+  '1 minute': 60, '5 minutes': 300, '15 minutes': 900, '1 hour': 3600, '6 hours': 21_600, '1 day': 86_400,
+};
+// Tope de cubos de GET /canales/{id}/historico (docs/19 §4, incremento 2, punto 4): el panel ofrece hasta 2 500 puntos y nunca arma
+// una petición mayor, pero la API es pública; una ventana de un año cada minuto (525 600 cubos) se rechaza ANTES de consultar.
+export const MAX_CUBOS = 5000;
+// El tope de cubos acota la RESPUESTA, no las filas leídas: 5 000 días a un cubo por día pasarían y leerían 13 años de un canal
+// (revisión del 22/10). La ventana máxima acota las filas; el panel dibuja hasta 30 días y, para más, está la exportación.
+export const MAX_DIAS_VENTANA = 366;
+export function cubos(desde: Date, hasta: Date, inter: Intervalo): number {
+  return Math.max(0, Math.ceil((hasta.getTime() - desde.getTime()) / 1000 / SEGUNDOS_INTERVALO[inter]));
+}
+export function exigirTopeCubos(desde: Date, hasta: Date, inter: Intervalo): void {
+  const dias = (hasta.getTime() - desde.getTime()) / 86_400_000;
+  if (dias > MAX_DIAS_VENTANA) throw new BadRequestException(`la ventana pedida abarca ${Math.ceil(dias)} días y el máximo es ${MAX_DIAS_VENTANA}: acórtala o usa la exportación`);
+  const n = cubos(desde, hasta, inter);
+  if (n > MAX_CUBOS) throw new BadRequestException(`la ventana pedida da ${n} cubos de «${inter}» y el máximo es ${MAX_CUBOS}: acorta la ventana o elige un intervalo mayor`);
+}
+
 export function limite(valor: unknown, porDefecto = 50, maximo = 500): number {
   const v = texto(valor, 'limite');
   if (v === undefined) return porDefecto;

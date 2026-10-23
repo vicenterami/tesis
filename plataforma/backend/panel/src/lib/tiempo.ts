@@ -39,3 +39,49 @@ export function haceSegundos(iso: string, ahora: Date): string {
   const s = Math.max(0, Math.floor((ahora.getTime() - Date.parse(iso)) / 1000));
   return s < 120 ? `hace ${s} s` : haceCuanto(iso, ahora);
 }
+
+// Desfase de una zona IANA en un instante, «UTC−03:00» (docs/19 §4, incremento 2, punto 3; docs/13 regla 6). Se calcula al instante
+// (cambia con el horario de verano), nunca se escribe fijo. `longOffset` da «GMT-03:00» (o «GMT» en cero); el navegador que no lo
+// conoce lanza RangeError y se usa `short` («GMT-3»); si `short` trae una abreviatura («EDT»), se calcula de las partes de la fecha.
+export function desfase(zona: string, instante: Date): string {
+  const nombre = (estilo: 'longOffset' | 'short'): string =>
+    new Intl.DateTimeFormat('en-US', { timeZone: zona, timeZoneName: estilo }).formatToParts(instante).find((p) => p.type === 'timeZoneName')?.value ?? '';
+  let texto: string;
+  try {
+    texto = nombre('longOffset');
+  } catch {
+    texto = nombre('short');
+  }
+  let minutos: number;
+  const m = /^(?:GMT|UTC)(?:([+-])(\d{1,2})(?::?(\d{2}))?)?$/.exec(texto);
+  if (m) minutos = m[1] === undefined ? 0 : (m[1] === '-' ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3] ?? 0));
+  else {
+    const p = Object.fromEntries(
+      new Intl.DateTimeFormat('en-US', { timeZone: zona, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric' })
+        .formatToParts(instante).map((x) => [x.type, Number(x.value)]),
+    );
+    const enZona = Date.UTC(p.year!, p.month! - 1, p.day!, p.hour!, p.minute!);
+    minutos = Math.round((enZona - Math.floor(instante.getTime() / 60_000) * 60_000) / 60_000);
+  }
+  const a = Math.abs(minutos);
+  return `UTC${minutos < 0 ? '\u2212' : '+'}${String(Math.floor(a / 60)).padStart(2, '0')}:${String(a % 60).padStart(2, '0')}`;
+}
+
+// «22/10/2026 21:58:07» en la zona del sitio, 24 h y con segundos (la hora del sitio bajo la cabecera, punto 3).
+export function relojSitio(zona: string, instante: Date): string {
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat('es-CL', { timeZone: zona, hourCycle: 'h23', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      .formatToParts(instante).map((x) => [x.type, x.value]),
+  );
+  return `${p.day}/${p.month}/${p.year} ${p.hour}:${p.minute}:${p.second}`;
+}
+
+// La zona del navegador (o null si no la declara): la que se compara con la del sitio para avisar.
+export function zonaDelNavegador(): string | null {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || null;
+  } catch {
+    return null;
+  }
+}
+

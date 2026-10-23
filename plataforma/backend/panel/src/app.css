@@ -42,3 +42,12 @@ th { background: #eef2f4; font-weight: 600; }
 .rechazadas { list-style: none; padding: 0; }
 .rechazadas li { background: #fff; border-bottom: 1px solid #e3e8eb; padding: 0.4rem 0.6rem; }
 .rechazadas pre { white-space: pre-wrap; word-break: break-all; font-size: 0.8rem; background: #f0f3f5; padding: 0.4rem; }
+/* Incremento 2 (docs/19 §4): la leyenda informa, no apaga (punto 1). uPlot oculta una serie al pulsar su fila de la leyenda; sin
+   eventos de puntero en las filas, el clic no hace nada y los valores bajo el cursor siguen al día (los mueve el cursor del lienzo). */
+.grafico .u-legend .u-series { pointer-events: none; }
+.grafico .u-legend .u-series th { cursor: default; }
+.aviso { font-size: 0.85rem; margin: 0.2rem 0; padding: 0.3rem 0.6rem; background: #fff8e1; border-left: 3px solid #b26a00; color: #5c3b00; }
+.filtros[aria-busy='true'] button, .filtros[aria-busy='true'] select { cursor: progress; }
+.resumen-rango { font-size: 0.9rem; margin: -0.5rem 0 1rem; display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; }
+.comparar-lista { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 0.3rem 1rem; }
+.comparar-lista .muestra { display: inline-block; width: 0.9rem; height: 0.9rem; border-radius: 2px; vertical-align: middle; margin-right: 0.3rem; }

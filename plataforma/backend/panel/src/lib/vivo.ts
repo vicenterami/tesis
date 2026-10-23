@@ -34,7 +34,7 @@ function decodificar(tipo: string, texto: unknown): EventoVivo | null {
 }
 
 export type EstadoCanal = 'conectando' | 'en_vivo' | 'reconectando';
-// Al volver a «en_vivo» después de una caída, el motivo es «reconectado»: la pantalla repide lo que muestra (docs/19 F4).
+// Al volver a «en_vivo» después de una caída, el motivo es «reconectado»: la pantalla vuelve a pedir lo que muestra (docs/19 F4).
 export const RECONECTADO = 'reconectado';
 
 // Lo mínimo que usamos de EventSource; el EventSource real lo cumple y las pruebas usan uno falso.
@@ -100,7 +100,7 @@ export function abrirCanal(
       // En otro estado, el navegador ya está reintentando solo (corte de red): solo se avisa.
       if (f.readyState === CERRADO) reconectar('el servidor rechazó o cerró el canal');
       else {
-        caido = true; // el navegador reintenta solo; al reabrir, también se repide
+        caido = true; // el navegador reintenta solo; al reabrir, también se vuelve a pedir
         alEstado('reconectando', 'sin red');
       }
     };

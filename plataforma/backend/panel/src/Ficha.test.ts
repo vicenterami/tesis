@@ -112,6 +112,7 @@ describe('Ficha (P3): identidad, canales, gráfico, condiciones y rechazadas, le
   it('una medición en vivo del canal visible actualiza la tarjeta y entra al gráfico en un lote (250 ms); en pausa, no', async () => {
     render(Ficha, { id: ID });
     await waitFor(() => expect(document.querySelector('[data-historico]')).toBeTruthy());
+    await waitFor(() => expect(graficos).toHaveLength(1)); // desde el incremento 2 el gráfico se monta con la primera respuesta (punto 2)
     const fuente = FuenteControlable.instancias[0]!;
     fuente.abrir();
     fuente.emitir('medicion', { dispositivo_id: ID, canal_id: 'c-temp', valor: 23.25, unidad: 'Cel', tiempo: '2026-10-12T15:00:05Z' });
@@ -147,7 +148,7 @@ describe('Ficha (P3): identidad, canales, gráfico, condiciones y rechazadas, le
     render(Ficha, { id: ID });
     await waitFor(() => expect(document.querySelector('[data-porcentaje]')?.textContent).toBe('61,4 % según su calibración'));
   });
-  it('un aviso de condición repide las condiciones con antirrebote: diez avisos → una consulta', async () => {
+  it('un aviso de condición vuelve a pedir las condiciones con antirrebote: diez avisos → una consulta', async () => {
     render(Ficha, { id: ID });
     await waitFor(() => expect(document.querySelector('[data-historico]')).toBeTruthy());
     const antes = peticiones.filter((p) => p.startsWith('/condiciones?')).length;
@@ -158,7 +159,7 @@ describe('Ficha (P3): identidad, canales, gráfico, condiciones y rechazadas, le
     expect(peticiones.filter((p) => p.startsWith('/condiciones?')).length - antes).toBe(2); // abiertas + recientes: una tanda
   });
 
-  it('al reconectar tras una caída (F4) se repide todo: ficha, condiciones, rechazadas e histórico', async () => {
+  it('al reconectar tras una caída (F4) se vuelve a pedir todo: ficha, condiciones, rechazadas e histórico', async () => {
     render(Ficha, { id: ID });
     await waitFor(() => expect(document.querySelector('[data-historico]')).toBeTruthy());
     const fichaAntes = peticiones.filter((p) => p === `/dispositivos/${ID}`).length;
@@ -321,5 +322,128 @@ describe('Ficha (P3), incremento 1: rango vacío, intervalo observado, reloj de 
       await vi.advanceTimersByTimeAsync(10_000);
     }
     expect(enVivo()).toBe('en vivo: conectado, sin lecturas');
+  });
+});
+
+// Incremento 2 (docs/19 §4, puntos 2, 3, 4 y 6), por el DOM. La leyenda (punto 1) solo se ve en un navegador real: banco.sh navegador.
+describe('Ficha (P3), incremento 2: cambio sin blanco, error con reintento, resolución, hora del sitio, resumen y CSV', () => {
+  // El histórico responde cuando la prueba lo decide: así se ve el estado intermedio («cargando…»).
+  let pendientes: { ruta: string; responder: (r: Response) => void }[] = [];
+  function historicoDiferido(): void {
+    pendientes = [];
+    const base = globalThis.fetch;
+    vi.stubGlobal('fetch', vi.fn((ruta: string) => {
+      if (ruta.startsWith('/canales/c-temp/historico')) {
+        peticiones.push(ruta);
+        return new Promise<Response>((r) => pendientes.push({ ruta, responder: r }));
+      }
+      return base(ruta);
+    }));
+  }
+  const textoPuntos = (): string => (document.querySelector('[data-historico]') ?? document.querySelector('[data-cargando-texto]'))?.textContent ?? '';
+  const datosGrafico = (): unknown => graficos.at(-1)?.datos;
+
+  it('al cambiar de rango conserva la serie anterior y dice «cargando…»; con la respuesta la reemplaza y recién entonces escribe la URL', async () => {
+    historicoDiferido();
+    const vistas: string[] = [];
+    render(Ficha, { id: ID, alCambiarVista: (f: string) => vistas.push(f) });
+    await waitFor(() => expect(pendientes).toHaveLength(1));
+    pendientes[0]!.responder(new Response(JSON.stringify(historico)));
+    await waitFor(() => expect(graficos).toHaveLength(1));
+    await waitFor(() => expect(textoPuntos()).toContain('2 puntos'));
+    expect(vistas.at(-1)).toBe(`#/dispositivos/${ID}?canal=c-temp&rango=24h`);
+    screen.getByRole('button', { name: '7 días' }).click();
+    await waitFor(() => expect(textoPuntos()).toBe('cargando…'));
+    expect(document.querySelector('[role="group"]')?.getAttribute('aria-busy')).toBe('true');
+    expect(datosGrafico()).toEqual([[1760270400, 1760271300], [20, 21], [null, null]]); // la serie anterior sigue
+    expect(vistas.at(-1)).toBe(`#/dispositivos/${ID}?canal=c-temp&rango=24h`); // la URL dice lo que se ve
+    pendientes[1]!.responder(new Response(JSON.stringify({ ...historico, intervalo: '1 hour', puntos: 1, tiempos: [1760270400], valores: [19], muestras: [60] })));
+    await waitFor(() => expect(textoPuntos()).toContain('1 puntos, promedio por 1 hora'));
+    expect(datosGrafico()).toEqual([[1760270400], [19], [null]]);
+    expect(graficos).toHaveLength(1); // mismo canal: el gráfico no se recrea, solo recibe datos
+    expect(vistas.at(-1)).toBe(`#/dispositivos/${ID}?canal=c-temp&rango=7d`);
+    expect(document.querySelector('[role="group"]')?.getAttribute('aria-busy')).toBe('false');
+  });
+
+  it('con error conserva la serie, dice el error con «Reintentar» y no toca la URL; «Reintentar» vuelve a pedir y se recupera', async () => {
+    historicoDiferido();
+    const vistas: string[] = [];
+    render(Ficha, { id: ID, alCambiarVista: (f: string) => vistas.push(f) });
+    await waitFor(() => expect(pendientes).toHaveLength(1));
+    pendientes[0]!.responder(new Response(JSON.stringify(historico)));
+    await waitFor(() => expect(textoPuntos()).toContain('2 puntos'));
+    screen.getByRole('button', { name: '30 días' }).click();
+    await waitFor(() => expect(pendientes).toHaveLength(2));
+    pendientes[1]!.responder(new Response('', { status: 503 }));
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('HTTP 503'));
+    expect(datosGrafico()).toEqual([[1760270400, 1760271300], [20, 21], [null, null]]);
+    expect(textoPuntos()).toContain('2 puntos, promedio por 15 minutos'); // lo dibujado, no lo pedido
+    expect(vistas.at(-1)).toBe(`#/dispositivos/${ID}?canal=c-temp&rango=24h`);
+    expect(document.querySelector('[data-rango-vacio]')).toBeNull(); // un error no se disfraza de rango vacío
+    screen.getByRole('button', { name: 'Reintentar' }).click();
+    await waitFor(() => expect(pendientes).toHaveLength(3));
+    expect(pendientes[2]!.ruta).toContain('intervalo=6+hours');
+    pendientes[2]!.responder(new Response(JSON.stringify({ ...historico, intervalo: '6 hours' })));
+    await waitFor(() => expect(vistas.at(-1)).toBe(`#/dispositivos/${ID}?canal=c-temp&rango=30d`));
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('resolución: «auto» y las que dan de 2 a 2 500 puntos; elegir una pide su intervalo y la escribe en la URL; un rango donde no sirve vuelve a «auto»', async () => {
+    const vistas: string[] = [];
+    render(Ficha, { id: ID, alCambiarVista: (f: string) => vistas.push(f) });
+    await waitFor(() => expect(textoPuntos()).toContain('2 puntos'));
+    const select = document.querySelector<HTMLSelectElement>('[data-resolucion]')!;
+    expect([...select.options].map((o) => o.value)).toEqual(['auto', '1m', '5m', '15m', '1h', '6h']);
+    expect(select.options[0]!.textContent).toBe('auto (15 minutos)');
+    expect(select.options[1]!.textContent).toBe('1 min (1.440 puntos)');
+    select.value = '1m';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    await waitFor(() => expect(vistas.at(-1)).toBe(`#/dispositivos/${ID}?canal=c-temp&rango=24h&res=1m`));
+    expect(peticiones.filter((p) => p.startsWith('/canales/')).at(-1)).toContain('intervalo=1+minute');
+    screen.getByRole('button', { name: '30 días' }).click(); // 30 días cada minuto serían 43 200 puntos: vuelve a «auto»
+    await waitFor(() => expect(vistas.at(-1)).toBe(`#/dispositivos/${ID}?canal=c-temp&rango=30d`));
+    expect(peticiones.filter((p) => p.startsWith('/canales/')).at(-1)).toContain('intervalo=6+hours');
+    expect(document.querySelector<HTMLSelectElement>('[data-resolucion]')!.value).toBe('auto');
+  });
+
+  it('la resolución de la URL se aplica al cargar; una que no sirve para el rango se ignora', async () => {
+    render(Ficha, { id: ID, rango: '7d', res: '5m' });
+    await waitFor(() => expect(peticiones.some((p) => p.startsWith('/canales/'))).toBe(true));
+    expect(peticiones.find((p) => p.startsWith('/canales/'))).toContain('intervalo=5+minutes');
+    cleanup();
+    peticiones.length = 0;
+    render(Ficha, { id: ID, rango: '30d', res: '1m' });
+    await waitFor(() => expect(peticiones.some((p) => p.startsWith('/canales/'))).toBe(true));
+    expect(peticiones.find((p) => p.startsWith('/canales/'))).toContain('intervalo=6+hours');
+  });
+
+  it('bajo el gráfico: mín, máx y promedio de los promedios dibujados, y el CSV de la ventana visible', async () => {
+    render(Ficha, { id: ID });
+    await waitFor(() => expect(document.querySelector('[data-resumen-rango]')).toBeTruthy());
+    expect(document.querySelector('[data-resumen-rango]')!.textContent!.replace(/\s+/g, ' ')).toBe('en este rango: mín 20 Cel · máx 21 Cel · promedio de los 2 promedios dibujados 20,5 Cel');
+    expect(screen.getByRole('link', { name: 'Descargar CSV de este rango' }).getAttribute('href')).toBe(
+      `/dispositivos/${ID}/exportar?formato=csv&desde=2026-10-11T15%3A00%3A00.000Z&hasta=2026-10-12T15%3A00%3A00.000Z`,
+    );
+    expect(screen.getByRole('link', { name: 'Comparar con otros dispositivos' }).getAttribute('href')).toBe(`#/comparar?dispositivos=${ID}&magnitud=temperatura&rango=24h`);
+  });
+
+  it('rango vacío: el mensaje y un gráfico sin puntos (con la ventana pedida en el eje; se mira en el navegador), sin resumen', async () => {
+    const base = globalThis.fetch;
+    vi.stubGlobal('fetch', vi.fn(async (ruta: string) => (ruta.startsWith('/canales/c-temp/historico') ? new Response(JSON.stringify({ ...historico, puntos: 0, tiempos: [], valores: [], muestras: [] })) : base(ruta))));
+    render(Ficha, { id: ID });
+    await waitFor(() => expect(document.querySelector('[data-rango-vacio]')).toBeTruthy());
+    await waitFor(() => expect(graficos).toHaveLength(1));
+    expect(document.querySelector('.grafico')?.getAttribute('data-puntos')).toBe('0');
+    expect(document.querySelector('[data-resumen-rango]')).toBeNull();
+    expect(screen.getByRole('link', { name: 'Descargar CSV de este rango' })).toBeTruthy();
+  });
+
+  it('la cabecera dice la hora del sitio con su zona y desfase, al día cada segundo', async () => {
+    render(Ficha, { id: ID });
+    await waitFor(() => expect(document.querySelector('[data-hora-sitio]')).toBeTruthy());
+    // 15:00:00 UTC del 12/10/2026 en Santiago (horario de verano desde el 6/9) son las 12:00:00
+    expect(document.querySelector('[data-hora-sitio]')!.textContent).toBe('Hora en el sitio: 12/10/2026 12:00:00 · America/Santiago (UTC−03:00)');
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(document.querySelector('[data-reloj-sitio]')!.textContent).toBe('12/10/2026 12:00:03');
   });
 });

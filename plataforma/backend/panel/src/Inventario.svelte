@@ -1,6 +1,6 @@
 <script lang="ts">
   // Pantalla P2 (docs/19 §4): inventario con semáforo (HU-19) y filtros (HU-20). Datos: GET /dispositivos y
-  // GET /condiciones?abiertas=true; se actualiza con el canal en vivo sin repedir el inventario.
+  // GET /condiciones?abiertas=true; se actualiza con el canal en vivo sin volver a pedir el inventario.
   import { onMount, untrack } from 'svelte';
   import { LIMITE_ABIERTAS, URL_ABIERTAS, mensajeError, obtener } from './lib/api';
   import { compararAtencion, conteoPorEstado, enLinea, estadoVisual, ORDEN_ATENCION, ROTULO, type EstadoVisual } from './lib/estado-visual';
@@ -8,7 +8,9 @@
   import { haceCuanto, horaLocal } from './lib/tiempo';
   import { RECONECTADO, abrirCanal, type EstadoCanal } from './lib/vivo';
   import { antirrebote, porLotes } from './lib/antirrebote';
-  import { SIN_FILTROS, fragmentoInventario, type FiltrosInventario } from './lib/vista';
+  import { MAX_COMPARAR, SIN_FILTROS, fragmentoComparar, fragmentoInventario, type FiltrosInventario } from './lib/vista';
+  import { marcadosParaComparar, recordarMarcados } from './lib/comparar';
+  import ZonaSitio from './ZonaSitio.svelte';
 
   // filtros: la vista inicial que trae la URL (docs/19 §4, incremento 1, punto 1); alCambiarVista la escribe (App.svelte).
   let { filtros = SIN_FILTROS, alCambiarVista = () => {} }: { filtros?: FiltrosInventario; alCambiarVista?: (fragmento: string) => void } = $props();
@@ -27,6 +29,8 @@
   let filtroZona = $state(inicial.zona); // id de la zona
   let filtroVia = $state(inicial.via);
   let busqueda = $state(inicial.q);
+  // Casillas «comparar» (docs/19 §4, incremento 2, punto 5): las recordadas de esta sesión (lib/comparar.ts), en el orden marcado.
+  let marcados = $state<string[]>(marcadosParaComparar());
 
   const tiposPorDispositivo = $derived.by(() => {
     const m = new Map<string, TipoCondicion[]>();
@@ -96,6 +100,19 @@
     }),
   );
 
+  // Zonas horarias de las filas listadas (incremento 2, punto 3): con una, la hora del sitio y el aviso si el navegador está en otra;
+  // con varias, que cada fila va en la de su sitio (la hora exacta por fila está al pasar el cursor).
+  const zonasListadas = $derived([...new Set(visibles.map((f) => f.d.zona_horaria))]);
+  // Solo cuentan los marcados que siguen en el inventario (uno dado de baja entre tanto no se compara a ciegas).
+  const marcadosVigentes = $derived(marcados.filter((id) => dispositivos.some((d) => d.id === id)));
+  function alternarMarca(id: string): void {
+    marcados = marcados.includes(id) ? marcados.filter((x) => x !== id) : [...marcados, id];
+    recordarMarcados(marcados);
+  }
+  function comparar(): void {
+    window.location.hash = fragmentoComparar(marcadosVigentes, null, '24h'); // otra pantalla: entrada nueva en el historial
+  }
+
   async function cargar(): Promise<void> {
     try {
       const [d, c] = await Promise.all([
@@ -112,9 +129,9 @@
     }
   }
 
-  // Qué hace cada evento del canal (docs/19 F3): `visto` mueve «hace cuánto» y recalcula en línea; `condicion` repide solo
+  // Qué hace cada evento del canal (docs/19 F3): `visto` mueve «hace cuánto» y recalcula en línea; `condicion` vuelve a pedir solo
   // las condiciones abiertas (una consulta chica), nunca el inventario entero; `medicion` no cambia esta pantalla.
-  // Las condiciones se repiden con antirrebote: muchos avisos seguidos → una consulta por segundo, nunca dos en vuelo.
+  // Las condiciones se vuelven a pedir con antirrebote: muchos avisos seguidos → una consulta por segundo, nunca dos en vuelo.
   const repedirAbiertas = antirrebote(() =>
     obtener<Condicion[]>(URL_ABIERTAS)
       .then((c) => (abiertas = c))
@@ -136,7 +153,7 @@
   onMount(() => {
     void cargar();
     const reloj = setInterval(() => (ahora = new Date()), 10_000);
-    // Al volver de una reconexión se repide todo (docs/19 F4): el canal no guarda cola y pudo perder visto o condicion.
+    // Al volver de una reconexión se vuelve a pedir todo (docs/19 F4): el canal no guarda cola y pudo perder visto o condicion.
     const c = abrirCanal('/eventos', alEvento, (estado, motivo) => {
       if (estado === 'en_vivo' && motivo === RECONECTADO) void cargar();
       canal = estado;
@@ -159,6 +176,11 @@
 <p class="vivo {canal}" data-canal={canal}>
   en vivo: {canal === 'en_vivo' ? 'conectado' : canal === 'conectando' ? 'conectando…' : `reconectando (${motivoCanal ?? ''})`}
 </p>
+{#if zonasListadas.length === 1}
+  <ZonaSitio zona={zonasListadas[0]!} />
+{:else if zonasListadas.length > 1}
+  <p class="vivo" data-hora-sitio>{zonasListadas.length} zonas horarias: cada fila va en la de su sitio</p>
+{/if}
 
 <ul class="fichas" aria-label="Dispositivos por estado">
   {#each ORDEN_ATENCION as e (e)}
@@ -179,6 +201,7 @@
   <label>Vía <select bind:value={filtroVia}><option value="">todas</option>{#each vias as v (v)}<option value={v}>{v}</option>{/each}</select></label>
   <label>Buscar <input type="search" bind:value={busqueda} placeholder="nombre o identificador" /></label>
   <span data-visibles>{visibles.length} de {filas.length}</span>
+  <button type="button" onclick={comparar} disabled={marcadosVigentes.length < 2 || marcadosVigentes.length > MAX_COMPARAR} title="de 2 a {MAX_COMPARAR} dispositivos" data-comparar>Comparar ({marcadosVigentes.length})</button>
 </div>
 
 {#if abiertas.length >= LIMITE_ABIERTAS}
@@ -197,13 +220,14 @@
     <table>
       <thead>
         <tr>
-          <th scope="col">Estado</th><th scope="col">Nombre</th><th scope="col">Identificador</th><th scope="col">Vía</th>
+          <th scope="col">Comparar</th><th scope="col">Estado</th><th scope="col">Nombre</th><th scope="col">Identificador</th><th scope="col">Vía</th>
           {#if variosSitios}<th scope="col">Sitio</th>{/if}<th scope="col">Zona</th><th scope="col">Última trama</th><th scope="col">Condiciones abiertas</th>
         </tr>
       </thead>
       <tbody>
         {#each visibles as f (f.d.id)}
           <tr data-estado={f.estado} data-id={f.d.id}>
+            <td><input type="checkbox" checked={marcados.includes(f.d.id)} onchange={() => alternarMarca(f.d.id)} aria-label={`comparar ${f.d.nombre}`} data-marcar={f.d.id} /></td>
             <td>
               <span class="estado {f.estado}">{ROTULO[f.estado]}</span>
               {#if relojPorDispositivo.has(f.d.id)}

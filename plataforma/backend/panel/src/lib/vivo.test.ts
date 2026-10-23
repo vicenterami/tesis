@@ -105,7 +105,7 @@ describe('abrirCanal (docs/19 F4)', () => {
     c.cerrar();
   });
 
-  it('la secuencia real es reconectando → conectando → en_vivo; al volver, el motivo es «reconectado» (F4: la pantalla repide)', () => {
+  it('la secuencia real es reconectando → conectando → en_vivo; al volver, el motivo es «reconectado» (F4: la pantalla vuelve a pedir)', () => {
     const estados: string[] = [];
     const c = abrirCanal('/eventos', () => undefined, (s, m) => estados.push(m === undefined ? s : `${s}:${m}`), crear);
     creadas[0]!.abrir();

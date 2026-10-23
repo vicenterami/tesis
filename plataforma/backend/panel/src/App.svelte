@@ -1,8 +1,9 @@
 <script lang="ts">
-  // Ruteo por fragmento (docs/19 §1): `#/` inventario, `#/dispositivos/<id>` ficha. Así ninguna ruta del panel choca
+  // Ruteo por fragmento (docs/19 §1): `#/` inventario, `#/dispositivos/<id>` ficha, `#/comparar?dispositivos=…` comparación (P3b). Así ninguna ruta del panel choca
   // con las de la API, que viven en la raíz del mismo origen. La vista (canal, rango, filtros) va tras el `?` del fragmento
   // (docs/19 §4, incremento 1, punto 1): se lee al cargar y en cada `hashchange` (atrás, un enlace); cada pantalla la escribe
   // con `replaceState`, que no ensucia el historial ni dispara `hashchange`.
+  import Comparar from './Comparar.svelte';
   import Ficha from './Ficha.svelte';
   import Inventario from './Inventario.svelte';
   import { obtener } from './lib/api';
@@ -41,7 +42,12 @@
   {#if vista.pantalla === 'ficha'}
     <!-- {#key}: otro dispositivo es otra ficha (otro canal en vivo, otro histórico), no la misma con otro id -->
     {#key vista.id}
-      <Ficha id={vista.id} canal={vista.canal} rango={vista.rango} {alCambiarVista} />
+      <Ficha id={vista.id} canal={vista.canal} rango={vista.rango} res={vista.res} {alCambiarVista} />
+    {/key}
+  {:else if vista.pantalla === 'comparar'}
+    <!-- otro conjunto de dispositivos es otra comparación (otras fichas, otras series) -->
+    {#key vista.dispositivos.join(',')}
+      <Comparar dispositivos={vista.dispositivos} magnitud={vista.magnitud} rango={vista.rango} res={vista.res} {alCambiarVista} />
     {/key}
   {:else}
     <Inventario filtros={vista.filtros} {alCambiarVista} />

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EJE_TIEMPO, NOMBRES_FECHA, RANGOS, SELLO_LEYENDA, agregarLectura, formatearValor, rangoQueContiene, rotuloIntervalo, seriesDesdeHistorico, urlHistorico, ventana } from './grafico';
+import { EJE_TIEMPO, NOMBRES_FECHA, PALETA, RANGOS, SELLO_LEYENDA, agregarLectura, alinearSeries, formatearValor, puntosDe, rangoQueContiene, resolucionValida, resolucionesAdmisibles, resumenRango, rotuloIntervalo, seriesDesdeHistorico, urlHistorico, ventana } from './grafico';
 
 describe('ventana y URL del histórico (docs/19 P3)', () => {
   const ahora = new Date('2026-10-12T15:00:00Z');
@@ -73,3 +73,42 @@ describe('rangoQueContiene: el menor rango que dibuja la última medición (docs
     expect(rangoQueContiene('no es fecha', ahora)).toBeNull();
   });
 });
+
+// Incremento 2 (docs/19 §4): resoluciones por rango (punto 4), resumen del rango (punto 6), alineación de P3b (punto 5).
+describe('resoluciones admisibles: entre 2 y 2 500 puntos para el rango', () => {
+  it('30 días desde 1 h; 7 días desde 5 min; 24 h desde 1 min y sin 1 día (1 punto); 1 hora hasta 15 min', () => {
+    expect(resolucionesAdmisibles('30d')).toEqual(['1h', '6h', '1d']);
+    expect(resolucionesAdmisibles('7d')).toEqual(['5m', '15m', '1h', '6h', '1d']);
+    expect(resolucionesAdmisibles('24h')).toEqual(['1m', '5m', '15m', '1h', '6h']);
+    expect(resolucionesAdmisibles('1h')).toEqual(['1m', '5m', '15m']);
+    expect(puntosDe('7d', '5m')).toBe(2016);
+  });
+  it('la resolución elegida cambia el intervalo pedido; una que no sirve para el rango vuelve a «auto»', () => {
+    const ahora = new Date('2026-10-12T15:00:00Z');
+    expect(ventana('7d', ahora, '5m').intervalo).toBe('5 minutes');
+    expect(ventana('7d', ahora, null).intervalo).toBe('1 hour');
+    expect(resolucionValida('30d', '1m')).toBeNull();
+    expect(resolucionValida('30d', '1h')).toBe('1h');
+  });
+});
+
+describe('resumenRango: mínimo, máximo y promedio de los promedios', () => {
+  it('ignora los nulos; sin valores, null', () => {
+    expect(resumenRango([20, null, 22, 24])).toEqual({ n: 3, min: 20, max: 24, promedio: 22 });
+    expect(resumenRango([null])).toBeNull();
+    expect(resumenRango([])).toBeNull();
+  });
+});
+
+describe('alinearSeries: un eje común con hueco (null) donde una serie no tiene cubo', () => {
+  it('une y ordena los instantes; cada serie conserva sus valores y deja null en los ajenos', () => {
+    expect(alinearSeries([{ tiempos: [10, 30], valores: [1, 3] }, { tiempos: [20, 30, 40], valores: [5, 6, 7] }])).toEqual([
+      [10, 20, 30, 40],
+      [1, null, 3, null],
+      [null, 5, 6, 7],
+    ]);
+    expect(alinearSeries([])).toEqual([[]]);
+  });
+  it('la paleta trae 6 colores distintos', () => expect(new Set(PALETA).size).toBe(6));
+});
+

@@ -29,7 +29,7 @@ export function estadoVisual(
 }
 
 // ¿Sigue en línea? La misma regla que la API (consulta.service.ts: visto dentro de 2 × intervalo esperado), repetida aquí
-// para recalcularla cuando llega un `visto` por el canal en vivo o pasa el tiempo, sin repedir el inventario. Sin
+// para recalcularla cuando llega un `visto` por el canal en vivo o pasa el tiempo, sin volver a pedir el inventario. Sin
 // ninguna trama todavía → null (ni en línea ni fuera: «sin tramas aún»).
 export function enLinea(visto: string | null, intervaloEsperadoS: number, ahora: Date): boolean | null {
   if (visto === null) return null;
