@@ -1602,7 +1602,8 @@ intermitente: al arrancar mostró el sensor con todos sus registros de control e
 primer ciclo, «el BME280 no responde por I2C, omitido», con un pack de tres registros (suelo y señal) en vez de basura. El watchdog se
 probó en la placa el 24/10 con el entorno `nodo-prueba-vigia`, que cuelga el loop a propósito en el ciclo 2: dos veces seguidas el nodo
 se reinició 120,0 s después del aviso (`task_wdt: … loopTask`, `rst:0xc (SW_CPU_RESET)`) y volvió a publicar solo; después se regrabó el
-entorno `nodo`. Queda por ver en la placa el camino «congelado», que no se pudo provocar a voluntad. (2) **Panel**
+entorno `nodo`. La plataforma vio cada cuelgue sin saber nada del firmware: dos condiciones «sin comunicación» abiertas a las 22:36:27 y
+22:39:27 (3 min entre sí, como los cuelgues) y cerradas al volver el nodo, a los 58 y 64 s. Queda por ver en la placa el camino «congelado», que no se pudo provocar a voluntad. (2) **Panel**
 (`docs/19 §4`, P3): un canal sin lecturas dentro de 2 × el intervalo esperado, con el dispositivo en línea, se marca «callado» en su tarjeta y
 en la cabecera. (3) **Guiones:** `corrida-larga.sh` decía «visto por última vez nunca» porque leía la columna anterior a la migración 11 (hoy
 lee `estado_dispositivo`) y no contaba el hueco final de un canal que calla (hoy la presión aparece con 1 hueco); `vigilar-corrida.sh`
