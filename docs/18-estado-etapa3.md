@@ -95,7 +95,7 @@ siga sin terminar y que sus horas sean las de `docs/04`: un elemento que se cier
 | 9 | HU-15 Calidad del enlace | 4 | ⬜ | Todo; necesita tráfico LoRaWAN real (`rssi` y `snr` ya quedan en la trama cruda) |
 | 10 | HU-16 Indicador de salud del sitio | 4 | ⬜ | Todo |
 
-El 1 suma 6 h y hasta el 30/10 caben unas 30 junto con el informe y la presentación. Del 2 en adelante, Etapa 4. (HU-21, HU-20
+El 1 suma 6 h y hasta el 30/10 caben unas 30 junto con el informe y la presentación. Del 2 en adelante, Etapa 4, en el orden de `docs/04 §8`. (HU-21, HU-20
 y HU-01 se cerraron el 16/10: `docs/16 §39`, §40 y §41; HU-19, el 24/10.)
 
 **Fuera del núcleo, también comprometido**, cada uno con diseño antes del código:

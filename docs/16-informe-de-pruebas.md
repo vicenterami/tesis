@@ -1599,8 +1599,10 @@ identifican por su tramo y su valor.
 y el modo del sensor antes y después de leerlo, compara sus bytes crudos con los del ciclo anterior y, ante cualquier anomalía, omite sus
 tres magnitudes; un watchdog de 120 s reinicia el nodo si una vuelta se cuelga. En la placa, después de la corrida y con el contacto todavía
 intermitente: al arrancar mostró el sensor con todos sus registros de control en `0x00` (se había reiniciado y quedó sin medir) y, en el
-primer ciclo, «el BME280 no responde por I2C, omitido», con un pack de tres registros (suelo y señal) en vez de basura. Quedan por ver en la
-placa el camino «congelado», que no se pudo provocar a voluntad, y el watchdog, con su entorno de prueba `nodo-prueba-vigia`. (2) **Panel**
+primer ciclo, «el BME280 no responde por I2C, omitido», con un pack de tres registros (suelo y señal) en vez de basura. El watchdog se
+probó en la placa el 24/10 con el entorno `nodo-prueba-vigia`, que cuelga el loop a propósito en el ciclo 2: dos veces seguidas el nodo
+se reinició 120,0 s después del aviso (`task_wdt: … loopTask`, `rst:0xc (SW_CPU_RESET)`) y volvió a publicar solo; después se regrabó el
+entorno `nodo`. Queda por ver en la placa el camino «congelado», que no se pudo provocar a voluntad. (2) **Panel**
 (`docs/19 §4`, P3): un canal sin lecturas dentro de 2 × el intervalo esperado, con el dispositivo en línea, se marca «callado» en su tarjeta y
 en la cabecera. (3) **Guiones:** `corrida-larga.sh` decía «visto por última vez nunca» porque leía la columna anterior a la migración 11 (hoy
 lee `estado_dispositivo`) y no contaba el hueco final de un canal que calla (hoy la presión aparece con 1 hueco); `vigilar-corrida.sh`

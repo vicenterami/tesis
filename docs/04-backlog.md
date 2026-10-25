@@ -560,6 +560,31 @@ LoRaWAN) y HU-19 (panel de salud, 9 h) se ejecutan solo contra holgura; qué pas
 `docs/18 §3`. La regla sigue
 siendo la de §6.5: se recorta por el final de cada criterio, nunca las pruebas.
 
+## 8. Plan de la Etapa 4, en orden (escrito el 24/10/2026; se ejecuta desde el 2/11)
+
+Reúne en un solo lugar todo lo que se dejó para la Etapa 4: las filas de este backlog con etapa 4 (24 elementos, 104 h), lo que
+queda de la Etapa 3 (`docs/18 §5`: diez elementos del núcleo, 46 h) y lo que las decisiones de diseño, las revisiones y la entrevista
+del 05/10 (`bitacora/2026-10-05-entrevista-academico-geologia.md`) mandaron a esta etapa. **Criterio de orden:** primero lo que
+desbloquea lo demás (la sesión y los roles: sin ellos no hay vista pública, auditoría ni «quién lo registró»), después lo que hace al
+sistema útil para cualquier flota con pocos clics, y al final la escala y el cierre. **Regla de cada bloque:** diseño escrito en el
+documento que corresponde (`docs/10`, `docs/19`, `docs/20`, `docs/14`) → código → pruebas que plantan la falla → revisión → medición en
+`docs/16`. Las horas de las filas existentes son las de este backlog; las de lo nuevo son **estimadas** y se corrigen al diseñar.
+
+| Orden | Bloque | Qué se hace | h |
+|---|---|---|---|
+| 1 | **Seguridad, usuarios y roles** | Sesión y roles (HU-18, diseño completo en `docs/20`; las 3 h de la fila no alcanzan para ese diseño: se reestiman); aislamiento entre sitios con pruebas (TT-21 🎯); auditoría de operaciones; «quién lo registró» en el alta (HU-11); CSP definitiva y sistema de archivos de solo lectura (`docs/11 §4`); dos valores vigentes al rotar los secretos del proxy y de administración; condición y evento en una sola sentencia; escaneo de secretos en el CI (obligatorio) | ≈ 22 |
+| 2 | **Panel para operar una flota con pocos clics** | Salud del sitio (HU-16 🎯), calidad del enlace (HU-15 🎯), historial por rango (HU-07 🎯), umbrales en pantalla (HU-06), asistente de alta (HU-22), batería (HU-17), sitio y zona (HU-12), mantenimiento (HU-13), flota por tecnología (HU-23); el tablero ampliado con evidencia de los referentes; tiempo real también en condiciones y en el alta; el canal en vivo por WebSocket (decidido el 14/10, diseño en `docs/10 §8.4`); los dos defectos abiertos del canal en vivo. Cada pantalla, primero en `docs/19` | ≈ 45 |
+| 3 | **Salud de los datos para cualquier dispositivo** | Canal callado y valor congelado como condiciones del supervisor, para todo dispositivo y vía (lo visto en la corrida de 24 h, `docs/16 §53`); datos inválidos; ciclo de vida de las alertas (aviso de cierre, retardo, reconocimiento, `docs/10 §4.4`); alias de claves en el catálogo (obligatorio); notificaciones (HU-24, HU-25, TT-23) | ≈ 24 |
+| 4 | **Lo que pidió el entrevistado del 05/10 (Académico/Investigador en Ingeniería Civil Geológica)** | Exportación XLSX (resto de HU-08 🎯); magnitudes de gases (radón, hidrógeno) en el catálogo con su unidad decidida (TT-12 🎯); vista pública de solo lectura (`docs/20 §7`); el requerimiento de «manipulación» con su fuente de dato; el transporte celular declarado como vía (MQTT sobre LTE-M o NB-IoT llega igual a la plataforma) y probado con el emulador; su prueba en terreno (OE5) | ≈ 13 |
+| 5 | **LoRaWAN completo** | Ruta C con ChirpStack probada de punta a punta (resto de HU-02 🎯) y su puerto 1700/udp con límite de tasa; vía E (la pasarela envía por HTTPS a nuestro servidor) cuando exista servidor público; eventos de unión y estado de las pasarelas, y estado propio de la pasarela si hace falta; adaptador de un formato no SenML (HU-04) | ≈ 18 |
+| 6 | **Despliegue, escala y operación** | Servidor real con certificado (resto de TT-22 🎯); Kubernetes según `docs/14 §6`: manifiestos en k3s y la opción B (varias réplicas del backend con suscripciones compartidas de MQTT 5 y el estado en Redis), con escalado automático y **una prueba de pico que muestre que se levantan réplicas y que no se pierde nada**; respaldos con guardia de restauración (`docs/10 §9.5`); agregados continuos para 7 y 30 días si la medición lo pide; historial de consumo por sitio y por contenedor para los administradores y costo por cliente (`docs/14 §2.1`); carga y recuperación repetidas en el servidor (TT-29, TT-30) | ≈ 37 |
+| 7 | **Pruebas, validación e informe final** | Contrato de trama (TT-27 🎯), quince casos funcionales (TT-31), comparación con ThingsBoard CE, OpenRemote y Magistrala con el mismo emulador (TT-40), entrevistas (TT-33 🎯), informe final (TT-37) y revisión completa antes de entregar | ≈ 32 |
+
+**Lo que dice la cuenta.** El plan completo suma **≈ 191 h** y el presupuesto de la Etapa 4 es de **≈ 75 h** (§6.2). El núcleo pendiente
+(46 h), el informe final (12 h) y la sesión (≈ 8 h) son ≈ 66 h y caben; el resto (≈ 125 h) no cabe a 15 horas por semana. Cómo se
+cierra esa diferencia (más horas por semana, o qué se hace primero y qué se declara como trabajo futuro, con su diseño ya escrito) se
+decide antes del 2/11 y se anota aquí; el orden de la tabla no cambia, cambia hasta dónde se llega.
+
 ## Seguimiento de ejecución
 
 El estado de cada ítem tocado (hecho / parcial / pendiente, con su evidencia) se lleva en
