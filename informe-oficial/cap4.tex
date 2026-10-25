@@ -46,7 +46,7 @@ sensor físico (TT-32) se adelantó al núcleo de esa misma etapa, para que el o
 \section{Seguimiento del backlog en la Etapa 3}
 \label{sec:seguimiento}
 
-La pauta evalúa en esta etapa el avance de la implementación. De los 17 elementos de la Etapa~3 (88~h), 11 están hechos (57~h), 6 parciales (31~h) y ninguno pendiente; en todo el proyecto, 22 de 34 elementos del núcleo hechos (110 de 168~h, 65\,\%) y 7 parciales (36~h): más de la mitad del núcleo, medido en horas. El cuadro~\ref{tab:seguimiento3}
+La pauta evalúa en esta etapa el avance de la implementación. De los 17 elementos de la Etapa~3 (88~h), 13 están hechos (69~h), 4 parciales (19~h) y ninguno pendiente; en todo el proyecto, 24 de 34 elementos del núcleo hechos (122 de 168~h, 73\,\%) y 5 parciales (24~h): más de la mitad del núcleo, medido en horas. El cuadro~\ref{tab:seguimiento3}
 (anexo~\ref{anx:seguimiento}) detalla cada elemento, junto al cierre de la Etapa~2 (cuadro~\ref{tab:seguimiento}).
 
 \section{Retroalimentación y cambios derivados}
@@ -63,12 +63,12 @@ está transmitiendo» le sirven «actualizaciones cada un par de horas». Las ob
 
 \section{Riesgos}
 
-El registro de riesgos (cuadro~\ref{tab:riesgos}, anexo~\ref{anx:seguimiento}) tiene seis riesgos: dos
-cerrados (ambigüedad de fechas; protocolo inadecuado, materializado y resuelto con el pivote a MQTT y SenML; el
-análisis de Contact ID está en el anexo~\ref{anx:contactid}), uno confirmado y controlado (alcance excesivo, tratado
-con el criterio de demostración en dos niveles) y tres en tratamiento: el acceso a partes interesadas (una entrevista
-respondida; falta la segunda, sección~\ref{sec:retro}), el hardware de sensores (las piezas llegaron el 13 de octubre y la placa ya se reconoce; falta cablearlas; mitigado con el emulador de nodo) y la recepción LoRaWAN en terreno, que necesita una
-pasarela que alcance el servidor (mitigada con el banco de pruebas y una prueba en la misma red local). La
+El registro de riesgos (cuadro~\ref{tab:riesgos}, anexo~\ref{anx:seguimiento}) tiene seis riesgos: tres
+cerrados (ambigüedad de fechas; protocolo inadecuado, resuelto con el pivote a MQTT y SenML, anexo~\ref{anx:contactid};
+y hardware de sensores: el nodo propio publicó 24~h sin pérdidas), uno confirmado y controlado (alcance excesivo, tratado
+con el criterio de demostración en dos niveles) y dos en tratamiento: el acceso a partes interesadas (falta la segunda
+entrevista, sección~\ref{sec:retro}) y la recepción LoRaWAN en terreno, probada en la misma red local que la pasarela
+y pendiente de un servidor que el campus alcance. La
 \textbf{desviación de RNF-15} declarada en la Etapa~2 (la compresión de TimescaleDB está bajo la \emph{Timescale
 License}, no de código abierto \parencite{timescalelicencia}) se resolvió el 06/10 adoptando la edición Apache~2.0,
 que no comprime.

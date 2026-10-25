@@ -323,6 +323,40 @@ describe('Ficha (P3), incremento 1: rango vacío, intervalo observado, reloj de 
     }
     expect(enVivo()).toBe('en vivo: conectado, sin lecturas');
   });
+
+  it('canal callado (docs/19 §4): equipo en línea y un canal sin lecturas en 2 intervalos → tarjeta y cabecera lo dicen; una lectura lo quita', async () => {
+    render(Ficha, { id: ID });
+    await waitFor(() => expect(document.querySelector('[data-historico]')).toBeTruthy());
+    const tarjeta = (c: string): HTMLElement => document.querySelector(`[data-canal-id="${c}"]`)!;
+    const aviso = (): string | null => document.querySelector('[data-callados]')?.textContent?.trim() ?? null;
+    const fuente = FuenteControlable.instancias[0]!;
+    fuente.abrir();
+    // Al cargar: c-hum nunca tuvo lecturas y el equipo reportó hace 30 s → callado; c-temp leyó hace 30 s → no.
+    expect(tarjeta('c-hum').classList.contains('callado')).toBe(true);
+    expect(tarjeta('c-hum').querySelector('[data-callado]')?.textContent).toBe('callado');
+    expect(tarjeta('c-hum').querySelector('.vivo')?.textContent).toBe('sin lecturas · callado');
+    expect(tarjeta('c-temp').classList.contains('callado')).toBe(false);
+    expect(aviso()).toMatch(/^1 canal callado:/);
+    // Llega una lectura de c-hum: deja de callar sin recargar.
+    fuente.emitir('medicion', { dispositivo_id: ID, canal_id: 'c-hum', valor: 50, unidad: '%RH', tiempo: new Date().toISOString() });
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(tarjeta('c-hum').classList.contains('callado')).toBe(false);
+    expect(aviso()).toBeNull();
+    // 130 s con el equipo reportando (visto) y solo c-hum leyendo: calla c-temp (como la presión de la corrida de 24 h).
+    for (let i = 0; i < 13; i++) {
+      fuente.emitir('visto', { dispositivo_id: ID, tiempo: new Date().toISOString() });
+      fuente.emitir('medicion', { dispositivo_id: ID, canal_id: 'c-hum', valor: 50, unidad: '%RH', tiempo: new Date().toISOString() });
+      await vi.advanceTimersByTimeAsync(10_000);
+    }
+    expect(tarjeta('c-temp').classList.contains('callado')).toBe(true);
+    expect(tarjeta('c-hum').classList.contains('callado')).toBe(false);
+    expect(aviso()).toMatch(/^1 canal callado:/);
+    // El equipo deja de reportar: manda «Sin señal» del equipo y los canales ya no se marcan uno a uno.
+    await vi.advanceTimersByTimeAsync(130_000);
+    expect(document.querySelector('[data-estado]')!.getAttribute('data-estado')).toBe('sin_senal');
+    expect(document.querySelectorAll('.canal.callado').length).toBe(0);
+    expect(aviso()).toBeNull();
+  });
 });
 
 // Incremento 2 (docs/19 §4, puntos 2, 3, 4 y 6), por el DOM. La leyenda (punto 1) solo se ve en un navegador real: banco.sh navegador.

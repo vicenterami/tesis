@@ -1015,7 +1015,7 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     protege de un error de tipeo («7» por «730») que borraría años de series. El de 7 días impide que un backend comprometido
     borre la última semana de tramas, cuarentena y métricas del broker, que es justo la que serviría para investigarlo.
     **Tres decisiones del estudiante (07/10).** (a) **Las mediciones no vencen por defecto**: diez años ocupan
-    ≈ 4,6 GB (`docs/14`) y el historial largo es el dato valioso del caso de uso; `RETENCION_MEDICION_DIAS` solo
+    ≈ 9,5 GB (`docs/14 §2`, medido el 24/10/2026) y el historial largo es el dato valioso del caso de uso; `RETENCION_MEDICION_DIAS` solo
     las recorta si se define (mínimo 30). Cada corrida de retención deja una fila en `evento` (tipo `retencion`):
     borrar es destructivo y su registro no puede vencer antes que los datos. (b) **Tope de 64 KiB por mensaje en
     el broker** (`max_packet_size`): sin él, Mosquitto 2.0.22 aceptó y entregó 50 MiB (observado); al excederlo
@@ -1141,10 +1141,11 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
 38. **Imágenes fijadas por digest y actualizadas con Dependabot.** Cada `FROM`, la imagen de registro del compose y las que
     usan los guiones llevan su etiqueta legible y su `@sha256` (paso 2u del guardián). El digest fija la base; la capa de
     parches (`apk upgrade`) se resuelve al construir, así que se escanea la imagen construida y se despliega esa misma
-    (`docs/11 §8`). Dependabot propone por pull request las versiones nuevas de imágenes y de acciones del CI, con 7 días
-    de espera desde su publicación; el estudiante revisa y fusiona (`.github/dependabot.yml`, `docs/11 §4`). El CI prueba
-    los de acciones, que usa, pero no los de imágenes, que no construye: antes de fusionar uno de imágenes,
-    `escanear-imagenes.sh` y el banco en local.
+    (`docs/11 §8`). Dependabot propone por pull request las versiones nuevas de imágenes, de acciones del CI y, desde el
+    23/10/2026, de paquetes npm del backend y del panel (un solo workspace; menores y parches agrupados en un PR semanal), con
+    7 días de espera desde su publicación; el estudiante revisa y fusiona (`.github/dependabot.yml`, `docs/11 §4`). El CI
+    prueba los de acciones y los de npm (corre la verificación completa y `pnpm audit`), pero no los de imágenes, que no
+    construye: antes de fusionar uno de imágenes, `escanear-imagenes.sh` y el banco en local.
 39. **Mudar un dispositivo de zona o de sitio, con historial de ubicaciones** (decidido el 09/10/2026). Hoy, cambiar
     `dispositivo.zona_id` muda el dispositivo, pero las mediciones no guardan dónde estaba: toda su historia pasaría a
     verla el sitio nuevo, y eso choca con el aislamiento entre sitios (RF-41). Se agrega `ubicacion_dispositivo`

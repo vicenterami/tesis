@@ -1,6 +1,8 @@
-# Actualizaciones propuestas como pull request (docs/11 §4). Las imágenes base y las acciones están fijadas por digest o SHA;
-# este archivo hace que las versiones nuevas lleguen avisadas. Nunca fusiona solo: lo revisa y fusiona el estudiante.
-# Ojo: el CI prueba los PR de acciones (las usa), pero NO los de imágenes (no construye imágenes). Antes de fusionar uno de
+# Actualizaciones propuestas como pull request (docs/11 §4). Las imágenes base y las acciones están fijadas por digest o SHA, y
+# los paquetes npm por versión exacta; este archivo hace que las versiones nuevas lleguen avisadas. Nunca fusiona solo: lo
+# revisa y fusiona el estudiante. Antes de fusionar uno de npm: que pnpm-workspace.yaml (overrides, allowBuilds, audit) siga
+# intacto, porque Dependabot regenera el lockfile pero no conoce esas reglas.
+# Ojo: el CI prueba los PR de acciones (las usa) y los de npm, pero NO los de imágenes (no construye imágenes). Antes de fusionar uno de
 # imágenes: `bash plataforma/pruebas/escanear-imagenes.sh` y el banco en local (docs/11 §8).
 # cooldown: espera 7 días desde que se publica una versión antes de proponerla (lo recién publicado no se instala).
 version: 2
@@ -38,7 +40,8 @@ updates:
       - dependency-name: "plataforma-*"
   # Dependencias de Node: backend y panel son un solo workspace con un solo pnpm-lock.yaml en /plataforma/backend (23/10/2026).
   # Hasta hoy nadie proponía versiones nuevas de npm: el CI avisaba recién cuando un aviso de seguridad lo ponía en rojo
-  # (23/10: vite 8.3.2, aviso publicado después de la última corrida). Las versiones se escriben exactas (save-exact).
+  # (23/10: vite 8.3.2, aviso publicado después de la última corrida). package.json fija versiones exactas (save-exact en
+  # .npmrc) y Dependabot las propone igual de exactas (PR del 23/10).
   - package-ecosystem: npm
     directory: /plataforma/backend
     schedule:

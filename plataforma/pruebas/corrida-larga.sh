@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Resumen de una corrida larga de un dispositivo real (TT-32; docs/16): cuántas lecturas entraron por canal, el intervalo entre lecturas
 # de cada canal (por la marca de la medición; el «intervalo observado» de la ficha es entre tramas recibidas, por `trama.recibido_en`),
-# los huecos mayores que dos intervalos esperados (pérdidas o desconexiones), las alarmas de silencio abiertas y
+# los huecos mayores que dos intervalos esperados (pérdidas o desconexiones; también el del final hasta ahora: un canal que calló), las alarmas de silencio abiertas y
 # cerradas en la ventana (reconexiones), el origen de la marca de tiempo y, por canal, mínimo, máximo y último valor (por ejemplo, el
 # % de humedad del suelo al mojar). Solo lee la base; sirve contra la pila de desarrollo (por defecto) o contra el banco (-p banco).
 #   bash plataforma/pruebas/corrida-larga.sh <id_fisico> [horas=24] [proyecto=plataforma]
@@ -16,12 +16,12 @@ sql() { docker compose -p "$P" exec -T timescaledb psql -X -U plataforma -d plat
 echo "── $ID · últimas $H h (proyecto $P) ──"
 if ! cab=$(sql -tA -F ' · ' <<'SQL'
 SELECT 'intervalo esperado ' || COALESCE(intervalo_esperado_s::text, '?') || ' s', 'vía ' || via,
-       'visto por última vez ' || COALESCE(to_char(visto_por_ultima_vez AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'), 'nunca') || ' UTC'
-FROM dispositivo WHERE id_fisico = :'id';
+       'visto por última vez ' || COALESCE(to_char(e.visto_por_ultima_vez AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'), 'nunca') || ' UTC'
+FROM dispositivo d LEFT JOIN estado_dispositivo e ON e.dispositivo_id = d.id WHERE d.id_fisico = :'id';
 SQL
 ); then echo "FALLA la base no respondió (¿pila apagada o proyecto equivocado? -p $P)"; exit 1; fi
 [ -n "$cab" ] || { echo "FALLA no existe el dispositivo $ID"; exit 1; }; echo "$cab"
-echo "── lecturas por canal, intervalo observado (mediana entre lecturas) y huecos > 2 × esperado ──"
+echo "── lecturas por canal, intervalo observado (mediana entre lecturas) y huecos > 2 × esperado (incluido el del final: canal que calló) ──"
 sql <<'SQL'
 WITH d AS (SELECT id, intervalo_esperado_s FROM dispositivo WHERE id_fisico = :'id'),
 m AS (SELECT c.magnitud_codigo AS canal, m.tiempo, m.valor, m.origen_tiempo,
@@ -31,8 +31,9 @@ m AS (SELECT c.magnitud_codigo AS canal, m.tiempo, m.valor, m.origen_tiempo,
 SELECT canal, count(*) AS lecturas,
        round(EXTRACT(epoch FROM percentile_cont(0.5) WITHIN GROUP (ORDER BY dt))) AS intervalo_obs_s,
        (SELECT intervalo_esperado_s FROM d) AS esperado_s,
-       count(*) FILTER (WHERE dt > 2 * make_interval(secs => (SELECT intervalo_esperado_s FROM d))) AS huecos,
-       round(EXTRACT(epoch FROM max(dt))) AS hueco_max_s,
+       count(*) FILTER (WHERE dt > 2 * make_interval(secs => (SELECT intervalo_esperado_s FROM d)))
+         + (now() - max(tiempo) > 2 * make_interval(secs => (SELECT intervalo_esperado_s FROM d)))::int AS huecos,
+       round(EXTRACT(epoch FROM GREATEST(max(dt), now() - max(tiempo)))) AS hueco_max_s,
        round(min(valor)::numeric, 2) AS minimo, round(max(valor)::numeric, 2) AS maximo,
        round((array_agg(valor ORDER BY tiempo DESC))[1]::numeric, 2) AS ultimo,
        string_agg(DISTINCT origen_tiempo, ',') AS origen

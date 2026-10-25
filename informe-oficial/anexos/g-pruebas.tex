@@ -4,7 +4,7 @@
 \setlength{\tabcolsep}{4pt}
 
 Cada fila resume una sección de la documentación de pruebas del repositorio (\texttt{docs/16}; la columna «§» da su
-número), con su resultado y el comando que la repite. Los guiones viven en \texttt{plataforma/pruebas/}; las 357 pruebas unitarias del backend y las 102 del panel corren con \texttt{pnpm verificar} y el verificador de concordancia con \texttt{verificar-todo.sh}.
+número), con su resultado y el comando que la repite. Los guiones viven en \texttt{plataforma/pruebas/}; las 357 pruebas unitarias del backend y las 107 del panel corren con \texttt{pnpm verificar} y el verificador de concordancia con \texttt{verificar-todo.sh}.
 
 \begin{longtable}{@{}L{0.8cm}L{3.2cm}L{4.2cm}L{3.8cm}@{}}
 \caption{Pruebas de la Etapa 3: qué se probó, qué resultó y cómo se repite.}\label{tab:pruebas-detalle}\\
@@ -41,4 +41,6 @@ número), con su resultado y el comando que la repite. Los guiones viven en \tex
 50 & Primer incremento del panel (22/10) & 23 pruebas nuevas por el DOM y de funciones puras: vista en la URL (ida y vuelta, valor inválido, cambio externo), rango vacío con «Ver la última medición», intervalo observado con sus dos avisos, reloj de pasarela, «en vivo» con prueba & \texttt{pnpm verificar} \\
 51 & Calibración por API con bloqueo optimista (22/10) & 17 unitarias nuevas sobre dobles de la base; en el banco y en la pila: 200 con el sello vigente, 409 con el viejo, 400 con una sola escala, 200 al quitar la calibración & \texttt{banco.sh nodo} \\
 52 & Segundo incremento del panel (22/10) & 26 pruebas nuevas del panel y 2 del backend; navegador 29 de 29 en Firefox y en Chromium (9 fallaban con el panel anterior); costo medido de cada resolución por rango & \texttt{banco.sh navegador} \\
+53 & Corrida de 24~h del nodo propio (23--24/10) & 1\,440 de 1\,440 tramas por Wi-Fi con TLS; 0 huecos de comunicación, 0 alarmas de silencio, 0 reinicios; 210 tramas a cuarentena por una falla del sensor de aire, que el nodo ahora omite cuando el sensor no responde (visto en la placa) y el panel marca como canal callado & \texttt{corrida-larga.sh} \\
+54 & Panel: canal callado y el inventario en un teléfono (24/10) & 5 pruebas nuevas del panel (4 plantadas); el inventario se desplazaba hasta 117~px a 320~px de ancho, y tras la corrección 0 en 20 casos; navegador 35 de 35 en Firefox y en Chromium & \texttt{banco.sh navegador} \\
 \end{longtable}

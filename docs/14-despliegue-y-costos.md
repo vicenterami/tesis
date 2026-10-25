@@ -31,9 +31,9 @@ los gigabytes, y de los gigabytes casi todo lo demás. Rubros y qué los mueve:
 |---|---|---|
 | Filas por día | 50 × (86 400 / 300) | 14 400 |
 | Filas por año | 14 400 × 365 | ≈ 5,3 millones |
-| Tamaño por fila sin comprimir | `uuid` 16 + `timestamptz` 8 + `float` 8 + `text` ≈ 6 + cabecera ≈ 24 | ≈ 62 B |
-| Crudo por año, sin comprimir | 5,3 M × 62 B | ≈ 330 MB (+ ~40 % de índice) |
-| Compresión | **No se usa** desde el 06/10/2026: la compresión de TimescaleDB es Timescale License y el sistema adopta la edición Apache (`docs/02`, RNF-15). Diez años del escenario ≈ 3,3 GB + índices ≈ 4,6 GB | — |
+| Tamaño por lectura, **medido** (24/10/2026) | 504 000 lecturas en el banco con el esquema y los dos índices de `medicion` (50 canales cada 60 s, 7 días): 93 B de fila y 85 B de índices; en la base de desarrollo, la semana de la corrida de 24 h (9 113 lecturas) da 192 B | **≈ 180 B** con índices |
+| Crudo por año, sin comprimir | 5,3 M × 180 B | ≈ **0,95 GB** con índices |
+| Compresión | **No se usa** desde el 06/10/2026: la compresión de TimescaleDB es Timescale License y el sistema adopta la edición Apache (`docs/02`, RNF-15). Diez años del escenario ≈ 9,5 GB con índices | — |
 
 **Política en capas** (la parte que hay que decidir **antes** de recibir datos; después es migración):
 
@@ -44,13 +44,45 @@ los gigabytes, y de los gigabytes casi todo lo demás. Rubros y qué los mueve:
 | Agregado diario | ídem por día | indefinido | vista materializada refrescada por tarea (Etapa 3) |
 | Crudo antiguo | no vence por defecto (07/10, `docs/10 §8.4` punto 19) | si se define `RETENCION_MEDICION_DIAS`, se borra con `drop_chunks` (función Apache) desde la tarea de retención del backend; exportar a archivo antes | `RetencionService` (la política automática es Timescale License) |
 
-Con esto, **diez años de operación del escenario ocupan ≈ 4,6 GB sin compresión** (330 MB por año más ≈ 40 % de
-índices). El almacenamiento no es el problema; el consumo de memoria RAM sí: RNF-17 lo acota a 2 GB en un servidor de 4 GB.
+Con esto, **diez años de operación del escenario ocupan ≈ 9,5 GB sin compresión** (≈ 0,95 GB por año con índices).
+Corrección del 24/10/2026: hasta ese día este documento estimaba 62 B por fila más un 40 % de índices (≈ 87 B), sin contar
+`recibido_en`, `origen_tiempo` ni el segundo índice; medido, es el doble. El almacenamiento no es el problema; el consumo de memoria RAM sí: RNF-17 lo acota a 2 GB en un servidor de 4 GB.
 
 **Qué se guarda y qué no.** Un sensor que reporta cada segundo un fenómeno que cambia cada cinco
 minutos multiplica el costo por trescientos sin agregar información. El intervalo lo fija el
 `intervalo_esperado_s` de cada dispositivo, y el catálogo de magnitudes define qué medir; la
 plataforma no guarda tramas rechazadas en las series (van a cuarentena, que sí tiene retención corta).
+
+### 2.1 Una flota: cuánto ocupa y cuánto procesa (medido el 24/10/2026)
+
+Las cuentas salen de tres mediciones, no de supuestos: **180 B por lectura** (arriba), **≈ 610 B por trama cruda**
+guardada (tabla `trama`, con sus tres índices: 1 440 tramas SenML del nodo propio ocupan 884 736 B; se retienen 30 días,
+`RETENCION_TRAMA_DIAS`) y el procesamiento de `docs/16 §10`: **sin pérdida hasta 409 tramas por segundo, de 2 lecturas cada una (≈ 818 lecturas/s)**, en el equipo de desarrollo, con
+los techos de `docs/10 §6` (la base usa su núcleo entero: el límite es la CPU de la base, no la memoria), y 324 MiB de memoria
+sumada en el pico. En reposo, con un nodo, la pila completa usaba 193 MiB (`docker stats`, 24/10, 22:00).
+
+Fórmulas: lecturas por día = canales × 86 400 / intervalo; tramas por segundo = nodos / intervalo; disco por año = lecturas
+por día × 365 × 180 B; tramas retenidas = nodos × (86 400 / intervalo) × 30 × 610 B (fijo, no crece).
+
+| Flota (cada nodo con 6 canales) | Intervalo | Tramas/s | Lecturas por día | Disco de mediciones por año | Tramas retenidas (30 días) |
+|---|---|---|---|---|---|
+| 1 nodo (el propio, `docs/17`) | 60 s | 0,017 | 8 640 | 0,57 GB | 26 MB |
+| 100 nodos (un sector) | 60 s | 1,7 | 864 000 | 57 GB | 2,6 GB |
+| 100 nodos | 300 s | 0,33 | 172 800 | 11 GB | 0,5 GB |
+| 1 000 nodos (diez sectores de 100) | 60 s | 16,7 | 8,6 millones | 568 GB | 26 GB |
+| 1 000 nodos | 300 s | 3,3 | 1,7 millones | 114 GB | 5,3 GB |
+
+**Lo que dice la tabla.** (1) La CPU y la memoria sobran: mil nodos de 6 canales cada minuto son 100 lecturas/s, ≈ 12 % de las ≈ 818 medidas (4 % si se cuenta en tramas, pero cada trama de 6 lecturas pesa más que las de 2 del emulador). (2) El
+que manda es el **disco**, y lo mueve el intervalo: pasar de 60 a 300 s lo divide por cinco; por eso el intervalo se declara
+en el alta y se elige según lo que cambia el fenómeno (§2). (3) Desde un centenar de nodos cada minuto, el crudo sin
+vencimiento deja de caber en un VPS de 40 GB (§3): se define `RETENCION_MEDICION_DIAS` y se conservan los agregados, o se
+suma disco (precio a cotizar al contratar).
+(4) En Kubernetes (§6) esto es el tamaño del volumen persistente de la base y el pedido de CPU de su réplica.
+
+**Lo que no mide:** el procesamiento se midió en el equipo de desarrollo, no en el servidor de 2 vCPU de §3, y con tramas de 2 lecturas (el techo con 6 por trama no está medido); el tamaño por
+lectura cambia si cambia el esquema; la cuarentena y los registros (≤ 200 MB, §1) no están en la tabla. Por sector y por cliente
+el sistema todavía no guarda su propio consumo (filas por día, disco y tramas por segundo por sitio): es la decisión pendiente
+sobre el historial de consumo para administradores.
 
 ## 3. Alternativas de alojamiento
 

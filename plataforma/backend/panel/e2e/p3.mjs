@@ -291,6 +291,34 @@ try {
     await pagina.screenshot({ path: captura.replace(/\.png$/, '-p3b.png'), fullPage: true });
   });
 
+  // RF-52 (docs/19 §1): en un teléfono la página no se desplaza a lo ancho; las tablas sí, dentro de su caja. banco.sh deja a un emulado
+  // en una zona de nombre largo: el 24/10, el filtro de zona ensanchaba el inventario a 320 px de ancho (117 px en la pila de desarrollo, hasta 188 en el banco).
+  await paso('RF-52', async () => {
+    for (const ancho of [320, 375, 414]) {
+      const p = await navegador.newPage({ viewport: { width: ancho, height: 800 } });
+      vigilar(p);
+      // Se mide con los datos ya dibujados: en P2, filas en la tabla y las zonas en su filtro (la primera versión de esta comprobación
+      // medía con la tabla aún vacía y daba OK con el error presente).
+      const listo = { P2: () => document.querySelectorAll('tbody tr').length > 0 && document.querySelectorAll('.filtros select option').length > 2,
+                      P3: (sel) => document.querySelector(sel) !== null };
+      for (const [nombre, url, arg] of [['P2', `${BASE}/panel/#/`, null], ['P3', `${BASE}/panel/#/dispositivos/${dispId}`, tarjeta]]) {
+        await p.goto(url);
+        await p.waitForFunction(listo[nombre], arg, { timeout: 15000 });
+        await asentar(p);
+        // El peor de 8 muestras en 2 s: el filtro de zona tomaba su ancho final un instante DESPUÉS de dibujar las filas (77 → 457 px),
+        // y una sola medición temprana daba OK con el error presente (24/10).
+        let sobra = 0;
+        for (let i = 0; i < 8; i++) {
+          sobra = Math.max(sobra, await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth));
+          await p.waitForTimeout(250);
+        }
+        if (sobra <= 0) ok(`${nombre} a ${ancho} px: la página no se desplaza a lo ancho`);
+        else falla(`${nombre} a ${ancho} px: la página se desplaza ${sobra} px a lo ancho`);
+      }
+      await p.close();
+    }
+  });
+
   if (errores.length === 0) ok('sin errores de JavaScript en la página'); else falla(`errores en la página: ${errores.join(' | ')}`);
 } catch (e) {
   falla(`la prueba se cortó: ${e instanceof Error ? e.message.split('\n')[0] : String(e)}`);

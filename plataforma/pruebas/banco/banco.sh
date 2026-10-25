@@ -765,6 +765,14 @@ case "${1:-}" in
         -m "[{\"bn\":\"$1\",\"bt\":$(($(date +%s) - $2 * 60)),\"n\":\"temperatura\",\"u\":\"Cel\",\"v\":$3}]"; }
     for m in 50 35 20; do pub emu-0001 "$m" "2$((m / 10)).5"; pub emu-0002 "$m" "1$((m / 10)).25"; done
     pub emu-0003 180 19.5
+    # RF-52 (docs/19 §1): emu-0003 pasa a una zona de nombre largo, como las del campus, para que el filtro de zona del inventario la
+    # muestre en un teléfono (el 24/10 ese filtro ensanchaba la página a 320 px de ancho: 117 px en la pila de desarrollo, hasta 188 en el banco).
+    zl='Laboratorio de Suelos y Recursos Hídricos, edificio norte'
+    psql_ -q -v zl="$zl" -f - >/dev/null <<'SQL' || { echo "FALLA no se pudo poner a emu-0003 en la zona de nombre largo"; exit 1; }
+INSERT INTO zona (sitio_id, nombre) SELECT z.sitio_id, :'zl' FROM zona z JOIN dispositivo d ON d.zona_id = z.id WHERE d.id_fisico = 'emu-0003'
+  ON CONFLICT (sitio_id, nombre) DO NOTHING;
+UPDATE dispositivo SET zona_id = (SELECT id FROM zona WHERE nombre = :'zl') WHERE id_fisico = 'emu-0003';
+SQL
     sleep 2
     (cd backend/panel && NAVEGADOR="$NAVEGADOR" E2E_DISP2="$did2" E2E_ID2=emu-0002 E2E_DISP_VACIO="$did3" E2E_CANAL_VACIO="$cid3" \
       node e2e/p3.mjs http://127.0.0.1:3001 "$did" "$cid" emu-0001 "$sitio" "$red" "$IMG_BROKER" banco-backend-1 "$PRIV/p3.png")
@@ -806,6 +814,16 @@ case "${1:-}" in
     echo; [ $fallos -eq 0 ] && echo "COLA OK" || { echo "$fallos comprobación(es) con falla"; exit 1; } ;;
   consultable) bash "$(dirname "$YO")/consultable.sh" http://127.0.0.1:3001 ;;   # docs/16 §48: todo dispositivo del banco es consultable de punta a punta
   vias) bash "$(dirname "$YO")/vias.sh" ;;   # docs/16 §49: la misma serie por las tres vías; mide pérdidas, duplicados, latencia y consumo
-  apagar) dcp down 2>/dev/null || dc down; rm -f "$ENV" ;;
+  apagar)
+    # Sin el archivo de claves (vive en /run/user, que el sistema puede vaciar), Compose no interpola el proyecto y `down` no baja
+    # nada: el 24/10 quedaron el proxy viejo y la base con claves que ya no calzaban. Entonces se bajan por la etiqueta del proyecto.
+    if [ -f "$ENV" ]; then dcp down; else
+      ids=$(docker ps -aq --filter label=com.docker.compose.project=banco)
+      [ -z "$ids" ] || docker rm -f $ids >/dev/null
+      docker network rm banco_default >/dev/null 2>&1 || true
+      echo "sin $ENV: bajados por etiqueta los contenedores del proyecto banco"
+    fi
+    rm -f "$ENV"
+    [ -z "$(docker ps -aq --filter label=com.docker.compose.project=banco)" ] || { echo "FALLA quedan contenedores del banco"; exit 1; } ;;
   *) sed -n '2,/^[^#]/p' "$YO" | grep '^#'; exit 2 ;;   # toda la ayuda del encabezado, no solo las primeras líneas
 esac

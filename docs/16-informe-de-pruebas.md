@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 357 pruebas unitarias del backend y 102 del panel, sin matriz formal) y TT-32 (sensor físico);
+cubre todavía: TT-27 (contrato de trama: hoy 357 pruebas unitarias del backend y 107 del panel, sin matriz formal); TT-32 (sensor físico) se cubrió después, en §43, §44 y §53;
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -334,7 +334,7 @@ puerto; en el servidor, 80 → 443, que es el caso real.
 ## 16. Panel, tramo 2: esqueleto, inventario con semáforo y reenvío de desarrollo (12/10/2026)
 
 `docs/19` (pantalla P2) y `docs/10 §8.4` (panel en `backend/panel/`, mismo workspace de pnpm, servido por el backend en `/panel`).
-Versiones elegidas con al menos siete días de publicadas (Svelte 5.57.1, Vite 8.3.2 (8.3.5 desde el 23/10/2026 por el aviso GHSA-587h-7wmj-h5pm, corregido desde 8.3.3), Vitest 5.0.3; `docs/11 §3`, fila de imágenes fijadas por digest y robot de dependencias: siete días de espera); ninguna
+Versiones elegidas con al menos siete días de publicadas (Svelte 5.57.1, Vite 8.3.2, Vitest 5.0.3; el 23/10/2026 Vite pasó a 8.3.5 por cinco avisos publicados el 20 y el 21/10, entre ellos GHSA-587h-7wmj-h5pm, alto, que afectan hasta 8.3.2: fue una **excepción** a los siete días, porque 8.3.5 tenía dos, y no hacía falta: 8.3.4, publicada el 08/10, ya los corregía y cumplía la regla; el 24/10 se decidió no retroceder y quedarse en 8.3.5, la última publicada, que el 28/10 cumple los siete días; `docs/11 §3`, fila de imágenes fijadas por digest y robot de dependencias: siete días de espera); ninguna
 dependencia ejecutó scripts de instalación (`ignore-scripts`). Auditoría del workspace: cero avisos en producción; en desarrollo,
 el alto conocido de `braces` y un moderado de `sprintf-js`, los dos solo por Jest y sin parche publicado.
 
@@ -1558,4 +1558,92 @@ manejador del selector: Svelte 5 delega ese evento en la raíz del documento.
 se reparte. (2) Los agregados continuos de TimescaleDB, que bajarían las filas leídas en 7 y 30 días, no se midieron: quedan como mejora
 aparte. (3) El eje de la ventana vacía y los colores de P3b se revisan en las capturas, no con una comprobación automática. (4) La comparación
 dibuja como mucho 6 dispositivos de un mismo sitio o de sitios con la misma zona en el eje; con varias zonas, el eje va en la del primero.
+
+## 53. Corrida de 24 h del nodo real (23–24/10/2026)
+
+**Qué se prueba** (TT-32; `docs/17 §6.2`): que el nodo propio publique sin pérdidas durante un día completo por una red Wi-Fi
+doméstica, cifrado hasta el proxy, y qué hace la plataforma con lo que llega: lecturas, huecos, reconexiones y datos inválidos.
+
+**Método.** `nodo-0001` (ESP32 con BME280, DS18B20 y sensor capacitivo de suelo; firmware de la fase 2) publica un pack SenML de seis
+registros cada 60 s por MQTT con TLS y QoS 1 al proxy del portátil, que corre la pila de desarrollo. Ventana: del 23/10/2026 a las
+18:53:42 al 24/10/2026 a las 18:53:42 (UTC−03:00). Durante la corrida, `pruebas/vigilar-corrida.sh` revisó cada 60 s la red del
+portátil, el proxy, `/salud`, el inhibidor de suspensión y la corriente, y el monitor serie guardó todo lo que imprimió el nodo. Al cerrar,
+`pruebas/corrida-larga.sh nodo-0001 24`, consultas a la base con la ventana exacta y los registros del backend, el broker y el proxy.
+
+| Medida | Resultado |
+|---|---|
+| Tramas recibidas | **1 440 de 1 440** (una por minuto), todas con la marca de tiempo del nodo (`bt`, hora por NTP) |
+| Huecos de más de 2 × 60 s entre lecturas | **0** en `humedad_suelo`, `temperatura_suelo`, `rssi` y `humedad`; en `temperatura`, 1 de 8 040 s y en `presion`, la última lectura guardada es de las 15:23:39 (la de 15:24:39 fue a cuarentena; ambos por la falla del sensor, abajo) |
+| Alarmas de silencio (`sin_comunicacion`) | 0 |
+| Reinicios del nodo | 0 (un solo arranque en el registro serie) |
+| Publicaciones sin acuse (PUBACK) en 5 s | 1 de 1 440 (23:46:39): la trama llegó al broker con 6,85 s de demora y se guardó una vez; el nodo cortó, falló un saludo TLS (15,8 s según el proxy), reconectó al segundo intento y el ciclo siguiente salió normal |
+| Diferencia entre la marca del nodo y la recepción | mediana 0,81 s, percentil 99 de 0,97 s (1,09 s en `presion`). Es una cota, no la latencia: `bt` va en segundos enteros truncados y los relojes de nodo y servidor se sincronizan por separado |
+| Tramas a cuarentena | 210, todas `invalida` por valor fuera del rango físico de su magnitud (abajo) |
+| Vigilante | 143 líneas «OK» (una cada 10 min) y 1 alerta: a las 15:25:24 no vio el inhibidor de suspensión; a las 15:34:24, «OK». La IP, la red, el proxy, `/salud` y la corriente no cambiaron |
+
+**Falla del sensor de aire durante la corrida.** A las 15:24:39 el bus I2C del BME280 empezó a fallar (666 errores de lectura en el
+registro serie) y la biblioteca, que no informa errores de bus, entregó números finitos pero falsos. El pipeline los trató así:
+
+| Tramo | Lo que publicó el nodo | Lo que hizo la plataforma |
+|---|---|---|
+| 15:24:39 (1 ciclo) | presión −149,14 hPa | presión a cuarentena; temperatura y humedad, plausibles, guardadas |
+| 15:25:39 → 17:37:39 (133 ciclos) | 183,03 °C, 100,0 %RH, −185,01 hPa | temperatura y presión a cuarentena por rango físico ([−40, 85] °C y [800, 1 100] hPa); **la humedad de 100 % se guardó**: está dentro de [0, 100] |
+| 17:38:39 → cierre (76 ciclos) | 22,10 °C, 82,3 %RH y 709,07 hPa, idénticos en cada ciclo | presión a cuarentena; **temperatura y humedad congeladas, guardadas** |
+
+Mientras tanto, el panel mostró el dispositivo en «Normal»: el equipo seguía reportando, y una presión ausente o un valor repetido no son,
+para el estado visual (`docs/19 §2`), motivo de alerta. Los canales de suelo y de señal siguieron sin interrupción. Las 133 humedades
+falsas y las 76 lecturas congeladas de temperatura y humedad quedan en la base como llegaron (la historia no se reescribe); se
+identifican por su tramo y su valor.
+
+**Qué se cambió por esta corrida.** (1) **Firmware** (`docs/17 §6.2`, «Salud del BME280 en cada ciclo»): el nodo comprueba el identificador
+y el modo del sensor antes y después de leerlo, compara sus bytes crudos con los del ciclo anterior y, ante cualquier anomalía, omite sus
+tres magnitudes; un watchdog de 120 s reinicia el nodo si una vuelta se cuelga. En la placa, después de la corrida y con el contacto todavía
+intermitente: al arrancar mostró el sensor con todos sus registros de control en `0x00` (se había reiniciado y quedó sin medir) y, en el
+primer ciclo, «el BME280 no responde por I2C, omitido», con un pack de tres registros (suelo y señal) en vez de basura. Quedan por ver en la
+placa el camino «congelado», que no se pudo provocar a voluntad, y el watchdog, con su entorno de prueba `nodo-prueba-vigia`. (2) **Panel**
+(`docs/19 §4`, P3): un canal sin lecturas dentro de 2 × el intervalo esperado, con el dispositivo en línea, se marca «callado» en su tarjeta y
+en la cabecera. (3) **Guiones:** `corrida-larga.sh` decía «visto por última vez nunca» porque leía la columna anterior a la migración 11 (hoy
+lee `estado_dispositivo`) y no contaba el hueco final de un canal que calla (hoy la presión aparece con 1 hueco); `vigilar-corrida.sh`
+escribía la IP, la puerta de enlace y el nombre de la red en su registro, y desde esta corrida solo registra si cambiaron.
+
+**Lo que esta corrida no midió.** El porcentaje de humedad del suelo al mojar la tierra (no se regó durante la corrida: entre 2,07 y
+2,22 V, a lo más 13 % según la calibración del canal) ni la memoria de la pila a lo largo del día (con carga se midió en §5 y §49). Un valor congelado como condición en la base
+(para que el estado pase a «Alerta») queda como decisión de diseño pendiente.
+
+## 54. Panel: canal callado y el inventario en un teléfono (24/10/2026)
+
+**Qué se prueba.** Dos cambios del panel que dejó la corrida de §53: (1) el **canal callado** de `docs/19 §4` (P3), un canal sin
+lecturas dentro de 2 × su intervalo esperado con el equipo en línea; y (2) **RF-52** (`docs/19 §1`: una columna en pantallas angostas,
+tablas con desplazamiento propio), que se encontró roto al medir el panel en anchos de teléfono.
+
+**Canal callado.** Una función pura (`canalCallado`, `lib/estado-visual.ts`) con 4 pruebas: el caso de la presión de §53 (3 h 30 min
+sin lecturas con el equipo reportando), el borde de la tolerancia (120 s no calla, 121 s sí), el canal que nunca leyó y el equipo fuera
+de línea (no se marca canal por canal: manda «Sin señal»). Una prueba por el DOM de la ficha: al cargar, la tarjeta del canal sin lecturas
+dice «sin lecturas · callado» y la cabecera «1 canal callado»; una lectura en vivo lo quita; 130 s después calla el otro canal; cuando el
+equipo deja de reportar, ninguna tarjeta queda marcada. **Plantado** (una violación a la vez, restaurada después): el borde con `>=`,
+la regla sin la condición de equipo en línea, la plantilla sin la clase y sin el espacio antes de «callado»: cada una hace fallar 1 prueba.
+**En la pila de desarrollo**, con un navegador real (Firefox): los tres canales del BME280, que el nodo omite desde que su contacto falla,
+aparecen callados; los del suelo y la señal, no; sin errores de JavaScript.
+
+**El inventario en un teléfono.** Medido con Playwright, el ancho de la página contra el de la ventana en P2 y P3, a 320, 375, 414, 768 y
+1 280 px, en Firefox y en Chromium:
+
+| Pila de desarrollo | Antes | Después |
+|---|---|---|
+| P2, Firefox, 320 px | la página se desplaza 117 px | 0 |
+| P2, Chromium, 320 / 375 / 414 px | 117 / 62 / 23 px | 0 / 0 / 0 |
+| P3, todos los anchos, y P2 desde 768 px | 0 | 0 |
+
+La causa: el filtro de zona toma el ancho de su opción más larga (en el campus, «Campus Dr. Luis Rivas del Canto · Laboratorio») y su
+rótulo no se encogía. Corrección en `app.css`: en pantalla angosta, un filtro por fila y el control al ancho que quede. El recorrido con
+navegador (`e2e/p3.mjs`) suma la comprobación **RF-52**: P2 y P3 a 320, 375 y 414 px sin desplazamiento horizontal de la página, el peor
+de 8 muestras en 2 s (el filtro toma su ancho final un instante después de dibujar las filas, y una medición temprana daba OK con el
+error presente); `banco.sh navegador` deja a `emu-0003` en una zona de nombre largo para que el filtro la tenga. **Plantado:** con el CSS
+anterior, Chromium da P2 con 188, 133 y 94 px (3 fallas); Firefox, dentro del recorrido, deja ese filtro en 77 px y no lo reproduce (en
+una página suelta lo lleva a 457 px; se observó, la causa no se confirmó), así que RF-52 se juzga con los dos navegadores. Con el CSS
+nuevo: **35 de 35 en Chromium y 35 de 35 en Firefox**, y en una medición aparte, 0 px en los 20 casos del banco y en los 20 de la pila.
+
+**Totales.** 107 pruebas del panel en 12 archivos, `svelte-check` con 337 archivos y 0 errores, y el build. En una de las corridas con el
+CSS anterior, Chromium no vio «reconectando» dentro de 20 s tras detener el backend del banco; la corrida siguiente pasó: queda anotada
+como intermitente, sin causa confirmada.
 

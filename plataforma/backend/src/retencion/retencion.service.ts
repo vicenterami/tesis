@@ -13,8 +13,8 @@ import { POOL } from '../db/db.module';
 // Precisión: se borra un fragmento solo cuando TODO él es más viejo que el plazo; con fragmentos de 7 días
 // (medicion) o de 1 día (trama, cuarentena), un dato puede durar hasta un fragmento más que el plazo.
 //
-// Las mediciones NO vencen por defecto (decisión del 07/10/2026, docs/10 §8.4 punto 19): diez años ocupan ≈ 4,6 GB
-// (docs/14) y el historial largo es el dato valioso del caso de uso. Solo se recortan si se define la variable.
+// Las mediciones NO vencen por defecto (decisión del 07/10/2026, docs/10 §8.4 punto 19): diez años ocupan ≈ 9,5 GB
+// (docs/14 §2, medido el 24/10/2026) y el historial largo es el dato valioso del caso de uso. Solo se recortan si se define la variable.
 // porDefecto null = sin límite: la tabla no se toca.
 export interface Limite<D extends number | null = number> { variable: string; porDefecto: D; minimo: number }
 export interface Plazo extends Limite<number | null> { tabla: 'medicion' | 'trama' | 'cuarentena' | 'metrica_broker' }

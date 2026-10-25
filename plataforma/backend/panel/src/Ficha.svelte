@@ -7,7 +7,7 @@
   import SelectorRango from './SelectorRango.svelte';
   import ZonaSitio from './ZonaSitio.svelte';
   import { mensajeError, obtener } from './lib/api';
-  import { enLinea, estadoVisual, ROTULO, rotuloCondicion } from './lib/estado-visual';
+  import { canalCallado, enLinea, estadoVisual, ROTULO, rotuloCondicion } from './lib/estado-visual';
   import { RANGO_POR_DEFECTO, agregarLectura, formatearValor, rango as datosRango, rangoQueContiene, resolucionValida, resumenRango, rotuloIntervalo, seriesDesdeHistorico, urlHistorico, ventana, type ClaveRango, type ClaveResolucion, type Series } from './lib/grafico';
   import type { Condicion, DispositivoFicha, EventoVivo, Historico, TramaRechazada } from './lib/modelo';
   import { duracion, fechaHora, haceCuanto, haceSegundos, horaLocal } from './lib/tiempo';
@@ -64,6 +64,10 @@
   // vuelve a pedir las condiciones y desaparece sin recargar.
   const relojDesviado = $derived(abiertas.find((c) => c.tipo === 'reloj_desviado') ?? null);
   // Intervalo observado frente al esperado (punto 3): informa, no decide (la alarma de silencio usa solo el esperado).
+  // Canales que callan con el equipo en línea (docs/19 §4): se recalculan con el reloj de la ficha y con cada lectura en vivo.
+  const callados = $derived(
+    d === null ? new Set<string>() : new Set(d.canales.filter((c) => canalCallado(c.ultima_medicion?.tiempo ?? null, d!.visto_por_ultima_vez, d!.intervalo_esperado_s, ahora)).map((c) => c.id)),
+  );
   const avisoIntervalo = $derived.by(() => {
     if (d === null || d.intervalo_observado_s === null) return null;
     if (d.intervalo_observado_s < d.intervalo_esperado_s / 2) return 'más seguido de lo declarado: revisa el intervalo esperado';
@@ -260,6 +264,9 @@
         reporta cada ≈ {duracion(d.intervalo_observado_s)} (esperado {duracion(d.intervalo_esperado_s)}){#if avisoIntervalo !== null}; <strong data-aviso-intervalo>{avisoIntervalo}</strong>{/if}
       {/if}
     </p>
+    {#if callados.size > 0}
+      <p class="aviso" data-callados>{callados.size === 1 ? '1 canal callado' : `${callados.size} canales callados`}: el equipo reporta, pero sin lecturas de esa magnitud dentro de 2 × su intervalo esperado</p>
+    {/if}
     <div class="zona-sitio"><ZonaSitio zona={d.zona_horaria} /></div>
     {#if relojDesviado !== null}
       <p class="error" role="status" data-reloj-desviado>
@@ -283,14 +290,14 @@
     <ul class="canales">
       {#each d.canales as c (c.id)}
         <li>
-          <button type="button" class="canal" aria-pressed={c.id === canalElegido} onclick={() => elegirCanal(c.id)} data-canal-id={c.id}>
+          <button type="button" class="canal" class:callado={callados.has(c.id)} aria-pressed={c.id === canalElegido} onclick={() => elegirCanal(c.id)} data-canal-id={c.id}>
             <strong>{c.magnitud_nombre}{c.etiqueta === null ? '' : ` · ${c.etiqueta}`}</strong>
             <span class="lectura" data-ultima>{formatearValor(c.ultima_medicion?.valor ?? null, c.unidad)}</span>
             <!-- «es un número», no «no es null»: un evento sin el campo (un backend anterior) no debe romper la tarjeta -->
             {#if typeof c.ultima_medicion?.porcentaje === 'number'}
               <span class="porcentaje" data-porcentaje>{c.ultima_medicion.porcentaje.toLocaleString('es-CL')} % según su calibración</span>
             {/if}
-            <span class="vivo">{c.ultima_medicion === null ? 'sin lecturas' : haceCuanto(c.ultima_medicion.tiempo, ahora)}</span>
+            <span class="vivo">{c.ultima_medicion === null ? 'sin lecturas' : haceCuanto(c.ultima_medicion.tiempo, ahora)}{#if callados.has(c.id)}{' · '}<strong data-callado>callado</strong>{/if}</span>
             {#if c.reglas !== null && c.reglas.length > 0}
               <span class="reglas">umbrales: {c.reglas.map((r) => `${r.umbral_bajo ?? '—'} a ${r.umbral_alto ?? '—'} (histéresis ${r.histeresis ?? 0})`).join('; ')}</span>
             {:else}

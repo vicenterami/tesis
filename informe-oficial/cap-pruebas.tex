@@ -5,7 +5,7 @@ Qué está implementado, cómo se prueba, qué resultó y qué falta validar; ca
 
 \section{Qué está implementado}
 
-El cuadro~\ref{tab:implementado} resume cada módulo; en horas, el núcleo demostrable está hecho en un 65\,\% (sección~\ref{sec:seguimiento}).
+El cuadro~\ref{tab:implementado} resume cada módulo; en horas, el núcleo demostrable está hecho en un 73\,\% (sección~\ref{sec:seguimiento}).
 
 \begin{table}[tb]
 \centering\footnotesize
@@ -21,7 +21,7 @@ M4 Supervisión & Silencio según el intervalo esperado de cada uno & Batería; 
 M5 Series & TimescaleDB, 21 migraciones, API, CSV y JSON, canal en vivo & XLSX; rango a medida \\
 M6 Alertas & Umbral con histéresis; alarma de la cola del broker & Notificación \\
 M7 Seguridad & Claves con hash, ACL por rol, mínimo privilegio, sin \texttt{NET\_RAW} & Sesión y roles \\
-M8 Panel & Semáforo, inventario filtrable, ficha con gráfico & Nodo propio en vivo \\
+M8 Panel & Semáforo, inventario filtrable, ficha con gráfico; canal callado & Salud del sitio (HU-16) \\
 \bottomrule
 \end{tabular}
 \end{tablaseg}
@@ -31,11 +31,11 @@ M8 Panel & Semáforo, inventario filtrable, ficha con gráfico & Nodo propio en 
 
 \section{Método de prueba}
 
-Se prueba en tres niveles, todos repetibles con un comando. Las 357 pruebas unitarias del backend y las 102 del panel corren sin base ni broker,
+Se prueba en tres niveles, todos repetibles con un comando. Las 357 pruebas unitarias del backend y las 107 del panel corren sin base ni broker,
 junto con tipos estrictos y análisis estático: cada una fija una regla de diseño en forma ejecutable. \textbf{Banco
 desechable}: una segunda pila con base, broker con su plugin de seguridad, backend y proxy reales, datos en memoria y un
 emulador de nodos (TT-28) que imita relojes rotos, pérdidas y deriva; sobre él corren casos fijos de carga, carreras,
-caídas, TLS, alta por API, LoRaWAN y cola del broker. \textbf{Verificador de concordancia}: 44 pasos que comparan informe, documentación, base y API. Otra recorre, por dispositivo, inventario, ficha, histórico, exportación, condiciones y cuarentena: toda serie es consultable. Cada comprobación nueva se ejecuta primero contra el error \emph{plantado}: una prueba vale solo si falla ante la falla.
+caídas, TLS, alta por API, LoRaWAN y cola del broker. \textbf{Verificador de concordancia}: 45 pasos que comparan informe, documentación, base y API. Otra recorre, por dispositivo, inventario, ficha, histórico, exportación, condiciones y cuarentena: toda serie es consultable. Cada comprobación nueva se ejecuta primero contra el error \emph{plantado}: una prueba vale solo si falla ante la falla.
 
 \section{Resultados frente a los requerimientos}
 
@@ -73,6 +73,5 @@ tiene topes de cola y una alarma sobre su contador. Dar de baja un dispositivo f
 
 \section{Validación preliminar y limitaciones}
 
-El sistema funciona de extremo a extremo con nodos emulados, con el nodo propio (sensores reales; contrato en el banco) y con la red LoRaWAN del campus: el 20 de octubre la pasarela real publicó por TLS con la credencial de la API y
-dos nodos entraron de punta a punta, 810 mediciones en tres horas. Un reloj de pasarela cuatro días atrasado se resolvió con una tolerancia y una condición propia. La misma serie de 180 lecturas entró completa por las tres vías (MQTT, HTTP en packs de 1, 10 y 60, y pasarela): 0 pérdidas, 0 duplicados y p95 de 4 a 157~ms; por HTTP, el ritmo de una trama por segundo hace que el pack de 1 tarde 194~s y el de 60, 5,6~s. Falta la corrida larga del nodo propio por Wi-Fi,
-el servidor de referencia (RNF-17 y las 72~horas de RNF-18, Etapa~4) y la ruta C en terreno.
+El sistema funciona de extremo a extremo con nodos emulados, con el nodo propio (24~h por Wi-Fi con TLS: 1\,440 de 1\,440 tramas, sin reinicios; una falla de su sensor de aire llevó a corregir el nodo y el panel) y con la red LoRaWAN del campus: el 20 de octubre la pasarela real publicó por TLS con la credencial de la API y
+dos nodos entraron de punta a punta, 810 mediciones en tres horas. Un reloj de pasarela cuatro días atrasado se resolvió con una tolerancia y una condición propia. La misma serie de 180 lecturas entró completa por las tres vías (MQTT, HTTP en packs de 1, 10 y 60, y pasarela): 0 pérdidas, 0 duplicados y p95 de 4 a 157~ms; por HTTP, el ritmo de una trama por segundo hace que el pack de 1 tarde 194~s y el de 60, 5,6~s. Faltan el servidor de referencia (RNF-17 y las 72~horas de RNF-18, Etapa~4) y la ruta C en terreno.

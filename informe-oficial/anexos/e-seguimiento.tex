@@ -60,12 +60,12 @@ HU-10 & Inventario con estado y vía de envío & 5 & Hecho: vía y formato en la
 HU-11 & Registrar un dispositivo desde la plataforma & 5 & Hecho: alta, baja y rotación por API, todo o nada con el broker \\
 HU-14 & Detectar que un dispositivo dejó de reportar & 7 & Hecho: supervisor con intervalo por dispositivo, medido \\
 TT-39 & Canal de tiempo real (SSE) & 4 & Parcial: canal en vivo hecho; falta la sesión (Etapa 4) \\
-HU-19 & Panel de salud con semáforo & 9 & Parcial: pantalla hecha; falta verla con el sensor físico \\
+HU-19 & Panel de salud con semáforo & 9 & Hecho: conteos, estado en cuatro valores y en vivo; 24 h con el sensor físico; teléfono sin desplazamiento horizontal \\
 HU-20 & Inventario filtrable por sitio, zona, estado y vía & 7 & Hecho (adelantada): filtros por estado, sitio, zona, vía y búsqueda; probado con varios sitios \\
 HU-08 & Exportar los datos en CSV, XLSX y JSON & 4 & Parcial (adelantada): CSV y JSON; XLSX con la sesión \\
 HU-21 & Ficha del dispositivo: condiciones, historial y serie & 7 & Hecho (adelantada): ficha con gráfico y \% calibrado, probada en navegador real; el rango a medida es HU-07 \\
 TT-28 & Emulador de nodos & 5 & Hecho: emulador de nodos para carga y pruebas \\
-TT-32 & Sensor físico de extremo a extremo & 3 & Parcial: los tres sensores verificados con la placa y el contrato probado en el banco; falta el nodo en vivo \\
+TT-32 & Sensor físico de extremo a extremo & 3 & Hecho: el nodo propio publicó 24~h por Wi-Fi con TLS hasta el panel, 1\,440 de 1\,440 tramas (23--24/10) \\
 TT-36 & Informe de pruebas y validación preliminar & 5 & Parcial: capítulo~\ref{cap:pruebas} y documentación de pruebas \\
 TT-41 & Diseño del despliegue en Kubernetes & 2 & Hecho: equivalencias Compose--k3s, estado por pieza y qué escala, en la documentación de despliegue \\
 \end{longtable}
@@ -164,7 +164,7 @@ $\sim$240 horas.}
 \toprule
  & \textbf{Riesgo} & \textbf{Estado} & \textbf{Mitigación} \\
 \midrule
-R1 & Hardware de sensores no disponible & \textbf{En tratamiento} & Emulador de nodo por software para la carga; para el sensor real (TT-32, núcleo), plan B activado el 7/10: nodo Wi-Fi propio; piezas recibidas el 13/10 y placa reconocida el 14/10 \\
+R1 & Hardware de sensores no disponible & \textbf{Cerrado} & Plan B activado el 7/10: nodo Wi-Fi propio, piezas recibidas el 13/10; publicó 24~h sin pérdidas el 23 y 24/10 (TT-32), y la red LoRaWAN del campus entró el 20/10 \\
 R2 & Sin acceso a partes interesadas & \textbf{En tratamiento} & Entrevista respondida el 5/10 (sección~\ref{sec:retro}); falta la segunda (OE1) \\
 R3 & Ambigüedad de fechas & \textbf{Cerrado} & Calendario oficial publicado el 24/08 \\
 R4 & Alcance excesivo & \textbf{Confirmado y controlado} & Núcleo comprometido vs.\ alcance condicional; revisión de holgura por etapa \\

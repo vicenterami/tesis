@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compararAtencion, conteoPorEstado, enLinea, estadoVisual, rotuloCondicion } from './estado-visual';
+import { canalCallado, compararAtencion, conteoPorEstado, enLinea, estadoVisual, rotuloCondicion } from './estado-visual';
 import type { TipoCondicion } from './modelo';
 
 describe('estadoVisual (docs/19 §2): la primera regla que aplica manda', () => {
@@ -58,5 +58,24 @@ describe('rótulo de cada tipo de condición (docs/19 §6: ningún código inter
     const tipos: TipoCondicion[] = ['sin_comunicacion', 'umbral', 'bateria', 'manipulacion', 'tope_superado', 'reloj_desviado'];
     expect(tipos.map(rotuloCondicion)).toEqual(['Sin comunicación', 'Umbral', 'Batería', 'Manipulación', 'Tope superado', 'Reloj de pasarela desviado']);
     expect(rotuloCondicion('nuevo_tipo')).toBe('nuevo_tipo');
+  });
+});
+
+describe('canalCallado (docs/19 §4, P3): equipo en línea y ese canal sin lectura dentro de 2 × intervalo esperado', () => {
+  const ahora = new Date('2026-10-24T18:53:42Z');
+  const visto = '2026-10-24T18:53:39Z'; // el equipo reportó hace 3 s
+  it('la presión de la corrida de 24 h: última lectura hace 3 h 30 min con el equipo en línea → callado', () => {
+    expect(canalCallado('2026-10-24T15:23:39Z', visto, 60, ahora)).toBe(true);
+  });
+  it('borde de la tolerancia: 120 s exactos no calla; 121 s, sí (intervalo 60 s)', () => {
+    expect(canalCallado('2026-10-24T18:51:42Z', visto, 60, ahora)).toBe(false);
+    expect(canalCallado('2026-10-24T18:51:41Z', visto, 60, ahora)).toBe(true);
+  });
+  it('un canal que nunca tuvo lecturas, de un equipo que ya reporta → callado', () => {
+    expect(canalCallado(null, visto, 60, ahora)).toBe(true);
+  });
+  it('equipo fuera de línea o sin tramas aún → no se marca el canal: manda «Sin señal» del equipo', () => {
+    expect(canalCallado('2026-10-24T15:24:39Z', '2026-10-24T18:00:00Z', 60, ahora)).toBe(false);
+    expect(canalCallado(null, null, 60, ahora)).toBe(false);
   });
 });

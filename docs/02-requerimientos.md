@@ -281,7 +281,7 @@ OSI, https://opensource.org/licenses, consultada el 08/10/2026). Tras evaluar nu
 TimescaleDB con el esquema real (fallan exactamente esas funciones y nada más; laboratorio del 06/10), **se adopta la
 edición Apache** (`timescale/timescaledb:2.24.0-pg16-oss`; actualizada a `2.30.2` con parches el 08/10/2026, `docs/16 §12`): hypertables, `time_bucket` con zona nombrada y
 `drop_chunks` son Apache y son lo que el sistema usa. Costo aceptado: sin compresión, el escenario de `docs/14` ocupa
-≈ 330 MB por año más índices (diez años ≈ 4,6 GB); la retención se ejecuta con `drop_chunks` desde una tarea
+≈ 0,95 GB por año con índices (diez años ≈ 9,5 GB; medido el 24/10/2026, `docs/14 §2`); la retención se ejecuta con `drop_chunks` desde una tarea
 programada del backend y los agregados se materializan por tarea. RNF-15 vuelve a cumplirse en su redacción literal.
 El cambio de imagen y de esquema es trabajo de la Etapa 3 (`docs/10 §8.4`, punto 11).
 

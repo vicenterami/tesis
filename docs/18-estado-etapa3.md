@@ -11,14 +11,14 @@
 |---|---|---|---|
 | Retroalimentación | 20 % | 🟡 | Al 15/10 no hay observaciones escritas del profesor guía sobre la entrega del 2/10; se le pedirán en una reunión presencial la semana del 20/10. Sí se incorporó la entrevista del 5/10 (`bitacora/2026-10-05-entrevista-academico-geologia.md`) en las decisiones del 6 y del 8/10 (`docs/10 §8.4`). Falta: recibir e incorporar la retroalimentación de la Etapa 2. |
 | Mejoras | 15 % | 🟢 | Decisiones de diseño del 6, 7 y 8/10 (`docs/10 §8.4`); proxy TLS (`docs/16 §9`); dependencias e imágenes sin vulnerabilidades altas o críticas corregibles (`docs/16 §12`). |
-| 50 % de la implementación | 10 % | 🟡 | Núcleo: 22 de 34 elementos hechos (110 de 168 h, 65 %) y 7 parciales (36 h: HU-02, HU-08, HU-19, TT-12, TT-22, TT-32 y TT-33). Todo el backlog: 34 de 66 (146 de 287 h, 51 %) y 15 parciales (67 h). Cifras calculadas desde las filas de `docs/04`, con los estados de `docs/12 §3`, de §2 y de la Etapa 1 (al final de §2). |
-| Pruebas iniciales | 30 % | 🟢 | `docs/16`: emulador, carga (59,7 tramas/s sin pérdida), carreras, TLS, capacidad y picos, caídas con carga, dependencias e imágenes, LoRaWAN por pasarela en el banco (`docs/16 §31–§34`); 357 pruebas unitarias del backend y 102 del panel. Falta: la matriz formal del contrato de trama (TT-27) y el broker de producción en las caídas (`docs/16 §11`). |
-| Validación preliminar | 10 % | 🟡 | Sensor físico de extremo a extremo (TT-32): todas las piezas llegaron el 13/10, la placa se reconoció el 14/10 y la fase 1 se cerró el 19/10 con los tres sensores verificados (`docs/16 §43`); falta la fase 2: publicar hasta el panel; guía de manejo seguro escrita (`docs/17 §4`). **Validación en terreno hecha el 20/10: red LoRaWAN real del campus publicando en el sistema (`docs/16 §45`).** |
+| 50 % de la implementación | 10 % | 🟡 | Núcleo: 24 de 34 elementos hechos (122 de 168 h, 73 %) y 5 parciales (24 h: HU-02, HU-08, TT-12, TT-22 y TT-33). Todo el backlog: 36 de 66 (158 de 287 h, 55 %) y 13 parciales (55 h). Cifras calculadas desde las filas de `docs/04`, con los estados de `docs/12 §3`, de §2 y de la Etapa 1 (al final de §2). |
+| Pruebas iniciales | 30 % | 🟢 | `docs/16`: emulador, carga (59,7 tramas/s sin pérdida), carreras, TLS, capacidad y picos, caídas con carga, dependencias e imágenes, LoRaWAN por pasarela en el banco (`docs/16 §31–§34`); 357 pruebas unitarias del backend y 107 del panel. Falta: la matriz formal del contrato de trama (TT-27) y el broker de producción en las caídas (`docs/16 §11`). |
+| Validación preliminar | 10 % | 🟡 | Sensor físico de extremo a extremo (TT-32): todas las piezas llegaron el 13/10, la placa se reconoció el 14/10 y la fase 1 se cerró el 19/10 con los tres sensores verificados (`docs/16 §43`) y la fase 2 publicó 24 h hasta el panel, sin pérdidas, el 23 y 24/10 (`docs/16 §53`); guía de manejo seguro escrita (`docs/17 §4`). **Validación en terreno hecha el 20/10: red LoRaWAN real del campus publicando en el sistema (`docs/16 §45`).** |
 | Documentación | 15 % | 🟡 | Documentos en concordancia (guardián `plataforma/pruebas/verificar-todo.sh`). El 15/10 el informe ganó el capítulo «Implementación y pruebas iniciales» y el anexo con el detalle de las pruebas (TT-36); falta incorporar la retroalimentación de la Etapa 2 y la revisión de entrega. |
 
 ## 2. Tareas de la Etapa 3: 17 elementos, 88 h (tras el corte del 08/10 y los adelantos del 12/10, §3)
 
-**Hechos: 11 (57 h) · parciales: 6 (31 h) · pendientes: 0 (0 h).**
+**Hechos: 13 (69 h) · parciales: 4 (19 h) · pendientes: 0 (0 h).**
 
 | Ítem | Tarea | h | Estado | Evidencia o lo que falta |
 |---|---|---|---|---|
@@ -31,12 +31,12 @@
 | HU-11 🎯 | Registrar un dispositivo desde la plataforma | 5 | ✅ | Alta por API hecha el 12/10: `POST /dispositivos` con clave de administrador, credencial mostrada una vez y cliente creado en el plugin del broker, todo o nada (`docs/16 §20`); baja y rotación de la credencial por la misma API el 13/10 (`docs/16 §21`). El criterio «quién lo registró» (RF-23) llega con la sesión (HU-18): hoy el evento guarda el instante y el origen (API con clave de administrador). La pantalla (P7) es HU-22, Etapa 4. |
 | HU-14 🎯 | Detectar que un dispositivo dejó de reportar | 7 | ✅ | Filtro 6 (`supervision.service.ts`), intervalo esperado por dispositivo (migración 10), medición en `docs/16 §5`. |
 | TT-39 | Canal de tiempo real (SSE) | 4 | 🟡 | Hecho el 09/10 en el backend: `GET /eventos` con mediciones, señales de vida y condiciones, cada una ya guardada (`docs/10 §5`, `docs/16 §14`). En esta etapa, sin sesión y solo en la red local, como la API. 12/10: lista de nombres de host contra el *DNS rebinding* en el backend y en el proxy (`docs/10 §8.4` punto 40). Falta: la sesión, que llega con HU-18 (Etapa 4). |
-| HU-19 🎯 | Panel de salud con semáforo | 9 | 🟡 | Tramo 2 hecho el 12/10: pantalla P2 (`docs/19`) con el estado visual en cuatro valores, conteos, tabla y actualización por el canal en vivo; servida por el backend en `/panel` y comprobada con el servidor de Vite real (`docs/16 §16`). Falta: verla con el sensor físico y la demostración. |
+| HU-19 🎯 | Panel de salud con semáforo | 9 | ✅ | Cerrada el 24/10, criterio por criterio: conteos, estado visual en cuatro valores (`docs/19 §2`), última comunicación y cambios por el canal en vivo sin recargar (`docs/16 §16`); con el sensor físico 24 h (`docs/16 §53`); en un teléfono sin desplazamiento horizontal, RF-52, medido en dos navegadores a 320–414 px (`docs/16 §54`). La demostración no es criterio de aceptación. |
 | HU-20 🎯 | Inventario filtrable por sitio, zona, estado y vía | 7 | ✅ | Adelantada de la Etapa 4 el 12/10 (§3). Tramo 2: filtro por estado (fichas), zona, vía y búsqueda, en el panel; **16/10:** filtro por sitio y columna Sitio cuando hay más de uno, zona elegida dentro del sitio, por código e id (dos sedes con una zona del mismo nombre no se confunden: prueba plantada y una comprobación a mano contra la base del banco; `docs/16 §40`). |
 | HU-08 🎯 | Exportar los datos en CSV, XLSX y JSON | 4 | 🟡 | Adelantada de la Etapa 4 el 12/10 (§3). CSV estándar y JSON por dispositivo y rango, en flujo por tandas (`GET /dispositivos/{id}/exportar`, `docs/16 §19`); XLSX y la exportación por sitio con rol, en la Etapa 4 con la sesión. |
 | HU-21 🎯 | Ficha del dispositivo: condiciones, historial y serie | 7 | ✅ | Adelantada de la Etapa 4 el 12/10 (§3). Tramo 3 hecho el 12/10: pantalla P3 (`docs/19`) con identidad, tarjetas por canal, gráfico uPlot del histórico agregado que sigue en vivo, condiciones y tramas rechazadas del dispositivo (`docs/16 §17`). **Prueba con navegador real hecha el 16/10** (`banco.sh navegador`: Firefox con Playwright, puntos del gráfico contra `/historico`, vivo sin recargar, caída y vuelta; `docs/16 §39`) y el % calibrado (`docs/16 §38`). El rango a medida por fechas es HU-07 (Etapa 4). |
 | TT-28 🎯 | Emulador de nodos | 5 | ✅ | `docs/16 §2`. |
-| TT-32 🎯 | Sensor físico de extremo a extremo | 3 | 🟡 | Fase 0 el 14/10 (`docs/17 §3`) y fase 1 cerrada el 19/10: los tres sensores miden con hardware real y el suelo quedó calibrado (`docs/16 §43`). Falta la fase 2: publicar por MQTT con TLS hasta el panel (diseño en `docs/17 §6.2`; el firmware `nodo` compila y su contrato está probado en el banco, `docs/16 §44`). |
+| TT-32 🎯 | Sensor físico de extremo a extremo | 3 | ✅ | Hecho el 24/10: el nodo propio publicó 24 h por MQTT con TLS hasta el panel, 1 440 de 1 440 tramas, consultables por la API con su valor, unidad y marca (`docs/16 §53`). Antes: fase 0 el 14/10 (`docs/17 §3`), fase 1 el 19/10 con los tres sensores y el suelo calibrado (`docs/16 §43`) y el contrato en el banco (`docs/16 §44`). |
 | TT-36 | Informe de pruebas y validación preliminar | 5 | 🟡 | `docs/16` y, desde el 15/10, el capítulo 5 del informe con el anexo de pruebas; falta la versión de entrega (retroalimentación de la Etapa 2; sensor físico y prueba en terreno si llegan a tiempo). |
 | TT-41 | Diseño del despliegue en Kubernetes | 2 | ✅ | Hecho el 22/10: `docs/14 §6` (equivalencias Compose → k3s, estado por pieza, opción B con suscripciones compartidas y respaldos); la implementación espera un clúster (M7). |
 
@@ -71,7 +71,7 @@ vuelve a la Etapa 4 con su registro aquí y en `docs/04`.
 ## 4. Lo que frena hoy
 
 - La retroalimentación de la Etapa 2 todavía no llega; las consultas al profesor guía están listas para la reunión presencial de la semana del 20/10.
-- El sensor físico (TT-32) ya mide con hardware real (fase 1 cerrada el 19/10): falta publicar hasta el panel (fase 2, diseñada en `docs/17 §6`).
+- El sensor de aire del nodo propio (BME280) tiene un contacto I2C intermitente desde el 24/10 (`docs/16 §53`): el nodo omite esas tres magnitudes y sigue publicando suelo y señal; falta revisar su cableado.
 - La recepción LoRaWAN en terreno (HU-02) necesita una pasarela que alcance el servidor (`docs/10 §8.4` punto 24); mientras
   tanto se prueba en el banco con el JSON exacto de las fuentes oficiales (`banco.sh lorawan`, `docs/16 §31`); la prueba en la misma red que la pasarela del campus está acordada para el martes 20/10 con el compañero a cargo; su pasarela es una UG65 con servidor embebido y dos nodos reportando cada 60 s, y el adaptador se ajusta antes a la forma real de su mensaje (`docs/10 §8.4` punto 47, nota del 15/10).
 
@@ -80,25 +80,23 @@ vuelve a la Etapa 4 con su registro aquí y en `docs/04`.
 El estado de cada elemento manda en §1 y §2; esta lista ordena lo que falta. El guardián (paso 2w5) comprueba que cada elemento
 siga sin terminar y que sus horas sean las de `docs/04`: un elemento que se cierra se quita de aquí en el mismo cambio.
 
-**Núcleo (🎯): 12 elementos, 58 h.** Siete parciales y cinco sin empezar, en el orden de trabajo:
+**Núcleo (🎯): 10 elementos, 46 h.** Cinco parciales y cinco sin empezar, en el orden de trabajo:
 
 | Orden | Elemento | Horas | Estado | Qué falta |
 |---|---|---|---|---|
 | 1 | HU-02 Eventos LoRaWAN | 6 | 🟡 | **Probada en terreno el 20/10** con la pasarela real del campus y dos nodos de punta a punta (`docs/16 §45`); el banco cubre lo demás (`docs/16 §31`, §36 y §37). Quedan la ruta C (ChirpStack) y la coexistencia con otro broker (vía E) |
-| 2 | TT-32 Sensor físico de extremo a extremo | 3 | 🟡 | Fase 1 cerrada el 19/10 (los tres sensores verificados y el suelo calibrado: `docs/16 §43`); falta la fase 2 (publicar por MQTT con TLS hasta el panel) (`docs/17 §6`) |
-| 3 | HU-19 Panel de salud con semáforo | 9 | 🟡 | Verlo con el sensor físico y en la demostración |
-| 4 | HU-08 Exportar en CSV, XLSX y JSON | 4 | 🟡 | XLSX y la exportación por sitio con rol: necesita la sesión (HU-18) |
-| 5 | TT-22 Cifrado del transporte | 4 | 🟡 | El broker de producción con certificado real (`docs/14`) |
-| 6 | TT-12 Catálogo de sensores y unidades | 6 | 🟡 | El catálogo editable con umbrales; con él, los alias de claves y los perfiles de decodificación (`docs/08 §8`) |
-| 7 | TT-33 Entrevistas | 4 | 🟡 | Más entrevistas: hay una (5/10) |
-| 8 | TT-21 Aislamiento entre sitios | 5 | ⬜ | Todo; necesita la sesión y los roles por sitio (`docs/20`) |
-| 9 | TT-27 Pruebas del contrato de trama | 5 | ⬜ | La matriz formal (esquema, cuarentena, adaptadores) |
-| 10 | HU-07 Historial por rango de fechas | 4 | ⬜ | Todo |
-| 11 | HU-15 Calidad del enlace | 4 | ⬜ | Todo; necesita tráfico LoRaWAN real (`rssi` y `snr` ya quedan en la trama cruda) |
-| 12 | HU-16 Indicador de salud del sitio | 4 | ⬜ | Todo |
+| 2 | HU-08 Exportar en CSV, XLSX y JSON | 4 | 🟡 | XLSX y la exportación por sitio con rol: necesita la sesión (HU-18) |
+| 3 | TT-22 Cifrado del transporte | 4 | 🟡 | El broker de producción con certificado real (`docs/14`) |
+| 4 | TT-12 Catálogo de sensores y unidades | 6 | 🟡 | El catálogo editable con umbrales; con él, los alias de claves y los perfiles de decodificación (`docs/08 §8`) |
+| 5 | TT-33 Entrevistas | 4 | 🟡 | Más entrevistas: hay una (5/10) |
+| 6 | TT-21 Aislamiento entre sitios | 5 | ⬜ | Todo; necesita la sesión y los roles por sitio (`docs/20`) |
+| 7 | TT-27 Pruebas del contrato de trama | 5 | ⬜ | La matriz formal (esquema, cuarentena, adaptadores) |
+| 8 | HU-07 Historial por rango de fechas | 4 | ⬜ | Todo |
+| 9 | HU-15 Calidad del enlace | 4 | ⬜ | Todo; necesita tráfico LoRaWAN real (`rssi` y `snr` ya quedan en la trama cruda) |
+| 10 | HU-16 Indicador de salud del sitio | 4 | ⬜ | Todo |
 
-Del 1 al 3 suman 18 h y hasta el 30/10 caben unas 30 junto con el informe. Del 4 en adelante, Etapa 4. (HU-21, HU-20 y HU-01 se
-cerraron el 16/10: `docs/16 §39`, §40 y §41.)
+El 1 suma 6 h y hasta el 30/10 caben unas 30 junto con el informe y la presentación. Del 2 en adelante, Etapa 4. (HU-21, HU-20
+y HU-01 se cerraron el 16/10: `docs/16 §39`, §40 y §41; HU-19, el 24/10.)
 
 **Fuera del núcleo, también comprometido**, cada uno con diseño antes del código:
 

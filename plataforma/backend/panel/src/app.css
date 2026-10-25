@@ -24,9 +24,10 @@ th { background: #eef2f4; font-weight: 600; }
 .vivo.en_vivo::before { content: '● '; color: #0b5a2a; }
 .vivo.reconectando::before, .vivo.conectando::before { content: '○ '; color: #7a4b00; }
 .filtros { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; margin-bottom: 0.75rem; align-items: center; }
-.filtros label { display: inline-flex; gap: 0.3rem; align-items: center; }
-.filtros input, .filtros select { font: inherit; padding: 0.25rem 0.4rem; }
-@media (max-width: 700px) { main { padding: 0.5rem; } th, td { padding: 0.35rem 0.4rem; } }
+.filtros label { display: inline-flex; gap: 0.3rem; align-items: center; max-width: 100%; min-width: 0; }
+.filtros input, .filtros select { font: inherit; padding: 0.25rem 0.4rem; min-width: 0; max-width: 100%; }
+/* RF-52 (docs/19 §1): en pantalla angosta, un filtro por fila y el control al ancho que quede; un nombre de zona largo no ensancha la página */
+@media (max-width: 700px) { main { padding: 0.5rem; } th, td { padding: 0.35rem 0.4rem; } .filtros label { flex: 1 1 100%; } .filtros label select, .filtros label input { flex: 1 1 auto; } }
 /* Ficha (P3) */
 .ficha-cabecera { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0.5rem; }
 .ficha-cabecera h2 { margin: 0.2rem 0; }
@@ -36,6 +37,7 @@ th { background: #eef2f4; font-weight: 600; }
 .canales { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: 0.5rem; }
 .canales .canal { width: 100%; text-align: left; font: inherit; background: #fff; border: 1px solid #c5cdd3; border-radius: 6px; padding: 0.6rem; cursor: pointer; display: grid; gap: 0.15rem; }
 .canales .canal[aria-pressed='true'] { outline: 3px solid #0b3954; }
+.canales .canal.callado { border: 2px dashed #b26a00; background: #fff8e1; }
 .canales .lectura { font-size: 1.4rem; font-weight: 700; }
 .canales .reglas { font-size: 0.8rem; color: #52606d; }
 .grafico { background: #fff; border: 1px solid #e3e8eb; border-radius: 6px; padding: 0.25rem; margin-bottom: 1rem; min-height: 290px; }

@@ -755,6 +755,11 @@ else:
     real = (len(f18), sum(h for h, _ in f18.values()), *e3['✅'], *e3['🟡'], *e3['⬜'], n[0], n[1], n[2], n[3], n[4], n[5], n[6])
     dicho = tuple(int(x) if x is not None else 0 for x in m.groups())  # «ninguno pendiente» = 0 elementos y 0 h
     if dicho != real: malos.append(f'informe (cap4.tex): dice {dicho}; las filas dan {real}')
+# 24/10, noche: cap-pruebas.tex repetía el porcentaje del núcleo (65 %) y nadie lo comparaba; quedó viejo al cerrar HU-19.
+cp = re.sub(r'\s+', ' ', open('informe-oficial/cap-pruebas.tex', encoding='utf-8').read())
+mp = re.findall(r'núcleo demostrable está hecho en un (\d+)\\,\\%', cp)
+if len(mp) != 1: malos.append(f'informe (cap-pruebas.tex): esperaba una frase «el núcleo demostrable está hecho en un N %», hay {len(mp)}')
+elif int(mp[0]) != cuenta(True)[4]: malos.append(f'informe (cap-pruebas.tex): dice {mp[0]} % del núcleo; las filas dan {cuenta(True)[4]} %')
 es = open('informe-oficial/anexos/e-seguimiento.tex', encoding='utf-8').read()
 if '\\label{tab:seguimiento3}' not in es: malos.append('informe: no encontré el cuadro tab:seguimiento3 en el anexo de seguimiento')
 else:
@@ -863,6 +868,34 @@ if not m: malos.append('docs/18 §5: no encontré «Núcleo (🎯): N elementos,
 elif (int(m.group(1)), int(m.group(2))) != (len(filas), sum(int(h) for _, h, _ in filas)): malos.append(f'docs/18 §5 dice {m.group(1)} elementos y {m.group(2)} h; la tabla suma {len(filas)} y {sum(int(h) for _, h, _ in filas)}')
 if malos: print('FALLA lo que falta del núcleo no cuadra:'); [print('  ' + x) for x in malos]; sys.exit(1)
 print(f'OK    docs/18 §5: {len(filas)} elementos del núcleo sin terminar, con sus horas y su estado; ninguno terminado sigue en la lista')
+PY
+
+paso "2w6. Citas a secciones: cada «docs/NN §M» de un archivo versionado apunta a una sección M que existe en docs/NN"
+# 24/10, revisión del día: docs/17 citaba «docs/16 §53» antes de que existiera. Se exige la sección principal (el título
+# «# M.» o «## M.»); «§M.K» puede ser un título o el punto K de una lista de §M, así que de ella solo se comprueba M.
+# 24/10, noche: también cada § de una lista que sigue a la cita («`docs/16 §39` y §40», «§39, §40 y §41»); antes solo se veía el primero.
+python3 -I - <<'PY' || fallos=$((fallos+1))
+import re, sys, pathlib, subprocess
+secciones = {}
+for p in pathlib.Path('docs').glob('*.md'):
+    if (m := re.match(r'(\d{2})-', p.name)):
+        secciones[m.group(1)] = {h.group(1) for l in p.read_text(encoding='utf-8').splitlines() if (h := re.match(r'^#{1,4}\s+(\d+)[.\s]', l))}
+archivos = subprocess.run(['git', 'ls-files', '--cached', '--others', '--exclude-standard', '*.md', '*.tex', '*.ts', '*.sh', '*.sql', '*.yml', '*.cpp', '*.ini', '*.svelte'],
+                          capture_output=True, text=True).stdout.split()
+malos, citas = [], 0
+for f in archivos:
+    p = pathlib.Path(f)
+    if not p.is_file(): continue
+    for n, linea in enumerate(p.read_text(encoding='utf-8', errors='replace').splitlines(), 1):
+        for m in re.finditer(r'docs/(\d{2})(?:-[\w-]+(?:\.md)?)?`?\s*§\s*(\d+)(?:\.\d+)?((?:`?\s*(?:,|y|e)\s*§\s*\d+(?:\.\d+)?)*)', linea):
+            if m.group(1) not in secciones: citas += 1; malos.append(f'{f}:{n}: cita docs/{m.group(1)}, que no existe'); continue
+            for sec in [m.group(2)] + re.findall(r'§\s*(\d+)', m.group(3)):
+                citas += 1
+                if sec not in secciones[m.group(1)]: malos.append(f'{f}:{n}: cita docs/{m.group(1)} §{sec}, sección que no existe')
+if citas < 100: print(f'FALLA leí solo {citas} citas a secciones (¿cambió su forma?)'); sys.exit(1)
+for m in malos: print('FALLA', m)
+if not malos: print(f'OK    {citas} citas a secciones de docs/, todas a una sección que existe')
+sys.exit(1 if malos else 0)
 PY
 
 paso "2y2. Sintaxis de los guiones: bash -n de cada *.sh versionado o nuevo (no ignorado)"

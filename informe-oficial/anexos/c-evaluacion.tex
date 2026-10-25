@@ -245,10 +245,10 @@ es un dato del sitio, no una constante del programa.
 
 El costo de una plataforma de sensores no lo mueve la cantidad de usuarios sino la \textbf{tasa de
 recepción por la retención}. Para el núcleo demostrativo —50 canales reportando cada cinco minutos—
-resultan 14\,400 filas diarias y unos 5,3 millones al año, del orden de 330~MB por año; sin compresión
+resultan 14\,400 filas diarias y unos 5,3 millones al año, del orden de 0,95~GB por año con índices (180~B por lectura, medidos); sin compresión
 (la de TimescaleDB es \emph{Timescale License}; se adopta la edición Apache~2.0 por RNF-15) y con una política
 en capas —crudo sin vencimiento mientras el disco lo permita, agregados horarios y diarios— diez años de
-operación caben en unos 4,6~GB. El almacenamiento no es el problema; la
+operación caben en unos 9,5~GB. El almacenamiento no es el problema; la
 memoria RAM consumida sí, y la acota el RNF-17.
 
 Se compararon cinco alternativas de alojamiento que ejecutan el mismo despliegue, con precios

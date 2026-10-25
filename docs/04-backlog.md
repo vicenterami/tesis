@@ -280,7 +280,7 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 **HU-19 — criterios de aceptación** 🎯
 
 - Presenta el total de dispositivos, cuántos en línea, cuántos con condición abierta y cuántos sin supervisión.
-- Cada dispositivo muestra un estado visual de tres niveles: normal, advertencia, crítico.
+- Cada dispositivo muestra un estado visual de cuatro valores: Normal, Alerta, Sin señal e Inactivo (`docs/19 §2`; decidido el 12/10/2026 a partir de una nube comercial de referencia, en reemplazo de los tres niveles del borrador).
 - Indica el momento de la última comunicación de cada dispositivo.
 - Es utilizable en un navegador móvil sin desplazamiento horizontal (RF-52).
 - Refleja los cambios de estado sin requerir recarga manual de la página.
@@ -586,7 +586,7 @@ ejecuta contra la holgura verificada al cierre de cada etapa.
 | 2. Segundo nivel | Alertas por umbral con interfaz | HU-06 | 🟡 motor listo |
 | 2. Segundo nivel | Aprovisionamiento desde la plataforma | HU-10, HU-11 | ✅ 12/10 (API; la pantalla es HU-22, E4) |
 | 2. Segundo nivel | Cifrado del transporte | TT-22 | ⬜ E3 |
-| 2. Segundo nivel | Panel de control | HU-19, HU-20, HU-21 | 🟡 12/10 (P2 y P3 hechas; HU-20 parcial); HU-21 y HU-20 cerradas el 16/10 (`docs/16 §39` y §40; estado al día: `docs/18`) |
+| 2. Segundo nivel | Panel de control | HU-19, HU-20, HU-21 | ✅ 24/10; 🟡 12/10 (P2 y P3 hechas; HU-20 parcial); HU-21 y HU-20 cerradas el 16/10 (`docs/16 §39` y §40) y HU-19 el 24/10 (`docs/16 §53` y §54; estado al día: `docs/18`) |
 | 2. Segundo nivel | Exportación en formato abierto | HU-08 | 🟡 E3 (CSV y JSON el 12/10; XLSX en la E4) |
 | 2. Segundo nivel | Validación formal | TT-27, TT-28, TT-29 | ⬜ E4 |
 

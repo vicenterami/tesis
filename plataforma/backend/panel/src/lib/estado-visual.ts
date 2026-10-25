@@ -36,6 +36,14 @@ export function enLinea(visto: string | null, intervaloEsperadoS: number, ahora:
   return ahora.getTime() - Date.parse(visto) <= intervaloEsperadoS * 2 * 1000;
 }
 
+// ¿Canal callado? (docs/19 §4, P3): el dispositivo está en línea pero ese canal no tiene lectura dentro de 2 × el intervalo
+// esperado, la misma tolerancia de enLinea. Un canal sin ninguna lectura de un dispositivo que ya reporta también calla. Regla de
+// presentación: no abre condición ni cambia el estado visual (corrida de 24 h: la presión calló 3 h con el equipo en «Normal»).
+export function canalCallado(ultima: string | null, visto: string | null, intervaloEsperadoS: number, ahora: Date): boolean {
+  if (enLinea(visto, intervaloEsperadoS, ahora) !== true) return false;
+  return ultima === null || ahora.getTime() - Date.parse(ultima) > intervaloEsperadoS * 2 * 1000;
+}
+
 export function conteoPorEstado(estados: readonly EstadoVisual[]): Record<EstadoVisual, number> {
   const c: Record<EstadoVisual, number> = { sin_senal: 0, alerta: 0, normal: 0, inactivo: 0 };
   for (const e of estados) c[e]++;
