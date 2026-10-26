@@ -57,3 +57,6 @@ updates:
       # Los tipos de Node siguen a la versión que corre (engines >=22 <23 y la imagen node:22): cambiar de mayor es una decisión aparte.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
+      # TypeScript 6 (26/10/2026, PR #11): cambia el valor por defecto de `types` a [] y ts-jest 29 exige <6. Se migra en la Etapa 4.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
