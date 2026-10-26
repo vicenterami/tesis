@@ -36,8 +36,9 @@ overrides:
   undici@>=8.0.0 <8.12.2: ^8.12.2
 # Avisos que la auditoría ignora (docs/11 §4; clave `audit.ignore`, la vigente desde pnpm 11.16): solo los que no tienen
 # versión corregida publicada y no entran a la imagen
-# de producción. El guardián (paso 2q) falla el día que salga el parche, para actualizar y quitar la línea.
-#   GHSA-vfj7-8cjw-p6xm · braces · alto · sin parche al 08/10/2026 · llega solo por jest (micromatch)
-audit:
-  ignore:
-    - GHSA-vfj7-8cjw-p6xm
+# de producción. El guardián (paso 2q) falla el día que salga el parche o que GitHub retire el aviso, para quitar la línea.
+# Sin excepciones desde el 26/10/2026: la única (GHSA-vfj7-8cjw-p6xm, braces, solo por jest) la retiró GitHub el 23/10.
+# Formato, si vuelve a hacer falta:
+#   audit:
+#     ignore:
+#       - GHSA-xxxx-xxxx-xxxx   # paquete · gravedad · sin parche al dd/mm/aaaa · por qué no entra a producción

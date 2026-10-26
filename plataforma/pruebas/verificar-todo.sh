@@ -444,9 +444,10 @@ else
   else echo "OK    ningún archivo versionado trae menciones vetadas ($(grep -cv '^\s*#\|^\s*$' "$MV") patrones)"; fi
 fi
 
-paso "2q. Auditoría de dependencias: cada aviso ignorado (audit.ignore de pnpm-workspace.yaml) sigue sin versión corregida (docs/11 §4)"
+paso "2q. Auditoría de dependencias: cada aviso ignorado (audit.ignore de pnpm-workspace.yaml) sigue vigente y sin versión corregida (docs/11 §4)"
 # 08/10: braces no tenía parche y la auditoría lo ignora (la leen igual el CI y el portátil). Una excepción que nadie revisa
 # queda para siempre: este paso consulta la base de avisos de GitHub y falla el día que el aviso tenga versión corregida.
+# 26/10: también falla si GitHub retiró el aviso (`withdrawn_at`): el de braces se retiró el 23/10 y el paso siguió en AVISO.
 # Se leen los GHSA fuera de comentarios, así vale con la clave vigente y con el nombre antiguo (`auditConfig.ignoreGhsas`).
 WS="${VERIFICAR_WORKSPACE:-plataforma/backend/pnpm-workspace.yaml}"
 ign=$(grep -v '^[[:space:]]*#' "$WS" 2>/dev/null | grep -oE 'GHSA-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}' | sort -u)
@@ -455,9 +456,10 @@ elif [ -z "$ign" ]; then echo "OK    la auditoría no ignora ningún aviso"
 elif ! command -v gh >/dev/null; then echo "omitida: gh no está en el PATH"; omitidos="$omitidos 2q"
 else
   for g in $ign; do
-    if ! p=$(gh api "/advisories/$g" --jq '[.vulnerabilities[].first_patched_version // empty] | join(", ")' 2>/dev/null); then
+    if ! r=$(gh api "/advisories/$g" --jq '(.withdrawn_at // "") + "|" + ([.vulnerabilities[].first_patched_version // empty] | join(", "))' 2>/dev/null); then
       echo "omitida: no se pudo consultar $g (¿sin red?)"; omitidos="$omitidos 2q"
-    elif [ -n "$p" ]; then echo "FALLA $g ya tiene versión corregida ($p): actualizar y quitar la excepción de pnpm-workspace.yaml y de docs/11 §4"; fallos=$((fallos+1))
+    elif [ -n "${r%%|*}" ]; then echo "FALLA $g fue retirado por GitHub (${r%%|*}): ya no es un aviso; quitar la excepción de pnpm-workspace.yaml y de docs/11 §4"; fallos=$((fallos+1))
+    elif p=${r#*|}; [ -n "$p" ]; then echo "FALLA $g ya tiene versión corregida ($p): actualizar y quitar la excepción de pnpm-workspace.yaml y de docs/11 §4"; fallos=$((fallos+1))
     else echo "AVISO $g sigue sin versión corregida publicada: excepción vigente, pendiente de resolver (no falla)"; fi
   done
 fi

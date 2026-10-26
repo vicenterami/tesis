@@ -1676,3 +1676,28 @@ miran el archivo, el nombre de la variable y el largo del valor: ningún valor s
 
 **Lo que no cubre:** formatos de secreto que no estén en la lista (lo cubrirá `gitleaks`, con sus reglas mantenidas) y los datos personales,
 que revisa el paso 2f del guardián.
+
+## 56. TypeScript 6 y una excepción de auditoría que sobraba (26/10/2026)
+
+**Por qué.** Dependabot propuso TypeScript 6.0.3 (PR #11) y la verificación automática lo detuvo con diez errores: los `*.spec.ts`
+no reconocían `describe`, `it` ni `expect`. TypeScript 6 cambia el valor por defecto de `types` a una lista vacía («In TypeScript 6.0,
+the default `types` value will be `[]`», https://devblogs.microsoft.com/typescript/announcing-typescript-6-0/), y `tsconfig.json`
+dependía del valor anterior, que cargaba todos los paquetes `@types`.
+
+**Qué cambió.** TypeScript 6.0.3 (publicada el 16/04/2026) en el backend y el panel; `tsconfig.json` declara `"types": ["node", "jest"]`
+y `tsconfig.build.json` solo `["node"]`, así la compilación de producción no conoce los tipos de las pruebas. Compatibilidad revisada en
+el registro de npm: ts-jest 29.4.15 (`typescript >=4.3 <7`), typescript-eslint 8 (`<6.1.0`) y svelte-check 4 (`^5 || ^6`). TypeScript 7
+queda fuera hasta que typescript-eslint la admita (regla en `.github/dependabot.yml`).
+
+**Aviso retirado.** La única excepción de la auditoría (`braces`, https://github.com/advisories/GHSA-vfj7-8cjw-p6xm, §12) la retiró
+GitHub el 23/10/2026, pero el paso 2q del guardián solo miraba si había versión corregida y la seguía mostrando como vigente. Se quitó
+la excepción y el paso 2q (y el aviso amarillo del CI, `plataforma/pruebas/avisos-dependencias.sh`) fallan ahora también con un aviso
+retirado.
+
+| Comprobación | Resultado |
+|---|---|
+| `pnpm verificar` (tipos, lint, pruebas del backend y del panel) | 357 + 107 pruebas en verde; `svelte-check` 340 archivos, 0 errores |
+| `tsc --noEmit --listFilesOnly` (backend) | 95 archivos de `src/`; el build de producción no incluye ningún `*.spec.ts` |
+| `pnpm audit --audit-level=high`, sin excepciones | sin avisos (y sin avisos en producción a ningún nivel) |
+| Paso 2q con el `pnpm-workspace.yaml` anterior (violación plantada) | FALLA: «fue retirado por GitHub» |
+| Paso 2q con el archivo actual | OK: la auditoría no ignora ningún aviso |
