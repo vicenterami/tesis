@@ -248,6 +248,15 @@ etapas del Dockerfile; mismo guion, bases frescas con `--pull --no-cache`):
 | base | 1 / 25 | 0 | `libexpat` (2.8.5 → 2.9.0) se sumó a la lista de parches; lo que queda está en `gosu` (binario de Go precompilado, residuo documentado en `docs/11 §4`) |
 | broker | 0 / 0 | 0 | sin cambios |
 
+**Dependencias, 25/10/2026.** Con el mismo lockfile que el 23/10 daba 0 avisos, la auditoría volvió a fallar (el PR agrupado de Dependabot
+lo destapó en el CI): avisos publicados del 19 al 23/10 contra paquetes que ya estaban. Dos altos **en producción**, ambos de denegación
+de servicio: `body-parser` < 2.4.0 (https://github.com/advisories/GHSA-27r3-jxmh-p828, cuerpo comprimido con bytes de sobra; alcanzable
+por `POST /recepcion/{id_fisico}`) y `multer` < 2.5.0 (https://github.com/advisories/GHSA-q7qp-rjg7-q26m; el backend no recibe archivos,
+pero `@nestjs/platform-express` 11.2.7 todavía fija `multer` 2.4.0). En desarrollo: `fast-uri` < 3.1.9 (cuatro, vía `@nestjs/cli`) y
+`undici` < 8.12.2 (tres, vía `jsdom` del panel). Cuatro *overrides* (dos nuevos, `body-parser` y `undici`, y dos que suben de versión, `fast-uri` y `multer`) y un paquete
+transitivo nuevo, `qs` 6.16.1, que pide `body-parser` 2.4.0; todas las versiones con más de 24 h publicadas (los parches, del 14 al 22/10).
+Resultado: `pnpm audit` sin avisos (también `--prod`), 357 pruebas del backend y 107 del panel en verde.
+
 ## 13. Migración 11: vía, pasarela, estado y sitio (08/10/2026)
 
 Se probó en bases desechables (contenedores de un solo uso, datos en RAM) antes de tocar la de desarrollo, y de punta a punta
@@ -1555,8 +1564,8 @@ que el recorrido elige la temperatura en el selector, como lo haría una persona
 manejador del selector: Svelte 5 delega ese evento en la raíz del documento.
 
 **Lo que no cubre.** (1) La medición es de un portátil con la base en RAM y un solo canal con datos; con muchos canales la caché de la base
-se reparte. (2) Los agregados continuos de TimescaleDB, que bajarían las filas leídas en 7 y 30 días, no se midieron: quedan como mejora
-aparte. (3) El eje de la ventana vacía y los colores de P3b se revisan en las capturas, no con una comprobación automática. (4) La comparación
+se reparte. (2) Los agregados materializados por tarea (los continuos de TimescaleDB no existen en la edición Apache, `docs/10 §8.4` punto 11),
+que bajarían las filas leídas en 7 y 30 días, no se midieron: quedan como mejora aparte. (3) El eje de la ventana vacía y los colores de P3b se revisan en las capturas, no con una comprobación automática. (4) La comparación
 dibuja como mucho 6 dispositivos de un mismo sitio o de sitios con la misma zona en el eje; con varias zonas, el eje va en la del primero.
 
 ## 53. Corrida de 24 h del nodo real (23–24/10/2026)
@@ -1650,3 +1659,20 @@ nuevo: **35 de 35 en Chromium y 35 de 35 en Firefox**, y en una medición aparte
 CSS anterior, Chromium no vio «reconectando» dentro de 20 s tras detener el backend del banco; la corrida siguiente pasó: queda anotada
 como intermitente, sin causa confirmada.
 
+
+## 55. Revisión manual de secretos antes de la entrega (25/10/2026)
+
+**Por qué.** El escaneo automático con `gitleaks` en el CI queda para la Etapa 4 (`docs/11 §4`); antes de entregar se hace una pasada
+manual sobre el árbol y **todo el historial** (205 commits de todas las ramas, `git log --all -p`). Solo se cuentan coincidencias y se
+miran el archivo, el nombre de la variable y el largo del valor: ningún valor se imprime.
+
+| Qué se buscó | Árbol | Historial | Resultado |
+|---|---|---|---|
+| Claves privadas (`BEGIN … PRIVATE KEY`), llaves de AWS, tokens de GitHub, Slack, Google y de servicios de IA, JWT, URL con usuario y clave | 0 | 0 | limpio |
+| Archivos `.env`, `.pem`, `.key`, `.crt`, `.p12` alguna vez versionados | — | solo `plataforma/.env.example` | sus seis claves son marcadores para cambiar; los otros tres valores son nombres (base, usuario y sonda) |
+| Asignaciones con forma de secreto (`clave`, `secreto`, `token`, `password` = texto de 8 o más) | 9 | — | nombres de cabeceras HTTP, valores de las pruebas unitarias y una clave equivocada a propósito en `plataforma/pruebas/base-rol-app.sh` (la prueba de que otra clave no entra); en `historico/herramientas/contactid.py`, la constante de protocolo de DC-09 |
+| Hashes `scrypt` con parámetros | 4 | 4 | prefijos de las pruebas de `plataforma/backend/src/alta/credenciales.spec.ts`, sin hash real |
+| Direcciones IPv4 fuera de 127.x, 0.0.0.0 y los rangos de documentación (RFC 5737) | 0 | — | limpio |
+
+**Lo que no cubre:** formatos de secreto que no estén en la lista (lo cubrirá `gitleaks`, con sus reglas mantenidas) y los datos personales,
+que revisa el paso 2f del guardián.

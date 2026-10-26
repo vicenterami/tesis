@@ -156,7 +156,8 @@ de dispositivos en un gráfico ni aviso por la zona del navegador (no declarado,
    Medición (`docs/16 §52`, en el banco, con una serie sembrada de 30 días a una lectura cada 10 s): para cada rango × resolución ofrecida,
    tiempo de respuesta (mediana de 10 peticiones), filas leídas (`EXPLAIN (ANALYZE, BUFFERS)`) y bytes de la respuesta; el «antes» son las
    cuatro combinaciones fijas de hoy. La tabla debe responder cuánto cuesta la resolución más fina de cada rango frente a la fija. Los
-   agregados continuos de TimescaleDB quedan como mejora aparte, también medida: hoy toda resolución lee las filas crudas.
+   agregados materializados por tarea quedan como mejora aparte, también medida (los continuos de TimescaleDB no existen en la edición
+   Apache, `docs/10 §8.4` punto 11): hoy toda resolución lee las filas crudas.
 5. **Comparar nodos: la misma magnitud de varios dispositivos en un gráfico (P3b).** Pantalla
    `#/comparar?dispositivos=<uuid>,<uuid>&magnitud=temperatura&rango=24h[&res=5m]` (de 2 a 6 dispositivos). Entradas: en P2, una casilla
    «comparar» por fila y el botón «Comparar (N)», activo con 2 a 6 marcadas; en P3, el enlace «Comparar con otros dispositivos», que abre P3b
