@@ -11,11 +11,16 @@
 
 Meta: **dos entrevistas** documentadas antes del 30 de octubre (OE1), la primera dentro de la Etapa 2.
 
+**Cumplida el 25/10/2026:** se realizaron con el perfil 3 (5/10, `bitacora/2026-10-05-entrevista-academico-geologia.md`) y con un
+perfil que no estaba previsto, el 4 (25/10, `bitacora/2026-10-25-entrevista-operador-red.md`). Los perfiles 1 y 2 no se consiguieron;
+quedan como candidatos para la validación de la Etapa 4.
+
 | # | Perfil | Qué valida | Cómo llegar |
 |---|---|---|---|
 | 1 | Responsable de laboratorios o del equipamiento de sensores de la Facultad de Ingeniería | Causas C1, C2, C4; qué sensores existen y qué pasa con sus datos | Contacto solicitado al profesor guía |
 | 2 | Dirección de informática de la universidad (red) | RNF-08 credenciales, RNF-09 segmentación, RNF-10 conexión saliente; cómo se despliega en la red del campus | Contacto solicitado al profesor guía |
 | 3 (reserva) | Académico con proyecto que use sensores (agronomía, ambiental) | C3, C5; datos que hoy no se procesan | Página de proyectos de la UCT; vía profesor guía |
+| 4 (realizada) | Operador de una red LoRaWAN que integró su pasarela al sistema | Alta de flotas, qué mira primero un operador, coexistencia con su broker, avisos de caída | Integración en terreno del 20/10 (`docs/16 §45`) |
 
 Datos personales: **ninguno al repositorio**. En la bitácora solo el rol.
 

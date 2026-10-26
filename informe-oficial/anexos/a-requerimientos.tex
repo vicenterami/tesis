@@ -10,14 +10,14 @@ Catálogo actualizado al pivote del 2 de septiembre (contrato SenML sobre MQTT).
 \begin{longtable}{@{}C{1.3cm}L{6.1cm}L{1.6cm}L{1.2cm}C{0.7cm}@{}}
 \filaencab \encab{ID} & \encab{Requerimiento} & \encab{Fuente} & \encab{Causa} & \encab{Pr.} \\ \midrule \endhead
 \textbf{RF-01} & El sistema debe exponer un punto de recepción \textbf{HTTP} que acepte tramas de medición en \textbf{SenML (RFC 8428)} & [PO] [BT] & C1 & \textbf{M} \\
-\textbf{RF-02} & El sistema debe poder recibir mediciones de la \textbf{rama LoRaWAN} a través del servidor de red, que las publica en MQTT (obligatoria desde el 08/10/2026: ruta B, pasarela con servidor de red embebido) & [PO] [BT] & C1, C2 & \textbf{M} \\
-\textbf{RF-03} & El sistema debe recibir eventos publicados en un \textbf{broker MQTT}, suscribiéndose a los tópicos configurados por sitio & [PO] & C1, C2 & \textbf{M} \\
-\textbf{RF-04} & El sistema debe admitir \textbf{adaptadores de formato por fuente} que traduzcan al modelo interno tramas que no lleguen en SenML, sin modificar el núcleo & [EM] [BT] & C2 & \textbf{S} \\
+\textbf{RF-02} & El sistema debe poder recibir mediciones de la \textbf{rama LoRaWAN} a través del servidor de red, que las publica en MQTT (obligatoria desde el 08/10/2026: ruta B, pasarela con servidor de red embebido) & [PO] [BT] [ENT] & C1, C2 & \textbf{M} \\
+\textbf{RF-03} & El sistema debe recibir eventos publicados en un \textbf{broker MQTT}, suscribiéndose a los tópicos configurados por sitio & [PO] [ENT] & C1, C2 & \textbf{M} \\
+\textbf{RF-04} & El sistema debe admitir \textbf{adaptadores de formato por fuente} que traduzcan al modelo interno tramas que no lleguen en SenML, sin modificar el núcleo & [EM] [BT] [ENT] & C2 & \textbf{S} \\
 \textbf{RF-05} & El sistema debe \textbf{validar cada trama} contra el esquema SenML y contra el registro del dispositivo, rechazando las inválidas sin contaminar las series & [BT] & C1 & \textbf{M} \\
 \textbf{RF-06} & El sistema debe \textbf{confirmar la recepción} al emisor: nivel de QoS acordado en MQTT y código de respuesta en HTTP & [BT] & C1 & \textbf{M} \\
-\textbf{RF-07} & El sistema debe \textbf{poner en cuarentena} las tramas rechazadas ---crudas, con su motivo--- y registrar los intentos de dispositivos desconocidos & [DP] & C5 & \textbf{S} \\
+\textbf{RF-07} & El sistema debe \textbf{poner en cuarentena} las tramas rechazadas ---crudas, con su motivo--- y registrar los intentos de dispositivos desconocidos & [DP] [ENT] & C5 & \textbf{S} \\
 \textbf{RF-08} & El sistema debe aceptar \textbf{múltiples mediciones por trama} (lista SenML con nombre, valor, unidad y tiempo por medición) & [BT] & C1 & \textbf{M} \\
-\textbf{RF-09} & El sistema debe \textbf{preservar los metadatos del transporte} de cada recepción (RSSI, SNR, gateway, identificador del nodo) asociándolos al evento & [BT] [DP] & C5 & \textbf{M} \\
+\textbf{RF-09} & El sistema debe \textbf{preservar los metadatos del transporte} de cada recepción (RSSI, SNR, gateway, identificador del nodo) asociándolos al evento & [BT] [DP] [ENT] & C5 & \textbf{M} \\
 \textbf{RF-10} & El sistema debe \textbf{descartar duplicados} cuando el mismo evento llegue por más de un camino o gateway & [BT] & C1 & \textbf{S} \\
 \end{longtable}
 
@@ -25,8 +25,8 @@ Catálogo actualizado al pivote del 2 de septiembre (contrato SenML sobre MQTT).
 \begin{longtable}{@{}C{1.3cm}L{6.1cm}L{1.6cm}L{1.2cm}C{0.7cm}@{}}
 \filaencab \encab{ID} & \encab{Requerimiento} & \encab{Fuente} & \encab{Causa} & \encab{Pr.} \\ \midrule \endhead
 \textbf{RF-11} & El sistema debe \textbf{normalizar toda trama aceptada al modelo interno único} (dispositivo, magnitud, unidad, valor, marca temporal), venga de la vía y formato que venga & [PO] [BT] & C1 & \textbf{M} \\
-\textbf{RF-12} & El sistema debe mantener \textbf{condiciones abiertas y cerradas} por dispositivo: el cruce de umbral abre la condición y la vuelta al rango la cierra & [BT] & C1, C5 & \textbf{M} \\
-\textbf{RF-13} & El sistema debe \textbf{generar eventos por umbral} cuando una medición cruce un límite configurado & [PO] & C1 & \textbf{M} \\
+\textbf{RF-12} & El sistema debe mantener \textbf{condiciones abiertas y cerradas} por dispositivo: el cruce de umbral abre la condición y la vuelta al rango la cierra & [BT] [ENT] & C1, C5 & \textbf{M} \\
+\textbf{RF-13} & El sistema debe \textbf{generar eventos por umbral} cuando una medición cruce un límite configurado & [PO] [ENT] & C1 & \textbf{M} \\
 \textbf{RF-14} & El sistema debe permitir \textbf{configurar umbrales de disparo y de restauración por dispositivo}, con banda de histéresis para evitar oscilación y un retardo de activación opcional contra picos aislados (0 por defecto) & [BT] & C5 & \textbf{S} \\
 \textbf{RF-15} & El sistema debe \textbf{correlacionar eventos con telemetría} mediante el identificador del dispositivo (\texttt{bn} / \texttt{id\_fisico}) y la marca temporal, para reconstruir el contexto de un evento & [DP] & C1 & \textbf{S} \\
 \textbf{RF-16} & El sistema debe \textbf{normalizar las marcas temporales} a un huso único, tolerando que el nodo no disponga de reloj confiable y usando la hora de recepción cuando corresponda & [BT] & C1 & \textbf{M} \\
@@ -37,7 +37,7 @@ Catálogo actualizado al pivote del 2 de septiembre (contrato SenML sobre MQTT).
 \begin{longtable}{@{}C{1.3cm}L{6.1cm}L{1.6cm}L{1.2cm}C{0.7cm}@{}}
 \filaencab \encab{ID} & \encab{Requerimiento} & \encab{Fuente} & \encab{Causa} & \encab{Pr.} \\ \midrule \endhead
 \textbf{RF-18} & El sistema debe mantener un \textbf{inventario de dispositivos} con tipo, ubicación, sitio, zona lógica, transporte de llegada y estado & [PO] & C4, C5 & \textbf{M} \\
-\textbf{RF-19} & El sistema debe permitir \textbf{registrar un dispositivo nuevo} asignándole su identificador físico, credencial y canales, sin intervenir la consola del servidor de red & [PO] [EM] & C4 & \textbf{M} \\
+\textbf{RF-19} & El sistema debe permitir \textbf{registrar un dispositivo nuevo} asignándole su identificador físico, credencial y canales, sin intervenir la consola del servidor de red & [PO] [EM] [ENT] & C4 & \textbf{M} \\
 \textbf{RF-20} & El sistema debe \textbf{rechazar el registro} de un dispositivo cuyo identificador físico ya exista & [BT] & C1 & \textbf{S} \\
 \textbf{RF-21} & El sistema debe permitir \textbf{agrupar dispositivos por sitio y por zona lógica}, y presentar la vista agrupada & [PO] & C4 & \textbf{M} \\
 \textbf{RF-22} & El sistema debe permitir \textbf{marcar un dispositivo en mantenimiento}, suprimiendo sus alertas y dejando registro del período & [BT] & C5 & \textbf{C} \\
@@ -47,30 +47,30 @@ Catálogo actualizado al pivote del 2 de septiembre (contrato SenML sobre MQTT).
 \section{M4 --- Supervisión de salud de enlace}
 \begin{longtable}{@{}C{1.3cm}L{6.1cm}L{1.6cm}L{1.2cm}C{0.7cm}@{}}
 \filaencab \encab{ID} & \encab{Requerimiento} & \encab{Fuente} & \encab{Causa} & \encab{Pr.} \\ \midrule \endhead
-\textbf{RF-24} & El sistema debe \textbf{detectar la pérdida de comunicación} de un dispositivo cuando no reporte durante un número configurable de intervalos, y abrir la condición correspondiente & [PO] [BT] & \textbf{C5} & \textbf{M} \\
-\textbf{RF-25} & El sistema debe \textbf{detectar la restauración} del dispositivo y cerrar la condición, registrando la duración de la interrupción & [BT] & C5 & \textbf{M} \\
+\textbf{RF-24} & El sistema debe \textbf{detectar la pérdida de comunicación} de un dispositivo cuando no reporte durante un número configurable de intervalos, y abrir la condición correspondiente & [PO] [BT] [ENT] & \textbf{C5} & \textbf{M} \\
+\textbf{RF-25} & El sistema debe \textbf{detectar la restauración} del dispositivo y cerrar la condición, registrando la duración de la interrupción & [BT] [ENT] & C5 & \textbf{M} \\
 \textbf{RF-26} & El sistema debe registrar la \textbf{última vez que se recibió} comunicación de cada dispositivo & [PO] & C5 & \textbf{M} \\
-\textbf{RF-27} & El sistema debe \textbf{presentar la calidad del enlace} por dispositivo (RSSI, SNR y porcentaje de recepción) cuando el transporte la provea & [BT] & C5 & \textbf{M} \\
-\textbf{RF-28} & El sistema debe \textbf{procesar lecturas de batería bajo el umbral configurado} (magnitud \texttt{bateria}) y exponer los dispositivos que requieren mantenimiento & [PO] [BT] & C5 & \textbf{M} \\
+\textbf{RF-27} & El sistema debe \textbf{presentar la calidad del enlace} por dispositivo (RSSI, SNR y porcentaje de recepción) cuando el transporte la provea & [BT] [ENT] & C5 & \textbf{M} \\
+\textbf{RF-28} & El sistema debe \textbf{procesar lecturas de batería bajo el umbral configurado} (magnitud \texttt{bateria}) y exponer los dispositivos que requieren mantenimiento & [PO] [BT] [ENT] & C5 & \textbf{M} \\
 \textbf{RF-29} & El sistema debe \textbf{aprovechar el *keep-alive* y el *Last Will* de MQTT} como evidencia de conexión y aviso inmediato de desconexión & [BT] & C5 & \textbf{M} \\
-\textbf{RF-30} & El sistema debe presentar un \textbf{indicador agregado de salud por sitio}: total de dispositivos, en línea, con condición abierta y sin supervisión & [PO] & C4, C5 & \textbf{M} \\
+\textbf{RF-30} & El sistema debe presentar un \textbf{indicador agregado de salud por sitio}: total de dispositivos, en línea, con condición abierta y sin supervisión & [PO] [ENT] & C4, C5 & \textbf{M} \\
 \end{longtable}
 
 \section{M5 --- Persistencia y consulta}
 \begin{longtable}{@{}C{1.3cm}L{6.1cm}L{1.6cm}L{1.2cm}C{0.7cm}@{}}
 \filaencab \encab{ID} & \encab{Requerimiento} & \encab{Fuente} & \encab{Causa} & \encab{Pr.} \\ \midrule \endhead
-\textbf{RF-31} & El sistema debe \textbf{almacenar de forma persistente} todo evento aceptado, conservando el mensaje original íntegro junto a su interpretación & [BT] [DP] & C1 & \textbf{M} \\
+\textbf{RF-31} & El sistema debe \textbf{almacenar de forma persistente} todo evento aceptado, conservando el mensaje original íntegro junto a su interpretación & [BT] [DP] [ENT] & C1 & \textbf{M} \\
 \textbf{RF-32} & El sistema debe \textbf{almacenar series de tiempo} de telemetría con valor, unidad y marca temporal & [PO] & C1 & \textbf{M} \\
-\textbf{RF-33} & El sistema debe permitir \textbf{consultar el historial} de eventos y mediciones de un dispositivo en un rango de fechas & [PO] & C4 & \textbf{M} \\
-\textbf{RF-34} & El sistema debe permitir \textbf{exportar} los datos de un sitio en formatos abiertos (CSV, XLSX y JSON) & [PO] [EM] & \textbf{C3, C5} & \textbf{M} \\
+\textbf{RF-33} & El sistema debe permitir \textbf{consultar el historial} de eventos y mediciones de un dispositivo en un rango de fechas & [PO] [ENT] & C4 & \textbf{M} \\
+\textbf{RF-34} & El sistema debe permitir \textbf{exportar} los datos de un sitio en formatos abiertos (CSV, XLSX y JSON) & [PO] [EM] [ENT] & \textbf{C3, C5} & \textbf{M} \\
 \textbf{RF-35} & El sistema debe exponer una \textbf{API de consulta} que permita a sistemas externos acceder a los datos del sitio & [PO] & C3 & \textbf{S} \\
 \end{longtable}
 
 \section{M6 --- Alertas y notificación}
 \begin{longtable}{@{}C{1.3cm}L{6.1cm}L{1.6cm}L{1.2cm}C{0.7cm}@{}}
 \filaencab \encab{ID} & \encab{Requerimiento} & \encab{Fuente} & \encab{Causa} & \encab{Pr.} \\ \midrule \endhead
-\textbf{RF-36} & El sistema debe \textbf{notificar} cuando se abra una condición de severidad configurada como notificable, y cuando se cierre, con el resumen del episodio (duración, valor extremo y lecturas fuera) & [PO] & C5 & \textbf{M} \\
-\textbf{RF-37} & El sistema debe permitir \textbf{configurar los destinatarios} de notificación por sitio & [PO] & C4 & \textbf{S} \\
+\textbf{RF-36} & El sistema debe \textbf{notificar} cuando se abra una condición de severidad configurada como notificable, y cuando se cierre, con el resumen del episodio (duración, valor extremo y lecturas fuera) & [PO] [ENT] & C5 & \textbf{M} \\
+\textbf{RF-37} & El sistema debe permitir \textbf{configurar los destinatarios} de notificación por sitio & [PO] [ENT] & C4 & \textbf{S} \\
 \textbf{RF-38} & El sistema debe \textbf{agrupar notificaciones repetidas} del mismo dispositivo en una ventana temporal, para evitar saturación & [BT] & C5 & \textbf{S} \\
 \textbf{RF-39} & El sistema debe permitir \textbf{reconocer una alerta}, registrando quién, cuándo y qué fue (real, falso positivo o mantenimiento no avisado) & [BT] & C5 & \textbf{C} \\
 \end{longtable}
@@ -79,10 +79,10 @@ Catálogo actualizado al pivote del 2 de septiembre (contrato SenML sobre MQTT).
 \begin{longtable}{@{}C{1.3cm}L{6.1cm}L{1.6cm}L{1.2cm}C{0.7cm}@{}}
 \filaencab \encab{ID} & \encab{Requerimiento} & \encab{Fuente} & \encab{Causa} & \encab{Pr.} \\ \midrule \endhead
 \textbf{RF-40} & El sistema debe \textbf{autenticar toda recepción} mediante credencial por sitio, rechazando mensajes sin credencial válida & [BT] & C1 & \textbf{M} \\
-\textbf{RF-41} & El sistema debe \textbf{aislar los datos entre sitios}: ningún usuario de un sitio puede acceder a datos de otro & [BT] [DP] & C3 & \textbf{M} \\
+\textbf{RF-41} & El sistema debe \textbf{aislar los datos entre sitios}: ningún usuario de un sitio puede acceder a datos de otro & [BT] [DP] [ENT] & C3 & \textbf{M} \\
 \textbf{RF-42} & El sistema debe \textbf{cifrar el transporte} de toda comunicación externa: TLS para HTTP y MQTT (la rama LoRaWAN trae AES-128 de fábrica) & [BT] & C1 & \textbf{M} \\
-\textbf{RF-43} & El sistema debe \textbf{autenticar a los usuarios} de la interfaz de administración con credenciales individuales & [BT] & C4 & \textbf{M} \\
-\textbf{RF-44} & El sistema debe distinguir al menos \textbf{dos roles}: administrador del sitio y usuario de consulta & [PO] & C4 & \textbf{S} \\
+\textbf{RF-43} & El sistema debe \textbf{autenticar a los usuarios} de la interfaz de administración con credenciales individuales & [BT] [ENT] & C4 & \textbf{M} \\
+\textbf{RF-44} & El sistema debe distinguir al menos \textbf{dos roles}: administrador del sitio y usuario de consulta & [PO] [ENT] & C4 & \textbf{S} \\
 \textbf{RF-45} & El sistema debe permitir \textbf{rotar las credenciales de recepción} de un sitio sin interrumpir el servicio & [BT] & C1 & \textbf{C} \\
 \textbf{RF-46} & El sistema debe \textbf{registrar en bitácora} los accesos y las operaciones sensibles & [BT] & C5 & \textbf{S} \\
 \end{longtable}
@@ -90,10 +90,10 @@ Catálogo actualizado al pivote del 2 de septiembre (contrato SenML sobre MQTT).
 \section{M8 --- Interfaz de administración}
 \begin{longtable}{@{}C{1.3cm}L{6.1cm}L{1.6cm}L{1.2cm}C{0.7cm}@{}}
 \filaencab \encab{ID} & \encab{Requerimiento} & \encab{Fuente} & \encab{Causa} & \encab{Pr.} \\ \midrule \endhead
-\textbf{RF-47} & La interfaz debe presentar el \textbf{inventario de dispositivos} con su estado y transporte de llegada, filtrable por sitio, zona y estado & [PO] & C4 & \textbf{M} \\
-\textbf{RF-48} & La interfaz debe presentar el \textbf{panel de salud del sitio} con semáforo por dispositivo & [PO] & C5 & \textbf{M} \\
+\textbf{RF-47} & La interfaz debe presentar el \textbf{inventario de dispositivos} con su estado y transporte de llegada, filtrable por sitio, zona y estado & [PO] [ENT] & C4 & \textbf{M} \\
+\textbf{RF-48} & La interfaz debe presentar el \textbf{panel de salud del sitio} con semáforo por dispositivo & [PO] [ENT] & C5 & \textbf{M} \\
 \textbf{RF-49} & La interfaz debe presentar el \textbf{detalle de un dispositivo}: identidad, condiciones abiertas, historial de eventos y serie de mediciones & [PO] & C4 & \textbf{M} \\
-\textbf{RF-50} & La interfaz debe ofrecer el \textbf{asistente de registro} de un dispositivo nuevo & [PO] & C4 & \textbf{M} \\
+\textbf{RF-50} & La interfaz debe ofrecer el \textbf{asistente de registro} de un dispositivo nuevo & [PO] [ENT] & C4 & \textbf{M} \\
 \textbf{RF-51} & La interfaz debe presentar la \textbf{vista agrupada por transporte de red}, mostrando cuántos dispositivos llegan por cada tecnología & [PO] [DP] & C1, C2 & \textbf{S} \\
 \textbf{RF-52} & La interfaz debe ser \textbf{utilizable desde un navegador móvil} & [EM] & C4 & \textbf{S} \\
 \end{longtable}
@@ -110,9 +110,9 @@ Catálogo actualizado al pivote del 2 de septiembre (contrato SenML sobre MQTT).
 \textbf{RNF-07} & La indisponibilidad de un adaptador de transporte \textbf{no debe afectar} la recepción por los demás & Prueba de aislamiento de fallas & [DP] & \textbf{S} \\
 \textbf{RNF-08} & Ninguna credencial debe almacenarse en texto claro, ni en base de datos ni en el repositorio de código & Inspección y revisión del repositorio & [BT] & \textbf{M} \\
 \textbf{RNF-09} & Los dispositivos IoT deben poder residir en un \textbf{segmento de red separado} del segmento de usuarios, con acceso restringido solo a los puertos de recepción & Diseño de red verificado y documentado & [BT] & \textbf{M} \\
-\textbf{RNF-10} & El sistema \textbf{no debe requerir puertos entrantes abiertos hacia los dispositivos}: la conexión siempre se inicia desde el dispositivo hacia la plataforma & Revisión de arquitectura & [BT] & \textbf{M} \\
+\textbf{RNF-10} & El sistema \textbf{no debe requerir puertos entrantes abiertos hacia los dispositivos}: la conexión siempre se inicia desde el dispositivo hacia la plataforma & Revisión de arquitectura & [BT] [ENT] & \textbf{M} \\
 \textbf{RNF-11} & El código debe residir en un \textbf{repositorio git} con mensajes de commit descriptivos en la totalidad de ellos & Inspección del historial & [BT] & \textbf{M} \\
-\textbf{RNF-12} & Añadir un \textbf{transporte nuevo} debe requerir implementar solo un adaptador, sin modificar el núcleo de normalización & Revisión de diseño y prueba de extensión & [DP] & \textbf{M} \\
+\textbf{RNF-12} & Añadir un \textbf{transporte nuevo} debe requerir implementar solo un adaptador, sin modificar el núcleo de normalización & Revisión de diseño y prueba de extensión & [DP] [ENT] & \textbf{M} \\
 \textbf{RNF-13} & La especificación del protocolo debe estar \textbf{documentada de forma independiente} de la implementación & Existencia del documento & [PO] & \textbf{M} \\
 \textbf{RNF-14} & El sistema debe poder \textbf{desplegarse completo en un único servidor} con recursos modestos, sin dependencia de servicios propietarios de nube & Despliegue verificado en máquina local & [PO] & \textbf{M} \\
 \textbf{RNF-15} & El sistema debe construirse \textbf{exclusivamente con componentes de código abierto}, sin licencias de pago & Inventario de dependencias & [PO] & \textbf{M} \\

@@ -31,7 +31,7 @@
 
 ## 1.1 Fuentes utilizadas
 
-Cada requerimiento declara su origen. Se emplean cuatro tipos de fuente, con distinto peso probatorio:
+Cada requerimiento declara su origen. Se emplean cinco tipos de fuente, con distinto peso probatorio:
 
 | Código | Fuente | Peso probatorio |
 |---|---|---|
@@ -39,7 +39,12 @@ Cada requerimiento declara su origen. Se emplean cuatro tipos de fuente, con dis
 | **[EM]** | **Estudio de mercado** — análisis de la oferta regional (IoT3, ControlTec) y del sector de alarmas monitoreadas | Medio-alto: evidencia de lo que el mercado cubre y no cubre |
 | **[BT]** | **Base teórica** — estándares (SIA DC-05, DC-09, LoRaWAN RP002, ISO/IEC 25010, RFC 8428) y literatura técnica | Alto para requerimientos técnicos |
 | **[DP]** | **Derivación del problema** — consecuencia lógica de una causa identificada en `docs/01-problema-y-objetivos.md` | Medio: requiere que la causa esté bien fundada |
+| **[ENT]** | **Entrevista directa** — declaraciones de partes interesadas registradas con la plantilla de `docs/03 §3`: `bitacora/2026-10-05-entrevista-academico-geologia.md` y `bitacora/2026-10-25-entrevista-operador-red.md` | Alto: necesidad declarada por quien usará u opera el sistema |
 
+> ✅ **Brecha cerrada el 25/10/2026** con dos entrevistas (5/10, Académico/Investigador en Ingeniería Civil Geológica; 25/10,
+> operador de la red LoRaWAN del campus): **[ENT]** queda marcada en los 26 requerimientos que alguna valida (24 funcionales y RNF-10
+> y RNF-12). Lo que amplían va a la Etapa 4 (`docs/04 §8`). Texto original de la brecha, conservado:
+>
 > 🔴 **Brecha declarada.** Falta la fuente **[ENT]** — entrevistas directas a las partes interesadas.
 > Las entrevistas al responsable técnico de los sensores de la universidad están pendientes. Hasta
 > obtenerlas, los requerimientos marcados **[PO]** se sustentan en la indicación transmitida por el
@@ -81,14 +86,14 @@ Cada requerimiento declara su origen. Se emplean cuatro tipos de fuente, con dis
 | ID | Requerimiento | Fuente | Causa | Prior. |
 |---|---|---|---|:---:|
 | **RF-01** | El sistema debe exponer un punto de recepción **HTTP** que acepte tramas de medición en **SenML (RFC 8428)** | [PO] [BT] | C1 | **M** |
-| **RF-02** | El sistema debe poder recibir mediciones de la **rama LoRaWAN** a través del servidor de red, que las publica en MQTT (obligatoria desde el 08/10/2026: ruta B, pasarela con servidor de red embebido) | [PO] [BT] | C1, C2 | **M** |
-| **RF-03** | El sistema debe recibir eventos publicados en un **broker MQTT**, suscribiéndose a los tópicos configurados por sitio | [PO] | C1, C2 | **M** |
-| **RF-04** | El sistema debe admitir **adaptadores de formato por fuente** que traduzcan al modelo interno tramas que no lleguen en SenML, sin modificar el núcleo | [EM] [BT] | C2 | **S** |
+| **RF-02** | El sistema debe poder recibir mediciones de la **rama LoRaWAN** a través del servidor de red, que las publica en MQTT (obligatoria desde el 08/10/2026: ruta B, pasarela con servidor de red embebido) | [PO] [BT] [ENT] | C1, C2 | **M** |
+| **RF-03** | El sistema debe recibir eventos publicados en un **broker MQTT**, suscribiéndose a los tópicos configurados por sitio | [PO] [ENT] | C1, C2 | **M** |
+| **RF-04** | El sistema debe admitir **adaptadores de formato por fuente** que traduzcan al modelo interno tramas que no lleguen en SenML, sin modificar el núcleo | [EM] [BT] [ENT] | C2 | **S** |
 | **RF-05** | El sistema debe **validar cada trama** contra el esquema SenML y contra el registro del dispositivo, rechazando las inválidas sin contaminar las series | [BT] | C1 | **M** |
 | **RF-06** | El sistema debe **confirmar la recepción** al emisor: nivel de QoS acordado en MQTT y código de respuesta en HTTP | [BT] | C1 | **M** |
-| **RF-07** | El sistema debe **poner en cuarentena** las tramas rechazadas —crudas, con su motivo— y registrar los intentos de dispositivos desconocidos | [DP] | C5 | **S** |
+| **RF-07** | El sistema debe **poner en cuarentena** las tramas rechazadas —crudas, con su motivo— y registrar los intentos de dispositivos desconocidos | [DP] [ENT] | C5 | **S** |
 | **RF-08** | El sistema debe aceptar **múltiples mediciones por trama** (lista SenML con nombre, valor, unidad y tiempo por medición) | [BT] | C1 | **M** |
-| **RF-09** | El sistema debe **preservar los metadatos del transporte** de cada recepción (RSSI, SNR, gateway, identificador del nodo) asociándolos al evento | [BT] [DP] | C5 | **M** |
+| **RF-09** | El sistema debe **preservar los metadatos del transporte** de cada recepción (RSSI, SNR, gateway, identificador del nodo) asociándolos al evento | [BT] [DP] [ENT] | C5 | **M** |
 | **RF-10** | El sistema debe **descartar duplicados** cuando el mismo evento llegue por más de un camino o gateway | [BT] | C1 | **S** |
 
 **Justificación ampliada de RF-04.** Es el requerimiento que distingue la solución de la oferta
@@ -107,8 +112,8 @@ entre pasarelas que oyen el mismo uplink la hace el servidor de red (`docs/10 §
 | ID | Requerimiento | Fuente | Causa | Prior. |
 |---|---|---|---|:---:|
 | **RF-11** | El sistema debe **normalizar toda trama aceptada al modelo interno único** (dispositivo, magnitud, unidad, valor, marca temporal), venga de la vía y formato que venga | [PO] [BT] | C1 | **M** |
-| **RF-12** | El sistema debe mantener **condiciones abiertas y cerradas** por dispositivo: el cruce de umbral abre la condición y la vuelta al rango la cierra | [BT] | C1, C5 | **M** |
-| **RF-13** | El sistema debe **generar eventos por umbral** cuando una medición cruce un límite configurado | [PO] | C1 | **M** |
+| **RF-12** | El sistema debe mantener **condiciones abiertas y cerradas** por dispositivo: el cruce de umbral abre la condición y la vuelta al rango la cierra | [BT] [ENT] | C1, C5 | **M** |
+| **RF-13** | El sistema debe **generar eventos por umbral** cuando una medición cruce un límite configurado | [PO] [ENT] | C1 | **M** |
 | **RF-14** | El sistema debe permitir **configurar umbrales de disparo y de restauración por dispositivo**, con banda de histéresis para evitar oscilación y un retardo de activación opcional contra picos aislados (0 por defecto) | [BT] | C5 | **S** |
 | **RF-15** | El sistema debe **correlacionar eventos con telemetría** mediante el identificador del dispositivo (`bn` / `id_fisico`) y la marca temporal, para reconstruir el contexto de un evento | [DP] | C1 | **S** |
 | **RF-16** | El sistema debe **normalizar las marcas temporales** a un huso único, tolerando que el nodo no disponga de reloj confiable y usando la hora de recepción cuando corresponda | [BT] | C1 | **M** |
@@ -119,7 +124,7 @@ entre pasarelas que oyen el mismo uplink la hace el servidor de red (`docs/10 §
 | ID | Requerimiento | Fuente | Causa | Prior. |
 |---|---|---|---|:---:|
 | **RF-18** | El sistema debe mantener un **inventario de dispositivos** con tipo, ubicación, sitio, zona lógica, transporte de llegada y estado | [PO] | C4, C5 | **M** |
-| **RF-19** | El sistema debe permitir **registrar un dispositivo nuevo** asignándole su identificador físico, credencial y canales, sin intervenir la consola del servidor de red | [PO] [EM] | C4 | **M** |
+| **RF-19** | El sistema debe permitir **registrar un dispositivo nuevo** asignándole su identificador físico, credencial y canales, sin intervenir la consola del servidor de red | [PO] [EM] [ENT] | C4 | **M** |
 | **RF-20** | El sistema debe **rechazar el registro** de un dispositivo cuyo identificador físico ya exista | [BT] | C1 | **S** |
 | **RF-21** | El sistema debe permitir **agrupar dispositivos por sitio y por zona lógica**, y presentar la vista agrupada | [PO] | C4 | **M** |
 | **RF-22** | El sistema debe permitir **marcar un dispositivo en mantenimiento**, suprimiendo sus alertas y dejando registro del período | [BT] | C5 | **C** |
@@ -129,13 +134,13 @@ entre pasarelas que oyen el mismo uplink la hace el servidor de red (`docs/10 §
 
 | ID | Requerimiento | Fuente | Causa | Prior. |
 |---|---|---|---|:---:|
-| **RF-24** | El sistema debe **detectar la pérdida de comunicación** de un dispositivo cuando no reporte durante un número configurable de intervalos, y abrir la condición correspondiente | [PO] [BT] | **C5** | **M** |
-| **RF-25** | El sistema debe **detectar la restauración** del dispositivo y cerrar la condición, registrando la duración de la interrupción | [BT] | C5 | **M** |
+| **RF-24** | El sistema debe **detectar la pérdida de comunicación** de un dispositivo cuando no reporte durante un número configurable de intervalos, y abrir la condición correspondiente | [PO] [BT] [ENT] | **C5** | **M** |
+| **RF-25** | El sistema debe **detectar la restauración** del dispositivo y cerrar la condición, registrando la duración de la interrupción | [BT] [ENT] | C5 | **M** |
 | **RF-26** | El sistema debe registrar la **última vez que se recibió** comunicación de cada dispositivo | [PO] | C5 | **M** |
-| **RF-27** | El sistema debe **presentar la calidad del enlace** por dispositivo (RSSI, SNR y porcentaje de recepción) cuando el transporte la provea | [BT] | C5 | **M** |
-| **RF-28** | El sistema debe **procesar lecturas de batería bajo el umbral configurado** (magnitud `bateria`) y exponer los dispositivos que requieren mantenimiento | [PO] [BT] | C5 | **M** |
+| **RF-27** | El sistema debe **presentar la calidad del enlace** por dispositivo (RSSI, SNR y porcentaje de recepción) cuando el transporte la provea | [BT] [ENT] | C5 | **M** |
+| **RF-28** | El sistema debe **procesar lecturas de batería bajo el umbral configurado** (magnitud `bateria`) y exponer los dispositivos que requieren mantenimiento | [PO] [BT] [ENT] | C5 | **M** |
 | **RF-29** | El sistema debe **aprovechar el *keep-alive* y el *Last Will* de MQTT** como evidencia de conexión y aviso inmediato de desconexión | [BT] | C5 | **M** |
-| **RF-30** | El sistema debe presentar un **indicador agregado de salud por sitio**: total de dispositivos, en línea, con condición abierta y sin supervisión | [PO] | C4, C5 | **M** |
+| **RF-30** | El sistema debe presentar un **indicador agregado de salud por sitio**: total de dispositivos, en línea, con condición abierta y sin supervisión | [PO] [ENT] | C4, C5 | **M** |
 
 **Justificación ampliada del módulo M4.** Responde directamente a la causa C5. (En la Etapa 1 se justificó
 además como diferencia frente a la oferta regional; no lo es frente a todos los competidores: ThingsBoard, por
@@ -148,10 +153,10 @@ módulo salvo uno son *Must*.
 
 | ID | Requerimiento | Fuente | Causa | Prior. |
 |---|---|---|---|:---:|
-| **RF-31** | El sistema debe **almacenar de forma persistente** todo evento aceptado, conservando el mensaje original íntegro junto a su interpretación | [BT] [DP] | C1 | **M** |
+| **RF-31** | El sistema debe **almacenar de forma persistente** todo evento aceptado, conservando el mensaje original íntegro junto a su interpretación | [BT] [DP] [ENT] | C1 | **M** |
 | **RF-32** | El sistema debe **almacenar series de tiempo** de telemetría con valor, unidad y marca temporal | [PO] | C1 | **M** |
-| **RF-33** | El sistema debe permitir **consultar el historial** de eventos y mediciones de un dispositivo en un rango de fechas | [PO] | C4 | **M** |
-| **RF-34** | El sistema debe permitir **exportar** los datos de un sitio en formatos abiertos (CSV, XLSX y JSON) | [PO] [EM] | **C3, C5** | **M** |
+| **RF-33** | El sistema debe permitir **consultar el historial** de eventos y mediciones de un dispositivo en un rango de fechas | [PO] [ENT] | C4 | **M** |
+| **RF-34** | El sistema debe permitir **exportar** los datos de un sitio en formatos abiertos (CSV, XLSX y JSON) | [PO] [EM] [ENT] | **C3, C5** | **M** |
 | **RF-35** | El sistema debe exponer una **API de consulta** que permita a sistemas externos acceder a los datos del sitio | [PO] | C3 | **S** |
 
 **Justificación ampliada de RF-34.** La exportación en formato abierto no es una comodidad: es el
@@ -163,8 +168,8 @@ resolver. Es *Must* por coherencia con la propuesta de valor.
 
 | ID | Requerimiento | Fuente | Causa | Prior. |
 |---|---|---|---|:---:|
-| **RF-36** | El sistema debe **notificar** cuando se abra una condición de severidad configurada como notificable, y cuando se cierre, con el resumen del episodio (duración, valor extremo y lecturas fuera) | [PO] | C5 | **M** |
-| **RF-37** | El sistema debe permitir **configurar los destinatarios** de notificación por sitio | [PO] | C4 | **S** |
+| **RF-36** | El sistema debe **notificar** cuando se abra una condición de severidad configurada como notificable, y cuando se cierre, con el resumen del episodio (duración, valor extremo y lecturas fuera) | [PO] [ENT] | C5 | **M** |
+| **RF-37** | El sistema debe permitir **configurar los destinatarios** de notificación por sitio | [PO] [ENT] | C4 | **S** |
 | **RF-38** | El sistema debe **agrupar notificaciones repetidas** del mismo dispositivo en una ventana temporal, para evitar saturación | [BT] | C5 | **S** |
 | **RF-39** | El sistema debe permitir **reconocer una alerta**, registrando quién, cuándo y qué fue (real, falso positivo o mantenimiento no avisado) | [BT] | C5 | **C** |
 
@@ -173,10 +178,10 @@ resolver. Es *Must* por coherencia con la propuesta de valor.
 | ID | Requerimiento | Fuente | Causa | Prior. |
 |---|---|---|---|:---:|
 | **RF-40** | El sistema debe **autenticar toda recepción** mediante credencial por sitio, rechazando mensajes sin credencial válida | [BT] | C1 | **M** |
-| **RF-41** | El sistema debe **aislar los datos entre sitios**: ningún usuario de un sitio puede acceder a datos de otro | [BT] [DP] | C3 | **M** |
+| **RF-41** | El sistema debe **aislar los datos entre sitios**: ningún usuario de un sitio puede acceder a datos de otro | [BT] [DP] [ENT] | C3 | **M** |
 | **RF-42** | El sistema debe **cifrar el transporte** de toda comunicación externa: TLS para HTTP y MQTT (la rama LoRaWAN trae AES-128 de fábrica) | [BT] | C1 | **M** |
-| **RF-43** | El sistema debe **autenticar a los usuarios** de la interfaz de administración con credenciales individuales | [BT] | C4 | **M** |
-| **RF-44** | El sistema debe distinguir al menos **dos roles**: administrador del sitio y usuario de consulta | [PO] | C4 | **S** |
+| **RF-43** | El sistema debe **autenticar a los usuarios** de la interfaz de administración con credenciales individuales | [BT] [ENT] | C4 | **M** |
+| **RF-44** | El sistema debe distinguir al menos **dos roles**: administrador del sitio y usuario de consulta | [PO] [ENT] | C4 | **S** |
 | **RF-45** | El sistema debe permitir **rotar las credenciales de recepción** de un sitio sin interrumpir el servicio | [BT] | C1 | **C** |
 | **RF-46** | El sistema debe **registrar en bitácora** los accesos y las operaciones sensibles | [BT] | C5 | **S** |
 
@@ -184,10 +189,10 @@ resolver. Es *Must* por coherencia con la propuesta de valor.
 
 | ID | Requerimiento | Fuente | Causa | Prior. |
 |---|---|---|---|:---:|
-| **RF-47** | La interfaz debe presentar el **inventario de dispositivos** con su estado y transporte de llegada, filtrable por sitio, zona y estado | [PO] | C4 | **M** |
-| **RF-48** | La interfaz debe presentar el **panel de salud del sitio** con semáforo por dispositivo | [PO] | C5 | **M** |
+| **RF-47** | La interfaz debe presentar el **inventario de dispositivos** con su estado y transporte de llegada, filtrable por sitio, zona y estado | [PO] [ENT] | C4 | **M** |
+| **RF-48** | La interfaz debe presentar el **panel de salud del sitio** con semáforo por dispositivo | [PO] [ENT] | C5 | **M** |
 | **RF-49** | La interfaz debe presentar el **detalle de un dispositivo**: identidad, condiciones abiertas, historial de eventos y serie de mediciones | [PO] | C4 | **M** |
-| **RF-50** | La interfaz debe ofrecer el **asistente de registro** de un dispositivo nuevo | [PO] | C4 | **M** |
+| **RF-50** | La interfaz debe ofrecer el **asistente de registro** de un dispositivo nuevo | [PO] [ENT] | C4 | **M** |
 | **RF-51** | La interfaz debe presentar la **vista agrupada por transporte de red**, mostrando cuántos dispositivos llegan por cada tecnología | [PO] [DP] | C1, C2 | **S** |
 | **RF-52** | La interfaz debe ser **utilizable desde un navegador móvil** | [EM] | C4 | **S** |
 
@@ -237,7 +242,7 @@ Clasificados según las características de calidad de **ISO/IEC 25010**.
 |---|---|---|---|:---:|
 | **RNF-08** | Ninguna credencial debe almacenarse en texto claro, ni en base de datos ni en el repositorio de código | Inspección y revisión del repositorio | [BT] | **M** |
 | **RNF-09** | Los dispositivos IoT deben poder residir en un **segmento de red separado** del segmento de usuarios, con acceso restringido solo a los puertos de recepción | Diseño de red verificado y documentado | [BT] | **M** |
-| **RNF-10** | El sistema **no debe requerir puertos entrantes abiertos hacia los dispositivos**: la conexión siempre se inicia desde el dispositivo hacia la plataforma | Revisión de arquitectura | [BT] | **M** |
+| **RNF-10** | El sistema **no debe requerir puertos entrantes abiertos hacia los dispositivos**: la conexión siempre se inicia desde el dispositivo hacia la plataforma | Revisión de arquitectura | [BT] [ENT] | **M** |
 
 **Justificación de RNF-09 y RNF-10.** Son los dos requerimientos que anclan el trabajo al enfoque de
 redes del profesor guía. RNF-10 en particular resuelve el problema de alcanzabilidad de dispositivos
@@ -251,7 +256,7 @@ la red corporativa.
 | ID | Requerimiento | Métrica de verificación | Fuente | Prior. |
 |---|---|---|---|:---:|
 | **RNF-11** | El código debe residir en un **repositorio git** con mensajes de commit descriptivos en la totalidad de ellos | Inspección del historial | [BT] | **M** |
-| **RNF-12** | Añadir un **transporte nuevo** debe requerir implementar solo un adaptador, sin modificar el núcleo de normalización | Revisión de diseño y prueba de extensión | [DP] | **M** |
+| **RNF-12** | Añadir un **transporte nuevo** debe requerir implementar solo un adaptador, sin modificar el núcleo de normalización | Revisión de diseño y prueba de extensión | [DP] [ENT] | **M** |
 | **RNF-13** | La especificación del protocolo debe estar **documentada de forma independiente** de la implementación | Existencia del documento | [PO] | **M** |
 
 **Justificación de RNF-12.** Es la traducción arquitectónica de la indicación del profesor guía de no

@@ -87,6 +87,9 @@ sensores desplegados y requiere un destino para sus datos: una API a la cual env
 plataforma desde la cual administrarlos. Esta necesidad, manifestada por el profesor guía en la
 reunión del 17 de agosto de 2026, constituye la solicitud que origina el proyecto.
 
+> ✅ **Actualización 25/10/2026:** la percepción directa quedó registrada en dos entrevistas (sección 1.6 y `docs/03 §1`). Texto
+> original:
+>
 > ⚠️ **Pendiente de completar:** esta sección debe incorporar la **percepción directa de las partes
 > interesadas** —la rúbrica lo exige literalmente— mediante entrevistas al responsable de los
 > sensores de la universidad. Ver sección 1.6.
@@ -120,12 +123,14 @@ de proponer un formato nuevo.
 
 | Parte interesada | Rol | Interés en el problema | Estado del levantamiento |
 |---|---|---|---|
-| **Universidad Católica de Temuco** | Propietaria del proyecto | Enviar los datos de sus sensores a una API y administrarlos | ⚠️ Entrevista pendiente |
-| **Responsable técnico de los sensores** | Usuario administrador | Saber qué dispositivos hay, si reportan y cómo incorporar uno nuevo | ⚠️ Por identificar |
-| **Usuario operativo** | Consumidor de la información | Consultar mediciones y recibir alertas | ⚠️ Por identificar |
+| **Universidad Católica de Temuco** | Propietaria del proyecto | Enviar los datos de sus sensores a una API y administrarlos | 🟡 Solicitud transmitida por el profesor guía; sin entrevista institucional |
+| **Responsable técnico de los sensores** | Usuario administrador | Saber qué dispositivos hay, si reportan y cómo incorporar uno nuevo | ✅ Entrevistado el 25/10 un perfil equivalente: el operador de la red LoRaWAN del campus (`bitacora/2026-10-25-entrevista-operador-red.md`) |
+| **Usuario operativo** | Consumidor de la información | Consultar mediciones y recibir alertas | ✅ Entrevistado el 5/10: Académico/Investigador en Ingeniería Civil Geológica (`bitacora/2026-10-05-entrevista-academico-geologia.md`) |
 | Pymes productivas de la región *(contexto regional, fuera de la validación desde el 21/09)* | Generalización posible | Aprovechar sensores ya adquiridos sin rehacer la inversión | No se valida en este trabajo |
 | **Profesor guía (Mario)** | Supervisor académico | Rigor metodológico y enfoque en redes | Reunión del 17/08/2026 registrada en `bitacora/` |
 
+> ✅ **Cerrada el 25/10/2026** con dos entrevistas (`docs/03 §1`). Texto original:
+>
 > 🔴 **Acción crítica de la semana:** identificar y entrevistar al responsable de los sensores de la
 > universidad. La rúbrica asigna el 10 % del criterio 1 a la validación del problema con las partes
 > interesadas, y el criterio 3 (45 %) exige «solicitudes del propietario del proyecto» como respaldo
@@ -229,8 +234,8 @@ Las cinco causas y los cinco efectos quedan cubiertos.
 | Sección | Estado |
 |---|---|
 | 1.1 – 1.4 Contexto, problema, causas y efectos | ✅ Completo |
-| 1.5 Justificación | 🟡 Falta la percepción directa de las partes interesadas |
-| 1.6 Partes interesadas | 🔴 Entrevistas pendientes |
+| 1.5 Justificación | ✅ Con la percepción directa de dos entrevistas (25/10) |
+| 1.6 Partes interesadas | ✅ Dos entrevistas (5/10 y 25/10) |
 | 1.7 Delimitación | ✅ Completo |
 | 2.2 – 2.3 Objetivos general y específicos | ✅ Completo, sujeto a validación del profesor guía |
 | 2.4 Matriz de trazabilidad | ✅ Completo |

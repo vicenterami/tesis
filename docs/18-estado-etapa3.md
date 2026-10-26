@@ -9,9 +9,9 @@
 
 | Criterio de la rúbrica | Peso | Estado | Evidencia y lo que falta |
 |---|---|---|---|
-| Retroalimentación | 20 % | 🟡 | Al 15/10 no hay observaciones escritas del profesor guía sobre la entrega del 2/10; se le pedirán en una reunión presencial la semana del 20/10. Sí se incorporó la entrevista del 5/10 (`bitacora/2026-10-05-entrevista-academico-geologia.md`) en las decisiones del 6 y del 8/10 (`docs/10 §8.4`). Falta: recibir e incorporar la retroalimentación de la Etapa 2. |
+| Retroalimentación | 20 % | 🟡 | Al 25/10 no hay observaciones escritas del profesor guía sobre la entrega del 2/10; se le pedirán en la presentación de avances de la semana del 26/10. Sí se incorporaron las entrevistas del 5/10 (`bitacora/2026-10-05-entrevista-academico-geologia.md`; decisiones del 6 y del 8/10, `docs/10 §8.4`) y del 25/10 (`bitacora/2026-10-25-entrevista-operador-red.md`; alta masiva al plan de la Etapa 4). Falta: recibir e incorporar la retroalimentación de la Etapa 2. |
 | Mejoras | 15 % | 🟢 | Decisiones de diseño del 6, 7 y 8/10 (`docs/10 §8.4`); proxy TLS (`docs/16 §9`); dependencias e imágenes sin vulnerabilidades altas o críticas corregibles (`docs/16 §12`). |
-| 50 % de la implementación | 10 % | 🟡 | Núcleo: 24 de 34 elementos hechos (122 de 168 h, 73 %) y 5 parciales (24 h: HU-02, HU-08, TT-12, TT-22 y TT-33). Todo el backlog: 36 de 66 (158 de 287 h, 55 %) y 13 parciales (55 h). Cifras calculadas desde las filas de `docs/04`, con los estados de `docs/12 §3`, de §2 y de la Etapa 1 (al final de §2). |
+| 50 % de la implementación | 10 % | 🟡 | Núcleo: 25 de 34 elementos hechos (126 de 168 h, 75 %) y 4 parciales (20 h: HU-02, HU-08, TT-12 y TT-22). Todo el backlog: 37 de 66 (162 de 287 h, 56 %) y 12 parciales (51 h). Cifras calculadas desde las filas de `docs/04`, con los estados de `docs/12 §3`, de §2 y de la Etapa 1 (al final de §2). |
 | Pruebas iniciales | 30 % | 🟢 | `docs/16`: emulador, carga (59,7 tramas/s sin pérdida), carreras, TLS, capacidad y picos, caídas con carga, dependencias e imágenes, LoRaWAN por pasarela en el banco (`docs/16 §31–§34`); 357 pruebas unitarias del backend y 107 del panel. Falta: la matriz formal del contrato de trama (TT-27) y el broker de producción en las caídas (`docs/16 §11`). |
 | Validación preliminar | 10 % | 🟡 | Sensor físico de extremo a extremo (TT-32): todas las piezas llegaron el 13/10, la placa se reconoció el 14/10 y la fase 1 se cerró el 19/10 con los tres sensores verificados (`docs/16 §43`) y la fase 2 publicó 24 h hasta el panel, sin pérdidas, el 23 y 24/10 (`docs/16 §53`); guía de manejo seguro escrita (`docs/17 §4`). **Validación en terreno hecha el 20/10: red LoRaWAN real del campus publicando en el sistema (`docs/16 §45`).** |
 | Documentación | 15 % | 🟡 | Documentos en concordancia (guardián `plataforma/pruebas/verificar-todo.sh`). El 15/10 el informe ganó el capítulo «Implementación y pruebas iniciales» y el anexo con el detalle de las pruebas (TT-36); falta incorporar la retroalimentación de la Etapa 2 y la revisión de entrega. |
@@ -48,8 +48,8 @@
 (`docs/16 §5`); TT-22 (TLS) 🟡: MQTT por el proxy, probado en el banco (`docs/16 §9`), y el canal en vivo por HTTPS (`docs/16 §14`); TT-30 (recuperación) 🟡: falta el
 broker de producción (`docs/16 §11`); HU-04 (adaptador de otro formato) 🟡: adaptador plano, se cierra con la trama real
 (`docs/12 §3`). **Pendiente de la Etapa 2, cerrado el 16/10:** HU-01 ✅: a la recepción por MQTT se suma la recepción por HTTP (RF-01),
-con los mismos filtros, token del alta y topes medidos (`docs/10 §8.4` punto 52, `docs/16 §41`). **Etapa 1:** TT-34 (documento de la etapa) ✅, entregado el 4/09; TT-33 (entrevistas) 🟡: una, el 5/10
-(`bitacora/2026-10-05-entrevista-academico-geologia.md`), falta consolidar; TT-38 (bitácora) 🟡: continua hasta la Etapa 4.
+con los mismos filtros, token del alta y topes medidos (`docs/10 §8.4` punto 52, `docs/16 §41`). **Etapa 1:** TT-34 (documento de la etapa) ✅, entregado el 4/09; TT-33 (entrevistas) ✅: dos, el 5/10
+(`bitacora/2026-10-05-entrevista-academico-geologia.md`) y el 25/10 (`bitacora/2026-10-25-entrevista-operador-red.md`), con la fuente `[ENT]` marcada en `docs/02`; TT-38 (bitácora) 🟡: continua hasta la Etapa 4.
 
 ## 3. ¿Cabe lo que falta? — medición y corte (decidido el 08/10)
 
@@ -70,7 +70,7 @@ vuelve a la Etapa 4 con su registro aquí y en `docs/04`.
 
 ## 4. Lo que frena hoy
 
-- La retroalimentación de la Etapa 2 todavía no llega; las consultas al profesor guía están listas para la reunión presencial de la semana del 20/10.
+- La retroalimentación de la Etapa 2 todavía no llega; se pedirá en la presentación de avances de la semana del 26/10.
 - El sensor de aire del nodo propio (BME280) tiene un contacto I2C intermitente desde el 24/10 (`docs/16 §53`): el nodo omite esas tres magnitudes y sigue publicando suelo y señal; falta revisar su cableado.
 - La recepción LoRaWAN en terreno (HU-02) necesita una pasarela que alcance el servidor (`docs/10 §8.4` punto 24); mientras
   tanto se prueba en el banco con el JSON exacto de las fuentes oficiales (`banco.sh lorawan`, `docs/16 §31`); la prueba en la misma red que la pasarela del campus está acordada para el martes 20/10 con el compañero a cargo; su pasarela es una UG65 con servidor embebido y dos nodos reportando cada 60 s, y el adaptador se ajusta antes a la forma real de su mensaje (`docs/10 §8.4` punto 47, nota del 15/10).
@@ -80,7 +80,7 @@ vuelve a la Etapa 4 con su registro aquí y en `docs/04`.
 El estado de cada elemento manda en §1 y §2; esta lista ordena lo que falta. El guardián (paso 2w5) comprueba que cada elemento
 siga sin terminar y que sus horas sean las de `docs/04`: un elemento que se cierra se quita de aquí en el mismo cambio.
 
-**Núcleo (🎯): 10 elementos, 46 h.** Cinco parciales y cinco sin empezar, en el orden de trabajo:
+**Núcleo (🎯): 9 elementos, 42 h.** Cuatro parciales y cinco sin empezar, en el orden de trabajo:
 
 | Orden | Elemento | Horas | Estado | Qué falta |
 |---|---|---|---|---|
@@ -88,12 +88,11 @@ siga sin terminar y que sus horas sean las de `docs/04`: un elemento que se cier
 | 2 | HU-08 Exportar en CSV, XLSX y JSON | 4 | 🟡 | XLSX y la exportación por sitio con rol: necesita la sesión (HU-18) |
 | 3 | TT-22 Cifrado del transporte | 4 | 🟡 | El broker de producción con certificado real (`docs/14`) |
 | 4 | TT-12 Catálogo de sensores y unidades | 6 | 🟡 | El catálogo editable con umbrales; con él, los alias de claves y los perfiles de decodificación (`docs/08 §8`) |
-| 5 | TT-33 Entrevistas | 4 | 🟡 | Más entrevistas: hay una (5/10) |
-| 6 | TT-21 Aislamiento entre sitios | 5 | ⬜ | Todo; necesita la sesión y los roles por sitio (`docs/20`) |
-| 7 | TT-27 Pruebas del contrato de trama | 5 | ⬜ | La matriz formal (esquema, cuarentena, adaptadores) |
-| 8 | HU-07 Historial por rango de fechas | 4 | ⬜ | Todo |
-| 9 | HU-15 Calidad del enlace | 4 | ⬜ | Todo; necesita tráfico LoRaWAN real (`rssi` y `snr` ya quedan en la trama cruda) |
-| 10 | HU-16 Indicador de salud del sitio | 4 | ⬜ | Todo |
+| 5 | TT-21 Aislamiento entre sitios | 5 | ⬜ | Todo; necesita la sesión y los roles por sitio (`docs/20`) |
+| 6 | TT-27 Pruebas del contrato de trama | 5 | ⬜ | La matriz formal (esquema, cuarentena, adaptadores) |
+| 7 | HU-07 Historial por rango de fechas | 4 | ⬜ | Todo |
+| 8 | HU-15 Calidad del enlace | 4 | ⬜ | Todo; necesita tráfico LoRaWAN real (`rssi` y `snr` ya quedan en la trama cruda) |
+| 9 | HU-16 Indicador de salud del sitio | 4 | ⬜ | Todo |
 
 El 1 suma 6 h y hasta el 30/10 caben unas 30 junto con el informe y la presentación. Del 2 en adelante, Etapa 4, en el orden de `docs/04 §8`. (HU-21, HU-20
 y HU-01 se cerraron el 16/10: `docs/16 §39`, §40 y §41; HU-19, el 24/10.)
@@ -108,7 +107,7 @@ y HU-01 se cerraron el 16/10: `docs/16 §39`, §40 y §41; HU-19, el 24/10.)
 | Pantallas para investigadores (exportación, series) y para quien solo observa | Entrevista del 5/10; `docs/19` | Parte hecha (P2, P3, exportación); el resto con la sesión |
 | Configuración por el usuario (umbrales, destinatarios de avisos) | HU-06, HU-25 | Sin código |
 | Envío HTTP desde la pasarela a un servidor propio | `docs/10 §8.4` punto 47 | Meta, cuando haya servidor |
-| Cargas masivas (alta de muchos dispositivos de una vez) | Sin elemento propio en el backlog | Se diseña y se agrega al backlog |
+| Cargas masivas (alta de muchos dispositivos de una vez) y bandeja de detectados | Entrevista del 25/10; bloque 2 de `docs/04 §8` (decidido el 25/10) | Por diseñar en la Etapa 4 |
 | Registros técnicos que no se pierden al recrear un contenedor, y catálogo de errores | `docs/11 §4` (rotación hecha) | Por diseñar |
 | Tope por emisor y tope de lecturas por trama | `docs/10 §8.4` punto 53, `docs/11 §3` | Hecho el 17/10: presupuesto de lecturas por hora y cuota de cuarentena en las tres vías, con contadores persistentes (migración 19) y condición `tope_superado` (`docs/16 §42`) |
 | Procesamiento en paralelo con comparación atómica del contador de trama | `docs/10 §4.1` | Por diseñar; hoy se procesa de a uno |
