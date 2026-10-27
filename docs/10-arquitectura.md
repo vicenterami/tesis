@@ -51,61 +51,53 @@ flowchart LR
 ```
 
 ```mermaid
+%%{init: {"themeVariables": {"fontSize": "24px"}, "flowchart": {"nodeSpacing": 16, "rankSpacing": 34, "wrappingWidth": 280, "subGraphTitleMargin": {"top": 8, "bottom": 22}}}}%%
 flowchart TB
-    subgraph CLI["Cliente"]
-        direction TB
-        U(["Usuario<br/>navegador"]) --- FE["Panel web<br/>Svelte + uPlot"]
+    subgraph CLI["Personas"]
+        U(["Navegador<br/>panel Svelte + uPlot"])
     end
-
-    subgraph TLS["Entran por TLS · cada uno con su credencial"]
-        direction LR
-        N2["Nodo Wi-Fi o celular<br/>MQTT directo"]
-        N3["Equipo que solo habla HTTP<br/>nodo 4G o sistema de terceros<br/>POST con token"]
+    N2["Nodo Wi-Fi o celular<br/>cliente MQTT"]
+        N3["Equipo que solo habla HTTP<br/>nodo 4G o sistema de terceros"]
         subgraph RB["Ruta B"]
             direction TB
-            NB["Nodos LoRa"] -- "radio LoRa" --> GB["Pasarela con servidor<br/>de red embebido"]
+            NB["Nodos LoRa"] -- "radio" --> GB["Pasarela con servidor<br/>de red embebido"]
         end
         subgraph RC["Ruta C · red del campus"]
             direction TB
-            NC["Nodos LoRa"] -- "radio LoRa" --> GC["Pasarela del campus"] -- "UDP 1700<br/>red del campus" --> NS["Servidor de red externo<br/>ChirpStack institucional"]
+            NC["Nodos LoRa"] -- "radio" --> GC["Pasarela del campus"] -- "UDP 1700" --> NS["Servidor de red externo<br/>ChirpStack"]
         end
-    end
-
-    subgraph RA["Ruta A · opcional"]
+    subgraph RA["Ruta A · opcional, sin TLS"]
         direction TB
-        NA["Nodos LoRa"] -- "radio LoRa" --> GA["Pasarela con<br/>packet forwarder"]
+        NA["Nodos LoRa"] -- "radio" --> GA["Pasarela con<br/>packet forwarder"]
     end
-
-    subgraph SRV["Servidor del sistema · contenedores Docker"]
+    subgraph SRV["Servidor del sistema · red interna Docker: solo el proxy publica puertos"]
         direction TB
-        RP["Proxy inverso · TLS<br/>único contenedor expuesto<br/>443 personas y HTTP de equipos · 8883 MQTT · 1700/udp solo ruta A"]
+        RP["Proxy inverso · termina TLS<br/>443 · 8883 · 1700/udp solo ruta A"]
         MQ["Mosquitto<br/>broker MQTT"]
-        subgraph BE["Backend · NestJS"]
+        CS["ChirpStack propio<br/>solo ruta A"]
+        subgraph BE["Backend NestJS · un solo puerto interno: 3000"]
             direction LR
-            M1["M1 Recepción<br/>suscriptor MQTT"] --> M2["M2 Normalización<br/>pipeline de 6 filtros"]
-            M2 --> M6["M6 Alertas<br/>umbrales, condiciones"] --> M4["M4 Supervisión<br/>de salud"]
-            M5["M5 Persistencia y consulta<br/>API REST + SSE"]
+            M1["M1 Recepción<br/>MQTT y POST /recepcion/{id}"] --> M2["M2 Pipeline<br/>de 6 filtros"] --> M6["M6 Alertas"] --> M4["M4 Supervisión"]
+            M5["M5 Consulta<br/>panel, API REST y SSE"]
         end
-        DB[("TimescaleDB<br/>series de tiempo + tablas relacionales")]
-        CS["ChirpStack propio<br/>solo ruta A (opcional)"]
+        DB[("TimescaleDB")]
     end
-
-    FE -- "HTTPS 443 · REST y SSE" --> RP
-    N2 -- "MQTT/TLS 8883" --> RP
-    N3 -- "HTTPS 443 · POST /recepcion/{id}" --> RP
-    GB -- "MQTT/TLS 8883" --> RP
-    GB -. "prevista: reporte HTTPS 443<br/>segundo destino de la pasarela" .-> RP
-    NS -- "MQTT/TLS 8883<br/>integración MQTT" --> RP
-    GA -. "UDP 1700 por Internet<br/>o la red del campus" .-> RP
-    RP -- "HTTP 3000 · red interna<br/>API, panel y SSE" --> M5
-    RP -- "HTTP 3000 · red interna<br/>POST /recepcion/{id} → filtro 1" --> M1
-    RP -- "MQTT 1883 · red interna" --> MQ
-    RP -. "UDP 1700 · red interna" .-> CS
-    CS -. "publica JSON decodificado" .-> MQ
+    U -- "HTTPS 443 · panel y API" --> RP
+    N2 -- "vía 1 · MQTT/TLS 8883" --> RP
+    N3 -- "vía 2 · HTTPS 443<br/>POST /recepcion/{id}" --> RP
+    GB -- "vía 3 · MQTT/TLS 8883" --> RP
+    NS -- "vía 3 · MQTT/TLS 8883" --> RP
+    GB -. "vía 4, prevista · HTTPS 443" .-> RP
+    GA -. "UDP 1700 · solo red local" .-> RP
+    RP -- "MQTT 1883" --> MQ
+    RP -- "HTTP 3000 · POST /recepcion/{id}" --> M1
+    RP -- "HTTP 3000 · /panel y la API<br/>/dispositivos, /eventos…" --> M5
+    RP -. "UDP 1700" .-> CS
+    CS -. "MQTT" .-> MQ
     MQ -- "suscripción sitio/#" --> M1
-    M2 -- "INSERT medicion" --> DB
-    M6 -- "condiciones, eventos" --> DB
-    M5 -- "SQL · time_bucket" --> DB
+    M2 -- "mediciones" --> DB
+    M6 -- "condiciones" --> DB
+    M5 -- "SQL" --> DB
     classDef opcional stroke-dasharray:6 4
     class CS,GA,NA opcional
 ```
