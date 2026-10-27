@@ -127,6 +127,41 @@
   \fuente{docs/10 §1 (vista resumida y vista de contenedores)}
 \end{frame}
 
+\begin{frame}{Cómo llega una trama: vías y rutas LoRaWAN}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.49\textwidth}
+      {\small\textbf{Vías}: por dónde viaja la trama}\par\smallskip
+      \footnotesize
+      \begin{tabular}{@{}L{0.55\linewidth}L{0.36\linewidth}@{}}
+        \toprule
+        Vía & Probada \\
+        \midrule
+        Dispositivo directo por MQTT/TLS (8883) & ESP32, 24 h \\
+        Dispositivo directo por HTTPS (443) & banco, 180 de 180 \\
+        Pasarela LoRaWAN por MQTT/TLS (8883) & UG65 del campus, 20/10 \\
+        \textit{Prevista:} pasarela por HTTPS (443) & Etapa 4 \\
+        \bottomrule
+      \end{tabular}
+    \end{column}
+    \begin{column}{0.49\textwidth}
+      {\small\textbf{Rutas LoRaWAN}: dónde corre el servidor de red}\par\smallskip
+      \footnotesize
+      \begin{tabular}{@{}L{0.16\linewidth}L{0.76\linewidth}@{}}
+        \toprule
+        Ruta & Servidor de red \\
+        \midrule
+        B & Embebido en la pasarela (UG65): \textbf{probada en campo} \\
+        C & Externo, como el ChirpStack del campus: probado su formato en el banco \\
+        A & ChirpStack propio en nuestro servidor: opcional \\
+        \bottomrule
+      \end{tabular}
+    \end{column}
+  \end{columns}
+  \bigskip
+  \small Las rutas B y C entran igual, por MQTT/TLS con credencial propia; solo cambia el adaptador.
+  \fuente{docs/10 §1 (vías dibujadas y rutas); docs/16 §45, §49 y §53}
+\end{frame}
+
 \begin{frame}{Cómo se trabajó}
   \begin{columns}[T,onlytextwidth]
     \begin{column}{0.62\textwidth}
