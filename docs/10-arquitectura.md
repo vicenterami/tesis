@@ -23,6 +23,33 @@ mostraba los sensores arriba. Se dibujan los módulos que tocan el dato (M1, M2,
 (aprovisionamiento), M7 (seguridad e identidad) y M8 (interfaz) no aparecen como cajas porque son
 transversales o viven en el cliente (`docs/02` §3).
 
+**Vista resumida** (26/10/2026, para presentar): el recorrido de una trama en una línea, sin las rutas LoRaWAN por separado. Resume la
+vista de contenedores que sigue y no agrega nada que esa vista no diga; si cambia una, cambia la otra.
+
+```mermaid
+%%{init: {"themeVariables": {"fontSize": "20px"}, "flowchart": {"nodeSpacing": 22, "rankSpacing": 46, "wrappingWidth": 260, "subGraphTitleMargin": {"top": 6, "bottom": 10}}}}%%
+flowchart LR
+    subgraph ORIGEN["Dispositivos"]
+        D1["Nodo Wi-Fi<br/>o celular"]
+        D2["Pasarela<br/>LoRaWAN"]
+        D3["Equipo HTTP"]
+    end
+    P(["Panel<br/>navegador"])
+    subgraph SRV["Servidor · contenedores Docker"]
+        RP["Proxy TLS<br/>8883 · 443"]
+        MQ["Broker<br/>Mosquitto"]
+        BE["Backend<br/>6 filtros"]
+        DB[("TimescaleDB<br/>mediciones y<br/>cuarentena")]
+    end
+    D1 -- "MQTT/TLS" --> RP
+    D2 -- "MQTT/TLS" --> RP
+    D3 -- "HTTPS" --> RP
+    P -- "HTTPS · REST y SSE" --> RP
+    RP --> MQ -- "sitio/#" --> BE
+    RP -- "HTTP" --> BE
+    BE --> DB
+```
+
 ```mermaid
 flowchart TB
     subgraph CLI["Cliente"]
@@ -251,7 +278,7 @@ persona y cifrado por SSH. Así se cumplen R1 y R2 del punto 44 sin exponer nada
    conexión: el proxy reenvía cada datagrama a ChirpStack y recuerda de quién vino para devolverle la respuesta.
 
 8. **Límite de tasa por dirección en el proxy (22/10/2026; `docs/11 §3`, `docs/16 §47`).** En el 443, `limit_req` de 100 peticiones/s con
-   ráfaga 200 para todo el tráfico (el doble de los 50 eventos/s de RNF-01, que una pasarela o un NAT puede enviar por HTTP desde una sola
+   ráfaga 200 para todo el tráfico (el doble de las 50 tramas/s de RNF-01, que una pasarela o un NAT puede enviar por HTTP desde una sola
    dirección) y de 5/s con ráfaga 10 para los métodos que escriben sobre `/dispositivos`, `/pasarelas` y `/canales` (frena también a quien intente
    adivinar la clave de administrador); el exceso recibe 429 y queda en el registro. En el 8883, `limit_conn` de 100 sesiones simultáneas por
    dirección (el doble de los 50 canales del caso de validación); la 101 se corta antes del saludo TLS. En HTTP, además, `limit_conn` de
@@ -756,7 +783,7 @@ mensajes en cola.
 broker conserva la cola mientras el backend está caído (§4.1); dos instancias con el mismo
 identificador se desconectarían mutuamente, y con identificadores distintos recibirían ambas todas las
 tramas. Dentro del servidor no hace falta más: Node delega la entrada y salida al núcleo del sistema,
-que sí es multihilo, y la carga de RNF-01 (50 eventos/s) se medirá en el banco de pruebas de `docs/09`
+que sí es multihilo, y la carga de RNF-01 (50 tramas/s) se medirá en el banco de pruebas de `docs/09`
 sobre esta única instancia. Si algún día hiciera falta repartir carga entre varias, el camino
 documentado es: suscripciones compartidas de MQTT 5 (`$share/<grupo>/sitio/#`, admitidas por
 Mosquitto) para que las instancias se repartan las tramas, y `cluster` o `worker_threads` de Node para
@@ -781,8 +808,12 @@ ocupar más núcleos. No está en el alcance de esta etapa: RNF-14 fija un únic
 | Histórico agregado con `time_bucket` + SSE del backend | RF-33, RNF-04 |
 | Límites de recursos por contenedor | RNF-17, protocolo de validación |
 
-> **Pendiente:** RF-29 (keep-alive y *Last Will* de MQTT) no está trazado porque el cliente MQTT del
-> backend aún no publica testamento (`will`); queda como brecha declarada hasta implementarlo (Etapa 3).
+> **Pendiente:** RF-29 (keep-alive y *Last Will* de MQTT) no está trazado: ni el firmware ni los demás dispositivos declaran
+> testamento (`will`) al conectar y el backend no escucha ningún tópico de testamentos. La caída se detecta por silencio (RF-24,
+> RNF-03), que vale para todas las vías; el testamento solo puede adelantar el aviso de quien tiene conexión MQTT propia, cuando
+> calla más de 1,5 veces su *keep-alive* (MQTT 5.0, apartado *Keep Alive*) o se cae sin `DISCONNECT`, y nunca de un nodo LoRaWAN tras su
+> pasarela ni de un equipo HTTP. Corregido el 26/10/2026: antes decía «el backend aún no publica testamento», que es otra cosa (el
+> testamento del propio backend). Se implementa en la Etapa 4 con la salud de los datos (bloque 3, `docs/04 §8`).
 
 ## 8. Propuestas abiertas y pendientes
 

@@ -163,7 +163,7 @@ En `/docs`:
 
 - Decir «datos de prueba» **antes** de que aparezca un número en pantalla, no después.
 - Decir «un solo dispositivo, publicado a mano»: la demo prueba el comportamiento, no la capacidad. La
-  carga con muchos nodos es TT-28 (emulador) y TT-29 (≥ 50 eventos/s), en la Etapa 4.
+  carga con muchos nodos es TT-28 (emulador) y TT-29 (≥ 50 tramas/s), en la Etapa 4.
 - Ensayar en voz alta la frase difícil (qué pasa si cae la base) hasta que salga sin titubear.
 - Tener lista la respuesta a «¿qué tan confiable es esto?» con el **límite real** (prototipo con un
   nodo, sin TLS aún, comparación con ThingsBoard pendiente para la Etapa 4), no con una defensa.

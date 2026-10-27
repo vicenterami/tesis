@@ -89,7 +89,7 @@ El arreglo tiene prueba unitaria en `alertas.service.spec.ts` y `supervision.ser
 
 | Requisito | Resultado preliminar | Observación |
 |---|---|---|
-| RNF-01: ≥ 50 eventos/s sin pérdida | ✅ 59,7 tramas/s sostenidas 90 s (119 lecturas/s), pico 74/s, 0 perdidas | En el portátil; la cola del broker nunca pasó de 52 mensajes |
+| RNF-01: ≥ 50 tramas/s sin pérdida | ✅ 59,7 tramas/s sostenidas 90 s (119 lecturas/s), pico 74/s, 0 perdidas | En el portátil; la cola del broker nunca pasó de 52 mensajes |
 | RNF-02: disponible para consulta ≤ 2 s (p95) | ✅ p95 de recepción 1 ms en paralelo, 3 ms de a uno; la confirmación (COMMIT) va a milisegundos de `recibido_en` | Sin red real ni TLS: en el servidor hay que repetirla |
 | RNF-03: detectar la pérdida de supervisión en ≤ 2 intervalos | ✅ detecta las caídas (3, 4 y 18 verdaderas) **pero con 52, 126 y 108 alarmas falsas** cuando el intervalo esperado se declara igual al periodo; con `intervalo = 2 × periodo` (corrida 4): 5 verdaderas y **3 falsas** | Ver §6.1: es cómo se declara el intervalo, no un error de código |
 | RNF-17: ≤ 2 GB de RAM | ✅ 174 MiB en total bajo carga (backend 53, base 118, broker 3) | Con los techos de producción activos |
@@ -1254,7 +1254,7 @@ La dirección 127.0.0.1 del propio contenedor (el chequeo de salud, cada 15 s) q
 
 | Control | Valor | Fundamento |
 |---|---|---|
-| `limit_req` general (443) | 100 r/s, ráfaga 200 sin espera | RNF-01 exige 50 eventos/s (`docs/02`). Por HTTP un NAT o una pasarela envía desde **una** dirección las tramas de todos sus dispositivos, y cada dispositivo manda a lo más 1 trama aceptada por segundo (`docs/10 §8.4` punto 52 e): 50 dispositivos detrás de una dirección dan 50 r/s. 100 r/s es el doble. La ráfaga de 200 son 4 s del ritmo de RNF-01: cubre la cola que los 50 canales reenvían tras una caída (`docs/02`, fundamento de RNF-01) y la carga de una pantalla del panel |
+| `limit_req` general (443) | 100 r/s, ráfaga 200 sin espera | RNF-01 exige 50 tramas/s (`docs/02`). Por HTTP un NAT o una pasarela envía desde **una** dirección las tramas de todos sus dispositivos, y cada dispositivo manda a lo más 1 trama aceptada por segundo (`docs/10 §8.4` punto 52 e): 50 dispositivos detrás de una dirección dan 50 r/s. 100 r/s es el doble. La ráfaga de 200 son 4 s del ritmo de RNF-01: cubre la cola que los 50 canales reenvían tras una caída (`docs/02`, fundamento de RNF-01) y la carga de una pantalla del panel |
 | `limit_req` de administración (443) | 5 r/s, ráfaga 10, solo `POST/PUT/PATCH/DELETE` sobre `/dispositivos`, `/pasarelas` y `/canales` | El backend ya admite a lo más 2 altas a la vez (`docs/10 §3`, 429); un lote de 10 seguidos cubre dar de alta un sitio a mano o con un guion, y quien intente adivinar `X-Clave-Admin` tiene a lo más 5 intentos por segundo y por dirección. La recepción (`POST /recepcion/{id}`) no entra: cuenta solo en la zona general |
 | `limit_conn` (8883) | 100 sesiones simultáneas por dirección | Cada nodo mantiene una sesión MQTT; el caso de validación tiene 50 canales (`docs/02`), a lo más 50 nodos de un canal tras un mismo NAT: el doble de holgura. Techo del proceso: `worker_connections 1024`, dos por sesión (cliente y broker) ≈ 512 por worker, así que una sola dirección no lo satura (hacen falta 6) |
 | `limit_conn` HTTP (443) | 100 peticiones en curso por dirección | Revisión del 22/10: `limit_req` cuenta inicios, no duración; sin esto una dirección abre 200 peticiones lentas y agota `worker_connections`. Mismo fundamento que el 8883 |

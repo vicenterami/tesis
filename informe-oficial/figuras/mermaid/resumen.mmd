@@ -1,0 +1,21 @@
+%%{init: {"themeVariables": {"fontSize": "20px"}, "flowchart": {"nodeSpacing": 22, "rankSpacing": 46, "wrappingWidth": 260, "subGraphTitleMargin": {"top": 6, "bottom": 10}}}}%%
+flowchart LR
+    subgraph ORIGEN["Dispositivos"]
+        D1["Nodo Wi-Fi<br/>o celular"]
+        D2["Pasarela<br/>LoRaWAN"]
+        D3["Equipo HTTP"]
+    end
+    P(["Panel<br/>navegador"])
+    subgraph SRV["Servidor · contenedores Docker"]
+        RP["Proxy TLS<br/>8883 · 443"]
+        MQ["Broker<br/>Mosquitto"]
+        BE["Backend<br/>6 filtros"]
+        DB[("TimescaleDB<br/>mediciones y<br/>cuarentena")]
+    end
+    D1 -- "MQTT/TLS" --> RP
+    D2 -- "MQTT/TLS" --> RP
+    D3 -- "HTTPS" --> RP
+    P -- "HTTPS · REST y SSE" --> RP
+    RP --> MQ -- "sitio/#" --> BE
+    RP -- "HTTP" --> BE
+    BE --> DB

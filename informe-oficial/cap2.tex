@@ -24,8 +24,10 @@ determinantes para este trabajo: \textbf{el dispositivo inicia la conexión sali
 lo que no se abren puertos hacia los sensores y el esquema funciona tras NAT (RNF-10); la
 \textbf{calidad de servicio} (\emph{Quality of Service}, QoS) tiene tres niveles integrados (a lo más
 una vez, al menos una vez, exactamente una vez), sin lógica de reintento propia; el \textbf{testamento} (\emph{Last Will}) hace
-que el broker publique un mensaje predefinido si el dispositivo se desconecta sin despedirse, con lo
-que la detección de caída resulta inmediata; y las \textbf{cabeceras de 2 bytes} responden la objeción
+que el broker publique un mensaje predefinido si el cliente se cae sin despedirse o calla más de 1,5 veces su
+\emph{keep-alive}: avisa antes que el silencio, pero solo de quien tiene conexión MQTT propia (no de un nodo
+LoRaWAN tras su pasarela ni de un equipo HTTP), así que aquí complementa la detección por silencio (RNF-03)
+y queda pendiente (RF-29); y las \textbf{cabeceras de 2 bytes} responden la objeción
 de sobrecarga. Se emplea \textbf{Mosquitto} como broker: implementación en C de consumo mínimo
 ($\sim$10\,MB), madura, con TLS y autenticación por cliente.
 

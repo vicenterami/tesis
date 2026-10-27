@@ -101,7 +101,7 @@ Catálogo actualizado al pivote del 2 de septiembre (contrato SenML sobre MQTT).
 \section{Requerimientos no funcionales}
 \begin{longtable}{@{}C{1.5cm}L{4.9cm}L{2.4cm}L{1.4cm}C{0.8cm}@{}}
 \filaencab \encab{ID} & \encab{Requerimiento} & \encab{Verificación} & \encab{Fuente} & \encab{Pr.} \\ \midrule \endhead
-\textbf{RNF-01} & El sistema debe sostener la recepción de \textbf{$\geq$ 50 eventos por segundo} sin pérdida & Prueba de carga con generador sintético & [DP] & \textbf{M} \\
+\textbf{RNF-01} & El sistema debe sostener la recepción de \textbf{$\geq$ 50 tramas por segundo} sin pérdida & Prueba de carga con generador sintético & [DP] & \textbf{M} \\
 \textbf{RNF-02} & El tiempo desde la recepción de un evento hasta su disponibilidad para consulta debe ser \textbf{$\leq$ 2 segundos} en el percentil 95 & Medición instrumentada & [DP] & \textbf{M} \\
 \textbf{RNF-03} & El sistema debe \textbf{detectar la pérdida de supervisión} de un dispositivo en \textbf{$\leq$ 2 intervalos} de reporte configurados & Prueba funcional con nodo silenciado & [PO] & \textbf{M} \\
 \textbf{RNF-04} & Una consulta de historial de 30 días de un dispositivo debe responder en \textbf{$\leq$ 3 segundos} & Medición con volumen sintético & [DP] & \textbf{S} \\

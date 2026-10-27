@@ -919,7 +919,10 @@ paso "3b. Informe: compilado después del último cambio y sano (cero desbordes 
 LOGTEX=informe-oficial/build/main.log
 if [ ! -f "$LOGTEX" ]; then echo "omitido: sin compilación previa → bash informe-oficial/actualizar.sh"; omitidos="$omitidos 3b"
 else
-  nuevas=$( { find informe-oficial -name '*.tex' -newer "$LOGTEX" -not -path '*/build/*'; find informe-oficial/figuras/render -name '*.pdf' -newer "$LOGTEX"; } 2>/dev/null | head -5 | tr '\n' ' ')
+  # 26/10: las láminas (informe-oficial/presentacion/) no entran a main.pdf; con ellas este paso no pasaba nunca.
+  nuevas=$( { find informe-oficial -name '*.tex' -newer "$LOGTEX" -not -path '*/build/*' -not -path 'informe-oficial/presentacion/*'; for r in $(find informe-oficial/figuras/render -name '*.pdf' -newer "$LOGTEX" 2>/dev/null); do
+      # solo las que el informe incluye: la vista resumida (26/10) es de las láminas
+      grep -rqs --include='*.tex' --exclude-dir=presentacion --exclude-dir=build "figuras/render/$(basename "$r")" informe-oficial && echo "$r"; done; } 2>/dev/null | head -5 | tr '\n' ' ')
   if [ -n "$nuevas" ]; then echo "omitido: fuentes más nuevas que la última compilación ($nuevas) → bash informe-oficial/actualizar.sh"; omitidos="$omitidos 3b"
   else python3 informe-oficial/comprobar-compilacion.py || fallos=$((fallos+1)); fi
 fi

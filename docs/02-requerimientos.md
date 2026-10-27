@@ -210,14 +210,14 @@ Clasificados según las características de calidad de **ISO/IEC 25010**.
 
 | ID | Requerimiento | Métrica de verificación | Fuente | Prior. |
 |---|---|---|---|:---:|
-| **RNF-01** | El sistema debe sostener la recepción de **≥ 50 eventos por segundo** sin pérdida | Prueba de carga con generador sintético | [DP] | **M** |
+| **RNF-01** | El sistema debe sostener la recepción de **≥ 50 tramas por segundo** sin pérdida | Prueba de carga con generador sintético | [DP] | **M** |
 | **RNF-02** | El tiempo desde la recepción de un evento hasta su disponibilidad para consulta debe ser **≤ 2 segundos** en el percentil 95 | Medición instrumentada | [DP] | **M** |
 | **RNF-03** | El sistema debe **detectar la pérdida de supervisión** de un dispositivo en **≤ 2 intervalos** de reporte configurados | Prueba funcional con nodo silenciado | [PO] | **M** |
 | **RNF-04** | Una consulta de historial de 30 días de un dispositivo debe responder en **≤ 3 segundos** | Medición con volumen sintético | [DP] | **S** |
 
 > **Fundamento de las cifras (agregado el 21/09/2026 tras la retroalimentación).** La carga del caso de
 > validación es de 50 canales que reportan cada 5 minutos: 50 / 300 s ≈ **0,17 lecturas por segundo**,
-> unas 14 400 al día y 5,3 millones al año (`docs/14`). **RNF-01 (50 mensajes/s)** es una meta de estrés
+> unas 14 400 al día y 5,3 millones al año (`docs/14`). **RNF-01 (50 tramas/s; una trama es un mensaje MQTT o un `POST` HTTP con una o más lecturas de un dispositivo)** es una meta de estrés
 > unas 300 veces mayor que esa carga: equivale a 15 000 canales a 5 minutos, o a que los 50 canales del
 > campus reenvíen una cola acumulada tras una caída de red. Se fija para demostrar holgura en el servidor
 > de referencia (2 vCPU y 4 GB, `docs/14`), no para describir la operación normal; Mosquitto y
@@ -489,7 +489,7 @@ directa de ello.
 | **L-D** | **Unificación del lenguaje con el frontend** | **15 %** | La interfaz de administración (M8) será una aplicación web. Un solo lenguaje en todo el sistema permite **compartir las definiciones de tipos** de la trama SenML y el modelo interno entre backend y frontend, definiéndolas una sola vez |
 | **L-E** | **Madurez de bibliotecas para MQTT, PostgreSQL/TimescaleDB y validación de esquema** | **15 %** | RF-02 exige recibir la rama LoRaWAN (payload que el servidor de red ya decodifica: la pasarela en la ruta B o ChirpStack en la A); RF-03 exige cliente MQTT; RF-05 exige validar cada trama contra el esquema SenML; toda la persistencia es PostgreSQL |
 | **L-F** | **Tipado estático** | **10 %** | El sistema manipula mensajes de formato estricto donde un campo mal posicionado es un error silencioso. El tipado traslada esos errores a tiempo de compilación |
-| **L-G** | **Rendimiento en tiempo de ejecución** | **5 %** | Peso bajo deliberadamente: RNF-01 exige 50 eventos/segundo, cifra que **todas** las alternativas alcanzan holgadamente. El cuello de botella del proyecto es el tiempo del desarrollador, no la CPU |
+| **L-G** | **Rendimiento en tiempo de ejecución** | **5 %** | Peso bajo deliberadamente: RNF-01 exige 50 tramas por segundo, cifra que **todas** las alternativas alcanzan holgadamente. El cuello de botella del proyecto es el tiempo del desarrollador, no la CPU |
 
 ### 6.5.2 Matriz comparativa ponderada
 
@@ -534,7 +534,7 @@ definirla dos veces y mantenerlas sincronizadas manualmente — una fuente de er
 resto del proyecto. Esto penaliza a Python (2) y a Java, Go y Rust (1) con independencia de sus méritos.
 
 **Sobre L-G y por qué su peso es bajo.** Go, Rust y Fastify obtienen 5 en rendimiento, y es irrelevante:
-RNF-01 pide 50 eventos por segundo, un orden de magnitud por debajo de lo que cualquiera de estas
+RNF-01 pide 50 tramas por segundo, un orden de magnitud por debajo de lo que cualquiera de estas
 alternativas sostiene. Ponderar el rendimiento por encima de la velocidad de desarrollo sería optimizar
 el recurso abundante a costa del escaso.
 

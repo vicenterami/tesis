@@ -16,12 +16,12 @@ TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
 docker compose -f plataforma/docker-compose.yml exec -T timescaledb \
   psql -U plataforma -d plataforma -tA < plataforma/db/pruebas/er-mermaid.sql > "$TMP/modelo-datos.mmd"
 
-# 2) Arquitectura: los seis bloques de docs/10, en su orden
+# 2) Arquitectura: los siete bloques de docs/10, en su orden (26/10: «resumen», la vista resumida para las láminas, va primero)
 python3 - "$TMP" <<'PY'
 import re, sys, pathlib
 tmp = pathlib.Path(sys.argv[1])
 bloques = re.findall(r"```mermaid\n(.*?)```", pathlib.Path("docs/10-arquitectura.md").read_text(), re.S)
-nombres = ["contenedores", "red", "sec-alta", "sec-pipeline", "sec-tiemporeal", "despliegue"]
+nombres = ["resumen", "contenedores", "red", "sec-alta", "sec-pipeline", "sec-tiemporeal", "despliegue"]
 assert len(bloques) == len(nombres), f"docs/10 tiene {len(bloques)} bloques; se esperaban {len(nombres)}"
 for n, b in zip(nombres, bloques): (tmp / f"{n}.mmd").write_text(b)
 PY

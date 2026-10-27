@@ -1,0 +1,313 @@
+%% Presentación de avances de la Etapa 3 al profesor guía (28/10/2026).
+%% Compilar desde esta carpeta: latexmk -pdf -outdir=build presentacion.tex
+%% El único aviso esperado es «Overfull \vbox (15.6pt)» en la portada: lo da el tema metropolis incluso en un documento mínimo
+%% (comprobado el 26/10/2026) y no se ve; cualquier otro Overfull se corrige.
+%% Manda el informe: problema, objetivos y cifras se copian de informe-oficial/ y docs/ (la fuente va al pie de cada lámina).
+%% Figuras: la arquitectura es la vista resumida de docs/10 §1 (generar-figuras.sh); el cableado se exporta de
+%% plataforma/firmware/cableado-fase-1.drawio (sin fechas en los metadatos).
+\documentclass[aspectratio=169,11pt]{beamer}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[spanish,es-noquoting]{babel}
+\usepackage{booktabs}
+\usepackage{array}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\usepackage{graphicx}
+\usepackage{tcolorbox}
+\tcbuselibrary{skins}
+\usetheme[progressbar=frametitle,numbering=fraction,block=fill]{metropolis}
+\usepackage{tgheros}
+\renewcommand{\familydefault}{\sfdefault}
+\graphicspath{{../figuras/render/}{figuras/}}
+
+%% Paleta: azul marino institucional y un acento turquesa; sobrio para una presentación formal.
+\definecolor{marino}{HTML}{0B1F3A}
+\definecolor{acento}{HTML}{0FA3B1}
+\definecolor{suave}{HTML}{EEF3F7}
+\definecolor{texto}{HTML}{1E2A36}
+\definecolor{gris}{HTML}{6B7785}
+\definecolor{bien}{HTML}{1F7A4D}
+\definecolor{curso}{HTML}{B26A00}
+\setbeamercolor{normal text}{fg=texto,bg=white}
+\setbeamercolor{frametitle}{fg=white,bg=marino}
+\setbeamercolor{progress bar}{fg=acento,bg=marino!70}
+\setbeamercolor{title separator}{fg=acento}
+\setbeamercolor{alerted text}{fg=acento}
+\setbeamercolor{block title}{fg=marino,bg=suave}
+\setbeamercolor{block body}{bg=suave!50}
+\setbeamercolor{background canvas}{bg=white}
+\setbeamercolor{standout text}{fg=white,bg=marino}
+\setbeamerfont{frametitle}{size=\large,series=\bfseries}
+\setbeamerfont{title}{size=\Large,series=\bfseries}
+\setbeamerfont{subtitle}{size=\normalsize}
+%% La fuente de cada lámina va en el pie (\fuente la deja y el pie la borra al imprimirla): nunca se superpone al contenido.
+\gdef\lafuente{}
+\setbeamertemplate{frame footer}{\ifx\lafuente\empty\else Fuente: \lafuente\fi\gdef\lafuente{}}
+\setbeamerfont{page number in head/foot}{size=\scriptsize}
+\setbeamercolor{footline}{fg=gris}
+
+\newcommand{\fuente}[1]{\gdef\lafuente{#1}}
+\newcommand{\hecho}{\textcolor{bien}{\textbf{Cumplido}}}
+\newcommand{\encurso}{\textcolor{curso}{\textbf{En curso}}}
+%% Indicador: cifra grande y su etiqueta, en una tarjeta.
+\newtcolorbox{tarjeta}[1][]{colback=suave,colframe=suave,arc=2pt,boxrule=0pt,left=6pt,right=6pt,top=5pt,bottom=5pt,
+  halign=center,valign=center,#1}
+\newcommand{\cifra}[2]{\begin{tarjeta}{\large\bfseries\color{marino}#1}\\[1pt]{\scriptsize\color{gris}#2}\end{tarjeta}}
+
+\title{Sistema integrado para el registro, gestión y monitoreo de dispositivos IoT}
+\subtitle{Etapa 3: mejoras, pruebas adicionales y validación preliminar}
+\author{Vicente Ricardo Ramírez Oñate}
+\institute{INFO-1197 · Universidad Católica de Temuco · Profesor guía: Mario Villanueva}
+\date{28 de octubre de 2026}
+
+\begin{document}
+
+\maketitle
+
+\begin{frame}{En una frase}
+  \vfill
+  \begin{tarjeta}[halign=left,left=14pt,right=14pt,top=12pt,bottom=12pt,borderline west={3pt}{0pt}{acento}]
+    \large El núcleo del sistema funciona de punta a punta con dispositivos reales, está medido y probado, y cabe en una
+    fracción de la memoria que piden las alternativas.
+  \end{tarjeta}
+  \medskip
+  La Etapa 4 está planificada en orden y con sus horas.
+  \vfill
+\end{frame}
+
+\begin{frame}{El problema y el objetivo general}
+  \begin{block}{Problema}
+    La Facultad de Ingeniería no puede consultar fácilmente, en un solo lugar, los datos de sensores de distinto origen:
+    cada fabricante entrega su propia plataforma y la información queda repartida.
+  \end{block}
+  \footnotesize
+  Cinco causas: formatos distintos, plataforma atada al equipo, costo y datos en la nube del fabricante, sin personal
+  dedicado, y el silencio de un dispositivo que no se distingue de la falta de novedades.
+  \normalsize
+  \begin{block}{Objetivo general}
+    Desarrollar un prototipo de sistema integrado para el registro, gestión y monitoreo en tiempo real de dispositivos IoT,
+    con un \emph{dashboard} que centralice sus datos, estado y alertas, para su aprovechamiento en la investigación de la
+    Facultad.
+  \end{block}
+  \fuente{informe, capítulo 1 (problema central y objetivo general)}
+\end{frame}
+
+\begin{frame}{Objetivos específicos}
+  \footnotesize
+  \begin{tabular}{@{}L{0.53\linewidth}L{0.12\linewidth}L{0.28\linewidth}@{}}
+    \toprule
+    \textbf{Objetivo} & \textbf{Plazo} & \textbf{Estado} \\
+    \midrule
+    \textbf{OE1} Caracterizar las necesidades de la Facultad: literatura, oferta y entrevistas & 30/10 & \hecho: dos
+      entrevistas (05/10 y 25/10) \\
+    \textbf{OE2} Evaluar y seleccionar el transporte y el formato de los datos & 02/10 & \hecho: MQTT y SenML \\
+    \textbf{OE3} Diseñar la arquitectura, el modelo de datos y el despliegue & 02/10 & \hecho: tres alojamientos
+      comparados \\
+    \textbf{OE4} Implementar: núcleo mínimo con un dispositivo real (30/10); registro, alertas y \emph{dashboard} (04/12)
+      & 30/10 y\newline 04/12 & \encurso: núcleo 25 de 34 tareas \\
+    \textbf{OE5} Validar en un servidor modesto contra los umbrales de los requerimientos & 04/12 & Etapa 4; mediciones
+      preliminares hechas \\
+    \bottomrule
+  \end{tabular}
+  \fuente{informe, capítulo 1 (objetivos); docs/18 §1}
+\end{frame}
+
+\begin{frame}{Arquitectura: el recorrido de una trama}
+  \centering
+  \includegraphics[width=\linewidth,height=0.56\textheight,keepaspectratio]{resumen.pdf}
+  \smallskip
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.31\textwidth}{\scriptsize Todo entra cifrado por un solo
+      \textbf{proxy TLS}; el backend es el \textbf{único suscriptor} del broker.\par}\end{column}
+    \begin{column}{0.31\textwidth}{\scriptsize \textbf{Seis filtros}: autenticar,
+      analizar, validar, normalizar, alertar y supervisar.\par}\end{column}
+    \begin{column}{0.31\textwidth}{\scriptsize Contrato \textbf{SenML}; lo rechazado va
+      a \textbf{cuarentena con su motivo}.\par}\end{column}
+  \end{columns}
+  \fuente{docs/10 §1 (vista resumida y vista de contenedores)}
+\end{frame}
+
+\begin{frame}{Cómo se trabajó}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.62\textwidth}
+      \begin{itemize}
+        \item El diseño escrito manda: primero \texttt{docs/}, después el código.
+        \item Un \textbf{guardián} comprueba que documentos, código, base e informe digan lo mismo.
+        \item \textbf{Banco de pruebas desechable}: cada prueba parte de cero.
+        \item Cada control se prueba \textbf{plantando la falla}.
+        \item \textbf{Revisión sin contexto} al cerrar cada bloque; cada hallazgo se verifica antes de corregir.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.33\textwidth}
+      \cifra{357}{pruebas automáticas del backend}
+      \cifra{107}{pruebas del panel}
+      \cifra{45}{pasos del guardián}
+    \end{column}
+  \end{columns}
+  \fuente{plataforma/pruebas/verificar-todo.sh; docs/18 §1}
+\end{frame}
+
+\begin{frame}{Prueba de campo: red LoRaWAN del campus (20/10)}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.3\textwidth}
+      \cifra{810}{mediciones en 3 h}
+      \cifra{2}{nodos y una pasarela real, por TLS}
+    \end{column}
+    \begin{column}{0.66\textwidth}
+      \textbf{Dos hallazgos reales, mostrados por el sistema y corregidos:}
+      \begin{enumerate}
+        \item Reloj de la pasarela \textbf{4 días atrasado} $\to$ tolerancia de 10 min y condición «reloj desviado».
+        \item La pasarela dejó de reenviar 27 min $\to$ «sin comunicación» abierta a los 6 min y cerrada sola al volver.
+      \end{enumerate}
+      \medskip
+      \small El operador de la red, entrevistado después, pidió primero estado y alertas, después calidad del enlace, y
+      alta masiva por archivo.
+    \end{column}
+  \end{columns}
+  \fuente{docs/16 §45 y §46; bitácora de la entrevista del 25/10}
+\end{frame}
+
+\begin{frame}{El nodo propio: ESP32 con tres sensores}
+  \begin{columns}[c,onlytextwidth]
+    \begin{column}{0.3\textwidth}
+      \footnotesize
+      \begin{itemize}
+        \item Aire (BME280), suelo (capacitivo) y sonda de temperatura (DS18B20).
+        \item Wi-Fi y MQTT con TLS, cada 60 s, con credencial y tópico propios.
+        \item Se cablea sin corriente y se revisa antes de conectar.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.68\textwidth}
+      \centering
+      \includegraphics[width=\linewidth,height=0.86\textheight,keepaspectratio]{cableado-esp32.pdf}
+    \end{column}
+  \end{columns}
+  \fuente{docs/17 §4.4; plataforma/firmware/cableado-fase-1.drawio (pines verificados contra el firmware)}
+\end{frame}
+
+\begin{frame}{Corrida de 24 h con el nodo propio (23--24/10)}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.31\textwidth}\cifra{1\,440 de 1\,440}{tramas recibidas, una por minuto}\end{column}
+    \begin{column}{0.31\textwidth}\cifra{0}{huecos de comunicación y reinicios}\end{column}
+    \begin{column}{0.31\textwidth}\cifra{210}{tramas a cuarentena por una falla real del sensor}\end{column}
+  \end{columns}
+  \bigskip
+  \begin{itemize}
+    \item A las 15:24 falló el contacto I2C del sensor de aire: valores imposibles (183 °C y $-185$ hPa), todos a
+      cuarentena con su motivo.
+    \item La humedad de 100 \%, falsa pero dentro de lo posible, sí entró: es la lección de la lámina siguiente.
+    \item Una prueba larga con hardware real destapa lo que ningún banco destapa.
+  \end{itemize}
+  \fuente{docs/16 §53}
+\end{frame}
+
+\begin{frame}{Lo que la corrida enseñó y ya está corregido}
+  \begin{itemize}
+    \item \textbf{Firmware:} comprueba el sensor antes y después de leer y omite lo dudoso; watchdog de 120 s probado en la
+      placa (dos cuelgues provocados, dos reinicios a los 120,0 s).
+    \item \textbf{Plataforma:} vio esos dos cuelgues sola, sin saber nada del firmware: funciona con dispositivos que no
+      controlamos.
+    \item \textbf{Panel:} «canal callado»: el equipo reporta, pero una magnitud no llega.
+    \item \textbf{Etapa 4:} canal callado y valor congelado para \emph{cualquier} dispositivo, con lo declarado en el alta.
+  \end{itemize}
+  \fuente{docs/16 §53 y §54; docs/17}
+\end{frame}
+
+\begin{frame}[standout]
+  Demostración del panel en vivo
+\end{frame}
+
+\begin{frame}{Rendimiento y consumo, medidos}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.24\textwidth}\cifra{409/s}{tramas sin pérdida (meta RNF-01: 50/s)}\end{column}
+    \begin{column}{0.24\textwidth}\cifra{324 MiB}{pico de toda la pila (meta: 2 GB)}\end{column}
+    \begin{column}{0.24\textwidth}\cifra{180 B}{por lectura en disco}\end{column}
+    \begin{column}{0.24\textwidth}\cifra{0 de 180}{perdidas o duplicadas en cada vía}\end{column}
+  \end{columns}
+  \medskip
+  \footnotesize
+  \begin{itemize}
+    \item \textbf{50 tramas/s es una meta de estrés}, unas 300 veces la carga del campus (50 canales cada 5 min); la operación
+      real es de una trama por nodo cada 60 s o más, y con ella se calcula el disco.
+    \item El límite medido es la CPU de la base, no la memoria: 193 MiB en reposo. ThingsBoard CE pide 4 GB para una prueba
+      de concepto.
+    \item Mil nodos de 6 canales cada minuto usan $\approx$ 12 \% de lo medido; lo que manda es el disco.
+  \end{itemize}
+  \fuente{docs/02 (fundamento de RNF-01); docs/16 §10 y §49; docs/14 §2.1; docs/01 (referentes)}
+\end{frame}
+
+\begin{frame}{Costo de operación}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.32\textwidth}
+      \cifra{$\approx$ CLP 6\,000}{al mes: VPS de 2 vCPU y 4 GB}
+      \cifra{$\approx$ 3 años}{100 nodos cada 5 min en 40 GB}
+    \end{column}
+    \begin{column}{0.64\textwidth}
+      \begin{itemize}
+        \item El costo no es fijo: \textbf{180 B $\times$ nodos $\times$ canales $\times$ lecturas al año}.
+        \item La palanca es el intervalo, que se declara en el alta: 1\,000 nodos de 6 canales ocupan 568 GB al año a 60 s
+          y 114 GB a 5 min.
+        \item Precios del 10/09/2026.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+  \fuente{docs/14 §2.1, §3 y §5}
+\end{frame}
+
+\begin{frame}{Avance de la Etapa 3 frente a la pauta}
+  \small
+  \begin{tabular}{@{}L{0.34\linewidth}L{0.6\linewidth}@{}}
+    \toprule
+    \textbf{Criterio (peso)} & \textbf{Estado} \\
+    \midrule
+    50 \% de implementación (10 \%) & \hecho: núcleo 25 de 34 tareas (126 de 168 h); backlog completo 37 de 66 \\
+    Pruebas iniciales (30 \%) & \hecho: carga, carreras, TLS, capacidad, caídas, campo y 24 h \\
+    Validación preliminar (10 \%) & \encurso: sensor real 24 h y red LoRaWAN real del campus \\
+    Mejoras (15 \%) & \hecho \\
+    Documentación (15 \%) & \encurso: revisión final antes del 30/10 \\
+    Retroalimentación (20 \%) & \encurso: falta la suya sobre la Etapa 2 \\
+    \bottomrule
+  \end{tabular}
+  \fuente{docs/18 §1}
+\end{frame}
+
+\begin{frame}{Plan de la Etapa 4}
+  \begin{columns}[T,onlytextwidth]
+    \begin{column}{0.62\textwidth}
+      \footnotesize
+      \begin{enumerate}
+        \item Seguridad, usuarios y roles.
+        \item Panel para operar una flota, con alta masiva por archivo y bandeja de detectados.
+        \item Salud de los datos: canal callado y valor congelado.
+        \item Lo pedido en la entrevista del 05/10.
+        \item LoRaWAN completo: ruta C con ChirpStack externo, de punta a punta.
+        \item Despliegue, Kubernetes con escalado probado y consumo en pesos.
+        \item Pruebas, comparación con los referentes e informe final.
+      \end{enumerate}
+    \end{column}
+    \begin{column}{0.33\textwidth}
+      \cifra{$\approx$ 212 h}{de plan}
+      \cifra{$\approx$ 75 h}{de presupuesto}
+      \scriptsize Se avanza en ese orden, todo probado; lo que no alcance queda diseñado y declarado.
+    \end{column}
+  \end{columns}
+  \fuente{docs/04 §8}
+\end{frame}
+
+\begin{frame}{Lo que necesito de usted}
+  \begin{enumerate}
+    \item Su retroalimentación sobre la Etapa 2 (pesa 20 \% en esta etapa).
+    \item ChirpStack externo del campus (ruta C): ¿se mantiene en la red?
+    \item ¿Hay un servidor de la Facultad para la Etapa 4? (OE5: validar en un servidor modesto).
+    \item ¿Le parece bien el orden de la Etapa 4, o algo debe subir?
+  \end{enumerate}
+\end{frame}
+
+\appendix
+\begin{frame}[plain]
+  % Respaldo: la figura de contenedores del informe, si pide ver el detalle de las rutas LoRaWAN.
+  \centering
+  \includegraphics[width=\linewidth,height=0.94\textheight,keepaspectratio]{contenedores.pdf}
+\end{frame}
+
+\end{document}

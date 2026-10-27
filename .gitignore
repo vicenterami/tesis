@@ -52,6 +52,7 @@ recursos-uct/
 informe-oficial/images/Logo_depto_ing_informatica.png
 referencias/*.pdf
 informe-oficial/build/
+informe-oficial/presentacion/build/
 
 # Secretos de despliegue
 plataforma/.env

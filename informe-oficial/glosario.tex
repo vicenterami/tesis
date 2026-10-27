@@ -51,4 +51,6 @@ Se configura en el broker y la API; no se desarrolla.
 \texttt{sitio/\textless sitio\textgreater/dispositivo/\textless id\_fisico\textgreater/\textless magnitud\textgreater};
 por ejemplo \texttt{sitio/uct/dispositivo/dev-0001/temperatura}. Es la frontera contractual con el
 trabajo del compañero.
+\item[Trama] Un mensaje que llega por cualquier vía (una publicación MQTT o un \texttt{POST} HTTP) con una o más
+lecturas de un dispositivo. Es la unidad de la meta de carga: RNF-01 pide 50 tramas por segundo sin pérdida.
 \end{description}
