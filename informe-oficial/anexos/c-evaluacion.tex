@@ -63,7 +63,7 @@ cada alternativa están a continuación.}
 
 
 \textbf{MQTT (4,85).} A favor: publicar/suscribir desacopla emisores de consumidores; QoS en tres
-niveles sin lógica propia; el testamento (\emph{Last Will}) hace inmediata la detección de caída;
+niveles sin lógica propia; el testamento (\emph{Last Will}) puede adelantar el aviso de caída;
 cabecera de 2 bytes; conexión saliente persistente que atraviesa NAT; nació para IoT en redes
 inestables. En contra: exige operar un broker (Mosquitto: un contenedor, consumo mínimo); el
 navegador no lo habla nativo (irrelevante: el panel consulta la API).
@@ -314,7 +314,7 @@ Nube gratuita (ARM) & 2 OCPU · 12 GB, sin garantía de capacidad & CLP 0 & 3,05
 \begin{tablaseg}
 \begin{tabular}{L{8.2cm}L{5.4cm}}
 \filaencab \encab{Elemento de diseño} & \encab{Requerimientos} \\
-Tres puntos de entrada: 8883 máquinas, 443 personas, 1700/udp \emph{gateways} (pendiente) & RF-42, RNF-09, RNF-10 \\
+Tres puntos de entrada: 8883 máquinas, 443 personas, 1700/udp \emph{gateways}, solo en la ruta A (opcional) & RF-42, RNF-09, RNF-10 \\
 Adaptadores por formato en el filtro de análisis & RF-01, RF-02, RF-04 \\
 Cuarentena separada de las series, con motivo y trama cruda & RF-05, RF-07 \\
 Supervisor periódico de «sin comunicación» & RF-24, RF-25, RF-26 \\
@@ -348,7 +348,7 @@ Interfaz servida (estática) & $\sim$10\,MB & Svelte compilado \\
 \bottomrule
 \end{tabular}
 \caption{Presupuesto de memoria estimado. Da origen al requerimiento RNF-17: la plataforma completa
-debe operar en un servidor de 2\,GB de memoria, lo que se verifica empíricamente en la Etapa 4.}
+debe consumir a lo más 2\,GB, la mitad de un servidor de 4\,GB, lo que se verifica empíricamente en la Etapa 4.}
 \end{table}
 
 Esta estimación es preliminar y se somete a medición real en el banco de comparación de la Etapa 4:

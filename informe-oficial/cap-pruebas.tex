@@ -25,7 +25,7 @@ M8 Panel & Semáforo, inventario filtrable, ficha con gráfico; canal callado & 
 \bottomrule
 \end{tabular}
 \end{tablaseg}
-\caption{Estado de la implementación por módulo al 22 de octubre de 2026.}
+\caption{Estado de la implementación por módulo al 28 de octubre de 2026.}
 \label{tab:implementado}
 \end{table}
 
@@ -35,7 +35,7 @@ Se prueba en tres niveles, todos repetibles con un comando. Las 357 pruebas unit
 junto con tipos estrictos y análisis estático: cada una fija una regla de diseño en forma ejecutable. \textbf{Banco
 desechable}: una segunda pila con base, broker con su plugin de seguridad, backend y proxy reales, datos en memoria y un
 emulador de nodos (TT-28) que imita relojes rotos, pérdidas y deriva; sobre él corren casos fijos de carga, carreras,
-caídas, TLS, alta por API, LoRaWAN y cola del broker. \textbf{Verificador de concordancia}: 45 pasos que comparan informe, documentación, base y API. Otra recorre, por dispositivo, inventario, ficha, histórico, exportación, condiciones y cuarentena: toda serie es consultable. Cada comprobación nueva se ejecuta primero contra el error \emph{plantado}: una prueba vale solo si falla ante la falla.
+caídas, TLS, alta por API, LoRaWAN y cola del broker. \textbf{Verificador de concordancia}: 45 pasos que comparan informe, documentación, base y API. Otra prueba recorre, por dispositivo, inventario, ficha, histórico, exportación, condiciones y cuarentena: toda serie es consultable. Cada comprobación nueva se ejecuta primero contra el error \emph{plantado}: una prueba vale solo si falla ante la falla.
 
 \section{Resultados frente a los requerimientos}
 
@@ -56,7 +56,7 @@ RF-10 & La misma lectura ×20 a la vez & Una fila por canal y una trama cruda & 
 RF-12 & Cinco sobre el umbral a la vez & Una condición, sin errores & Cumple \\
 RF-05 y RF-07 & Malformadas, sin alta, otro sitio & Cuarentena con motivo; ninguna señal de vida falsa & Cumple \\
 RF-40, RF-42 & Credencial ajena; sin CA; sin TLS & Rechazadas; claves con hash (RNF-08) & Cumple \\
-RF-02 & JSON oficial de los fabricantes; pasarela real del campus & 46 de 46 comprobaciones; en terreno, 810 mediciones de dos nodos & Cumple \\
+RF-02 & JSON oficial de los fabricantes; pasarela real del campus & 46 de 46 comprobaciones; en terreno, 813 mediciones de dos nodos & Cumple \\
 RNF-17 & Carga sostenida y pico & 174~MiB (sin proxy) y 324~MiB (pico, con proxy) & Preliminar \\
 \bottomrule
 \end{tabular}
@@ -74,4 +74,4 @@ tiene topes de cola y una alarma sobre su contador. Dar de baja un dispositivo f
 \section{Validación preliminar y limitaciones}
 
 El sistema funciona de extremo a extremo con nodos emulados, con el nodo propio (24~h por Wi-Fi con TLS: 1\,440 de 1\,440 tramas, sin reinicios; una falla de su sensor de aire llevó a corregir el nodo y el panel) y con la red LoRaWAN del campus: el 20 de octubre la pasarela real publicó por TLS con la credencial de la API y
-dos nodos entraron de punta a punta, 810 mediciones en tres horas. Un reloj de pasarela cuatro días atrasado se resolvió con una tolerancia y una condición propia. La misma serie de 180 lecturas entró completa por las tres vías (MQTT, HTTP en packs de 1, 10 y 60, y pasarela): 0 pérdidas, 0 duplicados y p95 de 4 a 157~ms; por HTTP, el ritmo de una trama por segundo hace que el pack de 1 tarde 194~s y el de 60, 5,6~s. Faltan el servidor de referencia (RNF-17 y las 72~horas de RNF-18, Etapa~4) y la ruta C en terreno.
+dos nodos entraron de punta a punta, 813 mediciones en tres horas. Un reloj de pasarela cuatro días atrasado se resolvió con una tolerancia y una condición propia. La misma serie de 180 lecturas entró completa por las tres vías (MQTT, HTTP en packs de 1, 10 y 60, y pasarela): 0 pérdidas, 0 duplicados y p95 de 4 a 157~ms; por HTTP, el ritmo de una trama por segundo hace que el pack de 1 tarde 194~s y el de 60, 5,6~s. Faltan el servidor de referencia (RNF-17 y las 72~horas de RNF-18, Etapa~4) y la ruta C en terreno.

@@ -1,6 +1,6 @@
 # Entrevista — Operador de la red LoRaWAN del campus — 25 de octubre de 2026
 
-- **Modalidad:** cuestionario escrito por mensaje (ocho preguntas y una de cierre; guion en `docs/03`), sobre lo vivido al integrar su
+- **Modalidad:** cuestionario escrito por mensaje (ocho preguntas y una de cierre; las preguntas están en `docs/03 §2b`), sobre lo vivido al integrar su
   pasarela al sistema el 20/10/2026; respuesta recibida el 25/10/2026 · **Autorización de cita:** sí, anonimizada, como «operador de la
   red LoRaWAN del campus».
 - **Contexto declarado:** administra la pasarela y los nodos LoRaWAN del campus para su propia investigación, con un broker y un tablero

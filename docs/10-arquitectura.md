@@ -13,7 +13,8 @@
 
 Qué piezas ejecutables existen y cómo se hablan. La **frontera** del trabajo es el tópico MQTT: de un
 lado, la red de sensores (lado del compañero: nodos, *gateway* y servidor de red LoRaWAN, que en la ruta
-B va embebido en la pasarela, en la ruta C es un servidor de red externo, como el ChirpStack de la red del campus, y en la
+B va embebido en la pasarela —la red del campus hoy: UG65, probada en terreno el 20/10—, en la ruta C es un servidor de red externo
+(por ejemplo, un ChirpStack institucional, por confirmar con el profesor guía; hasta el 15/10 se creyó que la red del campus era esta ruta), y en la
 ruta A, opcional, es un ChirpStack que aunque se aloja en nuestro servidor publica al broker como un productor más; B y C
 entran igual, por MQTT/TLS 8883 con credencial propia, y solo cambia el adaptador); del otro, el broker y el backend. **En las figuras,
 lo opcional va con borde y flecha punteados** (desde el 07/10/2026). No se
@@ -58,13 +59,13 @@ flowchart TB
     end
     N2["Nodo Wi-Fi o celular<br/>cliente MQTT"]
         N3["Equipo que solo habla HTTP<br/>nodo 4G o sistema de terceros"]
-        subgraph RB["Ruta B"]
+        subgraph RB["Ruta B · red del campus hoy"]
             direction TB
             NB["Nodos LoRa"] -- "radio" --> GB["Pasarela con servidor<br/>de red embebido"]
         end
-        subgraph RC["Ruta C · red del campus"]
+        subgraph RC["Ruta C · servidor de red externo"]
             direction TB
-            NC["Nodos LoRa"] -- "radio" --> GC["Pasarela del campus"] -- "UDP 1700" --> NS["Servidor de red externo<br/>ChirpStack"]
+            NC["Nodos LoRa"] -- "radio" --> GC["Pasarela"] -- "UDP 1700" --> NS["Servidor de red externo<br/>p. ej. ChirpStack institucional"]
         end
     subgraph RA["Ruta A · opcional, sin TLS"]
         direction TB
@@ -77,8 +78,8 @@ flowchart TB
         CS["ChirpStack propio<br/>solo ruta A"]
         subgraph BE["Backend NestJS · un solo puerto interno: 3000"]
             direction LR
-            M1["M1 Recepción<br/>MQTT y POST /recepcion/{id}"] --> M2["M2 Pipeline<br/>de 6 filtros"] --> M6["M6 Alertas"] --> M4["M4 Supervisión"]
-            M5["M5 Consulta<br/>panel, API REST y SSE"]
+            M1["M1 Recepción<br/>MQTT y POST /recepcion/{id}"] --> M2["M2 Normalización<br/>pipeline de 6 filtros"] --> M6["M6 Alertas"] --> M4["M4 Supervisión"]
+            M5["M5 Persistencia y consulta<br/>panel, API REST y SSE"]
         end
         DB[("TimescaleDB")]
     end
@@ -128,9 +129,10 @@ flowchart TB
   | 7. Pasarela con *Basics Station* hacia ChirpStack en este servidor | WebSocket sobre TLS (protocolo LNS), con autenticación TLS de servidor y, opcional, de cliente | 443 o puerto propio (por verificar) | Sí | Verificado el 06/10: el *Gateway Bridge* expone un manejador WebSocket para Basics Station y las pasarelas UG65/UG67 lo traen; reemplazaría el UDP sin autenticar de la ruta A |
   | 8. Pasarela LoRaWAN con servidor de red embebido, por su **reporte HTTP(S)** (segundo destino de la aplicación) | HTTPS, `POST` con el mismo JSON del uplink y cabeceras de autenticación | 443 | Sí | **Prevista** (22/10/2026): en terreno (20/10) la UG65 admitió un solo destino MQTT por aplicación y el segundo solo por HTTP(S); es la forma de convivir con el broker del operador sin tocarlo. Exige verificar la autenticación del reporte (cabeceras nombre/valor según la guía de Milesight) y un servidor con dirección pública. Punteada en las figuras |
 
-  **Vías dibujadas en las figuras (22/10/2026):** (1) dispositivo directo por MQTT sobre TLS, 8883 (escenarios 1 y 6); (2) dispositivo directo
-  por HTTP sobre TLS, 443 (escenario 2); (3) LoRaWAN → pasarela → MQTT sobre TLS, 8883 (escenarios 3 y 5, rutas B y C); (4) prevista y
-  punteada, pasarela → HTTPS 443 (escenario 8). Las personas entran siempre por 443. El 1700/udp (escenario 4, ruta A) se dibuja punteado y,
+  **Vías (22/10/2026; numeradas el 28/10, y así las citan la figura, su leyenda, el glosario y la presentación):** **vía 1**, dispositivo
+  directo por MQTT sobre TLS, 8883 (escenarios 1 y 6); **vía 2**, dispositivo directo por HTTP sobre TLS, 443 (escenario 2); **vía 3**,
+  LoRaWAN → pasarela → MQTT sobre TLS, 8883 (escenarios 3 y 5, rutas B y C); **vía 4**, prevista y punteada, pasarela → HTTPS 443
+  (escenario 8; la bitácora del 20/10 la llamó «vía E»). Las rutas dicen dónde corre el servidor de red; las vías, por dónde entra la trama. Las personas entran siempre por 443. El 1700/udp (escenario 4, ruta A) se dibuja punteado y,
   cuando se active, **solo en una red local**: el reenvío Semtech UDP no autentica ni cifra el transporte (la carga LoRaWAN sí va cifrada e
   íntegra de extremo a extremo); en producción corresponde *Basics Station* (escenario 7, WebSocket con TLS) o la vía MQTT con TLS (`docs/11 §1`).
 
@@ -1560,7 +1562,7 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     unitarias del presupuesto, de la cuota, del cierre y de las tres vías; `banco.sh tope` de punta a punta (HTTP para el presupuesto,
     MQTT para la cuota, y el cierre adelantando la ventana en la base); `docs/16 §42`.
 54. **Tolerancia de desvío de la marca de pasarela y condición `reloj_desviado` (decidido el 21/10/2026).** Origen: en la prueba de
-    campo del 20/10 (`docs/16 §45`) la pasarela UG65 no tenía NTP y su reloj iba 4 días atrasado; las reglas 7 y 17 de `docs/13` respetaron su marca y 810 mediciones quedaron fechadas 4 días antes: el panel decía «última trama: ahora» y «medición hace 4 d», y el histórico
+    campo del 20/10 (`docs/16 §45`) la pasarela UG65 no tenía NTP y su reloj iba 4 días atrasado; las reglas 7 y 17 de `docs/13` respetaron su marca y 555 de las 813 mediciones quedaron fechadas 4 días antes: el panel decía «última trama: ahora» y «medición hace 4 d», y el histórico
     de la última hora salió vacío. (i) **Regla:** solo para marcas con `origen_tiempo = pasarela` (adaptadores `milesight` y
     `chirpstack`), si la marca está más de **10 minutos atrasada** o más de **2 minutos adelantada** respecto de la hora de recepción (hacia el
     futuro, el mismo tope de la regla 7: toda marca de pasarela que se reemplaza avisa; revisión del 22/10), la marca se descarta: `tiempo` lo pone la base y la fila queda con

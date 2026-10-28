@@ -1195,18 +1195,18 @@ embebido, dos nodos Heltec LoRa 32 V3 (AU915), el portátil con la pila completa
 | La UG65 conecta por TLS verificando nuestra CA («Self signed certificates», solo `ca.crt`), con usuario y credencial del alta por API, QoS 1, sin retención; estado «MQTT Connected» | ✅ |
 | Alta por API de la pasarela (`formato milesight`) y de los dos nodos por DevEUI con el perfil `campus-heltec-v3-v1` | ✅ |
 | Tópico con `$devEUI` (mayúsculas): la pasarela lo publica literal → cuarentena `no_registrado` con la carga completa (≈ 25 tramas); con `$deveui` (minúsculas, documentación de la UG65) entra todo | ✅ el rechazo es el correcto; la plantilla del alta se corrige |
-| Tramas reales: «3/3 lecturas guardadas vía milesight» por nodo cada ≈ 17 s; 810 mediciones en 3 h, origen de tiempo `pasarela`; inventario en verde y ficha con las tres series | ✅ |
+| Tramas reales: «3/3 lecturas guardadas vía milesight»; 813 mediciones (271 tramas de 3 lecturas) en una ventana de ≈ 3 h: cada nodo publicó cada ≈ 17 s mientras la pasarela reenviaba (uno durante 1 h 45 min, el otro 27 min; contado en la base el 28/10), origen de tiempo `pasarela`; inventario en verde y ficha con las tres series | ✅ |
 | Reloj de la pasarela 4 días atrasado: mediciones fechadas el 16/10 (regla 17), ficha «última trama: ahora» / «medición hace 4 d», histórico de la última hora vacío; corregida la hora en la pasarela, `max(tiempo)` = `max(recibido_en)` | ✅ visible por diseño; falta tolerancia de desvío (resuelta en §46) |
 | La pasarela dejó de reenviar 27 min (destino cambiado y sesión cerrada): `sin_comunicacion` abierta en los dos nodos a los 6 min y cerrada sola al volver | ✅ |
 | Exportación CSV de la ficha (`GET /dispositivos/{id}/exportar`): 280 líneas | ✅ |
-| Un segundo destino en la UG65 solo puede ser HTTP/HTTPS (MQTT deshabilitado): la vía E (HTTP de pasarela) pasa a ser necesaria para coexistir con otro broker | observado |
+| Un segundo destino en la UG65 solo puede ser HTTP/HTTPS (MQTT deshabilitado): la vía 4 (HTTPS de pasarela, `docs/10 §1`) pasa a ser necesaria para coexistir con otro broker | observado |
 
 **Lo que no cubre:** la ruta C (ChirpStack) y la coexistencia por puente desde el Mosquitto del compañero (no se logró en su equipo).
 Las tramas reales quedan en la base del portátil y no se exportan al repositorio.
 
 ## 46. Tolerancia de desvío de la marca de pasarela (22/10/2026)
 
-**Qué se probó** (`docs/10 §8.4` punto 54; `docs/13` regla 18; migración 20). Origen: en §45 la UG65 sin NTP fechó 810 mediciones
+**Qué se probó** (`docs/10 §8.4` punto 54; `docs/13` regla 18; migración 20). Origen: en §45 la UG65 sin NTP fechó 555 de las 813 mediciones
 4 días antes. Desde ahora, una marca con origen `pasarela` a más de 10 minutos de la hora de recepción se reemplaza por la hora de
 recepción (`origen_tiempo = recepcion`) y abre la condición `reloj_desviado` del nodo; la primera marca de pasarela plausible la cierra.
 Una marca de dispositivo antigua se sigue respetando.
@@ -1574,8 +1574,8 @@ dibuja como mucho 6 dispositivos de un mismo sitio o de sitios con la misma zona
 doméstica, cifrado hasta el proxy, y qué hace la plataforma con lo que llega: lecturas, huecos, reconexiones y datos inválidos.
 
 **Método.** `nodo-0001` (ESP32 con BME280, DS18B20 y sensor capacitivo de suelo; firmware de la fase 2) publica un pack SenML de seis
-registros cada 60 s por MQTT con TLS y QoS 1 al proxy del portátil, que corre la pila de desarrollo. Ventana: del 23/10/2026 a las
-18:53:42 al 24/10/2026 a las 18:53:42 (UTC−03:00). Durante la corrida, `pruebas/vigilar-corrida.sh` revisó cada 60 s la red del
+registros cada 60 s por MQTT con TLS y QoS 1 al proxy del portátil, que corre la pila de desarrollo. Ventana: 24 h exactas entre el
+23 y el 24/10/2026 (UTC−03:00); las horas de esta sección son las del reloj del portátil durante la corrida. Durante la corrida, `pruebas/vigilar-corrida.sh` revisó cada 60 s la red del
 portátil, el proxy, `/salud`, el inhibidor de suspensión y la corriente, y el monitor serie guardó todo lo que imprimió el nodo. Al cerrar,
 `pruebas/corrida-larga.sh nodo-0001 24`, consultas a la base con la ventana exacta y los registros del backend, el broker y el proxy.
 
@@ -1611,8 +1611,8 @@ intermitente: al arrancar mostró el sensor con todos sus registros de control e
 primer ciclo, «el BME280 no responde por I2C, omitido», con un pack de tres registros (suelo y señal) en vez de basura. El watchdog se
 probó en la placa el 24/10 con el entorno `nodo-prueba-vigia`, que cuelga el loop a propósito en el ciclo 2: dos veces seguidas el nodo
 se reinició 120,0 s después del aviso (`task_wdt: … loopTask`, `rst:0xc (SW_CPU_RESET)`) y volvió a publicar solo; después se regrabó el
-entorno `nodo`. La plataforma vio cada cuelgue sin saber nada del firmware: dos condiciones «sin comunicación» abiertas a las 22:36:27 y
-22:39:27 (3 min entre sí, como los cuelgues) y cerradas al volver el nodo, a los 58 y 64 s. Queda por ver en la placa el camino «congelado», que no se pudo provocar a voluntad. (2) **Panel**
+entorno `nodo`. La plataforma vio cada cuelgue sin saber nada del firmware: dos condiciones «sin comunicación» abiertas con 3 min
+entre sí (como los cuelgues) y cerradas al volver el nodo, a los 58 y 64 s. Queda por ver en la placa el camino «congelado», que no se pudo provocar a voluntad. (2) **Panel**
 (`docs/19 §4`, P3): un canal sin lecturas dentro de 2 × el intervalo esperado, con el dispositivo en línea, se marca «callado» en su tarjeta y
 en la cabecera. (3) **Guiones:** `corrida-larga.sh` decía «visto por última vez nunca» porque leía la columna anterior a la migración 11 (hoy
 lee `estado_dispositivo`) y no contaba el hueco final de un canal que calla (hoy la presión aparece con 1 hueco); `vigilar-corrida.sh`
@@ -1691,8 +1691,8 @@ queda fuera hasta que typescript-eslint la admita (regla en `.github/dependabot.
 
 **Aviso retirado.** La única excepción de la auditoría (`braces`, https://github.com/advisories/GHSA-vfj7-8cjw-p6xm, §12) la retiró
 GitHub el 23/10/2026, pero el paso 2q del guardián solo miraba si había versión corregida y la seguía mostrando como vigente. Se quitó
-la excepción y el paso 2q (y el aviso amarillo del CI, `plataforma/pruebas/avisos-dependencias.sh`) fallan ahora también con un aviso
-retirado.
+la excepción; el paso 2q falla ahora también con un aviso retirado, y el CI lo muestra como advertencia «Excepción sobrante (aviso
+retirado)» (`plataforma/pruebas/avisos-dependencias.sh`), que avisa sin bloquear.
 
 | Comprobación | Resultado |
 |---|---|

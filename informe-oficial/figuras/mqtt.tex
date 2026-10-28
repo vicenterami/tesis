@@ -26,7 +26,7 @@
 \node[caja, below=8mm of br.south, anchor=north, text width=13.2cm, xshift=0.15cm,
       draw=grislinea, fill=grisclaro, font=\scriptsize, align=left]
   {Los mensajes se organizan en \textbf{tópicos}, con forma de ruta. En esta plataforma:
-   \texttt{sitio/\textless sitio\textgreater/dispositivo/\textless id\_fisico\textgreater/\textless magnitud\textgreater}, por ejemplo \texttt{sitio/uct/dispositivo/dev-0001/temperatura}\\[3pt]
+   \texttt{sitio/\textless sitio\textgreater/dispositivo/\textless id\_fisico\textgreater/\textless magnitud\textgreater}, por ejemplo \texttt{sitio/uct/dispositivo/dev-0001/temperatura}; las pasarelas, bajo \texttt{sitio/\textless sitio\textgreater/pasarela/\textless id\textgreater/…}\\[3pt]
    El backend es el \textbf{único suscriptor} (\texttt{sitio/\#}): recibe todo \textbf{sin necesidad de saber qué sensores
    existen}. Cada dispositivo solo puede publicar en sus propios tópicos, y el \emph{dashboard} recibe los datos del backend, no del broker.};
 

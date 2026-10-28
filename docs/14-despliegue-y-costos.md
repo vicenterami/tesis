@@ -59,7 +59,7 @@ Las cuentas salen de tres mediciones, no de supuestos: **180 B por lectura** (ar
 guardada (tabla `trama`, con sus tres índices: 1 440 tramas SenML del nodo propio ocupan 884 736 B; se retienen 30 días,
 `RETENCION_TRAMA_DIAS`) y el procesamiento de `docs/16 §10`: **sin pérdida hasta 409 tramas por segundo, de 2 lecturas cada una (≈ 818 lecturas/s)**, en el equipo de desarrollo, con
 los techos de `docs/10 §6` (la base usa su núcleo entero: el límite es la CPU de la base, no la memoria), y 324 MiB de memoria
-sumada en el pico. En reposo, con un nodo, la pila completa usaba 193 MiB (`docker stats`, 24/10, 22:00).
+sumada en el pico. En reposo, con un nodo, la pila completa usaba 193 MiB (`docker stats`, 24/10, en reposo).
 
 Fórmulas: lecturas por día = canales × 86 400 / intervalo; tramas por segundo = nodos / intervalo; disco por año = lecturas
 por día × 365 × 180 B; tramas retenidas = nodos × (86 400 / intervalo) × 30 × 610 B (fijo, no crece).

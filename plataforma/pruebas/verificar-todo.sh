@@ -145,6 +145,9 @@ paso "2f2. Sin horario personal: ni las bitácoras ni ningún archivo versionado
 # 15/10, segunda revisión: también «por la noche», «de madrugada» y una hora del reloj («a las 23:20»), que el primer patrón no veía.
 # 15/10, tercera revisión: lo mismo fuera de las bitácoras («12/10, noche», «la noche del 06/10», «la misma noche», en docs/10, 11 y 16).
 # Fuera de las bitácoras no se busca la hora del reloj: los ejemplos de zonas horarias la usan a propósito («a las 23:30 del 4-sep»).
+# 28/10 (revisión de privacidad): tampoco se puede distinguir a máquina la hora de un evento automático (la falla del sensor a las
+# 15:24 en la corrida de 24 h, que no dice nada) de la de una acción manual (el inicio de la corrida, los cuelgues provocados):
+# esas tres se quitaron a mano de docs/14 y docs/16; al escribir una hora fuera de una bitácora, preguntarse si la acción fue de la persona.
 DIA='\((madrugada|tarde|noche)[^)]*\)|, (madrugada|tarde|noche)\)|por la (noche|tarde|mañana)|de madrugada|\b(la|esa|misma) (noche|madrugada)\b|\b(esa|misma) tarde\b|[0-9]{1,2}/[0-9]{1,2}(/[0-9]{4})?,? (noche|madrugada|tarde)\b'
 horarios=$(grep -niE "$DIA|a las [0-9]{1,2}:[0-9]{2}" bitacora/*.md)
 git grep --untracked -n -i -E "$DIA" -- ':!privado' ':!bitacora' ':!plataforma/pruebas/verificar-todo.sh' ':!*.pdf' > "$VT"/horarios.txt 2>&1; rc=$?
@@ -404,7 +407,7 @@ if not malos: print(f'OK    {n} servicios en las dos combinaciones de compose: t
 sys.exit(1 if malos else 0)
 PY
 
-paso "2o. Informe: todo párrafo que nombra ChirpStack dice de qué ruta habla: opcional (ruta A) o externo del campus (ruta C), salvo el de OpenRemote (docs/10 §8.4 puntos 2 y 45)"
+paso "2o. Informe: todo párrafo que nombra ChirpStack dice de qué ruta habla: opcional (ruta A) o externo (ruta C), salvo el de OpenRemote (docs/10 §8.4 puntos 2 y 45)"
 # 07/10: la decisión del 06/10 dejó ChirpStack como opcional, pero el informe seguía diciendo «un contenedor más en la
 # plataforma», «cinco contenedores» y «tres puertos». Unidad: el párrafo en capítulos y anexos; el archivo en figuras/.
 python3 - <<'PY' || fallos=$((fallos+1))

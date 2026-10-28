@@ -70,6 +70,21 @@ Sin ese permiso no se puede citar.
 
 **Si solo alcanza una pregunta:** «¿Qué es lo más frustrante de tener estos sensores instalados?»
 
+## 2b. Cuestionario enviado al operador de la red LoRaWAN (perfil 4; respondido el 25/10/2026)
+
+Variante breve del guion, por mensaje escrito, para alguien que ya integró su pasarela al sistema (20/10/2026). Solo las preguntas;
+las respuestas, citadas y anonimizadas, están en `bitacora/2026-10-25-entrevista-operador-red.md`.
+
+1. ¿Cómo recibes hoy los datos de tus nodos y qué haces con ellos? (herramientas, frecuencia, quién más los mira)
+2. Conectaste la pasarela a un sistema ajeno con usuario, credencial y un certificado. ¿Qué parte te costó más y por qué?
+3. Si tuvieras 50 nodos en vez de 2, ¿cómo te gustaría darlos de alta? (uno por uno, un archivo, que la pasarela los anuncie…)
+4. ¿Qué querrías ver primero al abrir el panel: el estado de cada nodo, las curvas, las alertas, la calidad del enlace (RSSI/SNR)?
+5. ¿Qué te preocupa de dejar tus datos en un sistema que no administras? (seguridad, propiedad de los datos, exportarlos, borrarlos)
+6. Tu pasarela admite un segundo destino solo por HTTPS. ¿Usarías ese camino para enviar a dos sistemas a la vez? ¿Qué esperarías de él?
+7. ¿Qué tendría que pasar para que dejaras tu broker propio y usaras solo este sistema? ¿O preferirías siempre tener ambos?
+8. ¿Qué falló o te extrañó al integrar (reloj, comodín del tópico, reconexión) y cómo esperarías que el sistema te lo avisara?
+9. Cierre: ¿algo que no pregunté y que sí importa para alguien que opera sensores? Y si la cita va con nombre o anónima.
+
 ---
 
 ## 3. Registro (el mismo día)

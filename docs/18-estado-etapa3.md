@@ -1,4 +1,4 @@
-# Estado de la Etapa 3 — actualizado al 16 de octubre de 2026
+# Estado de la Etapa 3 — actualizado al 28 de octubre de 2026
 
 > Entrega: **viernes 30 de octubre de 2026**. Se actualiza al cerrar cada bloque de trabajo. Las tareas, sus horas y su
 > etapa salen de `docs/04` (manda el backlog); la rúbrica, de `referencias/materiales-curso.md`; cada estado, de la
@@ -22,7 +22,7 @@
 
 | Ítem | Tarea | h | Estado | Evidencia o lo que falta |
 |---|---|---|---|---|
-| HU-02 🎯 | Eventos LoRaWAN en la plataforma | 6 | 🟡 | Diseño: ruta B con tópico propio de la pasarela y adaptador de su JSON (`docs/10 §8.4` puntos 3 y 24). Hecho el 08/10: la entidad `pasarela` en la base y la comparación del sitio del tópico para los dispositivos (migración 11, `docs/16 §13`). **Hecho en el banco el 15/10** (`docs/10 §8.4` punto 47; formato declarado, adaptadores, filtro 1 de pasarela, pasarelas por API y su rol, `docs/16 §27–§31`; falta la prueba en terreno): adaptadores `chirpstack` y `milesight`, tópico de pasarela, `/pasarelas` por API con rol propio y `banco.sh lorawan` con el JSON de las fuentes oficiales (el emulador TT-28 no publica LoRaWAN todavía); falta además asociar RSSI y SNR al evento (criterio de `docs/04`, con HU-15); horas: 6 (HU-02) + 4 (adaptador «milesight»). Para la Etapa 4: el mapa de claves pasa al catálogo (`magnitud.alias`). **20/10: probada en terreno con la pasarela real y dos nodos de punta a punta (`docs/16 §45`); faltan la ruta C y la vía E.** |
+| HU-02 🎯 | Eventos LoRaWAN en la plataforma | 6 | 🟡 | Diseño: ruta B con tópico propio de la pasarela y adaptador de su JSON (`docs/10 §8.4` puntos 3 y 24). Hecho el 08/10: la entidad `pasarela` en la base y la comparación del sitio del tópico para los dispositivos (migración 11, `docs/16 §13`). **Hecho en el banco el 15/10** (`docs/10 §8.4` punto 47; formato declarado, adaptadores, filtro 1 de pasarela, pasarelas por API y su rol, `docs/16 §27–§31`; falta la prueba en terreno): adaptadores `chirpstack` y `milesight`, tópico de pasarela, `/pasarelas` por API con rol propio y `banco.sh lorawan` con el JSON de las fuentes oficiales (el emulador TT-28 no publica LoRaWAN todavía); falta además asociar RSSI y SNR al evento (criterio de `docs/04`, con HU-15); horas: 6 (HU-02) + 4 (adaptador «milesight»). Para la Etapa 4: el mapa de claves pasa al catálogo (`magnitud.alias`). **20/10: probada en terreno con la pasarela real y dos nodos de punta a punta (`docs/16 §45`); faltan la ruta C y la vía 4.** |
 | HU-03 🎯 | Publicar eventos en MQTT | 4 | ✅ | `docs/12 §3`; el emulador y el banco publican por MQTT (`docs/16 §2`). |
 | TT-17 🎯 | Pipeline de seis filtros con cuarentena | 6 | ✅ | `docs/12 §3` (seis filtros verificados). |
 | HU-05 🎯 | Condiciones abiertas por dispositivo | 7 | ✅ | Una condición abierta por regla (migración 02), `GET /condiciones`, pruebas de carrera (`docs/16 §4`). |
@@ -73,7 +73,7 @@ vuelve a la Etapa 4 con su registro aquí y en `docs/04`.
 - La retroalimentación de la Etapa 2 todavía no llega; se pedirá en la presentación de avances de la semana del 26/10.
 - El sensor de aire del nodo propio (BME280) tiene un contacto I2C intermitente desde el 24/10 (`docs/16 §53`): el nodo omite esas tres magnitudes y sigue publicando suelo y señal; falta revisar su cableado.
 - La recepción LoRaWAN en terreno (HU-02) necesita una pasarela que alcance el servidor (`docs/10 §8.4` punto 24); mientras
-  tanto se prueba en el banco con el JSON exacto de las fuentes oficiales (`banco.sh lorawan`, `docs/16 §31`); la prueba en la misma red que la pasarela del campus está acordada para el martes 20/10 con el compañero a cargo; su pasarela es una UG65 con servidor embebido y dos nodos reportando cada 60 s, y el adaptador se ajusta antes a la forma real de su mensaje (`docs/10 §8.4` punto 47, nota del 15/10).
+  tanto se prueba en el banco con el JSON exacto de las fuentes oficiales (`banco.sh lorawan`, `docs/16 §31`); la prueba en la misma red que la pasarela del campus se hizo el martes 20/10 con el operador de la red (`docs/16 §45`); su pasarela es una UG65 con servidor embebido y dos nodos reportando cada 60 s, y el adaptador se ajusta antes a la forma real de su mensaje (`docs/10 §8.4` punto 47, nota del 15/10).
 
 ## 5. Lo que falta del núcleo y lo que viene después (16/10/2026)
 
@@ -84,7 +84,7 @@ siga sin terminar y que sus horas sean las de `docs/04`: un elemento que se cier
 
 | Orden | Elemento | Horas | Estado | Qué falta |
 |---|---|---|---|---|
-| 1 | HU-02 Eventos LoRaWAN | 6 | 🟡 | **Probada en terreno el 20/10** con la pasarela real del campus y dos nodos de punta a punta (`docs/16 §45`); el banco cubre lo demás (`docs/16 §31`, §36 y §37). Quedan la ruta C (ChirpStack) y la coexistencia con otro broker (vía E) |
+| 1 | HU-02 Eventos LoRaWAN | 6 | 🟡 | **Probada en terreno el 20/10** con la pasarela real del campus y dos nodos de punta a punta (`docs/16 §45`); el banco cubre lo demás (`docs/16 §31`, §36 y §37). Quedan la ruta C (ChirpStack) y la coexistencia con otro broker (vía 4) |
 | 2 | HU-08 Exportar en CSV, XLSX y JSON | 4 | 🟡 | XLSX y la exportación por sitio con rol: necesita la sesión (HU-18) |
 | 3 | TT-22 Cifrado del transporte | 4 | 🟡 | El broker de producción con certificado real (`docs/14`) |
 | 4 | TT-12 Catálogo de sensores y unidades | 6 | 🟡 | El catálogo editable con umbrales; con él, los alias de claves y los perfiles de decodificación (`docs/08 §8`) |

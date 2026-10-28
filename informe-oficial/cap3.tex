@@ -51,13 +51,13 @@ cruza ambos.
 El despliegue completo corre como contenedores en un único servidor (figura~\ref{fig:despliegue},
 capítulo~\ref{cap:diseno}), con reinicio automático ante fallas. \textbf{La frontera con el trabajo del compañero es el tópico
 MQTT}: todo lo anterior (sensor, nodo, radio) es de él; todo lo posterior (broker, pipeline, base de
-datos, API, panel), de este trabajo. Un \textbf{emulador de nodo} (Etapa~4) publicará tramas en el mismo tópico,
+datos, API, panel), de este trabajo. Un \textbf{emulador de nodo} (TT-28, en uso desde la Etapa~3) publica tramas en el mismo tópico,
 de modo que la validación de la plataforma no depende del hardware ni de terceros.
 
-En la rama LoRa hay tres rutas. En la \textbf{ruta C}, la de la red del campus, un servidor de red externo (el ChirpStack de
-la institución) publica por MQTT sobre TLS en el 8883 con credencial propia; en la \textbf{ruta B}, el servidor de red embebido en la
-pasarela (sección~\ref{sec:rama-radio}) publica por MQTT sobre TLS en el puerto 8883, y la pasarela entra
-como un cliente más del broker, con su propia credencial, sin contenedores ni puertos adicionales; B y C solo difieren en el adaptador. La \textbf{ruta A es opcional}:
+En la rama LoRa hay tres rutas. En la \textbf{ruta B}, la de la red del campus hoy, el servidor de red embebido en la
+pasarela (sección~\ref{sec:rama-radio}; UG65, probada en terreno el 20/10) publica por MQTT sobre TLS en el puerto 8883, y la pasarela entra
+como un cliente más del broker, con su propia credencial, sin contenedores ni puertos adicionales; en la \textbf{ruta C}, un servidor de
+red externo (p.\,ej., un ChirpStack institucional, por confirmar) publica igual por 8883; B y C solo difieren en el adaptador. La \textbf{ruta A es opcional}:
 ChirpStack corre en el servidor de la plataforma y las pasarelas le envían por UDP al puerto 1700; solo
 se despliega si las pasarelas no traen servidor de red propio o si se quieren administrar desde un solo
 punto los nodos de varias pasarelas. En las tres, el decodificador de binario a JSON corre en el servidor de
@@ -77,4 +77,4 @@ exige el referente—, lo que se estima en el anexo~\ref{anx:evaluacion} y se mi
 
 \textbf{Restricciones:} RE-01 dedicación $\sim$15 h semanales; RE-02 proyecto individual coordinado
 con el trabajo del compañero; RE-03 solo componentes abiertos; RE-05 umbral de aprobación del
-70\,\%; RE-06 hardware no confirmado, mitigado con el emulador.
+70\,\%; RE-06 hardware de terceros no garantizado, mitigado con el emulador y el nodo propio.

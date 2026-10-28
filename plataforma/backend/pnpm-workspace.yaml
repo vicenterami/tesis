@@ -8,8 +8,8 @@ packages:
 #   @nestjs/core  → su postinstall solo imprime un mensaje de donación
 #   unrs-resolver → su postinstall descarga un binario; pnpm ya lo instala como dependencia opcional
 #   @scarf/scarf  → telemetría: su postinstall avisa a un servidor externo de la instalación; bloqueado
-#   @parcel/watcher → preventivo (23/10/2026): aún no está en el lockfile; llega con la actualización de jest que propone
-#                   Dependabot. Su postinstall compila un módulo nativo solo si falta el binario; pnpm ya instala el binario
+#   @parcel/watcher → bloqueado el 23/10/2026 antes de que llegara; está en el lockfile desde el 26/10 (jest 30.5, por
+#                   jest-haste-map; solo desarrollo, MIT). Su postinstall compila un módulo nativo solo si falta el binario; pnpm ya instala el binario
 #                   de la plataforma como dependencia opcional
 # Si una dependencia futura lo requiere de verdad, se pone en `true` con el porqué al lado.
 allowBuilds:

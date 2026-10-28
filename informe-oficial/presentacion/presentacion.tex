@@ -101,7 +101,7 @@
     \textbf{OE1} Caracterizar las necesidades de la Facultad: literatura, oferta y entrevistas & 30/10 & \hecho: dos
       entrevistas (05/10 y 25/10) \\
     \textbf{OE2} Evaluar y seleccionar el transporte y el formato de los datos & 02/10 & \hecho: MQTT y SenML \\
-    \textbf{OE3} Diseñar la arquitectura, el modelo de datos y el despliegue & 02/10 & \hecho: tres alojamientos
+    \textbf{OE3} Diseñar la arquitectura, el modelo de datos y el despliegue & 02/10 & \hecho: cinco alojamientos
       comparados \\
     \textbf{OE4} Implementar: núcleo mínimo con un dispositivo real (30/10); registro, alertas y \emph{dashboard} (04/12)
       & 30/10 y\newline 04/12 & \encurso: núcleo 25 de 34 tareas \\
@@ -117,8 +117,8 @@
   \includegraphics[width=\linewidth,height=0.56\textheight,keepaspectratio]{resumen.pdf}
   \smallskip
   \begin{columns}[T,onlytextwidth]
-    \begin{column}{0.31\textwidth}{\scriptsize Todo entra cifrado por un solo
-      \textbf{proxy TLS}; el backend es el \textbf{único suscriptor} del broker.\par}\end{column}
+    \begin{column}{0.31\textwidth}{\scriptsize Las vías 1 a 4 entran cifradas por un solo
+      \textbf{proxy TLS}; el backend es el \textbf{único que lee los datos} (\texttt{sitio/\#}).\par}\end{column}
     \begin{column}{0.31\textwidth}{\scriptsize \textbf{Seis filtros}: autenticar,
       analizar, validar, normalizar, alertar y supervisar.\par}\end{column}
     \begin{column}{0.31\textwidth}{\scriptsize Contrato \textbf{SenML}; lo rechazado va
@@ -151,14 +151,13 @@
         \toprule
         Ruta & Servidor de red \\
         \midrule
-        B & Embebido en la pasarela (UG65): \textbf{probada en campo} \\
-        C & Externo, como el ChirpStack del campus: probado su formato en el banco \\
+        B & Embebido en la pasarela (UG65, la red del campus hoy): \textbf{probada en campo} \\
+        C & Servidor de red externo (p. ej. un ChirpStack institucional, por confirmar): formato probado en el banco \\
         A & ChirpStack propio en nuestro servidor: opcional \\
         \bottomrule
       \end{tabular}
     \end{column}
   \end{columns}
-  \medskip
   \footnotesize La 2 la envía el propio equipo, con su token y en SenML; la 4, la pasarela en nombre de sus nodos, con su JSON.\\
 Las rutas B y C entran igual por la vía 3; solo cambia el adaptador.
   \fuente{docs/10 §1 (vías dibujadas y rutas); docs/16 §45, §49 y §53}
@@ -187,7 +186,7 @@ Las rutas B y C entran igual por la vía 3; solo cambia el adaptador.
 \begin{frame}{Prueba de campo: red LoRaWAN del campus (20/10)}
   \begin{columns}[T,onlytextwidth]
     \begin{column}{0.3\textwidth}
-      \cifra{810}{mediciones en 3 h}
+      \cifra{813}{mediciones en 3 h}
       \cifra{2}{nodos y una pasarela real, por TLS}
     \end{column}
     \begin{column}{0.66\textwidth}
@@ -256,12 +255,11 @@ Las rutas B y C entran igual por la vía 3; solo cambia el adaptador.
 
 \begin{frame}{Rendimiento y consumo, medidos}
   \begin{columns}[T,onlytextwidth]
-    \begin{column}{0.24\textwidth}\cifra{409/s}{tramas sin pérdida (meta RNF-01: 50/s)}\end{column}
+    \begin{column}{0.24\textwidth}\cifra{409/s}{pico de 30 s sin pérdida (RNF-01 pide 50/s; medido 59,7)}\end{column}
     \begin{column}{0.24\textwidth}\cifra{324 MiB}{pico de toda la pila (meta: 2 GB)}\end{column}
     \begin{column}{0.24\textwidth}\cifra{180 B}{por lectura en disco}\end{column}
     \begin{column}{0.24\textwidth}\cifra{0 de 180}{perdidas o duplicadas en cada vía}\end{column}
   \end{columns}
-  \medskip
   \footnotesize
   \begin{itemize}
     \item \textbf{50 tramas/s es una meta de estrés}, unas 300 veces la carga del campus (50 canales cada 5 min); la operación
@@ -297,7 +295,7 @@ Las rutas B y C entran igual por la vía 3; solo cambia el adaptador.
     \toprule
     \textbf{Criterio (peso)} & \textbf{Estado} \\
     \midrule
-    50 \% de implementación (10 \%) & \hecho: núcleo 25 de 34 tareas (126 de 168 h); backlog completo 37 de 66 \\
+    50 \% de implementación (10 \%) & \encurso: núcleo 25 de 34 tareas (126 de 168 h) y 4 parciales; backlog completo 37 de 66 \\
     Pruebas iniciales (30 \%) & \hecho: carga, carreras, TLS, capacidad, caídas, campo y 24 h \\
     Validación preliminar (10 \%) & \encurso: sensor real 24 h y red LoRaWAN real del campus \\
     Mejoras (15 \%) & \hecho \\
@@ -334,7 +332,7 @@ Las rutas B y C entran igual por la vía 3; solo cambia el adaptador.
 \begin{frame}{Lo que necesito de usted}
   \begin{enumerate}
     \item Su retroalimentación sobre la Etapa 2 (pesa 20 \% en esta etapa).
-    \item ChirpStack externo del campus (ruta C): ¿se mantiene en la red?
+    \item ¿Hay un ChirpStack institucional en el campus (ruta C), o la red sigue con la pasarela UG65 (ruta B)?
     \item ¿Hay un servidor de la Facultad para la Etapa 4? (OE5: validar en un servidor modesto).
     \item ¿Le parece bien el orden de la Etapa 4, o algo debe subir?
   \end{enumerate}

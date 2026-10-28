@@ -44,8 +44,8 @@ jobs:
           cache-dependency-path: plataforma/backend/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm verificar
-      # SCA: dependencias con vulnerabilidades conocidas (docs/11 §4). Falla con severidad alta o crítica, salvo las
-      # excepciones declaradas en pnpm-workspace.yaml (audit.ignore: avisos sin versión corregida que no entran a producción).
+      # SCA: dependencias con vulnerabilidades conocidas (docs/11 §4). Falla con severidad alta o crítica; hoy sin excepciones
+      # (si se declara una, va en audit.ignore de pnpm-workspace.yaml con su porqué, y el guardián 2q la vigila).
       - run: pnpm audit --audit-level=high
       # Lo que va a producción no puede tener ningún aviso, ni siquiera exceptuado: audit.ignore aplica también con --prod,
       # así que el código de salida no basta; el metadata del JSON cuenta todo, incluido lo ignorado (08/10/2026).

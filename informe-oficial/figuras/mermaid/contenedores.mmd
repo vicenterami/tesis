@@ -5,13 +5,13 @@ flowchart TB
     end
     N2["Nodo Wi-Fi o celular<br/>cliente MQTT"]
         N3["Equipo que solo habla HTTP<br/>nodo 4G o sistema de terceros"]
-        subgraph RB["Ruta B"]
+        subgraph RB["Ruta B · red del campus hoy"]
             direction TB
             NB["Nodos LoRa"] -- "radio" --> GB["Pasarela con servidor<br/>de red embebido"]
         end
-        subgraph RC["Ruta C · red del campus"]
+        subgraph RC["Ruta C · servidor de red externo"]
             direction TB
-            NC["Nodos LoRa"] -- "radio" --> GC["Pasarela del campus"] -- "UDP 1700" --> NS["Servidor de red externo<br/>ChirpStack"]
+            NC["Nodos LoRa"] -- "radio" --> GC["Pasarela"] -- "UDP 1700" --> NS["Servidor de red externo<br/>p. ej. ChirpStack institucional"]
         end
     subgraph RA["Ruta A · opcional, sin TLS"]
         direction TB
@@ -24,8 +24,8 @@ flowchart TB
         CS["ChirpStack propio<br/>solo ruta A"]
         subgraph BE["Backend NestJS · un solo puerto interno: 3000"]
             direction LR
-            M1["M1 Recepción<br/>MQTT y POST /recepcion/{id}"] --> M2["M2 Pipeline<br/>de 6 filtros"] --> M6["M6 Alertas"] --> M4["M4 Supervisión"]
-            M5["M5 Consulta<br/>panel, API REST y SSE"]
+            M1["M1 Recepción<br/>MQTT y POST /recepcion/{id}"] --> M2["M2 Normalización<br/>pipeline de 6 filtros"] --> M6["M6 Alertas"] --> M4["M4 Supervisión"]
+            M5["M5 Persistencia y consulta<br/>panel, API REST y SSE"]
         end
         DB[("TimescaleDB")]
     end
