@@ -15,9 +15,27 @@
 #include <esp_task_wdt.h>
 #include <math.h>
 #include <string.h>
+// Los secretos de esta placa: include/secretos.h, o el archivo que nombre el entorno (nodo-s3: secretos-s3.h, otra identidad).
+#ifdef SECRETOS_ARCHIVO
+#include SECRETOS_ARCHIVO
+#else
 #include "secretos.h"
+#endif
 
-static constexpr int PIN_SDA = 21, PIN_SCL = 22, PIN_1WIRE = 4, PIN_SUELO = 34;  // docs/17 §4.4
+// Pines de la NodeMCU ESP-32S (docs/17 §4.4) salvo que el entorno los defina (nodo-s3: en el ESP32-S3 no existen el 22 ni el 34).
+#ifndef NODO_PIN_SDA
+#define NODO_PIN_SDA 21
+#endif
+#ifndef NODO_PIN_SCL
+#define NODO_PIN_SCL 22
+#endif
+#ifndef NODO_PIN_1WIRE
+#define NODO_PIN_1WIRE 4
+#endif
+#ifndef NODO_PIN_SUELO
+#define NODO_PIN_SUELO 34
+#endif
+static constexpr int PIN_SDA = NODO_PIN_SDA, PIN_SCL = NODO_PIN_SCL, PIN_1WIRE = NODO_PIN_1WIRE, PIN_SUELO = NODO_PIN_SUELO;
 static constexpr uint32_t PERIODO_S = 60;             // docs/10 §8.4 punto 51; el mismo intervalo_esperado_s del alta
 static constexpr uint32_t ESPERA_WIFI_MS = 20000;
 static constexpr uint32_t ESPERA_NTP_MS = 10000;
@@ -213,11 +231,15 @@ static int armarPack(char *pack, size_t &largo) {
   const float tSuelo = sondas.getTempCByIndex(0);
   if (tSuelo != DEVICE_DISCONNECTED_C && tSuelo != DS18B20_ARRANQUE_C) registro("temperatura_suelo", "Cel", "%.2f", tSuelo);
   else Serial.print("sonda: sin lectura válida, omitida · ");
+#ifdef SIN_SUELO  // placa sin el sensor de suelo cableado (nodo-s3): un pin al aire daría milivoltios al azar, no una medición
+  Serial.print("suelo: sin sensor en esta placa, omitido · ");
+#else
   uint32_t suma = 0;
   for (int i = 0; i < 16; i++) suma += analogReadMilliVolts(PIN_SUELO);
   const uint32_t mv = suma / 16;
   if (mv >= SUELO_MINIMO_MV) registro("humedad_suelo", "V", "%.3f", mv / 1000.0);  // en V, no mV (docs/10 §8.4 punto 51)
   else Serial.print("suelo: por debajo de 100 mV (sin alimentación o desconectado), omitido · ");
+#endif
   if (WiFi.status() == WL_CONNECTED) registro("rssi", "dBm", "%.0f", static_cast<double>(WiFi.RSSI()));
   if (!agregar(pack, largo, "]")) return 0;
   return registros;

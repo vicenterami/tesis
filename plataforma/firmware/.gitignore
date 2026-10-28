@@ -1,2 +1,3 @@
 .pio/
 include/secretos.h
+include/secretos-*.h

@@ -236,3 +236,16 @@ y un pack con un sensor omitido → cinco mediciones. (2) **Con la placa (hecho)
 grabar, monitor, el dispositivo en línea en el panel y las seis series en su ficha; después, 24 h seguidas del 23 al 24/10
 (`docs/16 §53`: 1 440 de 1 440 tramas), que destaparon la falla del BME280 que motiva la fila «Salud del BME280 en cada ciclo».
 
+
+### 6.3 Segunda placa: ESP32-S3 con radio LoRa (28/10/2026)
+
+Una segunda placa, Heltec WiFi LoRa 32 V3 (ESP32-S3FN8 con 8 MB de flash integrada, radio SX1262 y puente CP2102; identificada con
+esptool: «Chip is ESP32-S3 (QFN56)», «Embedded Flash 8MB»), corre el **mismo firmware de la fase 2** como un dispositivo distinto,
+`nodo-0002`, con su propia alta y su propia credencial: así se prueba que dos nodos conviven en el mismo broker sin interferirse (usuario,
+identificador de cliente y tópicos distintos; la ACL de uno no alcanza al otro). Lo que cambia está en `platformio.ini` (`env:nodo-s3`,
+que extiende a `nodo`): la tarjeta; los pines, porque en el ESP32-S3 no existen el 22 ni el 34 (`41`/`42` para I2C, `2` para 1-Wire y
+`4` para el ADC, los que esa placa deja libres según su variante en el framework: la pantalla usa 17, 18 y 21 y la radio del 8 al 14);
+el archivo de secretos (`include/secretos-s3.h`, ignorado por git como `secretos.h`); y la bandera `SIN_SUELO`, porque esa placa no tiene
+el sensor de suelo cableado y un pin al aire daría milivoltios al azar, no una medición. Sin sensores publica solo `rssi`; si se le
+cablean, publica lo que responda, como el nodo 1. La radio LoRa y la pantalla no se usan: la vía LoRaWAN sigue dependiendo de una
+pasarela (§1).

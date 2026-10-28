@@ -27,3 +27,13 @@ a nada (`.pio/` está ignorado por git).
 
 Esquema de cableado de la fase 1, editable en diagrams.net (archivo `.drawio`, sin comprimir): `cableado-fase-1.drawio`. Se abre con
 «Archivo → Abrir desde → Dispositivo» o arrastrándolo al lienzo; exportar a PNG para una figura.
+
+## Segunda placa (ESP32-S3 con radio LoRa, 28/10/2026)
+
+El mismo firmware de la fase 2 corre en una Heltec WiFi LoRa 32 V3 como otro dispositivo (`nodo-0002`), con su propia alta y credencial en
+`include/secretos-s3.h` (copiar `secretos.h` y cambiar `DISPOSITIVO_ID` y `DISPOSITIVO_CLAVE`; git lo ignora). Qué cambia y por qué:
+`platformio.ini`, entorno `nodo-s3`, y `docs/17 §6.3`.
+
+```
+pio run -e nodo-s3 -t upload && pio device monitor -e nodo-s3
+```
