@@ -8,7 +8,7 @@
 #     guion de arranque que lo llama (08/10): sin él, la imagen levantada sola, sin el compose, se caía al iniciar.
 # Queda, documentado: gosu (el arranque lo usa para bajar privilegios). Cuando la imagen oficial se reconstruya con los
 # parches, este archivo vuelve a ser casi solo el FROM.
-FROM timescale/timescaledb:2.30.2-pg16-oss@sha256:df09d239ecc10f30dcd03165b9d8d61e30ef6465af05bceb9ab20f1c7e0f3469
+FROM timescale/timescaledb:2.31.0-pg16-oss@sha256:1bfcf994089b9c97b4ddfa07f2ff9eec430709715e419d9a6957d1a4b4614cd1
 RUN apk upgrade --no-cache pyc python3 python3-pyc python3-pycache-pyc0 zlib libexpat \
     && rm -f /usr/local/bin/timescaledb-parallel-copy /usr/local/bin/timescaledb-tune \
              /docker-entrypoint-initdb.d/001_timescaledb_tune.sh
