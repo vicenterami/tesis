@@ -20,8 +20,8 @@ los gigabytes, y de los gigabytes casi todo lo demás. Rubros y qué los mueve:
 | Registros | Rotación de Docker: 10 MB × 5 por servicio (`docs/11 §4`, 07/10/2026) | ≤ 200 MB en total, fijo |
 | Base de datos gestionada | Solo si se externaliza | No: TimescaleDB va en el mismo servidor (RNF-17) |
 | Tráfico de salida | GB que salen a Internet | Mínimo: el panel y la API sirven agregados, no datos crudos |
-| Observabilidad | Logs y métricas por volumen | `docker compose logs` y `docker stats`; sin servicio externo |
-| Dominio y TLS | Registro anual; certificados | Dominio ~USD 10–15/año; TLS gratuito (Let's Encrypt por ACME en el proxy) o CA propia si el servidor no es público (por decidir) |
+| Observabilidad | Logs y métricas por volumen | `docker compose logs` y `docker stats`; además un vigilante externo por latido, gratuito (§7.2): un servidor caído no puede avisar por sí mismo |
+| Dominio y TLS | Registro anual; certificados | Dominio ~USD 10–15/año; TLS gratuito (Let's Encrypt por ACME en el proxy) o CA propia si el servidor no es público (servidor de prueba: CA propia del servidor, §7; Let's Encrypt cuando exista nombre público) |
 
 ## 2. Modelo de volumen y política de retención
 
@@ -102,7 +102,9 @@ Notas de riesgo: en A, los planes compartidos de Hetzner aparecían **sin dispon
 septiembre de 2026 y subieron 30–38 % en junio (fuente citada); en D, la capacidad ARM gratuita suele
 estar agotada y el límite se redujo sin aviso: no hay garantía de servicio. En C, la operación depende
 de la red institucional (IP pública o túnel de salida) y de que alguien mantenga el equipo, lo que
-reintroduce la causa C4 salvo que lo administre la unidad de TI del campus.
+reintroduce la causa C4 salvo que lo administre la unidad de TI del campus. Desde el 01/11/2026 la alternativa C está en marcha como
+**servidor de prueba** (§7): la administración va por una red privada cifrada de salida entre equipos propios, que no exige puertos de
+entrada en la red institucional.
 
 ## 4. Criterios ponderados y evaluación
 
@@ -211,7 +213,63 @@ Para que varias réplicas no dupliquen tramas ni partan los topes, hacen falta c
 **Qué se actualiza al pasar a B:** `docs/10` (§4.1, §6 y punto nuevo en §8.4), `docs/07` (Redis si entra), `docs/11 §4` (una réplica
 menos no es un riesgo nuevo, pero Redis sí tiene su fila), `docs/04` (elemento de la Etapa 4) y este documento.
 
-## 7. Pendiente
+## 7. Instalación en un servidor de prueba: procedimiento (decidido el 01/11/2026)
+
+La alternativa C de §3 se pone en marcha como **servidor de prueba**: un equipo reutilizado (8–16 GB de RAM, 2–4 núcleos), en la red de
+una institución, sin nombre DNS público y, en principio, sin puertos de entrada desde Internet. No hay usuarios todavía: es un entorno para
+probar la instalación, la operación y el acceso remoto antes de llamarlo producción. El procedimiento vale para cualquier servidor Linux
+con Docker; lo que cambia entre uno y otro son los datos (nombres, direcciones, credenciales), que viven fuera del repositorio. Las
+decisiones están en `docs/10 §8.4` punto 55 y los controles que exige, en `docs/11 §8`.
+
+| Pieza | Decisión | Por qué |
+|---|---|---|
+| Sistema operativo | Una distribución LTS con soporte de seguridad vigente (Ubuntu Server 26.04 LTS si se instala desde cero; si el equipo trae uno, se acepta solo si pasa la lista de §7.1), instalación estándar, disco **sin cifrar**, parches de seguridad automáticos con reinicio a una hora fija en UTC, registros del sistema acotados | Soporte hasta 2031 sin migrar; Docker y el cliente de la red privada publican paquetes para esa versión (verificado el 01/11/2026); el servidor reinicia solo, y cifrar el disco exigiría teclear una frase en cada arranque; los datos son de prueba |
+| Acceso de administración | **Red privada cifrada (WireGuard) entre los equipos del operador y el servidor, de salida**: SSH y los puertos de personas (443 y 80) se publican **solo en la dirección de esa red**. Nada de administración se expone a Internet ni a la red institucional. Mientras la institución no reenvíe un puerto UDP, la red la coordina un servicio de terceros (Tailscale, plan Personal gratuito para uso no comercial, hasta 6 usuarios: [precios](https://tailscale.com/pricing), consultado el 01/11/2026); cuando lo reenvíe, WireGuard propio sin terceros, preparado desde el primer día (las dos conviven) | No depende de que la institución abra puertos; cumple `docs/11 §8` («la API no se publica en 443 antes de M7»): el panel no está en Internet, está en la red privada; cada equipo entra con su propia llave y se revoca por separado; el servicio de coordinación reparte llaves y atraviesa el NAT, pero el tráfico va cifrado de extremo a extremo y no pasa por él |
+| Puerto de dispositivos 8883 | Publicado en todas las interfaces | Es el único puerto que el diseño expone (`docs/10 §2`): lo alcanzan la pasarela de la red local y los equipos de la red privada; TLS, credencial por dispositivo y topes del proxy |
+| Certificado | CA propia **del servidor de prueba**, distinta de la de desarrollo, creada fuera del servidor (su clave privada no viaja); un solo certificado con SAN para el nombre interno `proxy` (lo verifica el nodo), la dirección de la red local (la verifica la pasarela) y la dirección y el nombre de la red privada (los verifican los navegadores); la raíz se instala una vez en cada cliente | Un solo certificado sirve a los tres tipos de cliente sin tocar la configuración del proxy. Let's Encrypt sigue siendo la meta con nombre público: la imagen del proxy ya trae el módulo ACME nativo de nginx (`ngx_http_acme_module`, verificado el 01/11/2026 en la imagen fijada por digest) y el puerto 80 ya redirige; faltan el nombre y el puerto 80 de entrada |
+| Secretos | Generados **en el servidor** con `openssl rand`; nunca se copia el `.env` de desarrollo | `docs/11 §8` y `docs/11 §5`: un `.env` por entorno |
+| Forma de producción | `COMPOSE_FILE=docker-compose.yml:proxy/compose.proxy.yml` en el `.env` del servidor | Compose ignora el `override` de desarrollo aunque esté en el árbol (verificado el 01/11/2026: `docker compose config` publica solo los tres puertos del proxy) |
+| Arranque | `restart: unless-stopped`, `live-restore` del demonio, el demonio espera a la red privada (`After=`) y `net.ipv4.ip_nonlocal_bind=1` | Corrección candidata del hallazgo de la demostración del 28/10/2026 (un proxy «Up» sin red porque su dirección aún no existía al arrancar, `bitacora/2026-10-28`); se verifica reiniciando dos veces |
+| Respaldo | `pg_dump -Fc` diario más el archivo del plugin del broker, 30 días en el servidor, copia periódica fuera por la red privada, **restauración probada** (`timescaledb_pre_restore` → `pg_restore` → `timescaledb_post_restore`) | `docs/10 §9.5` (RPO 24 h, RTO 1 h) y `docs/11 §8` |
+| Avisos | Vigilante externo por latido (§7.2) | Un servidor caído no puede avisar que se cayó |
+| Actualizar | `git pull --ff-only` con una llave de despliegue de solo lectura → `escanear-imagenes.sh` → `docker compose up -d --build` → `GET /salud` | Lo construido se escanea antes de correr (`docs/11 §8`); en un paso con `desplegar.sh` (Etapa 4) |
+
+### 7.1 Orden de instalación
+
+El detalle con salidas esperadas es operación y no se versiona; el orden sí, porque cada paso protege al siguiente:
+
+1. **Equipo:** encendido automático al volver la energía, contraseña de configuración del firmware, arranque solo desde el disco. Sin
+   cifrado de disco, la contraseña del firmware es lo que impide arrancar otro sistema desde un USB.
+2. **Sistema:** si el equipo trae uno, se acepta solo si (a) tiene soporte de seguridad vigente, (b) el operador obtiene `sudo`, (c) no hay
+   usuarios, llaves SSH ni servicios escuchando hacia afuera que no se puedan explicar, (d) el disco está sano (SMART) y (e) se puede
+   actualizar; si falla una, se reinstala. Un disco mecánico viejo se reemplaza por un SSD antes de confiarle datos: el tamaño no importa
+   (§2), la edad sí.
+3. **SSH y cortafuegos:** solo con llave, un usuario, sin root; entrada denegada salvo SSH por la interfaz de la red privada. El cortafuegos
+   del anfitrión no filtra lo que Docker publica: el control de los puertos de la plataforma es la dirección en la que se publican
+   (`docs/11 §8`).
+4. **Red privada, parches automáticos, Docker** desde el repositorio oficial, `live-restore`.
+5. **Plataforma:** repositorio con llave de solo lectura; `.env` nuevo; certificado; `docker compose config` revisado: tres puertos, todos
+   del proxy.
+6. **Construir, escanear, levantar;** prueba de reinicio; sitio, zona, pasarela y dispositivos de prueba.
+7. **Respaldo con restauración probada; latido probado;** rotación de todo antes de llamarlo producción (`docs/11 §7`).
+
+### 7.2 Vigilante externo por latido («hombre muerto»)
+
+La plataforma vigila a sus propios servicios (`docs/10 §6`), pero esos chequeos viven dentro del servidor: si se apaga o pierde la red,
+nadie los ve. Un temporizador del sistema consulta `GET /salud` cada 5 minutos y, **solo si responde `ok`**, envía un latido a un servicio
+externo; si pasan 10 minutos sin latido, el servicio avisa por correo y por mensajería. Un solo chequeo cubre las dos caídas: servidor
+apagado o sin red, y plataforma enferma. Servicio elegido: Healthchecks.io, plan gratuito de 20 chequeos
+([precios](https://healthchecks.io/pricing), consultado el 01/11/2026), código abierto bajo licencia BSD de tres cláusulas y autoalojable si algún día se
+prefiere. La URL del chequeo es un secreto de operación (`docs/11 §4`). La prueba de que avisa es parte de la instalación: detener el
+backend durante el tiempo de gracia y recibir el aviso.
+
+### 7.3 Lo que este servidor de prueba no cubre
+
+Acceso de terceros al panel (M7), nombre público y Let's Encrypt (`docs/10 §8.4` punto 22), un nodo fuera de la red institucional
+publicando al servidor (necesita un puerto de entrada) y alta disponibilidad (§6.2). Costo: el equipo existía; energía del orden de la
+fila C de §3; red privada y avisos, CLP 0 en sus planes gratuitos.
+
+## 8. Pendiente
 
 - [ ] Recotizar en la calculadora de cada proveedor la semana previa a contratar; registrar fecha.
 - [ ] Vistas materializadas horaria y diaria (Etapa 3; edición Apache). La tarea de retención ya existe (`RetencionService`, 07/10): `trama` y `cuarentena` a 30 días; mediciones sin límite salvo que se configure.

@@ -76,6 +76,8 @@
 
 | Capa | Control | Cuándo |
 |---|---|---|
+| 1 | **Red privada de administración** (01/11/2026, `docs/10 §8.4` punto 55, `docs/14 §7`): SSH y los puertos de personas (443 y 80) se publican solo en la dirección de la red privada WireGuard del operador; la cuenta del servicio de coordinación con segundo factor; aprobación manual de cada equipo nuevo; la llave del servidor sin vencimiento automático (si vence, el servidor desaparece de la red sin aviso); WireGuard propio preparado para cuando la institución reenvíe un puerto UDP | Servidor de prueba (11/2026) |
+| 8 | **Vigilante externo por latido** (01/11/2026, `docs/14 §7.2`): la URL del chequeo es un secreto de operación (quien la tenga puede silenciar la alarma o fingir que todo va bien): en un archivo con permisos 600 del usuario operador, fuera del repositorio y del guion; se regenera desde el servicio si se filtra; la cuenta del servicio con segundo factor; el canal de mensajería solo recibe avisos, nunca órdenes | Servidor de prueba (11/2026) |
 | 2 | **Fechas de validez del certificado en el nodo ESP32** (19/10/2026): el TLS del núcleo Arduino-ESP32 compila mbedTLS sin `MBEDTLS_HAVE_TIME_DATE` y no revisa `notBefore`/`notAfter`, así que un certificado o una CA vencidos se aceptarían (`docs/17 §6.2`). Aceptado en desarrollo (CA propia, certificado de 398 días); antes de producción, un núcleo con esa opción activa o una comprobación propia de la fecha tras NTP | Etapa 4 |
 | 2 | Proxy **nginx** (decidido el 06/10/2026, `docs/10 §8.4` punto 10) con TLS en 443 y 8883, variante A. **Capa implementada el 07/10** (`plataforma/proxy/`: TLS 1.2+, HSTS, registro JSON, resolución dinámica del nombre) y probada de punta a punta en el banco (`banco.sh proxy`). Falta: certificado del servidor (por decidir, `docs/10 §8.4` punto 22), y, en producción, no publicar el 1883 (hoy solo lo publica el override de desarrollo) | Etapa 3 (despliegue) |
 | 1 | **Registros de Docker acotados**: `logging` `json-file` con `max-size 10m` y `max-file 5` en cada servicio, proxy incluido (techo 50 MB por servicio; sin límite, el chequeo de salud del broker sumaba ≈ 395 MB/año medidos). Guardián paso 2n | ✅ 07/10/2026 |
@@ -224,8 +226,8 @@ queda dicho; lo que no corta, también.
 | Clave del superusuario de la base (`DB_CLAVE` en el `.env`, que el compose pasa como `POSTGRES_PASSWORD`) | sí | anual | de inmediato | `ALTER ROLE … PASSWORD` dentro del contenedor y el `.env`; solo la usan migraciones y respaldos | ninguno (el backend no la usa) | ídem |
 | `HTTP_CLAVE_ADMIN` (cabecera `X-Clave-Admin`) | sí | cada 3 meses, y se **retira** con la sesión (M7, RF-44) | de inmediato | `.env` → reiniciar el backend; quien la usa la recibe por un canal que no sea el chat | segundos | ídem |
 | `PROXY_SECRETO` (cabecera `X-Proxy-Secreto`, `docs/10 §8.4` punto 52) | sí (el de desarrollo nunca viaja al servidor) | cada 6 meses | de inmediato | `.env` → `docker compose up -d --force-recreate proxy backend` (el mismo valor en los dos) | segundos; mientras difieren, el backend no cree en `X-Forwarded-For` y lo anota (acotado) | ídem |
-| Certificado del servidor (443 y 8883) | se emite el real: ACME con renovación automática o CA institucional (`docs/10 §8.4` punto 22, decisión pendiente) | **automática** cada 60–90 días con ACME; con CA institucional, según su vigencia | revocar y reemitir; reiniciar el proxy | el proxy recarga el certificado sin cortar sesiones (`nginx -s reload`) | ninguno con `reload`; las sesiones MQTT vivas siguen con el certificado con que saludaron | registro del proxy y bitácora |
-| Raíz de confianza en los clientes (`ca.crt` en pasarelas; raíz en el firmware del nodo) | la CA propia es **solo de desarrollo**: en producción los clientes confían en la raíz pública (ACME) o en la institucional, instalada una vez | solo cuando cambia la CA (años), no en cada renovación del certificado: la raíz no cambia | si la CA se compromete: reemitir y reinstalar en cada pasarela y nodo | pasarela: TLS → CA File; nodo: nuevo firmware (`docs/17 §6.2`) | por cliente, hasta que reciba la raíz nueva | bitácora, con la lista de clientes actualizados |
+| Certificado del servidor (443 y 8883) | se emite el real: ACME con renovación automática o CA institucional (`docs/10 §8.4` punto 22; en el servidor de prueba, la CA propia del servidor del punto 55) | **automática** cada 60–90 días con ACME; con CA institucional, según su vigencia | revocar y reemitir; reiniciar el proxy | el proxy recarga el certificado sin cortar sesiones (`nginx -s reload`) | ninguno con `reload`; las sesiones MQTT vivas siguen con el certificado con que saludaron | registro del proxy y bitácora |
+| Raíz de confianza en los clientes (`ca.crt` en pasarelas; raíz en el firmware del nodo) | la CA propia es de desarrollo o del servidor de prueba (una CA distinta por entorno, `docs/10 §8.4` punto 55); en producción los clientes confían en la raíz pública (ACME) o en la institucional, instalada una vez | solo cuando cambia la CA (años), no en cada renovación del certificado: la raíz no cambia | si la CA se compromete: reemitir y reinstalar en cada pasarela y nodo | pasarela: TLS → CA File; nodo: nuevo firmware (`docs/17 §6.2`) | por cliente, hasta que reciba la raíz nueva | bitácora, con la lista de clientes actualizados |
 
 Tres reglas que atraviesan la tabla: (1) **se rota, nunca se «recupera»**: ningún secreto se puede leer de vuelta; (2) **la prueba es parte de
 la rotación**: cada guion comprueba que la credencial nueva entra antes de dar por hecho el cambio, y una rotación de dispositivo se verifica
@@ -283,17 +285,21 @@ de desarrollo:
 - [ ] **Eliminar los usuarios y dispositivos de prueba** (`dev-*`) del plugin del broker (`broker-cliente.sh --borrar`) y de la base.
 - [ ] Proxy TLS en 443 y 8883 antes de exponer nada a Internet (capa 2). En el `.env` del servidor: `PROXY_NOMBRE` con el
       nombre público (el del certificado; alimenta el `server_name` del proxy y la lista de `Host` del backend, §3) y
-      `PROXY_IP_DISPOSITIVOS=0.0.0.0` para publicar 8883; `PROXY_IP_PERSONAS` queda en 127.0.0.1 hasta M7 (12/10/2026:
+      `PROXY_IP_DISPOSITIVOS=0.0.0.0` para publicar 8883; `PROXY_IP_PERSONAS` queda en 127.0.0.1, o en la dirección de la red privada de administración (`docs/14 §7`), hasta M7 (12/10/2026:
       antes una sola variable publicaba los tres puertos y esta lista no se podía cumplir).
 - [ ] **La API no se publica en 443 mientras no exija credencial** (M7, RF-43): hoy `/dispositivos`
       responde sin sesión por diseño (consulta de solo lectura), y eso es correcto en `127.0.0.1`,
-      no en Internet. Hasta M7, el proxy expone solo 8883 y 1700/udp.
+      no en Internet. Hasta M7, el proxy expone solo 8883 y 1700/udp. **Servidor de prueba (01/11/2026):** 443 y 80 se publican
+      solo en la dirección de la red privada de administración (`PROXY_IP_PERSONAS`): el panel es alcanzable para el operador sin
+      estar en Internet (`docs/14 §7`).
 - [ ] `HTTP_DOCS` ausente o distinto de `si` en el servidor: `/docs` apagada (se verifica con
       `curl -o /dev/null -w '%{http_code}' https://…/docs` → 404).
 - [ ] Rol de base de datos del backend sin `DROP`/`TRUNCATE` (capa 6).
 - [ ] Respaldo automático configurado (`pg_dump` diario, cifrado, copia fuera del servidor) y **una restauración
       probada** antes de recibir datos reales; RPO y RTO decididos con el usuario (`docs/10 §9.5`).
-- [ ] Cortafuegos del servidor coordinado con Docker (regla `DOCKER-USER`), documentado en §4.
+- [ ] Cortafuegos del servidor coordinado con Docker, documentado en §4: el cortafuegos del anfitrión (`ufw`, cadena `INPUT`) **no
+      filtra** lo que Docker publica (va por `FORWARD`); el control de primer orden es **en qué dirección se publica cada puerto**
+      (`PROXY_IP_*`) y el de segundo, la cadena `DOCKER-USER` (01/11/2026).
 - [ ] **Construir con bases frescas, escanear y desplegar eso mismo:** `bash plataforma/pruebas/escanear-imagenes.sh`
       construye con `--pull --no-cache` y escanea: cero vulnerabilidades altas o críticas con corrección publicada; lo que
       no la tenga, anotado en §4 con su porqué. Enseguida, `docker compose up -d --build`, que reusa las capas recién
@@ -305,6 +311,11 @@ de desarrollo:
       El paso 2k del guardián compara la versión de la extensión con la de la imagen.
 - [ ] `docker compose config` en el servidor para revisar la configuración efectiva final: cero
       `ports` salvo los del proxy.
+- [ ] **Anfitrión endurecido antes de la plataforma** (01/11/2026, `docs/14 §7.1`): distribución con soporte vigente, parches de
+      seguridad automáticos, SSH solo con llave y sin root, entrada denegada salvo SSH por la red privada, llave de despliegue de **solo
+      lectura** para el repositorio (nunca la llave personal del operador en el servidor), y la plataforma vuelve sola tras un reinicio
+      (probado dos veces).
+- [ ] **Vigilante externo por latido probado** (§4, `docs/14 §7.2`): sin la prueba de que avisa, el aviso no existe.
 
 ## 9. Identidad, cifrado y mínimo privilegio por tramo (13/10/2026; regla en `docs/10 §8.4` punto 44)
 

@@ -751,6 +751,10 @@ lee `$SYS/#`, no puede publicar ni leer ningún tópico de datos (`acl`, `docs/1
 imagen llama a `GET /salud`, que confirma también la conexión con la base. Esas conexiones de `sonda`
 son las que aparecen cada 15 s en el registro del broker; `pila.sh logs` las oculta de la vista.
 
+**Vigilante externo (01/11/2026).** Los chequeos de arriba viven dentro del servidor: si el servidor se apaga o pierde la red,
+nadie los ve. En el servidor de prueba un temporizador del sistema consulta `GET /salud` cada 5 min y, solo si responde `ok`, envía un
+latido a un servicio externo que avisa tras 10 min de silencio (§8.4 punto 55; `docs/14 §7.2`).
+
 **Apagado ordenado (27/09/2026, hallazgo del ensayo).** Al recibir `SIGTERM` (lo que envía `docker compose
 stop` o un redespliegue) el backend cierra en orden: detiene el supervisor, se desconecta del broker
 —conservando su sesión persistente y su cola— y cierra el pool de la base. Hasta el 27/09 no lo hacía:
@@ -1583,6 +1587,24 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     tramas descartadas antes del filtro 4 (contador repetido, tope) no cuentan. La lectura de «abierta» en el filtro 1 no se cruza con
     otra trama del mismo nodo porque se procesan de a una (MQTT en serie, decisión 4; HTTP de a una por identificador, punto 52). (vi) **Prueba:** unitarias en `tiempo.spec.ts`, `recepcion.service.spec.ts`, `supervision.service.spec.ts` y
     `estado-visual.test.ts`; `banco.sh lorawan` de punta a punta; `docs/16 §46`.
+
+55. **Servidor de prueba en la red de una institución: acceso por red privada, CA propia del servidor y vigilante externo (decidido el
+    01/11/2026; procedimiento en `docs/14 §7`).** (i) **Acceso:** la administración (SSH) y los puertos de personas (443 y 80) se publican
+    **solo en la dirección de una red privada cifrada** (WireGuard) entre los equipos del operador y el servidor, de salida, sin puertos de
+    entrada en la red institucional; mientras la institución no reenvíe un puerto UDP, la coordinación la hace un servicio de terceros
+    (reparte llaves y atraviesa el NAT; el tráfico no pasa por él); cuando lo reenvíe, WireGuard propio, preparado desde el inicio (conviven).
+    Cumple `docs/11 §8` («la API no se publica en 443 antes de M7»): el panel no está en Internet, está en la red privada. El 8883 se publica
+    en todas las interfaces (es el único puerto que §2 expone). **La interfaz de publicación es el control:** el cortafuegos del anfitrión
+    (`INPUT`) no filtra lo que Docker publica (`FORWARD`); el segundo control es la cadena `DOCKER-USER`. (ii) **Certificado (punto 22, para
+    la prueba):** CA propia **del servidor**, distinta de la de desarrollo (una CA por entorno: comprometer o retirar una no toca la otra),
+    creada fuera del servidor; un solo certificado con SAN para `proxy` (el nodo verifica ese nombre), la dirección local (la pasarela
+    verifica la dirección) y la dirección y el nombre de la red privada (navegadores). Let's Encrypt sigue siendo la meta con nombre
+    público: la imagen del proxy ya trae el módulo ACME nativo de nginx (`ngx_http_acme_module`, verificado el 01/11/2026). (iii) **Caídas:**
+    un vigilante externo por latido («hombre muerto»): cada 5 min, si `GET /salud` responde `ok`, el servidor envía un latido a un servicio
+    externo; 10 min sin latido → aviso por correo y mensajería. Complementa los chequeos de salud de §6, que no pueden avisar cuando el
+    servidor se apaga. (iv) **Arranque:** corrección candidata del hallazgo del 28/10/2026 (proxy «Up» sin red cuando su dirección aún no
+    existía): el demonio de Docker espera a la red privada y `net.ipv4.ip_nonlocal_bind=1`; se verifica reiniciando dos veces. (v) **Lo que
+    no decide:** nombre público, acceso de terceros al panel (M7), un nodo fuera de la red institucional publicando al servidor.
 
 ## 9. Crecimiento, resiliencia y respaldo (aprobado el 06/10/2026)
 
