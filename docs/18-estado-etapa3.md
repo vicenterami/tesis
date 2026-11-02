@@ -109,7 +109,7 @@ y HU-01 se cerraron el 16/10: `docs/16 §39`, §40 y §41; HU-19, el 24/10.)
 | Envío HTTP desde la pasarela a un servidor propio | `docs/10 §8.4` punto 47 | Meta, cuando haya servidor |
 | Cargas masivas (alta de muchos dispositivos de una vez) y bandeja de detectados | Entrevista del 25/10; bloque 2 de `docs/04 §8` (decidido el 25/10) | Por diseñar en la Etapa 4 |
 | Registros técnicos que no se pierden al recrear un contenedor, y catálogo de errores | `docs/11 §4` (rotación hecha) | Por diseñar |
-| Tope por emisor y tope de lecturas por trama | `docs/10 §8.4` punto 53, `docs/11 §3` | Hecho el 17/10: presupuesto de lecturas por hora y cuota de cuarentena en las tres vías, con contadores persistentes (migración 19) y condición `tope_superado` (`docs/16 §42`) |
+| Tope por emisor y tope de lecturas por trama | `docs/10 §8.4` punto 53, `docs/11 §3` | Hecho el 17/10: presupuesto de lecturas por hora y cuota de cuarentena en las tres entradas, con contadores persistentes (migración 19) y condición `tope_superado` (`docs/16 §42`) |
 | Procesamiento en paralelo con comparación atómica del contador de trama | `docs/10 §4.1` | Por diseñar; hoy se procesa de a uno |
 
 ## 6. Cómo se mantiene

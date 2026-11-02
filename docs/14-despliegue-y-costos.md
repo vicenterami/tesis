@@ -248,8 +248,8 @@ El detalle con salidas esperadas es operación y no se versiona; el orden sí, p
    del anfitrión no filtra lo que Docker publica: el control de los puertos de la plataforma es la dirección en la que se publican
    (`docs/11 §8`).
 4. **Red privada, parches automáticos, Docker** desde el repositorio oficial, `live-restore`.
-5. **Plataforma:** repositorio con llave de solo lectura; `.env` nuevo; certificado; `docker compose config` revisado: tres puertos, todos
-   del proxy.
+5. **Plataforma:** repositorio con llave de solo lectura; `.env` nuevo; certificado; `docker compose config` revisado: tres puertos publicados y
+   todos del proxy (443, 8883 y el 80, que solo redirige a 443).
 6. **Construir, escanear, levantar;** prueba de reinicio; sitio, zona, pasarela y dispositivos de prueba.
 7. **Respaldo con restauración probada; latido probado;** rotación de todo antes de llamarlo producción (`docs/11 §7`).
 

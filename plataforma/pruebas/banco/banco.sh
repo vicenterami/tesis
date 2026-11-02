@@ -813,7 +813,7 @@ SQL
     n=$(psql_ -tA -c "SELECT count(*) FROM condicion_sistema WHERE tipo='broker_descarte' AND cerrada_en IS NOT NULL" | tr -d '[:space:]'); [ "$n" -ge 1 ] && ok "condicion_sistema: cerrada_en escrito y evento de cierre" || falla "cierre en la base: $n"
     echo; [ $fallos -eq 0 ] && echo "COLA OK" || { echo "$fallos comprobación(es) con falla"; exit 1; } ;;
   consultable) bash "$(dirname "$YO")/consultable.sh" http://127.0.0.1:3001 ;;   # docs/16 §48: todo dispositivo del banco es consultable de punta a punta
-  vias) bash "$(dirname "$YO")/vias.sh" ;;   # docs/16 §49: la misma serie por las tres vías; mide pérdidas, duplicados, latencia y consumo
+  vias) bash "$(dirname "$YO")/vias.sh" ;;   # docs/16 §49: la misma serie por las tres entradas (MQTT directo, HTTP y pasarela); mide pérdidas, duplicados, latencia y consumo
   apagar)
     # Sin el archivo de claves (vive en /run/user, que el sistema puede vaciar), Compose no interpola el proyecto y `down` no baja
     # nada: el 24/10 quedaron el proxy viejo y la base con claves que ya no calzaban. Entonces se bajan por la etiqueta del proyecto.

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # CA PROPIA para probar el proxy con TLS (docs/10 §8.4 decisiones 10 y 22). Dos usos, nunca producción con nombre público (ahí va
-# Let's Encrypt, D-06): (1) desarrollo en el portátil (por defecto); (2) un servidor de PRUEBA sin DNS público, con otra carpeta y otro
+# Let's Encrypt, docs/10 §8.4 punto 22): (1) desarrollo en el portátil (por defecto); (2) un servidor de PRUEBA sin DNS público, con otra carpeta y otro
 # nombre de CA (CA_NOMBRE), cuya raíz se instala una vez en los clientes que deben confiar en él (navegadores, pasarela, nodo).
 #   bash plataforma/proxy/ca-desarrollo.sh [carpeta]     → ca.crt, ca.key, servidor.crt, servidor.key (por defecto en
 #                                                          privado/certs-desarrollo, fuera del repositorio y del respaldo)

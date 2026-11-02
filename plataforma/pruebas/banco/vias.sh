@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# La misma serie por las tres vías (docs/16 §49): 60 instantes × 3 canales (temperatura °C, humedad %, tensión V), generados con una
+# La misma serie por las tres entradas, MQTT directo, HTTP y pasarela (docs/16 §49): 60 instantes × 3 canales (temperatura °C, humedad %, tensión V), generados con una
 # semilla fija, entran por MQTT (SenML, un mensaje por instante), por HTTP (SenML en packs de 1, 10 y 60 lecturas por POST) y por la
 # pasarela Milesight sin códec (10 bytes del perfil campus-heltec-v3-v1 por el sufijo nativo, fCnt creciente). Las primeras 10 tramas
 # de cada vía se envían dos veces a propósito. Por emisor: enviadas, guardadas, perdidas, filas de más por los duplicados y latencia

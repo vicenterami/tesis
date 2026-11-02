@@ -331,7 +331,7 @@ if [ $? -ne 0 ]; then echo "FALLA no pude leer la configuración resuelta de Com
 elif [ -n "$faltan" ]; then echo "FALLA servicios que conservan NET_RAW: $faltan"; fallos=$((fallos+1))
 else echo "OK    los cuatro servicios sueltan NET_RAW (el backend, todas las capacidades)"; fi
 
-paso "2l. Topes del broker (docs/11 §4; docs/10 §8.4 punto 43): max_packet_size <= 64 KiB; cola 10000 mensajes / 20 MB en la pila y el banco; autosave 300 s; el backend lee el mismo tope"
+paso "2l. Topes del broker (docs/11 §4; docs/10 §8.4 puntos 43 y 57): max_packet_size <= 64 KiB; cola 10000 mensajes / 20 MB y max_connections 1200 en la pila y el banco; autosave 300 s; el backend lee el mismo tope"
 # Sin tope, Mosquitto 2.0.22 aceptó 50 MiB (observado el 07/10): un dispositivo con credencial podría llenar el disco.
 tope=$(grep -E '^\s*max_packet_size\s+[0-9]+' "$MC/mosquitto.conf" | awk '{print $2}' | tail -1)
 if [[ -n "$tope" && "$tope" -le 65536 ]]; then echo "OK    max_packet_size = $tope bytes"
@@ -344,6 +344,10 @@ for conf in "$MC/mosquitto.conf" plataforma/pruebas/banco/mosquitto/mosquitto.co
   q=$(opcion_conf "$conf" max_queued_messages); b=$(opcion_conf "$conf" max_queued_bytes); [ "$conf" = "$MC/mosquitto.conf" ] && q_pila=$q
   if [ "$q" = 10000 ] && [ "$b" = 20971520 ]; then echo "OK    $conf: max_queued_messages 10000, max_queued_bytes 20971520"
   else echo "FALLA $conf: max_queued_messages=${q:-ausente}, max_queued_bytes=${b:-ausente} (esperado 10000 y 20971520; docs/10 §8.4 punto 43)"; fallos=$((fallos+1)); fi
+  # 01/11: sin tope, una avalancha de conexiones agota la memoria del broker (plantado con max_connections 3: docs/16 §57).
+  mc=$(opcion_conf "$conf" max_connections)
+  if [ "$mc" = 1200 ]; then echo "OK    $conf: max_connections 1200 (docs/10 §8.4 punto 57)"
+  else echo "FALLA $conf: max_connections=${mc:-ausente} (esperado 1200; docs/10 §8.4 punto 57)"; fallos=$((fallos+1)); fi
 done
 a=$(opcion_conf "$MC/mosquitto.conf" autosave_interval)
 if [ "$a" = 300 ]; then echo "OK    autosave_interval 300 s en la pila (antes 1800: ventana de pérdida si el contenedor muere de golpe)"

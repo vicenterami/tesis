@@ -107,7 +107,8 @@ flowchart TB
 
 - **Un solo contenedor expuesto (el proxy) y dos puertos, siempre:** 443 para personas, para los equipos que envían por HTTP
   (`POST /recepcion/{id_fisico}`, punto 52) y, en la ruta A, para la pasarela con *Basics Station* (WebSocket sobre TLS, punto 56); y 8883
-  para dispositivos y pasarelas MQTT; ambos cifrados y siempre presentes. Los dos los publica el proxy; ningún otro contenedor lleva
+  para dispositivos y pasarelas MQTT; ambos cifrados y siempre presentes (el 80, también del proxy, solo redirige a 443 y no recibe
+  datos). Los dos los publica el proxy; ningún otro contenedor lleva
   `ports`. En la ruta B (pasarela con servidor de red embebido, §8.4 puntos 2 y 24) y en la ruta C (servidor de red externo, como el
   ChirpStack de la red del campus, §8.4 punto 45) el servidor de red no es nuestro y nada más se abre. En la ruta A (ChirpStack en este
   servidor, opcional y **diseñada, no construida**) la pasarela llega por 443 al puente de pasarelas de ChirpStack; hasta el 01/11/2026
@@ -123,13 +124,13 @@ flowchart TB
   | 1. Nodo Wi-Fi (ESP32 u otro) con cliente MQTT | MQTT sobre TLS | 8883 | Sí | Implementado (en desarrollo, 1883 local sin TLS) |
   | 2. Equipo que solo habla HTTP | HTTPS, `POST` con SenML | 443 | Sí | Implementado el 16/10/2026 (HU-01, §8.4 punto 52); en el banco, directo al backend y una comprobación por el proxy con TLS |
   | 3. Pasarela LoRaWAN con servidor de red embebido (Milesight UG6x) | MQTT sobre TLS; JSON decodificado en la pasarela | 8883 | Sí | Ruta B; el 15/10/2026 la red del campus ofreció reenviar desde el servidor embebido de su UG63 para una prueba; adaptador `milesight` hecho y probado en el banco (§8.4 punto 47, `docs/16 §31`); **probada en terreno el 20/10/2026** con la pasarela UG65 del campus (`docs/16 §45`) |
-  | 4. Pasarela LoRaWAN con *Basics Station* y ChirpStack en este servidor | WebSocket sobre TLS (protocolo LNS) → ChirpStack → MQTT interno; la pasarela se autentica por token o certificado de cliente | 443 | Sí | Ruta A, opcional, **diseñada, no construida** (01/11/2026, §8.4 punto 56: reemplaza al reenvío Semtech UDP 1700, que no autentica ni cifra); ChirpStack no desplegado |
+  | 4. Pasarela LoRaWAN con *Basics Station* y ChirpStack en este servidor | WebSocket sobre TLS (protocolo LNS) → ChirpStack → MQTT interno; la pasarela se autentica con certificado de cliente (TLS mutuo; su CN lleva el identificador de la pasarela) | 443 | Sí | Ruta A, opcional, **diseñada, no construida** (01/11/2026, §8.4 punto 56: reemplaza al reenvío Semtech UDP 1700, que no autentica ni cifra); ChirpStack no desplegado |
   | 5. Servidor de red externo (TTN o ChirpStack de la red del campus) | Integración MQTT del servidor de red hacia este sistema | 8883 | Sí | **Ruta C, confirmada el 13/10/2026: la red del campus usa ChirpStack v4 con una pasarela Milesight UG63** (§8.4 punto 45); adaptador `chirpstack` hecho y probado en el banco (§8.4 punto 47, `docs/16 §31`); falta en terreno |
   | 6. Equipo celular (NB-IoT, LTE-M) con cliente MQTT | MQTT sobre TLS; trama JSON o binaria hexadecimal | 8883 | Sí | Candidato (entrevista del 05/10); adaptador binario pendiente |
-  | 7. (fusionado con el escenario 4 el 01/11/2026) | — | — | — | Verificado el 06/10: el *Gateway Bridge* expone un manejador WebSocket para Basics Station y las pasarelas UG65/UG67 lo traen; desde el 01/11/2026 es la forma de la ruta A (§8.4 punto 56) |
+  | 7. Pasarela con *Basics Station* hacia ChirpStack en este servidor (hoy, la forma del escenario 4) | WebSocket sobre TLS (protocolo LNS) | 443 | Sí | Verificado el 06/10: el *Gateway Bridge* expone un manejador WebSocket para Basics Station y las pasarelas UG65/UG67 lo traen; desde el 01/11/2026 es la forma de la ruta A: ver el escenario 4 (§8.4 punto 56) |
   | 8. Pasarela LoRaWAN con servidor de red embebido, por su **reporte HTTP(S)** (segundo destino de la aplicación) | HTTPS, `POST` con el mismo JSON del uplink y cabeceras de autenticación | 443 | Sí | **Prevista** (22/10/2026): en terreno (20/10) la UG65 admitió un solo destino MQTT por aplicación y el segundo solo por HTTP(S); es la forma de convivir con el broker del operador sin tocarlo. Exige verificar la autenticación del reporte (cabeceras nombre/valor según la guía de Milesight) y un servidor con dirección pública. Punteada en las figuras |
 
-  **Vías (22/10/2026; renumeradas por protocolo y relevancia el 01/11/2026, D-93, y así las citan la figura, su leyenda, el glosario y
+  **Vías (22/10/2026; renumeradas por protocolo y relevancia el 01/11/2026, y así las citan la figura, su leyenda, el glosario y
   la presentación):** **vía 1**, MQTT sobre TLS, 8883: dispositivo directo (escenarios 1 y 6), pasarela con servidor de red embebido
   (escenario 3, ruta B) y servidor de red externo (escenario 5, ruta C); **vía 2**, HTTPS, 443: equipo directo (escenario 2) y, **prevista
   y punteada**, el reporte HTTPS de la pasarela (escenario 8); **vía 3**, WebSocket sobre TLS, 443: pasarela con *Basics Station* hacia
@@ -137,7 +138,7 @@ flowchart TB
   red; las vías, por dónde entra la trama. Las personas entran siempre por 443. Hasta el 01/11/2026 las vías eran cuatro (1 MQTT directo,
   2 HTTP directo, 3 LoRaWAN por pasarela, 4 reporte HTTPS previsto) y la ruta A usaba el reenvío Semtech UDP en 1700/udp «solo en red
   local»: ese protocolo no autentica ni cifra el transporte (la carga LoRaWAN sí va cifrada e íntegra de extremo a extremo) y la
-  industria lo reemplazó por *Basics Station* (punto 56; `docs/11 §1`).
+  industria recomienda y ofrece como reemplazo *Basics Station* (punto 56; `docs/11 §1`).
 
   **¿Y «cualquier dispositivo»?** El sistema no promete entender cualquier aparato; promete dos puertas
   estándar: MQTT 3.1.1 o 5 sobre TLS 1.2 o superior, y HTTP/1.1 sobre TLS. Es lo que implementan los módulos
@@ -151,8 +152,8 @@ flowchart TB
   hablarle a ChirpStack (*Semtech UDP Packet Forwarder*) **no tiene autenticación ni cifrado**: un *gateway* se identifica con su EUI,
   un dato público, y cualquiera puede enviar UDP suplantándolo (Semtech/ChirpStack, documentación del *Gateway Bridge*). La defensa no
   podía ser el protocolo. En vez de rodearlo (contenedor sin privilegios, límite de tasa, no confiar en el EUI), se adopta el reemplazo
-  de la industria: *Basics Station*, WebSocket sobre TLS con autenticación de la pasarela por token o certificado de cliente, que el
-  puente de pasarelas de ChirpStack admite. La autenticación real de cada nodo sigue ocurriendo más adentro, en el filtro 1 del
+  que la industria recomienda: *Basics Station*, WebSocket sobre TLS con autenticación de la pasarela por certificado de cliente (TLS
+  mutuo), que el puente de pasarelas de ChirpStack admite (`ca_cert`; el CN del certificado lleva el identificador de la pasarela). La autenticación real de cada nodo sigue ocurriendo más adentro, en el filtro 1 del
   pipeline, contra el registro de dispositivos.
 - **El navegador nunca toca el broker** (patrón B, `docs/07`): consume la API del backend, que ya
   filtró y normalizó. Así la trama cruda jamás llega al cliente y las credenciales MQTT no viajan en
@@ -271,7 +272,7 @@ persona y cifrado por SSH. Así se cumplen R1 y R2 del punto 44 sin exponer nada
    orden de 0,1 a 0,2 MiB, `docs/16 §25`). Cambiarlo exigiría otro servidor HTTP en el backend sin ganancia medible. Se revisa si
    el backend pasa a otra máquina o si los flujos simultáneos llegan a miles.
 7. **La ruta A entra por el 443, no por un puerto UDP** (01/11/2026, §8.4 punto 56). El WebSocket de *Basics Station* llega al mismo
-   443 y el proxy lo enruta por su ruta (`/router-info`, `/traffic/`) hacia el puente de pasarelas de ChirpStack; no está configurado hoy
+   443 y el proxy lo enruta por su ruta (`/router-info` y las rutas de tráfico del protocolo LNS) hacia el puente de pasarelas de ChirpStack; no está configurado hoy
    (ChirpStack no desplegado) y se diseña con el bloque 5 de la Etapa 4 (`docs/04 §8`).
 
 8. **Límite de tasa por dirección en el proxy (22/10/2026; `docs/11 §3`, `docs/16 §47`).** En el 443, `limit_req` de 100 peticiones/s con
@@ -981,7 +982,7 @@ del fabricante de la pasarela (137 afirmaciones, en un registro del autor que no
 8. **Entidad pasarela y ubicación geográfica** en el modelo (`docs/08 §8`): el caso de terreno tiene una
    pasarela por estación y un mapa.
 9. **El proxy entra en la vista de contenedores y los puertos quedan fijados: dos siempre (443 y 8883), 1700/udp
-   solo en la ruta A.** (Desde el 01/11/2026, punto 56, la ruta A entra por 443 y no hay tercer puerto.) Hasta hoy el proxy aparecía en las vistas de red y de despliegue, pero el diagrama de
+   solo en la ruta A.** Hasta hoy el proxy aparecía en las vistas de red y de despliegue, pero el diagrama de
    contenedores mostraba a los dispositivos y al navegador llegando directo al broker y al backend. Los siete
    escenarios de entrada contemplados y la respuesta a «¿cualquier dispositivo?» están en §1. El proxy se elige
    con registro de evidencia (§8.3); la decisión se escribe aquí y en el anexo de evaluación del informe. Las leyendas del
@@ -990,6 +991,8 @@ del fabricante de la pasarela (137 afirmaciones, en un registro del autor que no
 **Más decisiones del 06/10/2026** (tras el registro de proxies, el laboratorio de la edición Apache y la
 revisión de las lecciones de método). Fuentes: registros de evidencia del autor, no incluidos en el
 repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 observaciones) y brokers (258 filas).
+
+    Desde el 01/11/2026 (punto 56) la ruta A entra por 443 y no hay tercer puerto.
 
 10. **Proxy inverso: nginx, variante A.** Termina TLS en 443 y 8883 y reenvía al backend por HTTP y al broker por
     TCP en claro (`stream`) dentro de la red interna; `ssl_preread` queda disponible para pasar a la variante B
@@ -1543,7 +1546,7 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
 53. **Tope por emisor, para todas las vías (decidido el 17/10/2026; cierra lo pendiente de §4.1 y de `docs/11 §4`, fila 8).** Regla:
     **toda vía de entrada tiene tope, y superarlo se avisa con su motivo.** Un emisor autenticado (un dispositivo por MQTT o HTTP, una
     pasarela por sus nodos) no puede, ni por error ni por mala intención, llenar la base ni la cuarentena. (i) **Dónde vive:** en
-    `filtros2a6`, el tramo del pipeline por el que pasan las tres vías (MQTT directo, MQTT por pasarela y HTTP) después del filtro 1: una
+    `filtros2a6`, el tramo del pipeline por el que pasan las tres entradas (MQTT directo, MQTT por pasarela y HTTP) después del filtro 1: una
     vía nueva que no entre por ahí no tendría tope, así que el guardián (paso 2z2) comprueba que las vías que lista `docs/11 §3` sean
     exactamente las que llaman a `filtros2a6`, y hay una prueba unitaria por vía. (ii) **Presupuesto de lecturas por hora**, por
     dispositivo: `max(TOPE_LECTURAS_MINIMO, TOPE_LECTURAS_FACTOR × canales × ⌈3600 / intervalo_esperado_s⌉)`, con 600 y 10 por defecto
@@ -1566,7 +1569,7 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     proceso. La decisión (¿cabe?) se toma sobre la foto que trae la fila: por MQTT las tramas van de a una (decisión 4) y por HTTP las de
     un mismo identificador se encolan en memoria y entran de a una, leyendo la fila recién cuando les toca. (v) **Lo que no cubre:** un emisor que manda 64 KiB de basura por trama gasta CPU del adaptador antes de contarse (acotado
     por el tamaño y, en HTTP, por el ritmo); el broker sigue sin tope de mensajes retenidos (`docs/11 §4`, fila 8). (vi) **Prueba:**
-    unitarias del presupuesto, de la cuota, del cierre y de las tres vías; `banco.sh tope` de punta a punta (HTTP para el presupuesto,
+    unitarias del presupuesto, de la cuota, del cierre y de las tres entradas; `banco.sh tope` de punta a punta (HTTP para el presupuesto,
     MQTT para la cuota, y el cierre adelantando la ventana en la base); `docs/16 §42`.
 54. **Tolerancia de desvío de la marca de pasarela y condición `reloj_desviado` (decidido el 21/10/2026).** Origen: en la prueba de
     campo del 20/10 (`docs/16 §45`) la pasarela UG65 no tenía NTP y su reloj iba 4 días atrasado; las reglas 7 y 17 de `docs/13` respetaron su marca y 555 de las 813 mediciones quedaron fechadas 4 días antes: el panel decía «última trama: ahora» y «medición hace 4 d», y el histórico
@@ -1610,18 +1613,42 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     no decide:** nombre público, acceso de terceros al panel (M7), un nodo fuera de la red institucional publicando al servidor.
 
 56. **La ruta A deja el reenvío Semtech UDP (1700) y adopta LoRa Basics Station; las vías se numeran por protocolo (decididas el
-    01/11/2026, D-90 y D-93).** (i) **Por qué:** el protocolo UDP de los *packet forwarders* no autentica ni cifra (documentación del
-    *Gateway Bridge* de ChirpStack; el fabricante de la pasarela del campus lo dice igual); la industria lo reemplazó por *Basics
-    Station*, WebSocket sobre TLS con autenticación de la pasarela por token o certificado de cliente, que el puente de pasarelas de
-    ChirpStack admite (`tls_cert`, `tls_key`, `ca_cert`). (ii) **Qué cambia:** el proxy publica **dos puertos, siempre** (443 y 8883); la
+    01/11/2026).** (i) **Por qué:** el protocolo UDP de los *packet forwarders* no autentica ni cifra (documentación del
+    *Gateway Bridge* de ChirpStack; el fabricante de la pasarela del campus lo dice igual en su artículo sobre reenviadores); la
+    industria recomienda y ofrece como reemplazo *Basics
+    Station*, WebSocket sobre TLS con autenticación de la pasarela por certificado de cliente (TLS mutuo), que el puente de pasarelas
+    de ChirpStack admite (`tls_cert`, `tls_key` para el servidor; `ca_cert` para los certificados de cliente, cuyo CN lleva el
+    identificador de la pasarela; documentación oficial de configuración de pasarelas de ChirpStack, leída el 01/11/2026). (ii) **Qué cambia:** el proxy publica **dos puertos, siempre** (443 y 8883); la
     ruta A entra por 443 y el proxy enruta el WebSocket al puente de pasarelas; desaparecen el tercer puerto, su límite de tasa pendiente
     y la condición «solo en red local». Sigue opcional y **diseñada, no construida** (punteada). (iii) **Vías:** por dónde entra la
-    trama, en orden de relevancia: vía 1 MQTT sobre TLS 8883 (nodo directo, rutas B y C), vía 2 HTTPS 443 (equipo directo; el reporte
+    trama, en orden de relevancia (primero lo implementado y más usado): vía 1 MQTT sobre TLS 8883 (nodo directo, rutas B y C), vía 2 HTTPS 443 (equipo directo; el reporte
     de la pasarela como variante prevista), vía 3 WebSocket sobre TLS 443 (Basics Station, ruta A). Hasta hoy eran cuatro (la 3 era
     «LoRaWAN por pasarela» y la 4 el reporte HTTPS); las bitácoras anteriores conservan esa numeración. (iv) **Sin cambio de código:**
     el proxy nunca tuvo el listener UDP; cambian `docs/10`, `docs/11`, `docs/04 §8`, el informe y la figura 4.1. (v) **Lo que falta
     para construirla:** ChirpStack y su puente en el compose (opcionales), la ruta del WebSocket en `nginx.conf`, la CA de pasarelas
-    para certificados de cliente y una prueba en el banco con una Basics Station emulada; bloque 5 de la Etapa 4.
+    para certificados de cliente, decidir si el proxy termina el TLS del WebSocket y verifica el certificado de la pasarela o pasa el TCP
+    por SNI al puente (como la variante B del punto 10), y una prueba en el banco con una Basics Station emulada; bloque 5 de la Etapa 4.
+
+57. **Identidad por dispositivo con certificado de cliente (TLS mutuo) y tope de conexiones del broker (decididos el 01/11/2026).**
+    (i) **Qué cambia y por qué:** hoy cada dispositivo se autentica con usuario y clave aleatoria (hash `scrypt`) sobre TLS que solo
+    autentica al servidor, y por HTTP con un token: es el perfil de transporte seguro de OASIS MQTT 5.0. El máximo de la industria es un
+    certificado X.509 por dispositivo que el servidor verifica en el saludo TLS (AWS IoT Core; Azure IoT Hub lo admite): quien no tiene
+    certificado ni siquiera llega al broker, y la identidad deja de ser una clave copiable. Se adopta como meta de la Etapa 4, bloque 1
+    (`docs/04 §8`), con diseño antes de código. (ii) **Emisión:** en el alta (`POST /dispositivos`, `POST /pasarelas`) la plataforma firma
+    un certificado por dispositivo con una CA propia de dispositivos, distinta de la del servidor, y devuelve certificado y llave una sola
+    vez, como hoy la credencial; rotar = reemitir; dar de baja = revocar (vigencia corta o lista de revocación). (iii) **Verificación en el
+    borde:** el `stream` de nginx no puede pasar al broker la identidad del certificado (envía PROXY protocol v1, sin datos TLS). Dos
+    caminos, a decidir midiendo: la variante B del punto 10 (`ssl_preread` y TLS terminado en Mosquitto con `require_certificate true` y
+    `use_identity_as_username true`), o HAProxy en el 8883 con `send-proxy-v2-ssl-cn` y Mosquitto 2.1 con `enable_proxy_protocol 2`, que
+    lee el resultado del certificado del encabezado PROXY. En 443, `ssl_verify_client optional` y obligatorio solo en `/recepcion`: los
+    navegadores no llevan certificado. (iv) **Clientes:** el nodo ESP32 carga certificado y llave (mbedTLS lo admite) y sigue sin revisar
+    fechas (`docs/11 §4`), lo que pesa más con TLS mutuo; la pasarela Milesight debe admitir certificado de cliente en su cliente MQTT
+    (otros equipos de la marca lo muestran; para la UG65 se verifica en su guía antes de diseñar). (v) **Prueba:** en el banco, un
+    certificado de otro dispositivo, uno vencido y uno ausente no entran; el legítimo publica. (vi) **Tope de conexiones, ya aplicado:**
+    `max_connections 1200` en el broker de la pila y del banco (1 000 nodos de `docs/14 §2.1` más pasarelas, backend, sonda y 20 % de
+    holgura); protege la memoria del contenedor; plantado en un broker desechable con `max_connections 3`: el cuarto y el quinto cliente
+    fueron rechazados (`docs/16 §57`); guardián paso 2l. Por sí solo no frena a muchas direcciones distintas: eso lo acota el proxy (100
+    conexiones por dirección) y lo cierra el certificado de cliente de (iii).
 
 ## 9. Crecimiento, resiliencia y respaldo (aprobado el 06/10/2026)
 

@@ -1318,6 +1318,9 @@ por una ruta propia.
 
 ## 49. La misma serie por las tres vías: latencia, pérdidas, duplicados y consumo (22/10/2026)
 
+> Nota del 01/11/2026: «tres vías» significa aquí MQTT directo, HTTP y pasarela, las tres entradas al pipeline; la numeración de las
+> vías cambió ese día (`docs/10 §1`: vía 1 MQTT sobre TLS, vía 2 HTTPS, vía 3 WebSocket sobre TLS). El registro se conserva como se escribió.
+
 **Qué compara y cómo** (`pruebas/banco/vias.sh`, caso `banco.sh vias`; RNF-02, RF-10, `docs/10 §8.4` puntos 47, 52 e y 53). Una serie
 determinista (semilla fija, 60 instantes × 3 canales: temperatura °C, humedad %, tensión V, las magnitudes del caso `lorawan`) entra al banco
 por cinco emisores dados de alta por la API, todos con intervalo esperado de 60 s:
@@ -1701,3 +1704,21 @@ retirado)» (`plataforma/pruebas/avisos-dependencias.sh`), que avisa sin bloquea
 | `pnpm audit --audit-level=high`, sin excepciones | sin avisos (y sin avisos en producción a ningún nivel) |
 | Paso 2q con el `pnpm-workspace.yaml` anterior (violación plantada) | FALLA: «fue retirado por GitHub» |
 | Paso 2q con el archivo actual | OK: la auditoría no ignora ningún aviso |
+
+## 57. Tope de conexiones del broker: plantado en un broker desechable (01/11/2026)
+
+**Qué cambió** (`docs/10 §8.4` punto 57; `docs/11 §3`). `max_connections 1200` en `mosquitto.conf` de la pila y del banco; antes el broker
+aceptaba conexiones sin límite (valor por defecto de Mosquitto). El guardián 2l exige el mismo valor en las dos configuraciones.
+
+**Cómo se probó.** Un broker desechable (`eclipse-mosquitto:2.1.2-alpine`, la misma imagen de la pila, con `--entrypoint mosquitto` y la
+configuración montada en una ruta neutra) con `allow_anonymous true` y `max_connections 3`; cinco clientes `mosquitto_sub` en contenedores
+que comparten su red.
+
+| Comprobación | Resultado |
+|---|---|
+| Clientes 1 a 3 | «New client connected … as cliente1», «cliente2», «cliente3» |
+| Clientes 4 y 5 | «Client connection from 127.0.0.1 denied: max_connections exceeded», repetido en cada reintento |
+| Pila de desarrollo tras recargar la configuración | broker `healthy`; `/salud` con el broker conectado |
+
+**Lo que no prueba.** Que 1 200 sea el número correcto para un servidor concreto: es el de la flota dimensionada más holgura, y se revisa
+con la primera medición de conexiones reales (`$SYS/broker/clients/connected`, que el backend ya muestrea).
