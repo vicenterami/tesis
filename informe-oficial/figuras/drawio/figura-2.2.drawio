@@ -1,0 +1,92 @@
+<mxfile host="app.diagrams.net">
+  <diagram name="Figura 2.2 · publicar/suscribir" id="6k4qViMSqoytntVZGsqv">
+    <mxGraphModel grid="1" page="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="6DCThCRo4TvbdaP000Xs-1" parent="1" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=18;fontColor=#1F3A5F;strokeColor=#1F3A5F;fillColor=#FFFFFF;" value="nodo Wi-Fi&lt;br&gt;(ESP32)" vertex="1">
+          <mxGeometry height="48" width="114" x="30" y="210" as="geometry" />
+        </mxCell>
+        <mxCell id="6DCThCRo4TvbdaP000Xs-2" parent="1" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=18;fontColor=#1F3A5F;strokeColor=#1F3A5F;fillColor=#FFFFFF;" value="pasarela&lt;br&gt;LoRaWAN" vertex="1">
+          <mxGeometry height="48" width="114" x="30" y="288.5" as="geometry" />
+        </mxCell>
+        <mxCell id="6DCThCRo4TvbdaP000Xs-3" parent="1" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=18;fontColor=#1F3A5F;strokeColor=#1F3A5F;fillColor=#FFFFFF;" value="emulador&lt;br&gt;de carga" vertex="1">
+          <mxGeometry height="48" width="114" x="30" y="366" as="geometry" />
+        </mxCell>
+        <mxCell id="6DCThCRo4TvbdaP000Xs-4" parent="1" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=18;fontColor=#1F3A5F;strokeColor=#1F3A5F;fillColor=#FFFFFF;strokeColor=#2E7D5B;strokeWidth=2;fillColor=#F1F7F4;" value="&lt;b&gt;BROKER&lt;/b&gt;&lt;br&gt;&lt;br&gt;Mosquitto&lt;br&gt;&lt;br&gt;&lt;i&gt;recibe de quien&lt;br&gt;publica,&lt;br&gt;entrega a quien&lt;br&gt;se suscribe&lt;/i&gt;" vertex="1">
+          <mxGeometry height="205" width="152" x="230" y="210" as="geometry" />
+        </mxCell>
+        <mxCell id="6DCThCRo4TvbdaP000Xs-5" parent="1" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=18;fontColor=#1F3A5F;strokeColor=#1F3A5F;fillColor=#FFFFFF;" value="el &lt;b&gt;backend&lt;/b&gt;&lt;br&gt;(seis filtros)" vertex="1">
+          <mxGeometry height="205" width="150" x="482" y="210" as="geometry" />
+        </mxCell>
+        <mxCell id="6DCThCRo4TvbdaP000Xs-6" parent="1" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=18;fontColor=#1F3A5F;strokeColor=#1F3A5F;fillColor=#FFFFFF;" value="la base de datos&lt;br&gt;(TimescaleDB)" vertex="1">
+          <mxGeometry height="48" width="162" x="694" y="210" as="geometry" />
+        </mxCell>
+        <mxCell id="6DCThCRo4TvbdaP000Xs-7" parent="1" style="rounded=1;arcSize=6;whiteSpace=wrap;html=1;fontFamily=Helvetica;fontSize=18;fontColor=#1F3A5F;strokeColor=#1F3A5F;fillColor=#FFFFFF;" value="el &lt;i&gt;dashboard&lt;/i&gt;&lt;br&gt;(navegador)" vertex="1">
+          <mxGeometry height="48" width="150" x="694" y="367" as="geometry" />
+        </mxCell>
+        <mxCell id="6DCThCRo4TvbdaP000Xs-10" parent="1" style="rounded=1;arcSize=4;whiteSpace=wrap;html=1;align=left;spacingLeft=8;spacingRight=8;fontFamily=Helvetica;fontSize=14;fontColor=#000000;strokeColor=#C9D1CC;fillColor=#F2F4F3;" value="Los mensajes se organizan en &lt;b&gt;tópicos&lt;/b&gt;, con forma de ruta. En esta plataforma: &lt;font face=&quot;Courier New&quot;&gt;sitio/&amp;lt;sitio&amp;gt;/dispositivo/&amp;lt;id_fisico&amp;gt;/&amp;lt;magnitud&amp;gt;&lt;/font&gt;, por ejemplo &lt;font face=&quot;Courier New&quot;&gt;sitio/uct/dispositivo/dev-0001/temperatura&lt;/font&gt;&lt;br&gt;&lt;br&gt;El backend es el &lt;b&gt;único suscriptor&lt;/b&gt; (&lt;font face=&quot;Courier New&quot;&gt;sitio/#&lt;/font&gt;): recibe todo &lt;b&gt;sin necesidad de saber qué sensores existen&lt;/b&gt;. Cada dispositivo solo puede publicar en sus propios tópicos, y el &lt;i&gt;dashboard&lt;/i&gt; recibe los datos del backend, no del broker." vertex="1">
+          <mxGeometry height="110" width="786" x="30" y="444" as="geometry" />
+        </mxCell>
+        <mxCell id="6DCThCRo4TvbdaP000Xs-11" edge="1" parent="1" source="6DCThCRo4TvbdaP000Xs-1" style="html=1;fontFamily=Helvetica;fontSize=16;fontColor=#55635B;strokeColor=#55635B;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;" target="6DCThCRo4TvbdaP000Xs-4" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="240" y="120" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="6DCThCRo4TvbdaP000Xs-23" connectable="0" parent="6DCThCRo4TvbdaP000Xs-11" style="edgeLabel=;html=1;align=center;verticalAlign=middle;resizable=0;points=[];inheritText=1;fontColor=#55635B;labelBackgroundColor=#FFFFFF;fontSize=16;" value="PUBLICA" vertex="1">
+          <mxGeometry relative="1" x="-0.0488" y="-2" as="geometry">
+            <mxPoint x="1" y="-3" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="6DCThCRo4TvbdaP000Xs-12" edge="1" parent="1" source="6DCThCRo4TvbdaP000Xs-2" style="html=1;fontFamily=Helvetica;fontSize=16;fontColor=#55635B;strokeColor=#55635B;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;" target="6DCThCRo4TvbdaP000Xs-4" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="210" y="120" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="6DCThCRo4TvbdaP000Xs-24" connectable="0" parent="6DCThCRo4TvbdaP000Xs-12" style="edgeLabel=;html=1;align=center;verticalAlign=middle;resizable=0;points=[];inheritText=1;fontColor=#55635B;labelBackgroundColor=#FFFFFF;fontSize=16;" value="PUBLICA" vertex="1">
+          <mxGeometry relative="1" x="-0.0564" y="-4" as="geometry">
+            <mxPoint y="-4" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="6DCThCRo4TvbdaP000Xs-13" edge="1" parent="1" source="6DCThCRo4TvbdaP000Xs-3" style="html=1;fontFamily=Helvetica;fontSize=16;fontColor=#55635B;strokeColor=#55635B;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;" target="6DCThCRo4TvbdaP000Xs-4" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="6DCThCRo4TvbdaP000Xs-25" connectable="0" parent="6DCThCRo4TvbdaP000Xs-13" style="edgeLabel=;html=1;align=center;verticalAlign=middle;resizable=0;points=[];inheritText=1;fontColor=#55635B;labelBackgroundColor=#FFFFFF;fontSize=16;" value="PUBLICA" vertex="1">
+          <mxGeometry relative="1" x="-0.4891" y="-4" as="geometry">
+            <mxPoint x="14" y="-18" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="6DCThCRo4TvbdaP000Xs-14" edge="1" parent="1" source="6DCThCRo4TvbdaP000Xs-4" style="html=1;fontFamily=Helvetica;fontSize=16;fontColor=#55635B;strokeColor=#55635B;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;strokeColor=#2E7D5B;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" target="6DCThCRo4TvbdaP000Xs-5" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="6DCThCRo4TvbdaP000Xs-20" connectable="0" parent="6DCThCRo4TvbdaP000Xs-14" style="edgeLabel=;html=1;align=center;verticalAlign=middle;resizable=0;points=[];inheritText=1;fontColor=#55635B;labelBackgroundColor=#FFFFFF;fontSize=16;" value="entrega&lt;br&gt;(suscrito a&lt;br&gt;sitio/#)" vertex="1">
+          <mxGeometry relative="1" x="-0.2539" as="geometry">
+            <mxPoint x="13" y="-2" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="6DCThCRo4TvbdaP000Xs-17" edge="1" parent="1" source="6DCThCRo4TvbdaP000Xs-5" style="html=1;fontFamily=Helvetica;fontSize=16;fontColor=#55635B;strokeColor=#55635B;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;" target="6DCThCRo4TvbdaP000Xs-6" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="300" y="110" as="sourcePoint" />
+            <mxPoint x="345" y="170" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="6DCThCRo4TvbdaP000Xs-19" connectable="0" parent="6DCThCRo4TvbdaP000Xs-17" style="edgeLabel=;html=1;align=center;verticalAlign=middle;resizable=0;points=[];inheritText=1;fontColor=#55635B;labelBackgroundColor=#FFFFFF;fontSize=16;" value="Guarda" vertex="1">
+          <mxGeometry relative="1" x="-0.2353" y="-2" as="geometry">
+            <mxPoint y="1" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="6DCThCRo4TvbdaP000Xs-21" edge="1" parent="1" source="6DCThCRo4TvbdaP000Xs-5" style="html=1;fontFamily=Helvetica;fontSize=16;fontColor=#55635B;strokeColor=#55635B;endArrow=block;endFill=1;labelBackgroundColor=#FFFFFF;" target="6DCThCRo4TvbdaP000Xs-7" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="620" y="217" as="sourcePoint" />
+            <mxPoint x="723" y="180" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="6DCThCRo4TvbdaP000Xs-22" connectable="0" parent="6DCThCRo4TvbdaP000Xs-21" style="edgeLabel=;html=1;align=center;verticalAlign=middle;resizable=0;points=[];inheritText=1;fontColor=#55635B;labelBackgroundColor=#FFFFFF;fontSize=16;" value="HTTPS" vertex="1">
+          <mxGeometry relative="1" x="-0.2353" y="-2" as="geometry">
+            <mxPoint y="1" as="offset" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,36 +1,6 @@
 \begin{figure}[H]
 \centering
-\resizebox{0.8\linewidth}{!}{%
-\begin{tikzpicture}[font=\scriptsize]
-
-\node[caja, text width=1.9cm] (s1) at (0,1.35) {nodo Wi-Fi\\(ESP32)};
-\node[caja, text width=1.9cm] (s2) at (0,0)    {pasarela LoRaWAN};
-\node[caja, text width=1.9cm] (s3) at (0,-1.35){emulador de carga};
-
-\node[caja, text width=2.5cm, align=center, draw=verdeacento, line width=1.2pt,
-      fill=verdeacento!6, minimum height=2.9cm] (br) at (4.3,0)
-  {\textbf{BROKER}\\[3pt] Mosquitto\\[3pt] \emph{recibe de quien publica,\\ entrega a quien se suscribe}};
-
-\node[caja, text width=2.5cm] (c1) at (8.9,1.55) {el \textbf{backend}\\(seis filtros)};
-\node[caja, text width=2.5cm] (c2) at (8.9,0)    {la base de datos\\(TimescaleDB)};
-\node[caja, text width=2.5cm] (c3) at (8.9,-1.55){el \emph{dashboard}\\(navegador)};
-
-\foreach \s in {s1,s2,s3} \draw[flecha] (\s.east) -- (br.west);
-\draw[flecha, color=verdeacento] (br.east) -- (c1.west);
-\draw[flecha] (c1.south) -- node[nota, left=0.5mm]{guarda} (c2.north);
-\draw[flecha] (c1.east) -- ++(0.35,0) |- node[nota, pos=0.25, right=1mm]{HTTPS} (c3.east);
-
-\node[nota, above=1mm of s1, font=\scriptsize\bfseries\color{gristexto}] {PUBLICAN};
-\node[nota, above=1mm of c1, font=\scriptsize\bfseries\color{gristexto}] {SE SUSCRIBE};
-
-\node[caja, below=8mm of br.south, anchor=north, text width=13.2cm, xshift=0.15cm,
-      draw=grislinea, fill=grisclaro, font=\scriptsize, align=left]
-  {Los mensajes se organizan en \textbf{tópicos}, con forma de ruta. En esta plataforma:
-   \texttt{sitio/\textless sitio\textgreater/dispositivo/\textless id\_fisico\textgreater/\textless magnitud\textgreater}, por ejemplo \texttt{sitio/uct/dispositivo/dev-0001/temperatura}; las pasarelas, bajo \texttt{sitio/\textless sitio\textgreater/pasarela/\textless id\textgreater/…}\\[3pt]
-   El backend es el \textbf{único suscriptor} (\texttt{sitio/\#}): recibe todo \textbf{sin necesidad de saber qué sensores
-   existen}. Cada dispositivo solo puede publicar en sus propios tópicos, y el \emph{dashboard} recibe los datos del backend, no del broker.};
-
-\end{tikzpicture}}
+\includegraphics[width=0.95\linewidth]{figuras/drawio/figura-2.2.pdf}
 \caption{Patrón publicar/suscribir de MQTT en este sistema. El desacoplamiento entre emisores y receptor es lo que
 permite sumar dispositivos sin tocar el backend.}
 \label{fig:mqtt}

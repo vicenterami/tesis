@@ -18,7 +18,7 @@
   {\textbf{SISTEMA}\\ \emph{aporte de este trabajo}};
 
 \draw[flecha] (nodos) -- node[nota, above, font=\scriptsize] {radio LoRa} node[nota, below, font=\scriptsize] {915 MHz} (gw);
-\draw[flecha] (gw) -- node[nota, above, font=\scriptsize] {UDP/IP (A)} node[nota, below, font=\scriptsize] {interno (B)} (cs);
+\draw[flecha] (gw) -- node[nota, above, font=\scriptsize] {WebSocket/TLS (A)} node[nota, below, font=\scriptsize] {interno (B)} (cs);
 \draw[flechagruesa] (cs) -- node[nota, above, font=\scriptsize\bfseries\color{verdeacento}] {MQTT} (plat);
 
 \node[notaaviso, below=5mm of gw.south, anchor=north, text width=13.2cm, xshift=2.6cm,

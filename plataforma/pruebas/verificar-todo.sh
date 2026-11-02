@@ -207,7 +207,7 @@ rutas_reales=$(jq -r '.paths|keys[]' plataforma/backend/openapi.json | sed -E 's
 # marcada «(Etapa 3)», «(Etapa 4)» o «Propuesta» en la misma línea está diseñada, no implementada: se acepta (docs/19 cita
 # así las rutas que el panel necesitará). 12/10: una ruta que termina en parámetro (`/x/{id}`) perdía la llave final al
 # quitar la `}` de un \texttt{…} y fallaba siempre; ahora el parámetro se protege antes de limpiar el final.
-rutas_citadas=$(grep -rhE '(GET|POST|PUT|PATCH|DELETE) /[a-zA-Z0-9_{}/.\\-]*' informe-oficial docs --include=*.tex --include=*.md --include=*.mmd \
+rutas_citadas=$(grep -rhE '(GET|POST|PUT|PATCH|DELETE) /[a-zA-Z0-9_{}/.\\-]*' informe-oficial docs --include=*.tex --include=*.md --include=*.mmd --include=*.drawio \
   | grep -vE '\(Etapa [34]\)|Propuesta|\(ruta prevista\)' | grep -oE '(GET|POST|PUT|PATCH|DELETE) /[a-zA-Z0-9_{}/.\\-]*' \
   | sed -E 's/^(GET|POST|PUT|PATCH|DELETE) //; s/\\\{/{/g; s/\\\}/}/g; s/\{[^}]*\}/@P@/g; s/[.,}]+$//; s/@P@/{p}/g' \
   | sort -u)
@@ -933,6 +933,46 @@ else
   if [ -n "$nuevas" ]; then echo "omitido: fuentes más nuevas que la última compilación ($nuevas) → bash informe-oficial/actualizar.sh"; omitidos="$omitidos 3b"
   else python3 informe-oficial/comprobar-compilacion.py || fallos=$((fallos+1)); fi
 fi
+
+paso "3d. Figuras en draw.io (4.1 y 2.2): cada .drawio con su PDF, con los términos que docs/10 §1 declara, sin rótulos viejos, y el PDF diciendo lo mismo"
+# 01/11: desde D-84 el autor dibuja estas figuras; el guardián cuida que el dibujo no se desincronice del texto (puertos, vías, rutas,
+# filtros, ruta HTTP) ni del PDF exportado (un .drawio editado sin reexportar deja el informe viejo). Se prueba plantando un término.
+python3 - <<'PYD' || fallos=$((fallos+1))
+import html, pathlib, re, subprocess, sys
+base = pathlib.Path('informe-oficial/figuras/drawio')
+exige = {
+  'figura-4.1': ['443', '8883', '1883', '3000', 'vía 1', 'vía 2', 'vía 3', 'Ruta A', 'Ruta B', 'Ruta C', 'Basics Station', 'WebSocket',
+                 'filtros 1 y 2', 'filtros 3 y 4', 'filtro 5', 'filtro 6', 'POST /recepcion/{id}', 'suscripción sitio/#', 'Dispositivos',
+                 'Equipo que solo habla HTTP', 'Mosquitto', 'TimescaleDB', 'Proxy inverso', 'Backend NestJS', 'ChirpStack propio',
+                 'red del campus hoy', 'servidor de red externo'],
+  'figura-2.2': ['sitio/#', 'Mosquitto', 'TimescaleDB', 'PUBLICA', 'entrega', 'suscrito a'],
+}
+prohibe = {'figura-4.1': ['Sensores', 'PREVISTO', 'packet forwarder', 'sin TLS', 'M1 ', 'M4 ', 'M6 '], 'figura-2.2': ['SE SUSCRIBE']}
+en_pdf = {'figura-4.1': ['Basics Station', 'filtro 6', 'MQTT/TLS 8883'], 'figura-2.2': ['Mosquitto', 'suscrito a']}
+malas = []; n = 0
+for nombre, terminos in exige.items():
+    dr = base / f'{nombre}.drawio'; pdf = base / f'{nombre}.pdf'
+    if not dr.exists(): malas.append(f'{dr} no existe'); continue
+    if not pdf.exists(): malas.append(f'{pdf} no existe (exportar desde el .drawio)'); continue
+    xml = dr.read_text(errors='ignore')
+    texto = html.unescape(' '.join(re.findall(r'value="([^"]*)"', xml)))
+    texto = re.sub(r'<br\s*/?>', ' ', texto); texto = re.sub(r'<[^>]+>', '', texto)
+    for t in terminos:
+        n += 1
+        if t not in texto: malas.append(f'{dr.name}: falta «{t}»')
+    for t in prohibe[nombre]:
+        n += 1
+        if t in texto: malas.append(f'{dr.name}: rótulo viejo «{t.strip()}»')
+    try: tp = subprocess.run(['pdftotext', str(pdf), '-'], capture_output=True, text=True, timeout=30).stdout
+    except Exception as e: malas.append(f'{pdf.name}: pdftotext falló ({e})'); continue
+    for t in en_pdf[nombre]:
+        n += 1
+        if t not in tp: malas.append(f'{pdf.name}: el PDF no dice «{t}» (reexportar desde el .drawio)')
+if n < 20: print(f'FALLA revisó solo {n} términos (se esperan >= 20)'); sys.exit(1)
+if malas:
+    print('FALLA figuras draw.io fuera de concordancia:'); [print('  ' + m) for m in malas]; sys.exit(1)
+print(f'OK    {n} comprobaciones sobre {len(exige)} figuras draw.io: términos de docs/10 §1 presentes, rótulos viejos ausentes, PDF coherente')
+PYD
 
 paso "3c. Figuras del informe acotadas al ancho de texto (regla del proyecto: ninguna figura excede 13,5 cm)"
 # 07/10: el ER regenerado cambió de proporción y, acotado solo en altura, se salió del margen. Toda inclusión acota

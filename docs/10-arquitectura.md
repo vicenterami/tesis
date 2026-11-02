@@ -17,15 +17,16 @@ B va embebido en la pasarela —la red del campus hoy: UG65, probada en terreno 
 (por ejemplo, un ChirpStack institucional, por confirmar con el profesor guía; hasta el 15/10 se creyó que la red del campus era esta ruta), y en la
 ruta A, opcional, es un ChirpStack que aunque se aloja en nuestro servidor publica al broker como un productor más; B y C
 entran igual, por MQTT/TLS 8883 con credencial propia, y solo cambia el adaptador); del otro, el broker y el backend. **En las figuras,
-lo opcional va con borde y flecha punteados** (desde el 07/10/2026). No se
-describe por posición (izquierda/derecha) porque el dibujo lo genera Mermaid y su distribución cambia
+lo opcional va con borde y flecha punteados** (desde el 07/10/2026). Hasta el 01/11/2026 no se
+describía por posición (izquierda/derecha) porque el dibujo lo generaba Mermaid y su distribución cambiaba
 al renderizar; el 23/09/2026 la leyenda del informe decía «a la izquierda… a la derecha» y el dibujo
-mostraba los sensores arriba. Se dibujan los módulos que tocan el dato (M1, M2, M4, M5, M6); M3
-(aprovisionamiento), M7 (seguridad e identidad) y M8 (interfaz) no aparecen como cajas porque son
-transversales o viven en el cliente (`docs/02` §3).
+mostraba los sensores arriba. Desde el 01/11/2026 el dibujo es un `.drawio` con posiciones fijas (abajo). Las cajas del backend llevan el número de los filtros de la figura 3.1 que ejecutan (decidido el 01/11/2026, para que las dos
+figuras se lean con los mismos números) y corresponden a los módulos que tocan el dato: M1 Recepción, M2 Normalización, M6 Alertas,
+M4 Supervisión y M5 Persistencia y consulta; M3 (aprovisionamiento), M7 (seguridad e identidad) y M8 (interfaz) no aparecen como cajas
+porque son transversales o viven en el cliente (`docs/02` §3).
 
 **Vista resumida** (26/10/2026, para presentar): el recorrido de una trama en una línea, sin las rutas LoRaWAN por separado. Resume la
-vista de contenedores que sigue y no agrega nada que esa vista no diga; si cambia una, cambia la otra.
+vista de contenedores completa (figura 4.1, en draw.io: ver abajo) y no agrega nada que esa vista no diga; si cambia una, cambia la otra.
 
 ```mermaid
 %%{init: {"themeVariables": {"fontSize": "20px"}, "flowchart": {"nodeSpacing": 22, "rankSpacing": 46, "wrappingWidth": 260, "subGraphTitleMargin": {"top": 6, "bottom": 10}}}}%%
@@ -51,57 +52,13 @@ flowchart LR
     BE --> DB
 ```
 
-```mermaid
-%%{init: {"themeVariables": {"fontSize": "24px"}, "flowchart": {"nodeSpacing": 16, "rankSpacing": 34, "wrappingWidth": 280, "subGraphTitleMargin": {"top": 8, "bottom": 22}}}}%%
-flowchart TB
-    subgraph CLI["Personas"]
-        U(["Navegador<br/>panel Svelte + uPlot"])
-    end
-    N2["Nodo Wi-Fi o celular<br/>cliente MQTT"]
-        N3["Equipo que solo habla HTTP<br/>nodo 4G o sistema de terceros"]
-        subgraph RB["Ruta B · red del campus hoy"]
-            direction TB
-            NB["Nodos LoRa"] -- "radio" --> GB["Pasarela con servidor<br/>de red embebido"]
-        end
-        subgraph RC["Ruta C · servidor de red externo"]
-            direction TB
-            NC["Nodos LoRa"] -- "radio" --> GC["Pasarela"] -- "UDP 1700" --> NS["Servidor de red externo<br/>p. ej. ChirpStack institucional"]
-        end
-    subgraph RA["Ruta A · opcional, diseñada"]
-        direction TB
-        NA["Nodos LoRa"] -- "radio" --> GA["Pasarela con<br/>Basics Station"]
-    end
-    subgraph SRV["Servidor del sistema · red interna Docker: solo el proxy publica puertos"]
-        direction TB
-        RP["Proxy inverso · termina TLS<br/>443 · 8883"]
-        MQ["Mosquitto<br/>broker MQTT"]
-        CS["ChirpStack propio<br/>solo ruta A"]
-        subgraph BE["Backend NestJS · un solo puerto interno: 3000"]
-            direction LR
-            M1["M1 Recepción<br/>MQTT y POST /recepcion/{id}"] --> M2["M2 Normalización<br/>pipeline de 6 filtros"] --> M6["M6 Alertas"] --> M4["M4 Supervisión"]
-            M5["M5 Persistencia y consulta<br/>panel, API REST y SSE"]
-        end
-        DB[("TimescaleDB")]
-    end
-    U -- "HTTPS 443 · panel y API" --> RP
-    N2 -- "vía 1 · MQTT/TLS 8883" --> RP
-    N3 -- "vía 2 · HTTPS 443<br/>POST /recepcion/{id}" --> RP
-    GB -- "vía 1 · MQTT/TLS 8883" --> RP
-    NS -- "vía 1 · MQTT/TLS 8883" --> RP
-    GB -. "vía 2, prevista · HTTPS 443" .-> RP
-    GA -. "vía 3, diseñada · WebSocket/TLS 443" .-> RP
-    RP -- "MQTT 1883" --> MQ
-    RP -- "HTTP 3000 · POST /recepcion/{id}" --> M1
-    RP -- "HTTP 3000 · /panel y la API<br/>/dispositivos, /eventos…" --> M5
-    RP -. "WebSocket" .-> CS
-    CS -. "MQTT" .-> MQ
-    MQ -- "suscripción sitio/#" --> M1
-    M2 -- "mediciones" --> DB
-    M6 -- "condiciones" --> DB
-    M5 -- "SQL" --> DB
-    classDef opcional stroke-dasharray:6 4
-    class CS,GA,NA opcional
-```
+**Vista de contenedores completa (figura 4.1 del informe).** Desde el 01/11/2026 es un dibujo en draw.io, fuente única de
+esa figura y de la 2.2 (`informe-oficial/figuras/drawio/figura-4.1.drawio` y `figura-2.2.drawio`, con su PDF exportado sin
+metadatos de fecha). Hasta entonces era un bloque Mermaid aquí mismo, generado al compilar; se cambió porque el autor dibuja las
+figuras y el generador no respetaba su distribución. El texto de esta sección sigue mandando: el guardián (paso 3d de
+`verificar-todo.sh`) exige que el dibujo contenga los puertos (443, 8883, 1883, 3000), las vías 1 a 3, las rutas A, B y C, Basics
+Station, los filtros 1 a 6 en las cajas del backend, `POST /recepcion/{id}`, la suscripción `sitio/#` y los nombres de los
+contenedores, y que el PDF exportado diga lo mismo que el `.drawio`. La vista resumida de arriba sigue en Mermaid para las láminas.
 
 **Decisiones visibles en el diagrama:**
 
@@ -127,7 +84,7 @@ flowchart TB
   | 4. Pasarela LoRaWAN con *Basics Station* y ChirpStack en este servidor | WebSocket sobre TLS (protocolo LNS) → ChirpStack → MQTT interno; la pasarela se autentica con certificado de cliente (TLS mutuo; su CN lleva el identificador de la pasarela) | 443 | Sí | Ruta A, opcional, **diseñada, no construida** (01/11/2026, §8.4 punto 56: reemplaza al reenvío Semtech UDP 1700, que no autentica ni cifra); ChirpStack no desplegado |
   | 5. Servidor de red externo (TTN o ChirpStack de la red del campus) | Integración MQTT del servidor de red hacia este sistema | 8883 | Sí | **Ruta C, confirmada el 13/10/2026: la red del campus usa ChirpStack v4 con una pasarela Milesight UG63** (§8.4 punto 45); adaptador `chirpstack` hecho y probado en el banco (§8.4 punto 47, `docs/16 §31`); falta en terreno |
   | 6. Equipo celular (NB-IoT, LTE-M) con cliente MQTT | MQTT sobre TLS; trama JSON o binaria hexadecimal | 8883 | Sí | Candidato (entrevista del 05/10); adaptador binario pendiente |
-  | 7. Pasarela con *Basics Station* hacia ChirpStack en este servidor (hoy, la forma del escenario 4) | WebSocket sobre TLS (protocolo LNS) | 443 | Sí | Verificado el 06/10: el *Gateway Bridge* expone un manejador WebSocket para Basics Station y las pasarelas UG65/UG67 lo traen; desde el 01/11/2026 es la forma de la ruta A: ver el escenario 4 (§8.4 punto 56) |
+  | 7. Pasarela con *Basics Station* hacia ChirpStack en este servidor (hoy, la forma del escenario 4) | WebSocket sobre TLS (protocolo LNS) | 443 | Sí | Verificado el 06/10: el *Gateway Bridge* expone un manejador WebSocket para Basics Station y la guía de la UG65 (firmware V2.14, p. 134) lista «Basic station» entre sus reenviadores, sin detallar sus campos; desde el 01/11/2026 es la forma de la ruta A: ver el escenario 4 (§8.4 punto 56) |
   | 8. Pasarela LoRaWAN con servidor de red embebido, por su **reporte HTTP(S)** (segundo destino de la aplicación) | HTTPS, `POST` con el mismo JSON del uplink y cabeceras de autenticación | 443 | Sí | **Prevista** (22/10/2026): en terreno (20/10) la UG65 admitió un solo destino MQTT por aplicación y el segundo solo por HTTP(S); es la forma de convivir con el broker del operador sin tocarlo. Exige verificar la autenticación del reporte (cabeceras nombre/valor según la guía de Milesight) y un servidor con dirección pública. Punteada en las figuras |
 
   **Vías (22/10/2026; renumeradas por protocolo y relevancia el 01/11/2026, y así las citan la figura, su leyenda, el glosario y
@@ -1642,8 +1599,9 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     `use_identity_as_username true`), o HAProxy en el 8883 con `send-proxy-v2-ssl-cn` y Mosquitto 2.1 con `enable_proxy_protocol 2`, que
     lee el resultado del certificado del encabezado PROXY. En 443, `ssl_verify_client optional` y obligatorio solo en `/recepcion`: los
     navegadores no llevan certificado. (iv) **Clientes:** el nodo ESP32 carga certificado y llave (mbedTLS lo admite) y sigue sin revisar
-    fechas (`docs/11 §4`), lo que pesa más con TLS mutuo; la pasarela Milesight debe admitir certificado de cliente en su cliente MQTT
-    (otros equipos de la marca lo muestran; para la UG65 se verifica en su guía antes de diseñar). (v) **Prueba:** en el banco, un
+    fechas (`docs/11 §4`), lo que pesa más con TLS mutuo; la pasarela Milesight UG65 admite certificado de cliente en su cliente MQTT: su guía oficial
+    (firmware V2.14, p. 34) dice «Self signed certificates: upload the custom CA certificates…, client Certificates… and secret key»;
+    no declara la versión de TLS (verificado el 01/11/2026). (v) **Prueba:** en el banco, un
     certificado de otro dispositivo, uno vencido y uno ausente no entran; el legítimo publica. (vi) **Tope de conexiones, ya aplicado:**
     `max_connections 1200` en el broker de la pila y del banco (1 000 nodos de `docs/14 §2.1` más pasarelas, backend, sonda y 20 % de
     holgura); protege la memoria del contenedor; plantado en un broker desechable con `max_connections 3`: el cuarto y el quinto cliente

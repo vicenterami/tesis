@@ -586,6 +586,15 @@ cierra esa diferencia (más horas por semana, o qué se hace primero y qué se d
 decidió el 24/10: **abarcar lo más posible en este orden**, con el núcleo y todo lo que se haga probado como en la Etapa 3; lo que no
 alcance queda en el informe final con su diseño escrito. Cada viernes se mide el avance contra este plan.
 
+**Mínimo indispensable y después iterar (01/11/2026).** Los bloques se mantienen; dentro de ellos, el orden de ejecución es por iteraciones
+cerradas, cada una entregable por sí sola: **iteración 0, el mínimo (≈ 62 h, semanas 1 a 3):** sesión y roles con aislamiento entre sitios
+(bloque 1, sin lo cual no hay vista pública ni auditoría), lo que falta del núcleo (`docs/18 §5`: ruta C, XLSX, catálogo, contrato de trama,
+historial por rango, calidad del enlace, salud del sitio), el servidor de prueba operando con respaldo y aviso (bloque 6, ya planeado) y el
+informe final; **iteración 1 (lo que quede de las 75 h, semanas 4 y 5):** certificado de cliente por dispositivo (bloque 1), la cata de
+ThingsBoard CE en el servidor de prueba y el ciclo de vida de alertas (bloque 3); **iteración 2, trabajo futuro con diseño escrito:** ruta A
+con Basics Station, Kubernetes, alta masiva, comparación completa TT-40 y lo demás de los bloques 2 a 7. Una iteración no empieza hasta que la
+anterior está probada y documentada; lo que no alcance se declara, no se deja a medias.
+
 ## Seguimiento de ejecución
 
 El estado de cada ítem tocado (hecho / parcial / pendiente, con su evidencia) se lleva en
