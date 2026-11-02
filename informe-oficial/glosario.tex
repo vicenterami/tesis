@@ -40,7 +40,7 @@ del siguiente. El de esta plataforma tiene seis filtros (figura~\ref{fig:pipelin
 \item[Rutas A, B y C] Las tres formas de recibir la red LoRaWAN. B, la de la red del campus hoy: el servidor de red va embebido en la pasarela (UG65), que
 publica por MQTT sobre TLS (8883) como un cliente más del broker. C: un servidor de red externo (por ejemplo, un
 ChirpStack institucional, por confirmar) publica igual, por 8883 con credencial propia. A, opcional:
-ChirpStack corre en el servidor de la plataforma y las pasarelas le envían por UDP (1700).
+ChirpStack corre en el servidor de la plataforma y las pasarelas le llegan por WebSocket sobre TLS (\emph{Basics Station}, 443).
 \item[SenML] \emph{Sensor Measurement Lists} (RFC 8428, IETF, gratuito): formato estándar para
 listas de mediciones con identidad, nombre, unidad, valor y tiempo. El contrato nativo de entrada.
 \item[Socket] Conexión TCP cruda entre dos programas, sin protocolo de mensajería encima. Evaluado y
@@ -54,7 +54,8 @@ por ejemplo \texttt{sitio/uct/dispositivo/dev-0001/temperatura}. Es la frontera 
 trabajo del compañero.
 \item[Trama] Un mensaje que llega por cualquier vía (una publicación MQTT o un \texttt{POST} HTTP) con una o más
 lecturas de un dispositivo. Es la unidad de la meta de carga: RNF-01 pide 50 tramas por segundo sin pérdida.
-\item[Vías 1 a 4] Por dónde entra una trama al servidor: 1, dispositivo directo por MQTT sobre TLS (8883); 2, dispositivo directo
-por HTTPS (443, \texttt{POST /recepcion/\{id\}}); 3, pasarela LoRaWAN por MQTT sobre TLS (8883; rutas B y C); 4, prevista, pasarela
-por HTTPS (443). Las rutas dicen dónde corre el servidor de red; las vías, por dónde entra la trama.
+\item[Vías 1 a 3] Por dónde entra una trama al servidor, en orden de relevancia: 1, MQTT sobre TLS (8883: dispositivo directo, pasarela
+de la ruta B y servidor de red de la ruta C); 2, HTTPS (443, \texttt{POST /recepcion/\{id\}}; el reporte HTTPS de la pasarela es su
+variante prevista); 3, WebSocket sobre TLS (443, \emph{Basics Station} hacia el ChirpStack de la ruta A; diseñada). Las rutas dicen
+dónde corre el servidor de red; las vías, por dónde entra la trama.
 \end{description}

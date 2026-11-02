@@ -117,7 +117,7 @@
   \includegraphics[width=\linewidth,height=0.56\textheight,keepaspectratio]{resumen.pdf}
   \smallskip
   \begin{columns}[T,onlytextwidth]
-    \begin{column}{0.31\textwidth}{\scriptsize Las vías 1 a 4 entran cifradas por un solo
+    \begin{column}{0.31\textwidth}{\scriptsize Las vías 1 a 3 entran cifradas por un solo
       \textbf{proxy TLS}; el backend es el \textbf{único que lee los datos} (\texttt{sitio/\#}).\par}\end{column}
     \begin{column}{0.31\textwidth}{\scriptsize \textbf{Seis filtros}: autenticar,
       analizar, validar, normalizar, alertar y supervisar.\par}\end{column}
@@ -136,11 +136,11 @@
         \toprule
         Vía & Probada \\
         \midrule
-        1. Dispositivo directo por MQTT/TLS (8883) & ESP32, 24 h \\
-        2. Dispositivo directo por HTTPS (443) & banco, 180 de 180 \\
-        3. Pasarela LoRaWAN por MQTT/TLS (8883) & UG65 del campus, 20/10 \\
-        4. \textit{Prevista:} pasarela por HTTPS (443) & Etapa 4 \\
-        \textit{Ruta A:} pasarela por UDP 1700, solo red local & opcional \\
+        1. MQTT/TLS (8883): nodo directo & ESP32, 24 h \\
+        1. MQTT/TLS (8883): pasarela LoRaWAN, ruta B & UG65 del campus, 20/10 \\
+        2. HTTPS (443): equipo directo & banco, 180 de 180 \\
+        2. \textit{Prevista:} pasarela por HTTPS (443) & Etapa 4 \\
+        3. \textit{Diseñada:} WebSocket/TLS (443), Basics Station, ruta A & Etapa 4 \\
         \bottomrule
       \end{tabular}
     \end{column}
@@ -158,8 +158,8 @@
       \end{tabular}
     \end{column}
   \end{columns}
-  \footnotesize La 2 la envía el propio equipo, con su token y en SenML; la 4, la pasarela en nombre de sus nodos, con su JSON.\\
-Las rutas B y C entran igual por la vía 3; solo cambia el adaptador.
+  \footnotesize La 2 la envía el propio equipo, con su token y en SenML, o la pasarela en nombre de sus nodos, con su JSON (prevista).\\
+Las rutas B y C entran igual por la vía 1; solo cambia el adaptador.
   \fuente{docs/10 §1 (vías dibujadas y rutas); docs/16 §45, §49 y §53}
 \end{frame}
 

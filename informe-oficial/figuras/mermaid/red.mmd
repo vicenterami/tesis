@@ -3,7 +3,7 @@ flowchart TB
         S1["Nodos LoRa"] -- radio --> G["Pasarela LoRaWAN"]
         S2["Nodos Wi-Fi"] --> R["Router del sitio\n(NAT, sin puertos abiertos)"]
         S3["Equipo que solo habla HTTP\n(nodo 4G o sistema de terceros)"] -- "HTTPS 443, saliente" --> R
-        G -- "ruta B: MQTT/TLS 8883\nruta A: UDP 1700" --> R
+        G -- "ruta B: MQTT/TLS 8883\nruta A: WebSocket/TLS 443" --> R
         G -. "prevista: reporte HTTPS 443\n(segundo destino de la pasarela)" .-> R
         G -- "ruta C: UDP 1700" --> NSE["Servidor de red externo\nChirpStack del campus (ruta C)"]
         NSE -- "MQTT/TLS 8883, saliente" --> R
@@ -12,7 +12,7 @@ flowchart TB
     INET(("Internet\no red del campus"))
 
     subgraph DMZ["Servidor · red pública (expuesta)"]
-        RP["Proxy inverso / TLS\n:443 → panel, API y recepción HTTP\n:8883 → broker\n:1700/udp → ChirpStack (solo ruta A)"]
+        RP["Proxy inverso / TLS\n:443 → panel, API, recepción HTTP\ny WebSocket de pasarelas (ruta A)\n:8883 → broker"]
     end
 
     subgraph INT["Servidor · red interna Docker (no expuesta)"]
@@ -23,10 +23,10 @@ flowchart TB
     end
 
     R -- "salientes únicamente" --> INET
-    INET -- "443 · 8883 · 1700/udp (ruta A)" --> RP
+    INET -- "443 · 8883" --> RP
     RP -- "1883" --> MQ
     RP -- "3000" --> BE
-    RP -. "1700/udp" .-> CS
+    RP -. "WebSocket (ruta A)" .-> CS
     CS -.-> MQ
     MQ --> BE
     BE --> DB

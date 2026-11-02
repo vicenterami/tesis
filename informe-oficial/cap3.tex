@@ -58,7 +58,7 @@ En la rama LoRa hay tres rutas. En la \textbf{ruta B}, la de la red del campus h
 pasarela (sección~\ref{sec:rama-radio}; UG65, probada en terreno el 20/10) publica por MQTT sobre TLS en el puerto 8883, y la pasarela entra
 como un cliente más del broker, con su propia credencial, sin contenedores ni puertos adicionales; en la \textbf{ruta C}, un servidor de
 red externo (p.\,ej., un ChirpStack institucional, por confirmar) publica igual por 8883; B y C solo difieren en el adaptador. La \textbf{ruta A es opcional}:
-ChirpStack corre en el servidor de la plataforma y las pasarelas le envían por UDP al puerto 1700; solo
+ChirpStack corre en el servidor de la plataforma y las pasarelas le llegan por WebSocket sobre TLS (\emph{Basics Station}, 443); solo
 se despliega si las pasarelas no traen servidor de red propio o si se quieren administrar desde un solo
 punto los nodos de varias pasarelas. En las tres, el decodificador de binario a JSON corre en el servidor de
 red (la pasarela o ChirpStack) y lo administra quien opera la red; si este entrega la trama sin decodificar,

@@ -17,7 +17,7 @@
 | A4 | **Error del operador** | `docker compose down -v` borra los volúmenes con todo el dato | Respaldos automáticos; comandos destructivos con confirmación |
 | A5 | **Fuga de secretos** | Una contraseña termina en el repositorio o en un log | `.gitignore` para secretos; solo hashes en base y broker; plantilla `.env.example` |
 | A6 | **Agotamiento de recursos** | Un bug o un ataque consume toda la memoria del servidor | Techo de memoria/CPU por contenedor; el anfitrión sobrevive |
-| A7 | **Suplantación de *gateway* LoRaWAN** | El protocolo *Semtech UDP Packet Forwarder* no autentica: cualquiera con el EUI (público) puede enviar UDP al puerto 1700 haciéndose pasar por un *gateway* | Límite de tasa en el proxy (previsto para el 1700/udp, que hoy no está configurado: §4; los límites del 22/10 cubren 443 y 8883); el filtro 1 del pipeline autentica cada dispositivo de todos modos, contra el registro, no contra lo que diga el *gateway*. Además (22/10/2026): el 1700/udp se activa **solo en una red local** (nunca expuesto a Internet), porque el reenvío Semtech UDP no autentica ni cifra el transporte (la carga LoRaWAN sí va cifrada e íntegra de extremo a extremo); en producción corresponde *Basics Station* (WebSocket con TLS) o la vía MQTT con TLS (`docs/10 §1`, escenarios 4 y 7) |
+| A7 | **Suplantación de *gateway* LoRaWAN** | El protocolo *Semtech UDP Packet Forwarder* no autentica: cualquiera con el EUI (público) puede enviar UDP al puerto 1700 haciéndose pasar por un *gateway* | Desde el 01/11/2026 la ruta A no usa ese protocolo: la pasarela entra con *Basics Station* por WebSocket sobre TLS, autenticada por token o certificado de cliente (`docs/10 §8.4` punto 56), y el 1700/udp no se publica. El filtro 1 del pipeline autentica cada dispositivo de todos modos, contra el registro, no contra lo que diga el *gateway*. (Hasta el 01/11 la mitigación era el límite de tasa en el proxy y activar el 1700/udp solo en una red local.) |
 | A8 | **Backend con permisos de administración del broker** (desde la decisión de credenciales, `docs/10 §8.4` punto 26) | Quien compromete el backend crea o cambia clientes y ACL del broker y suplanta a cualquier dispositivo o pasarela | Identidad de administración distinta de la de lectura, con ACL solo sobre `$CONTROL/#`; archivo del plugin con modo 0600, en el volumen de datos y dentro del respaldo (§7) |
 | A9 | **Pasarela comprometida (ruta B)** | Publica con su credencial lecturas falsas por muchos dispositivos a la vez | La pasarela publica solo bajo su tópico (`sitio/<s>/pasarela/<id>/…`, ACL con `%u`) y el filtro 1 toma su identidad del tópico y solo acepta los nodos asociados a ella en el alta (`docs/10 §8.4` puntos 24 y 47): no puede hacerse pasar por un dispositivo de otra vía, y un sitio ajeno o un identificador ya usado se rechazan; revocar su credencial corta a todos de una vez; lo rechazado queda en la cuarentena |
 
@@ -26,7 +26,7 @@
 ```
  Internet / red local
  ─────────────────────────────────────────────────────────────
- [1] Red      · solo 443 / 8883 / 1700-udp publicados; en desarrollo 1883 SOLO en 127.0.0.1;
+ [1] Red      · solo 443 / 8883 publicados; en desarrollo 1883 SOLO en 127.0.0.1;
               el backend escucha en 127.0.0.1 fuera de Docker y solo en la red interna dentro del contenedor
  [2] TLS      · cifrado obligatorio en producción (proxy); credenciales nunca en claro por la red
  [3] Identidad· broker sin anónimos; usuario MQTT = id físico del dispositivo; hash en el plugin del broker
@@ -85,7 +85,7 @@
 | 2–4 | **Límite de tasa en dos capas:** en el proxy, por dirección, **hecho el 22/10/2026** (fila de §3: `limit_req` general y de administración, `limit_conn` en el 8883; incluye el límite estricto de 5 r/s con ráfaga 10 para `POST /dispositivos` y las demás rutas que escriben). **Queda** `@nestjs/throttler` en el backend, por usuario y ruta, que necesita la sesión: con M7. Los topes propios de la recepción por HTTP (`docs/10 §8.4` punto 52, 16 y 17/10) y el tope por emisor de todas las vías (punto 53, 17/10) rigen desde antes, más las cabeceras de `helmet` (§3) | Proxy ✅ 22/10/2026; backend, Etapa 3 con M7 |
 | 2–4 | **Dos valores vigentes al rotar `PROXY_SECRETO` y `HTTP_CLAVE_ADMIN`** (22/10/2026, tabla de rotación de §7): aceptar el anterior durante una ventana, como ya hace el broker con `MQTT_ADMIN_CLAVE_ANTERIOR`, para que la rotación no corte ni siquiera segundos | Etapa 4 |
 | 8 | **Telemetría de TimescaleDB:** la extensión trae un trabajo `policy_telemetry` que cada 24 h envía estadísticas de uso a su fabricante (visto en `timescaledb_information.jobs` el 27/09). Decidir si se apaga (`timescaledb.telemetry_level=off`) | Antes de datos reales |
-| 2 | Puerto 1700/udp hacia ChirpStack, con límite de tasa en el proxy: el protocolo del *gateway* no trae autenticación propia (EUI público, sin cifrado) | Cuando ChirpStack se despliegue (no antes) |
+| 2 | ~~Puerto 1700/udp hacia ChirpStack, con límite de tasa en el proxy~~ → **descartado el 01/11/2026** (`docs/10 §8.4` punto 56): la ruta A entra por 443 con *Basics Station* (WebSocket sobre TLS). Queda, para cuando ChirpStack se despliegue, la ruta del WebSocket en el proxy con autenticación de la pasarela por token o certificado de cliente (CA de pasarelas) | Cuando ChirpStack se despliegue (no antes) |
 | 3 | ~~Credenciales por dispositivo generadas por la plataforma (flujo de alta, docs/10 §3)~~ → hecho el 12/10/2026 (`POST /dispositivos`, §3) | ✅ |
 | 4 | ~~ACL dinámica: el backend agrega/revoca usuarios del broker al dar de alta/baja~~ → el alta, hecha el 12/10/2026 (plugin Dynamic Security, `docs/10 §8.4` punto 42); la baja y la rotación por API, con las mismas órdenes, el 13/10/2026 (`DELETE /dispositivos/{id}`, `POST /dispositivos/{id}/credencial`; `docs/10 §3`) | ✅ |
 | 6 | ~~Un rol de base de datos para el backend **sin** permiso de `DROP`/`TRUNCATE`~~ → hecho el 13/10/2026: `plataforma_app`, SELECT en todo, INSERT en 11 tablas y UPDATE en 5 (migración 14, §9); desde la migración 16 también INSERT en `pasarela` y UPDATE solo de su columna `activo`, y desde la 21 UPDATE solo de `escala_cero` y `escala_cien` en `canal` (calibración por API) | ✅ |
@@ -289,7 +289,7 @@ de desarrollo:
       antes una sola variable publicaba los tres puertos y esta lista no se podía cumplir).
 - [ ] **La API no se publica en 443 mientras no exija credencial** (M7, RF-43): hoy `/dispositivos`
       responde sin sesión por diseño (consulta de solo lectura), y eso es correcto en `127.0.0.1`,
-      no en Internet. Hasta M7, el proxy expone solo 8883 y 1700/udp. **Servidor de prueba (01/11/2026):** 443 y 80 se publican
+      no en Internet. Hasta M7, el proxy expone solo 8883. **Servidor de prueba (01/11/2026):** 443 y 80 se publican
       solo en la dirección de la red privada de administración (`PROXY_IP_PERSONAS`): el panel es alcanzable para el operador sin
       estar en Internet (`docs/14 §7`).
 - [ ] `HTTP_DOCS` ausente o distinto de `si` en el servidor: `/docs` apagada (se verifica con

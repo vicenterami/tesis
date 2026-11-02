@@ -1199,7 +1199,7 @@ embebido, dos nodos Heltec LoRa 32 V3 (AU915), el portátil con la pila completa
 | Reloj de la pasarela 4 días atrasado: mediciones fechadas el 16/10 (regla 17), ficha «última trama: ahora» / «medición hace 4 d», histórico de la última hora vacío; corregida la hora en la pasarela, `max(tiempo)` = `max(recibido_en)` | ✅ visible por diseño; falta tolerancia de desvío (resuelta en §46) |
 | La pasarela dejó de reenviar 27 min (destino cambiado y sesión cerrada): `sin_comunicacion` abierta en los dos nodos a los 6 min y cerrada sola al volver | ✅ |
 | Exportación CSV de la ficha (`GET /dispositivos/{id}/exportar`): 280 líneas | ✅ |
-| Un segundo destino en la UG65 solo puede ser HTTP/HTTPS (MQTT deshabilitado): la vía 4 (HTTPS de pasarela, `docs/10 §1`) pasa a ser necesaria para coexistir con otro broker | observado |
+| Un segundo destino en la UG65 solo puede ser HTTP/HTTPS (MQTT deshabilitado): la vía 4 (HTTPS de pasarela, `docs/10 §1`; desde el 01/11/2026, variante prevista de la vía 2) pasa a ser necesaria para coexistir con otro broker | observado |
 
 **Lo que no cubre:** la ruta C (ChirpStack) y la coexistencia por puente desde el Mosquitto del compañero (no se logró en su equipo).
 Las tramas reales quedan en la base del portátil y no se exportan al repositorio.

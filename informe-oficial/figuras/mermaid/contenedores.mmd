@@ -13,13 +13,13 @@ flowchart TB
             direction TB
             NC["Nodos LoRa"] -- "radio" --> GC["Pasarela"] -- "UDP 1700" --> NS["Servidor de red externo<br/>p. ej. ChirpStack institucional"]
         end
-    subgraph RA["Ruta A · opcional, sin TLS"]
+    subgraph RA["Ruta A · opcional, diseñada"]
         direction TB
-        NA["Nodos LoRa"] -- "radio" --> GA["Pasarela con<br/>packet forwarder"]
+        NA["Nodos LoRa"] -- "radio" --> GA["Pasarela con<br/>Basics Station"]
     end
     subgraph SRV["Servidor del sistema · red interna Docker: solo el proxy publica puertos"]
         direction TB
-        RP["Proxy inverso · termina TLS<br/>443 · 8883 · 1700/udp solo ruta A"]
+        RP["Proxy inverso · termina TLS<br/>443 · 8883"]
         MQ["Mosquitto<br/>broker MQTT"]
         CS["ChirpStack propio<br/>solo ruta A"]
         subgraph BE["Backend NestJS · un solo puerto interno: 3000"]
@@ -32,14 +32,14 @@ flowchart TB
     U -- "HTTPS 443 · panel y API" --> RP
     N2 -- "vía 1 · MQTT/TLS 8883" --> RP
     N3 -- "vía 2 · HTTPS 443<br/>POST /recepcion/{id}" --> RP
-    GB -- "vía 3 · MQTT/TLS 8883" --> RP
-    NS -- "vía 3 · MQTT/TLS 8883" --> RP
-    GB -. "vía 4, prevista · HTTPS 443" .-> RP
-    GA -. "UDP 1700 · solo red local" .-> RP
+    GB -- "vía 1 · MQTT/TLS 8883" --> RP
+    NS -- "vía 1 · MQTT/TLS 8883" --> RP
+    GB -. "vía 2, prevista · HTTPS 443" .-> RP
+    GA -. "vía 3, diseñada · WebSocket/TLS 443" .-> RP
     RP -- "MQTT 1883" --> MQ
     RP -- "HTTP 3000 · POST /recepcion/{id}" --> M1
     RP -- "HTTP 3000 · /panel y la API<br/>/dispositivos, /eventos…" --> M5
-    RP -. "UDP 1700" .-> CS
+    RP -. "WebSocket" .-> CS
     CS -. "MQTT" .-> MQ
     MQ -- "suscripción sitio/#" --> M1
     M2 -- "mediciones" --> DB

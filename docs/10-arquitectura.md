@@ -67,13 +67,13 @@ flowchart TB
             direction TB
             NC["Nodos LoRa"] -- "radio" --> GC["Pasarela"] -- "UDP 1700" --> NS["Servidor de red externo<br/>p. ej. ChirpStack institucional"]
         end
-    subgraph RA["Ruta A · opcional, sin TLS"]
+    subgraph RA["Ruta A · opcional, diseñada"]
         direction TB
-        NA["Nodos LoRa"] -- "radio" --> GA["Pasarela con<br/>packet forwarder"]
+        NA["Nodos LoRa"] -- "radio" --> GA["Pasarela con<br/>Basics Station"]
     end
     subgraph SRV["Servidor del sistema · red interna Docker: solo el proxy publica puertos"]
         direction TB
-        RP["Proxy inverso · termina TLS<br/>443 · 8883 · 1700/udp solo ruta A"]
+        RP["Proxy inverso · termina TLS<br/>443 · 8883"]
         MQ["Mosquitto<br/>broker MQTT"]
         CS["ChirpStack propio<br/>solo ruta A"]
         subgraph BE["Backend NestJS · un solo puerto interno: 3000"]
@@ -86,14 +86,14 @@ flowchart TB
     U -- "HTTPS 443 · panel y API" --> RP
     N2 -- "vía 1 · MQTT/TLS 8883" --> RP
     N3 -- "vía 2 · HTTPS 443<br/>POST /recepcion/{id}" --> RP
-    GB -- "vía 3 · MQTT/TLS 8883" --> RP
-    NS -- "vía 3 · MQTT/TLS 8883" --> RP
-    GB -. "vía 4, prevista · HTTPS 443" .-> RP
-    GA -. "UDP 1700 · solo red local" .-> RP
+    GB -- "vía 1 · MQTT/TLS 8883" --> RP
+    NS -- "vía 1 · MQTT/TLS 8883" --> RP
+    GB -. "vía 2, prevista · HTTPS 443" .-> RP
+    GA -. "vía 3, diseñada · WebSocket/TLS 443" .-> RP
     RP -- "MQTT 1883" --> MQ
     RP -- "HTTP 3000 · POST /recepcion/{id}" --> M1
     RP -- "HTTP 3000 · /panel y la API<br/>/dispositivos, /eventos…" --> M5
-    RP -. "UDP 1700" .-> CS
+    RP -. "WebSocket" .-> CS
     CS -. "MQTT" .-> MQ
     MQ -- "suscripción sitio/#" --> M1
     M2 -- "mediciones" --> DB
@@ -105,16 +105,16 @@ flowchart TB
 
 **Decisiones visibles en el diagrama:**
 
-- **Un solo contenedor expuesto (el proxy) y dos puertos siempre, tres a lo sumo:** 443 para personas y para los
-  equipos que envían por HTTP (`POST /recepcion/{id_fisico}`, punto 52), y 8883 para dispositivos y pasarelas MQTT, ambos cifrados y siempre presentes; 1700/udp **solo en la ruta A, que es
-  opcional** (ChirpStack corriendo en este servidor y pasarelas con *Semtech UDP Packet Forwarder*). En la ruta
-  B (pasarela con servidor de red embebido, §8.4 puntos 2 y 24) y en la ruta C (servidor de red externo, como el
-  ChirpStack de la red del campus, §8.4 punto 45), el tercer puerto no existe en este servidor: en la C el 1700 llega al
-  servidor de red del campus, no al nuestro. Los tres los publica el proxy; ningún otro contenedor lleva `ports`. Hoy 1700/udp **no
-  aplica**: ChirpStack no está desplegado (§8.3). La base de datos y la interfaz de administración de
-  ChirpStack nunca se exponen; su puerto de recepción de pasarelas, cuando exista, sí, porque las pasarelas
-  están en el campo, sin VPN, y deben poder alcanzarlo (RNF-10 al revés: aquí es el servidor el que necesita
-  un puerto abierto, no el dispositivo).
+- **Un solo contenedor expuesto (el proxy) y dos puertos, siempre:** 443 para personas, para los equipos que envían por HTTP
+  (`POST /recepcion/{id_fisico}`, punto 52) y, en la ruta A, para la pasarela con *Basics Station* (WebSocket sobre TLS, punto 56); y 8883
+  para dispositivos y pasarelas MQTT; ambos cifrados y siempre presentes. Los dos los publica el proxy; ningún otro contenedor lleva
+  `ports`. En la ruta B (pasarela con servidor de red embebido, §8.4 puntos 2 y 24) y en la ruta C (servidor de red externo, como el
+  ChirpStack de la red del campus, §8.4 punto 45) el servidor de red no es nuestro y nada más se abre. En la ruta A (ChirpStack en este
+  servidor, opcional y **diseñada, no construida**) la pasarela llega por 443 al puente de pasarelas de ChirpStack; hasta el 01/11/2026
+  la ruta A usaba el *Semtech UDP Packet Forwarder* en un tercer puerto, 1700/udp, descartado por no autenticar ni cifrar (punto 56).
+  Hoy ChirpStack no está desplegado (§8.3). La base de datos y la interfaz de administración de ChirpStack nunca se exponen; su puente
+  de pasarelas, cuando exista, se alcanza solo a través del proxy, porque las pasarelas están en el campo, sin VPN, y deben poder
+  llegar (RNF-10 al revés: aquí es el servidor el que necesita un puerto alcanzable, no el dispositivo).
 
   **Escenarios de entrada contemplados (06/10/2026):**
 
@@ -123,18 +123,21 @@ flowchart TB
   | 1. Nodo Wi-Fi (ESP32 u otro) con cliente MQTT | MQTT sobre TLS | 8883 | Sí | Implementado (en desarrollo, 1883 local sin TLS) |
   | 2. Equipo que solo habla HTTP | HTTPS, `POST` con SenML | 443 | Sí | Implementado el 16/10/2026 (HU-01, §8.4 punto 52); en el banco, directo al backend y una comprobación por el proxy con TLS |
   | 3. Pasarela LoRaWAN con servidor de red embebido (Milesight UG6x) | MQTT sobre TLS; JSON decodificado en la pasarela | 8883 | Sí | Ruta B; el 15/10/2026 la red del campus ofreció reenviar desde el servidor embebido de su UG63 para una prueba; adaptador `milesight` hecho y probado en el banco (§8.4 punto 47, `docs/16 §31`); **probada en terreno el 20/10/2026** con la pasarela UG65 del campus (`docs/16 §45`) |
-  | 4. Pasarela LoRaWAN con *packet forwarder* y ChirpStack en este servidor | Semtech UDP → ChirpStack → MQTT interno | 1700/udp | Sí (UDP) | Ruta A, opcional; ChirpStack no desplegado |
+  | 4. Pasarela LoRaWAN con *Basics Station* y ChirpStack en este servidor | WebSocket sobre TLS (protocolo LNS) → ChirpStack → MQTT interno; la pasarela se autentica por token o certificado de cliente | 443 | Sí | Ruta A, opcional, **diseñada, no construida** (01/11/2026, §8.4 punto 56: reemplaza al reenvío Semtech UDP 1700, que no autentica ni cifra); ChirpStack no desplegado |
   | 5. Servidor de red externo (TTN o ChirpStack de la red del campus) | Integración MQTT del servidor de red hacia este sistema | 8883 | Sí | **Ruta C, confirmada el 13/10/2026: la red del campus usa ChirpStack v4 con una pasarela Milesight UG63** (§8.4 punto 45); adaptador `chirpstack` hecho y probado en el banco (§8.4 punto 47, `docs/16 §31`); falta en terreno |
   | 6. Equipo celular (NB-IoT, LTE-M) con cliente MQTT | MQTT sobre TLS; trama JSON o binaria hexadecimal | 8883 | Sí | Candidato (entrevista del 05/10); adaptador binario pendiente |
-  | 7. Pasarela con *Basics Station* hacia ChirpStack en este servidor | WebSocket sobre TLS (protocolo LNS), con autenticación TLS de servidor y, opcional, de cliente | 443 o puerto propio (por verificar) | Sí | Verificado el 06/10: el *Gateway Bridge* expone un manejador WebSocket para Basics Station y las pasarelas UG65/UG67 lo traen; reemplazaría el UDP sin autenticar de la ruta A |
+  | 7. (fusionado con el escenario 4 el 01/11/2026) | — | — | — | Verificado el 06/10: el *Gateway Bridge* expone un manejador WebSocket para Basics Station y las pasarelas UG65/UG67 lo traen; desde el 01/11/2026 es la forma de la ruta A (§8.4 punto 56) |
   | 8. Pasarela LoRaWAN con servidor de red embebido, por su **reporte HTTP(S)** (segundo destino de la aplicación) | HTTPS, `POST` con el mismo JSON del uplink y cabeceras de autenticación | 443 | Sí | **Prevista** (22/10/2026): en terreno (20/10) la UG65 admitió un solo destino MQTT por aplicación y el segundo solo por HTTP(S); es la forma de convivir con el broker del operador sin tocarlo. Exige verificar la autenticación del reporte (cabeceras nombre/valor según la guía de Milesight) y un servidor con dirección pública. Punteada en las figuras |
 
-  **Vías (22/10/2026; numeradas el 28/10, y así las citan la figura, su leyenda, el glosario y la presentación):** **vía 1**, dispositivo
-  directo por MQTT sobre TLS, 8883 (escenarios 1 y 6); **vía 2**, dispositivo directo por HTTP sobre TLS, 443 (escenario 2); **vía 3**,
-  LoRaWAN → pasarela → MQTT sobre TLS, 8883 (escenarios 3 y 5, rutas B y C); **vía 4**, prevista y punteada, pasarela → HTTPS 443
-  (escenario 8; la bitácora del 20/10 la llamó «vía E»). Las rutas dicen dónde corre el servidor de red; las vías, por dónde entra la trama. Las personas entran siempre por 443. El 1700/udp (escenario 4, ruta A) se dibuja punteado y,
-  cuando se active, **solo en una red local**: el reenvío Semtech UDP no autentica ni cifra el transporte (la carga LoRaWAN sí va cifrada e
-  íntegra de extremo a extremo); en producción corresponde *Basics Station* (escenario 7, WebSocket con TLS) o la vía MQTT con TLS (`docs/11 §1`).
+  **Vías (22/10/2026; renumeradas por protocolo y relevancia el 01/11/2026, D-93, y así las citan la figura, su leyenda, el glosario y
+  la presentación):** **vía 1**, MQTT sobre TLS, 8883: dispositivo directo (escenarios 1 y 6), pasarela con servidor de red embebido
+  (escenario 3, ruta B) y servidor de red externo (escenario 5, ruta C); **vía 2**, HTTPS, 443: equipo directo (escenario 2) y, **prevista
+  y punteada**, el reporte HTTPS de la pasarela (escenario 8); **vía 3**, WebSocket sobre TLS, 443: pasarela con *Basics Station* hacia
+  el ChirpStack propio de la ruta A (escenarios 4 y 7), **diseñada, no construida**, punteada. Las rutas dicen dónde corre el servidor de
+  red; las vías, por dónde entra la trama. Las personas entran siempre por 443. Hasta el 01/11/2026 las vías eran cuatro (1 MQTT directo,
+  2 HTTP directo, 3 LoRaWAN por pasarela, 4 reporte HTTPS previsto) y la ruta A usaba el reenvío Semtech UDP en 1700/udp «solo en red
+  local»: ese protocolo no autentica ni cifra el transporte (la carga LoRaWAN sí va cifrada e íntegra de extremo a extremo) y la
+  industria lo reemplazó por *Basics Station* (punto 56; `docs/11 §1`).
 
   **¿Y «cualquier dispositivo»?** El sistema no promete entender cualquier aparato; promete dos puertas
   estándar: MQTT 3.1.1 o 5 sobre TLS 1.2 o superior, y HTTP/1.1 sobre TLS. Es lo que implementan los módulos
@@ -144,14 +147,13 @@ flowchart TB
   raíz de confianza del certificado, tópico, formato) y **se prueba con la matriz de TT-32**: un emulador con
   TLS (TT-28), una pasarela real y la ruta HTTP. Lo que falle ahí se documenta, no se supone.
 
-  **Ese puerto es una amenaza real, no solo un trámite de firewall.** El protocolo que usan los
-  *gateways* para hablarle a ChirpStack (*Semtech UDP Packet Forwarder*) **no tiene autenticación ni
-  cifrado**: un *gateway* se identifica con su EUI, un dato público, y cualquiera puede enviar UDP a ese
-  puerto suplantándolo (Semtech/ChirpStack, documentación del *Gateway Bridge*). La defensa no puede ser
-  el protocolo; tiene que ser la capa de alrededor: el contenedor de ChirpStack sin privilegios
-  (`no-new-privileges`, usuario no root, igual que el resto), limitar la tasa de paquetes en el proxy, y
-  no confiar en el EUI recibido para nada que no sea enrutar — la autenticación real de cada nodo sigue
-  ocurriendo más adentro, en el filtro 1 del pipeline, contra el registro de dispositivos.
+  **Por qué la ruta A no usa el reenvío UDP (decidido el 01/11/2026, punto 56).** El protocolo que usaban los *gateways* para
+  hablarle a ChirpStack (*Semtech UDP Packet Forwarder*) **no tiene autenticación ni cifrado**: un *gateway* se identifica con su EUI,
+  un dato público, y cualquiera puede enviar UDP suplantándolo (Semtech/ChirpStack, documentación del *Gateway Bridge*). La defensa no
+  podía ser el protocolo. En vez de rodearlo (contenedor sin privilegios, límite de tasa, no confiar en el EUI), se adopta el reemplazo
+  de la industria: *Basics Station*, WebSocket sobre TLS con autenticación de la pasarela por token o certificado de cliente, que el
+  puente de pasarelas de ChirpStack admite. La autenticación real de cada nodo sigue ocurriendo más adentro, en el filtro 1 del
+  pipeline, contra el registro de dispositivos.
 - **El navegador nunca toca el broker** (patrón B, `docs/07`): consume la API del backend, que ya
   filtró y normalizó. Así la trama cruda jamás llega al cliente y las credenciales MQTT no viajan en
   JavaScript.
@@ -171,7 +173,7 @@ flowchart TB
         S1["Nodos LoRa"] -- radio --> G["Pasarela LoRaWAN"]
         S2["Nodos Wi-Fi"] --> R["Router del sitio\n(NAT, sin puertos abiertos)"]
         S3["Equipo que solo habla HTTP\n(nodo 4G o sistema de terceros)"] -- "HTTPS 443, saliente" --> R
-        G -- "ruta B: MQTT/TLS 8883\nruta A: UDP 1700" --> R
+        G -- "ruta B: MQTT/TLS 8883\nruta A: WebSocket/TLS 443" --> R
         G -. "prevista: reporte HTTPS 443\n(segundo destino de la pasarela)" .-> R
         G -- "ruta C: UDP 1700" --> NSE["Servidor de red externo\nChirpStack del campus (ruta C)"]
         NSE -- "MQTT/TLS 8883, saliente" --> R
@@ -180,7 +182,7 @@ flowchart TB
     INET(("Internet\no red del campus"))
 
     subgraph DMZ["Servidor · red pública (expuesta)"]
-        RP["Proxy inverso / TLS\n:443 → panel, API y recepción HTTP\n:8883 → broker\n:1700/udp → ChirpStack (solo ruta A)"]
+        RP["Proxy inverso / TLS\n:443 → panel, API, recepción HTTP\ny WebSocket de pasarelas (ruta A)\n:8883 → broker"]
     end
 
     subgraph INT["Servidor · red interna Docker (no expuesta)"]
@@ -191,10 +193,10 @@ flowchart TB
     end
 
     R -- "salientes únicamente" --> INET
-    INET -- "443 · 8883 · 1700/udp (ruta A)" --> RP
+    INET -- "443 · 8883" --> RP
     RP -- "1883" --> MQ
     RP -- "3000" --> BE
-    RP -. "1700/udp" .-> CS
+    RP -. "WebSocket (ruta A)" .-> CS
     CS -.-> MQ
     MQ --> BE
     BE --> DB
@@ -207,7 +209,7 @@ flowchart TB
 | Frontera | Cruza | No cruza | Por qué |
 |---|---|---|---|
 | Sitio → Internet | Conexiones **salientes** de nodos y gateway | Nada entrante | Los dispositivos inician la conexión: no hay que abrir puertos en el router del cliente (RNF-10) |
-| Internet → servidor | 443 (personas) y 8883 (dispositivos, pasarelas de la ruta B y servidores de red externos de la ruta C), siempre; 1700/udp (gateway) solo en la ruta A | 5432, 1883, 8080, 3000 | Solo se expone lo que necesita hablar con el exterior; todo lo demás vive en la red interna de Docker |
+| Internet → servidor | 443 (personas) y 8883 (dispositivos, pasarelas de la ruta B y servidores de red externos de la ruta C), siempre; en la ruta A la pasarela con Basics Station entra también por 443 (WebSocket sobre TLS) | 5432, 1883, 8080, 3000 | Solo se expone lo que necesita hablar con el exterior; todo lo demás vive en la red interna de Docker |
 | Red interna | Tráfico entre contenedores por nombre de servicio | Acceso desde fuera | La base de datos solo es alcanzable desde el backend |
 
 **Conceptos de la entrada, sin ambigüedad (13/10/2026, a pregunta del estudiante):**
@@ -222,8 +224,8 @@ flowchart TB
   campus, que administra su encargado y no nosotros; es un servicio aparte con el que solo acordamos a qué broker publica, con qué
   CA y con qué credencial) o nosotros (ruta A, opcional).
 - **UDP.** Protocolo de transporte sin conexión: envía y no espera confirmación ni reordena. Es simple y liviano; el *Semtech UDP
-  Packet Forwarder* lo usa entre la pasarela y el servidor de red, sin autenticación ni cifrado propios. Por eso el 1700/udp solo
-  se abre si el servidor de red es nuestro (ruta A) y es una amenaza registrada (`docs/11 §1`).
+  Packet Forwarder* lo usa entre la pasarela y el servidor de red, sin autenticación ni cifrado propios. Por eso la ruta A no lo usa:
+  desde el 01/11/2026 la pasarela entra con *Basics Station* por WebSocket sobre TLS (§8.4 punto 56; amenaza A7 en `docs/11 §1`).
 - **Proxy inverso.** Recibe conexiones desde fuera y las entrega a un servicio interno. Sabe a dónde mandarlas por su
   configuración: por **puerto** (`plataforma/proxy/nginx.conf`: el 8883 va al broker en su bloque `stream`, que trabaja con TCP y
   termina TLS; el 443 va al backend en su bloque `http`, que entiende HTTP) y, dentro del 443, por **nombre** (solo `PROXY_NOMBRE`;
@@ -268,8 +270,9 @@ persona y cifrado por SSH. Así se cumplen R1 y R2 del punto 44 sin exponer nada
    el tramo proxy→backend no sale del servidor: abrir una conexión ahí es casi gratis (medido: cada flujo SSE abierto cuesta del
    orden de 0,1 a 0,2 MiB, `docs/16 §25`). Cambiarlo exigiría otro servidor HTTP en el backend sin ganancia medible. Se revisa si
    el backend pasa a otra máquina o si los flujos simultáneos llegan a miles.
-7. **El 1700/udp (ruta A) no está configurado hoy.** Cuando exista, irá en el bloque `stream` con `listen 1700 udp`. UDP no tiene
-   conexión: el proxy reenvía cada datagrama a ChirpStack y recuerda de quién vino para devolverle la respuesta.
+7. **La ruta A entra por el 443, no por un puerto UDP** (01/11/2026, §8.4 punto 56). El WebSocket de *Basics Station* llega al mismo
+   443 y el proxy lo enruta por su ruta (`/router-info`, `/traffic/`) hacia el puente de pasarelas de ChirpStack; no está configurado hoy
+   (ChirpStack no desplegado) y se diseña con el bloque 5 de la Etapa 4 (`docs/04 §8`).
 
 8. **Límite de tasa por dirección en el proxy (22/10/2026; `docs/11 §3`, `docs/16 §47`).** En el 443, `limit_req` de 100 peticiones/s con
    ráfaga 200 para todo el tráfico (el doble de las 50 tramas/s de RNF-01, que una pasarela o un NAT puede enviar por HTTP desde una sola
@@ -678,7 +681,7 @@ flowchart TB
         direction LR
         subgraph SVC["Contenedores (versión fijada · no-new-privileges · reinicio automático)"]
             direction TB
-            C5["proxy<br/>nginx (decidido el 06/10) · TLS<br/>límite 0,1 GB · publica 443, 8883 · 1700/udp solo ruta A"]
+            C5["proxy<br/>nginx (decidido el 06/10) · TLS<br/>límite 0,1 GB · publica 443 y 8883"]
             C1["mosquitto<br/>eclipse-mosquitto 2.1.2-alpine<br/>límite 0,25 GB"]
             C2["chirpstack + redis propio<br/>solo ruta A (opcional)<br/>límite 0,35 GB"]
             C4["backend<br/>imagen propia: NestJS + panel estático en /panel (12/10)<br/>límite 0,5 GB · sin estado"]
@@ -698,7 +701,7 @@ flowchart TB
 
 | Servicio | Persistencia | Reinicio | Expuesto |
 |---|---|---|---|
-| proxy (nginx) | certificados | `unless-stopped` | 443, 8883; 1700/udp solo ruta A |
+| proxy (nginx) | certificados | `unless-stopped` | 443, 8883 |
 | mosquitto | cola de la sesión persistente del backend, retenidos y ACL | `unless-stopped` | no (vía proxy) |
 | chirpstack (solo ruta A, opcional) | base `chirpstack` en el mismo PostgreSQL (volumen datos-timescale) + redis | `unless-stopped` | no (vía proxy) |
 | timescaledb (edición Apache, `-oss`) | **todo el dato** | `unless-stopped` | no |
@@ -798,7 +801,7 @@ ocupar más núcleos. No está en el alcance de esta etapa: RNF-14 fija un únic
 
 | Elemento de diseño | Requerimientos que materializa |
 |---|---|
-| Un solo contenedor expuesto (proxy): 8883 máquinas, 443 personas, 1700/udp pasarelas (solo ruta A) | RNF-08, RNF-09, RNF-10 |
+| Un solo contenedor expuesto (proxy): 8883 máquinas, 443 personas y, en la ruta A, pasarelas con Basics Station | RNF-08, RNF-09, RNF-10 |
 | Adaptadores por origen (filtro 2) | RF-01, RF-02, RF-04 (recepción multiprotocolo) |
 | Cuarentena separada de las series | RF-05, RF-07 |
 | Supervisor periódico de `sin_comunicacion` | RF-24, RF-25, RF-26 |
@@ -978,7 +981,7 @@ del fabricante de la pasarela (137 afirmaciones, en un registro del autor que no
 8. **Entidad pasarela y ubicación geográfica** en el modelo (`docs/08 §8`): el caso de terreno tiene una
    pasarela por estación y un mapa.
 9. **El proxy entra en la vista de contenedores y los puertos quedan fijados: dos siempre (443 y 8883), 1700/udp
-   solo en la ruta A.** Hasta hoy el proxy aparecía en las vistas de red y de despliegue, pero el diagrama de
+   solo en la ruta A.** (Desde el 01/11/2026, punto 56, la ruta A entra por 443 y no hay tercer puerto.) Hasta hoy el proxy aparecía en las vistas de red y de despliegue, pero el diagrama de
    contenedores mostraba a los dispositivos y al navegador llegando directo al broker y al backend. Los siete
    escenarios de entrada contemplados y la respuesta a «¿cualquier dispositivo?» están en §1. El proxy se elige
    con registro de evidencia (§8.3); la decisión se escribe aquí y en el anexo de evaluación del informe. Las leyendas del
@@ -1605,6 +1608,20 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     servidor se apaga. (iv) **Arranque:** corrección candidata del hallazgo del 28/10/2026 (proxy «Up» sin red cuando su dirección aún no
     existía): el demonio de Docker espera a la red privada y `net.ipv4.ip_nonlocal_bind=1`; se verifica reiniciando dos veces. (v) **Lo que
     no decide:** nombre público, acceso de terceros al panel (M7), un nodo fuera de la red institucional publicando al servidor.
+
+56. **La ruta A deja el reenvío Semtech UDP (1700) y adopta LoRa Basics Station; las vías se numeran por protocolo (decididas el
+    01/11/2026, D-90 y D-93).** (i) **Por qué:** el protocolo UDP de los *packet forwarders* no autentica ni cifra (documentación del
+    *Gateway Bridge* de ChirpStack; el fabricante de la pasarela del campus lo dice igual); la industria lo reemplazó por *Basics
+    Station*, WebSocket sobre TLS con autenticación de la pasarela por token o certificado de cliente, que el puente de pasarelas de
+    ChirpStack admite (`tls_cert`, `tls_key`, `ca_cert`). (ii) **Qué cambia:** el proxy publica **dos puertos, siempre** (443 y 8883); la
+    ruta A entra por 443 y el proxy enruta el WebSocket al puente de pasarelas; desaparecen el tercer puerto, su límite de tasa pendiente
+    y la condición «solo en red local». Sigue opcional y **diseñada, no construida** (punteada). (iii) **Vías:** por dónde entra la
+    trama, en orden de relevancia: vía 1 MQTT sobre TLS 8883 (nodo directo, rutas B y C), vía 2 HTTPS 443 (equipo directo; el reporte
+    de la pasarela como variante prevista), vía 3 WebSocket sobre TLS 443 (Basics Station, ruta A). Hasta hoy eran cuatro (la 3 era
+    «LoRaWAN por pasarela» y la 4 el reporte HTTPS); las bitácoras anteriores conservan esa numeración. (iv) **Sin cambio de código:**
+    el proxy nunca tuvo el listener UDP; cambian `docs/10`, `docs/11`, `docs/04 §8`, el informe y la figura 4.1. (v) **Lo que falta
+    para construirla:** ChirpStack y su puente en el compose (opcionales), la ruta del WebSocket en `nginx.conf`, la CA de pasarelas
+    para certificados de cliente y una prueba en el banco con una Basics Station emulada; bloque 5 de la Etapa 4.
 
 ## 9. Crecimiento, resiliencia y respaldo (aprobado el 06/10/2026)
 
