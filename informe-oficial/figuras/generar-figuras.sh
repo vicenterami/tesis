@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Genera las figuras del informe desde UNA fuente: los bloques Mermaid de docs/ y, para el modelo de
+# Genera las figuras del informe desde UNA fuente (salvo la 4.1 y la 2.2, que el autor dibuja en draw.io en figuras/drawio/ y
+# revisa el guardián 3d): los bloques Mermaid de docs/ y, para el modelo de
 # datos, el esquema REAL de la base. Renderiza a PDF vectorial con mermaid-cli dentro de Docker
 # (nada que instalar). Con --verificar solo comprueba que informe, docs y base siguen coincidiendo.
 #

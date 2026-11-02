@@ -940,16 +940,15 @@ del fabricante de la pasarela (137 afirmaciones, en un registro del autor que no
    pasarela por estación y un mapa.
 9. **El proxy entra en la vista de contenedores y los puertos quedan fijados: dos siempre (443 y 8883), 1700/udp
    solo en la ruta A.** Hasta hoy el proxy aparecía en las vistas de red y de despliegue, pero el diagrama de
-   contenedores mostraba a los dispositivos y al navegador llegando directo al broker y al backend. Los siete
+   contenedores mostraba a los dispositivos y al navegador llegando directo al broker y al backend. Los
    escenarios de entrada contemplados y la respuesta a «¿cualquier dispositivo?» están en §1. El proxy se elige
    con registro de evidencia (§8.3); la decisión se escribe aquí y en el anexo de evaluación del informe. Las leyendas del
-   informe que aún dicen «WebSocket» o «ChirpStack correrá en el servidor» se corrigen con la próxima entrega.
+   informe que aún dicen «WebSocket» o «ChirpStack correrá en el servidor» se corrigen con la próxima entrega. Desde el 01/11/2026
+   (punto 56) la ruta A entra por 443 y no hay tercer puerto.
 
 **Más decisiones del 06/10/2026** (tras el registro de proxies, el laboratorio de la edición Apache y la
 revisión de las lecciones de método). Fuentes: registros de evidencia del autor, no incluidos en el
 repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 observaciones) y brokers (258 filas).
-
-    Desde el 01/11/2026 (punto 56) la ruta A entra por 443 y no hay tercer puerto.
 
 10. **Proxy inverso: nginx, variante A.** Termina TLS en 443 y 8883 y reenvía al backend por HTTP y al broker por
     TCP en claro (`stream`) dentro de la red interna; `ssl_preread` queda disponible para pasar a la variante B
@@ -1587,24 +1586,32 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     por SNI al puente (como la variante B del punto 10), y una prueba en el banco con una Basics Station emulada; bloque 5 de la Etapa 4.
 
 57. **Identidad por dispositivo con certificado de cliente (TLS mutuo) y tope de conexiones del broker (decididos el 01/11/2026).**
-    (i) **Qué cambia y por qué:** hoy cada dispositivo se autentica con usuario y clave aleatoria (hash `scrypt`) sobre TLS que solo
-    autentica al servidor, y por HTTP con un token: es el perfil de transporte seguro de OASIS MQTT 5.0. El máximo de la industria es un
+    (i) **Qué cambia y por qué:** hoy cada dispositivo se autentica con usuario y clave aleatoria (hash PBKDF2-SHA512 en el plugin del broker y `scrypt`
+    en la base) sobre TLS que solo autentica al servidor, y por HTTP con un token: lo que el capítulo 5 (seguridad) de OASIS MQTT 5.0
+    llama perfil de transporte seguro. El máximo de la industria es un
     certificado X.509 por dispositivo que el servidor verifica en el saludo TLS (AWS IoT Core; Azure IoT Hub lo admite): quien no tiene
     certificado ni siquiera llega al broker, y la identidad deja de ser una clave copiable. Se adopta como meta de la Etapa 4, bloque 1
     (`docs/04 §8`), con diseño antes de código. (ii) **Emisión:** en el alta (`POST /dispositivos`, `POST /pasarelas`) la plataforma firma
     un certificado por dispositivo con una CA propia de dispositivos, distinta de la del servidor, y devuelve certificado y llave una sola
     vez, como hoy la credencial; rotar = reemitir; dar de baja = revocar (vigencia corta o lista de revocación). (iii) **Verificación en el
-    borde:** el `stream` de nginx no puede pasar al broker la identidad del certificado (envía PROXY protocol v1, sin datos TLS). Dos
-    caminos, a decidir midiendo: la variante B del punto 10 (`ssl_preread` y TLS terminado en Mosquitto con `require_certificate true` y
+    borde:** el `stream` de nginx no puede pasar al broker la identidad del certificado (la 1.30 de la pila envía PROXY protocol v1; las
+    versiones recientes, v2, pero sin los datos TLS), aunque sí puede exigirlo (`ssl_verify_client` en `stream`) y rechazar en el borde a
+    quien no traiga uno firmado por la CA de dispositivos. Tres caminos, a decidir midiendo: el borde que solo exige certificado y el broker
+    que sigue autenticando por usuario y clave (dos factores, el más barato); la variante B del punto 10 (`ssl_preread` y TLS terminado en Mosquitto con `require_certificate true` y
     `use_identity_as_username true`), o HAProxy en el 8883 con `send-proxy-v2-ssl-cn` y Mosquitto 2.1 con `enable_proxy_protocol 2`, que
-    lee el resultado del certificado del encabezado PROXY. En 443, `ssl_verify_client optional` y obligatorio solo en `/recepcion`: los
-    navegadores no llevan certificado. (iv) **Clientes:** el nodo ESP32 carga certificado y llave (mbedTLS lo admite) y sigue sin revisar
-    fechas (`docs/11 §4`), lo que pesa más con TLS mutuo; la pasarela Milesight UG65 admite certificado de cliente en su cliente MQTT: su guía oficial
+    lee el resultado del certificado del encabezado PROXY (con `proxy_protocol_v2_require_tls true` y ese listener alcanzable solo desde el
+    proxy, nunca publicado, ni en el override de desarrollo: un cliente directo podría forjar el encabezado). El tope de conexiones es por
+    listener: cada listener nuevo lleva su `max_connections` (guardián 2l). En 443, `ssl_verify_client optional`, obligatorio solo en
+    `/recepcion` (los navegadores no llevan certificado), con `$ssl_client_verify` y el CN (`$ssl_client_s_dn`) pasados al backend en
+    cabeceras que el proxy siempre sobrescribe, y el filtro 1 compara ese CN con el `{id_fisico}` de la ruta: un certificado válido de
+    otro dispositivo no entra. (iv) **Clientes:** el nodo ESP32 carga certificado y llave (mbedTLS lo admite); que no revise las fechas del certificado del servidor
+    (`docs/11 §4`) es un punto aparte, que sigue; la pasarela Milesight UG65 admite certificado de cliente en su cliente MQTT: su guía oficial
     (firmware V2.14, p. 34) dice «Self signed certificates: upload the custom CA certificates…, client Certificates… and secret key»;
     no declara la versión de TLS (verificado el 01/11/2026). (v) **Prueba:** en el banco, un
     certificado de otro dispositivo, uno vencido y uno ausente no entran; el legítimo publica. (vi) **Tope de conexiones, ya aplicado:**
-    `max_connections 1200` en el broker de la pila y del banco (1 000 nodos de `docs/14 §2.1` más pasarelas, backend, sonda y 20 % de
-    holgura); protege la memoria del contenedor; plantado en un broker desechable con `max_connections 3`: el cuarto y el quinto cliente
+    `max_connections 1200` por listener en el broker de la pila y del banco (1 000 nodos de `docs/14 §2.1` más pasarelas, backend, sonda
+    y 20 % de holgura), con `ulimits nofile 4096` en el compose: el contenedor traía 1 024 descriptores y el tope no se habría alcanzado
+    (lo encontró la revisión del 01/11); acota descriptores y memoria del contenedor; plantado en un broker desechable con `max_connections 3`: el cuarto y el quinto cliente
     fueron rechazados (`docs/16 §57`); guardián paso 2l. Por sí solo no frena a muchas direcciones distintas: eso lo acota el proxy (100
     conexiones por dirección) y lo cierra el certificado de cliente de (iii).
 

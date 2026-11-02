@@ -1718,7 +1718,8 @@ que comparten su red.
 |---|---|
 | Clientes 1 a 3 | «New client connected … as cliente1», «cliente2», «cliente3» |
 | Clientes 4 y 5 | «Client connection from 127.0.0.1 denied: max_connections exceeded», repetido en cada reintento |
-| Pila de desarrollo tras recargar la configuración | broker `healthy`; `/salud` con el broker conectado |
+| Pila de desarrollo tras reiniciar el contenedor del broker (el tope no se aplica con una recarga) | broker `healthy`; `/salud` con el broker conectado |
+| Descriptores de archivo del contenedor (revisión del 01/11) | `/proc/1/limits` decía 1 024: con eso el tope de 1 200 no se alcanzaba; `ulimits nofile 4096` en el compose de la pila y del banco; tras recrear el contenedor, 4 096 |
 
 **Lo que no prueba.** Que 1 200 sea el número correcto para un servidor concreto: es el de la flota dimensionada más holgura, y se revisa
 con la primera medición de conexiones reales (`$SYS/broker/clients/connected`, que el backend ya muestrea).

@@ -22,6 +22,8 @@ services:
       - ./pruebas/banco/mosquitto:/mosquitto/config:ro
       - type: tmpfs
         target: /mosquitto/data
+    ulimits:
+      nofile: { soft: 4096, hard: 4096 }         # igual que la pila: el tope de 1200 conexiones exige más de 1024 descriptores
     environment:
       MQTT_ADMIN_CLAVE: ${MQTT_ADMIN_CLAVE}
     # El banco nace de cero cada vez (datos en RAM): el archivo del plugin de seguridad se crea aquí mismo, antes de arrancar el

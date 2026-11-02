@@ -37,7 +37,7 @@ en `historico/informe-v1/`.
 
 ## Figuras generadas (fuente única)
 
-Las figuras de diseño **no se dibujan a mano**: `figuras/generar-figuras.sh` toma los bloques Mermaid de
+Las figuras de diseño **no se dibujan a mano**, salvo las dos que dibuja el autor en draw.io (4.1 y 2.2, en `figuras/drawio/`, con el paso 3d del guardián); el resto: `figuras/generar-figuras.sh` toma los bloques Mermaid de
 `docs/10-arquitectura.md`, genera el modelo de datos desde el esquema real de la base
 (`plataforma/db/pruebas/er-mermaid.sql`) y los renderiza a PDF vectorial en `figuras/render/` con
 `mermaid-cli` dentro de Docker (imagen fijada; nada que instalar). Los `.tex` de `figuras/` solo

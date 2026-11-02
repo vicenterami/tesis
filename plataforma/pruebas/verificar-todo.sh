@@ -348,7 +348,17 @@ for conf in "$MC/mosquitto.conf" plataforma/pruebas/banco/mosquitto/mosquitto.co
   mc=$(opcion_conf "$conf" max_connections)
   if [ "$mc" = 1200 ]; then echo "OK    $conf: max_connections 1200 (docs/10 §8.4 punto 57)"
   else echo "FALLA $conf: max_connections=${mc:-ausente} (esperado 1200; docs/10 §8.4 punto 57)"; fallos=$((fallos+1)); fi
+  # El tope es por listener: cada `listener` lleva su max_connections (revisión del 01/11).
+  nl=$(grep -cE '^\s*listener\s' "$conf"); nm=$(grep -cE '^\s*max_connections\s' "$conf")
+  if [ "$nm" -ge "$nl" ]; then echo "OK    $conf: $nl listener(s), $nm max_connections (el tope es por listener)"
+  else echo "FALLA $conf: $nl listener(s) y $nm max_connections: un listener sin tope"; fallos=$((fallos+1)); fi
 done
+# 01/11: con los 1024 descriptores por defecto del contenedor, el tope de 1200 no se alcanza (EMFILE antes del «denied»; /proc/1/limits
+# del broker en marcha lo mostró en la revisión). El compose fija ulimits nofile; se exige al menos 2 × max_connections.
+nofile=$(docker compose -f plataforma/docker-compose.yml -f plataforma/proxy/compose.proxy.yml --env-file plataforma/.env.example config --format json 2>/dev/null \
+  | python3 -I -c "import sys,json; u=json.load(sys.stdin)['services']['mosquitto'].get('ulimits',{}).get('nofile'); print(u if isinstance(u,int) else (u or {}).get('soft',0))" 2>/dev/null)
+if [ "${nofile:-0}" -ge 2400 ] 2>/dev/null; then echo "OK    broker con ulimits nofile $nofile (>= 2 × max_connections)"
+else echo "FALLA broker sin ulimits nofile suficiente (${nofile:-ausente}): con 1024 descriptores el tope de 1200 no se alcanza (docs/10 §8.4 punto 57)"; fallos=$((fallos+1)); fi
 a=$(opcion_conf "$MC/mosquitto.conf" autosave_interval)
 if [ "$a" = 300 ]; then echo "OK    autosave_interval 300 s en la pila (antes 1800: ventana de pérdida si el contenedor muere de golpe)"
 else echo "FALLA autosave_interval=${a:-ausente} en la pila (esperado 300)"; fallos=$((fallos+1)); fi
@@ -927,52 +937,12 @@ LOGTEX=informe-oficial/build/main.log
 if [ ! -f "$LOGTEX" ]; then echo "omitido: sin compilación previa → bash informe-oficial/actualizar.sh"; omitidos="$omitidos 3b"
 else
   # 26/10: las láminas (informe-oficial/presentacion/) no entran a main.pdf; con ellas este paso no pasaba nunca.
-  nuevas=$( { find informe-oficial -name '*.tex' -newer "$LOGTEX" -not -path '*/build/*' -not -path 'informe-oficial/presentacion/*'; for r in $(find informe-oficial/figuras/render -name '*.pdf' -newer "$LOGTEX" 2>/dev/null); do
+  nuevas=$( { find informe-oficial -name '*.tex' -newer "$LOGTEX" -not -path '*/build/*' -not -path 'informe-oficial/presentacion/*'; for r in $(find informe-oficial/figuras/render informe-oficial/figuras/drawio -name '*.pdf' -newer "$LOGTEX" 2>/dev/null); do
       # solo las que el informe incluye: la vista resumida (26/10) es de las láminas
       grep -rqs --include='*.tex' --exclude-dir=presentacion --exclude-dir=build "figuras/render/$(basename "$r")" informe-oficial && echo "$r"; done; } 2>/dev/null | head -5 | tr '\n' ' ')
   if [ -n "$nuevas" ]; then echo "omitido: fuentes más nuevas que la última compilación ($nuevas) → bash informe-oficial/actualizar.sh"; omitidos="$omitidos 3b"
   else python3 informe-oficial/comprobar-compilacion.py || fallos=$((fallos+1)); fi
 fi
-
-paso "3d. Figuras en draw.io (4.1 y 2.2): cada .drawio con su PDF, con los términos que docs/10 §1 declara, sin rótulos viejos, y el PDF diciendo lo mismo"
-# 01/11: desde D-84 el autor dibuja estas figuras; el guardián cuida que el dibujo no se desincronice del texto (puertos, vías, rutas,
-# filtros, ruta HTTP) ni del PDF exportado (un .drawio editado sin reexportar deja el informe viejo). Se prueba plantando un término.
-python3 - <<'PYD' || fallos=$((fallos+1))
-import html, pathlib, re, subprocess, sys
-base = pathlib.Path('informe-oficial/figuras/drawio')
-exige = {
-  'figura-4.1': ['443', '8883', '1883', '3000', 'vía 1', 'vía 2', 'vía 3', 'Ruta A', 'Ruta B', 'Ruta C', 'Basics Station', 'WebSocket',
-                 'filtros 1 y 2', 'filtros 3 y 4', 'filtro 5', 'filtro 6', 'POST /recepcion/{id}', 'suscripción sitio/#', 'Dispositivos',
-                 'Equipo que solo habla HTTP', 'Mosquitto', 'TimescaleDB', 'Proxy inverso', 'Backend NestJS', 'ChirpStack propio',
-                 'red del campus hoy', 'servidor de red externo'],
-  'figura-2.2': ['sitio/#', 'Mosquitto', 'TimescaleDB', 'PUBLICA', 'entrega', 'suscrito a'],
-}
-prohibe = {'figura-4.1': ['Sensores', 'PREVISTO', 'packet forwarder', 'sin TLS', 'M1 ', 'M4 ', 'M6 '], 'figura-2.2': ['SE SUSCRIBE']}
-en_pdf = {'figura-4.1': ['Basics Station', 'filtro 6', 'MQTT/TLS 8883'], 'figura-2.2': ['Mosquitto', 'suscrito a']}
-malas = []; n = 0
-for nombre, terminos in exige.items():
-    dr = base / f'{nombre}.drawio'; pdf = base / f'{nombre}.pdf'
-    if not dr.exists(): malas.append(f'{dr} no existe'); continue
-    if not pdf.exists(): malas.append(f'{pdf} no existe (exportar desde el .drawio)'); continue
-    xml = dr.read_text(errors='ignore')
-    texto = html.unescape(' '.join(re.findall(r'value="([^"]*)"', xml)))
-    texto = re.sub(r'<br\s*/?>', ' ', texto); texto = re.sub(r'<[^>]+>', '', texto)
-    for t in terminos:
-        n += 1
-        if t not in texto: malas.append(f'{dr.name}: falta «{t}»')
-    for t in prohibe[nombre]:
-        n += 1
-        if t in texto: malas.append(f'{dr.name}: rótulo viejo «{t.strip()}»')
-    try: tp = subprocess.run(['pdftotext', str(pdf), '-'], capture_output=True, text=True, timeout=30).stdout
-    except Exception as e: malas.append(f'{pdf.name}: pdftotext falló ({e})'); continue
-    for t in en_pdf[nombre]:
-        n += 1
-        if t not in tp: malas.append(f'{pdf.name}: el PDF no dice «{t}» (reexportar desde el .drawio)')
-if n < 20: print(f'FALLA revisó solo {n} términos (se esperan >= 20)'); sys.exit(1)
-if malas:
-    print('FALLA figuras draw.io fuera de concordancia:'); [print('  ' + m) for m in malas]; sys.exit(1)
-print(f'OK    {n} comprobaciones sobre {len(exige)} figuras draw.io: términos de docs/10 §1 presentes, rótulos viejos ausentes, PDF coherente')
-PYD
 
 paso "3c. Figuras del informe acotadas al ancho de texto (regla del proyecto: ninguna figura excede 13,5 cm)"
 # 07/10: el ER regenerado cambió de proporción y, acotado solo en altura, se salió del margen. Toda inclusión acota
@@ -997,6 +967,50 @@ if malas:
     print('FALLA figuras sin acotar al ancho:'); [print('  ' + m) for m in malas]; sys.exit(1)
 print(f'OK    {n} inclusiones de figura acotadas al ancho (includegraphics con width; tikz dentro de resizebox)')
 PYG
+
+paso "3d. Figuras en draw.io (4.1 y 2.2): cada .drawio con su PDF, con los términos que docs/10 §1 declara, sin rótulos viejos, y el PDF diciendo lo mismo"
+# 01/11: desde el 01/11/2026 (docs/10 §1) el autor dibuja estas figuras; el guardián cuida que el dibujo no se desincronice del texto (puertos, vías, rutas,
+# filtros, ruta HTTP) ni del PDF exportado (un .drawio editado sin reexportar deja el informe viejo). Se prueba plantando un término.
+python3 -I - <<'PYD' || fallos=$((fallos+1))
+import html, pathlib, re, subprocess, sys
+base = pathlib.Path('informe-oficial/figuras/drawio')
+exige = {
+  'figura-4.1': ['443', '8883', '1883', '3000', 'vía 1', 'vía 2 · POST /recepcion/{id}', 'vía 2 · prevista', 'vía 3, diseñada · WebSocket/TLS',
+                 'Ruta A', 'Ruta B', 'Ruta C', 'Basics Station', 'WebSocket',
+                 'filtros 1 y 2', 'filtros 3 y 4', 'filtro 5', 'filtro 6', 'POST /recepcion/{id}', 'suscripción sitio/#', 'Dispositivos',
+                 'Equipo que solo habla HTTP', 'Mosquitto', 'TimescaleDB', 'Proxy inverso', 'Backend NestJS', 'ChirpStack propio',
+                 'red del campus hoy', 'servidor de red externo'],
+  'figura-2.2': ['sitio/#', 'Mosquitto', 'TimescaleDB', 'PUBLICA', 'entrega', 'suscrito a'],
+}
+prohibe = {'figura-4.1': ['Sensores', 'PREVISTO', 'packet forwarder', 'sin TLS'], 'figura-2.2': ['SE SUSCRIBE']}
+malas = []; n = 0
+for nombre, terminos in exige.items():
+    dr = base / f'{nombre}.drawio'; pdf = base / f'{nombre}.pdf'
+    if not dr.exists(): malas.append(f'{dr} no existe'); continue
+    if not pdf.exists(): malas.append(f'{pdf} no existe (exportar desde el .drawio)'); continue
+    xml = dr.read_text(errors='ignore')
+    texto = html.unescape(' '.join(re.findall(r'value="([^"]*)"', xml)))
+    texto = re.sub(r'<br\s*/?>', ' ', texto); texto = re.sub(r'<[^>]+>', '', texto)
+    for t in terminos:
+        n += 1
+        if t not in texto: malas.append(f'{dr.name}: falta «{t}»')
+    for t in prohibe[nombre]:
+        n += 1
+        if t in texto: malas.append(f'{dr.name}: rótulo viejo «{t.strip()}»')
+    if nombre == 'figura-4.1':
+        n += 1
+        if re.search(r'\bM[1-8]\b', texto): malas.append(f'{dr.name}: códigos de módulo (M1…M8) en las cajas; van los números de filtro de la figura 3.1')
+    # El PDF exportado debe decir lo mismo que el .drawio: todos los términos exigidos, con los espacios normalizados (pdftotext parte líneas).
+    try: tp = re.sub(r'\s+', ' ', subprocess.run(['pdftotext', str(pdf), '-'], capture_output=True, text=True, timeout=30).stdout)
+    except Exception as e: malas.append(f'{pdf.name}: pdftotext falló ({e})'); continue
+    for t in terminos:
+        n += 1
+        if t not in tp: malas.append(f'{pdf.name}: el PDF no dice «{t}» (reexportar desde el .drawio)')
+if n < 20: print(f'FALLA revisó solo {n} términos (se esperan >= 20)'); sys.exit(1)
+if malas:
+    print('FALLA figuras draw.io fuera de concordancia:'); [print('  ' + m) for m in malas]; sys.exit(1)
+print(f'OK    {n} comprobaciones sobre {len(exige)} figuras draw.io: términos de docs/10 §1 presentes, rótulos viejos ausentes, PDF coherente')
+PYD
 
 paso "4. API (si el backend está corriendo en 127.0.0.1:3000)"
 if curl -s -m 2 http://127.0.0.1:3000/salud >/dev/null; then bash plataforma/pruebas/api-smoke.sh || fallos=$((fallos+1)); else echo "omitida: backend no está corriendo"; omitidos="$omitidos 4"; fi
