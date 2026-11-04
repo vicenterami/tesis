@@ -269,6 +269,27 @@ Acceso de terceros al panel (M7), nombre público y Let's Encrypt (`docs/10 §8.
 publicando al servidor (necesita un puerto de entrada) y alta disponibilidad (§6.2). Costo: el equipo existía; energía del orden de la
 fila C de §3; red privada y avisos, CLP 0 en sus planes gratuitos.
 
+### 7.4 Cómo quedó en la práctica (03–04/11/2026)
+
+El equipo que apareció ya tenía responsable, otro servicio corriendo y SSH solo con llave. La lista de §7.1 se aplicó con una diferencia
+explícita: los usuarios y servicios ajenos se explicaron y el equipo se acepta como **compartido**. Consecuencias frente a lo planeado:
+- **Del responsable, no nuestros:** cortafuegos del anfitrión, demonio de Docker (sin `live-restore` ni espera a la red privada), parches del
+  sistema y reinicio del equipo. Nuestra parte es un usuario propio con Docker, la pila dentro de su proyecto de Compose y un `sysctl`
+  (`ip_nonlocal_bind`). Ningún comando sobre contenedores ajenos.
+- **Sin llave de despliegue:** el repositorio es público desde el 03/11; el clon del servidor es anónimo (actualiza, no empuja).
+- **Igual que lo planeado:** red privada de administración (SSH y 443/80 solo ahí; llave sin expiración, nombres de la red, aprobación manual
+  de equipos), CA propia creada fuera del servidor con la clave cifrada, secretos generados en el servidor, `COMPOSE_FILE` sin override, 8883
+  en todas las interfaces, respaldo diario con restauración probada y copia fuera del servidor.
+- **Verificado en ejecución** (bitácora del 03–04/11, tabla de §4): las dos vías de dispositivo con TLS, los rechazos sin credencial, con
+  credencial incorrecta, sin TLS y sin token, solo los puertos del contrato, TLS 1.1 fuera, la pila que vuelve sola tras `docker compose restart`,
+  y la restauración del respaldo con los mismos conteos.
+- **Pendiente:** latido del vigilante (§7.2), reinicio del equipo con su responsable, y una dirección de entrada desde Internet (pedida a la
+  institución) para dispositivos fuera de la red del campus.
+
+En paralelo, la institución entregó un namespace de Kubernetes para estudiantes: medido en 17 pruebas (bitácora del 03/11), cabe en cuota y
+ejecuta, pero sin dirección de entrada ni cupo de volúmenes persistentes; queda como entorno de desarrollo y como diseño B de §6 hasta que
+el administrador conceda ambas cosas.
+
 ## 8. Pendiente
 
 - [ ] Recotizar en la calculadora de cada proveedor la semana previa a contratar; registrar fecha.

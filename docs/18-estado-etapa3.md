@@ -86,7 +86,7 @@ siga sin terminar y que sus horas sean las de `docs/04`: un elemento que se cier
 |---|---|---|---|---|
 | 1 | HU-02 Eventos LoRaWAN | 6 | 🟡 | **Probada en terreno el 20/10** con la pasarela real del campus y dos nodos de punta a punta (`docs/16 §45`); el banco cubre lo demás (`docs/16 §31`, §36 y §37). Quedan la ruta C (ChirpStack) y la coexistencia con otro broker (reporte HTTPS de la pasarela, variante prevista de la vía 2; antes «vía 4») |
 | 2 | HU-08 Exportar en CSV, XLSX y JSON | 4 | 🟡 | XLSX y la exportación por sitio con rol: necesita la sesión (HU-18) |
-| 3 | TT-22 Cifrado del transporte | 4 | 🟡 | El broker de producción con certificado real (`docs/14`) |
+| 3 | TT-22 Cifrado del transporte | 4 | 🟡 | El broker de producción con certificado real (`docs/14`); desde el 03/11 un servidor de prueba en la red del campus opera con CA propia y TLS verificado en las dos vías (`docs/14 §7.4`, bitácora del 03–04/11); falta el certificado público |
 | 4 | TT-12 Catálogo de sensores y unidades | 6 | 🟡 | El catálogo editable con umbrales; con él, los alias de claves y los perfiles de decodificación (`docs/08 §8`) |
 | 5 | TT-21 Aislamiento entre sitios | 5 | ⬜ | Todo; necesita la sesión y los roles por sitio (`docs/20`) |
 | 6 | TT-27 Pruebas del contrato de trama | 5 | ⬜ | La matriz formal (esquema, cuarentena, adaptadores) |
