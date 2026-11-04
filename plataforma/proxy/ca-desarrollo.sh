@@ -9,10 +9,16 @@
 #   CA_DNS_EXTRA=<nombre>[,<nombre>…] bash …             → además vale para esos nombres de host (el del servidor en la red privada
 #                                                          de administración, por ejemplo); letras, dígitos, puntos y guiones
 #   CA_NOMBRE="CA de prueba (servidor X)" bash …         → nombre de la CA cuando se crea (por defecto, la de desarrollo)
+#   CA_FRASE=<frase> bash …                              → la clave de la CA queda CIFRADA en disco (AES-256) al crearla, y hace falta
+#                                                          la misma frase para emitir certificados; la frase vive en el gestor de
+#                                                          contraseñas, nunca en un archivo ni en el historial (exportarla con `read -rs`)
+#   CA_CIFRAR=1 CA_FRASE=<frase> bash … [carpeta]        → cifra en el sitio una ca.key que se creó sin frase, y termina. Antes de
+#                                                          borrar cualquier copia en claro, emitir un certificado con la frase y verificar
 # El certificado del servidor vale siempre para localhost, 127.0.0.1 y el nombre de servicio «proxy» (clientes dentro de la red
 # de Docker; el nodo ESP32 verifica ese nombre, docs/17 §6.2). Los clientes confían con `--cafile ca.crt` (mosquitto_pub) o
 # `--cacert ca.crt` (curl). Reejecutable: la CA se conserva si ya existe (así los clientes no tienen que volver a confiar); el
 # certificado del servidor se renueva. Las direcciones y nombres extra llegan por variable, nunca escritos en el repositorio.
+# La clave del servidor (servidor.key) va siempre sin frase: nginx la lee al arrancar sin nadie que la escriba.
 set -euo pipefail
 # Primero se validan las entradas: una variable mal escrita no deja una CA a medio crear.
 SAN="DNS:localhost,DNS:proxy,IP:127.0.0.1"
@@ -30,14 +36,34 @@ for n in "${NOMBRES[@]}"; do
 done
 DIR="${1:-$(cd "$(dirname "$0")/../.." && pwd)/privado/certs-desarrollo}"
 mkdir -p "$DIR"; chmod 700 "$DIR"; cd "$DIR"
+# Frase de la clave de la CA: openssl la lee de la variable (env:), nunca de la línea de comandos (ps la mostraría).
+PASS=(); [ -n "${CA_FRASE:-}" ] && PASS=(-passin env:CA_FRASE)
+if [ "${CA_CIFRAR:-0}" = 1 ]; then
+  [ -f ca.key ] || { echo "FALLA no hay ca.key en $DIR"; exit 1; }
+  [ -n "${CA_FRASE:-}" ] || { echo "FALLA CA_CIFRAR=1 necesita CA_FRASE"; exit 1; }
+  grep -q ENCRYPTED ca.key && { echo "ca.key ya estaba cifrada; nada que hacer"; exit 0; }
+  openssl pkey -in ca.key -aes256 -passout env:CA_FRASE -out ca.key.tmp 2>/dev/null || { echo "FALLA al cifrar ca.key"; rm -f ca.key.tmp; exit 1; }
+  chmod 600 ca.key.tmp && mv ca.key.tmp ca.key
+  echo "ca.key cifrada (AES-256): $DIR/ca.key · comprobar emitiendo un certificado con CA_FRASE antes de confiar"
+  exit 0
+fi
 if [ ! -f ca.key ]; then
-  openssl req -x509 -newkey rsa:3072 -nodes -days 825 -subj "/CN=${CA_NOMBRE:-CA de desarrollo (plataforma IoT)}" \
-    -keyout ca.key -out ca.crt 2>/dev/null
-  echo "CA nueva: $DIR/ca.crt"
+  if [ -n "${CA_FRASE:-}" ]; then
+    openssl req -x509 -newkey rsa:3072 -passout env:CA_FRASE -days 825 -subj "/CN=${CA_NOMBRE:-CA de desarrollo (plataforma IoT)}" \
+      -keyout ca.key -out ca.crt 2>/dev/null || { echo "FALLA al crear la CA cifrada"; exit 1; }
+    echo "CA nueva (clave cifrada): $DIR/ca.crt"
+  else
+    openssl req -x509 -newkey rsa:3072 -nodes -days 825 -subj "/CN=${CA_NOMBRE:-CA de desarrollo (plataforma IoT)}" \
+      -keyout ca.key -out ca.crt 2>/dev/null || { echo "FALLA al crear la CA"; exit 1; }
+    echo "CA nueva: $DIR/ca.crt"
+  fi
+elif grep -q ENCRYPTED ca.key && [ -z "${CA_FRASE:-}" ]; then
+  echo "FALLA ca.key está cifrada: exportar CA_FRASE (read -rs CA_FRASE; export CA_FRASE)"; exit 1
 fi
 openssl req -newkey rsa:2048 -nodes -subj "/CN=localhost" -keyout servidor.key -out servidor.csr 2>/dev/null
 printf 'subjectAltName=%s\nextendedKeyUsage=serverAuth\n' "$SAN" > san.ext
-openssl x509 -req -in servidor.csr -CA ca.crt -CAkey ca.key -CAcreateserial -days 398 -extfile san.ext -out servidor.crt 2>/dev/null
+openssl x509 -req -in servidor.csr -CA ca.crt -CAkey ca.key "${PASS[@]}" -CAcreateserial -days 398 -extfile san.ext -out servidor.crt 2>/dev/null \
+  || { echo "FALLA al firmar servidor.crt (¿frase de la CA incorrecta?)"; rm -f servidor.csr san.ext; exit 1; }
 rm -f servidor.csr san.ext
 chmod 600 ./*.key
 openssl verify -CAfile ca.crt servidor.crt
