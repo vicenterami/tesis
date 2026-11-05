@@ -1,6 +1,6 @@
 \begin{sidewaysfigure}
 \centering
 \includegraphics[width=0.96\textheight,height=0.9\textwidth,keepaspectratio]{figuras/render/sec-pipeline.pdf}
-\caption{Recepción de una trama: el pipeline de seis filtros como diagrama de secuencia UML. Cada filtro tiene una salida que continúa y una de rechazo hacia la cuarentena; ninguna lectura llega a las series de tiempo sin superar los cuatro primeros.}
+\caption{Recepción de una trama: el pipeline de seis filtros como diagrama de secuencia UML. Cada filtro tiene una salida que continúa y una de rechazo hacia la cuarentena; ninguna lectura llega a las series de tiempo sin superar los cuatro primeros. Simplificado: omite el tope por emisor (motivo «tope»), el desvío de reloj y la entrada HTTP, que sigue el mismo camino desde el filtro 2.}
 \label{fig:sec-pipeline}
 \end{sidewaysfigure}

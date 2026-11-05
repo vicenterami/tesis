@@ -14,7 +14,7 @@
 | 6 | Numeración de módulos vuelve a la canónica de `docs/02`: M4 supervisión, M5 persistencia y consulta, M6 alertas | `docs/10` y el código la tenían distinta | docs, código, README |
 | 7 | Informe de la Etapa 2 = mismo documento ampliado con el capítulo «Diseño de la plataforma» | La pauta describe un informe que crece por etapas; Cardiff pide un capítulo de diseño con varias vistas | `cap-diseno.tex` |
 | 8 | Para respetar 30 páginas: cuadros de evaluación al anexo, antecedentes condensados, seguimiento del backlog como `longtable` en anexo | Recortar sin perder contenido ni tocar la plantilla oficial | anexos C y D |
-| 9 | `actualizar.sh`: figuras + compilación + comprobaciones en un comando; git sigue siendo manual | Un solo paso reproducible; el estudiante conserva el control del repositorio | `informe-oficial/actualizar.sh` |
+| 9 | `actualizar.sh`: figuras + compilación + comprobaciones en un comando; git sigue siendo manual | Un solo paso reproducible; el repositorio se controla a mano | `informe-oficial/actualizar.sh` |
 
 ## 2. Verificaciones
 

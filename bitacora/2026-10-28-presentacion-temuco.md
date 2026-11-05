@@ -20,12 +20,12 @@ problemas de despliegue que el diseño no había enfrentado todavía, y cada uno
   grabar y dar de alta.
 - **Proxy restaurado sin red al encender**: Docker levantó los cuatro contenedores segundos después del arranque, antes de que existiera la
   dirección en la que el proxy publica el 8883, y el contenedor quedó «Up» pero fuera de la red de Compose. Un reinicio no lo repara; recrearlo
-  sí (pendiente 188: que la pila no dependa de esa dirección al arrancar y que `pila.sh estado` avise «contenedor sin red»).
+  sí (queda pendiente: que la pila no dependa de esa dirección al arrancar y que `pila.sh estado` avise «contenedor sin red»).
 - **Red de demostración**: un guion privado de montaje y retorno con comprobaciones (red, dirección fija, regrabación del nodo, proxy,
   backend, nodo publicando) y una orden de vuelta a un estado conocido.
 
 - **Vía LoRaWAN real, sin interrumpir al dueño de la pasarela**: la aplicación de la pasarela admite un solo destino MQTT y ya lo usa su
-  administrador, así que la copia hacia la plataforma se obtuvo con un flujo en el Node-RED que la propia pasarela incorpora (nodo «LoRa
+  administrador, así que la copia hacia la plataforma se obtuvo, con su administrador presente y de acuerdo, con un flujo en el Node-RED que la propia pasarela incorpora (nodo «LoRa
   Input» → función → «mqtt out» por 8883 con TLS, autenticado como la pasarela registrada). Resultado: un nodo del campus en línea con sus
   tres lecturas por trama, y los nodos no dados de alta en cuarentena «no registrado», como manda el diseño. En el mismo inventario quedaron
   un nodo por la vía Wi-Fi/MQTT y otro por la vía LoRaWAN.
@@ -34,7 +34,7 @@ problemas de despliegue que el diseño no había enfrentado todavía, y cada uno
 1. **Una red local sin nombre DNS choca con tres protecciones pensadas para el servidor público**: el proxy rechaza saludos TLS sin SNI y los
    navegadores no mandan SNI hacia una IP; la política de contenido del backend (`upgrade-insecure-requests`) deja el panel en blanco por HTTP
    fuera de la propia máquina; y el certificado de desarrollo no trae la dirección de la red del momento. Las tres son correctas y se quedan;
-   lo que falta es un **modo local** documentado para laboratorios y terreno sin DNS (pendiente 190).
+   lo que falta es un **modo local** documentado para laboratorios y terreno sin DNS (queda pendiente).
 2. **Quien da la red no puede ser a la vez su cliente**: el portátil como punto de acceso y el teléfono como fuente de Internet forman un lazo
    si el teléfono entra a esa Wi-Fi; y un teléfono no enruta desde sus aplicaciones hacia los equipos de su propio anclaje. La forma estable
    es que **un solo equipo dé la red y todos los demás sean clientes**.

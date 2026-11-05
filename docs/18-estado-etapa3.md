@@ -1,6 +1,6 @@
-# Estado de la Etapa 3 — actualizado al 28 de octubre de 2026
+# Estado de la Etapa 3 — actualizado al 4 de noviembre de 2026
 
-> Entrega: **viernes 30 de octubre de 2026**. Se actualiza al cerrar cada bloque de trabajo. Las tareas, sus horas y su
+> Entrega: **jueves 5 de noviembre de 2026** (plazo ampliado por el profesor guía; fecha del calendario del curso: viernes 30 de octubre). Se actualiza al cerrar cada bloque de trabajo. Las tareas, sus horas y su
 > etapa salen de `docs/04` (manda el backlog); la rúbrica, de `referencias/materiales-curso.md`; cada estado, de la
 > evidencia que se cita al lado. El cierre de la Etapa 2 quedó en `docs/12`.
 > Leyenda: ✅ hecho y verificado · 🟢 avanzado · 🟡 parcial · ⬜ pendiente · 🎯 núcleo del backlog.
@@ -9,12 +9,12 @@
 
 | Criterio de la rúbrica | Peso | Estado | Evidencia y lo que falta |
 |---|---|---|---|
-| Retroalimentación | 20 % | 🟡 | Al 25/10 no hay observaciones escritas del profesor guía sobre la entrega del 2/10; se le pedirán en la presentación de avances de la semana del 26/10. Sí se incorporaron las entrevistas del 5/10 (`bitacora/2026-10-05-entrevista-academico-geologia.md`; decisiones del 6 y del 8/10, `docs/10 §8.4`) y del 25/10 (`bitacora/2026-10-25-entrevista-operador-red.md`; alta masiva al plan de la Etapa 4). Falta: recibir e incorporar la retroalimentación de la Etapa 2. |
+| Retroalimentación | 20 % | 🟡 | Al 04/11 no hay observaciones escritas del profesor guía sobre la entrega del 2/10; los avances se presentaron el 28/10 (`bitacora/2026-10-28-presentacion-temuco.md`) y sus observaciones se incorporan al llegar. Sí se incorporaron las entrevistas del 5/10 (`bitacora/2026-10-05-entrevista-academico-geologia.md`; decisiones del 6 y del 8/10, `docs/10 §8.4`) y del 25/10 (`bitacora/2026-10-25-entrevista-operador-red.md`; alta masiva al plan de la Etapa 4). Falta: recibir e incorporar la retroalimentación de la Etapa 2. |
 | Mejoras | 15 % | 🟢 | Decisiones de diseño del 6, 7 y 8/10 (`docs/10 §8.4`); proxy TLS (`docs/16 §9`); dependencias e imágenes sin vulnerabilidades altas o críticas corregibles (`docs/16 §12`). |
 | 50 % de la implementación | 10 % | 🟡 | Núcleo: 25 de 34 elementos hechos (126 de 168 h, 75 %) y 4 parciales (20 h: HU-02, HU-08, TT-12 y TT-22). Todo el backlog: 37 de 66 (162 de 287 h, 56 %) y 12 parciales (51 h). Cifras calculadas desde las filas de `docs/04`, con los estados de `docs/12 §3`, de §2 y de la Etapa 1 (al final de §2). |
 | Pruebas iniciales | 30 % | 🟢 | `docs/16`: emulador, carga (59,7 tramas/s sin pérdida), carreras, TLS, capacidad y picos, caídas con carga, dependencias e imágenes, LoRaWAN por pasarela en el banco (`docs/16 §31–§34`); 357 pruebas unitarias del backend y 107 del panel. Falta: la matriz formal del contrato de trama (TT-27) y el broker de producción en las caídas (`docs/16 §11`). |
 | Validación preliminar | 10 % | 🟡 | Sensor físico de extremo a extremo (TT-32): todas las piezas llegaron el 13/10, la placa se reconoció el 14/10 y la fase 1 se cerró el 19/10 con los tres sensores verificados (`docs/16 §43`) y la fase 2 publicó 24 h hasta el panel, sin pérdidas, el 23 y 24/10 (`docs/16 §53`); guía de manejo seguro escrita (`docs/17 §4`). **Validación en terreno hecha el 20/10: red LoRaWAN real del campus publicando en el sistema (`docs/16 §45`).** Falta: la versión de entrega del capítulo de pruebas que la presenta (TT-36, §2), antes del 30/10; la validación en el servidor de referencia es de la Etapa 4 (OE5). |
-| Documentación | 15 % | 🟡 | Documentos en concordancia (guardián `plataforma/pruebas/verificar-todo.sh`). El 15/10 el informe ganó el capítulo «Implementación y pruebas iniciales» y el anexo con el detalle de las pruebas (TT-36); falta incorporar la retroalimentación de la Etapa 2 y la revisión de entrega. |
+| Documentación | 15 % | 🟡 | Documentos en concordancia (guardián `plataforma/pruebas/verificar-todo.sh`). El 15/10 el informe ganó el capítulo «Implementación y pruebas iniciales» y el anexo con el detalle de las pruebas (TT-36); revisión de entrega hecha el 04/11/2026: tres revisiones independientes (seguridad, concordancia, privacidad; 40 hallazgos verificados, 30 aplicados y el resto anotado) y una segunda pasada que corroboró informe y láminas contra la evidencia y contra el sistema en ejecución; falta incorporar la retroalimentación de la Etapa 2. |
 
 ## 2. Tareas de la Etapa 3: 17 elementos, 88 h (tras el corte del 08/10 y los adelantos del 12/10, §3)
 
@@ -70,7 +70,7 @@ vuelve a la Etapa 4 con su registro aquí y en `docs/04`.
 
 ## 4. Lo que frena hoy
 
-- La retroalimentación de la Etapa 2 todavía no llega; se pedirá en la presentación de avances de la semana del 26/10.
+- La retroalimentación de la Etapa 2 todavía no llega; los avances se presentaron el 28/10 y las observaciones se incorporan al llegar.
 - El sensor de aire del nodo propio (BME280) tiene un contacto I2C intermitente desde el 24/10 (`docs/16 §53`): el nodo omite esas tres magnitudes y sigue publicando suelo y señal; falta revisar su cableado.
 - La recepción LoRaWAN en terreno (HU-02) necesita una pasarela que alcance el servidor (`docs/10 §8.4` punto 24); mientras
   tanto se prueba en el banco con el JSON exacto de las fuentes oficiales (`banco.sh lorawan`, `docs/16 §31`); la prueba en la misma red que la pasarela del campus se hizo el martes 20/10 con el operador de la red (`docs/16 §45`); su pasarela es una UG65 con servidor embebido y dos nodos reportando cada 60 s, y el adaptador se ajusta antes a la forma real de su mensaje (`docs/10 §8.4` punto 47, nota del 15/10).

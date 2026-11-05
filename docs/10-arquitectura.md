@@ -66,8 +66,8 @@ contenedores, y que el PDF exportado diga lo mismo que el `.drawio`. La vista re
   (`POST /recepcion/{id_fisico}`, punto 52) y, en la ruta A, para la pasarela con *Basics Station* (WebSocket sobre TLS, punto 56); y 8883
   para dispositivos y pasarelas MQTT; ambos cifrados y siempre presentes (el 80, también del proxy, solo redirige a 443 y no recibe
   datos). Los dos los publica el proxy; ningún otro contenedor lleva
-  `ports`. En la ruta B (pasarela con servidor de red embebido, §8.4 puntos 2 y 24) y en la ruta C (servidor de red externo, como el
-  ChirpStack de la red del campus, §8.4 punto 45) el servidor de red no es nuestro y nada más se abre. En la ruta A (ChirpStack en este
+  `ports`. En la ruta B (pasarela con servidor de red embebido, §8.4 puntos 2 y 24) y en la ruta C (servidor de red externo, como un
+  ChirpStack institucional, por confirmar, §8.4 punto 45) el servidor de red no es nuestro y nada más se abre. En la ruta A (ChirpStack en este
   servidor, opcional y **diseñada, no construida**) la pasarela llega por 443 al puente de pasarelas de ChirpStack; hasta el 01/11/2026
   la ruta A usaba el *Semtech UDP Packet Forwarder* en un tercer puerto, 1700/udp, descartado por no autenticar ni cifrar (punto 56).
   Hoy ChirpStack no está desplegado (§8.3). La base de datos y la interfaz de administración de ChirpStack nunca se exponen; su puente
@@ -82,7 +82,7 @@ contenedores, y que el PDF exportado diga lo mismo que el `.drawio`. La vista re
   | 2. Equipo que solo habla HTTP | HTTPS, `POST` con SenML | 443 | Sí | Implementado el 16/10/2026 (HU-01, §8.4 punto 52); en el banco, directo al backend y una comprobación por el proxy con TLS |
   | 3. Pasarela LoRaWAN con servidor de red embebido (Milesight UG6x) | MQTT sobre TLS; JSON decodificado en la pasarela | 8883 | Sí | Ruta B; el 15/10/2026 la red del campus ofreció reenviar desde el servidor embebido de su UG63 para una prueba; adaptador `milesight` hecho y probado en el banco (§8.4 punto 47, `docs/16 §31`); **probada en terreno el 20/10/2026** con la pasarela UG65 del campus (`docs/16 §45`) |
   | 4. Pasarela LoRaWAN con *Basics Station* y ChirpStack en este servidor | WebSocket sobre TLS (protocolo LNS) → ChirpStack → MQTT interno; la pasarela se autentica con certificado de cliente (TLS mutuo; su CN lleva el identificador de la pasarela) | 443 | Sí | Ruta A, opcional, **diseñada, no construida** (01/11/2026, §8.4 punto 56: reemplaza al reenvío Semtech UDP 1700, que no autentica ni cifra); ChirpStack no desplegado |
-  | 5. Servidor de red externo (TTN o ChirpStack de la red del campus) | Integración MQTT del servidor de red hacia este sistema | 8883 | Sí | **Ruta C, confirmada el 13/10/2026: la red del campus usa ChirpStack v4 con una pasarela Milesight UG63** (§8.4 punto 45); adaptador `chirpstack` hecho y probado en el banco (§8.4 punto 47, `docs/16 §31`); falta en terreno |
+  | 5. Servidor de red externo (TTN o un ChirpStack institucional) | Integración MQTT del servidor de red hacia este sistema | 8883 | Sí | **Ruta C, por confirmar con el profesor guía** (§8.4 punto 45; el 13/10/2026 se creyó que era la de la red del campus, con ChirpStack v4 y una UG63, y el 15/10 resultó ser la ruta B: UG65 con servidor de red embebido, punto 47); adaptador `chirpstack` hecho y probado en el banco (§8.4 punto 47, `docs/16 §31`); falta en terreno |
   | 6. Equipo celular (NB-IoT, LTE-M) con cliente MQTT | MQTT sobre TLS; trama JSON o binaria hexadecimal | 8883 | Sí | Candidato (entrevista del 05/10); adaptador binario pendiente |
   | 7. Pasarela con *Basics Station* hacia ChirpStack en este servidor (hoy, la forma del escenario 4) | WebSocket sobre TLS (protocolo LNS) | 443 | Sí | Verificado el 06/10: el *Gateway Bridge* expone un manejador WebSocket para Basics Station y la guía de la UG65 (firmware V2.14, p. 134) lista «Basic station» entre sus reenviadores, sin detallar sus campos; desde el 01/11/2026 es la forma de la ruta A: ver el escenario 4 (§8.4 punto 56) |
   | 8. Pasarela LoRaWAN con servidor de red embebido, por su **reporte HTTP(S)** (segundo destino de la aplicación) | HTTPS, `POST` con el mismo JSON del uplink y cabeceras de autenticación | 443 | Sí | **Prevista** (22/10/2026): en terreno (20/10) la UG65 admitió un solo destino MQTT por aplicación y el segundo solo por HTTP(S); es la forma de convivir con el broker del operador sin tocarlo. Exige verificar la autenticación del reporte (cabeceras nombre/valor según la guía de Milesight) y un servidor con dirección pública. Punteada en las figuras |
@@ -92,7 +92,8 @@ contenedores, y que el PDF exportado diga lo mismo que el `.drawio`. La vista re
   (escenario 3, ruta B) y servidor de red externo (escenario 5, ruta C); **vía 2**, HTTPS, 443: equipo directo (escenario 2) y, **prevista
   y punteada**, el reporte HTTPS de la pasarela (escenario 8); **vía 3**, WebSocket sobre TLS, 443: pasarela con *Basics Station* hacia
   el ChirpStack propio de la ruta A (escenarios 4 y 7), **diseñada, no construida**, punteada. Las rutas dicen dónde corre el servidor de
-  red; las vías, por dónde entra la trama. Las personas entran siempre por 443. Hasta el 01/11/2026 las vías eran cuatro (1 MQTT directo,
+  red; las vías, por dónde entra la trama (no confundir con la vía declarada en el alta, `dispositivo.via`: mqtt, http o lorawan, que
+  dice cómo se autentica el emisor). Las personas entran siempre por 443. Hasta el 01/11/2026 las vías eran cuatro (1 MQTT directo,
   2 HTTP directo, 3 LoRaWAN por pasarela, 4 reporte HTTPS previsto) y la ruta A usaba el reenvío Semtech UDP en 1700/udp «solo en red
   local»: ese protocolo no autentica ni cifra el transporte (la carga LoRaWAN sí va cifrada e íntegra de extremo a extremo) y la
   industria recomienda y ofrece como reemplazo *Basics Station* (punto 56; `docs/11 §1`).
@@ -133,7 +134,7 @@ flowchart TB
         S3["Equipo que solo habla HTTP\n(nodo 4G o sistema de terceros)"] -- "HTTPS 443, saliente" --> R
         G -- "ruta B: MQTT/TLS 8883\nruta A: WebSocket/TLS 443" --> R
         G -. "prevista: reporte HTTPS 443\n(segundo destino de la pasarela)" .-> R
-        G -- "ruta C: UDP 1700" --> NSE["Servidor de red externo\nChirpStack del campus (ruta C)"]
+        G -- "ruta C: UDP 1700" --> NSE["Servidor de red externo\np. ej. ChirpStack institucional (ruta C)"]
         NSE -- "MQTT/TLS 8883, saliente" --> R
     end
 
@@ -147,7 +148,7 @@ flowchart TB
         MQ["Mosquitto :1883"]
         BE["Backend :3000"]
         DB[("TimescaleDB :5432")]
-        CS["ChirpStack :8080\n(solo ruta A, opcional)"]
+        CS["Puente de pasarelas + ChirpStack\n(solo ruta A, opcional, diseñada)"]
     end
 
     R -- "salientes únicamente" --> INET
@@ -168,7 +169,7 @@ flowchart TB
 |---|---|---|---|
 | Sitio → Internet | Conexiones **salientes** de nodos y gateway | Nada entrante | Los dispositivos inician la conexión: no hay que abrir puertos en el router del cliente (RNF-10) |
 | Internet → servidor | 443 (personas) y 8883 (dispositivos, pasarelas de la ruta B y servidores de red externos de la ruta C), siempre; en la ruta A la pasarela con Basics Station entra también por 443 (WebSocket sobre TLS) | 5432, 1883, 8080, 3000 | Solo se expone lo que necesita hablar con el exterior; todo lo demás vive en la red interna de Docker |
-| Red interna | Tráfico entre contenedores por nombre de servicio | Acceso desde fuera | La base de datos solo es alcanzable desde el backend |
+| Red interna | Tráfico entre contenedores por nombre de servicio | Acceso desde fuera | La base de datos no se publica fuera de la red interna; hoy los cuatro servicios comparten una sola red de Compose, así que segmentarla en dos (`borde` y `datos`) queda pendiente para la Etapa 4 |
 
 **Conceptos de la entrada, sin ambigüedad (13/10/2026, a pregunta del estudiante):**
 
@@ -219,7 +220,7 @@ persona y cifrado por SSH. Así se cumplen R1 y R2 del punto 44 sin exponer nada
 5. **Por qué no se satura.** nginx atiende muchas conexiones con pocos procesos, sin un hilo por conexión: un proceso por núcleo
    (`worker_processes auto`), hasta 1024 conexiones cada uno (`worker_connections`). Los plazos son de 5 s para conectar al
    servicio y de 1 h para las conexiones largas (MQTT y SSE), y el contenedor tiene un techo de 100 MB. Medido: 30 MiB en la carga
-   combinada de `docs/16 §10`. El límite de tasa por IP está pendiente (`docs/11 §4`).
+   combinada de `docs/16 §10`. El límite de tasa por IP lo aplica el proxy desde el 22/10 (`docs/11 §3`).
 6. **Navegador y proxy hablan HTTP/2; proxy y backend, HTTP/1.1.** HTTP/2 (`http2 on`) lleva muchas peticiones y flujos por una
    sola conexión del navegador. Hacia el backend va una conexión por petición o por flujo, dentro del mismo servidor.
    **Por qué no HTTP/2 también hacia el backend** (14/10/2026). Lo nuevo no es mejor por ser nuevo: es mejor si resuelve un
@@ -362,7 +363,7 @@ sequenceDiagram
                 F4->>F5: cada lectura guardada<br/>+ reglas de umbral<br/>de su canal
                 alt cruza umbral (con histéresis)
                     F5->>DB: abre/cierra condicion, INSERT evento
-                    Note right of F5: notifica al panel<br/>(tiempo real) y por correo<br/>si está configurado
+                    Note right of F5: notifica al panel<br/>(tiempo real). El correo<br/>queda previsto (RF-38)
                 end
             end
         end
@@ -473,7 +474,7 @@ excede por hasta un período de barrido. Dos salidas: declarar la tolerancia en 
 («≤ 2 intervalos + período de barrido») o adelantar el umbral en un período. Se decide antes de la
 prueba formal de la Etapa 4, no en el código de hoy.
 
-**Límite conocido de `/salud` (mismo hallazgo).** El endpoint solo verifica la base; con el broker
+**Límite conocido de `/salud` (mismo hallazgo).** El `estado` del endpoint depende solo de la base (desde el 13/10 la respuesta informa además el broker, sin cambiar `estado`); con el broker
 caído responde `200 ok` igual, porque `BrokerService` reconecta solo y no lo consulta. No es un error:
 hoy nada depende de que `/salud` refleje el broker, y `BrokerService` ya registra sus propios avisos
 de conexión. Si más adelante el healthcheck del contenedor necesita reflejar también el broker, es un
@@ -614,7 +615,7 @@ clave `(tiempo, canal_id)`; el instante viaja como texto exacto de la base (micr
 CSV estándar (coma, punto decimal, UTF-8, CRLF, cabecera `tiempo_utc,magnitud,valor,unidad,canal_id`; todo texto que empiece
 con `=`, `+`, `-`, `@`, tabulador o retorno se protege con apóstrofo contra la inyección de fórmulas) o JSON como lista.
 Descarga con nombre saneado; `Cache-Control: no-store`; rango acotado (desde el año 2000, hasta un día en el futuro); como
-mucho dos exportaciones simultáneas por proceso (429) y 30 s de tope por consulta en una conexión propia, para no quedarse con
+mucho dos exportaciones simultáneas por proceso (429) y 30 s de tope por consulta en una conexión del pool compartido, para no quedarse con
 el pool de la recepción; cada escritura espera `drain` (contrapresión); un error a mitad de flujo corta la conexión y queda en
 el registro. XLSX y la exportación por sitio con rol llegan con la sesión (`docs/20`). Pruebas: `docs/16 §19`.
 
@@ -639,13 +640,13 @@ flowchart TB
         direction LR
         subgraph SVC["Contenedores (versión fijada · no-new-privileges · reinicio automático)"]
             direction TB
-            C5["proxy<br/>nginx (decidido el 06/10) · TLS<br/>límite 0,1 GB · publica 443 y 8883"]
+            C5["proxy<br/>nginx (decidido el 06/10) · TLS<br/>límite 0,1 GB · publica 443 y 8883 (y 80, solo redirección)"]
             C1["mosquitto<br/>eclipse-mosquitto 2.1.2-alpine<br/>límite 0,25 GB"]
-            C2["chirpstack + redis propio<br/>solo ruta A (opcional)<br/>límite 0,35 GB"]
+            C2["chirpstack + puente de pasarelas + redis<br/>solo ruta A (opcional, diseñada)<br/>límite 0,35 GB (por medir)"]
             C4["backend<br/>imagen propia: NestJS + panel estático en /panel (12/10)<br/>límite 0,5 GB · sin estado"]
             C3["timescaledb<br/>timescale/timescaledb 2.30.2-pg16-oss (edición Apache) + parches<br/>límite 0,75 GB"]
         end
-        V4[("vol: certificados")]
+        V4[("certificados: carpeta del anfitrión, solo lectura")]
         V2[("vol: datos-mosquitto")]
         V1[("vol: datos-timescale<br/>todo el dato · base «chirpstack» aparte (ruta A)")]
     end
@@ -659,7 +660,7 @@ flowchart TB
 
 | Servicio | Persistencia | Reinicio | Expuesto |
 |---|---|---|---|
-| proxy (nginx) | certificados | `unless-stopped` | 443, 8883 |
+| proxy (nginx) | certificados | `unless-stopped` | 443, 8883 (y 80, que solo redirige a 443) |
 | mosquitto | cola de la sesión persistente del backend, retenidos y ACL | `unless-stopped` | no (vía proxy) |
 | chirpstack (solo ruta A, opcional) | base `chirpstack` en el mismo PostgreSQL (volumen datos-timescale) + redis | `unless-stopped` | no (vía proxy) |
 | timescaledb (edición Apache, `-oss`) | **todo el dato** | `unless-stopped` | no |
@@ -919,7 +920,7 @@ del fabricante de la pasarela (137 afirmaciones, en un registro del autor que no
 4. **Confirmación al broker después de persistir — implementado el 07/10/2026.** Hasta entonces el cliente MQTT
    confirmaba al recibir; si la base caía, el mensaje confirmado se perdía (§4.1). El pipeline corre ahora dentro de
    `handleMessage` de la librería (un mensaje a la vez: la librería no toma el siguiente paquete hasta que se llama su
-   callback) y la confirmación (PUBACK) se emite **después del COMMIT**; si el pipeline falla, se reintenta el mismo
+   callback) y la confirmación (PUBACK) se emite **después de guardar** (cada inserción se confirma por sí sola; la transacción por trama queda pendiente para la Etapa 4: hoy un reintento tras un fallo posterior al guardado cuenta la lectura como duplicada y no evalúa la alerta); si el pipeline falla, se reintenta el mismo
    mensaje (1, 2, 4 y 8 s) y, agotados, no se confirma y se reconecta para que el broker lo reenvíe. Medido en el banco
    (`docs/16 §3–4`): misma tasa (59,7 tramas/s), pico 81, p95 1 ms; la prueba de carrera «una sola trama cruda» pasó. Con QoS 1 y sesión persistente,
    un mensaje no confirmado se reentrega al volver; el índice único `(canal, instante)` evita duplicarlo. Esto
@@ -1088,9 +1089,9 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     «antes»; `NO KEY` porque ninguna edición cambia una clave y así las tramas del dispositivo no esperan: `docs/16 §26`). Una condición abierta se reevalúa con la trama siguiente. Va en la segunda pantalla del panel.
 29. **Picos y ataques: nunca una pérdida silenciosa.** Medido (`docs/16 §10`): sin pérdida hasta 409 tramas/s; por
     encima de unas 490/s, o con un aluvión de peticiones a `/salud`, el broker descartaba sin aviso. Se implementan:
-    límites por IP en el proxy (`limit_req`, `limit_conn`) y un `/salud` público que no consulta la base; topes de cola
+    límites por IP en el proxy (`limit_req`, `limit_conn`) y un `/salud` público (hoy consulta la base con un conteo ligero; la variante sin base queda pendiente); topes de cola
     explícitos en el broker y una alarma (evento y correo) cuando descarta; un tope de tramas por minuto por
-    dispositivo en el filtro 1, con revocación de su credencial (punto 26); y, al desplegar, un cortafuegos con solo
+    dispositivo en el filtro 1, con revocación de su credencial (punto 26; construido el 17/10 como tope por hora y por emisor en los filtros 2–6, sin revocación: punto 53); y, al desplegar, un cortafuegos con solo
     443 y 8883 abiertos y bloqueo automático de IP. Escribir en lote, solo si la medición del punto 31 lo pide. Suman
     robustez si caben: tiempos máximos y un grupo de conexiones propio para la API (la lectura no debe quitarle
     recursos a la recepción), `max_connections` en el broker, guardado a disco del broker más frecuente y vigilancia
@@ -1206,7 +1207,7 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     que el administrador recupera:** una hypertable `auditoria` con una fila por petición HTTP (instante, `usuario_id` cuando haya
     sesión, método, ruta normalizada, recurso, código, duración en ms, bytes, `id_peticion`, origen truncado a /24 en IPv4 y /48 en
     IPv6, porque la dirección completa es un dato personal y el bloqueo por IP se lleva en memoria con la exacta); se excluyen
-    `/salud` (lo pide el chequeo cada 10 s) y los latidos del canal en vivo (el flujo deja una fila al abrirse y otra al cerrarse,
+    `/salud` (lo pide el chequeo cada 15 s) y los latidos del canal en vivo (el flujo deja una fila al abrirse y otra al cerrarse,
     con su duración). Con 10 usuarios y 500 peticiones diarias son 5 000 filas por día: trivial. Se suman `acceso` (`docs/20`) y
     `metrica_broker`: una muestra por minuto de los contadores `$SYS` del broker que el manual documenta
     (`publish/messages/dropped`, `store/messages/count`, `store/messages/bytes`, `clients/connected`, `heap/current`), tomada por
@@ -1218,7 +1219,7 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     reenvía en una cabecera, así una línea del proxy, una del backend y la fila de `auditoria` se cruzan por el mismo valor. Lo que
     escribe (alta, baja, rotación) y todo error dejan una línea con conteos e identificadores, nunca datos de la persona ni
     secretos; las lecturas no se registran (están en la tabla). **(3) Métricas, los números en el tiempo:** sin Prometheus; los
-    números viven en `metrica_broker` y en `GET /salud` ampliado (cola del broker, descartes, conexiones, flujos abiertos, altas en
+    números viven en `metrica_broker` y en `GET /salud` ampliado (cola del broker, descartes, conexiones, altas en
     curso). **Qué pasa cuando la base cae:** el middleware nunca bloquea la petición: las filas se acumulan en memoria (cola de
     1 000, vaciada cada 5 s) y, si se llena, se descartan las más viejas **contando** lo descartado en una línea de registro (ruido,
     no silencio); el pipeline de tramas sigue como en §4.1 (sin confirmar al broker, que las guarda). **La cola del broker, con
@@ -1546,7 +1547,7 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     reemplaza la regla 7 y también abre la condición: revisión del 22/10); la condición se abre por nodo, no por pasarela (el modelo no
     tiene estado propio de pasarela): una pasarela desviada con N nodos abre N condiciones, y se cierran una a una; si la pasarela deja de
     incluir marca (o la manda sin zona), no abre ni cierra nada y una condición abierta queda así hasta la siguiente marca plausible; las
-    tramas descartadas antes del filtro 4 (contador repetido, tope) no cuentan. La lectura de «abierta» en el filtro 1 no se cruza con
+    tramas descartadas antes del filtro 4 (contador repetido, tope) no cuentan; hoy la marca se evalúa antes de validar las lecturas, así que una trama con todas sus lecturas inválidas también abre la condición (decidir en la Etapa 4 si debe esperar al filtro 3). La lectura de «abierta» en el filtro 1 no se cruza con
     otra trama del mismo nodo porque se procesan de a una (MQTT en serie, decisión 4; HTTP de a una por identificador, punto 52). (vi) **Prueba:** unitarias en `tiempo.spec.ts`, `recepcion.service.spec.ts`, `supervision.service.spec.ts` y
     `estado-visual.test.ts`; `banco.sh lorawan` de punta a punta; `docs/16 §46`.
 
@@ -1676,7 +1677,7 @@ construirlo por anticipado. Cada afirmación sobre una herramienta tiene su fuen
 ### 9.5 Respaldos: qué pérdida se acepta y qué se protege
 
 - **Qué garantiza cada cosa.** RNF-05 («ningún evento aceptado y confirmado se pierde ante un reinicio») lo cumplen la
-  transacción, la confirmación al broker tras el COMMIT y la cola del broker: cubre caídas del backend, de la base
+  inserción idempotente, la confirmación al broker tras guardar y la cola del broker: cubre caídas del backend, de la base
   o del servidor **mientras el disco sobreviva**. El respaldo cubre lo otro: el disco que muere, el proveedor que
   pierde la máquina, un borrado por error. Ahí lo único que existe es la copia más reciente, y lo que haya entrado
   después de ella se pierde. Ese tramo es el **RPO** (cuánto dato se acepta perder); el **RTO** es cuánto tiempo sin

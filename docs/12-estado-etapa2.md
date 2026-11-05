@@ -95,7 +95,7 @@ sobrepeso**; la regla sigue siendo agregar dependencias solo con justificación 
 - Patrón B (navegador solo con el backend): respetado; aún no hay panel.
 - Términos vetados: sin «heterogéneo» ni «ingesta» en documentos ni código.
 - Seguridad en capas: `docs/11` con controles verificados; secretos fuera del repositorio.
-- Flujo de commits: el estudiante ejecuta git; mensajes en imperativo, sin ruido.
+- Flujo de commits: git se ejecuta a mano; mensajes en imperativo, sin ruido.
 - Un solo modelo interno; adaptadores por formato; cuarentena separada de las series.
 
 ## 6. Dónde están los diagramas

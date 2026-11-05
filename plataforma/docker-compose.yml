@@ -1,5 +1,5 @@
-# Despliegue de la plataforma — Etapa 2 (base de datos, broker y backend).
-# El proxy TLS es la capa proxy/compose.proxy.yml; el panel se agrega cuando exista, y ChirpStack solo si se
+# Despliegue de la plataforma — Etapa 3 (base de datos, broker y backend, que sirve el panel en /panel).
+# El proxy TLS es la capa proxy/compose.proxy.yml; el panel lo sirve el backend, y ChirpStack solo si se
 # activa la ruta A, que es opcional (docs/10 §8.4 punto 2).
 # Este archivo es la FORMA DE PRODUCCIÓN: no publica puertos ni activa nada de desarrollo.
 # Lo propio del portátil (puertos en 127.0.0.1, /docs) vive en docker-compose.override.yml,

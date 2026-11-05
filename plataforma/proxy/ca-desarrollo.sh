@@ -9,10 +9,10 @@
 #   CA_DNS_EXTRA=<nombre>[,<nombre>…] bash …             → además vale para esos nombres de host (el del servidor en la red privada
 #                                                          de administración, por ejemplo); letras, dígitos, puntos y guiones
 #   CA_NOMBRE="CA de prueba (servidor X)" bash …         → nombre de la CA cuando se crea (por defecto, la de desarrollo)
-#   CA_FRASE=<frase> bash …                              → la clave de la CA queda CIFRADA en disco (AES-256) al crearla, y hace falta
+#   read -rs CA_FRASE; export CA_FRASE; bash …          → la clave de la CA queda CIFRADA en disco (AES-256) al crearla, y hace falta
 #                                                          la misma frase para emitir certificados; la frase vive en el gestor de
 #                                                          contraseñas, nunca en un archivo ni en el historial (exportarla con `read -rs`)
-#   CA_CIFRAR=1 CA_FRASE=<frase> bash … [carpeta]        → cifra en el sitio una ca.key que se creó sin frase, y termina. Antes de
+#   CA_CIFRAR=1 bash … [carpeta] (CA_FRASE exportada)    → cifra en el sitio una ca.key que se creó sin frase, y termina. Antes de
 #                                                          borrar cualquier copia en claro, emitir un certificado con la frase y verificar
 # El certificado del servidor vale siempre para localhost, 127.0.0.1 y el nombre de servicio «proxy» (clientes dentro de la red
 # de Docker; el nodo ESP32 verifica ese nombre, docs/17 §6.2). Los clientes confían con `--cafile ca.crt` (mosquitto_pub) o
@@ -59,6 +59,8 @@ if [ ! -f ca.key ]; then
   fi
 elif grep -q ENCRYPTED ca.key && [ -z "${CA_FRASE:-}" ]; then
   echo "FALLA ca.key está cifrada: exportar CA_FRASE (read -rs CA_FRASE; export CA_FRASE)"; exit 1
+elif ! grep -q ENCRYPTED ca.key && [ -n "${CA_FRASE:-}" ]; then
+  echo "AVISO ca.key está en claro: CA_FRASE se ignora al firmar; para cifrarla: CA_CIFRAR=1 bash $0 $DIR"
 fi
 openssl req -newkey rsa:2048 -nodes -subj "/CN=localhost" -keyout servidor.key -out servidor.csr 2>/dev/null
 printf 'subjectAltName=%s\nextendedKeyUsage=serverAuth\n' "$SAN" > san.ext

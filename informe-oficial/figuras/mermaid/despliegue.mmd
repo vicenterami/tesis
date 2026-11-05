@@ -3,13 +3,13 @@ flowchart TB
         direction LR
         subgraph SVC["Contenedores (versión fijada · no-new-privileges · reinicio automático)"]
             direction TB
-            C5["proxy<br/>nginx (decidido el 06/10) · TLS<br/>límite 0,1 GB · publica 443 y 8883"]
+            C5["proxy<br/>nginx (decidido el 06/10) · TLS<br/>límite 0,1 GB · publica 443 y 8883 (y 80, solo redirección)"]
             C1["mosquitto<br/>eclipse-mosquitto 2.1.2-alpine<br/>límite 0,25 GB"]
-            C2["chirpstack + redis propio<br/>solo ruta A (opcional)<br/>límite 0,35 GB"]
+            C2["chirpstack + puente de pasarelas + redis<br/>solo ruta A (opcional, diseñada)<br/>límite 0,35 GB (por medir)"]
             C4["backend<br/>imagen propia: NestJS + panel estático en /panel (12/10)<br/>límite 0,5 GB · sin estado"]
             C3["timescaledb<br/>timescale/timescaledb 2.30.2-pg16-oss (edición Apache) + parches<br/>límite 0,75 GB"]
         end
-        V4[("vol: certificados")]
+        V4[("certificados: carpeta del anfitrión, solo lectura")]
         V2[("vol: datos-mosquitto")]
         V1[("vol: datos-timescale<br/>todo el dato · base «chirpstack» aparte (ruta A)")]
     end

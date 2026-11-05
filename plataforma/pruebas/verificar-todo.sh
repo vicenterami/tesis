@@ -774,7 +774,7 @@ else:
     real = (len(f18), sum(h for h, _ in f18.values()), *e3['✅'], *e3['🟡'], *e3['⬜'], n[0], n[1], n[2], n[3], n[4], n[5], n[6])
     dicho = tuple(int(x) if x is not None else 0 for x in m.groups())  # «ninguno pendiente» = 0 elementos y 0 h
     if dicho != real: malos.append(f'informe (cap4.tex): dice {dicho}; las filas dan {real}')
-# 24/10, noche: cap-pruebas.tex repetía el porcentaje del núcleo (65 %) y nadie lo comparaba; quedó viejo al cerrar HU-19.
+# 24/10: cap-pruebas.tex repetía el porcentaje del núcleo (65 %) y nadie lo comparaba; quedó viejo al cerrar HU-19.
 cp = re.sub(r'\s+', ' ', open('informe-oficial/cap-pruebas.tex', encoding='utf-8').read())
 mp = re.findall(r'núcleo demostrable está hecho en un (\d+)\\,\\%', cp)
 if len(mp) != 1: malos.append(f'informe (cap-pruebas.tex): esperaba una frase «el núcleo demostrable está hecho en un N %», hay {len(mp)}')
@@ -819,7 +819,8 @@ pasos = len(re.findall(r'^paso "', pathlib.Path('plataforma/pruebas/verificar-to
 # No cuenta it.each(, it.skip( ni test.only(: hoy no hay ninguno en el panel; si aparecen, ampliar la expresión.
 panel = sum(len(re.findall(r'(?<![.\w])(?:it|test)\(', p.read_text(encoding='utf-8'))) for p in pathlib.Path('plataforma/backend/panel/src').rglob('*.test.ts'))
 if pasos < 20 or panel < 10: print(f'FALLA conté {pasos} pasos y {panel} pruebas del panel (¿cambió la forma?)'); sys.exit(1)
-fuentes = [*pathlib.Path('informe-oficial').glob('*.tex'), *pathlib.Path('informe-oficial/anexos').glob('*.tex'), *pathlib.Path('docs').glob('*.md')]
+fuentes = [*pathlib.Path('informe-oficial').glob('*.tex'), *pathlib.Path('informe-oficial/anexos').glob('*.tex'), *pathlib.Path('docs').glob('*.md'),
+           pathlib.Path('informe-oficial/presentacion/presentacion.tex')]  # 04/11: la lámina «N pasos del guardián» también se compara
 malos, n_pasos, n_panel = [], 0, 0
 for f in fuentes:
     if f.name.startswith('12-'): continue
@@ -829,8 +830,8 @@ for f in fuentes:
         # (antes de la primera «## N.») y en la última sección (la del cambio vigente).
         partes = re.split(r'(?m)^(?=## \d+\. )', crudo); crudo = partes[0] + (partes[-1] if len(partes) > 1 else '')
     t = re.sub(r'\s+', ' ', crudo)
-    for m in re.finditer(r'(\d+) pasos que comparan|verificador de (\d+) pasos|por sus pasos \((\d+)\)', t):
-        n_pasos += 1; dice = int(m.group(1) or m.group(2) or m.group(3))
+    for m in re.finditer(r'(\d+) pasos que comparan|verificador de (\d+) pasos|por sus pasos \((\d+)\)|\\cifra\{(\d+)\}\{pasos del guardián\}', t):
+        n_pasos += 1; dice = int(m.group(1) or m.group(2) or m.group(3) or m.group(4))
         if dice != pasos: malos.append(f'{f}: dice {dice} pasos del verificador; hay {pasos}')
     for m in re.finditer(r'(\d+) del panel', t):
         n_panel += 1
@@ -892,7 +893,7 @@ PY
 paso "2w6. Citas a secciones: cada «docs/NN §M» de un archivo versionado apunta a una sección M que existe en docs/NN"
 # 24/10, revisión del día: docs/17 citaba «docs/16 §53» antes de que existiera. Se exige la sección principal (el título
 # «# M.» o «## M.»); «§M.K» puede ser un título o el punto K de una lista de §M, así que de ella solo se comprueba M.
-# 24/10, noche: también cada § de una lista que sigue a la cita («`docs/16 §39` y §40», «§39, §40 y §41»); antes solo se veía el primero.
+# 24/10: también cada § de una lista que sigue a la cita («`docs/16 §39` y §40», «§39, §40 y §41»); antes solo se veía el primero.
 python3 -I - <<'PY' || fallos=$((fallos+1))
 import re, sys, pathlib, subprocess
 secciones = {}

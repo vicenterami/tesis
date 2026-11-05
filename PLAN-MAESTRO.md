@@ -83,7 +83,7 @@ complementarios, no alternativos.*
 |---|---|---|
 | **1** — Problema, objetivos, requerimientos | 17 ago – 4 sep | **4 de septiembre** |
 | **2** — Diseño e implementación inicial | 7 sep – 2 oct | **2 de octubre** |
-| **3** — Mejoras, pruebas, validación preliminar | 5 oct – 30 oct | **30 de octubre** |
+| **3** — Mejoras, pruebas, validación preliminar | 5 oct – 30 oct | **30 de octubre** (entrega aplazada al 5 de noviembre) |
 | **4** — Validación final e informe | 2 nov – 4 dic | **4 de diciembre** |
 
 **Indicación adicional del curso:** el informe tiene un **límite blando de 30 páginas**; el resto va a

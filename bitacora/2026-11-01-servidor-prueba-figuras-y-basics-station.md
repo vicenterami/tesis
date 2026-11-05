@@ -7,7 +7,7 @@ revisión de arquitectura que terminó cambiando una decisión de diseño.
 
 ## 1. Servidor de prueba en la red de la universidad
 
-Decisiones, con su ficha en el registro privado y su copia pública en `docs/14 §7`, `docs/11 §4` y `§8`, `docs/10 §8.4` punto 55:
+Decisiones, registradas en `docs/14 §7`, `docs/11 §4` y `§8`, `docs/10 §8.4` punto 55:
 - **Acceso de administración por red privada cifrada (WireGuard), de salida.** SSH y los puertos de personas (443 y 80) se publican solo en
   la dirección de esa red; el 8883 en todas las interfaces para la pasarela del campus. Mientras la institución no reenvíe un puerto UDP, la
   red la coordina un servicio de terceros con plan gratuito para uso no comercial; WireGuard propio queda preparado y detenido para el día
@@ -26,9 +26,9 @@ Decisiones, con su ficha en el registro privado y su copia pública en `docs/14 
 
 ## 2. Figuras 4.1 y 2.2: la versión del autor es la fuente
 
-El autor dibujó las dos figuras en draw.io y pidió que se respetara su versión: puertos visibles, orden de izquierda a derecha por puerto,
-énfasis en lo hecho y lo previsto, procesos del backend legibles, tamaños sin cambiar. Se escribió una lista de cambios mínimos, solo por
-concordancia con `docs/10 §1`, y se aplicó tras su aprobación. Hallazgo del cruce con el documento de diseño: el rótulo «red del campus»
+Las dos figuras se dibujaron en draw.io y esa versión es la que manda: puertos visibles, orden de izquierda a derecha por puerto,
+énfasis en lo hecho y lo previsto, procesos del backend legibles, tamaños sin cambiar. Los cambios se limitaron a una lista mínima, solo por
+concordancia con `docs/10 §1`. Hallazgo del cruce con el documento de diseño: el rótulo «red del campus»
 estaba sobre la ruta del servidor de red externo (ruta C), cuando desde el 15/10 la red del campus entra por el servidor embebido de la
 pasarela (ruta B); el mismo error vivía en una ficha de decisión y se corrigió en las dos partes.
 
@@ -64,7 +64,7 @@ guardián.
 
 Pruebas unitarias del backend (adaptadores, LoRaWAN, recepción, pasarelas): 4 suites, 112 pruebas en verde. Banco de punta a punta:
 rutas B y C 46 de 46, recepción por HTTP 20 de 20. Las afirmaciones sobre terceros usadas hoy (planes gratuitos, licencias, módulo ACME,
-integración de mensajería, certificado de cliente en la pasarela) quedaron con cita literal en el registro privado de evidencia.
+integración de mensajería, certificado de cliente en la pasarela) quedaron con cita literal en el registro de evidencia.
 
 ## 6. Lecciones
 
@@ -72,7 +72,7 @@ integración de mensajería, certificado de cliente en la pasarela) quedaron con
   diseño, no leyendo el dibujo solo.
 - «Tres vías» significaba una cosa el 22/10 y otra el 01/11: al renumerar, se busca el término en todo el repositorio y se anota dónde
   conserva el sentido antiguo (registros fechados), en vez de corregirlo a ciegas.
-- Una revisión sin contexto encontró dos imprecisiones que el autor no veía: «autenticación por token» donde el puente solo admite
+- Una revisión independiente encontró dos imprecisiones: «autenticación por token» donde el puente solo admite
   certificado, y un tope de conexiones inalcanzable por un límite del contenedor. Verificar cada hallazgo antes de corregir sigue valiendo:
   varios de los 24 eran de redacción y dos no aplicaban.
 - Un «mínimo indispensable» con horas que no caben en las semanas disponibles no es un plan: las iteraciones de la Etapa 4 se
@@ -81,5 +81,5 @@ integración de mensajería, certificado de cliente en la pasarela) quedaron con
 ## 7. Qué sigue
 
 Lunes: preparar el servidor (cuentas con segundo factor, medio de instalación, clientes de la red privada). Martes, si se confirma: instalación
-presencial mínima y el resto desde casa. Miércoles: pasada de revisión de tres lentes antes de la entrega. Jueves 05/11: Entrega 3 y
+presencial mínima y el resto a distancia. Miércoles: pasada de revisión de tres lentes antes de la entrega. Jueves 05/11: Entrega 3 y
 presentación. La retroalimentación del profesor, cuando llegue, se anota en la bitácora del 28/10 y reordena lo que haga falta.

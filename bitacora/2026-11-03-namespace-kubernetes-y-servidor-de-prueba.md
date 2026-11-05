@@ -1,8 +1,8 @@
 # 03–04/11/2026 — Un namespace de Kubernetes, un servidor de prueba compartido y la plataforma operando en la red del campus
 
 **Contexto.** El martes 03/11 la universidad no entregó el equipo planeado el 01/11, sino acceso a un namespace de Kubernetes para
-estudiantes; por la tarde apareció además un PC con Debian 13 en la red del campus, compartido con permiso de su responsable. El día en el
-campus se dedicó a medir qué permite cada entorno antes de diseñar nada; la noche, desde casa, a levantar la plataforma en el PC por la red
+estudiantes; después apareció además un equipo en la red del campus, compartido con permiso de su responsable. El día en el
+campus se dedicó a medir qué permite cada entorno antes de diseñar nada; después, desde casa, a levantar la plataforma en el PC por la red
 privada de administración, verificarla de extremo a extremo y dejarla respaldada. El repositorio se hizo público ese día, tras verificar en un
 clon limpio que no contiene datos personales ni del entorno.
 
@@ -23,10 +23,9 @@ una dirección de entrada y cupo de volúmenes. La petición se redactó con la 
 diseñado (la pasarela publica directo al broker del sistema por 8883); no se adoptan rodeos como puentes a brokers ajenos.
 
 ## 2. El equipo compartido: aceptado con reglas
-El PC ya tenía responsable, un servicio de monitoreo de red de otro proyecto y SSH solo con llave. La lista de aceptación de `docs/14 §7.1`
+El PC ya tenía responsable, un servicio de otro proyecto y SSH solo con llave. La lista de aceptación de `docs/14 §7.1`
 se aplicó con una diferencia: los usuarios y servicios ajenos **se explicaron** por su responsable, presente, y el equipo se acepta como
-**compartido**. Reglas que siguen: un usuario propio con `sudo` y Docker, la llave del portátil instalada a través del registro público de llaves
-de GitHub (SSH no admite contraseñas), nada del anfitrión se toca (cortafuegos, demonio de Docker, parches: son del responsable), ningún comando
+**compartido**. Reglas que siguen: un usuario propio con lo mínimo acordado, la llave del portátil instalada (SSH no admite contraseñas), nada del anfitrión se toca (cortafuegos, demonio de Docker, parches: son del responsable), ningún comando
 sobre contenedores ajenos, y cada cambio avisado el mismo día. El clon del repositorio es anónimo (repositorio público): puede actualizar, no
 puede empujar. Administración solo por la red privada cifrada (`docs/11 §8` fila 1): llave del servidor sin expiración, nombres de la red
 activados, aprobación manual de equipos; probado desde una red ajena al campus.
@@ -40,7 +39,7 @@ espera a un backend sano, no arranca: es la señal correcta); `/salud` con 18 ta
 privada; sitio, zona, la pasarela del campus con su credencial y los dos nodos del compañero dados de alta por su DevEUI (la vía `lorawan` no
 lleva credencial propia: la autentica su pasarela).
 
-## 4. Verificado en ejecución (madrugada del 04/11)
+## 4. Verificado en ejecución (04/11)
 | Afirmación | Prueba | Resultado |
 |---|---|---|
 | MQTT directo con TLS verificado | `mosquitto_pub --cafile` desde el portátil por la red privada | `PUBACK RC:0`; lectura en el panel |
@@ -48,7 +47,7 @@ lleva credencial propia: la autentica su pasarela).
 | Sin credencial / credencial incorrecta | `mosquitto_pub` | rechazadas; el broker registra «not authorised» (2) |
 | Sin TLS al 8883 | `mosquitto_pub` sin `--cafile` | `Protocol error` |
 | Sin token / token falso | `POST` | `401` y `401` |
-| Solo los puertos del contrato | `nc` a 22, 80, 443, 1883, 3000, 5432, 8883 | 1883, 3000 y 5432 rechazados; el resto solo por la red privada |
+| Solo los puertos del contrato | `nc` a 22, 80, 443, 1883, 3000, 5432, 8883 | 1883, 3000 y 5432 rechazados; 22, 80 y 443 solo por la red privada; 8883 en todas |
 | TLS 1.1 fuera, 1.2 negocia | `openssl s_client` | rechazado / `TLSv1.2` |
 | La baja invalida la credencial | `DELETE /dispositivos/<id>` | ambos «Inactivo» |
 | La pila vuelve sola | `docker compose restart` | 4/4 `healthy` en ≈ 60 s |
@@ -66,7 +65,7 @@ equipo probado (se hace con su responsable). El latido del vigilante externo (`d
 - Una variable vive en una sola terminal; antes de cada comando se mira el prompt. Una respuesta vacía de una API es un error escondido por el
   filtro: se pide la respuesta completa.
 - Un bloque pensado para una distribución y ejecutado en otra puede dejar archivos vacíos; descargar a un temporal y comprobar antes de instalar.
-- El reloj del servidor en UTC: un «último acceso a las 16:55» son las 13:55 locales.
+- El reloj del servidor en UTC: la hora de «último acceso» que muestra el sistema se convierte a la hora local antes de alarmarse.
 - Las credenciales de prueba que se muestran por pantalla se invalidan en el acto; los dispositivos de prueba se dan de baja al terminar.
 
 ## 7. Qué sigue

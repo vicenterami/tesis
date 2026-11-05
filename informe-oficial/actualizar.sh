@@ -5,7 +5,7 @@
 #   3) comprobaciones: cero desbordes > 6 pt, cero referencias rotas, guardián de concordancia
 #   4) copia del PDF a privado/previsualizaciones para revisarlo
 #   5) PDF con los cambios marcados (latexdiff): contra la última entrega y, si hay cambios sin commitear, contra HEAD
-# Lo que NO hace, por regla del proyecto: git add/commit/push (eso lo ejecuta el estudiante).
+# Lo que NO hace, por regla del proyecto: git add/commit/push (eso se hace a mano).
 #   bash informe-oficial/actualizar.sh            # todo
 #   bash informe-oficial/actualizar.sh --sin-figuras   # solo compilar y comprobar (si la pila no está arriba)
 #   bash informe-oficial/actualizar.sh --completo      # fuerza recompilación total (tras cambiar bibliografía o preámbulo)

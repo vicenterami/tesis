@@ -49,6 +49,7 @@
 \newcommand{\fuente}[1]{\gdef\lafuente{#1}}
 \newcommand{\hecho}{\textcolor{bien}{\textbf{Cumplido}}}
 \newcommand{\encurso}{\textcolor{curso}{\textbf{En curso}}}
+\newcommand{\avanzado}{\textcolor{curso}{\textbf{Avanzado}}}
 %% Indicador: cifra grande y su etiqueta, en una tarjeta.
 \newtcolorbox{tarjeta}[1][]{colback=suave,colframe=suave,arc=2pt,boxrule=0pt,left=6pt,right=6pt,top=5pt,bottom=5pt,
   halign=center,valign=center,#1}
@@ -58,7 +59,7 @@
 \subtitle{Etapa 3: mejoras, pruebas adicionales y validación preliminar}
 \author{Vicente Ricardo Ramírez Oñate}
 \institute{INFO-1197 · Universidad Católica de Temuco · Profesor guía: Mario Villanueva}
-\date{28 de octubre de 2026}
+\date{5 de noviembre de 2026}
 
 \begin{document}
 
@@ -68,7 +69,7 @@
   \vfill
   \begin{tarjeta}[halign=left,left=14pt,right=14pt,top=12pt,bottom=12pt,borderline west={3pt}{0pt}{acento}]
     \large El núcleo del sistema funciona de punta a punta con dispositivos reales, está medido y probado, y cabe en una
-    fracción de la memoria que piden las alternativas.
+    fracción de la memoria que pide el referente (ThingsBoard, 4~GB).
   \end{tarjeta}
   \medskip
   La Etapa 4 está planificada en orden y con sus horas.
@@ -138,9 +139,9 @@
         \midrule
         1. MQTT/TLS (8883): nodo directo & ESP32, 24 h \\
         1. MQTT/TLS (8883): pasarela LoRaWAN, ruta B & UG65 del campus, 20/10 \\
-        2. HTTPS (443): equipo directo & banco, 180 de 180 \\
+        2. HTTPS (443): equipo directo & 04/11 con TLS; banco 180/180 \\
         2. \textit{Prevista:} pasarela por HTTPS (443) & Etapa 4 \\
-        3. \textit{Diseñada:} WebSocket/TLS (443), Basics Station, ruta A & Etapa 4 \\
+        3. \textit{Diseñada:} WebSocket/TLS (443), Basics Station, ruta A & Etapa 4 (it. 2) \\
         \bottomrule
       \end{tabular}
     \end{column}
@@ -169,15 +170,15 @@ Las rutas B y C entran igual por la vía 1; solo cambia el adaptador.
       \begin{itemize}
         \item El diseño escrito manda: primero \texttt{docs/}, después el código.
         \item Un \textbf{guardián} comprueba que documentos, código, base e informe digan lo mismo.
-        \item \textbf{Banco de pruebas desechable}: cada prueba parte de cero.
+        \item \textbf{Banco de pruebas desechable}: se levanta desde cero y se borra al apagar.
         \item Cada control se prueba \textbf{plantando la falla}.
-        \item \textbf{Revisión sin contexto} al cerrar cada bloque; cada hallazgo se verifica antes de corregir.
+        \item \textbf{Revisión independiente} al cerrar cada bloque; cada hallazgo se verifica antes de corregir.
       \end{itemize}
     \end{column}
     \begin{column}{0.33\textwidth}
       \cifra{357}{pruebas automáticas del backend}
       \cifra{107}{pruebas del panel}
-      \cifra{45}{pasos del guardián}
+      \cifra{46}{pasos del guardián}
     \end{column}
   \end{columns}
   \fuente{plataforma/pruebas/verificar-todo.sh; docs/18 §1}
@@ -187,13 +188,14 @@ Las rutas B y C entran igual por la vía 1; solo cambia el adaptador.
   \begin{columns}[T,onlytextwidth]
     \begin{column}{0.3\textwidth}
       \cifra{813}{mediciones en 3 h}
-      \cifra{2}{nodos y una pasarela real, por TLS}
+      \cifra{2}{nodos (uno con sensor real) y una pasarela real, por TLS}
     \end{column}
     \begin{column}{0.66\textwidth}
-      \textbf{Dos hallazgos reales, mostrados por el sistema y corregidos:}
+      \textbf{Dos hallazgos reales, mostrados por el sistema y corregidos, y una respuesta sola:}
       \begin{enumerate}
         \item Reloj de la pasarela \textbf{4 días atrasado} $\to$ tolerancia de 10 min y condición «reloj desviado».
-        \item La pasarela dejó de reenviar 27 min $\to$ «sin comunicación» abierta a los 6 min y cerrada sola al volver.
+        \item Tópico \texttt{\$devEUI} sin resolver $\to$ cuarentena; plantilla del alta corregida.
+        \item 27 min sin reenvío (operación) $\to$ «sin comunicación» a los 6 min, cerrada sola.
       \end{enumerate}
       \medskip
       \small El operador de la red, entrevistado después, pidió primero estado y alertas, después calidad del enlace, y
@@ -239,14 +241,26 @@ Las rutas B y C entran igual por la vía 1; solo cambia el adaptador.
 
 \begin{frame}{Lo que la corrida enseñó y ya está corregido}
   \begin{itemize}
-    \item \textbf{Firmware:} comprueba el sensor antes y después de leer y omite lo dudoso; watchdog de 120 s probado en la
-      placa (dos cuelgues provocados, dos reinicios a los 120,0 s).
+    \item \textbf{Firmware:} omite el sensor que no responde (visto en la placa); el valor congelado, programado y por probar en la
+      placa; watchdog de 120 s probado (dos cuelgues provocados, dos reinicios a los 120,0 s).
     \item \textbf{Plataforma:} vio esos dos cuelgues sola, sin saber nada del firmware: funciona con dispositivos que no
       controlamos.
     \item \textbf{Panel:} «canal callado»: el equipo reporta, pero una magnitud no llega.
-    \item \textbf{Etapa 4:} canal callado y valor congelado para \emph{cualquier} dispositivo, con lo declarado en el alta.
+    \item \textbf{Etapa 4 (iteración 2):} canal callado y valor congelado para \emph{cualquier} dispositivo, con lo declarado en el alta.
   \end{itemize}
   \fuente{docs/16 §53 y §54; docs/17}
+\end{frame}
+
+\begin{frame}{Servidor de prueba operando en la red del campus (desde el 03/11)}
+  \footnotesize
+  \begin{itemize}
+    \item Equipo compartido con permiso; administración solo por red privada cifrada; un puerto hacia afuera (8883, TLS 1.2+).
+    \item Verificado el 04/11: MQTT con TLS y HTTPS con token guardan; sin credencial, con credencial incorrecta, sin TLS y sin
+      token, rechazado; TLS 1.1 fuera; 1883/3000/5432 cerrados.
+    \item Respaldo diario con restauración probada; la pila se recupera sola al reiniciar sus contenedores ($\approx$ 1 min); el reinicio del equipo, por probar.
+    \item Lo que falta: dirección de entrada desde Internet (pedida) y sesión de usuarios (bloque 1 de la Etapa 4).
+  \end{itemize}
+  \fuente{docs/14 §7.4; bitácora del 03--04/11}
 \end{frame}
 
 \begin{frame}[standout]
@@ -258,13 +272,13 @@ Las rutas B y C entran igual por la vía 1; solo cambia el adaptador.
     \begin{column}{0.24\textwidth}\cifra{409/s}{pico de 30 s sin pérdida (RNF-01 pide 50/s; medido 59,7)}\end{column}
     \begin{column}{0.24\textwidth}\cifra{324 MiB}{pico de toda la pila (meta: 2 GB)}\end{column}
     \begin{column}{0.24\textwidth}\cifra{180 B}{por lectura en disco}\end{column}
-    \begin{column}{0.24\textwidth}\cifra{0 de 180}{perdidas o duplicadas en cada vía}\end{column}
+    \begin{column}{0.24\textwidth}\cifra{0 de 180}{perdidas o duplicadas en cada entrada}\end{column}
   \end{columns}
   \footnotesize
   \begin{itemize}
     \item \textbf{50 tramas/s es una meta de estrés}, unas 300 veces la carga del campus (50 canales cada 5 min); la operación
       real es de una trama por nodo cada 60 s o más, y con ella se calcula el disco.
-    \item El límite medido es la CPU de la base, no la memoria: 193 MiB en reposo. ThingsBoard CE pide 4 GB para una prueba
+    \item El límite medido es la CPU de la base, no la memoria: 193 MiB en reposo (24/10). ThingsBoard CE pide 4 GB para una prueba
       de concepto.
     \item Mil nodos de 6 canales cada minuto usan $\approx$ 12 \% de lo medido; lo que manda es el disco.
   \end{itemize}
@@ -296,10 +310,10 @@ Las rutas B y C entran igual por la vía 1; solo cambia el adaptador.
     \textbf{Criterio (peso)} & \textbf{Estado} \\
     \midrule
     50 \% de implementación (10 \%) & \encurso: núcleo 25 de 34 tareas (126 de 168 h) y 4 parciales; backlog completo 37 de 66 \\
-    Pruebas iniciales (30 \%) & \hecho: carga, carreras, TLS, capacidad, caídas, campo y 24 h \\
+    Pruebas iniciales (30 \%) & \avanzado: carga, carreras, TLS, capacidad, caídas, campo y 24 h; faltan TT-27 y el broker de producción \\
     Validación preliminar (10 \%) & \encurso: sensor real 24 h y red LoRaWAN real del campus \\
-    Mejoras (15 \%) & \hecho \\
-    Documentación (15 \%) & \encurso: revisión final antes del 30/10 \\
+    Mejoras (15 \%) & \avanzado: decisiones del 6--8/10, proxy TLS, dependencias sin altas ni críticas \\
+    Documentación (15 \%) & \encurso: revisión final hecha el 04/11 \\
     Retroalimentación (20 \%) & \encurso: falta la suya sobre la Etapa 2 \\
     \bottomrule
   \end{tabular}
@@ -311,19 +325,19 @@ Las rutas B y C entran igual por la vía 1; solo cambia el adaptador.
     \begin{column}{0.62\textwidth}
       \footnotesize
       \begin{enumerate}
-        \item Seguridad, usuarios y roles.
-        \item Panel para operar una flota, con alta masiva por archivo y bandeja de detectados.
-        \item Salud de los datos: canal callado y valor congelado.
-        \item Lo pedido en la entrevista del 05/10.
-        \item LoRaWAN completo: ruta C con ChirpStack externo, de punta a punta.
-        \item Despliegue, Kubernetes con escalado probado y consumo en pesos.
-        \item Pruebas, comparación con los referentes e informe final.
+        \item Seguridad, usuarios y roles (iteración 0).
+        \item Panel para operar una flota, con alta masiva por archivo y bandeja de detectados (iteración 2).
+        \item Salud de los datos: canal callado y valor congelado (iteraciones 1 y 2).
+        \item Lo pedido en la entrevista del 05/10 (iteración 2).
+        \item LoRaWAN completo: ruta C con ChirpStack externo, de punta a punta (iteración 0).
+        \item Despliegue: servidor de prueba (iteración 0); Kubernetes, namespace ya medido, y consumo en pesos (iteración 2).
+        \item Informe final (iteración 0); comparación completa con los referentes (iteración 2).
       \end{enumerate}
     \end{column}
     \begin{column}{0.33\textwidth}
-      \cifra{$\approx$ 212 h}{de plan}
+      \cifra{$\approx$ 224 h}{de plan}
       \cifra{$\approx$ 75 h}{de presupuesto}
-      \scriptsize Se avanza en ese orden, todo probado; lo que no alcance queda diseñado y declarado.
+      \scriptsize Primero la iteración 0, el mínimo ($\approx$ 70 h, cabe en las 75); el resto por iteraciones, todo probado; lo que no alcance queda diseñado y declarado.
     \end{column}
   \end{columns}
   \fuente{docs/04 §8}
@@ -333,7 +347,8 @@ Las rutas B y C entran igual por la vía 1; solo cambia el adaptador.
   \begin{enumerate}
     \item Su retroalimentación sobre la Etapa 2 (pesa 20 \% en esta etapa).
     \item ¿Hay un ChirpStack institucional en el campus (ruta C), o la red sigue con la pasarela UG65 (ruta B)?
-    \item ¿Hay un servidor de la Facultad para la Etapa 4? (OE5: validar en un servidor modesto).
+    \item La institución ya entregó un namespace de Kubernetes y un equipo compartido en la red del campus; falta una dirección
+      de entrada desde Internet y cupo de volúmenes. ¿Nos ayuda a gestionarlo?
     \item ¿Le parece bien el orden de la Etapa 4, o algo debe subir?
   \end{enumerate}
 \end{frame}

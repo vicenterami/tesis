@@ -57,5 +57,6 @@ lecturas de un dispositivo. Es la unidad de la meta de carga: RNF-01 pide 50 tra
 \item[Vías 1 a 3] Por dónde entra una trama al servidor, en orden de relevancia: 1, MQTT sobre TLS (8883: dispositivo directo, pasarela
 de la ruta B y servidor de red de la ruta C); 2, HTTPS (443, \texttt{POST /recepcion/\{id\}}; el reporte HTTPS de la pasarela es su
 variante prevista); 3, WebSocket sobre TLS (443, \emph{Basics Station} hacia el ChirpStack de la ruta A; diseñada). Las rutas dicen
-dónde corre el servidor de red; las vías, por dónde entra la trama.
+dónde corre el servidor de red; las vías, por dónde entra la trama. No confundir con la vía declarada en el alta
+(\texttt{dispositivo.via}: mqtt, http o lorawan), que dice cómo se autentica el emisor.
 \end{description}

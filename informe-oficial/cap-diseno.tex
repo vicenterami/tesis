@@ -7,7 +7,8 @@ estática (contenedores), los datos, la red y la seguridad, el comportamiento di
 el manejo del tiempo y el despliegue. Las notaciones son las reconocidas en la industria: el modelo
 C4 \parencite{c4brown} para la vista de contenedores, diagramas entidad-relación \parencite{chen1976}
 para los datos y diagramas de secuencia UML \parencite{uml251} para el comportamiento. Las figuras
-se generan automáticamente desde la documentación versionada y, el modelo de datos, desde el esquema
+se generan desde la documentación versionada (dos vistas las dibuja el autor y el verificador las contrasta
+con ella) y, el modelo de datos, desde el esquema
 real de la base, de modo que informe, documentación y base no pueden diferir; lo que aún no está
 implementado se indica con su etapa.
 
@@ -22,7 +23,7 @@ Tres decisiones quedan visibles en la figura. Primero, hay \textbf{dos puntos de
 equipos que envían por HTTP con un token y, en la ruta A, para la pasarela con \emph{Basics Station} por WebSocket (443), y MQTT sobre
 TLS para dispositivos y pasarelas de las rutas B y C (8883); el reporte HTTPS de una pasarela como segundo destino, previsto, va
 punteado. La ruta A usaba un tercer puerto UDP con un protocolo sin autenticación ni cifrado (\emph{Semtech UDP Packet Forwarder});
-hoy entra por 443 con \emph{Basics Station}, que autentica a la pasarela con certificado, y el tercer puerto desapareció. La base de datos y la
+desde el 01/11 está diseñada (Etapa~4) para entrar por 443 con \emph{Basics Station}, que autentica a la pasarela con certificado, y el tercer puerto desapareció del diseño. La base de datos y la
 consola de administración de ChirpStack nunca se exponen. Segundo, \textbf{el navegador nunca se conecta al
 broker}: consume la API del backend, que ya autenticó, validó y normalizó cada trama. La alternativa
 —suscribir el navegador al broker por WebSocket— habría expuesto el broker a Internet y puesto
@@ -34,8 +35,8 @@ plataforma).
 Los ocho módulos del análisis (capítulo~\ref{cap:especificacion}) se reparten así: M1 recepción y M2
 normalización forman el servicio de recepción del backend, es decir, el pipeline; M4 supervisión de
 salud es el barrido periódico; M5 persistencia y consulta es la API sobre TimescaleDB; M6 alertas es el
-servicio de umbrales. No aparecen como cajas M3 inventario y aprovisionamiento ni M7 seguridad e
-identidad, transversales al backend y previstos para la siguiente etapa, ni M8 interfaz, que es el
+servicio de umbrales. No aparecen como cajas M3 inventario y aprovisionamiento (hecho por API) ni M7 seguridad e
+identidad (sesión y roles, siguiente etapa), transversales al backend, ni M8 interfaz, que es el
 panel y corre en el navegador.
 
 \section{Modelo de datos}
@@ -64,7 +65,7 @@ conecta un sensor sin tocar su red.
 
 
 La seguridad se diseñó en capas, asumiendo en cada una que la anterior falló: (1)~red: solo 443
-y 8883 publicados; (2)~TLS obligatorio en producción; (3)~identidad: broker sin conexiones anónimas,
+y 8883 publicados (y el 80, que solo redirige a 443); (2)~TLS obligatorio en producción; (3)~identidad: broker sin conexiones anónimas,
 usuario MQTT igual al identificador físico, contraseñas con hash; (4)~lista de control de acceso (ACL) por
 patrón: cada dispositivo escribe solo bajo su propio identificador, lo que impide la suplantación entre
 nodos; (5)~el pipeline valida y envía a cuarentena; (6)~datos: base sin puerto expuesto, una credencial
@@ -97,7 +98,7 @@ dispositivo se comunicó—, y por eso marca al dispositivo como visto aunque su
 cuarentena: un nodo que publica tramas malformadas está vivo y mal configurado, no en silencio, y
 confundir ambos casos manda al operador a buscar la falla donde no está. El filtro de análisis delega en \textbf{adaptadores} intercambiables —SenML
 \parencite{rfc8428} como contrato nativo y un formato plano para nodos simples—, de modo que admitir el formato de un nuevo
-fabricante es agregar una clase, no modificar el pipeline (RF-04). La entrega desde el broker es
+fabricante es agregar una clase y registrarla (lista de formatos y restricción de la base), sin tocar los filtros (RF-04). La entrega desde el broker es
 «al menos una vez»: QoS~1 con sesión persistente, de modo que si el backend cae el broker conserva la
 cola, hasta un tope de mensajes, y la entrega al volver. Eso admite reentregas, y por ello la inserción en la serie es idempotente
 sobre la clave natural canal e instante: una lectura repetida se ignora sin volver a evaluar umbrales
@@ -134,8 +135,8 @@ fijada, no puede escalar privilegios, se reinicia solo ante fallas y tiene un te
 
 
 La suma de techos es de 1,6~GB en las rutas B y C —los cuatro contenedores ya implementados— y de
-1,95~GB con ChirpStack (ruta A), ambas dentro del RNF-17 (consumo de a lo más 2~GB de RAM); el consumo real se
-mide en la Etapa~4. Los
+1,95~GB con ChirpStack (ruta A), ambas dentro del RNF-17 (consumo de a lo más 2~GB de RAM); el consumo real medido
+en pico fue de 324~MiB (capítulo de pruebas). Los
 límites cumplen además una segunda función: definen el \textbf{entorno de referencia} del banco de pruebas
 de la Etapa~4, para que la comparación no dependa del equipo de desarrollo.
 

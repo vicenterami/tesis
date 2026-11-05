@@ -24,11 +24,11 @@
 % Destinos. Lo rechazado por 1, 2 o 3 va a UNA cuarentena, cruda y con su motivo. La medición
 % aceptada entra a la serie desde 4. Los filtros 5 y 6 abren o cierran condiciones (no series).
 \node[notaaviso, text width=4.2cm, align=center, minimum height=1.1cm] (cua) at (5.1,-2.7)
-  {\textbf{cuarentena} (trama cruda + motivo)\\{\footnotesize no registrado · de baja\\malformada · inválida}};
+  {\textbf{cuarentena} (trama cruda + motivo)\\{\footnotesize no registrado · de baja · tope\\malformada · inválida}};
 \node[filtro, draw=verdeacento, line width=1.1pt, fill=verdeacento!6, minimum height=1.1cm, text width=2.5cm] (db) at (10.2,-2.7)
   {\textbf{TimescaleDB}\\[2pt]{\footnotesize medición (serie de tiempo)}};
 \node[filtro, draw=verdeacento, line width=1.1pt, fill=verdeacento!6, minimum height=1.1cm, text width=3.6cm] (cond) at (14.0,-2.7)
-  {\textbf{condiciones y eventos}\\[2pt]{\footnotesize umbral · sin comunicación}};
+  {\textbf{condiciones y eventos}\\[2pt]{\footnotesize umbral · sin comunicación · reloj desviado}};
 
 \draw[flecha, color=ambar] (f1.south) -- ++(0,-0.55) -| ([xshift=-12mm]cua.north);
 \draw[flecha, color=ambar] (f2.south) -- (cua.north);

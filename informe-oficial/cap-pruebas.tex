@@ -35,7 +35,7 @@ Se prueba en tres niveles, todos repetibles con un comando. Las 357 pruebas unit
 junto con tipos estrictos y análisis estático: cada una fija una regla de diseño en forma ejecutable. \textbf{Banco
 desechable}: una segunda pila con base, broker con su plugin de seguridad, backend y proxy reales, datos en memoria y un
 emulador de nodos (TT-28) que imita relojes rotos, pérdidas y deriva; sobre él corren casos fijos de carga, carreras,
-caídas, TLS, alta por API, LoRaWAN y cola del broker. \textbf{Verificador de concordancia}: 45 pasos que comparan informe, documentación, base y API. Otra prueba recorre, por dispositivo, inventario, ficha, histórico, exportación, condiciones y cuarentena: toda serie es consultable. Cada comprobación nueva se ejecuta primero contra el error \emph{plantado}: una prueba vale solo si falla ante la falla.
+caídas, TLS, alta por API, LoRaWAN y cola del broker. \textbf{Verificador de concordancia}: 46 pasos que comparan informe, documentación, base y API. Otra prueba recorre, por dispositivo, inventario, ficha, histórico, exportación, condiciones y cuarentena: toda serie es consultable. Cada comprobación nueva se ejecuta primero contra el error \emph{plantado}: una prueba vale solo si falla ante la falla.
 
 \section{Resultados frente a los requerimientos}
 
@@ -69,7 +69,7 @@ Las pruebas cambiaron el diseño, no solo lo confirmaron. Las 108 alarmas falsas
 RNF-03, al declarar el intervalo esperado como el silencio normal (dos periodos) y no como el periodo. Bajo
 duplicados simultáneos se guardaba dos veces la trama cruda y una condición abortaba el pipeline: ahora se procesa un
 mensaje a la vez y se confirma al broker después de guardar. Sobre la capacidad, el broker descartaba sin aviso: hoy
-tiene topes de cola y una alarma sobre su contador. Dar de baja un dispositivo frenaba hasta 5~s la recepción de sus tramas; hoy, 20~ms.
+tiene topes de cola y una alarma sobre su contador. Dar de baja un dispositivo frenaba hasta 5~s la recepción de todos los dispositivos; hoy, 20~ms.
 
 \section{Validación preliminar y limitaciones}
 

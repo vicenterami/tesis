@@ -8,7 +8,7 @@ Directorio de implementación. Todo corre en contenedores Docker (decisión y ra
 ```
 plataforma/
 ├── docker-compose.yml        # servicios, volúmenes, límites de recursos (forma de PRODUCCIÓN: sin puertos)
-├── docker-compose.override.yml # SOLO desarrollo: publica 5432 y 1883 en 127.0.0.1 (Compose lo carga solo)
+├── docker-compose.override.yml # SOLO desarrollo: publica 5432, 1883 y 3000 en 127.0.0.1 (Compose lo carga solo)
 ├── backend/                  # NestJS: recepción, pipeline, API (ver backend/README.md)
 ├── proxy/                    # capa opcional nginx con TLS: compose.proxy.yml, nginx.conf, ca-desarrollo.sh, Dockerfile (oficial + parches)
 ├── .env.example              # variables de entorno (copiar a .env; .env NO se versiona)
@@ -65,7 +65,7 @@ Probar el backend contenedorizado (`docker compose ps` debe mostrarlo `healthy`;
 puerto solo en `127.0.0.1`, igual que el resto):
 
 ```bash
-curl http://127.0.0.1:3000/salud    # {"estado":"ok","base":"conectada","tablas":13}
+curl http://127.0.0.1:3000/salud    # {"estado":"ok","base":"conectada","tablas":18,"broker":{...}}
 # http://127.0.0.1:3000/docs en el navegador → contrato OpenAPI
 ```
 
@@ -108,4 +108,4 @@ Capas, amenazas y controles verificados: `docs/11-seguridad.md`.
 3. ChirpStack (base aparte en el mismo PostgreSQL + Redis propio) **solo si se activa la ruta A**, que es opcional: en la
    ruta B la pasarela y en la ruta C el servidor de red del campus publican por MQTT/TLS con su propia credencial (`docs/10 §8.4`
    puntos 2, 24 y 45).
-4. ~~Proxy inverso con TLS~~ capa nginx hecha (07/10, `proxy/`, probada en el banco con `banco.sh proxy`); falta el certificado real (por decidir, `docs/10 §8.4` punto 22), `limit_req` y no publicar el 1883 en producción.
+4. ~~Proxy inverso con TLS~~ capa nginx hecha (07/10, `proxy/`, probada en el banco con `banco.sh proxy`); falta el certificado público (`docs/10 §8.4` punto 22); `limit_req` hecho el 22/10 y el 1883 no se publica fuera de desarrollo.

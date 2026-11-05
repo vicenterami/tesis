@@ -72,6 +72,8 @@ por día × 365 × 180 B; tramas retenidas = nodos × (86 400 / intervalo) × 30
 | 1 000 nodos (diez sectores de 100) | 60 s | 16,7 | 8,6 millones | 568 GB | 26 GB |
 | 1 000 nodos | 300 s | 3,3 | 1,7 millones | 114 GB | 5,3 GB |
 
+Con un disco de 40 GB (el del servidor de referencia, §3): 100 nodos cada 5 min suman ≈ 11,5 GB por año (mediciones más tramas retenidas), es decir ≈ 3,5 años; ≈ 3 años contando sistema, imágenes, cuarentena y registros (≤ 200 MB, §1). Es la cifra de la presentación.
+
 **Lo que dice la tabla.** (1) La CPU y la memoria sobran: mil nodos de 6 canales cada minuto son 100 lecturas/s, ≈ 12 % de las ≈ 818 medidas (4 % si se cuenta en tramas, pero cada trama de 6 lecturas pesa más que las de 2 del emulador). (2) El
 que manda es el **disco**, y lo mueve el intervalo: pasar de 60 a 300 s lo divide por cinco; por eso el intervalo se declara
 en el alta y se elige según lo que cambia el fenómeno (§2). (3) Desde un centenar de nodos cada minuto, el crudo sin
@@ -230,9 +232,9 @@ decisiones están en `docs/10 §8.4` punto 55 y los controles que exige, en `doc
 | Secretos | Generados **en el servidor** con `openssl rand`; nunca se copia el `.env` de desarrollo | `docs/11 §8` y `docs/11 §5`: un `.env` por entorno |
 | Forma de producción | `COMPOSE_FILE=docker-compose.yml:proxy/compose.proxy.yml` en el `.env` del servidor | Compose ignora el `override` de desarrollo aunque esté en el árbol (verificado el 01/11/2026: `docker compose config` publica solo los tres puertos del proxy) |
 | Arranque | `restart: unless-stopped`, `live-restore` del demonio, el demonio espera a la red privada (`After=`) y `net.ipv4.ip_nonlocal_bind=1` | Corrección candidata del hallazgo de la demostración del 28/10/2026 (un proxy «Up» sin red porque su dirección aún no existía al arrancar, `bitacora/2026-10-28`); se verifica reiniciando dos veces |
-| Respaldo | `pg_dump -Fc` diario más el archivo del plugin del broker, 30 días en el servidor, copia periódica fuera por la red privada, **restauración probada** (`timescaledb_pre_restore` → `pg_restore` → `timescaledb_post_restore`) | `docs/10 §9.5` (RPO 24 h, RTO 1 h) y `docs/11 §8` |
+| Respaldo | `pg_dump -Fc` diario más el archivo del plugin del broker, 30 días en el servidor, copia periódica fuera por la red privada, **restauración probada** (`timescaledb_pre_restore` → `pg_restore` → `timescaledb_post_restore`), **sin cifrado en reposo todavía** (pendiente, `docs/10 §9.5`) | `docs/10 §9.5` (RPO 24 h, RTO 1 h) y `docs/11 §8` |
 | Avisos | Vigilante externo por latido (§7.2) | Un servidor caído no puede avisar que se cayó |
-| Actualizar | `git pull --ff-only` con una llave de despliegue de solo lectura → `escanear-imagenes.sh` → `docker compose up -d --build` → `GET /salud` | Lo construido se escanea antes de correr (`docs/11 §8`); en un paso con `desplegar.sh` (Etapa 4) |
+| Actualizar | `git pull --ff-only` con una llave de despliegue de solo lectura → `escanear-imagenes.sh` → `docker compose up -d --build` → `GET /salud` | Lo construido se escanea antes de correr (`docs/11 §8`); en un paso con `desplegar.sh` (Etapa 4). Las migraciones no llevan tabla de versiones: `db/init` corre solo con el volumen vacío; en una base existente se aplican a mano y el guardián (paso 2) las verifica por huella |
 
 ### 7.1 Orden de instalación
 
@@ -277,14 +279,17 @@ explícita: los usuarios y servicios ajenos se explicaron y el equipo se acepta 
   sistema y reinicio del equipo. Nuestra parte es un usuario propio con Docker, la pila dentro de su proyecto de Compose y un `sysctl`
   (`ip_nonlocal_bind`). Ningún comando sobre contenedores ajenos.
 - **Sin llave de despliegue:** el repositorio es público desde el 03/11; el clon del servidor es anónimo (actualiza, no empuja).
+- **Riesgo aceptado del equipo compartido:** quien administra el anfitrión tiene `root` y puede leer el `.env`, el entorno de los contenedores, la
+  base y los respaldos. Por eso los secretos son propios de este entorno y no se reutilizan, se rotan al dejar el equipo, y no se cargan datos
+  reales mientras sea compartido (`docs/11 §4`).
 - **Igual que lo planeado:** red privada de administración (SSH y 443/80 solo ahí; llave sin expiración, nombres de la red, aprobación manual
   de equipos), CA propia creada fuera del servidor con la clave cifrada, secretos generados en el servidor, `COMPOSE_FILE` sin override, 8883
-  en todas las interfaces, respaldo diario con restauración probada y copia fuera del servidor.
+  en todas las interfaces, respaldo diario con restauración probada y copia fuera del servidor (sin cifrado en reposo aún).
 - **Verificado en ejecución** (bitácora del 03–04/11, tabla de §4): las dos vías de dispositivo con TLS, los rechazos sin credencial, con
   credencial incorrecta, sin TLS y sin token, solo los puertos del contrato, TLS 1.1 fuera, la pila que vuelve sola tras `docker compose restart`,
   y la restauración del respaldo con los mismos conteos.
-- **Pendiente:** latido del vigilante (§7.2), reinicio del equipo con su responsable, y una dirección de entrada desde Internet (pedida a la
-  institución) para dispositivos fuera de la red del campus.
+- **Pendiente:** latido del vigilante (§7.2), reinicio del equipo con su responsable, cifrado en reposo del respaldo (`docs/10 §9.5`), y una
+  dirección de entrada desde Internet (pedida a la institución) para dispositivos fuera de la red del campus.
 
 En paralelo, la institución entregó un namespace de Kubernetes para estudiantes: medido en 17 pruebas (bitácora del 03/11), cabe en cuota y
 ejecuta, pero sin dirección de entrada ni cupo de volúmenes persistentes; queda como entorno de desarrollo y como diseño B de §6 hasta que

@@ -37,7 +37,7 @@ sequenceDiagram
                 F4->>F5: cada lectura guardada<br/>+ reglas de umbral<br/>de su canal
                 alt cruza umbral (con histéresis)
                     F5->>DB: abre/cierra condicion, INSERT evento
-                    Note right of F5: notifica al panel<br/>(tiempo real) y por correo<br/>si está configurado
+                    Note right of F5: notifica al panel<br/>(tiempo real). El correo<br/>queda previsto (RF-38)
                 end
             end
         end

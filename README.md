@@ -14,10 +14,10 @@ estado de cada dispositivo y panel de control. Caso de validación: Campus Dr. L
 |---|---|---|
 | 1 — Problema, objetivos y requerimientos | viernes 4 de septiembre de 2026 | ✅ entregada |
 | 2 — Diseño e implementación inicial | viernes 2 de octubre de 2026 | ✅ entregada — [`bitácora`](bitacora/2026-10-02-entrega-etapa2.md); estado al cierre en [`docs/12`](docs/12-estado-etapa2.md) |
-| 3 — Mejoras, pruebas y validación preliminar | viernes 30 de octubre de 2026 | 🟡 en curso — ver [`docs/18`](docs/18-estado-etapa3.md) |
+| 3 — Mejoras, pruebas y validación preliminar | jueves 5 de noviembre de 2026 (plazo ampliado; calendario del curso: 30 de octubre) | 🟡 en curso — ver [`docs/18`](docs/18-estado-etapa3.md) |
 | 4 — Validación final e informe | viernes 4 de diciembre de 2026 | ⬜ |
 
-**Próximo hito:** entrega de la Etapa 3, **viernes 30 de octubre de 2026**.
+**Próximo hito:** entrega de la Etapa 3, **jueves 5 de noviembre de 2026** (plazo ampliado por el profesor guía; fecha del calendario del curso: viernes 30 de octubre).
 
 ## Por dónde empezar
 
@@ -65,8 +65,8 @@ recursos-uct/    (local, no versionada) materiales originales del curso
 
 ## Licencia
 
-El código (`plataforma/`) se publicará bajo AGPL-3.0-only (archivo `plataforma/LICENSE`; decisión del 08/10/2026, `docs/10 §8.4`
-punto 33); la titularidad se confirma con la universidad antes de liberarlo. Los documentos, el informe y las bitácoras no
+El código (`plataforma/`) es público desde el 3 de noviembre de 2026 bajo AGPL-3.0-only (archivo `plataforma/LICENSE`; decisión del
+08/10/2026, `docs/10 §8.4` punto 33); la titularidad se confirma con la universidad, y con ella una posible licencia comercial adicional. Los documentos, el informe y las bitácoras no
 tienen todavía una licencia de reutilización (todos los derechos reservados al autor); la plantilla institucional
 pertenece a la universidad, y su logo no se versiona (la portada lo usa si está en disco).
 
