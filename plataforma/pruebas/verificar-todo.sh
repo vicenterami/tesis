@@ -87,7 +87,7 @@ paso "2b. Número de entidades: la base manda; informe y estado deben decir el m
 n=$(docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -U plataforma -d plataforma -tA -c "SELECT count(*) FROM pg_tables WHERE schemaname='public'")
 # Sin número no hay comparación: antes, con n vacío, «\b entidades» calzaba con cualquier número.
 [[ "$n" =~ ^[0-9]+$ ]] || { echo "FALLA no se pudo contar las tablas en la base (¿base inalcanzable?)"; fallos=$((fallos+1)); n=NINGUNO; }
-for f in informe-oficial/cap-diseno.tex informe-oficial/anexos/e-seguimiento.tex docs/12-estado-etapa2.md docs/08-modelo-datos.md; do
+for f in informe-oficial/cap-diseno.tex informe-oficial/figuras/modelo-datos.tex informe-oficial/anexos/e-seguimiento.tex docs/12-estado-etapa2.md docs/08-modelo-datos.md; do
   if grep -qE "[0-9]+ entidades" "$f"; then
     if grep -qE "\b$n entidades" "$f" && ! grep -E "[0-9]+ entidades" "$f" | grep -vqE "\b$n entidades"; then echo "OK    $f dice $n entidades"; else echo "FALLA $f no dice $n entidades: $(grep -oE '[0-9]+ entidades' "$f" | sort -u | tr '\n' ' ')"; fallos=$((fallos+1)); fi
   fi

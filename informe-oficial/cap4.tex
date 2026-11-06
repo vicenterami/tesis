@@ -5,70 +5,50 @@
 
 Se adopta \textbf{PPDIOO} (Cisco) como ciclo de vida de ingeniería, por tres razones: es el marco propio
 del dominio de redes, corresponde a la especialidad del profesor guía, y sus fases coinciden con las
-cuatro etapas de evaluación (Prepare/Plan $\rightarrow$ Etapa 1; Design $\rightarrow$ Etapa 2; Implement
-$\rightarrow$ Etapa 3; Operate/Optimize $\rightarrow$ Etapa 4).
+cuatro etapas de evaluación (Prepare y Plan, Etapa 1; Design, Etapa 2; Implement, Etapa 3; Operate y Optimize, Etapa 4).
 
 Se descarta Scrum como marco de equipo —el proyecto es unipersonal— pero \textbf{se conservan sus
-artefactos}: backlog con épicas, historias, criterios de aceptación y estimaciones, porque la pauta mide
-el avance como porcentaje de tareas completadas. PPDIOO define las fases; el backlog, cómo se mide el
-avance. Los estándares siguen al SWEBOK v4 \parencite{swebok} en requerimientos, arquitectura y diseño,
-pruebas y gestión de configuración: todo se versiona en git y la retroalimentación del profesor guía se
-registra en bitácora con trazabilidad indicación $\rightarrow$ cambio $\rightarrow$ evidencia. El
-calendario oficial (cuadro~\ref{tab:calendario}, anexo~\ref{anx:seguimiento}) fija las entregas al 4
-de septiembre, 2 de octubre, 30 de octubre y 4 de diciembre, con $\sim$240 horas de presupuesto.
+artefactos}: backlog con épicas, historias, criterios de aceptación y estimaciones; PPDIOO define las fases y el backlog mide el avance. Los estándares siguen al SWEBOK v4 \parencite{swebok} en requerimientos, arquitectura y diseño,
+pruebas y gestión de configuración: todo se versiona en git y la retroalimentación se registra en bitácora con trazabilidad indicación $\rightarrow$ cambio $\rightarrow$ evidencia. El
+calendario oficial (cuadro~\ref{tab:calendario}, anexo~\ref{anx:seguimiento}) fija cuatro entregas, con $\sim$240 horas de presupuesto.
 
 \section{Backlog y verificación de viabilidad}
 \label{sec:backlog}
 
 El backlog contiene \textbf{66 elementos} —25 historias de usuario y 41 tareas técnicas en 14 épicas—
-estimados en horas ideales y reformulados tras el pivote del 2 de septiembre hacia el contrato SenML y
-el pipeline (núcleo demostrativo 168 h; anexo~\ref{anx:backlog}).
+estimados en horas ideales y reformulados tras el pivote del 2 de septiembre (anexo~\ref{anx:contactid}) hacia el contrato SenML y
+el pipeline (núcleo mínimo: 168 h; anexo~\ref{anx:backlog}).
 
 \begin{quote}
-\textbf{Criterio de demostración, en dos niveles.} El \textbf{núcleo mínimo demostrable} —prioridad
-absoluta, acotado tras la retroalimentación de la Etapa 1— demuestra la tesis si el prototipo recibe
+\textbf{Criterio de demostración, en dos niveles.} El \textbf{núcleo mínimo}, acotado tras la retroalimentación de la Etapa 1, demuestra la tesis si el prototipo recibe
 tramas por MQTT, las normaliza al modelo interno, detecta que un dispositivo dejó de reportar y
-permite consultar sus mediciones por la API; al cierre de esta etapa, los cuatro elementos están
-construidos y verificados (capítulo~\ref{cap:pruebas}). El \textbf{segundo nivel} —vía HTTP,
-alertas por umbral, panel de control y exportación en formato abierto— se ejecuta contra la holgura
-verificada al cierre de cada etapa.
+permite consultar sus mediciones por la API. El \textbf{segundo nivel} —vía HTTP, alertas por umbral, panel y exportación en formato abierto— se ejecutó con la holgura que deja el núcleo. Al cierre, el núcleo está construido y verificado, y el segundo nivel construido salvo XLSX (capítulo~\ref{cap:pruebas}).
 \end{quote}
 
-La verificación numérica de las estimaciones mostró que \textbf{el backlog completo (287 h) excede
-el presupuesto (240 h) y el núcleo demostrativo (168 h) cabe con holgura} (+30\,\%). Por eso
-\textbf{el compromiso es el núcleo} y los 32 elementos restantes son alcance condicional: la pauta
-mide el avance como porcentaje de tareas completadas, y comprometer lo que no se ejecutará bajaría
-ese porcentaje por debajo del umbral. La distribución temporal también se corrigió, trasladando horas
-de la Etapa 3 a la Etapa 4 para cumplir el 50\,\% exigido al 30 de octubre; la validación con un
-sensor físico (TT-32) se adelantó al núcleo de esa misma etapa, para que el objetivo específico 4
-—un sensor real de extremo a extremo al 30 de octubre— tenga una tarea comprometida que lo garantice.
+La verificación numérica mostró que \textbf{el backlog completo (287 h) excede
+el presupuesto (240 h) y el núcleo mínimo (168 h) cabe con holgura} (30\,\% del presupuesto). Por eso
+\textbf{el compromiso es el núcleo} y los 32 elementos restantes son alcance condicional: comprometer lo que no se ejecutará bajaría el porcentaje de avance que mide el curso. La distribución temporal también se corrigió, trasladando horas de la Etapa 3 a la Etapa 4 para cumplir el 50\,\% de avance que el curso exige al 30 de octubre, y la validación con un sensor físico (TT-32) se adelantó al núcleo de esa etapa; se cumplió el 24 de octubre (capítulo~\ref{cap:pruebas}).
 
 \section{Seguimiento del backlog en la Etapa 3}
 \label{sec:seguimiento}
 
-La pauta evalúa en esta etapa el avance de la implementación. De los 17 elementos de la Etapa~3 (88~h), 13 están hechos (69~h), 4 parciales (19~h) y ninguno pendiente; en todo el proyecto, 25 de 34 elementos del núcleo hechos (126 de 168~h, 75\,\%) y 4 parciales (20~h): más de la mitad del núcleo, medido en horas. El cuadro~\ref{tab:seguimiento3}
-(anexo~\ref{anx:seguimiento}) detalla cada elemento, junto al cierre de la Etapa~2 (cuadro~\ref{tab:seguimiento}).
+En la Etapa~3, 13 de 17 elementos están hechos (69 de 88~h) y 4 parciales (19~h). En el núcleo, 25 de 34 (126 de 168~h, 75\,\%) y 4 parciales (20~h); en el backlog entero, 37 de 66 elementos (56\,\%). El detalle por elemento, junto al cierre de la Etapa~2, está en los cuadros~\ref{tab:seguimiento3} y~\ref{tab:seguimiento} (anexo~\ref{anx:seguimiento}).
 
 \section{Retroalimentación y cambios derivados}
 \label{sec:retro}
 
 Las observaciones del profesor guía sobre la Etapa~1 (21 de septiembre) y las de la reunión del 29 de septiembre, seis
 cada una, se tradujeron en cambios concretos, registrados uno a uno en los cuadros~\ref{tab:retro} y~\ref{tab:retro2}
-(anexo~\ref{anx:seguimiento}). La entrevista con un Académico/Investigador en Ingeniería Civil Geológica, enviada el 29 de septiembre, se respondió
-el 5 de octubre y habilita la fuente [ENT]: valida los adaptadores por formato, el historial, la detección de silencio
+(anexo~\ref{anx:seguimiento}). La entrevista del 5 de octubre con un Académico/Investigador en Ingeniería Civil Geológica valida los adaptadores por formato, el historial, la detección de silencio
 y los roles; pide exportar «la data cruda (en .CSV o .XLSX)», algo «absolutamente crítico y no negociable», lo que
 adelantó la exportación (HU-08) a esta etapa; y relativiza el tiempo real: para saber que un equipo «tiene batería y
 está transmitiendo» le sirven «actualizaciones cada un par de horas». La del 25 de octubre, con el operador de la red LoRaWAN del campus, llama «inviable» dar de alta 50 nodos uno por uno:
-la alta masiva entra a la Etapa~4. Las observaciones sobre la Etapa~2 se pidieron en la presentación de avances del 28 de octubre; al cierre no habían llegado por escrito.
+la alta masiva entra a la Etapa~4. Las observaciones sobre la Etapa~2 se pidieron en la presentación de avances del 28 de octubre; al cierre no habían llegado por escrito. El 5 de noviembre, en la presentación conjunta con los tesistas de los profesores Mario Villanueva y Luis Alberto Caro, la única pregunta —cómo dar de alta una flota completa y si cada usuario configurará sus dispositivos— tiene respuesta en el plan de la Etapa~4: sesión con usuarios y roles por sitio (iteración 0) y alta masiva por archivo (iteración 2, diseñada).
 
-\section{Riesgos}
+\section{Riesgos y entorno de prueba}
+\label{sec:despliegue-prueba}
 
-El registro de riesgos (cuadro~\ref{tab:riesgos}, anexo~\ref{anx:seguimiento}) tiene seis riesgos: cuatro
-cerrados (ambigüedad de fechas; protocolo inadecuado, resuelto con el pivote a MQTT y SenML, anexo~\ref{anx:contactid};
-hardware de sensores: el nodo propio publicó 24~h sin pérdidas; y acceso a partes interesadas: dos entrevistas,
-sección~\ref{sec:retro}), uno confirmado y controlado (alcance excesivo, tratado con el criterio de demostración en dos
-niveles) y uno en tratamiento: la recepción LoRaWAN en terreno, probada en la misma red local que la pasarela
-y, desde el 3 de noviembre, con un servidor de prueba en la red del campus a la espera de sus tramas. La
-\textbf{desviación de RNF-15} declarada en la Etapa~2 (la compresión de TimescaleDB está bajo la \emph{Timescale
-License}, no de código abierto \parencite{timescalelicencia}) se resolvió el 06/10 adoptando la edición Apache~2.0,
-que no comprime.
+El registro de riesgos (cuadro~\ref{tab:riesgos}, anexo~\ref{anx:seguimiento}) tiene seis: cuatro cerrados (fechas; protocolo, resuelto con el pivote; hardware: el nodo propio publicó 24~h; partes interesadas: dos entrevistas, sección~\ref{sec:retro}), uno confirmado y controlado (alcance excesivo, con el criterio de demostración en dos niveles) y uno en tratamiento: la recepción LoRaWAN en terreno, probada en la red local de la pasarela; el servidor de prueba está disponible desde el 3 de noviembre, a la espera de sus tramas. La
+\textbf{desviación de RNF-15} declarada en la Etapa~2 (compresión de TimescaleDB bajo la \emph{Timescale License}, que no es de código abierto \parencite{timescalelicencia}) se resolvió el 06/10 con la edición Apache~2.0, que no comprime.
+
+\textbf{Despliegue de prueba en la institución} (anexo~\ref{anx:despliegue}). El 3 de noviembre la universidad ofreció dos entornos. Un namespace de Kubernetes admite la pila, pero no permite entrada desde fuera ni almacenamiento persistente: queda para desarrollo. En un equipo compartido de la red del campus, usado con permiso de su responsable y con reglas escritas, corre la pila completa, con el 8883 como único puerto hacia afuera, verificada el 4 de noviembre. Faltan la entrada desde Internet, ya pedida, y la sesión de usuarios; mientras sea compartido solo recibe datos de prueba.

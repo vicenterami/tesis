@@ -1,0 +1,104 @@
+\chapter[Despliegue de prueba en la institución]{Despliegue de prueba en la institución: procedimiento, hallazgos y proyección}
+\label{anx:despliegue}
+
+Complementa la sección~\ref{sec:despliegue-prueba}: qué se pidió, qué se obtuvo, qué se midió, qué falló y qué queda, sin nombres,
+direcciones ni credenciales, que viven fuera del repositorio (\texttt{docs/11 §7}). El procedimiento con el porqué de cada decisión está en
+\texttt{docs/14 §7}; el registro de los dos días, en la bitácora del 3 y 4 de noviembre.
+
+\section{Qué se pidió y qué se obtuvo}
+
+Lo que el diseño necesitaba de la institución era concreto: un equipo con Linux y Docker en su red, o un espacio en un clúster, con un
+puerto de entrada para dispositivos (8883) y, a futuro, un nombre público para el certificado. La universidad ofreció un equipo de su red el 1 de
+noviembre; el 3 llegaron dos cosas distintas de lo planeado: acceso a un \textbf{namespace de Kubernetes} de uso estudiantil y un
+\textbf{equipo compartido} en la red del campus, que ya tenía responsable, un servicio de otro proyecto corriendo y acceso remoto solo con llave.
+La regla fue medir primero y diseñar después: en los dos entornos se hicieron pruebas baratas y borrables antes de instalar nada.
+
+\section{El namespace: lo que cabe, lo que falta y lo que llega}
+
+Diecisiete pruebas, de solo lectura o con recursos etiquetados y borrados al terminar, respondieron cuatro preguntas (cuadro~\ref{tab:namespace}).
+
+\begin{table}[H]
+\centering\footnotesize
+\begin{tablaseg}
+\begin{tabular}{@{}L{2.6cm}L{6.4cm}L{4cm}@{}}
+\toprule
+\textbf{Pregunta} & \textbf{Resultado} & \textbf{Qué implica} \\
+\midrule
+¿Cabe la pila? & La cuota (2 CPU y 2~GB) y los permisos del namespace bastan para la pila, que mide 193~MiB en reposo y 324 en pico; los manifiestos de prueba, escritos para el perfil de seguridad restringido, pasan la admisión; los pods ejecutan en nodos reales y descargan imágenes públicas; la administración remota funciona sin exponer nada. & Sirve como entorno de desarrollo y de integración. \\
+¿Se llega desde afuera? & No hay clase de \emph{Ingress} ni balanceador asignado, y las direcciones de nodo viven en una red que ni la red del campus enruta (medido desde la red de la pasarela: tiempo agotado). & Sin puerta de entrada ningún dispositivo publica. Pedida al administrador. \\
+¿Se puede guardar? & No quedaba cupo de volúmenes persistentes disponible. & Sin volúmenes no hay base ni broker con estado. Pedido cupo. \\
+¿Llega al campus? & Hay conectividad en el sentido clúster $\rightarrow$ campus, no en el inverso. & El diseño necesita el inverso: la pasarela publica al broker. \\
+\bottomrule
+\end{tabular}
+\end{tablaseg}
+\caption[El namespace medido antes de diseñar]{El namespace medido el 3 de noviembre de 2026, antes de diseñar.}
+\label{tab:namespace}
+\end{table}
+
+Conclusión: el namespace ejecuta la plataforma pero no la deja operar. Las dos carencias dependen de la administración del clúster y se pidieron con la evidencia de cada prueba. Se descartó resolverlo con rodeos, como un puente de salida hacia un broker ajeno: el sistema funciona como está diseñado.
+
+\section{El equipo compartido: reglas y procedimiento}
+
+La lista de aceptación de \texttt{docs/14 §7.1} (soporte de seguridad vigente, administración delegada, nada sin explicar, disco sano,
+actualizable) se aplicó con una diferencia: los usuarios y servicios ajenos los explicó su responsable, presente, y el equipo se acepta como
+compartido. Reglas acordadas: un usuario propio con lo mínimo; acceso remoto solo con llave y solo por una red privada cifrada entre el portátil
+del autor y el servidor; nada del anfitrión se toca (cortafuegos, demonio de Docker, parches y reinicios son del responsable); ningún comando
+sobre contenedores ajenos; cada cambio avisado el mismo día, con el inventario de lo instalado y cómo deshacerlo.
+
+El procedimiento, en orden: clon anónimo del repositorio público (actualiza, no empuja); secretos generados en el propio servidor, nunca
+copiados de desarrollo; certificado emitido por una autoridad propia de este entorno, creada fuera del servidor y con su clave cifrada; forma de
+producción de Compose, que publica solo los puertos del proxy y los de personas únicamente en la dirección de la red privada; construcción,
+inicialización del broker con sus roles, y alta del sitio, de la pasarela del campus y de los dos nodos del compañero. Respaldo diario de la base, con restauración probada, y del archivo de credenciales del broker; copia fuera del servidor.
+
+\section{Problemas que aparecieron y qué enseñaron}
+
+\begin{itemize}
+\item \textbf{El backend no arrancaba sano} hasta fijar la clave del rol de aplicación de la base, y el proxy, que espera a un backend sano,
+  tampoco: era la señal correcta, no un error. Quedó como paso explícito del procedimiento.
+\item \textbf{Un secreto no viaja como argumento de un comando:} si el comando falla, el intérprete lo imprime. Va por variable de entorno
+  o se escribe sin eco.
+\item \textbf{Un bloque de instalación escrito para una distribución y ejecutado en otra} dejó archivos vacíos: se descarga a un temporal
+  y se comprueba antes de instalar.
+\item \textbf{El reloj del servidor va en UTC:} la hora de «último acceso» se convierte a la hora local antes de interpretarla.
+\item \textbf{Las credenciales de prueba que se muestran en pantalla se invalidan en el acto}, y los dispositivos de prueba se dan de baja
+  al terminar.
+\item \textbf{Una conexión tiene dirección:} sin dirección de entrada nadie llega, y las puertas y el disco los concede la institución.
+  Una tarde de pruebas baratas dijo exactamente qué pedir y a quién.
+\end{itemize}
+
+\section{Verificado en ejecución el 4 de noviembre}
+
+\begin{table}[H]
+\centering\footnotesize
+\begin{tablaseg}
+\begin{tabular}{@{}L{5.2cm}L{7.8cm}@{}}
+\toprule
+\textbf{Afirmación} & \textbf{Resultado} \\
+\midrule
+Publicar por MQTT con TLS y por HTTPS con token & Guardado y visible en el panel \\
+Sin credencial, o con credencial incorrecta & Rechazado; el broker lo registra \\
+Sin TLS al 8883 & Rechazado \\
+Sin token, o con token falso & Rechazado (401) \\
+Puertos alcanzables & Solo los del contrato: 8883 en todas las interfaces; 443, 80 y el acceso remoto únicamente por la red privada; broker, backend y base cerrados \\
+TLS 1.1 & Rechazado; TLS 1.2 negocia \\
+Baja de un dispositivo & Dispositivo y credencial quedan inactivos \\
+Reinicio de los contenedores & Los cuatro sanos en un minuto \\
+Respaldo & Restaurado en una base de prueba con los mismos conteos; temporizador diario activo; copia fuera del servidor \\
+\bottomrule
+\end{tabular}
+\end{tablaseg}
+\caption[Verificación en el servidor de prueba]{Verificación de extremo a extremo en el servidor de prueba (4 de noviembre de 2026).}
+\label{tab:servidor-verificacion}
+\end{table}
+
+\section{Lo que falta y cómo enlaza con la Etapa 4}
+
+\begin{itemize}
+\item \textbf{Entrada desde Internet:} pedida a la institución (reenvío del 8883 y, si es posible, un nombre DNS, que habilita el certificado
+  público con Let's Encrypt). Hasta entonces publican solo la pasarela del campus y los equipos de la red privada.
+\item \textbf{Sesión y roles} (bloque 1 de la Etapa~4): hoy el panel y la API se alcanzan solo por la red privada.
+\item \textbf{Riesgo aceptado del equipo compartido:} en un equipo compartido, la administración del anfitrión tiene por diseño acceso a secretos, base y respaldos; por eso los secretos son de este entorno, se rotan al dejarlo y solo se cargan datos de prueba. El cifrado en reposo del respaldo está pendiente y, mientras tanto, el respaldo no contiene datos de producción.
+\item \textbf{Operación pendiente:} latido a un vigilante externo, reinicio del equipo con su responsable, instalación en un paso, y las
+  tramas reales de la pasarela cuando su responsable la apunte al servidor.
+\item \textbf{Proyección:} la Etapa~4 mantiene este servidor como entorno de prueba (iteración 0: operando con respaldo y aviso); la validación de RNF-17 y de las 72~horas de RNF-18 (OE5) se hace en el servidor de recursos modestos que se confirme. El namespace queda como diseño B (\texttt{docs/14 §6}): varias réplicas del backend con suscripciones compartidas de MQTT~5 y el estado en un lugar común, para cuando la institución conceda entrada y volúmenes. El costo de alojamiento está cotizado (\texttt{docs/14 §3}); el consumo en pesos por sitio es de la Etapa~4.
+\end{itemize}

@@ -6,11 +6,7 @@ Siguiendo la recomendación de describir un sistema desde varias vistas \parenci
 estática (contenedores), los datos, la red y la seguridad, el comportamiento dinámico (secuencias),
 el manejo del tiempo y el despliegue. Las notaciones son las reconocidas en la industria: el modelo
 C4 \parencite{c4brown} para la vista de contenedores, diagramas entidad-relación \parencite{chen1976}
-para los datos y diagramas de secuencia UML \parencite{uml251} para el comportamiento. Las figuras
-se generan desde la documentación versionada (dos vistas las dibuja el autor y el verificador las contrasta
-con ella) y, el modelo de datos, desde el esquema
-real de la base, de modo que informe, documentación y base no pueden diferir; lo que aún no está
-implementado se indica con su etapa.
+para los datos y diagramas de secuencia UML \parencite{uml251} para el comportamiento. Las figuras se generan desde la documentación versionada (dos las dibuja el autor y se contrastan con ella) y el modelo de datos, desde el esquema real de la base; lo aún no implementado se indica con su etapa.
 
 \section{Vista de contenedores y frontera del trabajo}
 
@@ -21,16 +17,11 @@ el trabajo del compañero —el tópico MQTT— ya se definió en la sección~\r
 
 Tres decisiones quedan visibles en la figura. Primero, hay \textbf{dos puntos de entrada, siempre}: HTTPS para personas, para los
 equipos que envían por HTTP con un token y, en la ruta A, para la pasarela con \emph{Basics Station} por WebSocket (443), y MQTT sobre
-TLS para dispositivos y pasarelas de las rutas B y C (8883); el reporte HTTPS de una pasarela como segundo destino, previsto, va
-punteado. La ruta A usaba un tercer puerto UDP con un protocolo sin autenticación ni cifrado (\emph{Semtech UDP Packet Forwarder});
-desde el 01/11 está diseñada (Etapa~4) para entrar por 443 con \emph{Basics Station}, que autentica a la pasarela con certificado, y el tercer puerto desapareció del diseño. La base de datos y la
+TLS para dispositivos y pasarelas de las rutas B y C (8883); el reporte HTTPS de una pasarela a un segundo destino, aún previsto, va punteado. En la ruta A (Etapa~4), \emph{Basics Station} autentica a la pasarela con certificado y evita un tercer puerto UDP sin autenticación ni cifrado (\emph{Semtech UDP Packet Forwarder}). La base de datos y la
 consola de administración de ChirpStack nunca se exponen. Segundo, \textbf{el navegador nunca se conecta al
 broker}: consume la API del backend, que ya autenticó, validó y normalizó cada trama. La alternativa
 —suscribir el navegador al broker por WebSocket— habría expuesto el broker a Internet y puesto
-credenciales MQTT en el código del cliente. Tercero, \textbf{el servidor de red LoRaWAN es un productor más} hacia el
-broker: una trama LoRaWAN decodificada y una trama Wi-Fi directa son indistinguibles para la
-plataforma después del filtro de análisis, que es lo que resuelve la causa C2 (hardware atado a la
-plataforma).
+credenciales MQTT en el código del cliente. Tercero, \textbf{el servidor de red LoRaWAN es un productor más} hacia el broker: tras el filtro de análisis su trama no se distingue de una Wi-Fi directa, lo que resuelve la causa C2 (hardware atado a la plataforma).
 
 Los ocho módulos del análisis (capítulo~\ref{cap:especificacion}) se reparten así: M1 recepción y M2
 normalización forman el servicio de recepción del backend, es decir, el pipeline; M4 supervisión de
@@ -42,8 +33,7 @@ panel y corre en el navegador.
 \section{Modelo de datos}
 
 El modelo (figura~\ref{fig:modelo-datos}) tiene 18 entidades y una idea rectora: \textbf{el modelo
-interno es único}. No importa por qué vía ni en qué formato llegó una trama; una vez superado el
-pipeline, todo se guarda con la misma forma. Esa uniformidad es la respuesta a la causa C1 (formatos
+interno es único}. Llegue en el formato que llegue, una trama que supera el pipeline se guarda con la misma forma. Esa uniformidad es la respuesta a la causa C1 (formatos
 dispares). El esquema está en tercera forma normal, y no más allá porque la cuarta y la quinta resuelven dependencias multivaluadas y de reunión que este modelo no tiene: cada hecho vive en una sola tabla y las
 relaciones muchos a muchos se resuelven con entidades de asociación (\texttt{canal} es dispositivo por
 magnitud; \texttt{usuario\_sitio}, usuario por sitio). Las únicas redundancias son deliberadas y se
@@ -53,7 +43,7 @@ para que cambiar un catálogo no reinterprete el pasado.
 \input{figuras/modelo-datos}
 
 
-Las decisiones del modelo y su justificación —por qué la medición cuelga del canal, por qué la credencial es una entidad aparte, por qué la cuarentena vive aparte de las series— se detallan en el cuadro~\ref{tab:decisiones-datos} (anexo~\ref{anx:evaluacion}). Lo que el diagrama no muestra por convención también está diseñado: el esquema sigue un conjunto de \textbf{convenciones de calidad} verificadas contra la base real —toda restricción con nombre explícito y prefijo (\texttt{pk\_}, \texttt{fk\_}, \texttt{uq\_}, \texttt{ck\_}), un índice por cada clave foránea (PostgreSQL no lo crea solo y sin él cada unión recorre la tabla completa), auditoría con \texttt{actualizado\_en} mantenida por disparador en toda tabla mutable, baja lógica en lugar de borrado, dominios cerrados como \texttt{CHECK} y catálogos donde el usuario administra los valores, y comentarios \texttt{COMMENT ON} en las columnas cuya razón de ser no es obvia, de modo que la documentación viaja con la base—. El esquema evoluciona por \textbf{21 migraciones numeradas}: nunca se edita un archivo ya aplicado. Una instalación nueva ejecuta todas en orden; una
+Las decisiones del modelo y su justificación —por qué la medición cuelga del canal, por qué la credencial es una entidad aparte, por qué la cuarentena vive aparte de las series— se detallan en el cuadro~\ref{tab:decisiones-datos} (anexo~\ref{anx:evaluacion}). Lo que el diagrama no muestra por convención también está diseñado y verificado contra la base real: toda restricción con nombre y prefijo (\texttt{pk\_}, \texttt{fk\_}, \texttt{uq\_}, \texttt{ck\_}); un índice por clave foránea, que PostgreSQL no crea solo y sin el cual cada unión recorre la tabla; \texttt{actualizado\_en} mantenida por disparador en toda tabla mutable; baja lógica en vez de borrado; dominios cerrados como \texttt{CHECK} y catálogos donde el usuario administra los valores; y \texttt{COMMENT ON} en las columnas no obvias, para que la documentación viaje con la base. El esquema evoluciona por \textbf{21 migraciones numeradas}: nunca se edita un archivo ya aplicado. Una instalación nueva ejecuta todas en orden; una
 base existente aplica solo las nuevas.
 
 \section{Topología de red y seguridad en capas}
@@ -70,10 +60,7 @@ usuario MQTT igual al identificador físico, contraseñas con hash; (4)~lista de
 patrón: cada dispositivo escribe solo bajo su propio identificador, lo que impide la suplantación entre
 nodos; (5)~el pipeline valida y envía a cuarentena; (6)~datos: base sin puerto expuesto, una credencial
 por servicio; (7)~contenedores sin escalada de privilegios, con versión de imagen fijada y techo de
-recursos; (8)~operación: respaldos, secretos fuera del repositorio y rotación de claves y certificados con calendario, comando y prueba por secreto (\texttt{docs/11}). Las capas 1, 3, 4, 5 y 7 están
-implementadas y \textbf{verificadas} en el despliegue de desarrollo: una publicación anónima o con clave
-incorrecta es rechazada, y un dispositivo que intenta publicar en el tópico de otro es descartado sin
-que el suscriptor llegue a recibir el mensaje.
+recursos; (8)~operación: respaldos, secretos fuera del repositorio y rotación de claves y certificados con calendario, comando y prueba por secreto. Las capas 1 a 7 están implementadas y \textbf{verificadas} en el banco, y las de borde e identidad también en el servidor de prueba (anexo~\ref{anx:despliegue}): se rechazan la publicación anónima o con clave incorrecta y la entrada sin TLS o sin token, y lo que un dispositivo publica en el tópico de otro se descarta antes de llegar al suscriptor (probado en el banco); de la capa 8, los respaldos diarios corren con restauración probada.
 
 \section{Comportamiento}
 
@@ -91,13 +78,7 @@ La figura~\ref{fig:sec-pipeline} (anexo~\ref{anx:figuras}, apaisada para que se 
 continúa y una de rechazo hacia la cuarentena; ninguna lectura llega a las series sin superar los cuatro
 primeros, y los dos últimos no escriben series sino condiciones.
 El orden importa: autenticar primero evita gastar recursos en tramas de desconocidos; validar antes de
-guardar evita que una lectura imposible llegue a la serie. Los dos últimos filtros trabajan a distinta escala: el de alertas
-evalúa \emph{cada lectura} guardada, porque un umbral se cruza por valor; el de supervisión se ejecuta
-\emph{una vez al cerrar la trama}, porque lo que registra no es un dato sino un hecho del enlace —este
-dispositivo se comunicó—, y por eso marca al dispositivo como visto aunque sus lecturas hayan ido a
-cuarentena: un nodo que publica tramas malformadas está vivo y mal configurado, no en silencio, y
-confundir ambos casos manda al operador a buscar la falla donde no está. El filtro de análisis delega en \textbf{adaptadores} intercambiables —SenML
-\parencite{rfc8428} como contrato nativo y un formato plano para nodos simples—, de modo que admitir el formato de un nuevo
+guardar evita que una lectura imposible llegue a la serie. Los dos últimos filtros trabajan a distinta escala. El de alertas evalúa \emph{cada lectura} guardada, porque un umbral se cruza por valor. El de supervisión corre \emph{una vez al cerrar la trama}, porque registra un hecho del enlace —el dispositivo se comunicó—: lo marca como visto aunque sus lecturas vayan a cuarentena, pues un nodo con tramas malformadas está vivo y mal configurado, no en silencio, y confundirlos manda al operador a buscar la falla donde no está. El filtro de análisis delega en \textbf{adaptadores} intercambiables —SenML \parencite{rfc8428} como contrato nativo, un formato plano para nodos simples y los JSON de la pasarela del campus y de ChirpStack (ruta C)—, de modo que admitir el formato de un nuevo
 fabricante es agregar una clase y registrarla (lista de formatos y restricción de la base), sin tocar los filtros (RF-04). La entrega desde el broker es
 «al menos una vez»: QoS~1 con sesión persistente, de modo que si el backend cae el broker conserva la
 cola, hasta un tope de mensajes, y la entrega al volver. Eso admite reentregas, y por ello la inserción en la serie es idempotente
@@ -118,9 +99,9 @@ límite no dispare y cierre alertas sin parar.
 
 La figura~\ref{fig:sec-tiemporeal} (anexo~\ref{anx:figuras}) muestra los dos tiempos del panel. El histórico llega
 \textbf{agregado por la base de datos} con \texttt{time\_bucket}: cientos de puntos, no millones. Las lecturas
-nuevas las empuja el backend por un canal SSE, cifrado tras el proxy, que solo anuncia
+nuevas las empuja el backend por un canal SSE (\emph{Server-Sent Events}), cifrado tras el proxy, que solo anuncia
 lo ya guardado, rechaza otro origen u otro host y limita los flujos abiertos; desde la Etapa~4 se abre con la sesión del
-panel, como recomienda OWASP para WebSocket \parencite{owaspws}. El navegador nunca toca el broker. Toda consulta valida sus entradas (identificadores, fechas, un intervalo de una lista
+panel, como recomienda OWASP para WebSocket, el canal más parecido \parencite{owaspws}. Toda consulta valida sus entradas (identificadores, fechas, un intervalo de una lista
 cerrada) y usa parámetros, nunca texto interpolado. El \textbf{contrato de la API se
 genera desde el código}, en OpenAPI 3.0 \parencite{openapi303}, desde los controladores, así no puede describir rutas
 inexistentes; se sirve junto a la API y se versiona como el acuerdo que consumirá el panel.
@@ -135,9 +116,8 @@ fijada, no puede escalar privilegios, se reinicia solo ante fallas y tiene un te
 
 
 La suma de techos es de 1,6~GB en las rutas B y C —los cuatro contenedores ya implementados— y de
-1,95~GB con ChirpStack (ruta A), ambas dentro del RNF-17 (consumo de a lo más 2~GB de RAM); el consumo real medido
-en pico fue de 324~MiB (capítulo de pruebas). Los
-límites cumplen además una segunda función: definen el \textbf{entorno de referencia} del banco de pruebas
+1,95~GB con ChirpStack (ruta A), ambas dentro del RNF-17 (consumo de a lo más 2~GB de RAM). Los
+límites cumplen además una segunda función: definen el entorno del banco de pruebas
 de la Etapa~4, para que la comparación no dependa del equipo de desarrollo.
 
 \textbf{Alojamiento.} La recomendación es un \textbf{servidor privado virtual (VPS) internacional de 2~vCPU y 4~GB},
@@ -150,5 +130,4 @@ como Chile cambia de hora por decreto, toda pregunta de «día» se responde den
 (reglas y verificación en el anexo~\ref{anx:evaluacion}, sección~\ref{sec:tiempo}).
 
 \textbf{Trazabilidad.} Cada elemento de diseño materializa requerimientos del catálogo
-(cuadro~\ref{tab:trazabilidad-diseno}, anexo~\ref{anx:evaluacion}); RF-29 queda pendiente: los dispositivos aún
-no declaran \emph{Last Will} ni el backend lo escucha (la caída se detecta por silencio, RNF-03).
+(cuadro~\ref{tab:trazabilidad-diseno}, anexo~\ref{anx:evaluacion}).

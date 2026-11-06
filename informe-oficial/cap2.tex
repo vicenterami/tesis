@@ -9,8 +9,7 @@ y entrega entre máquinas; el \textbf{mecanismo de mensajería}, cómo viaja cad
 y el \textbf{formato}, qué dice el mensaje (SenML, JSON). La figura~\ref{fig:pila} resume la escalera.
 La independencia entre niveles es lo que hace posible la propuesta: \textbf{la misma trama llega por
 WiFi, por cable o por la rama de radio, y la plataforma la interpreta de forma idéntica}. HTTP no es
-una alternativa a TCP/IP sino un protocolo sobre él, igual que MQTT; la objeción a sus cabeceras
-—cientos de bytes por decenas de bytes útiles— es al mecanismo de mensajería, no a la red.
+una alternativa a TCP/IP sino un protocolo sobre él, igual que MQTT; el peso de sus cabeceras —cientos de bytes por decenas útiles— es del mecanismo de mensajería, no de la red.
 
 \input{figuras/pila}
 
@@ -24,12 +23,7 @@ determinantes para este trabajo: \textbf{el dispositivo inicia la conexión sali
 lo que no se abren puertos hacia los sensores y el esquema funciona tras NAT (RNF-10); la
 \textbf{calidad de servicio} (\emph{Quality of Service}, QoS) tiene tres niveles integrados (a lo más
 una vez, al menos una vez, exactamente una vez), sin lógica de reintento propia; el \textbf{testamento} (\emph{Last Will}) hace
-que el broker publique un mensaje predefinido si el cliente se cae sin despedirse o calla más de 1,5 veces su
-\emph{keep-alive}: avisa antes que el silencio, pero solo de quien tiene conexión MQTT propia (no de un nodo
-LoRaWAN tras su pasarela ni de un equipo HTTP), así que aquí complementa la detección por silencio (RNF-03)
-y queda pendiente (RF-29); y las \textbf{cabeceras de 2 bytes} responden la objeción
-de sobrecarga. Se emplea \textbf{Mosquitto} como broker: implementación en C de consumo mínimo
-($\sim$10\,MB), madura, con TLS y autenticación por cliente.
+que el broker publique un mensaje predefinido si el cliente se cae sin despedirse o calla más de 1,5 veces su \emph{keep-alive}; avisa antes que el silencio, pero solo por clientes MQTT propios (no por nodos LoRaWAN ni equipos HTTP), y por eso complementará la detección por silencio (RNF-03); y sus \textbf{cabeceras de 2 bytes} evitan esa sobrecarga. Se emplea \textbf{Mosquitto} como broker (sección~\ref{sec:infra}).
 
 \input{figuras/mqtt}
 

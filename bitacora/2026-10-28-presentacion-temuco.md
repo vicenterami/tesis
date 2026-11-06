@@ -44,7 +44,7 @@ problemas de despliegue que el diseño no había enfrentado todavía, y cada uno
    pines: el certificado se verifica por el nombre del proxy, no por su dirección.
 
 ## 4. Retroalimentación del profesor
-<Por anotar tras la presentación.>
+Las observaciones escritas sobre la Etapa 2 se pidieron en esta presentación. *(Nota del 05/11: a esa fecha no habían llegado.)*
 
 ## 5. Pendientes que deja el día
 184 (evento/trama), 185 (navegadores de Playwright), 186 (eje con un solo punto), 187 (guardián de figuras), 188 (proxy al arrancar),

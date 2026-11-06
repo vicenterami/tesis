@@ -9,11 +9,9 @@ profesor guía; \textbf{[EM]} estudio de mercado; \textbf{[BT]} base teórica (R
 \parencite{iso25010}, SWEBOK \parencite{swebok}); \textbf{[DP]} derivación del problema; \textbf{[ENT]} entrevista
 directa. La evidencia del propietario del problema recogida antes de la entrega de la Etapa 1 fue la indicación
 transmitida por el profesor guía en las reuniones del 17 de agosto y del 2 de septiembre, registradas en la bitácora del
-repositorio. La entrevista con un Académico/Investigador en Ingeniería Civil Geológica referido por el profesor guía, enviada el 29 de septiembre y respondida el 5
-de octubre, valida requerimientos del catálogo y propone otros (sección~\ref{sec:retro}); la del 25 de octubre, con el operador de la
-red LoRaWAN del campus, completa las dos que compromete OE1, y el catálogo marca [ENT] en lo que validan.
+repositorio. Las dos entrevistas que compromete OE1 (5 y 25 de octubre; sección~\ref{sec:retro}) validan requerimientos del catálogo y proponen otros; el catálogo marca [ENT] en lo que validan.
 
-\section{Síntesis del catálogo}
+\section{Síntesis del catálogo, transporte y formato}
 
 Se catalogan \textbf{70 requerimientos}: 52 \textbf{funcionales} (RF: lo que el sistema debe
 \emph{hacer}) en ocho módulos, y 18 \textbf{no funcionales} (RNF: cómo debe \emph{comportarse} —
@@ -22,13 +20,10 @@ ISO/IEC 25010— con prioridad MoSCoW (51 \emph{Must}, 16 \emph{Should}, 3 \emph
 completo está en el anexo~\ref{anx:requerimientos}.
 
 
-\textbf{Decisión:} MQTT como vía principal —su calidad de servicio (QoS) resuelve de fábrica la entrega
-confiable— y HTTP/REST como vía secundaria para integraciones. El navegador
-nunca toca MQTT: consulta la API REST del backend. El socket TCP propio se descarta explícitamente:
+Las matrices de cinco mecanismos de transporte y de cuatro formatos de trama (anexo~\ref{anx:evaluacion}, cuadros~\ref{tab:transporte} y~\ref{tab:formato}) sostienen dos decisiones.
+
+\textbf{Decisión:} MQTT como vía principal —su calidad de servicio (QoS) trae integrada la confirmación de entrega— y HTTP/REST como vía secundaria para integraciones. El socket TCP propio se descarta explícitamente:
 lograría la mínima sobrecarga a costa de reinventar sesiones, confirmaciones y formato.
-
-\section{Evaluación del formato de trama}
-
 
 \textbf{Decisión:} \textbf{SenML como contrato nativo}. Lo que no llegue en SenML entra mediante
 \textbf{adaptadores por formato} (uno por formato de fuente, no por sensor); la trama malformada de
@@ -41,39 +36,28 @@ es que aquí el contrato nativo es un estándar abierto.
 \label{sec:frontera}
 
 El aporte central es el \textbf{pipeline de tratamiento de tramas} (figura~\ref{fig:pipeline}):
-seis filtros en secuencia, verificables por separado. La identificación de dispositivos combina
+seis filtros en secuencia (autenticar, analizar, validar, normalizar, alertar, supervisar), verificables por separado. La identificación de dispositivos combina
 el \textbf{registro} (identidad, tipo, ubicación, credencial) con el \textbf{tópico} de cada trama, que
 la lista de control de acceso del broker ata al usuario que la publica; el filtro de autenticación
 cruza ambos.
 
 \input{figuras/pipeline}
 
-El despliegue completo corre como contenedores en un único servidor (figura~\ref{fig:despliegue},
-capítulo~\ref{cap:diseno}), con reinicio automático ante fallas. \textbf{La frontera con el trabajo del compañero es el tópico
+\textbf{La frontera con el trabajo del compañero es el tópico
 MQTT}: todo lo anterior (sensor, nodo, radio) es de él; todo lo posterior (broker, pipeline, base de
-datos, API, panel), de este trabajo. Un \textbf{emulador de nodo} (TT-28, en uso desde la Etapa~3) publica tramas en el mismo tópico,
+datos, API, panel), de este trabajo. Un \textbf{emulador de nodo} (en uso desde la Etapa~3) publica tramas en el mismo tópico,
 de modo que la validación de la plataforma no depende del hardware ni de terceros.
 
-En la rama LoRa hay tres rutas. En la \textbf{ruta B}, la de la red del campus hoy, el servidor de red embebido en la
-pasarela (sección~\ref{sec:rama-radio}; UG65, probada en terreno el 20/10) publica por MQTT sobre TLS en el puerto 8883, y la pasarela entra
-como un cliente más del broker, con su propia credencial, sin contenedores ni puertos adicionales; en la \textbf{ruta C}, un servidor de
-red externo (p.\,ej., un ChirpStack institucional, por confirmar) publica igual por 8883; B y C solo difieren en el adaptador. La \textbf{ruta A es opcional}:
-ChirpStack corre en el servidor de la plataforma y las pasarelas le llegan por WebSocket sobre TLS (\emph{Basics Station}, 443); solo
-se despliega si las pasarelas no traen servidor de red propio o si se quieren administrar desde un solo
-punto los nodos de varias pasarelas. En las tres, el decodificador de binario a JSON corre en el servidor de
-red (la pasarela o ChirpStack) y lo administra quien opera la red; si este entrega la trama sin decodificar,
-como la pasarela del campus, la decodifica la plataforma con un perfil declarado en el alta del nodo. El JSON
-se traduce al modelo interno por el adaptador que la pasarela declara al registrarse.
+En la rama LoRa hay tres rutas hacia el broker. En la \textbf{ruta B}, la del campus hoy (probada en terreno el 20 de octubre), el servidor de red va embebido en la pasarela (sección~\ref{sec:rama-radio}), que publica por MQTT sobre TLS como un cliente más, con su propia credencial. En la \textbf{ruta C} publica igual un servidor de red externo (p.\,ej., un ChirpStack institucional, por confirmar); B y C solo difieren en el adaptador. La \textbf{ruta A}, opcional, corre ChirpStack en el propio servidor y solo se despliega si las pasarelas no traen servidor de red o si se quiere administrar desde un punto los nodos de varias. En las tres, quien opera la red decodifica el binario a JSON en el servidor de red; si la trama llega sin decodificar, como en el campus, la decodifica la plataforma con un perfil declarado en el alta del nodo, y el adaptador que la pasarela declara la traduce al modelo interno.
 
 
 \section{Evaluación de infraestructura}
 \label{sec:infra}
 
-Cada componente se eligió frente a alternativas con una razón determinante (cuadro~\ref{tab:infra}, anexo~\ref{anx:evaluacion}): \textbf{Mosquitto} como broker (implementación en C de unos 10\,MB, con TLS y autenticación; EMQX y HiveMQ apuntan a millones de conexiones); \textbf{TimescaleDB} como persistencia (justificado en la sección~\ref{sec:persistencia}); \textbf{TypeScript con NestJS} en el backend (tipos de la trama definidos una vez para backend y panel, módulos uno a uno con M1--M8); \textbf{ChirpStack} para la ruta A de la rama LoRa, solo si se activa (autoalojable, publica en MQTT); \textbf{contenedores Docker} para el despliegue (reproducible con un comando); y \textbf{Svelte con uPlot} para la interfaz, por ligereza. Las matrices de backend y de interfaz, con sus pesos y puntajes, están en el mismo anexo.
+Cada componente se eligió frente a alternativas con una razón determinante (cuadro~\ref{tab:infra}, anexo~\ref{anx:evaluacion}): \textbf{Mosquitto} como broker (implementación en C de unos 10\,MB, con TLS y autenticación; EMQX y HiveMQ apuntan a millones de conexiones); \textbf{TimescaleDB} como persistencia (justificado en la sección~\ref{sec:persistencia}); \textbf{TypeScript con NestJS} en el backend (tipos de la trama definidos una vez para backend y panel, módulos uno a uno con los ocho del catálogo); \textbf{ChirpStack} para la ruta A de la rama LoRa, solo si se activa (autoalojable, publica en MQTT); \textbf{contenedores Docker} para el despliegue (reproducible con un comando); y \textbf{Svelte con uPlot} para la interfaz, por ligereza. Las matrices de backend y de interfaz, con sus pesos y puntajes, están en el mismo anexo.
 
 Un requerimiento no funcional propio del enfoque es \textbf{RNF-17}: la plataforma completa debe
-consumir a lo más 2\,GB de memoria RAM, la mitad de un servidor de 4\,GB —frente a los 4\,GB o más que
-exige el referente—, lo que se estima en el anexo~\ref{anx:evaluacion} y se mide en la Etapa 4.
+consumir a lo más 2\,GB de memoria RAM, la mitad de un servidor de 4\,GB —frente a los 4\,GB o más que exige ThingsBoard—, lo que se estima en el anexo~\ref{anx:evaluacion} y se valida en la Etapa~4.
 
 \textbf{Restricciones:} RE-01 dedicación $\sim$15 h semanales; RE-02 proyecto individual coordinado
 con el trabajo del compañero; RE-03 solo componentes abiertos; RE-05 umbral de aprobación del

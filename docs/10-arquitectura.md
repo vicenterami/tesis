@@ -635,25 +635,24 @@ con la sesión. Pruebas: `docs/16 §14`.
 ## 6. Vista de despliegue (Docker Compose)
 
 ```mermaid
-flowchart TB
-    subgraph HOST["Servidor Ubuntu · Docker Engine · red interna «plataforma»"]
+%%{init: {"flowchart": {"subGraphTitleMargin": {"top": 0, "bottom": 22}}}}%%
+flowchart LR
+    subgraph HOST["Servidor · Docker Engine · red interna «plataforma»<br/>contenedores con versión fijada · no-new-privileges · reinicio automático"]
         direction LR
-        subgraph SVC["Contenedores (versión fijada · no-new-privileges · reinicio automático)"]
-            direction TB
-            C5["proxy<br/>nginx (decidido el 06/10) · TLS<br/>límite 0,1 GB · publica 443 y 8883 (y 80, solo redirección)"]
-            C1["mosquitto<br/>eclipse-mosquitto 2.1.2-alpine<br/>límite 0,25 GB"]
-            C2["chirpstack + puente de pasarelas + redis<br/>solo ruta A (opcional, diseñada)<br/>límite 0,35 GB (por medir)"]
-            C4["backend<br/>imagen propia: NestJS + panel estático en /panel (12/10)<br/>límite 0,5 GB · sin estado"]
-            C3["timescaledb<br/>timescale/timescaledb 2.30.2-pg16-oss (edición Apache) + parches<br/>límite 0,75 GB"]
-        end
-        V4[("certificados: carpeta del anfitrión, solo lectura")]
+        C5["proxy<br/>nginx · TLS · límite 0,1 GB<br/>publica 443 y 8883 (y 80, solo redirección)"]
+        C1["mosquitto<br/>eclipse-mosquitto 2.1.2-alpine<br/>límite 0,25 GB"]
+        C4["backend<br/>imagen propia: NestJS + panel en /panel<br/>límite 0,5 GB · sin estado"]
+        C3["timescaledb<br/>timescale/timescaledb 2.30.2-pg16-oss<br/>(edición Apache) + parches · límite 0,75 GB"]
+        C2["chirpstack + puente de pasarelas + redis<br/>solo ruta A (opcional, diseñada)<br/>límite 0,35 GB (por medir)"]
+        V4[("certificados: carpeta del<br/>anfitrión, solo lectura")]
         V2[("vol: datos-mosquitto")]
-        V1[("vol: datos-timescale<br/>todo el dato · base «chirpstack» aparte (ruta A)")]
+        V1[("vol: datos-timescale<br/>todo el dato · base «chirpstack»<br/>aparte (ruta A)")]
     end
+    C4 ~~~ V4
     C5 --- V4
     C1 --- V2
     C3 --- V1
-    C2 -. "base propia en el mismo PostgreSQL" .-> C3
+    C2 -. "base propia en el mismo PostgreSQL" .- V1
     classDef opcional stroke-dasharray:6 4
     class C2 opcional
 ```

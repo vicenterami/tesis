@@ -1,41 +1,38 @@
 \chapter{Implementación y pruebas iniciales}
 \label{cap:pruebas}
 
-Qué está implementado, cómo se prueba, qué resultó y qué falta validar; cada corrida y cómo repetirla, en el anexo~\ref{anx:pruebas} y \texttt{docs/16}.
-
 \section{Qué está implementado}
 
-El cuadro~\ref{tab:implementado} resume cada módulo; en horas, el núcleo demostrable está hecho en un 75\,\% (sección~\ref{sec:seguimiento}).
+El cuadro~\ref{tab:implementado} resume cada módulo; en horas, el núcleo mínimo (OE4) está hecho en un 75\,\% (sección~\ref{sec:seguimiento}).
 
 \begin{table}[tb]
 \centering\footnotesize
 \begin{tablaseg}
-\begin{tabular}{@{}L{2.8cm}L{6.8cm}L{3.4cm}@{}}
+\begin{tabular}{@{}L{2.5cm}L{6.7cm}L{3.8cm}@{}}
 \toprule
 \textbf{Módulo} & \textbf{Implementado y probado} & \textbf{Falta} \\
 \midrule
-M1 Recepción & MQTT (con TLS) y HTTP, con credencial propia; LoRaWAN por la pasarela del campus (ruta B, en terreno) y ChirpStack (ruta C) & Ruta C en terreno \\
-M2 Normalización & Seis filtros con cuarentena; formato declarado en el alta; tope por emisor & Contrato formal (TT-27) \\
+M1 Recepción & MQTT con TLS y HTTP, credencial propia; LoRaWAN por pasarela (ruta B, en terreno) y ChirpStack (ruta C) & Ruta C en terreno \\
+M2 Normalización & Seis filtros con cuarentena; formato del alta; tope por emisor & Pruebas del contrato \\
 M3 Registro & Alta, baja y rotación por API, todo o nada; pasarelas & Pantalla (Etapa~4) \\
-M4 Supervisión & Silencio según el intervalo esperado de cada uno & Batería; enlace \\
+M4 Supervisión & Silencio según el intervalo esperado de cada uno & Batería; enlace; \emph{Last Will} \\
 M5 Series & TimescaleDB, 21 migraciones, API, CSV y JSON, canal en vivo & XLSX; rango a medida \\
 M6 Alertas & Umbral con histéresis; alarma de la cola del broker & Notificación \\
 M7 Seguridad & Claves con hash, ACL por rol, mínimo privilegio, sin \texttt{NET\_RAW} & Sesión y roles \\
-M8 Panel & Semáforo, inventario filtrable, ficha con gráfico; canal callado & Salud del sitio (HU-16) \\
+M8 Panel & Semáforo; inventario filtrable; ficha; canal callado & Salud del sitio \\
 \bottomrule
 \end{tabular}
 \end{tablaseg}
-\caption{Estado de la implementación por módulo al 28 de octubre de 2026.}
+\caption[Estado de la implementación por módulo]{Estado de la implementación por módulo al 28 de octubre de 2026.}
 \label{tab:implementado}
 \end{table}
 
 \section{Método de prueba}
 
-Se prueba en tres niveles, todos repetibles con un comando. Las 357 pruebas unitarias del backend y las 107 del panel corren sin base ni broker,
-junto con tipos estrictos y análisis estático: cada una fija una regla de diseño en forma ejecutable. \textbf{Banco
+Se prueba en tres niveles, todos repetibles con un comando (anexo~\ref{anx:pruebas}). Las 357 pruebas unitarias del backend y las 107 del panel corren sin base ni broker, con tipos estrictos y análisis estático. \textbf{Banco
 desechable}: una segunda pila con base, broker con su plugin de seguridad, backend y proxy reales, datos en memoria y un
-emulador de nodos (TT-28) que imita relojes rotos, pérdidas y deriva; sobre él corren casos fijos de carga, carreras,
-caídas, TLS, alta por API, LoRaWAN y cola del broker. \textbf{Verificador de concordancia}: 46 pasos que comparan informe, documentación, base y API. Otra prueba recorre, por dispositivo, inventario, ficha, histórico, exportación, condiciones y cuarentena: toda serie es consultable. Cada comprobación nueva se ejecuta primero contra el error \emph{plantado}: una prueba vale solo si falla ante la falla.
+emulador de nodos que imita relojes rotos, pérdidas y deriva; sobre él corren casos fijos de carga, carreras,
+caídas, TLS, alta por API, LoRaWAN y cola del broker. \textbf{Verificador de concordancia}: 46 pasos que comparan informe, documentación, base y API. Cada comprobación nueva se ejecuta primero contra el error \emph{plantado}: una prueba vale solo si falla ante la falla.
 
 \section{Resultados frente a los requerimientos}
 
@@ -44,7 +41,7 @@ El cuadro~\ref{tab:resultados} reúne los resultados preliminares.
 \begin{table}[tb]
 \centering\footnotesize
 \begin{tablaseg}
-\begin{tabular}{@{}L{2.4cm}L{3.8cm}L{4.9cm}L{1.9cm}@{}}
+\begin{tabular}{@{}L{2.1cm}L{4.1cm}L{5.2cm}L{1.6cm}@{}}
 \toprule
 \textbf{Requisito} & \textbf{Prueba} & \textbf{Resultado} & \textbf{Estado} \\
 \midrule
@@ -56,22 +53,17 @@ RF-10 & La misma lectura ×20 a la vez & Una fila por canal y una trama cruda & 
 RF-12 & Cinco sobre el umbral a la vez & Una condición, sin errores & Cumple \\
 RF-05 y RF-07 & Malformadas, sin alta, otro sitio & Cuarentena con motivo; ninguna señal de vida falsa & Cumple \\
 RF-40, RF-42 & Credencial ajena; sin CA; sin TLS & Rechazadas; claves con hash (RNF-08) & Cumple \\
-RF-02 & JSON oficial de los fabricantes; pasarela real del campus & 46 de 46 comprobaciones; en terreno, 813 mediciones de dos nodos & Cumple \\
+RF-02 & JSON oficial de los fabricantes; pasarela del campus & 46 de 46 del banco LoRaWAN; pasarela real en terreno & Cumple \\
 RNF-17 & Carga sostenida y pico & 174~MiB (sin proxy) y 324~MiB (pico, con proxy) & Preliminar \\
 \bottomrule
 \end{tabular}
 \end{tablaseg}
-\caption{Resultados preliminares frente a los requerimientos. «Parcial»: falta el broker de producción (RNF-05); RNF-02, medido sin red real, se repite en el servidor.}
+\caption[Resultados preliminares frente a los requerimientos]{Resultados preliminares. «Parcial»: falta el broker de producción (RNF-05); RNF-02, medido sin red real, se repite en el servidor.}
 \label{tab:resultados}
 \end{table}
 
-Las pruebas cambiaron el diseño, no solo lo confirmaron. Las 108 alarmas falsas de silencio bajaron a 3, sin tocar
-RNF-03, al declarar el intervalo esperado como el silencio normal (dos periodos) y no como el periodo. Bajo
-duplicados simultáneos se guardaba dos veces la trama cruda y una condición abortaba el pipeline: ahora se procesa un
-mensaje a la vez y se confirma al broker después de guardar. Sobre la capacidad, el broker descartaba sin aviso: hoy
-tiene topes de cola y una alarma sobre su contador. Dar de baja un dispositivo frenaba hasta 5~s la recepción de todos los dispositivos; hoy, 20~ms.
+\textbf{Mejoras derivadas de las pruebas.} Las pruebas cambiaron el diseño, no solo lo confirmaron. Las 108 alarmas falsas de silencio bajaron a 3 al declarar el intervalo esperado como el silencio normal (dos periodos), sin tocar RNF-03. Bajo duplicados simultáneos se duplicaba la trama cruda y una condición abortaba el pipeline: ahora se procesa un mensaje a la vez y se confirma al broker después de guardar. El broker descartaba sin aviso: hoy tiene topes de cola y una alarma sobre su contador. Dar de baja un dispositivo frenaba hasta 5~s la recepción de todos; hoy, 20~ms. En terreno, el reloj de la pasarela venía cuatro días atrasado: una tolerancia de diez minutos y la condición «reloj desviado» separan ese caso de una lectura inválida. La corrida de 24~h cambió el firmware (omite el sensor que no responde; vigilante de 120~s) y el panel (marca el «canal callado» cuando una magnitud deja de llegar).
 
 \section{Validación preliminar y limitaciones}
 
-El sistema funciona de extremo a extremo con nodos emulados, con el nodo propio (24~h por Wi-Fi con TLS: 1\,440 de 1\,440 tramas, sin reinicios; una falla de su sensor de aire llevó a corregir el nodo y el panel) y con la red LoRaWAN del campus: el 20 de octubre la pasarela real publicó por TLS con la credencial de la API y
-dos nodos entraron de punta a punta, 813 mediciones en tres horas. Un reloj de pasarela cuatro días atrasado se resolvió con una tolerancia y una condición propia. La misma serie de 180 lecturas entró completa por las tres entradas (MQTT, HTTP en packs de 1, 10 y 60, y pasarela): 0 pérdidas, 0 duplicados y p95 de 4 a 157~ms; por HTTP, el ritmo de una trama por segundo hace que el pack de 1 tarde 194~s y el de 60, 5,6~s. Faltan el servidor de referencia (RNF-17 y las 72~horas de RNF-18, Etapa~4) y la ruta C en terreno.
+El sistema funciona de extremo a extremo con nodos emulados; con el nodo propio, un ESP32 con sensores de aire, suelo y temperatura (CLP~26\,530 en piezas más la placa; figura~\ref{fig:cableado}), 24~h por Wi-Fi con TLS: 1\,440 de 1\,440 tramas, sin reinicios; y con la red LoRaWAN del campus: el 20 de octubre la pasarela real publicó por TLS con su credencial y dos nodos entraron de punta a punta, 813 mediciones en 3~h. La misma serie de 180 lecturas entró completa por las tres entradas (MQTT, HTTP y pasarela): 0 pérdidas, 0 duplicados y p95 de 4 a 157~ms; por HTTP, el tope de una trama por segundo por dispositivo obliga a agrupar lecturas. Desde el 3 de noviembre la pila corre además en un servidor de prueba de la institución (anexo~\ref{anx:despliegue}). Faltan la validación de RNF-17 y RNF-18 en un servidor de recursos modestos (OE5, Etapa~4) y la ruta C en terreno.

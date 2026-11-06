@@ -280,8 +280,7 @@ explícita: los usuarios y servicios ajenos se explicaron y el equipo se acepta 
   (`ip_nonlocal_bind`). Ningún comando sobre contenedores ajenos.
 - **Sin llave de despliegue:** el repositorio es público desde el 03/11; el clon del servidor es anónimo (actualiza, no empuja).
 - **Riesgo aceptado del equipo compartido:** quien administra el anfitrión tiene `root` y puede leer el `.env`, el entorno de los contenedores, la
-  base y los respaldos. Por eso los secretos son propios de este entorno y no se reutilizan, se rotan al dejar el equipo, y no se cargan datos
-  reales mientras sea compartido (`docs/11 §4`).
+  base y los respaldos. Por eso los secretos son propios de este entorno y no se reutilizan, se rotan al dejar el equipo, y solo se cargan datos de prueba mientras sea compartido (`docs/11 §4`).
 - **Igual que lo planeado:** red privada de administración (SSH y 443/80 solo ahí; llave sin expiración, nombres de la red, aprobación manual
   de equipos), CA propia creada fuera del servidor con la clave cifrada, secretos generados en el servidor, `COMPOSE_FILE` sin override, 8883
   en todas las interfaces, respaldo diario con restauración probada y copia fuera del servidor (sin cifrado en reposo aún).

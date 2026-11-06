@@ -23,21 +23,20 @@
 
 % Destinos. Lo rechazado por 1, 2 o 3 va a UNA cuarentena, cruda y con su motivo. La medición
 % aceptada entra a la serie desde 4. Los filtros 5 y 6 abren o cierran condiciones (no series).
-\node[notaaviso, text width=4.2cm, align=center, minimum height=1.1cm] (cua) at (5.1,-2.7)
-  {\textbf{cuarentena} (trama cruda + motivo)\\{\footnotesize no registrado · de baja · tope\\malformada · inválida}};
-\node[filtro, draw=verdeacento, line width=1.1pt, fill=verdeacento!6, minimum height=1.1cm, text width=2.5cm] (db) at (10.2,-2.7)
+\node[notaaviso, text width=6.4cm, align=center, minimum height=1cm] (cua) at (5.1,-2.55)
+  {\textbf{cuarentena} (trama cruda + motivo)\\{\footnotesize no registrado · de baja · tope · malformada · inválida}};
+\node[filtro, draw=verdeacento, line width=1.1pt, fill=verdeacento!6, minimum height=1cm, text width=2.5cm] (db) at (10.2,-2.55)
   {\textbf{TimescaleDB}\\[2pt]{\footnotesize medición (serie de tiempo)}};
-\node[filtro, draw=verdeacento, line width=1.1pt, fill=verdeacento!6, minimum height=1.1cm, text width=3.6cm] (cond) at (14.0,-2.7)
+\node[filtro, draw=verdeacento, line width=1.1pt, fill=verdeacento!6, minimum height=1cm, text width=3.9cm] (cond) at (14.0,-2.55)
   {\textbf{condiciones y eventos}\\[2pt]{\footnotesize umbral · sin comunicación · reloj desviado}};
 
-\draw[flecha, color=ambar] (f1.south) -- ++(0,-0.55) -| ([xshift=-12mm]cua.north);
-\draw[flecha, color=ambar] (f2.south) -- (cua.north);
-\draw[flecha, color=ambar] (f3.south) -- ++(0,-0.55) -| ([xshift=12mm]cua.north);
+% Flechas rectas: cada filtro baja a su destino; los destinos son más anchos que sus filtros, así
+% ninguna flecha corre sobre un borde ni cruza un título.
+\foreach \i in {1,2,3} \draw[flecha, color=ambar] (f\i.south) -- (f\i.south |- cua.north);
 \draw[flechagruesa] (f4.south) -- (db.north);
-\draw[flechagruesa] (f5.south) -- ++(0,-0.55) -| ([xshift=-8mm]cond.north);
-\draw[flechagruesa] (f6.south) -- ++(0,-0.55) -| ([xshift=8mm]cond.north);
+\foreach \i in {5,6} \draw[flechagruesa] (f\i.south) -- (f\i.south |- cond.north);
 \end{tikzpicture}}
-\caption{El pipeline de tratamiento de tramas, aporte central del trabajo, en su orden real de
+\caption[El pipeline de tratamiento de tramas]{El pipeline de tratamiento de tramas, aporte central del trabajo, en su orden real de
 ejecución. Cada filtro es independiente y verificable por separado. Lo que rechazan los tres primeros
 va a una cuarentena con la trama cruda, su motivo y su detalle (lo que no trae credencial ni siquiera
 llega: lo corta antes el broker); la medición aceptada entra a la serie de tiempo
