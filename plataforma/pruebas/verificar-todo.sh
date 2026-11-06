@@ -767,17 +767,20 @@ f18 = dict((k, (int(h), e)) for k, h, e in re.findall(r'^\| ((?:HU|TT)-\d+)[^|]*
 if len(f18) < 10: malos.append(f'docs/18 §2: leí solo {len(f18)} filas de la tabla (¿cambió su forma?)')
 e3 = {s: (sum(1 for h, e in f18.values() if e == s), sum(h for h, e in f18.values() if e == s)) for s in '✅🟡⬜'}
 tex = re.sub(r'\s+', ' ', open('informe-oficial/cap4.tex', encoding='utf-8').read())
-m = re.search(r'De los (\d+) elementos de la Etapa~3 \((\d+)~h\), (\d+) están hechos \((\d+)~h\), (\d+) parciales \((\d+)~h\) y (?:(\d+) pendientes? \((\d+)~h\)|ninguno pendiente); en todo el proyecto, (\d+) de (\d+) elementos del núcleo hechos \((\d+) de (\d+)~h, (\d+)\\,\\%\) y (\d+) parciales \((\d+)~h\)', tex)
+# 05/11: la frase se reescribió para un lector sin contexto («En la Etapa~3, 13 de 17 elementos están hechos (69 de 88~h) y 4 parciales
+# (19~h). En el núcleo, 25 de 34 (126 de 168~h, 75 %) y 4 parciales (20~h); en el backlog entero, 37 de 66 elementos (56 %)»): los
+# pendientes de la etapa se escriben solo si los hay («, y N pendientes (H~h)»), y el backlog entero también se compara con las filas.
+m = re.search(r'En la Etapa~3, (\d+) de (\d+) elementos están hechos \((\d+) de (\d+)~h\) y (\d+) parciales \((\d+)~h\)(?:, y (\d+) pendientes? \((\d+)~h\))?\. En el núcleo, (\d+) de (\d+) \((\d+) de (\d+)~h, (\d+)\\,\\%\) y (\d+) parciales \((\d+)~h\); en el backlog entero, (\d+) de (\d+) elementos \((\d+)\\,\\%\)', tex)
 if not m: malos.append('informe (cap4.tex): no encontré la frase del seguimiento de la Etapa 3 (¿cambió la redacción?)')
 else:
-    n = cuenta(True)
-    real = (len(f18), sum(h for h, _ in f18.values()), *e3['✅'], *e3['🟡'], *e3['⬜'], n[0], n[1], n[2], n[3], n[4], n[5], n[6])
-    dicho = tuple(int(x) if x is not None else 0 for x in m.groups())  # «ninguno pendiente» = 0 elementos y 0 h
-    if dicho != real: malos.append(f'informe (cap4.tex): dice {dicho}; las filas dan {real}')
+    n, b = cuenta(True), cuenta(False)
+    real = (e3['✅'][0], len(f18), e3['✅'][1], sum(h for h, _ in f18.values()), *e3['🟡'], *e3['⬜'], n[0], n[1], n[2], n[3], n[4], n[5], n[6], b[0], b[1], b[4])
+    dicho = tuple(int(x) if x is not None else 0 for x in m.groups())  # sin «pendientes» en la frase = 0 elementos y 0 h
+    if dicho != real: malos.append(f'informe (cap4.tex): dice {dicho}; las filas dan {real} (Etapa 3: hechos, total, h hechas, h totales, parciales, h, pendientes, h; núcleo: hechos, total, h, h, %, parciales, h; backlog: hechos, total, %)')
 # 24/10: cap-pruebas.tex repetía el porcentaje del núcleo (65 %) y nadie lo comparaba; quedó viejo al cerrar HU-19.
 cp = re.sub(r'\s+', ' ', open('informe-oficial/cap-pruebas.tex', encoding='utf-8').read())
-mp = re.findall(r'núcleo demostrable está hecho en un (\d+)\\,\\%', cp)
-if len(mp) != 1: malos.append(f'informe (cap-pruebas.tex): esperaba una frase «el núcleo demostrable está hecho en un N %», hay {len(mp)}')
+mp = re.findall(r'núcleo (?:demostrable|mínimo)(?: \(OE4\))? está hecho en un (\d+)\\,\\%', cp)  # 05/11: un solo nombre para el núcleo («núcleo mínimo»)
+if len(mp) != 1: malos.append(f'informe (cap-pruebas.tex): esperaba una frase «el núcleo mínimo está hecho en un N %», hay {len(mp)}')
 elif int(mp[0]) != cuenta(True)[4]: malos.append(f'informe (cap-pruebas.tex): dice {mp[0]} % del núcleo; las filas dan {cuenta(True)[4]} %')
 es = open('informe-oficial/anexos/e-seguimiento.tex', encoding='utf-8').read()
 if '\\label{tab:seguimiento3}' not in es: malos.append('informe: no encontré el cuadro tab:seguimiento3 en el anexo de seguimiento')
@@ -798,14 +801,15 @@ paso "2w3. Banco LoRaWAN: el conteo que cita docs/16 es el de comprobaciones del
 # y el número que dice docs/16 debe ser el del guion (cada «ok "» del caso es una comprobación).
 # 15/10, tercera revisión: el rango termina en la línea que imprime «LORAWAN OK» (si falta, falla en vez de contar hasta el final),
 # se cuentan apariciones y no líneas, y los dos archivos del informe deben existir.
+# 05/11: el capítulo cita el conteo en una celda acortada del cuadro de pruebas («46 de 46 del banco LoRaWAN»): se acepta esa forma además de «comprobaciones».
 rango=$(awk '/^  lorawan\)/{f=1} f{print} f && /echo "LORAWAN OK"/{exit}' plataforma/pruebas/banco/banco.sh)
 nl=$(grep -o ' ok "' <<<"$rango" | wc -l)
 if ! grep -q 'echo "LORAWAN OK"' <<<"$rango"; then echo "FALLA no encontré el final del caso lorawan en banco.sh"; fallos=$((fallos+1))
 elif ! [ -f informe-oficial/cap-pruebas.tex ] || ! [ -f informe-oficial/anexos/g-pruebas.tex ]; then echo "FALLA falta el capítulo o el anexo de pruebas del informe"; fallos=$((fallos+1))
 elif [ "$nl" -lt 10 ]; then echo "FALLA leí solo $nl comprobaciones en el caso lorawan de banco.sh (¿cambió su forma?)"; fallos=$((fallos+1))
 elif ! grep -q "$nl de $nl desde" docs/16-informe-de-pruebas.md; then echo "FALLA banco.sh lorawan tiene $nl comprobaciones y docs/16 no cita «$nl de $nl desde …»"; fallos=$((fallos+1))
-elif viejas=$(grep -noE '[0-9]+ de [0-9]+ comprobaciones' informe-oficial/cap-pruebas.tex informe-oficial/anexos/g-pruebas.tex | grep -v ":$nl de $nl comprobaciones"); [ -n "$viejas" ]; then echo "FALLA el informe cita otro conteo del banco LoRaWAN (son $nl): $viejas"; fallos=$((fallos+1))
-elif ! grep -q "$nl de $nl comprobaciones" informe-oficial/cap-pruebas.tex; then echo "FALLA el capítulo de pruebas no cita «$nl de $nl comprobaciones» (¿cambió la redacción?)"; fallos=$((fallos+1))
+elif viejas=$(grep -noE '[0-9]+ de [0-9]+ (comprobaciones|del banco LoRaWAN)' informe-oficial/cap-pruebas.tex informe-oficial/anexos/g-pruebas.tex | grep -vE ":$nl de $nl (comprobaciones|del banco LoRaWAN)"); [ -n "$viejas" ]; then echo "FALLA el informe cita otro conteo del banco LoRaWAN (son $nl): $viejas"; fallos=$((fallos+1))
+elif ! grep -qE "$nl de $nl (comprobaciones|del banco LoRaWAN)" informe-oficial/cap-pruebas.tex; then echo "FALLA el capítulo de pruebas no cita «$nl de $nl comprobaciones» ni «$nl de $nl del banco LoRaWAN» (¿cambió la redacción?)"; fallos=$((fallos+1))
 else echo "OK    banco.sh lorawan tiene $nl comprobaciones; docs/16 y el informe citan «$nl de $nl»"; fi
 
 paso "2w4. Cifras del método en el informe y los documentos: pasos del verificador, pruebas del panel y anexos citados por nombre"
