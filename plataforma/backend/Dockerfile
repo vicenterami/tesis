@@ -3,10 +3,13 @@
 
 # Base: Debian 13 «trixie» desde el 08/10/2026 (docs/11 §4): con la misma versión de Node, el escaneo de imágenes dio 0
 # vulnerabilidades críticas frente a 4 de la variante Debian 12.
+# 09/11/2026: digest de la reconstrucción de 22.23.4-trixie-slim del 05/11 (trae apt 3.0.4, CVE-2026-109518) en las dos
+# etapas; zlib1g (CVE-2026-76844 y CVE-2026-85091, corregido en 1:1.3.dfsg+really1.3.1-1+deb13u1) todavía no viene en la
+# imagen oficial y se actualiza en la etapa final (docs/16 §12). Cuando la oficial lo traiga, esa línea sobra.
 
 # ── Etapa 1: compilar ─────────────────────────────────────────────────────────────────────────
 # Aquí se usan pnpm y las herramientas de desarrollo; de esta etapa solo viaja dist/ a la imagen final.
-FROM node:22.23.4-trixie-slim@sha256:8eb619e402eaede1748a3c8173bffab391592812e85136452f781741c7242ddf AS build
+FROM node:22.23.4-trixie-slim@sha256:be1e2a3dc2c4fd68cdfadad2a696a280e0d2749098bee509230174d72fb768c6 AS build
 WORKDIR /app
 RUN corepack enable
 # Copiar antes que el resto: si solo cambia el código, esta capa se reutiliza de caché.
@@ -22,9 +25,11 @@ COPY panel ./panel
 RUN pnpm --filter panel build
 
 # ── Etapa 2: imagen que corre ─────────────────────────────────────────────────────────────────
-FROM node:22.23.4-trixie-slim@sha256:8eb619e402eaede1748a3c8173bffab391592812e85136452f781741c7242ddf AS runtime
+FROM node:22.23.4-trixie-slim@sha256:be1e2a3dc2c4fd68cdfadad2a696a280e0d2749098bee509230174d72fb768c6 AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
+# Parches de Debian que la imagen oficial todavía no trae (09/11/2026; solo los listados, sin upgrade general).
+RUN apt-get update && apt-get install -y --no-install-recommends --only-upgrade zlib1g && rm -rf /var/lib/apt/lists/*
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY panel/package.json ./panel/

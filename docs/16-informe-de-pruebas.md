@@ -248,6 +248,20 @@ etapas del Dockerfile; mismo guion, bases frescas con `--pull --no-cache`):
 | base | 1 / 25 | 0 | `libexpat` (2.8.5 → 2.9.0) se sumó a la lista de parches; lo que queda está en `gosu` (binario de Go precompilado, residuo documentado en `docs/11 §4`) |
 | broker | 0 / 0 | 0 | sin cambios |
 
+**Escaneo del 09/11/2026** (el servidor de prueba dio «HAY QUE ACTUAR»; mismo guion, Trivy 0.74.0, bases frescas con `--pull --no-cache`).
+Críticas / altas y, entre paréntesis, cuántas con versión corregida publicada fuera de los residuos:
+
+| Imagen | Antes | Después | Qué se hizo |
+|---|---|---|---|
+| broker | 1 / 3 (4) | 0 / 0 (0) | `brotli-libs` 1.2.0 → 1.2.1 (CVE-2026-111497, crítica), `musl`/`musl-utils` 1.2.5-r23 → r24 (CVE-2026-107891) y `zlib` 1.3.2-r0 → r1 (CVE-2026-85091): huella nueva de `eclipse-mosquitto:2.1.2-alpine` que propone el PR #17 de Dependabot (`sha256:860aeb5d…`, construida el 23/10, Alpine 3.23.7); sigue siendo Mosquitto 2.1.2 |
+| backend | 0 / 50 (4) | 0 / 46 (0) | `apt`/`libapt-pkg7.0` 3.0.3 → 3.0.4 (CVE-2026-109518): digest de la reconstrucción de `node:22.23.4-trixie-slim` del 05/11 en las dos etapas; `zlib1g` → `1:1.3.dfsg+really1.3.1-1+deb13u1` (CVE-2026-76844, CVE-2026-85091), que esa imagen aún no trae: `apt-get install --only-upgrade zlib1g` en la etapa final. Las 46 altas que quedan no tienen corrección publicada en Debian 13 (`docs/11 §4`) |
+| proxy | 1 / 2 (3) | 0 / 0 (0) | `brotli-libs` 1.2.0 → 1.2.1 (CVE-2026-111497, crítica) y `curl`/`libcurl` 8.22.0 → 8.23.0 (CVE-2026-92392): sumadas a la lista de `apk upgrade` y el `FROM` a la reconstrucción de `nginx:1.30.6-alpine` del 05/11 (`sha256:583b7f2f…`), que ya las trae |
+| base | 1 / 27 (2) | 1 / 25 (0) | `musl`/`musl-utils` 1.2.5-r23 → r24 (CVE-2026-107891) sumadas a la lista de `apk upgrade`; sin cambiar TimescaleDB (2.30.2). Las 26 que quedan están en `gosu` (residuo documentado) |
+
+Toda huella nueva tiene más de 24 h publicada y va fijada por digest de índice; las versiones se comprobaron dentro de las imágenes
+construidas (`dpkg-query`, `apk list -I`). Resultado: `OK    4 imágenes: ninguna vulnerabilidad alta o crítica con versión corregida
+publicada fuera de los residuos documentados`; la pila de desarrollo se recreó con las cuatro imágenes y quedó sana.
+
 **Dependencias, 25/10/2026.** Con el mismo lockfile que el 23/10 daba 0 avisos, la auditoría volvió a fallar (el PR agrupado de Dependabot
 lo destapó en el CI): avisos publicados del 19 al 23/10 contra paquetes que ya estaban. Dos altos **en producción**, ambos de denegación
 de servicio: `body-parser` < 2.4.0 (https://github.com/advisories/GHSA-27r3-jxmh-p828, cuerpo comprimido con bytes de sobra; alcanzable
