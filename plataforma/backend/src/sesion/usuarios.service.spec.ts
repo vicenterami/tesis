@@ -1,4 +1,5 @@
 import { ForbiddenException, HttpException, NotFoundException } from '@nestjs/common';
+import type { ConfigService } from '@nestjs/config';
 import type { Pool } from 'pg';
 import type { AlcanceService } from './alcance.service';
 import { Rol, UsuarioSesion, usuarioSistema } from './permisos';
@@ -10,10 +11,12 @@ import { CANDADO_ADMINISTRADORES, UsuariosService, rechazoDeCambio, tocaAdminist
 // administradores y la clave de administrador en la lista. Sitios: A y B. El SQL real lo ejercita el paso 4b del guardián.
 interface Persona { id: string; activo: boolean; sitios: { sitio: string; rol: Rol; activo: boolean }[] }
 
-function armar(personas: Persona[]) {
+function armar(personas: Persona[], config?: ConfigService) {
   const consultas: string[] = [];
+  const parametros: unknown[][] = [];
   const query = jest.fn((sql: string, p: unknown[] = []) => {
     consultas.push(sql);
+    parametros.push(p);
     const filas = (rows: unknown[], rowCount = rows.length) => Promise.resolve({ rows, rowCount });
     const alcance = (p[1] ?? null) as string[] | null;
     const en = (s: string) => alcance === null || alcance.includes(s);
@@ -49,7 +52,7 @@ function armar(personas: Persona[]) {
   const alcance = {
     exigirSitio: (u: UsuarioSesion, _a: string, s: string) => (u.todos || u.sitios.get(s) === 'administrador' ? Promise.resolve() : Promise.reject(new NotFoundException('sitio no encontrado'))),
   } as unknown as AlcanceService;
-  return { servicio: new UsuariosService(pool, sesiones, alcance), consultas, personas };
+  return { servicio: new UsuariosService(pool, sesiones, alcance, config), consultas, parametros, personas };
 }
 
 const ADMIN_A: UsuarioSesion = { ...usuarioSistema(), id: 'adm-a', nombre: 'Admin A', sistema: false, todos: false, sitios: new Map([['A', 'administrador']]), sesionId: 'a'.repeat(64) };
@@ -139,3 +142,25 @@ describe('GET /usuarios con la clave de administrador (revisión del 08/11/2026)
     expect(await codigo(armar(personas()).servicio.listar(ADMIN_A))).toBe(200);
   });
 });
+
+// Vigencia de la clave temporal (docs/20 §4; decidido el 08/11/2026): CLAVE_TEMPORAL_HORAS, 1–72 h, 2 por defecto. El reloj es el de la
+// base falsa (12:00 UTC): el vencimiento que llega al SQL es ese más la vigencia configurada.
+describe('Vigencia de la clave temporal configurable', () => {
+  const conHoras = (v: string): ConfigService => ({ get: (k: string) => (k === 'CLAVE_TEMPORAL_HORAS' ? v : undefined) }) as unknown as ConfigService;
+  const venceEnSql = (d: ReturnType<typeof armar>, marca: string, i: number): unknown => d.parametros[d.consultas.findIndex((q) => q.includes(marca))]?.[i];
+  it('sin la variable, 2 h: el alta y «asignar clave temporal» guardan el vencimiento a las 14:00 UTC', async () => {
+    const d = armar(personas());
+    expect(d.servicio.horasTemporal).toBe(2);
+    await d.servicio.crear(ADMIN_A, { nombre: 'Nueva', email: 'nueva@ejemplo.invalid', sitios: [{ sitio_id: 'A', rol: 'consulta' }] }).catch(() => undefined);
+    expect(venceEnSql(d, 'INSERT INTO usuario (', 3)).toEqual(new Date('2026-11-08T14:00:00Z'));
+    expect(await codigo(d.servicio.actualizar(ADMIN_A, 'carla', cambio({ clave_temporal: true })))).toBe(200);
+    expect(venceEnSql(d, 'UPDATE usuario SET nombre', 5)).toEqual(new Date('2026-11-08T14:00:00Z'));
+  });
+  it('con CLAVE_TEMPORAL_HORAS=5, la suya (17:00 UTC); con 0, 73 o texto, el servicio no se construye (el backend no arranca)', async () => {
+    const d = armar(personas(), conHoras('5'));
+    expect(await codigo(d.servicio.actualizar(ADMIN_A, 'carla', cambio({ clave_temporal: true })))).toBe(200);
+    expect(venceEnSql(d, 'UPDATE usuario SET nombre', 5)).toEqual(new Date('2026-11-08T17:00:00Z'));
+    for (const malo of ['0', '73', 'dos']) expect(() => armar(personas(), conHoras(malo))).toThrow(/^CLAVE_TEMPORAL_HORAS=".*" no es válido/);
+  });
+});
+

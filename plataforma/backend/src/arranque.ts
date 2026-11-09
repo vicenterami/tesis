@@ -93,6 +93,21 @@ export class AvisosAcotados {
 // Clave de administrador de las rutas que escriben, mientras no hay sesión (docs/10 §8.4 punto 41; docs/11 §3). Ausente o
 // vacía: esas rutas responden 503, nunca quedan abiertas. Definida pero corta: el arranque falla, a propósito; una clave
 // débil expuesta a la red es peor que ninguna. Mínimo 24 caracteres: lo que da `openssl rand -base64 24` son 32.
+// Vigencia de la clave temporal que asigna un administrador (docs/20 §4; decidido el 08/11/2026, reemplaza las 24 h fijas del 12/10):
+// la fija el operador con CLAVE_TEMPORAL_HORAS, entero de 1 a 72; sin la variable, 2 h. Un valor presente e inválido (vacío, 0, 73,
+// texto, decimal) detiene el arranque: nunca un plazo que el operador no pidió (lección del 23/09 con HTTP_INTERFAZ vacía).
+export const CLAVE_TEMPORAL_HORAS_POR_DEFECTO = 2;
+export const CLAVE_TEMPORAL_HORAS_MAXIMO = 72;
+export function horasClaveTemporal(valor: string | undefined): number {
+  if (valor === undefined) return CLAVE_TEMPORAL_HORAS_POR_DEFECTO;
+  const v = valor.trim();
+  const n = Number(v);
+  if (!/^\d+$/.test(v) || n < 1 || n > CLAVE_TEMPORAL_HORAS_MAXIMO) {
+    throw new Error(`CLAVE_TEMPORAL_HORAS="${valor.slice(0, 20)}" no es válido: se espera un entero de horas entre 1 y ${CLAVE_TEMPORAL_HORAS_MAXIMO} (por defecto ${CLAVE_TEMPORAL_HORAS_POR_DEFECTO})`);
+  }
+  return n;
+}
+
 export const CLAVE_ADMIN_MINIMO = 24;
 // Misma política para toda clave de administración que llega por el entorno (también MQTT_ADMIN_CLAVE, la del plugin del broker).
 export function claveOpcional(nombre: string, valor: string | undefined): string | undefined {

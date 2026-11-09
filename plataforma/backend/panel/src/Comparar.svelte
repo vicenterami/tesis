@@ -9,6 +9,7 @@
   import Grafico from './Grafico.svelte';
   import SelectorRango from './SelectorRango.svelte';
   import ZonaSitio from './ZonaSitio.svelte';
+  import Boton from './Boton.svelte';
   import { ErrorApi, URL_ABIERTAS, mensajeError, obtener } from './lib/api';
   import { antirrebote, porLotes } from './lib/antirrebote';
   import { recordarMarcados } from './lib/comparar';
@@ -245,7 +246,7 @@
   {:else}
     <div class="filtros" role="group" aria-label="Rango del gráfico" aria-busy={cargando} data-cargando={cargando}>
       <SelectorRango rango={rangoElegido} res={resElegida} alElegirRango={elegirRango} alElegirRes={elegirRes} />
-      <button type="button" onclick={() => void cargarGrafico()} data-actualizar>Actualizar</button>
+      <Boton etiqueta="Actualizar" ayuda="Vuelve a pedir la historia de todos los dispositivos con el rango y la resolución elegidos" onclick={() => void cargarGrafico()} data-actualizar />
       {#if cargando}
         <span class="vivo" data-cargando-texto>cargando…</span>
       {:else if mostrada !== null}
@@ -253,7 +254,7 @@
       {/if}
     </div>
     {#if errorGrafico !== null}
-      <p class="error" role="alert">{errorGrafico} <button type="button" onclick={() => void cargarGrafico()} data-reintentar>Reintentar</button></p>
+      <p class="error" role="alert">{errorGrafico} <Boton etiqueta="Reintentar" onclick={() => void cargarGrafico()} data-reintentar /></p>
     {/if}
     {#if mostrada !== null}
       {#if (series[0]?.length ?? 0) === 0}

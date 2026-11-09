@@ -21,8 +21,8 @@ import { MENSAJE_SIN_SESION, SesionService } from './sesion.service';
 //  1. La cookie `__Host-sesion` (una persona). Toda ruta que escribe exige además la cabecera `X-Pedido: panel` (CSRF, decidido el 12/10/2026):
 //     un formulario de otro sitio no puede ponerla y el cliente del panel la pone siempre.
 //  2. La clave de administrador por cabecera `X-Clave-Admin` (docs/10 §8.4 punto 41): sigue valiendo, como un «usuario del sistema» con
-//     rol de administrador en todos los sitios (docs/20 §5), hasta que se retire del .env. Así el guardián, el banco y los guiones de
-//     alta no se rompen antes de que exista la pantalla de inicio de sesión (P10). No necesita `X-Pedido`: es ella misma una cabecera
+//     rol de administrador en todos los sitios (docs/20 §5). Vale para los guiones, el banco y las pruebas, hasta retirarla del servidor
+//     (en el .env). No necesita `X-Pedido`: es ella misma una cabecera
 //     que un formulario de otro sitio no puede poner. Si viene, manda ella (una clave mala es 401 aunque haya cookie).
 export const CABECERA_PEDIDO = 'x-pedido';
 export const VALOR_PEDIDO = 'panel';

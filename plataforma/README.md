@@ -38,6 +38,12 @@ openssl rand -base64 24              # generar una clave por variable
 bash pruebas/broker-inicializar.sh
 # Credencial del dispositivo de la demo (dev-0001; la semilla lo crea en la base sin credencial): clave oculta y verificada.
 # Semilla para probar el panel con todos los estados, vías y condiciones: bash pruebas/semilla-demo.sh --completa (docs/16 §23).
+# La semilla crea además dos personas de demostración del sitio uct (admin-demo@ejemplo.invalid, administrador, y consulta-demo@ejemplo.invalid,
+# consulta) e imprime UNA vez al final sus claves temporales (vencen a las CLAVE_TEMPORAL_HORAS del .env, 2 h por defecto, 1–72): con ellas se entra al panel (pantalla P10, docs/19 §4), que pide elegir
+# una clave propia. Solo desarrollo y demostración; SEMILLA_SIN_PERSONAS=1 las omite; correrla de nuevo asigna otras temporales.
+# Como sus correos son fijos, solo se crean con el backend en bucle local (API=http://127.0.0.1:3000, la de por defecto, o localhost);
+# con otra dirección (un servidor) se omiten con aviso, salvo SEMILLA_PERSONAS=1 explícito.
+# El panel con sesión en navegadores reales (Chromium y Firefox, 390 y 1280 px): bash pruebas/panel-sesion-e2e.sh (paso 4c del guardián).
 # Los dispositivos nuevos se dan de alta por la API (POST /dispositivos con X-Clave-Admin o con sesión de administrador del sitio): la credencial se muestra una vez.
 bash pruebas/broker-cliente.sh dev-0001
 

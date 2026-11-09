@@ -176,9 +176,9 @@ Las rutas B y C entran igual por la vía 1; solo cambia el adaptador.
       \end{itemize}
     \end{column}
     \begin{column}{0.33\textwidth}
-      \cifra{357}{pruebas automáticas del backend}
-      \cifra{107}{pruebas del panel}
-      \cifra{47}{pasos del guardián}
+      \cifra{445}{pruebas automáticas del backend}
+      \cifra{165}{pruebas del panel}
+      \cifra{49}{pasos del guardián}
     \end{column}
   \end{columns}
   \fuente{plataforma/pruebas/verificar-todo.sh; docs/18 §1}
@@ -270,7 +270,7 @@ Las rutas B y C entran igual por la vía 1; solo cambia el adaptador.
 \begin{frame}{Rendimiento y consumo, medidos}
   \begin{columns}[T,onlytextwidth]
     \begin{column}{0.24\textwidth}\cifra{409/s}{pico de 30 s sin pérdida (RNF-01 pide 50/s; medido 59,7)}\end{column}
-    \begin{column}{0.24\textwidth}\cifra{324 MiB}{pico de toda la pila (meta: 2 GB)}\end{column}
+    \begin{column}{0.24\textwidth}\cifra{402 MiB}{pico de la pila, dos inicios de sesión (carga: 324; meta: 2 GB)}\end{column}
     \begin{column}{0.24\textwidth}\cifra{180 B}{por lectura en disco}\end{column}
     \begin{column}{0.24\textwidth}\cifra{0 de 180}{perdidas o duplicadas en cada entrada}\end{column}
   \end{columns}
@@ -309,7 +309,7 @@ Las rutas B y C entran igual por la vía 1; solo cambia el adaptador.
     \toprule
     \textbf{Criterio (peso)} & \textbf{Estado} \\
     \midrule
-    50 \% de implementación (10 \%) & \hecho: backlog completo 37 de 66 (56 \%); núcleo 25 de 34 (75 \%) y 4 parciales \\
+    50 \% de implementación (10 \%) & \hecho: backlog completo 38 de 66 (57 \%); núcleo 25 de 34 (75 \%) y 4 parciales \\
     Pruebas iniciales (30 \%) & \avanzado: carga, carreras, TLS, capacidad, caídas, campo y 24 h; faltan TT-27 y el broker de producción \\
     Validación preliminar (10 \%) & \hecho: sensor real 24 h y red LoRaWAN real del campus (20/10); la del servidor, Etapa 4 \\
     Mejoras (15 \%) & \avanzado: decisiones del 6--8/10, proxy TLS, dependencias sin altas ni críticas \\

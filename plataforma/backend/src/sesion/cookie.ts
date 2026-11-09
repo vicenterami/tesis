@@ -11,8 +11,11 @@ export const VIDA_ABSOLUTA_MS = 8 * 3600_000;
 // El guardia renueva `ultima_actividad` como mucho una vez por minuto (decidido al implementar, 08/11/2026): cada petición del panel
 // no se convierte en una escritura, y la inactividad efectiva queda entre 29 y 30 minutos.
 export const RENOVAR_CADA_MS = 60_000;
-// La clave temporal que asigna un administrador vale 24 h (decidido el 12/10/2026).
-export const VIDA_CLAVE_TEMPORAL_MS = 24 * 3600_000;
+// La vigencia de la clave temporal la fija el operador (CLAVE_TEMPORAL_HORAS, 1–72 h, 2 por defecto; arranque.ts, horasClaveTemporal):
+// decidido el 08/11/2026, reemplaza las 24 h fijas del 12/10. Aquí solo la cuenta pura, con el plazo como argumento.
+export function venceClaveTemporal(ahora: Date, horas: number): Date {
+  return new Date(ahora.getTime() + horas * 3600_000);
+}
 
 // 32 bytes aleatorios (256 bits; OWASP pide al menos 64) en base64url: 43 caracteres sin signos que haya que escapar en una cookie.
 export function generarIdentificador(): string {

@@ -306,13 +306,13 @@ malos=$(grep -lE '^\. "\$\(dirname "\$0"\)' plataforma/pruebas/*.sh plataforma/p
 if [ -n "$malos" ]; then echo "FALLA cargan con ruta relativa a \$0 (fallan según desde dónde se llamen):"; echo "$malos" | sed 's/^/  /'; fallos=$((fallos+1))
 else echo "OK    ningún guion carga lib-dynsec.sh con una ruta relativa a \$0"; fi
 
-paso "2z. Toda variable RETENCION_*, METRICA_BROKER_*, TOPE_* y PROXY_SECRETO del .env.example llega al backend por el compose (14/10; topes y secreto del proxy, 17/10)"
+paso "2z. Toda variable RETENCION_*, METRICA_BROKER_*, TOPE_*, PROXY_SECRETO y CLAVE_TEMPORAL_HORAS del .env.example llega al backend por el compose (14/10; topes y secreto del proxy, 17/10; vigencia de la clave temporal, 08/11)"
 # Hasta el 14/10 el compose no las reenviaba: cambiarlas en el .env no tenía efecto y nadie lo notaba.
-faltan=$(grep -oE '^#?((RETENCION|METRICA_BROKER|TOPE)_[A-Z_]+|PROXY_SECRETO)' plataforma/.env.example | tr -d '#' | sort -u | while read -r v; do grep -qE "^\s+$v:" plataforma/docker-compose.yml || echo "$v"; done)
-n=$(grep -cE '^#?((RETENCION|METRICA_BROKER|TOPE)_[A-Z_]+|PROXY_SECRETO)=' plataforma/.env.example)
-if [ "$n" -lt 9 ]; then echo "FALLA solo $n variables RETENCION_/METRICA_BROKER_/TOPE_/PROXY_SECRETO en .env.example: revisó de menos"; fallos=$((fallos+1))
+faltan=$(grep -oE '^#?((RETENCION|METRICA_BROKER|TOPE)_[A-Z_]+|PROXY_SECRETO|CLAVE_TEMPORAL_HORAS)' plataforma/.env.example | tr -d '#' | sort -u | while read -r v; do grep -qE "^\s+$v:" plataforma/docker-compose.yml || echo "$v"; done)
+n=$(grep -cE '^#?((RETENCION|METRICA_BROKER|TOPE)_[A-Z_]+|PROXY_SECRETO|CLAVE_TEMPORAL_HORAS)=' plataforma/.env.example)
+if [ "$n" -lt 10 ]; then echo "FALLA solo $n variables RETENCION_/METRICA_BROKER_/TOPE_/PROXY_SECRETO/CLAVE_TEMPORAL_HORAS en .env.example: revisó de menos"; fallos=$((fallos+1))
 elif [ -n "$faltan" ]; then echo "FALLA declaradas en .env.example pero el compose no las pasa al backend: $(echo $faltan)"; fallos=$((fallos+1))
-else echo "OK    las $n variables de limpieza, cola, topes y secreto del proxy llegan al backend por el compose"; fi
+else echo "OK    las $n variables de limpieza, cola, topes, secreto del proxy y vigencia de la clave temporal llegan al backend por el compose"; fi
 
 paso "2z2. Tope por emisor: las vías que docs/11 §3 declara con tope son exactamente las que entran por filtros2a6 (docs/10 §8.4 punto 53)"
 # 17/10: el tope vive en filtros2a6; una vía nueva que no pase por ahí no tendría tope. La fila de docs/11 nombra las vías; el código
@@ -588,6 +588,32 @@ if [ "$real" -lt 10 ]; then echo "FALLA contó solo $real pruebas (it( en los *.
 elif [ -z "$citas" ]; then echo "FALLA ninguna cita «N pruebas unitarias» en docs ni en el informe: ¿cambió la redacción? (no revisó nada)"; fallos=$((fallos+1))
 elif [ -n "$malas" ]; then echo "FALLA cifras de pruebas unitarias distintas de $real:"; sed 's/^/  /' <<<"$malas"; fallos=$((fallos+1))
 else echo "OK    $real pruebas unitarias; $(grep -c . <<<"$citas") cita(s) en docs e informe coinciden"; fi
+# 08/11: las láminas decían «357 pruebas automáticas del backend» y «107 pruebas del panel» con 439 y 154 en el repositorio: se vigilan
+# también «N pruebas automáticas» (con o sin «del backend») contra el backend y «N pruebas del panel» contra los it(/test( del panel, en
+# docs, informe, anexos y láminas (`\cifra{N}{pruebas …}` se lee como «N pruebas …»). docs/16 es un registro fechado: rige solo su cabecera
+# y su última sección (como en 2w4); una cifra fechada «al cierre del tramo N» se respeta.
+python3 -I - "$real" <<'PY' || fallos=$((fallos+1))
+import re, sys, pathlib
+backend = int(sys.argv[1])
+panel = sum(len(re.findall(r'(?<![.\w])(?:it|test)\(', p.read_text(encoding='utf-8'))) for p in pathlib.Path('plataforma/backend/panel/src').rglob('*.test.ts'))
+fuentes = [*sorted(pathlib.Path('docs').glob('*.md')), *sorted(pathlib.Path('informe-oficial').glob('*.tex')), *sorted(pathlib.Path('informe-oficial/anexos').glob('*.tex')),
+           pathlib.Path('informe-oficial/presentacion/presentacion.tex')]
+malos, n = [], 0
+for f in fuentes:
+    if f.name.startswith('12-'): continue
+    crudo = f.read_text(encoding='utf-8')
+    if f.name.startswith('16-'):
+        partes = re.split(r'(?m)^(?=## \d+\. )', crudo); crudo = partes[0] + (partes[-1] if len(partes) > 1 else '')
+    t = re.sub(r'\\cifra\{(\d+)\}\{', r'\1 ', re.sub(r'\s+', ' ', crudo))
+    for m in re.finditer(r'(\d+) pruebas (automáticas|unitarias)(?: del backend)?|(\d+) pruebas del panel(?! al cierre del tramo)', t):
+        n += 1
+        if m.group(1) and int(m.group(1)) != backend: malos.append(f'{f}: «{m.group(0)}»; el backend tiene {backend}')
+        if m.group(3) and int(m.group(3)) != panel: malos.append(f'{f}: «{m.group(0)}»; el panel tiene {panel}')
+for x in malos: print('FALLA', x)
+if n == 0: print('FALLA ninguna cita «N pruebas automáticas/del panel»: ¿cambió la redacción? (no revisó nada)'); sys.exit(1)
+if not malos: print(f'OK    {n} cita(s) de pruebas automáticas o del panel (láminas incluidas): {backend} del backend y {panel} del panel')
+sys.exit(1 if malos else 0)
+PY
 # 09/10: también la cifra por archivo («N pruebas en `eventos.spec.ts`»), que citan docs/11 y docs/16 y nadie recontaba.
 # 15/10: la forma corta («…, 5 en `alta.dto.spec.ts`») no se vigila a propósito: también cuenta subconjuntos («4 en `arranque.spec.ts`»
 # son las de la clave, de 37) y aparece en secciones fechadas con la cifra de ese día. Quien la escribe la recuenta a mano.
@@ -932,6 +958,18 @@ if [ "$n" -lt 15 ]; then echo "FALLA revisé solo $n guiones (¿cambió el lista
 elif [ -n "$malos" ]; then echo "FALLA guiones con error de sintaxis:$malos"; fallos=$((fallos+1))
 else echo "OK    $n guiones con la sintaxis de bash correcta (bash -n)"; fi
 
+paso "2y3. Panel: todo botón es Boton.svelte (docs/19 §6): ningún <button fuera de él y de los tres archivos justificados"
+# 08/11: la regla «todo botón nuevo es Boton.svelte» no tenía guardia. Ficha, Inventario y SelectorRango conservan botones propios
+# justificados en docs/19 §6 (fichas de conteo por estado y tarjetas de canal, con contenido rico; botones de rango); otro .svelte con «<button» falla.
+justificados="Boton.svelte Ficha.svelte Inventario.svelte SelectorRango.svelte"
+n=$(git ls-files -co --exclude-standard 'plataforma/backend/panel/src/*.svelte' | wc -l)
+malos=$(git ls-files -co --exclude-standard 'plataforma/backend/panel/src/*.svelte' | while IFS= read -r f; do
+  case " $justificados " in *" $(basename "$f") "*) continue ;; esac
+  grep -nH '<button' "$f"; done)
+if [ "$n" -lt 10 ]; then echo "FALLA revisé solo $n componentes del panel (¿cambió la carpeta?)"; fallos=$((fallos+1))
+elif [ -n "$malos" ]; then echo "FALLA <button fuera de Boton.svelte (usar el componente; docs/19 §6):"; sed 's/^/  /' <<<"$malos"; fallos=$((fallos+1))
+else echo "OK    $n componentes del panel: ningún <button fuera de Boton.svelte y de los tres justificados ($justificados)"; fi
+
 paso "3. Diagramas: informe = docs = base (generar-figuras.sh --verificar)"
 bash informe-oficial/figuras/generar-figuras.sh --verificar || fallos=$((fallos+1))
 
@@ -1024,6 +1062,12 @@ if curl -s -m 2 http://127.0.0.1:3000/salud >/dev/null; then bash plataforma/pru
 paso "4b. Sesión y permisos (docs/20 §6 y §8): la matriz ruta × rol con una sesión por rol, otro sitio → 404, bloqueo, cierre y canal en vivo por sitio"
 # 08/11/2026: el primer administrador con X-Clave-Admin, un usuario de consulta, dos sitios propios de la prueba; todo se borra al salir.
 if curl -s -m 2 http://127.0.0.1:3000/salud >/dev/null; then bash plataforma/pruebas/sesion-smoke.sh || fallos=$((fallos+1)); else echo "omitida: backend no está corriendo"; omitidos="$omitidos 4b"; fi
+
+paso "4c. Panel con sesión en navegadores reales (P10; docs/19 §4 y §6): entrar, clave temporal, inventario, exportar, usuarios, vencer y salir, a 390 y 1280 px, en Chromium y Firefox"
+# 08/11/2026: el e2e de la pantalla de inicio de sesión contra la pila de desarrollo (el panel servido por la imagen del backend). Sin el backend
+# o sin los navegadores de Playwright, el guion sale con 3 y el paso se OMITE con aviso: nunca «OK» sin haber probado.
+bash plataforma/pruebas/panel-sesion-e2e.sh; r=$?
+if [ "$r" = 3 ]; then omitidos="$omitidos 4c"; elif [ "$r" != 0 ]; then fallos=$((fallos+1)); fi
 
 # «TODO» solo si todo corrió: un paso omitido no se cuenta como aprobado (27/09: con el backend
 # apagado, el guardián decía TODO EN CONCORDANCIA sin haber probado la API). Sale 2 si hubo omisiones.

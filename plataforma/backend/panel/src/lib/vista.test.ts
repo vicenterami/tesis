@@ -21,6 +21,11 @@ describe('leerVista / fragmento*: la vista en la URL (docs/19 §4, incremento 1,
     expect(leerVista('')).toEqual({ pantalla: 'inventario', filtros: SIN_FILTROS });
     expect(leerVista('#/?estado=rojo&via=http')).toEqual({ pantalla: 'inventario', filtros: { ...SIN_FILTROS, via: 'http' } });
   });
+  it('usuarios (P10): «#/usuarios» abre la pantalla de usuarios; con algo detrás, no', () => {
+    expect(leerVista('#/usuarios')).toEqual({ pantalla: 'usuarios' });
+    expect(leerVista('#/usuarios?x=1')).toEqual({ pantalla: 'usuarios' });
+    expect(leerVista('#/usuarios/otro').pantalla).toBe('inventario');
+  });
   it('una ruta de ficha con un id que no es UUID no abre la ficha: vuelve al inventario', () => {
     expect(leerVista('#/dispositivos/../salud').pantalla).toBe('inventario');
   });

@@ -52,7 +52,7 @@ función que lo calcula es una sola, con prueba unitaria por cada fila de la tab
 | P7 | **Alta de dispositivo** (asistente) | Paso 1 identidad y zona; paso 2 vía y formato (y pasarela si LoRaWAN); paso 3 canales y magnitudes; paso 4 credencial según la vía, mostrada una sola vez; paso 5 «esperando la primera trama» en vivo | Crear; copiar la credencial y el tópico | `POST /dispositivos` (API hecha el 12/10, HU-11, `docs/16 §20`; la pantalla en la Etapa 4, HU-22) | RF-50, HU-11, HU-22, punto 25 | API: Etapa 3; pantalla: Etapa 4 |
 | P8 | **Exportar** | Dispositivo (hoy) o sitio (Etapa 4), rango, formato (CSV, XLSX, JSON); tamaño estimado antes de descargar | Descargar | Hecho el 12/10 por dispositivo: `GET /dispositivos/{id}/exportar?formato=csv\|json&desde&hasta` (flujo por tandas; CSV estándar con coma y punto decimal para R, Python y QGIS). **Propuesta** para la Etapa 4: `GET /sitios/{id}/exportar` con rol y XLSX | RF-34, HU-08 (adelantada a la Etapa 3 el 12/10) | API: Etapa 3; pantalla, XLSX y por sitio: Etapa 4 |
 | P9 | **Vista pública por enlace** | Solo lo que el administrador eligió: magnitudes agregadas, sin trama cruda ni identificadores | Ninguna | **Propuesta:** `GET /publico/{token}` | punto 6 | Etapa 4 |
-| P10 | **Sesión y usuarios** | Entrar, salir; usuarios del sitio y su rol | Administrar | **Propuesta:** `POST /sesion` y rutas de usuario | RF-43, RF-44, HU-18 | Etapa 4 |
+| P10 | **Sesión y usuarios** | Entrar, cambio de la clave temporal, salir; quién soy en la cabecera; usuarios de mis sitios, su rol por sitio y la guía de perfiles | Entrar, cambiar la clave, salir o cerrar en todos lados; dar de alta (clave temporal una vez), activar y desactivar, asignar una temporal, cambiar el rol | `POST /sesion`, `GET /sesion`, `DELETE /sesion`, `POST /sesion/clave`, `GET /usuarios`, `POST /usuarios`, `PATCH /usuarios/{id}` (`docs/20`) | RF-43, RF-44, HU-18 | Etapa 4; hecha el 08/11/2026 (§4) |
 
 Lo que **no** se construye, y por qué: mapa (ningún requisito lo pide; el caso de uso tiene decenas de dispositivos, no cientos
 dispersos), informes programados y disparadores con varias condiciones (más que el umbral con histéresis decidido; candidatos
@@ -192,6 +192,41 @@ recuerdan mientras dura la sesión del navegador (así el enlace de P3 y el vac�
 cuenta, la magnitud por defecto de P3b es la primera por nombre; un dispositivo tiene como mucho un canal por magnitud (restricción única
 de `canal`), así que «su canal de esa magnitud» es uno solo.
 
+**P10 Sesión y usuarios (Etapa 4; hecha el 08/11/2026, sobre el backend de `docs/20`).** Qué hace y cómo, en el orden en que la
+persona lo encuentra:
+1. **Entrar.** Al cargar, el panel pregunta `GET /sesion`. Sin sesión, la pantalla «Entrar»: correo y clave con `autocomplete="username"` y
+   `"current-password"` (los gestores de claves los reconocen), botón con estado «Entrando…», y «¿Olvidaste tu clave?» desplegable: «Pídele
+   una clave temporal al administrador de tu sitio» (sin correo saliente, `docs/20 §4`). Cualquier rechazo de credenciales muestra el MISMO
+   texto («Correo o clave incorrectos…»), sea usuario inexistente, inactivo o clave mala, como responde el servidor; un 429 dice cuántos
+   segundos esperar. Ninguna pantalla de datos (ni su canal en vivo) existe antes de entrar.
+2. **Clave temporal.** Si la sesión trae `clave_temporal`, la pantalla «Elige tu clave» es obligatoria (el servidor responde 403 a todo lo
+   demás): las reglas de `docs/20 §4` se leen ANTES de escribir, se comprueban mientras se escribe con los mismos números del servidor (la
+   lista de claves comunes la revisa solo el servidor, y sus motivos se muestran tal cual), la nueva se escribe dos veces
+   (`autocomplete="new-password"`) y la temporal que la persona acaba de usar no se pide otra vez (vive solo en memoria). La misma pantalla,
+   no obligatoria, se abre desde «Cambiar la clave» en la cabecera.
+3. **Dentro.** La cabecera dice quién soy: nombre y cada sitio con su rol («Campus (administrador)»), y ofrece «Cambiar la clave», «Salir»
+   y «Cerrar en todos lados» (`DELETE /sesion?todas=true`). El menú muestra «Usuarios» solo a quien administra algún sitio.
+4. **Renovar y vencer** (`docs/20 §3`). Mientras la persona mueve el ratón, toca o teclea, un `GET /sesion` como mucho cada 5 minutos; una
+   pantalla sin nadie delante no renueva y vence a los 30 min. Un 401 en cualquier petición (también en una descarga o al caer el canal en
+   vivo, que el servidor cierra cuando la sesión vence) guarda la ruta, desmonta las pantallas (sus `EventSource` se cierran) y muestra
+   «Entrar» con «Tu sesión venció o se cerró: entra de nuevo para seguir donde estabas»; al entrar, vuelve a esa ruta y reabre el canal.
+5. **Usuarios** (`#/usuarios`, solo administradores, solo sus sitios). Una mini guía «Qué puede hacer cada perfil» y el tooltip del selector
+   de rol salen de la matriz de permisos del servidor (`GET /sesion` → `permisos`, que es `PERMISOS` de `sesion/permisos.ts`) con un
+   diccionario de frases por acción (`panel/src/lib/ayudas.ts`): la ayuda no puede decir otra cosa que el permiso real. La lista muestra
+   nombre, correo, el rol en cada uno de mis sitios (un selector por sitio: consulta, administrador o sin acceso), si ya no está en mis
+   sitios, activo o inactivo y la temporal pendiente. El alta (nombre, correo, sitio, rol) muestra la clave temporal **una sola vez**, con
+   «Copiar» y el aviso de que no se vuelve a ver; «Ya la entregué: ocultar» la borra de la página. «Desactivar»/«Activar» y «Asignar clave
+   temporal» llevan el `actualizado_en` leído: un 409 muestra «Alguien lo cambió entretanto: recarga» con el botón «Recargar», y el selector
+   vuelve a lo leído (nunca pisa). Los botones que no aplican dicen por qué al lado («no puedes desactivarte a ti mismo», «actívalo primero»).
+6. **Exportar según el rol.** En la ficha, «Descargar CSV de este rango» queda desactivado para quien es de consulta en el sitio del
+   dispositivo, con el motivo escrito al lado («exportar exige el rol administrador en este sitio»); la decisión sigue siendo del servidor.
+Decidido al implementar (08/11/2026), en lo que el diseño no fijaba: la ruta guardada vive en memoria (el fragmento ya sobrevive a una
+recarga) y «Salir» la descarta y deja el panel en el inventario (quien entre después en ese navegador no hereda la pantalla de la
+anterior); «Entrar» no tiene fragmento propio (es un estado del panel, así la ruta pedida queda intacta); al primer cierre del canal en vivo
+por el servidor se pregunta `GET /sesion` (los reintentos siguientes no preguntan, para que un canal rechazado en bucle no mantenga viva la
+sesión de una pantalla sola); el usuario del sistema (la clave por cabecera, que usan guiones y pruebas) entra a las pantallas sin
+«Salir» ni «Usuarios».
+
 **P4 Condiciones y P5 Cuarentena (Etapa 4).** Dos listas con filtro y paginación por `limite`; cada fila lleva a la ficha. En
 P5 la trama cruda va plegada (es texto largo) con un botón de copiar.
 
@@ -244,7 +279,26 @@ descargar; la descarga exige rol de administrador; la vista pública nunca ofrec
 - **Fechas, horas y textos para personas:** horas en formato de 24 h y meses en español en ejes, leyendas y tablas, siempre en la zona
   del sitio (regla 6 de `docs/13`); ningún código interno a la vista (`sin_comunicacion` se muestra «Sin comunicación»). Lo encontró la
   primera prueba con navegador real: el gráfico mostraba «9:30pm» y «Time» (los valores por defecto de uPlot, en inglés).
-- **Un solo cliente HTTP** en el panel, que añade el prefijo de la API, interpreta los códigos y expone el 409 como tal.
+- **Un solo cliente HTTP** en el panel (`panel/src/lib/api.ts`), que añade el prefijo de la API, interpreta los códigos y expone el 409 como
+  tal. Desde la sesión (08/11/2026): manda la cookie del mismo origen; pone `X-Pedido: panel` en toda petición que escribe (y en ninguna
+  otra); resuelve una sola vez lo que vale para toda la aplicación: 401 → «Entrar» guardando la ruta, 403 por clave temporal → cambio
+  obligatorio, 409 → «alguien lo cambió, recarga», 429 → los segundos que trae el cuerpo (`reintentar_en_s`), sin red → «sin conexión».
+  **Gana la última:** una recarga o un cambio de pantalla o de filtro cancela la petición anterior (`AbortController`); una cancelación
+  nunca se muestra como error.
+- **Descargas por `fetch` y Blob, en un solo ayudante** (`descargar`, decidido al implementar el 08/11/2026). Exportar no es un `<a href>`
+  a la API ni lleva un token en la URL: con la sesión vencida, un enlace directo abría el JSON del 401 en una pestaña. El ayudante pide
+  con la sesión, pasa por el manejo central (401 → «Entrar») y, con 200, arma el archivo en memoria y lo entrega con un enlace creado en
+  memoria (nunca insertado en la página), con el nombre que trae `Content-Disposition`.
+- **Componentes de botones y mensajes** (regla del 08/11/2026): todo botón nuevo es `Boton.svelte`, con **etiqueta de texto obligatoria**
+  (ningún botón solo con icono: sin ella el componente falla en voz alta); `ayuda` como tooltip (`Tooltip.svelte`) que aparece al pasar
+  el ratón **y** al enfocar con el teclado, se va con Escape y se enlaza con `aria-describedby`; `cargando` (desactivado, `aria-busy`, la
+  etiqueta en gerundio) y `motivoDesactivado`, que desactiva el botón y **escribe el motivo al lado** (un botón desactivado no recibe el
+  foco ni el ratón en todos los navegadores: un tooltip no alcanzaría). Los mensajes son `Aviso.svelte` (éxito, error, conflicto, espera,
+  información; error y conflicto como alerta, lo demás como estado), y un error de la API se convierte en aviso con una sola función
+  (`lib/avisos.ts`). Migrados en este bloque: «Comparar (N)» (su `title` pasó a ayuda y motivo escrito), «Pausar»/«Reanudar», «Reintentar»,
+  «Actualizar», «Ver la última medición» y las dos descargas de la ficha. Quedan como botones propios, a propósito: las fichas de conteo por
+  estado y las tarjetas de canal (botones con contenido rico y texto visible) y los botones de rango de `SelectorRango.svelte`. El paso 2y3
+  del guardián falla si aparece `<button` en cualquier otro componente.
 - **Nada se repite por cada evento:** un aviso de condición pide la lista con antirrebote (una consulta por segundo como mucho,
   nunca dos en vuelo) y las lecturas en vivo se aplican por lotes (un redibujo cada 250 ms como mucho). Un dispositivo que
   oscila o un emisor malicioso no multiplican consultas a la base ni redibujos. La ficha descarta eventos de otro dispositivo
@@ -262,7 +316,8 @@ descargar; la descarga exige rol de administrador; la vista pública nunca ofrec
 | P4 Condiciones, P5 Cuarentena | HU-05, RF-11 a RF-13, RF-24 | Etapa 4 | Trama fuera de rango → fila en P4 en vivo; trama de un desconocido → fila en P5 con motivo `no_registrado` |
 | P1 Resumen | RF-30, HU-16 | Etapa 4 | Los cuatro conteos suman el total del inventario; cambian en vivo con F3 |
 | P8 Exportar (API) | RF-34, HU-08 | Etapa 3 (12/10): 6 pruebas de las funciones puras y 7 casos de humo; la pantalla, el XLSX y la exportación por sitio, en la Etapa 4 |
-| P6, P7, P9, P10 | HU-06, HU-11, HU-13, HU-18, HU-22; RF-43, RF-44, RF-50 | Etapa 4 |
+| P10 Sesión y usuarios | HU-18, RF-43, RF-44 | Etapa 4 (08/11/2026) | `docs/16 §59`: por el DOM (vitest) el cliente HTTP (cabecera, 401, 403 temporal, 409, 429, sin red, gana la última, descarga por Blob), la guía de perfiles contra la matriz y contra las acciones del servidor, las reglas de la clave contra los números del servidor, los componentes y los flujos de entrar, cambiar, vencer, renovar y salir; con navegador real (paso 4c del guardián, `pruebas/panel-sesion-e2e.sh`) en Chromium y Firefox, a 390 y 1280 px |
+| P6, P7, P9 | HU-06, HU-11, HU-13, HU-22; RF-50 | Etapa 4 |
 
 La etapa de cada pantalla es la de su historia en `docs/04`; mover una historia de etapa se decide con sus horas y se cambia
 primero allí (y en `docs/18`), nunca aquí. Matriz de acceso ruta × rol (`docs/11 §4`) y las pruebas de 409 con dos ediciones simultáneas |

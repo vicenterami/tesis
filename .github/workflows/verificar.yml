@@ -1,5 +1,5 @@
 # Verificación automática del backend en cada push y pull request (TT-03), y una vez por semana.
-# Solo lo que no necesita base ni broker: tipos, lint, pruebas unitarias y auditoría de dependencias. Lo que sí las necesita
+# Solo lo que no necesita base ni broker: tipos, lint, pruebas unitarias del backend y del panel (por `pnpm verificar`) y auditoría de dependencias. Lo que sí las necesita
 # (esquema, migraciones, API) corre en local con plataforma/pruebas/verificar-todo.sh.
 name: verificar
 on:

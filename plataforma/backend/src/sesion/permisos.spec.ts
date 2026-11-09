@@ -1,5 +1,5 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
-import { ACCIONES, PERMISOS, UsuarioSesion, alcanceDeLectura, usuarioSistema, exigir, exigirEnAlguno, permitir, puedeEnAlguno } from './permisos';
+import { ACCIONES, PERMISOS, ROLES, UsuarioSesion, alcanceDeLectura, matrizPorRol, usuarioSistema, exigir, exigirEnAlguno, permitir, puedeEnAlguno } from './permisos';
 
 // La matriz de docs/20 §6 en la función que decide (docs/10 §8.4 punto 36). Dos sitios: s1 (el de la persona) y s2 (otro).
 const persona = (sitios: [string, 'administrador' | 'consulta'][]): UsuarioSesion =>
@@ -30,6 +30,14 @@ describe('permitir(usuario, accion, sitio): la tabla de docs/20 §6', () => {
   });
   it('la tabla no se relaja en silencio: solo leer admite consulta', () => {
     expect(Object.entries(PERMISOS).filter(([, roles]) => roles.includes('consulta')).map(([a]) => a)).toEqual(['leer']);
+  });
+  it('matrizPorRol (la guía de perfiles del panel, GET /sesion): sale de PERMISOS, celda por celda, sin acciones de más ni de menos', () => {
+    const m = matrizPorRol();
+    expect(Object.keys(m).sort()).toEqual([...ROLES].sort());
+    for (const r of ROLES) for (const a of ACCIONES) expect(m[r].includes(a)).toBe(PERMISOS[a].includes(r));
+    expect(m).toEqual({ administrador: ['leer', 'exportar', 'escribir', 'usuarios'], consulta: ['leer'] });
+    // y coincide con la función que decide: lo que la guía dice que un rol puede, permitir() lo permite en su sitio
+    for (const r of ROLES) for (const a of ACCIONES) expect(permitir(persona([['s1', r]]), a, 's1') === 'permitido').toBe(m[r].includes(a));
   });
 });
 

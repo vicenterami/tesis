@@ -52,6 +52,8 @@ DELETE FROM evento WHERE dispositivo_id IN (SELECT id FROM d_prueba) OR (tipo LI
 DELETE FROM estado_dispositivo WHERE dispositivo_id IN (SELECT id FROM d_prueba);
 DELETE FROM canal WHERE dispositivo_id IN (SELECT id FROM d_prueba);
 DELETE FROM dispositivo WHERE id IN (SELECT id FROM d_prueba);
+DELETE FROM credencial WHERE pasarela_id IN (SELECT id FROM pasarela WHERE sitio_id IN (SELECT id FROM sitio WHERE codigo IN ('$sa', '$sb')));
+DELETE FROM pasarela WHERE sitio_id IN (SELECT id FROM sitio WHERE codigo IN ('$sa', '$sb'));
 DELETE FROM zona WHERE sitio_id IN (SELECT id FROM sitio WHERE codigo IN ('$sa', '$sb'));
 DELETE FROM sitio WHERE codigo IN ('$sa', '$sb');
 DELETE FROM acceso WHERE email_intentado LIKE '%$dom' OR usuario_id IN (SELECT id FROM u_prueba);
@@ -76,7 +78,9 @@ N=$(date +%s%N | tail -c 7)
 SA="pa-$N"; SB="pb-$N"; DOM="-$N@ejemplo.invalid"
 
 # Antes, una limpieza fallida solo decía «revisar a mano» (revisión del 08/11/2026): ahora dice qué quedó y cómo reintentar.
+MUESTREO=() # los muestreadores de memoria de 6b (cada uno bajo `timeout`: aunque el guion muera sin trap, no quedan girando)
 limpiar() {
+  [ ${#MUESTREO[@]} -gt 0 ] && kill "${MUESTREO[@]}" 2>/dev/null
   jobs -p | xargs -r kill 2>/dev/null # flujos SSE de fondo que sigan abiertos
   if ! limpiar_sufijo "$N"; then
     echo "AVISO no se pudo limpiar todo lo creado (sufijo $N): $(head -c 300 "$LOG_LIMPIEZA" | tr '\n' ' ')"
@@ -104,6 +108,23 @@ SQL
 )
 read -r SITIO_A SITIO_B ZA ZB DA DA2 DB CA CB <<<"$IDS"
 [ -n "${CB:-}" ] || { falla "no se pudieron crear los datos de prueba"; exit 1; }
+# Lo que faltaba en la matriz (revisión del 08/11/2026): una pasarela por sitio, una condición abierta y una trama en cuarentena por sitio
+# (para las listas SIN ?dispositivo=) y una persona que solo está en B. Las pasarelas se crean por SQL: ninguna llamada de esta prueba
+# llega a aprovisionar el broker (todas se rechazan antes, 401/403/404).
+IDS2=$(sql <<SQL
+WITH pa AS (INSERT INTO pasarela (sitio_id, id_fisico, nombre, formato) VALUES ('$SITIO_A', 'gwa-$N', 'pasarela A', 'chirpstack') RETURNING id),
+     pb AS (INSERT INTO pasarela (sitio_id, id_fisico, nombre, formato) VALUES ('$SITIO_B', 'gwb-$N', 'pasarela B', 'chirpstack') RETURNING id),
+     ka AS (INSERT INTO condicion (dispositivo_id, tipo) VALUES ('$DA', 'bateria') RETURNING id),
+     kb AS (INSERT INTO condicion (dispositivo_id, tipo) VALUES ('$DB', 'bateria') RETURNING id),
+     qa AS (INSERT INTO cuarentena (origen, motivo, payload_crudo, detalle, dispositivo_id) VALUES ('http', 'invalida', '\x7b7d', 'prueba de sesión A', '$DA') RETURNING id),
+     qb AS (INSERT INTO cuarentena (origen, motivo, payload_crudo, detalle, dispositivo_id) VALUES ('http', 'invalida', '\x7b7d', 'prueba de sesión B', '$DB') RETURNING id),
+     ub AS (INSERT INTO usuario (nombre, email, hash_password) VALUES ('Solo B de prueba', 'solob$DOM', 'sin-clave-nunca-entra') RETURNING id),
+     sb AS (INSERT INTO usuario_sitio (usuario_id, sitio_id, rol) SELECT id, '$SITIO_B', 'consulta' FROM ub RETURNING usuario_id)
+SELECT concat_ws(' ', (SELECT id FROM pa), (SELECT id FROM pb), (SELECT id FROM ka), (SELECT id FROM kb), (SELECT id FROM qa), (SELECT id FROM qb), (SELECT usuario_id FROM sb));
+SQL
+)
+read -r PA PB KA KB QA QB SOLO_B <<<"$IDS2"
+[ -n "${SOLO_B:-}" ] || { falla "no se pudieron crear las pasarelas, condiciones, cuarentena o la persona de B ($IDS2)"; exit 1; }
 FALSO="00000000-0000-4000-8000-000000000000"
 
 # pedir QUIEN MÉTODO RUTA [CUERPO]: QUIEN = anon | clave (X-Clave-Admin) | nombre del tarro de cookies (curl -c/-b). Las rutas que
@@ -193,6 +214,12 @@ SIN_PEDIDO=1 caso "POST /sesion sin X-Pedido: panel → 403 (un formulario de ot
 caso "POST /usuarios (administrador, sesión) → 201" 201 adm POST /usuarios \
      "{\"nombre\":\"Consulta de prueba\",\"email\":\"$CON_EMAIL\",\"sitios\":[{\"sitio_id\":\"$SITIO_A\",\"rol\":\"consulta\"}]}"
 CON_TEMP=$(campo "v['clave']"); CON_ID=$(campo "v['id']")
+# Vigencia de la temporal (docs/20 §4; desde el 08/11/2026, CLAVE_TEMPORAL_HORAS, 1–72 h, 2 por defecto): la respuesta trae su vencimiento
+# y queda a las horas que rigen en el contenedor (± 2 min), no a 24 h fijas.
+HORAS_T=$(docker compose -f "$PLAT/docker-compose.yml" exec -T backend printenv CLAVE_TEMPORAL_HORAS 2>/dev/null | tr -d '[:space:]'); HORAS_T=${HORAS_T:-2}
+d=$(python3 -I -c "import sys,json,datetime as t; v=json.load(open(sys.argv[1]))['clave_temporal_vence_en']; print(round((t.datetime.fromisoformat(v.replace('Z','+00:00')) - t.datetime.now(t.timezone.utc)).total_seconds()))" "$T/r" 2>/dev/null)
+[ -n "$d" ] && [ $((d - HORAS_T * 3600)) -le 120 ] && [ $((HORAS_T * 3600 - d)) -le 120 ] \
+  && ok "la temporal vence a las $HORAS_T h (CLAVE_TEMPORAL_HORAS; clave_temporal_vence_en en la respuesta, ${d} s)" || falla "vencimiento de la temporal: ${d:-sin dato} s; se esperaban $((HORAS_T * 3600)) ± 120"
 CON_CLAVE=$(nueva_clave)
 c=$(entrar con "$CON_EMAIL" <<<"$CON_TEMP"); [ "$c" = 200 ] || falla "consulta entra con la temporal → $c"
 c=$(cambiar_clave con "$CON_TEMP" "$CON_CLAVE"); [ "$c" = 200 ] && ok "consulta cambia su clave temporal → 200" || falla "consulta cambia la clave → $c $(head -c 160 "$T/r")"
@@ -229,6 +256,11 @@ caso "sin sesión: DELETE /dispositivos/{id}" 401 anon DELETE "/dispositivos/$DA
 caso "sin sesión: POST /dispositivos/{id}/credencial" 401 anon POST "/dispositivos/$DA/credencial"
 caso "sin sesión: PATCH /canales/{id}" 401 anon PATCH "/canales/$CA" "$CAL"
 caso "sin sesión: POST /usuarios" 401 anon POST /usuarios '{}'
+GW="{\"id_fisico\":\"gwn-$N\",\"nombre\":\"pasarela nueva\",\"sitio_id\":\"$SITIO_A\",\"formato\":\"chirpstack\"}"
+GW_B="{\"id_fisico\":\"gwm-$N\",\"nombre\":\"pasarela ajena\",\"sitio_id\":\"$SITIO_B\",\"formato\":\"chirpstack\"}"
+caso "sin sesión: POST /pasarelas" 401 anon POST /pasarelas "$GW"
+caso "sin sesión: DELETE /pasarelas/{id}" 401 anon DELETE "/pasarelas/$PA"
+caso "sin sesión: POST /pasarelas/{id}/credencial" 401 anon POST "/pasarelas/$PA/credencial"
 caso "sin sesión: PATCH /usuarios/{id}" 401 anon PATCH "/usuarios/$CON_ID" '{}'
 caso "sin sesión: DELETE /sesion" 401 anon DELETE /sesion
 c=$(entrar nadie "nadie$DOM" <<<"no-es-la-clave-de-nadie"); [ "$c" = 401 ] && ok "sin sesión: POST /sesion con credenciales malas → 401" || falla "POST /sesion malas → $c"
@@ -256,6 +288,19 @@ caso "consulta, otro sitio: GET /condiciones?dispositivo=" 404 con GET "/condici
 caso "consulta, otro sitio: GET /cuarentena?dispositivo=" 404 con GET "/cuarentena?dispositivo=$DB"
 caso "consulta, otro sitio: GET /eventos?dispositivo=" 404 con GET "/eventos?dispositivo=$DB"
 caso "consulta, otro sitio: GET /dispositivos/{id}/exportar" 404 con GET "/dispositivos/$DB/exportar"
+caso "consulta: POST /pasarelas" 403 con POST /pasarelas "$GW"
+caso "consulta: DELETE /pasarelas/{id} (su sitio)" 403 con DELETE "/pasarelas/$PA"
+caso "consulta: POST /pasarelas/{id}/credencial (su sitio)" 403 con POST "/pasarelas/$PA/credencial"
+# Las listas SIN ?dispositivo= (revisión del 08/11/2026): el filtro por sitio va en el WHERE, no solo en la ruta con dispositivo.
+caso "consulta: GET /condiciones (sin ?dispositivo=)" 200 con GET "/condiciones?abiertas=true&limite=500"
+lista=$(campo "' '.join(c['id'] for c in v)")
+grep -q "$KA" <<<"$lista" && ! grep -q "$KB" <<<"$lista" && ok "consulta: GET /condiciones trae la condición de su sitio y no la del otro" || falla "GET /condiciones sin filtro de sitio: A $(grep -c "$KA" <<<"$lista"), B $(grep -c "$KB" <<<"$lista")"
+caso "consulta: GET /cuarentena (sin ?dispositivo=)" 200 con GET /cuarentena
+lista=$(campo "' '.join(c['id'] for c in v)")
+grep -q "$QA" <<<"$lista" && ! grep -q "$QB" <<<"$lista" && ok "consulta: GET /cuarentena trae la trama de su sitio y no la del otro" || falla "GET /cuarentena sin filtro de sitio: A $(grep -c "$QA" <<<"$lista"), B $(grep -c "$QB" <<<"$lista")"
+caso "consulta: GET /pasarelas" 200 con GET /pasarelas
+lista=$(campo "' '.join(g['id'] for g in v)")
+grep -q "$PA" <<<"$lista" && ! grep -q "$PB" <<<"$lista" && ok "consulta: GET /pasarelas trae la de su sitio y no la del otro" || falla "GET /pasarelas sin filtro de sitio"
 
 for r in /dispositivos "/dispositivos/$DA" "/canales/$CA/historico" /condiciones /cuarentena "/dispositivos/$DA/exportar" /usuarios /pasarelas; do
   caso "administrador: GET $r" 200 adm GET "$r"
@@ -281,6 +326,16 @@ caso "administrador, otro sitio: POST /dispositivos/{id}/credencial" 404 adm POS
 caso "administrador, otro sitio: PATCH /canales/{id}" 404 adm PATCH "/canales/$CB" "$CAL"
 caso "administrador, otro sitio: POST /usuarios (sitio ajeno)" 404 adm POST /usuarios "{\"nombre\":\"X\",\"email\":\"x$DOM\",\"sitios\":[{\"sitio_id\":\"$SITIO_B\",\"rol\":\"consulta\"}]}"
 caso "administrador, otro sitio: GET /eventos?dispositivo=" 404 adm GET "/eventos?dispositivo=$DB"
+caso "administrador, otro sitio: POST /pasarelas (sitio ajeno)" 404 adm POST /pasarelas "$GW_B"
+caso "administrador, otro sitio: DELETE /pasarelas/{id}" 404 adm DELETE "/pasarelas/$PB"
+caso "administrador, otro sitio: POST /pasarelas/{id}/credencial" 404 adm POST "/pasarelas/$PB/credencial"
+n=$(sql -c "SELECT count(*) FROM pasarela WHERE id_fisico IN ('gwn-$N', 'gwm-$N') OR (id = '$PB' AND NOT activo)")
+[ "$n" = 0 ] && ok "ninguna pasarela creada ni dada de baja por los rechazos (todo se cortó antes del broker)" || falla "los rechazos dejaron $n pasarela(s) creada(s) o dada(s) de baja"
+M_B=$(sql -c "SELECT to_char(actualizado_en AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') FROM usuario WHERE id = '$SOLO_B'")
+caso "administrador, otro sitio: PATCH /usuarios/{id} de quien solo está en B → 404 (como uno inexistente)" 404 adm PATCH "/usuarios/$SOLO_B" "{\"actualizado_en\":\"$M_B\",\"activo\":false}"
+cp "$T/r" "$T/otro-u.json"; pedir adm PATCH "/usuarios/$FALSO" "{\"actualizado_en\":\"$M_B\",\"activo\":false}" >/dev/null
+cmp -s "$T/r" "$T/otro-u.json" && ok "PATCH /usuarios/{id} de otro sitio responde lo mismo que un usuario inexistente" || falla "PATCH /usuarios de otro sitio e inexistente difieren: $(cat "$T/otro-u.json") ≠ $(cat "$T/r")"
+[ "$(sql -c "SELECT activo FROM usuario WHERE id = '$SOLO_B'")" = t ] && ok "la persona de B sigue activa" || falla "la persona de B cambió pese al 404"
 
 # ── 4. Canal en vivo con dos sitios (docs/20 §8): consulta recibe solo lo de su sitio; tope de 5 flujos por usuario ─────────────
 caso "X-Clave-Admin: POST /dispositivos/{id}/credencial del sitio B (usuario del sistema, todos los sitios)" 201 clave POST "/dispositivos/$DB/credencial"
@@ -340,6 +395,57 @@ n=$(sql -c "SELECT string_agg(resultado, ',' ORDER BY instante) FROM acceso WHER
   && ok "acceso tiene 6 filas del usuario tras 8 intentos: 5 clave_incorrecta y 1 solo bloqueado" || falla "acceso del usuario: $n"
 n=$(sql -c "SELECT count(*) FROM acceso WHERE email_intentado = '$INA_EMAIL' AND resultado = 'inactivo'")
 [ "$n" = 1 ] && ok "acceso registra el intento del usuario inactivo como «inactivo»" || falla "intentos inactivos registrados: $n"
+
+# ── 6b. Memoria del backend durante dos POST /sesion simultáneos (revisión del 08/11/2026; docs/16 §58 y §59) ───────────────────────
+# Cada scrypt de personas pide 128 MiB y el backend admite dos a la vez (sesion/turnos.ts): se mide el pico real contra el techo de 512 MB
+# del compose. Tres rondas de dos inicios a la vez; mientras, se muestrea la memoria del contenedor de dos formas: `docker stats --no-stream`
+# (lo que pide el método; una muestra por segundo, aprox.) y, si el host deja leerlo, el `memory.current` del cgroup cada 20 ms (no se pierde
+# el pico entre dos muestras de docker stats). Es una medición y un tope: falla si el pico alcanza el techo. Además se suma la memoria de
+# TODOS los contenedores de la pila en cada muestra de docker stats (la pila entera en ese instante, para RNF-17; docs/16 §59).
+# Cada muestreador corre bajo `timeout 90s` y su PID queda en MUESTREO (lo mata `limpiar`): si el guion se corta, nada queda girando.
+CONT=$(docker compose -f "$PLAT/docker-compose.yml" ps -q backend 2>/dev/null)
+PILA=$(docker compose -f "$PLAT/docker-compose.yml" ps -q 2>/dev/null | tr '\n' ' ')
+CG="/sys/fs/cgroup/system.slice/docker-$CONT.scope"
+: > "$T/mem-stats.txt"; : > "$T/mem-cg.txt"; : > "$T/mem-pila.txt"
+timeout 90s bash -c 'while :; do docker stats --no-stream --format "{{.MemUsage}}" "$1" 2>/dev/null | cut -d/ -f1 >> "$2"; done' _ "$CONT" "$T/mem-stats.txt" & m1=$!
+# shellcheck disable=SC2086 # PILA: los ids de los contenedores, uno por palabra
+timeout 90s bash -c 'f=$1; shift; while :; do l=$(docker stats --no-stream --format "{{.MemUsage}}" "$@" 2>/dev/null | cut -d/ -f1 | tr "\n" ";"); echo "$#:$l" >> "$f"; done' _ "$T/mem-pila.txt" $PILA & m3=$!
+MUESTREO=("$m1" "$m3")
+if [ -r "$CG/memory.current" ]; then timeout 90s bash -c 'while :; do cat "$1" >> "$2"; sleep 0.02; done' _ "$CG/memory.current" "$T/mem-cg.txt" & m2=$!; MUESTREO+=("$m2"); else m2=; fi
+sleep 2.5 # con dos muestreadores de docker stats a la vez, la primera muestra tarda más de 1 s (la línea «antes» salía «?»)
+base_stats=$(head -1 "$T/mem-stats.txt")
+for ronda in 1 2 3; do
+  entrar mem1 "$ADM_EMAIL" <<<"$ADM_CLAVE" > "$T/mem1.cod" & q1=$!
+  entrar mem2 "$ADM_EMAIL" <<<"$ADM_CLAVE" > "$T/mem2.cod" & q2=$!
+  wait "$q1" "$q2"
+  [ "$(cat "$T/mem1.cod")$(cat "$T/mem2.cod")" = 200200 ] || falla "ronda $ronda de dos inicios simultáneos: $(cat "$T/mem1.cod") y $(cat "$T/mem2.cod")"
+done
+sleep 1.2
+kill "${MUESTREO[@]}" 2>/dev/null; wait "${MUESTREO[@]}" 2>/dev/null; MUESTREO=()
+python3 -I - "$T/mem-stats.txt" "$T/mem-cg.txt" "${base_stats:-?}" "$T/mem-pila.txt" <<'PY' && ok_n=$((ok_n+1)) || fallos=$((fallos+1))
+import re, sys
+def mib(s):
+    m = re.match(r'\s*([\d.]+)\s*([KMG]i?B|B)', s)
+    if not m: return None
+    f = {'B': 1 / 2**20, 'KiB': 1 / 1024, 'KB': 1 / 1024, 'MiB': 1, 'MB': 1, 'GiB': 1024, 'GB': 1024}[m.group(2)]
+    return float(m.group(1)) * f
+stats = [x for x in (mib(l) for l in open(sys.argv[1])) if x is not None]
+cg = [int(l) / 2**20 for l in open(sys.argv[2]) if l.strip().isdigit()]
+if not stats: print('FALLA docker stats no dio ninguna muestra de la memoria del backend'); sys.exit(1)
+pico = max(stats + cg)
+linea = (f'memoria del backend con dos POST /sesion simultáneos (3 rondas): docker stats --no-stream, antes {sys.argv[3].strip()}, '
+         f'máximo {max(stats):.0f} MiB en {len(stats)} muestras' + (f'; memory.current del cgroup cada 20 ms, máximo {max(cg):.0f} MiB en {len(cg)} muestras' if cg else '; sin acceso al cgroup')
+         + '; techo 512 MiB')
+# La pila entera: por muestra completa (los N contenedores respondieron), la suma; se informa la máxima.
+sumas = []
+for l in open(sys.argv[4]):
+    n, _, resto = l.strip().partition(':')
+    vals = [mib(x) for x in resto.split(';') if x.strip()]
+    if n.isdigit() and len(vals) == int(n) and None not in vals: sumas.append(sum(vals))
+linea += (f'; pila entera ({n} contenedores, suma por muestra de docker stats) máximo {max(sumas):.0f} MiB en {len(sumas)} muestras' if sumas else '; pila entera: sin muestras completas')
+print(('OK    ' if pico < 512 else 'FALLA ') + linea)
+sys.exit(0 if pico < 512 else 1)
+PY
 
 # ── 7. Carrera: dos inicios simultáneos crean dos sesiones válidas e independientes; cerrar sesión revoca de verdad ──────────────
 entrar c1 "$ADM_EMAIL" <<<"$ADM_CLAVE" > "$T/c1" & p1=$!

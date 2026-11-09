@@ -6,7 +6,11 @@
   import Grafico from './Grafico.svelte';
   import SelectorRango from './SelectorRango.svelte';
   import ZonaSitio from './ZonaSitio.svelte';
-  import { mensajeError, obtener } from './lib/api';
+  import Aviso from './Aviso.svelte';
+  import Boton from './Boton.svelte';
+  import { descargar, esCancelacion, mensajeError, obtener, ultimaGana } from './lib/api';
+  import { avisoDeError, type DatosAviso } from './lib/avisos';
+  import { puedeEn, type Sesion } from './lib/sesion';
   import { canalCallado, enLinea, estadoVisual, ROTULO, rotuloCondicion } from './lib/estado-visual';
   import { RANGO_POR_DEFECTO, agregarLectura, formatearValor, rango as datosRango, rangoQueContiene, resolucionValida, resumenRango, rotuloIntervalo, seriesDesdeHistorico, urlHistorico, ventana, type ClaveRango, type ClaveResolucion, type Series } from './lib/grafico';
   import type { Condicion, DispositivoFicha, EventoVivo, Historico, TramaRechazada } from './lib/modelo';
@@ -23,8 +27,9 @@
     canal: canalInicial = null,
     rango: rangoInicial = null,
     res: resInicial = null,
+    sesion = null,
     alCambiarVista = () => {},
-  }: { id: string; canal?: string | null; rango?: ClaveRango | null; res?: ClaveResolucion | null; alCambiarVista?: (fragmento: string) => void } = $props();
+  }: { id: string; canal?: string | null; rango?: ClaveRango | null; res?: ClaveResolucion | null; sesion?: Sesion | null; alCambiarVista?: (fragmento: string) => void } = $props();
 
   let d = $state<DispositivoFicha | null>(null);
   let condiciones = $state<Condicion[]>([]);
@@ -50,6 +55,11 @@
   // conserva la anterior y dice «cargando…»; con error, la conserva y la URL sigue diciendo lo que se ve.
   let mostrada = $state<{ canal: string; rango: ClaveRango; res: ClaveResolucion | null; desde: Date; hasta: Date } | null>(null);
   let cargando = $state(false);
+  let descargando = $state(false);
+  let avisoDescarga = $state<DatosAviso | null>(null);
+  // Exportar exige el rol administrador en el sitio del dispositivo (docs/20 §6): se sabe por la matriz de la sesión; si el panel no lo
+  // sabe (montado sin sesión, en las pruebas), deja la decisión al servidor y muestra su 403.
+  const motivoExportar = $derived(d === null || puedeEn(sesion, 'exportar', d.sitio_codigo) ? null : 'exportar exige el rol administrador en este sitio');
 
   const abiertas = $derived(condiciones.filter((c) => c.cerrada_en === null));
   const ordenadas = $derived([...abiertas, ...condiciones.filter((c) => c.cerrada_en !== null)]);
@@ -86,10 +96,10 @@
 
   // Las condiciones ABIERTAS se piden completas (hasta 500), aparte de las 50 más recientes: una sin_comunicacion vieja no
   // puede quedar fuera por 50 cierres y aperturas de umbral posteriores (12/10). Se unen sin repetir.
-  async function cargarCondiciones(): Promise<Condicion[]> {
+  async function cargarCondiciones(senal?: AbortSignal): Promise<Condicion[]> {
     const [abiertasTodas, recientes] = await Promise.all([
-      obtener<Condicion[]>(`/condiciones?dispositivo=${encodeURIComponent(id)}&abiertas=true&limite=500`),
-      obtener<Condicion[]>(`/condiciones?dispositivo=${encodeURIComponent(id)}&limite=50`),
+      obtener<Condicion[]>(`/condiciones?dispositivo=${encodeURIComponent(id)}&abiertas=true&limite=500`, senal),
+      obtener<Condicion[]>(`/condiciones?dispositivo=${encodeURIComponent(id)}&limite=50`, senal),
     ]);
     const vistas = new Set(abiertasTodas.map((c) => c.id));
     return [...abiertasTodas, ...recientes.filter((c) => !vistas.has(c.id))];
@@ -102,12 +112,15 @@
     series = s;
   });
 
+  // Gana la última (docs/19 §6): la recarga al reconectar cancela la anterior; al salir de la ficha se cancela la que esté en vuelo.
+  const carga = ultimaGana();
   async function cargar(): Promise<void> {
+    const senal = carga.senal();
     try {
       const [ficha, conds, rech] = await Promise.all([
-        obtener<DispositivoFicha>(`/dispositivos/${encodeURIComponent(id)}`),
-        cargarCondiciones(),
-        obtener<TramaRechazada[]>(`/cuarentena?dispositivo=${encodeURIComponent(id)}&limite=20`),
+        obtener<DispositivoFicha>(`/dispositivos/${encodeURIComponent(id)}`, senal),
+        cargarCondiciones(senal),
+        obtener<TramaRechazada[]>(`/cuarentena?dispositivo=${encodeURIComponent(id)}&limite=20`, senal),
       ]);
       d = ficha;
       condiciones = conds;
@@ -117,6 +130,7 @@
       error = null;
       listo = true;
     } catch (e) {
+      if (esCancelacion(e)) return;
       error = mensajeError(e);
     }
   }
@@ -209,7 +223,23 @@
     });
   });
 
-  // Enlace a la exportación por API alrededor de la última medición (P8; la pantalla es de la Etapa 4): la semana que la precede.
+  // Descarga por fetch con la sesión y un Blob (lib/api.ts, `descargar`; docs/19 §6): nunca un enlace directo a la API, que con la
+  // sesión vencida abriría el JSON del 401 en una pestaña. Un 401 lleva al inicio de sesión (manejo central); otro error, al aviso.
+  async function exportar(ruta: string): Promise<void> {
+    if (descargando) return;
+    descargando = true;
+    avisoDescarga = null;
+    try {
+      const r = await descargar(ruta, `${d?.id_fisico ?? 'dispositivo'}.csv`);
+      avisoDescarga = { tipo: 'exito', texto: `Descargado ${r.nombre} (${r.bytes.toLocaleString('es-CL')} bytes).` };
+    } catch (e) {
+      avisoDescarga = avisoDeError(e);
+    } finally {
+      descargando = false;
+    }
+  }
+
+  // La exportación por API alrededor de la última medición (P8; la pantalla es de la Etapa 4): la semana que la precede.
   function urlExportar(tiempo: string): string {
     const hasta = new Date(Date.parse(tiempo) + 1000);
     const q = new URLSearchParams({ formato: 'csv', desde: new Date(hasta.getTime() - 7 * 86_400_000).toISOString(), hasta: hasta.toISOString() });
@@ -232,6 +262,7 @@
     const c = abrirCanal(`/eventos?dispositivo=${encodeURIComponent(id)}`, alEvento, alEstadoCanal);
     return () => {
       clearInterval(reloj);
+      carga.cancelar();
       abortarHistorico?.abort();
       repedirCondiciones.cancelar();
       lecturas.cancelar();
@@ -255,7 +286,7 @@
           · última lectura {canalActual.ultima_medicion === null ? 'ninguna aún' : haceSegundos(canalActual.ultima_medicion.tiempo, ahora)}
         </span>
       {/if}
-      <button type="button" onclick={() => (pausado = !pausado)} aria-pressed={pausado}>{pausado ? 'Reanudar' : 'Pausar'}</button>
+      <Boton etiqueta={pausado ? 'Reanudar' : 'Pausar'} presionado={pausado} ayuda="Congela las lecturas en vivo de esta ficha; el gráfico y las tarjetas dejan de moverse" onclick={() => (pausado = !pausado)} />
     </p>
     <p class="vivo" data-intervalo>
       {#if d.intervalo_observado_s === null}
@@ -321,7 +352,7 @@
       <a href={fragmentoComparar([id], canalActual.magnitud, rangoElegido, resElegida)} onclick={irAComparar} data-ir-comparar>Comparar con otros dispositivos</a>
     </div>
     {#if errorHistorico !== null}
-      <p class="error" role="alert">{errorHistorico} <button type="button" onclick={() => void cargarHistorico()} data-reintentar>Reintentar</button></p>
+      <p class="error" role="alert">{errorHistorico} <Boton etiqueta="Reintentar" onclick={() => void cargarHistorico()} data-reintentar /></p>
     {/if}
     {#if canalMostrado !== null && mostrada !== null && historico !== null && historico.puntos === 0 && series[0].length === 0}
       {#if canalMostrado.ultima_medicion === null}
@@ -332,9 +363,11 @@
           Sin mediciones en este rango; la última es de {haceCuanto(canalMostrado.ultima_medicion.tiempo, ahora)}
           (<span title={horaLocal(canalMostrado.ultima_medicion.tiempo, d.zona_horaria)}>{fechaHora(canalMostrado.ultima_medicion.tiempo, d.zona_horaria)}</span>).
           {#if rangoConLaUltima === null}
-            El panel no dibuja más de 30 días: para verla, <a href={urlExportar(canalMostrado.ultima_medicion.tiempo)}>exporta sus mediciones</a>.
+            El panel no dibuja más de 30 días: para verla, exporta sus mediciones.
+            <Boton etiqueta="Exportar la semana de la última medición" cargando={descargando} etiquetaCargando="Descargando…" motivoDesactivado={motivoExportar}
+              onclick={() => canalMostrado?.ultima_medicion && void exportar(urlExportar(canalMostrado.ultima_medicion.tiempo))} data-exportar-ultima />
           {:else if rangoConLaUltima !== mostrada.rango}
-            <button type="button" onclick={() => rangoConLaUltima !== null && elegirRango(rangoConLaUltima)} data-ver-ultima>Ver la última medición</button>
+            <Boton etiqueta="Ver la última medición" onclick={() => rangoConLaUltima !== null && elegirRango(rangoConLaUltima)} data-ver-ultima />
             <span class="vivo">({datosRango(rangoConLaUltima).rotulo})</span>
           {/if}
         </p>
@@ -350,8 +383,11 @@
         {#if resumen !== null}
           <span data-resumen-rango>en este rango: mín {formatearValor(resumen.min, canalMostrado.unidad)} · máx {formatearValor(resumen.max, canalMostrado.unidad)} · promedio de los {resumen.n} promedios dibujados {formatearValor(resumen.promedio, canalMostrado.unidad)}</span>
         {/if}
-        <a href={urlExportarVentana(mostrada.desde, mostrada.hasta)} data-csv-rango>Descargar CSV de este rango</a>
+        <Boton etiqueta="Descargar CSV de este rango" etiquetaCargando="Descargando…" cargando={descargando} motivoDesactivado={motivoExportar}
+          ayuda="Las mediciones crudas de la ventana que muestra el gráfico, en CSV (coma y punto decimal)"
+          onclick={() => mostrada !== null && void exportar(urlExportarVentana(mostrada.desde, mostrada.hasta))} data-csv-rango />
       </p>
+      {#if avisoDescarga !== null}<Aviso tipo={avisoDescarga.tipo} texto={avisoDescarga.texto} alCerrar={() => (avisoDescarga = null)} />{/if}
     {/if}
   {/if}
 

@@ -24,12 +24,17 @@
 
 ```bash
 bash plataforma/pruebas/pila.sh encender      # construye, levanta, espera «healthy» y muestra el estado
-bash plataforma/pruebas/semilla-demo.sh       # datos del guion (idempotente): SEMILLA LISTA
+bash plataforma/pruebas/semilla-demo.sh       # datos del guion (idempotente): SEMILLA LISTA y, al final, las dos claves temporales
 bash plataforma/pruebas/verificar-todo.sh     # TODO EN CONCORDANCIA
 ```
 
-2b. **Abrir el panel** en una pestaña y dejarla: `http://127.0.0.1:3000/panel/` (inventario con semáforo; lo sirve el backend ya
-   construido en la imagen; si el backend corre fuera de Docker, antes `pnpm --filter panel build`). Entrar a la ficha de
+2b. **Abrir el panel** en una pestaña y dejarla: `http://127.0.0.1:3000/panel/`. **Entrar justo antes de empezar** (la sesión vence a los
+   30 min sin tocar el ratón o el teclado; `docs/20 §3`). Lo sirve el backend ya construido en la imagen (si el backend corre fuera
+   de Docker, antes `pnpm --filter panel build`). Desde el 08/11/2026 pide entrar (P10, `docs/19 §4`): con
+   `admin-demo@ejemplo.invalid` y la clave temporal que la semilla imprimió una sola vez al final (vence a las `CLAVE_TEMPORAL_HORAS`, 2 h por defecto: correr la semilla poco antes de la demo; si se perdió o venció, se
+   vuelve a correr la semilla, que asigna otra). Las personas de demostración solo se crean con el backend en bucle local (`127.0.0.1` o
+   `localhost`, como en esta demo); contra un servidor la semilla las omite con aviso, salvo `SEMILLA_PERSONAS=1` explícito, porque sus
+   correos son fijos y adivinables. El panel exige elegir una clave propia y muestra el inventario con semáforo. Entrar a la ficha de
    `dev-0001` (su nombre en la tabla) y volver al inventario: durante el paso 4 se verá cambiar el estado sin recargar y, en la
    ficha, el gráfico con la lectura en vivo.
 
@@ -115,6 +120,8 @@ apague la alerta una y otra vez.
 | `[{"n":"temperatura","v":27}]` | `valor de vuelta en rango · condición cerrada` |
 
 (Mismo comando: `bash plataforma/pruebas/publicar.sh temperatura '[{"n":"temperatura","v":35}]'`, luego con `29`, luego con `27`.)
+Si el panel muestra «Entrar» al volver a él, la sesión venció por inactividad (30 min, paso 2b): se entra de nuevo con la clave propia y
+el panel vuelve a la misma pantalla.
 
 **Decir:** el pipeline solo corre cuando llega algo; el silencio lo detecta un supervisor periódico.
 Callar unos 15 s → `sin comunicación hace N s · condición abierta`; publicar de nuevo → `comunicación
@@ -142,9 +149,9 @@ Desde el 08/11/2026 toda ruta exige sesión o la clave de administrador por cabe
 curl -s -OJ -H "X-Clave-Admin: $CLAVE" "http://127.0.0.1:3000/dispositivos/$(curl -s -H "X-Clave-Admin: $CLAVE" http://127.0.0.1:3000/dispositivos | python3 -c 'import sys,json; print(json.load(sys.stdin)[0]["id"])')/exportar?formato=csv" && head -3 dev-*.csv
 ```
 
-En `/docs` (la interfaz manda las peticiones desde el navegador, así que necesita una sesión: hasta que exista la pantalla de inicio
-de sesión P10, se crea el primer administrador con `POST /usuarios` y `X-Clave-Admin`, y se abre la sesión desde la consola del navegador
-con el `fetch` de `docs/20 §10`; con la cookie puesta, **Try it out** funciona):
+En `/docs` (la interfaz manda las peticiones desde el navegador, así que necesita una sesión: se entra antes en el panel, pantalla P10,
+con la persona de demostración del paso 2b; la cookie vale para el mismo origen y **Try it out** funciona; las rutas que escriben exigen
+además la cabecera `X-Pedido: panel`):
 
 1. `GET /dispositivos` → **Try it out** → **Execute**. Mostrar `estado`, `en_linea`, `condiciones_abiertas`
    y que todo instante termina en `Z`. Copiar el `id` que aparece dentro de `canales` (el UUID del canal
@@ -156,7 +163,7 @@ con el `fetch` de `docs/20 §10`; con la cookie puesta, **Try it out** funciona)
 
 ## 6. Cómo se sostiene esto (1 min)
 
-- `cd plataforma/backend && pnpm verificar`: tipos, lint y 436 pruebas unitarias en unos segundos
+- `cd plataforma/backend && pnpm verificar`: tipos, lint y 445 pruebas unitarias en unos segundos
   (la cifra exacta la da la salida de `jest`; no la memorices). Los avisos de cuarentena que aparecen
   mientras corre son de las pruebas, a propósito.
 - `bash plataforma/pruebas/verificar-todo.sh`: esquema, migraciones, diagramas del informe, API y

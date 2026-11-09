@@ -2,6 +2,7 @@ import { BadRequestException, HttpException, UnauthorizedException } from '@nest
 import type { Pool } from 'pg';
 import * as credenciales from '../alta/credenciales';
 import { INACTIVIDAD_MS, VIDA_ABSOLUTA_MS, hashIdentificador } from './cookie';
+import { matrizPorRol, usuarioSistema } from './permisos';
 import { MENSAJE_CREDENCIALES, SesionService, credencialesDelCuerpo } from './sesion.service';
 
 // La sesión de punta a punta contra una base falsa en memoria y un reloj simulado (docs/20 §3, §4 y §8). El hash real (N = 2^17) se
@@ -107,7 +108,7 @@ describe('SesionService (docs/20 §3–§4) con reloj simulado', () => {
     expect(accesos.map((a) => a.resultado)).toEqual([...Array(5).fill('clave_incorrecta'), 'bloqueado']);
   });
 
-  it('la clave temporal vencida (24 h) no abre sesión; vigente, sí, marcada como temporal', async () => {
+  it('la clave temporal vencida no abre sesión; vigente, sí, marcada como temporal', async () => {
     const vence = new Date('2026-11-09T12:00:00Z');
     const { s, avanzar } = armar([{ ...ANA, clave_temporal: true, clave_temporal_vence_en: vence }]);
     const r = await s.iniciar(credencial(ANA.email, 'caballo correcto bateria'), '192.0.2.1', undefined);
@@ -162,6 +163,24 @@ describe('SesionService (docs/20 §3–§4) con reloj simulado', () => {
     expect(await s.cargar(nueva.identificador)).not.toBeNull();
     expect(usuarios[0].hash_password).toBe('falso$otra frase bastante larga');
     expect(eventos).toHaveLength(1);
+  });
+
+  it('GET /sesion trae la matriz rol → acciones de la tabla que decide (la guía de perfiles del panel), con sesión y con la clave por cabecera', async () => {
+    const { s } = armar();
+    const abierta = await s.iniciar(credencial(ANA.email, 'caballo correcto bateria'), '192.0.2.1', undefined);
+    const u = (await s.cargar(abierta.identificador))!;
+    expect((await s.describir(u)).permisos).toEqual(matrizPorRol());
+    expect((await s.describir(usuarioSistema())).permisos).toEqual(matrizPorRol());
+  });
+
+  it('el 429 de POST /sesion/clave trae los segundos de espera en reintentar_en_s, como el de POST /sesion', async () => {
+    const { s } = armar();
+    const abierta = await s.iniciar(credencial(ANA.email, 'caballo correcto bateria'), '192.0.2.1', undefined);
+    const u = (await s.cargar(abierta.identificador))!;
+    for (let i = 0; i < 5; i++) s.bloqueos.registrarFallo(ANA.email, '192.0.2.1');
+    const e = await s.cambiarClave(u, { actual: 'caballo correcto bateria', nueva: 'otra frase bastante larga' }, '192.0.2.1', undefined).catch((x: HttpException) => x);
+    expect((e as HttpException).getStatus()).toBe(429);
+    expect((e as HttpException).getResponse()).toMatchObject({ reintentar_en_s: 60 });
   });
 
   it('ventana comprobar-actuar: si el bloqueo se completó mientras se verificaba, 429 aunque la clave sea correcta, y «bloqueado» en acceso', async () => {

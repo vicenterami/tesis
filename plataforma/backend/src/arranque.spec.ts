@@ -1,5 +1,5 @@
 import {
-  claveApp, AvisosAcotados, claveAdmin, claveOpcional, HOSTS_LOCALES, hostsPermitidos, interfazDeEscucha, nombreDeHost, rechazoDeHost, registrosEnJson, rutaSinCache, servirDocumentacion } from './arranque';
+  claveApp, AvisosAcotados, claveAdmin, horasClaveTemporal, claveOpcional, HOSTS_LOCALES, hostsPermitidos, interfazDeEscucha, nombreDeHost, rechazoDeHost, registrosEnJson, rutaSinCache, servirDocumentacion } from './arranque';
 
 describe('registrosEnJson (docs/10 §6): JSON en contenedor, texto en desarrollo', () => {
   it('sin variable → texto', () => expect(registrosEnJson(undefined)).toBe(false));
@@ -134,5 +134,17 @@ describe('rutaSinCache (revisión del 08/11/2026): Cache-Control: no-store en to
   });
   it('archivos del panel y la documentación → no (el navegador puede guardarlos)', () => {
     for (const r of ['/panel', '/panel/', '/panel/assets/app.js', '/PANEL/index.html', '/docs', '/docs/swagger-ui.css']) expect(rutaSinCache(r)).toBe(false);
+  });
+});
+
+describe('horasClaveTemporal (docs/20 §4): la vigencia de la clave temporal, 1–72 h, 2 por defecto', () => {
+  it('sin variable → 2 h', () => expect(horasClaveTemporal(undefined)).toBe(2));
+  it('un entero entre 1 y 72 se respeta (también con espacios)', () => {
+    expect(horasClaveTemporal('1')).toBe(1);
+    expect(horasClaveTemporal(' 24 ')).toBe(24);
+    expect(horasClaveTemporal('72')).toBe(72);
+  });
+  it('0, 73, texto, vacío, decimal o con unidad → el arranque se detiene con un mensaje que dice qué se espera', () => {
+    for (const malo of ['0', '73', 'dos', '', ' ', '1.5', '-2', '2h', '1e1']) expect(() => horasClaveTemporal(malo)).toThrow(/^CLAVE_TEMPORAL_HORAS=".*" no es válido: se espera un entero de horas entre 1 y 72 \(por defecto 2\)$/);
   });
 });

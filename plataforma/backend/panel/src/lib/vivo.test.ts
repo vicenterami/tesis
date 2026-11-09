@@ -131,6 +131,27 @@ describe('abrirCanal (docs/19 F4)', () => {
     c.cerrar();
   });
 
+  // Con sesión (docs/20 §10, R2), el servidor cierra el canal cuando la sesión vence; EventSource no da el código. Al PRIMER rechazo
+  // tras estar en vivo se pregunta por la sesión (un 401 lleva al inicio de sesión); los reintentos siguientes no preguntan, así un
+  // canal rechazado en bucle no mantiene viva la sesión de una pantalla sin nadie delante.
+  it('al primer rechazo del servidor pregunta por la sesión, no en cada reintento; tras volver a estar en vivo, de nuevo al primero', () => {
+    const preguntas: number[] = [];
+    const c = abrirCanal('/eventos', () => undefined, () => undefined, crear, () => preguntas.push(Date.now()));
+    creadas[0]!.abrir();
+    creadas[0]!.fallarCerrado();
+    expect(preguntas).toHaveLength(1);
+    vi.advanceTimersByTime(1000);
+    creadas[1]!.fallarCerrado();
+    vi.advanceTimersByTime(2000);
+    creadas[2]!.fallarCerrado();
+    expect(preguntas).toHaveLength(1);
+    vi.advanceTimersByTime(4000);
+    creadas[3]!.abrir();
+    creadas[3]!.fallarCerrado();
+    expect(preguntas).toHaveLength(2);
+    c.cerrar();
+  });
+
   it('cerrar() no deja reintentos ni vigilantes pendientes', () => {
     const c = abrirCanal('/eventos', () => undefined, () => undefined, crear);
     creadas[0]!.fallarCerrado();

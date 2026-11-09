@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ErrorApi, accionPara, obtener } from './api';
+import { ErrorApi, accionPara, alPerderSesion, comprobarSesion, descargar, nombreDeArchivo, obtener, pedir, segundosDeEspera, ultimaGana, type Guardador } from './api';
+
+const json = (cuerpo: unknown, status = 200, cabeceras: Record<string, string> = {}): Response => new Response(JSON.stringify(cuerpo), { status, headers: cabeceras });
+const llamadas = (): [string, RequestInit][] => vi.mocked(fetch).mock.calls as unknown as [string, RequestInit][];
+function oir(): { motivos: string[]; dejar: () => void } {
+  const motivos: string[] = [];
+  return { motivos, dejar: alPerderSesion((m) => motivos.push(m)) };
+}
 
 describe('obtener: un solo cliente HTTP, errores con código y acción', () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -12,5 +19,154 @@ describe('obtener: un solo cliente HTTP, errores con código y acción', () => {
     await expect(obtener('/x')).rejects.toMatchObject({ codigo: 409, accion: expect.stringContaining('recarga') } satisfies Partial<ErrorApi>);
     expect(accionPara(421)).toContain('nombre del servidor');
     expect(accionPara(418)).toContain('inténtalo');
+  });
+});
+
+// docs/20 §5 (CSRF) y docs/19 §6 (un solo cliente): la cabecera X-Pedido va en lo que escribe y solo ahí; la cookie, siempre.
+describe('pedir: cookie del mismo origen y X-Pedido: panel en lo que escribe', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it('GET sin X-Pedido; POST, PATCH y DELETE con X-Pedido: panel; todos con credentials same-origin y el cuerpo en JSON', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => json({ ok: true })));
+    await obtener('/usuarios');
+    await pedir('POST', '/usuarios', { cuerpo: { nombre: 'Ana' } });
+    await pedir('PATCH', '/usuarios/u1', { cuerpo: { activo: false } });
+    await pedir('DELETE', '/sesion');
+    const [get, post, patch, del] = llamadas();
+    expect((get![1].headers as Record<string, string>)['X-Pedido']).toBeUndefined();
+    for (const [, init] of [post!, patch!, del!]) expect((init.headers as Record<string, string>)['X-Pedido']).toBe('panel');
+    for (const [, init] of llamadas()) expect(init.credentials).toBe('same-origin');
+    expect(post![1].body).toBe('{"nombre":"Ana"}');
+    expect((post![1].headers as Record<string, string>)['content-type']).toBe('application/json');
+    expect(del![1].body).toBeUndefined();
+  });
+  it('una respuesta sin cuerpo (200 vacío) no rompe', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('', { status: 200 })));
+    await expect(pedir('DELETE', '/sesion')).resolves.toBeUndefined();
+  });
+});
+
+describe('manejo central: 401, 403 de clave temporal, 409, 429 y sin red', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it('401 → avisa «sin_sesion» a quien escucha (App muestra Entrar) y rechaza; con central: false, no avisa', async () => {
+    const o = oir();
+    vi.stubGlobal('fetch', vi.fn(async () => json({ statusCode: 401, message: 'sesión requerida' }, 401)));
+    await expect(obtener('/dispositivos')).rejects.toMatchObject({ codigo: 401 });
+    expect(o.motivos).toEqual(['sin_sesion']);
+    await expect(pedir('POST', '/sesion', { cuerpo: {}, central: false })).rejects.toMatchObject({ codigo: 401 });
+    expect(o.motivos).toEqual(['sin_sesion']); // el inicio de sesión trata su propio 401
+    o.dejar();
+  });
+  it('403 por clave temporal → avisa «clave_temporal»; un 403 de rol no avisa nada', async () => {
+    const o = oir();
+    vi.stubGlobal('fetch', vi.fn(async () => json({ statusCode: 403, message: 'debes cambiar la clave temporal antes de seguir (POST /sesion/clave)' }, 403)));
+    await expect(obtener('/dispositivos')).rejects.toMatchObject({ codigo: 403 });
+    vi.stubGlobal('fetch', vi.fn(async () => json({ statusCode: 403, message: 'tu rol en este sitio no permite la acción «exportar»' }, 403)));
+    await expect(obtener('/dispositivos/x/exportar')).rejects.toMatchObject({ codigo: 403, motivos: ['tu rol en este sitio no permite la acción «exportar»'] });
+    expect(o.motivos).toEqual(['clave_temporal']);
+    o.dejar();
+  });
+  it('400 → los motivos del cuerpo (lista de Nest) quedan en el error, para mostrarlos tal cual', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => json({ statusCode: 400, message: ['la clave debe tener al menos 12 caracteres', 'la clave no puede ser el email'] }, 400)));
+    await expect(pedir('POST', '/sesion/clave', { cuerpo: {} })).rejects.toMatchObject({ codigo: 400, motivos: ['la clave debe tener al menos 12 caracteres', 'la clave no puede ser el email'] });
+  });
+  it('429 → los segundos de espera: de reintentar_en_s o, si falta, del «reintenta en N s» del mensaje; la acción los dice', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => json({ statusCode: 429, message: 'bloqueado: demasiados intentos fallidos; reintenta en 60 s', reintentar_en_s: 60 }, 429)));
+    await expect(pedir('POST', '/sesion', { central: false })).rejects.toMatchObject({ codigo: 429, reintentarEnS: 60, accion: 'demasiados intentos; espera 60 s y reintenta' });
+    expect(segundosDeEspera({ message: 'bloqueado: demasiados intentos fallidos; reintenta en 300 s' })).toBe(300);
+    expect(segundosDeEspera({ message: 'ya tienes 5 flujos abiertos; cierra una pestaña' })).toBeNull();
+    expect(segundosDeEspera({ reintentar_en_s: -3 })).toBeNull();
+  });
+  it('sin red (fetch lanza) → ErrorApi código 0 «sin conexión»; una cancelación se propaga como AbortError, no como error que mostrar', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch'); }));
+    await expect(obtener('/dispositivos')).rejects.toMatchObject({ codigo: 0 });
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new DOMException('cancelada', 'AbortError'); }));
+    await expect(obtener('/dispositivos')).rejects.toMatchObject({ name: 'AbortError' });
+  });
+});
+
+describe('ultimaGana: la respuesta vieja no pisa a la nueva', () => {
+  it('cada señal nueva cancela la anterior; cancelar() corta la vigente', () => {
+    const g = ultimaGana();
+    const a = g.senal();
+    const b = g.senal();
+    expect(a.aborted).toBe(true);
+    expect(b.aborted).toBe(false);
+    g.cancelar();
+    expect(b.aborted).toBe(true);
+  });
+});
+
+// Descargas por Blob en un solo ayudante (docs/19 §6): con la sesión, sin token en la URL ni <a href> a la API.
+describe('descargar', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const guardador = (): Guardador & { pulsados: [string, string][]; liberadas: string[] } => {
+    const g = { pulsados: [] as [string, string][], liberadas: [] as string[], crearUrl: () => 'blob:x', liberarUrl: (u: string) => g.liberadas.push(u), pulsar: (u: string, n: string) => g.pulsados.push([u, n]) };
+    return g;
+  };
+  it('200 → Blob, nombre de Content-Disposition, un solo «clic» en memoria y la URL liberada; GET con la cookie y sin X-Pedido', async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('a,b\n1,2\n', { headers: { 'content-disposition': 'attachment; filename="dev-0001_temperatura.csv"' } })));
+    const g = guardador();
+    await expect(descargar('/dispositivos/d1/exportar?formato=csv', 'dispositivo.csv', undefined, g)).resolves.toEqual({ nombre: 'dev-0001_temperatura.csv', bytes: 8 });
+    expect(g.pulsados).toEqual([['blob:x', 'dev-0001_temperatura.csv']]);
+    vi.runAllTimers();
+    expect(g.liberadas).toEqual(['blob:x']);
+    const [ruta, init] = llamadas()[0]!;
+    expect(ruta).toBe('/dispositivos/d1/exportar?formato=csv');
+    expect(init.credentials).toBe('same-origin');
+    expect((init.headers as Record<string, string>)['X-Pedido']).toBeUndefined();
+    vi.useRealTimers();
+  });
+  it('401 → no descarga nada y avisa «sin_sesion» (vuelve al inicio de sesión en vez de abrir el JSON del 401)', async () => {
+    const o = oir();
+    vi.stubGlobal('fetch', vi.fn(async () => json({ statusCode: 401, message: 'sesión requerida' }, 401)));
+    const g = guardador();
+    await expect(descargar('/dispositivos/d1/exportar', 'x.csv', undefined, g)).rejects.toMatchObject({ codigo: 401 });
+    expect(g.pulsados).toEqual([]);
+    expect(o.motivos).toEqual(['sin_sesion']);
+    o.dejar();
+  });
+  it('nombreDeArchivo: el de la cabecera si es un nombre simple; si trae rutas o nada, el de por defecto', () => {
+    expect(nombreDeArchivo('attachment; filename="dev-0001.csv"', 'x.csv')).toBe('dev-0001.csv');
+    expect(nombreDeArchivo("attachment; filename*=UTF-8''medici%C3%B3n.json", 'x.json')).toBe('medición.json');
+    expect(nombreDeArchivo('attachment; filename="../../etc/passwd"', 'x.csv')).toBe('x.csv');
+    expect(nombreDeArchivo(null, 'x.csv')).toBe('x.csv');
+  });
+  it('nombreDeArchivo: un «%» mal formado (URIError al decodificar) da el nombre por defecto, sin lanzar', () => {
+    expect(nombreDeArchivo("attachment; filename*=UTF-8''medici%E0%A4n.json", 'x.json')).toBe('x.json');
+    expect(nombreDeArchivo('attachment; filename="100%.csv"', 'x.csv')).toBe('x.csv');
+  });
+});
+
+describe('comprobarSesion: una petición liviana cuando el canal en vivo cae, como mucho una cada 5 s', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it('GET /sesion por el cliente central, y no más de una cada 5 s', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => json({ sistema: false })));
+    comprobarSesion(1_000_000);
+    comprobarSesion(1_002_000);
+    comprobarSesion(1_006_000);
+    expect(llamadas().map(([r]) => r)).toEqual(['/sesion', '/sesion']);
+  });
+});
+
+// Una petición iniciada antes de entrar (o de salir) que vuelve después con 401 o 403 habla de la sesión anterior: no se avisa.
+describe('generación de la sesión: los avisos atrasados se descartan', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it('un 401 de una petición iniciada antes de POST /sesion no avisa; uno iniciado después, sí', async () => {
+    const o = oir();
+    let soltar: (r: Response) => void = () => undefined;
+    vi.stubGlobal('fetch', vi.fn((ruta: string, init: RequestInit = {}) => {
+      if (ruta === '/lenta') return new Promise<Response>((res) => (soltar = res));
+      if (init.method === 'POST' && ruta === '/sesion') return Promise.resolve(json({ usuario: {} }));
+      return Promise.resolve(json({ statusCode: 401, message: 'sesión requerida' }, 401));
+    }));
+    const lenta = obtener('/lenta');
+    await pedir('POST', '/sesion', { cuerpo: {}, central: false });
+    soltar(json({ statusCode: 403, message: 'debes cambiar la clave temporal antes de seguir (POST /sesion/clave)' }, 403));
+    await expect(lenta).rejects.toMatchObject({ codigo: 403 }); // quien la pidió igual recibe el error
+    expect(o.motivos).toEqual([]);
+    await expect(obtener('/otra')).rejects.toMatchObject({ codigo: 401 });
+    expect(o.motivos).toEqual(['sin_sesion']);
+    o.dejar();
   });
 });

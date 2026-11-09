@@ -68,7 +68,7 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": "`usuario`, `sitios` [{sitio_id, codigo, nombre, rol}], `clave_temporal`, `expira_en`, `inactividad_vence_en`; con X-Clave-Admin, `sistema: true`"
+            "description": "`usuario`, `sitios` [{sitio_id, codigo, nombre, rol}], `clave_temporal`, `expira_en`, `inactividad_vence_en` y `permisos` (rol → acciones que puede: la tabla de permisos que decide, para la guía de perfiles del panel); con X-Clave-Admin, `sistema: true`"
           },
           "401": {
             "description": "sesión requerida"
@@ -221,7 +221,7 @@
         ]
       },
       "post": {
-        "description": "Crea el usuario con una clave TEMPORAL (24 caracteres aleatorios, vence a las 24 h) que se devuelve UNA sola vez en `clave`; al entrar, la sesión solo sirve para cambiarla. Sin registro abierto: exige sesión de administrador en cada sitio que se asigna. Con la cabecera X-Clave-Admin solo mientras no exista ningún administrador (el primero; después, 403).",
+        "description": "Crea el usuario con una clave TEMPORAL (24 caracteres aleatorios, vence a las CLAVE_TEMPORAL_HORAS: 2 h por defecto, 1–72; su hora va en `clave_temporal_vence_en`) que se devuelve UNA sola vez en `clave`; al entrar, la sesión solo sirve para cambiarla. Sin registro abierto: exige sesión de administrador en cada sitio que se asigna. Con la cabecera X-Clave-Admin solo mientras no exista ningún administrador (el primero; después, 403).",
         "operationId": "UsuariosController_crear",
         "parameters": [
           {

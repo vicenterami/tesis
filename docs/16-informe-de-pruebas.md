@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 436 pruebas unitarias del backend y 107 del panel, sin matriz formal); TT-32 (sensor físico) se cubrió después, en §43, §44 y §53;
+cubre todavía: TT-27 (contrato de trama: hoy 445 pruebas unitarias del backend y 165 del panel, sin matriz formal); TT-32 (sensor físico) se cubrió después, en §43, §44 y §53;
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -1801,7 +1801,112 @@ administrador de A desactiva a la persona de B (200) y la cuenta cambia, las dos
 plataforma queda con **0** administradores, y el flujo de la sesión cerrada recibe su latido y sigue hasta que curl lo corta a los 40 s.
 R7 (nginx) lo cubre el paso 2m (la plantilla renderizada y válida); el límite no se midió con ráfagas en esta tanda.
 
-**Lo que no prueba.** La pantalla de inicio de sesión (P10, aún no existe): el panel actual recibe 401 hasta tenerla. El bloqueo por
+**Lo que no prueba.** La pantalla de inicio de sesión (P10: hecha después ese mismo día, §59). El bloqueo por
 dirección (50 fallos) solo tiene prueba unitaria: por HTTP, cada corrida del paso 4b deja 12 fallos desde su dirección de origen (una distinta del bucle local por corrida, `ORIGEN` en el guion; antes, la misma, y y más de
 cuatro corridas en 15 minutos recibían 429: el bloqueo funcionando, corregido el 08/11 sin tocar el backend). El banco (`banco.sh`) lee ahora
 con la clave de administrador, pero no se corrió en esta tanda.
+
+**Memoria con dos inicios de sesión simultáneos** (medido después, el mismo día, con el paso 4b ampliado; detalle en §59). Tres rondas de
+dos `POST /sesion` a la vez contra el contenedor del backend: de 57–64 MiB en reposo a un pico de **315–321 MiB** (dos corridas) (`memory.current` del cgroup,
+muestreado cada 20 ms; `docker stats --no-stream` dio el mismo máximo en sus 3 muestras). El techo es 512 MiB: queda un margen de unos 190 MiB
+con los dos cálculos de `scrypt` que admite `turnos.ts`. `docs/20 §10` cita esta cifra en lugar de «bajo el techo de 512 MB».
+
+## 59. El panel con sesión: P10, usuarios, componentes y descargas (08/11/2026)
+
+**Qué cambió** (`docs/19 §4`, P10, y §6; `docs/20 §10`). El panel inicia sesión: pantalla «Entrar» (`Entrar.svelte`), cambio obligatorio de la
+clave temporal (`CambiarClave.svelte`), quién soy, «Salir» y «Cerrar en todos lados» en la cabecera, renovación con interacción, vuelta a la
+ruta guardada tras un 401 y la pantalla de usuarios (`Usuarios.svelte`) con la guía de perfiles derivada de la matriz de permisos
+(`lib/ayudas.ts`). Un solo cliente HTTP (`lib/api.ts`): cookie del mismo origen, `X-Pedido: panel` en lo que escribe, 401, 403 por clave
+temporal, 409, 429 y sin red tratados en un lugar, «gana la última» y descargas por `fetch` y Blob. Componentes `Boton.svelte`,
+`Tooltip.svelte` y `Aviso.svelte` (regla nueva de `docs/19 §6`). En el backend, `GET /sesion` trae la matriz rol → acciones
+(`matrizPorRol()`, de `PERMISOS`) y el 429 de `POST /sesion/clave` trae `reintentar_en_s`; `openapi.json` regenerado. La semilla de desarrollo
+crea un administrador y un usuario de consulta de demostración con claves temporales impresas una vez.
+
+**Cifras.** Pruebas del panel: de 107 a 165 del panel (nuevas: el cliente HTTP, la guía de perfiles contra la matriz y contra las acciones
+del servidor, las reglas de la clave contra los números del servidor, la sesión y su renovación, los componentes, los flujos de P10 por el
+DOM, la pantalla de usuarios, el canal en vivo al ser rechazado, la ruta `#/usuarios`, la exportación según el rol y las descargas que
+fallan; adaptadas las de la ficha, que ya no tiene enlaces a la API). Pruebas unitarias del backend: de 436 a 445. Paso 4b
+(`sesion-smoke.sh`): 123 de 123 comprobaciones en 64 s (124 desde la vigencia configurable de la temporal, abajo), con el administrador de prueba creado por SQL porque la base de desarrollo ya tiene
+uno (el de la semilla); la carrera del último administrador se omite en ese caso y lo dice. Nuevas en 4b: `POST /pasarelas`,
+`DELETE /pasarelas/{id}` y `POST /pasarelas/{id}/credencial` sin sesión (401), con consulta (403) y en otro sitio (404), sin que ninguna
+pasarela quede creada ni dada de baja; `PATCH /usuarios/{id}` de quien solo está en otro sitio (404, el mismo cuerpo que uno inexistente, y
+la persona sin cambios); `GET /condiciones`, `GET /cuarentena` y `GET /pasarelas` sin `?dispositivo=` filtrados por sitio; y la memoria.
+
+**Memoria del backend con dos `POST /sesion` simultáneos** (paso 4b, tres rondas; dos corridas): `docker stats --no-stream` antes 57 y 64 MiB; pico 315 y 321 MiB
+(`memory.current` del cgroup cada 20 ms, 220 muestras; `docker stats`, 3 muestras, el mismo máximo); techo 512 MiB. Es la cifra que cita
+`docs/20 §10`. **La pila entera en ese instante** (medido después, el mismo día: el paso 4b suma en cada muestra de `docker stats --no-stream`
+los cuatro contenedores, backend, base, broker y proxy): máximo **387, 386, 394, 398 y 402 MiB** en cinco corridas (2 o 3 muestras completas cada una; el backend,
+312 a 320 MiB por el cgroup); se cita el mayor, 402 MiB, y varía entre corridas porque docker stats muestrea cada 1–2 s. Es la cifra que citan `docs/01`, `docs/14`, la conclusión y las láminas junto a los 324 MiB de la corrida de carga.
+
+**Con navegador real: paso 4c** (`pruebas/panel-sesion-e2e.sh` y `backend/panel/e2e/sesion.mjs`, Playwright 1.64.1), contra la pila de
+desarrollo en `http://127.0.0.1:3000` con el panel servido por la imagen del backend. Datos propios y desechables (un sitio, un dispositivo
+HTTP con 6 mediciones de la última hora y personas `@ejemplo.invalid`), borrados al salir; las claves viajan por la entrada estándar.
+
+| Comprobación | Resultado |
+|---|---|
+| Corrida completa | **118 de 118** (desde la revisión de seguridad, abajo; antes 112 en 28 s): 59 en Chromium 156 y 59 en Firefox 157, cada uno a 390 px (teléfono) y a 1280 px (escritorio) |
+| Entrar | `autocomplete` username y current-password; una clave mala → «Correo o clave incorrectos. Revisa los dos y vuelve a intentarlo.» |
+| Clave temporal | el panel exige elegir una propia, con las reglas a la vista; la cookie `__Host-sesion` es HttpOnly, Secure, SameSite=Lax, Path=/; `document.cookie` vacío; con la temporal, la API responde 403 a lo demás |
+| Dentro | el inventario con el dispositivo, quién soy con su sitio y rol, el canal en vivo «conectado» recién después de entrar |
+| Exportar | «Descargar CSV de este rango» descarga el archivo con su nombre (cabecera y 6 filas) por `fetch` y Blob; la página no navega a la API |
+| Sesión vencida | sin la cookie, el siguiente clic responde 401: «Entrar» con «Tu sesión venció o se cerró…»; al entrar, vuelve a la misma ficha |
+| Usuarios (1280 px) | la guía de perfiles sale de la matriz; el alta muestra la temporal de 24 caracteres una vez y, al ocultarla, ya no está en la página; «Asignar clave temporal» muestra una nueva solo en el aviso (ni en la fila ni la del alta) y, al ocultarla, tampoco queda |
+| Consulta (1280 px) | la persona creada en la pantalla entra con su temporal, la cambia y ve «Descargar CSV» desactivado con «exportar exige el rol administrador en este sitio»; sin «Usuarios»; «Cerrar en todos lados» vuelve a «Entrar» |
+| Salir | vuelve a «Entrar», la cookie se borró y la API responde 401 |
+| RF-52 y errores | sin desplazamiento horizontal en ninguna pantalla a 390 ni a 1280 px; sin errores de JavaScript |
+| Sin navegadores o sin backend | el guion sale con 3 y el guardián lo cuenta como omitido (probado con `E2E_NAVEGADORES=webkit`, que no está instalado) |
+
+Capturas (Chromium, datos de prueba sin personas reales; la hora del sitio, el gráfico y los vencimientos van tapados, para no fechar la corrida): `docs/capturas/panel-sesion/` (entrar y cambio de clave a 390 px, inventario a 390 y
+1280 px, usuarios y la ficha vista por consulta a 1280 px).
+
+**Lo que encontró el navegador y no las pruebas por el DOM** (corregido antes de cerrar): (1) la primera corrida no pudo entrar con ninguna
+temporal: el ayudante que crea personas de prueba hasheaba la clave con el salto de línea que agrega `<<<` (`lib-personas.sh` ahora lee una
+línea y la pasa con `printf '%s'`); la semilla corrida antes de la corrección quedó con claves inservibles y se volvió a correr; (2) «Salir» dejaba el panel en la
+pantalla de la persona anterior (la consulta entraba a `#/usuarios`): ahora vuelve al inventario; (3) en la cabecera oscura, «Cambiar la
+clave» y «Cerrar en todos lados» eran invisibles y la hora de vencimiento salía en «p. m.»: contraste y formato de 24 h corregidos.
+
+**Plantado.** Por el DOM (vitest), cada regla quitada a mano hace fallar sus pruebas y, restaurada, pasan las 154: sin `X-Pedido` (7 fallan),
+sin el manejo central del 401 (4), sin el aviso del 403 por clave temporal (2), sin los segundos del 429 (2), sin `credentials` (3), la
+descarga con un enlace a la API (1), sin cancelar la petición anterior (1), un `Boton` sin etiqueta admitido (1), el tooltip solo con el ratón
+(1), el motivo de desactivado sin escribir (5), renovar sin esperar 5 min (3), el canal preguntando por la sesión en cada reintento (1), la
+ayuda escrita a mano (2), exportar sin mirar el rol (1), entrar sin pasar por el cambio de la temporal (1), no volver a la ruta guardada (1), el
+409 como error común (1), «Salir» sin volver al inventario (1) y el vencimiento en formato de 12 h (1). En jest, sin `permisos` en
+`GET /sesion` y sin `reintentar_en_s` en el 429 del cambio de clave fallan 2. El paso 4c falló de verdad dos veces antes de la corrección
+(arriba, (1) y (2)).
+
+**Lo que no prueba.** El CI no corre el paso 4c: necesita la pila con la base, el broker y el backend, y GitHub Actions corre solo
+`pnpm verificar` sin servicios (sí corre las pruebas del backend y del panel por `pnpm verificar` y `pnpm audit`, que no prueba nada en
+ejecución: solo avisos publicados de las dependencias). No se plantó en el backend la falta del filtro por sitio en las listas sin `?dispositivo=` (la
+orden se detuvo antes de correr); esas comprobaciones nuevas del paso 4b solo se vieron pasar.
+
+**Revisión de seguridad del panel con sesión** (el mismo día, después; cada corrección con su falla plantada antes de restaurarla):
+
+| Corrección | Prueba y lo que falló al plantar |
+|---|---|
+| La temporal de «Asignar clave temporal» ya no queda en la lista de usuarios (solo en el aviso hasta «ocultar»; `lib/usuarios.ts`, `aplicarRespuesta`) | vitest: con la fila guardada con `clave`, falla 1; e2e: la clave asignada aparece una sola vez en la página y desaparece al ocultarla |
+| Las claves del paso 4c ya no viajan como argumento de `python3` | traza de `bash -x` sobre una copia y 222 510 líneas de `ps -eo args` muestreadas durante la corrida: 0 con una clave (las 4 líneas de la traza con clave son `printf`, interno de bash) |
+| Las personas de demostración de la semilla solo con el backend en bucle local (`127.0.0.1`, `localhost`); con otra dirección se omiten con aviso, salvo `SEMILLA_PERSONAS=1` | con `API` remota no cambió el vencimiento guardado; con la comprobación plantada (siempre «local») las reasignó |
+| El 401 central olvida también la temporal recién escrita (`lib/sesion.ts`, `trasAvisoDeSesion`) | vitest: sin la línea, falla 1 |
+| Un 403 de clave temporal sin sesión o en «Entrar» se ignora, y los avisos de peticiones iniciadas antes del último inicio de sesión o de la salida se descartan (`lib/api.ts`, generación de la sesión) | vitest: sin la generación fallan 2 (un 401 atrasado sacaba de la sesión recién abierta); sin la generación ni la fase, 4 (un 403 atrasado abría «Elige tu clave» sin sesión) |
+| `nombreDeArchivo` con un `%` mal formado usa el nombre por defecto | vitest: sin el `try`, falla 1 (URIError) |
+| La clave temporal ya no es región viva: `role="status"` solo en el texto del aviso | vitest: con el atributo en el contenedor, falla 1 |
+| El muestreo de memoria del paso 4b corre bajo `timeout 90s` y `limpiar` lo mata por PID | cortado con TERM a mitad: 0 procesos `docker stats` a los 3 s; con KILL (sin trap): 2 a los 30 s y 0 a los 100 s; sin `timeout` (plantado), 2 a los 100 s, quitados a mano |
+| El usuario del sistema (clave por cabecera) no ve «Usuarios» | vitest: sin la condición, falla 1 |
+
+**Banco con navegador, adaptado a la sesión.** `banco.sh navegador` pasa la clave de administrador del banco a `e2e/p3.mjs` por la entrada
+estándar; el navegador la manda como `X-Clave-Admin` en toda petición (también el canal en vivo) y el CSV se baja con el botón (evento de
+descarga, nombre y contenido). Resultado: **35 de 35** en Firefox 157. Plantado: sin la cabecera en la página principal, la primera espera
+se corta (el panel muestra «Entrar»).
+
+**Vigencia configurable de la clave temporal** (decisión del 08/11/2026; `docs/20 §4`). `CLAVE_TEMPORAL_HORAS`, entero de 1 a 72, 2 por
+defecto (`arranque.ts`, `horasClaveTemporal`), en `.env.example` y en el compose (guardianes 2d y 2z, cada uno plantado quitando la
+línea). jest: 2 h por defecto (vale a 1 h 59, vencida a 2 h y 1 s), 24 h configuradas, 5 h en el alta y al asignar otra, y 0, 73 o texto
+detienen la construcción del servicio; plantados el valor por defecto en 24 (fallan 3), sin el tope de 72 (2), el servicio sin leer la
+variable (1) y la cuenta en minutos (3). Arranque real con 0, 73 y «dos»: el contenedor sale con 1 y el mensaje
+«CLAVE_TEMPORAL_HORAS="…" no es válido: se espera un entero de horas entre 1 y 72 (por defecto 2)». Paso 4b: la respuesta del alta vence
+a las horas que rigen (7 200 s con 2 h; 18 000 s con el backend levantado con 5 h); plantado esperando 24 h, falla. El panel muestra la hora
+que devuelve el servidor (`clave_temporal_vence_en`), no un plazo propio (vitest plantado con «Vence en 24 horas»: falla 1).
+
+**Cifras finales del bloque.** Pruebas del panel: 165; del backend: 445; paso 4b: 124 de 124; paso 4c: 118 de 118; banco con navegador:
+35 de 35.
+

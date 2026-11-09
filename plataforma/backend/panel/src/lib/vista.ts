@@ -18,6 +18,7 @@ export const SIN_FILTROS: FiltrosInventario = { estado: null, sitio: '', zona: '
 export type Vista =
   | { pantalla: 'ficha'; id: string; canal: string | null; rango: ClaveRango | null; res: ClaveResolucion | null }
   | { pantalla: 'comparar'; dispositivos: string[]; magnitud: string | null; rango: ClaveRango | null; res: ClaveResolucion | null }
+  | { pantalla: 'usuarios' } // P10, administración de usuarios (docs/19 §4): `#/usuarios`
   | { pantalla: 'inventario'; filtros: FiltrosInventario };
 
 // Comparar admite de 2 a 6 dispositivos (docs/19 §4, incremento 2, punto 5); la pantalla dice qué hacer con menos.
@@ -44,6 +45,7 @@ export function leerVista(fragmento: string): Vista {
       res: leerRes(q.get('res')),
     };
   }
+  if (ruta === '/usuarios') return { pantalla: 'usuarios' };
   if (ruta === '/comparar') {
     // Ids válidos, sin repetir, en el orden de la URL (el primero fija la unidad del eje y el primer color); más de 6, se recorta.
     const ids = [...new Set((q.get('dispositivos') ?? '').split(',').map((x) => x.trim().toLowerCase()).filter((x) => UUID.test(x)))].slice(0, MAX_COMPARAR);

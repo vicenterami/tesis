@@ -59,7 +59,7 @@ export class SesionController {
     summary: 'Quién soy',
     description: 'Usuario, sus sitios con el rol en cada uno y los vencimientos de la sesión (absoluto e inactividad). Renueva la actividad: el panel la llama como mucho cada 5 min mientras la persona interactúa.',
   })
-  @ApiOkResponse({ description: '`usuario`, `sitios` [{sitio_id, codigo, nombre, rol}], `clave_temporal`, `expira_en`, `inactividad_vence_en`; con X-Clave-Admin, `sistema: true`' })
+  @ApiOkResponse({ description: '`usuario`, `sitios` [{sitio_id, codigo, nombre, rol}], `clave_temporal`, `expira_en`, `inactividad_vence_en` y `permisos` (rol → acciones que puede: la tabla de permisos que decide, para la guía de perfiles del panel); con X-Clave-Admin, `sistema: true`' })
   @ApiUnauthorizedResponse({ description: 'sesión requerida' })
   quien(@Usuario() u: UsuarioSesion): Promise<Record<string, unknown>> {
     return this.sesiones.describir(u);

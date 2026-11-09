@@ -32,7 +32,7 @@ export class UsuariosController {
   @ApiOperation({
     summary: 'Dar de alta un usuario',
     description:
-      'Crea el usuario con una clave TEMPORAL (24 caracteres aleatorios, vence a las 24 h) que se devuelve UNA sola vez en `clave`; al entrar, ' +
+      'Crea el usuario con una clave TEMPORAL (24 caracteres aleatorios, vence a las CLAVE_TEMPORAL_HORAS: 2 h por defecto, 1–72; su hora va en `clave_temporal_vence_en`) que se devuelve UNA sola vez en `clave`; al entrar, ' +
       'la sesión solo sirve para cambiarla. Sin registro abierto: exige sesión de administrador en cada sitio que se asigna. Con la ' +
       'cabecera X-Clave-Admin solo mientras no exista ningún administrador (el primero; después, 403).',
   })

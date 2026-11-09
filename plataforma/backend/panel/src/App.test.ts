@@ -37,6 +37,12 @@ const inventario: DispositivoInventario[] = [
 ];
 const historico = (canal: string): Historico => ({ canal_id: canal, magnitud: 'x', unidad: 'Cel', zona_horaria: 'America/Santiago', intervalo: '15 minutes', desde: 'x', hasta: 'y', puntos: 1, tiempos: [1760270400], valores: [20], muestras: [1] });
 
+// Con sesión de administrador (P10): estas pruebas miran la vista en la URL; la sesión se prueba en Sesion.test.ts.
+const SESION = {
+  sistema: false, usuario: { id: 'u1', nombre: 'Ana', email: 'ana@ejemplo.invalid' }, clave_temporal: false,
+  sitios: [{ sitio_id: 's1', codigo: 'uct', nombre: 'Campus', rol: 'administrador' }], expira_en: null, inactividad_vence_en: null,
+  permisos: { administrador: ['leer', 'exportar', 'escribir', 'usuarios'], consulta: ['leer'] },
+};
 class FuenteInerte {
   readyState = 1;
   onopen = null;
@@ -53,6 +59,7 @@ beforeEach(() => {
   vi.stubGlobal('EventSource', FuenteInerte);
   vi.stubGlobal('fetch', vi.fn(async (ruta: string) => {
     peticiones.push(ruta);
+    if (ruta === '/sesion') return new Response(JSON.stringify(SESION));
     if (ruta === '/dispositivos') return new Response(JSON.stringify(inventario));
     if (ruta === `/dispositivos/${ID}`) return new Response(JSON.stringify(ficha));
     if (ruta.startsWith('/condiciones?') || ruta.startsWith('/cuarentena?')) return new Response('[]');

@@ -12,7 +12,7 @@ import { motivosDeClave } from './claves';
 import {
   VIDA_ABSOLUTA_MS, claveTemporalVencida, debeRenovar, generarIdentificador, hashIdentificador, motivoDeVencimiento,
 } from './cookie';
-import { ROLES, Rol, UsuarioSesion } from './permisos';
+import { ROLES, Rol, UsuarioSesion, matrizPorRol } from './permisos';
 import { Turnos } from './turnos';
 
 // M7 · Sesión de personas (docs/20 §3 y §4). Una cookie opaca con estado en la base: aquí se abre, se carga en cada petición (el
@@ -218,7 +218,7 @@ export class SesionService implements OnModuleInit {
 
   // Lo que devuelve GET /sesion: quién soy, mis sitios con su rol y cuándo vence la sesión.
   async describir(u: UsuarioSesion): Promise<Record<string, unknown>> {
-    if (u.sistema) return { sistema: true, nombre: u.nombre, sitios: 'todos', rol: 'administrador' };
+    if (u.sistema) return { sistema: true, nombre: u.nombre, sitios: 'todos', rol: 'administrador', permisos: matrizPorRol() };
     const r = await this.pool.query<{ sitio_id: string; codigo: string; nombre: string; rol: string }>(
       `SELECT us.sitio_id, s.codigo, s.nombre, us.rol FROM usuario_sitio us JOIN sitio s ON s.id = us.sitio_id
         WHERE us.usuario_id = $1 AND us.activo ORDER BY s.nombre`, [u.id]);
@@ -228,6 +228,7 @@ export class SesionService implements OnModuleInit {
       sistema: false, usuario: { id: u.id, nombre: u.nombre, email: u.email }, clave_temporal: u.claveTemporal, sitios: r.rows,
       expira_en: fila?.expira_en.toISOString() ?? null,
       inactividad_vence_en: fila ? new Date(fila.ultima_actividad.getTime() + 30 * 60_000).toISOString() : null,
+      permisos: matrizPorRol(), // rol → acciones, de la tabla que decide (permisos.ts): la guía de perfiles del panel sale de aquí
     };
   }
 
@@ -252,7 +253,7 @@ export class SesionService implements OnModuleInit {
       throw new BadRequestException(['actual y nueva son obligatorias (texto)']);
     }
     const bloqueado = (espera: number): HttpException =>
-      new HttpException({ statusCode: 429, message: `bloqueado: demasiados intentos fallidos; reintenta en ${Math.ceil(espera / 1000)} s` }, HttpStatus.TOO_MANY_REQUESTS);
+      new HttpException({ statusCode: 429, message: `bloqueado: demasiados intentos fallidos; reintenta en ${Math.ceil(espera / 1000)} s`, reintentar_en_s: Math.ceil(espera / 1000) }, HttpStatus.TOO_MANY_REQUESTS);
     const espera = this.bloqueos.restante(u.email, ip);
     if (espera > 0) throw bloqueado(espera);
     const r = await this.pool.query<FilaUsuario>(

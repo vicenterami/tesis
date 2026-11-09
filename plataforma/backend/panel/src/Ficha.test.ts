@@ -69,10 +69,21 @@ beforeEach(() => {
     if (ruta.startsWith('/condiciones?')) return new Response(JSON.stringify(ruta.includes('abiertas=true') ? condiciones.filter((c) => c.cerrada_en === null) : condiciones));
     if (ruta.startsWith('/cuarentena?')) return new Response(JSON.stringify(rechazadas));
     if (ruta.startsWith('/canales/c-temp/historico')) return new Response(JSON.stringify(historico));
+    if (ruta.startsWith(`/dispositivos/${ID}/exportar?`)) return new Response('tiempo,valor\n2026-10-12T14:00:00Z,20\n', { headers: { 'content-type': 'text/csv', 'content-disposition': 'attachment; filename="dev-0001_temperatura.csv"' } });
     return new Response('', { status: 404 });
   }));
 });
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.useRealTimers(); });
+// Descargas por Blob (lib/api.ts, `descargar`; docs/19 §6): jsdom no tiene URL.createObjectURL ni descarga nada; se registra qué se
+// pidió, con qué nombre y que el enlace en memoria nunca entra a la página.
+function espiarDescargas(): { nombres: string[]; enPagina: () => number } {
+  const nombres: string[] = [];
+  vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: vi.fn(() => 'blob:prueba'), revokeObjectURL: vi.fn() }));
+  vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) { nombres.push(this.download); });
+  return { nombres, enPagina: () => document.querySelectorAll('a[href^="blob:"]').length };
+}
+const llamadaA = (prefijo: string): [string, RequestInit] | undefined =>
+  (vi.mocked(fetch).mock.calls as unknown as [string, RequestInit][]).find(([r]) => r.startsWith(prefijo));
+afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); vi.useRealTimers(); });
 
 describe('Ficha (P3): identidad, canales, gráfico, condiciones y rechazadas, leídos del DOM', () => {
   it('muestra la identidad con el estado visual, una tarjeta por canal con su última lectura y umbrales', async () => {
@@ -252,7 +263,12 @@ describe('Ficha (P3), incremento 1: rango vacío, intervalo observado, reloj de 
     render(Ficha, { id: ID });
     await waitFor(() => expect(document.querySelector('[data-rango-vacio]')).toBeTruthy());
     expect(vacio()).toContain('El panel no dibuja más de 30 días: para verla, exporta sus mediciones.');
-    expect(screen.getByRole('link', { name: 'exporta sus mediciones' }).getAttribute('href')).toMatch(new RegExp(`^/dispositivos/${ID}/exportar\\?formato=csv&desde=2026-07-25`));
+    // Un botón que descarga por fetch con la sesión (nunca un enlace directo a la API): la semana que precede a la última medición.
+    const d = espiarDescargas();
+    screen.getByRole('button', { name: 'Exportar la semana de la última medición' }).click();
+    await waitFor(() => expect(d.nombres).toEqual(['dev-0001_temperatura.csv']));
+    expect(llamadaA(`/dispositivos/${ID}/exportar`)![0]).toMatch(new RegExp(`^/dispositivos/${ID}/exportar\\?formato=csv&desde=2026-07-25`));
+    expect(screen.queryByRole('link', { name: /exporta/ })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Ver la última medición' })).toBeNull();
     cleanup();
     conUltima(null);
@@ -455,9 +471,15 @@ describe('Ficha (P3), incremento 2: cambio sin blanco, error con reintento, reso
     render(Ficha, { id: ID });
     await waitFor(() => expect(document.querySelector('[data-resumen-rango]')).toBeTruthy());
     expect(document.querySelector('[data-resumen-rango]')!.textContent!.replace(/\s+/g, ' ')).toBe('en este rango: mín 20 Cel · máx 21 Cel · promedio de los 2 promedios dibujados 20,5 Cel');
-    expect(screen.getByRole('link', { name: 'Descargar CSV de este rango' }).getAttribute('href')).toBe(
-      `/dispositivos/${ID}/exportar?formato=csv&desde=2026-10-11T15%3A00%3A00.000Z&hasta=2026-10-12T15%3A00%3A00.000Z`,
-    );
+    const d = espiarDescargas();
+    screen.getByRole('button', { name: 'Descargar CSV de este rango' }).click();
+    await waitFor(() => expect(d.nombres).toEqual(['dev-0001_temperatura.csv']));
+    const [ruta, init] = llamadaA(`/dispositivos/${ID}/exportar`)!;
+    expect(ruta).toBe(`/dispositivos/${ID}/exportar?formato=csv&desde=2026-10-11T15%3A00%3A00.000Z&hasta=2026-10-12T15%3A00%3A00.000Z`);
+    expect(init.credentials).toBe('same-origin'); // con la cookie de sesión, sin token en la URL
+    expect(d.enPagina()).toBe(0); // el enlace se crea en memoria y no queda en la página
+    await waitFor(() => expect(document.querySelector('[data-aviso="exito"]')?.textContent).toContain('Descargado dev-0001_temperatura.csv'));
+    expect(screen.queryByRole('link', { name: 'Descargar CSV de este rango' })).toBeNull();
     expect(screen.getByRole('link', { name: 'Comparar con otros dispositivos' }).getAttribute('href')).toBe(`#/comparar?dispositivos=${ID}&magnitud=temperatura&rango=24h`);
   });
 
@@ -469,7 +491,7 @@ describe('Ficha (P3), incremento 2: cambio sin blanco, error con reintento, reso
     await waitFor(() => expect(graficos).toHaveLength(1));
     expect(document.querySelector('.grafico')?.getAttribute('data-puntos')).toBe('0');
     expect(document.querySelector('[data-resumen-rango]')).toBeNull();
-    expect(screen.getByRole('link', { name: 'Descargar CSV de este rango' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Descargar CSV de este rango' })).toBeTruthy();
   });
 
   it('la cabecera dice la hora del sitio con su zona y desfase, al día cada segundo', async () => {
@@ -479,5 +501,54 @@ describe('Ficha (P3), incremento 2: cambio sin blanco, error con reintento, reso
     expect(document.querySelector('[data-hora-sitio]')!.textContent).toBe('Hora en el sitio: 12/10/2026 12:00:00 · America/Santiago (UTC−03:00)');
     await vi.advanceTimersByTimeAsync(3000);
     expect(document.querySelector('[data-reloj-sitio]')!.textContent).toBe('12/10/2026 12:00:03');
+  });
+});
+
+// Sesión en la ficha (P10; docs/20 §6): exportar exige el rol administrador en el sitio del dispositivo. El panel lo sabe por la matriz
+// que trae GET /sesion; si el servidor igual rechaza, el aviso lo dice, y un 401 lleva al inicio de sesión (manejo central).
+describe('Ficha (P3) con sesión: exportar según el rol y descargas que fallan', () => {
+  const matriz = { administrador: ['leer', 'exportar', 'escribir', 'usuarios'], consulta: ['leer'] };
+  const sesionCon = (rol: 'administrador' | 'consulta') => ({
+    sistema: false as const, usuario: { id: 'u1', nombre: 'Ana', email: 'ana@ejemplo.invalid' }, clave_temporal: false,
+    sitios: [{ sitio_id: 's1', codigo: 'uct', nombre: 'Campus', rol }], expira_en: null, inactividad_vence_en: null, permisos: matriz,
+  });
+
+  it('consulta: el botón de exportar está desactivado y el motivo se lee al lado; administrador: activo y sin motivo', async () => {
+    render(Ficha, { id: ID, sesion: sesionCon('consulta') });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Descargar CSV de este rango' })).toBeTruthy());
+    const boton = screen.getByRole('button', { name: 'Descargar CSV de este rango' }) as HTMLButtonElement;
+    expect(boton.disabled).toBe(true);
+    const motivo = document.getElementById(boton.getAttribute('aria-describedby')!.split(' ').find((x) => x.endsWith('-motivo'))!);
+    expect(motivo?.textContent).toBe('exportar exige el rol administrador en este sitio');
+    boton.click();
+    expect(llamadaA(`/dispositivos/${ID}/exportar`)).toBeUndefined();
+    cleanup();
+    render(Ficha, { id: ID, sesion: sesionCon('administrador') });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Descargar CSV de este rango' })).toBeTruthy());
+    expect((screen.getByRole('button', { name: 'Descargar CSV de este rango' }) as HTMLButtonElement).disabled).toBe(false);
+    expect(document.querySelector('[data-motivo-desactivado]')).toBeNull();
+  });
+
+  it('la descarga con la sesión vencida (401) no descarga nada y avisa al manejo central; un 403 se muestra en un aviso', async () => {
+    const { alPerderSesion } = await import('./lib/api');
+    const motivos: string[] = [];
+    const dejar = alPerderSesion((m) => motivos.push(m));
+    const d = espiarDescargas();
+    const base = vi.mocked(fetch).getMockImplementation()!;
+    let codigo = 401;
+    vi.mocked(fetch).mockImplementation(async (ruta, init) =>
+      String(ruta).includes('/exportar') ? new Response(JSON.stringify({ statusCode: codigo, message: codigo === 401 ? 'sesión requerida' : 'tu rol en este sitio no permite la acción «exportar»' }), { status: codigo }) : base(ruta, init));
+    render(Ficha, { id: ID });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Descargar CSV de este rango' })).toBeTruthy());
+    screen.getByRole('button', { name: 'Descargar CSV de este rango' }).click();
+    await waitFor(() => expect(motivos).toEqual(['sin_sesion']));
+    expect(d.nombres).toEqual([]);
+    codigo = 403;
+    await waitFor(() => expect((screen.getByRole('button', { name: 'Descargar CSV de este rango' }) as HTMLButtonElement).disabled).toBe(false));
+    screen.getByRole('button', { name: 'Descargar CSV de este rango' }).click();
+    await waitFor(() => expect(document.querySelector('[data-aviso="error"]')?.textContent).toContain('tu rol en este sitio no permite la acción «exportar»'));
+    expect(motivos).toEqual(['sin_sesion']); // el 403 de un rol no es «sin sesión»
+    expect(d.nombres).toEqual([]);
+    dejar();
   });
 });

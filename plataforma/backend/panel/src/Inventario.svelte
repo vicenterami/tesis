@@ -2,7 +2,7 @@
   // Pantalla P2 (docs/19 §4): inventario con semáforo (HU-19) y filtros (HU-20). Datos: GET /dispositivos y
   // GET /condiciones?abiertas=true; se actualiza con el canal en vivo sin volver a pedir el inventario.
   import { onMount, untrack } from 'svelte';
-  import { LIMITE_ABIERTAS, URL_ABIERTAS, mensajeError, obtener } from './lib/api';
+  import { LIMITE_ABIERTAS, URL_ABIERTAS, esCancelacion, mensajeError, obtener, ultimaGana } from './lib/api';
   import { compararAtencion, conteoPorEstado, enLinea, estadoVisual, ORDEN_ATENCION, ROTULO, type EstadoVisual } from './lib/estado-visual';
   import type { Condicion, DispositivoInventario, EventoVivo, TipoCondicion } from './lib/modelo';
   import { haceCuanto, horaLocal } from './lib/tiempo';
@@ -11,6 +11,7 @@
   import { MAX_COMPARAR, SIN_FILTROS, fragmentoComparar, fragmentoInventario, type FiltrosInventario } from './lib/vista';
   import { marcadosParaComparar, recordarMarcados } from './lib/comparar';
   import ZonaSitio from './ZonaSitio.svelte';
+  import Boton from './Boton.svelte';
 
   // filtros: la vista inicial que trae la URL (docs/19 §4, incremento 1, punto 1); alCambiarVista la escribe (App.svelte).
   let { filtros = SIN_FILTROS, alCambiarVista = () => {} }: { filtros?: FiltrosInventario; alCambiarVista?: (fragmento: string) => void } = $props();
@@ -113,16 +114,21 @@
     window.location.hash = fragmentoComparar(marcadosVigentes, null, '24h'); // otra pantalla: entrada nueva en el historial
   }
 
+  // Gana la última (docs/19 §6): una recarga (al reconectar) cancela la anterior, y al salir de la pantalla se cancela la que esté en
+  // vuelo; una respuesta vieja nunca pisa a la nueva.
+  const carga = ultimaGana();
   async function cargar(): Promise<void> {
+    const senal = carga.senal();
     try {
       const [d, c] = await Promise.all([
-        obtener<DispositivoInventario[]>('/dispositivos'),
-        obtener<Condicion[]>(URL_ABIERTAS),
+        obtener<DispositivoInventario[]>('/dispositivos', senal),
+        obtener<Condicion[]>(URL_ABIERTAS, senal),
       ]);
       dispositivos = d;
       abiertas = c;
       error = null;
     } catch (e) {
+      if (esCancelacion(e)) return;
       error = mensajeError(e);
     } finally {
       cargado = true;
@@ -161,6 +167,7 @@
     });
     return () => {
       clearInterval(reloj);
+      carga.cancelar();
       repedirAbiertas.cancelar();
       vistos.cancelar();
       c.cerrar();
@@ -201,7 +208,8 @@
   <label>Vía <select bind:value={filtroVia}><option value="">todas</option>{#each vias as v (v)}<option value={v}>{v}</option>{/each}</select></label>
   <label>Buscar <input type="search" bind:value={busqueda} placeholder="nombre o identificador" /></label>
   <span data-visibles>{visibles.length} de {filas.length}</span>
-  <button type="button" onclick={comparar} disabled={marcadosVigentes.length < 2 || marcadosVigentes.length > MAX_COMPARAR} title="de 2 a {MAX_COMPARAR} dispositivos" data-comparar>Comparar ({marcadosVigentes.length})</button>
+  <Boton etiqueta={`Comparar (${marcadosVigentes.length})`} onclick={comparar} ayuda={`La misma magnitud de 2 a ${MAX_COMPARAR} dispositivos en un gráfico`}
+    motivoDesactivado={marcadosVigentes.length < 2 ? `marca al menos 2 dispositivos (de 2 a ${MAX_COMPARAR})` : marcadosVigentes.length > MAX_COMPARAR ? `como mucho ${MAX_COMPARAR} dispositivos` : null} data-comparar />
 </div>
 
 {#if abiertas.length >= LIMITE_ABIERTAS}

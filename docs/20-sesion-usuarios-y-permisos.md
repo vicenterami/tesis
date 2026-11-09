@@ -7,8 +7,8 @@
 > flujos por usuario) quedó decidido el 12/10/2026 y aparece con su fecha.
 >
 > **Estado al 08/11/2026: implementado en el backend** (bloque 1 de la Etapa 4: sesión, usuarios, roles por sitio y guardia central;
-> migración 22, `backend/src/sesion/`). Lo hecho, lo decidido al implementar y lo que falta (la pantalla de inicio de sesión, P10, y la vista pública
-> por enlace) están en la §10. El diseño de las §1 a §9 no cambió.
+> migración 22, `backend/src/sesion/`), y **en el panel** el mismo día (pantalla P10: entrar, clave temporal, salir, usuarios; `docs/19 §4`).
+> Lo hecho, lo decidido al implementar y lo que falta (la vista pública por enlace) están en la §10. El diseño de las §1 a §9 no cambió.
 
 ## 1. Lo ya decidido que aquí se respeta
 | Decisión | Dónde | Consecuencia |
@@ -53,7 +53,7 @@
 - **Vida (decidido el 12/10/2026):** se renueva con cada petición (`ultima_actividad`); vence a los **30 minutos sin actividad** y a
   las **8 horas** desde que se creó, lo que ocurra primero. Son los topes que recomienda la hoja de sesiones de OWASP (inactividad de
   15 a 30 minutos para aplicaciones de riesgo bajo; absoluto «between 4 and 8 hours»): una jornada de trabajo exige entrar una vez.
-  El panel renueva solo mientras la persona interactúa (un `GET /sesion` (Etapa 4) liviano, como mucho cada 5 minutos, al mover el ratón o
+  El panel renueva solo mientras la persona interactúa (un `GET /sesion` liviano (hecho el 08/11/2026), como mucho cada 5 minutos, al mover el ratón o
   teclear); una pantalla fija sin nadie delante vence, y para una pantalla de sala está la vista pública por enlace (§7). Al vencer,
   401 y el panel vuelve al inicio de sesión guardando la ruta. El identificador de sesión (32 bytes, 256 bits de entropía; OWASP
   exige al menos 64) se **regenera** al iniciar sesión y al cambiar la clave, nunca se reutiliza uno anterior.
@@ -67,13 +67,15 @@
   mismo día en `http://127.0.0.1:3000`, con la pila real, en Chromium 156 y Firefox 157: `POST /sesion` 200, la guardan
   (`secure`, `httpOnly`, `sameSite: Lax`, `path: /`) y `GET /sesion` 200 con ella; `document.cookie` vacío. Una `__Host-` sin `Secure`
   o con otro `Path` la descartan los dos (servidor mínimo de prueba). curl 8.18 también la guarda y la devuelve en loopback.
-- **Cierre (Etapa 4):** `DELETE /sesion` marca `revocada_en` y borra la cookie; «cerrar en todos lados» revoca todas las del usuario.
+- **Cierre (hecho el 08/11/2026):** `DELETE /sesion` marca `revocada_en` y borra la cookie; «cerrar en todos lados» revoca todas las del usuario.
 - **El canal en vivo** (`GET /eventos`) exige la misma cookie: `EventSource` la manda solo al mismo origen. Con sesión, el canal
   filtra por los sitios del usuario y el tope de flujos pasa a ser **por usuario** (**5**, decidido el 12/10/2026: cinco pestañas
   abiertas de una misma persona; el tope global de 50 se mantiene).
 - **Descargas** (exportación): con sesión en la base no hay «token corto vencido»: un enlace normal a `/dispositivos/{id}/exportar`
   funciona mientras la sesión viva; si venció, el backend responde 401 y el panel muestra el inicio de sesión. No viaja ningún
-  token en la URL.
+  token en la URL. (Decidido al implementar, 08/11/2026, §10: para que «el panel muestra el inicio de sesión» se cumpla, el panel
+  descarga por `fetch` con la sesión y un Blob, no con un enlace directo: un enlace abría el JSON del 401 en una pestaña. La ruta y
+  la regla de no llevar token en la URL no cambian.)
 
 ## 4. Claves y bloqueos
 - **Hash:** `scrypt` de `node:crypto` (N = 2¹⁷, r = 8, p = 1, 64 bytes, sal de 16 bytes por usuario), comparación de tiempo
@@ -90,13 +92,16 @@
 - **La dirección del cliente detrás del proxy:** sale de `X-Forwarded-For` solo cuando la petición trae el secreto del proxy
   (`PROXY_SECRETO`, `recepcion/http/direccion.ts`); sin él se usa la del socket, que detrás de un proxy es la del proxy y volvería global el
   bloqueo por IP. La capa del proxy exige el secreto (compose) y en desarrollo sin proxy la del socket es la del cliente (revisión del 08/11/2026).
-- **Primer administrador (Etapa 4):** `POST /usuarios` con la clave de administrador del punto 41 solo mientras no exista ningún usuario
+- **Primer administrador (hecho el 08/11/2026):** `POST /usuarios` con la clave de administrador del punto 41 solo mientras no exista ningún usuario
   administrador; después esa ruta exige sesión de administrador y la variable **se retira** del `.env` (decidido el 12/10/2026:
   no queda como llave de emergencia; si se pierde el último administrador, se crea otro desde la terminal del servidor, que ya
   equivale a root).
-- **Olvidé mi clave:** sin correo saliente en la Etapa 4, el administrador del sitio asigna una clave temporal (se muestra una
-  vez, como la credencial de un dispositivo) y el usuario debe cambiarla al entrar; la temporal **vence a las 24 h** (decidido el
-  12/10/2026; la vigencia se prueba con reloj simulado y se corrobora con el instante guardado).
+- **Olvidé mi clave (hecho el 08/11/2026: «Asignar clave temporal» en P10):** sin correo saliente en la Etapa 4, el administrador del sitio asigna una clave temporal (se muestra una
+  vez, como la credencial de un dispositivo) y el usuario debe cambiarla al entrar; la temporal vence a las
+  **2 h por defecto, configurable de 1 a 72 h** con `CLAVE_TEMPORAL_HORAS` (decidido el 08/11/2026; reemplaza las 24 h fijas del
+  12/10/2026); si vence antes de entregarla, el administrador emite otra. Un valor inválido detiene el arranque (`arranque.ts`,
+  `horasClaveTemporal`); la vigencia se prueba con reloj simulado y se corrobora con el instante guardado, y el panel muestra la hora de
+  vencimiento que devuelve el servidor (`clave_temporal_vence_en`), nunca un plazo propio.
 - **Alta de usuarios:** solo un administrador; sin registro abierto. Un usuario se desactiva, no se borra (su rastro en
   `evento` y `acceso` lo necesita).
 
@@ -158,7 +163,7 @@ guardián (`plataforma/pruebas/sesion-smoke.sh`), con el costo medido en `docs/1
 - **La clave por cabecera gestiona usuarios solo mientras no exista ningún administrador activo** (`GET /usuarios`, `POST /usuarios` y
   `PATCH /usuarios/{id}`; después, 403; la lista, desde la revisión del 08/11/2026, punto R10), y lo que crea debe ser administrador de al menos un sitio. Dos «primeros» a la vez se ordenan con un candado de la base.
 - **Alta de usuarios con clave temporal.** `POST /usuarios` no recibe clave: genera una temporal (24 caracteres aleatorios, vence a las
-  24 h), la muestra una vez y la persona la cambia al entrar. Con clave temporal, la sesión solo sirve para `GET /sesion`, `DELETE /sesion`
+  `CLAVE_TEMPORAL_HORAS`: 2 h por defecto, 1–72; §4), la muestra una vez y la persona la cambia al entrar. Con clave temporal, la sesión solo sirve para `GET /sesion`, `DELETE /sesion`
   y `POST /sesion/clave`; lo demás responde 403. Una temporal vencida responde como una clave mala y queda en `acceso` como
   `clave_incorrecta` (el dominio de `resultado` no cambia).
 - **Quién ve a quién.** Un administrador ve a quien está o estuvo en alguno de sus sitios (`en_mis_sitios` dice cuál de las dos), y solo
@@ -174,7 +179,8 @@ guardián (`plataforma/pruebas/sesion-smoke.sh`), con el costo medido en `docs/1
   igual, así el bloqueo no revela qué cuentas existen. La respuesta al bloqueado es 429 «bloqueado…» con los segundos que faltan; un
   intento bloqueado no calcula el hash, y deja su fila «bloqueado» una sola vez por correo, dirección y ventana (R6). Cuentan como fallo la clave mala, el usuario inexistente y el inactivo; el nivel vuelve a cero
   tras un inicio correcto o 15 minutos sin fallos.
-- **Hash.** Como mucho dos cálculos de `scrypt` de personas a la vez (128 MiB cada uno, bajo el techo de 512 MB del contenedor); los
+- **Hash.** Como mucho dos cálculos de `scrypt` de personas a la vez (128 MiB cada uno; medido el 08/11/2026, `docs/16 §59`: con dos inicios
+  de sesión simultáneos el contenedor del backend llega a **315–321 MiB** (dos corridas), desde 57–64 MiB en reposo, frente al techo de 512 MiB); los
   demás esperan en orden y, con 20 esperando, 503. Además, como mucho 2 en curso o en cola por dirección (punto R8).
 - **Renovación.** El guardia escribe `ultima_actividad` como mucho una vez por minuto; la inactividad efectiva queda entre 29 y 30 min.
 - **Canal en vivo.** El sitio de cada dispositivo se tiene en memoria (se recarga al abrir un flujo con sesión y ante un dispositivo
@@ -235,9 +241,28 @@ lo que se decidió en cada uno (R = número del hallazgo). Cada corrección tien
 - **R21 · Guion de humo: limpieza silenciosa.** Si falla, imprime el error y los residuos por patrón (sitios `pa-`/`pb-`, usuarios y filas
   de `acceso` de `@ejemplo.invalid`) y cómo reintentar: `bash plataforma/pruebas/sesion-smoke.sh --limpiar SUFIJO`.
 
-**Lo que falta** (no cambia el diseño): la pantalla de inicio de sesión del panel (P10): hasta que exista, el panel en el navegador
-recibe 401 en sus lecturas, porque no tiene cómo iniciar sesión (se puede abrir una a mano desde la consola del navegador con un `fetch`
-a `POST /sesion` con `X-Pedido: panel`; la cookie queda y el panel funciona); el cliente del panel debe poner `X-Pedido: panel` en lo que
-escribe y volver al inicio ante un 401. La vista pública por enlace (§7 y `enlace_publico`), `auditoria` con su middleware (`docs/10 §8.4`
+**Hecho en el panel (08/11/2026; `docs/19 §4`, P10; pruebas en `docs/16 §59`).** La pantalla «Entrar», el cambio obligatorio de la clave
+temporal, quién soy en la cabecera, «Salir» y «Cerrar en todos lados», la renovación con interacción (§3), la vuelta a la ruta guardada tras
+un 401 y la pantalla de usuarios (alta con la temporal mostrada una vez, activar y desactivar, temporal nueva, rol por sitio, con bloqueo
+optimista). El cliente HTTP del panel pone `X-Pedido: panel` en todo lo que escribe y trata el 401, el 403 por clave temporal, el 409 y el
+429 en un solo lugar. Decidido al implementar (08/11/2026), en lo que el diseño no fijaba:
+- **La matriz en `GET /sesion`.** La respuesta trae `permisos` (rol → acciones), calculado de `PERMISOS` por `matrizPorRol()` (`permisos.ts`):
+  el panel arma la guía de cada perfil y desactiva lo que el rol no permite con la misma tabla que decide; no hay un segundo texto que
+  mantener. Se eligió ampliar `GET /sesion` antes que una ruta nueva: el panel ya la pide al cargar y al renovar, y la matriz no es secreta
+  para quien tiene sesión.
+- **`reintentar_en_s` también en el 429 de `POST /sesion/clave`**, como en el de `POST /sesion`: el panel dice cuántos segundos esperar.
+- **Descargas por `fetch` y Blob** (§3, nota): un 401 en una exportación vuelve al inicio de sesión en vez de abrir el JSON del error.
+- **El canal en vivo y la sesión.** Las pantallas (y sus `EventSource`) existen solo con sesión: al salir o al vencer se cierran, y al entrar
+  se reabren. Cuando el servidor cierra el canal (R2: la sesión venció), el panel pregunta `GET /sesion` una vez para saber si fue eso.
+- **Semilla de desarrollo.** `pruebas/semilla-demo.sh` crea un administrador y un usuario de consulta del sitio `uct` (`@ejemplo.invalid`)
+  con claves temporales impresas una vez; desde entonces la base de desarrollo ya tiene un administrador, así que `sesion-smoke.sh` crea el
+  suyo por SQL y omite la carrera del último administrador (lo dice al correr).
+
+**Vigencia de la clave temporal (08/11/2026).** De 24 h fijas a `CLAVE_TEMPORAL_HORAS` (1–72 h, 2 por defecto; §4), leída y validada
+al arrancar, declarada en `.env.example` y pasada por el compose (guardianes 2d y 2z). En la pantalla de administración de límites (plan de
+la Etapa 4) este valor pasará a configurarse desde el panel.
+
+**Lo que falta** (no cambia el diseño): la vista pública por enlace (§7 y `enlace_publico`), `auditoria` con su middleware (`docs/10 §8.4`
 punto 43), el «quién» en los eventos de alta, baja y calibración, y retirar `HTTP_CLAVE_ADMIN` del `.env` del servidor una vez creado el
-primer administrador.
+primer administrador. El recorrido del banco con navegador (`banco.sh navegador`, `e2e/p3.mjs`) ya entra como usuario del sistema, con la
+clave del banco por cabecera (`docs/16 §59`).

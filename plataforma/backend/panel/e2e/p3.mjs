@@ -4,8 +4,12 @@
 //   node e2e/p3.mjs <url_base> <dispositivo_id> <canal_id> <id_fisico> <sitio> <red_docker> <imagen_broker> <contenedor_backend> <captura.png>
 // Variables (las pone banco.sh): NAVEGADOR=firefox (por defecto) o chromium; E2E_DISP2 y E2E_ID2, el segundo emulado con temperatura
 // (P3b); E2E_DISP_VACIO y E2E_CANAL_VACIO, un canal cuya única lectura tiene entre 1 y 24 h (la «última hora» queda vacía).
+// Sesión (desde el 08/11/2026, docs/20 §5): la clave de administrador del banco llega por la ENTRADA ESTÁNDAR (una línea; nunca en la línea
+// de órdenes ni se imprime) y va como cabecera X-Clave-Admin en toda petición del navegador (también la del canal en vivo) y en api():
+// el panel entra como «usuario del sistema», sin la pantalla «Entrar».
 import { chromium, firefox } from 'playwright';
 import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 
 const [BASE, dispId, canalId, idFisico, sitio, red, imagen, backend, captura] = process.argv.slice(2);
 if (!captura) {
@@ -43,11 +47,17 @@ const lecturaEs = (texto, ms) => pagina.waitForFunction(([sel, t]) => document.q
 // El estado del canal en vivo se lee en su propio elemento (`p[data-canal]`, que también lleva el botón de pausa), no en toda la
 // página: el atributo dice el estado y el texto, lo que ve la persona (revisión del 16/10).
 const textoVisible = (texto, ms) => pagina.waitForFunction((t) => (document.querySelector('p[data-canal]')?.textContent ?? '').trim().startsWith(t), texto, { timeout: ms });
-const api = async (ruta) => (await fetch(`${BASE}${ruta}`)).json();
+const CLAVE_ADMIN = readFileSync(0, 'utf8').split('\n')[0].trim();
+if (!CLAVE_ADMIN) {
+  console.log('FALLA falta la clave de administrador del banco por la entrada estándar');
+  process.exit(2);
+}
+const CABECERAS = { 'X-Clave-Admin': CLAVE_ADMIN };
+const api = async (ruta) => (await fetch(`${BASE}${ruta}`, { headers: CABECERAS })).json();
 
 const navegador = await motores[NAVEGADOR].launch();
 console.log(`navegador: ${NAVEGADOR} ${navegador.version()}`);
-const pagina = await navegador.newPage({ viewport: { width: 1280, height: 900 } });
+const pagina = await navegador.newPage({ viewport: { width: 1280, height: 900 }, extraHTTPHeaders: CABECERAS, acceptDownloads: true });
 const errores = [];
 // Peticiones de histórico en vuelo y pedidas: al reconectar debe pedirlo de nuevo (docs/19 F4); tras cada clic se espera a que no
 // quede ninguna en vuelo (sirve igual para un build sin indicador de «cargando…»).
@@ -212,11 +222,14 @@ try {
   // 9. Lo que el rango ya sabe (punto 6): el resumen de los promedios y el CSV de la ventana visible (que la API sirve).
   await paso('resumen y CSV', async () => {
     const resumen = (await pagina.locator('[data-resumen-rango]').textContent({ timeout: 3000 })) ?? '';
-    const href = await pagina.locator('[data-csv-rango]').getAttribute('href', { timeout: 3000 });
-    const r = await fetch(`${BASE}${href}`);
-    const cuerpo = await r.text();
-    if (/^en este rango: mín .+ · máx .+ · promedio de los \d+ promedios dibujados/.test(resumen.replace(/\s+/g, ' ').trim()) && r.status === 200 && cuerpo.split('\n').length > 2) ok(`resumen del rango y CSV de la ventana visible (${r.status}, ${cuerpo.split('\n').length - 1} líneas)`);
-    else falla(`resumen «${resumen}», CSV ${r.status}`);
+    // Desde el 08/11/2026 «Descargar CSV» es un botón que descarga por fetch y Blob con la sesión (lib/api.ts, descargar): sin href.
+    const [descarga] = await Promise.all([pagina.waitForEvent('download', { timeout: 15000 }), pagina.locator('[data-csv-rango]').click()]);
+    const nombre = descarga.suggestedFilename();
+    const cuerpo = readFileSync(await descarga.path(), 'utf8');
+    const lineas = cuerpo.trim().split(/\r?\n/);
+    if (/^en este rango: mín .+ · máx .+ · promedio de los \d+ promedios dibujados/.test(resumen.replace(/\s+/g, ' ').trim()) && nombre.endsWith('.csv') && nombre.includes(idFisico)
+      && lineas.length > 2 && /^[a-z_]+(,[a-z_]+)+$/.test(lineas[0])) ok(`resumen del rango y CSV de la ventana visible (${nombre}, ${lineas.length - 1} filas)`);
+    else falla(`resumen «${resumen}», CSV ${nombre} con ${lineas.length} líneas (cabecera «${lineas[0]}»)`);
   });
 
   // 10. Rango vacío con eje (punto 2) y «Ver la última medición»: un canal cuya única lectura tiene entre 1 y 24 h.
@@ -240,7 +253,7 @@ try {
   await paso('zona horaria', async () => {
     const zonaSitio = (await api(`/dispositivos/${dispId}`)).zona_horaria;
     for (const [zona, debeAvisar] of [['Europe/Madrid', true], [zonaSitio, false]]) {
-      const ctx = await navegador.newContext({ timezoneId: zona, viewport: { width: 1280, height: 900 } });
+      const ctx = await navegador.newContext({ timezoneId: zona, viewport: { width: 1280, height: 900 }, extraHTTPHeaders: CABECERAS });
       const p = await ctx.newPage();
       p.on('pageerror', (e) => errores.push(String(e)));
       try {
@@ -295,7 +308,7 @@ try {
   // en una zona de nombre largo: el 24/10, el filtro de zona ensanchaba el inventario a 320 px de ancho (117 px en la pila de desarrollo, hasta 188 en el banco).
   await paso('RF-52', async () => {
     for (const ancho of [320, 375, 414]) {
-      const p = await navegador.newPage({ viewport: { width: ancho, height: 800 } });
+      const p = await navegador.newPage({ viewport: { width: ancho, height: 800 }, extraHTTPHeaders: CABECERAS });
       vigilar(p);
       // Se mide con los datos ya dibujados: en P2, filas en la tabla y las zonas en su filtro (la primera versión de esta comprobación
       // medía con la tabla aún vacía y daba OK con el error presente).

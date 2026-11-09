@@ -777,7 +777,8 @@ INSERT INTO zona (sitio_id, nombre) SELECT z.sitio_id, :'zl' FROM zona z JOIN di
 UPDATE dispositivo SET zona_id = (SELECT id FROM zona WHERE nombre = :'zl') WHERE id_fisico = 'emu-0003';
 SQL
     sleep 2
-    (cd backend/panel && NAVEGADOR="$NAVEGADOR" E2E_DISP2="$did2" E2E_ID2=emu-0002 E2E_DISP_VACIO="$did3" E2E_CANAL_VACIO="$cid3" \
+    # La lista y la ficha exigen sesión (docs/20 §6): la clave de administrador del banco va a p3.mjs por la entrada estándar (nunca en argv).
+    printf '%s\n' "$(leer HTTP_CLAVE_ADMIN)" | (cd backend/panel && NAVEGADOR="$NAVEGADOR" E2E_DISP2="$did2" E2E_ID2=emu-0002 E2E_DISP_VACIO="$did3" E2E_CANAL_VACIO="$cid3" \
       node e2e/p3.mjs http://127.0.0.1:3001 "$did" "$cid" emu-0001 "$sitio" "$red" "$IMG_BROKER" banco-backend-1 "$PRIV/p3.png")
     r=$?; echo "capturas: $PRIV/p3.png, p3-vacio.png y p3-p3b.png"; exit $r ;;
   cola)

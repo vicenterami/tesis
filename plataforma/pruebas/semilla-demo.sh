@@ -4,13 +4,25 @@
 #   bash plataforma/pruebas/semilla-demo.sh --completa  además db/semillas/demo-completa.sql: todos los estados, vías, condiciones y
 #                                                       límites, con el resultado esperado en su cabecera; la aplica
 #                                                       DOS veces y exige el mismo resultado (reconstruye su escenario, no acumula)
-# Requiere la pila arriba (docker compose up -d en plataforma/). Idempotente: correrla dos veces da lo mismo.
+# Requiere la pila arriba (docker compose up -d en plataforma/). Idempotente: correrla dos veces da lo mismo (salvo las claves temporales:
+# cada corrida asigna unas nuevas y las anteriores dejan de valer).
 # Para probar que la verificación de verdad verifica: SEMILLA_DISPOSITIVO=dev-9999 bash … → debe FALLAR.
+# Personas de demostración (desde el 08/11/2026, docs/20 §4): un administrador y un usuario de consulta del sitio uct, con correos de
+# dominio reservado (@ejemplo.invalid) y una clave TEMPORAL cada uno (vigencia: la del backend, CLAVE_TEMPORAL_HORAS, 2 h por defecto), impresa una sola vez al final; al entrar al panel (P10) se elige una
+# propia. Solo para desarrollo y demostración: SEMILLA_SIN_PERSONAS=1 las omite. Como sus correos son fijos y adivinables, la temporal
+# dura CLAVE_TEMPORAL_HORAS (2 h por defecto) y una corrida reactiva la cuenta si existía, SOLO se crean con el backend en bucle local (API=http://127.0.0.1:3000, la de
+# por defecto, o localhost); con cualquier otra dirección (un servidor) se omiten con aviso, salvo SEMILLA_PERSONAS=1 explícito
+# (revisión de seguridad del 08/11/2026).
 set -u
 AQUI="$(cd "$(dirname "$0")" && pwd)"
 . "$AQUI/lib-dynsec.sh"
+PLAT="$AQUI/.."
+. "$AQUI/lib-personas.sh"
 cd "$(dirname "$0")/../.."
 DISP="${SEMILLA_DISPOSITIVO:-dev-0001}"
+API="${API:-http://127.0.0.1:3000}"
+# ¿Backend en bucle local? Solo el anfitrión exacto 127.0.0.1, localhost o [::1] (no «127.0.0.1.ejemplo», no una IP de la red).
+es_local() { [[ "$1" =~ ^https?://(127\.0\.0\.1|localhost|\[::1\])(:[0-9]+)?(/.*)?$ ]]; }
 psql_() { docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -U plataforma -d plataforma -v ON_ERROR_STOP=1 -tA "$@"; }
 
 echo "══ semilla: plataforma/db/semillas/demo.sql ══"
@@ -52,7 +64,7 @@ if [ "${1:-}" = "--completa" ]; then
   comprobar "credenciales: ninguna verificable (hash de semilla)" "SELECT count(*) FROM credencial c JOIN dispositivo d ON d.id=c.dispositivo_id WHERE d.id_fisico IN ($L) AND c.hash <> 'scrypt\$semilla\$sin-secreto-inutilizable'" 0
   # La API dice lo mismo que la base (lo que ve el panel): en_linea por dispositivo.
   # Desde el 08/11/2026 la lista exige sesión (docs/20 §6): se lee con la clave de administrador del .env (usuario del sistema).
-  api=$(printf 'X-Clave-Admin: %s\n' "$(leer_env "$AQUI/../.env" HTTP_CLAVE_ADMIN 2>/dev/null)" | curl -s -m 5 -H @- http://127.0.0.1:3000/dispositivos | python3 -I -c "
+  api=$(printf 'X-Clave-Admin: %s\n' "$(leer_env "$AQUI/../.env" HTTP_CLAVE_ADMIN 2>/dev/null)" | curl -s -m 5 -H @- "$API/dispositivos" | python3 -I -c "
 import sys, json
 r = {d['id_fisico']: d['en_linea'] for d in json.load(sys.stdin)}
 esperado = {'demo-aire-01': True, 'demo-suelo-01': True, 'demo-silencioso': False, 'demo-mantenimiento': True, 'demo-baja': False,
@@ -62,4 +74,31 @@ print('; '.join(malos) or 'ok')" 2>&1)
   [ "$api" = ok ] && echo "OK    GET /dispositivos: en_linea de los 11 como dice la cabecera" || { echo "FALLA GET /dispositivos: $api"; fallos=$((fallos+1)); }
 fi
 
+# Personas de demostración: se crean (o se les asigna una temporal nueva) al final, y sus claves se imprimen una sola vez, después de
+# las comprobaciones (así no se mezclan con la salida que se pega en un informe).
+ADMIN_DEMO=admin-demo@ejemplo.invalid; CONSULTA_DEMO=consulta-demo@ejemplo.invalid; T_ADMIN=; T_CONSULTA=
+PERSONAS=1
+if [ "${SEMILLA_SIN_PERSONAS:-0}" = 1 ]; then PERSONAS=0
+elif ! es_local "$API" && [ "${SEMILLA_PERSONAS:-0}" != 1 ]; then
+  PERSONAS=0
+  echo; echo "AVISO personas de demostración OMITIDAS: el backend no está en bucle local (API no es 127.0.0.1 ni localhost); sus correos son"
+  echo "      fijos y adivinables. Si de verdad las quieres ahí: SEMILLA_PERSONAS=1 bash plataforma/pruebas/semilla-demo.sh"
+fi
+if [ "$PERSONAS" = 1 ]; then
+  echo; echo "══ personas de demostración (docs/20 §4) ══"
+  T_ADMIN=$(clave_temporal); T_CONSULTA=$(clave_temporal)
+  persona_temporal "Administración de demostración" "$ADMIN_DEMO" uct administrador <<<"$T_ADMIN" >/dev/null || { echo "FALLA no se pudo crear $ADMIN_DEMO"; fallos=$((fallos+1)); T_ADMIN=; }
+  persona_temporal "Consulta de demostración" "$CONSULTA_DEMO" uct consulta <<<"$T_CONSULTA" >/dev/null || { echo "FALLA no se pudo crear $CONSULTA_DEMO"; fallos=$((fallos+1)); T_CONSULTA=; }
+  comprobar "personas de demostración: administrador y consulta del sitio uct, activas, con clave temporal vigente" \
+    "SELECT string_agg(u.email||'='||us.rol, ',' ORDER BY u.email) FROM usuario u JOIN usuario_sitio us ON us.usuario_id = u.id AND us.activo JOIN sitio s ON s.id = us.sitio_id AND s.codigo = 'uct' WHERE u.email IN ('$ADMIN_DEMO', '$CONSULTA_DEMO') AND u.activo AND u.clave_temporal AND u.clave_temporal_vence_en > now() + make_interval(hours => $(horas_clave_temporal)) - interval '5 minutes'" \
+    "$ADMIN_DEMO=administrador,$CONSULTA_DEMO=consulta"
+fi
+
 echo; [[ $fallos -eq 0 ]] && echo "SEMILLA LISTA: el guion de docs/15 puede empezar" || { echo "$fallos comprobación(es) con falla"; exit 1; }
+if [ -n "$T_ADMIN" ] && [ -n "$T_CONSULTA" ]; then
+  echo
+  echo "Para entrar al panel ($API/panel/), solo desarrollo. Claves TEMPORALES: se muestran esta única vez y vencen en $(horas_clave_temporal) h (CLAVE_TEMPORAL_HORAS);"
+  echo "al entrar, el panel pide elegir una propia. Si se pierden, se vuelve a correr la semilla (asigna otras)."
+  echo "  administrador del sitio uct: $ADMIN_DEMO   clave temporal: $T_ADMIN"
+  echo "  consulta del sitio uct:      $CONSULTA_DEMO   clave temporal: $T_CONSULTA"
+fi

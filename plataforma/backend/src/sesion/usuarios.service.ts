@@ -1,10 +1,12 @@
-import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, Logger, NotFoundException, Optional, ServiceUnavailableException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Pool, PoolClient } from 'pg';
 import { POOL } from '../db/db.module';
 import { isoUs } from '../db/iso-us';
 import { AlcanceService } from './alcance.service';
 import { generarClaveTemporal } from './claves';
-import { VIDA_CLAVE_TEMPORAL_MS } from './cookie';
+import { horasClaveTemporal } from '../arranque';
+import { venceClaveTemporal } from './cookie';
 import { Rol, UsuarioSesion, exigirEnAlguno } from './permisos';
 import { SesionService } from './sesion.service';
 import { AltaUsuario, CambioUsuario } from './usuarios.dto';
@@ -13,7 +15,8 @@ import { AltaUsuario, CambioUsuario } from './usuarios.dto';
 // sus sitios. El primer administrador lo crea la clave de administrador (el «usuario del sistema») mientras no exista NINGUNO; después
 // esa clave ya no gestiona usuarios y la variable se retira del .env (decidido el 12/10/2026). Nadie se borra: se desactiva (su rastro
 // en `evento` y `acceso` lo necesita), y un sitio se le quita con una baja lógica de `usuario_sitio` (migración 22). La clave inicial
-// y la de «olvidé mi clave» son temporales: se muestran una vez, la base guarda su hash y vencen a las 24 h.
+// y la de «olvidé mi clave» son temporales: se muestran una vez, la base guarda su hash y vencen
+// a las CLAVE_TEMPORAL_HORAS (1–72, 2 por defecto; arranque.ts): la respuesta trae `clave_temporal_vence_en` para que el panel lo diga.
 
 export interface UsuarioListado {
   id: string;
@@ -45,7 +48,16 @@ const COLUMNAS = (alcance: string): string => `
 @Injectable()
 export class UsuariosService {
   private readonly log = new Logger('usuarios');
-  constructor(@Inject(POOL) private readonly pool: Pool, private readonly sesiones: SesionService, private readonly alcance: AlcanceService) {}
+  // Vigencia de la clave temporal en horas: se lee y valida al construir (al arrancar); un valor inválido detiene el arranque.
+  readonly horasTemporal: number;
+  constructor(
+    @Inject(POOL) private readonly pool: Pool,
+    private readonly sesiones: SesionService,
+    private readonly alcance: AlcanceService,
+    @Optional() config?: ConfigService,
+  ) {
+    this.horasTemporal = horasClaveTemporal(config?.get<string>('CLAVE_TEMPORAL_HORAS'));
+  }
 
   // Los sitios donde `por` administra usuarios; null = todos (usuario del sistema).
   private sitiosQueAdministra(por: UsuarioSesion): string[] | null {
@@ -91,7 +103,7 @@ export class UsuariosService {
     await this.exigirSitios(por, a.sitios);
     const clave = generarClaveTemporal();
     const hash = await this.sesiones.hashClave(clave); // antes de abrir la transacción: no se retienen candados mientras se calcula
-    const vence = new Date(this.sesiones.ahora().getTime() + VIDA_CLAVE_TEMPORAL_MS);
+    const vence = venceClaveTemporal(this.sesiones.ahora(), this.horasTemporal);
     const c = await this.pool.connect();
     try {
       await abrir(c);
@@ -154,7 +166,7 @@ export class UsuariosService {
                 clave_temporal = CASE WHEN $5::text IS NULL THEN clave_temporal ELSE true END,
                 clave_temporal_vence_en = CASE WHEN $5::text IS NULL THEN clave_temporal_vence_en ELSE $6::timestamptz END
           WHERE id = $1 AND actualizado_en = $2::timestamptz RETURNING id`,
-        [id, cambio.actualizado_en, cambio.nombre ?? null, cambio.activo ?? null, hash, new Date(ahora.getTime() + VIDA_CLAVE_TEMPORAL_MS)]);
+        [id, cambio.actualizado_en, cambio.nombre ?? null, cambio.activo ?? null, hash, venceClaveTemporal(ahora, this.horasTemporal)]);
       if (u.rowCount === 0) {
         throw new ConflictException({
           statusCode: 409, error: 'Conflict', actualizado_en: a.rows[0].actualizado_en,

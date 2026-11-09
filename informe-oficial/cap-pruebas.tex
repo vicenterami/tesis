@@ -29,10 +29,10 @@ M8 Panel & Semáforo; inventario filtrable; ficha; canal callado & Salud del sit
 
 \section{Método de prueba}
 
-Se prueba en tres niveles, todos repetibles con un comando (anexo~\ref{anx:pruebas}). Las 436 pruebas unitarias del backend y las 107 del panel corren sin base ni broker, con tipos estrictos y análisis estático. \textbf{Banco
+Se prueba en tres niveles, todos repetibles con un comando (anexo~\ref{anx:pruebas}). Las 445 pruebas unitarias del backend y las 165 del panel corren sin base ni broker, con tipos estrictos y análisis estático. \textbf{Banco
 desechable}: una segunda pila con base, broker con su plugin de seguridad, backend y proxy reales, datos en memoria y un
 emulador de nodos que imita relojes rotos, pérdidas y deriva; sobre él corren casos fijos de carga, carreras,
-caídas, TLS, alta por API, LoRaWAN y cola del broker. \textbf{Verificador de concordancia}: 47 pasos que comparan informe, documentación, base y API. Cada comprobación nueva se ejecuta primero contra el error \emph{plantado}: una prueba vale solo si falla ante la falla.
+caídas, TLS, alta por API, LoRaWAN y cola del broker. \textbf{Verificador de concordancia}: 49 pasos que comparan informe, documentación, base y API. Cada comprobación nueva se ejecuta primero contra el error \emph{plantado}: una prueba vale solo si falla ante la falla.
 
 \section{Resultados frente a los requerimientos}
 
@@ -54,7 +54,7 @@ RF-12 & Cinco sobre el umbral a la vez & Una condición, sin errores & Cumple \\
 RF-05 y RF-07 & Malformadas, sin alta, otro sitio & Cuarentena con motivo; ninguna señal de vida falsa & Cumple \\
 RF-40, RF-42 & Credencial ajena; sin CA; sin TLS & Rechazadas; claves con hash (RNF-08) & Cumple \\
 RF-02 & JSON oficial de los fabricantes; pasarela del campus & 46 de 46 del banco LoRaWAN; pasarela real en terreno & Cumple \\
-RNF-17 & Carga sostenida y pico & 174~MiB (sin proxy) y 324~MiB (pico, con proxy) & Preliminar \\
+RNF-17 & Carga sostenida y pico & 174~MiB (sin proxy) y 324~MiB (pico, con proxy); al iniciar sesión, el backend llega a 321~MiB (docs/16 §59) & Preliminar \\
 \bottomrule
 \end{tabular}
 \end{tablaseg}

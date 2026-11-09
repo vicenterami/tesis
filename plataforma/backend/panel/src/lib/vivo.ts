@@ -1,3 +1,4 @@
+import { comprobarSesion } from './api';
 import type { EventoVivo } from './modelo';
 
 // Canal en vivo con reconexión (docs/19 F4). `EventSource` reintenta solo ante un corte de red, pero NO ante un 503
@@ -60,6 +61,11 @@ export function abrirCanal(
   alEvento: (e: EventoVivo) => void,
   alEstado: (estado: EstadoCanal, motivo?: string) => void,
   crear: (url: string) => FuenteDeEventos = (u) => new EventSource(u) as unknown as FuenteDeEventos,
+  // Con sesión (docs/20 §3 y §10, R2), el servidor cierra el canal cuando la sesión vence o se cierra, y EventSource no dice el código.
+  // Al primer rechazo después de haber estado en vivo se pregunta por la sesión (una petición liviana): si venció, el cliente HTTP lleva
+  // al inicio de sesión y la pantalla, al desmontarse, cierra este canal. Solo al primero: los reintentos siguientes no preguntan, así
+  // un canal rechazado en bucle (cupo lleno) no mantiene viva la sesión de una pantalla sin nadie delante.
+  alRechazo: () => void = () => comprobarSesion(),
 ): Canal {
   let fuente: FuenteDeEventos | null = null;
   let intento = 0;
@@ -98,7 +104,10 @@ export function abrirCanal(
     f.onerror = () => {
       // Cerrado por el servidor (403, 503, respuesta inválida): el navegador no reintenta; lo hacemos nosotros.
       // En otro estado, el navegador ya está reintentando solo (corte de red): solo se avisa.
-      if (f.readyState === CERRADO) reconectar('el servidor rechazó o cerró el canal');
+      if (f.readyState === CERRADO) {
+        if (intento === 0) alRechazo(); // el primer rechazo tras una apertura buena (o el primero de todos)
+        reconectar('el servidor rechazó o cerró el canal');
+      }
       else {
         caido = true; // el navegador reintenta solo; al reabrir, también se vuelve a pedir
         alEstado('reconectando', 'sin red');

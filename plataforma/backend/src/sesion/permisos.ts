@@ -21,6 +21,14 @@ export const PERMISOS: Readonly<Record<Accion, readonly Rol[]>> = {
   usuarios: ['administrador'],
 };
 
+// La misma tabla vista por rol (rol → acciones que puede), para que el panel construya la guía de cada perfil a partir de ella y no de
+// un texto escrito aparte que podría desincronizarse (docs/19 §6; decidido al implementar, 08/11/2026). Sale de PERMISOS: no es otra fuente.
+export function matrizPorRol(): Record<Rol, Accion[]> {
+  const m = Object.fromEntries(ROLES.map((r) => [r, [] as Accion[]])) as Record<Rol, Accion[]>;
+  for (const a of ACCIONES) for (const r of PERMISOS[a]) m[r].push(a);
+  return m;
+}
+
 // Quién hace la petición. `todos` = alcance sobre todos los sitios: solo el «usuario del sistema», que es la clave de administrador
 // por cabecera (docs/20 §5; docs/10 §8.4 punto 41) mientras siga en el .env. Una persona con sesión siempre tiene `todos = false` y
 // su alcance es exactamente su mapa de sitios.

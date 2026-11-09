@@ -113,6 +113,7 @@ services:
       TOPE_LECTURAS_FACTOR:
       TOPE_LECTURAS_MINIMO:
       TOPE_CUARENTENA_HORA:
+      CLAVE_TEMPORAL_HORAS:                       # vigencia de la clave temporal de personas, 1–72 h; 2 por defecto (docs/20 §4)
       # El mismo secreto que el proxy pone en X-Proxy-Secreto (punto 52): solo con él el backend cree la dirección de X-Forwarded-For.
       # Ausente, el backend lo avisa al arrancar y usa la dirección del socket; presente y corto, no arranca.
       PROXY_SECRETO:

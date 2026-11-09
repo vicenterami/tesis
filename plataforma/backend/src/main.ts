@@ -11,7 +11,7 @@ import { join } from 'node:path';
 import type { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
-import { AvisosAcotados, hostsPermitidos, interfazDeEscucha, rechazoDeHost, registrosEnJson, rutaSinCache, servirDocumentacion, claveAdmin, claveApp } from './arranque';
+import { AvisosAcotados, horasClaveTemporal, hostsPermitidos, interfazDeEscucha, rechazoDeHost, registrosEnJson, rutaSinCache, servirDocumentacion, claveAdmin, claveApp } from './arranque';
 import { configurarOpenApi } from './openapi';
 
 // Punto de entrada. Levanta la aplicación Nest: al iniciarse, cada módulo se conecta a lo suyo
@@ -60,6 +60,8 @@ async function arrancar(): Promise<void> {
   // Clave de administrador por cabecera (docs/10 §8.4 punto 41; desde el 08/11/2026, el «usuario del sistema» de docs/20 §5): se valida
   // aquí para que una clave corta detenga el arranque; el guardia central (sesion/guardia.ts) la vuelve a leer por ConfigService.
   if (claveAdmin(process.env.HTTP_CLAVE_ADMIN) === undefined) log.warn('HTTP_CLAVE_ADMIN ausente: solo entra quien tenga sesión (y la cabecera X-Clave-Admin responde 503)');
+  // Vigencia de la clave temporal (docs/20 §4): la valida UsuariosService al construirse (un valor inválido ya detuvo el arranque); se dice cuál rige.
+  log.log(`clave temporal: vence a las ${horasClaveTemporal(process.env.CLAVE_TEMPORAL_HORAS)} h (CLAVE_TEMPORAL_HORAS, 1–72; por defecto 2)`);
   const avisos = new AvisosAcotados();
   app.use((req: Request, res: Response, next: NextFunction) => {
     const rechazo = rechazoDeHost(req.headers.host, permitidos);
