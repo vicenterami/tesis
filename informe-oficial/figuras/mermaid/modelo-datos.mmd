@@ -1,4 +1,5 @@
 erDiagram
+    usuario ||--o{ acceso : acceso
     dispositivo ||--o{ canal : canal
     magnitud ||--o{ canal : canal
     dispositivo ||--o{ condicion : condicion
@@ -13,10 +14,19 @@ erDiagram
     canal ||--o{ medicion : medicion
     sitio ||--o{ pasarela : pasarela
     canal ||--o{ regla_umbral : regla_umbral
+    usuario ||--o{ sesion : sesion
     dispositivo ||--o{ trama : trama
     sitio ||--o{ usuario_sitio : usuario_sitio
     usuario ||--o{ usuario_sitio : usuario_sitio
     sitio ||--o{ zona : zona
+    acceso {
+        timestamptz instante
+        uuid usuario_id FK
+        text email_intentado
+        inet ip
+        text resultado
+        text sesion_id
+    }
     canal {
         uuid id PK
         uuid dispositivo_id FK
@@ -135,6 +145,16 @@ erDiagram
         float histeresis
         timestamptz actualizado_en
     }
+    sesion {
+        text id PK
+        uuid usuario_id FK
+        timestamptz creada_en
+        timestamptz ultima_actividad
+        timestamptz expira_en
+        timestamptz revocada_en
+        inet ip
+        text agente
+    }
     sitio {
         uuid id PK
         text nombre
@@ -161,12 +181,15 @@ erDiagram
         timestamptz creado_en
         timestamptz actualizado_en
         bool activo
+        bool clave_temporal
+        timestamptz clave_temporal_vence_en
     }
     usuario_sitio {
         uuid usuario_id PK,FK
         uuid sitio_id PK,FK
         text rol
         timestamptz actualizado_en
+        bool activo
     }
     zona {
         uuid id PK

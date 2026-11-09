@@ -456,13 +456,16 @@ export class AltaService {
   }
 
   // Lista de pasarelas con sus nodos y la última vez vista, derivada de ellos (la recepción no escribe la fila de la pasarela: punto 27).
-  async listarPasarelas(): Promise<PasarelaListada[]> {
+  // `sitios`: el alcance de quien pregunta (docs/20 §5); null = todos (usuario del sistema).
+  async listarPasarelas(sitios: string[] | null = null): Promise<PasarelaListada[]> {
     const r = await this.pool.query<{ id: string; id_fisico: string; nombre: string; sitio_codigo: string; formato: FormatoPasarela; activo: boolean; nodos: string; vista: Date | null; creado_en: Date }>(
       `SELECT p.id, p.id_fisico, p.nombre, s.codigo AS sitio_codigo, p.formato, p.activo, p.creado_en,
               count(d.id) FILTER (WHERE d.estado <> 'baja') AS nodos, max(e.visto_por_ultima_vez) AS vista
          FROM pasarela p JOIN sitio s ON s.id = p.sitio_id
          LEFT JOIN dispositivo d ON d.pasarela_id = p.id LEFT JOIN estado_dispositivo e ON e.dispositivo_id = d.id
+        WHERE $1::uuid[] IS NULL OR p.sitio_id = ANY($1::uuid[])
         GROUP BY p.id, s.codigo ORDER BY p.id_fisico`,
+      [sitios],
     );
     return r.rows.map((x) => ({
       id: x.id, id_fisico: x.id_fisico, nombre: x.nombre, sitio_codigo: x.sitio_codigo, formato: x.formato, activo: x.activo,

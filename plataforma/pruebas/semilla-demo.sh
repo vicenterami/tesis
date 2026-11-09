@@ -7,6 +7,8 @@
 # Requiere la pila arriba (docker compose up -d en plataforma/). Idempotente: correrla dos veces da lo mismo.
 # Para probar que la verificación de verdad verifica: SEMILLA_DISPOSITIVO=dev-9999 bash … → debe FALLAR.
 set -u
+AQUI="$(cd "$(dirname "$0")" && pwd)"
+. "$AQUI/lib-dynsec.sh"
 cd "$(dirname "$0")/../.."
 DISP="${SEMILLA_DISPOSITIVO:-dev-0001}"
 psql_() { docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -U plataforma -d plataforma -v ON_ERROR_STOP=1 -tA "$@"; }
@@ -49,7 +51,8 @@ if [ "${1:-}" = "--completa" ]; then
   comprobar "condición del sistema de la semilla, cerrada" "SELECT count(*) FROM condicion_sistema WHERE detalle->>'origen'='semilla' AND cerrada_en IS NOT NULL" 1
   comprobar "credenciales: ninguna verificable (hash de semilla)" "SELECT count(*) FROM credencial c JOIN dispositivo d ON d.id=c.dispositivo_id WHERE d.id_fisico IN ($L) AND c.hash <> 'scrypt\$semilla\$sin-secreto-inutilizable'" 0
   # La API dice lo mismo que la base (lo que ve el panel): en_linea por dispositivo.
-  api=$(curl -s -m 5 http://127.0.0.1:3000/dispositivos | python3 -I -c "
+  # Desde el 08/11/2026 la lista exige sesión (docs/20 §6): se lee con la clave de administrador del .env (usuario del sistema).
+  api=$(printf 'X-Clave-Admin: %s\n' "$(leer_env "$AQUI/../.env" HTTP_CLAVE_ADMIN 2>/dev/null)" | curl -s -m 5 -H @- http://127.0.0.1:3000/dispositivos | python3 -I -c "
 import sys, json
 r = {d['id_fisico']: d['en_linea'] for d in json.load(sys.stdin)}
 esperado = {'demo-aire-01': True, 'demo-suelo-01': True, 'demo-silencioso': False, 'demo-mantenimiento': True, 'demo-baja': False,

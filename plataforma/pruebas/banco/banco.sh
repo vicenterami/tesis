@@ -44,6 +44,9 @@ psql_() { dc exec -T timescaledb psql -U plataforma -d plataforma -v ON_ERROR_ST
 # Plugin de seguridad del broker del banco: las mismas funciones que usa el operador con la pila real (pruebas/lib-dynsec.sh).
 . "$(dirname "$YO")/../lib-dynsec.sh"; DYN_DC=dc
 leer() { leer_env "$ENV" "$1"; }
+# Lecturas de la API del banco: desde el 08/11/2026 exigen sesión (docs/20 §6); el banco lee como «usuario del sistema» con la
+# clave de administrador de su .env (docs/20 §5), que entra a curl por la entrada estándar, nunca por argumentos.
+api_leer() { printf 'X-Clave-Admin: %s\n' "$(leer HTTP_CLAVE_ADMIN)" | curl -H @- "$@"; }
 DYN_ADMIN=""; [ -f "$ENV" ] && DYN_ADMIN=$(leer MQTT_ADMIN_CLAVE)
 emu() { (cd backend && pnpm -s exec ts-node --transpile-only src/emulador/emulador.ts "$@"); }
 case "${1:-}" in
@@ -171,7 +174,7 @@ case "${1:-}" in
     # en búfer el evento no llegaría a tiempo.
     disp_id=$(psql_ -tA -c "SELECT id FROM dispositivo WHERE id_fisico = 'emu-0003'" | tr -d '[:space:]')
     sse="$PRIV/sse-proxy.txt"; : > "$sse"
-    curl -s -N -m 30 --cacert "$CERTS/ca.crt" -H 'Origin: https://localhost:8443' "https://localhost:8443/eventos?dispositivo=$disp_id" > "$sse" & sse_pid=$!
+    api_leer -s -N -m 30 --cacert "$CERTS/ca.crt" -H 'Origin: https://localhost:8443' "https://localhost:8443/eventos?dispositivo=$disp_id" > "$sse" & sse_pid=$!
     trap 'kill "$sse_pid" 2>/dev/null' EXIT
     # Listo cuando llega el primer byte: Nest lo escribe (un salto de línea) recién suscrito, no antes. Un sleep fijo
     # podía publicar antes de la suscripción en un equipo cargado.
@@ -250,7 +253,7 @@ case "${1:-}" in
     [ "$h" = 'scrypt$' ] && ok "en la base, la credencial es un hash scrypt" || falla "hash en la base: «$h»"
     n=$(printf '\\set c %s\nSELECT count(*) FROM credencial WHERE position(:%sc%s in hash) > 0;\n' "'$CRED'" "'" "'" | psql_ -tA | tr -d '[:space:]'); [ "$n" = 0 ] && ok "el secreto en claro no está en ninguna fila de credencial" || falla "el secreto aparece en la base"
     n=$(psql_ -tA -c "SELECT count(*) FROM evento e JOIN dispositivo d ON d.id=e.dispositivo_id WHERE d.id_fisico='$id' AND e.tipo='alta'" | tr -d '[:space:]'); [ "$n" = 1 ] && ok "evento «alta» registrado" || falla "evento alta: $n"
-    curl -s http://127.0.0.1:3001/dispositivos | python3 -c "import sys,json; sys.exit(0 if any(d['id_fisico']=='$id' and d['via']=='mqtt' and d['en_linea'] for d in json.load(sys.stdin)) else 1)" && ok "GET /dispositivos lo lista con vía mqtt y en línea" || falla "no aparece en el inventario, o no en línea"
+    api_leer -s http://127.0.0.1:3001/dispositivos | python3 -c "import sys,json; sys.exit(0 if any(d['id_fisico']=='$id' and d['via']=='mqtt' and d['en_linea'] for d in json.load(sys.stdin)) else 1)" && ok "GET /dispositivos lo lista con vía mqtt y en línea" || falla "no aparece en el inventario, o no en línea"
     n=$(dc logs --no-color --since 3m backend 2>/dev/null | grep -cF -f <(printf '%s\n' "$CRED")); [ "$n" = 0 ] && ok "la credencial no aparece en el registro del backend" || falla "la credencial se escribió en el registro"
     # ── Rotación (POST /dispositivos/{id}/credencial, 13/10; docs/10 §3): la clave anterior deja de valer, la nueva publica,
     # en la base queda una fila activa y otra inactiva, y el evento «rotacion».
@@ -277,7 +280,7 @@ case "${1:-}" in
     n=$(psql_ -tA -c "SELECT d.estado || ' ' || (SELECT count(*) FROM credencial cr WHERE cr.dispositivo_id=d.id AND cr.activa) FROM dispositivo d WHERE d.id_fisico='$id'" | tr -d '[:space:]')
     [ "$n" = "baja0" ] && ok "en la base: estado baja y 0 credenciales activas" || falla "estado/credenciales activas: $n (esperado baja 0)"
     n=$(psql_ -tA -c "SELECT count(*) FROM evento e JOIN dispositivo d ON d.id=e.dispositivo_id WHERE d.id_fisico='$id' AND e.tipo='baja'" | tr -d '[:space:]'); [ "$n" = 1 ] && ok "evento «baja» registrado" || falla "evento baja: $n"
-    curl -s http://127.0.0.1:3001/dispositivos | python3 -c "import sys,json; sys.exit(0 if any(d['id_fisico']=='$id' and d['estado']=='baja' for d in json.load(sys.stdin)) else 1)" && ok "GET /dispositivos lo sigue listando, con estado baja (historial conservado)" || falla "no aparece con estado baja"
+    api_leer -s http://127.0.0.1:3001/dispositivos | python3 -c "import sys,json; sys.exit(0 if any(d['id_fisico']=='$id' and d['estado']=='baja' for d in json.load(sys.stdin)) else 1)" && ok "GET /dispositivos lo sigue listando, con estado baja (historial conservado)" || falla "no aparece con estado baja"
     code=$(del "$uid" | tail -1); [ "$code" = 409 ] && ok "repetir la baja → 409" || falla "repetir la baja → $code"
     code=$(rot "$uid" | tail -1); [ "$code" = 409 ] && ok "rotar un dado de baja → 409" || falla "rotar dado de baja → $code"
     code=$(del "00000000-0000-4000-8000-000000000000" | tail -1); [ "$code" = 404 ] && ok "dar de baja un UUID inexistente → 404" || falla "baja inexistente → $code"
@@ -382,9 +385,9 @@ case "${1:-}" in
     # edita la calibración aún no existe: se pone en la base, como lo haría una migración de datos.
     psql_ -q -c "UPDATE canal SET escala_cero = 0, escala_cien = 200 FROM dispositivo d WHERE canal.dispositivo_id = d.id AND d.id_fisico = '$udev' AND canal.magnitud_codigo = 'humedad'"
     did=$(psql_ -tA -c "SELECT id FROM dispositivo WHERE id_fisico = '$udev'"); cid=$(psql_ -tA -c "SELECT c.id FROM canal c JOIN dispositivo d ON d.id = c.dispositivo_id WHERE d.id_fisico = '$udev' AND c.magnitud_codigo = 'humedad'")
-    p=$(curl -s -m 5 "http://127.0.0.1:3001/dispositivos/$did" | python3 -c "import sys,json; c=[k for k in json.load(sys.stdin)['canales'] if k['magnitud']=='humedad'][0]; print(c['ultima_medicion']['porcentaje'])")
-    q=$(curl -s -m 5 "http://127.0.0.1:3001/canales/$cid/historico?intervalo=1%20minute&desde=$(date -u -d '-10 minutes' +%Y-%m-%dT%H:%M:%SZ)" | python3 -c "import sys,json; v=json.load(sys.stdin); print(v['escala'], v['porcentajes'])")
-    t=$(curl -s -m 5 "http://127.0.0.1:3001/dispositivos/$did" | python3 -c "import sys,json; c=[k for k in json.load(sys.stdin)['canales'] if k['magnitud']=='temperatura'][0]; print(c['ultima_medicion']['porcentaje'])")
+    p=$(api_leer -s -m 5 "http://127.0.0.1:3001/dispositivos/$did" | python3 -c "import sys,json; c=[k for k in json.load(sys.stdin)['canales'] if k['magnitud']=='humedad'][0]; print(c['ultima_medicion']['porcentaje'])")
+    q=$(api_leer -s -m 5 "http://127.0.0.1:3001/canales/$cid/historico?intervalo=1%20minute&desde=$(date -u -d '-10 minutes' +%Y-%m-%dT%H:%M:%SZ)" | python3 -c "import sys,json; v=json.load(sys.stdin); print(v['escala'], v['porcentajes'])")
+    t=$(api_leer -s -m 5 "http://127.0.0.1:3001/dispositivos/$did" | python3 -c "import sys,json; c=[k for k in json.load(sys.stdin)['canales'] if k['magnitud']=='temperatura'][0]; print(c['ultima_medicion']['porcentaje'])")
     [ "$p" = 32.8 ] && [[ "$q" == "{'cero': 0, 'cien': 200}"* ]] && [[ "$q" == *32.8* ]] && [ "$t" = None ] && ok "con calibración, la ficha y el histórico traen el % (65,52 → 32,8 %); sin calibración, null" || falla "porcentaje: ficha «$p» · histórico «$q» · sin calibración «$t»"
     visto0=$(visto "$udev"); sleep 1.1
     r=$(pub "$mid" "$MCRED" "$nativo" "$(sincodec AgAAAI8HGBmY 144 "$t3")"); c=$(esperar_cuarentena "$nativo" 'malformada*10 bytes*'); visto1=$(visto "$udev")
@@ -437,7 +440,7 @@ case "${1:-}" in
     rm -f "$PRIV/sesion.log"
     [ "$code" = 200 ] && [ "$(json "v['nodos_sin_pasarela']" <<<"${r%$'\n'*}")" = 1 ] && ok "baja → 200, con 1 nodo que queda sin pasarela" || falla "baja → $code: ${r:0:160}"
     r=$(pub "$pid" "$PCRED2" "$base/$deveui/up" "$(up "$deveui" '{"temperature":22}')"); [[ "$r" == *"Connection error"* ]] && ok "dada de baja, el broker ya no acepta su credencial" || falla "la dada de baja sigue entrando: $r"
-    curl -s http://127.0.0.1:3001/pasarelas | python3 -c "import sys,json; sys.exit(0 if any(p['id_fisico']=='$pid' and not p['activo'] for p in json.load(sys.stdin)) else 1)" && ok "GET /pasarelas la lista inactiva (historial conservado)" || falla "no aparece inactiva"
+    api_leer -s http://127.0.0.1:3001/pasarelas | python3 -c "import sys,json; sys.exit(0 if any(p['id_fisico']=='$pid' and not p['activo'] for p in json.load(sys.stdin)) else 1)" && ok "GET /pasarelas la lista inactiva (historial conservado)" || falla "no aparece inactiva"
     r=$(api POST /dispositivos -d "{\"id_fisico\":\"$(openssl rand -hex 8)\",\"nombre\":\"Nodo tardío\",\"zona_id\":\"$zona\",\"via\":\"lorawan\",\"pasarela_id\":\"$pasarela\",\"intervalo_esperado_s\":180,\"canales\":[{\"magnitud\":\"temperatura\"}]}")
     [ "${r##*$'\n'}" = 400 ] && [[ "${r%$'\n'*}" == *"$pid está dada de baja"* ]] && ok "alta de un nodo con la pasarela dada de baja → 400 que la nombra" || falla "nodo con pasarela de baja: ${r:0:160}"
     k=$(dc logs --no-color --since 5m backend 2>/dev/null | grep -cF -f <(printf '%s\n' "${PCRED:-sin}" "${PCRED2:-sin}" "${MCRED:-sin}")); [ "$k" = 0 ] && ok "ninguna credencial de pasarela aparece en el registro del backend" || falla "una credencial se escribió en el registro"
@@ -634,7 +637,7 @@ case "${1:-}" in
     CRED=$(json "v['conexion']['credencial']" <<<"$(cuerpo "$r")"); NUID=$(json "v['id']" <<<"$(cuerpo "$r")"); topico=$(json "v['conexion']['ejemplo']['topico']" <<<"$(cuerpo "$r")"); unset r
     [ "$topico" = "sitio/banco/dispositivo/$id/temperatura" ] && ok "el tópico del alta es el que arma el firmware (…/<id>/temperatura)" || falla "tópico «$topico»"
     # Calibración por API (punto 51): el canal y su actualizado_en salen de la ficha, como los tendría el panel.
-    f=$(curl -s -m 5 "http://127.0.0.1:3001/dispositivos/$NUID")
+    f=$(api_leer -s -m 5 "http://127.0.0.1:3001/dispositivos/$NUID")
     SCID=$(json "[k for k in v['canales'] if k['magnitud']=='humedad_suelo'][0]['id']" <<<"$f"); AT=$(json "[k for k in v['canales'] if k['magnitud']=='humedad_suelo'][0]['actualizado_en']" <<<"$f")
     [ -n \"$SCID\" ] && [ -n \"$AT\" ] || { falla \"la ficha no trae el canal de suelo o su actualizado_en\"; exit 1; }   # sin ellos, lo que sigue no prueba nada
     [[ "$AT" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:]{8}\.[0-9]{6}Z$ ]] && ok "la ficha entrega el actualizado_en del canal con microsegundos ($AT)" || falla "actualizado_en en la ficha: «$AT»"
@@ -652,7 +655,7 @@ case "${1:-}" in
     [ "$e" = "2.205/1.17" ] && [ "$ev" = "1/1" ] && ok "la base quedó con la calibración del 200 (el 409 no cambió nada) y un solo evento canal_calibrado con antes y después" || falla "base: escala «$e», eventos canal_calibrado «$ev»"
     # El evento en vivo del canal (SSE, directo al backend), abierto antes de publicar.
     sse="$PRIV/sse-nodo.txt"; : > "$sse"
-    curl -s -N -m 40 "http://127.0.0.1:3001/eventos?canal=$SCID" > "$sse" & sse_pid=$!
+    api_leer -s -N -m 40 "http://127.0.0.1:3001/eventos?canal=$SCID" > "$sse" & sse_pid=$!
     trap 'kill "$sse_pid" 2>/dev/null' EXIT
     sleep 1   # el flujo no escribe nada hasta el primer evento (o el latido, a los 25 s): se le da un segundo para suscribirse
     red=$(docker network ls --format '{{.Name}}' | grep '^banco_default$')
@@ -670,17 +673,17 @@ case "${1:-}" in
     v=$(psql_ -tA -c "SELECT m.valor FROM medicion m JOIN canal c ON c.id = m.canal_id WHERE c.dispositivo_id = '$NUID' AND c.magnitud_codigo = 'humedad_suelo' AND m.tiempo = to_timestamp($bt)")
     [ "$v" = 2.199 ] && ok "humedad_suelo guardada en V tal cual (2,199), sin convertir a porcentaje (docs/10 §8.4 punto 51)" || falla "humedad_suelo: «$v»"
     t=$(psql_ -tA -c "SELECT count(*) FROM trama WHERE dispositivo_id = '$NUID'"); [ "$t" = 1 ] && ok "una sola trama para las seis lecturas" || falla "tramas: $t"
-    p=$(curl -s -m 5 "http://127.0.0.1:3001/dispositivos/$NUID" | json "[k for k in v['canales'] if k['magnitud']=='humedad_suelo'][0]['ultima_medicion']['porcentaje']")
+    p=$(api_leer -s -m 5 "http://127.0.0.1:3001/dispositivos/$NUID" | json "[k for k in v['canales'] if k['magnitud']=='humedad_suelo'][0]['ultima_medicion']['porcentaje']")
     [ "$p" = 0.6 ] && ok "la ficha trae el porcentaje calculado con la calibración: 2,199 V → 0,6 % (sensor al aire)" || falla "porcentaje en la ficha: «$p»"
-    q=$(curl -s -m 5 "http://127.0.0.1:3001/canales/$SCID/historico?intervalo=1%20minute&desde=$(date -u -d "@$((bt - 1))" +%Y-%m-%dT%H:%M:%SZ)" | json "f\"{v['escala']}|{v['porcentajes']}\"")
+    q=$(api_leer -s -m 5 "http://127.0.0.1:3001/canales/$SCID/historico?intervalo=1%20minute&desde=$(date -u -d "@$((bt - 1))" +%Y-%m-%dT%H:%M:%SZ)" | json "f\"{v['escala']}|{v['porcentajes']}\"")
     [[ "$q" == "{'cero': 2.205, 'cien': 1.17}|[0.6"* ]] && ok "el histórico del canal trae la escala vigente y el porcentaje de cada punto (0,6 %)" || falla "histórico: «$q»"
     for _ in $(seq 1 20); do grep -q '^event: medicion' "$sse" && break; sleep 0.5; done
     kill "$sse_pid" 2>/dev/null; wait "$sse_pid" 2>/dev/null; trap - EXIT
     s=$(grep -m1 '^data: .*"tipo":"medicion"' "$sse" | sed 's/^data: //' | json "f\"{v['canal_id']}|{v['valor']}|{v['porcentaje']}\"" 2>/dev/null); rm -f "$sse"
     [ "$s" = "$SCID|2.199|0.6" ] && ok "el evento en vivo del canal (SSE medicion) trae el porcentaje con la calibración de la API: 0,6 %" || falla "evento en vivo: «$s»"
-    rs=$(curl -s -m 5 "http://127.0.0.1:3001/dispositivos/$NUID" | json "[k for k in v['canales'] if k['magnitud']=='rssi'][0]['ultima_medicion']['valor']")
+    rs=$(api_leer -s -m 5 "http://127.0.0.1:3001/dispositivos/$NUID" | json "[k for k in v['canales'] if k['magnitud']=='rssi'][0]['ultima_medicion']['valor']")
     [ "$rs" = -61 ] && ok "la intensidad Wi-Fi (rssi, dBm) llegó como magnitud del catálogo" || falla "rssi en la ficha: «$rs»"
-    curl -s http://127.0.0.1:3001/dispositivos | python3 -c "import sys,json; sys.exit(0 if any(d['id_fisico']=='$id' and d['en_linea'] for d in json.load(sys.stdin)) else 1)" && ok "el inventario lo muestra en línea" || falla "no aparece en línea en el inventario"
+    api_leer -s http://127.0.0.1:3001/dispositivos | python3 -c "import sys,json; sys.exit(0 if any(d['id_fisico']=='$id' and d['en_linea'] for d in json.load(sys.stdin)) else 1)" && ok "el inventario lo muestra en línea" || falla "no aparece en línea en el inventario"
     # Sin hora NTP el firmware omite bt: el backend pone la hora de recepción (docs/13 regla 7).
     r=$(pub "${pack/\"bt\":$bt,/}"); [[ "$r" == *"RC:0"* || "$r" == *"RC:16"* ]] || falla "publicar sin bt: $r"
     espera "m.origen_tiempo = 'recepcion'" 6 && ok "el mismo pack sin bt → seis mediciones con la hora de recepción (origen «recepcion»)" || falla "sin bt: $(cuenta "m.origen_tiempo = 'recepcion'") con origen recepcion"
@@ -710,7 +713,7 @@ case "${1:-}" in
     [ "$(codigo "$r")" = 201 ] || { echo "FALLA alta del dispositivo http → $(codigo "$r")"; exit 1; }
     TK=$(json "v['conexion']['token']" <<<"$(cuerpo "$r")"); TUID=$(json "v['id']" <<<"$(cuerpo "$r")"); unset r
     estado() { psql_ -tA -c "SELECT ventana_lecturas || '/' || ventana_cuarentena || '/' || ventana_sobre_tope || '/' || ventana_omitidas FROM estado_dispositivo WHERE dispositivo_id = '$1'"; }
-    abiertas() { curl -s "http://127.0.0.1:3001/condiciones?abiertas=true&dispositivo=$1" | json "','.join(sorted(c['tipo'] for c in v))"; }
+    abiertas() { api_leer -s "http://127.0.0.1:3001/condiciones?abiertas=true&dispositivo=$1" | json "','.join(sorted(c['tipo'] for c in v))"; }
     bt=$(date +%s)
     grande=$(python3 -c "import json,sys; bt=int(sys.argv[1]); print(json.dumps([{'bn':sys.argv[2],'bt':bt,'n':'temperatura','u':'Cel','v':20+(i%50)/10,'t':-i} for i in range(601)]))" "$bt" "$tid")
     r=$(enviar "$TK" "$tid" application/senml+json "$grande")

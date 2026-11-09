@@ -4,12 +4,15 @@ import { Pool } from 'pg';
 import { AltaService } from '../alta/alta.service';
 import { EstadoBroker, MetricasBrokerService } from '../broker/metricas.service';
 import { POOL } from '../db/db.module';
+import { Publica } from '../sesion/guardia';
 
 // GET /salud → estado del backend, de su conexión a la base y, desde el 13/10/2026 (docs/10 §8.4 punto 43), lo último que
 // se sabe del broker (cola, descartes, conexiones, condición abierta) y las operaciones de aprovisionamiento en curso. Lo usa
 // el healthcheck del contenedor cada 15 s: `estado` sigue dependiendo solo de la base (un broker caído se reconecta solo y no
 // debe reiniciar el backend); el resto es informativo y no toca la base.
+// Pública (docs/20 §6, primera fila): la consulta el chequeo de salud del contenedor, sin sesión.
 @ApiTags('salud')
+@Publica()
 @Controller('salud')
 export class SaludController {
   constructor(

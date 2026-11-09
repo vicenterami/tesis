@@ -1,22 +1,31 @@
 import {
-  BeforeApplicationShutdown, Controller, ForbiddenException, Logger, MessageEvent, Query, Req, ServiceUnavailableException, Sse,
+  BeforeApplicationShutdown, Controller, ForbiddenException, HttpException, HttpStatus, Logger, MessageEvent, Optional, Query, Req,
+  ServiceUnavailableException, Sse, UnauthorizedException, UseGuards,
 } from '@nestjs/common';
-import { ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiCookieAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
 import type { IncomingHttpHeaders } from 'node:http';
 import type { Socket } from 'node:net';
-import { Observable, defer, finalize, interval, map, merge } from 'rxjs';
+import { EMPTY, Observable, Subject, concat, concatMap, defer, filter, finalize, from, ignoreElements, interval, map, merge, of, takeUntil } from 'rxjs';
 import { AvisosAcotados } from '../arranque';
 import { uuid } from '../consulta/validacion';
-import { EventosService } from './eventos.service';
+import { EventoPanel, EventosService } from './eventos.service';
+import type { PeticionConUsuario } from '../sesion/guardia';
+import { UsuarioSesion, puedeEnAlguno } from '../sesion/permisos';
+import { MENSAJE_SIN_SESION, SesionService } from '../sesion/sesion.service';
+import { AlcanceDelFlujo, SitiosDeDispositivos } from './sitios-de-dispositivos';
 
 // Cuántos flujos abiertos a la vez admite el proceso: una cota de recursos compartida, no una defensa (un cliente de la
-// red puede agotarla, docs/11 §3). En la Etapa 3 el canal corre solo en la red local y sin sesión, como la API (docs/10
-// §5); el límite por usuario llega con la sesión (M7). Cada flujo es una conexión HTTP abierta.
+// red puede agotarla, docs/11 §3). Cada flujo es una conexión HTTP abierta. Desde el 08/11/2026 (M7, docs/20 §3) el canal exige la
+// sesión (o la clave de administrador) y además hay un tope POR USUARIO: 5 (decidido el 12/10/2026: cinco pestañas de una persona).
+// El usuario del sistema (X-Clave-Admin) cuenta como uno solo.
 export const MAX_FLUJOS = 50;
+export const MAX_FLUJOS_POR_USUARIO = 5;
 // Latido: un evento «latido» cada 25 s mantiene viva la conexión a través de proxies que cortan las inactivas (nginx, a
 // los 60 s por defecto; el de este proyecto, a la hora) y le confirma al panel que el canal sigue arriba aunque no haya
-// mediciones.
+// mediciones. En cada latido, además, se revalida la sesión del flujo (revisión del 08/11/2026): cerrada, vencida, revocada, de un
+// usuario desactivado o con clave temporal → el flujo se cierra; si cambiaron sus sitios, rige el alcance nuevo. Así un flujo abierto
+// no sobrevive más de un latido a la sesión que lo abrió (antes seguía hasta que el navegador se iba).
 export const LATIDO_MS = 25_000;
 
 @ApiTags('tiempo real')
@@ -24,18 +33,32 @@ export const LATIDO_MS = 25_000;
 export class EventosController implements BeforeApplicationShutdown {
   private readonly log = new Logger('tiempo-real');
   private abiertos = 0;
+  private readonly porUsuario = new Map<string, number>();
   private readonly conexiones = new Set<Socket>();
   private readonly avisos = new AvisosAcotados(); // un WARN por motivo y por minuto (docs/11 §3)
 
-  constructor(private readonly eventos: EventosService) {}
+  // Cada cuánto late el flujo. Las pruebas lo acortan asignándolo; nunca sale de una variable de entorno (ni de NODE_ENV).
+  latidoMs = LATIDO_MS;
+
+  // `sitios` y `sesiones` son opcionales para las pruebas que arman el controlador suelto con el usuario del sistema (sin filtro por
+  // sitio ni sesión que revalidar). En la aplicación, los dos existen siempre (TiempoRealModule y el módulo global de sesión).
+  constructor(
+    private readonly eventos: EventosService,
+    @Optional() private readonly sitios?: SitiosDeDispositivos,
+    @Optional() private readonly sesiones?: SesionService,
+  ) {}
 
   @Sse('eventos')
+  @UseGuards(AlcanceDelFlujo)
+  @ApiCookieAuth('sesion')
   @ApiOperation({
     summary: 'Canal de tiempo real (SSE)',
     description:
       'Server-Sent Events: medicion, visto y condicion, cada uno cuando ya está guardado, y un latido cada 25 s. ' +
-      'Filtros opcionales por dispositivo o por canal. Rechaza una página de otro sitio (403) y, con ' + MAX_FLUJOS +
-      ' flujos abiertos, responde 503.',
+      'Filtros opcionales por dispositivo o por canal. Exige sesión (o X-Clave-Admin): solo llegan los eventos de los dispositivos de ' +
+      'los sitios del usuario, y los del sistema (cola del broker) solo a quien administra algún sitio. La sesión se revalida en cada ' +
+      'latido: si se cerró, venció o fue revocada, el flujo termina; si cambiaron los sitios, rige el alcance nuevo. Rechaza una página de otro sitio ' +
+      '(403); con ' + MAX_FLUJOS_POR_USUARIO + ' flujos abiertos del mismo usuario responde 429 y con ' + MAX_FLUJOS + ' en total, 503.',
   })
   @ApiQuery({ name: 'dispositivo', required: false, description: 'UUID del dispositivo: solo sus eventos' })
   @ApiQuery({ name: 'canal', required: false, description: 'UUID del canal: solo sus mediciones' })
@@ -56,8 +79,11 @@ export class EventosController implements BeforeApplicationShutdown {
     },
   })
   @ApiResponse({ status: 400, description: 'Filtro que no es un UUID' })
+  @ApiResponse({ status: 401, description: 'sesión requerida' })
   @ApiResponse({ status: 403, description: 'Página de otro sitio (Origin o Sec-Fetch-Site)' })
-  @ApiResponse({ status: 503, description: 'Demasiados flujos abiertos' })
+  @ApiResponse({ status: 404, description: 'El dispositivo o el canal del filtro no existe o es de otro sitio' })
+  @ApiResponse({ status: 429, description: `Ya hay ${MAX_FLUJOS_POR_USUARIO} flujos abiertos de este usuario` })
+  @ApiResponse({ status: 503, description: 'Demasiados flujos abiertos en total' })
   flujo(
     @Req() req: Request,
     @Query('dispositivo') dispositivo?: string,
@@ -69,27 +95,84 @@ export class EventosController implements BeforeApplicationShutdown {
       if (aviso !== null) this.log.warn(`flujo rechazado: ${aviso}`);
       throw new ForbiddenException('origen no permitido');
     }
+    const inicial = (req as PeticionConUsuario).usuario;
+    if (inicial === undefined) throw new UnauthorizedException(MENSAJE_SIN_SESION);
+    let usuario: UsuarioSesion = inicial; // cambia en cada latido si cambiaron sus sitios
     const filtro = {
       dispositivo: dispositivo === undefined ? undefined : uuid(dispositivo, 'dispositivo'),
       canal: canal === undefined ? undefined : uuid(canal, 'canal'),
     };
+    const clave = usuario.id ?? 'sistema';
     if (this.abiertos >= MAX_FLUJOS) throw new ServiceUnavailableException('demasiados flujos abiertos');
-    // Se cuenta al suscribirse y se descuenta al cerrarse (el navegador se fue o el proceso se apaga): un flujo que
-    // nunca llegó a abrirse no ocupa cupo. Comprobar y contar no se separan: Nest se suscribe en una microtarea, sin E/S
-    // de por medio, así que ninguna otra petición entra entre las dos.
+    if ((this.porUsuario.get(clave) ?? 0) >= MAX_FLUJOS_POR_USUARIO) {
+      throw new HttpException(`ya tienes ${MAX_FLUJOS_POR_USUARIO} flujos abiertos; cierra una pestaña`, HttpStatus.TOO_MANY_REQUESTS);
+    }
+    // Se cuenta al suscribirse y se descuenta al cerrarse (el navegador se fue, la sesión dejó de valer o el proceso se apaga): un
+    // flujo que nunca llegó a abrirse no ocupa cupo. Comprobar y contar no se separan: Nest se suscribe en una microtarea, sin E/S
+    // de por medio, así que ninguna otra petición entra entre las dos. El mapa de sitios se refresca recién aquí, pasados el origen y
+    // los topes (como mucho cada 5 s, sitios-de-dispositivos.ts), y los eventos empiezan cuando terminó.
     return defer(() => {
       this.abiertos++;
+      this.porUsuario.set(clave, (this.porUsuario.get(clave) ?? 0) + 1);
       this.conexiones.add(req.socket);
-      return merge(
-        this.eventos.flujo(filtro).pipe(map((e): MessageEvent => ({ type: e.tipo, data: e }))),
-        interval(LATIDO_MS).pipe(map((): MessageEvent => ({ type: 'latido', data: { tiempo: new Date().toISOString() } }))),
+      const fin = new Subject<void>();
+      const refresco = usuario.todos || this.sitios === undefined ? EMPTY : from(this.sitios.refrescar()).pipe(ignoreElements());
+      return concat(
+        refresco,
+        merge(
+          this.eventos.flujo(filtro).pipe(
+            filter((e) => this.visible(usuario, e)),
+            map((e): MessageEvent => ({ type: e.tipo, data: e })),
+          ),
+          interval(this.latidoMs).pipe(
+            concatMap(() => this.revalidar(usuario)),
+            filter((u): u is UsuarioSesion => {
+              if (u === null) fin.next();
+              return u !== null;
+            }),
+            map((u): MessageEvent => {
+              usuario = u;
+              return { type: 'latido', data: { tiempo: new Date().toISOString() } };
+            }),
+          ),
+        ),
       ).pipe(
+        takeUntil(fin),
         finalize(() => {
           this.abiertos--;
+          const n = (this.porUsuario.get(clave) ?? 1) - 1;
+          if (n <= 0) this.porUsuario.delete(clave);
+          else this.porUsuario.set(clave, n);
           this.conexiones.delete(req.socket);
         }),
       );
     });
+  }
+
+  // La sesión del flujo, releída sin renovar la actividad (sesion.service.ts, cargarPorId), o null si ya no vale (cerrada, vencida,
+  // revocada, usuario inactivo, clave temporal) o si la base no responde: ante la duda, se cierra (el navegador reintenta y el guardia
+  // decide). El usuario del sistema no tiene sesión: sigue igual, sin consulta.
+  private revalidar(u: UsuarioSesion): Observable<UsuarioSesion | null> {
+    if (u.sistema || u.sesionId === null || this.sesiones === undefined) return of(u);
+    return from(
+      this.sesiones.cargarPorId(u.sesionId, { renovar: false }).then(
+        (n) => (n === null || n.claveTemporal ? null : n),
+        (e: unknown) => {
+          const aviso = this.avisos.registrar(`no se pudo revalidar la sesión de un flujo: ${(e as Error).message}`);
+          if (aviso !== null) this.log.warn(`flujo cerrado: ${aviso}`);
+          return null;
+        },
+      ),
+    );
+  }
+
+  // ¿Ve este evento? Con alcance total (usuario del sistema), todo. Una persona: los de dispositivos de sus sitios; los del sistema (la
+  // cola del broker afecta a toda la plataforma y no trae datos de ningún sitio), solo si administra alguno (docs/20 §3).
+  private visible(u: UsuarioSesion, e: EventoPanel): boolean {
+    if (u.todos) return true;
+    if (e.tipo === 'sistema') return puedeEnAlguno(u, 'escribir');
+    const sitio = this.sitios?.sitioDe(e.dispositivo_id);
+    return sitio !== undefined && u.sitios.has(sitio);
   }
 
   // Apagado ordenado (docs/10 §6): un flujo SSE no termina solo y retendría el cierre del servidor HTTP hasta que Docker

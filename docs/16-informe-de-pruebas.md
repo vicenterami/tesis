@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 357 pruebas unitarias del backend y 107 del panel, sin matriz formal); TT-32 (sensor físico) se cubrió después, en §43, §44 y §53;
+cubre todavía: TT-27 (contrato de trama: hoy 436 pruebas unitarias del backend y 107 del panel, sin matriz formal); TT-32 (sensor físico) se cubrió después, en §43, §44 y §53;
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -283,7 +283,7 @@ a `timescaledb-tune`, que se había quitado por seguridad; se quitó también el
 
 ## 14. Canal de tiempo real (TT-39, 09/10/2026)
 
-`GET /eventos` (`docs/10 §5`). 22 pruebas en `eventos.spec.ts` (`backend/src/tiempo-real/`); las del bloque «GET /eventos
+`GET /eventos` (`docs/10 §5`). 29 pruebas en `eventos.spec.ts` (`backend/src/tiempo-real/`; eran 22 cuando se escribió esta sección: la sesión sumó tres, §58); las del bloque «GET /eventos
 por HTTP» abren HTTP real en 127.0.0.1 con un puerto libre; más las del pipeline, las alertas y el supervisor sobre lo que cada uno anuncia.
 
 | Prueba | Resultado |
@@ -1723,3 +1723,85 @@ que comparten su red.
 
 **Lo que no prueba.** Que 1 200 sea el número correcto para un servidor concreto: es el de la flota dimensionada más holgura, y se revisa
 con la primera medición de conexiones reales (`$SYS/broker/clients/connected`, que el backend ya muestrea).
+
+## 58. Sesión de personas, usuarios y roles por sitio (08/11/2026)
+
+**Qué cambió** (`docs/20`; `docs/10 §8.4` puntos 36, 41 y 43; `docs/11 §3`). Migración 22 (`sesion`, `acceso` como hypertable, clave
+temporal de `usuario`, `usuario_sitio.activo`, `fn_limpiar_sesiones`), el módulo `backend/src/sesion/` (M7) y el guardia central: toda
+ruta exige la cookie de sesión (`__Host-sesion` desde la revisión del mismo día) o la clave de administrador, salvo `/salud`, `POST /sesion` y la recepción por HTTP. Las pruebas unitarias
+del backend pasan de 357 a 413 (nuevas: permisos, cookie y vencimientos con reloj simulado, privacidad de los registros de acceso, reglas de la clave, bloqueos, turnos del hash,
+la sesión contra una base falsa, el guardia y los cuerpos de usuarios; adaptadas: canal en vivo, retención, calibración e histórico). El
+guardián suma el paso 4b y un chequeo de la migración 22 en el paso 2.
+
+**Costo de `scrypt` con N = 2¹⁷** (r = 8, p = 1; una verificación, 10 repeticiones; `backend/src/alta/credenciales.ts`):
+
+| Dónde | N = 2¹⁷ (personas) | N = 2¹⁵ (dispositivos) |
+|---|---|---|
+| Portátil de desarrollo, Node 22.23.2 | mediana 250 ms (237–253) | mediana 64 ms |
+| Contenedor del backend, Node 22.23.4, con su techo de 0,5 CPU y 512 MB | mediana 508 ms (498–556) | mediana 117 ms |
+| `POST /sesion` de punta a punta contra el contenedor (paso 4b) | mediana ≈ 465 ms (clave mala y usuario inexistente) | — |
+
+El objetivo del diseño (100–300 ms por verificación) se cumple con un núcleo entero; con el medio núcleo que el compose le da hoy al backend,
+la verificación dura el doble porque el cálculo es de CPU. Un inicio de sesión de medio segundo es aceptable para una persona; lo que no se
+acepta es la memoria: cada cálculo pide 128 MiB, así que el backend admite como mucho dos a la vez (`sesion/turnos.ts`) y el resto espera.
+Si el servidor de referencia mantiene 0,5 CPU, revisar en la Etapa 4 si conviene subir el techo de CPU del backend o bajar N a 2¹⁶.
+
+**Cookie `Secure` en desarrollo** (`docs/20 §3`). En `http://127.0.0.1:3000`, con Chromium 156 y Firefox 157 sin interfaz (los que trae
+Playwright 1.64.1, ya en el árbol del panel): `POST /sesion` 200, `GET /sesion` 200 y `GET /dispositivos` 200 con la cookie que el
+navegador guardó (`secure: true`, `httpOnly: true`, `sameSite: Lax`, `path: /`); `document.cookie` vacío. Los dos tratan el loopback como
+contexto seguro: no hizo falta `HTTP_COOKIE_SEGURA`. curl 8.18 también la guarda y la devuelve con `-c`/`-b`.
+
+**La matriz de `docs/20 §6`, por HTTP** (`plataforma/pruebas/sesion-smoke.sh`, paso 4b). Datos propios y desechables: dos sitios, dos
+dispositivos HTTP por sitio y un canal en cada uno; el primer administrador lo crea la clave de administrador, y él a un usuario de
+consulta. Todo se borra al salir (comprobado: 0 usuarios, sesiones, accesos, sitios y dispositivos de prueba después de cada corrida).
+
+| Comprobación | Resultado |
+|---|---|
+| Corrida completa | 95 de 95 comprobaciones; con el administrador creado por SQL (cuando la base ya tiene uno), 89 de 89. Tras la revisión de seguridad (abajo): 111 de 111, y 105 de 105 con el administrador por SQL |
+| Sin sesión | 401 «sesión requerida» en las 8 lecturas, el canal en vivo y las 7 rutas que escriben; `/salud` 200 |
+| Consulta en su sitio | lecturas 200, la lista solo con su sitio; exportar y todo lo que escribe, 403 |
+| Administrador en su sitio | lecturas y exportar 200; alta 201, calibración 200 y 409 con la marca vieja, rotación 201, baja 200 y 409 repetida |
+| Otro sitio | 404 en ficha, histórico, condiciones, cuarentena, canal en vivo y exportar (consulta) y en alta, baja, rotación, calibración y alta de usuario (administrador); el 404 de otro sitio y el de un dispositivo inexistente tienen el mismo cuerpo |
+| CSRF | ruta que escribe con sesión y sin `X-Pedido: panel` → 403; `POST /sesion` sin ella → 403 |
+| Primer administrador | con `X-Clave-Admin` sin administradores → 201 con clave temporal; con uno ya creado → 403; con la temporal, solo `GET /sesion` (lo demás 403) hasta cambiarla |
+| Canal en vivo con dos sitios | una medición por HTTP en cada sitio: el flujo del usuario de consulta trae la de su sitio y no la del otro; el sexto flujo del mismo usuario → 429, otro usuario abre el suyo |
+| Igual respuesta, igual tiempo | inactivo, clave mala e inexistente: 401 «credenciales no válidas»; medianas de 5 intentos 467 y 471 ms (diferencia 4 ms, tolerancia 79 ms) |
+| Bloqueo | tras 5 claves malas, la sexta con la clave CORRECTA → 429 «bloqueado»; `acceso` con 5 `clave_incorrecta` y 1 `bloqueado` |
+| Desactivar, cerrar, carrera | desactivar corta su sesión (401); dos inicios simultáneos dan dos sesiones válidas distintas; cerrar deja la sesión revocada en la base y el identificador viejo responde 401; «cerrar en todos lados» corta las demás |
+| Cookie leída con `curl -D -` | `Set-Cookie: sesion=…; HttpOnly; Secure; SameSite=Lax; Path=/`; desde la revisión, `__Host-sesion=…`, sin `Domain` |
+
+**Plantado.** (1) Sin el chequeo de sitio en la ficha (`GET /dispositivos/{id}`), el paso 4b falla en 3 casos (otro sitio responde 200 con
+los datos, para consulta y para administrador, y el cuerpo deja de ser el de un inexistente); restaurado, 95 de 95. (2) Con `consulta` en
+la acción `exportar` de la tabla de permisos, fallan tres de las pruebas de `permisos.spec.ts`. (3) El chequeo de la migración 22 del paso 2
+da FALLA con un `GRANT UPDATE ON acceso` y con un `GRANT UPDATE (email) ON usuario` a `plataforma_app` dentro de una transacción que se
+deshace, y OK sin ellos.
+
+**Revisión de seguridad del bloque (08/11/2026; decisiones en `docs/20 §10`, R1–R21).** Pruebas unitarias del backend: de 413 a 436
+(nuevas en `usuarios.service.spec.ts`, la sesión, los bloqueos, los turnos, el usuario del sistema, el canal en vivo, el mapa de sitios y
+`rutaSinCache`). El paso 4b pasa de 95 a 111 comprobaciones. Lo medido contra el backend reconstruido:
+
+| Comprobación | Resultado |
+|---|---|
+| Corrida completa del paso 4b | 111 de 111 (59 s); con `SESION_SMOKE_ADMIN_POR_SQL=1`, 105 de 105 |
+| Cierre del canal en vivo al cerrar la sesión (R2) | el flujo abierto con la sesión que se cierra termina solo **24,0 s** después del cierre (el siguiente latido; tope del caso, 30 s), sin latido final; el de una sesión viva recibe su latido y sigue hasta que curl lo corta a los 32 s |
+| Escalada entre sitios (R1) | el administrador de A, sobre una persona de A que también está en B: desactivar 403 con el mensaje, clave temporal 403, su rol en A 200; la cuenta queda igual (misma huella de clave, activo y vencimiento); sobre quien solo está en A, 200 |
+| Carrera del último administrador (R3) | dos administradores (los únicos de la base) se desactivan el uno al otro a la vez: una 200 y la otra 409; queda 1 administrador activo |
+| Bloqueos (R6) | 8 intentos del mismo correo (5 malos y 3 bloqueados): `acceso` con 5 `clave_incorrecta` y **1** `bloqueado` |
+| `GET /usuarios` con `X-Clave-Admin` habiendo administrador (R10) | 403 |
+| `Cache-Control` (R14) | `no-store` en `GET /usuarios` y en `GET /salud`; `/panel/` sigue con `public, max-age=0` |
+| Cookie `__Host-sesion` (R15) | `curl -D -`: `HttpOnly; Secure; SameSite=Lax; Path=/`, sin `Domain`. Con Playwright, contra la pila real en `http://127.0.0.1:3000` y una persona de prueba creada y borrada por SQL: Chromium 156 y Firefox 157 dan `POST /sesion` 200, guardan `__Host-sesion` (`secure`, `httpOnly`, `sameSite: Lax`, `path: /`, dominio `127.0.0.1`) y `GET /sesion` 200; `document.cookie` vacío. En un servidor mínimo, los dos descartan una `__Host-` sin `Secure` o con `Path=/ver` |
+| Limpieza (R21) | con un error plantado en el SQL de limpieza: el aviso trae el error, los residuos por patrón (`sitios pa-/pb-: 3; usuarios *@ejemplo.invalid: 1; …`) y la orden `--limpiar SUFIJO`, que después limpia y deja 0 |
+| Hash de relleno calculado al arrancar (R16) | inexistente y clave mala siguen tardando lo mismo: 473 y 478 ms (medianas de 5; tolerancia 84 ms) |
+
+**Plantado** (cada corrección, quitada a mano, hace fallar su prueba; se restauró y todo vuelve a pasar): en jest, R1 (2 pruebas),
+R3 (1), R4 (1), R6 (2), R8 (2 sin el tope por dirección, 1 si el 503 no cuenta), R10 (1), R11 (1 sin el umbral, 1 con el refresco antes
+de los topes), R12 (1), R14 (1), R15 (5 con el nombre viejo), R16 (1), R17 (1), R18 (2), R2 (2 sin revalidar, 1 si revalida renovando la
+actividad). Contra el backend reconstruido con R1, R3, R10 y R2 quitados a la vez, el paso 4b dio 8 fallas: la clave lista con 200, el
+administrador de A desactiva a la persona de B (200) y la cuenta cambia, las dos desactivaciones cruzadas pasan (200 y 200) y la
+plataforma queda con **0** administradores, y el flujo de la sesión cerrada recibe su latido y sigue hasta que curl lo corta a los 40 s.
+R7 (nginx) lo cubre el paso 2m (la plantilla renderizada y válida); el límite no se midió con ráfagas en esta tanda.
+
+**Lo que no prueba.** La pantalla de inicio de sesión (P10, aún no existe): el panel actual recibe 401 hasta tenerla. El bloqueo por
+dirección (50 fallos) solo tiene prueba unitaria: por HTTP, cada corrida del paso 4b deja 12 fallos desde su dirección de origen (una distinta del bucle local por corrida, `ORIGEN` en el guion; antes, la misma, y y más de
+cuatro corridas en 15 minutos recibían 429: el bloqueo funcionando, corregido el 08/11 sin tocar el backend). El banco (`banco.sh`) lee ahora
+con la clave de administrador, pero no se corrió en esta tanda.

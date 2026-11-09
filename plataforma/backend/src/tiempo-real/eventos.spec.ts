@@ -1,14 +1,27 @@
-import { BadRequestException, Controller, Get, INestApplication, MessageEvent, ServiceUnavailableException } from '@nestjs/common';
+import {
+  BadRequestException, Controller, Get, Global, HttpException, INestApplication, MessageEvent, Module, ServiceUnavailableException, UnauthorizedException,
+} from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import type { Request } from 'express';
+import type { Pool } from 'pg';
 import { IncomingMessage, Server, request } from 'node:http';
 import { AddressInfo } from 'node:net';
-import { EventosController, LATIDO_MS, MAX_FLUJOS, mismoOrigen, rechazoDeOrigen } from './eventos.controller';
+import { EventosController, LATIDO_MS, MAX_FLUJOS, MAX_FLUJOS_POR_USUARIO, mismoOrigen, rechazoDeOrigen } from './eventos.controller';
 import { EventoPanel, EventosService } from './eventos.service';
 import { TiempoRealModule } from './tiempo-real.module';
+import { RECARGA_MINIMA_MS, SitiosDeDispositivos } from './sitios-de-dispositivos';
+import type { SesionService } from '../sesion/sesion.service';
+import { POOL } from '../db/db.module';
+import { AlcanceService } from '../sesion/alcance.service';
+import { UsuarioSesion, usuarioSistema } from '../sesion/permisos';
 
 // TT-39 · Canal de tiempo real del panel (docs/10 §5). Primero las piezas sueltas; al final, el canal por HTTP real.
-const SIN_ORIGEN = { headers: {} } as unknown as Request; // el propio panel, curl u otro servidor: sin Origin
+// El guardia central deja en la petición quién la hace (docs/20 §5); aquí, el usuario del sistema (alcance total).
+const SIN_ORIGEN = { headers: {}, usuario: usuarioSistema() } as unknown as Request; // el propio panel, curl u otro servidor: sin Origin
+// Una petición de otro usuario (para el tope global: cada uno cuenta aparte en el tope por usuario).
+const de = (u: UsuarioSesion): Request => ({ headers: {}, usuario: u }) as unknown as Request;
+const persona = (id: string, sitios: [string, 'administrador' | 'consulta'][]): UsuarioSesion =>
+  ({ ...usuarioSistema(), id, sistema: false, todos: false, sitios: new Map(sitios), sesionId: 'a'.repeat(64) });
 const M1: EventoPanel = { tipo: 'medicion', dispositivo_id: 'd1', canal_id: 'k1', valor: 21.5, unidad: 'Cel', tiempo: '2026-10-09T15:00:00.000Z', porcentaje: null };
 
 describe('EventosService: qué recibe cada flujo', () => {
@@ -68,11 +81,11 @@ describe('EventosController: cupo, filtros y latido', () => {
 
   it(`con ${MAX_FLUJOS} flujos abiertos responde 503; al cerrarse uno, vuelve a admitir`, () => {
     const c = new EventosController(new EventosService());
-    const abiertos = Array.from({ length: MAX_FLUJOS }, () => c.flujo(SIN_ORIGEN).subscribe());
+    const abiertos = Array.from({ length: MAX_FLUJOS }, (_, i) => c.flujo(de({ ...usuarioSistema(), id: `u${i}` })).subscribe());
     expect(c.flujosAbiertos).toBe(MAX_FLUJOS);
-    expect(() => c.flujo(SIN_ORIGEN)).toThrow(ServiceUnavailableException);
+    expect(() => c.flujo(de({ ...usuarioSistema(), id: 'otro' }))).toThrow(ServiceUnavailableException);
     abiertos[0].unsubscribe();
-    abiertos[0] = c.flujo(SIN_ORIGEN).subscribe();
+    abiertos[0] = c.flujo(de({ ...usuarioSistema(), id: 'otro' })).subscribe();
     expect(c.flujosAbiertos).toBe(MAX_FLUJOS);
     for (const s of abiertos) s.unsubscribe();
     expect(c.flujosAbiertos).toBe(0);
@@ -91,6 +104,109 @@ describe('EventosController: cupo, filtros y latido', () => {
     expect(c.flujosAbiertos).toBe(0);
   });
 
+  it(`con ${MAX_FLUJOS_POR_USUARIO} flujos de un mismo usuario, el sexto responde 429; otro usuario sigue entrando; al cerrar uno, vuelve a admitir`, () => {
+    const c = new EventosController(new EventosService());
+    const ana = persona('ana', [['s1', 'consulta']]);
+    const abiertos = Array.from({ length: MAX_FLUJOS_POR_USUARIO }, () => c.flujo(de(ana)).subscribe());
+    let codigo = 0;
+    try { c.flujo(de(ana)); } catch (e) { codigo = (e as HttpException).getStatus(); }
+    expect(codigo).toBe(429);
+    const otro = c.flujo(de(persona('beto', [['s1', 'consulta']]))).subscribe();
+    abiertos[0].unsubscribe();
+    abiertos[0] = c.flujo(de(ana)).subscribe();
+    expect(c.flujosAbiertos).toBe(MAX_FLUJOS_POR_USUARIO + 1);
+    for (const s of [...abiertos, otro]) s.unsubscribe();
+    expect(c.flujosAbiertos).toBe(0);
+  });
+
+  it('sin usuario en la petición (no pasó por el guardia) → 401; nunca un flujo abierto sin identidad', () => {
+    const c = new EventosController(new EventosService());
+    expect(() => c.flujo({ headers: {} } as unknown as Request)).toThrow(UnauthorizedException);
+    expect(c.flujosAbiertos).toBe(0);
+  });
+
+  it('cada persona recibe solo los eventos de los dispositivos de sus sitios; los del sistema, solo quien administra alguno (docs/20 §3)', async () => {
+    const bus = new EventosService();
+    const sitios = { sitioDe: (d: string) => ({ d1: 's1', d2: 's2' } as Record<string, string>)[d], refrescar: () => Promise.resolve() } as unknown as SitiosDeDispositivos;
+    const c = new EventosController(bus, sitios);
+    const suscripciones: { unsubscribe: () => void }[] = [];
+    const recibido = (u: UsuarioSesion): string[] => {
+      const r: string[] = [];
+      suscripciones.push(c.flujo(de(u)).subscribe((m) => r.push(`${String(m.type)}:${(m.data as { dispositivo_id?: string }).dispositivo_id ?? '-'}`)));
+      return r;
+    };
+    const consultaS1 = recibido(persona('ana', [['s1', 'consulta']]));
+    const adminS2 = recibido(persona('beto', [['s2', 'administrador']]));
+    const sistema = recibido(usuarioSistema());
+    const d2: EventoPanel = { ...M1, dispositivo_id: 'd2' };
+    const desconocido: EventoPanel = { ...M1, dispositivo_id: 'd9' }; // dado de alta recién: aún no está en el mapa
+    const cola: EventoPanel = { tipo: 'sistema', condicion: 'broker_descarte', estado: 'abierta', motivos: ['descartes'], mensajes_en_cola: 1, descartes_delta: 1 };
+    await new Promise((r) => setImmediate(r)); // el flujo de una persona empieza cuando terminó de refrescar el mapa de sitios
+    for (const e of [M1, d2, desconocido, cola]) bus.publicar(e);
+    expect(consultaS1).toEqual(['medicion:d1']);
+    expect(adminS2).toEqual(['medicion:d2', 'sistema:-']);
+    expect(sistema).toEqual(['medicion:d1', 'medicion:d2', 'medicion:d9', 'sistema:-']);
+    for (const s of suscripciones) s.unsubscribe(); // cada flujo lleva su latido: sin cerrarlos, el proceso de prueba no termina
+  });
+
+  it('en cada latido revalida la sesión SIN renovarla: aplica los sitios nuevos y, si ya no vale, cierra el flujo y libera el cupo (revisión del 08/11/2026)', async () => {
+    jest.useFakeTimers();
+    const bus = new EventosService();
+    const sitios = { sitioDe: (d: string) => ({ d1: 's1', d2: 's2' } as Record<string, string>)[d], refrescar: () => Promise.resolve() } as unknown as SitiosDeDispositivos;
+    const ana = persona('ana', [['s1', 'consulta']]);
+    const respuestas: (UsuarioSesion | null)[] = [persona('ana', [['s2', 'consulta']]), null];
+    const cargarPorId = jest.fn(() => Promise.resolve(respuestas.shift() ?? null));
+    const c = new EventosController(bus, sitios, { cargarPorId } as unknown as SesionService);
+    const recibidos: string[] = [];
+    let terminado = false;
+    c.flujo(de(ana)).subscribe({ next: (m) => recibidos.push(`${String(m.type)}:${(m.data as { dispositivo_id?: string }).dispositivo_id ?? '-'}`), complete: () => { terminado = true; } });
+    await jest.advanceTimersByTimeAsync(0);
+    bus.publicar(M1);
+    bus.publicar({ ...M1, dispositivo_id: 'd2' });
+    await jest.advanceTimersByTimeAsync(LATIDO_MS); // 1.er latido: la sesión sigue viva, pero ahora su sitio es s2
+    bus.publicar(M1);
+    bus.publicar({ ...M1, dispositivo_id: 'd2' });
+    expect(cargarPorId).toHaveBeenLastCalledWith('a'.repeat(64), { renovar: false });
+    expect(recibidos).toEqual(['medicion:d1', 'latido:-', 'medicion:d2']);
+    expect(terminado).toBe(false);
+    await jest.advanceTimersByTimeAsync(LATIDO_MS); // 2.º latido: la sesión ya no vale (cerrada, vencida o revocada)
+    expect(terminado).toBe(true);
+    expect(recibidos).toEqual(['medicion:d1', 'latido:-', 'medicion:d2']); // sin latido final
+    expect(c.flujosAbiertos).toBe(0);
+    expect(cargarPorId).toHaveBeenCalledTimes(2);
+  });
+
+  it('una clave temporal o una base que no responde también cierran el flujo; el usuario del sistema no consulta nada', async () => {
+    jest.useFakeTimers();
+    const sitios = { sitioDe: () => 's1', refrescar: () => Promise.resolve() } as unknown as SitiosDeDispositivos;
+    for (const respuesta of [() => Promise.resolve({ ...persona('ana', [['s1', 'consulta']]), claveTemporal: true }), () => Promise.reject(new Error('base caída'))]) {
+      const c = new EventosController(new EventosService(), sitios, { cargarPorId: jest.fn(respuesta) } as unknown as SesionService);
+      let terminado = false;
+      c.flujo(de(persona('ana', [['s1', 'consulta']]))).subscribe({ complete: () => { terminado = true; } });
+      await jest.advanceTimersByTimeAsync(LATIDO_MS);
+      expect(terminado).toBe(true);
+    }
+    const cargarPorId = jest.fn();
+    const c = new EventosController(new EventosService(), sitios, { cargarPorId } as unknown as SesionService);
+    const s = c.flujo(SIN_ORIGEN).subscribe();
+    await jest.advanceTimersByTimeAsync(LATIDO_MS * 2);
+    expect(cargarPorId).not.toHaveBeenCalled();
+    s.unsubscribe();
+  });
+
+  it('el mapa de sitios se refresca solo para un flujo que pasó el origen y los topes (revisión del 08/11/2026)', () => {
+    const refrescar = jest.fn(() => Promise.resolve());
+    const sitios = { sitioDe: () => 's1', refrescar } as unknown as SitiosDeDispositivos;
+    const c = new EventosController(new EventosService(), sitios);
+    const ana = persona('ana', [['s1', 'consulta']]);
+    expect(() => c.flujo({ headers: { 'sec-fetch-site': 'cross-site' }, usuario: ana } as unknown as Request)).toThrow();
+    const abiertos = Array.from({ length: MAX_FLUJOS_POR_USUARIO }, () => c.flujo(de(ana)).subscribe());
+    expect(refrescar).toHaveBeenCalledTimes(MAX_FLUJOS_POR_USUARIO);
+    expect(() => c.flujo(de(ana))).toThrow(HttpException); // el sexto: 429 sin consultar la base
+    expect(refrescar).toHaveBeenCalledTimes(MAX_FLUJOS_POR_USUARIO);
+    for (const s of abiertos) s.unsubscribe();
+  });
+
   it('un «latido» cada 25 s aunque no haya mediciones', () => {
     jest.useFakeTimers();
     const c = new EventosController(new EventosService());
@@ -99,6 +215,25 @@ describe('EventosController: cupo, filtros y latido', () => {
     jest.advanceTimersByTime(LATIDO_MS * 2);
     expect(recibidos.map((m) => m.type)).toEqual(['latido', 'latido']);
     s.unsubscribe();
+  });
+});
+
+describe('SitiosDeDispositivos: el mapa se recarga como mucho cada 5 s, aunque se abran flujos en bucle (revisión del 08/11/2026)', () => {
+  it('dentro de los 5 s, ninguna consulta más; pasados, una; dos pedidos a la vez comparten la misma', async () => {
+    const query = jest.fn(() => Promise.resolve({ rows: [{ id: 'd1', sitio_id: 's1' }] }));
+    const m = new SitiosDeDispositivos({ query } as unknown as Pool);
+    let ahora = 1_000_000;
+    m.ahora = () => ahora;
+    await Promise.all([m.refrescar(), m.refrescar()]);
+    expect(query).toHaveBeenCalledTimes(1);
+    expect(m.sitioDe('d1')).toBe('s1');
+    ahora += RECARGA_MINIMA_MS;
+    await m.refrescar();
+    m.sitioDe('d9'); // un dispositivo desconocido tampoco salta el umbral
+    expect(query).toHaveBeenCalledTimes(1);
+    ahora += 1;
+    await m.refrescar();
+    expect(query).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -112,6 +247,17 @@ class LentoController {
   }
 }
 
+// La base y el alcance, falsos: el canal los usa solo para el mapa de sitios y para los filtros (que aquí son del usuario del sistema).
+@Global()
+@Module({
+  providers: [
+    { provide: POOL, useValue: { query: () => Promise.resolve({ rows: [] }) } },
+    { provide: AlcanceService, useValue: { exigirDispositivo: () => Promise.resolve(), exigirCanal: () => Promise.resolve() } },
+  ],
+  exports: [POOL, AlcanceService],
+})
+class BaseYAlcanceFalsos {}
+
 // Por HTTP real, en 127.0.0.1 y un puerto libre: cabeceras, nombre y datos del evento, rechazos y apagado ordenado.
 // Los WARN de los rechazos se dejan ver a propósito (decisión del 23/09): son la evidencia de que el filtro actúa.
 describe('GET /eventos por HTTP (TT-39)', () => {
@@ -119,8 +265,10 @@ describe('GET /eventos por HTTP (TT-39)', () => {
   let puerto = 0;
 
   beforeEach(async () => {
-    const modulo = await Test.createTestingModule({ imports: [TiempoRealModule], controllers: [LentoController] }).compile();
+    const modulo = await Test.createTestingModule({ imports: [BaseYAlcanceFalsos, TiempoRealModule], controllers: [LentoController] }).compile();
     app = modulo.createNestApplication({ logger: ['warn', 'error'] });
+    // Lo que deja el guardia central (docs/20 §5): aquí, el usuario del sistema en toda petición.
+    app.use((req: Request & { usuario?: UsuarioSesion }, _res: unknown, next: () => void) => { req.usuario = usuarioSistema(); next(); });
     await app.listen(0, '127.0.0.1');
     puerto = ((app.getHttpServer() as Server).address() as AddressInfo).port;
   });

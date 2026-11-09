@@ -1,11 +1,12 @@
-import { BadRequestException, ConflictException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, ConflictException, ForbiddenException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { GUARDS_METADATA } from '@nestjs/common/constants';
 import type { Pool } from 'pg';
 import type { DynsecService } from '../broker/dynsec.service';
 import { AltaService } from './alta.service';
 import { validarCalibracion } from './calibracion.dto';
 import { CanalesAdminController } from './canales.controller';
-import { ClaveAdminGuard } from './clave-admin.guard';
+import type { AlcanceService } from '../sesion/alcance.service';
+import { UsuarioSesion, usuarioSistema } from '../sesion/permisos';
 
 // Calibración por API con bloqueo optimista (docs/10 §8.4 punto 51 (ii) a (vi)): DTO, 404, 409, evento y respuesta, con una base falsa.
 const C = '77777777-7777-4777-8777-777777777777';
@@ -124,12 +125,16 @@ describe('AltaService.calibrar: bloqueo optimista, evento y respuesta (docs/10 �
     await expect(armar({ insertFalla: { code: '55P03' } }).servicio.calibrar(C, { escala_cero: 1, escala_cien: 2, actualizado_en: VIEJO })).rejects.toBeInstanceOf(ServiceUnavailableException);
   });
 
-  it('la ruta lleva la guardia de la clave de administrador (punto 41) y valida el UUID antes de tocar el servicio', () => {
-    expect(Reflect.getMetadata(GUARDS_METADATA, CanalesAdminController)).toEqual([ClaveAdminGuard]);
+  it('la ruta la protege el guardia central (docs/20 §5): rol de consulta → 403 antes de validar; UUID y cuerpo validados antes del servicio', async () => {
+    expect(Reflect.getMetadata(GUARDS_METADATA, CanalesAdminController)).toBeUndefined(); // ya no lleva guardia propia: la global (APP_GUARD)
     const llamado = jest.fn();
-    const ctl = new CanalesAdminController({ calibrar: llamado } as unknown as AltaService);
-    expect(() => ctl.calibrar('no-es-uuid', { escala_cero: 1, escala_cien: 2, actualizado_en: VIEJO })).toThrow(BadRequestException);
-    expect(() => ctl.calibrar(C, { escala_cero: 1, actualizado_en: VIEJO })).toThrow(BadRequestException);
+    const exigirCanal = jest.fn(() => Promise.resolve());
+    const ctl = new CanalesAdminController({ calibrar: llamado } as unknown as AltaService, { exigirCanal } as unknown as AlcanceService);
+    const consulta: UsuarioSesion = { ...usuarioSistema(), id: 'u1', sistema: false, todos: false, sitios: new Map([['s1', 'consulta']]) };
+    await expect(ctl.calibrar(consulta, 'no-es-uuid', { escala_cero: 1, escala_cien: 2, actualizado_en: VIEJO })).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(ctl.calibrar(usuarioSistema(), 'no-es-uuid', { escala_cero: 1, escala_cien: 2, actualizado_en: VIEJO })).rejects.toBeInstanceOf(BadRequestException);
+    await expect(ctl.calibrar(usuarioSistema(), C, { escala_cero: 1, actualizado_en: VIEJO })).rejects.toBeInstanceOf(BadRequestException);
+    expect(exigirCanal).toHaveBeenCalledWith(usuarioSistema(), 'escribir', C);
     expect(llamado).not.toHaveBeenCalled();
   });
 });

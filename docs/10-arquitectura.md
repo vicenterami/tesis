@@ -491,7 +491,7 @@ cliente ──HTTP──► Express ⊂ NestJS ──► servicio ──► pg �
 
 - **Express** es la biblioteca de servidor HTTP más usada de Node.js; NestJS la usa por debajo
   (`@nestjs/platform-express`). El proceso de Node es el servidor; Express recibe cada petición y
-  entrega la respuesta. Es **la API**: 13 rutas REST (16 operaciones, la recepción por HTTP incluida) y el canal SSE `/eventos` (§5), descritos en el contrato OpenAPI (14 rutas y 17 operaciones contando `/eventos`). Express no toca la base.
+  entrega la respuesta. Es **la API**: 17 rutas REST (23 operaciones, la recepción por HTTP, la sesión y los usuarios incluidos) y el canal SSE `/eventos` (§5), descritos en el contrato OpenAPI (18 rutas y 24 operaciones contando `/eventos`). Desde el 08/11/2026, antes de cada ruta corre el guardia central de la sesión (`docs/20 §5`). Express no toca la base.
 - **`pg`** (node-postgres) es el conductor de la base: mantiene un *pool* de 5 conexiones
   (`db/db.module.ts`) y envía **SQL directo** con parámetros `$1, $2…`; el valor nunca se pega dentro
   del texto SQL, lo que evita la inyección. Sin ORM, por la razón de `docs/07` (series de tiempo con
@@ -607,7 +607,7 @@ unidireccional, reconexión nativa, sin biblioteca extra) es más simple y cabe 
 **Decidido el 06/10/2026: SSE** (§8.4, punto 1); los diagramas lo muestran así desde esa fecha. Lo que OWASP
 pide para WebSocket se traslada a SSE en lo que aplica: misma sesión (la cookie viaja sola en `EventSource`),
 autorización por canal antes de abrir el flujo y límite de flujos por usuario; ninguna de las dos toca el broker.
-**En la Etapa 3 el canal corre sin sesión, como la API:** solo en la red local (127.0.0.1); la sesión se le agrega con M7
+**Hasta el 08/11/2026 el canal corrió sin sesión, como la API (desde entonces exige la cookie y filtra por sitio, `docs/20`):** solo en la red local (127.0.0.1); la sesión se le agregó con M7 el 08/11/2026
 (HU-18, Etapa 4, desde el corte del 08/10). Ninguno de los dos se publica en Internet antes de eso (`docs/11 §8`).
 **Exportación (RF-34, implementada el 12/10/2026; HU-08 adelantada a la Etapa 3):** `GET /dispositivos/{id}/exportar?formato=csv|json
 &desde&hasta` escribe las mediciones crudas del dispositivo fila a fila al responder, por tandas de 10 000 con paginación por
@@ -1125,7 +1125,11 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     Aquí: roles por sitio (`usuario_sitio`) con una tabla de permisos por acción comprobada en un
     solo guardia del backend; el sitio sale de la sesión y entra al WHERE de cada consulta; las ediciones usan bloqueo optimista
     con 409 (punto 28) y dejan su `evento` con quién. Se prueba con una sesión de cada rol, no solo de administrador. Se
-    implementa con la autenticación (M7).
+    implementa con la autenticación (M7). **Hecho el 08/11/2026** (`backend/src/sesion/`, migración 22, `docs/20`): un guardia global
+    (`sesion/guardia.ts`) deja en la petición el usuario y su mapa sitio → rol; la tabla de permisos por acción y la única función que
+    decide (`permitir`) viven en `sesion/permisos.ts`; el sitio de cada recurso lo resuelve el servidor (`sesion/alcance.service.ts`) y
+    las listas lo llevan en el `WHERE`. Probado con una sesión por rol y dos sitios (paso 4b del guardián, `docs/16 §58`). Los cambios de
+    usuarios dejan su `evento` con quién; el «quién» en los eventos de alta, baja, rotación y calibración llega con la auditoría (punto 43).
 37. **Exportación en CSV, XLSX y JSON** (RF-34, HU-08). El Académico/Investigador en Ingeniería Civil Geológica la pidió «crítico y no negociable» en CSV o XLSX para
     trabajar en Python, R, MATLAB o QGIS. JSON sale de la misma consulta; XLSX necesita una biblioteca, que se elige con licencia
     permisiva y sin avisos de seguridad (los revisan el guardián y la auditoría). Solo datos del sitio de quien exporta (RF-41).
@@ -1167,7 +1171,7 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
 41. **Alta por API en la Etapa 3, antes de la sesión: clave de administrador por cabecera** (decidido el 12/10/2026). HU-11
     (`POST /dispositivos`, §3) es la primera ruta que escribe y crea credenciales del broker, y la sesión (M7) llega en la
     Etapa 4. Hasta entonces, toda ruta que escribe exige la cabecera `X-Clave-Admin` con el valor de `HTTP_CLAVE_ADMIN` del
-    `.env` (la escribe la persona; ausente = las rutas que escriben responden 503 «sin administrador configurado», nunca
+    `.env` (la escribe la persona; ausente = la cabecera responde 503 «sin administrador configurado» y las personas con sesión no se ven afectadas (desde el 08/11/2026), nunca
     quedan abiertas); sin la cabecera o con otro valor, 401, con un aviso acotado en el registro como los del `Host`. La
     comparación es de tiempo constante. Con M7 la cabecera se reemplaza por la cookie de sesión y el rol de administrador
     del sitio (punto 36); la clave de administrador pasa a crear el primer usuario y se retira. La credencial del dispositivo
@@ -1182,7 +1186,10 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     canales, hash y evento en una transacción, con el cliente del broker creado dentro de ella (`createClient` con su rol en un
     solo comando: todo o nada; sin respuesta del broker en 5 s, nada queda creado y se ordena borrar el cliente por si llegó a
     crearse; si la base no confirma después, el cliente se borra; como mucho dos altas a la vez, 429 la tercera); identidad administradora `backend-admin` con conexión propia y sesión limpia (`broker/dynsec.service.ts`), distinta
-    de `backend`. El laboratorio mostró que los archivos no conviven con el plugin: punto 42.
+    de `backend`. El laboratorio mostró que los archivos no conviven con el plugin: punto 42. **Desde el 08/11/2026** (M7, `docs/20 §5`):
+    toda ruta exige la sesión o esta cabecera; la cabecera pasa por el mismo guardia central como «usuario del sistema», administrador
+    en todos los sitios, y crea solo el PRIMER administrador (`POST /usuarios`; con uno activo, 403). Se retira del `.env` del servidor
+    una vez creado; en desarrollo la siguen usando el guardián y el banco.
 42. **Todos los usuarios del broker viven en el plugin Dynamic Security; `password_file` y `acl_file` se retiran** (decidido y
     hecho el 12/10/2026 con el laboratorio de `docs/16 §18`: con el plugin activo, la ACL de todos la decide el plugin, así que
     no hay convivencia útil con los archivos). El archivo del plugin (`dynamic-security.json`) vive en el volumen de datos del
@@ -1229,7 +1236,9 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     menos; la señal autoritativa de pérdida son los descartes), se abre una condición del sistema (nueva, sin dispositivo) que viaja por el canal en vivo y se cierra
     sola al normalizarse. Orden de implementación: topes y muestreo con alarma en la Etapa 3 (protegen datos: 2 h); `auditoria`,
     middleware e `id_peticion` al abrir la Etapa 4 junto con la sesión (3 h), porque «quién» necesita el usuario; la ruta de lectura (Etapa 4)
-    y la pantalla después. Se mide la sobrecarga del middleware en el banco antes de dejarlo (`docs/16`). **Hecho el 13/10/2026 (la parte de la Etapa 3):**
+    y la pantalla después. Se mide la sobrecarga del middleware en el banco antes de dejarlo (`docs/16`). **El 08/11/2026 llegó `acceso`**
+    con la sesión (migración 22: hypertable, 90 días por `RETENCION_ACCESO_DIAS`); `auditoria`, su middleware e `id_peticion` siguen
+    pendientes para el bloque siguiente. **Hecho el 13/10/2026 (la parte de la Etapa 3):**
     topes en `mosquitto.conf` y en el banco; migración 13 (`metrica_broker`, hypertable con retención de 90 días, y
     `condicion_sistema`); `broker/metricas.service.ts` muestrea cada `METRICA_BROKER_INTERVALO_S` (60 s) los contadores que recibe
     la conexión administradora, abre `broker_descarte` cuando el contador de descartes crece o la cola llega al 80 % de
@@ -1255,10 +1264,10 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     Los registros de Mosquitto y de los demás servicios no viajan: quedan en el disco del servidor (§6); si algún día se
     centralizan, ese envío cumple R1 y R2. Hecho el 13/10 en el broker: el rol `admin` del plugin, que de fábrica lee todo,
     quedó acotado a `$CONTROL/dynamic-security/#` y `$SYS/#` (probado en el banco). En la base, hecho el 13/10
-    (migración 14): el backend entra como `plataforma_app`, que lee todo, inserta solo en las 11 tablas donde el código inserta y actualiza solo en
+    (migración 14): el backend entra como `plataforma_app`, que lee todo, inserta solo en las tablas donde el código inserta (11 hasta la migración 21; desde la 22 también `usuario`, `usuario_sitio`, `sesion` y `acceso`) y actualiza solo en
     5 (desde la migración 16 también inserta en `pasarela` y actualiza solo su columna `activo`, para el alta y la baja por API; ni DELETE, ni TRUNCATE, ni DDL; `evento`, `medicion` y `trama` no se pueden reescribir, solo agregar);
     el dueño queda para migraciones y semillas. La retención, que usa `drop_chunks` y este exige ser dueño de la hypertable, pasa
-    por una sola función del dueño (`fn_retencion_drop_chunks`, `SECURITY DEFINER`, lista blanca de cuatro tablas, mínimo de días,
+    por una sola función del dueño (`fn_retencion_drop_chunks`, `SECURITY DEFINER`, lista blanca de cinco tablas (`acceso` desde la migración 22), mínimo de días,
     `search_path` fijo) que la aplicación solo puede ejecutar. Se eligió así frente a un proceso aparte con el dueño (un
     contenedor más, RNF-17) porque la única puerta con permiso de dueño queda en diez líneas revisables. Probado en el banco:
     `pruebas/base-rol-app.sh` (lo permitido entra y lo prohibido se rechaza) y la API completa, el alta, el pipeline, la cola y
@@ -1290,7 +1299,7 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     (a) **mismo puerto y mismo certificado**: 443 con `Upgrade` (RFC 6455 §1.7), en un bloque `location` propio del proxy que pase
     `Upgrade` y `Connection`; (b) **verificación del `Origin` en el saludo**, porque un WebSocket no está protegido por CORS y una
     página ajena podría abrirlo con la cookie de la víctima (lo mismo que hoy hace `/eventos` con el SSE); (c) **sesión**: la misma
-    cookie que la API cuando exista M7, y hasta entonces lectura sin sesión, como hoy; (d) **latido y reconexión**: ping/pong
+    cookie que la API (M7, desde el 08/11/2026; antes, lectura sin sesión); (d) **latido y reconexión**: ping/pong
     periódico y reconexión con espera creciente en el cliente, que el SSE traía por norma y WebSocket no; (e) **contrapresión y
     límites**: tope de conexiones (hoy `MAX_FLUJOS` = 50), tope de mensajes en cola por cliente y cierre del que no lee; (f) **mismo
     bus**: la pasarela WebSocket se cuelga de `EventosService`, sin tocar el pipeline; (g) **mensajes del navegador**: por ahora

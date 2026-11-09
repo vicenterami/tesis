@@ -17,7 +17,7 @@ import { POOL } from '../db/db.module';
 // (docs/14 §2, medido el 24/10/2026) y el historial largo es el dato valioso del caso de uso. Solo se recortan si se define la variable.
 // porDefecto null = sin límite: la tabla no se toca.
 export interface Limite<D extends number | null = number> { variable: string; porDefecto: D; minimo: number }
-export interface Plazo extends Limite<number | null> { tabla: 'medicion' | 'trama' | 'cuarentena' | 'metrica_broker' }
+export interface Plazo extends Limite<number | null> { tabla: 'medicion' | 'trama' | 'cuarentena' | 'metrica_broker' | 'acceso' }
 
 const ESPERA_INICIAL_MS = 60_000;
 
@@ -29,6 +29,9 @@ export const PLAZOS: Plazo[] = [
   { tabla: 'cuarentena', variable: 'RETENCION_CUARENTENA_DIAS', porDefecto: 30, minimo: 7 },
   // Muestras por minuto de los contadores $SYS del broker (docs/10 §8.4 punto 43, migración 13): 90 días.
   { tabla: 'metrica_broker', variable: 'RETENCION_METRICA_BROKER_DIAS', porDefecto: 90, minimo: 7 },
+  // Bitácora de accesos (RF-46; docs/20 §2, migración 22): 90 días, la misma que la auditoría de operaciones (docs/10 §8.4 punto 43).
+  // Con el mismo plazo se limpian las sesiones que dejaron de valer (fn_limpiar_sesiones): la fila `ok` de acceso las nombra hasta entonces.
+  { tabla: 'acceso', variable: 'RETENCION_ACCESO_DIAS', porDefecto: 90, minimo: 7 },
 ];
 
 // Ausente → valor por defecto. Presente pero vacía o no entera → error al arrancar, nunca un 0 silencioso:
@@ -94,6 +97,17 @@ export class RetencionService implements OnModuleInit, OnModuleDestroy {
         partes.push(`${p.tabla}=error`);
         this.log.error(`retención de ${p.tabla} falló, se reintenta en la próxima corrida: ${(e as Error).message}`);
       }
+    }
+    const diasAcceso = this.plazos.find(({ p }) => p.tabla === 'acceso')?.dias ?? 90;
+    try {
+      const r = await this.pool.query<{ n: number }>('SELECT fn_limpiar_sesiones($1) AS n', [diasAcceso]);
+      borrados.sesiones = Number(r.rows[0].n);
+      partes.push(`sesiones=${borrados.sesiones}`);
+    } catch (e) {
+      fallos++;
+      borrados.sesiones = 'error';
+      partes.push('sesiones=error');
+      this.log.error(`limpieza de sesiones vencidas falló, se reintenta en la próxima corrida: ${(e as Error).message}`);
     }
     const duracion = Date.now() - inicio;
     const linea = `resumen fragmentos_borrados ${partes.join(' ')} fallos=${fallos} duration_ms=${duracion}`;

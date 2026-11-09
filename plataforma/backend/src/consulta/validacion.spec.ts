@@ -1,6 +1,8 @@
 import { BadRequestException } from '@nestjs/common';
 import { CanalesController } from './canales.controller';
 import type { ConsultaService } from './consulta.service';
+import type { AlcanceService } from '../sesion/alcance.service';
+import { usuarioSistema } from '../sesion/permisos';
 import { MAX_CUBOS, cubos, exigirTopeCubos, fecha, intervalo, limite, uuid } from './validacion';
 
 // Toda entrada del cliente es hostil (docs/11 §3). Un parámetro repetido llega como arreglo: debe dar 400, nunca 500.
@@ -47,13 +49,16 @@ describe('validacion: parámetros de consulta', () => {
     expect(() => exigirTopeCubos(atras(366), hasta, '1 day')).not.toThrow();
     expect(() => exigirTopeCubos(atras(367), hasta, '1 day')).toThrow(/367 días.*máximo es 366/);
   });
-  it('GET /canales/{id}/historico rechaza la ventana excesiva sin llamar a la consulta', () => {
+  it('GET /canales/{id}/historico rechaza la ventana excesiva sin llamar a la consulta; si pasa, exige el sitio del canal (docs/20 §6)', async () => {
     const historico = jest.fn();
-    const c = new CanalesController({ historico } as unknown as ConsultaService);
+    const exigirCanal = jest.fn(() => Promise.resolve());
+    const c = new CanalesController({ historico } as unknown as ConsultaService, { exigirCanal } as unknown as AlcanceService);
     const ID = '11111111-1111-4111-8111-111111111111';
-    expect(() => c.historico(ID, '2026-01-01T00:00:00Z', '2026-10-01T00:00:00Z', '1 minute')).toThrow(BadRequestException);
+    await expect(c.historico(usuarioSistema(), ID, '2026-01-01T00:00:00Z', '2026-10-01T00:00:00Z', '1 minute')).rejects.toThrow(BadRequestException);
     expect(historico).not.toHaveBeenCalled();
-    void c.historico(ID, '2026-09-01T00:00:00Z', '2026-10-01T00:00:00Z', '1 hour');
+    expect(exigirCanal).not.toHaveBeenCalled();
+    await c.historico(usuarioSistema(), ID, '2026-09-01T00:00:00Z', '2026-10-01T00:00:00Z', '1 hour');
+    expect(exigirCanal).toHaveBeenCalledWith(usuarioSistema(), 'leer', ID);
     expect(historico).toHaveBeenCalledTimes(1);
   });
 });

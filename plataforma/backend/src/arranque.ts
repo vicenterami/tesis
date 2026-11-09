@@ -118,3 +118,10 @@ export function claveApp(valor: string | undefined): string {
   return v;
 }
 
+
+// ¿Lleva esta ruta `Cache-Control: no-store`? Toda la API, sí (revisión del 08/11/2026): con sesión, cualquier respuesta es de una
+// persona (sus sitios, sus dispositivos, una clave temporal) y ni el navegador ni un proxy intermedio deben guardarla. Quedan fuera
+// los archivos del panel (`/panel`, que el navegador sí debe guardar) y `/docs`. Sin distinguir mayúsculas, como el enrutador de Express.
+export function rutaSinCache(ruta: string): boolean {
+  return !/^\/(panel|docs)(\/|$)/i.test(ruta);
+}

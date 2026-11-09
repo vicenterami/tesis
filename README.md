@@ -14,10 +14,10 @@ estado de cada dispositivo y panel de control. Caso de validación: Campus Dr. L
 |---|---|---|
 | 1 — Problema, objetivos y requerimientos | viernes 4 de septiembre de 2026 | ✅ entregada |
 | 2 — Diseño e implementación inicial | viernes 2 de octubre de 2026 | ✅ entregada — [`bitácora`](bitacora/2026-10-02-entrega-etapa2.md); estado al cierre en [`docs/12`](docs/12-estado-etapa2.md) |
-| 3 — Mejoras, pruebas y validación preliminar | jueves 5 de noviembre de 2026 (plazo ampliado; calendario del curso: 30 de octubre) | 🟡 en curso — ver [`docs/18`](docs/18-estado-etapa3.md) |
-| 4 — Validación final e informe | viernes 4 de diciembre de 2026 | ⬜ |
+| 3 — Mejoras, pruebas y validación preliminar | jueves 5 de noviembre de 2026 (plazo ampliado; calendario del curso: 30 de octubre) | ✅ entregada — [`bitácora`](bitacora/2026-11-05-entrega-etapa3.md); estado al cierre en [`docs/18`](docs/18-estado-etapa3.md) |
+| 4 — Validación final e informe | viernes 4 de diciembre de 2026 | 🟡 en curso desde el 6 de noviembre — plan en [`docs/04 §8`](docs/04-backlog.md); bloque 1 (sesión, usuarios y roles por sitio, [`docs/20`](docs/20-sesion-usuarios-y-permisos.md)): backend hecho el 8 de noviembre, falta la pantalla de inicio de sesión |
 
-**Próximo hito:** entrega de la Etapa 3, **jueves 5 de noviembre de 2026** (plazo ampliado por el profesor guía; fecha del calendario del curso: viernes 30 de octubre).
+**Próximo hito:** entrega de la Etapa 4 (validación final e informe), **viernes 4 de diciembre de 2026**.
 
 ## Por dónde empezar
 

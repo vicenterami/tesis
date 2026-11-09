@@ -29,19 +29,21 @@ uniformidad es la que resuelve la causa C1 (formatos dispares).
 | 7 | **medicion** | Una lectura: valor + unidad + tiempo | **Hypertable** de TimescaleDB (serie de tiempo) |
 | 8 | **regla_umbral** | Límite que, al cruzarse, abre una condición | Con histéresis (umbral de disparo y de restauración) |
 | 9 | **condicion** | Un estado anómalo abierto de un dispositivo | Se abre y se cierra; guarda inicio, fin y duración |
-| 10 | **evento** | Registro histórico de algo que pasó | Alta, baja, mantenimiento, apertura/cierre de condición, calibración de un canal (`canal_calibrado`) |
+| 10 | **evento** | Registro histórico de algo que pasó | Alta, baja, mantenimiento, apertura/cierre de condición, calibración de un canal (`canal_calibrado`); alta y cambios de usuarios (`usuario_alta`, `usuario_cambio`) y cambio de clave (`usuario_clave`), desde el 08/11/2026 |
 | 11 | **cuarentena** | Trama rechazada por los filtros 1 a 3 (desconocida, malformada o inválida) o por el tope por emisor (`tope`: no cabía en el presupuesto de lecturas de la hora, migración 19) | Cruda, con motivo y detalle, una fila por trama; no contamina las series. **Hypertable** desde la migración 09 (retención 30 días). Por dispositivo y hora se guardan completas las primeras `TOPE_CUARENTENA_HORA` (60); las demás solo se cuentan (`docs/10 §8.4` punto 53). Lo que no tiene credencial no llega: lo corta el broker |
-| 12 | **usuario** | Persona que accede a la plataforma | Con hash de contraseña, nunca en claro |
-| 13 | **usuario_sitio** | Qué usuario puede ver qué sitio y con qué rol | Multi-tenencia: aísla los datos entre sitios |
+| 12 | **usuario** | Persona que accede a la plataforma | Con hash de contraseña (`scrypt`, N = 2¹⁷), nunca en claro; el email, en minúsculas, es su nombre de inicio de sesión; baja lógica (`activo`) y, desde la migración 22, `clave_temporal` con su vencimiento a las 24 h (la asigna un administrador; debe cambiarla al entrar, `docs/20 §4`) |
+| 13 | **usuario_sitio** | Qué usuario puede ver qué sitio y con qué rol | Multi-tenencia: aísla los datos entre sitios. `rol` es `administrador` o `consulta` (RF-44); desde la migración 22, `activo`: quitarle un sitio a una persona es una baja lógica |
 | 14 | **trama** | Trama cruda de un mensaje aceptado (al menos una lectura guardada) | **Hypertable**, solo inserción, retención 30 días: auditoría y re-decodificación si un adaptador tuvo un error (migración 09) |
 | 15 | **pasarela** | Quien publica en nombre de los nodos LoRaWAN: una pasarela con servidor de red embebido (ruta B) o un servidor de red externo (ruta C, `docs/10 §8.4` punto 45) | Una sirve a muchos nodos; su id físico es su usuario del broker, único también frente a los dispositivos (migración 11); **declara el formato** de lo que publica (`milesight` o `chirpstack`, migración 15) y sus nodos lo heredan: lo garantiza la base con una clave foránea compuesta `(pasarela_id, formato)` en cascada (`docs/10 §8.4` punto 47) |
 | 16 | **estado_dispositivo** | Lo que el sistema escribe sobre cada dispositivo: la última trama aceptada | Una fila por dispositivo y sin `actualizado_en`: la fila de `dispositivo` queda para lo que edita una persona (migración 11). Se borra en cascada con su dispositivo: es un derivado, sin historia propia. Desde la migración 17 guarda también el contador de la última trama LoRaWAN guardada (`ultimo_fcnt`), con el que el filtro 3 descarta la repetida (`docs/10 §4.1`); desde la 19, los contadores de la hora en curso del tope por emisor (`ventana_inicio`, `ventana_lecturas`, `ventana_cuarentena`, `ventana_sobre_tope`, `ventana_omitidas`), que el filtro 6 escribe en el mismo `INSERT … ON CONFLICT` (`docs/10 §8.4` punto 53) |
 | 17 | **metrica_broker** | Una muestra por minuto de los contadores `$SYS` del broker: descartes acumulados, mensajes y bytes en cola, clientes conectados, memoria | **Hypertable**, retención 90 días; la toma la conexión administradora del backend (migración 13, `docs/10 §8.4` punto 43) |
 | 18 | **condicion_sistema** | Un estado anómalo de la plataforma, sin dispositivo (`broker_descarte`: el broker descarta o la cola pasa el 80 % del tope) | Misma forma que `condicion` (abierta/cerrada, una abierta por tipo); se abre y se cierra sola desde el muestreo del broker (migración 13) |
+| 19 | **sesion** | Una sesión abierta de una persona en el panel (M7, `docs/20 §3`) | Su `id` es el hash SHA-256 del identificador que viaja en la cookie: la base nunca guarda lo que autentica. Vence a los 30 min sin actividad o a las 8 h de creada; cerrar la revoca (`revocada_en`). La limpia una función del dueño (`fn_limpiar_sesiones`) con el plazo de `acceso` (migración 22) |
+| 20 | **acceso** | Un intento de inicio de sesión o un cierre (RF-46): instante, usuario si existe, email intentado, IP, resultado (`ok`, `clave_incorrecta`, `bloqueado`, `inactivo`, `cierre`) y sesión | **Hypertable**, solo inserción, retención 90 días (`RETENCION_ACCESO_DIAS`, migración 22) |
 
-18 entidades (OE3 pide ≥ 8). Cuatro son hypertables, particionadas por tiempo: `medicion` (la serie de tiempo),
-desde la migración 09 `trama` y `cuarentena`, y desde la 13 `metrica_broker` (para borrar lo vencido por fragmentos enteros con
-`drop_chunks`). El resto son tablas relacionales normales de PostgreSQL.
+20 entidades (OE3 pide ≥ 8). Cinco son hypertables, particionadas por tiempo: `medicion` (la serie de tiempo),
+desde la migración 09 `trama` y `cuarentena`, desde la 13 `metrica_broker` y desde la 22 `acceso` (para borrar lo vencido por
+fragmentos enteros con `drop_chunks`). El resto son tablas relacionales normales de PostgreSQL.
 
 ## 3. Diagrama entidad-relación
 
@@ -49,6 +51,7 @@ desde la migración 09 `trama` y `cuarentena`, y desde la 13 `metrica_broker` (p
 
 ```mermaid
 erDiagram
+    usuario ||--o{ acceso : acceso
     dispositivo ||--o{ canal : canal
     magnitud ||--o{ canal : canal
     dispositivo ||--o{ condicion : condicion
@@ -63,10 +66,19 @@ erDiagram
     canal ||--o{ medicion : medicion
     sitio ||--o{ pasarela : pasarela
     canal ||--o{ regla_umbral : regla_umbral
+    usuario ||--o{ sesion : sesion
     dispositivo ||--o{ trama : trama
     sitio ||--o{ usuario_sitio : usuario_sitio
     usuario ||--o{ usuario_sitio : usuario_sitio
     sitio ||--o{ zona : zona
+    acceso {
+        timestamptz instante
+        uuid usuario_id FK
+        text email_intentado
+        inet ip
+        text resultado
+        text sesion_id
+    }
     canal {
         uuid id PK
         uuid dispositivo_id FK
@@ -185,6 +197,16 @@ erDiagram
         float histeresis
         timestamptz actualizado_en
     }
+    sesion {
+        text id PK
+        uuid usuario_id FK
+        timestamptz creada_en
+        timestamptz ultima_actividad
+        timestamptz expira_en
+        timestamptz revocada_en
+        inet ip
+        text agente
+    }
     sitio {
         uuid id PK
         text nombre
@@ -211,12 +233,15 @@ erDiagram
         timestamptz creado_en
         timestamptz actualizado_en
         bool activo
+        bool clave_temporal
+        timestamptz clave_temporal_vence_en
     }
     usuario_sitio {
         uuid usuario_id PK,FK
         uuid sitio_id PK,FK
         text rol
         timestamptz actualizado_en
+        bool activo
     }
     zona {
         uuid id PK
@@ -260,17 +285,17 @@ PostgreSQL en producción y se verificaron contra la base real (`plataforma/prue
 | Restricciones con nombre | Toda restricción se nombra con prefijo: `pk_`, `fk_<tabla>_<destino>`, `uq_`, `ck_`, `idx_`, `trg_`, `fn_` | Un nombre autogenerado (`canal_dispositivo_id_fkey`) no dice qué protege ni se puede citar en un informe o en un error | ✅ restricciones; 🟡 índices, disparadores y funciones: 5 objetos anteriores a la convención o que se le escaparon, listados como excepción en el paso 1b del guardián, se renombran en la próxima migración de esquema (los índices que crea TimescaleDB llevan el nombre que él les pone) |
 | Índice por cada FK | Cada clave foránea lleva su índice | Postgres no lo crea solo; sin él cada `JOIN` y cada `ON DELETE` recorre la tabla | ✅ paso 1b del guardián |
 | Tipos | `text` (nunca `varchar(n)`), `timestamptz` (nunca `timestamp`), `uuid`, `boolean`. `double precision` **solo** para mediciones físicas, que tienen incertidumbre propia; `numeric(p,s)` para dinero o cantidades exactas (no hay hoy) | Un límite arbitrario obliga a migrar; un `timestamp` sin zona es ambiguo; el flotante binario no sirve para dinero | ✅ paso 1b del guardián |
-| Auditoría | `creado_en` y `actualizado_en` con disparador `trg_<tabla>_actualizado_en` en toda tabla mutable (salvo `estado_dispositivo`, a propósito: la escribe el sistema en cada trama, `docs/10 §8.4` punto 27); las de solo inserción (`medicion`, `evento`, `cuarentena`, `trama`) llevan solo su instante | Saber cuándo cambió algo sin depender de la aplicación. `creado_por`/`actualizado_por` llegarán con M7 (usuarios) | ✅ paso 1b del guardián |
-| Baja lógica | `dispositivo.estado = 'baja'`, `sitio.activo`, `usuario.activo`, `credencial.activa`; nunca `DELETE` sobre entidades con historia | Conserva la historia y no rompe las filas que referencian el registro | ✅ |
+| Auditoría | `creado_en` y `actualizado_en` con disparador `trg_<tabla>_actualizado_en` en toda tabla mutable (salvo `estado_dispositivo`, a propósito: la escribe el sistema en cada trama, `docs/10 §8.4` punto 27; y `sesion`, por lo mismo: la renueva el guardia en cada petición, y `ultima_actividad` y `revocada_en` dicen cuándo cambió, migración 22); las de solo inserción (`medicion`, `evento`, `cuarentena`, `trama`, `acceso`) llevan solo su instante | Saber cuándo cambió algo sin depender de la aplicación. `creado_por`/`actualizado_por` llegarán con M7 (usuarios) | ✅ paso 1b del guardián |
+| Baja lógica | `dispositivo.estado = 'baja'`, `sitio.activo`, `usuario.activo`, `usuario_sitio.activo` (migración 22), `credencial.activa`; nunca `DELETE` sobre entidades con historia (la aplicación no tiene `DELETE` en ninguna tabla; las sesiones vencidas las borra `fn_limpiar_sesiones`, una función del dueño acotada, como `fn_retencion_drop_chunks`) | Conserva la historia y no rompe las filas que referencian el registro | ✅ |
 | Dominios cerrados | Si el **código** interpreta los valores (`estado`, `condicion.tipo`, `rol`, `cuarentena.motivo` desde la migración 07) → `CHECK`. Si el **usuario** los administra (magnitudes) → tabla catálogo con código estable y nombre visible | Un `CHECK` exige `ALTER` para crecer y no guarda etiqueta ni orden; un catálogo para valores que solo entiende el código sería una indirección vacía | ✅ |
 | Foto por valor | Lo que un registro **posee** se copia (`medicion.unidad`, `evento.detalle` con el umbral vigente); lo que **referencia** se lee por FK (`condicion.regla_id` como procedencia) | Cambiar el catálogo o una regla no debe reinterpretar el pasado | ✅ |
 | JSON solo para fotos | `jsonb` únicamente para capturar un contenido tal como fue (`evento.detalle`); nunca para datos de dominio consultables | Lo consultable va en columnas con tipo y FK | ✅ |
 | Ledger sobre contador | Las series (`medicion`) y los hechos (`evento`, `condicion`) son registros que se acumulan; `visto_por_ultima_vez` es un derivado recalculable, no la fuente | Un contador se corrompe en silencio; un registro se audita y se recalcula | ✅ |
 | Comentarios en el modelo | `COMMENT ON` en toda columna cuya razón de ser no es obvia (qué es, quién la escribe, qué no hacer con ella) | El comentario viaja con la base y lo ve quien lea el esquema sin abrir el informe | ✅ cada migración comenta sus columnas (el conteo lo da la base: `pg_description`; el «10» escrito a mano el 23/09 llevaba semanas desactualizado) |
-| Migraciones idempotentes | Cada `NN-*.sql` puede reejecutarse sin duplicar ni pisar nada (`IF NOT EXISTS`, `ON CONFLICT DO NOTHING`, `CREATE OR REPLACE`). Una regla que redefinen varias migraciones: la última la reemplaza y las anteriores solo la crean si no existe (los motivos de cuarentena: 07, 09 y 12) | Permite aplicar el mismo archivo en cualquier ambiente sin miedo | ✅ desde el 16/10, de la 02 a la última en cada `banco.sh encender`: se reaplican y el esquema (con permisos y comentarios) y el catálogo deben quedar idénticos (`banco.sh migraciones`, `docs/16 §37`); antes, 02–06 y 07, 09, 11 y 12 a mano en bases desechables (`docs/16 §13`). La 01 es el esquema base y no se repite |
+| Migraciones idempotentes | Cada `NN-*.sql` puede reejecutarse sin duplicar ni pisar nada (`IF NOT EXISTS`, `ON CONFLICT DO NOTHING`, `CREATE OR REPLACE`). La 14 (permisos del rol de la aplicación) es la única que se **edita y reaplica** cuando una migración posterior agrega tablas o columnas que la aplicación escribe (16, 21, 22). Una regla que redefinen varias migraciones: la última la reemplaza y las anteriores solo la crean si no existe (los motivos de cuarentena: 07, 09 y 12) | Permite aplicar el mismo archivo en cualquier ambiente sin miedo | ✅ desde el 16/10, de la 02 a la última en cada `banco.sh encender`: se reaplican y el esquema (con permisos y comentarios) y el catálogo deben quedar idénticos (`banco.sh migraciones`, `docs/16 §37`); antes, 02–06 y 07, 09, 11 y 12 a mano en bases desechables (`docs/16 §13`). La 01 es el esquema base y no se repite |
 | Tercera forma normal | Cada hecho vive en una sola tabla; las relaciones muchos a muchos se resuelven con entidades de asociación con identidad propia (`canal` = dispositivo × magnitud, `usuario_sitio` = usuario × sitio); ningún atributo depende de otro que no sea la clave | Sin redundancia no hay anomalías de actualización: cambiar el nombre de un dispositivo se hace en una fila. **¿Por qué no más allá?** Más formas normales no es mejor por sí solo: cada una elimina un tipo específico de anomalía. La 4FN y la 5FN resuelven dependencias multivaluadas o de reunión, que en este modelo no existen; no aportarían nada y cada tabla extra agregaría un JOIN a cada consulta. No es una ley universal: es que aquí no están las anomalías que esas formas resuelven | ✅ |
 | Redundancia solo como foto | Las únicas copias son las «fotos por valor» (fila anterior): están **desnormalizadas a propósito** porque el pasado no debe reinterpretarse | Una desnormalización se documenta con su razón; si no tiene razón, es un error | ✅ |
-| Clave natural única | Además del `id`, cada tabla declara qué la hace única en el dominio: `medicion (canal_id, tiempo)`, `canal (dispositivo_id, magnitud_codigo)`, `dispositivo.id_fisico`, `usuario.correo`, `usuario_sitio (usuario_id, sitio_id)` | El `id` evita duplicar filas por accidente solo si existe la clave natural; en `medicion` sostiene la idempotencia ante reentregas QoS 1 (migración 06) | ✅ |
+| Clave natural única | Además del `id`, cada tabla declara qué la hace única en el dominio: `medicion (canal_id, tiempo)`, `canal (dispositivo_id, magnitud_codigo)`, `dispositivo.id_fisico`, `usuario.email`, `usuario_sitio (usuario_id, sitio_id)` | El `id` evita duplicar filas por accidente solo si existe la clave natural; en `medicion` sostiene la idempotencia ante reentregas QoS 1 (migración 06) | ✅ |
 | Cambio sobre datos reales | Todo script que modifique una base con datos: `BEGIN` → `SELECT` de preflight (cuántas filas, qué valores) → cambio → **el mismo** `SELECT` → `COMMIT` o `ROLLBACK`; `SET lock_timeout` antes de un `ALTER`; si un disparador depende de la columna, se suelta y recrea **en la misma transacción** | Ver el antes y el después en la misma sesión es la única prueba de que el cambio hizo lo que se creía | regla (aplica desde el primer despliegue) |
 | Parámetros con tipo | Todo `$N` que no se compare directo con una columna lleva cast (`$1::int`, `$2::timestamptz`, `ANY($3::uuid[])`): en `INSERT … SELECT` y en expresiones Postgres asume `text` y TypeScript no lo atrapa | El error aparece en producción con un dato que en desarrollo no existía | regla |
 | Deprecación | Una columna en uso no se borra: se comenta como DEPRECADA con fecha y reemplazo, y se elimina en una migración posterior | El código que la lee puede estar desplegado | regla |
@@ -355,8 +380,9 @@ consistente para reportes.
       declara como `pasarela`. La hora de guardado es la del COMMIT y, con la confirmación tras persistir
       (`docs/10 §8.4` punto 4), queda a milisegundos de `recibido_en`: no hace falta una cuarta columna. **Implementado** en `db/init/08-hora-recepcion.sql`
       (CHECK `ck_medicion_recepcion`, `NOT VALID`: rige para toda fila nueva; las anteriores quedan NULL).
-- [ ] **Permisos por rol** (decidido el 08/10/2026, `docs/10 §8.4` punto 36): tabla de permisos por acción para los roles de
-      `usuario_sitio`, consultada por un solo guardia del backend; se implementa con la autenticación (M7).
+- [x] **Permisos por rol** (decidido el 08/10/2026, `docs/10 §8.4` punto 36; hecho el 08/11/2026 con la sesión, M7): la tabla de permisos
+      por acción para los roles de `usuario_sitio` vive en el backend (`sesion/permisos.ts`, la matriz de `docs/20 §6`) y la consulta un
+      solo guardia; el esquema suma `sesion`, `acceso` (hypertable), la clave temporal de `usuario` y `usuario_sitio.activo` (migración 22).
 - [x] **Código del sitio e identificador del broker** (migración 11, 08/10/2026; `docs/10 §8.4` punto 24): `sitio.codigo` es el
       segmento del tópico y el filtro 1 lo compara con el sitio registrado; `id_fisico` lleva la lista blanca `[a-z0-9-]` y es
       único entre dispositivos y pasarelas (disparador con un bloqueo por identificador; las reglas las comprueba el guardián, paso 1c, y la carrera de dos altas

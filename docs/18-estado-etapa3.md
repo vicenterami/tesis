@@ -11,8 +11,8 @@
 |---|---|---|---|
 | Retroalimentación | 20 % | 🟡 | Al 04/11 no hay observaciones escritas del profesor guía sobre la entrega del 2/10; los avances se presentaron el 28/10 (`bitacora/2026-10-28-presentacion-temuco.md`) y sus observaciones se incorporan al llegar. Sí se incorporaron las entrevistas del 5/10 (`bitacora/2026-10-05-entrevista-academico-geologia.md`; decisiones del 6 y del 8/10, `docs/10 §8.4`) y del 25/10 (`bitacora/2026-10-25-entrevista-operador-red.md`; alta masiva al plan de la Etapa 4). El 05/11, en la presentación conjunta con los tesistas de los profesores Mario Villanueva y Luis Alberto Caro, la única pregunta (cómo dar de alta una flota completa; si cada usuario configurará sus dispositivos) tiene respuesta en el plan de la Etapa 4: sesión con usuarios y roles por sitio (iteración 0) y alta masiva por archivo (iteración 2, diseñada; `docs/04 §8`). Falta: recibir e incorporar la retroalimentación de la Etapa 2. |
 | Mejoras | 15 % | 🟢 | Decisiones de diseño del 6, 7 y 8/10 (`docs/10 §8.4`); proxy TLS (`docs/16 §9`); dependencias e imágenes sin vulnerabilidades altas o críticas corregibles (`docs/16 §12`). |
-| 50 % de la implementación | 10 % | ✅ | Superado: todo el backlog va en 56 % (y el núcleo en 75 %). Núcleo: 25 de 34 elementos hechos (126 de 168 h, 75 %) y 4 parciales (20 h: HU-02, HU-08, TT-12 y TT-22). Todo el backlog: 37 de 66 (162 de 287 h, 56 %) y 12 parciales (51 h). Cifras calculadas desde las filas de `docs/04`, con los estados de `docs/12 §3`, de §2 y de la Etapa 1 (al final de §2). |
-| Pruebas iniciales | 30 % | 🟢 | `docs/16`: emulador, carga (59,7 tramas/s sin pérdida), carreras, TLS, capacidad y picos, caídas con carga, dependencias e imágenes, LoRaWAN por pasarela en el banco (`docs/16 §31–§34`); 357 pruebas unitarias del backend y 107 del panel. Falta: la matriz formal del contrato de trama (TT-27) y el broker de producción en las caídas (`docs/16 §11`). |
+| 50 % de la implementación | 10 % | ✅ | Superado: todo el backlog va en 56 % (y el núcleo en 75 %). Núcleo: 25 de 34 elementos hechos (126 de 168 h, 75 %) y 4 parciales (20 h: HU-02, HU-08, TT-12 y TT-22). Todo el backlog: 37 de 66 (162 de 287 h, 56 %) y 13 parciales (54 h). Cifras calculadas desde las filas de `docs/04`, con los estados de `docs/12 §3`, de §2 y de la Etapa 1 (al final de §2). |
+| Pruebas iniciales | 30 % | 🟢 | `docs/16`: emulador, carga (59,7 tramas/s sin pérdida), carreras, TLS, capacidad y picos, caídas con carga, dependencias e imágenes, LoRaWAN por pasarela en el banco (`docs/16 §31–§34`); 436 pruebas unitarias del backend (357 al 04/11; las 56 nuevas son de la sesión y los permisos, Etapa 4) y 107 del panel. Falta: la matriz formal del contrato de trama (TT-27) y el broker de producción en las caídas (`docs/16 §11`). |
 | Validación preliminar | 10 % | ✅ | Sensor físico de extremo a extremo (TT-32): todas las piezas llegaron el 13/10, la placa se reconoció el 14/10 y la fase 1 se cerró el 19/10 con los tres sensores verificados (`docs/16 §43`) y la fase 2 publicó 24 h hasta el panel, sin pérdidas, el 23 y 24/10 (`docs/16 §53`); guía de manejo seguro escrita (`docs/17 §4`). **Validación en terreno hecha el 20/10: red LoRaWAN real del campus publicando en el sistema (`docs/16 §45`).** El capítulo de pruebas que la presenta (TT-36, §2) va en la versión de entrega del 05/11; la validación en el servidor de referencia es de la Etapa 4 (OE5). |
 | Documentación | 15 % | ✅ | Documentos en concordancia (guardián `plataforma/pruebas/verificar-todo.sh`). El 15/10 el informe ganó el capítulo «Implementación y pruebas iniciales» y el anexo con el detalle de las pruebas (TT-36); revisión de entrega hecha el 04/11/2026 en tres frentes (seguridad, concordancia, privacidad; 40 hallazgos verificados, 30 aplicados y el resto anotado) y una segunda pasada que corroboró informe y láminas contra la evidencia y contra el sistema en ejecución; versión de entrega del 05/11 (informe de 30 páginas de cuerpo y láminas). La retroalimentación de la Etapa 2 se incorpora al llegar. |
 
@@ -42,7 +42,7 @@
 
 
 **Pasadas a la Etapa 4 el 08/10** (§3): HU-06 Umbrales por dispositivo (4 h, 🟡); HU-12 Agrupar por sitio y zona (3 h,
-🟡); HU-15 Calidad del enlace (4 h, ⬜); HU-17 Batería baja (3 h, ⬜); HU-18 Sesión y roles (3 h, ⬜).
+🟡); HU-15 Calidad del enlace (4 h, ⬜); HU-17 Batería baja (3 h, ⬜); HU-18 Sesión y roles (3 h, 🟡: backend hecho el 08/11, falta la pantalla P10).
 
 **Adelantados de la Etapa 4:** TT-20 (autenticación de la recepción) ✅ (`docs/12 §3`); TT-29 (carga) ✅ preliminar
 (`docs/16 §5`); TT-22 (TLS) 🟡: MQTT por el proxy, probado en el banco (`docs/16 §9`), y el canal en vivo por HTTPS (`docs/16 §14`); TT-30 (recuperación) 🟡: falta el
@@ -102,7 +102,7 @@ y HU-01 se cerraron el 16/10: `docs/16 §39`, §40 y §41; HU-19, el 24/10.)
 | Tema | Dónde está decidido o pedido | Estado |
 |---|---|---|
 | Canal en vivo por WebSocket en vez de SSE | `docs/10 §8.4` punto 46 | Diseño; sin código |
-| Sesión, usuarios y roles | HU-18, `docs/20` | Diseño; sin código |
+| Sesión, usuarios y roles | HU-18, `docs/20` | Backend hecho el 08/11/2026 (migración 22, guardia central, paso 4b del guardián); falta la pantalla P10 |
 | Vista pública de solo lectura por enlace (quien solo mira, sin cuenta) | `docs/10 §8.4` punto 6, pantalla P9 de `docs/19`, `docs/20 §7` | Diseño |
 | Pantallas para investigadores (exportación, series) y para quien solo observa | Entrevista del 5/10; `docs/19` | Parte hecha (P2, P3, exportación); el resto con la sesión |
 | Configuración por el usuario (umbrales, destinatarios de avisos) | HU-06, HU-25 | Sin código |

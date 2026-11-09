@@ -1,5 +1,5 @@
 import {
-  claveApp, AvisosAcotados, claveAdmin, claveOpcional, HOSTS_LOCALES, hostsPermitidos, interfazDeEscucha, nombreDeHost, rechazoDeHost, registrosEnJson, servirDocumentacion } from './arranque';
+  claveApp, AvisosAcotados, claveAdmin, claveOpcional, HOSTS_LOCALES, hostsPermitidos, interfazDeEscucha, nombreDeHost, rechazoDeHost, registrosEnJson, rutaSinCache, servirDocumentacion } from './arranque';
 
 describe('registrosEnJson (docs/10 §6): JSON en contenedor, texto en desarrollo', () => {
   it('sin variable → texto', () => expect(registrosEnJson(undefined)).toBe(false));
@@ -127,3 +127,12 @@ describe('claveApp (DB_APP_CLAVE, migración 14): obligatoria y de 24 caracteres
   });
 });
 
+
+describe('rutaSinCache (revisión del 08/11/2026): Cache-Control: no-store en toda la API, salvo el panel y /docs', () => {
+  it('rutas de la API → sí, también con mayúsculas o sin barra final', () => {
+    for (const r of ['/usuarios', '/sesion', '/dispositivos/x/exportar', '/salud', '/eventos', '/', '/panelito', '/documentos']) expect(rutaSinCache(r)).toBe(true);
+  });
+  it('archivos del panel y la documentación → no (el navegador puede guardarlos)', () => {
+    for (const r of ['/panel', '/panel/', '/panel/assets/app.js', '/PANEL/index.html', '/docs', '/docs/swagger-ui.css']) expect(rutaSinCache(r)).toBe(false);
+  });
+});

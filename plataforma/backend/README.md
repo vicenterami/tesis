@@ -162,7 +162,7 @@ Pendiente del pipeline: la notificación de condiciones por correo (al panel ya 
 
 ## API de consulta (M5)
 
-Solo lectura, sin autenticación aún (por eso escucha en 127.0.0.1). Fechas en ISO 8601 UTC (`Z`).
+Desde el 08/11/2026 (M7, `docs/20`) toda ruta exige una sesión (cookie de sesión más la cabecera `X-Pedido: panel` en las que escriben) o la clave de administrador por cabecera (`X-Clave-Admin`, «usuario del sistema»); las lecturas se filtran por los sitios de la persona y un recurso de otro sitio responde 404. En desarrollo escucha en 127.0.0.1; en producción, detrás del proxy. Fechas en ISO 8601 UTC (`Z`).
 
 **Contrato OpenAPI (TT-13):** se genera desde los decoradores de los controladores, así que no puede
 describir rutas que no existen. Con el backend corriendo, la documentación interactiva está en
@@ -181,14 +181,20 @@ describir rutas que no existen. Con el backend corriendo, la documentación inte
 | `DELETE /dispositivos/:id` (cabecera `X-Clave-Admin`) | baja lógica: `estado = baja`, credenciales inactivas, condiciones abiertas cerradas, evento `baja`, cliente borrado del broker; todo o nada | 200; 404 si no existe; 409 si ya estaba de baja (13/10) |
 | `POST /recepcion/:idFisico` (cabecera `Authorization: Bearer`) | recepción por HTTP (HU-01): 202 con el resumen, 401, 413, 415, 422, 429, 503 (`docs/10 §8.4` punto 52) | dispositivos de vía `http` |
 | `GET /pasarelas`, `POST /pasarelas`, `DELETE /pasarelas/:id`, `POST /pasarelas/:id/credencial` (las que escriben, con `X-Clave-Admin`) | pasarelas LoRaWAN: inventario, alta con credencial del broker, baja y rotación (`docs/10 §8.4` punto 47) | 401 o 503 sin la clave |
-| `GET /salud` | estado del backend, la base y el broker (cola, descartes, condición del sistema) | lo usa el `HEALTHCHECK` |
+| `POST /sesion` (cabecera `X-Pedido: panel`) | inicio de sesión con email y clave: cookie de sesión; 401 con el mismo mensaje exista o no la cuenta; 429 con bloqueo | `docs/20 §3–§4` |
+| `GET /sesion`, `DELETE /sesion`, `POST /sesion/clave` | quién soy (renueva la actividad); cierre (revoca en la base y borra la cookie); cambio de clave (rota la sesión) | con clave temporal solo valen estas tres |
+| `GET /usuarios`, `POST /usuarios`, `PATCH /usuarios/:id` | usuarios de mis sitios; alta con clave temporal mostrada una vez (el primer administrador, con `X-Clave-Admin`); activar/desactivar, temporal nueva y roles por sitio, con bloqueo optimista | solo administradores |
+| `GET /salud` | estado del backend, la base y el broker (cola, descartes, condición del sistema) | pública; lo usa el `HEALTHCHECK` |
 | `PATCH /canales/:id` (cabecera `X-Clave-Admin`) | calibración: `{escala_cero, escala_cien, actualizado_en}` (las dos con valor, o las dos `null` para quitarla), evento `canal_calibrado` (`docs/10 §8.4` punto 51) | 200 con el canal y su `actualizado_en` nuevo; 400 motivos; 404; 409 si otro lo cambió desde la ficha (bloqueo optimista, 22/10) |
 | `POST /dispositivos/:id/credencial` (cabecera `X-Clave-Admin`) | rotación: credencial nueva (mostrada una vez), la anterior inactiva, evento `rotacion`, `setClientPassword` en el broker; todo o nada | 201 con `conexion`; 409 de baja; 400 lorawan; si la respuesta no llega, repetir (13/10) |
 
+Las rutas que escriben aceptan la clave por cabecera o una sesión de administrador del sitio (con `X-Pedido: panel`).
+
 ```bash
-curl -s http://127.0.0.1:3000/dispositivos | python3 -m json.tool
-curl -s "http://127.0.0.1:3000/canales/<canal_id>/historico?intervalo=1%20hour" | python3 -m json.tool
-curl -s "http://127.0.0.1:3000/condiciones?abiertas=true"
+CLAVE=$(grep '^HTTP_CLAVE_ADMIN=' plataforma/.env | cut -d= -f2-)   # desde la raíz del repositorio; no se imprime
+curl -s -H "X-Clave-Admin: $CLAVE" http://127.0.0.1:3000/dispositivos | python3 -m json.tool
+curl -s -H "X-Clave-Admin: $CLAVE" "http://127.0.0.1:3000/canales/<canal_id>/historico?intervalo=1%20hour" | python3 -m json.tool
+curl -s -H "X-Clave-Admin: $CLAVE" "http://127.0.0.1:3000/condiciones?abiertas=true"
 ```
 
 Entradas inválidas responden `400` con el motivo (UUID mal formado, fecha no ISO, intervalo fuera
@@ -200,11 +206,12 @@ libre en SQL.
 `GET /eventos` abre un flujo SSE (`text/event-stream`) que el panel lee con `EventSource`. Cada evento sale después de
 quedar guardado: `medicion` (dispositivo, canal, valor, unidad, tiempo), `visto` (señal de vida) y `condicion` (umbral o
 sin comunicación, abierta o cerrada); además, un `latido` cada 25 s. Filtros opcionales `?dispositivo=` o `?canal=`
-(UUID). Rechaza la petición que el navegador marca como de otro sitio (`Sec-Fetch-Site` u `Origin`, 403) y, con 50
-flujos abiertos, responde 503 (`docs/10 §5`).
+(UUID). Exige la misma sesión que la API (401 sin cookie ni clave), entrega solo los eventos de los sitios de la persona y admite 5
+flujos por usuario (503 al sexto; 50 en total). Rechaza la petición que el navegador marca como de otro sitio (`Sec-Fetch-Site` u
+`Origin`, 403) (`docs/10 §5`, `docs/20 §3`).
 
 ```bash
-curl -N http://127.0.0.1:3000/eventos
+curl -N -H "X-Clave-Admin: $CLAVE" http://127.0.0.1:3000/eventos
 ```
 
 ## Reglas del proyecto en este código

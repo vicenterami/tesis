@@ -1,9 +1,434 @@
 {
   "openapi": "3.0.0",
   "paths": {
+    "/sesion": {
+      "post": {
+        "description": "Con `email` y `clave`. Responde la cookie `__Host-sesion` (HttpOnly; Secure; SameSite=Lax; Path=/, sin Domain), con un identificador nuevo en cada inicio. Usuario inexistente, inactivo o clave mala: el mismo 401 «credenciales no válidas», con el mismo tiempo de respuesta. 5 fallos en 15 min bloquean el usuario (1, 5 y 15 min, creciente) y 50 fallos en 15 min desde una dirección la bloquean: 429 «bloqueado». Todo intento queda en `acceso`. Con una clave temporal, la sesión solo sirve para cambiarla (`POST /sesion/clave`).",
+        "operationId": "SesionController_iniciar",
+        "parameters": [
+          {
+            "name": "X-Pedido",
+            "in": "header",
+            "description": "Siempre `panel` (protección contra peticiones de otros sitios)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email",
+                  "clave"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "maxLength": 254
+                  },
+                  "clave": {
+                    "type": "string",
+                    "maxLength": 128
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Sesión abierta: `usuario` (id, nombre, email, clave_temporal) y `expira_en` (vida absoluta, 8 h)"
+          },
+          "400": {
+            "description": "Cuerpo sin email o clave"
+          },
+          "401": {
+            "description": "credenciales no válidas"
+          },
+          "403": {
+            "description": "Sin la cabecera X-Pedido: panel"
+          },
+          "429": {
+            "description": "bloqueado: demasiados intentos fallidos (por usuario o por dirección)"
+          }
+        },
+        "summary": "Iniciar sesión",
+        "tags": [
+          "sesion"
+        ]
+      },
+      "get": {
+        "description": "Usuario, sus sitios con el rol en cada uno y los vencimientos de la sesión (absoluto e inactividad). Renueva la actividad: el panel la llama como mucho cada 5 min mientras la persona interactúa.",
+        "operationId": "SesionController_quien",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "`usuario`, `sitios` [{sitio_id, codigo, nombre, rol}], `clave_temporal`, `expira_en`, `inactividad_vence_en`; con X-Clave-Admin, `sistema: true`"
+          },
+          "401": {
+            "description": "sesión requerida"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Quién soy",
+        "tags": [
+          "sesion"
+        ]
+      },
+      "delete": {
+        "description": "Revoca la sesión en la base y borra la cookie; con `todas=true`, revoca todas las sesiones del usuario («cerrar en todos lados»). Deja la fila `cierre` en `acceso`.",
+        "operationId": "SesionController_cerrar",
+        "parameters": [
+          {
+            "name": "todas",
+            "required": false,
+            "in": "query",
+            "description": "Cerrar todas las sesiones del usuario",
+            "schema": {
+              "enum": [
+                "true",
+                "false"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Pedido",
+            "in": "header",
+            "description": "Siempre `panel`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "`revocadas`: cuántas sesiones se cerraron"
+          },
+          "401": {
+            "description": "sesión requerida"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Cerrar sesión",
+        "tags": [
+          "sesion"
+        ]
+      }
+    },
+    "/sesion/clave": {
+      "post": {
+        "description": "Con `actual` y `nueva`. La nueva: 12 a 128 caracteres, fuera de la lista de claves comunes, distinta del email y de la anterior. Revoca todas las sesiones del usuario y abre una nueva (identificador regenerado): la respuesta trae la cookie nueva. Quita la marca de clave temporal.",
+        "operationId": "SesionController_cambiarClave",
+        "parameters": [
+          {
+            "name": "X-Pedido",
+            "in": "header",
+            "description": "Siempre `panel`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "actual",
+                  "nueva"
+                ],
+                "properties": {
+                  "actual": {
+                    "type": "string"
+                  },
+                  "nueva": {
+                    "type": "string",
+                    "minLength": 12,
+                    "maxLength": 128
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Clave cambiada; sesión nueva en la cookie"
+          },
+          "400": {
+            "description": "La clave actual no es correcta o la nueva no cumple las reglas: `message` es la lista de motivos"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "429": {
+            "description": "bloqueado: demasiados intentos fallidos"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Cambiar la clave",
+        "tags": [
+          "sesion"
+        ]
+      }
+    },
+    "/usuarios": {
+      "get": {
+        "description": "Quienes están o estuvieron en alguno de los sitios que administra quien pregunta; de sus sitios, solo esos. Exige rol administrador en algún sitio.",
+        "operationId": "UsuariosController_listar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Lista: id, nombre, email, en_mis_sitios (false = ya no está en ninguno de tus sitios, pero estuvo), activo, clave_temporal, clave_temporal_vence_en, sitios [{sitio_id, codigo, rol}], creado_en y actualizado_en (con microsegundos, para el PATCH)"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "403": {
+            "description": "Sin rol administrador en ningún sitio, o la clave de administrador cuando ya existe un administrador"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Listar usuarios",
+        "tags": [
+          "usuarios"
+        ]
+      },
+      "post": {
+        "description": "Crea el usuario con una clave TEMPORAL (24 caracteres aleatorios, vence a las 24 h) que se devuelve UNA sola vez en `clave`; al entrar, la sesión solo sirve para cambiarla. Sin registro abierto: exige sesión de administrador en cada sitio que se asigna. Con la cabecera X-Clave-Admin solo mientras no exista ningún administrador (el primero; después, 403).",
+        "operationId": "UsuariosController_crear",
+        "parameters": [
+          {
+            "name": "X-Pedido",
+            "in": "header",
+            "description": "Con sesión, siempre `panel`",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "nombre",
+                  "email",
+                  "sitios"
+                ],
+                "properties": {
+                  "nombre": {
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  "email": {
+                    "type": "string",
+                    "maxLength": 254,
+                    "description": "Nombre de inicio de sesión; se guarda en minúsculas"
+                  },
+                  "sitios": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 50,
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "sitio_id",
+                        "rol"
+                      ],
+                      "properties": {
+                        "sitio_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "rol": {
+                          "type": "string",
+                          "enum": [
+                            "administrador",
+                            "consulta"
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Usuario creado; `clave` trae la clave temporal (una sola vez)"
+          },
+          "400": {
+            "description": "Cuerpo inválido: `message` es la lista de motivos"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "403": {
+            "description": "Rol de consulta, o la clave de administrador cuando ya existe un administrador"
+          },
+          "404": {
+            "description": "Un sitio que no existe o que no administras"
+          },
+          "409": {
+            "description": "Ya existe un usuario con ese email"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Dar de alta un usuario",
+        "tags": [
+          "usuarios"
+        ]
+      }
+    },
+    "/usuarios/{id}": {
+      "patch": {
+        "description": "`actualizado_en` (obligatorio) es el que entregó `GET /usuarios`, tal cual: si cambió desde entonces, 409 (bloqueo optimista). `activo` false desactiva (no borra) y corta sus sesiones; `clave_temporal: true` asigna una temporal nueva («olvidé mi clave»), la devuelve UNA vez en `clave` y corta sus sesiones; `sitios` asigna o cambia el rol en cada sitio, y `rol: null` le quita ese sitio. Ningún cambio puede dejar la plataforma sin administradores activos (409). Los roles, solo en tus sitios; los campos de la cuenta (`nombre`, `activo`, `clave_temporal`), solo si administras TODOS los sitios activos de la persona (si no, 403). Deja un `evento` usuario_cambio con quién.",
+        "operationId": "UsuariosController_actualizar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "UUID del usuario",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Pedido",
+            "in": "header",
+            "description": "Con sesión, siempre `panel`",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "actualizado_en"
+                ],
+                "properties": {
+                  "actualizado_en": {
+                    "type": "string"
+                  },
+                  "nombre": {
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  "activo": {
+                    "type": "boolean"
+                  },
+                  "clave_temporal": {
+                    "type": "boolean",
+                    "enum": [
+                      true
+                    ]
+                  },
+                  "sitios": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "sitio_id",
+                        "rol"
+                      ],
+                      "properties": {
+                        "sitio_id": {
+                          "type": "string",
+                          "format": "uuid"
+                        },
+                        "rol": {
+                          "type": "string",
+                          "enum": [
+                            "administrador",
+                            "consulta"
+                          ],
+                          "nullable": true
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "El usuario como lo lista GET /usuarios (y `clave`, si se asignó una temporal)"
+          },
+          "400": {
+            "description": "UUID o cuerpo inválidos"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "403": {
+            "description": "Rol de consulta; la clave de administrador cuando ya existe un administrador; un campo de la cuenta de alguien que también está en sitios que no administras, o que ya no está en ninguno de los tuyos"
+          },
+          "404": {
+            "description": "El usuario o un sitio no existen, o no son de tus sitios"
+          },
+          "409": {
+            "description": "Cambió desde que se leyó (recarga), te desactivarías a ti mismo o quedaría sin administradores"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Cambiar un usuario: activar, desactivar, clave temporal y roles por sitio",
+        "tags": [
+          "usuarios"
+        ]
+      }
+    },
     "/eventos": {
       "get": {
-        "description": "Server-Sent Events: medicion, visto y condicion, cada uno cuando ya está guardado, y un latido cada 25 s. Filtros opcionales por dispositivo o por canal. Rechaza una página de otro sitio (403) y, con 50 flujos abiertos, responde 503.",
+        "description": "Server-Sent Events: medicion, visto y condicion, cada uno cuando ya está guardado, y un latido cada 25 s. Filtros opcionales por dispositivo o por canal. Exige sesión (o X-Clave-Admin): solo llegan los eventos de los dispositivos de los sitios del usuario, y los del sistema (cola del broker) solo a quien administra algún sitio. La sesión se revalida en cada latido: si se cerró, venció o fue revocada, el flujo termina; si cambiaron los sitios, rige el alcance nuevo. Rechaza una página de otro sitio (403); con 5 flujos abiertos del mismo usuario responde 429 y con 50 en total, 503.",
         "operationId": "EventosController_flujo",
         "parameters": [
           {
@@ -40,13 +465,27 @@
           "400": {
             "description": "Filtro que no es un UUID"
           },
+          "401": {
+            "description": "sesión requerida"
+          },
           "403": {
             "description": "Página de otro sitio (Origin o Sec-Fetch-Site)"
           },
+          "404": {
+            "description": "El dispositivo o el canal del filtro no existe o es de otro sitio"
+          },
+          "429": {
+            "description": "Ya hay 5 flujos abiertos de este usuario"
+          },
           "503": {
-            "description": "Demasiados flujos abiertos"
+            "description": "Demasiados flujos abiertos en total"
           }
         },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
         "summary": "Canal de tiempo real (SSE)",
         "tags": [
           "tiempo real"
@@ -118,28 +557,36 @@
     },
     "/dispositivos": {
       "get": {
-        "description": "Cada dispositivo con su sitio y zona (nombres, y `sitio_codigo` y `zona_id` para filtrar: los nombres pueden repetirse), zona horaria, canales, `en_linea` (última trama hace menos de 2 × intervalo esperado) y número de condiciones abiertas.",
+        "description": "Cada dispositivo de los sitios del usuario con su sitio y zona (nombres, y `sitio_codigo` y `zona_id` para filtrar: los nombres pueden repetirse), zona horaria, canales, `en_linea` (última trama hace menos de 2 × intervalo esperado) y número de condiciones abiertas.",
         "operationId": "DispositivosController_listar",
         "parameters": [],
         "responses": {
           "200": {
             "description": "Lista de dispositivos"
+          },
+          "401": {
+            "description": "sesión requerida"
           }
         },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
         "summary": "Inventario de dispositivos con estado",
         "tags": [
           "dispositivos"
         ]
       },
       "post": {
-        "description": "Crea el dispositivo, sus canales y, según la vía, su credencial: `mqtt` crea el usuario en el broker (plugin Dynamic Security) y devuelve la clave UNA sola vez; `http` devuelve un token (la recepción por HTTP llega en una tanda posterior); `lorawan` no tiene credencial propia (la autentica su pasarela). Todo o nada: si el broker no acepta, nada queda creado. Mientras no hay sesión, exige la cabecera `X-Clave-Admin` (docs/10 §8.4 punto 41).",
+        "description": "Crea el dispositivo, sus canales y, según la vía, su credencial: `mqtt` crea el usuario en el broker (plugin Dynamic Security) y devuelve la clave UNA sola vez; `http` devuelve un token (la recepción por HTTP llega en una tanda posterior); `lorawan` no tiene credencial propia (la autentica su pasarela). Todo o nada: si el broker no acepta, nada queda creado. Exige sesión de administrador del sitio de la zona (docs/20 §6) o la cabecera `X-Clave-Admin` (docs/10 §8.4 punto 41).",
         "operationId": "AltaController_crear",
         "parameters": [
           {
             "name": "X-Clave-Admin",
             "in": "header",
-            "description": "Clave de administrador (HTTP_CLAVE_ADMIN del servidor)",
-            "required": true,
+            "description": "Sin sesión: la clave de administrador (HTTP_CLAVE_ADMIN), como usuario del sistema (docs/20 §5)",
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -260,7 +707,10 @@
             "description": "Cuerpo inválido: `message` es la lista de motivos"
           },
           "401": {
-            "description": "Cabecera X-Clave-Admin ausente o incorrecta"
+            "description": "Sin sesión ni X-Clave-Admin, o X-Clave-Admin incorrecta"
+          },
+          "403": {
+            "description": "Rol de consulta en ese sitio, o sesión sin la cabecera X-Pedido: panel"
           },
           "409": {
             "description": "El id_fisico ya existe (en la base o, huérfano, en el broker)"
@@ -275,6 +725,11 @@
             "description": "Sin clave de administrador configurada, o sin conexión de administración con el broker"
           }
         },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
         "summary": "Dar de alta un dispositivo",
         "tags": [
           "dispositivos"
@@ -300,17 +755,25 @@
           "200": {
             "description": "Ficha del dispositivo"
           },
+          "401": {
+            "description": "sesión requerida"
+          },
           "404": {
-            "description": "No existe"
+            "description": "No existe, o es de otro sitio"
           }
         },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
         "summary": "Ficha de un dispositivo",
         "tags": [
           "dispositivos"
         ]
       },
       "delete": {
-        "description": "Baja lógica: `estado = baja`, credenciales revocadas, condiciones abiertas cerradas y evento `baja`, en una transacción; si la vía es `mqtt`, el cliente se borra del broker dentro de ella (un cliente que el broker ya no tiene cuenta como borrado). La fila y su historial quedan; lo que llegue después va a cuarentena como `dado_de_baja`. Exige la cabecera `X-Clave-Admin` (docs/10 §3).",
+        "description": "Baja lógica: `estado = baja`, credenciales revocadas, condiciones abiertas cerradas y evento `baja`, en una transacción; si la vía es `mqtt`, el cliente se borra del broker dentro de ella (un cliente que el broker ya no tiene cuenta como borrado). La fila y su historial quedan; lo que llegue después va a cuarentena como `dado_de_baja`. Exige sesión de administrador del sitio o `X-Clave-Admin` (docs/10 §3).",
         "operationId": "AltaController_darDeBaja",
         "parameters": [
           {
@@ -325,8 +788,8 @@
           {
             "name": "X-Clave-Admin",
             "in": "header",
-            "description": "Clave de administrador (HTTP_CLAVE_ADMIN del servidor)",
-            "required": true,
+            "description": "Sin sesión: la clave de administrador (HTTP_CLAVE_ADMIN), como usuario del sistema (docs/20 §5)",
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -340,10 +803,13 @@
             "description": "UUID inválido"
           },
           "401": {
-            "description": "Cabecera X-Clave-Admin ausente o incorrecta"
+            "description": "Sin sesión ni X-Clave-Admin, o X-Clave-Admin incorrecta"
+          },
+          "403": {
+            "description": "Rol de consulta en ese sitio, o sesión sin la cabecera X-Pedido: panel"
           },
           "404": {
-            "description": "No existe"
+            "description": "No existe, o es de otro sitio"
           },
           "409": {
             "description": "Ya estaba dado de baja"
@@ -358,6 +824,11 @@
             "description": "Sin clave de administrador configurada, sin conexión de administración con el broker, u otra operación sobre el mismo dispositivo en curso"
           }
         },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
         "summary": "Dar de baja un dispositivo",
         "tags": [
           "dispositivos"
@@ -417,10 +888,21 @@
           "400": {
             "description": "UUID, fecha o formato inválidos"
           },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "403": {
+            "description": "Rol de consulta: exportar exige administrador"
+          },
           "404": {
-            "description": "Dispositivo inexistente"
+            "description": "Dispositivo inexistente o de otro sitio"
           }
         },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
         "summary": "Exportar las mediciones crudas de un dispositivo",
         "tags": [
           "dispositivos"
@@ -484,10 +966,18 @@
           "400": {
             "description": "UUID, fecha o intervalo inválidos, o una ventana de más de 366 días o de más de 5000 cubos"
           },
+          "401": {
+            "description": "sesión requerida"
+          },
           "404": {
-            "description": "Canal inexistente"
+            "description": "Canal inexistente o de otro sitio"
           }
         },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
         "summary": "Histórico agregado de un canal",
         "tags": [
           "canales"
@@ -533,9 +1023,20 @@
         ],
         "responses": {
           "200": {
-            "description": "Lista de condiciones"
+            "description": "Lista de condiciones de los sitios del usuario"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "404": {
+            "description": "El dispositivo del filtro no existe o es de otro sitio"
           }
         },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
         "summary": "Condiciones (estados anómalos) con duración",
         "tags": [
           "condiciones"
@@ -568,9 +1069,20 @@
         ],
         "responses": {
           "200": {
-            "description": "Lista de tramas en cuarentena"
+            "description": "Lista de tramas en cuarentena de los sitios del usuario (por el dispositivo o, si no se identificó, por el sitio del tópico)"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "404": {
+            "description": "El dispositivo del filtro no existe o es de otro sitio"
           }
         },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
         "summary": "Últimas tramas rechazadas",
         "tags": [
           "cuarentena"
@@ -594,7 +1106,7 @@
     },
     "/dispositivos/{id}/credencial": {
       "post": {
-        "description": "La credencial perdida no se recupera: se reemplaza. Nueva fila en `credencial` (la anterior queda inactiva), evento `rotacion` y, si la vía es `mqtt`, `setClientPassword` en el broker dentro de la transacción (si el broker no tenía al cliente, se crea con su rol). Devuelve la credencial nueva UNA sola vez. La anterior deja de valer al confirmar; una sesión MQTT ya abierta sigue hasta que el dispositivo reconecte. Si la respuesta no llega, repetir: la anterior puede haber dejado de valer. Exige `X-Clave-Admin`.",
+        "description": "La credencial perdida no se recupera: se reemplaza. Nueva fila en `credencial` (la anterior queda inactiva), evento `rotacion` y, si la vía es `mqtt`, `setClientPassword` en el broker dentro de la transacción (si el broker no tenía al cliente, se crea con su rol). Devuelve la credencial nueva UNA sola vez. La anterior deja de valer al confirmar; una sesión MQTT ya abierta sigue hasta que el dispositivo reconecte. Si la respuesta no llega, repetir: la anterior puede haber dejado de valer. Exige sesión de administrador del sitio o `X-Clave-Admin`.",
         "operationId": "AltaController_rotar",
         "parameters": [
           {
@@ -609,8 +1121,8 @@
           {
             "name": "X-Clave-Admin",
             "in": "header",
-            "description": "Clave de administrador (HTTP_CLAVE_ADMIN del servidor)",
-            "required": true,
+            "description": "Sin sesión: la clave de administrador (HTTP_CLAVE_ADMIN), como usuario del sistema (docs/20 §5)",
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -624,10 +1136,13 @@
             "description": "UUID inválido, o dispositivo lorawan (sin credencial propia)"
           },
           "401": {
-            "description": "Cabecera X-Clave-Admin ausente o incorrecta"
+            "description": "Sin sesión ni X-Clave-Admin, o X-Clave-Admin incorrecta"
+          },
+          "403": {
+            "description": "Rol de consulta en ese sitio, o sesión sin la cabecera X-Pedido: panel"
           },
           "404": {
-            "description": "No existe"
+            "description": "No existe, o es de otro sitio"
           },
           "409": {
             "description": "Está dado de baja"
@@ -642,6 +1157,11 @@
             "description": "Sin clave de administrador configurada, sin conexión de administración con el broker, u otra operación sobre el mismo dispositivo en curso"
           }
         },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
         "summary": "Rotar la credencial de un dispositivo",
         "tags": [
           "dispositivos"
@@ -650,28 +1170,36 @@
     },
     "/pasarelas": {
       "get": {
-        "description": "Cada pasarela con su formato, su estado, sus nodos y la última vez vista, derivada de ellos.",
+        "description": "Cada pasarela de los sitios del usuario con su formato, su estado, sus nodos y la última vez vista, derivada de ellos.",
         "operationId": "PasarelasController_listar",
         "parameters": [],
         "responses": {
           "200": {
             "description": "Lista de pasarelas"
+          },
+          "401": {
+            "description": "sesión requerida"
           }
         },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
         "summary": "Listar pasarelas",
         "tags": [
           "pasarelas"
         ]
       },
       "post": {
-        "description": "Crea la pasarela, su credencial (solo el hash en la base) y su cliente del broker con el rol `pasarela`, todo o nada. La respuesta trae, UNA sola vez, la credencial y las plantillas de tópico del formato declarado (ChirpStack: `event_topic` y `command_topic`; Milesight: el tópico del uplink con `$deveui` (minúsculas: es lo que la pasarela sustituye) y, para mantener el tópico nativo de la pasarela, la línea del puente de Mosquitto en `puente_mosquitto`). Sus nodos se dan de alta con `POST /dispositivos` y `via = lorawan` (con `decodificador` si la pasarela entrega la trama sin decodificar). Exige `X-Clave-Admin`.",
+        "description": "Crea la pasarela, su credencial (solo el hash en la base) y su cliente del broker con el rol `pasarela`, todo o nada. La respuesta trae, UNA sola vez, la credencial y las plantillas de tópico del formato declarado (ChirpStack: `event_topic` y `command_topic`; Milesight: el tópico del uplink con `$deveui` (minúsculas: es lo que la pasarela sustituye) y, para mantener el tópico nativo de la pasarela, la línea del puente de Mosquitto en `puente_mosquitto`). Sus nodos se dan de alta con `POST /dispositivos` y `via = lorawan` (con `decodificador` si la pasarela entrega la trama sin decodificar). Exige sesión de administrador del sitio o `X-Clave-Admin`.",
         "operationId": "PasarelasController_crear",
         "parameters": [
           {
             "name": "X-Clave-Admin",
             "in": "header",
-            "description": "Clave de administrador (HTTP_CLAVE_ADMIN del servidor)",
-            "required": true,
+            "description": "Sin sesión: la clave de administrador (HTTP_CLAVE_ADMIN), como usuario del sistema (docs/20 §5)",
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -724,7 +1252,10 @@
             "description": "Cuerpo inválido, sitio inexistente o inactivo"
           },
           "401": {
-            "description": "Cabecera X-Clave-Admin ausente o incorrecta"
+            "description": "Sin sesión ni X-Clave-Admin, o X-Clave-Admin incorrecta"
+          },
+          "403": {
+            "description": "Rol de consulta en ese sitio, o sesión sin la cabecera X-Pedido: panel"
           },
           "409": {
             "description": "El id_fisico ya existe (pasarela o dispositivo, o huérfano en el broker)"
@@ -739,6 +1270,11 @@
             "description": "Sin clave de administrador configurada, o sin conexión de administración con el broker"
           }
         },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
         "summary": "Dar de alta una pasarela o un servidor de red externo",
         "tags": [
           "pasarelas"
@@ -747,7 +1283,7 @@
     },
     "/pasarelas/{id}": {
       "delete": {
-        "description": "`activo = false`, credenciales revocadas, evento y cliente borrado del broker, en una transacción. Exige `X-Clave-Admin`.",
+        "description": "`activo = false`, credenciales revocadas, evento y cliente borrado del broker, en una transacción. Exige sesión de administrador del sitio o `X-Clave-Admin`.",
         "operationId": "PasarelasController_darDeBaja",
         "parameters": [
           {
@@ -762,8 +1298,8 @@
           {
             "name": "X-Clave-Admin",
             "in": "header",
-            "description": "Clave de administrador (HTTP_CLAVE_ADMIN del servidor)",
-            "required": true,
+            "description": "Sin sesión: la clave de administrador (HTTP_CLAVE_ADMIN), como usuario del sistema (docs/20 §5)",
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -774,12 +1310,17 @@
             "description": "Dada de baja: credenciales revocadas y nodos que quedan sin pasarela"
           },
           "404": {
-            "description": "No existe"
+            "description": "No existe, o es de otro sitio"
           },
           "409": {
             "description": "Ya estaba dada de baja"
           }
         },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
         "summary": "Dar de baja una pasarela",
         "tags": [
           "pasarelas"
@@ -788,7 +1329,7 @@
     },
     "/pasarelas/{id}/credencial": {
       "post": {
-        "description": "Credencial nueva (una sola vez), la anterior inactiva y `setClientPassword` en el broker. Exige `X-Clave-Admin`.",
+        "description": "Credencial nueva (una sola vez), la anterior inactiva y `setClientPassword` en el broker. Exige sesión de administrador del sitio o `X-Clave-Admin`.",
         "operationId": "PasarelasController_rotar",
         "parameters": [
           {
@@ -803,8 +1344,8 @@
           {
             "name": "X-Clave-Admin",
             "in": "header",
-            "description": "Clave de administrador (HTTP_CLAVE_ADMIN del servidor)",
-            "required": true,
+            "description": "Sin sesión: la clave de administrador (HTTP_CLAVE_ADMIN), como usuario del sistema (docs/20 §5)",
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -815,12 +1356,17 @@
             "description": "Credencial rotada; `conexion` trae la nueva y las plantillas de tópico"
           },
           "404": {
-            "description": "No existe"
+            "description": "No existe, o es de otro sitio"
           },
           "409": {
             "description": "Está dada de baja"
           }
         },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
         "summary": "Rotar la credencial de una pasarela",
         "tags": [
           "pasarelas"
@@ -829,7 +1375,7 @@
     },
     "/canales/{id}": {
       "patch": {
-        "description": "Fija `escala_cero` y `escala_cien`, el valor de la magnitud que corresponde al 0 % y al 100 % (las dos con valor), o las quita (las dos null). Las dos o ninguna, números finitos y distintas; `escala_cien` < `escala_cero` es válido (sensor que baja al crecer lo medido). **Bloqueo optimista:** `actualizado_en` es el que entregó la ficha (`GET /dispositivos/{id}`) para este canal, tal cual (trae microsegundos); si el canal cambió desde entonces, 409 con la hora del cambio y el `actualizado_en` vigente. Deja el evento `canal_calibrado` del dispositivo con la escala anterior y la nueva. Nada guardado se reescribe: el porcentaje de la ficha, del histórico y del canal en vivo sale con la escala vigente desde la siguiente consulta o lectura. Exige `X-Clave-Admin` (docs/10 §8.4 punto 51).",
+        "description": "Fija `escala_cero` y `escala_cien`, el valor de la magnitud que corresponde al 0 % y al 100 % (las dos con valor), o las quita (las dos null). Las dos o ninguna, números finitos y distintas; `escala_cien` < `escala_cero` es válido (sensor que baja al crecer lo medido). **Bloqueo optimista:** `actualizado_en` es el que entregó la ficha (`GET /dispositivos/{id}`) para este canal, tal cual (trae microsegundos); si el canal cambió desde entonces, 409 con la hora del cambio y el `actualizado_en` vigente. Deja el evento `canal_calibrado` del dispositivo con la escala anterior y la nueva. Nada guardado se reescribe: el porcentaje de la ficha, del histórico y del canal en vivo sale con la escala vigente desde la siguiente consulta o lectura. Exige sesión de administrador del sitio o `X-Clave-Admin` (docs/10 §8.4 punto 51; docs/20 §6).",
         "operationId": "CanalesAdminController_calibrar",
         "parameters": [
           {
@@ -844,8 +1390,8 @@
           {
             "name": "X-Clave-Admin",
             "in": "header",
-            "description": "Clave de administrador (HTTP_CLAVE_ADMIN del servidor)",
-            "required": true,
+            "description": "Sin sesión: la clave de administrador (HTTP_CLAVE_ADMIN), como usuario del sistema (docs/20 §5)",
+            "required": false,
             "schema": {
               "type": "string"
             }
@@ -896,10 +1442,13 @@
             "description": "UUID inválido, o cuerpo inválido (una sola escala, iguales, no finitas, sin actualizado_en): `message` es la lista de motivos"
           },
           "401": {
-            "description": "Cabecera X-Clave-Admin ausente o incorrecta"
+            "description": "Sin sesión ni X-Clave-Admin, o X-Clave-Admin incorrecta"
+          },
+          "403": {
+            "description": "Rol de consulta en ese sitio, o sesión sin la cabecera X-Pedido: panel"
           },
           "404": {
-            "description": "El canal no existe"
+            "description": "El canal no existe, o es de otro sitio"
           },
           "409": {
             "description": "«alguien lo cambió a las HH:MM UTC (…); recarga»: el canal cambió desde la ficha enviada; `actualizado_en` trae el vigente"
@@ -908,6 +1457,11 @@
             "description": "Sin clave de administrador configurada, u otra operación sobre el mismo canal en curso"
           }
         },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
         "summary": "Calibrar un canal (o quitar su calibración)",
         "tags": [
           "canales"
@@ -917,7 +1471,7 @@
   },
   "info": {
     "title": "Registro, gestión y monitoreo de dispositivos IoT",
-    "description": "API del sistema: consulta (M5) y canal de tiempo real (SSE) para el panel; recepción de tramas por HTTP; administración (alta, baja, rotación de credenciales y calibración) con la clave de administración. Todos los instantes en ISO 8601 UTC (sufijo Z); las agregaciones por día se calculan en la zona horaria del sitio. Rangos semiabiertos [desde, hasta).",
+    "description": "API del sistema: consulta (M5) y canal de tiempo real (SSE) para el panel; recepción de tramas por HTTP; administración (alta, baja, rotación de credenciales y calibración); sesión, usuarios y roles por sitio (M7). Salvo /salud, POST /sesion y la recepción, toda ruta exige la cookie `__Host-sesion` (o, mientras siga configurada, la cabecera X-Clave-Admin) y cada una responde solo con lo de los sitios del usuario; con sesión, las que escriben exigen además `X-Pedido: panel`. Todos los instantes en ISO 8601 UTC (sufijo Z); las agregaciones por día se calculan en la zona horaria del sitio. Rangos semiabiertos [desde, hasta).",
     "version": "0.1.0",
     "contact": {}
   },
@@ -953,10 +1507,26 @@
     {
       "name": "pasarelas",
       "description": "Pasarelas y servidores de red externos (rutas B y C)"
+    },
+    {
+      "name": "sesion",
+      "description": "Sesión del panel: iniciar, ver, cerrar y cambiar la clave (M7, docs/20)"
+    },
+    {
+      "name": "usuarios",
+      "description": "Usuarios y sus roles por sitio (HU-18, RF-43, RF-44)"
     }
   ],
   "servers": [],
   "components": {
+    "securitySchemes": {
+      "cookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "__Host-sesion",
+        "description": "Identificador opaco de 32 bytes; HttpOnly, Secure, SameSite=Lax, Path=/ y sin Domain (prefijo __Host-)"
+      }
+    },
     "schemas": {}
   }
 }

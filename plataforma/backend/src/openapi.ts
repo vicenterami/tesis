@@ -10,7 +10,9 @@ export function construirDocumento(app: INestApplication): OpenAPIObject {
     .setTitle('Registro, gestión y monitoreo de dispositivos IoT')
     .setDescription(
       'API del sistema: consulta (M5) y canal de tiempo real (SSE) para el panel; recepción de tramas por HTTP; administración ' +
-        '(alta, baja, rotación de credenciales y calibración) con la clave de administración. Todos los instantes en ISO 8601 UTC ' +
+        '(alta, baja, rotación de credenciales y calibración); sesión, usuarios y roles por sitio (M7). Salvo /salud, POST /sesion y la ' +
+        'recepción, toda ruta exige la cookie `__Host-sesion` (o, mientras siga configurada, la cabecera X-Clave-Admin) y cada una responde solo ' +
+        'con lo de los sitios del usuario; con sesión, las que escriben exigen además `X-Pedido: panel`. Todos los instantes en ISO 8601 UTC ' +
         '(sufijo Z); las agregaciones por día se calculan en la zona horaria del sitio. Rangos semiabiertos [desde, hasta).',
     )
     .setVersion('0.1.0')
@@ -22,6 +24,9 @@ export function construirDocumento(app: INestApplication): OpenAPIObject {
     .addTag('salud', 'Estado del servicio')
     .addTag('recepcion', 'Recepción de tramas por HTTP (vía http)')
     .addTag('pasarelas', 'Pasarelas y servidores de red externos (rutas B y C)')
+    .addTag('sesion', 'Sesión del panel: iniciar, ver, cerrar y cambiar la clave (M7, docs/20)')
+    .addTag('usuarios', 'Usuarios y sus roles por sitio (HU-18, RF-43, RF-44)')
+    .addCookieAuth('sesion', { type: 'apiKey', in: 'cookie', name: '__Host-sesion', description: 'Identificador opaco de 32 bytes; HttpOnly, Secure, SameSite=Lax, Path=/ y sin Domain (prefijo __Host-)' })
     .build();
   return SwaggerModule.createDocument(app, config);
 }

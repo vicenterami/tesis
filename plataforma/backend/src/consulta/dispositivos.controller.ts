@@ -1,6 +1,9 @@
 import { BadRequestException, Controller, Get, HttpException, HttpStatus, Logger, Param, Query, Res } from '@nestjs/common';
 import { once } from 'node:events';
-import { ApiBadRequestResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiProduces, ApiQuery, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBadRequestResponse, ApiCookieAuth, ApiForbiddenResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiProduces, ApiQuery, ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 import type { Response } from 'express';
 import { ConsultaService } from './consulta.service';
 import { CABECERA_CSV, FORMATOS, filaCsv, filaJson, formato, nombreDeArchivo, rangoRazonable } from './exportar';
@@ -8,19 +11,27 @@ import { CABECERA_CSV, FORMATOS, filaCsv, filaJson, formato, nombreDeArchivo, ra
 // Exportaciones simultáneas admitidas por proceso: cada una ocupa una conexión a la base durante toda la descarga.
 export const MAX_EXPORTACIONES = 2;
 import { fecha, uuid } from './validacion';
+import { AlcanceService } from '../sesion/alcance.service';
+import { Usuario } from '../sesion/guardia';
+import { alcanceDeLectura } from '../sesion/permisos';
+import type { UsuarioSesion } from '../sesion/permisos';
 
+// Lecturas con sesión (docs/20 §6, desde el 08/11/2026): 401 sin sesión; la lista sale filtrada por los sitios del usuario en el WHERE;
+// un dispositivo de otro sitio responde 404, igual que uno inexistente (RF-41); exportar exige rol administrador (403 al de consulta).
 @ApiTags('dispositivos')
+@ApiCookieAuth('sesion')
+@ApiUnauthorizedResponse({ description: 'sesión requerida' })
 @Controller('dispositivos')
 export class DispositivosController {
   private readonly log = new Logger('exportar');
   private exportacionesEnCurso = 0;
-  constructor(private readonly consulta: ConsultaService) {}
+  constructor(private readonly consulta: ConsultaService, private readonly alcance: AlcanceService) {}
 
   // Inventario con estado: base de la vista "salud del sitio" (HU-19).
   @Get()
-  @ApiOperation({ summary: 'Inventario de dispositivos con estado', description: 'Cada dispositivo con su sitio y zona (nombres, y `sitio_codigo` y `zona_id` para filtrar: los nombres pueden repetirse), zona horaria, canales, `en_linea` (última trama hace menos de 2 × intervalo esperado) y número de condiciones abiertas.' })
+  @ApiOperation({ summary: 'Inventario de dispositivos con estado', description: 'Cada dispositivo de los sitios del usuario con su sitio y zona (nombres, y `sitio_codigo` y `zona_id` para filtrar: los nombres pueden repetirse), zona horaria, canales, `en_linea` (última trama hace menos de 2 × intervalo esperado) y número de condiciones abiertas.' })
   @ApiOkResponse({ description: 'Lista de dispositivos' })
-  listar() { return this.consulta.dispositivos(); }
+  listar(@Usuario() u: UsuarioSesion) { return this.consulta.dispositivos(alcanceDeLectura(u)); }
 
   // Ficha completa: canales, reglas, última medición y condiciones abiertas (HU-21).
   @Get(':id')
@@ -35,12 +46,16 @@ export class DispositivosController {
   })
   @ApiParam({ name: 'id', description: 'UUID del dispositivo' })
   @ApiOkResponse({ description: 'Ficha del dispositivo' })
-  @ApiNotFoundResponse({ description: 'No existe' })
-  detalle(@Param('id') id: string) { return this.consulta.dispositivo(uuid(id)); }
+  @ApiNotFoundResponse({ description: 'No existe, o es de otro sitio' })
+  async detalle(@Usuario() u: UsuarioSesion, @Param('id') id: string) {
+    const dispositivoId = uuid(id);
+    await this.alcance.exigirDispositivo(u, 'leer', dispositivoId);
+    return this.consulta.dispositivo(dispositivoId);
+  }
 
   // GET /dispositivos/:id/exportar?formato=csv|json&desde&hasta — mediciones crudas en flujo (RF-34, HU-08; docs/19 P8).
   // Se escribe fila a fila al responder, por tandas de 10 000 (consulta.service.ts): un rango de años no cabe en memoria y
-  // tampoco hace falta. Por defecto, los últimos 30 días. Sin sesión hasta M7, como toda la API (docs/11 §4).
+  // tampoco hace falta. Por defecto, los últimos 30 días. Solo administrador del sitio (docs/20 §6: datos crudos, no públicos).
   @Get(':id/exportar')
   @ApiOperation({
     summary: 'Exportar las mediciones crudas de un dispositivo',
@@ -55,8 +70,10 @@ export class DispositivosController {
   @ApiProduces('text/csv', 'application/json')
   @ApiOkResponse({ description: 'Archivo descargable (Content-Disposition: attachment)' })
   @ApiBadRequestResponse({ description: 'UUID, fecha o formato inválidos' })
-  @ApiNotFoundResponse({ description: 'Dispositivo inexistente' })
+  @ApiForbiddenResponse({ description: 'Rol de consulta: exportar exige administrador' })
+  @ApiNotFoundResponse({ description: 'Dispositivo inexistente o de otro sitio' })
   async exportar(
+    @Usuario() u: UsuarioSesion,
     @Param('id') id: string,
     @Res() res: Response,
     @Query('formato') f?: string,
@@ -64,6 +81,7 @@ export class DispositivosController {
     @Query('hasta') hasta?: string,
   ): Promise<void> {
     const dispositivoId = uuid(id, 'dispositivo');
+    await this.alcance.exigirDispositivo(u, 'exportar', dispositivoId);
     let fmt;
     try {
       fmt = formato(f);

@@ -7,10 +7,17 @@
 #   bash plataforma/pruebas/banco/consultable.sh [URL]      (por defecto http://127.0.0.1:3000; sirve contra la pila o contra el banco)
 set -euo pipefail
 API="${1:-http://127.0.0.1:3000}"
+# Desde el 08/11/2026 las lecturas exigen sesión (docs/20 §6): se lee como «usuario del sistema» con la clave de administrador
+# (docs/20 §5) del .env que corresponde (el del banco si la URL es la suya, el de la pila si no). Entra a curl por la entrada estándar.
+AQUI="$(cd "$(dirname "$0")" && pwd)"
+. "$AQUI/../lib-dynsec.sh"
+case "$API" in *:3001*) ENV_CLAVE="${XDG_RUNTIME_DIR:-$HOME/.cache}/plataforma-banco/banco.env" ;; *) ENV_CLAVE="$AQUI/../../.env" ;; esac
+CLAVE=$(leer_env "$ENV_CLAVE" HTTP_CLAVE_ADMIN 2>/dev/null || true)
+[ -n "$CLAVE" ] || { echo "FALLA sin HTTP_CLAVE_ADMIN en $ENV_CLAVE: las lecturas exigen sesión o esa clave"; exit 1; }
 ok=0; fallos=0; sin_datos=0
 ok() { echo "OK    $*"; ok=$((ok+1)); }
 falla() { echo "FALLA $*"; fallos=$((fallos+1)); }
-get() { curl -sS -m 20 -o "$2" -w '%{http_code}' "$API$1" || true; }   # ruta, archivo de salida → código (000 si no responde: se cuenta como FALLA, no mata el guion)
+get() { printf 'X-Clave-Admin: %s\n' "$CLAVE" | curl -sS -m 20 -H @- -o "$2" -w '%{http_code}' "$API$1" || true; }   # ruta, archivo de salida → código (000 si no responde: se cuenta como FALLA, no mata el guion)
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
 AHORA=$(date -u +%FT%TZ)
 desde() { date -u -d "$AHORA - $1" +%FT%TZ; }   # «1 hour», «24 hours», «7 days», «30 days»

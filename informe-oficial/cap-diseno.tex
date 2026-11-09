@@ -27,12 +27,12 @@ Los ocho módulos del análisis (capítulo~\ref{cap:especificacion}) se reparten
 normalización forman el servicio de recepción del backend, es decir, el pipeline; M4 supervisión de
 salud es el barrido periódico; M5 persistencia y consulta es la API sobre TimescaleDB; M6 alertas es el
 servicio de umbrales. No aparecen como cajas M3 inventario y aprovisionamiento (hecho por API) ni M7 seguridad e
-identidad (sesión y roles, siguiente etapa), transversales al backend, ni M8 interfaz, que es el
+identidad (sesión y roles, hechos el 08/11; falta su pantalla), transversales al backend, ni M8 interfaz, que es el
 panel y corre en el navegador.
 
 \section{Modelo de datos}
 
-El modelo (figura~\ref{fig:modelo-datos}) tiene 18 entidades y una idea rectora: \textbf{el modelo
+El modelo (figura~\ref{fig:modelo-datos}) tiene 20 entidades y una idea rectora: \textbf{el modelo
 interno es único}. Llegue en el formato que llegue, una trama que supera el pipeline se guarda con la misma forma. Esa uniformidad es la respuesta a la causa C1 (formatos
 dispares). El esquema está en tercera forma normal, y no más allá porque la cuarta y la quinta resuelven dependencias multivaluadas y de reunión que este modelo no tiene: cada hecho vive en una sola tabla y las
 relaciones muchos a muchos se resuelven con entidades de asociación (\texttt{canal} es dispositivo por
@@ -43,7 +43,7 @@ para que cambiar un catálogo no reinterprete el pasado.
 \input{figuras/modelo-datos}
 
 
-Las decisiones del modelo y su justificación —por qué la medición cuelga del canal, por qué la credencial es una entidad aparte, por qué la cuarentena vive aparte de las series— se detallan en el cuadro~\ref{tab:decisiones-datos} (anexo~\ref{anx:evaluacion}). Lo que el diagrama no muestra por convención también está diseñado y verificado contra la base real: toda restricción con nombre y prefijo (\texttt{pk\_}, \texttt{fk\_}, \texttt{uq\_}, \texttt{ck\_}); un índice por clave foránea, que PostgreSQL no crea solo y sin el cual cada unión recorre la tabla; \texttt{actualizado\_en} mantenida por disparador en toda tabla mutable; baja lógica en vez de borrado; dominios cerrados como \texttt{CHECK} y catálogos donde el usuario administra los valores; y \texttt{COMMENT ON} en las columnas no obvias, para que la documentación viaje con la base. El esquema evoluciona por \textbf{21 migraciones numeradas}: nunca se edita un archivo ya aplicado. Una instalación nueva ejecuta todas en orden; una
+Las decisiones del modelo y su justificación —por qué la medición cuelga del canal, por qué la credencial es una entidad aparte, por qué la cuarentena vive aparte de las series— se detallan en el cuadro~\ref{tab:decisiones-datos} (anexo~\ref{anx:evaluacion}). Lo que el diagrama no muestra por convención también está diseñado y verificado contra la base real: toda restricción con nombre y prefijo (\texttt{pk\_}, \texttt{fk\_}, \texttt{uq\_}, \texttt{ck\_}); un índice por clave foránea, que PostgreSQL no crea solo y sin el cual cada unión recorre la tabla; \texttt{actualizado\_en} mantenida por disparador en toda tabla mutable; baja lógica en vez de borrado; dominios cerrados como \texttt{CHECK} y catálogos donde el usuario administra los valores; y \texttt{COMMENT ON} en las columnas no obvias, para que la documentación viaje con la base. El esquema evoluciona por \textbf{22 migraciones numeradas}: un archivo ya aplicado no se edita, salvo la 14 (permisos del rol de la aplicación), que se reaplica. Una instalación nueva ejecuta todas en orden; una
 base existente aplica solo las nuevas.
 
 \section{Topología de red y seguridad en capas}

@@ -105,6 +105,7 @@ services:
       RETENCION_TRAMA_DIAS:
       RETENCION_CUARENTENA_DIAS:
       RETENCION_METRICA_BROKER_DIAS:
+      RETENCION_ACCESO_DIAS:                     # bitácora de accesos (RF-46, docs/20 §2): 90 días por defecto
       RETENCION_INTERVALO_H:
       METRICA_BROKER_INTERVALO_S:
       METRICA_BROKER_COLA_TOPE:
@@ -120,7 +121,7 @@ services:
       MQTT_BACKEND_CLAVE: ${MQTT_BACKEND_CLAVE}
       MQTT_ADMIN_CLAVE: ${MQTT_ADMIN_CLAVE:-}          # administrador del plugin del broker (docs/10 §8.4 punto 41); vacío = alta por API en 503
       MQTT_SONDA_USUARIO: ${MQTT_SONDA_USUARIO:-sonda}   # nombre reservado: ningún dispositivo puede llamarse como la sonda
-      HTTP_CLAVE_ADMIN: ${HTTP_CLAVE_ADMIN:-}          # clave de las rutas que escriben, por cabecera (punto 41); vacío = 503, nunca abiertas
+      HTTP_CLAVE_ADMIN: ${HTTP_CLAVE_ADMIN:-}          # clave de administrador por cabecera (punto 41): «usuario del sistema» y primer administrador (docs/20 §5)
       HTTP_INTERFAZ: 0.0.0.0                       # todas las interfaces DEL CONTENEDOR; sin `ports` no se ve desde fuera
       HTTP_HOSTS: ${PROXY_NOMBRE:-}                # el nombre público del proxy, además de localhost y 127.0.0.1 (docs/11 §3, docs/10 §8.4 punto 40); vacío en desarrollo
       LOG_FORMATO: json                            # un evento JSON por línea, sin color (docs/10 §6)

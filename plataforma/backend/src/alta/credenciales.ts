@@ -12,15 +12,19 @@ export function generarSecreto(): string {
   return randomBytes(24).toString('base64url');
 }
 
-// Para secretos aleatorios de 24 bytes (alta entropía) basta N = 2^15; las claves de personas (docs/20) usarán 2^17.
-// Memoria por hash: 128·N·r = 32 MiB, justo el tope por defecto de Node (maxmem): se declara uno mayor a propósito.
+// Para secretos aleatorios de 24 bytes (alta entropía) basta N = 2^15; las claves de personas, que las eligen ellas y pueden ser
+// adivinables, usan N = 2^17 (docs/20 §4; costo medido en docs/16 §58). Memoria por hash: 128·N·r = 32 MiB con 2^15 y 128 MiB con
+// 2^17; el tope de Node (maxmem) se declara al doble de lo que pide N, a propósito (el de fábrica, 32 MiB, no alcanza).
 // Asíncrono: el cálculo corre en el pool de hilos de Node y no detiene la recepción de tramas mientras tanto.
-const PARAMETROS = { N: 2 ** 15, r: 8, p: 1, largo: 64, maxmem: 64 * 1024 * 1024 };
+export const N_DISPOSITIVO = 2 ** 15;
+export const N_PERSONA = 2 ** 17;
+const PARAMETROS = { r: 8, p: 1, largo: 64 };
 const LARGO_MINIMO = { sal: 16, clave: 32 };
 
-export async function hashScrypt(secreto: string, sal: Buffer = randomBytes(16)): Promise<string> {
-  const clave = await scrypt(secreto, sal, PARAMETROS.largo, { N: PARAMETROS.N, r: PARAMETROS.r, p: PARAMETROS.p, maxmem: PARAMETROS.maxmem });
-  return `scrypt$${PARAMETROS.N}$${PARAMETROS.r}$${PARAMETROS.p}$${sal.toString('base64')}$${clave.toString('base64')}`;
+export async function hashScrypt(secreto: string, sal: Buffer = randomBytes(16), N: number = N_DISPOSITIVO): Promise<string> {
+  const maxmem = 2 * 128 * N * PARAMETROS.r;
+  const clave = await scrypt(secreto, sal, PARAMETROS.largo, { N, r: PARAMETROS.r, p: PARAMETROS.p, maxmem });
+  return `scrypt$${N}$${PARAMETROS.r}$${PARAMETROS.p}$${sal.toString('base64')}$${clave.toString('base64')}`;
 }
 
 // Un hash con otra forma, degenerado (sal o clave cortas: dos vacíos serían «iguales») o con parámetros fuera de lo que se

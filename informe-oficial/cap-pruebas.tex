@@ -16,9 +16,9 @@ M1 Recepción & MQTT con TLS y HTTP, credencial propia; LoRaWAN por pasarela (ru
 M2 Normalización & Seis filtros con cuarentena; formato del alta; tope por emisor & Pruebas del contrato \\
 M3 Registro & Alta, baja y rotación por API, todo o nada; pasarelas & Pantalla (Etapa~4) \\
 M4 Supervisión & Silencio según el intervalo esperado de cada uno & Batería; enlace; \emph{Last Will} \\
-M5 Series & TimescaleDB, 21 migraciones, API, CSV y JSON, canal en vivo & XLSX; rango a medida \\
+M5 Series & TimescaleDB, 22 migraciones, API, CSV y JSON, canal en vivo & XLSX; rango a medida \\
 M6 Alertas & Umbral con histéresis; alarma de la cola del broker & Notificación \\
-M7 Seguridad & Claves con hash, ACL por rol, mínimo privilegio, sin \texttt{NET\_RAW} & Sesión y roles \\
+M7 Seguridad & Claves con hash, ACL por rol, mínimo privilegio, sin \texttt{NET\_RAW}; sesión y roles por sitio & Pantalla de sesión; auditoría \\
 M8 Panel & Semáforo; inventario filtrable; ficha; canal callado & Salud del sitio \\
 \bottomrule
 \end{tabular}
@@ -29,10 +29,10 @@ M8 Panel & Semáforo; inventario filtrable; ficha; canal callado & Salud del sit
 
 \section{Método de prueba}
 
-Se prueba en tres niveles, todos repetibles con un comando (anexo~\ref{anx:pruebas}). Las 357 pruebas unitarias del backend y las 107 del panel corren sin base ni broker, con tipos estrictos y análisis estático. \textbf{Banco
+Se prueba en tres niveles, todos repetibles con un comando (anexo~\ref{anx:pruebas}). Las 436 pruebas unitarias del backend y las 107 del panel corren sin base ni broker, con tipos estrictos y análisis estático. \textbf{Banco
 desechable}: una segunda pila con base, broker con su plugin de seguridad, backend y proxy reales, datos en memoria y un
 emulador de nodos que imita relojes rotos, pérdidas y deriva; sobre él corren casos fijos de carga, carreras,
-caídas, TLS, alta por API, LoRaWAN y cola del broker. \textbf{Verificador de concordancia}: 46 pasos que comparan informe, documentación, base y API. Cada comprobación nueva se ejecuta primero contra el error \emph{plantado}: una prueba vale solo si falla ante la falla.
+caídas, TLS, alta por API, LoRaWAN y cola del broker. \textbf{Verificador de concordancia}: 47 pasos que comparan informe, documentación, base y API. Cada comprobación nueva se ejecuta primero contra el error \emph{plantado}: una prueba vale solo si falla ante la falla.
 
 \section{Resultados frente a los requerimientos}
 

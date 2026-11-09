@@ -135,11 +135,16 @@ desde el código, así que no puede describir rutas que no existen.
 **Exportar (1 min, lo «no negociable» del entrevistado):** en la terminal B, descargar el CSV crudo del dispositivo de la demo y
 mirar sus tres primeras líneas (instantes en UTC con microsegundos, punto decimal, una fila por lectura):
 
+Desde el 08/11/2026 toda ruta exige sesión o la clave de administrador por cabecera (`docs/20`): en la terminal B, una vez,
+`CLAVE=$(grep '^HTTP_CLAVE_ADMIN=' plataforma/.env | cut -d= -f2-)` (no se imprime) y cada `curl` lleva `-H "X-Clave-Admin: $CLAVE"`.
+
 ```bash
-curl -s -OJ "http://127.0.0.1:3000/dispositivos/$(curl -s http://127.0.0.1:3000/dispositivos | python3 -c 'import sys,json; print(json.load(sys.stdin)[0]["id"])')/exportar?formato=csv" && head -3 dev-*.csv
+curl -s -OJ -H "X-Clave-Admin: $CLAVE" "http://127.0.0.1:3000/dispositivos/$(curl -s -H "X-Clave-Admin: $CLAVE" http://127.0.0.1:3000/dispositivos | python3 -c 'import sys,json; print(json.load(sys.stdin)[0]["id"])')/exportar?formato=csv" && head -3 dev-*.csv
 ```
 
-En `/docs`:
+En `/docs` (la interfaz manda las peticiones desde el navegador, así que necesita una sesión: hasta que exista la pantalla de inicio
+de sesión P10, se crea el primer administrador con `POST /usuarios` y `X-Clave-Admin`, y se abre la sesión desde la consola del navegador
+con el `fetch` de `docs/20 §10`; con la cookie puesta, **Try it out** funciona):
 
 1. `GET /dispositivos` → **Try it out** → **Execute**. Mostrar `estado`, `en_linea`, `condiciones_abiertas`
    y que todo instante termina en `Z`. Copiar el `id` que aparece dentro de `canales` (el UUID del canal
@@ -151,7 +156,7 @@ En `/docs`:
 
 ## 6. Cómo se sostiene esto (1 min)
 
-- `cd plataforma/backend && pnpm verificar`: tipos, lint y 357 pruebas unitarias en unos segundos
+- `cd plataforma/backend && pnpm verificar`: tipos, lint y 436 pruebas unitarias en unos segundos
   (la cifra exacta la da la salida de `jest`; no la memorices). Los avisos de cuarentena que aparecen
   mientras corre son de las pruebas, a propósito.
 - `bash plataforma/pruebas/verificar-todo.sh`: esquema, migraciones, diagramas del informe, API y

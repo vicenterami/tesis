@@ -1,7 +1,3 @@
-import { CanActivate, ExecutionContext, Injectable, Logger, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import type { Request } from 'express';
-import { AvisosAcotados, claveAdmin } from '../arranque';
 import { igualesEnTiempoConstante } from './credenciales';
 
 export const CABECERA_CLAVE_ADMIN = 'x-clave-admin';
@@ -16,26 +12,5 @@ export function rechazoDeClaveAdmin(cabecera: string | string[] | undefined, con
   return igualesEnTiempoConstante(cabecera, configurada) ? null : 'distinta';
 }
 
-// Guardia de toda ruta que escribe mientras no hay sesión (M7, Etapa 4). Una cabecera propia que el navegador no manda sola:
-// una página de otro sitio no puede forzarla sin una verificación previa de CORS, que este backend no concede (docs/11 §3).
-@Injectable()
-export class ClaveAdminGuard implements CanActivate {
-  private readonly log = new Logger('clave-admin');
-  private readonly avisos = new AvisosAcotados();
-  private readonly configurada: string | undefined;
-
-  constructor(config: ConfigService) {
-    this.configurada = claveAdmin(config.get<string>('HTTP_CLAVE_ADMIN'));
-  }
-
-  canActivate(ctx: ExecutionContext): boolean {
-    const req = ctx.switchToHttp().getRequest<Request>();
-    const rechazo = rechazoDeClaveAdmin(req.headers[CABECERA_CLAVE_ADMIN], this.configurada);
-    if (rechazo === null) return true;
-    if (rechazo === 'sin_configurar') throw new ServiceUnavailableException('sin administrador configurado (HTTP_CLAVE_ADMIN)');
-    const aviso = this.avisos.registrar(`clave de administrador ${rechazo} (${req.method} ${req.path})`);
-    if (aviso !== null) this.log.warn(`petición rechazada (401): ${aviso}`);
-    // El mismo mensaje para «ausente» y «distinta»: no se le dice a quien prueba si acertó el formato.
-    throw new UnauthorizedException('clave de administrador ausente o incorrecta');
-  }
-}
+// Desde el 08/11/2026 la comprueba el guardia central de la sesión (sesion/guardia.ts, docs/20 §5): si la cabecera viene y coincide, la
+// petición la hace el «usuario del sistema», con rol de administrador en todos los sitios, hasta que la variable se retire del .env.

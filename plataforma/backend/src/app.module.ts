@@ -8,6 +8,7 @@ import { SaludModule } from './salud/salud.module';
 import { RetencionModule } from './retencion/retencion.module';
 import { TiempoRealModule } from './tiempo-real/tiempo-real.module';
 import { AltaModule } from './alta/alta.module';
+import { SesionModule } from './sesion/sesion.module';
 
 // Módulo raíz. Cada módulo de aquí corresponde a un módulo funcional del diseño (docs/10 §1):
 //   DbModule        → acceso a TimescaleDB (infraestructura compartida)
@@ -22,13 +23,17 @@ import { AltaModule } from './alta/alta.module';
 //   TiempoRealModule → canal de tiempo real hacia el panel (SSE, TT-39): GET /eventos
 //   AltaModule      → M3 Aprovisionamiento (HU-11): POST /dispositivos, DELETE /dispositivos/{id} y POST /dispositivos/{id}/credencial, con clave de administrador por cabecera
 //                     (docs/10 §8.4 punto 41) y la credencial del broker creada en el plugin (punto 42)
-// M7 (seguridad e identidad: sesión y usuarios, docs/20) llega en la Etapa 4; M8 es el panel (backend/panel).
+//   SesionModule    → M7 Seguridad e identidad (docs/20, Etapa 4): POST/GET/DELETE /sesion, POST /sesion/clave, /usuarios y el guardia
+//                     central GLOBAL (APP_GUARD): toda ruta exige la cookie de sesión o la clave de administrador, salvo las @Publica();
+//                     cada ruta decide con permitir() sobre el sitio del recurso (docs/10 §8.4 punto 36). Va antes que los que lo usan.
+// M8 es el panel (backend/panel).
 @Module({
   imports: [
     // Lee variables de entorno. En desarrollo toma el .env de la carpeta plataforma/ (el mismo que
     // usa Docker Compose): una sola fuente de secretos, nunca dos copias que se desincronicen.
     ConfigModule.forRoot({ isGlobal: true, envFilePath: ['../.env', '.env'] }),
     DbModule,
+    SesionModule,
     BrokerModule,
     RecepcionModule,
     ConsultaModule,

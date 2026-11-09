@@ -31,7 +31,8 @@ export class ConsultaService {
 
   // Un dispositivo está "en línea" si su último mensaje cae dentro de 2 × su intervalo esperado
   // (mismo criterio que el supervisor: un mensaje perdido no es una caída; dos seguidos, sí).
-  async dispositivos() {
+  // `sitios`: el alcance de quien pregunta (docs/20 §5; docs/10 §8.4 punto 36), en el WHERE; null = todos (usuario del sistema).
+  async dispositivos(sitios: string[] | null = null) {
     const r = await this.pool.query(`
       SELECT d.id, d.id_fisico, d.nombre, d.estado, d.via, d.formato, d.intervalo_esperado_s,
              e.visto_por_ultima_vez,
@@ -46,7 +47,8 @@ export class ConsultaService {
         LEFT JOIN estado_dispositivo e ON e.dispositivo_id = d.id
         JOIN zona z ON z.id = d.zona_id
         JOIN sitio s ON s.id = z.sitio_id
-       ORDER BY s.nombre, z.nombre, d.nombre`);
+       WHERE $1::uuid[] IS NULL OR s.id = ANY($1::uuid[])
+       ORDER BY s.nombre, z.nombre, d.nombre`, [sitios]);
     return r.rows;
   }
 
@@ -120,9 +122,14 @@ export class ConsultaService {
   }
 
   // `dispositivoId` (opcional, ya validado como UUID por el controlador): solo las de ese dispositivo (ficha del panel, docs/19 P3).
-  async condiciones(abiertas: boolean | undefined, lim: number, dispositivoId?: string) {
+  // `sitios`: alcance de quien pregunta (null = todos), por el sitio de la zona del dispositivo.
+  async condiciones(abiertas: boolean | undefined, lim: number, dispositivoId?: string, sitios: string[] | null = null) {
     const condiciones: string[] = [];
     const parametros: unknown[] = [lim];
+    if (sitios !== null) {
+      parametros.push(sitios);
+      condiciones.push(`z.sitio_id = ANY($${parametros.length}::uuid[])`);
+    }
     if (abiertas !== undefined) condiciones.push(abiertas ? 'c.cerrada_en IS NULL' : 'c.cerrada_en IS NOT NULL');
     if (dispositivoId !== undefined) {
       parametros.push(dispositivoId);
@@ -136,6 +143,7 @@ export class ConsultaService {
              r.umbral_alto, r.umbral_bajo, ca.magnitud_codigo AS magnitud
         FROM condicion c
         JOIN dispositivo d ON d.id = c.dispositivo_id
+        JOIN zona z ON z.id = d.zona_id
         LEFT JOIN regla_umbral r ON r.id = c.regla_id
         LEFT JOIN canal ca ON ca.id = r.canal_id
         ${filtro}
@@ -189,14 +197,28 @@ export class ConsultaService {
   // da texto si es UTF-8 y hexadecimal si no: antes, una sola trama binaria hacía fallar la consulta entera.
   // El detalle dice el porqué concreto («temperatura: 500 Cel fuera del rango físico [-40, 85]»).
   // `dispositivoId` (opcional, UUID validado): solo lo rechazado de ese dispositivo (las de `no_registrado` no tienen dueño).
-  async cuarentena(lim: number, dispositivoId?: string) {
-    const filtro = dispositivoId === undefined ? '' : 'WHERE q.dispositivo_id = $2';
-    const parametros = dispositivoId === undefined ? [lim] : [lim, dispositivoId];
+  // `sitios`: alcance de quien pregunta (null = todos). Una trama se atribuye al sitio de su dispositivo y, si no se identificó
+  // (no_registrado, malformada sin emisor), al sitio cuyo código va en el tópico (`sitio/<codigo>/…`): el sitio al que iba dirigida
+  // (decidido al implementar, 08/11/2026). Lo que no calza con ningún sitio solo lo ve el usuario del sistema.
+  async cuarentena(lim: number, dispositivoId?: string, sitios: string[] | null = null) {
+    const condiciones: string[] = [];
+    const parametros: unknown[] = [lim];
+    if (dispositivoId !== undefined) {
+      parametros.push(dispositivoId);
+      condiciones.push(`q.dispositivo_id = $${parametros.length}`);
+    }
+    if (sitios !== null) {
+      parametros.push(sitios);
+      condiciones.push(`coalesce(z.sitio_id, st.id) = ANY($${parametros.length}::uuid[])`);
+    }
+    const filtro = condiciones.length === 0 ? '' : `WHERE ${condiciones.join(' AND ')}`;
     const r = await this.pool.query(`
       SELECT q.id, q.origen, q.topico, q.motivo, q.detalle, d.id_fisico AS dispositivo, q.recibido_en,
              p.texto AS payload, p.formato AS payload_formato
         FROM cuarentena q
         LEFT JOIN dispositivo d ON d.id = q.dispositivo_id
+        LEFT JOIN zona z ON z.id = d.zona_id
+        LEFT JOIN sitio st ON q.dispositivo_id IS NULL AND st.codigo = split_part(q.topico, '/', 2)
         CROSS JOIN LATERAL payload_legible(q.payload_crudo, 200) p
         ${filtro}
        ORDER BY q.recibido_en DESC LIMIT $1`, parametros);

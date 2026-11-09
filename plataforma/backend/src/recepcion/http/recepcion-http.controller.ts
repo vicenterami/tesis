@@ -8,6 +8,7 @@ import { limpia } from '../texto';
 import { direccionDelCliente } from './direccion';
 import { claveDeDireccion, FallosPorClave, RitmoPorDispositivo } from './topes';
 import { VerificacionDeTokens } from './verificacion';
+import { Publica } from '../../sesion/guardia';
 
 // Recepción por HTTP (RF-01, HU-01; docs/10 §8.4 punto 52, decidido el 16/10/2026 y corregido el 17/10). La trama entra por la misma
 // tubería que la de MQTT (filtros 1 a 6); aquí solo se autentica con el token, se aplican los topes y se traduce el resultado a un
@@ -19,6 +20,8 @@ const BEARER = /^Bearer ([A-Za-z0-9_-]{16,128})$/i; // el token del alta: 24 byt
 const FORMA_ID = /^[a-z0-9][a-z0-9-]{2,62}$/; // la de id_fisico (alta.dto.ts y la base): otra forma no puede existir
 
 @ApiTags('recepcion')
+// Pública para el guardia central de sesión (docs/20 §5): la recepción no es de personas; autentica cada trama con el token del dispositivo.
+@Publica()
 @Controller('recepcion')
 export class RecepcionHttpController {
   private readonly log = new Logger('recepcion-http');

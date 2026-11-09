@@ -38,7 +38,7 @@ openssl rand -base64 24              # generar una clave por variable
 bash pruebas/broker-inicializar.sh
 # Credencial del dispositivo de la demo (dev-0001; la semilla lo crea en la base sin credencial): clave oculta y verificada.
 # Semilla para probar el panel con todos los estados, vías y condiciones: bash pruebas/semilla-demo.sh --completa (docs/16 §23).
-# Los dispositivos nuevos se dan de alta por la API (POST /dispositivos con X-Clave-Admin): la credencial se muestra una vez.
+# Los dispositivos nuevos se dan de alta por la API (POST /dispositivos con X-Clave-Admin o con sesión de administrador del sitio): la credencial se muestra una vez.
 bash pruebas/broker-cliente.sh dev-0001
 
 docker compose up -d                 # descarga imágenes, construye el backend y la base, crea red, volúmenes y arranca
@@ -65,7 +65,7 @@ Probar el backend contenedorizado (`docker compose ps` debe mostrarlo `healthy`;
 puerto solo en `127.0.0.1`, igual que el resto):
 
 ```bash
-curl http://127.0.0.1:3000/salud    # {"estado":"ok","base":"conectada","tablas":18,"broker":{...}}
+curl http://127.0.0.1:3000/salud    # {"estado":"ok","base":"conectada","tablas":20,"broker":{...}}
 # http://127.0.0.1:3000/docs en el navegador → contrato OpenAPI
 ```
 

@@ -2,8 +2,17 @@
 # Prueba de humo de la API de consulta. Requiere la pila arriba y el backend corriendo en 127.0.0.1:3000.
 # Uso: bash pruebas/api-smoke.sh            (solo lectura; no toca la base ni el broker)
 # Imprime una línea por caso: OK / FALLA. Sale con código 1 si algo falla.
+# Desde el 08/11/2026 toda lectura exige sesión (docs/20 §6): aquí se lee como el «usuario del sistema», con la cabecera X-Clave-Admin
+# (docs/20 §5), cuyo valor sale de HTTP_CLAVE_ADMIN del .env y entra a curl por la entrada estándar (nunca en la línea de órdenes ni
+# en la salida). La matriz completa de sesión × rol la recorre sesion-smoke.sh (paso 4b del guardián).
 set -u
+AQUI="$(cd "$(dirname "$0")" && pwd)"
+. "$AQUI/lib-dynsec.sh"
 API="${API:-http://127.0.0.1:3000}"
+CLAVE=$(leer_env "${ENV_PILA:-$AQUI/../.env}" HTTP_CLAVE_ADMIN 2>/dev/null)
+[ -n "$CLAVE" ] || { echo "FALLA sin HTTP_CLAVE_ADMIN en el .env de la pila: las lecturas exigen sesión o esa clave (docs/20 §5)"; exit 1; }
+# curl con la clave de administrador por la entrada estándar.
+ck() { printf 'X-Clave-Admin: %s\n' "$CLAVE" | curl -H @- "$@"; }
 # openapi.json versionado: se regenera a mano con `pnpm openapi` (docs/openapi.ts); esta ruta lo ubica
 # relativo al script, no al directorio desde el que se invoque.
 OPENAPI_COMMITTED="${OPENAPI_COMMITTED:-$(dirname "$0")/../backend/openapi.json}"
@@ -11,7 +20,7 @@ fallos=0
 caso() { # nombre · url · expresión python sobre `r` (json) o código HTTP esperado
   local nombre="$1" url="$2" check="$3"
   local out code
-  out=$(curl -s -w '\n%{http_code}' "$API$url"); code=${out##*$'\n'}; body=${out%$'\n'*}
+  out=$(ck -s -w '\n%{http_code}' "$API$url"); code=${out##*$'\n'}; body=${out%$'\n'*}
   if [[ "$check" =~ ^[0-9]{3}$ ]]; then
     [[ "$code" == "$check" ]] && echo "OK    $nombre" || { echo "FALLA $nombre (HTTP $code, esperado $check)"; fallos=$((fallos+1)); }
   else
@@ -26,11 +35,11 @@ N_ESQUEMA=$(cat "$(dirname "$0")"/../db/init/*.sql | grep -ciE '^\s*CREATE TABLE
 caso "salud responde y ve las $N_ESQUEMA tablas de las migraciones" /salud "r['estado']=='ok' and r['tablas']==$N_ESQUEMA"
 caso "dispositivos es una lista con zona IANA"  /dispositivos     "isinstance(r,list) and all('/' in d['zona_horaria'] for d in r)"
 caso "fechas de la API terminan en Z"           /dispositivos     "all((d['visto_por_ultima_vez'] or 'Z').endswith('Z') for d in r)"
-CANAL=$(curl -s "$API/dispositivos" | python3 -c "import sys,json; r=json.load(sys.stdin); print(r[0]['canales'][0]['id'] if r and r[0]['canales'] else '')")
+CANAL=$(ck -s "$API/dispositivos" | python3 -c "import sys,json; r=json.load(sys.stdin); print(r[0]['canales'][0]['id'] if r and r[0]['canales'] else '')")
 if [[ -n "$CANAL" ]]; then
   caso "historico por día devuelve columnas alineadas" "/canales/$CANAL/historico?intervalo=1%20day" "len(r['tiempos'])==len(r['valores'])==len(r['muestras'])==r['puntos']"
   caso "historico: inicio de bucket diario cae a medianoche de la zona del sitio" "/canales/$CANAL/historico?intervalo=1%20day&desde=2026-09-01T00:00:00Z" "all(__import__('datetime').datetime.fromtimestamp(t, __import__('zoneinfo').ZoneInfo(r['zona_horaria'])).strftime('%H:%M')=='00:00' for t in r['tiempos'])"
-  caso "última medición dentro de JSON también termina en Z" "/dispositivos/$(curl -s "$API/dispositivos" | python3 -c "import sys,json; print(json.load(sys.stdin)[0]['id'])")" "all((c['ultima_medicion'] or {}).get('tiempo','Z').endswith('Z') for c in r['canales'])"
+  caso "última medición dentro de JSON también termina en Z" "/dispositivos/$(ck -s "$API/dispositivos" | python3 -c "import sys,json; print(json.load(sys.stdin)[0]['id'])")" "all((c['ultima_medicion'] or {}).get('tiempo','Z').endswith('Z') for c in r['canales'])"
   caso "intervalo fuera de la lista → 400"   "/canales/$CANAL/historico?intervalo=1%20year" 400
   caso "fecha no ISO → 400"                  "/canales/$CANAL/historico?desde=ayer" 400
   caso "ventana de más de 5 000 cubos → 400"  "/canales/$CANAL/historico?intervalo=1%20minute&desde=2026-09-01T00:00:00Z" 400
@@ -39,7 +48,7 @@ fi
 caso "UUID inválido → 400"                    /dispositivos/no-es-uuid 400
 caso "limite fuera de rango → 400"            "/condiciones?limite=99999" 400
 caso "condiciones abiertas es lista con duracion_s" "/condiciones?abiertas=true" "isinstance(r,list) and all(isinstance(c['duracion_s'],int) for c in r)"
-caso "contrato OpenAPI servido con 14 rutas (17 operaciones: alta, baja y rotación de dispositivos y de pasarelas, la calibración de un canal y la recepción por HTTP incluidas), con el canal /eventos como text/event-stream" /docs/openapi.json "len(r['paths'])==14 and sum(1 for p in r['paths'].values() for m in p if m in {'get','post','put','patch','delete'})==17 and 'post' in r['paths']['/dispositivos'] and 'delete' in r['paths']['/dispositivos/{id}'] and 'post' in r['paths']['/dispositivos/{id}/credencial'] and 'patch' in r['paths']['/canales/{id}'] and r['openapi'].startswith('3.') and 'text/event-stream' in r['paths']['/eventos']['get']['responses']['200']['content']"
+caso "contrato OpenAPI servido con 18 rutas (24 operaciones: alta, baja y rotación de dispositivos y de pasarelas, la calibración de un canal, la recepción por HTTP, la sesión y los usuarios incluidas), con el canal /eventos como text/event-stream" /docs/openapi.json "len(r['paths'])==18 and sum(1 for p in r['paths'].values() for m in p if m in {'get','post','put','patch','delete'})==24 and {'post','get','delete'} <= set(r['paths']['/sesion']) and 'patch' in r['paths']['/usuarios/{id}'] and 'post' in r['paths']['/dispositivos'] and 'delete' in r['paths']['/dispositivos/{id}'] and 'post' in r['paths']['/dispositivos/{id}/credencial'] and 'patch' in r['paths']['/canales/{id}'] and r['openapi'].startswith('3.') and 'text/event-stream' in r['paths']['/eventos']['get']['responses']['200']['content']"
 # El servido (generado en caliente desde los decoradores) vs. el versionado en el repo (se
 # desincroniza si alguien cambia una ruta y olvida correr `pnpm openapi` antes de commitear).
 caso "OpenAPI servido == OpenAPI versionado (mismas rutas y métodos)" /docs/openapi.json \
@@ -68,8 +77,8 @@ for ruta in "POST /pasarelas" "DELETE /pasarelas/no-es-uuid" "POST /pasarelas/no
   [[ "$code" == 401 || "$code" == 503 ]] && echo "OK    $ruta sin X-Clave-Admin → $code" || { echo "FALLA $ruta sin clave → HTTP $code (esperado 401 o 503)"; fallos=$((fallos+1)); }
 done
 # Filtro por dispositivo (ficha del panel, docs/19 P3; 12/10): solo lo de ese dispositivo, y un valor que no es UUID → 400.
-DISP=$(curl -s "$API/dispositivos" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0]['id'] if d else '')")
-DISP_FIS=$(curl -s "$API/dispositivos" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0]['id_fisico'] if d else '')")
+DISP=$(ck -s "$API/dispositivos" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0]['id'] if d else '')")
+DISP_FIS=$(ck -s "$API/dispositivos" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d[0]['id_fisico'] if d else '')")
 if [ -n "$DISP" ]; then
   caso "condiciones filtradas por dispositivo: todas de ese dispositivo" "/condiciones?dispositivo=$DISP" "isinstance(r,list) and all(c['dispositivo_id']=='$DISP' for c in r)"
   caso "cuarentena filtrada por dispositivo: todas atribuidas a él" "/cuarentena?dispositivo=$DISP&limite=5" "isinstance(r,list) and len(r)<=5 and all(c['dispositivo']=='$DISP_FIS' for c in r)"
@@ -81,11 +90,11 @@ caso "parámetro repetido (llega como arreglo) → 400, no 500" "/cuarentena?dis
 caso "limite repetido → 400"                            "/condiciones?limite=5&limite=6" 400
 # Exportación (RF-34, HU-08; 12/10): CSV estándar con cabecera fija y descarga; JSON como lista; formato o fechas inválidos → 400.
 if [ -n "$DISP" ]; then
-  exp=$(curl -s -D - -m 20 "$API/dispositivos/$DISP/exportar?formato=csv" | tr -d '\r')
+  exp=$(ck -s -D - -m 20 "$API/dispositivos/$DISP/exportar?formato=csv" | tr -d '\r')
   grep -q "^tiempo_utc,magnitud,valor,unidad,canal_id$" <<<"$exp" && echo "OK    exportar csv: cabecera fija" || { echo "FALLA exportar csv: sin cabecera → $(head -c 160 <<<"$exp")"; fallos=$((fallos+1)); }
   grep -qi "^content-disposition: attachment; filename=\".*\.csv\"$" <<<"$exp" && echo "OK    exportar csv: descarga con nombre .csv" || { echo "FALLA exportar csv: sin Content-Disposition"; fallos=$((fallos+1)); }
   # El instante viaja como texto exacto de la base (6 decimales): con milisegundos, la última fila de cada tanda se repetía.
-  fila1=$(curl -s -m 20 "$API/dispositivos/$DISP/exportar?formato=csv&desde=2026-01-01T00:00:00Z" | sed -n 2p)
+  fila1=$(ck -s -m 20 "$API/dispositivos/$DISP/exportar?formato=csv&desde=2026-01-01T00:00:00Z" | sed -n 2p)
   if [ -z "$fila1" ]; then echo "OK    exportar csv: sin filas en el rango (no se puede comprobar el instante)"; elif grep -qE "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{6}Z," <<<"$fila1"; then echo "OK    exportar csv: instante con microsegundos"; else echo "FALLA exportar csv: instante sin microsegundos → ${fila1:0:60}"; fallos=$((fallos+1)); fi
   caso "exportar json: lista de filas con tiempo_utc y valor" "/dispositivos/$DISP/exportar?formato=json&desde=2026-01-01T00:00:00Z" "isinstance(r,list) and all('tiempo_utc' in x and 'valor' in x for x in r)"
   caso "exportar con formato desconocido → 400" "/dispositivos/$DISP/exportar?formato=xlsx" 400
@@ -93,7 +102,7 @@ if [ -n "$DISP" ]; then
 fi
 caso "exportar un dispositivo inexistente → 404" "/dispositivos/00000000-0000-4000-8000-000000000000/exportar" 404
 # Cabeceras de seguridad (docs/11 §3). Se leen con -I; el helper `caso` mira cuerpos, así que van aparte.
-cab=$(curl -s -I --max-time 10 "$API/dispositivos" | tr -d '\r')
+cab=$(ck -s -I --max-time 10 "$API/dispositivos" | tr -d '\r')
 cabecera() { # nombre · regex que debe (o no) aparecer · esperado: si|no
   local nombre="$1" re="$2" esperado="$3"; local hay=no
   echo "$cab" | grep -qiE "^$re" && hay=si
@@ -108,12 +117,12 @@ cabecera "Permissions-Policy niega cámara, micrófono y ubicación"  "permissio
 # HSTS lo pone el proxy, no el backend (una sola capa): aquí debe estar ausente.
 cabecera "sin HSTS en el backend (lo pondrá el proxy TLS)"          "strict-transport-security:" no
 # Canal de tiempo real (TT-39, docs/10 §5). Un flujo SSE no termina solo: se leen las cabeceras y curl corta a los 2 s.
-cab=$(curl -s -N --max-time 2 -D - -o /dev/null "$API/eventos" | tr -d '\r')
+cab=$(ck -s -N --max-time 2 -D - -o /dev/null "$API/eventos" | tr -d '\r')
 cabecera "SSE: /eventos abre un flujo text/event-stream"              "content-type: text/event-stream" si
 cabecera "SSE: le pide al proxy no retenerlo (X-Accel-Buffering: no)" "x-accel-buffering: no" si
 cabecera "SSE: sin CORS (una página de otro sitio no puede leerlo)"   "access-control-allow-origin:" no
 pagina() { # nombre · cabecera que pondría el navegador · código esperado
-  local code; code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 -H "$2" "$API/eventos")
+  local code; code=$(ck -s -o /dev/null -w '%{http_code}' --max-time 2 -H "$2" "$API/eventos")
   [[ "$code" == "$3" ]] && echo "OK    $1" || { echo "FALLA $1 (HTTP $code, esperado $3)"; fallos=$((fallos+1)); }
 }
 pagina "SSE: Origin de otro sitio → 403"                                 "Origin: https://otro.example" 403
@@ -133,4 +142,12 @@ conhost "Host: localhost con otro puerto (Vite, banco) → 200"         "localho
 conhost "Host: 127.0.0.1 con puerto → 200"                            "127.0.0.1:3000" 200
 conhost "Host: LOCALHOST en mayúsculas → 200"                         "LOCALHOST:3000" 200
 conhost "Host: ilegible (usuario@) → 421"                             "usuario@localhost" 421
+# Sin sesión ni clave (docs/20 §6, columna «Sin sesión»): toda lectura y el canal en vivo → 401 con el cuerpo fijo; /salud sigue abierta.
+for ruta in /dispositivos "/dispositivos/${DISP:-00000000-0000-4000-8000-000000000000}" "/dispositivos/${DISP:-00000000-0000-4000-8000-000000000000}/exportar" \
+            "/canales/${CANAL:-00000000-0000-4000-8000-000000000000}/historico" /condiciones /cuarentena /pasarelas /eventos /usuarios /sesion; do
+  r=$(curl -s -m 3 -w '\n%{http_code}' "$API$ruta"); code=${r##*$'\n'}; cuerpo=${r%$'\n'*}
+  if [ "$code" = 401 ] && grep -q '"message":"sesión requerida"' <<<"$cuerpo"; then echo "OK    sin sesión: GET $ruta → 401 «sesión requerida»"
+  else echo "FALLA sin sesión: GET $ruta → HTTP $code ${cuerpo:0:80} (esperado 401 «sesión requerida»)"; fallos=$((fallos+1)); fi
+done
+code=$(curl -s -o /dev/null -w '%{http_code}' -m 3 "$API/salud"); [ "$code" = 200 ] && echo "OK    sin sesión: GET /salud → 200 (pública)" || { echo "FALLA GET /salud sin sesión → $code"; fallos=$((fallos+1)); }
 echo; [[ $fallos -eq 0 ]] && echo "TODO OK" || { echo "$fallos caso(s) con falla"; exit 1; }

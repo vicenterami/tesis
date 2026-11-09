@@ -42,6 +42,17 @@ DO $$ BEGIN
     GRANT UPDATE (escala_cero, escala_cien) ON canal TO plataforma_app;
   END IF;
 END $$;
+-- Desde la migración 22, la sesión de personas (docs/20): usuarios, sus sitios, sesiones y la bitácora de accesos. Las tablas y columnas
+-- nacen después de esta: en un contenedor nuevo la 22 da los permisos; aquí se repiten solo si ya existen.
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'sesion')
+     AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'usuario_sitio' AND column_name = 'activo') THEN
+    GRANT INSERT ON usuario, usuario_sitio, sesion, acceso TO plataforma_app;
+    GRANT UPDATE (nombre, hash_password, activo, clave_temporal, clave_temporal_vence_en) ON usuario TO plataforma_app;
+    GRANT UPDATE (rol, activo) ON usuario_sitio TO plataforma_app;
+    GRANT UPDATE (ultima_actividad, revocada_en) ON sesion TO plataforma_app;
+  END IF;
+END $$;
 ALTER DEFAULT PRIVILEGES FOR ROLE plataforma IN SCHEMA public REVOKE INSERT, UPDATE ON TABLES FROM plataforma_app;
 ALTER DEFAULT PRIVILEGES FOR ROLE plataforma IN SCHEMA public GRANT SELECT ON TABLES TO plataforma_app;
 
@@ -49,7 +60,7 @@ CREATE OR REPLACE FUNCTION fn_retencion_drop_chunks(tabla text, dias integer) RE
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE n integer;
 BEGIN
-  IF tabla IS NULL OR tabla NOT IN ('medicion', 'trama', 'cuarentena', 'metrica_broker') THEN
+  IF tabla IS NULL OR tabla NOT IN ('medicion', 'trama', 'cuarentena', 'metrica_broker', 'acceso') THEN  -- acceso: migración 22
     RAISE EXCEPTION 'fn_retencion_drop_chunks: tabla «%» fuera de la lista blanca', tabla;
   END IF;
   -- Mínimos fuera del alcance del backend: 30 días las mediciones, 7 lo demás (un backend comprometido no puede borrar la última
@@ -61,7 +72,7 @@ BEGIN
   RETURN n;
 END $$;
 COMMENT ON FUNCTION fn_retencion_drop_chunks(text, integer) IS
-  'Única puerta con permiso de dueño para la aplicación: borra fragmentos vencidos de una de cuatro hypertables (migración 14, docs/10 §8.4 punto 44).';
+  'Única puerta con permiso de dueño para la aplicación: borra fragmentos vencidos de una de cinco hypertables (migraciones 14 y 22, docs/10 §8.4 punto 44).';
 REVOKE ALL ON FUNCTION fn_retencion_drop_chunks(text, integer) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION fn_retencion_drop_chunks(text, integer) TO plataforma_app;
 

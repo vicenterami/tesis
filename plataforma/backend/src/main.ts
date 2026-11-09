@@ -11,7 +11,7 @@ import { join } from 'node:path';
 import type { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
-import { AvisosAcotados, hostsPermitidos, interfazDeEscucha, rechazoDeHost, registrosEnJson, servirDocumentacion, claveAdmin, claveApp } from './arranque';
+import { AvisosAcotados, hostsPermitidos, interfazDeEscucha, rechazoDeHost, registrosEnJson, rutaSinCache, servirDocumentacion, claveAdmin, claveApp } from './arranque';
 import { configurarOpenApi } from './openapi';
 
 // Punto de entrada. Levanta la aplicación Nest: al iniciarse, cada módulo se conecta a lo suyo
@@ -44,9 +44,12 @@ async function arrancar(): Promise<void> {
     if (err) return void res.status(400).json({ statusCode: 400, message: 'cuerpo ilegible' });
     next();
   });
-  // helmet no emite Permissions-Policy; la API no usa cámara, micrófono ni ubicación.
-  app.use((_req: Request, res: Response, next: NextFunction) => {
+  // helmet no emite Permissions-Policy; la API no usa cámara, micrófono ni ubicación. Y toda respuesta de la API va con
+  // `Cache-Control: no-store` (arranque.ts, rutaSinCache; revisión del 08/11/2026): una sola regla en vez de repetirla ruta por ruta.
+  // Una ruta puede pisarla después (el canal en vivo pone la suya, también sin caché).
+  app.use((req: Request, res: Response, next: NextFunction) => {
     res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+    if (rutaSinCache(req.path)) res.setHeader('Cache-Control', 'no-store');
     next();
   });
 
@@ -54,9 +57,9 @@ async function arrancar(): Promise<void> {
   // de HTTP_HOSTS recibe 421 y no llega a ninguna ruta. Es lo que detiene el DNS rebinding, que el control
   // de origen del canal en vivo no cubre (eventos.controller.ts). El rechazo se registra como WARN, acotado.
   const permitidos = hostsPermitidos(process.env.HTTP_HOSTS); // un valor malformado detiene el arranque, a propósito
-  // Clave de administrador de las rutas que escriben (docs/10 §8.4 punto 41): se valida aquí para que una clave corta
-  // detenga el arranque; la guardia (alta/clave-admin.guard.ts) la vuelve a leer por ConfigService.
-  if (claveAdmin(process.env.HTTP_CLAVE_ADMIN) === undefined) log.warn('HTTP_CLAVE_ADMIN ausente: las rutas que escriben (alta) responden 503');
+  // Clave de administrador por cabecera (docs/10 §8.4 punto 41; desde el 08/11/2026, el «usuario del sistema» de docs/20 §5): se valida
+  // aquí para que una clave corta detenga el arranque; el guardia central (sesion/guardia.ts) la vuelve a leer por ConfigService.
+  if (claveAdmin(process.env.HTTP_CLAVE_ADMIN) === undefined) log.warn('HTTP_CLAVE_ADMIN ausente: solo entra quien tenga sesión (y la cabecera X-Clave-Admin responde 503)');
   const avisos = new AvisosAcotados();
   app.use((req: Request, res: Response, next: NextFunction) => {
     const rechazo = rechazoDeHost(req.headers.host, permitidos);
