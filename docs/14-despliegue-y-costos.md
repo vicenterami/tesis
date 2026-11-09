@@ -271,7 +271,7 @@ Acceso de terceros al panel (M7), nombre público y Let's Encrypt (`docs/10 §8.
 publicando al servidor (necesita un puerto de entrada) y alta disponibilidad (§6.2). Costo: el equipo existía; energía del orden de la
 fila C de §3; red privada y avisos, CLP 0 en sus planes gratuitos.
 
-### 7.4 Cómo quedó en la práctica (03–04/11/2026)
+### 7.4 Cómo quedó en la práctica (03–04/11/2026; sesión y parches el 09/11)
 
 El equipo que apareció ya tenía responsable, otro servicio corriendo y SSH solo con llave. La lista de §7.1 se aplicó con una diferencia
 explícita: los usuarios y servicios ajenos se explicaron y el equipo se acepta como **compartido**. Consecuencias frente a lo planeado:
@@ -293,6 +293,13 @@ explícita: los usuarios y servicios ajenos se explicaron y el equipo se acepta 
 En paralelo, la institución entregó un namespace de Kubernetes para estudiantes: medido en 17 pruebas (bitácora del 03/11), cabe en cuota y
 ejecuta, pero sin dirección de entrada ni cupo de volúmenes persistentes; queda como entorno de desarrollo y como diseño B de §6 hasta que
 el administrador conceda ambas cosas.
+
+**09/11/2026, sesión y parches.** Con el bloque de sesión (`docs/20`) el servidor recibió la migración 22 y los permisos del rol (migración
+14 reaplicada), las imágenes reconstruidas con los parches del 09/11 (escáner en OK) y el proxy con la zona estricta de tasa para `/sesion`
+y `/usuarios`. El primer administrador se creó con la clave por cabecera y la clave se **retiró** del `.env` del servidor: desde entonces
+`X-Clave-Admin` responde 503 y solo entran personas con sesión; la semilla de demostración no se usa en el servidor (solo crea personas
+contra el bucle local). Falta un certificado público para el nombre de la red privada (`docs/11 §4`): un navegador sin la CA propia
+instalada avisa de conexión no privada.
 
 ## 8. Pendiente
 
