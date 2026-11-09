@@ -5,6 +5,8 @@
 > digan lo mismo; TT-39 agregada el 23/09; TT-32 promovida a núcleo y adelantada a la Etapa 3, y la
 > redistribución de §6.4 —decidida por escrito el 22/09 pero nunca aplicada a las filas— ejecutada,
 > el 23/09: la Etapa 3 tenía en realidad 97 h de núcleo, no las 60 que este documento afirmaba).
+> **08/11/2026:** el plan de la Etapa 4, versión 2 (§8), agregó 13 elementos fuera del núcleo (HU-26 a HU-31 y TT-42 a TT-48, 60 h)
+> y la épica EP-15: las cifras de §6.1 son ahora **79 elementos, 347 h; núcleo 34 elementos, 168 h** (el núcleo no cambia).
 
 # Backlog del proyecto
 
@@ -66,12 +68,13 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 | **EP-06** | Persistencia y consulta | M5 | OE4 | 2 · 4 | 17 |
 | **EP-07** | Inventario y aprovisionamiento | M3 | OE4 | 3 · 4 | 15 |
 | **EP-08** | Supervisión de salud de enlace | M4 | OE4 | 3 · 4 | 18 |
-| **EP-09** | Seguridad y multi-tenencia | M7 | OE4 | 3 · 4 | 20 |
-| **EP-10** | Interfaz de administración | M8 | OE4 | 3 · 4 | 30 |
+| **EP-09** | Seguridad y multi-tenencia | M7 | OE4 | 3 · 4 | 34 |
+| **EP-10** | Interfaz de administración | M8 | OE4 | 3 · 4 | 48 |
 | **EP-11** | Alertas y notificación | M6 | OE4 | 4 | 10 |
-| **EP-12** | Modelo de despliegue y análisis de costos | — | OE3 | 2 | 8 |
+| **EP-12** | Modelo de despliegue y análisis de costos | — | OE3 | 2 · 3 · 4 | 16 |
 | **EP-13** | Validación y pruebas | — | OE5 | 3 · 4 | 26 |
 | **EP-14** | Documentación y entregables académicos | — | todos | 1–4 | 34 |
+| **EP-15** | Operación y confiabilidad (agregada el 08/11/2026) | — | OE5 | 4 | 28 |
 
 ---
 
@@ -253,6 +256,9 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 | **TT-22** | 🎯 Cifrado del transporte: TLS para HTTP y MQTT | M | 4 | 4 |
 | **HU-18** | **Como administrador de sitio**, quiero iniciar sesión con mis credenciales y que existan roles distintos de administración y consulta | M | 4 | 3 |
 | **TT-39** | Canal de tiempo real autenticado hacia el panel (SSE tras el proxy TLS, `docs/10 §8.4` punto 1): sesión del panel verificada al abrir (desde M7, en la Etapa 4; antes, solo en la red local, `docs/10 §5`), `Origin` del propio panel, lista de nombres de host (421, `docs/10 §8.4` punto 40), filtros validados y tope de flujos abiertos; límite por usuario y de tasa con la sesión (RF-43, RNF-08; `docs/11 §3` y §4) — agregada el 23/09/2026 | M | 3 | 4 |
+| **HU-26** | **Como administrador del sistema**, quiero dar a cada persona uno de los cinco perfiles (administrador del sistema, administrador de sitio, investigador, operador técnico, consulta), para que cada una vea y haga solo lo que le corresponde (RF-44; `docs/20 §2` y §6) — agregada el 08/11/2026 | S | 4 | 6 |
+| **HU-27** | **Como persona usuaria**, quiero aceptar los términos de uso al primer ingreso y consultar desde el panel la privacidad, los términos, los avisos de terceros y la versión, para saber qué se hace con mis datos (RF-53, RF-54; `docs/21`) — agregada el 08/11/2026 | M | 4 | 5 |
+| **HU-28** | **Como persona usuaria**, quiero dar de baja mi propia cuenta, sabiendo que mis datos personales se anonimizan y el historial del sitio se conserva (RF-55; `docs/20 §11`) — agregada el 08/11/2026 | S | 4 | 3 |
 
 **TT-32 — criterios de aceptación** 🎯
 
@@ -276,6 +282,11 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 | **HU-21** | 🎯 **Como usuario de consulta**, quiero el detalle de un dispositivo con sus condiciones abiertas, historial y serie de mediciones | M | 3 | **7** |
 | **HU-22** | **Como administrador de sitio**, quiero un asistente guiado para registrar un dispositivo nuevo | M | 4 | 4 |
 | **HU-23** | **Como administrador de sitio**, quiero ver mi flota agrupada por tecnología de red, para entender por dónde llega cada cosa | S | 4 | 3 |
+| **HU-29** | **Como persona usuaria**, quiero elegir las unidades de visualización (°C o °F; mm, m o km), mi zona horaria y guardar vistas, para leer los datos a mi manera sin cambiar lo que guarda la base (RF-56; `docs/19 §4`, P13) — agregada el 08/11/2026 | S | 4 | 5 |
+| **HU-31** | **Como persona usuaria**, quiero enviar un mensaje de soporte desde el panel y ver el contacto del responsable de la instancia (RF-61; `docs/19 §4`, P11) — agregada el 08/11/2026 | C | 4 | 2 |
+| **TT-42** | Paginación: keyset con cursor opaco sobre `(tiempo, id)` en cuarentena, condiciones, accesos, auditoría y eventos; desplazamiento con total en usuarios e inventario (RF-57; `docs/10 §8.4` punto 58) — agregada el 08/11/2026 | M | 4 | 4 |
+| **TT-43** | Componentes reutilizables con etiqueta de texto y ayuda accesible (`Boton`, `Tooltip`, `Aviso`) extendidos a tablas y formularios (RF-58; `docs/19 §6`) — agregada el 08/11/2026 | M | 4 | 4 |
+| **TT-44** | Comparativa previa de referentes y de normas de usabilidad (WCAG 2.2), cada afirmación con su fuente, antes de rediseñar el tablero y las gráficas (`docs/19 §4`, P1) — agregada el 08/11/2026 | S | 4 | 3 |
 
 **HU-19 — criterios de aceptación** 🎯
 
@@ -346,23 +357,40 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 - Se obtiene al menos una declaración textual que describa el problema en palabras de la parte interesada.
 - Las declaraciones se vinculan a requerimientos concretos del catálogo, cerrando la brecha de fuente `[ENT]`.
 
+## EP-15 · Operación y confiabilidad
+
+> Épica agregada el 08/11/2026 con el plan de la Etapa 4, versión 2 (§8, bloque B4): lo que hace falta para operar el sistema con datos
+> reales sin depender de terceros (RNF-17, RNF-20) y saber cuándo algo falla antes de que lo note quien lo usa.
+
+| ID | Elemento | Prior. | Etapa | Horas |
+|---|---|:---:|:---:|:---:|
+| **HU-30** | **Como administrador del sistema**, quiero una pantalla «Estado del sistema» con los recursos por contenedor, los errores y el último respaldo, y ajustar desde el panel los límites de los servicios (RF-59, RF-60; `docs/19 §4`, P12) — agregada el 08/11/2026 | M | 4 | 5 |
+| **TT-45** | Monitorización propia en la base: `error_sistema` con un filtro global de excepciones, errores del navegador sin datos personales y con límite de tasa, colector de recursos por cgroups a `metrica_recurso` (sin `docker.sock`), condiciones `error_repetido`, `memoria_alta` y `respaldo_atrasado`, latido externo (RNF-19; `docs/10 §8.4` puntos 60 y 61) — agregada el 08/11/2026 | M | 4 | 8 |
+| **TT-46** | Respaldos: cifrado en reposo, guion versionado, simulacro mensual de borrado accidental con restauración, guardia «último respaldo de menos de 26 h» y papelera de dispositivos de 30 días (`docs/10 §9.5`) — agregada el 08/11/2026 | M | 4 | 8 |
+| **TT-47** | Backend en ES modules (`docs/10 §8.4` punto 63) — agregada el 08/11/2026 | C | 4 | 4 |
+| **TT-48** | Pruebas de extremo a extremo en el CI, las que corran sin hardware ni secretos — agregada el 08/11/2026 | S | 4 | 3 |
+
 ---
 
 # 6. Verificación de viabilidad del alcance
 
 > Todas las cifras de esta sección se obtuvieron **sumando programáticamente** las estimaciones de los
-> 66 elementos del backlog, no estimando el total a ojo. El procedimiento es reproducible sobre este
-> mismo documento.
+> elementos del backlog, no estimando el total a ojo. El procedimiento es reproducible sobre este
+> mismo documento. §6.1 está al día (79 elementos desde el 08/11/2026); §6.3 a §6.6 conservan el análisis de
+> viabilidad con los 66 elementos de entonces, y la cuenta de la Etapa 4 que rige es la de §8.
 
 ## 6.1 Esfuerzo estimado
 
 | | Elementos | Horas |
 |---|:---:|:---:|
 | **Núcleo demostrativo** 🎯 | 34 | **168** |
-| Fuera del núcleo | 32 | 119 |
-| **Total del backlog** | **66** | **287** |
+| Fuera del núcleo | 45 | 179 |
+| **Total del backlog** | **79** | **347** |
 
-Por prioridad: **Must** 56 elementos / 253 h · **Should** 8 / 30 h · **Could** 2 / 4 h.
+Por prioridad: **Must** 62 elementos / 287 h · **Should** 13 / 50 h · **Could** 4 / 10 h. Por etapa: la 4 tiene 37 elementos y 164 h.
+Hasta el 08/11/2026 eran 66 elementos y 287 h (Must 56 / 253 h · Should 8 / 30 h · Could 2 / 4 h); las 13 filas nuevas de la
+Etapa 4 (§8) suman 60 h, todas fuera del núcleo. La épica EP-12 decía 8 h y sus filas suman 16 desde que se agregaron TT-40 y TT-41
+(22/10/2026): corregido el 08/11/2026.
 
 ## 6.2 Presupuesto disponible
 
@@ -527,14 +555,14 @@ no demuestran ninguna.
 
 | Aspecto | Estado |
 |---|---|
-| Épicas definidas | ✅ 14, todas vinculadas a un objetivo específico |
-| Historias de usuario | ✅ 25, con rol, capacidad y beneficio |
-| Tareas técnicas | ✅ 39 |
+| Épicas definidas | ✅ 15 (EP-15 desde el 08/11/2026), todas vinculadas a un objetivo específico |
+| Historias de usuario | ✅ 31, con rol, capacidad y beneficio (HU-26 a HU-31, agregadas el 08/11/2026) |
+| Tareas técnicas | ✅ 48 (TT-42 a TT-48, agregadas el 08/11/2026) |
 | Elementos del núcleo demostrativo | ✅ 34 elementos, 168 h |
 | Criterios de aceptación | ✅ Detallados en los elementos del núcleo; deliberadamente sin refinar en el resto |
-| Estimaciones | ✅ 66 elementos estimados, **287 h** en total, sumadas programáticamente |
+| Estimaciones | ✅ 79 elementos estimados, **347 h** en total, sumadas programáticamente (66 y 287 h hasta el 08/11/2026) |
 | Priorización | ✅ MoSCoW heredado del catálogo, más orden de ejecución justificado |
-| Verificación de viabilidad | 🔴 **Realizada. El backlog completo excede el presupuesto en 19 %; el núcleo cabe con 30 % de holgura. Redistribución correctiva definida** |
+| Verificación de viabilidad | 🔴 **Realizada. El backlog completo excede el presupuesto en 19 %; el núcleo cabe con 30 % de holgura. Redistribución correctiva definida.** La Etapa 4 tiene su propia cuenta, con las horas decididas el 08/11/2026 (§8) |
 
 ## 7. Plan de la Etapa 3 ordenado por criterio de la rúbrica (06/10/2026)
 
@@ -560,41 +588,75 @@ LoRaWAN) y HU-19 (panel de salud, 9 h) se ejecutan solo contra holgura; qué pas
 `docs/18 §3`. La regla sigue
 siendo la de §6.5: se recorta por el final de cada criterio, nunca las pruebas.
 
-## 8. Plan de la Etapa 4, en orden (escrito el 24/10/2026; se ejecuta desde el 2/11)
+## 8. Plan de la Etapa 4, versión 2 (08/11/2026)
 
-Reúne en un solo lugar todo lo que se dejó para la Etapa 4: las filas de este backlog con etapa 4 (24 elementos, 104 h), lo que
-queda de la Etapa 3 (`docs/18 §5`: nueve elementos del núcleo, 42 h) y lo que las decisiones de diseño, las revisiones y la entrevista
-del 05/10 (`bitacora/2026-10-05-entrevista-academico-geologia.md`) mandaron a esta etapa. **Criterio de orden:** primero lo que
-desbloquea lo demás (la sesión y los roles: sin ellos no hay vista pública, auditoría ni «quién lo registró»), después lo que hace al
-sistema útil para cualquier flota con pocos clics, y al final la escala y el cierre. **Regla de cada bloque:** diseño escrito en el
-documento que corresponde (`docs/10`, `docs/19`, `docs/20`, `docs/14`) → código → pruebas que plantan la falla → revisión → medición en
-`docs/16`. Las horas de las filas existentes son las de este backlog; las de lo nuevo son **estimadas** y se corrigen al diseñar.
+La Etapa 4 va del 06/11 (tras la entrega de la Etapa 3) al 04/12/2026. El 08/11/2026 se reordenó el plan del 01/11 (la versión 1,
+resumida al final de esta sección) para poner **primero lo que la persona ve y opera** —el panel, la configuración por usuario, los
+perfiles y el alta masiva— y **después los datos, la operación y el cierre**. Responde a la pregunta de la presentación del 05/11 (cómo
+dar de alta una flota completa y si cada usuario configurará sus dispositivos, `docs/18 §1`). **Regla de cada bloque:** diseño en el
+documento que corresponde (`docs/10`, `docs/19`, `docs/20`, `docs/21`, `docs/14`) → código → prueba que planta la falla → revisión
+independiente → medición en `docs/16` → verificador en verde. Las horas de las filas son las de este backlog; las de los bloques, estimadas.
 
-| Orden | Bloque | Qué se hace | h |
+| Bloque | Qué entra | h | Iteración |
 |---|---|---|---|
-| 1 | **Seguridad, usuarios y roles** | Sesión y roles (HU-18, diseño completo en `docs/20`; las 3 h de la fila no alcanzan para ese diseño: se reestiman); aislamiento entre sitios con pruebas (TT-21 🎯); auditoría de operaciones; «quién lo registró» en el alta (HU-11); CSP definitiva y sistema de archivos de solo lectura (`docs/11 §4`); dos valores vigentes al rotar los secretos del proxy y de administración; condición y evento en una sola sentencia; escaneo de secretos en el CI (obligatorio); **certificado de cliente por dispositivo (TLS mutuo)** (`docs/10 §8.4` punto 57, 01/11/2026): CA de dispositivos, emisión en el alta, verificación en el borde (variante B del proxy o HAProxy con PROXY v2), nodo y pasarela con certificado, pruebas plantadas (≈ 12 h) | ≈ 34 |
-| 2 | **Panel para operar una flota con pocos clics** | Salud del sitio (HU-16 🎯), calidad del enlace (HU-15 🎯), historial por rango (HU-07 🎯), umbrales en pantalla (HU-06), asistente de alta (HU-22); **alta masiva por archivo** (CSV, y XLSX si su biblioteca cumple licencia y antigüedad) con vista previa que usa la misma validación que el alta individual, CSV de filas rechazadas con su motivo, límite de filas probado en el límite y una carga a la vez, y **bandeja de detectados** (los identificadores sin alta que ya guarda la cuarentena `no_registrado`, agrupados, para darlos de alta con un clic) (decidido el 25/10/2026); batería (HU-17), sitio y zona (HU-12), mantenimiento (HU-13), flota por tecnología (HU-23); el tablero ampliado con evidencia de los referentes; **panel configurable por usuario** (vistas, tarjetas y umbrales que cada uno guarda, con las guardas de concurrencia ya decididas) con un diseño visual cuidado y probado en teléfono, tableta y escritorio en dos navegadores, como RF-52; tiempo real también en condiciones y en el alta; el canal en vivo por WebSocket (decidido el 14/10, diseño en `docs/10 §8.4`); los dos defectos abiertos del canal en vivo. Cada pantalla, primero en `docs/19` | ≈ 63 |
-| 3 | **Salud de los datos para cualquier dispositivo** | Canal callado y valor congelado como condiciones del supervisor, para todo dispositivo y vía (lo visto en la corrida de 24 h, `docs/16 §53`); datos inválidos; ciclo de vida de las alertas (aviso de cierre, retardo, reconocimiento, `docs/10 §4.4`); alias de claves en el catálogo (obligatorio); notificaciones (HU-24, HU-25, TT-23); testamento de MQTT como aviso adelantado de desconexión para los dispositivos con conexión propia (RF-29, ≈ 3 h; agregado el 26/10/2026) | ≈ 27 |
-| 4 | **Lo que pidió el entrevistado del 05/10 (Académico/Investigador en Ingeniería Civil Geológica)** | Exportación XLSX (resto de HU-08 🎯); magnitudes de gases (radón, hidrógeno) en el catálogo con su unidad decidida (TT-12 🎯); vista pública de solo lectura (`docs/20 §7`); el requerimiento de «manipulación» con su fuente de dato; el transporte celular declarado como vía (MQTT sobre LTE-M o NB-IoT llega igual a la plataforma) y probado con el emulador; su prueba en terreno (OE5) | ≈ 13 |
-| 5 | **LoRaWAN completo** | Ruta C con ChirpStack probada de punta a punta (resto de HU-02 🎯) y la ruta A con *Basics Station* por 443 (WebSocket sobre TLS, `docs/10 §8.4` punto 56) en vez del reenvío UDP, con autenticación de la pasarela por certificado de cliente; la variante prevista de la vía 2 (la pasarela envía por HTTPS a nuestro servidor, `docs/10 §1`) cuando exista servidor público; eventos de unión y estado de las pasarelas, y estado propio de la pasarela si hace falta; adaptador de un formato no SenML (HU-04) | ≈ 18 |
-| 6 | **Despliegue, escala y operación** | Servidor real con certificado (resto de TT-22 🎯); Kubernetes según `docs/14 §6`: manifiestos en k3s y la opción B (varias réplicas del backend con suscripciones compartidas de MQTT 5 y el estado en Redis), con escalado automático y **una prueba de pico que muestre que se levantan réplicas y que no se pierde nada**; respaldos con guardia de restauración (`docs/10 §9.5`); agregados materializados por tarea para 7 y 30 días si la medición lo pide (los continuos de TimescaleDB no existen en la edición Apache, `docs/10 §8.4` punto 11); historial de consumo por sitio y por contenedor para los administradores, con gráficos, y su **costo en pesos** por sitio y por mes (precio del servidor de `docs/14 §3` repartido por lo medido, `docs/14 §2.1`); carga y recuperación repetidas en el servidor (TT-29, TT-30); **dimensionar el proxy** (`worker_connections`, `worker_rlimit_nofile`, `ulimits`) con su guardia, como el tope del broker (`docs/11 §3`) | ≈ 39 |
-| 7 | **Pruebas, validación e informe final** | Contrato de trama (TT-27 🎯), quince casos funcionales (TT-31), comparación con ThingsBoard CE, OpenRemote y Magistrala con el mismo emulador (TT-40) y con Milesight IoT Cloud desde su documentación oficial y las capturas de su uso (es un servicio cerrado: no se instala), cada afirmación con su fuente, informe final (TT-37) y revisión completa antes de entregar | ≈ 30 |
+| **B1 · Identidad, legal y auditoría** | ✅ Sesión y roles (HU-18) y pantalla de entrada (P10, `docs/19 §4`), **08/11/2026**; ✅ aislamiento entre sitios (TT-21 🎯), probado el **08/11/2026** con la matriz del paso 4b del guardián; ✅ clave temporal configurable de 1 a 72 h, 2 por defecto (`docs/20 §4`), **08/11/2026**. Falta: auditoría de operaciones (`docs/10 §8.4` punto 43) y «quién lo registró» (HU-11); los **cinco perfiles** en código y en pantalla (HU-26; `docs/20 §2`, §5 y §6; `docs/10 §8.4` punto 64); términos con versión y aceptación al primer ingreso, privacidad generada desde el inventario de `docs/21` y «Acerca de» con versión, commit, aviso AGPL y avisos de terceros generados en la compilación (HU-27; `docs/20 §12`); soporte con formulario en la base y contacto configurable (HU-31); baja de la cuenta por anonimización (HU-28; `docs/20 §11`) | ≈ 30 | 0 |
+| **B2 · Panel y experiencia** | Componentes con etiqueta y ayuda accesible, extendidos a tablas y formularios (TT-43); paginación keyset en las listas por tiempo y con total en las chicas (TT-42; `docs/10 §8.4` punto 58); renderizado optimista solo en acciones rápidas y reversibles (`docs/19 §6`); preferencias por usuario: °C o °F, mm, m o km, zona horaria y vistas guardadas, con la base siempre en la unidad estándar (HU-29); umbrales con histéresis y notificaciones en pantalla (HU-06, HU-24, HU-25; RF-14); asistente de alta (HU-22), **alta masiva por archivo** y bandeja de detectados (decididas el 25/10/2026; controles en `docs/11 §4`); tablero y gráficas rediseñados (zoom, rango, varias series, agregados, responsivas) después de una comparativa de referentes y de WCAG 2.2 con fuente (TT-44; `docs/19 §4`, P1); salud del sitio, calidad del enlace e historial por rango (HU-16 🎯, HU-15 🎯, HU-07 🎯); todo probado en teléfono, con evidencia | ≈ 60 | 1 (HU-07, HU-15 y HU-16, en la 0) |
+| **B3 · Datos y consultas** | Barrido de supervisión sin N+1 (un `INSERT … SELECT` y los eventos por `UNNEST`) y guardia de «consultas por petición» (`docs/10 §8.4` punto 59); asincronía medida (`Promise.all` en lecturas independientes, cancelación con `AbortController`, `AsyncLocalStorage` para el identificador de petición); agregados por tarea a 7 y 30 días; exportación XLSX (HU-08 🎯); catálogo editable (TT-12 🎯); contrato de trama (TT-27 🎯); ruta C de punta a punta (HU-02 🎯) | ≈ 25 | 2 |
+| **B4 · Operación y confiabilidad** | ✅ Parches de seguridad de las cuatro imágenes, **09/11/2026** (`docs/16 §12`). Falta: monitorización propia (TT-45; `docs/10 §8.4` puntos 60 y 61) y pantalla «Estado del sistema» con los límites configurables (HU-30; `docs/19 §4`, P12); respaldos cifrados, con guion versionado, simulacro mensual, guardia de 26 h y papelera de dispositivos (TT-46); backend en ES modules (TT-47; `docs/10 §8.4` punto 63); e2e en el CI donde quepan (TT-48); CSP definitiva y sistema de archivos de solo lectura (`docs/11 §4`); carga y recuperación repetidas en el servidor (TT-29, TT-30; OE5) | ≈ 40 | 1 (monitorización y respaldos); 2 (el resto) |
+| **B5 · Cierre** | Informe final de 30 páginas como máximo, con todo lo no hecho declarado (TT-37), láminas, revisión de entrega en tres frentes (seguridad, concordancia, privacidad) y entrega el 04/12 | ≈ 15 | Cierre |
 
-**Lo que dice la cuenta.** El plan completo suma **≈ 224 h** (≈ 201 h el 24/10; el 25/10, +12 h de la alta masiva y la bandeja de detectados y −4 h de las entrevistas, ya cerradas; el 26/10, +3 h del testamento de MQTT, RF-29; el 01/11, +12 h del certificado de cliente por dispositivo, `docs/10 §8.4` punto 57) y el presupuesto de la Etapa 4 es de **≈ 75 h** (§6.2). El núcleo pendiente
-(42 h), el informe final (12 h) y la sesión (≈ 8 h) son ≈ 62 h y caben; el resto (≈ 162 h) no cabe a 15 horas por semana. Cómo se
-cierra esa diferencia (más horas por semana, o qué se hace primero y qué se declara como trabajo futuro, con su diseño ya escrito) se
-decidió el 24/10: **abarcar lo más posible en este orden**, con el núcleo y todo lo que se haga probado como en la Etapa 3; lo que no
-alcance queda en el informe final con su diseño escrito. Cada viernes se mide el avance contra este plan.
+**Iteraciones, cada una entregable por sí sola.** **0:** B1 completo y lo que el panel necesita para mostrar datos con sentido (HU-07,
+HU-15 y HU-16). **1:** el resto de B2 —con el alta masiva— y la monitorización y los respaldos de B4. **2:** lo demás: ES modules, e2e en
+el CI, ruta C, XLSX, contrato de trama (TT-27), catálogo editable, certificado de cliente por dispositivo (`docs/10 §8.4` punto 57),
+Kubernetes, la comparación completa con los referentes (TT-40) y lo de la versión 1 que esta tabla no nombra (abajo). Una iteración no
+empieza hasta que la anterior está probada y documentada. **Trabajo futuro, con diseño ya escrito:** la ruta A con Basics Station
+(`docs/10 §8.4` punto 56), Kubernetes con escalado probado (`docs/14 §6`), TLS mutuo si no entra en la iteración 2 (`docs/10 §8.4`
+punto 57) y la recuperación a un instante con el archivado del WAL (`docs/10 §9.5`).
 
-**Mínimo indispensable y después iterar (01/11/2026).** Los bloques se mantienen; dentro de ellos, el orden de ejecución es por iteraciones
-cerradas, cada una entregable por sí sola: **iteración 0, el mínimo (≈ 70 h: las 62 del núcleo pendiente, el informe y la sesión, más ≈ 8 del
-servidor de prueba; las cinco semanas a 15 h):** sesión y roles con aislamiento entre sitios (bloque 1, sin lo cual no hay vista pública ni
-auditoría), lo que falta del núcleo (`docs/18 §5`: ruta C, XLSX, catálogo, contrato de trama, historial por rango, calidad del enlace, salud
-del sitio), el servidor de prueba operando con respaldo y aviso (bloque 6, ya planeado) y el informe final; **iteración 1 (solo si el mínimo
-termina antes o con más horas por semana):** certificado de cliente por dispositivo (≈ 12 h, bloque 1), la cata de ThingsBoard CE en el
-servidor de prueba (≈ 2 h) y el ciclo de vida de alertas (bloque 3); **iteración 2, trabajo futuro con diseño escrito:** ruta A
-con Basics Station, Kubernetes, alta masiva, comparación completa TT-40 y lo demás de los bloques 2 a 7. Una iteración no empieza hasta que la
-anterior está probada y documentada; lo que no alcance se declara, no se deja a medias.
+**La cuenta.** Disponibilidad decidida el 08/11/2026: **≈ 30 h por semana, ≈ 110 h hasta el 04/12** (el doble de las 15 h de RE-01, con
+que §6.2 calculó ≈ 75 h para esta etapa). Los bloques suman **≈ 170 h**. La iteración 0 son ≈ 42 h (B1 con lo ya hecho, más las 12 h de
+HU-07, HU-15 y HU-16), la 1 ≈ 69 h (las 48 h que quedan de B2 y ≈ 21 h de monitorización y respaldos) y el cierre ≈ 15 h: ≈ 126 h, más
+que las ≈ 110 disponibles. Caben la iteración 0, el cierre y la mayor parte de la 1; lo que no alcance, empezando por lo último de la 1,
+pasa a la 2, y lo que no se haga se **declara en el informe final con su diseño escrito**, nunca a medias. De esas ≈ 126 h, ≈ 10 ya están
+hechas (B1), así que lo pendiente ronda las 116. **Decisión del 09/11/2026:** los cuatro elementos del núcleo que habían quedado en la
+iteración 2 (HU-02, HU-08, TT-12 y TT-27; 21 h) **suben a la iteración 1**, porque el núcleo es el compromiso (§6.3); a cambio bajan a la 2
+las preferencias de unidades y zona horaria (HU-29), la papelera de dispositivos y la comparativa completa de referentes (lo que exceda a
+lo necesario para el tablero). El certificado público de TT-22 sigue en la 2. Cada viernes se mide el avance contra este plan.
+
+**Decisiones del 08/11/2026 que el plan supone** (cada una escrita donde manda):
+1. **Cinco perfiles con roles fijos y la matriz en el código** (`docs/20 §2`, §5 y §6; `docs/10 §8.4` punto 64): administrador del
+   sistema, administrador de sitio, investigador, operador técnico y consulta; el invitado es la vista pública por enlace, sin cuenta.
+   «Exportar» pasa a administrador de sitio e investigador.
+2. **Baja de la cuenta por anonimización** (`docs/20 §11`; `docs/10 §8.4` punto 62).
+3. **Monitorización propia, sin terceros y dentro de RNF-17** (`docs/10 §8.4` puntos 60 y 61).
+4. **Soporte:** formulario guardado en la base (`mensaje_soporte`, con límite de tasa y sin adjuntos) que ve el administrador del
+   sistema, más un contacto configurable (`docs/19 §4`, P11).
+5. **ES modules en el backend:** bloque propio en la iteración 2 (`docs/10 §8.4` punto 63).
+6. **Paginación:** keyset en cuarentena, condiciones, accesos, auditoría y eventos; desplazamiento con total en usuarios e inventario
+   (`docs/10 §8.4` punto 58).
+7. **Clave temporal:** 2 h por defecto, configurable de 1 a 72 h (hecho el 08/11/2026, `docs/20 §4`).
+8. **Consentimiento y permisos del navegador:** solo la cookie estrictamente necesaria, sin scripts ni SDK de terceros, permisos pedidos
+   al activar la función; inventario en `docs/21`.
+9. **Páginas legales:** términos con versión y aceptación obligatoria al primer ingreso (`docs/20 §12`); privacidad generada desde el
+   inventario, con responsable y contacto configurables; «Acerca de» con avisos de terceros generados desde `pnpm licenses` y
+   comprobados por el verificador (`docs/21 §7`).
+
+**Filas nuevas (08/11/2026):** HU-26 a HU-31 y TT-42 a TT-48 (13 elementos, 60 h, Etapa 4, fuera del núcleo) y la épica EP-15; los
+requisitos RF-53 a RF-61, RNF-19 y RNF-20 en `docs/02`.
+
+**Versión 1 (01/11/2026), conservada como registro.** Escrita el 24/10 y ajustada hasta el 01/11, ordenaba la etapa en siete bloques
+—seguridad, usuarios y roles (≈ 34 h, con el certificado de cliente por dispositivo); panel para operar una flota con pocos clics
+(≈ 63 h, con el alta masiva); salud de los datos (≈ 27 h: canal callado y valor congelado, ciclo de vida de las alertas, alias de claves,
+notificaciones, testamento de MQTT); lo que pidió el entrevistado del 05/10 (≈ 13 h: XLSX, magnitudes de gases, vista pública, transporte
+celular); LoRaWAN completo (≈ 18 h); despliegue, escala y operación (≈ 39 h: servidor con certificado, Kubernetes, respaldos, consumo y
+costo por sitio, dimensionar el proxy); pruebas e informe (≈ 30 h)— que sumaban ≈ 224 h frente a ≈ 75 h a 15 h por semana. Su iteración 0
+era el mínimo (≈ 70 h: el núcleo pendiente, la sesión, el servidor de prueba y el informe), la 1 el certificado de cliente, la cata de
+ThingsBoard CE en el servidor y el ciclo de vida de las alertas, y la 2, trabajo futuro con diseño escrito, incluía el alta masiva. La
+versión 2 cambia tres cosas: más horas por semana, el panel y la identidad primero, y **el alta masiva pasa de la iteración 2 a la 1**. Lo
+de la versión 1 que la tabla de arriba no nombra (canal callado y valor congelado, ciclo de vida de las alertas, alias de claves,
+testamento de MQTT, vista pública por enlace, magnitudes de gases, transporte celular, canal en vivo por WebSocket, costo por sitio,
+dimensionar el proxy, rotación con dos valores vigentes, escaneo de secretos en el CI) no se descarta: queda en la iteración 2, con su
+diseño donde ya estaba escrito.
 
 ## Seguimiento de ejecución
 

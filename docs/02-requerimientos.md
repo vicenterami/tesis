@@ -56,6 +56,12 @@ Cada requerimiento declara su origen. Se emplean cinco tipos de fuente, con dist
 > solicitados al profesor guía, primera entrevista dentro de la Etapa 2 y catálogo validado al 30/10 (OE1,
 > hito 2). Guion y registro: `docs/03` §2 y §3. Detalle: `bitacora/2026-09-21-retroalimentacion-etapa1.md`.
 
+> **Requisitos agregados el 08/11/2026 (RF-53 a RF-61, RNF-19 y RNF-20).** Salen del plan de la Etapa 4, versión 2 (`docs/04 §8`),
+> decidido por el propietario del producto a partir de la pregunta de la presentación del 05/11 (cómo dar de alta una flota y si cada
+> usuario configurará lo suyo) y de lo que exige operar con personas reales: perfiles, páginas legales, datos personales, ayuda y
+> monitorización. Llevan [PO] en ese sentido —una decisión del dueño del producto, no una indicación de la universidad— y la fecha en
+> su descripción. El inventario de datos personales que los sustenta está en `docs/21`.
+
 ## 1.2 Convención de identificación
 
 - **RF-nn** — requerimiento funcional
@@ -184,6 +190,9 @@ resolver. Es *Must* por coherencia con la propuesta de valor.
 | **RF-44** | El sistema debe distinguir al menos **dos roles**: administrador del sitio y usuario de consulta | [PO] [ENT] | C4 | **S** |
 | **RF-45** | El sistema debe permitir **rotar las credenciales de recepción** de un sitio sin interrumpir el servicio | [BT] | C1 | **C** |
 | **RF-46** | El sistema debe **registrar en bitácora** los accesos y las operaciones sensibles | [BT] | C5 | **S** |
+| **RF-53** | El sistema debe exigir la **aceptación de los términos de uso, con su versión**, al primer ingreso y cada vez que la versión cambie — agregado 08/11/2026 | [PO] | C3 | **M** |
+| **RF-54** | La interfaz debe ofrecer, desde cualquier pantalla, las **páginas de privacidad y de términos**, con el responsable y el contacto configurados — agregado 08/11/2026 | [PO] | C3 | **M** |
+| **RF-55** | El sistema debe permitir a una persona **dar de baja su propia cuenta por anonimización**, conservando sin datos personales el rastro que la auditoría necesita — agregado 08/11/2026 | [PO] | C3 | **S** |
 
 ## M8 — Interfaz de administración
 
@@ -195,6 +204,12 @@ resolver. Es *Must* por coherencia con la propuesta de valor.
 | **RF-50** | La interfaz debe ofrecer el **asistente de registro** de un dispositivo nuevo | [PO] [ENT] | C4 | **M** |
 | **RF-51** | La interfaz debe presentar la **vista agrupada por transporte de red**, mostrando cuántos dispositivos llegan por cada tecnología | [PO] [DP] | C1, C2 | **S** |
 | **RF-52** | La interfaz debe ser **utilizable desde un navegador móvil** | [EM] | C4 | **S** |
+| **RF-56** | La interfaz debe permitir a cada persona elegir sus **preferencias de visualización**: unidades (la base guarda siempre la estándar) y zona horaria — agregado 08/11/2026 | [PO] | C4 | **S** |
+| **RF-57** | La interfaz debe **paginar toda lista que crezca con el tiempo**, sin pedir la lista completa — agregado 08/11/2026 | [PO] | C4 | **M** |
+| **RF-58** | La interfaz debe ofrecer **ayuda contextual**: todo botón con etiqueta de texto y una ayuda accesible con el teclado — agregado 08/11/2026 | [PO] | C4 | **M** |
+| **RF-59** | La interfaz debe presentar al administrador del sistema el **estado del sistema**: recursos por contenedor, errores y último respaldo — agregado 08/11/2026 | [PO] | C5 | **M** |
+| **RF-60** | El sistema debe permitir al administrador del sistema **configurar los límites de los servicios** desde la interfaz — agregado 08/11/2026 | [PO] | C4 | **S** |
+| **RF-61** | La interfaz debe ofrecer un **formulario de soporte** que guarde el mensaje para el administrador del sistema — agregado 08/11/2026 | [PO] | C4 | **C** |
 
 **Justificación de RF-52.** El análisis de la oferta regional muestra que ControlTec destaca la
 supervisión desde el teléfono como característica comercial. Es una expectativa establecida del
@@ -243,6 +258,8 @@ Clasificados según las características de calidad de **ISO/IEC 25010**.
 | **RNF-08** | Ninguna credencial debe almacenarse en texto claro, ni en base de datos ni en el repositorio de código | Inspección y revisión del repositorio | [BT] | **M** |
 | **RNF-09** | Los dispositivos IoT deben poder residir en un **segmento de red separado** del segmento de usuarios, con acceso restringido solo a los puertos de recepción | Diseño de red verificado y documentado | [BT] | **M** |
 | **RNF-10** | El sistema **no debe requerir puertos entrantes abiertos hacia los dispositivos**: la conexión siempre se inicia desde el dispositivo hacia la plataforma | Revisión de arquitectura | [BT] [ENT] | **M** |
+| **RNF-19** | Los **errores del backend y del navegador** deben quedar registrados **sin datos personales** (ni nombre, ni correo, ni dirección IP, ni el cuerpo de la petición) — agregado 08/11/2026 | Prueba que planta un error con un correo en su mensaje y busca el correo en lo guardado | [PO] | **M** |
+| **RNF-20** | El panel **no debe cargar scripts, fuentes ni SDK de terceros**: todo recurso se sirve desde el propio origen — agregado 08/11/2026 | Inspección del paquete y de las peticiones del navegador (hoy lo garantiza que el paquete no referencia recursos externos; la política de contenido definitiva cerrará font-src y style-src) | [PO] | **M** |
 
 **Justificación de RNF-09 y RNF-10.** Son los dos requerimientos que anclan el trabajo al enfoque de
 redes del profesor guía. RNF-10 en particular resuelve el problema de alcanzabilidad de dispositivos
@@ -313,13 +330,15 @@ almacenamiento en disco no tiene requisito propio y se dimensiona en `docs/14 §
 
 | Prioridad | Funcionales | No funcionales | Total |
 |---|:---:|:---:|:---:|
-| **Must** — indispensable para el producto | 35 | 16 | **51** |
-| **Should** — importante, postergable | 14 | 2 | **16** |
-| **Could** — deseable | 3 | 0 | **3** |
+| **Must** — indispensable para el producto | 40 | 18 | **58** |
+| **Should** — importante, postergable | 17 | 2 | **19** |
+| **Could** — deseable | 4 | 0 | **4** |
 | **Won't** — fuera de alcance | — | — | ver 4.3 |
-| **Total catalogado** | **52** | **18** | **70** |
+| **Total catalogado** | **61** | **20** | **81** |
 
-> ⚠️ **Tensión detectada en la priorización, declarada explícitamente.** 51 requerimientos *Must*
+Hasta el 08/11/2026 eran 70 (52 RF y 18 RNF; *Must* 51, *Should* 16, *Could* 3); ese día se agregaron RF-53 a RF-61, RNF-19 y RNF-20.
+
+> ⚠️ **Tensión detectada en la priorización, declarada explícitamente.** 58 requerimientos *Must* (51 hasta el 08/11/2026)
 > representan un alcance considerable frente a la restricción **RE-01** (~15 horas semanales) y al
 > riesgo **R4**. La lectura correcta es que los *Must* definen **el producto que la tesis propone**,
 > mientras que el **núcleo demostrativo** de la sección 4.2 —el conjunto mínimo que prueba la
@@ -374,14 +393,15 @@ como omisión.
 
 | Causa del problema | Requerimientos que la abordan | Nº |
 |---|---|:---:|
-| **C1** Fragmentación de protocolos y formatos | RF-01…RF-06, RF-08, RF-10…RF-17, RF-20, RF-31, RF-40, RF-42, RF-45, RF-51, RNF-16 | **24** |
+| **C1** Fragmentación de protocolos y formatos | RF-01…RF-03, RF-05, RF-06, RF-08, RF-10…RF-13, RF-15…RF-17, RF-20, RF-31, RF-32, RF-40, RF-42, RF-45, RF-51, RNF-16 | **21** |
 | **C2** Acoplamiento hardware-plataforma | RF-02, RF-03, RF-04, RF-51, RNF-12 | **5** |
-| **C3** Costo y dependencia de plataformas SaaS | RF-34, RF-35, RF-41, RNF-14, RNF-15 | **5** |
-| **C4** Ausencia de capacidad técnica interna | RF-18, RF-19, RF-21, RF-30, RF-33, RF-43, RF-44, RF-47, RF-49, RF-50, RF-52 | **11** |
-| **C5** Falta de visibilidad de la conectividad | RF-07, RF-12, RF-14, RF-22, RF-23, RF-24…RF-30, RF-34, RF-36, RF-38, RF-39, RF-46, RF-48, RNF-03 | **20** |
+| **C3** Costo y dependencia de plataformas SaaS | RF-34, RF-35, RF-41, RF-53…RF-55, RNF-14, RNF-15, RNF-20 | **9** |
+| **C4** Ausencia de capacidad técnica interna | RF-18, RF-19, RF-21, RF-30, RF-33, RF-43, RF-44, RF-47, RF-49, RF-37, RF-50, RF-52, RF-56…RF-58, RF-60, RF-61 | **17** |
+| **C5** Falta de visibilidad de la conectividad | RF-07, RF-09, RF-12, RF-14, RF-18, RF-22, RF-23, RF-24…RF-30, RF-34, RF-36, RF-38, RF-39, RF-46, RF-48, RF-59, RNF-03, RNF-19 | **23** |
 
 **Verificación:** ninguna causa queda sin requerimientos asociados, y ningún requerimiento del catálogo
-carece de causa declarada.
+carece de causa declarada. **Recalculada el 08/11/2026 desde la columna «Causa» de cada tabla**, al sumar RF-53 a RF-61: C1 listaba
+RF-04 (solo C2) y RF-14 (C5) y omitía RF-32, y decía 24 con 22 en la lista; C4 omitía RF-37 y C5, RF-09 y RF-18.
 
 ## 5.2 Trazabilidad requerimiento → objetivo → etapa
 
@@ -595,12 +615,12 @@ funcionamiento en navegador móvil (RF-52). Las alternativas a evaluar serán ma
 | Sección | Estado |
 |---|---|
 | 1 Metodología y fuentes | ✅ Completo, con la brecha de entrevistas declarada |
-| 2 Requerimientos funcionales (52) | ✅ Completo, sujeto a ajuste tras las entrevistas |
-| 3 Requerimientos no funcionales (18) | ✅ Completo |
+| 2 Requerimientos funcionales (61) | ✅ Completo, sujeto a ajuste tras las entrevistas; RF-53 a RF-61 agregados el 08/11/2026 |
+| 3 Requerimientos no funcionales (20) | ✅ Completo; RNF-19 y RNF-20 agregados el 08/11/2026 |
 | 4 Priorización MoSCoW y MVP | ✅ Completo |
 | 5 Matriz de trazabilidad | ✅ Completo, cobertura de las 5 causas verificada |
 | 6 Evaluación de alternativas | ✅ Completo. 6.5 resuelto con la experiencia del desarrollador confirmada; 6.6 diferido a la Etapa 2 |
 | 7 Restricciones y supuestos | ✅ Completo |
 
-**Total catalogado: 70 requerimientos**, frente a los 20 que definen el núcleo mínimo demostrable
+**Total catalogado: 81 requerimientos** (70 hasta el 08/11/2026), frente a los 20 que definen el núcleo mínimo demostrable
 (sección 4.2): ningún objetivo específico compromete una cifra mínima de requerimientos catalogados.

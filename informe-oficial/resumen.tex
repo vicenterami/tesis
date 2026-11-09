@@ -12,10 +12,10 @@ Como propuesta, se desarrolla un prototipo de sistema integrado que administra e
 presenta en tiempo real, en un dashboard, sus datos, su estado y sus alertas. El trabajo se organiza
 en cuatro etapas con la metodología PPDIOO de Cisco. En la primera se formuló el problema mediante un
 árbol de causas y efectos, se definieron los objetivos con su trazabilidad, se catalogaron 70
-requerimientos y se compararon cinco mecanismos de transporte y cuatro formatos de datos. En la
+requerimientos (81 desde el 8 de noviembre) y se compararon cinco mecanismos de transporte y cuatro formatos de datos. En la
 segunda se diseñaron el sistema, su red y su despliegue con notaciones reconocidas, y se contrastó
 con las soluciones existentes, de código abierto, de fabricante y en la nube. En la tercera se implementó y probó
-el 75\,\% del núcleo: el sistema registra dispositivos con credencial propia, recibe sus datos por MQTT y por
+el 78\,\% del núcleo: el sistema registra dispositivos con credencial propia, recibe sus datos por MQTT y por
 LoRaWAN en el formato estándar SenML o los traduce desde otros, los unifica, supervisa si cada dispositivo sigue
 reportando, genera alertas ante valores fuera de rango y los muestra en un panel en vivo. En un banco de pruebas sostuvo 59,7 tramas por segundo sin pérdida, por sobre las 50 exigidas, y ya recibe de extremo a extremo los datos de un sensor físico (24 h, 1\,440 de 1\,440 tramas) y de la red LoRaWAN del campus. El trabajo incorporó las observaciones del profesor guía sobre la Etapa 1 y las de la reunión del 29 de septiembre, y dos entrevistas: un Académico/Investigador en Ingeniería Civil Geológica y el operador de la red LoRaWAN del campus; la siguiente etapa validará el sistema en un servidor de recursos modestos e incorporará la sesión y los roles.
 

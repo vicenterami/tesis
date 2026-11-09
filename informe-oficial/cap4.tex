@@ -15,7 +15,7 @@ calendario oficial (cuadro~\ref{tab:calendario}, anexo~\ref{anx:seguimiento}) fi
 \section{Backlog y verificación de viabilidad}
 \label{sec:backlog}
 
-El backlog contiene \textbf{66 elementos} —25 historias de usuario y 41 tareas técnicas en 14 épicas—
+El backlog contiene \textbf{79 elementos} —31 historias de usuario y 48 tareas técnicas en 15 épicas, 13 sumados el 8 de noviembre—
 estimados en horas ideales y reformulados tras el pivote del 2 de septiembre (anexo~\ref{anx:contactid}) hacia el contrato SenML y
 el pipeline (núcleo mínimo: 168 h; anexo~\ref{anx:backlog}).
 
@@ -25,14 +25,14 @@ tramas por MQTT, las normaliza al modelo interno, detecta que un dispositivo dej
 permite consultar sus mediciones por la API. El \textbf{segundo nivel} —vía HTTP, alertas por umbral, panel y exportación en formato abierto— se ejecutó con la holgura que deja el núcleo. Al cierre, el núcleo está construido y verificado, y el segundo nivel construido salvo XLSX (capítulo~\ref{cap:pruebas}).
 \end{quote}
 
-La verificación numérica mostró que \textbf{el backlog completo (287 h) excede
+La verificación numérica mostró que \textbf{el backlog de entonces (287 h) excede
 el presupuesto (240 h) y el núcleo mínimo (168 h) cabe con holgura} (30\,\% del presupuesto). Por eso
-\textbf{el compromiso es el núcleo} y los 32 elementos restantes son alcance condicional: comprometer lo que no se ejecutará bajaría el porcentaje de avance que mide el curso. La distribución temporal también se corrigió, trasladando horas de la Etapa 3 a la Etapa 4 para cumplir el 50\,\% de avance que el curso exige al 30 de octubre, y la validación con un sensor físico (TT-32) se adelantó al núcleo de esa etapa; se cumplió el 24 de octubre (capítulo~\ref{cap:pruebas}).
+\textbf{el compromiso es el núcleo} y el resto es alcance condicional: comprometer lo que no se ejecutará bajaría el porcentaje de avance que mide el curso. La distribución temporal también se corrigió, trasladando horas de la Etapa 3 a la Etapa 4 para cumplir el 50\,\% de avance que el curso exige al 30 de octubre, y la validación con un sensor físico (TT-32) se adelantó al núcleo de esa etapa; se cumplió el 24 de octubre (capítulo~\ref{cap:pruebas}).
 
 \section{Seguimiento del backlog en la Etapa 3}
 \label{sec:seguimiento}
 
-En la Etapa~3, 13 de 17 elementos están hechos (69 de 88~h) y 4 parciales (19~h). En el núcleo, 25 de 34 (126 de 168~h, 75\,\%) y 4 parciales (20~h); en el backlog entero, 38 de 66 elementos (57\,\%). El detalle por elemento, junto al cierre de la Etapa~2, está en los cuadros~\ref{tab:seguimiento3} y~\ref{tab:seguimiento} (anexo~\ref{anx:seguimiento}).
+En la Etapa~3, 13 de 17 elementos están hechos (69 de 88~h) y 4 parciales (19~h). En el núcleo, 26 de 34 (131 de 168~h, 78\,\%) y 4 parciales (20~h); en el backlog entero, 39 de 79 elementos (49\,\%), al 8 de noviembre. El detalle por elemento, junto al cierre de la Etapa~2, está en los cuadros~\ref{tab:seguimiento3} y~\ref{tab:seguimiento} (anexo~\ref{anx:seguimiento}).
 
 \section{Retroalimentación y cambios derivados}
 \label{sec:retro}
@@ -43,7 +43,7 @@ cada una, se tradujeron en cambios concretos, registrados uno a uno en los cuadr
 y los roles; pide exportar «la data cruda (en .CSV o .XLSX)», algo «absolutamente crítico y no negociable», lo que
 adelantó la exportación (HU-08) a esta etapa; y relativiza el tiempo real: para saber que un equipo «tiene batería y
 está transmitiendo» le sirven «actualizaciones cada un par de horas». La del 25 de octubre, con el operador de la red LoRaWAN del campus, llama «inviable» dar de alta 50 nodos uno por uno:
-la alta masiva entra a la Etapa~4. Las observaciones sobre la Etapa~2 se pidieron en la presentación de avances del 28 de octubre; al cierre no habían llegado por escrito. El 5 de noviembre, en la presentación conjunta con los tesistas de los profesores Mario Villanueva y Luis Alberto Caro, la única pregunta —cómo dar de alta una flota completa y si cada usuario configurará sus dispositivos— tiene respuesta en el plan de la Etapa~4: sesión con usuarios y roles por sitio (iteración 0) y alta masiva por archivo (iteración 2, diseñada).
+la alta masiva entra a la Etapa~4. Las observaciones sobre la Etapa~2 se pidieron en la presentación de avances del 28 de octubre; al cierre no habían llegado por escrito. El 5 de noviembre, en la presentación conjunta con los tesistas de los profesores Mario Villanueva y Luis Alberto Caro, la única pregunta —cómo dar de alta una flota completa y si cada usuario configurará sus dispositivos— tiene respuesta en la Etapa~4: sesión con usuarios y roles por sitio, hecha el 8 de noviembre, y alta masiva por archivo, en la iteración~1 del plan.
 
 \section{Riesgos y entorno de prueba}
 \label{sec:despliegue-prueba}
@@ -51,4 +51,4 @@ la alta masiva entra a la Etapa~4. Las observaciones sobre la Etapa~2 se pidiero
 El registro de riesgos (cuadro~\ref{tab:riesgos}, anexo~\ref{anx:seguimiento}) tiene seis: cuatro cerrados (fechas; protocolo, resuelto con el pivote; hardware: el nodo propio publicó 24~h; partes interesadas: dos entrevistas, sección~\ref{sec:retro}), uno confirmado y controlado (alcance excesivo, con el criterio de demostración en dos niveles) y uno en tratamiento: la recepción LoRaWAN en terreno, probada en la red local de la pasarela; el servidor de prueba está disponible desde el 3 de noviembre, a la espera de sus tramas. La
 \textbf{desviación de RNF-15} declarada en la Etapa~2 (compresión de TimescaleDB bajo la \emph{Timescale License}, que no es de código abierto \parencite{timescalelicencia}) se resolvió el 06/10 con la edición Apache~2.0, que no comprime.
 
-\textbf{Despliegue de prueba en la institución} (anexo~\ref{anx:despliegue}). El 3 de noviembre la universidad ofreció dos entornos. Un namespace de Kubernetes admite la pila, pero no permite entrada desde fuera ni almacenamiento persistente: queda para desarrollo. En un equipo compartido de la red del campus, usado con permiso de su responsable y con reglas escritas, corre la pila completa, con el 8883 como único puerto hacia afuera, verificada el 4 de noviembre. Faltan la entrada desde Internet, ya pedida, y la sesión de usuarios; mientras sea compartido solo recibe datos de prueba.
+\textbf{Despliegue de prueba en la institución} (anexo~\ref{anx:despliegue}). El 3 de noviembre la universidad ofreció dos entornos. Un namespace de Kubernetes admite la pila, pero no permite entrada desde fuera ni almacenamiento persistente: queda para desarrollo. En un equipo compartido de la red del campus, usado con permiso de su responsable y con reglas escritas, corre la pila completa, con el 8883 como único puerto hacia afuera, verificada el 4 de noviembre. Falta la entrada desde Internet, ya pedida; mientras sea compartido solo recibe datos de prueba.

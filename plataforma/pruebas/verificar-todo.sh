@@ -809,6 +809,11 @@ cp = re.sub(r'\s+', ' ', open('informe-oficial/cap-pruebas.tex', encoding='utf-8
 mp = re.findall(r'núcleo (?:demostrable|mínimo)(?: \(OE4\))? está hecho en un (\d+)\\,\\%', cp)  # 05/11: un solo nombre para el núcleo («núcleo mínimo»)
 if len(mp) != 1: malos.append(f'informe (cap-pruebas.tex): esperaba una frase «el núcleo mínimo está hecho en un N %», hay {len(mp)}')
 elif int(mp[0]) != cuenta(True)[4]: malos.append(f'informe (cap-pruebas.tex): dice {mp[0]} % del núcleo; las filas dan {cuenta(True)[4]} %')
+# 09/11: la conclusión y el resumen repetían otro porcentaje (75 frente a 78): se comparan también.
+for f in ('informe-oficial/conclusion.tex', 'informe-oficial/resumen.tex'):
+    tx = re.sub(r'\s+', ' ', open(f, encoding='utf-8').read())
+    for v in re.findall(r'(\d+)\\,\\% del núcleo', tx):
+        if int(v) != cuenta(True)[4]: malos.append(f'informe ({f.split("/")[-1]}): dice {v} % del núcleo; las filas dan {cuenta(True)[4]} %')
 es = open('informe-oficial/anexos/e-seguimiento.tex', encoding='utf-8').read()
 if '\\label{tab:seguimiento3}' not in es: malos.append('informe: no encontré el cuadro tab:seguimiento3 en el anexo de seguimiento')
 else:

@@ -4,7 +4,7 @@
 \setlength{\tabcolsep}{4pt}
 
 Los elementos marcados \textbf{(N)} pertenecen al núcleo demostrativo. Actualizado al pivote
-del 2 de septiembre.
+del 2 de septiembre; HU-26 a HU-31, TT-42 a TT-48 y la épica EP-15 se agregaron el 8 de noviembre con el plan de la Etapa~4.
 
 \section{EP-01 --- Infraestructura y entorno de desarrollo}
 \begin{longtable}{@{}C{1.3cm}L{6.1cm}C{0.9cm}C{1.2cm}C{1.0cm}@{}}
@@ -92,6 +92,9 @@ del 2 de septiembre.
 \textbf{TT-39} & Canal de tiempo real autenticado hacia el panel (SSE tras el proxy TLS): sesión verificada al abrir (desde M7; antes, solo red local), \texttt{Origin} del propio panel, lista de nombres de host, filtros validados y tope de flujos & M & 3 & 4 \\
 \textbf{TT-40} & Despliegue comparativo en el banco de pruebas: ThingsBoard CE, OpenRemote y Magistrala con el mismo emulador (TT-28) y las mismas métricas, con datos propios en vez de cifras declaradas & S & 4 & 6 \\
 \textbf{TT-41} & Diseño del despliegue en Kubernetes: equivalencias Compose--k3s, estado por pieza, qué escala y qué no, respaldos & C & 3 & 2 \\
+\textbf{HU-26} & \textbf{Como administrador del sistema}, quiero dar a cada persona uno de los cinco perfiles, para que vea y haga solo lo que le corresponde & S & 4 & 6 \\
+\textbf{HU-27} & \textbf{Como persona usuaria}, quiero aceptar los términos al primer ingreso y consultar la privacidad, los términos y los avisos de terceros & M & 4 & 5 \\
+\textbf{HU-28} & \textbf{Como persona usuaria}, quiero dar de baja mi cuenta: mis datos se anonimizan y el historial del sitio se conserva & S & 4 & 3 \\
 \end{longtable}
 
 \section{EP-10 --- Interfaz de administración}
@@ -102,6 +105,11 @@ del 2 de septiembre.
 \textbf{HU-21} & \textbf{(N)}~\textbf{Como usuario de consulta}, quiero el detalle de un dispositivo con sus condiciones abiertas, historial y serie de mediciones & M & 3 & 7 \\
 \textbf{HU-22} & \textbf{Como administrador de sitio}, quiero un asistente guiado para registrar un dispositivo nuevo & M & 4 & 4 \\
 \textbf{HU-23} & \textbf{Como administrador de sitio}, quiero ver mi flota agrupada por tecnología de red, para entender por dónde llega cada cosa & S & 4 & 3 \\
+\textbf{HU-29} & \textbf{Como persona usuaria}, quiero elegir unidades de visualización, zona horaria y vistas guardadas & S & 4 & 5 \\
+\textbf{HU-31} & \textbf{Como persona usuaria}, quiero enviar un mensaje de soporte y ver el contacto del responsable & C & 4 & 2 \\
+\textbf{TT-42} & Paginación keyset en las listas por tiempo y con total en las chicas & M & 4 & 4 \\
+\textbf{TT-43} & Componentes con etiqueta de texto y ayuda accesible en botones, tablas y formularios & M & 4 & 4 \\
+\textbf{TT-44} & Comparativa de referentes y de WCAG 2.2, con fuente, antes de rediseñar el tablero & S & 4 & 3 \\
 \end{longtable}
 
 \section{EP-11 --- Alertas y notificación}
@@ -142,12 +150,22 @@ del 2 de septiembre.
 \textbf{TT-38} & Bitácora de reuniones y trazabilidad de retroalimentación incorporada & M & 1--4 & 2 \\
 \end{longtable}
 
+\section{EP-15 --- Operación y confiabilidad}
+\begin{longtable}{@{}C{1.3cm}L{6.1cm}C{0.9cm}C{1.2cm}C{1.0cm}@{}}
+\filaencab \encab{ID} & \encab{Elemento} & \encab{Pr.} & \encab{Etapa} & \encab{Horas} \\ \midrule \endhead
+\textbf{HU-30} & \textbf{Como administrador del sistema}, quiero ver el estado del sistema (recursos, errores, último respaldo) y ajustar los límites de los servicios & M & 4 & 5 \\
+\textbf{TT-45} & Monitorización propia en la base: errores del backend y del navegador sin datos personales, recursos por cgroups y sus condiciones & M & 4 & 8 \\
+\textbf{TT-46} & Respaldos cifrados, guion versionado, simulacro mensual, guardia de 26~h y papelera de dispositivos & M & 4 & 8 \\
+\textbf{TT-47} & Backend en ES modules & C & 4 & 4 \\
+\textbf{TT-48} & Pruebas de extremo a extremo en el CI & S & 4 & 3 \\
+\end{longtable}
+
 \section{Resumen del esfuerzo}
 \begin{longtable}{@{}L{7.0cm}C{2.4cm}C{2.4cm}@{}}
 \filaencab \encab{Conjunto} & \encab{Elementos} & \encab{Horas} \\ \midrule \endhead
 Núcleo demostrativo & 34 & \textbf{168} \\
-Alcance condicional & 32 & 119 \\ \midrule
-\textbf{Total del backlog} & \textbf{66} & \textbf{287} \\ \midrule
+Alcance condicional & 45 & 179 \\ \midrule
+\textbf{Total del backlog} & \textbf{79} & \textbf{347} \\ \midrule
 Presupuesto disponible (calendario oficial) & --- & $\sim$\textbf{240} \\
 \bottomrule
 \caption{Esfuerzo estimado frente al presupuesto.}

@@ -8,14 +8,19 @@
 >
 > **Estado al 08/11/2026: implementado en el backend** (bloque 1 de la Etapa 4: sesión, usuarios, roles por sitio y guardia central;
 > migración 22, `backend/src/sesion/`), y **en el panel** el mismo día (pantalla P10: entrar, clave temporal, salir, usuarios; `docs/19 §4`).
-> Lo hecho, lo decidido al implementar y lo que falta (la vista pública por enlace) están en la §10. El diseño de las §1 a §9 no cambió.
+> Lo hecho, lo decidido al implementar y lo que falta (la vista pública por enlace) están en la §10.
+>
+> **Decidido el 08/11/2026 (plan de la Etapa 4, versión 2, `docs/04 §8`; diseño, código en la iteración 0):** los **cinco perfiles**
+> (§2, §5 y §6, que cambian: «exportar» pasa a administrador de sitio e investigador), la **baja de la cuenta por anonimización** (§11)
+> y la **aceptación de los términos de uso** (§12). Lo que el código hace hoy sigue siendo lo de la §10 (dos roles); donde el diseño ya
+> dice otra cosa, se marca.
 
 ## 1. Lo ya decidido que aquí se respeta
 | Decisión | Dónde | Consecuencia |
 |---|---|---|
 | Cookie `HttpOnly; Secure; SameSite=Lax`; el panel lo sirve el backend (mismo origen); `Secure` no atado a `NODE_ENV` | `docs/11 §4` | Ningún script lee la sesión; sin CORS; el proxy pone TLS |
 | Roles por sitio con un guardia central: la identidad y el alcance salen de la sesión y entran al `WHERE` de cada consulta | `docs/10 §8.4` punto 36 | Una sola función decide; ninguna ruta confía en lo que manda el cliente |
-| Dos roles: administrador del sitio y usuario de consulta | RF-44; `usuario_sitio.rol` ya existe (migración 01) | Un usuario puede tener roles distintos en sitios distintos |
+| Dos roles: administrador del sitio y usuario de consulta (desde el 08/11/2026, cinco perfiles: §2) | RF-44; `usuario_sitio.rol` ya existe (migración 01) | Un usuario puede tener roles distintos en sitios distintos |
 | Vista pública por enlace con token, no un tercer rol | `docs/10 §8.4` punto 6 | Solo lectura agregada, sin cuenta |
 | Clave de administrador por cabecera hasta la sesión | `docs/10 §8.4` punto 41 | Crea el primer usuario y se retira |
 | Bloqueo optimista en lo editable; cada cambio deja un `evento` con quién | `docs/10 §8.4` punto 28 | El «quién» sale de la sesión |
@@ -28,6 +33,17 @@
   o ninguna) y un `CHECK` que guarda el email en minúsculas.
 - `usuario_sitio` (existe): `(usuario_id, sitio_id, rol)`. ✅ Migración 22: `activo` (decidido al implementar, 08/11/2026): quitarle un
   sitio a una persona es una baja lógica; la aplicación no tiene `DELETE` en ninguna tabla (migración 14) y así sigue.
+- **Cinco perfiles (decidido el 08/11/2026; diseño, código en la iteración 0).** Roles fijos, con la matriz de permisos en el código
+  (`permitir()`, §5), no editables por pantalla: un rol a medida exigiría una interfaz de permisos y su propia prueba, sin un caso que lo
+  pida. Por sitio, en `usuario_sitio.rol`: **administrador** (de sitio: todo en su sitio, también sus usuarios, enlaces públicos y
+  exportar), **investigador** (consulta completa de su sitio, exportación y preferencias propias), **operador** (técnico: alta,
+  configuración y mantenimiento de los dispositivos y pasarelas de su sitio; sin usuarios ni exportación) y **consulta** (solo lectura).
+  Una migración nueva (prevista para la iteración 0) amplía el `CHECK` de `ck_usuario_sitio_rol` a esos cuatro valores; `administrador`
+  conserva su nombre y su significado (de sitio), así las filas y las pruebas de hoy siguen valiendo sin migrar datos. Global, el
+  **administrador del sistema** (usuarios, sitios, límites, estado del sistema y auditoría de todos los sitios): es el alcance que hoy
+  solo tiene el usuario del sistema de la clave por cabecera (`todos` en `UsuarioSesion`), dado a una persona. Cómo se guarda queda por
+  fijar al escribir esa migración; se prefiere una columna de `usuario` (`administrador_sistema`) antes que una fila por sitio, que no
+  alcanzaría a los sitios creados después. El **invitado** no es un perfil: es la vista pública por enlace, sin cuenta (§7).
 - `sesion` (nueva): `id` (hash SHA-256 del identificador aleatorio que viaja en la cookie: la base nunca guarda lo que
   autentica), `usuario_id`, `creada_en`, `ultima_actividad`, `expira_en`, `revocada_en`, `ip`, `agente` (acotado a 200
   caracteres). Índice por `usuario_id` y por `expira_en` (limpieza). ✅ Migración 22; la limpieza la hace una función del dueño
@@ -37,12 +53,12 @@
   **90 días**, la misma que la auditoría de operaciones de `docs/10 §8.4` punto 43; decidido el 12/10/2026). ✅ Migración 22
   (`RETENCION_ACCESO_DIAS`, mínimo 7). Sin clave foránea a `sesion`: los fallidos no tienen sesión y las vencidas se limpian antes.
 - **Qué se guarda de cada persona y por cuánto tiempo (revisión del 08/11/2026):** nombre y correo mientras la cuenta exista (al darse
-  de baja se anonimizan; cómo, está por decidir); el hash scrypt de la clave (nunca la clave); en `sesion` y `acceso`, la dirección IP **completa** y el
+  de baja se anonimizan, §11); el hash scrypt de la clave (nunca la clave); en `sesion` y `acceso`, la dirección IP **completa** y el
   `User-Agent` acotado a 200 caracteres, **90 días** (`fn_limpiar_sesiones` y la retención de `acceso`): son un registro de seguridad que
   debe distinguir atacantes dentro de una misma red y permitir a la persona reconocer sus sesiones; la auditoría de operaciones
   (`docs/10 §8.4` punto 43) trunca el origen a /24 porque su fin es de uso, no de seguridad. `email_intentado` se guarda solo si tiene forma
   de correo (una clave pegada en el campo equivocado no queda en la base). A los registros de la aplicación la IP va truncada a /24 y nunca
-  van correos ni nombres. El inventario completo de datos personales y de terceros va en `docs/21` (Etapa 4).
+  van correos ni nombres. El inventario completo de datos personales y de terceros está en `docs/21` (08/11/2026).
 - `enlace_publico` (nueva): `id`, `sitio_id`, `token_hash`, `magnitudes` (lista), `intervalo` (de la lista cerrada), `creado_por`,
   `expira_en`, `revocado_en`.
 
@@ -103,7 +119,7 @@
   `horasClaveTemporal`); la vigencia se prueba con reloj simulado y se corrobora con el instante guardado, y el panel muestra la hora de
   vencimiento que devuelve el servidor (`clave_temporal_vence_en`), nunca un plazo propio.
 - **Alta de usuarios:** solo un administrador; sin registro abierto. Un usuario se desactiva, no se borra (su rastro en
-  `evento` y `acceso` lo necesita).
+  `evento` y `acceso` lo necesita); al darse de baja, se anonimiza (§11).
 
 ## 5. El guardia central
 - Un middleware lee la cookie, busca la sesión viva, renueva `ultima_actividad` y deja en la petición `usuario` y sus
@@ -118,16 +134,36 @@
   lo cumple `X-Clave-Admin` en la única ruta que escribe).
 - La clave de administrador del punto 41 pasa por el mismo guardia como un «usuario del sistema» con rol de administrador en
   todos los sitios, hasta que se retira.
+- **Perfiles: el frontend oculta, el backend decide (08/11/2026).** Cada perfil es una fila de la tabla de `permitir()`; el panel recibe
+  la misma tabla en `GET /sesion` (`permisos`, §10) y solo oculta o desactiva lo que el perfil no puede, con el motivo escrito. Cada celda
+  de la §6 es un caso de humo con una sesión por perfil (paso 4b del guardián).
+- **Membresía frente a cuenta (08/11/2026; amplía R1 de la §10).** La **membresía** es el rol de una persona en un sitio y si está
+  activa allí; la **cuenta** es lo que vale en todos sus sitios: nombre, `activo`, clave temporal, baja. Un administrador de sitio edita
+  solo la membresía en sus sitios de una cuenta que también pertenece a otro sitio; la cuenta la cambia el administrador del sistema o
+  quien administra todos los sitios activos de esa persona. Un administrador de sitio no puede dar el perfil de administrador del sistema
+  ni crear sitios.
 
-## 6. Matriz de acceso (ruta × rol → código esperado). Se convierte en casos de humo con una sesión por rol
-| Ruta | Sin sesión | Consulta (su sitio) | Administrador (su sitio) | Otro sitio |
-|---|---|---|---|---|
-| `GET /salud`, los archivos del panel bajo `/panel/`, `/publico/{token}` (Etapa 4) | 200 | 200 | 200 | 200 |
-| `POST /sesion` (pública), `GET /sesion`, `DELETE /sesion`, `POST /sesion/clave` (las tres valen con clave temporal) | 200 / 401 | 200 | 200 | — |
-| `GET /dispositivos`, `GET /dispositivos/{id}`, `GET /canales/{id}/historico`, `GET /condiciones`, `GET /cuarentena`, `GET /pasarelas`, `GET /eventos` | 401 | 200 (solo sus sitios en la lista; filtro por sitio en el `WHERE`) | 200 | 404 |
-| `GET /dispositivos/{id}/exportar` | 401 | 403 (exportar exige administrador: punto 6, datos crudos no públicos) | 200 | 404 |
-| `POST /dispositivos`, `DELETE /dispositivos/{id}`, `POST /dispositivos/{id}/credencial` (Etapa 3), `PATCH /canales/{id}` (calibración), `POST /pasarelas`, `DELETE /pasarelas/{id}`, `POST /pasarelas/{id}/credencial`; `PATCH /dispositivos/{id}`, `PUT /canales/{id}/reglas` y mudanza (Etapa 4, aún no existen) | 401 | 403 | 200 / 409 | 404 |
-| `GET /usuarios`, `POST /usuarios`, `PATCH /usuarios/{id}`; enlaces públicos (Etapa 4) | 401 | 403 | 200 (los de sus sitios; la cuenta de quien también está en otro sitio: 403) | 404 |
+## 6. Matriz de acceso (ruta × perfil → código esperado). Se convierte en casos de humo con una sesión por perfil
+Ampliada el 08/11/2026 a los cinco perfiles (§2). **Vigente en el código** (paso 4b del guardián, `docs/16 §58`): las columnas «Sin
+sesión», «Consulta», «Administrador de sitio» y «Otro sitio», con «exportar» solo para el administrador; las columnas «Investigador»,
+«Operador técnico» y «Administrador del sistema», el cambio de «exportar» y las filas de rutas nuevas son **diseño** y entran con la
+migración prevista de la iteración 0. Cada celda dice qué responde la ruta a esa persona en **su** sitio; «Otro sitio» es la misma
+persona pidiendo un recurso de un sitio donde no tiene membresía (el administrador del sistema no tiene «otro sitio»: alcanza a todos).
+
+| Ruta | Sin sesión | Consulta | Investigador | Operador técnico | Administrador de sitio | Administrador del sistema | Otro sitio |
+|---|---|---|---|---|---|---|---|
+| `GET /salud`, los archivos del panel bajo `/panel/`, la vista pública `/publico/{token}` (Etapa 4) | 200 | 200 | 200 | 200 | 200 | 200 | 200 |
+| `POST /sesion` (pública), `GET /sesion`, `DELETE /sesion`, `POST /sesion/clave` (las tres valen con clave temporal) | 200 / 401 | 200 | 200 | 200 | 200 | 200 | — |
+| `GET /dispositivos`, `GET /dispositivos/{id}`, `GET /canales/{id}/historico`, `GET /condiciones`, `GET /cuarentena`, `GET /pasarelas`, `GET /eventos` | 401 | 200 (solo sus sitios en la lista; filtro por sitio en el `WHERE`) | 200 | 200 | 200 | 200 (todos los sitios) | 404 |
+| `GET /dispositivos/{id}/exportar` (datos crudos, no públicos: punto 6) | 401 | 403 | 200 | 403 | 200 | 200 | 404 |
+| `POST /dispositivos`, `POST /dispositivos/{id}/credencial`, `PATCH /canales/{id}` (calibración), `POST /pasarelas`, `POST /pasarelas/{id}/credencial` | 401 | 403 | 403 | 200 / 409 | 200 / 409 | 200 / 409 | 404 |
+| `DELETE /dispositivos/{id}`, `DELETE /pasarelas/{id}` (baja: el equipo deja de recibir datos) | 401 | 403 | 403 | 403 | 200 / 409 | 200 / 409 | 404 |
+| Configurar un dispositivo, sus reglas de umbral y su estado (mantenimiento), y mudarlo (Etapa 4, rutas por fijar en el OpenAPI) | 401 | 403 | 403 | 200 / 409 | 200 / 409 | 200 / 409 | 404 |
+| `GET /usuarios`, `POST /usuarios`, `PATCH /usuarios/{id}` | 401 | 403 | 403 | 403 | 200 (las membresías de sus sitios; la cuenta de quien también está en otro sitio: 403, §5) | 200 (todas las cuentas) | 404 |
+| Enlaces públicos de un sitio (Etapa 4) | 401 | 403 | 403 | 403 | 200 | 200 | 404 |
+| Auditoría de un sitio (Etapa 4) | 401 | 403 | 403 | 403 | 200 | 200 | 404 |
+| Estado del sistema, límites de los servicios, sitios y auditoría de todos los sitios (Etapa 4) | 401 | 403 | 403 | 403 | 403 | 200 | — |
+| Lo propio de cada persona: preferencias, aceptar los términos, darse de baja, enviar un mensaje de soporte (Etapa 4) | 401 | 200 | 200 | 200 | 200 | 200 (la baja, 409 si es el último administrador del sistema: §11) | — |
 
 ## 7. Vista pública por enlace
 - Un administrador crea el enlace eligiendo sitio, magnitudes e intervalo de agregación; el token (32 bytes) se muestra una vez
@@ -266,3 +302,43 @@ la Etapa 4) este valor pasará a configurarse desde el panel.
 punto 43), el «quién» en los eventos de alta, baja y calibración, y retirar `HTTP_CLAVE_ADMIN` del `.env` del servidor una vez creado el
 primer administrador. El recorrido del banco con navegador (`banco.sh navegador`, `e2e/p3.mjs`) ya entra como usuario del sistema, con la
 clave del banco por cabecera (`docs/16 §59`).
+
+**Perfiles: decidido el 08/11/2026; estado: diseño, código en la iteración 0 (`docs/04 §8`; `docs/10 §8.4` punto 64).** Lo que cambia en
+el código, en este orden: (1) la migración prevista amplía `ck_usuario_sitio_rol` a `administrador`, `investigador`, `operador` y
+`consulta`, y agrega el alcance global del administrador del sistema (§2); (2) `ROLES` y `PERMISOS` de `permisos.ts` crecen con las
+acciones que la §6 distingue (`leer`, `exportar`, `escribir`, `baja`, `usuarios`, `enlaces`, `auditoria`, `sistema`), y `exportar` pasa a
+`administrador` e `investigador`; ninguna ruta compara perfiles por su cuenta: todas siguen llamando a `permitir()`; (3) el guardia carga el
+alcance global en `todos`, como hoy para el usuario del sistema; (4) el panel no cambia de lógica: arma la guía de perfiles y desactiva
+botones con la matriz que ya recibe en `GET /sesion`; el selector de rol de P10 ofrece los cuatro de sitio y, solo al administrador del
+sistema, el global; (5) `sesion-smoke.sh` crea una sesión por perfil y recorre cada celda de la §6. **Plantado:** con `exportar` de vuelta
+en solo `administrador`, el caso «investigador exporta → 200» debe fallar; con `escribir` abierto a `consulta`, el alta debe fallar.
+
+## 11. Baja de la cuenta por anonimización (decidido el 08/11/2026; diseño, código en la iteración 0)
+- **Qué es y por qué.** La persona se da de baja ella misma (RF-55), o la da de baja un administrador del sistema. Borrar la fila de
+  `usuario` rompería `evento`, `acceso` y la auditoría, que la referencian; dejarla intacta conservaría datos personales sin un fin. Se
+  conserva la fila, sin nada que identifique a nadie.
+- **Qué se hace, en una sola transacción:** `nombre` pasa a un marcador derivado del id («Cuenta dada de baja · 3f2a», los primeros
+  caracteres del uuid) y `email` a una dirección que no es de nadie, derivada del mismo id en un dominio reservado que no existe
+  (`…@ejemplo.invalid`, como las personas de prueba), así se siguen cumpliendo `ck_usuario_email` y la unicidad; `hash_password` se reemplaza
+  por un valor que ninguna clave verifica (la columna es `NOT NULL`); se revocan todas sus sesiones; `activo = false`; las membresías quedan
+  inactivas; se borran sus preferencias, si existen (son de la iteración 1); y una columna nueva, `anonimizado_en`, guarda el instante (migración prevista, la misma de los
+  perfiles). La acción queda en la auditoría con el id, nunca con el nombre de antes.
+- **Qué queda, y por qué.** La fila con el id, enlazada desde `evento`, `acceso` y la auditoría, ya sin datos personales; `acceso` y las sesiones revocadas (`sesion`: IP y agente, hasta 90 días) guardan
+  además la dirección IP y el correo intentado de sus intentos, que se borran solos a los 90 días (`docs/21 §2`). Los respaldos anteriores
+  contienen los datos de antes hasta que vencen (30 días, `docs/10 §9.5`): se dice así en la página de privacidad.
+- **Reglas.** Es irreversible: una cuenta anonimizada no se reactiva (la persona puede recibir una cuenta nueva). El **último administrador
+  del sistema no puede darse de baja** (409), por la misma regla que impide dejar la plataforma sin administradores (R3, con el mismo
+  candado). Pedirla exige la clave actual, como cambiarla: una sesión olvidada abierta no basta para borrar una cuenta.
+- **Prueba (antes de darla por hecha):** después de la baja, ninguna columna de `usuario` contiene el nombre ni el correo de antes
+  (consulta directa en la base); el correo de antes ya no entra; las filas de `evento` y `acceso` siguen enlazadas; el último administrador
+  del sistema recibe 409.
+
+## 12. Aceptación de los términos de uso (decidido el 08/11/2026; diseño, código en la iteración 0)
+- **Qué se guarda.** La versión vigente de los términos es un valor de configuración; en `usuario`, la versión aceptada y el instante
+  (columnas nuevas en la migración prevista). Qué dicen los términos y la página de privacidad, y de dónde salen, está en `docs/21 §7`.
+- **Cómo se aplica.** Al entrar, si la versión aceptada no es la vigente, la sesión queda restringida como con una clave temporal (§10):
+  solo sirve para leer las páginas legales, aceptar y salir; lo demás responde 403 con un motivo que el panel convierte en la pantalla
+  «Términos de uso». Aceptar guarda versión e instante y deja una fila en la auditoría. Cambiar la versión obliga a todos a aceptar de
+  nuevo en su siguiente petición. Una clave temporal pendiente va primero; la aceptación, después.
+- **Prueba:** una sesión sin aceptar recibe 403 en una lectura y 200 en las páginas legales; aceptar la vuelve normal; subir la versión la
+  vuelve a restringir.

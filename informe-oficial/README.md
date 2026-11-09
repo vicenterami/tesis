@@ -20,8 +20,8 @@ latexmk -pdf -outdir=build main.tex     # SIEMPRE desde esta carpeta, nunca desd
 | `cap4.tex` | Metodología: backlog, viabilidad, seguimiento, retroalimentación y riesgos |
 | `conclusion.tex` | Conclusiones de la etapa |
 | `glosario.tex` | Glosario de términos y API |
-| `anexos/a-requerimientos.tex` | Catálogo completo: 70 requerimientos (52 RF + 18 RNF) |
-| `anexos/b-backlog.tex` | Backlog completo: 65 elementos (25 historias y 40 tareas) en 14 épicas |
+| `anexos/a-requerimientos.tex` | Catálogo completo: 81 requerimientos (61 RF + 20 RNF; 11 agregados el 08/11/2026) |
+| `anexos/b-backlog.tex` | Backlog completo: 79 elementos (31 historias y 48 tareas) en 15 épicas |
 | `anexos/c-evaluacion.tex` | Evaluación detallada de transporte, formato, infraestructura, tiempo y alojamiento |
 | `anexos/d-contactid.tex` | Camino evaluado y descartado: el protocolo Contact ID |
 | `anexos/e-seguimiento.tex` | Seguimiento de las Etapas 2 y 3, retroalimentación, calendario y riesgos |

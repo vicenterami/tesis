@@ -5,6 +5,10 @@
 > qué permite cada una, con qué datos reales se alimenta y en qué tramo entra**. No fija colores ni tipografías. Cuando una
 > pantalla exija una ruta de la API que hoy no existe, se dice y se marca como propuesta: el contrato lo fija el `openapi.json`
 > al implementarse (`docs/10 §5`). Sin términos de la lista vetada del profesor guía.
+>
+> **08/11/2026 (plan de la Etapa 4, versión 2, `docs/04 §8`):** se suman las reglas transversales de botones, tablas, paginación,
+> renderizado optimista y avisos (§6), las pantallas P11 «Legal y acerca de», P12 «Estado del sistema» y P13 «Preferencias» (§3 y §4),
+> los cinco perfiles en P10 (`docs/20 §6`) y el rediseño de P1 con una comparativa previa de referentes y de normas (§4).
 
 ## 1. Lo que ya está decidido y aquí se respeta
 | Decisión | Dónde | Consecuencia para el panel |
@@ -42,7 +46,7 @@ función que lo calcula es una sola, con prueba unitaria por cada fila de la tab
 ## 3. Mapa de pantallas
 | # | Pantalla | Qué muestra | Acciones | Datos (ruta real o propuesta) | Requisitos | Cuándo |
 |---|---|---|---|---|---|---|
-| P1 | **Resumen del sitio** | Conteo por estado visual (los cuatro), condiciones abiertas, últimas tramas rechazadas, estado del servicio | Ir a cada lista filtrada | `GET /dispositivos`, `GET /condiciones?abiertas=true`, `GET /cuarentena?limite=5`, `GET /salud` | RF-30, HU-16 | Etapa 4 (`docs/04`); los conteos por estado ya aparecen en P2 desde la Etapa 3 |
+| P1 | **Resumen del sitio (tablero)** | Conteo por estado visual (los cuatro), condiciones abiertas, últimas tramas rechazadas, estado del servicio; rediseñado en la Etapa 4 con gráficas (zoom, rango, varias series, agregados) después de una comparativa de referentes y de WCAG 2.2 (§4) | Ir a cada lista filtrada | `GET /dispositivos`, `GET /condiciones?abiertas=true`, `GET /cuarentena?limite=5`, `GET /salud` | RF-30, HU-16, TT-44 | Etapa 4 (`docs/04`); los conteos por estado ya aparecen en P2 desde la Etapa 3; HU-16 en la iteración 0, el rediseño en la 1 |
 | P2 | **Inventario** | Tabla: estado visual, nombre, identificador físico, vía, zona, última trama (hace cuánto), condiciones abiertas; filtros por estado, sitio (si hay más de uno), zona y vía con conteo | Abrir la ficha; filtrar; buscar por nombre o identificador | `GET /dispositivos` y `GET /condiciones?abiertas=true&limite=500` (el tipo de cada condición abierta decide el estado, §2; filtra el panel: hoy la API no filtra) | Semáforo y tabla: RF-47, RF-48, HU-10, HU-19. Filtros y búsqueda: RF-51, HU-20 (adelantada a la Etapa 3 el 12/10) | Etapa 3, tramo 2 |
 | P3 | **Ficha del dispositivo** | Identidad (nombre, identificador, vía, formato, zona, sitio, intervalo esperado, desde cuándo); estado visual; por canal: última lectura con unidad y, si el canal tiene calibración, su porcentaje (`docs/10 §8.4` punto 51), y reglas de umbral; gráfico histórico por canal (rango elegible; la agregación la fija el rango) que sigue en vivo; condiciones abiertas y cerradas del dispositivo; sus tramas rechazadas | Cambiar canal y rango (el intervalo lo fija cada rango); pausar el vivo; ir a configurar (P6) o a mudar (Etapa 4) | `GET /dispositivos/{id}`, `GET /canales/{id}/historico?desde&hasta&intervalo`, `GET /eventos?dispositivo=`, `GET /condiciones?dispositivo=&abiertas=true&limite=500` (todas las abiertas) más `?dispositivo=&limite=50` (las recientes), `GET /cuarentena?dispositivo=&limite=20` | RF-33, RF-49 (identidad, condiciones y serie; su «historial de eventos» queda con la Etapa 4), HU-21 (adelantada a la Etapa 3 el 12/10, con sus 7 h); el rango a medida por fechas es HU-07 (Etapa 4) | Etapa 3, tramo 3 |
 | P3b | **Comparar dispositivos** (`#/comparar`; incremento 2) | La misma magnitud de 2 a 6 dispositivos en un gráfico de historia (promedios por cubo; misma ventana y resolución que P3) y, debajo, la tabla en tiempo real con la última lectura, hace cuánto y el estado de cada uno; selector de magnitud; entradas desde las casillas de P2 y el enlace de P3 | Abrir la ficha de cada dispositivo; volver al inventario con las casillas marcadas | `GET /dispositivos/{id}` por dispositivo, `GET /canales/{id}/historico`, `GET /condiciones?abiertas`, `GET /eventos` | — | — |
@@ -52,7 +56,10 @@ función que lo calcula es una sola, con prueba unitaria por cada fila de la tab
 | P7 | **Alta de dispositivo** (asistente) | Paso 1 identidad y zona; paso 2 vía y formato (y pasarela si LoRaWAN); paso 3 canales y magnitudes; paso 4 credencial según la vía, mostrada una sola vez; paso 5 «esperando la primera trama» en vivo | Crear; copiar la credencial y el tópico | `POST /dispositivos` (API hecha el 12/10, HU-11, `docs/16 §20`; la pantalla en la Etapa 4, HU-22) | RF-50, HU-11, HU-22, punto 25 | API: Etapa 3; pantalla: Etapa 4 |
 | P8 | **Exportar** | Dispositivo (hoy) o sitio (Etapa 4), rango, formato (CSV, XLSX, JSON); tamaño estimado antes de descargar | Descargar | Hecho el 12/10 por dispositivo: `GET /dispositivos/{id}/exportar?formato=csv\|json&desde&hasta` (flujo por tandas; CSV estándar con coma y punto decimal para R, Python y QGIS). **Propuesta** para la Etapa 4: `GET /sitios/{id}/exportar` con rol y XLSX | RF-34, HU-08 (adelantada a la Etapa 3 el 12/10) | API: Etapa 3; pantalla, XLSX y por sitio: Etapa 4 |
 | P9 | **Vista pública por enlace** | Solo lo que el administrador eligió: magnitudes agregadas, sin trama cruda ni identificadores | Ninguna | **Propuesta:** `GET /publico/{token}` | punto 6 | Etapa 4 |
-| P10 | **Sesión y usuarios** | Entrar, cambio de la clave temporal, salir; quién soy en la cabecera; usuarios de mis sitios, su rol por sitio y la guía de perfiles | Entrar, cambiar la clave, salir o cerrar en todos lados; dar de alta (clave temporal una vez), activar y desactivar, asignar una temporal, cambiar el rol | `POST /sesion`, `GET /sesion`, `DELETE /sesion`, `POST /sesion/clave`, `GET /usuarios`, `POST /usuarios`, `PATCH /usuarios/{id}` (`docs/20`) | RF-43, RF-44, HU-18 | Etapa 4; hecha el 08/11/2026 (§4) |
+| P10 | **Sesión y usuarios** | Entrar, cambio de la clave temporal, salir; quién soy en la cabecera; usuarios de mis sitios, su perfil por sitio y la guía de perfiles (cinco desde el 08/11/2026, diseño: `docs/20 §6`) | Entrar, cambiar la clave, salir o cerrar en todos lados; dar de alta (clave temporal una vez), activar y desactivar, asignar una temporal, cambiar el rol | `POST /sesion`, `GET /sesion`, `DELETE /sesion`, `POST /sesion/clave`, `GET /usuarios`, `POST /usuarios`, `PATCH /usuarios/{id}` (`docs/20`) | RF-43, RF-44, HU-18 | Etapa 4; hecha el 08/11/2026 (§4) |
+| P11 | **Legal y acerca de** (Etapa 4) | Privacidad (generada desde `docs/21`), términos de uso con su versión, avisos de terceros, versión y commit, aviso AGPL; soporte: contacto del responsable y formulario | Leer; aceptar los términos (obligatorio al primer ingreso y al cambiar la versión); enviar un mensaje de soporte | Rutas nuevas, por fijar en el OpenAPI (Etapa 4); los avisos de terceros, un archivo generado en la compilación | RF-53, RF-54, RF-61, HU-27, HU-31 | Iteración 0 |
+| P12 | **Estado del sistema** (solo administrador del sistema; Etapa 4) | Recursos por contenedor en el tiempo (memoria frente a su techo, CPU), errores agrupados por huella, último respaldo y su antigüedad, condiciones del sistema abiertas; límites de los servicios | Ver el detalle de un error; ajustar un límite con bloqueo optimista | `GET /salud` y rutas nuevas sobre `metrica_recurso`, `error_sistema` y los límites (Etapa 4; `docs/10 §8.4` puntos 60 y 61) | RF-59, RF-60, RNF-19, HU-30 | Iteración 1 |
+| P13 | **Preferencias** (mi cuenta; Etapa 4) | Unidades de visualización (°C o °F; mm, m o km), zona horaria propia o la del sitio, vistas guardadas; mis datos y mis sesiones abiertas (por decidir: sin fila en el backlog) y la versión de términos aceptada; darme de baja | Guardar; exportar mis datos de cuenta; cerrar una sesión; darme de baja (con la clave actual) | Rutas nuevas, por fijar en el OpenAPI (Etapa 4); la baja, `docs/20 §11` | RF-55, RF-56, HU-28, HU-29 | Iteración 1 (la baja, en la 0) |
 
 Lo que **no** se construye, y por qué: mapa (ningún requisito lo pide; el caso de uso tiene decenas de dispositivos, no cientos
 dispersos), informes programados y disparadores con varias condiciones (más que el umbral con histéresis decidido; candidatos
@@ -234,6 +241,36 @@ P5 la trama cruda va plegada (es texto largo) con un botón de copiar.
 /dispositivos` (en la Etapa 3 los calcula el panel; cuando haya cientos de dispositivos, una ruta de resumen en el servidor, que
 hoy no hace falta). El estado del servicio muestra `GET /salud` y si el canal en vivo está conectado.
 
+**P1 rediseñado: tablero y gráficas, con una comparativa antes (Etapa 4, iteración 1; TT-44).** Antes de dibujarlo, una comparativa
+escrita de cómo resuelven el tablero ThingsBoard CE, OpenRemote, Magistrala y Milesight IoT Cloud (zoom y rango, varias series, agregados,
+lectura en pantallas angostas) y de lo que pide WCAG 2.2 (contraste, foco visible, tamaño de los objetivos táctiles, información que no
+depende solo del color), **cada afirmación con su cita de la fuente oficial**; lo que una fuente no declara se escribe «no declarado», no
+como ausencia (la misma regla del incremento 1). Con eso: el tablero del sitio (los cuatro conteos de §2, condiciones abiertas, salud del
+sitio de HU-16) y gráficas que admiten zoom por arrastre y vuelta atrás, varias series con su leyenda informativa (incremento 2, punto 1),
+agregados con su nombre («promedio por hora») y un ancho que se adapta del teléfono al escritorio; probado en teléfono con capturas.
+
+**P11 Legal y acerca de (Etapa 4, iteración 0; HU-27, HU-31).** Un enlace «Legal y acerca de» al pie de toda pantalla, también antes de
+entrar. Cuatro apartados: **Privacidad**, generada desde el inventario de `docs/21` (§7 de ese documento) con el responsable y el contacto
+que configuró el administrador del sistema; **Términos de uso**, con su versión y fecha; **Acerca de**, con la versión, el commit, el aviso
+de la licencia AGPL y los avisos de terceros generados en la compilación; y **Soporte**: el contacto y un formulario de texto (sin
+adjuntos) que se guarda en la base para el administrador del sistema, con límite de tasa. **Aceptación:** con la sesión restringida
+(`docs/20 §12`), la pantalla «Términos de uso» muestra el texto completo, un botón «Acepto los términos (versión N)» y «Salir»; sin
+aceptar no se ve ningún dato.
+
+**P12 Estado del sistema (Etapa 4, iteración 1; solo el administrador del sistema; HU-30).** Arriba, lo que exige atención: condiciones
+del sistema abiertas (`broker_descarte`, `error_repetido`, `memoria_alta`, `respaldo_atrasado`) y la antigüedad del último respaldo. Debajo,
+por servicio, la memoria frente a su techo y la CPU en el tiempo (de `metrica_recurso`, `docs/10 §8.4` punto 61), y la suma de memoria
+frente al límite de RNF-17; los errores agrupados por huella con su conteo y la última vez (de `error_sistema`, punto 60), sin datos
+personales; y los **límites de los servicios** que hoy viven en el `.env` y pasan a configurarse aquí (primero la vigencia de la clave
+temporal, `docs/20 §4`), cada uno con su rango válido, su valor por defecto y bloqueo optimista.
+
+**P13 Preferencias (Etapa 4, iteración 1; HU-29, HU-28).** Unidades de visualización (temperatura en °C o °F; longitudes en mm, m o km):
+la base guarda siempre la unidad estándar del catálogo y la conversión ocurre solo al mostrar, con la unidad escrita al lado de cada
+valor; zona horaria: la del sitio (por defecto, `docs/13`) o la propia, dicha en la cabecera como hoy el aviso de zona (incremento 2,
+punto 3); vistas guardadas (filtros de P2, rango y resolución de P3), guardadas en la base y no en el navegador (`docs/21 §4`). En «Mi
+cuenta»: nombre, correo, sitios y perfiles, sesiones abiertas (con «cerrar»), versión de términos aceptada, exportar mis datos de cuenta y
+«Darme de baja», que explica qué se borra y qué queda (`docs/20 §11`) y pide la clave actual.
+
 ## 5. Flujos
 **F1 · Alta y primera trama.** Ya está dibujado en el diagrama de secuencia del alta (`docs/10`, figura del informe): el
 administrador crea el dispositivo (API en la Etapa 3), recibe la credencial una sola vez, configura el nodo, y el panel
@@ -258,7 +295,8 @@ que la pantalla muestra (inventario y condiciones en P2; ficha, condiciones, rec
 porque pudo perder eventos mientras estuvo caído: el canal no guarda cola.
 
 **F5 · Exportar (Etapa 4).** Elegir sitio, rango, magnitudes y formato; el panel muestra cuántas filas serán antes de
-descargar; la descarga exige rol de administrador; la vista pública nunca ofrece exportar (punto 6).
+descargar; la descarga exige el perfil de administrador de sitio o de investigador (desde el 08/11/2026, `docs/20 §6`; hasta entonces,
+administrador); la vista pública nunca ofrece exportar (punto 6).
 
 ## 6. Reglas transversales
 - **Errores con acción:** cada código tiene un texto y un siguiente paso (400 «revisa el filtro», 404 «ya no existe, vuelve
@@ -299,6 +337,23 @@ descargar; la descarga exige rol de administrador; la vista pública nunca ofrec
   «Actualizar», «Ver la última medición» y las dos descargas de la ficha. Quedan como botones propios, a propósito: las fichas de conteo por
   estado y las tarjetas de canal (botones con contenido rico y texto visible) y los botones de rango de `SelectorRango.svelte`. El paso 2y3
   del guardián falla si aparece `<button` en cualquier otro componente.
+- **Tablas y formularios con la misma regla** (08/11/2026; TT-43, RF-58): cada columna con un encabezado de texto, y con ayuda cuando es
+  una abreviatura o una unidad; la acción de una fila es un `Boton` con etiqueta, nunca la fila entera como enlace sin decirlo; cada campo
+  con su `<label>` visible, la ayuda debajo enlazada con `aria-describedby` y el error del campo escrito junto a él, no solo arriba del
+  formulario. La validación del panel es la misma función que usa el servidor cuando puede (como las reglas de la clave en P10).
+- **Paginación** (08/11/2026; RF-57, `docs/10 §8.4` punto 58): en las listas por tiempo (cuarentena, condiciones, accesos, auditoría,
+  eventos) los botones «Más recientes» y «Más antiguos», sin número de página porque con keyset no lo hay; en usuarios e inventario,
+  páginas con total («1–50 de 132»). La posición va en la URL, como la vista (incremento 1, punto 1): «atrás» vuelve a la misma página.
+  Ninguna lista que crece pide «todo».
+- **Renderizado optimista, solo donde se puede deshacer** (08/11/2026): lo rápido y reversible (marcar para comparar, pausar el vivo,
+  guardar una preferencia, reconocer una alerta) se muestra hecho al instante y, si el servidor lo rechaza, vuelve atrás con un aviso que
+  dice por qué. **Nunca optimista:** lo que muestra un secreto una sola vez (credencial, clave temporal), lo que da de baja o borra, lo que
+  cambia permisos y lo que puede chocar con otra persona (bloqueo optimista, 409): eso espera la respuesta con el botón en «cargando».
+- **Toda descarga nueva** (XLSX, exportación por sitio, mis datos de cuenta, el CSV de filas rechazadas del alta masiva) usa el mismo
+  ayudante `descargar` de la regla anterior: con la sesión, sin token en la URL y con el 401 llevando a «Entrar».
+- **Avisos** (08/11/2026): todo mensaje es `Aviso.svelte`; los de éxito se van solos, los de error y conflicto quedan hasta cerrarlos;
+  los cambios que llegan en vivo se anuncian con `aria-live` sin robar el foco. Las notificaciones en pantalla de una condición crítica
+  (HU-24) se agrupan si llegan varias del mismo dispositivo (TT-23); las del navegador, solo si la persona las activa (`docs/21 §5`).
 - **Nada se repite por cada evento:** un aviso de condición pide la lista con antirrebote (una consulta por segundo como mucho,
   nunca dos en vuelo) y las lecturas en vivo se aplican por lotes (un redibujo cada 250 ms como mucho). Un dispositivo que
   oscila o un emisor malicioso no multiplican consultas a la base ni redibujos. La ficha descarta eventos de otro dispositivo
@@ -313,10 +368,13 @@ descargar; la descarga exige rol de administrador; la vista pública nunca ofrec
 | P3 Ficha | RF-33, RF-49, HU-21 | Tramo 3 (Etapa 3); prueba con navegador real el 16/10 | `banco.sh navegador` (Firefox con Playwright): los puntos del gráfico (texto y `data-puntos`) son los de `/historico`; una trama publicada por MQTT aparece en su tarjeta sin recargar; con el backend detenido se ve «reconectando», se publica una lectura durante la caída y, al volver, la tarjeta la muestra, la página repite el histórico (se ve la petición) y el canal vuelve a «conectado»; sin errores de JavaScript; la captura revisa lo que se dibuja en el lienzo (eje en 24 h); RF-52 en `banco.sh navegador`: la página no se desplaza a lo ancho a 320, 375 ni 414 px, en Firefox y en Chromium (`docs/16 §54`) |
 | P2 y P3, incremento 1: vista en la URL, rango vacío, intervalo observado, reloj de pasarela, «en vivo» con prueba | RF-33, RF-47, RF-49, HU-20, HU-21 | Etapa 3 (22/10/2026) | `docs/16 §50`: 23 pruebas nuevas del panel por el DOM y de funciones puras (ida y vuelta URL ↔ estado en P2 y P3 con valor inválido y `hashchange` externo, texto y botón del rango vacío y su ausencia con puntos, el intervalo con sus dos avisos y el nulo, la alerta del reloj que aparece y se va sin recargar, «conectado, sin lecturas») y 4 del backend (contrato de `intervalo_observado_s`, `openapi.json` regenerado); la mediana, contrastada en la base de desarrollo; el paquete servido, con `pruebas/panel-desarrollo.sh` |
 | P3 y P2, incremento 2: leyenda informativa, cambio de rango sin blanco, hora del sitio, resolución elegible, comparación entre nodos (P3b), resumen y CSV del rango | RF-33, RF-34, RF-47, RF-49, HU-20, HU-21 | Etapa 3 (22/10/2026) | `docs/16 §52`: con navegador real (29 comprobaciones en Firefox y en Chromium; contra el build anterior, 9 fallan), los clics de leyenda, rango, resolución, «Ver la última medición» y canal dejan la ficha en su URL con puntos o con el mensaje de vacío; el aviso de zona con el contexto del navegador en otra zona; P3b con dos emulados; por el DOM y funciones puras (26 pruebas nuevas del panel): resoluciones por rango, desfase, alineación, URL de P3b; 2 del backend (tope de 5 000 cubos); medición rango × resolución antes y después |
-| P4 Condiciones, P5 Cuarentena | HU-05, RF-11 a RF-13, RF-24 | Etapa 4 | Trama fuera de rango → fila en P4 en vivo; trama de un desconocido → fila en P5 con motivo `no_registrado` |
-| P1 Resumen | RF-30, HU-16 | Etapa 4 | Los cuatro conteos suman el total del inventario; cambian en vivo con F3 |
+| P4 Condiciones, P5 Cuarentena | HU-05, RF-11 a RF-13, RF-24, RF-57, TT-42 | Etapa 4 | Trama fuera de rango → fila en P4 en vivo; trama de un desconocido → fila en P5 con motivo `no_registrado`; paginación: una fila nueva entre dos páginas no se repite ni se pierde (`docs/10 §8.4` punto 58) |
+| P1 Resumen (tablero) | RF-30, HU-16, TT-44 | Etapa 4 (HU-16 en la iteración 0; el rediseño en la 1) | Los cuatro conteos suman el total del inventario; cambian en vivo con F3; la comparativa escrita con sus fuentes antes del código; zoom, rango y varias series con navegador real, a 390 y 1280 px |
 | P8 Exportar (API) | RF-34, HU-08 | Etapa 3 (12/10): 6 pruebas de las funciones puras y 7 casos de humo; la pantalla, el XLSX y la exportación por sitio, en la Etapa 4 |
-| P10 Sesión y usuarios | HU-18, RF-43, RF-44 | Etapa 4 (08/11/2026) | `docs/16 §59`: por el DOM (vitest) el cliente HTTP (cabecera, 401, 403 temporal, 409, 429, sin red, gana la última, descarga por Blob), la guía de perfiles contra la matriz y contra las acciones del servidor, las reglas de la clave contra los números del servidor, los componentes y los flujos de entrar, cambiar, vencer, renovar y salir; con navegador real (paso 4c del guardián, `pruebas/panel-sesion-e2e.sh`) en Chromium y Firefox, a 390 y 1280 px |
+| P10 Sesión y usuarios | HU-18, RF-43, RF-44 (los cinco perfiles: HU-26, iteración 0) | Etapa 4 (08/11/2026) | `docs/16 §59`: por el DOM (vitest) el cliente HTTP (cabecera, 401, 403 temporal, 409, 429, sin red, gana la última, descarga por Blob), la guía de perfiles contra la matriz y contra las acciones del servidor, las reglas de la clave contra los números del servidor, los componentes y los flujos de entrar, cambiar, vencer, renovar y salir; con navegador real (paso 4c del guardián, `pruebas/panel-sesion-e2e.sh`) en Chromium y Firefox, a 390 y 1280 px |
+| P11 Legal y acerca de | RF-53, RF-54, RF-61, HU-27, HU-31 | Etapa 4, iteración 0 | Sesión sin aceptar: 403 en una lectura y 200 en las páginas legales; aceptar la normaliza; subir la versión la restringe otra vez (`docs/20 §12`); ningún aviso de terceros falta frente a las dependencias de producción (verificador) |
+| P12 Estado del sistema | RF-59, RF-60, RNF-19, HU-30 | Etapa 4, iteración 1 | Solo el administrador del sistema la ve (403 a los demás, `docs/20 §6`); un error plantado con un correo aparece agrupado y sin el correo; un servicio cerca de su techo abre `memoria_alta`; un límite cambiado con dos ediciones a la vez da 409 a la segunda |
+| P13 Preferencias | RF-55, RF-56, HU-28, HU-29 | Etapa 4, iteración 1 (la baja, en la 0) | Una medición guardada en °C se muestra en °F con su unidad y la base no cambia; la zona propia cambia las horas visibles y el aviso; la baja deja `usuario` sin nombre ni correo (`docs/20 §11`) |
 | P6, P7, P9 | HU-06, HU-11, HU-13, HU-22; RF-50 | Etapa 4 |
 
 La etapa de cada pantalla es la de su historia en `docs/04`; mover una historia de etapa se decide con sus horas y se cambia

@@ -231,7 +231,8 @@ persona y cifrado por SSH. Así se cumplen R1 y R2 del punto 44 sin exponer nada
    el backend pasa a otra máquina o si los flujos simultáneos llegan a miles.
 7. **La ruta A entra por el 443, no por un puerto UDP** (01/11/2026, §8.4 punto 56). El WebSocket de *Basics Station* llega al mismo
    443 y el proxy lo enruta por su ruta (`/router-info` y las rutas de tráfico del protocolo LNS) hacia el puente de pasarelas de ChirpStack; no está configurado hoy
-   (ChirpStack no desplegado) y se diseña con el bloque 5 de la Etapa 4 (`docs/04 §8`).
+   (ChirpStack no desplegado). Era el bloque 5 de la versión 1 del plan de la Etapa 4; en la versión 2 (08/11/2026) es trabajo futuro con
+   este diseño escrito (`docs/04 §8`).
 
 8. **Límite de tasa por dirección en el proxy (22/10/2026; `docs/11 §3`, `docs/16 §47`).** En el 443, `limit_req` de 100 peticiones/s con
    ráfaga 200 para todo el tráfico (el doble de las 50 tramas/s de RNF-01, que una pasarela o un NAT puede enviar por HTTP desde una sola
@@ -772,7 +773,7 @@ ocupar más núcleos. No está en el alcance de esta etapa: RNF-14 fija un únic
 > RNF-03), que vale para todas las vías; el testamento solo puede adelantar el aviso de quien tiene conexión MQTT propia, cuando
 > calla más de 1,5 veces su *keep-alive* (MQTT 5.0, apartado *Keep Alive*) o se cae sin `DISCONNECT`, y nunca de un nodo LoRaWAN tras su
 > pasarela ni de un equipo HTTP. Corregido el 26/10/2026: antes decía «el backend aún no publica testamento», que es otra cosa (el
-> testamento del propio backend). Se implementa en la Etapa 4 con la salud de los datos (bloque 3, `docs/04 §8`).
+> testamento del propio backend). Se implementa en la Etapa 4 con la salud de los datos (bloque 3 de la versión 1 del plan; en la versión 2, iteración 2, `docs/04 §8`).
 
 ## 8. Propuestas abiertas y pendientes
 
@@ -1592,15 +1593,16 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     el proxy nunca tuvo el listener UDP; cambian `docs/10`, `docs/11`, `docs/04 §8`, el informe y la figura 4.1. (v) **Lo que falta
     para construirla:** ChirpStack y su puente en el compose (opcionales), la ruta del WebSocket en `nginx.conf`, la CA de pasarelas
     para certificados de cliente, decidir si el proxy termina el TLS del WebSocket y verifica el certificado de la pasarela o pasa el TCP
-    por SNI al puente (como la variante B del punto 10), y una prueba en el banco con una Basics Station emulada; bloque 5 de la Etapa 4.
+    por SNI al puente (como la variante B del punto 10), y una prueba en el banco con una Basics Station emulada; bloque 5 de la versión 1
+    del plan de la Etapa 4, trabajo futuro con este diseño en la versión 2 (`docs/04 §8`, 08/11/2026).
 
 57. **Identidad por dispositivo con certificado de cliente (TLS mutuo) y tope de conexiones del broker (decididos el 01/11/2026).**
     (i) **Qué cambia y por qué:** hoy cada dispositivo se autentica con usuario y clave aleatoria (hash PBKDF2-SHA512 en el plugin del broker y `scrypt`
     en la base) sobre TLS que solo autentica al servidor, y por HTTP con un token: lo que el capítulo 5 (seguridad) de OASIS MQTT 5.0
     llama perfil de transporte seguro. El máximo de la industria es un
     certificado X.509 por dispositivo que el servidor verifica en el saludo TLS (AWS IoT Core; Azure IoT Hub lo admite): quien no tiene
-    certificado ni siquiera llega al broker, y la identidad deja de ser una clave copiable. Se adopta como meta de la Etapa 4, bloque 1
-    (`docs/04 §8`), con diseño antes de código. (ii) **Emisión:** en el alta (`POST /dispositivos`, `POST /pasarelas`) la plataforma firma
+    certificado ni siquiera llega al broker, y la identidad deja de ser una clave copiable. Se adopta como meta de la Etapa 4 (bloque 1 de la versión 1
+    del plan; iteración 2 en la versión 2 del 08/11/2026, trabajo futuro si no alcanza: `docs/04 §8`), con diseño antes de código. (ii) **Emisión:** en el alta (`POST /dispositivos`, `POST /pasarelas`) la plataforma firma
     un certificado por dispositivo con una CA propia de dispositivos, distinta de la del servidor, y devuelve certificado y llave una sola
     vez, como hoy la credencial; rotar = reemitir; dar de baja = revocar (vigencia corta o lista de revocación). (iii) **Verificación en el
     borde:** el `stream` de nginx no puede pasar al broker la identidad del certificado (la 1.30 de la pila envía PROXY protocol v1; las
@@ -1623,6 +1625,71 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     (lo encontró la revisión del 01/11); acota descriptores y memoria del contenedor; plantado en un broker desechable con `max_connections 3`: el cuarto y el quinto cliente
     fueron rechazados (`docs/16 §57`); guardián paso 2l. Por sí solo no frena a muchas direcciones distintas: eso lo acota el proxy (100
     conexiones por dirección) y lo cierra el certificado de cliente de (iii).
+
+**Decisiones del 08/11/2026** (plan de la Etapa 4, versión 2, `docs/04 §8`). Diseño antes del código; cada punto dice en qué iteración
+entra. Lo que aquí se marca «a fijar al implementar» es un detalle que el diseño propone y la prueba confirma.
+
+58. **Paginación: keyset en las listas que crecen con el tiempo, desplazamiento con total en las chicas (RF-57, TT-42; iteración 1).**
+    (i) **Por qué:** hoy las listas (`GET /condiciones`, `GET /cuarentena`) devuelven las últimas `limite` filas y no hay página siguiente.
+    Paginar con `OFFSET n` obliga a la base a leer y descartar n filas (cada página cuesta más que la anterior) y, si entra una fila nueva
+    entre dos páginas, la siguiente repite o salta una. (ii) **Keyset:** orden fijo `(tiempo, id)` descendente y la página siguiente con
+    `WHERE (tiempo, id) < ($1, $2)`, comparación de filas que usa un índice con esas dos columnas (cada lista con el suyo, comprobado con
+    `EXPLAIN` antes de dejarla). El cliente recibe un **cursor opaco** (las dos claves codificadas) y lo devuelve tal cual; el alcance por
+    sitio sigue en el `WHERE` (punto 36), así que un cursor manipulado solo puede pedir otra posición de lo que la persona ya puede ver.
+    Listas: cuarentena, condiciones, accesos, auditoría y eventos de un dispositivo. (iii) **Desplazamiento con total** (`LIMIT`, `OFFSET`
+    y `count(*)`) en usuarios e inventario: crecen poco, se ordenan por nombre y quien mira quiere saber cuántos hay. El tope de `limite`
+    de hoy se mantiene. (iv) **Prueba:** una fila insertada entre dos páginas no se repite ni se pierde (plantado con `OFFSET`: se repite);
+    un cursor de otro sitio no trae nada.
+59. **Consultas por petición acotadas y barrido de supervisión sin N+1 (B3; iteración 2).** (i) **El barrido** (`supervision.service.ts`)
+    hace hoy una consulta para hallar los dispositivos caídos y, **por cada uno**, dos más (abrir la condición y escribir el evento): con
+    una caída de red que silencia 1 000 equipos son 2 001 consultas en un barrido. Pasa a dos sentencias fijas: un `INSERT … SELECT … ON
+    CONFLICT DO NOTHING RETURNING` que abre todas las condiciones de una vez (la misma guarda del índice único parcial que hoy) y un
+    `INSERT` de los eventos desde `UNNEST` de lo que devolvió. (ii) **Guardia de «consultas por petición»:** un contador por petición
+    (el `id_peticion` del punto 43, que se llevaría en `AsyncLocalStorage`) que en las pruebas falla si una ruta supera su
+    presupuesto escrito (p. ej. la ficha, un número fijo que no crece con los canales); en producción solo se registra. (iii)
+    **Asincronía medida:** `Promise.all` donde dos lecturas no dependen una de otra (la ficha pide dispositivo, condiciones y cuarentena) y
+    cancelación con `AbortController` cuando el cliente se va; se mide el antes y el después en `docs/16`. (iv) **Prueba:** el barrido con
+    1 000 caídos sembrados hace dos consultas, no 2 001 (plantado con el código de hoy).
+60. **Errores del sistema y del navegador, en la base y sin datos personales (RNF-19, TT-45; iteración 1).** (i) **Backend:** un filtro
+    global de excepciones de NestJS guarda en `error_sistema` cada error inesperado (las respuestas 5xx y las excepciones fuera de una
+    petición): instante, origen, código, mensaje acotado, ruta normalizada sin parámetros de consulta, identificador de petición, versión y
+    una **huella** (tipo, mensaje sin números ni identificadores y primer marco de la pila) para agruparlos. Los 4xx no son errores del
+    sistema: no se guardan aquí. (ii) **Navegador:** el panel envía sus errores no atrapados (`error` y `unhandledrejection`) a
+    `POST /errores-panel` (ruta prevista) con el mismo esquema; la ruta no exige sesión (un error de la pantalla de entrada también cuenta),
+    acepta como mucho 4 KiB, exige el `Origin` del propio panel y tiene **límite de tasa** en el proxy y en el backend; no guarda la
+    dirección IP ni el usuario. (iii) **Sin datos personales:** antes de guardar, el mensaje y la pila pasan por una sola función que
+    reemplaza correos, direcciones IP y valores largos de aspecto aleatorio por marcadores (a fijar al implementar: la lista de patrones,
+    con prueba por cada uno). (iv) **Condición `error_repetido`:** una misma huella que se repite sobre un umbral en una ventana corta abre
+    una condición del sistema (como `broker_descarte`, punto 43) que se cierra sola al calmarse. Retención como la de `metrica_broker`. (v)
+    **Prueba:** un error plantado cuyo mensaje lleva un correo queda guardado sin el correo; 1 000 envíos seguidos a la ruta del navegador
+    dejan como mucho lo que permite el límite.
+61. **Colector de recursos por cgroups, nunca con `docker.sock` (TT-45, HU-30; iteración 1).** (i) **Qué:** cada minuto, por servicio,
+    memoria actual y techo, uso de CPU y E/S, leídos de los archivos de cgroups v2 (`memory.current`, `memory.max`, `cpu.stat`, `io.stat`),
+    a una hypertable `metrica_recurso` con la retención de `metrica_broker`. Con ella, la pantalla «Estado del sistema» (P12, `docs/19 §4`)
+    y la medición de RNF-17 salen de la base, no de un `docker stats` a mano. (ii) **Cómo:** el colector monta `/sys/fs/cgroup` **de solo
+    lectura**. No monta el socket de Docker: quien habla con él puede lanzar un contenedor con el disco del anfitrión montado, lo que
+    equivale a ser root en el anfitrión; un colector de métricas no necesita ese poder. Sin el socket, el servicio de cada cgroup se
+    reconoce por su ruta: a fijar al implementar (candidato: un `cgroup_parent` propio por servicio en el compose), verificado en el
+    servidor de prueba, que es donde importa la versión de cgroups. (iii) **Condiciones:** `memoria_alta` (el uso supera una fracción del
+    techo durante varias muestras seguidas) y `respaldo_atrasado` (el último respaldo terminado tiene más de 26 h: el diario más un
+    margen), con el mismo ciclo de las condiciones del sistema. (iv) **Prueba:** un servicio que reserva memoria hasta cerca de su techo
+    abre `memoria_alta`; un respaldo detenido abre `respaldo_atrasado`.
+62. **Baja de la cuenta por anonimización, no por borrado (RF-55, HU-28; iteración 0).** Borrar la fila de `usuario` rompería `evento`,
+    `acceso` y la auditoría, que la referencian, y desactivarla sin más conservaría datos personales sin un fin. Se reemplazan nombre y
+    correo por marcadores derivados del id, se invalida el hash, se revocan las sesiones y se marca `anonimizado_en`; la fila queda para que
+    lo enlazado siga cuadrando sin datos de nadie. Detalle, reglas (el último administrador del sistema no puede darse de baja) y prueba:
+    `docs/20 §11`; qué queda en `acceso` y en los respaldos, y por cuánto tiempo: `docs/21 §2`.
+63. **Backend en ES modules: decidido, en un bloque propio de la iteración 2 (TT-47).** Hoy el backend compila a CommonJS (`module`
+    `node16` sin `"type": "module"`). Pasar a ES modules alinea el código con el estándar del lenguaje y con las dependencias que publican
+    solo ese formato; el cambio es mecánico pero toca todo (cada import relativo con su extensión, la configuración de TypeScript, Jest y
+    NestJS), por eso va solo, sin funcionalidad mezclada, con la batería completa del guardián antes y después y el paquete servido
+    comparado. Si la iteración 2 no lo alcanza, queda declarado con este diseño.
+64. **Perfiles con roles fijos y la matriz en el código (HU-26; iteración 0).** Cinco perfiles —administrador del sistema, administrador
+    de sitio, investigador, operador técnico y consulta— y el invitado como vista pública por enlace (punto 6). Roles fijos, no editables:
+    un editor de permisos sería otra interfaz que diseñar y probar sin un caso que lo pida, y la matriz fija se prueba entera (cada celda,
+    un caso del paso 4b). La tabla vive en `permitir()` (punto 36, `docs/20 §5`) y el panel la recibe, no la copia: el frontend oculta, el
+    backend decide. Cambia una decisión anterior: **exportar** deja de ser solo del administrador y pasa a administrador de sitio e
+    investigador (los datos crudos siguen sin ser públicos, punto 6). Matriz completa: `docs/20 §6`.
 
 ## 9. Crecimiento, resiliencia y respaldo (aprobado el 06/10/2026)
 
@@ -1709,6 +1776,10 @@ construirlo por anticipado. Cada afirmación sobre una herramienta tiene su fuen
   ley chilena de protección de datos (citar el texto vigente antes de escribirlo en el informe); el cifrado es
   barato siempre.
 - Un respaldo que no se restauró no es respaldo (`docs/11`, lista de despliegue).
+- **Etapa 4 (decidido el 08/11/2026; TT-46, iteración 1 del plan, `docs/04 §8`):** cifrado en reposo con la clave fuera del servidor;
+  el guion de respaldo y restauración, versionado; un **simulacro mensual de borrado accidental** (se borra en una copia, se restaura y se
+  cuentan filas); la guardia «último respaldo de menos de 26 h», que abre `respaldo_atrasado` (§8.4 punto 61); y una **papelera de
+  dispositivos**: la baja de un dispositivo se puede deshacer durante 30 días sin tocar un respaldo (su pantalla, primero en `docs/19`).
 
 ### 9.6 Tramas irregulares: periodos distintos, latencia, ráfagas
 

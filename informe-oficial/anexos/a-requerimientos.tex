@@ -4,7 +4,7 @@
 \setlength{\tabcolsep}{4pt}
 
 Cada requerimiento declara su fuente, la causa del problema que aborda y su prioridad MoSCoW.
-Catálogo actualizado al pivote del 2 de septiembre (contrato SenML sobre MQTT).
+Catálogo actualizado al pivote del 2 de septiembre (contrato SenML sobre MQTT); RF-53 a RF-61, RNF-19 y RNF-20 se agregaron el 8 de noviembre con el plan de la Etapa~4.
 
 \section{M1 --- Recepción multiprotocolo}
 \begin{longtable}{@{}C{1.3cm}L{6.1cm}L{1.6cm}L{1.2cm}C{0.7cm}@{}}
@@ -85,6 +85,9 @@ Catálogo actualizado al pivote del 2 de septiembre (contrato SenML sobre MQTT).
 \textbf{RF-44} & El sistema debe distinguir al menos \textbf{dos roles}: administrador del sitio y usuario de consulta & [PO] [ENT] & C4 & \textbf{S} \\
 \textbf{RF-45} & El sistema debe permitir \textbf{rotar las credenciales de recepción} de un sitio sin interrumpir el servicio & [BT] & C1 & \textbf{C} \\
 \textbf{RF-46} & El sistema debe \textbf{registrar en bitácora} los accesos y las operaciones sensibles & [BT] & C5 & \textbf{S} \\
+\textbf{RF-53} & El sistema debe exigir la \textbf{aceptación de los términos de uso, con su versión}, al primer ingreso y cada vez que la versión cambie --- agregado 08/11/2026 & [PO] & C3 & \textbf{M} \\
+\textbf{RF-54} & La interfaz debe ofrecer, desde cualquier pantalla, las \textbf{páginas de privacidad y de términos}, con el responsable y el contacto configurados --- agregado 08/11/2026 & [PO] & C3 & \textbf{M} \\
+\textbf{RF-55} & El sistema debe permitir a una persona \textbf{dar de baja su propia cuenta por anonimización}, conservando sin datos personales el rastro que la auditoría necesita --- agregado 08/11/2026 & [PO] & C3 & \textbf{S} \\
 \end{longtable}
 
 \section{M8 --- Interfaz de administración}
@@ -96,6 +99,12 @@ Catálogo actualizado al pivote del 2 de septiembre (contrato SenML sobre MQTT).
 \textbf{RF-50} & La interfaz debe ofrecer el \textbf{asistente de registro} de un dispositivo nuevo & [PO] [ENT] & C4 & \textbf{M} \\
 \textbf{RF-51} & La interfaz debe presentar la \textbf{vista agrupada por transporte de red}, mostrando cuántos dispositivos llegan por cada tecnología & [PO] [DP] & C1, C2 & \textbf{S} \\
 \textbf{RF-52} & La interfaz debe ser \textbf{utilizable desde un navegador móvil} & [EM] & C4 & \textbf{S} \\
+\textbf{RF-56} & La interfaz debe permitir a cada persona elegir sus \textbf{preferencias de visualización}: unidades (la base guarda siempre la estándar) y zona horaria --- agregado 08/11/2026 & [PO] & C4 & \textbf{S} \\
+\textbf{RF-57} & La interfaz debe \textbf{paginar toda lista que crezca con el tiempo}, sin pedir la lista completa --- agregado 08/11/2026 & [PO] & C4 & \textbf{M} \\
+\textbf{RF-58} & La interfaz debe ofrecer \textbf{ayuda contextual}: todo botón con etiqueta de texto y una ayuda accesible con el teclado --- agregado 08/11/2026 & [PO] & C4 & \textbf{M} \\
+\textbf{RF-59} & La interfaz debe presentar al administrador del sistema el \textbf{estado del sistema}: recursos por contenedor, errores y último respaldo --- agregado 08/11/2026 & [PO] & C5 & \textbf{M} \\
+\textbf{RF-60} & El sistema debe permitir al administrador del sistema \textbf{configurar los límites de los servicios} desde la interfaz --- agregado 08/11/2026 & [PO] & C4 & \textbf{S} \\
+\textbf{RF-61} & La interfaz debe ofrecer un \textbf{formulario de soporte} que guarde el mensaje para el administrador del sistema --- agregado 08/11/2026 & [PO] & C4 & \textbf{C} \\
 \end{longtable}
 
 \section{Requerimientos no funcionales}
@@ -119,4 +128,6 @@ Catálogo actualizado al pivote del 2 de septiembre (contrato SenML sobre MQTT).
 \textbf{RNF-16} & La trama nativa debe cumplir \textbf{SenML (RFC 8428)}; la rama LoRaWAN debe caber en el payload disponible del plan regional & Validación de esquema + verificación de tamaño & [BT] & \textbf{M} \\
 \textbf{RNF-17} & La plataforma completa (broker, base de datos, backend, interfaz y, de existir, el servidor de red) debe \textbf{consumir a lo más 2\,GB de memoria RAM}, en reposo y bajo carga, en un servidor de 4\,GB (la mitad del servidor recomendado), por debajo del mínimo que declara el referente de código abierto (ThingsBoard CE: 4\,GB) & Medición de consumo en reposo y bajo carga en la Etapa 4 (\texttt{docker stats}) & [DP] [EM] & \textbf{M} \\
 \textbf{RNF-18} & La recepción debe tener una \textbf{disponibilidad $\geq$ 99\,\%} en una ventana continua de 72 horas ($\leq$ 43 min de indisponibilidad) --- agregado 22/09/2026 tras la retroalimentación (observación 6), umbral de OE5 que no tenía RNF de respaldo & Emulador publicando cada minuto en el banco de pruebas de la Etapa 4; se cuentan las ventanas sin confirmación & [DP] & \textbf{M} \\
+\textbf{RNF-19} & Los \textbf{errores del backend y del navegador} deben quedar registrados \textbf{sin datos personales} (ni nombre, ni correo, ni dirección IP, ni el cuerpo de la petición) --- agregado 08/11/2026 & Prueba que planta un error con un correo en su mensaje y busca el correo en lo guardado & [PO] & \textbf{M} \\
+\textbf{RNF-20} & El panel \textbf{no debe cargar scripts, fuentes ni SDK de terceros}: todo recurso se sirve desde el propio origen --- agregado 08/11/2026 & Inspección del paquete y de las peticiones del navegador (hoy lo garantiza que el paquete no referencia recursos externos; la política de contenido definitiva cerrará font-src y style-src) & [PO] & \textbf{M} \\
 \end{longtable}

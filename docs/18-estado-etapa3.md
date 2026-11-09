@@ -1,4 +1,4 @@
-# Estado de la Etapa 3 — actualizado al 5 de noviembre de 2026
+# Estado de la Etapa 3 — actualizado al 8 de noviembre de 2026
 
 > Entrega: **jueves 5 de noviembre de 2026** (plazo ampliado por el profesor guía; fecha del calendario del curso: viernes 30 de octubre). Se actualiza al cerrar cada bloque de trabajo. Las tareas, sus horas y su
 > etapa salen de `docs/04` (manda el backlog); la rúbrica, de `referencias/materiales-curso.md`; cada estado, de la
@@ -9,9 +9,9 @@
 
 | Criterio de la rúbrica | Peso | Estado | Evidencia y lo que falta |
 |---|---|---|---|
-| Retroalimentación | 20 % | 🟡 | Al 04/11 no hay observaciones escritas del profesor guía sobre la entrega del 2/10; los avances se presentaron el 28/10 (`bitacora/2026-10-28-presentacion-temuco.md`) y sus observaciones se incorporan al llegar. Sí se incorporaron las entrevistas del 5/10 (`bitacora/2026-10-05-entrevista-academico-geologia.md`; decisiones del 6 y del 8/10, `docs/10 §8.4`) y del 25/10 (`bitacora/2026-10-25-entrevista-operador-red.md`; alta masiva al plan de la Etapa 4). El 05/11, en la presentación conjunta con los tesistas de los profesores Mario Villanueva y Luis Alberto Caro, la única pregunta (cómo dar de alta una flota completa; si cada usuario configurará sus dispositivos) tiene respuesta en el plan de la Etapa 4: sesión con usuarios y roles por sitio (iteración 0) y alta masiva por archivo (iteración 2, diseñada; `docs/04 §8`). Falta: recibir e incorporar la retroalimentación de la Etapa 2. |
+| Retroalimentación | 20 % | 🟡 | Al 04/11 no hay observaciones escritas del profesor guía sobre la entrega del 2/10; los avances se presentaron el 28/10 (`bitacora/2026-10-28-presentacion-temuco.md`) y sus observaciones se incorporan al llegar. Sí se incorporaron las entrevistas del 5/10 (`bitacora/2026-10-05-entrevista-academico-geologia.md`; decisiones del 6 y del 8/10, `docs/10 §8.4`) y del 25/10 (`bitacora/2026-10-25-entrevista-operador-red.md`; alta masiva al plan de la Etapa 4). El 05/11, en la presentación conjunta con los tesistas de los profesores Mario Villanueva y Luis Alberto Caro, la única pregunta (cómo dar de alta una flota completa; si cada usuario configurará sus dispositivos) tiene respuesta en el plan de la Etapa 4: sesión con usuarios y roles por sitio (hecha el 08/11/2026, `docs/20 §10`) y alta masiva por archivo (iteración 1 del plan de la Etapa 4, versión 2, del 08/11/2026; antes, iteración 2; `docs/04 §8`). Falta: recibir e incorporar la retroalimentación de la Etapa 2. |
 | Mejoras | 15 % | 🟢 | Decisiones de diseño del 6, 7 y 8/10 (`docs/10 §8.4`); proxy TLS (`docs/16 §9`); dependencias e imágenes sin vulnerabilidades altas o críticas corregibles (`docs/16 §12`). |
-| 50 % de la implementación | 10 % | ✅ | Superado: todo el backlog va en 57 % (y el núcleo en 75 %). Núcleo: 25 de 34 elementos hechos (126 de 168 h, 75 %) y 4 parciales (20 h: HU-02, HU-08, TT-12 y TT-22). Todo el backlog: 38 de 66 (165 de 287 h, 57 %) y 12 parciales (51 h). Cifras calculadas desde las filas de `docs/04`, con los estados de `docs/12 §3`, de §2 y de la Etapa 1 (al final de §2). |
+| 50 % de la implementación | 10 % | ✅ | Superado: al cierre de la Etapa 3 (05/11) el núcleo iba en 75 % y todo el backlog en 57 %. Al 08/11/2026, con TT-21 cerrada y las 13 filas nuevas de la Etapa 4 (`docs/04 §8`, 60 h que bajan el porcentaje del backlog entero sin que se haya deshecho nada): Núcleo: 26 de 34 elementos hechos (131 de 168 h, 78 %) y 4 parciales (20 h: HU-02, HU-08, TT-12 y TT-22). Todo el backlog: 39 de 79 (170 de 347 h, 49 %) y 12 parciales (51 h). Cifras calculadas desde las filas de `docs/04`, con los estados de `docs/12 §3`, de §2 y de la Etapa 1 (al final de §2). |
 | Pruebas iniciales | 30 % | 🟢 | `docs/16`: emulador, carga (59,7 tramas/s sin pérdida), carreras, TLS, capacidad y picos, caídas con carga, dependencias e imágenes, LoRaWAN por pasarela en el banco (`docs/16 §31–§34`); 445 pruebas unitarias del backend (357 al 04/11; las 82 nuevas son de la sesión y los permisos, Etapa 4) y 165 del panel. Falta: la matriz formal del contrato de trama (TT-27) y el broker de producción en las caídas (`docs/16 §11`). |
 | Validación preliminar | 10 % | ✅ | Sensor físico de extremo a extremo (TT-32): todas las piezas llegaron el 13/10, la placa se reconoció el 14/10 y la fase 1 se cerró el 19/10 con los tres sensores verificados (`docs/16 §43`) y la fase 2 publicó 24 h hasta el panel, sin pérdidas, el 23 y 24/10 (`docs/16 §53`); guía de manejo seguro escrita (`docs/17 §4`). **Validación en terreno hecha el 20/10: red LoRaWAN real del campus publicando en el sistema (`docs/16 §45`).** El capítulo de pruebas que la presenta (TT-36, §2) va en la versión de entrega del 05/11; la validación en el servidor de referencia es de la Etapa 4 (OE5). |
 | Documentación | 15 % | ✅ | Documentos en concordancia (guardián `plataforma/pruebas/verificar-todo.sh`). El 15/10 el informe ganó el capítulo «Implementación y pruebas iniciales» y el anexo con el detalle de las pruebas (TT-36); revisión de entrega hecha el 04/11/2026 en tres frentes (seguridad, concordancia, privacidad; 40 hallazgos verificados, 30 aplicados y el resto anotado) y una segunda pasada que corroboró informe y láminas contra la evidencia y contra el sistema en ejecución; versión de entrega del 05/11 (informe de 30 páginas de cuerpo y láminas). La retroalimentación de la Etapa 2 se incorpora al llegar. |
@@ -43,6 +43,10 @@
 
 **Pasadas a la Etapa 4 el 08/10** (§3): HU-06 Umbrales por dispositivo (4 h, 🟡); HU-12 Agrupar por sitio y zona (3 h,
 🟡); HU-15 Calidad del enlace (4 h, ⬜); HU-17 Batería baja (3 h, ⬜); HU-18 Sesión y roles (3 h, ✅: backend y pantalla hechos el 08/11).
+
+**Cerrados en la Etapa 4:** TT-21 🎯 (aislamiento entre sitios) ✅ el 08/11/2026: el alcance por sitio entra al `WHERE` de cada consulta
+(`docs/20 §5`) y el paso 4b del guardián prueba la matriz con dos sitios: otro sitio responde 404, igual que un recurso inexistente, también
+en la exportación y en el canal en vivo (`docs/16 §58`).
 
 **Adelantados de la Etapa 4:** TT-20 (autenticación de la recepción) ✅ (`docs/12 §3`); TT-29 (carga) ✅ preliminar
 (`docs/16 §5`); TT-22 (TLS) 🟡: MQTT por el proxy, probado en el banco (`docs/16 §9`), y el canal en vivo por HTTPS (`docs/16 §14`); TT-30 (recuperación) 🟡: falta el
@@ -80,22 +84,22 @@ vuelve a la Etapa 4 con su registro aquí y en `docs/04`.
 El estado de cada elemento manda en §1 y §2; esta lista ordena lo que falta. El guardián (paso 2w5) comprueba que cada elemento
 siga sin terminar y que sus horas sean las de `docs/04`: un elemento que se cierra se quita de aquí en el mismo cambio.
 
-**Núcleo (🎯): 9 elementos, 42 h.** Cuatro parciales y cinco sin empezar, en el orden de trabajo:
+**Núcleo (🎯): 8 elementos, 37 h.** Cuatro parciales y cuatro sin empezar, en el orden de trabajo de la Etapa 4 (plan del 08/11/2026; por decisión del 09/11 los cuatro del núcleo que quedaban en la iteración 2 van en la 1):
 
 | Orden | Elemento | Horas | Estado | Qué falta |
 |---|---|---|---|---|
-| 1 | HU-02 Eventos LoRaWAN | 6 | 🟡 | **Probada en terreno el 20/10** con la pasarela real del campus y dos nodos de punta a punta (`docs/16 §45`); el banco cubre lo demás (`docs/16 §31`, §36 y §37). Quedan la ruta C (ChirpStack) y la coexistencia con otro broker (reporte HTTPS de la pasarela, variante prevista de la vía 2; antes «vía 4») |
-| 2 | HU-08 Exportar en CSV, XLSX y JSON | 4 | 🟡 | XLSX y la exportación por sitio con rol: necesita la sesión (HU-18) |
-| 3 | TT-22 Cifrado del transporte | 4 | 🟡 | El broker de producción con certificado real (`docs/14`); desde el 03/11 un servidor de prueba en la red del campus opera con CA propia y TLS verificado en las dos vías (`docs/14 §7.4`, bitácora del 03–04/11); falta el certificado público |
-| 4 | TT-12 Catálogo de sensores y unidades | 6 | 🟡 | El catálogo editable con umbrales; con él, los alias de claves y los perfiles de decodificación (`docs/08 §8`) |
-| 5 | TT-21 Aislamiento entre sitios | 5 | ⬜ | Todo; necesita la sesión y los roles por sitio (`docs/20`) |
-| 6 | TT-27 Pruebas del contrato de trama | 5 | ⬜ | La matriz formal (esquema, cuarentena, adaptadores) |
-| 7 | HU-07 Historial por rango de fechas | 4 | ⬜ | Todo |
-| 8 | HU-15 Calidad del enlace | 4 | ⬜ | Todo; necesita tráfico LoRaWAN real (`rssi` y `snr` ya quedan en la trama cruda) |
-| 9 | HU-16 Indicador de salud del sitio | 4 | ⬜ | Todo |
+| 1 | HU-07 Historial por rango de fechas | 4 | ⬜ | Todo |
+| 2 | HU-15 Calidad del enlace | 4 | ⬜ | Todo; necesita tráfico LoRaWAN real (`rssi` y `snr` ya quedan en la trama cruda) |
+| 3 | HU-16 Indicador de salud del sitio | 4 | ⬜ | Todo |
+| 4 | HU-02 Eventos LoRaWAN | 6 | 🟡 | **Probada en terreno el 20/10** con la pasarela real del campus y dos nodos de punta a punta (`docs/16 §45`); el banco cubre lo demás (`docs/16 §31`, §36 y §37). Quedan la ruta C (ChirpStack) y la coexistencia con otro broker (reporte HTTPS de la pasarela, variante prevista de la vía 2; antes «vía 4») |
+| 5 | HU-08 Exportar en CSV, XLSX y JSON | 4 | 🟡 | XLSX y la exportación por sitio con rol: necesita la sesión (HU-18) |
+| 6 | TT-12 Catálogo de sensores y unidades | 6 | 🟡 | El catálogo editable con umbrales; con él, los alias de claves y los perfiles de decodificación (`docs/08 §8`) |
+| 7 | TT-27 Pruebas del contrato de trama | 5 | ⬜ | La matriz formal (esquema, cuarentena, adaptadores) |
+| 8 | TT-22 Cifrado del transporte | 4 | 🟡 | El broker de producción con certificado real (`docs/14`); desde el 03/11 un servidor de prueba en la red del campus opera con CA propia y TLS verificado en las dos vías (`docs/14 §7.4`, bitácora del 03–04/11); falta el certificado público |
 
-El 1 suma 6 h y hasta el 30/10 caben unas 30 junto con el informe y la presentación. Del 2 en adelante, Etapa 4, en el orden de `docs/04 §8`. (HU-21, HU-20
-y HU-01 se cerraron el 16/10: `docs/16 §39`, §40 y §41; HU-19, el 24/10.)
+En la Etapa 4, el orden lo fija el plan de la versión 2 (`docs/04 §8`, 08/11/2026): HU-07, HU-15 y HU-16 en la iteración 0; HU-02, HU-08,
+TT-12, TT-27 y el certificado público de TT-22 en la 2, con su falta declarada en el informe si no alcanza. (HU-21, HU-20 y HU-01 se
+cerraron el 16/10: `docs/16 §39`, §40 y §41; HU-19, el 24/10; TT-21, el 08/11.)
 
 **Fuera del núcleo, también comprometido**, cada uno con diseño antes del código:
 
@@ -107,7 +111,7 @@ y HU-01 se cerraron el 16/10: `docs/16 §39`, §40 y §41; HU-19, el 24/10.)
 | Pantallas para investigadores (exportación, series) y para quien solo observa | Entrevista del 5/10; `docs/19` | Parte hecha (P2, P3, exportación); el resto con la sesión |
 | Configuración por el usuario (umbrales, destinatarios de avisos) | HU-06, HU-25 | Sin código |
 | Envío HTTP desde la pasarela a un servidor propio | `docs/10 §8.4` punto 47 | Meta, cuando haya servidor |
-| Cargas masivas (alta de muchos dispositivos de una vez) y bandeja de detectados | Entrevista del 25/10; bloque 2 de `docs/04 §8` (decidido el 25/10) | Por diseñar en la Etapa 4 |
+| Cargas masivas (alta de muchos dispositivos de una vez) y bandeja de detectados | Entrevista del 25/10; bloque B2 de `docs/04 §8` (decidido el 25/10) | Iteración 1 del plan de la Etapa 4, versión 2 (08/11/2026); controles en `docs/11 §4` |
 | Registros técnicos que no se pierden al recrear un contenedor, y catálogo de errores | `docs/11 §4` (rotación hecha) | Por diseñar |
 | Tope por emisor y tope de lecturas por trama | `docs/10 §8.4` punto 53, `docs/11 §3` | Hecho el 17/10: presupuesto de lecturas por hora y cuota de cuarentena en las tres entradas, con contadores persistentes (migración 19) y condición `tope_superado` (`docs/16 §42`) |
 | Procesamiento en paralelo con comparación atómica del contador de trama | `docs/10 §4.1` | Por diseñar; hoy se procesa de a uno |
