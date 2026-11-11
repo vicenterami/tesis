@@ -1,4 +1,5 @@
-import { esperaS, lectura, marcaDelNodo, mulberry32, pack, perfiles, semillaSQL } from './modelo';
+import { describe, expect, it } from 'vitest';
+import { esperaS, lectura, marcaDelNodo, mulberry32, pack, perfiles, semillaSQL } from './modelo.js';
 
 // El modelo de tráfico se prueba solo: sin red ni reloj. Lo que importa es que sea reproducible (misma semilla,
 // misma corrida), que respete lo que docs/10 §9.6 pide y que la semilla SQL no duplique nada al reejecutarse.

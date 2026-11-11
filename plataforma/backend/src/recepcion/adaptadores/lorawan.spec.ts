@@ -1,12 +1,13 @@
+import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { ContextoTrama } from '../lectura';
-import { TramaMalformada } from './adaptador';
-import { ChirpstackAdaptador } from './chirpstack.adaptador';
-import { IdentidadNoVerificada } from './lorawan';
-import { CLAVES, resolverClave } from './mapa-claves';
-import { MilesightAdaptador } from './milesight.adaptador';
-import { PERFILES, decodificar } from './perfiles';
+import { ContextoTrama } from '../lectura.js';
+import { TramaMalformada } from './adaptador.js';
+import { ChirpstackAdaptador } from './chirpstack.adaptador.js';
+import { IdentidadNoVerificada } from './lorawan.js';
+import { CLAVES, resolverClave } from './mapa-claves.js';
+import { MilesightAdaptador } from './milesight.adaptador.js';
+import { PERFILES, decodificar } from './perfiles.js';
 
 // Adaptadores LoRaWAN (docs/10 §8.4 punto 47) contra el JSON de las fuentes oficiales.
 // Identificadores: el DevEUI 0101010101010101 es el del ejemplo oficial de ChirpStack (sintético). El gatewayId del ejemplo y el
@@ -34,7 +35,7 @@ describe('mapa de claves (docs/10 §8.4 punto 47)', () => {
   // Cada destino del mapa debe existir en el catálogo que siembran las migraciones, con esa misma unidad canónica: una clave que
   // apunte a una magnitud inexistente haría caer todas sus lecturas en cuarentena «canal no declarado» sin que nadie lo note.
   const catalogo = new Map<string, string>();
-  const dir = join(__dirname, '../../../../db/init');
+  const dir = join(import.meta.dirname, '../../../../db/init');
   for (const f of readdirSync(dir).filter((x) => x.endsWith('.sql'))) {
     const sql = readFileSync(join(dir, f), 'utf8');
     for (const bloque of sql.match(/INSERT INTO magnitud[\s\S]*?;/g) ?? []) {
@@ -44,7 +45,7 @@ describe('mapa de claves (docs/10 §8.4 punto 47)', () => {
   it('el catálogo se leyó de las migraciones (si no, la prueba de abajo no probaría nada)', () => {
     expect(catalogo.size).toBeGreaterThanOrEqual(7);
   });
-  // Un solo it que recorre el mapa (no it.each): así la cifra de pruebas que cuenta el guardián es la misma que informa jest.
+  // Un solo it que recorre el mapa (no it.each): así la cifra de pruebas que cuenta el guardián es la misma que informa vitest.
   it('cada clave del mapa → una magnitud del catálogo con su unidad canónica', () => {
     const malas = Object.entries(CLAVES).filter(([, d]) => catalogo.get(d.magnitud) !== d.unidad).map(([k, d]) => `${k} → ${d.magnitud} (${d.unidad})`);
     expect(malas).toEqual([]);
@@ -269,8 +270,8 @@ describe('perfil campus-heltec-v3-v1 con la captura de la UG65 del campus (migra
 });
 
 describe('perfiles: la lista del código es la del CHECK y cada lectura existe en el catálogo (migración 17)', () => {
-  const sql = readdirSync(join(__dirname, '../../../../db/init')).filter((x) => x.endsWith('.sql')).sort()
-    .map((f) => readFileSync(join(__dirname, '../../../../db/init', f), 'utf8')).join('\n');
+  const sql = readdirSync(join(import.meta.dirname, '../../../../db/init')).filter((x) => x.endsWith('.sql')).sort()
+    .map((f) => readFileSync(join(import.meta.dirname, '../../../../db/init', f), 'utf8')).join('\n');
   it('PERFILES == el dominio de ck_dispositivo_decodificador en la última migración que lo define', () => {
     const definiciones = [...sql.matchAll(/ADD CONSTRAINT ck_dispositivo_decodificador CHECK \(decodificador IN \(([^)]*)\)\)/g)];
     expect(definiciones.length).toBeGreaterThanOrEqual(1);

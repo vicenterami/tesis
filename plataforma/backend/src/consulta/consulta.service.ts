@@ -1,10 +1,10 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import type { FilaExportada } from './exportar';
+import type { FilaExportada } from './exportar.js';
 import { Pool } from 'pg';
-import { POOL } from '../db/db.module';
-import { porcentaje } from './escala';
-import { isoUs } from '../db/iso-us';
-import { Intervalo } from './validacion';
+import { POOL } from '../db/db.module.js';
+import { porcentaje } from './escala.js';
+import { isoUs } from '../db/iso-us.js';
+import { Intervalo } from './validacion.js';
 
 // Consultas de lectura. SQL explícito y parametrizado ($1, $2…): se lee, se audita, se explica.
 // Las fechas salen como Date → JSON las serializa en ISO 8601 con 'Z' (UTC), regla 5 de docs/13.

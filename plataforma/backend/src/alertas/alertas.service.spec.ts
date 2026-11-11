@@ -1,6 +1,7 @@
+import { describe, expect, it, vi } from 'vitest';
 import { Pool } from 'pg';
-import { EventoPanel, EventosService } from '../tiempo-real/eventos.service';
-import { AlertasService } from './alertas.service';
+import { EventoPanel, EventosService } from '../tiempo-real/eventos.service.js';
+import { AlertasService } from './alertas.service.js';
 
 // Histéresis (docs/10 §4, RF-36): con umbral alto 30 e histéresis 2, la condición abre al superar 30 y
 // cierra solo por debajo de 28. Entre 28 y 30 no pasa nada: ni abre ni cierra. Sin esto, un valor que
@@ -19,7 +20,7 @@ describe('AlertasService.evaluar: umbral con histéresis', () => {
 
   function armar(abierta: boolean) {
     const escrituras: string[] = [];
-    const query = jest.fn((sql: string) => {
+    const query = vi.fn((sql: string) => {
       if (sql.startsWith('SELECT id, umbral_alto')) return Promise.resolve({ rows: [regla], rowCount: 1 });
       if (sql.startsWith('SELECT id FROM condicion')) return Promise.resolve({ rows: abierta ? [{ id: 'c1' }] : [], rowCount: abierta ? 1 : 0 });
       escrituras.push(sql.trim().split(/\s+/).slice(0, 3).join(' ')); // "INSERT INTO condicion", "UPDATE condicion SET", …
@@ -56,7 +57,7 @@ describe('AlertasService.evaluar: umbral con histéresis', () => {
   // segunda, que debe seguir sin error (antes rompía con 23505 y abortaba el pipeline a mitad) y sin evento repetido.
   it('carrera: otra trama abrió la condición entre el SELECT y el INSERT → sin error ni evento repetido', async () => {
     const escrituras: string[] = [];
-    const query = jest.fn((sql: string) => {
+    const query = vi.fn((sql: string) => {
       if (sql.startsWith('SELECT id, umbral_alto')) return Promise.resolve({ rows: [regla], rowCount: 1 });
       if (sql.startsWith('SELECT id FROM condicion')) return Promise.resolve({ rows: [], rowCount: 0 });
       escrituras.push(sql.trim().split(/\s+/).slice(0, 3).join(' '));
@@ -73,7 +74,7 @@ describe('AlertasService.evaluar: umbral con histéresis', () => {
 
   it('carrera al cerrar: otra trama la cerró entre el SELECT y el UPDATE → no mueve la hora de cierre ni repite evento ni aviso', async () => {
     const escrituras: string[] = [];
-    const query = jest.fn((sql: string) => {
+    const query = vi.fn((sql: string) => {
       if (sql.startsWith('SELECT id, umbral_alto')) return Promise.resolve({ rows: [regla], rowCount: 1 });
       if (sql.startsWith('SELECT id FROM condicion')) return Promise.resolve({ rows: [{ id: 'c1' }], rowCount: 1 });
       escrituras.push(sql.trim().split(/\s+/).slice(0, 3).join(' '));

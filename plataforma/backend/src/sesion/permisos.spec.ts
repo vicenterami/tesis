@@ -1,5 +1,6 @@
+import { describe, expect, it } from 'vitest';
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
-import { ACCIONES, PERMISOS, ROLES, UsuarioSesion, alcanceDeLectura, matrizPorRol, usuarioSistema, exigir, exigirEnAlguno, permitir, puedeEnAlguno } from './permisos';
+import { ACCIONES, PERMISOS, ROLES, UsuarioSesion, alcanceDeLectura, matrizPorRol, usuarioSistema, exigir, exigirEnAlguno, permitir, puedeEnAlguno } from './permisos.js';
 
 // La matriz de docs/20 §6 en la función que decide (docs/10 §8.4 punto 36). Dos sitios: s1 (el de la persona) y s2 (otro).
 const persona = (sitios: [string, 'administrador' | 'consulta'][]): UsuarioSesion =>

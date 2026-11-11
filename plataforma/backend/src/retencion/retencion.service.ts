@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Pool } from 'pg';
-import { POOL } from '../db/db.module';
+import { POOL } from '../db/db.module.js';
 
 // Retención de datos (docs/10 §8.4 punto 11). La edición Apache de TimescaleDB no trae add_retention_policy,
 // pero sí drop_chunks: borra fragmentos enteros (archivos), sin filas muertas ni vacuum. Esta tarea lo llama

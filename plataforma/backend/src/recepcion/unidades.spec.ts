@@ -1,4 +1,5 @@
-import { aCanonica } from './unidades';
+import { describe, expect, it } from 'vitest';
+import { aCanonica } from './unidades.js';
 
 // Filtro 4: conversión a la unidad canónica; lo que no se sabe convertir se rechaza (undefined).
 describe('aCanonica', () => {

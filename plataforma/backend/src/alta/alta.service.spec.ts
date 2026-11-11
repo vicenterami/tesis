@@ -1,10 +1,11 @@
+import { describe, expect, it, vi } from 'vitest';
 import { BadGatewayException, BadRequestException, ConflictException, InternalServerErrorException, ServiceUnavailableException } from '@nestjs/common';
 import type { Pool } from 'pg';
-import { ErrorDynsec, OrdenDynsec } from '../broker/dynsec';
-import type { DynsecService } from '../broker/dynsec.service';
-import { AltaValidada } from './alta.dto';
-import { AltaService } from './alta.service';
-import { verificarScrypt } from './credenciales';
+import { ErrorDynsec, OrdenDynsec } from '../broker/dynsec.js';
+import type { DynsecService } from '../broker/dynsec.service.js';
+import { AltaValidada } from './alta.dto.js';
+import { AltaService } from './alta.service.js';
+import { verificarScrypt } from './credenciales.js';
 
 // Los 400 llevan la lista de motivos en el cuerpo (`message`), no en el mensaje de la excepción.
 const motivosDe = async (p: Promise<unknown>): Promise<string[]> => {
@@ -40,7 +41,7 @@ function armar(opciones: { insertFalla?: string; insertRestriccion?: string; com
       if (texto === 'COMMIT' && opciones.commitFalla) throw new Error('la base se fue');
       return { rows: [] };
     },
-    release: jest.fn(),
+    release: vi.fn(),
   };
   const ordenes: OrdenDynsec[][] = [];
   const dynsec = {

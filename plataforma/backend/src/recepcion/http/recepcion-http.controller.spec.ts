@@ -1,9 +1,10 @@
+import { describe, expect, it, vi } from 'vitest';
 import { Logger } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import type { Request, Response } from 'express';
-import type { CredencialHttp, RecepcionService, ResumenTrama } from '../recepcion.service';
-import { RecepcionHttpController } from './recepcion-http.controller';
-import type { ResultadoVerificacion, VerificacionDeTokens } from './verificacion';
+import type { CredencialHttp, RecepcionService, ResumenTrama } from '../recepcion.service.js';
+import { RecepcionHttpController } from './recepcion-http.controller.js';
+import type { ResultadoVerificacion, VerificacionDeTokens } from './verificacion.js';
 
 // El controlador de la vía HTTP: el orden de comprobaciones del punto 52 y la traducción del resultado a un código; la tubería y la
 // verificación son de mentira (la verificación real se prueba en verificacion.spec.ts).
@@ -15,16 +16,16 @@ describe('RecepcionHttpController', () => {
 
   function armar(verifica: ResultadoVerificacion, procesa: ResumenTrama | null = resumen({ guardadas: 1 }), secreto?: string) {
     const recepcion = {
-      credencialHttp: jest.fn((idFisico: string) => Promise.resolve(fila(`d-${idFisico}`))),
-      procesarHttp: jest.fn(() => Promise.resolve(procesa)),
+      credencialHttp: vi.fn((idFisico: string) => Promise.resolve(fila(`d-${idFisico}`))),
+      procesarHttp: vi.fn(() => Promise.resolve(procesa)),
     };
-    const verificacion = { enCache: jest.fn(() => false), pista: jest.fn(() => false), verificar: jest.fn(() => Promise.resolve(verifica)) };
+    const verificacion = { enCache: vi.fn(() => false), pista: vi.fn(() => false), verificar: vi.fn(() => Promise.resolve(verifica)) };
     const config = { get: () => secreto } as unknown as ConfigService;
     const c = new RecepcionHttpController(recepcion as unknown as RecepcionService, verificacion as unknown as VerificacionDeTokens, config);
     return { c, recepcion, verificacion };
   }
   function pedir(c: RecepcionHttpController, cabeceras: Record<string, string> = {}, ip = '203.0.113.1', id = 'nodo-01') {
-    const res = { status: jest.fn().mockReturnThis(), json: jest.fn().mockReturnThis(), setHeader: jest.fn() };
+    const res = { status: vi.fn().mockReturnThis(), json: vi.fn().mockReturnThis(), setHeader: vi.fn() };
     const req = { socket: { remoteAddress: ip }, body: Buffer.from('[{"n":"temperatura","v":21}]'),
       headers: { 'content-type': 'application/json', authorization: `Bearer ${TOKEN}`, ...cabeceras } } as unknown as Request;
     return c.recibir(id, undefined, req, res as unknown as Response).then(() => res);
@@ -130,7 +131,7 @@ describe('RecepcionHttpController', () => {
   });
   it('la dirección del cliente sale de X-Forwarded-For solo con el secreto del proxy', async () => {
     const { c } = armar('no', null, SECRETO);
-    const avisos = jest.spyOn((c as unknown as { log: { warn: (m: string) => void } }).log, 'warn').mockImplementation(() => undefined);
+    const avisos = vi.spyOn((c as unknown as { log: { warn: (m: string) => void } }).log, 'warn').mockImplementation(() => undefined);
     await pedir(c, { 'x-forwarded-for': '198.51.100.7', 'x-proxy-secreto': SECRETO });
     await pedir(c, { 'x-forwarded-for': '198.51.100.8' }); // sin el secreto: la del socket
     const mensajes = avisos.mock.calls.map(([m]) => m);
@@ -140,7 +141,7 @@ describe('RecepcionHttpController', () => {
   });
   it('con el secreto configurado, una X-Forwarded-For que llega sin él se anota (acotado); con él, no', async () => {
     const { c } = armar('ok', null, SECRETO);
-    const avisos = jest.spyOn((c as unknown as { log: { warn: (m: string) => void } }).log, 'warn').mockImplementation(() => undefined);
+    const avisos = vi.spyOn((c as unknown as { log: { warn: (m: string) => void } }).log, 'warn').mockImplementation(() => undefined);
     await pedir(c, { 'x-forwarded-for': '198.51.100.7' });
     await pedir(c, { 'x-forwarded-for': '198.51.100.8', 'x-proxy-secreto': SECRETO }, '203.0.113.1', 'nodo-02');
     const sinSecreto = avisos.mock.calls.map(([m]) => m).filter((m) => m.includes('X-Forwarded-For sin el secreto'));
@@ -148,7 +149,7 @@ describe('RecepcionHttpController', () => {
   });
   it('un id con un salto de línea no llega crudo al registro', async () => {
     const { c } = armar('no');
-    const avisos = jest.spyOn((c as unknown as { log: { warn: (m: string) => void } }).log, 'warn').mockImplementation(() => undefined);
+    const avisos = vi.spyOn((c as unknown as { log: { warn: (m: string) => void } }).log, 'warn').mockImplementation(() => undefined);
     await pedir(c, { authorization: '' }, '203.0.113.9', 'nodo-01\nFALSO linea forjada');
     expect(avisos).toHaveBeenCalled();
     expect(avisos.mock.calls.every(([m]) => !m.includes('\n'))).toBe(true);
@@ -158,7 +159,7 @@ describe('RecepcionHttpController', () => {
     expect((await pedir(c)).status).toHaveBeenCalledWith(401);
   });
   it('sin PROXY_SECRETO el arranque avisa; con uno corto, el controlador no se construye (como las demás claves)', () => {
-    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    const warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
     try {
       armar('ok');
       expect(warn.mock.calls.some(([m]) => String(m).includes('PROXY_SECRETO no definido'))).toBe(true);

@@ -1,7 +1,8 @@
-import { TramaMalformada } from './adaptador';
-import { PlanoAdaptador } from './plano.adaptador';
-import { SenmlAdaptador } from './senml.adaptador';
-import { ContextoTrama } from '../lectura';
+import { describe, expect, it } from 'vitest';
+import { TramaMalformada } from './adaptador.js';
+import { PlanoAdaptador } from './plano.adaptador.js';
+import { SenmlAdaptador } from './senml.adaptador.js';
+import { ContextoTrama } from '../lectura.js';
 
 const ctx = (cuerpo: string, magnitud = 'temperatura'): ContextoTrama => ({
   topico: `sitio/uct/dispositivo/dev-0001/${magnitud}`, idFisico: 'dev-0001', magnitudTopico: magnitud, carga: Buffer.from(cuerpo, 'utf8'),

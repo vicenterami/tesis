@@ -1,17 +1,18 @@
+import { describe, expect, it, vi, type Mock } from 'vitest';
 import { Logger } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import { Pool } from 'pg';
-import { AlertasService } from '../alertas/alertas.service';
-import { BrokerService } from '../broker/broker.service';
-import { SupervisionService } from '../supervision/supervision.service';
-import { EventoPanel, EventosService } from '../tiempo-real/eventos.service';
-import { ChirpstackAdaptador } from './adaptadores/chirpstack.adaptador';
-import { resolverClave } from './adaptadores/mapa-claves';
-import { MilesightAdaptador } from './adaptadores/milesight.adaptador';
-import { PlanoAdaptador } from './adaptadores/plano.adaptador';
-import { SenmlAdaptador } from './adaptadores/senml.adaptador';
-import { inicioDeVentana } from './cuota';
-import { RecepcionService } from './recepcion.service';
+import { AlertasService } from '../alertas/alertas.service.js';
+import { BrokerService } from '../broker/broker.service.js';
+import { SupervisionService } from '../supervision/supervision.service.js';
+import { EventoPanel, EventosService } from '../tiempo-real/eventos.service.js';
+import { ChirpstackAdaptador } from './adaptadores/chirpstack.adaptador.js';
+import { resolverClave } from './adaptadores/mapa-claves.js';
+import { MilesightAdaptador } from './adaptadores/milesight.adaptador.js';
+import { PlanoAdaptador } from './adaptadores/plano.adaptador.js';
+import { SenmlAdaptador } from './adaptadores/senml.adaptador.js';
+import { inicioDeVentana } from './cuota.js';
+import { RecepcionService } from './recepcion.service.js';
 
 // Prueba el CONTRATO del pipeline con la base y los módulos vecinos simulados (docs/10 §4):
 // «vivo» es salud del enlace, no calidad del dato. Un dispositivo autenticado que manda una trama
@@ -32,7 +33,7 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
   // topes: las variables del tope por emisor (docs/10 §8.4 punto 53); por defecto, los valores de producción.
   function armar(dispositivo: Disp | undefined, duplicada = false, pasarela?: Pas, escala: { cero: number; cien: number } | null = null, topes: Record<string, string> = {}) {
     const canal = { id: 'k1', magnitud: 'temperatura', unidad_canonica: 'Cel', rango_min: -40, rango_max: 85, escala_cero: escala?.cero ?? null, escala_cien: escala?.cien ?? null };
-    const query = jest.fn((sql: string, params?: unknown[]) => {
+    const query = vi.fn((sql: string, params?: unknown[]) => {
       // El dispositivo de prueba está registrado en el sitio «uct», el mismo del tópico, salvo que la prueba diga otro.
       if (sql.startsWith('SELECT d.id, d.estado, d.formato, d.pasarela_id, s.codigo AS sitio_codigo, d.decodificador, e.ultimo_fcnt, d.intervalo_esperado_s')) {
         const fila = { sitio_codigo: 'uct', formato: 'plano', pasarela_id: null, decodificador: null, ultimo_fcnt: null, intervalo_esperado_s: 60, canales: 1,
@@ -52,13 +53,13 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
       return Promise.resolve({ rows: [], rowCount: 1 });
     });
     const pool = { query } as unknown as Pool;
-    const broker = { alRecibir: jest.fn() } as unknown as BrokerService;
-    const evaluar = jest.fn();
-    const marcarVivo = jest.fn();
-    const abrirTope = jest.fn();
-    const cerrarTope = jest.fn();
-    const abrirRelojDesviado = jest.fn();
-    const cerrarRelojDesviado = jest.fn();
+    const broker = { alRecibir: vi.fn() } as unknown as BrokerService;
+    const evaluar = vi.fn();
+    const marcarVivo = vi.fn();
+    const abrirTope = vi.fn();
+    const cerrarTope = vi.fn();
+    const abrirRelojDesviado = vi.fn();
+    const cerrarRelojDesviado = vi.fn();
     const alertas = { evaluar } as unknown as AlertasService;
     const supervision = { marcarVivo, abrirTope, cerrarTope, abrirRelojDesviado, cerrarRelojDesviado } as unknown as SupervisionService;
     // Lo que el pipeline anuncia al panel en vivo (TT-39), en orden.
@@ -71,9 +72,9 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
     return { servicio, query, marcarVivo, abrirTope, cerrarTope, abrirRelojDesviado, cerrarRelojDesviado, evaluar, publicados };
   }
 
-  const cuarentenas = (query: jest.Mock) =>
+  const cuarentenas = (query: Mock) =>
     query.mock.calls.filter(([sql]) => String(sql).startsWith('INSERT INTO cuarentena')).map(([, params]) => (params as unknown[])[2]);
-  const marcoVisto = (query: jest.Mock) => query.mock.calls.some(([sql]) => String(sql).startsWith('INSERT INTO estado_dispositivo'));
+  const marcoVisto = (query: Mock) => query.mock.calls.some(([sql]) => String(sql).startsWith('INSERT INTO estado_dispositivo'));
 
   it('trama malformada de un dispositivo conocido → cuarentena "malformada" Y marcado vivo', async () => {
     const { servicio, query, marcarVivo, evaluar } = armar({ id: 'd1', estado: 'activo' });
@@ -137,12 +138,12 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
   });
 
   // Migración 09: una fila de cuarentena por trama, con detalle y dispositivo; trama cruda si guardó algo.
-  const filasCuarentena = (query: jest.Mock) =>
+  const filasCuarentena = (query: Mock) =>
     query.mock.calls.filter(([sql]) => String(sql).startsWith('INSERT INTO cuarentena')).map(([, p]) => {
       const [, , motivo, , detalle, dispositivoId, recibidoEn] = p as unknown[];
       return { motivo, detalle: detalle as string, dispositivoId, recibidoEn };
     });
-  const tramas = (query: jest.Mock) =>
+  const tramas = (query: Mock) =>
     query.mock.calls.filter(([sql]) => String(sql).startsWith('INSERT INTO trama')).map(([, p]) => p as unknown[]);
 
   it('dos lecturas inválidas en una trama → UNA fila "invalida" con los dos porqués y el dispositivo', async () => {
@@ -181,7 +182,7 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
   });
 
   // Migración 08: cada medición dice cuándo llegó y quién puso su marca de tiempo (docs/10 §8.4 punto 12).
-  const insertMedicion = (query: jest.Mock) =>
+  const insertMedicion = (query: Mock) =>
     query.mock.calls.find(([sql]) => String(sql).trimStart().startsWith('INSERT INTO medicion'))?.[1] as unknown[];
 
   it('sin marca del emisor → origen_tiempo "recepcion", tiempo lo pone la base y recibido_en es la llegada', async () => {
@@ -270,7 +271,7 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
     }
   });
   describe('filtro 2: despacho por el formato declarado (docs/10 §8.4 puntos 25 y 47)', () => {
-    const detalleCuarentena = (query: jest.Mock) =>
+    const detalleCuarentena = (query: Mock) =>
       (query.mock.calls.find(([sql]) => String(sql).startsWith('INSERT INTO cuarentena'))?.[1] as unknown[])?.[4];
     it('SenML a un dispositivo que declaró plano → malformada «la trama no tiene esa forma», sin lecturas, y vivo', async () => {
       const { servicio, query, marcarVivo } = armar({ id: 'd1', estado: 'activo', formato: 'plano' });
@@ -305,8 +306,8 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
     const T_UP = 'sitio/uct/pasarela/chirpstack-campus/0101010101010101/up';
     const up = (devEui = '0101010101010101', objeto: object = { temperature: 21.5 }) =>
       Buffer.from(JSON.stringify({ time: '2026-10-15T12:00:00Z', deviceInfo: { devEui }, object: objeto }));
-    const escrituras = (query: jest.Mock) => query.mock.calls.filter(([sql]) => /^\s*(INSERT|UPDATE)/.test(String(sql)));
-    const detalle = (query: jest.Mock) => (query.mock.calls.find(([sql]) => String(sql).startsWith('INSERT INTO cuarentena'))?.[1] as unknown[])?.[4];
+    const escrituras = (query: Mock) => query.mock.calls.filter(([sql]) => /^\s*(INSERT|UPDATE)/.test(String(sql)));
+    const detalle = (query: Mock) => (query.mock.calls.find(([sql]) => String(sql).startsWith('INSERT INTO cuarentena'))?.[1] as unknown[])?.[4];
 
     it('un «up» de un nodo asociado → lectura guardada, trama cruda con su adaptador y nodo vivo', async () => {
       const { servicio, query, marcarVivo } = armar(NODO, false, PAS);
@@ -408,7 +409,7 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
       }
     });
     it('también el id del tópico directo y la línea del registro de la cuarentena se limpian (revisión del 15/10)', async () => {
-      const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+      const warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
       try {
         const { servicio, query } = armar(undefined);
         await servicio.procesar('sitio/uct/dispositivo/de\u202Ev-0001/temperatura', Buffer.from('21.5'));
@@ -429,9 +430,9 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
     // Forma nativa de la pasarela Milesight bajo nuestro árbol (16/10): lo que deja el puente de Mosquitto al cambiar el prefijo.
     const T_NATIVO = 'sitio/uct/pasarela/ug65-campus/device/0101010101010101/event/up';
     const conFcnt = (fCnt: number) => Buffer.from(JSON.stringify({ time: '2026-10-15T12:00:00Z', fCnt, deviceInfo: { devEui: '0101010101010101' }, object: { temperature: 21.5 } }));
-    const medicionesDe = (query: jest.Mock) => query.mock.calls.filter(([sql]) => String(sql).trimStart().startsWith('INSERT INTO medicion'));
+    const medicionesDe = (query: Mock) => query.mock.calls.filter(([sql]) => String(sql).trimStart().startsWith('INSERT INTO medicion'));
     // Lo que el INSERT de estado deja en ultimo_fcnt: el valor si la trama dejó huella ($8), «borrado» si la dejó sin contador, «sin cambio» si no.
-    const fcntGuardado = (query: jest.Mock) => {
+    const fcntGuardado = (query: Mock) => {
       const p = query.mock.calls.find(([sql]) => String(sql).startsWith('INSERT INTO estado_dispositivo'))?.[1] as unknown[] | undefined;
       return p === undefined || !p[7] ? 'sin cambio' : (p[1] ?? 'borrado');
     };
@@ -467,7 +468,7 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
       expect(fcntGuardado(query)).toBe('sin cambio'); // el SQL conserva el que había
     });
     it('una trama que repite el fCnt pero el adaptador no entiende → malformada, y NO se anota como repetida (revisión del 16/10)', async () => {
-      const log = jest.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+      const log = vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
       try {
         const corta = { devEUI: '0101010101010101', fCnt: 142, fPort: 1, data: 'AgAAAI8HGBmY', rxInfo: [] }; // 9 bytes
         const { servicio, query, marcarVivo } = armar({ ...NODO, formato: 'milesight', decodificador: 'campus-heltec-v3-v1', ultimo_fcnt: '142' }, false, PAS);
@@ -514,12 +515,11 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
       const { servicio, query, marcarVivo } = armar({ ...NODO, formato: 'milesight', decodificador: 'campus-heltec-v3-v1' }, false, PAS);
       // La captura es del 15/10: el reloj de la prueba se fija a su minuto, porque una marca de pasarela a más de 10 min de la llegada ya
       // no se respeta (docs/13 regla 18). Solo se finge la fecha; temporizadores y promesas siguen siendo los reales.
-      jest.useFakeTimers({ now: new Date('2026-10-15T15:35:00Z'), doNotFake: ['nextTick', 'setImmediate', 'clearImmediate', 'setInterval',
-        'clearInterval', 'setTimeout', 'clearTimeout', 'queueMicrotask', 'hrtime', 'performance'] });
+      vi.useFakeTimers({ now: new Date('2026-10-15T15:35:00Z'), toFake: ['Date'] });
       try {
         await servicio.procesar(T_NATIVO, Buffer.from(JSON.stringify(captura)));
       } finally {
-        jest.useRealTimers();
+        vi.useRealTimers();
       }
       const [fila] = medicionesDe(query).map(([, params]) => params as unknown[]);
       expect(fila.slice(1, 4)).toEqual([new Date('2026-10-15T15:34:56.340Z'), 18.16, 'Cel']);
@@ -549,8 +549,8 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
     const HORA_ANTERIOR = new Date(VENTANA.getTime() - 3_600_000);
     const DOS = Buffer.from('[{"n":"temperatura","v":21},{"n":"temperatura","v":22}]');
     const UNA = Buffer.from('[{"n":"temperatura","v":21}]');
-    const estado = (query: jest.Mock) => query.mock.calls.find(([sql]) => String(sql).startsWith('INSERT INTO estado_dispositivo'))?.[1] as unknown[];
-    const mediciones = (query: jest.Mock) => query.mock.calls.filter(([sql]) => String(sql).trimStart().startsWith('INSERT INTO medicion')).length;
+    const estado = (query: Mock) => query.mock.calls.find(([sql]) => String(sql).startsWith('INSERT INTO estado_dispositivo'))?.[1] as unknown[];
+    const mediciones = (query: Mock) => query.mock.calls.filter(([sql]) => String(sql).trimStart().startsWith('INSERT INTO medicion')).length;
     // Un dispositivo SenML con 1 canal cada 3600 s: presupuesto = max(600, 10 × 1 × 1) = 600 lecturas por hora.
     const LENTO: Disp = { id: 'd1', estado: 'activo', formato: 'senml', intervalo_esperado_s: 3600, canales: 1 };
 
@@ -624,7 +624,7 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
       const traba = new Promise<void>((r) => (soltar = r));
       const original = query.getMockImplementation() as (sql: string, params?: unknown[]) => Promise<unknown>;
       let primeraInsercion = true;
-      (query as jest.Mock).mockImplementation((sql: string, params?: unknown[]) => {
+      (query as Mock).mockImplementation((sql: string, params?: unknown[]) => {
         if (String(sql).trimStart().startsWith('INSERT INTO medicion') && primeraInsercion) { primeraInsercion = false; return traba.then(() => original(sql, params)); }
         return original(sql, params);
       });
@@ -661,7 +661,7 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
     const T_UP = 'sitio/uct/pasarela/chirpstack-campus/0101010101010101/up';
     const DIA = 86_400_000;
     const up = (time: string) => Buffer.from(JSON.stringify({ time, deviceInfo: { devEui: '0101010101010101' }, object: { temperature: 21.5 } }));
-    const medicion = (query: jest.Mock) =>
+    const medicion = (query: Mock) =>
       query.mock.calls.find(([sql]) => String(sql).trimStart().startsWith('INSERT INTO medicion'))?.[1] as unknown[];
 
     it('marca de pasarela 4 días atrasada → tiempo de la base, origen «recepcion» y se abre reloj_desviado con pasarela, desvío y marca', async () => {

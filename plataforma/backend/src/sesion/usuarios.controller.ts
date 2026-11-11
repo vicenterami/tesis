@@ -3,12 +3,12 @@ import {
   ApiBadRequestResponse, ApiBody, ApiConflictResponse, ApiCookieAuth, ApiCreatedResponse, ApiForbiddenResponse, ApiHeader, ApiNotFoundResponse,
   ApiOkResponse, ApiOperation, ApiParam, ApiTags, ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { uuid } from '../consulta/validacion';
-import { Usuario } from './guardia';
-import { ROLES, exigirEnAlguno } from './permisos';
-import type { UsuarioSesion } from './permisos';
-import { UsuarioConClave, UsuarioListado, UsuariosService } from './usuarios.service';
-import { MAX_SITIOS, validarAltaUsuario, validarCambioUsuario } from './usuarios.dto';
+import { uuid } from '../consulta/validacion.js';
+import { Usuario } from './guardia.js';
+import { ROLES, exigirEnAlguno } from './permisos.js';
+import type { UsuarioSesion } from './permisos.js';
+import { UsuarioConClave, UsuarioListado, UsuariosService } from './usuarios.service.js';
+import { MAX_SITIOS, validarAltaUsuario, validarCambioUsuario } from './usuarios.dto.js';
 
 // Usuarios (HU-18, RF-43, RF-44; docs/20 §4 y §6). Solo administradores, y solo en sus sitios: un usuario o un sitio de otro sitio
 // responde 404, como uno que no existe (RF-41). Con sesión, toda ruta que escribe exige `X-Pedido: panel` (el guardia central).

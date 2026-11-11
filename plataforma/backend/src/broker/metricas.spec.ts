@@ -1,9 +1,10 @@
+import { describe, expect, it } from 'vitest';
 import type { Pool } from 'pg';
 import { ConfigService } from '@nestjs/config';
-import { EventoPanel, EventosService } from '../tiempo-real/eventos.service';
-import type { DynsecService } from './dynsec.service';
-import { Contador, Muestra, armarMuestra, evaluar, valorSys } from './metricas';
-import { MetricasBrokerService } from './metricas.service';
+import { EventoPanel, EventosService } from '../tiempo-real/eventos.service.js';
+import type { DynsecService } from './dynsec.service.js';
+import { Contador, Muestra, armarMuestra, evaluar, valorSys } from './metricas.js';
+import { MetricasBrokerService } from './metricas.service.js';
 
 const muestra = (extra: Partial<Muestra> = {}): Muestra => ({
   tiempo: new Date('2026-10-13T22:00:00Z'), mensajes_descartados: 0, mensajes_en_cola: 0, bytes_en_cola: 0, clientes_conectados: 3, memoria_bytes: null, ...extra,

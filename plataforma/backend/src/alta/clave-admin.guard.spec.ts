@@ -1,4 +1,5 @@
-import { rechazoDeClaveAdmin } from './clave-admin.guard';
+import { describe, expect, it } from 'vitest';
+import { rechazoDeClaveAdmin } from './clave-admin.guard.js';
 
 describe('rechazoDeClaveAdmin (docs/10 §8.4 punto 41)', () => {
   const clave = 'x'.repeat(32);

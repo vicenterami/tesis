@@ -1,4 +1,5 @@
-import { claveDeDireccion, Cupo, FallosPorClave, RitmoPorDispositivo } from './topes';
+import { describe, expect, it } from 'vitest';
+import { claveDeDireccion, Cupo, FallosPorClave, RitmoPorDispositivo } from './topes.js';
 
 // Topes de la recepción por HTTP (docs/10 §8.4 punto 52), con un reloj de mentira.
 describe('topes de la recepción por HTTP', () => {

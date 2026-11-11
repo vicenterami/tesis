@@ -1,15 +1,15 @@
 import { BadRequestException, ConflictException, ForbiddenException, Inject, Injectable, Logger, NotFoundException, Optional, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Pool, PoolClient } from 'pg';
-import { POOL } from '../db/db.module';
-import { isoUs } from '../db/iso-us';
-import { AlcanceService } from './alcance.service';
-import { generarClaveTemporal } from './claves';
-import { horasClaveTemporal } from '../arranque';
-import { venceClaveTemporal } from './cookie';
-import { Rol, UsuarioSesion, exigirEnAlguno } from './permisos';
-import { SesionService } from './sesion.service';
-import { AltaUsuario, CambioUsuario } from './usuarios.dto';
+import { POOL } from '../db/db.module.js';
+import { isoUs } from '../db/iso-us.js';
+import { AlcanceService } from './alcance.service.js';
+import { generarClaveTemporal } from './claves.js';
+import { horasClaveTemporal } from '../arranque.js';
+import { venceClaveTemporal } from './cookie.js';
+import { Rol, UsuarioSesion, exigirEnAlguno } from './permisos.js';
+import { SesionService } from './sesion.service.js';
+import { AltaUsuario, CambioUsuario } from './usuarios.dto.js';
 
 // Usuarios y sus roles por sitio (HU-18, RF-43, RF-44; docs/20 §4). Sin registro abierto: solo un administrador da de alta, y solo en
 // sus sitios. El primer administrador lo crea la clave de administrador (el «usuario del sistema») mientras no exista NINGUNO; después

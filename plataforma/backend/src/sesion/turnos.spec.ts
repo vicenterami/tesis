@@ -1,5 +1,6 @@
+import { describe, expect, it } from 'vitest';
 import { HttpException, ServiceUnavailableException } from '@nestjs/common';
-import { Turnos } from './turnos';
+import { Turnos } from './turnos.js';
 
 // Turnos del hash de claves de personas: como mucho 2 a la vez (128 MiB cada uno), los demás esperan en orden; con la cola llena, 503.
 describe('Turnos', () => {

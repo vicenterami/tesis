@@ -2,7 +2,7 @@
 // contrario. Devuelve el cuerpo limpio o lanza 400 con la lista de motivos. Lo que solo pone el sistema (estado inicial,
 // instantes, credencial) no está en el tipo de entrada: ningún cliente puede mandarlo.
 import { BadRequestException } from '@nestjs/common';
-import { PERFILES, Perfil } from '../recepcion/adaptadores/perfiles';
+import { PERFILES, Perfil } from '../recepcion/adaptadores/perfiles.js';
 
 export const VIAS = ['mqtt', 'http', 'lorawan'] as const;
 // Formatos que declara un dispositivo directo (mqtt, http). Uno lorawan no declara formato: hereda el de su pasarela

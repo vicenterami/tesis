@@ -3,7 +3,7 @@
 // regla que ck_canal_escala, migración 18). `actualizado_en` es el que entregó la ficha y se devuelve a la base TAL CUAL, como texto:
 // trae microsegundos y un Date de JavaScript los perdería (el bloqueo optimista daría 409 siempre).
 import { BadRequestException } from '@nestjs/common';
-import { validarEscalas } from './alta.dto';
+import { validarEscalas } from './alta.dto.js';
 
 export interface CalibracionValidada {
   escala_cero: number | null;

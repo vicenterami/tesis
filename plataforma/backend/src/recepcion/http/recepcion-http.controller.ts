@@ -2,13 +2,13 @@ import { Controller, Logger, Param, Post, Query, Req, Res } from '@nestjs/common
 import { ConfigService } from '@nestjs/config';
 import { ApiHeader, ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
-import { AvisosAcotados, claveOpcional } from '../../arranque';
-import { RecepcionService } from '../recepcion.service';
-import { limpia } from '../texto';
-import { direccionDelCliente } from './direccion';
-import { claveDeDireccion, FallosPorClave, RitmoPorDispositivo } from './topes';
-import { VerificacionDeTokens } from './verificacion';
-import { Publica } from '../../sesion/guardia';
+import { AvisosAcotados, claveOpcional } from '../../arranque.js';
+import { RecepcionService } from '../recepcion.service.js';
+import { limpia } from '../texto.js';
+import { direccionDelCliente } from './direccion.js';
+import { claveDeDireccion, FallosPorClave, RitmoPorDispositivo } from './topes.js';
+import { VerificacionDeTokens } from './verificacion.js';
+import { Publica } from '../../sesion/guardia.js';
 
 // Recepción por HTTP (RF-01, HU-01; docs/10 §8.4 punto 52, decidido el 16/10/2026 y corregido el 17/10). La trama entra por la misma
 // tubería que la de MQTT (filtros 1 a 6); aquí solo se autentica con el token, se aplican los topes y se traduce el resultado a un

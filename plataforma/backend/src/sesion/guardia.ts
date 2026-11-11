@@ -5,11 +5,11 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import type { Request, Response } from 'express';
-import { AvisosAcotados, claveAdmin } from '../arranque';
-import { CABECERA_CLAVE_ADMIN, rechazoDeClaveAdmin } from '../alta/clave-admin.guard';
-import { cabeceraBorrarCookie, leerCookie } from './cookie';
-import { UsuarioSesion, usuarioSistema } from './permisos';
-import { MENSAJE_SIN_SESION, SesionService } from './sesion.service';
+import { AvisosAcotados, claveAdmin } from '../arranque.js';
+import { CABECERA_CLAVE_ADMIN, rechazoDeClaveAdmin } from '../alta/clave-admin.guard.js';
+import { cabeceraBorrarCookie, leerCookie } from './cookie.js';
+import { UsuarioSesion, usuarioSistema } from './permisos.js';
+import { MENSAJE_SIN_SESION, SesionService } from './sesion.service.js';
 
 // El guardia central (docs/20 §5; docs/10 §8.4 punto 36). Corre antes de TODA ruta de Nest (APP_GUARD en sesion.module.ts) y deja en la
 // petición quién la hace (`usuario`, con su mapa sitio → rol). No decide permisos por recurso: eso lo hace permitir() (permisos.ts),

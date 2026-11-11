@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
-import { hashScrypt, verificarScrypt } from '../../alta/credenciales';
-import type { CredencialHttp } from '../recepcion.service';
-import { Cupo } from './topes';
+import { hashScrypt, verificarScrypt } from '../../alta/credenciales.js';
+import type { CredencialHttp } from '../recepcion.service.js';
+import { Cupo } from './topes.js';
 
 // Filtro 1 de la vía HTTP (docs/10 §8.4 punto 52): el token contra la huella scrypt de la credencial activa, con la caché de
 // verificaciones (a). Tras una verificación correcta se recuerda, por dispositivo, la huella contra la que se verificó y el resumen

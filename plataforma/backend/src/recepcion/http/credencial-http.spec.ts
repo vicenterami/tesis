@@ -1,20 +1,21 @@
+import { describe, expect, it, vi } from 'vitest';
 import { Pool } from 'pg';
-import { AlertasService } from '../../alertas/alertas.service';
-import { BrokerService } from '../../broker/broker.service';
-import { SupervisionService } from '../../supervision/supervision.service';
-import { EventosService } from '../../tiempo-real/eventos.service';
-import { ChirpstackAdaptador } from '../adaptadores/chirpstack.adaptador';
-import { resolverClave } from '../adaptadores/mapa-claves';
-import { MilesightAdaptador } from '../adaptadores/milesight.adaptador';
-import { PlanoAdaptador } from '../adaptadores/plano.adaptador';
-import { SenmlAdaptador } from '../adaptadores/senml.adaptador';
-import { RecepcionService } from '../recepcion.service';
+import { AlertasService } from '../../alertas/alertas.service.js';
+import { BrokerService } from '../../broker/broker.service.js';
+import { SupervisionService } from '../../supervision/supervision.service.js';
+import { EventosService } from '../../tiempo-real/eventos.service.js';
+import { ChirpstackAdaptador } from '../adaptadores/chirpstack.adaptador.js';
+import { resolverClave } from '../adaptadores/mapa-claves.js';
+import { MilesightAdaptador } from '../adaptadores/milesight.adaptador.js';
+import { PlanoAdaptador } from '../adaptadores/plano.adaptador.js';
+import { SenmlAdaptador } from '../adaptadores/senml.adaptador.js';
+import { RecepcionService } from '../recepcion.service.js';
 
 // La consulta de la credencial para la vía HTTP (docs/10 §8.4 punto 52): la fila tal cual, con tiempo máximo.
 describe('RecepcionService.credencialHttp', () => {
   function servicio(fila: { id: string; via: string; estado: string; hash: string | null } | undefined) {
-    const query = jest.fn(() => Promise.resolve({ rows: fila ? [fila] : [], rowCount: fila ? 1 : 0 }));
-    const s = new RecepcionService({ query } as unknown as Pool, { alRecibir: jest.fn() } as unknown as BrokerService, {} as AlertasService,
+    const query = vi.fn(() => Promise.resolve({ rows: fila ? [fila] : [], rowCount: fila ? 1 : 0 }));
+    const s = new RecepcionService({ query } as unknown as Pool, { alRecibir: vi.fn() } as unknown as BrokerService, {} as AlertasService,
       {} as SupervisionService, new EventosService(), new SenmlAdaptador(), new PlanoAdaptador(), new ChirpstackAdaptador(resolverClave), new MilesightAdaptador(resolverClave));
     return { s, query };
   }

@@ -3,14 +3,14 @@ import {
   Logger, NotFoundException, ServiceUnavailableException,
 } from '@nestjs/common';
 import type { Pool, PoolClient } from 'pg';
-import { POOL } from '../db/db.module';
-import { ErrorDynsec, ROL_DISPOSITIVO, ROL_PASARELA, ordenBaja, ordenRotacion, ordenesAlta, ordenesAltaDispositivo, ordenesAltaPasarela } from '../broker/dynsec';
-import { DynsecService } from '../broker/dynsec.service';
-import { AltaValidada, Formato, Via } from './alta.dto';
-import { CalibracionValidada } from './calibracion.dto';
-import { isoUs } from '../db/iso-us';
-import { generarSecreto, hashScrypt } from './credenciales';
-import { FormatoPasarela, PasarelaValidada } from './pasarela.dto';
+import { POOL } from '../db/db.module.js';
+import { ErrorDynsec, ROL_DISPOSITIVO, ROL_PASARELA, ordenBaja, ordenRotacion, ordenesAlta, ordenesAltaDispositivo, ordenesAltaPasarela } from '../broker/dynsec.js';
+import { DynsecService } from '../broker/dynsec.service.js';
+import { AltaValidada, Formato, Via } from './alta.dto.js';
+import { CalibracionValidada } from './calibracion.dto.js';
+import { isoUs } from '../db/iso-us.js';
+import { generarSecreto, hashScrypt } from './credenciales.js';
+import { FormatoPasarela, PasarelaValidada } from './pasarela.dto.js';
 
 export interface CanalCreado {
   id: string;

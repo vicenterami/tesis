@@ -1,4 +1,5 @@
-import { CuotaPorEmisor, inicioDeVentana } from './cuota';
+import { describe, expect, it } from 'vitest';
+import { CuotaPorEmisor, inicioDeVentana } from './cuota.js';
 
 // Cuota de cuarentena en memoria para lo que el filtro 1 rechaza (docs/10 §8.4 punto 53 (iii)).
 describe('CuotaPorEmisor', () => {

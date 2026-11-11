@@ -7,13 +7,13 @@ import type { Request } from 'express';
 import type { IncomingHttpHeaders } from 'node:http';
 import type { Socket } from 'node:net';
 import { EMPTY, Observable, Subject, concat, concatMap, defer, filter, finalize, from, ignoreElements, interval, map, merge, of, takeUntil } from 'rxjs';
-import { AvisosAcotados } from '../arranque';
-import { uuid } from '../consulta/validacion';
-import { EventoPanel, EventosService } from './eventos.service';
-import type { PeticionConUsuario } from '../sesion/guardia';
-import { UsuarioSesion, puedeEnAlguno } from '../sesion/permisos';
-import { MENSAJE_SIN_SESION, SesionService } from '../sesion/sesion.service';
-import { AlcanceDelFlujo, SitiosDeDispositivos } from './sitios-de-dispositivos';
+import { AvisosAcotados } from '../arranque.js';
+import { uuid } from '../consulta/validacion.js';
+import { EventoPanel, EventosService } from './eventos.service.js';
+import type { PeticionConUsuario } from '../sesion/guardia.js';
+import { UsuarioSesion, puedeEnAlguno } from '../sesion/permisos.js';
+import { MENSAJE_SIN_SESION, SesionService } from '../sesion/sesion.service.js';
+import { AlcanceDelFlujo, SitiosDeDispositivos } from './sitios-de-dispositivos.js';
 
 // Cuántos flujos abiertos a la vez admite el proceso: una cota de recursos compartida, no una defensa (un cliente de la
 // red puede agotarla, docs/11 §3). Cada flujo es una conexión HTTP abierta. Desde el 08/11/2026 (M7, docs/20 §3) el canal exige la

@@ -1,3 +1,4 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   BadRequestException, Controller, Get, Global, HttpException, INestApplication, MessageEvent, Module, ServiceUnavailableException, UnauthorizedException,
 } from '@nestjs/common';
@@ -6,14 +7,14 @@ import type { Request } from 'express';
 import type { Pool } from 'pg';
 import { IncomingMessage, Server, request } from 'node:http';
 import { AddressInfo } from 'node:net';
-import { EventosController, LATIDO_MS, MAX_FLUJOS, MAX_FLUJOS_POR_USUARIO, mismoOrigen, rechazoDeOrigen } from './eventos.controller';
-import { EventoPanel, EventosService } from './eventos.service';
-import { TiempoRealModule } from './tiempo-real.module';
-import { RECARGA_MINIMA_MS, SitiosDeDispositivos } from './sitios-de-dispositivos';
-import type { SesionService } from '../sesion/sesion.service';
-import { POOL } from '../db/db.module';
-import { AlcanceService } from '../sesion/alcance.service';
-import { UsuarioSesion, usuarioSistema } from '../sesion/permisos';
+import { EventosController, LATIDO_MS, MAX_FLUJOS, MAX_FLUJOS_POR_USUARIO, mismoOrigen, rechazoDeOrigen } from './eventos.controller.js';
+import { EventoPanel, EventosService } from './eventos.service.js';
+import { TiempoRealModule } from './tiempo-real.module.js';
+import { RECARGA_MINIMA_MS, SitiosDeDispositivos } from './sitios-de-dispositivos.js';
+import type { SesionService } from '../sesion/sesion.service.js';
+import { POOL } from '../db/db.module.js';
+import { AlcanceService } from '../sesion/alcance.service.js';
+import { UsuarioSesion, usuarioSistema } from '../sesion/permisos.js';
 
 // TT-39 · Canal de tiempo real del panel (docs/10 §5). Primero las piezas sueltas; al final, el canal por HTTP real.
 // El guardia central deja en la petición quién la hace (docs/20 §5); aquí, el usuario del sistema (alcance total).
@@ -77,7 +78,7 @@ describe('rechazoDeOrigen: Sec-Fetch-Site cubre lo que Origin no', () => {
 });
 
 describe('EventosController: cupo, filtros y latido', () => {
-  afterEach(() => jest.useRealTimers());
+  afterEach(() => vi.useRealTimers());
 
   it(`con ${MAX_FLUJOS} flujos abiertos responde 503; al cerrarse uno, vuelve a admitir`, () => {
     const c = new EventosController(new EventosService());
@@ -150,26 +151,26 @@ describe('EventosController: cupo, filtros y latido', () => {
   });
 
   it('en cada latido revalida la sesión SIN renovarla: aplica los sitios nuevos y, si ya no vale, cierra el flujo y libera el cupo (revisión del 08/11/2026)', async () => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
     const bus = new EventosService();
     const sitios = { sitioDe: (d: string) => ({ d1: 's1', d2: 's2' } as Record<string, string>)[d], refrescar: () => Promise.resolve() } as unknown as SitiosDeDispositivos;
     const ana = persona('ana', [['s1', 'consulta']]);
     const respuestas: (UsuarioSesion | null)[] = [persona('ana', [['s2', 'consulta']]), null];
-    const cargarPorId = jest.fn(() => Promise.resolve(respuestas.shift() ?? null));
+    const cargarPorId = vi.fn(() => Promise.resolve(respuestas.shift() ?? null));
     const c = new EventosController(bus, sitios, { cargarPorId } as unknown as SesionService);
     const recibidos: string[] = [];
     let terminado = false;
     c.flujo(de(ana)).subscribe({ next: (m) => recibidos.push(`${String(m.type)}:${(m.data as { dispositivo_id?: string }).dispositivo_id ?? '-'}`), complete: () => { terminado = true; } });
-    await jest.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(0);
     bus.publicar(M1);
     bus.publicar({ ...M1, dispositivo_id: 'd2' });
-    await jest.advanceTimersByTimeAsync(LATIDO_MS); // 1.er latido: la sesión sigue viva, pero ahora su sitio es s2
+    await vi.advanceTimersByTimeAsync(LATIDO_MS); // 1.er latido: la sesión sigue viva, pero ahora su sitio es s2
     bus.publicar(M1);
     bus.publicar({ ...M1, dispositivo_id: 'd2' });
     expect(cargarPorId).toHaveBeenLastCalledWith('a'.repeat(64), { renovar: false });
     expect(recibidos).toEqual(['medicion:d1', 'latido:-', 'medicion:d2']);
     expect(terminado).toBe(false);
-    await jest.advanceTimersByTimeAsync(LATIDO_MS); // 2.º latido: la sesión ya no vale (cerrada, vencida o revocada)
+    await vi.advanceTimersByTimeAsync(LATIDO_MS); // 2.º latido: la sesión ya no vale (cerrada, vencida o revocada)
     expect(terminado).toBe(true);
     expect(recibidos).toEqual(['medicion:d1', 'latido:-', 'medicion:d2']); // sin latido final
     expect(c.flujosAbiertos).toBe(0);
@@ -177,25 +178,25 @@ describe('EventosController: cupo, filtros y latido', () => {
   });
 
   it('una clave temporal o una base que no responde también cierran el flujo; el usuario del sistema no consulta nada', async () => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
     const sitios = { sitioDe: () => 's1', refrescar: () => Promise.resolve() } as unknown as SitiosDeDispositivos;
     for (const respuesta of [() => Promise.resolve({ ...persona('ana', [['s1', 'consulta']]), claveTemporal: true }), () => Promise.reject(new Error('base caída'))]) {
-      const c = new EventosController(new EventosService(), sitios, { cargarPorId: jest.fn(respuesta) } as unknown as SesionService);
+      const c = new EventosController(new EventosService(), sitios, { cargarPorId: vi.fn(respuesta) } as unknown as SesionService);
       let terminado = false;
       c.flujo(de(persona('ana', [['s1', 'consulta']]))).subscribe({ complete: () => { terminado = true; } });
-      await jest.advanceTimersByTimeAsync(LATIDO_MS);
+      await vi.advanceTimersByTimeAsync(LATIDO_MS);
       expect(terminado).toBe(true);
     }
-    const cargarPorId = jest.fn();
+    const cargarPorId = vi.fn();
     const c = new EventosController(new EventosService(), sitios, { cargarPorId } as unknown as SesionService);
     const s = c.flujo(SIN_ORIGEN).subscribe();
-    await jest.advanceTimersByTimeAsync(LATIDO_MS * 2);
+    await vi.advanceTimersByTimeAsync(LATIDO_MS * 2);
     expect(cargarPorId).not.toHaveBeenCalled();
     s.unsubscribe();
   });
 
   it('el mapa de sitios se refresca solo para un flujo que pasó el origen y los topes (revisión del 08/11/2026)', () => {
-    const refrescar = jest.fn(() => Promise.resolve());
+    const refrescar = vi.fn(() => Promise.resolve());
     const sitios = { sitioDe: () => 's1', refrescar } as unknown as SitiosDeDispositivos;
     const c = new EventosController(new EventosService(), sitios);
     const ana = persona('ana', [['s1', 'consulta']]);
@@ -208,11 +209,11 @@ describe('EventosController: cupo, filtros y latido', () => {
   });
 
   it('un «latido» cada 25 s aunque no haya mediciones', () => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
     const c = new EventosController(new EventosService());
     const recibidos: MessageEvent[] = [];
     const s = c.flujo(SIN_ORIGEN).subscribe((m) => recibidos.push(m));
-    jest.advanceTimersByTime(LATIDO_MS * 2);
+    vi.advanceTimersByTime(LATIDO_MS * 2);
     expect(recibidos.map((m) => m.type)).toEqual(['latido', 'latido']);
     s.unsubscribe();
   });
@@ -220,7 +221,7 @@ describe('EventosController: cupo, filtros y latido', () => {
 
 describe('SitiosDeDispositivos: el mapa se recarga como mucho cada 5 s, aunque se abran flujos en bucle (revisión del 08/11/2026)', () => {
   it('dentro de los 5 s, ninguna consulta más; pasados, una; dos pedidos a la vez comparten la misma', async () => {
-    const query = jest.fn(() => Promise.resolve({ rows: [{ id: 'd1', sitio_id: 's1' }] }));
+    const query = vi.fn(() => Promise.resolve({ rows: [{ id: 'd1', sitio_id: 's1' }] }));
     const m = new SitiosDeDispositivos({ query } as unknown as Pool);
     let ahora = 1_000_000;
     m.ahora = () => ahora;

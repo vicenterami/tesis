@@ -1,4 +1,5 @@
-import { porcentaje } from './escala';
+import { describe, expect, it } from 'vitest';
+import { porcentaje } from './escala.js';
 
 // Calibración del suelo de docs/16 §38: 0 % al aire (2,65 V) y 100 % en agua (1,20 V): el 100 % está por debajo del 0 %.
 describe('porcentaje con la calibración del canal (docs/10 §8.4 punto 51)', () => {

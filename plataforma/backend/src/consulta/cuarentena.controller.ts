@@ -1,11 +1,11 @@
 import { Controller, Get, Query } from '@nestjs/common';
-import { ConsultaService } from './consulta.service';
+import { ConsultaService } from './consulta.service.js';
 import { ApiCookieAuth, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiQuery, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
-import { limite, uuid } from './validacion';
-import { AlcanceService } from '../sesion/alcance.service';
-import { Usuario } from '../sesion/guardia';
-import { alcanceDeLectura } from '../sesion/permisos';
-import type { UsuarioSesion } from '../sesion/permisos';
+import { limite, uuid } from './validacion.js';
+import { AlcanceService } from '../sesion/alcance.service.js';
+import { Usuario } from '../sesion/guardia.js';
+import { alcanceDeLectura } from '../sesion/permisos.js';
+import type { UsuarioSesion } from '../sesion/permisos.js';
 
 @ApiTags('cuarentena')
 @ApiCookieAuth('sesion')

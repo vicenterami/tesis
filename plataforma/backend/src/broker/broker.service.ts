@@ -1,7 +1,7 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import mqtt, { IPublishPacket, MqttClient, Packet } from 'mqtt';
-import { limpia } from '../recepcion/texto';
+import { limpia } from '../recepcion/texto.js';
 
 export type ManejadorTrama = (topico: string, carga: Buffer) => void | Promise<void>;
 

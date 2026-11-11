@@ -1,9 +1,9 @@
 import { CanActivate, ExecutionContext, Inject, Injectable, Logger } from '@nestjs/common';
 import { Pool } from 'pg';
-import { POOL } from '../db/db.module';
-import { uuid } from '../consulta/validacion';
-import { AlcanceService } from '../sesion/alcance.service';
-import type { PeticionConUsuario } from '../sesion/guardia';
+import { POOL } from '../db/db.module.js';
+import { uuid } from '../consulta/validacion.js';
+import { AlcanceService } from '../sesion/alcance.service.js';
+import type { PeticionConUsuario } from '../sesion/guardia.js';
 
 // Sitio de cada dispositivo, en memoria, para filtrar el canal en vivo por los sitios del usuario (docs/20 §3). Los eventos del bus
 // traen el dispositivo, no el sitio, y el filtro corre por cada evento: no puede ir a la base. Se recarga entero al abrir un flujo con

@@ -34,7 +34,7 @@ RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY panel/package.json ./panel/
 # Solo dependencias de producción DEL BACKEND (--filter): el panel ya está compilado y es estático, svelte no viaja.
-# Sin @nestjs/cli, sin jest, sin eslint, sin el código fuente.
+# Sin @nestjs/cli, sin vitest, sin eslint, sin el código fuente.
 # --prod: sin devDependencies. El almacén de pnpm (paquetes descargados) no se necesita después de
 # instalar en un contenedor que nunca vuelve a correr pnpm: se borra en la misma capa (verificado el
 # 23/09/2026 con docker history: "pnpm store prune" NO lo hacía, porque todo seguía referenciado).

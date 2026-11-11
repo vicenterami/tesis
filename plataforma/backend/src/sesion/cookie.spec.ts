@@ -1,7 +1,8 @@
+import { describe, expect, it } from 'vitest';
 import {
   INACTIVIDAD_MS, RENOVAR_CADA_MS, VIDA_ABSOLUTA_MS, cabeceraBorrarCookie, cabeceraCookie, claveTemporalVencida, venceClaveTemporal, debeRenovar, generarIdentificador,
   hashIdentificador, leerCookie, motivoDeVencimiento,
-} from './cookie';
+} from './cookie.js';
 
 // La cookie de sesión y su vida (docs/20 §3), con un reloj simulado: cada instante se construye, nada depende de la hora real.
 describe('cookie de sesión', () => {

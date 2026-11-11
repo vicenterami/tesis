@@ -1,12 +1,13 @@
+import { describe, expect, it, vi } from 'vitest';
 import { BadRequestException, ConflictException, ForbiddenException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
-import { GUARDS_METADATA } from '@nestjs/common/constants';
+import { GUARDS_METADATA } from '@nestjs/common/constants.js';
 import type { Pool } from 'pg';
-import type { DynsecService } from '../broker/dynsec.service';
-import { AltaService } from './alta.service';
-import { validarCalibracion } from './calibracion.dto';
-import { CanalesAdminController } from './canales.controller';
-import type { AlcanceService } from '../sesion/alcance.service';
-import { UsuarioSesion, usuarioSistema } from '../sesion/permisos';
+import type { DynsecService } from '../broker/dynsec.service.js';
+import { AltaService } from './alta.service.js';
+import { validarCalibracion } from './calibracion.dto.js';
+import { CanalesAdminController } from './canales.controller.js';
+import type { AlcanceService } from '../sesion/alcance.service.js';
+import { UsuarioSesion, usuarioSistema } from '../sesion/permisos.js';
 
 // Calibración por API con bloqueo optimista (docs/10 §8.4 punto 51 (ii) a (vi)): DTO, 404, 409, evento y respuesta, con una base falsa.
 const C = '77777777-7777-4777-8777-777777777777';
@@ -65,7 +66,7 @@ function armar(opciones: { existe?: boolean; vigente?: string; antes?: { cero: n
       }
       return { rows: [], rowCount: 1 };
     },
-    release: jest.fn(),
+    release: vi.fn(),
   };
   const pool = { connect: () => Promise.resolve(cliente) } as unknown as Pool;
   return { servicio: new AltaService(pool, { disponible: true } as unknown as DynsecService), sql, params, cliente };
@@ -127,8 +128,8 @@ describe('AltaService.calibrar: bloqueo optimista, evento y respuesta (docs/10 �
 
   it('la ruta la protege el guardia central (docs/20 §5): rol de consulta → 403 antes de validar; UUID y cuerpo validados antes del servicio', async () => {
     expect(Reflect.getMetadata(GUARDS_METADATA, CanalesAdminController)).toBeUndefined(); // ya no lleva guardia propia: la global (APP_GUARD)
-    const llamado = jest.fn();
-    const exigirCanal = jest.fn(() => Promise.resolve());
+    const llamado = vi.fn();
+    const exigirCanal = vi.fn(() => Promise.resolve());
     const ctl = new CanalesAdminController({ calibrar: llamado } as unknown as AltaService, { exigirCanal } as unknown as AlcanceService);
     const consulta: UsuarioSesion = { ...usuarioSistema(), id: 'u1', sistema: false, todos: false, sitios: new Map([['s1', 'consulta']]) };
     await expect(ctl.calibrar(consulta, 'no-es-uuid', { escala_cero: 1, escala_cien: 2, actualizado_en: VIEJO })).rejects.toBeInstanceOf(ForbiddenException);

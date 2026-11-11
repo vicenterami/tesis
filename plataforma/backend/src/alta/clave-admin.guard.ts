@@ -1,4 +1,4 @@
-import { igualesEnTiempoConstante } from './credenciales';
+import { igualesEnTiempoConstante } from './credenciales.js';
 
 export const CABECERA_CLAVE_ADMIN = 'x-clave-admin';
 export type RechazoClaveAdmin = 'sin_configurar' | 'ausente' | 'distinta';

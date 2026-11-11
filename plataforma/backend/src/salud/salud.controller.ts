@@ -1,10 +1,10 @@
 import { Controller, Get, Inject } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Pool } from 'pg';
-import { AltaService } from '../alta/alta.service';
-import { EstadoBroker, MetricasBrokerService } from '../broker/metricas.service';
-import { POOL } from '../db/db.module';
-import { Publica } from '../sesion/guardia';
+import { AltaService } from '../alta/alta.service.js';
+import { EstadoBroker, MetricasBrokerService } from '../broker/metricas.service.js';
+import { POOL } from '../db/db.module.js';
+import { Publica } from '../sesion/guardia.js';
 
 // GET /salud → estado del backend, de su conexión a la base y, desde el 13/10/2026 (docs/10 §8.4 punto 43), lo último que
 // se sabe del broker (cola, descartes, conexiones, condición abierta) y las operaciones de aprovisionamiento en curso. Lo usa

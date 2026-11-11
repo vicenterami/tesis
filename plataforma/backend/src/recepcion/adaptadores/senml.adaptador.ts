@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { ContextoTrama, Lectura } from '../lectura';
-import { Adaptador, TramaMalformada } from './adaptador';
+import { ContextoTrama, Lectura } from '../lectura.js';
+import { Adaptador, TramaMalformada } from './adaptador.js';
 
 // Registro SenML (RFC 8428) en su forma JSON: los campos que usa esta plataforma.
 //   bn = base name (identificador del emisor)   bt = base time (segundos Unix)

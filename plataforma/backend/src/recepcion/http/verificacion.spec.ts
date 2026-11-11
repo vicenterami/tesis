@@ -1,7 +1,8 @@
-import * as credenciales from '../../alta/credenciales';
-import type { CredencialHttp } from '../recepcion.service';
-import { Cupo } from './topes';
-import { VerificacionDeTokens } from './verificacion';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
+import * as credenciales from '../../alta/credenciales.js';
+import type { CredencialHttp } from '../recepcion.service.js';
+import { Cupo } from './topes.js';
+import { VerificacionDeTokens } from './verificacion.js';
 
 // Filtro 1 de la vía HTTP con la caché de verificaciones (docs/10 §8.4 punto 52 (a)): scrypt solo la primera vez y en los fallos.
 describe('VerificacionDeTokens', () => {
@@ -14,7 +15,7 @@ describe('VerificacionDeTokens', () => {
     huella2 = await credenciales.hashScrypt(OTRO);
   });
   const fila = (extra: Partial<CredencialHttp> = {}): CredencialHttp => ({ id: 'd1', via: 'http', estado: 'activo', hash: huella, ...extra });
-  const espiar = () => jest.spyOn(credenciales, 'verificarScrypt');
+  const espiar = () => vi.spyOn(credenciales, 'verificarScrypt');
 
   it('token correcto → ok, y la segunda vez entra por la caché sin scrypt', async () => {
     const espia = espiar();
@@ -86,7 +87,7 @@ describe('VerificacionDeTokens', () => {
     }
   });
   it('si calcular la huella de relleno falla una vez, no queda guardado el fallo: la siguiente vez se recalcula', async () => {
-    const espia = jest.spyOn(credenciales, 'hashScrypt').mockRejectedValueOnce(new Error('sin memoria'));
+    const espia = vi.spyOn(credenciales, 'hashScrypt').mockRejectedValueOnce(new Error('sin memoria'));
     try {
       const v = new VerificacionDeTokens();
       await expect(v.verificar(undefined, TOKEN)).rejects.toThrow('sin memoria');

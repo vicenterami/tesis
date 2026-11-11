@@ -1,11 +1,12 @@
+import { describe, expect, it, vi } from 'vitest';
 import { ForbiddenException, HttpException, NotFoundException } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import type { Pool } from 'pg';
-import type { AlcanceService } from './alcance.service';
-import { Rol, UsuarioSesion, usuarioSistema } from './permisos';
-import type { SesionService } from './sesion.service';
-import type { CambioUsuario } from './usuarios.dto';
-import { CANDADO_ADMINISTRADORES, UsuariosService, rechazoDeCambio, tocaAdministradores, tocaCuenta } from './usuarios.service';
+import type { AlcanceService } from './alcance.service.js';
+import { Rol, UsuarioSesion, usuarioSistema } from './permisos.js';
+import type { SesionService } from './sesion.service.js';
+import type { CambioUsuario } from './usuarios.dto.js';
+import { CANDADO_ADMINISTRADORES, UsuariosService, rechazoDeCambio, tocaAdministradores, tocaCuenta } from './usuarios.service.js';
 
 // Usuarios contra una base falsa (docs/20 §4 y §10; revisión del 08/11/2026): quién puede cambiar la cuenta de quién, el candado de los
 // administradores y la clave de administrador en la lista. Sitios: A y B. El SQL real lo ejercita el paso 4b del guardián.
@@ -14,7 +15,7 @@ interface Persona { id: string; activo: boolean; sitios: { sitio: string; rol: R
 function armar(personas: Persona[], config?: ConfigService) {
   const consultas: string[] = [];
   const parametros: unknown[][] = [];
-  const query = jest.fn((sql: string, p: unknown[] = []) => {
+  const query = vi.fn((sql: string, p: unknown[] = []) => {
     consultas.push(sql);
     parametros.push(p);
     const filas = (rows: unknown[], rowCount = rows.length) => Promise.resolve({ rows, rowCount });

@@ -2,8 +2,8 @@
 // tocar la base y un cuerpo inválido es 400 con la lista de motivos, como en el alta de dispositivos. Lo que pone solo el sistema (la
 // clave, que es temporal y se genera aquí; los instantes) no está en la entrada: ningún cliente puede mandarlo.
 import { BadRequestException } from '@nestjs/common';
-import { FORMA_ACTUALIZADO_EN } from '../alta/calibracion.dto';
-import { ROLES, Rol } from './permisos';
+import { FORMA_ACTUALIZADO_EN } from '../alta/calibracion.dto.js';
+import { ROLES, Rol } from './permisos.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // La misma forma que exige la base (ck_usuario_email, migración 22).

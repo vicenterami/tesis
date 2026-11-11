@@ -18,7 +18,7 @@ src/
 │   ├── tiempo.ts              # plausibilidad de la marca de tiempo del emisor (filtro 4, docs/13 regla 7)
 │   ├── unidades.ts            # conversiones a la unidad canónica (filtro 4)
 │   ├── adaptadores/           # filtro 2: senml (nativo, RFC 8428), plano (número o JSON simple), chirpstack y milesight (LoRaWAN, punto 47)
-│   └── *.spec.ts              # pruebas unitarias de las funciones puras (jest)
+│   └── *.spec.ts              # pruebas unitarias de las funciones puras (vitest)
 ├── consulta/                  # M5: API de solo lectura (dispositivos, canales, condiciones, cuarentena)
 ├── tiempo-real/               # TT-39: canal SSE hacia el panel (GET /eventos) y bus de eventos en memoria
 ├── alta/                      # HU-11: POST /dispositivos, DELETE /dispositivos/:id y POST /dispositivos/:id/credencial (guardia X-Clave-Admin, validación, transacción + cliente del broker, scrypt); PATCH /canales/:id (calibración)
@@ -53,14 +53,17 @@ bash ../pruebas/panel-desarrollo.sh   # con la pila arriba: el reenvío conserva
 ## Verificación automática (TT-03)
 
 ```bash
-pnpm verificar        # = pnpm typecheck && pnpm lint && pnpm test  (≈ 5 s, sin base ni broker)
+pnpm verificar        # = pnpm typecheck && pnpm lint && pnpm test, y lo mismo del panel  (≈ 14 s, sin base ni broker)
 ```
 
 | Capa | Herramienta | Qué atrapa |
 |---|---|---|
 | Tipos | `tsc --noEmit` (`strict`) | usos incorrectos entre módulos; `null` no tratado |
 | Estilo y errores latentes | ESLint 10 + typescript-eslint `recommendedTypeChecked` | promesas sin `await` (`no-floating-promises`), variables sin uso, `async` mal colocado |
-| Comportamiento | jest + ts-jest sobre las funciones **puras** del pipeline | reglas de tiempo, conversión de unidades, adaptadores SenML y plano |
+| Comportamiento | vitest (`vitest.config.ts`) sobre las funciones **puras** del pipeline | reglas de tiempo, conversión de unidades, adaptadores SenML y plano |
+
+El backend es un paquete de ES modules desde el 11/11/2026 (`"type": "module"`, `module` `nodenext`; `docs/10 §8.4` punto 63): toda
+importación relativa lleva la extensión `.js`, y cada `*.spec.ts` importa de `vitest` lo que usa (`describe`, `it`, `expect`, `vi`).
 
 Las pruebas unitarias viven junto al código (`*.spec.ts`) y no tocan base ni broker: cada caso
 documenta una regla (p. ej. «marca anterior al año 2000 → hora de recepción»). Lo que sí depende

@@ -3,13 +3,13 @@ import {
   ApiBadRequestResponse, ApiBody, ApiConflictResponse, ApiCookieAuth, ApiForbiddenResponse, ApiHeader, ApiNotFoundResponse, ApiOkResponse, ApiOperation,
   ApiParam, ApiResponse, ApiTags, ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { AltaService, CanalCalibrado } from './alta.service';
-import { FORMA_ACTUALIZADO_EN, validarCalibracion } from './calibracion.dto';
-import { uuid } from '../consulta/validacion';
-import { AlcanceService } from '../sesion/alcance.service';
-import { Usuario } from '../sesion/guardia';
-import { exigirEnAlguno } from '../sesion/permisos';
-import type { UsuarioSesion } from '../sesion/permisos';
+import { AltaService, CanalCalibrado } from './alta.service.js';
+import { FORMA_ACTUALIZADO_EN, validarCalibracion } from './calibracion.dto.js';
+import { uuid } from '../consulta/validacion.js';
+import { AlcanceService } from '../sesion/alcance.service.js';
+import { Usuario } from '../sesion/guardia.js';
+import { exigirEnAlguno } from '../sesion/permisos.js';
+import type { UsuarioSesion } from '../sesion/permisos.js';
 
 // Calibración de un canal por API (docs/10 §8.4 punto 51 (ii)): una ruta que escribe; desde el 08/11/2026 la protege el guardia central
 // (sesión de administrador del sitio del canal o la clave de administrador, docs/20 §5). La lectura del canal sigue en el módulo de

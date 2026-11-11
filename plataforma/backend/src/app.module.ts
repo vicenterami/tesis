@@ -1,14 +1,14 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { DbModule } from './db/db.module';
-import { BrokerModule } from './broker/broker.module';
-import { RecepcionModule } from './recepcion/recepcion.module';
-import { ConsultaModule } from './consulta/consulta.module';
-import { SaludModule } from './salud/salud.module';
-import { RetencionModule } from './retencion/retencion.module';
-import { TiempoRealModule } from './tiempo-real/tiempo-real.module';
-import { AltaModule } from './alta/alta.module';
-import { SesionModule } from './sesion/sesion.module';
+import { DbModule } from './db/db.module.js';
+import { BrokerModule } from './broker/broker.module.js';
+import { RecepcionModule } from './recepcion/recepcion.module.js';
+import { ConsultaModule } from './consulta/consulta.module.js';
+import { SaludModule } from './salud/salud.module.js';
+import { RetencionModule } from './retencion/retencion.module.js';
+import { TiempoRealModule } from './tiempo-real/tiempo-real.module.js';
+import { AltaModule } from './alta/alta.module.js';
+import { SesionModule } from './sesion/sesion.module.js';
 
 // Módulo raíz. Cada módulo de aquí corresponde a un módulo funcional del diseño (docs/10 §1):
 //   DbModule        → acceso a TimescaleDB (infraestructura compartida)

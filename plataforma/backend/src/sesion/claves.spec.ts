@@ -1,4 +1,5 @@
-import { CLAVES_COMUNES, CLAVE_MAXIMO, CLAVE_MINIMO, generarClaveTemporal, motivosDeClave } from './claves';
+import { describe, expect, it } from 'vitest';
+import { CLAVES_COMUNES, CLAVE_MAXIMO, CLAVE_MINIMO, generarClaveTemporal, motivosDeClave } from './claves.js';
 
 // Reglas de la clave de una persona (docs/20 §4).
 describe('motivosDeClave', () => {

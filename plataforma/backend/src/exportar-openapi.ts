@@ -1,8 +1,9 @@
-process.env.TZ = 'UTC';
+import 'reflect-metadata';
+import './zona-utc.js';
 import { NestFactory } from '@nestjs/core';
 import { writeFileSync } from 'node:fs';
-import { AppModule } from './app.module';
-import { construirDocumento } from './openapi';
+import { AppModule } from './app.module.js';
+import { construirDocumento } from './openapi.js';
 
 // `pnpm openapi`: arma la aplicación SIN iniciarla ni escuchar en ningún puerto, genera el contrato y lo escribe en
 // openapi.json. El documento sale de los decoradores, así que no hace falta la base ni el broker. Hasta el 09/10 la

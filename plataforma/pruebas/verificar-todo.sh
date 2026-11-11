@@ -31,7 +31,10 @@ exige() { # exige ARCHIVO SALIDA_PSQL MINIMO_OK
 paso "0. Backend: tipos, lint y pruebas unitarias (pnpm verificar) — no necesita base ni broker"
 # `tsc` con salida 0 no prueba nada si no revisó archivos (tsconfig mal apuntado): se exige un mínimo.
 if command -v pnpm >/dev/null; then (cd plataforma/backend && n=$(pnpm -s exec tsc --listFiles --noEmit 2>/dev/null | grep -c "/src/"); [[ ${n:-0} -ge 10 ]] && echo "tsc revisó $n archivos de src" || { echo "FALLA tsc revisó solo ${n:-0} archivos de src"; exit 1; }) || fallos=$((fallos+1)); fi
-if command -v pnpm >/dev/null; then (cd plataforma/backend && pnpm verificar 2>&1 | grep -E "^\$ |Tests:|error|✖|FAIL"; exit "${PIPESTATUS[0]}") || fallos=$((fallos+1)); else echo "omitida: pnpm no está en el PATH"; omitidos="$omitidos 0"; fi
+# 11/11/2026: la línea de resumen de vitest es «Tests  N passed (N)» (la de jest era «Tests:»); sale la del backend y la del panel.
+# Revisión del 11/11/2026: «exit 0 no prueba nada si no revisó nada»: además del código de salida se exige ver las dos suites
+# (backend y panel), cada una con al menos 100 pruebas pasadas; si vitest no encontrara archivos, saldría con 0 líneas y el paso falla.
+if command -v pnpm >/dev/null; then (cd plataforma/backend && salida=$(pnpm verificar 2>&1); rc=$?; grep -E "^\$ |^ *Tests +[0-9]|error|✖|FAIL" <<<"$salida"; suites=$(grep -oE "^ *Tests +[0-9]+ passed" <<<"$salida" | grep -oE "[0-9]+"); n=$(grep -c . <<<"$suites"); pocas=$(awk '$1 < 100' <<<"$suites" | grep -c .); if [ "$rc" -ne 0 ]; then exit "$rc"; elif [ "${n:-0}" -ne 2 ] || [ "$pocas" -ne 0 ]; then echo "FALLA pnpm verificar salió con 0 pero no se vieron dos suites con al menos 100 pruebas (backend y panel): $(tr '\n' ' ' <<<"$suites")"; exit 1; else echo "suites con pruebas pasadas: $(tr '\n' ' ' <<<"$suites")(backend y panel)"; fi) || fallos=$((fallos+1)); else echo "omitida: pnpm no está en el PATH"; omitidos="$omitidos 0"; fi
 
 paso "1. Esquema: guardias de tipo y zonas horarias (db/pruebas/zonas-horarias.sql)"
 docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -U plataforma -d plataforma -v ON_ERROR_STOP=1 -tA -F ' · ' \

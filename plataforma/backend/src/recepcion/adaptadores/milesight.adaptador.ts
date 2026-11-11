@@ -1,10 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { ContextoTrama, Lectura } from '../lectura';
-import { Adaptador, TramaMalformada } from './adaptador';
-import { IdentidadNoVerificada, anotarFcnt, exigirDevEui, lecturasDe, objetoJson, tiempoDe } from './lorawan';
-import { RESOLVER_CLAVE } from './mapa-claves';
-import type { ResolverClave } from './mapa-claves';
-import { decodificar } from './perfiles';
+import { ContextoTrama, Lectura } from '../lectura.js';
+import { Adaptador, TramaMalformada } from './adaptador.js';
+import { IdentidadNoVerificada, anotarFcnt, exigirDevEui, lecturasDe, objetoJson, tiempoDe } from './lorawan.js';
+import { RESOLVER_CLAVE } from './mapa-claves.js';
+import type { ResolverClave } from './mapa-claves.js';
+import { decodificar } from './perfiles.js';
 
 // Uplink del servidor de red embebido de una pasarela Milesight (UG63, UG65 y familia; ruta B; docs/10 §8.4 punto 47). Dos formas:
 //   con «Payload Codec» y «Metadata»: lo que devuelve el decodificador más devEUI, deviceName y applicationID. Ejemplo:

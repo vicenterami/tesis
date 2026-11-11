@@ -1,4 +1,4 @@
-import { OrigenTiempo } from './lectura';
+import { OrigenTiempo } from './lectura.js';
 
 // Marca de tiempo del emisor: se acepta solo si es plausible (docs/13, reglas 7 y 18).
 //  · sin marca                      → hora de recepción (nodo sin reloj)

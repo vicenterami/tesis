@@ -1,5 +1,6 @@
+import { describe, expect, it } from 'vitest';
 import { BadRequestException } from '@nestjs/common';
-import { validarAlta } from './alta.dto';
+import { validarAlta } from './alta.dto.js';
 
 const Z = '11111111-1111-4111-8111-111111111111';
 const bueno = { id_fisico: 'Nodo-01', nombre: 'Invernadero', zona_id: Z, via: 'mqtt', intervalo_esperado_s: 60, canales: [{ magnitud: 'temperatura' }, { magnitud: 'humedad', etiqueta: 'suelo' }] };

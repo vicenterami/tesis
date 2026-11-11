@@ -1,14 +1,15 @@
+import { describe, expect, it, vi, type Mock } from 'vitest';
 import { ConfigService } from '@nestjs/config';
 import { Pool } from 'pg';
-import { EventoPanel, EventosService } from '../tiempo-real/eventos.service';
-import { SupervisionService } from './supervision.service';
+import { EventoPanel, EventosService } from '../tiempo-real/eventos.service.js';
+import { SupervisionService } from './supervision.service.js';
 
 // El barrido corre en un temporizador, sin petición HTTP que atrape un rechazo (a diferencia del
 // pipeline, docs/10 §4.1): una consulta que falla no debe tirar el proceso abajo (hallazgo 23/09/2026,
 // visto al dockerizar y apagar la base: el proceso se caía y Docker lo reiniciaba en bucle).
 describe('SupervisionService.barridoSeguro: una base caída no debe tumbar el proceso', () => {
   function armar(fallaConsulta: boolean) {
-    const query = jest.fn(() =>
+    const query = vi.fn(() =>
       fallaConsulta ? Promise.reject(new Error('getaddrinfo EAI_AGAIN timescaledb')) : Promise.resolve({ rows: [] }),
     );
     const pool = { query } as unknown as Pool;
@@ -30,7 +31,7 @@ describe('SupervisionService.barridoSeguro: una base caída no debe tumbar el pr
   // devuelve 0 filas; no hay error ni evento «condicion_abierta» repetido.
   it('carrera entre barridos: la condición ya estaba abierta (INSERT devuelve 0 filas) → sin evento repetido', async () => {
     const escrituras: string[] = [];
-    const query = jest.fn((sql: string) => {
+    const query = vi.fn((sql: string) => {
       const s = sql.trim();
       if (s.startsWith('SELECT d.id, d.id_fisico')) return Promise.resolve({ rows: [{ id: 'd1', id_fisico: 'dev-0001', silencio_s: 99 }], rowCount: 1 });
       if (s.startsWith('UPDATE condicion c SET')) return Promise.resolve({ rows: [], rowCount: 0 });
@@ -60,7 +61,7 @@ describe('SupervisionService: avisa al panel en vivo (TT-39)', () => {
 
   // topeDentro: un dispositivo cuya fila de estado ya muestra una hora nueva dentro del presupuesto con la condición tope_superado abierta.
   function armar(cierraAlMarcarVivo: boolean, topeDentro = false) {
-    const query = jest.fn((sql: string) => {
+    const query = vi.fn((sql: string) => {
       const s = sql.trim();
       if (s.startsWith('SELECT d.id, d.id_fisico')) return Promise.resolve({ rows: [{ id: 'd1', id_fisico: 'dev-0001', silencio_s: 99 }], rowCount: 1 });
       if (s.startsWith('UPDATE condicion c SET')) return Promise.resolve({ rows: [{ id: 'd2', id_fisico: 'dev-0002' }], rowCount: 1 });
@@ -84,7 +85,7 @@ describe('SupervisionService: avisa al panel en vivo (TT-39)', () => {
     const { servicio, publicados, query } = armar(false, true);
     await servicio.barrer();
     expect(publicados[2]).toEqual({ tipo: 'condicion', dispositivo_id: 'd3', condicion: 'tope_superado', estado: 'cerrada' });
-    const llamadas = (query as jest.Mock).mock.calls as [string, unknown[]][];
+    const llamadas = (query as Mock).mock.calls as [string, unknown[]][];
     const cierre = llamadas.find(([sql, params]) => String(sql).startsWith('INSERT INTO evento') && params[0] === 'd3');
     expect(cierre?.[1][1]).toEqual({ tipo: 'tope_superado', por: 'barrido' });
   });
@@ -102,7 +103,7 @@ describe('SupervisionService: avisa al panel en vivo (TT-39)', () => {
 // Reloj de la pasarela desviado (docs/10 §8.4 punto 54): la abre y la cierra el pipeline; escribe y avisa solo en la transición.
 describe('SupervisionService: condición reloj_desviado', () => {
   function armar(filasCondicion: number) {
-    const query = jest.fn((sql: string, _params?: unknown[]) =>
+    const query = vi.fn((sql: string, _params?: unknown[]) =>
       Promise.resolve({ rows: [], rowCount: /^\s*(INSERT INTO condicion|UPDATE condicion)/.test(sql) ? filasCondicion : 1 }));
     const eventos = new EventosService();
     const publicados: EventoPanel[] = [];

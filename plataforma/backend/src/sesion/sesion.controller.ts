@@ -5,12 +5,12 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import type { Request, Response } from 'express';
-import { claveOpcional } from '../arranque';
-import { direccionDelCliente } from '../recepcion/http/direccion';
-import { cabeceraBorrarCookie, cabeceraCookie } from './cookie';
-import { ConClaveTemporal, Publica, Usuario, exigirPedidoDelPanel } from './guardia';
-import type { UsuarioSesion } from './permisos';
-import { SesionAbiertaRespuesta, SesionService } from './sesion.service';
+import { claveOpcional } from '../arranque.js';
+import { direccionDelCliente } from '../recepcion/http/direccion.js';
+import { cabeceraBorrarCookie, cabeceraCookie } from './cookie.js';
+import { ConClaveTemporal, Publica, Usuario, exigirPedidoDelPanel } from './guardia.js';
+import type { UsuarioSesion } from './permisos.js';
+import { SesionAbiertaRespuesta, SesionService } from './sesion.service.js';
 
 // M7 · Sesión del panel (docs/20 §3 y §4): abrir, ver, cerrar y cambiar la clave. La cookie `__Host-sesion` va con `HttpOnly; Secure;
 // SameSite=Lax; Path=/`; ningún script la lee. Las rutas que escriben exigen `X-Pedido: panel` (CSRF), también el inicio de sesión

@@ -1,7 +1,7 @@
 // Validación del cuerpo del alta de una pasarela (docs/10 §8.4 punto 47): todo lo que llega es hostil hasta demostrar lo contrario.
 // Lo que pone el sistema (estado, instantes, credencial) no está en el tipo de entrada.
 import { BadRequestException } from '@nestjs/common';
-import { FORMA_ID_FISICO, FORMATOS_PASARELA, RESERVADOS } from './alta.dto';
+import { FORMA_ID_FISICO, FORMATOS_PASARELA, RESERVADOS } from './alta.dto.js';
 
 export type FormatoPasarela = (typeof FORMATOS_PASARELA)[number];
 export interface PasarelaValidada {

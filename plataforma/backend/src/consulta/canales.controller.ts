@@ -1,10 +1,10 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
-import { ConsultaService } from './consulta.service';
+import { ConsultaService } from './consulta.service.js';
 import { ApiBadRequestResponse, ApiCookieAuth, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiQuery, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
-import { INTERVALOS, MAX_CUBOS, MAX_DIAS_VENTANA, exigirTopeCubos, fecha, intervalo, uuid } from './validacion';
-import { AlcanceService } from '../sesion/alcance.service';
-import { Usuario } from '../sesion/guardia';
-import type { UsuarioSesion } from '../sesion/permisos';
+import { INTERVALOS, MAX_CUBOS, MAX_DIAS_VENTANA, exigirTopeCubos, fecha, intervalo, uuid } from './validacion.js';
+import { AlcanceService } from '../sesion/alcance.service.js';
+import { Usuario } from '../sesion/guardia.js';
+import type { UsuarioSesion } from '../sesion/permisos.js';
 
 @ApiTags('canales')
 @ApiCookieAuth('sesion')

@@ -1,4 +1,5 @@
-import { desvioDePasarela, tiempoPlausible } from './tiempo';
+import { describe, expect, it } from 'vitest';
+import { desvioDePasarela, tiempoPlausible } from './tiempo.js';
 
 // Filtro 4, regla 7 de docs/13: la marca del emisor se acepta solo si es plausible.
 describe('tiempoPlausible', () => {

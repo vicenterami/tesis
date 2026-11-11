@@ -1,8 +1,7 @@
-// El proceso corre SIEMPRE en UTC, sin depender de la zona del sistema que lo aloje (portátil en
-// Chile, servidor en UTC, contenedor sin zona). Ninguna operación con Date debe verse afectada por
-// dónde corre el backend (docs/13). Va antes de cualquier import que pueda crear un Date.
-process.env.TZ = 'UTC';
-
+// reflect-metadata primero: los decoradores de Nest leen los tipos de los constructores con él. Después, la zona UTC
+// (zona-utc.ts), antes de cualquier otro módulo que pueda crear un Date.
+import 'reflect-metadata';
+import './zona-utc.js';
 import { ConsoleLogger, Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
@@ -10,9 +9,9 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import type { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
-import { AppModule } from './app.module';
-import { AvisosAcotados, horasClaveTemporal, hostsPermitidos, interfazDeEscucha, rechazoDeHost, registrosEnJson, rutaSinCache, servirDocumentacion, claveAdmin, claveApp } from './arranque';
-import { configurarOpenApi } from './openapi';
+import { AppModule } from './app.module.js';
+import { AvisosAcotados, horasClaveTemporal, hostsPermitidos, interfazDeEscucha, rechazoDeHost, registrosEnJson, rutaSinCache, servirDocumentacion, claveAdmin, claveApp } from './arranque.js';
+import { configurarOpenApi } from './openapi.js';
 
 // Punto de entrada. Levanta la aplicación Nest: al iniciarse, cada módulo se conecta a lo suyo
 // (base de datos, broker) y queda escuchando. El puerto HTTP sirve la API y, más adelante, el panel.
@@ -88,7 +87,7 @@ async function arrancar(): Promise<void> {
   // la API, así no hace falta CORS y la sesión (Etapa 4) valdrá para los dos. Ruta: backend/panel/dist, tanto desde dist/
   // (compilado) como desde src/ (desarrollo con --watch); en la imagen, /app/panel/dist. Si no está construido, /panel
   // responde 404 y se avisa al arrancar: la API sigue funcionando sin él.
-  const panel = join(__dirname, '..', 'panel', 'dist');
+  const panel = join(import.meta.dirname, '..', 'panel', 'dist');
   if (existsSync(join(panel, 'index.html'))) {
     app.useStaticAssets(panel, { prefix: '/panel/', index: 'index.html' });
   } else {

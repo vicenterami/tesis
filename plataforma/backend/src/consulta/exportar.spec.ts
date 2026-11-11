@@ -1,4 +1,5 @@
-import { CABECERA_CSV, celdaCsv, celdaNumerica, filaCsv, filaJson, formato, nombreDeArchivo, rangoRazonable } from './exportar';
+import { describe, expect, it } from 'vitest';
+import { CABECERA_CSV, celdaCsv, celdaNumerica, filaCsv, filaJson, formato, nombreDeArchivo, rangoRazonable } from './exportar.js';
 
 const F = { tiempo_utc: '2026-10-12T15:00:00.123456Z', magnitud: 'temperatura', valor: 21.5, unidad: 'Cel', canal_id: 'c1' };
 

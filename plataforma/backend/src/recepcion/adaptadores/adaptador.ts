@@ -1,4 +1,4 @@
-import { ContextoTrama, Lectura, OrigenTiempo } from '../lectura';
+import { ContextoTrama, Lectura, OrigenTiempo } from '../lectura.js';
 
 // Contrato de un adaptador de formato (filtro 2). La plataforma tiene un contrato nativo (SenML)
 // y admite otros formatos mediante adaptadores: cada uno sabe reconocer su formato y traducirlo

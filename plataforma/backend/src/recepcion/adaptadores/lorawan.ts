@@ -1,7 +1,7 @@
-import { ContextoTrama, Lectura } from '../lectura';
-import { limpia } from '../texto';
-import { TramaMalformada } from './adaptador';
-import { ResolverClave } from './mapa-claves';
+import { ContextoTrama, Lectura } from '../lectura.js';
+import { limpia } from '../texto.js';
+import { TramaMalformada } from './adaptador.js';
+import { ResolverClave } from './mapa-claves.js';
 
 // Lo común a los dos adaptadores LoRaWAN (docs/10 §8.4 punto 47): el DevEUI del cuerpo debe ser el del tópico, y las claves
 // decodificadas se traducen con el mapa único.

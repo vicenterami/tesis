@@ -1,4 +1,5 @@
-import { Bloqueos, ESCALONES_MS, ESPERA_SI_LLENO_MS, FALLOS_POR_IP, FALLOS_POR_USUARIO, MAX_CLAVES, VENTANA_MS } from './bloqueos';
+import { describe, expect, it } from 'vitest';
+import { Bloqueos, ESCALONES_MS, ESPERA_SI_LLENO_MS, FALLOS_POR_IP, FALLOS_POR_USUARIO, MAX_CLAVES, VENTANA_MS } from './bloqueos.js';
 
 // Bloqueos por intentos fallidos (docs/20 §4) con un reloj simulado.
 describe('Bloqueos', () => {

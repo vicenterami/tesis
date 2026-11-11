@@ -9,11 +9,11 @@
 //
 // Opciones del tráfico (valores por defecto entre paréntesis): --dispositivos (100) --periodo s (2) --jitter s (0.3)
 // --perdida (0.01) --deriva ms/periodo (20) --caidas fracción (0.1) --semilla (1) --sitio (banco) --sin-sys.
-process.env.TZ = 'UTC';
+import '../zona-utc.js';
 import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import mqtt, { MqttClient } from 'mqtt';
-import { esperaS, lectura, marcaDelNodo, mulberry32, Opciones, pack, Perfil, perfiles, semillaSQL, topico } from './modelo';
+import { esperaS, lectura, marcaDelNodo, mulberry32, Opciones, pack, Perfil, perfiles, semillaSQL, topico } from './modelo.js';
 
 type Estado = 'publicada' | 'rafaga' | 'perdida_emulada';
 interface Envio { id: string; magnitud: string; tiempoMs: number; enviadoEnMs: number; confirmadoEnMs: number | null; estado: Estado }

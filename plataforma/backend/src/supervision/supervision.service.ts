@@ -1,8 +1,8 @@
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Pool } from 'pg';
-import { POOL } from '../db/db.module';
-import { EventosService } from '../tiempo-real/eventos.service';
+import { POOL } from '../db/db.module.js';
+import { EventosService } from '../tiempo-real/eventos.service.js';
 
 // M4 Supervisión de salud — filtro 6 completo.
 //

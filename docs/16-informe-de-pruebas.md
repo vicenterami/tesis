@@ -1914,7 +1914,7 @@ se corta (el panel muestra «Entrar»).
 
 **Vigencia configurable de la clave temporal** (decisión del 08/11/2026; `docs/20 §4`). `CLAVE_TEMPORAL_HORAS`, entero de 1 a 72, 2 por
 defecto (`arranque.ts`, `horasClaveTemporal`), en `.env.example` y en el compose (guardianes 2d y 2z, cada uno plantado quitando la
-línea). jest: 2 h por defecto (vale a 1 h 59, vencida a 2 h y 1 s), 24 h configuradas, 5 h en el alta y al asignar otra, y 0, 73 o texto
+línea). Pruebas unitarias del backend: 2 h por defecto (vale a 1 h 59, vencida a 2 h y 1 s), 24 h configuradas, 5 h en el alta y al asignar otra, y 0, 73 o texto
 detienen la construcción del servicio; plantados el valor por defecto en 24 (fallan 3), sin el tope de 72 (2), el servicio sin leer la
 variable (1) y la cuenta en minutos (3). Arranque real con 0, 73 y «dos»: el contenedor sale con 1 y el mensaje
 «CLAVE_TEMPORAL_HORAS="…" no es válido: se espera un entero de horas entre 1 y 72 (por defecto 2)». Paso 4b: la respuesta del alta vence
@@ -1924,3 +1924,73 @@ que devuelve el servidor (`clave_temporal_vence_en`), no un plazo propio (vitest
 **Cifras finales del bloque.** Pruebas del panel: 165; del backend: 445; paso 4b: 124 de 124; paso 4c: 118 de 118; banco con navegador:
 35 de 35.
 
+## 60. Backend en ES modules y pruebas con vitest (11/11/2026)
+
+**Por qué** (`docs/10 §8.4` punto 63, TT-47). `@nestjs/config` 12 se publica solo como ES module (`"type": "module"` en su
+`package.json`), y su actualización (PR #15 de Dependabot) no compilaba en el CI: 18 errores TS1479 («The current file is a CommonJS
+module whose imports will produce 'require' calls; however, the referenced file is an ECMAScript module») y 4 TS1541. Con el backend en
+CommonJS esa actualización, y después NestJS 12, quedaban cerradas.
+
+**Qué cambió.**
+
+| Pieza | Antes | Después |
+|---|---|---|
+| Formato del paquete | CommonJS (`package.json` sin `"type"`) | `"type": "module"` |
+| `tsconfig.json` | `module` y `moduleResolution` `node16`; `types` `["node", "jest"]` | `nodenext`; `types` `["node"]`; `experimentalDecorators` y `emitDecoratorMetadata` sin cambios |
+| Importaciones relativas | 360 sin extensión | 360 con `.js` (ninguna apunta a una carpeta); `@nestjs/common/constants` → `@nestjs/common/constants.js` (el paquete no declara `exports`) |
+| Ruta del panel y de las migraciones | `__dirname` (`main.ts`, `lorawan.spec.ts`) | `import.meta.dirname` (Node ≥ 20.11) |
+| Zona UTC | `process.env.TZ = 'UTC'` antes de las importaciones de `main.ts`, `exportar-openapi.ts` y `emulador.ts` | módulo `zona-utc.ts`, importado primero: en ES modules las importaciones se evalúan antes que el cuerpo del archivo, y la asignación habría corrido después de cargar todo. En `main.ts` y `exportar-openapi.ts` lo precede `import 'reflect-metadata'` |
+| Pruebas unitarias | jest 30.5.2 + ts-jest 29.4.15, configuración en `package.json` | vitest 5.0.5 (la versión del panel), `vitest.config.ts`, sin globales: cada `*.spec.ts` importa de `vitest` lo que usa; 95 `jest.*` → `vi.*`, 16 `jest.Mock` → `Mock`, 2 `jest.SpyInstance` → `MockInstance` |
+| Emulador (`pnpm emulador`, `banco.sh`) | ts-node 10.9.2 `--transpile-only` | tsx 4.23.15 (MIT, publicada el 20/09/2026) |
+| Dependencias de desarrollo | jest, ts-jest, ts-node, `@types/jest` | vitest, tsx; `esbuild` (llega con tsx) con su script de instalación bloqueado (`allowBuilds: false`; pnpm instala el binario de la plataforma como dependencia opcional) |
+| Guardián, paso 0 | filtraba la línea `Tests:` de jest | filtra `Tests  N passed (N)` de vitest (la del backend y la del panel); lo que comprueba no cambió |
+
+Lo que no cambió: el `Dockerfile` (solo su comentario «sin jest»), el `HEALTHCHECK` (`node -e "require('http')…"`: el código de `-e` es
+CommonJS aunque el paquete sea `"type": "module"`), las importaciones desde paquetes CommonJS (`pg`, `mqtt`, `helmet` y los de NestJS
+cargan desde ES modules sin «Named export not found»: el grafo completo cargó en `pnpm openapi` y en el contenedor) y `openapi.json`.
+Dos guiones de prueba (`lib-personas.sh` y `sesion-smoke.sh`) cargan `dist/alta/credenciales.js` con `require` dentro del contenedor:
+con `"type": "module"` eso es `require(esm)`, estable desde Node 22.12 (la imagen usa 22.23); `engines.node` pasa a `>=22.12 <23`
+para que el backend no corra en una versión donde fallaría.
+
+**Tres decisiones.** (1) **tsx y no la ejecución nativa de TypeScript de Node 22**: la nativa exige importar con `.ts`, y el código importa
+con `.js`, que es lo que pide `nodenext` para que `tsc` emita rutas válidas. (2) **El spec con `Test.createTestingModule`**
+(`tiempo-real/eventos.spec.ts`, el canal por HTTP real) **quedó igual**: vitest 5 transforma con oxc, que lee `emitDecoratorMetadata`
+de `tsconfig.json` y emite la metadata de los constructores; comprobado con una prueba temporal que leyó `design:paramtypes` de
+`EventosController` (`EventosService`, `SitiosDeDispositivos`) y se borró. Así la prueba sigue armando el módulo como en producción.
+(3) **El falso de `mqtt`** (`broker.service.spec.ts`): `vi.mock('mqtt', () => ({ default: { connect } }))`; en ES modules la importación
+por defecto es la clave `default`, y la marca `__esModule` de jest sobra. Una opción de jest sin equivalente: `doNotFake` (en
+`recepcion.service.spec.ts`, que solo finge la fecha) pasó a `toFake: ['Date']`.
+
+**Cómo se verificó** (la pila de desarrollo arriba; base, broker y proxy sin tocar: se reconstruyó y recreó solo el backend, con
+`docker compose build backend` y `up -d --no-deps backend`).
+
+| Comprobación | Resultado |
+|---|---|
+| `pnpm verificar` | tipos (120 archivos de `src/`), ESLint (120 archivos, 0 hallazgos), 445 pruebas unitarias del backend en 41 archivos y 165 del panel; en verde |
+| `pnpm openapi` | 18 rutas; `openapi.json` sin diferencias |
+| Imagen y arranque | `dist/` en ES modules; el contenedor `healthy` a los 6 s; el `HEALTHCHECK` a mano, salida 0; `new Date(0).toString()` en el contenedor, `GMT+0000`; `/panel/` 200 (la ruta con `import.meta.dirname`); en los registros, solo el aviso esperado de `/docs` |
+| `api-smoke.sh` | 71 OK, TODO OK |
+| `sesion-smoke.sh` (paso 4b) | 124 de 124 |
+| Banco: `encender` (la semilla la genera el emulador con tsx) y `correr` (100 nodos, 60 s) | 3 020 tramas, 0 pérdidas, latencia p95 4 ms, 0 en cuarentena |
+| Banco, 120 nodos, 90 s (tráfico de §3), con la imagen nueva y con la anterior, cada una en un banco nuevo | nueva: 5 546 tramas, 0 pérdidas, p95 5 ms, `sin_comunicacion` 7 en nodos con caída y 21 falsas, 12 de umbral; anterior (CommonJS): 5 538 tramas, 0 pérdidas, p95 4 ms, 9 con caída y 26 falsas, 12 de umbral. Del mismo orden: el cambio no altera el pipeline. Las 3 falsas de la corrida 4 (07/10) no se repiten con ninguna de las dos imágenes |
+
+**Antes y después.**
+
+| Medida | Antes (jest, CommonJS) | Después (vitest, ES modules) |
+|---|---|---|
+| `pnpm test`, tres corridas seguidas | 3,4 s la primera; 2,7 s las siguientes | 2,8 s la primera; 2,4–2,5 s las siguientes |
+| Pruebas unitarias del backend | 445 en 41 archivos | 445 en 41 archivos |
+| `pnpm audit` | 3 avisos de desarrollo: `glob` y `minimatch` (moderados), `deepmerge` (bajo) | los mismos 3; rutas: `glob` de 131 a 1 (`@nestjs/cli`), `minimatch` de 200 a 34 (`eslint`, `@nestjs/cli`), `deepmerge` de 8 a 2 (`@nestjs/cli`, el plugin de Svelte) |
+| `pnpm audit --prod` y `--audit-level=high` | 0 | 0 |
+| Paquetes en `pnpm-lock.yaml` | 856 (8 235 líneas) | 601 (5 640 líneas): salen 283, entran tsx, esbuild y 26 binarios de esbuild por plataforma |
+| Imagen `plataforma-backend` | 403 MB en disco, 90,5 MB de contenido | 403 MB, 90,5 MB (las dependencias de producción no cambiaron) |
+
+Quitar jest no eliminó ningún aviso de la auditoría: la cadena jest → `test-exclude` → `glob` desapareció, pero `glob` y `minimatch`
+siguen llegando por `@nestjs/cli` y `eslint`, y `deepmerge` por `@nestjs/cli` y el panel. Ninguno entra a la imagen. Licencias de las
+dependencias nuevas, todas de desarrollo y fuera de la imagen (`pnpm licenses list`): tsx, esbuild y sus binarios por plataforma, vitest y
+vite, MIT; entre sus transitivas, `terser` BSD-2-Clause, `expect-type` Apache-2.0 y `lightningcss` MPL-2.0 (ya presente por Vite en el
+panel); compatibles con la AGPL-3.0 del código propio y sin redistribución.
+
+**Cómo repetirlo:** `cd plataforma/backend && pnpm verificar && pnpm audit && pnpm openapi`; con la pila arriba,
+`bash plataforma/pruebas/api-smoke.sh`, `bash plataforma/pruebas/sesion-smoke.sh`, `bash plataforma/pruebas/banco/banco.sh encender 120`,
+`banco.sh correr --duracion 90 --dispositivos 120`, `banco.sh apagar` y `bash plataforma/pruebas/verificar-todo.sh`.

@@ -1,9 +1,10 @@
+import { describe, expect, it, vi } from 'vitest';
 import { BadGatewayException, BadRequestException, ConflictException, InternalServerErrorException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import type { Pool } from 'pg';
-import { ErrorDynsec, OrdenDynsec } from '../broker/dynsec';
-import type { DynsecService } from '../broker/dynsec.service';
-import { AltaService } from './alta.service';
-import { verificarScrypt } from './credenciales';
+import { ErrorDynsec, OrdenDynsec } from '../broker/dynsec.js';
+import type { DynsecService } from '../broker/dynsec.service.js';
+import { AltaService } from './alta.service.js';
+import { verificarScrypt } from './credenciales.js';
 
 const ID = '44444444-4444-4444-8444-444444444444';
 
@@ -30,7 +31,7 @@ function armar(opciones: {
       if (texto === 'COMMIT' && opciones.commitFalla) throw new Error('la base se fue');
       return { rows: [], rowCount: 0 };
     },
-    release: jest.fn(),
+    release: vi.fn(),
   };
   const ordenes: OrdenDynsec[][] = [];
   const dynsec = {

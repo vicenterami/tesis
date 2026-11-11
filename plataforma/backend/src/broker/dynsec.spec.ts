@@ -1,4 +1,5 @@
-import { AdministradorDynsec, ErrorDynsec, TOPICO_ORDENES, ordenesAltaDispositivo } from './dynsec';
+import { describe, expect, it } from 'vitest';
+import { AdministradorDynsec, ErrorDynsec, TOPICO_ORDENES, ordenesAltaDispositivo } from './dynsec.js';
 
 // Sin broker: se captura lo publicado y se simula la respuesta por el tópico de respuestas.
 function armar(esperaMs = 50) {

@@ -1,4 +1,5 @@
-import { emailParaRegistro, ipParaRegistro } from './sesion.service';
+import { describe, expect, it } from 'vitest';
+import { emailParaRegistro, ipParaRegistro } from './sesion.service.js';
 
 // Lo que sale hacia los registros y lo que entra a `acceso.email_intentado` (revisión de privacidad del 08/11/2026).
 describe('privacidad de los registros de acceso', () => {

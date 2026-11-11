@@ -1,11 +1,11 @@
 import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Pool } from 'pg';
-import { POOL } from '../db/db.module';
-import { leerEntero } from '../retencion/retencion.service';
-import { EventosService } from '../tiempo-real/eventos.service';
-import { DynsecService } from './dynsec.service';
-import { COLA_TOPE_POR_DEFECTO, Evaluacion, Muestra, armarMuestra, evaluar } from './metricas';
+import { POOL } from '../db/db.module.js';
+import { leerEntero } from '../retencion/retencion.service.js';
+import { EventosService } from '../tiempo-real/eventos.service.js';
+import { DynsecService } from './dynsec.service.js';
+import { COLA_TOPE_POR_DEFECTO, Evaluacion, Muestra, armarMuestra, evaluar } from './metricas.js';
 
 // Cola del broker vigilada (docs/10 §8.4 punto 43; evidencia SYS-01…05): cada METRICA_BROKER_INTERVALO_S guarda en
 // `metrica_broker` los últimos contadores $SYS que recibió la conexión administradora y evalúa la alarma: si el contador de

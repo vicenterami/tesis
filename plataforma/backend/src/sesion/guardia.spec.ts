@@ -1,9 +1,10 @@
+import { describe, expect, it, vi } from 'vitest';
 import { ExecutionContext, ForbiddenException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
-import { ConClaveTemporal, GuardiaCentral, Publica, escribe, traePedidoDelPanel } from './guardia';
-import { UsuarioSesion, usuarioSistema } from './permisos';
-import type { SesionService } from './sesion.service';
+import { ConClaveTemporal, GuardiaCentral, Publica, escribe, traePedidoDelPanel } from './guardia.js';
+import { UsuarioSesion, usuarioSistema } from './permisos.js';
+import type { SesionService } from './sesion.service.js';
 
 // El guardia central (docs/20 §5), con la sesión falsa: quién entra, quién no y con qué código.
 const CLAVE = 'k'.repeat(32);
@@ -17,7 +18,7 @@ class Rutas {
 }
 
 function armar(opciones: { clave?: string; usuario?: UsuarioSesion | null } = {}) {
-  const cargar = jest.fn(() => Promise.resolve(opciones.usuario === undefined ? ANA : opciones.usuario));
+  const cargar = vi.fn(() => Promise.resolve(opciones.usuario === undefined ? ANA : opciones.usuario));
   const config = { get: (k: string) => (k === 'HTTP_CLAVE_ADMIN' ? opciones.clave : undefined) } as unknown as ConfigService;
   const guardia = new GuardiaCentral(new Reflector(), { cargar } as unknown as SesionService, config);
   const pedir = async (metodo: string, ruta: keyof Rutas, headers: Record<string, string> = {}) => {

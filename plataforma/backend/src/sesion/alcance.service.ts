@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Pool } from 'pg';
-import { POOL } from '../db/db.module';
-import { Accion, UsuarioSesion, exigir } from './permisos';
+import { POOL } from '../db/db.module.js';
+import { Accion, UsuarioSesion, exigir } from './permisos.js';
 
 // El sitio de un recurso, resuelto por el SERVIDOR (docs/20 §5): nunca el que mande el cliente. null = el recurso no existe. Cada ruta
 // que toca un recurso concreto llama a exigirX() antes de tocar la base con él: 404 si no existe o es de otro sitio (misma forma),

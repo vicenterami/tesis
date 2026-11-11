@@ -1,6 +1,6 @@
-import { Lectura } from '../lectura';
-import { limpia } from '../texto';
-import { TramaMalformada } from './adaptador';
+import { Lectura } from '../lectura.js';
+import { limpia } from '../texto.js';
+import { TramaMalformada } from './adaptador.js';
 
 // Perfiles de decodificación por dispositivo (docs/10 §8.4 punto 47; migración 17). Cuando la pasarela entrega el uplink sin
 // decodificar (`data` en base64), el nodo puede declarar en el alta con qué perfil la decodifica la plataforma. La lista es la misma

@@ -5,14 +5,14 @@ import {
   ApiOperation, ApiParam, ApiResponse, ApiTags, ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import type { Response } from 'express';
-import { uuid } from '../consulta/validacion';
-import { AlcanceService } from '../sesion/alcance.service';
-import { Usuario } from '../sesion/guardia';
-import { alcanceDeLectura, exigirEnAlguno } from '../sesion/permisos';
-import type { UsuarioSesion } from '../sesion/permisos';
-import { FORMA_ID_FISICO, FORMATOS_PASARELA } from './alta.dto';
-import { AltaService, CredencialPasarelaRotada, PasarelaCreada, PasarelaDadaDeBaja, PasarelaListada } from './alta.service';
-import { validarPasarela } from './pasarela.dto';
+import { uuid } from '../consulta/validacion.js';
+import { AlcanceService } from '../sesion/alcance.service.js';
+import { Usuario } from '../sesion/guardia.js';
+import { alcanceDeLectura, exigirEnAlguno } from '../sesion/permisos.js';
+import type { UsuarioSesion } from '../sesion/permisos.js';
+import { FORMA_ID_FISICO, FORMATOS_PASARELA } from './alta.dto.js';
+import { AltaService, CredencialPasarelaRotada, PasarelaCreada, PasarelaDadaDeBaja, PasarelaListada } from './alta.service.js';
+import { validarPasarela } from './pasarela.dto.js';
 
 // Pasarelas y servidores de red externos (rutas B y C; docs/10 §3 y §8.4 punto 47). Desde el 08/11/2026 (M7, docs/20 §5): la lista exige
 // sesión y muestra solo las de los sitios del usuario; las rutas que escriben exigen administrador del sitio de la pasarela (o la clave

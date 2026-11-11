@@ -1,7 +1,7 @@
 import { Module } from '@nestjs/common';
-import { EventosController } from './eventos.controller';
-import { EventosService } from './eventos.service';
-import { SitiosDeDispositivos } from './sitios-de-dispositivos';
+import { EventosController } from './eventos.controller.js';
+import { EventosService } from './eventos.service.js';
+import { SitiosDeDispositivos } from './sitios-de-dispositivos.js';
 
 // TT-39 · Canal de tiempo real hacia el panel (SSE). Lo importan quienes publican (recepción, alertas, supervisión);
 // Nest crea un solo EventosService para toda la aplicación.

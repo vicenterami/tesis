@@ -48,7 +48,7 @@ leer() { leer_env "$ENV" "$1"; }
 # clave de administrador de su .env (docs/20 §5), que entra a curl por la entrada estándar, nunca por argumentos.
 api_leer() { printf 'X-Clave-Admin: %s\n' "$(leer HTTP_CLAVE_ADMIN)" | curl -H @- "$@"; }
 DYN_ADMIN=""; [ -f "$ENV" ] && DYN_ADMIN=$(leer MQTT_ADMIN_CLAVE)
-emu() { (cd backend && pnpm -s exec ts-node --transpile-only src/emulador/emulador.ts "$@"); }
+emu() { (cd backend && pnpm -s exec tsx src/emulador/emulador.ts "$@"); }
 case "${1:-}" in
   encender)
     umask 077

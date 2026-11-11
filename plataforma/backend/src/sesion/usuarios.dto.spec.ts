@@ -1,5 +1,6 @@
+import { describe, expect, it } from 'vitest';
 import { BadRequestException } from '@nestjs/common';
-import { validarAltaUsuario, validarCambioUsuario } from './usuarios.dto';
+import { validarAltaUsuario, validarCambioUsuario } from './usuarios.dto.js';
 
 // Cuerpos de POST /usuarios y PATCH /usuarios/{id}: limpios o 400 con todos los motivos (HU-18).
 const S1 = '11111111-1111-4111-8111-111111111111';

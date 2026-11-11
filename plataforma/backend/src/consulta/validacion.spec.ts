@@ -1,9 +1,10 @@
+import { describe, expect, it, vi } from 'vitest';
 import { BadRequestException } from '@nestjs/common';
-import { CanalesController } from './canales.controller';
-import type { ConsultaService } from './consulta.service';
-import type { AlcanceService } from '../sesion/alcance.service';
-import { usuarioSistema } from '../sesion/permisos';
-import { MAX_CUBOS, cubos, exigirTopeCubos, fecha, intervalo, limite, uuid } from './validacion';
+import { CanalesController } from './canales.controller.js';
+import type { ConsultaService } from './consulta.service.js';
+import type { AlcanceService } from '../sesion/alcance.service.js';
+import { usuarioSistema } from '../sesion/permisos.js';
+import { MAX_CUBOS, cubos, exigirTopeCubos, fecha, intervalo, limite, uuid } from './validacion.js';
 
 // Toda entrada del cliente es hostil (docs/11 §3). Un parámetro repetido llega como arreglo: debe dar 400, nunca 500.
 describe('validacion: parámetros de consulta', () => {
@@ -50,8 +51,8 @@ describe('validacion: parámetros de consulta', () => {
     expect(() => exigirTopeCubos(atras(367), hasta, '1 day')).toThrow(/367 días.*máximo es 366/);
   });
   it('GET /canales/{id}/historico rechaza la ventana excesiva sin llamar a la consulta; si pasa, exige el sitio del canal (docs/20 §6)', async () => {
-    const historico = jest.fn();
-    const exigirCanal = jest.fn(() => Promise.resolve());
+    const historico = vi.fn();
+    const exigirCanal = vi.fn(() => Promise.resolve());
     const c = new CanalesController({ historico } as unknown as ConsultaService, { exigirCanal } as unknown as AlcanceService);
     const ID = '11111111-1111-4111-8111-111111111111';
     await expect(c.historico(usuarioSistema(), ID, '2026-01-01T00:00:00Z', '2026-10-01T00:00:00Z', '1 minute')).rejects.toThrow(BadRequestException);

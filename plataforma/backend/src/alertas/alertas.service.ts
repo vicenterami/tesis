@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { Pool } from 'pg';
-import { POOL } from '../db/db.module';
-import { EventosService } from '../tiempo-real/eventos.service';
+import { POOL } from '../db/db.module.js';
+import { EventosService } from '../tiempo-real/eventos.service.js';
 
 interface Regla { id: string; umbral_alto: number | null; umbral_bajo: number | null; histeresis: number }
 

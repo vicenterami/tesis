@@ -1,4 +1,5 @@
-import { N_PERSONA, generarSecreto, hashScrypt, igualesEnTiempoConstante, verificarScrypt } from './credenciales';
+import { describe, expect, it } from 'vitest';
+import { N_PERSONA, generarSecreto, hashScrypt, igualesEnTiempoConstante, verificarScrypt } from './credenciales.js';
 
 describe('credenciales del alta: secreto aleatorio y hash scrypt', () => {
   it('el secreto tiene 32 caracteres base64url y nunca se repite', () => {

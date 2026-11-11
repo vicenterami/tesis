@@ -1,9 +1,9 @@
 import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import mqtt, { MqttClient } from 'mqtt';
-import { claveOpcional } from '../arranque';
-import { AdministradorDynsec, ErrorDynsec, OrdenDynsec, RespuestaDynsec, TOPICO_RESPUESTAS, USUARIO_ADMIN } from './dynsec';
-import { Contador, TOPICOS_SYS, valorSys } from './metricas';
+import { claveOpcional } from '../arranque.js';
+import { AdministradorDynsec, ErrorDynsec, OrdenDynsec, RespuestaDynsec, TOPICO_RESPUESTAS, USUARIO_ADMIN } from './dynsec.js';
+import { Contador, TOPICOS_SYS, valorSys } from './metricas.js';
 
 // Segunda conexión al broker, como `backend-admin`, solo para administrar el plugin de seguridad (docs/10 §8.4 punto 41: una
 // identidad distinta de la que recibe tramas, con el rol `admin` del plugin). Sesión limpia: una respuesta a una orden que ya

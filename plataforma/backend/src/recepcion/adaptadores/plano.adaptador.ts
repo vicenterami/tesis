@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { ContextoTrama, Lectura } from '../lectura';
-import { Adaptador, TramaMalformada } from './adaptador';
+import { ContextoTrama, Lectura } from '../lectura.js';
+import { Adaptador, TramaMalformada } from './adaptador.js';
 
 // Formato "plano": el más simple que puede emitir un nodo con poca memoria, y también la forma
 // esperada del JSON del compañero (identificador, marca temporal, valor). Acepta dos variantes:

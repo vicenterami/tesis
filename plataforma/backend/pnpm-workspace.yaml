@@ -8,14 +8,18 @@ packages:
 #   @nestjs/core  → su postinstall solo imprime un mensaje de donación
 #   unrs-resolver → su postinstall descarga un binario; pnpm ya lo instala como dependencia opcional
 #   @scarf/scarf  → telemetría: su postinstall avisa a un servidor externo de la instalación; bloqueado
-#   @parcel/watcher → bloqueado el 23/10/2026 antes de que llegara; está en el lockfile desde el 26/10 (jest 30.5, por
+#   @parcel/watcher → bloqueado el 23/10/2026 antes de que llegara; estuvo en el lockfile del 26/10 al 11/11/2026 (jest 30.5, por
 #                   jest-haste-map; solo desarrollo, MIT). Su postinstall compila un módulo nativo solo si falta el binario; pnpm ya instala el binario
-#                   de la plataforma como dependencia opcional
+#                   de la plataforma como dependencia opcional. Con jest salieron él y unrs-resolver; las dos líneas quedan como bloqueo preventivo
+#   esbuild       → llega el 11/11/2026 con tsx (emulador; solo desarrollo, MIT). Su postinstall (install.js) valida la versión del
+#                   binario, lo descarga de registry.npmjs.org solo si falta el paquete de la plataforma y reemplaza el shim JS por
+#                   el binario nativo (optimización de arranque); pnpm ya instala @esbuild/linux-x64 como dependencia opcional
 # Si una dependencia futura lo requiere de verdad, se pone en `true` con el porqué al lado.
 allowBuilds:
   '@nestjs/core': false
   '@parcel/watcher': false
   '@scarf/scarf': false
+  esbuild: false
   unrs-resolver: false
 # Versiones corregidas de dependencias transitivas con avisos de seguridad (docs/11 §4): el 23/09/2026 ajv, multer y
 # picomatch; el 08/10/2026 el resto (avisos publicados después del 27/09); el 25/10/2026 body-parser, multer, fast-uri y undici

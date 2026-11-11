@@ -1,9 +1,10 @@
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest';
 import { BadRequestException, HttpException, UnauthorizedException } from '@nestjs/common';
 import type { Pool } from 'pg';
-import * as credenciales from '../alta/credenciales';
-import { INACTIVIDAD_MS, VIDA_ABSOLUTA_MS, hashIdentificador } from './cookie';
-import { matrizPorRol, usuarioSistema } from './permisos';
-import { MENSAJE_CREDENCIALES, SesionService, credencialesDelCuerpo } from './sesion.service';
+import * as credenciales from '../alta/credenciales.js';
+import { INACTIVIDAD_MS, VIDA_ABSOLUTA_MS, hashIdentificador } from './cookie.js';
+import { matrizPorRol, usuarioSistema } from './permisos.js';
+import { MENSAJE_CREDENCIALES, SesionService, credencialesDelCuerpo } from './sesion.service.js';
 
 // La sesión de punta a punta contra una base falsa en memoria y un reloj simulado (docs/20 §3, §4 y §8). El hash real (N = 2^17) se
 // reemplaza por uno trivial: aquí se prueba QUÉ se verifica y cuándo; el costo y el tiempo igual los mide el guardián contra el backend.
@@ -14,7 +15,7 @@ function base(usuarios: Usuario[]) {
   const sesiones: Sesion[] = [];
   const accesos: { resultado: string; usuario_id: string | null; email: string | null; sesion_id: string | null }[] = [];
   const eventos: string[] = [];
-  const query = jest.fn((sql: string, p: unknown[] = []) => {
+  const query = vi.fn((sql: string, p: unknown[] = []) => {
     const filas = (rows: unknown[]) => Promise.resolve({ rows, rowCount: rows.length });
     if (sql.startsWith('SELECT id, nombre, email, hash_password')) {
       return filas(usuarios.filter((u) => (sql.includes('WHERE email') ? u.email === p[0] : u.id === p[0])));
@@ -55,13 +56,13 @@ function base(usuarios: Usuario[]) {
 }
 
 describe('SesionService (docs/20 §3–§4) con reloj simulado', () => {
-  let verificar: jest.SpyInstance;
-  let hashear: jest.SpyInstance;
+  let verificar: MockInstance;
+  let hashear: MockInstance;
   beforeEach(() => {
-    hashear = jest.spyOn(credenciales, 'hashScrypt').mockImplementation((s: string) => Promise.resolve(`falso$${s}`));
-    verificar = jest.spyOn(credenciales, 'verificarScrypt').mockImplementation((s: string, h: string) => Promise.resolve(h === `falso$${s}`));
+    hashear = vi.spyOn(credenciales, 'hashScrypt').mockImplementation((s: string) => Promise.resolve(`falso$${s}`));
+    verificar = vi.spyOn(credenciales, 'verificarScrypt').mockImplementation((s: string, h: string) => Promise.resolve(h === `falso$${s}`));
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => vi.restoreAllMocks());
 
   const ANA: Usuario = { id: 'u-ana', nombre: 'Ana', email: 'ana@ejemplo.invalid', hash_password: 'falso$caballo correcto bateria', activo: true, clave_temporal: false, clave_temporal_vence_en: null };
   const armar = (usuarios: Usuario[] = [{ ...ANA }]) => {
@@ -214,7 +215,7 @@ describe('SesionService (docs/20 §3–§4) con reloj simulado', () => {
     const { s } = armar();
     const pendientes: (() => void)[] = [];
     verificar.mockImplementation(() => new Promise<boolean>((r) => pendientes.push(() => r(false))));
-    const fallaIp = jest.spyOn(s.bloqueos, 'registrarFalloIp');
+    const fallaIp = vi.spyOn(s.bloqueos, 'registrarFalloIp');
     const intentos: Promise<unknown>[] = [];
     // 11 direcciones × 2 = 22 verificaciones: 2 en curso y 20 en cola (turnos.ts).
     for (let i = 0; i < 11; i++) for (let j = 0; j < 2; j++) intentos.push(fallo(s.iniciar(credencial(ANA.email, 'mala larguisima'), `192.0.2.${10 + i}`, undefined)));

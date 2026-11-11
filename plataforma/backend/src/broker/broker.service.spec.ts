@@ -1,20 +1,23 @@
+import { describe, expect, it, vi, type Mock } from 'vitest';
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import mqtt from 'mqtt';
 import type { IPublishPacket } from 'mqtt';
-import { BrokerService, REINTENTOS_MS } from './broker.service';
+import { BrokerService, REINTENTOS_MS } from './broker.service.js';
 
 // Decisión 4 (docs/10 §8.4): el pipeline corre dentro de handleMessage de mqtt.js, un mensaje a la vez, y el PUBACK
 // (el callback) sale solo cuando el manejador terminó. Se prueba con un cliente mockCliente: nada de red.
 const clienteFalso = () => ({
-  on: jest.fn(),
-  subscribe: jest.fn(),
-  end: jest.fn(),
-  reconnect: jest.fn(),
+  on: vi.fn(),
+  subscribe: vi.fn(),
+  end: vi.fn(),
+  reconnect: vi.fn(),
   handleMessage: undefined as unknown,
 });
 let mockCliente = clienteFalso();
-jest.mock('mqtt', () => ({ __esModule: true, default: { connect: jest.fn(() => mockCliente) } }));
+// vitest sube vi.mock sobre las importaciones; la fábrica lee mockCliente recién al llamar a connect, ya inicializado.
+// En ES modules la importación por defecto (`import mqtt from 'mqtt'`) es la clave `default` del módulo falso.
+vi.mock('mqtt', () => ({ default: { connect: vi.fn(() => mockCliente) } }));
 
 const publish = (topico: string, carga: string): IPublishPacket =>
   ({ cmd: 'publish', qos: 1, dup: false, retain: false, messageId: 1, topic: topico, payload: Buffer.from(carga) });
@@ -38,8 +41,8 @@ describe('BrokerService: un mensaje a la vez y PUBACK después de guardar (decis
     const { servicio, handle } = armar();
     const vistos: string[] = [];
     servicio.alRecibir(async (_t, c) => { vistos.push(c.toString()); await Promise.resolve(); });
-    const cb = jest.fn();
-    const warn = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    const cb = vi.fn();
+    const warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
     handle({ ...publish('sitio/x/pasarela/p/d\u202E/up', 'R'), retain: true }, cb);
     await new Promise((r) => setTimeout(r, 0));
     expect(cb).toHaveBeenCalledWith();
@@ -50,7 +53,7 @@ describe('BrokerService: un mensaje a la vez y PUBACK después de guardar (decis
 
   it('el descarte vale porque la conexión es MQTT 3.1.1 y la suscripción no pide «Retain As Published» (docs/10 §8.4 punto 50)', () => {
     armar();
-    const opciones = (mqtt.connect as jest.Mock).mock.calls.at(-1)?.[1] as { protocolVersion?: number };
+    const opciones = (mqtt.connect as Mock).mock.calls.at(-1)?.[1] as { protocolVersion?: number };
     expect(opciones.protocolVersion).toBe(4); // explícito: con 5 y rap, el envío en vivo llegaría con retain = 1 y se perdería
     const conectar = mockCliente.on.mock.calls.find(([ev]) => ev === 'connect')?.[1] as () => void;
     conectar();
@@ -67,7 +70,7 @@ describe('BrokerService: un mensaje a la vez y PUBACK después de guardar (decis
       if (c.toString() === 'A') await primero;
       orden.push(`fin ${c.toString()}`);
     });
-    const cbA = jest.fn();
+    const cbA = vi.fn();
     handle(publish('sitio/x/dispositivo/d/temperatura', 'A'), cbA);
     await Promise.resolve();
     expect(cbA).not.toHaveBeenCalled(); // A sigue en el manejador: sin PUBACK todavía
@@ -79,16 +82,16 @@ describe('BrokerService: un mensaje a la vez y PUBACK después de guardar (decis
 
   it('paquetes que no son publish se confirman de inmediato sin tocar el pipeline', () => {
     const { servicio, handle } = armar();
-    const manejador = jest.fn();
+    const manejador = vi.fn();
     servicio.alRecibir(manejador);
-    const cb = jest.fn();
+    const cb = vi.fn();
     handle({ cmd: 'pingresp' } as unknown as IPublishPacket, cb);
     expect(cb).toHaveBeenCalledWith();
     expect(manejador).not.toHaveBeenCalled();
   });
 
   it('si el manejador falla, reintenta el MISMO mensaje con las esperas fijadas y confirma al lograrlo', async () => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
     try {
       const { servicio, handle } = armar();
       let intentos = 0;
@@ -96,19 +99,19 @@ describe('BrokerService: un mensaje a la vez y PUBACK después de guardar (decis
         intentos++;
         if (intentos < 3) throw new Error('getaddrinfo EAI_AGAIN timescaledb');
       });
-      const cb = jest.fn();
+      const cb = vi.fn();
       handle(publish('sitio/x/dispositivo/d/temperatura', '21'), cb);
-      await jest.advanceTimersByTimeAsync(REINTENTOS_MS[0] + REINTENTOS_MS[1]);
+      await vi.advanceTimersByTimeAsync(REINTENTOS_MS[0] + REINTENTOS_MS[1]);
       expect(intentos).toBe(3);
       expect(cb).toHaveBeenCalledWith();
       expect(mockCliente.reconnect).not.toHaveBeenCalled();
     } finally {
-      jest.useRealTimers();
+      vi.useRealTimers();
     }
   });
 
   it('agotados los reintentos: NO confirma (el broker lo reenviará) y reconecta', async () => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
     try {
       const { servicio, handle } = armar();
       let intentos = 0;
@@ -116,15 +119,15 @@ describe('BrokerService: un mensaje a la vez y PUBACK después de guardar (decis
         intentos++;
         throw new Error('la base no responde');
       });
-      const cb = jest.fn();
+      const cb = vi.fn();
       handle(publish('sitio/x/dispositivo/d/temperatura', '21'), cb);
-      await jest.advanceTimersByTimeAsync(REINTENTOS_MS.reduce((a, b) => a + b, 0) + 1);
+      await vi.advanceTimersByTimeAsync(REINTENTOS_MS.reduce((a, b) => a + b, 0) + 1);
       expect(intentos).toBe(REINTENTOS_MS.length + 1);
       expect(cb).toHaveBeenCalledTimes(1);
       expect(cb.mock.calls[0][0]).toBeInstanceOf(Error); // con error = sin PUBACK
       expect(mockCliente.reconnect).toHaveBeenCalledTimes(1);
     } finally {
-      jest.useRealTimers();
+      vi.useRealTimers();
     }
   });
 });

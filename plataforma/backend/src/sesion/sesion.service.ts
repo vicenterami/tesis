@@ -4,16 +4,16 @@ import {
 import { isIP } from 'node:net';
 import { randomBytes } from 'node:crypto';
 import { Pool } from 'pg';
-import { POOL } from '../db/db.module';
-import { AvisosAcotados } from '../arranque';
-import { hashScrypt, N_PERSONA, verificarScrypt } from '../alta/credenciales';
-import { Bloqueos } from './bloqueos';
-import { motivosDeClave } from './claves';
+import { POOL } from '../db/db.module.js';
+import { AvisosAcotados } from '../arranque.js';
+import { hashScrypt, N_PERSONA, verificarScrypt } from '../alta/credenciales.js';
+import { Bloqueos } from './bloqueos.js';
+import { motivosDeClave } from './claves.js';
 import {
   VIDA_ABSOLUTA_MS, claveTemporalVencida, debeRenovar, generarIdentificador, hashIdentificador, motivoDeVencimiento,
-} from './cookie';
-import { ROLES, Rol, UsuarioSesion, matrizPorRol } from './permisos';
-import { Turnos } from './turnos';
+} from './cookie.js';
+import { ROLES, Rol, UsuarioSesion, matrizPorRol } from './permisos.js';
+import { Turnos } from './turnos.js';
 
 // M7 · Sesión de personas (docs/20 §3 y §4). Una cookie opaca con estado en la base: aquí se abre, se carga en cada petición (el
 // guardia central la usa), se renueva, se cierra y se rota al cambiar la clave. Todo intento de inicio de sesión y todo cierre deja una

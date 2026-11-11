@@ -5,16 +5,16 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import type { Response } from 'express';
-import { ConsultaService } from './consulta.service';
-import { CABECERA_CSV, FORMATOS, filaCsv, filaJson, formato, nombreDeArchivo, rangoRazonable } from './exportar';
+import { ConsultaService } from './consulta.service.js';
+import { CABECERA_CSV, FORMATOS, filaCsv, filaJson, formato, nombreDeArchivo, rangoRazonable } from './exportar.js';
 
 // Exportaciones simultáneas admitidas por proceso: cada una ocupa una conexión a la base durante toda la descarga.
 export const MAX_EXPORTACIONES = 2;
-import { fecha, uuid } from './validacion';
-import { AlcanceService } from '../sesion/alcance.service';
-import { Usuario } from '../sesion/guardia';
-import { alcanceDeLectura } from '../sesion/permisos';
-import type { UsuarioSesion } from '../sesion/permisos';
+import { fecha, uuid } from './validacion.js';
+import { AlcanceService } from '../sesion/alcance.service.js';
+import { Usuario } from '../sesion/guardia.js';
+import { alcanceDeLectura } from '../sesion/permisos.js';
+import type { UsuarioSesion } from '../sesion/permisos.js';
 
 // Lecturas con sesión (docs/20 §6, desde el 08/11/2026): 401 sin sesión; la lista sale filtrada por los sitios del usuario en el WHERE;
 // un dispositivo de otro sitio responde 404, igual que uno inexistente (RF-41); exportar exige rol administrador (403 al de consulta).

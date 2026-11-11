@@ -1,16 +1,16 @@
 import { Module } from '@nestjs/common';
-import { AlertasModule } from '../alertas/alertas.module';
-import { BrokerModule } from '../broker/broker.module';
-import { SupervisionModule } from '../supervision/supervision.module';
-import { TiempoRealModule } from '../tiempo-real/tiempo-real.module';
-import { ChirpstackAdaptador } from './adaptadores/chirpstack.adaptador';
-import { RESOLVER_CLAVE, resolverClave } from './adaptadores/mapa-claves';
-import { MilesightAdaptador } from './adaptadores/milesight.adaptador';
-import { PlanoAdaptador } from './adaptadores/plano.adaptador';
-import { SenmlAdaptador } from './adaptadores/senml.adaptador';
-import { RecepcionHttpController } from './http/recepcion-http.controller';
-import { VerificacionDeTokens } from './http/verificacion';
-import { RecepcionService } from './recepcion.service';
+import { AlertasModule } from '../alertas/alertas.module.js';
+import { BrokerModule } from '../broker/broker.module.js';
+import { SupervisionModule } from '../supervision/supervision.module.js';
+import { TiempoRealModule } from '../tiempo-real/tiempo-real.module.js';
+import { ChirpstackAdaptador } from './adaptadores/chirpstack.adaptador.js';
+import { RESOLVER_CLAVE, resolverClave } from './adaptadores/mapa-claves.js';
+import { MilesightAdaptador } from './adaptadores/milesight.adaptador.js';
+import { PlanoAdaptador } from './adaptadores/plano.adaptador.js';
+import { SenmlAdaptador } from './adaptadores/senml.adaptador.js';
+import { RecepcionHttpController } from './http/recepcion-http.controller.js';
+import { VerificacionDeTokens } from './http/verificacion.js';
+import { RecepcionService } from './recepcion.service.js';
 
 // Para admitir un formato nuevo: crear su adaptador y registrarlo aquí y en el constructor del servicio.
 @Module({

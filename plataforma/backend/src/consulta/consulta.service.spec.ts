@@ -1,6 +1,7 @@
+import { describe, expect, it, vi } from 'vitest';
 import { NotFoundException } from '@nestjs/common';
 import { Pool } from 'pg';
-import { ConsultaService, SQL_INTERVALO_OBSERVADO } from './consulta.service';
+import { ConsultaService, SQL_INTERVALO_OBSERVADO } from './consulta.service.js';
 
 // Contrato de GET /dispositivos/{id} con el intervalo observado (docs/19 §4, incremento 1, punto 3). La mediana la calcula la
 // base: aquí se fija qué se le pide (las piezas de la regla) y que el campo llega a la respuesta tal cual, número o null.
@@ -8,7 +9,7 @@ describe('ConsultaService.dispositivo: intervalo_observado_s', () => {
   const ID = '00000000-0000-4000-8000-000000000001';
   function armar(fila: Record<string, unknown> | undefined) {
     const consultas: string[] = [];
-    const query = jest.fn((sql: string) => {
+    const query = vi.fn((sql: string) => {
       consultas.push(sql);
       if (sql.includes('FROM dispositivo d')) return Promise.resolve({ rows: fila ? [fila] : [] });
       return Promise.resolve({ rows: [] });

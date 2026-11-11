@@ -1,5 +1,6 @@
+import { describe, expect, it } from 'vitest';
 import type { Request } from 'express';
-import { direccionDelCliente } from './direccion';
+import { direccionDelCliente } from './direccion.js';
 
 // La dirección del cliente detrás del proxy (docs/10 §8.4 punto 52): X-Forwarded-For solo con el secreto compartido.
 describe('direccionDelCliente', () => {

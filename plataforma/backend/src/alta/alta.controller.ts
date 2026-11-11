@@ -5,14 +5,14 @@ import {
   ApiOperation, ApiParam, ApiResponse, ApiTags, ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import type { Response } from 'express';
-import { AltaValidada, FORMATOS_DIRECTOS, FORMA_ID_FISICO, MAX_CANALES, VIAS, validarAlta } from './alta.dto';
-import { PERFILES } from '../recepcion/adaptadores/perfiles';
-import { AltaService, CredencialRotada, DispositivoCreado, DispositivoDadoDeBaja } from './alta.service';
-import { uuid } from '../consulta/validacion';
-import { AlcanceService } from '../sesion/alcance.service';
-import { Usuario } from '../sesion/guardia';
-import { exigirEnAlguno } from '../sesion/permisos';
-import type { UsuarioSesion } from '../sesion/permisos';
+import { AltaValidada, FORMATOS_DIRECTOS, FORMA_ID_FISICO, MAX_CANALES, VIAS, validarAlta } from './alta.dto.js';
+import { PERFILES } from '../recepcion/adaptadores/perfiles.js';
+import { AltaService, CredencialRotada, DispositivoCreado, DispositivoDadoDeBaja } from './alta.service.js';
+import { uuid } from '../consulta/validacion.js';
+import { AlcanceService } from '../sesion/alcance.service.js';
+import { Usuario } from '../sesion/guardia.js';
+import { exigirEnAlguno } from '../sesion/permisos.js';
+import type { UsuarioSesion } from '../sesion/permisos.js';
 
 // Aprovisionamiento por API (docs/10 §3, §8.4 puntos 41 y 42; docs/19 P7 «Propuesta»): POST /dispositivos (HU-11, RF-19),
 // DELETE /dispositivos/{id} (baja) y POST /dispositivos/{id}/credencial (rotación por dispositivo; RF-45 pide rotar la credencial de recepción de un SITIO sin

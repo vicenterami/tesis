@@ -1,10 +1,11 @@
+import { describe, expect, it, vi } from 'vitest';
 import { BadRequestException, ConflictException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import type { Pool } from 'pg';
-import { ErrorDynsec, OrdenDynsec, ROL_PASARELA } from '../broker/dynsec';
-import type { DynsecService } from '../broker/dynsec.service';
-import { AltaService } from './alta.service';
-import { verificarScrypt } from './credenciales';
-import { validarPasarela } from './pasarela.dto';
+import { ErrorDynsec, OrdenDynsec, ROL_PASARELA } from '../broker/dynsec.js';
+import type { DynsecService } from '../broker/dynsec.service.js';
+import { AltaService } from './alta.service.js';
+import { verificarScrypt } from './credenciales.js';
+import { validarPasarela } from './pasarela.dto.js';
 
 // Pasarelas por API (docs/10 §8.4 punto 47): el mismo todo o nada que un dispositivo, con base y broker falsos.
 const S = '55555555-5555-4555-8555-555555555555';
@@ -32,7 +33,7 @@ function armar(opciones: { sitio?: { codigo: string; activo: boolean } | null; f
       if (texto.startsWith('INSERT INTO evento')) return { rows: [{ ocurrido_en: new Date('2026-10-15T23:05:00Z') }], rowCount: 1 };
       return { rows: [], rowCount: 1 };
     },
-    release: jest.fn(),
+    release: vi.fn(),
   };
   const ordenes: OrdenDynsec[][] = [];
   const dynsec = {

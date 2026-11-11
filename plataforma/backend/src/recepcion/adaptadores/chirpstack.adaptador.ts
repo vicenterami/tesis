@@ -1,10 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { ContextoTrama, Lectura } from '../lectura';
-import { Adaptador, TramaMalformada } from './adaptador';
-import { IdentidadNoVerificada, anotarFcnt, exigirDevEui, lecturasDe, objetoJson, tiempoDe } from './lorawan';
-import { RESOLVER_CLAVE } from './mapa-claves';
-import type { ResolverClave } from './mapa-claves';
-import { decodificar } from './perfiles';
+import { ContextoTrama, Lectura } from '../lectura.js';
+import { Adaptador, TramaMalformada } from './adaptador.js';
+import { IdentidadNoVerificada, anotarFcnt, exigirDevEui, lecturasDe, objetoJson, tiempoDe } from './lorawan.js';
+import { RESOLVER_CLAVE } from './mapa-claves.js';
+import type { ResolverClave } from './mapa-claves.js';
+import { decodificar } from './perfiles.js';
 
 // Evento `up` de la integración MQTT de ChirpStack v4 (docs/10 §8.4 punto 47; ruta C, y la A si algún día hay un ChirpStack propio).
 // JSON por defecto (`json=true`), con el mapeo JSON de Protocol Buffers: nombres en camelCase. Lo que se usa:

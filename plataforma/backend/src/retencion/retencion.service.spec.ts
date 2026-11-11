@@ -1,6 +1,7 @@
+import { describe, expect, it, vi } from 'vitest';
 import { ConfigService } from '@nestjs/config';
 import { Pool } from 'pg';
-import { leerEntero, PLAZOS, RetencionService } from './retencion.service';
+import { leerEntero, PLAZOS, RetencionService } from './retencion.service.js';
 
 // La retención borra datos: lo primero que se prueba es que un valor mal escrito NO borre de más.
 describe('RetencionService', () => {
@@ -20,7 +21,7 @@ describe('RetencionService', () => {
 
   function armar(fallaEn?: string, entorno: Record<string, string> = {}) {
     const consultas: string[] = [];
-    const query = jest.fn((sql: string, params?: unknown[]) => {
+    const query = vi.fn((sql: string, params?: unknown[]) => {
       consultas.push(sql);
       if (sql.includes('drop_chunks')) {
         if (params?.[0] === fallaEn) return Promise.reject(new Error('canceling statement due to lock timeout'));
@@ -28,14 +29,14 @@ describe('RetencionService', () => {
       }
       return Promise.resolve({ rows: [] });
     });
-    const release = jest.fn();
+    const release = vi.fn();
     // pool.query: la limpieza de sesiones (fn_limpiar_sesiones, migración 22) y la fila de la corrida en `evento`.
-    const registrar = jest.fn((sql: string, _params?: unknown[]) => {
+    const registrar = vi.fn((sql: string, _params?: unknown[]) => {
       if (sql.includes('fn_limpiar_sesiones')) return fallaEn === 'sesiones' ? Promise.reject(new Error('sin conexión')) : Promise.resolve({ rows: [{ n: 3 }] });
       return Promise.resolve({ rows: [] });
     });
-    const pool = { connect: jest.fn(() => Promise.resolve({ query, release })), query: registrar } as unknown as Pool;
-    const config = { get: jest.fn((k: string) => entorno[k]) } as unknown as ConfigService;
+    const pool = { connect: vi.fn(() => Promise.resolve({ query, release })), query: registrar } as unknown as Pool;
+    const config = { get: vi.fn((k: string) => entorno[k]) } as unknown as ConfigService;
     return { servicio: new RetencionService(pool, config), query, release, consultas, registrar };
   }
 
@@ -71,23 +72,23 @@ describe('RetencionService', () => {
   });
 
   it('al arrancar NO borra nada de inmediato: un proceso de corta vida (pnpm openapi) se cierra antes', async () => {
-    jest.useFakeTimers();
+    vi.useFakeTimers();
     try {
       const corto = armar();
       corto.servicio.onModuleInit();
       corto.servicio.onModuleDestroy();
-      await jest.advanceTimersByTimeAsync(25 * 3600 * 1000);
+      await vi.advanceTimersByTimeAsync(25 * 3600 * 1000);
       expect(corto.query).not.toHaveBeenCalled();
 
       const largo = armar();
       largo.servicio.onModuleInit();
-      await jest.advanceTimersByTimeAsync(59_000);
+      await vi.advanceTimersByTimeAsync(59_000);
       expect(largo.query).not.toHaveBeenCalled();
-      await jest.advanceTimersByTimeAsync(1_000);
+      await vi.advanceTimersByTimeAsync(1_000);
       expect(largo.consultas.filter((c) => c.includes('drop_chunks'))).toHaveLength(4);
       largo.servicio.onModuleDestroy();
     } finally {
-      jest.useRealTimers();
+      vi.useRealTimers();
     }
   });
 
