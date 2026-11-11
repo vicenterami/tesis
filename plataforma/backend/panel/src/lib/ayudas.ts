@@ -11,13 +11,19 @@ interface Frase {
 export const FRASES: Readonly<Record<string, Frase>> = {
   leer: { puede: 've dispositivos, históricos, condiciones y cuarentena de sus sitios', noPuede: 'no ve los datos de sus sitios' },
   exportar: { puede: 'exporta las mediciones crudas', noPuede: 'no exporta' },
-  escribir: { puede: 'da de alta, da de baja y configura dispositivos, pasarelas y calibraciones', noPuede: 'no cambia nada' },
+  // La baja es otra acción (`baja`, solo administradores): corrección del 11/11/2026, antes la guía del operador técnico decía que da de baja.
+  escribir: { puede: 'da de alta y calibra dispositivos y pasarelas', noPuede: 'no cambia nada' },
   usuarios: { puede: 'da de alta personas y les asigna su rol en sus sitios', noPuede: 'no administra personas' },
   // Desde el tablero v2 (docs/19 §4, E; servidor: PATCH /dispositivos/{id} y PUT /canales/{id}/reglas).
   configurar: { puede: 'configura nombre, estado, intervalo, zona y umbrales de los dispositivos', noPuede: 'no configura dispositivos ni umbrales' },
+  // Los cinco perfiles (docs/20 §2 y §6; servidor: ACCIONES de sesion/permisos.ts, 11/11/2026).
+  baja: { puede: 'da de baja dispositivos (revoca sus credenciales)', noPuede: 'no da de baja dispositivos' },
+  enlaces: { puede: 'crea y revoca los enlaces públicos de solo lectura del sitio', noPuede: 'no administra enlaces públicos' },
+  auditoria: { puede: 've la actividad de las personas en sus sitios', noPuede: 'no ve la actividad de las personas' },
+  sistema: { puede: 'administra el sistema: soporte, estado y límites de los servicios', noPuede: 'no administra el sistema' },
 };
 
-const NOMBRE_ROL: Readonly<Record<string, string>> = { administrador: 'Administrador', consulta: 'Consulta' };
+const NOMBRE_ROL: Readonly<Record<string, string>> = { administrador: 'Administrador', consulta: 'Consulta', investigador: 'Investigación', operador: 'Operación técnica' };
 
 // «a, b y c»
 function enumerar(xs: readonly string[], ultima: string): string {
@@ -25,14 +31,18 @@ function enumerar(xs: readonly string[], ultima: string): string {
   return `${xs.slice(0, -1).join(', ')} ${ultima} ${xs[xs.length - 1]}`;
 }
 
-// Todas las acciones que la matriz conoce (la unión de las de cada rol), en el orden en que aparecen.
+// Acciones de la matriz que aún no tienen ninguna ruta (los enlaces públicos son de la Etapa 4, docs/19 §7): la guía no las ofrece ni las
+// niega mientras no existan (corrección del 11/11/2026). Al construir la ruta, se quita de aquí.
+export const SIN_RUTA_TODAVIA: readonly string[] = ['enlaces'];
+
+// Todas las acciones que la matriz conoce (la unión de las de cada rol), en el orden en que aparecen, sin las que aún no tienen ruta.
 export function accionesDe(m: Matriz): string[] {
-  return [...new Set(Object.values(m).flat())];
+  return [...new Set(Object.values(m).flat())].filter((a) => !SIN_RUTA_TODAVIA.includes(a));
 }
 
 // «Consulta: ve dispositivos, históricos, condiciones y cuarentena de sus sitios; no exporta, no cambia nada ni administra personas.»
 export function ayudaDeRol(rol: string, m: Matriz): string {
-  const suyas = m[rol] ?? [];
+  const suyas = (m[rol] ?? []).filter((a) => !SIN_RUTA_TODAVIA.includes(a));
   const todas = accionesDe(m);
   const si = suyas.map((a) => FRASES[a]?.puede ?? `puede «${a}»`);
   const no = todas.filter((a) => !suyas.includes(a)).map((a) => FRASES[a]?.noPuede ?? `no puede «${a}»`);

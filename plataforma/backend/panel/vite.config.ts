@@ -12,7 +12,9 @@ const BACKEND = process.env.PANEL_BACKEND ?? 'http://127.0.0.1:3000';
 // Las rutas reales de la API (openapi.json) y la documentación; todo lo demás lo atiende Vite.
 // Desde el 08/11/2026 también la sesión, los usuarios y las pasarelas (docs/20): la cookie viaja por el mismo origen del reenvío.
 // Desde el 11/11/2026, las del tablero v2 (docs/19 §4, I): sitios (resumen, histórico, actividad), preferencias y sesiones propias.
-const RUTAS_API = ['/dispositivos', '/canales', '/condiciones', '/cuarentena', '/eventos', '/salud', '/docs', '/sesion', '/usuarios', '/pasarelas', '/sitios', '/preferencias', '/sesiones'];
+// Desde el 11/11/2026 (P11 y P13), las páginas legales, el soporte y la cuenta propia.
+const RUTAS_API = ['/dispositivos', '/canales', '/condiciones', '/cuarentena', '/eventos', '/salud', '/docs', '/sesion', '/usuarios', '/pasarelas', '/sitios', '/preferencias', '/sesiones',
+  '/terminos', '/privacidad', '/acerca', '/soporte', '/cuenta'];
 
 export default defineConfig({
   base: '/panel/',

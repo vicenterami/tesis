@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SIN_FILTROS, fragmentoComparar, fragmentoFicha, fragmentoInventario, fragmentoTablero, leerVentanaFija, leerVista, redireccionVieja } from './vista';
+import { SIN_FILTROS, SIN_FILTROS_ACTIVIDAD, fragmentoActividad, fragmentoAlta, fragmentoComparar, fragmentoFicha, fragmentoInventario, fragmentoTablero, leerVentanaFija, leerVista, redireccionVieja } from './vista';
 
 const ID = '00000000-0000-4000-8000-000000000001';
 const CANAL = '00000000-0000-4000-8000-0000000000c1';
@@ -90,3 +90,24 @@ describe('resolución en la ficha y URL de la comparación (P3b)', () => {
   });
 });
 
+
+// Las pantallas de la iteración 1 (11/11/2026): P6, P7, P13, P14 y los apartados de P11, de ida y vuelta; lo inválido se ignora.
+describe('rutas de P6, P7, P11, P13 y P14', () => {
+  const ID = '00000000-0000-4000-8000-000000000001';
+  it('configurar, alta (con un detectado), preferencias y apartados legales; un identificador o un apartado inválido se ignora', () => {
+    expect(leerVista(`#/dispositivos/${ID.toUpperCase()}/configurar`)).toEqual({ pantalla: 'configurar', id: ID });
+    expect(leerVista('#/dispositivos/no-uuid/configurar').pantalla).toBe('tablero');
+    expect(leerVista(fragmentoAlta('uno', 'nodo-raro', 'uct'))).toEqual({ pantalla: 'alta', modo: 'uno', idFisico: 'nodo-raro', sitio: 'uct' });
+    expect(leerVista('#/alta?modo=lote&id_fisico=Nodo_Malo')).toEqual({ pantalla: 'alta', modo: 'lote', idFisico: '', sitio: '' });
+    expect(fragmentoAlta('uno')).toBe('#/alta');
+    expect(leerVista('#/preferencias')).toEqual({ pantalla: 'preferencias' });
+    expect(leerVista('#/legal?seccion=soporte')).toEqual({ pantalla: 'legal', seccion: 'soporte' });
+    expect(leerVista('#/legal?seccion=otra')).toEqual({ pantalla: 'legal' });
+  });
+  it('actividad: sitio, tipo, persona y ventana en la URL, de ida y vuelta; valores con otra forma se descartan', () => {
+    const f = { sitio: 'uct', tipo: 'reglas_cambiadas', usuario: ID, fija: { desde: new Date('2026-11-10T00:00:00Z'), hasta: new Date('2026-11-11T00:00:00Z') } };
+    expect(leerVista(fragmentoActividad(f))).toEqual({ pantalla: 'actividad', filtros: f });
+    expect(fragmentoActividad(SIN_FILTROS_ACTIVIDAD)).toBe('#/actividad');
+    expect(leerVista('#/actividad?tipo=DROP%20TABLE&usuario=x&sitio=a%20b')).toEqual({ pantalla: 'actividad', filtros: SIN_FILTROS_ACTIVIDAD });
+  });
+});

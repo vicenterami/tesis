@@ -75,7 +75,7 @@ export class AltaController {
   @ApiCreatedResponse({ description: 'Dispositivo creado; `conexion` trae la credencial (una sola vez), el tópico y una trama de ejemplo' })
   @ApiBadRequestResponse({ description: 'Cuerpo inválido: `message` es la lista de motivos' })
   @ApiUnauthorizedResponse({ description: 'Sin sesión ni X-Clave-Admin, o X-Clave-Admin incorrecta' })
-  @ApiForbiddenResponse({ description: 'Rol de consulta en ese sitio, o sesión sin la cabecera X-Pedido: panel' })
+  @ApiForbiddenResponse({ description: 'Un perfil sin ese permiso en ese sitio (docs/20 §6), o sesión sin la cabecera X-Pedido: panel' })
   @ApiConflictResponse({ description: 'El id_fisico ya existe (en la base o, huérfano, en el broker)' })
   @ApiResponse({ status: 502, description: 'El broker no aceptó la credencial; nada quedó creado' })
   @ApiResponse({ status: 503, description: 'Sin clave de administrador configurada, o sin conexión de administración con el broker' })
@@ -164,7 +164,7 @@ export class AltaController {
   })
   @ApiOkResponse({ description: 'La ficha del dispositivo, con su actualizado_en nuevo' })
   @ApiBadRequestResponse({ description: 'Cuerpo inválido: `errores[{campo, motivo}]`' })
-  @ApiForbiddenResponse({ description: 'Rol de consulta en ese sitio, o sesión sin la cabecera X-Pedido: panel' })
+  @ApiForbiddenResponse({ description: 'Un perfil sin ese permiso en ese sitio (docs/20 §6), o sesión sin la cabecera X-Pedido: panel' })
   @ApiNotFoundResponse({ description: 'No existe, o es de otro sitio' })
   @ApiConflictResponse({ description: 'Cambió desde la ficha enviada (`actualizado_en` trae el vigente), o está dado de baja' })
   async configurar(@Usuario() u: UsuarioSesion, @Param('id') id: string, @Body() cuerpo: unknown) {
@@ -182,23 +182,23 @@ export class AltaController {
     description:
       'Baja lógica: `estado = baja`, credenciales revocadas, condiciones abiertas cerradas y evento `baja`, en una transacción; si la vía es ' +
       '`mqtt`, el cliente se borra del broker dentro de ella (un cliente que el broker ya no tiene cuenta como borrado). La fila y su historial ' +
-      'quedan; lo que llegue después va a cuarentena como `dado_de_baja`. Exige sesión de administrador del sitio o `X-Clave-Admin` (docs/10 §3).',
+      'quedan; lo que llegue después va a cuarentena como `dado_de_baja`. Exige sesión de administrador del sitio o del sistema, o `X-Clave-Admin` (docs/10 §3; docs/20 §6: el operador técnico no da de baja).',
   })
   @ApiHeader({ name: 'X-Clave-Admin', required: false, description: 'Sin sesión: la clave de administrador (HTTP_CLAVE_ADMIN), como usuario del sistema (docs/20 §5)' })
   @ApiParam({ name: 'id', description: 'UUID del dispositivo' })
   @ApiOkResponse({ description: 'Dado de baja: estado anterior, credenciales revocadas y condiciones cerradas' })
   @ApiBadRequestResponse({ description: 'UUID inválido' })
   @ApiUnauthorizedResponse({ description: 'Sin sesión ni X-Clave-Admin, o X-Clave-Admin incorrecta' })
-  @ApiForbiddenResponse({ description: 'Rol de consulta en ese sitio, o sesión sin la cabecera X-Pedido: panel' })
+  @ApiForbiddenResponse({ description: 'Un perfil sin ese permiso en ese sitio (docs/20 §6), o sesión sin la cabecera X-Pedido: panel' })
   @ApiNotFoundResponse({ description: 'No existe, o es de otro sitio' })
   @ApiConflictResponse({ description: 'Ya estaba dado de baja' })
   @ApiResponse({ status: 502, description: 'El broker no confirmó el borrado del cliente; nada cambió en la base' })
   @ApiResponse({ status: 503, description: 'Sin clave de administrador configurada, sin conexión de administración con el broker, u otra operación sobre el mismo dispositivo en curso' })
   @ApiResponse({ status: 429, description: 'Ya hay 2 operaciones de aprovisionamiento en curso (alta, baja o rotación); reintentar en un momento' })
   async darDeBaja(@Usuario() u: UsuarioSesion, @Param('id') id: string): Promise<DispositivoDadoDeBaja> {
-    exigirEnAlguno(u, 'escribir');
+    exigirEnAlguno(u, 'baja'); // la baja: solo quien administra el sitio (docs/20 §6; el operador técnico, no)
     const dispositivoId = uuid(id, 'dispositivo');
-    await this.alcance.exigirDispositivo(u, 'escribir', dispositivoId);
+    await this.alcance.exigirDispositivo(u, 'baja', dispositivoId);
     return this.alta.darDeBaja(dispositivoId, u.id);
   }
 
@@ -217,7 +217,7 @@ export class AltaController {
   @ApiCreatedResponse({ description: 'Credencial rotada; `conexion` trae la nueva (una sola vez), el tópico y una trama de ejemplo' })
   @ApiBadRequestResponse({ description: 'UUID inválido, o dispositivo lorawan (sin credencial propia)' })
   @ApiUnauthorizedResponse({ description: 'Sin sesión ni X-Clave-Admin, o X-Clave-Admin incorrecta' })
-  @ApiForbiddenResponse({ description: 'Rol de consulta en ese sitio, o sesión sin la cabecera X-Pedido: panel' })
+  @ApiForbiddenResponse({ description: 'Un perfil sin ese permiso en ese sitio (docs/20 §6), o sesión sin la cabecera X-Pedido: panel' })
   @ApiNotFoundResponse({ description: 'No existe, o es de otro sitio' })
   @ApiConflictResponse({ description: 'Está dado de baja' })
   @ApiResponse({ status: 502, description: 'El broker no confirmó la clave nueva; nada cambió en la base (repetir la rotación)' })

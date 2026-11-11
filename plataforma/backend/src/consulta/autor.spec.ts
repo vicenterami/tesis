@@ -5,7 +5,7 @@ import type { Rol, UsuarioSesion } from '../sesion/permisos.js';
 
 // «Quién hizo el cambio» (docs/21 §2; decidido el 11/11/2026): el nombre, solo para quien administra el sitio y el usuario del sistema.
 const S = '00000000-0000-4000-8000-000000000001';
-const persona = (rol: Rol): UsuarioSesion => ({ id: 'u', nombre: 'n', email: 'e', sistema: false, todos: false, sitios: new Map([[S, rol]]), claveTemporal: false, sesionId: 's' });
+const persona = (rol: Rol): UsuarioSesion => ({ id: 'u', nombre: 'n', email: 'e', sistema: false, todos: false, sitios: new Map([[S, rol]]), claveTemporal: false, terminosPendientes: false, sesionId: 's' });
 const filas = [{ id: 'e1', usuario: { id: 'u1', nombre: 'Ana' } }, { id: 'e2', usuario: null }];
 
 describe('verAutor y conAutor', () => {

@@ -1,14 +1,17 @@
-import { Body, Controller, Get, HttpCode, Param, Patch, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpException, HttpStatus, Param, Patch, Post } from '@nestjs/common';
 import {
   ApiBadRequestResponse, ApiBody, ApiConflictResponse, ApiCookieAuth, ApiCreatedResponse, ApiForbiddenResponse, ApiHeader, ApiNotFoundResponse,
-  ApiOkResponse, ApiOperation, ApiParam, ApiTags, ApiUnauthorizedResponse,
+  ApiOkResponse, ApiOperation, ApiParam, ApiResponse, ApiTags, ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+import { TasaPorPersona } from '../alta/lote.js';
 import { uuid } from '../consulta/validacion.js';
 import { Usuario } from './guardia.js';
 import { ROLES, exigirEnAlguno } from './permisos.js';
 import type { UsuarioSesion } from './permisos.js';
 import { UsuarioConClave, UsuarioListado, UsuariosService } from './usuarios.service.js';
-import { MAX_SITIOS, validarAltaUsuario, validarCambioUsuario } from './usuarios.dto.js';
+import { MAX_MOTIVO, MAX_SITIOS, validarAltaUsuario, validarCambioUsuario } from './usuarios.dto.js';
+
+export const ALTAS_POR_MINUTO = 10;
 
 // Usuarios (HU-18, RF-43, RF-44; docs/20 §4 y §6). Solo administradores, y solo en sus sitios: un usuario o un sitio de otro sitio
 // responde 404, como uno que no existe (RF-41). Con sesión, toda ruta que escribe exige `X-Pedido: panel` (el guardia central).
@@ -16,10 +19,13 @@ import { MAX_SITIOS, validarAltaUsuario, validarCambioUsuario } from './usuarios
 @ApiCookieAuth('sesion')
 @Controller('usuarios')
 export class UsuariosController {
+  // Altas por persona y minuto (revisión del 11/11/2026; docs/20 §10): el 409 «ya existe un usuario con ese email» no depende del alcance,
+  // así que un administrador de sitio podría probar correos de a miles; con el tope, de a ALTAS_POR_MINUTO. En memoria del proceso.
+  private readonly tasaAltas = new TasaPorPersona(ALTAS_POR_MINUTO, 60_000);
   constructor(private readonly usuarios: UsuariosService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Listar usuarios', description: 'Quienes están o estuvieron en alguno de los sitios que administra quien pregunta; de sus sitios, solo esos. Exige rol administrador en algún sitio.' })
+  @ApiOperation({ summary: 'Listar usuarios', description: 'Quienes están o estuvieron en alguno de los sitios que administra quien pregunta; de sus sitios, solo esos. Exige rol administrador en algún sitio; el administrador del sistema ve todas las cuentas.' })
   @ApiOkResponse({ description: 'Lista: id, nombre, email, en_mis_sitios (false = ya no está en ninguno de tus sitios, pero estuvo), activo, clave_temporal, clave_temporal_vence_en, sitios [{sitio_id, codigo, rol}], creado_en y actualizado_en (con microsegundos, para el PATCH)' })
   @ApiUnauthorizedResponse({ description: 'sesión requerida' })
   @ApiForbiddenResponse({ description: 'Sin rol administrador en ningún sitio, o la clave de administrador cuando ya existe un administrador' })
@@ -43,18 +49,24 @@ export class UsuariosController {
       properties: {
         nombre: { type: 'string', maxLength: 80 },
         email: { type: 'string', maxLength: 254, description: 'Nombre de inicio de sesión; se guarda en minúsculas' },
-        sitios: { type: 'array', minItems: 1, maxItems: MAX_SITIOS, items: { type: 'object', required: ['sitio_id', 'rol'], properties: { sitio_id: { type: 'string', format: 'uuid' }, rol: { type: 'string', enum: [...ROLES] } } } },
+        sitios: { type: 'array', minItems: 0, maxItems: MAX_SITIOS, description: 'Al menos uno, salvo para un administrador del sistema', items: { type: 'object', required: ['sitio_id', 'rol'], properties: { sitio_id: { type: 'string', format: 'uuid' }, rol: { type: 'string', enum: [...ROLES] } } } },
+        administrador_sistema: { type: 'boolean', description: 'Perfil global (docs/20 §2); solo lo da un administrador del sistema (o la clave de administrador, el primero)' },
       },
     },
   })
   @ApiCreatedResponse({ description: 'Usuario creado; `clave` trae la clave temporal (una sola vez)' })
   @ApiBadRequestResponse({ description: 'Cuerpo inválido: `message` es la lista de motivos' })
   @ApiUnauthorizedResponse({ description: 'sesión requerida' })
-  @ApiForbiddenResponse({ description: 'Rol de consulta, o la clave de administrador cuando ya existe un administrador' })
+  @ApiForbiddenResponse({ description: 'Un perfil distinto de administrador (de sitio o del sistema), o la clave de administrador cuando ya existe un administrador' })
   @ApiNotFoundResponse({ description: 'Un sitio que no existe o que no administras' })
-  @ApiConflictResponse({ description: 'Ya existe un usuario con ese email' })
+  @ApiConflictResponse({ description: 'Ya existe un usuario con ese email; si está inactivo, `reactivable: true` y la ficha en `usuario` (se reactiva con PATCH activo: true y clave_temporal: true), o `reactivable: false` si es de sitios que no administras' })
+  @ApiResponse({ status: 429, description: `Más de ${ALTAS_POR_MINUTO} altas (o intentos) por persona en un minuto` })
   async crear(@Usuario() u: UsuarioSesion, @Body() cuerpo: unknown): Promise<UsuarioConClave> {
     exigirEnAlguno(u, 'usuarios'); // antes de validar: un usuario de consulta no aprende la forma del cuerpo
+    // Se reserva antes de validar y de ir a la base: cuenta todo intento, también el que termina en 409.
+    if (!this.tasaAltas.admitir(u.id ?? 'sistema')) {
+      throw new HttpException({ statusCode: 429, message: `más de ${ALTAS_POR_MINUTO} altas de usuarios en un minuto: espera un momento`, reintentar_en_s: 60 }, HttpStatus.TOO_MANY_REQUESTS);
+    }
     const a = validarAltaUsuario(cuerpo);
     return this.usuarios.crear(u, a); // la respuesta lleva una clave: Cache-Control: no-store, como toda la API (main.ts)
   }
@@ -68,7 +80,10 @@ export class UsuariosController {
       'false desactiva (no borra) y corta sus sesiones; `clave_temporal: true` asigna una temporal nueva («olvidé mi clave»), la devuelve UNA vez ' +
       'en `clave` y corta sus sesiones; `sitios` asigna o cambia el rol en cada sitio, y `rol: null` le quita ese sitio. Ningún cambio puede ' +
       'dejar la plataforma sin administradores activos (409). Los roles, solo en tus sitios; los campos de la cuenta (`nombre`, `activo`, ' +
-      '`clave_temporal`), solo si administras TODOS los sitios activos de la persona (si no, 403). Deja un `evento` usuario_cambio con quién.',
+      '`clave_temporal`), solo si administras TODOS los sitios activos de la persona (si no, 403); el administrador del sistema, todas. La cuenta de un ' +
+      'administrador del sistema (también sus sitios) y la reactivación de una baja que hizo un administrador del sistema, solo otro administrador del sistema (403). ' +
+      'Desactivar exige `motivo` (baja con motivo: fecha, quién y por qué quedan en la cuenta; reactivar los limpia). Reactivar (`activo: true`) exige ' +
+      '`clave_temporal: true` en la misma petición: la clave anterior no vuelve (400). Una cuenta anonimizada no se cambia (409). Deja un `evento` usuario_cambio con quién.',
   })
   @ApiParam({ name: 'id', description: 'UUID del usuario' })
   @ApiHeader({ name: 'X-Pedido', required: false, description: 'Con sesión, siempre `panel`' })
@@ -77,6 +92,8 @@ export class UsuariosController {
       type: 'object', required: ['actualizado_en'],
       properties: {
         actualizado_en: { type: 'string' }, nombre: { type: 'string', maxLength: 80 }, activo: { type: 'boolean' }, clave_temporal: { type: 'boolean', enum: [true] },
+        motivo: { type: 'string', maxLength: MAX_MOTIVO, description: 'Obligatorio con activo: false: por qué se da de baja (se guarda con quién y cuándo)' },
+        administrador_sistema: { type: 'boolean', description: 'Dar o quitar el perfil global: solo un administrador del sistema; 409 si dejaría la plataforma sin ninguno' },
         sitios: { type: 'array', items: { type: 'object', required: ['sitio_id', 'rol'], properties: { sitio_id: { type: 'string', format: 'uuid' }, rol: { type: 'string', enum: [...ROLES], nullable: true } } } },
       },
     },
@@ -84,7 +101,7 @@ export class UsuariosController {
   @ApiOkResponse({ description: 'El usuario como lo lista GET /usuarios (y `clave`, si se asignó una temporal)' })
   @ApiBadRequestResponse({ description: 'UUID o cuerpo inválidos' })
   @ApiUnauthorizedResponse({ description: 'sesión requerida' })
-  @ApiForbiddenResponse({ description: 'Rol de consulta; la clave de administrador cuando ya existe un administrador; un campo de la cuenta de alguien que también está en sitios que no administras, o que ya no está en ninguno de los tuyos' })
+  @ApiForbiddenResponse({ description: 'Un perfil distinto de administrador; la clave de administrador cuando ya existe un administrador; un campo de la cuenta de alguien que también está en sitios que no administras, o que ya no está en ninguno de los tuyos; la cuenta de un administrador del sistema, o reactivar una baja que hizo uno, sin serlo' })
   @ApiNotFoundResponse({ description: 'El usuario o un sitio no existen, o no son de tus sitios' })
   @ApiConflictResponse({ description: 'Cambió desde que se leyó (recarga), te desactivarías a ti mismo o quedaría sin administradores' })
   async actualizar(@Usuario() u: UsuarioSesion, @Param('id') id: string, @Body() cuerpo: unknown): Promise<UsuarioListado | UsuarioConClave> {

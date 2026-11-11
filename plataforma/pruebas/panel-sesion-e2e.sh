@@ -3,7 +3,10 @@
 # docs/20; docs/16 §59). Por cada navegador (Chromium y Firefox, los de Playwright) y cada ancho (390 px, teléfono; 1280 px, escritorio):
 # entrar con la clave temporal, cambiarla, inventario y quién soy, ficha y exportar CSV, la sesión que vence y vuelve a la misma ficha,
 # salir; en el ancho de escritorio, además, la pantalla de usuarios (alta con la temporal mostrada una vez) y la persona de consulta con
-# la exportación desactivada. El recorrido lo hace backend/panel/e2e/sesion.mjs.
+# la exportación desactivada. Desde el 11/11/2026 también las pantallas del tablero v2 (docs/19 §7): legal antes de entrar y la
+# aceptación obligatoria de los términos; el tablero (indicadores que suman el inventario); P6 (validación en vivo, guardar y el 409 con
+# otra escritura entretanto); P7 (asistente con vía HTTP y alta masiva por archivo, sin tocar el broker); P13 (°F en la ficha sin cambiar la base) y
+# P14 (el cambio de umbrales con la persona que lo hizo). El recorrido lo hace backend/panel/e2e/sesion.mjs.
 #   bash plataforma/pruebas/panel-sesion-e2e.sh
 #   E2E_CAPTURAS=docs/capturas/panel-sesion bash plataforma/pruebas/panel-sesion-e2e.sh   (guarda capturas; por defecto, ninguna)
 #   E2E_NAVEGADORES=chromium bash …                                                       (uno solo)
@@ -51,6 +54,11 @@ DELETE FROM canal WHERE dispositivo_id IN (SELECT d.id FROM dispositivo d JOIN z
 DELETE FROM dispositivo WHERE zona_id IN (SELECT z.id FROM zona z JOIN sitio s ON s.id = z.sitio_id WHERE s.codigo = '$SITIO');
 DELETE FROM zona WHERE sitio_id IN (SELECT id FROM sitio WHERE codigo = '$SITIO');
 DELETE FROM acceso WHERE email_intentado LIKE '%$DOM' OR usuario_id IN (SELECT id FROM u_e2e);
+-- 11/11/2026: lo que dejan las pantallas nuevas (términos aceptados, preferencias, soporte) y apunta a la persona
+DELETE FROM evento WHERE usuario_id IN (SELECT id FROM u_e2e);
+DELETE FROM preferencia WHERE usuario_id IN (SELECT id FROM u_e2e);
+DELETE FROM mensaje_soporte WHERE usuario_id IN (SELECT id FROM u_e2e);
+UPDATE usuario SET desactivado_por = NULL WHERE desactivado_por IN (SELECT id FROM u_e2e);
 DELETE FROM usuario WHERE id IN (SELECT id FROM u_e2e);
 DELETE FROM sitio WHERE codigo = '$SITIO';
 COMMIT;
@@ -89,15 +97,15 @@ for n in $NAVS; do
   done
   entrada=$(python3 -I -c '
 import json, sys
-base, nav, disp, idf, capt, n, dom = sys.argv[1:8]
+base, nav, disp, idf, capt, n, dom, sitio = sys.argv[1:9]
 casos = []
 for l in sys.stdin.read().splitlines():
     if not l: continue
     ancho, tmp, nueva, cnueva, mala = l.split("\t")
     casos.append({"ancho": int(ancho), "email": f"adm-{n}-{ancho}{dom}", "nombre": "Administración e2e", "temporal": tmp, "nueva": nueva,
                   "consulta": {"nombre": "Consulta e2e", "email": f"con-{n}{dom}", "nueva": cnueva} if cnueva else None, "claveMala": mala or None})
-print(json.dumps({"base": base, "navegador": nav, "dispositivo": disp, "idFisico": idf, "capturas": capt or None, "casos": casos}))
-' "$API" "$n" "$DISP" "te-$N" "$CAPT" "$n" "$DOM" <<<"$lineas")
+print(json.dumps({"base": base, "navegador": nav, "dispositivo": disp, "idFisico": idf, "sitio": sitio, "capturas": capt or None, "casos": casos}))
+' "$API" "$n" "$DISP" "te-$N" "$CAPT" "$n" "$DOM" "$SITIO" <<<"$lineas")
   unset lineas tmp nueva cnueva
   (cd "$PANEL" && node e2e/sesion.mjs <<<"$entrada") > "$T/$n.txt" 2>&1; r=$?
   cat "$T/$n.txt"

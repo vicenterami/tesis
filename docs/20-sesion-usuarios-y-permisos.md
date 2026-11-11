@@ -14,6 +14,10 @@
 > (§2, §5 y §6, que cambian: «exportar» pasa a administrador de sitio e investigador), la **baja de la cuenta por anonimización** (§11)
 > y la **aceptación de los términos de uso** (§12). Lo que el código hace hoy sigue siendo lo de la §10 (dos roles); donde el diseño ya
 > dice otra cosa, se marca.
+>
+> **✅ 11/11/2026: implementado en el backend** (migración 24): los cinco perfiles con la matriz completa de la §6, la baja con motivo, la
+> baja por anonimización (§11), los términos con sesión restringida (§12), la cuenta propia (preferencias, sesiones, exportar) y la actividad
+> del sitio. Lo hecho y lo decidido al implementar, en la §10 (R22 en adelante); el panel, en `docs/19 §4`.
 
 ## 1. Lo ya decidido que aquí se respeta
 | Decisión | Dónde | Consecuencia |
@@ -33,17 +37,17 @@
   o ninguna) y un `CHECK` que guarda el email en minúsculas.
 - `usuario_sitio` (existe): `(usuario_id, sitio_id, rol)`. ✅ Migración 22: `activo` (decidido al implementar, 08/11/2026): quitarle un
   sitio a una persona es una baja lógica; la aplicación no tiene `DELETE` en ninguna tabla (migración 14) y así sigue.
-- **Cinco perfiles (decidido el 08/11/2026; diseño, código en la iteración 0).** Roles fijos, con la matriz de permisos en el código
+- **Cinco perfiles (decidido el 08/11/2026; ✅ 11/11/2026, migración 24 y `permisos.ts`).** Roles fijos, con la matriz de permisos en el código
   (`permitir()`, §5), no editables por pantalla: un rol a medida exigiría una interfaz de permisos y su propia prueba, sin un caso que lo
   pida. Por sitio, en `usuario_sitio.rol`: **administrador** (de sitio: todo en su sitio, también sus usuarios, enlaces públicos y
   exportar), **investigador** (consulta completa de su sitio, exportación y preferencias propias), **operador** (técnico: alta,
   configuración y mantenimiento de los dispositivos y pasarelas de su sitio; sin usuarios ni exportación) y **consulta** (solo lectura).
-  Una migración nueva (prevista para la iteración 0) amplía el `CHECK` de `ck_usuario_sitio_rol` a esos cuatro valores; `administrador`
+  La migración 24 (✅ 11/11/2026) amplía el `CHECK` de `ck_usuario_sitio_rol` a esos cuatro valores; `administrador`
   conserva su nombre y su significado (de sitio), así las filas y las pruebas de hoy siguen valiendo sin migrar datos. Global, el
   **administrador del sistema** (usuarios, sitios, límites, estado del sistema y auditoría de todos los sitios): es el alcance que hoy
   solo tiene el usuario del sistema de la clave por cabecera (`todos` en `UsuarioSesion`), dado a una persona. Cómo se guarda queda por
   fijar al escribir esa migración; se prefiere una columna de `usuario` (`administrador_sistema`) antes que una fila por sitio, que no
-  alcanzaría a los sitios creados después. El **invitado** no es un perfil: es la vista pública por enlace, sin cuenta (§7).
+  alcanzaría a los sitios creados después (✅ 11/11/2026: `usuario.administrador_sistema`, migración 24). El **invitado** no es un perfil: es la vista pública por enlace, sin cuenta (§7).
 - `sesion` (nueva): `id` (hash SHA-256 del identificador aleatorio que viaja en la cookie: la base nunca guarda lo que
   autentica), `usuario_id`, `creada_en`, `ultima_actividad`, `expira_en`, `revocada_en`, `ip`, `agente` (acotado a 200
   caracteres). Índice por `usuario_id` y por `expira_en` (limpieza). ✅ Migración 22; la limpieza la hace una función del dueño
@@ -144,10 +148,11 @@
   ni crear sitios.
 
 ## 6. Matriz de acceso (ruta × perfil → código esperado). Se convierte en casos de humo con una sesión por perfil
-Ampliada el 08/11/2026 a los cinco perfiles (§2). **Vigente en el código** (paso 4b del guardián, `docs/16 §58`): las columnas «Sin
-sesión», «Consulta», «Administrador de sitio» y «Otro sitio», con «exportar» solo para el administrador; las columnas «Investigador»,
-«Operador técnico» y «Administrador del sistema», el cambio de «exportar» y las filas de rutas nuevas son **diseño** y entran con la
-migración prevista de la iteración 0. Cada celda dice qué responde la ruta a esa persona en **su** sitio; «Otro sitio» es la misma
+Ampliada el 08/11/2026 a los cinco perfiles (§2). **✅ 11/11/2026: vigente en el código con las siete columnas** (`permisos.ts`, migración
+24; paso 4b del guardián, `docs/16 §63`), incluido el cambio de «exportar» (administrador de sitio e investigador). La baja de dispositivos
+y pasarelas es una acción propia (`baja`), separada de `escribir`, para que el operador técnico dé de alta y no de baja. Las filas de enlaces
+públicos y de estado del sistema siguen siendo **diseño** (sus rutas no existen aún); la de auditoría de un sitio es `GET /sitios/{id}/actividad`
+(Etapa 4). Cada celda dice qué responde la ruta a esa persona en **su** sitio; «Otro sitio» es la misma
 persona pidiendo un recurso de un sitio donde no tiene membresía (el administrador del sistema no tiene «otro sitio»: alcanza a todos).
 
 | Ruta | Sin sesión | Consulta | Investigador | Operador técnico | Administrador de sitio | Administrador del sistema | Otro sitio |
@@ -164,9 +169,10 @@ persona pidiendo un recurso de un sitio donde no tiene membresía (el administra
 | `POST /dispositivos/lote` y `GET /cuarentena/detectados` (Etapa 4; hoy «escribir»: administrador de sitio; con los cinco perfiles, también operador técnico; en el lote, una zona o un identificador de otro sitio no se revelan) | 401 | 403 | 403 | 200 | 200 | 200 | 404 |
 | `GET /usuarios`, `POST /usuarios`, `PATCH /usuarios/{id}` | 401 | 403 | 403 | 403 | 200 (las membresías de sus sitios; la cuenta de quien también está en otro sitio: 403, §5) | 200 (todas las cuentas) | 404 |
 | Enlaces públicos de un sitio (Etapa 4) | 401 | 403 | 403 | 403 | 200 | 200 | 404 |
-| Auditoría de un sitio (Etapa 4) | 401 | 403 | 403 | 403 | 200 | 200 | 404 |
-| Estado del sistema, límites de los servicios, sitios y auditoría de todos los sitios (Etapa 4) | 401 | 403 | 403 | 403 | 403 | 200 | — |
-| Lo propio de cada persona: preferencias, aceptar los términos, darse de baja, enviar un mensaje de soporte (Etapa 4) | 401 | 200 | 200 | 200 | 200 | 200 (la baja, 409 si es el último administrador del sistema: §11) | — |
+| Auditoría de un sitio: `GET /sitios/{id}/actividad` (Etapa 4) | 401 | 403 | 403 | 403 | 200 | 200 | 404 |
+| Estado del sistema, límites de los servicios, sitios y auditoría de todos los sitios; leer el soporte (`GET /soporte` (Etapa 4)) | 401 | 403 | 403 | 403 | 403 | 200 | — |
+| Lo propio de cada persona: `GET`/`PUT /preferencias`, `GET /sesiones`, `DELETE /sesiones/{id}`, `GET /cuenta/exportar`, `POST /cuenta/baja`, `POST /terminos/aceptar`, `POST /soporte` (Etapa 4) | 401 | 200 | 200 | 200 | 200 | 200 (la baja, 409 si es el último administrador del sistema: §11) | — |
+| Páginas legales: `GET /terminos`, `GET /privacidad`, `GET /acerca` (Etapa 4; públicas, también con la sesión restringida por los términos) | 200 | 200 | 200 | 200 | 200 | 200 | — |
 
 ## 7. Vista pública por enlace
 - Un administrador crea el enlace eligiendo sitio, magnitudes e intervalo de agregación; el token (32 bytes) se muestra una vez
@@ -240,6 +246,9 @@ lo que se decidió en cada uno (R = número del hallazgo). Cada corrección tien
   se le puede devolver un sitio propio; tocar su cuenta, 403. (El encargo decía «el EXISTS de PATCH filtra los sitios activos» y a la vez
   «la lista muestra a quien estuvo para devolverle el sitio»: filtrado al pie de la letra, `PATCH` respondía 404 a esa persona y el sitio
   no se podía devolver. Se resolvió así: sitios activos para la cuenta, también los inactivos para devolver un rol. Confirmado el 08/11/2026.)
+  Desde la corrección del 11/11/2026, además: la cuenta de un **administrador del sistema** (nombre, activo, clave temporal y también sus
+  sitios) solo la cambia otro administrador del sistema, aunque comparta un sitio con quien lo intenta (403 «la cuenta es de un
+  administrador del sistema…»): antes, un administrador de sitio podía asignarle una clave temporal y entrar como él.
 - **R2 · El canal en vivo no revalidaba la sesión.** En cada latido (25 s) relee la sesión del flujo **sin renovar la actividad** (un flujo
   abierto no es una persona delante: renovar en cada latido dejaría viva para siempre la sesión de una pantalla sola); si ya no vale
   (cerrada, vencida, revocada, usuario inactivo o con clave temporal) o la base no responde, el flujo se cierra; si cambiaron los sitios,
@@ -256,8 +265,12 @@ lo que se decidió en cada uno (R = número del hallazgo). Cada corrección tien
   `PATCH /usuarios/{id}` entran en la zona `administracion` de nginx (5 r/s, ráfaga 10, por dirección; `docs/11 §3`).
 - **R8 · Saturación del hash.** Como mucho 2 cálculos de una misma dirección en curso o en cola; el tercero, 429 sin encolarse. Un 503 por
   la cola llena cuenta como fallo de esa dirección (suma a su bloqueo; no al de ningún usuario).
-- **R9 · El 409 de `POST /usuarios` («ya existe un usuario con ese email») revela qué correos tienen cuenta.** Se asume: solo lo ve un
-  administrador, que es un rol de confianza y ya puede listar a las personas de sus sitios.
+- **R9 · El 409 de `POST /usuarios` («ya existe un usuario con ese email») revela qué correos tienen cuenta.** No depende del alcance: un
+  administrador de sitio puede saber si un correo tiene cuenta en otro sitio. Desde el 11/11/2026 el alta tiene un tope de **10 intentos
+  por persona y minuto** (`ALTAS_POR_MINUTO`, en memoria; el 429 cuenta también los que terminan en 409), así que probar correos de a miles
+  ya no es posible. **Riesgo residual que se asume:** de a 10 por minuto, un administrador de sitio (un rol de confianza que ya lista a las
+  personas de sus sitios) aún puede confirmar si un correo concreto tiene cuenta; responder lo mismo para un correo libre y uno tomado
+  exigiría crear la cuenta en dos pasos (invitación por correo), que la plataforma no tiene.
 - **R10 · `GET /usuarios` con la clave de administrador.** La misma regla que crear y cambiar: solo mientras no haya ningún administrador activo.
 - **R11 · Recarga del mapa de sitios en cada apertura.** Como mucho una vez cada 5 s aunque se abran flujos en bucle, y recién después del
   control de origen y de los topes 429/503: un flujo rechazado no cuesta una consulta.
@@ -306,8 +319,8 @@ punto 43), el «quién» en los eventos de alta, baja y calibración, y retirar 
 primer administrador. El recorrido del banco con navegador (`banco.sh navegador`, `e2e/p3.mjs`) ya entra como usuario del sistema, con la
 clave del banco por cabecera (`docs/16 §59`).
 
-**Perfiles: decidido el 08/11/2026; estado: diseño, código en la iteración 0 (`docs/04 §8`; `docs/10 §8.4` punto 64).** Lo que cambia en
-el código, en este orden: (1) la migración prevista amplía `ck_usuario_sitio_rol` a `administrador`, `investigador`, `operador` y
+**Perfiles: decidido el 08/11/2026; ✅ hecho el 11/11/2026 (abajo, R22 en adelante; `docs/04 §8`; `docs/10 §8.4` punto 64).** Lo que cambia en
+el código, en este orden: (1) la migración 24 amplía `ck_usuario_sitio_rol` a `administrador`, `investigador`, `operador` y
 `consulta`, y agrega el alcance global del administrador del sistema (§2); (2) `ROLES` y `PERMISOS` de `permisos.ts` crecen con las
 acciones que la §6 distingue (`leer`, `exportar`, `escribir`, `baja`, `usuarios`, `enlaces`, `auditoria`, `sistema`), y `exportar` pasa a
 `administrador` e `investigador`; ninguna ruta compara perfiles por su cuenta: todas siguen llamando a `permitir()`; (3) el guardia carga el
@@ -316,29 +329,86 @@ botones con la matriz que ya recibe en `GET /sesion`; el selector de rol de P10 
 sistema, el global; (5) `sesion-smoke.sh` crea una sesión por perfil y recorre cada celda de la §6. **Plantado:** con `exportar` de vuelta
 en solo `administrador`, el caso «investigador exporta → 200» debe fallar; con `escribir` abierto a `consulta`, el alta debe fallar.
 
-## 11. Baja de la cuenta por anonimización (decidido el 08/11/2026; diseño, código en la iteración 0)
-- **Qué es y por qué.** La persona se da de baja ella misma (RF-55), o la da de baja un administrador del sistema. Borrar la fila de
-  `usuario` rompería `evento`, `acceso` y la auditoría, que la referencian; dejarla intacta conservaría datos personales sin un fin. Se
-  conserva la fila, sin nada que identifique a nadie.
-- **Qué se hace, en una sola transacción:** `nombre` pasa a un marcador derivado del id («Cuenta dada de baja · 3f2a», los primeros
-  caracteres del uuid) y `email` a una dirección que no es de nadie, derivada del mismo id en un dominio reservado que no existe
-  (`…@ejemplo.invalid`, como las personas de prueba), así se siguen cumpliendo `ck_usuario_email` y la unicidad; `hash_password` se reemplaza
-  por un valor que ninguna clave verifica (la columna es `NOT NULL`); se revocan todas sus sesiones; `activo = false`; las membresías quedan
-  inactivas; se borran sus preferencias, si existen (son de la iteración 1); y una columna nueva, `anonimizado_en`, guarda el instante (migración prevista, la misma de los
-  perfiles). La acción queda en la auditoría con el id, nunca con el nombre de antes.
-- **Qué queda, y por qué.** La fila con el id, enlazada desde `evento`, `acceso` y la auditoría, ya sin datos personales; `acceso` y las sesiones revocadas (`sesion`: IP y agente, hasta 90 días) guardan
-  además la dirección IP y el correo intentado de sus intentos, que se borran solos a los 90 días (`docs/21 §2`). Los respaldos anteriores
-  contienen los datos de antes hasta que vencen (30 días, `docs/10 §9.5`): se dice así en la página de privacidad.
-- **Reglas.** Es irreversible: una cuenta anonimizada no se reactiva (la persona puede recibir una cuenta nueva). El **último administrador
-  del sistema no puede darse de baja** (409), por la misma regla que impide dejar la plataforma sin administradores (R3, con el mismo
-  candado). Pedirla exige la clave actual, como cambiarla: una sesión olvidada abierta no basta para borrar una cuenta.
-- **Prueba (antes de darla por hecha):** después de la baja, ninguna columna de `usuario` contiene el nombre ni el correo de antes
-  (consulta directa en la base); el correo de antes ya no entra; las filas de `evento` y `acceso` siguen enlazadas; el último administrador
-  del sistema recibe 409.
+**Implementación del 11/11/2026: cinco perfiles, cuenta propia, términos y actividad** (migración 24; `sesion/`, `cuenta/`, `legal/`,
+`consulta/actividad*.ts`; OpenAPI regenerado; pruebas en `docs/16 §63`). Lo decidido al implementar, en lo que el diseño no fijaba:
+- **R22 · Perfiles en la tabla.** `ROLES` son los cuatro de sitio y `PERFILES` suma `administrador_sistema`; `permitir()` usa ese perfil
+  cuando el alcance es `todos` (la persona con `usuario.administrador_sistema` y la clave por cabecera). Acciones nuevas: `baja` (dar de baja
+  dispositivos y pasarelas: administradores; el operador técnico no), `enlaces`, `auditoria` y `sistema` (lo global, con `permitirGlobal`).
+  `GET /sesion` trae `permisos` con los cinco perfiles, `administrador_sistema`, `terminos` y `preferencias`; `sitios[].rol` es el perfil en
+  cada sitio. Para el administrador del sistema, `GET /sitios` sigue diciendo `rol: administrador` en cada sitio (el panel ya lo entiende) y
+  el perfil global va aparte.
+- **R23 · Quién da el perfil global.** Solo quien ya lo tiene (o la clave por cabecera, mientras crea el primero); un administrador de sitio
+  recibe 403. Quitarlo o desactivar a quien lo tiene responde 409 si dejaría la plataforma sin ninguno **habiendo alguno** (con cero, la regla
+  de siempre: sin administradores de ningún tipo, 409). Todo bajo el candado de R3; `hayAdministrador` cuenta también a los del sistema.
+- **R24 · Baja con motivo.** `PATCH /usuarios/{id}` con `activo: false` exige `motivo` (1–300); la cuenta guarda cuándo, quién y por qué
+  (`ck_usuario_baja`: activa ⇔ sin fecha ni motivo); reactivar (`activo: true`) los limpia y el motivo queda en el `evento` usuario_cambio,
+  que desde hoy lleva `usuario_id` (helper único `db/evento.ts`, también en usuario_alta, usuario_clave, usuario_baja y terminos_aceptados).
+  Las cuentas inactivas de antes de la migración reciben un motivo fijo que lo dice. El motivo es texto libre: la pantalla pide escribirlo
+  sin nombres ni datos personales, y la baja por anonimización lo anula también en esos eventos (§11; `docs/21 §2`). **Reactivar**
+  (corrección del 11/11/2026) exige `clave_temporal: true` en la misma petición (400 si no): la clave de antes no vuelve. Una baja que hizo
+  un administrador del sistema (o la clave por cabecera: `desactivado_por` nulo) solo la deshace un administrador del sistema (403).
+- **R25 · Alta con un correo que existe inactivo.** 409 con `reactivable: true` y la ficha (filtrada a los sitios de quien pregunta), no un
+  duplicado; si la cuenta es de sitios que quien pregunta no administra, 409 con `reactivable: false` y sin ficha. Activa: el 409 de siempre.
+- **R26 · Anonimización en la base.** La baja borra preferencias y mensajes de soporte, y la aplicación no tiene `DELETE` (migración 14): la
+  hace `fn_anonimizar_usuario`, del dueño, `SECURITY DEFINER`, en una sola sentencia (como `fn_limpiar_sesiones`). El backend verifica la
+  clave actual (con los bloqueos de `POST /sesion/clave`), toma el candado de R3, aplica la regla del último administrador y llama a la función
+  dentro de su transacción. El correo anonimizado va al dominio reservado `cuenta-anonimizada.invalid` y no a `ejemplo.invalid` (§11): así la
+  limpieza de las pruebas, que borra por `@ejemplo.invalid`, nunca confunde una cuenta real dada de baja con una de prueba. Una persona de
+  consulta siempre puede darse de baja; un administrador, solo si queda otro.
+- **R27 · Términos.** `TERMINOS_VERSION` es una constante del backend (`legal/terminos.ts`). Con la versión aceptada menor, el guardia responde
+  403 con `codigo: terminos_pendientes` y la versión vigente; valen `GET /sesion`, `DELETE /sesion`, `POST /sesion/clave` y
+  `POST /terminos/aceptar` (`@ConTerminosPendientes()`), y la clave temporal va primero. Las páginas legales son **públicas** (P11: se leen
+  también antes de entrar). Aceptar con otra versión que la vigente: 409 (se mostró un texto viejo). Aceptar deja un `evento`
+  `terminos_aceptados` (la auditoría por petición, punto 43, aún no existe). El soporte no vale con los términos pendientes.
+- **R28 · Sesiones propias.** `GET /sesiones` muestra solo las vivas, con el origen truncado (/24, /48) y el agente acotado a 120; su `id` es
+  el hash que guarda la base (no autentica: la cookie lleva el identificador). La de otra persona responde 404, igual que una inexistente.
+  «Exportar mis datos» sí trae las direcciones completas de sus sesiones e intentos: son datos de la persona (`docs/21 §8`, acceso).
+- **R29 · Actividad del sitio.** Une `evento` de los dispositivos del sitio (con quién, cuando lo hizo una persona; sin persona, lo del sistema),
+  los `evento` **sin dispositivo** que son del sitio (corrección del 11/11/2026: antes se perdían): `pasarela_*` de sus pasarelas,
+  `usuario_*` de las personas que están o estuvieron en él y `terminos_aceptados` de quienes tienen membresía activa, cada uno con su texto
+  («dio de alta la cuenta de «Ana»», «aceptó los términos de uso»); y `acceso` de quienes tienen membresía **activa** en el sitio (quien
+  salió del sitio deja de mostrarle sus entradas a su administrador), por cursor `(instante, id)`; para eso `acceso` gana `id`
+  (migración 24). Ventana por defecto de 7 días, hasta 92. Nunca correos ni direcciones, ni el `detalle` de los eventos (el motivo de una
+  baja no sale).
+- **R30 · Soporte.** 5 mensajes por persona y hora (en memoria, como los bloqueos); los lee el administrador del sistema por cursor; se
+  conservan mientras exista la cuenta y se borran con la baja (`docs/21 §2`). Marcarlos leídos (`leido_en`) queda para la pantalla P12.
+- **R31 · Avisos de terceros.** `plataforma/backend/generar-avisos-terceros.sh` escribe `panel/public/avisos-de-terceros.txt` desde
+  `pnpm licenses list --prod --json` (backend y panel: 179 paquetes y 7 licencias al 11/11/2026), con el texto completo de cada licencia
+  distinta de MIT (y su NOTICE, si existe), y con `--comprobar` es el paso 2r2 del guardián: falla si falta un paquete o uno de esos textos.
+  El compose pasa `RESPONSABLE_NOMBRE`, `RESPONSABLE_CONTACTO` y `CODIGO_FUENTE_URL` al contenedor (el paso 2z lo comprueba);
+  `COMPILACION_COMMIT` lo fija la imagen con `--build-arg COMMIT=…`, que `pila.sh encender` exporta desde `git rev-parse --short HEAD`.
+  «Acerca de» da la versión y el commit solo con sesión; sin ella, la licencia, su aviso y el enlace al código (AGPL).
 
-## 12. Aceptación de los términos de uso (decidido el 08/11/2026; diseño, código en la iteración 0)
-- **Qué se guarda.** La versión vigente de los términos es un valor de configuración; en `usuario`, la versión aceptada y el instante
-  (columnas nuevas en la migración prevista). Qué dicen los términos y la página de privacidad, y de dónde salen, está en `docs/21 §7`.
+## 11. Baja de la cuenta por anonimización (decidido el 08/11/2026; ✅ 11/11/2026, `POST /cuenta/baja` y `fn_anonimizar_usuario`, migración 24)
+- **Qué es y por qué.** La persona se da de baja ella misma (RF-55, `POST /cuenta/baja` desde P13). Borrar la fila de `usuario` rompería
+  `evento`, `acceso` y la auditoría, que la referencian; dejarla intacta conservaría datos personales sin un fin. Se conserva la fila, sin
+  nada que identifique a nadie. **Pendiente:** que un administrador del sistema dé de baja por anonimización la cuenta de otra persona
+  (hoy solo puede desactivarla con motivo, R24); la función ya recibe quién la da (`por`), falta la ruta y su pantalla.
+- **Qué se hace, en una sola transacción (`fn_anonimizar_usuario`, del dueño de la base, `SECURITY DEFINER`; R26):** `nombre` pasa a un
+  marcador derivado del id («Cuenta dada de baja · 3f2a», los primeros caracteres del uuid) y `email` a `baja-<uuid sin guiones>@cuenta-anonimizada.invalid`,
+  una dirección que no es de nadie en un dominio reservado que no existe (distinto del de las personas de prueba, R26), así se siguen
+  cumpliendo `ck_usuario_email` y la unicidad; `hash_password` se reemplaza por un valor que ninguna clave verifica (la columna es
+  `NOT NULL`); pierde el perfil global; se revocan todas sus sesiones; `activo = false` con la fecha, quién y el motivo fijo «baja de la
+  cuenta (anonimizada)»; las membresías quedan inactivas; se borran sus preferencias y sus mensajes de soporte; se anulan el correo
+  tecleado en sus intentos de `acceso` y el `motivo` (texto libre) de los eventos `usuario_cambio` de esa cuenta (corrección del 11/11/2026);
+  y `anonimizado_en` guarda el instante. La acción queda como `evento` `usuario_baja` con el id, nunca con el nombre de antes.
+- **Qué queda, y por qué.** La fila con el id, enlazada desde `evento`, `acceso` y la auditoría, ya sin datos personales; `acceso` y las
+  sesiones revocadas (`sesion`: IP y agente) guardan además la dirección IP de sus intentos y sesiones, que se borra sola a los 90 días
+  (`docs/21 §2`); el correo intentado ya no queda. Los respaldos anteriores contienen los datos de antes hasta que vencen (30 días,
+  `docs/10 §9.5`): se dice así en la página de privacidad.
+- **Reglas.** Es irreversible: una cuenta anonimizada no se reactiva (409; la persona puede recibir una cuenta nueva). El **último
+  administrador del sistema no puede darse de baja** (409), por la misma regla que impide dejar la plataforma sin administradores (R3, con
+  el mismo candado); desde el 11/11/2026 la función también lo rechaza por sí misma, y exige saber quién da la baja (`por` no nulo): una
+  regla que solo vive en quien la llama no protege una función `SECURITY DEFINER`. Pedirla exige la clave actual, como cambiarla: una
+  sesión olvidada abierta no basta para borrar una cuenta.
+- **Prueba:** después de la baja, ninguna columna de `usuario` contiene el nombre ni el correo de antes, y sus intentos de acceso ya no
+  guardan el correo (consulta directa en la base, paso 4b); el correo de antes ya no entra; las filas de `evento` y `acceso` siguen
+  enlazadas; el último administrador del sistema recibe 409. Las reglas de la función, plantadas por SQL en una transacción que se deshace
+  (`db/pruebas/anonimizacion.sql`, paso 1c). El dominio del correo anonimizado que cita esta sección es el de la función (el guardián lo compara, paso 2g).
+
+## 12. Aceptación de los términos de uso (decidido el 08/11/2026; ✅ 11/11/2026, `legal/terminos.ts` y el guardia central)
+- **Qué se guarda.** La versión vigente de los términos es un valor de configuración (`TERMINOS_VERSION`, `legal/terminos.ts`); en
+  `usuario`, la versión aceptada y el instante (`terminos_version_aceptada` y `terminos_aceptados_en`, migración 24). Qué dicen los términos y la página de privacidad, y de dónde salen, está en `docs/21 §7`.
 - **Cómo se aplica.** Al entrar, si la versión aceptada no es la vigente, la sesión queda restringida como con una clave temporal (§10):
   solo sirve para leer las páginas legales, aceptar y salir; lo demás responde 403 con un motivo que el panel convierte en la pantalla
   «Términos de uso». Aceptar guarda versión e instante y deja una fila en la auditoría. Cambiar la versión obliga a todos a aceptar de

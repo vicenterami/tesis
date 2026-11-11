@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ESPERA_MAX_MS, RECONECTADO, SIN_LATIDO_MS, abrirCanal, esEventoVivo, esperaReintento, type FuenteDeEventos } from './vivo';
+import { ESPERA_MAX_MS, RECONECTADO, SIN_LATIDO_MS, abrirCanal, abrirCanalCompartido, esEventoVivo, esperaReintento, type FuenteDeEventos } from './vivo';
 
 // EventSource falso: registra oyentes y deja disparar eventos y errores a mano.
 class FuenteFalsa implements FuenteDeEventos {
@@ -181,5 +181,37 @@ describe('abrirCanal (docs/19 F4)', () => {
     c.cerrar();
     vi.advanceTimersByTime(ESPERA_MAX_MS * 3);
     expect(creadas).toHaveLength(1);
+  });
+});
+
+// Un solo canal sin filtro por pestaña (11/11/2026): el tablero, el inventario, la comparación y los avisos lo comparten.
+describe('abrirCanalCompartido', () => {
+  it('dos suscriptores, una conexión; los dos reciben eventos y estados; quien llega tarde recibe el estado actual; se cierra con el último', () => {
+    const creadas: { url: string; cerrada: boolean; f: FuenteDeEventos & { emitir: (t: string, d: unknown) => void } }[] = [];
+    vi.stubGlobal('EventSource', class {
+      readyState = 1; onopen: ((e: Event) => void) | null = null; onerror: ((e: Event) => void) | null = null;
+      private oyentes = new Map<string, (e: MessageEvent) => void>();
+      constructor(url: string) { creadas.push({ url, cerrada: false, f: this as never }); }
+      addEventListener(t: string, o: (e: MessageEvent) => void): void { this.oyentes.set(t, o); }
+      emitir(t: string, d: unknown): void { this.oyentes.get(t)?.(new MessageEvent(t, { data: JSON.stringify(d) })); }
+      close(): void { creadas.find((c) => c.f === (this as never))!.cerrada = true; }
+    });
+    const a: string[] = [];
+    const b: string[] = [];
+    const ca = abrirCanalCompartido('/eventos', (e) => a.push(e.tipo), (s) => a.push(s));
+    creadas[0]!.f.onopen?.(new Event('open'));
+    const cb = abrirCanalCompartido('/eventos', (e) => b.push(e.tipo), (s) => b.push(s));
+    expect(creadas).toHaveLength(1);
+    creadas[0]!.f.emitir('visto', { dispositivo_id: 'd1', tiempo: '2026-11-11T12:00:00Z' });
+    expect(a).toEqual(['conectando', 'en_vivo', 'visto']);
+    expect(b).toEqual(['en_vivo', 'visto']);
+    ca.cerrar();
+    ca.cerrar(); // dos veces no descuenta dos
+    expect(creadas[0]!.cerrada).toBe(false);
+    cb.cerrar();
+    expect(creadas[0]!.cerrada).toBe(true);
+    abrirCanalCompartido('/eventos', () => {}, () => {}).cerrar();
+    expect(creadas).toHaveLength(2); // después del último, uno nuevo abre otra conexión
+    vi.unstubAllGlobals();
   });
 });

@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
-# Paso 4b del guardián: la matriz de acceso de docs/20 §6 contra el backend corriendo, con una sesión por rol (docs/20 §8).
+# Paso 4b del guardián: la matriz de acceso de docs/20 §6 contra el backend corriendo, con una sesión por perfil (docs/20 §8): desde el
+# 11/11/2026, las siete columnas (sin sesión, consulta, investigador, operador técnico, administrador de sitio, administrador del sistema y
+# otro sitio), los términos de uso (§12), la baja por anonimización (§11), la cuenta propia (preferencias, sesiones, exportar), el soporte y
+# la actividad del sitio (docs/19 §4, G, H y P11).
 #   bash plataforma/pruebas/sesion-smoke.sh
-# Requiere la pila arriba (backend en 127.0.0.1:3000 con la migración 22) y HTTP_CLAVE_ADMIN en plataforma/.env: con ella se crea el
+# Requiere la pila arriba (backend en 127.0.0.1:3000 con las migraciones 22 a 24) y HTTP_CLAVE_ADMIN en plataforma/.env: con ella se crea el
 # primer administrador (docs/20 §4), que crea a su vez un usuario de consulta. Datos de prueba propios y desechables: dos sitios
 # (A, el de las dos personas, y B, «otro sitio»), una zona, dos dispositivos HTTP y un canal en cada uno; correos @ejemplo.invalid
 # (dominio reservado, RFC 2606). Todo lo creado se borra al salir, también si algo falla (trap), con el dueño de la base.
@@ -41,7 +44,12 @@ limpiar_sufijo() {
   sql <<SQL >/dev/null 2>"$LOG_LIMPIEZA"
 BEGIN;
 CREATE TEMP TABLE d_prueba AS SELECT d.id FROM dispositivo d JOIN zona z ON z.id = d.zona_id JOIN sitio s ON s.id = z.sitio_id WHERE s.codigo IN ('$sa', '$sb');
-CREATE TEMP TABLE u_prueba AS SELECT id FROM usuario WHERE email LIKE '%$dom';
+-- Las personas de la corrida: por su correo y, las anonimizadas (su correo ya no es el de la prueba), por su membresía en los sitios de prueba.
+CREATE TEMP TABLE u_prueba AS SELECT id FROM usuario WHERE email LIKE '%$dom'
+  OR (anonimizado_en IS NOT NULL AND id IN (SELECT us.usuario_id FROM usuario_sitio us JOIN sitio s ON s.id = us.sitio_id WHERE s.codigo IN ('$sa', '$sb')));
+DELETE FROM preferencia WHERE usuario_id IN (SELECT id FROM u_prueba) OR sitio_predeterminado IN (SELECT id FROM sitio WHERE codigo IN ('$sa', '$sb'));
+DELETE FROM mensaje_soporte WHERE usuario_id IN (SELECT id FROM u_prueba);
+UPDATE usuario SET desactivado_por = NULL WHERE desactivado_por IN (SELECT id FROM u_prueba);
 DELETE FROM medicion WHERE canal_id IN (SELECT id FROM canal WHERE dispositivo_id IN (SELECT id FROM d_prueba));
 DELETE FROM condicion WHERE dispositivo_id IN (SELECT id FROM d_prueba);
 DELETE FROM regla_umbral WHERE canal_id IN (SELECT id FROM canal WHERE dispositivo_id IN (SELECT id FROM d_prueba));
@@ -199,6 +207,30 @@ SQL
 fi
 c=$(entrar adm "$ADM_EMAIL" <<<"$ADM_CLAVE"); [ "$c" = 200 ] && ok "el administrador entra con su clave → 200" || falla "entrar el administrador → $c $(head -c 120 "$T/r")"
 
+# ── 1b. Términos de uso (docs/20 §12; 11/11/2026): sin aceptar la versión vigente, la sesión solo sirve para leer lo legal, aceptar y salir ─
+TV=$(curl -s -m 5 "$API/terminos" | python3 -I -c "import sys,json; print(json.load(sys.stdin)['version'])" 2>/dev/null)
+[[ "$TV" =~ ^[0-9]+$ ]] && ok "GET /terminos (pública) trae la versión vigente ($TV)" || falla "GET /terminos sin versión: ${TV:-nada}"
+aceptar() { # QUIEN: acepta la versión vigente y comprueba el 200
+  local c; c=$(pedir "$1" POST /terminos/aceptar "{\"version\":$TV}")
+  [ "$c" = 200 ] && ok "$1 acepta los términos (versión $TV) → 200" || falla "$1 acepta los términos → $c $(head -c 120 "$T/r")"
+}
+caso "términos pendientes: GET /dispositivos → 403" 403 adm GET /dispositivos
+[ "$(campo "v['codigo']")" = terminos_pendientes ] && ok "el 403 trae el código terminos_pendientes (el panel muestra la pantalla de términos)" || falla "403 sin el código: $(head -c 160 "$T/r")"
+caso "términos pendientes: GET /sesion → 200" 200 adm GET /sesion
+[ "$(campo "(v['terminos']['pendiente'], v['terminos']['version_vigente'], v['administrador_sistema'], v['preferencias']['actualizado_en'])")" = "(True, $TV, False, None)" ] \
+  && ok "GET /sesion dice términos pendientes, la versión vigente, el perfil global y las preferencias por defecto" || falla "GET /sesion: $(head -c 300 "$T/r")"
+for r in /terminos /privacidad /acerca; do caso "términos pendientes: GET $r (pública)" 200 adm GET "$r"; done
+caso "términos pendientes: POST /soporte → 403" 403 adm POST /soporte '{"texto":"hola"}'
+caso "POST /terminos/aceptar con otra versión → 409 (se mostró un texto viejo)" 409 adm POST /terminos/aceptar '{"version":999}'
+aceptar adm
+caso "aceptados: GET /dispositivos → 200" 200 adm GET /dispositivos
+n=$(sql -c "SELECT count(*) FROM evento WHERE tipo = 'terminos_aceptados' AND usuario_id = (SELECT id FROM usuario WHERE email = '$ADM_EMAIL')")
+[ "$n" = 1 ] && ok "aceptar deja su evento terminos_aceptados con quién" || falla "eventos terminos_aceptados: $n"
+# «Subir la versión» se simula dejando la aceptada por debajo de la vigente (la vigente es una constante del código): vuelve a restringir.
+sql -c "UPDATE usuario SET terminos_version_aceptada = NULL, terminos_aceptados_en = NULL WHERE email = '$ADM_EMAIL'" >/dev/null
+caso "con una versión aceptada menor que la vigente, otra vez 403" 403 adm GET /dispositivos
+aceptar adm
+
 # La cookie, leída con curl -D - (docs/20 §8): HttpOnly, Secure, SameSite=Lax y Path=/, también en desarrollo; con el prefijo __Host-
 # (revisión del 08/11/2026), que el navegador solo acepta con Secure, Path=/ y sin Domain.
 cab=$(curl "${IFZ[@]}" -s -m 15 -D - -o /dev/null -X POST -H 'X-Pedido: panel' -H 'Content-Type: application/json' --data-binary @- "$API/sesion" <<<"$(cuerpo_entrar "$ADM_EMAIL" <<<"$ADM_CLAVE")" | tr -d '\r' | grep -i '^set-cookie: __Host-sesion=')
@@ -229,6 +261,7 @@ d=$(python3 -I -c "import sys,json,datetime as t; v=json.load(open(sys.argv[1]))
 CON_CLAVE=$(nueva_clave)
 c=$(entrar con "$CON_EMAIL" <<<"$CON_TEMP"); [ "$c" = 200 ] || falla "consulta entra con la temporal → $c"
 c=$(cambiar_clave con "$CON_TEMP" "$CON_CLAVE"); [ "$c" = 200 ] && ok "consulta cambia su clave temporal → 200" || falla "consulta cambia la clave → $c $(head -c 160 "$T/r")"
+aceptar con
 
 # ── 2b. Escalada entre sitios (revisión del 08/11/2026): la cuenta de quien también está en otro sitio no la toca un administrador de A ──
 # «multi» está en A (lo crea el administrador de A) y en B (se lo da el dueño de la base, como lo haría un administrador de B).
@@ -240,14 +273,14 @@ marca() { pedir adm GET /usuarios >/dev/null; campo "[u['actualizado_en'] for u 
 huella() { sql -c "SELECT md5(hash_password || activo::text || coalesce(clave_temporal_vence_en::text, '')) FROM usuario WHERE id = '$1'"; }
 antes=$(huella "$MULTI_ID")
 M=$(marca "$MULTI_ID")
-caso "administrador de A: desactivar a quien también está en B → 403" 403 adm PATCH "/usuarios/$MULTI_ID" "{\"actualizado_en\":\"$M\",\"activo\":false}"
+caso "administrador de A: desactivar a quien también está en B → 403" 403 adm PATCH "/usuarios/$MULTI_ID" "{\"actualizado_en\":\"$M\",\"activo\":false,\"motivo\":\"prueba\"}"
 [ "$(campo "v['message']")" = "la cuenta pertenece también a otros sitios: pídelo a un administrador del sistema" ] \
   && ok "el 403 lo explica: «la cuenta pertenece también a otros sitios…»" || falla "mensaje del 403: $(head -c 160 "$T/r")"
 caso "administrador de A: clave temporal a quien también está en B → 403 (no puede entrar como ella)" 403 adm PATCH "/usuarios/$MULTI_ID" "{\"actualizado_en\":\"$M\",\"clave_temporal\":true}"
 caso "administrador de A: su rol en A sí lo cambia → 200" 200 adm PATCH "/usuarios/$MULTI_ID" "{\"actualizado_en\":\"$M\",\"sitios\":[{\"sitio_id\":\"$SITIO_A\",\"rol\":\"consulta\"}]}"
 [ "$(huella "$MULTI_ID")" = "$antes" ] && ok "la cuenta de quien también está en B no cambió (activa, misma clave y mismo vencimiento)" || falla "la cuenta de multi cambió pese al 403"
 M=$(marca "$CON_ID")
-caso "administrador de A: un campo de la cuenta de quien SOLO está en A → 200" 200 adm PATCH "/usuarios/$CON_ID" "{\"actualizado_en\":\"$M\",\"activo\":true}"
+caso "administrador de A: un campo de la cuenta de quien SOLO está en A → 200" 200 adm PATCH "/usuarios/$CON_ID" "{\"actualizado_en\":\"$M\",\"nombre\":\"Consulta de prueba\"}"
 
 # ── 3. La matriz (docs/20 §6): sin sesión, consulta y administrador en su sitio, y otro sitio ───────────────────────────────────
 ALTA="{\"id_fisico\":\"tn-$N\",\"nombre\":\"nodo nuevo\",\"zona_id\":\"$ZA\",\"via\":\"http\",\"intervalo_esperado_s\":60,\"canales\":[{\"magnitud\":\"temperatura\"}]}"
@@ -338,8 +371,8 @@ caso "administrador, otro sitio: POST /pasarelas/{id}/credencial" 404 adm POST "
 n=$(sql -c "SELECT count(*) FROM pasarela WHERE id_fisico IN ('gwn-$N', 'gwm-$N') OR (id = '$PB' AND NOT activo)")
 [ "$n" = 0 ] && ok "ninguna pasarela creada ni dada de baja por los rechazos (todo se cortó antes del broker)" || falla "los rechazos dejaron $n pasarela(s) creada(s) o dada(s) de baja"
 M_B=$(sql -c "SELECT to_char(actualizado_en AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') FROM usuario WHERE id = '$SOLO_B'")
-caso "administrador, otro sitio: PATCH /usuarios/{id} de quien solo está en B → 404 (como uno inexistente)" 404 adm PATCH "/usuarios/$SOLO_B" "{\"actualizado_en\":\"$M_B\",\"activo\":false}"
-cp "$T/r" "$T/otro-u.json"; pedir adm PATCH "/usuarios/$FALSO" "{\"actualizado_en\":\"$M_B\",\"activo\":false}" >/dev/null
+caso "administrador, otro sitio: PATCH /usuarios/{id} de quien solo está en B → 404 (como uno inexistente)" 404 adm PATCH "/usuarios/$SOLO_B" "{\"actualizado_en\":\"$M_B\",\"activo\":false,\"motivo\":\"prueba\"}"
+cp "$T/r" "$T/otro-u.json"; pedir adm PATCH "/usuarios/$FALSO" "{\"actualizado_en\":\"$M_B\",\"activo\":false,\"motivo\":\"prueba\"}" >/dev/null
 cmp -s "$T/r" "$T/otro-u.json" && ok "PATCH /usuarios/{id} de otro sitio responde lo mismo que un usuario inexistente" || falla "PATCH /usuarios de otro sitio e inexistente difieren: $(cat "$T/otro-u.json") ≠ $(cat "$T/r")"
 [ "$(sql -c "SELECT activo FROM usuario WHERE id = '$SOLO_B'")" = t ] && ok "la persona de B sigue activa" || falla "la persona de B cambió pese al 404"
 
@@ -411,6 +444,215 @@ CUR_B=$(sql -c "SELECT to_char(abierta_en AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH
 caso "keyset: consulta pide /condiciones con un cursor de otro sitio" 200 con GET "/condiciones?limite=500&cursor=$CUR_B"
 [ "$(campo "sum(1 for c in v if c['dispositivo_id']=='$DB')")" = 0 ] && ok "keyset: un cursor de otro sitio no trae nada de ese sitio (el alcance sigue en el WHERE)" || falla "keyset: el cursor de B trajo filas de B"
 
+# ── 3d. Cinco perfiles (docs/20 §6, las siete columnas; 11/11/2026): investigador, operador técnico y administrador del sistema ────────
+# El investigador y el operador los da de alta el administrador de A; el administrador del sistema se crea con el dueño de la base (solo
+# otro administrador del sistema puede dar ese perfil) con el hash que calcula el backend. Cada uno entra, cambia su temporal y acepta.
+alta_persona() { # QUIEN EMAIL ROL NOMBRE → deja la clave nueva en NUEVA_ULTIMA
+  local quien=$1 email=$2 rol=$3 nombre=$4 tmp c c2
+  caso "POST /usuarios ($rol de A, por el administrador de A)" 201 adm POST /usuarios "{\"nombre\":\"$nombre\",\"email\":\"$email\",\"sitios\":[{\"sitio_id\":\"$SITIO_A\",\"rol\":\"$rol\"}]}"
+  tmp=$(campo "v['clave']"); NUEVA_ULTIMA=$(nueva_clave)
+  c=$(entrar "$quien" "$email" <<<"$tmp"); c2=$(cambiar_clave "$quien" "$tmp" "$NUEVA_ULTIMA")
+  [ "$c$c2" = 200200 ] || falla "$rol entra y cambia su temporal → $c y $c2"
+  aceptar "$quien"
+}
+alta_persona inv "inv$DOM" investigador "Investigación de prueba"
+INV_CLAVE=$NUEVA_ULTIMA; INV_ID=$(sql -c "SELECT id FROM usuario WHERE email = 'inv$DOM'")
+alta_persona ope "ope$DOM" operador "Operación de prueba"
+SIS_CLAVE=$(nueva_clave)
+HASH_SIS=$(printf '%s' "$SIS_CLAVE" | docker compose -f "$PLAT/docker-compose.yml" exec -T backend node -e \
+  "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>import('/app/dist/alta/credenciales.js').then(m=>m.hashScrypt(s,undefined,2**17)).then(h=>process.stdout.write(h)))")
+[[ "$HASH_SIS" =~ ^scrypt\$[0-9]+\$[0-9]+\$[0-9]+\$[A-Za-z0-9+/=]+\$[A-Za-z0-9+/=]+$ ]] || falla "el backend no devolvió el hash del administrador del sistema"
+SIS_ID=$(sql <<SQL
+INSERT INTO usuario (nombre, email, hash_password, administrador_sistema) VALUES ('Sistema de prueba', 'sis$DOM', '$HASH_SIS', true) RETURNING id;
+SQL
+)
+c=$(entrar sis "sis$DOM" <<<"$SIS_CLAVE"); [ "$c" = 200 ] && ok "el administrador del sistema (sin sitios propios) entra → 200" || falla "entrar sis → $c"
+aceptar sis
+caso "administrador del sistema: GET /sesion" 200 sis GET /sesion
+[ "$(campo "v['administrador_sistema']")" = True ] && ok "GET /sesion: administrador_sistema: true" || falla "GET /sesion del sistema: $(head -c 200 "$T/r")"
+caso "investigador: GET /sesion" 200 inv GET /sesion
+[ "$(campo "(v['administrador_sistema'], [s['rol'] for s in v['sitios']], sorted(v['permisos']['investigador']))")" = "(False, ['investigador'], ['exportar', 'leer'])" ] \
+  && ok "GET /sesion del investigador: su perfil por sitio y la matriz de cinco perfiles" || falla "GET /sesion del investigador: $(head -c 300 "$T/r")"
+
+# Lecturas: los tres perfiles nuevos en su sitio; el del sistema, también en B (todos los sitios).
+for q in inv ope sis; do
+  for r in /dispositivos "/dispositivos/$DA" "/canales/$CA/historico" /condiciones /cuarentena /pasarelas /sitios "/sitios/$SITIO_A/resumen" "/dispositivos/$DA/historico" "/dispositivos/$DA/eventos"; do
+    caso "$q: GET ${r%%\?*}" 200 "$q" GET "$r"
+  done
+done
+for q in inv ope; do
+  caso "$q, otro sitio: GET /dispositivos/{id}" 404 "$q" GET "/dispositivos/$DB"
+  caso "$q, otro sitio: GET /sitios/{id}/resumen" 404 "$q" GET "/sitios/$SITIO_B/resumen"
+done
+caso "administrador del sistema: GET /dispositivos/{id} del sitio B (todos los sitios)" 200 sis GET "/dispositivos/$DB"
+pedir sis GET /dispositivos >/dev/null; lista=$(campo "' '.join(d['id'] for d in v)")
+grep -q "$DA" <<<"$lista" && grep -q "$DB" <<<"$lista" && ok "administrador del sistema: la lista trae A y B" || falla "administrador del sistema: la lista no trae los dos sitios"
+# Exportar: administrador de sitio e investigador (y el del sistema); consulta y operador técnico, 403.
+caso "investigador: GET /dispositivos/{id}/exportar → 200" 200 inv GET "/dispositivos/$DA/exportar"
+caso "operador técnico: GET /dispositivos/{id}/exportar → 403" 403 ope GET "/dispositivos/$DA/exportar"
+caso "administrador del sistema: GET /dispositivos/{id}/exportar (sitio B)" 200 sis GET "/dispositivos/$DB/exportar"
+# Escribir y configurar: operador técnico y administradores; el investigador, 403. La baja: solo administradores.
+ALTA_O="{\"id_fisico\":\"to-$N\",\"nombre\":\"nodo del operador\",\"zona_id\":\"$ZA\",\"via\":\"http\",\"intervalo_esperado_s\":60,\"canales\":[{\"magnitud\":\"temperatura\"}]}"
+caso "investigador: POST /dispositivos → 403" 403 inv POST /dispositivos "$ALTA_O"
+caso "operador técnico: POST /dispositivos (zona de su sitio) → 201" 201 ope POST /dispositivos "$ALTA_O"
+DO=$(campo "v['id']")
+caso "administrador del sistema: POST /dispositivos en el sitio B → 201" 201 sis POST /dispositivos "$ALTA_B"
+caso "investigador: POST /dispositivos/{id}/credencial → 403" 403 inv POST "/dispositivos/$DA/credencial"
+caso "operador técnico: POST /dispositivos/{id}/credencial → 201" 201 ope POST "/dispositivos/$DA/credencial"
+TOKEN_A=$(campo "v['conexion']['token']") # la credencial vigente de A (la sección 4 la usa para enviar)
+caso "investigador: DELETE /dispositivos/{id} → 403" 403 inv DELETE "/dispositivos/$DO"
+caso "operador técnico: DELETE /dispositivos/{id} → 403 (la baja es del administrador)" 403 ope DELETE "/dispositivos/$DO"
+caso "administrador del sistema: DELETE /dispositivos/{id} → 200" 200 sis DELETE "/dispositivos/$DO"
+caso "investigador: POST /pasarelas → 403" 403 inv POST /pasarelas "$GW"
+caso "operador técnico: POST /pasarelas en un sitio ajeno → 404 (pasa el permiso; el sitio no es suyo)" 404 ope POST /pasarelas "$GW_B"
+caso "operador técnico: DELETE /pasarelas/{id} → 403 (la baja es del administrador)" 403 ope DELETE "/pasarelas/$PA"
+pedir adm GET "/dispositivos/$DA" >/dev/null; MD=$(campo "v['actualizado_en']"); MC=$(campo "[c for c in v['canales'] if c['id']=='$CA'][0]['actualizado_en']")
+caso "investigador: PATCH /canales/{id} (calibración) → 403" 403 inv PATCH "/canales/$CA" "{\"escala_cero\":0,\"escala_cien\":100,\"actualizado_en\":\"$MC\"}"
+caso "operador técnico: PATCH /canales/{id} (calibración) → 200" 200 ope PATCH "/canales/$CA" "{\"escala_cero\":0,\"escala_cien\":100,\"actualizado_en\":\"$MC\"}"
+pedir adm GET "/dispositivos/$DA" >/dev/null; MC=$(campo "[c for c in v['canales'] if c['id']=='$CA'][0]['actualizado_en']")
+caso "investigador: PATCH /dispositivos/{id} → 403" 403 inv PATCH "/dispositivos/$DA" "{\"actualizado_en\":\"$MD\",\"nombre\":\"nodo A\"}"
+caso "operador técnico: PATCH /dispositivos/{id} → 200" 200 ope PATCH "/dispositivos/$DA" "{\"actualizado_en\":\"$MD\",\"nombre\":\"nodo A\"}"
+caso "investigador: PUT /canales/{id}/reglas → 403" 403 inv PUT "/canales/$CA/reglas" "{\"actualizado_en\":\"$MC\",\"reglas\":[]}"
+caso "operador técnico: PUT /canales/{id}/reglas → 200" 200 ope PUT "/canales/$CA/reglas" "{\"actualizado_en\":\"$MC\",\"reglas\":[{\"umbral_alto\":31,\"histeresis\":1}]}"
+caso "investigador: POST /dispositivos/lote → 403" 403 inv POST "/dispositivos/lote?modo=validar" '{"filas":[{}]}'
+caso "operador técnico: POST /dispositivos/lote?modo=validar → 200" 200 ope POST "/dispositivos/lote?modo=validar" '{"filas":[{}]}'
+caso "investigador: GET /cuarentena/detectados → 403" 403 inv GET /cuarentena/detectados
+caso "operador técnico: GET /cuarentena/detectados?sitio= → 200" 200 ope GET "/cuarentena/detectados?sitio=$SITIO_A"
+caso "administrador del sistema: GET /cuarentena/detectados?sitio= (B) → 200" 200 sis GET "/cuarentena/detectados?sitio=$SITIO_B"
+# Usuarios: administradores (de sitio en sus sitios; del sistema, todas las cuentas) y nadie más.
+for q in inv ope; do caso "$q: GET /usuarios → 403" 403 "$q" GET /usuarios; caso "$q: POST /usuarios → 403" 403 "$q" POST /usuarios '{}'; done
+caso "administrador del sistema: GET /usuarios (todas las cuentas)" 200 sis GET /usuarios
+grep -q "$SOLO_B" "$T/r" && grep -q "$CON_ID" "$T/r" && ok "administrador del sistema: ve a la persona de A y a la que solo está en B" || falla "administrador del sistema no ve todas las cuentas"
+M_B=$(sql -c "SELECT to_char(actualizado_en AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') FROM usuario WHERE id = '$SOLO_B'")
+caso "administrador del sistema: desactiva (con motivo) a quien solo está en B → 200" 200 sis PATCH "/usuarios/$SOLO_B" "{\"actualizado_en\":\"$M_B\",\"activo\":false,\"motivo\":\"prueba del sistema\"}"
+caso "administrador del sistema: la reactiva (con clave temporal nueva) → 200" 200 sis PATCH "/usuarios/$SOLO_B" "{\"actualizado_en\":\"$(campo "v['actualizado_en']")\",\"activo\":true,\"clave_temporal\":true}"
+M=$(marca "$CON_ID")
+caso "administrador de sitio: dar administrador_sistema → 403 (solo el del sistema)" 403 adm PATCH "/usuarios/$CON_ID" "{\"actualizado_en\":\"$M\",\"administrador_sistema\":true}"
+caso "administrador del sistema: dar administrador_sistema a consulta → 200" 200 sis PATCH "/usuarios/$CON_ID" "{\"actualizado_en\":\"$M\",\"administrador_sistema\":true}"
+caso "administrador del sistema: quitárselo → 200" 200 sis PATCH "/usuarios/$CON_ID" "{\"actualizado_en\":\"$(campo "v['actualizado_en']")\",\"administrador_sistema\":false}"
+otros=$(sql -c "SELECT count(*) FROM usuario WHERE administrador_sistema AND activo AND id <> '$SIS_ID'")
+if [ "$otros" = 0 ]; then
+  M=$(sql -c "SELECT to_char(actualizado_en AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') FROM usuario WHERE id = '$SIS_ID'")
+  caso "el último administrador del sistema no se quita el perfil → 409" 409 sis PATCH "/usuarios/$SIS_ID" "{\"actualizado_en\":\"$M\",\"administrador_sistema\":false}"
+else echo "      (último administrador del sistema omitido: la base tiene $otros fuera de la prueba)"; fi
+# Revisión del 11/11/2026: un administrador del sistema que además está en A no queda a merced del administrador de A (antes, con una
+# clave temporal, este entraba como él). Se le da A por SQL, se prueba y se le quita.
+sql -c "INSERT INTO usuario_sitio (usuario_id, sitio_id, rol) VALUES ('$SIS_ID', '$SITIO_A', 'consulta')" >/dev/null
+antes=$(huella "$SIS_ID"); M=$(marca "$SIS_ID")
+caso "administrador de A: clave temporal al administrador del sistema (que está en A) → 403" 403 adm PATCH "/usuarios/$SIS_ID" "{\"actualizado_en\":\"$M\",\"clave_temporal\":true}"
+[ "$(campo "v['message']")" = "la cuenta es de un administrador del sistema: solo otro administrador del sistema la cambia" ] \
+  && ok "el 403 lo explica: «la cuenta es de un administrador del sistema…»" || falla "mensaje del 403: $(head -c 160 "$T/r")"
+caso "administrador de A: desactivar al administrador del sistema → 403" 403 adm PATCH "/usuarios/$SIS_ID" "{\"actualizado_en\":\"$M\",\"activo\":false,\"motivo\":\"prueba\"}"
+caso "administrador de A: renombrarlo → 403" 403 adm PATCH "/usuarios/$SIS_ID" "{\"actualizado_en\":\"$M\",\"nombre\":\"otro\"}"
+caso "administrador de A: quitarle el sitio A → 403" 403 adm PATCH "/usuarios/$SIS_ID" "{\"actualizado_en\":\"$M\",\"sitios\":[{\"sitio_id\":\"$SITIO_A\",\"rol\":null}]}"
+[ "$(huella "$SIS_ID")" = "$antes" ] && ok "la cuenta del administrador del sistema no cambió (activa, misma clave)" || falla "la cuenta del administrador del sistema cambió pese al 403"
+sql -c "UPDATE usuario_sitio SET activo = false WHERE usuario_id = '$SIS_ID' AND sitio_id = '$SITIO_A'" >/dev/null
+
+# ── 3e. Lo propio de cada persona (docs/20 §6, última fila; docs/19 §4, H; docs/21 §8) y la actividad del sitio (P14) ─────────────
+for par in "GET /preferencias" "PUT /preferencias" "GET /sesiones" "DELETE /sesiones/$(printf 'a%.0s' {1..64})" "GET /cuenta/exportar" "POST /cuenta/baja" "POST /soporte" "GET /soporte" "GET /sitios/$SITIO_A/actividad" "POST /terminos/aceptar"; do
+  caso "sin sesión: ${par%% *} $(sed 's|/[0-9a-f-]\{36\}|/{id}|; s|/a\{64\}|/{id}|' <<<"${par#* }")" 401 anon ${par%% *} "${par#* }" '{}'
+done
+for r in /terminos /privacidad /acerca; do caso "sin sesión: GET $r (pública)" 200 anon GET "$r"; done
+# «Acerca de» (revisión del 11/11/2026): sin sesión, la licencia y el código fuente, pero no la versión ni el commit; con sesión, la versión.
+pedir anon GET /acerca >/dev/null
+[ "$(campo "(v['version'], v['commit'], v['licencia'], len(v['aviso_licencia']) > 0)")" = "(None, None, 'AGPL-3.0-only', True)" ] && ok "GET /acerca sin sesión: licencia y aviso AGPL; sin versión ni commit" || falla "GET /acerca sin sesión: $(head -c 200 "$T/r")"
+pedir con GET /acerca >/dev/null
+[[ "$(campo "v['version']")" =~ ^[0-9]+\.[0-9]+\.[0-9]+ ]] && ok "GET /acerca con sesión: trae la versión" || falla "GET /acerca con sesión: $(head -c 200 "$T/r")"
+for q in con inv ope adm sis; do caso "$q: GET /preferencias" 200 "$q" GET /preferencias; done
+PREF="{\"actualizado_en\":null,\"unidad_temperatura\":\"F\",\"unidad_longitud\":\"km\",\"zona_horaria\":\"America/Punta_Arenas\",\"tema\":\"oscuro\",\"notificar\":[\"umbral\"],\"vistas\":[{\"nombre\":\"Alertas\",\"pantalla\":\"inventario\",\"parametros\":{\"estado\":\"alerta\"}}],\"sitio_predeterminado\":\"$SITIO_A\"}"
+caso "consulta: PUT /preferencias (la primera vez, actualizado_en null) → 200" 200 con PUT /preferencias "$PREF"
+MP=$(campo "v['actualizado_en']")
+caso "consulta: PUT /preferencias otra vez con null → 409 (ya existían)" 409 con PUT /preferencias "$PREF"
+caso "consulta: PUT /preferencias con la marca vigente → 200" 200 con PUT /preferencias "${PREF/\"actualizado_en\":null/\"actualizado_en\":\"$MP\"}"
+caso "consulta: PUT /preferencias con la marca vieja → 409 (bloqueo optimista)" 409 con PUT /preferencias "${PREF/\"actualizado_en\":null/\"actualizado_en\":\"$MP\"}"
+caso "consulta: PUT /preferencias con una zona inventada → 400" 400 con PUT /preferencias "${PREF/America\/Punta_Arenas/Marte\/Olympus}"
+caso "consulta: PUT /preferencias con un sitio por defecto ajeno → 400" 400 con PUT /preferencias "${PREF/$SITIO_A/$SITIO_B}"
+# Vistas guardadas como las arma el panel (corrección del 11/11/2026): `parametros` es un objeto con la ruta; el texto suelto de antes, 400.
+pedir con GET /preferencias >/dev/null; MP=$(campo "v['actualizado_en']")
+P2=${PREF/\"actualizado_en\":null/\"actualizado_en\":\"$MP\"}
+VISTA_RUTA='{"ruta":"/inventario?estado=alerta"}'; VISTA_TEXTO='"/inventario?estado=alerta"'; VISTA_OTRO='{"ruta":"//otro.example/x"}'; VISTA_VIEJA='{"estado":"alerta"}'
+caso "consulta: PUT /preferencias con una vista como la guarda el panel (parametros.ruta) → 200" 200 con PUT /preferencias "${P2/"$VISTA_VIEJA"/$VISTA_RUTA}"
+[ "$(campo "v['vistas'][0]['parametros']")" = "{'ruta': '/inventario?estado=alerta'}" ] && ok "la vista vuelve con su ruta, tal cual" || falla "vista guardada: $(head -c 200 "$T/r")"
+MP=$(campo "v['actualizado_en']"); P2=${PREF/\"actualizado_en\":null/\"actualizado_en\":\"$MP\"}
+caso "consulta: PUT /preferencias con parametros como texto (la forma vieja del panel) → 400" 400 con PUT /preferencias "${P2/"$VISTA_VIEJA"/$VISTA_TEXTO}"
+caso "consulta: PUT /preferencias con una ruta de otro origen → 400" 400 con PUT /preferencias "${P2/"$VISTA_VIEJA"/$VISTA_OTRO}"
+caso "consulta: GET /sesion trae las preferencias guardadas" 200 con GET /sesion
+[ "$(campo "(v['preferencias']['unidad_temperatura'], v['preferencias']['zona_horaria'])")" = "('F', 'America/Punta_Arenas')" ] && ok "GET /sesion: las preferencias de la persona (°F, su zona)" || falla "GET /sesion sin preferencias: $(head -c 200 "$T/r")"
+c=$(entrar con2 "$CON_EMAIL" <<<"$CON_CLAVE"); [ "$c" = 200 ] || falla "consulta abre una segunda sesión → $c"
+caso "consulta: GET /sesiones" 200 con GET /sesiones
+[ "$(campo "(len(v) >= 2, sum(1 for s in v if s['actual']), all(s['origen'].endswith(('/24', '/48')) or s['origen'] == 'desconocido' for s in v), any('ip' in s for s in v))")" = "(True, 1, True, False)" ] \
+  && ok "GET /sesiones: las dos sesiones, una «actual», origen truncado y sin la dirección completa" || falla "GET /sesiones: $(head -c 300 "$T/r")"
+OTRA=$(sql -c "SELECT s.id FROM sesion s JOIN usuario u ON u.id = s.usuario_id WHERE u.email = '$ADM_EMAIL' AND s.revocada_en IS NULL LIMIT 1")
+caso "consulta: DELETE /sesiones/{id} de otra persona → 404" 404 con DELETE "/sesiones/$OTRA"
+SEG=$(sql -c "SELECT s.id FROM sesion s JOIN usuario u ON u.id = s.usuario_id WHERE u.email = '$CON_EMAIL' AND s.revocada_en IS NULL ORDER BY s.creada_en DESC LIMIT 1")
+caso "consulta: DELETE /sesiones/{id} de su otra sesión → 200" 200 con DELETE "/sesiones/$SEG"
+caso "la sesión cerrada desde «Mi cuenta» ya no vale" 401 con2 GET /sesion
+caso "la sesión desde la que se cerró sigue viva" 200 con GET /sesion
+cod=$(curl "${IFZ[@]}" -s -m 15 -o "$T/r" -D "$T/h" -w '%{http_code}' -b "$T/con.jar" "$API/cuenta/exportar")
+[ "$cod" = 200 ] && grep -qi '^content-disposition: attachment' "$T/h" && [ "$(campo "(v['cuenta']['email'], v['preferencias']['unidad_temperatura'], len(v['sesiones']) >= 2)")" = "('$CON_EMAIL', 'F', True)" ] \
+  && ok "consulta: GET /cuenta/exportar → 200, descarga (attachment) con su cuenta, preferencias y sesiones" || falla "exportar mis datos → $cod: $(head -c 200 "$T/r")"
+[ "$(campo "('motivo_baja' in v['cuenta'], 'desactivado_en' in v['cuenta'], any(a.get('email_intentado') == '$CON_EMAIL' for a in v['accesos']), all('detalle' in e for e in v['cambios_hechos']), 'No se incluyen' in v['aviso'])")" = "(True, True, True, True, True)" ] \
+  && ok "exportar: con el correo tecleado en sus accesos, la fecha y el motivo de baja, el detalle de sus cambios y lo que no incluye" || falla "exportar: faltan campos: $(head -c 300 "$T/r")"
+# Soporte: cualquier persona envía (5 por hora); solo el administrador del sistema lee.
+caso "consulta: POST /soporte → 201" 201 con POST /soporte '{"texto":"no veo el sitio B (prueba de soporte)"}'
+caso "consulta: POST /soporte vacío → 400" 400 con POST /soporte '{"texto":"  "}'
+for i in 2 3 4 5; do pedir con POST /soporte "{\"texto\":\"mensaje $i\"}" >/dev/null; done
+caso "consulta: el sexto mensaje de la hora → 429" 429 con POST /soporte '{"texto":"uno más"}'
+for q in con inv ope adm; do caso "$q: GET /soporte → 403 (solo el administrador del sistema)" 403 "$q" GET /soporte; done
+caso "administrador del sistema: GET /soporte" 200 sis GET "/soporte?limite=500"
+[ "$(campo "sum(1 for m in v if m['usuario']['id']=='$CON_ID')")" = 5 ] && ok "administrador del sistema: lee los 5 mensajes de la persona, con su nombre" || falla "GET /soporte: $(head -c 200 "$T/r")"
+# Actividad del sitio (P14): administrador de sitio en sus sitios, el del sistema en todos; los demás, 403; otro sitio, 404.
+for q in con inv ope; do caso "$q: GET /sitios/{id}/actividad → 403" 403 "$q" GET "/sitios/$SITIO_A/actividad"; done
+caso "administrador, otro sitio: GET /sitios/{id}/actividad → 404" 404 adm GET "/sitios/$SITIO_B/actividad"
+caso "administrador del sistema: GET /sitios/{id}/actividad del sitio B → 200" 200 sis GET "/sitios/$SITIO_B/actividad"
+# Eventos sin dispositivo (corrección del 11/11/2026): una pasarela de A y otra de B con su evento (las pasarelas de la prueba se crean por
+# SQL, sin evento; aquí se le pone uno a cada una, a nombre del administrador de A, como lo dejaría POST /pasarelas).
+sql -c "INSERT INTO evento (tipo, detalle, usuario_id) VALUES ('pasarela_rotacion', jsonb_build_object('pasarela_id', '$PA'), '$ADM_UID'), ('pasarela_rotacion', jsonb_build_object('pasarela_id', '$PB'), '$ADM_UID')" >/dev/null
+caso "administrador: GET /sitios/{id}/actividad" 200 adm GET "/sitios/$SITIO_A/actividad?limite=500"
+[ "$(campo "(any(a['tipo']=='usuario_alta' and a['texto']=='dio de alta la cuenta de «Multi de prueba»' for a in v), any(a['tipo']=='terminos_aceptados' for a in v), sum(1 for a in v if a['tipo']=='pasarela_rotacion'), any('Solo B de prueba' in a['texto'] or 'pasarela B' in a['texto'] for a in v))")" = "(True, True, 1, False)" ] \
+  && ok "actividad: también lo que no tiene dispositivo (altas de cuentas de A, términos aceptados, la pasarela de A), nada de B" || falla "actividad sin dispositivo: $(head -c 300 "$T/r")"
+[ "$(campo "(any(a['tipo']=='reglas_cambiadas' and a['usuario'] and a['usuario']['id']=='$ADM_UID' and a['texto'].startswith('cambió los umbrales de') for a in v), any(a['clase']=='acceso' and a['tipo']=='ok' for a in v))")" = "(True, True)" ] \
+  && ok "actividad: «cambió los umbrales de …» con la persona, y las entradas (acceso) de las personas del sitio" || falla "actividad: $(head -c 300 "$T/r")"
+grep -qE '@|\b[0-9]{1,3}(\.[0-9]{1,3}){3}\b' "$T/r" && falla "actividad: la respuesta trae un correo o una dirección IP" || ok "actividad: sin correos ni direcciones IP en la respuesta"
+grep -q "$DB" "$T/r" && falla "actividad del sitio A trae el dispositivo de B" || ok "actividad del sitio A: nada del sitio B"
+sig=$(pedir_cabecera adm "/sitios/$SITIO_A/actividad?limite=2" X-Siguiente); P1=$(campo "[a['id'] for a in v]")
+caso "actividad: página 2 con el cursor" 200 adm GET "/sitios/$SITIO_A/actividad?limite=2&cursor=$sig"
+python3 -I -c "import sys,json,ast; a=ast.literal_eval(sys.argv[1]); b=[x['id'] for x in json.load(open(sys.argv[2]))]; sys.exit(0 if len(a)==2 and b and not set(a)&set(b) else 1)" "$P1" "$T/r" \
+  && ok "actividad por cursor: la página 2 sigue a la 1 sin repetir" || falla "actividad por cursor: $P1 | $(head -c 200 "$T/r")"
+# Reactivar (revisión del 11/11/2026): una baja hecha por el administrador del sistema solo la deshace el alcance global, y toda
+# reactivación trae una clave temporal nueva (la de antes no vuelve).
+M=$(marca "$INV_ID")
+caso "administrador del sistema: desactiva al investigador de A (con motivo) → 200" 200 sis PATCH "/usuarios/$INV_ID" "{\"actualizado_en\":\"$M\",\"activo\":false,\"motivo\":\"prueba de reactivación\"}"
+M=$(campo "v['actualizado_en']")
+caso "administrador de A: reactivar sin clave temporal → 400 (la clave anterior no vuelve)" 400 adm PATCH "/usuarios/$INV_ID" "{\"actualizado_en\":\"$M\",\"activo\":true}"
+caso "administrador de A: reactivar una baja hecha por el administrador del sistema → 403" 403 adm PATCH "/usuarios/$INV_ID" "{\"actualizado_en\":\"$M\",\"activo\":true,\"clave_temporal\":true}"
+antes=$(huella "$INV_ID")
+caso "administrador del sistema: la reactiva con clave temporal nueva → 200" 200 sis PATCH "/usuarios/$INV_ID" "{\"actualizado_en\":\"$M\",\"activo\":true,\"clave_temporal\":true}"
+[ "$(campo "(v['activo'], len(v.get('clave', '')) > 0)")" = "(True, True)" ] && [ "$(huella "$INV_ID")" != "$antes" ] \
+  && ok "reactivada con una clave temporal nueva (otro hash: la de antes no vuelve)" || falla "reactivación: $(head -c 200 "$T/r")"
+c=$(entrar inv2 "inv$DOM" <<<"$INV_CLAVE"); [ "$c" = 401 ] && ok "la clave de antes de la baja ya no entra → 401" || falla "la clave de antes entra → $c"
+# Baja por anonimización (docs/20 §11): una persona de consulta se da de baja con su clave; la fila queda sin nombre ni correo.
+alta_persona baj "baja$DOM" consulta "Persona que se va"
+BAJ_ID=$(sql -c "SELECT id FROM usuario WHERE email = 'baja$DOM'")
+caso "baja: POST /cuenta/baja con una clave mala → 400" 400 baj POST /cuenta/baja '{"clave":"no-es-la-mia-123"}'
+caso "baja: POST /cuenta/baja con su clave → 200" 200 baj POST /cuenta/baja "$(python3 -I -c "import sys,json; print(json.dumps({'clave': sys.argv[1]}))" "$NUEVA_ULTIMA")"
+n=$(sql -c "SELECT (nombre NOT LIKE '%Persona que se va%' AND email NOT LIKE 'baja$DOM' AND NOT activo AND anonimizado_en IS NOT NULL AND hash_password NOT LIKE 'scrypt%')::text FROM usuario WHERE id = '$BAJ_ID'")
+[ "$n" = true ] && ok "baja: ninguna columna de usuario guarda el nombre ni el correo de antes; sin clave; anonimizado_en" || falla "baja: la fila conserva datos: $n"
+n=$(sql -c "SELECT (SELECT count(*) FROM sesion WHERE usuario_id = '$BAJ_ID' AND revocada_en IS NULL) || '/' || (SELECT count(*) FROM usuario_sitio WHERE usuario_id = '$BAJ_ID' AND activo) || '/' || (SELECT count(*) FROM acceso WHERE usuario_id = '$BAJ_ID') || '/' || (SELECT count(*) FROM evento WHERE usuario_id = '$BAJ_ID' AND tipo = 'usuario_baja')")
+[[ "$n" =~ ^0/0/[1-9][0-9]*/1$ ]] && ok "baja: sesiones revocadas, sitios inactivos; acceso y evento siguen enlazados por el id ($n)" || falla "baja: sesiones/sitios/acceso/evento = $n"
+n=$(sql -c "SELECT count(*) FROM acceso WHERE (usuario_id = '$BAJ_ID' OR email_intentado = 'baja$DOM') AND email_intentado IS NOT NULL")
+[ "$n" = 0 ] && ok "baja: sus intentos de acceso ya no guardan el correo tecleado (corrección del 11/11/2026)" || falla "baja: $n filas de acceso conservan el correo"
+caso "baja: la sesión ya no vale" 401 baj GET /sesion
+c=$(entrar baj2 "baja$DOM" <<<"$NUEVA_ULTIMA"); [ "$c" = 401 ] && ok "baja: el correo de antes ya no entra → 401" || falla "baja: el correo de antes entra → $c"
+M=$(sql -c "SELECT to_char(actualizado_en AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') FROM usuario WHERE id = '$BAJ_ID'")
+caso "baja: una cuenta anonimizada no se reactiva → 409" 409 sis PATCH "/usuarios/$BAJ_ID" "{\"actualizado_en\":\"$M\",\"activo\":true,\"clave_temporal\":true}"
+if [ "$otros" = 0 ]; then
+  caso "el último administrador del sistema no se da de baja → 409" 409 sis POST /cuenta/baja "$(python3 -I -c "import sys,json; print(json.dumps({'clave': sys.argv[1]}))" "$SIS_CLAVE")"
+fi
+# El administrador del sistema de la prueba se desactiva aquí (con motivo, como exige ck_usuario_baja): la carrera del último administrador
+# (sección 8) necesita que los únicos administradores sean los dos de sitio que se cruzan.
+sql -c "UPDATE usuario SET activo = false, desactivado_en = now(), motivo_baja = 'fin de la prueba del sistema' WHERE id = '$SIS_ID'" >/dev/null
+
 # ── 4. Canal en vivo con dos sitios (docs/20 §8): consulta recibe solo lo de su sitio; tope de 5 flujos por usuario ─────────────
 caso "X-Clave-Admin: POST /dispositivos/{id}/credencial del sitio B (usuario del sistema, todos los sitios)" 201 clave POST "/dispositivos/$DB/credencial"
 TOKEN_B=$(campo "v['conexion']['token']")
@@ -436,7 +678,15 @@ caso "administrador: POST /usuarios (un tercer usuario, de consulta)" 201 adm PO
      "{\"nombre\":\"Inactivo de prueba\",\"email\":\"$INA_EMAIL\",\"sitios\":[{\"sitio_id\":\"$SITIO_A\",\"rol\":\"consulta\"}]}"
 INA_TEMP=$(campo "v['clave']"); INA_ID=$(campo "v['id']"); MARCA_U=$(campo "v['actualizado_en']")
 c=$(entrar ina "$INA_EMAIL" <<<"$INA_TEMP"); [ "$c" = 200 ] || falla "el tercer usuario entra con su temporal → $c"
-caso "administrador: PATCH /usuarios/{id} activo=false" 200 adm PATCH "/usuarios/$INA_ID" "{\"actualizado_en\":\"$MARCA_U\",\"activo\":false}"
+caso "administrador: PATCH /usuarios/{id} activo=false sin motivo → 400 (la baja exige motivo)" 400 adm PATCH "/usuarios/$INA_ID" "{\"actualizado_en\":\"$MARCA_U\",\"activo\":false}"
+caso "administrador: PATCH /usuarios/{id} activo=false con motivo" 200 adm PATCH "/usuarios/$INA_ID" "{\"actualizado_en\":\"$MARCA_U\",\"activo\":false,\"motivo\":\"dejó el proyecto (prueba)\"}"
+n=$(sql -c "SELECT (motivo_baja = 'dejó el proyecto (prueba)' AND desactivado_en IS NOT NULL AND desactivado_por = (SELECT id FROM usuario WHERE email = '$ADM_EMAIL'))::text FROM usuario WHERE id = '$INA_ID'")
+[ "$n" = true ] && ok "la baja guarda motivo, cuándo y quién (ck_usuario_baja)" || falla "baja sin motivo, fecha o quién: $n"
+n=$(sql -c "SELECT count(*) FROM evento WHERE tipo = 'usuario_cambio' AND usuario_id = (SELECT id FROM usuario WHERE email = '$ADM_EMAIL') AND detalle->>'usuario_id' = '$INA_ID' AND detalle->>'motivo' = 'dejó el proyecto (prueba)'")
+[ "$n" = 1 ] && ok "la baja deja el evento usuario_cambio con quién (usuario_id) y el motivo" || falla "evento de la baja: $n"
+caso "POST /usuarios con el correo de una cuenta inactiva → 409 (no un duplicado)" 409 adm POST /usuarios "{\"nombre\":\"Otra vez\",\"email\":\"$INA_EMAIL\",\"sitios\":[{\"sitio_id\":\"$SITIO_A\",\"rol\":\"consulta\"}]}"
+[ "$(campo "(v['reactivable'], v['usuario']['id'], v['usuario']['motivo_baja'])")" = "(True, '$INA_ID', 'dejó el proyecto (prueba)')" ] \
+  && ok "el 409 trae la ficha con reactivable: true (la reactivación es PATCH con activo: true y clave_temporal: true)" || falla "409 sin la ficha reactivable: $(head -c 200 "$T/r")"
 caso "la sesión del usuario desactivado ya no vale" 401 ina GET /sesion
 c=$(entrar ina2 "$INA_EMAIL" <<<"$INA_TEMP"); m_inactivo=$(campo "v['message']")
 inicio=$(sql -c "SELECT now()")
@@ -469,6 +719,10 @@ n=$(sql -c "SELECT string_agg(resultado, ',' ORDER BY instante) FROM acceso WHER
   && ok "acceso tiene 6 filas del usuario tras 8 intentos: 5 clave_incorrecta y 1 solo bloqueado" || falla "acceso del usuario: $n"
 n=$(sql -c "SELECT count(*) FROM acceso WHERE email_intentado = '$INA_EMAIL' AND resultado = 'inactivo'")
 [ "$n" = 1 ] && ok "acceso registra el intento del usuario inactivo como «inactivo»" || falla "intentos inactivos registrados: $n"
+M=$(marca "$INA_ID")
+caso "reactivar sin clave temporal → 400 (la clave anterior no vuelve)" 400 adm PATCH "/usuarios/$INA_ID" "{\"actualizado_en\":\"$M\",\"activo\":true}"
+caso "reactivar (PATCH activo: true y clave_temporal: true) la cuenta que dio de baja el mismo administrador de sitio → 200" 200 adm PATCH "/usuarios/$INA_ID" "{\"actualizado_en\":\"$M\",\"activo\":true,\"clave_temporal\":true}"
+[ "$(campo "(v['activo'], v['motivo_baja'], v['desactivado_en'], len(v.get('clave', '')) > 0)")" = "(True, None, None, True)" ] && ok "reactivar limpia fecha y motivo (el motivo queda en el evento) y entrega una clave temporal nueva" || falla "reactivar: $(head -c 200 "$T/r")"
 
 # ── 6b. Memoria del backend durante dos POST /sesion simultáneos (revisión del 08/11/2026; docs/16 §58 y §59) ───────────────────────
 # Cada scrypt de personas pide 128 MiB y el backend admite dos a la vez (sesion/turnos.ts): se mide el pico real contra el techo de 512 MB
@@ -549,7 +803,7 @@ caso "después de cerrar en todos lados, la sesión del administrador ya no vale
 # ── 8. Carrera del último administrador (revisión del 08/11/2026): dos administradores se desactivan el uno al otro a la vez ─────────
 # Sin el candado de los administradores (usuarios.service.ts), cada uno veía al otro todavía activo y la plataforma quedaba sin
 # ninguno. Solo tiene sentido si los de la prueba son los únicos administradores de la base (con otro, nunca queda sin ninguno).
-fuera=$(sql -c "SELECT count(*) FROM usuario_sitio us JOIN usuario u ON u.id = us.usuario_id WHERE us.rol = 'administrador' AND us.activo AND u.activo AND u.email NOT LIKE '%$DOM'")
+fuera=$(sql -c "SELECT (SELECT count(*) FROM usuario_sitio us JOIN usuario u ON u.id = us.usuario_id WHERE us.rol = 'administrador' AND us.activo AND u.activo AND u.email NOT LIKE '%$DOM') + (SELECT count(*) FROM usuario WHERE administrador_sistema AND activo)")
 if [ "$fuera" != 0 ]; then
   echo "      (carrera del último administrador omitida: la base tiene $fuera administrador/es fuera de la prueba; la cubre la prueba unitaria del orden)"
 else
@@ -560,10 +814,11 @@ else
   ADM2_TEMP=$(campo "v['clave']"); ADM2_ID=$(campo "v['id']")
   c=$(entrar adm2 "$ADM2_EMAIL" <<<"$ADM2_TEMP"); c2=$(cambiar_clave adm2 "$ADM2_TEMP" "$ADM2_CLAVE")
   [ "$c$c2" = 200200 ] || falla "el segundo administrador entra y cambia su temporal → $c y $c2"
+  aceptar adm2
   M1=$(marca "$ADM_ID"); M2=$(marca "$ADM2_ID")
   cruzar() { curl -s -m 15 -o "$T/cruce-$1.txt" -w '%{http_code}' -X PATCH -H 'X-Pedido: panel' -H 'Content-Type: application/json' -b "$T/$1.jar" --data-binary "$3" "$API/usuarios/$2"; }
-  cruzar adm "$ADM2_ID" "{\"actualizado_en\":\"$M2\",\"activo\":false}" > "$T/cruce-adm.cod" & q1=$!
-  cruzar adm2 "$ADM_ID" "{\"actualizado_en\":\"$M1\",\"activo\":false}" > "$T/cruce-adm2.cod" & q2=$!
+  cruzar adm "$ADM2_ID" "{\"actualizado_en\":\"$M2\",\"activo\":false,\"motivo\":\"carrera\"}" > "$T/cruce-adm.cod" & q1=$!
+  cruzar adm2 "$ADM_ID" "{\"actualizado_en\":\"$M1\",\"activo\":false,\"motivo\":\"carrera\"}" > "$T/cruce-adm2.cod" & q2=$!
   wait "$q1" "$q2"
   codigos=$(printf '%s\n%s\n' "$(cat "$T/cruce-adm.cod")" "$(cat "$T/cruce-adm2.cod")" | sort | tr '\n' ' ')
   activos=$(sql -c "SELECT count(*) FROM usuario_sitio us JOIN usuario u ON u.id = us.usuario_id WHERE us.rol = 'administrador' AND us.activo AND u.activo")

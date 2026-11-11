@@ -34,9 +34,27 @@ export type Vista =
   | { pantalla: 'ficha'; id: string; canal: string | null; rango: ClaveRango | null; res: ClaveResolucion | null; fija: VentanaFija | null }
   | { pantalla: 'comparar'; dispositivos: string[]; magnitud: string | null; rango: ClaveRango | null; res: ClaveResolucion | null }
   | { pantalla: 'usuarios' } // P10, administración de usuarios (docs/19 §4): `#/usuarios`
-  | { pantalla: 'legal' } // P11 mínima (A1): `#/legal`
+  | { pantalla: 'legal'; seccion?: SeccionLegal } // P11 (A1): `#/legal[?seccion=terminos]`
+  | { pantalla: 'configurar'; id: string } // P6: `#/dispositivos/<id>/configurar`
+  | { pantalla: 'alta'; modo: ModoAlta; idFisico: string; sitio: string } // P7: `#/alta?modo=lote|detectados&id_fisico=&sitio=`
+  | { pantalla: 'preferencias' } // P13: `#/preferencias`
+  | { pantalla: 'actividad'; filtros: FiltrosActividad } // P14: `#/actividad?sitio=&tipo=&usuario=&desde=&hasta=`
   | { pantalla: 'tablero'; sitio: string; rango: ClaveRango | null; fija: VentanaFija | null }
   | { pantalla: 'inventario'; filtros: FiltrosInventario };
+
+export const SECCIONES_LEGALES = ['privacidad', 'terminos', 'acerca', 'soporte'] as const;
+export type SeccionLegal = (typeof SECCIONES_LEGALES)[number];
+export type ModoAlta = 'uno' | 'lote' | 'detectados';
+// Los filtros de P14 (docs/19 §4, tablero v2, G2): sitio (código), tipo, persona (id) y la ventana (ISO); la posición es un cursor y
+// no va en la URL (keyset: «Más antiguos» suma la página siguiente).
+export interface FiltrosActividad {
+  sitio: string;
+  tipo: string;
+  usuario: string;
+  fija: VentanaFija | null;
+}
+const TIPO_ACTIVIDAD = /^[a-z_]{1,40}$/;
+export const SIN_FILTROS_ACTIVIDAD: FiltrosActividad = { sitio: '', tipo: '', usuario: '', fija: null };
 
 // Comparar admite de 2 a 6 dispositivos (docs/19 §4, incremento 2, punto 5); la pantalla dice qué hacer con menos.
 export const MAX_COMPARAR = 6;
@@ -87,8 +105,25 @@ export function leerVista(fragmento: string): Vista {
       fija: leerVentanaFija(q.get('desde'), q.get('hasta')),
     };
   }
+  const configurar = /^\/dispositivos\/([^/]+)\/configurar$/.exec(ruta);
+  if (configurar && UUID.test(configurar[1]!)) return { pantalla: 'configurar', id: configurar[1]!.toLowerCase() };
   if (ruta === '/usuarios') return { pantalla: 'usuarios' };
-  if (ruta === '/legal') return { pantalla: 'legal' };
+  if (ruta === '/legal') {
+    const s = q.get('seccion');
+    return (SECCIONES_LEGALES as readonly string[]).includes(s ?? '') ? { pantalla: 'legal', seccion: s as SeccionLegal } : { pantalla: 'legal' };
+  }
+  if (ruta === '/preferencias') return { pantalla: 'preferencias' };
+  if (ruta === '/alta') {
+    const m = q.get('modo');
+    const idf = (q.get('id_fisico') ?? '').trim().toLowerCase();
+    // El identificador que trae un detectado: la forma que exige la base (FORMA_ID_FISICO del backend); otra cosa se ignora.
+    return { pantalla: 'alta', modo: m === 'lote' || m === 'detectados' ? m : 'uno', idFisico: /^[a-z0-9][a-z0-9-]{2,62}$/.test(idf) ? idf : '', sitio: leerSitio(q.get('sitio')) };
+  }
+  if (ruta === '/actividad') {
+    const tipo = q.get('tipo') ?? '';
+    const usuario = q.get('usuario') ?? '';
+    return { pantalla: 'actividad', filtros: { sitio: leerSitio(q.get('sitio')), tipo: TIPO_ACTIVIDAD.test(tipo) ? tipo : '', usuario: UUID.test(usuario) ? usuario.toLowerCase() : '', fija: leerVentanaFija(q.get('desde'), q.get('hasta')) } };
+  }
   if (ruta === '/comparar') {
     // Ids válidos, sin repetir, en el orden de la URL (el primero fija la unidad del eje y el primer color); más de 6, se recorta.
     const ids = [...new Set((q.get('dispositivos') ?? '').split(',').map((x) => x.trim().toLowerCase()).filter((x) => UUID.test(x)))].slice(0, MAX_COMPARAR);
@@ -164,4 +199,28 @@ export function fragmentoInventario(f: FiltrosInventario): string {
   if (f.orden !== 'atencion') q.set('orden', f.orden);
   const s = q.toString();
   return s === '' ? '#/inventario' : `#/inventario?${s}`;
+}
+
+// P14: solo lo puesto, en un orden fijo.
+export function fragmentoActividad(f: FiltrosActividad): string {
+  const q = new URLSearchParams();
+  if (f.sitio !== '') q.set('sitio', f.sitio);
+  if (f.tipo !== '') q.set('tipo', f.tipo);
+  if (f.usuario !== '') q.set('usuario', f.usuario);
+  if (f.fija !== null) {
+    q.set('desde', f.fija.desde.toISOString());
+    q.set('hasta', f.fija.hasta.toISOString());
+  }
+  const s = q.toString();
+  return s === '' ? '#/actividad' : `#/actividad?${s}`;
+}
+
+// P7: el asistente (con el identificador de un detectado ya escrito), el alta masiva o la bandeja de detectados.
+export function fragmentoAlta(modo: ModoAlta, idFisico = '', sitio = ''): string {
+  const q = new URLSearchParams();
+  if (modo !== 'uno') q.set('modo', modo);
+  if (idFisico !== '') q.set('id_fisico', idFisico);
+  if (sitio !== '') q.set('sitio', sitio);
+  const s = q.toString();
+  return s === '' ? '#/alta' : `#/alta?${s}`;
 }

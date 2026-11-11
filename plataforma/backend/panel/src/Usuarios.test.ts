@@ -26,13 +26,24 @@ beforeEach(() => {
     const metodo = init.method ?? 'GET';
     pedidos.push({ metodo, ruta, cuerpo: typeof init.body === 'string' ? JSON.parse(init.body) : undefined, pedido: (init.headers as Record<string, string>)['X-Pedido'] });
     if (ruta === '/usuarios' && metodo === 'GET') return new Response(JSON.stringify(lista));
+    if (ruta === '/sitios' && metodo === 'GET') return new Response(JSON.stringify([{ id: 's-uct', codigo: 'uct', nombre: 'Campus' }, { id: 's-mag', codigo: 'mag', nombre: 'Magallanes' }]));
     if (ruta === '/usuarios' && metodo === 'POST') {
       const c = JSON.parse(String(init.body));
+      const inactiva = lista.find((u) => u.email === c.email && !u.activo);
+      if (inactiva) return new Response(JSON.stringify({ statusCode: 409, reactivable: true, usuario: inactiva, message: 'existe una cuenta inactiva con ese email' }), { status: 409 });
       const nuevo = { ...bea, id: 'u-ceci', nombre: c.nombre, email: c.email, clave_temporal: true, clave_temporal_vence_en: '2026-11-09T12:00:00Z', sitios: [{ sitio_id: 's-uct', codigo: 'uct', rol: c.sitios[0].rol }] };
       lista = [...lista, nuevo];
       return new Response(JSON.stringify({ ...nuevo, clave: 'Tmp-una-sola-vez-123456' }), { status: 201 });
     }
-    if (ruta.startsWith('/usuarios/') && metodo === 'PATCH') return respuestaPatch();
+    if (ruta.startsWith('/usuarios/') && metodo === 'PATCH') {
+      // Las mismas reglas que el servidor (sesion/usuarios.dto.ts): la baja exige motivo (1–300) y reactivar, clave temporal nueva.
+      const c = JSON.parse(String(init.body)) as { activo?: boolean; motivo?: string; clave_temporal?: boolean };
+      const motivos: string[] = [];
+      if (c.activo === false && (typeof c.motivo !== 'string' || c.motivo.trim().length < 1 || c.motivo.trim().length > 300)) motivos.push('motivo es obligatorio al desactivar (activo: false): por qué se da de baja');
+      if (c.activo === true && c.clave_temporal !== true) motivos.push('activo: true (reactivar) exige clave_temporal: true en la misma petición: la clave anterior no vuelve');
+      if (motivos.length > 0) return new Response(JSON.stringify({ statusCode: 400, message: motivos }), { status: 400 });
+      return respuestaPatch();
+    }
     return new Response('', { status: 404 });
   }));
 });
@@ -85,8 +96,16 @@ describe('Usuarios (P10)', () => {
     expect(mia.disabled).toBe(true);
     expect(filaDe('ana@ejemplo.invalid').textContent).toContain('no puedes desactivarte a ti mismo');
     await fireEvent.click(filaDe('bea@ejemplo.invalid').querySelector('[data-alternar-activo]')!);
+    // La baja pide el motivo antes de enviar nada (el servidor lo exige): sin texto, el botón está desactivado y lo dice.
+    expect(pedidos.filter((p) => p.metodo === 'PATCH')).toHaveLength(0);
+    const motivo = filaDe('bea@ejemplo.invalid').querySelector<HTMLInputElement>('[data-motivo-baja]')!;
+    expect(document.getElementById(motivo.getAttribute('aria-describedby')!)!.textContent).toContain('sin nombres ni datos personales');
+    expect(filaDe('bea@ejemplo.invalid').querySelector<HTMLButtonElement>('[data-confirmar-baja]')!.disabled).toBe(true);
+    await fireEvent.input(motivo, { target: { value: '  dejó el proyecto  ' } });
+    await fireEvent.click(filaDe('bea@ejemplo.invalid').querySelector('[data-confirmar-baja]')!);
     await waitFor(() => expect(filaDe('bea@ejemplo.invalid').querySelector('[data-estado-usuario]')!.textContent).toContain('inactivo'));
-    expect(pedidos.find((p) => p.metodo === 'PATCH')).toMatchObject({ ruta: '/usuarios/u-bea', pedido: 'panel', cuerpo: { actualizado_en: '2026-11-08T12:30:00.123456Z', activo: false } });
+    expect(pedidos.find((p) => p.metodo === 'PATCH')).toMatchObject({ ruta: '/usuarios/u-bea', pedido: 'panel', cuerpo: { actualizado_en: '2026-11-08T12:30:00.123456Z', activo: false, motivo: 'dejó el proyecto' } });
+    expect(filaDe('bea@ejemplo.invalid').querySelector('[data-motivo-baja]')).toBeNull();
     expect(document.querySelector('[data-aviso="exito"]')!.textContent).toContain('Bea quedó inactivo');
     pedidos.length = 0;
     respuestaPatch = () => new Response(JSON.stringify({ ...bea, activo: false, sitios: [{ sitio_id: 's-uct', codigo: 'uct', rol: 'administrador' }], actualizado_en: '2026-11-08T13:05:00.000000Z' }));
@@ -120,6 +139,66 @@ describe('Usuarios (P10)', () => {
     const estado = filaDe('bea@ejemplo.invalid').querySelector('[data-estado-usuario]')!.textContent!;
     expect(estado).toMatch(/vence el \S+ \d{2}:\d{2}/);
     expect(estado).not.toMatch(/[ap]\.\s?m\./);
+  });
+
+  it('el servidor simulado exige lo mismo que el real: una baja sin motivo y una reactivación sin clave temporal → 400', async () => {
+    const r1 = await fetch('/usuarios/u-bea', { method: 'PATCH', headers: {}, body: JSON.stringify({ actualizado_en: 'x', activo: false }) });
+    const r2 = await fetch('/usuarios/u-bea', { method: 'PATCH', headers: {}, body: JSON.stringify({ actualizado_en: 'x', activo: true }) });
+    const r3 = await fetch('/usuarios/u-bea', { method: 'PATCH', headers: {}, body: JSON.stringify({ actualizado_en: 'x', activo: true, clave_temporal: true }) });
+    expect([r1.status, r2.status, r3.status]).toEqual([400, 400, 200]);
+  });
+
+  it('reactivar desde la fila: PATCH con activo y una clave temporal nueva, que se muestra una vez', async () => {
+    lista = [yo, { ...bea, activo: false }];
+    respuestaPatch = () => new Response(JSON.stringify({ ...bea, activo: true, clave_temporal: true, clave: 'Nueva-al-volver-123456' }));
+    render(Usuarios, { sesion: SESION });
+    await waitFor(() => expect(filaDe('bea@ejemplo.invalid')).toBeTruthy());
+    await fireEvent.click(filaDe('bea@ejemplo.invalid').querySelector('[data-alternar-activo]')!);
+    await waitFor(() => expect(document.querySelector('[data-clave-temporal]')?.textContent).toBe('Nueva-al-volver-123456'));
+    expect(pedidos.find((p) => p.metodo === 'PATCH')).toMatchObject({ cuerpo: { actualizado_en: '2026-11-08T12:30:00.123456Z', activo: true, clave_temporal: true } });
+  });
+
+  it('el selector de rol ofrece los cuatro perfiles de sitio; la casilla del perfil global solo aparece para el administrador del sistema', async () => {
+    render(Usuarios, { sesion: SESION });
+    await waitFor(() => expect(filaDe('bea@ejemplo.invalid')).toBeTruthy());
+    expect([...document.querySelectorAll<HTMLOptionElement>('[data-rol-alta] option')].map((o) => o.value)).toEqual(['consulta', 'investigador', 'operador', 'administrador']);
+    expect([...filaDe('bea@ejemplo.invalid').querySelectorAll<HTMLOptionElement>('[data-rol-sitio="uct"] option')].map((o) => o.value)).toEqual(['', 'consulta', 'investigador', 'operador', 'administrador']);
+    expect(document.querySelector('[data-global-alta]')).toBeNull();
+    cleanup();
+    render(Usuarios, { sesion: { ...SESION, sitios: [], administrador_sistema: true } });
+    await waitFor(() => expect(document.querySelector('[data-global-alta]')).toBeTruthy());
+    await waitFor(() => expect([...document.querySelectorAll<HTMLOptionElement>('[data-sitio-alta] option')].map((o) => o.textContent)).toEqual(['Campus', 'Magallanes']));
+    await fireEvent.input(screen.getByLabelText('Nombre'), { target: { value: 'Gloria' } });
+    await fireEvent.input(screen.getByLabelText('Correo'), { target: { value: 'gloria@ejemplo.invalid' } });
+    await fireEvent.change(document.querySelector('[data-rol-alta]')!, { target: { value: 'operador' } });
+    await fireEvent.click(document.querySelector('[data-global-alta]')!);
+    await fireEvent.click(screen.getByRole('button', { name: 'Dar de alta' }));
+    await waitFor(() => expect(pedidos.find((p) => p.metodo === 'POST')).toMatchObject({ cuerpo: { email: 'gloria@ejemplo.invalid', administrador_sistema: true, sitios: [{ sitio_id: 's-uct', rol: 'operador' }] } }));
+  });
+
+  it('una cuenta de administrador del sistema no se ofrece a cambiar a quien administra solo un sitio (el servidor diría 403)', async () => {
+    lista = [yo, { ...bea, administrador_sistema: true }];
+    render(Usuarios, { sesion: SESION });
+    await waitFor(() => expect(filaDe('bea@ejemplo.invalid')).toBeTruthy());
+    expect(filaDe('bea@ejemplo.invalid').querySelector<HTMLButtonElement>('[data-asignar-temporal]')!.disabled).toBe(true);
+    expect(filaDe('bea@ejemplo.invalid').querySelector<HTMLButtonElement>('[data-alternar-activo]')!.disabled).toBe(true);
+    expect(filaDe('bea@ejemplo.invalid').textContent).toContain('solo otro administrador del sistema');
+  });
+
+  it('alta con el correo de una cuenta inactiva (409 reactivable): ofrece «Reactivar» y la reactiva con clave temporal nueva', async () => {
+    lista = [yo, { ...bea, activo: false }];
+    respuestaPatch = () => new Response(JSON.stringify({ ...bea, activo: true, clave_temporal: true, clave: 'Vuelve-con-esta-123456' }));
+    render(Usuarios, { sesion: SESION });
+    await waitFor(() => expect(filaDe('bea@ejemplo.invalid')).toBeTruthy());
+    await fireEvent.input(screen.getByLabelText('Nombre'), { target: { value: 'Bea' } });
+    await fireEvent.input(screen.getByLabelText('Correo'), { target: { value: 'bea@ejemplo.invalid' } });
+    await fireEvent.click(screen.getByRole('button', { name: 'Dar de alta' }));
+    await waitFor(() => expect(document.querySelector('[data-reactivable]')).toBeTruthy());
+    expect(document.querySelector('[data-reactivable]')!.textContent).toContain('inactiva');
+    await fireEvent.click(document.querySelector('[data-reactivar-alta]')!);
+    await waitFor(() => expect(document.querySelector('[data-clave-temporal]')?.textContent).toBe('Vuelve-con-esta-123456'));
+    expect(pedidos.find((p) => p.metodo === 'PATCH')).toMatchObject({ ruta: '/usuarios/u-bea', cuerpo: { actualizado_en: '2026-11-08T12:30:00.123456Z', activo: true, clave_temporal: true } });
+    expect(document.querySelector('[data-reactivable]')).toBeNull();
   });
 
   it('la temporal asignada no queda en la lista: la fila se guarda sin `clave`; vive solo en el aviso hasta ocultarla', () => {

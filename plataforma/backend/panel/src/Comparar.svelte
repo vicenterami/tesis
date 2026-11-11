@@ -19,7 +19,7 @@
   import type { CanalFicha, Condicion, DispositivoFicha, EventoVivo, Historico } from './lib/modelo';
   import { haceCuanto, horaLocal } from './lib/tiempo';
   import { fragmentoComparar } from './lib/vista';
-  import { RECONECTADO, abrirCanal, type EstadoCanal } from './lib/vivo';
+  import { RECONECTADO, abrirCanalCompartido, type EstadoCanal } from './lib/vivo';
 
   let {
     dispositivos,
@@ -203,7 +203,7 @@
     if (ids.length < 2) return; // sin dos dispositivos no hay nada que cargar ni que escuchar: ni fichas, ni reloj, ni canal (revisión del 22/10)
     void cargarFichas().then(cargarGrafico);
     const reloj = setInterval(() => (ahora = new Date()), 10_000);
-    const c = abrirCanal('/eventos', alEvento, (estado, motivo) => {
+    const c = abrirCanalCompartido('/eventos', alEvento, (estado, motivo) => {
       canal = estado;
       // Al volver de una caída se repite lo que la pantalla muestra (docs/19 F4): el canal no guarda cola.
       if (estado === 'en_vivo' && motivo === RECONECTADO) void cargarFichas().then(cargarGrafico);

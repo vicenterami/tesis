@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ErrorApi, accionPara, alPerderSesion, comprobarSesion, descargar, leerPaginacion, nombreDeArchivo, obtener, obtenerPagina, pedir, segundosDeEspera, ultimaGana, type Guardador, type Paginacion } from './api';
+import { ErrorApi, accionPara, alPerderSesion, cambiaLaSesion, comprobarSesion, descargar, descargarTexto, leerPaginacion, nombreDeArchivo, obtener, obtenerPagina, pedir, segundosDeEspera, ultimaGana, type Guardador, type Paginacion } from './api';
 
 const json = (cuerpo: unknown, status = 200, cabeceras: Record<string, string> = {}): Response => new Response(JSON.stringify(cuerpo), { status, headers: cabeceras });
 const llamadas = (): [string, RequestInit][] => vi.mocked(fetch).mock.calls as unknown as [string, RequestInit][];
@@ -175,6 +175,22 @@ describe('generación de la sesión: los avisos atrasados se descartan', () => {
     expect(o.motivos).toEqual(['sin_sesion']);
     o.dejar();
   });
+  it('POST /cuenta/baja también cambia la sesión: un 401 atrasado tras la baja no avisa «venció» (revisión del 11/11/2026)', async () => {
+    const o = oir();
+    let soltar: (r: Response) => void = () => undefined;
+    vi.stubGlobal('fetch', vi.fn((ruta: string) => (ruta === '/lenta' ? new Promise<Response>((res) => (soltar = res)) : Promise.resolve(json({ baja: true })))));
+    const lenta = obtener('/lenta');
+    await pedir('POST', '/cuenta/baja', { cuerpo: { clave: 'x' } });
+    soltar(json({ statusCode: 401, message: 'sesión requerida' }, 401));
+    await expect(lenta).rejects.toMatchObject({ codigo: 401 });
+    expect(o.motivos).toEqual([]);
+    expect([cambiaLaSesion('POST', '/cuenta/baja'), cambiaLaSesion('GET', '/cuenta/exportar'), cambiaLaSesion('POST', '/soporte')]).toEqual([true, false, false]);
+    o.dejar();
+  });
+  it('el ErrorApi trae el cuerpo entero del error (el 409 `reactivable` del alta lo necesita)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => json({ statusCode: 409, reactivable: true, usuario: { id: 'u1' }, message: 'existe una cuenta inactiva' }, 409)));
+    await expect(pedir('POST', '/usuarios', { cuerpo: {} })).rejects.toMatchObject({ codigo: 409, cuerpo: { reactivable: true, usuario: { id: 'u1' } } });
+  });
 });
 
 // Totales y cursores en cabeceras (docs/19 §6 y §4 tablero v2, I): `pedir` los expone a quien los pide y no cambia nada para los demás.
@@ -198,5 +214,36 @@ describe('paginación: X-Total y X-Siguiente', () => {
     expect(leerPaginacion(new Headers({ 'X-Total': '-3' })).total).toBeNull();
     expect(leerPaginacion(new Headers({ 'X-Total': '' , 'X-Siguiente': '  ' }))).toEqual({ total: null, siguiente: null });
     expect(leerPaginacion(new Headers({ 'X-Total': '0' })).total).toBe(0);
+  });
+});
+
+// 11/11/2026: el 403 de los términos sin aceptar avisa a App (docs/20 §12) y lo que el panel ya tiene en memoria (credenciales del lote,
+// rechazadas) se entrega por el mismo camino de las descargas.
+describe('términos pendientes y descargarTexto', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it('un 403 con codigo «terminos_pendientes» avisa «terminos»; el de la clave temporal sigue siendo el suyo; sin `central`, nadie', async () => {
+    const avisos: string[] = [];
+    const dejar = alPerderSesion((m) => avisos.push(m));
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ statusCode: 403, codigo: 'terminos_pendientes', message: 'debes aceptar los términos de uso (versión 2) antes de seguir (GET /terminos y POST /terminos/aceptar)' }), { status: 403 })));
+    await expect(obtener('/sitios')).rejects.toBeInstanceOf(ErrorApi);
+    await expect(pedir('GET', '/sitios', { central: false })).rejects.toBeInstanceOf(ErrorApi);
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ message: 'cambia tu clave temporal primero: POST /sesion/clave' }), { status: 403 })));
+    await expect(obtener('/sitios')).rejects.toBeInstanceOf(ErrorApi);
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ message: 'tu rol en este sitio no lo permite' }), { status: 403 })));
+    await expect(obtener('/sitios')).rejects.toBeInstanceOf(ErrorApi);
+    dejar();
+    expect(avisos).toEqual(['terminos', 'clave_temporal']);
+  });
+  it('descargarTexto: un Blob con el tipo, el nombre saneado (solo .csv o .json) y la URL liberada después', async () => {
+    const pulsados: string[] = [];
+    const liberadas: string[] = [];
+    let blob: Blob | null = null;
+    const g: Guardador = { crearUrl: (b) => { blob = b; return 'blob:1'; }, liberarUrl: (u) => liberadas.push(u), pulsar: (_u, n) => pulsados.push(n) };
+    expect(descargarTexto('a,b\r\n', 'credenciales-2026-11-11.csv', undefined, g)).toEqual({ nombre: 'credenciales-2026-11-11.csv', bytes: 5 });
+    expect(descargarTexto('x', '../malo.exe', undefined, g).nombre).toBe('descarga.csv');
+    expect(pulsados).toEqual(['credenciales-2026-11-11.csv', 'descarga.csv']);
+    expect(blob!.type).toBe('text/csv;charset=utf-8');
+    await new Promise((r) => setTimeout(r, 0));
+    expect(liberadas).toEqual(['blob:1', 'blob:1']);
   });
 });

@@ -9,8 +9,14 @@
   // desmontan, y con ellas se cierran sus `EventSource` y se cancelan sus peticiones; al volver a entrar se montan y reabren. Un 401 en
   // cualquier petición (lib/api.ts, manejo central) guarda la ruta, muestra «Entrar» y, tras entrar, vuelve a esa misma ruta.
   import { onMount } from 'svelte';
+  import Actividad from './Actividad.svelte';
+  import Alta from './Alta.svelte';
   import Aviso from './Aviso.svelte';
   import Boton from './Boton.svelte';
+  import Configurar from './Configurar.svelte';
+  import Notificaciones from './Notificaciones.svelte';
+  import Preferencias from './Preferencias.svelte';
+  import Terminos from './Terminos.svelte';
   import CambiarClave from './CambiarClave.svelte';
   import Comparar from './Comparar.svelte';
   import Entrar from './Entrar.svelte';
@@ -22,7 +28,7 @@
   import { ErrorApi, alPerderSesion, esCancelacion, obtener, pedir, ultimaGana } from './lib/api';
   import { avisoDeError, type DatosAviso } from './lib/avisos';
   import { olvidarMarcados } from './lib/comparar';
-  import type { Salud, Sitio } from './lib/modelo';
+  import type { Preferencias as DatosPreferencias, Salud, Sitio } from './lib/modelo';
   import { crearRenovador, puedeEnAlguno, quienSoy, trasAvisoDeSesion, type Fase, type Sesion, type SesionAbierta } from './lib/sesion';
   import { aplicarTema, leerPreferenciaTema } from './lib/tema';
   import { preferenciaUnidades } from './lib/unidades';
@@ -46,8 +52,22 @@
   // El usuario del sistema (clave por cabecera) no tiene personas a su cargo: la pantalla de usuarios es solo para personas con sesión.
   const administraUsuarios = $derived(sesion !== null && !sesion.sistema && puedeEnAlguno(sesion, 'usuarios'));
   const email = $derived(sesion !== null && !sesion.sistema ? sesion.usuario.email : null);
-  // Administrador del sistema (P12, A1): hoy, el usuario del sistema; con los cinco perfiles, el que la sesión declare.
-  const administraSistema = $derived(sesion !== null && sesion.sistema);
+  // Administrador del sistema (P12, A1): el usuario del sistema o, con los cinco perfiles (docs/20 §2), la persona que la sesión declare.
+  const administraSistema = $derived(sesion !== null && (sesion.sistema || sesion.administrador_sistema === true));
+  // P14 Actividad: quien administra algún sitio (la misma acción de la matriz que la pantalla de usuarios) o el sistema.
+  const veActividad = $derived(sesion !== null && !sesion.sistema && (puedeEnAlguno(sesion, 'auditoria') || sesion.administrador_sistema === true));
+  // P7 Alta: quien puede escribir en algún sitio (el servidor decide igual).
+  const daDeAlta = $derived(sesion !== null && puedeEnAlguno(sesion, 'escribir'));
+  // La última vista de datos abierta (tablero, inventario o ficha): P13 la ofrece para guardarla con un nombre.
+  let ultimaVista = $state<string | null>(null);
+  $effect(() => {
+    if (vista.pantalla === 'tablero' || vista.pantalla === 'inventario' || vista.pantalla === 'ficha') ultimaVista = ruta === '' ? '#/' : ruta;
+  });
+  function alCambiarPreferencias(p: DatosPreferencias): void {
+    if (sesion !== null) sesion = { ...sesion, preferencias: p };
+  }
+  // Términos pendientes (docs/20 §12): la clave temporal va primero; después, la aceptación.
+  const fasePorSesion = (s: Sesion): Fase => (!s.sistema && s.clave_temporal ? 'cambiar' : !s.sistema && s.terminos?.pendiente === true ? 'terminos' : 'dentro');
   const unidades = $derived(preferenciaUnidades(sesion?.preferencias));
 
   // Armazón (docs/19 §4, tablero v2, A1): los sitios de la persona (`GET /sitios`) para el selector de la cabecera, que aparece solo con
@@ -105,7 +125,7 @@
       const s = await pedir<Sesion>('GET', '/sesion', { central: false });
       sesion = s;
       aplicarTema(leerPreferenciaTema(s.preferencias?.tema)); // «sistema» mientras el backend no traiga la preferencia
-      fase = !s.sistema && s.clave_temporal ? 'cambiar' : 'dentro';
+      fase = fasePorSesion(s);
       if (fase === 'dentro') {
         volverARutaGuardada();
         void cargarSitios();
@@ -125,7 +145,7 @@
   const renovador = crearRenovador(() =>
     pedir<Sesion>('GET', '/sesion').then((s) => {
       sesion = s;
-      if (!s.sistema && s.clave_temporal) fase = 'cambiar';
+      if (fasePorSesion(s) !== 'dentro') fase = fasePorSesion(s);
     }),
   );
 
@@ -141,6 +161,19 @@
     cambiandoClave = false;
     avisoCabecera = { tipo: 'exito', texto: 'Clave cambiada. Tus otras sesiones se cerraron.' };
     void cargarSesion();
+  }
+
+  // Tras darse de baja (P13; docs/20 §11): el servidor ya revocó las sesiones y borró la cookie; el panel queda como al salir.
+  function alDarseDeBaja(): void {
+    olvidarMarcados();
+    rutaGuardada = null;
+    claveRecienUsada = null;
+    alCambiarVista('#/');
+    sitios = null;
+    aplicarTema('sistema');
+    sesion = null;
+    mensajeEntrar = 'Tu cuenta quedó dada de baja: tus datos personales se borraron. Gracias por usar el sistema.';
+    fase = 'entrar';
   }
 
   async function salir(todas: boolean): Promise<void> {
@@ -231,8 +264,9 @@
       <a href="#/inventario" aria-current={vista.pantalla === 'inventario' ? 'page' : undefined} data-ir-inventario>Inventario</a>
       <span class="nav-pendiente" data-nav-pendiente>Condiciones (próximamente)</span>
       <span class="nav-pendiente" data-nav-pendiente>Cuarentena (próximamente)</span>
-      {#if administraUsuarios}<span class="nav-pendiente" data-nav-pendiente>Actividad (próximamente)</span>{/if}
+      {#if veActividad}<a href="#/actividad" aria-current={vista.pantalla === 'actividad' ? 'page' : undefined} data-ir-actividad>Actividad</a>{/if}
       {#if administraUsuarios}<a href="#/usuarios" aria-current={vista.pantalla === 'usuarios' ? 'page' : undefined} data-ir-usuarios>Usuarios</a>{/if}
+      {#if daDeAlta}<a href="#/alta" aria-current={vista.pantalla === 'alta' ? 'page' : undefined} data-ir-alta-menu>Dar de alta</a>{/if}
       {#if administraSistema}<span class="nav-pendiente" data-nav-pendiente>Estado del sistema (próximamente)</span>{/if}
     </nav>
   {/if}
@@ -242,7 +276,7 @@
       <summary>Cuenta: <strong data-quien-nombre>{quien.nombre}</strong></summary>
       <div class="cuenta-menu">
         <span class="vivo" data-quien-sitios>{quien.sitios}</span>
-        <span class="vivo">Preferencias (próximamente)</span>
+        <a href="#/preferencias" data-ir-preferencias>Preferencias y mi cuenta</a>
         {#if sesion !== null && !sesion.sistema}
           <Boton etiqueta="Cambiar la clave" variante="discreto" onclick={() => (cambiandoClave = true)} data-cambiar-mi-clave />
           <Boton etiqueta="Salir" etiquetaCargando="Saliendo…" cargando={saliendo} onclick={() => void salir(false)} data-salir />
@@ -256,14 +290,16 @@
 <main>
   {#if avisoCabecera !== null}<Aviso tipo={avisoCabecera.tipo} texto={avisoCabecera.texto} alCerrar={() => (avisoCabecera = null)} />{/if}
   {#if vista.pantalla === 'legal'}
-    <!-- P11 mínima: también antes de entrar (docs/19 §4, P11) -->
-    <Legal />
+    <!-- P11: también antes de entrar y con los términos pendientes (docs/19 §4, P11; docs/20 §12) -->
+    <Legal seccion={vista.seccion} conSesion={fase === 'dentro' || fase === 'terminos'} />
   {:else if fase === 'comprobando'}
     <p class="vacio">Comprobando la sesión…</p>
   {:else if fase === 'sin_servicio'}
     <p class="vacio">No se pudo comprobar la sesión. <Boton etiqueta="Reintentar" onclick={() => { avisoCabecera = null; fase = 'comprobando'; void cargarSesion(); }} data-reintentar-sesion /></p>
   {:else if fase === 'entrar'}
     <Entrar {alEntrar} mensaje={mensajeEntrar} />
+  {:else if fase === 'terminos'}
+    <Terminos alAceptar={() => { fase = 'comprobando'; void cargarSesion(); }} alSalir={() => void salir(false)} />
   {:else if fase === 'cambiar' || cambiandoClave}
     <CambiarClave {email} claveActual={claveRecienUsada} obligatorio={fase === 'cambiar'} alListo={alCambiarClave}
       alSalir={() => (fase === 'cambiar' ? void salir(false) : (cambiandoClave = false))} />
@@ -278,6 +314,14 @@
       {#key vista.dispositivos.join(',')}
         <Comparar dispositivos={vista.dispositivos} magnitud={vista.magnitud} rango={vista.rango} res={vista.res} {alCambiarVista} />
       {/key}
+    {:else if vista.pantalla === 'configurar'}
+      {#key vista.id}<Configurar id={vista.id} {sesion} {sitios} />{/key}
+    {:else if vista.pantalla === 'alta'}
+      <Alta modo={vista.modo} idFisico={vista.idFisico} sitio={vista.sitio} {sesion} {sitios} />
+    {:else if vista.pantalla === 'preferencias'}
+      <Preferencias {sesion} {sitios} {ultimaVista} {alCambiarPreferencias} {alDarseDeBaja} />
+    {:else if vista.pantalla === 'actividad'}
+      <Actividad filtros={vista.filtros} {sesion} {sitios} {alCambiarVista} />
     {:else if vista.pantalla === 'usuarios'}
       {#if administraUsuarios && !sesion.sistema}
         <Usuarios {sesion} />
@@ -300,6 +344,10 @@
     {/if}
   {/if}
 </main>
+{#if fase === 'dentro' && sesion !== null}
+  <!-- Avisos de condiciones nuevas en cualquier pantalla (E); se desmontan al salir, con su canal -->
+  <Notificaciones notificar={sesion.preferencias?.notificar ?? []} />
+{/if}
 <footer class="pie">
   <a href="#/legal" data-ir-legal>Legal y acerca de</a>
 </footer>

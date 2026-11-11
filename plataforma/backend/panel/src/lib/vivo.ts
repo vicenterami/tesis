@@ -135,3 +135,49 @@ export function abrirCanal(
     },
   };
 }
+
+// ── Un solo canal sin filtro por pestaña (11/11/2026) ─────────────────────────────────────────────────────────────────────────────
+// Las notificaciones en pantalla (docs/19 §4, tablero v2, E) escuchan `GET /eventos` en toda pantalla, y el tablero, el inventario y la
+// comparación también: con una conexión cada uno, una pestaña abría dos al mismo canal y el proxy acota las conexiones a ese canal por
+// cliente. Aquí se comparten: el primer suscriptor abre el canal (con `abrirCanal`, sin cambiar nada de su comportamiento) y los demás
+// reciben los mismos eventos y estados; quien llega tarde recibe el estado actual. Al irse el último, se cierra.
+interface Suscriptor {
+  evento: (e: EventoVivo) => void;
+  estado: (estado: EstadoCanal, motivo?: string) => void;
+}
+const compartidos = new Map<string, { canal: Canal | null; suscriptores: Set<Suscriptor>; estado: EstadoCanal }>();
+export function abrirCanalCompartido(url: string, alEvento: (e: EventoVivo) => void, alEstado: (estado: EstadoCanal, motivo?: string) => void): Canal {
+  const yo: Suscriptor = { evento: alEvento, estado: alEstado };
+  let h = compartidos.get(url);
+  if (h === undefined) {
+    const nuevo = { canal: null as Canal | null, suscriptores: new Set<Suscriptor>([yo]), estado: 'conectando' as EstadoCanal };
+    compartidos.set(url, nuevo);
+    h = nuevo;
+    nuevo.canal = abrirCanal(
+      url,
+      (e) => {
+        for (const s of [...nuevo.suscriptores]) s.evento(e);
+      },
+      (estado, motivo) => {
+        nuevo.estado = estado;
+        for (const s of [...nuevo.suscriptores]) s.estado(estado, motivo);
+      },
+    );
+  } else {
+    h.suscriptores.add(yo);
+    alEstado(h.estado);
+  }
+  const hub = h;
+  let cerrado = false;
+  return {
+    cerrar() {
+      if (cerrado) return;
+      cerrado = true;
+      hub.suscriptores.delete(yo);
+      if (hub.suscriptores.size === 0) {
+        hub.canal?.cerrar();
+        if (compartidos.get(url) === hub) compartidos.delete(url);
+      }
+    },
+  };
+}

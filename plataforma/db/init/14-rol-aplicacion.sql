@@ -65,6 +65,19 @@ DO $$ BEGIN
     GRANT UPDATE (etiqueta) ON canal TO plataforma_app;
   END IF;
 END $$;
+-- Desde la migración 24, los cinco perfiles, la baja con motivo, la anonimización, las preferencias y el soporte (docs/20 §2, §11 y §12):
+-- INSERT en preferencia y mensaje_soporte, UPDATE de sus columnas y de las nuevas de usuario, y la función acotada de la anonimización.
+-- Nacen después de esta: aquí se repiten solo si ya existen.
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'fn_anonimizar_usuario')
+     AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'mensaje_soporte') THEN
+    GRANT EXECUTE ON FUNCTION fn_anonimizar_usuario(uuid, uuid) TO plataforma_app;
+    GRANT INSERT ON preferencia, mensaje_soporte TO plataforma_app;
+    GRANT UPDATE (unidad_temperatura, unidad_longitud, zona_horaria, tema, notificar, vistas, sitio_predeterminado) ON preferencia TO plataforma_app;
+    GRANT UPDATE (leido_en) ON mensaje_soporte TO plataforma_app;
+    GRANT UPDATE (administrador_sistema, desactivado_en, desactivado_por, motivo_baja, terminos_version_aceptada, terminos_aceptados_en) ON usuario TO plataforma_app;
+  END IF;
+END $$;
 ALTER DEFAULT PRIVILEGES FOR ROLE plataforma IN SCHEMA public REVOKE INSERT, UPDATE ON TABLES FROM plataforma_app;
 ALTER DEFAULT PRIVILEGES FOR ROLE plataforma IN SCHEMA public GRANT SELECT ON TABLES TO plataforma_app;
 

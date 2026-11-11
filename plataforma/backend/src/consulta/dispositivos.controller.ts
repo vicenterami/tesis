@@ -29,7 +29,8 @@ export function conAutor<T extends { usuario: unknown }>(filas: readonly T[], ve
 }
 
 // Lecturas con sesión (docs/20 §6, desde el 08/11/2026): 401 sin sesión; la lista sale filtrada por los sitios del usuario en el WHERE;
-// un dispositivo de otro sitio responde 404, igual que uno inexistente (RF-41); exportar exige rol administrador (403 al de consulta).
+// un dispositivo de otro sitio responde 404, igual que uno inexistente (RF-41); exportar, administrador de sitio o del sistema e investigador
+// (403 a consulta y operador técnico; docs/20 §6, desde el 11/11/2026).
 @ApiTags('dispositivos')
 @ApiCookieAuth('sesion')
 @ApiUnauthorizedResponse({ description: 'sesión requerida' })
@@ -161,7 +162,7 @@ export class DispositivosController {
   @ApiProduces('text/csv', 'application/json')
   @ApiOkResponse({ description: 'Archivo descargable (Content-Disposition: attachment)' })
   @ApiBadRequestResponse({ description: 'UUID, fecha o formato inválidos' })
-  @ApiForbiddenResponse({ description: 'Rol de consulta: exportar exige administrador' })
+  @ApiForbiddenResponse({ description: 'Consulta u operador técnico: exportar es del administrador (de sitio o del sistema) y del investigador (docs/20 §6)' })
   @ApiNotFoundResponse({ description: 'Dispositivo inexistente o de otro sitio' })
   async exportar(
     @Usuario() u: UsuarioSesion,

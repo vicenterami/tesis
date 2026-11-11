@@ -13,10 +13,14 @@ erDiagram
     dispositivo ||--o{ evento : evento
     usuario ||--o{ evento : evento
     canal ||--o{ medicion : medicion
+    usuario ||--o{ mensaje_soporte : mensaje_soporte
     sitio ||--o{ pasarela : pasarela
+    sitio ||--o{ preferencia : preferencia
+    usuario ||--o{ preferencia : preferencia
     canal ||--o{ regla_umbral : regla_umbral
     usuario ||--o{ sesion : sesion
     dispositivo ||--o{ trama : trama
+    usuario ||--o{ usuario : usuario
     sitio ||--o{ usuario_sitio : usuario_sitio
     usuario ||--o{ usuario_sitio : usuario_sitio
     sitio ||--o{ zona : zona
@@ -27,6 +31,7 @@ erDiagram
         inet ip
         text resultado
         text sesion_id
+        uuid id
     }
     canal {
         uuid id PK
@@ -120,6 +125,13 @@ erDiagram
         timestamptz recibido_en
         text origen_tiempo
     }
+    mensaje_soporte {
+        uuid id PK
+        uuid usuario_id FK
+        text texto
+        timestamptz creado_en
+        timestamptz leido_en
+    }
     metrica_broker {
         timestamptz tiempo PK
         bigint mensajes_descartados
@@ -138,6 +150,18 @@ erDiagram
         timestamptz creado_en
         timestamptz actualizado_en
         text formato
+    }
+    preferencia {
+        uuid usuario_id PK,FK
+        text unidad_temperatura
+        text unidad_longitud
+        text zona_horaria
+        text tema
+        ARRAY notificar
+        jsonb vistas
+        uuid sitio_predeterminado FK
+        timestamptz creado_en
+        timestamptz actualizado_en
     }
     regla_umbral {
         uuid id PK
@@ -187,6 +211,13 @@ erDiagram
         bool activo
         bool clave_temporal
         timestamptz clave_temporal_vence_en
+        bool administrador_sistema
+        timestamptz desactivado_en
+        uuid desactivado_por FK
+        text motivo_baja
+        timestamptz anonimizado_en
+        int terminos_version_aceptada
+        timestamptz terminos_aceptados_en
     }
     usuario_sitio {
         uuid usuario_id PK,FK

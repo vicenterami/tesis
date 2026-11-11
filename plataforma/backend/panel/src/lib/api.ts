@@ -16,6 +16,8 @@ export class ErrorApi extends Error {
     // El `message` del cuerpo (texto o lista de motivos del 400), para las pantallas que lo muestran tal cual (alta de usuarios, clave).
     public readonly motivos: readonly string[] = [],
     public readonly reintentarEnS: number | null = null,
+    // El cuerpo entero del error, para las pantallas que leen algo más que el mensaje (el 409 `reactivable` del alta de usuarios).
+    public readonly cuerpo: Readonly<Record<string, unknown>> = {},
   ) {
     super(mensaje);
     this.name = 'ErrorApi';
@@ -42,6 +44,12 @@ export const CABECERA_PEDIDO = 'X-Pedido';
 const VALOR_PEDIDO = 'panel';
 // El texto del 403 del guardia cuando la sesión tiene clave temporal (sesion/guardia.ts). Se reconoce por la ruta que nombra.
 const MARCA_TEMPORAL = '/sesion/clave';
+// El 403 de la sesión restringida por términos sin aceptar (docs/20 §12): el cuerpo trae un código propio; se reconoce por ese código
+// o, como el de la clave temporal, por la ruta que nombra el mensaje (`/terminos`).
+const MARCA_TERMINOS = '/terminos';
+export function esTerminosPendientes(cuerpo: { codigo?: unknown; message?: unknown }, motivos: readonly string[]): boolean {
+  return (typeof cuerpo.codigo === 'string' && cuerpo.codigo.includes('terminos')) || motivos.some((m) => m.includes(MARCA_TERMINOS));
+}
 
 export const escribe = (metodo: string): boolean => !['GET', 'HEAD', 'OPTIONS'].includes(metodo.toUpperCase());
 
@@ -57,7 +65,7 @@ export function accionPara(codigo: number, reintentarEnS: number | null = null):
 }
 
 // ── Quién escucha lo que vale para toda la aplicación (App.svelte) ─────────────────────────────────────────────────────────────
-export type MotivoSesion = 'sin_sesion' | 'clave_temporal';
+export type MotivoSesion = 'sin_sesion' | 'clave_temporal' | 'terminos';
 type Oyente = (motivo: MotivoSesion) => void;
 const oyentes = new Set<Oyente>();
 export function alPerderSesion(f: Oyente): () => void {
@@ -72,13 +80,16 @@ function avisar(motivo: MotivoSesion): void {
 // abierta ni abre el cambio de clave sin sesión). La respuesta igual llega a quien la pidió como ErrorApi.
 let generacion = 0;
 export const generacionDeSesion = (): number => generacion;
-const cambiaLaSesion = (metodo: string, ruta: string): boolean =>
-  (metodo === 'POST' && (ruta === '/sesion' || ruta === '/sesion/clave')) || (metodo === 'DELETE' && (ruta === '/sesion' || ruta.startsWith('/sesion?')));
+// La baja de la propia cuenta (POST /cuenta/baja) también cierra todas sus sesiones (revisión del 11/11/2026): una petición atrasada que
+// vuelve con 401 después de la baja no debe mostrar «tu sesión venció».
+export const cambiaLaSesion = (metodo: string, ruta: string): boolean =>
+  (metodo === 'POST' && (ruta === '/sesion' || ruta === '/sesion/clave' || ruta === '/cuenta/baja')) || (metodo === 'DELETE' && (ruta === '/sesion' || ruta.startsWith('/sesion?')));
 
 // ── El cuerpo de un error: el `message` de Nest (texto o lista) y, en un 429, los segundos de espera ──────────────────────────────
 interface CuerpoError {
   message?: unknown;
   reintentar_en_s?: unknown;
+  codigo?: unknown;
 }
 async function leerCuerpoError(r: Response): Promise<CuerpoError> {
   try {
@@ -126,7 +137,8 @@ async function rechazo(r: Response, metodo: string, ruta: string, central: boole
   if (generacionAlPedir !== generacion) central = false; // atrasada: habla de una sesión que ya no es la de ahora
   if (central && r.status === 401) avisar('sin_sesion');
   if (central && r.status === 403 && motivos.some((m) => m.includes(MARCA_TEMPORAL))) avisar('clave_temporal');
-  return new ErrorApi(r.status, accionPara(r.status, espera), `HTTP ${r.status} en ${metodo === 'GET' ? '' : `${metodo} `}${ruta}`, motivos, espera);
+  else if (central && r.status === 403 && esTerminosPendientes(cuerpo, motivos)) avisar('terminos');
+  return new ErrorApi(r.status, accionPara(r.status, espera), `HTTP ${r.status} en ${metodo === 'GET' ? '' : `${metodo} `}${ruta}`, motivos, espera, cuerpo as Record<string, unknown>);
 }
 
 // fetch con lo común. Sin red, fetch lanza TypeError: se vuelve ErrorApi(0). Una cancelación (AbortError) se propaga tal cual.
@@ -229,7 +241,17 @@ const guardadorDelNavegador: Guardador = {
 export async function descargar(ruta: string, porDefecto: string, abortar?: AbortSignal, g: Guardador = guardadorDelNavegador): Promise<{ nombre: string; bytes: number }> {
   const r = await llamar('GET', ruta, { abortar }, 'text/csv, application/json');
   const blob = await r.blob();
-  const nombre = nombreDeArchivo(r.headers.get('content-disposition'), porDefecto);
+  return entregar(blob, nombreDeArchivo(r.headers.get('content-disposition'), porDefecto), g);
+}
+
+// La misma entrega para lo que el panel ya tiene en memoria y nunca vuelve a pedir (las credenciales del alta masiva, que llegan una
+// sola vez; las filas rechazadas para corregir): un Blob, un enlace en memoria y la URL liberada después (docs/19 §6, «toda descarga
+// nueva usa el mismo ayudante»). Sin petición: no hay sesión que comprobar.
+export function descargarTexto(contenido: string, nombre: string, tipo = 'text/csv;charset=utf-8', g: Guardador = guardadorDelNavegador): { nombre: string; bytes: number } {
+  return entregar(new Blob([contenido], { type: tipo }), nombreDeArchivo(`attachment; filename="${nombre}"`, 'descarga.csv'), g);
+}
+
+function entregar(blob: Blob, nombre: string, g: Guardador): { nombre: string; bytes: number } {
   const url = g.crearUrl(blob);
   try {
     g.pulsar(url, nombre);

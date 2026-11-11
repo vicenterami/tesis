@@ -2,6 +2,7 @@ import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import type { FilaExportada } from './exportar.js';
 import { Pool } from 'pg';
 import { POOL } from '../db/db.module.js';
+import { errorDeCliente } from '../db/cliente.js';
 import { porcentaje } from './escala.js';
 import { isoUs } from '../db/iso-us.js';
 import { Intervalo } from './validacion.js';
@@ -217,12 +218,13 @@ export class ConsultaService {
     const r = await this.pool.query(`
       SELECT c.id, c.tipo, c.abierta_en, c.cerrada_en,
              extract(epoch FROM coalesce(c.cerrada_en, now()) - c.abierta_en)::int AS duracion_s,
-             d.id AS dispositivo_id, d.id_fisico, d.nombre AS dispositivo,
+             d.id AS dispositivo_id, d.id_fisico, d.nombre AS dispositivo, s.nombre AS sitio,
              r.umbral_alto, r.umbral_bajo, ca.magnitud_codigo AS magnitud,
              ${isoUs('c.abierta_en')} AS clave_t
         FROM condicion c
         JOIN dispositivo d ON d.id = c.dispositivo_id
         JOIN zona z ON z.id = d.zona_id
+        JOIN sitio s ON s.id = z.sitio_id
         LEFT JOIN regla_umbral r ON r.id = c.regla_id
         LEFT JOIN canal ca ON ca.id = r.canal_id
         ${filtro}
@@ -244,6 +246,8 @@ export class ConsultaService {
   // en el banco antes de afirmar nada sobre índices (pendiente). El llamador escribe cada fila al flujo de salida.
   async *mediciones(dispositivoId: string, desde: Date, hasta: Date, tanda = 10_000): AsyncGenerator<FilaExportada> {
     const cliente = await this.pool.connect();
+    // Una exportación larga tiene su cliente prestado minutos: si la base corta la conexión a mitad, falla esta descarga y no el proceso.
+    cliente.on('error', errorDeCliente);
     try {
       await cliente.query('SET statement_timeout TO 30000');
       let ultimoTiempo: string | null = null;
@@ -268,6 +272,7 @@ export class ConsultaService {
       }
     } finally {
       await cliente.query('RESET statement_timeout').catch(() => undefined);
+      cliente.off('error', errorDeCliente);
       cliente.release();
     }
   }

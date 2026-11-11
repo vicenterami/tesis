@@ -5,6 +5,7 @@ import { ConsultaService } from './consulta.service.js';
 import { CuarentenaController } from './cuarentena.controller.js';
 import { DispositivosController } from './dispositivos.controller.js';
 import { SitiosController } from './sitios.controller.js';
+import { ActividadService } from './actividad.service.js';
 import { TableroService } from './tablero.service.js';
 
 // M5 Persistencia y consulta — la API que consumirá el panel (patrón B: el navegador solo habla con el backend).
@@ -12,7 +13,7 @@ import { TableroService } from './tablero.service.js';
 // decide con permitir() por el sitio del recurso (AlcanceService, del módulo global de sesión).
 @Module({
   controllers: [DispositivosController, CanalesController, CondicionesController, CuarentenaController, SitiosController],
-  providers: [ConsultaService, TableroService],
+  providers: [ConsultaService, TableroService, ActividadService],
   exports: [ConsultaService],
 })
 export class ConsultaModule {}

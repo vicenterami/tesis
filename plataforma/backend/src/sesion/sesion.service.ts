@@ -13,6 +13,10 @@ import {
   VIDA_ABSOLUTA_MS, claveTemporalVencida, debeRenovar, generarIdentificador, hashIdentificador, motivoDeVencimiento,
 } from './cookie.js';
 import { ROLES, Rol, UsuarioSesion, matrizPorRol } from './permisos.js';
+import { errorDeCliente } from '../db/cliente.js';
+import { registrarEvento } from '../db/evento.js';
+import { TERMINOS_VERSION, terminosPendientes } from '../legal/terminos.js';
+import { leerPreferencias } from '../cuenta/preferencias.js';
 import { Turnos } from './turnos.js';
 
 // M7 · Sesión de personas (docs/20 §3 y §4). Una cookie opaca con estado en la base: aquí se abre, se carga en cada petición (el
@@ -192,9 +196,10 @@ export class SesionService implements OnModuleInit {
     const r = await this.pool.query<{
       creada_en: Date; ultima_actividad: Date; expira_en: Date; revocada_en: Date | null; usuario_id: string; nombre: string; email: string;
       activo: boolean; clave_temporal: boolean; clave_temporal_vence_en: Date | null; sitios: { sitio_id: string; rol: string }[];
+      administrador_sistema: boolean; terminos_version_aceptada: number | null;
     }>(
       `SELECT s.creada_en, s.ultima_actividad, s.expira_en, s.revocada_en, u.id AS usuario_id, u.nombre, u.email, u.activo, u.clave_temporal,
-              u.clave_temporal_vence_en,
+              u.clave_temporal_vence_en, u.administrador_sistema, u.terminos_version_aceptada,
               coalesce((SELECT json_agg(json_build_object('sitio_id', us.sitio_id, 'rol', us.rol))
                           FROM usuario_sitio us WHERE us.usuario_id = u.id AND us.activo), '[]'::json) AS sitios
          FROM sesion s JOIN usuario u ON u.id = s.usuario_id
@@ -213,19 +218,34 @@ export class SesionService implements OnModuleInit {
     }
     const sitios = new Map<string, Rol>();
     for (const x of s.sitios) if ((ROLES as readonly string[]).includes(x.rol)) sitios.set(x.sitio_id, x.rol as Rol);
-    return { id: s.usuario_id, nombre: s.nombre, email: s.email, sistema: false, todos: false, sitios, claveTemporal: s.clave_temporal, sesionId: id };
+    // El administrador del sistema (docs/20 §2, migración 24) alcanza a todos los sitios, también a los creados después: `todos`.
+    return {
+      id: s.usuario_id, nombre: s.nombre, email: s.email, sistema: false, todos: s.administrador_sistema, sitios, claveTemporal: s.clave_temporal,
+      terminosPendientes: terminosPendientes(s.terminos_version_aceptada), sesionId: id,
+    };
   }
 
   // Lo que devuelve GET /sesion: quién soy, mis sitios con su rol y cuándo vence la sesión.
   async describir(u: UsuarioSesion): Promise<Record<string, unknown>> {
-    if (u.sistema) return { sistema: true, nombre: u.nombre, sitios: 'todos', rol: 'administrador', permisos: matrizPorRol() };
+    if (u.sistema) return { sistema: true, nombre: u.nombre, sitios: 'todos', rol: 'administrador', administrador_sistema: true, permisos: matrizPorRol() };
     const r = await this.pool.query<{ sitio_id: string; codigo: string; nombre: string; rol: string }>(
       `SELECT us.sitio_id, s.codigo, s.nombre, us.rol FROM usuario_sitio us JOIN sitio s ON s.id = us.sitio_id
         WHERE us.usuario_id = $1 AND us.activo ORDER BY s.nombre`, [u.id]);
-    const v = await this.pool.query<{ expira_en: Date; ultima_actividad: Date }>('SELECT expira_en, ultima_actividad FROM sesion WHERE id = $1', [u.sesionId]);
+    const v = await this.pool.query<{ expira_en: Date; ultima_actividad: Date; terminos_version_aceptada: number | null; terminos_aceptados_en: string | null }>(
+      `SELECT s.expira_en, s.ultima_actividad, u.terminos_version_aceptada, iso_utc(u.terminos_aceptados_en) AS terminos_aceptados_en
+         FROM sesion s JOIN usuario u ON u.id = s.usuario_id WHERE s.id = $1`, [u.sesionId]);
     const fila = v.rows[0];
+    const preferencias = u.id === null ? null : await leerPreferencias(this.pool, u.id);
     return {
       sistema: false, usuario: { id: u.id, nombre: u.nombre, email: u.email }, clave_temporal: u.claveTemporal, sitios: r.rows,
+      // Desde el 11/11/2026 (docs/20 §2 y §12; docs/19 §4, H): el perfil global, los términos (si la sesión está restringida hasta aceptar)
+      // y las preferencias, que el panel aplica al cargar. `sitios[].rol` es el perfil en cada sitio.
+      administrador_sistema: u.todos,
+      terminos: {
+        version_vigente: TERMINOS_VERSION, version_aceptada: fila?.terminos_version_aceptada ?? null,
+        aceptados_en: fila?.terminos_aceptados_en ?? null, pendiente: u.terminosPendientes,
+      },
+      preferencias,
       expira_en: fila?.expira_en.toISOString() ?? null,
       inactividad_vence_en: fila ? new Date(fila.ultima_actividad.getTime() + 30 * 60_000).toISOString() : null,
       permisos: matrizPorRol(), // rol → acciones, de la tabla que decide (permisos.ts): la guía de perfiles del panel sale de aquí
@@ -270,20 +290,44 @@ export class SesionService implements OnModuleInit {
     if (motivos.length > 0) throw new BadRequestException(motivos);
     const hash = await this.hashClave(c.nueva);
     const cliente = await this.pool.connect();
+    cliente.on('error', errorDeCliente); // un corte de la base a mitad falla esta petición, no el proceso (db/cliente.ts)
     try {
       await cliente.query('BEGIN');
       await cliente.query('UPDATE usuario SET hash_password = $2, clave_temporal = false, clave_temporal_vence_en = NULL WHERE id = $1', [u.id, hash]);
       await cliente.query('UPDATE sesion SET revocada_en = $2 WHERE usuario_id = $1 AND revocada_en IS NULL', [u.id, this.ahora()]);
-      await cliente.query("INSERT INTO evento (dispositivo_id, tipo, detalle) VALUES (NULL, 'usuario_clave', $1)", [JSON.stringify({ usuario_id: u.id, por: u.id })]);
+      await registrarEvento(cliente, { dispositivoId: null, tipo: 'usuario_clave', detalle: { usuario_id: u.id, por: u.id }, usuarioId: u.id });
       await cliente.query('COMMIT');
     } catch (e) {
       await cliente.query('ROLLBACK').catch(() => undefined);
       throw e;
     } finally {
+      cliente.off('error', errorDeCliente);
       cliente.release();
     }
     this.bloqueos.registrarExito(u.email);
     return this.abrirSesion({ ...fila, clave_temporal: false }, ip, agente);
+  }
+
+  // La clave actual de una persona con sesión, con los mismos bloqueos que POST /sesion/clave (docs/20 §4): la piden la baja de la cuenta
+  // (docs/20 §11: «una sesión olvidada abierta no basta para borrar una cuenta») y cualquier acción que la exija. Una clave mala cuenta como
+  // intento fallido (por usuario y por dirección) y responde 400; un bloqueo vigente, 429. Devuelve el email de la fila (para el registro).
+  async exigirClaveActual(u: UsuarioSesion, clave: unknown, ip: string): Promise<void> {
+    if (u.sistema || u.id === null || u.email === null) throw new BadRequestException('la clave de administrador no es una cuenta: no tiene clave que verificar');
+    if (typeof clave !== 'string' || clave === '' || clave.length > 1024) throw new BadRequestException(['clave es obligatoria (la actual, texto)']);
+    const bloqueado = (espera: number): HttpException =>
+      new HttpException({ statusCode: 429, message: `bloqueado: demasiados intentos fallidos; reintenta en ${Math.ceil(espera / 1000)} s`, reintentar_en_s: Math.ceil(espera / 1000) }, HttpStatus.TOO_MANY_REQUESTS);
+    const espera = this.bloqueos.restante(u.email, ip);
+    if (espera > 0) throw bloqueado(espera);
+    const r = await this.pool.query<{ hash_password: string }>('SELECT hash_password FROM usuario WHERE id = $1 AND activo', [u.id]);
+    const fila = r.rows[0];
+    const valida = fila !== undefined && (await this.verificarIntento(clave, fila.hash_password, ip));
+    const esperaTras = Math.max(this.bloqueos.restanteIp(ip), this.bloqueos.restanteUsuario(u.email));
+    if (esperaTras > 0) throw bloqueado(esperaTras);
+    if (!valida) {
+      this.bloqueos.registrarFallo(u.email, ip);
+      throw new BadRequestException(['la clave actual no es correcta']);
+    }
+    this.bloqueos.registrarExito(u.email);
   }
 
   // Una fila en `acceso`. Si la base no la acepta, se registra el error y la petición sigue: la bitácora no decide si se entra.

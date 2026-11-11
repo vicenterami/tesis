@@ -34,6 +34,9 @@ ruido() { if [ "${PILA_TODO:-0}" = 1 ]; then cat; else grep --line-buffered -vE 
 case "${1:-}" in
   encender)
     t0=$SECONDS
+    # El commit corto para «Acerca de» (docker-compose.yml lo pasa como ARG COMMIT al construir el backend). Si git falla (sin repositorio,
+    # o sin git), vacío: la página dice commit null en vez de inventarlo.
+    COMMIT=$(git rev-parse --short HEAD 2>/dev/null || true); export COMMIT
     dc up -d --build || exit 1
     echo "esperando «healthy» (máx. 90 s)…"
     sano=0

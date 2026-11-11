@@ -492,7 +492,7 @@ cliente ──HTTP──► Express ⊂ NestJS ──► servicio ──► pg �
 
 - **Express** es la biblioteca de servidor HTTP más usada de Node.js; NestJS la usa por debajo
   (`@nestjs/platform-express`). El proceso de Node es el servidor; Express recibe cada petición y
-  entrega la respuesta. Es **la API**: 25 rutas REST (32 operaciones, la recepción por HTTP, la sesión, los usuarios y el tablero v2 incluidos) y el canal SSE `/eventos` (§5), descritos en el contrato OpenAPI (26 rutas y 33 operaciones contando `/eventos`; el paso 2h2 del guardián compara estas cifras con `openapi.json`). Desde el 08/11/2026, antes de cada ruta corre el guardia central de la sesión (`docs/20 §5`). Express no toca la base.
+  entrega la respuesta. Es **la API**: 36 rutas REST (45 operaciones, la recepción por HTTP, la sesión, los usuarios, el tablero v2 y, desde el 11/11/2026, la cuenta propia, lo legal, el soporte y la actividad incluidos) y el canal SSE `/eventos` (§5), descritos en el contrato OpenAPI (37 rutas y 46 operaciones contando `/eventos`; el paso 2h2 del guardián compara estas cifras con `openapi.json`). Desde el 08/11/2026, antes de cada ruta corre el guardia central de la sesión (`docs/20 §5`). Express no toca la base.
 - **`pg`** (node-postgres) es el conductor de la base: mantiene un *pool* de 5 conexiones
   (`db/db.module.ts`) y envía **SQL directo** con parámetros `$1, $2…`; el valor nunca se pega dentro
   del texto SQL, lo que evita la inyección. Sin ORM, por la razón de `docs/07` (series de tiempo con

@@ -51,7 +51,7 @@ function base(usuarios: Usuario[]) {
     if (sql.startsWith('INSERT INTO evento')) { eventos.push(sql); return filas([]); }
     return filas([]); // BEGIN, COMMIT
   });
-  const pool = { query, connect: () => Promise.resolve({ query, release: () => undefined }) } as unknown as Pool;
+  const pool = { query, connect: () => Promise.resolve({ query, release: () => undefined, on: () => undefined, off: () => undefined }) } as unknown as Pool;
   return { pool, sesiones, accesos, eventos, query };
 }
 

@@ -31,17 +31,19 @@ uniformidad es la que resuelve la causa C1 (formatos dispares).
 | 9 | **condicion** | Un estado anómalo abierto de un dispositivo | Se abre y se cierra; guarda inicio, fin y duración |
 | 10 | **evento** | Registro histórico de algo que pasó | Alta, baja, mantenimiento, apertura/cierre de condición, calibración de un canal (`canal_calibrado`); alta y cambios de usuarios (`usuario_alta`, `usuario_cambio`) y cambio de clave (`usuario_clave`), desde el 08/11/2026; configuración desde el panel (`dispositivo_configurado`, `reglas_cambiadas`), desde el 11/11/2026, con `usuario_id` = quién lo hizo (nulo = el sistema; migración 23, HU-11) |
 | 11 | **cuarentena** | Trama rechazada por los filtros 1 a 3 (desconocida, malformada o inválida) o por el tope por emisor (`tope`: no cabía en el presupuesto de lecturas de la hora, migración 19) | Cruda, con motivo y detalle, una fila por trama; no contamina las series. **Hypertable** desde la migración 09 (retención 30 días). Por dispositivo y hora se guardan completas las primeras `TOPE_CUARENTENA_HORA` (60); las demás solo se cuentan (`docs/10 §8.4` punto 53). Lo que no tiene credencial no llega: lo corta el broker |
-| 12 | **usuario** | Persona que accede a la plataforma | Con hash de contraseña (`scrypt`, N = 2¹⁷), nunca en claro; el email, en minúsculas, es su nombre de inicio de sesión; baja lógica (`activo`) y, desde la migración 22, `clave_temporal` con su vencimiento (`CLAVE_TEMPORAL_HORAS`: 2 h por defecto, 1–72; la asigna un administrador; debe cambiarla al entrar, `docs/20 §4`) |
-| 13 | **usuario_sitio** | Qué usuario puede ver qué sitio y con qué rol | Multi-tenencia: aísla los datos entre sitios. `rol` es `administrador` o `consulta` (RF-44; desde el 08/11/2026, diseño de cinco perfiles en `docs/20 §2`: el `CHECK` se amplía en una migración prevista para la iteración 0); desde la migración 22, `activo`: quitarle un sitio a una persona es una baja lógica |
+| 12 | **usuario** | Persona que accede a la plataforma | Con hash de contraseña (`scrypt`, N = 2¹⁷), nunca en claro; el email, en minúsculas, es su nombre de inicio de sesión; baja lógica (`activo`) y, desde la migración 22, `clave_temporal` con su vencimiento (`CLAVE_TEMPORAL_HORAS`: 2 h por defecto, 1–72; la asigna un administrador; debe cambiarla al entrar, `docs/20 §4`). Desde la migración 24 (11/11/2026): `administrador_sistema` (el perfil global, `docs/20 §2`), la baja con motivo (`desactivado_en`, `desactivado_por`, `motivo_baja`, con un `CHECK` de coherencia: activa ⇔ sin fecha ni motivo), `anonimizado_en` (baja por anonimización, `docs/20 §11`, solo por `fn_anonimizar_usuario`) y los términos aceptados (`terminos_version_aceptada`, `terminos_aceptados_en`, `docs/20 §12`) |
+| 13 | **usuario_sitio** | Qué usuario puede ver qué sitio y con qué rol | Multi-tenencia: aísla los datos entre sitios. `rol` es `administrador`, `investigador`, `operador` o `consulta` (RF-44; los cuatro perfiles de sitio de `docs/20 §2`, migración 24; el quinto, administrador del sistema, es `usuario.administrador_sistema`); desde la migración 22, `activo`: quitarle un sitio a una persona es una baja lógica |
 | 14 | **trama** | Trama cruda de un mensaje aceptado (al menos una lectura guardada) | **Hypertable**, solo inserción, retención 30 días: auditoría y re-decodificación si un adaptador tuvo un error (migración 09) |
 | 15 | **pasarela** | Quien publica en nombre de los nodos LoRaWAN: una pasarela con servidor de red embebido (ruta B) o un servidor de red externo (ruta C, `docs/10 §8.4` punto 45) | Una sirve a muchos nodos; su id físico es su usuario del broker, único también frente a los dispositivos (migración 11); **declara el formato** de lo que publica (`milesight` o `chirpstack`, migración 15) y sus nodos lo heredan: lo garantiza la base con una clave foránea compuesta `(pasarela_id, formato)` en cascada (`docs/10 §8.4` punto 47) |
 | 16 | **estado_dispositivo** | Lo que el sistema escribe sobre cada dispositivo: la última trama aceptada | Una fila por dispositivo y sin `actualizado_en`: la fila de `dispositivo` queda para lo que edita una persona (migración 11). Se borra en cascada con su dispositivo: es un derivado, sin historia propia. Desde la migración 17 guarda también el contador de la última trama LoRaWAN guardada (`ultimo_fcnt`), con el que el filtro 3 descarta la repetida (`docs/10 §4.1`); desde la 19, los contadores de la hora en curso del tope por emisor (`ventana_inicio`, `ventana_lecturas`, `ventana_cuarentena`, `ventana_sobre_tope`, `ventana_omitidas`), que el filtro 6 escribe en el mismo `INSERT … ON CONFLICT` (`docs/10 §8.4` punto 53) |
 | 17 | **metrica_broker** | Una muestra por minuto de los contadores `$SYS` del broker: descartes acumulados, mensajes y bytes en cola, clientes conectados, memoria | **Hypertable**, retención 90 días; la toma la conexión administradora del backend (migración 13, `docs/10 §8.4` punto 43) |
 | 18 | **condicion_sistema** | Un estado anómalo de la plataforma, sin dispositivo (`broker_descarte`: el broker descarta o la cola pasa el 80 % del tope) | Misma forma que `condicion` (abierta/cerrada, una abierta por tipo); se abre y se cierra sola desde el muestreo del broker (migración 13) |
 | 19 | **sesion** | Una sesión abierta de una persona en el panel (M7, `docs/20 §3`) | Su `id` es el hash SHA-256 del identificador que viaja en la cookie: la base nunca guarda lo que autentica. Vence a los 30 min sin actividad o a las 8 h de creada; cerrar la revoca (`revocada_en`). La limpia una función del dueño (`fn_limpiar_sesiones`) con el plazo de `acceso` (migración 22) |
-| 20 | **acceso** | Un intento de inicio de sesión o un cierre (RF-46): instante, usuario si existe, email intentado, IP, resultado (`ok`, `clave_incorrecta`, `bloqueado`, `inactivo`, `cierre`) y sesión | **Hypertable**, solo inserción, retención 90 días (`RETENCION_ACCESO_DIAS`, migración 22) |
+| 20 | **acceso** | Un intento de inicio de sesión o un cierre (RF-46): instante, usuario si existe, email intentado, IP, resultado (`ok`, `clave_incorrecta`, `bloqueado`, `inactivo`, `cierre`) y sesión | **Hypertable**, solo inserción, retención 90 días (`RETENCION_ACCESO_DIAS`, migración 22); desde la 24, `id` (desempate del cursor de la actividad del sitio) |
+| 21 | **preferencia** | Cómo quiere ver los datos una persona (HU-29, RF-56; `docs/19 §4`, H): unidades de temperatura y longitud, zona horaria («sitio» o una IANA), tema, tipos de condición con notificación, vistas guardadas y sitio por defecto | Una fila por persona (la clave es `usuario_id`), con `actualizado_en` y su disparador (bloqueo optimista de `PUT /preferencias`). La base sigue guardando la unidad estándar: solo cambia la visualización. Se borra con la baja (migración 24) |
+| 22 | **mensaje_soporte** | Un mensaje del formulario de soporte (RF-61, HU-31): texto de 1 a 2 000 caracteres, quién y cuándo; `leido_en` | Lo lee el administrador del sistema (`GET /soporte`, por cursor); se borra con la baja de la cuenta (migración 24) |
 
-20 entidades (OE3 pide ≥ 8). Cinco son hypertables, particionadas por tiempo: `medicion` (la serie de tiempo),
+22 entidades (OE3 pide ≥ 8). Cinco son hypertables, particionadas por tiempo: `medicion` (la serie de tiempo),
 desde la migración 09 `trama` y `cuarentena`, desde la 13 `metrica_broker` y desde la 22 `acceso` (para borrar lo vencido por
 fragmentos enteros con `drop_chunks`). El resto son tablas relacionales normales de PostgreSQL.
 
@@ -65,10 +67,14 @@ erDiagram
     dispositivo ||--o{ evento : evento
     usuario ||--o{ evento : evento
     canal ||--o{ medicion : medicion
+    usuario ||--o{ mensaje_soporte : mensaje_soporte
     sitio ||--o{ pasarela : pasarela
+    sitio ||--o{ preferencia : preferencia
+    usuario ||--o{ preferencia : preferencia
     canal ||--o{ regla_umbral : regla_umbral
     usuario ||--o{ sesion : sesion
     dispositivo ||--o{ trama : trama
+    usuario ||--o{ usuario : usuario
     sitio ||--o{ usuario_sitio : usuario_sitio
     usuario ||--o{ usuario_sitio : usuario_sitio
     sitio ||--o{ zona : zona
@@ -79,6 +85,7 @@ erDiagram
         inet ip
         text resultado
         text sesion_id
+        uuid id
     }
     canal {
         uuid id PK
@@ -172,6 +179,13 @@ erDiagram
         timestamptz recibido_en
         text origen_tiempo
     }
+    mensaje_soporte {
+        uuid id PK
+        uuid usuario_id FK
+        text texto
+        timestamptz creado_en
+        timestamptz leido_en
+    }
     metrica_broker {
         timestamptz tiempo PK
         bigint mensajes_descartados
@@ -190,6 +204,18 @@ erDiagram
         timestamptz creado_en
         timestamptz actualizado_en
         text formato
+    }
+    preferencia {
+        uuid usuario_id PK,FK
+        text unidad_temperatura
+        text unidad_longitud
+        text zona_horaria
+        text tema
+        ARRAY notificar
+        jsonb vistas
+        uuid sitio_predeterminado FK
+        timestamptz creado_en
+        timestamptz actualizado_en
     }
     regla_umbral {
         uuid id PK
@@ -239,6 +265,13 @@ erDiagram
         bool activo
         bool clave_temporal
         timestamptz clave_temporal_vence_en
+        bool administrador_sistema
+        timestamptz desactivado_en
+        uuid desactivado_por FK
+        text motivo_baja
+        timestamptz anonimizado_en
+        int terminos_version_aceptada
+        timestamptz terminos_aceptados_en
     }
     usuario_sitio {
         uuid usuario_id PK,FK

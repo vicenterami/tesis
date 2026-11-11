@@ -57,7 +57,7 @@ función que lo calcula es una sola, con prueba unitaria por cada fila de la tab
 | P8 | **Exportar** | Dispositivo (hoy) o sitio (Etapa 4), rango, formato (CSV, XLSX, JSON); tamaño estimado antes de descargar | Descargar | Hecho el 12/10 por dispositivo: `GET /dispositivos/{id}/exportar?formato=csv\|json&desde&hasta` (flujo por tandas; CSV estándar con coma y punto decimal para R, Python y QGIS). **Propuesta** para la Etapa 4: `GET /sitios/{id}/exportar` con rol y XLSX | RF-34, HU-08 (adelantada a la Etapa 3 el 12/10) | API: Etapa 3; pantalla, XLSX y por sitio: Etapa 4 |
 | P9 | **Vista pública por enlace** | Solo lo que el administrador eligió: magnitudes agregadas, sin trama cruda ni identificadores | Ninguna | **Propuesta:** `GET /publico/{token}` | punto 6 | Etapa 4 |
 | P10 | **Sesión y usuarios** | Entrar, cambio de la clave temporal, salir; quién soy en la cabecera; usuarios de mis sitios, su perfil por sitio y la guía de perfiles (cinco desde el 08/11/2026, diseño: `docs/20 §6`) | Entrar, cambiar la clave, salir o cerrar en todos lados; dar de alta (clave temporal una vez), activar y desactivar, asignar una temporal, cambiar el rol | `POST /sesion`, `GET /sesion`, `DELETE /sesion`, `POST /sesion/clave`, `GET /usuarios`, `POST /usuarios`, `PATCH /usuarios/{id}` (`docs/20`) | RF-43, RF-44, HU-18 | Etapa 4; hecha el 08/11/2026 (§4) |
-| P11 | **Legal y acerca de** (Etapa 4) | Privacidad (generada desde `docs/21`), términos de uso con su versión, avisos de terceros, versión y commit, aviso AGPL; soporte: contacto del responsable y formulario | Leer; aceptar los términos (obligatorio al primer ingreso y al cambiar la versión); enviar un mensaje de soporte | Rutas nuevas, por fijar en el OpenAPI (Etapa 4); los avisos de terceros, un archivo generado en la compilación | RF-53, RF-54, RF-61, HU-27, HU-31 | Iteración 0 |
+| P11 | **Legal y acerca de** (Etapa 4) | Privacidad (generada desde `docs/21`), términos de uso con su versión, avisos de terceros, versión y commit, aviso AGPL; soporte: contacto del responsable y formulario | Leer; aceptar los términos (obligatorio al primer ingreso y al cambiar la versión); enviar un mensaje de soporte | `GET /terminos`, `POST /terminos/aceptar`, `GET /privacidad`, `GET /acerca` (versión y commit solo con sesión), `POST /soporte` y `GET /soporte` (Etapa 4); los avisos de terceros, un archivo generado al cambiar dependencias | RF-53, RF-54, RF-61, HU-27, HU-31 | Iteración 0; hecha el 11/11/2026 |
 | P12 | **Estado del sistema** (solo administrador del sistema; Etapa 4) | Recursos por contenedor en el tiempo (memoria frente a su techo, CPU), errores agrupados por huella, último respaldo y su antigüedad, condiciones del sistema abiertas; límites de los servicios | Ver el detalle de un error; ajustar un límite con bloqueo optimista | `GET /salud` y rutas nuevas sobre `metrica_recurso`, `error_sistema` y los límites (Etapa 4; `docs/10 §8.4` puntos 60 y 61) | RF-59, RF-60, RNF-19, HU-30 | Iteración 1 |
 | P13 | **Preferencias** (mi cuenta; Etapa 4) | Unidades de visualización (°C o °F; mm, m o km), zona horaria propia o la del sitio, vistas guardadas; mis datos y mis sesiones abiertas (por decidir: sin fila en el backlog) y la versión de términos aceptada; darme de baja | Guardar; exportar mis datos de cuenta; cerrar una sesión; darme de baja (con la clave actual) | `GET`/`PUT /preferencias`, `GET /sesiones`, `DELETE /sesiones/{id}` (Etapa 4), fijadas el 11/11/2026 (§4 tablero v2, H); la baja, `docs/20 §11` | RF-55, RF-56, HU-28, HU-29 | Iteración 1 (la baja, en la 0) |
 | P14 | **Actividad** (administrador de sitio en sus sitios; el del sistema en todos; diseñada el 11/11/2026) | Lo que hicieron las personas en el sitio (eventos con quién, de `evento.usuario_id`) y sus entradas, salidas y bloqueos (`acceso`), con filtros por persona, tipo y rango, en texto para personas | Filtrar; abrir la ficha del dispositivo o la persona | `GET /sitios/{id}/actividad?desde&hasta&tipo&usuario&cursor` (Etapa 4) (§4 tablero v2, G) | RF-46, HU-11, HU-26 | Iteración 1 |
@@ -221,13 +221,18 @@ persona lo encuentra:
 5. **Usuarios** (`#/usuarios`, solo administradores, solo sus sitios). Una mini guía «Qué puede hacer cada perfil» y el tooltip del selector
    de rol salen de la matriz de permisos del servidor (`GET /sesion` → `permisos`, que es `PERMISOS` de `sesion/permisos.ts`) con un
    diccionario de frases por acción (`panel/src/lib/ayudas.ts`): la ayuda no puede decir otra cosa que el permiso real. La lista muestra
-   nombre, correo, el rol en cada uno de mis sitios (un selector por sitio: consulta, administrador o sin acceso), si ya no está en mis
-   sitios, activo o inactivo y la temporal pendiente. El alta (nombre, correo, sitio, rol) muestra la clave temporal **una sola vez**, con
-   «Copiar» y el aviso de que no se vuelve a ver; «Ya la entregué: ocultar» la borra de la página. «Desactivar»/«Activar» y «Asignar clave
-   temporal» llevan el `actualizado_en` leído: un 409 muestra «Alguien lo cambió entretanto: recarga» con el botón «Recargar», y el selector
-   vuelve a lo leído (nunca pisa). Los botones que no aplican dicen por qué al lado («no puedes desactivarte a ti mismo», «actívalo primero»).
+   nombre, correo, el rol en cada uno de mis sitios (un selector por sitio con los cuatro perfiles de sitio: consulta, investigación,
+   operación técnica y administrador, o sin acceso), si ya no está en mis sitios, activo o inactivo y la temporal pendiente. El alta
+   (nombre, correo, sitio, rol; y, solo para el administrador del sistema, la casilla del perfil global, con los sitios de `GET /sitios`)
+   muestra la clave temporal **una sola vez**, con «Copiar» y el aviso de que no se vuelve a ver; «Ya la entregué: ocultar» la borra de la
+   página. Un correo de una cuenta inactiva (409 `reactivable`) ofrece «Reactivar» en vez de crear otra. «Desactivar» pide el **motivo**
+   (1–300, con el aviso «sin nombres ni datos personales»: queda en el registro de cambios) antes de enviar; «Activar» reactiva con una
+   clave temporal nueva, que se muestra una vez (la de antes no vuelve; correcciones del 11/11/2026). Todo cambio lleva el
+   `actualizado_en` leído: un 409 muestra «Alguien lo cambió entretanto: recarga» con el botón «Recargar», y el selector vuelve a lo
+   leído (nunca pisa). Los botones que no aplican dicen por qué al lado («no puedes desactivarte a ti mismo», «actívalo primero», «es
+   administrador del sistema: solo otro administrador del sistema cambia su cuenta»).
 6. **Exportar según el rol.** En la ficha, «Descargar CSV de este rango» queda desactivado para quien es de consulta en el sitio del
-   dispositivo, con el motivo escrito al lado («exportar exige el rol administrador en este sitio»); la decisión sigue siendo del servidor.
+   dispositivo, con el motivo escrito al lado («exportar exige el perfil de administrador o de investigador en este sitio»); la decisión sigue siendo del servidor.
 Decidido al implementar (08/11/2026), en lo que el diseño no fijaba: la ruta guardada vive en memoria (el fragmento ya sobrevive a una
 recarga) y «Salir» la descarta y deja el panel en el inventario (quien entre después en ese navegador no hereda la pantalla de la
 anterior); «Entrar» no tiene fragmento propio (es un estado del panel, así la ruta pedida queda intacta); al primer cierre del canal en vivo
@@ -255,7 +260,7 @@ salud; zoom por arrastre con doble clic y botón para volver; preajustes hacia a
 nombre escrito; 320 px sin desplazamiento en dos dimensiones, objetivos de 24 px y contraste 4,5:1. El diseño que lo aplica es el bloque
 «Tablero v2» de esta sección.
 
-**P11 Legal y acerca de (Etapa 4, iteración 0; HU-27, HU-31).** Un enlace «Legal y acerca de» al pie de toda pantalla, también antes de
+**P11 Legal y acerca de (Etapa 4, iteración 0; HU-27, HU-31).** ✅ panel, 11/11/2026 (`docs/16 §64`; los textos llegan del servidor y se muestran como texto, nunca como HTML; el formulario de soporte, solo con sesión). ✅ backend, 11/11/2026 (`GET /terminos`, `POST /terminos/aceptar`, `GET /privacidad`, `GET /acerca`, `POST`/`GET /soporte` (Etapa 4); `docs/20 §10` R27, R30 y R31). Un enlace «Legal y acerca de» al pie de toda pantalla, también antes de
 entrar. Cuatro apartados: **Privacidad**, generada desde el inventario de `docs/21` (§7 de ese documento) con el responsable y el contacto
 que configuró el administrador del sistema; **Términos de uso**, con su versión y fecha; **Acerca de**, con la versión, el commit, el aviso
 de la licencia AGPL y los avisos de terceros generados en la compilación; y **Soporte**: el contacto y un formulario de texto (sin
@@ -270,7 +275,7 @@ frente al límite de RNF-17; los errores agrupados por huella con su conteo y la
 personales; y los **límites de los servicios** que hoy viven en el `.env` y pasan a configurarse aquí (primero la vigencia de la clave
 temporal, `docs/20 §4`), cada uno con su rango válido, su valor por defecto y bloqueo optimista.
 
-**P13 Preferencias (Etapa 4, iteración 1; HU-29, HU-28).** Unidades de visualización (temperatura en °C o °F; longitudes en mm, m o km):
+**P13 Preferencias (Etapa 4, iteración 1; HU-29, HU-28).** ✅ panel, 11/11/2026 (salvo la zona horaria propia aplicada a las horas visibles: la preferencia se guarda y las pantallas siguen en la zona del sitio; pendiente). Unidades de visualización (temperatura en °C o °F; longitudes en mm, m o km):
 la base guarda siempre la unidad estándar del catálogo y la conversión ocurre solo al mostrar, con la unidad escrita al lado de cada
 valor; zona horaria: la del sitio (por defecto, `docs/13`) o la propia, dicha en la cabecera como hoy el aviso de zona (incremento 2,
 punto 3); vistas guardadas (filtros de P2, rango y resolución de P3), guardadas en la base y no en el navegador (`docs/21 §4`). En «Mi
@@ -286,7 +291,7 @@ el mismo contrato. Referentes y normas: la comparativa de «P1 rediseñado» (ar
 referentes, y las reglas de visualización de §6 (colores validados, un solo eje, leyenda siempre que haya más de una serie).
 
 **A. Armazón y sistema visual (toda pantalla).**
-1. **Cabecera y navegación.** ✅ panel, 11/11/2026 (sin «en vivo» en la cabecera: cada pantalla conserva el suyo; Preferencias, Condiciones, Cuarentena, Actividad y Estado del sistema se nombran sin enlace hasta tener pantalla). Arriba: el nombre del sistema, el selector de sitio (solo si la persona tiene más de uno; el sitio vive
+1. **Cabecera y navegación.** ✅ panel, 11/11/2026 (sin «en vivo» en la cabecera: cada pantalla conserva el suyo; Condiciones, Cuarentena y Estado del sistema se nombran sin enlace hasta tener pantalla; Actividad, «Dar de alta» y Preferencias tienen enlace desde el mismo día). Arriba: el nombre del sistema, el selector de sitio (solo si la persona tiene más de uno; el sitio vive
    en la URL `?sitio=` y la última elección se guarda en las preferencias, lo que llega con P13) y el menú principal: Tablero · Inventario · Condiciones ·
    Cuarentena · Actividad (administrador de sitio) · Usuarios (administrador de sitio) · Estado del sistema (administrador del sistema).
    A la derecha: «en vivo», quién soy y el menú de cuenta (Preferencias, Cambiar la clave, Salir, Cerrar en todos lados). Bajo 700 px el
@@ -379,7 +384,7 @@ servidor.
    lado (P13; la base no cambia). Sin preferencia no se convierte nada: se muestra la unidad del catálogo; y la conversión de longitud aplica
    solo a magnitudes de longitud, distancia o nivel, nunca a una precipitación en mm (decidido al implementar, 11/11/2026).
 
-**E. P6 Configurar (HU-06, HU-13, RF-14; F2).** ✅ backend, 11/11/2026 (rutas, validación en el servidor, bloqueo optimista, evento con la persona y retardo de activación en el filtro alertar; las notificaciones, no). Desde la ficha, para operador técnico, administrador de sitio y del sistema. Del
+**E. P6 Configurar (HU-06, HU-13, RF-14; F2).** ✅ backend, 11/11/2026 (rutas, validación en el servidor, bloqueo optimista, evento con la persona y retardo de activación en el filtro alertar; las notificaciones, no). ✅ panel, 11/11/2026 (P6 en `#/dispositivos/<id>/configurar` y las notificaciones en pantalla y del navegador; `docs/16 §64`). Decidido al implementar (11/11/2026): los umbrales se escriben en la unidad en que se guardan (la del catálogo, escrita al lado), no en la de la preferencia, para no sumar un redondeo a cada guardado; el rango físico de la magnitud lo comprueba solo el servidor (la ficha no lo trae) y su 400 se escribe junto al campo; las notificaciones comparten con el tablero, el inventario y la comparación UNA conexión al canal sin filtro por pestaña (`abrirCanalCompartido`), porque el proxy acota las conexiones a ese canal. Desde la ficha, para operador técnico, administrador de sitio y del sistema. Del
 dispositivo: nombre, estado (activo / mantenimiento), intervalo esperado y zona (mudar dentro del sitio); por canal: etiqueta, umbral
 alto, umbral bajo, histéresis y **retardo de activación** en segundos (0 por defecto; RF-14: la condición se abre cuando la medición lleva
 al menos ese tiempo fuera de la banda, y la histéresis la cierra). Validación en una sola función compartida con el servidor (bajo < alto;
@@ -388,36 +393,42 @@ optimista (`actualizado_en`; 409 → «alguien lo cambió a las 10:42: recarga»
 Rutas (Etapa 4): `PATCH /dispositivos/{id}` y `PUT /canales/{id}/reglas` (reemplaza las reglas del canal). Cada guardado deja un `evento` con la
 persona (G1). **Notificaciones en pantalla (HU-24, HU-25):** una condición que se abre en un sitio de la persona aparece como aviso
 agrupado por dispositivo (`aria-live`) en cualquier pantalla; en P13 cada persona elige para qué tipos quiere además la **notificación
-del navegador** (permiso pedido al activarla, `docs/21 §5`). No hay correo saliente (`docs/20 §4`): un canal saliente por sitio
+del navegador** (permiso pedido al activarla, `docs/21 §5`), con un cuerpo genérico («N condiciones nuevas en» el sitio; el detalle, en
+la pantalla). En teléfono se ven 2 avisos y el resto queda plegado en «y N más», para no tapar el campo con el foco (WCAG 2.4.11;
+corrección del 11/11/2026). No hay correo saliente (`docs/20 §4`): un canal saliente por sitio
 (webhook) queda diseñado para la iteración 2.
 
 **F. P7 Alta: asistente, alta masiva y bandeja de detectados (HU-22, RF-50; decididas el 25/10/2026).**
-1. **Asistente** de cinco pasos (§3): identidad y zona; vía y formato (pasarela si LoRaWAN; perfil de decodificación si lo hay); canales
+1. **Asistente** ✅ panel, 11/11/2026 (`#/alta`; sin el perfil de decodificación, que sigue por API) de cinco pasos (§3): identidad y zona; vía y formato (pasarela si LoRaWAN; perfil de decodificación si lo hay); canales
    y magnitudes del catálogo; credencial mostrada una sola vez con «Copiar» y el tópico; «esperando la primera trama» en vivo. Un
-   identificador que ya existe inactivo ofrece reactivarlo (409 con la ficha), no crea un duplicado.
-2. **Alta masiva por archivo:** ✅ backend, 11/11/2026 (la ruta y su informe; la pantalla, no); un CSV con cabecera fija (`id_fisico, nombre, zona, via, formato, intervalo_esperado_s, canales,
+   identificador que ya existe inactivo ofrece reactivarlo (409 con la ficha), no crea un duplicado. Construido así (11/11/2026): cada
+   paso con su encabezado «Paso N de 5», que recibe el foco al cambiar de paso, y los errores del paso 1 ligados a cada campo; la magnitud
+   se escribe por su **código** del catálogo (el selector del catálogo queda pendiente); la hora de la primera trama va en la zona del
+   sitio (la **zona propia** de P13 se guarda y aún no se aplica); un identificador que ya existe responde 409 y remite al inventario (la
+   reactivación desde el asistente queda pendiente).
+2. **Alta masiva por archivo:** ✅ backend, 11/11/2026 (la ruta y su informe); ✅ panel, 11/11/2026 (`#/alta?modo=lote`: el CSV se lee en el navegador, `modo=validar` completo, `modo=crear` en tandas de 50 con «creadas N de M»; las credenciales no se dibujan: se descargan una vez y «Ya las guardé: olvidarlas» las saca de la memoria; «Descargar rechazadas» agrega la columna `motivo`, que el lector ignora al volver a subir; decidido al implementar). Límite que se cruza: 500 filas son una validación y 10 tandas, y el servidor admite 10 lotes por minuto por persona, así que la última tanda recibe 429 y queda como «Reintentar las restantes» con la espera escrita; un CSV con cabecera fija (`id_fisico, nombre, zona, via, formato, intervalo_esperado_s, canales,
    pasarela`; `canales` como `magnitud:unidad;magnitud:unidad`) de hasta 500 filas se envía a `POST /dispositivos/lote?modo=validar` (Etapa 4) y
    la pantalla muestra el informe fila por fila (válida / rechazada con motivo / ya existe) **antes** de crear nada; con «Crear las
    válidas», `modo=crear` inserta en una sola transacción (una sentencia para los dispositivos y otra para sus eventos, no N inserciones; el panel manda tandas de 50, D-103), devuelve el mismo informe con las credenciales
    de las creadas **una sola vez**, y la pantalla ofrece «Descargar credenciales (CSV)» por el ayudante `descargar` de §6 y «Descargar
    rechazadas» para corregir y volver a subir. Las filas rechazadas no bloquean a las válidas; el informe lo dice. Límite de tasa y de
    tamaño en `docs/11 §4`.
-3. **Bandeja de detectados (Etapa 4):** ✅ backend, 11/11/2026; `GET /cuarentena/detectados?sitio` agrupa las tramas rechazadas por `no_registrado` de los últimos 7 días
+3. **Bandeja de detectados (Etapa 4):** ✅ backend, 11/11/2026; ✅ panel, 11/11/2026 (`#/alta?modo=detectados`); `GET /cuarentena/detectados?sitio` agrupa las tramas rechazadas por `no_registrado` de los últimos 7 días
    por emisor (identificador o tópico), con cuántas y la última; cada fila lleva al asistente con el identificador ya escrito. Es la
    forma de dar de alta «lo que ya está hablando».
 
-**G. Actividad y quién lo hizo (P14, nueva; HU-11, RF-46, HU-26).**
+**G. Actividad y quién lo hizo (P14, nueva; HU-11, RF-46, HU-26).** ✅ backend, 11/11/2026 (`docs/20 §10` R29).
 1. ✅ backend, 11/11/2026 (columna y su uso en las escrituras; usuarios, aún con su detalle). `evento` gana `usuario_id` (nulo para lo que hace el sistema): toda escritura con sesión lo deja (alta, baja, mantenimiento,
    umbrales, calibración, credenciales, usuarios), y `GET /dispositivos/{id}` y la ficha muestran «registrado por N». «Registrado por N» solo
    para administradores: el nombre lo reciben el administrador de ese sitio y el del sistema; los demás perfiles, `usuario: null`
    (`docs/21 §2`; decidido el 11/11/2026).
-2. **P14 Actividad** (`#/actividad`; administrador de sitio en sus sitios, administrador del sistema en todos): una lista por cursor que
+2. **P14 Actividad** ✅ panel, 11/11/2026 (el menú, según la acción `auditoria` de la matriz del servidor; la persona y el tipo del filtro salen de `GET /usuarios` y de los tipos recibidos) (`#/actividad`; administrador de sitio en sus sitios, administrador del sistema en todos): una lista por cursor que
    mezcla `evento` (con persona y dispositivo) y `acceso` (entradas, salidas y bloqueos de las personas de esos sitios), con filtros por
    persona, tipo y rango, y texto para personas («cambió los umbrales de Humedad del invernadero»); de
    `GET /sitios/{id}/actividad?desde&hasta&tipo&usuario&cursor` (Etapa 4). La auditoría por petición HTTP de `docs/10 §8.4` punto 43 sigue
    siendo de la monitorización (B4) y no se muestra aquí.
 
-**H. P13 Preferencias y mi cuenta (HU-29, RF-56; HU-28).** Tabla `preferencia` (una fila por persona: unidad de temperatura, unidad de
+**H. P13 Preferencias y mi cuenta (HU-29, RF-56; HU-28).** ✅ panel, 11/11/2026 (`#/preferencias`; los guardados van en fila, nunca dos `PUT` en vuelo, y uno rechazado devuelve solo lo que él cambió; la sesión actual no se cierra desde la lista, para eso está «Salir»; las vistas guardadas se toman de la última vista de datos abierta; decidido al implementar). ✅ backend, 11/11/2026 (además `GET /cuenta/exportar` y `POST /cuenta/baja` (Etapa 4); `docs/20 §10` R26 y R28). Tabla `preferencia` (una fila por persona: unidad de temperatura, unidad de
 longitud, zona horaria «la del sitio» o una IANA, tema, tipos de condición con notificación del navegador, vistas guardadas con nombre
 —filtros de P2, rango y resolución de P3— y `actualizado_en`); `GET` y `PUT /preferencias` propias (Etapa 4), con bloqueo optimista; se aplican al
 cargar la sesión (`GET /sesion` las trae) y el panel las guarda de forma optimista (reversible). **Mi cuenta:** nombre, correo, sitios y
@@ -425,7 +436,7 @@ perfiles, **sesiones abiertas** (Etapa 4) con `GET /sesiones` (creada, última a
 `DELETE /sesiones/{id}` (Etapa 4); decidido aquí porque la fila faltaba en el backlog y cuesta una tarde), versión de términos aceptada, «Exportar
 mis datos» (JSON por `descargar`) y «Darme de baja» (`docs/20 §11`).
 
-**I. Contrato de la API que este diseño fija** (rutas nuevas o cambiadas; el código por perfil, en `docs/20 §6`). ✅ backend, 11/11/2026: todas salvo `/sitios/{id}/actividad`, `/preferencias` y `/sesiones`; medido en `docs/16 §61`.
+**I. Contrato de la API que este diseño fija** (rutas nuevas o cambiadas; el código por perfil, en `docs/20 §6`). ✅ backend, 11/11/2026: todas (`/sitios/{id}/actividad`, `/preferencias` y `/sesiones`, el mismo día: `docs/16 §63`); medido en `docs/16 §61`.
 | Ruta | Qué devuelve o hace | Quién |
 |---|---|---|
 | `GET /sitios` | mis sitios con código, nombre, zona horaria, zonas y mi perfil en cada uno (el administrador del sistema, todos) | con sesión (Etapa 4) |
@@ -457,8 +468,11 @@ retardo_s}]` (con `id`, cambia esa regla; sin `id`, una nueva; las que no vienen
 (el panel convierte el CSV) y responde `validas, rechazadas, existentes, filas[{n, id_fisico, resultado, motivo, id, credencial, topico}]`
 con `resultado` en `valida | creada | rechazada | existe`; `/preferencias` → `unidad_temperatura (C|F), unidad_longitud (mm|m|km),
 zona_horaria (sitio|IANA), tema (sistema|claro|oscuro), notificar[tipos], vistas[{nombre, pantalla, parametros}], sitio_predeterminado,
-actualizado_en`; `/sesiones` → `id, creada_en, ultima_actividad, agente, origen, actual`; `/sitios/{id}/actividad` → `instante, clase
-(evento|acceso), tipo, texto, usuario{id, nombre}|null, dispositivo{id, nombre}|null`.
+actualizado_en`, con `parametros` un objeto texto → texto en el panel y en el servidor (la ruta del panel que abre la vista va en `ruta`,
+`{ruta: '/inventario?estado=alerta'}`; corrección del 11/11/2026: el panel la mandaba como texto y el servidor rechazaba toda vista);
+`/sesiones` → `id, creada_en, ultima_actividad, agente, origen, actual`; `/sitios/{id}/actividad?desde&hasta&tipo&usuario&cursor&limite` →
+`id, instante, clase (evento|acceso), tipo, texto, usuario{id, nombre}|null, dispositivo{id, nombre}|null`; cada fila de `/condiciones`
+suma `sitio` (el nombre: el cuerpo genérico de la notificación del navegador).
 
 **J. Pruebas y medición (antes de dar por hecho).** Por el DOM: cada pantalla en los dos sentidos (lo que debe verse y lo que debe
 frenarse); las conversiones de unidad con casos de ida y vuelta; el estado visual del servidor frente al del panel; la validación de
@@ -579,14 +593,14 @@ administrador); la vista pública nunca ofrece exportar (punto 6).
 | P1 Resumen (tablero) | RF-30, HU-16, TT-44 | Etapa 4 (HU-16 en la iteración 0; el rediseño en la 1) | Los cuatro conteos suman el total del inventario; cambian en vivo con F3; la comparativa escrita con sus fuentes antes del código; zoom, rango y varias series con navegador real, a 390 y 1280 px |
 | P8 Exportar (API) | RF-34, HU-08 | Etapa 3 (12/10): 6 pruebas de las funciones puras y 7 casos de humo; la pantalla, el XLSX y la exportación por sitio, en la Etapa 4 |
 | P10 Sesión y usuarios | HU-18, RF-43, RF-44 (los cinco perfiles: HU-26, iteración 0) | Etapa 4 (08/11/2026) | `docs/16 §59`: por el DOM (vitest) el cliente HTTP (cabecera, 401, 403 temporal, 409, 429, sin red, gana la última, descarga por Blob), la guía de perfiles contra la matriz y contra las acciones del servidor, las reglas de la clave contra los números del servidor, los componentes y los flujos de entrar, cambiar, vencer, renovar y salir; con navegador real (paso 4c del guardián, `pruebas/panel-sesion-e2e.sh`) en Chromium y Firefox, a 390 y 1280 px |
-| P11 Legal y acerca de | RF-53, RF-54, RF-61, HU-27, HU-31 | Etapa 4, iteración 0 | Sesión sin aceptar: 403 en una lectura y 200 en las páginas legales; aceptar la normaliza; subir la versión la restringe otra vez (`docs/20 §12`); ningún aviso de terceros falta frente a las dependencias de producción (verificador) |
+| P11 Legal y acerca de | RF-53, RF-54, RF-61, HU-27, HU-31 | Etapa 4, iteración 0 | Sesión sin aceptar: 403 en una lectura y 200 en las páginas legales; aceptar la normaliza; subir la versión la restringe otra vez (`docs/20 §12`); ningún aviso de terceros falta frente a las dependencias de producción (verificador). Panel (`docs/16 §64`): por el DOM, privacidad, términos y acerca de como texto (un `<script>` del servidor queda como texto), soporte con su 429 en segundos, la pantalla de términos sin ningún dato ni canal hasta aceptar y el 403 `terminos_pendientes` de cualquier lectura que la abre; con navegador real, legal antes de entrar y la aceptación tras el primer ingreso |
 | P12 Estado del sistema | RF-59, RF-60, RNF-19, HU-30 | Etapa 4, iteración 1 | Solo el administrador del sistema la ve (403 a los demás, `docs/20 §6`); un error plantado con un correo aparece agrupado y sin el correo; un servicio cerca de su techo abre `memoria_alta`; un límite cambiado con dos ediciones a la vez da 409 a la segunda |
-| P13 Preferencias | RF-55, RF-56, HU-28, HU-29 | Etapa 4, iteración 1 (la baja, en la 0) | Una medición guardada en °C se muestra en °F con su unidad y la base no cambia; la zona propia cambia las horas visibles y el aviso; la baja deja `usuario` sin nombre ni correo (`docs/20 §11`) |
+| P13 Preferencias | RF-55, RF-56, HU-28, HU-29 | Etapa 4, iteración 1 (la baja, en la 0) | Una medición guardada en °C se muestra en °F con su unidad y la base no cambia; la zona propia cambia las horas visibles y el aviso; la baja deja `usuario` sin nombre ni correo (`docs/20 §11`). Panel (`docs/16 §64`): por el DOM, optimista y reversible (un 409 vuelve atrás con el aviso), el permiso de notificar pedido al marcar, sesiones, vistas y la baja con clave; con navegador real, °F en la ficha con la base en °C. Pendiente: la zona propia en las horas visibles |
 | P1 Tablero v2 | RF-30, HU-07, HU-15, HU-16, TT-44 | Etapa 4, iteración 1 (diseñado el 11/11/2026) | Los indicadores suman el inventario y cambian en vivo con F3; el resumen y el histórico del sitio medidos con la serie de 30 días del banco (como `docs/16 §52`); zoom, rango a medida y varias series con navegador real a 390 y 1 280 px; colores de series validados antes del código (§4 tablero v2, A3) |
 | P2 y P3 v2 | RF-33, RF-47, RF-49, RF-57, HU-07, TT-42 | Etapa 4, iteración 1 | El estado visual del servidor coincide con `estadoVisual()` fila por fila; paginación con total en la cabecera; un zoom cambia la resolución y la URL; banda mín–máx; umbrales y condiciones dibujados; tramas rechazadas agrupadas con «× N»; unidades según la preferencia con ida y vuelta exacta |
-| P6 Configurar | HU-06, HU-13, RF-14 | Etapa 4, iteración 1 | Validación compartida (plantada: bajo ≥ alto falla en los dos lados); 409 con dos pestañas; retardo de activación: una medición fuera de banda menos tiempo que el retardo no abre condición, más tiempo sí; cada guardado deja un `evento` con la persona |
-| P7 Alta, lote y detectados | HU-22, RF-50, HU-11 | Etapa 4, iteración 1 | Credencial una sola vez; `modo=validar` no crea nada; un lote con filas malas crea solo las válidas y el informe lo dice; tope de 500 filas y límite de tasa plantados; un emisor desconocido aparece en detectados y llega al asistente con su identificador |
-| P14 Actividad | RF-46, HU-11, HU-26 | Etapa 4, iteración 1 | Un umbral cambiado aparece con la persona que lo cambió; un administrador de un sitio no ve la actividad de otro (404); un cursor de otro sitio no trae nada |
+| P6 Configurar | HU-06, HU-13, RF-14 | Etapa 4, iteración 1 | Validación compartida (plantada: bajo ≥ alto falla en los dos lados); 409 con dos pestañas; retardo de activación: una medición fuera de banda menos tiempo que el retardo no abre condición, más tiempo sí; cada guardado deja un `evento` con la persona. Panel (`docs/16 §64`): los casos de la prueba del servidor repetidos contra la función del panel, el error junto al campo, «Guardando…», el 409 con la hora y «Recargar» sin pisar; con navegador real, la validación en vivo y el 409 con dos pestañas |
+| P7 Alta, lote y detectados | HU-22, RF-50, HU-11 | Etapa 4, iteración 1 | Credencial una sola vez; `modo=validar` no crea nada; un lote con filas malas crea solo las válidas y el informe lo dice; tope de 500 filas y límite de tasa plantados; un emisor desconocido aparece en detectados y llega al asistente con su identificador. Panel (`docs/16 §64`): por el DOM, 121 válidas en tandas de 50 con la segunda fallando (se detiene con 50 y reintenta 71), 501 filas frenadas en el navegador, detectado → asistente; con navegador real, el asistente por HTTP y un lote de 2 válidas y 1 rechazada |
+| P14 Actividad | RF-46, HU-11, HU-26 | Etapa 4, iteración 1 | Un umbral cambiado aparece con la persona que lo cambió; un administrador de un sitio no ve la actividad de otro (404); un cursor de otro sitio no trae nada. Panel (`docs/16 §64`): por el DOM, cursor, filtros en la URL, tarjetas en teléfono y nada para quien no administra; con navegador real, el umbral cambiado en P6 con quien lo cambió y sin correos |
 | P9 Vista pública | punto 6 | Etapa 4, iteración 2 | Sin cuenta: solo las magnitudes agregadas elegidas; ninguna ruta cruda responde con el token |
 
 La etapa de cada pantalla es la de su historia en `docs/04`; mover una historia de etapa se decide con sus horas y se cambia

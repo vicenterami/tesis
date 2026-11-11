@@ -10,17 +10,22 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const FORMA_EMAIL = /^[^@\s]+@[^@\s]+$/;
 export const MAX_SITIOS = 50;
 
+export const MAX_MOTIVO = 300; // el mismo tope que ck_usuario_motivo_baja (migración 24)
+
 export interface AltaUsuario {
   nombre: string;
   email: string;
   sitios: { sitio_id: string; rol: Rol }[];
+  administrador_sistema: boolean; // perfil global (docs/20 §2); solo lo da quien ya lo tiene (o la clave de administrador, el primero)
 }
 export interface CambioUsuario {
   actualizado_en: string; // bloqueo optimista (docs/10 §8.4 punto 28): el que entregó GET /usuarios, tal cual
   nombre?: string;
-  activo?: boolean;
+  activo?: boolean; // true = reactivar: exige clave_temporal: true en la misma petición (la clave anterior no vuelve)
   clave_temporal?: true; // «olvidé mi clave»: asigna una temporal nueva (se muestra una vez)
   sitios?: { sitio_id: string; rol: Rol | null }[]; // rol null = quitarle ese sitio (baja lógica de usuario_sitio)
+  motivo?: string; // obligatorio con activo: false (baja con motivo, migración 24); se guarda con quién y cuándo
+  administrador_sistema?: boolean; // dar o quitar el perfil global: solo el administrador del sistema
 }
 
 function objeto(cuerpo: unknown): Record<string, unknown> {
@@ -33,9 +38,9 @@ function nombre(v: unknown, motivos: string[]): string {
   return typeof v === 'string' ? v.trim() : '';
 }
 
-function sitios(v: unknown, motivos: string[], admiteNulo: boolean): { sitio_id: string; rol: Rol | null }[] {
-  if (!Array.isArray(v) || v.length < 1 || v.length > MAX_SITIOS) {
-    motivos.push(`sitios debe ser una lista de 1 a ${MAX_SITIOS} elementos {sitio_id, rol}`);
+function sitios(v: unknown, motivos: string[], admiteNulo: boolean, minimo = 1): { sitio_id: string; rol: Rol | null }[] {
+  if (!Array.isArray(v) || v.length < minimo || v.length > MAX_SITIOS) {
+    motivos.push(`sitios debe ser una lista de ${minimo} a ${MAX_SITIOS} elementos {sitio_id, rol}${minimo === 0 ? '' : ' (vacía solo para un administrador del sistema)'}`);
     return [];
   }
   const vistos = new Set<string>();
@@ -59,10 +64,13 @@ export function validarAltaUsuario(cuerpo: unknown): AltaUsuario {
   const n = nombre(c.nombre, motivos);
   const email = typeof c.email === 'string' ? c.email.trim().toLowerCase() : '';
   if (email.length < 3 || email.length > 254 || !FORMA_EMAIL.test(email)) motivos.push('email debe tener la forma nombre@dominio (hasta 254 caracteres)');
-  const s = sitios(c.sitios, motivos, false);
-  for (const k of Object.keys(c)) if (!['nombre', 'email', 'sitios'].includes(k)) motivos.push(`campo no admitido: ${k}`);
+  const global = c.administrador_sistema;
+  if (global !== undefined && typeof global !== 'boolean') motivos.push('administrador_sistema debe ser true o false');
+  // Un administrador del sistema puede no tener ningún sitio propio: alcanza a todos (docs/20 §2).
+  const s = sitios(c.sitios, motivos, false, global === true ? 0 : 1);
+  for (const k of Object.keys(c)) if (!['nombre', 'email', 'sitios', 'administrador_sistema'].includes(k)) motivos.push(`campo no admitido: ${k}`);
   if (motivos.length > 0) throw new BadRequestException(motivos);
-  return { nombre: n, email, sitios: s as { sitio_id: string; rol: Rol }[] };
+  return { nombre: n, email, sitios: s as { sitio_id: string; rol: Rol }[], administrador_sistema: global === true };
 }
 
 export function validarCambioUsuario(cuerpo: unknown): CambioUsuario {
@@ -83,8 +91,22 @@ export function validarCambioUsuario(cuerpo: unknown): CambioUsuario {
     else salida.clave_temporal = true;
   }
   if ('sitios' in c) salida.sitios = sitios(c.sitios, motivos, true);
-  for (const k of Object.keys(c)) if (!['actualizado_en', 'nombre', 'activo', 'clave_temporal', 'sitios'].includes(k)) motivos.push(`campo no admitido: ${k}`);
-  if (motivos.length === 0 && Object.keys(c).length === 1) motivos.push('nada que cambiar: nombre, activo, clave_temporal o sitios');
+  // Reactivar exige una clave temporal nueva en la misma petición (revisión del 11/11/2026): la clave de antes no vuelve, porque
+  // pudo quedar expuesta mientras la cuenta estaba de baja o ser la razón de la baja.
+  if (salida.activo === true && salida.clave_temporal !== true) motivos.push('activo: true (reactivar) exige clave_temporal: true en la misma petición: la clave anterior no vuelve');
+  // Baja con motivo (migración 24; conocimiento-portable, baja lógica §2): desactivar exige el motivo, que se guarda con quién y cuándo.
+  if ('motivo' in c) {
+    const m = typeof c.motivo === 'string' ? c.motivo.trim() : '';
+    if (m.length < 1 || m.length > MAX_MOTIVO) motivos.push(`motivo debe tener entre 1 y ${MAX_MOTIVO} caracteres`);
+    else if (salida.activo !== false) motivos.push('motivo solo acompaña a activo: false (la baja)');
+    else salida.motivo = m;
+  } else if (salida.activo === false) motivos.push('motivo es obligatorio al desactivar (activo: false): por qué se da de baja');
+  if ('administrador_sistema' in c) {
+    if (typeof c.administrador_sistema !== 'boolean') motivos.push('administrador_sistema debe ser true o false');
+    else salida.administrador_sistema = c.administrador_sistema;
+  }
+  for (const k of Object.keys(c)) if (!['actualizado_en', 'nombre', 'activo', 'clave_temporal', 'sitios', 'motivo', 'administrador_sistema'].includes(k)) motivos.push(`campo no admitido: ${k}`);
+  if (motivos.length === 0 && Object.keys(c).length === 1) motivos.push('nada que cambiar: nombre, activo, clave_temporal, sitios o administrador_sistema');
   if (motivos.length > 0) throw new BadRequestException(motivos);
   return salida;
 }

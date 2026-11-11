@@ -8,7 +8,7 @@ import type { Request, Response } from 'express';
 import { claveOpcional } from '../arranque.js';
 import { direccionDelCliente } from '../recepcion/http/direccion.js';
 import { cabeceraBorrarCookie, cabeceraCookie } from './cookie.js';
-import { ConClaveTemporal, Publica, Usuario, exigirPedidoDelPanel } from './guardia.js';
+import { ConClaveTemporal, ConTerminosPendientes, Publica, Usuario, exigirPedidoDelPanel } from './guardia.js';
 import type { UsuarioSesion } from './permisos.js';
 import { SesionAbiertaRespuesta, SesionService } from './sesion.service.js';
 
@@ -54,12 +54,13 @@ export class SesionController {
 
   @Get()
   @ConClaveTemporal()
+  @ConTerminosPendientes()
   @ApiCookieAuth('sesion')
   @ApiOperation({
     summary: 'Quién soy',
     description: 'Usuario, sus sitios con el rol en cada uno y los vencimientos de la sesión (absoluto e inactividad). Renueva la actividad: el panel la llama como mucho cada 5 min mientras la persona interactúa.',
   })
-  @ApiOkResponse({ description: '`usuario`, `sitios` [{sitio_id, codigo, nombre, rol}], `clave_temporal`, `expira_en`, `inactividad_vence_en` y `permisos` (rol → acciones que puede: la tabla de permisos que decide, para la guía de perfiles del panel); con X-Clave-Admin, `sistema: true`' })
+  @ApiOkResponse({ description: '`usuario`, `sitios` [{sitio_id, codigo, nombre, rol}] (rol = perfil en ese sitio: administrador, investigador, operador o consulta), `clave_temporal`, `expira_en`, `inactividad_vence_en`, `administrador_sistema` (perfil global), `terminos` {version_vigente, version_aceptada, aceptados_en, pendiente}, `preferencias` (las de GET /preferencias) y `permisos` (perfil → acciones que puede: la tabla de permisos que decide, para la guía de perfiles del panel); con X-Clave-Admin, `sistema: true`' })
   @ApiUnauthorizedResponse({ description: 'sesión requerida' })
   quien(@Usuario() u: UsuarioSesion): Promise<Record<string, unknown>> {
     return this.sesiones.describir(u);
@@ -67,6 +68,7 @@ export class SesionController {
 
   @Delete()
   @ConClaveTemporal()
+  @ConTerminosPendientes()
   @HttpCode(200)
   @ApiCookieAuth('sesion')
   @ApiOperation({ summary: 'Cerrar sesión', description: 'Revoca la sesión en la base y borra la cookie; con `todas=true`, revoca todas las sesiones del usuario («cerrar en todos lados»). Deja la fila `cierre` en `acceso`.' })
@@ -82,6 +84,7 @@ export class SesionController {
 
   @Post('clave')
   @ConClaveTemporal()
+  @ConTerminosPendientes()
   @HttpCode(200)
   @ApiCookieAuth('sesion')
   @ApiOperation({

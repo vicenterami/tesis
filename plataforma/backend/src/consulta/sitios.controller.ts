@@ -1,9 +1,12 @@
-import { BadRequestException, Controller, Get, Param, Query } from '@nestjs/common';
+import { BadRequestException, Controller, Get, Param, Query, Res } from '@nestjs/common';
+import type { Response } from 'express';
 import {
   ApiBadRequestResponse, ApiCookieAuth, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiQuery, ApiTags, ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
-import { ISO_8601, INTERVALOS, MAX_CUBOS, MAX_DIAS_VENTANA, SEGUNDOS_INTERVALO, exigirTopeCubos, fecha, intervalo, uuid } from './validacion.js';
-import { intervaloParaRango } from './tablero.js';
+import { CABECERA_X_SIGUIENTE, ISO_8601, INTERVALOS, MAX_CUBOS, MAX_DIAS_VENTANA, SEGUNDOS_INTERVALO, exigirTopeCubos, fecha, intervalo, limite, uuid } from './validacion.js';
+import { DIAS_ACTIVIDAD_POR_DEFECTO, MAX_DIAS_ACTIVIDAD, tipoValido } from './actividad.js';
+import { ActividadService, FilaActividad } from './actividad.service.js';
+import { intervaloParaRango, leerCursor, siguiente } from './tablero.js';
 import { MAX_ENTREGA_RESUMEN, TableroService } from './tablero.service.js';
 
 // El histórico del sitio lee TODOS los canales de la magnitud: medido en el banco (docs/16 §61), 30 días de 120 canales a una lectura cada
@@ -23,12 +26,12 @@ import type { UsuarioSesion } from '../sesion/permisos.js';
 @ApiUnauthorizedResponse({ description: 'sesión requerida' })
 @Controller('sitios')
 export class SitiosController {
-  constructor(private readonly tablero: TableroService, private readonly alcance: AlcanceService) {}
+  constructor(private readonly tablero: TableroService, private readonly alcance: AlcanceService, private readonly actividadSitio: ActividadService) {}
 
   @Get()
   @ApiOperation({
     summary: 'Mis sitios (Etapa 4)',
-    description: 'Los sitios activos de la sesión con `id, codigo, nombre, zona_horaria, rol` (el perfil de la persona en ese sitio) y `zonas[{id, nombre}]`. El usuario del sistema ve todos, con rol administrador.',
+    description: 'Los sitios activos de la sesión con `id, codigo, nombre, zona_horaria, rol` (el perfil de la persona en ese sitio) y `zonas[{id, nombre}]`. El administrador del sistema y el usuario del sistema ven todos, con rol administrador (su perfil global va en `administrador_sistema` de GET /sesion).',
   })
   @ApiOkResponse({ description: 'Lista de sitios' })
   async listar(@Usuario() u: UsuarioSesion) {
@@ -90,6 +93,47 @@ export class SitiosController {
     const sitioId = uuid(id, 'sitio');
     await this.alcance.exigirSitio(u, 'leer', sitioId);
     return this.tablero.historicoSitio(sitioId, magnitud, d, h, i);
+  }
+
+  @Get(':id/actividad')
+  @ApiOperation({
+    summary: 'Actividad del sitio (Etapa 4; P14)',
+    description:
+      'Lo que hicieron las personas sobre los dispositivos del sitio (eventos, con quién) y las entradas, salidas y bloqueos de quienes tienen membresía activa ' +
+      'en él (accesos), mezclados del más reciente al más antiguo: `id, instante, clase (evento|acceso), tipo, texto, usuario{id, nombre}|null, dispositivo{id, nombre}|null`. ' +
+      'Sin correos ni direcciones IP. Filtros: `tipo` (un tipo de evento o un resultado de acceso), `usuario` (UUID) y [desde, hasta) (por defecto, los últimos ' +
+      `${DIAS_ACTIVIDAD_POR_DEFECTO} días; hasta ${MAX_DIAS_ACTIVIDAD}). Página por clave: la cabecera \`X-Siguiente\` trae el cursor de la siguiente. ` +
+      'Administrador del sitio en sus sitios; administrador del sistema en todos; los demás perfiles, 403; otro sitio, 404.',
+  })
+  @ApiParam({ name: 'id', description: 'UUID del sitio' })
+  @ApiQuery({ name: 'desde', required: false, description: `${ISO_8601}; por defecto hasta − ${DIAS_ACTIVIDAD_POR_DEFECTO} días` })
+  @ApiQuery({ name: 'hasta', required: false, description: `${ISO_8601}; por defecto ahora` })
+  @ApiQuery({ name: 'tipo', required: false, description: 'Tipo de evento (alta, baja, reglas_cambiadas, …) o resultado de acceso (ok, cierre, clave_incorrecta, bloqueado, inactivo)' })
+  @ApiQuery({ name: 'usuario', required: false, description: 'UUID de la persona' })
+  @ApiQuery({ name: 'limite', required: false, description: '1–500, por defecto 100' })
+  @ApiQuery({ name: 'cursor', required: false, description: 'El de la cabecera X-Siguiente de la página anterior' })
+  @ApiOkResponse({ description: 'Lista de actividad; X-Siguiente si hay otra página', headers: { ...CABECERA_X_SIGUIENTE } })
+  @ApiBadRequestResponse({ description: 'UUID, fecha, tipo, límite o cursor inválidos, o una ventana de más de ' + MAX_DIAS_ACTIVIDAD + ' días' })
+  @ApiNotFoundResponse({ description: 'Sitio inexistente o de otro' })
+  async actividad(
+    @Usuario() u: UsuarioSesion, @Param('id') id: string, @Res({ passthrough: true }) res: Response,
+    @Query('desde') desde?: string, @Query('hasta') hasta?: string, @Query('tipo') tipo?: string, @Query('usuario') usuario?: string,
+    @Query('limite') lim?: string, @Query('cursor') cursor?: string,
+  ): Promise<FilaActividad[]> {
+    const h = fecha(hasta, new Date(), 'hasta');
+    const d = fecha(desde, new Date(h.getTime() - DIAS_ACTIVIDAD_POR_DEFECTO * 86_400_000), 'desde');
+    if (d.getTime() >= h.getTime()) throw new BadRequestException('desde debe ser anterior a hasta');
+    if ((h.getTime() - d.getTime()) / 86_400_000 > MAX_DIAS_ACTIVIDAD) throw new BadRequestException(`la ventana de actividad es de ${MAX_DIAS_ACTIVIDAD} días como máximo`);
+    if (tipo !== undefined && !tipoValido(tipo)) throw new BadRequestException('tipo: un tipo de evento o de acceso, en minúsculas (p. ej. reglas_cambiadas, ok)');
+    const persona = usuario === undefined ? undefined : uuid(usuario, 'usuario');
+    const l = limite(lim, 100);
+    const c = leerCursor(cursor);
+    const sitioId = uuid(id, 'sitio');
+    await this.alcance.exigirSitio(u, 'auditoria', sitioId);
+    const filas = await this.actividadSitio.actividad(sitioId, { desde: d, hasta: h, tipo, usuario: persona, limite: l, cursor: c });
+    const sig = siguiente(filas, l, (f) => ({ t: f.instante, id: f.id }));
+    if (sig !== null) res.setHeader('X-Siguiente', sig);
+    return filas;
   }
 }
 

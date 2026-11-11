@@ -54,7 +54,7 @@ export class CanalesAdminController {
   @ApiOkResponse({ description: 'El canal con sus reglas vigentes y su actualizado_en nuevo' })
   @ApiBadRequestResponse({ description: 'UUID inválido o reglas inválidas: `errores[{campo, motivo}]`' })
   @ApiUnauthorizedResponse({ description: 'Sin sesión ni X-Clave-Admin' })
-  @ApiForbiddenResponse({ description: 'Rol de consulta en ese sitio, o sesión sin la cabecera X-Pedido: panel' })
+  @ApiForbiddenResponse({ description: 'Un perfil sin ese permiso en ese sitio (docs/20 §6), o sesión sin la cabecera X-Pedido: panel' })
   @ApiNotFoundResponse({ description: 'El canal no existe, o es de otro sitio' })
   @ApiConflictResponse({ description: 'El canal cambió desde la ficha enviada; `actualizado_en` trae el vigente' })
   async reglas(@Usuario() u: UsuarioSesion, @Param('id') id: string, @Body() cuerpo: unknown): Promise<CanalConReglas> {
@@ -95,7 +95,7 @@ export class CanalesAdminController {
   })
   @ApiBadRequestResponse({ description: 'UUID inválido, o cuerpo inválido (una sola escala, iguales, no finitas, sin actualizado_en): `message` es la lista de motivos' })
   @ApiUnauthorizedResponse({ description: 'Sin sesión ni X-Clave-Admin, o X-Clave-Admin incorrecta' })
-  @ApiForbiddenResponse({ description: 'Rol de consulta en ese sitio, o sesión sin la cabecera X-Pedido: panel' })
+  @ApiForbiddenResponse({ description: 'Un perfil sin ese permiso en ese sitio (docs/20 §6), o sesión sin la cabecera X-Pedido: panel' })
   @ApiNotFoundResponse({ description: 'El canal no existe, o es de otro sitio' })
   @ApiConflictResponse({ description: '«alguien lo cambió a las HH:MM UTC (…); recarga»: el canal cambió desde la ficha enviada; `actualizado_en` trae el vigente' })
   @ApiResponse({ status: 503, description: 'Sin clave de administrador configurada, u otra operación sobre el mismo canal en curso' })

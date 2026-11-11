@@ -24,8 +24,8 @@
   import { coloresSeries, temaVivo } from './lib/tema';
   import { haceCuanto, horaLocal, instanteDesdeLocal, localDesdeInstante } from './lib/tiempo';
   import type { PreferenciaUnidades } from './lib/unidades';
-  import { MAX_COMPARAR, MAX_VENTANA_MS, fragmentoComparar, fragmentoInventario, fragmentoTablero, SIN_FILTROS, type VentanaFija } from './lib/vista';
-  import { abrirCanal, RECONECTADO, type EstadoCanal } from './lib/vivo';
+  import { MAX_COMPARAR, MAX_VENTANA_MS, fragmentoAlta, fragmentoComparar, fragmentoInventario, fragmentoTablero, SIN_FILTROS, type VentanaFija } from './lib/vista';
+  import { abrirCanalCompartido, RECONECTADO, type EstadoCanal } from './lib/vivo';
 
   let {
     sitio,
@@ -193,7 +193,7 @@
   onMount(() => {
     void cargar();
     const reloj = setInterval(() => (ahora = new Date()), 10_000);
-    const c = abrirCanal('/eventos', alEvento, (estado, motivo) => {
+    const c = abrirCanalCompartido('/eventos', alEvento, (estado, motivo) => {
       canal = estado;
       if (estado === 'en_vivo' && motivo === RECONECTADO && fijaElegida === null) void cargar(); // el canal no guarda cola (F4)
     });
@@ -235,9 +235,10 @@
 {:else if resumen.dispositivos.total === 0}
   <!-- Vacíos con camino (B5) -->
   <div class="vacio" data-tablero-vacio>
-    <p><strong>Este sitio aún no tiene dispositivos.</strong> Da de alta el primero: hoy por la API (<code>POST /dispositivos</code>, con su credencial
-      una sola vez); el asistente de alta y el alta masiva por archivo llegan al panel en esta misma iteración.</p>
-    <p><a href="#/inventario">Ir al inventario</a></p>
+    <p><strong>Este sitio aún no tiene dispositivos.</strong> Da de alta el primero con el asistente (la credencial se muestra una sola vez), o
+      varios a la vez desde un archivo CSV.</p>
+    <p class="acciones"><a href={fragmentoAlta('uno', '', sitio.codigo)} data-ir-alta>Da de alta el primero</a> <a href={fragmentoAlta('lote')} data-ir-alta-lote>Alta masiva por archivo</a>
+      <a href="#/inventario">Ir al inventario</a></p>
   </div>
 {:else}
   <ul class="indicadores" aria-label="Indicadores del sitio" data-indicadores>

@@ -82,9 +82,9 @@
   let cargando = $state(false);
   let descargando = $state(false);
   let avisoDescarga = $state<DatosAviso | null>(null);
-  // Exportar exige el rol administrador en el sitio del dispositivo (docs/20 §6): se sabe por la matriz de la sesión; si el panel no lo
+  // Exportar exige el perfil de administrador o de investigador en el sitio del dispositivo (docs/20 §6): se sabe por la matriz de la sesión; si el panel no lo
   // sabe (montado sin sesión, en las pruebas), deja la decisión al servidor y muestra su 403.
-  const motivoExportar = $derived(d === null || puedeEn(sesion, 'exportar', d.sitio_codigo) ? null : 'exportar exige el rol administrador en este sitio');
+  const motivoExportar = $derived(d === null || puedeEn(sesion, 'exportar', d.sitio_codigo) ? null : 'exportar exige el perfil de administrador o de investigador en este sitio');
 
   const abiertas = $derived(condiciones.filter((c) => c.cerrada_en === null));
   const ordenadas = $derived([...abiertas, ...condiciones.filter((c) => c.cerrada_en !== null)]);
@@ -488,6 +488,10 @@
       </p>
     {/if}
   </header>
+  {#if puedeEn(sesion, 'configurar', d.sitio_codigo) && d.estado !== 'baja'}
+    <!-- P6 (docs/19 §4, tablero v2, E): desde la ficha, para quien puede configurar en el sitio -->
+    <p><a href={`#/dispositivos/${d.id}/configurar`} data-ir-configurar>Configurar el dispositivo y sus umbrales</a></p>
+  {/if}
   <dl class="identidad">
     <div><dt>Identificador</dt><dd><code>{d.id_fisico}</code></dd></div>
     <div><dt>Vía · formato</dt><dd>{d.via} · {d.formato}</dd></div>

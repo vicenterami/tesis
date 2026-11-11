@@ -7,7 +7,8 @@
 # Requiere la pila arriba (docker compose up -d en plataforma/). Idempotente: correrla dos veces da lo mismo (salvo las claves temporales:
 # cada corrida asigna unas nuevas y las anteriores dejan de valer).
 # Para probar que la verificación de verdad verifica: SEMILLA_DISPOSITIVO=dev-9999 bash … → debe FALLAR.
-# Personas de demostración (desde el 08/11/2026, docs/20 §4): un administrador y un usuario de consulta del sitio uct, con correos de
+# Personas de demostración (desde el 08/11/2026, docs/20 §4; desde el 11/11/2026, una por perfil de docs/20 §2: administrador del sistema,
+# administrador, investigador, operador técnico y consulta del sitio uct; la del sistema, además, con el perfil global), con correos de
 # dominio reservado (@ejemplo.invalid) y una clave TEMPORAL cada uno (vigencia: la del backend, CLAVE_TEMPORAL_HORAS, 2 h por defecto), impresa una sola vez al final; al entrar al panel (P10) se elige una
 # propia. Solo para desarrollo y demostración: SEMILLA_SIN_PERSONAS=1 las omite. Como sus correos son fijos y adivinables, la temporal
 # dura CLAVE_TEMPORAL_HORAS (2 h por defecto) y una corrida reactiva la cuenta si existía, SOLO se crean con el backend en bucle local (API=http://127.0.0.1:3000, la de
@@ -77,6 +78,8 @@ fi
 # Personas de demostración: se crean (o se les asigna una temporal nueva) al final, y sus claves se imprimen una sola vez, después de
 # las comprobaciones (así no se mezclan con la salida que se pega en un informe).
 ADMIN_DEMO=admin-demo@ejemplo.invalid; CONSULTA_DEMO=consulta-demo@ejemplo.invalid; T_ADMIN=; T_CONSULTA=
+INVESTIGADOR_DEMO=investigador-demo@ejemplo.invalid; OPERADOR_DEMO=operador-demo@ejemplo.invalid; SISTEMA_DEMO=sistema-demo@ejemplo.invalid
+T_INVESTIGADOR=; T_OPERADOR=; T_SISTEMA=
 PERSONAS=1
 if [ "${SEMILLA_SIN_PERSONAS:-0}" = 1 ]; then PERSONAS=0
 elif ! es_local "$API" && [ "${SEMILLA_PERSONAS:-0}" != 1 ]; then
@@ -89,16 +92,25 @@ if [ "$PERSONAS" = 1 ]; then
   T_ADMIN=$(clave_temporal); T_CONSULTA=$(clave_temporal)
   persona_temporal "Administración de demostración" "$ADMIN_DEMO" uct administrador <<<"$T_ADMIN" >/dev/null || { echo "FALLA no se pudo crear $ADMIN_DEMO"; fallos=$((fallos+1)); T_ADMIN=; }
   persona_temporal "Consulta de demostración" "$CONSULTA_DEMO" uct consulta <<<"$T_CONSULTA" >/dev/null || { echo "FALLA no se pudo crear $CONSULTA_DEMO"; fallos=$((fallos+1)); T_CONSULTA=; }
-  comprobar "personas de demostración: administrador y consulta del sitio uct, activas, con clave temporal vigente" \
-    "SELECT string_agg(u.email||'='||us.rol, ',' ORDER BY u.email) FROM usuario u JOIN usuario_sitio us ON us.usuario_id = u.id AND us.activo JOIN sitio s ON s.id = us.sitio_id AND s.codigo = 'uct' WHERE u.email IN ('$ADMIN_DEMO', '$CONSULTA_DEMO') AND u.activo AND u.clave_temporal AND u.clave_temporal_vence_en > now() + make_interval(hours => $(horas_clave_temporal)) - interval '5 minutes'" \
-    "$ADMIN_DEMO=administrador,$CONSULTA_DEMO=consulta"
+  T_INVESTIGADOR=$(clave_temporal); T_OPERADOR=$(clave_temporal); T_SISTEMA=$(clave_temporal)
+  persona_temporal "Investigación de demostración" "$INVESTIGADOR_DEMO" uct investigador <<<"$T_INVESTIGADOR" >/dev/null || { echo "FALLA no se pudo crear $INVESTIGADOR_DEMO"; fallos=$((fallos+1)); T_INVESTIGADOR=; }
+  persona_temporal "Operación de demostración" "$OPERADOR_DEMO" uct operador <<<"$T_OPERADOR" >/dev/null || { echo "FALLA no se pudo crear $OPERADOR_DEMO"; fallos=$((fallos+1)); T_OPERADOR=; }
+  # El administrador del sistema: consulta en uct (para tener un sitio por defecto) y el perfil global (usuario.administrador_sistema).
+  persona_temporal "Sistema de demostración" "$SISTEMA_DEMO" uct consulta <<<"$T_SISTEMA" >/dev/null \
+    && psql_ -c "UPDATE usuario SET administrador_sistema = true WHERE email = '$SISTEMA_DEMO'" >/dev/null || { echo "FALLA no se pudo crear $SISTEMA_DEMO"; fallos=$((fallos+1)); T_SISTEMA=; }
+  comprobar "personas de demostración: una por perfil del sitio uct, activas, con clave temporal vigente" \
+    "SELECT string_agg(u.email||'='||us.rol||CASE WHEN u.administrador_sistema THEN '+sistema' ELSE '' END, ',' ORDER BY u.email) FROM usuario u JOIN usuario_sitio us ON us.usuario_id = u.id AND us.activo JOIN sitio s ON s.id = us.sitio_id AND s.codigo = 'uct' WHERE u.email IN ('$ADMIN_DEMO', '$CONSULTA_DEMO', '$INVESTIGADOR_DEMO', '$OPERADOR_DEMO', '$SISTEMA_DEMO') AND u.activo AND u.clave_temporal AND u.clave_temporal_vence_en > now() + make_interval(hours => $(horas_clave_temporal)) - interval '5 minutes'" \
+    "$ADMIN_DEMO=administrador,$CONSULTA_DEMO=consulta,$INVESTIGADOR_DEMO=investigador,$OPERADOR_DEMO=operador,$SISTEMA_DEMO=consulta+sistema"
 fi
 
 echo; [[ $fallos -eq 0 ]] && echo "SEMILLA LISTA: el guion de docs/15 puede empezar" || { echo "$fallos comprobación(es) con falla"; exit 1; }
-if [ -n "$T_ADMIN" ] && [ -n "$T_CONSULTA" ]; then
+if [ -n "$T_ADMIN" ] && [ -n "$T_CONSULTA" ] && [ -n "$T_INVESTIGADOR" ] && [ -n "$T_OPERADOR" ] && [ -n "$T_SISTEMA" ]; then
   echo
   echo "Para entrar al panel ($API/panel/), solo desarrollo. Claves TEMPORALES: se muestran esta única vez y vencen en $(horas_clave_temporal) h (CLAVE_TEMPORAL_HORAS);"
-  echo "al entrar, el panel pide elegir una propia. Si se pierden, se vuelve a correr la semilla (asigna otras)."
-  echo "  administrador del sitio uct: $ADMIN_DEMO   clave temporal: $T_ADMIN"
-  echo "  consulta del sitio uct:      $CONSULTA_DEMO   clave temporal: $T_CONSULTA"
+  echo "al entrar, el panel pide elegir una propia y aceptar los términos de uso. Si se pierden, se vuelve a correr la semilla (asigna otras)."
+  echo "  administrador del sistema:     $SISTEMA_DEMO        clave temporal: $T_SISTEMA"
+  echo "  administrador del sitio uct:   $ADMIN_DEMO          clave temporal: $T_ADMIN"
+  echo "  investigador del sitio uct:    $INVESTIGADOR_DEMO   clave temporal: $T_INVESTIGADOR"
+  echo "  operador técnico del sitio uct: $OPERADOR_DEMO      clave temporal: $T_OPERADOR"
+  echo "  consulta del sitio uct:        $CONSULTA_DEMO       clave temporal: $T_CONSULTA"
 fi

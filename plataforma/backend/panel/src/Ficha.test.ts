@@ -526,7 +526,7 @@ describe('Ficha (P3), incremento 2: cambio sin blanco, error con reintento, reso
   });
 });
 
-// Sesión en la ficha (P10; docs/20 §6): exportar exige el rol administrador en el sitio del dispositivo. El panel lo sabe por la matriz
+// Sesión en la ficha (P10; docs/20 §6): exportar exige el perfil de administrador o de investigador en el sitio del dispositivo. El panel lo sabe por la matriz
 // que trae GET /sesion; si el servidor igual rechaza, el aviso lo dice, y un 401 lleva al inicio de sesión (manejo central).
 describe('Ficha (P3) con sesión: exportar según el rol y descargas que fallan', () => {
   const matriz = { administrador: ['leer', 'exportar', 'escribir', 'usuarios'], consulta: ['leer'] };
@@ -541,7 +541,7 @@ describe('Ficha (P3) con sesión: exportar según el rol y descargas que fallan'
     const boton = screen.getByRole('button', { name: 'Descargar CSV de este rango' }) as HTMLButtonElement;
     expect(boton.disabled).toBe(true);
     const motivo = document.getElementById(boton.getAttribute('aria-describedby')!.split(' ').find((x) => x.endsWith('-motivo'))!);
-    expect(motivo?.textContent).toBe('exportar exige el rol administrador en este sitio');
+    expect(motivo?.textContent).toBe('exportar exige el perfil de administrador o de investigador en este sitio');
     boton.click();
     expect(llamadaA(`/dispositivos/${ID}/exportar`)).toBeUndefined();
     cleanup();
@@ -704,7 +704,7 @@ describe('Ficha v2: zoom, banda, umbrales, todos los canales, eventos, rechazada
     const base = globalThis.fetch;
     vi.stubGlobal('fetch', vi.fn(async (ruta: string) => (ruta.startsWith('/cuarentena?') ? new Response(JSON.stringify(ruta.includes('cursor=') ? [] : iguales), { headers: ruta.includes('cursor=') ? {} : { 'X-Siguiente': 'r2' } }) : base(ruta))));
     render(Ficha, { id: ID });
-    await waitFor(() => expect(document.querySelector('[data-evento="e1"]')?.textContent).toContain('Cambio de umbrales · por Ana'));
+    await waitFor(() => expect(document.querySelector('[data-evento="e1"]')?.textContent).toContain('Cambio de umbrales · cambiado por Ana'));
     expect(document.querySelectorAll('[data-grupo-rechazadas]')).toHaveLength(1);
     expect(document.querySelector('[data-veces]')!.textContent).toBe('× 3');
     eventos = [{ id: 'e0', tipo: 'mantenimiento', detalle: null, ocurrido_en: '2026-10-12T09:00:00Z', usuario: null }];

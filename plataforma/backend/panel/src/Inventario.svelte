@@ -11,7 +11,7 @@
   import { compararAtencion, conteoPorEstado, enLinea, estadoVisual, ORDEN_ATENCION, ROTULO, rotuloCondicion, type EstadoVisual } from './lib/estado-visual';
   import type { Condicion, DispositivoInventario, EventoVivo, Sitio, TipoCondicion } from './lib/modelo';
   import { haceCuanto, horaLocal } from './lib/tiempo';
-  import { RECONECTADO, abrirCanal, type EstadoCanal } from './lib/vivo';
+  import { RECONECTADO, abrirCanalCompartido, type EstadoCanal } from './lib/vivo';
   import { antirrebote, porLotes } from './lib/antirrebote';
   import { MAX_COMPARAR, SIN_FILTROS, fragmentoComparar, fragmentoInventario, type FiltrosInventario, type OrdenInventario } from './lib/vista';
   import { marcadosParaComparar, recordarMarcados } from './lib/comparar';
@@ -65,8 +65,10 @@
       return { d, tipos, nombre: d.nombre, estado: !recalcular && d.estado_visual !== undefined ? d.estado_visual : delPanel() };
     }),
   );
-  // Por entrega, con un servidor que pagina, manda su orden (el de todas las páginas); si no, la página se ordena por atención.
-  const filas = $derived(orden === 'entrega' && total !== null ? filasSinOrden : [...filasSinOrden].sort(compararAtencion));
+  // Con un servidor que pagina manda SU orden (`orden=atencion` por defecto u `orden=entrega`), el de todas las páginas: ordenar solo la
+  // página recibida ponía la atención de la página 2 debajo de la normalidad de la 1 (corrección del 11/11/2026). Con un backend
+  // anterior (sin `X-Total`), el panel ordena todo lo que recibió por atención.
+  const filas = $derived(total !== null ? filasSinOrden : [...filasSinOrden].sort(compararAtencion));
   // Con un backend anterior, el panel filtra y pagina lo que recibió (todo el inventario); con uno nuevo, el filtro del panel no cambia
   // nada (el servidor ya filtró) salvo un estado recalculado en vivo.
   const filtrosActuales = $derived({ estado: filtroEstado, sitio: filtroSitio, zona: filtroZona, via: filtroVia, q: busqueda, pagina, orden });
@@ -260,7 +262,7 @@
       recalcular = true;
     }, 10_000);
     // Al volver de una reconexión se vuelve a pedir todo (docs/19 F4): el canal no guarda cola y pudo perder visto o condicion.
-    const c = abrirCanal('/eventos', alEvento, (estado, motivo) => {
+    const c = abrirCanalCompartido('/eventos', alEvento, (estado, motivo) => {
       if (estado === 'en_vivo' && motivo === RECONECTADO) void cargar();
       canal = estado;
       motivoCanal = estado === 'en_vivo' ? undefined : motivo;
@@ -323,7 +325,7 @@
 {:else if !cargado}
   <p class="vacio">Cargando…</p>
 {:else if totalVisible === 0 && filtroEstado === null && filtroZona === '' && filtroVia === '' && busqueda.trim() === '' && pagina === 1}
-  <p class="vacio">Sin dispositivos registrados. El alta se hace por la API (docs/10 §8.4, punto 25); el primero aparecerá aquí al registrarse.</p>
+  <p class="vacio">Sin dispositivos registrados. <a href="#/alta" data-ir-alta>Da de alta el primero</a> o <a href="#/alta?modo=lote">varios desde un archivo CSV</a>; aparecerán aquí al registrarse.</p>
 {:else if visibles.length === 0}
   <p class="vacio">Ningún dispositivo coincide con el filtro.</p>
 {:else if angosto}

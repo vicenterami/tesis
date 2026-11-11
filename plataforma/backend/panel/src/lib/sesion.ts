@@ -4,7 +4,7 @@
 // rechazaría, y si se equivoca, el servidor responde 403 y el aviso lo dice.
 import type { Preferencias } from './modelo';
 
-export type Rol = 'administrador' | 'consulta';
+export type Rol = 'administrador' | 'consulta' | 'investigador' | 'operador';
 export type Matriz = Readonly<Record<string, readonly string[]>>;
 
 export interface SitioDeSesion {
@@ -26,8 +26,11 @@ export type Sesion =
       permisos: Matriz;
       // Las preferencias de la persona (docs/19 §4, tablero v2, H): llegan con la sesión cuando el backend las tenga; hasta entonces, nada.
       preferencias?: Preferencias | null;
+      administrador_sistema?: boolean; // los cinco perfiles (docs/20 §2): administrador del sistema como persona
+      // Términos de uso (docs/20 §12): con `pendiente`, el panel abre la pantalla de aceptación sin esperar el 403 de la primera lectura.
+      terminos?: { version_vigente: number; version_aceptada: number | null; aceptados_en: string | null; pendiente: boolean };
     }
-  | { sistema: true; nombre: string; sitios: 'todos'; rol: 'administrador'; permisos: Matriz; preferencias?: Preferencias | null };
+  | { sistema: true; nombre: string; sitios: 'todos'; rol: 'administrador'; permisos: Matriz; preferencias?: Preferencias | null; administrador_sistema?: boolean; terminos?: undefined };
 
 // ¿Puede `accion` en el sitio de código `codigo`? Con el usuario del sistema, sí en todos. Sin la matriz (un backend anterior), no se
 // supone nada: se deja al servidor (true) y su 403 se muestra.
@@ -56,7 +59,7 @@ export interface SesionAbierta {
 // Puro, para probarlo sin DOM (App.svelte lo aplica). 401: «Entrar», guardando la ruta si se estaba dentro; se olvida la sesión y la
 // temporal recién escrita (que no quede en memoria tras perder la sesión). 403 por clave temporal: el cambio obligatorio, pero solo con
 // sesión; en «Entrar» o sin sesión es un aviso atrasado y se ignora (el cliente HTTP ya descarta los de una sesión anterior).
-export type Fase = 'comprobando' | 'sin_servicio' | 'entrar' | 'cambiar' | 'dentro';
+export type Fase = 'comprobando' | 'sin_servicio' | 'entrar' | 'cambiar' | 'terminos' | 'dentro';
 export interface EstadoPanel {
   fase: Fase;
   sesion: Sesion | null;
@@ -66,9 +69,15 @@ export interface EstadoPanel {
   mensajeEntrar: string | null;
 }
 export const TEXTO_VENCIDA = 'Tu sesión venció o se cerró: entra de nuevo para seguir donde estabas.';
-export function trasAvisoDeSesion(e: EstadoPanel, motivo: 'sin_sesion' | 'clave_temporal', rutaActual: string): EstadoPanel {
+// 403 por términos sin aceptar (docs/20 §12): la pantalla «Términos de uso», solo con sesión; la clave temporal va primero (si la fase
+// es «cambiar», se queda ahí: el servidor pedirá los términos después del cambio). La ruta se guarda para volver tras aceptar.
+export function trasAvisoDeSesion(e: EstadoPanel, motivo: 'sin_sesion' | 'clave_temporal' | 'terminos', rutaActual: string): EstadoPanel {
   if (motivo === 'clave_temporal') return e.fase === 'entrar' || e.sesion === null ? e : { ...e, fase: 'cambiar' };
-  const estaba = e.fase === 'dentro' || e.fase === 'cambiar';
+  if (motivo === 'terminos') {
+    if (e.fase === 'entrar' || e.fase === 'cambiar' || e.sesion === null) return e;
+    return { ...e, fase: 'terminos', cambiandoClave: false, rutaGuardada: e.fase === 'dentro' ? rutaActual : e.rutaGuardada };
+  }
+  const estaba = e.fase === 'dentro' || e.fase === 'cambiar' || e.fase === 'terminos';
   return {
     fase: 'entrar',
     sesion: null,
@@ -82,7 +91,7 @@ export function trasAvisoDeSesion(e: EstadoPanel, motivo: 'sin_sesion' | 'clave_
 // El texto de P10 ante cualquier rechazo de credenciales: uno solo, sea cual sea la causa (docs/20 §4).
 export const TEXTO_CREDENCIALES = 'Correo o clave incorrectos. Revisa los dos y vuelve a intentarlo.';
 
-export const ROTULO_ROL: Readonly<Record<Rol, string>> = { administrador: 'administrador', consulta: 'consulta' };
+export const ROTULO_ROL: Readonly<Record<Rol, string>> = { administrador: 'administrador', consulta: 'consulta', investigador: 'investigación', operador: 'operación técnica' };
 
 // «Ana · Campus (administrador), Magallanes (consulta)»: quién soy, para la cabecera.
 export function quienSoy(s: Sesion): { nombre: string; sitios: string } {

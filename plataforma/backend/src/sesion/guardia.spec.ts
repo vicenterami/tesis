@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ExecutionContext, ForbiddenException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
-import { ConClaveTemporal, GuardiaCentral, Publica, escribe, traePedidoDelPanel } from './guardia.js';
+import { CODIGO_TERMINOS_PENDIENTES, ConClaveTemporal, ConTerminosPendientes, GuardiaCentral, Publica, escribe, traePedidoDelPanel } from './guardia.js';
 import { UsuarioSesion, usuarioSistema } from './permisos.js';
 import type { SesionService } from './sesion.service.js';
 
@@ -15,6 +15,8 @@ class Rutas {
   @Publica() publica(): void { /* ruta pública */ }
   privada(): void { /* ruta con guardia */ }
   @ConClaveTemporal() quienSoy(): void { /* admitida con clave temporal */ }
+  @ConTerminosPendientes() aceptar(): void { /* admitida con los términos pendientes */ }
+  @ConClaveTemporal() @ConTerminosPendientes() sesion(): void { /* GET /sesion: admitida con las dos */ }
 }
 
 function armar(opciones: { clave?: string; usuario?: UsuarioSesion | null } = {}) {
@@ -91,5 +93,28 @@ describe('GuardiaCentral', () => {
     expect(traePedidoDelPanel('Panel')).toBe(true);
     expect(traePedidoDelPanel('panel, panel')).toBe(false);
     expect(traePedidoDelPanel(undefined)).toBe(false);
+  });
+});
+
+// Términos de uso (docs/20 §12; 11/11/2026): la sesión sin aceptar la versión vigente solo sirve para ver la sesión, aceptar y salir; lo demás,
+// 403 con el código propio que el panel convierte en la pantalla «Términos de uso». La clave temporal va primero.
+describe('GuardiaCentral: términos pendientes', () => {
+  const PENDIENTE: UsuarioSesion = { ...ANA, terminosPendientes: true };
+  it('una lectura → 403 terminos_pendientes, con la versión vigente', async () => {
+    const { error } = await armar({ usuario: PENDIENTE }).pedir('GET', 'privada', { cookie: `__Host-sesion=${ID}` });
+    expect(error).toBeInstanceOf(ForbiddenException);
+    expect((error as ForbiddenException).getResponse()).toMatchObject({ statusCode: 403, codigo: CODIGO_TERMINOS_PENDIENTES, version: 1 });
+  });
+  it('aceptar y ver la sesión, 200; las páginas legales son públicas', async () => {
+    expect((await armar({ usuario: PENDIENTE }).pedir('POST', 'aceptar', { cookie: `__Host-sesion=${ID}`, 'x-pedido': 'panel' })).error).toBeNull();
+    expect((await armar({ usuario: PENDIENTE }).pedir('GET', 'sesion', { cookie: `__Host-sesion=${ID}` })).error).toBeNull();
+    expect((await armar({ usuario: PENDIENTE }).pedir('GET', 'publica')).error).toBeNull();
+  });
+  it('con clave temporal y términos pendientes, la clave va primero: aceptar → 403 de la clave temporal', async () => {
+    const { error } = await armar({ usuario: { ...PENDIENTE, claveTemporal: true } }).pedir('POST', 'aceptar', { cookie: `__Host-sesion=${ID}`, 'x-pedido': 'panel' });
+    expect((error as ForbiddenException).message).toMatch(/clave temporal/);
+  });
+  it('aceptados: todo vuelve a la normalidad', async () => {
+    expect((await armar({ usuario: { ...ANA, terminosPendientes: false } }).pedir('GET', 'privada', { cookie: `__Host-sesion=${ID}` })).error).toBeNull();
   });
 });

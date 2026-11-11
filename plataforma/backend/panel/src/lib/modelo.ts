@@ -43,6 +43,7 @@ export interface Condicion {
   dispositivo_id: string;
   id_fisico: string;
   dispositivo: string;
+  sitio?: string; // nombre del sitio (para el cuerpo genérico de la notificación del navegador); opcional: un backend anterior no lo manda
   umbral_alto: number | null;
   umbral_bajo: number | null;
   magnitud: string | null;
@@ -65,6 +66,7 @@ export interface ReglaUmbral {
   umbral_alto: number | null;
   umbral_bajo: number | null;
   histeresis: number | null;
+  retardo_s?: number; // retardo de activación en segundos (RF-14; migración 23): opcional, un backend anterior no lo manda
 }
 
 export interface CanalFicha {
@@ -74,6 +76,7 @@ export interface CanalFicha {
   unidad: string;
   etiqueta: string | null;
   reglas: ReglaUmbral[] | null;
+  actualizado_en?: string; // marca del bloqueo optimista de PUT /canales/{id}/reglas (P6), con microsegundos, tal cual
   // porcentaje: con la calibración del canal (docs/10 §8.4 punto 51); null sin calibración
   ultima_medicion: { valor: number; tiempo: string; porcentaje: number | null } | null;
 }
@@ -85,6 +88,7 @@ export interface DispositivoFicha extends Omit<DispositivoInventario, 'canales' 
   // Mediana de los intervalos entre las últimas 20 tramas, en segundos; null con menos de 3 (docs/19 §4, incremento 1, punto 3).
   intervalo_observado_s: number | null;
   canales: CanalFicha[];
+  actualizado_en?: string; // marca del bloqueo optimista de PATCH /dispositivos/{id} (P6), con microsegundos, tal cual
 }
 
 // GET /canales/{id}/historico: columnar, listo para uPlot (tiempos en segundos Unix).
@@ -159,12 +163,23 @@ export interface EventoDispositivo {
   usuario: { id: string; nombre: string } | null;
 }
 
+// GET/PUT /preferencias (docs/19 §4, tablero v2, H; «Campos»): las propias, con bloqueo optimista.
+// `parametros` es un objeto texto → texto en el panel y en el servidor (cuenta/preferencias.ts; docs/19 «Campos»); la ruta del panel va en
+// `ruta` (corrección del 11/11/2026: el panel la mandaba como texto suelto y el servidor, que exige un objeto, rechazaba toda vista).
+export interface VistaGuardada {
+  nombre: string;
+  pantalla: string;
+  parametros: { ruta?: string } & Record<string, string>;
+}
 export interface Preferencias {
   unidad_temperatura?: 'C' | 'F';
   unidad_longitud?: 'mm' | 'm' | 'km';
-  zona_horaria?: string;
+  zona_horaria?: string; // «sitio» o una zona IANA
   tema?: 'sistema' | 'claro' | 'oscuro';
   sitio_predeterminado?: string | null;
+  notificar?: string[]; // tipos de condición con notificación del navegador
+  vistas?: VistaGuardada[];
+  actualizado_en?: string | null; // null: la persona aún no guardó ninguna (son las de por defecto)
 }
 
 export interface TramaRechazada {

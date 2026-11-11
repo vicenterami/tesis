@@ -11,7 +11,8 @@ export const VIAS = ['http', 'lorawan', 'mqtt'] as const;
 // sale de la página. Texto de la persona, siempre codificado. La API filtra por el id (UUID) del sitio y de la zona; la URL del panel
 // lleva el código del sitio (legible y estable), que se traduce aquí con `GET /sitios` (corrección del 11/11/2026: el código mandado
 // tal cual no filtraba). Sin el id, el sitio no se manda (quien llama espera la lista de sitios antes de pedir). `orden=entrega` lo
-// ordena el servidor, de peor a mejor con los nulos al final: el orden vale para todas las páginas, no solo para la visible.
+// ordena el servidor, de peor a mejor con los nulos al final; por defecto, `orden=atencion` (sin señal, alerta, normal, inactivo y dentro
+// por nombre, desde el 11/11/2026): el orden vale para todas las páginas, no solo para la visible.
 export function urlInventario(f: FiltrosInventario, limite: number, sitioId: string | null = null): string {
   const q = new URLSearchParams();
   if (f.sitio !== '' && sitioId !== null) q.set('sitio', sitioId);
@@ -19,7 +20,7 @@ export function urlInventario(f: FiltrosInventario, limite: number, sitioId: str
   if (f.via !== '') q.set('via', f.via);
   if (f.estado !== null) q.set('estado', f.estado);
   if (f.q.trim() !== '') q.set('q', f.q.trim());
-  if (f.orden === 'entrega') q.set('orden', 'entrega');
+  q.set('orden', f.orden === 'entrega' ? 'entrega' : 'atencion');
   q.set('limite', String(limite));
   q.set('desplazamiento', String((f.pagina - 1) * limite));
   return `/dispositivos?${q.toString()}`;

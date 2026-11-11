@@ -68,7 +68,7 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": "`usuario`, `sitios` [{sitio_id, codigo, nombre, rol}], `clave_temporal`, `expira_en`, `inactividad_vence_en` y `permisos` (rol → acciones que puede: la tabla de permisos que decide, para la guía de perfiles del panel); con X-Clave-Admin, `sistema: true`"
+            "description": "`usuario`, `sitios` [{sitio_id, codigo, nombre, rol}] (rol = perfil en ese sitio: administrador, investigador, operador o consulta), `clave_temporal`, `expira_en`, `inactividad_vence_en`, `administrador_sistema` (perfil global), `terminos` {version_vigente, version_aceptada, aceptados_en, pendiente}, `preferencias` (las de GET /preferencias) y `permisos` (perfil → acciones que puede: la tabla de permisos que decide, para la guía de perfiles del panel); con X-Clave-Admin, `sistema: true`"
           },
           "401": {
             "description": "sesión requerida"
@@ -196,7 +196,7 @@
     },
     "/usuarios": {
       "get": {
-        "description": "Quienes están o estuvieron en alguno de los sitios que administra quien pregunta; de sus sitios, solo esos. Exige rol administrador en algún sitio.",
+        "description": "Quienes están o estuvieron en alguno de los sitios que administra quien pregunta; de sus sitios, solo esos. Exige rol administrador en algún sitio; el administrador del sistema ve todas las cuentas.",
         "operationId": "UsuariosController_listar",
         "parameters": [],
         "responses": {
@@ -257,8 +257,9 @@
                   },
                   "sitios": {
                     "type": "array",
-                    "minItems": 1,
+                    "minItems": 0,
                     "maxItems": 50,
+                    "description": "Al menos uno, salvo para un administrador del sistema",
                     "items": {
                       "type": "object",
                       "required": [
@@ -274,11 +275,17 @@
                           "type": "string",
                           "enum": [
                             "administrador",
+                            "investigador",
+                            "operador",
                             "consulta"
                           ]
                         }
                       }
                     }
+                  },
+                  "administrador_sistema": {
+                    "type": "boolean",
+                    "description": "Perfil global (docs/20 §2); solo lo da un administrador del sistema (o la clave de administrador, el primero)"
                   }
                 }
               }
@@ -296,13 +303,16 @@
             "description": "sesión requerida"
           },
           "403": {
-            "description": "Rol de consulta, o la clave de administrador cuando ya existe un administrador"
+            "description": "Un perfil distinto de administrador (de sitio o del sistema), o la clave de administrador cuando ya existe un administrador"
           },
           "404": {
             "description": "Un sitio que no existe o que no administras"
           },
           "409": {
-            "description": "Ya existe un usuario con ese email"
+            "description": "Ya existe un usuario con ese email; si está inactivo, `reactivable: true` y la ficha en `usuario` (se reactiva con PATCH activo: true y clave_temporal: true), o `reactivable: false` si es de sitios que no administras"
+          },
+          "429": {
+            "description": "Más de 10 altas (o intentos) por persona en un minuto"
           }
         },
         "security": [
@@ -318,7 +328,7 @@
     },
     "/usuarios/{id}": {
       "patch": {
-        "description": "`actualizado_en` (obligatorio) es el que entregó `GET /usuarios`, tal cual: si cambió desde entonces, 409 (bloqueo optimista). `activo` false desactiva (no borra) y corta sus sesiones; `clave_temporal: true` asigna una temporal nueva («olvidé mi clave»), la devuelve UNA vez en `clave` y corta sus sesiones; `sitios` asigna o cambia el rol en cada sitio, y `rol: null` le quita ese sitio. Ningún cambio puede dejar la plataforma sin administradores activos (409). Los roles, solo en tus sitios; los campos de la cuenta (`nombre`, `activo`, `clave_temporal`), solo si administras TODOS los sitios activos de la persona (si no, 403). Deja un `evento` usuario_cambio con quién.",
+        "description": "`actualizado_en` (obligatorio) es el que entregó `GET /usuarios`, tal cual: si cambió desde entonces, 409 (bloqueo optimista). `activo` false desactiva (no borra) y corta sus sesiones; `clave_temporal: true` asigna una temporal nueva («olvidé mi clave»), la devuelve UNA vez en `clave` y corta sus sesiones; `sitios` asigna o cambia el rol en cada sitio, y `rol: null` le quita ese sitio. Ningún cambio puede dejar la plataforma sin administradores activos (409). Los roles, solo en tus sitios; los campos de la cuenta (`nombre`, `activo`, `clave_temporal`), solo si administras TODOS los sitios activos de la persona (si no, 403); el administrador del sistema, todas. La cuenta de un administrador del sistema (también sus sitios) y la reactivación de una baja que hizo un administrador del sistema, solo otro administrador del sistema (403). Desactivar exige `motivo` (baja con motivo: fecha, quién y por qué quedan en la cuenta; reactivar los limpia). Reactivar (`activo: true`) exige `clave_temporal: true` en la misma petición: la clave anterior no vuelve (400). Una cuenta anonimizada no se cambia (409). Deja un `evento` usuario_cambio con quién.",
         "operationId": "UsuariosController_actualizar",
         "parameters": [
           {
@@ -366,6 +376,15 @@
                       true
                     ]
                   },
+                  "motivo": {
+                    "type": "string",
+                    "maxLength": 300,
+                    "description": "Obligatorio con activo: false: por qué se da de baja (se guarda con quién y cuándo)"
+                  },
+                  "administrador_sistema": {
+                    "type": "boolean",
+                    "description": "Dar o quitar el perfil global: solo un administrador del sistema; 409 si dejaría la plataforma sin ninguno"
+                  },
                   "sitios": {
                     "type": "array",
                     "items": {
@@ -383,6 +402,8 @@
                           "type": "string",
                           "enum": [
                             "administrador",
+                            "investigador",
+                            "operador",
                             "consulta"
                           ],
                           "nullable": true
@@ -406,7 +427,7 @@
             "description": "sesión requerida"
           },
           "403": {
-            "description": "Rol de consulta; la clave de administrador cuando ya existe un administrador; un campo de la cuenta de alguien que también está en sitios que no administras, o que ya no está en ninguno de los tuyos"
+            "description": "Un perfil distinto de administrador; la clave de administrador cuando ya existe un administrador; un campo de la cuenta de alguien que también está en sitios que no administras, o que ya no está en ninguno de los tuyos; la cuenta de un administrador del sistema, o reactivar una baja que hizo uno, sin serlo"
           },
           "404": {
             "description": "El usuario o un sitio no existen, o no son de tus sitios"
@@ -799,7 +820,7 @@
             "description": "Sin sesión ni X-Clave-Admin, o X-Clave-Admin incorrecta"
           },
           "403": {
-            "description": "Rol de consulta en ese sitio, o sesión sin la cabecera X-Pedido: panel"
+            "description": "Un perfil sin ese permiso en ese sitio (docs/20 §6), o sesión sin la cabecera X-Pedido: panel"
           },
           "409": {
             "description": "El id_fisico ya existe (en la base o, huérfano, en el broker)"
@@ -1089,7 +1110,7 @@
             "description": "Cuerpo inválido: `errores[{campo, motivo}]`"
           },
           "403": {
-            "description": "Rol de consulta en ese sitio, o sesión sin la cabecera X-Pedido: panel"
+            "description": "Un perfil sin ese permiso en ese sitio (docs/20 §6), o sesión sin la cabecera X-Pedido: panel"
           },
           "404": {
             "description": "No existe, o es de otro sitio"
@@ -1109,7 +1130,7 @@
         ]
       },
       "delete": {
-        "description": "Baja lógica: `estado = baja`, credenciales revocadas, condiciones abiertas cerradas y evento `baja`, en una transacción; si la vía es `mqtt`, el cliente se borra del broker dentro de ella (un cliente que el broker ya no tiene cuenta como borrado). La fila y su historial quedan; lo que llegue después va a cuarentena como `dado_de_baja`. Exige sesión de administrador del sitio o `X-Clave-Admin` (docs/10 §3).",
+        "description": "Baja lógica: `estado = baja`, credenciales revocadas, condiciones abiertas cerradas y evento `baja`, en una transacción; si la vía es `mqtt`, el cliente se borra del broker dentro de ella (un cliente que el broker ya no tiene cuenta como borrado). La fila y su historial quedan; lo que llegue después va a cuarentena como `dado_de_baja`. Exige sesión de administrador del sitio o del sistema, o `X-Clave-Admin` (docs/10 §3; docs/20 §6: el operador técnico no da de baja).",
         "operationId": "AltaController_darDeBaja",
         "parameters": [
           {
@@ -1142,7 +1163,7 @@
             "description": "Sin sesión ni X-Clave-Admin, o X-Clave-Admin incorrecta"
           },
           "403": {
-            "description": "Rol de consulta en ese sitio, o sesión sin la cabecera X-Pedido: panel"
+            "description": "Un perfil sin ese permiso en ese sitio (docs/20 §6), o sesión sin la cabecera X-Pedido: panel"
           },
           "404": {
             "description": "No existe, o es de otro sitio"
@@ -1228,7 +1249,7 @@
             "description": "sesión requerida"
           },
           "403": {
-            "description": "Rol de consulta: exportar exige administrador"
+            "description": "Consulta u operador técnico: exportar es del administrador (de sitio o del sistema) y del investigador (docs/20 §6)"
           },
           "404": {
             "description": "Dispositivo inexistente o de otro sitio"
@@ -1322,7 +1343,7 @@
     },
     "/condiciones": {
       "get": {
-        "description": "Cada condición con `duracion_s`, dispositivo y regla que la disparó. `sin_comunicacion` la abre el supervisor periódico; `umbral`, el filtro de alertas con histéresis.",
+        "description": "Cada condición con `duracion_s`, dispositivo, el nombre de su sitio (`sitio`) y regla que la disparó. `sin_comunicacion` la abre el supervisor periódico; `umbral`, el filtro de alertas con histéresis.",
         "operationId": "CondicionesController_listar",
         "parameters": [
           {
@@ -1513,7 +1534,7 @@
     },
     "/sitios": {
       "get": {
-        "description": "Los sitios activos de la sesión con `id, codigo, nombre, zona_horaria, rol` (el perfil de la persona en ese sitio) y `zonas[{id, nombre}]`. El usuario del sistema ve todos, con rol administrador.",
+        "description": "Los sitios activos de la sesión con `id, codigo, nombre, zona_horaria, rol` (el perfil de la persona en ese sitio) y `zonas[{id, nombre}]`. El administrador del sistema y el usuario del sistema ven todos, con rol administrador (su perfil global va en `administrador_sistema` de GET /sesion).",
         "operationId": "SitiosController_listar",
         "parameters": [],
         "responses": {
@@ -1694,6 +1715,108 @@
         ]
       }
     },
+    "/sitios/{id}/actividad": {
+      "get": {
+        "description": "Lo que hicieron las personas sobre los dispositivos del sitio (eventos, con quién) y las entradas, salidas y bloqueos de quienes tienen membresía activa en él (accesos), mezclados del más reciente al más antiguo: `id, instante, clase (evento|acceso), tipo, texto, usuario{id, nombre}|null, dispositivo{id, nombre}|null`. Sin correos ni direcciones IP. Filtros: `tipo` (un tipo de evento o un resultado de acceso), `usuario` (UUID) y [desde, hasta) (por defecto, los últimos 7 días; hasta 92). Página por clave: la cabecera `X-Siguiente` trae el cursor de la siguiente. Administrador del sitio en sus sitios; administrador del sistema en todos; los demás perfiles, 403; otro sitio, 404.",
+        "operationId": "SitiosController_actividad",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "UUID del sitio",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "desde",
+            "required": false,
+            "in": "query",
+            "description": "ISO 8601; una fecha sin hora (AAAA-MM-DD) es las 00:00 UTC, no la medianoche del sitio; por defecto hasta − 7 días",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": false,
+            "in": "query",
+            "description": "ISO 8601; una fecha sin hora (AAAA-MM-DD) es las 00:00 UTC, no la medianoche del sitio; por defecto ahora",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tipo",
+            "required": false,
+            "in": "query",
+            "description": "Tipo de evento (alta, baja, reglas_cambiadas, …) o resultado de acceso (ok, cierre, clave_incorrecta, bloqueado, inactivo)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "usuario",
+            "required": false,
+            "in": "query",
+            "description": "UUID de la persona",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limite",
+            "required": false,
+            "in": "query",
+            "description": "1–500, por defecto 100",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "El de la cabecera X-Siguiente de la página anterior",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de actividad; X-Siguiente si hay otra página",
+            "headers": {
+              "X-Siguiente": {
+                "description": "Cursor opaco de la página siguiente; ausente si no hay más (docs/10 §8.4 punto 58)",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "UUID, fecha, tipo, límite o cursor inválidos, o una ventana de más de 92 días"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "404": {
+            "description": "Sitio inexistente o de otro"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Actividad del sitio (Etapa 4; P14)",
+        "tags": [
+          "sitios"
+        ]
+      }
+    },
     "/salud": {
       "get": {
         "operationId": "SaludController_estado",
@@ -1802,7 +1925,7 @@
             "description": "Sin sesión ni X-Clave-Admin, o X-Clave-Admin incorrecta"
           },
           "403": {
-            "description": "Rol de consulta en ese sitio, o sesión sin la cabecera X-Pedido: panel"
+            "description": "Un perfil sin ese permiso en ese sitio (docs/20 §6), o sesión sin la cabecera X-Pedido: panel"
           },
           "404": {
             "description": "No existe, o es de otro sitio"
@@ -1918,7 +2041,7 @@
             "description": "Sin sesión ni X-Clave-Admin, o X-Clave-Admin incorrecta"
           },
           "403": {
-            "description": "Rol de consulta en ese sitio, o sesión sin la cabecera X-Pedido: panel"
+            "description": "Un perfil sin ese permiso en ese sitio (docs/20 §6), o sesión sin la cabecera X-Pedido: panel"
           },
           "409": {
             "description": "El id_fisico ya existe (pasarela o dispositivo, o huérfano en el broker)"
@@ -1946,7 +2069,7 @@
     },
     "/pasarelas/{id}": {
       "delete": {
-        "description": "`activo = false`, credenciales revocadas, evento y cliente borrado del broker, en una transacción. Exige sesión de administrador del sitio o `X-Clave-Admin`.",
+        "description": "`activo = false`, credenciales revocadas, evento y cliente borrado del broker, en una transacción. Exige sesión de administrador del sitio o del sistema, o `X-Clave-Admin` (el operador técnico no da de baja: docs/20 §6).",
         "operationId": "PasarelasController_darDeBaja",
         "parameters": [
           {
@@ -2139,7 +2262,7 @@
             "description": "Sin sesión ni X-Clave-Admin"
           },
           "403": {
-            "description": "Rol de consulta en ese sitio, o sesión sin la cabecera X-Pedido: panel"
+            "description": "Un perfil sin ese permiso en ese sitio (docs/20 §6), o sesión sin la cabecera X-Pedido: panel"
           },
           "404": {
             "description": "El canal no existe, o es de otro sitio"
@@ -2231,7 +2354,7 @@
             "description": "Sin sesión ni X-Clave-Admin, o X-Clave-Admin incorrecta"
           },
           "403": {
-            "description": "Rol de consulta en ese sitio, o sesión sin la cabecera X-Pedido: panel"
+            "description": "Un perfil sin ese permiso en ese sitio (docs/20 §6), o sesión sin la cabecera X-Pedido: panel"
           },
           "404": {
             "description": "El canal no existe, o es de otro sitio"
@@ -2251,6 +2374,569 @@
         "summary": "Calibrar un canal (o quitar su calibración)",
         "tags": [
           "canales"
+        ]
+      }
+    },
+    "/preferencias": {
+      "get": {
+        "description": "Unidades de visualización, zona horaria, tema, tipos de condición con notificación, vistas guardadas y sitio por defecto. Si aún no guardaste ninguna, las de por defecto con `actualizado_en: null`. La base guarda siempre la unidad estándar: esto solo cambia cómo se muestra.",
+        "operationId": "CuentaController_leer",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "`unidad_temperatura, unidad_longitud, zona_horaria, tema, notificar, vistas, sitio_predeterminado, actualizado_en`"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "403": {
+            "description": "Clave temporal o términos de uso pendientes (403 `terminos_pendientes`), o sin la cabecera X-Pedido: panel en una ruta que escribe"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Mis preferencias (Etapa 4)",
+        "tags": [
+          "cuenta"
+        ]
+      },
+      "put": {
+        "description": "Reemplaza todas (PUT). Bloqueo optimista: `actualizado_en` es el de GET /preferencias, tal cual (null la primera vez); si cambiaron entretanto, 409 con las vigentes. La zona IANA se valida contra la lista del servidor; `sitio_predeterminado` debe ser uno de tus sitios.",
+        "operationId": "CuentaController_guardar",
+        "parameters": [
+          {
+            "name": "X-Pedido",
+            "in": "header",
+            "description": "Siempre `panel`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "actualizado_en",
+                  "unidad_temperatura",
+                  "unidad_longitud",
+                  "zona_horaria",
+                  "tema",
+                  "notificar",
+                  "vistas",
+                  "sitio_predeterminado"
+                ],
+                "properties": {
+                  "actualizado_en": {
+                    "type": "string",
+                    "nullable": true,
+                    "description": "El de GET /preferencias, tal cual (null si aún no había ninguna guardada)"
+                  },
+                  "unidad_temperatura": {
+                    "type": "string",
+                    "enum": [
+                      "C",
+                      "F"
+                    ]
+                  },
+                  "unidad_longitud": {
+                    "type": "string",
+                    "enum": [
+                      "mm",
+                      "m",
+                      "km"
+                    ]
+                  },
+                  "zona_horaria": {
+                    "type": "string",
+                    "description": "«sitio» (la del sitio) o una zona IANA (p. ej. America/Santiago)"
+                  },
+                  "tema": {
+                    "type": "string",
+                    "enum": [
+                      "sistema",
+                      "claro",
+                      "oscuro"
+                    ]
+                  },
+                  "notificar": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "sin_comunicacion",
+                        "umbral",
+                        "bateria",
+                        "manipulacion",
+                        "tope_superado",
+                        "reloj_desviado"
+                      ]
+                    }
+                  },
+                  "vistas": {
+                    "type": "array",
+                    "maxItems": 20,
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "nombre",
+                        "pantalla",
+                        "parametros"
+                      ],
+                      "properties": {
+                        "nombre": {
+                          "type": "string",
+                          "maxLength": 60
+                        },
+                        "pantalla": {
+                          "type": "string",
+                          "enum": [
+                            "inventario",
+                            "ficha",
+                            "tablero"
+                          ]
+                        },
+                        "parametros": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string",
+                            "maxLength": 200
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "sitio_predeterminado": {
+                    "type": "string",
+                    "format": "uuid",
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Las preferencias guardadas, con el `actualizado_en` nuevo"
+          },
+          "400": {
+            "description": "Cuerpo inválido: `message` es la lista de motivos"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "403": {
+            "description": "Clave temporal o términos de uso pendientes (403 `terminos_pendientes`), o sin la cabecera X-Pedido: panel en una ruta que escribe"
+          },
+          "409": {
+            "description": "Cambiaron desde que se leyeron: `preferencias` trae las vigentes"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Guardar mis preferencias (Etapa 4)",
+        "tags": [
+          "cuenta"
+        ]
+      }
+    },
+    "/sesiones": {
+      "get": {
+        "description": "`id` (el hash que guarda la base: no autentica nada), `creada_en`, `ultima_actividad`, `agente` (navegador, hasta 120 caracteres), `origen` (dirección truncada a /24 o /48) y `actual` (la de esta petición). Solo las vivas, de la más reciente a la más antigua.",
+        "operationId": "CuentaController_sesiones",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Lista de sesiones vivas"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "403": {
+            "description": "Clave temporal o términos de uso pendientes (403 `terminos_pendientes`), o sin la cabecera X-Pedido: panel en una ruta que escribe"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Mis sesiones abiertas (Etapa 4)",
+        "tags": [
+          "cuenta"
+        ]
+      }
+    },
+    "/sesiones/{id}": {
+      "delete": {
+        "description": "Revoca esa sesión (si es la actual, también borra la cookie) y deja la fila `cierre` en `acceso`. La de otra persona, o una que no existe o ya se cerró: 404.",
+        "operationId": "CuentaController_cerrar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "El `id` de GET /sesiones (64 caracteres hexadecimales)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Pedido",
+            "in": "header",
+            "description": "Siempre `panel`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "`revocada: true`, `actual`"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "403": {
+            "description": "Clave temporal o términos de uso pendientes (403 `terminos_pendientes`), o sin la cabecera X-Pedido: panel en una ruta que escribe"
+          },
+          "404": {
+            "description": "sesión no encontrada"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Cerrar una de mis sesiones (Etapa 4)",
+        "tags": [
+          "cuenta"
+        ]
+      }
+    },
+    "/cuenta/exportar": {
+      "get": {
+        "description": "Un JSON con lo que el sistema guarda de ti (docs/21 §8): cuenta, sitios y perfiles, preferencias, sesiones e intentos de acceso (con su dirección y navegador: son tus datos), cambios que hiciste y tus mensajes de soporte. Se descarga como archivo (`Content-Disposition: attachment`).",
+        "operationId": "CuentaController_exportar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Los datos de la cuenta"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "403": {
+            "description": "Clave temporal o términos de uso pendientes (403 `terminos_pendientes`), o sin la cabecera X-Pedido: panel en una ruta que escribe"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Exportar los datos de mi cuenta (Etapa 4)",
+        "tags": [
+          "cuenta"
+        ]
+      }
+    },
+    "/cuenta/baja": {
+      "post": {
+        "description": "Con la clave actual (`clave`): una sesión olvidada abierta no basta. Irreversible: nombre y correo pasan a marcadores derivados del id, la clave deja de valer, se revocan todas tus sesiones, tus sitios quedan inactivos y se borran tus preferencias y mensajes de soporte; lo que hiciste queda en el historial del sitio sin tus datos (docs/20 §11). El último administrador del sistema, o quien dejaría la plataforma sin administradores, recibe 409. Borra la cookie.",
+        "operationId": "CuentaController_baja",
+        "parameters": [
+          {
+            "name": "X-Pedido",
+            "in": "header",
+            "description": "Siempre `panel`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "clave"
+                ],
+                "properties": {
+                  "clave": {
+                    "type": "string",
+                    "description": "Tu clave actual"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "`anonimizado_en`"
+          },
+          "400": {
+            "description": "Sin la clave, o la clave actual no es correcta"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "403": {
+            "description": "Clave temporal o términos de uso pendientes (403 `terminos_pendientes`), o sin la cabecera X-Pedido: panel en una ruta que escribe"
+          },
+          "409": {
+            "description": "Eres el último administrador del sistema, o tu baja dejaría la plataforma sin administradores"
+          },
+          "429": {
+            "description": "bloqueado: demasiados intentos fallidos"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Darme de baja (Etapa 4; anonimización)",
+        "tags": [
+          "cuenta"
+        ]
+      }
+    },
+    "/terminos": {
+      "get": {
+        "description": "Texto (Markdown simple), versión vigente y fecha. Pública: se lee antes de entrar y con la sesión restringida.",
+        "operationId": "LegalController_leerTerminos",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "`version`, `fecha`, `texto`"
+          }
+        },
+        "summary": "Términos de uso (Etapa 4)",
+        "tags": [
+          "legal"
+        ]
+      }
+    },
+    "/terminos/aceptar": {
+      "post": {
+        "description": "Con `version` (la vigente, la que se mostró): guarda versión e instante en la cuenta y deja un evento `terminos_aceptados`. Desde entonces la sesión deja de estar restringida. Una versión distinta de la vigente → 409 (se mostró un texto viejo: recargar).",
+        "operationId": "LegalController_aceptar",
+        "parameters": [
+          {
+            "name": "X-Pedido",
+            "in": "header",
+            "description": "Siempre `panel`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "version"
+                ],
+                "properties": {
+                  "version": {
+                    "type": "integer",
+                    "minimum": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "`version`, `aceptados_en`"
+          },
+          "400": {
+            "description": "Sin `version`, o la clave de administrador (no es una cuenta)"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "409": {
+            "description": "La versión no es la vigente"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Aceptar los términos de uso (Etapa 4)",
+        "tags": [
+          "legal"
+        ]
+      }
+    },
+    "/privacidad": {
+      "get": {
+        "description": "Generada desde el inventario de docs/21 §2 (`datos`: dato, dónde, para qué, cuánto tiempo y quién accede) y los apartados de terceros, cookies, permisos y derechos (`secciones`); el responsable y su contacto, de RESPONSABLE_NOMBRE y RESPONSABLE_CONTACTO (null y `aviso_responsable` si no están configurados). Pública.",
+        "operationId": "LegalController_leerPrivacidad",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "`version`, `fecha`, `responsable`, `aviso_responsable`, `datos[]`, `secciones[{titulo, parrafos}]`"
+          }
+        },
+        "summary": "Política de privacidad (Etapa 4)",
+        "tags": [
+          "legal"
+        ]
+      }
+    },
+    "/acerca": {
+      "get": {
+        "description": "Licencia AGPL-3.0-only con su aviso, enlace al código fuente (CODIGO_FUENTE_URL, o null) y la ruta de los avisos de terceros: pública. La versión del backend y el commit de la compilación, solo con sesión (sin ella, null).",
+        "operationId": "LegalController_leerAcerca",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "`nombre`, `version` (null sin sesión), `commit` (null sin sesión o si la imagen no lo trae), `licencia`, `aviso_licencia`, `codigo_fuente`, `avisos_terceros`"
+          }
+        },
+        "summary": "Acerca de (Etapa 4)",
+        "tags": [
+          "legal"
+        ]
+      }
+    },
+    "/soporte": {
+      "post": {
+        "description": "Texto de 1 a 2000 caracteres, sin adjuntos; se guarda para el administrador del sistema. Como mucho 5 por persona y hora (429 con `reintentar_en_s`).",
+        "operationId": "LegalController_enviar",
+        "parameters": [
+          {
+            "name": "X-Pedido",
+            "in": "header",
+            "description": "Siempre `panel`",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "texto"
+                ],
+                "properties": {
+                  "texto": {
+                    "type": "string",
+                    "maxLength": 2000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "`id`, `creado_en`"
+          },
+          "400": {
+            "description": "Texto vacío o demasiado largo, o la clave de administrador (no es una cuenta)"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "403": {
+            "description": "Clave temporal o términos pendientes"
+          },
+          "429": {
+            "description": "Demasiados mensajes en la última hora"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Enviar un mensaje de soporte (Etapa 4)",
+        "tags": [
+          "legal"
+        ]
+      },
+      "get": {
+        "description": "Del más reciente al más antiguo: `id, creado_en, leido_en, texto, usuario{id, nombre}`. Página por clave: la cabecera `X-Siguiente` trae el cursor de la siguiente. Solo el administrador del sistema (403 a los demás perfiles).",
+        "operationId": "LegalController_listar",
+        "parameters": [
+          {
+            "name": "limite",
+            "required": false,
+            "in": "query",
+            "description": "1–500, por defecto 50",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "El de la cabecera X-Siguiente de la página anterior",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de mensajes; X-Siguiente si hay otra página",
+            "headers": {
+              "X-Siguiente": {
+                "description": "Cursor opaco de la página siguiente; ausente si no hay más (docs/10 §8.4 punto 58)",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "403": {
+            "description": "No eres administrador del sistema"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Mensajes de soporte (Etapa 4; administrador del sistema)",
+        "tags": [
+          "legal"
         ]
       }
     }

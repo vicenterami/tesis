@@ -10,6 +10,7 @@ import { CABECERA_CLAVE_ADMIN, rechazoDeClaveAdmin } from '../alta/clave-admin.g
 import { cabeceraBorrarCookie, leerCookie } from './cookie.js';
 import { UsuarioSesion, usuarioSistema } from './permisos.js';
 import { MENSAJE_SIN_SESION, SesionService } from './sesion.service.js';
+import { TERMINOS_VERSION } from '../legal/terminos.js';
 
 // El guardia central (docs/20 §5; docs/10 §8.4 punto 36). Corre antes de TODA ruta de Nest (APP_GUARD en sesion.module.ts) y deja en la
 // petición quién la hace (`usuario`, con su mapa sitio → rol). No decide permisos por recurso: eso lo hace permitir() (permisos.ts),
@@ -28,12 +29,18 @@ export const CABECERA_PEDIDO = 'x-pedido';
 export const VALOR_PEDIDO = 'panel';
 const RUTA_PUBLICA = 'ruta_publica';
 const CON_CLAVE_TEMPORAL = 'con_clave_temporal';
+const CON_TERMINOS_PENDIENTES = 'con_terminos_pendientes';
+// Código del 403 de una sesión restringida por los términos (docs/20 §12): el panel lo convierte en la pantalla «Términos de uso».
+export const CODIGO_TERMINOS_PENDIENTES = 'terminos_pendientes';
 
 // Ruta sin guardia (docs/20 §6, primera fila).
 export const Publica = (): MethodDecorator & ClassDecorator => SetMetadata(RUTA_PUBLICA, true);
 // Ruta que puede usar una persona con clave temporal (la que le asignó un administrador): ver su sesión, cerrarla y cambiar la clave.
 // Todo lo demás le responde 403 hasta que la cambie (docs/20 §4).
 export const ConClaveTemporal = (): MethodDecorator => SetMetadata(CON_CLAVE_TEMPORAL, true);
+// Ruta que puede usar una persona que aún no aceptó la versión vigente de los términos (docs/20 §12): ver su sesión, cerrarla, cambiar la
+// clave y aceptar. Las páginas legales son públicas (@Publica). Todo lo demás le responde 403 `terminos_pendientes` hasta que acepte.
+export const ConTerminosPendientes = (): MethodDecorator => SetMetadata(CON_TERMINOS_PENDIENTES, true);
 
 export interface PeticionConUsuario extends Request {
   usuario?: UsuarioSesion;
@@ -98,6 +105,13 @@ export class GuardiaCentral implements CanActivate {
     if (escribe(req.method)) exigirPedidoDelPanel(req);
     if (usuario.claveTemporal && !this.reflector.get<boolean>(CON_CLAVE_TEMPORAL, ctx.getHandler())) {
       throw new ForbiddenException('debes cambiar la clave temporal antes de seguir (POST /sesion/clave)');
+    }
+    // Términos de uso después de la clave temporal (docs/20 §12: «una clave temporal pendiente va primero»).
+    if (usuario.terminosPendientes && !this.reflector.get<boolean>(CON_TERMINOS_PENDIENTES, ctx.getHandler())) {
+      throw new ForbiddenException({
+        statusCode: 403, error: 'Forbidden', codigo: CODIGO_TERMINOS_PENDIENTES, version: TERMINOS_VERSION,
+        message: `debes aceptar los términos de uso (versión ${TERMINOS_VERSION}) antes de seguir (GET /terminos y POST /terminos/aceptar)`,
+      });
     }
     req.usuario = usuario;
     return true;

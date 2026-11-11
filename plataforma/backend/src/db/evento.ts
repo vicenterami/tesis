@@ -1,6 +1,6 @@
 // La única forma de insertar en `evento` desde una escritura con persona (docs/10 §8.4 punto 65 v; docs/19 §4, G1; HU-11): el alta, la
-// baja, la rotación de credenciales, la calibración, la configuración del dispositivo y sus reglas, y el alta por lote (registrarEventos).
-// Faltan los de sesion/ (usuario_alta, usuario_cambio, usuario_clave), que aún insertan por su cuenta y sin usuario_id. Lleva el
+// baja, la rotación de credenciales, la calibración, la configuración del dispositivo y sus reglas, el alta por lote (registrarEventos) y,
+// desde el 11/11/2026, los de las personas (usuario_alta, usuario_cambio, usuario_clave, usuario_baja, terminos_aceptados). Lleva el
 // `usuario_id` de la sesión (nulo = el sistema: la clave de administrador por cabecera no es una fila de `usuario`). El detalle va
 // como JSON, una foto por valor (docs/08 §6). Recibe el cliente de la transacción: el evento se confirma o se deshace con el cambio.
 import type { PoolClient } from 'pg';

@@ -48,12 +48,17 @@ docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -X -U p
   < plataforma/db/pruebas/convenciones.sql | tee "$VT"/convenciones.txt
 exige "$VT"/convenciones.txt "${PIPESTATUS[0]}" 7 || fallos=$((fallos+1))
 
-paso "1c. Reglas de identidad de las migraciones 11, 15, 16, 17, 18, 19, 20 y 21, plantadas en una transacción que se deshace (docs/10 §8.4 puntos 24 y 47)"
+paso "1c. Reglas de identidad de las migraciones 11, 15, 16, 17, 18, 19, 20 y 21 y la anonimización de la 24, plantadas en una transacción que se deshace (docs/10 §8.4 puntos 24, 47 y 62)"
 # Pasarela y dispositivo no comparten identificador; lista blanca; LoRaWAN exige pasarela; código de sitio válido. Nada
 # queda en la base: el archivo termina en ROLLBACK. La carrera de dos altas simultáneas se probó a mano (docs/16 §13).
 docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -X -U plataforma -d plataforma -v ON_ERROR_STOP=1 -tA \
   < plataforma/db/pruebas/reglas-identidad.sql | tee "$VT"/identidad.txt
 exige "$VT"/identidad.txt "${PIPESTATUS[0]}" 33 || fallos=$((fallos+1))
+# fn_anonimizar_usuario (SECURITY DEFINER; corrección del 11/11/2026): el último administrador del sistema y `por` nulo, rechazados dentro de
+# la función; el correo de sus intentos de acceso y el motivo de sus eventos, anulados; con otro administrador activo, la baja pasa.
+docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -X -U plataforma -d plataforma -v ON_ERROR_STOP=1 -tA \
+  < plataforma/db/pruebas/anonimizacion.sql | tee "$VT"/anonimizacion.txt
+exige "$VT"/anonimizacion.txt "${PIPESTATUS[0]}" 6 || fallos=$((fallos+1))
 
 paso "2. Migraciones aplicadas = archivos en db/init (cada NN-*.sql debe estar reflejado en la base)"
 # 02: índice por regla · 03: zona_horaria · 04: iso_utc · 05: convenciones (disparadores actualizado_en, pm2_5) · 06: índice único de medicion · 07: CHECK de cuarentena.motivo · 08: medicion.recibido_en y origen_tiempo · 09: trama y cuarentena como hypertables · 10: semántica de intervalo_esperado_s · 11: vía, pasarela, estado_dispositivo y sitio.codigo · 12: nombre ck_cuarentena_motivo
@@ -81,8 +86,9 @@ SELECT CASE WHEN (SELECT pg_get_constraintdef(oid) LIKE '%reloj_desviado%' FROM 
 SELECT CASE WHEN EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='trg_canal_actualizado_en' AND tgrelid='canal'::regclass AND tgenabled <> 'D') AND col_description('canal'::regclass, (SELECT attnum FROM pg_attribute WHERE attrelid='canal'::regclass AND attname='actualizado_en')) LIKE '%bloqueo optimista%' AND has_column_privilege('plataforma_app', 'canal', 'escala_cero', 'UPDATE') AND has_column_privilege('plataforma_app', 'canal', 'escala_cien', 'UPDATE') AND NOT has_column_privilege('plataforma_app', 'canal', 'actualizado_en', 'UPDATE') AND NOT has_column_privilege('plataforma_app', 'canal', 'dispositivo_id', 'UPDATE') AND NOT has_column_privilege('plataforma_app', 'canal', 'magnitud_codigo', 'UPDATE') THEN 'OK    21 canal.actualizado_en con su disparador y documentado como bloqueo optimista; la aplicación solo actualiza escala_cero y escala_cien' ELSE 'FALLA 21 falta el disparador o el comentario de canal.actualizado_en, o el permiso de la calibración no es el justo (migración 21)' END;
 SELECT CASE WHEN (SELECT count(*) FROM timescaledb_information.hypertables WHERE hypertable_name='acceso')=1 AND (SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name='sesion')=1 AND (SELECT pg_get_constraintdef(oid) LIKE '%cierre%' FROM pg_constraint WHERE conname='ck_acceso_resultado' AND conrelid='acceso'::regclass) AND EXISTS (SELECT 1 FROM pg_constraint WHERE conname='ck_usuario_clave_temporal' AND conrelid='usuario'::regclass) AND EXISTS (SELECT 1 FROM pg_constraint WHERE conname='ck_sesion_id' AND conrelid='sesion'::regclass) AND (SELECT count(*) FROM information_schema.columns WHERE table_name='usuario_sitio' AND column_name='activo')=1 AND has_table_privilege('plataforma_app', 'acceso', 'INSERT') AND NOT has_table_privilege('plataforma_app', 'acceso', 'UPDATE') AND has_column_privilege('plataforma_app', 'sesion', 'revocada_en', 'UPDATE') AND NOT has_column_privilege('plataforma_app', 'sesion', 'usuario_id', 'UPDATE') AND NOT has_column_privilege('plataforma_app', 'usuario', 'email', 'UPDATE') AND (SELECT prosecdef FROM pg_proc WHERE proname='fn_limpiar_sesiones') AND NOT has_function_privilege('public', 'fn_limpiar_sesiones(integer)', 'EXECUTE') THEN 'OK    22 sesion (identificador solo como hash) y acceso (hypertable, resultado de dominio cerrado); clave temporal con su vencimiento; usuario_sitio.activo; la aplicación agrega accesos sin reescribirlos, solo renueva o revoca sesiones y no cambia el email' ELSE 'FALLA 22 falta la sesión de personas (sesion, acceso como hypertable, clave temporal, usuario_sitio.activo) o el permiso de la aplicación no es el justo (migración 22)' END;
 SELECT CASE WHEN (SELECT count(*) FROM pg_constraint WHERE conname='ck_regla_umbral_retardo_s' AND conrelid='regla_umbral'::regclass)=1 AND (SELECT count(*) FROM information_schema.columns WHERE table_name='regla_umbral' AND column_name='fuera_de_banda_desde')=1 AND (SELECT count(*) FROM pg_constraint WHERE conname='fk_evento_usuario' AND conrelid='evento'::regclass)=1 AND (SELECT count(*) FROM pg_indexes WHERE (indexname='idx_condicion_abierta_en_id' AND indexdef LIKE '%(abierta_en DESC, id DESC)') OR (indexname='idx_cuarentena_recibido_en_id' AND indexdef LIKE '%(recibido_en DESC, id DESC)') OR (indexname='idx_evento_dispositivo_ocurrido_en_id' AND indexdef LIKE '%(dispositivo_id, ocurrido_en DESC, id DESC)') OR (indexname='idx_evento_usuario_id' AND indexdef LIKE '%(usuario_id)'))=4 AND (SELECT pg_get_constraintdef(oid) LIKE '%>= 1)%<= 86400)%' FROM pg_constraint WHERE conname='ck_dispositivo_intervalo_esperado_s' AND conrelid='dispositivo'::regclass) AND has_function_privilege('plataforma_app', 'fn_quitar_reglas(uuid, uuid[])', 'EXECUTE') AND NOT has_table_privilege('plataforma_app', 'regla_umbral', 'DELETE') AND has_column_privilege('plataforma_app', 'regla_umbral', 'retardo_s', 'UPDATE') THEN 'OK    23 regla_umbral.retardo_s (0..86400) y fuera_de_banda_desde, evento.usuario_id con su FK, índices de keyset en el sentido del orden (tiempo DESC, id DESC), intervalo_esperado_s 1..86400 y fn_quitar_reglas; la aplicación sigue sin DELETE' ELSE 'FALLA 23 falta algo de la migración 23 (retardo, usuario_id, índices de keyset en el sentido del orden, CHECK del intervalo esperado o permisos)' END;
+SELECT CASE WHEN (SELECT pg_get_constraintdef(oid) LIKE '%investigador%operador%' FROM pg_constraint WHERE conname='ck_usuario_sitio_rol' AND conrelid='usuario_sitio'::regclass) AND (SELECT count(*) FROM information_schema.columns WHERE table_name='usuario' AND column_name IN ('administrador_sistema','desactivado_en','desactivado_por','motivo_baja','anonimizado_en','terminos_version_aceptada','terminos_aceptados_en'))=7 AND (SELECT count(*) FROM pg_constraint WHERE conrelid='usuario'::regclass AND conname IN ('ck_usuario_baja','ck_usuario_motivo_baja','ck_usuario_anonimizado','ck_usuario_terminos'))=4 AND (SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_name IN ('preferencia','mensaje_soporte'))=2 AND EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='trg_preferencia_actualizado_en') AND (SELECT count(*) FROM information_schema.columns WHERE table_name='acceso' AND column_name='id' AND is_nullable='NO')=1 AND (SELECT prosecdef FROM pg_proc WHERE proname='fn_anonimizar_usuario') AND has_function_privilege('plataforma_app', 'fn_anonimizar_usuario(uuid, uuid)', 'EXECUTE') AND NOT has_function_privilege('public', 'fn_anonimizar_usuario(uuid, uuid)', 'EXECUTE') AND NOT has_table_privilege('plataforma_app', 'preferencia', 'DELETE') AND NOT has_table_privilege('plataforma_app', 'mensaje_soporte', 'DELETE') AND NOT has_column_privilege('plataforma_app', 'mensaje_soporte', 'texto', 'UPDATE') AND has_column_privilege('plataforma_app', 'usuario', 'motivo_baja', 'UPDATE') AND NOT has_column_privilege('plataforma_app', 'usuario', 'anonimizado_en', 'UPDATE') THEN 'OK    24 cuatro perfiles de sitio y administrador_sistema; baja con motivo (CHECK de coherencia); anonimización solo por fn_anonimizar_usuario (SECURITY DEFINER, no ejecutable por PUBLIC); términos; preferencia y mensaje_soporte sin DELETE; acceso.id' ELSE 'FALLA 24 falta algo de la migración 24 (perfiles, baja con motivo, anonimización, términos, preferencia, mensaje_soporte, acceso.id o permisos)' END;
 SQL
-exige "$VT"/mig.txt "${PIPESTATUS[0]}" 23 || fallos=$((fallos+1))
+exige "$VT"/mig.txt "${PIPESTATUS[0]}" 24 || fallos=$((fallos+1))
 # Toda migración en disco debe tener su comprobación arriba: una 08 nueva sin comprobación falla aquí,
 # no solo por el conteo en prosa del paso 2g.
 sin_chequeo=$(ls plataforma/db/init/ | grep -oE '^[0-9]{2}' | while read -r nn; do grep -q "^OK    $nn \|^FALLA $nn " "$VT"/mig.txt || echo "$nn"; done)
@@ -203,6 +209,13 @@ if [ -n "$futuras" ]; then
 else
   echo "OK    ninguna prosa cita una migración posterior a la $ultima"
 fi
+# 11/11/2026 (corrección del bloque de cuenta): docs/20 §11 decía «…@ejemplo.invalid» y la función escribe otro dominio. El dominio que
+# cita la §11 para el correo anonimizado debe ser el de fn_anonimizar_usuario (migración 24). Probado plantando «@ejemplo.invalid».
+dom_fn=$(grep -oE "@[a-z0-9.-]+\.invalid'" plataforma/db/init/24-perfiles-cuenta-legal.sql | head -1 | tr -d "'")
+dom_doc=$(awk '/^## 11\. /,/^## 12\. /' docs/20-sesion-usuarios-y-permisos.md | grep -oE 'baja-[^`]*@[a-z0-9.-]+\.invalid' | grep -oE '@[a-z0-9.-]+\.invalid' | sort -u)
+if [ -z "$dom_fn" ] || [ -z "$dom_doc" ]; then echo "FALLA no encontré el dominio del correo anonimizado (función: «$dom_fn», docs/20 §11: «$dom_doc»)"; fallos=$((fallos+1))
+elif [ "$dom_doc" != "$dom_fn" ]; then echo "FALLA docs/20 §11 cita $(echo $dom_doc) y fn_anonimizar_usuario escribe $dom_fn"; fallos=$((fallos+1))
+else echo "OK    el correo anonimizado que cita docs/20 §11 usa el dominio de fn_anonimizar_usuario ($dom_fn)"; fi
 
 paso "2h. Rutas HTTP citadas en prosa (glosario, docs/10, docs/12, docs/15) == rutas reales del OpenAPI"
 # Hallazgo del 26/09: el glosario citaba GET /mediciones, ruta que nunca existió en el backend.
@@ -322,13 +335,13 @@ malos=$(grep -lE '^\. "\$\(dirname "\$0"\)' plataforma/pruebas/*.sh plataforma/p
 if [ -n "$malos" ]; then echo "FALLA cargan con ruta relativa a \$0 (fallan según desde dónde se llamen):"; echo "$malos" | sed 's/^/  /'; fallos=$((fallos+1))
 else echo "OK    ningún guion carga lib-dynsec.sh con una ruta relativa a \$0"; fi
 
-paso "2z. Toda variable RETENCION_*, METRICA_BROKER_*, TOPE_*, PROXY_SECRETO y CLAVE_TEMPORAL_HORAS del .env.example llega al backend por el compose (14/10; topes y secreto del proxy, 17/10; vigencia de la clave temporal, 08/11)"
+paso "2z. Toda variable RETENCION_*, METRICA_BROKER_*, TOPE_*, PROXY_SECRETO, CLAVE_TEMPORAL_HORAS, RESPONSABLE_* y CODIGO_FUENTE_URL del .env.example llega al backend por el compose (14/10; topes y secreto del proxy, 17/10; vigencia de la clave temporal, 08/11; responsable y código fuente, 11/11)"
 # Hasta el 14/10 el compose no las reenviaba: cambiarlas en el .env no tenía efecto y nadie lo notaba.
-faltan=$(grep -oE '^#?((RETENCION|METRICA_BROKER|TOPE)_[A-Z_]+|PROXY_SECRETO|CLAVE_TEMPORAL_HORAS)' plataforma/.env.example | tr -d '#' | sort -u | while read -r v; do grep -qE "^\s+$v:" plataforma/docker-compose.yml || echo "$v"; done)
-n=$(grep -cE '^#?((RETENCION|METRICA_BROKER|TOPE)_[A-Z_]+|PROXY_SECRETO|CLAVE_TEMPORAL_HORAS)=' plataforma/.env.example)
-if [ "$n" -lt 10 ]; then echo "FALLA solo $n variables RETENCION_/METRICA_BROKER_/TOPE_/PROXY_SECRETO/CLAVE_TEMPORAL_HORAS en .env.example: revisó de menos"; fallos=$((fallos+1))
+faltan=$(grep -oE '^#?((RETENCION|METRICA_BROKER|TOPE|RESPONSABLE)_[A-Z_]+|PROXY_SECRETO|CLAVE_TEMPORAL_HORAS|CODIGO_FUENTE_URL)' plataforma/.env.example | tr -d '#' | sort -u | while read -r v; do grep -qE "^\s+$v:" plataforma/docker-compose.yml || echo "$v"; done)
+n=$(grep -cE '^#?((RETENCION|METRICA_BROKER|TOPE|RESPONSABLE)_[A-Z_]+|PROXY_SECRETO|CLAVE_TEMPORAL_HORAS|CODIGO_FUENTE_URL)=' plataforma/.env.example)
+if [ "$n" -lt 13 ]; then echo "FALLA solo $n variables RETENCION_/METRICA_BROKER_/TOPE_/RESPONSABLE_/PROXY_SECRETO/CLAVE_TEMPORAL_HORAS/CODIGO_FUENTE_URL en .env.example: revisó de menos"; fallos=$((fallos+1))
 elif [ -n "$faltan" ]; then echo "FALLA declaradas en .env.example pero el compose no las pasa al backend: $(echo $faltan)"; fallos=$((fallos+1))
-else echo "OK    las $n variables de limpieza, cola, topes, secreto del proxy y vigencia de la clave temporal llegan al backend por el compose"; fi
+else echo "OK    las $n variables de limpieza, cola, topes, secreto del proxy, vigencia de la clave temporal, responsable y código fuente llegan al backend por el compose"; fi
 
 paso "2z2. Tope por emisor: las vías que docs/11 §3 declara con tope son exactamente las que entran por filtros2a6 (docs/10 §8.4 punto 53)"
 # 17/10: el tope vive en filtros2a6; una vía nueva que no pase por ahí no tendría tope. La fila de docs/11 nombra las vías; el código
@@ -558,6 +571,12 @@ PY
   elif [ -n "$malas" ]; then echo "FALLA dependencias de producción con licencia fuera de la lista:"; sed 's/^/  /' <<<"$malas"; fallos=$((fallos+1))
   else echo "OK    $n paquetes de producción con licencia permitida ($(jq -r 'to_entries | map("\(.key) \(.value | length)") | join(", ")' "$VT"/licencias.json))"; fi
 fi
+
+paso "2r2. Avisos de terceros: toda dependencia de producción del lockfile tiene su aviso en panel/public/avisos-de-terceros.txt (docs/21 §7; 11/11/2026)"
+# El archivo lo escribe plataforma/backend/generar-avisos-terceros.sh desde `pnpm licenses list --prod --json`; si alguien agrega una dependencia y
+# no lo regenera, «Acerca de» mentiría. Plantado el 11/11/2026: sin la línea de svelte, este paso falla con «svelte@… sin aviso».
+if ! command -v pnpm >/dev/null || ! command -v node >/dev/null; then echo "omitida: falta pnpm o node"; omitidos="$omitidos 2r2"
+else bash plataforma/backend/generar-avisos-terceros.sh --comprobar || fallos=$((fallos+1)); fi
 
 paso "2s. Requerimientos: el anexo A del informe dice lo mismo que docs/02 (cada RF y RNF, todas sus columnas, sin repetidos)"
 # 08/10: RF-02, RNF-16 y RNF-17 habían cambiado en docs/02 y no en el anexo. Manda

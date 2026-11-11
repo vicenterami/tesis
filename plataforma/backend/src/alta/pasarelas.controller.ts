@@ -60,7 +60,7 @@ export class PasarelasController {
   @ApiCreatedResponse({ description: 'Pasarela creada; `conexion` trae la credencial (una sola vez) y las plantillas de tópico' })
   @ApiBadRequestResponse({ description: 'Cuerpo inválido, sitio inexistente o inactivo' })
   @ApiUnauthorizedResponse({ description: 'Sin sesión ni X-Clave-Admin, o X-Clave-Admin incorrecta' })
-  @ApiForbiddenResponse({ description: 'Rol de consulta en ese sitio, o sesión sin la cabecera X-Pedido: panel' })
+  @ApiForbiddenResponse({ description: 'Un perfil sin ese permiso en ese sitio (docs/20 §6), o sesión sin la cabecera X-Pedido: panel' })
   @ApiConflictResponse({ description: 'El id_fisico ya existe (pasarela o dispositivo, o huérfano en el broker)' })
   @ApiResponse({ status: 502, description: 'El broker no aceptó la credencial; nada quedó creado' })
   @ApiResponse({ status: 503, description: 'Sin clave de administrador configurada, o sin conexión de administración con el broker' })
@@ -75,16 +75,16 @@ export class PasarelasController {
 
   @Delete(':id')
   @HttpCode(200)
-  @ApiOperation({ summary: 'Dar de baja una pasarela', description: '`activo = false`, credenciales revocadas, evento y cliente borrado del broker, en una transacción. Exige sesión de administrador del sitio o `X-Clave-Admin`.' })
+  @ApiOperation({ summary: 'Dar de baja una pasarela', description: '`activo = false`, credenciales revocadas, evento y cliente borrado del broker, en una transacción. Exige sesión de administrador del sitio o del sistema, o `X-Clave-Admin` (el operador técnico no da de baja: docs/20 §6).' })
   @ApiHeader({ name: 'X-Clave-Admin', required: false, description: 'Sin sesión: la clave de administrador (HTTP_CLAVE_ADMIN), como usuario del sistema (docs/20 §5)' })
   @ApiParam({ name: 'id', description: 'UUID de la pasarela' })
   @ApiOkResponse({ description: 'Dada de baja: credenciales revocadas y nodos que quedan sin pasarela' })
   @ApiNotFoundResponse({ description: 'No existe, o es de otro sitio' })
   @ApiConflictResponse({ description: 'Ya estaba dada de baja' })
   async darDeBaja(@Usuario() u: UsuarioSesion, @Param('id') id: string): Promise<PasarelaDadaDeBaja> {
-    exigirEnAlguno(u, 'escribir');
+    exigirEnAlguno(u, 'baja'); // la baja: solo quien administra el sitio (docs/20 §6)
     const pasarelaId = uuid(id, 'pasarela');
-    await this.alcance.exigirPasarela(u, 'escribir', pasarelaId);
+    await this.alcance.exigirPasarela(u, 'baja', pasarelaId);
     return this.alta.darDeBajaPasarela(pasarelaId, u.id);
   }
 

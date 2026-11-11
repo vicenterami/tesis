@@ -22,15 +22,17 @@ horas_clave_temporal() {
   if [[ "$h" =~ ^[0-9]+$ ]] && [ "$h" -ge 1 ] && [ "$h" -le 72 ]; then echo "$h"; else echo 2; fi
 }
 
-# persona_temporal NOMBRE EMAIL SITIO_CODIGO ROL  (la clave temporal por la entrada estándar)
-# Crea la persona o, si ya existe, le pone esa clave temporal (con la vigencia del backend, horas_clave_temporal), la reactiva, le da ese rol en ese sitio y corta sus sesiones.
+# persona_temporal NOMBRE EMAIL SITIO_CODIGO ROL  (la clave temporal por la entrada estándar; ROL: administrador, investigador, operador o
+# consulta, los cuatro perfiles de sitio de la migración 24)
+# Crea la persona o, si ya existe, le pone esa clave temporal (con la vigencia del backend, horas_clave_temporal), la reactiva (limpiando la baja
+# con motivo, ck_usuario_baja), le da ese rol en ese sitio y corta sus sesiones.
 # Escribe su id. Solo correos de dominio reservado (@ejemplo.invalid, RFC 2606): nunca una cuenta real.
 persona_temporal() {
   local nombre=$1 email=$2 sitio=$3 rol=$4 h clave horas
   # Una línea, sin el salto final: `<<<"$clave"` agrega uno, y el hash sería el de «clave + salto» (pasó en la primera corrida del e2e).
   IFS= read -r clave || [ -n "$clave" ] || { echo "persona_temporal: falta la clave por la entrada estándar" >&2; return 1; }
   [[ "$email" =~ ^[a-z0-9._-]+@ejemplo\.invalid$ ]] || { echo "persona_temporal: solo correos @ejemplo.invalid ($email)" >&2; return 1; }
-  [[ "$rol" =~ ^(administrador|consulta)$ ]] && [[ "$sitio" =~ ^[a-z0-9-]+$ ]] && [[ "$nombre" =~ ^[[:alnum:][:space:]áéíóúñÁÉÍÓÚÑ.-]+$ ]] || { echo "persona_temporal: argumentos inválidos" >&2; return 1; }
+  [[ "$rol" =~ ^(administrador|investigador|operador|consulta)$ ]] && [[ "$sitio" =~ ^[a-z0-9-]+$ ]] && [[ "$nombre" =~ ^[[:alnum:][:space:]áéíóúñÁÉÍÓÚÑ.-]+$ ]] || { echo "persona_temporal: argumentos inválidos" >&2; return 1; }
   h=$(printf '%s' "$clave" | hash_persona) || { echo "persona_temporal: el backend no calculó el hash (¿está arriba?)" >&2; return 1; }
   horas=$(horas_clave_temporal)
   docker compose -f "$PLAT/docker-compose.yml" exec -T timescaledb psql -X -U plataforma -d plataforma -v ON_ERROR_STOP=1 -tA -q <<SQL
@@ -38,7 +40,7 @@ WITH u AS (
   INSERT INTO usuario (nombre, email, hash_password, clave_temporal, clave_temporal_vence_en)
   VALUES ('$nombre', '$email', '$h', true, now() + make_interval(hours => $horas))
   ON CONFLICT (email) DO UPDATE SET hash_password = EXCLUDED.hash_password, clave_temporal = true,
-    clave_temporal_vence_en = EXCLUDED.clave_temporal_vence_en, activo = true
+    clave_temporal_vence_en = EXCLUDED.clave_temporal_vence_en, activo = true, desactivado_en = NULL, desactivado_por = NULL, motivo_baja = NULL
   RETURNING id),
 s AS (INSERT INTO usuario_sitio (usuario_id, sitio_id, rol) SELECT u.id, sitio.id, '$rol' FROM u, sitio WHERE sitio.codigo = '$sitio'
   ON CONFLICT (usuario_id, sitio_id) DO UPDATE SET rol = EXCLUDED.rol, activo = true RETURNING usuario_id),

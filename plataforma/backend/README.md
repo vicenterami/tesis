@@ -21,11 +21,14 @@ src/
 │   └── *.spec.ts              # pruebas unitarias de las funciones puras (vitest)
 ├── consulta/                  # M5: API de solo lectura (dispositivos, canales, condiciones, cuarentena); tablero v2 (sitios, resumen, históricos, keyset: tablero*.ts)
 ├── tiempo-real/               # TT-39: canal SSE hacia el panel (GET /eventos) y bus de eventos en memoria
-├── db/evento.ts               # registrarEvento y registrarEventos (el lote): el INSERT de `evento` de las escrituras con persona (usuario_id, HU-11); los de sesion/ aún no
+├── db/evento.ts               # registrarEvento y registrarEventos (el lote): el INSERT de `evento` de las escrituras con persona (usuario_id, HU-11), también los de sesion/, cuenta/ y legal/
 ├── db/cliente.ts              # oyente de 'error' de un cliente prestado del pool: una conexión cortada a mitad no tumba el proceso
 ├── alta/                      # HU-11: POST /dispositivos, DELETE /dispositivos/:id y POST /dispositivos/:id/credencial (guardia X-Clave-Admin, validación, transacción + cliente del broker, scrypt); PATCH /canales/:id (calibración); configuracion.* (PATCH /dispositivos/:id y PUT /canales/:id/reglas); lote.ts (alta por lote)
 ├── broker/dynsec*.ts          # administración del plugin Dynamic Security por $CONTROL (identidad backend-admin, conexión propia); recibe los contadores $SYS
 ├── broker/metricas*.ts        # cola del broker vigilada: muestra por minuto en metrica_broker y condición del sistema broker_descarte (docs/10 §8.4 punto 43)
+├── sesion/                    # sesión por cookie, guardia central, permisos de los cinco perfiles (permisos.ts) y usuarios (docs/20)
+├── cuenta/                    # lo propio de cada persona: preferencias, sesiones, exportar la cuenta y la baja por anonimización (docs/20 §11)
+├── legal/                     # términos, privacidad (desde el inventario de docs/21), acerca de y soporte (P11)
 ├── retencion/                 # borra lo vencido de medicion, trama, cuarentena y metrica_broker por la función acotada fn_retencion_drop_chunks (migración 14)
 ├── openapi.ts                 # contrato OpenAPI generado desde los decoradores; /docs
 └── salud/salud.controller.ts  # GET /salud: base, cola del broker (descartes, condición abierta) y aprovisionamiento en curso
@@ -35,8 +38,14 @@ panel/                         # el panel (Svelte + Vite; docs/19): paquete del 
 ├── src/Inventario.svelte      # P2: inventario con semáforo, conteos, filtros y canal en vivo
 ├── src/Ficha.svelte           # P3: identidad, canales, gráfico que sigue en vivo, condiciones, rechazadas
 ├── src/Grafico.svelte         # el gráfico uPlot (promedio del histórico y lectura actual en series aparte)
+├── src/Configurar.svelte      # P6: dispositivo y reglas por canal, validación en vivo (lib/configurar.ts) y bloqueo optimista
+├── src/Alta.svelte            # P7: asistente, alta masiva por CSV en tandas de 50 (lib/lote.ts) y bandeja de detectados
+├── src/Preferencias.svelte    # P13: preferencias (optimistas y reversibles) y mi cuenta: sesiones, exportar, darme de baja
+├── src/Actividad.svelte       # P14: actividad del sitio por cursor, con filtros en la URL
+├── src/Legal.svelte, src/Terminos.svelte  # P11: privacidad, términos, acerca de y soporte; la aceptación obligatoria
+├── src/Notificaciones.svelte  # avisos de condiciones agrupados por dispositivo y notificación del navegador (canal compartido)
 ├── src/app.css                # estilos propios, sin biblioteca de componentes
-├── public/avisos-de-terceros.txt  # avisos MIT de svelte y uPlot, servidos con el build
+├── public/avisos-de-terceros.txt  # avisos de las 179 dependencias de producción (7 licencias; el texto completo de cada una distinta de MIT), generados por generar-avisos-terceros.sh
 ├── src/lib/                   # estado visual, cliente HTTP, canal en vivo con reconexión, datos del gráfico, antirrebote y lotes, tiempo
 ├── src/**/*.test.ts           # pruebas (vitest; las de pantalla, por el DOM con jsdom)
 └── vite.config.ts             # base /panel/, reenvío al backend en desarrollo, build sin .map
@@ -50,6 +59,7 @@ El backend lo sirve compilado en `/panel` (`main.ts`, `useStaticAssets`); la ima
 pnpm --filter panel dev        # Vite en http://127.0.0.1:5173/panel/, reenvía la API y /eventos al backend (3000) sin cambiar el Host
 pnpm --filter panel verificar  # svelte-check + vitest + vite build (también lo corre `pnpm verificar` desde aquí)
 bash ../pruebas/panel-desarrollo.sh   # con la pila arriba: el reenvío conserva el Host y no retiene el canal; el build servido lleva la CSP
+bash ../pruebas/panel-sesion-e2e.sh   # paso 4c: Chromium y Firefox a 390 y 1280 px contra la imagen construida (docs/16 §59 y §64)
 ```
 
 ## Verificación automática (TT-03)
@@ -201,8 +211,16 @@ describir rutas que no existen. Con el backend corriendo, la documentación inte
 | `PATCH /dispositivos/:id` (Etapa 4) | nombre, estado (activo o mantenimiento), intervalo esperado y zona del mismo sitio, con `actualizado_en` (bloqueo optimista) | responde la ficha; 409 con el vigente; 400 con `errores[{campo, motivo}]`; evento `dispositivo_configurado` con quién |
 | `PUT /canales/:id/reglas` (Etapa 4) | reemplaza las reglas de umbral del canal (alto, bajo, histéresis y `retardo_s`, RF-14), emparejadas por `id` (sin `id`, nueva; las que no vienen se quitan), y su etiqueta, con el `actualizado_en` del canal | 409 con el vigente; 400 con `errores[{campo, motivo}]`; evento `reglas_cambiadas` con quién |
 | `POST /dispositivos/lote?modo=validar\|crear` (Etapa 4) | alta por lote (`docs/19 §4`, F2): informe fila por fila (`valida`, `creada`, `rechazada`, `existe`); en `crear`, las válidas en una transacción (una sentencia para dispositivos, canales y credenciales y otra para los eventos) y las credenciales una vez | hasta 500 filas (413), 10 lotes por minuto por persona (429), una creación a la vez (409); un `id_fisico` de otro sitio, «identificador no disponible»; 500 tardan ≈ 70 s: crear en tandas de 50 (`docs/16 §61`) |
+| `GET /preferencias`, `PUT /preferencias` (Etapa 4) | las propias (`docs/19 §4`, H): unidades, zona horaria («sitio» o IANA), tema, notificaciones, vistas y sitio por defecto | PUT reemplaza todas, con `actualizado_en` (null la primera vez); 409 con las vigentes |
+| `GET /sesiones`, `DELETE /sesiones/:id` (Etapa 4) | mis sesiones vivas (`origen` truncado a /24, `actual`) y cerrar una | la de otra persona, 404 |
+| `GET /cuenta/exportar`, `POST /cuenta/baja` (Etapa 4) | los datos de mi cuenta en JSON (descarga); darme de baja con la clave actual (anonimización, `docs/20 §11`) | la baja: 409 si soy el último administrador del sistema o de la plataforma |
+| `GET /terminos`, `GET /privacidad`, `GET /acerca` (Etapa 4) | términos con su versión, privacidad generada desde `docs/21 §2` y «acerca de» (versión, commit, AGPL, avisos de terceros) | públicas; con los términos pendientes, toda ruta de datos responde 403 `terminos_pendientes` hasta `POST /terminos/aceptar` (Etapa 4) |
+| `POST /soporte`, `GET /soporte` (Etapa 4) | enviar un mensaje (1–2 000 caracteres, 5 por hora) y leerlos por cursor | leer: solo el administrador del sistema |
+| `GET /sitios/:id/actividad?desde&hasta&tipo&usuario&cursor` (Etapa 4) | actividad del sitio (P14): eventos con quién y accesos de sus personas, con texto para personas; sin correos ni IP | administrador del sitio o del sistema; keyset con `X-Siguiente` |
 
-Las rutas que escriben aceptan la clave por cabecera o una sesión de administrador del sitio (con `X-Pedido: panel`).
+Las rutas que escriben aceptan la clave por cabecera o una sesión con el perfil que la matriz de `docs/20 §6` exige (con `X-Pedido: panel`):
+desde el 11/11/2026, cinco perfiles (administrador del sistema, administrador de sitio, investigador, operador técnico y consulta; `sesion/permisos.ts`).
+Los avisos de terceros del panel (`panel/public/avisos-de-terceros.txt`) se regeneran con `bash plataforma/backend/generar-avisos-terceros.sh` al cambiar dependencias.
 
 ```bash
 CLAVE=$(grep '^HTTP_CLAVE_ADMIN=' plataforma/.env | cut -d= -f2-)   # desde la raíz del repositorio; no se imprime

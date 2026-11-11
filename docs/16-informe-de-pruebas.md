@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 513 pruebas unitarias del backend y 241 del panel, sin matriz formal); TT-32 (sensor físico) se cubrió después, en §43, §44 y §53;
+cubre todavía: TT-27 (contrato de trama: hoy 552 pruebas unitarias del backend y 297 del panel, sin matriz formal); TT-32 (sensor físico) se cubrió después, en §43, §44 y §53;
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -2128,7 +2128,7 @@ vez): 100 filas, 14,5 s → 14,1 s, y el alta individual 12,5 s → 0,9 s; 500 f
 `node ../pruebas/banco/tablero-explicar-inventario.mjs src/consulta/consulta.service.ts "$PWD/dist" nombre` por el `psql` del banco; las
 listas, en un banco nuevo (no caben junto con la serie), `tablero-semilla-listas.sql` y `tablero-explicar.sql`; al final, `banco.sh apagar`.
 
-**Cifras finales de la corrección:** `pnpm verificar` en verde (513 pruebas unitarias del backend en 49 archivos; el panel, las suyas);
+**Cifras finales de la corrección:** `pnpm verificar` en verde (552 pruebas unitarias del backend en 53 archivos; el panel, las suyas);
 `pnpm openapi`, 26 rutas y 33 operaciones (`orden` con `nombre | entrega | atencion` en `GET /dispositivos`, cabeceras `X-Total` y
 `X-Siguiente` declaradas, `X-Clave-Admin` en las tres escrituras nuevas); `api-smoke.sh`, 114 OK; `sesion-smoke.sh` (paso 4b), 182 de 182;
 la migración 23, dos pasadas en la pila y en el banco. El guardián, en verde en todo lo del backend (pasos 23, 2h2 y 2t incluidos); quedaron
@@ -2231,3 +2231,195 @@ resumen, el filtro por sitio del vivo y el retroceso del canal fallan con el có
 | CSS | 20 074 B | 20 636 B (4,64 kB comprimido) |
 | JS total | 224 530 B | 230 531 B |
 | Archivos `.map` en `dist/` | 0 | 0 |
+
+## 63. Cinco perfiles, cuenta propia, términos y actividad (11/11/2026)
+
+**Qué cambió** (`docs/20 §2`, §6, §10 R22–R31, §11 y §12; `docs/21 §2` y §7; `docs/19 §4`, G, H y P11; `docs/10 §8.4` puntos 62 y 64;
+HU-26 a HU-29 y HU-31). Migración 24 (`24-perfiles-cuenta-legal.sql`, aplicada dos veces sin error ni cambio): `ck_usuario_sitio_rol` con
+cuatro perfiles de sitio; en `usuario`, `administrador_sistema`, la baja con motivo (`desactivado_en`, `desactivado_por`, `motivo_baja` y un
+CHECK de coherencia), `anonimizado_en` y los términos aceptados; las tablas `preferencia` y `mensaje_soporte` (22 entidades, antes 20);
+`acceso.id`; y `fn_anonimizar_usuario`, del dueño, porque la baja borra filas y la aplicación no tiene `DELETE`. En el backend, la tabla de
+`permitir()` con cinco perfiles y nueve acciones (`baja`, `enlaces`, `auditoria` y `sistema` son nuevas); el guardia restringe la sesión
+mientras la versión de los términos aceptada sea menor que la vigente (403 `terminos_pendientes`); usuarios con el perfil global, la baja con
+motivo y el 409 «reactivable»; y once rutas nuevas, todas «Etapa 4»: `GET`/`PUT /preferencias`, `GET /sesiones`,
+`DELETE /sesiones/{id}`, `GET /cuenta/exportar`, `POST /cuenta/baja`, `GET /terminos`, `POST /terminos/aceptar`, `GET /privacidad`,
+`GET /acerca`, `POST`/`GET /soporte` y `GET /sitios/{id}/actividad`. La página de privacidad sale del inventario de `docs/21 §2`
+(`legal/inventario.ts`, comparado celda por celda con el documento por `legal.spec.ts`). Los avisos de terceros los escribe
+`generar-avisos-terceros.sh` desde `pnpm licenses list --prod --json` (179 paquetes de producción, ninguna herramienta de desarrollo).
+El OpenAPI pasa de 26 rutas (33 operaciones) a 37 (46); `orden` de `GET /dispositivos` ya estaba declarado.
+
+**Cómo se verificó y cifras.**
+
+| Verificación | Resultado |
+|---|---|
+| `pnpm typecheck` y `pnpm lint` (backend) | 0 errores |
+| Pruebas unitarias del backend (vitest) | 541 de 541 (antes 513): la matriz de siete columnas escrita aparte de `PERMISOS`, el guardia con términos, preferencias, textos de actividad, la regla del último administrador y el orden de la baja, privacidad contra `docs/21`, acerca, soporte |
+| Plantado: `exportar` de vuelta en solo administrador | 4 pruebas de `permisos.spec.ts` fallan («investigador exporta») |
+| Plantado: `escribir` abierto a consulta | 5 pruebas fallan |
+| Plantado: sin el candado de los administradores en `PATCH /usuarios/{id}` | la prueba del orden falla (dos desactivaciones cruzadas pasarían las dos) |
+| Plantado: una línea menos en `avisos-de-terceros.txt` (svelte) | `generar-avisos-terceros.sh --comprobar` (paso 2r2) falla con «svelte@5.57.3 sin aviso» |
+| `sesion-smoke.sh` (paso 4b), con la imagen nueva | **351 de 351** en una base sin otro administrador del sistema, **349 de 349** dentro del guardián, con la semilla que ya lo trae (antes 182): una sesión por perfil, cada ruta nueva con los siete perfiles, términos pendientes y su 403, baja con motivo, 409 reactivable y reactivación, perfil global, último administrador del sistema (409 al quitarse el perfil y al darse de baja), preferencias con bloqueo optimista, sesiones propias (la de otro, 404), exportar con `attachment`, soporte (el sexto en la hora, 429), actividad (sin correos ni IP, por cursor, otro sitio 404) y la baja por anonimización contra la base |
+| Baja por anonimización, en la base | sin el nombre ni el correo de antes, sin clave, sesiones revocadas y sitios inactivos; `acceso` y `evento` siguen enlazados por el id; el correo de antes no entra (401) |
+| `semilla-demo.sh` | una persona de demostración por perfil (`@ejemplo.invalid`) |
+
+Las comprobaciones del último administrador del sistema se omiten (con aviso) cuando la base ya tiene otro; con la semilla nueva, la de
+desarrollo lo tiene.
+
+**Correcciones de la revisión** (revisión del bloque en tres frentes: seguridad, concordancia, privacidad y accesibilidad; cada hallazgo
+se comprobó en el archivo antes de corregirlo, y cada corrección tiene su prueba en los dos sentidos, plantando el error):
+- **Cuenta de un administrador del sistema** (`rechazoDeCambio`): un administrador de sitio podía asignarle una clave temporal (y entrar
+  como él) si compartían un sitio. Ahora su cuenta y sus sitios solo los cambia otro administrador del sistema (403). Prueba unitaria y
+  cuatro casos en el paso 4b (clave temporal, baja, nombre y sitio, con la huella de la cuenta intacta); plantado sin la regla, 3 pruebas fallan.
+- **Reactivación:** exige `clave_temporal: true` en la misma petición (400 si no; la clave de antes no vuelve), y la baja que hizo un
+  administrador del sistema (o la clave por cabecera) solo la deshace un administrador del sistema (403). En el paso 4b, además, la clave
+  de antes de la baja ya no entra (401).
+- **Soporte:** el tope de 5 por hora no era atómico (se miraba antes del `INSERT` y se anotaba después): `intentar()` reserva el cupo sin
+  un `await` en medio y `devolver()` lo libera si el `INSERT` falla. Ráfaga de 20 envíos simultáneos con un `INSERT` lento: 5 llegan a la
+  base y 15 reciben 429 (con la versión anterior, los 20 pasaban). `TasaPorPersona` (alta por lote) ya reservaba en la misma llamada.
+- **`fn_anonimizar_usuario`** (migración 24, aplicada dos veces): exige `por`, toma el candado de los administradores y rechaza la baja del
+  último administrador del sistema activo dentro de la función; anula el correo tecleado en `acceso` y el `motivo` de los eventos
+  `usuario_cambio` de esa cuenta. `db/pruebas/anonimizacion.sql` lo planta en una transacción que se deshace (paso 1c): 6 de 6 con la
+  función nueva; con la anterior, 4 fallan.
+- **Altas por persona:** 10 por minuto (`ALTAS_POR_MINUTO`): el 409 por correo existente no depende del alcance; el riesgo residual queda
+  escrito en `docs/20 §10` (R9).
+- **«Acerca de»:** la versión y el commit, solo con sesión; la licencia, su aviso y el enlace al código, siempre. `pila.sh encender` exporta
+  `COMMIT` antes de construir y `.env.example` trae el enlace del repositorio público; el paso 2z vigila además `RESPONSABLE_*` y
+  `CODIGO_FUENTE_URL` (plantado sin `CODIGO_FUENTE_URL` en el compose, falla).
+- **Exportar mis datos:** suma el correo tecleado en sus accesos, la fecha y el motivo de una baja y el detalle de sus cambios; el aviso
+  dice qué no incluye.
+- **Actividad del sitio:** los eventos sin dispositivo se perdían; ahora entran los de las pasarelas del sitio, las cuentas de sus
+  personas y los términos aceptados, con su texto (paso 4b: altas de cuentas de A, términos y la pasarela de A, nada de B).
+- **Vistas guardadas:** el servidor exigía `parametros` como objeto y el panel mandaba texto: ninguna vista se guardaba. Ahora es
+  `{ruta}` en los dos lados, con una prueba cruzada (lo que arma el panel lo acepta el validador del servidor) y tres casos contra la pila.
+- **Privacidad:** la prueba que compara `docs/21 §2` con `legal/inventario.ts` se saltaba la primera fila («Nombre»), y la página de
+  privacidad no la mostraba; corregida la prueba y regenerado el arreglo (16 filas, con la nueva del motivo de baja).
+- **Avisos de terceros:** el texto completo de cada licencia distinta de MIT (0BSD, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC y
+  Python-2.0) y su NOTICE si existe; `--comprobar` (paso 2r2) falla si falta alguno (con el archivo anterior, falla con las seis).
+- **Telemetría:** `SCARF_ANALYTICS=false` en las dos etapas de instalación del `Dockerfile` (además de `ignore-scripts`).
+- **`docs/20 §11`** citaba el dominio de las personas de prueba para el correo anonimizado: el guardián compara ahora el dominio citado con
+  el de la función (paso 2g; plantado `@ejemplo.invalid`, falla).
+
+| Verificación tras la corrección | Resultado |
+|---|---|
+| Pruebas unitarias del backend | 552 de 552 en 53 archivos (antes 541) |
+| `sesion-smoke.sh` (paso 4b) | 371 de 371 (antes 351) |
+| `api-smoke.sh` (paso 4) | 114 comprobaciones, todo bien |
+| OpenAPI | 37 rutas, 46 operaciones (sin rutas nuevas; descripciones al día) |
+
+## 64. Pantallas P6, P7, P11, P13 y P14 y prueba en navegador del tablero v2 (11/11/2026)
+
+**Qué cambió** (diseño: `docs/19 §4`, tablero v2, E, F, G, H y P11; `docs/20 §11` y §12; `docs/21 §4`, §5 y §7; el contrato, el
+`openapi.json` y las rutas de la cuenta, los términos y la actividad de §63).
+
+- **P6 Configurar** (`#/dispositivos/<id>/configurar`, desde la ficha para quien tiene `configurar`). Nombre, estado, intervalo esperado y
+  zona del sitio; por canal, etiqueta y hasta cuatro reglas (alto, bajo, histéresis, retardo de activación). La validación es la del
+  servidor escrita para el panel (`lib/configurar.ts`, mismos campos y motivos que `configuracion.dto.ts`), se lee junto a cada campo
+  mientras se escribe y es la misma que arma el cuerpo; un 400 del servidor se reparte por campo; el `PUT` conserva el id de cada regla;
+  el 409 dice «alguien lo cambió a las HH:MM» en la zona del sitio con «Recargar» y no pisa lo escrito; nada se muestra guardado antes
+  de la respuesta («Guardando…»).
+- **P7 Alta** (`#/alta`). Asistente de cinco pasos con el motivo escrito junto a «Siguiente», la credencial y el tópico una sola vez con
+  «Copiar» y la espera de la primera trama por el canal en vivo del dispositivo nuevo; un 409 remite al inventario en vez de duplicar.
+  Alta masiva (`?modo=lote`): el CSV se lee en el navegador (RFC 4180, marca BOM, cabecera fija, tope de 500 filas antes de enviar),
+  `modo=validar` va completo y `modo=crear` en tandas secuenciales de 50 (D-103 A) con «Creadas N de M»; si una tanda falla, se detiene,
+  dice desde qué fila y ofrece «Reintentar las restantes (N)». Las credenciales no se dibujan: «Descargar credenciales (CSV)» y, después,
+  «Ya las guardé: olvidarlas». «Descargar rechazadas» lleva las columnas del archivo más `motivo`, que el lector ignora al volver a subirlo;
+  una celda con forma de fórmula se neutraliza con un apóstrofo (salvo las credenciales). Bandeja de detectados (`?modo=detectados`):
+  cada emisor lleva al asistente con su identificador escrito.
+- **P13 Preferencias y mi cuenta** (`#/preferencias`). Unidades, zona horaria, tema, sitio al entrar, notificaciones del navegador por
+  tipo (el permiso se pide al marcar la primera) y vistas guardadas (la última vista de datos abierta, con nombre); cada cambio se ve al
+  instante, viaja completo con el `actualizado_en` leído, en fila (nunca dos `PUT` en vuelo) y, si el servidor lo rechaza, vuelve atrás
+  solo lo que ese guardado cambió, con el aviso. Mi cuenta: sesiones abiertas con «Cerrar esta sesión» (la actual, por «Salir»), términos
+  aceptados, «Exportar mis datos» (`GET /cuenta/exportar` por el ayudante `descargar`) y «Darme de baja» explicada, con la clave actual y
+  la casilla de irreversible.
+- **P14 Actividad** (`#/actividad`, en el menú para quien tiene `auditoria`). Lista por cursor con «Más antiguos», filtros por persona, tipo
+  y rango en la URL, texto del servidor con quién lo hizo, enlace a la ficha y tarjetas bajo 700 px.
+- **P11 Legal y acerca de** (`#/legal`, con `?seccion=`). Privacidad desde `GET /privacidad` (inventario por filas, responsable o el aviso
+  de que no está configurado), términos con versión y fecha, acerca de con versión y commit, la cookie y los avisos de terceros; todo
+  como texto (los títulos y listas en Markdown simple se parten en bloques; nada del servidor se interpreta como HTML); soporte con su
+  límite de tasa (el 429 dice los segundos). **Términos obligatorios:** con `GET /sesion → terminos.pendiente` o con cualquier 403
+  `terminos_pendientes`, la pantalla «Términos de uso» con «Acepto los términos (versión N)» y «Salir»; ninguna pantalla de datos ni canal
+  en vivo existe hasta aceptar, y después se vuelve a la ruta pedida.
+- **Notificaciones en pantalla (E).** Una condición abierta en un sitio de la persona aparece en cualquier pantalla como aviso agrupado
+  por dispositivo («Invernadero: Umbral, Batería (× 2)», con «Abrir la ficha»), en una región `aria-live` que no roba el foco; los
+  nombres se piden con antirrebote; la notificación del navegador, solo para los tipos elegidos y con permiso (una por dispositivo, por
+  `tag`). El canal sin filtro es uno por pestaña: el tablero, el inventario, la comparación y los avisos lo comparten
+  (`abrirCanalCompartido`, `lib/vivo.ts`).
+- **Lo que pedía la revisión del backend.** El inventario manda `orden=atencion` por defecto y, con un servidor que pagina, ya no
+  reordena la página recibida; la ficha dice «registrado por N» o «cambiado por N» solo cuando el servidor manda la persona y, con
+  `usuario: null`, no dice nada de quién (antes decía «(sistema)», que no es lo que significa ese null); la guía de perfiles tiene frase
+  para las nueve acciones de la matriz de cinco perfiles.
+
+**Hallazgos de la prueba con navegador real (corregidos).** (1) Las 6 comprobaciones rotas del paso 4c: «Nombre» también rotula una
+columna de la lista de usuarios (el selector se acota al formulario de alta) y «Salir» vive dentro del menú de cuenta plegado desde el
+armazón v2 (se abre antes). (2) A 390 px, la ayuda emergente de «Marcar los visibles» se salía 11 px por la derecha y la página se
+desplazaba a lo ancho (401 px de documento): en teléfono la ayuda va fija al pie, a todo el ancho (`app.css`). (3) Una casilla de
+notificación quedaba marcada aunque el navegador negara el permiso: vuelve a desmarcarse. (4) La segunda corrida (Firefox, sobre el mismo
+dispositivo que dejó la de Chromium) no tenía conflicto que probar: la «otra pestaña» escribía el mismo nombre y un `PATCH` que no cambia
+nada no mueve `actualizado_en`; el nombre lleva ahora el navegador y la otra escritura va por la API desde la misma página. Y uno
+que queda escrito en el diseño: 500 filas son una validación y 10 tandas, y el servidor admite 10 lotes por minuto por persona, así que la
+última tanda recibe 429 y queda en «Reintentar las restantes» (`docs/19 §4`, F2).
+
+**Cómo se probó.** Por el DOM (vitest con jsdom y respuestas con la forma del contrato), en los dos sentidos: los casos de
+`configuracion.dto.spec.ts` contra la función del panel (bajo ≥ alto, histéresis, rango físico, retardo 86 401 y 1,5, al menos un umbral,
+cinco reglas, etiqueta larga); el error enlazado al campo con `aria-describedby` y `aria-invalid`; «Guardando…» con `aria-busy` mientras el
+`PUT` no responde; el 409 con «10:42» en America/Santiago para un `13:42Z`; 121 válidas en tandas de 50, 50 y 21 con la segunda fallando
+(50 creadas, 71 pendientes, el reintento las completa y nunca hay dos tandas en vuelo); 501 filas frenadas sin enviar nada; el preferido
+°F antes de la respuesta y el 409 que lo devuelve; el permiso pedido solo al marcar; la baja con clave mala (400) sin llamar a la salida;
+la actividad por cursor y en tarjetas; un `<script>` en los términos queda como texto; la pantalla de términos sin ninguna petición de
+datos ni canal; y una sola conexión `/eventos` con el inventario y los avisos montados. Con navegador real: el paso 4c
+(`pruebas/panel-sesion-e2e.sh` y `e2e/sesion.mjs`), Chromium 156 y Firefox 157, a 390 y 1 280 px, contra la pila con la imagen del
+backend recién construida: legal antes de entrar; la aceptación de los términos tras cambiar la clave (con el 403 `terminos_pendientes`
+antes); los indicadores del tablero suman el total y el total es el `X-Total` del inventario del sitio; P6 con el error junto al campo,
+la regla guardada en el servidor y el 409 tras otra escritura; P13 con °F en la tarjeta de la ficha y la base en °C; P14 con el cambio de umbrales y su
+autor, sin correos; P7 con el asistente por HTTP (sin tocar el broker) y un lote de 2 válidas y 1 rechazada que crea solo 2; todas las
+pantallas sin desplazamiento horizontal; datos propios y desechables, borrados al final (la limpieza suma eventos, preferencias y
+mensajes de soporte de las personas de prueba).
+
+**Capturas reproducibles a 390 px** (Chromium, con la hora, los gráficos y los secretos tapados; se regeneran con
+`E2E_CAPTURAS=docs/capturas/panel-sesion bash plataforma/pruebas/panel-sesion-e2e.sh`): `docs/capturas/panel-sesion/6-tablero-chromium-390.png`,
+`3-inventario-chromium-390.png` y `7-ficha-chromium-390.png`, para la lámina de la presentación.
+
+| Medida | Antes | Después |
+|---|---|---|
+| Pruebas del panel (vitest) | 243 en 23 archivos | 284 en 31 archivos (282 casos escritos, la cifra que compara el guardián; se adaptaron, sin quitar ninguna, las que fijaban el orden sin `orden=atencion`, «(sistema)», el menú sin Actividad y la matriz de dos perfiles) |
+| `pnpm check` | 376 archivos, 0 errores | 396 archivos, 0 errores, 0 avisos |
+| Paso 4c (Chromium y Firefox, 390 y 1 280 px) | 84 de 90 (6 rotas) | 218 de 218 (109 por navegador) |
+| JS del panel (`index-*.js`) | 179 541 B (62,73 kB comprimido) | 257 489 B (86,67 kB comprimido) |
+| CSS | 20 636 B | 22 747 B (5,04 kB comprimido) |
+| JS total (con uPlot, 50 990 B, aparte) | 230 531 B | 308 479 B (+34 %; frente a antes del tablero, 178 341 B, 1,73 veces: no lo duplica) |
+| Archivos `.map` en `dist/` | 0 | 0 |
+
+**Lo que queda.** La zona horaria propia de P13 se guarda pero las pantallas siguen en la del sitio; el asistente no ofrece el perfil de
+decodificación (sigue por API) y la magnitud se escribe como código (no hay una ruta del catálogo de magnitudes); con navegador real
+faltan la bandeja de detectados (exige sembrar una trama `no_registrado`), la primera trama del asistente (exige publicar con la
+credencial), la notificación del navegador (permisos de Playwright) y el tema oscuro en captura (los cuatro perfiles de sitio en P10,
+pendientes aquí, se corrigieron abajo); y las pantallas nuevas podrían cargarse aparte, a pedido, para no sumar su peso a la primera
+carga.
+
+**Correcciones de la revisión** (revisión del bloque en tres frentes; cada hallazgo comprobado en el archivo, cada corrección con su
+prueba en los dos sentidos):
+- **Usuarios (P10):** «Desactivar» mandaba la baja sin `motivo` y el servidor respondía 400 siempre: ahora pide el motivo (1–300) junto al
+  aviso «sin nombres ni datos personales» y no envía nada sin él; el servidor simulado de la prueba exige lo mismo que el real. El selector
+  ofrece los cuatro perfiles de sitio; el administrador del sistema ve la casilla del perfil global y los sitios de `GET /sitios`; el 409
+  `reactivable` del alta ofrece «Reactivar» (con una temporal nueva); «Activar» reactiva con clave temporal; la cuenta de un administrador
+  del sistema no se ofrece a quien administra solo un sitio. Paso 4c: los cuatro perfiles, la baja con motivo y la reactivación desde el alta.
+- **Asistente de alta (P7):** encabezado «Paso N de 5» con el foco al cambiar de paso (también en la credencial), errores del paso 1
+  ligados a cada campo, el tamaño del CSV comprobado antes de leerlo, y las credenciales se olvidan al salir de la pantalla y al perder
+  la sesión; cerrar la pestaña con credenciales del lote sin descargar pide confirmar. Plantada cada regresión, su prueba falla.
+- **Avisos fijos al pie (WCAG 2.4.11):** en teléfono se ven 2 y el resto queda plegado en «y N más». La prueba con navegador real
+  (tres avisos a 390 px y Tab hasta «Enviar a soporte») mostró que un margen fijo de 8rem no alcanzaba: el botón quedaba entero bajo los
+  avisos (de 651 a 695 px, con los avisos desde 547). Ahora el margen sigue lo que miden los avisos (`--alto-avisos`) y el paso 4c lo
+  comprueba en Chromium y Firefox.
+- **Notificación del navegador:** cuerpo genérico («N condiciones nuevas en» el sitio; `GET /condiciones` suma `sitio`), dicho en la ayuda.
+- **«Acerca de» (P11):** el aviso AGPL del servidor siempre y, sin enlace configurado, «pídelo al responsable (Soporte)»; sin sesión,
+  sin versión.
+- **Otras:** la baja propia con una clave mala (400) dice «La clave no es la actual»; «Darme de baja» separa altas y cambios (sin datos
+  tuyos) de los accesos con IP (90 días) y suma los mensajes de soporte; `POST /cuenta/baja` cambia la generación de la sesión (un 401
+  atrasado no dice «venció»); los rótulos de P14 son los códigos reales del servidor; la guía de perfiles ya no dice que `escribir` da
+  de baja ni ofrece enlaces públicos sin ruta; el motivo de exportar nombra a administrador e investigador; las capturas tapan además la
+  cabecera del servicio y se regeneraron (`3-inventario`, `6-tablero` y `7-ficha` a 390 px).
+
+| Verificación tras la corrección | Resultado |
+|---|---|
+| Pruebas del panel | 297 del panel (299 ejecuciones en vitest, en 31 archivos); `pnpm check`: 396 archivos, 0 errores |
+| Paso 4c (Chromium y Firefox, 390 y 1 280 px) | 230 de 230 (antes 218) |

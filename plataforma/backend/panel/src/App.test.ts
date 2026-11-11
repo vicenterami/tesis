@@ -44,7 +44,7 @@ const historico = (canal: string): Historico => ({ canal_id: canal, magnitud: 'x
 const SESION = {
   sistema: false, usuario: { id: 'u1', nombre: 'Ana', email: 'ana@ejemplo.invalid' }, clave_temporal: false,
   sitios: [{ sitio_id: 's1', codigo: 'uct', nombre: 'Campus', rol: 'administrador' }], expira_en: null, inactividad_vence_en: null,
-  permisos: { administrador: ['leer', 'exportar', 'escribir', 'usuarios'], consulta: ['leer'] },
+  permisos: { administrador: ['leer', 'exportar', 'escribir', 'baja', 'configurar', 'usuarios', 'enlaces', 'auditoria'], consulta: ['leer'] },
 };
 class FuenteInerte {
   readyState = 1;
@@ -216,7 +216,11 @@ describe('armazón: llegada, menú, sitio, legal y tema', () => {
     expect(screen.getByRole('link', { name: 'Inventario' }).getAttribute('href')).toBe('#/inventario');
     expect(screen.getByRole('link', { name: 'Usuarios' })).toBeTruthy(); // administra su sitio
     expect(screen.queryByRole('link', { name: /Condiciones/ })).toBeNull(); // sin pantalla todavía: sin enlace
-    expect([...document.querySelectorAll('[data-nav-pendiente]')].map((x) => x.textContent)).toEqual(['Condiciones (próximamente)', 'Cuarentena (próximamente)', 'Actividad (próximamente)']);
+    expect([...document.querySelectorAll('[data-nav-pendiente]')].map((x) => x.textContent)).toEqual(['Condiciones (próximamente)', 'Cuarentena (próximamente)']);
+    // Desde P7 y P14 (11/11/2026): «Actividad» con «auditoria» en la matriz, «Dar de alta» con «escribir»; «Preferencias» en la cuenta.
+    expect(screen.getByRole('link', { name: 'Actividad' }).getAttribute('href')).toBe('#/actividad');
+    expect(screen.getByRole('link', { name: 'Dar de alta' }).getAttribute('href')).toBe('#/alta');
+    expect(document.querySelector('[data-ir-preferencias]')!.getAttribute('href')).toBe('#/preferencias');
     expect(screen.getByRole('link', { name: 'Legal y acerca de' }).getAttribute('href')).toBe('#/legal');
   });
 

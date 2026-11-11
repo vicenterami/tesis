@@ -131,7 +131,7 @@ describe('Inventario (P2): semáforo, orden y filtros leídos del DOM', () => {
     zona.value = 'z-lab'; // la «Lab» del campus
     zona.dispatchEvent(new Event('change'));
     await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(4)); // Invernadero, Bodega, Azotea; no la de la sede norte
-    expect(vi.mocked(fetch).mock.calls.map(([r]) => String(r)).some((r) => r.startsWith('/dispositivos?zona=z-lab&limite=50'))).toBe(true); // filtra el servidor
+    expect(vi.mocked(fetch).mock.calls.map(([r]) => String(r)).some((r) => r.startsWith('/dispositivos?zona=z-lab&orden=atencion&limite=50'))).toBe(true); // filtra el servidor
     expect(screen.queryByText('Estación norte')).toBeNull();
     await rerender({ sitios, filtros: { ...SIN_FILTROS, sitio: 'norte' } }); // lo que hace el selector de la cabecera
     // La zona elegida no es de la sede norte: vuelve a «todas»; quedan solo los dispositivos de esa sede, y la zona sin prefijo.
@@ -278,11 +278,11 @@ describe('Inventario v2: paginación, estado del servidor, tarjetas en angosto, 
     render(Inventario, { alCambiarVista: (f: string) => vistas.push(f) });
     await waitFor(() => expect(document.querySelector('[data-rotulo-pagina]')?.textContent).toBe('1–50 de 132'));
     expect(screen.getAllByRole('row')).toHaveLength(51);
-    expect(paginas()[0]).toBe('/dispositivos?limite=50&desplazamiento=0');
+    expect(paginas()[0]).toBe('/dispositivos?orden=atencion&limite=50&desplazamiento=0');
     expect(document.querySelector('[data-conteo="normal"] .n')?.textContent).toBe('132'); // del servidor (X-Total), no de la página
     (document.querySelector('[data-pagina-siguiente]') as HTMLButtonElement).click();
     await waitFor(() => expect(document.querySelector('[data-rotulo-pagina]')?.textContent).toBe('51–100 de 132'));
-    expect(paginas().at(-1)).toBe('/dispositivos?limite=50&desplazamiento=50');
+    expect(paginas().at(-1)).toBe('/dispositivos?orden=atencion&limite=50&desplazamiento=50');
     expect(vistas.at(-1)).toBe('#/inventario?pagina=2');
     (document.querySelector('[data-pagina-siguiente]') as HTMLButtonElement).click();
     await waitFor(() => expect(document.querySelector('[data-rotulo-pagina]')?.textContent).toBe('101–132 de 132'));
@@ -297,7 +297,7 @@ describe('Inventario v2: paginación, estado del servidor, tarjetas en angosto, 
     const via = screen.getByLabelText('Vía') as HTMLSelectElement;
     via.value = 'mqtt';
     via.dispatchEvent(new Event('change'));
-    await waitFor(() => expect(paginas().at(-1)).toBe('/dispositivos?via=mqtt&limite=50&desplazamiento=0'));
+    await waitFor(() => expect(paginas().at(-1)).toBe('/dispositivos?via=mqtt&orden=atencion&limite=50&desplazamiento=0'));
   });
 
   it('el estado de cada fila es el del servidor al cargar y el del panel desde el primer dato en vivo (misma regla, §2)', async () => {

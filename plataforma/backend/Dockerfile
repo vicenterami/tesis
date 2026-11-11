@@ -15,6 +15,9 @@ RUN corepack enable
 # Copiar antes que el resto: si solo cambia el código, esta capa se reutiliza de caché.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY panel/package.json ./panel/
+# Sin telemetría de paquetes al instalar (docs/21 §3; 11/11/2026): Scarf la envía desde un script de instalación, que .npmrc ya no deja
+# correr (ignore-scripts=true); la variable la apaga además por si otra vía la intentara.
+ENV SCARF_ANALYTICS=false
 RUN pnpm install --frozen-lockfile
 COPY tsconfig*.json nest-cli.json ./
 COPY src ./src
@@ -41,6 +44,7 @@ COPY panel/package.json ./panel/
 # npm, npx, corepack y Yarn vienen en la imagen base y el contenedor nunca los usa: se quitan (08/10/2026). El escaneo
 # encontró en las dependencias internas de npm (tar, sigstore, pacote…) vulnerabilidades que no son del sistema; sin npm,
 # no están.
+ENV SCARF_ANALYTICS=false
 RUN pnpm install --prod --frozen-lockfile --filter plataforma-backend \
     && rm -rf "$(pnpm store path --silent)" /root/.cache/pnpm \
     && corepack disable \
@@ -49,6 +53,9 @@ RUN pnpm install --prod --frozen-lockfile --filter plataforma-backend \
               /usr/local/bin/yarn /usr/local/bin/yarnpkg /opt/yarn-v*
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/panel/dist ./panel/dist
+# Commit de la compilación para «Acerca de» (GET /acerca; docs/21 §7), si quien construye lo pasa (--build-arg COMMIT=…); vacío, null.
+ARG COMMIT=""
+ENV COMPILACION_COMMIT=$COMMIT
 # La imagen oficial ya trae un usuario sin privilegios; se usa en vez de root.
 USER node
 EXPOSE 3000

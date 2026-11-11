@@ -9,6 +9,8 @@ import { RetencionModule } from './retencion/retencion.module.js';
 import { TiempoRealModule } from './tiempo-real/tiempo-real.module.js';
 import { AltaModule } from './alta/alta.module.js';
 import { SesionModule } from './sesion/sesion.module.js';
+import { CuentaModule } from './cuenta/cuenta.module.js';
+import { LegalModule } from './legal/legal.module.js';
 
 // Módulo raíz. Cada módulo de aquí corresponde a un módulo funcional del diseño (docs/10 §1):
 //   DbModule        → acceso a TimescaleDB (infraestructura compartida)
@@ -26,6 +28,8 @@ import { SesionModule } from './sesion/sesion.module.js';
 //   SesionModule    → M7 Seguridad e identidad (docs/20, Etapa 4): POST/GET/DELETE /sesion, POST /sesion/clave, /usuarios y el guardia
 //                     central GLOBAL (APP_GUARD): toda ruta exige la cookie de sesión o la clave de administrador, salvo las @Publica();
 //                     cada ruta decide con permitir() sobre el sitio del recurso (docs/10 §8.4 punto 36). Va antes que los que lo usan.
+//   CuentaModule    → lo propio de cada persona (Etapa 4): /preferencias, /sesiones, /cuenta/exportar y /cuenta/baja (docs/20 §11)
+//   LegalModule     → términos con su versión y aceptación, privacidad, acerca de y soporte (Etapa 4; docs/19 §4, P11; docs/21 §7)
 // M8 es el panel (backend/panel).
 @Module({
   imports: [
@@ -41,6 +45,8 @@ import { SesionModule } from './sesion/sesion.module.js';
     RetencionModule,
     TiempoRealModule,
     AltaModule,
+    CuentaModule,
+    LegalModule,
   ],
 })
 export class AppModule {}
