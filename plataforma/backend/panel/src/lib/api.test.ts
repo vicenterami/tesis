@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ErrorApi, accionPara, alPerderSesion, comprobarSesion, descargar, nombreDeArchivo, obtener, pedir, segundosDeEspera, ultimaGana, type Guardador } from './api';
+import { ErrorApi, accionPara, alPerderSesion, comprobarSesion, descargar, leerPaginacion, nombreDeArchivo, obtener, obtenerPagina, pedir, segundosDeEspera, ultimaGana, type Guardador, type Paginacion } from './api';
 
 const json = (cuerpo: unknown, status = 200, cabeceras: Record<string, string> = {}): Response => new Response(JSON.stringify(cuerpo), { status, headers: cabeceras });
 const llamadas = (): [string, RequestInit][] => vi.mocked(fetch).mock.calls as unknown as [string, RequestInit][];
@@ -132,6 +132,12 @@ describe('descargar', () => {
     expect(nombreDeArchivo('attachment; filename="../../etc/passwd"', 'x.csv')).toBe('x.csv');
     expect(nombreDeArchivo(null, 'x.csv')).toBe('x.csv');
   });
+  it('nombreDeArchivo: solo .csv y .json (lo que la API entrega); otra extensión da el nombre de por defecto', () => {
+    expect(nombreDeArchivo('attachment; filename="datos.exe"', 'x.csv')).toBe('x.csv');
+    expect(nombreDeArchivo('attachment; filename="pagina.html"', 'x.csv')).toBe('x.csv');
+    expect(nombreDeArchivo('attachment; filename="sin-extension"', 'x.json')).toBe('x.json');
+    expect(nombreDeArchivo('attachment; filename="dev-0001.JSON"', 'x.json')).toBe('dev-0001.JSON');
+  });
   it('nombreDeArchivo: un «%» mal formado (URIError al decodificar) da el nombre por defecto, sin lanzar', () => {
     expect(nombreDeArchivo("attachment; filename*=UTF-8''medici%E0%A4n.json", 'x.json')).toBe('x.json');
     expect(nombreDeArchivo('attachment; filename="100%.csv"', 'x.csv')).toBe('x.csv');
@@ -168,5 +174,29 @@ describe('generación de la sesión: los avisos atrasados se descartan', () => {
     await expect(obtener('/otra')).rejects.toMatchObject({ codigo: 401 });
     expect(o.motivos).toEqual(['sin_sesion']);
     o.dejar();
+  });
+});
+
+// Totales y cursores en cabeceras (docs/19 §6 y §4 tablero v2, I): `pedir` los expone a quien los pide y no cambia nada para los demás.
+describe('paginación: X-Total y X-Siguiente', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  it('obtenerPagina entrega las filas, el total y el cursor; sin cabeceras, null (un backend anterior)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => json([{ id: 'a' }], 200, { 'X-Total': '132', 'X-Siguiente': 'c2' })));
+    await expect(obtenerPagina('/dispositivos?limite=50')).resolves.toEqual({ filas: [{ id: 'a' }], total: 132, siguiente: 'c2' });
+    vi.stubGlobal('fetch', vi.fn(async () => json([])));
+    await expect(obtenerPagina('/dispositivos')).resolves.toEqual({ filas: [], total: null, siguiente: null });
+  });
+  it('pedir con alPaginar avisa las cabeceras; quien no lo pasa recibe el mismo cuerpo de siempre', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => json([1, 2], 200, { 'X-Total': '2' })));
+    const vistas: Paginacion[] = [];
+    await expect(pedir('GET', '/x', { alPaginar: (p) => vistas.push(p) })).resolves.toEqual([1, 2]);
+    expect(vistas).toEqual([{ total: 2, siguiente: null }]);
+    await expect(obtener('/x')).resolves.toEqual([1, 2]);
+  });
+  it('en los dos sentidos: un total que no es un entero no negativo se descarta (nunca NaN ni negativo en «1–50 de N»)', () => {
+    expect(leerPaginacion(new Headers({ 'X-Total': 'muchos' })).total).toBeNull();
+    expect(leerPaginacion(new Headers({ 'X-Total': '-3' })).total).toBeNull();
+    expect(leerPaginacion(new Headers({ 'X-Total': '' , 'X-Siguiente': '  ' }))).toEqual({ total: null, siguiente: null });
+    expect(leerPaginacion(new Headers({ 'X-Total': '0' })).total).toBe(0);
   });
 });

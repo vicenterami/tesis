@@ -140,3 +140,14 @@ export function claveApp(valor: string | undefined): string {
 export function rutaSinCache(ruta: string): boolean {
   return !/^\/(panel|docs)(\/|$)/i.test(ruta);
 }
+
+// Tope de bytes del cuerpo JSON fuera del alta por lote (main.ts): 100 KiB, el de fábrica del lector. El lote admite hasta 512 KiB (su
+// tope real es el de filas, lote.ts). Lo usan el atajo por Content-Length y `verify`, que cuenta lo leído cuando el cuerpo llega por
+// trozos (Transfer-Encoding: chunked, sin largo declarado).
+export const TOPE_CUERPO = 100 * 1024;
+export function esLote(url: string | undefined): boolean {
+  return /^\/dispositivos\/lote(\?|$)/i.test(url ?? '');
+}
+export function cuerpoExcedido(url: string | undefined, bytes: number): boolean {
+  return bytes > TOPE_CUERPO && !esLote(url);
+}

@@ -1,6 +1,6 @@
 <script lang="ts">
-  // Ruteo por fragmento (docs/19 §1): `#/` inventario, `#/dispositivos/<id>` ficha, `#/comparar?dispositivos=…` comparación (P3b),
-  // `#/usuarios` usuarios (P10). Así ninguna ruta del panel choca con las de la API, que viven en la raíz del mismo origen. La vista
+  // Ruteo por fragmento (docs/19 §1): `#/` tablero (desde el tablero v2, A1), `#/inventario` inventario, `#/dispositivos/<id>` ficha, `#/comparar?dispositivos=…` comparación (P3b),
+  // `#/usuarios` usuarios (P10), `#/legal` legal y acerca de (P11, también antes de entrar). Así ninguna ruta del panel choca con las de la API, que viven en la raíz del mismo origen. La vista
   // (canal, rango, filtros) va tras el `?` del fragmento (docs/19 §4, incremento 1, punto 1): se lee al cargar y en cada `hashchange`
   // (atrás, un enlace); cada pantalla la escribe con `replaceState`, que no ensucia el historial ni dispara `hashchange`.
   //
@@ -16,12 +16,17 @@
   import Entrar from './Entrar.svelte';
   import Ficha from './Ficha.svelte';
   import Inventario from './Inventario.svelte';
+  import Legal from './Legal.svelte';
+  import Tablero from './Tablero.svelte';
   import Usuarios from './Usuarios.svelte';
-  import { ErrorApi, alPerderSesion, obtener, pedir } from './lib/api';
+  import { ErrorApi, alPerderSesion, esCancelacion, obtener, pedir, ultimaGana } from './lib/api';
   import { avisoDeError, type DatosAviso } from './lib/avisos';
-  import type { Salud } from './lib/modelo';
+  import { olvidarMarcados } from './lib/comparar';
+  import type { Salud, Sitio } from './lib/modelo';
   import { crearRenovador, puedeEnAlguno, quienSoy, trasAvisoDeSesion, type Fase, type Sesion, type SesionAbierta } from './lib/sesion';
-  import { leerVista } from './lib/vista';
+  import { aplicarTema, leerPreferenciaTema } from './lib/tema';
+  import { preferenciaUnidades } from './lib/unidades';
+  import { fragmentoInventario, fragmentoTablero, leerVista, redireccionVieja } from './lib/vista';
 
   let fase = $state<Fase>('comprobando');
   let sesion = $state<Sesion | null>(null);
@@ -41,6 +46,46 @@
   // El usuario del sistema (clave por cabecera) no tiene personas a su cargo: la pantalla de usuarios es solo para personas con sesión.
   const administraUsuarios = $derived(sesion !== null && !sesion.sistema && puedeEnAlguno(sesion, 'usuarios'));
   const email = $derived(sesion !== null && !sesion.sistema ? sesion.usuario.email : null);
+  // Administrador del sistema (P12, A1): hoy, el usuario del sistema; con los cinco perfiles, el que la sesión declare.
+  const administraSistema = $derived(sesion !== null && sesion.sistema);
+  const unidades = $derived(preferenciaUnidades(sesion?.preferencias));
+
+  // Armazón (docs/19 §4, tablero v2, A1): los sitios de la persona (`GET /sitios`) para el selector de la cabecera, que aparece solo con
+  // más de uno; el sitio vive en la URL (`?sitio=<código>`) y, si no viene, rige la preferencia `sitio_predeterminado` o el primero.
+  let sitios = $state<Sitio[] | null>(null);
+  let errorSitios = $state<string | null>(null);
+  let menuAbierto = $state(false);
+  const cargaSitios = ultimaGana();
+  async function cargarSitios(): Promise<void> {
+    try {
+      sitios = await obtener<Sitio[]>('/sitios', cargaSitios.senal());
+      errorSitios = null;
+    } catch (e) {
+      if (esCancelacion(e)) return;
+      errorSitios = avisoDeError(e).texto;
+    }
+  }
+  const sitioPredeterminado = $derived.by(() => {
+    if (sitios === null || sitios.length === 0) return '';
+    const p = sesion?.preferencias?.sitio_predeterminado ?? null;
+    return (sitios.find((x) => x.codigo === p || x.id === p) ?? sitios[0]!).codigo;
+  });
+  // El sitio de la pantalla: el de la URL si es de la persona; si no, el predeterminado (en el inventario, «todos» es válido).
+  const sitioDeVista = $derived.by(() => {
+    if (vista.pantalla === 'tablero') return sitios?.some((x) => x.codigo === vista.sitio) ? vista.sitio : sitioPredeterminado;
+    if (vista.pantalla === 'inventario') return vista.filtros.sitio;
+    return null;
+  });
+  const sitioActual = $derived(sitios?.find((x) => x.codigo === sitioDeVista) ?? null);
+  function elegirSitio(codigo: string): void {
+    if (vista.pantalla === 'tablero') alCambiarVista(fragmentoTablero(codigo, vista.rango, vista.fija));
+    else if (vista.pantalla === 'inventario') alCambiarVista(fragmentoInventario({ ...vista.filtros, sitio: codigo, zona: '', pagina: 1 }));
+  }
+  // Una ruta nueva cierra el menú plegado (el teléfono vuelve a ver la pantalla, no el menú).
+  $effect(() => {
+    void ruta;
+    menuAbierto = false;
+  });
 
   // Una pantalla cambió su vista: se reemplaza la entrada actual del historial (nunca pushState por cada filtro) y `ruta` se
   // pone al día, para que un `hashchange` posterior hacia la vista anterior se note como cambio.
@@ -59,8 +104,12 @@
       // central: false → aquí un 401 no es «venció», es «no hay sesión»: se muestra «Entrar» sin aviso.
       const s = await pedir<Sesion>('GET', '/sesion', { central: false });
       sesion = s;
+      aplicarTema(leerPreferenciaTema(s.preferencias?.tema)); // «sistema» mientras el backend no traiga la preferencia
       fase = !s.sistema && s.clave_temporal ? 'cambiar' : 'dentro';
-      if (fase === 'dentro') volverARutaGuardada();
+      if (fase === 'dentro') {
+        volverARutaGuardada();
+        void cargarSitios();
+      }
       renovador.renovado();
     } catch (e) {
       sesion = null;
@@ -112,8 +161,12 @@
     }
     claveRecienUsada = null;
     rutaGuardada = null;
-    // Quien sale deja el panel en el inventario: la próxima persona que entre en este navegador no hereda la pantalla de la anterior.
+    olvidarMarcados();
+    // Quien sale deja el panel en el tablero (la llegada, A1): la próxima persona que entre en este navegador no hereda la pantalla de la
+    // anterior, ni su sitio ni su tema.
     alCambiarVista('#/');
+    sitios = null;
+    aplicarTema('sistema');
     sesion = null;
     cambiandoClave = false;
     fase = 'entrar';
@@ -121,7 +174,15 @@
   }
 
   onMount(() => {
+    // Un enlace viejo `#/?estado=…` lleva al inventario (`#/inventario?…`), sin sumar una entrada al historial.
+    const redirigir = (): void => {
+      const nueva = redireccionVieja(window.location.hash);
+      if (nueva !== null) history.replaceState(history.state, '', nueva);
+    };
+    redirigir();
+    ruta = window.location.hash;
     const alCambiar = (): void => {
+      redirigir();
       ruta = window.location.hash;
     };
     window.addEventListener('hashchange', alCambiar);
@@ -131,6 +192,7 @@
     // Lo que vale para toda la aplicación (lib/api.ts): 401 → «Entrar» guardando la ruta y olvidando la temporal recién escrita; 403
     // por clave temporal → cambio obligatorio, solo con sesión (lib/sesion.ts, trasAvisoDeSesion).
     const dejar = alPerderSesion((motivo) => {
+      olvidarMarcados(); // las casillas «comparar» no pasan a quien entre después
       const e = trasAvisoDeSesion({ fase, sesion, claveRecienUsada, cambiandoClave, rutaGuardada, mensajeEntrar }, motivo, window.location.hash);
       ({ fase, sesion, claveRecienUsada, cambiandoClave, rutaGuardada, mensajeEntrar } = e);
     });
@@ -145,6 +207,7 @@
       window.removeEventListener('hashchange', alCambiar);
       for (const t of tipos) window.removeEventListener(t, actividad);
       dejar();
+      cargaSitios.cancelar();
     };
   });
 </script>
@@ -152,27 +215,50 @@
 <header class="principal">
   <h1>Registro, gestión y monitoreo de dispositivos IoT</h1>
   {#if fase === 'dentro'}
-    <nav aria-label="Pantallas">
-      <a href="#/" aria-current={vista.pantalla === 'inventario' ? 'page' : undefined}>Inventario</a>
+    {#if sitios !== null && sitios.length > 1 && (vista.pantalla === 'tablero' || vista.pantalla === 'inventario')}
+      <label class="selector-sitio">Sitio
+        <select value={sitioDeVista ?? ''} onchange={(e) => elegirSitio(e.currentTarget.value)} data-selector-sitio>
+          {#if vista.pantalla === 'inventario'}<option value="">todos los sitios</option>{/if}
+          {#each sitios as x (x.id)}<option value={x.codigo}>{sitios.filter((y) => y.nombre === x.nombre).length > 1 ? `${x.nombre} (${x.codigo})` : x.nombre}</option>{/each}
+        </select>
+      </label>
+    {/if}
+    <span class="menu-boton"><Boton etiqueta="Menú" variante="discreto" aria-expanded={menuAbierto} aria-controls="menu-principal"
+      onclick={() => (menuAbierto = !menuAbierto)} data-menu /></span>
+    <!-- El menú según el rol (A1): las pantallas que aún no existen se nombran sin enlace, para que nadie pulse una página vacía -->
+    <nav id="menu-principal" aria-label="Pantallas" class:abierto={menuAbierto} data-menu-principal>
+      <a href="#/" aria-current={vista.pantalla === 'tablero' ? 'page' : undefined} data-ir-tablero>Tablero</a>
+      <a href="#/inventario" aria-current={vista.pantalla === 'inventario' ? 'page' : undefined} data-ir-inventario>Inventario</a>
+      <span class="nav-pendiente" data-nav-pendiente>Condiciones (próximamente)</span>
+      <span class="nav-pendiente" data-nav-pendiente>Cuarentena (próximamente)</span>
+      {#if administraUsuarios}<span class="nav-pendiente" data-nav-pendiente>Actividad (próximamente)</span>{/if}
       {#if administraUsuarios}<a href="#/usuarios" aria-current={vista.pantalla === 'usuarios' ? 'page' : undefined} data-ir-usuarios>Usuarios</a>{/if}
+      {#if administraSistema}<span class="nav-pendiente" data-nav-pendiente>Estado del sistema (próximamente)</span>{/if}
     </nav>
   {/if}
   <span class="vivo" data-salud>servicio: {salud}</span>
   {#if fase === 'dentro' && quien !== null}
-    <div class="quien" data-quien>
-      <span><strong data-quien-nombre>{quien.nombre}</strong> · <span data-quien-sitios>{quien.sitios}</span></span>
-      {#if sesion !== null && !sesion.sistema}
-        <Boton etiqueta="Cambiar la clave" variante="discreto" onclick={() => (cambiandoClave = true)} data-cambiar-mi-clave />
-        <Boton etiqueta="Salir" etiquetaCargando="Saliendo…" cargando={saliendo} onclick={() => void salir(false)} data-salir />
-        <Boton etiqueta="Cerrar en todos lados" variante="discreto" cargando={saliendo}
-          ayuda="Cierra también las sesiones abiertas en otros navegadores o equipos" onclick={() => void salir(true)} data-salir-todas />
-      {/if}
-    </div>
+    <details class="cuenta" data-quien>
+      <summary>Cuenta: <strong data-quien-nombre>{quien.nombre}</strong></summary>
+      <div class="cuenta-menu">
+        <span class="vivo" data-quien-sitios>{quien.sitios}</span>
+        <span class="vivo">Preferencias (próximamente)</span>
+        {#if sesion !== null && !sesion.sistema}
+          <Boton etiqueta="Cambiar la clave" variante="discreto" onclick={() => (cambiandoClave = true)} data-cambiar-mi-clave />
+          <Boton etiqueta="Salir" etiquetaCargando="Saliendo…" cargando={saliendo} onclick={() => void salir(false)} data-salir />
+          <Boton etiqueta="Cerrar en todos lados" variante="discreto" cargando={saliendo}
+            ayuda="Cierra también las sesiones abiertas en otros navegadores o equipos" onclick={() => void salir(true)} data-salir-todas />
+        {/if}
+      </div>
+    </details>
   {/if}
 </header>
 <main>
   {#if avisoCabecera !== null}<Aviso tipo={avisoCabecera.tipo} texto={avisoCabecera.texto} alCerrar={() => (avisoCabecera = null)} />{/if}
-  {#if fase === 'comprobando'}
+  {#if vista.pantalla === 'legal'}
+    <!-- P11 mínima: también antes de entrar (docs/19 §4, P11) -->
+    <Legal />
+  {:else if fase === 'comprobando'}
     <p class="vacio">Comprobando la sesión…</p>
   {:else if fase === 'sin_servicio'}
     <p class="vacio">No se pudo comprobar la sesión. <Boton etiqueta="Reintentar" onclick={() => { avisoCabecera = null; fase = 'comprobando'; void cargarSesion(); }} data-reintentar-sesion /></p>
@@ -185,7 +271,7 @@
     {#if vista.pantalla === 'ficha'}
       <!-- {#key}: otro dispositivo es otra ficha (otro canal en vivo, otro histórico), no la misma con otro id -->
       {#key vista.id}
-        <Ficha id={vista.id} canal={vista.canal} rango={vista.rango} res={vista.res} {sesion} {alCambiarVista} />
+        <Ficha id={vista.id} canal={vista.canal} rango={vista.rango} res={vista.res} fija={vista.fija} {sesion} {unidades} {alCambiarVista} />
       {/key}
     {:else if vista.pantalla === 'comparar'}
       <!-- otro conjunto de dispositivos es otra comparación (otras fichas, otras series) -->
@@ -196,10 +282,24 @@
       {#if administraUsuarios && !sesion.sistema}
         <Usuarios {sesion} />
       {:else}
-        <p class="vacio" data-sin-usuarios>Tu rol no administra personas en ningún sitio: pídeselo a quien administra el tuyo. <a href="#/">Volver al inventario</a></p>
+        <p class="vacio" data-sin-usuarios>Tu rol no administra personas en ningún sitio: pídeselo a quien administra el tuyo. <a href="#/">Volver al tablero</a></p>
       {/if}
+    {:else if vista.pantalla === 'inventario'}
+      <Inventario filtros={vista.filtros} {sitios} {alCambiarVista} />
+    {:else if errorSitios !== null}
+      <p class="error" role="alert" data-error-sitios>No se pudieron leer tus sitios: {errorSitios} <Boton etiqueta="Reintentar" onclick={() => void cargarSitios()} /></p>
+    {:else if sitios === null}
+      <p class="vacio">Cargando tus sitios…</p>
+    {:else if sitioActual === null}
+      <p class="vacio" data-sin-sitios>No tienes sitios asignados: pídele a quien administra el tuyo que te dé acceso. <a href="#/inventario">Ir al inventario</a></p>
     {:else}
-      <Inventario filtros={vista.filtros} {alCambiarVista} />
+      <!-- {#key}: otro sitio es otro tablero (otro resumen, otras gráficas) -->
+      {#key sitioActual.id}
+        <Tablero sitio={sitioActual} rango={vista.pantalla === 'tablero' ? vista.rango : null} fija={vista.pantalla === 'tablero' ? vista.fija : null} {unidades} {alCambiarVista} />
+      {/key}
     {/if}
   {/if}
 </main>
+<footer class="pie">
+  <a href="#/legal" data-ir-legal>Legal y acerca de</a>
+</footer>

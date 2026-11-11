@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { desfase, duracion, fechaHora, haceCuanto, haceSegundos, horaLocal, relojSitio } from './tiempo';
+import { desfase, duracion, fechaHora, haceCuanto, haceSegundos, horaLocal, relojSitio, instanteDesdeLocal, localDesdeInstante } from './tiempo';
 
 describe('haceCuanto', () => {
   const ahora = new Date('2026-10-12T15:00:00Z');
@@ -65,3 +65,17 @@ describe('desfase y reloj del sitio', () => {
   });
 });
 
+
+// Rango a medida (HU-07; docs/19 §4, tablero v2, B1): la hora del campo datetime-local es la del SITIO, no la del navegador.
+describe('rango a medida: hora del sitio ↔ instante', () => {
+  it('Santiago en invierno (UTC−04:00) y en verano (UTC−03:00); ida y vuelta', () => {
+    expect(instanteDesdeLocal('2026-07-10T08:30', 'America/Santiago')?.toISOString()).toBe('2026-07-10T12:30:00.000Z');
+    expect(instanteDesdeLocal('2026-11-10T08:30', 'America/Santiago')?.toISOString()).toBe('2026-11-10T11:30:00.000Z');
+    expect(localDesdeInstante(new Date('2026-11-10T11:30:00Z'), 'America/Santiago')).toBe('2026-11-10T08:30');
+    expect(localDesdeInstante(instanteDesdeLocal('2026-07-10T23:59', 'Europe/Madrid')!, 'Europe/Madrid')).toBe('2026-07-10T23:59');
+  });
+  it('un texto que no es fecha y hora no da instante (nunca se adivina)', () => {
+    expect(instanteDesdeLocal('ayer', 'America/Santiago')).toBeNull();
+    expect(instanteDesdeLocal('2026-11-10', 'America/Santiago')).toBeNull();
+  });
+});

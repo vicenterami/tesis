@@ -10,3 +10,7 @@ export function marcadosParaComparar(): string[] {
 export function recordarMarcados(ids: readonly string[]): void {
   marcados = [...new Set(ids)];
 }
+// Al salir o al vencer la sesión (corrección del 11/11/2026): la persona siguiente en este navegador no hereda las casillas.
+export function olvidarMarcados(): void {
+  marcados = [];
+}

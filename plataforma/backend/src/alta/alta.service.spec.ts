@@ -1,3 +1,4 @@
+import { errorDeCliente } from '../db/cliente.js';
 import { describe, expect, it, vi } from 'vitest';
 import { BadGatewayException, BadRequestException, ConflictException, InternalServerErrorException, ServiceUnavailableException } from '@nestjs/common';
 import type { Pool } from 'pg';
@@ -41,7 +42,7 @@ function armar(opciones: { insertFalla?: string; insertRestriccion?: string; com
       if (texto === 'COMMIT' && opciones.commitFalla) throw new Error('la base se fue');
       return { rows: [] };
     },
-    release: vi.fn(),
+    release: vi.fn(), on: vi.fn(), off: vi.fn(),
   };
   const ordenes: OrdenDynsec[][] = [];
   const dynsec = {
@@ -78,6 +79,9 @@ describe('AltaService.crear (HU-11): todo o nada entre la base y el broker', () 
     expect((r.conexion as { topico: string }).topico).toBe('sitio/uct/dispositivo/nodo-01/<magnitud>');
     expect(r.canales.map((c) => c.unidad)).toEqual(['Cel', '%RH']);
     expect(cliente.release).toHaveBeenCalledTimes(1);
+    // Mientras está prestado, el cliente tiene oyente de 'error' (db/cliente.ts) y se le quita al soltarlo.
+    expect(cliente.on).toHaveBeenCalledWith('error', errorDeCliente);
+    expect(cliente.off).toHaveBeenCalledWith('error', errorDeCliente);
   });
 
   it('el broker no responde (error ambiguo) → 502, ROLLBACK, sin COMMIT, y se intenta borrar el cliente por si llegó a crearse', async () => {

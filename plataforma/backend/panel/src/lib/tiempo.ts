@@ -85,3 +85,33 @@ export function zonaDelNavegador(): string | null {
   }
 }
 
+
+// ── Rango a medida (HU-07; docs/19 §4, tablero v2, B1): `<input type="datetime-local">` escribe una hora SIN zona; se interpreta en la
+// zona del sitio (docs/13 regla 6), nunca en la del navegador. Minutos de desfase de la zona en un instante (positivo al este de UTC).
+function minutosDeDesfase(zona: string, instante: number): number {
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', { timeZone: zona, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' })
+      .formatToParts(new Date(instante)).map((x) => [x.type, Number(x.value)]),
+  );
+  const enZona = Date.UTC(p.year!, p.month! - 1, p.day!, p.hour!, p.minute!, p.second!);
+  return Math.round((enZona - Math.floor(instante / 1000) * 1000) / 60_000);
+}
+// «2026-11-10T08:30» en la zona → el instante. Se prueba el desfase dos veces (cerca de un cambio de hora, el primero puede ser el del
+// otro lado). Una hora que no existe en la zona (el salto de primavera) cae en la siguiente válida; un texto inválido → null.
+export function instanteDesdeLocal(texto: string, zona: string): Date | null {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(texto);
+  if (!m) return null;
+  const comoUtc = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6] ?? 0));
+  if (Number.isNaN(comoUtc)) return null;
+  let t = comoUtc - minutosDeDesfase(zona, comoUtc) * 60_000;
+  t = comoUtc - minutosDeDesfase(zona, t) * 60_000;
+  return new Date(t);
+}
+// El instante → «2026-11-10T08:30» en la zona (el valor que el campo datetime-local muestra).
+export function localDesdeInstante(instante: Date, zona: string): string {
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat('en-CA', { timeZone: zona, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+      .formatToParts(instante).map((x) => [x.type, x.value]),
+  );
+  return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`;
+}

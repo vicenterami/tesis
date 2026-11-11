@@ -2,6 +2,7 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DispositivoFicha, DispositivoInventario, Historico } from './lib/modelo';
+import { inventarioSimulado } from './servidor-simulado';
 
 // La vista en la URL (docs/19 §4, incremento 1, punto 1), por el DOM y en los dos sentidos: la URL fija lo que se ve, lo que se
 // elige se escribe en la URL sin sumar entradas al historial, un cambio externo del fragmento se reaplica y un valor inválido
@@ -35,6 +36,8 @@ const inventario: DispositivoInventario[] = [
   { ...comun, id: ID, nombre: 'Invernadero', condiciones_abiertas: 0, canales: [] },
   { ...comun, id: '00000000-0000-4000-8000-000000000003', nombre: 'Pozo', id_fisico: 'dev-0003', via: 'http', condiciones_abiertas: 0, canales: [] },
 ];
+const SITIO = { id: 's1', codigo: 'uct', nombre: 'Campus', zona_horaria: 'America/Santiago', rol: 'administrador', zonas: [{ id: 'z-lab', nombre: 'Lab' }] };
+let sitios = [SITIO];
 const historico = (canal: string): Historico => ({ canal_id: canal, magnitud: 'x', unidad: 'Cel', zona_horaria: 'America/Santiago', intervalo: '15 minutes', desde: 'x', hasta: 'y', puntos: 1, tiempos: [1760270400], valores: [20], muestras: [1] });
 
 // Con sesión de administrador (P10): estas pruebas miran la vista en la URL; la sesión se prueba en Sesion.test.ts.
@@ -60,7 +63,9 @@ beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn(async (ruta: string) => {
     peticiones.push(ruta);
     if (ruta === '/sesion') return new Response(JSON.stringify(SESION));
-    if (ruta === '/dispositivos') return new Response(JSON.stringify(inventario));
+    const inv = inventarioSimulado(ruta, inventario, [], AHORA);
+    if (inv !== null) return inv;
+    if (ruta === '/sitios') return new Response(JSON.stringify(sitios));
     if (ruta === `/dispositivos/${ID}`) return new Response(JSON.stringify(ficha));
     if (ruta.startsWith('/condiciones?') || ruta.startsWith('/cuarentena?')) return new Response('[]');
     const h = /^\/canales\/([^/]+)\/historico/.exec(ruta);
@@ -73,6 +78,8 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
   history.replaceState(null, '', '#/');
+  sitios = [SITIO];
+  document.documentElement.removeAttribute('data-theme');
 });
 
 const pulsado = (nombre: string): string | null => screen.getByRole('button', { name: nombre }).getAttribute('aria-pressed');
@@ -141,24 +148,25 @@ describe('P3: canal y rango en la URL', () => {
 describe('P2: filtros en la URL', () => {
   const filas = (): string[] => screen.getAllByRole('row').slice(1).map((f) => f.querySelector('a')?.textContent ?? '');
 
-  it('la URL fija los filtros al abrir; cambiarlos los escribe; quitarlos deja «#/»', async () => {
-    history.replaceState(null, '', '#/?via=http&q=poz');
+  it('la URL fija los filtros al abrir; cambiarlos los escribe; quitarlos deja «#/inventario»; un enlace viejo «#/?via=…» llega al inventario', async () => {
+    history.replaceState(null, '', '#/?via=http&q=poz'); // guardado antes del tablero v2 (A1): se redirige sin entrada nueva
     render(App);
     await waitFor(() => expect(filas()).toEqual(['Pozo']));
+    expect(window.location.hash).toBe('#/inventario?via=http&q=poz');
     expect((screen.getByLabelText('Vía') as HTMLSelectElement).value).toBe('http');
     expect((screen.getByLabelText('Buscar') as HTMLInputElement).value).toBe('poz');
     const largo = history.length;
     const buscar = screen.getByLabelText('Buscar') as HTMLInputElement;
     buscar.value = '';
     buscar.dispatchEvent(new Event('input'));
-    await waitFor(() => expect(window.location.hash).toBe('#/?via=http'));
+    await waitFor(() => expect(window.location.hash).toBe('#/inventario?via=http'));
     const via = screen.getByLabelText('Vía') as HTMLSelectElement;
     via.value = '';
     via.dispatchEvent(new Event('change'));
-    await waitFor(() => expect(window.location.hash).toBe('#/'));
-    expect(filas()).toEqual(['Invernadero', 'Pozo']);
+    await waitFor(() => expect(window.location.hash).toBe('#/inventario'));
+    await waitFor(() => expect(filas()).toEqual(['Invernadero', 'Pozo']));
     document.querySelector<HTMLButtonElement>('[data-conteo="normal"]')!.click();
-    await waitFor(() => expect(window.location.hash).toBe('#/?estado=normal'));
+    await waitFor(() => expect(window.location.hash).toBe('#/inventario?estado=normal'));
     expect(history.length).toBe(largo);
   });
 
@@ -172,11 +180,11 @@ describe('P2: filtros en la URL', () => {
     expect((screen.getByLabelText('Buscar') as HTMLInputElement).value).toBe('invern');
   });
 
-  it('un estado desconocido y un sitio, una zona o una vía que no existen se ignoran: tabla completa y la URL queda en «#/»', async () => {
+  it('un estado desconocido y un sitio, una zona o una vía que no existen se ignoran: tabla completa y la URL queda en «#/inventario»', async () => {
     history.replaceState(null, '', '#/?estado=rojo&sitio=nada&zona=tampoco&via=paloma');
     render(App);
     await waitFor(() => expect(filas()).toEqual(['Invernadero', 'Pozo']));
-    await waitFor(() => expect(window.location.hash).toBe('#/'));
+    await waitFor(() => expect(window.location.hash).toBe('#/inventario'));
   });
 
   it('el enlace de una fila abre la ficha y «atrás» vuelve al inventario con sus filtros', async () => {
@@ -189,5 +197,79 @@ describe('P2: filtros en la URL', () => {
     cambioExterno('#/?via=http'); // «atrás»
     await waitFor(() => expect(filas()).toEqual(['Pozo']));
     expect((screen.getByLabelText('Vía') as HTMLSelectElement).value).toBe('http');
+  });
+});
+
+// Armazón (docs/19 §4, tablero v2, A1 y A2): la llegada es el tablero; el menú según el rol, con las pantallas que aún no existen sin
+// enlace; el selector de sitio solo con más de uno y en la URL; el botón «Menú» con texto; el pie legal también sin sesión; el tema y el
+// sitio de las preferencias.
+describe('armazón: llegada, menú, sitio, legal y tema', () => {
+  const NORTE = { ...SITIO, id: 's2', codigo: 'norte', nombre: 'Sede Norte' };
+  const resumenes = (): string[] => peticiones.filter((p) => p.includes('/resumen?'));
+
+  it('«#/» es el tablero del sitio (con un solo sitio, sin selector); el menú nombra lo que viene sin enlazarlo', async () => {
+    render(App);
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Tablero · Campus' })).toBeTruthy());
+    await waitFor(() => expect(resumenes()[0]).toMatch(/^\/sitios\/s1\/resumen\?desde=/));
+    expect(document.querySelector('[data-selector-sitio]')).toBeNull();
+    expect(screen.getByRole('link', { name: 'Tablero' }).getAttribute('aria-current')).toBe('page');
+    expect(screen.getByRole('link', { name: 'Inventario' }).getAttribute('href')).toBe('#/inventario');
+    expect(screen.getByRole('link', { name: 'Usuarios' })).toBeTruthy(); // administra su sitio
+    expect(screen.queryByRole('link', { name: /Condiciones/ })).toBeNull(); // sin pantalla todavía: sin enlace
+    expect([...document.querySelectorAll('[data-nav-pendiente]')].map((x) => x.textContent)).toEqual(['Condiciones (próximamente)', 'Cuarentena (próximamente)', 'Actividad (próximamente)']);
+    expect(screen.getByRole('link', { name: 'Legal y acerca de' }).getAttribute('href')).toBe('#/legal');
+  });
+
+  it('con dos sitios aparece el selector; elegir otro lo escribe en la URL y abre su tablero', async () => {
+    sitios = [SITIO, NORTE];
+    render(App);
+    await waitFor(() => expect(document.querySelector('[data-selector-sitio]')).toBeTruthy());
+    const selector = document.querySelector<HTMLSelectElement>('[data-selector-sitio]')!;
+    expect([...selector.options].map((o) => o.textContent)).toEqual(['Campus', 'Sede Norte']);
+    selector.value = 'norte';
+    selector.dispatchEvent(new Event('change', { bubbles: true }));
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Tablero · Sede Norte' })).toBeTruthy());
+    expect(window.location.hash).toBe('#/?sitio=norte');
+    await waitFor(() => expect(resumenes().at(-1)).toMatch(/^\/sitios\/s2\/resumen\?/));
+  });
+
+  it('el botón «Menú» (con texto) pliega y despliega el menú, con aria-expanded', async () => {
+    render(App);
+    await waitFor(() => expect(document.querySelector('[data-menu]')).toBeTruthy());
+    const boton = document.querySelector<HTMLButtonElement>('[data-menu]')!;
+    expect(boton.textContent).toBe('Menú');
+    expect(boton.getAttribute('aria-expanded')).toBe('false');
+    expect(boton.getAttribute('aria-controls')).toBe('menu-principal');
+    boton.click();
+    await waitFor(() => expect(boton.getAttribute('aria-expanded')).toBe('true'));
+    expect(document.querySelector('[data-menu-principal]')!.classList.contains('abierto')).toBe(true);
+    expect(boton.textContent).toBe('Menú'); // el nombre no cambia: el estado lo lleva aria-expanded
+  });
+
+  it('«Legal y acerca de» se lee también sin sesión: la licencia AGPL y los avisos de terceros', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (ruta: string) => (ruta === '/salud' ? new Response('{}') : new Response(JSON.stringify({ statusCode: 401 }), { status: 401 }))));
+    history.replaceState(null, '', '#/legal');
+    render(App);
+    await waitFor(() => expect(document.querySelector('[data-legal]')).toBeTruthy());
+    expect(document.querySelector('[data-legal]')!.textContent).toContain('GNU Affero General Public License, versión 3');
+    const cookie = document.querySelector('[data-legal-cookie]')!.textContent!;
+    expect(cookie).toContain('__Host-sesion');
+    expect(cookie).toContain('30 minutos sin actividad');
+    expect(cookie).toContain('8 horas');
+    expect(cookie).toContain('No hay cookies de');
+    expect(document.querySelector('[data-avisos-terceros]')!.getAttribute('href')).toBe(`${import.meta.env.BASE_URL}avisos-de-terceros.txt`); // bajo /panel/ en el build
+    expect(screen.queryByRole('heading', { name: 'Entrar' })).toBeNull();
+    cambioExterno('#/');
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Entrar' })).toBeTruthy()); // los datos, en cambio, exigen sesión
+  });
+
+  it('las preferencias de la sesión mandan: tema oscuro en <html data-theme> y el sitio predeterminado en el tablero', async () => {
+    sitios = [SITIO, NORTE];
+    const base = vi.mocked(fetch).getMockImplementation()!;
+    vi.stubGlobal('fetch', vi.fn(async (ruta: string, init?: RequestInit) =>
+      ruta === '/sesion' ? new Response(JSON.stringify({ ...SESION, preferencias: { tema: 'oscuro', sitio_predeterminado: 'norte' } })) : base(ruta, init)));
+    render(App);
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Tablero · Sede Norte' })).toBeTruthy());
+    expect(document.documentElement.getAttribute('data-theme')).toBe('oscuro');
   });
 });

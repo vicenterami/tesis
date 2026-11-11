@@ -1,16 +1,24 @@
 // @vitest-environment jsdom
 import { cleanup, render, screen, waitFor } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { Condicion, DispositivoFicha, Historico, TramaRechazada } from './lib/modelo';
+import type { Condicion, DispositivoFicha, EventoDispositivo, Historico, HistoricoDispositivo, TramaRechazada } from './lib/modelo';
 
 // uPlot dibuja en un canvas, que jsdom no tiene: se sustituye por un doble que registra datos y tamaño.
-const graficos: { datos: unknown; destruido: boolean; titulo: string }[] = [];
+// Desde el tablero v2 también guarda las opciones (ganchos de selección, bandas, cursor) y ofrece lo que el zoom usa: `over` (el doble
+// clic), `select` y `posToVal` (aquí, píxel = segundo, para elegir la ventana exacta).
+interface Opciones { title: string; bands?: unknown[]; series: { label?: string }[]; cursor?: { sync?: { key: string } }; hooks: { setSelect?: ((u: unknown) => void)[] } }
+const graficos: { datos: unknown; destruido: boolean; titulo: string; opciones: Opciones; u: { over: HTMLElement; select: { left: number; width: number } } }[] = [];
 vi.mock('uplot', () => {
   class UPlotFalso {
-    constructor(o: { title: string }, datos: unknown, el: HTMLElement) {
+    over = document.createElement('div');
+    select = { left: 0, width: 0, top: 0, height: 0 };
+    constructor(o: Opciones, datos: unknown, el: HTMLElement) {
       el.appendChild(document.createElement('canvas'));
-      graficos.push({ datos, destruido: false, titulo: o.title });
+      graficos.push({ datos, destruido: false, titulo: o.title, opciones: o, u: this });
     }
+    posToVal(px: number): number { return px; }
+    setSelect(): void {}
+    redraw(): void {}
     setData(d: unknown): void { graficos[graficos.length - 1]!.datos = d; }
     setSize(): void {}
     destroy(): void { graficos[graficos.length - 1]!.destruido = true; }
@@ -41,6 +49,16 @@ const rechazadas: TramaRechazada[] = [
 ];
 const historico: Historico = { canal_id: 'c-temp', magnitud: 'temperatura', unidad: 'Cel', zona_horaria: 'America/Santiago', intervalo: '15 minutes', desde: 'x', hasta: 'y', puntos: 2, tiempos: [1760270400, 1760271300], valores: [20, 21], muestras: [3, 3] };
 
+let eventos: EventoDispositivo[] = [];
+let eventosSiguiente: string | null = null;
+const todos: HistoricoDispositivo = {
+  tiempos: [1760270400, 1760271300],
+  canales: [
+    { id: 'c-temp', magnitud: 'temperatura', magnitud_nombre: 'Temperatura', unidad: 'Cel', valores: [20, 21], minimos: [19, 20], maximos: [21, 22] },
+    { id: 'c-hum', magnitud: 'humedad', magnitud_nombre: 'Humedad', unidad: '%RH', valores: [40, null], minimos: [38, null], maximos: [42, null] },
+  ],
+};
+
 // EventSource controlable: la prueba emite eventos y simula la caída y la reapertura.
 class FuenteControlable {
   static instancias: FuenteControlable[] = [];
@@ -58,6 +76,8 @@ class FuenteControlable {
 const peticiones: string[] = [];
 
 beforeEach(() => {
+  eventos = [];
+  eventosSiguiente = null;
   graficos.length = 0;
   peticiones.length = 0;
   vi.useFakeTimers({ now: AHORA, toFake: ['Date', 'setInterval', 'clearInterval', 'setTimeout', 'clearTimeout'] });
@@ -69,6 +89,8 @@ beforeEach(() => {
     if (ruta.startsWith('/condiciones?')) return new Response(JSON.stringify(ruta.includes('abiertas=true') ? condiciones.filter((c) => c.cerrada_en === null) : condiciones));
     if (ruta.startsWith('/cuarentena?')) return new Response(JSON.stringify(rechazadas));
     if (ruta.startsWith('/canales/c-temp/historico')) return new Response(JSON.stringify(historico));
+    if (ruta.startsWith(`/dispositivos/${ID}/eventos?`)) return new Response(JSON.stringify(eventos), { headers: eventosSiguiente === null ? {} : { 'X-Siguiente': eventosSiguiente } });
+    if (ruta.startsWith(`/dispositivos/${ID}/historico?`)) return new Response(JSON.stringify(todos));
     if (ruta.startsWith(`/dispositivos/${ID}/exportar?`)) return new Response('tiempo,valor\n2026-10-12T14:00:00Z,20\n', { headers: { 'content-type': 'text/csv', 'content-disposition': 'attachment; filename="dev-0001_temperatura.csv"' } });
     return new Response('', { status: 404 });
   }));
@@ -94,8 +116,8 @@ describe('Ficha (P3): identidad, canales, gráfico, condiciones y rechazadas, le
     expect(screen.getByText('dev-0001')).toBeTruthy();
     expect(screen.getByText('mqtt · senml')).toBeTruthy();
     const lecturas = [...document.querySelectorAll('[data-ultima]')].map((e) => e.textContent);
-    expect(lecturas).toEqual(['21,5 Cel', '—']); // sin lectura: raya, sin unidad
-    expect(screen.getByText(/umbrales: 5 a 30 \(histéresis 0.5\)/)).toBeTruthy();
+    expect(lecturas).toEqual(['21,5 °C', '—']); // sin lectura: raya, sin unidad
+    expect(screen.getByText(/umbrales: 5 °C a 30 °C \(histéresis 0,5 °C\)/)).toBeTruthy();
     expect(screen.getByText('sin umbrales')).toBeTruthy();
   });
 
@@ -103,7 +125,7 @@ describe('Ficha (P3): identidad, canales, gráfico, condiciones y rechazadas, le
     render(Ficha, { id: ID });
     await waitFor(() => expect(document.querySelector('[data-historico]')).toBeTruthy());
     await waitFor(() => expect(graficos).toHaveLength(1));
-    expect(peticiones.filter((p) => p.startsWith('/condiciones?')).sort()).toEqual([`/condiciones?dispositivo=${ID}&abiertas=true&limite=500`, `/condiciones?dispositivo=${ID}&limite=50`]);
+    expect(peticiones.filter((p) => p.startsWith('/condiciones?') && !p.includes('desde=')).sort()).toEqual([`/condiciones?dispositivo=${ID}&abiertas=true&limite=500`, `/condiciones?dispositivo=${ID}&limite=50`]);
     const url = peticiones.find((p) => p.startsWith('/canales/c-temp/historico'))!;
     expect(url).toContain('intervalo=15+minutes');
     expect(url).toContain('desde=2026-10-11T15%3A00%3A00.000Z');
@@ -116,7 +138,7 @@ describe('Ficha (P3): identidad, canales, gráfico, condiciones y rechazadas, le
     await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(3));
     const filas = screen.getAllByRole('row').slice(1);
     expect(filas.map((f) => f.getAttribute('data-condicion'))).toEqual(['abierta', 'cerrada']);
-    expect(screen.getByText('invalida')).toBeTruthy();
+    expect(screen.getByText('Inválida')).toBeTruthy(); // el motivo en palabras, nunca el código (§6)
     expect(document.querySelector('details pre')?.textContent).toBe('{"v":500}');
   });
 
@@ -128,7 +150,7 @@ describe('Ficha (P3): identidad, canales, gráfico, condiciones y rechazadas, le
     fuente.abrir();
     fuente.emitir('medicion', { dispositivo_id: ID, canal_id: 'c-temp', valor: 23.25, unidad: 'Cel', tiempo: '2026-10-12T15:00:05Z' });
     fuente.emitir('medicion', { dispositivo_id: 'otro-dispositivo', canal_id: 'c-temp', valor: 99, unidad: 'Cel', tiempo: '2026-10-12T15:00:06Z' }); // ajeno: se descarta
-    await waitFor(() => expect(document.querySelector('[data-ultima]')?.textContent).toBe('23,25 Cel'));
+    await waitFor(() => expect(document.querySelector('[data-ultima]')?.textContent).toBe('23,25 °C'));
     expect(graficos.at(-1)?.datos).toEqual([[1760270400, 1760271300], [20, 21], [null, null]]); // todavía no: va por lotes
     await vi.advanceTimersByTimeAsync(250);
     expect((graficos.at(-1)?.datos as number[][])[2]).toEqual([null, null, 23.25]);
@@ -136,7 +158,7 @@ describe('Ficha (P3): identidad, canales, gráfico, condiciones y rechazadas, le
     await waitFor(() => expect(screen.getByRole('button', { name: 'Reanudar' })).toBeTruthy());
     fuente.emitir('medicion', { dispositivo_id: ID, canal_id: 'c-temp', valor: 30, unidad: 'Cel', tiempo: '2026-10-12T15:00:07Z' });
     await vi.advanceTimersByTimeAsync(250);
-    expect(document.querySelector('[data-ultima]')?.textContent).toBe('23,25 Cel');
+    expect(document.querySelector('[data-ultima]')?.textContent).toBe('23,25 °C');
     expect((graficos.at(-1)?.datos as number[][])[2]).toEqual([null, null, 23.25]);
   });
 
@@ -149,7 +171,7 @@ describe('Ficha (P3): identidad, canales, gráfico, condiciones y rechazadas, le
     fuente.emitir('medicion', { dispositivo_id: ID, canal_id: 'c-temp', valor: 23.25, unidad: 'Cel', tiempo: '2026-10-12T15:00:05Z', porcentaje: 32.8 });
     await waitFor(() => expect(document.querySelector('[data-porcentaje]')?.textContent).toBe('32,8 % según su calibración'));
     fuente.emitir('medicion', { dispositivo_id: ID, canal_id: 'c-temp', valor: 24, unidad: 'Cel', tiempo: '2026-10-12T15:00:10Z' });
-    await waitFor(() => expect(document.querySelector('[data-ultima]')?.textContent).toBe('24 Cel'));
+    await waitFor(() => expect(document.querySelector('[data-ultima]')?.textContent).toBe('24 °C'));
     expect(document.querySelector('[data-porcentaje]')).toBeNull();
   });
   it('el porcentaje que llega en la carga de la ficha (GET /dispositivos/{id}) también se muestra', async () => {
@@ -202,7 +224,7 @@ describe('Ficha (P3): identidad, canales, gráfico, condiciones y rechazadas, le
     }));
     render(Ficha, { id: ID });
     await waitFor(() => expect(graficos).toHaveLength(1));
-    expect(graficos[0]!.titulo).toBe('Temperatura (Cel)');
+    expect(graficos[0]!.titulo).toBe('Temperatura (°C)');
     document.querySelector<HTMLButtonElement>('[data-canal-id="c-hum"]')!.click();
     await waitFor(() => expect(graficos).toHaveLength(2));
     expect(graficos[0]!.destruido).toBe(true);
@@ -470,7 +492,7 @@ describe('Ficha (P3), incremento 2: cambio sin blanco, error con reintento, reso
   it('bajo el gráfico: mín, máx y promedio de los promedios dibujados, y el CSV de la ventana visible', async () => {
     render(Ficha, { id: ID });
     await waitFor(() => expect(document.querySelector('[data-resumen-rango]')).toBeTruthy());
-    expect(document.querySelector('[data-resumen-rango]')!.textContent!.replace(/\s+/g, ' ')).toBe('en este rango: mín 20 Cel · máx 21 Cel · promedio de los 2 promedios dibujados 20,5 Cel');
+    expect(document.querySelector('[data-resumen-rango]')!.textContent!.replace(/\s+/g, ' ')).toBe('en este rango: mín 20 °C · máx 21 °C · promedio de los 2 promedios dibujados 20,5 °C');
     const d = espiarDescargas();
     screen.getByRole('button', { name: 'Descargar CSV de este rango' }).click();
     await waitFor(() => expect(d.nombres).toEqual(['dev-0001_temperatura.csv']));
@@ -550,5 +572,159 @@ describe('Ficha (P3) con sesión: exportar según el rol y descargas que fallan'
     expect(motivos).toEqual(['sin_sesion']); // el 403 de un rol no es «sin sesión»
     expect(d.nombres).toEqual([]);
     dejar();
+  });
+});
+
+// Ficha v2 (docs/19 §4, tablero v2, D): zoom que refina, «Volver» y doble clic; mín–máx; umbrales y franjas; todos los canales; eventos
+// por cursor; rechazadas agrupadas; unidades de la persona.
+describe('Ficha v2: zoom, banda, umbrales, todos los canales, eventos, rechazadas y unidades', () => {
+  const HORA = 3600;
+  const ahoraS = AHORA.getTime() / 1000;
+  const historicos = (): string[] => peticiones.filter((p) => p.startsWith('/canales/c-temp/historico'));
+  const seleccionar = (desdeS: number, hastaS: number): void => {
+    const g = graficos.at(-1)!;
+    g.u.select = { left: desdeS, width: hastaS - desdeS };
+    g.opciones.hooks.setSelect![0]!(g.u);
+  };
+
+  it('arrastrar acota la ventana: pide la resolución más fina admisible, la escribe en la URL y el vivo deja de agregar puntos; «Volver» y el doble clic deshacen', async () => {
+    const vistas: string[] = [];
+    render(Ficha, { id: ID, alCambiarVista: (f: string) => vistas.push(f) });
+    await waitFor(() => expect(graficos).toHaveLength(1));
+    seleccionar(ahoraS - 3 * HORA, ahoraS - 2 * HORA); // una hora, hace tres
+    await waitFor(() => expect(historicos()).toHaveLength(2));
+    expect(historicos()[1]).toContain('intervalo=1+minute');
+    expect(historicos()[1]).toContain('desde=2026-10-12T12%3A00%3A00.000Z');
+    await waitFor(() => expect(vistas.at(-1)).toBe(`#/dispositivos/${ID}?canal=c-temp&rango=24h&res=1m&desde=2026-10-12T12%3A00%3A00.000Z&hasta=2026-10-12T13%3A00%3A00.000Z`));
+    expect(document.querySelector('[data-rango-fijo]')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '24 horas' }).getAttribute('aria-pressed')).toBe('false'); // ningún preajuste: manda la ventana
+    // El vivo: la tarjeta se mueve, el gráfico (historia) no.
+    const fuente = FuenteControlable.instancias[0]!;
+    fuente.abrir();
+    fuente.emitir('medicion', { dispositivo_id: ID, canal_id: 'c-temp', valor: 25, unidad: 'Cel', tiempo: '2026-10-12T15:00:05Z' });
+    await waitFor(() => expect(document.querySelector('[data-ultima]')?.textContent).toBe('25 °C'));
+    await vi.advanceTimersByTimeAsync(300);
+    expect((graficos.at(-1)!.datos as unknown[][])[2]).toEqual([null, null]);
+    // Un segundo zoom y «Volver»: vuelve al primero; otro «Volver»: al rango completo.
+    seleccionar(ahoraS - 3 * HORA, ahoraS - 3 * HORA + 600);
+    await waitFor(() => expect(historicos()).toHaveLength(3));
+    screen.getByRole('button', { name: 'Volver' }).click();
+    await waitFor(() => expect(historicos()).toHaveLength(4));
+    expect(historicos()[3]).toContain('desde=2026-10-12T12%3A00%3A00.000Z');
+    screen.getByRole('button', { name: 'Volver' }).click();
+    await waitFor(() => expect(vistas.at(-1)).toBe(`#/dispositivos/${ID}?canal=c-temp&rango=24h`));
+    expect(screen.queryByRole('button', { name: 'Volver' })).toBeNull();
+    // El doble clic: al rango completo, terminando en ahora.
+    seleccionar(ahoraS - 2 * HORA, ahoraS - HORA);
+    await waitFor(() => expect(document.querySelector('[data-rango-fijo]')).toBeTruthy());
+    graficos.at(-1)!.u.over.dispatchEvent(new MouseEvent('dblclick'));
+    await waitFor(() => expect(vistas.at(-1)).toBe(`#/dispositivos/${ID}?canal=c-temp&rango=24h`));
+    expect(historicos().at(-1)).toContain('intervalo=15+minutes');
+    expect(document.querySelector('[data-rango-fijo]')).toBeNull();
+  });
+
+  it('una ventana de la URL (enlace compartido) se respeta al abrir; un clic sin arrastre no hace zoom', async () => {
+    const fija = { desde: new Date('2026-10-12T10:00:00Z'), hasta: new Date('2026-10-12T11:00:00Z') };
+    render(Ficha, { id: ID, fija });
+    await waitFor(() => expect(historicos()).toHaveLength(1));
+    expect(historicos()[0]).toContain('desde=2026-10-12T10%3A00%3A00.000Z');
+    expect(historicos()[0]).toContain('intervalo=1+minute');
+    await waitFor(() => expect(graficos).toHaveLength(1));
+    const g = graficos[0]!;
+    g.u.select = { left: ahoraS - HORA, width: 1 };
+    g.opciones.hooks.setSelect![0]!(g.u);
+    await vi.advanceTimersByTimeAsync(50);
+    expect(historicos()).toHaveLength(1);
+  });
+
+  it('«Mostrar mín–máx» dibuja la banda del mismo matiz con el mínimo y el máximo de cada cubo; sin esos campos, el botón no aparece', async () => {
+    const conBanda = { ...historico, minimos: [19, 20], maximos: [22, 23] };
+    const base = globalThis.fetch;
+    vi.stubGlobal('fetch', vi.fn(async (ruta: string) => (ruta.startsWith('/canales/c-temp/historico') ? new Response(JSON.stringify(conBanda)) : base(ruta))));
+    render(Ficha, { id: ID });
+    await waitFor(() => expect(graficos).toHaveLength(1));
+    expect(graficos[0]!.opciones.bands).toEqual([]);
+    screen.getByRole('button', { name: 'Mostrar mín–máx' }).click();
+    await waitFor(() => expect(graficos).toHaveLength(2));
+    expect(graficos[1]!.opciones.bands).toHaveLength(1);
+    expect(graficos[1]!.opciones.series.map((x) => x.label)).toEqual(['Hora', 'promedio', 'lectura actual', 'mínimo', 'máximo']);
+    expect(graficos[1]!.datos).toEqual([[1760270400, 1760271300], [20, 21], [null, null], [19, 20], [22, 23]]);
+    cleanup();
+    vi.stubGlobal('fetch', base);
+    render(Ficha, { id: ID });
+    await waitFor(() => expect(document.querySelector('[data-historico]')).toBeTruthy());
+    expect(screen.queryByRole('button', { name: 'Mostrar mín–máx' })).toBeNull();
+  });
+
+  it('umbrales como líneas con etiqueta y su histéresis; las condiciones del canal en la ventana, como franjas', async () => {
+    const base = globalThis.fetch;
+    vi.stubGlobal('fetch', vi.fn(async (ruta: string) => (ruta.startsWith('/canales/c-hum/historico') ? new Response(JSON.stringify({ ...historico, canal_id: 'c-hum', unidad: '%RH' })) : base(ruta))));
+    render(Ficha, { id: ID });
+    await waitFor(() => expect(document.querySelector('.grafico')?.getAttribute('data-umbrales')).toBe('2'));
+    expect(peticiones.some((p) => p.startsWith(`/condiciones?dispositivo=${ID}&desde=`))).toBe(true);
+    await waitFor(() => expect(document.querySelector('.grafico')?.getAttribute('data-franjas')).toBe('2'));
+    expect(document.querySelector('[data-franjas-texto]')!.textContent).toContain('Umbral, Umbral');
+    // En los dos sentidos: el canal de humedad no tiene umbrales ni condiciones de su magnitud.
+    document.querySelector<HTMLButtonElement>('[data-canal-id="c-hum"]')!.click();
+    await waitFor(() => expect(document.querySelector('.grafico')?.getAttribute('data-umbrales')).toBe('0'));
+    expect(document.querySelector('.grafico')?.getAttribute('data-franjas')).toBe('0');
+  });
+
+  it('si llegan 500 condiciones en la ventana (el tope), un aviso dice que se muestran las 500 más recientes; con menos, nada', async () => {
+    const base = globalThis.fetch;
+    const muchas = (n: number) => Array.from({ length: n }, (_, i) => ({ id: `c${i}`, tipo: 'umbral', abierta_en: '2026-10-12T14:00:00Z', cerrada_en: '2026-10-12T14:01:00Z', duracion_s: 60, dispositivo_id: ID, id_fisico: 'dev-0001', dispositivo: 'Invernadero', umbral_alto: 30, umbral_bajo: null, magnitud: 'temperatura' }));
+    let n = 500;
+    vi.stubGlobal('fetch', vi.fn(async (ruta: string) => (ruta.startsWith(`/condiciones?dispositivo=${ID}&desde=`) ? new Response(JSON.stringify(muchas(n))) : base(ruta))));
+    render(Ficha, { id: ID });
+    await waitFor(() => expect(screen.getByText(/Se muestran las 500 condiciones más recientes/)).toBeTruthy());
+    cleanup();
+    n = 499;
+    render(Ficha, { id: ID });
+    await waitFor(() => expect(document.querySelector('.grafico')?.getAttribute('data-franjas')).toBe('499'));
+    expect(screen.queryByText(/Se muestran las 500 condiciones más recientes/)).toBeNull();
+  });
+
+  it('«Todos los canales»: una petición para todos y una gráfica pequeña por canal, con el cursor sincronizado', async () => {
+    render(Ficha, { id: ID });
+    await waitFor(() => expect(graficos).toHaveLength(1));
+    screen.getByRole('button', { name: 'Todos los canales' }).click();
+    await waitFor(() => expect(document.querySelectorAll('[data-grafico-canal]')).toHaveLength(2));
+    const pedidas = peticiones.filter((p) => p.startsWith(`/dispositivos/${ID}/historico?`));
+    expect(pedidas).toHaveLength(1);
+    expect(pedidas[0]).toContain('intervalo=15+minutes');
+    await waitFor(() => expect(graficos).toHaveLength(3));
+    expect(new Set(graficos.map((g) => g.opciones.cursor?.sync?.key))).toEqual(new Set([`ficha-${ID}`]));
+    expect(graficos.map((g) => g.titulo).slice(1)).toEqual(['Temperatura (°C)', 'Humedad (%RH)']);
+  });
+
+  it('historial de eventos del rango, con quién lo hizo, y «Más antiguos» por cursor; rechazadas iguales agrupadas con «× N»', async () => {
+    eventos = [{ id: 'e1', tipo: 'umbrales', detalle: null, ocurrido_en: '2026-10-12T14:00:00Z', usuario: { id: 'u1', nombre: 'Ana' } }];
+    eventosSiguiente = 'cursor-2';
+    const iguales = [0, 1, 2].map((i) => ({ ...rechazadas[0]!, id: `q${i}`, recibido_en: `2026-10-12T1${i}:00:00Z` }));
+    const base = globalThis.fetch;
+    vi.stubGlobal('fetch', vi.fn(async (ruta: string) => (ruta.startsWith('/cuarentena?') ? new Response(JSON.stringify(ruta.includes('cursor=') ? [] : iguales), { headers: ruta.includes('cursor=') ? {} : { 'X-Siguiente': 'r2' } }) : base(ruta))));
+    render(Ficha, { id: ID });
+    await waitFor(() => expect(document.querySelector('[data-evento="e1"]')?.textContent).toContain('Cambio de umbrales · por Ana'));
+    expect(document.querySelectorAll('[data-grupo-rechazadas]')).toHaveLength(1);
+    expect(document.querySelector('[data-veces]')!.textContent).toBe('× 3');
+    eventos = [{ id: 'e0', tipo: 'mantenimiento', detalle: null, ocurrido_en: '2026-10-12T09:00:00Z', usuario: null }];
+    eventosSiguiente = null;
+    screen.getByRole('button', { name: 'Más antiguos' }).click();
+    await waitFor(() => expect(document.querySelectorAll('[data-evento]')).toHaveLength(2));
+    expect(peticiones.filter((p) => p.includes('/eventos?')).at(-1)).toContain('cursor=cursor-2');
+    expect(screen.queryByRole('button', { name: 'Más antiguos' })).toBeNull(); // sin cursor, no hay más
+    screen.getByRole('button', { name: 'Más antiguas' }).click();
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Más antiguas' })).toBeNull());
+    expect(vi.mocked(fetch).mock.calls.map(([r]) => String(r)).some((r) => r.startsWith('/cuarentena?') && r.includes('cursor=r2'))).toBe(true);
+  });
+
+  it('unidades de la persona: con °F la tarjeta, el título, la serie y los umbrales se convierten al mostrar (la petición no cambia)', async () => {
+    render(Ficha, { id: ID, unidades: { temperatura: 'F', longitud: 'mm' } });
+    await waitFor(() => expect(document.querySelector('[data-ultima]')?.textContent).toBe('70,7 °F'));
+    await waitFor(() => expect(graficos).toHaveLength(1));
+    expect(graficos[0]!.titulo).toBe('Temperatura (°F)');
+    expect(graficos[0]!.datos).toEqual([[1760270400, 1760271300], [68, 69.8], [null, null]]);
+    expect(screen.getByText(/umbrales: 41 °F a 86 °F \(histéresis 0,9 °F\)/)).toBeTruthy();
+    expect(historicos()[0]).not.toContain('F'); // la API no sabe de unidades de la persona
   });
 });

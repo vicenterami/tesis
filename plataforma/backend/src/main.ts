@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import type { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module.js';
-import { AvisosAcotados, horasClaveTemporal, hostsPermitidos, interfazDeEscucha, rechazoDeHost, registrosEnJson, rutaSinCache, servirDocumentacion, claveAdmin, claveApp } from './arranque.js';
+import { AvisosAcotados, TOPE_CUERPO, cuerpoExcedido, esLote, horasClaveTemporal, hostsPermitidos, interfazDeEscucha, rechazoDeHost, registrosEnJson, rutaSinCache, servirDocumentacion, claveAdmin, claveApp } from './arranque.js';
 import { configurarOpenApi } from './openapi.js';
 
 // Punto de entrada. Levanta la aplicación Nest: al iniciarse, cada módulo se conecta a lo suyo
@@ -42,6 +42,29 @@ async function arrancar(): Promise<void> {
     if (err?.type === 'entity.too.large') return void res.status(413).json({ statusCode: 413, message: 'trama de más de 64 KiB' });
     if (err) return void res.status(400).json({ statusCode: 400, message: 'cuerpo ilegible' });
     next();
+  });
+  // El alta por lote (docs/19 §4, F2) trae hasta 500 filas: con el tope por omisión del lector de JSON (100 KiB) no caben. Nest admite un
+  // solo lector de JSON (uno registrado aquí reemplaza al suyo): se le da 512 KiB y, ANTES de leer, toda otra ruta con un cuerpo declarado de
+  // más de 100 KiB responde 413, como antes. El tope que manda en el lote es el de filas (413 con el motivo); el de bytes es la guarda gruesa.
+  // Un cuerpo sin largo declarado (Transfer-Encoding: chunked) no lo detiene la cabecera: `verify` cuenta los bytes leídos y, fuera del
+  // lote, más de 100 KiB también es 413 (arranque.ts, cuerpoExcedido; revisión del 11/11/2026). El atajo por cabecera queda: no lee nada.
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const largo = Number(req.headers['content-length'] ?? 0);
+    if (largo > TOPE_CUERPO && !esLote(req.url) && !/^\/recepcion\//i.test(req.url ?? '')) {
+      return void res.status(413).json({ statusCode: 413, message: 'cuerpo de más de 100 KiB' });
+    }
+    next();
+  });
+  app.useBodyParser('json', {
+    limit: 512 * 1024,
+    verify: (req: Request, _res: Response, buf: Buffer) => {
+      if (cuerpoExcedido(req.url, buf.length)) throw Object.assign(new Error('cuerpo de más de 100 KiB'), { status: 413, type: 'entity.too.large' });
+    },
+  });
+  // Los errores del lector de JSON (413 de arriba o del tope de 512 KiB, 400 de un JSON ilegible) responden en JSON, como el resto de la API.
+  app.use((err: { status?: number; type?: string; message?: string }, _req: Request, res: Response, next: NextFunction) => {
+    if (err?.type === 'entity.too.large') return void res.status(413).json({ statusCode: 413, message: err.message === 'cuerpo de más de 100 KiB' ? err.message : 'cuerpo de más de 512 KiB' });
+    next(err);
   });
   // helmet no emite Permissions-Policy; la API no usa cámara, micrófono ni ubicación. Y toda respuesta de la API va con
   // `Cache-Control: no-store` (arranque.ts, rutaSinCache; revisión del 08/11/2026): una sola regla en vez de repetirla ruta por ruta.

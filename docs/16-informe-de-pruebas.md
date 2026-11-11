@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 445 pruebas unitarias del backend y 165 del panel, sin matriz formal); TT-32 (sensor físico) se cubrió después, en §43, §44 y §53;
+cubre todavía: TT-27 (contrato de trama: hoy 513 pruebas unitarias del backend y 241 del panel, sin matriz formal); TT-32 (sensor físico) se cubrió después, en §43, §44 y §53;
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -1966,7 +1966,7 @@ por defecto es la clave `default`, y la marca `__esModule` de jest sobra. Una op
 
 | Comprobación | Resultado |
 |---|---|
-| `pnpm verificar` | tipos (120 archivos de `src/`), ESLint (120 archivos, 0 hallazgos), 445 pruebas unitarias del backend en 41 archivos y 165 del panel; en verde |
+| `pnpm verificar` | tipos (120 archivos de `src/`), ESLint (120 archivos, 0 hallazgos), las pruebas unitarias del backend en 41 archivos (445 ese día; tras §61, 486 en 45 archivos y, con su corrección, 513 en 49) y 241 del panel; en verde |
 | `pnpm openapi` | 18 rutas; `openapi.json` sin diferencias |
 | Imagen y arranque | `dist/` en ES modules; el contenedor `healthy` a los 6 s; el `HEALTHCHECK` a mano, salida 0; `new Date(0).toString()` en el contenedor, `GMT+0000`; `/panel/` 200 (la ruta con `import.meta.dirname`); en los registros, solo el aviso esperado de `/docs` |
 | `api-smoke.sh` | 71 OK, TODO OK |
@@ -1994,3 +1994,240 @@ panel); compatibles con la AGPL-3.0 del código propio y sin redistribución.
 **Cómo repetirlo:** `cd plataforma/backend && pnpm verificar && pnpm audit && pnpm openapi`; con la pila arriba,
 `bash plataforma/pruebas/api-smoke.sh`, `bash plataforma/pruebas/sesion-smoke.sh`, `bash plataforma/pruebas/banco/banco.sh encender 120`,
 `banco.sh correr --duracion 90 --dispositivos 120`, `banco.sh apagar` y `bash plataforma/pruebas/verificar-todo.sh`.
+
+## 61. Backend del tablero v2: resumen, históricos, keyset, reglas y lote (11/11/2026)
+
+**Qué cambió** (`docs/19 §4`, bloque «Tablero v2», I; `docs/10 §8.4` puntos 28, 58 y 65). Migración 23 (`23-tablero.sql`):
+`regla_umbral.retardo_s` (0–86 400, CHECK) y `fuera_de_banda_desde`; `evento.usuario_id` con su clave foránea e índice; tres índices de
+lista por clave en el sentido del orden, `(tiempo DESC, id DESC)` (con `id` ascendente el índice no sirve al desempate); y
+`fn_quitar_reglas`, una función del dueño acotada a un canal, porque la aplicación sigue sin `DELETE` en ninguna tabla. Rutas nuevas:
+`GET /sitios`, `GET /sitios/{id}/resumen`, `GET /sitios/{id}/historico`, `GET /dispositivos/{id}/historico`,
+`GET /dispositivos/{id}/eventos`, `GET /cuarentena/detectados`, `PATCH /dispositivos/{id}`, `PUT /canales/{id}/reglas` y
+`POST /dispositivos/lote` (todas «Etapa 4»). Cambios compatibles: `minimos` y `maximos` en el histórico de un canal; filtros, página,
+`X-Total`, `orden=nombre|entrega`, `estado_visual` y `entrega` (ventana fija de 24 h; la del resumen es la del rango) en el inventario; `cursor` y `X-Siguiente` en `GET /condiciones` y `GET /cuarentena`, y `desde` y
+`hasta` en `GET /condiciones` (la ficha dibuja las condiciones dentro de la ventana); `actualizado_en` del dispositivo y `retardo_s` de
+cada regla en la ficha. El filtro alertar respeta el retardo de activación. Un solo ayudante inserta los eventos de las escrituras con
+persona (`db/evento.ts`): alta, baja, rotación, calibración, pasarelas, configuración y, desde la corrección de abajo, el lote
+(`registrarEventos`, una sentencia para todas sus filas; antes lo insertaba su propio SQL). Los de usuarios y sesión (`sesion/`) todavía
+insertan por su cuenta y sin `usuario_id`: quedan para el bloque de usuarios. Permisos: una acción nueva, `configurar`
+(fila «Configurar un dispositivo…» de `docs/20 §6`), hoy del administrador de sitio; el lote y los detectados usan `escribir`.
+
+**Cómo se verificó.** (1) Pruebas unitarias nuevas de las funciones puras: estado visual con los mismos casos que el panel y el orden de
+las ramas en el SQL, entrega, cursor (ida y vuelta y manipulado), filtros del inventario, alineación de series, resolución del rango,
+validación de reglas y del cambio de dispositivo, lote (rechazadas que no bloquean, «existe», zona ambigua, unidad no canónica, tope de 500
+en el borde, tasa) y el retardo en los dos sentidos, con una plantada: sin la guarda, la misma lectura abre antes de tiempo. (2)
+`api-smoke.sh`: la forma de cada respuesta nueva, que los indicadores del resumen suman el inventario del sitio (`X-Total`), dos páginas de
+eventos que siguen sin repetirse, 400 y 409 de las escrituras sin cambiar nada, y un lote que valida sin crear. (3) `sesion-smoke.sh`: una
+fila por ruta nueva y perfil (401, 403, 404, 200, 409 y 400), el evento con `usuario_id` de quien configuró y un lote con una fila creada,
+una de otro sitio rechazada como inexistente y una que ya existe. (4) La migración 23, dos veces en la pila de desarrollo y en la base nueva
+del banco (`banco.sh encender`: las migraciones 02 a 23 reaplicadas sin error y sin cambiar el esquema ni el catálogo).
+
+**Mediciones** en el banco (`banco.sh encender 5`), con la serie de §52 ampliada: 30 días a una lectura cada 10 s en el canal de
+temperatura de dos emulados (518 400 filas) y 259 200 tramas de uno; mediana de 10 peticiones tras una de calentamiento (`time_total`).
+
+| Petición | Rango · resolución | Mediana | Bytes |
+|---|---|---|---|
+| `GET /sitios/{id}/resumen` | 1 h · 1 minuto | 4,8 ms | 4 212 |
+| | 24 h · 5 minutos | 10,5 ms | 16 182 |
+| | 7 días · 1 hora | 46,0 ms | 10 162 |
+| | 30 días · 6 horas | 168,7 ms | 7 741 |
+| `GET /sitios/{id}/historico?magnitud=temperatura` | 1 h · 1 minuto | 3,8 ms | 2 578 |
+| | 24 h · 5 minutos | 15,9 ms | 10 910 |
+| | 7 días · 1 hora | 129,8 ms | 6 530 |
+| | 30 días · 6 horas | 485,6 ms | 4 165 |
+| | 30 días · 1 hora | 493,1 ms | 26 623 |
+| `GET /dispositivos/{id}/historico` | 30 días · 1 hora | 280,5 ms | 33 262 |
+| `GET /canales/{id}/historico` (referencia) | 30 días · 1 hora | 192,0 ms | 25 126 |
+| `GET /dispositivos` (inventario con estado visual y entrega) | — | 27,6 ms | 2 968 |
+
+Todas bajo los 3 s de RNF-04. **Keyset** (`EXPLAIN (ANALYZE, BUFFERS)`, con 200 000 eventos y 200 000 condiciones sembradas en el banco):
+la página de 50 de `GET /condiciones` lee 50 filas por `Index Only Scan using idx_condicion_abierta_en_id` (50 bloques, 0,08 ms); la de
+eventos de un dispositivo, 50 filas por `idx_evento_dispositivo_ocurrido_en_id` (5 bloques). Plantada con `OFFSET 20000`: 20 050 filas y
+19 404 bloques (3,8 ms) para la misma página. Precisión (corrección del mismo día): esas cifras son de una sentencia reducida
+(`SELECT id, abierta_en FROM condicion ORDER BY abierta_en DESC, id DESC LIMIT 50`), no de la que corre el backend, que une
+`dispositivo`, `zona`, `regla_umbral` y `canal`; con la sentencia real, abajo. `GET /cuarentena` usa `idx_cuarentena_recibido_en_id` en cada fragmento (pila de
+desarrollo). **Lote de 500 filas** (banco, `X-Clave-Admin`, 112 KB de JSON): `modo=validar`, 7–20 ms; `modo=crear`, **70,2 s** (500
+dispositivos, 1 000 canales, 500 credenciales, 500 eventos y 250 clientes en el broker; la segunda validación del mismo archivo da 500
+«existe»). Lo que cuesta es el resumen scrypt de cada credencial (N = 2^15): 100 filas tardan 14 s por HTTP y 14 s por MQTT, y 500 resúmenes
+en el portátil, fuera del contenedor, 8,2 s; el backend tiene 0,5 CPU. **Riesgo abierto:** detrás del proxy, una petición de más de 60 s
+puede cortarse mientras el backend confirma, y las credenciales, que se muestran una sola vez, se perderían. Queda para decidir (pendiente):
+lotes de creación más chicos, el resumen fuera de la petición o un costo de scrypt distinto para secretos aleatorios de 32 bytes.
+**Decidido el mismo día (D-103 A):** las tandas las hace el panel; el backend no cambia el tope de 500, y el OpenAPI de
+`POST /dispositivos/lote` dice que una creación de 500 tarda ≈ 70 s y que el cliente debe validar el archivo entero y crear en tandas de 50
+filas (≈ 7 s cada una).
+
+**Corrección del bloque (revisión en tres frentes: privacidad y rendimiento, seguridad, concordancia; 11/11/2026).** Cada hallazgo se
+verificó abriendo el archivo antes de corregirlo; cada corrección tiene su prueba, unitaria o de humo, en los dos sentidos.
+
+| Hallazgo | Corrección | Prueba |
+|---|---|---|
+| El lote devolvía el `id` y el estado de un dispositivo, o la existencia de una pasarela, de **otro sitio** (la búsqueda por `id_fisico` no miraba el sitio) | Los catálogos traen el sitio de cada uno; lo ajeno es `rechazada: identificador no disponible`, sin `id` (RF-41) | `lote.spec.ts`; humo 4b: `tb-N` y `gwb-N` del sitio B subidos desde A, sin el UUID de B en la respuesta |
+| Cualquier perfil con lectura veía el nombre de quien hizo cada cambio | Decidido: solo el administrador de ese sitio y el del sistema; los demás, `usuario: null` (`docs/21 §2`) | `autor.spec.ts`; humo 4b: consulta ve los 3 eventos sin nombre, el administrador con él |
+| La retención de `trama` se medía desde `hasta`: una ventana pasada fuera de ella daba 0 % de entrega | Se mide desde ahora | `tablero.spec.ts`: de hace 60 a hace 45 días → nulo (plantada: con `hasta`, 0 %) |
+| El inventario contaba las tramas de 24 h dos veces por dispositivo, siempre | Un `LEFT JOIN LATERAL` que se usa en los dos sitios | `EXPLAIN` antes y después (abajo) |
+| División por `intervalo_esperado_s` sin protección | `NULLIF` y, en la migración 23, `ck_dispositivo_intervalo_esperado_s` **1..86 400** (la API exige 5; la semilla del banco siembra emulados de 1 a 6 s y con 5 dejaba de sembrar) | Plantada en el banco: 0 y 86 401 rechazados; la 23 dos veces en la pila y en el banco; paso 23 del guardián |
+| Cursor con día inexistente o año 0000 → 500 | Ida y vuelta de la fecha y año ≥ 1900 → 400 | `tablero.spec.ts`; humo: 30 de febrero y año 0000 → 400 |
+| `actualizado_en` con día inexistente → 500 en PATCH y PUT de reglas | Ida y vuelta en la validación y 22007/22008/22P02 → 400 en la transacción | `configuracion.dto.spec.ts` |
+| El tope de 100 KiB miraba solo `Content-Length`: por trozos regía el de 512 KiB en todas las rutas | `verify` del lector de JSON cuenta lo leído | `arranque.spec.ts`; humo: 200 KiB por trozos a `PUT /canales/{id}/reglas` → 413 y uno chico → 409 |
+| 500 scrypt a la vez en el pool de hilos | Tandas de 4 (`hashesEnTandas`) y el resumen de las altas, rotaciones y pasarelas de a uno ANTES de abrir la transacción | `credenciales.spec.ts` (a lo más 4 a la vez; plantada: sin tandas, más de 400); medición abajo |
+| Reglas reasignadas por posición: una condición abierta quedaba con otros umbrales | Decidido: `reglas[{id?, …}]`, emparejadas por `id`; sin `id`, nueva; las que no vienen se quitan | `configuracion.service.spec.ts`: cambia la regla del `id`, no la primera; un `id` ajeno → 400 sin tocar nada |
+| Marca de retardo obsoleta (tras mantenimiento o un silencio) abría sin retardo; mezclaba `now()` y `new Date()` | Hora de la lectura; marca más vieja que `retardo_s + 2 × intervalo` = nula; el mantenimiento la limpia | `alertas.service.spec.ts` (plantada: sin la vigencia, la misma lectura abría) |
+| `detectados` mezclaba sitios para el usuario del sistema y descartaba los tópicos sin sitio | Agrupa por (sitio, emisor), `sitio_codigo`; `LEFT JOIN` | humo: la forma con `sitio_codigo` |
+| El resumen devolvía la entrega de todos los activos | Los 50 peores y `total_activos` | `tablero.spec.ts`; humo: `len(entrega) == min(50, total_activos)` |
+| El estado visual del SQL y el del panel «se probaban entre sí» sin una prueba que los cruzara; el SQL contaba como alerta cualquier tipo | El SQL enumera los cinco tipos, como el panel; el humo recalcula la regla de `docs/19 §2` fila por fila con `/condiciones` | `api-smoke.sh` (plantada a mano: con alerta antes que sin señal, 2 filas distintas) |
+| El 409 del lote decía «id_fisico «lote de 500» ya existe» | «un identificador del lote ya existe: vuelve a validar» | `lote-servicio.spec.ts` |
+| El paso 23 del guardián aceptaba cualquier índice (`LIKE '%id%'`) | Compara la definición exacta, en el sentido del orden | Plantado: el índice en orden ascendente → FALLA 23; deshecho → OK |
+| docs/10 citaba 17 rutas y 23 operaciones | 25 rutas REST y 32 operaciones (26 y 33 con `/eventos`); paso 2h2 del guardián | Plantada una copia con la cifra vieja → FALLA |
+
+**Hallazgo nuevo al medir (corregido):** con un lote de 500 en curso, un alta individual esperó su scrypt detrás de los 500 (≈ 70 s); su
+transacción, abierta y ociosa, pasó su `idle_in_transaction_session_timeout` de 15 s, la base cortó la conexión y el evento `error` de un
+cliente prestado sin oyente **tumbó el proceso** (el contenedor se reinició; el lote quedó sin crear). Se corrigió por tres lados: el
+resumen fuera de la transacción, las tandas y un oyente de `error` mientras el cliente está prestado (`db/cliente.ts`, `cliente.spec.ts`).
+
+**Mediciones con 120 fuentes** (banco, `banco.sh encender 120` y `tablero-semilla-serie.sql`): 30 días a una lectura cada 300 s en el canal
+de temperatura de los 120 emulados (1 036 800 mediciones) y una trama por lectura (1 036 800 tramas); es lo que cabe en los 768 MB de la
+base del banco (los datos viven en memoria dentro de ese techo). Mediana de 10 peticiones tras una de calentamiento, imagen anterior →
+imagen corregida:
+
+| Petición | Rango · resolución | Antes | Después | Bytes después |
+|---|---|---|---|---|
+| `GET /sitios/{id}/resumen` | 1 h · 1 minuto | 6,2 ms | 7,4 ms | 6 383 |
+| | 24 h · 5 minutos | 25,9 ms | 27,2 ms | 21 014 |
+| | 7 días · 1 hora | 151,2 ms | 151,5 ms | 15 031 |
+| | 30 días · 6 horas | 664,8 ms | **619,7 ms** (el máximo) | 12 496 |
+| | 30 días · 1 hora | 644,8 ms | 626,4 ms | 44 840 |
+| `GET /sitios/{id}/historico?magnitud=temperatura` | 24 h · 5 minutos | 37,7 ms | 38,3 ms | 11 658 |
+| | 30 días · 6 horas | 1 109,6 ms | 1 102,3 ms | 5 298 |
+| | 30 días · 1 hora | 1 126,8 ms | **1 132,4 ms** (el máximo) | 29 665 |
+| `GET /dispositivos/{id}/historico` | 30 días · 1 hora | 16,2 ms | 16,8 ms | 37 751 |
+| `GET /dispositivos` | — | 11,2 ms | 9,4 ms | 122 201 (221 dispositivos) |
+
+Los bytes del resumen bajan porque `entrega` trae los 50 peores, no los 120. El histórico del sitio lee ≈ 1 µs por lectura
+(`EXPLAIN`: 1 036 680 filas por 120 recorridos del índice de `medicion`, 1,27 s); con el tope general de 366 días serían ≈ 13 s, así que
+**su ventana se acota a 31 días** (`MAX_DIAS_SITIO`; humo: 31 días → 200, 31 días y 1 hora → 400). **Estimación, no medida:** el caso de
+100 canales a 60 s (4,3 M lecturas en 30 días) no cabe en la base del banco; a ese ritmo serían ≈ 4,5 s, por encima de RNF-04: queda
+pendiente decidir un tope por lecturas estimadas (canales × ventana ÷ intervalo) o un agregado continuo.
+
+**Inventario, `EXPLAIN (ANALYZE, BUFFERS)` antes y después** (la consulta real, armada por `tablero-explicar-inventario.mjs`, 221
+dispositivos): orden por nombre, de 6 recorridos de `idx_trama_dispositivo_id` por dispositivo (dos subconsultas × 3 fragmentos) a 3, de
+3 605 a 2 372 bloques y de 13,8–14,7 ms a 9,0–9,5 ms; orden por entrega (página de 50), de 3 084 a 1 518 bloques, 7,4–9,2 ms en las dos.
+
+**Listas por clave con la sentencia real** (`tablero-semilla-listas.sql` y `tablero-explicar.sql`; 400 000 condiciones, porque la primera
+pasada de la semilla quedó a mitad cuando la base del banco se cortó por memoria, y 200 000 eventos de un dispositivo): la primera página de
+`GET /condiciones` recorre `idx_condicion_abierta_en_id` (50 filas, 132 bloques con los JOIN, 0,56 ms); la misma a la mitad por cursor, 133
+bloques y 0,27 ms; por `OFFSET 100000`, 102 137 bloques y 95 ms. Los eventos de un dispositivo, por
+`idx_evento_dispositivo_ocurrido_en_id`, 100 bloques y 0,09 ms.
+
+**Lote, antes y después de las tandas** (`tablero-medir.sh lote`, vía http: solo el costo de scrypt; a los 2 s, un alta individual a la
+vez): 100 filas, 14,5 s → 14,1 s, y el alta individual 12,5 s → 0,9 s; 500 filas, el proceso caído a los 72 s (arriba) → 71,9 s con las
+500 creadas, y el alta individual 1,0 s. El total no cambia (lo pone la CPU: 0,5 en el backend); cambia que nadie más espera detrás.
+
+**Cómo repetirlo.** `bash plataforma/pruebas/banco/banco.sh encender 120`; la semilla, con el `psql` del banco (comando en la cabecera de
+`plataforma/pruebas/banco/tablero-semilla-serie.sql`); `bash plataforma/pruebas/banco/tablero-medir.sh tiempos` (el bucle de
+`curl -w '%{time_total}'`) y `tablero-medir.sh lote 500 x5`; el plan del inventario, desde `plataforma/backend`, con
+`node ../pruebas/banco/tablero-explicar-inventario.mjs src/consulta/consulta.service.ts "$PWD/dist" nombre` por el `psql` del banco; las
+listas, en un banco nuevo (no caben junto con la serie), `tablero-semilla-listas.sql` y `tablero-explicar.sql`; al final, `banco.sh apagar`.
+
+**Cifras finales de la corrección:** `pnpm verificar` en verde (513 pruebas unitarias del backend en 49 archivos; el panel, las suyas);
+`pnpm openapi`, 26 rutas y 33 operaciones (`orden` con `nombre | entrega | atencion` en `GET /dispositivos`, cabeceras `X-Total` y
+`X-Siguiente` declaradas, `X-Clave-Admin` en las tres escrituras nuevas); `api-smoke.sh`, 114 OK; `sesion-smoke.sh` (paso 4b), 182 de 182;
+la migración 23, dos pasadas en la pila y en el banco. El guardián, en verde en todo lo del backend (pasos 23, 2h2 y 2t incluidos); quedaron
+en rojo, de otro bloque, las cifras del panel citadas en docs e informe (165, hoy 241) y el paso 4c del navegador (6 de 90: «usuarios» y
+«salir» de la prueba del panel).
+
+## 62. Panel del tablero v2: armazón, tema, tablero, inventario y ficha (11/11/2026)
+
+**Qué cambió** (diseño: `docs/19 §4`, bloque «Tablero v2», puntos A a D; el contrato de la API, su punto I; el backend se construye
+aparte contra el mismo contrato, y estas pruebas usan respuestas simuladas con esa forma).
+
+- **Tokens y tema (A2, A3).** `app.css` define superficie, texto, borde, acento, los cuatro estados, las seis series, espaciado de 4 px,
+  escala tipográfica y radios; ningún componente escribe un color. Tema oscuro por `prefers-color-scheme` y por `data-theme` en `<html>`
+  (`lib/tema.ts`; la preferencia llegará en `GET /sesion → preferencias.tema`, hasta entonces «sistema»). Series de Okabe e Ito en el
+  orden validado, en los dos temas; «promedio» en el azul y «lectura actual» en el naranja; ejes, rejilla, umbrales y franjas del lienzo
+  también por tema.
+- **Armazón (A1, A5).** Cabecera con selector de sitio (de `GET /sitios`, solo con más de uno, en la URL `?sitio=`; si no viene, la
+  preferencia `sitio_predeterminado` o el primero), menú según el rol (las pantallas que aún no existen se nombran sin enlace), botón
+  «Menú» con texto bajo 700 px, menú de cuenta y el pie «Legal y acerca de» con una página mínima `#/legal` (licencia AGPL y avisos de
+  terceros), legible también sin sesión. La llegada es el tablero (`#/`); el inventario pasa a `#/inventario` y un enlace viejo
+  `#/?estado=…` se redirige allí.
+- **P1 Tablero (B).** Fila de filtros (preajustes y rango a medida con `datetime-local` en la hora del sitio, en la URL como `desde` y
+  `hasta`), indicadores de una sola respuesta (`GET /sitios/{id}/resumen`), salud con medidor, condiciones por tipo y entrega en barras
+  ordenadas, «Requiere atención», tramas por cubo apiladas y una gráfica por magnitud con su banda mín–máx (`GET /sitios/{id}/historico`),
+  todas con el cursor sincronizado; vacíos con camino; en vivo, el resumen se vuelve a pedir con antirrebote (uno cada 2 s como mucho) y
+  nunca con una ventana fija.
+- **P2 v2 (C).** Filtros y paginación en el servidor (`limite`, `desplazamiento`, total en `X-Total`: «1–50 de 132», la página en la URL),
+  fichas de conteo con totales del servidor, `estado_visual` del servidor al cargar y `estadoVisual()` desde el primer dato en vivo,
+  columna Entrega ordenable, «Marcar los visibles» con el tope de seis y tarjetas bajo 700 px. Con un backend anterior (sin `X-Total`) el
+  panel filtra y pagina lo que recibe. `lib/api.ts`: `pedir` expone `X-Total` y `X-Siguiente` a quien pasa `alPaginar` (y
+  `obtenerPagina`); nadie más cambia.
+- **P3 v2 (D).** Zoom por arrastre que pide la resolución más fina admisible y escribe `desde`/`hasta` en la URL, «Volver» con historial,
+  doble clic y «Volver a ahora» al rango completo; con ventana fija el vivo no agrega puntos. «Todos los canales» (una petición,
+  `GET /dispositivos/{id}/historico`), «Mostrar mín–máx», umbrales con su histéresis y las condiciones del canal como franjas
+  (`GET /condiciones?dispositivo=&desde&hasta`), historial de eventos por cursor (`GET /dispositivos/{id}/eventos`), rechazadas agrupadas
+  con «× N» y «Más antiguas» por cursor, y unidades para personas (`lib/unidades.ts`: «Cel» → «°C», °C/°F y mm/m/km solo al mostrar).
+- **Un hallazgo de las pruebas.** Con siete gráficos montados a la vez, siete `import('uplot')` simultáneos hacían que el doble de uPlot de
+  las pruebas perdiera contra el real en seis de ellos. Desde hoy hay una sola importación compartida (`lib/cargar-uplot.ts`), que además
+  evita seis promesas en el navegador.
+
+**Cómo se probó** (por el DOM con jsdom y respuestas simuladas, en los dos sentidos; `pnpm check && pnpm test && pnpm build` en
+`panel/`). Contraste WCAG calculado con la luminancia relativa sobre los tokens del propio `app.css` en los dos temas (texto ≥ 4,5:1,
+controles y foco ≥ 3:1), plantado: un `--texto-secundario` de `#999999` falla (2,70:1) y un bloque oscuro desincronizado también.
+Tablero: los cuatro estados suman el total y, si no suman, la tarjeta lo dice; cada tarjeta lleva al inventario filtrado; seis gráficas y
+la séptima magnitud en la lista; un rango a medida al revés se frena sin pedir nada y el bueno llega a la URL en UTC; diez avisos dan un
+resumen. Inventario: «1–50 de 132», «Siguiente» pide `desplazamiento=50` y escribe `pagina=2`; el estado del servidor al cargar y el del
+panel tras el reloj; tarjetas con `matchMedia` simulado y vuelta a la tabla al ensanchar; el tope de seis escrito al lado. Ficha: una
+selección de una hora pide `intervalo=1 minute` y la ventana, el vivo no la toca, «Volver» y el doble clic deshacen; banda con cinco
+series; dos umbrales y dos franjas, ninguno en otro canal; un solo pedido para todos los canales; eventos y rechazadas por cursor; en °F,
+«70,7 °F» y la serie convertida sin cambiar la petición. Las pruebas de hoy se adaptaron (el inventario en `#/inventario`, las unidades
+con su símbolo, el servidor simulado que pagina) sin quitar ninguna.
+
+| Medida | Antes | Después |
+|---|---|---|
+| Pruebas del panel (vitest) | 165 en 18 archivos | 220 en 22 archivos (219 casos escritos; el de contraste corre una vez por tema) |
+| `pnpm check` | 358 archivos, 0 errores | 375 archivos, 0 errores, 0 avisos |
+| JS del panel (`index-*.js`) | 127 351 B (45,27 kB comprimido) | 173 540 B (60,76 kB comprimido) |
+| uPlot (`uPlot.esm-*.js`, aparte) | 50 990 B | 50 990 B |
+| CSS | 9 347 B (2,69 kB comprimido) | 20 074 B (4,54 kB comprimido) |
+| JS total | 178 341 B | 224 530 B (+26 %: el tablero no lo duplica, `docs/19 §4`, J) |
+| Archivos `.map` en `dist/` | 0 | 0 |
+
+**Lo que queda para la prueba con navegador real (paso 4c, Chromium y Firefox, 390 y 1 280 px).** jsdom no dibuja ni arrastra: el zoom con
+el uPlot real (selección, `posToVal`, doble clic), el cursor sincronizado, las barras apiladas, la banda, las líneas de umbral con su
+etiqueta y las franjas en el lienzo; el tema oscuro y el foco visible en capturas; el campo `datetime-local` en los dos navegadores; las
+tarjetas, el menú plegado y la ausencia de desplazamiento horizontal desde 320 px; y el contrato real del backend (nombres de campos,
+`X-Total`, `X-Siguiente`, `/panel/avisos-de-terceros.txt` servido).
+
+**Correcciones de la revisión (11/11/2026).** Una revisión del bloque en tres frentes (seguridad y robustez, accesibilidad y
+publicabilidad, concordancia con el contrato y el diseño) dejó hallazgos que se verificaron uno por uno contra el código antes de
+corregir; cada corrección lleva su prueba en los dos sentidos y la violación se plantó donde la prueba es nueva (la carrera del
+resumen, el filtro por sitio del vivo y el retroceso del canal fallan con el código anterior).
+
+- **Robustez.** Las barras ordenadas usan el id como clave (dos dispositivos con el mismo nombre rompían el tablero); el resumen que pide
+  el vivo se descarta si llega después de un cambio de rango (los indicadores quedaban de un rango y las gráficas de otro) y solo lo
+  piden los avisos de dispositivos del sitio; el canal en vivo vuelve a la espera de 1 s con el primer mensaje, no al abrir (un servidor
+  que acepta y cierra producía una recarga por segundo: ahora 1, 2, 4, 8, 16 s); el inventario agrupa los avisos de condición cada 3 s
+  (tope medido: 100 avisos → 5 peticiones, nunca la página); las casillas «comparar» se olvidan al salir y al vencer la sesión; `sitio`,
+  `zona` y `via` de la URL se validan como el resto; el nombre de una descarga solo admite `.csv` y `.json`; una selección del gráfico
+  sin extremos válidos no hace zoom.
+- **Accesibilidad.** Cada gráfico es una imagen con nombre (título y resumen del rango) y abre «Ver los datos», una tabla con un renglón
+  por punto; las barras se leen como lista «etiqueta: valor»; el medidor sin dato dice «sin datos»; las tarjetas usan `<dt>`/`<dd>`; el
+  botón «Menú» no cambia de nombre (el estado lo lleva `aria-expanded`); cada magnitud del tablero tiene su encabezado; la casilla
+  «comparar» mide 24 × 24 px también en la tabla; radios y letra en la escala de A2. La excepción de contraste de las series quedó
+  escrita y probada (`docs/19 §4`, A3: amarillo 2,25:1 y celeste 2,31:1; el rosa, 3,06:1, sí pasa). «Legal y acerca de» informa la
+  única cookie (`__Host-sesion`, necesaria, 30 min sin actividad u 8 h, sin cookies de terceros).
+- **Concordancia con el contrato.** El inventario manda a la API el id del sitio (la URL del panel sigue con el código) y `orden=entrega`
+  (el servidor ordena todas las páginas), y espera la lista de sitios antes de pedir con un sitio en la URL; la columna dice «Entrega
+  (24 h)», su ventana fija; el resumen se pide con `intervalo` y el rótulo de las tramas sale del intervalo que declara el servidor;
+  «promedio de N dispositivos»; sin preferencia no se convierte ninguna unidad y la de longitud aplica solo a una lista explícita de
+  magnitudes (hoy vacía: el catálogo no tiene ninguna); las gráficas se recrean al cambiar el tema (un solo oyente del sistema operativo
+  y de `data-theme`, en `lib/tema.ts`); los colores del lienzo se comprueban contra los tokens; la ficha avisa cuando llegan 500
+  condiciones en la ventana (las más recientes).
+
+| Medida | Antes de las correcciones | Después |
+|---|---|---|
+| Pruebas del panel (vitest) | 220 en 22 archivos | 243 en 23 archivos (ninguna quitada; se adaptaron las que fijaban lo anterior: el latido que reinicia la espera, el antirrebote de 3 s, el sitio por id, avisos de un dispositivo del sitio, «dispositivos», unidades sin preferencia, zona como UUID y una selección que puede no dar ventana) |
+| `pnpm check` | 375 archivos, 0 errores, 0 avisos | 376 archivos, 0 errores, 0 avisos |
+| JS del panel (`index-*.js`) | 173 540 B | 179 541 B (62,73 kB comprimido) |
+| CSS | 20 074 B | 20 636 B (4,64 kB comprimido) |
+| JS total | 224 530 B | 230 531 B |
+| Archivos `.map` en `dist/` | 0 | 0 |

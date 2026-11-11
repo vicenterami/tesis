@@ -5,6 +5,7 @@ import { POOL } from '../db/db.module.js';
 import { porcentaje } from './escala.js';
 import { isoUs } from '../db/iso-us.js';
 import { Intervalo } from './validacion.js';
+import { Cursor, FiltroInventario, SQL_EN_LINEA, SQL_ESTADO_VISUAL, entrega, patronBusqueda } from './tablero.js';
 
 // Consultas de lectura. SQL explícito y parametrizado ($1, $2…): se lee, se audita, se explica.
 // Las fechas salen como Date → JSON las serializa en ISO 8601 con 'Z' (UTC), regla 5 de docs/13.
@@ -25,6 +26,14 @@ export const SQL_INTERVALO_OBSERVADO = `(
                                       ORDER BY tr.recibido_en DESC LIMIT 20) x) u) w
               WHERE w.dif IS NOT NULL)`;
 
+// Prefijo del ORDER BY del inventario por `orden` (lista cerrada de tablero.ts: nunca texto del cliente). `atencion`: el orden de docs/19 §2
+// (sin señal, alerta, normal, inactivo) y, dentro, por nombre (y después el de siempre, para que el orden sea total).
+const ORDEN_SQL: Readonly<Record<NonNullable<FiltroInventario['orden']>, string>> = {
+  nombre: '',
+  entrega: 'inv.entrega_orden ASC NULLS LAST, ',
+  atencion: "CASE inv.estado_visual WHEN 'sin_senal' THEN 0 WHEN 'alerta' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END, inv.nombre, ",
+};
+
 @Injectable()
 export class ConsultaService {
   constructor(@Inject(POOL) private readonly pool: Pool) {}
@@ -33,28 +42,75 @@ export class ConsultaService {
   // (mismo criterio que el supervisor: un mensaje perdido no es una caída; dos seguidos, sí).
   // `sitios`: el alcance de quien pregunta (docs/20 §5; docs/10 §8.4 punto 36), en el WHERE; null = todos (usuario del sistema).
   async dispositivos(sitios: string[] | null = null) {
-    const r = await this.pool.query(`
+    return (await this.inventario(sitios, {})).filas;
+  }
+
+  // Inventario v2 (docs/19 §4, C; docs/10 §8.4 punto 65): filtros `sitio, zona, via, estado, q` y, si se pide, `limite` y
+  // `desplazamiento` (punto 58 iii: desplazamiento con total en las listas chicas). El total va aparte (cabecera X-Total): la forma de la
+  // respuesta no cambia. Por fila suma `estado_visual` (la regla de docs/19 §2 en SQL, para filtrar y paginar aquí) y `entrega` (% de las
+  // últimas 24 h, HU-15; nulo si no hay una trama esperada completa en la ventana). Una consulta: el total sale de `count(*) OVER ()`.
+  async inventario(sitios: string[] | null, f: FiltroInventario): Promise<{ filas: Record<string, unknown>[]; total: number }> {
+    const p: unknown[] = [sitios, f.sitio ?? null, f.zona ?? null, f.via ?? null, f.estado ?? null, f.q === undefined ? null : patronBusqueda(f.q)];
+    let pagina = '';
+    if (f.limite !== undefined) {
+      p.push(f.limite, f.desplazamiento ?? 0);
+      pagina = `LIMIT $${p.length - 1} OFFSET $${p.length}`;
+    }
+    const r = await this.pool.query<Record<string, unknown> & { total: string; recibidas_24h: number; creado_en: Date; intervalo_esperado_s: number }>(`
+      WITH inv AS (
       SELECT d.id, d.id_fisico, d.nombre, d.estado, d.via, d.formato, d.intervalo_esperado_s,
              e.visto_por_ultima_vez,
-             (e.visto_por_ultima_vez >= now() - d.intervalo_esperado_s * 2 * INTERVAL '1 second') AS en_linea,
+             ${SQL_EN_LINEA} AS en_linea,
              z.nombre AS zona, s.nombre AS sitio, s.zona_horaria,
              -- Identidades para filtrar (docs/19 P2): el código del sitio es único y el id de la zona también; los nombres pueden repetirse.
              s.codigo AS sitio_codigo, z.id AS zona_id,
              (SELECT count(*)::int FROM condicion c WHERE c.dispositivo_id = d.id AND c.cerrada_en IS NULL) AS condiciones_abiertas,
              (SELECT coalesce(json_agg(json_build_object('id', c.id, 'magnitud', c.magnitud_codigo, 'unidad', m.unidad_canonica) ORDER BY c.magnitud_codigo), '[]'::json)
-                FROM canal c JOIN magnitud m ON m.codigo = c.magnitud_codigo WHERE c.dispositivo_id = d.id) AS canales
+                FROM canal c JOIN magnitud m ON m.codigo = c.magnitud_codigo WHERE c.dispositivo_id = d.id) AS canales,
+             ${SQL_ESTADO_VISUAL} AS estado_visual,
+             -- Entrega (punto 65 vii): tramas de las últimas 24 h, contadas UNA vez por dispositivo (el LATERAL de abajo, por el índice
+             -- (dispositivo_id, recibido_en DESC)); el % lo calcula entrega(). Antes se contaban dos veces (dos subplanes): docs/16 §61.
+             t24.n AS recibidas_24h,
+             d.creado_en,
+             -- Solo para ordenar por entrega en la base (la página se corta aquí): la misma regla que entrega(), con la ventana de 24 h
+             -- que empieza en el alta si es posterior; nulo si no está activo o no hay una trama esperada completa. El valor que se
+             -- devuelve lo calcula entrega() (tablero.ts); la prueba de humo comprueba que el orden y los valores coinciden. NULLIF:
+             -- un intervalo 0 no divide (la base lo impide desde la migración 23, ck_dispositivo_intervalo_esperado_s).
+             (SELECT CASE WHEN d.estado = 'activo' AND w.esperadas >= 1
+                          THEN least(100, round(1000.0 * t24.n / w.esperadas) / 10) END
+                FROM (SELECT floor(extract(epoch FROM now() - greatest(now() - INTERVAL '24 hours', d.creado_en)) / NULLIF(d.intervalo_esperado_s, 0)) AS esperadas) w) AS entrega_orden
         FROM dispositivo d
+        LEFT JOIN LATERAL (SELECT count(*)::int AS n FROM trama t WHERE t.dispositivo_id = d.id AND t.recibido_en >= now() - INTERVAL '24 hours') t24 ON true
         LEFT JOIN estado_dispositivo e ON e.dispositivo_id = d.id
         JOIN zona z ON z.id = d.zona_id
         JOIN sitio s ON s.id = z.sitio_id
-       WHERE $1::uuid[] IS NULL OR s.id = ANY($1::uuid[])
-       ORDER BY s.nombre, z.nombre, d.nombre`, [sitios]);
-    return r.rows;
+       WHERE ($1::uuid[] IS NULL OR s.id = ANY($1::uuid[]))
+         AND ($2::uuid IS NULL OR s.id = $2::uuid)
+         AND ($3::uuid IS NULL OR z.id = $3::uuid)
+         AND ($4::text IS NULL OR d.via = $4::text)
+         AND ($6::text IS NULL OR d.id_fisico ILIKE $6::text OR d.nombre ILIKE $6::text))
+      SELECT inv.*, count(*) OVER () AS total FROM inv
+       WHERE $5::text IS NULL OR inv.estado_visual = $5::text
+       ORDER BY ${ORDEN_SQL[f.orden ?? 'nombre']}inv.sitio, inv.zona, inv.nombre, inv.id ${pagina}`, p);
+    let total = r.rows[0] === undefined ? 0 : Number(r.rows[0].total);
+    // Una página más allá del final no trae filas de donde leer el total: solo en ese caso se cuenta aparte, con los mismos filtros.
+    if (r.rows.length === 0 && (f.desplazamiento ?? 0) > 0) total = (await this.inventario(sitios, { ...f, limite: undefined, desplazamiento: undefined })).total;
+    const ahora = new Date();
+    const ventana = new Date(ahora.getTime() - 24 * 3600 * 1000);
+    const filas = r.rows.map((x) => {
+      const { total: _total, recibidas_24h, creado_en, entrega_orden: _orden, ...resto } = x;
+      void _total; void _orden;
+      // Un dispositivo en mantenimiento o de baja no tiene tramas esperadas (RF-22): su entrega no se calcula (nulo), como en el resumen.
+      return { ...resto, entrega: x.estado === 'activo' ? entrega(recibidas_24h, ventana, ahora, creado_en, x.intervalo_esperado_s, ventana).porcentaje : null };
+    });
+    return { filas, total };
   }
 
   async dispositivo(id: string) {
     const d = await this.pool.query(`
       SELECT d.id, d.id_fisico, d.nombre, d.estado, d.via, d.formato, d.intervalo_esperado_s, e.visto_por_ultima_vez, d.creado_en,
+             -- Marca del bloqueo optimista de PATCH /dispositivos/{id} (Etapa 4; docs/10 §8.4 punto 28), con microsegundos, como texto.
+             ${isoUs('d.actualizado_en')} AS actualizado_en,
              (e.visto_por_ultima_vez >= now() - d.intervalo_esperado_s * 2 * INTERVAL '1 second') AS en_linea,
              z.nombre AS zona, s.nombre AS sitio, s.zona_horaria, s.codigo AS sitio_codigo, z.id AS zona_id,
              ${SQL_INTERVALO_OBSERVADO} AS intervalo_observado_s
@@ -68,7 +124,8 @@ export class ConsultaService {
              c.escala_cero, c.escala_cien,
              -- Marca del bloqueo optimista de PATCH /canales/{id} (punto 51): con microsegundos, como texto, para devolverla tal cual.
              ${isoUs('c.actualizado_en')} AS actualizado_en,
-             (SELECT json_agg(json_build_object('id', r.id, 'umbral_alto', r.umbral_alto, 'umbral_bajo', r.umbral_bajo, 'histeresis', r.histeresis))
+             (SELECT json_agg(json_build_object('id', r.id, 'umbral_alto', r.umbral_alto, 'umbral_bajo', r.umbral_bajo, 'histeresis', r.histeresis,
+                                     'retardo_s', r.retardo_s) ORDER BY r.id)
                 FROM regla_umbral r WHERE r.canal_id = c.id) AS reglas,
              (SELECT json_build_object('valor', x.valor, 'tiempo', iso_utc(x.tiempo)) FROM medicion x
                WHERE x.canal_id = c.id ORDER BY x.tiempo DESC LIMIT 1) AS ultima_medicion
@@ -101,9 +158,11 @@ export class ConsultaService {
     const calibrado = escala_cero !== null && escala_cien !== null;
 
     // El intervalo viene de una lista cerrada (validacion.ts), por eso puede ir como parámetro ::interval.
-    const r = await this.pool.query<{ t: string; v: number; n: number }>(`
+    const r = await this.pool.query<{ t: string; v: number; mn: number; mx: number; n: number }>(`
       SELECT extract(epoch FROM time_bucket($4::interval, tiempo, $5))::bigint AS t,
              round(avg(valor)::numeric, 3)::float AS v,
+             round(min(valor)::numeric, 3)::float AS mn,
+             round(max(valor)::numeric, 3)::float AS mx,
              count(*)::int AS n
         FROM medicion
        WHERE canal_id = $1 AND tiempo >= $2 AND tiempo < $3
@@ -114,6 +173,9 @@ export class ConsultaService {
       desde, hasta, puntos: r.rows.length,
       tiempos: r.rows.map((x) => Number(x.t)),
       valores: r.rows.map((x) => x.v),
+      // Tablero v2 (docs/19 §4, D3): el mínimo y el máximo de cada cubo, para la banda mín–máx (campos nuevos; nada cambia de forma).
+      minimos: r.rows.map((x) => x.mn),
+      maximos: r.rows.map((x) => x.mx),
       muestras: r.rows.map((x) => x.n),
       // Punto 51: el % de cada promedio, con la calibración del canal; sin calibración, null (no un arreglo de nulos).
       escala: calibrado ? { cero: escala_cero, cien: escala_cien } : null,
@@ -123,9 +185,25 @@ export class ConsultaService {
 
   // `dispositivoId` (opcional, ya validado como UUID por el controlador): solo las de ese dispositivo (ficha del panel, docs/19 P3).
   // `sitios`: alcance de quien pregunta (null = todos), por el sitio de la zona del dispositivo.
-  async condiciones(abiertas: boolean | undefined, lim: number, dispositivoId?: string, sitios: string[] | null = null) {
+  // `cursor` (docs/10 §8.4 punto 58): la página siguiente por clave, (abierta_en, id) < cursor, con el índice idx_condicion_abierta_en_id
+  // (migración 23). `clave_t` (abierta_en con microsegundos) viaja solo hasta el controlador, que arma X-Siguiente y lo quita.
+  // `ventana` (Etapa 4; la ficha dibuja las condiciones del canal dentro del gráfico, docs/19 §4, D4): las que se superponen con
+  // [desde, hasta): abiertas antes de `hasta` y cerradas después de `desde` (o aún abiertas).
+  async condiciones(abiertas: boolean | undefined, lim: number, dispositivoId?: string, sitios: string[] | null = null, cursor?: Cursor, ventana?: { desde?: Date; hasta?: Date }) {
     const condiciones: string[] = [];
     const parametros: unknown[] = [lim];
+    if (ventana?.hasta !== undefined) {
+      parametros.push(ventana.hasta);
+      condiciones.push(`c.abierta_en < $${parametros.length}::timestamptz`);
+    }
+    if (ventana?.desde !== undefined) {
+      parametros.push(ventana.desde);
+      condiciones.push(`(c.cerrada_en IS NULL OR c.cerrada_en >= $${parametros.length}::timestamptz)`);
+    }
+    if (cursor !== undefined) {
+      parametros.push(cursor.t, cursor.id);
+      condiciones.push(`(c.abierta_en, c.id) < ($${parametros.length - 1}::timestamptz, $${parametros.length}::uuid)`);
+    }
     if (sitios !== null) {
       parametros.push(sitios);
       condiciones.push(`z.sitio_id = ANY($${parametros.length}::uuid[])`);
@@ -140,15 +218,16 @@ export class ConsultaService {
       SELECT c.id, c.tipo, c.abierta_en, c.cerrada_en,
              extract(epoch FROM coalesce(c.cerrada_en, now()) - c.abierta_en)::int AS duracion_s,
              d.id AS dispositivo_id, d.id_fisico, d.nombre AS dispositivo,
-             r.umbral_alto, r.umbral_bajo, ca.magnitud_codigo AS magnitud
+             r.umbral_alto, r.umbral_bajo, ca.magnitud_codigo AS magnitud,
+             ${isoUs('c.abierta_en')} AS clave_t
         FROM condicion c
         JOIN dispositivo d ON d.id = c.dispositivo_id
         JOIN zona z ON z.id = d.zona_id
         LEFT JOIN regla_umbral r ON r.id = c.regla_id
         LEFT JOIN canal ca ON ca.id = r.canal_id
         ${filtro}
-       ORDER BY c.abierta_en DESC LIMIT $1`, parametros);
-    return r.rows;
+       ORDER BY c.abierta_en DESC, c.id DESC LIMIT $1`, parametros);
+    return r.rows as (Record<string, unknown> & { id: string; clave_t: string })[];
   }
 
   // Identidad mínima de un dispositivo para la exportación (404 si no existe).
@@ -200,9 +279,14 @@ export class ConsultaService {
   // `sitios`: alcance de quien pregunta (null = todos). Una trama se atribuye al sitio de su dispositivo y, si no se identificó
   // (no_registrado, malformada sin emisor), al sitio cuyo código va en el tópico (`sitio/<codigo>/…`): el sitio al que iba dirigida
   // (decidido al implementar, 08/11/2026). Lo que no calza con ningún sitio solo lo ve el usuario del sistema.
-  async cuarentena(lim: number, dispositivoId?: string, sitios: string[] | null = null) {
+  // `cursor`: como en condiciones, por (recibido_en, id) con idx_cuarentena_recibido_en_id (migración 23).
+  async cuarentena(lim: number, dispositivoId?: string, sitios: string[] | null = null, cursor?: Cursor) {
     const condiciones: string[] = [];
     const parametros: unknown[] = [lim];
+    if (cursor !== undefined) {
+      parametros.push(cursor.t, cursor.id);
+      condiciones.push(`(q.recibido_en, q.id) < ($${parametros.length - 1}::timestamptz, $${parametros.length}::uuid)`);
+    }
     if (dispositivoId !== undefined) {
       parametros.push(dispositivoId);
       condiciones.push(`q.dispositivo_id = $${parametros.length}`);
@@ -214,14 +298,14 @@ export class ConsultaService {
     const filtro = condiciones.length === 0 ? '' : `WHERE ${condiciones.join(' AND ')}`;
     const r = await this.pool.query(`
       SELECT q.id, q.origen, q.topico, q.motivo, q.detalle, d.id_fisico AS dispositivo, q.recibido_en,
-             p.texto AS payload, p.formato AS payload_formato
+             p.texto AS payload, p.formato AS payload_formato, ${isoUs('q.recibido_en')} AS clave_t
         FROM cuarentena q
         LEFT JOIN dispositivo d ON d.id = q.dispositivo_id
         LEFT JOIN zona z ON z.id = d.zona_id
         LEFT JOIN sitio st ON q.dispositivo_id IS NULL AND st.codigo = split_part(q.topico, '/', 2)
         CROSS JOIN LATERAL payload_legible(q.payload_crudo, 200) p
         ${filtro}
-       ORDER BY q.recibido_en DESC LIMIT $1`, parametros);
-    return r.rows;
+       ORDER BY q.recibido_en DESC, q.id DESC LIMIT $1`, parametros);
+    return r.rows as (Record<string, unknown> & { id: string; clave_t: string })[];
   }
 }

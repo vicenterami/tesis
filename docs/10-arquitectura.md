@@ -492,7 +492,7 @@ cliente ──HTTP──► Express ⊂ NestJS ──► servicio ──► pg �
 
 - **Express** es la biblioteca de servidor HTTP más usada de Node.js; NestJS la usa por debajo
   (`@nestjs/platform-express`). El proceso de Node es el servidor; Express recibe cada petición y
-  entrega la respuesta. Es **la API**: 17 rutas REST (23 operaciones, la recepción por HTTP, la sesión y los usuarios incluidos) y el canal SSE `/eventos` (§5), descritos en el contrato OpenAPI (18 rutas y 24 operaciones contando `/eventos`). Desde el 08/11/2026, antes de cada ruta corre el guardia central de la sesión (`docs/20 §5`). Express no toca la base.
+  entrega la respuesta. Es **la API**: 25 rutas REST (32 operaciones, la recepción por HTTP, la sesión, los usuarios y el tablero v2 incluidos) y el canal SSE `/eventos` (§5), descritos en el contrato OpenAPI (26 rutas y 33 operaciones contando `/eventos`; el paso 2h2 del guardián compara estas cifras con `openapi.json`). Desde el 08/11/2026, antes de cada ruta corre el guardia central de la sesión (`docs/20 §5`). Express no toca la base.
 - **`pg`** (node-postgres) es el conductor de la base: mantiene un *pool* de 5 conexiones
   (`db/db.module.ts`) y envía **SQL directo** con parámetros `$1, $2…`; el valor nunca se pega dentro
   del texto SQL, lo que evita la inyección. Sin ORM, por la razón de `docs/07` (series de tiempo con
@@ -1636,10 +1636,12 @@ entra. Lo que aquí se marca «a fijar al implementar» es un detalle que el dis
     `WHERE (tiempo, id) < ($1, $2)`, comparación de filas que usa un índice con esas dos columnas (cada lista con el suyo, comprobado con
     `EXPLAIN` antes de dejarla). El cliente recibe un **cursor opaco** (las dos claves codificadas) y lo devuelve tal cual; el alcance por
     sitio sigue en el `WHERE` (punto 36), así que un cursor manipulado solo puede pedir otra posición de lo que la persona ya puede ver.
-    Listas: cuarentena, condiciones, accesos, auditoría y eventos de un dispositivo. (iii) **Desplazamiento con total** (`LIMIT`, `OFFSET`
+    Listas: cuarentena, condiciones, accesos, auditoría y eventos de un dispositivo (al 11/11/2026, hechas cuarentena, condiciones y
+    eventos; accesos y auditoría, pendientes: sus rutas aún no existen). (iii) **Desplazamiento con total** (`LIMIT`, `OFFSET`
     y `count(*)`) en usuarios e inventario: crecen poco, se ordenan por nombre y quien mira quiere saber cuántos hay. El tope de `limite`
-    de hoy se mantiene. (iv) **Prueba:** una fila insertada entre dos páginas no se repite ni se pierde (plantado con `OFFSET`: se repite);
-    un cursor de otro sitio no trae nada.
+    de hoy se mantiene (al 11/11/2026, hecho en el inventario; usuarios, pendiente). (iv) **Prueba:** una fila insertada entre dos páginas
+    no se repite ni se pierde (plantado con `OFFSET`: se repite); un cursor de otro sitio no trae nada (las dos, en `sesion-smoke.sh` desde
+    el 11/11/2026, `docs/16 §61`).
 59. **Consultas por petición acotadas y barrido de supervisión sin N+1 (B3; iteración 2).** (i) **El barrido** (`supervision.service.ts`)
     hace hoy una consulta para hallar los dispositivos caídos y, **por cada uno**, dos más (abrir la condición y escribir el evento): con
     una caída de red que silencia 1 000 equipos son 2 001 consultas en un barrido. Pasa a dos sentencias fijas: un `INSERT … SELECT … ON
@@ -1679,17 +1681,38 @@ entra. Lo que aquí se marca «a fijar al implementar» es un detalle que el dis
     correo por marcadores derivados del id, se invalida el hash, se revocan las sesiones y se marca `anonimizado_en`; la fila queda para que
     lo enlazado siga cuadrando sin datos de nadie. Detalle, reglas (el último administrador del sistema no puede darse de baja) y prueba:
     `docs/20 §11`; qué queda en `acceso` y en los respaldos, y por cuánto tiempo: `docs/21 §2`.
-63. **Backend en ES modules: decidido, en un bloque propio de la iteración 2 (TT-47).** Hoy el backend compila a CommonJS (`module`
-    `node16` sin `"type": "module"`). Pasar a ES modules alinea el código con el estándar del lenguaje y con las dependencias que publican
-    solo ese formato; el cambio es mecánico pero toca todo (cada import relativo con su extensión, la configuración de TypeScript, Jest y
-    NestJS), por eso va solo, sin funcionalidad mezclada, con la batería completa del guardián antes y después y el paquete servido
-    comparado. Si la iteración 2 no lo alcanza, queda declarado con este diseño.
+63. **Backend en ES modules: hecho el 11/11/2026 (TT-47), adelantado de la iteración 2.** Hasta entonces el backend compilaba a CommonJS
+    (`module` `node16` sin `"type": "module"`). Motivo del adelanto: `@nestjs/config` 12 se publica solo como ES module y su actualización
+    (PR #15 de Dependabot) no compilaba (TS1479: un archivo CommonJS no puede importar un ES module); es también la puerta a NestJS 12.
+    Qué cambió: `"type": "module"` en `package.json`; `module` y `moduleResolution` en `nodenext`; las 360 importaciones relativas con su
+    extensión `.js`; `__dirname` → `import.meta.dirname`; la zona UTC en un módulo propio (`zona-utc.ts`), importado primero, porque en
+    ES modules las importaciones se evalúan antes que el cuerpo del archivo; las pruebas unitarias de Jest a vitest (la versión del panel)
+    y el emulador de ts-node a tsx. Los decoradores y su metadata siguen igual (`nest build` compila con tsc). Fue un bloque solo, sin
+    funcionalidad mezclada; verificación y cifras antes y después en `docs/16 §60`.
 64. **Perfiles con roles fijos y la matriz en el código (HU-26; iteración 0).** Cinco perfiles —administrador del sistema, administrador
     de sitio, investigador, operador técnico y consulta— y el invitado como vista pública por enlace (punto 6). Roles fijos, no editables:
     un editor de permisos sería otra interfaz que diseñar y probar sin un caso que lo pida, y la matriz fija se prueba entera (cada celda,
     un caso del paso 4b). La tabla vive en `permitir()` (punto 36, `docs/20 §5`) y el panel la recibe, no la copia: el frontend oculta, el
     backend decide. Cambia una decisión anterior: **exportar** deja de ser solo del administrador y pasa a administrador de sitio e
     investigador (los datos crudos siguen sin ser públicos, punto 6). Matriz completa: `docs/20 §6`.
+65. **Tablero v2: contrato de la API y estado visual en el servidor (diseñado el 11/11/2026; iteración 1).** Las rutas nuevas
+    (`GET /sitios` (Etapa 4), `/sitios/{id}/resumen`, `/sitios/{id}/historico`, `/sitios/{id}/actividad`, `/dispositivos/{id}/historico`,
+    `/dispositivos/{id}/eventos`, `/cuarentena/detectados`, `PATCH /dispositivos/{id}`, `PUT /canales/{id}/reglas` (Etapa 4),
+    `POST /dispositivos/lote` (Etapa 4), `/preferencias`, `/sesiones`) y los cambios compatibles (mínimo y máximo por cubo; filtros, paginación,
+    `estado_visual` y `entrega` en el inventario) están en `docs/19 §4` (tablero v2, I) con el perfil que usa cada una (`docs/20 §6`).
+    Decisiones: (i) **ninguna respuesta cambia de forma:** los totales (`X-Total`) y los cursores (`X-Siguiente`) van en cabeceras y los
+    campos nuevos se suman; así los humos y el panel anterior siguen valiendo mientras se construye. (ii) **El estado visual de cuatro
+    valores se calcula también en SQL** (la regla de `docs/19 §2`) para filtrar y paginar en el servidor; el panel conserva su función
+    para recalcular en vivo, y una prueba comprueba que coinciden: dos implementaciones de una sola regla escrita, probadas entre sí.
+    (iii) **El resumen del sitio es una consulta por petición**, no una tabla materializada: con decenas de dispositivos y los cubos de la
+    resolución del rango cuesta milisegundos (se mide como `docs/16 §52`); un agregado por tarea queda para cuando la medición lo pida.
+    (iv) **El lote de alta es una sola transacción:** validación completa en memoria con las mismas funciones del alta de a uno, una inserción
+    con `UNNEST` en una transacción, credenciales generadas y devueltas una sola vez, tope de 500 filas y límite de tasa (`docs/11 §4`);
+    las filas rechazadas no bloquean a las válidas y el informe lo dice fila por fila. (v) `evento.usuario_id` (nulo = el sistema) es la
+    fuente de «quién lo hizo» (HU-11); la retención de `evento` no cambia. (vi) **Retardo de activación** (RF-14): el filtro alertar abre
+    la condición de umbral solo cuando la medición lleva al menos `retardo_s` fuera de la banda (0 = como hoy); desde cuándo está fuera
+    se guarda por canal en la base, no en memoria, para que sobreviva a un reinicio. (vii) **Entrega** (HU-15) = tramas recibidas en la
+    ventana ÷ esperadas (ventana ÷ intervalo esperado), acotada a 100 %; nula si el dispositivo no está activo o si en la ventana no cabe una trama esperada completa (así, sin tramas retenidas no se inventa); 0 % si esperaba y no llegó nada.
 
 ## 9. Crecimiento, resiliencia y respaldo (aprobado el 06/10/2026)
 

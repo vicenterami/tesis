@@ -101,6 +101,21 @@ export interface Opciones {
   abortar?: AbortSignal;
   // false = quien llama trata el 401 y el 403 él mismo (el inicio de sesión: un 401 ahí es «credenciales no válidas», no «venció»).
   central?: boolean;
+  // Las listas paginadas (docs/19 §6 y §4 tablero v2, I): el total va en `X-Total` y el cursor de la página siguiente en `X-Siguiente`;
+  // el cuerpo sigue siendo la lista. Quien las necesita pasa este oyente; quien no, no cambia nada.
+  alPaginar?: (p: Paginacion) => void;
+}
+
+// null = la respuesta no trae la cabecera (un backend anterior, o una ruta sin paginación): quien llama decide qué hacer sin ella.
+export interface Paginacion {
+  total: number | null;
+  siguiente: string | null;
+}
+export function leerPaginacion(h: Headers): Paginacion {
+  const t = h.get('x-total');
+  const n = t === null || t.trim() === '' ? NaN : Number(t);
+  const sig = h.get('x-siguiente');
+  return { total: Number.isInteger(n) && n >= 0 ? n : null, siguiente: sig === null || sig.trim() === '' ? null : sig.trim() };
 }
 
 // Convierte una respuesta no 2xx en ErrorApi y, si vale para toda la aplicación (401, 403 de clave temporal), lo avisa.
@@ -142,11 +157,20 @@ async function llamar(metodo: string, ruta: string, o: Opciones, acepta: string)
 export async function pedir<T>(metodo: string, ruta: string, o: Opciones = {}): Promise<T> {
   const r = await llamar(metodo, ruta, o, 'application/json');
   const texto = await r.text();
-  return (texto === '' ? undefined : JSON.parse(texto)) as T;
+  const datos = (texto === '' ? undefined : JSON.parse(texto)) as T;
+  o.alPaginar?.(leerPaginacion(r.headers));
+  return datos;
 }
 
 export function obtener<T>(ruta: string, abortar?: AbortSignal): Promise<T> {
   return pedir<T>('GET', ruta, { abortar });
+}
+
+// Una página de una lista con su total y su cursor (las cabeceras), en una sola llamada.
+export async function obtenerPagina<T>(ruta: string, abortar?: AbortSignal): Promise<{ filas: T[]; total: number | null; siguiente: string | null }> {
+  let p: Paginacion = { total: null, siguiente: null };
+  const filas = await pedir<T[]>('GET', ruta, { abortar, alPaginar: (x) => (p = x) });
+  return { filas, ...p };
 }
 
 // «Gana la última» (docs/19 §6): cada llamada cancela la anterior y entrega su señal; `cancelar()` corta la que esté en vuelo (al
@@ -180,8 +204,9 @@ export function nombreDeArchivo(cabecera: string | null, porDefecto: string): st
   } catch {
     nombre = ''; // un «%» mal formado (URIError): el nombre de por defecto, nunca una descarga que falla
   }
-  // Solo el nombre: nada de rutas ni caracteres que un sistema de archivos interprete.
-  return /^[\p{L}\p{N}_.\- ]{1,120}$/u.test(nombre) && !nombre.startsWith('.') ? nombre : porDefecto;
+  // Solo el nombre: nada de rutas ni caracteres que un sistema de archivos interprete; y solo las extensiones que la API entrega
+  // (.csv y .json, corrección del 11/11/2026): un «.exe» o un «.html» ajeno nunca llega al disco con ese nombre.
+  return /^[\p{L}\p{N}_.\- ]{1,120}$/u.test(nombre) && !nombre.startsWith('.') && /\.(csv|json)$/i.test(nombre) ? nombre : porDefecto;
 }
 
 export interface Guardador {

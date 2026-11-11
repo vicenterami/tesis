@@ -7,14 +7,18 @@
     rango,
     res,
     alElegirRango,
-    alElegirRes,
-  }: { rango: ClaveRango; res: ClaveResolucion | null; alElegirRango: (r: ClaveRango) => void; alElegirRes: (r: ClaveResolucion | null) => void } = $props();
-  const admisibles = $derived(resolucionesAdmisibles(rango));
+    alElegirRes = () => {},
+    conResolucion = true,
+  }: { rango: ClaveRango | null; res?: ClaveResolucion | null; alElegirRango: (r: ClaveRango) => void; alElegirRes?: (r: ClaveResolucion | null) => void; conResolucion?: boolean } = $props();
+  // rango null: una ventana fija (a medida o por zoom) manda y ningún preajuste queda marcado. En el tablero no hay resolución
+  // elegible (la fija el rango, docs/19 §4 tablero v2, B4).
+  const admisibles = $derived(rango === null ? [] : resolucionesAdmisibles(rango));
 </script>
 
 {#each RANGOS as r (r.clave)}
   <button type="button" aria-pressed={rango === r.clave} onclick={() => alElegirRango(r.clave)} data-rango={r.clave}>{r.rotulo}</button>
 {/each}
+{#if conResolucion && rango !== null}
 <label>
   resolución
   <select data-resolucion value={res ?? 'auto'} onchange={(e) => { const v = e.currentTarget.value; alElegirRes(v === 'auto' ? null : (v as ClaveResolucion)); }}>
@@ -24,3 +28,4 @@
     {/each}
   </select>
 </label>
+{/if}

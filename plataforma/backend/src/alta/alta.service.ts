@@ -9,8 +9,11 @@ import { DynsecService } from '../broker/dynsec.service.js';
 import { AltaValidada, Formato, Via } from './alta.dto.js';
 import { CalibracionValidada } from './calibracion.dto.js';
 import { isoUs } from '../db/iso-us.js';
-import { generarSecreto, hashScrypt } from './credenciales.js';
+import { registrarEvento, registrarEventos } from '../db/evento.js';
+import { errorDeCliente } from '../db/cliente.js';
+import { generarSecreto, hashScrypt, hashesEnTandas } from './credenciales.js';
 import { FormatoPasarela, PasarelaValidada } from './pasarela.dto.js';
+import { AltaDeLote, Catalogos, PasarelaCatalogo, ZonaCatalogo } from './lote.js';
 
 export interface CanalCreado {
   id: string;
@@ -179,9 +182,13 @@ export class AltaService {
     return this.enCurso;
   }
 
-  async crear(a: AltaValidada): Promise<DispositivoCreado> {
+  async crear(a: AltaValidada, usuarioId: string | null = null): Promise<DispositivoCreado> {
     // Sin administración del broker no se abre siquiera la transacción: un dispositivo sin credencial no sirve de nada.
     if (a.via === 'mqtt' && !this.dynsec.disponible) throw this.sinBroker();
+    // El secreto y su resumen ANTES de abrir la transacción (como en el lote): scrypt corre en el pool de hilos y, si está ocupado,
+    // la transacción quedaba abierta y ociosa más que su idle_in_transaction (15 s): la base cortaba la conexión (docs/16 §61).
+    const secreto = a.via === 'lorawan' ? null : generarSecreto(); // la pasarela autentica a los lorawan (docs/10 §3)
+    const hash = secreto === null ? null : await hashScrypt(secreto);
     const c = await this.tomar();
     let enBroker = false;
     try {
@@ -203,11 +210,11 @@ export class AltaService {
         );
         canales.push({ id: r.rows[0].id, magnitud: k.magnitud, unidad: unidades.get(k.magnitud) ?? '', etiqueta: k.etiqueta, escala_cero: k.escala_cero, escala_cien: k.escala_cien });
       }
-      const secreto = a.via === 'lorawan' ? null : generarSecreto(); // la pasarela autentica a los lorawan (docs/10 §3)
-      if (secreto !== null) await c.query('INSERT INTO credencial (dispositivo_id, hash) VALUES ($1, $2)', [id, await hashScrypt(secreto)]); // nunca el secreto
-      await c.query('INSERT INTO evento (dispositivo_id, tipo, detalle) VALUES ($1, $2, $3)', [
-        id, 'alta', JSON.stringify({ via: a.via, formato, decodificador: a.decodificador, canales: a.canales.map((k) => k.magnitud), origen: 'api' }),
-      ]);
+      if (hash !== null) await c.query('INSERT INTO credencial (dispositivo_id, hash) VALUES ($1, $2)', [id, hash]); // nunca el secreto
+      await registrarEvento(c, {
+        dispositivoId: id, tipo: 'alta', usuarioId,
+        detalle: { via: a.via, formato, decodificador: a.decodificador, canales: a.canales.map((k) => k.magnitud), origen: 'api' },
+      });
       if (a.via === 'mqtt' && secreto !== null) {
         await this.dynsec.ordenar(ordenesAltaDispositivo(a.id_fisico, secreto));
         enBroker = true;
@@ -234,7 +241,7 @@ export class AltaService {
   // evento, en una transacción; el cliente del broker se borra dentro de ella, antes de confirmar. Un cliente que el broker ya
   // no tiene cuenta como borrado (una baja repetida tras un corte deja el mismo estado final). La fila queda: el historial de
   // mediciones y eventos no se pierde, y el filtro 1 manda a cuarentena («dado_de_baja») lo que llegue por otra vía.
-  async darDeBaja(id: string): Promise<DispositivoDadoDeBaja> {
+  async darDeBaja(id: string, usuarioId: string | null = null): Promise<DispositivoDadoDeBaja> {
     const c = await this.tomar();
     let idFisico = id;
     try {
@@ -246,15 +253,16 @@ export class AltaService {
       await c.query('UPDATE dispositivo SET estado = $2 WHERE id = $1', [id, 'baja']);
       const cred = await c.query('UPDATE credencial SET activa = false WHERE dispositivo_id = $1 AND activa', [id]);
       const cond = await c.query('UPDATE condicion SET cerrada_en = now() WHERE dispositivo_id = $1 AND cerrada_en IS NULL', [id]);
-      const ev = await c.query<{ ocurrido_en: Date }>('INSERT INTO evento (dispositivo_id, tipo, detalle) VALUES ($1, $2, $3) RETURNING ocurrido_en', [
-        id, 'baja', JSON.stringify({ via: d.via, estado_anterior: d.estado, credenciales_revocadas: cred.rowCount ?? 0, condiciones_cerradas: cond.rowCount ?? 0, origen: 'api' }),
-      ]);
+      const ocurrido = await registrarEvento(c, {
+        dispositivoId: id, tipo: 'baja', usuarioId,
+        detalle: { via: d.via, estado_anterior: d.estado, credenciales_revocadas: cred.rowCount ?? 0, condiciones_cerradas: cond.rowCount ?? 0, origen: 'api' },
+      });
       if (d.via === 'mqtt') await this.borrarEnBroker(d.id_fisico);
       await c.query('COMMIT');
       this.log.log(`baja: ${d.id_fisico} (${d.via}; ${cred.rowCount ?? 0} credencial(es) revocada(s), ${cond.rowCount ?? 0} condición(es) cerrada(s))`);
       return {
         id, id_fisico: d.id_fisico, estado: 'baja', estado_anterior: d.estado, via: d.via, credenciales_revocadas: cred.rowCount ?? 0,
-        condiciones_cerradas: cond.rowCount ?? 0, dado_de_baja_en: ev.rows[0].ocurrido_en.toISOString(),
+        condiciones_cerradas: cond.rowCount ?? 0, dado_de_baja_en: ocurrido.toISOString(),
       };
     } catch (e) {
       await c.query('ROLLBACK').catch(() => undefined);
@@ -269,7 +277,9 @@ export class AltaService {
   // queda inactiva), evento, y `setClientPassword` en el broker dentro de la transacción. Si el broker no conoce al cliente
   // (huérfano al revés: la base lo tiene y el broker no), se crea con su rol: rotar es también la reparación. Un corte después
   // de cambiar la clave en el broker deja al dispositivo sin poder entrar con la anterior: el remedio es repetir la rotación.
-  async rotarCredencial(id: string): Promise<CredencialRotada> {
+  async rotarCredencial(id: string, usuarioId: string | null = null): Promise<CredencialRotada> {
+    const secreto = generarSecreto(); // y su resumen, antes de la transacción (ver crear)
+    const hash = await hashScrypt(secreto);
     const c = await this.tomar();
     let idFisico = id;
     try {
@@ -280,17 +290,14 @@ export class AltaService {
       if (d.via === 'lorawan') throw new BadRequestException(['un dispositivo lorawan no tiene credencial propia: lo autentica su pasarela']);
       if (d.via === 'mqtt' && !this.dynsec.disponible) throw this.sinBroker();
       const canales = await this.canalesDe(c, id);
-      const secreto = generarSecreto();
       await c.query('UPDATE credencial SET activa = false WHERE dispositivo_id = $1 AND activa', [id]);
-      await c.query('INSERT INTO credencial (dispositivo_id, hash) VALUES ($1, $2)', [id, await hashScrypt(secreto)]); // nunca el secreto
-      const ev = await c.query<{ ocurrido_en: Date }>('INSERT INTO evento (dispositivo_id, tipo, detalle) VALUES ($1, $2, $3) RETURNING ocurrido_en', [
-        id, 'rotacion', JSON.stringify({ via: d.via, origen: 'api' }),
-      ]);
+      await c.query('INSERT INTO credencial (dispositivo_id, hash) VALUES ($1, $2)', [id, hash]); // nunca el secreto
+      const ocurrido = await registrarEvento(c, { dispositivoId: id, tipo: 'rotacion', usuarioId, detalle: { via: d.via, origen: 'api' } });
       if (d.via === 'mqtt') await this.rotarEnBroker(d.id_fisico, secreto);
       await c.query('COMMIT');
       this.log.log(`rotación: ${d.id_fisico} (${d.via})`);
       return {
-        id, id_fisico: d.id_fisico, via: d.via, sitio_codigo: d.sitio_codigo, rotada_en: ev.rows[0].ocurrido_en.toISOString(),
+        id, id_fisico: d.id_fisico, via: d.via, sitio_codigo: d.sitio_codigo, rotada_en: ocurrido.toISOString(),
         conexion: this.conexion(d.via, d.id_fisico, d.sitio_codigo, canales, secreto, null) as ConexionMqtt | ConexionHttp,
       };
     } catch (e) {
@@ -307,7 +314,7 @@ export class AltaService {
   // entrando) para que «antes» sea exactamente lo que el UPDATE reemplaza; el evento `canal_calibrado` va en la misma transacción. Nada
   // guardado se reescribe: el % sale con la escala vigente en la siguiente consulta o lectura (consulta/escala.ts). No pasa por el cupo de
   // las operaciones de aprovisionamiento: no espera al broker y dura lo que dos sentencias.
-  async calibrar(id: string, cal: CalibracionValidada): Promise<CanalCalibrado> {
+  async calibrar(id: string, cal: CalibracionValidada, usuarioId: string | null = null): Promise<CanalCalibrado> {
     const c = await this.pool.connect();
     try {
       await this.abrir(c);
@@ -340,12 +347,12 @@ export class AltaService {
           message: `alguien lo cambió a las ${antes.actualizado_en.slice(11, 16)} UTC (${antes.actualizado_en}); recarga`,
         });
       }
-      await c.query('INSERT INTO evento (dispositivo_id, tipo, detalle) VALUES ($1, $2, $3)', [
-        antes.dispositivo_id, 'canal_calibrado', JSON.stringify({
+      await registrarEvento(c, {
+        dispositivoId: antes.dispositivo_id, tipo: 'canal_calibrado', usuarioId, detalle: {
           canal_id: id, magnitud: antes.magnitud, antes: { cero: antes.escala_cero, cien: antes.escala_cien },
           despues: { cero: despues.escala_cero, cien: despues.escala_cien }, origen: 'api',
-        }),
-      ]);
+        },
+      });
       await c.query('COMMIT');
       this.log.log(`calibración: canal ${id} (${antes.magnitud}) ${antes.escala_cero ?? '—'}/${antes.escala_cien ?? '—'} → ${despues.escala_cero ?? '—'}/${despues.escala_cien ?? '—'}`);
       return despues;
@@ -358,8 +365,10 @@ export class AltaService {
   }
 
   // Alta de una pasarela: la misma forma que la de un dispositivo (todo o nada; el cliente del broker nace con su rol en una orden).
-  async crearPasarela(p: PasarelaValidada): Promise<PasarelaCreada> {
+  async crearPasarela(p: PasarelaValidada, usuarioId: string | null = null): Promise<PasarelaCreada> {
     if (!this.dynsec.disponible) throw this.sinBroker();
+    const secreto = generarSecreto(); // y su resumen, antes de la transacción (ver crear)
+    const hash = await hashScrypt(secreto);
     const c = await this.tomar();
     let enBroker = false;
     try {
@@ -372,11 +381,8 @@ export class AltaService {
         [p.sitio_id, p.id_fisico, p.nombre, p.formato],
       );
       const id = r.rows[0].id;
-      const secreto = generarSecreto();
-      await c.query('INSERT INTO credencial (pasarela_id, hash) VALUES ($1, $2)', [id, await hashScrypt(secreto)]); // nunca el secreto
-      await c.query('INSERT INTO evento (dispositivo_id, tipo, detalle) VALUES (NULL, $1, $2)', [
-        'pasarela_alta', JSON.stringify({ pasarela_id: id, id_fisico: p.id_fisico, formato: p.formato, origen: 'api' }),
-      ]);
+      await c.query('INSERT INTO credencial (pasarela_id, hash) VALUES ($1, $2)', [id, hash]); // nunca el secreto
+      await registrarEvento(c, { dispositivoId: null, tipo: 'pasarela_alta', usuarioId, detalle: { pasarela_id: id, id_fisico: p.id_fisico, formato: p.formato, origen: 'api' } });
       await this.dynsec.ordenar(ordenesAltaPasarela(p.id_fisico, secreto));
       enBroker = true;
       await c.query('COMMIT');
@@ -397,7 +403,7 @@ export class AltaService {
   // Baja de una pasarela: `activo = false`, credenciales revocadas, evento y cliente borrado del broker, en una transacción. Sus nodos
   // quedan sin quien publique por ellos: el broker borra su cliente y corta la sesión abierta; si algo llegara igual, el filtro 1 lo
   // manda a cuarentena («pasarela inactiva»).
-  async darDeBajaPasarela(id: string): Promise<PasarelaDadaDeBaja> {
+  async darDeBajaPasarela(id: string, usuarioId: string | null = null): Promise<PasarelaDadaDeBaja> {
     const c = await this.tomar();
     let idFisico = id;
     try {
@@ -409,15 +415,15 @@ export class AltaService {
       await c.query('UPDATE pasarela SET activo = false WHERE id = $1', [id]);
       const cred = await c.query('UPDATE credencial SET activa = false WHERE pasarela_id = $1 AND activa', [id]);
       const nodos = await c.query<{ n: string }>("SELECT count(*) AS n FROM dispositivo WHERE pasarela_id = $1 AND estado <> 'baja'", [id]);
-      const ev = await c.query<{ ocurrido_en: Date }>('INSERT INTO evento (dispositivo_id, tipo, detalle) VALUES (NULL, $1, $2) RETURNING ocurrido_en', [
-        'pasarela_baja', JSON.stringify({ pasarela_id: id, id_fisico: p.id_fisico, credenciales_revocadas: cred.rowCount ?? 0, origen: 'api' }),
-      ]);
+      const ocurrido = await registrarEvento(c, {
+        dispositivoId: null, tipo: 'pasarela_baja', usuarioId, detalle: { pasarela_id: id, id_fisico: p.id_fisico, credenciales_revocadas: cred.rowCount ?? 0, origen: 'api' },
+      });
       await this.borrarEnBroker(p.id_fisico);
       await c.query('COMMIT');
       this.log.log(`baja de pasarela: ${p.id_fisico} (${cred.rowCount ?? 0} credencial(es) revocada(s), ${nodos.rows[0].n} nodo(s) sin pasarela)`);
       return {
         id, id_fisico: p.id_fisico, activo: false, credenciales_revocadas: cred.rowCount ?? 0, nodos_sin_pasarela: Number(nodos.rows[0].n),
-        dada_de_baja_en: ev.rows[0].ocurrido_en.toISOString(),
+        dada_de_baja_en: ocurrido.toISOString(),
       };
     } catch (e) {
       await c.query('ROLLBACK').catch(() => undefined);
@@ -428,7 +434,9 @@ export class AltaService {
   }
 
   // Rotación de la credencial de una pasarela: la misma que la de un dispositivo (rotar también repara un cliente que falta).
-  async rotarPasarela(id: string): Promise<CredencialPasarelaRotada> {
+  async rotarPasarela(id: string, usuarioId: string | null = null): Promise<CredencialPasarelaRotada> {
+    const secreto = generarSecreto(); // y su resumen, antes de la transacción (ver crear)
+    const hash = await hashScrypt(secreto);
     const c = await this.tomar();
     let idFisico = id;
     try {
@@ -437,19 +445,113 @@ export class AltaService {
       idFisico = p.id_fisico;
       if (!p.activo) throw new ConflictException(`la pasarela «${p.id_fisico}» está dada de baja: no se rota su credencial`);
       if (!this.dynsec.disponible) throw this.sinBroker();
-      const secreto = generarSecreto();
       await c.query('UPDATE credencial SET activa = false WHERE pasarela_id = $1 AND activa', [id]);
-      await c.query('INSERT INTO credencial (pasarela_id, hash) VALUES ($1, $2)', [id, await hashScrypt(secreto)]); // nunca el secreto
-      const ev = await c.query<{ ocurrido_en: Date }>('INSERT INTO evento (dispositivo_id, tipo, detalle) VALUES (NULL, $1, $2) RETURNING ocurrido_en', [
-        'pasarela_rotacion', JSON.stringify({ pasarela_id: id, id_fisico: p.id_fisico, origen: 'api' }),
-      ]);
+      await c.query('INSERT INTO credencial (pasarela_id, hash) VALUES ($1, $2)', [id, hash]); // nunca el secreto
+      const ocurrido = await registrarEvento(c, { dispositivoId: null, tipo: 'pasarela_rotacion', usuarioId, detalle: { pasarela_id: id, id_fisico: p.id_fisico, origen: 'api' } });
       await this.rotarEnBroker(p.id_fisico, secreto, ROL_PASARELA);
       await c.query('COMMIT');
       this.log.log(`rotación de pasarela: ${p.id_fisico}`);
-      return { id, id_fisico: p.id_fisico, rotada_en: ev.rows[0].ocurrido_en.toISOString(), conexion: this.conexionPasarela(p.formato, p.sitio_codigo, p.id_fisico, secreto) };
+      return { id, id_fisico: p.id_fisico, rotada_en: ocurrido.toISOString(), conexion: this.conexionPasarela(p.formato, p.sitio_codigo, p.id_fisico, secreto) };
     } catch (e) {
       await c.query('ROLLBACK').catch(() => undefined);
       throw this.traducir(e, idFisico, 'rotación');
+    } finally {
+      this.soltar(c);
+    }
+  }
+
+  // Catálogos del alta por lote (docs/10 §8.4 punto 65 iv), leídos una vez para todo el archivo (no una consulta por fila): las zonas de
+  // los sitios donde quien carga puede dar de alta (`sitios` null = todos), las magnitudes, las pasarelas de esos sitios, los dispositivos
+  // que ya tienen alguno de los id_fisico del archivo y los id_fisico de pasarela (comparten espacio de nombres, migración 11).
+  async catalogosLote(sitios: string[] | null, idsFisicos: string[]): Promise<Catalogos> {
+    const [z, m, p, e, ip] = await Promise.all([
+      this.pool.query<ZonaCatalogo>(
+        `SELECT z.id, z.nombre, z.sitio_id, s.codigo AS sitio_codigo FROM zona z JOIN sitio s ON s.id = z.sitio_id
+          WHERE s.activo AND ($1::uuid[] IS NULL OR z.sitio_id = ANY($1::uuid[]))`, [sitios]),
+      this.pool.query<{ codigo: string; unidad_canonica: string }>('SELECT codigo, unidad_canonica FROM magnitud'),
+      this.pool.query<PasarelaCatalogo>(
+        'SELECT id, id_fisico, sitio_id, activo, formato FROM pasarela WHERE $1::uuid[] IS NULL OR sitio_id = ANY($1::uuid[])', [sitios]),
+      // Con el sitio de cada uno: lo de otro sitio no devuelve id ni estado (RF-41), solo «no disponible» (lote.ts, `ajenos`).
+      this.pool.query<{ id: string; id_fisico: string; estado: string; propio: boolean }>(
+        `SELECT d.id, d.id_fisico, d.estado, ($2::uuid[] IS NULL OR z.sitio_id = ANY($2::uuid[])) AS propio
+           FROM dispositivo d JOIN zona z ON z.id = d.zona_id WHERE d.id_fisico = ANY($1::text[])`, [idsFisicos, sitios]),
+      this.pool.query<{ id_fisico: string; propio: boolean }>(
+        'SELECT id_fisico, ($2::uuid[] IS NULL OR sitio_id = ANY($2::uuid[])) AS propio FROM pasarela WHERE id_fisico = ANY($1::text[])', [idsFisicos, sitios]),
+    ]);
+    return {
+      zonas: z.rows, magnitudes: new Map(m.rows.map((x) => [x.codigo, x.unidad_canonica])), pasarelas: p.rows,
+      existentes: new Map(e.rows.filter((x) => x.propio).map((x) => [x.id_fisico, { id: x.id, estado: x.estado }])),
+      idsDePasarela: new Set(ip.rows.filter((x) => x.propio).map((x) => x.id_fisico)),
+      ajenos: new Set([...e.rows, ...ip.rows].filter((x) => !x.propio).map((x) => x.id_fisico)),
+    };
+  }
+
+  // Alta por lote: las filas válidas en dos sentencias, no N (una con UNNEST que inserta dispositivos, canales y credenciales, y la de
+  // los eventos por registrarEventos), en una transacción, y las credenciales de las vías mqtt en el broker antes de confirmar, en tandas de 100 órdenes por
+  // mensaje (el plugin las ejecuta en orden; un mensaje con 500 pasaría el tope de paquete del broker). Si el broker o la base fallan,
+  // nada queda creado y los clientes que alcanzaron a crearse se borran. Los secretos se generan y se resumen (scrypt) ANTES de abrir la
+  // transacción: es lo lento, y no debe retener la conexión ni las filas. Devuelve, por fila del archivo, el id y la conexión (la
+  // credencial, una sola vez).
+  async crearLote(altas: readonly AltaDeLote[], usuarioId: string | null): Promise<Map<number, { id: string; credencial: string | null; topico: string | null }>> {
+    if (altas.some((x) => x.alta.via === 'mqtt') && !this.dynsec.disponible) throw this.sinBroker();
+    const secretos = altas.map((x) => (x.alta.via === 'lorawan' ? null : generarSecreto()));
+    const hashes = await hashesEnTandas(secretos); // en tandas: no acapara el pool de hilos (credenciales.ts)
+    const c = await this.tomar();
+    const creadosEnBroker: string[] = [];
+    try {
+      await this.abrir(c);
+      const canales = altas.flatMap((x) => x.alta.canales.map((k) => [x.alta.id_fisico, k.magnitud] as const));
+      const credenciales = altas.flatMap((x, i) => (hashes[i] === null ? [] : [[x.alta.id_fisico, hashes[i]] as const]));
+      const r = await c.query<{ id: string; id_fisico: string; via: string; formato: string }>(
+        `WITH d AS (
+           INSERT INTO dispositivo (zona_id, id_fisico, nombre, intervalo_esperado_s, via, formato, pasarela_id, decodificador)
+           SELECT * FROM unnest($1::uuid[], $2::text[], $3::text[], $4::int[], $5::text[], $6::text[], $7::uuid[], $8::text[])
+           RETURNING id, id_fisico, via, formato),
+         k AS (
+           INSERT INTO canal (dispositivo_id, magnitud_codigo)
+           SELECT d.id, x.magnitud FROM unnest($9::text[], $10::text[]) AS x(id_fisico, magnitud) JOIN d ON d.id_fisico = x.id_fisico
+           RETURNING 1),
+         cr AS (
+           INSERT INTO credencial (dispositivo_id, hash)
+           SELECT d.id, x.hash FROM unnest($11::text[], $12::text[]) AS x(id_fisico, hash) JOIN d ON d.id_fisico = x.id_fisico
+           RETURNING 1)
+         SELECT d.id, d.id_fisico, d.via, d.formato FROM d`,
+        [
+          altas.map((x) => x.alta.zona_id), altas.map((x) => x.alta.id_fisico), altas.map((x) => x.alta.nombre),
+          altas.map((x) => x.alta.intervalo_esperado_s), altas.map((x) => x.alta.via), altas.map((x) => x.formato),
+          altas.map((x) => x.alta.pasarela_id), altas.map((x) => x.alta.decodificador),
+          canales.map((x) => x[0]), canales.map((x) => x[1]), credenciales.map((x) => x[0]), credenciales.map((x) => x[1]),
+        ],
+      );
+      // Los eventos, por el ayudante único de db/evento.ts (una sentencia para todas las filas), en la misma transacción.
+      await registrarEventos(c, r.rows.map((x) => ({ dispositivoId: x.id, tipo: 'alta', usuarioId, detalle: { via: x.via, formato: x.formato, origen: 'lote' } })));
+      const ids = new Map(r.rows.map((x) => [x.id_fisico, x.id]));
+      const ordenes = altas.flatMap((x, i) => (x.alta.via === 'mqtt' && secretos[i] !== null ? [{ id_fisico: x.alta.id_fisico, secreto: secretos[i] }] : []));
+      for (let i = 0; i < ordenes.length; i += 100) {
+        const tanda = ordenes.slice(i, i + 100);
+        try {
+          await this.dynsec.ordenar(tanda.flatMap((o) => ordenesAltaDispositivo(o.id_fisico, o.secreto)));
+          creadosEnBroker.push(...tanda.map((o) => o.id_fisico));
+        } catch (e) {
+          // Sin respuesta, o una orden rechazada a mitad de la tanda: las anteriores pueden haberse ejecutado. Se borra la tanda entera
+          // (borrar un cliente que no existe es un error inofensivo; dejarlo vivo sería una credencial huérfana).
+          if (e instanceof ErrorDynsec) creadosEnBroker.push(...tanda.map((o) => o.id_fisico));
+          throw e;
+        }
+      }
+      await c.query('COMMIT');
+      this.log.log(`alta por lote: ${altas.length} dispositivo(s), ${ordenes.length} credencial(es) en el broker`);
+      return new Map(altas.map((x, i) => {
+        const codigo = x.sitio_codigo;
+        const topico = x.alta.via === 'mqtt' ? `sitio/${codigo}/dispositivo/${x.alta.id_fisico}/<magnitud>` : null;
+        return [x.n, { id: ids.get(x.alta.id_fisico) ?? '', credencial: secretos[i] ?? null, topico }];
+      }));
+    } catch (e) {
+      await c.query('ROLLBACK').catch(() => undefined);
+      for (const id of creadosEnBroker) await this.deshacerEnBroker(id);
+      // Un 23505 aquí es un identificador que otra petición creó entre la validación y la creación: no hay uno solo que nombrar.
+      if ((e as ErrorPg).code === '23505') throw new ConflictException('un identificador del lote ya existe: vuelve a validar');
+      throw this.traducir(e, `lote de ${altas.length}`, 'alta');
     } finally {
       this.soltar(c);
     }
@@ -502,7 +604,10 @@ export class AltaService {
     if (this.enCurso >= MAX_ALTAS_EN_CURSO) throw new HttpException(`hay ${MAX_ALTAS_EN_CURSO} operaciones de aprovisionamiento en curso; inténtalo en un momento`, HttpStatus.TOO_MANY_REQUESTS);
     this.enCurso++;
     try {
-      return await this.pool.connect();
+      const c = await this.pool.connect();
+      // Oyente de 'error' mientras está prestado (db/cliente.ts): sin él, una conexión cortada a mitad tumbaba el proceso.
+      c.on('error', errorDeCliente);
+      return c;
     } catch (e) {
       this.enCurso--;
       throw e;
@@ -510,6 +615,7 @@ export class AltaService {
   }
 
   private soltar(c: PoolClient): void {
+    c.off('error', errorDeCliente);
     c.release();
     this.enCurso--;
   }

@@ -48,7 +48,8 @@ DELETE FROM regla_umbral WHERE canal_id IN (SELECT id FROM canal WHERE dispositi
 DELETE FROM trama WHERE dispositivo_id IN (SELECT id FROM d_prueba);
 DELETE FROM cuarentena WHERE dispositivo_id IN (SELECT id FROM d_prueba);
 DELETE FROM credencial WHERE dispositivo_id IN (SELECT id FROM d_prueba);
-DELETE FROM evento WHERE dispositivo_id IN (SELECT id FROM d_prueba) OR (tipo LIKE 'usuario_%' AND detalle->>'usuario_id' IN (SELECT id::text FROM u_prueba));
+DELETE FROM evento WHERE dispositivo_id IN (SELECT id FROM d_prueba) OR (tipo LIKE 'usuario_%' AND detalle->>'usuario_id' IN (SELECT id::text FROM u_prueba))
+                      OR usuario_id IN (SELECT id FROM u_prueba);
 DELETE FROM estado_dispositivo WHERE dispositivo_id IN (SELECT id FROM d_prueba);
 DELETE FROM canal WHERE dispositivo_id IN (SELECT id FROM d_prueba);
 DELETE FROM dispositivo WHERE id IN (SELECT id FROM d_prueba);
@@ -139,6 +140,11 @@ pedir() {
     clave) printf 'X-Clave-Admin: %s\n' "$CLAVE" | curl "${IFZ[@]}" "${args[@]}" -H @- "$API$r" ;;
     *) curl "${IFZ[@]}" "${args[@]}" -b "$T/$quien.jar" -c "$T/$quien.jar" "$API$r" ;;
   esac
+}
+# pedir_cabecera QUIEN RUTA CABECERA: un GET con el tarro de QUIEN; el cuerpo queda en $T/r y se imprime el valor de la cabecera.
+pedir_cabecera() {
+  curl "${IFZ[@]}" -s -m 15 -o "$T/r" -D "$T/h" -b "$T/$1.jar" -c "$T/$1.jar" "$API$2" >/dev/null
+  tr -d '\r' < "$T/h" | awk -v k="$(tr '[:upper:]' '[:lower:]' <<<"$3"):" 'tolower($1)==k{print $2}'
 }
 caso() { # descripción · código esperado · QUIEN · MÉTODO · RUTA [CUERPO]
   local d=$1 e=$2; shift 2; local c; c=$(pedir "$@")
@@ -336,6 +342,74 @@ caso "administrador, otro sitio: PATCH /usuarios/{id} de quien solo está en B �
 cp "$T/r" "$T/otro-u.json"; pedir adm PATCH "/usuarios/$FALSO" "{\"actualizado_en\":\"$M_B\",\"activo\":false}" >/dev/null
 cmp -s "$T/r" "$T/otro-u.json" && ok "PATCH /usuarios/{id} de otro sitio responde lo mismo que un usuario inexistente" || falla "PATCH /usuarios de otro sitio e inexistente difieren: $(cat "$T/otro-u.json") ≠ $(cat "$T/r")"
 [ "$(sql -c "SELECT activo FROM usuario WHERE id = '$SOLO_B'")" = t ] && ok "la persona de B sigue activa" || falla "la persona de B cambió pese al 404"
+
+# ── 3b. Tablero v2 (docs/19 §4, I; docs/10 §8.4 punto 65; docs/16 §61): una fila por ruta nueva y perfil ─────────────────────────
+for r in /sitios "/sitios/$SITIO_A/resumen" "/sitios/$SITIO_A/historico?magnitud=temperatura" "/dispositivos/$DA/historico" "/dispositivos/$DA/eventos" /cuarentena/detectados; do
+  caso "sin sesión: GET ${r%%\?*}" 401 anon GET "$r"
+done
+caso "sin sesión: PATCH /dispositivos/{id}" 401 anon PATCH "/dispositivos/$DA" '{}'
+caso "sin sesión: PUT /canales/{id}/reglas" 401 anon PUT "/canales/$CA/reglas" '{}'
+caso "sin sesión: POST /dispositivos/lote" 401 anon POST "/dispositivos/lote?modo=validar" '{}'
+caso "consulta: GET /sitios" 200 con GET /sitios
+[ "$(campo "' '.join(x['id']+':'+x['rol'] for x in v)")" = "$SITIO_A:consulta" ] && ok "consulta: GET /sitios trae solo su sitio, con su rol" || falla "consulta: GET /sitios → $(head -c 160 "$T/r")"
+for r in "/sitios/$SITIO_A/resumen" "/sitios/$SITIO_A/historico?magnitud=temperatura" "/dispositivos/$DA/historico" "/dispositivos/$DA/eventos"; do
+  caso "consulta: GET ${r%%\?*} (su sitio)" 200 con GET "$r"
+  caso "administrador: GET ${r%%\?*} (su sitio)" 200 adm GET "$r"
+done
+for r in "/sitios/$SITIO_B/resumen" "/sitios/$SITIO_B/historico?magnitud=temperatura" "/dispositivos/$DB/historico" "/dispositivos/$DB/eventos"; do
+  caso "consulta, otro sitio: GET ${r%%\?*}" 404 con GET "$r"
+  caso "administrador, otro sitio: GET ${r%%\?*}" 404 adm GET "$r"
+done
+caso "consulta: GET /cuarentena/detectados → 403 (es la entrada del alta)" 403 con GET /cuarentena/detectados
+caso "administrador: GET /cuarentena/detectados?sitio= (su sitio)" 200 adm GET "/cuarentena/detectados?sitio=$SITIO_A"
+caso "administrador, otro sitio: GET /cuarentena/detectados?sitio=" 404 adm GET "/cuarentena/detectados?sitio=$SITIO_B"
+pedir adm GET "/dispositivos/$DA" >/dev/null; MD=$(campo "v['actualizado_en']"); MC=$(campo "[c for c in v['canales'] if c['id']=='$CA'][0]['actualizado_en']")
+caso "consulta: PATCH /dispositivos/{id}" 403 con PATCH "/dispositivos/$DA" "{\"actualizado_en\":\"$MD\",\"nombre\":\"x\"}"
+caso "consulta: PUT /canales/{id}/reglas" 403 con PUT "/canales/$CA/reglas" "{\"actualizado_en\":\"$MC\",\"reglas\":[]}"
+caso "consulta: POST /dispositivos/lote" 403 con POST "/dispositivos/lote?modo=validar" '{"filas":[{}]}'
+caso "administrador: PATCH /dispositivos/{id} con la marca vigente (mantenimiento)" 200 adm PATCH "/dispositivos/$DA" "{\"actualizado_en\":\"$MD\",\"estado\":\"mantenimiento\"}"
+[ "$(campo "v['estado']")" = mantenimiento ] && ok "PATCH responde la ficha con el estado nuevo" || falla "PATCH no devolvió la ficha: $(head -c 120 "$T/r")"
+caso "administrador: PATCH /dispositivos/{id} con la marca vieja → 409 (bloqueo optimista)" 409 adm PATCH "/dispositivos/$DA" "{\"actualizado_en\":\"$MD\",\"estado\":\"activo\"}"
+caso "administrador: PATCH /dispositivos/{id} a una zona de otro sitio → 400" 400 adm PATCH "/dispositivos/$DA" "{\"actualizado_en\":\"$(campo "v['actualizado_en']")\",\"zona_id\":\"$ZB\"}"
+pedir adm GET "/dispositivos/$DA" >/dev/null
+caso "administrador: PATCH /dispositivos/{id} de vuelta a activo (lo que sigue espera sus tramas)" 200 adm PATCH "/dispositivos/$DA" "{\"actualizado_en\":\"$(campo "v['actualizado_en']")\",\"estado\":\"activo\"}"
+pedir adm GET "/dispositivos/$DA" >/dev/null; MC=$(campo "[c for c in v['canales'] if c['id']=='$CA'][0]['actualizado_en']")
+caso "administrador: PUT /canales/{id}/reglas con la marca vigente" 200 adm PUT "/canales/$CA/reglas" "{\"actualizado_en\":\"$MC\",\"reglas\":[{\"umbral_alto\":30,\"histeresis\":1,\"retardo_s\":60}]}"
+caso "administrador: PUT /canales/{id}/reglas con la marca vieja → 409" 409 adm PUT "/canales/$CA/reglas" "{\"actualizado_en\":\"$MC\",\"reglas\":[]}"
+caso "administrador: PUT /canales/{id}/reglas con bajo ≥ alto → 400" 400 adm PUT "/canales/$CA/reglas" "{\"actualizado_en\":\"$MC\",\"reglas\":[{\"umbral_alto\":5,\"umbral_bajo\":9}]}"
+caso "administrador, otro sitio: PATCH /dispositivos/{id}" 404 adm PATCH "/dispositivos/$DB" "{\"actualizado_en\":\"$MD\",\"nombre\":\"x\"}"
+caso "administrador, otro sitio: PUT /canales/{id}/reglas" 404 adm PUT "/canales/$CB/reglas" "{\"actualizado_en\":\"$MC\",\"reglas\":[]}"
+ADM_UID=$(sql -c "SELECT id FROM usuario WHERE email = '$ADM_EMAIL'")
+n=$(sql -c "SELECT count(*) FROM evento WHERE dispositivo_id = '$DA' AND tipo IN ('dispositivo_configurado', 'reglas_cambiadas') AND usuario_id = '$ADM_UID'")
+[ "$n" = 3 ] && ok "cada guardado deja su evento con quién lo hizo (evento.usuario_id = el administrador): 3 de 3" || falla "eventos con usuario_id del administrador: $n (esperado 3)"
+# «Quién hizo el cambio» es un dato personal (docs/21 §2; decidido el 11/11/2026): el nombre, solo para quien administra el sitio.
+caso "administrador: GET /dispositivos/{id}/eventos muestra quién (usuario{id, nombre})" 200 adm GET "/dispositivos/$DA/eventos"
+[ "$(campo "sum(1 for e in v if e['usuario'] and e['usuario']['id']=='$ADM_UID' and e['tipo'] in ('dispositivo_configurado','reglas_cambiadas'))")" = 3 ] && ok "administrador: los eventos del dispositivo traen la persona que configuró" || falla "administrador: eventos sin la persona: $(head -c 200 "$T/r")"
+caso "consulta: GET /dispositivos/{id}/eventos (su sitio)" 200 con GET "/dispositivos/$DA/eventos"
+[ "$(campo "(len([e for e in v if e['tipo'] in ('dispositivo_configurado','reglas_cambiadas')]), sum(1 for e in v if e['usuario'] is not None))")" = "(3, 0)" ] && ok "consulta: ve los 3 eventos, pero sin el nombre de quien los hizo (usuario: null)" || falla "consulta ve quién: $(head -c 200 "$T/r")"
+LOTE="{\"filas\":[{\"id_fisico\":\"tl-$N\",\"nombre\":\"por lote\",\"zona\":\"$ZA\",\"via\":\"http\",\"intervalo_esperado_s\":\"60\",\"canales\":\"temperatura:Cel\"},{\"id_fisico\":\"tk-$N\",\"nombre\":\"ajeno\",\"zona\":\"$ZB\",\"via\":\"http\",\"intervalo_esperado_s\":\"60\",\"canales\":\"temperatura\"},{\"id_fisico\":\"tb-$N\",\"nombre\":\"de otro sitio\",\"zona\":\"$ZA\",\"via\":\"http\",\"intervalo_esperado_s\":\"60\",\"canales\":\"temperatura\"},{\"id_fisico\":\"gwb-$N\",\"nombre\":\"pasarela de otro sitio\",\"zona\":\"$ZA\",\"via\":\"http\",\"intervalo_esperado_s\":\"60\",\"canales\":\"temperatura\"},{\"id_fisico\":\"ta-$N\",\"nombre\":\"ya existe\",\"zona\":\"$ZA\",\"via\":\"http\",\"intervalo_esperado_s\":\"60\",\"canales\":\"temperatura\"}]}"
+caso "administrador: POST /dispositivos/lote?modo=crear" 200 adm POST "/dispositivos/lote?modo=crear" "$LOTE"
+[ "$(campo "' '.join(f['resultado'] for f in v['filas'])")" = "creada rechazada rechazada rechazada existe" ] && ok "lote: crea la válida, rechaza la de una zona de otro sitio (como inexistente) y marca la que ya existe" || falla "lote: $(head -c 300 "$T/r")"
+# RF-41 (revisión del 11/11/2026): el id_fisico de un dispositivo o de una pasarela del sitio B, subido desde A, no revela su UUID ni su estado.
+[ "$(campo "[(f['motivo'], f['id']) for f in v['filas'][2:4]]")" = "[('identificador no disponible', None), ('identificador no disponible', None)]" ] && ok "lote: un id_fisico de un dispositivo o pasarela de otro sitio → «identificador no disponible», sin id" || falla "lote ajeno: $(campo "v['filas'][2:4]")"
+grep -q "$DB" "$T/r" && falla "lote: la respuesta trae el UUID del dispositivo del sitio B" || ok "lote: la respuesta no trae el UUID del dispositivo del sitio B"
+[ -n "$(campo "v['filas'][0]['credencial'] or ''")" ] && ok "lote: la credencial de la creada viene una vez en la respuesta" || falla "lote sin credencial"
+n=$(sql -c "SELECT count(*) FROM dispositivo d JOIN evento e ON e.dispositivo_id = d.id AND e.tipo = 'alta' AND e.usuario_id = '$ADM_UID' WHERE d.id_fisico = 'tl-$N'")
+[ "$n" = 1 ] && ok "lote: el dispositivo quedó con su evento de alta y quién lo creó" || falla "lote: evento de alta con usuario → $n"
+
+# ── 3c. Listas por clave (docs/10 §8.4 punto 58 iv): una fila insertada entre dos páginas no se repite ni se pierde; un cursor de otro sitio
+# no trae nada de ese sitio. Cuatro eventos con instantes fijos en el dispositivo A2; la página 1 trae los dos más nuevos; se inserta un
+# quinto, más nuevo que todos (con desplazamiento, la página 2 repetiría el último de la 1); la página 2 sigue exactamente después.
+sql -c "INSERT INTO evento (dispositivo_id, tipo, detalle, ocurrido_en) SELECT '$DA2', 'prueba_keyset', jsonb_build_object('n', n), '2026-01-01T00:00:00Z'::timestamptz + n * INTERVAL '1 second' FROM generate_series(1, 4) n" >/dev/null
+EVQ="/dispositivos/$DA2/eventos?desde=2025-12-31T00:00:00Z&hasta=2026-01-02T00:00:00Z&limite=2"
+sig=$(pedir_cabecera adm "$EVQ" X-Siguiente); P1=$(campo "[e['detalle']['n'] for e in v]")
+sql -c "INSERT INTO evento (dispositivo_id, tipo, detalle, ocurrido_en) VALUES ('$DA2', 'prueba_keyset', '{\"n\": 5}', '2026-01-01T00:00:05Z')" >/dev/null
+caso "keyset: página 2 de los eventos con el cursor de la 1" 200 adm GET "$EVQ&cursor=$sig"
+[ "$P1 | $(campo "[e['detalle']['n'] for e in v]")" = "[4, 3] | [2, 1]" ] && ok "keyset: la fila insertada entre dos páginas no se repite ni se pierde (4 3 | 2 1)" || falla "keyset: páginas $P1 | $(campo "[e['detalle']['n'] for e in v]")"
+# Un cursor armado con la condición del sitio B (instante e id reales), usado por la persona de consulta de A: solo filas de A.
+CUR_B=$(sql -c "SELECT to_char(abierta_en AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') || ' ' || id FROM condicion WHERE id = '$KB'" | python3 -I -c "import sys,json,base64; t,i=sys.stdin.read().split(); print(base64.urlsafe_b64encode(json.dumps([t,i]).encode()).decode().rstrip('='))")
+caso "keyset: consulta pide /condiciones con un cursor de otro sitio" 200 con GET "/condiciones?limite=500&cursor=$CUR_B"
+[ "$(campo "sum(1 for c in v if c['dispositivo_id']=='$DB')")" = 0 ] && ok "keyset: un cursor de otro sitio no trae nada de ese sitio (el alcance sigue en el WHERE)" || falla "keyset: el cursor de B trajo filas de B"
 
 # ── 4. Canal en vivo con dos sitios (docs/20 §8): consulta recibe solo lo de su sitio; tope de 5 flujos por usuario ─────────────
 caso "X-Clave-Admin: POST /dispositivos/{id}/credencial del sitio B (usuario del sistema, todos los sitios)" 201 clave POST "/dispositivos/$DB/credencial"

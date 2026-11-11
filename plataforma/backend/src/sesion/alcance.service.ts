@@ -31,8 +31,11 @@ export class AlcanceService {
     return this.sitio('SELECT id AS sitio_id FROM sitio WHERE id = $1', id);
   }
 
-  async exigirDispositivo(u: UsuarioSesion, accion: Accion, id: string): Promise<void> {
-    exigir(u, accion, await this.sitioDeDispositivo(id), 'dispositivo no encontrado');
+  // Devuelve el sitio (ya comprobado) para quien necesite decidir algo más con él (p. ej. si ve el nombre de quien hizo un cambio).
+  async exigirDispositivo(u: UsuarioSesion, accion: Accion, id: string): Promise<string> {
+    const sitio = await this.sitioDeDispositivo(id);
+    exigir(u, accion, sitio, 'dispositivo no encontrado');
+    return sitio as string;
   }
   async exigirCanal(u: UsuarioSesion, accion: Accion, id: string): Promise<void> {
     exigir(u, accion, await this.sitioDeCanal(id), 'canal no encontrado');

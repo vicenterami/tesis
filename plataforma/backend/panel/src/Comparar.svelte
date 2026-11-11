@@ -14,7 +14,8 @@
   import { antirrebote, porLotes } from './lib/antirrebote';
   import { recordarMarcados } from './lib/comparar';
   import { enLinea, estadoVisual, ROTULO } from './lib/estado-visual';
-  import { PALETA, RANGO_POR_DEFECTO, alinearSeries, formatearValor, resolucionValida, rotuloIntervalo, urlHistorico, ventana, type ClaveRango, type ClaveResolucion } from './lib/grafico';
+  import { coloresSeries, temaVivo } from './lib/tema';
+  import { RANGO_POR_DEFECTO, alinearSeries, formatearValor, resolucionValida, rotuloIntervalo, urlHistorico, ventana, type ClaveRango, type ClaveResolucion } from './lib/grafico';
   import type { CanalFicha, Condicion, DispositivoFicha, EventoVivo, Historico } from './lib/modelo';
   import { haceCuanto, horaLocal } from './lib/tiempo';
   import { fragmentoComparar } from './lib/vista';
@@ -39,7 +40,8 @@
   let rangoElegido = $state<ClaveRango>(untrack(() => rangoInicial) ?? RANGO_POR_DEFECTO);
   let resElegida = $state<ClaveResolucion | null>(untrack(() => resolucionValida(rangoInicial ?? RANGO_POR_DEFECTO, resInicial)));
   // Como en la ficha (punto 2): lo elegido es lo pedido; `mostrada`, lo dibujado. Mientras llega, se conserva lo anterior.
-  type Dibujada = { id: string; nombre: string; color: string };
+  type Dibujada = { id: string; nombre: string; serie: number }; // el color sale de `serie` y del tema vigente (colores, abajo)
+  const colores = $derived(coloresSeries($temaVivo));
   let mostrada = $state<{ magnitud: string; nombre: string; unidad: string; rango: ClaveRango; res: ClaveResolucion | null; intervalo: string; desde: Date; hasta: Date; dibujadas: Dibujada[] } | null>(null);
   let series = $state<(number | null)[][]>([[]]);
   let cargando = $state(false);
@@ -127,7 +129,7 @@
       series = alinearSeries(hs);
       mostrada = {
         magnitud: mag, nombre: nombreMagnitud, unidad: lista[0]!.canal!.unidad, ...pedido, intervalo: v.intervalo, desde: v.desde, hasta: v.hasta,
-        dibujadas: lista.map((f) => ({ id: f.id, nombre: rotulo(f.ficha!), color: PALETA[f.i % PALETA.length]! })),
+        dibujadas: lista.map((f) => ({ id: f.id, nombre: rotulo(f.ficha!), serie: (f.i % 6) + 1 })),
       };
       errorGrafico = null;
     } catch (e) {
@@ -216,10 +218,10 @@
   });
 </script>
 
-<p><a href="#/">← Inventario</a></p>
+<p><a href="#/inventario">← Inventario</a></p>
 <h2>Comparar dispositivos</h2>
 {#if ids.length < 2}
-  <p class="vacio" data-comparar-vacio>Marca al menos dos dispositivos en el inventario. <a href="#/">Ir al inventario</a></p>
+  <p class="vacio" data-comparar-vacio>Marca al menos dos dispositivos en el inventario. <a href="#/inventario">Ir al inventario</a></p>
 {:else if error !== null}
   <p class="error" role="alert">{error}</p>
 {:else if !cargado}
@@ -266,7 +268,7 @@
           unidad={mostrada.unidad}
           zona={zonas[0] ?? 'UTC'}
           titulo={`${mostrada.nombre} (${mostrada.unidad})`}
-          lineas={mostrada.dibujadas.map((x) => ({ label: x.nombre, stroke: x.color, width: 2 }))}
+          lineas={mostrada.dibujadas.map((x) => ({ label: x.nombre, stroke: colores[x.serie - 1]!, width: 2 }))}
           ventana={{ desde: mostrada.desde.getTime() / 1000, hasta: mostrada.hasta.getTime() / 1000 }}
         />
       {/key}
@@ -283,7 +285,7 @@
           {@const dibujada = mostrada?.dibujadas.find((x) => x.id === f.id)}
           <tr data-fila-comparar={f.id}>
             <td>
-              {#if dibujada}<span class="muestra" style:background={dibujada.color}></span>{/if}
+              {#if dibujada}<span class="muestra serie-{dibujada.serie}" aria-hidden="true"></span>{/if}
               {#if f.ficha !== null}<a href={`#/dispositivos/${f.id}`}>{rotulo(f.ficha)}</a>{:else}<code>{f.id}</code>{/if}
               {#if f.motivo !== null}<span class="vivo" data-motivo> · {f.motivo}</span>{/if}
             </td>

@@ -1,8 +1,8 @@
-import { Body, Controller, Delete, HttpCode, Param, Post, Res } from '@nestjs/common';
+import { Body, ConflictException, Controller, Delete, HttpCode, HttpException, HttpStatus, Param, Patch, Post, Query, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   ApiBadRequestResponse, ApiBody, ApiConflictResponse, ApiCookieAuth, ApiCreatedResponse, ApiForbiddenResponse, ApiHeader, ApiNotFoundResponse, ApiOkResponse,
-  ApiOperation, ApiParam, ApiResponse, ApiTags, ApiUnauthorizedResponse,
+  ApiOperation, ApiParam, ApiQuery, ApiResponse, ApiTags, ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { AltaValidada, FORMATOS_DIRECTOS, FORMA_ID_FISICO, MAX_CANALES, VIAS, validarAlta } from './alta.dto.js';
@@ -11,7 +11,12 @@ import { AltaService, CredencialRotada, DispositivoCreado, DispositivoDadoDeBaja
 import { uuid } from '../consulta/validacion.js';
 import { AlcanceService } from '../sesion/alcance.service.js';
 import { Usuario } from '../sesion/guardia.js';
-import { exigirEnAlguno } from '../sesion/permisos.js';
+import { alcanceDeLectura, exigirEnAlguno, permitir } from '../sesion/permisos.js';
+import { ConfiguracionService } from './configuracion.service.js';
+import { validarCambioDispositivo } from './configuracion.dto.js';
+import { FORMA_ACTUALIZADO_EN } from './calibracion.dto.js';
+import { ConsultaService } from '../consulta/consulta.service.js';
+import { COLUMNAS_LOTE, FilaInforme, LOTES_POR_MINUTO, MAX_FILAS_LOTE, MODOS_LOTE, TANDA_CLIENTE_LOTE, TasaPorPersona, filasDelCuerpo, modoLote, totales, validarLote } from './lote.js';
 import type { UsuarioSesion } from '../sesion/permisos.js';
 
 // Aprovisionamiento por API (docs/10 §3, §8.4 puntos 41 y 42; docs/19 P7 «Propuesta»): POST /dispositivos (HU-11, RF-19),
@@ -26,7 +31,12 @@ import type { UsuarioSesion } from '../sesion/permisos.js';
 export class AltaController {
   // El usuario de la sonda del chequeo de salud es configurable (MQTT_SONDA_USUARIO): también queda reservado.
   private readonly reservados: string[];
-  constructor(private readonly alta: AltaService, private readonly alcance: AlcanceService, config: ConfigService) {
+  private readonly tasaLote = new TasaPorPersona();
+  private loteEnCurso = false;
+  constructor(
+    private readonly alta: AltaService, private readonly alcance: AlcanceService, config: ConfigService,
+    private readonly configuracion: ConfiguracionService, private readonly consulta: ConsultaService,
+  ) {
     this.reservados = [config.get<string>('MQTT_SONDA_USUARIO', 'sonda').trim().toLowerCase()];
   }
 
@@ -75,7 +85,94 @@ export class AltaController {
     const a: AltaValidada = validarAlta(cuerpo, this.reservados);
     await this.alcance.exigirZona(u, 'escribir', a.zona_id); // 404 si la zona no existe o es de otro sitio
     res.setHeader('Cache-Control', 'no-store'); // la respuesta lleva una credencial: ningún proxy ni navegador la guarda
-    return this.alta.crear(a);
+    return this.alta.crear(a, u.id);
+  }
+
+  // Alta masiva por archivo (docs/19 §4, F2; docs/10 §8.4 punto 65 iv). `validar` no escribe nada; `crear` inserta las válidas en una transacción (dos sentencias).
+  @Post('lote')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Alta por lote: validar o crear (Etapa 4)',
+    description:
+      `Recibe \`filas[{${COLUMNAS_LOTE.join(', ')}}]\` (el panel convierte el CSV; \`zona\` es el nombre o el UUID de una zona de un sitio donde la persona ` +
+      'puede dar de alta; `canales` como «magnitud:unidad;magnitud:unidad», con la unidad canónica del catálogo; `pasarela`, su id_fisico o UUID, solo en ' +
+      'la vía lorawan). Cada fila pasa por la misma validación del alta de a uno. Responde `validas, rechazadas, existentes` y ' +
+      '`filas[{n, id_fisico, resultado, motivo, id, credencial, topico}]`, con `n` la fila del archivo (la 1 es la cabecera) y `resultado` en ' +
+      '`valida | creada | rechazada | existe` (un id_fisico ya dado de alta, activo o no: `existe` con su id; reactivarlo es de su ficha). Con `modo=crear`, ' +
+      `las válidas se crean en una transacción con dos sentencias (dispositivos, canales y credenciales; eventos), no N inserciones, y las credenciales vienen UNA sola vez. Hasta ${MAX_FILAS_LOTE} filas (más: 413), ` +
+      `${LOTES_POR_MINUTO} lotes por minuto por persona (429) y una creación por lote a la vez (409). Un id_fisico que ya usa un dispositivo o una pasarela ` +
+      'de otro sitio se rechaza como «identificador no disponible», sin id ni estado (RF-41). **Tiempo:** cada credencial cuesta un resumen scrypt; una creación ' +
+      `de ${MAX_FILAS_LOTE} filas tarda ≈ 70 s (docs/16 §61) y detrás de un proxy puede cortarse antes de responder, y las credenciales se muestran una sola ` +
+      `vez: el cliente debe validar el archivo entero y crear en tandas de ${TANDA_CLIENTE_LOTE} filas (≈ 7 s cada una), como hace el panel.`,
+  })
+  @ApiHeader({ name: 'X-Clave-Admin', required: false, description: 'Sin sesión: la clave de administrador (HTTP_CLAVE_ADMIN), como usuario del sistema (docs/20 §5)' })
+  @ApiQuery({ name: 'modo', required: true, enum: MODOS_LOTE })
+  @ApiOkResponse({ description: 'Informe fila por fila' })
+  @ApiBadRequestResponse({ description: 'Modo o cuerpo inválidos' })
+  @ApiForbiddenResponse({ description: 'Sin ningún sitio donde dar de alta, o sesión sin la cabecera X-Pedido: panel' })
+  @ApiConflictResponse({ description: 'Otra creación por lote en curso' })
+  @ApiResponse({ status: 413, description: `Más de ${MAX_FILAS_LOTE} filas` })
+  @ApiResponse({ status: 429, description: 'Límite de tasa del lote' })
+  async lote(@Usuario() u: UsuarioSesion, @Query('modo') m: unknown, @Body() cuerpo: unknown, @Res({ passthrough: true }) res: Response) {
+    exigirEnAlguno(u, 'escribir');
+    const modo = modoLote(m);
+    if (!this.tasaLote.admitir(u.id ?? 'sistema')) throw new HttpException(`más de ${LOTES_POR_MINUTO} lotes en un minuto: espera un momento`, HttpStatus.TOO_MANY_REQUESTS);
+    const filas = filasDelCuerpo(cuerpo);
+    const sitios = alcanceDeLectura(u)?.filter((s) => permitir(u, 'escribir', s) === 'permitido') ?? null;
+    const ids = filas.map((f) => (typeof f.id_fisico === 'string' ? f.id_fisico.trim().toLowerCase() : '')).filter((x) => x !== '');
+    const catalogos = await this.alta.catalogosLote(sitios, ids);
+    const { informe, altas } = validarLote(filas, catalogos, this.reservados);
+    if (modo === 'crear' && altas.length > 0) {
+      if (this.loteEnCurso) throw new ConflictException('hay otra alta por lote en curso: espera a que termine y vuelve a validar');
+      this.loteEnCurso = true;
+      try {
+        const creadas = await this.alta.crearLote(altas, u.id);
+        for (const f of informe) {
+          const c = creadas.get(f.n);
+          if (c !== undefined) Object.assign(f, { resultado: 'creada', id: c.id, credencial: c.credencial, topico: c.topico } satisfies Partial<FilaInforme>);
+        }
+      } finally {
+        this.loteEnCurso = false;
+      }
+      res.setHeader('Cache-Control', 'no-store'); // la respuesta lleva credenciales
+    }
+    return { ...totales(informe), filas: informe };
+  }
+
+  // Configurar un dispositivo desde el panel (docs/19 §4, E; docs/10 §8.4 punto 28), con bloqueo optimista; responde la ficha.
+  @Patch(':id')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Configurar un dispositivo (Etapa 4)',
+    description:
+      'Cambia `nombre`, `estado` (activo o mantenimiento; la baja es DELETE), `intervalo_esperado_s` (5–86400) y `zona_id` (otra zona del mismo sitio). ' +
+      '`actualizado_en` es obligatorio: el de la ficha, tal cual (microsegundos); si el dispositivo cambió desde entonces, 409 con el vigente y nada se pisa. ' +
+      'Deja el evento `dispositivo_configurado` con lo que cambió (antes y después) y quién. Responde la ficha (`GET /dispositivos/{id}`). Validación: 400 con ' +
+      '`errores[{campo, motivo}]`.',
+  })
+  @ApiHeader({ name: 'X-Clave-Admin', required: false, description: 'Sin sesión: la clave de administrador (HTTP_CLAVE_ADMIN), como usuario del sistema (docs/20 §5)' })
+  @ApiParam({ name: 'id', description: 'UUID del dispositivo' })
+  @ApiBody({
+    schema: {
+      type: 'object', required: ['actualizado_en'],
+      properties: {
+        actualizado_en: { type: 'string', pattern: FORMA_ACTUALIZADO_EN.source },
+        nombre: { type: 'string', maxLength: 80 }, estado: { type: 'string', enum: ['activo', 'mantenimiento'] },
+        intervalo_esperado_s: { type: 'integer', minimum: 5, maximum: 86400 }, zona_id: { type: 'string', format: 'uuid' },
+      },
+    },
+  })
+  @ApiOkResponse({ description: 'La ficha del dispositivo, con su actualizado_en nuevo' })
+  @ApiBadRequestResponse({ description: 'Cuerpo inválido: `errores[{campo, motivo}]`' })
+  @ApiForbiddenResponse({ description: 'Rol de consulta en ese sitio, o sesión sin la cabecera X-Pedido: panel' })
+  @ApiNotFoundResponse({ description: 'No existe, o es de otro sitio' })
+  @ApiConflictResponse({ description: 'Cambió desde la ficha enviada (`actualizado_en` trae el vigente), o está dado de baja' })
+  async configurar(@Usuario() u: UsuarioSesion, @Param('id') id: string, @Body() cuerpo: unknown) {
+    exigirEnAlguno(u, 'configurar');
+    const dispositivoId = uuid(id, 'dispositivo');
+    await this.alcance.exigirDispositivo(u, 'configurar', dispositivoId);
+    await this.configuracion.cambiarDispositivo(dispositivoId, validarCambioDispositivo(cuerpo), u.id);
+    return this.consulta.dispositivo(dispositivoId);
   }
 
   @Delete(':id')
@@ -102,7 +199,7 @@ export class AltaController {
     exigirEnAlguno(u, 'escribir');
     const dispositivoId = uuid(id, 'dispositivo');
     await this.alcance.exigirDispositivo(u, 'escribir', dispositivoId);
-    return this.alta.darDeBaja(dispositivoId);
+    return this.alta.darDeBaja(dispositivoId, u.id);
   }
 
   @Post(':id/credencial')
@@ -131,6 +228,6 @@ export class AltaController {
     const dispositivoId = uuid(id, 'dispositivo');
     await this.alcance.exigirDispositivo(u, 'escribir', dispositivoId);
     res.setHeader('Cache-Control', 'no-store'); // la respuesta lleva una credencial: ningún proxy ni navegador la guarda
-    return this.alta.rotarCredencial(dispositivoId);
+    return this.alta.rotarCredencial(dispositivoId, u.id);
   }
 }

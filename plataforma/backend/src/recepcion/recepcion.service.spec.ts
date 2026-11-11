@@ -224,7 +224,8 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
     const { servicio, query, marcarVivo, evaluar } = armar({ id: 'd1', estado: 'mantenimiento' });
     await servicio.procesar(TOPICO, Buffer.from('35'));
     expect(query.mock.calls.some(([sql]) => String(sql).trimStart().startsWith('INSERT INTO medicion'))).toBe(true);
-    expect(evaluar).toHaveBeenCalledWith('d1', 'k1', 'dev-0001', 35, 'Cel', true);
+    // y la hora de la lectura (la que devolvió la base) con el intervalo esperado: el retardo se cuenta con ese reloj (alertas.service.ts).
+    expect(evaluar).toHaveBeenCalledWith('d1', 'k1', 'dev-0001', 35, 'Cel', true, { tiempo: expect.any(Date), intervaloS: expect.any(Number) });
     expect(marcarVivo).toHaveBeenCalledTimes(1);
   });
 

@@ -340,7 +340,8 @@ export class RecepcionService implements OnModuleInit {
         porcentaje: porcentaje(valor, canal.escala_cero ?? null, canal.escala_cien ?? null),
       });
       // ── [5] Alertar: ¿la medición cruza un umbral de este canal? (en mantenimiento no abre condiciones, RF-22) ──
-      await this.alertas.evaluar(dispositivo.id, canal.id, ctx.idFisico, valor, canal.unidad_canonica, dispositivo.estado === 'mantenimiento');
+      await this.alertas.evaluar(dispositivo.id, canal.id, ctx.idFisico, valor, canal.unidad_canonica, dispositivo.estado === 'mantenimiento',
+        { tiempo: r.rows[0].tiempo, intervaloS: dispositivo.intervalo_esperado_s });
     }
 
     if (rechazos.length) await this.cuarentena(trama, 'invalida', rechazos.join('; '), cuota);

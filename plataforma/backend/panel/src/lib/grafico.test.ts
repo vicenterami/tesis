@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EJE_TIEMPO, NOMBRES_FECHA, PALETA, RANGOS, SELLO_LEYENDA, agregarLectura, alinearSeries, formatearValor, puntosDe, rangoQueContiene, resolucionValida, resolucionesAdmisibles, resumenRango, rotuloIntervalo, seriesDesdeHistorico, urlHistorico, ventana } from './grafico';
+import { EJE_TIEMPO, NOMBRES_FECHA, PALETA, RANGOS, SELLO_LEYENDA, agregarLectura, alinearSeries, formatearValor, puntosDe, rangoQueContiene, resolucionValida, resolucionesAdmisibles, resumenRango, rotuloIntervalo, seriesDesdeHistorico, urlHistorico, ventana, intervaloParaVentana, resolucionMasFina, ventanaDeSeleccion } from './grafico';
 
 describe('ventana y URL del histórico (docs/19 P3)', () => {
   const ahora = new Date('2026-10-12T15:00:00Z');
@@ -112,3 +112,27 @@ describe('alinearSeries: un eje común con hueco (null) donde una serie no tiene
   it('la paleta trae 6 colores distintos', () => expect(new Set(PALETA).size).toBe(6));
 });
 
+
+// Zoom que refina y rango a medida (docs/19 §4, tablero v2, B1 y D1).
+describe('ventanas fijas: resolución del zoom y del rango a medida', () => {
+  it('el zoom pide la resolución más fina con 2 a 2 500 puntos', () => {
+    expect(resolucionMasFina(3_600_000)).toBe('1m'); // 1 h → 60 puntos por minuto
+    expect(resolucionMasFina(3 * 86_400_000)).toBe('5m'); // 3 días: 4 320 por minuto (no), 864 cada 5 min
+    expect(resolucionMasFina(30 * 86_400_000)).toBe('1h');
+  });
+  it('una selección de menos de dos minutos se ensancha a dos, centrada; el orden de los extremos no importa', () => {
+    const v = ventanaDeSeleccion(1_000_060, 1_000_000)!;
+    expect((v.hasta.getTime() - v.desde.getTime()) / 1000).toBe(120);
+    expect(v.desde.getTime() / 1000).toBe(999_970);
+  });
+  it('una selección con un extremo que no es número finito no da ventana (nunca una fecha inválida que lance al armar la URL)', () => {
+    expect(ventanaDeSeleccion(Number.NaN, 1_000_000)).toBeNull();
+    expect(ventanaDeSeleccion(1_000_000, Infinity)).toBeNull();
+    expect(ventanaDeSeleccion(1_000_000, 1_003_600)).not.toBeNull(); // en los dos sentidos
+  });
+  it('a medida, la resolución la fija el menor rango que contiene la ventana; más de 30 días, un día', () => {
+    expect(intervaloParaVentana(2 * 3_600_000)).toBe('15 minutes');
+    expect(intervaloParaVentana(10 * 86_400_000)).toBe('6 hours');
+    expect(intervaloParaVentana(90 * 86_400_000)).toBe('1 day');
+  });
+});

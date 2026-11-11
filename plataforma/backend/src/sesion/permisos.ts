@@ -9,9 +9,11 @@ export type Rol = (typeof ROLES)[number];
 // Acciones de la matriz de docs/20 §6:
 //   leer        GET de dispositivos, ficha, histórico, condiciones, cuarentena, pasarelas y el canal en vivo
 //   exportar    GET /dispositivos/{id}/exportar (datos crudos: solo administrador, docs/10 §8.4 punto 6)
-//   escribir    alta, baja, rotación de credenciales, calibración, pasarelas
+//   escribir    alta (de a uno y por lote), baja, rotación de credenciales, calibración, pasarelas, bandeja de detectados
 //   usuarios    alta y cambios de usuarios y de sus roles
-export const ACCIONES = ['leer', 'exportar', 'escribir', 'usuarios'] as const;
+//   configurar  PATCH /dispositivos/{id} y PUT /canales/{id}/reglas (Etapa 4; fila «Configurar un dispositivo…» de docs/20 §6). Hoy la
+//               tiene el administrador de sitio; el operador técnico se suma a esta fila cuando exista el perfil
+export const ACCIONES = ['leer', 'exportar', 'escribir', 'usuarios', 'configurar'] as const;
 export type Accion = (typeof ACCIONES)[number];
 
 export const PERMISOS: Readonly<Record<Accion, readonly Rol[]>> = {
@@ -19,6 +21,7 @@ export const PERMISOS: Readonly<Record<Accion, readonly Rol[]>> = {
   exportar: ['administrador'],
   escribir: ['administrador'],
   usuarios: ['administrador'],
+  configurar: ['administrador'],
 };
 
 // La misma tabla vista por rol (rol → acciones que puede), para que el panel construya la guía de cada perfil a partir de ella y no de

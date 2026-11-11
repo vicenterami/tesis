@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { N_PERSONA, generarSecreto, hashScrypt, igualesEnTiempoConstante, verificarScrypt } from './credenciales.js';
+import { N_PERSONA, TANDA_SCRYPT, generarSecreto, hashScrypt, hashesEnTandas, igualesEnTiempoConstante, verificarScrypt } from './credenciales.js';
 
 describe('credenciales del alta: secreto aleatorio y hash scrypt', () => {
   it('el secreto tiene 32 caracteres base64url y nunca se repite', () => {
@@ -40,5 +40,35 @@ describe('credenciales del alta: secreto aleatorio y hash scrypt', () => {
     expect(await verificarScrypt('otra frase de persona', h)).toBe(false);
     expect(ms).toBeGreaterThan(20); // cuatro veces el trabajo y la memoria de 2^15 (128 MiB); el costo medido va en docs/16 §58
     expect(ms).toBeLessThan(5000);
+  });
+});
+
+// Lote (docs/16 §61): nunca más de TANDA_SCRYPT resúmenes a la vez, en orden, y null pasa como null. Plantada: con la tanda igual al
+// lote (lo que hacía el código antes, Promise.all de todo), los 500 corren a la vez.
+describe('hashesEnTandas', () => {
+  async function maximoSimultaneo(n: number, tanda: number): Promise<{ maximo: number; salida: (string | null)[] }> {
+    let vivos = 0;
+    let maximo = 0;
+    const resumir = async (s: string): Promise<string> => {
+      vivos++;
+      maximo = Math.max(maximo, vivos);
+      await new Promise((r) => setTimeout(r, 1));
+      vivos--;
+      return `h(${s})`;
+    };
+    const secretos = Array.from({ length: n }, (_, i) => (i % 7 === 3 ? null : `s${i}`));
+    const salida = await hashesEnTandas(secretos, tanda, resumir);
+    return { maximo, salida };
+  }
+  it(`500 secretos: a lo más ${TANDA_SCRYPT} a la vez, en el orden de entrada; null se conserva`, async () => {
+    const { maximo, salida } = await maximoSimultaneo(500, TANDA_SCRYPT);
+    expect(maximo).toBe(TANDA_SCRYPT);
+    expect(salida[0]).toBe('h(s0)');
+    expect(salida[3]).toBeNull();
+    expect(salida[499]).toBe('h(s499)');
+    expect(salida).toHaveLength(500);
+  });
+  it('plantada: sin tandas (tanda = 500) corren los 500 a la vez', async () => {
+    expect((await maximoSimultaneo(500, 500)).maximo).toBeGreaterThan(400);
   });
 });

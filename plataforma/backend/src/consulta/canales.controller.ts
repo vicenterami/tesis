@@ -1,7 +1,7 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ConsultaService } from './consulta.service.js';
 import { ApiBadRequestResponse, ApiCookieAuth, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiQuery, ApiTags, ApiUnauthorizedResponse } from '@nestjs/swagger';
-import { INTERVALOS, MAX_CUBOS, MAX_DIAS_VENTANA, exigirTopeCubos, fecha, intervalo, uuid } from './validacion.js';
+import { ISO_8601, INTERVALOS, MAX_CUBOS, MAX_DIAS_VENTANA, exigirTopeCubos, fecha, intervalo, uuid } from './validacion.js';
 import { AlcanceService } from '../sesion/alcance.service.js';
 import { Usuario } from '../sesion/guardia.js';
 import type { UsuarioSesion } from '../sesion/permisos.js';
@@ -19,13 +19,14 @@ export class CanalesController {
     summary: 'Histórico agregado de un canal',
     description:
       'Promedio por intervalo calculado con time_bucket EN LA ZONA HORARIA DEL SITIO. Formato columnar para uPlot: ' +
-      '`tiempos` (segundos Unix), `valores`, `muestras` (cuántas lecturas hay detrás de cada promedio). Rango semiabierto [desde, hasta). ' +
+      '`tiempos` (segundos Unix), `valores` (promedio), `minimos` y `maximos` (Etapa 4), `muestras` (cuántas lecturas hay detrás de cada promedio). Los cubos sin datos no ' +
+      'se emiten (no son 0). Rango semiabierto [desde, hasta). ' +
       'Por defecto: últimas 24 h cada 15 minutos. Una ventana que daría más de ' + MAX_CUBOS + ' cubos (ventana ÷ intervalo) se rechaza con 400 ' +
       'antes de consultar (docs/19 §4, incremento 2, punto 4).',
   })
   @ApiParam({ name: 'id', description: 'UUID del canal' })
-  @ApiQuery({ name: 'desde', required: false, description: 'ISO 8601; por defecto hasta − 24 h' })
-  @ApiQuery({ name: 'hasta', required: false, description: 'ISO 8601; por defecto ahora' })
+  @ApiQuery({ name: 'desde', required: false, description: `${ISO_8601}; por defecto hasta − 24 h` })
+  @ApiQuery({ name: 'hasta', required: false, description: `${ISO_8601}; por defecto ahora` })
   @ApiQuery({ name: 'intervalo', required: false, enum: INTERVALOS, description: 'Lista cerrada: nunca texto libre en SQL' })
   @ApiOkResponse({ description: 'Serie agregada' })
   @ApiBadRequestResponse({ description: `UUID, fecha o intervalo inválidos, o una ventana de más de ${MAX_DIAS_VENTANA} días o de más de ${MAX_CUBOS} cubos` })

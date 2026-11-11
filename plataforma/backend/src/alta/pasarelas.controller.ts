@@ -70,7 +70,7 @@ export class PasarelasController {
     const p = validarPasarela(cuerpo, this.reservados);
     await this.alcance.exigirSitio(u, 'escribir', p.sitio_id); // 404 si el sitio no existe o no es suyo
     res.setHeader('Cache-Control', 'no-store'); // la respuesta lleva una credencial
-    return this.alta.crearPasarela(p);
+    return this.alta.crearPasarela(p, u.id);
   }
 
   @Delete(':id')
@@ -85,7 +85,7 @@ export class PasarelasController {
     exigirEnAlguno(u, 'escribir');
     const pasarelaId = uuid(id, 'pasarela');
     await this.alcance.exigirPasarela(u, 'escribir', pasarelaId);
-    return this.alta.darDeBajaPasarela(pasarelaId);
+    return this.alta.darDeBajaPasarela(pasarelaId, u.id);
   }
 
   @Post(':id/credencial')
@@ -101,6 +101,6 @@ export class PasarelasController {
     const pasarelaId = uuid(id, 'pasarela');
     await this.alcance.exigirPasarela(u, 'escribir', pasarelaId);
     res.setHeader('Cache-Control', 'no-store');
-    return this.alta.rotarPasarela(pasarelaId);
+    return this.alta.rotarPasarela(pasarelaId, u.id);
   }
 }

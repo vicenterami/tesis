@@ -51,7 +51,9 @@ export interface Canal {
   cerrar(): void;
 }
 
-// 1, 2, 4, 8, 16, 30, 30… segundos: nunca más de 30 s entre intentos.
+// 1, 2, 4, 8, 16, 30, 30… segundos: nunca más de 30 s entre intentos. La espera vuelve a 1 s con el primer mensaje del servidor (un
+// latido o un evento), no al abrir (corrección del 11/11/2026): un servidor que acepta el flujo y lo cierra enseguida producía una
+// reconexión, y con ella una recarga de la pantalla, cada segundo sin retroceso.
 export function esperaReintento(intento: number): number {
   return Math.min(1000 * 2 ** intento, ESPERA_MAX_MS);
 }
@@ -95,7 +97,6 @@ export function abrirCanal(
     const f = crear(url);
     fuente = f;
     f.onopen = () => {
-      intento = 0;
       const volvio = caido;
       caido = false;
       alEstado('en_vivo', volvio ? RECONECTADO : undefined);
@@ -105,7 +106,7 @@ export function abrirCanal(
       // Cerrado por el servidor (403, 503, respuesta inválida): el navegador no reintenta; lo hacemos nosotros.
       // En otro estado, el navegador ya está reintentando solo (corte de red): solo se avisa.
       if (f.readyState === CERRADO) {
-        if (intento === 0) alRechazo(); // el primer rechazo tras una apertura buena (o el primero de todos)
+        if (intento === 0) alRechazo(); // el primer rechazo tras un canal que entregó algo (o el primero de todos)
         reconectar('el servidor rechazó o cerró el canal');
       }
       else {
@@ -116,6 +117,7 @@ export function abrirCanal(
     for (const tipo of TIPOS) {
       f.addEventListener(tipo, (ev) => {
         armarVigilante(); // cualquier mensaje del servidor, válido o no, prueba que el canal vive
+        intento = 0; // y que vale la pena volver a intentar pronto si se corta
         const e = decodificar(tipo, ev.data);
         if (e !== null) alEvento(e);
       });

@@ -284,7 +284,7 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 | **HU-23** | **Como administrador de sitio**, quiero ver mi flota agrupada por tecnología de red, para entender por dónde llega cada cosa | S | 4 | 3 |
 | **HU-29** | **Como persona usuaria**, quiero elegir las unidades de visualización (°C o °F; mm, m o km), mi zona horaria y guardar vistas, para leer los datos a mi manera sin cambiar lo que guarda la base (RF-56; `docs/19 §4`, P13) — agregada el 08/11/2026 | S | 4 | 5 |
 | **HU-31** | **Como persona usuaria**, quiero enviar un mensaje de soporte desde el panel y ver el contacto del responsable de la instancia (RF-61; `docs/19 §4`, P11) — agregada el 08/11/2026 | C | 4 | 2 |
-| **TT-42** | Paginación: keyset con cursor opaco sobre `(tiempo, id)` en cuarentena, condiciones, accesos, auditoría y eventos; desplazamiento con total en usuarios e inventario (RF-57; `docs/10 §8.4` punto 58) — agregada el 08/11/2026 | M | 4 | 4 |
+| **TT-42** | Paginación: keyset con cursor opaco sobre `(tiempo, id)` en cuarentena, condiciones, accesos, auditoría y eventos; desplazamiento con total en usuarios e inventario (RF-57; `docs/10 §8.4` punto 58) — agregada el 08/11/2026; al 11/11/2026 faltan accesos y auditoría (keyset) y usuarios (desplazamiento) | M | 4 | 4 |
 | **TT-43** | Componentes reutilizables con etiqueta de texto y ayuda accesible (`Boton`, `Tooltip`, `Aviso`) extendidos a tablas y formularios (RF-58; `docs/19 §6`) — agregada el 08/11/2026 | M | 4 | 4 |
 | **TT-44** | Comparativa previa de referentes y de normas de usabilidad (WCAG 2.2), cada afirmación con su fuente, antes de rediseñar el tablero y las gráficas (`docs/19 §4`, P1) — agregada el 08/11/2026 | S | 4 | 3 |
 

@@ -36,7 +36,7 @@ describe('permitir(usuario, accion, sitio): la tabla de docs/20 §6', () => {
     const m = matrizPorRol();
     expect(Object.keys(m).sort()).toEqual([...ROLES].sort());
     for (const r of ROLES) for (const a of ACCIONES) expect(m[r].includes(a)).toBe(PERMISOS[a].includes(r));
-    expect(m).toEqual({ administrador: ['leer', 'exportar', 'escribir', 'usuarios'], consulta: ['leer'] });
+    expect(m).toEqual({ administrador: ['leer', 'exportar', 'escribir', 'usuarios', 'configurar'], consulta: ['leer'] });
     // y coincide con la función que decide: lo que la guía dice que un rol puede, permitir() lo permite en su sitio
     for (const r of ROLES) for (const a of ACCIONES) expect(permitir(persona([['s1', r]]), a, 's1') === 'permitido').toBe(m[r].includes(a));
   });

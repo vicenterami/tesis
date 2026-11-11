@@ -2,6 +2,8 @@
 // hacer la persona en cada sitio según la matriz que trae la propia respuesta (`permisos`: rol → acciones, la tabla que decide en el
 // servidor) y la renovación mientras la persona interactúa. El panel nunca decide un permiso: oculta o desactiva lo que el servidor
 // rechazaría, y si se equivoca, el servidor responde 403 y el aviso lo dice.
+import type { Preferencias } from './modelo';
+
 export type Rol = 'administrador' | 'consulta';
 export type Matriz = Readonly<Record<string, readonly string[]>>;
 
@@ -22,8 +24,10 @@ export type Sesion =
       expira_en: string | null;
       inactividad_vence_en: string | null;
       permisos: Matriz;
+      // Las preferencias de la persona (docs/19 §4, tablero v2, H): llegan con la sesión cuando el backend las tenga; hasta entonces, nada.
+      preferencias?: Preferencias | null;
     }
-  | { sistema: true; nombre: string; sitios: 'todos'; rol: 'administrador'; permisos: Matriz };
+  | { sistema: true; nombre: string; sitios: 'todos'; rol: 'administrador'; permisos: Matriz; preferencias?: Preferencias | null };
 
 // ¿Puede `accion` en el sitio de código `codigo`? Con el usuario del sistema, sí en todos. Sin la matriz (un backend anterior), no se
 // supone nada: se deja al servidor (true) y su 403 se muestra.

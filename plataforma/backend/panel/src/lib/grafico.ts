@@ -1,5 +1,6 @@
 import type uPlot from 'uplot';
 import type { Historico } from './modelo';
+import { SERIES } from './tema';
 
 // Datos del gráfico de la ficha (docs/19 P3): el histórico llega agregado por la base (cientos de puntos) y lo que llega en
 // vivo se dibuja aparte, como «lectura actual», para no mezclar un valor crudo con promedios.
@@ -59,6 +60,31 @@ export function resolucionValida(clave: ClaveRango, res: ClaveResolucion | null)
   return res !== null && resolucionesAdmisibles(clave).includes(res) ? res : null;
 }
 
+// ── Ventanas fijas (tablero v2, B1 y D1): el rango a medida y el zoom por arrastre son la misma cosa, `desde` y `hasta` ──────────
+// «La resolución la fija el rango» también a medida: la del menor rango de la lista que la contiene (60 a 170 puntos, como los
+// preajustes); más allá de 30 días, un día (366 como mucho: el tope del servidor).
+export function intervaloParaVentana(ms: number): string {
+  return RANGOS.find((r) => ms <= r.ms)?.intervalo ?? '1 day';
+}
+// El zoom refina (D1): la resolución más fina de la lista que da entre 2 y 2 500 puntos para la ventana. Una ventana de menos de dos
+// minutos no tiene ninguna (1 min daría menos de 2 puntos): quien hace zoom la ensancha antes (VENTANA_MINIMA_S).
+export const VENTANA_MINIMA_S = 2 * 60;
+export function resolucionMasFina(ms: number): ClaveResolucion {
+  const s = ms / 1000;
+  return (RESOLUCIONES.find((r) => Math.ceil(s / r.s) <= MAX_PUNTOS && Math.ceil(s / r.s) >= MIN_PUNTOS) ?? RESOLUCIONES[RESOLUCIONES.length - 1]!).clave;
+}
+// Una selección del gráfico (segundos Unix) → la ventana a pedir, de al menos dos minutos (centrada en lo elegido si era menor).
+// null si algún extremo no es un número finito (un NaN de uPlot fuera del área): nunca una fecha inválida que reviente al armar la URL.
+export function ventanaDeSeleccion(desdeS: number, hastaS: number): { desde: Date; hasta: Date } | null {
+  if (!Number.isFinite(desdeS) || !Number.isFinite(hastaS)) return null;
+  let [a, b] = desdeS <= hastaS ? [desdeS, hastaS] : [hastaS, desdeS];
+  if (b - a < VENTANA_MINIMA_S) {
+    const centro = (a + b) / 2;
+    [a, b] = [centro - VENTANA_MINIMA_S / 2, centro + VENTANA_MINIMA_S / 2];
+  }
+  return { desde: new Date(Math.round(a) * 1000), hasta: new Date(Math.round(b) * 1000) };
+}
+
 // Ventana [desde, hasta) que pide el panel para un rango, terminando en «ahora»; con resolución elegida, su intervalo.
 export function ventana(clave: ClaveRango, ahora: Date, res: ClaveResolucion | null = null): { desde: Date; hasta: Date; intervalo: string } {
   const r = rango(clave);
@@ -109,9 +135,11 @@ export function rotuloIntervalo(intervalo: string): string {
 }
 
 // Valor con su unidad, con tres decimales como mucho y coma decimal (es-CL).
+const NUMERO = new Intl.NumberFormat('es-CL', { maximumFractionDigits: 3 });
+export const formatearNumero = (v: number): string => NUMERO.format(v);
 export function formatearValor(valor: number | null, unidad: string): string {
   if (valor === null) return '—';
-  return `${new Intl.NumberFormat('es-CL', { maximumFractionDigits: 3 }).format(valor)} ${unidad}`;
+  return `${NUMERO.format(valor)} ${unidad}`;
 }
 
 // Fechas y horas como se leen en Chile (docs/19 §6): 24 h y meses en español. uPlot trae por defecto el formato en inglés de 12 h
@@ -169,7 +197,8 @@ export function alinearSeries(series: readonly { tiempos: readonly number[]; val
   return [tiempos, ...columnas];
 }
 
-// Paleta fija de 6 colores distinguibles para P3b (Okabe e Ito, 2008, «Color Universal Design»: pensada para quien no distingue rojo y verde), en orden fijo: el
-// primer dispositivo de la URL siempre lleva el primero.
-export const PALETA = ['#0072b2', '#d55e00', '#009e73', '#cc79a7', '#e69f00', '#56b4e9'] as const;
+// Paleta fija de 6 colores distinguibles para P3b (Okabe e Ito, 2008, «Color Universal Design»: pensada para quien no distingue rojo y
+// verde), en el orden fijo validado en docs/19 §4 (tablero v2, A3): el primer dispositivo de la URL siempre lleva el primero. Los valores
+// de cada tema viven en lib/tema.ts (SERIES, la única fuente); esta es la del tema claro.
+export const PALETA: readonly string[] = SERIES.claro;
 

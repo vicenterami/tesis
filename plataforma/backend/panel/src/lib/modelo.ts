@@ -28,6 +28,10 @@ export interface DispositivoInventario {
   zona_id: string;
   condiciones_abiertas: number;
   canales: CanalResumen[];
+  // Tablero v2 (docs/19 §4, C): el estado visual con la regla de §2 escrita en SQL y la entrega del rango (B4c), en porcentaje o null
+  // sin intervalo esperado. Opcionales: un backend anterior no los manda, y el panel recalcula el estado igual.
+  estado_visual?: 'inactivo' | 'sin_senal' | 'alerta' | 'normal';
+  entrega?: number | null;
 }
 
 export interface Condicion {
@@ -96,6 +100,71 @@ export interface Historico {
   tiempos: number[];
   valores: number[];
   muestras: number[];
+  // Tablero v2 (D3): mínimo y máximo por cubo (campos nuevos, compatibles: un backend anterior no los manda).
+  minimos?: (number | null)[];
+  maximos?: (number | null)[];
+}
+
+// ── Tablero v2 (docs/19 §4, I y «Campos»): lo que el panel lee de las rutas nuevas ─────────────────────────────────────────────────
+export interface Sitio {
+  id: string;
+  codigo: string;
+  nombre: string;
+  zona_horaria: string;
+  rol: string;
+  zonas: { id: string; nombre: string }[];
+}
+
+export interface ResumenSitio {
+  sitio: { id: string; codigo: string; nombre: string; zona_horaria: string };
+  ventana: { desde: string; hasta: string; intervalo: string };
+  dispositivos: { total: number; normal: number; alerta: number; sin_senal: number; inactivo: number };
+  salud: { reportan: number; supervisados: number; porcentaje: number | null };
+  condiciones_abiertas: { tipo: string; n: number }[];
+  // cubos[].tiempo en segundos Unix, como `tiempos` de los históricos (lo declara el OpenAPI del resumen).
+  tramas: { recibidas: number; rechazadas: number; cubos: { tiempo: number; recibidas: number; rechazadas: number }[] };
+  atencion: { id: string; nombre: string; estado_visual: 'sin_senal' | 'alerta'; visto_por_ultima_vez: string | null; tipos: string[] }[];
+  magnitudes: { codigo: string; nombre: string; unidad: string; canales: number }[];
+  entrega: { id: string; nombre: string; recibidas: number; esperadas: number; porcentaje: number | null }[];
+}
+
+// GET /sitios/{id}/historico: la forma de Historico (sin canal) más mínimos, máximos y cuántos canales aportan por cubo.
+export interface HistoricoSitio {
+  magnitud: string;
+  unidad: string;
+  zona_horaria: string;
+  intervalo: string;
+  desde: string;
+  hasta: string;
+  puntos: number;
+  tiempos: number[];
+  valores: (number | null)[];
+  minimos: (number | null)[];
+  maximos: (number | null)[];
+  n: number[];
+}
+
+// GET /dispositivos/{id}/historico: todos los canales alineados por cubo.
+export interface HistoricoDispositivo {
+  tiempos: number[];
+  intervalo?: string;
+  canales: { id: string; magnitud: string; magnitud_nombre: string; unidad: string; valores: (number | null)[]; minimos: (number | null)[]; maximos: (number | null)[] }[];
+}
+
+export interface EventoDispositivo {
+  id: string;
+  tipo: string;
+  detalle: unknown;
+  ocurrido_en: string;
+  usuario: { id: string; nombre: string } | null;
+}
+
+export interface Preferencias {
+  unidad_temperatura?: 'C' | 'F';
+  unidad_longitud?: 'mm' | 'm' | 'km';
+  zona_horaria?: string;
+  tema?: 'sistema' | 'claro' | 'oscuro';
+  sitio_predeterminado?: string | null;
 }
 
 export interface TramaRechazada {

@@ -22,6 +22,9 @@ export function uuid(valor: unknown, nombre = 'id'): string {
   return v.toLowerCase();
 }
 
+// Lo que el contrato dice de toda fecha de consulta (OpenAPI de `desde` y `hasta`): una fecha sin hora es medianoche UTC, no la del sitio.
+// docs/13 pide la zona del sitio para «días»; cambiar este comportamiento es otra decisión (revisión del 11/11/2026): por ahora se declara.
+export const ISO_8601 = 'ISO 8601; una fecha sin hora (AAAA-MM-DD) es las 00:00 UTC, no la medianoche del sitio';
 export function fecha(valor: unknown, porDefecto: Date, nombre: string): Date {
   const v = texto(valor, nombre);
   if (v === undefined) return porDefecto;
@@ -72,3 +75,8 @@ export function limite(valor: unknown, porDefecto = 50, maximo = 500): number {
   if (!Number.isInteger(n) || n < 1 || n > maximo) throw new BadRequestException(`limite debe ser un entero entre 1 y ${maximo}`);
   return n;
 }
+
+// Cabeceras de respuesta declaradas en el OpenAPI (revisión del 11/11/2026): el cuerpo de una lista sigue siendo la lista; el total y el
+// cursor viajan aparte (docs/19 §4, I, «Compatibilidad»).
+export const CABECERA_X_TOTAL = { 'X-Total': { description: 'Cuántas filas cumplen los filtros (sin la página)', schema: { type: 'integer' } } } as const;
+export const CABECERA_X_SIGUIENTE = { 'X-Siguiente': { description: 'Cursor opaco de la página siguiente; ausente si no hay más (docs/10 §8.4 punto 58)', schema: { type: 'string' } } } as const;

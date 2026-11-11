@@ -25,7 +25,7 @@
 
 ## 2. Vocabulario visual: el estado de un dispositivo en cuatro valores
 La referencia observada en una nube comercial (cuatro estados con conteo visible, la misma leyenda en la lista y en el resumen)
-es exactamente lo que piden RF-30, RF-47 y RF-48. Se adopta como **regla de presentación**, calculada en el panel a partir de
+es exactamente lo que piden RF-30, RF-47 y RF-48. Se adopta como **regla de presentación**, calculada en el servidor (en SQL, para filtrar y paginar, desde el 11/11/2026) y en el panel (para actualizar en vivo) a partir de
 campos que la API ya devuelve (`estado`, `en_linea`, `condiciones_abiertas` y el `tipo` de cada condición abierta). No cambia
 el modelo de datos.
 
@@ -46,20 +46,21 @@ función que lo calcula es una sola, con prueba unitaria por cada fila de la tab
 ## 3. Mapa de pantallas
 | # | Pantalla | Qué muestra | Acciones | Datos (ruta real o propuesta) | Requisitos | Cuándo |
 |---|---|---|---|---|---|---|
-| P1 | **Resumen del sitio (tablero)** | Conteo por estado visual (los cuatro), condiciones abiertas, últimas tramas rechazadas, estado del servicio; rediseñado en la Etapa 4 con gráficas (zoom, rango, varias series, agregados) después de una comparativa de referentes y de WCAG 2.2 (§4) | Ir a cada lista filtrada | `GET /dispositivos`, `GET /condiciones?abiertas=true`, `GET /cuarentena?limite=5`, `GET /salud` | RF-30, HU-16, TT-44 | Etapa 4 (`docs/04`); los conteos por estado ya aparecen en P2 desde la Etapa 3; HU-16 en la iteración 0, el rediseño en la 1 |
-| P2 | **Inventario** | Tabla: estado visual, nombre, identificador físico, vía, zona, última trama (hace cuánto), condiciones abiertas; filtros por estado, sitio (si hay más de uno), zona y vía con conteo | Abrir la ficha; filtrar; buscar por nombre o identificador | `GET /dispositivos` y `GET /condiciones?abiertas=true&limite=500` (el tipo de cada condición abierta decide el estado, §2; filtra el panel: hoy la API no filtra) | Semáforo y tabla: RF-47, RF-48, HU-10, HU-19. Filtros y búsqueda: RF-51, HU-20 (adelantada a la Etapa 3 el 12/10) | Etapa 3, tramo 2 |
+| P1 | **Resumen del sitio (tablero)** | Conteo por estado visual (los cuatro), condiciones abiertas, últimas tramas rechazadas, estado del servicio; rediseñado en la Etapa 4 con gráficas (zoom, rango, varias series, agregados) después de una comparativa de referentes y de WCAG 2.2 (§4) | Ir a cada lista filtrada; cambiar el rango del tablero; abrir P3b desde una magnitud | `GET /sitios`, `GET /sitios/{id}/resumen`, `GET /sitios/{id}/historico`, `GET /salud` (Etapa 4), diseño del 11/11/2026 (§4 tablero v2) | RF-30, HU-15, HU-16, HU-07, TT-44 | Etapa 4 (`docs/04`); los conteos por estado ya aparecen en P2 desde la Etapa 3; diseñado el 11/11/2026, iteración 1 |
+| P2 | **Inventario** | Tabla: estado visual, nombre, identificador físico, vía, zona, última trama (hace cuánto), condiciones abiertas; filtros por estado, sitio (si hay más de uno), zona y vía con conteo | Abrir la ficha; filtrar; buscar por nombre o identificador | `GET /dispositivos` y `GET /condiciones?abiertas=true&limite=500` (el tipo de cada condición abierta decide el estado, §2; desde el 11/11/2026 la API filtra, ordena y pagina, y el panel recalcula en vivo) | Semáforo y tabla: RF-47, RF-48, HU-10, HU-19. Filtros y búsqueda: RF-51, HU-20 (adelantada a la Etapa 3 el 12/10) | Etapa 3, tramo 2 |
 | P3 | **Ficha del dispositivo** | Identidad (nombre, identificador, vía, formato, zona, sitio, intervalo esperado, desde cuándo); estado visual; por canal: última lectura con unidad y, si el canal tiene calibración, su porcentaje (`docs/10 §8.4` punto 51), y reglas de umbral; gráfico histórico por canal (rango elegible; la agregación la fija el rango) que sigue en vivo; condiciones abiertas y cerradas del dispositivo; sus tramas rechazadas | Cambiar canal y rango (el intervalo lo fija cada rango); pausar el vivo; ir a configurar (P6) o a mudar (Etapa 4) | `GET /dispositivos/{id}`, `GET /canales/{id}/historico?desde&hasta&intervalo`, `GET /eventos?dispositivo=`, `GET /condiciones?dispositivo=&abiertas=true&limite=500` (todas las abiertas) más `?dispositivo=&limite=50` (las recientes), `GET /cuarentena?dispositivo=&limite=20` | RF-33, RF-49 (identidad, condiciones y serie; su «historial de eventos» queda con la Etapa 4), HU-21 (adelantada a la Etapa 3 el 12/10, con sus 7 h); el rango a medida por fechas es HU-07 (Etapa 4) | Etapa 3, tramo 3 |
 | P3b | **Comparar dispositivos** (`#/comparar`; incremento 2) | La misma magnitud de 2 a 6 dispositivos en un gráfico de historia (promedios por cubo; misma ventana y resolución que P3) y, debajo, la tabla en tiempo real con la última lectura, hace cuánto y el estado de cada uno; selector de magnitud; entradas desde las casillas de P2 y el enlace de P3 | Abrir la ficha de cada dispositivo; volver al inventario con las casillas marcadas | `GET /dispositivos/{id}` por dispositivo, `GET /canales/{id}/historico`, `GET /condiciones?abiertas`, `GET /eventos` | — | — |
 | P4 | **Condiciones** | Lista con tipo, dispositivo, magnitud y umbral, abierta en, duración; filtro abiertas / todas; al cerrarse, el resumen del episodio, y el reconocimiento con su clasificación (`docs/10 §8.4` punto 49) | Abrir la ficha del dispositivo | `GET /condiciones?abiertas&limite` | HU-05, RF-24 | Etapa 4 (lista sobre lo que la API ya devuelve) |
 | P5 | **Cuarentena** | Últimas tramas rechazadas: cuándo, por qué (`no_registrado`, `dado_de_baja`, `malformada`, `invalida`), detalle, dispositivo si se conoce, la trama cruda plegada | Copiar la trama; ir al alta si el motivo es `no_registrado` | `GET /cuarentena?limite` | RF-11 a RF-13 | Etapa 4 (lista sobre lo que la API ya devuelve) |
-| P6 | **Configurar dispositivo y canales** | Nombre, estado (activo / mantenimiento), intervalo esperado; por canal, umbral alto, umbral bajo, histéresis | Guardar con bloqueo optimista; validación en vivo (bajo < alto, histéresis dentro de la banda, rango de la magnitud) | **Propuesta:** `PATCH /dispositivos/{id}`, `PUT /canales/{id}/reglas` | HU-06, HU-13, punto 28 | Etapa 4 (exige sesión) |
-| P7 | **Alta de dispositivo** (asistente) | Paso 1 identidad y zona; paso 2 vía y formato (y pasarela si LoRaWAN); paso 3 canales y magnitudes; paso 4 credencial según la vía, mostrada una sola vez; paso 5 «esperando la primera trama» en vivo | Crear; copiar la credencial y el tópico | `POST /dispositivos` (API hecha el 12/10, HU-11, `docs/16 §20`; la pantalla en la Etapa 4, HU-22) | RF-50, HU-11, HU-22, punto 25 | API: Etapa 3; pantalla: Etapa 4 |
+| P6 | **Configurar dispositivo y canales** | Nombre, estado (activo / mantenimiento), intervalo esperado, zona; por canal, etiqueta, umbral alto, umbral bajo, histéresis y retardo de activación | Guardar con bloqueo optimista; validación en vivo (bajo < alto, histéresis dentro de la banda, rango de la magnitud) | `PATCH /dispositivos/{id}`, `PUT /canales/{id}/reglas` (Etapa 4), fijadas el 11/11/2026 (§4 tablero v2, E) | HU-06, HU-13, RF-14, punto 28 | Etapa 4, iteración 1 (exige sesión) |
+| P7 | **Alta de dispositivo** (asistente) | Paso 1 identidad y zona; paso 2 vía y formato (y pasarela si LoRaWAN); paso 3 canales y magnitudes; paso 4 credencial según la vía, mostrada una sola vez; paso 5 «esperando la primera trama» en vivo | Crear; copiar la credencial y el tópico; subir un CSV, validarlo y crear las filas válidas; dar de alta un emisor detectado | `POST /dispositivos` (API hecha el 12/10, HU-11, `docs/16 §20`); `POST /dispositivos/lote?modo=validar\|crear` y `GET /cuarentena/detectados` (Etapa 4), fijadas el 11/11/2026 (§4 tablero v2, F) | RF-50, HU-11, HU-22, punto 25 | API: Etapa 3; pantalla, lote y detectados: Etapa 4, iteración 1 |
 | P8 | **Exportar** | Dispositivo (hoy) o sitio (Etapa 4), rango, formato (CSV, XLSX, JSON); tamaño estimado antes de descargar | Descargar | Hecho el 12/10 por dispositivo: `GET /dispositivos/{id}/exportar?formato=csv\|json&desde&hasta` (flujo por tandas; CSV estándar con coma y punto decimal para R, Python y QGIS). **Propuesta** para la Etapa 4: `GET /sitios/{id}/exportar` con rol y XLSX | RF-34, HU-08 (adelantada a la Etapa 3 el 12/10) | API: Etapa 3; pantalla, XLSX y por sitio: Etapa 4 |
 | P9 | **Vista pública por enlace** | Solo lo que el administrador eligió: magnitudes agregadas, sin trama cruda ni identificadores | Ninguna | **Propuesta:** `GET /publico/{token}` | punto 6 | Etapa 4 |
 | P10 | **Sesión y usuarios** | Entrar, cambio de la clave temporal, salir; quién soy en la cabecera; usuarios de mis sitios, su perfil por sitio y la guía de perfiles (cinco desde el 08/11/2026, diseño: `docs/20 §6`) | Entrar, cambiar la clave, salir o cerrar en todos lados; dar de alta (clave temporal una vez), activar y desactivar, asignar una temporal, cambiar el rol | `POST /sesion`, `GET /sesion`, `DELETE /sesion`, `POST /sesion/clave`, `GET /usuarios`, `POST /usuarios`, `PATCH /usuarios/{id}` (`docs/20`) | RF-43, RF-44, HU-18 | Etapa 4; hecha el 08/11/2026 (§4) |
 | P11 | **Legal y acerca de** (Etapa 4) | Privacidad (generada desde `docs/21`), términos de uso con su versión, avisos de terceros, versión y commit, aviso AGPL; soporte: contacto del responsable y formulario | Leer; aceptar los términos (obligatorio al primer ingreso y al cambiar la versión); enviar un mensaje de soporte | Rutas nuevas, por fijar en el OpenAPI (Etapa 4); los avisos de terceros, un archivo generado en la compilación | RF-53, RF-54, RF-61, HU-27, HU-31 | Iteración 0 |
 | P12 | **Estado del sistema** (solo administrador del sistema; Etapa 4) | Recursos por contenedor en el tiempo (memoria frente a su techo, CPU), errores agrupados por huella, último respaldo y su antigüedad, condiciones del sistema abiertas; límites de los servicios | Ver el detalle de un error; ajustar un límite con bloqueo optimista | `GET /salud` y rutas nuevas sobre `metrica_recurso`, `error_sistema` y los límites (Etapa 4; `docs/10 §8.4` puntos 60 y 61) | RF-59, RF-60, RNF-19, HU-30 | Iteración 1 |
-| P13 | **Preferencias** (mi cuenta; Etapa 4) | Unidades de visualización (°C o °F; mm, m o km), zona horaria propia o la del sitio, vistas guardadas; mis datos y mis sesiones abiertas (por decidir: sin fila en el backlog) y la versión de términos aceptada; darme de baja | Guardar; exportar mis datos de cuenta; cerrar una sesión; darme de baja (con la clave actual) | Rutas nuevas, por fijar en el OpenAPI (Etapa 4); la baja, `docs/20 §11` | RF-55, RF-56, HU-28, HU-29 | Iteración 1 (la baja, en la 0) |
+| P13 | **Preferencias** (mi cuenta; Etapa 4) | Unidades de visualización (°C o °F; mm, m o km), zona horaria propia o la del sitio, vistas guardadas; mis datos y mis sesiones abiertas (por decidir: sin fila en el backlog) y la versión de términos aceptada; darme de baja | Guardar; exportar mis datos de cuenta; cerrar una sesión; darme de baja (con la clave actual) | `GET`/`PUT /preferencias`, `GET /sesiones`, `DELETE /sesiones/{id}` (Etapa 4), fijadas el 11/11/2026 (§4 tablero v2, H); la baja, `docs/20 §11` | RF-55, RF-56, HU-28, HU-29 | Iteración 1 (la baja, en la 0) |
+| P14 | **Actividad** (administrador de sitio en sus sitios; el del sistema en todos; diseñada el 11/11/2026) | Lo que hicieron las personas en el sitio (eventos con quién, de `evento.usuario_id`) y sus entradas, salidas y bloqueos (`acceso`), con filtros por persona, tipo y rango, en texto para personas | Filtrar; abrir la ficha del dispositivo o la persona | `GET /sitios/{id}/actividad?desde&hasta&tipo&usuario&cursor` (Etapa 4) (§4 tablero v2, G) | RF-46, HU-11, HU-26 | Iteración 1 |
 
 Lo que **no** se construye, y por qué: mapa (ningún requisito lo pide; el caso de uso tiene decenas de dispositivos, no cientos
 dispersos), informes programados y disparadores con varias condiciones (más que el umbral con histéresis decidido; candidatos
@@ -248,6 +249,11 @@ depende solo del color), **cada afirmación con su cita de la fuente oficial**; 
 como ausencia (la misma regla del incremento 1). Con eso: el tablero del sitio (los cuatro conteos de §2, condiciones abiertas, salud del
 sitio de HU-16) y gráficas que admiten zoom por arrastre y vuelta atrás, varias series con su leyenda informativa (incremento 2, punto 1),
 agregados con su nombre («promedio por hora») y un ancho que se adapta del teléfono al escritorio; probado en teléfono con capturas.
+**Comparativa hecha el 11/11/2026: `docs/22`** (siete referentes, incluido Grafana, que dibuja con uPlot como este panel; 31 filas
+verificadas y los siete criterios de WCAG 2.2 citados; ISO 9241 sin texto abierto, no se cita). Lo que sostiene: portada fija con conteos y
+salud; zoom por arrastre con doble clic y botón para volver; preajustes hacia atrás más rango a medida, en la URL; el agregado con su
+nombre escrito; 320 px sin desplazamiento en dos dimensiones, objetivos de 24 px y contraste 4,5:1. El diseño que lo aplica es el bloque
+«Tablero v2» de esta sección.
 
 **P11 Legal y acerca de (Etapa 4, iteración 0; HU-27, HU-31).** Un enlace «Legal y acerca de» al pie de toda pantalla, también antes de
 entrar. Cuatro apartados: **Privacidad**, generada desde el inventario de `docs/21` (§7 de ese documento) con el responsable y el contacto
@@ -271,6 +277,201 @@ punto 3); vistas guardadas (filtros de P2, rango y resolución de P3), guardadas
 cuenta»: nombre, correo, sitios y perfiles, sesiones abiertas (con «cerrar»), versión de términos aceptada, exportar mis datos de cuenta y
 «Darme de baja», que explica qué se borra y qué queda (`docs/20 §11`) y pide la clave actual.
 
+**Tablero v2 y experiencia de uso (diseñado el 11/11/2026, antes del código, como manda la regla de concordancia; iteración 1 del plan
+v2, `docs/04 §8`).** Qué lo motiva: la presentación del 05/11 dejó claro que lo que se evalúa es lo que se ve y se opera (`docs/18 §1`):
+el panel de la Etapa 3 es un inventario y una ficha, sin tablero del sitio, sin nada que la persona configure y con tablas que en un
+teléfono se desplazan de lado. Este diseño cubre el bloque B2 completo —tablero, gráficas, inventario, ficha, umbrales, alta masiva,
+actividad y preferencias— y fija el contrato de la API que cada pantalla necesita (I), para construir backend y panel por separado contra
+el mismo contrato. Referentes y normas: la comparativa de «P1 rediseñado» (arriba), ampliada el 11/11/2026 a doce criterios y siete
+referentes, y las reglas de visualización de §6 (colores validados, un solo eje, leyenda siempre que haya más de una serie).
+
+**A. Armazón y sistema visual (toda pantalla).**
+1. **Cabecera y navegación.** ✅ panel, 11/11/2026 (sin «en vivo» en la cabecera: cada pantalla conserva el suyo; Preferencias, Condiciones, Cuarentena, Actividad y Estado del sistema se nombran sin enlace hasta tener pantalla). Arriba: el nombre del sistema, el selector de sitio (solo si la persona tiene más de uno; el sitio vive
+   en la URL `?sitio=` y la última elección se guarda en las preferencias, lo que llega con P13) y el menú principal: Tablero · Inventario · Condiciones ·
+   Cuarentena · Actividad (administrador de sitio) · Usuarios (administrador de sitio) · Estado del sistema (administrador del sistema).
+   A la derecha: «en vivo», quién soy y el menú de cuenta (Preferencias, Cambiar la clave, Salir, Cerrar en todos lados). Bajo 700 px el
+   menú se pliega tras un botón «Menú» con texto (nunca solo un icono). El pie «Legal y acerca de» (P11) va en todas las pantallas. La
+   pantalla de llegada tras entrar es el tablero (P1), no el inventario.
+2. **Tokens de diseño en `app.css`** ✅ panel, 11/11/2026; y ningún color escrito suelto en un componente: superficie y superficie elevada, texto primario y
+   secundario, borde, acento (`#0b3954`, el de hoy), los cuatro estados (los de hoy: todos entre 6,6:1 y 8:1 de contraste, medidos el
+   11/11/2026), los seis colores de series (punto 3), espaciado en pasos de 4 px (4, 8, 12, 16, 24, 32), escala tipográfica (0,8 · 0,9 ·
+   1 · 1,15 · 1,4 · 2 rem, `system-ui`: la CSP no admite fuentes externas), números tabulares (`font-variant-numeric: tabular-nums`) en
+   tarjetas y tablas, radios de 6 y 10 px, sombra suave solo en tarjetas elevadas y el foco visible de 3 px que ya existe. **Tema claro y
+   oscuro:** por `prefers-color-scheme` y por la preferencia de la persona (P13; `data-theme` en `<html>` manda sobre el sistema
+   operativo); el oscuro redefine los tokens, nunca los componentes.
+3. **Colores de las gráficas, validados antes del código.** ✅ panel, 11/11/2026. Series categóricas (varias series en un gráfico: P3b y los canales de un
+   dispositivo): la paleta de Okabe e Ito en este orden fijo —azul `#0072b2`, naranja `#d55e00`, verde `#009e73`, amarillo `#e69f00`,
+   rosa `#cc79a7`, celeste `#56b4e9`— pasa las seis comprobaciones del método de visualización sobre fondo claro (banda de luminosidad,
+   croma, separación para daltonismo entre vecinas ΔE ≥ 9,6, separación normal ≥ 20, contraste), con una obligación: amarillo, rosa y
+   celeste quedan bajo 3:1 frente al fondo, así que toda gráfica con varias series lleva leyenda con nombres y la tabla de valores al lado
+   (P3b ya la tiene). Sobre fondo oscuro, los mismos seis matices re-escalonados: `#2a86c7`, `#d55e00`, `#009e73`, `#c98500`, `#c26a9b`,
+   `#1f8fc9` (pasan las seis; la pareja rosa–celeste queda en 7,6 para daltonismo, admisible solo con leyenda y tabla, que se exigen
+   igual). El orden es parte de la validación: cambiarlo exige volver a validar. En la ficha, «promedio» pasa al azul de la paleta y
+   «lectura actual» al naranja: el azul oscuro y el rojo de hoy no pasan (luminosidad y croma fuera de banda). Nunca dos ejes verticales
+   en un gráfico: dos magnitudes distintas son dos gráficos alineados en el tiempo. Series de estado (los cuatro colores de §2) nunca se
+   reutilizan como series de datos. **Excepción explícita a WCAG 1.4.11 (decidido al implementar, 11/11/2026):** medidos contra la
+   superficie del gráfico del tema claro (`#ffffff`), amarillo `#e69f00` da 2,25:1, celeste `#56b4e9` 2,31:1 y rosa `#cc79a7` 3,06:1; el
+   rosa sí llega a 3:1, así que la excepción cubre solo amarillo y celeste, y se acepta porque toda gráfica con varias series lleva leyenda
+   con nombres y la tabla «Ver los datos» de cada gráfico (el texto alternativo de `Grafico.svelte`). La prueba de contraste
+   (`lib/tema.test.ts`) fija 2,2:1 para las series y 3:1 para todo lo demás, y comprueba que solo esas dos quedan bajo 3:1; en el tema
+   oscuro las seis superan 4:1. Los colores no cambian: el orden está validado.
+4. **Un valor, un estado.** ✅ panel, 11/11/2026 (tablero). Cada número visible nace de un único estado derivado; nunca un bloque se recalcula al escribir y otro al
+   pulsar un botón (el defecto típico de «dos valores que no calzan» en una demostración). Lo que depende de un dato nuevo se actualiza
+   junto o se marca «cargando».
+5. **Teléfono (RF-52; WCAG 2.2, 1.4.10 y 2.5.8).** ✅ panel, 11/11/2026 (inventario en tarjetas y menú plegado; las capturas, en el paso 4c). Sin desplazamiento horizontal de la página desde 320 px: las tablas del inventario,
+   las condiciones, la cuarentena y la actividad se vuelven listas de tarjetas bajo 700 px (una tarjeta por fila con lo esencial a la
+   vista y el resto plegado); objetivos táctiles de 24 × 24 px CSS como mínimo y de 44 px en los botones principales; los gráficos al
+   ancho disponible con la leyenda debajo. Capturas reproducibles a 390 y 1 280 px (paso 4c del guardián).
+
+**B. P1 Tablero del sitio (HU-16, RF-30, HU-15, HU-07; TT-44).** Lo primero que se ve al entrar. De arriba abajo:
+1. **Una sola fila de filtros** ✅ panel, 11/11/2026 (el sitio, en la cabecera) (regla de los tableros de monitoreo: los filtros arriba y alcanzan a todo lo que está debajo): sitio (si
+   hay varios), rango temporal (última hora, 24 h, 7 días, 30 días y **a medida**, con fecha y hora de inicio y fin: HU-07) y el aviso de
+   zona horaria. El rango va en la URL (`#/?sitio=&rango=7d`, o `&desde=&hasta=` en ISO), como toda vista.
+2. **Fila de indicadores** ✅ panel, 11/11/2026; ✅ backend, 11/11/2026 (los cuatro estados de §2 más el total; «en línea», en la tarjeta de salud) (tarjetas de valor, no gráficos de una barra): Dispositivos (total) · Normal · Alerta · Sin señal ·
+   Inactivos (los cuatro suman el total; «en línea» va en la tarjeta de salud), cada una un botón que abre el inventario filtrado (como hoy las fichas de conteo); **Salud del sitio** = en línea ÷ (total
+   − inactivos), en porcentaje con un medidor de una sola rampa y en texto («14 de 16 reportan»), que es el indicador agregado de RF-30;
+   condiciones abiertas por tipo (barras horizontales ordenadas, un solo matiz) y las tramas del rango, recibidas y rechazadas. Todo sale
+   de una sola respuesta, `GET /sitios/{id}/resumen` (Etapa 4), y cambia en vivo con los eventos del canal (F3) sin repedir el resumen por cada
+   evento (antirrebote de §6).
+3. **«Requiere atención»:** ✅ panel, 11/11/2026; hasta diez dispositivos en Sin señal o Alerta, en el orden de atención de P2, con hace cuánto y la
+   condición; enlace a cada ficha y «ver todos» (P2 ordenado por atención, sin filtro de estado: el inventario filtra por un solo estado y aquí
+   conviven dos; decidido al implementar, 11/11/2026).
+4. **Gráficas del sitio** ✅ panel, 11/11/2026; ✅ backend, 11/11/2026 (uPlot, cursor sincronizado entre ellas): (a) **tramas por cubo** del rango, recibidas y rechazadas como barras
+   apiladas (dos colores de la paleta, leyenda); (b) **una gráfica por magnitud que el sitio mide** (hasta seis; las demás, en una
+   lista): el promedio del sitio por cubo con la banda mín–máx del mismo matiz al 15 % y cuántos dispositivos aportan («promedio de 9
+   dispositivos»; un canal por dispositivo y magnitud, así que el conteo de canales es el de dispositivos), de `GET /sitios/{id}/historico` (Etapa 4); un clic abre P3b con esa magnitud y hasta seis dispositivos del sitio; la resolución
+   la fija el rango, como en P3; (c) **entrega por dispositivo** (HU-15, calidad del enlace): tramas recibidas en el rango ÷ esperadas
+   (ventana ÷ intervalo esperado), barras horizontales de peor a mejor (hasta diez; «ver todos» en P2, columna Entrega); quien tiene
+   canales de señal (RSSI, SNR) los muestra en su ficha como cualquier canal. No se inventa una calidad sin datos.
+5. **Vacíos con camino:** ✅ panel, 11/11/2026; un sitio sin dispositivos muestra «Da de alta el primero» (P7) y «Alta masiva por archivo» (los enlaces llegan con P7); un rango sin
+   tramas lo dice y ofrece «últimos 30 días».
+
+**C. P2 Inventario v2 (RF-47, RF-51, RF-57, TT-42).** ✅ panel, 11/11/2026; ✅ backend, 11/11/2026 (el SQL del estado visual, en el backend). Lo de hoy sigue; cambia: (1) **el servidor filtra y pagina**
+(`GET /dispositivos?sitio&zona&via&estado&q&limite&desplazamiento`, total en la cabecera `X-Total` para no cambiar la forma de la
+respuesta), 50 por página con «1–50 de 132»; el estado visual lo calcula también el servidor, con la regla de §2 escrita en SQL (inactivo
+si el estado administrativo no es activo; sin señal si hay `sin_comunicacion` abierta o no está en línea; alerta si hay otra condición
+abierta; normal), y la prueba de §2 comprueba fila por fila que el servidor y `estadoVisual()` del panel dicen lo mismo (el panel conserva
+su función para recalcular en vivo sin repedir la página); (2) columna **Entrega** (%, de B4c), ordenable; (3) **tarjetas en teléfono**
+(A5); (4) «Marcar los visibles» para comparar, con el tope de seis; (5) las fichas de conteo y los filtros con conteo siguen, ahora del
+servidor.
+
+**D. P3 Ficha v2 y gráficas (HU-07, RF-33, RF-49).**
+1. **Zoom por arrastre que refina.** ✅ panel, 11/11/2026. Arrastrar sobre el gráfico acota el rango (uPlot lo trae); el panel pide el histórico de esa ventana
+   con la resolución más fina admisible (entre 2 y 2 500 puntos, la regla de hoy) y la dibuja; «Volver» (botón con texto) deshace el
+   último zoom y el doble clic vuelve al rango completo. La ventana acotada va a la URL como `desde` y `hasta` (ISO), que es también la
+   forma del **rango a medida** por fecha y hora (HU-07): un solo mecanismo. Mientras la ventana no termina en «ahora», el vivo no agrega
+   puntos (es historia) y la cabecera dice «rango fijo · Volver a ahora».
+2. **Varias series sin dos ejes.** ✅ panel, 11/11/2026; ✅ backend, 11/11/2026. Botón «Todos los canales»: una gráfica pequeña por canal (misma ventana, cursor sincronizado, un eje
+   cada una) en una fila que se envuelve; se pide todo de una vez con `GET /dispositivos/{id}/historico` (Etapa 4), no un pedido por canal. P3b
+   (comparar dispositivos) sigue como está.
+3. **Agregados con su nombre y su banda.** ✅ panel, 11/11/2026; ✅ backend, 11/11/2026. El histórico trae, por cubo, promedio, mínimo y máximo (campos nuevos, compatibles); el gráfico
+   dibuja el promedio y, con «mostrar mín–máx», la banda del mismo matiz al 15 %; el texto bajo los botones sigue diciendo «N puntos,
+   promedio por X».
+4. **Umbrales y condiciones dibujados.** ✅ panel, 11/11/2026. En el gráfico del canal, líneas horizontales con etiqueta para el umbral alto y el bajo («alto
+   30 °C») y la banda de histéresis sombreada; las condiciones de ese canal dentro de la ventana, como franjas verticales (de `abierta_en`
+   a `cerrada_en` o hasta ahora) con su tipo al pasar el cursor. Así se ve por qué sonó una alerta.
+5. **Historial de eventos del dispositivo en el rango** ✅ panel, 11/11/2026; ✅ backend, 11/11/2026 (HU-07): lista por cursor, `GET /dispositivos/{id}/eventos?desde&hasta` (Etapa 4), con
+   quién lo hizo cuando hubo persona (HU-11, G1).
+6. **Tramas rechazadas agrupadas:** ✅ panel, 11/11/2026; filas iguales (mismo motivo y detalle) se muestran una vez con «× N» y la última fecha; paginación por
+   cursor. Hoy la ficha lista veinte filas idénticas.
+7. **Unidades para personas:** ✅ panel, 11/11/2026; los códigos de unidad de SenML se muestran con su símbolo («Cel» → «°C», «%RH», «hPa», «dBm», «V») desde
+   una sola tabla del panel y, según la preferencia (°C o °F; mm, m o km), la conversión ocurre solo al mostrar, con la unidad escrita al
+   lado (P13; la base no cambia). Sin preferencia no se convierte nada: se muestra la unidad del catálogo; y la conversión de longitud aplica
+   solo a magnitudes de longitud, distancia o nivel, nunca a una precipitación en mm (decidido al implementar, 11/11/2026).
+
+**E. P6 Configurar (HU-06, HU-13, RF-14; F2).** ✅ backend, 11/11/2026 (rutas, validación en el servidor, bloqueo optimista, evento con la persona y retardo de activación en el filtro alertar; las notificaciones, no). Desde la ficha, para operador técnico, administrador de sitio y del sistema. Del
+dispositivo: nombre, estado (activo / mantenimiento), intervalo esperado y zona (mudar dentro del sitio); por canal: etiqueta, umbral
+alto, umbral bajo, histéresis y **retardo de activación** en segundos (0 por defecto; RF-14: la condición se abre cuando la medición lleva
+al menos ese tiempo fuera de la banda, y la histéresis la cierra). Validación en una sola función compartida con el servidor (bajo < alto;
+histéresis menor que la mitad de la banda; valores dentro del rango físico de la magnitud; retardo entre 0 y 86 400). Guardar con bloqueo
+optimista (`actualizado_en`; 409 → «alguien lo cambió a las 10:42: recarga», sin pisar), nunca optimista en pantalla (regla de §6).
+Rutas (Etapa 4): `PATCH /dispositivos/{id}` y `PUT /canales/{id}/reglas` (reemplaza las reglas del canal). Cada guardado deja un `evento` con la
+persona (G1). **Notificaciones en pantalla (HU-24, HU-25):** una condición que se abre en un sitio de la persona aparece como aviso
+agrupado por dispositivo (`aria-live`) en cualquier pantalla; en P13 cada persona elige para qué tipos quiere además la **notificación
+del navegador** (permiso pedido al activarla, `docs/21 §5`). No hay correo saliente (`docs/20 §4`): un canal saliente por sitio
+(webhook) queda diseñado para la iteración 2.
+
+**F. P7 Alta: asistente, alta masiva y bandeja de detectados (HU-22, RF-50; decididas el 25/10/2026).**
+1. **Asistente** de cinco pasos (§3): identidad y zona; vía y formato (pasarela si LoRaWAN; perfil de decodificación si lo hay); canales
+   y magnitudes del catálogo; credencial mostrada una sola vez con «Copiar» y el tópico; «esperando la primera trama» en vivo. Un
+   identificador que ya existe inactivo ofrece reactivarlo (409 con la ficha), no crea un duplicado.
+2. **Alta masiva por archivo:** ✅ backend, 11/11/2026 (la ruta y su informe; la pantalla, no); un CSV con cabecera fija (`id_fisico, nombre, zona, via, formato, intervalo_esperado_s, canales,
+   pasarela`; `canales` como `magnitud:unidad;magnitud:unidad`) de hasta 500 filas se envía a `POST /dispositivos/lote?modo=validar` (Etapa 4) y
+   la pantalla muestra el informe fila por fila (válida / rechazada con motivo / ya existe) **antes** de crear nada; con «Crear las
+   válidas», `modo=crear` inserta en una sola transacción (una sentencia para los dispositivos y otra para sus eventos, no N inserciones; el panel manda tandas de 50, D-103), devuelve el mismo informe con las credenciales
+   de las creadas **una sola vez**, y la pantalla ofrece «Descargar credenciales (CSV)» por el ayudante `descargar` de §6 y «Descargar
+   rechazadas» para corregir y volver a subir. Las filas rechazadas no bloquean a las válidas; el informe lo dice. Límite de tasa y de
+   tamaño en `docs/11 §4`.
+3. **Bandeja de detectados (Etapa 4):** ✅ backend, 11/11/2026; `GET /cuarentena/detectados?sitio` agrupa las tramas rechazadas por `no_registrado` de los últimos 7 días
+   por emisor (identificador o tópico), con cuántas y la última; cada fila lleva al asistente con el identificador ya escrito. Es la
+   forma de dar de alta «lo que ya está hablando».
+
+**G. Actividad y quién lo hizo (P14, nueva; HU-11, RF-46, HU-26).**
+1. ✅ backend, 11/11/2026 (columna y su uso en las escrituras; usuarios, aún con su detalle). `evento` gana `usuario_id` (nulo para lo que hace el sistema): toda escritura con sesión lo deja (alta, baja, mantenimiento,
+   umbrales, calibración, credenciales, usuarios), y `GET /dispositivos/{id}` y la ficha muestran «registrado por N». «Registrado por N» solo
+   para administradores: el nombre lo reciben el administrador de ese sitio y el del sistema; los demás perfiles, `usuario: null`
+   (`docs/21 §2`; decidido el 11/11/2026).
+2. **P14 Actividad** (`#/actividad`; administrador de sitio en sus sitios, administrador del sistema en todos): una lista por cursor que
+   mezcla `evento` (con persona y dispositivo) y `acceso` (entradas, salidas y bloqueos de las personas de esos sitios), con filtros por
+   persona, tipo y rango, y texto para personas («cambió los umbrales de Humedad del invernadero»); de
+   `GET /sitios/{id}/actividad?desde&hasta&tipo&usuario&cursor` (Etapa 4). La auditoría por petición HTTP de `docs/10 §8.4` punto 43 sigue
+   siendo de la monitorización (B4) y no se muestra aquí.
+
+**H. P13 Preferencias y mi cuenta (HU-29, RF-56; HU-28).** Tabla `preferencia` (una fila por persona: unidad de temperatura, unidad de
+longitud, zona horaria «la del sitio» o una IANA, tema, tipos de condición con notificación del navegador, vistas guardadas con nombre
+—filtros de P2, rango y resolución de P3— y `actualizado_en`); `GET` y `PUT /preferencias` propias (Etapa 4), con bloqueo optimista; se aplican al
+cargar la sesión (`GET /sesion` las trae) y el panel las guarda de forma optimista (reversible). **Mi cuenta:** nombre, correo, sitios y
+perfiles, **sesiones abiertas** (Etapa 4) con `GET /sesiones` (creada, última actividad, navegador acotado, origen truncado; «cerrar» con
+`DELETE /sesiones/{id}` (Etapa 4); decidido aquí porque la fila faltaba en el backlog y cuesta una tarde), versión de términos aceptada, «Exportar
+mis datos» (JSON por `descargar`) y «Darme de baja» (`docs/20 §11`).
+
+**I. Contrato de la API que este diseño fija** (rutas nuevas o cambiadas; el código por perfil, en `docs/20 §6`). ✅ backend, 11/11/2026: todas salvo `/sitios/{id}/actividad`, `/preferencias` y `/sesiones`; medido en `docs/16 §61`.
+| Ruta | Qué devuelve o hace | Quién |
+|---|---|---|
+| `GET /sitios` | mis sitios con código, nombre, zona horaria, zonas y mi perfil en cada uno (el administrador del sistema, todos) | con sesión (Etapa 4) |
+| `GET /sitios/{id}/resumen?desde&hasta[&intervalo]` | conteos por estado visual, condiciones abiertas por tipo, tramas recibidas y rechazadas por cubo (resolución del rango, o `intervalo` de la lista cerrada; la respuesta la declara en `ventana.intervalo` y el panel rotula con eso; los cubos sin datos no se emiten: no son 0), entrega de los 50 dispositivos con peor entrega en el rango pedido y cuántos activos hay, magnitudes medidas con cuántos canales, «requiere atención» | consulta o más (Etapa 4) |
+| `GET /sitios/{id}/historico?magnitud&desde&hasta&intervalo` | por cubo: promedio, mínimo, máximo, lecturas y n de todos los canales de esa magnitud del sitio; 5 000 cubos y **31 días** (lee todos los canales de la magnitud: 30 días de 120 canales cada 300 s tardan ≈ 1,1 s, `docs/16 §61`; más largo, por canal o exportación) | consulta o más (Etapa 4) |
+| `GET /canales/{id}/historico` | además del promedio, mínimo y máximo por cubo (campos nuevos) | como hoy |
+| `GET /dispositivos/{id}/historico?desde&hasta&intervalo` | todos los canales del dispositivo en una respuesta, alineados por cubo | consulta o más (Etapa 4) |
+| `GET /dispositivos` | filtros `sitio, zona, via, estado, q` (`sitio` y `zona` son ids; el panel traduce el código de su URL con `GET /sitios`), `orden` (`nombre` por defecto, `entrega` de peor a mejor con los nulos al final, o `atencion`: sin señal, alerta, normal, inactivo y dentro por nombre) y paginación `limite, desplazamiento`; `estado_visual` y `entrega` (sobre las últimas 24 h; nulo si el dispositivo no está activo o si en la ventana no cabe una trama esperada completa; 0 % si esperaba y no llegó nada) por fila; total en `X-Total` | como hoy |
+| `GET /dispositivos/{id}/eventos?desde&hasta&cursor` · `GET /condiciones` · `GET /cuarentena` · `GET /sitios/{id}/actividad` | keyset (`docs/10 §8.4` punto 58): el cursor de la página siguiente en la cabecera `X-Siguiente`; el cuerpo sigue siendo la lista; `GET /condiciones` admite además `desde` y `hasta` (las franjas del gráfico de la ficha; con 500 filas el panel avisa que muestra las más recientes) | según la ruta (Etapa 4) |
+| `GET /cuarentena/detectados?sitio` | emisores no registrados de los últimos 7 días: identificador o tópico, cuántas tramas, última | administrador de sitio hoy; operador técnico cuando exista el perfil (Etapa 4) |
+| `PATCH /dispositivos/{id}` | nombre, estado, intervalo esperado, zona; `actualizado_en` obligatorio; 409 si cambió | administrador de sitio hoy; operador técnico cuando exista el perfil (Etapa 4) |
+| `PUT /canales/{id}/reglas` | reemplaza las reglas del canal (alto, bajo, histéresis, retardo); `actualizado_en`; 409 | administrador de sitio hoy; operador técnico cuando exista el perfil (Etapa 4) |
+| `POST /dispositivos/lote?modo=validar\|crear` | informe fila por fila; en `crear`, las credenciales una sola vez | administrador de sitio hoy; operador técnico cuando exista el perfil (Etapa 4) |
+| `GET /preferencias` · `PUT /preferencias` | las propias; bloqueo optimista | con sesión (Etapa 4) |
+| `GET /sesiones` · `DELETE /sesiones/{id}` | las propias | con sesión (Etapa 4) |
+Compatibilidad: ninguna respuesta cambia de forma (los totales y los cursores van en cabeceras; los campos nuevos se suman); el OpenAPI se
+regenera y el paso 4b del guardián suma una fila por ruta y perfil. **Campos** (los nombres son los de las columnas, como en todo el
+panel; el OpenAPI generado es la fuente una vez construido): `/sitios` → `id, codigo, nombre, zona_horaria, rol, zonas[{id, nombre}]`;
+`/sitios/{id}/resumen` → `sitio, ventana{desde, hasta, intervalo}, dispositivos{total, normal, alerta, sin_senal, inactivo}, salud{reportan,
+supervisados, porcentaje}, condiciones_abiertas[{tipo, n}], tramas{recibidas, rechazadas, cubos[{tiempo, recibidas, rechazadas}]},
+atencion[{id, nombre, estado_visual, visto_por_ultima_vez, tipos}], magnitudes[{codigo, nombre, unidad, canales}], entrega[{id, nombre,
+recibidas, esperadas, porcentaje}]` (los 50 peores), `total_activos`; `/sitios/{id}/historico` → la forma de `Historico` más `minimos, maximos, n` y `magnitud, unidad`;
+`/canales/{id}/historico` → `minimos, maximos` además de lo de hoy; `/dispositivos/{id}/historico` → `tiempos, canales[{id, magnitud,
+magnitud_nombre, unidad, valores, minimos, maximos, muestras}]`; cada fila de `/dispositivos` suma `estado_visual` y `entrega`;
+`/dispositivos/{id}/eventos` → `id, tipo, detalle, ocurrido_en, usuario{id, nombre}|null`; `/cuarentena/detectados` → `sitio_codigo, emisor, topico,
+tramas, ultima` (una fila por sitio y emisor); `PATCH /dispositivos/{id}` (Etapa 4) recibe `actualizado_en` y los campos que cambian, y responde la ficha o 409 con el
+`actualizado_en` vigente; `PUT /canales/{id}/reglas` (Etapa 4) recibe `actualizado_en, etiqueta, reglas[{id?, umbral_alto, umbral_bajo, histeresis,
+retardo_s}]` (con `id`, cambia esa regla; sin `id`, una nueva; las que no vienen se quitan: decidido el 11/11/2026); `POST /dispositivos/lote` (Etapa 4) recibe `filas[{id_fisico, nombre, zona, via, formato, intervalo_esperado_s, canales, pasarela}]`
+(el panel convierte el CSV) y responde `validas, rechazadas, existentes, filas[{n, id_fisico, resultado, motivo, id, credencial, topico}]`
+con `resultado` en `valida | creada | rechazada | existe`; `/preferencias` → `unidad_temperatura (C|F), unidad_longitud (mm|m|km),
+zona_horaria (sitio|IANA), tema (sistema|claro|oscuro), notificar[tipos], vistas[{nombre, pantalla, parametros}], sitio_predeterminado,
+actualizado_en`; `/sesiones` → `id, creada_en, ultima_actividad, agente, origen, actual`; `/sitios/{id}/actividad` → `instante, clase
+(evento|acceso), tipo, texto, usuario{id, nombre}|null, dispositivo{id, nombre}|null`.
+
+**J. Pruebas y medición (antes de dar por hecho).** Por el DOM: cada pantalla en los dos sentidos (lo que debe verse y lo que debe
+frenarse); las conversiones de unidad con casos de ida y vuelta; el estado visual del servidor frente al del panel; la validación de
+reglas compartida. Con navegador real (paso 4c, Chromium y Firefox, 390 y 1 280 px): los indicadores suman el inventario; un zoom cambia
+la resolución y la URL; un rango a medida se comparte por enlace; cambiar °C a °F cambia la tarjeta y no la base; un 409 en P6 con dos
+pestañas; un lote con filas rechazadas crea solo las válidas; un detectado llega al asistente con el identificador; las tarjetas en
+teléfono sin desplazamiento horizontal. En `docs/16`: tiempo del resumen y del histórico del sitio con la serie de 30 días del banco
+(como §52), tiempo del lote de 500 filas y el tamaño del paquete del panel antes y después (el tablero no debe duplicarlo).
+
+**K. Orden de construcción (iteración 1).** Primero el contrato (I) en el backend con sus humos y, a la vez, el armazón, los tokens y
+las gráficas del panel contra ese contrato; después P6, P7, P13 y P14; al final el teléfono con capturas y la medición. Lo que no
+alcance se declara con este diseño escrito, nunca a medias.
+
 ## 5. Flujos
 **F1 · Alta y primera trama.** Ya está dibujado en el diagrama de secuencia del alta (`docs/10`, figura del informe): el
 administrador crea el dispositivo (API en la Etapa 3), recibe la credencial una sola vez, configura el nodo, y el panel
@@ -290,7 +491,8 @@ condición y el estado vuelve a «Normal».
 
 **F4 · El canal en vivo se cae.** `EventSource` reintenta solo ante un corte de red, no ante un 503 (cupo lleno) ni un 403.
 El panel envuelve el canal: si recibe 503 o 403, o si pasan 60 s sin latido (el backend manda uno cada 25 s), cierra y vuelve
-a abrir con espera de 1, 2, 4… hasta 30 s, y muestra «en vivo: reconectando» en la cabecera. Al reconectar, repite todo lo
+a abrir con espera de 1, 2, 4… hasta 30 s (la espera vuelve a 1 s con el primer latido o evento recibido, no al abrir la conexión: un
+servidor que acepta y cierra enseguida no provoca una recarga por segundo; corrección del 11/11/2026), y muestra «en vivo: reconectando» en la cabecera. Al reconectar, repite todo lo
 que la pantalla muestra (inventario y condiciones en P2; ficha, condiciones, rechazadas e histórico del rango visible en P3),
 porque pudo perder eventos mientras estuvo caído: el canal no guarda cola.
 
@@ -360,6 +562,11 @@ administrador); la vista pública nunca ofrece exportar (punto 6).
   aunque el canal venga filtrado.
 - **Rendimiento:** el histórico llega agregado (en resolución «auto», entre 60 y 170 puntos según el rango; con una resolución elegida, hasta 2 500); uPlot dibuja; el vivo añade al final; en P2 la tabla se
   recalcula solo con los eventos recibidos, no repidiendo el inventario cada vez.
+- **Sistema visual, tema y teléfono** (11/11/2026): tokens en `app.css` sin colores sueltos en los componentes, tema claro y oscuro por
+  preferencia, colores de series validados en los dos temas y tablas que se vuelven tarjetas bajo 700 px: puntos A2, A3 y A5 del tablero
+  v2 (§4). **Un valor, un estado** (A4): ningún número visible nace de dos cálculos distintos.
+- **Totales y cursores en cabeceras** (11/11/2026): la paginación con total manda `X-Total` y la paginación por cursor `X-Siguiente`; el
+  cuerpo de cada lista sigue siendo la lista. Un campo nuevo se suma a la respuesta; ninguna respuesta cambia de forma (§4 tablero v2, I).
 
 ## 7. Trazabilidad y prueba de cada pantalla
 | Pantalla | Requisitos | Entra en | Cómo se prueba |
@@ -375,7 +582,12 @@ administrador); la vista pública nunca ofrece exportar (punto 6).
 | P11 Legal y acerca de | RF-53, RF-54, RF-61, HU-27, HU-31 | Etapa 4, iteración 0 | Sesión sin aceptar: 403 en una lectura y 200 en las páginas legales; aceptar la normaliza; subir la versión la restringe otra vez (`docs/20 §12`); ningún aviso de terceros falta frente a las dependencias de producción (verificador) |
 | P12 Estado del sistema | RF-59, RF-60, RNF-19, HU-30 | Etapa 4, iteración 1 | Solo el administrador del sistema la ve (403 a los demás, `docs/20 §6`); un error plantado con un correo aparece agrupado y sin el correo; un servicio cerca de su techo abre `memoria_alta`; un límite cambiado con dos ediciones a la vez da 409 a la segunda |
 | P13 Preferencias | RF-55, RF-56, HU-28, HU-29 | Etapa 4, iteración 1 (la baja, en la 0) | Una medición guardada en °C se muestra en °F con su unidad y la base no cambia; la zona propia cambia las horas visibles y el aviso; la baja deja `usuario` sin nombre ni correo (`docs/20 §11`) |
-| P6, P7, P9 | HU-06, HU-11, HU-13, HU-22; RF-50 | Etapa 4 |
+| P1 Tablero v2 | RF-30, HU-07, HU-15, HU-16, TT-44 | Etapa 4, iteración 1 (diseñado el 11/11/2026) | Los indicadores suman el inventario y cambian en vivo con F3; el resumen y el histórico del sitio medidos con la serie de 30 días del banco (como `docs/16 §52`); zoom, rango a medida y varias series con navegador real a 390 y 1 280 px; colores de series validados antes del código (§4 tablero v2, A3) |
+| P2 y P3 v2 | RF-33, RF-47, RF-49, RF-57, HU-07, TT-42 | Etapa 4, iteración 1 | El estado visual del servidor coincide con `estadoVisual()` fila por fila; paginación con total en la cabecera; un zoom cambia la resolución y la URL; banda mín–máx; umbrales y condiciones dibujados; tramas rechazadas agrupadas con «× N»; unidades según la preferencia con ida y vuelta exacta |
+| P6 Configurar | HU-06, HU-13, RF-14 | Etapa 4, iteración 1 | Validación compartida (plantada: bajo ≥ alto falla en los dos lados); 409 con dos pestañas; retardo de activación: una medición fuera de banda menos tiempo que el retardo no abre condición, más tiempo sí; cada guardado deja un `evento` con la persona |
+| P7 Alta, lote y detectados | HU-22, RF-50, HU-11 | Etapa 4, iteración 1 | Credencial una sola vez; `modo=validar` no crea nada; un lote con filas malas crea solo las válidas y el informe lo dice; tope de 500 filas y límite de tasa plantados; un emisor desconocido aparece en detectados y llega al asistente con su identificador |
+| P14 Actividad | RF-46, HU-11, HU-26 | Etapa 4, iteración 1 | Un umbral cambiado aparece con la persona que lo cambió; un administrador de un sitio no ve la actividad de otro (404); un cursor de otro sitio no trae nada |
+| P9 Vista pública | punto 6 | Etapa 4, iteración 2 | Sin cuenta: solo las magnitudes agregadas elegidas; ninguna ruta cruda responde con el token |
 
 La etapa de cada pantalla es la de su historia en `docs/04`; mover una historia de etapa se decide con sus horas y se cambia
 primero allí (y en `docs/18`), nunca aquí. Matriz de acceso ruta × rol (`docs/11 §4`) y las pruebas de 409 con dos ediciones simultáneas |

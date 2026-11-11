@@ -10,11 +10,23 @@ import { CABECERA_CSV, FORMATOS, filaCsv, filaJson, formato, nombreDeArchivo, ra
 
 // Exportaciones simultáneas admitidas por proceso: cada una ocupa una conexión a la base durante toda la descarga.
 export const MAX_EXPORTACIONES = 2;
-import { fecha, uuid } from './validacion.js';
+import { CABECERA_X_SIGUIENTE, CABECERA_X_TOTAL, ISO_8601, INTERVALOS, MAX_CUBOS, MAX_DIAS_VENTANA, fecha, limite, uuid } from './validacion.js';
+import { ORDENES_INVENTARIO, filtroInventario, leerCursor, siguiente } from './tablero.js';
+import { TableroService } from './tablero.service.js';
+import { ventana } from './sitios.controller.js';
 import { AlcanceService } from '../sesion/alcance.service.js';
 import { Usuario } from '../sesion/guardia.js';
-import { alcanceDeLectura } from '../sesion/permisos.js';
+import { alcanceDeLectura, permitir } from '../sesion/permisos.js';
 import type { UsuarioSesion } from '../sesion/permisos.js';
+
+// «Quién hizo el cambio» (evento.usuario_id) es un dato personal (docs/21 §2; decidido el 11/11/2026): el nombre lo ven quienes administran
+// el sitio (la acción `usuarios`: administrador de ese sitio y usuario del sistema); los demás perfiles reciben `usuario: null`.
+export function verAutor(u: UsuarioSesion, sitio: string): boolean {
+  return permitir(u, 'usuarios', sitio) === 'permitido';
+}
+export function conAutor<T extends { usuario: unknown }>(filas: readonly T[], ver: boolean): T[] {
+  return ver ? [...filas] : filas.map((f) => ({ ...f, usuario: null }));
+}
 
 // Lecturas con sesión (docs/20 §6, desde el 08/11/2026): 401 sin sesión; la lista sale filtrada por los sitios del usuario en el WHERE;
 // un dispositivo de otro sitio responde 404, igual que uno inexistente (RF-41); exportar exige rol administrador (403 al de consulta).
@@ -25,13 +37,92 @@ import type { UsuarioSesion } from '../sesion/permisos.js';
 export class DispositivosController {
   private readonly log = new Logger('exportar');
   private exportacionesEnCurso = 0;
-  constructor(private readonly consulta: ConsultaService, private readonly alcance: AlcanceService) {}
+  constructor(private readonly consulta: ConsultaService, private readonly alcance: AlcanceService, private readonly tablero: TableroService) {}
 
   // Inventario con estado: base de la vista "salud del sitio" (HU-19).
   @Get()
-  @ApiOperation({ summary: 'Inventario de dispositivos con estado', description: 'Cada dispositivo de los sitios del usuario con su sitio y zona (nombres, y `sitio_codigo` y `zona_id` para filtrar: los nombres pueden repetirse), zona horaria, canales, `en_linea` (última trama hace menos de 2 × intervalo esperado) y número de condiciones abiertas.' })
-  @ApiOkResponse({ description: 'Lista de dispositivos' })
-  listar(@Usuario() u: UsuarioSesion) { return this.consulta.dispositivos(alcanceDeLectura(u)); }
+  @ApiOperation({
+    summary: 'Inventario de dispositivos con estado',
+    description:
+      'Cada dispositivo de los sitios del usuario con su sitio y zona (nombres, y `sitio_codigo` y `zona_id` para filtrar: los nombres pueden repetirse), zona ' +
+      'horaria, canales, `en_linea` (última trama hace menos de 2 × intervalo esperado), número de condiciones abiertas, `estado_visual` (docs/19 §2: ' +
+      'inactivo, sin_senal, alerta o normal) y `entrega` (% de tramas recibidas sobre las esperadas en las últimas 24 h, acotado a 100; nulo si no hay una ' +
+      'trama esperada completa en la ventana). Filtros opcionales en el servidor (docs/19 §4, C) y, con `limite` o `desplazamiento`, una página; el total ' +
+      'que cumple los filtros va en la cabecera `X-Total` (Etapa 4). Sin parámetros, la lista completa como antes. `entrega` usa siempre una ventana fija de 24 h ' +
+      '(la del resumen del sitio es la del rango pedido); `orden=entrega` ordena de peor a mejor con los nulos al final; `orden=atencion`, por estado visual ' +
+      '(sin señal, alerta, normal, inactivo) y nombre.',
+  })
+  @ApiQuery({ name: 'sitio', required: false, description: 'UUID del sitio' })
+  @ApiQuery({ name: 'zona', required: false, description: 'UUID de la zona' })
+  @ApiQuery({ name: 'via', required: false, enum: ['mqtt', 'http', 'lorawan'] })
+  @ApiQuery({ name: 'estado', required: false, enum: ['inactivo', 'sin_senal', 'alerta', 'normal'], description: 'Estado visual' })
+  @ApiQuery({ name: 'q', required: false, description: 'Busca en id_fisico y nombre, sin distinguir mayúsculas (hasta 80 caracteres)' })
+  @ApiQuery({ name: 'orden', required: false, enum: ORDENES_INVENTARIO, description: 'nombre (por defecto: sitio, zona, nombre), entrega (de peor a mejor, nulos al final) o atencion (sin señal, alerta, normal, inactivo; dentro, por nombre)' })
+  @ApiQuery({ name: 'limite', required: false, description: '1–500; con desplazamiento y sin limite, 50' })
+  @ApiQuery({ name: 'desplazamiento', required: false, description: 'Filas a saltar (0 por defecto)' })
+  @ApiOkResponse({ description: 'Lista de dispositivos; cabecera X-Total con el total que cumple los filtros', headers: { ...CABECERA_X_TOTAL } })
+  @ApiBadRequestResponse({ description: 'Un filtro inválido' })
+  async listar(@Usuario() u: UsuarioSesion, @Query() parametros: Record<string, unknown>, @Res({ passthrough: true }) res: Response) {
+    const r = await this.consulta.inventario(alcanceDeLectura(u), filtroInventario(parametros));
+    res.setHeader('X-Total', String(r.total));
+    return r.filas;
+  }
+
+  // GET /dispositivos/:id/historico — todos los canales del dispositivo en una respuesta, alineados por cubo (docs/19 §4, D2).
+  @Get(':id/historico')
+  @ApiOperation({
+    summary: 'Histórico de todos los canales de un dispositivo (Etapa 4)',
+    description:
+      '`tiempos` (segundos Unix, la unión de los cubos de todos los canales) y `canales[{id, magnitud, magnitud_nombre, unidad, valores, minimos, maximos, muestras}]`, ' +
+      'con null donde un canal no tiene dato en ese cubo (y 0 en `muestras`, las lecturas del cubo). Los cubos sin datos de ningún canal no se emiten (no son 0). time_bucket en la zona del sitio; rango semiabierto; mismos topes que el histórico de un canal ' +
+      `(${MAX_CUBOS} cubos, ${MAX_DIAS_VENTANA} días). Por defecto, las últimas 24 h cada 15 minutos.`,
+  })
+  @ApiParam({ name: 'id', description: 'UUID del dispositivo' })
+  @ApiQuery({ name: 'desde', required: false, description: `${ISO_8601}; por defecto hasta − 24 h` })
+  @ApiQuery({ name: 'hasta', required: false, description: `${ISO_8601}; por defecto ahora` })
+  @ApiQuery({ name: 'intervalo', required: false, enum: INTERVALOS })
+  @ApiOkResponse({ description: 'Series alineadas' })
+  @ApiBadRequestResponse({ description: 'UUID, fecha o intervalo inválidos, o ventana excesiva' })
+  @ApiNotFoundResponse({ description: 'No existe, o es de otro sitio' })
+  async historico(@Usuario() u: UsuarioSesion, @Param('id') id: string, @Query('desde') desde?: string, @Query('hasta') hasta?: string, @Query('intervalo') inter?: string) {
+    const { d, h, i } = ventana(desde, hasta, inter, false);
+    const dispositivoId = uuid(id, 'dispositivo');
+    await this.alcance.exigirDispositivo(u, 'leer', dispositivoId);
+    return this.tablero.historicoDispositivo(dispositivoId, d, h, i);
+  }
+
+  // GET /dispositivos/:id/eventos — historial del dispositivo por cursor (docs/19 §4, D5; docs/10 §8.4 punto 58).
+  @Get(':id/eventos')
+  @ApiOperation({
+    summary: 'Eventos de un dispositivo, por páginas (Etapa 4)',
+    description:
+      '`id, tipo, detalle, ocurrido_en, usuario{id, nombre}|null` (quién lo hizo, si fue una persona: HU-11; el nombre lo reciben solo el administrador de ese ' +
+      'sitio y el del sistema, los demás perfiles reciben `usuario: null`: docs/21 §2), del más reciente al más antiguo, en [desde, hasta) ' +
+      '(por defecto, los últimos 30 días). Página por clave: si hay más, la cabecera `X-Siguiente` trae el cursor que se devuelve tal cual en `cursor`.',
+  })
+  @ApiParam({ name: 'id', description: 'UUID del dispositivo' })
+  @ApiQuery({ name: 'desde', required: false, description: `${ISO_8601}; por defecto hasta − 30 días` })
+  @ApiQuery({ name: 'hasta', required: false, description: `${ISO_8601}; por defecto ahora` })
+  @ApiQuery({ name: 'limite', required: false, description: '1–500, por defecto 50' })
+  @ApiQuery({ name: 'cursor', required: false, description: 'El de la cabecera X-Siguiente de la página anterior' })
+  @ApiOkResponse({ description: 'Lista de eventos; X-Siguiente si hay otra página', headers: { ...CABECERA_X_SIGUIENTE } })
+  @ApiBadRequestResponse({ description: 'UUID, fecha, límite o cursor inválidos' })
+  @ApiNotFoundResponse({ description: 'No existe, o es de otro sitio' })
+  async eventos(
+    @Usuario() u: UsuarioSesion, @Param('id') id: string, @Res({ passthrough: true }) res: Response,
+    @Query('desde') desde?: string, @Query('hasta') hasta?: string, @Query('limite') lim?: string, @Query('cursor') cursor?: string,
+  ) {
+    const h = fecha(hasta, new Date(), 'hasta');
+    const d = fecha(desde, new Date(h.getTime() - 30 * 86_400_000), 'desde');
+    const l = limite(lim);
+    const c = leerCursor(cursor);
+    const dispositivoId = uuid(id, 'dispositivo');
+    const sitio = await this.alcance.exigirDispositivo(u, 'leer', dispositivoId);
+    const filas = await this.tablero.eventosDispositivo(dispositivoId, d, h, l, c);
+    const sig = siguiente(filas, l, (f) => ({ t: f.ocurrido_en, id: f.id }));
+    if (sig !== null) res.setHeader('X-Siguiente', sig);
+    return conAutor(filas, verAutor(u, sitio));
+  }
 
   // Ficha completa: canales, reglas, última medición y condiciones abiertas (HU-21).
   @Get(':id')
@@ -65,8 +156,8 @@ export class DispositivosController {
   })
   @ApiParam({ name: 'id', description: 'UUID del dispositivo' })
   @ApiQuery({ name: 'formato', required: false, enum: FORMATOS, description: 'csv (por defecto) o json' })
-  @ApiQuery({ name: 'desde', required: false, description: 'ISO 8601; por defecto hasta − 30 días' })
-  @ApiQuery({ name: 'hasta', required: false, description: 'ISO 8601; por defecto ahora' })
+  @ApiQuery({ name: 'desde', required: false, description: `${ISO_8601}; por defecto hasta − 30 días` })
+  @ApiQuery({ name: 'hasta', required: false, description: `${ISO_8601}; por defecto ahora` })
   @ApiProduces('text/csv', 'application/json')
   @ApiOkResponse({ description: 'Archivo descargable (Content-Disposition: attachment)' })
   @ApiBadRequestResponse({ description: 'UUID, fecha o formato inválidos' })

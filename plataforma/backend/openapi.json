@@ -557,12 +557,101 @@
     },
     "/dispositivos": {
       "get": {
-        "description": "Cada dispositivo de los sitios del usuario con su sitio y zona (nombres, y `sitio_codigo` y `zona_id` para filtrar: los nombres pueden repetirse), zona horaria, canales, `en_linea` (última trama hace menos de 2 × intervalo esperado) y número de condiciones abiertas.",
+        "description": "Cada dispositivo de los sitios del usuario con su sitio y zona (nombres, y `sitio_codigo` y `zona_id` para filtrar: los nombres pueden repetirse), zona horaria, canales, `en_linea` (última trama hace menos de 2 × intervalo esperado), número de condiciones abiertas, `estado_visual` (docs/19 §2: inactivo, sin_senal, alerta o normal) y `entrega` (% de tramas recibidas sobre las esperadas en las últimas 24 h, acotado a 100; nulo si no hay una trama esperada completa en la ventana). Filtros opcionales en el servidor (docs/19 §4, C) y, con `limite` o `desplazamiento`, una página; el total que cumple los filtros va en la cabecera `X-Total` (Etapa 4). Sin parámetros, la lista completa como antes. `entrega` usa siempre una ventana fija de 24 h (la del resumen del sitio es la del rango pedido); `orden=entrega` ordena de peor a mejor con los nulos al final; `orden=atencion`, por estado visual (sin señal, alerta, normal, inactivo) y nombre.",
         "operationId": "DispositivosController_listar",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "desplazamiento",
+            "required": false,
+            "in": "query",
+            "description": "Filas a saltar (0 por defecto)",
+            "schema": {}
+          },
+          {
+            "name": "limite",
+            "required": false,
+            "in": "query",
+            "description": "1–500; con desplazamiento y sin limite, 50",
+            "schema": {}
+          },
+          {
+            "name": "orden",
+            "required": false,
+            "in": "query",
+            "description": "nombre (por defecto: sitio, zona, nombre), entrega (de peor a mejor, nulos al final) o atencion (sin señal, alerta, normal, inactivo; dentro, por nombre)",
+            "schema": {
+              "enum": [
+                "nombre",
+                "entrega",
+                "atencion"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "q",
+            "required": false,
+            "in": "query",
+            "description": "Busca en id_fisico y nombre, sin distinguir mayúsculas (hasta 80 caracteres)",
+            "schema": {}
+          },
+          {
+            "name": "estado",
+            "required": false,
+            "in": "query",
+            "description": "Estado visual",
+            "schema": {
+              "enum": [
+                "inactivo",
+                "sin_senal",
+                "alerta",
+                "normal"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "via",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "mqtt",
+                "http",
+                "lorawan"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "zona",
+            "required": false,
+            "in": "query",
+            "description": "UUID de la zona",
+            "schema": {}
+          },
+          {
+            "name": "sitio",
+            "required": false,
+            "in": "query",
+            "description": "UUID del sitio",
+            "schema": {}
+          }
+        ],
         "responses": {
           "200": {
-            "description": "Lista de dispositivos"
+            "description": "Lista de dispositivos; cabecera X-Total con el total que cumple los filtros",
+            "headers": {
+              "X-Total": {
+                "description": "Cuántas filas cumplen los filtros (sin la página)",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Un filtro inválido"
           },
           "401": {
             "description": "sesión requerida"
@@ -736,6 +825,164 @@
         ]
       }
     },
+    "/dispositivos/{id}/historico": {
+      "get": {
+        "description": "`tiempos` (segundos Unix, la unión de los cubos de todos los canales) y `canales[{id, magnitud, magnitud_nombre, unidad, valores, minimos, maximos, muestras}]`, con null donde un canal no tiene dato en ese cubo (y 0 en `muestras`, las lecturas del cubo). Los cubos sin datos de ningún canal no se emiten (no son 0). time_bucket en la zona del sitio; rango semiabierto; mismos topes que el histórico de un canal (5000 cubos, 366 días). Por defecto, las últimas 24 h cada 15 minutos.",
+        "operationId": "DispositivosController_historico",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "UUID del dispositivo",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "desde",
+            "required": false,
+            "in": "query",
+            "description": "ISO 8601; una fecha sin hora (AAAA-MM-DD) es las 00:00 UTC, no la medianoche del sitio; por defecto hasta − 24 h",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": false,
+            "in": "query",
+            "description": "ISO 8601; una fecha sin hora (AAAA-MM-DD) es las 00:00 UTC, no la medianoche del sitio; por defecto ahora",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "intervalo",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "1 minute",
+                "5 minutes",
+                "15 minutes",
+                "1 hour",
+                "6 hours",
+                "1 day"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Series alineadas"
+          },
+          "400": {
+            "description": "UUID, fecha o intervalo inválidos, o ventana excesiva"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "404": {
+            "description": "No existe, o es de otro sitio"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Histórico de todos los canales de un dispositivo (Etapa 4)",
+        "tags": [
+          "dispositivos"
+        ]
+      }
+    },
+    "/dispositivos/{id}/eventos": {
+      "get": {
+        "description": "`id, tipo, detalle, ocurrido_en, usuario{id, nombre}|null` (quién lo hizo, si fue una persona: HU-11; el nombre lo reciben solo el administrador de ese sitio y el del sistema, los demás perfiles reciben `usuario: null`: docs/21 §2), del más reciente al más antiguo, en [desde, hasta) (por defecto, los últimos 30 días). Página por clave: si hay más, la cabecera `X-Siguiente` trae el cursor que se devuelve tal cual en `cursor`.",
+        "operationId": "DispositivosController_eventos",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "UUID del dispositivo",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "desde",
+            "required": false,
+            "in": "query",
+            "description": "ISO 8601; una fecha sin hora (AAAA-MM-DD) es las 00:00 UTC, no la medianoche del sitio; por defecto hasta − 30 días",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": false,
+            "in": "query",
+            "description": "ISO 8601; una fecha sin hora (AAAA-MM-DD) es las 00:00 UTC, no la medianoche del sitio; por defecto ahora",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limite",
+            "required": false,
+            "in": "query",
+            "description": "1–500, por defecto 50",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "El de la cabecera X-Siguiente de la página anterior",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de eventos; X-Siguiente si hay otra página",
+            "headers": {
+              "X-Siguiente": {
+                "description": "Cursor opaco de la página siguiente; ausente si no hay más (docs/10 §8.4 punto 58)",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "UUID, fecha, límite o cursor inválidos"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "404": {
+            "description": "No existe, o es de otro sitio"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Eventos de un dispositivo, por páginas (Etapa 4)",
+        "tags": [
+          "dispositivos"
+        ]
+      }
+    },
     "/dispositivos/{id}": {
       "get": {
         "description": "Canales con sus reglas de umbral y última medición, y condiciones abiertas. `intervalo_observado_s` (entero o null): mediana, en segundos, de las diferencias entre los instantes de recepción (truncados al segundo) de las últimas 20 tramas del dispositivo; null con menos de 3 instantes o sin tramas retenidas (RETENCION_TRAMA_DIAS, 30 días por defecto). Informa: la alarma de silencio usa `intervalo_esperado_s`. Por canal: `escala_cero` y `escala_cien` (calibración; null sin ella), `porcentaje` en la última medición, y `actualizado_en` (ISO 8601 UTC con microsegundos), el que se manda tal cual en `PATCH /canales/{id}` (bloqueo optimista).",
@@ -768,6 +1015,95 @@
           }
         ],
         "summary": "Ficha de un dispositivo",
+        "tags": [
+          "dispositivos"
+        ]
+      },
+      "patch": {
+        "description": "Cambia `nombre`, `estado` (activo o mantenimiento; la baja es DELETE), `intervalo_esperado_s` (5–86400) y `zona_id` (otra zona del mismo sitio). `actualizado_en` es obligatorio: el de la ficha, tal cual (microsegundos); si el dispositivo cambió desde entonces, 409 con el vigente y nada se pisa. Deja el evento `dispositivo_configurado` con lo que cambió (antes y después) y quién. Responde la ficha (`GET /dispositivos/{id}`). Validación: 400 con `errores[{campo, motivo}]`.",
+        "operationId": "AltaController_configurar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "UUID del dispositivo",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Clave-Admin",
+            "in": "header",
+            "description": "Sin sesión: la clave de administrador (HTTP_CLAVE_ADMIN), como usuario del sistema (docs/20 §5)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "actualizado_en"
+                ],
+                "properties": {
+                  "actualizado_en": {
+                    "type": "string",
+                    "pattern": "^(?:19|20)\\d{2}-\\d{2}-\\d{2}T(?:[01]\\d|2[0-3]):\\d{2}:\\d{2}(\\.\\d{1,6})?(Z|[+-]\\d{2}:\\d{2})$"
+                  },
+                  "nombre": {
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  "estado": {
+                    "type": "string",
+                    "enum": [
+                      "activo",
+                      "mantenimiento"
+                    ]
+                  },
+                  "intervalo_esperado_s": {
+                    "type": "integer",
+                    "minimum": 5,
+                    "maximum": 86400
+                  },
+                  "zona_id": {
+                    "type": "string",
+                    "format": "uuid"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "La ficha del dispositivo, con su actualizado_en nuevo"
+          },
+          "400": {
+            "description": "Cuerpo inválido: `errores[{campo, motivo}]`"
+          },
+          "403": {
+            "description": "Rol de consulta en ese sitio, o sesión sin la cabecera X-Pedido: panel"
+          },
+          "404": {
+            "description": "No existe, o es de otro sitio"
+          },
+          "409": {
+            "description": "Cambió desde la ficha enviada (`actualizado_en` trae el vigente), o está dado de baja"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Configurar un dispositivo (Etapa 4)",
         "tags": [
           "dispositivos"
         ]
@@ -866,7 +1202,7 @@
             "name": "desde",
             "required": false,
             "in": "query",
-            "description": "ISO 8601; por defecto hasta − 30 días",
+            "description": "ISO 8601; una fecha sin hora (AAAA-MM-DD) es las 00:00 UTC, no la medianoche del sitio; por defecto hasta − 30 días",
             "schema": {
               "type": "string"
             }
@@ -875,7 +1211,7 @@
             "name": "hasta",
             "required": false,
             "in": "query",
-            "description": "ISO 8601; por defecto ahora",
+            "description": "ISO 8601; una fecha sin hora (AAAA-MM-DD) es las 00:00 UTC, no la medianoche del sitio; por defecto ahora",
             "schema": {
               "type": "string"
             }
@@ -911,7 +1247,7 @@
     },
     "/canales/{id}/historico": {
       "get": {
-        "description": "Promedio por intervalo calculado con time_bucket EN LA ZONA HORARIA DEL SITIO. Formato columnar para uPlot: `tiempos` (segundos Unix), `valores`, `muestras` (cuántas lecturas hay detrás de cada promedio). Rango semiabierto [desde, hasta). Por defecto: últimas 24 h cada 15 minutos. Una ventana que daría más de 5000 cubos (ventana ÷ intervalo) se rechaza con 400 antes de consultar (docs/19 §4, incremento 2, punto 4).",
+        "description": "Promedio por intervalo calculado con time_bucket EN LA ZONA HORARIA DEL SITIO. Formato columnar para uPlot: `tiempos` (segundos Unix), `valores` (promedio), `minimos` y `maximos` (Etapa 4), `muestras` (cuántas lecturas hay detrás de cada promedio). Los cubos sin datos no se emiten (no son 0). Rango semiabierto [desde, hasta). Por defecto: últimas 24 h cada 15 minutos. Una ventana que daría más de 5000 cubos (ventana ÷ intervalo) se rechaza con 400 antes de consultar (docs/19 §4, incremento 2, punto 4).",
         "operationId": "CanalesController_historico",
         "parameters": [
           {
@@ -927,7 +1263,7 @@
             "name": "desde",
             "required": false,
             "in": "query",
-            "description": "ISO 8601; por defecto hasta − 24 h",
+            "description": "ISO 8601; una fecha sin hora (AAAA-MM-DD) es las 00:00 UTC, no la medianoche del sitio; por defecto hasta − 24 h",
             "schema": {
               "type": "string"
             }
@@ -936,7 +1272,7 @@
             "name": "hasta",
             "required": false,
             "in": "query",
-            "description": "ISO 8601; por defecto ahora",
+            "description": "ISO 8601; una fecha sin hora (AAAA-MM-DD) es las 00:00 UTC, no la medianoche del sitio; por defecto ahora",
             "schema": {
               "type": "string"
             }
@@ -1019,11 +1355,46 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Página siguiente (Etapa 4): el de la cabecera X-Siguiente, tal cual (docs/10 §8.4 punto 58)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "desde",
+            "required": false,
+            "in": "query",
+            "description": "ISO 8601; una fecha sin hora (AAAA-MM-DD) es las 00:00 UTC, no la medianoche del sitio (Etapa 4): solo las que siguen abiertas o se cerraron desde este instante",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": false,
+            "in": "query",
+            "description": "ISO 8601; una fecha sin hora (AAAA-MM-DD) es las 00:00 UTC, no la medianoche del sitio (Etapa 4): solo las abiertas antes de este instante",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "Lista de condiciones de los sitios del usuario"
+            "description": "Lista de condiciones de los sitios del usuario, de la más reciente a la más antigua; X-Siguiente si hay otra página",
+            "headers": {
+              "X-Siguiente": {
+                "description": "Cursor opaco de la página siguiente; ausente si no hay más (docs/10 §8.4 punto 58)",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "401": {
             "description": "sesión requerida"
@@ -1065,11 +1436,28 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "cursor",
+            "required": false,
+            "in": "query",
+            "description": "Página siguiente (Etapa 4): el de la cabecera X-Siguiente, tal cual (docs/10 §8.4 punto 58)",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "Lista de tramas en cuarentena de los sitios del usuario (por el dispositivo o, si no se identificó, por el sitio del tópico)"
+            "description": "Lista de tramas en cuarentena de los sitios del usuario (por el dispositivo o, si no se identificó, por el sitio del tópico); X-Siguiente si hay otra página",
+            "headers": {
+              "X-Siguiente": {
+                "description": "Cursor opaco de la página siguiente; ausente si no hay más (docs/10 §8.4 punto 58)",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
           },
           "401": {
             "description": "sesión requerida"
@@ -1089,6 +1477,223 @@
         ]
       }
     },
+    "/cuarentena/detectados": {
+      "get": {
+        "description": "Tramas en cuarentena por `no_registrado` sin dispositivo, agrupadas por sitio y emisor (el identificador del tópico directo o el DevEUI tras una pasarela; si el tópico no tiene esa forma, el tópico): `sitio_codigo` (nulo si el tópico no nombra un sitio: solo lo ve el usuario del sistema), `emisor, topico` (el más reciente), `tramas` y `ultima`. Del sitio pedido o, sin `sitio`, de todos donde la persona puede dar de alta.",
+        "operationId": "CuarentenaController_detectados",
+        "parameters": [
+          {
+            "name": "sitio",
+            "required": false,
+            "in": "query",
+            "description": "UUID del sitio",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hasta 200 emisores, el más reciente primero"
+          },
+          "404": {
+            "description": "El sitio no existe o es de otro"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Emisores no registrados de los últimos 7 días (Etapa 4)",
+        "tags": [
+          "cuarentena"
+        ]
+      }
+    },
+    "/sitios": {
+      "get": {
+        "description": "Los sitios activos de la sesión con `id, codigo, nombre, zona_horaria, rol` (el perfil de la persona en ese sitio) y `zonas[{id, nombre}]`. El usuario del sistema ve todos, con rol administrador.",
+        "operationId": "SitiosController_listar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Lista de sitios"
+          },
+          "401": {
+            "description": "sesión requerida"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Mis sitios (Etapa 4)",
+        "tags": [
+          "sitios"
+        ]
+      }
+    },
+    "/sitios/{id}/resumen": {
+      "get": {
+        "description": "Una consulta por petición (docs/10 §8.4 punto 65 iii). `sitio`, `ventana{desde, hasta, intervalo}`, `dispositivos{total, normal, alerta, sin_senal, inactivo}` (estado visual de docs/19 §2), `salud{reportan, supervisados, porcentaje}` (en línea ÷ no inactivos), `condiciones_abiertas[{tipo, n}]`, `tramas{recibidas, rechazadas, cubos[{tiempo, recibidas, rechazadas}]}` (tiempo en segundos Unix, como `tiempos` de los históricos; cubos en la zona del sitio; los cubos sin datos no se emiten: no son 0), `atencion[{id, nombre, estado_visual, visto_por_ultima_vez, tipos}]` (hasta diez, sin señal primero), `magnitudes[{codigo, nombre, unidad, canales}]` y `entrega[{id, nombre, recibidas, esperadas, porcentaje}]`: los 50 dispositivos activos con peor entrega, de peor a mejor, y `total_activos`, cuántos hay (todos, en `GET /dispositivos?orden=entrega`). Porcentaje nulo si no hay una trama esperada completa en la ventana, contada desde su alta y dentro de la retención de tramas (medida desde ahora); 0 % si se esperaban y no llegó ninguna. Sin `intervalo`, el más fino que deja la ventana en 300 cubos o menos.",
+        "operationId": "SitiosController_resumen",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "UUID del sitio",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "desde",
+            "required": false,
+            "in": "query",
+            "description": "ISO 8601; una fecha sin hora (AAAA-MM-DD) es las 00:00 UTC, no la medianoche del sitio; por defecto hasta − 24 h",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": false,
+            "in": "query",
+            "description": "ISO 8601; una fecha sin hora (AAAA-MM-DD) es las 00:00 UTC, no la medianoche del sitio; por defecto ahora",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "intervalo",
+            "required": false,
+            "in": "query",
+            "description": "Resolución de los cubos de tramas; por defecto, según el rango",
+            "schema": {
+              "enum": [
+                "1 minute",
+                "5 minutes",
+                "15 minutes",
+                "1 hour",
+                "6 hours",
+                "1 day"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Resumen del sitio"
+          },
+          "400": {
+            "description": "UUID, fecha o intervalo inválidos, o una ventana de más de 366 días o de más de 5000 cubos"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "404": {
+            "description": "Sitio inexistente o de otro"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Resumen del sitio para el tablero (Etapa 4)",
+        "tags": [
+          "sitios"
+        ]
+      }
+    },
+    "/sitios/{id}/historico": {
+      "get": {
+        "description": "Por cubo (time_bucket en la zona del sitio): `valores` (promedio), `minimos`, `maximos`, `muestras` (lecturas) y `n` (canales que aportan) de todos los canales de esa magnitud del sitio; `dispositivos`, cuántos aportan en la ventana. La forma del histórico de un canal más esos campos, con `magnitud` y `unidad`; sin calibración (`escala` y `porcentajes` nulos). `tiempos` en segundos Unix; los cubos sin datos no se emiten (no son 0). Topes: 5000 cubos y 31 días (menos que los 366 de un canal: lee todos los canales de la magnitud; medido en docs/16 §61).",
+        "operationId": "SitiosController_historico",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "UUID del sitio",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "magnitud",
+            "required": true,
+            "in": "query",
+            "description": "Código del catálogo (temperatura, humedad, …)",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "desde",
+            "required": false,
+            "in": "query",
+            "description": "ISO 8601; una fecha sin hora (AAAA-MM-DD) es las 00:00 UTC, no la medianoche del sitio; por defecto hasta − 24 h",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": false,
+            "in": "query",
+            "description": "ISO 8601; una fecha sin hora (AAAA-MM-DD) es las 00:00 UTC, no la medianoche del sitio; por defecto ahora",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "intervalo",
+            "required": false,
+            "in": "query",
+            "description": "Por defecto 15 minutes",
+            "schema": {
+              "enum": [
+                "1 minute",
+                "5 minutes",
+                "15 minutes",
+                "1 hour",
+                "6 hours",
+                "1 day"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Serie agregada del sitio"
+          },
+          "400": {
+            "description": "UUID, fecha, intervalo o magnitud inválidos, o una ventana de más de 31 días o de más de 5000 cubos"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "404": {
+            "description": "Sitio inexistente o de otro"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Histórico de una magnitud en todo el sitio (Etapa 4)",
+        "tags": [
+          "sitios"
+        ]
+      }
+    },
     "/salud": {
       "get": {
         "operationId": "SaludController_estado",
@@ -1101,6 +1706,64 @@
         "summary": "Estado del servicio, de su conexión a la base y de la cola del broker",
         "tags": [
           "salud"
+        ]
+      }
+    },
+    "/dispositivos/lote": {
+      "post": {
+        "description": "Recibe `filas[{id_fisico, nombre, zona, via, formato, intervalo_esperado_s, canales, pasarela}]` (el panel convierte el CSV; `zona` es el nombre o el UUID de una zona de un sitio donde la persona puede dar de alta; `canales` como «magnitud:unidad;magnitud:unidad», con la unidad canónica del catálogo; `pasarela`, su id_fisico o UUID, solo en la vía lorawan). Cada fila pasa por la misma validación del alta de a uno. Responde `validas, rechazadas, existentes` y `filas[{n, id_fisico, resultado, motivo, id, credencial, topico}]`, con `n` la fila del archivo (la 1 es la cabecera) y `resultado` en `valida | creada | rechazada | existe` (un id_fisico ya dado de alta, activo o no: `existe` con su id; reactivarlo es de su ficha). Con `modo=crear`, las válidas se crean en una transacción con dos sentencias (dispositivos, canales y credenciales; eventos), no N inserciones, y las credenciales vienen UNA sola vez. Hasta 500 filas (más: 413), 10 lotes por minuto por persona (429) y una creación por lote a la vez (409). Un id_fisico que ya usa un dispositivo o una pasarela de otro sitio se rechaza como «identificador no disponible», sin id ni estado (RF-41). **Tiempo:** cada credencial cuesta un resumen scrypt; una creación de 500 filas tarda ≈ 70 s (docs/16 §61) y detrás de un proxy puede cortarse antes de responder, y las credenciales se muestran una sola vez: el cliente debe validar el archivo entero y crear en tandas de 50 filas (≈ 7 s cada una), como hace el panel.",
+        "operationId": "AltaController_lote",
+        "parameters": [
+          {
+            "name": "modo",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "enum": [
+                "validar",
+                "crear"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Clave-Admin",
+            "in": "header",
+            "description": "Sin sesión: la clave de administrador (HTTP_CLAVE_ADMIN), como usuario del sistema (docs/20 §5)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Informe fila por fila"
+          },
+          "400": {
+            "description": "Modo o cuerpo inválidos"
+          },
+          "403": {
+            "description": "Sin ningún sitio donde dar de alta, o sesión sin la cabecera X-Pedido: panel"
+          },
+          "409": {
+            "description": "Otra creación por lote en curso"
+          },
+          "413": {
+            "description": "Más de 500 filas"
+          },
+          "429": {
+            "description": "Límite de tasa del lote"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Alta por lote: validar o crear (Etapa 4)",
+        "tags": [
+          "dispositivos"
         ]
       }
     },
@@ -1370,6 +2033,129 @@
         "summary": "Rotar la credencial de una pasarela",
         "tags": [
           "pasarelas"
+        ]
+      }
+    },
+    "/canales/{id}/reglas": {
+      "put": {
+        "description": "Recibe `actualizado_en` (el del canal en la ficha, tal cual), `etiqueta` (hasta 40 caracteres o null) y `reglas[{id?, umbral_alto, umbral_bajo, histeresis, retardo_s}]` (0 a 4; vacía quita todas) y REEMPLAZA las del canal, emparejadas por `id`: con `id` (el de la ficha) cambia esa regla y su condición abierta sigue con ella; sin `id`, una regla nueva; las guardadas que no vienen se quitan (un `id` que no es de este canal: 400). Por regla: al menos un umbral; bajo < alto; histéresis ≥ 0 y menor que la mitad de la banda; umbrales dentro del rango físico de la magnitud; `retardo_s` entero de 0 a 86400: la condición se abre cuando la medición lleva al menos ese tiempo fuera de la banda (RF-14). 400 con `errores[{campo, motivo}]`; 409 si el canal cambió (también por una calibración), con el `actualizado_en` vigente. Una regla quitada cierra su condición abierta. Deja el evento `reglas_cambiadas` (antes y después) con quién. Responde el canal con sus reglas y el `actualizado_en` nuevo.",
+        "operationId": "CanalesAdminController_reglas",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "UUID del canal",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Clave-Admin",
+            "in": "header",
+            "description": "Sin sesión: la clave de administrador (HTTP_CLAVE_ADMIN), como usuario del sistema (docs/20 §5)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "actualizado_en",
+                  "reglas"
+                ],
+                "properties": {
+                  "actualizado_en": {
+                    "type": "string",
+                    "pattern": "^(?:19|20)\\d{2}-\\d{2}-\\d{2}T(?:[01]\\d|2[0-3]):\\d{2}:\\d{2}(\\.\\d{1,6})?(Z|[+-]\\d{2}:\\d{2})$"
+                  },
+                  "etiqueta": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 40
+                  },
+                  "reglas": {
+                    "type": "array",
+                    "maxItems": 4,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "description": "La regla guardada que se cambia; sin id, una regla nueva"
+                        },
+                        "umbral_alto": {
+                          "type": "number",
+                          "nullable": true
+                        },
+                        "umbral_bajo": {
+                          "type": "number",
+                          "nullable": true
+                        },
+                        "histeresis": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "retardo_s": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 86400
+                        }
+                      }
+                    }
+                  }
+                },
+                "example": {
+                  "actualizado_en": "2026-11-11T18:04:31.123456Z",
+                  "etiqueta": null,
+                  "reglas": [
+                    {
+                      "umbral_alto": 30,
+                      "umbral_bajo": 5,
+                      "histeresis": 1,
+                      "retardo_s": 120
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "El canal con sus reglas vigentes y su actualizado_en nuevo"
+          },
+          "400": {
+            "description": "UUID inválido o reglas inválidas: `errores[{campo, motivo}]`"
+          },
+          "401": {
+            "description": "Sin sesión ni X-Clave-Admin"
+          },
+          "403": {
+            "description": "Rol de consulta en ese sitio, o sesión sin la cabecera X-Pedido: panel"
+          },
+          "404": {
+            "description": "El canal no existe, o es de otro sitio"
+          },
+          "409": {
+            "description": "El canal cambió desde la ficha enviada; `actualizado_en` trae el vigente"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Reemplazar las reglas de umbral de un canal (Etapa 4)",
+        "tags": [
+          "canales"
         ]
       }
     },

@@ -99,9 +99,10 @@ describe('abrirCanal (docs/19 F4)', () => {
     vi.advanceTimersByTime(2000);
     expect(creadas).toHaveLength(3); // tercero, a los 2 s
     creadas[2]!.abrir();
+    creadas[2]!.emitir('latido', { tiempo: 't' });
     creadas[2]!.fallarCerrado();
     vi.advanceTimersByTime(1000);
-    expect(creadas).toHaveLength(4); // tras abrir bien, la espera vuelve a 1 s
+    expect(creadas).toHaveLength(4); // tras abrir bien y recibir algo, la espera vuelve a 1 s
     c.cerrar();
   });
 
@@ -147,8 +148,30 @@ describe('abrirCanal (docs/19 F4)', () => {
     expect(preguntas).toHaveLength(1);
     vi.advanceTimersByTime(4000);
     creadas[3]!.abrir();
+    creadas[3]!.emitir('latido', { tiempo: 't' });
     creadas[3]!.fallarCerrado();
     expect(preguntas).toHaveLength(2);
+    c.cerrar();
+  });
+
+  it('un servidor que acepta el flujo y lo cierra enseguida, sin mandar nada: la espera sigue creciendo (1, 2, 4… s), no una recarga por segundo', () => {
+    const estados: string[] = [];
+    const preguntas: number[] = [];
+    const c = abrirCanal('/eventos', () => undefined, (s, m) => estados.push(m === undefined ? s : `${s}:${m}`), crear, () => preguntas.push(1));
+    const esperas: number[] = [];
+    let t = 0;
+    for (let i = 0; i < 5; i++) {
+      creadas[i]!.abrir();
+      creadas[i]!.fallarCerrado(); // abre y cierra sin un latido
+      let n = 0;
+      while (creadas.length === i + 1) { vi.advanceTimersByTime(1000); n += 1000; }
+      esperas.push(n);
+      t += n;
+    }
+    expect(esperas).toEqual([1000, 2000, 4000, 8000, 16_000]);
+    expect(estados.filter((s) => s === `en_vivo:${RECONECTADO}`)).toHaveLength(4); // cuatro recargas en 31 s, no 31
+    expect(t).toBe(31_000);
+    expect(preguntas).toHaveLength(1); // y la sesión se pregunta una sola vez
     c.cerrar();
   });
 

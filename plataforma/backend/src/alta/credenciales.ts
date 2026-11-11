@@ -27,6 +27,19 @@ export async function hashScrypt(secreto: string, sal: Buffer = randomBytes(16),
   return `scrypt$${N}$${PARAMETROS.r}$${PARAMETROS.p}$${sal.toString('base64')}$${clave.toString('base64')}`;
 }
 
+// Los resúmenes de un lote, en tandas (docs/16 §61): el pool de hilos de Node tiene 4 hilos y lo comparten la verificación de las
+// credenciales de recepción y de las claves de las personas. Con 500 scrypt a la vez, uno de recepción o de sesión esperaba detrás de
+// todos (≈ 70 s medidos; un alta individual a la vez superó su idle_in_transaction de 15 s y tumbó el proceso). En tandas de TANDA_SCRYPT,
+// lo que llega entre tanda y tanda espera a lo más una tanda. null pasa como null (vía lorawan: sin credencial propia).
+export const TANDA_SCRYPT = 4;
+export async function hashesEnTandas(secretos: readonly (string | null)[], tanda = TANDA_SCRYPT, resumir: (s: string) => Promise<string> = hashScrypt): Promise<(string | null)[]> {
+  const salida: (string | null)[] = [];
+  for (let i = 0; i < secretos.length; i += tanda) {
+    salida.push(...(await Promise.all(secretos.slice(i, i + tanda).map((k) => (k === null ? Promise.resolve(null) : resumir(k))))));
+  }
+  return salida;
+}
+
 // Un hash con otra forma, degenerado (sal o clave cortas: dos vacíos serían «iguales») o con parámetros fuera de lo que se
 // escribe aquí no verifica nada: devuelve false, nunca lanza.
 export async function verificarScrypt(secreto: string, hash: string): Promise<boolean> {

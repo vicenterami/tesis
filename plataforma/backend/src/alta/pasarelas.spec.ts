@@ -33,7 +33,7 @@ function armar(opciones: { sitio?: { codigo: string; activo: boolean } | null; f
       if (texto.startsWith('INSERT INTO evento')) return { rows: [{ ocurrido_en: new Date('2026-10-15T23:05:00Z') }], rowCount: 1 };
       return { rows: [], rowCount: 1 };
     },
-    release: vi.fn(),
+    release: vi.fn(), on: vi.fn(), off: vi.fn(),
   };
   const ordenes: OrdenDynsec[][] = [];
   const dynsec = {
@@ -73,7 +73,7 @@ describe('AltaService: pasarelas (rutas B y C)', () => {
       event_topic: 'sitio/uct/pasarela/chirpstack-campus/{{dev_eui}}/{{event}}',
       command_topic: 'sitio/uct/pasarela/chirpstack-campus/{{dev_eui}}/command/{{command}}',
     });
-    expect(JSON.parse(params[i('INSERT INTO evento')][1] as string)).toMatchObject({ pasarela_id: P, formato: 'chirpstack' });
+    expect(JSON.parse(params[i('INSERT INTO evento')][2] as string)).toMatchObject({ pasarela_id: P, formato: 'chirpstack' });
   });
   it('alta milesight: la plantilla es el uplink con $deveui (minúsculas: lo que la UG65 sustituye), y la línea del puente de Mosquitto para el tópico nativo (16/10)', async () => {
     const r = await armar().servicio.crearPasarela(validarPasarela({ ...cuerpo, id_fisico: 'ug63-campus', formato: 'milesight' }));

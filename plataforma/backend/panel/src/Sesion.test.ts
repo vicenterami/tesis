@@ -2,7 +2,9 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DispositivoInventario } from './lib/modelo';
+import { marcadosParaComparar, recordarMarcados } from './lib/comparar';
 import { TEXTO_CREDENCIALES } from './lib/sesion';
+import { inventarioSimulado } from './servidor-simulado';
 
 // P10 de punta a punta en el DOM (docs/19 §4 y §6; docs/20 §3 y §4), contra un backend falso con estado: sin sesión → «Entrar»; con la
 // temporal → cambio obligatorio; dentro → inventario y quién soy; la sesión que vence → «Entrar» con la ruta guardada y vuelta a ella;
@@ -47,7 +49,9 @@ function backend(ruta: string, init: RequestInit = {}): Response {
     return json({ usuario: { id: 'u1', nombre: 'Ana', email: 'ana@ejemplo.invalid', clave_temporal: false }, expira_en: '2026-11-08T23:00:00Z' });
   }
   if (srv.sesion === 'temporal') return json({ statusCode: 403, message: 'debes cambiar la clave temporal antes de seguir (POST /sesion/clave)' }, 403);
-  if (ruta === '/dispositivos') return json(inventario);
+  const inv = inventarioSimulado(ruta, inventario, [], AHORA);
+  if (inv !== null) return inv;
+  if (ruta === '/sitios') return json([{ id: 's1', codigo: 'uct', nombre: 'Campus', zona_horaria: 'America/Santiago', rol: srv.rol, zonas: [{ id: 'z', nombre: 'Lab' }] }]);
   if (ruta.startsWith('/condiciones?')) return json([]);
   if (ruta === '/usuarios') return json([]);
   return json({ statusCode: 404, message: 'no encontrado' }, 404);
@@ -73,7 +77,7 @@ beforeEach(() => {
   vi.useFakeTimers({ now: AHORA, toFake: ['Date'] });
   vi.stubGlobal('EventSource', Fuente);
   vi.stubGlobal('fetch', vi.fn(async (ruta: string, init?: RequestInit) => backend(ruta, init)));
-  history.replaceState(null, '', '#/');
+  history.replaceState(null, '', '#/inventario'); // estas pruebas miran el inventario; la llegada al tablero, App.test.ts
 });
 afterEach(() => {
   cleanup();
@@ -166,19 +170,21 @@ describe('P10: entrar, clave temporal, quién soy', () => {
 
 describe('P10: vencer, renovar y salir', () => {
   it('la sesión vence (401 en una petición): «Entrar» con aviso, el canal en vivo se cierra; al entrar, vuelve a la ruta guardada y reabre el canal', async () => {
-    history.replaceState(null, '', '#/?via=http');
+    history.replaceState(null, '', '#/inventario?via=http');
     await dentro(2);
     expect(abiertas()).toHaveLength(1);
+    recordarMarcados(['00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000002']);
     srv.sesion = 'ninguna'; // venció en el servidor
     vi.setSystemTime(new Date(AHORA.getTime() + 6 * 60_000));
     await fireEvent.keyDown(window, { key: 'a' }); // interacción → renovación → 401
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Entrar' })).toBeTruthy());
     expect(document.body.textContent).toContain('Tu sesión venció o se cerró: entra de nuevo para seguir donde estabas.');
     expect(abiertas()).toHaveLength(0);
+    expect(marcadosParaComparar()).toEqual([]); // las casillas «comparar» no pasan a quien entre después
     history.replaceState(null, '', '#/usuarios'); // la URL cambió mientras tanto: manda la ruta guardada
     window.dispatchEvent(new HashChangeEvent('hashchange'));
     await entrarCon(srv.clave);
-    await waitFor(() => expect(window.location.hash).toBe('#/?via=http'));
+    await waitFor(() => expect(window.location.hash).toBe('#/inventario?via=http'));
     await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(2)); // el filtro de la ruta guardada: solo la de vía http
     expect(abiertas()).toHaveLength(1);
   });
@@ -207,17 +213,21 @@ describe('P10: vencer, renovar y salir', () => {
     expect(abiertas()).toHaveLength(0); // las pantallas (y sus canales) se desmontan mientras tanto
   });
 
-  it('salir: DELETE /sesion con X-Pedido, «Entrar», el canal cerrado y el panel vuelto al inventario; «cerrar en todos lados» manda ?todas=true', async () => {
-    history.replaceState(null, '', '#/?via=http');
+  it('salir: DELETE /sesion con X-Pedido, «Entrar», el canal cerrado y el panel vuelto al tablero; «cerrar en todos lados» manda ?todas=true', async () => {
+    history.replaceState(null, '', '#/inventario?via=http');
     await dentro(2);
+    recordarMarcados(['00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000002']);
+    expect(marcadosParaComparar()).toHaveLength(2); // en los dos sentidos: con sesión, se recuerdan
     await fireEvent.click(screen.getByRole('button', { name: 'Salir' }));
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Entrar' })).toBeTruthy());
     expect(pedidos.find((p) => p.metodo === 'DELETE')).toMatchObject({ ruta: '/sesion', pedido: 'panel' });
     expect(document.body.textContent).toContain('Cerraste la sesión.');
     expect(abiertas()).toHaveLength(0);
     expect(window.location.hash).toBe('#/'); // la próxima persona no hereda la pantalla ni los filtros de la anterior
+    expect(marcadosParaComparar()).toEqual([]); // ni sus casillas «comparar»
     cleanup();
     pedidos.length = 0;
+    history.replaceState(null, '', '#/inventario');
     await dentro();
     await fireEvent.click(screen.getByRole('button', { name: 'Cerrar en todos lados' }));
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Entrar' })).toBeTruthy());

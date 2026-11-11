@@ -13,6 +13,8 @@ export const FRASES: Readonly<Record<string, Frase>> = {
   exportar: { puede: 'exporta las mediciones crudas', noPuede: 'no exporta' },
   escribir: { puede: 'da de alta, da de baja y configura dispositivos, pasarelas y calibraciones', noPuede: 'no cambia nada' },
   usuarios: { puede: 'da de alta personas y les asigna su rol en sus sitios', noPuede: 'no administra personas' },
+  // Desde el tablero v2 (docs/19 §4, E; servidor: PATCH /dispositivos/{id} y PUT /canales/{id}/reglas).
+  configurar: { puede: 'configura nombre, estado, intervalo, zona y umbrales de los dispositivos', noPuede: 'no configura dispositivos ni umbrales' },
 };
 
 const NOMBRE_ROL: Readonly<Record<string, string>> = { administrador: 'Administrador', consulta: 'Consulta' };

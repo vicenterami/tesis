@@ -45,6 +45,7 @@ estado de cada dispositivo y panel de control. Caso de validación: Campus Dr. L
 | Panel: pantallas, flujos y reglas de presentación | [`docs/19-panel-pantallas-y-flujos.md`](docs/19-panel-pantallas-y-flujos.md) |
 | Sesión, usuarios, perfiles y permisos | [`docs/20-sesion-usuarios-y-permisos.md`](docs/20-sesion-usuarios-y-permisos.md) |
 | Datos personales y terceros: inventario, cookies, permisos y base de las páginas legales | [`docs/21-datos-personales-y-terceros.md`](docs/21-datos-personales-y-terceros.md) |
+| Comparativa de tableros: referentes y normas de accesibilidad, con citas | [`docs/22-comparativa-tableros-y-normas.md`](docs/22-comparativa-tableros-y-normas.md) |
 | Cómo levantar, probar y verificar la plataforma | [`plataforma/README.md`](plataforma/README.md) |
 | Glosario vigente (términos del informe) | [`informe-oficial/glosario.tex`](informe-oficial/glosario.tex) |
 | Preguntas al profesor guía y guion de entrevistas | [`docs/03-instrumentos-levantamiento.md`](docs/03-instrumentos-levantamiento.md) |

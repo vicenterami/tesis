@@ -93,7 +93,10 @@ for (const caso of casos) {
   });
 
   await paso(`${etiqueta}: inventario y quién soy`, async () => {
-    await p.locator(`tr[data-id="${dispositivo}"]`).waitFor({ timeout: 15000 });
+    // Desde el tablero v2 (docs/19 §4, A1) la llegada es el tablero; el inventario vive en #/inventario y bajo 700 px es una lista de
+    // tarjetas: la fila se busca por su data-id, sea fila de tabla o tarjeta.
+    await p.evaluate(() => { location.hash = '#/inventario'; });
+    await p.locator(`[data-id="${dispositivo}"]`).waitFor({ timeout: 15000 });
     ok(`${etiqueta}: tras cambiar la clave, el inventario muestra el dispositivo de prueba`);
     comprobar((await p.locator('[data-quien-nombre]').textContent()) === caso.nombre, `${etiqueta}: la cabecera dice quién soy (${caso.nombre})`);
     comprobar((await p.locator('[data-quien-sitios]').textContent()).includes('(administrador)'), `${etiqueta}: … con su sitio y su rol`);
@@ -104,7 +107,7 @@ for (const caso of casos) {
   });
 
   await paso(`${etiqueta}: ficha y exportar`, async () => {
-    await p.locator(`tr[data-id="${dispositivo}"] a`).click();
+    await p.locator(`[data-id="${dispositivo}"] a`).click();
     const boton = p.getByRole('button', { name: 'Descargar CSV de este rango' });
     await boton.waitFor({ timeout: 15000 });
     const [descarga] = await Promise.all([p.waitForEvent('download', { timeout: 15000 }), boton.click()]);
@@ -171,7 +174,8 @@ for (const caso of casos) {
     await paso(`${etiqueta}: consulta`, async () => {
       await entrar(p, caso.consulta.email, caso.consulta.temporal);
       await elegirClave(p, caso.consulta.nueva);
-      await p.locator(`tr[data-id="${dispositivo}"] a`).click();
+      await p.evaluate(() => { location.hash = '#/inventario'; });
+      await p.locator(`[data-id="${dispositivo}"] a`).click();
       const boton = p.getByRole('button', { name: 'Descargar CSV de este rango' });
       await boton.waitFor({ timeout: 15000 });
       comprobar(await boton.isDisabled(), `${etiqueta}: consulta ve «Descargar CSV» desactivado`);

@@ -11,6 +11,7 @@ erDiagram
     zona ||--o{ dispositivo : dispositivo
     dispositivo ||--o{ estado_dispositivo : estado_dispositivo
     dispositivo ||--o{ evento : evento
+    usuario ||--o{ evento : evento
     canal ||--o{ medicion : medicion
     sitio ||--o{ pasarela : pasarela
     canal ||--o{ regla_umbral : regla_umbral
@@ -101,6 +102,7 @@ erDiagram
         text tipo
         jsonb detalle
         timestamptz ocurrido_en
+        uuid usuario_id FK
     }
     magnitud {
         text codigo PK
@@ -144,6 +146,8 @@ erDiagram
         float umbral_bajo
         float histeresis
         timestamptz actualizado_en
+        int retardo_s
+        timestamptz fuera_de_banda_desde
     }
     sesion {
         text id PK

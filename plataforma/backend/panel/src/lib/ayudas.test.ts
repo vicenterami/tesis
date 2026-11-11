@@ -3,22 +3,22 @@ import { describe, expect, it } from 'vitest';
 import fuentePermisos from '../../../src/sesion/permisos.ts?raw';
 import { FRASES, accionesDe, ayudaDeRol, guiaDePerfiles } from './ayudas';
 
-const MATRIZ = { administrador: ['leer', 'exportar', 'escribir', 'usuarios'], consulta: ['leer'] };
+const MATRIZ = { administrador: ['leer', 'exportar', 'escribir', 'usuarios', 'configurar'], consulta: ['leer'] };
 
 // Guía de perfiles derivada de la matriz (docs/19 §6; docs/20 §6): el texto de cada rol sale de sus acciones, no de una frase aparte.
 describe('ayudaDeRol y guiaDePerfiles', () => {
   it('con la matriz de hoy: consulta ve y no exporta ni cambia nada; administrador puede todo', () => {
     expect(ayudaDeRol('consulta', MATRIZ)).toBe(
-      'Consulta: ve dispositivos, históricos, condiciones y cuarentena de sus sitios; no exporta, no cambia nada ni administra personas.',
+      'Consulta: ve dispositivos, históricos, condiciones y cuarentena de sus sitios; no exporta, no cambia nada, no administra personas ni configura dispositivos ni umbrales.',
     );
     expect(ayudaDeRol('administrador', MATRIZ)).toBe(
-      'Administrador: ve dispositivos, históricos, condiciones y cuarentena de sus sitios, exporta las mediciones crudas, da de alta, da de baja y configura dispositivos, pasarelas y calibraciones y da de alta personas y les asigna su rol en sus sitios.',
+      'Administrador: ve dispositivos, históricos, condiciones y cuarentena de sus sitios, exporta las mediciones crudas, da de alta, da de baja y configura dispositivos, pasarelas y calibraciones, da de alta personas y les asigna su rol en sus sitios y configura nombre, estado, intervalo, zona y umbrales de los dispositivos.',
     );
     expect(guiaDePerfiles(MATRIZ).map((g) => g.rol)).toEqual(['administrador', 'consulta']);
   });
   it('si la matriz cambia, la ayuda cambia sola: con «exportar» para consulta, la guía lo dice y deja de negarlo', () => {
     const otra = { ...MATRIZ, consulta: ['leer', 'exportar'] };
-    expect(ayudaDeRol('consulta', otra)).toBe('Consulta: ve dispositivos, históricos, condiciones y cuarentena de sus sitios y exporta las mediciones crudas; no cambia nada ni administra personas.');
+    expect(ayudaDeRol('consulta', otra)).toBe('Consulta: ve dispositivos, históricos, condiciones y cuarentena de sus sitios y exporta las mediciones crudas; no cambia nada, no administra personas ni configura dispositivos ni umbrales.');
   });
   it('una acción que el diccionario no conoce se nombra tal cual (nunca se calla) y un rol sin acciones lo dice', () => {
     expect(ayudaDeRol('administrador', { administrador: ['leer', 'auditar'], consulta: [] })).toContain('puede «auditar»');

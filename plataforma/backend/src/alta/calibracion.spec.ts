@@ -3,6 +3,7 @@ import { BadRequestException, ConflictException, ForbiddenException, NotFoundExc
 import { GUARDS_METADATA } from '@nestjs/common/constants.js';
 import type { Pool } from 'pg';
 import type { DynsecService } from '../broker/dynsec.service.js';
+import type { ConfiguracionService } from './configuracion.service.js';
 import { AltaService } from './alta.service.js';
 import { validarCalibracion } from './calibracion.dto.js';
 import { CanalesAdminController } from './canales.controller.js';
@@ -66,7 +67,7 @@ function armar(opciones: { existe?: boolean; vigente?: string; antes?: { cero: n
       }
       return { rows: [], rowCount: 1 };
     },
-    release: vi.fn(),
+    release: vi.fn(), on: vi.fn(), off: vi.fn(),
   };
   const pool = { connect: () => Promise.resolve(cliente) } as unknown as Pool;
   return { servicio: new AltaService(pool, { disponible: true } as unknown as DynsecService), sql, params, cliente };
@@ -130,7 +131,7 @@ describe('AltaService.calibrar: bloqueo optimista, evento y respuesta (docs/10 Â
     expect(Reflect.getMetadata(GUARDS_METADATA, CanalesAdminController)).toBeUndefined(); // ya no lleva guardia propia: la global (APP_GUARD)
     const llamado = vi.fn();
     const exigirCanal = vi.fn(() => Promise.resolve());
-    const ctl = new CanalesAdminController({ calibrar: llamado } as unknown as AltaService, { exigirCanal } as unknown as AlcanceService);
+    const ctl = new CanalesAdminController({ calibrar: llamado } as unknown as AltaService, { exigirCanal } as unknown as AlcanceService, {} as unknown as ConfiguracionService);
     const consulta: UsuarioSesion = { ...usuarioSistema(), id: 'u1', sistema: false, todos: false, sitios: new Map([['s1', 'consulta']]) };
     await expect(ctl.calibrar(consulta, 'no-es-uuid', { escala_cero: 1, escala_cien: 2, actualizado_en: VIEJO })).rejects.toBeInstanceOf(ForbiddenException);
     await expect(ctl.calibrar(usuarioSistema(), 'no-es-uuid', { escala_cero: 1, escala_cien: 2, actualizado_en: VIEJO })).rejects.toBeInstanceOf(BadRequestException);

@@ -53,6 +53,18 @@ DO $$ BEGIN
     GRANT UPDATE (ultima_actividad, revocada_en) ON sesion TO plataforma_app;
   END IF;
 END $$;
+-- Desde la migración 23, las reglas de umbral por API (PUT /canales/{id}/reglas) y el retardo de activación del filtro alertar: INSERT en
+-- regla_umbral, UPDATE de sus columnas configurables y de fuera_de_banda_desde, UPDATE de canal.etiqueta y la función acotada que borra
+-- reglas. Nacen después de esta: aquí se repiten solo si ya existen.
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'fn_quitar_reglas')
+     AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'regla_umbral' AND column_name = 'retardo_s') THEN
+    GRANT EXECUTE ON FUNCTION fn_quitar_reglas(uuid, uuid[]) TO plataforma_app;
+    GRANT INSERT ON regla_umbral TO plataforma_app;
+    GRANT UPDATE (umbral_alto, umbral_bajo, histeresis, retardo_s, fuera_de_banda_desde) ON regla_umbral TO plataforma_app;
+    GRANT UPDATE (etiqueta) ON canal TO plataforma_app;
+  END IF;
+END $$;
 ALTER DEFAULT PRIVILEGES FOR ROLE plataforma IN SCHEMA public REVOKE INSERT, UPDATE ON TABLES FROM plataforma_app;
 ALTER DEFAULT PRIVILEGES FOR ROLE plataforma IN SCHEMA public GRANT SELECT ON TABLES TO plataforma_app;
 

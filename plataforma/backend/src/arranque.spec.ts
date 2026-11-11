@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  claveApp, AvisosAcotados, claveAdmin, horasClaveTemporal, claveOpcional, HOSTS_LOCALES, hostsPermitidos, interfazDeEscucha, nombreDeHost, rechazoDeHost, registrosEnJson, rutaSinCache, servirDocumentacion } from './arranque.js';
+  claveApp, AvisosAcotados, claveAdmin, horasClaveTemporal, claveOpcional, HOSTS_LOCALES, hostsPermitidos, interfazDeEscucha, nombreDeHost, rechazoDeHost, registrosEnJson, rutaSinCache, servirDocumentacion, TOPE_CUERPO, cuerpoExcedido } from './arranque.js';
 
 describe('registrosEnJson (docs/10 §6): JSON en contenedor, texto en desarrollo', () => {
   it('sin variable → texto', () => expect(registrosEnJson(undefined)).toBe(false));
@@ -147,5 +147,16 @@ describe('horasClaveTemporal (docs/20 §4): la vigencia de la clave temporal, 1�
   });
   it('0, 73, texto, vacío, decimal o con unidad → el arranque se detiene con un mensaje que dice qué se espera', () => {
     for (const malo of ['0', '73', 'dos', '', ' ', '1.5', '-2', '2h', '1e1']) expect(() => horasClaveTemporal(malo)).toThrow(/^CLAVE_TEMPORAL_HORAS=".*" no es válido: se espera un entero de horas entre 1 y 72 \(por defecto 2\)$/);
+  });
+});
+
+// Tope de 100 KiB también para un cuerpo por trozos (sin Content-Length): lo cuenta `verify` en main.ts con esta función.
+describe('cuerpoExcedido', () => {
+  it('fuera del lote, más de 100 KiB → sí; justo 100 KiB → no; en el lote (con o sin consulta, cualquier mayúscula) → no', () => {
+    expect(cuerpoExcedido('/canales/x/reglas', TOPE_CUERPO + 1)).toBe(true);
+    expect(cuerpoExcedido('/canales/x/reglas', TOPE_CUERPO)).toBe(false);
+    expect(cuerpoExcedido('/dispositivos/lote?modo=crear', 200 * 1024)).toBe(false);
+    expect(cuerpoExcedido('/DISPOSITIVOS/LOTE', 200 * 1024)).toBe(false);
+    expect(cuerpoExcedido('/dispositivos/lote-falso', 200 * 1024)).toBe(true);
   });
 });

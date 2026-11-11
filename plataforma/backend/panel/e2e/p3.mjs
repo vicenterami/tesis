@@ -111,7 +111,7 @@ try {
   await textoVisible('en vivo: conectado', 15000);
   ok('el canal en vivo dice «conectado»');
   publicar(27.5);
-  await lecturaEs('27,5 Cel', 15000).then(() => ok('una trama publicada por MQTT aparece en su tarjeta sin recargar (27,5 Cel)'), () => falla('la lectura en vivo no apareció'));
+  await lecturaEs('27,5 °C', 15000).then(() => ok('una trama publicada por MQTT aparece en su tarjeta sin recargar (27,5 °C)'), () => falla('la lectura en vivo no apareció'));
   // 4. Caída del backend: «reconectando»; lo publicado mientras tanto aparece al volver, porque la ficha se repite (docs/19 F4).
   const historicosAntes = pedidosHistorico;
   try {
@@ -123,7 +123,7 @@ try {
     docker('start', backend); // pase lo que pase, el banco no queda con el backend detenido (revisión del 16/10)
     backendDetenido = false;
   }
-  await lecturaEs('28,25 Cel', 60000).then(() => ok('al volver el backend, la ficha muestra la lectura publicada durante la caída (28,25 Cel)'), () => falla('la lectura de la caída no apareció'));
+  await lecturaEs('28,25 °C', 60000).then(() => ok('al volver el backend, la ficha muestra la lectura publicada durante la caída (28,25 °C)'), () => falla('la lectura de la caída no apareció'));
   await textoVisible('en vivo: conectado', 30000).then(() => ok('y el canal vuelve a «conectado»'), () => falla('el canal no volvió a «conectado»'));
   // Al reconectar también se repite el histórico con una ventana nueva: debe traer las lecturas recién guardadas (más puntos que
   // antes). Sin esperarlo, la captura salía antes de esa respuesta y parecía que faltaban (visto en la primera corrida, 16/10).
@@ -159,9 +159,9 @@ try {
     for (const f of [0.995, 0.98, 0.96, 0.9, 0.8]) {
       await pagina.mouse.move(lienzo.x + lienzo.width * f, lienzo.y + lienzo.height / 2);
       valor = (await pagina.locator('.grafico .u-legend .u-series', { hasText: 'promedio' }).locator('.u-value').textContent()) ?? '';
-      if (valor.includes('Cel')) break;
+      if (valor.includes('°C')) break; // la unidad para personas (docs/19 §4, tablero v2, D7)
     }
-    if (valor.includes('Cel')) ok(`con el cursor sobre el gráfico, la leyenda sigue dando el valor del promedio («${valor.trim()}»)`);
+    if (valor.includes('°C')) ok(`con el cursor sobre el gráfico, la leyenda sigue dando el valor del promedio («${valor.trim()}»)`);
     else falla(`la leyenda no muestra el valor bajo el cursor («${valor}»)`);
     await pagina.mouse.move(0, 0);
   });
@@ -276,7 +276,7 @@ try {
   await paso('comparar (P3b)', async () => {
     if (!disp2 || !idFisico2) throw new Error('faltan E2E_DISP2 y E2E_ID2');
     const nombres = [(await api(`/dispositivos/${dispId}`)).nombre, (await api(`/dispositivos/${disp2}`)).nombre];
-    await pagina.goto(`${BASE}/panel/#/`);
+    await pagina.goto(`${BASE}/panel/#/inventario`); // desde el tablero v2, «#/» es el tablero
     await pagina.waitForSelector(`tr[data-id="${dispId}"]`, { timeout: 15000 });
     await pagina.check(`[data-marcar="${dispId}"]`, { timeout: 3000 });
     await pagina.check(`[data-marcar="${disp2}"]`);
@@ -312,9 +312,9 @@ try {
       vigilar(p);
       // Se mide con los datos ya dibujados: en P2, filas en la tabla y las zonas en su filtro (la primera versión de esta comprobación
       // medía con la tabla aún vacía y daba OK con el error presente).
-      const listo = { P2: () => document.querySelectorAll('tbody tr').length > 0 && document.querySelectorAll('.filtros select option').length > 2,
+      const listo = { P2: () => document.querySelectorAll('tbody tr, .tarjeta-inventario').length > 0 && document.querySelectorAll('.filtros select option').length > 2,
                       P3: (sel) => document.querySelector(sel) !== null };
-      for (const [nombre, url, arg] of [['P2', `${BASE}/panel/#/`, null], ['P3', `${BASE}/panel/#/dispositivos/${dispId}`, tarjeta]]) {
+      for (const [nombre, url, arg] of [['P2', `${BASE}/panel/#/inventario`, null], ['P3', `${BASE}/panel/#/dispositivos/${dispId}`, tarjeta]]) {
         await p.goto(url);
         await p.waitForFunction(listo[nombre], arg, { timeout: 15000 });
         await asentar(p);

@@ -19,9 +19,11 @@ src/
 │   ├── unidades.ts            # conversiones a la unidad canónica (filtro 4)
 │   ├── adaptadores/           # filtro 2: senml (nativo, RFC 8428), plano (número o JSON simple), chirpstack y milesight (LoRaWAN, punto 47)
 │   └── *.spec.ts              # pruebas unitarias de las funciones puras (vitest)
-├── consulta/                  # M5: API de solo lectura (dispositivos, canales, condiciones, cuarentena)
+├── consulta/                  # M5: API de solo lectura (dispositivos, canales, condiciones, cuarentena); tablero v2 (sitios, resumen, históricos, keyset: tablero*.ts)
 ├── tiempo-real/               # TT-39: canal SSE hacia el panel (GET /eventos) y bus de eventos en memoria
-├── alta/                      # HU-11: POST /dispositivos, DELETE /dispositivos/:id y POST /dispositivos/:id/credencial (guardia X-Clave-Admin, validación, transacción + cliente del broker, scrypt); PATCH /canales/:id (calibración)
+├── db/evento.ts               # registrarEvento y registrarEventos (el lote): el INSERT de `evento` de las escrituras con persona (usuario_id, HU-11); los de sesion/ aún no
+├── db/cliente.ts              # oyente de 'error' de un cliente prestado del pool: una conexión cortada a mitad no tumba el proceso
+├── alta/                      # HU-11: POST /dispositivos, DELETE /dispositivos/:id y POST /dispositivos/:id/credencial (guardia X-Clave-Admin, validación, transacción + cliente del broker, scrypt); PATCH /canales/:id (calibración); configuracion.* (PATCH /dispositivos/:id y PUT /canales/:id/reglas); lote.ts (alta por lote)
 ├── broker/dynsec*.ts          # administración del plugin Dynamic Security por $CONTROL (identidad backend-admin, conexión propia); recibe los contadores $SYS
 ├── broker/metricas*.ts        # cola del broker vigilada: muestra por minuto en metrica_broker y condición del sistema broker_descarte (docs/10 §8.4 punto 43)
 ├── retencion/                 # borra lo vencido de medicion, trama, cuarentena y metrica_broker por la función acotada fn_retencion_drop_chunks (migración 14)
@@ -174,12 +176,12 @@ describir rutas que no existen. Con el backend corriendo, la documentación inte
 
 | Endpoint | Devuelve | Notas |
 |---|---|---|
-| `GET /dispositivos` | inventario: estado, `en_linea`, última vista, canales, condiciones abiertas | `en_linea` = visto hace menos de 2 × intervalo esperado |
-| `GET /dispositivos/:id` | ficha: canales con reglas y última medición, condiciones abiertas | 404 si no existe |
-| `GET /canales/:id/historico?desde&hasta&intervalo` | `{tiempos[], valores[], muestras[]}` agregado con `time_bucket(…, zona_del_sitio)` | por defecto 24 h cada `15 minutes`; intervalos: 1 minute, 5 minutes, 15 minutes, 1 hour, 6 hours, 1 day; rango `[desde, hasta)`; más de 5 000 cubos o de más de 366 días (ventana ÷ intervalo) → 400 |
-| `GET /condiciones?abiertas=true\|false&limite&dispositivo` | condiciones con `duracion_s`, dispositivo y regla | sin `abiertas`: todas; `dispositivo` (UUID): solo las suyas (12/10) |
+| `GET /dispositivos?sitio&zona&via&estado&q&orden&limite&desplazamiento` (`orden`: nombre, entrega o atencion) | inventario: estado, `en_linea`, última vista, canales, condiciones abiertas, `estado_visual` y `entrega` (% de las últimas 24 h) | `en_linea` = visto hace menos de 2 × intervalo esperado; filtros (sitio y zona por id), `orden=nombre\|entrega` (de peor a mejor, nulos al final), página en el servidor y total en la cabecera `X-Total` (Etapa 4); sin parámetros, la lista completa |
+| `GET /dispositivos/:id` | ficha: canales con reglas (con `retardo_s`) y última medición, condiciones abiertas, `actualizado_en` del dispositivo y de cada canal (bloqueo optimista) | 404 si no existe |
+| `GET /canales/:id/historico?desde&hasta&intervalo` | `{tiempos[], valores[], minimos[], maximos[], muestras[]}` agregado con `time_bucket(…, zona_del_sitio)` | por defecto 24 h cada `15 minutes`; intervalos: 1 minute, 5 minutes, 15 minutes, 1 hour, 6 hours, 1 day; rango `[desde, hasta)`; más de 5 000 cubos o de más de 366 días (ventana ÷ intervalo) → 400 |
+| `GET /condiciones?abiertas=true\|false&limite&dispositivo&desde&hasta&cursor` | condiciones con `duracion_s`, dispositivo y regla | sin `abiertas`: todas; `dispositivo` (UUID): solo las suyas (12/10); `desde` y `hasta`: las que se superponen con la ventana; `cursor`: keyset, cabecera `X-Siguiente` (Etapa 4) |
 | `GET /dispositivos/:id/exportar?formato=csv\|json&desde&hasta` | mediciones crudas del dispositivo en el rango, en flujo por tandas; CSV estándar (coma, punto decimal, UTF-8, CRLF) o JSON por fila | RF-34 (12/10); XLSX en la Etapa 4 |
-| `GET /cuarentena?limite&dispositivo` | últimas tramas rechazadas con motivo y carga (200 caracteres) | diagnóstico |
+| `GET /cuarentena?limite&dispositivo&cursor` | últimas tramas rechazadas con motivo y carga (200 caracteres) | diagnóstico; `cursor`: keyset, cabecera `X-Siguiente` (Etapa 4) |
 | `POST /dispositivos` (cabecera `X-Clave-Admin`) | alta: dispositivo, canales, credencial (mostrada una vez) y cliente del broker, todo o nada | 201 con `conexion` (usuario, credencial, tópico, trama de ejemplo); 400 lista de motivos; 401; 409 existe; 502 el broker no aceptó; 503 sin clave o sin broker |
 | `DELETE /dispositivos/:id` (cabecera `X-Clave-Admin`) | baja lógica: `estado = baja`, credenciales inactivas, condiciones abiertas cerradas, evento `baja`, cliente borrado del broker; todo o nada | 200; 404 si no existe; 409 si ya estaba de baja (13/10) |
 | `POST /recepcion/:idFisico` (cabecera `Authorization: Bearer`) | recepción por HTTP (HU-01): 202 con el resumen, 401, 413, 415, 422, 429, 503 (`docs/10 §8.4` punto 52) | dispositivos de vía `http` |
@@ -190,6 +192,15 @@ describir rutas que no existen. Con el backend corriendo, la documentación inte
 | `GET /salud` | estado del backend, la base y el broker (cola, descartes, condición del sistema) | pública; lo usa el `HEALTHCHECK` |
 | `PATCH /canales/:id` (cabecera `X-Clave-Admin`) | calibración: `{escala_cero, escala_cien, actualizado_en}` (las dos con valor, o las dos `null` para quitarla), evento `canal_calibrado` (`docs/10 §8.4` punto 51) | 200 con el canal y su `actualizado_en` nuevo; 400 motivos; 404; 409 si otro lo cambió desde la ficha (bloqueo optimista, 22/10) |
 | `POST /dispositivos/:id/credencial` (cabecera `X-Clave-Admin`) | rotación: credencial nueva (mostrada una vez), la anterior inactiva, evento `rotacion`, `setClientPassword` en el broker; todo o nada | 201 con `conexion`; 409 de baja; 400 lorawan; si la respuesta no llega, repetir (13/10) |
+| `GET /sitios` (Etapa 4) | mis sitios: `id, codigo, nombre, zona_horaria, rol, zonas[{id, nombre}]` | el usuario del sistema ve todos, como administrador |
+| `GET /sitios/:id/resumen?desde&hasta&intervalo` (Etapa 4) | tablero del sitio (`docs/19 §4`, B e I): conteos por estado visual, salud, condiciones abiertas por tipo, tramas recibidas y rechazadas por cubo, «requiere atención», magnitudes y entrega por dispositivo | una consulta por petición (`docs/10 §8.4` punto 65 iii); sin `intervalo`, el que deja la ventana en 300 cubos o menos |
+| `GET /sitios/:id/historico?magnitud&desde&hasta&intervalo` (Etapa 4) | una magnitud en todo el sitio: por cubo, promedio, `minimos`, `maximos`, `muestras` y `n` (canales que aportan) | 5 000 cubos y 31 días (lee todos los canales de la magnitud, `docs/16 §61`) |
+| `GET /dispositivos/:id/historico?desde&hasta&intervalo` (Etapa 4) | todos los canales en una respuesta, alineados por cubo: `tiempos` y `canales[{…, valores, minimos, maximos, muestras}]` | null (y 0 muestras) donde un canal no tiene dato |
+| `GET /dispositivos/:id/eventos?desde&hasta&limite&cursor` (Etapa 4) | historial del dispositivo con `usuario{id, nombre}` (quién, HU-11; el nombre solo para los administradores del sitio, los demás reciben `null`: `docs/21 §2`) | keyset: cabecera `X-Siguiente` (`docs/10 §8.4` punto 58); también `cursor` en `GET /condiciones` y `GET /cuarentena` |
+| `GET /cuarentena/detectados?sitio` (Etapa 4) | emisores no registrados de los últimos 7 días, por sitio y emisor: `sitio_codigo, emisor, topico, tramas, ultima` | quien puede dar de alta en ese sitio |
+| `PATCH /dispositivos/:id` (Etapa 4) | nombre, estado (activo o mantenimiento), intervalo esperado y zona del mismo sitio, con `actualizado_en` (bloqueo optimista) | responde la ficha; 409 con el vigente; 400 con `errores[{campo, motivo}]`; evento `dispositivo_configurado` con quién |
+| `PUT /canales/:id/reglas` (Etapa 4) | reemplaza las reglas de umbral del canal (alto, bajo, histéresis y `retardo_s`, RF-14), emparejadas por `id` (sin `id`, nueva; las que no vienen se quitan), y su etiqueta, con el `actualizado_en` del canal | 409 con el vigente; 400 con `errores[{campo, motivo}]`; evento `reglas_cambiadas` con quién |
+| `POST /dispositivos/lote?modo=validar\|crear` (Etapa 4) | alta por lote (`docs/19 §4`, F2): informe fila por fila (`valida`, `creada`, `rechazada`, `existe`); en `crear`, las válidas en una transacción (una sentencia para dispositivos, canales y credenciales y otra para los eventos) y las credenciales una vez | hasta 500 filas (413), 10 lotes por minuto por persona (429), una creación a la vez (409); un `id_fisico` de otro sitio, «identificador no disponible»; 500 tardan ≈ 70 s: crear en tandas de 50 (`docs/16 §61`) |
 
 Las rutas que escriben aceptan la clave por cabecera o una sesión de administrador del sitio (con `X-Pedido: panel`).
 

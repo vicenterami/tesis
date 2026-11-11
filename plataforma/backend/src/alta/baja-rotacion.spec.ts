@@ -31,7 +31,7 @@ function armar(opciones: {
       if (texto === 'COMMIT' && opciones.commitFalla) throw new Error('la base se fue');
       return { rows: [], rowCount: 0 };
     },
-    release: vi.fn(),
+    release: vi.fn(), on: vi.fn(), off: vi.fn(),
   };
   const ordenes: OrdenDynsec[][] = [];
   const dynsec = {

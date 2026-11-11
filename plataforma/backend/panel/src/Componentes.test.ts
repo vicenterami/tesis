@@ -74,3 +74,44 @@ describe('Aviso', () => {
     expect(cerrar).toHaveBeenCalledOnce();
   });
 });
+
+// Piezas del tablero (docs/19 §4, tablero v2, B2), por el DOM y en los dos sentidos (correcciones del 11/11/2026).
+describe('BarrasOrdenadas, Medidor y Tarjeta', () => {
+  it('dos barras con el mismo nombre (el nombre no es único) se dibujan las dos, con la clave del id', async () => {
+    const { default: BarrasOrdenadas } = await import('./BarrasOrdenadas.svelte');
+    render(BarrasOrdenadas, { titulo: 'Entrega por dispositivo', orden: 'asc', maximo: 100, barras: [
+      { id: 'd1', etiqueta: 'Nodo', valor: 40, texto: '40 %' },
+      { id: 'd2', etiqueta: 'Nodo', valor: 90, texto: '90 %' },
+    ] });
+    expect(document.querySelectorAll('[data-barra="Nodo"]')).toHaveLength(2);
+  });
+  it('cada barra expone su etiqueta y su valor a un lector de pantalla, en una lista con el título; el dibujo queda oculto', async () => {
+    const { default: BarrasOrdenadas } = await import('./BarrasOrdenadas.svelte');
+    render(BarrasOrdenadas, { titulo: 'Condiciones abiertas por tipo', barras: [
+      { etiqueta: 'Sin comunicación', valor: 1, texto: '1' },
+      { etiqueta: 'Umbral', valor: 3, texto: '3' },
+    ] });
+    const lista = screen.getByRole('list', { name: 'Condiciones abiertas por tipo' });
+    expect([...lista.querySelectorAll('li')].map((li) => li.textContent)).toEqual(['Umbral: 3', 'Sin comunicación: 1']);
+    expect(document.querySelector('svg.barras')!.getAttribute('aria-hidden')).toBe('true');
+    expect(document.querySelector('svg.barras title')!.textContent).toBe('Condiciones abiertas por tipo'); // el <title> se conserva
+    expect(screen.queryByRole('img')).toBeNull(); // ya no es una imagen con un solo nombre
+  });
+  it('el medidor con valor es un «meter» con aria-valuenow; sin dato, una imagen que dice «sin datos»', async () => {
+    const { default: Medidor } = await import('./Medidor.svelte');
+    const { unmount } = render(Medidor, { porcentaje: 92.9, etiqueta: 'Salud del sitio' });
+    expect(screen.getByRole('meter', { name: 'Salud del sitio' }).getAttribute('aria-valuenow')).toBe('93');
+    unmount();
+    render(Medidor, { porcentaje: null, etiqueta: 'Salud del sitio' });
+    expect(screen.queryByRole('meter')).toBeNull();
+    expect(screen.getByRole('img', { name: 'Salud del sitio: sin datos' })).toBeTruthy();
+  });
+  it('la tarjeta asocia título y valor en una lista de descripción (dt/dd), no con aria-describedby sobre un span', async () => {
+    const { default: Tarjeta } = await import('./Tarjeta.svelte');
+    render(Tarjeta, { titulo: 'Dispositivos', valor: 1234 });
+    const dl = document.querySelector('.tarjeta dl')!;
+    expect(dl.querySelector('dt')!.textContent).toBe('Dispositivos');
+    expect(dl.querySelector('dd')!.textContent).toBe('1.234');
+    expect(document.querySelector('.tarjeta [aria-describedby]')).toBeNull();
+  });
+});

@@ -48,7 +48,7 @@ fi
 caso "UUID inválido → 400"                    /dispositivos/no-es-uuid 400
 caso "limite fuera de rango → 400"            "/condiciones?limite=99999" 400
 caso "condiciones abiertas es lista con duracion_s" "/condiciones?abiertas=true" "isinstance(r,list) and all(isinstance(c['duracion_s'],int) for c in r)"
-caso "contrato OpenAPI servido con 18 rutas (24 operaciones: alta, baja y rotación de dispositivos y de pasarelas, la calibración de un canal, la recepción por HTTP, la sesión y los usuarios incluidas), con el canal /eventos como text/event-stream" /docs/openapi.json "len(r['paths'])==18 and sum(1 for p in r['paths'].values() for m in p if m in {'get','post','put','patch','delete'})==24 and {'post','get','delete'} <= set(r['paths']['/sesion']) and 'patch' in r['paths']['/usuarios/{id}'] and 'post' in r['paths']['/dispositivos'] and 'delete' in r['paths']['/dispositivos/{id}'] and 'post' in r['paths']['/dispositivos/{id}/credencial'] and 'patch' in r['paths']['/canales/{id}'] and r['openapi'].startswith('3.') and 'text/event-stream' in r['paths']['/eventos']['get']['responses']['200']['content']"
+caso "contrato OpenAPI servido con 26 rutas (33 operaciones: alta, baja y rotación de dispositivos y de pasarelas, la calibración de un canal, la recepción por HTTP, la sesión, los usuarios y el tablero v2 incluidos), con el canal /eventos como text/event-stream" /docs/openapi.json "len(r['paths'])==26 and sum(1 for p in r['paths'].values() for m in p if m in {'get','post','put','patch','delete'})==33 and 'get' in r['paths']['/sitios/{id}/resumen'] and 'put' in r['paths']['/canales/{id}/reglas'] and 'patch' in r['paths']['/dispositivos/{id}'] and 'post' in r['paths']['/dispositivos/lote'] and {'post','get','delete'} <= set(r['paths']['/sesion']) and 'patch' in r['paths']['/usuarios/{id}'] and 'post' in r['paths']['/dispositivos'] and 'delete' in r['paths']['/dispositivos/{id}'] and 'post' in r['paths']['/dispositivos/{id}/credencial'] and 'patch' in r['paths']['/canales/{id}'] and r['openapi'].startswith('3.') and 'text/event-stream' in r['paths']['/eventos']['get']['responses']['200']['content']"
 # El servido (generado en caliente desde los decoradores) vs. el versionado en el repo (se
 # desincroniza si alguien cambia una ruta y olvida correr `pnpm openapi` antes de commitear).
 caso "OpenAPI servido == OpenAPI versionado (mismas rutas y métodos)" /docs/openapi.json \
@@ -101,6 +101,93 @@ if [ -n "$DISP" ]; then
   caso "exportar con desde posterior a hasta → 400" "/dispositivos/$DISP/exportar?desde=2026-10-02T00:00:00Z&hasta=2026-10-01T00:00:00Z" 400
 fi
 caso "exportar un dispositivo inexistente → 404" "/dispositivos/00000000-0000-4000-8000-000000000000/exportar" 404
+# Tablero v2 (docs/19 §4, I; docs/10 §8.4 punto 65; docs/16 §61). Lecturas: forma de cada respuesta nueva, cabeceras X-Total y
+# X-Siguiente, y los 400 de entrada. Las escrituras (PATCH, PUT de reglas, lote) se prueban con datos inválidos o una marca vieja: 400
+# y 409 sin cambiar nada; la creación real por lote la mide docs/16 §61 en el banco.
+SITIO=$(ck -s "$API/sitios" | python3 -c "import sys,json; r=json.load(sys.stdin); print(r[0]['id'] if r else '')")
+caso "sitios: lista con código, zona horaria, rol y zonas" /sitios "isinstance(r,list) and len(r)>=1 and all({'id','codigo','nombre','zona_horaria','rol','zonas'} <= set(s) for s in r)"
+if [[ -n "$SITIO" ]]; then
+  caso "resumen del sitio: exactamente los campos del contrato" "/sitios/$SITIO/resumen" "set(r)=={'sitio','ventana','dispositivos','salud','condiciones_abiertas','tramas','atencion','magnitudes','entrega','total_activos'} and len(r['entrega'])<=50 and len(r['entrega'])==min(50, r['total_activos']) and set(r['dispositivos'])=={'total','normal','alerta','sin_senal','inactivo'} and set(r['salud'])=={'reportan','supervisados','porcentaje'} and set(r['tramas'])=={'recibidas','rechazadas','cubos'} and len(r['atencion'])<=10"
+  caso "resumen: los cuatro estados suman el total" "/sitios/$SITIO/resumen" "sum(r['dispositivos'][k] for k in ('normal','alerta','sin_senal','inactivo'))==r['dispositivos']['total']"
+  caso "resumen: los indicadores suman el inventario del sitio" "/sitios/$SITIO/resumen" "r['dispositivos']['total']==$(ck -s -D - -o /dev/null "$API/dispositivos?sitio=$SITIO&limite=1" | tr -d '\r' | awk 'tolower($1)=="x-total:"{print $2}')"
+  caso "histórico del sitio: columnas alineadas con mín, máx y n" "/sitios/$SITIO/historico?magnitud=temperatura&intervalo=1%20hour" "len(r['tiempos'])==len(r['valores'])==len(r['minimos'])==len(r['maximos'])==len(r['n'])==r['puntos'] and r['magnitud']=='temperatura' and r['unidad']=='Cel'"
+  caso "histórico del sitio sin magnitud → 400" "/sitios/$SITIO/historico" 400
+  caso "histórico del sitio con ventana de más de 366 días → 400" "/sitios/$SITIO/historico?magnitud=temperatura&desde=2024-01-01T00:00:00Z&intervalo=1%20day" 400
+  # El del sitio lee todos los canales de la magnitud: su tope es 31 días (docs/16 §61); 31 pasa y 32 no.
+  caso "histórico del sitio con 31 días → 200" "/sitios/$SITIO/historico?magnitud=temperatura&desde=2026-10-01T00:00:00Z&hasta=2026-11-01T00:00:00Z&intervalo=1%20day" "r['magnitud']=='temperatura'"
+  caso "histórico del sitio con 31 días y 1 hora → 400 (tope de la ruta)" "/sitios/$SITIO/historico?magnitud=temperatura&desde=2026-10-01T00:00:00Z&hasta=2026-11-01T01:00:00Z&intervalo=1%20day" 400
+  caso "detectados del sitio: sitio, emisor, tópico, tramas y última" "/cuarentena/detectados?sitio=$SITIO" "isinstance(r,list) and all({'sitio_codigo','emisor','topico','tramas','ultima'}==set(x) for x in r)"
+fi
+caso "resumen de un sitio inexistente → 404" "/sitios/00000000-0000-4000-8000-000000000000/resumen" 404
+caso "inventario: cada fila suma estado_visual (cuatro valores) y entrega" /dispositivos "all(d['estado_visual'] in ('inactivo','sin_senal','alerta','normal') and (d['entrega'] is None or 0<=d['entrega']<=100) for d in r)"
+caso "inventario: un dispositivo inactivo no tiene entrega" /dispositivos "all(d['entrega'] is None for d in r if d['estado']!='activo')"
+caso "inventario filtrado por estado: solo ese estado" "/dispositivos?estado=sin_senal" "all(d['estado_visual']=='sin_senal' for d in r)"
+caso "inventario con estado desconocido → 400" "/dispositivos?estado=rojo" 400
+caso "inventario orden=entrega: de peor a mejor, sin cálculo al final" "/dispositivos?orden=entrega" "(lambda e: e==sorted(e, key=lambda x: (x is None, x or 0)))([d['entrega'] for d in r])"
+caso "inventario con orden desconocido → 400" "/dispositivos?orden=estado" 400
+caso "inventario orden=atencion: sin señal, alerta, normal, inactivo; dentro, por nombre" "/dispositivos?orden=atencion" "(lambda k: k==sorted(k))([(['sin_senal','alerta','normal','inactivo'].index(d['estado_visual']), d['nombre']) for d in r])"
+# Estado visual (docs/19 §2): el SQL del servidor y la regla escrita, comparados fila por fila con lo que dicen /dispositivos y las
+# condiciones abiertas (la misma regla que estadoVisual() del panel, aquí en python). Así se prueban entre sí de verdad (docs/10 punto 65 ii).
+ABIERTAS=$(mktemp); ck -s "$API/condiciones?abiertas=true&limite=500" > "$ABIERTAS"
+caso "estado visual del servidor = la regla de docs/19 §2 recalculada, fila por fila" /dispositivos "(lambda ab: all(d['estado_visual']==('inactivo' if d['estado']!='activo' else 'sin_senal' if ('sin_comunicacion' in ab.get(d['id'],[]) or d['en_linea'] is False) else 'alerta' if any(t in ('umbral','bateria','manipulacion','tope_superado','reloj_desviado') for t in ab.get(d['id'],[])) else 'normal') for d in r))((lambda cs: {c['dispositivo_id']: [x['tipo'] for x in cs if x['dispositivo_id']==c['dispositivo_id']] for c in cs})(json.load(open('$ABIERTAS'))))"
+rm -f "$ABIERTAS"
+xtotal=$(ck -s -D - -o /dev/null "$API/dispositivos?limite=1" | tr -d '\r' | awk 'tolower($1)=="x-total:"{print $2}')
+ntodos=$(ck -s "$API/dispositivos" | python3 -c "import sys,json; print(len(json.load(sys.stdin)))")
+[[ -n "$xtotal" && "$xtotal" == "$ntodos" ]] && echo "OK    inventario paginado: X-Total ($xtotal) = filas sin paginar" || { echo "FALLA X-Total «$xtotal» ≠ $ntodos filas"; fallos=$((fallos+1)); }
+if [[ -n "$CANAL" ]]; then
+  caso "histórico de un canal: minimos y maximos alineados" "/canales/$CANAL/historico?intervalo=1%20day" "len(r['minimos'])==len(r['maximos'])==r['puntos'] and all(a<=b for a,b in zip(r['minimos'],r['maximos']))"
+fi
+esc() { ck -s -o /dev/null -w '%{http_code}' -X "$1" -H 'Content-Type: application/json' --data-binary "$3" "$API$2"; }
+if [[ -n "${DISP:-}" ]]; then
+  caso "histórico del dispositivo: un eje de tiempos y una serie por canal, con muestras" "/dispositivos/$DISP/historico?intervalo=1%20day&desde=$(date -u -d '30 days ago' +%FT%TZ)" "all(len(c['valores'])==len(c['muestras'])==len(r['tiempos']) for c in r['canales']) and r['puntos']==len(r['tiempos']) and all((m==0)==(v is None) for c in r['canales'] for v,m in zip(c['valores'],c['muestras']))"
+  caso "eventos del dispositivo: id, tipo, detalle, ocurrido_en, usuario" "/dispositivos/$DISP/eventos?desde=2026-01-01T00:00:00Z" "isinstance(r,list) and all({'id','tipo','detalle','ocurrido_en','usuario'}==set(e) for e in r)"
+  # Keyset (punto 58): dos páginas seguidas no se repiten y, juntas, son la lista sin paginar.
+  sig=$(ck -s -D - -o /dev/null "$API/dispositivos/$DISP/eventos?desde=2026-01-01T00:00:00Z&limite=2" | tr -d '\r' | awk 'tolower($1)=="x-siguiente:"{print $2}')
+  if [[ -n "$sig" ]]; then
+    caso "eventos por cursor: la página 2 sigue a la 1 sin repetir" "/dispositivos/$DISP/eventos?desde=2026-01-01T00:00:00Z&limite=2&cursor=$sig" "[e['id'] for e in r]==[e['id'] for e in $(ck -s "$API/dispositivos/$DISP/eventos?desde=2026-01-01T00:00:00Z&limite=4" | python3 -c 'import sys,json; print(json.dumps(json.load(sys.stdin)))')][2:4]"
+  fi
+  # Escrituras con datos que no deben pasar: nada cambia.
+  code=$(esc PATCH "/dispositivos/$DISP" '{"actualizado_en":"2001-01-01T00:00:00.000001Z","nombre":"x"}')
+  [ "$code" = 409 ] && echo "OK    PATCH /dispositivos/{id} con marca vieja → 409 (nada se pisa)" || { echo "FALLA PATCH con marca vieja → $code"; fallos=$((fallos+1)); }
+  code=$(esc PATCH "/dispositivos/$DISP" '{"actualizado_en":"2001-01-01T00:00:00.000001Z","estado":"baja"}')
+  [ "$code" = 400 ] && echo "OK    PATCH /dispositivos/{id} a «baja» → 400 (la baja es DELETE)" || { echo "FALLA PATCH estado baja → $code"; fallos=$((fallos+1)); }
+fi
+if [[ -n "$CANAL" ]]; then
+  code=$(esc PUT "/canales/$CANAL/reglas" '{"actualizado_en":"2001-01-01T00:00:00.000001Z","reglas":[{"umbral_alto":10,"umbral_bajo":20}]}')
+  [ "$code" = 400 ] && echo "OK    PUT /canales/{id}/reglas con bajo ≥ alto → 400" || { echo "FALLA PUT reglas inválidas → $code"; fallos=$((fallos+1)); }
+  code=$(esc PUT "/canales/$CANAL/reglas" '{"actualizado_en":"2001-01-01T00:00:00.000001Z","reglas":[]}')
+  [ "$code" = 409 ] && echo "OK    PUT /canales/{id}/reglas con marca vieja → 409 (nada se pisa)" || { echo "FALLA PUT reglas marca vieja → $code"; fallos=$((fallos+1)); }
+fi
+caso_lote() { # nombre · cuerpo · expresión sobre r o código
+  local out code body; out=$(ck -s -w '\n%{http_code}' -X POST -H 'Content-Type: application/json' --data-binary "$2" "$API/dispositivos/lote?modo=validar"); code=${out##*$'\n'}; body=${out%$'\n'*}
+  if [[ "$3" =~ ^[0-9]{3}$ ]]; then [[ "$code" == "$3" ]] && echo "OK    $1" || { echo "FALLA $1 (HTTP $code, esperado $3)"; fallos=$((fallos+1)); }
+  elif python3 -c "import sys,json; r=json.loads(sys.stdin.read()); sys.exit(0 if ($3) else 1)" <<<"$body" 2>/dev/null; then echo "OK    $1"
+  else echo "FALLA $1 (HTTP $code) → ${body:0:160}"; fallos=$((fallos+1)); fi
+}
+caso_lote "lote validar: una fila rechazada no bloquea a la otra, y nada se crea" '{"filas":[{"id_fisico":"lote-humo-01","nombre":"Humo","zona":"Laboratorio","via":"mqtt","intervalo_esperado_s":"60","canales":"temperatura:Cel"},{"id_fisico":"Malo_2","nombre":"x","zona":"Laboratorio","via":"mqtt","intervalo_esperado_s":"60","canales":"temperatura"}]}' "[f['resultado'] for f in r['filas']]==['valida','rechazada'] and r['validas']==1 and r['rechazadas']==1 and r['filas'][1]['n']==3"
+caso_lote "lote de 501 filas → 413" "{\"filas\":[$(python3 -c "print(','.join(['{}']*501))")]}" 413
+code=$(ck -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data-binary '{"filas":[{}]}' "$API/dispositivos/lote?modo=borrar")
+[ "$code" = 400 ] && echo "OK    lote con modo desconocido → 400" || { echo "FALLA lote modo → $code"; fallos=$((fallos+1)); }
+DESC=$(ck -s "$API/dispositivos?q=lote-humo-01" | python3 -c "import sys,json; print(len(json.load(sys.stdin)))")
+[ "$DESC" = 0 ] && echo "OK    validar no creó nada (lote-humo-01 no existe)" || { echo "FALLA validar creó $DESC"; fallos=$((fallos+1)); }
+caso "condiciones en una ventana (desde, hasta): solo las que se superponen con ella" "/condiciones?desde=2026-10-01T00:00:00Z&hasta=2026-10-02T00:00:00Z&limite=500" "all(c['abierta_en'] < '2026-10-02T00:00:00' and (c['cerrada_en'] is None or c['cerrada_en'] >= '2026-10-01T00:00:00') for c in r)"
+caso "condiciones con desde que no es fecha → 400" "/condiciones?desde=ayer" 400
+caso "condiciones con cursor manipulado → 400" "/condiciones?cursor=no-es-un-cursor%25" 400
+# Un cursor con buena forma y un día que no existe (o el año 0000) era 500 (la base respondía 22008); el punto 58 pide 400.
+caso "condiciones con cursor del 30 de febrero → 400" "/condiciones?cursor=$(printf '["2026-02-30T00:00:00Z","11111111-1111-4111-8111-111111111111"]' | base64 -w0 | tr '+/' '-_' | tr -d '=')" 400
+caso "condiciones con cursor del año 0000 → 400" "/condiciones?cursor=$(printf '["0000-01-01T00:00:00Z","11111111-1111-4111-8111-111111111111"]' | base64 -w0 | tr '+/' '-_' | tr -d '=')" 400
+# Tope de 100 KiB también por trozos (sin Content-Length): antes regía el de 512 KiB del lote en todas las rutas.
+# Los cuerpos van en archivos temporales: la entrada estándar de curl ya la ocupa la clave (ck).
+if [[ -n "$CANAL" ]]; then
+  TROZOS=$(mktemp); trap 'rm -f "$TROZOS"' EXIT
+  head -c $((200*1024)) /dev/zero | tr '\0' 'a' > "$TROZOS"
+  code=$(ck -s -o /dev/null -w '%{http_code}' -X PUT -H 'Content-Type: application/json' -H 'Transfer-Encoding: chunked' --data-binary @"$TROZOS" "$API/canales/$CANAL/reglas")
+  [ "$code" = 413 ] && echo "OK    PUT /canales/{id}/reglas con 200 KiB por trozos (sin Content-Length) → 413" || { echo "FALLA 200 KiB por trozos → $code (esperado 413)"; fallos=$((fallos+1)); }
+  printf '{"actualizado_en":"2001-01-01T00:00:00.000001Z","reglas":[]}' > "$TROZOS"
+  code=$(ck -s -o /dev/null -w '%{http_code}' -X PUT -H 'Content-Type: application/json' -H 'Transfer-Encoding: chunked' --data-binary @"$TROZOS" "$API/canales/$CANAL/reglas")
+  [ "$code" = 409 ] && echo "OK    el mismo PUT chico por trozos pasa el tope (409 por la marca vieja)" || { echo "FALLA PUT chico por trozos → $code (esperado 409)"; fallos=$((fallos+1)); }
+fi
+caso "cuarentena con cursor manipulado → 400" "/cuarentena?cursor=eyJ4IjoxfQ" 400
 # Cabeceras de seguridad (docs/11 §3). Se leen con -I; el helper `caso` mira cuerpos, así que van aparte.
 cab=$(ck -s -I --max-time 10 "$API/dispositivos" | tr -d '\r')
 cabecera() { # nombre · regex que debe (o no) aparecer · esperado: si|no
@@ -144,7 +231,9 @@ conhost "Host: LOCALHOST en mayúsculas → 200"                         "LOCALH
 conhost "Host: ilegible (usuario@) → 421"                             "usuario@localhost" 421
 # Sin sesión ni clave (docs/20 §6, columna «Sin sesión»): toda lectura y el canal en vivo → 401 con el cuerpo fijo; /salud sigue abierta.
 for ruta in /dispositivos "/dispositivos/${DISP:-00000000-0000-4000-8000-000000000000}" "/dispositivos/${DISP:-00000000-0000-4000-8000-000000000000}/exportar" \
-            "/canales/${CANAL:-00000000-0000-4000-8000-000000000000}/historico" /condiciones /cuarentena /pasarelas /eventos /usuarios /sesion; do
+            "/canales/${CANAL:-00000000-0000-4000-8000-000000000000}/historico" /condiciones /cuarentena /pasarelas /eventos /usuarios /sesion \
+            /sitios "/sitios/${SITIO:-00000000-0000-4000-8000-000000000000}/resumen" /cuarentena/detectados \
+            "/dispositivos/${DISP:-00000000-0000-4000-8000-000000000000}/eventos"; do
   r=$(curl -s -m 3 -w '\n%{http_code}' "$API$ruta"); code=${r##*$'\n'}; cuerpo=${r%$'\n'*}
   if [ "$code" = 401 ] && grep -q '"message":"sesión requerida"' <<<"$cuerpo"; then echo "OK    sin sesión: GET $ruta → 401 «sesión requerida»"
   else echo "FALLA sin sesión: GET $ruta → HTTP $code ${cuerpo:0:80} (esperado 401 «sesión requerida»)"; fallos=$((fallos+1)); fi

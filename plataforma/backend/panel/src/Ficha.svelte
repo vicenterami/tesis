@@ -8,12 +8,16 @@
   import ZonaSitio from './ZonaSitio.svelte';
   import Aviso from './Aviso.svelte';
   import Boton from './Boton.svelte';
-  import { descargar, esCancelacion, mensajeError, obtener, ultimaGana } from './lib/api';
+  import { descargar, esCancelacion, mensajeError, obtener, obtenerPagina, ultimaGana } from './lib/api';
   import { avisoDeError, type DatosAviso } from './lib/avisos';
   import { puedeEn, type Sesion } from './lib/sesion';
   import { canalCallado, enLinea, estadoVisual, ROTULO, rotuloCondicion } from './lib/estado-visual';
-  import { RANGO_POR_DEFECTO, agregarLectura, formatearValor, rango as datosRango, rangoQueContiene, resolucionValida, resumenRango, rotuloIntervalo, seriesDesdeHistorico, urlHistorico, ventana, type ClaveRango, type ClaveResolucion, type Series } from './lib/grafico';
-  import type { Condicion, DispositivoFicha, EventoVivo, Historico, TramaRechazada } from './lib/modelo';
+  import { RANGO_POR_DEFECTO, agregarLectura, formatearValor, rango as datosRango, rangoQueContiene, resolucion, resolucionMasFina, resolucionValida, resumenRango, rotuloIntervalo, seriesDesdeHistorico, urlHistorico, ventana, ventanaDeSeleccion, type ClaveRango, type ClaveResolucion, type Series } from './lib/grafico';
+  import type { Condicion, DispositivoFicha, EventoDispositivo, EventoVivo, Historico, HistoricoDispositivo, TramaRechazada } from './lib/modelo';
+  import { coloresSeries, temaVivo } from './lib/tema';
+  import { UNIDADES_POR_DEFECTO, conversion, convertirSerie, type PreferenciaUnidades } from './lib/unidades';
+  import { agruparRechazadas, rotuloMotivo, textoEvento } from './lib/ficha';
+  import type { VentanaFija } from './lib/vista';
   import { duracion, fechaHora, haceCuanto, haceSegundos, horaLocal } from './lib/tiempo';
   import { fragmentoComparar, fragmentoFicha } from './lib/vista';
   import { recordarMarcados } from './lib/comparar';
@@ -27,9 +31,11 @@
     canal: canalInicial = null,
     rango: rangoInicial = null,
     res: resInicial = null,
+    fija: fijaInicial = null,
     sesion = null,
+    unidades = UNIDADES_POR_DEFECTO,
     alCambiarVista = () => {},
-  }: { id: string; canal?: string | null; rango?: ClaveRango | null; res?: ClaveResolucion | null; sesion?: Sesion | null; alCambiarVista?: (fragmento: string) => void } = $props();
+  }: { id: string; canal?: string | null; rango?: ClaveRango | null; res?: ClaveResolucion | null; fija?: VentanaFija | null; sesion?: Sesion | null; unidades?: PreferenciaUnidades; alCambiarVista?: (fragmento: string) => void } = $props();
 
   let d = $state<DispositivoFicha | null>(null);
   let condiciones = $state<Condicion[]>([]);
@@ -44,6 +50,25 @@
   // Resolución (incremento 2, punto 4): null = «auto»; una que no sirve para el rango vuelve a «auto».
   let resElegida = $state<ClaveResolucion | null>(untrack(() => resolucionValida(rangoInicial ?? RANGO_POR_DEFECTO, resInicial)));
   let listo = $state(false); // la ficha cargó y el canal elegido está validado contra sus canales
+  // Zoom por arrastre que refina (docs/19 §4, tablero v2, D1): una ventana fija (`desde`/`hasta` en la URL, también el rango a medida)
+  // con la resolución más fina admisible; «Volver» deshace el último zoom (la pila vive en memoria) y el doble clic vuelve al rango.
+  let fijaElegida = $state<VentanaFija | null>(untrack(() => fijaInicial));
+  let zooms = $state<{ fija: VentanaFija | null; res: ClaveResolucion | null }[]>([]);
+  // Mín–máx (D3), todos los canales (D2), condiciones del canal en la ventana (D4), eventos (D5) y rechazadas por cursor (D6).
+  let mostrarMinMax = $state(false);
+  let todosLosCanales = $state(false);
+  let historicoTodos = $state<HistoricoDispositivo | null>(null);
+  let errorTodos = $state<string | null>(null);
+  let condicionesVentana = $state<Condicion[]>([]);
+  // Tope de condiciones por ventana: el servidor manda las más recientes primero; si llegan todas las pedidas, puede haber más, y se
+  // dice (corrección del 11/11/2026): nunca un recorte en silencio.
+  const LIMITE_CONDICIONES_VENTANA = 500;
+  let eventos = $state<EventoDispositivo[]>([]);
+  let eventosSiguiente = $state<string | null>(null);
+  let eventosCargando = $state(false);
+  let errorEventos = $state<string | null>(null);
+  let rechazadasSiguiente = $state<string | null>(null);
+  let rechazadasCargando = $state(false);
   // «En vivo» con prueba (punto 5): cuándo pasó el canal a en_vivo y cuándo llegó (reloj local) la última lectura de cada canal.
   let enVivoDesde = $state<number | null>(null);
   let llegadas = $state<Record<string, number>>({});
@@ -53,7 +78,7 @@
   // Cambio de rango sin pantalla en blanco (incremento 2, punto 2): canal, rango y resolución ELEGIDOS son lo que se pidió (los
   // botones los marcan); `mostrada` es lo que el gráfico dibuja, de la última respuesta buena. Mientras llega la nueva, el gráfico
   // conserva la anterior y dice «cargando…»; con error, la conserva y la URL sigue diciendo lo que se ve.
-  let mostrada = $state<{ canal: string; rango: ClaveRango; res: ClaveResolucion | null; desde: Date; hasta: Date } | null>(null);
+  let mostrada = $state<{ canal: string; rango: ClaveRango; res: ClaveResolucion | null; fija: VentanaFija | null; desde: Date; hasta: Date } | null>(null);
   let cargando = $state(false);
   let descargando = $state(false);
   let avisoDescarga = $state<DatosAviso | null>(null);
@@ -69,6 +94,54 @@
   const canalActual = $derived(d?.canales.find((c) => c.id === canalElegido) ?? null);
   const canalMostrado = $derived(mostrada === null ? null : (d?.canales.find((c) => c.id === mostrada!.canal) ?? null));
   const resumen = $derived(historico === null ? null : resumenRango(historico.valores));
+  // Unidades para personas (D7): la del canal dibujado según la preferencia; se convierte solo al mostrar.
+  const conv = $derived(canalMostrado === null ? null : conversion(canalMostrado.unidad, unidades, canalMostrado.magnitud));
+  const valorDe = (v: number | null, unidad: string, magnitud: string | null = null): string => {
+    const c = conversion(unidad, unidades, magnitud);
+    return formatearValor(v === null ? null : c.desdeBase(v), c.simbolo);
+  };
+  // Los datos del gráfico: [tiempos, promedio, lectura actual] y, con «mostrar mín–máx», el mínimo y el máximo de cada cubo alineados a
+  // los mismos instantes (un punto en vivo no tiene banda). Convertidos a la unidad de la persona.
+  const datosGrafico = $derived.by(() => {
+    const c = conv;
+    if (c === null) return series as (number | null)[][];
+    const base: (number | null)[][] = [series[0], convertirSerie(series[1], c), convertirSerie(series[2], c)];
+    if (!mostrarMinMax || historico === null) return base;
+    const indice = new Map(historico.tiempos.map((t, i) => [t, i]));
+    const de = (col: (number | null)[] | undefined): (number | null)[] =>
+      series[0].map((t, i) => (series[1][i] === null || col === undefined ? null : (col[indice.get(t) ?? -1] ?? null)));
+    return [...base, convertirSerie(de(historico.minimos), c), convertirSerie(de(historico.maximos), c)];
+  });
+  const tieneMinMax = $derived(historico !== null && Array.isArray(historico.minimos) && Array.isArray(historico.maximos));
+  // Umbrales como líneas con etiqueta y la banda de histéresis sombreada (D4), en la unidad de la persona.
+  const umbralesDibujados = $derived.by(() => {
+    const c = conv;
+    if (canalMostrado === null || c === null) return { lineas: [], bandas: [] };
+    const lineas: { valor: number; etiqueta: string }[] = [];
+    const bandas: { baja: number; alta: number }[] = [];
+    for (const r of canalMostrado.reglas ?? []) {
+      const h = r.histeresis ?? 0;
+      if (r.umbral_alto !== null) {
+        lineas.push({ valor: c.desdeBase(r.umbral_alto), etiqueta: `alto ${valorDe(r.umbral_alto, canalMostrado.unidad, canalMostrado.magnitud)}` });
+        if (h > 0) bandas.push({ baja: c.desdeBase(r.umbral_alto - h), alta: c.desdeBase(r.umbral_alto) });
+      }
+      if (r.umbral_bajo !== null) {
+        lineas.push({ valor: c.desdeBase(r.umbral_bajo), etiqueta: `bajo ${valorDe(r.umbral_bajo, canalMostrado.unidad, canalMostrado.magnitud)}` });
+        if (h > 0) bandas.push({ baja: c.desdeBase(r.umbral_bajo), alta: c.desdeBase(r.umbral_bajo + h) });
+      }
+    }
+    return { lineas, bandas };
+  });
+  // Las condiciones de ESE canal (su magnitud) dentro de la ventana, como franjas de `abierta_en` a `cerrada_en` o hasta ahora (D4).
+  const franjas = $derived(
+    canalMostrado === null || mostrada === null
+      ? []
+      : condicionesVentana
+          .filter((c) => c.magnitud === canalMostrado!.magnitud)
+          .map((c) => ({ desde: Date.parse(c.abierta_en) / 1000, hasta: (c.cerrada_en === null ? ahora.getTime() : Date.parse(c.cerrada_en)) / 1000, etiqueta: rotuloCondicion(c.tipo) })),
+  );
+  const rechazadasAgrupadas = $derived(agruparRechazadas(rechazadas));
+  const colores = $derived(coloresSeries($temaVivo));
   const ventanaGrafico = $derived(mostrada === null ? null : { desde: mostrada.desde.getTime() / 1000, hasta: mostrada.hasta.getTime() / 1000 });
   // Reloj de pasarela desviado (punto 4): la condición abierta, en palabras, con su hace cuánto. Al cerrarse, el aviso `condicion`
   // vuelve a pedir las condiciones y desaparece sin recargar.
@@ -120,11 +193,12 @@
       const [ficha, conds, rech] = await Promise.all([
         obtener<DispositivoFicha>(`/dispositivos/${encodeURIComponent(id)}`, senal),
         cargarCondiciones(senal),
-        obtener<TramaRechazada[]>(`/cuarentena?dispositivo=${encodeURIComponent(id)}&limite=20`, senal),
+        obtenerPagina<TramaRechazada>(`/cuarentena?dispositivo=${encodeURIComponent(id)}&limite=20`, senal),
       ]);
       d = ficha;
       condiciones = conds;
-      rechazadas = rech;
+      rechazadas = rech.filas;
+      rechazadasSiguiente = rech.siguiente;
       // Un canal de la URL que no es de este dispositivo se ignora: rige el primero.
       if (canalElegido === null || !ficha.canales.some((c) => c.id === canalElegido)) canalElegido = ficha.canales[0]?.id ?? null;
       error = null;
@@ -140,20 +214,34 @@
   let abortarHistorico: AbortController | null = null; // la petición anterior se cancela, no solo se ignora (revisión del 22/10)
   async function cargarHistorico(): Promise<void> {
     if (canalElegido === null) return;
-    const pedido = { canal: canalElegido, rango: rangoElegido, res: resElegida };
-    const v = ventana(pedido.rango, new Date(), pedido.res);
+    const pedido = { canal: canalElegido, rango: rangoElegido, res: resElegida, fija: fijaElegida };
+    // Con una ventana fija (zoom o a medida), su resolución: la elegida al hacer zoom (la más fina admisible) o, si no, la más fina.
+    const v = pedido.fija === null
+      ? ventana(pedido.rango, new Date(), pedido.res)
+      : { ...pedido.fija, intervalo: resolucion(pedido.res ?? resolucionMasFina(pedido.fija.hasta.getTime() - pedido.fija.desde.getTime())).intervalo };
     const mia = ++generacion;
     abortarHistorico?.abort();
     const ctl = new AbortController();
     abortarHistorico = ctl;
     cargando = true;
     try {
-      const h = await obtener<Historico>(urlHistorico(pedido.canal, v.desde, v.hasta, v.intervalo), ctl.signal);
+      const qv = new URLSearchParams({ desde: v.desde.toISOString(), hasta: v.hasta.toISOString() }).toString();
+      const [h, cv] = await Promise.all([
+        obtener<Historico>(urlHistorico(pedido.canal, v.desde, v.hasta, v.intervalo), ctl.signal),
+        // Las condiciones del dispositivo en la ventana, para dibujar las del canal como franjas (D4); si la ruta falla, sin franjas.
+        obtener<Condicion[]>(`/condiciones?dispositivo=${encodeURIComponent(id)}&${qv}&limite=${LIMITE_CONDICIONES_VENTANA}`, ctl.signal).catch((e: unknown) => {
+          if (esCancelacion(e)) throw e;
+          return [] as Condicion[];
+        }),
+      ]);
       if (mia !== generacion) return;
       historico = h;
+      condicionesVentana = cv;
       series = seriesDesdeHistorico(h);
       mostrada = { ...pedido, desde: v.desde, hasta: v.hasta };
       errorHistorico = null;
+      void cargarEventos(true);
+      if (todosLosCanales) void cargarTodos();
     } catch (e) {
       if (mia !== generacion) return;
       errorHistorico = mensajeError(e); // la serie anterior se queda: el error se dice, no se dibuja como vacío
@@ -177,7 +265,8 @@
     } else if (e.tipo === 'medicion') {
       d = { ...d, canales: d.canales.map((c) => (c.id === e.canal_id ? { ...c, ultima_medicion: { valor: e.valor, tiempo: e.tiempo, porcentaje: e.porcentaje ?? null } } : c)) };
       llegadas = { ...llegadas, [e.canal_id]: Date.now() };
-      if (e.canal_id === mostrada?.canal) lecturas.agregar({ tiempo: e.tiempo, valor: e.valor }); // la serie es la del canal dibujado
+      // La serie es la del canal dibujado; con una ventana fija es historia (D1): la tarjeta se mueve, el gráfico no.
+      if (e.canal_id === mostrada?.canal && mostrada.fija === null) lecturas.agregar({ tiempo: e.tiempo, valor: e.valor });
     } else if (e.tipo === 'condicion') {
       repedirCondiciones.pedir();
     }
@@ -189,12 +278,95 @@
   }
   function elegirRango(r: ClaveRango): void {
     rangoElegido = r;
-    resElegida = resolucionValida(r, resElegida); // la resolución elegida se conserva si sirve para el rango nuevo
+    fijaElegida = null; // un preajuste vuelve a «ahora»
+    zooms = [];
+    resElegida = resolucionValida(r, mostrada?.fija === null ? resElegida : null); // la elegida se conserva si sirve (y no venía de un zoom)
     void cargarHistorico();
   }
   function elegirRes(r: ClaveResolucion | null): void {
     resElegida = resolucionValida(rangoElegido, r);
     void cargarHistorico();
+  }
+  // Zoom por arrastre (D1): la selección del gráfico (segundos) se vuelve la ventana nueva, con la resolución más fina admisible.
+  function zoom(desdeS: number, hastaS: number): void {
+    const v = ventanaDeSeleccion(desdeS, hastaS);
+    if (v === null) return; // selección sin extremos válidos: no hay zoom
+    zooms = [...zooms, { fija: fijaElegida, res: resElegida }];
+    fijaElegida = v;
+    resElegida = resolucionMasFina(v.hasta.getTime() - v.desde.getTime());
+    void cargarHistorico();
+  }
+  function volverZoom(): void {
+    const previo = zooms.at(-1);
+    if (previo === undefined) return;
+    zooms = zooms.slice(0, -1);
+    fijaElegida = previo.fija;
+    resElegida = previo.fija === null ? resolucionValida(rangoElegido, previo.res) : previo.res;
+    void cargarHistorico();
+  }
+  // Doble clic y «Volver a ahora»: el rango completo, terminando en ahora, con su resolución automática.
+  function rangoCompleto(): void {
+    zooms = [];
+    fijaElegida = null;
+    resElegida = null;
+    void cargarHistorico();
+  }
+  // Todos los canales del dispositivo en una sola respuesta (D2), con la misma ventana e intervalo que el gráfico principal.
+  let abortarTodos: AbortController | null = null;
+  async function cargarTodos(): Promise<void> {
+    if (mostrada === null || historico === null) return;
+    abortarTodos?.abort();
+    const ctl = new AbortController();
+    abortarTodos = ctl;
+    const q = new URLSearchParams({ desde: mostrada.desde.toISOString(), hasta: mostrada.hasta.toISOString(), intervalo: historico.intervalo });
+    try {
+      historicoTodos = await obtener<HistoricoDispositivo>(`/dispositivos/${encodeURIComponent(id)}/historico?${q.toString()}`, ctl.signal);
+      errorTodos = null;
+    } catch (e) {
+      if (esCancelacion(e)) return;
+      errorTodos = mensajeError(e);
+    }
+  }
+  function alternarTodos(): void {
+    todosLosCanales = !todosLosCanales;
+    if (todosLosCanales) void cargarTodos();
+  }
+  // Historial de eventos del rango (D5), por cursor: «Más antiguos» pide la página siguiente con `X-Siguiente`.
+  let abortarEventos: AbortController | null = null;
+  async function cargarEventos(desdeElPrincipio: boolean): Promise<void> {
+    if (mostrada === null) return;
+    abortarEventos?.abort();
+    const ctl = new AbortController();
+    abortarEventos = ctl;
+    const q = new URLSearchParams({ desde: mostrada.desde.toISOString(), hasta: mostrada.hasta.toISOString() });
+    if (!desdeElPrincipio && eventosSiguiente !== null) q.set('cursor', eventosSiguiente);
+    eventosCargando = true;
+    try {
+      const p = await obtenerPagina<EventoDispositivo>(`/dispositivos/${encodeURIComponent(id)}/eventos?${q.toString()}`, ctl.signal);
+      eventos = desdeElPrincipio ? p.filas : [...eventos, ...p.filas];
+      eventosSiguiente = p.siguiente;
+      errorEventos = null;
+    } catch (e) {
+      if (esCancelacion(e)) return;
+      errorEventos = mensajeError(e);
+    } finally {
+      if (abortarEventos === ctl) eventosCargando = false;
+    }
+  }
+  // Tramas rechazadas por cursor (D6): «Más antiguas» suma la página siguiente; se muestran agrupadas.
+  async function masRechazadas(): Promise<void> {
+    if (rechazadasSiguiente === null || rechazadasCargando) return;
+    rechazadasCargando = true;
+    try {
+      const q = new URLSearchParams({ dispositivo: id, limite: '20', cursor: rechazadasSiguiente });
+      const p = await obtenerPagina<TramaRechazada>(`/cuarentena?${q.toString()}`);
+      rechazadas = [...rechazadas, ...p.filas.filter((t) => !rechazadas.some((x) => x.id === t.id))];
+      rechazadasSiguiente = p.siguiente;
+    } catch (e) {
+      avisoDescarga = avisoDeError(e);
+    } finally {
+      rechazadasCargando = false;
+    }
   }
 
   // La vista va a la URL (punto 1) cuando cambia lo que el gráfico MUESTRA (incremento 2, punto 2: con error, la URL no se toca). Depende
@@ -203,7 +375,7 @@
   $effect(() => {
     const m = mostrada;
     if (!listo || m === null) return;
-    const f = fragmentoFicha(untrack(() => id), m.canal, m.rango, m.res);
+    const f = fragmentoFicha(untrack(() => id), m.canal, m.rango, m.res, m.fija);
     untrack(() => alCambiarVista(f));
   });
   // La URL cambió desde fuera (atrás, un enlace): se reaplica. Si coincide con lo que ya se muestra (la escribió esta misma
@@ -211,14 +383,18 @@
   $effect(() => {
     const r = rangoInicial ?? RANGO_POR_DEFECTO;
     const c = canalInicial;
-    const x = resolucionValida(r, resInicial);
+    const fx = fijaInicial;
+    const x = fx === null ? resolucionValida(r, resInicial) : resInicial;
     untrack(() => {
       if (!listo || d === null) return;
       const canalNuevo = c !== null && d.canales.some((k) => k.id === c) ? c : (d.canales[0]?.id ?? null);
-      if (r === rangoElegido && canalNuevo === canalElegido && x === resElegida) return;
+      const mismaFija = (fx === null && fijaElegida === null) || (fx !== null && fijaElegida !== null && fx.desde.getTime() === fijaElegida.desde.getTime() && fx.hasta.getTime() === fijaElegida.hasta.getTime());
+      if (r === rangoElegido && canalNuevo === canalElegido && x === resElegida && mismaFija) return;
       rangoElegido = r;
       canalElegido = canalNuevo;
       resElegida = x;
+      if (!mismaFija) zooms = [];
+      fijaElegida = fx;
       void cargarHistorico();
     });
   });
@@ -245,8 +421,8 @@
     const q = new URLSearchParams({ formato: 'csv', desde: new Date(hasta.getTime() - 7 * 86_400_000).toISOString(), hasta: hasta.toISOString() });
     return `/dispositivos/${encodeURIComponent(id)}/exportar?${q.toString()}`;
   }
-  // «Descargar CSV de este rango» (incremento 2, punto 6): la ventana que el gráfico muestra, tal cual. Es un enlace a la API, no la
-  // pantalla P8 (Etapa 4).
+  // «Descargar CSV de este rango» (incremento 2, punto 6): la ventana que el gráfico muestra, tal cual. Se descarga con
+  // `descargar()` (fetch con la sesión y un Blob, §6), no con un enlace a la API; no es la pantalla P8 (Etapa 4).
   function urlExportarVentana(desde: Date, hasta: Date): string {
     const q = new URLSearchParams({ formato: 'csv', desde: desde.toISOString(), hasta: hasta.toISOString() });
     return `/dispositivos/${encodeURIComponent(id)}/exportar?${q.toString()}`;
@@ -264,6 +440,8 @@
       clearInterval(reloj);
       carga.cancelar();
       abortarHistorico?.abort();
+      abortarTodos?.abort();
+      abortarEventos?.abort();
       repedirCondiciones.cancelar();
       lecturas.cancelar();
       c.cerrar();
@@ -271,7 +449,7 @@
   });
 </script>
 
-<p><a href="#/">← Inventario</a></p>
+<p><a href="#/inventario">← Inventario</a></p>
 {#if error !== null}
   <p class="error" role="alert">{error}</p>
 {:else if d === null || estado === null}
@@ -287,6 +465,11 @@
         </span>
       {/if}
       <Boton etiqueta={pausado ? 'Reanudar' : 'Pausar'} presionado={pausado} ayuda="Congela las lecturas en vivo de esta ficha; el gráfico y las tarjetas dejan de moverse" onclick={() => (pausado = !pausado)} />
+      {#if mostrada !== null && mostrada.fija !== null}
+        <!-- Ventana que no termina en «ahora» (D1): es historia; el vivo no le agrega puntos -->
+        <span data-rango-fijo>· rango fijo</span>
+        <Boton etiqueta="Volver a ahora" variante="discreto" ayuda="Vuelve al rango completo que termina ahora, con las lecturas en vivo" onclick={rangoCompleto} data-volver-a-ahora />
+      {/if}
     </p>
     <p class="vivo" data-intervalo>
       {#if d.intervalo_observado_s === null}
@@ -323,14 +506,15 @@
         <li>
           <button type="button" class="canal" class:callado={callados.has(c.id)} aria-pressed={c.id === canalElegido} onclick={() => elegirCanal(c.id)} data-canal-id={c.id}>
             <strong>{c.magnitud_nombre}{c.etiqueta === null ? '' : ` · ${c.etiqueta}`}</strong>
-            <span class="lectura" data-ultima>{formatearValor(c.ultima_medicion?.valor ?? null, c.unidad)}</span>
+            <span class="lectura" data-ultima>{valorDe(c.ultima_medicion?.valor ?? null, c.unidad, c.magnitud)}</span>
             <!-- «es un número», no «no es null»: un evento sin el campo (un backend anterior) no debe romper la tarjeta -->
             {#if typeof c.ultima_medicion?.porcentaje === 'number'}
               <span class="porcentaje" data-porcentaje>{c.ultima_medicion.porcentaje.toLocaleString('es-CL')} % según su calibración</span>
             {/if}
             <span class="vivo">{c.ultima_medicion === null ? 'sin lecturas' : haceCuanto(c.ultima_medicion.tiempo, ahora)}{#if callados.has(c.id)}{' · '}<strong data-callado>callado</strong>{/if}</span>
             {#if c.reglas !== null && c.reglas.length > 0}
-              <span class="reglas">umbrales: {c.reglas.map((r) => `${r.umbral_bajo ?? '—'} a ${r.umbral_alto ?? '—'} (histéresis ${r.histeresis ?? 0})`).join('; ')}</span>
+              {@const k = conversion(c.unidad, unidades, c.magnitud)}
+              <span class="reglas">umbrales: {c.reglas.map((r) => `${valorDe(r.umbral_bajo, c.unidad, c.magnitud)} a ${valorDe(r.umbral_alto, c.unidad, c.magnitud)} (histéresis ${formatearValor(k.desdeBase(r.histeresis ?? 0) - k.desdeBase(0), k.simbolo)})`).join('; ')}</span>
             {:else}
               <span class="reglas">sin umbrales</span>
             {/if}
@@ -343,12 +527,16 @@
   {#if canalActual !== null}
     <!-- Rango y resolución (incremento 2, puntos 2 y 4): mientras llega el histórico, el grupo queda ocupado y el texto dice «cargando…» -->
     <div class="filtros" role="group" aria-label="Rango del gráfico" aria-busy={cargando} data-cargando={cargando}>
-      <SelectorRango rango={rangoElegido} res={resElegida} alElegirRango={elegirRango} alElegirRes={elegirRes} />
+      <SelectorRango rango={fijaElegida === null ? rangoElegido : null} res={resElegida} alElegirRango={elegirRango} alElegirRes={elegirRes} />
+      {#if zooms.length > 0}<Boton etiqueta="Volver" ayuda="Deshace el último zoom" onclick={volverZoom} data-volver-zoom />{/if}
+      {#if tieneMinMax}<Boton etiqueta="Mostrar mín–máx" presionado={mostrarMinMax} ayuda="Dibuja, alrededor del promedio, la banda entre el mínimo y el máximo de cada cubo" onclick={() => (mostrarMinMax = !mostrarMinMax)} data-min-max />{/if}
+      <Boton etiqueta="Todos los canales" presionado={todosLosCanales} ayuda="Una gráfica pequeña por canal, con la misma ventana y el cursor sincronizado" onclick={alternarTodos} data-todos-canales />
       {#if cargando}
         <span class="vivo" data-cargando-texto>cargando…</span>
       {:else if historico !== null}
-        <span class="vivo" data-historico>{historico.puntos} puntos, promedio por {rotuloIntervalo(historico.intervalo)}; en vivo, cada lectura aparte</span>
+        <span class="vivo" data-historico>{historico.puntos} puntos, promedio por {rotuloIntervalo(historico.intervalo)}{mostrada?.fija === null ? '; en vivo, cada lectura aparte' : ''}{#if mostrada !== null && mostrada.fija !== null}; del {fechaHora(mostrada.desde.toISOString(), d.zona_horaria)} al {fechaHora(mostrada.hasta.toISOString(), d.zona_horaria)}{/if}</span>
       {/if}
+      <span class="vivo">Arrastra sobre el gráfico para acercar; doble clic para el rango completo.</span>
       <a href={fragmentoComparar([id], canalActual.magnitud, rangoElegido, resElegida)} onclick={irAComparar} data-ir-comparar>Comparar con otros dispositivos</a>
     </div>
     {#if errorHistorico !== null}
@@ -375,19 +563,70 @@
     {/if}
     {#if canalMostrado !== null && mostrada !== null}
       <!-- {#key}: el gráfico se crea una vez por canal DIBUJADO; al llegar el histórico de otro canal se recrea con su título y unidad -->
-      {#key canalMostrado.id}
-        <Grafico {series} unidad={canalMostrado.unidad} zona={d.zona_horaria} titulo={`${canalMostrado.magnitud_nombre} (${canalMostrado.unidad})`} ventana={ventanaGrafico} />
+      {#key `${canalMostrado.id}|${mostrarMinMax}|${conv?.simbolo}`}
+        <Grafico series={datosGrafico} unidad={conv?.simbolo ?? canalMostrado.unidad} zona={d.zona_horaria} titulo={`${canalMostrado.magnitud_nombre} (${conv?.simbolo ?? canalMostrado.unidad})`} ventana={ventanaGrafico}
+          lineas={mostrarMinMax ? [
+            { label: 'promedio', stroke: colores[0]!, width: 2 },
+            { label: 'lectura actual', stroke: colores[1]!, width: 0, puntos: true },
+            { label: 'mínimo', stroke: colores[0]!, width: 0 },
+            { label: 'máximo', stroke: colores[0]!, width: 0 },
+          ] : null}
+          banda={mostrarMinMax ? { alta: 4, baja: 3, color: colores[0]! } : null}
+          umbrales={umbralesDibujados.lineas} histeresis={umbralesDibujados.bandas} {franjas}
+          alSeleccionar={zoom} alDobleClic={rangoCompleto} sincronizar={`ficha-${id}`} />
       {/key}
+      {#if condicionesVentana.length >= LIMITE_CONDICIONES_VENTANA}
+        <Aviso tipo="info" texto={`Se muestran las ${LIMITE_CONDICIONES_VENTANA} condiciones más recientes de esta ventana: acorta el rango para ver las anteriores.`} />
+      {/if}
+      {#if franjas.length > 0}
+        <p class="vivo" data-franjas-texto>En la ventana: {franjas.map((f) => f.etiqueta).join(', ')} (franjas sombreadas).</p>
+      {/if}
       <!-- Lo que el rango ya sabe (incremento 2, punto 6): sobre los promedios recibidos, y así se nombra -->
       <p class="resumen-rango vivo">
         {#if resumen !== null}
-          <span data-resumen-rango>en este rango: mín {formatearValor(resumen.min, canalMostrado.unidad)} · máx {formatearValor(resumen.max, canalMostrado.unidad)} · promedio de los {resumen.n} promedios dibujados {formatearValor(resumen.promedio, canalMostrado.unidad)}</span>
+          <span data-resumen-rango>en este rango: mín {valorDe(resumen.min, canalMostrado.unidad, canalMostrado.magnitud)} · máx {valorDe(resumen.max, canalMostrado.unidad, canalMostrado.magnitud)} · promedio de los {resumen.n} promedios dibujados {valorDe(resumen.promedio, canalMostrado.unidad, canalMostrado.magnitud)}</span>
         {/if}
         <Boton etiqueta="Descargar CSV de este rango" etiquetaCargando="Descargando…" cargando={descargando} motivoDesactivado={motivoExportar}
           ayuda="Las mediciones crudas de la ventana que muestra el gráfico, en CSV (coma y punto decimal)"
           onclick={() => mostrada !== null && void exportar(urlExportarVentana(mostrada.desde, mostrada.hasta))} data-csv-rango />
       </p>
       {#if avisoDescarga !== null}<Aviso tipo={avisoDescarga.tipo} texto={avisoDescarga.texto} alCerrar={() => (avisoDescarga = null)} />{/if}
+      {#if todosLosCanales}
+        <!-- Todos los canales (D2): una gráfica pequeña por canal, un eje cada una, misma ventana, cursor sincronizado -->
+        <section aria-label="Todos los canales" data-seccion-todos>
+          {#if errorTodos !== null}
+            <p class="error" role="alert">{errorTodos} <Boton etiqueta="Reintentar" onclick={() => void cargarTodos()} /></p>
+          {:else if historicoTodos === null}
+            <p class="vacio">Cargando los canales…</p>
+          {:else}
+            <div class="graficos-canales">
+              {#each historicoTodos.canales as k, i (k.id)}
+                {@const ck = conversion(k.unidad, unidades, k.magnitud)}
+                <div data-grafico-canal={k.id}>
+                  <Grafico series={[historicoTodos.tiempos, convertirSerie(k.valores, ck)]} unidad={ck.simbolo} zona={d.zona_horaria} titulo={`${k.magnitud_nombre} (${ck.simbolo})`}
+                    lineas={[{ label: 'promedio', stroke: colores[i % colores.length]!, width: 2 }]} ventana={ventanaGrafico} sincronizar={`ficha-${id}`} alto={160} />
+                </div>
+              {/each}
+            </div>
+          {/if}
+        </section>
+      {/if}
+    {/if}
+  {/if}
+
+  <h3>Historial de eventos del rango</h3>
+  {#if errorEventos !== null}
+    <p class="error" role="alert" data-error-eventos>{errorEventos} <Boton etiqueta="Reintentar" onclick={() => void cargarEventos(true)} /></p>
+  {:else if eventos.length === 0}
+    <p class="vacio" data-eventos-vacio>{eventosCargando ? 'Cargando…' : 'Sin eventos en este rango (altas, cambios de configuración, mantenimiento).'}</p>
+  {:else}
+    <ul class="eventos" data-eventos>
+      {#each eventos as e (e.id)}
+        <li data-evento={e.id}><span title={horaLocal(e.ocurrido_en, d.zona_horaria)}>{fechaHora(e.ocurrido_en, d.zona_horaria)}</span> · {textoEvento(e)}</li>
+      {/each}
+    </ul>
+    {#if eventosSiguiente !== null}
+      <Boton etiqueta="Más antiguos" cargando={eventosCargando} etiquetaCargando="Cargando…" onclick={() => void cargarEventos(false)} data-eventos-mas />
     {/if}
   {/if}
 
@@ -417,16 +656,21 @@
   {#if rechazadas.length === 0}
     <p class="vacio">Ninguna trama de este dispositivo fue a cuarentena.</p>
   {:else}
+    <!-- Agrupadas (D6): filas iguales (motivo y detalle) una vez, con «× N» y la última; la trama cruda es la de la última -->
     <ul class="rechazadas">
-      {#each rechazadas as t (t.id)}
-        <li>
-          <span title={horaLocal(t.recibido_en, d.zona_horaria)}>{haceCuanto(t.recibido_en, ahora)}</span> · <strong>{t.motivo}</strong>
-          {#if t.detalle !== null}· {t.detalle}{/if}
-          {#if t.payload !== null}
-            <details><summary>trama ({t.payload_formato ?? 'texto'})</summary><pre>{t.payload}</pre></details>
+      {#each rechazadasAgrupadas as g (g.clave)}
+        <li data-grupo-rechazadas={g.n}>
+          <span title={horaLocal(g.ultima.recibido_en, d.zona_horaria)}>{haceCuanto(g.ultima.recibido_en, ahora)}</span> · <strong>{rotuloMotivo(g.motivo)}</strong>
+          {#if g.detalle !== null}· {g.detalle}{/if}
+          {#if g.n > 1}<strong data-veces>× {g.n}</strong> <span class="vivo">(la última)</span>{/if}
+          {#if g.ultima.payload !== null}
+            <details><summary>trama ({g.ultima.payload_formato ?? 'texto'})</summary><pre>{g.ultima.payload}</pre></details>
           {/if}
         </li>
       {/each}
     </ul>
+    {#if rechazadasSiguiente !== null}
+      <Boton etiqueta="Más antiguas" cargando={rechazadasCargando} etiquetaCargando="Cargando…" onclick={() => void masRechazadas()} data-rechazadas-mas />
+    {/if}
   {/if}
 {/if}
