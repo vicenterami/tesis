@@ -291,7 +291,7 @@ el mismo contrato. Referentes y normas: la comparativa de «P1 rediseñado» (ar
 referentes, y las reglas de visualización de §6 (colores validados, un solo eje, leyenda siempre que haya más de una serie).
 
 **A. Armazón y sistema visual (toda pantalla).**
-1. **Cabecera y navegación.** ✅ panel, 11/11/2026 (sin «en vivo» en la cabecera: cada pantalla conserva el suyo; Condiciones, Cuarentena y Estado del sistema se nombran sin enlace hasta tener pantalla; Actividad, «Dar de alta» y Preferencias tienen enlace desde el mismo día). Arriba: el nombre del sistema, el selector de sitio (solo si la persona tiene más de uno; el sitio vive
+1. **Cabecera y navegación.** *(Desde el 13/11/2026 la navegación se rediseña en L1: barra lateral que se contrae a iconos, el mismo menú como cajón bajo 1 000 px y la línea de servicio fuera de la cabecera; lo que sigue describe lo construido el 11/11.)* ✅ panel, 11/11/2026 (sin «en vivo» en la cabecera: cada pantalla conserva el suyo; Condiciones, Cuarentena y Estado del sistema se nombran sin enlace hasta tener pantalla; Actividad, «Dar de alta» y Preferencias tienen enlace desde el mismo día). Arriba: el nombre del sistema, el selector de sitio (solo si la persona tiene más de uno; el sitio vive
    en la URL `?sitio=` y la última elección se guarda en las preferencias, lo que llega con P13) y el menú principal: Tablero · Inventario · Condiciones ·
    Cuarentena · Actividad (administrador de sitio) · Usuarios (administrador de sitio) · Estado del sistema (administrador del sistema).
    A la derecha: «en vivo», quién soy y el menú de cuenta (Preferencias, Cambiar la clave, Salir, Cerrar en todos lados). Bajo 700 px el
@@ -323,16 +323,16 @@ referentes, y las reglas de visualización de §6 (colores validados, un solo ej
 4. **Un valor, un estado.** ✅ panel, 11/11/2026 (tablero). Cada número visible nace de un único estado derivado; nunca un bloque se recalcula al escribir y otro al
    pulsar un botón (el defecto típico de «dos valores que no calzan» en una demostración). Lo que depende de un dato nuevo se actualiza
    junto o se marca «cargando».
-5. **Teléfono (RF-52; WCAG 2.2, 1.4.10 y 2.5.8).** ✅ panel, 11/11/2026 (inventario en tarjetas y menú plegado; las capturas, en el paso 4c). Sin desplazamiento horizontal de la página desde 320 px: las tablas del inventario,
+5. **Teléfono (RF-52; WCAG 2.2, 1.4.10 y 2.5.8).** *(El alto de los gráficos y el gesto táctil, en L4g; el menú como cajón, en L1c.)* ✅ panel, 11/11/2026 (inventario en tarjetas y menú plegado; las capturas, en el paso 4c). Sin desplazamiento horizontal de la página desde 320 px: las tablas del inventario,
    las condiciones, la cuarentena y la actividad se vuelven listas de tarjetas bajo 700 px (una tarjeta por fila con lo esencial a la
    vista y el resto plegado); objetivos táctiles de 24 × 24 px CSS como mínimo y de 44 px en los botones principales; los gráficos al
    ancho disponible con la leyenda debajo. Capturas reproducibles a 390 y 1 280 px (paso 4c del guardián).
 
 **B. P1 Tablero del sitio (HU-16, RF-30, HU-15, HU-07; TT-44).** Lo primero que se ve al entrar. De arriba abajo:
-1. **Una sola fila de filtros** ✅ panel, 11/11/2026 (el sitio, en la cabecera) (regla de los tableros de monitoreo: los filtros arriba y alcanzan a todo lo que está debajo): sitio (si
+1. **Una sola fila de filtros** *(desde L2: la fila del rango va en las pestañas Tendencias y Red; el Resumen no la lleva)* ✅ panel, 11/11/2026 (el sitio, en la cabecera) (regla de los tableros de monitoreo: los filtros arriba y alcanzan a todo lo que está debajo): sitio (si
    hay varios), rango temporal (última hora, 24 h, 7 días, 30 días y **a medida**, con fecha y hora de inicio y fin: HU-07) y el aviso de
    zona horaria. El rango va en la URL (`#/?sitio=&rango=7d`, o `&desde=&hasta=` en ISO), como toda vista.
-2. **Fila de indicadores** ✅ panel, 11/11/2026; ✅ backend, 11/11/2026 (los cuatro estados de §2 más el total; «en línea», en la tarjeta de salud) (tarjetas de valor, no gráficos de una barra): Dispositivos (total) · Normal · Alerta · Sin señal ·
+2. **Fila de indicadores** *(desde L2a, la ficha entera es el enlace y «Tramas» va en la misma franja)* ✅ panel, 11/11/2026; ✅ backend, 11/11/2026 (los cuatro estados de §2 más el total; «en línea», en la tarjeta de salud) (tarjetas de valor, no gráficos de una barra): Dispositivos (total) · Normal · Alerta · Sin señal ·
    Inactivos (los cuatro suman el total; «en línea» va en la tarjeta de salud), cada una un botón que abre el inventario filtrado (como hoy las fichas de conteo); **Salud del sitio** = en línea ÷ (total
    − inactivos), en porcentaje con un medidor de una sola rampa y en texto («14 de 16 reportan»), que es el indicador agregado de RF-30;
    condiciones abiertas por tipo (barras horizontales ordenadas, un solo matiz) y las tramas del rango, recibidas y rechazadas. Todo sale
@@ -341,7 +341,7 @@ referentes, y las reglas de visualización de §6 (colores validados, un solo ej
 3. **«Requiere atención»:** ✅ panel, 11/11/2026; hasta diez dispositivos en Sin señal o Alerta, en el orden de atención de P2, con hace cuánto y la
    condición; enlace a cada ficha y «ver todos» (P2 ordenado por atención, sin filtro de estado: el inventario filtra por un solo estado y aquí
    conviven dos; decidido al implementar, 11/11/2026).
-4. **Gráficas del sitio** ✅ panel, 11/11/2026; ✅ backend, 11/11/2026 (uPlot, cursor sincronizado entre ellas): (a) **tramas por cubo** del rango, recibidas y rechazadas como barras
+4. **Gráficas del sitio** *(desde L2 y L4: en las pestañas Tendencias y Red, vivas y con etiqueta flotante)* ✅ panel, 11/11/2026; ✅ backend, 11/11/2026 (uPlot, cursor sincronizado entre ellas): (a) **tramas por cubo** del rango, recibidas y rechazadas como barras
    apiladas (dos colores de la paleta, leyenda); (b) **una gráfica por magnitud que el sitio mide** (hasta seis; las demás, en una
    lista): el promedio del sitio por cubo con la banda mín–máx del mismo matiz al 15 % y cuántos dispositivos aportan («promedio de 9
    dispositivos»; un canal por dispositivo y magnitud, así que el conteo de canales es el de dispositivos), de `GET /sitios/{id}/historico` (Etapa 4); un clic abre P3b con esa magnitud y hasta seis dispositivos del sitio; la resolución
@@ -486,6 +486,114 @@ teléfono sin desplazamiento horizontal. En `docs/16`: tiempo del resumen y del 
 las gráficas del panel contra ese contrato; después P6, P7, P13 y P14; al final el teléfono con capturas y la medición. Lo que no
 alcance se declara con este diseño escrito, nunca a medias.
 
+**L. Tablero v3: armazón lateral, pestañas, «Ahora» y gráficas vivas (diseñado el 13/11/2026, antes del código, y revisado el mismo día).**
+Qué lo motiva: con la semilla completa cargada, el tablero v2 mide 3 957 px de alto a 1 280 px y 6 254 px a 390 px (más de siete
+pantallas de teléfono); sus gráficas no cambian mientras se miran (solo los indicadores se repiden en vivo); no hay ninguna vista de
+**lo que se mide en este momento**, que es la pregunta con la que llega quien abre el sistema; cada gráfica repite su título tres veces
+y trae la tabla de leyenda que uPlot dibuja por defecto; y el menú es una fila de enlaces de texto con dos entradas sin pantalla. Este
+bloque cambia A1, A5, B1, B2 y B4 y acota la regla de botones de §6 (punto 1e, con su precisión en RF-58); lo demás de A a K sigue.
+Una revisión del diseño, antes de construir, quitó lo que costaba más de lo que daba: una barra inferior fija en teléfono (puede tapar
+el foco, choca con el teclado en pantalla y deja casi sin contenido en apaisado), guardar en la cuenta si el menú está contraído (pedía
+una migración por un dato que es de cada pantalla, no de la persona), las gráficas vivas en 7 y 30 días (repetían consultas de un
+segundo para mover un cubo de seis horas) y volver a pedir datos por cada trama recibida.
+1. **Armazón (cambia A1).** (a) *Desde 1 000 px:* **barra lateral** a la izquierda con la marca corta del sistema y el menú, cada
+   entrada con icono y texto: Tablero, Inventario, Actividad, Usuarios y Dar de alta (según el perfil, como hoy) y, abajo, «Legal y
+   acerca de». Una pantalla entra al menú cuando existe: se quitan las entradas «(próximamente)». (b) **Se contrae a solo iconos**
+   (56 px) con el botón «Menú» de la barra superior; al abrir la página está expandida desde 1 280 px y contraída entre 1 000 y
+   1 279 px. El estado vale mientras la página sigue abierta: no se guarda en la cuenta ni en el navegador (`docs/21` no cambia).
+   (c) *Bajo 1 000 px* el mismo menú se abre como un **cajón** sobre el contenido con el botón «Menú» (reemplaza al menú plegado de
+   hoy): se cierra con Escape, al elegir un destino o al tocar fuera; mientras está abierto el foco no sale de él y, al cerrarlo,
+   vuelve al botón. No hay barra fija abajo. (d) **Barra superior:** «Menú», el sitio (selector si la persona tiene más de uno; el
+   nombre si no), el botón de tema (punto 5) y el menú de cuenta de hoy. El estado del canal en vivo sigue en cada pantalla, como
+   decidió A1. La línea «servicio: ok, base conectada, N tablas» sale de la cabecera: describe la instalación y no ayuda a quien mira
+   datos; pasa a «Legal y acerca de» (con sesión), y si el servicio falla se dice con un aviso. (e) **Solo icono, en un único
+   lugar.** Los enlaces de la barra lateral contraída son los únicos controles sin texto visible: cada uno lleva como nombre accesible
+   el texto de su entrada y lo muestra como ayuda al pasar el puntero o al enfocar (WCAG 2.2, 1.1.1 y 4.1.2; la ayuda es la de
+   `Tooltip.svelte`, que debe cumplir 1.4.13: se quita con Escape, admite el puntero encima y dura mientras hay foco). Los botones
+   siguen la regla de §6 —texto obligatorio—, también «Menú» y el de tema; RF-58 se precisa con esta única excepción. Los destinos
+   miden 44 px. (f) **Iconos propios:** un solo componente con trazos SVG dibujados para este proyecto (sin biblioteca de terceros ni
+   fuente de iconos: la CSP no admite recursos externos y no se suma una licencia), de 24 px, con `currentColor` y ocultos al lector
+   de pantalla (el nombre es el del control). (g) Un enlace «Saltar al contenido» es lo primero que recibe el foco (2.4.1) y el orden
+   del foco es barra superior, menú y contenido (2.4.3).
+2. **El tablero en tres pestañas (cambia B1 y B2, y reordena B3 y B4).** Son enlaces con la vista en la URL
+   (`#/?sitio=&ver=tendencias|red&rango=`; sin `ver`, el resumen), así el botón atrás del navegador vuelve a la anterior y una
+   pestaña se comparte por enlace. **Resumen** es el presente: la franja de indicadores, «Ahora» (punto 3), «Requiere atención» y
+   las condiciones abiertas por tipo; **no lleva selector de rango**, porque nada de lo que muestra depende de él (las tramas son las
+   de las últimas 24 horas, y así se rotulan). **Tendencias** (una gráfica por magnitud, B4b) y **Red** (las tramas por cubo, B4a, y
+   la entrega por dispositivo, B4c) llevan la fila del rango (B1). Solo se pide lo de la pestaña abierta: al entrar, el resumen y
+   «Ahora» (dos pedidos; hoy son siete). (a) **Franja de indicadores:** fichas compactas —Dispositivos, Normal, Alerta, Sin señal,
+   Inactivos, Tramas (24 h) y Salud del sitio—; el enlace de cada ficha es su rótulo con su cifra («Sin señal: 5») y su área activa
+   cubre la ficha entera; ya no hay un «Ver en el inventario» por ficha; «Tramas» lleva a la pestaña Red. En teléfono, tres por fila
+   y la salud a lo ancho. (b) Un nombre largo ocupa una línea con puntos suspensivos y se lee entero en la ayuda; nunca parte la
+   fila. (c) Las barras ordenadas (condiciones por tipo, entrega) usan el tamaño de texto del cuerpo. (d) En teléfono, «Requiere
+   atención» muestra cinco y «Ahora» ocho, con su «ver todos».
+3. **«Ahora»: lo que se mide en este momento.** (a) **Por magnitud:** una ficha por cada magnitud que el sitio mide, con el
+   promedio, el mínimo y el máximo de la última lectura de los dispositivos que están reportando y cuántos aportan («Temperatura
+   17,2 °C · entre 11,8 y 21,4 · 9 dispositivos»). Es lo que busca quien solo consulta, y lo que podrá reutilizar la vista pública
+   por enlace, que solo admite agregados (`docs/20 §7`). (b) **Por dispositivo:** una tarjeta por dispositivo **que está
+   reportando** (estado Normal o Alerta, §2), primero los que tienen una alerta y después por zona y nombre, hasta 24 (con más,
+   «Ver los N en el inventario»). Los que están sin señal no se repiten aquí —ya están en «Requiere atención», y una línea lo dice
+   («5 sin señal, arriba»)—: así nunca se muestra en grande, como si fuera de ahora, un valor de hace semanas. Cada tarjeta: nombre,
+   zona, estado, hace cuánto reportó y **hasta tres canales** con su último valor en grande y su unidad para personas (D7): primero
+   las magnitudes de lo que se mide y al final las de salud del equipo (batería y señal); con más de tres, «+N»; un canal cuya
+   última lectura tiene más de dos intervalos esperados se atenúa y dice su antigüedad. Junto a cada valor, una **línea de
+   tendencia** de las últimas 24 horas (24 promedios por hora, en un trazo SVG decorativo: el dato es el número). El enlace es el
+   nombre del dispositivo, con el área activa extendida a la tarjeta (§6: la tarjeta entera no es el nombre de un enlace). (c) **En
+   vivo, sin pedir por cada trama.** Cada trama produce un aviso `medicion` por lectura y un `visto`: los dos se aplican en el panel
+   —el valor, su hora y «hace cuánto»—, como ya hace la ficha, y **ninguno pide nada al servidor**; lo dibujado se pone al día como
+   mucho una vez por segundo por tarjeta, con un resalte breve (ninguno si la persona pidió menos movimiento,
+   `prefers-reduced-motion`). Solo un aviso `condicion` de un dispositivo del sitio repide «Ahora» y el resumen (antirrebote de §6),
+   y mientras llegan tramas el resumen se repide, además, una vez por minuto (los conteos de tramas). Para saber qué avisos son del
+   sitio, cada aviso trae su `sitio_id` (campo nuevo): hoy el panel lo deduce de las listas del resumen, que traen como mucho 60
+   dispositivos. La tendencia se pide una vez al cargar y no se repide en vivo. Los cambios en vivo no se anuncian al lector de
+   pantalla uno por uno (serían ruido): las condiciones nuevas ya tienen su aviso (E).
+4. **Gráficas (cambia B4 y A5, y completa D).** (a) **Vivas donde sirve:** con el rango «última hora» o «24 horas», las gráficas de
+   Tendencias y de Red se repiden solas mientras llegan avisos de dispositivos del sitio: como mucho una vez cada sexta parte del
+   cubo y nunca fuera de 5 a 60 s (con cubos de un minuto, cada 10 s; de 15 minutos, cada 60 s), sin dos pedidos en vuelo y solo con
+   la pestaña del navegador visible; la ventana avanza de cubo en cubo (su inicio se alinea al cubo, para que los promedios ya
+   dibujados no cambien) y se lee «actualizado hace N s». Con 7 o 30 días no se actualizan solas —el último cubo, de una o seis
+   horas, casi no cambia y cada pedido lee el rango entero (`docs/16 §61`)—: hay un botón «Actualizar». Con un rango fijo es
+   historia, como hoy. La base sigue siendo la fuente: el panel no recalcula promedios con lo que llega. **«Pausar»**, en la fila
+   del tablero, detiene toda actualización automática (WCAG 2.2, 2.2.2) y «Reanudar» vuelve a pedir una vez lo que se muestra, como
+   al reconectar (F4); la ficha, que hoy descarta lo que llega en pausa y no lo repone, se corrige igual. (b) **Un título por
+   gráfica,** el de su sección: el lienzo no repite el nombre (lo conserva como nombre accesible y como título de la tabla «Ver los
+   datos»). (c) **Etiqueta flotante en vez de la tabla de leyenda:** uPlot no la trae; es un complemento propio sobre su gancho del
+   cursor. Aparece solo en el gráfico que está bajo el puntero (los demás, sincronizados, muestran la línea del cursor), junto al
+   punto, con la hora y el valor de cada serie con su unidad, sin salirse del gráfico; se quita al salir, con Escape o al desplazar
+   la página. En pantallas táctiles, un toque la muestra y un toque fuera la quita; si en la prueba con navegador real no resulta
+   fiable, en táctil queda una línea de leyenda compacta con los valores del punto tocado, y aquí se anota cuál quedó. Nadie
+   depende de ella: los mismos valores están en «Ver los datos». Con más de una serie hay, además, una leyenda fija de nombres con
+   su color (A3). (d) Los bordes de la banda mín–máx no dibujan puntos; la serie principal los dibuja solo con 30 puntos o menos.
+   (e) Las gráficas de conteo (tramas) tienen eje de enteros. (f) Una magnitud sin datos en el rango no dibuja ejes vacíos: se
+   nombra en una línea («Sin datos en este rango: …»). (g) **Alto según la pantalla:** 280 px en escritorio y entre 180 y 240 px en
+   teléfono. El zoom por arrastre es del puntero; en una pantalla táctil arrastrar desplaza la página (uPlot no escucha gestos
+   táctiles) y el rango se cambia con los botones y «A medida».
+5. **Tema con un botón.** En la barra superior (dentro del cajón, en teléfono), un botón con icono y texto —«Tema oscuro» o «Tema
+   claro»: lo que hará— alterna entre los dos: se aplica al instante (`data-theme`) y, con sesión, guarda la preferencia `tema` por
+   la misma fila de guardado de P13 (un solo escritor de preferencias en el panel: nunca dos `PUT` en vuelo ni un 409 contra uno
+   mismo); si el servidor lo rechaza, vuelve y lo dice. Partiendo de «sistema», el primer toque pasa al contrario del tema que se
+   está viendo; volver a «sistema» se hace en P13, que conserva las tres opciones. Sin sesión el botón vale para esa visita.
+6. **Contrato que este bloque agrega (I).** `GET /sitios/{id}/ahora?limite&tendencia` (Etapa 4) —consulta o más; otro sitio, 404; `limite` de
+   1 a 60, 24 por defecto; `tendencia=si` suma las líneas de tendencia— → `reportan` y `sin_senal` (cuántos dispositivos hay en cada
+   caso), `por_magnitud[{codigo, nombre, unidad, canales, promedio, minimo, maximo}]` (sobre la última lectura de cada canal de los
+   que reportan) y `dispositivos[{id, nombre, zona, estado_visual, visto_por_ultima_vez, intervalo_esperado_s, canales_total,
+   canales[{id, magnitud, magnitud_nombre, unidad, salud, ultima{valor, tiempo, porcentaje}|null, chispa[número|null]}]}]` (hasta
+   tres canales por dispositivo, en el orden del punto 3b; `chispa`, solo con `tendencia=si`), más `chispa{desde, intervalo,
+   puntos}`: 24 cubos de una hora que terminan en la hora en curso (el último, parcial), alineados a la hora UTC (es una tendencia
+   sin eje, no una serie para leer valores); un cubo sin lecturas es `null`, no 0. El estado visual sale de la misma regla en SQL
+   que el inventario (C). Los avisos `medicion`, `visto` y `condicion` del canal en vivo suman `sitio_id`. `/preferencias` no cambia.
+7. **Pruebas y medición (J), con umbral.** Por el DOM: el enlace de una ficha de indicador se llama por su rótulo y su cifra; el
+   menú contraído conserva los nombres accesibles y el cajón devuelve el foco a «Menú»; una ráfaga de avisos `medicion` y `visto`
+   cambia las tarjetas **sin ningún pedido**, y con tramas continuas hay como mucho un pedido de resumen por minuto; «Reanudar»
+   vuelve a pedir una vez (tablero y ficha); el tema alterna y vuelve si el guardado falla; una magnitud sin datos no dibuja lienzo;
+   la etiqueta flotante aparece y se quita con Escape. Con navegador real (paso 4c, 390 × 844 y 1 280 px, los dos temas, con la
+   semilla completa): la pestaña Resumen no mide más de tres pantallas de alto a 390 px (2 532 px; hoy el tablero mide 6 254);
+   ninguna pestaña se desplaza a lo ancho; el cajón se abre, navega y se cierra con el teclado. En `docs/16`: pedidos al entrar (de
+   siete a dos); `GET /sitios/{id}/ahora` (Etapa 4) sin tendencia no tarda más que `…/resumen` en la misma medición con 120 fuentes (`§61`), y
+   con tendencia se mide con tramas cada 60 s y cada 5 s (si con 60 s tarda más del doble que el resumen, la tendencia sale del
+   diseño y se anota); y el paquete inicial del panel no crece más de 10 % sobre el de `§64`, para lo cual las pantallas pasan a
+   cargarse a pedido.
+
 ## 5. Flujos
 **F1 · Alta y primera trama.** Ya está dibujado en el diagrama de secuencia del alta (`docs/10`, figura del informe): el
 administrador crea el dispositivo (API en la Etapa 3), recibe la credencial una sola vez, configura el nodo, y el panel
@@ -544,7 +652,8 @@ administrador); la vista pública nunca ofrece exportar (punto 6).
   con la sesión, pasa por el manejo central (401 → «Entrar») y, con 200, arma el archivo en memoria y lo entrega con un enlace creado en
   memoria (nunca insertado en la página), con el nombre que trae `Content-Disposition`.
 - **Componentes de botones y mensajes** (regla del 08/11/2026): todo botón nuevo es `Boton.svelte`, con **etiqueta de texto obligatoria**
-  (ningún botón solo con icono: sin ella el componente falla en voz alta); `ayuda` como tooltip (`Tooltip.svelte`) que aparece al pasar
+  (ningún botón solo con icono: sin ella el componente falla en voz alta; la única excepción de solo icono, desde el 13/11/2026, son los
+  enlaces de la barra lateral contraída, con su nombre accesible y su ayuda visible: §4, L1e); `ayuda` como tooltip (`Tooltip.svelte`) que aparece al pasar
   el ratón **y** al enfocar con el teclado, se va con Escape y se enlaza con `aria-describedby`; `cargando` (desactivado, `aria-busy`, la
   etiqueta en gerundio) y `motivoDesactivado`, que desactiva el botón y **escribe el motivo al lado** (un botón desactivado no recibe el
   foco ni el ratón en todos los navegadores: un tooltip no alcanzaría). Los mensajes son `Aviso.svelte` (éxito, error, conflicto, espera,
