@@ -24,15 +24,18 @@
 
 ```bash
 bash plataforma/pruebas/pila.sh encender      # construye, levanta, espera «healthy» y muestra el estado
-bash plataforma/pruebas/semilla-demo.sh       # datos del guion (idempotente): SEMILLA LISTA y, al final, las dos claves temporales
+bash plataforma/pruebas/semilla-demo.sh       # datos del guion (idempotente): SEMILLA LISTA y, al final, qué pasó con cada una de las cinco personas
 bash plataforma/pruebas/verificar-todo.sh     # TODO EN CONCORDANCIA
 ```
 
 2b. **Abrir el panel** en una pestaña y dejarla: `http://127.0.0.1:3000/panel/`. **Entrar justo antes de empezar** (la sesión vence a los
    30 min sin tocar el ratón o el teclado; `docs/20 §3`). Lo sirve el backend ya construido en la imagen (si el backend corre fuera
    de Docker, antes `pnpm --filter panel build`). Desde el 08/11/2026 pide entrar (P10, `docs/19 §4`): con
-   `admin-demo@ejemplo.invalid` y la clave temporal que la semilla imprimió una sola vez al final (vence a las `CLAVE_TEMPORAL_HORAS`, 2 h por defecto: correr la semilla poco antes de la demo; si se perdió o venció, se
-   vuelve a correr la semilla, que asigna otra). Las personas de demostración solo se crean con el backend en bucle local (`127.0.0.1` o
+   `admin-demo@ejemplo.invalid` y su clave: la propia, si ya la eligió, o la temporal que la semilla imprimió una sola vez al final (vence a las
+   `CLAVE_TEMPORAL_HORAS`, 2 h por defecto). Desde el 13/11/2026 la semilla respeta las claves: a quien ya eligió la suya no se la toca ni le
+   corta la sesión, una temporal aún vigente se deja como está, y solo la cuenta nueva o con la temporal vencida recibe una temporal nueva (la
+   salida dice, por persona, la clave nueva o qué conserva); una cuenta desactivada se reactiva siempre con una clave temporal nueva. Para asignar otras a las cinco y cortar sus sesiones, como antes:
+   `SEMILLA_ROTAR_CLAVES=1 bash plataforma/pruebas/semilla-demo.sh`. Las personas de demostración solo se crean con el backend en bucle local (`127.0.0.1` o
    `localhost`, como en esta demo); contra un servidor la semilla las omite con aviso, salvo `SEMILLA_PERSONAS=1` explícito, porque sus
    correos son fijos y adivinables. El panel exige elegir una clave propia y muestra el inventario con semáforo. Entrar a la ficha de
    `dev-0001` (su nombre en la tabla) y volver al inventario: durante el paso 4 se verá cambiar el estado sin recargar y, en la
@@ -163,7 +166,7 @@ además la cabecera `X-Pedido: panel`):
 
 ## 6. Cómo se sostiene esto (1 min)
 
-- `cd plataforma/backend && pnpm verificar`: tipos, lint y 552 pruebas unitarias en unos segundos
+- `cd plataforma/backend && pnpm verificar`: tipos, lint y 564 pruebas unitarias en unos segundos
   (la cifra exacta la da la salida de `vitest`; no la memorices). Los avisos de cuarentena que aparecen
   mientras corre son de las pruebas, a propósito.
 - `bash plataforma/pruebas/verificar-todo.sh`: esquema, migraciones, diagramas del informe, API y

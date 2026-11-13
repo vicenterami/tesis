@@ -470,10 +470,11 @@ PY
 
 paso "2p. Repositorio público: ningún archivo versionado cita fichas privadas (viven en privado/, un lector no las abre)"
 # 08/10: 19 referencias en 12 archivos apuntaban a fichas de decisión privadas (formato D, guion y dos dígitos). Lo público
+# (13/11: el patrón pedía exactamente dos dígitos y una ficha de tres pasó doce veces en ocho archivos; ahora, dos o tres.)
 # cita lo público: la sección de docs/10 §8.4 o de docs/11 donde quedó la decisión.
 # 15/10: lo mismo con los pendientes privados (la palabra y su número): siete referencias en seis archivos, quitadas y vigiladas; y
 # con el «registro» de evidencia privado: lo público cita la URL de la fuente, no el registro donde se anotó.
-git grep --untracked -n -E 'ficha D-[0-9]{2}|decisi[oó]n D-[0-9]{2}|\bD-[0-9]{2}\b|\bpendientes? [0-9]{1,3}\b|registro privad[o]|privad[o]/[A-Z]' -- ':!privado' ':!historico' > "$VT"/fichas.txt 2>&1; rc=$?
+git grep --untracked -n -E 'ficha D-[0-9]{2,3}|decisi[oó]n D-[0-9]{2,3}|\bD-[0-9]{2,3}\b|\bpendientes? [0-9]{1,3}\b|registro privad[o]|privad[o]/[A-Z]' -- ':!privado' ':!historico' > "$VT"/fichas.txt 2>&1; rc=$?
 if [ "$rc" -eq 0 ]; then echo "FALLA archivos públicos que citan fichas o pendientes privados:"; cut -c1-160 "$VT"/fichas.txt; fallos=$((fallos+1))
 elif [ "$rc" -ne 1 ]; then echo "FALLA git grep falló ($rc): no se pudo revisar"; fallos=$((fallos+1))
 else echo "OK    ningún archivo versionado cita fichas ni pendientes privados"; fi
@@ -1108,6 +1109,12 @@ paso "4c. Panel con sesión en navegadores reales (P10; docs/19 §4 y §6): entr
 # o sin los navegadores de Playwright, el guion sale con 3 y el paso se OMITE con aviso: nunca «OK» sin haber probado.
 bash plataforma/pruebas/panel-sesion-e2e.sh; r=$?
 if [ "$r" = 3 ]; then omitidos="$omitidos 4c"; elif [ "$r" != 0 ]; then fallos=$((fallos+1)); fi
+
+paso "4d. Semilla de demostración: respeta la clave de quien ya eligió la suya (persona_temporal en conservar y rotar, con una persona de descarte)"
+# 13/11/2026: cada corrida de la semilla anulaba la clave propia de las personas de demostración y cortaba sus sesiones. La prueba usa una
+# persona y un sitio propios que borra al salir (nunca las cuentas *-demo); sin backend sale con 3 y el paso se OMITE.
+bash plataforma/pruebas/personas-semilla-prueba.sh; r=$?
+if [ "$r" = 3 ]; then omitidos="$omitidos 4d"; elif [ "$r" != 0 ]; then fallos=$((fallos+1)); fi
 
 # «TODO» solo si todo corrió: un paso omitido no se cuenta como aprobado (27/09: con el backend
 # apagado, el guardián decía TODO EN CONCORDANCIA sin haber probado la API). Sale 2 si hubo omisiones.

@@ -48,8 +48,9 @@ type Motivo = 'no_registrado' | 'dado_de_baja' | 'malformada' | 'invalida' | 'to
 interface TramaRecibida { topico: string; carga: Buffer; recibidoEn: Date; dispositivoId?: string; origen?: 'mqtt' | 'http'; pasarela?: string }
 // Lo que pasó con una trama después del filtro 1 (lo usa la recepción por HTTP para responder; la de MQTT no lo necesita).
 export interface ResumenTrama { guardadas: number; duplicadas: number; rechazos: string[]; malformada: string | null; repetida: boolean }
-// Lo que el filtro 1 de la vía HTTP necesita: el dispositivo, su vía, su estado y la huella de su credencial activa.
-export interface CredencialHttp { id: string; via: string; estado: string; hash: string | null }
+// Lo que el filtro 1 de la vía HTTP necesita: el dispositivo, su vía, su estado y la huella de su credencial activa, con el id de esa fila
+// de `credencial` (para convertir una huella anterior, docs/10 §8.4 punto 52).
+export interface CredencialHttp { id: string; via: string; estado: string; credencial_id: string | null; hash: string | null }
 interface Canal { id: string; magnitud: string; unidad_canonica: string; rango_min: number | null; rango_max: number | null; escala_cero: number | null; escala_cien: number | null }
 
 // M1 Recepción + M2 Normalización (pipeline). Los seis filtros: 1 autenticar · 2 analizar · 3 validar ·
@@ -389,12 +390,12 @@ export class RecepcionService implements OnModuleInit {
   }
 
   // ── Vía HTTP (docs/10 §8.4 punto 52): el filtro 1 lo hace la capa HTTP (http/verificacion.ts) con lo que esta consulta entrega ──
-  // El dispositivo, su vía, su estado y la huella de su credencial activa (o sin fila si no existe). Corre fuera del cupo de scrypt;
-  // con tiempo máximo, para que una base colgada no deje peticiones colgadas. pg lo lee de la consulta (`config.query_timeout`,
+  // El dispositivo, su vía, su estado y la huella de su credencial activa (o sin fila si no existe). Corre fuera del cupo de scrypt (que
+  // desde el 13/11/2026 solo usan las credenciales anteriores); con tiempo máximo, para que una base colgada no deje peticiones colgadas. pg lo lee de la consulta (`config.query_timeout`,
   // pg 8.23 lib/client.js), aunque sus tipos no lo declaren.
   async credencialHttp(idFisico: string): Promise<CredencialHttp | undefined> {
     const consulta: QueryConfig & { query_timeout: number } = {
-      text: `SELECT d.id, d.via, d.estado, c.hash FROM dispositivo d
+      text: `SELECT d.id, d.via, d.estado, c.id AS credencial_id, c.hash FROM dispositivo d
                LEFT JOIN credencial c ON c.dispositivo_id = d.id AND c.activa
               WHERE d.id_fisico = $1 ORDER BY c.creada_en DESC NULLS LAST LIMIT 1`,
       values: [idFisico],
@@ -402,6 +403,20 @@ export class RecepcionService implements OnModuleInit {
     };
     const r = await this.pool.query<CredencialHttp>(consulta);
     return r.rows[0];
+  }
+
+  // Conversión de una credencial anterior (docs/10 §8.4 punto 52; docs/11 §4): tras verificar el token contra la huella scrypt, la fila
+  // pasa a `sha256$…`. Condicionada a que la fila siga activa y con la huella verificada: si entretanto se rotó (la fila quedó inactiva,
+  // con su huella intacta) o ya se convirtió, no toca nada, y dos tramas simultáneas escriben el mismo valor (SHA-256 sin sal). Con tiempo
+  // máximo, como la consulta de la credencial.
+  async convertirCredencial(credencialId: string, anterior: string, nueva: string): Promise<boolean> {
+    const sentencia: QueryConfig & { query_timeout: number } = {
+      text: 'UPDATE credencial SET hash = $3 WHERE id = $1 AND activa AND hash = $2',
+      values: [credencialId, anterior, nueva],
+      query_timeout: 5_000,
+    };
+    const r = await this.pool.query(sentencia);
+    return (r.rowCount ?? 0) > 0;
   }
 
   // La trama ya autenticada: la misma tubería que en MQTT. `magnitud` la usa el formato `plano` (un número solo no dice qué mide).

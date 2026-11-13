@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Sesion } from './lib/sesion';
 import Alta from './Alta.svelte';
 
-// P7 Alta (docs/19 §4, tablero v2, F; D-103 A) por el DOM: el asistente con la credencial una sola vez y la espera de la primera trama;
+// P7 Alta (docs/19 §4, tablero v2, F; docs/16 §61) por el DOM: el asistente con la credencial una sola vez y la espera de la primera trama;
 // el alta masiva que valida antes de crear y crea en tandas de 50 con avance, se detiene en la tanda que falla y reintenta las restantes;
 // la bandeja de detectados que lleva al asistente con el identificador.
 const SITIOS = [{ id: 's1', codigo: 'uct', nombre: 'Campus', zona_horaria: 'America/Santiago', rol: 'administrador', zonas: [{ id: 'z-lab', nombre: 'Lab' }] }];
@@ -180,7 +180,7 @@ describe('P7: foco, errores por campo y credenciales que no quedan', () => {
   });
 });
 
-describe('P7: alta masiva por tandas (D-103 A)', () => {
+describe('P7: alta masiva por tandas', () => {
   const CAB = 'id_fisico,nombre,zona,via,formato,intervalo_esperado_s,canales,pasarela';
   const filasCsv = (n: number): string => Array.from({ length: n }, (_, i) => `n-${i + 1},Nodo ${i + 1},Lab,mqtt,senml,60,temperatura:Cel,`).join('\n');
   const informe = (filas: { id_fisico: string }[], modo: string) => ({

@@ -12,14 +12,14 @@ describe('RecepcionHttpController', () => {
   const TOKEN = 'abcdefghijklmnopqrstuvwxyz012345';
   const SECRETO = 'secreto-de-prueba-de-treinta-y-dos-c';
   const resumen = (r: Partial<ResumenTrama>): ResumenTrama => ({ guardadas: 0, duplicadas: 0, rechazos: [], malformada: null, repetida: false, ...r });
-  const fila = (id = 'd1'): CredencialHttp => ({ id, via: 'http', estado: 'activo', hash: 'huella' });
+  const fila = (id = 'd1'): CredencialHttp => ({ id, via: 'http', estado: 'activo', credencial_id: `c-${id}`, hash: 'huella' });
 
   function armar(verifica: ResultadoVerificacion, procesa: ResumenTrama | null = resumen({ guardadas: 1 }), secreto?: string) {
     const recepcion = {
       credencialHttp: vi.fn((idFisico: string) => Promise.resolve(fila(`d-${idFisico}`))),
       procesarHttp: vi.fn(() => Promise.resolve(procesa)),
     };
-    const verificacion = { enCache: vi.fn(() => false), pista: vi.fn(() => false), verificar: vi.fn(() => Promise.resolve(verifica)) };
+    const verificacion = { enCache: vi.fn(() => false), pista: vi.fn(() => false), caminoAnterior: vi.fn(() => true), verificar: vi.fn(() => Promise.resolve(verifica)) };
     const config = { get: () => secreto } as unknown as ConfigService;
     const c = new RecepcionHttpController(recepcion as unknown as RecepcionService, verificacion as unknown as VerificacionDeTokens, config);
     return { c, recepcion, verificacion };
@@ -113,6 +113,19 @@ describe('RecepcionHttpController', () => {
     verificacion.enCache.mockReturnValue(true);
     expect((await pedir(c, {}, '203.0.113.1', 'nodo-13')).status).toHaveBeenCalledWith(202); // en caché: no cuesta, no se bloquea
     expect(recepcion.credencialHttp).toHaveBeenCalledTimes(consultas + 1);
+    // Con la pista pero sin caché: una credencial anterior (scrypt) espera el bloqueo; una nueva (camino rápido, I4) entra.
+    verificacion.enCache.mockReturnValue(false);
+    const verificadas = verificacion.verificar.mock.calls.length;
+    expect((await pedir(c, {}, '203.0.113.1', 'nodo-14')).status).toHaveBeenCalledWith(429);
+    expect(verificacion.verificar).toHaveBeenCalledTimes(verificadas);
+    verificacion.caminoAnterior.mockReturnValue(false);
+    expect((await pedir(c, {}, '203.0.113.1', 'nodo-15')).status).toHaveBeenCalledWith(202);
+    expect(verificacion.verificar).toHaveBeenCalledTimes(verificadas + 1);
+    // Sin la pista, ni siquiera el camino rápido consulta la base.
+    verificacion.pista.mockReturnValue(false);
+    const antes = recepcion.credencialHttp.mock.calls.length;
+    expect((await pedir(c, {}, '203.0.113.1', 'nodo-16')).status).toHaveBeenCalledWith(429);
+    expect(recepcion.credencialHttp).toHaveBeenCalledTimes(antes);
   });
   it('(e) dos tramas del mismo dispositivo en el mismo segundo → la segunda 429', async () => {
     const { c } = armar('ok');

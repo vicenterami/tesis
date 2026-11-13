@@ -100,8 +100,9 @@
 ## 4. Claves y bloqueos
 - **Hash:** `scrypt` de `node:crypto` (N = 2¹⁷, r = 8, p = 1, 64 bytes, sal de 16 bytes por usuario), comparación de tiempo
   constante. **Decidido el 12/10/2026: `scrypt`** sin dependencias (frente a `argon2id`, que exige un paquete con binario nativo y un
-  script de instalación, prohibidos por `ignore-scripts`). La función ya existe en `backend/src/alta/credenciales.ts` (la usa la
-  credencial de los dispositivos con N = 2¹⁵); para personas, N = 2¹⁷ y se documenta el costo medido (objetivo: 100–300 ms por
+  script de instalación, prohibidos por `ignore-scripts`). La función ya existe en `backend/src/alta/credenciales.ts` (la usaba la
+  credencial de los dispositivos con N = 2¹⁵ hasta el 13/11/2026; desde entonces la credencial, aleatoria y de 192 bits, se guarda con
+  SHA-256 y scrypt queda solo para las claves de personas: `docs/11 §4`); para personas, N = 2¹⁷ y se documenta el costo medido (objetivo: 100–300 ms por
   verificación en el servidor de referencia).
 - **Reglas de la clave:** mínimo 12 caracteres, sin máximo bajo (hasta 128), sin exigir símbolos; se rechaza si aparece en una
   lista corta de claves comunes incluida en el repositorio. Una clave nueva no puede ser igual a la anterior ni al propio correo (decidido al implementar, 08/11/2026).
@@ -307,7 +308,9 @@ optimista). El cliente HTTP del panel pone `X-Pedido: panel` en todo lo que escr
 - **El canal en vivo y la sesión.** Las pantallas (y sus `EventSource`) existen solo con sesión: al salir o al vencer se cierran, y al entrar
   se reabren. Cuando el servidor cierra el canal (R2: la sesión venció), el panel pregunta `GET /sesion` una vez para saber si fue eso.
 - **Semilla de desarrollo.** `pruebas/semilla-demo.sh` crea un administrador y un usuario de consulta del sitio `uct` (`@ejemplo.invalid`)
-  con claves temporales impresas una vez; desde entonces la base de desarrollo ya tiene un administrador, así que `sesion-smoke.sh` crea el
+  con claves temporales impresas una vez (cinco personas, una por perfil, desde el 11/11/2026; y desde el 13/11/2026 una corrida nueva no
+  toca la clave ni las sesiones de quien ya eligió la suya, ni una temporal aún vigente, y una cuenta desactivada se reactiva siempre con una
+  clave temporal nueva: `docs/15 §0`, `docs/16 §65`); desde entonces la base de desarrollo ya tiene un administrador, así que `sesion-smoke.sh` crea el
   suyo por SQL y omite la carrera del último administrador (lo dice al correr).
 
 **Vigencia de la clave temporal (08/11/2026).** De 24 h fijas a `CLAVE_TEMPORAL_HORAS` (1–72 h, 2 por defecto; §4), leída y validada

@@ -1183,7 +1183,8 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     (`docs/16 §18`): no conviven, y migraron al plugin en la misma tanda (punto 42). **Implementado el
     12/10:** `POST /dispositivos` (`backend/src/alta/`); guardia `X-Clave-Admin` de tiempo constante sobre hashes (clave
     de 24 caracteres o más: una más corta detiene el arranque; ausente, 503); credencial de 24 bytes aleatorios (base64url)
-    mostrada una vez con `Cache-Control: no-store` y guardada en `credencial` solo como `scrypt` (N = 2¹⁵); dispositivo,
+    mostrada una vez con `Cache-Control: no-store` y guardada en `credencial` solo como resumen (desde el 13/11/2026, SHA-256: `sha256$…`;
+    antes, `scrypt` con N = 2¹⁵; `docs/11 §4`); dispositivo,
     canales, hash y evento en una transacción, con el cliente del broker creado dentro de ella (`createClient` con su rol en un
     solo comando: todo o nada; sin respuesta del broker en 5 s, nada queda creado y se ordena borrar el cliente por si llegó a
     crearse; si la base no confirma después, el cliente se borra; como mucho dos altas a la vez, 429 la tercera); identidad administradora `backend-admin` con conexión propia y sesión limpia (`broker/dynsec.service.ts`), distinta
@@ -1462,38 +1463,60 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     operaciones de aprovisionamiento (punto 42), porque no espera al broker; sí entra en la zona de tasa de administración del proxy (§2 punto 8).
 
 52. **Recepción por HTTP (RF-01, HU-01): decidido el 16/10/2026.** El alta de un dispositivo
-    de vía `http` entrega un token y la base guarda solo su huella `scrypt` (`credencial`, §8.4 punto 25). (i) **`POST /recepcion/{id_fisico}`**,
+    de vía `http` entrega un token y la base guarda solo su huella (`credencial`, §8.4 punto 25; `sha256$…` desde el 13/11/2026, antes `scrypt`). (i) **`POST /recepcion/{id_fisico}`**,
     aparte de las rutas de administración y consulta, con el token en **`Authorization: Bearer <token>`** (RFC 6750) y el cuerpo en
     SenML JSON o, si el formato declarado es `plano`, un número con la magnitud en `?magnitud=`. (ii) **La misma tubería:** el filtro 1
-    busca el dispositivo con su credencial activa y compara la huella (`scrypt` y comparación en tiempo constante; si el dispositivo no
-    existe se calcula igual una huella, para que el tiempo de respuesta no revele cuáles existen); después corren los mismos filtros 2 a 6
+    busca el dispositivo con su credencial activa y compara la huella en tiempo constante (si el dispositivo no existe se hace igual el
+    mismo trabajo contra una huella de relleno, para que el tiempo de respuesta no revele cuáles existen; los dos caminos desde el 13/11/2026,
+    al final de (iv)); después corren los mismos filtros 2 a 6
     que en MQTT. La recepción por MQTT no cambia. (iii) **Respuestas** (RF-06): **202** con el resumen (lecturas guardadas, repetidas y
     rechazadas con su porqué) si hubo al menos una lectura válida o repetida; **422** si la trama no se entiende o ninguna lectura es
     válida, y va a cuarentena con `origen = http` (RF-07); **401** igual para un dispositivo desconocido, de otra vía, dado de baja o con
     el token equivocado; **413** sobre 64 KiB, el tope del broker (`max_packet_size`); **415** si no es JSON ni texto; **400** si el lector no puede leer el cuerpo (por ejemplo, una codificación declarada que no es la suya). La ruta no distingue mayúsculas, como el enrutador de Express, y el lector del cuerpo crudo tampoco. (iv) **Topes**, con
-    el costo medido el 16/10/2026 en el portátil: una verificación de `scrypt` (N = 2¹⁵, r = 8) tarda **65 ms** y el *pool* de 4 hilos de
-    Node llega a **57 por segundo** (medido a mano, sin guion en el repositorio). Ese costo es deliberado (una huella lenta protege los
-    tokens si alguien llega a leer la base), pero no debe pagarse en cada trama ni dejar que un desconocido lo gaste por los demás. Por eso,
+    el costo medido el 16/10/2026 en el portátil, sin límite de CPU: una verificación de `scrypt` (N = 2¹⁵, r = 8) tarda **65 ms** y el
+    *pool* de 4 hilos de Node llega a **57 por segundo** (medido a mano, sin guion en el repositorio); en el banco, con el backend limitado
+    a 0,5 CPU como en el compose, una verificación tarda ≈ 110 ms (`docs/16 §65`). Hasta el 13/11/2026 ese costo se tuvo por deliberado
+    (una huella lenta protegería los tokens si alguien llegara a leer la base; lo que cambió, al final de este punto), pero no debe pagarse en cada trama ni dejar que un desconocido lo gaste por los demás. Por eso,
     desde el 17/10/2026 (lo que la revisión del 16/10 encontró, decidido ese día): **(a) caché de verificaciones:** tras una verificación
     correcta, el backend guarda en memoria, por dispositivo, la huella contra la que verificó y el resumen SHA-256 del token; en la trama
     siguiente, si la huella activa en la base es la misma y el resumen coincide (comparación en tiempo constante), el token se da por
     verificado sin `scrypt`. Una rotación cambia la huella y deja esa entrada sin efecto sola; una baja se ve antes (la base se consulta en
-    cada trama); un token equivocado nunca entra a la caché y cuesta `scrypt` igual que antes, así que el tiempo de un fallo no cambia y
-    sigue sin revelar qué identificadores existen. A lo más una entrada por dispositivo de vía `http` que haya autenticado (tope de
+    cada trama); un token equivocado nunca entra a la caché y cuesta `scrypt` igual que antes, así que el tiempo de un fallo no cambia y,
+    hasta el 13/11/2026, seguía sin revelar qué identificadores existen (desde entonces, uno contra una credencial anterior sí lo revela:
+    riesgo aceptado, al final de este punto). A lo más una entrada por dispositivo de vía `http` que haya autenticado (tope de
     10 000; se sueltan las más antiguas). **(b) Bloqueo por par dirección + dispositivo:** 5 fallos de autenticación en 60 s desde una
     misma dirección para un mismo identificador bloquean ese par 60 s (429 con `Retry-After`); un vecino detrás de la misma dirección
     pública (un NAT) con su token bueno sigue entrando. **(c) Tope grueso por dirección:** 50 fallos en 60 s desde una dirección, con
     cualquier identificador, bloquean 60 s las verificaciones con `scrypt` desde esa dirección (429); las tramas con el token en caché no
     lo sufren, porque no cuestan nada. Un fallo cuenta para (b) y (c) solo si llegó a comprobarse: lo que ya está bloqueado se rechaza
-    antes y no suma; así, quien usa una dirección gasta a lo más 50 × 65 ms ≈ 3,3 s de CPU por minuto. **(d) Cupo:** como mucho
+    antes y no suma; así, quien usa una dirección gasta a lo más 50 × 65 ms ≈ 3,3 s de CPU por minuto (con la cifra del portátil). **(d) Cupo:** como mucho
     2 verificaciones con `scrypt` a la vez (503 con `Retry-After` si llega una tercera; la consulta de la credencial corre fuera del cupo y con un tiempo
     máximo de 5 s, para que una base colgada no deje peticiones colgadas): nunca se ocupa más de la mitad del *pool*, y solo lo necesitan la
     primera trama de cada dispositivo tras arrancar o rotar y los tokens equivocados. **(e) Ritmo:** cada dispositivo, como mucho una
     trama aceptada por segundo (429); el presupuesto por hora lo pone el tope por emisor (punto 53), común a todas las vías. Una IPv6 se
     cuenta por su prefijo /64 (lo que recibe un solo equipo) y, con más de 10 000 claves vivas, se sueltan las cuentas más antiguas, nunca
     un bloqueo vigente. Los contadores de (b) a (e) y la caché viven en la memoria del proceso: se reinician con él (aceptado: el proceso
-    es uno, decisión 4). Orden de las comprobaciones: par bloqueado → tipo de contenido → forma del token y del identificador → credencial
-    y caché → dirección bloqueada → cupo → `scrypt` → ritmo → filtros 2 a 6. **La dirección del cliente** la da el proxy en
+    es uno, decisión 4). **Desde el 13/11/2026 la credencial se guarda con SHA-256** (decisión y porqué en `docs/11 §4`: con 192 bits de
+    entropía, el costo de scrypt no protegía nada) y el filtro 1 tiene dos caminos. **Camino rápido** (huella `sha256$…`): sin cupo y sin
+    esperar al *pool* de hilos, un resumen SHA-256 del token y una comparación en tiempo constante. Un dispositivo inexistente, sin credencial,
+    de otra vía o dado de baja hace **el mismo trabajo** contra una huella de relleno que nadie conoce (se genera al arrancar) y recibe el
+    mismo 401: «no existe» y «existe con huella nueva y token equivocado» cuestan lo mismo, una consulta, un resumen y una comparación. Un
+    acierto actualiza la pista del identificador, así una dirección bloqueada por los fallos de un vecino (c) no deja fuera a ese dispositivo.
+    **Camino anterior** (huella `scrypt$…`, credenciales creadas antes del 13/11/2026): (a) a (d) como antes —caché, dirección bloqueada,
+    cupo y scrypt— y, al **primer acierto**, la fila se convierte: `UPDATE credencial SET hash = <resumen SHA-256 del token> WHERE id = <la
+    fila> AND activa AND hash = <la huella scrypt verificada>` (si entretanto se rotó, la fila quedó inactiva y no toca nada; dos tramas
+    simultáneas escriben el mismo valor). Si
+    ese `UPDATE` falla, se anota en el registro sin token ni huella y la trama sigue: la entrada de la caché vale como antes y la conversión
+    se reintenta en la próxima verificación con scrypt. **Qué queda y qué dejó de hacer falta:** la caché (a), el cupo (d) y el costo que
+    acota (c) existen ya solo para las credenciales anteriores, y dejan de usarse cuando la última se convierta o se rote (cuántas quedan:
+    `docs/14 §7.5`). Para las nuevas, verificar cuesta lo que una consulta y el 503 de (d) no puede darse; siguen (b), (c) y (e), que frenan
+    un barrido de tokens aunque ya no gaste CPU. Mientras queden anteriores, un fallo contra una de ellas tarda lo que scrypt y revela que
+    ese identificador existe y es antiguo (riesgo aceptado, `docs/11 §4`). El 503 de (d) revela lo mismo sin medir tiempos: solo las
+    huellas anteriores pasan por el cupo, así que bastan tres peticiones simultáneas con tokens equivocados para distinguir un
+    identificador antiguo de uno inexistente, y un 503 no cuenta como fallo para (b) ni para (c). Las credenciales nuevas de la vía MQTT y de las pasarelas se
+    guardan igual; las que ya existían no se pueden recalcular sin el secreto y no hay migración de datos. Orden de las comprobaciones desde
+    el 13/11/2026: par bloqueado → tipo de contenido → forma del token y del identificador → dirección bloqueada (salvo la pista) → credencial
+    y caché → huella nueva: resumen y comparación; huella anterior: dirección bloqueada → cupo → `scrypt` → conversión → ritmo → filtros 2 a 6. **La dirección del cliente** la da el proxy en
     `X-Forwarded-For` (la reemplaza, no la agrega: `proxy/nginx.conf`) junto con la cabecera `X-Proxy-Secreto`, un secreto compartido
     (`PROXY_SECRETO` en el `.env`: 24 caracteres o más, el mismo para el proxy y el backend; lo escribe la persona, como las demás claves).
     Con la capa del proxy es **obligatorio**: sin él, el proxy no arranca (revisión del 17/10: sin secreto, todas las peticiones
@@ -1597,8 +1620,8 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     del plan de la Etapa 4, trabajo futuro con este diseño en la versión 2 (`docs/04 §8`, 08/11/2026).
 
 57. **Identidad por dispositivo con certificado de cliente (TLS mutuo) y tope de conexiones del broker (decididos el 01/11/2026).**
-    (i) **Qué cambia y por qué:** hoy cada dispositivo se autentica con usuario y clave aleatoria (hash PBKDF2-SHA512 en el plugin del broker y `scrypt`
-    en la base) sobre TLS que solo autentica al servidor, y por HTTP con un token: lo que el capítulo 5 (seguridad) de OASIS MQTT 5.0
+    (i) **Qué cambia y por qué:** hoy cada dispositivo se autentica con usuario y clave aleatoria (hash PBKDF2-SHA512 en el plugin del broker y su
+    resumen en la base: `scrypt` hasta el 13/11/2026, SHA-256 desde entonces) sobre TLS que solo autentica al servidor, y por HTTP con un token: lo que el capítulo 5 (seguridad) de OASIS MQTT 5.0
     llama perfil de transporte seguro. El máximo de la industria es un
     certificado X.509 por dispositivo que el servidor verifica en el saludo TLS (AWS IoT Core; Azure IoT Hub lo admite): quien no tiene
     certificado ni siquiera llega al broker, y la identidad deja de ser una clave copiable. Se adopta como meta de la Etapa 4 (bloque 1 de la versión 1
@@ -1708,7 +1731,8 @@ entra. Lo que aquí se marca «a fijar al implementar» es un detalle que el dis
     resolución del rango cuesta milisegundos (se mide como `docs/16 §52`); un agregado por tarea queda para cuando la medición lo pida.
     (iv) **El lote de alta es una sola transacción:** validación completa en memoria con las mismas funciones del alta de a uno, una inserción
     con `UNNEST` en una transacción, credenciales generadas y devueltas una sola vez, tope de 500 filas y límite de tasa (`docs/11 §4`);
-    las filas rechazadas no bloquean a las válidas y el informe lo dice fila por fila. (v) `evento.usuario_id` (nulo = el sistema) es la
+    las filas rechazadas no bloquean a las válidas y el informe lo dice fila por fila; desde el 13/11/2026 cada credencial se resume con SHA-256
+    (`docs/11 §4`) y crear 500 tarda ≈ 0,1 s por la vía http y ≈ 0,4 s por la mqtt, no ≈ 70 s (`docs/16 §61` y §65). (v) `evento.usuario_id` (nulo = el sistema) es la
     fuente de «quién lo hizo» (HU-11); la retención de `evento` no cambia. (vi) **Retardo de activación** (RF-14): el filtro alertar abre
     la condición de umbral solo cuando la medición lleva al menos `retardo_s` fuera de la banda (0 = como hoy); desde cuándo está fuera
     se guarda por canal en la base, no en memoria, para que sobreviva a un reinicio. (vii) **Entrega** (HU-15) = tramas recibidas en la

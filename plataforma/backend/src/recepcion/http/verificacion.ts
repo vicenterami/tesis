@@ -1,35 +1,50 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
-import { hashScrypt, verificarScrypt } from '../../alta/credenciales.js';
+import { caminoDeCredencial, resumirSecreto, verificarCredencialDispositivo } from '../../alta/credenciales.js';
 import type { CredencialHttp } from '../recepcion.service.js';
 import { Cupo } from './topes.js';
 
-// Filtro 1 de la vía HTTP (docs/10 §8.4 punto 52): el token contra la huella scrypt de la credencial activa, con la caché de
-// verificaciones (a). Tras una verificación correcta se recuerda, por dispositivo, la huella contra la que se verificó y el resumen
-// SHA-256 del token: en la trama siguiente, si la huella activa en la base es la misma y el resumen coincide, el token se da por
-// verificado sin scrypt. Una rotación cambia la huella (la entrada deja de servir sola); una baja o un cambio de vía se ven en la
-// fila, antes; un token equivocado nunca entra y cuesta scrypt igual que antes, así que el tiempo de un fallo no cambia.
+// Filtro 1 de la vía HTTP (docs/10 §8.4 punto 52). Desde el 13/11/2026 (docs/11 §4) dos caminos, según la huella de la credencial activa:
+//  - camino rápido, huella `sha256$…` (la de toda credencial creada desde ese día): un resumen y una comparación en tiempo constante, sin
+//    cupo ni pool de hilos. Un dispositivo inexistente, sin credencial, de otra vía o dado de baja hace EL MISMO trabajo contra una huella
+//    de relleno que nadie conoce: «no existe» y «token equivocado» cuestan lo mismo (una consulta, un resumen, una comparación).
+//  - camino anterior, huella `scrypt$…` (credenciales creadas antes): scrypt dentro del cupo (d), con la caché de verificaciones (a): tras
+//    un acierto se recuerda, por dispositivo, la huella contra la que se verificó y el resumen SHA-256 del token; en la trama siguiente, si
+//    la huella activa es la misma y el resumen coincide, el token se da por verificado sin scrypt. Al PRIMER acierto la fila se convierte a
+//    `sha256$…` (`convertir`, una sentencia condicionada a la huella verificada); si eso falla, se anota y la trama sigue.
 export type ResultadoVerificacion = 'ok' | 'no' | 'saturado';
 type Aceptable = CredencialHttp & { hash: string };
+// Reemplaza la huella anterior por la nueva en la fila `credencialId`, solo si sigue siendo `anterior`; true si la cambió.
+export type ConvertirCredencial = (credencialId: string, anterior: string, nueva: string) => Promise<boolean>;
 
 const resumen = (token: string): Buffer => createHash('sha256').update(token).digest();
 
 @Injectable()
 export class VerificacionDeTokens {
+  private readonly log = new Logger('recepcion-http');
   private readonly cache = new Map<string, { huella: string; resumen: Buffer }>();
   // Pista por identificador: el resumen del último token verificado para ese id_fisico. Sirve ANTES de consultar la base, para que una
   // dirección bloqueada (punto 52 (c)) no gaste ni una consulta salvo que presente el token que ya se le conoce a ese identificador.
   private readonly pistas = new Map<string, Buffer>();
-  private rellenoHuella: Promise<string> | null = null;
+  // Una huella válida de un secreto que nadie conoce (se genera al construir y no sale del proceso): verificar contra ella cuesta lo mismo
+  // que contra una real.
+  private readonly relleno = resumirSecreto(randomBytes(24).toString('base64url'));
 
   constructor(
     private readonly cupo = new Cupo(),
     private readonly maxEntradas = 10_000,
+    private readonly convertir?: ConvertirCredencial,
   ) {}
 
   // Vía http, no dado de baja y con credencial activa: lo demás ni con el token correcto entra.
   private static aceptable(fila: CredencialHttp | undefined): fila is Aceptable {
     return fila !== undefined && fila.hash !== null && fila.via === 'http' && fila.estado !== 'baja';
+  }
+
+  // ¿Esta fila se verifica por el camino anterior (scrypt, con cupo)? Lo pregunta el controlador antes de verificar: con la dirección
+  // bloqueada, solo el camino rápido sigue abierto (no gasta CPU que valga la pena acotar).
+  caminoAnterior(fila: CredencialHttp | undefined): boolean {
+    return VerificacionDeTokens.aceptable(fila) && caminoDeCredencial(fila.hash) === 'scrypt';
   }
 
   // (a) Sin scrypt: true solo si ya se verificó este mismo token contra esta misma huella.
@@ -50,23 +65,47 @@ export class VerificacionDeTokens {
     return t.length === r.length && timingSafeEqual(t, r);
   }
 
-  // Con scrypt, dentro del cupo (d). Si el dispositivo no existe se verifica igual contra una huella de relleno: el tiempo de
-  // respuesta no revela cuáles existen. 'no' por cualquier motivo (la respuesta no dice cuál).
+  // 'no' por cualquier motivo (la respuesta no dice cuál); 'saturado' solo en el camino anterior, con el cupo lleno.
   async verificar(fila: CredencialHttp | undefined, token: string, idFisico?: string): Promise<ResultadoVerificacion> {
-    if (!this.cupo.tomar()) return 'saturado';
-    try {
-      const valida = await verificarScrypt(token, fila?.hash ?? (await this.huellaDeRelleno()));
-      if (!valida || !VerificacionDeTokens.aceptable(fila)) return 'no';
-      this.recordar(fila.id, fila.hash, token);
-      if (idFisico !== undefined) this.recordarPista(idFisico, token);
-      return 'ok';
-    } finally {
-      this.cupo.soltar();
-    }
+    if (this.caminoAnterior(fila)) return this.verificarAnterior(fila as Aceptable, token, idFisico);
+    // Camino rápido. La huella de la fila solo si es aceptable y `sha256$…`; si no, la de relleno, con la misma llamada: el mismo resumen
+    // y la misma comparación en los dos casos.
+    const propia = VerificacionDeTokens.aceptable(fila) && caminoDeCredencial(fila.hash) === 'sha256';
+    const { valida } = await verificarCredencialDispositivo(token, propia ? fila.hash : this.relleno);
+    if (!valida || !propia) return 'no';
+    if (idFisico !== undefined) this.recordarPista(idFisico, token);
+    return 'ok';
   }
 
   get entradas(): number {
     return this.cache.size;
+  }
+
+  // Camino anterior: scrypt dentro del cupo (d) y, al primer acierto, la conversión de la fila (fuera del cupo).
+  private async verificarAnterior(fila: Aceptable, token: string, idFisico: string | undefined): Promise<ResultadoVerificacion> {
+    if (!this.cupo.tomar()) return 'saturado';
+    try {
+      const { valida } = await verificarCredencialDispositivo(token, fila.hash);
+      if (!valida) return 'no';
+      this.recordar(fila.id, fila.hash, token);
+      if (idFisico !== undefined) this.recordarPista(idFisico, token);
+    } finally {
+      this.cupo.soltar();
+    }
+    await this.convertirAnterior(fila, token);
+    return 'ok';
+  }
+
+  // Un fallo aquí no pierde la trama: se anota sin token ni huella y la entrada de la caché sigue valiendo; se reintenta en la próxima
+  // verificación con scrypt. Si la fila cambió, la caché de este dispositivo ya no sirve (la huella activa es otra) y se suelta.
+  private async convertirAnterior(fila: Aceptable, token: string): Promise<void> {
+    if (this.convertir === undefined || !fila.credencial_id) return;
+    try {
+      if (await this.convertir(fila.credencial_id, fila.hash, resumirSecreto(token))) this.cache.delete(fila.id);
+    } catch (e) {
+      const codigo = typeof e === 'object' && e !== null ? (e as { code?: unknown }).code : undefined; // un rechazo puede no traer objeto
+      this.log.warn(`no se pudo convertir a SHA-256 la credencial anterior del dispositivo ${fila.id} (${typeof codigo === 'string' ? codigo : e instanceof Error ? e.name : 'error'}); la trama sigue y se reintenta en la próxima verificación con scrypt`);
+    }
   }
 
   // A lo más una entrada por dispositivo que haya autenticado; sobre el tope se suelta la más antigua (un Map conserva el orden de
@@ -87,15 +126,5 @@ export class VerificacionDeTokens {
       if (masAntigua !== undefined) this.pistas.delete(masAntigua);
     }
     this.pistas.set(idFisico, resumen(token));
-  }
-
-  // Una huella válida de un secreto que nadie conoce: verificar contra ella cuesta lo mismo que contra una real. Si calcularla falla,
-  // no se guarda el fallo: la próxima vez se intenta de nuevo (si no, todo desconocido daría 500 hasta reiniciar).
-  private huellaDeRelleno(): Promise<string> {
-    this.rellenoHuella ??= hashScrypt(randomBytes(24).toString('base64url')).catch((e: unknown) => {
-      this.rellenoHuella = null;
-      throw e;
-    });
-    return this.rellenoHuella;
   }
 }

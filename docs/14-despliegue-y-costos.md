@@ -164,7 +164,7 @@ una réplica del backend no se pise. La decisión: **A ahora, B diseñada** (dec
 | Pieza | ¿Con estado? | Por qué | En Kubernetes |
 |---|---|---|---|
 | Proxy (nginx) | No | no guarda nada entre peticiones; cualquier réplica atiende cualquier conexión | `Deployment`, N réplicas; puede escalar con `HorizontalPodAutoscaler` sin diseño nuevo |
-| Backend (NestJS) | **Hoy sí** | topes por par y por dirección, caché de verificaciones, cupo de `scrypt` y `enCursoHttp` viven en la memoria del proceso (`docs/10 §8.4` puntos 52 y 53), y hay **una sola suscripción MQTT con sesión persistente** (`clientId` fijo, `clean: false`, MQTT 3.1.1) | `Deployment` con **una réplica** (opción A) y sondas `liveness`/`readiness` sobre `/salud`; N réplicas solo con la opción B |
+| Backend (NestJS) | **Hoy sí** | topes por par y por dirección, caché de verificaciones y cupo de `scrypt` (desde el 13/11/2026, solo para las credenciales anteriores: `docs/11 §4`) y `enCursoHttp` viven en la memoria del proceso (`docs/10 §8.4` puntos 52 y 53), y hay **una sola suscripción MQTT con sesión persistente** (`clientId` fijo, `clean: false`, MQTT 3.1.1) | `Deployment` con **una réplica** (opción A) y sondas `liveness`/`readiness` sobre `/salud`; N réplicas solo con la opción B |
 | Mosquitto | Sí | `mosquitto.db` (sesiones persistentes, mensajes en cola) y `dynamic-security.json` (credenciales y ACL) | `StatefulSet` de 1 réplica con volumen persistente; sin réplicas (un broker en clúster es otra pieza: `docs/10 §8.4` punto 10) |
 | TimescaleDB | Sí | todo el dato | `StatefulSet` de 1 réplica con volumen persistente; respaldo con `CronJob` (`pg_dump`) y retención (§2); réplica de lectura asíncrona solo si §9.4 de `docs/10` lo pide |
 
@@ -300,6 +300,24 @@ y `/usuarios`. El primer administrador se creó con la clave por cabecera y la c
 `X-Clave-Admin` responde 503 y solo entran personas con sesión; la semilla de demostración no se usa en el servidor (solo crea personas
 contra el bucle local). Falta un certificado público para el nombre de la red privada (`docs/11 §4`): un navegador sin la CA propia
 instalada avisa de conexión no privada.
+
+### 7.5 Consultas de operación
+
+**Credenciales anteriores sin convertir** (riesgo aceptado del 13/11/2026, `docs/11 §4`): desde ese día la credencial de un dispositivo o
+de una pasarela se guarda como `sha256$…`, y las de vía `http` creadas antes (`scrypt$…`) se convierten en su primera trama válida. Mientras
+quede alguna de vía `http`, el tiempo de un fallo contra ella revela que ese identificador existe; las de la vía MQTT y las de las pasarelas
+no se convierten (no hay secreto con qué recalcularlas) y no tienen ese riesgo, porque la vía HTTP no las acepta. Se cuentan así
+(`bash plataforma/pruebas/pila.sh sql "…"` en desarrollo):
+
+```sql
+SELECT coalesce(d.via, 'pasarela') AS titular, count(*) AS por_convertir
+  FROM credencial c LEFT JOIN dispositivo d ON d.id = c.dispositivo_id
+ WHERE c.activa AND c.hash LIKE 'scrypt$%' GROUP BY 1 ORDER BY 1;
+```
+
+La fila `http` es la que importa: cuando llega a cero, la caché de verificaciones y el cupo de la vía HTTP dejan de usarse (`docs/10 §8.4`
+punto 52). En la base de desarrollo cuentan también las credenciales de la semilla completa (`db/semillas/demo-completa.sql`): tienen la
+forma `scrypt$…` pero no verifican nada (no existe secreto), así que nunca se convierten; una rotación desde la ficha las reemplaza.
 
 ## 8. Pendiente
 

@@ -4,7 +4,7 @@ import type { Pool } from 'pg';
 import { ErrorDynsec, OrdenDynsec, ROL_PASARELA } from '../broker/dynsec.js';
 import type { DynsecService } from '../broker/dynsec.service.js';
 import { AltaService } from './alta.service.js';
-import { verificarScrypt } from './credenciales.js';
+import * as credenciales from './credenciales.js';
 import { validarPasarela } from './pasarela.dto.js';
 
 // Pasarelas por API (docs/10 §8.4 punto 47): el mismo todo o nada que un dispositivo, con base y broker falsos.
@@ -61,13 +61,17 @@ describe('validarPasarela', () => {
 describe('AltaService: pasarelas (rutas B y C)', () => {
   it('alta: pasarela, hash de su credencial, evento sin dispositivo y cliente con rol pasarela ANTES del COMMIT; plantillas de ChirpStack', async () => {
     const { servicio, sql, params, ordenes } = armar();
+    const scrypt = vi.spyOn(credenciales, 'hashScrypt');
     const r = await servicio.crearPasarela(validarPasarela(cuerpo));
+    expect(scrypt).not.toHaveBeenCalled(); // I1
+    scrypt.mockRestore();
     const i = (prefijo: string) => sql.findIndex((s) => s.startsWith(prefijo));
     expect(i('INSERT INTO pasarela')).toBeLessThan(i('INSERT INTO credencial'));
     expect(ordenes[0][0]).toMatchObject({ command: 'createClient', username: 'chirpstack-campus', roles: [{ rolename: ROL_PASARELA }] });
     expect(i('INSERT INTO evento')).toBeLessThan(sql.indexOf('COMMIT'));
     const hash = params[i('INSERT INTO credencial')][1] as string;
-    expect(await verificarScrypt(r.conexion.credencial, hash)).toBe(true);
+    expect(hash.startsWith('sha256$')).toBe(true); // I1 (docs/11 §4)
+    expect(credenciales.verificarResumen(r.conexion.credencial, hash)).toBe(true);
     expect(params.flat()).not.toContain(r.conexion.credencial); // el secreto no está en ningún parámetro SQL
     expect(r.conexion.plantillas).toEqual({
       event_topic: 'sitio/uct/pasarela/chirpstack-campus/{{dev_eui}}/{{event}}',
@@ -116,8 +120,14 @@ describe('AltaService: pasarelas (rutas B y C)', () => {
     await expect(armar({ fila: null }).servicio.darDeBajaPasarela(P)).rejects.toThrow(NotFoundException);
   });
   it('rotación: credencial nueva con su hash, la anterior inactiva, setClientPassword antes del COMMIT, mismas plantillas', async () => {
-    const { servicio, sql, ordenes } = armar();
+    const { servicio, sql, params, ordenes } = armar();
+    const scrypt = vi.spyOn(credenciales, 'hashScrypt');
     const r = await servicio.rotarPasarela(P);
+    expect(scrypt).not.toHaveBeenCalled(); // I1
+    scrypt.mockRestore();
+    const hash = params[sql.findIndex((s) => s.startsWith('INSERT INTO credencial'))][1] as string;
+    expect(hash.startsWith('sha256$')).toBe(true);
+    expect(credenciales.verificarResumen(r.conexion.credencial, hash)).toBe(true);
     expect(sql.findIndex((s) => s.startsWith('UPDATE credencial'))).toBeLessThan(sql.findIndex((s) => s.startsWith('INSERT INTO credencial')));
     expect(ordenes[0][0]).toMatchObject({ command: 'setClientPassword', username: 'chirpstack-campus' });
     expect(r.conexion.plantillas.event_topic).toBe('sitio/uct/pasarela/chirpstack-campus/{{dev_eui}}/{{event}}');

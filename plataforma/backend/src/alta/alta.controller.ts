@@ -101,9 +101,10 @@ export class AltaController {
       '`valida | creada | rechazada | existe` (un id_fisico ya dado de alta, activo o no: `existe` con su id; reactivarlo es de su ficha). Con `modo=crear`, ' +
       `las válidas se crean en una transacción con dos sentencias (dispositivos, canales y credenciales; eventos), no N inserciones, y las credenciales vienen UNA sola vez. Hasta ${MAX_FILAS_LOTE} filas (más: 413), ` +
       `${LOTES_POR_MINUTO} lotes por minuto por persona (429) y una creación por lote a la vez (409). Un id_fisico que ya usa un dispositivo o una pasarela ` +
-      'de otro sitio se rechaza como «identificador no disponible», sin id ni estado (RF-41). **Tiempo:** cada credencial cuesta un resumen scrypt; una creación ' +
-      `de ${MAX_FILAS_LOTE} filas tarda ≈ 70 s (docs/16 §61) y detrás de un proxy puede cortarse antes de responder, y las credenciales se muestran una sola ` +
-      `vez: el cliente debe validar el archivo entero y crear en tandas de ${TANDA_CLIENTE_LOTE} filas (≈ 7 s cada una), como hace el panel.`,
+      'de otro sitio se rechaza como «identificador no disponible», sin id ni estado (RF-41). **Tiempo:** cada credencial se resume con SHA-256 ' +
+      `(docs/11 §4); una creación de ${MAX_FILAS_LOTE} filas tarda menos de medio segundo en el banco (docs/16 §65; ≈ 70 s hasta el 13/11/2026, cuando el resumen era scrypt). Las ` +
+      'credenciales se muestran una sola vez y una respuesta cortada las perdería: el cliente valida el archivo entero y crea en tandas de ' +
+      `${TANDA_CLIENTE_LOTE} filas (unas decenas de milisegundos cada una), como hace el panel.`,
   })
   @ApiHeader({ name: 'X-Clave-Admin', required: false, description: 'Sin sesión: la clave de administrador (HTTP_CLAVE_ADMIN), como usuario del sistema (docs/20 §5)' })
   @ApiQuery({ name: 'modo', required: true, enum: MODOS_LOTE })

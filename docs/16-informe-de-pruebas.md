@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 552 pruebas unitarias del backend y 297 del panel, sin matriz formal); TT-32 (sensor físico) se cubrió después, en §43, §44 y §53;
+cubre todavía: TT-27 (contrato de trama: hoy 564 pruebas unitarias del backend y 297 del panel, sin matriz formal); TT-32 (sensor físico) se cubrió después, en §43, §44 y §53;
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -2051,8 +2051,8 @@ dispositivos, 1 000 canales, 500 credenciales, 500 eventos y 250 clientes en el 
 «existe»). Lo que cuesta es el resumen scrypt de cada credencial (N = 2^15): 100 filas tardan 14 s por HTTP y 14 s por MQTT, y 500 resúmenes
 en el portátil, fuera del contenedor, 8,2 s; el backend tiene 0,5 CPU. **Riesgo abierto:** detrás del proxy, una petición de más de 60 s
 puede cortarse mientras el backend confirma, y las credenciales, que se muestran una sola vez, se perderían. Queda para decidir (pendiente):
-lotes de creación más chicos, el resumen fuera de la petición o un costo de scrypt distinto para secretos aleatorios de 32 bytes.
-**Decidido el mismo día (D-103 A):** las tandas las hace el panel; el backend no cambia el tope de 500, y el OpenAPI de
+lotes de creación más chicos, el resumen fuera de la petición o un costo de scrypt distinto para secretos aleatorios de 24 bytes (32 caracteres en base64url; corregido el 13/11/2026: decía 32 bytes). Se resolvió el 13/11/2026 guardándolos con SHA-256 (§65).
+**Decidido el mismo día:** las tandas las hace el panel; el backend no cambia el tope de 500, y el OpenAPI de
 `POST /dispositivos/lote` dice que una creación de 500 tarda ≈ 70 s y que el cliente debe validar el archivo entero y crear en tandas de 50
 filas (≈ 7 s cada una).
 
@@ -2128,7 +2128,7 @@ vez): 100 filas, 14,5 s → 14,1 s, y el alta individual 12,5 s → 0,9 s; 500 f
 `node ../pruebas/banco/tablero-explicar-inventario.mjs src/consulta/consulta.service.ts "$PWD/dist" nombre` por el `psql` del banco; las
 listas, en un banco nuevo (no caben junto con la serie), `tablero-semilla-listas.sql` y `tablero-explicar.sql`; al final, `banco.sh apagar`.
 
-**Cifras finales de la corrección:** `pnpm verificar` en verde (552 pruebas unitarias del backend en 53 archivos; el panel, las suyas);
+**Cifras finales de la corrección:** `pnpm verificar` en verde (pruebas unitarias del backend: 552, en 53 archivos; el panel, las suyas);
 `pnpm openapi`, 26 rutas y 33 operaciones (`orden` con `nombre | entrega | atencion` en `GET /dispositivos`, cabeceras `X-Total` y
 `X-Siguiente` declaradas, `X-Clave-Admin` en las tres escrituras nuevas); `api-smoke.sh`, 114 OK; `sesion-smoke.sh` (paso 4b), 182 de 182;
 la migración 23, dos pasadas en la pila y en el banco. El guardián, en verde en todo lo del backend (pasos 23, 2h2 y 2t incluidos); quedaron
@@ -2320,7 +2320,7 @@ se comprobó en el archivo antes de corregirlo, y cada corrección tiene su prue
 - **P7 Alta** (`#/alta`). Asistente de cinco pasos con el motivo escrito junto a «Siguiente», la credencial y el tópico una sola vez con
   «Copiar» y la espera de la primera trama por el canal en vivo del dispositivo nuevo; un 409 remite al inventario en vez de duplicar.
   Alta masiva (`?modo=lote`): el CSV se lee en el navegador (RFC 4180, marca BOM, cabecera fija, tope de 500 filas antes de enviar),
-  `modo=validar` va completo y `modo=crear` en tandas secuenciales de 50 (D-103 A) con «Creadas N de M»; si una tanda falla, se detiene,
+  `modo=validar` va completo y `modo=crear` en tandas secuenciales de 50 (`§61`) con «Creadas N de M»; si una tanda falla, se detiene,
   dice desde qué fila y ofrece «Reintentar las restantes (N)». Las credenciales no se dibujan: «Descargar credenciales (CSV)» y, después,
   «Ya las guardé: olvidarlas». «Descargar rechazadas» lleva las columnas del archivo más `motivo`, que el lector ignora al volver a subirlo;
   una celda con forma de fórmula se neutraliza con un apóstrofo (salvo las credenciales). Bandeja de detectados (`?modo=detectados`):
@@ -2423,3 +2423,93 @@ prueba en los dos sentidos):
 |---|---|
 | Pruebas del panel | 297 del panel (299 ejecuciones en vitest, en 31 archivos); `pnpm check`: 396 archivos, 0 errores |
 | Paso 4c (Chromium y Firefox, 390 y 1 280 px) | 230 de 230 (antes 218) |
+
+## 65. Credencial de dispositivos con SHA-256 y semilla que respeta las claves (13/11/2026)
+
+**Qué cambió** (decisión y porqué en `docs/11 §4`; diseño en `docs/10 §3` y §8.4 puntos 52 y 65 (iv)). La credencial aleatoria de
+dispositivos y pasarelas (24 bytes, 192 bits) deja de guardarse con scrypt y pasa a `sha256$<base64>`, sin sal y comparada en tiempo
+constante (`alta/credenciales.ts`: `resumirSecreto`, `verificarResumen`, `caminoDeCredencial` y `verificarCredencialDispositivo`, que
+despacha por la forma de la huella y dice por qué camino fue). Scrypt queda para las claves de personas (N = 2¹⁷, ahora el valor por
+defecto de `hashScrypt`) y para verificar las credenciales anteriores. Ningún camino de producción crea ya una huella scrypt para un
+dispositivo o una pasarela (alta, lote, rotación, pasarela nueva y su rotación); `hashesEnTandas` y `TANDA_SCRYPT` se quitaron con sus dos
+pruebas (nada más los usaba). La recepción por HTTP tiene un camino rápido (huella nueva: sin cupo ni *pool* de hilos; inexistente, sin
+credencial, de otra vía o dado de baja: el mismo trabajo contra una huella de relleno) y el anterior (scrypt, caché y cupo como antes) que
+convierte la fila en su primer acierto con un `UPDATE` condicionado a la huella verificada (`RecepcionService.convertirCredencial`; la
+consulta de la credencial trae ahora el id de su fila). Con la dirección bloqueada y la pista del identificador, el camino rápido sigue
+abierto y el anterior espera, como antes. Cuántas credenciales anteriores quedan: la consulta de `docs/14 §7.5`.
+
+**Pruebas nuevas y la falla plantada de cada una** (cada plantada se aplicó sobre el código, se vio en rojo y se deshizo):
+
+| Prueba | Plantada | Resultado |
+|---|---|---|
+| `credenciales.spec.ts`: formato `sha256$` + 32 bytes, sin sal, verificación, formas inválidas (11 casos), camino y despacho | sin la expresión de forma (solo el prefijo) | 1 en rojo (formas inválidas) |
+| `credenciales.spec.ts`, I2: una huella `sha256$…` no verifica como clave de persona | `verificarScrypt` acepta `sha256$` | 1 en rojo |
+| `verificacion.spec.ts`, I3: inexistente, sin credencial, otra vía, baja y huella anterior de otra vía cuestan un resumen contra el relleno, sin scrypt | el relleno vuelve a ser scrypt | 1 en rojo |
+| `verificacion.spec.ts`, I4: un acierto del camino rápido actualiza la pista | sin actualizar la pista | 1 en rojo |
+| `verificacion.spec.ts`: cuántas veces corre scrypt, con `node:crypto` simulado en parte (scrypt real envuelto en un contador, lo demás real): cero en el camino rápido y con el relleno, una en el camino anterior. Reemplaza a dos espías sobre `credenciales.js` que no podían fallar: `verificarCredencialDispositivo` llama a scrypt por el enlace local del módulo | el camino rápido calcula además un scrypt dentro de `credenciales.ts` | 2 en rojo |
+| `verificacion.spec.ts`: el primer acierto anterior convierte con el id, la huella verificada y el resumen del token | sin la conversión | 2 en rojo |
+| `verificacion.spec.ts`, I5: la conversión que falla (también con un rechazo sin objeto) no pierde la trama y el aviso no lleva token ni huellas | la falla se propaga; el aviso lleva el mensaje del error; leer `code` de un rechazo sin objeto | 1 en rojo cada una |
+| `recepcion-http.controller.spec.ts`: con la dirección bloqueada y la pista, la huella nueva entra y la anterior espera (429) | el bloqueo corta también el camino rápido | 1 en rojo |
+| `credencial-http.spec.ts`: la consulta trae `credencial_id`; la conversión es `UPDATE … WHERE id = $1 AND activa AND hash = $2` | sin el id; sin la condición sobre la huella; sin `AND activa` | 1 en rojo cada una |
+| I1 en `alta.service.spec.ts`, `baja-rotacion.spec.ts`, `pasarelas.spec.ts` (alta y rotación) y `lote-servicio.spec.ts` (500 filas): huella `sha256$`, que verifica, y `hashScrypt` nunca llamado | `hashScrypt` en cada uno de los cinco usos | 1 en rojo en cada archivo |
+
+Las huellas de las pruebas se calculan en la propia prueba; ningún archivo trae una huella literal. En el banco, `banco.sh alta` comprueba
+que la credencial nueva es `sha256$` (40 comprobaciones) y `banco.sh http` suma una credencial anterior: con un token equivocado, 401 y la
+fila intacta; con el suyo, 202 y la fila convertida en esa misma trama; la siguiente entra por el camino rápido (24 comprobaciones).
+
+**Medición, antes → después** (banco desechable: `banco.sh encender 10`, el backend con 0,5 CPU como en el compose; `tablero-medir.sh lote N P
+http|mqtt`, que ahora admite la vía, y `tablero-medir.sh verificacion 20`, nuevo). Antes: la imagen del commit anterior, una corrida por
+caso. Después: la imagen con el cambio, cuatro corridas por caso (mediana; el tope de 10 lotes por minuto obliga a espaciarlas).
+
+| Medida | Antes (scrypt) | Después (SHA-256) |
+|---|---|---|
+| Lote de 100, vía http | 14,6 s | 0,03 s |
+| Lote de 500, vía http | 72,3 s | 0,10 s |
+| Lote de 100, vía mqtt (con las órdenes al broker) | 14,5 s | 0,07 s |
+| Lote de 500, vía mqtt | 71,7 s | 0,40 s |
+| Tanda de 50 filas, la que usa el panel (una corrida) | ≈ 7 s (`docs/16 §61`) | 0,014 s (http) · 0,033 s (mqtt) |
+| `POST /recepcion/{id_fisico}`, primera trama (verifica la huella) | 109,5 ms | 5,3 y 4,9 ms |
+| `POST /recepcion/{id_fisico}`, segunda trama (antes, por la caché) | 4,7 ms | 4,6 y 4,4 ms |
+| 401 con token equivocado | 109,7 ms | 1,7 ms |
+| 401 con identificador inexistente | 113,9 ms | 1,7 y 1,6 ms |
+
+Mediana de 20 dispositivos por fila en la recepción (`curl -w '%{time_total}'` en bucle local, cuerpo de una lectura; la primera y la
+segunda trama incluyen los filtros 2 a 6). Después, la primera trama cuesta lo mismo que la segunda, y «no existe» lo mismo que «token
+equivocado» (I3). Lo que se tardaba en verificar una credencial anterior no cambia (es el mismo scrypt): ≈ 110 ms en el banco, la cifra del
+riesgo aceptado de `docs/11 §4`. **Lo que no cubre:** es el portátil, no el servidor de referencia; 500 filas es el tope del lote, no se
+midió más; el «alta individual a la vez» que lanza el guion a los 2 s ya no se solapa con el lote (termina antes), así que deja de medir la
+espera detrás de él; la verificación se midió desde una sola dirección y por debajo de los topes (b) y (c), y sin proxy; la carrera entre una rotación y la
+conversión de una credencial anterior la cubre la condición de la sentencia (`AND activa AND hash = $2`), no una prueba que ejecute la carrera. El tamaño de la
+tanda del panel no se cambió: queda para decidir aparte con estas cifras.
+
+### Semilla de demostración que respeta las claves
+
+**Qué pasaba:** cada corrida de `semilla-demo.sh` le ponía una clave temporal nueva a las cinco personas de demostración y cortaba sus
+sesiones: sacaba del panel a quien estaba dentro y anulaba la clave que había elegido. **Qué cambió:** `persona_temporal` (`lib-personas.sh`)
+tiene un quinto argumento, `rotar` (por defecto, lo de antes; lo sigue usando `panel-sesion-e2e.sh` con sus personas propias) o `conservar`:
+la cuenta nueva se crea con la temporal; la que ya eligió su clave no se toca, ni la huella ni las sesiones; una temporal vigente se deja;
+solo una temporal vencida se reemplaza, y entonces se cortan las sesiones; una cuenta desactivada se reactiva siempre con una clave temporal
+nueva y las sesiones cortadas, aunque hubiera elegido la suya (quien la desactivó porque su clave se filtró no la ve volver con esa clave).
+En todos los casos la cuenta queda activa, sin baja y con el rol pedido. La decisión se toma dentro del `ON CONFLICT … DO UPDATE`, con `CASE` sobre la fila existente, y la función escribe el id y qué pasó
+(`nueva`, `rotada`, `propia` o `vigente`). La semilla usa `conservar` (con `SEMILLA_ROTAR_CLAVES=1`, `rotar`) e imprime por persona su
+temporal nueva solo si quedó en uso, o «conserva la clave que eligió» o «conserva su clave temporal, aún vigente»; su comprobación pasa a
+«activas, con su rol, y con clave propia o temporal vigente», y con `SEMILLA_ROTAR_CLAVES=1` además las cinco con temporal recién asignada.
+
+**Prueba:** `plataforma/pruebas/personas-semilla-prueba.sh`, paso 4d del guardián, con una persona y un sitio de descarte que borra al
+salir: crear → `nueva`; otra corrida → `vigente` con la huella igual y la sesión abierta; marcada como clave propia, activa y con otro
+rol → `propia`, la huella igual, la sesión sin revocar y el rol pedido; con clave propia y dada de baja → `rotada`, huella nueva, temporal
+vigente, la sesión revocada y la cuenta activa; temporal vencida → `rotada` y la sesión revocada; `rotar` → `rotada` y la sesión revocada;
+un modo desconocido se rechaza: 7 de 7 comprobaciones. **Plantadas:** con `PERSONAS_PLANTAR=1` («conservar» corrido como «rotar», lo de
+antes), 2 de 7 en rojo, «vigente» y «propia», con la huella cambiada y la sesión revocada; con la condición de `conservar` sin
+`NOT usuario.activo` (la primera versión de este cambio), 1 de 7 en rojo: la cuenta desactivada volvía como `propia`, con la misma huella y
+la sesión abierta. Además, una copia de la semilla con las cinco cuentas cambiadas por cuentas de descarte, contra la pila de desarrollo:
+la primera corrida las crea (cinco temporales impresas), la segunda dice «aún vigente» en las cinco, con una de ellas marcada como clave
+propia y con una sesión dice «conserva la clave que eligió» sin cambiar su huella ni cortar la sesión, y con `SEMILLA_ROTAR_CLAVES=1`
+pasan las dos comprobaciones y la sesión queda revocada; las cuentas de descarte se borraron al terminar.
+
+**Cifras del bloque:** `pnpm verificar` en verde: 564 pruebas unitarias del backend en 53 archivos y 297 pruebas del panel (299 ejecuciones en 31
+archivos); `svelte-check`, 396 archivos sin errores. `pnpm openapi`: 37 rutas, con dos descripciones cambiadas (el 503 de la recepción y el
+tiempo del lote). Humos contra la pila reconstruida y el verificador de 52 pasos (el 4d es nuevo):
+`api-smoke.sh` (paso 4), 114 OK; `sesion-smoke.sh` (4b), 371 de 371; el panel en navegadores reales (4c), 230 de 230;
+`personas-semilla-prueba.sh` (4d), 7 de 7; en el banco, `banco.sh alta` (40) y `banco.sh http` (24) en verde. Las cifras que repiten el
+informe y `docs/18` (564 pruebas unitarias del backend y 52 pasos del verificador) se pusieron al día en el mismo cambio.

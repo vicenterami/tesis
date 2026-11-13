@@ -11,7 +11,7 @@ import { CalibracionValidada } from './calibracion.dto.js';
 import { isoUs } from '../db/iso-us.js';
 import { registrarEvento, registrarEventos } from '../db/evento.js';
 import { errorDeCliente } from '../db/cliente.js';
-import { generarSecreto, hashScrypt, hashesEnTandas } from './credenciales.js';
+import { generarSecreto, resumirSecreto } from './credenciales.js';
 import { FormatoPasarela, PasarelaValidada } from './pasarela.dto.js';
 import { AltaDeLote, Catalogos, PasarelaCatalogo, ZonaCatalogo } from './lote.js';
 
@@ -185,10 +185,10 @@ export class AltaService {
   async crear(a: AltaValidada, usuarioId: string | null = null): Promise<DispositivoCreado> {
     // Sin administración del broker no se abre siquiera la transacción: un dispositivo sin credencial no sirve de nada.
     if (a.via === 'mqtt' && !this.dynsec.disponible) throw this.sinBroker();
-    // El secreto y su resumen ANTES de abrir la transacción (como en el lote): scrypt corre en el pool de hilos y, si está ocupado,
-    // la transacción quedaba abierta y ociosa más que su idle_in_transaction (15 s): la base cortaba la conexión (docs/16 §61).
+    // El secreto y su resumen antes de abrir la transacción. Hasta el 13/11/2026 el resumen era scrypt y, con el pool de hilos ocupado,
+    // retenía la transacción más que su idle_in_transaction (15 s; docs/16 §61); desde entonces es SHA-256, síncrono (docs/11 §4).
     const secreto = a.via === 'lorawan' ? null : generarSecreto(); // la pasarela autentica a los lorawan (docs/10 §3)
-    const hash = secreto === null ? null : await hashScrypt(secreto);
+    const hash = secreto === null ? null : resumirSecreto(secreto);
     const c = await this.tomar();
     let enBroker = false;
     try {
@@ -279,7 +279,7 @@ export class AltaService {
   // de cambiar la clave en el broker deja al dispositivo sin poder entrar con la anterior: el remedio es repetir la rotación.
   async rotarCredencial(id: string, usuarioId: string | null = null): Promise<CredencialRotada> {
     const secreto = generarSecreto(); // y su resumen, antes de la transacción (ver crear)
-    const hash = await hashScrypt(secreto);
+    const hash = resumirSecreto(secreto);
     const c = await this.tomar();
     let idFisico = id;
     try {
@@ -368,7 +368,7 @@ export class AltaService {
   async crearPasarela(p: PasarelaValidada, usuarioId: string | null = null): Promise<PasarelaCreada> {
     if (!this.dynsec.disponible) throw this.sinBroker();
     const secreto = generarSecreto(); // y su resumen, antes de la transacción (ver crear)
-    const hash = await hashScrypt(secreto);
+    const hash = resumirSecreto(secreto);
     const c = await this.tomar();
     let enBroker = false;
     try {
@@ -436,7 +436,7 @@ export class AltaService {
   // Rotación de la credencial de una pasarela: la misma que la de un dispositivo (rotar también repara un cliente que falta).
   async rotarPasarela(id: string, usuarioId: string | null = null): Promise<CredencialPasarelaRotada> {
     const secreto = generarSecreto(); // y su resumen, antes de la transacción (ver crear)
-    const hash = await hashScrypt(secreto);
+    const hash = resumirSecreto(secreto);
     const c = await this.tomar();
     let idFisico = id;
     try {
@@ -489,13 +489,13 @@ export class AltaService {
   // Alta por lote: las filas válidas en dos sentencias, no N (una con UNNEST que inserta dispositivos, canales y credenciales, y la de
   // los eventos por registrarEventos), en una transacción, y las credenciales de las vías mqtt en el broker antes de confirmar, en tandas de 100 órdenes por
   // mensaje (el plugin las ejecuta en orden; un mensaje con 500 pasaría el tope de paquete del broker). Si el broker o la base fallan,
-  // nada queda creado y los clientes que alcanzaron a crearse se borran. Los secretos se generan y se resumen (scrypt) ANTES de abrir la
-  // transacción: es lo lento, y no debe retener la conexión ni las filas. Devuelve, por fila del archivo, el id y la conexión (la
-  // credencial, una sola vez).
+  // nada queda creado y los clientes que alcanzaron a crearse se borran. Los secretos se generan y se resumen (SHA-256, síncrono: docs/11 §4)
+  // antes de abrir la transacción. Hasta el 13/11/2026 el resumen era scrypt, en tandas para no acaparar el pool de hilos (docs/16 §61);
+  // ya no hace falta (docs/16 §65). Devuelve, por fila del archivo, el id y la conexión (la credencial, una sola vez).
   async crearLote(altas: readonly AltaDeLote[], usuarioId: string | null): Promise<Map<number, { id: string; credencial: string | null; topico: string | null }>> {
     if (altas.some((x) => x.alta.via === 'mqtt') && !this.dynsec.disponible) throw this.sinBroker();
     const secretos = altas.map((x) => (x.alta.via === 'lorawan' ? null : generarSecreto()));
-    const hashes = await hashesEnTandas(secretos); // en tandas: no acapara el pool de hilos (credenciales.ts)
+    const hashes = secretos.map((k) => (k === null ? null : resumirSecreto(k)));
     const c = await this.tomar();
     const creadosEnBroker: string[] = [];
     try {

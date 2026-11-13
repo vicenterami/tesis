@@ -1,5 +1,9 @@
-// Secretos y hashes del alta (docs/10 §3; decisión del 12/10: scrypt de node:crypto, sin dependencias). El secreto del
-// dispositivo se genera aquí, se entrega UNA vez en la respuesta y la base guarda solo su hash; el broker guarda el suyo.
+// Secretos y hashes (docs/10 §3; docs/11 §4). El secreto de un dispositivo o de una pasarela se genera aquí, se entrega UNA vez en la
+// respuesta y la base guarda solo su resumen; el broker guarda el suyo. Dos tratamientos, según quién elige el secreto (decidido el
+// 13/11/2026, docs/11 §4):
+//  - la credencial aleatoria (192 bits) se guarda con SHA-256: con esa entropía no hay nada que adivinar y un hash con costo no protegía nada;
+//  - la clave de una persona, que puede ser adivinable, con scrypt N = 2^17 (docs/20 §4).
+// Las credenciales anteriores al 13/11/2026 tienen huella scrypt (N = 2^15): siguen verificando y la vía HTTP las convierte (verificacion.ts).
 import { createHash, randomBytes, scrypt as scryptCb, ScryptOptions, timingSafeEqual } from 'node:crypto';
 
 // promisify elige la firma sin opciones; esta envoltura conserva N, r, p y maxmem.
@@ -12,36 +16,64 @@ export function generarSecreto(): string {
   return randomBytes(24).toString('base64url');
 }
 
-// Para secretos aleatorios de 24 bytes (alta entropía) basta N = 2^15; las claves de personas, que las eligen ellas y pueden ser
-// adivinables, usan N = 2^17 (docs/20 §4; costo medido en docs/16 §58). Memoria por hash: 128·N·r = 32 MiB con 2^15 y 128 MiB con
-// 2^17; el tope de Node (maxmem) se declara al doble de lo que pide N, a propósito (el de fábrica, 32 MiB, no alcanza).
-// Asíncrono: el cálculo corre en el pool de hilos de Node y no detiene la recepción de tramas mientras tanto.
-export const N_DISPOSITIVO = 2 ** 15;
+// ── Credencial aleatoria de dispositivos y pasarelas: SHA-256 ──────────────────────────────────────────────────────────────────────────
+// `sha256$<base64 del resumen de 32 bytes>`, sin sal: con 192 bits no hay diccionario ni tabla precalculada posible, y así dos
+// conversiones simultáneas de la misma credencial escriben el mismo valor. Síncrono: no pasa por el pool de hilos.
+const PREFIJO_SHA256 = 'sha256$';
+const FORMA_SHA256 = /^sha256\$[A-Za-z0-9+/]{43}=$/; // 32 bytes en base64 estándar: 43 caracteres y un «=»
+
+export function resumirSecreto(secreto: string): string {
+  return PREFIJO_SHA256 + createHash('sha256').update(secreto, 'utf8').digest('base64');
+}
+
+// Siempre calcula el resumen y compara en tiempo constante, aunque la huella tenga otra forma (el trabajo es el mismo en los dos casos).
+// Una huella con otra forma o con un largo distinto de 32 bytes no verifica nada: devuelve false, nunca lanza.
+export function verificarResumen(secreto: string, huella: string): boolean {
+  const calculado = createHash('sha256').update(secreto, 'utf8').digest();
+  const esperado = FORMA_SHA256.test(huella) ? Buffer.from(huella.slice(PREFIJO_SHA256.length), 'base64') : Buffer.alloc(0);
+  if (esperado.length !== calculado.length) {
+    timingSafeEqual(calculado, calculado);
+    return false;
+  }
+  return timingSafeEqual(calculado, esperado);
+}
+
+// Por qué camino se verifica una credencial de dispositivo o pasarela: `sha256` (la de hoy), `scrypt` (las anteriores al 13/11/2026) o
+// null (otra forma: no verifica nada). La capa HTTP lo pregunta antes de verificar (solo el camino scrypt pasa por el cupo) y lo usa
+// después (un acierto por el camino scrypt convierte la fila).
+export type CaminoCredencial = 'sha256' | 'scrypt';
+export function caminoDeCredencial(huella: string): CaminoCredencial | null {
+  if (huella.startsWith(PREFIJO_SHA256)) return 'sha256';
+  if (huella.startsWith('scrypt$')) return 'scrypt';
+  return null;
+}
+
+// Verifica una credencial de dispositivo o pasarela despachando por la forma de su huella, y dice por qué camino fue.
+export async function verificarCredencialDispositivo(secreto: string, huella: string): Promise<{ valida: boolean; camino: CaminoCredencial | null }> {
+  const camino = caminoDeCredencial(huella);
+  if (camino === 'sha256') return { valida: verificarResumen(secreto, huella), camino };
+  if (camino === 'scrypt') return { valida: await verificarScrypt(secreto, huella), camino };
+  return { valida: false, camino };
+}
+
+// ── Claves de personas: scrypt ──────────────────────────────────────────────────────────────────────────────────────────────────────────
+// N = 2^17 para las claves de personas (docs/20 §4; costo medido en docs/16 §58). N_CREDENCIAL_ANTERIOR = 2^15 es el que llevan las
+// credenciales de dispositivos creadas antes del 13/11/2026: ningún camino de producción lo escribe ya (solo las pruebas, para fabricar
+// una credencial anterior). Memoria por hash: 128·N·r = 32 MiB con 2^15 y 128 MiB con 2^17; el tope de Node (maxmem) se declara al doble
+// de lo que pide N, a propósito (el de fábrica, 32 MiB, no alcanza). Asíncrono: el cálculo corre en el pool de hilos de Node.
 export const N_PERSONA = 2 ** 17;
+export const N_CREDENCIAL_ANTERIOR = 2 ** 15;
 const PARAMETROS = { r: 8, p: 1, largo: 64 };
 const LARGO_MINIMO = { sal: 16, clave: 32 };
 
-export async function hashScrypt(secreto: string, sal: Buffer = randomBytes(16), N: number = N_DISPOSITIVO): Promise<string> {
+export async function hashScrypt(secreto: string, sal: Buffer = randomBytes(16), N: number = N_PERSONA): Promise<string> {
   const maxmem = 2 * 128 * N * PARAMETROS.r;
   const clave = await scrypt(secreto, sal, PARAMETROS.largo, { N, r: PARAMETROS.r, p: PARAMETROS.p, maxmem });
   return `scrypt$${N}$${PARAMETROS.r}$${PARAMETROS.p}$${sal.toString('base64')}$${clave.toString('base64')}`;
 }
 
-// Los resúmenes de un lote, en tandas (docs/16 §61): el pool de hilos de Node tiene 4 hilos y lo comparten la verificación de las
-// credenciales de recepción y de las claves de las personas. Con 500 scrypt a la vez, uno de recepción o de sesión esperaba detrás de
-// todos (≈ 70 s medidos; un alta individual a la vez superó su idle_in_transaction de 15 s y tumbó el proceso). En tandas de TANDA_SCRYPT,
-// lo que llega entre tanda y tanda espera a lo más una tanda. null pasa como null (vía lorawan: sin credencial propia).
-export const TANDA_SCRYPT = 4;
-export async function hashesEnTandas(secretos: readonly (string | null)[], tanda = TANDA_SCRYPT, resumir: (s: string) => Promise<string> = hashScrypt): Promise<(string | null)[]> {
-  const salida: (string | null)[] = [];
-  for (let i = 0; i < secretos.length; i += tanda) {
-    salida.push(...(await Promise.all(secretos.slice(i, i + tanda).map((k) => (k === null ? Promise.resolve(null) : resumir(k))))));
-  }
-  return salida;
-}
-
-// Un hash con otra forma, degenerado (sal o clave cortas: dos vacíos serían «iguales») o con parámetros fuera de lo que se
-// escribe aquí no verifica nada: devuelve false, nunca lanza.
+// Un hash con otra forma (también una huella `sha256$…`: una clave de persona se verifica SOLO con scrypt), degenerado (sal o clave
+// cortas: dos vacíos serían «iguales») o con parámetros fuera de lo que se escribe aquí no verifica nada: devuelve false, nunca lanza.
 export async function verificarScrypt(secreto: string, hash: string): Promise<boolean> {
   const partes = hash.split('$');
   if (partes.length !== 6 || partes[0] !== 'scrypt') return false;

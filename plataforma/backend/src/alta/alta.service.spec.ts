@@ -6,7 +6,7 @@ import { ErrorDynsec, OrdenDynsec } from '../broker/dynsec.js';
 import type { DynsecService } from '../broker/dynsec.service.js';
 import { AltaValidada } from './alta.dto.js';
 import { AltaService } from './alta.service.js';
-import { verificarScrypt } from './credenciales.js';
+import * as credenciales from './credenciales.js';
 
 // Los 400 llevan la lista de motivos en el cuerpo (`message`), no en el mensaje de la excepción.
 const motivosDe = async (p: Promise<unknown>): Promise<string[]> => {
@@ -59,9 +59,12 @@ function armar(opciones: { insertFalla?: string; insertRestriccion?: string; com
 }
 
 describe('AltaService.crear (HU-11): todo o nada entre la base y el broker', () => {
-  it('vía mqtt: transacción con dispositivo, canales, hash scrypt, evento; cliente creado en el broker ANTES del COMMIT; credencial una vez', async () => {
+  it('vía mqtt: transacción con dispositivo, canales, resumen SHA-256, evento; cliente creado en el broker ANTES del COMMIT; credencial una vez', async () => {
     const { servicio, sql, params, ordenes, cliente } = armar();
+    const scrypt = vi.spyOn(credenciales, 'hashScrypt');
     const r = await servicio.crear(alta());
+    expect(scrypt).not.toHaveBeenCalled(); // I1: ningún camino de producción crea una huella scrypt para un dispositivo
+    scrypt.mockRestore();
     expect(sql[0]).toBe('BEGIN');
     expect(sql.at(-1)).toBe('COMMIT');
     expect(sql.filter((s) => s.startsWith('INSERT INTO canal'))).toHaveLength(2);
@@ -73,8 +76,8 @@ describe('AltaService.crear (HU-11): todo o nada entre la base y el broker', () 
     expect(credencial).toHaveLength(32);
     expect(ordenes[0][0].password).toBe(credencial); // el broker recibe el secreto…
     const hash = params[sql.findIndex((s) => s.startsWith('INSERT INTO credencial'))][1] as string;
-    expect(hash.startsWith('scrypt$')).toBe(true); // …y la base, solo su hash
-    expect(await verificarScrypt(credencial, hash)).toBe(true);
+    expect(hash.startsWith('sha256$')).toBe(true); // …y la base, solo su resumen (docs/11 §4)
+    expect(credenciales.verificarResumen(credencial, hash)).toBe(true);
     expect(JSON.stringify(params).includes(credencial)).toBe(false);
     expect((r.conexion as { topico: string }).topico).toBe('sitio/uct/dispositivo/nodo-01/<magnitud>');
     expect(r.canales.map((c) => c.unidad)).toEqual(['Cel', '%RH']);

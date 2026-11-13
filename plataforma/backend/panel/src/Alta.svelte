@@ -3,7 +3,7 @@
   //  - Asistente de cinco pasos: identidad y zona · vía, formato e intervalo (pasarela si LoRaWAN) · canales · credencial mostrada UNA
   //    vez con «Copiar» · «esperando la primera trama» en vivo (`GET /eventos?dispositivo=`, F1).
   //  - Alta masiva: el CSV se lee en el navegador (lib/lote.ts), se valida entero con `modo=validar` y las válidas se crean en tandas de
-  //    50 (D-103 A) con «creadas N de M»; las credenciales, una sola vez, por «Descargar credenciales (CSV)»; «Descargar rechazadas» para
+  //    50 (docs/16 §61) con «creadas N de M»; las credenciales, una sola vez, por «Descargar credenciales (CSV)»; «Descargar rechazadas» para
   //    corregir y volver a subir.
   //  - Bandeja de detectados (`GET /cuarentena/detectados`): lo que ya habla sin estar dado de alta; cada fila abre el asistente con el
   //    identificador ya escrito.

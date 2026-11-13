@@ -4,7 +4,7 @@ import type { Pool } from 'pg';
 import { ErrorDynsec, OrdenDynsec } from '../broker/dynsec.js';
 import type { DynsecService } from '../broker/dynsec.service.js';
 import { AltaService } from './alta.service.js';
-import { verificarScrypt } from './credenciales.js';
+import * as credenciales from './credenciales.js';
 
 const ID = '44444444-4444-4444-8444-444444444444';
 
@@ -117,7 +117,10 @@ describe('AltaService.darDeBaja: estado baja, credenciales revocadas, condicione
 describe('AltaService.rotarCredencial: nueva fila con hash, la anterior inactiva, setClientPassword antes del COMMIT, secreto una vez', () => {
   it('vía mqtt: credencial nueva de 32 caracteres; en la base solo su hash; el broker recibe el secreto; conexión como en el alta', async () => {
     const { servicio, sql, params, ordenes } = armar();
+    const scrypt = vi.spyOn(credenciales, 'hashScrypt');
     const r = await servicio.rotarCredencial(ID);
+    expect(scrypt).not.toHaveBeenCalled(); // I1
+    scrypt.mockRestore();
     expect(sql[0]).toBe('BEGIN');
     expect(sql.at(-1)).toBe('COMMIT');
     expect(sql.find((s) => s.startsWith('SELECT d.id'))).toContain('FOR NO KEY UPDATE OF d');
@@ -132,8 +135,8 @@ describe('AltaService.rotarCredencial: nueva fila con hash, la anterior inactiva
     expect(credencial).toHaveLength(32);
     expect(ordenes).toEqual([[{ command: 'setClientPassword', username: 'nodo-07', password: credencial }]]);
     const hash = params[iNueva][1] as string;
-    expect(hash.startsWith('scrypt$')).toBe(true);
-    expect(await verificarScrypt(credencial, hash)).toBe(true);
+    expect(hash.startsWith('sha256$')).toBe(true); // I1: la credencial nueva se guarda con SHA-256 (docs/11 §4)
+    expect(credenciales.verificarResumen(credencial, hash)).toBe(true);
     expect(JSON.stringify(params).includes(credencial)).toBe(false);
     expect(params[sql.findIndex((s) => s.startsWith('INSERT INTO evento'))][1]).toBe('rotacion');
     expect((r.conexion as { topico: string }).topico).toBe('sitio/uct/dispositivo/nodo-07/<magnitud>');

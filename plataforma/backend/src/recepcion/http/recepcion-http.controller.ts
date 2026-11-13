@@ -14,7 +14,8 @@ import { Publica } from '../../sesion/guardia.js';
 // tubería que la de MQTT (filtros 1 a 6); aquí solo se autentica con el token, se aplican los topes y se traduce el resultado a un
 // código HTTP. El cuerpo llega crudo (Buffer, hasta 64 KiB: el lector de main.ts), así el adaptador ve los mismos bytes que por MQTT.
 // Orden de las comprobaciones (punto 52): par bloqueado → tipo de contenido → forma del token y del identificador → dirección bloqueada
-// (salvo que el token sea el último verificado para ese identificador) → credencial y caché → cupo → scrypt → ritmo → filtros 2 a 6.
+// (salvo que el token sea el último verificado para ese identificador) → credencial y caché → huella `sha256$…` (desde el 13/11/2026):
+// resumen y comparación; huella `scrypt$…` (anterior): dirección bloqueada → cupo → scrypt → conversión → ritmo → filtros 2 a 6.
 const TIPOS = new Set(['application/json', 'application/senml+json', 'text/plain']);
 const BEARER = /^Bearer ([A-Za-z0-9_-]{16,128})$/i; // el token del alta: 24 bytes en base64url (32 caracteres); el esquema no distingue mayúsculas (RFC 9110 §11.1)
 const FORMA_ID = /^[a-z0-9][a-z0-9-]{2,62}$/; // la de id_fisico (alta.dto.ts y la base): otra forma no puede existir
@@ -61,7 +62,7 @@ export class RecepcionHttpController {
   @ApiResponse({ status: 415, description: 'No es JSON ni texto' })
   @ApiResponse({ status: 422, description: 'No se entiende, ninguna lectura es válida o no cabe en el presupuesto de la hora; queda en cuarentena' })
   @ApiResponse({ status: 429, description: 'Demasiados fallos de autenticación (para este dispositivo desde esta dirección, o desde esta dirección con cualquier dispositivo), o más de una trama por segundo del dispositivo' })
-  @ApiResponse({ status: 503, description: 'Verificación de tokens saturada; reintentar' })
+  @ApiResponse({ status: 503, description: 'Verificación de tokens saturada (solo credenciales anteriores al 13/11/2026); reintentar' })
   async recibir(@Param('idFisico') idFisico: string, @Query('magnitud') magnitud: unknown, @Req() req: Request, @Res() res: Response): Promise<void> {
     const cliente = direccionDelCliente(req, this.secreto);
     if (cliente.forwardedIgnorado) {
@@ -80,14 +81,15 @@ export class RecepcionHttpController {
     const token = BEARER.exec(req.headers.authorization ?? '')?.[1];
     if (token === undefined || !FORMA_ID.test(idFisico)) return this.noAutorizado(res, par, direccion, idFisico, false); // sin comprobar: no cuenta
     // (c) Una dirección bloqueada no gasta ni una consulta, salvo que presente el último token verificado para ese identificador (la
-    // pista): entonces se consulta la base, y la caché decide con la huella vigente.
+    // pista): entonces se consulta la base y decide la huella vigente (la caché, o el camino rápido si es `sha256$…`).
     const esperaDireccion = this.fallosDireccion.bloqueo(direccion);
     const bloqueada = 'demasiados fallos de autenticación desde esta dirección; reintentar más tarde';
     if (esperaDireccion > 0 && !this.verificacion.pista(idFisico, token)) return this.bloqueada(res, esperaDireccion, bloqueada);
     const fila = await this.recepcion.credencialHttp(idFisico);
-    // (a) Con el token ya verificado contra esta misma huella no hay scrypt, ni cupo, ni bloqueo por dirección que valga.
+    // (a) Con el token ya verificado contra esta misma huella no hay scrypt, ni cupo, ni bloqueo por dirección que valga. Con la dirección
+    // bloqueada, de lo demás solo sigue el camino rápido (no gasta CPU); el anterior, con scrypt, espera.
     if (!this.verificacion.enCache(fila, token)) {
-      if (esperaDireccion > 0) return this.bloqueada(res, esperaDireccion, bloqueada);
+      if (esperaDireccion > 0 && this.verificacion.caminoAnterior(fila)) return this.bloqueada(res, esperaDireccion, bloqueada);
       const resultado = await this.verificacion.verificar(fila, token, idFisico);
       if (resultado === 'saturado') {
         res.setHeader('Retry-After', '1');

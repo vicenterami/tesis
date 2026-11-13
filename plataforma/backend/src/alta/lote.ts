@@ -6,8 +6,9 @@ import { AltaValidada, Formato, validarAlta } from './alta.dto.js';
 
 // Una sola constante para el tope (la usan la validación y la documentación del contrato): 500 filas por lote.
 export const MAX_FILAS_LOTE = 500;
-// Lo que se recomienda al cliente para `modo=crear` (D-103 A, 11/11/2026): tandas de 50 filas (≈ 7 s cada una, docs/16 §61), para que
-// ninguna petición se acerque al corte del proxy. El backend no lo exige: el tope sigue en 500.
+// Lo que se recomienda al cliente para `modo=crear` (decidido el 11/11/2026): tandas de 50 filas, para que ninguna petición se acerque al
+// corte del proxy. Hoy una tanda tarda ≈ 0,014 s por la vía http y ≈ 0,033 s por la mqtt (docs/16 §65); hasta el 13/11/2026, con la
+// credencial en scrypt, ≈ 7 s (docs/16 §61). El backend no lo exige: el tope sigue en 500.
 export const TANDA_CLIENTE_LOTE = 50;
 export const MODOS_LOTE = ['validar', 'crear'] as const;
 export type ModoLote = (typeof MODOS_LOTE)[number];

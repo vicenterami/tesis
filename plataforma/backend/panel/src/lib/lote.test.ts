@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { celda, celdasCsv, crearPorTandas, csvCredenciales, csvRechazadas, leerCsv, renumerar, type FilaInforme, type InformeLote } from './lote';
 
-// P7, alta masiva (docs/19 §4, tablero v2, F2; D-103 A): el CSV en el navegador y la creación por tandas de 50.
+// P7, alta masiva (docs/19 §4, tablero v2, F2; docs/16 §61): el CSV en el navegador y la creación por tandas de 50.
 const CAB = 'id_fisico,nombre,zona,via,formato,intervalo_esperado_s,canales,pasarela';
 
 describe('el CSV', () => {
@@ -28,7 +28,7 @@ describe('el CSV', () => {
   });
 });
 
-describe('crear por tandas (D-103 A)', () => {
+describe('crear por tandas', () => {
   const informe = (filas: { id_fisico?: string }[], resultado: FilaInforme['resultado'] = 'creada'): InformeLote =>
     ({ validas: 0, rechazadas: 0, existentes: 0, filas: filas.map((f, i) => ({ n: i + 2, id_fisico: f.id_fisico ?? '', resultado, motivo: null, id: `id-${f.id_fisico}`, credencial: `c-${f.id_fisico}`, topico: null })) });
 

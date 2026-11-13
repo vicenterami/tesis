@@ -94,7 +94,7 @@ export function validarCambioUsuario(cuerpo: unknown): CambioUsuario {
   // Reactivar exige una clave temporal nueva en la misma petición (revisión del 11/11/2026): la clave de antes no vuelve, porque
   // pudo quedar expuesta mientras la cuenta estaba de baja o ser la razón de la baja.
   if (salida.activo === true && salida.clave_temporal !== true) motivos.push('activo: true (reactivar) exige clave_temporal: true en la misma petición: la clave anterior no vuelve');
-  // Baja con motivo (migración 24; conocimiento-portable, baja lógica §2): desactivar exige el motivo, que se guarda con quién y cuándo.
+  // Baja con motivo (migración 24; docs/20 §10): desactivar exige el motivo, que se guarda con quién y cuándo.
   if ('motivo' in c) {
     const m = typeof c.motivo === 'string' ? c.motivo.trim() : '';
     if (m.length < 1 || m.length > MAX_MOTIVO) motivos.push(`motivo debe tener entre 1 y ${MAX_MOTIVO} caracteres`);

@@ -212,7 +212,7 @@ case "${1:-}" in
     # Alta por API de punta a punta (HU-11; docs/10 §3 y §8.4 puntos 41 y 42; docs/16 §20): POST con la clave de administrador
     # del banco → 201 con la credencial (que nunca se imprime) → el «dispositivo» publica con ella por 1884 → la lectura llega a
     # medicion; con la misma credencial no puede publicar como otro (RC:135); con otra clave no conecta; repetir el alta da 409;
-    # sin clave, 401; con clave incorrecta, 401; un cuerpo inválido, 400. En la base: credencial con hash scrypt (nunca el
+    # sin clave, 401; con clave incorrecta, 401; un cuerpo inválido, 400. En la base: credencial con resumen SHA-256 (nunca el
     # secreto) y un evento «alta»; en la API, el inventario lo lista con su vía. Además: un anónimo no puede dar órdenes al plugin
     # y el usuario backend (rol recepcion) no puede publicar. Los secretos del banco entran a curl, psql y grep por la entrada
     # estándar, no por argumentos (ps).
@@ -250,7 +250,7 @@ case "${1:-}" in
     code=$(post_admin -d '{"id_fisico":"backend"}' | tail -1); [ "$code" = 400 ] && ok "cuerpo inválido (id reservado, campos faltantes) → 400" || falla "cuerpo inválido → $code"
     code=$(post_admin -d "${cuerpo/\"via\":\"mqtt\"/\"via\":\"lorawan\"}" | tail -1); [ "$code" = 400 ] && ok "lorawan sin pasarela → 400" || falla "lorawan sin pasarela → $code"
     h=$(psql_ -tA -c "SELECT left(hash, 7) FROM credencial cr JOIN dispositivo d ON d.id=cr.dispositivo_id WHERE d.id_fisico='$id'" | tr -d '[:space:]')
-    [ "$h" = 'scrypt$' ] && ok "en la base, la credencial es un hash scrypt" || falla "hash en la base: «$h»"
+    [ "$h" = 'sha256$' ] && ok "en la base, la credencial es su resumen SHA-256 (docs/11 §4)" || falla "hash en la base: «$h»"
     n=$(printf '\\set c %s\nSELECT count(*) FROM credencial WHERE position(:%sc%s in hash) > 0;\n' "'$CRED'" "'" "'" | psql_ -tA | tr -d '[:space:]'); [ "$n" = 0 ] && ok "el secreto en claro no está en ninguna fila de credencial" || falla "el secreto aparece en la base"
     n=$(psql_ -tA -c "SELECT count(*) FROM evento e JOIN dispositivo d ON d.id=e.dispositivo_id WHERE d.id_fisico='$id' AND e.tipo='alta'" | tr -d '[:space:]'); [ "$n" = 1 ] && ok "evento «alta» registrado" || falla "evento alta: $n"
     api_leer -s http://127.0.0.1:3001/dispositivos | python3 -c "import sys,json; sys.exit(0 if any(d['id_fisico']=='$id' and d['via']=='mqtt' and d['en_linea'] for d in json.load(sys.stdin)) else 1)" && ok "GET /dispositivos lo lista con vía mqtt y en línea" || falla "no aparece en el inventario, o no en línea"
@@ -578,6 +578,21 @@ case "${1:-}" in
     # La ruta en mayúsculas llega al mismo controlador (Express no distingue): el cuerpo debe llegar crudo igual, no vacío.
     sleep 1.1; r=$(printf 'Authorization: Bearer %s\n' "$TK" | curl -s -m 10 -w '\n%{http_code}' -H @- -H 'Content-Type: application/json' --data-binary "[{\"bn\":\"$hid\",\"bt\":$((t+10)),\"n\":\"temperatura\",\"u\":\"Cel\",\"v\":22}]" "http://127.0.0.1:3001/RECEPCION/$hid")
     [ "$(codigo "$r")" = 202 ] && [ "$(lec "$hid")" = 2 ] && ok "la ruta en mayúsculas → 202 con el cuerpo leído (el lector crudo no distingue mayúsculas)" || falla "mayúsculas: $(codigo "$r") $(cuerpo "$r")"
+    # Credencial anterior (docs/10 §8.4 punto 52, 13/11/2026): la huella de un tercer nodo se reemplaza en la base por la scrypt que habría
+    # tenido antes de ese día (calculada por la función del backend, con el token por la entrada estándar; ni el token ni la huella se
+    # imprimen). Un token equivocado no entra ni la convierte; el bueno entra (202) y la fila pasa a sha256$; la trama siguiente, también.
+    aid="anterior-$n"; r=$(api POST /dispositivos -d "{\"id_fisico\":\"$aid\",\"nombre\":\"Nodo con credencial anterior\",\"zona_id\":\"$zona\",\"via\":\"http\",\"intervalo_esperado_s\":60,\"canales\":[{\"magnitud\":\"temperatura\"}]}")
+    TKA=$(json "v['conexion']['token']" <<<"$(cuerpo "$r")"); AUID=$(json "v['id']" <<<"$(cuerpo "$r")"); unset r
+    HA=$(printf '%s' "$TKA" | dc exec -T backend node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>import('/app/dist/alta/credenciales.js').then(m=>m.hashScrypt(s,undefined,m.N_CREDENCIAL_ANTERIOR)).then(h=>process.stdout.write(h)))")
+    printf "UPDATE credencial SET hash = '%s' WHERE dispositivo_id = '%s' AND activa;\n" "$HA" "$AUID" | psql_ -q >/dev/null; unset HA
+    huella() { psql_ -tA -c "SELECT left(hash, 7) FROM credencial WHERE dispositivo_id = '$AUID' AND activa" | tr -d '[:space:]'; }
+    [ "$(huella)" = 'scrypt$' ] && ok "un nodo con credencial anterior (huella scrypt\$ en la base)" || falla "no se pudo preparar la credencial anterior: «$(huella)»"
+    c=$(codigo "$(enviar xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx "$aid" application/json '[]')")
+    [ "$c" = 401 ] && [ "$(huella)" = 'scrypt$' ] && ok "credencial anterior con un token equivocado → 401, y la fila no se toca" || falla "anterior, token malo: $c · huella «$(huella)»"
+    r=$(enviar "$TKA" "$aid" application/senml+json "[{\"bn\":\"$aid\",\"bt\":$t,\"n\":\"temperatura\",\"u\":\"Cel\",\"v\":20}]")
+    [ "$(codigo "$r")" = 202 ] && [ "$(huella)" = 'sha256$' ] && ok "credencial anterior con su token → 202, y la fila queda convertida a sha256\$ en esa misma trama" || falla "conversión: $(codigo "$r") · huella «$(huella)»"
+    sleep 1.1; r=$(enviar "$TKA" "$aid" application/senml+json "[{\"bn\":\"$aid\",\"bt\":$((t+1)),\"n\":\"temperatura\",\"u\":\"Cel\",\"v\":20.5}]")
+    [ "$(codigo "$r")" = 202 ] && ok "convertida, la trama siguiente entra por el camino rápido (202)" || falla "tras convertir: $(codigo "$r")"
     # A través del proxy, la dirección que cuenta es la que ve el proxy: una dirección falsa en X-Forwarded-For no se cree.
     [ -f "$CERTS/ca.crt" ] || bash proxy/ca-desarrollo.sh "$CERTS"
     dcp up -d proxy >/dev/null 2>&1; for _ in $(seq 1 20); do [ "$(dcp ps --format '{{.Status}}' proxy | grep -c healthy)" = 1 ] && break; sleep 2; done
@@ -603,11 +618,12 @@ case "${1:-}" in
     sleep 1.1; c7=$(codigo "$(enviar "$TKP" "$pid?magnitud=humedad" text/plain '56.5')")
     [ "$c" = 429 ] && [ $intentos -le 4 ] && [ "$c6" = 429 ] && [ "$c7" = 202 ] && ok "a los 5 fallos del par dirección + dispositivo, ese par queda bloqueado (429) incluso con su token bueno, y el vecino de la misma dirección sigue entrando (202)" || falla "bloqueo por par: $c tras $intentos intento(s) más; con el token bueno $c6; el vecino $c7"
     # (c) Tope grueso por dirección: 50 fallos con identificadores distintos (5 por par; lo ya bloqueado no suma) bloquean 60 s las
-    # verificaciones con scrypt desde la dirección; el plano, con su token ya verificado (caché), sigue entrando sin scrypt.
+    # verificaciones desde la dirección; el plano, con el token que ya se le verificó (la pista), sigue entrando: desde el 13/11/2026 su
+    # huella es sha256$ y entra por el camino rápido (antes, por la caché de la verificación scrypt).
     for n2 in $(seq 1 10); do for _ in 1 2 3 4 5; do enviar xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx "fantasma-$n2" application/json '[]' >/dev/null; done; done
     c8=$(codigo "$(enviar xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx fantasma-99 application/json '[]')")
     sleep 1.1; c9=$(codigo "$(enviar "$TKP" "$pid?magnitud=humedad" text/plain '57.5')")
-    [ "$c8" = 429 ] && [ "$c9" = 202 ] && ok "a los 50 fallos desde la dirección, con cualquier identificador, las verificaciones con scrypt se bloquean (429); el token en caché sigue entrando (202)" || falla "tope grueso: identificador nuevo $c8; en caché $c9"
+    [ "$c8" = 429 ] && [ "$c9" = 202 ] && ok "a los 50 fallos desde la dirección, con cualquier identificador, las verificaciones se bloquean (429); el token ya verificado de ese identificador sigue entrando (202)" || falla "tope grueso: identificador nuevo $c8; en caché $c9"
     # Los contadores viven en la memoria del proceso (docs/10 §8.4 punto 52): al reiniciar el backend, la dirección queda libre. Dado de
     # baja por la API, su token ya no entra (401, como cualquier otro motivo). Va al final: el backend ve una sola dirección para las
     # peticiones directas y las del proxy (la de la red de Docker, no 127.0.0.1), así que cada 401 de arriba cuenta para el bloqueo.
@@ -615,8 +631,8 @@ case "${1:-}" in
     code=$(printf 'X-Clave-Admin: %s\n' "$CLAVE" | curl -s -m 10 -o /dev/null -w '%{http_code}' -X DELETE -H @- "http://127.0.0.1:3001/dispositivos/$HUID")
     r=$(enviar "$TK" "$hid" application/json "$senml")
     [ "$code" = 200 ] && [ "$(codigo "$r")" = 401 ] && ok "tras reiniciar, la dirección queda libre; y dado de baja por la API, su token ya no entra (401)" || falla "baja: DELETE $code, envío $(codigo "$r")"
-    k=$(dc logs --no-color --since 10m backend 2>/dev/null | grep -cF -f <(printf '%s\n' "${TK:-sin}" "${TKP:-sin}")); [ "$k" = 0 ] && ok "ningún token aparece en el registro del backend" || falla "un token aparece en el registro"
-    unset TK TKP CLAVE
+    k=$(dc logs --no-color --since 10m backend 2>/dev/null | grep -cF -f <(printf '%s\n' "${TK:-sin}" "${TKP:-sin}" "${TKA:-sin}")); [ "$k" = 0 ] && ok "ningún token aparece en el registro del backend" || falla "un token aparece en el registro"
+    unset TK TKP TKA CLAVE
     echo; [ $fallos -eq 0 ] && echo "HTTP OK" || { echo "$fallos comprobación(es) con falla"; exit 1; } ;;
   nodo)
     # Contrato del nodo propio (fase 2, docs/17 §6.2; docs/16 §44), sin la placa: alta con los seis canales del nodo, calibración del

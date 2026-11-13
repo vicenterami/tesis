@@ -9,6 +9,7 @@ import { MilesightAdaptador } from './adaptadores/milesight.adaptador.js';
 import { PlanoAdaptador } from './adaptadores/plano.adaptador.js';
 import { SenmlAdaptador } from './adaptadores/senml.adaptador.js';
 import { RecepcionHttpController } from './http/recepcion-http.controller.js';
+import { Cupo } from './http/topes.js';
 import { VerificacionDeTokens } from './http/verificacion.js';
 import { RecepcionService } from './recepcion.service.js';
 
@@ -19,7 +20,9 @@ import { RecepcionService } from './recepcion.service.js';
   // El resolvedor del mapa de claves se inyecta: en la Etapa 4 pasa a leer `magnitud.alias` sin tocar los adaptadores (punto 47).
   providers: [RecepcionService, SenmlAdaptador, PlanoAdaptador, ChirpstackAdaptador, MilesightAdaptador,
     { provide: RESOLVER_CLAVE, useValue: resolverClave },
-    // Con fábrica: sus parámetros (cupo y tope de la caché) tienen valor por defecto y no son proveedores de Nest.
-    { provide: VerificacionDeTokens, useFactory: () => new VerificacionDeTokens() }],
+    // Con fábrica: sus parámetros (cupo y tope de la caché) tienen valor por defecto y no son proveedores de Nest; la conversión de las
+    // credenciales anteriores la hace el servicio (docs/10 §8.4 punto 52).
+    { provide: VerificacionDeTokens, inject: [RecepcionService],
+      useFactory: (r: RecepcionService) => new VerificacionDeTokens(new Cupo(), 10_000, (id, anterior, nueva) => r.convertirCredencial(id, anterior, nueva)) }],
 })
 export class RecepcionModule {}

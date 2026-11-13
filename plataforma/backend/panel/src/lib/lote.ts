@@ -1,7 +1,8 @@
-// P7, alta masiva por archivo (docs/19 §4, tablero v2, F2; D-103 A). El CSV se lee en el navegador (nunca se sube el archivo: se
+// P7, alta masiva por archivo (docs/19 §4, tablero v2, F2; docs/16 §61). El CSV se lee en el navegador (nunca se sube el archivo: se
 // convierte en `filas` y va como JSON), se valida completo con `POST /dispositivos/lote?modo=validar` (rápido: no crea nada) y las
-// válidas se crean con `modo=crear` en TANDAS de 50 filas secuenciales: crear 500 de una vez tarda ≈ 70 s (un resumen scrypt por
-// credencial) y el proxy corta a los 60 s; cada tanda tarda ≈ 7 s. Si una tanda falla, se detiene, se muestra lo creado hasta ahí y se
+// válidas se crean con `modo=crear` en TANDAS de 50 filas secuenciales. Hasta el 13/11/2026 crear 500 de una vez tardaba ≈ 70 s (un
+// resumen scrypt por credencial) y el proxy corta a los 60 s; desde entonces el resumen es SHA-256 y 500 tardan menos de medio segundo, cada
+// tanda unas decenas de milisegundos (docs/16 §65; el tamaño de la tanda se revisa aparte). Si una tanda falla, se detiene, se muestra lo creado hasta ahí y se
 // ofrece reintentar las restantes. Las credenciales llegan UNA sola vez y viven solo en memoria hasta que la persona las descarga.
 export const COLUMNAS_LOTE = ['id_fisico', 'nombre', 'zona', 'via', 'formato', 'intervalo_esperado_s', 'canales', 'pasarela'] as const;
 export type ColumnaLote = (typeof COLUMNAS_LOTE)[number];
@@ -9,7 +10,7 @@ export type ColumnaLote = (typeof COLUMNAS_LOTE)[number];
 export const COLUMNA_MOTIVO = 'motivo';
 const OBLIGATORIAS: readonly ColumnaLote[] = ['id_fisico', 'nombre', 'zona', 'canales'];
 export const MAX_FILAS_LOTE = 500; // el tope del servidor (lote.ts, MAX_FILAS_LOTE): más es 413
-export const TANDA = 50; // D-103 A (lote.ts, TANDA_CLIENTE_LOTE)
+export const TANDA = 50; // docs/16 §61 (lote.ts, TANDA_CLIENTE_LOTE)
 export const MAX_BYTES_CSV = 1_000_000;
 
 export type FilaLote = Partial<Record<ColumnaLote, string>>;

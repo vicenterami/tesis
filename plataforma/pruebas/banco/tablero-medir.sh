@@ -1,10 +1,16 @@
 #!/usr/bin/env bash
-# Mediciones del tablero v2 contra el backend del banco (docs/16 §61). Requiere `banco.sh encender 120` y la semilla de la serie
-# (tablero-semilla-serie.sql). Lee como usuario del sistema con la clave de descarte del banco, por la entrada estándar de curl.
-#   bash plataforma/pruebas/banco/tablero-medir.sh tiempos      mediana de 10 peticiones (tras una de calentamiento) por ruta y rango
-#   bash plataforma/pruebas/banco/tablero-medir.sh lote N P      POST /dispositivos/lote?modo=crear con N filas (vía http, sin broker:
-#                                                               solo el costo de scrypt) e id_fisico P-0000…; a los 2 s, un alta
-#                                                               individual a la vez: cuánto espera su scrypt detrás del lote
+# Mediciones del tablero v2 contra el backend del banco (docs/16 §61 y §65). `tiempos` requiere `banco.sh encender 120` y la semilla de la
+# serie (tablero-semilla-serie.sql); `lote` y `verificacion`, solo `banco.sh encender`. Lee y escribe como usuario del sistema con la clave
+# de descarte del banco, por la entrada estándar de curl; los tokens creados para medir viajan igual y nunca se imprimen. Lo que se crea
+# vive en el banco (datos en RAM) y desaparece con `banco.sh apagar`.
+#   bash plataforma/pruebas/banco/tablero-medir.sh tiempos          mediana de 10 peticiones (tras una de calentamiento) por ruta y rango
+#   bash plataforma/pruebas/banco/tablero-medir.sh lote N P [VIA]   POST /dispositivos/lote?modo=crear con N filas de vía VIA (http, por
+#                                                                   defecto: sin broker, solo el costo del resumen de cada credencial; mqtt:
+#                                                                   además las órdenes al broker) e id_fisico P-0000…; a los 2 s, un alta
+#                                                                   individual a la vez: cuánto espera detrás del lote
+#   bash plataforma/pruebas/banco/tablero-medir.sh verificacion K P K dispositivos http (lote) y, por cada uno, POST /recepcion: la primera
+#                                                                   trama (verifica la huella), la segunda (ya verificada) y un token
+#                                                                   equivocado; más K identificadores inexistentes. Mediana de cada grupo
 set -u; export LC_ALL=C
 ENV="${XDG_RUNTIME_DIR:-$HOME/.cache}/plataforma-banco/banco.env"
 [ -f "$ENV" ] || { echo "FALLA sin $ENV: primero banco.sh encender"; exit 1; }
@@ -26,13 +32,36 @@ case "${1:-}" in
     echo "inventario: $(mediana "$B/dispositivos")"
     echo "inventario orden=entrega limite=50: $(mediana "$B/dispositivos?orden=entrega&limite=50")" ;;
   lote)
-    N="${2:?N filas}"; P="${3:?prefijo de id_fisico}"; T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
+    N="${2:?N filas}"; P="${3:?prefijo de id_fisico}"; VIA="${4:-http}"; T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
+    [[ "$VIA" =~ ^(http|mqtt)$ ]] || { echo "FALLA vía «$VIA»: http o mqtt"; exit 1; }
     ZONA=$(api "$B/sitios" | python3 -I -c 'import json,sys; print(json.load(sys.stdin)[0]["zonas"][0]["id"])')
-    python3 -I -c "import json,sys; n,p=int(sys.argv[1]),sys.argv[2]; print(json.dumps({'filas':[{'id_fisico':'%s-%04d'%(p,i),'nombre':'lote','zona':sys.argv[3],'via':'http','intervalo_esperado_s':'60','canales':'temperatura:Cel'} for i in range(n)]}))" "$N" "$P" "$ZONA" > "$T/lote.json"
+    python3 -I -c "import json,sys; n,p,v=int(sys.argv[1]),sys.argv[2],sys.argv[4]; print(json.dumps({'filas':[{'id_fisico':'%s-%04d'%(p,i),'nombre':'lote','zona':sys.argv[3],'via':v,'intervalo_esperado_s':'60','canales':'temperatura:Cel'} for i in range(n)]}))" "$N" "$P" "$ZONA" "$VIA" > "$T/lote.json"
     ( sleep 2; api -o /dev/null -w "alta individual a la vez: %{time_total} s · HTTP %{http_code}\n" -X POST "$B/dispositivos" -H 'Content-Type: application/json' \
-        -d "{\"id_fisico\":\"$P-solo\",\"nombre\":\"solo\",\"zona_id\":\"$ZONA\",\"via\":\"http\",\"intervalo_esperado_s\":60,\"canales\":[{\"magnitud\":\"temperatura\"}]}" ) &
-    api -o "$T/r.json" -w "lote de $N, modo=crear: %{time_total} s · HTTP %{http_code}\n" -X POST "$B/dispositivos/lote?modo=crear" -H 'Content-Type: application/json' --data-binary @"$T/lote.json"
+        -d "{\"id_fisico\":\"$P-solo\",\"nombre\":\"solo\",\"zona_id\":\"$ZONA\",\"via\":\"$VIA\",\"intervalo_esperado_s\":60,\"canales\":[{\"magnitud\":\"temperatura\"}]}" ) &
+    api -o "$T/r.json" -w "lote de $N ($VIA), modo=crear: %{time_total} s · HTTP %{http_code}\n" -X POST "$B/dispositivos/lote?modo=crear" -H 'Content-Type: application/json' --data-binary @"$T/lote.json"
     wait
     python3 -I -c "import json,sys; r=json.load(open(sys.argv[1])); print('creadas:', sum(f['resultado']=='creada' for f in r['filas']))" "$T/r.json" 2>/dev/null || echo "sin informe (¿se cortó la conexión?)" ;;
-  *) sed -n '2,8p' "$0"; exit 1 ;;
+  verificacion)
+    K="${2:?K dispositivos}"; P="${3:?prefijo de id_fisico}"; T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
+    # Menos de 50 fallos por dirección en total (2K < 50): el tope grueso por dirección (docs/10 §8.4 punto 52 (c)) no entra en la medida.
+    [ "$K" -ge 1 ] && [ $((2 * K)) -lt 50 ] || { echo "FALLA K entre 1 y 24 (2K fallos desde una dirección; el tope es 50)"; exit 1; }
+    ZONA=$(api "$B/sitios" | python3 -I -c 'import json,sys; print(json.load(sys.stdin)[0]["zonas"][0]["id"])')
+    python3 -I -c "import json,sys; k,p=int(sys.argv[1]),sys.argv[2]; print(json.dumps({'filas':[{'id_fisico':'%s-%04d'%(p,i),'nombre':'verificacion','zona':sys.argv[3],'via':'http','intervalo_esperado_s':'60','canales':'temperatura:Cel'} for i in range(k)]}))" "$K" "$P" "$ZONA" > "$T/lote.json"
+    api -s -o "$T/r.json" -X POST "$B/dispositivos/lote?modo=crear" -H 'Content-Type: application/json' --data-binary @"$T/lote.json"
+    # id_fisico TAB token, a un archivo de la carpeta temporal (modo 600 por mktemp -d); nunca a la salida.
+    python3 -I -c "import json,sys; r=json.load(open(sys.argv[1])); [print(f['id_fisico']+'\t'+f['credencial']) for f in r['filas'] if f['resultado']=='creada']" "$T/r.json" > "$T/tokens" \
+      || { echo "FALLA el lote no devolvió credenciales"; exit 1; }
+    [ "$(wc -l < "$T/tokens")" = "$K" ] || { echo "FALLA se crearon $(wc -l < "$T/tokens") de $K"; exit 1; }
+    trama() { printf 'Authorization: Bearer %s\n' "$2" | curl -s -o /dev/null -w '%{time_total} %{http_code}\n' -H @- -X POST "$B/recepcion/$1" \
+      -H 'Content-Type: application/senml+json' --data-binary "[{\"n\":\"temperatura\",\"u\":\"Cel\",\"v\":21.5,\"bt\":$(date +%s)}]"; }
+    while IFS=$'\t' read -r id tok; do trama "$id" "$tok" >> "$T/primera"; done < "$T/tokens"
+    sleep 1.2   # el ritmo admite una trama por segundo por dispositivo (punto 52 (e))
+    while IFS=$'\t' read -r id tok; do trama "$id" "$tok" >> "$T/segunda"; done < "$T/tokens"
+    while IFS=$'\t' read -r id _; do trama "$id" "token-equivocado-con-32-simbolos" >> "$T/equivocado"; done < "$T/tokens"
+    for i in $(seq "$K"); do trama "$P-nadie-$i" "token-equivocado-con-32-simbolos" >> "$T/inexistente"; done
+    for g in primera segunda equivocado inexistente; do
+      sort -n "$T/$g" | awk -v g="$g" '{a[NR]=$1; c[$2]++} END {m=(NR%2)?a[(NR+1)/2]:(a[NR/2]+a[NR/2+1])/2; s=""; for (k in c) s=s k "×" c[k] " ";
+        printf "%-12s mediana %.1f ms · mín %.1f · máx %.1f · HTTP %s\n", g, m*1000, a[1]*1000, a[NR]*1000, s}'
+    done ;;
+  *) sed -n '2,15p' "$0"; exit 1 ;;
 esac

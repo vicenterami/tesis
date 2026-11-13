@@ -1,6 +1,8 @@
-// Topes de la recepción por HTTP (docs/10 §8.4 punto 52). Verificar un token cuesta CPU a propósito (scrypt: 65 ms medidos el
-// 16/10/2026 en el portátil; 57 por segundo con los 4 hilos de Node): sin topes, mandar tokens falsos saturaría el backend. Los
-// contadores viven en la memoria del proceso y se reinician con él (aceptado). El reloj se inyecta para probarlos sin esperar.
+// Topes de la recepción por HTTP (docs/10 §8.4 punto 52). Se diseñaron cuando verificar un token costaba CPU a propósito (scrypt: 65 ms
+// medidos el 16/10/2026 en el portátil; 57 por segundo con los 4 hilos de Node): sin topes, mandar tokens falsos saturaba el backend.
+// Desde el 13/11/2026 la credencial se guarda con SHA-256 (docs/11 §4) y ese costo queda solo para las anteriores; (b), (c) y (e) siguen
+// frenando un barrido de tokens. Los contadores viven en la memoria del proceso y se reinician con él (aceptado). El reloj se inyecta
+// para probarlos sin esperar.
 export type Reloj = () => number;
 
 // Una dirección IPv6 se cuenta por su prefijo /64, lo que suele recibir un solo equipo: con una dirección por petición dentro de él,
@@ -76,8 +78,9 @@ export class FallosPorClave {
   }
 }
 
-// (d) Como mucho `max` verificaciones de scrypt a la vez: nunca más de la mitad del pool de hilos. Solo las pagan la primera trama de
-// cada dispositivo tras arrancar o rotar y los tokens equivocados: las demás las resuelve la caché (verificacion.ts).
+// (d) Como mucho `max` verificaciones de scrypt a la vez: nunca más de la mitad del pool de hilos. Desde el 13/11/2026 solo las pagan las
+// credenciales anteriores (`scrypt$…`): la primera trama tras arrancar, que además la convierte, y los tokens equivocados; las demás las
+// resuelve la caché, y las credenciales `sha256$…` no pasan por aquí (verificacion.ts).
 export class Cupo {
   private enCurso = 0;
   constructor(private readonly max = 2) {}

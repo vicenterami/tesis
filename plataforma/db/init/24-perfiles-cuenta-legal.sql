@@ -5,7 +5,7 @@
 --     `administrador` conserva nombre y significado (de sitio): las filas de hoy siguen valiendo sin migrar datos.
 --   · usuario.administrador_sistema: el perfil global (docs/20 §2). Una columna y no una fila por sitio: alcanza también a los sitios
 --     creados después. La tabla de permisos vive en el backend (sesion/permisos.ts).
---   · Baja con motivo (conocimiento-portable, baja lógica §2): desactivado_en, desactivado_por y motivo_baja, con un CHECK de coherencia
+--   · Baja con motivo (docs/20 §10): desactivado_en, desactivado_por y motivo_baja, con un CHECK de coherencia
 --     (activo ⇔ sin fecha ni motivo; inactivo ⇔ con fecha y motivo). desactivado_por puede quedar nulo: la clave de administrador por
 --     cabecera no es una fila de `usuario`. Las filas inactivas de antes de esta migración reciben un motivo fijo que lo dice.
 --   · usuario.anonimizado_en (docs/20 §11): instante de la baja por anonimización; una cuenta anonimizada no se reactiva (CHECK).

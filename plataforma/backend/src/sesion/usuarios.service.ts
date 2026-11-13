@@ -134,7 +134,7 @@ export class UsuariosService {
       if (por.sistema && (await this.hayAdministrador(c))) {
         throw new ForbiddenException('ya existe un administrador: el alta de usuarios exige su sesión (la clave de administrador solo crea el primero)');
       }
-      // Un correo que ya existe INACTIVO no se duplica (conocimiento-portable, baja lógica §6): 409 con la ficha y `reactivable: true`; la
+      // Un correo que ya existe INACTIVO no se duplica (docs/20 §10, R25): 409 con la ficha y `reactivable: true`; la
       // reactivación es la acción de siempre (PATCH con activo: true), no una ruta nueva. La ficha, solo si quien pregunta la puede ver
       // (estuvo en alguno de sus sitios, o es administrador del sistema); si no, 409 sin ficha: pídelo a quien sí puede.
       await this.exigirCorreoLibre(c, a.email, this.sitiosQueAdministra(por));
