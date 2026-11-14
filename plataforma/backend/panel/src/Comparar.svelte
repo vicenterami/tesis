@@ -264,6 +264,7 @@
       {/if}
       {#key `${mostrada.magnitud}|${mostrada.dibujadas.map((x) => x.id).join(',')}`}
         <Grafico
+          tituloVisible
           {series}
           unidad={mostrada.unidad}
           zona={zonas[0] ?? 'UTC'}

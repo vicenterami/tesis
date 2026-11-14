@@ -37,6 +37,17 @@ describe('esperaReintento: 1, 2, 4, 8, 16, 30, 30… segundos', () => {
 });
 
 describe('esEventoVivo: un evento sin la forma esperada se descarta, no rompe la pantalla', () => {
+  it('acepta `sitio_id` (L6): el id del sitio, null o ausente (un backend anterior); otro tipo no es un aviso nuestro', () => {
+    const m = { dispositivo_id: 'd', canal_id: 'c', valor: 1, unidad: 'Cel', tiempo: '2026-11-13T00:00:00Z' };
+    expect(esEventoVivo('medicion', { ...m, sitio_id: 's1' })).toBe(true);
+    expect(esEventoVivo('medicion', { ...m, sitio_id: null })).toBe(true);
+    expect(esEventoVivo('medicion', m)).toBe(true);
+    expect(esEventoVivo('medicion', { ...m, sitio_id: 7 })).toBe(false);
+    expect(esEventoVivo('visto', { dispositivo_id: 'd', tiempo: 'x', sitio_id: 's1' })).toBe(true);
+    expect(esEventoVivo('visto', { dispositivo_id: 'd', tiempo: 'x', sitio_id: { id: 's1' } })).toBe(false);
+    expect(esEventoVivo('condicion', { dispositivo_id: 'd', condicion: 'umbral', estado: 'abierta', sitio_id: 's1' })).toBe(true);
+    expect(esEventoVivo('condicion', { dispositivo_id: 'd', condicion: 'umbral', estado: 'abierta', sitio_id: ['s1'] })).toBe(false);
+  });
   it('acepta los cuatro tipos con sus campos (el latido solo trae tiempo); rechaza sin tiempo, tipo desconocido, valor que no es número, o no objeto', () => {
     expect(esEventoVivo('visto', { tipo: 'visto', dispositivo_id: 'd', tiempo: 't' })).toBe(true);
     expect(esEventoVivo('medicion', { dispositivo_id: 'd', canal_id: 'c', valor: 1.5, unidad: 'Cel', tiempo: 't' })).toBe(true);

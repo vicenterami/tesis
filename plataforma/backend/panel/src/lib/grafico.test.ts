@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EJE_TIEMPO, NOMBRES_FECHA, PALETA, RANGOS, SELLO_LEYENDA, agregarLectura, alinearSeries, formatearValor, puntosDe, rangoQueContiene, resolucionValida, resolucionesAdmisibles, resumenRango, rotuloIntervalo, seriesDesdeHistorico, urlHistorico, ventana, intervaloParaVentana, resolucionMasFina, ventanaDeSeleccion } from './grafico';
+import { EJE_TIEMPO, NOMBRES_FECHA, PALETA, RANGOS, SELLO_LEYENDA, agregarLectura, alinearSeries, decimalesDeSeries, decimalesParaRecorrido, filasEtiqueta, formatearValor, puntosDe, rangoQueContiene, resolucionValida, resolucionesAdmisibles, resumenRango, rotuloIntervalo, seriesDesdeHistorico, urlHistorico, ventana, intervaloParaVentana, resolucionMasFina, ventanaDeSeleccion } from './grafico';
 
 describe('ventana y URL del histórico (docs/19 P3)', () => {
   const ahora = new Date('2026-10-12T15:00:00Z');
@@ -42,6 +42,30 @@ describe('series: histórico agregado y lecturas en vivo aparte', () => {
   it('formatea con coma decimal y la unidad; nulo → raya', () => {
     expect(formatearValor(21.456789, 'Cel')).toBe('21,457 Cel');
     expect(formatearValor(null, 'Cel')).toBe('—');
+  });
+  it('los decimales de lo dibujado (L4c): los que distinguen dos valores del recorrido, entre cero y tres', () => {
+    expect(decimalesParaRecorrido(10.8, 21.4)).toBe(1); // temperatura del sitio: «19,4 °C»
+    expect(decimalesParaRecorrido(1009, 1010.5)).toBe(2); // presión: «1.009,51 hPa»
+    expect(decimalesParaRecorrido(0, 100)).toBe(0); // un porcentaje de punta a punta
+    expect(decimalesParaRecorrido(3.25, 3.31)).toBe(3); // tensión de batería
+    expect(decimalesParaRecorrido(0, 1e9)).toBe(0); // nunca negativo
+    expect(decimalesParaRecorrido(20, 20)).toBe(3); // sin recorrido: los de la API
+    expect(decimalesParaRecorrido(Infinity, -Infinity)).toBe(3); // sin ningún valor
+    expect(formatearValor(19.396, '°C', 1)).toBe('19,4 °C');
+    expect(formatearValor(60.023, '%RH', 1)).toBe('60 %RH'); // como mucho: no rellena con ceros
+  });
+  it('… el recorrido se mide sobre todas las series de valores (nunca sobre la de tiempos) y sin los huecos', () => {
+    expect(decimalesDeSeries([[1_000_000, 1_000_900], [19.396, null], [10.8, 19.29], [21.03, 19.5]])).toBe(1);
+    expect(decimalesDeSeries([[1_000_000, 1_000_900], [null, null]])).toBe(3);
+    expect(decimalesDeSeries([[1_000_000]])).toBe(3);
+  });
+  it('… y la etiqueta flotante escribe todas sus filas con esos decimales como mucho (el valor exacto está en «Ver los datos»)', () => {
+    const series = [[1_000_000, 1_000_900], [19.396, 19.292], [19.29, 10.8], [19.5, 21.03]];
+    const lineas = [{ label: 'promedio', stroke: '#111' }, { label: 'mínimo', stroke: '#111' }, { label: 'máximo', stroke: '#111' }];
+    const banda = { alta: 3, baja: 2, color: '#111' };
+    expect(filasEtiqueta(series, lineas, banda, 0, '°C', decimalesDeSeries(series)).map((f) => `${f.nombre}: ${f.valor}`)).toEqual(['promedio: 19,4 °C', 'mínimo–máximo: 19,3 a 19,5 °C']);
+    expect(filasEtiqueta(series, lineas, banda, 0, '°C').map((f) => f.valor)).toEqual(['19,396 °C', '19,29 a 19,5 °C']); // sin pedirlo, los tres de la API
+    expect(filasEtiqueta([[1], [null]], [{ label: 'promedio', stroke: '#111' }], null, 0, '°C', 1)).toEqual([{ nombre: 'sin datos', valor: '—', color: '' }]);
   });
 });
 

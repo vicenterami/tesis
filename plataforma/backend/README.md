@@ -59,7 +59,7 @@ El backend lo sirve compilado en `/panel` (`main.ts`, `useStaticAssets`); la ima
 pnpm --filter panel dev        # Vite en http://127.0.0.1:5173/panel/, reenvía la API y /eventos al backend (3000) sin cambiar el Host
 pnpm --filter panel verificar  # svelte-check + vitest + vite build (también lo corre `pnpm verificar` desde aquí)
 bash ../pruebas/panel-desarrollo.sh   # con la pila arriba: el reenvío conserva el Host y no retiene el canal; el build servido lleva la CSP
-bash ../pruebas/panel-sesion-e2e.sh   # paso 4c: Chromium y Firefox a 390 y 1280 px contra la imagen construida (docs/16 §59 y §64)
+bash ../pruebas/panel-sesion-e2e.sh   # paso 4c: Chromium y Firefox a 390 y 1280 px contra la imagen construida (docs/16 §59, §64 y §67)
 ```
 
 ## Verificación automática (TT-03)

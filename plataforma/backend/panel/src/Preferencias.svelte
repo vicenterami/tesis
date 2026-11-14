@@ -3,10 +3,12 @@
   // Preferencias: unidades, zona horaria, tema, notificaciones del navegador (el permiso se pide al activarlas, nunca al cargar), vistas
   // guardadas y sitio predeterminado; en la base (`GET`/`PUT /preferencias`), guardadas de forma OPTIMISTA y reversible: se ven al instante y,
   // si el servidor las rechaza, vuelven atrás con un aviso que dice por qué. Los guardados van en fila (nunca dos `PUT` en vuelo: el
-  // segundo llevaría un `actualizado_en` viejo y daría 409 contra el propio panel).
+  // segundo llevaría un `actualizado_en` viejo y daría 409 contra el propio panel). Desde el tablero v3 la fila es la del único escritor
+  // de preferencias (lib/escritor-preferencias.ts), que comparte con el botón de tema de la barra superior (docs/19 §4, bloque L, punto 5).
   // Mi cuenta: quién soy, sesiones abiertas con «Cerrar», términos aceptados, «Exportar mis datos» y «Darme de baja» (clave actual,
   // irreversible, explicada antes). Nada de eso es optimista.
   import { onMount } from 'svelte';
+  import { fijarPreferencias, guardarPreferencias, suscribirPreferencias } from './lib/escritor-preferencias';
   import Aviso from './Aviso.svelte';
   import Boton from './Boton.svelte';
   import { ErrorApi, descargar, esCancelacion, obtener, pedir, ultimaGana } from './lib/api';
@@ -14,7 +16,7 @@
   import { rotuloCondicion } from './lib/estado-visual';
   import type { Preferencias, Sitio } from './lib/modelo';
   import { permisoActual, type Permiso } from './lib/notificaciones';
-  import { TIPOS_NOTIFICABLES, alternarNotificacion, cambiar, cuerpoPreferencias, enlaceDeVista, guardarVista, zonasIana } from './lib/preferencias';
+  import { TIPOS_NOTIFICABLES, alternarNotificacion, enlaceDeVista, guardarVista, zonasIana } from './lib/preferencias';
   import { ROTULO_ROL, type Sesion } from './lib/sesion';
   import { aplicarTema, leerPreferenciaTema } from './lib/tema';
   import { fechaHora } from './lib/tiempo';
@@ -38,38 +40,36 @@
 
   async function cargar(): Promise<void> {
     try {
-      prefs = await obtener<Preferencias>('/preferencias', carga.senal());
+      const leidas = await obtener<Preferencias>('/preferencias', carga.senal());
+      fijarPreferencias(leidas); // las recién leídas mandan, también para el botón de tema
+      prefs = leidas;
       errorCarga = null;
     } catch (e) {
       if (!esCancelacion(e)) errorCarga = avisoDeError(e).texto;
     }
   }
 
-  // Los guardados, en fila: cada uno espera al anterior y usa el `actualizado_en` que dejó.
-  let cola: Promise<void> = Promise.resolve();
+  // Los guardados, por el único escritor: optimista (se ve ya), en fila y, si el servidor lo rechaza, vuelve solo lo que ese guardado
+  // cambió (el escritor avisa con las preferencias revertidas) y aquí se dice por qué.
   function guardar(cambio: Partial<Preferencias>): void {
     if (prefs === null) return;
-    const { nuevas, anteriores } = cambiar(prefs, cambio);
-    prefs = nuevas; // optimista: se ve ya
-    alCambiarPreferencias(nuevas);
     if (cambio.tema !== undefined) aplicarTema(leerPreferenciaTema(cambio.tema));
-    cola = cola.then(async () => {
-      try {
-        const r = await pedir<Preferencias>('PUT', '/preferencias', { cuerpo: cuerpoPreferencias({ ...prefs!, ...cambio }) });
-        prefs = { ...prefs!, actualizado_en: r.actualizado_en };
-        alCambiarPreferencias(prefs);
-      } catch (e) {
-        // Vuelve atrás SOLO lo que este guardado cambió (otro posterior pudo cambiar otra cosa), y dice por qué.
-        const revertido: Preferencias = { ...prefs! };
-        for (const k of Object.keys(cambio) as (keyof Preferencias)[]) (revertido as Record<string, unknown>)[k] = anteriores[k];
-        prefs = revertido;
-        alCambiarPreferencias(revertido);
-        if (cambio.tema !== undefined) aplicarTema(leerPreferenciaTema(anteriores.tema));
-        const a = avisoDeError(e);
-        aviso = { tipo: a.tipo, texto: `No se guardó la preferencia; volvió a la anterior. ${a.texto}` };
-      }
+    void guardarPreferencias(cambio).then((r) => {
+      if (r.ok) return;
+      const a = avisoDeError(r.error);
+      aviso = { tipo: a.tipo, texto: `No se guardó la preferencia; volvió a la anterior. ${a.texto}` };
     });
   }
+  // Lo que el escritor dice (un guardado de aquí, el botón de tema, un rechazo que vuelve atrás) es lo que esta pantalla muestra.
+  onMount(() =>
+    suscribirPreferencias((p) => {
+      if (prefs === null) return;
+      const temaAntes = prefs.tema;
+      prefs = p;
+      alCambiarPreferencias(p);
+      if (p.tema !== temaAntes) aplicarTema(leerPreferenciaTema(p.tema));
+    }),
+  );
 
   // Notificaciones del navegador: el permiso se pide AL ACTIVAR (docs/21 §5). Negado, la casilla no se marca y se dice por qué.
   // false = no se guardó (sin permiso): la casilla vuelve a desmarcarse, para que no diga lo que no es.

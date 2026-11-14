@@ -1011,6 +1011,39 @@ if [ "$n" -lt 10 ]; then echo "FALLA revisé solo $n componentes del panel (¿ca
 elif [ -n "$malos" ]; then echo "FALLA <button fuera de Boton.svelte (usar el componente; docs/19 §6):"; sed 's/^/  /' <<<"$malos"; fallos=$((fallos+1))
 else echo "OK    $n componentes del panel: ningún <button fuera de Boton.svelte y de los tres justificados ($justificados)"; fi
 
+paso "2y4. Pruebas de navegador: ningún guion busca lo que el panel ya no dibuja (atributos data-* y la leyenda de uPlot)"
+# 13/11: el tablero v3 dejó de dibujar la tabla de leyenda de uPlot y e2e/p3.mjs (la prueba del banco, que este verificador no corre)
+# la seguía buscando: «todo en concordancia» con una prueba que ya no podía pasar. Estático y barato: cada atributo data-* que un guion
+# de e2e busca debe ponerlo algún componente, y ninguno busca la leyenda ni el título de uPlot mientras Grafico.svelte los tenga apagados.
+python3 -I - <<'PY' || fallos=$((fallos+1))
+import re, sys, pathlib
+panel = pathlib.Path('plataforma/backend/panel')
+fuentes = [*panel.glob('src/*.svelte'), *panel.glob('src/**/*.svelte')]
+guiones = sorted(panel.glob('e2e/*.mjs'))
+if len(fuentes) < 10 or len(guiones) < 1: print(f'FALLA revisé {len(fuentes)} componentes y {len(guiones)} guiones (¿cambió la carpeta?)'); sys.exit(1)
+src = '\n'.join(p.read_text(encoding='utf-8') for p in set(fuentes))
+puestos = set(re.findall(r'\bdata-[a-z0-9-]+', src))
+# Un atributo armado con plantilla (`data-ir-${…}`) vale por su prefijo; el prefijo desnudo «data-» no cuenta (valdría para todo).
+prefijos = [p for p in re.findall(r'`(data-[a-z0-9-]*)\$\{', src) if p != 'data-']
+malos, n = [], 0
+for g in guiones:
+    t = g.read_text(encoding='utf-8')
+    for a in sorted(set(re.findall(r'\[(data-[a-z0-9-]+)', t))):
+        n += 1
+        if a not in puestos and not any(a.startswith(p) for p in prefijos): malos.append(f'{g.name}: busca [{a}], que ningún componente pone')
+    # Lo que uPlot dibujaba y el panel apagó: sin tabla de leyenda (legend.show false) no hay .u-legend ni sus filas; sin `title`, no hay .u-title.
+    grafico = (panel / 'src/Grafico.svelte').read_text(encoding='utf-8')
+    apagado = (['.u-legend', '.u-series', '.u-label', '.u-value', '.u-off'] if re.search(r'legend:\s*\{\s*show:\s*false', grafico) else []) + ([] if re.search(r'^\s*title:', grafico, re.M) else ['.u-title'])
+    for c in apagado:
+        if re.search(re.escape(c) + r'(?![a-z-])', t): malos.append(f'{g.name}: busca {c}, que Grafico.svelte ya no dibuja')
+if n < 20: print(f'FALLA revisé solo {n} selectores data-* (¿cambió la forma de las pruebas?)'); sys.exit(1)
+if malos:
+    print('FALLA las pruebas de navegador buscan algo que el panel no dibuja:')
+    for m in malos[:12]: print('  ' + m)
+    sys.exit(1)
+print(f'OK    {n} selectores data-* de {len(guiones)} guiones existen en los {len(set(fuentes))} componentes; ninguno busca la leyenda ni el título que uPlot ya no dibuja')
+PY
+
 paso "3. Diagramas: informe = docs = base (generar-figuras.sh --verificar)"
 bash informe-oficial/figuras/generar-figuras.sh --verificar || fallos=$((fallos+1))
 

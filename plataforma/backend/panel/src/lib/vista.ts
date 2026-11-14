@@ -3,8 +3,9 @@ import { RANGOS, RESOLUCIONES, type ClaveRango, type ClaveResolucion } from './g
 import { VIAS } from './inventario';
 
 // La vista vive en la URL (docs/19 §4, incremento 1, punto 1): `#/dispositivos/<id>?canal=<uuid>&rango=24h&res=5m[&desde=&hasta=]`,
-// `#/inventario?estado=alerta&sitio=&zona=&via=&q=&pagina=2&orden=entrega` y `#/?sitio=&rango=7d` (el tablero, P1; o `&desde=&hasta=`
-// en ISO, el rango a medida). La comparación (incremento 2, punto 5), `#/comparar?dispositivos=<uuid>,<uuid>&magnitud=&rango=&res=`.
+// `#/inventario?estado=alerta&sitio=&zona=&via=&q=&pagina=2&orden=entrega` y `#/?sitio=&ver=tendencias&rango=7d` (el tablero, P1, con su
+// pestaña: sin `ver`, el resumen, docs/19 §4, bloque L, punto 2; el rango, o `&desde=&hasta=` en ISO para el rango a medida, solo en
+// Tendencias y Red). La comparación (incremento 2, punto 5), `#/comparar?dispositivos=<uuid>,<uuid>&magnitud=&rango=&res=`.
 // Los parámetros van tras el `?` DEL FRAGMENTO, así la ruta del panel sigue siendo `#/…` y nunca llega al servidor. Un valor inválido se
 // ignora y rige el valor por defecto; nunca se adivina. Desde el tablero v2 (11/11/2026, A1) `#/` es el tablero y el inventario vive en
 // `#/inventario`: un enlace viejo `#/?estado=…` (con algún filtro del inventario) se redirige a `#/inventario?…` (redireccionVieja).
@@ -39,8 +40,14 @@ export type Vista =
   | { pantalla: 'alta'; modo: ModoAlta; idFisico: string; sitio: string } // P7: `#/alta?modo=lote|detectados&id_fisico=&sitio=`
   | { pantalla: 'preferencias' } // P13: `#/preferencias`
   | { pantalla: 'actividad'; filtros: FiltrosActividad } // P14: `#/actividad?sitio=&tipo=&usuario=&desde=&hasta=`
-  | { pantalla: 'tablero'; sitio: string; rango: ClaveRango | null; fija: VentanaFija | null }
+  | { pantalla: 'tablero'; sitio: string; ver: VerTablero; rango: ClaveRango | null; fija: VentanaFija | null }
   | { pantalla: 'inventario'; filtros: FiltrosInventario };
+
+// Las tres pestañas del tablero (bloque L, punto 2): el resumen (el presente, sin rango), tendencias (una gráfica por magnitud) y red
+// (tramas por cubo y entrega). Son enlaces con la vista en la URL: «atrás» vuelve a la pestaña anterior y una pestaña se comparte.
+export const VISTAS_TABLERO = ['resumen', 'tendencias', 'red'] as const;
+export type VerTablero = (typeof VISTAS_TABLERO)[number];
+const leerVer = (v: string | null): VerTablero => (v === 'tendencias' || v === 'red' ? v : 'resumen');
 
 export const SECCIONES_LEGALES = ['privacidad', 'terminos', 'acerca', 'soporte'] as const;
 export type SeccionLegal = (typeof SECCIONES_LEGALES)[number];
@@ -148,7 +155,7 @@ export function leerVista(fragmento: string): Vista {
     };
   }
   // Todo lo demás es el tablero (P1), la pantalla de llegada (A1).
-  return { pantalla: 'tablero', sitio: leerSitio(q.get('sitio')), rango: leerRango(q.get('rango')), fija: leerVentanaFija(q.get('desde'), q.get('hasta')) };
+  return { pantalla: 'tablero', sitio: leerSitio(q.get('sitio')), ver: leerVer(q.get('ver')), rango: leerRango(q.get('rango')), fija: leerVentanaFija(q.get('desde'), q.get('hasta')) };
 }
 
 // Solo se escribe lo que no es el valor por defecto en el inventario; la ficha lleva siempre canal y rango (un enlace
@@ -167,14 +174,18 @@ export function fragmentoFicha(id: string, canal: string | null, rango: ClaveRan
   return `#/dispositivos/${id}?${q.toString()}`;
 }
 
-// El tablero: el sitio (si la persona tiene más de uno) y el rango o la ventana a medida; «#/» con todo por defecto.
-export function fragmentoTablero(sitio: string, rango: ClaveRango | null, fija: VentanaFija | null = null): string {
+// El tablero: el sitio (si la persona tiene más de uno), la pestaña y, en Tendencias y Red, el rango o la ventana a medida; el resumen
+// no lleva rango (nada de lo que muestra depende de él). «#/» con todo por defecto.
+export function fragmentoTablero(sitio: string, ver: VerTablero, rango: ClaveRango | null, fija: VentanaFija | null = null): string {
   const q = new URLSearchParams();
   if (sitio !== '') q.set('sitio', sitio);
-  if (fija !== null) {
-    q.set('desde', fija.desde.toISOString());
-    q.set('hasta', fija.hasta.toISOString());
-  } else if (rango !== null) q.set('rango', rango);
+  if (ver !== 'resumen') {
+    q.set('ver', ver);
+    if (fija !== null) {
+      q.set('desde', fija.desde.toISOString());
+      q.set('hasta', fija.hasta.toISOString());
+    } else if (rango !== null) q.set('rango', rango);
+  }
   const s = q.toString();
   return s === '' ? '#/' : `#/?${s}`;
 }

@@ -100,13 +100,25 @@ try {
   const puntosGrafico = Number(await pagina.getAttribute('.grafico', 'data-puntos'));
   if (h.puntos >= 3 && texto.startsWith(`${h.puntos} puntos`) && puntosGrafico === h.puntos) ok(`el gráfico tiene los ${h.puntos} puntos de /historico (en el texto y en el gráfico)`);
   else falla(`puntos: API ${h.puntos}, texto «${texto}», gráfico ${puntosGrafico}`);
-  // 2. Formatos para personas (docs/19 §6): lo que es texto (la leyenda); el eje, en la captura.
-  // El eje se dibuja en un lienzo (no se puede leer como texto: se revisa en la captura); aquí, el primer rótulo de la leyenda de uPlot
-  // (`.u-legend .u-label`, el de la serie del tiempo) y que nada del gráfico traiga am/pm ni «Time».
-  const rotuloTiempo = (await pagina.textContent('.grafico .u-legend .u-label'))?.trim();
-  const textosGrafico = await pagina.textContent('.grafico');
-  if (rotuloTiempo === 'Hora' && !/\d(am|pm)\b/i.test(textosGrafico) && !textosGrafico.includes('Time')) ok('la leyenda del tiempo dice «Hora» y el gráfico no trae am/pm ni «Time» (el eje, en la captura)');
-  else falla(`formato del gráfico: rótulo «${rotuloTiempo}», texto «${textosGrafico.slice(0, 120)}»`);
+  // 2. Formatos para personas (docs/19 §6): lo que es texto; el eje, en la captura.
+  // El eje se dibuja en un lienzo (no se puede leer como texto: se revisa en la captura). Desde el tablero v3 (docs/19 §4, L4c) ya no hay
+  // tabla de leyenda de uPlot: la hora bajo el cursor la da la etiqueta flotante, en 24 h y día/mes/año, y nada trae am/pm ni «Time».
+  // El gráfico puede quedar bajo el borde de la ventana: se lleva a la vista antes de mover el puntero (fuera de la ventana no hay nada
+  // bajo el puntero) y se espera un instante, porque desplazar la página quita la etiqueta (L4c).
+  const sobreElGrafico = async (fraccion) => {
+    const sobre = pagina.locator('.grafico .u-over').first();
+    await sobre.scrollIntoViewIfNeeded();
+    await pagina.waitForTimeout(200);
+    const lienzo = await sobre.boundingBox();
+    await pagina.mouse.move(lienzo.x + lienzo.width * fraccion, lienzo.y + lienzo.height / 2);
+    await pagina.waitForTimeout(100);
+  };
+  await sobreElGrafico(0.5);
+  const horaEtiqueta = ((await pagina.locator('[data-etiqueta-flotante] .hora').textContent({ timeout: 5000 }).catch(() => '')) ?? '').trim();
+  const textosGrafico = (await pagina.textContent('.grafico-marco')) ?? '';
+  await pagina.mouse.move(0, 0);
+  if (/^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}$/.test(horaEtiqueta) && !/\d(am|pm)\b/i.test(textosGrafico) && !textosGrafico.includes('Time')) ok(`la etiqueta flotante da la hora en 24 h y día/mes/año («${horaEtiqueta}») y el gráfico no trae am/pm ni «Time» (el eje, en la captura)`);
+  else falla(`formato del gráfico: hora de la etiqueta «${horaEtiqueta}», texto «${textosGrafico.slice(0, 120)}»`);
   // 3. En vivo: una trama publicada por MQTT aparece sin recargar.
   await textoVisible('en vivo: conectado', 15000);
   ok('el canal en vivo dice «conectado»');
@@ -139,30 +151,32 @@ try {
   await pagina.screenshot({ path: captura, fullPage: true });
 
   // ── Incremento 2 (docs/19 §4, puntos 1 a 6) ────────────────────────────────────────────────────────────────────────────────────
-  // 5. La leyenda informa, no apaga (punto 1): clic en «promedio» y en «lectura actual» (con el ratón, donde está la fila, como una
-  // persona; Playwright no puede forzar el clic sobre el elemento si este no recibe eventos) → mismos puntos y ninguna fila apagada.
+  // 5. La leyenda informa, no apaga (punto 1; desde L4c es la leyenda fija de nombres, sin controles): clic en «promedio» y en «lectura
+  // actual» (con el ratón, donde está el nombre, como una persona) → mismos puntos; y la leyenda no tiene nada que se pueda accionar.
   await paso('leyenda', async () => {
     const antes = await estadoGrafico();
+    const nombresLeyenda = (await pagina.locator('[data-leyenda-fija] li').allTextContents()).map((x) => x.trim());
+    const controles = await pagina.locator('[data-leyenda-fija] button, [data-leyenda-fija] a, [data-leyenda-fija] input, [data-leyenda-fija] [tabindex], [data-leyenda-fija] [role="button"]').count();
+    if (nombresLeyenda.includes('promedio') && nombresLeyenda.includes('lectura actual') && controles === 0) ok(`la leyenda fija nombra las series (${nombresLeyenda.join(', ')}) y no tiene ningún control`);
+    else falla(`leyenda fija: nombres ${JSON.stringify(nombresLeyenda)}, controles ${controles}`);
     for (const nombre of ['promedio', 'lectura actual']) {
-      const fila = pagina.locator('.grafico .u-legend .u-series', { hasText: nombre }).first();
+      const fila = pagina.locator('[data-leyenda-fija] li', { hasText: nombre }).first();
       const caja = await fila.boundingBox();
       await pagina.mouse.click(caja.x + 12, caja.y + caja.height / 2);
       await pagina.waitForTimeout(300);
-      const apagadas = await pagina.locator('.grafico .u-legend .u-off').count();
       const despues = await estadoGrafico();
-      if (apagadas === 0 && despues.puntos === antes.puntos) ok(`clic en «${nombre}» de la leyenda: ninguna serie apagada y los mismos ${despues.puntos} puntos`);
-      else falla(`clic en «${nombre}» de la leyenda: ${apagadas} fila(s) apagada(s) (u-off), puntos ${antes.puntos} → ${despues.puntos}`);
+      if (despues.puntos === antes.puntos) ok(`clic en «${nombre}» de la leyenda: nada se apaga, los mismos ${despues.puntos} puntos`);
+      else falla(`clic en «${nombre}» de la leyenda: puntos ${antes.puntos} → ${despues.puntos}`);
     }
-    // Los valores de la leyenda siguen al cursor (los mueve el lienzo, no la leyenda).
-    const lienzo = await pagina.locator('.grafico .u-over').boundingBox();
+    // El valor bajo el cursor lo da la etiqueta flotante (la mueve el lienzo), con la unidad para personas (docs/19 §4, tablero v2, D7).
     let valor = '';
     for (const f of [0.995, 0.98, 0.96, 0.9, 0.8]) {
-      await pagina.mouse.move(lienzo.x + lienzo.width * f, lienzo.y + lienzo.height / 2);
-      valor = (await pagina.locator('.grafico .u-legend .u-series', { hasText: 'promedio' }).locator('.u-value').textContent()) ?? '';
-      if (valor.includes('°C')) break; // la unidad para personas (docs/19 §4, tablero v2, D7)
+      await sobreElGrafico(f);
+      valor = ((await pagina.locator('[data-etiqueta-flotante] .fila', { hasText: 'promedio' }).first().textContent({ timeout: 2000 }).catch(() => '')) ?? '').trim();
+      if (valor.includes('°C')) break;
     }
-    if (valor.includes('°C')) ok(`con el cursor sobre el gráfico, la leyenda sigue dando el valor del promedio («${valor.trim()}»)`);
-    else falla(`la leyenda no muestra el valor bajo el cursor («${valor}»)`);
+    if (valor.includes('°C')) ok(`con el cursor sobre el gráfico, la etiqueta flotante da el valor del promedio («${valor}»)`);
+    else falla(`la etiqueta flotante no muestra el valor bajo el cursor («${valor}»)`);
     await pagina.mouse.move(0, 0);
   });
 
@@ -289,8 +303,8 @@ try {
     await pagina.waitForSelector('.grafico[data-series]', { timeout: 15000 });
     const e = await estadoGrafico();
     const series = Number(await pagina.getAttribute('.grafico', 'data-series'));
-    const leyenda = await pagina.locator('.grafico .u-legend .u-series .u-label').allTextContents();
-    if (e.hash.startsWith(`#/comparar?dispositivos=${dispId},${disp2}`) && e.hash.includes('magnitud=temperatura') && series === 2 && e.puntos > 0 && nombres.every((n) => leyenda.includes(n))) ok(`P3b: dos series (${leyenda.slice(1).join(' y ')}) con ${e.puntos} instantes, abierta desde «Comparar (2)» en el inventario`);
+    const leyenda = (await pagina.locator('[data-leyenda-fija] li').allTextContents()).map((x) => x.trim()); // desde L4c, la leyenda fija de nombres
+    if (e.hash.startsWith(`#/comparar?dispositivos=${dispId},${disp2}`) && e.hash.includes('magnitud=temperatura') && series === 2 && e.puntos > 0 && nombres.every((n) => leyenda.includes(n))) ok(`P3b: dos series (${leyenda.join(' y ')}) con ${e.puntos} instantes, abierta desde «Comparar (2)» en el inventario`);
     else falla(`P3b: hash «${e.hash}», series ${series}, puntos ${e.puntos}, leyenda ${JSON.stringify(leyenda)}`);
     await pagina.getByRole('button', { name: '7 días', exact: true }).click();
     await asentar();

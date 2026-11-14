@@ -12,10 +12,16 @@
   // Texto alternativo (WCAG 1.1.1 y 1.3.1; corrección del 11/11/2026): el lienzo es una imagen con nombre (título y resumen del rango:
   // mínimo, máximo, último y cuántos puntos) y, debajo, «Ver los datos» abre una tabla con un renglón por cubo y una columna por serie
   // (con mínimo y máximo cuando hay banda). La tabla se arma solo al abrirla: con 2 500 puntos no pesa mientras está cerrada.
+  // Tablero v3 (docs/19 §4, bloque L, punto 4): (b) el lienzo no repite el título: el título es el de la sección (o el que se pide con
+  // `tituloVisible`, una sola línea), y `titulo` queda como nombre accesible y título de la tabla; (c) sin la tabla de leyenda de uPlot:
+  // una etiqueta flotante propia, sobre su gancho del cursor, solo en el gráfico bajo el puntero (los sincronizados muestran la línea del
+  // cursor), que se quita al salir, con Escape, al desplazar la página o al tocar fuera; con más de una serie, una leyenda fija de
+  // nombres con su color; (d) puntos solo con 30 o menos y nunca en los bordes de la banda; (e) `enteros`: eje de enteros desde 0 (las
+  // tramas); (g) alto según la pantalla (280 px; 200 px en un teléfono) si no se pide otro.
   import { untrack } from 'svelte';
   import type uPlotTipo from 'uplot';
   import 'uplot/dist/uPlot.min.css';
-  import { EJE_TIEMPO, NOMBRES_FECHA, SELLO_LEYENDA, formatearNumero, resumenRango } from './lib/grafico';
+  import { EJE_TIEMPO, MAX_PUNTOS_DIBUJADOS, NOMBRES_FECHA, SELLO_LEYENDA, altoGrafico, decimalesDeSeries, filasEtiqueta, formatearNumero, horaEtiqueta, resumenRango, type FilaEtiqueta } from './lib/grafico';
   import { LIENZO, colorLecturaActual, colorPromedio, temaVivo, type Tema } from './lib/tema';
   import { fechaHora } from './lib/tiempo';
 
@@ -26,7 +32,7 @@
     stroke: string;
     width: number;
     puntos?: boolean;
-    // El valor que la leyenda muestra para el cubo i (por defecto, el de la serie): las barras apiladas muestran el propio, no la suma.
+    // El valor que la etiqueta muestra para el cubo i (por defecto, el de la serie): las barras apiladas muestran el propio, no la suma.
     leyenda?: (i: number) => string;
   }
   export interface Umbral {
@@ -44,27 +50,31 @@
     unidad,
     zona,
     titulo,
+    tituloVisible = false,
     lineas = null,
     ventana = null,
     banda = null,
     barras = false,
+    enteros = false,
     umbrales = [],
     histeresis = [],
     franjas = [],
     alSeleccionar = null,
     alDobleClic = null,
     sincronizar = null,
-    alto = 280,
+    alto = null,
   }: {
     series: (number | null)[][];
     unidad: string;
     zona: string;
     titulo: string;
+    tituloVisible?: boolean;
     lineas?: Linea[] | null;
     ventana?: { desde: number; hasta: number } | null;
     // Banda mín–máx del mismo matiz al 15 % (tablero v2, B4b y D3): índices de las series alta y baja.
     banda?: { alta: number; baja: number; color: string } | null;
     barras?: boolean;
+    enteros?: boolean;
     umbrales?: Umbral[];
     histeresis?: { baja: number; alta: number }[];
     franjas?: Franja[];
@@ -72,14 +82,26 @@
     alSeleccionar?: ((desde: number, hasta: number) => void) | null;
     alDobleClic?: (() => void) | null;
     sincronizar?: string | null;
-    alto?: number;
+    alto?: number | null;
   } = $props();
+  let marco: HTMLDivElement | undefined = $state();
   let contenedor: HTMLDivElement | undefined = $state();
   let grafico: uPlotTipo | undefined;
   let listo = $state(false); // reactivo: el efecto de datos corre también cuando el gráfico recién existe
   let ventanaVigente: { desde: number; hasta: number } | null = null; // la lee la función de rango; se pone al día antes de cada setData
   // Lo que se dibuja encima (umbrales, histéresis, franjas): se lee en el gancho de dibujo, así un cambio no recrea el gráfico.
   let encima = { umbrales: [] as Umbral[], histeresis: [] as { baja: number; alta: number }[], franjas: [] as Franja[] };
+  // El alto reservado antes de que uPlot cargue (sin saltos: el hueco mide lo que medirá el gráfico).
+  const altoInicial = untrack(() => alto ?? altoGrafico(typeof window === 'undefined' ? 0 : Math.min(window.innerWidth, 1200)));
+  let altoVigente = $state(altoInicial);
+
+  const lista = $derived<Linea[]>(lineas ?? [
+    { label: 'promedio', stroke: colorPromedio($temaVivo), width: 2 },
+    { label: 'lectura actual', stroke: colorLecturaActual($temaVivo), width: 0, puntos: true },
+  ]);
+  const esBorde = (s: number): boolean => banda !== null && (s === banda.alta || s === banda.baja);
+  // Los decimales de la etiqueta flotante (L4c): los que distinguen dos valores de lo dibujado, los mismos para todas sus filas.
+  const decimales = $derived(decimalesDeSeries(series));
 
   function rangoX(_u: uPlotTipo, min: number | null, max: number | null): uPlotTipo.Range.MinMax {
     const w = ventanaVigente;
@@ -124,41 +146,95 @@
     ctx.restore();
   }
 
+  // ── Etiqueta flotante (L4c) ───────────────────────────────────────────────────────────────────────────────────────────────────────
+  // Solo el gráfico que tiene el puntero (o el último toque) la muestra; los demás, sincronizados, reciben el mismo gancho y la callan.
+  let bajoPuntero = false;
+  // Tras un toque, el navegador emula el ratón y en algún momento da un `mouseleave` que no es «el puntero se fue» (y uPlot, al recibirlo,
+  // esconde su cursor): mientras el último puntero fue un dedo, eso no quita la etiqueta (con el dedo, se va al tocar fuera o al desplazar);
+  // un ratón de verdad lo restablece.
+  let conDedo = false;
+  let etiqueta = $state<{ x: number; y: number; derecha: boolean; arriba: boolean; hora: string; filas: FilaEtiqueta[] } | null>(null);
+  let etiquetaEl: HTMLDivElement | undefined = $state();
+  // Junto al punto y nunca fuera del gráfico: se mide la etiqueta ya dibujada y se acota a su marco (en un teléfono, una etiqueta anclada
+  // a la derecha del punto se salía por la izquierda; lo mostró la prueba con pantalla táctil).
+  $effect(() => {
+    const e = etiqueta;
+    const el = etiquetaEl;
+    if (e === null || el === undefined || marco === undefined) return;
+    const w = el.offsetWidth;
+    const h = el.offsetHeight;
+    const W = marco.clientWidth;
+    const H = marco.clientHeight;
+    const x = e.derecha ? e.x - 12 - w : e.x + 12;
+    const y = e.arriba ? e.y - 12 - h : e.y + 12;
+    el.style.left = `${Math.max(0, Math.min(x, W - w))}px`;
+    el.style.top = `${Math.max(0, Math.min(y, H - h))}px`;
+  });
+  function quitarEtiqueta(): void {
+    etiqueta = null;
+  }
+  function alMoverCursor(u: uPlotTipo): void {
+    const i = u.cursor.idx;
+    const left = u.cursor.left ?? -1;
+    const top = u.cursor.top ?? -1;
+    if (conDedo && left < 0 && etiqueta !== null) return; // el `mouseleave` emulado tras un toque: la etiqueta se queda en su punto
+    if (!bajoPuntero || i === null || i === undefined || left < 0 || marco === undefined) {
+      if (etiqueta !== null) etiqueta = null;
+      return;
+    }
+    const t = (u.data[0] as number[])[i];
+    if (t === undefined || t === null) return;
+    // La posición del área de dibujo dentro del marco: la etiqueta va junto al punto y nunca se sale (se ancla al lado que tiene espacio).
+    const m = marco.getBoundingClientRect();
+    const o = u.over.getBoundingClientRect();
+    const x = o.left - m.left + left;
+    const y = o.top - m.top + top;
+    etiqueta = {
+      x, y, derecha: left > o.width / 2, arriba: top > o.height / 2,
+      hora: horaEtiqueta(t, zona),
+      filas: filasEtiqueta(untrack(() => series), untrack(() => lista), untrack(() => banda), i, unidad, untrack(() => decimales)),
+    };
+  }
+
   function opciones(UPlot: typeof uPlotTipo, ancho: number, tema: Tema): uPlotTipo.Options {
     const colores = LIENZO[tema];
-    const lista = lineas ?? [
-      { label: 'promedio', stroke: colorPromedio(tema), width: 2 },
-      { label: 'lectura actual', stroke: colorLecturaActual(tema), width: 0, puntos: true },
-    ];
-    const valor = (v: number | null): string => (v === null || v === undefined ? '—' : `${formatearNumero(v)} ${unidad}`);
     const barrasCamino = barras && typeof UPlot.paths?.bars === 'function' ? UPlot.paths.bars({ size: [0.7, 40] }) : undefined;
-    const lineasUplot: uPlotTipo.Series[] = lista.map((l) => ({
+    const pocos = (_u: uPlotTipo, _s: number, i0: number, i1: number): boolean => i1 - i0 + 1 <= MAX_PUNTOS_DIBUJADOS;
+    const lineasUplot: uPlotTipo.Series[] = lista.map((l, k) => ({
       label: l.label,
       stroke: l.stroke,
       width: l.width,
-      value: (_u: uPlotTipo, v: number | null, _s: number, i: number | null) => (l.leyenda !== undefined && i !== null ? l.leyenda(i) : valor(v)),
-      ...(l.puntos ? { points: { show: true, size: 6 } } : {}),
+      // Los bordes de la banda nunca llevan puntos; la serie principal, solo con 30 o menos; «lectura actual» (sin línea), siempre.
+      points: esBorde(k + 1) ? { show: false } : l.puntos ? { show: true, size: 6 } : { show: pocos, size: 5 },
       ...(barrasCamino !== undefined ? { paths: barrasCamino, fill: l.stroke, points: { show: false } } : {}),
     }));
-    // La banda: sus dos series de borde existen (la leyenda muestra mín y máx bajo el cursor) sin trazo propio.
+    // La banda: sus dos series de borde existen (la etiqueta muestra mín y máx bajo el cursor) sin trazo propio.
     const bandas: uPlotTipo.Band[] = banda === null ? [] : [{ series: [banda.alta, banda.baja], fill: `${banda.color}26` }];
-    const eje = { stroke: colores.texto, grid: { stroke: colores.rejilla }, ticks: { stroke: colores.rejilla } };
+    const eje = { stroke: colores.texto, grid: { stroke: colores.rejilla, width: 1 }, ticks: { stroke: colores.rejilla, width: 1 } };
+    // El eje vertical mide lo que sus números (no los 50 px fijos de uPlot más 30 del rótulo): en un teléfono, el área de dibujo gana ancho.
+    const anchoEjeY = (_u: uPlotTipo, v: string[] | null): number => Math.max(28, ...(v ?? []).map((x) => String(x).length * 7.5)) + 10;
+    const comunY = { label: unidad, labelSize: 18, labelGap: 2, size: anchoEjeY, ...eje, values: (_u: uPlotTipo, v: number[]) => v.map((x) => formatearNumero(x)) };
+    const ejeY: uPlotTipo.Axis = enteros ? { ...comunY, incrs: [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10_000, 20_000, 50_000, 100_000] } : comunY;
     return {
-      title: titulo,
       width: ancho,
-      height: alto,
+      height: altoVigente,
       tzDate: (ts) => UPlot.tzDate(new Date(ts * 1000), zona),
       fmtDate: (tpl) => UPlot.fmtDate(tpl, NOMBRES_FECHA), // meses y días en español (docs/19 §6)
-      scales: { x: { time: true, range: rangoX as uPlotTipo.Scale.Range } },
+      scales: {
+        x: { time: true, range: rangoX as uPlotTipo.Scale.Range },
+        ...(enteros ? { y: { range: (_u: uPlotTipo, _min: number, max: number): uPlotTipo.Range.MinMax => [0, Math.max(1, Math.ceil(max))] } } : {}),
+      },
       series: [{ label: 'Hora', value: SELLO_LEYENDA }, ...lineasUplot],
       bands: bandas,
-      axes: [{ values: EJE_TIEMPO, ...eje }, { label: unidad, ...eje }],
+      legend: { show: false },
+      axes: [{ values: EJE_TIEMPO, ...eje }, ejeY],
       cursor: {
         ...(sincronizar !== null ? { sync: { key: sincronizar } } : {}),
         ...(alSeleccionar !== null ? { drag: { x: true, y: false, setScale: false } } : {}),
       },
       hooks: {
         draw: [(u: uPlotTipo) => dibujarEncima(u, colores)],
+        setCursor: [alMoverCursor],
         ...(alSeleccionar !== null
           ? {
               setSelect: [
@@ -184,13 +260,44 @@
     let activo = true;
     let observador: ResizeObserver | undefined;
     const doble = (): void => alDobleClic?.();
+    const entra = (e?: Event): void => {
+      bajoPuntero = true;
+      if ((e as PointerEvent | undefined)?.pointerType === 'touch') conDedo = true;
+    };
+    const mueveRaton = (e: PointerEvent): void => {
+      if (e.pointerType === 'mouse') conDedo = false;
+    };
+    // En una pantalla táctil uPlot no escucha el dedo (1.6.32, sin eventos táctiles): un toque lleva el cursor al punto tocado y la
+    // etiqueta aparece ahí; un toque fuera la quita (L4c, decidido tras probarlo en el navegador con pantalla táctil).
+    const toque = (e: PointerEvent): void => {
+      if (e.pointerType !== 'touch' || grafico === undefined) return;
+      bajoPuntero = true;
+      conDedo = true;
+      const r = grafico.over.getBoundingClientRect();
+      grafico.setCursor({ left: e.clientX - r.left, top: e.clientY - r.top });
+    };
+    const sale = (): void => {
+      if (conDedo) return;
+      bajoPuntero = false;
+      quitarEtiqueta();
+    };
     void cargarUplot().then((UPlot) => {
       if (!activo) return;
       ventanaVigente = untrack(() => ventana);
       encima = untrack(() => ({ umbrales, histeresis, franjas }));
-      grafico = new UPlot(untrack(() => opciones(UPlot, el.clientWidth || 600, tema)), untrack(() => series) as uPlotTipo.AlignedData, el);
+      const ancho = el.clientWidth || 600;
+      altoVigente = untrack(() => alto) ?? altoGrafico(el.clientWidth);
+      grafico = new UPlot(untrack(() => opciones(UPlot, ancho, tema)), untrack(() => series) as uPlotTipo.AlignedData, el);
       grafico.over?.addEventListener('dblclick', doble);
-      observador = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(() => grafico?.setSize({ width: el.clientWidth, height: untrack(() => alto) }));
+      grafico.over?.addEventListener('mouseenter', entra);
+      grafico.over?.addEventListener('pointerdown', entra);
+      grafico.over?.addEventListener('pointerup', toque);
+      grafico.over?.addEventListener('pointermove', mueveRaton);
+      grafico.over?.addEventListener('mouseleave', sale);
+      observador = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(() => {
+        altoVigente = untrack(() => alto) ?? altoGrafico(el.clientWidth);
+        grafico?.setSize({ width: el.clientWidth, height: altoVigente });
+      });
       observador?.observe(el);
       listo = true;
     });
@@ -198,9 +305,44 @@
       activo = false;
       observador?.disconnect();
       grafico?.over?.removeEventListener('dblclick', doble);
+      grafico?.over?.removeEventListener('mouseenter', entra);
+      grafico?.over?.removeEventListener('pointerdown', entra);
+      grafico?.over?.removeEventListener('pointerup', toque);
+      grafico?.over?.removeEventListener('pointermove', mueveRaton);
+      grafico?.over?.removeEventListener('mouseleave', sale);
       grafico?.destroy();
       grafico = undefined;
       listo = false;
+      etiqueta = null;
+    };
+  });
+
+  // Mientras la etiqueta se ve: Escape la quita (WCAG 1.4.13), desplazar la página la quita (quedaría fuera de su punto) y tocar o
+  // pulsar fuera del gráfico la quita (en una pantalla táctil no hay «salir» del puntero).
+  $effect(() => {
+    if (etiqueta === null) return;
+    const tecla = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') quitarEtiqueta();
+    };
+    // Con el dedo no hay «salir» del puntero: tras desplazar, el gráfico deja de estar «bajo el puntero» (si no, al tocar otro gráfico
+    // sincronizado este volvía a mostrar su etiqueta y quedaban dos); con el ratón sigue encima y la etiqueta vuelve al moverlo.
+    const desplazar = (): void => {
+      if (conDedo) bajoPuntero = false;
+      quitarEtiqueta();
+    };
+    const fuera = (e: PointerEvent): void => {
+      if (marco !== undefined && e.target instanceof Node && !marco.contains(e.target)) {
+        bajoPuntero = false;
+        quitarEtiqueta();
+      }
+    };
+    document.addEventListener('keydown', tecla);
+    window.addEventListener('scroll', desplazar, { capture: true, passive: true });
+    document.addEventListener('pointerdown', fuera, true);
+    return () => {
+      document.removeEventListener('keydown', tecla);
+      window.removeEventListener('scroll', desplazar, { capture: true });
+      document.removeEventListener('pointerdown', fuera, true);
     };
   });
 
@@ -218,8 +360,15 @@
     grafico?.redraw?.(false, false);
   });
 
+  // Leyenda fija (A3, L4c): con más de una serie (o con la banda), los nombres con su color; sin valores (los da la etiqueta).
+  const leyenda = $derived.by(() => {
+    const items = lista.filter((_l, k) => !esBorde(k + 1)).map((l) => ({ nombre: l.label, color: l.stroke, banda: false }));
+    if (banda !== null) items.push({ nombre: 'mínimo–máximo', color: banda.color, banda: true });
+    return items.length > 1 ? items : [];
+  });
+
   // Texto alternativo y tabla de datos.
-  const nombres = $derived((lineas ?? [{ label: 'promedio' }, { label: 'lectura actual' }]).map((l) => l.label));
+  const nombres = $derived(lista.map((l) => l.label));
   const valorTexto = (v: number | null | undefined): string => (v === null || v === undefined || !Number.isFinite(v) ? '—' : `${formatearNumero(v)} ${unidad}`);
   const descripcion = $derived.by(() => {
     const valores = series[1] ?? [];
@@ -237,18 +386,35 @@
   };
 </script>
 
-<div
-  class="grafico"
-  class:pequeno={alto < 250}
-  bind:this={contenedor}
-  role="img"
-  aria-label={descripcion}
-  data-puntos={series[0]?.length ?? 0}
-  data-series={(lineas ?? [0, 0]).length}
-  data-umbrales={umbrales.length}
-  data-franjas={franjas.length}
-  data-banda={banda !== null}
-></div>
+{#if tituloVisible}<p class="titulo-grafico" data-titulo-grafico>{titulo}</p>{/if}
+<div class="grafico-marco" bind:this={marco}>
+  <div
+    class="grafico"
+    bind:this={contenedor}
+    style:min-height="{altoVigente}px"
+    role="img"
+    aria-label={descripcion}
+    data-titulo={titulo}
+    data-puntos={series[0]?.length ?? 0}
+    data-series={lista.length}
+    data-umbrales={umbrales.length}
+    data-franjas={franjas.length}
+    data-banda={banda !== null}
+  ></div>
+  {#if etiqueta !== null}
+    <div class="etiqueta-flotante" bind:this={etiquetaEl} aria-hidden="true" data-etiqueta-flotante>
+      <span class="hora">{etiqueta.hora}</span>
+      {#each etiqueta.filas as f, k (k)}
+        <span class="fila"><span class="muestra-linea" class:banda={f.banda === true} style:background={f.color || null}></span>{f.nombre}: <strong>{f.valor}</strong></span>
+      {/each}
+    </div>
+  {/if}
+</div>
+{#if leyenda.length > 0}
+  <ul class="leyenda-fija" aria-label="Series de {titulo}" data-leyenda-fija>
+    {#each leyenda as l (l.nombre)}<li><span class="muestra-linea" class:banda={l.banda} style:background={l.color}></span>{l.nombre}</li>{/each}
+  </ul>
+{/if}
 <details class="datos-grafico" ontoggle={(e) => (datosAbiertos = e.currentTarget.open)} data-datos-grafico>
   <summary>Ver los datos</summary>
   {#if datosAbiertos}

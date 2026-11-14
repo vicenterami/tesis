@@ -30,8 +30,8 @@ describe('leerVista / fragmento*: la vista en la URL (docs/19 §4, incremento 1,
     });
   });
   it('tablero v2 (A1): «#/» y lo vacío son el tablero; un enlace viejo con filtros del inventario se redirige a «#/inventario»', () => {
-    expect(leerVista('')).toEqual({ pantalla: 'tablero', sitio: '', rango: null, fija: null });
-    expect(leerVista('#/?sitio=uct&rango=7d')).toEqual({ pantalla: 'tablero', sitio: 'uct', rango: '7d', fija: null });
+    expect(leerVista('')).toEqual({ pantalla: 'tablero', sitio: '', ver: 'resumen', rango: null, fija: null });
+    expect(leerVista('#/?sitio=uct&rango=7d')).toEqual({ pantalla: 'tablero', sitio: 'uct', ver: 'resumen', rango: '7d', fija: null });
     expect(redireccionVieja('#/?estado=alerta&sitio=uct')).toBe('#/inventario?estado=alerta&sitio=uct');
     expect(redireccionVieja('#/?via=http')).toBe('#/inventario?via=http');
     expect(redireccionVieja('#/?sitio=uct&rango=7d')).toBeNull(); // el tablero no se redirige
@@ -40,14 +40,28 @@ describe('leerVista / fragmento*: la vista en la URL (docs/19 §4, incremento 1,
   });
   it('tablero: el rango a medida va en desde/hasta (ISO); fechas al revés, inválidas o de más de 366 días se ignoran', () => {
     const fija = { desde: new Date('2026-11-01T03:00:00Z'), hasta: new Date('2026-11-08T03:00:00Z') };
-    const f = fragmentoTablero('uct', null, fija);
-    expect(f).toBe('#/?sitio=uct&desde=2026-11-01T03%3A00%3A00.000Z&hasta=2026-11-08T03%3A00%3A00.000Z');
-    expect(leerVista(f)).toEqual({ pantalla: 'tablero', sitio: 'uct', rango: null, fija });
-    expect(fragmentoTablero('', null)).toBe('#/');
+    const f = fragmentoTablero('uct', 'tendencias', null, fija);
+    expect(f).toBe('#/?sitio=uct&ver=tendencias&desde=2026-11-01T03%3A00%3A00.000Z&hasta=2026-11-08T03%3A00%3A00.000Z');
+    expect(leerVista(f)).toEqual({ pantalla: 'tablero', sitio: 'uct', ver: 'tendencias', rango: null, fija });
+    expect(fragmentoTablero('', 'resumen', null)).toBe('#/');
     expect(leerVentanaFija('2026-11-08T00:00:00Z', '2026-11-01T00:00:00Z')).toBeNull();
     expect(leerVentanaFija('ayer', '2026-11-01T00:00:00Z')).toBeNull();
     expect(leerVentanaFija('2025-01-01T00:00:00Z', '2026-11-01T00:00:00Z')).toBeNull();
     expect(leerVista('#/?sitio=<b>').pantalla === 'tablero' && (leerVista('#/?sitio=<b>') as { sitio: string }).sitio).toBe('');
+  });
+  it('tablero v3 (L2): la pestaña en `ver`, de ida y vuelta; sin `ver` o con uno desconocido, el resumen, que no lleva rango', () => {
+    for (const ver of ['tendencias', 'red'] as const) {
+      for (const rango of ['1h', '24h', '7d', '30d'] as const) {
+        const f = fragmentoTablero('uct', ver, rango);
+        expect(f).toBe(`#/?sitio=uct&ver=${ver}&rango=${rango}`);
+        expect(leerVista(f)).toEqual({ pantalla: 'tablero', sitio: 'uct', ver, rango, fija: null });
+      }
+    }
+    expect(fragmentoTablero('uct', 'resumen', '7d')).toBe('#/?sitio=uct'); // el resumen no depende del rango: no lo escribe
+    expect(fragmentoTablero('', 'resumen', '7d', { desde: new Date('2026-11-01T00:00:00Z'), hasta: new Date('2026-11-02T00:00:00Z') })).toBe('#/');
+    expect((leerVista('#/?sitio=uct&ver=mapa&rango=7d') as { ver: string }).ver).toBe('resumen');
+    expect((leerVista('#/?ver=RED') as { ver: string }).ver).toBe('resumen');
+    expect(redireccionVieja('#/?sitio=uct&ver=red&rango=24h')).toBeNull();
   });
   it('legal (P11): «#/legal»', () => expect(leerVista('#/legal')).toEqual({ pantalla: 'legal' }));
   it('usuarios (P10): «#/usuarios» abre la pantalla de usuarios; con algo detrás, no', () => {

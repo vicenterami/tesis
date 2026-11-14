@@ -206,7 +206,7 @@ resolver. Es *Must* por coherencia con la propuesta de valor.
 | **RF-52** | La interfaz debe ser **utilizable desde un navegador móvil** | [EM] | C4 | **S** |
 | **RF-56** | La interfaz debe permitir a cada persona elegir sus **preferencias de visualización**: unidades (la base guarda siempre la estándar) y zona horaria — agregado 08/11/2026 | [PO] | C4 | **S** |
 | **RF-57** | La interfaz debe **paginar toda lista que crezca con el tiempo**, sin pedir la lista completa — agregado 08/11/2026 | [PO] | C4 | **M** |
-| **RF-58** | La interfaz debe ofrecer **ayuda contextual**: todo botón con etiqueta de texto y una ayuda accesible con el teclado — agregado 08/11/2026 | [PO] | C4 | **M** |
+| **RF-58** | La interfaz debe ofrecer **ayuda contextual**: todo botón con etiqueta de texto y una ayuda accesible con el teclado — agregado 08/11/2026 (precisión del 13/11/2026: los enlaces de la barra lateral contraída muestran solo su icono, con el mismo texto como nombre accesible y como ayuda visible: `docs/19 §4`, L1e) | [PO] | C4 | **M** |
 | **RF-59** | La interfaz debe presentar al administrador del sistema el **estado del sistema**: recursos por contenedor, errores y último respaldo — agregado 08/11/2026 | [PO] | C5 | **M** |
 | **RF-60** | El sistema debe permitir al administrador del sistema **configurar los límites de los servicios** desde la interfaz — agregado 08/11/2026 | [PO] | C4 | **S** |
 | **RF-61** | La interfaz debe ofrecer un **formulario de soporte** que guarde el mensaje para el administrador del sistema — agregado 08/11/2026 | [PO] | C4 | **C** |

@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 592 pruebas unitarias del backend y 297 del panel, sin matriz formal); TT-32 (sensor físico) se cubrió después, en §43, §44 y §53;
+cubre todavía: TT-27 (contrato de trama: hoy 592 pruebas unitarias del backend y 340 del panel, sin matriz formal); TT-32 (sensor físico) se cubrió después, en §43, §44 y §53;
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -2704,3 +2704,131 @@ referencia.
 en 31 archivos); `svelte-check`, 396 archivos sin errores. `pnpm openapi`: 38 rutas (la descripción de «Ahora» y de `tendencia`).
 Contra la pila recreada con las imágenes nuevas: `api-smoke.sh`, 122 OK; `sesion-smoke.sh` (4b), dos corridas seguidas, 386 de 386 cada
 una. El verificador completo, en verde. El informe, recompilado: 30 páginas de cuerpo y ningún desborde.
+
+## 67. Panel del tablero v3: armazón lateral, pestañas, «Ahora» y gráficas vivas (13/11/2026)
+
+**Qué cambió** (diseño en `docs/19 §4`, bloque L, puntos 1 a 5 y 7, con lo decidido al implementar escrito allí; el contrato de «Ahora» y
+de `sitio_id` es el de §66). **Armazón:** barra lateral con icono y texto por entrada (iconos propios en `Icono.svelte`, sobre una cuadrícula de 24 px y dibujados a 20 y 22 px), que
+«Menú» contrae a 56 px (abre expandida desde 1 280 px y contraída entre 1 000 y 1 279 px; el estado vive en memoria); bajo 1 000 px, el
+mismo menú es un cajón que atrapa el foco y lo devuelve a «Menú»; barra superior con «Menú», el sitio, el tema y la cuenta; «Saltar al
+contenido»; sin entradas «(próximamente)»; la línea «servicio: …» pasó a «Legal y acerca de» y un fallo del servicio se dice con un aviso.
+`Tooltip.svelte` se corrigió para WCAG 2.2, 1.4.13. El botón de tema guarda por el único escritor de preferencias
+(`lib/escritor-preferencias.ts`), el mismo de P13. **Tablero en tres pestañas** (`ver` en la URL): el Resumen, sin selector de rango, pide
+dos cosas al entrar —el resumen de las últimas 24 horas y «Ahora» con tendencia— y se mantiene con los avisos (`medicion` y `visto` en
+memoria, dibujados como mucho una vez por segundo; `condicion` repide «Ahora» sin tendencia y el resumen; con tramas llegando, el resumen
+una vez por minuto); Tendencias y Red piden lo suyo al abrirlas, con la fila del rango, y se refrescan solas solo con 1 h y 24 h (sexta
+parte del cubo entre 5 y 60 s, nunca dos en vuelo, con la pestaña visible y la ventana alineada al cubo); «Pausar» y «Reanudar» en el
+tablero y la misma corrección en la ficha. **Gráficas:** sin título en el lienzo ni tabla de leyenda de uPlot; etiqueta flotante propia
+(Escape, salir, desplazar; en táctil, un toque la muestra y un toque fuera la quita), leyenda fija de nombres, puntos solo con 30 o menos
+y nunca en los bordes de la banda, eje de enteros en las tramas, las magnitudes sin datos en una línea y sin lienzo, alto según la
+pantalla. Las barras ordenadas pasaron de SVG a HTML (texto del cuerpo). **Carga a pedido:** toda pantalla que no es la de entrada (el
+tablero o «Entrar») se descarga con `import()` al abrirla. Paso 4c: `panel/e2e/sesion.mjs` y `pruebas/panel-sesion-e2e.sh` suman lo de L7.
+
+**Pruebas nuevas y la falla plantada de cada una** (cada plantada se aplicó, se vio en rojo y se deshizo; 43 pruebas nuevas del panel por
+el DOM y de funciones puras, de 297 a 340, y 60 plantadas):
+
+| Prueba | Plantada | Resultado |
+|---|---|---|
+| `App.test.ts`: menú con las pantallas que existen, icono y texto, sin «próximamente», orden del foco | — (reescrita sobre la anterior) | — |
+| `App.test.ts`: «Saltar al contenido» no cambia la ruta | sin `preventDefault` | 1 en rojo |
+| `App.test.ts`: contraída a iconos con su nombre accesible y su ayuda (foco, Escape) | sin `aria-label` | 1 en rojo |
+| `App.test.ts`: cajón: el foco entra, Tab da la vuelta, Escape, tocar fuera y elegir un destino lo cierran y devuelven el foco | sin la vuelta de Tab; el tema también en la barra superior | 1 y 1 en rojo |
+| `App.test.ts`: el tema se aplica al instante, se guarda en fila (nunca dos `PUT` en vuelo) y vuelve si el servidor lo rechaza | el escritor sin fila | 1 en rojo |
+| `App.test.ts`: el servicio caído se dice con un aviso; «Legal y acerca de» dice su estado | sin el aviso | 1 en rojo |
+| `Componentes.test.ts`: la ayuda cumple 1.4.13 (Escape con el foco fuera, el puntero pasa a la ayuda, dura con foco) | `Tooltip.svelte` anterior | 1 en rojo |
+| `Tablero.test.ts`: al entrar, dos pedidos y ningún histórico | «Ahora» sin tendencia | 3 en rojo |
+| `Tablero.test.ts`: la franja: «Sin señal: 1» y su destino | sin el «:» del nombre | 1 en rojo |
+| `Tablero.test.ts`: «Ahora» por magnitud y por dispositivo (cifra, lectura vieja, «+N», «esperando la primera trama») | tres decimales; vieja a tres intervalos | 1 y 1 en rojo |
+| `Tablero.test.ts`: ráfaga de `medicion` y `visto` sin ningún pedido, una vez por segundo; con tramas continuas, el resumen una vez por minuto | `medicion` repide; minuto de un segundo | 1 y 1 en rojo |
+| `Tablero.test.ts`: `condicion` repide sin tendencia y la conserva; `sitio_id`; «Pausar»/«Reanudar»; la tendencia omitida no se insiste | sin conservar; todo aviso es del sitio; sin pausa; reintento a los 30 s | 1, 1, 1 y 1 en rojo |
+| `Tablero.test.ts`: Tendencias sin título ni leyenda de uPlot y las magnitudes sin datos sin lienzo; puntos ≤ 30 y no en la banda; Red con eje de enteros | con lienzo; con título; 31 puntos; puntos en la banda; sin enteros | 1, 1, 1, 1 y 1 en rojo |
+| `Tablero.test.ts`: la etiqueta flotante solo bajo el puntero y se va con Escape, al salir y al desplazar; en táctil, con un toque | en todos los sincronizados; sin Escape; el toque no mueve el cursor; el `mouseleave` emulado la quita; un ratón de verdad no la vuelve a quitar al salir; uPlot esconde el cursor y se va | 1 en rojo cada una |
+| `Tablero.test.ts`: vivo con 1 h (10 s, ventana alineada), nada en 7 días salvo «Actualizar»; «Pausar» en las gráficas | período de 1 s; sin alinear; 7 días vivo; sin pausa | 1 en rojo cada una |
+| `lib/refresco.test.ts` (6) y `lib/ahora.test.ts` (6) | dos en vuelo; con la pestaña oculta; la tendencia une los huecos; una medición desordenada pisa | 1 en rojo cada una |
+| `Ficha.test.ts`: «Reanudar» repide la ficha y el histórico una vez | sin repedir | 1 en rojo |
+| `lib/vivo.test.ts`: `sitio_id` de texto, null o ausente; otro tipo, no | cualquier tipo | 1 en rojo |
+| `lib/vista.test.ts`: `ver` de ida y vuelta; el resumen no escribe el rango | cualquier `ver`; el resumen con rango | 1 y 1 en rojo |
+| `lib/grafico.test.ts` (3): los decimales de lo dibujado, el recorrido sin la serie de tiempos y la etiqueta con todas sus filas iguales | un decimal menos; el recorrido cuenta los tiempos; la banda ignora los decimales | 3, 2 y 1 en rojo |
+| `lib/refresco.test.ts` (2 más): `marcar()` olvida lo ya programado; `soltar()`, al pausar, también | sin olvidar; `soltar()` vacío | 1 y 1 en rojo |
+| `Tablero.test.ts`: un refresco ya programado no sobrevive a un cambio de rango (ni lo pisa ni corre en 7 días) | sin olvidar y sin mirar si el rango es vivo | 1 en rojo |
+| `Tablero.test.ts`: «Pausar» detiene también lo ya programado (Resumen y gráficas) y el reloj de los «hace N s», y dice desde cuándo | lo programado corre en pausa (gráficas; Resumen); el reloj sigue; sin «desde las…» | 1 en rojo cada una (4) |
+| `Tablero.test.ts`: una lectura que llega mientras «Ahora» se repide no se pierde | las lecturas en espera se descartan | 1 en rojo |
+| `Tablero.test.ts`: en táctil, tras desplazar, el cursor sincronizado de otro gráfico no revive la etiqueta del primero | el gráfico sigue «bajo el puntero» | 1 en rojo |
+| `Tablero.test.ts`: cada ficha de indicador lleva un solo enlace y ningún botón (reemplaza una afirmación que no podía fallar) | un segundo enlace «Ver en el inventario» | 1 en rojo |
+| `App.test.ts`: tras un 409 se releen las preferencias y el intento siguiente lleva la marca vigente | sin releer | 1 en rojo |
+| `App.test.ts`: con el menú contraído, todo enlace de solo icono, también «Legal y acerca de», muestra su ayuda | el del pie sin ayuda | 1 en rojo |
+| `App.test.ts`: el cajón: Tab devuelve el foco si quedó fuera, «Saltar al contenido» inerte, «Cerrar menú» y Escape desde cualquier foco | sin devolver el foco; sin `inert`; sin el botón; Escape solo dentro | 1 en rojo cada una (4) |
+| `App.test.ts`: una navegación que el panel aún no procesó manda sobre la vista que una carga en vuelo quiere escribir en la URL | la vista se escribe igual | 1 en rojo |
+
+Se reescribieron sobre el diseño nuevo, sin cambiar lo que comprueban, las del armazón de `App.test.ts`, las de `Tablero.test.ts` que siguen
+(indicadores que suman el total, a medida, vacíos, error con «Reintentar», tema que recrea las gráficas, texto alternativo) y el doble de
+uPlot de `Ficha.test.ts` y `Comparar.test.ts` (el título se lee del contenedor: el lienzo ya no lo lleva). **Paso 4c** (Chromium y Firefox,
+390 y 1 280 px): las pestañas (dos pedidos al entrar, «atrás» vuelve de Red a Tendencias, sin desplazamiento horizontal), el menú contraído
+con sus nombres, 44 px por destino y la ayuda de cada enlace (también el del pie), el cajón con el teclado y su botón «Cerrar menú», el
+tema que alterna y se guarda; y, con una persona de consulta de descarte en
+el sitio de la semilla completa, el alto de la pestaña Resumen a 390 × 844, las tres pestañas sin desplazamiento horizontal a 390 y
+1 280 px en los dos temas y las pistas de la entrega, todas del mismo largo: **TODO OK (330 de 330 comprobaciones del panel con sesión, en: chromium firefox)**. La primera corrida dio una
+falla en Firefox («error loading dynamically imported module» al recargar con una pantalla a medio descargar): desde entonces una pantalla
+que no se puede descargar lo dice con un aviso y no deja un error sin atender.
+
+**Tres correcciones al mirar las capturas** (13/11/2026, con el sitio `uct` y la semilla completa recién cargada). (1) *La entrega por
+dispositivo no se podía comparar de fila en fila:* cada fila era su propia rejilla y el valor escrito al lado («0 % (0 de 17.399)») le
+quitaba largo a su pista, así que un 88 % se dibujaba más largo que un 90 %. Las columnas pasaron a ser de la lista (cada fila las
+hereda) y el paso 4c lo comprueba: todas las pistas (nueve o diez, según cuántos dispositivos esperan tramas en el rango) miden lo mismo
+a 390 px y a 1 280 px en los dos temas y los dos navegadores (188 y 324 px en Chromium); con la rejilla anterior puesta a mano en el navegador, la diferencia es de 37 px (la comprobación admite 1). (2) *El nombre
+de la magnitud se cortaba en las tarjetas de «Ahora»* («Humedad r…») cuando la tarjeta mide 282 px (menú contraído a 1 280 px): ahora
+ocupa dos líneas (9 rótulos, ninguno recortado, 5 en dos líneas; a 390 px, ninguno en dos). (3) *La etiqueta flotante mezclaba decimales*
+(«19,396 °C» junto a «19,29 a 19,5 °C»): ahora todas sus cifras llevan los que distinguen dos valores de lo dibujado («18,9 °C» y «18,8 a
+19 °C» en la temperatura del sitio), y el resumen del rango de la ficha, igual («promedio de los 165 promedios dibujados 60,1 %RH», antes
+«60,023 %RH»); el valor exacto sigue en «Ver los datos» y en el CSV. Las alturas de las pestañas Tendencias y Red no cambiaron (1 492 y
+1 199 px a 1 280 px; 2 358 y 1 410 px a 390 px).
+
+**Correcciones tras la revisión del bloque** (13/11/2026; revisión independiente de tres frentes —comportamiento, concordancia, y
+privacidad y licencias—: 20 hallazgos, 19 corregidos aquí y uno a medias). *De comportamiento (7):* (1) un refresco de las gráficas ya
+programado corría después de un cambio de rango, podía cortar la carga que la persona pidió y dejaba la URL con el rango anterior;
+(2) «Pausar» no alcanzaba a lo ya programado ni al reloj de los «hace N s»: ahora sí, y la fila dice desde cuándo está en pausa; (3) tras
+un 409 al guardar una preferencia, cada guardado siguiente repetía el 409 hasta recargar la página: ahora se releen las vigentes;
+(4) al vencer la sesión no se olvidaban las preferencias de la persona; (5) al repedirse «Ahora» se descartaban lecturas en vivo
+posteriores a la respuesta; (6) con el cajón abierto, el foco podía salir hacia «Saltar al contenido» y no había un control con nombre
+para cerrarlo: Tab devuelve el foco, el enlace queda inerte y hay «Cerrar menú»; (7) en una pantalla táctil, tras desplazar, tocar otro
+gráfico revivía la etiqueta del primero. *De concordancia (13):* la prueba de navegador del banco (`e2e/p3.mjs`, que el verificador no
+corre) seguía buscando la tabla de leyenda de uPlot, que este bloque dejó de dibujar: se reescribió sobre la etiqueta flotante y la
+leyenda fija (`banco.sh navegador`: 36 de 36 comprobaciones en Firefox y en Chromium), y el verificador ganó el **paso 2y4** (53 pasos): falla si un guion de navegador busca
+un atributo `data-*` que ningún componente pone, o la leyenda que ya no se dibuja (probado sobre una copia, plantando una y otra: las dos
+en rojo); «Legal y acerca de» no mostraba su ayuda con el menú contraído (RF-58); una afirmación de `Tablero.test.ts` no podía fallar
+(buscaba un atributo que el tablero ya no pone); tres reglas de estilo de la leyenda quedaron sin uso; y nueve precisiones de `docs/19`
+y de las cifras medidas (la fila P1 de §3, la leyenda del incremento 2, los trece criterios de WCAG 2.2, el texto de «sin señal», el
+tamaño de los iconos, dos reglas de §6, el alto del Resumen y el paquete). El hallazgo a medias: `Tarjeta.svelte`, del tablero anterior,
+quedó sin uso; su afirmación vacía se corrigió, el componente sigue en el repositorio. De paso, la prueba del tema dependía del orden
+(fallaba al correr sola, por un segundo aviso en pantalla): ahora busca su aviso entre todos.
+
+**Una falla intermitente que resultó un defecto.** En una de tres corridas seguidas del paso 4c, Firefox a 390 px se quedó en Tendencias
+después de pedir el Resumen («pestañas del tablero: se cortó»). No era la prueba: al cambiar de pantalla, la URL cambia enseguida y su
+`hashchange` llega en la tarea siguiente; si justo ahí terminaba la carga de la pantalla anterior, esta escribía su vista con
+`replaceState` **sobre la URL nueva** y la persona se quedaba donde estaba, como si su clic no hubiera valido. Desde ahora una pantalla
+no escribe su vista si la URL del navegador ya no es la que el panel procesó (`App.svelte`, `alCambiarVista`; `docs/19 §4`, incremento
+1, punto 1). La prueba lo reproduce sin azar (retiene el resumen de Tendencias, cambia la URL sin despachar el evento y suelta la
+carga) y su falla plantada da 1 en rojo.
+
+**Mediciones** (pila de desarrollo, sitio `uct` con la semilla completa, una persona de descarte; Chromium 156):
+
+| | Tablero v2 (una página) | v3 Resumen | v3 Tendencias | v3 Red |
+|---|---|---|---|---|
+| Alto a 1 280 px (claro · oscuro) | 3 957 px | 1 031 · 961 px | 1 492 · 1 422 px | 1 199 · 1 130 px |
+| Alto a 390 × 844 (claro · oscuro) | 6 254 px | 1 473 · 1 473 px | 2 358 · 2 358 px | 1 410 · 1 410 px |
+| Pedidos al entrar | 7 | 2 (`…/resumen`, `…/ahora?tendencia=si`) | — | — |
+
+**El alto del Resumen depende de cuántos dispositivos reportan:** los de la tabla se midieron con 2 de 10; con la semilla recién cargada
+(5 de 10) mide 1 175 px a 1 280 px y 1 998 px a 390 px. A 1 280 px en claro, el aviso «Clave cambiada» de la primera entrada suma 70 px;
+en el paso 4c, la persona de consulta (con ese aviso a 390 px) midió **2 119 px con la semilla recién cargada** (5 tarjetas de «Ahora»;
+2 120 en Firefox) y 1 377 px con la semilla envejecida, casi sin nadie reportando: por eso la comprobación dice ahora con cuántas tarjetas
+midió y avisa si son menos de tres (una semilla envejecida aprobaba sin exigir). El umbral de L7 es 2 532 (tres pantallas). **Paquete inicial** (`vite build`): 257 489 B
+(86,67 kB comprimido) en §64 y 266 282 B (89,08 kB) al empezar este bloque; ahora 154 463 B (56,34 kB): `index-*.js` 96 332 B y la parte
+común `api-*.js` 58 131 B (precargada), con las once pantallas restantes en archivos de 0,8 a 27,9 kB que se descargan al abrirlas y uPlot
+(51 kB) como antes. El CSS pasó de 23,1 a 34,3 kB (7,1 kB comprimido). **Cifras del bloque:** `pnpm verificar` en verde: 592 pruebas
+unitarias del backend en 54 archivos y 340 pruebas del panel (342 ejecuciones en vitest, en 33 archivos); `pnpm check`: 405 archivos, 0 errores.
+**Lo que no cubre:** la zona horaria propia de las preferencias sigue sin aplicarse (P13; pendiente); la etiqueta flotante en táctil se
+probó en Chromium con pantalla táctil emulada, no en un teléfono; las fichas por magnitud de «Ahora» no cambian en vivo (`docs/19` L3);
+el alto del Resumen en teléfono con ocho tarjetas de «Ahora» (el máximo que se muestra) no se midió: la semilla llega a cinco; la prueba
+de navegador del banco sigue fuera del verificador (se corre a mano con `banco.sh navegador`; el paso 2y4 solo mira sus selectores); y
+el promedio del sitio de Tendencias se calcula sobre todas las lecturas de cada cubo, sin igualar el peso de cada dispositivo (pendiente).

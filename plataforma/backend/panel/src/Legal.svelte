@@ -5,12 +5,15 @@
   // Términos de uso (`GET /terminos`, con versión y fecha), Acerca de (`GET /acerca`: versión, commit, AGPL, avisos de terceros) y
   // Soporte (`POST /soporte`, texto sin adjuntos, con límite de tasa: un 429 dice cuántos segundos esperar). Más la licencia y la cookie,
   // que no dependen del servidor. Los textos se muestran como texto, nunca como HTML (lib/legal.ts).
+  // Desde el tablero v3 (docs/19 §4, bloque L, punto 1d), con sesión, «Acerca de» dice también el estado del servicio («servicio: ok, base
+  // conectada, N tablas»), que antes iba en la cabecera de toda pantalla: describe la instalación y no ayuda a quien mira datos.
   import { onMount } from 'svelte';
   import Aviso from './Aviso.svelte';
   import Boton from './Boton.svelte';
-  import { ErrorApi, pedir } from './lib/api';
+  import { ErrorApi, obtener, pedir } from './lib/api';
   import { avisoDeError, type DatosAviso } from './lib/avisos';
   import { MAX_SOPORTE, bloquesDeTexto, esPrivacidad, limpio, textoDe, type Privacidad, type TextoLegal } from './lib/legal';
+  import type { Salud } from './lib/modelo';
   import type { SeccionLegal } from './lib/vista';
 
   let { seccion = undefined, conSesion = false }: { seccion?: SeccionLegal; conSesion?: boolean } = $props();
@@ -22,6 +25,7 @@
   let mensaje = $state('');
   let enviando = $state(false);
   let avisoSoporte = $state<DatosAviso | null>(null);
+  let salud = $state<string | null>(null);
 
   // central: false → estas páginas se leen también sin sesión: un 401 aquí no lleva a «Entrar».
   const leer = (ruta: string): Promise<unknown> => pedir<unknown>('GET', ruta, { central: false });
@@ -29,6 +33,7 @@
     void leer('/privacidad').then((x) => (privacidad = esPrivacidad(x) ? x : 'error')).catch(() => (privacidad = 'error'));
     void leer('/terminos').then((x) => (terminos = textoDe(x) ?? 'error')).catch(() => (terminos = 'error'));
     void leer('/acerca').then((x) => (acerca = typeof x === 'object' && x !== null ? (x as Record<string, unknown>) : 'error')).catch(() => (acerca = 'error'));
+    if (conSesion) void obtener<Salud>('/salud').then((s) => (salud = `${s.estado}, base ${s.base}, ${s.tablas} tablas`)).catch(() => (salud = 'sin respuesta'));
     if (seccion !== undefined) queueMicrotask(() => document.getElementById(`legal-${seccion}`)?.scrollIntoView?.());
   });
 
@@ -116,6 +121,7 @@
       <dl class="identidad" data-acerca>
         {#if texto(acerca.version) !== ''}<dt>Versión</dt><dd data-acerca-version>{texto(acerca.version)}</dd>{/if}
         {#if texto(acerca.commit) !== ''}<dt>Commit</dt><dd data-acerca-commit><code>{texto(acerca.commit)}</code></dd>{/if}
+        {#if conSesion}<dt>Servicio</dt><dd data-salud>{salud ?? 'consultando…'}</dd>{/if}
       </dl>
     {:else if acerca === 'error'}
       <p class="vacio">No se pudo leer la versión del servicio.</p>

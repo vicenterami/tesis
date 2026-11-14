@@ -8,11 +8,15 @@
 // Desde el 11/11/2026 (docs/19 §7, tablero v2): legal antes de entrar, la aceptación obligatoria de los términos (docs/20 §12), el tablero
 // cuyos indicadores suman el inventario, P6 (validación en vivo, guardar y el 409 con otra escritura entretanto), P7 (asistente por HTTP y alta masiva
 // por archivo), P13 (°F en la ficha sin cambiar la base) y P14 (el cambio de umbrales con la persona que lo hizo).
+// Desde el 13/11/2026 (docs/19 §4, bloque L, punto 7): las tres pestañas del tablero (dos pedidos al entrar, «atrás» vuelve a la pestaña
+// anterior, sin desplazamiento horizontal), el menú contraído con sus nombres (1 280 px), el cajón con el teclado (390 px), el tema que
+// alterna y se guarda, y, con una persona de consulta de descarte en el sitio de la semilla completa, el alto de la pestaña Resumen a
+// 390 × 844 (≤ 2 532 px, tres pantallas) y ninguna pestaña con desplazamiento horizontal a 390 y 1 280 px en los dos temas.
 import { readFileSync } from 'node:fs';
 import { chromium, firefox } from 'playwright';
 
 const datos = JSON.parse(readFileSync(0, 'utf8'));
-const { base, navegador: NAV, dispositivo, idFisico, sitio, capturas, casos } = datos;
+const { base, navegador: NAV, dispositivo, idFisico, sitio, capturas, casos, uct = null, uctMotivo = '' } = datos;
 const motores = { firefox, chromium };
 if (!motores[NAV]) { console.log(`FALLA navegador ${NAV}: se admite firefox o chromium`); process.exit(2); }
 let fallos = 0;
@@ -169,6 +173,102 @@ for (const caso of casos) {
     comprobar(n.length >= 5 && n[0] === inventario && n.slice(1, 5).reduce((a, b) => a + b, 0) === n[0], `${etiqueta}: P1: los indicadores suman el total y el total es el del inventario (${inventario})`, JSON.stringify(n));
     await sinDesborde(p, `${etiqueta}, tablero`);
     await foto(p, '6-tablero');
+  });
+
+  // Tablero v3 (L2, L7): al entrar, dos pedidos (el resumen y «Ahora»); las pestañas son enlaces y «atrás» vuelve a la anterior.
+  await paso(`${etiqueta}: pestañas del tablero`, async () => {
+    const pedidos = [];
+    const anotar = (r) => { const u = new URL(r.url()); if (u.pathname.startsWith('/sitios/') && u.pathname.split('/').length > 3) pedidos.push(u.pathname.split('/').at(-1)); };
+    p.on('request', anotar);
+    await p.reload();
+    await p.locator('[data-ahora]').waitFor({ timeout: 15000 });
+    await p.waitForTimeout(500);
+    p.off('request', anotar);
+    comprobar(JSON.stringify(pedidos.sort()) === JSON.stringify(['ahora', 'resumen']), `${etiqueta}: L2: al entrar al tablero, dos pedidos (resumen y «Ahora»)`, JSON.stringify(pedidos));
+    comprobar((await p.locator('[data-pestana="resumen"]').getAttribute('aria-current')) === 'page' && (await p.locator('[data-rango]').count()) === 0, `${etiqueta}: … el Resumen, marcado y sin selector de rango`);
+    await p.locator('[data-pestana="tendencias"]').click();
+    await p.locator('[data-magnitud-seccion] canvas, [data-sin-datos-rango], [data-sin-magnitudes]').first().waitFor({ timeout: 15000 });
+    comprobar(p.url().includes('ver=tendencias'), `${etiqueta}: … Tendencias va a la URL`, p.url());
+    await sinDesborde(p, `${etiqueta}, Tendencias`);
+    await p.locator('[data-pestana="red"]').click();
+    await p.locator('[data-titulo-tramas]').waitFor({ timeout: 15000 });
+    await sinDesborde(p, `${etiqueta}, Red`);
+    await p.goBack();
+    await p.waitForFunction(() => location.hash.includes('ver=tendencias'), null, { timeout: 15000 });
+    await p.locator('[data-pestana="tendencias"][aria-current="page"]').waitFor({ timeout: 15000 });
+    ok(`${etiqueta}: … «atrás» vuelve de Red a Tendencias`);
+    await p.evaluate(() => { location.hash = '#/'; });
+    await p.locator('[data-ahora]').waitFor({ timeout: 15000 });
+  });
+
+  // L1 y L5: el menú contraído (escritorio) o el cajón (teléfono), con teclado; el tema que alterna y se guarda en la cuenta.
+  if (ancho >= 1000) {
+    await paso(`${etiqueta}: menú contraído`, async () => {
+      await p.locator('[data-menu]').click();
+      await p.locator('.armazon.contraido').waitFor({ timeout: 5000 });
+      const enlaces = await p.locator('[data-menu-principal] a').evaluateAll((as) => as.map((a) => [a.getAttribute('aria-label'), a.textContent.trim(), a.getBoundingClientRect().width]));
+      comprobar(enlaces.length >= 5 && enlaces.every(([n, t, w]) => n === t && n !== '' && w >= 44), `${etiqueta}: L1e: contraído, cada enlace se llama por su texto (aria-label) y mide 44 px`, JSON.stringify(enlaces));
+      await p.locator('[data-ir-inventario]').hover();
+      const ayuda = p.locator('#ayuda-menu-inventario');
+      await ayuda.waitFor({ state: 'visible', timeout: 5000 });
+      comprobar((await ayuda.textContent()) === 'Inventario', `${etiqueta}: … al pasar el puntero, la ayuda dice su nombre`);
+      await p.keyboard.press('Escape');
+      await ayuda.waitFor({ state: 'hidden', timeout: 5000 });
+      ok(`${etiqueta}: … y Escape la quita (WCAG 1.4.13)`);
+      // El enlace del pie también es de solo icono: lleva la misma ayuda (RF-58 no admite un icono sin su nombre a la vista).
+      await p.locator('[data-ir-legal]').hover();
+      const ayudaLegal = p.locator('#ayuda-menu-legal');
+      await ayudaLegal.waitFor({ state: 'visible', timeout: 5000 });
+      comprobar((await ayudaLegal.textContent()) === 'Legal y acerca de', `${etiqueta}: … «Legal y acerca de», en el pie, también muestra su ayuda`);
+      await sinDesborde(p, `${etiqueta}, menú contraído`);
+      await p.mouse.move(600, 400);
+      await p.locator('[data-menu]').click();
+      await p.locator('.armazon:not(.contraido)').waitFor({ timeout: 5000 });
+    });
+  } else {
+    await paso(`${etiqueta}: cajón con el teclado`, async () => {
+      await p.locator('[data-menu]').focus();
+      await p.keyboard.press('Enter');
+      await p.waitForFunction(() => document.querySelector('[data-menu-principal]')?.contains(document.activeElement), null, { timeout: 5000 });
+      comprobar((await p.locator('[data-menu]').getAttribute('aria-expanded')) === 'true', `${etiqueta}: L1c: «Menú» abre el cajón y el foco entra en él`);
+      for (let i = 0; i < 12; i++) await p.keyboard.press('Tab');
+      comprobar(await p.evaluate(() => document.querySelector('[data-menu-principal]').contains(document.activeElement)), `${etiqueta}: … con Tab el foco no sale del cajón`);
+      await p.keyboard.press('Escape');
+      await p.waitForFunction(() => document.activeElement?.hasAttribute('data-menu'), null, { timeout: 5000 });
+      comprobar((await p.locator('[data-menu]').getAttribute('aria-expanded')) === 'false', `${etiqueta}: … Escape lo cierra y el foco vuelve a «Menú»`);
+      // El cajón es un diálogo modal: también se cierra con un control con nombre, el último del cajón (sin tecla Escape, con un lector de
+      // pantalla táctil, no había otra forma que elegir un destino).
+      await p.keyboard.press('Enter');
+      await p.waitForFunction(() => document.querySelector('[data-menu-principal]')?.contains(document.activeElement), null, { timeout: 5000 });
+      await p.keyboard.press('Shift+Tab'); // del primero, hacia atrás: el último
+      const enCerrar = await p.evaluate(() => document.activeElement?.hasAttribute('data-cerrar-menu') === true);
+      await p.keyboard.press('Enter');
+      await p.waitForFunction(() => document.activeElement?.hasAttribute('data-menu'), null, { timeout: 5000 });
+      comprobar(enCerrar && (await p.locator('[data-menu]').getAttribute('aria-expanded')) === 'false', `${etiqueta}: … «Cerrar menú», el último control del cajón, lo cierra y devuelve el foco a «Menú»`, `foco en «Cerrar menú»: ${enCerrar}`);
+      await p.keyboard.press('Enter');
+      await p.waitForFunction(() => document.activeElement?.hasAttribute('data-ir-tablero'), null, { timeout: 5000 });
+      await p.keyboard.press('Tab');
+      await p.keyboard.press('Enter'); // «Inventario»
+      await p.waitForFunction(() => location.hash.startsWith('#/inventario') && document.activeElement?.hasAttribute('data-menu'), null, { timeout: 15000 });
+      ok(`${etiqueta}: … elegir un destino con el teclado navega, cierra el cajón y devuelve el foco a «Menú»`);
+      await p.evaluate(() => { location.hash = '#/'; });
+      await p.locator('[data-ahora]').waitFor({ timeout: 15000 });
+    });
+  }
+  await paso(`${etiqueta}: tema`, async () => {
+    if (ancho < 1000) await p.locator('[data-menu]').click(); // en teléfono, el tema va dentro del cajón (L5)
+    const boton = p.locator('[data-tema]');
+    const antes = await p.evaluate(() => document.documentElement.getAttribute('data-theme'));
+    const texto = (await boton.textContent()).trim();
+    const [put] = await Promise.all([p.waitForResponse((r) => r.url().endsWith('/preferencias') && r.request().method() === 'PUT', { timeout: 15000 }), boton.click()]);
+    const despues = await p.evaluate(() => document.documentElement.getAttribute('data-theme'));
+    comprobar(put.status() === 200 && despues === (texto === 'Tema oscuro' ? 'oscuro' : 'claro') && despues !== antes, `${etiqueta}: L5: «${texto}» lo aplica al instante y lo guarda en la cuenta (PUT 200)`, `${antes} → ${despues}, ${put.status()}`);
+    await sinDesborde(p, `${etiqueta}, tema ${despues}`);
+    await foto(p, `6b-tablero-${despues}`);
+    if (ancho < 1000 && (await p.locator('[data-menu]').getAttribute('aria-expanded')) === 'false') await p.locator('[data-menu]').click();
+    const [put2] = await Promise.all([p.waitForResponse((r) => r.url().endsWith('/preferencias') && r.request().method() === 'PUT', { timeout: 15000 }), p.locator('[data-tema]').click()]);
+    comprobar(put2.status() === 200 && (await p.evaluate(() => document.documentElement.getAttribute('data-theme'))) !== despues, `${etiqueta}: … y vuelve con otro toque`);
+    if (ancho < 1000 && (await p.locator('[data-menu]').getAttribute('aria-expanded')) === 'true') await p.keyboard.press('Escape');
   });
 
   await paso(`${etiqueta}: configurar (P6)`, async () => {
@@ -424,6 +524,48 @@ for (const caso of casos) {
     });
   }
   comprobar(errores.length === 0, `${etiqueta}: sin errores de JavaScript`, errores.join(' | ').slice(0, 300));
+  await contexto.close();
+}
+// L7: con la semilla completa, el sitio de la vitrina medido por una persona de consulta de descarte (la crea y la borra el guion).
+if (uct === null) console.log(`OMITIDO [${NAV}] alto de la pestaña Resumen y desplazamiento horizontal con la semilla completa: ${uctMotivo}`);
+else {
+  const contexto = await motor.newContext({ viewport: { width: 390, height: 844 }, timezoneId: 'America/Santiago', colorScheme: 'light' });
+  const p = await contexto.newPage();
+  paginaActual = p;
+  const errores = [];
+  p.on('pageerror', (e) => errores.push(String(e)));
+  await paso('semilla completa: entrar', async () => {
+    await p.goto(`${base}/panel/#/`);
+    await entrar(p, uct.email, uct.temporal);
+    await elegirClave(p, uct.nueva);
+    await aceptarTerminos(p, 'semilla completa');
+  });
+  for (const [ancho, tema] of [[390, 'light'], [390, 'dark'], [1280, 'light'], [1280, 'dark']]) {
+    await paso(`semilla completa, ${ancho} px, tema ${tema === 'dark' ? 'oscuro' : 'claro'}`, async () => {
+      await p.setViewportSize({ width: ancho, height: ancho < 500 ? 844 : 900 });
+      await p.emulateMedia({ colorScheme: tema });
+      for (const ver of ['resumen', 'tendencias', 'red']) {
+        await p.evaluate((v) => { location.hash = v === 'resumen' ? '#/' : `#/?ver=${v}`; }, ver);
+        await p.locator(ver === 'resumen' ? '[data-ahora-dispositivos], [data-ahora-vacio]' : ver === 'red' ? '[data-titulo-tramas]' : '[data-magnitud-seccion] canvas, [data-sin-datos-rango]').first().waitFor({ timeout: 15000 });
+        await p.waitForTimeout(400);
+        await sinDesborde(p, `semilla completa, ${ver}, ${tema === 'dark' ? 'oscuro' : 'claro'}`);
+        if (ver === 'red') {
+          // La entrega se compara de fila en fila: todas las pistas miden lo mismo, tenga la fila el valor que tenga escrito al lado
+          // («0 % (0 de 17.399)» acortaba la suya y un 88 % se dibujaba más largo que un 90 %).
+          const pistas = await p.locator('[data-barras-lista] .pista').evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().width)));
+          comprobar(pistas.length >= 2 && Math.max(...pistas) - Math.min(...pistas) <= 1, `semilla completa: las ${pistas.length} pistas de la entrega miden lo mismo a ${ancho} px, tema ${tema === 'dark' ? 'oscuro' : 'claro'}`, pistas.join(', '));
+        }
+        if (ver === 'resumen' && ancho === 390) {
+          const alto = await p.evaluate(() => document.documentElement.scrollHeight);
+          // El alto depende de cuántos dispositivos reportan: se dice con cuántas tarjetas se midió (la semilla envejece en una hora).
+          const tarjetas = await p.locator('[data-ahora-dispositivo]').count();
+          comprobar(alto <= 2532, `semilla completa: la pestaña Resumen mide ${alto} px de alto a 390 × 844 con ${tarjetas} tarjetas de «Ahora», tema ${tema === 'dark' ? 'oscuro' : 'claro'} (tope 2 532, tres pantallas)`, String(alto));
+          if (tarjetas < 3 && tema === 'light') console.log(`AVISO [${NAV}] solo ${tarjetas} tarjeta(s) de «Ahora» al medir el alto del Resumen: la semilla completa envejeció (quien reporta cada pocos minutos ya pasó a «Sin señal»); para medir el caso exigente, recárgala antes: bash plataforma/pruebas/semilla-demo.sh --completa`);
+        }
+      }
+    });
+  }
+  comprobar(errores.length === 0, 'semilla completa: sin errores de JavaScript', errores.join(' | ').slice(0, 300));
   await contexto.close();
 }
 await motor.close();

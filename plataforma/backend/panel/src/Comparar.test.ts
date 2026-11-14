@@ -9,7 +9,7 @@ vi.mock('uplot', () => {
   class UPlotFalso {
     constructor(o: { title: string; series: { label: string }[] }, datos: unknown, el: HTMLElement) {
       el.appendChild(document.createElement('canvas'));
-      graficos.push({ datos, lineas: o.series.slice(1).map((s) => s.label), titulo: o.title });
+      graficos.push({ datos, lineas: o.series.slice(1).map((s) => s.label), titulo: el.dataset.titulo ?? '' }); // el título, del contenedor (L4b)
     }
     setData(d: unknown): void { graficos[graficos.length - 1]!.datos = d; }
     setSize(): void {}

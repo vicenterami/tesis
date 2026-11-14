@@ -247,7 +247,7 @@ describe('P10: vencer, renovar y salir', () => {
     await entrarCon(srv.clave);
     await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(3));
     soltar()(json({ statusCode: 401, message: 'sesión requerida' }, 401));
-    await waitFor(() => expect(document.querySelector('[data-salud]')!.textContent).toContain('sin respuesta'));
+    await waitFor(() => expect(document.querySelector('[data-aviso-servicio]')).toBeTruthy()); // llegó la respuesta atrasada (L1d: un fallo del servicio se dice con un aviso)
     await new Promise((r) => setTimeout(r, 20));
     expect(screen.queryByRole('heading', { name: 'Entrar' })).toBeNull();
     expect(screen.getAllByRole('row')).toHaveLength(3);
@@ -261,7 +261,7 @@ describe('P10: vencer, renovar y salir', () => {
     await fireEvent.click(screen.getByRole('button', { name: 'Salir' }));
     await waitFor(() => expect(screen.getByRole('heading', { name: 'Entrar' })).toBeTruthy());
     soltar()(json({ statusCode: 403, message: 'debes cambiar la clave temporal antes de seguir (POST /sesion/clave)' }, 403));
-    await waitFor(() => expect(document.querySelector('[data-salud]')!.textContent).toContain('sin respuesta'));
+    await waitFor(() => expect(document.querySelector('[data-aviso-servicio]')).toBeTruthy()); // llegó la respuesta atrasada (L1d: un fallo del servicio se dice con un aviso)
     await new Promise((r) => setTimeout(r, 20));
     expect(screen.queryByRole('heading', { name: 'Elige tu clave' })).toBeNull();
     expect(screen.getByRole('heading', { name: 'Entrar' })).toBeTruthy();

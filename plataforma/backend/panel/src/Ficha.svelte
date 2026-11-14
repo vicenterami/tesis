@@ -12,7 +12,7 @@
   import { avisoDeError, type DatosAviso } from './lib/avisos';
   import { puedeEn, type Sesion } from './lib/sesion';
   import { canalCallado, enLinea, estadoVisual, ROTULO, rotuloCondicion } from './lib/estado-visual';
-  import { RANGO_POR_DEFECTO, agregarLectura, formatearValor, rango as datosRango, rangoQueContiene, resolucion, resolucionMasFina, resolucionValida, resumenRango, rotuloIntervalo, seriesDesdeHistorico, urlHistorico, ventana, ventanaDeSeleccion, type ClaveRango, type ClaveResolucion, type Series } from './lib/grafico';
+  import { RANGO_POR_DEFECTO, agregarLectura, decimalesParaRecorrido, formatearValor, rango as datosRango, rangoQueContiene, resolucion, resolucionMasFina, resolucionValida, resumenRango, rotuloIntervalo, seriesDesdeHistorico, urlHistorico, ventana, ventanaDeSeleccion, type ClaveRango, type ClaveResolucion, type Series } from './lib/grafico';
   import type { Condicion, DispositivoFicha, EventoDispositivo, EventoVivo, Historico, HistoricoDispositivo, TramaRechazada } from './lib/modelo';
   import { coloresSeries, temaVivo } from './lib/tema';
   import { UNIDADES_POR_DEFECTO, conversion, convertirSerie, type PreferenciaUnidades } from './lib/unidades';
@@ -96,10 +96,18 @@
   const resumen = $derived(historico === null ? null : resumenRango(historico.valores));
   // Unidades para personas (D7): la del canal dibujado según la preferencia; se convierte solo al mostrar.
   const conv = $derived(canalMostrado === null ? null : conversion(canalMostrado.unidad, unidades, canalMostrado.magnitud));
-  const valorDe = (v: number | null, unidad: string, magnitud: string | null = null): string => {
+  const valorDe = (v: number | null, unidad: string, magnitud: string | null = null, decimales = 3): string => {
     const c = conversion(unidad, unidades, magnitud);
-    return formatearValor(v === null ? null : c.desdeBase(v), c.simbolo);
+    return formatearValor(v === null ? null : c.desdeBase(v), c.simbolo, decimales);
   };
+  // Los decimales del resumen del rango: los que distinguen dos valores del recorrido dibujado, en la unidad de la persona («60 %RH» y
+  // no «60,023 %RH» cuando el rango va de 45 a 75); el valor exacto está en «Ver los datos» y en el CSV.
+  const decimalesResumen = $derived.by(() => {
+    if (resumen === null || conv === null) return 3;
+    const a = conv.desdeBase(resumen.min);
+    const b = conv.desdeBase(resumen.max);
+    return decimalesParaRecorrido(Math.min(a, b), Math.max(a, b));
+  });
   // Los datos del gráfico: [tiempos, promedio, lectura actual] y, con «mostrar mín–máx», el mínimo y el máximo de cada cubo alineados a
   // los mismos instantes (un punto en vivo no tiene banda). Convertidos a la unidad de la persona.
   const datosGrafico = $derived.by(() => {
@@ -270,6 +278,13 @@
     } else if (e.tipo === 'condicion') {
       repedirCondiciones.pedir();
     }
+  }
+
+  // «Reanudar» vuelve a pedir una vez lo que se muestra, como al reconectar (F4): en pausa los avisos se descartan y, sin esto, lo que
+  // llegó mientras tanto no aparecía nunca (docs/19 §4, bloque L, punto 4a; corrección del 13/11/2026).
+  function alternarPausa(): void {
+    pausado = !pausado;
+    if (!pausado) void cargar().then(cargarHistorico);
   }
 
   function elegirCanal(cid: string): void {
@@ -464,7 +479,9 @@
           · última lectura {canalActual.ultima_medicion === null ? 'ninguna aún' : haceSegundos(canalActual.ultima_medicion.tiempo, ahora)}
         </span>
       {/if}
-      <Boton etiqueta={pausado ? 'Reanudar' : 'Pausar'} presionado={pausado} ayuda="Congela las lecturas en vivo de esta ficha; el gráfico y las tarjetas dejan de moverse" onclick={() => (pausado = !pausado)} />
+      <Boton etiqueta={pausado ? 'Reanudar' : 'Pausar'} icono={pausado ? 'reanudar' : 'pausa'} presionado={pausado}
+        ayuda={pausado ? 'Vuelve a pedir la ficha y el gráfico, y sigue con las lecturas en vivo' : 'Congela las lecturas en vivo de esta ficha; el gráfico y las tarjetas dejan de moverse'}
+        onclick={alternarPausa} data-pausar />
       {#if mostrada !== null && mostrada.fija !== null}
         <!-- Ventana que no termina en «ahora» (D1): es historia; el vivo no le agrega puntos -->
         <span data-rango-fijo>· rango fijo</span>
@@ -568,7 +585,7 @@
     {#if canalMostrado !== null && mostrada !== null}
       <!-- {#key}: el gráfico se crea una vez por canal DIBUJADO; al llegar el histórico de otro canal se recrea con su título y unidad -->
       {#key `${canalMostrado.id}|${mostrarMinMax}|${conv?.simbolo}`}
-        <Grafico series={datosGrafico} unidad={conv?.simbolo ?? canalMostrado.unidad} zona={d.zona_horaria} titulo={`${canalMostrado.magnitud_nombre} (${conv?.simbolo ?? canalMostrado.unidad})`} ventana={ventanaGrafico}
+        <Grafico tituloVisible series={datosGrafico} unidad={conv?.simbolo ?? canalMostrado.unidad} zona={d.zona_horaria} titulo={`${canalMostrado.magnitud_nombre} (${conv?.simbolo ?? canalMostrado.unidad})`} ventana={ventanaGrafico}
           lineas={mostrarMinMax ? [
             { label: 'promedio', stroke: colores[0]!, width: 2 },
             { label: 'lectura actual', stroke: colores[1]!, width: 0, puntos: true },
@@ -588,7 +605,7 @@
       <!-- Lo que el rango ya sabe (incremento 2, punto 6): sobre los promedios recibidos, y así se nombra -->
       <p class="resumen-rango vivo">
         {#if resumen !== null}
-          <span data-resumen-rango>en este rango: mín {valorDe(resumen.min, canalMostrado.unidad, canalMostrado.magnitud)} · máx {valorDe(resumen.max, canalMostrado.unidad, canalMostrado.magnitud)} · promedio de los {resumen.n} promedios dibujados {valorDe(resumen.promedio, canalMostrado.unidad, canalMostrado.magnitud)}</span>
+          <span data-resumen-rango>en este rango: mín {valorDe(resumen.min, canalMostrado.unidad, canalMostrado.magnitud, decimalesResumen)} · máx {valorDe(resumen.max, canalMostrado.unidad, canalMostrado.magnitud, decimalesResumen)} · promedio de los {resumen.n} promedios dibujados {valorDe(resumen.promedio, canalMostrado.unidad, canalMostrado.magnitud, decimalesResumen)}</span>
         {/if}
         <Boton etiqueta="Descargar CSV de este rango" etiquetaCargando="Descargando…" cargando={descargando} motivoDesactivado={motivoExportar}
           ayuda="Las mediciones crudas de la ventana que muestra el gráfico, en CSV (coma y punto decimal)"

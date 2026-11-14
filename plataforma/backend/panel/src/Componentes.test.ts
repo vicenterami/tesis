@@ -24,6 +24,7 @@ describe('Boton', () => {
     await fireEvent.mouseEnter(boton.parentElement!);
     expect(ayuda.hidden).toBe(false);
     await fireEvent.mouseLeave(boton.parentElement!);
+    await new Promise((r) => setTimeout(r, 200)); // se va un instante después de salir (el puntero puede cruzar hasta la ayuda)
     expect(ayuda.hidden).toBe(true);
     await fireEvent.focusIn(boton);
     expect(ayuda.hidden).toBe(false);
@@ -31,6 +32,36 @@ describe('Boton', () => {
     expect(ayuda.hidden).toBe(true);
     // jsdom calcula la descripción accesible desde aria-describedby, también con la ayuda oculta a la vista
     expect(screen.getByRole('button', { description: 'Cierra esta sesión' })).toBe(boton);
+  });
+  it('WCAG 1.4.13 (L1e): Escape la quita aunque el foco esté en otra parte; el puntero puede pasar a la ayuda sin que se vaya; dura mientras hay foco', async () => {
+    render(Boton, { etiqueta: 'Salir', ayuda: 'Cierra esta sesión' });
+    const boton = screen.getByRole('button', { name: 'Salir' });
+    const ayuda = document.getElementById(boton.getAttribute('aria-describedby')!)!;
+    const envoltura = boton.parentElement!;
+    await fireEvent.mouseEnter(envoltura);
+    await fireEvent.keyDown(document.body, { key: 'Escape' }); // abierta por el puntero, con el foco en el cuerpo de la página
+    expect(ayuda.hidden).toBe(true);
+    await fireEvent.mouseLeave(envoltura);
+    await new Promise((r) => setTimeout(r, 200));
+    await fireEvent.mouseEnter(envoltura); // otra vez: el descarte valía hasta que el puntero se fue
+    expect(ayuda.hidden).toBe(false);
+    await fireEvent.mouseLeave(envoltura);
+    // Cruza a la ayuda antes de que se vaya: la ayuda está dentro de la envoltura, así que el navegador le da `mouseenter` de nuevo.
+    await fireEvent.mouseEnter(envoltura, { relatedTarget: ayuda });
+    await new Promise((r) => setTimeout(r, 200));
+    expect(ayuda.hidden).toBe(false);
+    await fireEvent.mouseLeave(envoltura);
+    await fireEvent.focusIn(boton); // con foco dura aunque el puntero se vaya
+    await new Promise((r) => setTimeout(r, 200));
+    expect(ayuda.hidden).toBe(false);
+  });
+  it('un icono va ANTES del texto, oculto al lector de pantalla; el nombre del botón sigue siendo su texto', () => {
+    render(Boton, { etiqueta: 'Menú', icono: 'menu' });
+    const boton = screen.getByRole('button', { name: 'Menú' });
+    const svg = boton.querySelector('svg')!;
+    expect(svg.getAttribute('aria-hidden')).toBe('true');
+    expect(boton.firstElementChild).toBe(svg);
+    expect(boton.textContent).toBe('Menú');
   });
   it('cargando: desactivado, aria-busy y la etiqueta en gerundio; el clic no llega', async () => {
     const clic = vi.fn();
@@ -85,7 +116,7 @@ describe('BarrasOrdenadas, Medidor y Tarjeta', () => {
     ] });
     expect(document.querySelectorAll('[data-barra="Nodo"]')).toHaveLength(2);
   });
-  it('cada barra expone su etiqueta y su valor a un lector de pantalla, en una lista con el título; el dibujo queda oculto', async () => {
+  it('cada barra expone su etiqueta y su valor a un lector de pantalla, en una lista con el título; la barra queda oculta (L2c: HTML, con el texto del cuerpo)', async () => {
     const { default: BarrasOrdenadas } = await import('./BarrasOrdenadas.svelte');
     render(BarrasOrdenadas, { titulo: 'Condiciones abiertas por tipo', barras: [
       { etiqueta: 'Sin comunicación', valor: 1, texto: '1' },
@@ -93,8 +124,9 @@ describe('BarrasOrdenadas, Medidor y Tarjeta', () => {
     ] });
     const lista = screen.getByRole('list', { name: 'Condiciones abiertas por tipo' });
     expect([...lista.querySelectorAll('li')].map((li) => li.textContent)).toEqual(['Umbral: 3', 'Sin comunicación: 1']);
-    expect(document.querySelector('svg.barras')!.getAttribute('aria-hidden')).toBe('true');
-    expect(document.querySelector('svg.barras title')!.textContent).toBe('Condiciones abiertas por tipo'); // el <title> se conserva
+    expect([...document.querySelectorAll('.barras .pista')].every((b) => b.getAttribute('aria-hidden') === 'true')).toBe(true);
+    expect(document.querySelector('svg')).toBeNull(); // HTML: la letra no crece con el ancho de la pantalla
+    expect([...document.querySelectorAll('.barras .relleno')].map((b) => (b as HTMLElement).style.width)).toEqual(['100%', '33.33333333333333%']);
     expect(screen.queryByRole('img')).toBeNull(); // ya no es una imagen con un solo nombre
   });
   it('el medidor con valor es un «meter» con aria-valuenow; sin dato, una imagen que dice «sin datos»', async () => {

@@ -16,11 +16,13 @@ const TIPOS = ['medicion', 'visto', 'condicion', 'latido'] as const;
 export function esEventoVivo(tipo: string, x: unknown): x is Omit<EventoVivo, 'tipo'> {
   if (typeof x !== 'object' || x === null) return false;
   const e = x as Record<string, unknown>;
+  // `sitio_id` (docs/19 §4, bloque L, punto 6): el id del sitio, null o ausente (un backend anterior); otra cosa no es un aviso nuestro.
+  const sitio = e.sitio_id === undefined || e.sitio_id === null || typeof e.sitio_id === 'string';
   switch (tipo) {
     case 'latido': return typeof e.tiempo === 'string';
-    case 'visto': return typeof e.dispositivo_id === 'string' && typeof e.tiempo === 'string';
-    case 'medicion': return typeof e.dispositivo_id === 'string' && typeof e.canal_id === 'string' && typeof e.valor === 'number' && Number.isFinite(e.valor) && typeof e.tiempo === 'string';
-    case 'condicion': return typeof e.dispositivo_id === 'string' && typeof e.condicion === 'string' && (e.estado === 'abierta' || e.estado === 'cerrada');
+    case 'visto': return sitio && typeof e.dispositivo_id === 'string' && typeof e.tiempo === 'string';
+    case 'medicion': return sitio && typeof e.dispositivo_id === 'string' && typeof e.canal_id === 'string' && typeof e.valor === 'number' && Number.isFinite(e.valor) && typeof e.tiempo === 'string';
+    case 'condicion': return sitio && typeof e.dispositivo_id === 'string' && typeof e.condicion === 'string' && (e.estado === 'abierta' || e.estado === 'cerrada');
     default: return false;
   }
 }

@@ -4,8 +4,10 @@
   //  - `ayuda`: el tooltip, al pasar el ratón y al enfocar con el teclado, enlazado con aria-describedby;
   //  - `cargando`: el botón queda desactivado, con aria-busy y la etiqueta en gerundio («Entrando…»): un doble clic no envía dos veces;
   //  - `motivoDesactivado`: si hay motivo, el botón está desactivado y el motivo se ESCRIBE al lado, visible (un botón desactivado no
-  //    recibe el foco ni el ratón en todos los navegadores: su tooltip no alcanzaría).
+  //    recibe el foco ni el ratón en todos los navegadores: su tooltip no alcanzaría);
+  //  - `icono` (desde el 13/11/2026, docs/19 §4, bloque L, punto 1): un icono propio ANTES del texto, nunca en su lugar.
   import type { HTMLButtonAttributes } from 'svelte/elements';
+  import Icono, { type NombreIcono } from './Icono.svelte';
   import Tooltip from './Tooltip.svelte';
 
   type Propias = {
@@ -15,8 +17,9 @@
     etiquetaCargando?: string;
     motivoDesactivado?: string | null;
     tipo?: 'button' | 'submit';
-    variante?: 'normal' | 'principal' | 'peligro' | 'discreto';
+    variante?: 'normal' | 'principal' | 'peligro' | 'discreto' | 'barra'; // «barra»: los de la barra superior y el menú (L1)
     presionado?: boolean;
+    icono?: NombreIcono | null;
   };
   let {
     etiqueta,
@@ -27,6 +30,7 @@
     tipo = 'button',
     variante = 'normal',
     presionado = undefined,
+    icono = null,
     ...resto
   }: Propias & Omit<HTMLButtonAttributes, 'type' | 'disabled' | 'children' | 'aria-describedby' | 'aria-pressed' | 'aria-busy'> = $props();
 
@@ -47,11 +51,12 @@
     {...resto}
     type={tipo}
     class="boton {variante}"
+    class:con-icono={icono !== null}
     disabled={cargando || conMotivo}
     aria-busy={cargando || undefined}
     aria-pressed={presionado}
     aria-describedby={describe}
-  >{cargando ? etiquetaCargando || `${etiqueta}…` : etiqueta}</button>
+  >{#if icono !== null}<Icono nombre={icono} />{/if}{cargando ? etiquetaCargando || `${etiqueta}…` : etiqueta}</button>
 {/snippet}
 
 <span class="boton-envoltura">

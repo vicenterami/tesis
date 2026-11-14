@@ -134,12 +134,35 @@ export function rotuloIntervalo(intervalo: string): string {
   return ROTULO_INTERVALO[intervalo] ?? intervalo;
 }
 
-// Valor con su unidad, con tres decimales como mucho y coma decimal (es-CL).
-const NUMERO = new Intl.NumberFormat('es-CL', { maximumFractionDigits: 3 });
-export const formatearNumero = (v: number): string => NUMERO.format(v);
-export function formatearValor(valor: number | null, unidad: string): string {
+// Valor con su unidad, con tres decimales como mucho (los que guarda la API) y coma decimal (es-CL). `decimales` (0 a 3) los limita más:
+// lo usa quien resume lo dibujado (la etiqueta flotante, el resumen del rango), con `decimalesParaRecorrido`.
+const NUMEROS = [0, 1, 2, 3].map((d) => new Intl.NumberFormat('es-CL', { maximumFractionDigits: d }));
+const NUMERO = NUMEROS[3]!;
+export const formatearNumero = (v: number, decimales = 3): string => (NUMEROS[decimales] ?? NUMERO).format(v);
+export function formatearValor(valor: number | null, unidad: string, decimales = 3): string {
   if (valor === null) return '—';
-  return `${NUMERO.format(valor)} ${unidad}`;
+  return `${formatearNumero(valor, decimales)} ${unidad}`;
+}
+// Cuántos decimales hacen falta para leer un punto de lo dibujado (docs/19 §4, bloque L, punto 4c): los que distinguen dos valores
+// vecinos del recorrido, y no más. Con 11 °C de recorrido, uno («19,4 °C» y no «19,396 °C»); con 1,5 hPa, dos («1.009,51 hPa»); con 100,
+// ninguno. Sin recorrido (un solo valor, o todos iguales) no hay con qué decidir: los tres de la API.
+export function decimalesParaRecorrido(minimo: number, maximo: number): number {
+  const recorrido = maximo - minimo;
+  if (!Number.isFinite(recorrido) || recorrido <= 0) return 3;
+  return Math.max(0, Math.min(3, Math.ceil(-Math.log10(recorrido)) + 2));
+}
+// El recorrido de todo lo dibujado (las series de valores: todas menos la de tiempos), para `decimalesParaRecorrido`.
+export function decimalesDeSeries(series: readonly (readonly (number | null)[])[]): number {
+  let min = Infinity;
+  let max = -Infinity;
+  for (let s = 1; s < series.length; s++) {
+    for (const v of series[s]!) {
+      if (v === null || !Number.isFinite(v)) continue;
+      if (v < min) min = v;
+      if (v > max) max = v;
+    }
+  }
+  return decimalesParaRecorrido(min, max);
 }
 
 // Fechas y horas como se leen en Chile (docs/19 §6): 24 h y meses en español. uPlot trae por defecto el formato en inglés de 12 h
@@ -202,3 +225,51 @@ export function alinearSeries(series: readonly { tiempos: readonly number[]; val
 // de cada tema viven en lib/tema.ts (SERIES, la única fuente); esta es la del tema claro.
 export const PALETA: readonly string[] = SERIES.claro;
 
+// ── Gráficas del tablero v3 (docs/19 §4, bloque L, punto 4) ──────────────────────────────────────────────────────────────────────
+// Alto según la pantalla (L4g): 280 px en escritorio y 200 px en un teléfono (el contenedor mide menos de 560 px).
+export const altoGrafico = (ancho: number): number => (ancho > 0 && ancho < 560 ? 200 : 280);
+// Puntos sobre la serie principal solo con 30 o menos a la vista (L4d): con más, tapan la línea.
+export const MAX_PUNTOS_DIBUJADOS = 30;
+
+// La hora de la etiqueta flotante, en la zona del sitio y en 24 h («13/11/2026 18:45»).
+export function horaEtiqueta(segundos: number, zona: string): string {
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat('es-CL', { timeZone: zona, hourCycle: 'h23', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+      .formatToParts(new Date(segundos * 1000)).map((x) => [x.type, x.value]),
+  );
+  return `${p.day}/${p.month}/${p.year} ${p.hour}:${p.minute}`;
+}
+
+// Las filas de la etiqueta flotante (L4c) para el cubo `i`: una por serie con su valor y su unidad (o lo que la serie diga de sí, como las
+// barras apiladas, que muestran el propio y no la suma); la banda mín–máx, en una sola fila; las series sin valor en ese cubo no se
+// nombran (en la ficha, «lectura actual» existe solo donde llegó algo en vivo). Sin ninguna, una fila «sin datos». Todos los valores de
+// la etiqueta llevan los mismos decimales como mucho (`decimales`, de `decimalesDeSeries`): el valor exacto está en «Ver los datos».
+export interface FilaEtiqueta {
+  nombre: string;
+  valor: string;
+  color: string;
+  banda?: boolean; // la fila de la banda mín–máx: su muestra es la de la leyenda fija (un bloque tenue), no una línea
+}
+export function filasEtiqueta(
+  series: readonly (readonly (number | null)[])[],
+  lineas: readonly { label: string; stroke: string; leyenda?: (i: number) => string }[],
+  banda: { alta: number; baja: number; color: string } | null,
+  i: number,
+  unidad: string,
+  decimales = 3,
+): FilaEtiqueta[] {
+  const texto = (v: number | null | undefined): string | null => (v === null || v === undefined || !Number.isFinite(v) ? null : `${formatearNumero(v, decimales)} ${unidad}`);
+  const filas: FilaEtiqueta[] = [];
+  lineas.forEach((l, k) => {
+    const s = k + 1;
+    if (banda !== null && (s === banda.alta || s === banda.baja)) return;
+    const valor = l.leyenda !== undefined ? l.leyenda(i) : texto(series[s]?.[i]);
+    if (valor !== null) filas.push({ nombre: l.label, valor, color: l.stroke });
+  });
+  if (banda !== null) {
+    const baja = series[banda.baja]?.[i];
+    const alta = series[banda.alta]?.[i];
+    if (baja !== null && baja !== undefined && alta !== null && alta !== undefined) filas.push({ nombre: 'mínimo–máximo', valor: `${formatearNumero(baja, decimales)} a ${formatearNumero(alta, decimales)} ${unidad}`, color: banda.color, banda: true });
+  }
+  return filas.length === 0 ? [{ nombre: 'sin datos', valor: '—', color: '' }] : filas;
+}

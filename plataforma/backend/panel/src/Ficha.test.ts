@@ -14,7 +14,7 @@ vi.mock('uplot', () => {
     select = { left: 0, width: 0, top: 0, height: 0 };
     constructor(o: Opciones, datos: unknown, el: HTMLElement) {
       el.appendChild(document.createElement('canvas'));
-      graficos.push({ datos, destruido: false, titulo: o.title, opciones: o, u: this });
+      graficos.push({ datos, destruido: false, titulo: el.dataset.titulo ?? '', opciones: o, u: this }); // el título, del contenedor: el lienzo ya no lo repite (L4b)
     }
     posToVal(px: number): number { return px; }
     setSelect(): void {}
@@ -160,6 +160,23 @@ describe('Ficha (P3): identidad, canales, gráfico, condiciones y rechazadas, le
     await vi.advanceTimersByTimeAsync(250);
     expect(document.querySelector('[data-ultima]')?.textContent).toBe('23,25 °C');
     expect((graficos.at(-1)?.datos as number[][])[2]).toEqual([null, null, 23.25]);
+  });
+
+  it('«Reanudar» vuelve a pedir una vez la ficha y el histórico (L4a): lo que llegó en pausa no se pierde; otro toque a «Pausar» no pide nada', async () => {
+    render(Ficha, { id: ID });
+    await waitFor(() => expect(graficos).toHaveLength(1));
+    const fuente = FuenteControlable.instancias[0]!;
+    fuente.abrir();
+    screen.getByRole('button', { name: 'Pausar' }).click();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Reanudar' })).toBeTruthy());
+    const antes = { ficha: peticiones.filter((r) => r === `/dispositivos/${ID}`).length, historico: peticiones.filter((r) => r.startsWith('/canales/c-temp/historico')).length };
+    fuente.emitir('medicion', { dispositivo_id: ID, canal_id: 'c-temp', valor: 30, unidad: 'Cel', tiempo: '2026-10-12T15:00:07Z' }); // se descarta en pausa
+    await vi.advanceTimersByTimeAsync(300);
+    expect(peticiones.filter((r) => r === `/dispositivos/${ID}`)).toHaveLength(antes.ficha); // pausar no pide
+    screen.getByRole('button', { name: 'Reanudar' }).click();
+    await waitFor(() => expect(peticiones.filter((r) => r.startsWith('/canales/c-temp/historico'))).toHaveLength(antes.historico + 1));
+    expect(peticiones.filter((r) => r === `/dispositivos/${ID}`)).toHaveLength(antes.ficha + 1); // una vez, como al reconectar
+    expect(screen.getByRole('button', { name: 'Pausar' }).getAttribute('aria-pressed')).toBe('false');
   });
 
   it('el porcentaje calibrado (docs/10 §8.4 punto 51) aparece solo si el canal lo trae; un evento sin el campo no rompe la tarjeta', async () => {
