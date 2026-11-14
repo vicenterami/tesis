@@ -11,9 +11,49 @@
 # Sale 1 si alguna imagen tiene vulnerabilidades altas o críticas con versión corregida publicada (hay algo que hacer), si
 # un escaneo no se entendió o si se escanearon menos imágenes de las que declara el compose. Los residuos documentados
 # salen como AVISO: no se esconden.
+# Después de la tabla, una comprobación propia (13/11/2026): Trivy lee los paquetes del sistema, no el servidor PostgreSQL compilado en
+# /usr/local de la imagen de la base, así que se compara su PG_VERSION con la de postgres:<mayor>-alpine (la última publicada de su serie)
+# y con la de timescale/timescaledb:latest-pg<mayor>-oss: al día → OK; hay una nueva y TimescaleDB ya la trae → HAY QUE ACTUAR (subir la
+# huella; sale 1); hay una nueva y TimescaleDB aún no → AVISO (riesgo aceptado transitorio, docs/11 §4; no cambia la salida); no se pudo
+# consultar → FALLA (sale 1). Construye con COMMIT exportado, como pila.sh: la imagen del backend que deja lleva el commit de «Acerca de».
 #   bash plataforma/pruebas/escanear-imagenes.sh
+#   bash plataforma/pruebas/escanear-imagenes.sh --probar-pg   sin red ni Docker: la comparación contra ocho casos plantados (los cuatro
+#                                                              veredictos, el orden 16.9 < 16.10 y dos versiones ilegibles); sale 1 si uno falla
 set -u -o pipefail
 cd "$(dirname "$0")/.." || { echo "FALLA no se encontró plataforma/"; exit 1; }
+# comparar_pg NUESTRA OFICIAL TIMESCALE → escribe el veredicto y devuelve 0 (al día o aviso) o 1 (hay que actuar o no se pudo comparar).
+comparar_pg() {
+  local nuestra=$1 oficial=$2 ts=$3 forma='^[0-9]+\.[0-9]+$'
+  if ! [[ "$nuestra" =~ $forma && "$oficial" =~ $forma && "$ts" =~ $forma ]]; then
+    echo "FALLA no se pudo comparar el servidor PostgreSQL de la imagen (imagen «${nuestra:-?}», oficial «${oficial:-?}», TimescaleDB «${ts:-?}»)"; return 1
+  fi
+  local mayor; mayor=$(printf '%s\n%s\n' "$nuestra" "$oficial" | sort -V | tail -1)
+  if [ "$mayor" = "$nuestra" ]; then echo "OK    el servidor PostgreSQL de la imagen de la base es $nuestra, la última publicada de su serie"; return 0; fi
+  if [ "$(printf '%s\n%s\n' "$nuestra" "$ts" | sort -V | tail -1)" != "$nuestra" ]; then
+    echo "HAY QUE ACTUAR: el servidor PostgreSQL de la imagen de la base es $nuestra y ya hay una imagen de TimescaleDB con $ts: subir la huella (docs/11 §4)"; return 1
+  fi
+  echo "AVISO el servidor PostgreSQL de la imagen de la base es $nuestra y ya se publicó $oficial; TimescaleDB todavía no trae una imagen con ella (la última, $ts): riesgo declarado en docs/11 §4; repetir este guion cada día"
+  return 0
+}
+if [ "${1:-}" = --probar-pg ]; then
+  # NUESTRA OFICIAL TIMESCALE · salida esperada · comienzo esperado del veredicto
+  mal=0
+  while read -r nu of ts sal ver; do
+    [ "$nu" = - ] && nu=""; [ "$of" = - ] && of=""; [ "$ts" = - ] && ts=""
+    v=$(comparar_pg "$nu" "$of" "$ts"); r=$?
+    if [ "$r" = "$sal" ] && [[ "$v" == "$ver"* ]]; then echo "OK    ${nu:-?} · ${of:-?} · ${ts:-?} → $ver (salida $r)"; else echo "FALLA ${nu:-?} · ${of:-?} · ${ts:-?} → salida $r «$v» (esperado $sal y «$ver…»)"; mal=1; fi
+  done <<'CASOS'
+16.15 16.15 16.15 0 OK
+16.16 16.15 16.15 0 OK
+16.15 16.16 16.16 1 HAY QUE ACTUAR
+16.15 16.17 16.16 1 HAY QUE ACTUAR
+16.15 16.16 16.15 0 AVISO
+16.9 16.10 16.9 0 AVISO
+16.15 - 16.15 1 FALLA
+16.15-r0 16.16 16.15 1 FALLA
+CASOS
+  exit "$mal"
+fi
 TRIVY=ghcr.io/aquasecurity/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969
 # Residuos documentados en docs/11 §4 (08/10/2026): gosu, binario de Go precompilado de la imagen de la base que el arranque
 # usa para bajar privilegios y que no recibe datos de afuera; corregirlo exige recompilarlo. Se quita de la lista cuando la
@@ -23,6 +63,8 @@ TRAB=$(mktemp -d "${TMPDIR:-/tmp}/escaneo-imagenes.XXXXXX") || { echo "FALLA no 
 trap 'rm -rf "$TRAB"' EXIT
 CACHE="${XDG_CACHE_HOME:-$HOME/.cache}/trivy-plataforma"; mkdir -p "$CACHE"
 dc() { docker compose -f docker-compose.yml -f proxy/compose.proxy.yml "$@"; }
+# El commit corto para «Acerca de», como pila.sh: sin él, esta reconstrucción dejaba la imagen del backend con commit null.
+COMMIT=$(git rev-parse --short HEAD 2>/dev/null || true); export COMMIT
 if ! dc build --pull --no-cache -q > "$TRAB/build.log" 2>&1; then
   echo "FALLA no se pudieron construir las imágenes (docker compose build):"; tail -5 "$TRAB/build.log" | sed 's/^/  /'; exit 1
 fi
@@ -62,6 +104,16 @@ for i in $imgs; do
   [ "$p" -gt 0 ] && accion=1
 done
 if [ "$escaneadas" -lt "$esperadas" ]; then echo "FALLA se escanearon $escaneadas de $esperadas imágenes del compose"; accion=1; fi
+# El servidor PostgreSQL de la imagen de la base (ver la cabecera): su PG_VERSION frente a la publicada.
+img_base=$(dc config --format json | jq -r '.services.timescaledb.image // empty')
+plataforma=$(docker version -f '{{.Server.Os}}/{{.Server.Arch}}' 2>/dev/null || echo linux/amd64)
+env_de() { docker buildx imagetools inspect --format '{{json .Image}}' "$1" 2>/dev/null \
+  | jq -r --arg p "$plataforma" 'if has("config") then .config.Env else .[$p].config.Env end | .[]? | select(startswith("PG_VERSION=")) | ltrimstr("PG_VERSION=")'; }
+nuestra=$( [ -n "$img_base" ] && docker image inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$img_base" 2>/dev/null | sed -n 's/^PG_VERSION=//p')
+mayor_pg=${nuestra%%.*}
+oficial=$( [[ "$mayor_pg" =~ ^[0-9]+$ ]] && env_de "postgres:$mayor_pg-alpine")
+ultima_ts=$( [[ "$mayor_pg" =~ ^[0-9]+$ ]] && env_de "timescale/timescaledb:latest-pg$mayor_pg-oss")
+comparar_pg "$nuestra" "$oficial" "$ultima_ts" || accion=1
 if [ "$accion" -eq 0 ]; then echo "OK    $escaneadas imágenes: ninguna vulnerabilidad alta o crítica con versión corregida publicada fuera de los residuos documentados"
 else echo "HAY QUE ACTUAR: vulnerabilidades altas o críticas con versión corregida publicada, o un escaneo que no se completó (ver arriba)"; fi
 exit "$accion"

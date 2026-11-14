@@ -262,6 +262,36 @@ Toda huella nueva tiene más de 24 h publicada y va fijada por digest de índice
 construidas (`dpkg-query`, `apk list -I`). Resultado: `OK    4 imágenes: ninguna vulnerabilidad alta o crítica con versión corregida
 publicada fuera de los residuos documentados`; la pila de desarrollo se recreó con las cuatro imágenes y quedó sana.
 
+**Escaneo del 13/11/2026** (el guion dio «HAY QUE ACTUAR»; Trivy 0.74.0, bases frescas con `--pull --no-cache`). Críticas / altas y, entre
+paréntesis, cuántas con versión corregida publicada fuera de los residuos. El «antes» de la base y del proxy sale de escanear, el mismo
+día y con la misma base de avisos, las imágenes construidas con los Dockerfile anteriores; el broker y el backend no cambiaron:
+
+| Imagen | Antes | Después | Qué se hizo |
+|---|---|---|---|
+| broker | 0 / 0 (0) | 0 / 0 (0) | Nada: imagen sin cambios |
+| backend | 0 / 46 (0) | 0 / 46 (0) | Nada: las 46 altas de Debian 13 (`util-linux` y su familia, `libsqlite3-0`, …) siguen sin versión corregida publicada (`docs/11 §4`) |
+| proxy | 0 / 3 (3) | 0 / 0 (0) | `libxslt` 1.1.43-r3 → r4 (3 altas), sumada a la lista de `apk upgrade` |
+| base | 1 / 196 (171) | 1 / 25 (0) | Fuera la copia sin uso de PostgreSQL y de Python que arrastraba `postgresql16-plpython3` (14 paquetes; `postgresql16`, `postgresql16-client` y `postgresql16-plpython3` 16.15-r0, con corrección en 16.16-r0, y `libpq` 18.6-r0, en 18.7-r0: 38 altas cada uno, los mismos 38 avisos), con las cuatro bibliotecas y los ocho archivos de extensión de PL/Python de `/usr/local`; `krb5-libs` 1.22.1-r0 → 1.22.3-r0 (16 altas) y `libxslt` 1.1.43-r3 → r4 (3 altas), que sí usa el servidor. Las 26 que quedan están en `gosu` (residuo documentado; la crítica, CVE-2025-68121, es de `crypto/tls`) |
+
+**Que siga funcionando.** En contenedores desechables, la imagen nueva de la base frente a la construida con el Dockerfile anterior: el
+registro de arranque trae las mismas líneas (salvo tiempos y el orden de dos de ellas); crea la extensión TimescaleDB 2.30.2 y una
+hipertabla, `pgcrypto` calcula un SHA-256, `pg_dump` y `pg_restore -l` funcionan, los lenguajes instalados son los mismos (`c`,
+`internal`, `plpgsql`, `sql`) y `CREATE EXTENSION plpython3u` responde «is not available» en vez de fallar al cargar. Pesa 11,6 MB menos
+(446,7 → 435,0 MB). Dentro de ella: ninguno de los 14 paquetes, `krb5-libs` 1.22.3-r0 y `libxslt` 1.1.43-r4; `pg_dump` enlaza con
+`/usr/local/lib/libpq.so.5`. La pila de desarrollo se recreó con las imágenes nuevas (`pila.sh encender`): la base conservó sus datos y su
+extensión.
+
+**El servidor PostgreSQL que el escáner no ve.** Trivy lee los paquetes del sistema, no el servidor compilado en `/usr/local`: hoy 16.15,
+y la imagen oficial `postgres:16-alpine` ya trae 16.16, que ninguna imagen de TimescaleDB trae todavía (consultado el 13/11/2026: la
+`2.30.2-pg16-oss`, la `2.31.0-pg16-oss` y la `latest-pg16-oss` dicen `PG_VERSION=16.15`; subir de versión no lo corrige). El guion suma
+una comprobación propia después de la tabla, con su prueba sin red (`--probar-pg`: ocho casos plantados, los cuatro veredictos, el
+orden 16.9 < 16.10 y dos versiones ilegibles, en verde; plantadas: sin `sort -V`, 1 en rojo; los veredictos de actuar y de aviso
+cruzados, 4; sin validar la forma, 2). Hoy da el AVISO del riesgo aceptado transitorio de `docs/11 §4`. El guion exporta además `COMMIT`
+antes de construir, como `pila.sh`: su reconstrucción dejaba la imagen del backend sin el commit que muestra «Acerca de».
+
+Resultado: la tabla de arriba, `AVISO 26 en residuos documentados (docs/11 §4): usr/local/bin/gosu`, el AVISO del servidor PostgreSQL y
+`OK    4 imágenes: ninguna vulnerabilidad alta o crítica con versión corregida publicada fuera de los residuos documentados` (salida 0).
+
 **Dependencias, 25/10/2026.** Con el mismo lockfile que el 23/10 daba 0 avisos, la auditoría volvió a fallar (el PR agrupado de Dependabot
 lo destapó en el CI): avisos publicados del 19 al 23/10 contra paquetes que ya estaban. Dos altos **en producción**, ambos de denegación
 de servicio: `body-parser` < 2.4.0 (https://github.com/advisories/GHSA-27r3-jxmh-p828, cuerpo comprimido con bytes de sobra; alcanzable
