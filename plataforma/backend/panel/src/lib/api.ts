@@ -79,7 +79,6 @@ function avisar(motivo: MotivoSesion): void {
 // antes de ese cambio que vuelve después con 401 o 403 habla de la sesión anterior: su aviso se descarta (no saca de una sesión recién
 // abierta ni abre el cambio de clave sin sesión). La respuesta igual llega a quien la pidió como ErrorApi.
 let generacion = 0;
-export const generacionDeSesion = (): number => generacion;
 // La baja de la propia cuenta (POST /cuenta/baja) también cierra todas sus sesiones (revisión del 11/11/2026): una petición atrasada que
 // vuelve con 401 después de la baja no debe mostrar «tu sesión venció».
 export const cambiaLaSesion = (metodo: string, ruta: string): boolean =>

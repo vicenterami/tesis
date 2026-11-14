@@ -107,7 +107,7 @@ describe('Aviso', () => {
 });
 
 // Piezas del tablero (docs/19 §4, tablero v2, B2), por el DOM y en los dos sentidos (correcciones del 11/11/2026).
-describe('BarrasOrdenadas, Medidor y Tarjeta', () => {
+describe('BarrasOrdenadas y Medidor', () => {
   it('dos barras con el mismo nombre (el nombre no es único) se dibujan las dos, con la clave del id', async () => {
     const { default: BarrasOrdenadas } = await import('./BarrasOrdenadas.svelte');
     render(BarrasOrdenadas, { titulo: 'Entrega por dispositivo', orden: 'asc', maximo: 100, barras: [
@@ -137,13 +137,5 @@ describe('BarrasOrdenadas, Medidor y Tarjeta', () => {
     render(Medidor, { porcentaje: null, etiqueta: 'Salud del sitio' });
     expect(screen.queryByRole('meter')).toBeNull();
     expect(screen.getByRole('img', { name: 'Salud del sitio: sin datos' })).toBeTruthy();
-  });
-  it('la tarjeta asocia título y valor en una lista de descripción (dt/dd), no con aria-describedby sobre un span', async () => {
-    const { default: Tarjeta } = await import('./Tarjeta.svelte');
-    render(Tarjeta, { titulo: 'Dispositivos', valor: 1234 });
-    const dl = document.querySelector('.tarjeta dl')!;
-    expect(dl.querySelector('dt')!.textContent).toBe('Dispositivos');
-    expect(dl.querySelector('dd')!.textContent).toBe('1.234');
-    expect(document.querySelector('.tarjeta [aria-describedby]')).toBeNull();
   });
 });

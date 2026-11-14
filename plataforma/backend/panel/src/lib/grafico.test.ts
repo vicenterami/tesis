@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { EJE_TIEMPO, NOMBRES_FECHA, PALETA, RANGOS, SELLO_LEYENDA, agregarLectura, alinearSeries, decimalesDeSeries, decimalesParaRecorrido, filasEtiqueta, formatearValor, rotuloCada, puntosDe, rangoQueContiene, resolucionValida, resolucionesAdmisibles, resumenRango, rotuloIntervalo, seriesDesdeHistorico, urlHistorico, ventana, intervaloParaVentana, resolucionMasFina, ventanaDeSeleccion } from './grafico';
+import { SERIES } from './tema';
+import { EJE_TIEMPO, NOMBRES_FECHA, RANGOS, SELLO_LEYENDA, agregarLectura, alinearSeries, decimalesDeSeries, decimalesParaRecorrido, filasEtiqueta, formatearValor, rotuloCada, puntosDe, rangoQueContiene, resolucionValida, resolucionesAdmisibles, resumenRango, rotuloIntervalo, seriesDesdeHistorico, urlHistorico, ventana, intervaloParaVentana, resolucionMasFina, ventanaDeSeleccion } from './grafico';
 
 describe('ventana y URL del histórico (docs/19 P3)', () => {
   const ahora = new Date('2026-10-12T15:00:00Z');
@@ -148,7 +149,7 @@ describe('alinearSeries: un eje común con hueco (null) donde una serie no tiene
     ]);
     expect(alinearSeries([])).toEqual([[]]);
   });
-  it('la paleta trae 6 colores distintos', () => expect(new Set(PALETA).size).toBe(6));
+  it('la paleta trae 6 colores distintos en cada tema', () => expect([new Set(SERIES.claro).size, new Set(SERIES.oscuro).size]).toEqual([6, 6]));
 });
 
 

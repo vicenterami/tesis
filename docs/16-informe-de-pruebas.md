@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 610 pruebas unitarias del backend y 345 del panel, sin matriz formal); TT-32 (sensor físico) se cubrió después, en §43, §44 y §53;
+cubre todavía: TT-27 (contrato de trama: hoy 610 pruebas unitarias del backend y 344 del panel, sin matriz formal); TT-32 (sensor físico) se cubrió después, en §43, §44 y §53;
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -2965,3 +2965,22 @@ de cuerpo y ningún desborde.
 la base, no por HTTP, y solo con 2 000; el intervalo esperado que se usa es el de hoy de cada dispositivo, no el que tenía cuando
 reportó; con 2 000 dispositivos el ritmo es cada hora porque cada 300 s no caben 30 días en la base del banco; una petición a la vez, sin
 proxy, en el portátil y no en el servidor de referencia; la etiqueta flotante con la fila nueva no se probó en una pantalla táctil.
+
+## 69. Limpieza: código del panel sin uso (14/11/2026)
+
+**Qué se quitó, y con qué evidencia** (cada pieza se buscó en todos los componentes, módulos, pruebas y guiones de navegador antes de
+borrarla). `Tarjeta.svelte`, el componente de valor del tablero anterior: desde el tablero v3 ninguna pantalla lo monta (§67 lo había
+dejado declarado); se fue con su prueba de `Componentes.test.ts` y con sus reglas de estilo (`.tarjeta` y derivadas, `.indicadores`).
+`.comparar-lista`, que ningún componente nombra. Dos funciones exportadas que nadie llamaba: `generacionDeSesion` (`lib/api.ts`) y
+`preferenciasActuales` (`lib/escritor-preferencias.ts`). Y `PALETA` (`lib/grafico.ts`), un alias de la paleta del tema claro que solo
+usaba una prueba: esa prueba lee ahora `SERIES` de `lib/tema.ts`, la única fuente, y comprueba los dos temas.
+
+**Lo que se revisó y se queda.** Las clases `.muestra.serie-1` a `.serie-6`: la comparación las usa con un nombre armado
+(`serie-{n}`), y una búsqueda del texto literal las daba por sueltas. En el backend, ningún archivo sin importar salvo los tres puntos
+de entrada (el servicio, la exportación del OpenAPI y el emulador), ninguna exportación sin uso y ninguna dependencia declarada sin
+uso (la CLI se usa en `nest build`; los tipos de `express` y `pg`, al compilar; `jsdom`, en las pruebas del panel). Ningún guion de
+`plataforma/pruebas` quedó sin quien lo llame. `historico/` es la constancia de la etapa anterior y lo citan el README y las bitácoras.
+
+**Cifras del bloque:** 344 pruebas del panel (346 ejecuciones en vitest, en 33 archivos; una menos, la del componente quitado) y 610
+del backend; `svelte-check`, 404 archivos sin errores; la hoja de estilos queda en 33,4 kB (34,3 en §67). El verificador completo, en
+«TODO EN CONCORDANCIA».

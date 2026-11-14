@@ -1,6 +1,5 @@
 import type uPlot from 'uplot';
 import type { Historico } from './modelo';
-import { SERIES } from './tema';
 
 // Datos del gráfico de la ficha (docs/19 P3): el histórico llega agregado por la base (cientos de puntos) y lo que llega en
 // vivo se dibuja aparte, como «lectura actual», para no mezclar un valor crudo con promedios.
@@ -232,10 +231,6 @@ export function alinearSeries(series: readonly { tiempos: readonly number[]; val
   return [tiempos, ...columnas];
 }
 
-// Paleta fija de 6 colores distinguibles para P3b (Okabe e Ito, 2008, «Color Universal Design»: pensada para quien no distingue rojo y
-// verde), en el orden fijo validado en docs/19 §4 (tablero v2, A3): el primer dispositivo de la URL siempre lleva el primero. Los valores
-// de cada tema viven en lib/tema.ts (SERIES, la única fuente); esta es la del tema claro.
-export const PALETA: readonly string[] = SERIES.claro;
 
 // ── Gráficas del tablero v3 (docs/19 §4, bloque L, punto 4) ──────────────────────────────────────────────────────────────────────
 // Alto según la pantalla (L4g): 280 px en escritorio y 200 px en un teléfono (el contenedor mide menos de 560 px).

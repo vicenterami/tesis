@@ -29,7 +29,6 @@ export function fijarPreferencias(p: Preferencias | null | undefined): void {
   actuales = p === null || p === undefined ? null : { ...p };
   avisar();
 }
-export const preferenciasActuales = (): Preferencias | null => actuales;
 export function suscribirPreferencias(f: Oyente): () => void {
   oyentes.add(f);
   return () => oyentes.delete(f);
