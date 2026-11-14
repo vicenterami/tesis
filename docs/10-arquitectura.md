@@ -492,7 +492,7 @@ cliente ──HTTP──► Express ⊂ NestJS ──► servicio ──► pg �
 
 - **Express** es la biblioteca de servidor HTTP más usada de Node.js; NestJS la usa por debajo
   (`@nestjs/platform-express`). El proceso de Node es el servidor; Express recibe cada petición y
-  entrega la respuesta. Es **la API**: 36 rutas REST (45 operaciones, la recepción por HTTP, la sesión, los usuarios, el tablero v2 y, desde el 11/11/2026, la cuenta propia, lo legal, el soporte y la actividad incluidos) y el canal SSE `/eventos` (§5), descritos en el contrato OpenAPI (37 rutas y 46 operaciones contando `/eventos`; el paso 2h2 del guardián compara estas cifras con `openapi.json`). Desde el 08/11/2026, antes de cada ruta corre el guardia central de la sesión (`docs/20 §5`). Express no toca la base.
+  entrega la respuesta. Es **la API**: 37 rutas REST (46 operaciones, la recepción por HTTP, la sesión, los usuarios, el tablero v2 y, desde el 11/11/2026, la cuenta propia, lo legal, el soporte y la actividad incluidos) y el canal SSE `/eventos` (§5), descritos en el contrato OpenAPI (38 rutas y 47 operaciones contando `/eventos`; el paso 2h2 del guardián compara estas cifras con `openapi.json`). Desde el 08/11/2026, antes de cada ruta corre el guardia central de la sesión (`docs/20 §5`). Express no toca la base.
 - **`pg`** (node-postgres) es el conductor de la base: mantiene un *pool* de 5 conexiones
   (`db/db.module.ts`) y envía **SQL directo** con parámetros `$1, $2…`; el valor nunca se pega dentro
   del texto SQL, lo que evita la inyección. Sin ORM, por la razón de `docs/07` (series de tiempo con
@@ -621,7 +621,8 @@ el pool de la recepción; cada escritura espera `drain` (contrapresión); un err
 el registro. XLSX y la exportación por sitio con rol llegan con la sesión (`docs/20`). Pruebas: `docs/16 §19`.
 
 **Implementado el 09/10 (TT-39):** `GET /eventos`, con filtro opcional `?dispositivo=` o `?canal=` (un UUID; otro valor,
-400). Emite `medicion`, `visto` y `condicion`, cada uno después de quedar guardado en la base, y un `latido` cada 25 s. Se
+400). Emite `medicion`, `visto` y `condicion`, cada uno después de quedar guardado en la base (desde el 13/11/2026, con el `sitio_id` de
+su dispositivo: §8.4 punto 65 viii), y un `latido` cada 25 s. Se
 rechaza (403) la petición que el navegador marca como de otro sitio: `Sec-Fetch-Site` distinto de `same-origin` o `none`,
 o un `Origin` de otro host o puerto. El panel lo sirve el propio backend y, en desarrollo, Vite le reenvía las peticiones,
 así que no hace falta una lista de orígenes; el proxy reenvía el `Host` con su puerto. Eso no detiene el *DNS rebinding*,
@@ -1719,7 +1720,7 @@ entra. Lo que aquí se marca «a fijar al implementar» es un detalle que el dis
     backend decide. Cambia una decisión anterior: **exportar** deja de ser solo del administrador y pasa a administrador de sitio e
     investigador (los datos crudos siguen sin ser públicos, punto 6). Matriz completa: `docs/20 §6`.
 65. **Tablero v2: contrato de la API y estado visual en el servidor (diseñado el 11/11/2026; iteración 1).** Las rutas nuevas
-    (`GET /sitios` (Etapa 4), `/sitios/{id}/resumen`, `/sitios/{id}/historico`, `/sitios/{id}/actividad`, `/dispositivos/{id}/historico`,
+    (`GET /sitios` (Etapa 4), `/sitios/{id}/resumen`, `/sitios/{id}/ahora`, `/sitios/{id}/historico`, `/sitios/{id}/actividad`, `/dispositivos/{id}/historico`,
     `/dispositivos/{id}/eventos`, `/cuarentena/detectados`, `PATCH /dispositivos/{id}`, `PUT /canales/{id}/reglas` (Etapa 4),
     `POST /dispositivos/lote` (Etapa 4), `/preferencias`, `/sesiones`) y los cambios compatibles (mínimo y máximo por cubo; filtros, paginación,
     `estado_visual` y `entrega` en el inventario) están en `docs/19 §4` (tablero v2, I) con el perfil que usa cada una (`docs/20 §6`).
@@ -1737,6 +1738,15 @@ entra. Lo que aquí se marca «a fijar al implementar» es un detalle que el dis
     la condición de umbral solo cuando la medición lleva al menos `retardo_s` fuera de la banda (0 = como hoy); desde cuándo está fuera
     se guarda por canal en la base, no en memoria, para que sobreviva a un reinicio. (vii) **Entrega** (HU-15) = tramas recibidas en la
     ventana ÷ esperadas (ventana ÷ intervalo esperado), acotada a 100 %; nula si el dispositivo no está activo o si en la ventana no cabe una trama esperada completa (así, sin tramas retenidas no se inventa); 0 % si esperaba y no llegó nada.
+    (viii) **«Ahora» (`GET /sitios/{id}/ahora`, tablero v3, `docs/19 §4` L3 y L6; 13/11/2026):** lo que mide cada dispositivo que reporta
+    (estado visual normal o alerta, la regla de (ii)) con un número fijo de consultas por petición, ninguna por fila: una para los
+    dispositivos, los conteos y la página ordenada (alerta primero, después zona y nombre; `limite` de 1 a 60); otra para los canales de todos
+    los que reportan con su última lectura (la misma subconsulta que la ficha); de esas filas salen, en memoria, el resumen por magnitud
+    (solo lecturas con menos de dos intervalos esperados del dispositivo: una vieja no entra a un promedio de «ahora») y los tres canales de
+    cada tarjeta (lo medido primero, la salud del equipo —`bateria`, `tension`, `rssi`— al final); y, solo con `tendencia=si`, una tercera
+    con `canal_id = ANY($1)` y cota de 24 h para los promedios por hora de los canales mostrados. La prueba unitaria cuenta las consultas con
+    1 y con 60 dispositivos. Los avisos `medicion`, `visto` y `condicion` del canal en vivo suman `sitio_id`, del mismo mapa en memoria que
+    filtra el canal por sitio (`docs/20 §3`); quién recibe qué no cambia. Medido con 120 fuentes en `docs/16 §66`.
 
 ## 9. Crecimiento, resiliencia y respaldo (aprobado el 06/10/2026)
 

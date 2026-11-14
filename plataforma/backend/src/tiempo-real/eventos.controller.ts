@@ -9,7 +9,7 @@ import type { Socket } from 'node:net';
 import { EMPTY, Observable, Subject, concat, concatMap, defer, filter, finalize, from, ignoreElements, interval, map, merge, of, takeUntil } from 'rxjs';
 import { AvisosAcotados } from '../arranque.js';
 import { uuid } from '../consulta/validacion.js';
-import { EventoPanel, EventosService } from './eventos.service.js';
+import { EventoConSitio, EventoPanel, EventosService } from './eventos.service.js';
 import type { PeticionConUsuario } from '../sesion/guardia.js';
 import { UsuarioSesion, puedeEnAlguno } from '../sesion/permisos.js';
 import { MENSAJE_SIN_SESION, SesionService } from '../sesion/sesion.service.js';
@@ -54,7 +54,8 @@ export class EventosController implements BeforeApplicationShutdown {
   @ApiOperation({
     summary: 'Canal de tiempo real (SSE)',
     description:
-      'Server-Sent Events: medicion, visto y condicion, cada uno cuando ya está guardado, y un latido cada 25 s. ' +
+      'Server-Sent Events: medicion, visto y condicion, cada uno cuando ya está guardado y con el `sitio_id` de su dispositivo (null solo para quien alcanza ' +
+      'a todos los sitios, si el dispositivo es tan nuevo que el servidor aún no lo conoce), y un latido cada 25 s. ' +
       'Filtros opcionales por dispositivo o por canal. Exige sesión (o X-Clave-Admin): solo llegan los eventos de los dispositivos de ' +
       'los sitios del usuario, y los del sistema (cola del broker) solo a quien administra algún sitio. La sesión se revalida en cada ' +
       'latido: si se cerró, venció o fue revocada, el flujo termina; si cambiaron los sitios, rige el alcance nuevo. Rechaza una página de otro sitio ' +
@@ -70,9 +71,9 @@ export class EventosController implements BeforeApplicationShutdown {
         schema: { type: 'string' },
         example:
           'event: medicion\ndata: {"tipo":"medicion","dispositivo_id":"<uuid>","canal_id":"<uuid>","valor":21.5,' +
-          '"unidad":"Cel","tiempo":"2026-10-09T15:00:00.000Z"}\n\n' +
-          'event: visto\ndata: {"tipo":"visto","dispositivo_id":"<uuid>","tiempo":"2026-10-09T15:00:00.000Z"}\n\n' +
-          'event: condicion\ndata: {"tipo":"condicion","dispositivo_id":"<uuid>","condicion":"umbral","estado":"abierta"}\n\n' +
+          '"unidad":"Cel","tiempo":"2026-10-09T15:00:00.000Z","porcentaje":null,"sitio_id":"<uuid>"}\n\n' +
+          'event: visto\ndata: {"tipo":"visto","dispositivo_id":"<uuid>","tiempo":"2026-10-09T15:00:00.000Z","sitio_id":"<uuid>"}\n\n' +
+          'event: condicion\ndata: {"tipo":"condicion","dispositivo_id":"<uuid>","condicion":"umbral","estado":"abierta","sitio_id":"<uuid>"}\n\n' +
           'event: sistema\ndata: {"tipo":"sistema","condicion":"broker_descarte","estado":"abierta","motivos":["descartes"],"mensajes_en_cola":120,"descartes_delta":57}\n\n' +
           'event: latido\ndata: {"tiempo":"2026-10-09T15:00:25.000Z"}\n\n',
       },
@@ -116,13 +117,14 @@ export class EventosController implements BeforeApplicationShutdown {
       this.porUsuario.set(clave, (this.porUsuario.get(clave) ?? 0) + 1);
       this.conexiones.add(req.socket);
       const fin = new Subject<void>();
-      const refresco = usuario.todos || this.sitios === undefined ? EMPTY : from(this.sitios.refrescar()).pipe(ignoreElements());
+      // Desde el 13/11/2026 también para quien alcanza a todos: el mapa pone el `sitio_id` de cada aviso (no cambia quién recibe qué).
+      const refresco = this.sitios === undefined ? EMPTY : from(this.sitios.refrescar()).pipe(ignoreElements());
       return concat(
         refresco,
         merge(
           this.eventos.flujo(filtro).pipe(
             filter((e) => this.visible(usuario, e)),
-            map((e): MessageEvent => ({ type: e.tipo, data: e })),
+            map((e): MessageEvent => ({ type: e.tipo, data: this.conSitio(e) })),
           ),
           interval(this.latidoMs).pipe(
             concatMap(() => this.revalidar(usuario)),
@@ -173,6 +175,15 @@ export class EventosController implements BeforeApplicationShutdown {
     if (e.tipo === 'sistema') return puedeEnAlguno(u, 'escribir');
     const sitio = this.sitios?.sitioDe(e.dispositivo_id);
     return sitio !== undefined && u.sitios.has(sitio);
+  }
+
+  // Los avisos de un dispositivo (`medicion`, `visto`, `condicion`) suman `sitio_id` (docs/19 §4, L3c y L6): así el panel sabe cuáles son
+  // del sitio que muestra sin deducirlo de sus listas. Sale del mismo mapa que filtra el canal; null solo si el servidor aún no conoce el
+  // dispositivo (recién dado de alta, hasta la próxima recarga del mapa), y eso solo lo recibe quien alcanza a todos los sitios: a una
+  // persona con sitios, un aviso de un dispositivo desconocido no se le muestra (visible()). `sistema` no es de ningún sitio: sin cambios.
+  private conSitio(e: EventoPanel): EventoPanel | EventoConSitio {
+    if (e.tipo === 'sistema') return e;
+    return { ...e, sitio_id: this.sitios?.sitioDe(e.dispositivo_id) ?? null };
   }
 
   // Apagado ordenado (docs/10 §6): un flujo SSE no termina solo y retendría el cierre del servidor HTTP hasta que Docker

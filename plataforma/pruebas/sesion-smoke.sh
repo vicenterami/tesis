@@ -377,7 +377,7 @@ cmp -s "$T/r" "$T/otro-u.json" && ok "PATCH /usuarios/{id} de otro sitio respond
 [ "$(sql -c "SELECT activo FROM usuario WHERE id = '$SOLO_B'")" = t ] && ok "la persona de B sigue activa" || falla "la persona de B cambió pese al 404"
 
 # ── 3b. Tablero v2 (docs/19 §4, I; docs/10 §8.4 punto 65; docs/16 §61): una fila por ruta nueva y perfil ─────────────────────────
-for r in /sitios "/sitios/$SITIO_A/resumen" "/sitios/$SITIO_A/historico?magnitud=temperatura" "/dispositivos/$DA/historico" "/dispositivos/$DA/eventos" /cuarentena/detectados; do
+for r in /sitios "/sitios/$SITIO_A/resumen" "/sitios/$SITIO_A/ahora" "/sitios/$SITIO_A/historico?magnitud=temperatura" "/dispositivos/$DA/historico" "/dispositivos/$DA/eventos" /cuarentena/detectados; do
   caso "sin sesión: GET ${r%%\?*}" 401 anon GET "$r"
 done
 caso "sin sesión: PATCH /dispositivos/{id}" 401 anon PATCH "/dispositivos/$DA" '{}'
@@ -385,14 +385,20 @@ caso "sin sesión: PUT /canales/{id}/reglas" 401 anon PUT "/canales/$CA/reglas" 
 caso "sin sesión: POST /dispositivos/lote" 401 anon POST "/dispositivos/lote?modo=validar" '{}'
 caso "consulta: GET /sitios" 200 con GET /sitios
 [ "$(campo "' '.join(x['id']+':'+x['rol'] for x in v)")" = "$SITIO_A:consulta" ] && ok "consulta: GET /sitios trae solo su sitio, con su rol" || falla "consulta: GET /sitios → $(head -c 160 "$T/r")"
-for r in "/sitios/$SITIO_A/resumen" "/sitios/$SITIO_A/historico?magnitud=temperatura" "/dispositivos/$DA/historico" "/dispositivos/$DA/eventos"; do
+for r in "/sitios/$SITIO_A/resumen" "/sitios/$SITIO_A/ahora" "/sitios/$SITIO_A/historico?magnitud=temperatura" "/dispositivos/$DA/historico" "/dispositivos/$DA/eventos"; do
   caso "consulta: GET ${r%%\?*} (su sitio)" 200 con GET "$r"
   caso "administrador: GET ${r%%\?*} (su sitio)" 200 adm GET "$r"
 done
-for r in "/sitios/$SITIO_B/resumen" "/sitios/$SITIO_B/historico?magnitud=temperatura" "/dispositivos/$DB/historico" "/dispositivos/$DB/eventos"; do
+for r in "/sitios/$SITIO_B/resumen" "/sitios/$SITIO_B/ahora" "/sitios/$SITIO_B/historico?magnitud=temperatura" "/dispositivos/$DB/historico" "/dispositivos/$DB/eventos"; do
   caso "consulta, otro sitio: GET ${r%%\?*}" 404 con GET "$r"
   caso "administrador, otro sitio: GET ${r%%\?*}" 404 adm GET "$r"
 done
+# «Ahora» (docs/19 §4, L6): con tendencia, la forma; el dispositivo de A está, el de B no; limite fuera de 1–60 → 400 antes del alcance.
+caso "consulta: GET /sitios/{id}/ahora?tendencia=si (su sitio)" 200 con GET "/sitios/$SITIO_A/ahora?tendencia=si&limite=60"
+[ "$(campo "(sorted(v) == ['chispa', 'dispositivos', 'por_magnitud', 'reportan', 'sin_senal'], v['chispa']['puntos'], all(len(c['chispa']) == 24 for d in v['dispositivos'] for c in d['canales']), '$DB' in [d['id'] for d in v['dispositivos']])")" = "(True, 24, True, False)" ] \
+  && ok "consulta: «Ahora» con tendencia trae la chispa de 24 cubos y ningún dispositivo de otro sitio" || falla "consulta: GET /sitios/{id}/ahora?tendencia=si → $(head -c 300 "$T/r")"
+caso "consulta: GET /sitios/{id}/ahora?limite=61 → 400" 400 con GET "/sitios/$SITIO_A/ahora?limite=61"
+caso "consulta, otro sitio: GET /sitios/{id}/ahora?limite=61 → 400 (la entrada se valida antes que el alcance)" 400 con GET "/sitios/$SITIO_B/ahora?limite=61"
 caso "consulta: GET /cuarentena/detectados → 403 (es la entrada del alta)" 403 con GET /cuarentena/detectados
 caso "administrador: GET /cuarentena/detectados?sitio= (su sitio)" 200 adm GET "/cuarentena/detectados?sitio=$SITIO_A"
 caso "administrador, otro sitio: GET /cuarentena/detectados?sitio=" 404 adm GET "/cuarentena/detectados?sitio=$SITIO_B"
@@ -476,14 +482,16 @@ caso "investigador: GET /sesion" 200 inv GET /sesion
 
 # Lecturas: los tres perfiles nuevos en su sitio; el del sistema, también en B (todos los sitios).
 for q in inv ope sis; do
-  for r in /dispositivos "/dispositivos/$DA" "/canales/$CA/historico" /condiciones /cuarentena /pasarelas /sitios "/sitios/$SITIO_A/resumen" "/dispositivos/$DA/historico" "/dispositivos/$DA/eventos"; do
+  for r in /dispositivos "/dispositivos/$DA" "/canales/$CA/historico" /condiciones /cuarentena /pasarelas /sitios "/sitios/$SITIO_A/resumen" "/sitios/$SITIO_A/ahora" "/dispositivos/$DA/historico" "/dispositivos/$DA/eventos"; do
     caso "$q: GET ${r%%\?*}" 200 "$q" GET "$r"
   done
 done
 for q in inv ope; do
   caso "$q, otro sitio: GET /dispositivos/{id}" 404 "$q" GET "/dispositivos/$DB"
   caso "$q, otro sitio: GET /sitios/{id}/resumen" 404 "$q" GET "/sitios/$SITIO_B/resumen"
+  caso "$q, otro sitio: GET /sitios/{id}/ahora" 404 "$q" GET "/sitios/$SITIO_B/ahora"
 done
+caso "administrador del sistema: GET /sitios/{id}/ahora del sitio B (todos los sitios)" 200 sis GET "/sitios/$SITIO_B/ahora"
 caso "administrador del sistema: GET /dispositivos/{id} del sitio B (todos los sitios)" 200 sis GET "/dispositivos/$DB"
 pedir sis GET /dispositivos >/dev/null; lista=$(campo "' '.join(d['id'] for d in v)")
 grep -q "$DA" <<<"$lista" && grep -q "$DB" <<<"$lista" && ok "administrador del sistema: la lista trae A y B" || falla "administrador del sistema: la lista no trae los dos sitios"

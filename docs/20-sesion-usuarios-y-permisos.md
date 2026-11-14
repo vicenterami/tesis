@@ -167,6 +167,7 @@ persona pidiendo un recurso de un sitio donde no tiene membresía (el administra
 | Configurar un dispositivo, sus reglas de umbral y su estado (mantenimiento), y mudarlo (Etapa 4, rutas por fijar en el OpenAPI) | 401 | 403 | 403 | 200 / 409 | 200 / 409 | 200 / 409 | 404 |
 | `GET /sitios` (Etapa 4: los sitios de la persona, con su perfil en cada uno) | 401 | 200 | 200 | 200 | 200 | 200 (todos los sitios) | — |
 | `GET /sitios/{id}/resumen`, `GET /sitios/{id}/historico`, `GET /dispositivos/{id}/historico`, `GET /dispositivos/{id}/eventos` (Etapa 4; en los eventos, el nombre de quien hizo el cambio solo para los administradores: `docs/21 §2`) | 401 | 200 | 200 | 200 | 200 | 200 | 404 |
+| `GET /sitios/{id}/ahora` (Etapa 4, 13/11/2026: lo que se mide ahora, `docs/19 §4` L6; con y sin `tendencia=si`) | 401 | 200 | 200 | 200 | 200 | 200 | 404 |
 | `POST /dispositivos/lote` y `GET /cuarentena/detectados` (Etapa 4; hoy «escribir»: administrador de sitio; con los cinco perfiles, también operador técnico; en el lote, una zona o un identificador de otro sitio no se revelan) | 401 | 403 | 403 | 200 | 200 | 200 | 404 |
 | `GET /usuarios`, `POST /usuarios`, `PATCH /usuarios/{id}` | 401 | 403 | 403 | 403 | 200 (las membresías de sus sitios; la cuenta de quien también está en otro sitio: 403, §5) | 200 (todas las cuentas) | 404 |
 | Enlaces públicos de un sitio (Etapa 4) | 401 | 403 | 403 | 403 | 200 | 200 | 404 |

@@ -150,6 +150,27 @@ describe('EventosController: cupo, filtros y latido', () => {
     for (const s of suscripciones) s.unsubscribe(); // cada flujo lleva su latido: sin cerrarlos, el proceso de prueba no termina
   });
 
+  it('medicion, visto y condicion llegan con el sitio_id de su dispositivo; sistema, sin él; null solo a quien alcanza a todos (docs/19 §4, L6)', async () => {
+    const bus = new EventosService();
+    const refrescar = vi.fn(() => Promise.resolve());
+    const sitios = { sitioDe: (d: string) => ({ d1: 's1', d2: 's2' } as Record<string, string>)[d], refrescar } as unknown as SitiosDeDispositivos;
+    const c = new EventosController(bus, sitios);
+    const ana: unknown[] = [];
+    const sistema: unknown[] = [];
+    const s1 = c.flujo(de(persona('ana', [['s1', 'consulta']]))).subscribe((m) => ana.push(m.data));
+    const s2 = c.flujo(SIN_ORIGEN).subscribe((m) => sistema.push(m.data));
+    await new Promise((r) => setImmediate(r));
+    expect(refrescar).toHaveBeenCalledTimes(2); // también el de quien alcanza a todos: sin el mapa no sabría el sitio de cada aviso
+    const visto: EventoPanel = { tipo: 'visto', dispositivo_id: 'd1', tiempo: M1.tiempo };
+    const condicion: EventoPanel = { tipo: 'condicion', dispositivo_id: 'd2', condicion: 'umbral', estado: 'abierta' };
+    const cola: EventoPanel = { tipo: 'sistema', condicion: 'broker_descarte', estado: 'abierta', motivos: ['descartes'], mensajes_en_cola: 1, descartes_delta: 1 };
+    for (const e of [M1, visto, condicion, { ...M1, dispositivo_id: 'd9' }, cola]) bus.publicar(e);
+    expect(ana).toEqual([{ ...M1, sitio_id: 's1' }, { ...visto, sitio_id: 's1' }]); // quién recibe qué no cambia
+    expect(sistema).toEqual([{ ...M1, sitio_id: 's1' }, { ...visto, sitio_id: 's1' }, { ...condicion, sitio_id: 's2' }, { ...M1, dispositivo_id: 'd9', sitio_id: null }, cola]);
+    s1.unsubscribe();
+    s2.unsubscribe();
+  });
+
   it('en cada latido revalida la sesión SIN renovarla: aplica los sitios nuevos y, si ya no vale, cierra el flujo y libera el cupo (revisión del 08/11/2026)', async () => {
     vi.useFakeTimers();
     const bus = new EventosService();
@@ -177,7 +198,7 @@ describe('EventosController: cupo, filtros y latido', () => {
     expect(cargarPorId).toHaveBeenCalledTimes(2);
   });
 
-  it('una clave temporal o una base que no responde también cierran el flujo; el usuario del sistema no consulta nada', async () => {
+  it('una clave temporal o una base que no responde también cierran el flujo; el usuario del sistema no revalida ninguna sesión', async () => {
     vi.useFakeTimers();
     const sitios = { sitioDe: () => 's1', refrescar: () => Promise.resolve() } as unknown as SitiosDeDispositivos;
     for (const respuesta of [() => Promise.resolve({ ...persona('ana', [['s1', 'consulta']]), claveTemporal: true }), () => Promise.reject(new Error('base caída'))]) {
@@ -304,7 +325,8 @@ describe('GET /eventos por HTTP (TT-39)', () => {
     app!.get(EventosService).publicar(M1);
     const texto = await llegada;
     expect(texto).toContain('event: medicion\n');
-    expect(texto).toContain(`data: ${JSON.stringify(M1)}\n`);
+    // La base falsa no conoce el dispositivo: el usuario del sistema lo recibe igual, con sitio_id null (docs/19 §4, L6).
+    expect(texto).toContain(`data: ${JSON.stringify({ ...M1, sitio_id: null })}\n`);
     res.destroy();
   });
 

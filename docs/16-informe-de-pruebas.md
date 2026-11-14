@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 564 pruebas unitarias del backend y 297 del panel, sin matriz formal); TT-32 (sensor físico) se cubrió después, en §43, §44 y §53;
+cubre todavía: TT-27 (contrato de trama: hoy 585 pruebas unitarias del backend y 297 del panel, sin matriz formal); TT-32 (sensor físico) se cubrió después, en §43, §44 y §53;
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -297,7 +297,7 @@ a `timescaledb-tune`, que se había quitado por seguridad; se quitó también el
 
 ## 14. Canal de tiempo real (TT-39, 09/10/2026)
 
-`GET /eventos` (`docs/10 §5`). 29 pruebas en `eventos.spec.ts` (`backend/src/tiempo-real/`; eran 22 cuando se escribió esta sección: la sesión sumó tres, §58); las del bloque «GET /eventos
+`GET /eventos` (`docs/10 §5`). 30 pruebas en `eventos.spec.ts` (`backend/src/tiempo-real/`; eran 22 cuando se escribió esta sección: la sesión sumó tres, §58, y el `sitio_id` de los avisos una, §66); las del bloque «GET /eventos
 por HTTP» abren HTTP real en 127.0.0.1 con un puerto libre; más las del pipeline, las alertas y el supervisor sobre lo que cada uno anuncia.
 
 | Prueba | Resultado |
@@ -623,6 +623,10 @@ cabecera del archivo dice qué debe quedar y qué debe mostrar cada pantalla; el
 **Lo que no cubre:** el recorrido del panel con esta semilla (siguiente paso: anotar cada diferencia como hallazgo); los que
 reportan cada 300 s pasan a «sin comunicación» a los 10 min porque nadie publica (está escrito en la cabecera); ningún dispositivo
 de la semilla tiene cliente en el broker.
+
+**Actualización del 13/11/2026 (§66):** los dos casos límite (identificador de 3 y de 63 caracteres) pasaron a un sitio aparte de pruebas,
+`pruebas-limite`, y cada medición de la semilla tiene ahora su trama, para que la entrega por dispositivo del tablero sea creíble. La
+tabla de arriba es la de su día.
 
 ## 24. Rol de la aplicación con mínimo privilegio (13/10/2026)
 
@@ -2507,9 +2511,95 @@ la primera corrida las crea (cinco temporales impresas), la segunda dice «aún 
 propia y con una sesión dice «conserva la clave que eligió» sin cambiar su huella ni cortar la sesión, y con `SEMILLA_ROTAR_CLAVES=1`
 pasan las dos comprobaciones y la sesión queda revocada; las cuentas de descarte se borraron al terminar.
 
-**Cifras del bloque:** `pnpm verificar` en verde: 564 pruebas unitarias del backend en 53 archivos y 297 pruebas del panel (299 ejecuciones en 31
+**Cifras del bloque:** `pnpm verificar` en verde (pruebas unitarias del backend: 564, en 53 archivos) y 297 pruebas del panel (299 ejecuciones en 31
 archivos); `svelte-check`, 396 archivos sin errores. `pnpm openapi`: 37 rutas, con dos descripciones cambiadas (el 503 de la recepción y el
 tiempo del lote). Humos contra la pila reconstruida y el verificador de 52 pasos (el 4d es nuevo):
 `api-smoke.sh` (paso 4), 114 OK; `sesion-smoke.sh` (4b), 371 de 371; el panel en navegadores reales (4c), 230 de 230;
 `personas-semilla-prueba.sh` (4d), 7 de 7; en el banco, `banco.sh alta` (40) y `banco.sh http` (24) en verde. Las cifras que repiten el
-informe y `docs/18` (564 pruebas unitarias del backend y 52 pasos del verificador) se pusieron al día en el mismo cambio.
+informe y `docs/18` (las pruebas unitarias del backend, 564 ese día, y 52 pasos del verificador) se pusieron al día en el mismo cambio.
+
+## 66. «Ahora» del tablero v3 en el backend y semilla del campus creíble (13/11/2026)
+
+**Qué cambió** (diseño en `docs/19 §4`, bloque L, puntos 3 y 6; contrato en `docs/10 §8.4` punto 65 viii). Ruta nueva
+`GET /sitios/{id}/ahora?limite&tendencia` (Etapa 4; consulta o más, otro sitio 404, `limite` de 1 a 60 y 24 por defecto): `reportan` y
+`sin_senal` (la regla del estado visual del inventario y del resumen), `por_magnitud` sobre la última lectura de cada canal de los que
+reportan, solo si tiene menos de dos intervalos esperados del dispositivo, y hasta `limite` tarjetas, alerta primero y después por zona y
+nombre, cada una con hasta tres canales: lo medido primero y la salud del equipo al final (`bateria`, `tension` y `rssi`,
+`MAGNITUDES_SALUD` de `consulta/tablero.ts`, declarado en `docs/19` L3b). Con `tendencia=si`, 24 promedios por hora alineados a la hora UTC
+por canal mostrado (null = sin lecturas). La última lectura es la misma subconsulta de la ficha (`SQL_ULTIMA_MEDICION`, ahora compartida).
+Consultas por petición: dos, y tres con la tendencia, sin una por dispositivo. Al implementar se sumaron `salud` y el orden a `por_magnitud`
+(`docs/19` L6). El canal en vivo agrega `sitio_id` a `medicion`, `visto` y `condicion`, desde el mapa con que ya filtra por sitio; para eso
+el mapa se refresca también al abrir el flujo de quien alcanza a todos los sitios (antes solo el de una persona con sitios). Quién recibe qué
+no cambia.
+
+**Pruebas nuevas y la falla plantada de cada una** (cada plantada se aplicó, se vio en rojo y se deshizo):
+
+| Prueba | Plantada | Resultado |
+|---|---|---|
+| `ahora.spec.ts` (20): dos sentencias sin tendencia y tres con ella, con 1 y con 60 dispositivos | una consulta de canales por dispositivo | 3 en rojo |
+| `ahora.spec.ts`: hasta tres canales, la salud al final | el orden solo por código de magnitud | 4 en rojo |
+| `ahora.spec.ts`: una lectura de más de 2 × intervalo no entra al promedio | sin el filtro de vigencia | 3 en rojo |
+| `ahora.spec.ts`: `limite` fuera de 1–60, no entero o repetido → 400 antes del alcance y de la base | tope de 500 | 1 en rojo |
+| `ahora.spec.ts`: solo `tendencia=si` la pide | cualquier valor la pide | 1 en rojo |
+| `ahora.spec.ts`: sin tendencia, ningún campo `chispa` | `chispa: null` siempre | 1 en rojo |
+| `eventos.spec.ts`: los tres avisos con `sitio_id`, `sistema` sin él, null solo para quien alcanza a todos y el dispositivo es desconocido | sin `sitio_id`; sin refrescar el mapa para quien alcanza a todos | 2 y 1 en rojo |
+| `api-smoke.sh`: forma, conteos iguales a los del resumen, orden, tendencia de 24 cubos, 400 de `limite`, 404 y 401 | una copia del guion con cuatro expectativas cambiadas | 4 en rojo |
+| `sesion-smoke.sh` (4b): una fila por perfil, «otro sitio → 404», la tendencia sin dispositivos de otro sitio y `limite=61` → 400 | una copia con dos expectativas cambiadas | 3 en rojo |
+
+**Medición** (banco desechable, `banco.sh encender 120`: backend con 0,5 CPU y la base en RAM con techo de 768 MB, como en §61; cada cifra,
+mediana de 10 peticiones tras una de calentamiento, con `tablero-medir.sh ahora`, que mide el resumen y las tres variantes de «Ahora» en la
+misma corrida, del sitio de los 120 emulados). La primera fila es la serie de §61 (`tablero-semilla-serie.sql`: 30 días cada 300 s, con el
+intervalo de los emulados en 300 s y su última trama como visto); las otras, solo las últimas 24 h a cada ritmo (`tablero-semilla-ahora.sql`
+con `vaciar=1`: la serie de 30 días no deja lugar para 24 h más densas). La base del banco se cortó por memoria dos veces: al cargar la
+serie de §61 después de probar ahí la semilla de demostración (los datos quedaron, a 752 de 768 MiB) y al sembrar 24 h cada 5 s en una sola
+sentencia, que se reinició vacía; desde entonces la semilla de «Ahora» siembra hora por hora con un `CHECKPOINT` entre cada una.
+
+| Lecturas · tramas (120 fuentes) | `…/resumen` (24 h) | `…/ahora` | `…/ahora?tendencia=si` | `…&limite=60` |
+|---|---|---|---|---|
+| Serie de §61: 30 días cada 300 s (base a 752 de 768 MiB) | 163,5 ms | 7,4 ms | 10,7 ms | 16,1 ms |
+| 24 h cada 300 s · cada 300 s | 28,1 ms | 5,9 ms | 11,5 ms | 15,0 ms |
+| 24 h cada 60 s · cada 60 s (repetida) | 194,6 ms (199,5) | 5,9 ms (6,2) | 24,7 ms (25,0) | 37,3 ms (36,0) |
+| 24 h cada 5 s · cada 60 s | 118,9 ms | 6,3 ms | 392,2 ms | 391,7 ms |
+
+Bytes: `…/ahora`, 14,4 kB (24 tarjetas); con tendencia, 21,9 kB; con `limite=60`, 54,2 kB; el resumen, 21,8 kB. **Criterio de
+`docs/19` L7:** sin tendencia, «Ahora» no tarda más que el resumen en ninguna corrida (5,9 a 7,4 ms frente a 28 a 200 ms): ✅. Con
+tendencia y 60 s, 24,7 ms frente a 194,6 ms del resumen (0,13 veces; el umbral es 2): ✅, la tendencia se queda. **Observación con 5 s:**
+la tendencia tarda 392 ms, 3,3 veces el resumen de esa corrida, y lo mismo con 24 que con 60 tarjetas; `EXPLAIN (ANALYZE, BUFFERS)` de su
+sentencia con 24 canales: `Bitmap Index Scan` por el índice único `(canal_id, tiempo)` del fragmento, 401 856 filas y 19 789 bloques de la
+tabla de un fragmento de 2,07 millones: las lecturas de los 120 canales están intercaladas por tiempo, así que pedir 24 canales toca casi
+todas las páginas. El criterio está escrito para 60 s y se cumple; con 5 s queda anotado, sin cambiar el diseño, y la salida natural sería un
+agregado por hora (pendiente de decidir con esta cifra). **Lo que no cubre:** los emulados tienen un canal con lecturas (temperatura) y uno
+sin ellas (humedad: última `null` y tendencia toda `null`); el intervalo esperado se fijó en 3 600 s para que el supervisor no los pasara a
+«sin señal» durante la medición (nadie publica en el banco; con 60 s, los 120 aparecían sin señal); con 5 s, las tramas son cada 60 s
+porque cada 5 s no caben en la base del banco; una petición a la vez, sin proxy, en el portátil y no en el servidor de referencia; la
+diferencia del resumen entre la primera fila y la segunda (163,5 y 28,1 ms, con las mismas tramas de 24 h) coincide con la base al borde de su
+techo de memoria y no se investigó más.
+
+### Semilla de demostración: el campus creíble y los casos límite aparte
+
+**Qué cambió** (decidido el 13/11/2026). `db/semillas/demo-completa.sql`: (1) los dos casos límite (`d03`, identificador de 3 caracteres y
+nombre «Ñ», y el de 63 caracteres con nombre de 80) pasan a un sitio aparte, `pruebas-limite` («Sitio de pruebas: casos límite», zona
+«Casos límite»); el sitio `uct` queda como vitrina, con 8 dispositivos de la semilla, y las personas de demostración siguen solo en él. (2)
+**Tramas coherentes con las mediciones:** cada recepción sembrada deja su trama (SenML, plano o el JSON de la pasarela, según el formato,
+con los mismos valores) y sus mediciones, al intervalo esperado de cada dispositivo, y la última es `visto_por_ultima_vez`. En las últimas
+24 h la entrega queda distinta y creíble: `demo-aire-01` 100 %, `demo-lora-01` 97,5 % (12 de 480 perdidas), `demo-suelo-01` 91,7 % (22 de
+24), `demo-lora-02` 37,5 % (pierde 5 de cada 8; es el de la batería baja) y `demo-silencioso` 0 %; «Tramas (24 h)» del sitio suma 718 de la
+semilla. `demo-suelo-01` se seca y cruza el umbral bajo de 20 hace 5 h, cuando se abre su condición. Sigue en una transacción y es
+idempotente (se aplica dos veces y da lo mismo).
+
+**Comprobaciones nuevas** en `semilla-demo.sh --completa` (de 16 a 25 tras la semilla): los dos casos límite en el sitio de pruebas; el sitio
+`uct` sin ninguno, ni de la semilla ni con su forma (identificador de 3 o 63 caracteres, nombre de 1 u 80); los dispositivos por sitio (8, 1
+y 2); toda medición con su trama; la última trama igual a `visto_por_ultima_vez`; la entrega de 24 h de cada uno, la de la cabecera; al
+menos tres valores de entrega distintos; las 718 tramas de 24 h en `uct`; y ninguna persona de demostración con membresía fuera de `uct`.
+**Plantadas** (en el banco, con copias de la semilla): `d03` de vuelta en `uct`, 4 en rojo; sin el `INSERT` de las tramas, 5 en rojo; una
+persona `*-demo` con membresía en otro sitio, la consulta da 1 en vez de 0. **Dónde se aplicó:** en la base del banco, dos veces seguidas,
+con las 31 comprobaciones en verde (las del guion, con `SEMILLA_SIN_PERSONAS=1`). En la pila de desarrollo no se aplicó dentro de este
+cambio porque estaba en uso: aplicarla recrea los 11 dispositivos de la semilla con identificadores nuevos. Se aplica con
+`bash plataforma/pruebas/semilla-demo.sh --completa`.
+
+**Cifras del bloque:** `pnpm verificar` en verde: 585 pruebas unitarias del backend en 54 archivos y 297 pruebas del panel (299 ejecuciones
+en 31 archivos); `svelte-check`, 396 archivos sin errores. `pnpm openapi`: 38 rutas y 47 operaciones (`/sitios/{id}/ahora` nueva y el
+ejemplo de `/eventos` con `sitio_id`). Humos contra la pila reconstruida: `api-smoke.sh`, 122 OK; `sesion-smoke.sh` (4b), 386 de 386. El verificador de 52 pasos, completo y
+en verde; su primera corrida marcó el paso 2t por dos citas fechadas de §65 con la forma «N pruebas unitarias», que se reescribieron con la
+misma cifra de ese día; la segunda, lanzada enseguida, dio 429 en el inicio de sesión (4b y 4c) por el bloqueo de intentos fallidos que
+dejaron varias corridas seguidas de los humos, y la tercera, pasada la ventana del bloqueo, terminó en «TODO EN CONCORDANCIA». El informe, recompilado: 30 páginas de cuerpo y ningún desborde.

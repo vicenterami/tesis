@@ -4,6 +4,9 @@
 # de descarte del banco, por la entrada estándar de curl; los tokens creados para medir viajan igual y nunca se imprimen. Lo que se crea
 # vive en el banco (datos en RAM) y desaparece con `banco.sh apagar`.
 #   bash plataforma/pruebas/banco/tablero-medir.sh tiempos          mediana de 10 peticiones (tras una de calentamiento) por ruta y rango
+#   bash plataforma/pruebas/banco/tablero-medir.sh ahora            «Ahora» (docs/16 §66): en la misma corrida, la mediana del resumen (24 h) y
+#                                                                   de GET /sitios/{id}/ahora sin tendencia, con ella y con ella y limite=60, del
+#                                                                   sitio de los emulados (código «banco»); el ritmo lo pone tablero-semilla-ahora.sql
 #   bash plataforma/pruebas/banco/tablero-medir.sh lote N P [VIA]   POST /dispositivos/lote?modo=crear con N filas de vía VIA (http, por
 #                                                                   defecto: sin broker, solo el costo del resumen de cada credencial; mqtt:
 #                                                                   además las órdenes al broker) e id_fisico P-0000…; a los 2 s, un alta
@@ -31,6 +34,15 @@ case "${1:-}" in
     echo "histórico del dispositivo 30 días · 1 hora: $(mediana "$B/dispositivos/$DISP/historico?desde=$(d '30 days ago')&hasta=$H&intervalo=1%20hour")"
     echo "inventario: $(mediana "$B/dispositivos")"
     echo "inventario orden=entrega limite=50: $(mediana "$B/dispositivos?orden=entrega&limite=50")" ;;
+  ahora)
+    SITIO=$(api "$B/sitios" | python3 -I -c 'import json,sys; print([s["id"] for s in json.load(sys.stdin) if s["codigo"]=="banco"][0])')
+    mediana() { api -o /dev/null "$1"; for _ in $(seq 10); do api -o /dev/null -w '%{time_total} %{size_download} %{http_code}\n' "$1"; done \
+      | sort -n | awk '{a[NR]=$1; b=$2; c=$3} END {printf "%.1f ms  %s B  HTTP %s\n", (a[5]+a[6])/2*1000, b, c}'; }
+    api "$B/sitios/$SITIO/ahora" | python3 -I -c 'import json,sys; r=json.load(sys.stdin); print("reportan", r["reportan"], "· sin señal", r["sin_senal"], "· por magnitud", [(m["codigo"], m["canales"]) for m in r["por_magnitud"]])'
+    echo "resumen (24 h): $(mediana "$B/sitios/$SITIO/resumen")"
+    echo "ahora: $(mediana "$B/sitios/$SITIO/ahora")"
+    echo "ahora?tendencia=si: $(mediana "$B/sitios/$SITIO/ahora?tendencia=si")"
+    echo "ahora?tendencia=si&limite=60: $(mediana "$B/sitios/$SITIO/ahora?tendencia=si&limite=60")" ;;
   lote)
     N="${2:?N filas}"; P="${3:?prefijo de id_fisico}"; VIA="${4:-http}"; T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
     [[ "$VIA" =~ ^(http|mqtt)$ ]] || { echo "FALLA vía «$VIA»: http o mqtt"; exit 1; }
@@ -63,5 +75,5 @@ case "${1:-}" in
       sort -n "$T/$g" | awk -v g="$g" '{a[NR]=$1; c[$2]++} END {m=(NR%2)?a[(NR+1)/2]:(a[NR/2]+a[NR/2+1])/2; s=""; for (k in c) s=s k "×" c[k] " ";
         printf "%-12s mediana %.1f ms · mín %.1f · máx %.1f · HTTP %s\n", g, m*1000, a[1]*1000, a[NR]*1000, s}'
     done ;;
-  *) sed -n '2,15p' "$0"; exit 1 ;;
+  *) sed -n '2,18p' "$0"; exit 1 ;;
 esac

@@ -2,7 +2,12 @@ import { BadRequestException, Inject, Injectable, NotFoundException } from '@nes
 import { Pool } from 'pg';
 import { POOL } from '../db/db.module.js';
 import { isoUs } from '../db/iso-us.js';
-import { Cursor, Entrega, FilaCubo, SQL_EN_LINEA, SQL_ESTADO_VISUAL, alinear, entrega } from './tablero.js';
+import {
+  CUBOS_CHISPA, CanalConUltima, Cursor, Entrega, FilaCubo, SQL_EN_LINEA, SQL_ESTADO_VISUAL, alinear, armarChispas, elegirCanales, entrega, esSalud,
+  porMagnitud, ventanaChispa,
+} from './tablero.js';
+import { SQL_ULTIMA_MEDICION } from './consulta.service.js';
+import { porcentaje } from './escala.js';
 import { Intervalo } from './validacion.js';
 import { PLAZOS, leerEntero } from '../retencion/retencion.service.js';
 
@@ -113,6 +118,74 @@ export class TableroService {
       ...resto,
       salud: { ...salud, porcentaje: salud.supervisados > 0 ? Math.round((1000 * salud.reportan) / salud.supervisados) / 10 : null },
       ...entregasDelResumen(entrega_base, desde, hasta),
+    };
+  }
+
+  // GET /sitios/{id}/ahora (docs/19 §4, bloque L, puntos 3 y 6; docs/10 §8.4 punto 65 viii): lo que mide cada dispositivo del sitio en
+  // este momento. Un número FIJO de sentencias por petición, sin ninguna por fila: (1) los dispositivos con su estado visual (la regla
+  // SQL del inventario y del resumen), los conteos, los ids de los que reportan y la página ordenada; (2) los canales de los que reportan
+  // con su última lectura (la consulta de la ficha, SQL_ULTIMA_MEDICION), de donde salen en memoria los agregados por magnitud y los tres
+  // canales de cada tarjeta; (3) solo con `tendencia`, los promedios por hora de los canales mostrados, en una sentencia con
+  // `canal_id = ANY($1)` y cota de tiempo. Sin tendencia, dos; con ella, tres (ahora.spec.ts las cuenta).
+  async ahora(sitioId: string, limite: number, tendencia: boolean) {
+    const r = await this.pool.query<{
+      existe: boolean; ahora: string; reportan: number; sin_senal: number; ids: string[];
+      pagina: { id: string; nombre: string; zona: string; estado_visual: string; visto_por_ultima_vez: string | null; intervalo_esperado_s: number }[];
+    }>(`
+      WITH dev AS (
+        SELECT d.id, d.nombre, z.nombre AS zona, d.intervalo_esperado_s, e.visto_por_ultima_vez, ${SQL_ESTADO_VISUAL} AS estado_visual
+          FROM dispositivo d JOIN zona z ON z.id = d.zona_id LEFT JOIN estado_dispositivo e ON e.dispositivo_id = d.id
+         WHERE z.sitio_id = $1)
+      SELECT EXISTS (SELECT 1 FROM sitio WHERE id = $1) AS existe, iso_utc(now()) AS ahora,
+             (SELECT count(*)::int FROM dev WHERE estado_visual IN ('normal', 'alerta')) AS reportan,
+             (SELECT count(*)::int FROM dev WHERE estado_visual = 'sin_senal') AS sin_senal,
+             (SELECT coalesce(array_agg(id), '{}') FROM dev WHERE estado_visual IN ('normal', 'alerta')) AS ids,
+             (SELECT coalesce(json_agg(json_build_object('id', p.id, 'nombre', p.nombre, 'zona', p.zona, 'estado_visual', p.estado_visual,
+                                       'visto_por_ultima_vez', iso_utc(p.visto_por_ultima_vez), 'intervalo_esperado_s', p.intervalo_esperado_s)
+                                       ORDER BY p.orden, p.zona, p.nombre, p.id), '[]'::json)
+                FROM (SELECT dev.*, CASE dev.estado_visual WHEN 'alerta' THEN 0 ELSE 1 END AS orden FROM dev
+                       WHERE dev.estado_visual IN ('normal', 'alerta') ORDER BY orden, dev.zona, dev.nombre, dev.id LIMIT $2) p) AS pagina`,
+      [sitioId, limite]);
+    const base = r.rows[0];
+    if (base === undefined || !base.existe) throw new NotFoundException('sitio no encontrado');
+    const ahoraMs = Date.parse(base.ahora);
+    const c = await this.pool.query<CanalConUltima>(`
+      SELECT c.id, c.dispositivo_id, c.magnitud_codigo AS magnitud, m.nombre AS magnitud_nombre, m.unidad_canonica AS unidad,
+             d.intervalo_esperado_s, c.escala_cero, c.escala_cien, ${SQL_ULTIMA_MEDICION} AS ultima
+        FROM canal c JOIN magnitud m ON m.codigo = c.magnitud_codigo JOIN dispositivo d ON d.id = c.dispositivo_id
+       WHERE c.dispositivo_id = ANY($1::uuid[])`, [base.ids]);
+    const porDispositivo = new Map<string, CanalConUltima[]>();
+    for (const k of c.rows) porDispositivo.set(k.dispositivo_id, [...(porDispositivo.get(k.dispositivo_id) ?? []), k]);
+    const dispositivos = base.pagina.map((d) => {
+      const todos = porDispositivo.get(d.id) ?? [];
+      return { ...d, canales_total: todos.length, canales: elegirCanales(todos) };
+    });
+    const mostrados = dispositivos.flatMap((d) => d.canales.map((k) => k.id));
+    let chispas: Map<string, (number | null)[]> | undefined;
+    let chispa: { desde: string; intervalo: '1 hour'; puntos: number } | undefined;
+    if (tendencia) {
+      const v = ventanaChispa(ahoraMs);
+      const t = mostrados.length === 0 ? { rows: [] } : await this.pool.query<{ canal_id: string; t: string; v: number }>(`
+        SELECT x.canal_id, extract(epoch FROM time_bucket(INTERVAL '1 hour', x.tiempo))::bigint AS t, round(avg(x.valor)::numeric, 3)::float AS v
+          FROM medicion x
+         WHERE x.canal_id = ANY($1::uuid[]) AND x.tiempo >= $2 AND x.tiempo < $3
+         GROUP BY 1, 2`, [mostrados, v.desde, v.hasta]);
+      chispas = armarChispas(t.rows.map((x) => ({ canal_id: x.canal_id, t: Number(x.t), v: x.v })), mostrados, v.desde);
+      chispa = { desde: v.desde.toISOString(), intervalo: '1 hour', puntos: CUBOS_CHISPA };
+    }
+    return {
+      reportan: base.reportan,
+      sin_senal: base.sin_senal,
+      por_magnitud: porMagnitud(c.rows, ahoraMs),
+      dispositivos: dispositivos.map((d) => ({
+        ...d,
+        canales: d.canales.map((k) => ({
+          id: k.id, magnitud: k.magnitud, magnitud_nombre: k.magnitud_nombre, unidad: k.unidad, salud: esSalud(k.magnitud),
+          ultima: k.ultima && { ...k.ultima, porcentaje: porcentaje(k.ultima.valor, k.escala_cero, k.escala_cien) },
+          ...(chispas === undefined ? {} : { chispa: chispas.get(k.id) ?? new Array<number | null>(CUBOS_CHISPA).fill(null) }),
+        })),
+      })),
+      ...(chispa === undefined ? {} : { chispa }),
     };
   }
 

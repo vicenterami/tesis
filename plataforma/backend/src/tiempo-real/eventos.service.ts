@@ -13,6 +13,10 @@ export type EventoPanel =
   // Condición del sistema, sin dispositivo (docs/10 §8.4 punto 43): solo la reciben los flujos sin filtro (la vista general).
   | { tipo: 'sistema'; condicion: 'broker_descarte'; estado: 'abierta' | 'cerrada'; motivos: string[]; mensajes_en_cola: number; descartes_delta: number };
 
+// Lo que recibe el panel de un aviso de dispositivo: el evento del bus más el sitio de ese dispositivo (lo pone EventosController con el
+// mapa de SitiosDeDispositivos; docs/19 §4, L6). Los publicadores no cambian: siguen sin saber de sitios.
+export type EventoConSitio = Exclude<EventoPanel, { tipo: 'sistema' }> & { sitio_id: string | null };
+
 export interface FiltroEventos {
   dispositivo?: string;
   canal?: string;

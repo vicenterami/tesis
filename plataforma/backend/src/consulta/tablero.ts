@@ -166,6 +166,82 @@ export function alinear(filas: readonly FilaCubo[], canales: readonly string[]):
   return { tiempos, series };
 }
 
+// ── «Ahora»: lo que se mide en este momento (docs/19 §4, bloque L, puntos 3 y 6) ──────────────────────────────────────────────────
+// Magnitudes de **salud del equipo** (L3b): batería (nivel y tensión) y señal. Un solo lugar del backend, con los códigos del catálogo
+// `magnitud` (migraciones 01 y 17); en la tarjeta de un dispositivo van al final, después de lo que se mide. Una magnitud nueva de salud
+// se agrega aquí y en docs/19 L3b, juntas.
+export const MAGNITUDES_SALUD = ['bateria', 'tension', 'rssi'] as const;
+export function esSalud(magnitud: string): boolean {
+  return (MAGNITUDES_SALUD as readonly string[]).includes(magnitud);
+}
+// Cuántos canales lleva cada tarjeta, y los topes de `limite` (de 1 a 60; 24 por defecto).
+export const MAX_CANALES_AHORA = 3;
+export const LIMITE_AHORA = { porDefecto: 24, maximo: 60 } as const;
+// La tendencia: 24 cubos de una hora alineados a la hora UTC; el último es la hora en curso (parcial).
+export const CUBOS_CHISPA = 24;
+const HORA_MS = 3_600_000;
+
+// Un canal con su última lectura tal como lo trae la consulta (la forma de la ficha: valor y tiempo; la calibración para el %).
+export interface CanalConUltima {
+  id: string; dispositivo_id: string; magnitud: string; magnitud_nombre: string; unidad: string; intervalo_esperado_s: number;
+  escala_cero: number | null; escala_cien: number | null; ultima: { valor: number; tiempo: string } | null;
+}
+
+// El orden de los canales en una tarjeta: primero lo que se mide, al final la salud; dentro, por código de magnitud (como la ficha) e id.
+export function ordenCanales(a: Pick<CanalConUltima, 'id' | 'magnitud'>, b: Pick<CanalConUltima, 'id' | 'magnitud'>): number {
+  return Number(esSalud(a.magnitud)) - Number(esSalud(b.magnitud)) || a.magnitud.localeCompare(b.magnitud) || a.id.localeCompare(b.id);
+}
+export function elegirCanales<T extends Pick<CanalConUltima, 'id' | 'magnitud'>>(canales: readonly T[]): T[] {
+  return [...canales].sort(ordenCanales).slice(0, MAX_CANALES_AHORA);
+}
+
+// ¿La lectura es de «ahora»? Menos de dos intervalos esperados del dispositivo, medidos con el reloj de la base (`ahoraMs`). Una lectura
+// vieja no entra al promedio de «ahora» (L3a); en la tarjeta se muestra atenuada con su antigüedad (eso lo decide el panel).
+export function lecturaVigente(c: Pick<CanalConUltima, 'ultima' | 'intervalo_esperado_s'>, ahoraMs: number): boolean {
+  if (c.ultima === null) return false;
+  return ahoraMs - Date.parse(c.ultima.tiempo) < 2 * c.intervalo_esperado_s * 1000;
+}
+
+// Por magnitud, sobre la última lectura vigente de cada canal: promedio, mínimo, máximo y cuántos canales aportan. Las magnitudes de
+// salud van al final; dentro, por código. Una magnitud sin ninguna lectura vigente no aparece (no es 0).
+export interface AgregadoMagnitud {
+  codigo: string; nombre: string; unidad: string; salud: boolean; canales: number; promedio: number; minimo: number; maximo: number;
+}
+export function porMagnitud(canales: readonly CanalConUltima[], ahoraMs: number): AgregadoMagnitud[] {
+  const grupos = new Map<string, { nombre: string; unidad: string; valores: number[] }>();
+  for (const c of canales) {
+    if (!lecturaVigente(c, ahoraMs) || c.ultima === null) continue;
+    const g = grupos.get(c.magnitud) ?? { nombre: c.magnitud_nombre, unidad: c.unidad, valores: [] };
+    g.valores.push(c.ultima.valor);
+    grupos.set(c.magnitud, g);
+  }
+  const redondeo = (x: number): number => Math.round(x * 1000) / 1000;
+  return [...grupos.entries()]
+    .map(([codigo, g]) => ({
+      codigo, nombre: g.nombre, unidad: g.unidad, salud: esSalud(codigo), canales: g.valores.length,
+      promedio: redondeo(g.valores.reduce((s, v) => s + v, 0) / g.valores.length),
+      minimo: Math.min(...g.valores), maximo: Math.max(...g.valores),
+    }))
+    .sort((a, b) => Number(a.salud) - Number(b.salud) || a.codigo.localeCompare(b.codigo));
+}
+
+// La ventana de la tendencia: desde el inicio de la hora UTC en curso menos 23 h, 24 cubos (hasta el fin de la hora en curso).
+export function ventanaChispa(ahoraMs: number): { desde: Date; hasta: Date } {
+  const desde = Math.floor(ahoraMs / HORA_MS) * HORA_MS - (CUBOS_CHISPA - 1) * HORA_MS;
+  return { desde: new Date(desde), hasta: new Date(desde + CUBOS_CHISPA * HORA_MS) };
+}
+// Filas (canal, cubo en segundos Unix, promedio) → por canal, 24 posiciones con null donde no hubo lecturas (un cubo vacío no es 0).
+export function armarChispas(filas: readonly { canal_id: string; t: number; v: number }[], canales: readonly string[], desde: Date): Map<string, (number | null)[]> {
+  const r = new Map(canales.map((c) => [c, new Array<number | null>(CUBOS_CHISPA).fill(null)]));
+  const base = desde.getTime() / 1000;
+  for (const f of filas) {
+    const i = Math.round((f.t - base) / 3600);
+    const serie = r.get(f.canal_id);
+    if (serie !== undefined && i >= 0 && i < CUBOS_CHISPA) serie[i] = f.v;
+  }
+  return r;
+}
+
 // La resolución del rango cuando no se pide (resumen del sitio, docs/19 §4, B4): el intervalo más fino de la lista cerrada que deja la
 // ventana en 300 cubos o menos (una gráfica de barras legible en un teléfono); una ventana de más de 300 días, cubos de un día.
 export const MAX_CUBOS_RESUMEN = 300;

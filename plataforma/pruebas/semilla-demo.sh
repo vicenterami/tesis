@@ -3,7 +3,9 @@
 #   bash plataforma/pruebas/semilla-demo.sh             la mínima del guion de docs/15 (dev-0001)
 #   bash plataforma/pruebas/semilla-demo.sh --completa  además db/semillas/demo-completa.sql: todos los estados, vías, condiciones y
 #                                                       límites, con el resultado esperado en su cabecera; la aplica
-#                                                       DOS veces y exige el mismo resultado (reconstruye su escenario, no acumula)
+#                                                       DOS veces y exige el mismo resultado (reconstruye su escenario, no acumula);
+#                                                       desde el 13/11/2026, los casos límite en su propio sitio de pruebas y una
+#                                                       trama por cada medición (entrega por dispositivo distinta y creíble)
 # Requiere la pila arriba (docker compose up -d en plataforma/). Idempotente: correrla dos veces da lo mismo. Desde el 13/11/2026 respeta
 # las claves: a quien ya eligió la suya no se la toca ni se le cortan las sesiones, y una temporal aún vigente se deja como está; solo se
 # asigna una temporal nueva a la cuenta que no existía o cuya temporal venció (persona_temporal … conservar, lib-personas.sh). Una cuenta
@@ -62,8 +64,22 @@ if [ "${1:-}" = "--completa" ]; then
   comprobar "un solo pico de 38,5 °C" "SELECT count(*) FROM medicion m JOIN canal c ON c.id=m.canal_id JOIN dispositivo d ON d.id=c.dispositivo_id WHERE d.id_fisico='demo-aire-01' AND m.valor=38.5" 1
   comprobar "sin mediciones fuera del rango de su magnitud" "SELECT count(*) FROM medicion m JOIN canal c ON c.id=m.canal_id JOIN magnitud g ON g.codigo=c.magnitud_codigo JOIN dispositivo d ON d.id=c.dispositivo_id WHERE d.id_fisico IN ($L) AND (m.valor < g.rango_min OR m.valor > g.rango_max)" 0
   comprobar "límites: identificadores de 3 y 63 caracteres, nombre de 80" "SELECT string_agg(length(id_fisico)||'/'||length(nombre), ',' ORDER BY length(id_fisico)) FROM dispositivo WHERE id_fisico IN ('d03','demo-identificador-en-el-limite-de-sesenta-y-tres-caracteres-ok')" "3/1,63/80"
+  # Desde el 13/11/2026 los casos límite viven en el sitio de pruebas: la vitrina (uct, lo que ven las personas de demostración) no tiene
+  # ninguno, ni de la semilla ni con la forma de uno (identificador en un tope o nombre de 1 u 80 caracteres).
+  comprobar "casos límite en el sitio de pruebas: los 2" "SELECT count(*) FROM dispositivo d JOIN zona z ON z.id=d.zona_id JOIN sitio s ON s.id=z.sitio_id WHERE s.codigo='pruebas-limite' AND d.id_fisico IN ('d03','demo-identificador-en-el-limite-de-sesenta-y-tres-caracteres-ok')" 2
+  comprobar "el sitio uct no tiene ningún caso límite" "SELECT count(*) FROM dispositivo d JOIN zona z ON z.id=d.zona_id JOIN sitio s ON s.id=z.sitio_id WHERE s.codigo='uct' AND (d.id_fisico IN ('d03','demo-identificador-en-el-limite-de-sesenta-y-tres-caracteres-ok') OR length(d.id_fisico) IN (3, 63) OR length(d.nombre) IN (1, 80))" 0
+  comprobar "dispositivos de la semilla por sitio: 8 en uct, 1 en magallanes, 2 en pruebas-limite" "SELECT string_agg(codigo||'='||n, ',' ORDER BY codigo) FROM (SELECT s.codigo, count(*) n FROM dispositivo d JOIN zona z ON z.id=d.zona_id JOIN sitio s ON s.id=z.sitio_id WHERE d.id_fisico IN ($L) GROUP BY 1) x" "magallanes=1,pruebas-limite=2,uct=8"
+  # Tramas coherentes con las mediciones: cada medición de la semilla tiene su trama (mismo instante de recepción), la última trama es
+  # visto_por_ultima_vez, y la entrega de 24 h (recibidas ÷ esperadas, la regla de consulta/tablero.ts) es la de la cabecera.
+  comprobar "toda medición de la semilla tiene su trama" "SELECT count(*) FROM medicion m JOIN canal c ON c.id=m.canal_id JOIN dispositivo d ON d.id=c.dispositivo_id WHERE d.id_fisico IN ($L) AND NOT EXISTS (SELECT 1 FROM trama t WHERE t.dispositivo_id=d.id AND t.recibido_en=m.recibido_en)" 0
+  comprobar "la última trama de cada uno es su visto_por_ultima_vez" "SELECT count(*) FROM dispositivo d JOIN estado_dispositivo e ON e.dispositivo_id=d.id WHERE d.id_fisico IN ($L) AND e.visto_por_ultima_vez IS DISTINCT FROM (SELECT max(recibido_en) FROM trama t WHERE t.dispositivo_id=d.id)" 0
+  ENTREGA="SELECT d.id_fisico, round(least(100, round(1000.0 * (SELECT count(*) FROM trama t WHERE t.dispositivo_id=d.id AND t.recibido_en >= now() - INTERVAL '24 hours') / floor(86400.0 / d.intervalo_esperado_s)) / 10), 1) AS p FROM dispositivo d WHERE d.id_fisico IN ($L) AND d.estado='activo' AND d.creado_en <= now() - INTERVAL '24 hours'"
+  comprobar "entrega de 24 h por dispositivo, la de la cabecera" "SELECT string_agg(id_fisico||'='||p, ',' ORDER BY id_fisico) FROM ($ENTREGA) x WHERE id_fisico IN ('demo-aire-01','demo-suelo-01','demo-silencioso','demo-lora-01','demo-lora-02')" "demo-aire-01=100.0,demo-lora-01=97.5,demo-lora-02=37.5,demo-silencioso=0.0,demo-suelo-01=91.7"
+  comprobar "al menos tres valores de entrega distintos entre los dispositivos de la semilla" "SELECT (count(DISTINCT p) >= 3)::int FROM ($ENTREGA) x" 1
+  comprobar "tramas de las últimas 24 h en uct: las de la cabecera (no casi cero)" "SELECT count(*) FROM trama t JOIN dispositivo d ON d.id=t.dispositivo_id JOIN zona z ON z.id=d.zona_id JOIN sitio s ON s.id=z.sitio_id WHERE s.codigo='uct' AND d.id_fisico IN ($L) AND t.recibido_en >= now() - INTERVAL '24 hours'" 718
   comprobar "pasarela inactiva presente (un alta lorawan con ella debe dar 400)" "SELECT count(*) FROM pasarela WHERE id_fisico='demo-pasarela-02' AND NOT activo" 1
   comprobar "sitio con otra zona horaria" "SELECT zona_horaria FROM sitio WHERE codigo='magallanes'" America/Punta_Arenas
+  comprobar "las personas de demostración no tienen membresía fuera de uct" "SELECT count(*) FROM usuario_sitio us JOIN usuario u ON u.id=us.usuario_id JOIN sitio s ON s.id=us.sitio_id WHERE u.email LIKE '%-demo@ejemplo.invalid' AND s.codigo <> 'uct'" 0
   comprobar "condición del sistema de la semilla, cerrada" "SELECT count(*) FROM condicion_sistema WHERE detalle->>'origen'='semilla' AND cerrada_en IS NOT NULL" 1
   comprobar "credenciales: ninguna verificable (hash de semilla)" "SELECT count(*) FROM credencial c JOIN dispositivo d ON d.id=c.dispositivo_id WHERE d.id_fisico IN ($L) AND c.hash <> 'scrypt\$semilla\$sin-secreto-inutilizable'" 0
   # La API dice lo mismo que la base (lo que ve el panel): en_linea por dispositivo.

@@ -449,7 +449,7 @@
     },
     "/eventos": {
       "get": {
-        "description": "Server-Sent Events: medicion, visto y condicion, cada uno cuando ya está guardado, y un latido cada 25 s. Filtros opcionales por dispositivo o por canal. Exige sesión (o X-Clave-Admin): solo llegan los eventos de los dispositivos de los sitios del usuario, y los del sistema (cola del broker) solo a quien administra algún sitio. La sesión se revalida en cada latido: si se cerró, venció o fue revocada, el flujo termina; si cambiaron los sitios, rige el alcance nuevo. Rechaza una página de otro sitio (403); con 5 flujos abiertos del mismo usuario responde 429 y con 50 en total, 503.",
+        "description": "Server-Sent Events: medicion, visto y condicion, cada uno cuando ya está guardado y con el `sitio_id` de su dispositivo (null solo para quien alcanza a todos los sitios, si el dispositivo es tan nuevo que el servidor aún no lo conoce), y un latido cada 25 s. Filtros opcionales por dispositivo o por canal. Exige sesión (o X-Clave-Admin): solo llegan los eventos de los dispositivos de los sitios del usuario, y los del sistema (cola del broker) solo a quien administra algún sitio. La sesión se revalida en cada latido: si se cerró, venció o fue revocada, el flujo termina; si cambiaron los sitios, rige el alcance nuevo. Rechaza una página de otro sitio (403); con 5 flujos abiertos del mismo usuario responde 429 y con 50 en total, 503.",
         "operationId": "EventosController_flujo",
         "parameters": [
           {
@@ -479,7 +479,7 @@
                 "schema": {
                   "type": "string"
                 },
-                "example": "event: medicion\ndata: {\"tipo\":\"medicion\",\"dispositivo_id\":\"<uuid>\",\"canal_id\":\"<uuid>\",\"valor\":21.5,\"unidad\":\"Cel\",\"tiempo\":\"2026-10-09T15:00:00.000Z\"}\n\nevent: visto\ndata: {\"tipo\":\"visto\",\"dispositivo_id\":\"<uuid>\",\"tiempo\":\"2026-10-09T15:00:00.000Z\"}\n\nevent: condicion\ndata: {\"tipo\":\"condicion\",\"dispositivo_id\":\"<uuid>\",\"condicion\":\"umbral\",\"estado\":\"abierta\"}\n\nevent: sistema\ndata: {\"tipo\":\"sistema\",\"condicion\":\"broker_descarte\",\"estado\":\"abierta\",\"motivos\":[\"descartes\"],\"mensajes_en_cola\":120,\"descartes_delta\":57}\n\nevent: latido\ndata: {\"tiempo\":\"2026-10-09T15:00:25.000Z\"}\n\n"
+                "example": "event: medicion\ndata: {\"tipo\":\"medicion\",\"dispositivo_id\":\"<uuid>\",\"canal_id\":\"<uuid>\",\"valor\":21.5,\"unidad\":\"Cel\",\"tiempo\":\"2026-10-09T15:00:00.000Z\",\"porcentaje\":null,\"sitio_id\":\"<uuid>\"}\n\nevent: visto\ndata: {\"tipo\":\"visto\",\"dispositivo_id\":\"<uuid>\",\"tiempo\":\"2026-10-09T15:00:00.000Z\",\"sitio_id\":\"<uuid>\"}\n\nevent: condicion\ndata: {\"tipo\":\"condicion\",\"dispositivo_id\":\"<uuid>\",\"condicion\":\"umbral\",\"estado\":\"abierta\",\"sitio_id\":\"<uuid>\"}\n\nevent: sistema\ndata: {\"tipo\":\"sistema\",\"condicion\":\"broker_descarte\",\"estado\":\"abierta\",\"motivos\":[\"descartes\"],\"mensajes_en_cola\":120,\"descartes_delta\":57}\n\nevent: latido\ndata: {\"tiempo\":\"2026-10-09T15:00:25.000Z\"}\n\n"
               }
             }
           },
@@ -1626,6 +1626,67 @@
           }
         ],
         "summary": "Resumen del sitio para el tablero (Etapa 4)",
+        "tags": [
+          "sitios"
+        ]
+      }
+    },
+    "/sitios/{id}/ahora": {
+      "get": {
+        "description": "Un número fijo de consultas por petición, sin una por dispositivo (docs/10 §8.4 punto 65 viii). `reportan` y `sin_senal`: cuántos dispositivos del sitio tienen estado visual normal o alerta, y sin señal (la regla de docs/19 §2, la misma del inventario y del resumen). `por_magnitud[{codigo, nombre, unidad, salud, canales, promedio, minimo, maximo}]`: sobre la última lectura de cada canal de los que reportan, solo si tiene menos de dos intervalos esperados del dispositivo (una lectura vieja no entra); `canales`, cuántos aportan; las de salud del equipo al final. `dispositivos[{id, nombre, zona, estado_visual, visto_por_ultima_vez, intervalo_esperado_s, canales_total, canales}]`: los que reportan, primero los de alerta y después por zona y nombre, hasta `limite`; `canales` trae hasta 3 `{id, magnitud, magnitud_nombre, unidad, salud, ultima{valor, tiempo, porcentaje}|null}`: primero lo que se mide y al final la salud del equipo (bateria, tension, rssi). Con `tendencia=si`, además `chispa{desde, intervalo, puntos}` y, en cada canal, `chispa`: 24 promedios por hora alineados a la hora UTC, el último de la hora en curso (parcial); un cubo sin lecturas es null, no 0. Consulta o más en su sitio; otro sitio, 404.",
+        "operationId": "SitiosController_ahora",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "UUID del sitio",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limite",
+            "required": false,
+            "in": "query",
+            "description": "Tarjetas de dispositivo: 1–60, por defecto 24",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "tendencia",
+            "required": false,
+            "in": "query",
+            "description": "`si` suma las líneas de tendencia de 24 h; cualquier otro valor o ausente, no",
+            "schema": {
+              "enum": [
+                "si"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lo que reporta cada dispositivo ahora y el resumen por magnitud"
+          },
+          "400": {
+            "description": "UUID inválido o limite fuera de 1–60"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "404": {
+            "description": "Sitio inexistente o de otro"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Lo que se mide ahora en el sitio (Etapa 4; tablero v3, «Ahora»)",
         "tags": [
           "sitios"
         ]

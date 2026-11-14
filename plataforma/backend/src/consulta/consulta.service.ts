@@ -27,6 +27,11 @@ export const SQL_INTERVALO_OBSERVADO = `(
                                       ORDER BY tr.recibido_en DESC LIMIT 20) x) u) w
               WHERE w.dif IS NOT NULL)`;
 
+// La última lectura de un canal `c`: la de la ficha (GET /dispositivos/{id}) y la de «Ahora» (GET /sitios/{id}/ahora, docs/19 §4, L6), una
+// sola forma: `{valor, tiempo}` o null, por el índice único (canal_id, tiempo) de `medicion` (lee una fila). El % lo pone porcentaje().
+export const SQL_ULTIMA_MEDICION = `(SELECT json_build_object('valor', x.valor, 'tiempo', iso_utc(x.tiempo)) FROM medicion x
+               WHERE x.canal_id = c.id ORDER BY x.tiempo DESC LIMIT 1)`;
+
 // Prefijo del ORDER BY del inventario por `orden` (lista cerrada de tablero.ts: nunca texto del cliente). `atencion`: el orden de docs/19 §2
 // (sin señal, alerta, normal, inactivo) y, dentro, por nombre (y después el de siempre, para que el orden sea total).
 const ORDEN_SQL: Readonly<Record<NonNullable<FiltroInventario['orden']>, string>> = {
@@ -128,8 +133,7 @@ export class ConsultaService {
              (SELECT json_agg(json_build_object('id', r.id, 'umbral_alto', r.umbral_alto, 'umbral_bajo', r.umbral_bajo, 'histeresis', r.histeresis,
                                      'retardo_s', r.retardo_s) ORDER BY r.id)
                 FROM regla_umbral r WHERE r.canal_id = c.id) AS reglas,
-             (SELECT json_build_object('valor', x.valor, 'tiempo', iso_utc(x.tiempo)) FROM medicion x
-               WHERE x.canal_id = c.id ORDER BY x.tiempo DESC LIMIT 1) AS ultima_medicion
+             ${SQL_ULTIMA_MEDICION} AS ultima_medicion
         FROM canal c JOIN magnitud m ON m.codigo = c.magnitud_codigo
        WHERE c.dispositivo_id = $1 ORDER BY c.magnitud_codigo`, [id]);
 

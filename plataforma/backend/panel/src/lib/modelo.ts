@@ -56,9 +56,11 @@ export interface Salud {
 }
 
 export type EventoVivo =
-  | { tipo: 'medicion'; dispositivo_id: string; canal_id: string; valor: number; unidad: string; tiempo: string; porcentaje?: number | null } // opcional: un backend anterior no lo manda
-  | { tipo: 'visto'; dispositivo_id: string; tiempo: string }
-  | { tipo: 'condicion'; dispositivo_id: string; condicion: TipoCondicion | string; estado: 'abierta' | 'cerrada' }
+  // sitio_id (docs/19 §4, L6): el sitio del dispositivo; null solo para quien alcanza a todos, si el servidor aún no conoce el dispositivo.
+  // Opcional: un backend anterior no lo manda.
+  | { tipo: 'medicion'; dispositivo_id: string; canal_id: string; valor: number; unidad: string; tiempo: string; porcentaje?: number | null; sitio_id?: string | null } // porcentaje, opcional: un backend anterior no lo manda
+  | { tipo: 'visto'; dispositivo_id: string; tiempo: string; sitio_id?: string | null }
+  | { tipo: 'condicion'; dispositivo_id: string; condicion: TipoCondicion | string; estado: 'abierta' | 'cerrada'; sitio_id?: string | null }
   | { tipo: 'latido'; tiempo: string };
 
 export interface ReglaUmbral {
@@ -130,6 +132,35 @@ export interface ResumenSitio {
   atencion: { id: string; nombre: string; estado_visual: 'sin_senal' | 'alerta'; visto_por_ultima_vez: string | null; tipos: string[] }[];
   magnitudes: { codigo: string; nombre: string; unidad: string; canales: number }[];
   entrega: { id: string; nombre: string; recibidas: number; esperadas: number; porcentaje: number | null }[];
+}
+
+// GET /sitios/{id}/ahora (docs/19 §4, bloque L, puntos 3 y 6): lo que se mide en este momento. `chispa` (la de arriba y la de cada canal)
+// solo viene con `tendencia=si`: 24 promedios por hora alineados a la hora UTC desde `chispa.desde`, el último parcial; null = sin lecturas.
+export interface CanalAhora {
+  id: string;
+  magnitud: string;
+  magnitud_nombre: string;
+  unidad: string;
+  salud: boolean; // batería o señal: van al final de la tarjeta
+  ultima: { valor: number; tiempo: string; porcentaje: number | null } | null;
+  chispa?: (number | null)[];
+}
+export interface DispositivoAhora {
+  id: string;
+  nombre: string;
+  zona: string;
+  estado_visual: 'normal' | 'alerta';
+  visto_por_ultima_vez: string | null;
+  intervalo_esperado_s: number;
+  canales_total: number;
+  canales: CanalAhora[]; // hasta tres
+}
+export interface AhoraSitio {
+  reportan: number;
+  sin_senal: number;
+  por_magnitud: { codigo: string; nombre: string; unidad: string; salud: boolean; canales: number; promedio: number; minimo: number; maximo: number }[];
+  dispositivos: DispositivoAhora[];
+  chispa?: { desde: string; intervalo: '1 hour'; puntos: number };
 }
 
 // GET /sitios/{id}/historico: la forma de Historico (sin canal) más mínimos, máximos y cuántos canales aportan por cubo.
