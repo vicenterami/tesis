@@ -654,7 +654,7 @@ describe('Ficha v2: zoom, banda, umbrales, todos los canales, eventos, rechazada
     expect(historicos()).toHaveLength(1);
   });
 
-  it('«Mostrar mín–máx» dibuja la banda del mismo matiz con el mínimo y el máximo de cada cubo; sin esos campos, el botón no aparece', async () => {
+  it('«Mostrar mín–máx» dibuja la banda del mismo matiz con el mínimo y el máximo de cada intervalo; sin esos campos, el botón no aparece', async () => {
     const conBanda = { ...historico, minimos: [19, 20], maximos: [22, 23] };
     const base = globalThis.fetch;
     vi.stubGlobal('fetch', vi.fn(async (ruta: string) => (ruta.startsWith('/canales/c-temp/historico') ? new Response(JSON.stringify(conBanda)) : base(ruta))));

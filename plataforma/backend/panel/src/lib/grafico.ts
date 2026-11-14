@@ -133,6 +133,18 @@ const ROTULO_INTERVALO: Readonly<Record<string, string>> = {
 export function rotuloIntervalo(intervalo: string): string {
   return ROTULO_INTERVALO[intervalo] ?? intervalo;
 }
+// «cada 15 minutos», «cada hora» (docs/19 §4, M4): el intervalo como lo dice una persona en un rótulo («Tramas cada 15 minutos»); «cubo» es
+// palabra del diseño y del código, no de la pantalla. Con uno, sin el número («cada hora», no «cada 1 hora»).
+const CADA: Readonly<Record<string, string>> = {
+  '1 minute': 'cada minuto', '5 minutes': 'cada 5 minutos', '15 minutes': 'cada 15 minutos', '1 hour': 'cada hora', '6 hours': 'cada 6 horas', '1 day': 'cada día',
+};
+export function rotuloCada(intervalo: string): string {
+  return CADA[intervalo] ?? `cada ${rotuloIntervalo(intervalo)}`;
+}
+// «aportan: 3 dispositivos» (docs/19 §4, M3): cuántos dispositivos aportan al promedio del sitio en un punto.
+export function textoAportan(n: number): string {
+  return `${n} ${n === 1 ? 'dispositivo' : 'dispositivos'}`;
+}
 
 // Valor con su unidad, con tres decimales como mucho (los que guarda la API) y coma decimal (es-CL). `decimales` (0 a 3) los limita más:
 // lo usa quien resume lo dibujado (la etiqueta flotante, el resumen del rango), con `decimalesParaRecorrido`.
@@ -244,11 +256,13 @@ export function horaEtiqueta(segundos: number, zona: string): string {
 // barras apiladas, que muestran el propio y no la suma); la banda mín–máx, en una sola fila; las series sin valor en ese cubo no se
 // nombran (en la ficha, «lectura actual» existe solo donde llegó algo en vivo). Sin ninguna, una fila «sin datos». Todos los valores de
 // la etiqueta llevan los mismos decimales como mucho (`decimales`, de `decimalesDeSeries`): el valor exacto está en «Ver los datos».
+// Con `aportes` (el promedio del sitio, docs/19 §4, M3), una fila más al final: cuántos dispositivos aportan en ese punto.
 export interface FilaEtiqueta {
   nombre: string;
   valor: string;
   color: string;
   banda?: boolean; // la fila de la banda mín–máx: su muestra es la de la leyenda fija (un bloque tenue), no una línea
+  aporte?: boolean; // la fila de cuántos aportan (M3): no es una serie, va sin muestra de color
 }
 export function filasEtiqueta(
   series: readonly (readonly (number | null)[])[],
@@ -257,6 +271,7 @@ export function filasEtiqueta(
   i: number,
   unidad: string,
   decimales = 3,
+  aportes: readonly (number | null)[] | null = null,
 ): FilaEtiqueta[] {
   const texto = (v: number | null | undefined): string | null => (v === null || v === undefined || !Number.isFinite(v) ? null : `${formatearNumero(v, decimales)} ${unidad}`);
   const filas: FilaEtiqueta[] = [];
@@ -271,5 +286,9 @@ export function filasEtiqueta(
     const alta = series[banda.alta]?.[i];
     if (baja !== null && baja !== undefined && alta !== null && alta !== undefined) filas.push({ nombre: 'mínimo–máximo', valor: `${formatearNumero(baja, decimales)} a ${formatearNumero(alta, decimales)} ${unidad}`, color: banda.color, banda: true });
   }
-  return filas.length === 0 ? [{ nombre: 'sin datos', valor: '—', color: '' }] : filas;
+  if (filas.length === 0) return [{ nombre: 'sin datos', valor: '—', color: '' }];
+  // El promedio del sitio (M3): cuántos dispositivos aportan en ese punto; cuando un equipo calla, el número baja y se ve.
+  const n = aportes?.[i];
+  if (n !== null && n !== undefined && n > 0) filas.push({ nombre: 'aportan', valor: textoAportan(n), color: '', aporte: true });
+  return filas;
 }

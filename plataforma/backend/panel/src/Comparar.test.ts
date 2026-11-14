@@ -87,6 +87,18 @@ describe('Comparar (P3b): la misma magnitud de varios dispositivos', () => {
     expect(document.querySelector('[data-historico]')?.textContent).toContain('2 series, 3 instantes, promedio por 15 minutos');
   });
 
+  it('el título de la historia no dice «cubo» (M4) y su «Ver los datos» no tiene la columna de cuántos aportan, que es solo del promedio del sitio (M3)', async () => {
+    render(Comparar, { dispositivos: [id(1), id(2), id(3), id(4)] });
+    await waitFor(() => expect(graficos).toHaveLength(1));
+    expect([...document.querySelectorAll('h3')].map((h) => h.textContent)).toContain('Historia: promedios por intervalo de tiempo');
+    const detalles = document.querySelector<HTMLDetailsElement>('[data-datos-grafico]')!;
+    detalles.open = true;
+    detalles.dispatchEvent(new Event('toggle'));
+    await waitFor(() => expect(document.querySelector('[data-tabla-grafico]')).toBeTruthy());
+    expect([...document.querySelectorAll('[data-tabla-grafico] thead th')].map((t) => t.textContent)).toEqual(['Hora (America/Santiago)', 'Invernadero (Cel)', 'Bodega (Cel)']);
+    expect(document.querySelector('[data-celda-aportan]')).toBeNull();
+  });
+
   it('una sola conexión a /eventos sin filtro; una lectura de un marcado actualiza su fila sin recargar y la de otro se ignora', async () => {
     render(Comparar, { dispositivos: [id(1), id(2)] });
     await waitFor(() => expect(document.querySelectorAll('[data-fila-comparar]')).toHaveLength(2));

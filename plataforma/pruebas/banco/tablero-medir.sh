@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Mediciones del tablero v2 contra el backend del banco (docs/16 §61 y §65). `tiempos` requiere `banco.sh encender 120` y la semilla de la
+# Mediciones del tablero v2 contra el backend del banco (docs/16 §61, §65, §66 y §68). `tiempos` requiere `banco.sh encender 120` y la semilla de la
 # serie (tablero-semilla-serie.sql); `lote` y `verificacion`, solo `banco.sh encender`. Lee y escribe como usuario del sistema con la clave
 # de descarte del banco, por la entrada estándar de curl; los tokens creados para medir viajan igual y nunca se imprimen. Lo que se crea
 # vive en el banco (datos en RAM) y desaparece con `banco.sh apagar`.
@@ -8,6 +8,8 @@
 #                                                                   de GET /sitios/{id}/ahora sin tendencia, con ella y con ella y limite=60, del
 #                                                                   sitio CÓDIGO («banco», el de los emulados, por defecto; §66 mide también uno de
 #                                                                   2 000 dispositivos); el ritmo lo pone tablero-semilla-ahora.sql
+#   bash plataforma/pruebas/banco/tablero-medir.sh historico [CÓDIGO] [HASTA]  el histórico del sitio (docs/19 §4, M6) con los cuatro rangos del panel y
+#                                                                   un `hasta` fijo, para medir el antes y el después sobre la misma ventana
 #   bash plataforma/pruebas/banco/tablero-medir.sh lote N P [VIA]   POST /dispositivos/lote?modo=crear con N filas de vía VIA (http, por
 #                                                                   defecto: sin broker, solo el costo del resumen de cada credencial; mqtt:
 #                                                                   además las órdenes al broker) e id_fisico P-0000…; a los 2 s, un alta
@@ -44,6 +46,22 @@ case "${1:-}" in
     echo "ahora: $(mediana "$B/sitios/$SITIO/ahora")"
     echo "ahora?tendencia=si: $(mediana "$B/sitios/$SITIO/ahora?tendencia=si")"
     echo "ahora?tendencia=si&limite=60: $(mediana "$B/sitios/$SITIO/ahora?tendencia=si&limite=60")" ;;
+  historico)
+    # docs/19 §4, M6: GET /sitios/{id}/historico con los cuatro rangos del panel (1 h · 1 minuto, 24 h · 15 minutos, 7 días · 1 hora y 30 días
+    # · 6 horas), del sitio CÓDIGO, con un `hasta` FIJO (HASTA, ISO; por defecto, ahora): así el antes y el después leen exactamente la misma
+    # ventana aunque se midan con horas de diferencia. Con GUARDAR=<carpeta> deja además cada respuesta en <carpeta>/<rango>.json (para
+    # comparar el antes y el después campo a campo); esa carpeta va fuera del repositorio.
+    SITIO=$(api "$B/sitios" | python3 -I -c 'import json,sys; print([s["id"] for s in json.load(sys.stdin) if s["codigo"]==sys.argv[1]][0])' "${2:-banco}")
+    H="${3:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"; MAG="${MAGNITUD:-temperatura}"
+    mediana() { api -o /dev/null "$1"; for _ in $(seq 10); do api -o /dev/null -w '%{time_total} %{size_download} %{http_code}\n' "$1"; done \
+      | sort -n | awk '{a[NR]=$1; b=$2; c=$3} END {printf "%.1f ms  %s B  HTTP %s\n", (a[5]+a[6])/2*1000, b, c}'; }
+    echo "sitio ${2:-banco} · magnitud $MAG · hasta $H"
+    for r in "1h|1 hour|1%20minute" "24h|24 hours|15%20minutes" "7d|7 days|1%20hour" "30d|30 days|6%20hours"; do
+      IFS='|' read -r clave atras inter <<< "$r"
+      u="$B/sitios/$SITIO/historico?magnitud=$MAG&desde=$(date -u -d "$H - $atras" +%Y-%m-%dT%H:%M:%SZ)&hasta=$H&intervalo=$inter"
+      [ -n "${GUARDAR:-}" ] && api -o "$GUARDAR/$clave.json" "$u"
+      echo "histórico del sitio $clave · ${inter//%20/ }: $(mediana "$u")"
+    done ;;
   lote)
     N="${2:?N filas}"; P="${3:?prefijo de id_fisico}"; VIA="${4:-http}"; T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
     [[ "$VIA" =~ ^(http|mqtt)$ ]] || { echo "FALLA vía «$VIA»: http o mqtt"; exit 1; }
@@ -76,5 +94,5 @@ case "${1:-}" in
       sort -n "$T/$g" | awk -v g="$g" '{a[NR]=$1; c[$2]++} END {m=(NR%2)?a[(NR+1)/2]:(a[NR/2]+a[NR/2+1])/2; s=""; for (k in c) s=s k "×" c[k] " ";
         printf "%-12s mediana %.1f ms · mín %.1f · máx %.1f · HTTP %s\n", g, m*1000, a[1]*1000, a[NR]*1000, s}'
     done ;;
-  *) sed -n '2,19p' "$0"; exit 1 ;;
+  *) sed -n '2,21p' "$0"; exit 1 ;;
 esac

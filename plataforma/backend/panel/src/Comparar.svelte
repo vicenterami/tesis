@@ -242,7 +242,7 @@
     </label>
   </div>
 
-  <h3>Historia: promedios por cubo de tiempo</h3>
+  <h3>Historia: promedios por intervalo de tiempo</h3>
   {#if aDibujar.length === 0}
     <p class="vacio" data-comparar-sin-magnitud>Ninguno de los marcados mide {nombreMagnitud}.</p>
   {:else}

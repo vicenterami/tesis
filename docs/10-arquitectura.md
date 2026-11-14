@@ -1754,6 +1754,16 @@ entra. Lo que aquí se marca «a fijar al implementar» es un detalle que el dis
     mismo mapa en memoria que filtra el canal por sitio (`docs/20 §3`), que se pone al día al abrir un flujo, con un dispositivo
     desconocido y, desde el 13/11/2026, en cada latido (como mucho una recarga cada 5 s); quién recibe qué no cambia. Medido con 120 y
     con 2 000 fuentes en `docs/16 §66`.
+66. **El promedio del sitio es el de sus dispositivos (`docs/19 §4`, M; 14/11/2026).** `GET /sitios/{id}/historico` (Etapa 4) ya no
+    promedia todas las lecturas de cada tramo: cada dispositivo aporta un valor, el promedio de sus lecturas del tramo o, si no reportó
+    en él, su última lectura mientras siga vigente al empezar el tramo; la banda es entre dispositivos y `n`, cuántos aportan. La regla
+    de vigencia (menos de dos intervalos esperados del dispositivo, estricta) tiene una sola casa, `sqlLecturaVigente` de
+    `consulta/tablero.ts`, que usan «Ahora» (con el reloj de la base) y esta consulta (`SQL_HISTORICO_SITIO`, en el mismo archivo). Una
+    consulta en la base, en una conexión propia con 5 s de tiempo máximo (503 si lo excede; la conexión vuelve sin el tope o se destruye) y
+    como mucho dos a la vez en el proceso (las demás esperan en fila, hasta doce; llena, 503), para no dejar sin conexiones a la recepción.
+    Medido antes y después con 120 y 2 000 dispositivos en `docs/16 §68`: el umbral relativo de 1,5 veces que traía `docs/19` M6 se cumplía en 4 de 8
+    mediciones y se reemplazó por uno absoluto (ninguna petición sobre 3 s; el refresco en vivo de la pestaña, bajo la décima parte de su
+    período), que las ocho cumplen; la más lenta, 1 088 ms.
 
 ## 9. Crecimiento, resiliencia y respaldo (aprobado el 06/10/2026)
 

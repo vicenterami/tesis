@@ -18,7 +18,7 @@
   import { esDelSitio } from './lib/ahora';
   import { esCancelacion, obtener } from './lib/api';
   import { avisoDeError } from './lib/avisos';
-  import { RANGO_POR_DEFECTO, intervaloParaVentana, resumenRango, rotuloIntervalo, type ClaveRango } from './lib/grafico';
+  import { RANGO_POR_DEFECTO, intervaloParaVentana, resumenRango, rotuloCada, type ClaveRango } from './lib/grafico';
   import type { EventoVivo, HistoricoSitio, ResumenSitio, Sitio } from './lib/modelo';
   import { esRangoVivo, limitador, periodoRefrescoMs, ventanaAlineada } from './lib/refresco';
   import { coloresSeries, temaVivo } from './lib/tema';
@@ -246,7 +246,7 @@
               <a class="enlace-secundario" href={fragmentoComparar(paraComparar, m.codigo, rangoElegido ?? '30d')} data-comparar-magnitud={m.codigo}>Comparar dispositivos</a>
             {/if}
           </div>
-          <GraficoSitio historico={h} nombre={m.nombre} canales={m.canales} {zona} ventana={ventanaGrafico} {sincronizar} {unidades} />
+          <GraficoSitio historico={h} nombre={m.nombre} {zona} ventana={ventanaGrafico} {sincronizar} {unidades} />
         </section>
       {/if}
     {/each}
@@ -259,7 +259,7 @@
   {/if}
 {:else}
   <section class="panel-seccion" aria-labelledby="titulo-tramas">
-    <h3 id="titulo-tramas" data-titulo-tramas>Tramas por cubo de {rotuloIntervalo(resumen.ventana.intervalo)}</h3>
+    <h3 id="titulo-tramas" data-titulo-tramas>Tramas {rotuloCada(resumen.ventana.intervalo)}</h3>
     <p class="vivo">{resumen.tramas.recibidas.toLocaleString('es-CL')} recibidas · {resumen.tramas.rechazadas.toLocaleString('es-CL')} rechazadas en el rango</p>
     {#if resumen.tramas.recibidas + resumen.tramas.rechazadas === 0}
       <p class="vacio" data-sin-tramas>Sin tramas en este rango. <Boton etiqueta="Ver los últimos 30 días" onclick={() => elegirRango('30d')} data-ultimos-30 /></p>

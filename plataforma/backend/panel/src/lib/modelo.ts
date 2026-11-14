@@ -178,7 +178,10 @@ export interface HistoricoSitio {
   valores: (number | null)[];
   minimos: (number | null)[];
   maximos: (number | null)[];
+  // Desde el bloque M (docs/19 §4): `n`, cuántos dispositivos aportan en cada punto (con lectura propia o vigente); `dispositivos`, cuántos
+  // aportan en algún punto de la ventana.
   n: number[];
+  dispositivos: number;
 }
 
 // GET /dispositivos/{id}/historico: todos los canales alineados por cubo.

@@ -116,7 +116,7 @@ const historico = (magnitud: string): HistoricoSitio => ({
   magnitud, unidad: magnitud === 'temperatura' ? 'Cel' : 'V', zona_horaria: 'America/Santiago', intervalo: '15 minutes', desde: 'x', hasta: 'y', puntos: 2,
   tiempos: [1762869600, 1762870500],
   // «tension» no tiene datos en el rango: se nombra en una línea, sin lienzo (L4f).
-  valores: magnitud === 'tension' ? [null, null] : [20, 21], minimos: [18, 19], maximos: [23, 24], n: [9, 9],
+  valores: magnitud === 'tension' ? [null, null] : [20, 21], minimos: [18, 19], maximos: [23, 24], n: [9, 8], dispositivos: 9,
 });
 const peticiones: string[] = [];
 const oyentes = new Map<string, (ev: MessageEvent) => void>();
@@ -400,7 +400,23 @@ describe('Tendencias y Red (L2, L4): se piden al abrirlas, con la fila del rango
     expect(document.getElementById(sec.getAttribute('aria-labelledby')!)!.textContent).toBe('humedad');
     expect(screen.getByRole('region', { name: 'humedad' })).toBe(sec);
     expect(sec.querySelector('[data-leyenda-fija]')!.textContent).toBe('promediomínimo–máximo'); // nombres con su color, sin valores
-    expect(document.querySelector('[data-aporte]')!.textContent).toBe('Promedio de 9 dispositivos por 15 minutos');
+    expect(document.querySelector('[data-aporte]')!.textContent).toBe('Promedio de los dispositivos que reportan, cada 15 minutos (hasta 9)'); // M3: el de la respuesta, no el conteo de canales del resumen
+  });
+
+  it('si el histórico pasa su tiempo máximo (503 con motivo), el aviso dice lo que el servidor aconseja y ofrece «Reintentar» (M5)', async () => {
+    let falla = true;
+    const f = vi.mocked(fetch).getMockImplementation()!;
+    vi.stubGlobal('fetch', vi.fn(async (ruta: string) => (falla && ruta.includes('/historico?')
+      ? new Response(JSON.stringify({ statusCode: 503, message: 'el histórico del sitio tardó más de 5 s: prueba con un rango más corto o más tarde' }), { status: 503 })
+      : f(ruta))));
+    montarVer('tendencias');
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('El histórico del sitio tardó más de 5 s: prueba con un rango más corto o más tarde.'));
+    expect(screen.getByRole('alert').textContent).not.toContain('saturado');
+    falla = false;
+    screen.getByRole('button', { name: 'Reintentar' }).click();
+    await conLienzo();
+    await waitFor(() => expect(graficos).toHaveLength(5));
+    expect(document.querySelector('[role="alert"]')).toBeNull();
   });
 
   it('puntos solo con 30 o menos y nunca en los bordes de la banda (L4d)', async () => {
@@ -416,7 +432,7 @@ describe('Tendencias y Red (L2, L4): se piden al abrirlas, con la fila del rango
 
   it('Red: tramas por cubo apiladas con eje de enteros desde 0 y entrega de peor a mejor; ningún histórico por magnitud', async () => {
     montarVer('red');
-    await waitFor(() => expect(document.querySelector('[data-titulo-tramas]')!.textContent).toBe('Tramas por cubo de 15 minutos')); // el intervalo que declara el servidor
+    await waitFor(() => expect(document.querySelector('[data-titulo-tramas]')!.textContent).toBe('Tramas cada 15 minutos')); // el intervalo que declara el servidor; sin «cubo» (M4)
     expect(historicos()).toEqual([]);
     await conLienzo();
     const tramas = graficos.find((g) => g.titulo === 'Tramas recibidas y rechazadas')!;
@@ -430,7 +446,7 @@ describe('Tendencias y Red (L2, L4): se piden al abrirlas, con la fila del rango
   it('el rótulo de las tramas sale del intervalo que declara el servidor, no del pedido', async () => {
     resumen = { ...base(), ventana: { ...base().ventana, intervalo: '1 hour' } };
     montarVer('red');
-    await waitFor(() => expect(document.querySelector('[data-titulo-tramas]')!.textContent).toBe('Tramas por cubo de 1 hora'));
+    await waitFor(() => expect(document.querySelector('[data-titulo-tramas]')!.textContent).toBe('Tramas cada hora'));
   });
 
   it('texto alternativo (WCAG 1.1.1): cada gráfica es una imagen con nombre; «Ver los datos» con un renglón por punto, cada serie con su propio número', async () => {
@@ -466,7 +482,7 @@ describe('Tendencias y Red (L2, L4): se piden al abrirlas, con la fila del rango
     await vi.advanceTimersByTimeAsync(0);
     const etiqueta = (): HTMLElement | null => document.querySelector<HTMLElement>('[data-etiqueta-flotante]');
     expect(document.querySelectorAll('[data-etiqueta-flotante]')).toHaveLength(1);
-    expect([etiqueta()!.querySelector('.hora')!.textContent, ...[...etiqueta()!.querySelectorAll('.fila')].map((f) => f.textContent)]).toEqual(['11/11/2025 11:15', 'promedio: 21 °C', 'mínimo–máximo: 19 a 24 °C']);
+    expect([etiqueta()!.querySelector('.hora')!.textContent, ...[...etiqueta()!.querySelectorAll('.fila')].map((f) => f.textContent)]).toEqual(['11/11/2025 11:15', 'promedio: 21 °C', 'mínimo–máximo: 19 a 24 °C', 'aportan: 8 dispositivos']); // M3: cuántos aportan en ese punto
     expect(etiqueta()!.getAttribute('aria-hidden')).toBe('true'); // los mismos valores están en «Ver los datos»
     await fireEvent.keyDown(document.body, { key: 'Escape' });
     expect(etiqueta()).toBeNull();
@@ -483,6 +499,28 @@ describe('Tendencias y Red (L2, L4): se piden al abrirlas, con la fila del rango
     mover(a!, 0); // fuera del gráfico ya no aparece
     await vi.advanceTimersByTimeAsync(0);
     expect(etiqueta()).toBeNull();
+  });
+
+  it('«Ver los datos» del promedio del sitio suma la columna de cuántos aportan en cada punto (M3); la fila «aportan» va sin muestra de color', async () => {
+    montarVer('tendencias');
+    await waitFor(() => expect(graficos).toHaveLength(5));
+    await conLienzo();
+    const sec = document.querySelector('[data-magnitud-seccion="temperatura"]')!;
+    const detalles = sec.querySelector<HTMLDetailsElement>('[data-datos-grafico]')!;
+    detalles.open = true;
+    await fireEvent(detalles, new Event('toggle'));
+    await waitFor(() => expect(sec.querySelector('[data-tabla-grafico]')).toBeTruthy());
+    const tabla = sec.querySelector('[data-tabla-grafico]')!;
+    expect([...tabla.querySelectorAll('thead th')].map((t) => t.textContent)).toEqual(['Hora (America/Santiago)', 'promedio (°C)', 'mínimo (°C)', 'máximo (°C)', 'Dispositivos que aportan']);
+    expect([...tabla.querySelectorAll('[data-celda-aportan]')].map((t) => t.textContent)).toEqual(['9 dispositivos', '8 dispositivos']);
+    const g = graficos.find((x) => x.titulo === 'temperatura (°C)')!;
+    await fireEvent.mouseEnter(g.u.over);
+    g.u.cursor = { idx: 0, left: 40, top: 20 };
+    for (const h of g.opciones.hooks.setCursor ?? []) h(g.u);
+    await vi.advanceTimersByTimeAsync(0);
+    const filas = [...document.querySelectorAll('[data-etiqueta-flotante] .fila')];
+    expect(filas.at(-1)!.textContent).toBe('aportan: 9 dispositivos');
+    expect(filas.at(-1)!.querySelector('.muestra-linea')).toBeNull();
   });
 
   it('en una pantalla táctil (L4c): un toque muestra la etiqueta en el punto tocado; el `mouseleave` que emula el navegador no la quita; tocar fuera, sí', async () => {

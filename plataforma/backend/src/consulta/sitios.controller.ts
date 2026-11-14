@@ -1,12 +1,12 @@
 import { BadRequestException, Controller, Get, Param, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import {
-  ApiBadRequestResponse, ApiCookieAuth, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiQuery, ApiTags, ApiUnauthorizedResponse,
+  ApiBadRequestResponse, ApiCookieAuth, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiQuery, ApiServiceUnavailableResponse, ApiTags, ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { CABECERA_X_SIGUIENTE, ISO_8601, INTERVALOS, MAX_CUBOS, MAX_DIAS_VENTANA, SEGUNDOS_INTERVALO, exigirTopeCubos, fecha, intervalo, limite, uuid } from './validacion.js';
 import { DIAS_ACTIVIDAD_POR_DEFECTO, MAX_DIAS_ACTIVIDAD, tipoValido } from './actividad.js';
 import { ActividadService, FilaActividad } from './actividad.service.js';
-import { CUBOS_CHISPA, LIMITE_AHORA, MAGNITUDES_SALUD, MAX_CANALES_AHORA, TENDENCIA, intervaloParaRango, leerCursor, siguiente } from './tablero.js';
+import { CUBOS_CHISPA, HISTORICO_SITIO, LIMITE_AHORA, MAGNITUDES_SALUD, MAX_CANALES_AHORA, TENDENCIA, intervaloParaRango, leerCursor, siguiente } from './tablero.js';
 import { MAX_ENTREGA_RESUMEN, TableroService } from './tablero.service.js';
 
 // El histórico del sitio lee TODOS los canales de la magnitud: medido en el banco (docs/16 §61), 30 días de 120 canales a una lectura cada
@@ -100,10 +100,14 @@ export class SitiosController {
   @ApiOperation({
     summary: 'Histórico de una magnitud en todo el sitio (Etapa 4)',
     description:
-      'Por cubo (time_bucket en la zona del sitio): `valores` (promedio), `minimos`, `maximos`, `muestras` (lecturas) y `n` (canales que aportan) de todos ' +
-      'los canales de esa magnitud del sitio; `dispositivos`, cuántos aportan en la ventana. La forma del histórico de un canal más esos campos, con ' +
-      '`magnitud` y `unidad`; sin calibración (`escala` y `porcentajes` nulos). `tiempos` en segundos Unix; los cubos sin datos no se emiten (no son 0). Topes: ' +
-      MAX_CUBOS + ' cubos y ' + MAX_DIAS_SITIO + ' días (menos que los ' + MAX_DIAS_VENTANA + ' de un canal: lee todos los canales de la magnitud; medido en docs/16 §61).',
+      'Por cubo (time_bucket en la zona del sitio), el promedio de los DISPOSITIVOS de esa magnitud del sitio (docs/19 §4, M): en cada cubo, cada ' +
+      'dispositivo aporta un valor, el promedio de sus lecturas del cubo o, si no reportó en él, su última lectura mientras tenga menos de dos ' +
+      'intervalos esperados al empezar el cubo (la regla de «Ahora»). `valores` (el promedio de esos aportes: cada dispositivo pesa lo mismo), `minimos` y ' +
+      '`maximos` (entre dispositivos), `muestras` (las lecturas reales del cubo; las vigentes no cuentan) y `n` (cuántos aportan); `dispositivos`, cuántos ' +
+      'aportan en algún cubo de la ventana. La forma del histórico de un canal más esos campos, con `magnitud` y `unidad`; sin calibración (`escala` y ' +
+      '`porcentajes` nulos). `tiempos` en segundos Unix; un cubo sin ningún aporte no se emite (no es 0). Topes: ' +
+      MAX_CUBOS + ' cubos y ' + MAX_DIAS_SITIO + ' días (menos que los ' + MAX_DIAS_VENTANA + ' de un canal: lee todos los canales de la magnitud; medido en docs/16 §61 y §68) ' +
+      'y ' + HISTORICO_SITIO.tiempoMaximoMs / 1000 + ' s de tiempo máximo de la consulta (si lo excede, 503).',
   })
   @ApiParam({ name: 'id', description: 'UUID del sitio' })
   @ApiQuery({ name: 'magnitud', required: true, description: 'Código del catálogo (temperatura, humedad, …)' })
@@ -113,6 +117,7 @@ export class SitiosController {
   @ApiOkResponse({ description: 'Serie agregada del sitio' })
   @ApiBadRequestResponse({ description: `UUID, fecha, intervalo o magnitud inválidos, o una ventana de más de ${MAX_DIAS_SITIO} días o de más de ${MAX_CUBOS} cubos` })
   @ApiNotFoundResponse({ description: 'Sitio inexistente o de otro' })
+  @ApiServiceUnavailableResponse({ description: `La consulta pasó su tiempo máximo (${HISTORICO_SITIO.tiempoMaximoMs / 1000} s): el panel lo dice con «Reintentar»` })
   async historico(
     @Usuario() u: UsuarioSesion, @Param('id') id: string, @Query('magnitud') magnitud?: string,
     @Query('desde') desde?: string, @Query('hasta') hasta?: string, @Query('intervalo') inter?: string,

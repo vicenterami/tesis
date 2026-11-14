@@ -29,7 +29,7 @@ M8 Panel & Semáforo; inventario filtrable; ficha; canal callado & Salud del sit
 
 \section{Método de prueba}
 
-Se prueba en tres niveles, todos repetibles con un comando (anexo~\ref{anx:pruebas}). Las 592 pruebas unitarias del backend y las 340 del panel corren sin base ni broker, con tipos estrictos y análisis estático. \textbf{Banco
+Se prueba en tres niveles, todos repetibles con un comando (anexo~\ref{anx:pruebas}). Las 610 pruebas unitarias del backend y las 345 del panel corren sin base ni broker, con tipos estrictos y análisis estático. \textbf{Banco
 desechable}: una segunda pila con base, broker con su plugin de seguridad, backend y proxy reales, datos en memoria y un
 emulador de nodos que imita relojes rotos, pérdidas y deriva; sobre él corren casos fijos de carga, carreras,
 caídas, TLS, alta por API, LoRaWAN y cola del broker. \textbf{Verificador de concordancia}: 53 pasos que comparan informe, documentación, base y API. Cada comprobación nueva se ejecuta primero contra el error \emph{plantado}: una prueba vale solo si falla ante la falla.

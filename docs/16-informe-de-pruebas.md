@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 592 pruebas unitarias del backend y 340 del panel, sin matriz formal); TT-32 (sensor físico) se cubrió después, en §43, §44 y §53;
+cubre todavía: TT-27 (contrato de trama: hoy 610 pruebas unitarias del backend y 345 del panel, sin matriz formal); TT-32 (sensor físico) se cubrió después, en §43, §44 y §53;
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -2831,4 +2831,137 @@ unitarias del backend en 54 archivos y 340 pruebas del panel (342 ejecuciones en
 probó en Chromium con pantalla táctil emulada, no en un teléfono; las fichas por magnitud de «Ahora» no cambian en vivo (`docs/19` L3);
 el alto del Resumen en teléfono con ocho tarjetas de «Ahora» (el máximo que se muestra) no se midió: la semilla llega a cinco; la prueba
 de navegador del banco sigue fuera del verificador (se corre a mano con `banco.sh navegador`; el paso 2y4 solo mira sus selectores); y
-el promedio del sitio de Tendencias se calcula sobre todas las lecturas de cada cubo, sin igualar el peso de cada dispositivo (pendiente).
+el promedio del sitio de Tendencias se calcula sobre todas las lecturas de cada cubo, sin igualar el peso de cada dispositivo (resuelto el 14/11/2026, §68).
+
+## 68. El promedio del sitio es el de sus dispositivos (14/11/2026)
+
+**Qué cambió** (diseño en `docs/19 §4`, bloque M, con lo decidido al implementar escrito allí; `docs/10 §8.4` punto 66). Resuelve lo
+que §67 dejó pendiente: `GET /sitios/{id}/historico` (Etapa 4) promediaba todas las lecturas de cada tramo, y en Tendencias la gráfica
+salía con dientes de sierra y la banda con púas cada hora. Ahora, en cada tramo, cada dispositivo aporta un valor —el promedio de sus
+lecturas del tramo o, si no reportó en él, su última lectura mientras tenga menos de dos intervalos esperados al empezar el tramo— y el
+punto es el promedio de esos aportes; la banda, el mínimo y el máximo entre ellos; `n`, cuántos aportan; `muestras`, las lecturas
+reales. La forma de la respuesta no cambia. **Backend:** la regla de vigencia pasó a una función, `sqlLecturaVigente` de
+`consulta/tablero.ts`, su única casa: «Ahora» la evalúa con el reloj de la base (el mismo texto de antes) y el histórico al empezar cada
+tramo. La consulta, `SQL_HISTORICO_SITIO` en el mismo archivo, agrega cada canal por su cuenta (`LATERAL`), lleva la lectura anterior a
+la ventana en un tramo aparte y arrastra la última lectura por una rejilla de tramos hecha con `generate_series` en la zona del sitio. Va
+en una conexión propia con 5 s de tiempo máximo y responde 503 si lo excede; la conexión vuelve al grupo con `RESET` y, si ni eso se
+puede, se suelta con el error para que el grupo la destruya. La tendencia de «Ahora» comparte ese mecanismo (`conTiempoMaximo`): antes
+devolvía la conexión al grupo aunque el `RESET` fallara. **Panel:** el rótulo de cada gráfica de Tendencias dice «Promedio de los
+dispositivos que reportan, cada 15 minutos (hasta 3)», con el número de la respuesta; la etiqueta flotante suma «aportan: 3
+dispositivos» y «Ver los datos», la columna «Dispositivos que aportan» (la ficha y la comparación, que usan el mismo gráfico, no la
+tienen). Sin «cubo» en pantalla: «Tramas cada 15 minutos», «Historia: promedios por intervalo de tiempo» en P3b y «de cada intervalo»
+en la ayuda de «Mostrar mín–máx». El OpenAPI describe el promedio nuevo y el 503 (38 rutas). **Banco:** `banco.sh historico`
+(`historico-sitio.sh`, los cinco casos de M7), `tablero-semilla-historico.sql` (30 días de lecturas al ritmo que se le pida, con el
+intervalo esperado igual al ritmo y la guarda del banco) y `tablero-medir.sh historico` (los cuatro rangos del panel con un `hasta` fijo).
+
+**Pruebas nuevas y la falla plantada de cada una** (cada plantada se aplicó, se vio en rojo y se deshizo, y la huella del archivo quedó
+igual a la de antes de plantarla). Backend, sin base: 18 pruebas en `historico-sitio.spec.ts`.
+
+| Prueba | Plantada | Resultado |
+|---|---|---|
+| `historico-sitio.spec.ts`: el arrastre exige vigencia al empezar cada tramo | evaluarla al terminar el tramo | 1 en rojo |
+| `historico-sitio.spec.ts`: la lectura anterior a la ventana se busca desde el inicio del primer tramo | desde `desde` | 1 en rojo |
+| `historico-sitio.spec.ts`: ninguna regla de vigencia escrita a mano en la consulta | la del arrastre escrita a mano, con 3 intervalos | 2 en rojo |
+| `historico-sitio.spec.ts`: cada canal por su cuenta y la cota `$7` | sin la cota (dos días antes de `desde`) | 1 en rojo |
+| `historico-sitio.spec.ts`: la consulta, en una conexión propia con el tope de 5 s | por el grupo; con el tope de la tendencia (2 s) | 6 y 1 en rojo |
+| `historico-sitio.spec.ts`: tiempo vencido → 503 y la conexión vuelve con `RESET` | sin el 503 | 2 en rojo |
+| `historico-sitio.spec.ts`: con el `RESET` fallido, la conexión se suelta con el error (histórico y tendencia) | soltarla sin el error | 2 en rojo |
+| `historico-sitio.spec.ts`: los parámetros llevan la cota calculada; `dispositivos` sale de la consulta; magnitud desconocida → 400 sin conexión | `desde` en vez de la cota; `dispositivos` = puntos; sin el 400 | 1, 1 y 1 en rojo |
+| `historico-sitio.spec.ts`: la cota de lo que se lee sale de la misma regla que la vigencia (`sqlLimiteVigencia`) | la regla a 3 intervalos y la cota escrita a mano con 2 | 1 en rojo (y las 2 que fijan el factor) |
+| `historico-sitio.spec.ts` (3): cupo de 2 consultas a la vez con fila en orden; fila llena → 503 sin pedir conexión; una consulta que falla o vence suelta su cupo | sin cupo; sin pasar al siguiente; fila sin tope; sin soltar al fallar | 2, 2, 1 y 1 en rojo |
+
+Contra la base y el backend del banco (`banco.sh historico`: un sitio propio con ocho dispositivos de prueba en cuatro magnitudes, una
+ventana de 75 minutos en cinco tramos; 7 comprobaciones). Con el código anterior, 6 de las 7 en rojo: la temperatura del caso 1 daba
+11,917, 11,5, 11,5, 11,5 y 12,786 con `n` = 2, 1, 1, 1, 3 (los dientes de sierra), y la humedad del caso 3, 40,221 en vez de 60. Cada
+plantada se aplicó en el código, se reconstruyó la imagen del banco y se corrió el guion:
+
+| Caso (M7) | Plantada | Resultado |
+|---|---|---|
+| 1. Uno cada 3 minutos y dos cada hora: aportan 3 en los cinco tramos (14,167 ×4 y 14,5) | sin arrastre | 5 de 7 en rojo |
+| 2. Uno cada 10 minutos que calla: aporta hasta dos intervalos (exactamente dos, ya no) y `n` baja | la vigencia con `>=` | 1 de 7 en rojo |
+| 3. Uno cada 5 s junto a uno cada hora: 60, no 40,22 | cada lectura pesa (`sum(v * k) / sum(k)`) | 5 de 7 en rojo |
+| 4. El primer tramo usa la lectura anterior a la ventana | leer solo desde `desde` | 3 de 7 en rojo |
+| 5. Un tramo sin aportes no tiene punto | todos los tramos de la rejilla, con el promedio nulo | 1 de 7 en rojo |
+
+La primera versión de la plantada 4 dejaba el parámetro `$7` sin usar y la base respondía 500 en las siete: se rehízo leyendo desde el
+mayor entre la cota y `desde`, para que fallara por lo que prueba. Panel (5 pruebas nuevas, 345 pruebas del panel):
+
+| Prueba | Plantada | Resultado |
+|---|---|---|
+| `Tablero.test.ts`: el rótulo con el número de la respuesta y sin «cubo»; «Tramas cada 15 minutos» y «cada hora» | el rótulo anterior; «Tramas por cubo de»; «cada 1 hora» | 1, 2 y 2 en rojo |
+| `Tablero.test.ts`: la etiqueta flotante termina en «aportan: 8 dispositivos» | sin la fila; `GraficoSitio` sin `aportes` | 3 y 2 en rojo |
+| `Tablero.test.ts` (nueva): «Ver los datos» con la columna de cuántos aportan, y la fila «aportan» sin muestra de color | sin la columna; con muestra | 1 y 1 en rojo |
+| `lib/grafico.test.ts` (2 nuevas): `rotuloCada` y la fila «aportan» de `filasEtiqueta` (singular, sin dato, sin `aportes`) | «cada 1 hora»; sin la fila | 2 y 3 en rojo |
+| `Comparar.test.ts` (nueva): «Historia: promedios por intervalo de tiempo» y sin la columna de cuántos aportan | el título anterior; la columna siempre | 1 y 2 en rojo |
+| `Tablero.test.ts` (nueva): un 503 del histórico con su motivo muestra el consejo del servidor y «Reintentar» | el aviso de 503 siempre dice «saturado» | 1 en rojo |
+
+**Medición (M6)**, en el banco (backend con 0,5 CPU y la base en RAM con techo de 768 MB, como en §61 y §66): 30 días sembrados con
+`tablero-semilla-historico.sql`, los cuatro rangos del panel con `tablero-medir.sh historico` y un `hasta` fijo, mediana de 10
+peticiones tras una de calentamiento, dos corridas (se da su promedio). Antes y después **sobre los mismos datos**: medido el código
+nuevo, el backend se recreó con la imagen anterior, guardada, sin tocar la base.
+
+| Dispositivos · ritmo (lecturas en 30 días) | Rango · resolución | Antes | Después | Veces |
+|---|---|---|---|---|
+| 120 cada 300 s (1 036 800) | 1 hora · 1 minuto | 6,1 ms | 12,2 ms | 2,0 |
+| | 24 horas · 15 minutos | 30,5 ms | 34,1 ms | 1,1 |
+| | 7 días · 1 hora | 181 ms | 143 ms | 0,8 |
+| | 30 días · 6 horas | 817 ms | 553 ms | 0,7 |
+| 2 000 cada 3 600 s (1 440 000) | 1 hora · 1 minuto | 14,4 ms | 65,2 ms | 4,5 |
+| | 24 horas · 15 minutos | 52,5 ms | 162,5 ms | 3,1 |
+| | 7 días · 1 hora | 313 ms | 521 ms | 1,7 |
+| | 30 días · 6 horas | 1 251 ms | 1 088 ms | 0,9 |
+
+**El umbral de 1,5 veces se cumple en 4 de las 8 mediciones.** Donde no: los equipos reportan una vez por tramo o menos, y la consulta
+nueva trabaja por dispositivo y tramo (2 000 cada hora en tramos de un minuto: 2 000 lecturas en la hora y 120 000 aportes); en 7 días con
+2 000, un tramo por lectura: 336 000 grupos de canal y tramo frente a 336 000 lecturas. Las respuestas cambian como pide M: con 2 000, `n`
+pasa de variar (38, 42 o 60 en la última hora; 42, 158 o 900 en 24 horas) a 2 000 en todos los puntos, la última hora de 34 a 60 puntos
+y las `muestras` suman lo mismo que antes. Antes de dejarla se compararon seis formas de la misma consulta con una de referencia (la
+rejilla completa de canales por tramos, con funciones de ventana), con resultados idénticos fila por fila en los cuatro rangos; con 2 000,
+la de referencia tardaba en la base 227–235 ms en la última hora y 960–971 ms en 7 días, y la que quedó, antes de un último ajuste (las
+posiciones de la rejilla por una unión en vez de buscarlas en el arreglo, con las mismas respuestas), 45–49 ms y 492–497 ms. **La variante que arrastra en el
+proceso** (la base devuelve lo propio por tramo y los tramos de arrastre en JSON, y el proceso los expande) se midió en la base, con los
+mismos datos y sin contar el viaje ni el trabajo del proceso: 27–36 ms en 1 hora, 157–159 ms en 24 horas, 523–531 ms en 7 días y
+1,07–1,08 s en 30 días, frente a 45–49, 168–169, 492–497 ms y 1,08 s de la de SQL (dos corridas de cada una). Ahorra la expansión del
+arrastre en las ventanas cortas pero tampoco cumple el umbral, porque lo caro es agregar cada dispositivo por tramo y eso lo hacen las
+dos en la base: quedó la de SQL (`docs/19` M6). **El criterio se corrigió el mismo día** (`docs/19` M6): el umbral relativo castigaba
+diferencias de milisegundos que nadie percibe (12 ms frente a 6); el que queda es absoluto: ninguna petición sobre los 3 s que RNF-04 fija para
+el historial de 30 días de un dispositivo (la más lenta, 1 088 ms), y en los rangos vivos el refresco de las seis magnitudes de la pestaña
+bajo la décima parte de su período (con 2 000 dispositivos, 0,39 s de 10 s en «última hora» y 0,98 s de 60 s en «24 horas»). Las ocho
+mediciones lo cumplen. El agregado por hora en la base queda como salida si un sitio real supera esas cifras. Con la serie de §61 (30 días de 120 cada
+300 s, sembrada como allí), la consulta anterior tardó 1 138 ms en 30 días, como entonces (≈ 1,1 s); su primera corrida devolvió 500: el
+proceso de la base que la atendía terminó y la base entró en recuperación, con el contenedor a 753 de 768 MiB (no se comprobó si fue el
+límite de memoria); se vaciaron las tramas (el histórico no las lee) y se repitió.
+
+**En navegador real** (pila de desarrollo, sitio `uct`, semilla completa recién cargada, una persona de descarte, Chromium 156, 1 280 y
+390 px, tema claro; las capturas quedan fuera del repositorio). Antes (las capturas de §67): la temperatura en dientes de sierra entre
+≈ 11 y 21 °C con la banda en púas cada hora, la humedad y la batería igual, y el rótulo «Promedio de 9 dispositivos por 15 minutos» en la
+temperatura (el conteo de canales del resumen). Después: la temperatura es una curva continua con la banda lisa entre dispositivos (97 puntos en 24 horas, 2 o 3 aportando;
+un solo salto de más de 1 °C entre puntos vecinos, cuando un tercer equipo vuelve a aportar tras sus pérdidas de la semilla), la humedad
+y la batería sin púas, y la señal y la presión, de un solo equipo que reporta cada hora, en escalones (su última lectura, tramo a tramo).
+Los rótulos dicen «(hasta 3)», «(hasta 4)», «(hasta 1)», «(hasta 2)» y «(hasta 1)»: antes la señal y la presión decían 2, el conteo de
+canales del resumen, aunque solo uno reportaba en el rango. La etiqueta flotante: «promedio: 16,1 °C», «mínimo–máximo: 10,2 a 19,8 °C» y
+«aportan: 3 dispositivos». A 390 px el rótulo ocupa dos líneas y la pestaña mide 2 453 px (2 358 en §67); a 1 280 px, 1 492 px, como
+antes; ninguna se desplaza a lo ancho. La página registró un 401 en la consola, el de la sesión antes de entrar.
+
+**Correcciones tras la revisión del bloque** (14/11/2026; revisión independiente de dos frentes, lógica y concordancia: 8 hallazgos, 7
+distintos, todos corregidos). (1) *Cada consulta del histórico tomaba una conexión propia hasta 5 s sin tope de concurrencia:* la pestaña
+pide hasta seis magnitudes juntas y el grupo tiene cinco conexiones, que comparte con la recepción; ahora corren como mucho dos a la vez,
+las demás esperan en fila y, con doce en espera, la ruta responde 503. (2) *La cota de lo que se lee repetía a mano el «dos intervalos»*
+de la regla de vigencia: ahora las dos salen de `sqlLimiteVigencia`. (3) *El panel decía «el servicio está saturado» ante todo 503:*
+si la respuesta trae su motivo («prueba con un rango más corto o más tarde»), muestra el motivo. (4) *El paso 2t del verificador
+comparaba con la cifra de hoy también las citas fechadas de las secciones anteriores de este documento,* y obligaba a redactarlas de
+otra forma para pasar: de este documento rigen la cabecera y la última sección, como en el paso 2w4 (probado: la cita fechada pasa; una
+cifra vigente equivocada en el informe o en la cabecera, no). (5) Un comentario del guion del banco quedó en la línea de otra orden; el
+título de una prueba de la ficha aún decía «cubo»; y el pendiente de §67 no estaba marcado como resuelto.
+
+**Cifras del bloque:** `pnpm verificar` en verde: 610 pruebas unitarias del backend en 55 archivos y 345 pruebas del panel (347
+ejecuciones en vitest, en 33 archivos); `svelte-check`, 405 archivos sin errores. `pnpm openapi`: 38 rutas. `banco.sh historico`: 7 de 7.
+`banco.sh navegador` (fuera del verificador; usa el gráfico y la comparación): 36 de 36 comprobaciones en Firefox y en Chromium.
+El verificador completo, con la pila reconstruida y la semilla recién cargada: su primera corrida marcó el paso 2t por una cita fechada
+de §66 con la forma «N pruebas unitarias» (la cifra de ese día), que se reescribió con la misma cifra; la segunda terminó en «TODO EN
+CONCORDANCIA» (sesión y permisos, 386 de 386; panel con sesión, 330 de 330 en Chromium y Firefox). El informe, recompilado: 30 páginas
+de cuerpo y ningún desborde.
+**Lo que no cubre:** varias personas mirando a la vez (el criterio de la décima parte del período se calculó con una petición a la vez; no se midió con concurrencia); la variante del proceso se midió solo en
+la base, no por HTTP, y solo con 2 000; el intervalo esperado que se usa es el de hoy de cada dispositivo, no el que tenía cuando
+reportó; con 2 000 dispositivos el ritmo es cada hora porque cada 300 s no caben 30 días en la base del banco; una petición a la vez, sin
+proxy, en el portátil y no en el servidor de referencia; la etiqueta flotante con la fila nueva no se probó en una pantalla táctil.

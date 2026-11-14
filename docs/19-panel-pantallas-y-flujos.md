@@ -348,8 +348,10 @@ referentes, y las reglas de visualización de §6 (colores validados, un solo ej
    conviven dos; decidido al implementar, 11/11/2026).
 4. **Gráficas del sitio** *(desde L2 y L4: en las pestañas Tendencias y Red, vivas y con etiqueta flotante)* ✅ panel, 11/11/2026; ✅ backend, 11/11/2026 (uPlot, cursor sincronizado entre ellas): (a) **tramas por cubo** del rango, recibidas y rechazadas como barras
    apiladas (dos colores de la paleta, leyenda); (b) **una gráfica por magnitud que el sitio mide** (hasta seis; las demás, en una
-   lista): el promedio del sitio por cubo con la banda mín–máx del mismo matiz al 15 % y cuántos dispositivos aportan («promedio de 9
-   dispositivos»; un canal por dispositivo y magnitud, así que el conteo de canales es el de dispositivos), de `GET /sitios/{id}/historico` (Etapa 4); un clic abre P3b con esa magnitud y hasta seis dispositivos del sitio; la resolución
+   lista): el promedio del sitio por cubo *(desde el bloque M, 14/11/2026: el promedio de los dispositivos, cada uno con su lectura
+   propia o vigente, y no el de todas las lecturas)* con la banda mín–máx del mismo matiz al 15 % y cuántos dispositivos aportan («promedio de 9
+   dispositivos»; desde M3, «Promedio de los dispositivos que reportan, cada 15 minutos (hasta 9)», con el número de la respuesta; un canal
+   por dispositivo y magnitud, así que el conteo de canales es el de dispositivos), de `GET /sitios/{id}/historico` (Etapa 4); un clic abre P3b con esa magnitud y hasta seis dispositivos del sitio; la resolución
    la fija el rango, como en P3; (c) **entrega por dispositivo** (HU-15, calidad del enlace): tramas recibidas en el rango ÷ esperadas
    (ventana ÷ intervalo esperado), barras horizontales de peor a mejor (hasta diez; «ver todos» en P2, columna Entrega); quien tiene
    canales de señal (RSSI, SNR) los muestra en su ficha como cualquier canal. No se inventa una calidad sin datos.
@@ -447,7 +449,7 @@ mis datos» (JSON por `descargar`) y «Darme de baja» (`docs/20 §11`).
 | `GET /sitios` | mis sitios con código, nombre, zona horaria, zonas y mi perfil en cada uno (el administrador del sistema, todos) | con sesión (Etapa 4) |
 | `GET /sitios/{id}/resumen?desde&hasta[&intervalo]` | conteos por estado visual, condiciones abiertas por tipo, tramas recibidas y rechazadas por cubo (resolución del rango, o `intervalo` de la lista cerrada; la respuesta la declara en `ventana.intervalo` y el panel rotula con eso; los cubos sin datos no se emiten: no son 0), entrega de los 50 dispositivos con peor entrega en el rango pedido y cuántos activos hay, magnitudes medidas con cuántos canales, «requiere atención» | consulta o más (Etapa 4) |
 | `GET /sitios/{id}/ahora?limite&tendencia` (L6, 13/11/2026) | lo que se mide ahora: cuántos reportan y cuántos están sin señal, el promedio, mínimo y máximo por magnitud de la última lectura vigente de cada canal, y hasta 60 tarjetas (24 por defecto) de los que reportan, alerta primero, con hasta tres canales y su última lectura; con `tendencia=si`, 24 promedios por hora por canal (si su cálculo no alcanza el tiempo o el cupo, `tendencia: false`) | consulta o más (Etapa 4) |
-| `GET /sitios/{id}/historico?magnitud&desde&hasta&intervalo` | por cubo: promedio, mínimo, máximo, lecturas y n de todos los canales de esa magnitud del sitio; 5 000 cubos y **31 días** (lee todos los canales de la magnitud: 30 días de 120 canales cada 300 s tardan ≈ 1,1 s, `docs/16 §61`; más largo, por canal o exportación) | consulta o más (Etapa 4) |
+| `GET /sitios/{id}/historico?magnitud&desde&hasta&intervalo` | por cubo: promedio, mínimo, máximo, lecturas y n de todos los canales de esa magnitud del sitio (desde el bloque M: promedio y banda **entre dispositivos**, cada uno con su lectura propia o vigente; `n`, los que aportan); 5 000 cubos y **31 días** (lee todos los canales de la magnitud: 30 días de 120 canales cada 300 s tardan ≈ 1,1 s, `docs/16 §61`; más largo, por canal o exportación) y, desde M5, 5 s de tiempo máximo de la consulta (si no, 503) | consulta o más (Etapa 4) |
 | `GET /canales/{id}/historico` | además del promedio, mínimo y máximo por cubo (campos nuevos) | como hoy |
 | `GET /dispositivos/{id}/historico?desde&hasta&intervalo` | todos los canales del dispositivo en una respuesta, alineados por cubo | consulta o más (Etapa 4) |
 | `GET /dispositivos` | filtros `sitio, zona, via, estado, q` (`sitio` y `zona` son ids; el panel traduce el código de su URL con `GET /sitios`), `orden` (`nombre` por defecto, `entrega` de peor a mejor con los nulos al final, o `atencion`: sin señal, alerta, normal, inactivo y dentro por nombre) y paginación `limite, desplazamiento`; `estado_visual` y `entrega` (sobre las últimas 24 h; nulo si el dispositivo no está activo o si en la ventana no cabe una trama esperada completa; 0 % si esperaba y no llegó nada) por fila; total en `X-Total` | como hoy |
@@ -655,6 +657,86 @@ segundo para mover un cubo de seis horas) y volver a pedir datos por cada trama 
    diseño y se anota; medido el 13/11/2026 en `docs/16 §66`: sin tendencia, 6 ms frente a 28–200 ms del resumen; con ella y 60 s,
    25 ms frente a 195 ms: se queda; con 5 s, 392 ms, anotado); y el paquete inicial del panel no crece más de 10 % sobre el de `§64`, para lo cual las pantallas pasan a
    cargarse a pedido.
+
+**M. El promedio del sitio es el de sus dispositivos (cambia B4b y la fila de `…/historico` del contrato; diseñado el 14/11/2026, antes del código).**
+✅ backend y panel, 14/11/2026 (la consulta, `SQL_HISTORICO_SITIO` de `consulta/tablero.ts`; `docs/10 §8.4` punto 66; probado y medido en `docs/16 §68`).
+Al mirar las gráficas de Tendencias con la semilla completa, salen con dientes de sierra y la banda con púas cada hora. No es el dibujo:
+es el cálculo. `GET /sitios/{id}/historico` (Etapa 4) promedia **todas las lecturas** que caen en cada tramo de tiempo. Medido el 13/11/2026 en la
+pila de desarrollo (sitio `uct`, temperatura, tramos de 15 minutos):
+
+| Tramo | Dispositivos que aportan | Lecturas | Promedio de lecturas (lo que se dibuja) | Promedio de dispositivos | Mínimo–máximo |
+|---|---|---|---|---|---|
+| 1 | 3 | 6 | 12,92 | 14,03 | 11,8–17,6 |
+| 2 | 1 | 5 | 11,65 | 11,65 | 11,6–11,7 |
+| 3 | 1 | 5 | 11,52 | 11,52 | 11,5–11,6 |
+| 4 | 1 | 5 | 11,42 | 11,42 | 11,4–11,5 |
+| 5 | 3 | 4 | 13,49 | 14,20 | 11,4–19,0 |
+
+Son dos defectos: **el conjunto cambia de tramo en tramo** (quien reporta cada hora entra en uno de cada cuatro; en los otros tres «el
+sitio» es un solo equipo, y el rótulo dice «promedio de 9 dispositivos») y **pesa más quien más reporta** (en el tramo 5, 13,49 frente a
+14,20; con un equipo cada 5 s junto a uno por hora, el promedio «del sitio» sería el del primero).
+1. **Definición.** En cada tramo, cada dispositivo que mide la magnitud aporta **un** valor: el promedio de sus lecturas del tramo o, si
+   no reportó en él, **su última lectura mientras siga vigente**: la misma regla de «Ahora» (L3; `consulta/tablero.ts`), dos intervalos
+   esperados del dispositivo, evaluada al empezar el tramo. El punto del sitio es el promedio de esos aportes —cada dispositivo pesa lo
+   mismo, reporte cada 5 s o cada hora—; la banda, el mínimo y el máximo entre dispositivos (de sus lecturas del tramo, o su lectura
+   vigente); `n`, cuántos aportan; `muestras`, las lecturas reales del tramo (las vigentes no cuentan). Un tramo sin ningún aporte no
+   tiene punto. Para los primeros tramos se busca la última lectura de cada canal anterior a la ventana, hasta dos intervalos
+   esperados atrás. La historia de un dispositivo dado de baja sigue contando en los tramos en que reportaba, como hoy. *Decidido al
+   implementar (14/11/2026):* «dos intervalos atrás» se cuenta desde el inicio del primer tramo, que es donde se evalúa la vigencia (el
+   primer tramo empieza antes de `desde` cuando la ventana no está alineada); y la regla se escribe una sola vez, `sqlLecturaVigente` de
+   `consulta/tablero.ts`, que «Ahora» evalúa con el reloj de la base y el histórico al empezar cada tramo.
+2. **Por qué así y no con tramos más largos.** Alargar el tramo hasta el intervalo esperado más lento también iguala el conjunto, pero
+   con un equipo que reporta cada hora la gráfica de «24 horas» bajaría a 24 puntos y la de «última hora» a uno. Tomar de cada serie
+   su última muestra vigente es lo que hace un sistema de monitoreo al agregar series que no coinciden en el tiempo: Prometheus toma
+   «the newest sample that is less than the lookback period ago» (documentación de consultas, sección *Staleness*, consultada el
+   13/11/2026); allá la vigencia es una ventana fija y aquí, dos intervalos esperados de cada dispositivo. No se inventa un dato: se
+   sigue mostrando el último que el dispositivo dio, y solo mientras el sistema aún lo considera reportando.
+3. **Lo que se ve.** El rótulo de cada gráfica dice lo que es: «Promedio de los dispositivos que reportan, cada 15 minutos (hasta 9)»,
+   donde el número es el de los que aportan en algún tramo de la ventana. La etiqueta flotante suma una fila con cuántos aportan en ese
+   punto («aportan: 3 dispositivos») y «Ver los datos», una columna con lo mismo: cuando un equipo calla, el número baja y se ve.
+   *Decidido al implementar:* el número del rótulo es `dispositivos` de la respuesta (los que aportan en algún tramo, también con solo la
+   lectura anterior a la ventana), no el conteo de canales del resumen; la fila «aportan» va sin muestra de color (no es una serie); la
+   ficha y la comparación, que usan el mismo gráfico, no la tienen.
+4. **Sin jerga en pantalla.** «Cubo» es palabra del diseño y del código, no de la persona: los rótulos visibles dicen «cada 15 minutos»
+   («Tramas cada 15 minutos»; en P3b, «Historia: promedios por intervalo de tiempo»). *Decidido al implementar:* con un intervalo de uno,
+   sin el número («cada hora», «cada minuto», «cada día»); y la ayuda de «Mostrar mín–máx» de la ficha, que decía «de cada cubo», dice
+   «de cada intervalo».
+5. **Contrato.** `GET /sitios/{id}/historico` (Etapa 4) conserva su forma (`tiempos, valores, minimos, maximos, muestras, n` y `dispositivos`) y sus
+   topes; cambia lo que significan `valores` (promedio de dispositivos), `minimos` y `maximos` (entre dispositivos) y `n` (los que
+   aportan, con lectura propia o vigente). La consulta lleva un tiempo máximo: si lo excede, la ruta responde 503 con el consejo («prueba con un rango más corto o más tarde»)
+   y el panel muestra ese consejo con «Reintentar» (precisado tras la revisión del 14/11/2026: el panel decía «el servicio está saturado»
+   ante todo 503; ahora, si la respuesta trae su motivo, muestra el motivo). Como mucho dos de estas consultas corren a la vez en el proceso
+   —el grupo tiene cinco conexiones y las comparte con la recepción, y la pestaña pide hasta seis magnitudes juntas—: las demás esperan su
+   turno en fila y, con doce en espera, la ruta responde 503 (agregado tras la misma revisión). Las demás rutas no cambian (el histórico de un canal y el de un dispositivo siguen igual).
+   *Decidido al implementar:* 5 s (unas cuatro veces y media lo más lento medido en M6, 1,09 s), en una conexión propia con
+   `SET statement_timeout` y `RESET` al soltarla, como la tendencia de «Ahora»; si ni el `RESET` se puede (la conexión se cortó), la
+   conexión se suelta con el error y el grupo la destruye en vez de reusarla con el tope puesto. La tendencia de «Ahora» pasó a usar el
+   mismo mecanismo: antes la devolvía al grupo aunque el `RESET` hubiera fallado.
+6. **Costo, con umbral.** El trabajo crece con canales × tramos. Se mide antes y después en el mismo banco, con 120 y con 2 000
+   dispositivos y los cuatro rangos: la consulta nueva se acepta si no tarda más de **1,5 veces** lo que tarda hoy la misma petición
+   (hoy, 30 días de 120 canales cada 300 s ≈ 1,1 s, `docs/16 §61`); si la versión en SQL no cumple, se mide la que arrastra la lectura
+   vigente en el backend con la misma definición, y aquí se anota cuál quedó y por qué. **Medido el 14/11/2026 (`docs/16 §68`); quedó
+   la versión en SQL.** Mismo banco y mismos datos, la imagen anterior y la nueva sobre la misma base, 30 días sembrados: con 120
+   dispositivos cada 300 s, 1 hora 6,1 → 12,2 ms (2,0 veces), 24 horas 30,5 → 34,1 ms (1,1), 7 días 181 → 143 ms (0,8) y 30 días 817 →
+   553 ms (0,7); con 2 000 cada 3 600 s, 14,4 → 65,2 ms (4,5), 52,5 → 162,5 ms (3,1), 313 → 521 ms (1,7) y 1 251 → 1 088 ms (0,9). **El
+   umbral de 1,5 veces se cumple en 4 de las 8 mediciones:** no en la última hora (las dos flotas) ni en 24 horas y 7 días con 2 000
+   equipos que reportan cada hora. No es la forma de escribirla sino la definición: la consulta anterior trabaja por lectura y la nueva
+   por dispositivo y tramo, y cuando los equipos reportan una vez por tramo o menos, hay tantos aportes como lecturas o más (2 000 cada
+   hora en tramos de un minuto: 2 000 lecturas en la hora, 120 000 aportes). La variante que arrastra en el proceso, con la misma
+   definición (la base devuelve lo propio por tramo y los tramos de arrastre, y el proceso los expande), se midió en la base, sin contar
+   el viaje ni el trabajo del proceso: 27–36 ms en 1 hora, 157–159 ms en 24 horas, 523–531 ms en 7 días y 1,07–1,08 s en 30 días, frente a
+   45–49, 168–169, 492–497 ms y 1,08 s de la de SQL en las mismas condiciones (dos corridas de cada una; la de SQL antes de un último
+   ajuste que no cambia sus respuestas, `docs/16 §68`). Ahorra la expansión del arrastre
+   en las ventanas cortas, pero tampoco cumple el umbral: lo caro es agregar cada dispositivo por tramo, que las dos hacen en la base.
+   Quedó la de SQL: una consulta, la regla con una sola casa y ningún segundo cálculo en el proceso. Todas las cifras siguen bajo los 3 s
+   de RNF-04. **Decidido el 14/11/2026: se acepta ese costo y se corrige el criterio.** El umbral relativo estaba mal planteado: sobre tiempos de 6 a 50 ms, «1,5 veces» mide diferencias que nadie percibe (12 ms frente a 6) y no dice si la pantalla responde. El criterio que queda es absoluto y sale del uso: (a) ninguna petición pasa de los 3 s que RNF-04 fija para el historial de 30 días de un dispositivo, tomados aquí como tope (la más lenta medida, 1 088 ms); (b) en los rangos vivos, el refresco completo de la pestaña —seis magnitudes— no ocupa más de la décima parte de su período, para que diez personas mirando el mismo sitio a la vez no pasen del período entero: con 2 000 dispositivos, 6 × 65,2 ms = 0,39 s de los 10 s de «última hora» (3,9 %) y 6 × 162,5 ms = 0,98 s de los 60 s de «24 horas» (1,6 %). El agregado por hora en la base queda como salida si un sitio real supera esas cifras, la misma salida que quedó anotada para la tendencia de «Ahora» (`docs/16 §66`); no se construye ahora.
+7. **Pruebas.** Con datos sembrados a propósito —un dispositivo cada 3 minutos y dos cada hora, como en la tabla—: en los cinco tramos
+   aportan tres y el promedio no salta; un dispositivo que deja de reportar aporta hasta dos intervalos esperados y después `n` baja;
+   uno que reporta cada 5 s no arrastra el promedio; el primer tramo usa la lectura anterior a la ventana; un tramo sin aportes no tiene
+   punto. Cada prueba, con su falla plantada. En navegador real: la gráfica de temperatura del sitio de la semilla, antes y después.
+   ✅ 14/11/2026: los cinco casos, contra la base y el backend del banco (`banco.sh historico`, 7 comprobaciones; con la imagen anterior,
+   6 en rojo); sin base, la regla, el tiempo máximo y su 503 (`historico-sitio.spec.ts`); en el panel, el rótulo, la fila «aportan» y la
+   columna de «Ver los datos». Las fallas plantadas y las capturas, en `docs/16 §68`.
 
 ## 5. Flujos
 **F1 · Alta y primera trama.** Ya está dibujado en el diagrama de secuencia del alta (`docs/10`, figura del informe): el

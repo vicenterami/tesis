@@ -18,10 +18,12 @@
   // cursor), que se quita al salir, con Escape, al desplazar la página o al tocar fuera; con más de una serie, una leyenda fija de
   // nombres con su color; (d) puntos solo con 30 o menos y nunca en los bordes de la banda; (e) `enteros`: eje de enteros desde 0 (las
   // tramas); (g) alto según la pantalla (280 px; 200 px en un teléfono) si no se pide otro.
+  // Promedio del sitio (docs/19 §4, M3): con `aportes` (cuántos dispositivos aportan en cada punto), la etiqueta flotante suma la fila
+  // «aportan: 3 dispositivos» y «Ver los datos», una columna con lo mismo. Sin `aportes` (la ficha, la comparación), nada cambia.
   import { untrack } from 'svelte';
   import type uPlotTipo from 'uplot';
   import 'uplot/dist/uPlot.min.css';
-  import { EJE_TIEMPO, MAX_PUNTOS_DIBUJADOS, NOMBRES_FECHA, SELLO_LEYENDA, altoGrafico, decimalesDeSeries, filasEtiqueta, formatearNumero, horaEtiqueta, resumenRango, type FilaEtiqueta } from './lib/grafico';
+  import { EJE_TIEMPO, MAX_PUNTOS_DIBUJADOS, NOMBRES_FECHA, SELLO_LEYENDA, altoGrafico, decimalesDeSeries, filasEtiqueta, formatearNumero, horaEtiqueta, resumenRango, textoAportan, type FilaEtiqueta } from './lib/grafico';
   import { LIENZO, colorLecturaActual, colorPromedio, temaVivo, type Tema } from './lib/tema';
   import { fechaHora } from './lib/tiempo';
 
@@ -63,6 +65,7 @@
     alDobleClic = null,
     sincronizar = null,
     alto = null,
+    aportes = null,
   }: {
     series: (number | null)[][];
     unidad: string;
@@ -83,6 +86,8 @@
     alDobleClic?: (() => void) | null;
     sincronizar?: string | null;
     alto?: number | null;
+    // Cuántos dispositivos aportan en cada punto, alineado con `series[0]` (el promedio del sitio, M3).
+    aportes?: (number | null)[] | null;
   } = $props();
   let marco: HTMLDivElement | undefined = $state();
   let contenedor: HTMLDivElement | undefined = $state();
@@ -192,7 +197,7 @@
     etiqueta = {
       x, y, derecha: left > o.width / 2, arriba: top > o.height / 2,
       hora: horaEtiqueta(t, zona),
-      filas: filasEtiqueta(untrack(() => series), untrack(() => lista), untrack(() => banda), i, unidad, untrack(() => decimales)),
+      filas: filasEtiqueta(untrack(() => series), untrack(() => lista), untrack(() => banda), i, unidad, untrack(() => decimales), untrack(() => aportes)),
     };
   }
 
@@ -405,7 +410,7 @@
     <div class="etiqueta-flotante" bind:this={etiquetaEl} aria-hidden="true" data-etiqueta-flotante>
       <span class="hora">{etiqueta.hora}</span>
       {#each etiqueta.filas as f, k (k)}
-        <span class="fila"><span class="muestra-linea" class:banda={f.banda === true} style:background={f.color || null}></span>{f.nombre}: <strong>{f.valor}</strong></span>
+        <span class="fila">{#if f.aporte !== true}<span class="muestra-linea" class:banda={f.banda === true} style:background={f.color || null}></span>{/if}{f.nombre}: <strong>{f.valor}</strong></span>
       {/each}
     </div>
   {/if}
@@ -421,10 +426,10 @@
     <div class="tabla-desplazable">
       <table data-tabla-grafico>
         <caption class="solo-lector">{titulo}</caption>
-        <thead><tr><th scope="col">Hora ({zona})</th>{#each nombres as n, k (k)}<th scope="col">{n} ({unidad})</th>{/each}</tr></thead>
+        <thead><tr><th scope="col">Hora ({zona})</th>{#each nombres as n, k (k)}<th scope="col">{n} ({unidad})</th>{/each}{#if aportes !== null}<th scope="col">Dispositivos que aportan</th>{/if}</tr></thead>
         <tbody>
           {#each series[0] ?? [] as t, i (i)}
-            <tr><th scope="row">{t === null ? '—' : fechaHora(new Date(t * 1000).toISOString(), zona)}</th>{#each nombres as _n, k (k)}<td>{celda(k + 1, i)}</td>{/each}</tr>
+            <tr><th scope="row">{t === null ? '—' : fechaHora(new Date(t * 1000).toISOString(), zona)}</th>{#each nombres as _n, k (k)}<td>{celda(k + 1, i)}</td>{/each}{#if aportes !== null}<td data-celda-aportan>{aportes[i] === null || aportes[i] === undefined ? '—' : textoAportan(aportes[i])}</td>{/if}</tr>
           {/each}
         </tbody>
       </table>

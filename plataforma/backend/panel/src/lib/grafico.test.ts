@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EJE_TIEMPO, NOMBRES_FECHA, PALETA, RANGOS, SELLO_LEYENDA, agregarLectura, alinearSeries, decimalesDeSeries, decimalesParaRecorrido, filasEtiqueta, formatearValor, puntosDe, rangoQueContiene, resolucionValida, resolucionesAdmisibles, resumenRango, rotuloIntervalo, seriesDesdeHistorico, urlHistorico, ventana, intervaloParaVentana, resolucionMasFina, ventanaDeSeleccion } from './grafico';
+import { EJE_TIEMPO, NOMBRES_FECHA, PALETA, RANGOS, SELLO_LEYENDA, agregarLectura, alinearSeries, decimalesDeSeries, decimalesParaRecorrido, filasEtiqueta, formatearValor, rotuloCada, puntosDe, rangoQueContiene, resolucionValida, resolucionesAdmisibles, resumenRango, rotuloIntervalo, seriesDesdeHistorico, urlHistorico, ventana, intervaloParaVentana, resolucionMasFina, ventanaDeSeleccion } from './grafico';
 
 describe('ventana y URL del histórico (docs/19 P3)', () => {
   const ahora = new Date('2026-10-12T15:00:00Z');
@@ -39,6 +39,10 @@ describe('series: histórico agregado y lecturas en vivo aparte', () => {
     expect(rotuloIntervalo('15 minutes')).toBe('15 minutos');
     expect(rotuloIntervalo('1 day')).toBe('1 día');
   });
+  it('los rótulos dicen «cada 15 minutos», sin «cubo» y sin «cada 1 …» (docs/19 §4, M4)', () => {
+    expect(['1 minute', '5 minutes', '15 minutes', '1 hour', '6 hours', '1 day'].map(rotuloCada))
+      .toEqual(['cada minuto', 'cada 5 minutos', 'cada 15 minutos', 'cada hora', 'cada 6 horas', 'cada día']);
+  });
   it('formatea con coma decimal y la unidad; nulo → raya', () => {
     expect(formatearValor(21.456789, 'Cel')).toBe('21,457 Cel');
     expect(formatearValor(null, 'Cel')).toBe('—');
@@ -66,6 +70,17 @@ describe('series: histórico agregado y lecturas en vivo aparte', () => {
     expect(filasEtiqueta(series, lineas, banda, 0, '°C', decimalesDeSeries(series)).map((f) => `${f.nombre}: ${f.valor}`)).toEqual(['promedio: 19,4 °C', 'mínimo–máximo: 19,3 a 19,5 °C']);
     expect(filasEtiqueta(series, lineas, banda, 0, '°C').map((f) => f.valor)).toEqual(['19,396 °C', '19,29 a 19,5 °C']); // sin pedirlo, los tres de la API
     expect(filasEtiqueta([[1], [null]], [{ label: 'promedio', stroke: '#111' }], null, 0, '°C', 1)).toEqual([{ nombre: 'sin datos', valor: '—', color: '' }]);
+  });
+  it('… con `aportes` (el promedio del sitio, M3), al final, cuántos dispositivos aportan en ese punto; sin dato o sin aportes, ninguna fila más', () => {
+    const series = [[1_000_000, 1_000_900], [14.2, 11.6], [11.8, 11.6], [17.6, 11.7]];
+    const lineas = [{ label: 'promedio', stroke: '#111' }, { label: 'mínimo', stroke: '#111' }, { label: 'máximo', stroke: '#111' }];
+    const banda = { alta: 3, baja: 2, color: '#111' };
+    const filas = filasEtiqueta(series, lineas, banda, 0, '°C', 1, [3, 1]);
+    expect(filas.map((f) => `${f.nombre}: ${f.valor}`)).toEqual(['promedio: 14,2 °C', 'mínimo–máximo: 11,8 a 17,6 °C', 'aportan: 3 dispositivos']);
+    expect(filas.at(-1)).toMatchObject({ aporte: true, color: '' });
+    expect(filasEtiqueta(series, lineas, banda, 1, '°C', 1, [3, 1]).at(-1)!.valor).toBe('1 dispositivo');
+    expect(filasEtiqueta(series, lineas, banda, 0, '°C', 1)).toHaveLength(2); // la ficha y la comparación no pasan `aportes`
+    expect(filasEtiqueta([[1], [null]], [{ label: 'promedio', stroke: '#111' }], null, 0, '°C', 1, [0])).toEqual([{ nombre: 'sin datos', valor: '—', color: '' }]);
   });
 });
 

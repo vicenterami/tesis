@@ -1,10 +1,11 @@
-import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { Pool } from 'pg';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { Pool, PoolClient } from 'pg';
 import { POOL } from '../db/db.module.js';
 import { isoUs } from '../db/iso-us.js';
 import {
-  CUBOS_CHISPA, CanalConUltima, Cursor, Entrega, FilaCubo, FilaMagnitud, SQL_EN_LINEA, SQL_ESTADO_VISUAL, SQL_LECTURA_VIGENTE, TENDENCIA, alinear,
-  armarChispas, elegirCanales, entrega, esSalud, porMagnitud, ventanaChispa,
+  CUBOS_CHISPA, CanalConUltima, Cursor, Entrega, FilaCubo, FilaMagnitud, HISTORICO_SITIO, SQL_EN_LINEA, SQL_ESTADO_VISUAL, SQL_HISTORICO_SITIO,
+  SQL_LECTURA_VIGENTE, TENDENCIA, alinear,
+  armarChispas, elegirCanales, entrega, esSalud, porMagnitud, sqlLimiteVigencia, ventanaChispa,
 } from './tablero.js';
 import { AvisosAcotados } from '../arranque.js';
 import { errorDeCliente } from '../db/cliente.js';
@@ -205,8 +206,8 @@ export class TableroService {
   }
 
   // La tendencia de «Ahora» con sus dos topes (TENDENCIA, tablero.ts; docs/11 §4): como mucho dos a la vez en el proceso, cada una en una
-  // conexión propia con tiempo máximo de sentencia (el mecanismo de la exportación, consulta.service.ts) y RESET al soltarla. null = se
-  // omite: sin cupo (sin tocar la base) o tiempo vencido (57014, query_canceled). Cualquier otro error de la base sigue siendo un error.
+  // conexión propia con tiempo máximo de sentencia (conTiempoMaximo). null = se omite: sin cupo (sin tocar la base) o tiempo vencido (57014,
+  // query_canceled). Cualquier otro error de la base sigue siendo un error.
   private tendenciasEnCurso = 0;
   private readonly avisos = new AvisosAcotados(); // un WARN por motivo y por minuto
   private readonly log = new Logger('tablero');
@@ -217,27 +218,39 @@ export class TableroService {
     }
     this.tendenciasEnCurso++;
     try {
-      const cliente = await this.pool.connect();
-      cliente.on('error', errorDeCliente); // un corte de la base a mitad falla esta petición, no el proceso (db/cliente.ts)
-      try {
-        await cliente.query(`SET statement_timeout TO ${TENDENCIA.tiempoMaximoMs}`);
-        const t = await cliente.query<{ canal_id: string; t: string; v: number }>(`
+      const t = await this.conTiempoMaximo(TENDENCIA.tiempoMaximoMs, (cliente) => cliente.query<{ canal_id: string; t: string; v: number }>(`
           SELECT x.canal_id, extract(epoch FROM time_bucket(INTERVAL '1 hour', x.tiempo))::bigint AS t, round(avg(x.valor)::numeric, 3)::float AS v
             FROM medicion x
            WHERE x.canal_id = ANY($1::uuid[]) AND x.tiempo >= $2 AND x.tiempo < $3
-           GROUP BY 1, 2`, [canales, desde, hasta]);
-        return t.rows;
-      } catch (e) {
-        if ((e as { code?: string }).code !== '57014') throw e;
-        this.omitida(`tiempo máximo vencido (${TENDENCIA.tiempoMaximoMs} ms)`);
-        return null;
-      } finally {
-        await cliente.query('RESET statement_timeout').catch(() => undefined);
-        cliente.off('error', errorDeCliente);
-        cliente.release();
-      }
+           GROUP BY 1, 2`, [canales, desde, hasta]));
+      if (t === null) this.omitida(`tiempo máximo vencido (${TENDENCIA.tiempoMaximoMs} ms)`);
+      return t?.rows ?? null;
     } finally {
       this.tendenciasEnCurso--;
+    }
+  }
+  // Una consulta en una conexión propia con tiempo máximo de sentencia (el mecanismo de la exportación, consulta.service.ts), para la
+  // tendencia y el histórico del sitio. null = venció el tiempo (57014); cualquier otro error sigue siendo un error. La conexión vuelve al
+  // grupo con el tope restablecido (RESET) también si la consulta falla; si ni el RESET se puede (la conexión se cortó a mitad), se
+  // devuelve con ese error y el grupo la DESTRUYE en vez de reusarla con el tope puesto (pg-pool: release(err) la quita del grupo).
+  private async conTiempoMaximo<T>(ms: number, consulta: (cliente: PoolClient) => Promise<T>): Promise<T | null> {
+    const cliente = await this.pool.connect();
+    cliente.on('error', errorDeCliente); // un corte de la base a mitad falla esta petición, no el proceso (db/cliente.ts)
+    let rota: Error | undefined;
+    try {
+      await cliente.query(`SET statement_timeout TO ${ms}`);
+      return await consulta(cliente);
+    } catch (e) {
+      if ((e as { code?: string }).code !== '57014') throw e;
+      return null;
+    } finally {
+      try {
+        await cliente.query('RESET statement_timeout');
+      } catch (e) {
+        rota = e instanceof Error ? e : new Error(String(e));
+      }
+      cliente.off('error', errorDeCliente);
+      cliente.release(rota);
     }
   }
   private omitida(motivo: string): void {
@@ -245,37 +258,62 @@ export class TableroService {
     if (aviso !== null) this.log.warn(`«Ahora» respondió sin tendencia: ${aviso}`);
   }
 
-  // GET /sitios/{id}/historico?magnitud (docs/19 §4, B4b): por cubo, promedio, mínimo, máximo, lecturas (`muestras`) y canales que
-  // aportan (`n`) de todos los canales de esa magnitud del sitio; `dispositivos`, cuántos aportan en la ventana («promedio de 9
-  // dispositivos»). La forma del histórico de un canal, sin calibración (escala y porcentajes nulos: cada canal tiene la suya).
+  // El cupo del histórico del sitio (HISTORICO_SITIO, tablero.ts; docs/19 §4, M5): como mucho `maxEnCurso` consultas a la vez en el proceso,
+  // para que las gráficas de una pestaña (hasta seis magnitudes juntas) no dejen sin conexiones a la recepción; las demás esperan en fila,
+  // en orden de llegada, y con la fila llena se responde 503 sin tocar la base. Al soltar, el cupo pasa directo a quien espera primero.
+  private historicosEnCurso = 0;
+  private readonly filaHistorico: (() => void)[] = [];
+  private async tomarCupoHistorico(): Promise<void> {
+    if (this.historicosEnCurso < HISTORICO_SITIO.maxEnCurso) {
+      this.historicosEnCurso++;
+      return;
+    }
+    if (this.filaHistorico.length >= HISTORICO_SITIO.maxEnEspera) {
+      throw new ServiceUnavailableException('hay demasiadas gráficas del sitio en espera: reintenta en un momento');
+    }
+    await new Promise<void>((seguir) => this.filaHistorico.push(seguir));
+  }
+  private soltarCupoHistorico(): void {
+    const siguiente = this.filaHistorico.shift();
+    if (siguiente !== undefined) siguiente();
+    else this.historicosEnCurso--;
+  }
+
+  // GET /sitios/{id}/historico?magnitud (docs/19 §4, B4b y M): por tramo, el promedio de los DISPOSITIVOS que aportan (cada uno con el
+  // promedio de sus lecturas del tramo o su última lectura vigente; SQL_HISTORICO_SITIO, tablero.ts), el mínimo y el máximo entre ellos,
+  // las lecturas reales (`muestras`) y cuántos aportan (`n`); `dispositivos`, cuántos aportan en algún tramo («hasta 9»). La forma del
+  // histórico de un canal, sin calibración (escala y porcentajes nulos: cada canal tiene la suya). Dos consultas: la primera trae la zona,
+  // la unidad y la cota de lo que se lee (el inicio del primer tramo menos dos veces el mayor intervalo esperado de los canales); la
+  // segunda, en una conexión propia con tiempo máximo (HISTORICO_SITIO): si lo excede, 503 y la conexión vuelve sin el tope.
   async historicoSitio(sitioId: string, magnitud: string, desde: Date, hasta: Date, intervalo: Intervalo) {
-    const m = await this.pool.query<{ zona_horaria: string; unidad: string; nombre: string }>(
-      'SELECT s.zona_horaria, m.unidad_canonica AS unidad, m.nombre FROM sitio s CROSS JOIN magnitud m WHERE s.id = $1 AND m.codigo = $2',
-      [sitioId, magnitud],
+    const m = await this.pool.query<{ zona_horaria: string; unidad: string; nombre: string; cota: string }>(`
+      SELECT s.zona_horaria, m.unidad_canonica AS unidad, m.nombre,
+             iso_utc(${sqlLimiteVigencia('time_bucket($3::interval, $4::timestamptz, s.zona_horaria)', 'mx.i')}) AS cota
+        FROM sitio s CROSS JOIN magnitud m
+       CROSS JOIN LATERAL (
+             SELECT coalesce(max(d.intervalo_esperado_s), 0) AS i
+               FROM canal c JOIN dispositivo d ON d.id = c.dispositivo_id JOIN zona z ON z.id = d.zona_id
+              WHERE z.sitio_id = s.id AND c.magnitud_codigo = m.codigo) mx
+       WHERE s.id = $1 AND m.codigo = $2`,
+      [sitioId, magnitud, intervalo, desde],
     );
     const meta = m.rows[0];
     if (meta === undefined) throw new BadRequestException(`magnitud desconocida: ${magnitud}`);
-    const r = await this.pool.query<{ t: string; v: number; mn: number; mx: number; muestras: number; n: number; dispositivos: number }>(`
-      SELECT extract(epoch FROM time_bucket($4::interval, x.tiempo, $5))::bigint AS t,
-             round(avg(x.valor)::numeric, 3)::float AS v,
-             round(min(x.valor)::numeric, 3)::float AS mn,
-             round(max(x.valor)::numeric, 3)::float AS mx,
-             count(*)::int AS muestras,
-             count(DISTINCT x.canal_id)::int AS n
-        FROM medicion x
-        JOIN canal c ON c.id = x.canal_id
-        JOIN dispositivo d ON d.id = c.dispositivo_id
-        JOIN zona z ON z.id = d.zona_id
-       WHERE z.sitio_id = $1 AND c.magnitud_codigo = $6 AND x.tiempo >= $2 AND x.tiempo < $3
-       GROUP BY 1 ORDER BY 1`, [sitioId, desde, hasta, intervalo, meta.zona_horaria, magnitud]);
-    const aportan = await this.pool.query<{ n: number }>(`
-      SELECT count(DISTINCT c.dispositivo_id)::int AS n
-        FROM canal c JOIN dispositivo d ON d.id = c.dispositivo_id JOIN zona z ON z.id = d.zona_id
-       WHERE z.sitio_id = $1 AND c.magnitud_codigo = $2
-         AND EXISTS (SELECT 1 FROM medicion x WHERE x.canal_id = c.id AND x.tiempo >= $3 AND x.tiempo < $4)`, [sitioId, magnitud, desde, hasta]);
+    await this.tomarCupoHistorico();
+    let r: { rows: { t: string; v: number; mn: number; mx: number; muestras: number; n: number; dispositivos: number }[] } | null;
+    try {
+      r = await this.conTiempoMaximo(HISTORICO_SITIO.tiempoMaximoMs, (cliente) =>
+        cliente.query<{ t: string; v: number; mn: number; mx: number; muestras: number; n: number; dispositivos: number }>(
+          SQL_HISTORICO_SITIO, [sitioId, desde, hasta, intervalo, meta.zona_horaria, magnitud, meta.cota]));
+    } finally {
+      this.soltarCupoHistorico();
+    }
+    if (r === null) {
+      throw new ServiceUnavailableException(`el histórico del sitio tardó más de ${HISTORICO_SITIO.tiempoMaximoMs / 1000} s: prueba con un rango más corto o más tarde`);
+    }
     return {
       sitio_id: sitioId, magnitud, magnitud_nombre: meta.nombre, unidad: meta.unidad, zona_horaria: meta.zona_horaria, intervalo,
-      desde, hasta, puntos: r.rows.length, dispositivos: aportan.rows[0]?.n ?? 0,
+      desde, hasta, puntos: r.rows.length, dispositivos: r.rows[0]?.dispositivos ?? 0,
       tiempos: r.rows.map((x) => Number(x.t)),
       valores: r.rows.map((x) => x.v),
       minimos: r.rows.map((x) => x.mn),

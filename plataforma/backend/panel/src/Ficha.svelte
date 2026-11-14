@@ -550,7 +550,7 @@
     <div class="filtros" role="group" aria-label="Rango del gráfico" aria-busy={cargando} data-cargando={cargando}>
       <SelectorRango rango={fijaElegida === null ? rangoElegido : null} res={resElegida} alElegirRango={elegirRango} alElegirRes={elegirRes} />
       {#if zooms.length > 0}<Boton etiqueta="Volver" ayuda="Deshace el último zoom" onclick={volverZoom} data-volver-zoom />{/if}
-      {#if tieneMinMax}<Boton etiqueta="Mostrar mín–máx" presionado={mostrarMinMax} ayuda="Dibuja, alrededor del promedio, la banda entre el mínimo y el máximo de cada cubo" onclick={() => (mostrarMinMax = !mostrarMinMax)} data-min-max />{/if}
+      {#if tieneMinMax}<Boton etiqueta="Mostrar mín–máx" presionado={mostrarMinMax} ayuda="Dibuja, alrededor del promedio, la banda entre el mínimo y el máximo de cada intervalo" onclick={() => (mostrarMinMax = !mostrarMinMax)} data-min-max />{/if}
       <Boton etiqueta="Todos los canales" presionado={todosLosCanales} ayuda="Una gráfica pequeña por canal, con la misma ventana y el cursor sincronizado" onclick={alternarTodos} data-todos-canales />
       {#if cargando}
         <span class="vivo" data-cargando-texto>cargando…</span>

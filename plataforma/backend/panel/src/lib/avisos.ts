@@ -23,8 +23,12 @@ export function avisoDeError(e: unknown): DatosAviso {
       return { tipo: 'error', texto: e.motivos[0] ?? 'Tu rol en este sitio no lo permite.' };
     case 404:
       return { tipo: 'error', texto: 'Ya no existe o no es de tus sitios: recarga la lista.' };
-    case 503:
-      return { tipo: 'espera', texto: 'El servicio está saturado: reintenta en un momento.' };
+    case 503: {
+      // Si el servidor dice por qué (una consulta que pasó su tiempo máximo: «prueba con un rango más corto»), se muestra eso: es lo que
+      // la persona puede hacer. Sin motivo (el cupo del canal en vivo, el proxy), el aviso general.
+      const motivo = e.motivos.join('; ');
+      return { tipo: 'espera', texto: motivo !== '' ? `${motivo.charAt(0).toUpperCase()}${motivo.slice(1)}.` : 'El servicio está saturado: reintenta en un momento.' };
+    }
     default:
       return { tipo: 'error', texto: mensajeError(e) };
   }

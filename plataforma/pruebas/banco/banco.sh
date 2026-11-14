@@ -19,6 +19,7 @@
 #   bash plataforma/pruebas/banco/banco.sh nodo                contrato del nodo ESP32 (fase 2, docs/17 §6.2) sin la placa: alta con seis canales, calibración por API (400, 200, 409), el pack del firmware con QoS 1 → medicion, ficha, histórico y en vivo
 #   bash plataforma/pruebas/banco/banco.sh navegador           P3, P3b y P2 en un navegador real con Playwright: puntos contra /historico, vivo sin recargar, caída y vuelta (docs/16 §39);
 #                                                              leyenda, rangos, resoluciones, rango vacío, zona horaria y comparación (docs/16 §52). NAVEGADOR=firefox (por defecto) o chromium
+#   bash plataforma/pruebas/banco/banco.sh historico           el promedio del sitio es el de sus dispositivos: los cinco casos de docs/19 §4 M7 con datos sembrados a propósito (docs/16 §68)
 #   bash plataforma/pruebas/banco/banco.sh cola                cola del broker vigilada: backend detenido + 200 emulados → descartes → condición broker_descarte (docs/16 §22)
 #   bash plataforma/pruebas/banco/banco.sh estado | logs [servicio] | sql ["CONSULTA"]
 #   bash plataforma/pruebas/banco/banco.sh apagar              baja todo; los datos estaban en RAM, no queda nada
@@ -834,6 +835,7 @@ SQL
     echo; [ $fallos -eq 0 ] && echo "COLA OK" || { echo "$fallos comprobación(es) con falla"; exit 1; } ;;
   consultable) bash "$(dirname "$YO")/consultable.sh" http://127.0.0.1:3001 ;;   # docs/16 §48: todo dispositivo del banco es consultable de punta a punta
   vias) bash "$(dirname "$YO")/vias.sh" ;;   # docs/16 §49: la misma serie por las tres entradas (MQTT directo, HTTP y pasarela); mide pérdidas, duplicados, latencia y consumo
+  historico) bash "$(dirname "$YO")/historico-sitio.sh" ;;   # docs/16 §68: GET /sitios/{id}/historico contra los cinco casos de docs/19 §4 M7
   apagar)
     # Sin el archivo de claves (vive en /run/user, que el sistema puede vaciar), Compose no interpola el proyecto y `down` no baja
     # nada: el 24/10 quedaron el proxy viejo y la base con claves que ya no calzaban. Entonces se bajan por la etiqueta del proyecto.

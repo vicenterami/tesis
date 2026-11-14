@@ -200,11 +200,88 @@ export function elegirCanales<T extends Pick<CanalConUltima, 'id' | 'magnitud'>>
   return [...canales].sort(ordenCanales).slice(0, MAX_CANALES_AHORA);
 }
 
-// ¿La lectura es de «ahora»? Menos de dos intervalos esperados del dispositivo, con el reloj de la base: una lectura vieja no entra al
-// promedio de «ahora» (L3a); en la tarjeta se muestra atenuada con su antigüedad (eso lo decide el panel). Desde el 13/11/2026 el agregado
-// por magnitud se calcula en la base (docs/16 §66): la regla vive aquí, en SQL, sobre `dev` (el dispositivo, con `intervalo_esperado_s`) y
-// `u` (la última lectura del canal). Estricta: exactamente dos intervalos ya no es de «ahora».
-export const SQL_LECTURA_VIGENTE = `u.tiempo > now() - dev.intervalo_esperado_s * 2 * INTERVAL '1 second'`;
+// ¿La lectura sigue vigente en el instante `referencia`? Menos de dos intervalos esperados del dispositivo: una lectura vieja no entra al
+// promedio de «ahora» (L3a); en la tarjeta se muestra atenuada con su antigüedad (eso lo decide el panel). Estricta: exactamente dos
+// intervalos ya no es vigente. Es la ÚNICA casa de la regla: «Ahora» la evalúa con el reloj de la base (desde el 13/11/2026 el agregado por
+// magnitud se calcula en la base, docs/16 §66) y el histórico del sitio, al empezar cada tramo (docs/19 §4, M1). Los argumentos son
+// expresiones SQL fijas del código, nunca datos.
+export const VIGENCIA_INTERVALOS = 2;
+// El instante más antiguo que una lectura puede tener para seguir vigente en `referencia`. Lo usa también quien acota desde cuándo leer
+// (la cota del histórico del sitio): si el factor cambia, cambian juntos la regla y la cota.
+export function sqlLimiteVigencia(referencia: string, intervalo: string): string {
+  return `${referencia} - ${intervalo} * ${VIGENCIA_INTERVALOS} * INTERVAL '1 second'`;
+}
+export function sqlLecturaVigente(lectura: string, referencia: string, intervalo: string): string {
+  return `${lectura} > ${sqlLimiteVigencia(referencia, intervalo)}`;
+}
+// En «Ahora», sobre `dev` (el dispositivo, con `intervalo_esperado_s`) y `u` (la última lectura del canal).
+export const SQL_LECTURA_VIGENTE = sqlLecturaVigente('u.tiempo', 'now()', 'dev.intervalo_esperado_s');
+
+// ── Histórico del sitio: el promedio de sus dispositivos (docs/19 §4, M; docs/10 §8.4 punto 66) ────────────────────────────────────
+// En cada tramo, cada canal de la magnitud (uno por dispositivo: UNIQUE (dispositivo_id, magnitud_codigo)) aporta UN valor: el promedio
+// de sus lecturas del tramo o, si no reportó en él, su última lectura mientras siga vigente al empezar el tramo (sqlLecturaVigente). El
+// punto es el promedio de los aportes; la banda, el mínimo y el máximo entre ellos; `n`, cuántos aportan; `muestras`, las lecturas reales.
+// Parámetros: $1 sitio, $2 desde, $3 hasta, $4 intervalo, $5 zona horaria, $6 magnitud y $7 la cota inferior de lo que se lee: el inicio
+// del primer tramo menos dos veces el mayor intervalo esperado de esos canales (la calcula el servicio; como constante, la base descarta
+// los fragmentos que no tocan al planificar). Cómo (medido en docs/16 §68):
+//   · `propio`: por canal (LATERAL: cada canal se agrega solo, sin ordenar las lecturas de todo el sitio) y tramo, el promedio, mínimo,
+//     máximo, cuántas y la última lectura con su hora; las anteriores a la ventana, aún vigentes al empezar el primer tramo, van a un
+//     tramo «-infinity», del que solo se usa la última (la lectura anterior a la ventana). `b_sig`, el siguiente tramo con lecturas.
+//   · `arrastre`: después de cada tramo con lecturas (y del «-infinity»), los tramos de la rejilla hasta el siguiente con lecturas en que
+//     su última lectura sigue vigente; solo se recorren los tramos que pueden estarlo (dos intervalos esperados, en tramos, más uno). La
+//     rejilla es un arreglo ordenado de los inicios de tramo (generate_series en la zona del sitio y time_bucket de cada paso: así coincide
+//     con los tramos de las lecturas también cuando cambia la hora); `orden`, la posición de cada uno, para cortar el arreglo sin buscar.
+//   · `suyo` y `ajeno`: lo propio y lo arrastrado, sumados por tramo, y unidos: un tramo sin ningún aporte no sale (no es 0).
+// `dispositivos`: cuántos aportan en algún tramo (todo canal con lecturas en la ventana o una anterior vigente tiene exactamente una fila
+// sin siguiente).
+// `maxEnCurso` y `maxEnEspera` (revisión del 14/11/2026): cada consulta ocupa una conexión propia hasta `tiempoMaximoMs`, el grupo tiene
+// cinco y las comparte con la recepción, y la pestaña Tendencias pide hasta seis magnitudes juntas; como mucho dos a la vez en el proceso,
+// las demás esperan su turno (doce: dos pestañas completas) y, con la fila llena, 503.
+export const HISTORICO_SITIO = { tiempoMaximoMs: 5_000, maxEnCurso: 2, maxEnEspera: 12 } as const;
+export const SQL_HISTORICO_SITIO = `
+      WITH c AS (
+        SELECT c.id, d.intervalo_esperado_s
+          FROM canal c JOIN dispositivo d ON d.id = c.dispositivo_id JOIN zona z ON z.id = d.zona_id
+         WHERE z.sitio_id = $1 AND c.magnitud_codigo = $6),
+      rejilla AS (
+        SELECT array_agg(b ORDER BY b) AS b
+          FROM (SELECT DISTINCT time_bucket($4::interval, g, $5) AS b
+                  FROM generate_series(time_bucket($4::interval, $2::timestamptz, $5), $3::timestamptz, $4::interval, $5) g
+                 WHERE g < $3) u),
+      propio AS (
+        SELECT c.id AS canal_id, c.intervalo_esperado_s, p.*
+          FROM c CROSS JOIN LATERAL (
+            SELECT g.b, g.v, g.mn, g.mx, g.k, g.ut, g.uv, lead(g.b) OVER (ORDER BY g.b) AS b_sig
+              FROM (SELECT CASE WHEN x.tiempo < $2 THEN '-infinity' ELSE time_bucket($4::interval, x.tiempo, $5) END AS b,
+                           avg(x.valor) AS v, min(x.valor) AS mn, max(x.valor) AS mx, count(*)::int AS k,
+                           max(x.tiempo) AS ut, last(x.valor, x.tiempo) AS uv
+                      FROM medicion x
+                     WHERE x.canal_id = c.id AND x.tiempo >= $7 AND x.tiempo < $3
+                       AND ${sqlLecturaVigente('x.tiempo', 'time_bucket($4::interval, $2::timestamptz, $5)', 'c.intervalo_esperado_s')}
+                     GROUP BY 1) g) p),
+      orden AS (SELECT u.b, u.i::int AS i FROM rejilla r CROSS JOIN LATERAL unnest(r.b) WITH ORDINALITY u(b, i)),
+      arrastre AS (
+        SELECT u.b, p.uv
+          FROM (SELECT p.uv, p.ut, p.intervalo_esperado_s, coalesce(o0.i, 0) AS i0,
+                       least(coalesce(o1.i, (SELECT cardinality(b) FROM rejilla) + 1) - 1,
+                             coalesce(o0.i, 0) + 1 + ceil(p.intervalo_esperado_s * 2 / extract(epoch FROM $4::interval))::int) AS i1
+                  FROM propio p LEFT JOIN orden o0 ON o0.b = p.b LEFT JOIN orden o1 ON o1.b = p.b_sig
+                 WHERE p.b_sig IS NULL OR p.b_sig > p.b + $4::interval) p
+         CROSS JOIN rejilla r CROSS JOIN LATERAL unnest(r.b[p.i0 + 1 : p.i1]) u(b)
+         WHERE ${sqlLecturaVigente('p.ut', 'u.b', 'p.intervalo_esperado_s')}),
+      suyo AS (
+        SELECT b, sum(v) AS sv, count(*) AS n, min(mn) AS mn, max(mx) AS mx, sum(k) AS k FROM propio WHERE b > '-infinity' GROUP BY b),
+      ajeno AS (
+        SELECT b, sum(uv) AS sv, count(*) AS n, min(uv) AS mn, max(uv) AS mx FROM arrastre GROUP BY b)
+      SELECT extract(epoch FROM b)::bigint AS t,
+             round(((coalesce(s.sv, 0) + coalesce(a.sv, 0)) / (coalesce(s.n, 0) + coalesce(a.n, 0)))::numeric, 3)::float AS v,
+             round(least(s.mn, a.mn)::numeric, 3)::float AS mn,
+             round(greatest(s.mx, a.mx)::numeric, 3)::float AS mx,
+             coalesce(s.k, 0)::int AS muestras,
+             (coalesce(s.n, 0) + coalesce(a.n, 0))::int AS n,
+             (SELECT count(*) FROM propio WHERE b_sig IS NULL)::int AS dispositivos
+        FROM suyo s FULL JOIN ajeno a USING (b)
+       ORDER BY b`;
 
 // Por magnitud, sobre la última lectura vigente de cada canal: promedio, mínimo, máximo y cuántos canales aportan (una fila por magnitud,
 // de la base). Aquí, la marca de salud, el promedio con tres decimales y el orden: las magnitudes de salud al final; dentro, por código.

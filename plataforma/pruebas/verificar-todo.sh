@@ -618,7 +618,10 @@ paso "2t. Pruebas unitarias: la cifra citada en docs e informe es la que existe 
 # 08/10: la misma cifra decía 49, 70 y 78 en distintos documentos. Se cuentan los it( y se compara con cada «N pruebas
 # unitarias» de docs/ (salvo docs/12, el estado fechado de la Etapa 2) y del informe.
 real=$(grep -rhoE '^[[:space:]]*it\(' plataforma/backend/src --include='*.spec.ts' | wc -l)
-citas=$(grep -rnoE '[0-9]+ pruebas unitarias' docs/*.md informe-oficial/*.tex informe-oficial/anexos/*.tex 2>/dev/null | grep -v '^docs/12-')
+# 14/11: docs/16 es un registro fechado: sus secciones anteriores citan la cifra de su día («592 pruebas unitarias» en la del 13/11) y
+# aquí fallaban al subir el número, lo que obligaba a redactar la cita de otra forma para pasar. De docs/16 rigen solo la cabecera y la
+# última sección, y esas las compara el bloque de abajo (como en 2w4); aquí queda fuera.
+citas=$(grep -rnoE '[0-9]+ pruebas unitarias' docs/*.md informe-oficial/*.tex informe-oficial/anexos/*.tex 2>/dev/null | grep -v '^docs/1[26]-')
 malas=$(awk -F: -v r="$real" 'NF { split($3, a, " "); if (a[1] != r) print }' <<<"$citas")
 if [ "$real" -lt 10 ]; then echo "FALLA contó solo $real pruebas (it( en los *.spec.ts)"; fallos=$((fallos+1))
 elif [ -z "$citas" ]; then echo "FALLA ninguna cita «N pruebas unitarias» en docs ni en el informe: ¿cambió la redacción? (no revisó nada)"; fallos=$((fallos+1))
