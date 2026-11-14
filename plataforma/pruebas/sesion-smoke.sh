@@ -9,8 +9,8 @@
 # (A, el de las dos personas, y B, «otro sitio»), una zona, dos dispositivos HTTP y un canal en cada uno; correos @ejemplo.invalid
 # (dominio reservado, RFC 2606). Todo lo creado se borra al salir, también si algo falla (trap), con el dueño de la base.
 # Las claves de prueba se generan aquí, viajan a curl por la entrada estándar o dentro del cuerpo y no se imprimen.
-# Cuántos intentos fallidos deja: 5 con clave mala, 6 con un email inexistente y 1 de usuario inactivo (el bloqueo por IP corta a los 50
-# en 15 minutos; por eso cada corrida sale desde una dirección distinta del bucle local, ver ORIGEN).
+# Cuántos intentos fallidos deja: 5 con clave mala, 6 con un email inexistente y 1 de usuario inactivo, más las claves malas de la baja y
+# de la clave anterior (el bloqueo por IP corta a los 50 en 15 minutos; por eso cada corrida cuenta como una dirección distinta, ver ORIGEN).
 # Residuos de una corrida que no pudo limpiar (lo avisa con los conteos y el sufijo):
 #   bash plataforma/pruebas/sesion-smoke.sh --limpiar SUFIJO
 set -u
@@ -18,10 +18,17 @@ set +x # nunca con traza: las claves de prueba y la clave de administrador viven
 AQUI="$(cd "$(dirname "$0")" && pwd)"
 . "$AQUI/lib-dynsec.sh"
 API="${API:-http://127.0.0.1:3000}"
-# Cada corrida sale desde una dirección distinta del bucle local (127.0.0.0/8 entero es loopback en Linux): así el bloqueo por
-# dirección (50 fallos en 15 min, docs/20 §4) no encadena corridas seguidas y no hay que reiniciar el backend. Solo contra 127.0.0.1;
-# contra otro servidor, curl sale por la ruta normal.
-if [[ "$API" == *127.0.0.1* ]]; then ORIGEN="127.$((RANDOM % 200 + 2)).$((RANDOM % 250 + 1)).$((RANDOM % 250 + 1))"; IFZ=(--interface "$ORIGEN"); else ORIGEN=; IFZ=(); fi
+# Cada corrida cuenta como una dirección distinta, ORIGEN, para que el bloqueo por dirección (50 fallos en 15 min, docs/20 §4) no encadene
+# corridas seguidas sin reiniciar el backend. Hasta el 13/11/2026 se intentaba saliendo desde otra dirección del bucle local (curl
+# --interface), pero no alcanzaba: el backend corre en Docker y, por el puerto publicado, ve TODA conexión venir de la puerta de enlace de
+# la red de Docker, la misma en cada corrida (y la de quien use el panel por ese puerto). Dos o tres corridas seguidas sumaban los 50
+# fallos de esa única dirección y la siguiente recibía «429 bloqueado» (en la baja o en el bloqueo de la sección 6). Ahora cada petición
+# lleva ORIGEN en X-Forwarded-For junto con X-Proxy-Secreto, como hace el proxy: es el único camino por el que el backend cree esa
+# cabecera (direccion.ts), así que el bloqueo sigue intacto y solo cambia de quién se cuentan los fallos. El secreto se lee del .env de la
+# pila, va a curl desde un archivo de la carpeta temporal (-H @archivo: no aparece en «ps») y nunca se imprime. Sin PROXY_SECRETO, o
+# contra otro servidor (sin 127.0.0.1), las peticiones salen sin esas cabeceras y se avisa: las corridas comparten dirección.
+if [[ "$API" == *127.0.0.1* ]]; then ORIGEN="127.$((RANDOM % 200 + 2)).$((RANDOM % 250 + 1)).$((RANDOM % 250 + 1))"; else ORIGEN=; fi
+IFZ=()
 PLAT="$AQUI/.."
 sql() { docker compose -f "$PLAT/docker-compose.yml" exec -T timescaledb psql -X -U plataforma -d plataforma -v ON_ERROR_STOP=1 -tA -q "$@"; }
 ok_n=0; fallos=0
@@ -82,6 +89,13 @@ fi
 CLAVE=$(leer_env "${ENV_PILA:-$PLAT/.env}" HTTP_CLAVE_ADMIN 2>/dev/null)
 [ -n "$CLAVE" ] || { echo "FALLA sin HTTP_CLAVE_ADMIN en el .env de la pila: no hay con qué crear el primer administrador (docs/20 §4)"; exit 1; }
 T=$(mktemp -d "${TMPDIR:-/tmp}/sesion-smoke.XXXXXX") || exit 1
+SECRETO_PROXY=$(leer_env "${ENV_PILA:-$PLAT/.env}" PROXY_SECRETO 2>/dev/null)
+if [ -n "$ORIGEN" ] && [ -n "$SECRETO_PROXY" ]; then
+  printf 'X-Proxy-Secreto: %s\nX-Forwarded-For: %s\n' "$SECRETO_PROXY" "$ORIGEN" > "$T/origen.cab"; IFZ=(-H "@$T/origen.cab")
+else
+  echo "AVISO sin PROXY_SECRETO en el .env o contra otro servidor: esta corrida comparte dirección con las anteriores (el bloqueo de 50 fallos en 15 min puede alcanzarla)"
+fi
+unset SECRETO_PROXY
 LOG_LIMPIEZA="$T/limpieza.txt"
 N=$(date +%s%N | tail -c 7)
 SA="pa-$N"; SB="pb-$N"; DOM="-$N@ejemplo.invalid"
@@ -395,7 +409,7 @@ for r in "/sitios/$SITIO_B/resumen" "/sitios/$SITIO_B/ahora" "/sitios/$SITIO_B/h
 done
 # «Ahora» (docs/19 §4, L6): con tendencia, la forma; el dispositivo de A está, el de B no; limite fuera de 1–60 → 400 antes del alcance.
 caso "consulta: GET /sitios/{id}/ahora?tendencia=si (su sitio)" 200 con GET "/sitios/$SITIO_A/ahora?tendencia=si&limite=60"
-[ "$(campo "(sorted(v) == ['chispa', 'dispositivos', 'por_magnitud', 'reportan', 'sin_senal'], v['chispa']['puntos'], all(len(c['chispa']) == 24 for d in v['dispositivos'] for c in d['canales']), '$DB' in [d['id'] for d in v['dispositivos']])")" = "(True, 24, True, False)" ] \
+[ "$(campo "(sorted(v) == ['chispa', 'dispositivos', 'por_magnitud', 'reportan', 'sin_senal', 'tendencia'] and v['tendencia'] is True, v['chispa']['puntos'], all(len(c['chispa']) == 24 for d in v['dispositivos'] for c in d['canales']), '$DB' in [d['id'] for d in v['dispositivos']])")" = "(True, 24, True, False)" ] \
   && ok "consulta: «Ahora» con tendencia trae la chispa de 24 cubos y ningún dispositivo de otro sitio" || falla "consulta: GET /sitios/{id}/ahora?tendencia=si → $(head -c 300 "$T/r")"
 caso "consulta: GET /sitios/{id}/ahora?limite=61 → 400" 400 con GET "/sitios/$SITIO_A/ahora?limite=61"
 caso "consulta, otro sitio: GET /sitios/{id}/ahora?limite=61 → 400 (la entrada se valida antes que el alcance)" 400 con GET "/sitios/$SITIO_B/ahora?limite=61"
@@ -699,9 +713,9 @@ caso "la sesión del usuario desactivado ya no vale" 401 ina GET /sesion
 c=$(entrar ina2 "$INA_EMAIL" <<<"$INA_TEMP"); m_inactivo=$(campo "v['message']")
 inicio=$(sql -c "SELECT now()")
 for i in 1 2 3 4 5; do
-  t=$(curl -s -m 15 -o "$T/r" -w '%{http_code} %{time_total}' -X POST -H 'X-Pedido: panel' -H 'Content-Type: application/json' --data-binary @- "$API/sesion" <<<"$(cuerpo_entrar "$CON_EMAIL" <<<"mala-$i-$(nueva_clave)")")
+  t=$(curl "${IFZ[@]}" -s -m 15 -o "$T/r" -w '%{http_code} %{time_total}' -X POST -H 'X-Pedido: panel' -H 'Content-Type: application/json' --data-binary @- "$API/sesion" <<<"$(cuerpo_entrar "$CON_EMAIL" <<<"mala-$i-$(nueva_clave)")")
   echo "$t" >> "$T/malas.txt"; m_mala=$(campo "v['message']")
-  t=$(curl -s -m 15 -o "$T/r" -w '%{http_code} %{time_total}' -X POST -H 'X-Pedido: panel' -H 'Content-Type: application/json' --data-binary @- "$API/sesion" <<<"$(cuerpo_entrar "inexistente$DOM" <<<"$(nueva_clave)")")
+  t=$(curl "${IFZ[@]}" -s -m 15 -o "$T/r" -w '%{http_code} %{time_total}' -X POST -H 'X-Pedido: panel' -H 'Content-Type: application/json' --data-binary @- "$API/sesion" <<<"$(cuerpo_entrar "inexistente$DOM" <<<"$(nueva_clave)")")
   echo "$t" >> "$T/inexistentes.txt"; m_nadie=$(campo "v['message']")
 done
 if [ "$c" = 401 ] && [ "$m_inactivo" = "$m_mala" ] && [ "$m_mala" = "$m_nadie" ] && ! grep -qv '^401 ' "$T/malas.txt" "$T/inexistentes.txt"; then

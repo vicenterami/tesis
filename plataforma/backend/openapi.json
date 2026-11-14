@@ -1633,7 +1633,7 @@
     },
     "/sitios/{id}/ahora": {
       "get": {
-        "description": "Un número fijo de consultas por petición, sin una por dispositivo (docs/10 §8.4 punto 65 viii). `reportan` y `sin_senal`: cuántos dispositivos del sitio tienen estado visual normal o alerta, y sin señal (la regla de docs/19 §2, la misma del inventario y del resumen). `por_magnitud[{codigo, nombre, unidad, salud, canales, promedio, minimo, maximo}]`: sobre la última lectura de cada canal de los que reportan, solo si tiene menos de dos intervalos esperados del dispositivo (una lectura vieja no entra); `canales`, cuántos aportan; las de salud del equipo al final. `dispositivos[{id, nombre, zona, estado_visual, visto_por_ultima_vez, intervalo_esperado_s, canales_total, canales}]`: los que reportan, primero los de alerta y después por zona y nombre, hasta `limite`; `canales` trae hasta 3 `{id, magnitud, magnitud_nombre, unidad, salud, ultima{valor, tiempo, porcentaje}|null}`: primero lo que se mide y al final la salud del equipo (bateria, tension, rssi). Con `tendencia=si`, además `chispa{desde, intervalo, puntos}` y, en cada canal, `chispa`: 24 promedios por hora alineados a la hora UTC, el último de la hora en curso (parcial); un cubo sin lecturas es null, no 0. Consulta o más en su sitio; otro sitio, 404.",
+        "description": "Como mucho tres consultas por petición, sin una por dispositivo (docs/10 §8.4 punto 65 viii). `reportan` y `sin_senal`: cuántos dispositivos del sitio tienen estado visual normal o alerta, y sin señal (la regla de docs/19 §2, la misma del inventario y del resumen). `por_magnitud[{codigo, nombre, unidad, salud, canales, promedio, minimo, maximo}]`: sobre la última lectura de cada canal de los que reportan, solo si tiene menos de dos intervalos esperados del dispositivo (una lectura vieja no entra); `canales`, cuántos aportan; las de salud del equipo al final. `dispositivos[{id, nombre, zona, estado_visual, visto_por_ultima_vez, intervalo_esperado_s, canales_total, canales}]`: los que reportan, primero los de alerta y después por zona y nombre, hasta `limite`; `canales` trae hasta 3 `{id, magnitud, magnitud_nombre, unidad, salud, ultima{valor, tiempo, porcentaje}|null}`: primero lo que se mide y al final la salud del equipo (bateria, tension, rssi). Con `tendencia=si`, además `chispa{desde, intervalo, puntos}` y, en cada canal, `chispa`: 24 promedios por hora alineados a la hora UTC, el último de la hora en curso (parcial); un cubo sin lecturas es null, no 0. `tendencia` va siempre: true si la tendencia está en la respuesta; false si no se pidió o si se omitió porque su cálculo pasó de 2000 ms o ya había 2 en curso (no es un error: el resto de la respuesta es el mismo). Consulta o más en su sitio; otro sitio, 404.",
         "operationId": "SitiosController_ahora",
         "parameters": [
           {
@@ -1658,7 +1658,7 @@
             "name": "tendencia",
             "required": false,
             "in": "query",
-            "description": "`si` suma las líneas de tendencia de 24 h; cualquier otro valor o ausente, no",
+            "description": "`si` pide las líneas de tendencia de 24 h (si no alcanzan el tiempo o el cupo, `tendencia: false`); cualquier otro valor o ausente, no",
             "schema": {
               "enum": [
                 "si"

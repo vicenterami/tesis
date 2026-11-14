@@ -441,7 +441,7 @@ mis datos» (JSON por `descargar`) y «Darme de baja» (`docs/20 §11`).
 |---|---|---|
 | `GET /sitios` | mis sitios con código, nombre, zona horaria, zonas y mi perfil en cada uno (el administrador del sistema, todos) | con sesión (Etapa 4) |
 | `GET /sitios/{id}/resumen?desde&hasta[&intervalo]` | conteos por estado visual, condiciones abiertas por tipo, tramas recibidas y rechazadas por cubo (resolución del rango, o `intervalo` de la lista cerrada; la respuesta la declara en `ventana.intervalo` y el panel rotula con eso; los cubos sin datos no se emiten: no son 0), entrega de los 50 dispositivos con peor entrega en el rango pedido y cuántos activos hay, magnitudes medidas con cuántos canales, «requiere atención» | consulta o más (Etapa 4) |
-| `GET /sitios/{id}/ahora?limite&tendencia` (L6, 13/11/2026) | lo que se mide ahora: cuántos reportan y cuántos están sin señal, el promedio, mínimo y máximo por magnitud de la última lectura vigente de cada canal, y hasta 60 tarjetas (24 por defecto) de los que reportan, alerta primero, con hasta tres canales y su última lectura; con `tendencia=si`, 24 promedios por hora por canal | consulta o más (Etapa 4) |
+| `GET /sitios/{id}/ahora?limite&tendencia` (L6, 13/11/2026) | lo que se mide ahora: cuántos reportan y cuántos están sin señal, el promedio, mínimo y máximo por magnitud de la última lectura vigente de cada canal, y hasta 60 tarjetas (24 por defecto) de los que reportan, alerta primero, con hasta tres canales y su última lectura; con `tendencia=si`, 24 promedios por hora por canal (si su cálculo no alcanza el tiempo o el cupo, `tendencia: false`) | consulta o más (Etapa 4) |
 | `GET /sitios/{id}/historico?magnitud&desde&hasta&intervalo` | por cubo: promedio, mínimo, máximo, lecturas y n de todos los canales de esa magnitud del sitio; 5 000 cubos y **31 días** (lee todos los canales de la magnitud: 30 días de 120 canales cada 300 s tardan ≈ 1,1 s, `docs/16 §61`; más largo, por canal o exportación) | consulta o más (Etapa 4) |
 | `GET /canales/{id}/historico` | además del promedio, mínimo y máximo por cubo (campos nuevos) | como hoy |
 | `GET /dispositivos/{id}/historico?desde&hasta&intervalo` | todos los canales del dispositivo en una respuesta, alineados por cubo | consulta o más (Etapa 4) |
@@ -462,7 +462,7 @@ atencion[{id, nombre, estado_visual, visto_por_ultima_vez, tipos}], magnitudes[{
 recibidas, esperadas, porcentaje}]` (los 50 peores), `total_activos`; `/sitios/{id}/ahora` → `reportan, sin_senal, por_magnitud[{codigo,
 nombre, unidad, salud, canales, promedio, minimo, maximo}], dispositivos[{id, nombre, zona, estado_visual, visto_por_ultima_vez,
 intervalo_esperado_s, canales_total, canales[{id, magnitud, magnitud_nombre, unidad, salud, ultima{valor, tiempo, porcentaje}|null,
-chispa?}]}], chispa?{desde, intervalo, puntos}` (las `chispa`, solo con `tendencia=si`; L6); `/sitios/{id}/historico` → la forma de `Historico` más `minimos, maximos, n` y `magnitud, unidad`;
+chispa?}]}], tendencia, chispa?{desde, intervalo, puntos}` (las `chispa`, solo con `tendencia: true`; L6); `/sitios/{id}/historico` → la forma de `Historico` más `minimos, maximos, n` y `magnitud, unidad`;
 `/canales/{id}/historico` → `minimos, maximos` además de lo de hoy; `/dispositivos/{id}/historico` → `tiempos, canales[{id, magnitud,
 magnitud_nombre, unidad, valores, minimos, maximos, muestras}]`; cada fila de `/dispositivos` suma `estado_visual` y `entrega`;
 `/dispositivos/{id}/eventos` → `id, tipo, detalle, ocurrido_en, usuario{id, nombre}|null`; `/cuarentena/detectados` → `sitio_codigo, emisor, topico,
@@ -586,14 +586,22 @@ segundo para mover un cubo de seis horas) y volver a pedir datos por cada trama 
    que reportan, solo si tiene menos de dos intervalos esperados del dispositivo; `canales`, cuántos aportan; `salud` y el orden —las de
    salud del equipo al final— se sumaron al implementar, 13/11/2026, para que el panel las ordene como las tarjetas sin repetir la lista) y `dispositivos[{id, nombre, zona, estado_visual, visto_por_ultima_vez, intervalo_esperado_s, canales_total,
    canales[{id, magnitud, magnitud_nombre, unidad, salud, ultima{valor, tiempo, porcentaje}|null, chispa[número|null]}]}]` (hasta
-   tres canales por dispositivo, en el orden del punto 3b; `chispa`, solo con `tendencia=si`), más `chispa{desde, intervalo,
+   tres canales por dispositivo, en el orden del punto 3b; `chispa`, solo con `tendencia: true`), `tendencia` (siempre: `true` si la
+   tendencia está en la respuesta; `false` si no se pidió o si se omitió, ver abajo) y, con `tendencia: true`, `chispa{desde, intervalo,
    puntos}`: 24 cubos de una hora que terminan en la hora en curso (el último, parcial), alineados a la hora UTC (es una tendencia
    sin eje, no una serie para leer valores); un cubo sin lecturas es `null`, no 0. El estado visual sale de la misma regla en SQL
    que el inventario (C); por esa regla, un dispositivo activo que aún no envía nada es Normal y aparece con sus canales en `null` y
-   `visto_por_ultima_vez` nulo (es el «esperando la primera trama» de F1). Cada petición hace un número fijo de consultas: dos, y tres con la tendencia,
-   tenga el sitio uno o cien dispositivos. Los avisos `medicion`, `visto` y `condicion` del canal en vivo suman `sitio_id` (✅ backend,
-   13/11/2026: sale del mapa de sitios con que el servidor ya filtra el canal; es `null` solo para quien alcanza a todos los sitios, si el
-   dispositivo es tan nuevo que el servidor aún no lo conoce, hasta 5 s). `/preferencias` no cambia.
+   `visto_por_ultima_vez` nulo (es el «esperando la primera trama» de F1). Cada petición hace como mucho tres consultas, tenga el sitio
+   uno o dos mil dispositivos (corrección del 13/11/2026, medida en `docs/16 §66`): la primera calcula **en la base** el agregado por
+   magnitud, así que al proceso no viajan los canales de todo el sitio; la segunda trae solo los canales de los dispositivos de la página
+   (ninguna si la página está vacía); la tercera, la tendencia, solo si se pidió y hay canales que mostrar. **La tendencia tiene dos topes**
+   (13/11/2026, `docs/11 §4`): 2 s de tiempo máximo de sentencia, en una conexión propia, y como mucho dos cálculos a la vez en el proceso.
+   Si no alcanza, la respuesta sale igual, con `tendencia: false` y sin ninguna `chispa`: no es un error, y el panel dibuja las tarjetas
+   sin la línea. Los avisos `medicion`, `visto` y `condicion` del canal en vivo suman `sitio_id` (✅ backend, 13/11/2026: sale del mapa de
+   sitios con que el servidor ya filtra el canal; es `null` solo para quien alcanza a todos los sitios, si el dispositivo es tan nuevo que
+   el servidor aún no lo conoce: hasta la siguiente recarga del mapa, que pide el mismo aviso o el latido siguiente del flujo —cada 25 s—,
+   con el tope de una recarga cada 5 s). Desde el 13/11/2026 el latido también pone al día el mapa para un dispositivo que cambia de sitio:
+   sale con el sitio nuevo a más tardar un latido después, sin que nadie abra otro flujo. `/preferencias` no cambia.
 7. **Pruebas y medición (J), con umbral.** Por el DOM: el enlace de una ficha de indicador se llama por su rótulo y su cifra; el
    menú contraído conserva los nombres accesibles y el cajón devuelve el foco a «Menú»; una ráfaga de avisos `medicion` y `visto`
    cambia las tarjetas **sin ningún pedido**, y con tramas continuas hay como mucho un pedido de resumen por minuto; «Reanudar»

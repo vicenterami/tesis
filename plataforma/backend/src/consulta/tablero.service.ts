@@ -1,11 +1,13 @@
-import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { Pool } from 'pg';
 import { POOL } from '../db/db.module.js';
 import { isoUs } from '../db/iso-us.js';
 import {
-  CUBOS_CHISPA, CanalConUltima, Cursor, Entrega, FilaCubo, SQL_EN_LINEA, SQL_ESTADO_VISUAL, alinear, armarChispas, elegirCanales, entrega, esSalud,
-  porMagnitud, ventanaChispa,
+  CUBOS_CHISPA, CanalConUltima, Cursor, Entrega, FilaCubo, FilaMagnitud, SQL_EN_LINEA, SQL_ESTADO_VISUAL, SQL_LECTURA_VIGENTE, TENDENCIA, alinear,
+  armarChispas, elegirCanales, entrega, esSalud, porMagnitud, ventanaChispa,
 } from './tablero.js';
+import { AvisosAcotados } from '../arranque.js';
+import { errorDeCliente } from '../db/cliente.js';
 import { SQL_ULTIMA_MEDICION } from './consulta.service.js';
 import { porcentaje } from './escala.js';
 import { Intervalo } from './validacion.js';
@@ -122,24 +124,33 @@ export class TableroService {
   }
 
   // GET /sitios/{id}/ahora (docs/19 §4, bloque L, puntos 3 y 6; docs/10 §8.4 punto 65 viii): lo que mide cada dispositivo del sitio en
-  // este momento. Un número FIJO de sentencias por petición, sin ninguna por fila: (1) los dispositivos con su estado visual (la regla
-  // SQL del inventario y del resumen), los conteos, los ids de los que reportan y la página ordenada; (2) los canales de los que reportan
-  // con su última lectura (la consulta de la ficha, SQL_ULTIMA_MEDICION), de donde salen en memoria los agregados por magnitud y los tres
-  // canales de cada tarjeta; (3) solo con `tendencia`, los promedios por hora de los canales mostrados, en una sentencia con
-  // `canal_id = ANY($1)` y cota de tiempo. Sin tendencia, dos; con ella, tres (ahora.spec.ts las cuenta).
+  // este momento. Como mucho tres consultas por petición, sin ninguna por fila: (1) los dispositivos con su estado visual (la regla SQL del
+  // inventario y del resumen), los conteos, la página ordenada y el agregado por magnitud, calculado EN LA BASE sobre la última lectura de
+  // cada canal de los que reportan (una fila por magnitud: desde el 13/11/2026 ya no viajan al proceso los canales de todo el sitio); (2) solo
+  // si la página trae dispositivos, los canales DE LA PÁGINA con su última lectura (la consulta de la ficha, SQL_ULTIMA_MEDICION), de donde
+  // salen los tres de cada tarjeta; (3) solo con `tendencia` y algún canal mostrado, los promedios por hora de esos canales, en una conexión
+  // propia con tiempo máximo y cupo (tendencias(): si no alcanza, la respuesta sale con `tendencia: false`). ahora.spec.ts las cuenta.
   async ahora(sitioId: string, limite: number, tendencia: boolean) {
     const r = await this.pool.query<{
-      existe: boolean; ahora: string; reportan: number; sin_senal: number; ids: string[];
+      existe: boolean; ahora: string; reportan: number; sin_senal: number; por_magnitud: FilaMagnitud[];
       pagina: { id: string; nombre: string; zona: string; estado_visual: string; visto_por_ultima_vez: string | null; intervalo_esperado_s: number }[];
     }>(`
       WITH dev AS (
         SELECT d.id, d.nombre, z.nombre AS zona, d.intervalo_esperado_s, e.visto_por_ultima_vez, ${SQL_ESTADO_VISUAL} AS estado_visual
           FROM dispositivo d JOIN zona z ON z.id = d.zona_id LEFT JOIN estado_dispositivo e ON e.dispositivo_id = d.id
-         WHERE z.sitio_id = $1)
+         WHERE z.sitio_id = $1),
+      mag AS (
+        SELECT c.magnitud_codigo AS codigo, count(*)::int AS canales, avg(u.valor) AS promedio, min(u.valor) AS minimo, max(u.valor) AS maximo
+          FROM dev JOIN canal c ON c.dispositivo_id = dev.id
+         CROSS JOIN LATERAL (SELECT x.valor, x.tiempo FROM medicion x WHERE x.canal_id = c.id ORDER BY x.tiempo DESC LIMIT 1) u
+         WHERE dev.estado_visual IN ('normal', 'alerta') AND ${SQL_LECTURA_VIGENTE}
+         GROUP BY c.magnitud_codigo)
       SELECT EXISTS (SELECT 1 FROM sitio WHERE id = $1) AS existe, iso_utc(now()) AS ahora,
              (SELECT count(*)::int FROM dev WHERE estado_visual IN ('normal', 'alerta')) AS reportan,
              (SELECT count(*)::int FROM dev WHERE estado_visual = 'sin_senal') AS sin_senal,
-             (SELECT coalesce(array_agg(id), '{}') FROM dev WHERE estado_visual IN ('normal', 'alerta')) AS ids,
+             (SELECT coalesce(json_agg(json_build_object('codigo', mag.codigo, 'nombre', m.nombre, 'unidad', m.unidad_canonica, 'canales', mag.canales,
+                                       'promedio', mag.promedio, 'minimo', mag.minimo, 'maximo', mag.maximo)), '[]'::json)
+                FROM mag JOIN magnitud m ON m.codigo = mag.codigo) AS por_magnitud,
              (SELECT coalesce(json_agg(json_build_object('id', p.id, 'nombre', p.nombre, 'zona', p.zona, 'estado_visual', p.estado_visual,
                                        'visto_por_ultima_vez', iso_utc(p.visto_por_ultima_vez), 'intervalo_esperado_s', p.intervalo_esperado_s)
                                        ORDER BY p.orden, p.zona, p.nombre, p.id), '[]'::json)
@@ -148,14 +159,18 @@ export class TableroService {
       [sitioId, limite]);
     const base = r.rows[0];
     if (base === undefined || !base.existe) throw new NotFoundException('sitio no encontrado');
-    const ahoraMs = Date.parse(base.ahora);
-    const c = await this.pool.query<CanalConUltima>(`
+    const enPagina = base.pagina.map((d) => d.id);
+    const c = enPagina.length === 0 ? { rows: [] as CanalConUltima[] } : await this.pool.query<CanalConUltima>(`
       SELECT c.id, c.dispositivo_id, c.magnitud_codigo AS magnitud, m.nombre AS magnitud_nombre, m.unidad_canonica AS unidad,
              d.intervalo_esperado_s, c.escala_cero, c.escala_cien, ${SQL_ULTIMA_MEDICION} AS ultima
         FROM canal c JOIN magnitud m ON m.codigo = c.magnitud_codigo JOIN dispositivo d ON d.id = c.dispositivo_id
-       WHERE c.dispositivo_id = ANY($1::uuid[])`, [base.ids]);
+       WHERE c.dispositivo_id = ANY($1::uuid[])`, [enPagina]);
     const porDispositivo = new Map<string, CanalConUltima[]>();
-    for (const k of c.rows) porDispositivo.set(k.dispositivo_id, [...(porDispositivo.get(k.dispositivo_id) ?? []), k]);
+    for (const k of c.rows) {
+      const lista = porDispositivo.get(k.dispositivo_id);
+      if (lista === undefined) porDispositivo.set(k.dispositivo_id, [k]);
+      else lista.push(k);
+    }
     const dispositivos = base.pagina.map((d) => {
       const todos = porDispositivo.get(d.id) ?? [];
       return { ...d, canales_total: todos.length, canales: elegirCanales(todos) };
@@ -164,19 +179,17 @@ export class TableroService {
     let chispas: Map<string, (number | null)[]> | undefined;
     let chispa: { desde: string; intervalo: '1 hour'; puntos: number } | undefined;
     if (tendencia) {
-      const v = ventanaChispa(ahoraMs);
-      const t = mostrados.length === 0 ? { rows: [] } : await this.pool.query<{ canal_id: string; t: string; v: number }>(`
-        SELECT x.canal_id, extract(epoch FROM time_bucket(INTERVAL '1 hour', x.tiempo))::bigint AS t, round(avg(x.valor)::numeric, 3)::float AS v
-          FROM medicion x
-         WHERE x.canal_id = ANY($1::uuid[]) AND x.tiempo >= $2 AND x.tiempo < $3
-         GROUP BY 1, 2`, [mostrados, v.desde, v.hasta]);
-      chispas = armarChispas(t.rows.map((x) => ({ canal_id: x.canal_id, t: Number(x.t), v: x.v })), mostrados, v.desde);
-      chispa = { desde: v.desde.toISOString(), intervalo: '1 hour', puntos: CUBOS_CHISPA };
+      const v = ventanaChispa(Date.parse(base.ahora));
+      const filas = mostrados.length === 0 ? [] : await this.tendencias(mostrados, v.desde, v.hasta);
+      if (filas !== null) {
+        chispas = armarChispas(filas.map((x) => ({ canal_id: x.canal_id, t: Number(x.t), v: x.v })), mostrados, v.desde);
+        chispa = { desde: v.desde.toISOString(), intervalo: '1 hour', puntos: CUBOS_CHISPA };
+      }
     }
     return {
       reportan: base.reportan,
       sin_senal: base.sin_senal,
-      por_magnitud: porMagnitud(c.rows, ahoraMs),
+      por_magnitud: porMagnitud(base.por_magnitud),
       dispositivos: dispositivos.map((d) => ({
         ...d,
         canales: d.canales.map((k) => ({
@@ -185,8 +198,51 @@ export class TableroService {
           ...(chispas === undefined ? {} : { chispa: chispas.get(k.id) ?? new Array<number | null>(CUBOS_CHISPA).fill(null) }),
         })),
       })),
+      // Siempre presente: true si la tendencia va en la respuesta; false si no se pidió o si se omitió (tiempo vencido o sin cupo).
+      tendencia: chispa !== undefined,
       ...(chispa === undefined ? {} : { chispa }),
     };
+  }
+
+  // La tendencia de «Ahora» con sus dos topes (TENDENCIA, tablero.ts; docs/11 §4): como mucho dos a la vez en el proceso, cada una en una
+  // conexión propia con tiempo máximo de sentencia (el mecanismo de la exportación, consulta.service.ts) y RESET al soltarla. null = se
+  // omite: sin cupo (sin tocar la base) o tiempo vencido (57014, query_canceled). Cualquier otro error de la base sigue siendo un error.
+  private tendenciasEnCurso = 0;
+  private readonly avisos = new AvisosAcotados(); // un WARN por motivo y por minuto
+  private readonly log = new Logger('tablero');
+  private async tendencias(canales: string[], desde: Date, hasta: Date): Promise<{ canal_id: string; t: string; v: number }[] | null> {
+    if (this.tendenciasEnCurso >= TENDENCIA.maxEnCurso) {
+      this.omitida(`sin cupo (${TENDENCIA.maxEnCurso} cálculos en curso)`);
+      return null;
+    }
+    this.tendenciasEnCurso++;
+    try {
+      const cliente = await this.pool.connect();
+      cliente.on('error', errorDeCliente); // un corte de la base a mitad falla esta petición, no el proceso (db/cliente.ts)
+      try {
+        await cliente.query(`SET statement_timeout TO ${TENDENCIA.tiempoMaximoMs}`);
+        const t = await cliente.query<{ canal_id: string; t: string; v: number }>(`
+          SELECT x.canal_id, extract(epoch FROM time_bucket(INTERVAL '1 hour', x.tiempo))::bigint AS t, round(avg(x.valor)::numeric, 3)::float AS v
+            FROM medicion x
+           WHERE x.canal_id = ANY($1::uuid[]) AND x.tiempo >= $2 AND x.tiempo < $3
+           GROUP BY 1, 2`, [canales, desde, hasta]);
+        return t.rows;
+      } catch (e) {
+        if ((e as { code?: string }).code !== '57014') throw e;
+        this.omitida(`tiempo máximo vencido (${TENDENCIA.tiempoMaximoMs} ms)`);
+        return null;
+      } finally {
+        await cliente.query('RESET statement_timeout').catch(() => undefined);
+        cliente.off('error', errorDeCliente);
+        cliente.release();
+      }
+    } finally {
+      this.tendenciasEnCurso--;
+    }
+  }
+  private omitida(motivo: string): void {
+    const aviso = this.avisos.registrar(motivo);
+    if (aviso !== null) this.log.warn(`«Ahora» respondió sin tendencia: ${aviso}`);
   }
 
   // GET /sitios/{id}/historico?magnitud (docs/19 §4, B4b): por cubo, promedio, mínimo, máximo, lecturas (`muestras`) y canales que

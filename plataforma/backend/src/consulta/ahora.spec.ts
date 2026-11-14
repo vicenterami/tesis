@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Pool } from 'pg';
 import {
-  CUBOS_CHISPA, CanalConUltima, MAGNITUDES_SALUD, MAX_CANALES_AHORA, SQL_ESTADO_VISUAL, armarChispas, elegirCanales, lecturaVigente, porMagnitud,
-  ventanaChispa,
+  CUBOS_CHISPA, CanalConUltima, FilaMagnitud, MAGNITUDES_SALUD, MAX_CANALES_AHORA, SQL_ESTADO_VISUAL, SQL_LECTURA_VIGENTE, TENDENCIA, armarChispas,
+  elegirCanales, porMagnitud, ventanaChispa,
 } from './tablero.js';
 import { TableroService } from './tablero.service.js';
 import { SitiosController } from './sitios.controller.js';
@@ -40,24 +40,21 @@ describe('elegirCanales: hasta tres, primero lo que se mide y al final la salud'
   });
 });
 
-describe('porMagnitud: sobre la última lectura vigente de cada canal (menos de dos intervalos)', () => {
-  it('una lectura vieja (más de 2 × intervalo) no entra al promedio ni a la cuenta', () => {
-    const r = porMagnitud([canal('a', 'temperatura', 10, 30), canal('b', 'temperatura', 20, 60), canal('c', 'temperatura', 99, 121)], AHORA_MS);
-    expect(r).toEqual([{ codigo: 'temperatura', nombre: 'temperatura', unidad: 'u', salud: false, canales: 2, promedio: 15, minimo: 10, maximo: 20 }]);
+// Desde el 13/11/2026 el agregado por magnitud se calcula en la base (una fila por magnitud); aquí, lo que queda en el proceso y la regla.
+const fila = (codigo: string, canales: number, promedio: number, minimo = promedio, maximo = promedio): FilaMagnitud =>
+  ({ codigo, nombre: codigo, unidad: 'u', canales, promedio, minimo, maximo });
+describe('porMagnitud: sobre la última lectura vigente de cada canal (menos de dos intervalos), agregada en la base', () => {
+  it('la regla de vigencia es estricta (exactamente 2 × intervalo ya no es de «ahora») y usa el intervalo de cada dispositivo', () => {
+    expect(SQL_LECTURA_VIGENTE).toBe("u.tiempo > now() - dev.intervalo_esperado_s * 2 * INTERVAL '1 second'");
   });
-  it('el borde: exactamente 2 × intervalo ya no es de «ahora»; un segundo menos, sí', () => {
-    expect(lecturaVigente(canal('a', 'temperatura', 1, 120), AHORA_MS)).toBe(false);
-    expect(lecturaVigente(canal('a', 'temperatura', 1, 119), AHORA_MS)).toBe(true);
-    expect(lecturaVigente(canal('a', 'temperatura', null), AHORA_MS)).toBe(false);
+  it('la salud va al final y, dentro, por código; el promedio con tres decimales; mínimo y máximo, tal cual', () => {
+    const r = porMagnitud([fila('bateria', 1, 80), fila('temperatura', 3, 5 / 3, 1, 2), fila('humedad', 2, 60.0004, 50, 70.25)]);
+    expect(r.map((x) => [x.codigo, x.salud])).toEqual([['humedad', false], ['temperatura', false], ['bateria', true]]);
+    expect(r[1]).toEqual({ codigo: 'temperatura', nombre: 'temperatura', unidad: 'u', salud: false, canales: 3, promedio: 1.667, minimo: 1, maximo: 2 });
+    expect(r[0]?.promedio).toBe(60);
+    expect(r[0]?.maximo).toBe(70.25);
   });
-  it('el intervalo es el de cada dispositivo: 10 min de antigüedad es vigente a 3 600 s y vieja a 60 s', () => {
-    expect(porMagnitud([canal('a', 'humedad', 50, 600, 3600), canal('b', 'humedad', 70, 600, 60)], AHORA_MS)[0]).toMatchObject({ canales: 1, promedio: 50 });
-  });
-  it('magnitud sin lecturas vigentes: no aparece (no es 0); la salud va al final; el promedio con tres decimales', () => {
-    const r = porMagnitud([canal('a', 'bateria', 80), canal('b', 'temperatura', 1), canal('c', 'temperatura', 2), canal('d', 'temperatura', 2), canal('e', 'humedad', null)], AHORA_MS);
-    expect(r.map((x) => [x.codigo, x.salud])).toEqual([['temperatura', false], ['bateria', true]]);
-    expect(r[0]?.promedio).toBe(1.667);
-  });
+  it('sin ninguna magnitud vigente, lista vacía (una magnitud sin lecturas vigentes no aparece: no es 0)', () => expect(porMagnitud([])).toEqual([]));
 });
 
 describe('tendencia: 24 cubos de una hora alineados a la hora UTC', () => {
@@ -77,38 +74,64 @@ describe('tendencia: 24 cubos de una hora alineados a la hora UTC', () => {
   });
 });
 
-// El servicio contra una base falsa: cuenta las sentencias y arma la respuesta con lo que la base devolvería.
-function base(n: number, opciones: { existe?: boolean } = {}) {
+// El servicio contra una base falsa: cuenta las sentencias (las del pool y las de la conexión propia de la tendencia) y arma la respuesta
+// con lo que la base devolvería. `n` dispositivos reportan; la base devuelve los de la página (el LIMIT) y, de canales, los de los ids que
+// se le pasan. `tendencia`: 'ok', 'tarda' (un tiempo vencido: error 57014), 'falla' (otro error), o una promesa que la retiene.
+interface OpcionesBase { existe?: boolean; sinCanales?: boolean; tendencia?: 'ok' | 'tarda' | 'falla' | Promise<void> }
+function base(n: number, opciones: OpcionesBase = {}) {
   const ids = Array.from({ length: n }, (_, i) => `d${i}`);
   const consultas: string[] = [];
   const parametros: unknown[][] = [];
-  const query = vi.fn((sql: string, p: unknown[] = []) => {
-    consultas.push(sql);
-    parametros.push(p);
+  const enCliente: string[] = [];
+  const liberadas = { n: 0 };
+  const responder = (sql: string, p: unknown[]) => {
     if (sql.includes('WITH dev AS')) {
-      return Promise.resolve({ rows: [{
-        existe: opciones.existe ?? true, ahora: AHORA, reportan: n, sin_senal: 2, ids,
+      return { rows: [{
+        existe: opciones.existe ?? true, ahora: AHORA, reportan: n, sin_senal: 2,
+        por_magnitud: [fila('bateria', n, 90), fila('temperatura', n, 20), fila('humedad', n, 50)],
         pagina: ids.slice(0, p[1] as number).map((id, i) => ({
           id, nombre: `nodo ${i}`, zona: 'Invernadero', estado_visual: i === 0 ? 'alerta' : 'normal', visto_por_ultima_vez: hace(30), intervalo_esperado_s: 60,
         })),
-      }] });
+      }] };
     }
     if (sql.includes(SQL_ULTIMA_MEDICION)) {
-      return Promise.resolve({ rows: ids.flatMap((d) => [
+      if (opciones.sinCanales) return { rows: [] };
+      return { rows: (p[0] as string[]).flatMap((d) => [
         canal(`${d}-t`, 'temperatura', 20, 30, 60, d), canal(`${d}-b`, 'bateria', 90, 30, 60, d), canal(`${d}-h`, 'humedad', 50, 30, 60, d),
         { ...canal(`${d}-s`, 'humedad_suelo', 1.2, 30, 60, d), escala_cero: 2, escala_cien: 1 }, canal(`${d}-r`, 'rssi', -90, 500, 60, d),
-      ]) });
+      ]) };
     }
     if (sql.includes('time_bucket')) {
       const t0 = ventanaChispa(AHORA_MS).desde.getTime() / 1000;
-      return Promise.resolve({ rows: (p[0] as string[]).map((c) => ({ canal_id: c, t: String(t0 + 22 * 3600), v: 1 })) });
+      return { rows: (p[0] as string[]).map((c) => ({ canal_id: c, t: String(t0 + 22 * 3600), v: 1 })) };
     }
-    return Promise.resolve({ rows: [] });
+    return { rows: [] };
+  };
+  const query = vi.fn((sql: string, p: unknown[] = []) => {
+    consultas.push(sql);
+    parametros.push(p);
+    return Promise.resolve(responder(sql, p));
   });
-  return { servicio: new TableroService({ query } as unknown as Pool), consultas, parametros };
+  const cliente = {
+    on: vi.fn(), off: vi.fn(), release: vi.fn(() => { liberadas.n++; }),
+    query: vi.fn(async (sql: string, p: unknown[] = []) => {
+      enCliente.push(sql);
+      if (sql.includes('time_bucket')) {
+        consultas.push(sql);
+        parametros.push(p);
+        const t = opciones.tendencia ?? 'ok';
+        if (t === 'tarda') throw Object.assign(new Error('canceling statement due to statement timeout'), { code: '57014' });
+        if (t === 'falla') throw Object.assign(new Error('la base no responde'), { code: '57P01' });
+        if (t !== 'ok') await t;
+      }
+      return responder(sql, p);
+    }),
+  };
+  const connect = vi.fn(() => Promise.resolve(cliente));
+  return { servicio: new TableroService({ query, connect } as unknown as Pool), consultas, parametros, enCliente, connect, liberadas };
 }
 
-describe('TableroService.ahora: un número fijo de sentencias, sin consultas por fila', () => {
+describe('TableroService.ahora: como mucho tres consultas, sin consultas por fila', () => {
   it('sin tendencia, dos; con tendencia, tres; con 1 o con 60 dispositivos, las mismas', async () => {
     for (const [n, tendencia, esperadas] of [[1, false, 2], [60, false, 2], [1, true, 3], [60, true, 3]] as const) {
       const { servicio, consultas } = base(n);
@@ -116,16 +139,32 @@ describe('TableroService.ahora: un número fijo de sentencias, sin consultas por
       expect(consultas, `${n} dispositivos, tendencia ${tendencia}`).toHaveLength(esperadas);
     }
   });
-  it('la primera aplica la regla del estado visual del inventario y el orden de L3b (alerta, zona, nombre) con el límite como parámetro', async () => {
+  it('con tendencia=si y ningún canal que mostrar, dos (no hay tendencia que calcular, ni conexión propia); sin nadie que reporte, una', async () => {
+    const sin = base(3, { sinCanales: true });
+    const r = await sin.servicio.ahora('s1', 24, true);
+    expect(sin.consultas).toHaveLength(2);
+    expect(sin.connect).not.toHaveBeenCalled();
+    expect(r.tendencia).toBe(true); // se pidió y no se omitió: no hay canales a los que ponerle chispa
+    const vacio = base(0);
+    await vacio.servicio.ahora('s1', 24, true);
+    expect(vacio.consultas).toHaveLength(1);
+  });
+  it('la primera aplica la regla del estado visual del inventario, el orden de L3b (alerta, zona, nombre) con el límite como parámetro y el agregado por magnitud en SQL', async () => {
     const { servicio, consultas, parametros } = base(3);
     await servicio.ahora('s1', 7, false);
     const sql = (consultas[0] ?? '').replace(/\s+/g, ' ');
     expect(sql).toContain(SQL_ESTADO_VISUAL.replace(/\s+/g, ' '));
     expect(sql).toContain("CASE dev.estado_visual WHEN 'alerta' THEN 0 ELSE 1 END AS orden");
     expect(sql).toContain('ORDER BY orden, dev.zona, dev.nombre, dev.id LIMIT $2');
+    expect(sql).toContain(`WHERE dev.estado_visual IN ('normal', 'alerta') AND ${SQL_LECTURA_VIGENTE} GROUP BY c.magnitud_codigo`);
     expect(parametros[0]).toEqual(['s1', 7]);
-    // la segunda, los canales de TODOS los que reportan (para el promedio por magnitud), de una vez
-    expect(parametros[1]).toEqual([['d0', 'd1', 'd2']]);
+  });
+  it('un sitio con 2 000 que reportan y limite=2: la consulta de canales lleva solo los dos de la página, no los del sitio', async () => {
+    const { servicio, parametros } = base(2000);
+    const r = await servicio.ahora('s1', 2, false);
+    expect(parametros[1]).toEqual([['d0', 'd1']]);
+    expect(r.reportan).toBe(2000);
+    expect(r.por_magnitud.map((m) => `${m.codigo}:${m.canales}`)).toEqual(['humedad:2000', 'temperatura:2000', 'bateria:2000']);
   });
   it('la tendencia, una sentencia con canal_id = ANY y cota de tiempo, solo de los canales mostrados', async () => {
     const { servicio, consultas, parametros } = base(2);
@@ -133,10 +172,11 @@ describe('TableroService.ahora: un número fijo de sentencias, sin consultas por
     expect(consultas[2]).toContain('x.canal_id = ANY($1::uuid[]) AND x.tiempo >= $2 AND x.tiempo < $3');
     expect(parametros[2]?.[0]).toEqual(['d0-h', 'd0-s', 'd0-t', 'd1-h', 'd1-s', 'd1-t']);
   });
-  it('la forma: exactamente los campos del contrato; tres canales con su total; el % con la calibración; sin tendencia, ninguna chispa', async () => {
+  it('la forma: exactamente los campos del contrato; tres canales con su total; el % con la calibración; sin tendencia, tendencia: false y ninguna chispa', async () => {
     const { servicio } = base(2);
     const r = await servicio.ahora('s1', 24, false);
-    expect(Object.keys(r).sort()).toEqual(['dispositivos', 'por_magnitud', 'reportan', 'sin_senal']);
+    expect(Object.keys(r).sort()).toEqual(['dispositivos', 'por_magnitud', 'reportan', 'sin_senal', 'tendencia']);
+    expect(r.tendencia).toBe(false);
     expect(r.dispositivos.map((d) => d.id)).toEqual(['d0', 'd1']); // el orden de la base se respeta
     const d = r.dispositivos[0];
     expect(Object.keys(d ?? {}).sort()).toEqual(['canales', 'canales_total', 'estado_visual', 'id', 'intervalo_esperado_s', 'nombre', 'visto_por_ultima_vez', 'zona']);
@@ -144,12 +184,13 @@ describe('TableroService.ahora: un número fijo de sentencias, sin consultas por
     expect(d?.canales.map((k) => k.magnitud)).toEqual(['humedad', 'humedad_suelo', 'temperatura']);
     expect(Object.keys(d?.canales[0] ?? {}).sort()).toEqual(['id', 'magnitud', 'magnitud_nombre', 'salud', 'ultima', 'unidad']);
     expect(d?.canales[1]?.ultima).toEqual({ valor: 1.2, tiempo: hace(30), porcentaje: 80 });
-    // rssi tiene 500 s con intervalo 60: vieja, fuera del promedio; la batería sí entra, al final
-    expect(r.por_magnitud.map((m) => `${m.codigo}:${m.canales}`)).toEqual(['humedad:2', 'humedad_suelo:2', 'temperatura:2', 'bateria:2']);
+    // la salud al final, como en las tarjetas
+    expect(r.por_magnitud.map((m) => `${m.codigo}:${m.salud}`)).toEqual(['humedad:false', 'temperatura:false', 'bateria:true']);
   });
-  it('con tendencia=si: chispa arriba y en cada canal mostrado, 24 posiciones con null donde no hubo lecturas', async () => {
+  it('con tendencia=si: tendencia: true, chispa arriba y en cada canal mostrado, 24 posiciones con null donde no hubo lecturas', async () => {
     const { servicio } = base(1);
     const r = await servicio.ahora('s1', 24, true);
+    expect(r.tendencia).toBe(true);
     expect(r.chispa).toEqual({ desde: '2026-11-12T13:00:00.000Z', intervalo: '1 hour', puntos: 24 });
     const c = r.dispositivos[0]?.canales[0] as { chispa?: (number | null)[] } | undefined;
     expect(c?.chispa).toHaveLength(24);
@@ -160,6 +201,53 @@ describe('TableroService.ahora: un número fijo de sentencias, sin consultas por
     const { servicio, consultas } = base(0, { existe: false });
     await expect(servicio.ahora('s1', 24, false)).rejects.toBeInstanceOf(NotFoundException);
     expect(consultas).toHaveLength(1);
+  });
+});
+
+describe('TableroService.ahora: los topes de la tendencia (docs/19 §4, L6; docs/11 §4)', () => {
+  const sinChispa = (r: Awaited<ReturnType<TableroService['ahora']>>): boolean =>
+    !('chispa' in r) && r.dispositivos.every((d) => d.canales.every((k) => !('chispa' in k)));
+  it(`en una conexión propia con SET statement_timeout de ${TENDENCIA.tiempoMaximoMs} ms y RESET al soltarla`, async () => {
+    const { servicio, enCliente, liberadas } = base(2);
+    await servicio.ahora('s1', 24, true);
+    expect(enCliente[0]).toBe(`SET statement_timeout TO ${TENDENCIA.tiempoMaximoMs}`);
+    expect(enCliente[2]).toBe('RESET statement_timeout');
+    expect(liberadas.n).toBe(1);
+  });
+  it('si vence el tiempo, responde igual: tendencia: false, sin ninguna chispa, con las tarjetas y el agregado; la conexión se suelta con RESET', async () => {
+    const { servicio, enCliente, liberadas } = base(2, { tendencia: 'tarda' });
+    const r = await servicio.ahora('s1', 24, true);
+    expect(r.tendencia).toBe(false);
+    expect(sinChispa(r)).toBe(true);
+    expect(r.dispositivos).toHaveLength(2);
+    expect(r.por_magnitud).toHaveLength(3);
+    expect(enCliente.at(-1)).toBe('RESET statement_timeout');
+    expect(liberadas.n).toBe(1);
+  });
+  it('otro error de la base no se disfraza de «sin tendencia»: sigue siendo un error, y la conexión se suelta igual', async () => {
+    const { servicio, liberadas } = base(2, { tendencia: 'falla' });
+    await expect(servicio.ahora('s1', 24, true)).rejects.toThrow('la base no responde');
+    expect(liberadas.n).toBe(1);
+  });
+  it(`como mucho ${TENDENCIA.maxEnCurso} a la vez: la tercera responde sin tendencia y sin pedir conexión; al terminar una, vuelve a haber cupo`, async () => {
+    let soltar: () => void = () => undefined;
+    const retenida = new Promise<void>((r) => { soltar = r; });
+    const { servicio, connect } = base(2, { tendencia: retenida });
+    const enCurso = [servicio.ahora('s1', 24, true), servicio.ahora('s1', 24, true)];
+    await new Promise((r) => setImmediate(r));
+    expect(connect).toHaveBeenCalledTimes(TENDENCIA.maxEnCurso);
+    const tercera = await servicio.ahora('s1', 24, true);
+    expect(tercera.tendencia).toBe(false);
+    expect(sinChispa(tercera)).toBe(true);
+    expect(connect).toHaveBeenCalledTimes(TENDENCIA.maxEnCurso);
+    soltar();
+    expect((await Promise.all(enCurso)).map((r) => r.tendencia)).toEqual([true, true]);
+    expect((await servicio.ahora('s1', 24, true)).tendencia).toBe(true);
+  });
+  it('si no se pidió, tendencia: false sin tocar la conexión propia', async () => {
+    const { servicio, connect } = base(2);
+    expect((await servicio.ahora('s1', 24, false)).tendencia).toBe(false);
+    expect(connect).not.toHaveBeenCalled();
   });
 });
 

@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 585 pruebas unitarias del backend y 297 del panel, sin matriz formal); TT-32 (sensor físico) se cubrió después, en §43, §44 y §53;
+cubre todavía: TT-27 (contrato de trama: hoy 592 pruebas unitarias del backend y 297 del panel, sin matriz formal); TT-32 (sensor físico) se cubrió después, en §43, §44 y §53;
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -327,7 +327,7 @@ a `timescaledb-tune`, que se había quitado por seguridad; se quitó también el
 
 ## 14. Canal de tiempo real (TT-39, 09/10/2026)
 
-`GET /eventos` (`docs/10 §5`). 30 pruebas en `eventos.spec.ts` (`backend/src/tiempo-real/`; eran 22 cuando se escribió esta sección: la sesión sumó tres, §58, y el `sitio_id` de los avisos una, §66); las del bloque «GET /eventos
+`GET /eventos` (`docs/10 §5`). 31 pruebas en `eventos.spec.ts` (`backend/src/tiempo-real/`; eran 22 cuando se escribió esta sección: la sesión sumó tres, §58, el `sitio_id` de los avisos una, §66, y el mapa puesto al día con el latido otra, también §66); las del bloque «GET /eventos
 por HTTP» abren HTTP real en 127.0.0.1 con un puerto libre; más las del pipeline, las alertas y el supervisor sobre lo que cada uno anuncia.
 
 | Prueba | Resultado |
@@ -2557,7 +2557,8 @@ reportan, solo si tiene menos de dos intervalos esperados del dispositivo, y has
 nombre, cada una con hasta tres canales: lo medido primero y la salud del equipo al final (`bateria`, `tension` y `rssi`,
 `MAGNITUDES_SALUD` de `consulta/tablero.ts`, declarado en `docs/19` L3b). Con `tendencia=si`, 24 promedios por hora alineados a la hora UTC
 por canal mostrado (null = sin lecturas). La última lectura es la misma subconsulta de la ficha (`SQL_ULTIMA_MEDICION`, ahora compartida).
-Consultas por petición: dos, y tres con la tendencia, sin una por dispositivo. Al implementar se sumaron `salud` y el orden a `por_magnitud`
+Consultas por petición: dos, y tres con la tendencia, sin una por dispositivo (como mucho tres tras la corrección del mismo día, al final
+de esta sección). Al implementar se sumaron `salud` y el orden a `por_magnitud`
 (`docs/19` L6). El canal en vivo agrega `sitio_id` a `medicion`, `visto` y `condicion`, desde el mapa con que ya filtra por sitio; para eso
 el mapa se refresca también al abrir el flujo de quien alcanza a todos los sitios (antes solo el de una persona con sitios). Quién recibe qué
 no cambia.
@@ -2627,9 +2628,79 @@ con las 31 comprobaciones en verde (las del guion, con `SEMILLA_SIN_PERSONAS=1`)
 cambio porque estaba en uso: aplicarla recrea los 11 dispositivos de la semilla con identificadores nuevos. Se aplica con
 `bash plataforma/pruebas/semilla-demo.sh --completa`.
 
-**Cifras del bloque:** `pnpm verificar` en verde: 585 pruebas unitarias del backend en 54 archivos y 297 pruebas del panel (299 ejecuciones
+**Cifras del bloque:** `pnpm verificar` en verde (pruebas unitarias del backend: 585, en 54 archivos) y 297 pruebas del panel (299 ejecuciones
 en 31 archivos); `svelte-check`, 396 archivos sin errores. `pnpm openapi`: 38 rutas y 47 operaciones (`/sitios/{id}/ahora` nueva y el
 ejemplo de `/eventos` con `sitio_id`). Humos contra la pila reconstruida: `api-smoke.sh`, 122 OK; `sesion-smoke.sh` (4b), 386 de 386. El verificador de 52 pasos, completo y
 en verde; su primera corrida marcó el paso 2t por dos citas fechadas de §65 con la forma «N pruebas unitarias», que se reescribieron con la
 misma cifra de ese día; la segunda, lanzada enseguida, dio 429 en el inicio de sesión (4b y 4c) por el bloqueo de intentos fallidos que
 dejaron varias corridas seguidas de los humos, y la tercera, pasada la ventana del bloqueo, terminó en «TODO EN CONCORDANCIA». El informe, recompilado: 30 páginas de cuerpo y ningún desborde.
+
+### Correcciones del mismo día: «Ahora» sin los canales de todo el sitio, topes de la tendencia, el mapa con el latido y dos guiones
+
+**Qué cambió** (13/11/2026; diseño en `docs/19 §4` L6, contrato en `docs/10 §8.4` punto 65 viii, control en `docs/11 §4`).
+(1) **«Ahora» ya no trae al proceso los canales de todo el sitio.** La segunda consulta pedía los canales de **todos** los que reportan,
+no los de la página, y el agregado por magnitud se armaba en memoria: el número de consultas era fijo, pero el trabajo crecía con el sitio
+aunque se pidiera `limite=1`. Ahora el agregado se calcula en la base, en la primera consulta (una fila por magnitud: canales que aportan,
+promedio, mínimo y máximo de la última lectura vigente; la regla de vigencia, `SQL_LECTURA_VIGENTE` de `consulta/tablero.ts`), y los
+canales se piden solo para los dispositivos de la página (ninguna consulta si la página está vacía). La respuesta es la misma: en el banco,
+con los mismos datos, las respuestas del código anterior y del nuevo son idénticas campo a campo en los dos sitios y con y sin tendencia
+(salvo el campo `tendencia`, nuevo). (2) **Topes de la tendencia:** conexión propia con `SET statement_timeout` de 2 s y `RESET` al
+soltarla, como la exportación; como mucho dos cálculos a la vez en el proceso; si vence el tiempo o no hay cupo, la ruta responde igual,
+con `tendencia: false` y sin `chispa`, y un aviso acotado en el registro. 2 s son cinco veces lo más lento medido arriba (392 ms, lecturas
+cada 5 s). En el banco, 30 peticiones simultáneas con tendencia al sitio de 2 000: 4 con ella y 26 sin ella, todas respondidas, y un solo
+aviso en el registro. (3) **El mapa dispositivo → sitio del canal en vivo** se pone al día también en cada latido (como mucho una recarga
+cada 5 s): un dispositivo que cambia de sitio sale con el nuevo a más tardar un latido después, sin que nadie abra otro flujo. (4)
+**`tablero-semilla-ahora.sql` tiene guarda:** con `vaciar=1` trunca `medicion` y `trama`, y solo un comentario impedía correrlo contra otra
+base; ahora aborta (y fija `ON_ERROR_STOP` él mismo) si los datos de la base no están en tmpfs o no existe el sitio «banco», las dos
+marcas del banco. (5) **El humo de sesión se puede correr dos veces seguidas** (detalle abajo). (6) Concordancia: «como mucho tres
+consultas» en vez de «dos, y tres con la tendencia» (con tendencia y ningún canal que mostrar son dos), y la cifra de archivos de pruebas
+del backend en `docs/18` (54, no 53).
+
+**Por qué el humo de sesión heredaba el bloqueo.** El guion hacía salir cada corrida desde una dirección distinta del bucle local (`curl
+--interface`), pero el backend corre en Docker y, por el puerto publicado, ve toda conexión venir de la puerta de enlace de la red de
+Docker, la misma en cada corrida: en la tabla `acceso` de la pila de desarrollo, todas las filas tenían una sola dirección, de esa red.
+Los fallos de varias corridas se sumaban en esa dirección hasta los 50 del bloqueo por dirección (`docs/20 §4`). Reproducido: con el guion
+anterior, tres corridas seguidas en verde y la cuarta con 12 fallas («429 bloqueado» en la sección del bloqueo y en las siguientes).
+**Corrección, solo en el guion:** cada petición lleva su `ORIGEN` en `X-Forwarded-For` junto con `X-Proxy-Secreto`, el único camino por el
+que el backend cree esa cabecera (`recepcion/http/direccion.ts`, el mismo que usa el proxy); el bloqueo no cambia, solo de quién se cuentan
+los fallos. El secreto se lee del `.env` de la pila y va a curl desde un archivo de la carpeta temporal, nunca por argumento; sin él, el
+guion avisa que la corrida comparte dirección. También los diez intentos fallidos de la sección 5, que salían sin la dirección propia.
+Prueba: con la dirección de la puerta de enlace todavía bloqueada por la cuarta corrida, dos corridas seguidas del guion corregido, las dos
+386 de 386.
+
+**Medición de (1) y (2)** (banco desechable con 2 120 emulados: 120 en el sitio «banco», como arriba, y 2 000 movidos a un sitio aparte,
+«grande»; las últimas 24 h cada 300 s en sus canales de temperatura con `tablero-semilla-ahora.sql`; `tablero-medir.sh ahora [CÓDIGO]`,
+que ahora acepta el sitio; mediana de 10 tras una de calentamiento). Antes y después, **sobre los mismos datos**: medido el código nuevo,
+el backend se recreó con la imagen anterior, guardada, sin tocar la base:
+
+| Sitio | `…/ahora` antes → después | `…?limite=1` | `…?tendencia=si` | `…?tendencia=si&limite=60` |
+|---|---|---|---|---|
+| 120 que reportan | 7,1 → 7,4 ms | 6,3 → 6,2 ms | 10,9 → 11,4 ms | 14,5 → 15,9 ms |
+| 2 000 que reportan | 35,7 → 25,3 ms | 34,1 → 23,8 ms | 40,3 → 29,2 ms | 42,9 → 33,0 ms |
+
+Con 120 la diferencia queda dentro del ruido (otra corrida del código anterior, sobre datos sembrados igual, dio 6,6, 6,5, 10,5 y 14,6
+ms). Con 2 000, un 30 % menos en las cuatro variantes; lo que queda es leer la última lectura de cada uno de los 2 000 canales con datos
+para el agregado, ahora en la base. El resumen del mismo sitio de 2 000 tardó 392,8 a 648,0 ms en estas corridas. **Lo que no cubre:**
+emulados con un canal con lecturas y uno sin ellas; una petición a la vez (salvo la prueba del cupo); el portátil, no el servidor de
+referencia.
+
+**Pruebas nuevas o cambiadas y la falla plantada de cada una** (cada plantada se aplicó, se vio en rojo y se deshizo):
+
+| Prueba | Plantada | Resultado |
+|---|---|---|
+| `ahora.spec.ts`: con 2 000 que reportan y `limite=2`, la consulta de canales lleva solo los dos de la página | la consulta de canales con el sitio en vez de la página | 9 en rojo |
+| `ahora.spec.ts`: el agregado por magnitud en SQL con la regla de vigencia; la regla, estricta | sin la regla en la consulta; `>=` en vez de `>` | 1 y 1 en rojo |
+| `ahora.spec.ts`: tiempo vencido → `tendencia: false`, sin `chispa`, con tarjetas y agregado | sin atrapar el error 57014 | 1 en rojo |
+| `ahora.spec.ts`: como mucho dos a la vez; la tercera, sin tendencia y sin pedir conexión | cupo de tres | 1 en rojo |
+| `ahora.spec.ts`: `SET statement_timeout` y `RESET` en la conexión propia, soltada también tras un error | sin el `RESET` | 2 en rojo |
+| `ahora.spec.ts`: `tendencia` siempre presente; `false` si no se pidió o se omitió | ausente cuando es `false`; igual a lo pedido | 4 y 2 en rojo |
+| `ahora.spec.ts`: con tendencia y cero canales, dos consultas y ninguna conexión propia | la tendencia aunque no haya canales | 1 en rojo |
+| `eventos.spec.ts`: el latido pone al día el mapa (un dispositivo mudado sale con el sitio nuevo), una sola recarga con dos latidos a la vez | el latido sin recargar el mapa; sin el tope de 5 s | 1 y 2 en rojo |
+| `tablero-semilla-ahora.sql`: la guarda aborta contra la pila de desarrollo (datos en ext4, sin sitio «banco») | una copia sin la guarda: llega a la parte que borra | salida 3 con la guarda; la copia, salida 0 |
+| `sesion-smoke.sh`: dos corridas seguidas | el guion anterior | la cuarta corrida seguida, 12 fallas |
+| `api-smoke.sh` y `sesion-smoke.sh`: la forma de «Ahora» con `tendencia` | — (las expectativas cambian con el contrato) | — |
+
+**Cifras del bloque:** `pnpm verificar` en verde: 592 pruebas unitarias del backend en 54 archivos y 297 pruebas del panel (299 ejecuciones
+en 31 archivos); `svelte-check`, 396 archivos sin errores. `pnpm openapi`: 38 rutas (la descripción de «Ahora» y de `tendencia`).
+Contra la pila recreada con las imágenes nuevas: `api-smoke.sh`, 122 OK; `sesion-smoke.sh` (4b), dos corridas seguidas, 386 de 386 cada
+una. El verificador completo, en verde. El informe, recompilado: 30 páginas de cuerpo y ningún desborde.

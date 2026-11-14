@@ -166,7 +166,7 @@ además la cabecera `X-Pedido: panel`):
 
 ## 6. Cómo se sostiene esto (1 min)
 
-- `cd plataforma/backend && pnpm verificar`: tipos, lint y 585 pruebas unitarias en unos segundos
+- `cd plataforma/backend && pnpm verificar`: tipos, lint y 592 pruebas unitarias en unos segundos
   (la cifra exacta la da la salida de `vitest`; no la memorices). Los avisos de cuarentena que aparecen
   mientras corre son de las pruebas, a propósito.
 - `bash plataforma/pruebas/verificar-todo.sh`: esquema, migraciones, diagramas del informe, API y

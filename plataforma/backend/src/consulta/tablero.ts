@@ -179,6 +179,11 @@ export const MAX_CANALES_AHORA = 3;
 export const LIMITE_AHORA = { porDefecto: 24, maximo: 60 } as const;
 // La tendencia: 24 cubos de una hora alineados a la hora UTC; el último es la hora en curso (parcial).
 export const CUBOS_CHISPA = 24;
+// Topes de la tendencia (docs/19 §4, L6; docs/11 §4; desde el 13/11/2026): lee 24 h de mediciones, así que va en una conexión propia con
+// tiempo máximo de sentencia y, como mucho, dos cálculos a la vez en el proceso; si vence el tiempo o no hay cupo, «Ahora» responde igual,
+// con `tendencia: false`. 2 s: cinco veces lo más lento medido en docs/16 §66 (392 ms, lecturas cada 5 s); con las dos de a la vez, quedan
+// libres tres de las cinco conexiones del pool para la recepción.
+export const TENDENCIA = { maxEnCurso: 2, tiempoMaximoMs: 2_000 } as const;
 const HORA_MS = 3_600_000;
 
 // Un canal con su última lectura tal como lo trae la consulta (la forma de la ficha: valor y tiempo; la calibración para el %).
@@ -195,32 +200,23 @@ export function elegirCanales<T extends Pick<CanalConUltima, 'id' | 'magnitud'>>
   return [...canales].sort(ordenCanales).slice(0, MAX_CANALES_AHORA);
 }
 
-// ¿La lectura es de «ahora»? Menos de dos intervalos esperados del dispositivo, medidos con el reloj de la base (`ahoraMs`). Una lectura
-// vieja no entra al promedio de «ahora» (L3a); en la tarjeta se muestra atenuada con su antigüedad (eso lo decide el panel).
-export function lecturaVigente(c: Pick<CanalConUltima, 'ultima' | 'intervalo_esperado_s'>, ahoraMs: number): boolean {
-  if (c.ultima === null) return false;
-  return ahoraMs - Date.parse(c.ultima.tiempo) < 2 * c.intervalo_esperado_s * 1000;
-}
+// ¿La lectura es de «ahora»? Menos de dos intervalos esperados del dispositivo, con el reloj de la base: una lectura vieja no entra al
+// promedio de «ahora» (L3a); en la tarjeta se muestra atenuada con su antigüedad (eso lo decide el panel). Desde el 13/11/2026 el agregado
+// por magnitud se calcula en la base (docs/16 §66): la regla vive aquí, en SQL, sobre `dev` (el dispositivo, con `intervalo_esperado_s`) y
+// `u` (la última lectura del canal). Estricta: exactamente dos intervalos ya no es de «ahora».
+export const SQL_LECTURA_VIGENTE = `u.tiempo > now() - dev.intervalo_esperado_s * 2 * INTERVAL '1 second'`;
 
-// Por magnitud, sobre la última lectura vigente de cada canal: promedio, mínimo, máximo y cuántos canales aportan. Las magnitudes de
-// salud van al final; dentro, por código. Una magnitud sin ninguna lectura vigente no aparece (no es 0).
-export interface AgregadoMagnitud {
-  codigo: string; nombre: string; unidad: string; salud: boolean; canales: number; promedio: number; minimo: number; maximo: number;
-}
-export function porMagnitud(canales: readonly CanalConUltima[], ahoraMs: number): AgregadoMagnitud[] {
-  const grupos = new Map<string, { nombre: string; unidad: string; valores: number[] }>();
-  for (const c of canales) {
-    if (!lecturaVigente(c, ahoraMs) || c.ultima === null) continue;
-    const g = grupos.get(c.magnitud) ?? { nombre: c.magnitud_nombre, unidad: c.unidad, valores: [] };
-    g.valores.push(c.ultima.valor);
-    grupos.set(c.magnitud, g);
-  }
+// Por magnitud, sobre la última lectura vigente de cada canal: promedio, mínimo, máximo y cuántos canales aportan (una fila por magnitud,
+// de la base). Aquí, la marca de salud, el promedio con tres decimales y el orden: las magnitudes de salud al final; dentro, por código.
+// Una magnitud sin ninguna lectura vigente no llega de la base: no aparece (no es 0).
+export interface FilaMagnitud { codigo: string; nombre: string; unidad: string; canales: number; promedio: number; minimo: number; maximo: number }
+export interface AgregadoMagnitud extends FilaMagnitud { salud: boolean }
+export function porMagnitud(filas: readonly FilaMagnitud[]): AgregadoMagnitud[] {
   const redondeo = (x: number): number => Math.round(x * 1000) / 1000;
-  return [...grupos.entries()]
-    .map(([codigo, g]) => ({
-      codigo, nombre: g.nombre, unidad: g.unidad, salud: esSalud(codigo), canales: g.valores.length,
-      promedio: redondeo(g.valores.reduce((s, v) => s + v, 0) / g.valores.length),
-      minimo: Math.min(...g.valores), maximo: Math.max(...g.valores),
+  return filas
+    .map((f) => ({
+      codigo: f.codigo, nombre: f.nombre, unidad: f.unidad, salud: esSalud(f.codigo), canales: f.canales,
+      promedio: redondeo(f.promedio), minimo: f.minimo, maximo: f.maximo,
     }))
     .sort((a, b) => Number(a.salud) - Number(b.salud) || a.codigo.localeCompare(b.codigo));
 }

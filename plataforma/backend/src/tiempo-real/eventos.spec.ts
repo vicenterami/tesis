@@ -229,6 +229,28 @@ describe('EventosController: cupo, filtros y latido', () => {
     for (const s of abiertos) s.unsubscribe();
   });
 
+  it('el latido pone al día el mapa de sitios: un dispositivo que cambió de sitio sale con el nuevo sin abrir otro flujo, con el tope de 5 s (13/11/2026)', async () => {
+    vi.useFakeTimers();
+    let sitioDeD1 = 's1';
+    const query = vi.fn(() => Promise.resolve({ rows: [{ id: 'd1', sitio_id: sitioDeD1 }] }));
+    const mapa = new SitiosDeDispositivos({ query } as unknown as Pool);
+    const bus = new EventosService();
+    const c = new EventosController(bus, mapa);
+    const recibidos: unknown[] = [];
+    const s1 = c.flujo(SIN_ORIGEN).subscribe((m) => { if (m.type === 'medicion') recibidos.push((m.data as { sitio_id: unknown }).sitio_id); });
+    const s2 = c.flujo(de({ ...usuarioSistema(), id: 'otro' })).subscribe(); // un segundo flujo: su latido cae a la vez
+    await vi.advanceTimersByTimeAsync(0);
+    expect(query).toHaveBeenCalledTimes(1); // al abrir (el segundo, dentro de los 5 s, no recarga)
+    bus.publicar(M1);
+    sitioDeD1 = 's2'; // se muda de sitio (Etapa 4): nadie abre otro flujo ni llega un dispositivo desconocido
+    await vi.advanceTimersByTimeAsync(LATIDO_MS);
+    expect(query).toHaveBeenCalledTimes(2); // dos latidos a la vez, una sola recarga
+    bus.publicar(M1);
+    expect(recibidos).toEqual(['s1', 's2']);
+    s1.unsubscribe();
+    s2.unsubscribe();
+  });
+
   it('un «latido» cada 25 s aunque no haya mediciones', () => {
     vi.useFakeTimers();
     const c = new EventosController(new EventosService());

@@ -9,6 +9,21 @@
 -- en el banco, y con el intervalo igual a `paso` el supervisor los pasaría a «sin señal» a los 2 × paso, en plena medición, y «Ahora» leería
 -- menos de lo que mide (visto el 13/11/2026 con 60 s: 120 sin señal antes de la primera petición). Así los 120 «reportan» y su última
 -- lectura es vigente; el costo de las dos rutas no depende del intervalo (solo lo usan para calcular, no para leer).
+-- Guarda (13/11/2026): antes solo un comentario impedía correrlo contra otra base, y con vaciar=1 trunca `medicion` y `trama`. Se aborta si
+-- la base no es la del banco, con las dos marcas con que lo distinguen esta carpeta y sus guiones: los datos en tmpfs, en RAM
+-- (compose.banco.yml; la pila de desarrollo y el servidor guardan en disco) y el sitio de los emulados, código «banco» (emulador.ts semilla;
+-- tablero-medir.sh lo busca por ese código). ON_ERROR_STOP va aquí mismo, para que el error detenga el guion aunque se olvide en la línea de psql.
+\set ON_ERROR_STOP on
+DO $guarda$
+DECLARE montaje text;
+BEGIN
+  SELECT split_part(l, ' ', 3) INTO montaje FROM regexp_split_to_table(pg_read_file('/proc/self/mounts'), E'\n') l
+   WHERE split_part(l, ' ', 2) = current_setting('data_directory');
+  IF montaje IS DISTINCT FROM 'tmpfs' OR NOT EXISTS (SELECT 1 FROM sitio WHERE codigo = 'banco') THEN
+    RAISE EXCEPTION 'tablero-semilla-ahora.sql es solo para la base desechable del banco (datos en %, sitio «banco» %): no se toca nada',
+      coalesce(montaje, 'un montaje desconocido'), CASE WHEN EXISTS (SELECT 1 FROM sitio WHERE codigo = 'banco') THEN 'presente' ELSE 'ausente' END;
+  END IF;
+END $guarda$;
 \timing on
 SELECT CASE WHEN :vaciar = 1 THEN 'vaciar' ELSE 'conservar' END AS modo \gset
 \if :vaciar

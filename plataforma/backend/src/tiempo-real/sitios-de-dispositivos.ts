@@ -7,10 +7,11 @@ import type { PeticionConUsuario } from '../sesion/guardia.js';
 
 // Sitio de cada dispositivo, en memoria, para filtrar el canal en vivo por los sitios del usuario (docs/20 §3). Los eventos del bus
 // traen el dispositivo, no el sitio, y el filtro corre por cada evento: no puede ir a la base. Se recarga entero al abrir un flujo con
-// sesión y cuando llega un evento de un dispositivo que no conoce (uno recién dado de alta), en los dos casos como mucho una vez cada
-// 5 s (revisión del 08/11/2026: antes, cada apertura forzaba la recarga, y abrir flujos en bucle era una consulta entera por petición):
-// mientras tanto, ese evento no se le muestra a nadie con alcance acotado (nunca a quien no corresponde). Mudar un dispositivo de sitio
-// (Etapa 4, docs/10 §8.4 punto 39) se verá a lo más 5 s después, al abrir el siguiente flujo. Con 1 000 dispositivos son ≈ 100 kB.
+// sesión, en cada latido de un flujo abierto (cada 25 s; desde el 13/11/2026) y cuando llega un evento de un dispositivo que no conoce
+// (uno recién dado de alta), en todos los casos como mucho una vez cada 5 s (revisión del 08/11/2026: antes, cada apertura forzaba la
+// recarga, y abrir flujos en bucle era una consulta entera por petición): mientras tanto, ese evento no se le muestra a nadie con alcance
+// acotado (nunca a quien no corresponde). Mudar un dispositivo de sitio (Etapa 4, docs/10 §8.4 punto 39) se verá a más tardar en el
+// latido siguiente de cualquier flujo abierto (25 s), sin esperar a que alguien abra otro. Con 1 000 dispositivos son ≈ 100 kB.
 export const RECARGA_MINIMA_MS = 5_000;
 
 @Injectable()

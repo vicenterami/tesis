@@ -135,7 +135,8 @@ export interface ResumenSitio {
 }
 
 // GET /sitios/{id}/ahora (docs/19 §4, bloque L, puntos 3 y 6): lo que se mide en este momento. `chispa` (la de arriba y la de cada canal)
-// solo viene con `tendencia=si`: 24 promedios por hora alineados a la hora UTC desde `chispa.desde`, el último parcial; null = sin lecturas.
+// solo viene con `tendencia: true`: 24 promedios por hora alineados a la hora UTC desde `chispa.desde`, el último parcial; null = sin
+// lecturas. `tendencia` viene siempre: false si no se pidió o si el servidor la omitió (tiempo máximo o cupo; la respuesta es la misma).
 export interface CanalAhora {
   id: string;
   magnitud: string;
@@ -160,6 +161,7 @@ export interface AhoraSitio {
   sin_senal: number;
   por_magnitud: { codigo: string; nombre: string; unidad: string; salud: boolean; canales: number; promedio: number; minimo: number; maximo: number }[];
   dispositivos: DispositivoAhora[];
+  tendencia: boolean;
   chispa?: { desde: string; intervalo: '1 hour'; puntos: number };
 }
 

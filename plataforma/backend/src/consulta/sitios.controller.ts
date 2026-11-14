@@ -6,7 +6,7 @@ import {
 import { CABECERA_X_SIGUIENTE, ISO_8601, INTERVALOS, MAX_CUBOS, MAX_DIAS_VENTANA, SEGUNDOS_INTERVALO, exigirTopeCubos, fecha, intervalo, limite, uuid } from './validacion.js';
 import { DIAS_ACTIVIDAD_POR_DEFECTO, MAX_DIAS_ACTIVIDAD, tipoValido } from './actividad.js';
 import { ActividadService, FilaActividad } from './actividad.service.js';
-import { CUBOS_CHISPA, LIMITE_AHORA, MAGNITUDES_SALUD, MAX_CANALES_AHORA, intervaloParaRango, leerCursor, siguiente } from './tablero.js';
+import { CUBOS_CHISPA, LIMITE_AHORA, MAGNITUDES_SALUD, MAX_CANALES_AHORA, TENDENCIA, intervaloParaRango, leerCursor, siguiente } from './tablero.js';
 import { MAX_ENTREGA_RESUMEN, TableroService } from './tablero.service.js';
 
 // El histórico del sitio lee TODOS los canales de la magnitud: medido en el banco (docs/16 §61), 30 días de 120 canales a una lectura cada
@@ -71,7 +71,7 @@ export class SitiosController {
   @ApiOperation({
     summary: 'Lo que se mide ahora en el sitio (Etapa 4; tablero v3, «Ahora»)',
     description:
-      'Un número fijo de consultas por petición, sin una por dispositivo (docs/10 §8.4 punto 65 viii). `reportan` y `sin_senal`: cuántos dispositivos del sitio ' +
+      'Como mucho tres consultas por petición, sin una por dispositivo (docs/10 §8.4 punto 65 viii). `reportan` y `sin_senal`: cuántos dispositivos del sitio ' +
       'tienen estado visual normal o alerta, y sin señal (la regla de docs/19 §2, la misma del inventario y del resumen). ' +
       '`por_magnitud[{codigo, nombre, unidad, salud, canales, promedio, minimo, maximo}]`: sobre la última lectura de cada canal de los que reportan, solo si ' +
       'tiene menos de dos intervalos esperados del dispositivo (una lectura vieja no entra); `canales`, cuántos aportan; las de salud del equipo al final. ' +
@@ -79,11 +79,13 @@ export class SitiosController {
       'alerta y después por zona y nombre, hasta `limite`; `canales` trae hasta ' + MAX_CANALES_AHORA + ' `{id, magnitud, magnitud_nombre, unidad, salud, ' +
       'ultima{valor, tiempo, porcentaje}|null}`: primero lo que se mide y al final la salud del equipo (' + MAGNITUDES_SALUD.join(', ') + '). Con `tendencia=si`, ' +
       `además \`chispa{desde, intervalo, puntos}\` y, en cada canal, \`chispa\`: ${CUBOS_CHISPA} promedios por hora alineados a la hora UTC, el último de la hora ` +
-      'en curso (parcial); un cubo sin lecturas es null, no 0. Consulta o más en su sitio; otro sitio, 404.',
+      'en curso (parcial); un cubo sin lecturas es null, no 0. `tendencia` va siempre: true si la tendencia está en la respuesta; false si no se ' +
+      `pidió o si se omitió porque su cálculo pasó de ${TENDENCIA.tiempoMaximoMs} ms o ya había ${TENDENCIA.maxEnCurso} en curso (no es un error: el resto ` +
+      'de la respuesta es el mismo). Consulta o más en su sitio; otro sitio, 404.',
   })
   @ApiParam({ name: 'id', description: 'UUID del sitio' })
   @ApiQuery({ name: 'limite', required: false, description: `Tarjetas de dispositivo: 1–${LIMITE_AHORA.maximo}, por defecto ${LIMITE_AHORA.porDefecto}` })
-  @ApiQuery({ name: 'tendencia', required: false, enum: ['si'], description: '`si` suma las líneas de tendencia de 24 h; cualquier otro valor o ausente, no' })
+  @ApiQuery({ name: 'tendencia', required: false, enum: ['si'], description: '`si` pide las líneas de tendencia de 24 h (si no alcanzan el tiempo o el cupo, `tendencia: false`); cualquier otro valor o ausente, no' })
   @ApiOkResponse({ description: 'Lo que reporta cada dispositivo ahora y el resumen por magnitud' })
   @ApiBadRequestResponse({ description: `UUID inválido o limite fuera de 1–${LIMITE_AHORA.maximo}` })
   @ApiNotFoundResponse({ description: 'Sitio inexistente o de otro' })

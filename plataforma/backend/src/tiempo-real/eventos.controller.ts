@@ -25,7 +25,9 @@ export const MAX_FLUJOS_POR_USUARIO = 5;
 // los 60 s por defecto; el de este proyecto, a la hora) y le confirma al panel que el canal sigue arriba aunque no haya
 // mediciones. En cada latido, además, se revalida la sesión del flujo (revisión del 08/11/2026): cerrada, vencida, revocada, de un
 // usuario desactivado o con clave temporal → el flujo se cierra; si cambiaron sus sitios, rige el alcance nuevo. Así un flujo abierto
-// no sobrevive más de un latido a la sesión que lo abrió (antes seguía hasta que el navegador se iba).
+// no sobrevive más de un latido a la sesión que lo abrió (antes seguía hasta que el navegador se iba). Desde el 13/11/2026 el latido
+// también pone al día el mapa dispositivo → sitio (con su tope de una recarga cada 5 s): un dispositivo que cambia de sitio sale con el
+// sitio nuevo a más tardar un latido después, aunque nadie abra otro flujo.
 export const LATIDO_MS = 25_000;
 
 @ApiTags('tiempo real')
@@ -118,16 +120,15 @@ export class EventosController implements BeforeApplicationShutdown {
       this.conexiones.add(req.socket);
       const fin = new Subject<void>();
       // Desde el 13/11/2026 también para quien alcanza a todos: el mapa pone el `sitio_id` de cada aviso (no cambia quién recibe qué).
-      const refresco = this.sitios === undefined ? EMPTY : from(this.sitios.refrescar()).pipe(ignoreElements());
       return concat(
-        refresco,
+        this.refrescoDelMapa(),
         merge(
           this.eventos.flujo(filtro).pipe(
             filter((e) => this.visible(usuario, e)),
             map((e): MessageEvent => ({ type: e.tipo, data: this.conSitio(e) })),
           ),
           interval(this.latidoMs).pipe(
-            concatMap(() => this.revalidar(usuario)),
+            concatMap(() => concat(this.refrescoDelMapa(), this.revalidar(usuario))),
             filter((u): u is UsuarioSesion => {
               if (u === null) fin.next();
               return u !== null;
@@ -149,6 +150,12 @@ export class EventosController implements BeforeApplicationShutdown {
         }),
       );
     });
+  }
+
+  // Recarga el mapa de sitios (como mucho una vez cada 5 s, sitios-de-dispositivos.ts) sin emitir nada: al abrir el flujo y en cada latido.
+  // refrescar() no falla (un error de la base queda en el registro y el mapa sigue como estaba).
+  private refrescoDelMapa(): Observable<never> {
+    return this.sitios === undefined ? EMPTY : from(this.sitios.refrescar()).pipe(ignoreElements());
   }
 
   // La sesión del flujo, releída sin renovar la actividad (sesion.service.ts, cargarPorId), o null si ya no vale (cerrada, vencida,
@@ -179,7 +186,8 @@ export class EventosController implements BeforeApplicationShutdown {
 
   // Los avisos de un dispositivo (`medicion`, `visto`, `condicion`) suman `sitio_id` (docs/19 §4, L3c y L6): así el panel sabe cuáles son
   // del sitio que muestra sin deducirlo de sus listas. Sale del mismo mapa que filtra el canal; null solo si el servidor aún no conoce el
-  // dispositivo (recién dado de alta, hasta la próxima recarga del mapa), y eso solo lo recibe quien alcanza a todos los sitios: a una
+  // dispositivo (recién dado de alta, hasta la próxima recarga del mapa: la que pide ese mismo aviso o el latido siguiente, con el tope de
+  // una cada 5 s), y eso solo lo recibe quien alcanza a todos los sitios: a una
   // persona con sitios, un aviso de un dispositivo desconocido no se le muestra (visible()). `sistema` no es de ningún sitio: sin cambios.
   private conSitio(e: EventoPanel): EventoPanel | EventoConSitio {
     if (e.tipo === 'sistema') return e;

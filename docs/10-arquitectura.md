@@ -1739,14 +1739,21 @@ entra. Lo que aquí se marca «a fijar al implementar» es un detalle que el dis
     se guarda por canal en la base, no en memoria, para que sobreviva a un reinicio. (vii) **Entrega** (HU-15) = tramas recibidas en la
     ventana ÷ esperadas (ventana ÷ intervalo esperado), acotada a 100 %; nula si el dispositivo no está activo o si en la ventana no cabe una trama esperada completa (así, sin tramas retenidas no se inventa); 0 % si esperaba y no llegó nada.
     (viii) **«Ahora» (`GET /sitios/{id}/ahora`, tablero v3, `docs/19 §4` L3 y L6; 13/11/2026):** lo que mide cada dispositivo que reporta
-    (estado visual normal o alerta, la regla de (ii)) con un número fijo de consultas por petición, ninguna por fila: una para los
-    dispositivos, los conteos y la página ordenada (alerta primero, después zona y nombre; `limite` de 1 a 60); otra para los canales de todos
-    los que reportan con su última lectura (la misma subconsulta que la ficha); de esas filas salen, en memoria, el resumen por magnitud
-    (solo lecturas con menos de dos intervalos esperados del dispositivo: una vieja no entra a un promedio de «ahora») y los tres canales de
-    cada tarjeta (lo medido primero, la salud del equipo —`bateria`, `tension`, `rssi`— al final); y, solo con `tendencia=si`, una tercera
-    con `canal_id = ANY($1)` y cota de 24 h para los promedios por hora de los canales mostrados. La prueba unitaria cuenta las consultas con
-    1 y con 60 dispositivos. Los avisos `medicion`, `visto` y `condicion` del canal en vivo suman `sitio_id`, del mismo mapa en memoria que
-    filtra el canal por sitio (`docs/20 §3`); quién recibe qué no cambia. Medido con 120 fuentes en `docs/16 §66`.
+    (estado visual normal o alerta, la regla de (ii)) con como mucho tres consultas por petición, ninguna por fila: una para los
+    dispositivos, los conteos, la página ordenada (alerta primero, después zona y nombre; `limite` de 1 a 60) y el resumen por magnitud,
+    calculado en la base sobre la última lectura de cada canal de los que reportan (solo lecturas con menos de dos intervalos esperados del
+    dispositivo: una vieja no entra a un promedio de «ahora»; una fila por magnitud, corrección del 13/11/2026: antes viajaban al proceso
+    los canales de todo el sitio aunque se pidiera una tarjeta); otra, solo si la página trae dispositivos, para los canales **de la
+    página** con su última lectura (la misma subconsulta que la ficha), de donde salen los tres de cada tarjeta (lo medido primero, la
+    salud del equipo —`bateria`, `tension`, `rssi`— al final); y, solo con `tendencia=si` y algún canal mostrado, una tercera con
+    `canal_id = ANY($1)` y cota de 24 h para los promedios por hora. **La tendencia tiene topes** (13/11/2026, `docs/11 §4`): una conexión
+    propia con `SET statement_timeout` de 2 s (`RESET` al soltarla, como la exportación) y como mucho dos cálculos a la vez en el proceso;
+    si vence el tiempo o no hay cupo, la ruta responde igual, sin tendencia. La respuesta dice siempre `tendencia: true|false` (false si no
+    se pidió o si se omitió) y `chispa` solo va con `true`. Las pruebas unitarias cuentan las consultas con 1, 60 y 2 000 dispositivos,
+    con cero canales y con la tendencia omitida. Los avisos `medicion`, `visto` y `condicion` del canal en vivo suman `sitio_id`, del
+    mismo mapa en memoria que filtra el canal por sitio (`docs/20 §3`), que se pone al día al abrir un flujo, con un dispositivo
+    desconocido y, desde el 13/11/2026, en cada latido (como mucho una recarga cada 5 s); quién recibe qué no cambia. Medido con 120 y
+    con 2 000 fuentes en `docs/16 §66`.
 
 ## 9. Crecimiento, resiliencia y respaldo (aprobado el 06/10/2026)
 
