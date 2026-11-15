@@ -15,6 +15,9 @@ import { generarSecreto, resumirSecreto } from './credenciales.js';
 import { FormatoPasarela, PasarelaValidada } from './pasarela.dto.js';
 import { AltaDeLote, Catalogos, ChoqueDeLote, PasarelaCatalogo, ZonaCatalogo } from './lote.js';
 
+// El COMMIT del lote falló y no se pudo saber si se aplicó (crearLote): no se deshace nada en el broker.
+class LoteIncierto extends Error {}
+
 export interface CanalCreado {
   id: string;
   magnitud: string;
@@ -486,6 +489,17 @@ export class AltaService {
     };
   }
 
+  // ¿Quedaron estos dispositivos en la base? true si alguno está (una transacción no deja la mitad), false si ninguno, null si la consulta
+  // misma falla (la base no responde: no se sabe).
+  private async loteQuedo(idsFisicos: string[]): Promise<boolean | null> {
+    try {
+      const r = await this.pool.query<{ n: string }>('SELECT count(*) AS n FROM dispositivo WHERE id_fisico = ANY($1::text[])', [idsFisicos]);
+      return Number(r.rows[0]?.n ?? 0) > 0;
+    } catch {
+      return null;
+    }
+  }
+
   // El catálogo de magnitudes (GET /magnitudes, docs/19 §4, N4): código, nombre y unidad canónica. No es de ningún sitio.
   async magnitudes(): Promise<{ codigo: string; nombre: string; unidad: string }[]> {
     const r = await this.pool.query<{ codigo: string; nombre: string; unidad: string }>('SELECT codigo, nombre, unidad_canonica AS unidad FROM magnitud ORDER BY codigo');
@@ -506,6 +520,14 @@ export class AltaService {
     const creadosEnBroker: string[] = [];
     try {
       await this.abrir(c);
+      // Las pasarelas del lote, bloqueadas en modo compartido hasta confirmar y todavía activas (revisión del 15/11/2026: la FK solo cuida
+      // el formato; una pasarela dada de baja entre el cálculo del plan y el INSERT dejaría nodos colgando de ella). Si alguna ya no lo
+      // está, es un plan que cambió.
+      const pasarelas = [...new Set(altas.map((x) => x.alta.pasarela_id).filter((x): x is string => x !== null))];
+      if (pasarelas.length > 0) {
+        const activas = await c.query<{ id: string }>('SELECT id FROM pasarela WHERE id = ANY($1::uuid[]) AND activo FOR SHARE', [pasarelas]);
+        if (activas.rows.length !== pasarelas.length) throw new ChoqueDeLote();
+      }
       const canales = altas.flatMap((x) => x.alta.canales.map((k) => [x.alta.id_fisico, k.magnitud] as const));
       const credenciales = altas.flatMap((x, i) => (hashes[i] === null ? [] : [[x.alta.id_fisico, hashes[i]] as const]));
       const r = await c.query<{ id: string; id_fisico: string; via: string; formato: string }>(
@@ -545,21 +567,39 @@ export class AltaService {
           throw e;
         }
       }
-      await c.query('COMMIT');
-      this.log.log(`alta por lote: ${altas.length} dispositivo(s), ${ordenes.length} credencial(es) en el broker`);
-      return new Map(altas.map((x, i) => {
+      const resultado = new Map(altas.map((x, i) => {
         const codigo = x.sitio_codigo;
         const topico = x.alta.via === 'mqtt' ? `sitio/${codigo}/dispositivo/${x.alta.id_fisico}/<magnitud>` : null;
-        return [x.n, { id: ids.get(x.alta.id_fisico) ?? '', credencial: secretos[i] ?? null, topico }];
+        return [x.n, { id: ids.get(x.alta.id_fisico) ?? '', credencial: secretos[i] ?? null, topico }] as const;
       }));
+      try {
+        await c.query('COMMIT');
+      } catch (e) {
+        // Un COMMIT que falla puede haberse confirmado igual (la conexión se cortó después de que la base lo aplicó; revisión del
+        // 15/11/2026). Antes de deshacer en el broker se mira, por otra conexión, si los dispositivos quedaron: si quedaron, el lote está
+        // creado y sus credenciales valen; si no se puede saber, nada se borra y se dice qué revisar.
+        const quedo = await this.loteQuedo(altas.map((x) => x.alta.id_fisico));
+        if (quedo === true) {
+          this.log.warn(`alta por lote: el COMMIT respondió con error pero los ${altas.length} dispositivo(s) quedaron en la base; se dan por creados`);
+          return resultado;
+        }
+        if (quedo === null) throw new LoteIncierto();
+        throw e;
+      }
+      this.log.log(`alta por lote: ${altas.length} dispositivo(s), ${ordenes.length} credencial(es) en el broker`);
+      return resultado;
     } catch (e) {
       await c.query('ROLLBACK').catch(() => undefined);
+      if (e instanceof LoteIncierto) {
+        this.log.error(`alta por lote: no se pudo saber si ${altas.length} dispositivo(s) quedaron creados; no se tocó el broker`);
+        throw new ServiceUnavailableException('no se pudo confirmar si el lote quedó creado: revisa el inventario; los que aparezcan necesitan rotar su credencial (las de esta respuesta no se entregaron)');
+      }
       for (const id of creadosEnBroker) await this.deshacerEnBroker(id);
       // Un 23505 aquí es un identificador que otra petición creó entre la validación y la creación; un 23503 de
       // fk_dispositivo_pasarela_formato, el formato de una pasarela que cambió en el mismo intervalo. Lo que ve solo la base: se deshizo
       // todo y el controlador recalcula y responde `plan_cambio` con el plan nuevo (docs/19 §4, N8).
       const pg = e as ErrorPg;
-      if (pg.code === '23505' || (pg.code === '23503' && pg.constraint === 'fk_dispositivo_pasarela_formato')) throw new ChoqueDeLote();
+      if (e instanceof ChoqueDeLote || pg.code === '23505' || (pg.code === '23503' && pg.constraint === 'fk_dispositivo_pasarela_formato')) throw new ChoqueDeLote();
       throw this.traducir(e, `lote de ${altas.length}`, 'alta');
     } finally {
       this.soltar(c);

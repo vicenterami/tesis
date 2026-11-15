@@ -29,12 +29,17 @@ export const TOPES_COLUMNA: Readonly<Record<ColumnaLote, number>> = {
   canales: TOPE_CANALES, pasarela: TOPE_POR_OMISION, decodificador: TOPE_POR_OMISION,
 };
 
-// El tope de bytes del cuerpo de POST /dispositivos/lote: el peor caso de MAX_FILAS_LOTE filas con TODAS las columnas en su tope (con
-// caracteres de tres bytes en UTF-8 donde se admite texto libre: nombre, zona y la unidad de cada canal), `n` con 16 cifras y la huella,
-// medido por `lote-limites.spec.ts` (JSON.stringify y Buffer.byteLength), no estimado: 1 467 087 bytes al 15/11/2026, redondeado hacia
-// arriba al KiB: 1 433 KiB (1 467 392 bytes). La prueba falla si el peor caso no cabe o si este tope lo pasa en más de 16 KiB (ni corto ni arbitrario). Lo usan el
-// lector de JSON (arranque.ts), la plantilla (`max_bytes`) y el proxy (`client_max_body_size` de proxy/nginx.conf, comparado por la misma prueba).
-export const MAX_BYTES_LOTE = 1433 * 1024;
+// El tope de bytes del cuerpo de POST /dispositivos/lote: el peor caso de lo que `filasDelCuerpo` ACEPTA, con MAX_FILAS_LOTE filas y todas
+// las columnas en su tope: tres bytes por carácter en el texto libre (nombre y zona: el máximo en UTF-8 por unidad de UTF-16, porque los
+// caracteres de control y los sustitutos sueltos, que el JSON escribe con seis, se rechazan) y uno en las demás (ASCII imprimible sin
+// «"» ni «\»), `n` con 16 cifras y la huella. Medido por `lote-limites.spec.ts` (JSON.stringify y Buffer.byteLength), que además intenta
+// superarlo con cada carácter admisible: 1 147 087 bytes al 15/11/2026, redondeado hacia arriba al KiB, 1 121 KiB (1 147 904 bytes). Hasta
+// la revisión del 15/11/2026 la guarda solo rechazaba NUL y el «peor caso» de 1 467 392 no lo era: con caracteres de control o de tres bytes
+// en las columnas de códigos se pasaba. La prueba falla si el peor caso no cabe o si este tope lo pasa en más de 16 KiB. Lo usan el lector de
+// JSON (arranque.ts), la plantilla (`max_bytes`) y el proxy (`client_max_body_size` del `location` del lote en proxy/nginx.conf).
+// Un cliente que escriba el JSON con escapes innecesarios («\u0041» por «A») o claves repetidas manda más bytes para el mismo contenido y
+// puede recibir 413: el tope es el de la forma que produce JSON.stringify, la del panel.
+export const MAX_BYTES_LOTE = 1121 * 1024;
 
 export const SEPARADORES_LOTE = { columnas: [';', ',', '\t'], canales: ['|', ';'] } as const;
 
@@ -108,7 +113,7 @@ export interface Catalogos {
   // Sigue sin poder usarse (id_fisico es único en toda la plataforma): la fila se rechaza con un motivo que no dice más.
   ajenos: ReadonlySet<string>;
 }
-export interface AltaDeLote { n: number; alta: AltaValidada; formato: Formato; sitio_codigo: string }
+export interface AltaDeLote { n: number; alta: AltaValidada; formato: Formato; sitio_codigo: string; sitio_id: string }
 export type FilaEntrada = Record<string, unknown> & { n: number };
 
 // El choque que solo ve la base al insertar (23505: otra petición creó el identificador entre la validación y la inserción; o el formato de
@@ -131,10 +136,22 @@ export function modoLote(v: unknown): ModoLote {
 
 // ── La forma del cuerpo ────────────────────────────────────────────────────────────────────────────────────────────────────────────
 // `{filas: [...], huella?}` con 1 a 500 objetos; más de 500 es 413 (antes de mirar cada fila). Cada fila trae `n`: un entero positivo,
-// mayor que el de la fila anterior (único y creciente), que se devuelve tal cual. Cada celda es texto o número, sin el carácter NUL y
-// dentro del tope de su columna; si no, 400 con la fila (`n`, o su posición si `n` no sirve). En `crear`, `huella` es obligatoria.
+// mayor que el de la fila anterior (único y creciente), que se devuelve tal cual, y solo columnas de la plantilla. Cada celda es texto o
+// número, dentro del tope de su columna, sin caracteres de control ni sustitutos sueltos, y en las columnas de códigos e identificadores
+// solo ASCII imprimible (revisión del 15/11/2026: así el peor caso del cuerpo es el de lo que se acepta, no el de lo que se suele mandar).
+// Si no, 400 con la fila (`n`, o su posición si `n` no sirve). En `crear`, `huella` es obligatoria.
 export const FORMA_HUELLA = /^[0-9a-f]{64}$/;
+// Las columnas de texto libre (nombre y zona) admiten cualquier carácter imprimible; las demás son códigos, identificadores o números
+// (`canales`: códigos de magnitud y unidades canónicas del catálogo, todas ASCII hoy; una unidad que no lo fuera exigiría revisar esto).
+export const COLUMNAS_TEXTO_LIBRE: readonly ColumnaLote[] = ['nombre', 'zona'];
+// ASCII imprimible sin «"» ni «\»: ningún código, identificador, número ni unidad del catálogo los usa, y el JSON los escribe con dos bytes.
+const ASCII_IMPRIMIBLE = /^[\x20\x21\x23-\x5b\x5d-\x7e]*$/;
+const CONTROL = /\p{Cc}/u;
+const SUSTITUTO_SUELTO = /\p{Cs}/u; // en modo «u», un par de sustitutos es un solo punto de código: solo calzan los sueltos
 const MAX_MOTIVOS_CUERPO = 20;
+// Un texto que viene del cliente, recortado antes de ponerlo en un motivo (una clave puede medir lo que el cuerpo permita).
+export const recorte = (t: string, max = TOPE_POR_OMISION): string => (t.length > max ? `${t.slice(0, max)}…` : t);
+const esColumna = (k: string): k is ColumnaLote => Object.hasOwn(TOPES_COLUMNA, k);
 export function filasDelCuerpo(cuerpo: unknown, modo: ModoLote = 'validar'): { filas: FilaEntrada[]; huella: string | null } {
   if (typeof cuerpo !== 'object' || cuerpo === null || Array.isArray(cuerpo)) throw new BadRequestException(['el cuerpo debe ser un objeto JSON con `filas`']);
   const c = cuerpo as Record<string, unknown>;
@@ -142,7 +159,7 @@ export function filasDelCuerpo(cuerpo: unknown, modo: ModoLote = 'validar'): { f
   if (!Array.isArray(filas) || filas.length === 0) throw new BadRequestException(['filas debe ser una lista con al menos una fila']);
   if (filas.length > MAX_FILAS_LOTE) throw new PayloadTooLargeException(`el lote trae ${filas.length} filas y el máximo es ${MAX_FILAS_LOTE}: divídelo`);
   const motivos: string[] = [];
-  for (const k of Object.keys(c)) if (k !== 'filas' && k !== 'huella') motivos.push(`campo no admitido en el cuerpo: ${k}`);
+  for (const k of Object.keys(c)) if (k !== 'filas' && k !== 'huella') motivos.push(`campo no admitido en el cuerpo: ${recorte(k)}`);
   let huella: string | null = null;
   if (c.huella !== undefined) {
     if (typeof c.huella === 'string' && FORMA_HUELLA.test(c.huella)) huella = c.huella;
@@ -166,10 +183,20 @@ export function filasDelCuerpo(cuerpo: unknown, modo: ModoLote = 'validar'): { f
     } else anterior = n;
     for (const [k, v] of Object.entries(o)) {
       if (k === 'n') continue;
-      const tope = (TOPES_COLUMNA as Readonly<Record<string, number>>)[k] ?? TOPE_POR_OMISION;
-      if (typeof v === 'number' ? !Number.isFinite(v) : typeof v !== 'string') motivos.push(`${etiqueta}: ${k} debe ser texto o número`);
-      else if (String(v).includes('\u0000')) motivos.push(`${etiqueta}: ${k} trae el carácter NUL`);
-      else if (String(v).length > tope) motivos.push(`${etiqueta}: ${k} pasa su tope de ${tope} caracteres (trae ${String(v).length})`);
+      if (!esColumna(k)) {
+        motivos.push(`${etiqueta}: columna no admitida: ${recorte(k)}`);
+        continue;
+      }
+      const tope = TOPES_COLUMNA[k];
+      if (typeof v === 'number' ? !Number.isFinite(v) : typeof v !== 'string') {
+        motivos.push(`${etiqueta}: ${k} debe ser texto o número`);
+        continue;
+      }
+      const t = String(v);
+      if (SUSTITUTO_SUELTO.test(t)) motivos.push(`${etiqueta}: ${k} trae un carácter no válido (un sustituto UTF-16 suelto)`);
+      else if (CONTROL.test(t)) motivos.push(`${etiqueta}: ${k} trae un carácter de control`);
+      else if (!COLUMNAS_TEXTO_LIBRE.includes(k) && !ASCII_IMPRIMIBLE.test(t)) motivos.push(`${etiqueta}: ${k} admite solo caracteres ASCII imprimibles, sin comillas dobles ni barra invertida`);
+      else if (t.length > tope) motivos.push(`${etiqueta}: ${k} pasa su tope de ${tope} caracteres (trae ${t.length})`);
     }
     salida.push(o as FilaEntrada);
   });
@@ -225,6 +252,12 @@ export function validarLote(filas: readonly FilaEntrada[], cat: Catalogos, reser
     const k = texto(f.nombre).toLowerCase();
     if (k !== '') nombres.set(k, [...(nombres.get(k) ?? []), f.n]);
   }
+  // Zonas y pasarelas por su id y por su nombre o id_fisico, una vez por petición (revisión del 15/11/2026: antes, un recorrido por fila).
+  const zonasPorId = new Map(cat.zonas.map((x) => [x.id, x]));
+  const zonasPorNombre = new Map<string, ZonaCatalogo[]>();
+  for (const x of cat.zonas) zonasPorNombre.set(x.nombre.toLowerCase(), [...(zonasPorNombre.get(x.nombre.toLowerCase()) ?? []), x]);
+  const pasarelasPorId = new Map(cat.pasarelas.map((x) => [x.id, x]));
+  const pasarelasPorIdFisico = new Map(cat.pasarelas.map((x) => [x.id_fisico, x]));
   for (const f of filas) {
     const n = f.n;
     const crudo = texto(f.id_fisico);
@@ -256,7 +289,6 @@ export function validarLote(filas: readonly FilaEntrada[], cat: Catalogos, reser
       informe.push(fila('existe', { id: existente.id }));
       continue;
     }
-    for (const k of Object.keys(f)) if (k !== 'n' && !(COLUMNAS_LOTE as readonly string[]).includes(k)) motivos.push({ campo: k, texto: `columna no admitida: ${k}` });
     if (crudo !== idFisico) avisos.push({ campo: 'id_fisico', texto: `venía con mayúsculas: se guardará como «${idFisico}»` });
     if (cat.idsDePasarela.has(idFisico)) motivos.push({ campo: 'id_fisico', texto: `id_fisico «${idFisico}» ya lo usa una pasarela` });
     const otras = (nombres.get(texto(f.nombre).toLowerCase()) ?? []).filter((x) => x !== n);
@@ -265,7 +297,8 @@ export function validarLote(filas: readonly FilaEntrada[], cat: Catalogos, reser
     // Zona: su UUID o su nombre, entre las zonas de los sitios donde quien carga puede dar de alta.
     const z = texto(f.zona);
     const porId = UUID.test(z);
-    const candidatas = porId ? cat.zonas.filter((x) => x.id === z.toLowerCase()) : cat.zonas.filter((x) => x.nombre.toLowerCase() === z.toLowerCase());
+    const porIdZona = porId ? zonasPorId.get(z.toLowerCase()) : undefined;
+    const candidatas = porId ? (porIdZona === undefined ? [] : [porIdZona]) : (zonasPorNombre.get(z.toLowerCase()) ?? []);
     let zona: ZonaCatalogo | undefined;
     if (z === '') motivos.push({ campo: 'zona', texto: 'zona vacía' });
     else if (candidatas.length === 0) motivos.push({ campo: 'zona', texto: `zona «${z}» no existe en tus sitios` });
@@ -280,7 +313,7 @@ export function validarLote(filas: readonly FilaEntrada[], cat: Catalogos, reser
     const p = texto(f.pasarela);
     let pasarela: PasarelaCatalogo | undefined;
     if (p !== '') {
-      pasarela = cat.pasarelas.find((x) => (UUID.test(p) ? x.id === p.toLowerCase() : x.id_fisico === p.toLowerCase()));
+      pasarela = UUID.test(p) ? pasarelasPorId.get(p.toLowerCase()) : pasarelasPorIdFisico.get(p.toLowerCase());
       if (pasarela === undefined) motivos.push({ campo: 'pasarela', texto: `pasarela «${p}» no existe` });
       else if (zona !== undefined && pasarela.sitio_id !== zona.sitio_id) motivos.push({ campo: 'pasarela', texto: `la pasarela ${pasarela.id_fisico} pertenece a otro sitio` });
       else if (!pasarela.activo) motivos.push({ campo: 'pasarela', texto: `la pasarela ${pasarela.id_fisico} está dada de baja` });
@@ -317,7 +350,7 @@ export function validarLote(filas: readonly FilaEntrada[], cat: Catalogos, reser
       continue;
     }
     const formatoFinal: Formato = alta.formato ?? pasarela?.formato ?? 'senml';
-    altas.push({ n, alta, formato: formatoFinal, sitio_codigo: zona.sitio_codigo });
+    altas.push({ n, alta, formato: formatoFinal, sitio_codigo: zona.sitio_codigo, sitio_id: zona.sitio_id });
     const interpretada: Interpretada = {
       id_fisico: alta.id_fisico, nombre: alta.nombre, sitio: zona.sitio_codigo, zona: zona.nombre, zona_id: zona.id, via: alta.via, formato: formatoFinal,
       intervalo_esperado_s: alta.intervalo_esperado_s,
@@ -372,15 +405,23 @@ export function respuestaLote(informe: FilaInforme[]): RespuestaLote {
 
 // ── Reintento de `modo=crear` con la misma llave (bloque N, punto 8) ──────────────────────────────────────────────────────────────────
 // La llave viaja en la cabecera `Idempotency-Key` (el nombre del borrador de la IETF «The Idempotency-Key HTTP Header Field»); la genera
-// el cliente (el panel, un UUID). La respuesta de una creación que terminó se guarda por (persona, llave) durante 2 minutos en la memoria
-// del proceso, con la firma del cuerpo: repetir con la misma llave y el mismo cuerpo devuelve la misma respuesta sin crear nada; la misma
-// llave con otro cuerpo es 422 (`llave_reutilizada`). Solo se guardan creaciones que terminaron (un 409 o un 400 se vuelven a calcular).
-// Tope de entradas: llena, se borran las vencidas y, si no alcanza, la más antigua. Vale con una instancia, como «una creación a la vez»
+// el cliente (el panel, un UUID). La respuesta de una creación que creó al menos un dispositivo se guarda por (persona, llave) durante 2
+// minutos en la memoria del proceso, con la firma del cuerpo y los sitios de lo creado: repetir con la misma llave y el mismo cuerpo
+// devuelve la misma respuesta sin crear nada, si la persona conserva «escribir» en esos sitios; la misma llave con otro cuerpo es 422
+// (`llave_reutilizada`). Lo que no creó nada no se guarda: se vuelve a calcular. Vale con una instancia, como «una creación a la vez»
 // (docs/11 §4). Las credenciales en claro viven aquí esos 2 minutos y nunca se escriben en un registro.
+// Topes (revisión del 15/11/2026: antes solo por conteo): 200 entradas, 3 por persona y 16 MiB en total, medidos como el largo del JSON de
+// la respuesta. Una respuesta de 500 filas creadas pesa ≈ 0,4 MiB, así que caben ≈ 40; 16 MiB son ≈ 3 % del techo de memoria del backend
+// (512 MiB en docker-compose.yml, dentro de los 2 GB de RNF-17). Al llenarse salen las vencidas, después las más antiguas de esa persona
+// y después las más antiguas de todas; una respuesta más grande que el tope total no se guarda.
 export const CABECERA_LLAVE = 'idempotency-key';
 export const FORMA_LLAVE = /^[A-Za-z0-9_-]{16,128}$/;
 export const VIDA_LLAVE_MS = 120_000;
 export const MAX_LLAVES = 200;
+export const MAX_LLAVES_POR_PERSONA = 3;
+export const MAX_BYTES_LLAVES = 16 * 1024 * 1024;
+// Los reintentos tienen su propio cupo (no gastan el de los lotes, para que una respuesta perdida no quede tras un 429, pero tampoco son gratis).
+export const REINTENTOS_POR_MINUTO = 10;
 export function llaveDeReintento(v: unknown): string {
   if (typeof v === 'string' && FORMA_LLAVE.test(v)) return v;
   throw new BadRequestException(['Idempotency-Key es obligatoria en modo=crear: de 16 a 128 caracteres entre letras, dígitos, «-» y «_» (el panel manda un UUID)']);
@@ -388,33 +429,57 @@ export function llaveDeReintento(v: unknown): string {
 export function firmaDelCuerpo(cuerpo: unknown): string {
   return createHash('sha256').update(JSON.stringify(cuerpo) ?? '').digest('hex');
 }
+interface Guardada<T> { persona: string; expira: number; firma: string; respuesta: T; sitios: readonly string[]; bytes: number }
 export class RespuestasPorLlave<T> {
-  private readonly guardadas = new Map<string, { expira: number; firma: string; respuesta: T }>();
-  constructor(private readonly vidaMs = VIDA_LLAVE_MS, private readonly tope = MAX_LLAVES) {}
+  private readonly guardadas = new Map<string, Guardada<T>>();
+  private total = 0;
+  constructor(
+    private readonly vidaMs = VIDA_LLAVE_MS, private readonly tope = MAX_LLAVES, private readonly porPersona = MAX_LLAVES_POR_PERSONA,
+    private readonly topeBytes = MAX_BYTES_LLAVES,
+  ) {}
   get tamano(): number {
     return this.guardadas.size;
   }
-  private limpiar(ahora: number): void {
-    for (const [k, v] of this.guardadas) if (v.expira <= ahora) this.guardadas.delete(k);
+  get bytes(): number {
+    return this.total;
   }
-  // La respuesta guardada, o undefined si no hay; 422 si la llave ya se usó con otro cuerpo.
-  buscar(persona: string, llave: string, firma: string, ahora = Date.now()): T | undefined {
+  private quitar(k: string): void {
+    const g = this.guardadas.get(k);
+    if (g === undefined) return;
+    this.total -= g.bytes;
+    this.guardadas.delete(k);
+  }
+  private limpiar(ahora: number): void {
+    for (const [k, v] of this.guardadas) if (v.expira <= ahora) this.quitar(k);
+  }
+  // ¿Hay una respuesta guardada con esta llave? (barato: sin firmar el cuerpo; decide qué cupo gasta la petición)
+  tiene(persona: string, llave: string, ahora = Date.now()): boolean {
+    this.limpiar(ahora);
+    return this.guardadas.has(`${persona}\n${llave}`);
+  }
+  // La respuesta guardada y los sitios de lo creado, o undefined si no hay; 422 si la llave ya se usó con otro cuerpo.
+  buscar(persona: string, llave: string, firma: string, ahora = Date.now()): { respuesta: T; sitios: readonly string[] } | undefined {
     this.limpiar(ahora);
     const g = this.guardadas.get(`${persona}\n${llave}`);
     if (g === undefined) return undefined;
     if (g.firma !== firma) {
       throw new HttpException({ statusCode: 422, error: 'Unprocessable Entity', codigo: 'llave_reutilizada', message: 'esta Idempotency-Key ya se usó con otro cuerpo: genera una nueva para otra creación' }, HttpStatus.UNPROCESSABLE_ENTITY);
     }
-    return g.respuesta;
+    return { respuesta: g.respuesta, sitios: g.sitios };
   }
-  guardar(persona: string, llave: string, firma: string, respuesta: T, ahora = Date.now()): void {
+  guardar(persona: string, llave: string, firma: string, respuesta: T, sitios: readonly string[], bytes: number, ahora = Date.now()): void {
     this.limpiar(ahora);
-    while (this.guardadas.size >= this.tope) {
-      const primera = this.guardadas.keys().next().value;
-      if (primera === undefined) break;
-      this.guardadas.delete(primera);
+    const clave = `${persona}\n${llave}`;
+    this.quitar(clave);
+    if (bytes > this.topeBytes) return;
+    const deLaPersona = [...this.guardadas].filter(([, g]) => g.persona === persona).map(([k]) => k);
+    while (deLaPersona.length >= this.porPersona) this.quitar(deLaPersona.shift()!);
+    for (const k of [...this.guardadas.keys()]) {
+      if (this.guardadas.size < this.tope && this.total + bytes <= this.topeBytes) break;
+      this.quitar(k);
     }
-    this.guardadas.set(`${persona}\n${llave}`, { expira: ahora + this.vidaMs, firma, respuesta });
+    this.guardadas.set(clave, { persona, expira: ahora + this.vidaMs, firma, respuesta, sitios, bytes });
+    this.total += bytes;
   }
 }
 

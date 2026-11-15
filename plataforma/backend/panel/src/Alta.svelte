@@ -14,7 +14,7 @@
   import { ErrorApi, alPerderSesion, descargarTexto, esCancelacion, obtener, pedir, ultimaGana } from './lib/api';
   import { avisoDeError, type DatosAviso } from './lib/avisos';
   import {
-    ROTULO_RESULTADO, codigoDeConflicto, crearConReintento, csvCredenciales, csvEjemplo, csvRechazadas, excedeBytes, leerCsv, megas, nuevaLlave,
+    AVISO_SIN_RESPUESTA, ROTULO_RESULTADO, codigoDeConflicto, hayQueRepetir, crearConReintento, csvCredenciales, csvEjemplo, csvRechazadas, excedeBytes, leerCsv, megas, nuevaLlave,
     type FilaInforme, type FilaLote, type InformeLote, type PlantillaLote,
   } from './lib/lote';
   import type { EventoVivo, Sitio } from './lib/modelo';
@@ -272,6 +272,9 @@
         avisoLote = { tipo: 'conflicto', texto: 'Cambió desde que lo revisaste: no se creó ninguno. Revisa el informe y vuelve a crear las válidas.' };
       } else if (codigo === 'lote_en_curso') {
         avisoLote = { tipo: 'espera', texto: 'Hay otra alta por lote en curso: espera a que termine y vuelve a intentarlo. No se creó ninguno.' };
+      } else if (hayQueRepetir(e)) {
+        // Tres intentos sin respuesta (revisión del 15/11/2026): no se sabe si se crearon, y sus credenciales no se pueden recuperar.
+        avisoLote = { tipo: 'error', texto: AVISO_SIN_RESPUESTA };
       } else avisoLote = avisoDeError(e);
     } finally {
       creandoLote = false;
@@ -507,6 +510,7 @@
             <Boton etiqueta={`Crear las válidas (${validas.length})`} variante="principal" etiquetaCargando="Creando…" cargando={creandoLote}
               ayuda="Se crean todas en una sola petición, o ninguna; las credenciales se muestran una sola vez" onclick={() => void crearValidas(validas)} data-crear-validas />
           {/if}
+          {#if creandoLote}<span role="status" data-creando-lote>Creando: no cierres ni recargues la pestaña; si la respuesta se pierde, las credenciales no se pueden recuperar.</span>{/if}
           {#if conteo.rechazada > 0}<Boton etiqueta="Descargar rechazadas" onclick={bajarRechazadas} data-descargar-rechazadas />{/if}
         </span>
         <div class="tabla">

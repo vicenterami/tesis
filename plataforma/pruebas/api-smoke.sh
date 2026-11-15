@@ -190,7 +190,9 @@ caso_lote "lote con una celda sobre su tope → 400 que dice la fila" '{"filas":
 caso_lote "lote con n repetido → 400 (n es único y creciente)" '{"filas":[{"n":3,"id_fisico":"lote-humo-03"},{"n":3,"id_fisico":"lote-humo-04"}]}' 400
 code=$(ck -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data-binary '{"filas":[{"n":2,"id_fisico":"lote-humo-05"}],"huella":"'"$(printf 'a%.0s' $(seq 64))"'"}' "$API/dispositivos/lote?modo=crear")
 [ "$code" = 400 ] && echo "OK    lote crear sin Idempotency-Key → 400" || { echo "FALLA lote crear sin llave → $code"; fallos=$((fallos+1)); }
-caso "plantilla del lote: las columnas con su tope, max_filas 500 y max_bytes igual al tope del cuerpo" /dispositivos/lote/plantilla "r['max_filas']==500 and r['max_bytes']>=1400000 and [c['nombre'] for c in r['columnas']][-1]=='decodificador' and [c['nombre'] for c in r['columnas'] if c['obligatoria']]==['id_fisico','nombre','zona','intervalo_esperado_s','canales']"
+# El tope del cuerpo sale de su única casa (MAX_BYTES_LOTE de alta/lote.ts), no se escribe aquí otra vez.
+MAX_BYTES_LOTE=$(python3 -I -c "import re,sys; m=re.search(r'export const MAX_BYTES_LOTE = (\\d+) \\* 1024;', open(sys.argv[1]).read()); print(int(m.group(1))*1024)" "$AQUI/../backend/src/alta/lote.ts")
+caso "plantilla del lote: las columnas con su tope, max_filas 500 y max_bytes igual al tope del cuerpo ($MAX_BYTES_LOTE bytes, MAX_BYTES_LOTE de alta/lote.ts)" /dispositivos/lote/plantilla "r['max_filas']==500 and r['max_bytes']==$MAX_BYTES_LOTE and [c['nombre'] for c in r['columnas']][-1]=='decodificador' and [c['nombre'] for c in r['columnas'] if c['obligatoria']]==['id_fisico','nombre','zona','intervalo_esperado_s','canales']"
 caso "catálogo de magnitudes con código, nombre y unidad canónica" /magnitudes "any(m['codigo']=='temperatura' and m['unidad']=='Cel' and m['nombre'] for m in r)"
 caso_lote "lote de 501 filas → 413" "{\"filas\":[$(python3 -c "print(','.join(['{}']*501))")]}" 413
 code=$(ck -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' --data-binary '{"filas":[{}]}' "$API/dispositivos/lote?modo=borrar")

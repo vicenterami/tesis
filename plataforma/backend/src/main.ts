@@ -11,7 +11,7 @@ import { join } from 'node:path';
 import type { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module.js';
-import { AvisosAcotados, MENSAJE_TOPE_CUERPO, TOPE_CUERPO, errorDeLectorJson, esLote, opcionesLectorJson, horasClaveTemporal, hostsPermitidos, interfazDeEscucha, rechazoDeHost, registrosEnJson, rutaSinCache, servirDocumentacion, claveAdmin, claveApp } from './arranque.js';
+import { AvisosAcotados, errorDeLectorJson, filtroAntesDeLeer, opcionesLectorJson, horasClaveTemporal, hostsPermitidos, interfazDeEscucha, rechazoDeHost, registrosEnJson, rutaSinCache, servirDocumentacion, claveAdmin, claveApp } from './arranque.js';
 import { configurarOpenApi } from './openapi.js';
 
 // Punto de entrada. Levanta la aplicación Nest: al iniciarse, cada módulo se conecta a lo suyo
@@ -49,13 +49,9 @@ async function arrancar(): Promise<void> {
   // más de 100 KiB responde 413, como antes. El tope que manda en el lote es el de filas (413 con el motivo); el de bytes es la guarda gruesa.
   // Un cuerpo sin largo declarado (Transfer-Encoding: chunked) no lo detiene la cabecera: `verify` cuenta los bytes leídos y, fuera del
   // lote, más de 100 KiB también es 413 (arranque.ts, cuerpoExcedido; revisión del 11/11/2026). El atajo por cabecera queda: no lee nada.
-  app.use((req: Request, res: Response, next: NextFunction) => {
-    const largo = Number(req.headers['content-length'] ?? 0);
-    if (largo > TOPE_CUERPO && !esLote(req.url) && !/^\/recepcion\//i.test(req.url ?? '')) {
-      return void res.status(413).json({ statusCode: 413, message: MENSAJE_TOPE_CUERPO });
-    }
-    next();
-  });
+  // Lo que se decide antes de leer (arranque.ts, filtroAntesDeLeer): el 413 por Content-Length fuera del lote y, en el lote, el 401 de una
+  // petición sin la forma de una sesión (revisión del 15/11/2026).
+  app.use(filtroAntesDeLeer);
   // Desde NestJS 12 el tipo de las opciones excluye `verify` (la guía de migración 11→12 no lo menciona): Nest lo reserva para capturar el
   // cuerpo crudo con `rawBody: true`, que esta aplicación no usa. En ejecución, sin `rawBody`, el adaptador de Express pasa las opciones tal
   // cual al lector de JSON (adapters/utils/get-body-parser-options.util.js de @nestjs/platform-express 12.4.0), así que `verify` sigue rigiendo.

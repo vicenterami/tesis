@@ -229,12 +229,18 @@ export class RecepcionService implements OnModuleInit {
       try {
         lecturas = adaptador.analizar(ctx);
       } catch (e) {
-        if (!(e instanceof TramaMalformada)) throw e;
+        // Un adaptador solo traduce bytes (no toca la base ni el broker): cualquier error suyo es un problema de la trama o un defecto del
+        // adaptador, nunca de infraestructura. Uno que no es TramaMalformada se trata como trama malformada con un motivo genérico (revisión
+        // del 15/11/2026: relanzarlo dejaba el mensaje sin confirmar y el broker lo reenviaba sin fin, como pasó con un `n` numérico en
+        // SenML). El error real va al registro con su clase, sin su mensaje, que puede traer pedazos de la trama.
+        const imprevisto = !(e instanceof TramaMalformada);
+        if (imprevisto) this.log.error(`adaptador ${adaptador.nombre}: error imprevisto (${e instanceof Error ? e.name : typeof e}); la trama va a cuarentena como malformada`);
         // El contador pudo anotarse antes de fallar (p. ej. data corta): una trama que no se entendió no es «la repetida» (§4.1).
         ctx.fcnt = undefined;
-        malformada = `formato declarado ${adaptador.nombre}: ${e.message}`;
+        malformada = `formato declarado ${adaptador.nombre}: ${imprevisto ? 'la trama no se pudo interpretar' : (e).message}`;
         // El cuerpo no deja verificar el DevEUI (otro, ausente o ilegible): no hay certeza de que sea del nodo, no se marca vivo (§4.1).
-        const sinIdentidad = e instanceof IdentidadNoVerificada;
+        // Un error imprevisto por el tópico de pasarela tampoco verificó nada.
+        const sinIdentidad = e instanceof IdentidadNoVerificada || (imprevisto && dePasarela);
         await this.cuarentena(trama, 'malformada', malformada, sinIdentidad ? cuotaSinIdentidad : cuota);
         if (sinIdentidad) return sinLecturas();
       }

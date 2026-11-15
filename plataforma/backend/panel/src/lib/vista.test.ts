@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SIN_FILTROS, SIN_FILTROS_ACTIVIDAD, fragmentoActividad, fragmentoAlta, fragmentoComparar, fragmentoFicha, fragmentoInventario, fragmentoTablero, leerVentanaFija, leerVista, redireccionVieja, validarAMedida } from './vista';
+import { SIN_FILTROS, SIN_FILTROS_ACTIVIDAD, fragmentoActividad, fragmentoAlta, fragmentoComparar, fragmentoFicha, fragmentoInventario, fragmentoTablero, errorDeVentana, leerVentanaFija, leerVista, redireccionVieja, validarAMedida } from './vista';
 
 const ID = '00000000-0000-4000-8000-000000000001';
 const CANAL = '00000000-0000-4000-8000-0000000000c1';
@@ -139,6 +139,12 @@ describe('validarAMedida: el rango a medida de la ficha y del tablero (HU-07)', 
     expect(validarAMedida('2026-10-10T08:00', '2026-10-09T08:00', Z).error).toBe('El fin debe ser posterior al inicio.');
     expect(validarAMedida('', '2026-10-10T08:00', Z).error).toBe('Escribe la fecha y la hora de inicio y de fin.');
     expect(validarAMedida('2026-10-10T08:00', 'ayer', Z).error).toBe('Escribe la fecha y la hora de inicio y de fin.');
+  });
+  it('la URL (leerVentanaFija) y el formulario (validarAMedida) aceptan exactamente las mismas ventanas: una sola regla', () => {
+    const pares: [string, string][] = [['2025-10-10T08:00', '2026-10-11T08:00'], ['2025-10-10T08:00', '2026-10-11T08:01'], ['2026-10-10T08:00', '2026-10-10T08:00'],
+      ['2026-10-10T08:00', '2026-10-09T08:00'], ['2026-10-10T08:00', '2026-10-10T08:01']];
+    for (const [d, h] of pares) expect([d, h, leerVentanaFija(`${d}:00Z`, `${h}:00Z`) !== null]).toEqual([d, h, validarAMedida(d, h, 'UTC').error === null]);
+    expect(errorDeVentana(new Date('2026-01-01T00:00:00Z'), new Date('2027-01-02T00:01:00Z'))).toBe('Como mucho 366 días.');
   });
   it('366 días pasan; un minuto más, no (el tope del servidor)', () => {
     expect(validarAMedida('2025-10-10T08:00', '2026-10-11T08:00', Z).error).toBeNull(); // 366 días justos

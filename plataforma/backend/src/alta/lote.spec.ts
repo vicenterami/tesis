@@ -59,10 +59,9 @@ describe('validarLote: el plan por fila', () => {
       { id_fisico: 'nodo-06', zona: 'Bodega' }, // zona inexistente (o de un sitio ajeno: lo mismo)
       { id_fisico: 'nodo-07', intervalo_esperado_s: '2' },
       { id_fisico: 'nodo-01' }, // repetida en el archivo
-      { id_fisico: 'nodo-09', color: 'rojo' }, // columna no admitida
     ]), cat);
-    expect(r.informe.map((f) => f.resultado)).toEqual(['valida', 'rechazada', 'rechazada', 'rechazada', 'rechazada', 'rechazada', 'rechazada', 'rechazada', 'rechazada']);
-    expect(r.informe.slice(1).map((f) => f.motivos.map((m) => m.campo))).toEqual([['id_fisico'], ['canales'], ['canales'], ['zona'], ['zona'], ['intervalo_esperado_s'], ['id_fisico'], ['color']]);
+    expect(r.informe.map((f) => f.resultado)).toEqual(['valida', 'rechazada', 'rechazada', 'rechazada', 'rechazada', 'rechazada', 'rechazada', 'rechazada']);
+    expect(r.informe.slice(1).map((f) => f.motivos.map((m) => m.campo))).toEqual([['id_fisico'], ['canales'], ['canales'], ['zona'], ['zona'], ['intervalo_esperado_s'], ['id_fisico']]);
     expect(r.informe[1]?.motivo).toMatch(/id_fisico: minúsculas/);
     expect(r.informe[2]?.motivo).toMatch(/magnitud desconocida: presion/);
     expect(r.informe[3]?.motivo).toMatch(/la unidad es Cel, no K/);
@@ -77,7 +76,7 @@ describe('validarLote: el plan por fila', () => {
     const r = validarLote(numeradas([
       { id_fisico: 'Nodo-A1', nombre: 'Patio norte' },
       { id_fisico: 'nodo-a2', nombre: 'patio norte', zona: Z1, canales: 'temperatura:Cel' },
-      { id_fisico: 'a84041000181b0e1', via: 'lorawan', formato: 'milesight', pasarela: 'ug65-campus', canales: 'temperatura:Cel' },
+      { id_fisico: '0101010101010101', via: 'lorawan', formato: 'milesight', pasarela: 'ug65-campus', canales: 'temperatura:Cel' },
     ]), cat);
     expect(r.informe.map((f) => f.resultado)).toEqual(['valida', 'valida', 'valida']);
     expect(r.informe[0]?.avisos).toEqual([
@@ -91,7 +90,7 @@ describe('validarLote: el plan por fila', () => {
       { campo: 'zona', texto: 'zona «Laboratorio» del sitio uct' },
       { campo: 'formato', texto: 'se ignora: un nodo lorawan hereda el formato de su pasarela (milesight)' },
     ]);
-    expect(r.informe[2]?.interpretada).toMatchObject({ formato: 'milesight', pasarela: 'ug65-campus', pasarela_id: P1, topico: 'sitio/uct/pasarela/ug65-campus/a84041000181b0e1/<evento>' });
+    expect(r.informe[2]?.interpretada).toMatchObject({ formato: 'milesight', pasarela: 'ug65-campus', pasarela_id: P1, topico: 'sitio/uct/pasarela/ug65-campus/0101010101010101/<evento>' });
     expect(totales(r.informe)).toMatchObject({ validas: 3, con_aviso: 3 });
   });
   it('invariante: validas + existentes + rechazadas = leidas, con con_aviso transversal (una rechazada también puede traer aviso)', () => {
@@ -108,11 +107,26 @@ describe('validarLote: el plan por fila', () => {
     expect(totales(r.informe).existentes).toBe(1);
   });
   it('lorawan: la pasarela por su id_fisico, del mismo sitio; el nodo hereda su formato; la columna decodificador se admite', () => {
-    const r = validarLote([fila({ id_fisico: 'a84041000181b0e1', via: 'lorawan', pasarela: 'ug65-campus', decodificador: 'campus-heltec-v3-v1' })], cat);
+    const r = validarLote([fila({ id_fisico: '0101010101010101', via: 'lorawan', pasarela: 'ug65-campus', decodificador: 'campus-heltec-v3-v1' })], cat);
     expect(r.informe[0]?.resultado).toBe('valida');
     expect(r.altas[0]).toMatchObject({ formato: 'milesight', alta: { decodificador: 'campus-heltec-v3-v1' } });
     expect(validarLote([fila({ decodificador: 'campus-heltec-v3-v1' })], cat).informe[0]?.motivos).toEqual([{ campo: 'decodificador', texto: 'decodificador solo aplica a la vía lorawan' }]);
     expect(validarLote([fila({ id_fisico: 'ug65-campus' })], cat).informe[0]?.motivo).toMatch(/ya lo usa una pasarela/);
+  });
+  it('zonas y pasarelas se recorren una vez por petición, no una por fila (los recorridos no crecen con las filas)', () => {
+    const contar = (filas: number): number => {
+      let recorridos = 0;
+      const vigilar = <T extends object>(xs: readonly T[]): readonly T[] => new Proxy(xs, {
+        get(o, k, r) {
+          if (k === 'filter' || k === 'find' || k === 'map' || k === 'some' || k === Symbol.iterator) recorridos++;
+          return Reflect.get(o, k, r) as unknown;
+        },
+      });
+      const c = { ...cat, zonas: vigilar(cat.zonas), pasarelas: vigilar(cat.pasarelas) };
+      validarLote(Array.from({ length: filas }, (_, i) => fila({ id_fisico: `nodo-${i}`, via: 'lorawan', pasarela: 'ug65-campus', canales: 'temperatura' }, i + 2)), c);
+      return recorridos;
+    };
+    expect(contar(500)).toBe(contar(1));
   });
   it('canales con «|» y con «;» dan el mismo plan', () => {
     const a = validarLote([fila({ canales: 'temperatura:Cel | humedad:%RH' })], cat);
@@ -177,20 +191,34 @@ describe('forma del cuerpo, modo, llave y límite de tasa', () => {
     expect(llaveDeReintento('3f2b1c8e-7d6a-4e5f-9a0b-1c2d3e4f5a6b')).toBe('3f2b1c8e-7d6a-4e5f-9a0b-1c2d3e4f5a6b');
     for (const mala of [undefined, '', 'corta', 'a'.repeat(129), 'con espacio 1234567890', ['a'.repeat(20)]]) expect(() => llaveDeReintento(mala)).toThrow(BadRequestException);
   });
-  it('respuestas por llave: la misma llave y el mismo cuerpo devuelven lo guardado; otro cuerpo, 422; vencen a los 2 minutos; con tope de entradas', () => {
-    const r = new RespuestasPorLlave<string>(120_000, 3);
-    r.guardar('ana', 'k', 'f1', 'respuesta', 0);
-    expect(r.buscar('ana', 'k', 'f1', 1_000)).toBe('respuesta');
+  it('respuestas por llave: la misma llave y el mismo cuerpo devuelven lo guardado (con sus sitios); otro cuerpo, 422; vencen a los 2 minutos', () => {
+    const r = new RespuestasPorLlave<string>(120_000, 10, 10, 1_000);
+    r.guardar('ana', 'k', 'f1', 'respuesta', ['s1'], 10, 0);
+    expect(r.tiene('ana', 'k', 1_000)).toBe(true);
+    expect(r.buscar('ana', 'k', 'f1', 1_000)).toEqual({ respuesta: 'respuesta', sitios: ['s1'] });
     expect(r.buscar('bruno', 'k', 'f1', 1_000)).toBeUndefined(); // por persona
     const e = (() => { try { r.buscar('ana', 'k', 'f2', 1_000); } catch (x) { return x; } })();
     expect(e).toBeInstanceOf(HttpException);
     expect((e as HttpException).getStatus()).toBe(422);
     expect((e as HttpException).getResponse()).toMatchObject({ codigo: 'llave_reutilizada' });
     expect(r.buscar('ana', 'k', 'f1', 120_000)).toBeUndefined(); // vencida
-    for (const k of ['a', 'b', 'c', 'd']) r.guardar('ana', k, 'f', k, 200_000);
-    expect(r.tamano).toBe(3);
-    expect(r.buscar('ana', 'a', 'f', 200_001)).toBeUndefined(); // la más antigua salió
-    expect(r.buscar('ana', 'd', 'f', 200_001)).toBe('d');
+    expect([r.tamano, r.bytes]).toEqual([0, 0]);
+  });
+  it('topes del almacén: entradas en total, por persona y bytes en total; la más antigua sale primero y una respuesta más grande que el tope no se guarda', () => {
+    const porConteo = new RespuestasPorLlave<string>(120_000, 3, 10, 1_000_000);
+    for (const k of ['a', 'b', 'c', 'd']) porConteo.guardar(k, 'k', 'f', k, [], 1, 0);
+    expect([porConteo.tamano, porConteo.tiene('a', 'k', 1), porConteo.tiene('d', 'k', 1)]).toEqual([3, false, true]);
+    const porPersona = new RespuestasPorLlave<string>(120_000, 100, 2, 1_000_000);
+    for (const k of ['a', 'b', 'c']) porPersona.guardar('ana', k, 'f', k, [], 1, 0);
+    porPersona.guardar('bruno', 'x', 'f', 'x', [], 1, 0);
+    expect([porPersona.tamano, porPersona.tiene('ana', 'a', 1), porPersona.tiene('ana', 'c', 1), porPersona.tiene('bruno', 'x', 1)]).toEqual([3, false, true, true]);
+    const porBytes = new RespuestasPorLlave<string>(120_000, 100, 100, 100);
+    porBytes.guardar('ana', 'a', 'f', 'a', [], 60, 0);
+    porBytes.guardar('bruno', 'b', 'f', 'b', [], 30, 0);
+    porBytes.guardar('carla', 'c', 'f', 'c', [], 30, 0); // 60 + 30 + 30 > 100: sale la más antigua
+    expect([porBytes.bytes, porBytes.tiene('ana', 'a', 1), porBytes.tiene('carla', 'c', 1)]).toEqual([60, false, true]);
+    porBytes.guardar('dario', 'd', 'f', 'd', [], 101, 0); // más grande que el tope: no se guarda ni desaloja
+    expect([porBytes.tiene('dario', 'd', 1), porBytes.bytes]).toEqual([false, 60]);
   });
   it('tasa: 10 por minuto por persona; la 11.ª no; otra persona sí; pasado el minuto, de nuevo', () => {
     const t = new TasaPorPersona(10, 60_000);

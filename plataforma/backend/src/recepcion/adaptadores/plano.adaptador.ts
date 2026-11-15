@@ -22,7 +22,7 @@ export class PlanoAdaptador implements Adaptador {
     const texto = ctx.carga.toString('utf8').trim();
 
     if (/^-?\d+(\.\d+)?$/.test(texto)) {
-      return [{ magnitud: ctx.magnitudTopico, valor: Number(texto) }];
+      return [{ magnitud: ctx.magnitudTopico, valor: finito(Number(texto)) }];
     }
 
     let obj: Record<string, unknown>;
@@ -44,4 +44,11 @@ export class PlanoAdaptador implements Adaptador {
 function primero(obj: Record<string, unknown>, claves: string[]): unknown {
   for (const k of claves) if (obj[k] !== undefined) return obj[k];
   return undefined;
+}
+
+// Un número a secas con más de 308 cifras es Infinity para JavaScript: se guardaría y se serializaría como null (revisión del 15/11/2026,
+// regla C-95 de la matriz del contrato). La rama JSON ya lo exigía; esta, no.
+function finito(v: number): number {
+  if (!Number.isFinite(v)) throw new TramaMalformada('valor fuera del rango numérico');
+  return v;
 }

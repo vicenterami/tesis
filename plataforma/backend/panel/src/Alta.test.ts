@@ -278,6 +278,19 @@ describe('P7: alta masiva en una petición', () => {
     expect(pedidasCrear[0]!.cabeceras['Idempotency-Key']).not.toBe(pedidasCrear[1]!.cabeceras['Idempotency-Key']); // otra creación, otra llave
   });
 
+  it('si la creación se queda sin respuesta tras los tres intentos, la pantalla dice que puede haberse creado y el remedio (inventario y rotar la credencial)', async () => {
+    responder = (metodo, ruta, cuerpo) => (ruta === '/dispositivos/lote?modo=validar' ? json(informe(cuerpo.filas!, 'validar')) : json({ statusCode: 504, message: 'Gateway Timeout' }, 504));
+    render(Alta, { modo: 'lote', sesion: SESION, sitios: SITIOS });
+    await subir(`${CAB}\n${filasCsv(2)}`);
+    await waitFor(() => expect(boton('Validar el archivo')).toBeTruthy());
+    await fireEvent.click(boton('Validar el archivo'));
+    await waitFor(() => expect(boton('Crear las válidas (2)')).toBeTruthy());
+    await fireEvent.click(boton('Crear las válidas (2)'));
+    await waitFor(() => expect(document.querySelector('[data-creando-lote]')!.textContent).toContain('no cierres ni recargues la pestaña'));
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('rota la credencial de cada una desde su ficha'), { timeout: 6000 });
+    expect(pedidos.filter((p) => p.ruta === '/dispositivos/lote?modo=crear')).toHaveLength(3);
+  }, 10_000);
+
   it('un archivo con la cabecera mal o con más filas que max_filas se rechaza en el navegador, sin enviar nada', async () => {
     render(Alta, { modo: 'lote', sesion: SESION, sitios: SITIOS });
     await subir(`${CAB}\n${filasCsv(501)}`, 'grande.csv');

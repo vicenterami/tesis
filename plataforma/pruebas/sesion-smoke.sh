@@ -452,13 +452,19 @@ LOTE_FILAS="[{\"n\":2,\"id_fisico\":\"tl-$N\",\"nombre\":\"por lote\",\"zona\":\
 caso "administrador: POST /dispositivos/lote?modo=validar (vista previa)" 200 adm POST "/dispositivos/lote?modo=validar" "{\"filas\":$LOTE_FILAS}"
 cp "$T/r" "$T/vista.json"; HUELLA_LOTE=$(campo "v['huella']")
 [ "$(campo "(v['leidas'], v['validas'] + v['existentes'] + v['rechazadas'], [f['n'] for f in v['filas']])")" = "(5, 5, [2, 3, 5, 6, 7])" ] && ok "lote: la vista previa devuelve el n de cada fila tal cual y validas + existentes + rechazadas = leidas" || falla "lote vista previa: $(head -c 300 "$T/r")"
-LLAVE_LOTE=$(python3 -I -c 'import uuid; print(uuid.uuid4())')
-LLAVE=$LLAVE_LOTE caso "administrador: POST /dispositivos/lote?modo=crear (con la huella y la llave)" 200 adm POST "/dispositivos/lote?modo=crear" "{\"filas\":$LOTE_FILAS,\"huella\":\"$HUELLA_LOTE\"}"
-cp "$T/r" "$T/creado.json"
-[ "$(campo "' '.join(f['resultado'] for f in v['filas'])")" = "creada rechazada rechazada rechazada existe" ] && ok "lote: crea la válida, rechaza la de una zona de otro sitio (como inexistente) y marca la que ya existe" || falla "lote: $(head -c 300 "$T/r")"
+[ "$(campo "' '.join(f['resultado'] for f in v['filas'])")" = "valida rechazada rechazada rechazada existe" ] && ok "lote: la vista previa marca la válida, rechaza la de una zona de otro sitio (como inexistente) y marca la que ya existe" || falla "lote: $(head -c 300 "$T/r")"
 # RF-41 (revisión del 11/11/2026): el id_fisico de un dispositivo o de una pasarela del sitio B, subido desde A, no revela su UUID ni su estado.
 [ "$(campo "[(f['motivo'], f['id'], f['interpretada']) for f in v['filas'][2:4]]")" = "[('identificador no disponible', None, None), ('identificador no disponible', None, None)]" ] && ok "lote: un id_fisico de un dispositivo o pasarela de otro sitio → «identificador no disponible», sin id ni interpretada" || falla "lote ajeno: $(campo "v['filas'][2:4]")"
 grep -q "$DB" "$T/r" && falla "lote: la respuesta trae el UUID del dispositivo del sitio B" || ok "lote: la respuesta no trae el UUID del dispositivo del sitio B"
+# Todo o nada al pie de la letra (revisión del 15/11/2026): crear con las filas que no entran es 409 plan_cambio y no crea ninguna.
+LLAVE=$(python3 -I -c 'import uuid; print(uuid.uuid4())') caso "administrador: crear mandando también las que no entran → 409 (todo o nada)" 409 adm POST "/dispositivos/lote?modo=crear" "{\"filas\":$LOTE_FILAS,\"huella\":\"$HUELLA_LOTE\"}"
+[ "$(sql -c "SELECT count(*) FROM dispositivo WHERE id_fisico = 'tl-$N'")" = 0 ] && ok "lote: el 409 no creó ninguna (ni la válida)" || falla "lote: el 409 creó la válida"
+# Lo que manda el panel: solo las que entran, con la huella de la vista previa y una llave.
+VALIDAS=$(python3 -I -c "import sys,json; print(json.dumps([f for f in json.loads(sys.argv[1]) if f['n'] == 2]))" "$LOTE_FILAS")
+LLAVE_LOTE=$(python3 -I -c 'import uuid; print(uuid.uuid4())')
+LLAVE=$LLAVE_LOTE caso "administrador: POST /dispositivos/lote?modo=crear (las válidas, con la huella y la llave)" 200 adm POST "/dispositivos/lote?modo=crear" "{\"filas\":$VALIDAS,\"huella\":\"$HUELLA_LOTE\"}"
+cp "$T/r" "$T/creado.json"
+[ "$(campo "(' '.join(f['resultado'] for f in v['filas']), v['huella'])")" = "('creada', '$HUELLA_LOTE')" ] && ok "lote: crea la válida y la respuesta lleva la misma huella que la vista previa" || falla "lote: $(head -c 300 "$T/r")"
 [ -n "$(campo "v['filas'][0]['credencial'] or ''")" ] && ok "lote: la credencial de la creada viene una vez en la respuesta" || falla "lote sin credencial"
 n=$(sql -c "SELECT count(*) FROM dispositivo d JOIN evento e ON e.dispositivo_id = d.id AND e.tipo = 'alta' AND e.usuario_id = '$ADM_UID' WHERE d.id_fisico = 'tl-$N'")
 [ "$n" = 1 ] && ok "lote: el dispositivo quedó con su evento de alta y quién lo creó" || falla "lote: evento de alta con usuario → $n"
@@ -468,13 +474,15 @@ pedir adm GET "/dispositivos/$TL" >/dev/null
 [ "$(python3 -I -c "import sys,json; a=json.load(open(sys.argv[1]))['filas'][0]['interpretada']; f=json.load(open(sys.argv[2])); print([a[k]==f[k] for k in ('id_fisico','nombre','via','formato','intervalo_esperado_s','zona_id','zona')]+[a['sitio']==f['sitio_codigo'], [c['magnitud'] for c in a['canales']]==[c['magnitud'] for c in f['canales']]])" "$T/vista.json" "$T/r")" = "[True, True, True, True, True, True, True, True, True]" ] \
   && ok "lote: lo creado es lo que anunció la vista previa (identificador, nombre, vía, formato, intervalo, zona, sitio y canales)" || falla "lote: la ficha difiere de la vista previa: $(head -c 300 "$T/r")"
 # Reintento con la misma llave y el mismo cuerpo: la misma respuesta, y ningún dispositivo de más; otro cuerpo con esa llave, 422.
-LLAVE=$LLAVE_LOTE caso "administrador: repetir el crear con la misma llave → 200" 200 adm POST "/dispositivos/lote?modo=crear" "{\"filas\":$LOTE_FILAS,\"huella\":\"$HUELLA_LOTE\"}"
+LLAVE=$LLAVE_LOTE caso "administrador: repetir el crear con la misma llave → 200" 200 adm POST "/dispositivos/lote?modo=crear" "{\"filas\":$VALIDAS,\"huella\":\"$HUELLA_LOTE\"}"
 cmp -s "$T/r" "$T/creado.json" && ok "lote: el reintento con la misma llave devuelve la misma respuesta" || falla "lote: el reintento devolvió otra respuesta: $(head -c 200 "$T/r")"
 [ "$(sql -c "SELECT count(*) FROM dispositivo WHERE id_fisico = 'tl-$N'")" = 1 ] && ok "lote: el reintento no creó ningún dispositivo de más" || falla "lote: el reintento duplicó"
 LLAVE=$LLAVE_LOTE caso "administrador: la misma llave con otro cuerpo → 422" 422 adm POST "/dispositivos/lote?modo=crear" "{\"filas\":[{\"n\":2,\"id_fisico\":\"tz-$N\"}],\"huella\":\"$HUELLA_LOTE\"}"
 # La huella de un plan viejo (ya se creó tl-…): 409 plan_cambio con el plan nuevo, y nada creado.
-LLAVE=$(python3 -I -c 'import uuid; print(uuid.uuid4())') caso "administrador: crear con la huella de un plan que ya cambió → 409" 409 adm POST "/dispositivos/lote?modo=crear" "{\"filas\":$LOTE_FILAS,\"huella\":\"$HUELLA_LOTE\"}"
+LLAVE=$(python3 -I -c 'import uuid; print(uuid.uuid4())') caso "administrador: crear con la huella de un plan que ya cambió → 409" 409 adm POST "/dispositivos/lote?modo=crear" "{\"filas\":$VALIDAS,\"huella\":\"$HUELLA_LOTE\"}"
 [ "$(campo "(v['codigo'], v['plan']['filas'][0]['resultado'])")" = "('plan_cambio', 'existe')" ] && ok "lote: el 409 dice plan_cambio y trae el plan nuevo (la fila creada ahora «existe»)" || falla "lote plan_cambio: $(head -c 200 "$T/r")"
+# Sin la forma de una sesión, el lote es 401 antes de leer el cuerpo (revisión del 15/11/2026).
+caso "sin sesión: POST /dispositivos/lote con 100 KB → 401 (antes de leer el cuerpo)" 401 anon POST "/dispositivos/lote?modo=validar" "{\"filas\":[{\"n\":2,\"nombre\":\"$(head -c 100000 /dev/zero | tr '\0' 'a')\"}]}"
 
 # ── 3c. Listas por clave (docs/10 §8.4 punto 58 iv): una fila insertada entre dos páginas no se repite ni se pierde; un cursor de otro sitio
 # no trae nada de ese sitio. Cuatro eventos con instantes fijos en el dispositivo A2; la página 1 trae los dos más nuevos; se inserta un

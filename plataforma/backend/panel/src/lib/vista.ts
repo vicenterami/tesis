@@ -37,13 +37,19 @@ export const MAX_VENTANA_MS = 366 * 86_400_000; // el tope del servidor (docs/19
 export const ERROR_A_MEDIDA_VACIO = 'Escribe la fecha y la hora de inicio y de fin.';
 export const ERROR_A_MEDIDA_ORDEN = 'El fin debe ser posterior al inicio.';
 export const ERROR_A_MEDIDA_ANCHO = 'Como mucho 366 días.';
+// La regla de una ventana (revisión del 15/11/2026: estaba escrita dos veces, aquí y en leerVentanaFija): las dos fechas válidas, el fin
+// después del inicio y como mucho 366 días. null = sirve.
+export function errorDeVentana(d: Date | null, h: Date | null): string | null {
+  if (d === null || h === null || Number.isNaN(d.getTime()) || Number.isNaN(h.getTime())) return ERROR_A_MEDIDA_VACIO;
+  if (h.getTime() <= d.getTime()) return ERROR_A_MEDIDA_ORDEN;
+  if (h.getTime() - d.getTime() > MAX_VENTANA_MS) return ERROR_A_MEDIDA_ANCHO;
+  return null;
+}
 export function validarAMedida(desdeLocal: string, hastaLocal: string, zona: string): { ventana: VentanaFija; error: null } | { ventana: null; error: string } {
   const d = instanteDesdeLocal(desdeLocal, zona);
   const h = instanteDesdeLocal(hastaLocal, zona);
-  if (d === null || h === null) return { ventana: null, error: ERROR_A_MEDIDA_VACIO };
-  if (h.getTime() <= d.getTime()) return { ventana: null, error: ERROR_A_MEDIDA_ORDEN };
-  if (h.getTime() - d.getTime() > MAX_VENTANA_MS) return { ventana: null, error: ERROR_A_MEDIDA_ANCHO };
-  return { ventana: { desde: d, hasta: h }, error: null };
+  const error = errorDeVentana(d, h);
+  return error !== null || d === null || h === null ? { ventana: null, error: error ?? ERROR_A_MEDIDA_VACIO } : { ventana: { desde: d, hasta: h }, error: null };
 }
 
 export type Vista =
@@ -91,9 +97,7 @@ export function leerVentanaFija(desde: string | null, hasta: string | null): Ven
   if (desde === null || hasta === null) return null;
   const d = new Date(desde);
   const h = new Date(hasta);
-  if (Number.isNaN(d.getTime()) || Number.isNaN(h.getTime())) return null;
-  if (h.getTime() <= d.getTime() || h.getTime() - d.getTime() > MAX_VENTANA_MS) return null;
-  return { desde: d, hasta: h };
+  return errorDeVentana(d, h) === null ? { desde: d, hasta: h } : null;
 }
 const PARAMETROS_INVENTARIO = ['estado', 'zona', 'via', 'q', 'pagina', 'orden'];
 

@@ -86,6 +86,25 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
     expect(evaluar).not.toHaveBeenCalled(); // sin lecturas no hay umbral que evaluar
   });
 
+  it('un adaptador que lanza algo que no es TramaMalformada: la trama termina en cuarentena «malformada» con un motivo genérico, el mensaje se confirma (procesar no lanza) y el registro no lleva el texto del error', async () => {
+    const { servicio, query, marcarVivo } = armar({ id: 'd1', estado: 'activo' });
+    const analizar = vi.spyOn(PlanoAdaptador.prototype, 'analizar').mockImplementation(() => { throw new TypeError('x.toLowerCase is not a function: «secreto-de-la-trama»'); });
+    const error = vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+    try {
+      await expect(servicio.procesar(TOPICO, Buffer.from('21.5'))).resolves.not.toThrow();
+      expect(cuarentenas(query)).toEqual(['malformada']);
+      const detalle = query.mock.calls.find(([sql]) => String(sql).startsWith('INSERT INTO cuarentena'))?.[1] as unknown[];
+      expect(JSON.stringify(detalle)).toContain('la trama no se pudo interpretar');
+      expect(JSON.stringify(detalle)).not.toContain('secreto-de-la-trama');
+      expect(error).toHaveBeenCalledWith('adaptador plano: error imprevisto (TypeError); la trama va a cuarentena como malformada');
+      expect(JSON.stringify(error.mock.calls)).not.toContain('secreto-de-la-trama');
+      expect(marcarVivo).toHaveBeenCalledWith('d1', 'dev-0001'); // por su tópico directo, autenticado: se marca vivo como cualquier malformada
+    } finally {
+      analizar.mockRestore();
+      error.mockRestore();
+    }
+  });
+
   it('dispositivo no registrado → cuarentena "no_registrado" y NO se marca vivo (no pasó el filtro 1)', async () => {
     const { servicio, query, marcarVivo } = armar(undefined);
     await servicio.procesar(TOPICO, Buffer.from('hola'));

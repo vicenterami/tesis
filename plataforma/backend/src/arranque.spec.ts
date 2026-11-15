@@ -152,11 +152,12 @@ describe('horasClaveTemporal (docs/20 §4): la vigencia de la clave temporal, 1�
 
 // Tope de 100 KiB también para un cuerpo por trozos (sin Content-Length): lo cuenta `verify` en main.ts con esta función.
 describe('cuerpoExcedido', () => {
-  it('fuera del lote, más de 100 KiB → sí; justo 100 KiB → no; en el lote (con o sin consulta, cualquier mayúscula) → no', () => {
-    expect(cuerpoExcedido('/canales/x/reglas', TOPE_CUERPO + 1)).toBe(true);
-    expect(cuerpoExcedido('/canales/x/reglas', TOPE_CUERPO)).toBe(false);
-    expect(cuerpoExcedido('/dispositivos/lote?modo=crear', 200 * 1024)).toBe(false);
-    expect(cuerpoExcedido('/DISPOSITIVOS/LOTE', 200 * 1024)).toBe(false);
-    expect(cuerpoExcedido('/dispositivos/lote-falso', 200 * 1024)).toBe(true);
+  it('fuera del lote, más de 100 KiB → sí; justo 100 KiB → no; en POST al lote (con o sin consulta, cualquier mayúscula) → no; otro método al lote → sí', () => {
+    expect(cuerpoExcedido('PUT', '/canales/x/reglas', TOPE_CUERPO + 1)).toBe(true);
+    expect(cuerpoExcedido('PUT', '/canales/x/reglas', TOPE_CUERPO)).toBe(false);
+    expect(cuerpoExcedido('POST', '/dispositivos/lote?modo=crear', 200 * 1024)).toBe(false);
+    expect(cuerpoExcedido('post', '/DISPOSITIVOS/LOTE', 200 * 1024)).toBe(false);
+    expect(cuerpoExcedido('POST', '/dispositivos/lote-falso', 200 * 1024)).toBe(true);
+    for (const m of ['PUT', 'PATCH', 'DELETE', 'GET']) expect(cuerpoExcedido(m, '/dispositivos/lote', 200 * 1024)).toBe(true);
   });
 });

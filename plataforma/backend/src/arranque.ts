@@ -1,5 +1,6 @@
 // Decisiones de arranque que merecen prueba unitaria (docs/10 §6, docs/11 §3).
 import { MAX_BYTES_LOTE } from './alta/lote.js';
+import { leerCookie } from './sesion/cookie.js';
 
 // Interfaz en la que escucha la API. Por defecto SOLO este equipo; en contenedor se fija 0.0.0.0.
 // Se usa `||` y no `??` a propósito: una variable presente pero vacía (`HTTP_INTERFAZ=` en un .env)
@@ -142,15 +143,42 @@ export function rutaSinCache(ruta: string): boolean {
   return !/^\/(panel|docs)(\/|$)/i.test(ruta);
 }
 
-// Tope de bytes del cuerpo JSON fuera del alta por lote (main.ts): 100 KiB, el de fábrica del lector. El lote admite hasta TOPE_CUERPO_LOTE (su
-// tope real es el de filas, lote.ts). Lo usan el atajo por Content-Length y `verify`, que cuenta lo leído cuando el cuerpo llega por
-// trozos (Transfer-Encoding: chunked, sin largo declarado).
+// Tope de bytes del cuerpo JSON fuera del alta por lote (main.ts): 100 KiB, el de fábrica del lector. Solo `POST /dispositivos/lote` admite
+// hasta TOPE_CUERPO_LOTE (revisión del 15/11/2026: antes cualquier método en esa ruta; su tope real es el de filas, lote.ts). Lo usan el
+// atajo por Content-Length y `verify`, que cuenta lo leído cuando el cuerpo llega por trozos (Transfer-Encoding: chunked, sin largo declarado).
 export const TOPE_CUERPO = 100 * 1024;
-export function esLote(url: string | undefined): boolean {
-  return /^\/dispositivos\/lote(\?|$)/i.test(url ?? '');
+export function esLote(metodo: string | undefined, url: string | undefined): boolean {
+  return (metodo ?? '').toUpperCase() === 'POST' && /^\/dispositivos\/lote\/?(\?|$)/i.test(url ?? '');
 }
-export function cuerpoExcedido(url: string | undefined, bytes: number): boolean {
-  return bytes > TOPE_CUERPO && !esLote(url);
+export function cuerpoExcedido(metodo: string | undefined, url: string | undefined, bytes: number): boolean {
+  return bytes > TOPE_CUERPO && !esLote(metodo, url);
+}
+
+// Antes de leer un cuerpo (main.ts, revisión del 15/11/2026). (i) Fuera del lote, un Content-Length de más de 100 KiB es 413 sin leer nada
+// (la recepción por HTTP tiene su propio lector y su tope). (ii) En el lote, una petición sin la cookie de sesión y sin X-Clave-Admin es 401
+// antes de leer hasta TOPE_CUERPO_LOTE: no valida la sesión (eso es del guardia, que corre después de leer y consulta la base), solo quita
+// el caso trivial de quien no tiene ni la forma de una sesión. Una cookie inventada con la forma correcta sigue costando una lectura, acotada
+// por el tope y por los límites de tasa del proxy.
+// El mismo cuerpo del 401 del guardia (MENSAJE_SIN_SESION de sesion.service.ts, que importa este archivo: aquí no se puede importar sin un
+// ciclo; arranque-cuerpo.spec.ts compara los dos).
+export const MENSAJE_SIN_SESION_LOTE = 'sesión requerida';
+export function filtroAntesDeLeer(
+  req: { method?: string; url?: string; headers: Record<string, string | string[] | undefined> },
+  res: { status(codigo: number): { json(cuerpo: unknown): unknown } },
+  next: () => void,
+): void {
+  const url = req.url ?? '';
+  if (/^\/recepcion\//i.test(url)) return next();
+  if (esLote(req.method, url)) {
+    const cookie = req.headers.cookie;
+    const clave = req.headers['x-clave-admin'];
+    if (leerCookie(typeof cookie === 'string' ? cookie : undefined) === null && (typeof clave !== 'string' || clave === '')) {
+      return void res.status(401).json({ statusCode: 401, message: MENSAJE_SIN_SESION_LOTE });
+    }
+    return next();
+  }
+  if (Number(req.headers['content-length'] ?? 0) > TOPE_CUERPO) return void res.status(413).json({ statusCode: 413, message: MENSAJE_TOPE_CUERPO });
+  next();
 }
 
 // Las opciones del lector de JSON y su manejador de errores viven aquí para que main.ts y su prueba (arranque-cuerpo.spec.ts) usen
@@ -161,11 +189,11 @@ export function cuerpoExcedido(url: string | undefined, bytes: number): boolean 
 export const TOPE_CUERPO_LOTE = MAX_BYTES_LOTE;
 export const MENSAJE_TOPE_CUERPO = 'cuerpo de más de 100 KiB';
 export const MENSAJE_TOPE_LOTE = `cuerpo de más de ${MAX_BYTES_LOTE} bytes`;
-export function opcionesLectorJson(): { limit: number; verify: (req: { url?: string }, res: unknown, buf: Buffer) => void } {
+export function opcionesLectorJson(): { limit: number; verify: (req: { method?: string; url?: string }, res: unknown, buf: Buffer) => void } {
   return {
     limit: TOPE_CUERPO_LOTE,
     verify: (req, _res, buf) => {
-      if (cuerpoExcedido(req.url, buf.length)) throw Object.assign(new Error(MENSAJE_TOPE_CUERPO), { status: 413, type: 'entity.too.large' });
+      if (cuerpoExcedido(req.method, req.url, buf.length)) throw Object.assign(new Error(MENSAJE_TOPE_CUERPO), { status: 413, type: 'entity.too.large' });
     },
   };
 }

@@ -127,6 +127,8 @@ export const ROTULO_RESULTADO: Readonly<Record<ResultadoFila, string>> = { valid
 // Se repite solo cuando no se sabe qué pasó (sin respuesta, o un 502/503/504 de un intermediario); un 4xx es una respuesta y se devuelve.
 // Un 409 `lote_en_curso` al repetir puede ser la propia petición anterior todavía en curso: también se repite, tras la espera.
 export const INTENTOS_CREAR = 3;
+// Lo que dice la pantalla si la creación se queda sin respuesta tras los intentos (o si la pestaña se cerró mientras creaba): el remedio.
+export const AVISO_SIN_RESPUESTA = 'No llegó la respuesta de la creación y no se sabe si se crearon. Revisa el inventario: las filas que al validar de nuevo salgan «ya existe» se crearon, y sus credenciales no se pueden recuperar: rota la credencial de cada una desde su ficha.';
 export function hayQueRepetir(e: unknown): boolean {
   if (!(e instanceof ErrorApi)) return false;
   return e.codigo === 0 || e.codigo === 502 || e.codigo === 503 || e.codigo === 504;

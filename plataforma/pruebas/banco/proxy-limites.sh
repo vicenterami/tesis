@@ -95,20 +95,43 @@ else falla "mosquitto_pub desde otra dirección no pudo publicar por TLS con la 
 for p in "${pids[@]}"; do pkill -P "$p" 2>/dev/null || true; kill "$p" 2>/dev/null || true; done; pids=(); sleep 3
 if sonda; then ok "al cerrar las 100 sesiones, la misma dirección vuelve a conectar"; else falla "tras cerrar las sesiones, la dirección sigue rechazada"; fi
 
-# ── (v) /eventos: 20 flujos SSE simultáneos por dirección (revisión del 22/10) ───────────────────────────────────────
-sse=(); abre_sse() { ( "${CURL[@]}" -N -m 60 -o /dev/null "$URL/eventos" ) & sse+=($!); }
-for i in $(seq 1 20); do abre_sse; done; sleep 3
+# ── (v) /eventos: 20 peticiones simultáneas por dirección (revisión del 22/10) ──────────────────────────────────────
+# Desde el 08/11 el canal en vivo exige sesión y el backend admite 5 flujos por persona: 20 flujos abiertos de verdad pedirían cuatro
+# personas. Lo que se prueba aquí es el tope del proxy (limit_conn), que cuenta peticiones en curso sin mirar quién: se sostienen 20
+# peticiones a /eventos que suben su cuerpo despacio (nginx las cuenta mientras lo lee, antes de pasarlas al backend) y la 21.ª recibe
+# 429 del proxy. Después, lo que rige hoy: sin sesión, 401 (del backend: el proxy dejó pasar) y con la clave de administrador del banco,
+# un flujo que se abre (200). Corregido en la revisión del 15/11/2026: antes se abrían flujos sin sesión, que reciben 401 al instante.
+CLAVE_BANCO() { printf 'X-Clave-Admin: %s\n' "$(grep -E '^HTTP_CLAVE_ADMIN=' "$ENV" | cut -d= -f2-)"; }
+LENTO=$(mktemp); head -c 1500 /dev/zero | tr '\0' 'a' > "$LENTO"
+sse=(); abre_lenta() { ( "${CURL[@]}" -m 60 -o /dev/null -X POST --limit-rate 50 -H 'Content-Type: text/plain' --data-binary @"$LENTO" "$URL/eventos" ) & sse+=($!); }
+for i in $(seq 1 20); do abre_lenta; done; sleep 3
 c=$("${CURL[@]}" -N -m 4 -o /dev/null -w '%{http_code}' "$URL/eventos" || true)
-[ "$c" = 429 ] && ok "con 20 flujos SSE abiertos desde una dirección, el 21.º recibe 429 (limit_conn de /eventos)" || falla "el 21.º flujo SSE dio HTTP $c (esperado 429)"
+[ "$c" = 429 ] && ok "con 20 peticiones a /eventos en curso desde una dirección, la 21.ª recibe 429 (limit_conn de /eventos)" || falla "la 21.ª petición a /eventos dio HTTP $c (esperado 429)"
 # el mismo tope cubre las variantes que Express también sirve (revisión del 22/10): mayúsculas y barra final
 for ruta in /Eventos /eventos/; do
   c=$("${CURL[@]}" -N -m 4 -o /dev/null -w '%{http_code}' "$URL$ruta" || true)
-  [ "$c" = 429 ] && ok "con los 20 abiertos, $ruta también recibe 429 (la location es una expresión regular)" || falla "$ruta esquivó el tope de /eventos: HTTP $c"
+  [ "$c" = 429 ] && ok "con las 20 en curso, $ruta también recibe 429 (la location es una expresión regular)" || falla "$ruta esquivó el tope de /eventos: HTTP $c"
 done
 c=$("${CURL[@]}" -m 4 -o /dev/null -w '%{http_code}' "$URL/salud" || true)
-[ "$c" = 200 ] && ok "con los 20 flujos abiertos, una petición normal de la misma dirección sigue pasando (HTTP $c): el tope es solo de /eventos" || falla "con los flujos abiertos, /salud dio HTTP $c"
-for p in "${sse[@]}"; do pkill -P "$p" 2>/dev/null || true; kill "$p" 2>/dev/null || true; done; sleep 2
+[ "$c" = 200 ] && ok "con las 20 en curso, una petición normal de la misma dirección sigue pasando (HTTP $c): el tope es solo de /eventos" || falla "con las peticiones en curso, /salud dio HTTP $c"
+for p in "${sse[@]}"; do pkill -P "$p" 2>/dev/null || true; kill "$p" 2>/dev/null || true; done; rm -f "$LENTO"; sleep 2
 c=$("${CURL[@]}" -N -m 3 -o /dev/null -w '%{http_code}' "$URL/eventos" || true)
-[ "$c" = 200 ] && ok "al cerrar los flujos, la misma dirección vuelve a abrir uno (HTTP $c)" || falla "tras cerrar los flujos, /eventos dio HTTP $c"
+[ "$c" = 401 ] && ok "al cerrarlas, /eventos sin sesión llega al backend y responde 401 (el canal en vivo exige sesión)" || falla "tras cerrarlas, /eventos sin sesión dio HTTP $c (esperado 401)"
+c=$(CLAVE_BANCO | "${CURL[@]}" -H @- -H 'Origin: https://localhost:8443' -N -m 3 -o /dev/null -w '%{http_code}' "$URL/eventos" || true)
+[ "$c" = 200 ] && ok "con la clave de administrador del banco, la misma dirección abre un flujo (HTTP $c)" || falla "con la clave del banco, /eventos dio HTTP $c (esperado 200)"
+
+# ── (vi) Topes del cuerpo (revisión del 15/11/2026): 128 KiB en general y MAX_BYTES_LOTE en el alta por lote; el 413 del proxy, en JSON ──
+MAXB=$(python3 -I -c "import re,sys; m=re.search(r'export const MAX_BYTES_LOTE = (\\d+) \\* 1024;', open(sys.argv[1]).read()); print(int(m.group(1))*1024)" backend/src/alta/lote.ts)
+GRANDE=$(mktemp); head -c $((MAXB + 1)) /dev/zero | tr '\0' 'a' > "$GRANDE"
+r=$("${CURL[@]}" -X POST -H 'Content-Type: application/json' --data-binary @"$GRANDE" -w '\n%{http_code}' "$URL/dispositivos/lote?modo=validar" || true)
+[ "${r##*$'\n'}" = 413 ] && [ "${r%$'\n'*}" = "{\"statusCode\":413,\"message\":\"cuerpo de más de $MAXB bytes\"}" ] \
+  && ok "un byte más que el tope del lote ($MAXB) → 413 del proxy, en JSON con el mensaje del backend" || falla "lote sobre el tope → ${r:0:120}"
+head -c $((200 * 1024)) /dev/zero | tr '\0' 'a' > "$GRANDE"
+r=$("${CURL[@]}" -X PUT -H 'Content-Type: application/json' --data-binary @"$GRANDE" -w '\n%{http_code}' "$URL/canales/x/reglas" || true)
+[ "${r##*$'\n'}" = 413 ] && [ "${r%$'\n'*}" = '{"statusCode":413,"message":"cuerpo de más de 100 KiB"}' ] \
+  && ok "200 KiB fuera del lote → 413 del proxy (tope general de 128 KiB), en JSON" || falla "200 KiB fuera del lote → ${r:0:120}"
+r=$("${CURL[@]}" -X PUT -H 'Content-Type: application/json' --data-binary @"$GRANDE" -w '\n%{http_code}' "$URL/dispositivos/lote" || true)
+[ "${r##*$'\n'}" = 413 ] && ok "200 KiB con PUT al lote → 413 (el tope grande es solo de POST: lo corta el backend)" || falla "PUT de 200 KiB al lote → ${r:0:120}"
+rm -f "$GRANDE"
 
 echo; if [ "$fallos" = 0 ]; then echo "LÍMITES DEL PROXY OK ($total/$total)"; else echo "$fallos comprobación(es) con falla ($((total-fallos))/$total)"; exit 1; fi

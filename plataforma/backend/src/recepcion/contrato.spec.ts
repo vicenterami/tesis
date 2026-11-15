@@ -24,7 +24,8 @@ import { aCanonica } from './unidades.js';
 // de la matriz: la sección que va a docs/16 se genera de esta tabla. Las pruebas de abajo son las de las reglas que no tenían
 // prueba (C-NN en el nombre); las demás citan la prueba que ya existía, y el guardián del final comprueba que cada cita existe.
 // Fuentes de la RFC: RFC 8428 (SenML), copia local del 16/10/2026. «hallazgo» marca una diferencia entre la fuente y el código
-// que esta tarea no corrige (ver las pruebas it.todo).
+// que este bloque no corrige (ver las pruebas it.todo).
+// Los ejemplos de RFC 8428 §5.1 (© IETF Trust) se reproducen textuales, cada uno con su sección, para probar la regla que ilustran.
 type Grupo = 'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g';
 interface Cubre { archivo: string; nombre: string }
 interface Regla {
@@ -43,7 +44,7 @@ const htp = (nombre: string): Cubre => ({ archivo: 'http/recepcion-http.controll
 const MATRIZ: Regla[] = [
   // (a) Esquema SenML
   { id: 'C-01', grupo: 'a', regla: 'Un registro con n, u y v produce una lectura; el nombre se pasa a minúsculas', fuente: 'RFC 8428 §4.2; senml.adaptador.ts', esperado: 'aceptada: {magnitud en minúsculas, valor, unidad}', cubre: [aqui('C-01')] },
-  { id: 'C-02', grupo: 'a', regla: 'bn no se antepone al nombre: la magnitud es n tal cual (hallazgo H-3)', fuente: 'RFC 8428 §4.1 y §4.5.1 (ejemplo §5.1.2); senml.adaptador.ts:49', esperado: 'aceptada: magnitud «voltage», no «urn:…:voltage»', cubre: [aqui('C-02')] },
+  { id: 'C-02', grupo: 'a', regla: 'bn no se antepone al nombre: la magnitud es n tal cual (hallazgo H-3)', fuente: 'RFC 8428 §4.1 y §4.5.1 (ejemplo §5.1.2); senml.adaptador.ts, «(n ?? ctx.magnitudTopico).toLowerCase()»', esperado: 'aceptada: magnitud «voltage», no «urn:…:voltage»', cubre: [aqui('C-02')] },
   { id: 'C-03', grupo: 'a', regla: 'bt se hereda a los registros siguientes y t es relativo a bt', fuente: 'RFC 8428 §4.5.3 (ejemplo §5.1.2)', esperado: 'aceptada: tiempo = bt + t', cubre: [aqui('C-03'), adp('hereda bn/bt/bu')] },
   { id: 'C-04', grupo: 'a', regla: 'bu se hereda y la u del registro gana', fuente: 'RFC 8428 §4.1 y §4.5.2 (ejemplo §5.1.3)', esperado: 'aceptada: unidad del registro, si no la base', cubre: [aqui('C-04')] },
   { id: 'C-05', grupo: 'a', regla: 'bt persiste aunque cambie bn; un bt posterior reemplaza al anterior', fuente: 'RFC 8428 §4 (ejemplo §5.1.6)', esperado: 'aceptada: cada registro con la base vigente', cubre: [aqui('C-05')] },
@@ -51,14 +52,14 @@ const MATRIZ: Regla[] = [
   { id: 'C-07', grupo: 'a', regla: 'bver mayor que la versión que se entiende (10) se rechaza (hallazgo H-4)', fuente: 'RFC 8428 §4.4: «MUST NOT use this object»', esperado: 'esperado por la RFC: rechazada; hoy se acepta (it.todo)', cubre: [aqui('C-07')] },
   { id: 'C-08', grupo: 'a', regla: 'Un campo que no se conoce se ignora', fuente: 'RFC 8428 §4.4: «MUST ignore fields they don\'t recognize»', esperado: 'aceptada: el campo no cambia la lectura', cubre: [aqui('C-08')] },
   { id: 'C-09', grupo: 'a', regla: 'Un campo desconocido cuya etiqueta termina en «_» es un error (hallazgo H-5)', fuente: 'RFC 8428 §4.4: «in which case an error MUST be generated»', esperado: 'esperado por la RFC: rechazada; hoy se ignora (it.todo)', cubre: [aqui('C-09')] },
-  { id: 'C-10', grupo: 'a', regla: 'v debe ser un número finito; cadena, nulo, booleano o desborde se rechazan', fuente: 'RFC 8428 §4.3 (tipo de v); senml.adaptador.ts:46', esperado: 'rechazada: malformada «v no numérico»', cubre: [aqui('C-10'), adp('rechaza JSON inválido, pack vacío y valores no numéricos')] },
-  { id: 'C-11', grupo: 'a', regla: 'Los registros solo con vs, vb o vd se omiten: el sistema guarda solo valores numéricos', fuente: 'RFC 8428 §4.2 y §5.1.5; senml.adaptador.ts:45', esperado: 'aceptada: solo la lectura numérica', cubre: [aqui('C-11')] },
-  { id: 'C-12', grupo: 'a', regla: 'Un registro con solo campos base (sin valor) no genera lectura', fuente: 'RFC 8428 §4 (ejemplo §5.1.7); senml.adaptador.ts:45', esperado: 'aceptada: sin lectura para ese registro', cubre: [aqui('C-12')] },
-  { id: 'C-13', grupo: 'a', regla: 'Un pack sin ninguna lectura numérica se rechaza', fuente: 'RFC 8428 §4.2 (el valor es obligatorio salvo con s); senml.adaptador.ts:58', esperado: 'rechazada: malformada «pack sin valores»', cubre: [aqui('C-13')] },
+  { id: 'C-10', grupo: 'a', regla: 'v debe ser un número finito; cadena, nulo, booleano o desborde se rechazan', fuente: 'RFC 8428 §4.3 (tipo de v); senml.adaptador.ts, «typeof r.v !== \'number\' || !Number.isFinite(r.v)»', esperado: 'rechazada: malformada «v no numérico»', cubre: [aqui('C-10'), adp('rechaza JSON inválido, pack vacío y valores no numéricos')] },
+  { id: 'C-11', grupo: 'a', regla: 'Los registros solo con vs, vb o vd se omiten: el sistema guarda solo valores numéricos', fuente: 'RFC 8428 §4.2 y §5.1.5; senml.adaptador.ts, «if (r.v === undefined) continue»', esperado: 'aceptada: solo la lectura numérica', cubre: [aqui('C-11')] },
+  { id: 'C-12', grupo: 'a', regla: 'Un registro con solo campos base (sin valor) no genera lectura', fuente: 'RFC 8428 §4 (ejemplo §5.1.7); senml.adaptador.ts, «if (r.v === undefined) continue»', esperado: 'aceptada: sin lectura para ese registro', cubre: [aqui('C-12')] },
+  { id: 'C-13', grupo: 'a', regla: 'Un pack sin ninguna lectura numérica se rechaza', fuente: 'RFC 8428 §4.2 (el valor es obligatorio salvo con s); senml.adaptador.ts, «throw new TramaMalformada(\'pack sin valores\')»', esperado: 'rechazada: malformada «pack sin valores»', cubre: [aqui('C-13')] },
   { id: 'C-14', grupo: 'a', regla: 'bv se suma al valor del registro (hallazgo H-6)', fuente: 'RFC 8428 §4.5.4: «added together to get the value»', esperado: 'esperado por la RFC: bv + v; hoy se ignora bv (it.todo)', cubre: [aqui('C-14')] },
   { id: 'C-15', grupo: 'a', regla: 'Un registro con dos campos de valor (v y vs) se rechaza (hallazgo H-7)', fuente: 'RFC 8428 §4.2: «Exactly one Value field MUST appear»', esperado: 'esperado por la RFC: rechazada; hoy se acepta y vale v (it.todo)', cubre: [aqui('C-15')] },
   { id: 'C-16', grupo: 'a', regla: 'Un n que no es cadena se rechaza como trama malformada (hallazgo H-1)', fuente: 'RFC 8428 §4.3 (n es cadena); adaptadores/adaptador.ts:13 («Lanza Error si el contenido es inválido»); recepcion.service.ts:232', esperado: 'rechazada, malformada «n no es texto» (corregido el 15/11/2026: antes lanzaba TypeError)', cubre: [aqui('C-16')] },
-  { id: 'C-17', grupo: 'a', regla: 'Un elemento del pack que no es objeto se rechaza', fuente: 'RFC 8428 §5; senml.adaptador.ts:42', esperado: 'rechazada: malformada «registro no es objeto»', cubre: [aqui('C-17')] },
+  { id: 'C-17', grupo: 'a', regla: 'Un elemento del pack que no es objeto se rechaza', fuente: 'RFC 8428 §5; senml.adaptador.ts, «throw new TramaMalformada(\'registro no es objeto\')»', esperado: 'rechazada: malformada «registro no es objeto»', cubre: [aqui('C-17')] },
   { id: 'C-18', grupo: 'a', regla: 'El adaptador SenML reconoce solo arreglos JSON', fuente: 'RFC 8428 §5: «The root JSON value consists of an array»', esperado: 'reconoce: arreglo sí; objeto o número no', cubre: [adp('reconoce un pack (arreglo JSON)')] },
   // (b) Tiempo
   { id: 'C-20', grupo: 'b', regla: 'Sin marca de tiempo rige la hora de recepción', fuente: 'docs/13 regla 7; RFC 8428 §4.5.3 (cero = «ahora»)', esperado: 'aceptada: tiempo de recepción, origen_tiempo recepcion', cubre: [tmp('sin marca → hora de recepción'), svc('sin marca del emisor → origen_tiempo "recepcion"')] },
@@ -68,14 +69,14 @@ const MATRIZ: Regla[] = [
   { id: 'C-24', grupo: 'b', regla: 'Hasta 2 min de adelanto se respeta la marca; más, rige la recepción', fuente: 'docs/13 regla 7', esperado: '+120 s: la marca; +121 s o 2030: recepción', cubre: [tmp('adelanto de hasta 2 minutos'), tmp('más de 2 minutos en el futuro')] },
   { id: 'C-25', grupo: 'b', regla: 'En milisegundos: SenML usa segundos, así que una marca en ms cae en un futuro lejano y rige la recepción; el formato plano acepta ms (más de 1e12)', fuente: 'RFC 8428 §4.5.3 (segundos); docs/13 fila «Filtro 4: … en milisegundos»; plano.adaptador.ts:38', esperado: 'SenML en ms: recepción; plano en ms: la marca', cubre: [aqui('C-25'), adp('tiempo en segundos o milisegundos')] },
   { id: 'C-26', grupo: 'b', regla: 'Una marca imposible (desborde) no lanza: rige la recepción', fuente: 'docs/13 regla 16', esperado: 'aceptada: recepción', cubre: [aqui('C-26'), tmp('fecha inválida')] },
-  { id: 'C-27', grupo: 'b', regla: 'Marca de pasarela a más de 10 min atrás (o 2 adelante): rige la recepción y se abre reloj_desviado', fuente: 'docs/13 regla 18', esperado: 'aceptada con tiempo de recepción; condición reloj_desviado', cubre: [tmp('tiempoPlausible con origen pasarela'), svc('marca de pasarela 4 días atrasada')] },
+  { id: 'C-27', grupo: 'b', regla: 'Marca de pasarela a más de 10 min atrás (o 2 adelante): rige la recepción y se abre reloj_desviado', fuente: 'docs/13 regla 18', esperado: 'aceptada con tiempo de recepción; condición reloj_desviado', cubre: [tmp('pasarela justo 10 min atrás'), tmp('más de 2 min en el futuro'), svc('marca de pasarela 4 días atrasada')] },
   { id: 'C-28', grupo: 'b', regla: 'Marca de pasarela dentro de 10 min se respeta; la de un dispositivo, aunque tenga días, también', fuente: 'docs/13 reglas 7 y 18', esperado: 'aceptada con la marca; no abre reloj_desviado', cubre: [svc('marca de pasarela 9 min atrás'), svc('una marca de DISPOSITIVO 4 días atrás')] },
   { id: 'C-29', grupo: 'b', regla: 'La hora de una trama LoRaWAN es RFC 3339 con zona; sin zona no se adivina', fuente: 'docs/13 regla 17; lorawan.ts:46-49', esperado: 'con zona: marca de pasarela; sin zona: sin marca', cubre: [lora('una hora sin zona → sin marca'), lora('time sin zona → sin marca')] },
   { id: 'C-30', grupo: 'b', regla: 'origen_tiempo dice quién puso la marca: dispositivo, pasarela o recepcion', fuente: 'docs/10 §8.4 punto 12; docs/13 regla 7', esperado: 'columna origen_tiempo según el adaptador y la plausibilidad', cubre: [svc('marca del emisor plausible'), svc('sin marca del emisor → origen_tiempo "recepcion"')] },
   { id: 'C-31', grupo: 'b', regla: 'La misma lectura (canal más instante del emisor) dos veces cuenta una sola', fuente: 'docs/10 §4.1 (RF-10); recepcion.service.ts:324', esperado: 'duplicada: sin evento nuevo ni umbral', cubre: [svc('TT-39: lectura repetida')] },
   // (c) Unidades y magnitudes
   { id: 'C-32', grupo: 'c', regla: 'La unidad canónica o la ausencia de unidad deja el valor tal cual', fuente: 'lectura.ts: «si falta, se asume la canónica»; unidades.ts', esperado: 'aceptada: mismo valor', cubre: [uni('misma unidad o sin unidad')] },
-  { id: 'C-33', grupo: 'c', regla: 'Alias convertibles: K, °F y F a Cel; Pa, kPa y bar a hPa; % a %RH o %EL; mV a V', fuente: 'unidades.ts; docs/10 §8.4 punto 51; RFC 8798 §1', esperado: 'aceptada: valor en la unidad canónica', cubre: [uni('Kelvin y Fahrenheit'), uni('presión: Pa, kPa y bar'), uni('porcentaje genérico'), uni('mV (unidad secundaria'), aqui('C-33')] },
+  { id: 'C-33', grupo: 'c', regla: 'Alias convertibles: K, °F y F a Cel; Pa, kPa y bar a hPa; % a %RH o %EL; mV a V', fuente: 'unidades.ts; docs/10 §8.4 punto 51; RFC 8798 §3', esperado: 'aceptada: valor en la unidad canónica', cubre: [uni('Kelvin y Fahrenheit'), uni('presión: Pa, kPa y bar'), uni('porcentaje genérico'), uni('mV (unidad secundaria'), aqui('C-33')] },
   { id: 'C-34', grupo: 'c', regla: 'Una unidad que no se sabe convertir se rechaza', fuente: 'unidades.ts: «mejor rechazar que adivinar»; docs/10 filtro 3', esperado: 'rechazada: invalida «unidad X no convertible a Y»', cubre: [svc('filtro 3: unidad no convertible')] },
   { id: 'C-35', grupo: 'c', regla: 'No existe la conversión inversa ni entre magnitudes distintas', fuente: 'unidades.ts', esperado: 'sin conversión: la lectura se rechaza como en C-34', cubre: [uni('pareja desconocida'), uni('V a mV no se inventa')] },
   { id: 'C-36', grupo: 'c', regla: 'Una magnitud sin canal declarado se rechaza', fuente: 'docs/10 filtro 3; recepcion.service.ts:301', esperado: 'rechazada: invalida «canal no declarado»', cubre: [svc('filtro 3: canal no declarado')] },
@@ -84,11 +85,11 @@ const MATRIZ: Regla[] = [
   { id: 'C-39', grupo: 'c', regla: 'Todo destino de una conversión es una unidad canónica del catálogo', fuente: 'unidades.ts; docs/08 (magnitud.unidad_canonica)', esperado: 'ninguna conversión desemboca en una unidad que ninguna magnitud usa', cubre: [aqui('C-39')] },
   // (d) Tamaño y forma del sobre
   { id: 'C-40', grupo: 'd', regla: 'Un cuerpo vacío no lo reconoce ningún formato', fuente: 'docs/10 §4.1 (tabla de casos); recepcion.service.ts:223', esperado: 'rechazada: malformada «la trama no tiene esa forma»; el dispositivo se marca vivo', cubre: [svc('cuerpo vacío → ningún adaptador lo reconoce')] },
-  { id: 'C-41', grupo: 'd', regla: 'Un JSON ilegible se rechaza', fuente: 'RFC 8428 §5; senml.adaptador.ts:33', esperado: 'rechazada: malformada «JSON inválido»', cubre: [aqui('C-41'), adp('rechaza JSON inválido, pack vacío y valores no numéricos')] },
+  { id: 'C-41', grupo: 'd', regla: 'Un JSON ilegible se rechaza', fuente: 'RFC 8428 §5; senml.adaptador.ts, «throw new TramaMalformada(\'JSON inválido\')»', esperado: 'rechazada: malformada «JSON inválido»', cubre: [aqui('C-41'), adp('rechaza JSON inválido, pack vacío y valores no numéricos')] },
   { id: 'C-42', grupo: 'd', regla: 'Si el formato declarado es SenML y el cuerpo no es una lista, se rechaza', fuente: 'RFC 8428 §5; docs/10 §8.4 punto 47', esperado: 'rechazada: malformada «formato declarado senml: la trama no tiene esa forma»', cubre: [aqui('C-42'), svc('plano a un dispositivo que declaró senml')] },
-  { id: 'C-43', grupo: 'd', regla: 'Una lista vacía se rechaza', fuente: 'RFC 8428 §5; senml.adaptador.ts:35', esperado: 'rechazada: malformada «pack SenML vacío»', cubre: [adp('rechaza JSON inválido, pack vacío y valores no numéricos')] },
+  { id: 'C-43', grupo: 'd', regla: 'Una lista vacía se rechaza', fuente: 'RFC 8428 §5; senml.adaptador.ts, «throw new TramaMalformada(\'pack SenML vacío\')»', esperado: 'rechazada: malformada «pack SenML vacío»', cubre: [aqui('C-43'), adp('rechaza JSON inválido, pack vacío y valores no numéricos')] },
   { id: 'C-44', grupo: 'd', regla: 'No hay un máximo de registros por pack: lo acota el presupuesto de lecturas por hora, y lo que no cabe se rechaza entero', fuente: 'docs/10 §8.4 punto 53', esperado: 'rechazada entera: cuarentena «tope»', cubre: [svc('la trama que no cabe en el presupuesto'), svc('el presupuesto sale del dispositivo')] },
-  { id: 'C-45', grupo: 'd', regla: 'Una trama de más de 64 KiB no entra: el broker la corta (max_packet_size) y la vía HTTP responde 413', fuente: 'docs/10 §8.4 puntos 43 y 52; mosquitto.conf; main.ts:41', esperado: 'MQTT: el broker no entrega; HTTP: 413', cubre: [aqui('C-45')] },
+  { id: 'C-45', grupo: 'd', regla: 'Una trama de más de 64 KiB no entra: el broker la corta (max_packet_size) y la vía HTTP responde 413', fuente: 'docs/10 §8.4 puntos 19 (b) y 52; mosquitto.conf; main.ts:41', esperado: 'MQTT: el broker no entrega; HTTP: 413', cubre: [aqui('C-45')] },
   { id: 'C-46', grupo: 'd', regla: 'El texto de afuera (claves, DevEUI, segmentos del tópico) va recortado y sin caracteres invisibles al detalle y al registro', fuente: 'texto.ts; lorawan.ts:15', esperado: 'detalle de cuarentena con «?» en lugar de los controles y recorte por caracteres', cubre: [lora('una clave larga o con saltos de línea'), lora('los espacios invisibles y los rellenos'), svc('los segmentos del tópico se limpian')] },
   { id: 'C-47', grupo: 'd', regla: 'Por HTTP, un tipo de contenido que no es JSON ni texto se rechaza antes del token', fuente: 'docs/10 §8.4 punto 52; recepcion-http.controller.ts:19', esperado: 'HTTP 415', cubre: [htp('el tipo de contenido se revisa antes que el token')] },
   { id: 'C-48', grupo: 'd', regla: 'Por HTTP, una trama malformada o sin lectura útil responde 422; si solo trae lecturas repetidas, 202', fuente: 'docs/10 §8.4 punto 52; recepcion-http.controller.ts:112', esperado: 'HTTP 422 con el detalle, o 202', cubre: [htp('malformada o sin ninguna lectura útil')] },
@@ -100,12 +101,12 @@ const MATRIZ: Regla[] = [
   { id: 'C-52', grupo: 'e', regla: 'Un dispositivo dado de baja se rechaza, atribuido a él', fuente: 'docs/10 §4.1; docs/06 §3.2', esperado: 'rechazada: dado_de_baja; no se marca vivo', cubre: [svc('dispositivo dado de baja'), svc('no registrado → sin dispositivo_id; dado de baja')] },
   { id: 'C-53', grupo: 'e', regla: 'El sitio del tópico debe ser el del alta', fuente: 'docs/10 §8.4 punto 24', esperado: 'rechazada: no_registrado «registrado en el sitio X, no en Y»', cubre: [svc('filtro 1: tópico con el sitio de otra sede')] },
   { id: 'C-54', grupo: 'e', regla: 'La identidad sale del tópico y la credencial, no del cuerpo: un bn de otro dispositivo no cambia a quién se atribuye (hallazgo H-2)', fuente: 'docs/10 filtro 1 (el tópico); contradice docs/06 §3.1 y §3.2 («la identificación viene dentro de la trama»)', esperado: 'aceptada y atribuida al dispositivo del tópico; bn no se compara', cubre: [aqui('C-54')] },
-  { id: 'C-55', grupo: 'e', regla: 'El nombre del registro gana; si falta, rige la magnitud del tópico', fuente: 'senml.adaptador.ts:49; README del backend', esperado: 'magnitud del registro; sin n, la del tópico', cubre: [aqui('C-55'), adp('sin nombre en el registro, la magnitud sale del tópico')] },
+  { id: 'C-55', grupo: 'e', regla: 'El nombre del registro gana; si falta, rige la magnitud del tópico', fuente: 'senml.adaptador.ts, «(n ?? ctx.magnitudTopico).toLowerCase()»; README del backend', esperado: 'magnitud del registro; sin n, la del tópico', cubre: [aqui('C-55'), adp('sin nombre en el registro, la magnitud sale del tópico')] },
   { id: 'C-56', grupo: 'e', regla: 'La magnitud del tópico se pasa a minúsculas', fuente: 'recepcion.service.ts:127', esperado: 'una trama en «…/Temperatura» usa el canal «temperatura»', cubre: [aqui('C-56')] },
   { id: 'C-57', grupo: 'e', regla: 'Una pasarela sin alta, inactiva o de otro sitio se rechaza, con cualquier evento', fuente: 'docs/10 §8.4 punto 47', esperado: 'rechazada: no_registrado; nadie se marca vivo', cubre: [svc('pasarela sin alta, inactiva o de otro sitio')] },
   { id: 'C-58', grupo: 'e', regla: 'El DevEUI del tópico, en minúsculas, debe ser un nodo asociado a esa pasarela', fuente: 'docs/10 §8.4 punto 47', esperado: 'sin asociación: no_registrado', cubre: [svc('DevEUI no asociado a esa pasarela'), svc('el DevEUI del tópico se busca en minúsculas')] },
   { id: 'C-59', grupo: 'e', regla: 'El DevEUI del cuerpo debe ser el del tópico', fuente: 'docs/10 §4.1 y §8.4 punto 47', esperado: 'rechazada: malformada; el nodo no se marca vivo', cubre: [svc('DevEUI del cuerpo distinto del tópico'), lora('DevEUI del cuerpo distinto del tópico')] },
-  { id: 'C-60', grupo: 'e', regla: 'Un evento de pasarela que no es «up» se anota y termina', fuente: 'docs/10 §8.4 puntos 27 y 47', esperado: 'sin cuarentena ni escritura en la base', cubre: [svc('un evento distinto de «up» (join)')] },
+  { id: 'C-60', grupo: 'e', regla: 'Un evento de pasarela que no es «up» se anota y termina', fuente: 'docs/10 §8.4 punto 47 y la tabla de casos del §4.1', esperado: 'sin cuarentena ni escritura en la base', cubre: [svc('un evento distinto de «up» (join)')] },
   { id: 'C-61', grupo: 'e', regla: 'El formato lo fija el alta y no se adivina; uno de pasarela solo entra por el tópico de pasarela y uno directo, por el suyo', fuente: 'docs/10 §8.4 punto 47', esperado: 'rechazada: malformada «no se recibe por este tópico» o «la trama no tiene esa forma»', cubre: [svc('SenML a un dispositivo que declaró plano'), svc('un formato de pasarela por el tópico de un dispositivo directo'), svc('un formato directo por el tópico de pasarela')] },
   { id: 'C-62', grupo: 'e', regla: 'La forma nativa device/<deveui>/event/up es equivalente a <deveui>/up', fuente: 'docs/10 §4.1 (tabla de casos); recepcion.service.ts:28', esperado: 'mismo filtro 1 y misma lectura', cubre: [svc('sufijo nativo device/<deveui>/event/up')] },
   { id: 'C-63', grupo: 'e', regla: 'Un DevEUI con caracteres que no son letras ASCII, dígitos ni guion no identifica al nodo', fuente: 'docs/10 §4.1 (tabla de casos); lorawan.ts:33', esperado: 'rechazada: malformada (IdentidadNoVerificada); el nodo no se marca vivo', cubre: [lora('un DevEUI del cuerpo con controles')] },
@@ -129,6 +130,7 @@ const MATRIZ: Regla[] = [
   { id: 'C-79', grupo: 'g', adaptador: 'plano', tipo: 'valida', regla: 'Plano: un número solo (magnitud del tópico) o un objeto con v, u, t', fuente: 'plano.adaptador.ts', esperado: 'una lectura', cubre: [adp('número a secas → una lectura'), adp('objeto con nombres tolerantes')] },
   { id: 'C-80', grupo: 'g', adaptador: 'plano', tipo: 'valida', regla: 'Plano: cada sinónimo (valor, v, value; unidad, u, unit; tiempo, t, ts, time) se reconoce, y el primero de la lista gana', fuente: 'plano.adaptador.ts:34-38', esperado: 'la misma lectura con cualquiera de los nombres', cubre: [aqui('C-80')] },
   { id: 'C-81', grupo: 'g', adaptador: 'plano', tipo: 'malformada', regla: 'Plano: sin valor numérico o con JSON ilegible se rechaza', fuente: 'plano.adaptador.ts:32-35', esperado: 'rechazada: malformada', cubre: [adp('sin valor numérico → malformada'), aqui('C-81')] },
+  { id: 'C-95', grupo: 'g', adaptador: 'plano', tipo: 'malformada', regla: 'Plano: un número a secas que no cabe en un número finito (más de 308 cifras) se rechaza', fuente: 'docs/10 §4.1 (la trama que no calza va a cuarentena malformada); plano.adaptador.ts, «function finito»', esperado: 'rechazada: malformada «valor fuera del rango numérico» (corregido el 15/11/2026: antes se guardaba Infinity)', cubre: [aqui('C-95')] },
   { id: 'C-82', grupo: 'g', adaptador: 'chirpstack', tipo: 'valida', regla: 'ChirpStack: un evento up con object produce lecturas con la unidad canónica del mapa y la marca del servidor de red', fuente: 'docs/10 §8.4 punto 47; chirpstack.adaptador.ts', esperado: 'lecturas con tiempo RFC 3339', cubre: [lora('lecturas desde object, con la marca del servidor de red')] },
   { id: 'C-83', grupo: 'g', adaptador: 'chirpstack', tipo: 'malformada', regla: 'ChirpStack: sin deviceInfo no hay identidad; sin object ni perfil se rechaza diciendo qué falta', fuente: 'chirpstack.adaptador.ts:33-39', esperado: 'rechazada: IdentidadNoVerificada, o malformada con la instrucción', cubre: [aqui('C-83'), lora('sin object (el perfil no tiene decodificador)')] },
   { id: 'C-84', grupo: 'g', adaptador: 'chirpstack', tipo: 'valida', regla: 'ChirpStack: hereda devEui (verificado contra el tópico), time (origen pasarela) y fCnt (deduplicación)', fuente: 'docs/10 §4.1 y §8.4 punto 47', esperado: 'ctx.fcnt anotado; origen_tiempo pasarela', cubre: [lora('ChirpStack sin object y con perfil'), aqui('C-84')] },
@@ -279,7 +281,7 @@ describe('contrato (a): esquema SenML (RFC 8428)', () => {
   it.todo('C-14 bv se suma a v (RFC 8428 §4.5.4): [{"bv":10,"n":"temperatura","v":5}] da 15; hoy da 5');
   // Hallazgo H-7: RFC 8428 §4.2, «Exactly one Value field MUST appear».
   it.todo('C-15 un registro con v y vs a la vez se rechaza (RFC 8428 §4.2); hoy se acepta y vale v');
-  // Hallazgo H-1 (defecto): senml.adaptador.ts:49 hace (r.n ?? tópico).toLowerCase(): con n numérico lanza TypeError, que no es
+  // Hallazgo H-1 (defecto, corregido): senml.adaptador.ts hacía «(r.n ?? ctx.magnitudTopico).toLowerCase()»: con n numérico lanza TypeError, que no es
   // TramaMalformada; el servicio lo relanza (recepcion.service.ts:232) y el broker reintenta y reconecta (broker.service.ts:91-94).
   it('C-16 un n o un u que no es cadena se rechaza con TramaMalformada (antes lanzaba TypeError y el mensaje no se confirmaba al broker)', () => {
     for (const pack of ['[{"n":5,"v":1}]', '[{"n":{},"v":1}]', '[{"n":["temperatura"],"v":1}]', '[{"n":true,"v":1}]']) {
@@ -370,6 +372,10 @@ describe('contrato (d): forma y tamaño de la trama', () => {
       expect(cuarentenas().map((c) => [c.motivo, c.detalle]), cuerpo).toEqual([['malformada', 'formato declarado senml: la trama no tiene esa forma']]);
       expect(mediciones()).toEqual([]);
     }
+  });
+  it('C-43 una lista vacía es malformada «pack SenML vacío» (no «pack sin valores», que es otra regla)', () => {
+    expect(() => senml.analizar(ctxDir('[]'))).toThrow(TramaMalformada);
+    expect(() => senml.analizar(ctxDir('[]'))).toThrow('pack SenML vacío');
   });
   it('C-45 el tope de 64 KiB: el broker (max_packet_size) y la vía HTTP (cuerpo crudo y 413) usan el mismo', () => {
     const conf = readFileSync(join(DIR, '../../../mosquitto/config/mosquitto.conf'), 'utf8');
@@ -494,6 +500,11 @@ describe('contrato (g): adaptadores de formato', () => {
       expect(() => plano.analizar(ctxDir(cuerpo)), cuerpo).toThrow(TramaMalformada);
     }
   });
+  it('C-95 plano: un número a secas de 309 cifras (Infinity para JavaScript) es malformada; uno de 308 cifras se acepta', () => {
+    expect(() => plano.analizar(ctxDir('9'.repeat(309)))).toThrow(TramaMalformada);
+    expect(() => plano.analizar(ctxDir(`-${'9'.repeat(309)}`))).toThrow('valor fuera del rango numérico');
+    expect(Number.isFinite(plano.analizar(ctxDir('9'.repeat(308)))[0].valor)).toBe(true);
+  });
   it('C-83 chirpstack: sin deviceInfo no hay identidad (IdentidadNoVerificada); sin devEui, igual; con otro devEui, igual', () => {
     expect(() => chirp.analizar(ctxPas({ object: { temperature: 1 } }))).toThrow(IdentidadNoVerificada);
     expect(() => chirp.analizar(ctxPas({ deviceInfo: {}, object: { temperature: 1 } }))).toThrow(IdentidadNoVerificada);
@@ -539,10 +550,11 @@ describe('contrato: guardián de cobertura de la matriz', () => {
       for (const c of r.cubre) {
         const ruta = join(DIR, c.archivo);
         const texto = existsSync(ruta) ? readFileSync(ruta, 'utf8') : undefined;
-        // Las pruebas nuevas se buscan como «it('C-NN » o «it.todo('C-NN »; las anteriores, por una parte de su título.
+        // Las pruebas nuevas se buscan como «it('C-NN » o «it.todo('C-NN »; las anteriores, por una parte de su título, en una línea que
+        // abre una prueba (`it(`): un `describe` o un comentario con ese texto no cuentan.
         const hallada = texto !== undefined && (c.archivo === 'contrato.spec.ts'
           ? new RegExp(`\\bit(\\.todo)?\\('${c.nombre.trim()} `).test(texto)
-          : texto.includes(c.nombre));
+          : texto.split('\n').some((l) => /^\s*it(\.todo)?\(/.test(l) && l.includes(c.nombre)));
         if (!hallada) faltan.push(`${r.id} → ${c.archivo}: «${c.nombre}»`);
       }
     }

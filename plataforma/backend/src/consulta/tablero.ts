@@ -29,11 +29,8 @@ export const SQL_ESTADO_VISUAL = `(CASE
                        AND cv.tipo IN (${TIPOS_ALERTA.map((t) => `'${t}'`).join(', ')})) THEN 'alerta'
         ELSE 'normal' END)`;
 
-// ── Entrega (HU-15; punto 65 vii) ────────────────────────────────────────────────────────────────────────────────────────────────
-// Tramas recibidas en la ventana ÷ esperadas (ventana ÷ intervalo esperado), acotada a 100 %. La ventana efectiva empieza en lo más
-// tardío entre `desde`, el alta del dispositivo y el horizonte de retención de `trama` (antes no hay con qué contar). Sin una trama
-// esperada completa en esa ventana (recién creado, o una ventana entera fuera de la retención), no se calcula: nulo, nunca inventado.
-// Salud del sitio (HU-16, RF-30): en línea ÷ supervisados (los no inactivos), en porcentaje con un decimal; null sin dispositivos
+// ── Salud del sitio (HU-16, RF-30) ───────────────────────────────────────────────────────────────────────────────────────────────
+// En línea ÷ supervisados (los no inactivos), en porcentaje con un decimal; null sin dispositivos
 // supervisados (no hay nada que medir: nunca 0 % ni NaN). Los conteos salen de la base (resumenSitio) y por construcción
 // `reportan` ⊆ `supervisados`; si llegara a pasar lo contrario (un defecto de la consulta), se acota a 100 en vez de decir «105 %».
 export function porcentajeSalud(reportan: number, supervisados: number): number | null {
@@ -42,6 +39,10 @@ export function porcentajeSalud(reportan: number, supervisados: number): number 
   return Math.round((1000 * r) / supervisados) / 10;
 }
 
+// ── Entrega (HU-15; punto 65 vii) ────────────────────────────────────────────────────────────────────────────────────────────────
+// Tramas recibidas en la ventana ÷ esperadas (ventana ÷ intervalo esperado), acotada a 100 %. La ventana efectiva empieza en lo más
+// tardío entre `desde`, el alta del dispositivo y el horizonte de retención de `trama` (antes no hay con qué contar). Sin una trama
+// esperada completa en esa ventana (recién creado, o una ventana entera fuera de la retención), no se calcula: nulo, nunca inventado.
 export interface Entrega { recibidas: number; esperadas: number; porcentaje: number | null }
 export function entrega(recibidas: number, desde: Date, hasta: Date, creadoEn: Date, intervaloS: number, retencionDesde: Date): Entrega {
   const inicio = Math.max(desde.getTime(), creadoEn.getTime(), retencionDesde.getTime());

@@ -86,7 +86,7 @@ esperado, la misma tolerancia de `en_linea`: el equipo reporta, pero esa magnitu
 validación manda a cuarentena; en la corrida de 24 h la presión calló 3 h 30 min con el equipo en «Normal», `docs/16 §53`). La
 cabecera suma «N canal(es) callado(s)». Es regla de presentación, como §2: no abre condición ni cambia el estado visual del
 dispositivo; volverla alerta exige una condición en la base. Debajo, el gráfico del
-canal elegido: rango (última hora, 24 h, 7 días, 30 días; el rango a medida por fechas es HU-07, Etapa 4), cada uno con un intervalo de
+canal elegido: rango (última hora, 24 h, 7 días, 30 días; el rango a medida por fechas es HU-07: su formulario existe desde el 15/11/2026, D1b, y falta probarlo en un navegador real), cada uno con un intervalo de
 agregación fijo de la lista cerrada de la API (1 minuto, 15 minutos, 1 hora, 6 horas);
 el panel pide el histórico y abre el canal en vivo filtrado por dispositivo; cada `medicion` nueva del canal visible se añade al
 final sin volver a pedir el histórico; cada `visto` actualiza «hace cuánto»; cada `condicion` actualiza la lista de condiciones y el
@@ -128,7 +128,7 @@ declara intervalo observado ni desvío de reloj. Lo que se toma, lo que no y lo 
    la señal explícita de Magistrala y la hace verificable.
 Pruebas (§6): por el DOM, ida y vuelta URL ↔ estado en P2 y P3, el texto y el botón del rango vacío, el intervalo con sus dos avisos, la alerta
 del reloj; en el backend, unitaria del contrato y de las piezas de la consulta (OpenAPI regenerado); la mediana se contrasta en la base, porque las unitarias corren sin ella. Lo que no entra en este incremento: filtros guardados por
-persona, rango a medida (HU-07) y la administración de pasarelas (incremento 3).
+persona, rango a medida (HU-07: su formulario llegó el 15/11/2026, D1b; falta la prueba en navegador real) y la administración de pasarelas (incremento 3).
 
 **Incremento 2 de P3 y P2: leyenda sin sorpresas, cambio de rango sin pantalla en blanco, hora del sitio, resolución elegible y
 comparación entre nodos (diseñado el 22/10/2026, antes del código, como manda la regla de concordancia).** Qué lo motiva: al revisar la
@@ -193,7 +193,7 @@ de dispositivos en un gráfico ni aviso por la zona del navegador (no declarado,
    `GET /dispositivos/{id}/exportar` con la ventana visible (la pantalla P8 sigue en la Etapa 4; un enlace no es la pantalla).
 Pruebas (§6): las de navegador se suman al recorrido de `banco.sh navegador` (el mismo arranque de Firefox); por el DOM y funciones puras:
 resoluciones admisibles por rango, desfase de zona, alineación de series y lectura y escritura de la URL de P3b. Lo que no entra: rango a
-medida por fechas (HU-07), tableros guardados por persona, y una serie en miniatura por fila en P2 (una petición por fila: se mide antes).
+medida por fechas (HU-07: hecho el formulario el 15/11/2026, D1b; falta la prueba en navegador real), tableros guardados por persona, y una serie en miniatura por fila en P2 (una petición por fila: se mide antes).
 **Hecho el 22/10/2026 (`docs/16 §52`).** Medido en el banco con la serie de 30 días a una lectura cada 10 s: toda resolución de un rango lee
 las mismas filas crudas salvo dos o tres por el borde del cubo (≈ 8 600 en 24 h, 60 500 en 7 días y 259 200 en 30 días; la tabla exacta
 está en `docs/16 §52`), así que la resolución más fina cuesta poco más en tiempo
@@ -421,13 +421,12 @@ corrección del 11/11/2026). No hay correo saliente (`docs/20 §4`): un canal sa
    se escribe por su **código** del catálogo (el selector del catálogo queda pendiente); la hora de la primera trama va en la zona del
    sitio (la **zona propia** de P13 se guarda y aún no se aplica); un identificador que ya existe responde 409 y remite al inventario (la
    reactivación desde el asistente queda pendiente).
-2. **Alta masiva por archivo:** ✅ backend, 11/11/2026 (la ruta y su informe); ✅ panel, 11/11/2026 (`#/alta?modo=lote`: el CSV se lee en el navegador, `modo=validar` completo, `modo=crear` en tandas de 50 con «creadas N de M»; las credenciales no se dibujan: se descargan una vez y «Ya las guardé: olvidarlas» las saca de la memoria; «Descargar rechazadas» agrega la columna `motivo`, que el lector ignora al volver a subir; decidido al implementar). Límite que se cruza: 500 filas son una validación y 10 tandas, y el servidor admite 10 lotes por minuto por persona, así que la última tanda recibe 429 y queda como «Reintentar las restantes» con la espera escrita; un CSV con cabecera fija (`id_fisico, nombre, zona, via, formato, intervalo_esperado_s, canales,
-   pasarela`; `canales` como `magnitud:unidad;magnitud:unidad`) de hasta 500 filas se envía a `POST /dispositivos/lote?modo=validar` (Etapa 4) y
-   la pantalla muestra el informe fila por fila (válida / rechazada con motivo / ya existe) **antes** de crear nada; con «Crear las
-   válidas», `modo=crear` inserta en una sola transacción (una sentencia para los dispositivos y otra para sus eventos, no N inserciones; el panel manda tandas de 50, `docs/16 §61`), devuelve el mismo informe con las credenciales
-   de las creadas **una sola vez**, y la pantalla ofrece «Descargar credenciales (CSV)» por el ayudante `descargar` de §6 y «Descargar
-   rechazadas» para corregir y volver a subir. Las filas rechazadas no bloquean a las válidas; el informe lo dice. Límite de tasa y de
-   tamaño en `docs/11 §4`.
+2. **Alta masiva por archivo:** ✅ backend, 11/11/2026; ✅ panel, 11/11/2026 (`#/alta?modo=lote`). **Reemplazado por el bloque N el
+   15/11/2026** (vista previa con el plan por fila y creación todo o nada en una petición; lo que rige está allí y en `docs/11 §4`). Lo
+   histórico, en una frase: hasta entonces el panel validaba completo y creaba en tandas de 50, con «creadas N de M» y «Reintentar las
+   restantes» (la última de 10 tandas recibía 429), y las rechazadas no bloqueaban a las válidas. Lo que sigue igual: el CSV se lee en el
+   navegador; las credenciales no se dibujan: se descargan una vez y «Ya las guardé: olvidarlas» las saca de la memoria; «Descargar
+   rechazadas» agrega la columna `motivo`, que el lector ignora al volver a subir.
 3. **Bandeja de detectados (Etapa 4):** ✅ backend, 11/11/2026; ✅ panel, 11/11/2026 (`#/alta?modo=detectados`); `GET /cuarentena/detectados?sitio` agrupa las tramas rechazadas por `no_registrado` de los últimos 7 días
    por emisor (identificador o tópico), con cuántas y la última; cada fila lleva al asistente con el identificador ya escrito. Es la
    forma de dar de alta «lo que ya está hablando».
@@ -773,12 +772,14 @@ El alta masiva de F2 (11/11/2026) valida bien y explica poco. Lo que se observa 
    con_aviso, huella, filas}` y cada fila trae: `n`, `id_fisico`, `resultado` (`valida`, `creada`, `existe`, `rechazada`; no cambian),
    `interpretada` (lo que se creará, o `null` si no entra: identificador ya normalizado, nombre, sitio y zona por su nombre, vía, formato
    resuelto, intervalo, canales con nombre y unidad canónica, pasarela, perfil de decodificación y el tópico en que publicará),
-   `por_defecto` (los campos que la persona dejó vacíos y el servidor completó), `avisos` y `motivos` (listas de `{campo, texto}`), y
-   `id`, `credencial` y `tópico` solo en `crear`. Los campos nuevos **se suman**: `motivo` se conserva como la unión de `motivos`
+   `por_defecto` (los campos que la persona dejó vacíos y el servidor completó), `avisos` y `motivos` (listas de `{campo, texto}`), `id`
+   (el creado en `crear`, y el del dispositivo que ya existe en las filas `existe`, también en `validar`), y `credencial` y `topico` solo
+   en `crear`. Los campos nuevos **se suman**: `motivo` se conserva como la unión de `motivos`
    (`docs/10 §8.4` punto 65 i: ninguna respuesta cambia de forma). **`n` lo manda el cliente** en cada fila (la fila del origen: en un
    CSV o un pegado, la línea contando las vacías, con la cabecera en la 1; en JSON, la posición más 1); el servidor exige que sea un
-   entero, único y creciente, y lo devuelve tal cual. `huella` es un resumen de todas las `interpretada`, en orden: identifica el plan
-   que la persona vio. Invariante con prueba: `validas + existentes + rechazadas = leidas`; `con_aviso` es transversal.
+   entero, único y creciente, y lo devuelve tal cual. `huella` es un resumen de las `interpretada` de las filas que entran, con su `n`, en
+   orden: identifica el plan que la persona vio. Solo columnas de la plantilla: una que no lo es responde 400 con la fila (revisión del
+   15/11/2026; antes era un motivo de la fila). Invariante con prueba: `validas + existentes + rechazadas = leidas`; `con_aviso` es transversal.
 3. **Avisos: lo que entra, pero la persona debe ver.** ✅ backend, 15/11/2026 (los cinco; la línea sobre la tabla es del panel). No bloquean. El identificador venía con mayúsculas y se guardará en minúsculas;
    la unidad se omitió y se asume la canónica; la zona se resolvió por nombre (se dice en qué sitio); el formato declarado en un nodo
    LoRaWAN coincide con el de su pasarela y se ignora; el nombre se repite en otra fila del archivo. El aviso se marca en la fila y
@@ -791,13 +792,15 @@ El alta masiva de F2 (11/11/2026) valida bien y explica poco. Lo que se observa 
    de columnas obligatorias. `GET /magnitudes` publica el catálogo (código, nombre y unidad canónica) a cualquier sesión: no
    es de ningún sitio; lo usan la ayuda de `canales`, la vista previa y el selector del asistente (F1). La plantilla y `COLUMNAS_LOTE`
    suman la columna opcional `decodificador`, que `validarAlta` ya admite y el lote hoy rechaza como columna no admitida.
-5. **Topes por columna, y el del cuerpo calculado desde ellos.** ✅ backend y proxy, 15/11/2026 (la unidad dentro de `canales`, 16
-   caracteres: la celda `canales` mide 1 197; el peor caso medido, 1 467 087 bytes, y el tope, 1 467 392: `MAX_BYTES_LOTE`, el mismo en el
-   lector de JSON, la plantilla y `client_max_body_size`). Cada columna tiene su tope, el de `validarAlta` donde existe
-   (identificador 63, nombre 80, magnitud 40, hasta 20 canales) y 80 donde no; una celda que lo pasa, que no es texto ni número o que
-   trae el carácter NUL responde 400 con la fila. `max_bytes` es el peor caso de `max_filas` filas con todas las columnas en su tope,
-   medido en bytes UTF-8 por una prueba, no estimado: con 20 canales por fila ronda 0,9 MB, así que los 512 KiB de hoy no alcanzan
-   para 500 filas llenas y el tope del cuerpo de esta ruta se fija en ese cálculo, en el backend y en el proxy (`docs/11 §4`).
+5. **Topes por columna, y el del cuerpo calculado desde ellos.** ✅ backend y proxy, 15/11/2026. Cada columna tiene su tope, el de
+   `validarAlta` donde existe (identificador 63, nombre 80, magnitud 40, hasta 20 canales) y 80 donde no; dentro de `canales`, la unidad
+   tiene 16 caracteres, así que la celda `canales` mide 1 197 (20 × «magnitud:unidad» y « | » entre ellos). Una celda que pasa su tope,
+   que no es texto ni número, que trae un carácter de control o un sustituto UTF-16 suelto, o que en una columna de códigos (todas salvo
+   `nombre` y `zona`) trae algo que no es ASCII imprimible, `"` o `\`, responde 400 con la fila (revisión del 15/11/2026: con solo el NUL
+   prohibido, el «peor caso» se podía superar). `max_bytes` es el peor caso de lo que se **acepta** con `max_filas` filas y todas las
+   columnas en su tope, medido en bytes UTF-8 por una prueba, no estimado, que además intenta superarlo con cada carácter admisible:
+   1 147 087 bytes; el tope, 1 147 904 (`MAX_BYTES_LOTE`, 1 121 KiB), el mismo en el lector de JSON, la plantilla y el `location` del lote
+   en el proxy (`docs/11 §4`). Los 512 KiB de antes no alcanzaban para 500 filas llenas.
 6. **Entradas, y un solo camino desde ahí.** Archivo CSV (separador `;`, `,` o tabulador, detectado en la cabecera fuera de comillas;
    con o sin BOM), **pegado desde la planilla** (el portapapeles llega separado por tabuladores: mismo lector) y JSON (una lista de
    objetos con las mismas columnas). Las tres terminan en la misma lista `filas`. Si el origen trae una sola columna, la pantalla avisa
@@ -831,10 +834,16 @@ El alta masiva de F2 (11/11/2026) valida bien y explica poco. Lo que se observa 
    mismo —una fila dejó de ser válida, **o sigue siendo válida pero crearía otra cosa** (cambió el formato de su pasarela, la zona
    resuelve a otro sitio)— responde 409 con `codigo: plan_cambio` y el plan nuevo, y **no crea ninguna**: la pantalla vuelve a la
    revisión con el aviso «cambió desde que lo revisaste». El 409 de «otra creación en curso» lleva `codigo: lote_en_curso`; el
-   choque de identificador que solo ve la base (otra petición lo creó entre la validación y la inserción) deshace todo, recalcula y
-   responde también `plan_cambio` con su plan. **Si la respuesta se pierde** (las credenciales viajan una sola vez), el panel repite la
+   choque de identificador que solo ve la base (otra petición lo creó entre la validación y la inserción), una pasarela que dejó de
+   estar activa (se bloquean en modo compartido dentro de la transacción) o un formato de pasarela que cambió deshacen todo, recalculan
+   y responden también `plan_cambio` con su plan. **Todo o nada al pie de la letra** (revisión del 15/11/2026): en `crear`, una fila
+   que no entra o que ya existe también es `plan_cambio`, aunque la huella coincida; el panel solo manda las válidas. Si el COMMIT
+   responde con error, se mira si los dispositivos quedaron: si quedaron, el lote está creado; si no, se deshace en el broker; si no se
+   puede saber, 503 con el remedio (revisar el inventario y rotar la credencial de los que aparezcan), sin tocar el broker. **Si la respuesta se pierde** (las credenciales viajan una sola vez), el panel repite la
    petición con la misma llave y el servidor devuelve la misma respuesta: la guarda dos minutos en la memoria del proceso y después la
-   borra (vale con una instancia, como «una creación a la vez»: `docs/11 §4`). Desaparecen las tandas, «creadas N de M», «Reintentar
+   borra (vale con una instancia, como «una creación a la vez»: `docs/11 §4`). Solo se guarda lo que creó algo, con topes de 200
+   entradas, 3 por persona y 16 MiB; el reintento tiene su propio cupo de 10 por minuto y exige que la persona conserve «escribir» en los
+   sitios de lo creado (revisión del 15/11/2026). Si tras tres intentos no hay respuesta, la pantalla lo dice con el remedio. Desaparecen las tandas, «creadas N de M», «Reintentar
    las restantes» y la constante `TANDA_CLIENTE_LOTE`; un alta de 500 son dos peticiones, y cada «Volver» y nueva revisión cuenta en
    el tope de 10 por minuto.
 9. **Lo que se descarga.** Plantilla y «las que no entran» van con `;`, BOM y CRLF, con las columnas de la plantilla en su orden más
@@ -980,7 +989,7 @@ administrador); la vista pública nunca ofrece exportar (punto 6).
 | P1 Tablero v3 (armazón, pestañas, «Ahora», gráficas vivas) | RF-30, RF-52, RF-58, HU-07, HU-15, HU-16, TT-44 | Etapa 4, iteración 1 (diseñado y construido el 13/11/2026) | `docs/16 §67`: por el DOM, dos pedidos al entrar, la franja con enlaces por rótulo y cifra, «Ahora» vivo sin pedir nada por cada trama, el resumen como mucho una vez por minuto, `sitio_id`, «Pausar»/«Reanudar» (tablero y ficha), refresco solo en 1 h y 24 h con la ventana alineada, puntos y eje de enteros, la etiqueta flotante, el menú contraído, el cajón y el tema por un solo escritor; con navegador real (paso 4c), el cajón con el teclado, el menú contraído con sus nombres, el tema que alterna y el alto de la pestaña Resumen a 390 × 844 con la semilla completa, sin desplazamiento horizontal en ninguna pestaña |
 | P2 y P3 v2 | RF-33, RF-47, RF-49, RF-57, HU-07, TT-42 | Etapa 4, iteración 1 | El estado visual del servidor coincide con `estadoVisual()` fila por fila; paginación con total en la cabecera; un zoom cambia la resolución y la URL; banda mín–máx; umbrales y condiciones dibujados; tramas rechazadas agrupadas con «× N»; unidades según la preferencia con ida y vuelta exacta |
 | P6 Configurar | HU-06, HU-13, RF-14 | Etapa 4, iteración 1 | Validación compartida (plantada: bajo ≥ alto falla en los dos lados); 409 con dos pestañas; retardo de activación: una medición fuera de banda menos tiempo que el retardo no abre condición, más tiempo sí; cada guardado deja un `evento` con la persona. Panel (`docs/16 §64`): los casos de la prueba del servidor repetidos contra la función del panel, el error junto al campo, «Guardando…», el 409 con la hora y «Recargar» sin pisar; con navegador real, la validación en vivo y el 409 con dos pestañas |
-| P7 Alta, lote y detectados | HU-22, RF-50, HU-11 | Etapa 4, iteración 1 | Credencial una sola vez; `modo=validar` no crea nada; un lote con filas malas crea solo las válidas y el informe lo dice; tope de 500 filas y límite de tasa plantados; un emisor desconocido aparece en detectados y llega al asistente con su identificador. Panel (`docs/16 §64`): por el DOM, 121 válidas en tandas de 50 con la segunda fallando (se detiene con 50 y reintenta 71), 501 filas frenadas en el navegador, detectado → asistente; con navegador real, el asistente por HTTP y un lote de 2 válidas y 1 rechazada |
+| P7 Alta, lote y detectados | HU-22, RF-50, HU-11 | Etapa 4, iteración 1 | Credencial una sola vez; `modo=validar` no crea nada; desde el bloque N (15/11/2026), crear es todo o nada: una fila que no entra o un plan que cambió es 409 `plan_cambio` y no se crea ninguna, y el reintento con la misma llave no duplica (`docs/16 §71`); tope de 500 filas, del cuerpo y límite de tasa plantados; un emisor desconocido aparece en detectados y llega al asistente con su identificador. Panel: por el DOM, 121 válidas en una petición, repetida con la misma llave tras un 502, y los 409 por su `codigo` (`docs/16 §71`; hasta el 15/11, tandas de 50: `docs/16 §64`), 501 filas frenadas en el navegador, detectado → asistente; con navegador real, el asistente por HTTP y un lote de 2 válidas y 1 rechazada |
 | P14 Actividad | RF-46, HU-11, HU-26 | Etapa 4, iteración 1 | Un umbral cambiado aparece con la persona que lo cambió; un administrador de un sitio no ve la actividad de otro (404); un cursor de otro sitio no trae nada. Panel (`docs/16 §64`): por el DOM, cursor, filtros en la URL, tarjetas en teléfono y nada para quien no administra; con navegador real, el umbral cambiado en P6 con quien lo cambió y sin correos |
 | P9 Vista pública | punto 6 | Etapa 4, iteración 2 | Sin cuenta: solo las magnitudes agregadas elegidas; ninguna ruta cruda responde con el token |
 

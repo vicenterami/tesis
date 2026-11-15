@@ -27,7 +27,7 @@ const catalogos = (x: Partial<Catalogos> = {}): Catalogos => ({
 });
 const filas = [
   { n: 2, id_fisico: 'nodo-01', nombre: 'Uno', zona: 'Laboratorio', via: 'http', intervalo_esperado_s: '60', canales: 'temperatura:Cel' },
-  { n: 4, id_fisico: 'a84041000181b0e1', nombre: 'LoRa', zona: 'Laboratorio', via: 'lorawan', pasarela: 'ug65-campus', intervalo_esperado_s: '300', canales: 'temperatura | humedad' },
+  { n: 4, id_fisico: '0101010101010101', nombre: 'LoRa', zona: 'Laboratorio', via: 'lorawan', pasarela: 'ug65-campus', intervalo_esperado_s: '300', canales: 'temperatura | humedad' },
 ];
 const res = (): Response & { cabeceras: Record<string, string> } => {
   const cabeceras: Record<string, string> = {};
@@ -137,6 +137,51 @@ describe('POST /dispositivos/lote?modo=crear: todo o nada', () => {
     await ctrl.lote(persona('operador'), 'crear', cuerpo, LLAVE, res());
     expect(servicio.crearLote).toHaveBeenCalledTimes(2);
   });
+  it('todo o nada al pie de la letra: una fila que no entra o que ya existe en crear (aunque la huella coincida) es 409 plan_cambio y no se crea ninguna', async () => {
+    const { ctrl, servicio } = conServicioFalso(() => catalogos({ existentes: new Map([['nodo-viejo', { id: 'D-viejo', estado: 'activo' }]]) }));
+    const u = usuarioSistema();
+    for (const extra of [{ n: 9, id_fisico: 'Mala_1', nombre: 'x', zona: 'Laboratorio', intervalo_esperado_s: '60', canales: 'temperatura' }, { n: 9, id_fisico: 'nodo-viejo', nombre: 'x', zona: 'Laboratorio', intervalo_esperado_s: '60', canales: 'temperatura' }]) {
+      const cuerpo = { filas: [...filas, extra] };
+      const vista = await ctrl.lote(u, 'validar', cuerpo, undefined, res());
+      expect(vista.huella).toBe((await ctrl.lote(u, 'validar', { filas }, undefined, res())).huella); // la huella no mira las que no entran
+      const e = await error(ctrl.lote(u, 'crear', { ...cuerpo, huella: vista.huella }, `llave-${extra.id_fisico}-00000000`, res()));
+      expect([e.getStatus(), (e.getResponse() as { codigo: string }).codigo]).toEqual([409, 'plan_cambio']);
+    }
+    expect(servicio.crearLote).not.toHaveBeenCalled();
+  });
+  it('un 409 no se guarda: repetir con la misma llave vuelve a calcular', async () => {
+    let cat = catalogos({ pasarelas: [] });
+    const { ctrl, servicio } = conServicioFalso(() => cat);
+    const u = usuarioSistema();
+    const vista = await ctrl.lote(u, 'validar', { filas: filas.slice(0, 1) }, undefined, res());
+    cat = catalogos({ zonas: [] });
+    await error(ctrl.lote(u, 'crear', { filas: filas.slice(0, 1), huella: vista.huella }, LLAVE, res()));
+    cat = catalogos({ pasarelas: [] });
+    await ctrl.lote(u, 'crear', { filas: filas.slice(0, 1), huella: vista.huella }, LLAVE, res());
+    expect(servicio.crearLote).toHaveBeenCalledTimes(1);
+  });
+  it('la tasa va antes de firmar el cuerpo; los reintentos tienen su propio cupo de 10 por minuto, aparte del de los lotes', async () => {
+    const { ctrl, servicio } = conServicioFalso(() => catalogos());
+    const u = usuarioSistema();
+    const vista = await ctrl.lote(u, 'validar', { filas }, undefined, res());
+    const cuerpo = { filas, huella: vista.huella };
+    await ctrl.lote(u, 'crear', cuerpo, LLAVE, res());
+    for (let i = 0; i < 8; i++) await ctrl.lote(u, 'validar', { filas }, undefined, res()); // 10 lotes en el minuto
+    const venenoso = { toJSON: (): never => { throw new Error('se firmó el cuerpo antes de la tasa'); } };
+    expect((await error(ctrl.lote(u, 'crear', venenoso, 'otra-llave-0000000000', res()))).getStatus()).toBe(429);
+    for (let i = 0; i < 10; i++) expect((await ctrl.lote(u, 'crear', cuerpo, LLAVE, res())).huella).toBe(vista.huella); // reintentos, con el cupo de lotes agotado
+    expect((await error(ctrl.lote(u, 'crear', cuerpo, LLAVE, res()))).getStatus()).toBe(429);
+    expect(servicio.crearLote).toHaveBeenCalledTimes(1);
+  });
+  it('el reintento exige conservar «escribir» en los sitios de lo creado: con el rol bajado a consulta en esos 2 minutos, 403', async () => {
+    const { ctrl } = conServicioFalso(() => catalogos());
+    const ope = persona('operador');
+    const vista = await ctrl.lote(ope, 'validar', { filas }, undefined, res());
+    const cuerpo = { filas, huella: vista.huella };
+    await ctrl.lote(ope, 'crear', cuerpo, LLAVE, res());
+    const bajado: UsuarioSesion = { ...ope, sitios: new Map([[S1, 'consulta'], ['00000000-0000-4000-8000-000000000009', 'operador']]) };
+    await expect(ctrl.lote(bajado, 'crear', cuerpo, LLAVE, res())).rejects.toBeInstanceOf(ForbiddenException);
+  });
   it('sin Idempotency-Key o sin huella, crear es 400 y no lee la base', async () => {
     const { ctrl, servicio } = conServicioFalso(() => catalogos());
     expect((await error(ctrl.lote(usuarioSistema(), 'crear', { filas, huella: 'a'.repeat(64) }, undefined, res()))).getStatus()).toBe(400);
@@ -182,6 +227,7 @@ function conBaseFalsa() {
     connect: () => Promise.resolve({
       query: async (texto: string, p: unknown[] = []) => {
         await Promise.resolve();
+        if (texto.startsWith('SELECT id FROM pasarela')) return { rows: (p[0] as string[]).map((id) => ({ id })) }; // activas y bloqueadas
         if (texto.trim().startsWith('WITH d AS')) {
           insertados.push(p);
           return { rows: (p[1] as string[]).map((f, i) => ({ id: `D${i}`, id_fisico: f, via: (p[4] as string[])[i], formato: (p[5] as string[])[i] })) };
