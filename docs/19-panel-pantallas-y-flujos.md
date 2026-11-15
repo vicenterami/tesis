@@ -738,6 +738,111 @@ sitio» es un solo equipo, y el rótulo dice «promedio de 9 dispositivos») y *
    6 en rojo); sin base, la regla, el tiempo máximo y su 503 (`historico-sitio.spec.ts`); en el panel, el rótulo, la fila «aportan» y la
    columna de «Ver los datos». Las fallas plantadas y las capturas, en `docs/16 §68`.
 
+**N. P7 v2: la vista previa del alta masiva (cambia F2, la fila de `POST /dispositivos/lote` del contrato, `docs/10 §8.4` punto 65 iv, la fila del alta masiva de `docs/11 §4` y la matriz de `docs/20 §6`; diseñado el 15/11/2026, antes del código, y revisado el mismo día: 16 objeciones, todas atendidas en este texto).**
+El alta masiva de F2 (11/11/2026) valida bien y explica poco. Lo que se observa en el código y en la pantalla de hoy:
+
+| Hoy | Por qué no alcanza |
+|---|---|
+| El informe trae por fila una palabra (`valida`, `rechazada`, `existe`) y **un** motivo en una sola cadena | No dice qué se va a crear: en qué sitio cayó la zona, qué formato heredó de la pasarela, qué quedó por omisión (`via` = `mqtt`, `formato` = `senml`) |
+| 500 filas son 1 validación y 10 tandas de 50: 11 peticiones con un tope de 10 por minuto | La última tanda recibe 429 (F2 lo declara). La razón de las tandas era el resumen `scrypt` (≈ 70 s por 500); desde el 13/11/2026 las 500 se crean en 0,10 s por HTTP y 0,40 s por MQTT (`docs/16 §65`, medido en el equipo de desarrollo y sin proxy) |
+| El archivo se lee y se escribe con coma | Una planilla configurada en español lo abre en una sola columna; lo que se descarga para corregir no se puede corregir ahí |
+| El tope de filas, las columnas y la tanda están escritos en el backend (`alta/lote.ts`) y otra vez en el panel (`lib/lote.ts`) | Ya se contradicen: el panel exige cuatro columnas y el servidor cinco (`intervalo_esperado_s`), así que un archivo sin esa columna pasa la lectura y se rechaza fila por fila |
+| El número de fila lo pone el servidor contando lo que recibe, y el panel quita antes las filas vacías | Con una fila vacía en medio, cada número posterior apunta a otra fila de la planilla |
+| Solo CSV por archivo | Quien tiene la lista en una planilla debe exportarla antes; no se puede pegar |
+
+1. **Una sola función decide, y decide dos veces.** `validarLote` ya llama a la validación del alta de a uno (`validarAlta`): eso se
+   conserva. La vista previa y la creación usan esa misma función, y la creación **vuelve a calcular** con lo que hay en la base en ese
+   momento: la vista previa queda vieja en cuanto se muestra.
+2. **El plan por fila (contrato).** `POST /dispositivos/lote?modo=validar|crear` responde `{leidas, validas, existentes, rechazadas,
+   con_aviso, huella, filas}` y cada fila trae: `n`, `id_fisico`, `resultado` (`valida`, `creada`, `existe`, `rechazada`; no cambian),
+   `interpretada` (lo que se creará, o `null` si no entra: identificador ya normalizado, nombre, sitio y zona por su nombre, vía, formato
+   resuelto, intervalo, canales con nombre y unidad canónica, pasarela, perfil de decodificación y el tópico en que publicará),
+   `por_defecto` (los campos que la persona dejó vacíos y el servidor completó), `avisos` y `motivos` (listas de `{campo, texto}`), y
+   `id`, `credencial` y `tópico` solo en `crear`. Los campos nuevos **se suman**: `motivo` se conserva como la unión de `motivos`
+   (`docs/10 §8.4` punto 65 i: ninguna respuesta cambia de forma). **`n` lo manda el cliente** en cada fila (la fila del origen: en un
+   CSV o un pegado, la línea contando las vacías, con la cabecera en la 1; en JSON, la posición más 1); el servidor exige que sea un
+   entero, único y creciente, y lo devuelve tal cual. `huella` es un resumen de todas las `interpretada`, en orden: identifica el plan
+   que la persona vio. Invariante con prueba: `validas + existentes + rechazadas = leidas`; `con_aviso` es transversal.
+3. **Avisos: lo que entra, pero la persona debe ver.** No bloquean. El identificador venía con mayúsculas y se guardará en minúsculas;
+   la unidad se omitió y se asume la canónica; la zona se resolvió por nombre (se dice en qué sitio); el formato declarado en un nodo
+   LoRaWAN coincide con el de su pasarela y se ignora; el nombre se repite en otra fila del archivo. El aviso se marca en la fila y
+   cuenta en la tarjeta «Con aviso»; no fuerza la fila en otros filtros. Si hay válidas con aviso, una línea sobre la tabla lo dice
+   («N filas que se crean traen avisos: ver») y lleva a ese filtro.
+4. **Los límites y la plantilla tienen una sola casa.** `GET /dispositivos/lote/plantilla` (Etapa 4) publica las
+   columnas (nombre, si es obligatoria, tope de caracteres, ayuda y ejemplo), `max_filas`, `max_bytes` y los separadores admitidos; la
+   lee quien puede usar la ruta del lote (la acción «escribir» de `docs/20 §6`: operador técnico y administradores). El panel no guarda
+   copia: de ahí salen el texto «máximo…», la comprobación antes de enviar, la plantilla que se descarga y la lista
+   de columnas obligatorias. `GET /magnitudes` (Etapa 4) publica el catálogo (código, nombre y unidad canónica) a cualquier sesión: no
+   es de ningún sitio; lo usan la ayuda de `canales`, la vista previa y el selector del asistente (F1). La plantilla y `COLUMNAS_LOTE`
+   suman la columna opcional `decodificador`, que `validarAlta` ya admite y el lote hoy rechaza como columna no admitida.
+5. **Topes por columna, y el del cuerpo calculado desde ellos.** Cada columna tiene su tope, el de `validarAlta` donde existe
+   (identificador 63, nombre 80, magnitud 40, hasta 20 canales) y 80 donde no; una celda que lo pasa, que no es texto ni número o que
+   trae el carácter NUL responde 400 con la fila. `max_bytes` es el peor caso de `max_filas` filas con todas las columnas en su tope,
+   medido en bytes UTF-8 por una prueba, no estimado: con 20 canales por fila ronda 0,9 MB, así que los 512 KiB de hoy no alcanzan
+   para 500 filas llenas y el tope del cuerpo de esta ruta se fija en ese cálculo, en el backend y en el proxy (`docs/11 §4`).
+6. **Entradas, y un solo camino desde ahí.** Archivo CSV (separador `;`, `,` o tabulador, detectado en la cabecera fuera de comillas;
+   con o sin BOM), **pegado desde la planilla** (el portapapeles llega separado por tabuladores: mismo lector) y JSON (una lista de
+   objetos con las mismas columnas). Las tres terminan en la misma lista `filas`. Si el origen trae una sola columna, la pantalla avisa
+   del separador **antes** de enviar; una fila con más o con menos celdas que la cabecera no se envía: «la fila N trae X celdas y la
+   cabecera Y» (hoy las que sobran se pierden en silencio). Dentro de `canales` el separador documentado pasa a ser `|`
+   (`temperatura:Cel | humedad:%RH`), porque `;` es ahora el de columnas; el servidor admite `|` y `;` siempre, y el ejemplo que se
+   descarga deja de traer `;` sin comillas.
+   **XLSX (decidido el 15/11/2026: lector propio, sin dependencia nueva; cambia el control de `docs/11 §4`, que pedía una biblioteca
+   auditada, y allí se anota el porqué).** Se descarga solo al elegir un `.xlsx` y lee textos y números de la primera hoja. Como abre
+   un archivo que puede venir de un tercero, sus límites van escritos: solo se leen `xl/workbook.xml`, sus relaciones,
+   `xl/sharedStrings.xml` y la hoja que de ahí resulte; un tope de bytes **descomprimidos**, contado mientras se descomprime (no el
+   que declara la cabecera del zip), por entrada y en total; un máximo de entradas y de cadenas compartidas; un XML con `<!DOCTYPE`
+   se rechaza; la lectura se detiene en `max_filas + 1`. La columna sale del atributo `r` de la celda (las vacías no aparecen) y la
+   fila, del de la fila. Un identificador que llega como número se rechaza («escríbelo como texto»: la planilla ya pudo redondearlo)
+   y una celda con formato de fecha, también. Antes de construirlo se comprueba en una fuente primaria en qué navegadores existe
+   `DecompressionStream('deflate-raw')`; donde no exista, la pantalla ofrece pegar.
+7. **La pantalla (`#/alta?modo=lote`), en tres pasos.** (i) *Origen:* elegir archivo o pegar, con la plantilla para descargar y los
+   límites leídos de la API. (ii) *Revisión:* cinco tarjetas que son botones de filtro (`aria-pressed`) —«Leídas», «Se crean», «Ya
+   existen», «No entran», «Con aviso»— y una tabla con «Fila», «Identificador», «Qué pasa» y «Detalle»; «Qué pasa» es una frase («Se
+   crea en Zona norte (sitio uct)», «Ya existe: no se toca», «Ya existe, dado de baja: se reactiva desde su ficha», «No entra: zona
+   vacía») con icono y texto, nunca solo color. Al abrir una
+   fila se ve lo interpretado campo por campo, con la marca «por omisión» donde corresponde, los avisos y los motivos junto al campo
+   que los causa. Si hay filas que no entran, la revisión abre con ese filtro. Abajo: «Volver» (conserva el origen), «Descargar las que
+   no entran (CSV)» y «Crear N dispositivos», que se desactiva mientras su petición está en vuelo. La tabla dibuja de a 100 filas
+   («Mostrar 100 más»); en teléfono cada fila es una tarjeta.
+   (iii) *Resultado:* cuántos se crearon y las credenciales, que se descargan una sola vez como hoy.
+8. **Confirmar es una petición, todo o nada (decidido el 15/11/2026).** `modo=crear` recibe las filas que la persona confirmó, la
+   `huella` del plan que vio y una llave de reintento, y las crea en una transacción. Vuelve a calcular, y si el plan ya no es el
+   mismo —una fila dejó de ser válida, **o sigue siendo válida pero crearía otra cosa** (cambió el formato de su pasarela, la zona
+   resuelve a otro sitio)— responde 409 con `codigo: plan_cambio` y el plan nuevo, y **no crea ninguna**: la pantalla vuelve a la
+   revisión con el aviso «cambió desde que lo revisaste». El 409 de «otra creación en curso» lleva `codigo: lote_en_curso`; el
+   choque de identificador que solo ve la base (otra petición lo creó entre la validación y la inserción) deshace todo, recalcula y
+   responde también `plan_cambio` con su plan. **Si la respuesta se pierde** (las credenciales viajan una sola vez), el panel repite la
+   petición con la misma llave y el servidor devuelve la misma respuesta: la guarda dos minutos en la memoria del proceso y después la
+   borra (vale con una instancia, como «una creación a la vez»: `docs/11 §4`). Desaparecen las tandas, «creadas N de M», «Reintentar
+   las restantes» y la constante `TANDA_CLIENTE_LOTE`; un alta de 500 son dos peticiones, y cada «Volver» y nueva revisión cuenta en
+   el tope de 10 por minuto.
+9. **Lo que se descarga.** Plantilla y «las que no entran» van con `;`, BOM y CRLF, con las columnas de la plantilla en su orden más
+   `fila` y `motivo`, que el lector ignora al volver a subir. Contra la inyección de fórmulas (OWASP, «CSV Injection») se antepone un
+   apóstrofo a toda celda que empiece con `=`, `+`, `-`, `@`, tabulador, retorno o salto de línea, o con sus variantes de ancho
+   completo (`＝`, `＋`, `－`, `＠`); la única excepción es una celda que **entera** sea un número (`-5`, `+3,2`). El lector quita ese
+   apóstrofo inicial cuando lo sigue uno de esos caracteres, para que lo descargado y vuelto a subir sin tocar dé el mismo plan. El
+   archivo de credenciales no cambia: es para máquinas.
+10. **Lo que no cambia, y lo que cambia en otros documentos.** No cambia lo que no se revela de otros sitios (RF-41: un
+    identificador ajeno sigue siendo «no disponible», sin `interpretada`), los 10 lotes por minuto por persona, una creación a la vez
+    y las credenciales una sola vez. Cambian junto con el código de este bloque, porque describen lo que rige: `docs/10 §8.4` punto 65 iv y la fila del alta masiva
+    de `docs/11 §4` («las rechazadas no bloquean a las válidas» pasa a «las que no entran no se envían; si al confirmar el plan
+    cambió, 409 y nada»; el tope del cuerpo; el XLSX), y `docs/20 §6` suma las dos rutas nuevas.
+11. **Pruebas y medición (antes de dar por hecho).** «Vista previa = creación»: crear y comparar el informe con lo anunciado, fila por
+    fila. El 409 de `plan_cambio` se prueba con un cambio que la base **no** impide (desactivar la pasarela o cambiarle el formato
+    entre validar y crear): un identificador duplicado lo frenaría la restricción única aunque faltara la segunda validación, y la
+    prueba pasaría con el defecto puesto. El límite, **en el límite**: 500 filas con cada columna en su tope caben en el cuerpo, y 501
+    es 413. Un CSV con una fila vacía en medio: cada `n` es el de la planilla. La vista previa de 500 filas cuenta sus consultas
+    (catálogos una vez; ninguna por fila). Reintento con la misma llave: misma respuesta, ningún dispositivo de más. Fórmulas:
+    `-1+cmd|…` y `＝1+2` salen neutralizadas, `-5` intacto, y el archivo descargado, vuelto a subir sin tocar, da el mismo plan. Un
+    pegado desde una planilla, un CSV con `;` y otro con `,`, y una fila con una celda de más. XLSX: uno real con una celda
+    numérica, y tres hostiles (relación de compresión enorme, una hoja de un millón de filas, un XML con `<!DOCTYPE`). En navegador
+    real: las tres pantallas a 1 280 y 390 px y el foco al cambiar de paso. Umbrales: el primer dibujo de la revisión de 500 filas y
+    cada «Mostrar 100 más», bajo 1 s a 390 px; el lector de XLSX no suma más de 10 kB comprimidos y no entra en la primera carga.
+    Medidas en `docs/16`: validar y crear 500 por cada vía, con el proxy delante.
+12. **Orden.** Contrato y backend (plan por fila, `n`, huella, plantilla, magnitudes, topes, todo o nada y reintento) con sus pruebas;
+    después el panel (lector, revisión, descargas); al final el lector de XLSX, que no bloquea lo anterior, y la revisión por capturas.
+
 ## 5. Flujos
 **F1 · Alta y primera trama.** Ya está dibujado en el diagrama de secuencia del alta (`docs/10`, figura del informe): el
 administrador crea el dispositivo (API en la Etapa 3), recibe la credencial una sola vez, configura el nodo, y el panel
