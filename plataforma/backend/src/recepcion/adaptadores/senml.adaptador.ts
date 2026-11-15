@@ -1,6 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { ContextoTrama, Lectura } from '../lectura.js';
+import { limpia } from '../texto.js';
 import { Adaptador, TramaMalformada } from './adaptador.js';
+
+// El nombre y la unidad de un registro son texto del emisor y terminan en el detalle de una cuarentena y en el registro: van recortados
+// (40 es el largo máximo de un código de magnitud del catálogo) y sin caracteres de control (texto.ts).
+const MAX_NOMBRE = 40;
+const MAX_UNIDAD = 32;
 
 // Registro SenML (RFC 8428) en su forma JSON: los campos que usa esta plataforma.
 //   bn = base name (identificador del emisor)   bt = base time (segundos Unix)
@@ -45,15 +51,22 @@ export class SenmlAdaptador implements Adaptador {
       if (r.v === undefined) continue; // registro solo de base, sin valor
       if (typeof r.v !== 'number' || !Number.isFinite(r.v)) throw new TramaMalformada('v no numérico');
 
-      // La magnitud viene del nombre del registro; si no lo trae, del tópico.
-      const magnitud = (r.n ?? ctx.magnitudTopico).toLowerCase();
+      // La magnitud viene del nombre del registro; si no lo trae, del tópico. `n` y `u` deben ser cadenas (RFC 8428 §4.3): un `n` numérico
+      // lanzaba TypeError, que no es TramaMalformada, así que la trama no iba a cuarentena y el broker la reenviaba (docs/16, matriz del
+      // contrato, C-16).
+      const n: unknown = r.n;
+      const u: unknown = r.u;
+      if (n !== undefined && typeof n !== 'string') throw new TramaMalformada('n no es texto');
+      if (u !== undefined && typeof u !== 'string') throw new TramaMalformada('u no es texto');
+      const magnitud = limpia((n ?? ctx.magnitudTopico).toLowerCase(), MAX_NOMBRE);
+      const unidad = u ?? baseUnidad;
       // Tiempo: SenML usa segundos Unix. Si hay bt, t es un desplazamiento relativo.
       let tiempo: Date | undefined;
       if (typeof r.t === 'number' || baseTiempo) {
         const seg = baseTiempo + (typeof r.t === 'number' ? r.t : 0);
         tiempo = seg > 0 ? new Date(seg * 1000) : undefined;
       }
-      lecturas.push({ magnitud, valor: r.v, unidad: r.u ?? baseUnidad, tiempo });
+      lecturas.push({ magnitud, valor: r.v, unidad: unidad === undefined ? undefined : limpia(unidad, MAX_UNIDAD), tiempo });
     }
     if (lecturas.length === 0) throw new TramaMalformada('pack sin valores');
     return lecturas;

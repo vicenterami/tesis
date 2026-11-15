@@ -150,7 +150,7 @@ Cualquiera de estas en un cambio exige justificación escrita:
 |---|---|---|
 | Buckets por día/mes en la zona, día de 23 h, otras zonas, `iso_utc`, guardias de tipo | `plataforma/db/pruebas/zonas-horarias.sql` | `docker compose exec -T timescaledb psql -U plataforma -d plataforma < db/pruebas/zonas-horarias.sql` |
 | API: formato `Z` en todas las fechas (incluidas las de JSON en SQL), buckets a medianoche del sitio, validaciones | `plataforma/pruebas/api-smoke.sh` | `bash pruebas/api-smoke.sh` con el backend arriba |
-| Filtro 4: marcas ausentes, en 1970, futuras, en milisegundos | casos manuales del README del backend; automatizar en Etapa 3 (TT-27) | — |
+| Filtro 4: marcas ausentes, relativas, en 1970 y antes de 2000, futuras, en milisegundos, imposibles; y las de pasarela (reglas 7, 16, 17 y 18) | `plataforma/backend/src/recepcion/tiempo.spec.ts` y las reglas C-20 a C-31 de `plataforma/backend/src/recepcion/contrato.spec.ts` (TT-27) | `cd plataforma/backend && pnpm test` |
 
 **Cómo se prueba (la parte que casi nadie hace).** A la hora en que uno programa, las dos
 interpretaciones suelen dar lo mismo: mirar un dato del mediodía no descarta nada. Dos formas de
