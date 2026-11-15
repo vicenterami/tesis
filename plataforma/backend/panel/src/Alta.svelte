@@ -14,8 +14,9 @@
   import { ErrorApi, alPerderSesion, descargarTexto, esCancelacion, obtener, pedir, ultimaGana } from './lib/api';
   import { avisoDeError, type DatosAviso } from './lib/avisos';
   import {
-    AVISO_SIN_RESPUESTA, ROTULO_RESULTADO, codigoDeConflicto, hayQueRepetir, crearConReintento, csvCredenciales, csvEjemplo, csvRechazadas, excedeBytes, leerCsv, megas, nuevaLlave,
-    type FilaInforme, type FilaLote, type InformeLote, type PlantillaLote,
+    ACCION_DE, FalloDeCreacion, ROTULO_ACCION, ROTULO_RESULTADO, borradorLote, crearConReintento, csvCredenciales, csvEjemplo, csvRechazadas, excedeBytes,
+    TEXTO_SESION_RETOMADA, explicarError, leerCsv, nuevaLlave, textoPesado, type AccionLote, type ErrorExplicado, type FilaInforme, type FilaLote, type InformeLote, type PlantillaLote,
+    type Problema,
   } from './lib/lote';
   import type { EventoVivo, Sitio } from './lib/modelo';
   import { puedeEn, type Sesion } from './lib/sesion';
@@ -165,14 +166,30 @@
   }
 
   // ── Alta masiva ───────────────────────────────────────────────────────────────────────────────────────────────────────────────
-  let archivo = $state<string | null>(null);
-  let filasArchivo = $state<FilaLote[]>([]);
-  let erroresArchivo = $state<string[]>([]);
+  // El archivo leído se retoma del borrador de la pestaña (lib/lote.ts): si la sesión venció, la aplicación mostró «Entrar» y, al volver,
+  // la persona no tiene que elegirlo de nuevo (docs/19 §4, N8b).
+  let archivo = $state<string | null>(borradorLote.archivo);
+  let filasArchivo = $state<FilaLote[]>(borradorLote.filas);
+  let erroresArchivo = $state<Problema[]>([]);
   let informe = $state<FilaInforme[] | null>(null);
   let huella = $state<string | null>(null);
   let validando = $state(false);
   let creandoLote = $state(false);
   let avisoLote = $state<DatosAviso | null>(null);
+  // Un error del alta masiva, ya traducido (qué pasó, por qué y el botón del remedio: docs/19 §4, N8b). El foco va al aviso.
+  let errorLote = $state<ErrorExplicado | null>(untrack(() => borradorLote.aviso));
+  borradorLote.aviso = null;
+  let cajaError = $state<HTMLDivElement | null>(null);
+  let campoArchivo = $state<HTMLInputElement | null>(null);
+  let tablaInforme = $state<HTMLTableElement | null>(null);
+  $effect(() => {
+    if (errorLote !== null) void tick().then(() => cajaError?.focus());
+  });
+  function mostrarError(x: ErrorExplicado): void {
+    errorLote = x;
+    // La aplicación cambia a «Entrar»: al volver, el aviso dice que el archivo se conservó y ofrece validarlo de nuevo.
+    if (x.caso === 'sesion_vencida') borradorLote.aviso = { ...x, texto: TEXTO_SESION_RETOMADA, accion: 'reintentar' };
+  }
   // La plantilla del servidor: columnas, obligatorias, topes y límites (docs/19 §4, N4). Sin ella no se lee el archivo.
   let plantilla = $state<PlantillaLote | null>(null);
   let errorPlantilla = $state<string | null>(null);
@@ -197,25 +214,40 @@
     informe = null;
     huella = null;
     avisoLote = null;
+    errorLote = null;
     if (f === undefined || plantilla === null) return;
     archivo = f.name;
     // El tamaño ANTES de leerlo (revisión del 11/11/2026): un archivo de cientos de MB no se carga entero en la memoria de la pestaña. El
     // tope es el del cuerpo del lote (`max_bytes`): un CSV que lo pasa tampoco cabría como JSON.
     if (f.size > plantilla.max_bytes) {
       filasArchivo = [];
-      erroresArchivo = [`el archivo pesa más de ${megas(plantilla.max_bytes)} MB: divídelo`];
-      return;
+      erroresArchivo = [{ caso: 'archivo_pesado', texto: textoPesado(f.size, plantilla.max_bytes) }];
+    } else {
+      const l = leerCsv(await f.text(), plantilla);
+      filasArchivo = l.filas;
+      erroresArchivo = l.errores;
     }
-    const l = leerCsv(await f.text(), plantilla);
-    filasArchivo = l.filas;
-    erroresArchivo = l.errores;
+    borradorLote.archivo = archivo;
+    borradorLote.filas = filasArchivo;
+  }
+
+  // El botón del remedio de cada caso (la tabla de N8b): lo que hace no depende de dónde se mostró el error.
+  function remedio(a: AccionLote): void {
+    errorLote = null;
+    if (a === 'otro_archivo') campoArchivo?.focus();
+    else if (a === 'plantilla' && plantilla !== null) descargarTexto(csvEjemplo(plantilla), 'plantilla-alta-masiva.csv');
+    else if (a === 'revisar') void tick().then(() => (tablaInforme ?? campoArchivo)?.focus());
+    else if (a === 'reintentar') void (informe !== null && huella !== null && validas.length > 0 ? crearValidas(validas) : validar());
+    else if (a === 'inventario') window.location.hash = '#/inventario';
+    else if (a === 'sesion') window.location.reload();
   }
 
   async function validar(): Promise<void> {
     if (validando || filasArchivo.length === 0 || plantilla === null) return;
     const cuerpo = { filas: filasArchivo };
+    errorLote = null;
     if (excedeBytes(cuerpo, plantilla)) {
-      avisoLote = { tipo: 'error', texto: `El archivo convertido pasa el tope de ${megas(plantilla.max_bytes)} MB: divídelo.` };
+      mostrarError({ caso: 'archivo_pesado', texto: textoPesado(new TextEncoder().encode(JSON.stringify(cuerpo)).length, plantilla.max_bytes), accion: ACCION_DE.archivo_pesado, detalles: [] });
       return;
     }
     validando = true;
@@ -226,7 +258,7 @@
       informe = r.filas;
       huella = r.huella;
     } catch (e) {
-      if (!esCancelacion(e)) avisoLote = avisoDeError(e);
+      if (!esCancelacion(e)) mostrarError(explicarError(e, { operacion: 'validar' }));
     } finally {
       validando = false;
     }
@@ -263,19 +295,18 @@
       if (credenciales.length > 0) descargadas = false;
       avisoLote = { tipo: 'exito', texto: `Listo: ${r.filas.filter((f) => f.resultado === 'creada').length} creadas de ${filas.length}.` };
     } catch (e) {
-      const codigo = codigoDeConflicto(e);
-      const plan = e instanceof ErrorApi ? (e.cuerpo.plan as InformeLote | undefined) : undefined;
-      if (codigo === 'plan_cambio' && plan !== undefined) {
+      // La traducción única (lib/lote.ts, explicarError): qué pasó, por qué y el remedio. Con `plan_cambio` en el primer intento, la
+      // revisión pasa al plan nuevo, con su huella, y el aviso lista las filas que cambiaron (antes → ahora).
+      const visto = informe ?? [];
+      const x = explicarError(e, { operacion: 'crear', visto });
+      const causa = e instanceof FalloDeCreacion ? e.causa : e;
+      const plan = x.caso === 'plan_cambio' && causa instanceof ErrorApi ? (causa.cuerpo.plan as InformeLote | undefined) : undefined;
+      if (plan !== undefined) {
         const porFila = new Map(plan.filas.map((f) => [f.n, f]));
-        informe = (informe ?? []).map((f) => porFila.get(f.n) ?? f);
+        informe = visto.map((f) => porFila.get(f.n) ?? f);
         huella = plan.huella;
-        avisoLote = { tipo: 'conflicto', texto: 'Cambió desde que lo revisaste: no se creó ninguno. Revisa el informe y vuelve a crear las válidas.' };
-      } else if (codigo === 'lote_en_curso') {
-        avisoLote = { tipo: 'espera', texto: 'Hay otra alta por lote en curso: espera a que termine y vuelve a intentarlo. No se creó ninguno.' };
-      } else if (hayQueRepetir(e)) {
-        // Tres intentos sin respuesta (revisión del 15/11/2026): no se sabe si se crearon, y sus credenciales no se pueden recuperar.
-        avisoLote = { tipo: 'error', texto: AVISO_SIN_RESPUESTA };
-      } else avisoLote = avisoDeError(e);
+      }
+      mostrarError(x);
     } finally {
       creandoLote = false;
     }
@@ -483,16 +514,32 @@
           <Boton etiqueta="Descargar un ejemplo" variante="discreto" onclick={() => descargarTexto(csvEjemplo(p), 'ejemplo-alta-masiva.csv')} /></p>
         <div class="campo">
           <label for="{uid}-archivo">Archivo CSV</label>
-          <input id="{uid}-archivo" type="file" accept=".csv,text/csv" onchange={(e) => void leerArchivo(e)} data-archivo />
+          <input id="{uid}-archivo" type="file" accept=".csv,text/csv" onchange={(e) => void leerArchivo(e)} bind:this={campoArchivo} data-archivo />
         </div>
       {/if}
       {#if erroresArchivo.length > 0}
-        <Aviso tipo="error" texto={`El archivo no sirve: ${erroresArchivo.join('; ')}.`} />
+        {@const accion = ACCION_DE[erroresArchivo[0]!.caso]}
+        <div class="aviso-caja error" role="alert" data-error-archivo={erroresArchivo[0]!.caso}>
+          <p class="aviso-texto">El archivo no se puede usar todavía{archivo === null ? '' : ` (${archivo})`}:</p>
+          <ul>{#each erroresArchivo as x, i (i)}<li>{x.texto}</li>{/each}</ul>
+          <Boton etiqueta={ROTULO_ACCION[accion]} onclick={() => remedio(accion)} data-remedio={accion} />
+        </div>
       {:else if archivo !== null && informe === null}
         <p data-filas-leidas>{archivo}: {filasArchivo.length} filas leídas.</p>
         <Boton etiqueta="Validar el archivo" etiquetaCargando="Validando…" variante="principal" cargando={validando} onclick={() => void validar()} data-validar />
       {/if}
       {#if avisoLote !== null}<Aviso tipo={avisoLote.tipo} texto={avisoLote.texto} alCerrar={() => (avisoLote = null)} />{/if}
+      {#if errorLote !== null}
+        {@const x = errorLote}
+        <div class="aviso-caja error" role="alert" tabindex="-1" bind:this={cajaError} data-error-lote={x.caso}>
+          <p class="aviso-texto">{x.texto}</p>
+          {#if x.detalles.length > 0}<ul data-detalles-error>{#each x.detalles as d, i (i)}<li>{d}</li>{/each}</ul>{/if}
+          <span class="acciones">
+            <Boton etiqueta={ROTULO_ACCION[x.accion]} variante="principal" onclick={() => remedio(x.accion)} data-remedio={x.accion} />
+            <Boton etiqueta="Cerrar aviso" variante="discreto" onclick={() => (errorLote = null)} />
+          </span>
+        </div>
+      {/if}
       {#if credenciales.length > 0}
         <div class="clave-una-vez" data-credenciales-lote>
           <p role="status"><strong>{credenciales.length} credenciales</strong> de las creadas. <strong>No se vuelven a mostrar</strong>: descárgalas ahora y
@@ -514,7 +561,7 @@
           {#if conteo.rechazada > 0}<Boton etiqueta="Descargar rechazadas" onclick={bajarRechazadas} data-descargar-rechazadas />{/if}
         </span>
         <div class="tabla">
-          <table data-informe-lote>
+          <table data-informe-lote tabindex="-1" bind:this={tablaInforme}>
             <thead><tr><th scope="col">Fila</th><th scope="col">Identificador</th><th scope="col">Resultado</th><th scope="col">Motivo</th></tr></thead>
             <tbody>
               {#each informe as f (f.n)}

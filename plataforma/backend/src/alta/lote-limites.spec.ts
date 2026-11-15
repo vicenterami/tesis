@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { BadRequestException, PayloadTooLargeException } from '@nestjs/common';
 import { COLUMNAS_LOTE, COLUMNAS_TEXTO_LIBRE, MAX_BYTES_LOTE, MAX_FILAS_LOTE, TOPES_COLUMNA, TOPE_CANALES, filasDelCuerpo, plantillaLote } from './lote.js';
-import { MENSAJE_TOPE_CUERPO, MENSAJE_TOPE_LOTE, TOPE_CUERPO_LOTE } from '../arranque.js';
+import { MENSAJE_TOPE_CUERPO, MENSAJE_TOPE_LOTE, TOPE_CUERPO_LOTE, esLote } from '../arranque.js';
 
 // Los límites del alta por lote, en el límite (docs/19 §4, N5 y N11): el peor caso de 500 filas con cada columna en su tope se MIDE en
 // bytes UTF-8 (no se estima) y fija el tope del cuerpo, que es uno solo en el backend (MAX_BYTES_LOTE, que usa el lector de JSON) y en el
@@ -69,8 +69,11 @@ describe('el tope del cuerpo sale del peor caso medido de lo que se acepta', () 
       for (const x of ['"', '\\', 'é', '€']) expect(motivosDe({ n: 8, [c]: x })).toEqual([`fila 8: ${c} admite solo caracteres ASCII imprimibles, sin comillas dobles ni barra invertida`]);
     }
   });
-  it('501 filas es 413', () => {
+  it('501 filas es 413 con `codigo: demasiadas_filas`; un cuerpo inválido es 400 con `codigo: cuerpo_invalido` y la lista de motivos', () => {
     expect(() => filasDelCuerpo(peorCaso(MAX_FILAS_LOTE + 1), 'crear')).toThrow(PayloadTooLargeException);
+    try { filasDelCuerpo(peorCaso(MAX_FILAS_LOTE + 1)); } catch (e) { expect((e as PayloadTooLargeException).getResponse()).toMatchObject({ codigo: 'demasiadas_filas' }); }
+    try { filasDelCuerpo({ filas: [{ n: 2, color: 'x' }] }); } catch (e) { expect((e as BadRequestException).getResponse()).toEqual({ statusCode: 400, error: 'Bad Request', codigo: 'cuerpo_invalido', message: ['fila 2: columna no admitida: color'] }); }
+    expect.assertions(3);
   });
   it('una celda un carácter sobre su tope es 400 con su fila; también una que no es texto ni número', () => {
     for (const c of COLUMNAS_LOTE) {
@@ -103,12 +106,26 @@ describe('el tope del cuerpo sale del peor caso medido de lo que se acepta', () 
     const cuerpos = [...conf.matchAll(/return 413 '([^']*)';/g)].map((m) => JSON.parse(m[1]) as unknown);
     expect(cuerpos).toEqual([{ statusCode: 413, message: MENSAJE_TOPE_CUERPO }, { statusCode: 413, message: MENSAJE_TOPE_LOTE }]);
   });
+  it('lo que el backend trata como lote (tope grande) también lo trata así el proxy: nunca al revés', () => {
+    const conf = readFileSync(new URL('../../../proxy/nginx.conf', import.meta.url), 'utf8');
+    const expr = /location ~\* (\S+) \{\n[^}]*client_max_body_size/.exec(conf)?.[1];
+    expect(expr).toBe('^/dispositivos/lote/?$');
+    const delProxy = new RegExp(expr!, 'i');
+    // nginx compara `$uri`: sin la consulta, con los %XX decodificados y las barras repetidas unidas (merge_slashes, por omisión).
+    const uri = (url: string): string => decodeURIComponent(url.split('?')[0]).replace(/\/{2,}/g, '/');
+    const urls = ['/dispositivos/lote', '/dispositivos/lote/', '/dispositivos/lote?x=1', '/dispositivos/lote/?modo=crear', '/Dispositivos/Lote', '/DISPOSITIVOS/LOTE?modo=validar',
+      '/dispositivos/lote;x', '//dispositivos/lote', '/dispositivos//lote', '/dispositivos%2flote', '/dispositivos/lote%2f', '/dispositivos/lote/plantilla', '/dispositivos/lote-falso'];
+    const inseguras = urls.filter((u) => esLote('POST', u) && !delProxy.test(uri(u)));
+    expect(inseguras).toEqual([]);
+    expect(urls.filter((u) => esLote('POST', u))).toEqual(['/dispositivos/lote', '/dispositivos/lote/', '/dispositivos/lote?x=1', '/dispositivos/lote/?modo=crear', '/Dispositivos/Lote', '/DISPOSITIVOS/LOTE?modo=validar']);
+  });
   it('la plantilla publica los mismos topes, max_filas, max_bytes y los separadores; las obligatorias son las que exige la validación', () => {
     const p = plantillaLote();
     expect(p.columnas.map((c) => c.nombre)).toEqual([...COLUMNAS_LOTE]);
     expect(Object.fromEntries(p.columnas.map((c) => [c.nombre, c.tope]))).toEqual(TOPES_COLUMNA);
     expect(p.columnas.filter((c) => c.obligatoria).map((c) => c.nombre)).toEqual(['id_fisico', 'nombre', 'zona', 'intervalo_esperado_s', 'canales']);
     expect(p).toMatchObject({ max_filas: MAX_FILAS_LOTE, max_bytes: MAX_BYTES_LOTE, separadores: { columnas: [';', ',', '\t'], canales: ['|', ';'] } });
-    expect(p.columnas.find((c) => c.nombre === 'canales')?.ejemplo).not.toContain(';'); // el ejemplo ya no trae «;» sin comillas
+    expect(p.columnas.find((c) => c.nombre === 'canales')?.ejemplo).not.toContain(';');
+    expect(p.columnas.filter((c) => c.texto_libre).map((c) => c.nombre)).toEqual([...COLUMNAS_TEXTO_LIBRE]); // la pantalla comprueba lo mismo que filasDelCuerpo // el ejemplo ya no trae «;» sin comillas
   });
 });

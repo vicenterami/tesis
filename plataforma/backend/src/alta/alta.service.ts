@@ -17,6 +17,18 @@ import { AltaDeLote, Catalogos, ChoqueDeLote, PasarelaCatalogo, ZonaCatalogo } f
 
 // El COMMIT del lote falló y no se pudo saber si se aplicó (crearLote): no se deshace nada en el broker.
 class LoteIncierto extends Error {}
+// El `codigo` del 503 de un lote incierto (docs/10 §8.4 punto 67): el panel lo distingue de un 503 definitivo («nada se creó»).
+export const CODIGO_LOTE_INCIERTO = 'lote_incierto';
+// Un 500, 502 o 503 del lote que sale de aquí es definitivo (se deshizo la transacción o no se abrió): `codigo: nada_creado`, aditivo, para
+// que el panel no lo confunda con una respuesta perdida, que sí puede haber creado algo (revisión del 15/11/2026).
+export const CODIGO_NADA_CREADO = 'nada_creado';
+function nadaCreado(e: HttpException): HttpException {
+  const estado = e.getStatus();
+  if (estado !== 500 && estado !== 502 && estado !== 503) return e;
+  const r = e.getResponse();
+  const message = typeof r === 'string' ? r : (r as { message?: unknown }).message;
+  return new HttpException({ statusCode: estado, error: e.name, codigo: CODIGO_NADA_CREADO, message }, estado);
+}
 
 export interface CanalCreado {
   id: string;
@@ -489,12 +501,24 @@ export class AltaService {
     };
   }
 
-  // ¿Quedaron estos dispositivos en la base? true si alguno está (una transacción no deja la mitad), false si ninguno, null si la consulta
-  // misma falla (la base no responde: no se sabe).
-  private async loteQuedo(idsFisicos: string[]): Promise<boolean | null> {
+  // ¿Quedó el lote? Se pregunta por otra conexión y solo cuando el proceso de la base que tenía la transacción ya terminó (revisión del
+  // 15/11/2026): la conexión se destruyó y se pide a la base terminar ese proceso; mientras exista, un COMMIT en vuelo todavía podría
+  // aplicarse y «no está» no probaría nada. Después se buscan los `id` que devolvió el INSERT de ESTE lote (no los id_fisico: otra
+  // petición pudo crear uno de esos identificadores entre tanto): 'todos' = quedó; 'ninguno' = no quedó; null = no se sabe (el proceso no
+  // terminó a tiempo, la consulta falló, o están algunos y no todos, que una transacción no deja).
+  private async loteQuedo(ids: string[], pid: number | null, esperaMs = 5_000): Promise<'todos' | 'ninguno' | null> {
     try {
-      const r = await this.pool.query<{ n: string }>('SELECT count(*) AS n FROM dispositivo WHERE id_fisico = ANY($1::text[])', [idsFisicos]);
-      return Number(r.rows[0]?.n ?? 0) > 0;
+      if (pid === null) return null;
+      await this.pool.query('SELECT pg_terminate_backend($1)', [pid]);
+      for (let t = 0; ; t += 100) {
+        const vivo = await this.pool.query('SELECT 1 FROM pg_stat_activity WHERE pid = $1', [pid]);
+        if (vivo.rows.length === 0) break;
+        if (t >= esperaMs) return null;
+        await new Promise((ok) => setTimeout(ok, 100));
+      }
+      const r = await this.pool.query<{ n: string }>('SELECT count(*) AS n FROM dispositivo WHERE id = ANY($1::uuid[])', [ids]);
+      const n = Number(r.rows[0]?.n ?? -1);
+      return n === ids.length ? 'todos' : n === 0 ? 'ninguno' : null;
     } catch {
       return null;
     }
@@ -513,13 +537,16 @@ export class AltaService {
   // antes de abrir la transacción. Hasta el 13/11/2026 el resumen era scrypt, en tandas para no acaparar el pool de hilos (docs/16 §61);
   // ya no hace falta (docs/16 §65). Devuelve, por fila del archivo, el id y la conexión (la credencial, una sola vez).
   async crearLote(altas: readonly AltaDeLote[], usuarioId: string | null): Promise<Map<number, { id: string; credencial: string | null; topico: string | null }>> {
-    if (altas.some((x) => x.alta.via === 'mqtt') && !this.dynsec.disponible) throw this.sinBroker();
+    if (altas.some((x) => x.alta.via === 'mqtt') && !this.dynsec.disponible) throw nadaCreado(this.sinBroker());
     const secretos = altas.map((x) => (x.alta.via === 'lorawan' ? null : generarSecreto()));
     const hashes = secretos.map((k) => (k === null ? null : resumirSecreto(k)));
     const c = await this.tomar();
     const creadosEnBroker: string[] = [];
+    let destruida = false;
     try {
       await this.abrir(c);
+      // El proceso de la base que lleva esta transacción: si el COMMIT responde con error, se espera a que termine antes de preguntar si quedó.
+      const pid = (await c.query<{ pid: number }>('SELECT pg_backend_pid() AS pid')).rows[0]?.pid ?? null;
       // Las pasarelas del lote, bloqueadas en modo compartido hasta confirmar y todavía activas (revisión del 15/11/2026: la FK solo cuida
       // el formato; una pasarela dada de baja entre el cálculo del plan y el INSERT dejaría nodos colgando de ella). Si alguna ya no lo
       // está, es un plan que cambió.
@@ -576,10 +603,12 @@ export class AltaService {
         await c.query('COMMIT');
       } catch (e) {
         // Un COMMIT que falla puede haberse confirmado igual (la conexión se cortó después de que la base lo aplicó; revisión del
-        // 15/11/2026). Antes de deshacer en el broker se mira, por otra conexión, si los dispositivos quedaron: si quedaron, el lote está
-        // creado y sus credenciales valen; si no se puede saber, nada se borra y se dice qué revisar.
-        const quedo = await this.loteQuedo(altas.map((x) => x.alta.id_fisico));
-        if (quedo === true) {
+        // 15/11/2026). La conexión se destruye (no vuelve al grupo con una transacción quizá abierta) y, por otra, se mira si el lote
+        // quedó: si quedó, sus credenciales valen; si no, se deshace en el broker; si no se puede saber, nada se borra y se dice qué revisar.
+        this.soltar(c, true);
+        destruida = true;
+        const quedo = await this.loteQuedo(r.rows.map((x) => x.id), pid);
+        if (quedo === 'todos') {
           this.log.warn(`alta por lote: el COMMIT respondió con error pero los ${altas.length} dispositivo(s) quedaron en la base; se dan por creados`);
           return resultado;
         }
@@ -589,10 +618,15 @@ export class AltaService {
       this.log.log(`alta por lote: ${altas.length} dispositivo(s), ${ordenes.length} credencial(es) en el broker`);
       return resultado;
     } catch (e) {
-      await c.query('ROLLBACK').catch(() => undefined);
+      if (!destruida) await c.query('ROLLBACK').catch(() => undefined);
       if (e instanceof LoteIncierto) {
-        this.log.error(`alta por lote: no se pudo saber si ${altas.length} dispositivo(s) quedaron creados; no se tocó el broker`);
-        throw new ServiceUnavailableException('no se pudo confirmar si el lote quedó creado: revisa el inventario; los que aparezcan necesitan rotar su credencial (las de esta respuesta no se entregaron)');
+        // No se borra nada del broker: si el lote quedó, esos clientes son los suyos. Si no quedó, quedan clientes sin dispositivo: se
+        // listan aquí (son identificadores, no secretos) para borrarlos a mano.
+        this.log.error(`alta por lote: no se pudo saber si ${altas.length} dispositivo(s) quedaron creados; no se tocó el broker. Si no aparecen en el inventario, sus clientes quedaron sin dispositivo: borrarlos con pruebas/broker-cliente.sh --borrar <id> (${creadosEnBroker.join(', ') || 'ninguno creado en el broker'})`);
+        throw new ServiceUnavailableException({
+          statusCode: 503, error: 'Service Unavailable', codigo: CODIGO_LOTE_INCIERTO,
+          message: 'no se pudo confirmar si el lote quedó creado: revisa el inventario. Los que aparezcan quedaron creados y necesitan rotar su credencial (las de esta respuesta no se entregaron); si no aparecen, pudo quedar su usuario en el broker sin dispositivo y el administrador del servidor debe borrarlo (el registro del backend dice cuáles)',
+        });
       }
       for (const id of creadosEnBroker) await this.deshacerEnBroker(id);
       // Un 23505 aquí es un identificador que otra petición creó entre la validación y la creación; un 23503 de
@@ -600,9 +634,9 @@ export class AltaService {
       // todo y el controlador recalcula y responde `plan_cambio` con el plan nuevo (docs/19 §4, N8).
       const pg = e as ErrorPg;
       if (e instanceof ChoqueDeLote || pg.code === '23505' || (pg.code === '23503' && pg.constraint === 'fk_dispositivo_pasarela_formato')) throw new ChoqueDeLote();
-      throw this.traducir(e, `lote de ${altas.length}`, 'alta');
+      throw nadaCreado(this.traducir(e, `lote de ${altas.length}`, 'alta'));
     } finally {
-      this.soltar(c);
+      if (!destruida) this.soltar(c);
     }
   }
 
@@ -663,9 +697,10 @@ export class AltaService {
     }
   }
 
-  private soltar(c: PoolClient): void {
+  // `destruir`: la conexión no vuelve al grupo (pg la cierra). Se usa cuando su estado es dudoso (un COMMIT que respondió con error).
+  private soltar(c: PoolClient, destruir = false): void {
     c.off('error', errorDeCliente);
-    c.release();
+    c.release(destruir ? true : undefined);
     this.enCurso--;
   }
 

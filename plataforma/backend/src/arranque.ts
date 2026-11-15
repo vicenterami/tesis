@@ -142,6 +142,15 @@ export function claveApp(valor: string | undefined): string {
 export function rutaSinCache(ruta: string): boolean {
   return !/^\/(panel|docs)(\/|$)/i.test(ruta);
 }
+// helmet no emite Permissions-Policy; la API no usa cámara, micrófono ni ubicación. Y toda respuesta de la API va con
+// `Cache-Control: no-store` (rutaSinCache; revisión del 08/11/2026): una sola regla en vez de repetirla ruta por ruta. Una ruta puede
+// pisarla después (el canal en vivo pone la suya, también sin caché). main.ts la monta primero, para que valga también en los rechazos
+// que se dan antes de leer el cuerpo.
+export function cabecerasDeLaApi(req: { path?: string; url?: string }, res: { setHeader(k: string, v: string): unknown }, next: () => void): void {
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  if (rutaSinCache(req.path ?? (req.url ?? '').split('?')[0] ?? '')) res.setHeader('Cache-Control', 'no-store');
+  next();
+}
 
 // Tope de bytes del cuerpo JSON fuera del alta por lote (main.ts): 100 KiB, el de fábrica del lector. Solo `POST /dispositivos/lote` admite
 // hasta TOPE_CUERPO_LOTE (revisión del 15/11/2026: antes cualquier método en esa ruta; su tope real es el de filas, lote.ts). Lo usan el
@@ -201,10 +210,11 @@ export function opcionesLectorJson(): { limit: number; verify: (req: { method?: 
 // (un JSON ilegible) sigue su camino. Cuatro parámetros: así reconoce Express un manejador de errores.
 export function errorDeLectorJson(
   err: { status?: number; type?: string; message?: string } | undefined,
-  _req: unknown,
+  req: { method?: string; url?: string },
   res: { status(codigo: number): { json(cuerpo: unknown): unknown } },
   next: (e?: unknown) => void,
 ): void {
-  if (err?.type === 'entity.too.large') return void res.status(413).json({ statusCode: 413, message: err.message === MENSAJE_TOPE_CUERPO ? err.message : MENSAJE_TOPE_LOTE });
+  // El mensaje, por la ruta (revisión del 15/11/2026): fuera del lote, el tope de 100 KiB, aunque el cuerpo haya pasado también el del lote.
+  if (err?.type === 'entity.too.large') return void res.status(413).json({ statusCode: 413, message: esLote(req.method, req.url) ? MENSAJE_TOPE_LOTE : MENSAJE_TOPE_CUERPO });
   next(err);
 }

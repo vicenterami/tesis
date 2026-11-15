@@ -4,7 +4,7 @@ Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emu
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
 cubría al escribirse se agregó después: TT-32 (sensor físico) en §43, §44 y §53, y TT-30 (recuperación ante reinicio) en §11. El
-contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 726 pruebas unitarias del backend y 355 del panel.
+contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 731 pruebas unitarias del backend y 365 del panel.
 Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -3211,6 +3211,28 @@ topes del cuerpo por el proxy: un byte más que el del lote y 200 KiB fuera de �
 backend. Por el proxy, el peor caso nuevo, 1 147 087 bytes, entra (200, en 0,04 s). Pruebas: 709 → 726 en el backend (62 archivos) y
 353 → 355 en el panel (357 ejecuciones).
 
+**Lo que dejó la segunda revisión del 15/11/2026, y los errores que ve quien usa la pantalla.** Cada corrección con su prueba y su
+falla plantada (aplicada, vista en rojo y deshecha); el contrato y la tabla de errores se escribieron en `docs/19 §4` (N8 y N8b) y en
+`docs/10 §8.4` punto 67.
+
+| Corrección | Prueba | Plantada → resultado |
+|---|---|---|
+| COMMIT con error: se buscan los `id` que devolvió el INSERT de este lote (no los `id_fisico`, que otra petición pudo crear entre tanto) y deben estar todos; «algunos» es incierto | `lote-servicio.spec.ts` (todos; 1 de 2) | buscar por `id_fisico` → 1; «alguno basta» → 1 |
+| COMMIT con error: la conexión se destruye antes de preguntar (no vuelve al grupo con una transacción quizá abierta) y se espera a que termine su proceso en la base (`pg_terminate_backend` y `pg_stat_activity`), para que un COMMIT en vuelo ya se haya aplicado o ya no pueda | `lote-servicio.spec.ts` (las tres ramas comprueban `release(true)`) | sin destruirla → 3 |
+| El 503 incierto lleva `codigo: lote_incierto` y dice qué puede quedar (usuarios del broker sin dispositivo, listados en el registro) | `lote-servicio.spec.ts` | sin el `codigo` → 2 |
+| Los fallos definitivos del lote llevan `codigo: nada_creado`; el 429, `codigo` y `reintentar_en_s`; el 400 del cuerpo, `cuerpo_invalido`; el 413 de filas, `demasiadas_filas`; la plantilla, `texto_libre` por columna | `lote-servicio.spec.ts`, `lote-controlador.spec.ts` y `lote-limites.spec.ts` | el 429 sin la espera → 1 |
+| `Permissions-Policy` y `Cache-Control: no-store` también en el 401 y el 413 que se dan antes de leer (`cabecerasDeLaApi`, montada primero) | `arranque-cuerpo.spec.ts` | montarla después → 1 |
+| El 413 del lector elige su mensaje por la ruta (`esLote`): fuera del lote, el de 100 KiB aunque el cuerpo pase también el tope grande | `arranque-cuerpo.spec.ts` | el mensaje del lote para todos → 1 |
+| El almacén por llave mide bytes (`Buffer.byteLength`); medido en memoria, ≈ 2 veces el JSON (20 respuestas de 500 filas: 9,9 MB de JSON, 20 MB del montículo), así que lleno ronda 32 MiB | — (documentado en `lote.ts`, `docs/10` y `docs/11`) | — |
+| El error imprevisto de un adaptador se registra acotado (un ERROR por adaptador y clase por minuto); la rama del tópico de pasarela tiene su prueba | `recepcion.service.spec.ts` | sin acotar → 1; sin la condición de la pasarela → 1 |
+| Lo que el backend trata como lote también lo trata así el proxy (tabla de URL con `/` final, consulta, mayúsculas, `;x`, `//` y `%2f`) | `lote-limites.spec.ts` | un `esLote` más ancho que el `location` → 1 |
+| «El peor caso de lo que se acepta» es el del JSON tal como lo escribe `JSON.stringify`: un cuerpo con sangría, números con relleno o escapes pesa más y recibe 413 (se eligió decirlo; restringir los números no evitaba la sangría) | — (documentado) | — |
+| Panel: un 409 que llega en un reintento no dice «no se creó ninguno» sino que no se sabe; un fallo con `codigo` (`nada_creado`, `lote_incierto`) no se repite y dice lo cierto | `lib/lote.test.ts` y `Alta.test.ts` | sin la regla del intento → 2; repetir lo definitivo → 1 |
+| Panel: la tabla de N8b. Una sola traducción (`explicarError`, `TEXTO_DE`, `ACCION_DE`), una prueba por caso en `lib/lote.test.ts` (22 casos), lo que se ve y el botón en `Alta.test.ts`, y una prueba que falla si un caso queda sin mensaje o sin acción; lo que se puede ver al leer (columna desconocida, obligatoria que falta, celdas de más, celda fuera de forma, filas o bytes de más) se ve antes de enviar | `lib/lote.test.ts`, `Alta.test.ts` | plan cambió sin las filas → 2; columna desconocida sin aviso → 3; sesión vencida como «otro» → 2; un caso sin acción → 1 |
+
+Con la pila reconstruida y el proxy reiniciado: `api-smoke.sh` TODO OK, `sesion-smoke.sh` 408 de 408 y `banco.sh proxy` PROXY OK, con `proxy-limites.sh` 27 de 27. Pruebas: 726 → 731 en el backend (62 archivos) y
+355 → 365 en el panel (404 ejecuciones en vitest).
+
 ## 72. Rango a medida en la ficha y el valor de la salud del sitio (15/11/2026)
 
 **Por qué.** A dos historias del núcleo les faltaba una sola cosa para poder cerrarse (`docs/18 §5`). HU-07 (historial por rango de fechas): la ficha
@@ -3470,10 +3492,10 @@ de `src/recepcion/` volvió a como estaba). Para el guardián se alteró la prop
 | | Antes | Después |
 |---|---|---|
 | Pruebas del backend | 665 en 61 archivos | 709 en 62 archivos (más 4 pendientes) |
-| Pruebas del panel | 355 ejecuciones en 33 archivos | sin cambio |
+| Pruebas del panel | 353 en 33 archivos (355 ejecuciones) | sin cambio en este bloque (las vigentes, en «Cifras del bloque») |
 | `it(` contados por el paso 2t del verificador | 665 | 709 |
 
-**Cifras del bloque:** `pnpm verificar` en verde al cerrarlo: 709 pruebas en el backend, en 62 archivos (más 4 pendientes), y 353 en el panel (355 ejecuciones en vitest, en 33 archivos); `pnpm build` pasa. De `src/recepcion/` cambió solo `adaptadores/senml.adaptador.ts`, por las dos correcciones. Tras la revisión del mismo día (§71, «Lo que dejó la revisión»): 726 pruebas unitarias del backend y 355 pruebas del panel; en la matriz, C-43 con prueba propia y C-95 nueva (`plano.adaptador.ts`), y en `recepcion.service.ts`, el error imprevisto de un adaptador va a cuarentena.
+**Cifras del bloque:** `pnpm verificar` en verde al cerrarlo: 709 pruebas en el backend, en 62 archivos (más 4 pendientes), y 353 en el panel (355 ejecuciones en vitest, en 33 archivos); `pnpm build` pasa. De `src/recepcion/` cambió solo `adaptadores/senml.adaptador.ts`, por las dos correcciones. Tras las revisiones del mismo día (§71, «Lo que dejó la revisión»), las cifras vigentes: 731 pruebas unitarias del backend y 365 pruebas del panel (404 ejecuciones en vitest); en la matriz, C-43 con prueba propia y C-95 nueva (`plano.adaptador.ts`), y en `recepcion.service.ts`, el error imprevisto de un adaptador va a cuarentena.
 El verificador completo (`plataforma/pruebas/verificar-todo.sh`) corrió con el bloque integrado.
 
 ### Lo que queda

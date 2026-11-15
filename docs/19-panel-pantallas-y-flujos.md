@@ -798,7 +798,7 @@ El alta masiva de F2 (11/11/2026) valida bien y explica poco. Lo que se observa 
    que no es texto ni número, que trae un carácter de control o un sustituto UTF-16 suelto, o que en una columna de códigos (todas salvo
    `nombre` y `zona`) trae algo que no es ASCII imprimible, `"` o `\`, responde 400 con la fila (revisión del 15/11/2026: con solo el NUL
    prohibido, el «peor caso» se podía superar). `max_bytes` es el peor caso de lo que se **acepta** con `max_filas` filas y todas las
-   columnas en su tope, medido en bytes UTF-8 por una prueba, no estimado, que además intenta superarlo con cada carácter admisible:
+   columnas en su tope, en el JSON tal como lo escribe `JSON.stringify` (el del panel; un cuerpo con sangría, números con relleno o escapes innecesarios pesa más y recibe 413), medido en bytes UTF-8 por una prueba, no estimado, que además intenta superarlo con cada carácter admisible:
    1 147 087 bytes; el tope, 1 147 904 (`MAX_BYTES_LOTE`, 1 121 KiB), el mismo en el lector de JSON, la plantilla y el `location` del lote
    en el proxy (`docs/11 §4`). Los 512 KiB de antes no alcanzaban para 500 filas llenas.
 6. **Entradas, y un solo camino desde ahí.** Archivo CSV (separador `;`, `,` o tabulador, detectado en la cabecera fuera de comillas;
@@ -839,13 +839,52 @@ El alta masiva de F2 (11/11/2026) valida bien y explica poco. Lo que se observa 
    y responden también `plan_cambio` con su plan. **Todo o nada al pie de la letra** (revisión del 15/11/2026): en `crear`, una fila
    que no entra o que ya existe también es `plan_cambio`, aunque la huella coincida; el panel solo manda las válidas. Si el COMMIT
    responde con error, se mira si los dispositivos quedaron: si quedaron, el lote está creado; si no, se deshace en el broker; si no se
-   puede saber, 503 con el remedio (revisar el inventario y rotar la credencial de los que aparezcan), sin tocar el broker. **Si la respuesta se pierde** (las credenciales viajan una sola vez), el panel repite la
+   puede saber, 503 `codigo: lote_incierto` con el remedio (revisar el inventario y rotar la credencial de los que aparezcan), sin tocar el
+   broker: si el lote no quedó, sus usuarios del broker quedan sin dispositivo y el registro del backend los lista para que el
+   administrador los borre (repetir la creación no los limpia). Antes de preguntar, la conexión del COMMIT se destruye y se espera a que
+   termine su proceso en la base; se buscan los `id` del INSERT de este lote, y deben estar todos. **Si la respuesta se pierde** (las credenciales viajan una sola vez), el panel repite la
    petición con la misma llave y el servidor devuelve la misma respuesta: la guarda dos minutos en la memoria del proceso y después la
    borra (vale con una instancia, como «una creación a la vez»: `docs/11 §4`). Solo se guarda lo que creó algo, con topes de 200
    entradas, 3 por persona y 16 MiB; el reintento tiene su propio cupo de 10 por minuto y exige que la persona conserve «escribir» en los
    sitios de lo creado (revisión del 15/11/2026). Si tras tres intentos no hay respuesta, la pantalla lo dice con el remedio. Desaparecen las tandas, «creadas N de M», «Reintentar
    las restantes» y la constante `TANDA_CLIENTE_LOTE`; un alta de 500 son dos peticiones, y cada «Volver» y nueva revisión cuenta en
    el tope de 10 por minuto.
+**8b. Qué puede fallar en el alta masiva, por qué, qué ve la persona y qué puede hacer (diseñado y hecho el 15/11/2026, en la
+revisión del bloque).** ✅ panel y backend, 15/11/2026 (la traducción única es `explicarError` y la lectura `leerCsv`, de
+`panel/src/lib/lote.ts`; los mensajes y las acciones, en `TEXTO_DE` y `ACCION_DE`, y una prueba falla si un caso se queda sin ellos;
+`docs/16 §71`). Todo error se muestra en un aviso con `role="alert"` que recibe el foco, con el botón del remedio; el archivo leído
+**se conserva** en todos los casos (también si la sesión vence: queda en la memoria de la pestaña y se retoma al volver de «Entrar»).
+Lo que se puede ver al leer el archivo se ve antes de enviar, con la fila y la columna, usando la plantilla del servidor (tope y
+`texto_libre` de cada columna); el servidor sigue siendo la guarda real. Los botones: «Elegir otro archivo» (lleva al campo del
+archivo), «Descargar la plantilla», «Volver a revisar» (lleva a la tabla de la revisión), «Reintentar» (vuelve a validar o a crear),
+«Ir al inventario» e «Iniciar sesión».
+
+| Qué pasó | Por qué | Qué ve en pantalla | Qué puede hacer |
+|---|---|---|---|
+| El archivo está vacío | No trae ni la cabecera | «El archivo está vacío.» | Elegir otro archivo |
+| Trae solo la cabecera | No hay filas de datos | «El archivo trae la cabecera pero ninguna fila de datos.» | Elegir otro archivo |
+| La cabecera tiene una sola columna | El archivo no está separado por comas (una planilla en español suele guardar con `;`) | «La cabecera tiene una sola columna («…»): el archivo no está separado por comas. Una planilla en español suele guardar con «;»; descarga la plantilla y copia tus datos en ella.» | Descargar la plantilla |
+| Una columna no es de la plantilla | La cabecera trae un nombre que el sistema no conoce | «La columna «color» no es de la plantilla. Las columnas son: id_fisico, nombre, zona, via, formato, intervalo_esperado_s, canales, pasarela, decodificador.» | Descargar la plantilla |
+| Falta una columna obligatoria | La cabecera no la trae | «Falta la columna obligatoria «zona».» | Descargar la plantilla |
+| Una columna está repetida | La cabecera la trae dos veces | «La columna «nombre» está repetida en la cabecera.» | Descargar la plantilla |
+| Una fila trae más o menos celdas que la cabecera | Una coma de más o de menos en esa fila | «La fila 7 trae 9 celdas y la cabecera 8.» | Elegir otro archivo |
+| Demasiadas filas | Pasa el máximo de la plantilla (500) | «El archivo trae 501 filas y el máximo es 500: divídelo en partes de 500 o menos.» (si lo dice el servidor: «el lote trae 501 filas y el máximo es 500: divídelo.») | Elegir otro archivo |
+| El archivo pesa demasiado | Pasa `max_bytes` de la plantilla | «El archivo pesa 1,6 MB y el máximo es 1,1 MB: divídelo en partes más chicas.» (si lo dice el servidor: «cuerpo de más de 1147904 bytes.») | Elegir otro archivo |
+| Una celda pasa su tope, trae un carácter que no se admite o no es texto | El tope de la columna, un salto de línea o tabulador dentro de la celda, o un carácter que no es ASCII en una columna de códigos | «Fila 2, columna «nombre»: tiene 81 caracteres y el máximo es 80.» · «Fila 2, columna «id_fisico»: solo admite letras sin acento, dígitos y signos ASCII, sin comillas dobles ni barra invertida («…»).» · «Fila 2, columna «nombre»: trae un carácter que no se admite (un salto de línea, un tabulador u otro carácter de control).» | Elegir otro archivo |
+| El servidor rechazó el archivo (lo que la pantalla no alcanzó a ver) | Una regla del servidor (`codigo: cuerpo_invalido`) | «El servidor rechazó el archivo. Corrígelo y vuelve a elegirlo.» y la lista de sus motivos, con la fila | Elegir otro archivo |
+| Filas que no entran en la revisión | La validación de cada fila | La fila «Rechazada» con su motivo por campo (como hoy) | Descargar rechazadas |
+| La sesión venció | Pasó el tiempo de inactividad o de vida de la sesión | «Tu sesión venció. Entra de nuevo: el archivo leído se conserva en esta pestaña y lo vuelves a validar antes de crear.» Al volver de «Entrar»: «Tu sesión había vencido. El archivo leído se conservó: valídalo de nuevo antes de crear.» | Iniciar sesión; al volver, Reintentar |
+| No tiene permiso | Su perfil no da de alta | «Tu perfil no permite dar de alta dispositivos (lo hacen el operador técnico y los administradores). No se creó ninguno.» | Ir al inventario |
+| Hay otra creación en curso | El servidor crea un lote a la vez | «Hay otra alta por lote en curso en el servidor. Espera a que termine y reintenta; no se creó ninguno.» | Reintentar |
+| El plan cambió desde la revisión | Algo cambió en la base entre validar y crear | «Cambió algo desde que lo revisaste y no se creó ninguno. La revisión ya muestra lo de ahora; míralo y vuelve a crear.» y la lista de lo que cambió: «Fila 12 (nodo-12): se crea → ya existe: ya está dado de alta», «Fila 30 (nodo-30): se crea → no entra: la pasarela ug65 está dada de baja», «Fila 31 (nodo-31): sigue entrando, pero cambió formato milesight → chirpstack» | Volver a revisar (con el plan nuevo ya cargado) |
+| Demasiadas peticiones en un minuto | 10 validaciones o creaciones por minuto por persona | «Hiciste demasiadas validaciones o creaciones en un minuto. Espera 37 s y reintenta.» (los segundos los da el servidor) | Reintentar |
+| No llegó la respuesta y no se sabe si se creó | La conexión se cortó tras tres intentos con la misma llave, o un 409 llegó en un reintento (la primera petición pudo crear y perder su respuesta) | «No llegó la respuesta de la creación y no se sabe si se crearon. Revisa el inventario: las filas que al validar de nuevo salgan «ya existe» se crearon, y sus credenciales no se pueden recuperar: rota la credencial de cada una desde su ficha.» | Ir al inventario |
+| Sin respuesta al validar | La conexión se cortó; validar no crea nada | «No hubo respuesta del servidor. Validar no crea nada: reintenta cuando vuelva la conexión.» | Reintentar |
+| No se creó nada porque el broker o la base no respondieron | Falló antes de abrir la transacción o se deshizo (`codigo: nada_creado`) | «No se creó ninguno: el servidor no logró hablar con el broker o con la base de datos. Reintenta en un momento.» | Reintentar |
+| El servidor no pudo confirmar | El COMMIT respondió con error y no se pudo saber si se aplicó (`codigo: lote_incierto`) | «El servidor no pudo confirmar si se crearon. Revisa el inventario: los que aparezcan quedaron creados y necesitan rotar su credencial desde su ficha; si no aparecen, avisa al administrador del servidor.» | Ir al inventario |
+| La llave ya se usó con otro contenido | El reintento llevaba una llave de otra creación (`codigo: llave_reutilizada`) | «Esta creación se cruzó con una anterior de otro contenido y no se creó nada con ella. Vuelve a revisar y crea de nuevo.» | Volver a revisar |
+| Otro error | Lo que no calza en los anteriores | «No se pudo completar. Reintenta en un momento.» y los motivos del servidor, si los hay | Reintentar |
+
 9. **Lo que se descarga.** Plantilla y «las que no entran» van con `;`, BOM y CRLF, con las columnas de la plantilla en su orden más
    `fila` y `motivo`, que el lector ignora al volver a subir. Contra la inyección de fórmulas (OWASP, «CSV Injection») se antepone un
    apóstrofo a toda celda que empiece con `=`, `+`, `-`, `@`, tabulador, retorno o salto de línea, o con sus variantes de ancho

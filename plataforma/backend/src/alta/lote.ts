@@ -37,13 +37,17 @@ export const TOPES_COLUMNA: Readonly<Record<ColumnaLote, number>> = {
 // la revisión del 15/11/2026 la guarda solo rechazaba NUL y el «peor caso» de 1 467 392 no lo era: con caracteres de control o de tres bytes
 // en las columnas de códigos se pasaba. La prueba falla si el peor caso no cabe o si este tope lo pasa en más de 16 KiB. Lo usan el lector de
 // JSON (arranque.ts), la plantilla (`max_bytes`) y el proxy (`client_max_body_size` del `location` del lote en proxy/nginx.conf).
-// Un cliente que escriba el JSON con escapes innecesarios («\u0041» por «A») o claves repetidas manda más bytes para el mismo contenido y
-// puede recibir 413: el tope es el de la forma que produce JSON.stringify, la del panel.
+// Es el peor caso del JSON TAL COMO LO ESCRIBE JSON.stringify (la forma que manda el panel), no de cualquier texto que JSON.parse reduzca
+// a lo mismo: un cliente que escriba escapes innecesarios («\u0041» por «A»), claves repetidas, números con relleno («60.000…0») o el JSON
+// con sangría manda más bytes para el mismo contenido y puede recibir 413 del lector (revisión del 15/11/2026; se eligió decirlo y no
+// restringir los números a `n` e `intervalo_esperado_s`, porque la sangría y los espacios lo agrandan igual).
 export const MAX_BYTES_LOTE = 1121 * 1024;
 
 export const SEPARADORES_LOTE = { columnas: [';', ',', '\t'], canales: ['|', ';'] } as const;
 
-export interface ColumnaPlantilla { nombre: ColumnaLote; obligatoria: boolean; tope: number; ayuda: string; ejemplo: string }
+// `texto_libre`: admite cualquier carácter imprimible (nombre y zona); las demás, solo ASCII imprimible sin «"» ni «\» (filasDelCuerpo). Lo
+// publica la plantilla para que la pantalla compruebe lo mismo antes de enviar (revisión del 15/11/2026), sin copiar la lista.
+export interface ColumnaPlantilla { nombre: ColumnaLote; obligatoria: boolean; tope: number; texto_libre: boolean; ayuda: string; ejemplo: string }
 export interface PlantillaLote {
   columnas: ColumnaPlantilla[];
   max_filas: number;
@@ -63,7 +67,9 @@ const AYUDAS: Readonly<Record<ColumnaLote, [obligatoria: boolean, ayuda: string,
 };
 export function plantillaLote(): PlantillaLote {
   return {
-    columnas: COLUMNAS_LOTE.map((nombre) => ({ nombre, obligatoria: AYUDAS[nombre][0], tope: TOPES_COLUMNA[nombre], ayuda: AYUDAS[nombre][1], ejemplo: AYUDAS[nombre][2] })),
+    columnas: COLUMNAS_LOTE.map((nombre) => ({
+      nombre, obligatoria: AYUDAS[nombre][0], tope: TOPES_COLUMNA[nombre], texto_libre: COLUMNAS_TEXTO_LIBRE.includes(nombre), ayuda: AYUDAS[nombre][1], ejemplo: AYUDAS[nombre][2],
+    })),
     max_filas: MAX_FILAS_LOTE, max_bytes: MAX_BYTES_LOTE, separadores: SEPARADORES_LOTE,
   };
 }
@@ -157,7 +163,9 @@ export function filasDelCuerpo(cuerpo: unknown, modo: ModoLote = 'validar'): { f
   const c = cuerpo as Record<string, unknown>;
   const filas = c.filas;
   if (!Array.isArray(filas) || filas.length === 0) throw new BadRequestException(['filas debe ser una lista con al menos una fila']);
-  if (filas.length > MAX_FILAS_LOTE) throw new PayloadTooLargeException(`el lote trae ${filas.length} filas y el máximo es ${MAX_FILAS_LOTE}: divídelo`);
+  if (filas.length > MAX_FILAS_LOTE) {
+    throw new PayloadTooLargeException({ statusCode: 413, error: 'Payload Too Large', codigo: 'demasiadas_filas', message: `el lote trae ${filas.length} filas y el máximo es ${MAX_FILAS_LOTE}: divídelo` });
+  }
   const motivos: string[] = [];
   for (const k of Object.keys(c)) if (k !== 'filas' && k !== 'huella') motivos.push(`campo no admitido en el cuerpo: ${recorte(k)}`);
   let huella: string | null = null;
@@ -202,7 +210,8 @@ export function filasDelCuerpo(cuerpo: unknown, modo: ModoLote = 'validar'): { f
   });
   if (motivos.length > 0) {
     const extra = motivos.length > MAX_MOTIVOS_CUERPO ? [`… y ${motivos.length - MAX_MOTIVOS_CUERPO} más`] : [];
-    throw new BadRequestException([...motivos.slice(0, MAX_MOTIVOS_CUERPO), ...extra]);
+    // `codigo` (aditivo, revisión del 15/11/2026): la pantalla lo distingue de otros 400; `message` sigue siendo la lista de motivos.
+    throw new BadRequestException({ statusCode: 400, error: 'Bad Request', codigo: 'cuerpo_invalido', message: [...motivos.slice(0, MAX_MOTIVOS_CUERPO), ...extra] });
   }
   return { filas: salida, huella };
 }
@@ -410,9 +419,11 @@ export function respuestaLote(informe: FilaInforme[]): RespuestaLote {
 // devuelve la misma respuesta sin crear nada, si la persona conserva «escribir» en esos sitios; la misma llave con otro cuerpo es 422
 // (`llave_reutilizada`). Lo que no creó nada no se guarda: se vuelve a calcular. Vale con una instancia, como «una creación a la vez»
 // (docs/11 §4). Las credenciales en claro viven aquí esos 2 minutos y nunca se escriben en un registro.
-// Topes (revisión del 15/11/2026: antes solo por conteo): 200 entradas, 3 por persona y 16 MiB en total, medidos como el largo del JSON de
-// la respuesta. Una respuesta de 500 filas creadas pesa ≈ 0,4 MiB, así que caben ≈ 40; 16 MiB son ≈ 3 % del techo de memoria del backend
-// (512 MiB en docker-compose.yml, dentro de los 2 GB de RNF-17). Al llenarse salen las vencidas, después las más antiguas de esa persona
+// Topes (revisión del 15/11/2026: antes solo por conteo): 200 entradas, 3 por persona y 16 MiB en total, medidos en bytes UTF-8 del JSON
+// de la respuesta (Buffer.byteLength). Una respuesta de 500 filas creadas pesa ≈ 0,5 MB, así que caben ≈ 30. En memoria el objeto ocupa
+// más que su JSON (cadenas en UTF-16 y la estructura de cada fila): medido con 20 respuestas de 500 filas, 9,9 MB de JSON ocupaban 20 MB
+// del montículo, ≈ 2 veces. El almacén lleno ronda entonces 32 MiB, ≈ 6 % del techo de memoria del backend (512 MiB en
+// docker-compose.yml, dentro de los 2 GB de RNF-17). Al llenarse salen las vencidas, después las más antiguas de esa persona
 // y después las más antiguas de todas; una respuesta más grande que el tope total no se guarda.
 export const CABECERA_LLAVE = 'idempotency-key';
 export const FORMA_LLAVE = /^[A-Za-z0-9_-]{16,128}$/;
@@ -490,6 +501,11 @@ export class TasaPorPersona {
   private readonly marcas = new Map<string, number[]>();
   constructor(private readonly tope = LOTES_POR_MINUTO, private readonly ventanaMs = 60_000) {}
   // true = se admite (y se anota); false = se pasó del tope.
+  // Cuánto falta para que se libere un lugar en la ventana (para decírselo a la persona en el 429).
+  esperaS(clave: string, ahora = Date.now()): number {
+    const vivas = (this.marcas.get(clave) ?? []).filter((t) => ahora - t < this.ventanaMs);
+    return vivas.length === 0 ? 0 : Math.max(1, Math.ceil((vivas[0] + this.ventanaMs - ahora) / 1000));
+  }
   admitir(clave: string, ahora = Date.now()): boolean {
     const vivas = (this.marcas.get(clave) ?? []).filter((t) => ahora - t < this.ventanaMs);
     if (vivas.length >= this.tope) {

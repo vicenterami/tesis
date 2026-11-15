@@ -11,7 +11,7 @@ import { join } from 'node:path';
 import type { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module.js';
-import { AvisosAcotados, errorDeLectorJson, filtroAntesDeLeer, opcionesLectorJson, horasClaveTemporal, hostsPermitidos, interfazDeEscucha, rechazoDeHost, registrosEnJson, rutaSinCache, servirDocumentacion, claveAdmin, claveApp } from './arranque.js';
+import { AvisosAcotados, cabecerasDeLaApi, errorDeLectorJson, filtroAntesDeLeer, opcionesLectorJson, horasClaveTemporal, hostsPermitidos, interfazDeEscucha, rechazoDeHost, registrosEnJson, servirDocumentacion, claveAdmin, claveApp } from './arranque.js';
 import { configurarOpenApi } from './openapi.js';
 
 // Punto de entrada. Levanta la aplicación Nest: al iniciarse, cada módulo se conecta a lo suyo
@@ -33,6 +33,9 @@ async function arrancar(): Promise<void> {
   // Referrer-Policy; y helmet retira X-Powered-By. HSTS queda fuera A PROPÓSITO: solo tiene sentido
   // detrás de TLS y lo pondrá una sola capa (el proxy) cuando exista; dos capas serían dos fuentes.
   app.use(helmet({ strictTransportSecurity: false }));
+  // Permissions-Policy y `Cache-Control: no-store` en toda respuesta de la API (arranque.ts, cabecerasDeLaApi), antes de cualquier otro
+  // middleware: también los 401 y 413 que se dan antes de leer el cuerpo (revisión del 15/11/2026: antes iban después y esos salían sin ellas).
+  app.use(cabecerasDeLaApi);
   // La dirección del cliente la resuelve la recepción por HTTP con el secreto compartido del proxy (recepcion/http/direccion.ts,
   // docs/10 §8.4 punto 52): Express no debe creer X-Forwarded-For por sí solo, así que `trust proxy` queda apagado (su valor por defecto).
   // El cuerpo de la recepción por HTTP llega crudo, como por MQTT, y con el mismo tope que el broker (max_packet_size, 64 KiB). Va
@@ -60,14 +63,6 @@ async function arrancar(): Promise<void> {
   app.useBodyParser('json', opcionesLectorJson());
   // Los errores del lector de JSON (413 de arriba o del tope del lote) responden en JSON, como el resto de la API.
   app.use(errorDeLectorJson);
-  // helmet no emite Permissions-Policy; la API no usa cámara, micrófono ni ubicación. Y toda respuesta de la API va con
-  // `Cache-Control: no-store` (arranque.ts, rutaSinCache; revisión del 08/11/2026): una sola regla en vez de repetirla ruta por ruta.
-  // Una ruta puede pisarla después (el canal en vivo pone la suya, también sin caché).
-  app.use((req: Request, res: Response, next: NextFunction) => {
-    res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-    if (rutaSinCache(req.path)) res.setHeader('Cache-Control', 'no-store');
-    next();
-  });
 
   // Lista de nombres de host (docs/11 §3, docs/10 §8.4 punto 40): toda petición cuyo `Host` no sea uno de los locales ni uno
   // de HTTP_HOSTS recibe 421 y no llega a ninguna ruta. Es lo que detiene el DNS rebinding, que el control

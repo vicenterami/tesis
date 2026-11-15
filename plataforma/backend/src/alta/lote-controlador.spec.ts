@@ -168,7 +168,10 @@ describe('POST /dispositivos/lote?modo=crear: todo o nada', () => {
     await ctrl.lote(u, 'crear', cuerpo, LLAVE, res());
     for (let i = 0; i < 8; i++) await ctrl.lote(u, 'validar', { filas }, undefined, res()); // 10 lotes en el minuto
     const venenoso = { toJSON: (): never => { throw new Error('se firmó el cuerpo antes de la tasa'); } };
-    expect((await error(ctrl.lote(u, 'crear', venenoso, 'otra-llave-0000000000', res()))).getStatus()).toBe(429);
+    const e429 = await error(ctrl.lote(u, 'crear', venenoso, 'otra-llave-0000000000', res()));
+    expect(e429.getStatus()).toBe(429);
+    expect(e429.getResponse()).toMatchObject({ codigo: 'demasiadas_peticiones', reintentar_en_s: expect.any(Number) as number });
+    expect((e429.getResponse() as { reintentar_en_s: number }).reintentar_en_s).toBeGreaterThanOrEqual(1);
     for (let i = 0; i < 10; i++) expect((await ctrl.lote(u, 'crear', cuerpo, LLAVE, res())).huella).toBe(vista.huella); // reintentos, con el cupo de lotes agotado
     expect((await error(ctrl.lote(u, 'crear', cuerpo, LLAVE, res()))).getStatus()).toBe(429);
     expect(servicio.crearLote).toHaveBeenCalledTimes(1);

@@ -99,6 +99,10 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
       expect(error).toHaveBeenCalledWith('adaptador plano: error imprevisto (TypeError); la trama va a cuarentena como malformada');
       expect(JSON.stringify(error.mock.calls)).not.toContain('secreto-de-la-trama');
       expect(marcarVivo).toHaveBeenCalledWith('d1', 'dev-0001'); // por su tópico directo, autenticado: se marca vivo como cualquier malformada
+      // La misma trama otra vez: va a cuarentena de nuevo, pero el registro no repite el ERROR dentro del minuto.
+      await servicio.procesar(TOPICO, Buffer.from('21.5'));
+      expect(cuarentenas(query)).toEqual(['malformada', 'malformada']);
+      expect(error).toHaveBeenCalledTimes(1);
     } finally {
       analizar.mockRestore();
       error.mockRestore();
@@ -337,6 +341,20 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
       const trama = query.mock.calls.find(([sql]) => String(sql).startsWith('INSERT INTO trama'))?.[1] as unknown[];
       expect(trama[4]).toBe('chirpstack');
       expect(marcarVivo).toHaveBeenCalledWith('n1', '0101010101010101');
+    });
+    it('un error imprevisto del adaptador por el tópico de la pasarela: cuarentena malformada y el nodo NO se marca vivo (nada verificó el DevEUI)', async () => {
+      const { servicio, query, marcarVivo } = armar(NODO, false, PAS);
+      const analizar = vi.spyOn(ChirpstackAdaptador.prototype, 'analizar').mockImplementation(() => { throw new RangeError('fuera de rango'); });
+      const error = vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+      try {
+        await servicio.procesar(T_UP, up());
+        expect(cuarentenas(query)).toEqual(['malformada']);
+        expect(detalle(query)).toBe('formato declarado chirpstack: la trama no se pudo interpretar');
+        expect(marcarVivo).not.toHaveBeenCalled();
+      } finally {
+        analizar.mockRestore();
+        error.mockRestore();
+      }
     });
     it('la vía de pasarela pasa por el mismo tope por emisor: con el presupuesto de la hora agotado, el «up» se rechaza entero con «tope»', async () => {
       const { servicio, query, marcarVivo, abrirTope } = armar({ ...NODO, intervalo_esperado_s: 3600, canales: 1, ventana_inicio: inicioDeVentana(new Date()), ventana_lecturas: 600 }, false, PAS);

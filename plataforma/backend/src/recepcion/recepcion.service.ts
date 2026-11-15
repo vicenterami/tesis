@@ -1,3 +1,4 @@
+import { AvisosAcotados } from '../arranque.js';
 import { Inject, Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Pool, type QueryConfig } from 'pg';
@@ -80,6 +81,7 @@ interface Canal { id: string; magnitud: string; unidad_canonica: string; rango_m
 @Injectable()
 export class RecepcionService implements OnModuleInit {
   private readonly log = new Logger('recepcion');
+  private readonly avisosImprevistos = new AvisosAcotados();
   // Uno por formato declarado (docs/10 §8.4 puntos 25 y 47): el filtro 2 no adivina, usa el del alta.
   private readonly adaptadores: Map<string, Adaptador>;
   // Tope por emisor (docs/10 §8.4 punto 53): presupuesto de lecturas por hora y cuota de cuarentena, configurables y validados al
@@ -234,7 +236,12 @@ export class RecepcionService implements OnModuleInit {
         // del 15/11/2026: relanzarlo dejaba el mensaje sin confirmar y el broker lo reenviaba sin fin, como pasó con un `n` numérico en
         // SenML). El error real va al registro con su clase, sin su mensaje, que puede traer pedazos de la trama.
         const imprevisto = !(e instanceof TramaMalformada);
-        if (imprevisto) this.log.error(`adaptador ${adaptador.nombre}: error imprevisto (${e instanceof Error ? e.name : typeof e}); la trama va a cuarentena como malformada`);
+        if (imprevisto) {
+          // Acotado (revisión del 15/11/2026): una trama repetida que provoca el mismo error no llena el registro; un ERROR por adaptador y
+          // clase de error por minuto, con cuántos se callaron.
+          const aviso = this.avisosImprevistos.registrar(`adaptador ${adaptador.nombre}: error imprevisto (${e instanceof Error ? e.name : typeof e}); la trama va a cuarentena como malformada`);
+          if (aviso !== null) this.log.error(aviso);
+        }
         // El contador pudo anotarse antes de fallar (p. ej. data corta): una trama que no se entendió no es «la repetida» (§4.1).
         ctx.fcnt = undefined;
         malformada = `formato declarado ${adaptador.nombre}: ${imprevisto ? 'la trama no se pudo interpretar' : (e).message}`;

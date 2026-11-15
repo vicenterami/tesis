@@ -3,7 +3,7 @@ import { Body, Controller, Post, Put } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
 import type { AddressInfo } from 'node:net';
-import { MENSAJE_SIN_SESION_LOTE, MENSAJE_TOPE_CUERPO, MENSAJE_TOPE_LOTE, TOPE_CUERPO_LOTE, errorDeLectorJson, filtroAntesDeLeer, opcionesLectorJson } from './arranque.js';
+import { MENSAJE_SIN_SESION_LOTE, MENSAJE_TOPE_CUERPO, MENSAJE_TOPE_LOTE, TOPE_CUERPO_LOTE, cabecerasDeLaApi, errorDeLectorJson, filtroAntesDeLeer, opcionesLectorJson } from './arranque.js';
 import { MENSAJE_SIN_SESION } from './sesion/sesion.service.js';
 
 // El lector de JSON de main.ts con un servidor real (docs/16 §70). Desde NestJS 12 el tipo de las opciones de `useBodyParser` excluye
@@ -37,6 +37,7 @@ afterEach(async () => {
 async function servidor(): Promise<string> {
   const modulo = await Test.createTestingModule({ controllers: [EcoController] }).compile();
   app = modulo.createNestApplication<NestExpressApplication>();
+  app.use(cabecerasDeLaApi);
   app.use(filtroAntesDeLeer);
   app.useBodyParser('json', opcionesLectorJson());
   app.use(errorDeLectorJson);
@@ -88,6 +89,13 @@ describe('lector de JSON de main.ts: los topes del cuerpo rigen con NestJS 12', 
     expect(r.status).toBe(413);
     expect(await r.json()).toEqual({ statusCode: 413, message: MENSAJE_TOPE_LOTE });
   });
+  it('fuera del lote, un cuerpo por trozos que pasa también el tope grande → 413 con el mensaje de 100 KiB (no el del lote); los 413 llevan no-store y Permissions-Policy', async () => {
+    const base = await servidor();
+    const r = await enviar(`${base}/eco`, TOPE_CUERPO_LOTE + 1024);
+    expect(r.status).toBe(413);
+    expect(await r.json()).toEqual({ statusCode: 413, message: MENSAJE_TOPE_CUERPO });
+    expect([r.headers.get('cache-control'), r.headers.get('permissions-policy')]).toEqual(['no-store', 'camera=(), microphone=(), geolocation=()']);
+  });
   it('el tope grande es solo de POST: PUT al lote con 150 KiB por trozos → 413 (el de 100 KiB)', async () => {
     const base = await servidor();
     const r = await enviar(`${base}/dispositivos/lote`, 150 * 1024, { metodo: 'PUT' });
@@ -102,6 +110,8 @@ describe('lector de JSON de main.ts: los topes del cuerpo rigen con NestJS 12', 
       expect(await r.json()).toEqual({ statusCode: 401, message: MENSAJE_SIN_SESION });
     }
     expect(MENSAJE_SIN_SESION_LOTE).toBe(MENSAJE_SIN_SESION);
+    const sin = await enviar(`${base}/dispositivos/lote`, 1024, { cookie: null });
+    expect([sin.headers.get('cache-control'), sin.headers.get('permissions-policy')]).toEqual(['no-store', 'camera=(), microphone=(), geolocation=()']);
     const conClave = await fetch(`${base}/dispositivos/lote`, { method: 'POST', headers: { 'content-type': 'application/json', 'x-clave-admin': 'x' }, body: '{}' });
     expect(conClave.status).toBe(201); // la clave la valida el guardia, no este filtro
   });

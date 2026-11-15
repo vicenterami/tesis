@@ -29,6 +29,11 @@ import type { UsuarioSesion } from '../sesion/permisos.js';
 // las protege el guardia central: sesión de administrador del sitio del dispositivo (o de la zona, en el alta) o la clave de administrador. El
 // orden no cambia: sin sesión, 401 antes de mirar nada; con rol de consulta en todos sus sitios, 403 antes de validar; después, el
 // sitio del recurso: 404 si no existe o es de otro sitio (RF-41), 403 si es suyo y su rol no puede.
+// El 429 del lote, con cuánto esperar (`reintentar_en_s` y `codigo`, aditivos: revisión del 15/11/2026; el panel ya lee `reintentar_en_s`).
+function demasiadas(texto: string, esperaS: number): HttpException {
+  return new HttpException({ statusCode: 429, error: 'Too Many Requests', codigo: 'demasiadas_peticiones', reintentar_en_s: esperaS, message: `${texto}: reintenta en ${esperaS} s` }, HttpStatus.TOO_MANY_REQUESTS);
+}
+
 // El 409 de un plan que cambió entre la vista previa y la creación (docs/19 §4, N8): el plan nuevo va en `plan`; nada se creó.
 function planCambio(plan: RespuestaLote): HttpException {
   return new HttpException({ statusCode: 409, error: 'Conflict', codigo: 'plan_cambio', message: 'el plan cambió desde que lo revisaste: revísalo de nuevo; no se creó ninguno', plan }, HttpStatus.CONFLICT);
@@ -149,7 +154,7 @@ export class AltaController {
     if (modo === 'crear') {
       llave = llaveDeReintento(cabeceraLlave);
       if (this.respuestasLote.tiene(persona, llave)) {
-        if (!this.tasaReintentos.admitir(persona)) throw new HttpException(`más de ${REINTENTOS_POR_MINUTO} reintentos en un minuto: espera un momento`, HttpStatus.TOO_MANY_REQUESTS);
+        if (!this.tasaReintentos.admitir(persona)) throw demasiadas(`más de ${REINTENTOS_POR_MINUTO} reintentos en un minuto`, this.tasaReintentos.esperaS(persona));
         const previa = this.respuestasLote.buscar(persona, llave, firmaDelCuerpo(cuerpo));
         if (previa !== undefined) {
           // Solo si la persona conserva «escribir» en todos los sitios de lo creado (un rol quitado en esos 2 minutos corta el reintento).
@@ -159,7 +164,7 @@ export class AltaController {
         }
       }
     }
-    if (!this.tasaLote.admitir(persona)) throw new HttpException(`más de ${LOTES_POR_MINUTO} lotes en un minuto: espera un momento`, HttpStatus.TOO_MANY_REQUESTS);
+    if (!this.tasaLote.admitir(persona)) throw demasiadas(`más de ${LOTES_POR_MINUTO} lotes en un minuto`, this.tasaLote.esperaS(persona));
     const { filas, huella } = filasDelCuerpo(cuerpo, modo);
     if (modo === 'validar') return respuestaLote((await this.planLote(u, filas)).informe);
     const firma = firmaDelCuerpo(cuerpo);
@@ -184,7 +189,7 @@ export class AltaController {
       }
       const respuesta = respuestaLote(informe);
       // Solo se guarda lo que creó algo (siempre, desde que toda fila debe entrar), con los sitios de lo creado.
-      if (creadas.size > 0) this.respuestasLote.guardar(persona, llave, firma, respuesta, [...new Set(altas.map((a) => a.sitio_id))], JSON.stringify(respuesta).length);
+      if (creadas.size > 0) this.respuestasLote.guardar(persona, llave, firma, respuesta, [...new Set(altas.map((a) => a.sitio_id))], Buffer.byteLength(JSON.stringify(respuesta)));
       res.setHeader('Cache-Control', 'no-store'); // la respuesta lleva credenciales
       return respuesta;
     } finally {

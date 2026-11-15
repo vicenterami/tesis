@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/sv
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Sesion } from './lib/sesion';
 import Alta from './Alta.svelte';
+import { borradorLote } from './lib/lote';
 
 // P7 Alta (docs/19 §4, tablero v2, F; docs/16 §61) por el DOM: el asistente con la credencial una sola vez y la espera de la primera trama;
 // el alta masiva que lee las columnas y los límites de la plantilla del servidor, valida antes de crear (cada fila con su `n`) y crea en
@@ -22,7 +23,7 @@ const COLS = ['id_fisico', 'nombre', 'zona', 'via', 'formato', 'intervalo_espera
 const OBLIGATORIAS = ['id_fisico', 'nombre', 'zona', 'intervalo_esperado_s', 'canales'];
 const PLANTILLA = {
   columnas: COLS.map((nombre) => ({ nombre, obligatoria: OBLIGATORIAS.includes(nombre), tope: 80, ayuda: '', ejemplo: '' })),
-  max_filas: 500, max_bytes: 1_467_392, separadores: { columnas: [';', ',', '\t'], canales: ['|', ';'] },
+  max_filas: 500, max_bytes: 1_147_904, separadores: { columnas: [';', ',', '\t'], canales: ['|', ';'] },
 };
 let descargas: { nombre: string; contenido: Promise<string> }[] = [];
 
@@ -38,6 +39,7 @@ class Fuente {
 }
 
 beforeEach(() => {
+  Object.assign(borradorLote, { archivo: null, filas: [], aviso: null }); // el borrador de la pestaña no pasa de una prueba a otra
   pedidos = [];
   descargas = [];
   Fuente.todas.length = 0;
@@ -153,7 +155,7 @@ describe('P7: foco, errores por campo y credenciales que no quedan', () => {
     render(Alta, { modo: 'lote', sesion: SESION, sitios: SITIOS });
     await waitFor(() => expect(document.querySelector('[data-archivo]')).toBeTruthy());
     await fireEvent.change(document.querySelector('[data-archivo]')!, { target: { files: [new File(['x'.repeat(PLANTILLA.max_bytes + 1)], 'enorme.csv')] } });
-    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('pesa más de 1,5 MB'));
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('y el máximo es 1,1 MB: divídelo'));
     expect(leer).not.toHaveBeenCalled();
   });
 
@@ -268,11 +270,16 @@ describe('P7: alta masiva en una petición', () => {
     await fireEvent.click(boton('Validar el archivo'));
     await waitFor(() => expect(boton('Crear las válidas (3)')).toBeTruthy());
     await fireEvent.click(boton('Crear las válidas (3)'));
-    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('Cambió desde que lo revisaste: no se creó ninguno'));
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('Cambió algo desde que lo revisaste y no se creó ninguno'));
+    expect(document.querySelector('[data-detalles-error]')!.textContent).toContain('Fila 3 (n-2): se crea → no entra: la pasarela ug65 está dada de baja');
+    expect(document.activeElement).toBe(document.querySelector('[data-error-lote="plan_cambio"]')); // el foco va al aviso
+    await fireEvent.click(boton('Volver a revisar'));
+    await waitFor(() => expect(document.activeElement).toBe(document.querySelector('[data-informe-lote]'))); // la revisión, ya con el plan nuevo
     expect(document.querySelector('[data-fila-lote="3"]')!.getAttribute('data-resultado')).toBe('rechazada');
     expect(document.querySelector('[data-credenciales-lote]')).toBeNull();
     await fireEvent.click(boton('Crear las válidas (2)'));
     await waitFor(() => expect(document.body.textContent).toContain('Hay otra alta por lote en curso'));
+    expect(boton('Reintentar')).toBeTruthy();
     const pedidasCrear = pedidos.filter((p) => p.ruta === '/dispositivos/lote?modo=crear');
     expect(pedidasCrear.map((p) => [p.cuerpo.huella, p.cuerpo.filas!.map((f) => f.n)])).toEqual([[HUELLA, [2, 3, 4]], ['b'.repeat(64), [2, 4]]]);
     expect(pedidasCrear[0]!.cabeceras['Idempotency-Key']).not.toBe(pedidasCrear[1]!.cabeceras['Idempotency-Key']); // otra creación, otra llave
@@ -288,15 +295,117 @@ describe('P7: alta masiva en una petición', () => {
     await fireEvent.click(boton('Crear las válidas (2)'));
     await waitFor(() => expect(document.querySelector('[data-creando-lote]')!.textContent).toContain('no cierres ni recargues la pestaña'));
     await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('rota la credencial de cada una desde su ficha'), { timeout: 6000 });
+    expect(boton('Ir al inventario')).toBeTruthy();
     expect(pedidos.filter((p) => p.ruta === '/dispositivos/lote?modo=crear')).toHaveLength(3);
   }, 10_000);
 
   it('un archivo con la cabecera mal o con más filas que max_filas se rechaza en el navegador, sin enviar nada', async () => {
     render(Alta, { modo: 'lote', sesion: SESION, sitios: SITIOS });
     await subir(`${CAB}\n${filasCsv(501)}`, 'grande.csv');
-    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('el archivo trae 501 filas y el máximo es 500'));
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('El archivo trae 501 filas y el máximo es 500'));
+    expect(boton('Elegir otro archivo')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Validar el archivo' })).toBeNull();
     expect(pedidos.filter((p) => p.ruta.startsWith('/dispositivos/lote?'))).toEqual([]);
+  });
+});
+
+describe('P7: alta masiva, qué falló y qué hacer (docs/19 §4, N8b): lo que se ve y el botón', () => {
+  const CAB = 'id_fisico,nombre,zona,via,formato,intervalo_esperado_s,canales,pasarela';
+  const HUELLA = 'a'.repeat(64);
+  const valido = (filas: { id_fisico: string; n: number }[]) => ({ validas: filas.length, rechazadas: 0, existentes: 0, huella: HUELLA,
+    filas: filas.map((f) => ({ n: f.n, id_fisico: f.id_fisico, resultado: 'valida', motivo: null, id: null, credencial: null, topico: null })) });
+  const subir = async (texto: string): Promise<void> => {
+    await waitFor(() => expect(document.querySelector('[data-archivo]')).toBeTruthy());
+    await fireEvent.change(document.querySelector('[data-archivo]')!, { target: { files: [new File([texto], 'nodos.csv', { type: 'text/csv' })] } });
+  };
+  // [caso, respuesta de crear, el texto que se ve, el botón]
+  const AL_CREAR: [string, () => Response, string, string][] = [
+    ['sin permiso', () => json({ statusCode: 403, message: 'tu rol no permite hacer cambios' }, 403), 'Tu perfil no permite dar de alta', 'Ir al inventario'],
+    ['demasiadas peticiones', () => json({ statusCode: 429, codigo: 'demasiadas_peticiones', reintentar_en_s: 37, message: 'más de 10 lotes en un minuto: reintenta en 37 s' }, 429), 'Espera 37 s y reintenta', 'Reintentar'],
+    ['nada creado', () => json({ statusCode: 503, codigo: 'nada_creado', message: 'sin conexión de administración con el broker' }, 503), 'No se creó ninguno: el servidor no logró hablar con el broker', 'Reintentar'],
+    ['lote incierto', () => json({ statusCode: 503, codigo: 'lote_incierto', message: 'no se pudo confirmar' }, 503), 'El servidor no pudo confirmar si se crearon', 'Ir al inventario'],
+    ['llave reutilizada', () => json({ statusCode: 422, codigo: 'llave_reutilizada', message: 'otra' }, 422), 'se cruzó con una anterior de otro contenido', 'Volver a revisar'],
+    ['rechazo del servidor', () => json({ statusCode: 400, codigo: 'cuerpo_invalido', message: ['fila 2: nombre pasa su tope de 80 caracteres (trae 81)'] }, 400), 'El servidor rechazó el archivo', 'Elegir otro archivo'],
+  ];
+  for (const [caso, respuesta, texto, accion] of AL_CREAR) {
+    it(`al crear, ${caso}: el aviso lo dice, con el foco y el botón «${accion}»; el archivo sigue cargado`, async () => {
+      responder = (metodo, ruta, cuerpo) => (ruta === '/dispositivos/lote?modo=validar' ? json(valido(cuerpo.filas!)) : respuesta());
+      render(Alta, { modo: 'lote', sesion: SESION, sitios: SITIOS });
+      await subir(`${CAB}\nn-1,Uno,Lab,mqtt,senml,60,temperatura:Cel,`);
+      await waitFor(() => expect(boton('Validar el archivo')).toBeTruthy());
+      await fireEvent.click(boton('Validar el archivo'));
+      await waitFor(() => expect(boton('Crear las válidas (1)')).toBeTruthy());
+      await fireEvent.click(boton('Crear las válidas (1)'));
+      await waitFor(() => expect(document.querySelector('[data-error-lote]')!.textContent).toContain(texto));
+      expect(document.querySelector('[data-error-lote]')!.getAttribute('role')).toBe('alert');
+      expect(document.activeElement).toBe(document.querySelector('[data-error-lote]'));
+      expect(boton(accion)).toBeTruthy();
+      expect(document.querySelector('[data-informe-lote]')).toBeTruthy(); // nada se perdió: la revisión sigue ahí
+      expect(pedidos.filter((p) => p.ruta === '/dispositivos/lote?modo=crear')).toHaveLength(1); // un fallo con `codigo` no se repite
+    });
+  }
+  it('un 409 que llega en un reintento no dice «no se creó ninguno»: dice que no se sabe y lleva al inventario', async () => {
+    let n = 0;
+    responder = (metodo, ruta, cuerpo) => {
+      if (ruta === '/dispositivos/lote?modo=validar') return json(valido(cuerpo.filas!));
+      n++;
+      return n === 1 ? json({ statusCode: 502, message: 'Bad Gateway' }, 502) : json({ statusCode: 409, codigo: 'plan_cambio', message: 'cambió', plan: { ...valido(cuerpo.filas!), filas: [] } }, 409);
+    };
+    render(Alta, { modo: 'lote', sesion: SESION, sitios: SITIOS });
+    await subir(`${CAB}\nn-1,Uno,Lab,mqtt,senml,60,temperatura:Cel,`);
+    await waitFor(() => expect(boton('Validar el archivo')).toBeTruthy());
+    await fireEvent.click(boton('Validar el archivo'));
+    await waitFor(() => expect(boton('Crear las válidas (1)')).toBeTruthy());
+    await fireEvent.click(boton('Crear las válidas (1)'));
+    await waitFor(() => expect(document.querySelector('[data-error-lote="sin_respuesta"]')).toBeTruthy(), { timeout: 4000 });
+    expect(document.body.textContent).not.toContain('no se creó ninguno');
+    expect(boton('Ir al inventario')).toBeTruthy();
+  });
+  // [caso, el archivo, el texto que se ve, el botón]
+  const AL_LEER: [string, string, string, string][] = [
+    ['columna desconocida', `${CAB},color\nn-1,Uno,Lab,,,60,temperatura,,rojo`, 'La columna «color» no es de la plantilla. Las columnas son: id_fisico,', 'Descargar la plantilla'],
+    ['falta una obligatoria', 'id_fisico,nombre,zona,canales\nx,y,z,w', 'Falta la columna obligatoria «intervalo_esperado_s»', 'Descargar la plantilla'],
+    ['una sola columna', 'id_fisico;nombre;zona\nx;y;z', 'no está separado por comas', 'Descargar la plantilla'],
+    ['solo la cabecera', `${CAB}\n`, 'ninguna fila de datos', 'Elegir otro archivo'],
+    ['vacío', ' ', 'El archivo está vacío', 'Elegir otro archivo'],
+    ['celdas de más', `${CAB}\nn-1,Uno,Lab,,,60,temperatura,,sobra`, 'La fila 2 trae 9 celdas y la cabecera 8', 'Elegir otro archivo'],
+    ['celda sobre su tope', `${CAB}\nn-1,${'N'.repeat(81)},Lab,,,60,temperatura,`, 'Fila 2, columna «nombre»: tiene 81 caracteres y el máximo es 80', 'Elegir otro archivo'],
+    ['carácter no admitido', `${CAB}\nnodo-ñ,Uno,Lab,,,60,temperatura,`, 'Fila 2, columna «id_fisico»: solo admite letras sin acento', 'Elegir otro archivo'],
+  ];
+  for (const [caso, csv, texto, accion] of AL_LEER) {
+    it(`al leer, ${caso}: se ve antes de enviar, con el botón «${accion}»`, async () => {
+      render(Alta, { modo: 'lote', sesion: SESION, sitios: SITIOS });
+      await subir(csv);
+      await waitFor(() => expect(screen.getByRole('alert').textContent).toContain(texto));
+      expect(boton(accion)).toBeTruthy();
+      expect(screen.queryByRole('button', { name: 'Validar el archivo' })).toBeNull();
+      expect(pedidos.filter((p) => p.ruta.startsWith('/dispositivos/lote?'))).toEqual([]);
+    });
+  }
+  it('«Descargar la plantilla» descarga la plantilla del servidor', async () => {
+    render(Alta, { modo: 'lote', sesion: SESION, sitios: SITIOS });
+    await subir(`${CAB},color\nn-1,Uno,Lab,,,60,temperatura,,rojo`);
+    await waitFor(() => expect(boton('Descargar la plantilla')).toBeTruthy());
+    await fireEvent.click(boton('Descargar la plantilla'));
+    expect(descargas.at(-1)!.nombre).toBe('plantilla-alta-masiva.csv');
+    expect((await descargas.at(-1)!.contenido).split('\r\n')[0]).toBe(PLANTILLA.columnas.map((c) => c.nombre).join(','));
+  });
+  it('la sesión vence al validar: el aviso lo dice y, al volver a la pantalla (tras entrar), el archivo leído sigue ahí con su aviso', async () => {
+    responder = (metodo, ruta) => (ruta === '/dispositivos/lote?modo=validar' ? json({ statusCode: 401, message: 'sesión requerida' }, 401) : json([]));
+    render(Alta, { modo: 'lote', sesion: SESION, sitios: SITIOS });
+    await subir(`${CAB}\nn-1,Uno,Lab,mqtt,senml,60,temperatura:Cel,`);
+    await waitFor(() => expect(boton('Validar el archivo')).toBeTruthy());
+    await fireEvent.click(boton('Validar el archivo'));
+    await waitFor(() => expect(document.querySelector('[data-error-lote="sesion_vencida"]')!.textContent).toContain('Tu sesión venció'));
+    expect(boton('Iniciar sesión')).toBeTruthy();
+    cleanup(); // la aplicación muestra «Entrar»; al volver, la pantalla se arma de nuevo
+    responder = (metodo, ruta, cuerpo) => (ruta === '/dispositivos/lote?modo=validar' ? json(valido(cuerpo.filas!)) : json([]));
+    render(Alta, { modo: 'lote', sesion: SESION, sitios: SITIOS });
+    await waitFor(() => expect(document.querySelector('[data-error-lote]')!.textContent).toContain('El archivo leído se conservó'));
+    expect(document.querySelector('[data-filas-leidas]')!.textContent).toContain('1 filas leídas');
+    await waitFor(() => expect(document.querySelector('[data-archivo]')).toBeTruthy()); // la plantilla volvió a cargarse
+    await fireEvent.click(boton('Reintentar'));
+    await waitFor(() => expect(boton('Crear las válidas (1)')).toBeTruthy());
   });
 });
 

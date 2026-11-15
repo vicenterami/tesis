@@ -1782,17 +1782,25 @@ entra. Lo que aquí se marca «a fijar al implementar» es un detalle que el dis
     revisión del 15/11/2026), 409 `codigo: plan_cambio` con el plan nuevo en `plan` y nada creado; otra creación en curso es 409
     `codigo: lote_en_curso`; el choque que solo ve la base (23505, el formato de la pasarela que cambió: `fk_dispositivo_pasarela_formato`,
     o una pasarela que ya no está activa: se bloquean `FOR SHARE` dentro de la transacción) deshace la transacción, recalcula y responde
-    también `plan_cambio`. Un COMMIT que responde con error se comprueba por otra conexión: si los dispositivos quedaron, el lote está
-    creado; si no, se borra del broker lo que se alcanzó a crear; si no se puede saber, 503 con el remedio y sin tocar el broker.
+    también `plan_cambio`. Un COMMIT que responde con error **destruye su conexión** (no vuelve al grupo con una transacción quizá abierta),
+    pide a la base terminar el proceso que la llevaba y espera a que termine (así un COMMIT en vuelo ya se aplicó o ya no puede
+    aplicarse), y recién entonces busca por otra conexión los `id` que devolvió el INSERT de este lote: si están todos, el lote está
+    creado; si no está ninguno, se borra del broker lo que se alcanzó a crear y responde con `codigo: nada_creado`; si están algunos, el
+    proceso no terminó a tiempo o la consulta falla, 503 `codigo: lote_incierto` con el remedio y sin tocar el broker: si el lote no quedó,
+    sus usuarios del broker quedan sin dispositivo y el registro del backend los lista para borrarlos con `pruebas/broker-cliente.sh
+    --borrar` (repetir la creación no los limpia de inmediato; según el código de `crearLote`, el broker rechaza un usuario que ya existe, se borra esa tanda y la creación falla con
+    409; la siguiente ya entra). Códigos nuevos de esta ruta, aditivos: `cuerpo_invalido` (400, con `message` como lista de motivos),
+    `demasiadas_filas` (413), `demasiadas_peticiones` con `reintentar_en_s` (429), `nada_creado` (500, 502 o 503 definitivos) y
+    `lote_incierto` (503); y `texto_libre` en cada columna de la plantilla.
     (v) **Reintento:** la respuesta de una creación que creó algo se guarda por persona y llave durante 2 minutos en la memoria del proceso,
-    con los sitios de lo creado (topes: 200 entradas, 3 por persona y 16 MiB medidos como el largo del JSON, ≈ 3 % de los 512 MiB del
-    backend; llena, primero las vencidas, después las de esa persona y después las más antiguas); la misma llave con el mismo cuerpo
+    con los sitios de lo creado (topes: 200 entradas, 3 por persona y 16 MiB de JSON en bytes UTF-8; en memoria ocupa ≈ 2 veces su JSON, medido, así que el almacén lleno ronda
+    32 MiB, ≈ 6 % de los 512 MiB del backend; llena, primero las vencidas, después las de esa persona y después las más antiguas); la misma llave con el mismo cuerpo
     devuelve esa respuesta sin crear nada, con un cupo propio de 10 por minuto y solo si la persona conserva «escribir» en esos sitios; con
     otro cuerpo, 422 `codigo: llave_reutilizada`. La tasa de los lotes va antes de firmar el cuerpo. Vale con una instancia, como el candado
     (`docs/11 §4`). (vi) **Topes:** cada columna tiene el suyo (el de `validarAlta` donde existe y 80 donde no; dentro de `canales`, 16 para
     la unidad); solo columnas de la plantilla; una celda que pasa su tope, que no es texto ni número, que trae un carácter de control o un
     sustituto suelto, o que fuera de `nombre` y `zona` no es ASCII imprimible (sin `"` ni `\`), es 400 con su fila. El tope del cuerpo es el
-    peor caso **medido** de lo que se acepta con 500 filas llenas (`MAX_BYTES_LOTE`, 1 147 904 bytes), el mismo en el lector de JSON, en la
+    peor caso **medido** de lo que se acepta con 500 filas llenas, en el JSON tal como lo escribe `JSON.stringify` (el del panel; un cuerpo con sangría, números con relleno o escapes innecesarios pesa más y recibe 413 del lector) (`MAX_BYTES_LOTE`, 1 147 904 bytes), el mismo en el lector de JSON, en la
     plantilla y en el `location` del lote del proxy; ese tope es solo de `POST` a esa ruta (las demás, 100 KiB; en el proxy, 128 KiB), y en
     esa ruta una petición sin la cookie de sesión ni `X-Clave-Admin` es 401 antes de leer el cuerpo. Los 413 del proxy salen en JSON. (vii) `GET /dispositivos/lote/plantilla`
     publica columnas, topes, `max_filas`, `max_bytes` y separadores (la acción «escribir»); `GET /magnitudes`, el catálogo, a cualquier
