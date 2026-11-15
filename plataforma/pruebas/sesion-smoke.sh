@@ -151,12 +151,14 @@ read -r PA PB KA KB QA QB SOLO_B <<<"$IDS2"
 FALSO="00000000-0000-4000-8000-000000000000"
 
 # pedir QUIEN MÉTODO RUTA [CUERPO]: QUIEN = anon | clave (X-Clave-Admin) | nombre del tarro de cookies (curl -c/-b). Las rutas que
-# escriben llevan X-Pedido: panel salvo con SIN_PEDIDO=1. Escribe el cuerpo de la respuesta en $T/r y devuelve el código.
+# escriben llevan X-Pedido: panel salvo con SIN_PEDIDO=1; con LLAVE=… va también `Idempotency-Key` (la creación por lote, docs/19 §4, N8).
+# Escribe el cuerpo de la respuesta en $T/r y devuelve el código.
 pedir() {
   local quien=$1 m=$2 r=$3 c=${4:-}
   local args=(-s -m 15 -o "$T/r" -w '%{http_code}' -X "$m")
   [ -n "$c" ] && args+=(-H 'Content-Type: application/json' --data-binary "$c")
   [ "$m" != GET ] && [ "${SIN_PEDIDO:-0}" != 1 ] && args+=(-H 'X-Pedido: panel')
+  [ -n "${LLAVE:-}" ] && args+=(-H "Idempotency-Key: $LLAVE")
   case "$quien" in
     anon) curl "${IFZ[@]}" "${args[@]}" "$API$r" ;;
     clave) printf 'X-Clave-Admin: %s\n' "$CLAVE" | curl "${IFZ[@]}" "${args[@]}" -H @- "$API$r" ;;
@@ -397,6 +399,8 @@ done
 caso "sin sesión: PATCH /dispositivos/{id}" 401 anon PATCH "/dispositivos/$DA" '{}'
 caso "sin sesión: PUT /canales/{id}/reglas" 401 anon PUT "/canales/$CA/reglas" '{}'
 caso "sin sesión: POST /dispositivos/lote" 401 anon POST "/dispositivos/lote?modo=validar" '{}'
+caso "sin sesión: GET /dispositivos/lote/plantilla" 401 anon GET /dispositivos/lote/plantilla
+caso "sin sesión: GET /magnitudes" 401 anon GET /magnitudes
 caso "consulta: GET /sitios" 200 con GET /sitios
 [ "$(campo "' '.join(x['id']+':'+x['rol'] for x in v)")" = "$SITIO_A:consulta" ] && ok "consulta: GET /sitios trae solo su sitio, con su rol" || falla "consulta: GET /sitios → $(head -c 160 "$T/r")"
 for r in "/sitios/$SITIO_A/resumen" "/sitios/$SITIO_A/ahora" "/sitios/$SITIO_A/historico?magnitud=temperatura" "/dispositivos/$DA/historico" "/dispositivos/$DA/eventos"; do
@@ -419,7 +423,10 @@ caso "administrador, otro sitio: GET /cuarentena/detectados?sitio=" 404 adm GET 
 pedir adm GET "/dispositivos/$DA" >/dev/null; MD=$(campo "v['actualizado_en']"); MC=$(campo "[c for c in v['canales'] if c['id']=='$CA'][0]['actualizado_en']")
 caso "consulta: PATCH /dispositivos/{id}" 403 con PATCH "/dispositivos/$DA" "{\"actualizado_en\":\"$MD\",\"nombre\":\"x\"}"
 caso "consulta: PUT /canales/{id}/reglas" 403 con PUT "/canales/$CA/reglas" "{\"actualizado_en\":\"$MC\",\"reglas\":[]}"
-caso "consulta: POST /dispositivos/lote" 403 con POST "/dispositivos/lote?modo=validar" '{"filas":[{}]}'
+caso "consulta: POST /dispositivos/lote" 403 con POST "/dispositivos/lote?modo=validar" '{"filas":[{"n":2}]}'
+caso "consulta: GET /dispositivos/lote/plantilla → 403 (es de quien da de alta)" 403 con GET /dispositivos/lote/plantilla
+caso "consulta: GET /magnitudes (el catálogo, a cualquier sesión)" 200 con GET /magnitudes
+caso "administrador: GET /dispositivos/lote/plantilla" 200 adm GET /dispositivos/lote/plantilla
 caso "administrador: PATCH /dispositivos/{id} con la marca vigente (mantenimiento)" 200 adm PATCH "/dispositivos/$DA" "{\"actualizado_en\":\"$MD\",\"estado\":\"mantenimiento\"}"
 [ "$(campo "v['estado']")" = mantenimiento ] && ok "PATCH responde la ficha con el estado nuevo" || falla "PATCH no devolvió la ficha: $(head -c 120 "$T/r")"
 caso "administrador: PATCH /dispositivos/{id} con la marca vieja → 409 (bloqueo optimista)" 409 adm PATCH "/dispositivos/$DA" "{\"actualizado_en\":\"$MD\",\"estado\":\"activo\"}"
@@ -440,15 +447,34 @@ caso "administrador: GET /dispositivos/{id}/eventos muestra quién (usuario{id, 
 [ "$(campo "sum(1 for e in v if e['usuario'] and e['usuario']['id']=='$ADM_UID' and e['tipo'] in ('dispositivo_configurado','reglas_cambiadas'))")" = 3 ] && ok "administrador: los eventos del dispositivo traen la persona que configuró" || falla "administrador: eventos sin la persona: $(head -c 200 "$T/r")"
 caso "consulta: GET /dispositivos/{id}/eventos (su sitio)" 200 con GET "/dispositivos/$DA/eventos"
 [ "$(campo "(len([e for e in v if e['tipo'] in ('dispositivo_configurado','reglas_cambiadas')]), sum(1 for e in v if e['usuario'] is not None))")" = "(3, 0)" ] && ok "consulta: ve los 3 eventos, pero sin el nombre de quien los hizo (usuario: null)" || falla "consulta ve quién: $(head -c 200 "$T/r")"
-LOTE="{\"filas\":[{\"id_fisico\":\"tl-$N\",\"nombre\":\"por lote\",\"zona\":\"$ZA\",\"via\":\"http\",\"intervalo_esperado_s\":\"60\",\"canales\":\"temperatura:Cel\"},{\"id_fisico\":\"tk-$N\",\"nombre\":\"ajeno\",\"zona\":\"$ZB\",\"via\":\"http\",\"intervalo_esperado_s\":\"60\",\"canales\":\"temperatura\"},{\"id_fisico\":\"tb-$N\",\"nombre\":\"de otro sitio\",\"zona\":\"$ZA\",\"via\":\"http\",\"intervalo_esperado_s\":\"60\",\"canales\":\"temperatura\"},{\"id_fisico\":\"gwb-$N\",\"nombre\":\"pasarela de otro sitio\",\"zona\":\"$ZA\",\"via\":\"http\",\"intervalo_esperado_s\":\"60\",\"canales\":\"temperatura\"},{\"id_fisico\":\"ta-$N\",\"nombre\":\"ya existe\",\"zona\":\"$ZA\",\"via\":\"http\",\"intervalo_esperado_s\":\"60\",\"canales\":\"temperatura\"}]}"
-caso "administrador: POST /dispositivos/lote?modo=crear" 200 adm POST "/dispositivos/lote?modo=crear" "$LOTE"
+# Alta por lote (docs/19 §4, N): vista previa con el n de cada fila, creación con su huella y la llave; las que no entran se informan.
+LOTE_FILAS="[{\"n\":2,\"id_fisico\":\"tl-$N\",\"nombre\":\"por lote\",\"zona\":\"$ZA\",\"via\":\"http\",\"intervalo_esperado_s\":\"60\",\"canales\":\"temperatura:Cel\"},{\"n\":3,\"id_fisico\":\"tk-$N\",\"nombre\":\"ajeno\",\"zona\":\"$ZB\",\"via\":\"http\",\"intervalo_esperado_s\":\"60\",\"canales\":\"temperatura\"},{\"n\":5,\"id_fisico\":\"tb-$N\",\"nombre\":\"de otro sitio\",\"zona\":\"$ZA\",\"via\":\"http\",\"intervalo_esperado_s\":\"60\",\"canales\":\"temperatura\"},{\"n\":6,\"id_fisico\":\"gwb-$N\",\"nombre\":\"pasarela de otro sitio\",\"zona\":\"$ZA\",\"via\":\"http\",\"intervalo_esperado_s\":\"60\",\"canales\":\"temperatura\"},{\"n\":7,\"id_fisico\":\"ta-$N\",\"nombre\":\"ya existe\",\"zona\":\"$ZA\",\"via\":\"http\",\"intervalo_esperado_s\":\"60\",\"canales\":\"temperatura\"}]"
+caso "administrador: POST /dispositivos/lote?modo=validar (vista previa)" 200 adm POST "/dispositivos/lote?modo=validar" "{\"filas\":$LOTE_FILAS}"
+cp "$T/r" "$T/vista.json"; HUELLA_LOTE=$(campo "v['huella']")
+[ "$(campo "(v['leidas'], v['validas'] + v['existentes'] + v['rechazadas'], [f['n'] for f in v['filas']])")" = "(5, 5, [2, 3, 5, 6, 7])" ] && ok "lote: la vista previa devuelve el n de cada fila tal cual y validas + existentes + rechazadas = leidas" || falla "lote vista previa: $(head -c 300 "$T/r")"
+LLAVE_LOTE=$(python3 -I -c 'import uuid; print(uuid.uuid4())')
+LLAVE=$LLAVE_LOTE caso "administrador: POST /dispositivos/lote?modo=crear (con la huella y la llave)" 200 adm POST "/dispositivos/lote?modo=crear" "{\"filas\":$LOTE_FILAS,\"huella\":\"$HUELLA_LOTE\"}"
+cp "$T/r" "$T/creado.json"
 [ "$(campo "' '.join(f['resultado'] for f in v['filas'])")" = "creada rechazada rechazada rechazada existe" ] && ok "lote: crea la válida, rechaza la de una zona de otro sitio (como inexistente) y marca la que ya existe" || falla "lote: $(head -c 300 "$T/r")"
 # RF-41 (revisión del 11/11/2026): el id_fisico de un dispositivo o de una pasarela del sitio B, subido desde A, no revela su UUID ni su estado.
-[ "$(campo "[(f['motivo'], f['id']) for f in v['filas'][2:4]]")" = "[('identificador no disponible', None), ('identificador no disponible', None)]" ] && ok "lote: un id_fisico de un dispositivo o pasarela de otro sitio → «identificador no disponible», sin id" || falla "lote ajeno: $(campo "v['filas'][2:4]")"
+[ "$(campo "[(f['motivo'], f['id'], f['interpretada']) for f in v['filas'][2:4]]")" = "[('identificador no disponible', None, None), ('identificador no disponible', None, None)]" ] && ok "lote: un id_fisico de un dispositivo o pasarela de otro sitio → «identificador no disponible», sin id ni interpretada" || falla "lote ajeno: $(campo "v['filas'][2:4]")"
 grep -q "$DB" "$T/r" && falla "lote: la respuesta trae el UUID del dispositivo del sitio B" || ok "lote: la respuesta no trae el UUID del dispositivo del sitio B"
 [ -n "$(campo "v['filas'][0]['credencial'] or ''")" ] && ok "lote: la credencial de la creada viene una vez en la respuesta" || falla "lote sin credencial"
 n=$(sql -c "SELECT count(*) FROM dispositivo d JOIN evento e ON e.dispositivo_id = d.id AND e.tipo = 'alta' AND e.usuario_id = '$ADM_UID' WHERE d.id_fisico = 'tl-$N'")
 [ "$n" = 1 ] && ok "lote: el dispositivo quedó con su evento de alta y quién lo creó" || falla "lote: evento de alta con usuario → $n"
+# «Vista previa = creación» contra la base real: la ficha del creado dice lo que anunció su `interpretada`.
+TL=$(python3 -I -c "import sys,json; print(json.load(open(sys.argv[1]))['filas'][0]['id'])" "$T/creado.json")
+pedir adm GET "/dispositivos/$TL" >/dev/null
+[ "$(python3 -I -c "import sys,json; a=json.load(open(sys.argv[1]))['filas'][0]['interpretada']; f=json.load(open(sys.argv[2])); print([a[k]==f[k] for k in ('id_fisico','nombre','via','formato','intervalo_esperado_s','zona_id','zona')]+[a['sitio']==f['sitio_codigo'], [c['magnitud'] for c in a['canales']]==[c['magnitud'] for c in f['canales']]])" "$T/vista.json" "$T/r")" = "[True, True, True, True, True, True, True, True, True]" ] \
+  && ok "lote: lo creado es lo que anunció la vista previa (identificador, nombre, vía, formato, intervalo, zona, sitio y canales)" || falla "lote: la ficha difiere de la vista previa: $(head -c 300 "$T/r")"
+# Reintento con la misma llave y el mismo cuerpo: la misma respuesta, y ningún dispositivo de más; otro cuerpo con esa llave, 422.
+LLAVE=$LLAVE_LOTE caso "administrador: repetir el crear con la misma llave → 200" 200 adm POST "/dispositivos/lote?modo=crear" "{\"filas\":$LOTE_FILAS,\"huella\":\"$HUELLA_LOTE\"}"
+cmp -s "$T/r" "$T/creado.json" && ok "lote: el reintento con la misma llave devuelve la misma respuesta" || falla "lote: el reintento devolvió otra respuesta: $(head -c 200 "$T/r")"
+[ "$(sql -c "SELECT count(*) FROM dispositivo WHERE id_fisico = 'tl-$N'")" = 1 ] && ok "lote: el reintento no creó ningún dispositivo de más" || falla "lote: el reintento duplicó"
+LLAVE=$LLAVE_LOTE caso "administrador: la misma llave con otro cuerpo → 422" 422 adm POST "/dispositivos/lote?modo=crear" "{\"filas\":[{\"n\":2,\"id_fisico\":\"tz-$N\"}],\"huella\":\"$HUELLA_LOTE\"}"
+# La huella de un plan viejo (ya se creó tl-…): 409 plan_cambio con el plan nuevo, y nada creado.
+LLAVE=$(python3 -I -c 'import uuid; print(uuid.uuid4())') caso "administrador: crear con la huella de un plan que ya cambió → 409" 409 adm POST "/dispositivos/lote?modo=crear" "{\"filas\":$LOTE_FILAS,\"huella\":\"$HUELLA_LOTE\"}"
+[ "$(campo "(v['codigo'], v['plan']['filas'][0]['resultado'])")" = "('plan_cambio', 'existe')" ] && ok "lote: el 409 dice plan_cambio y trae el plan nuevo (la fila creada ahora «existe»)" || falla "lote plan_cambio: $(head -c 200 "$T/r")"
 
 # ── 3c. Listas por clave (docs/10 §8.4 punto 58 iv): una fila insertada entre dos páginas no se repite ni se pierde; un cursor de otro sitio
 # no trae nada de ese sitio. Cuatro eventos con instantes fijos en el dispositivo A2; la página 1 trae los dos más nuevos; se inserta un
@@ -536,8 +562,12 @@ caso "investigador: PATCH /dispositivos/{id} → 403" 403 inv PATCH "/dispositiv
 caso "operador técnico: PATCH /dispositivos/{id} → 200" 200 ope PATCH "/dispositivos/$DA" "{\"actualizado_en\":\"$MD\",\"nombre\":\"nodo A\"}"
 caso "investigador: PUT /canales/{id}/reglas → 403" 403 inv PUT "/canales/$CA/reglas" "{\"actualizado_en\":\"$MC\",\"reglas\":[]}"
 caso "operador técnico: PUT /canales/{id}/reglas → 200" 200 ope PUT "/canales/$CA/reglas" "{\"actualizado_en\":\"$MC\",\"reglas\":[{\"umbral_alto\":31,\"histeresis\":1}]}"
-caso "investigador: POST /dispositivos/lote → 403" 403 inv POST "/dispositivos/lote?modo=validar" '{"filas":[{}]}'
-caso "operador técnico: POST /dispositivos/lote?modo=validar → 200" 200 ope POST "/dispositivos/lote?modo=validar" '{"filas":[{}]}'
+caso "investigador: POST /dispositivos/lote → 403" 403 inv POST "/dispositivos/lote?modo=validar" '{"filas":[{"n":2}]}'
+caso "operador técnico: POST /dispositivos/lote?modo=validar → 200" 200 ope POST "/dispositivos/lote?modo=validar" '{"filas":[{"n":2}]}'
+caso "investigador: GET /dispositivos/lote/plantilla → 403" 403 inv GET /dispositivos/lote/plantilla
+caso "operador técnico: GET /dispositivos/lote/plantilla → 200" 200 ope GET /dispositivos/lote/plantilla
+caso "administrador del sistema: GET /dispositivos/lote/plantilla → 200" 200 sis GET /dispositivos/lote/plantilla
+caso "investigador: GET /magnitudes → 200" 200 inv GET /magnitudes
 caso "investigador: GET /cuarentena/detectados → 403" 403 inv GET /cuarentena/detectados
 caso "operador técnico: GET /cuarentena/detectados?sitio= → 200" 200 ope GET "/cuarentena/detectados?sitio=$SITIO_A"
 caso "administrador del sistema: GET /cuarentena/detectados?sitio= (B) → 200" 200 sis GET "/cuarentena/detectados?sitio=$SITIO_B"

@@ -492,7 +492,7 @@ cliente ──HTTP──► Express ⊂ NestJS ──► servicio ──► pg �
 
 - **Express** es la biblioteca de servidor HTTP más usada de Node.js; NestJS la usa por debajo
   (`@nestjs/platform-express`). El proceso de Node es el servidor; Express recibe cada petición y
-  entrega la respuesta. Es **la API**: 37 rutas REST (46 operaciones, la recepción por HTTP, la sesión, los usuarios, el tablero v2 y, desde el 11/11/2026, la cuenta propia, lo legal, el soporte y la actividad incluidos) y el canal SSE `/eventos` (§5), descritos en el contrato OpenAPI (38 rutas y 47 operaciones contando `/eventos`; el paso 2h2 del guardián compara estas cifras con `openapi.json`). Desde el 08/11/2026, antes de cada ruta corre el guardia central de la sesión (`docs/20 §5`). Express no toca la base.
+  entrega la respuesta. Es **la API**: 39 rutas REST (48 operaciones, la recepción por HTTP, la sesión, los usuarios, el tablero v2, desde el 11/11/2026 la cuenta propia, lo legal, el soporte y la actividad, y desde el 15/11/2026 la plantilla del alta por lote y el catálogo de magnitudes incluidos) y el canal SSE `/eventos` (§5), descritos en el contrato OpenAPI (40 rutas y 49 operaciones contando `/eventos`; el paso 2h2 del guardián compara estas cifras con `openapi.json`). Desde el 08/11/2026, antes de cada ruta corre el guardia central de la sesión (`docs/20 §5`). Express no toca la base.
 - **`pg`** (node-postgres) es el conductor de la base: mantiene un *pool* de 5 conexiones
   (`db/db.module.ts`) y envía **SQL directo** con parámetros `$1, $2…`; el valor nunca se pega dentro
   del texto SQL, lo que evita la inyección. Sin ORM, por la razón de `docs/07` (series de tiempo con
@@ -1732,7 +1732,8 @@ entra. Lo que aquí se marca «a fijar al implementar» es un detalle que el dis
     resolución del rango cuesta milisegundos (se mide como `docs/16 §52`); un agregado por tarea queda para cuando la medición lo pida.
     (iv) **El lote de alta es una sola transacción:** validación completa en memoria con las mismas funciones del alta de a uno, una inserción
     con `UNNEST` en una transacción, credenciales generadas y devueltas una sola vez, tope de 500 filas y límite de tasa (`docs/11 §4`);
-    las filas rechazadas no bloquean a las válidas y el informe lo dice fila por fila; desde el 13/11/2026 cada credencial se resume con SHA-256
+    hasta el 15/11/2026 las filas rechazadas no bloqueaban a las válidas; desde entonces las que no entran no se envían y, si al confirmar
+    el plan cambió, 409 y nada se crea (punto 67); desde el 13/11/2026 cada credencial se resume con SHA-256
     (`docs/11 §4`) y crear 500 tarda ≈ 0,1 s por la vía http y ≈ 0,4 s por la mqtt, no ≈ 70 s (`docs/16 §61` y §65). (v) `evento.usuario_id` (nulo = el sistema) es la
     fuente de «quién lo hizo» (HU-11); la retención de `evento` no cambia. (vi) **Retardo de activación** (RF-14): el filtro alertar abre
     la condición de umbral solo cuando la medición lleva al menos `retardo_s` fuera de la banda (0 = como hoy); desde cuándo está fuera
@@ -1764,6 +1765,29 @@ entra. Lo que aquí se marca «a fijar al implementar» es un detalle que el dis
     Medido antes y después con 120 y 2 000 dispositivos en `docs/16 §68`: el umbral relativo de 1,5 veces que traía `docs/19` M6 se cumplía en 4 de 8
     mediciones y se reemplazó por uno absoluto (ninguna petición sobre 3 s; el refresco en vivo de la pestaña, bajo la décima parte de su
     período), que las ocho cumplen; la más lenta, 1 088 ms.
+67. **Alta masiva: plan por fila, todo o nada y reintento (`docs/19 §4`, N; 15/11/2026).** `POST /dispositivos/lote?modo=validar|crear`
+    (Etapa 4) responde `{leidas, validas, existentes, rechazadas, con_aviso, huella, filas}` (validas + existentes + rechazadas = leidas;
+    `con_aviso` es transversal) y cada fila suma, a lo que ya traía (`n, id_fisico, resultado, motivo, id, credencial, topico`: ninguna
+    respuesta cambia de forma, punto 65 i), `interpretada` (lo que se creará: identificador normalizado, nombre, sitio, zona y su id, vía,
+    formato resuelto, intervalo, canales con nombre y unidad, pasarela y su id, decodificador y tópico; `null` si no entra o ya existe),
+    `por_defecto`, `avisos` y `motivos` (listas de `{campo, texto}`; `motivo` es la unión de `motivos`). Decisiones: (i) **`n` lo manda el
+    cliente** (la fila del origen) y el servidor exige un entero positivo, único y creciente, y lo devuelve tal cual. (ii) **Una sola
+    función decide, dos veces:** `validarLote` (que usa `validarAlta`, la del alta de a uno) calcula la vista previa y vuelve a calcular en
+    la creación, con los catálogos leídos una vez (cinco consultas, ninguna por fila). (iii) **La huella** es el SHA-256 de la forma
+    canónica (JSON con las claves ordenadas) de `[n, interpretada]` de las filas que entran, en orden: la creación, que recibe solo las
+    confirmadas, da la misma si nada cambió, y otra si una fila dejó de entrar, empezó a entrar o crearía otra cosa. (iv) **Todo o nada:**
+    `modo=crear` exige la `huella` y la cabecera `Idempotency-Key` (de 16 a 128 caracteres, la genera el cliente); recalcula dentro del
+    candado de «una creación a la vez» y, si la huella difiere, 409 `codigo: plan_cambio` con el plan nuevo en `plan` y nada creado; otra
+    creación en curso es 409 `codigo: lote_en_curso`; el choque que solo ve la base (23505, o el formato de la pasarela que cambió:
+    `fk_dispositivo_pasarela_formato`) deshace la transacción, recalcula y responde también `plan_cambio`. (v) **Reintento:** la respuesta de
+    una creación que terminó se guarda por persona y llave durante 2 minutos en la memoria del proceso (hasta 200 entradas; llena, primero
+    las vencidas y después la más antigua); la misma llave con el mismo cuerpo devuelve esa respuesta sin crear nada, antes del límite de
+    tasa; con otro cuerpo, 422 `codigo: llave_reutilizada`. Vale con una instancia, como el candado (`docs/11 §4`). (vi) **Topes:** cada
+    columna tiene el suyo (el de `validarAlta` donde existe y 80 donde no; dentro de `canales`, 16 para la unidad) y una celda que lo pasa,
+    que no es texto ni número o que trae NUL es 400 con su fila; el tope del cuerpo es el peor caso **medido** de 500 filas llenas
+    (`MAX_BYTES_LOTE`, 1 467 392 bytes), el mismo en el lector de JSON, en la plantilla y en el proxy. (vii) `GET /dispositivos/lote/plantilla`
+    publica columnas, topes, `max_filas`, `max_bytes` y separadores (la acción «escribir»); `GET /magnitudes`, el catálogo, a cualquier
+    sesión (`docs/20 §6`). Probado con la falla plantada y medido en `docs/16 §71`.
 
 ## 9. Crecimiento, resiliencia y respaldo (aprobado el 06/10/2026)
 

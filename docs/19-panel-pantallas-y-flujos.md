@@ -457,7 +457,9 @@ mis datos» (JSON por `descargar`) y «Darme de baja» (`docs/20 §11`).
 | `GET /cuarentena/detectados?sitio` | emisores no registrados de los últimos 7 días: identificador o tópico, cuántas tramas, última | administrador de sitio hoy; operador técnico cuando exista el perfil (Etapa 4) |
 | `PATCH /dispositivos/{id}` | nombre, estado, intervalo esperado, zona; `actualizado_en` obligatorio; 409 si cambió | administrador de sitio hoy; operador técnico cuando exista el perfil (Etapa 4) |
 | `PUT /canales/{id}/reglas` | reemplaza las reglas del canal (alto, bajo, histéresis, retardo); `actualizado_en`; 409 | administrador de sitio hoy; operador técnico cuando exista el perfil (Etapa 4) |
-| `POST /dispositivos/lote?modo=validar\|crear` | informe fila por fila; en `crear`, las credenciales una sola vez | administrador de sitio hoy; operador técnico cuando exista el perfil (Etapa 4) |
+| `POST /dispositivos/lote?modo=validar\|crear` | informe fila por fila; en `crear`, las credenciales una sola vez; desde el bloque N, el plan por fila con su huella, y en `crear` la huella y `Idempotency-Key`, todo o nada (409 `plan_cambio` o `lote_en_curso`) | administrador de sitio hoy; operador técnico cuando exista el perfil (Etapa 4) |
+| `GET /dispositivos/lote/plantilla` (bloque N) | columnas del lote (nombre, obligatoria, tope, ayuda, ejemplo), `max_filas`, `max_bytes` y separadores | operador técnico y administradores (la acción «escribir») |
+| `GET /magnitudes` (bloque N) | el catálogo: código, nombre y unidad canónica | con sesión |
 | `GET /preferencias` · `PUT /preferencias` | las propias; bloqueo optimista | con sesión (Etapa 4) |
 | `GET /sesiones` · `DELETE /sesiones/{id}` | las propias | con sesión (Etapa 4) |
 Compatibilidad: ninguna respuesta cambia de forma (los totales y los cursores van en cabeceras; los campos nuevos se suman); el OpenAPI se
@@ -739,6 +741,11 @@ sitio» es un solo equipo, y el rótulo dice «promedio de 9 dispositivos») y *
    columna de «Ver los datos». Las fallas plantadas y las capturas, en `docs/16 §68`.
 
 **N. P7 v2: la vista previa del alta masiva (cambia F2, la fila de `POST /dispositivos/lote` del contrato, `docs/10 §8.4` punto 65 iv, la fila del alta masiva de `docs/11 §4` y la matriz de `docs/20 §6`; diseñado el 15/11/2026, antes del código, y revisado el mismo día: 16 objeciones, todas atendidas en este texto).**
+✅ backend, 15/11/2026 (la primera parte del punto 12: contrato, plan por fila, `n`, huella, plantilla, magnitudes, topes, todo o nada y
+reintento, con sus pruebas; `alta/lote.ts`, `alta/alta.controller.ts` y `alta/magnitudes.controller.ts`; `docs/10 §8.4` punto 67; probado y
+medido en `docs/16 §71`). El panel de hoy quedó adaptado al contrato sin rediseñarse (`n` contando las filas vacías, columnas y límites
+leídos de la plantilla, una sola petición con la huella y la llave, los 409 por su `codigo`); la pantalla de tres pasos (7), los lectores
+(6), las descargas (9) y el XLSX quedan para el bloque siguiente.
 El alta masiva de F2 (11/11/2026) valida bien y explica poco. Lo que se observa en el código y en la pantalla de hoy:
 
 | Hoy | Por qué no alcanza |
@@ -753,7 +760,8 @@ El alta masiva de F2 (11/11/2026) valida bien y explica poco. Lo que se observa 
 1. **Una sola función decide, y decide dos veces.** `validarLote` ya llama a la validación del alta de a uno (`validarAlta`): eso se
    conserva. La vista previa y la creación usan esa misma función, y la creación **vuelve a calcular** con lo que hay en la base en ese
    momento: la vista previa queda vieja en cuanto se muestra.
-2. **El plan por fila (contrato).** `POST /dispositivos/lote?modo=validar|crear` responde `{leidas, validas, existentes, rechazadas,
+2. **El plan por fila (contrato).** ✅ backend, 15/11/2026 (la huella, SHA-256 de `[n, interpretada]` de las filas que entran, en JSON con
+   las claves ordenadas: así la creación, que recibe solo esas filas, da la misma; decidido al implementar). `POST /dispositivos/lote?modo=validar|crear` responde `{leidas, validas, existentes, rechazadas,
    con_aviso, huella, filas}` y cada fila trae: `n`, `id_fisico`, `resultado` (`valida`, `creada`, `existe`, `rechazada`; no cambian),
    `interpretada` (lo que se creará, o `null` si no entra: identificador ya normalizado, nombre, sitio y zona por su nombre, vía, formato
    resuelto, intervalo, canales con nombre y unidad canónica, pasarela, perfil de decodificación y el tópico en que publicará),
@@ -763,19 +771,21 @@ El alta masiva de F2 (11/11/2026) valida bien y explica poco. Lo que se observa 
    CSV o un pegado, la línea contando las vacías, con la cabecera en la 1; en JSON, la posición más 1); el servidor exige que sea un
    entero, único y creciente, y lo devuelve tal cual. `huella` es un resumen de todas las `interpretada`, en orden: identifica el plan
    que la persona vio. Invariante con prueba: `validas + existentes + rechazadas = leidas`; `con_aviso` es transversal.
-3. **Avisos: lo que entra, pero la persona debe ver.** No bloquean. El identificador venía con mayúsculas y se guardará en minúsculas;
+3. **Avisos: lo que entra, pero la persona debe ver.** ✅ backend, 15/11/2026 (los cinco; la línea sobre la tabla es del panel). No bloquean. El identificador venía con mayúsculas y se guardará en minúsculas;
    la unidad se omitió y se asume la canónica; la zona se resolvió por nombre (se dice en qué sitio); el formato declarado en un nodo
    LoRaWAN coincide con el de su pasarela y se ignora; el nombre se repite en otra fila del archivo. El aviso se marca en la fila y
    cuenta en la tarjeta «Con aviso»; no fuerza la fila en otros filtros. Si hay válidas con aviso, una línea sobre la tabla lo dice
    («N filas que se crean traen avisos: ver») y lleva a ese filtro.
-4. **Los límites y la plantilla tienen una sola casa.** `GET /dispositivos/lote/plantilla` (Etapa 4) publica las
+4. **Los límites y la plantilla tienen una sola casa.** ✅ backend, 15/11/2026 (las dos rutas; el panel de hoy ya lee la plantilla). `GET /dispositivos/lote/plantilla` publica las
    columnas (nombre, si es obligatoria, tope de caracteres, ayuda y ejemplo), `max_filas`, `max_bytes` y los separadores admitidos; la
    lee quien puede usar la ruta del lote (la acción «escribir» de `docs/20 §6`: operador técnico y administradores). El panel no guarda
    copia: de ahí salen el texto «máximo…», la comprobación antes de enviar, la plantilla que se descarga y la lista
-   de columnas obligatorias. `GET /magnitudes` (Etapa 4) publica el catálogo (código, nombre y unidad canónica) a cualquier sesión: no
+   de columnas obligatorias. `GET /magnitudes` publica el catálogo (código, nombre y unidad canónica) a cualquier sesión: no
    es de ningún sitio; lo usan la ayuda de `canales`, la vista previa y el selector del asistente (F1). La plantilla y `COLUMNAS_LOTE`
    suman la columna opcional `decodificador`, que `validarAlta` ya admite y el lote hoy rechaza como columna no admitida.
-5. **Topes por columna, y el del cuerpo calculado desde ellos.** Cada columna tiene su tope, el de `validarAlta` donde existe
+5. **Topes por columna, y el del cuerpo calculado desde ellos.** ✅ backend y proxy, 15/11/2026 (la unidad dentro de `canales`, 16
+   caracteres: la celda `canales` mide 1 197; el peor caso medido, 1 467 087 bytes, y el tope, 1 467 392: `MAX_BYTES_LOTE`, el mismo en el
+   lector de JSON, la plantilla y `client_max_body_size`). Cada columna tiene su tope, el de `validarAlta` donde existe
    (identificador 63, nombre 80, magnitud 40, hasta 20 canales) y 80 donde no; una celda que lo pasa, que no es texto ni número o que
    trae el carácter NUL responde 400 con la fila. `max_bytes` es el peor caso de `max_filas` filas con todas las columnas en su tope,
    medido en bytes UTF-8 por una prueba, no estimado: con 20 canales por fila ronda 0,9 MB, así que los 512 KiB de hoy no alcanzan
@@ -786,7 +796,7 @@ El alta masiva de F2 (11/11/2026) valida bien y explica poco. Lo que se observa 
    del separador **antes** de enviar; una fila con más o con menos celdas que la cabecera no se envía: «la fila N trae X celdas y la
    cabecera Y» (hoy las que sobran se pierden en silencio). Dentro de `canales` el separador documentado pasa a ser `|`
    (`temperatura:Cel | humedad:%RH`), porque `;` es ahora el de columnas; el servidor admite `|` y `;` siempre, y el ejemplo que se
-   descarga deja de traer `;` sin comillas.
+   descarga deja de traer `;` sin comillas. ✅ la parte del servidor, 15/11/2026 (`canales` con `|` y `;`; la columna `decodificador`).
    **XLSX (decidido el 15/11/2026: lector propio, sin dependencia nueva; cambia el control de `docs/11 §4`, que pedía una biblioteca
    auditada, y allí se anota el porqué).** Se descarga solo al elegir un `.xlsx` y lee textos y números de la primera hoja. Como abre
    un archivo que puede venir de un tercero, sus límites van escritos: solo se leen `xl/workbook.xml`, sus relaciones,
@@ -806,7 +816,9 @@ El alta masiva de F2 (11/11/2026) valida bien y explica poco. Lo que se observa 
    no entran (CSV)» y «Crear N dispositivos», que se desactiva mientras su petición está en vuelo. La tabla dibuja de a 100 filas
    («Mostrar 100 más»); en teléfono cada fila es una tarjeta.
    (iii) *Resultado:* cuántos se crearon y las credenciales, que se descargan una sola vez como hoy.
-8. **Confirmar es una petición, todo o nada (decidido el 15/11/2026).** `modo=crear` recibe las filas que la persona confirmó, la
+8. **Confirmar es una petición, todo o nada (decidido el 15/11/2026).** ✅ backend, 15/11/2026 (la llave viaja en la cabecera
+   `Idempotency-Key`, de 16 a 128 caracteres; la misma llave con otro cuerpo responde 422 `llave_reutilizada`; decidido al implementar).
+   `modo=crear` recibe las filas que la persona confirmó, la
    `huella` del plan que vio y una llave de reintento, y las crea en una transacción. Vuelve a calcular, y si el plan ya no es el
    mismo —una fila dejó de ser válida, **o sigue siendo válida pero crearía otra cosa** (cambió el formato de su pasarela, la zona
    resuelve a otro sitio)— responde 409 con `codigo: plan_cambio` y el plan nuevo, y **no crea ninguna**: la pantalla vuelve a la
@@ -823,12 +835,12 @@ El alta masiva de F2 (11/11/2026) valida bien y explica poco. Lo que se observa 
    completo (`＝`, `＋`, `－`, `＠`); la única excepción es una celda que **entera** sea un número (`-5`, `+3,2`). El lector quita ese
    apóstrofo inicial cuando lo sigue uno de esos caracteres, para que lo descargado y vuelto a subir sin tocar dé el mismo plan. El
    archivo de credenciales no cambia: es para máquinas.
-10. **Lo que no cambia, y lo que cambia en otros documentos.** No cambia lo que no se revela de otros sitios (RF-41: un
+10. **Lo que no cambia, y lo que cambia en otros documentos.** ✅ 15/11/2026, salvo lo del XLSX en `docs/11 §4`, que va con el lector. No cambia lo que no se revela de otros sitios (RF-41: un
     identificador ajeno sigue siendo «no disponible», sin `interpretada`), los 10 lotes por minuto por persona, una creación a la vez
     y las credenciales una sola vez. Cambian junto con el código de este bloque, porque describen lo que rige: `docs/10 §8.4` punto 65 iv y la fila del alta masiva
     de `docs/11 §4` («las rechazadas no bloquean a las válidas» pasa a «las que no entran no se envían; si al confirmar el plan
     cambió, 409 y nada»; el tope del cuerpo; el XLSX), y `docs/20 §6` suma las dos rutas nuevas.
-11. **Pruebas y medición (antes de dar por hecho).** «Vista previa = creación»: crear y comparar el informe con lo anunciado, fila por
+11. **Pruebas y medición (antes de dar por hecho).** ✅ lo del servidor, 15/11/2026 (`docs/16 §71`); lo del navegador, con el panel. «Vista previa = creación»: crear y comparar el informe con lo anunciado, fila por
     fila. El 409 de `plan_cambio` se prueba con un cambio que la base **no** impide (desactivar la pasarela o cambiarle el formato
     entre validar y crear): un identificador duplicado lo frenaría la restricción única aunque faltara la segunda validación, y la
     prueba pasaría con el defecto puesto. El límite, **en el límite**: 500 filas con cada columna en su tope caben en el cuerpo, y 501

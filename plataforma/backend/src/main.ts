@@ -45,7 +45,7 @@ async function arrancar(): Promise<void> {
     next();
   });
   // El alta por lote (docs/19 §4, F2) trae hasta 500 filas: con el tope por omisión del lector de JSON (100 KiB) no caben. Nest admite un
-  // solo lector de JSON (uno registrado aquí reemplaza al suyo): se le da 512 KiB y, ANTES de leer, toda otra ruta con un cuerpo declarado de
+  // solo lector de JSON (uno registrado aquí reemplaza al suyo): se le da el tope del lote (TOPE_CUERPO_LOTE, arranque.ts) y, ANTES de leer, toda otra ruta con un cuerpo declarado de
   // más de 100 KiB responde 413, como antes. El tope que manda en el lote es el de filas (413 con el motivo); el de bytes es la guarda gruesa.
   // Un cuerpo sin largo declarado (Transfer-Encoding: chunked) no lo detiene la cabecera: `verify` cuenta los bytes leídos y, fuera del
   // lote, más de 100 KiB también es 413 (arranque.ts, cuerpoExcedido; revisión del 11/11/2026). El atajo por cabecera queda: no lee nada.
@@ -62,7 +62,7 @@ async function arrancar(): Promise<void> {
   // Las opciones vienen de arranque.ts (no de un literal, que el compilador rechazaría por la propiedad de más) y son las mismas que
   // monta arranque-cuerpo.spec.ts: si una versión futura ignorara `verify`, o alguien lo quitara, esa prueba falla.
   app.useBodyParser('json', opcionesLectorJson());
-  // Los errores del lector de JSON (413 de arriba o del tope de 512 KiB) responden en JSON, como el resto de la API.
+  // Los errores del lector de JSON (413 de arriba o del tope del lote) responden en JSON, como el resto de la API.
   app.use(errorDeLectorJson);
   // helmet no emite Permissions-Policy; la API no usa cámara, micrófono ni ubicación. Y toda respuesta de la API va con
   // `Cache-Control: no-store` (arranque.ts, rutaSinCache; revisión del 08/11/2026): una sola regla en vez de repetirla ruta por ruta.

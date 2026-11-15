@@ -2,9 +2,9 @@
   // P7 Alta (docs/19 §4, tablero v2, F; HU-22, RF-50, HU-11; punto 25): tres caminos en una pantalla.
   //  - Asistente de cinco pasos: identidad y zona · vía, formato e intervalo (pasarela si LoRaWAN) · canales · credencial mostrada UNA
   //    vez con «Copiar» · «esperando la primera trama» en vivo (`GET /eventos?dispositivo=`, F1).
-  //  - Alta masiva: el CSV se lee en el navegador (lib/lote.ts), se valida entero con `modo=validar` y las válidas se crean en tandas de
-  //    50 (docs/16 §61) con «creadas N de M»; las credenciales, una sola vez, por «Descargar credenciales (CSV)»; «Descargar rechazadas» para
-  //    corregir y volver a subir.
+  //  - Alta masiva: el CSV se lee en el navegador (lib/lote.ts) con las columnas y los límites de `GET /dispositivos/lote/plantilla`, se
+  //    valida entero con `modo=validar` y las válidas se crean en UNA petición, todo o nada, con la huella del plan y una llave de reintento
+  //    (docs/19 §4, N8); las credenciales, una sola vez, por «Descargar credenciales (CSV)»; «Descargar rechazadas» para corregir y volver a subir.
   //  - Bandeja de detectados (`GET /cuarentena/detectados`): lo que ya habla sin estar dado de alta; cada fila abre el asistente con el
   //    identificador ya escrito.
   // Nada de esto es optimista: muestra secretos una vez y crea filas (docs/19 §6).
@@ -14,8 +14,8 @@
   import { ErrorApi, alPerderSesion, descargarTexto, esCancelacion, obtener, pedir, ultimaGana } from './lib/api';
   import { avisoDeError, type DatosAviso } from './lib/avisos';
   import {
-    CSV_EJEMPLO, MAX_BYTES_CSV, MAX_FILAS_LOTE, ROTULO_RESULTADO, TANDA, crearPorTandas, csvCredenciales, csvRechazadas, leerCsv, renumerar,
-    type FilaInforme, type FilaLote, type InformeLote,
+    ROTULO_RESULTADO, codigoDeConflicto, crearConReintento, csvCredenciales, csvEjemplo, csvRechazadas, excedeBytes, leerCsv, megas, nuevaLlave,
+    type FilaInforme, type FilaLote, type InformeLote, type PlantillaLote,
   } from './lib/lote';
   import type { EventoVivo, Sitio } from './lib/modelo';
   import { puedeEn, type Sesion } from './lib/sesion';
@@ -169,11 +169,24 @@
   let filasArchivo = $state<FilaLote[]>([]);
   let erroresArchivo = $state<string[]>([]);
   let informe = $state<FilaInforme[] | null>(null);
+  let huella = $state<string | null>(null);
   let validando = $state(false);
   let creandoLote = $state(false);
-  let avance = $state<{ creadas: number; total: number } | null>(null);
   let avisoLote = $state<DatosAviso | null>(null);
-  let pendientes = $state<number[]>([]);
+  // La plantilla del servidor: columnas, obligatorias, topes y límites (docs/19 §4, N4). Sin ella no se lee el archivo.
+  let plantilla = $state<PlantillaLote | null>(null);
+  let errorPlantilla = $state<string | null>(null);
+  async function cargarPlantilla(): Promise<void> {
+    try {
+      plantilla = await obtener<PlantillaLote>('/dispositivos/lote/plantilla');
+      errorPlantilla = null;
+    } catch (e) {
+      if (!esCancelacion(e)) errorPlantilla = avisoDeError(e).texto;
+    }
+  }
+  $effect(() => {
+    if (modo === 'lote' && plantilla === null) untrack(() => void cargarPlantilla());
+  });
   // Las credenciales de las creadas: solo en memoria hasta que la persona las descarga y pulsa «olvidar».
   let credenciales = $state<FilaInforme[]>([]);
   let descargadas = $state(false);
@@ -182,32 +195,36 @@
   async function leerArchivo(ev: Event): Promise<void> {
     const f = (ev.currentTarget as HTMLInputElement).files?.[0];
     informe = null;
+    huella = null;
     avisoLote = null;
-    pendientes = [];
-    if (f === undefined) return;
+    if (f === undefined || plantilla === null) return;
     archivo = f.name;
-    // El tamaño ANTES de leerlo (revisión del 11/11/2026): un archivo de cientos de MB no se carga entero en la memoria de la pestaña.
-    if (f.size > MAX_BYTES_CSV) {
+    // El tamaño ANTES de leerlo (revisión del 11/11/2026): un archivo de cientos de MB no se carga entero en la memoria de la pestaña. El
+    // tope es el del cuerpo del lote (`max_bytes`): un CSV que lo pasa tampoco cabría como JSON.
+    if (f.size > plantilla.max_bytes) {
       filasArchivo = [];
-      erroresArchivo = [`el archivo pesa más de ${MAX_BYTES_CSV / 1_000_000} MB: divídelo`];
+      erroresArchivo = [`el archivo pesa más de ${megas(plantilla.max_bytes)} MB: divídelo`];
       return;
     }
-    const l = leerCsv(await f.text());
+    const l = leerCsv(await f.text(), plantilla);
     filasArchivo = l.filas;
     erroresArchivo = l.errores;
   }
 
-  const enviarLote = (modoLote: 'validar' | 'crear', filas: FilaLote[], senal?: AbortSignal): Promise<InformeLote> =>
-    pedir<InformeLote>('POST', `/dispositivos/lote?modo=${modoLote}`, { cuerpo: { filas }, abortar: senal });
-
   async function validar(): Promise<void> {
-    if (validando || filasArchivo.length === 0) return;
+    if (validando || filasArchivo.length === 0 || plantilla === null) return;
+    const cuerpo = { filas: filasArchivo };
+    if (excedeBytes(cuerpo, plantilla)) {
+      avisoLote = { tipo: 'error', texto: `El archivo convertido pasa el tope de ${megas(plantilla.max_bytes)} MB: divídelo.` };
+      return;
+    }
     validando = true;
     avisoLote = null;
     try {
-      // modo=validar va completo: es rápido y no crea nada.
-      const r = await enviarLote('validar', filasArchivo, carga.senal());
-      informe = renumerar(r, filasArchivo.map((_, i) => i + 2));
+      // modo=validar va completo: no crea nada. Cada fila lleva su `n` y el servidor lo devuelve tal cual.
+      const r = await pedir<InformeLote>('POST', '/dispositivos/lote?modo=validar', { cuerpo, abortar: carga.senal() });
+      informe = r.filas;
+      huella = r.huella;
     } catch (e) {
       if (!esCancelacion(e)) avisoLote = avisoDeError(e);
     } finally {
@@ -222,27 +239,43 @@
     return c;
   });
 
-  // Crea las filas pedidas (todas las válidas, o las que quedaron tras una tanda fallida) en tandas de 50, una tras otra.
+  // Crea las válidas en UNA petición, todo o nada (docs/19 §4, N8): las filas confirmadas, la huella del plan que se ve y una llave de
+  // reintento nueva; si la respuesta se pierde, se repite con la misma llave y el servidor devuelve la misma. Si el plan cambió desde la
+  // validación (409 `plan_cambio`), no se creó ninguna: el informe pasa al plan nuevo y se avisa.
   async function crearValidas(filas: number[]): Promise<void> {
-    if (creandoLote || filas.length === 0) return;
+    if (creandoLote || filas.length === 0 || huella === null) return;
+    const pedidas = new Set(filas);
+    const cuerpo = { filas: filasArchivo.filter((f) => pedidas.has(f.n)), huella };
     creandoLote = true;
     avisoLote = null;
-    avance = { creadas: 0, total: filas.length };
-    const r = await crearPorTandas(filas, (n) => filasArchivo[n - 2]!, (x) => enviarLote('crear', x), (av) => (avance = av), TANDA);
-    // El informe se pone al día con lo que respondió el servidor (creadas, o rechazadas/existentes si algo cambió desde validar).
-    const porFila = new Map(r.filas.map((f) => [f.n, f]));
-    informe = (informe ?? []).map((f) => {
-      const nueva = porFila.get(f.n);
-      return nueva === undefined ? f : { ...nueva, credencial: null }; // la credencial no queda en el informe visible
-    });
-    credenciales = [...credenciales, ...r.filas.filter((f) => f.resultado === 'creada')];
-    if (credenciales.length > 0) descargadas = false;
-    pendientes = r.pendientes;
-    if (r.error !== null) {
-      const base = avisoDeError(r.error);
-      avisoLote = { tipo: base.tipo === 'espera' ? 'espera' : 'error', texto: `Se detuvo en la tanda que empieza en la fila ${r.pendientes[0]}: ${base.texto} Se crearon ${r.filas.filter((f) => f.resultado === 'creada').length} de ${filas.length}; las ${r.pendientes.length} restantes no se tocaron.` };
-    } else avisoLote = { tipo: 'exito', texto: `Listo: ${r.filas.filter((f) => f.resultado === 'creada').length} creadas de ${filas.length}.` };
-    creandoLote = false;
+    try {
+      const r = await crearConReintento(
+        (llave) => pedir<InformeLote>('POST', '/dispositivos/lote?modo=crear', { cuerpo, cabeceras: { 'Idempotency-Key': llave } }),
+        nuevaLlave(),
+      );
+      // El informe se pone al día con lo que respondió el servidor; la credencial no queda en el informe visible.
+      const porFila = new Map(r.filas.map((f) => [f.n, f]));
+      informe = (informe ?? []).map((f) => {
+        const nueva = porFila.get(f.n);
+        return nueva === undefined ? f : { ...nueva, credencial: null };
+      });
+      credenciales = [...credenciales, ...r.filas.filter((f) => f.resultado === 'creada')];
+      if (credenciales.length > 0) descargadas = false;
+      avisoLote = { tipo: 'exito', texto: `Listo: ${r.filas.filter((f) => f.resultado === 'creada').length} creadas de ${filas.length}.` };
+    } catch (e) {
+      const codigo = codigoDeConflicto(e);
+      const plan = e instanceof ErrorApi ? (e.cuerpo.plan as InformeLote | undefined) : undefined;
+      if (codigo === 'plan_cambio' && plan !== undefined) {
+        const porFila = new Map(plan.filas.map((f) => [f.n, f]));
+        informe = (informe ?? []).map((f) => porFila.get(f.n) ?? f);
+        huella = plan.huella;
+        avisoLote = { tipo: 'conflicto', texto: 'Cambió desde que lo revisaste: no se creó ninguno. Revisa el informe y vuelve a crear las válidas.' };
+      } else if (codigo === 'lote_en_curso') {
+        avisoLote = { tipo: 'espera', texto: 'Hay otra alta por lote en curso: espera a que termine y vuelve a intentarlo. No se creó ninguno.' };
+      } else avisoLote = avisoDeError(e);
+    } finally {
+      creandoLote = false;
+    }
   }
 
   const bajarCredenciales = (): void => {
@@ -250,7 +283,7 @@
     descargadas = true;
   };
   const bajarRechazadas = (): void => {
-    descargarTexto(csvRechazadas(filasArchivo, informe ?? []), `rechazadas-${(archivo ?? 'lote').replace(/\.csv$/i, '')}.csv`);
+    descargarTexto(csvRechazadas(plantilla?.columnas.map((c) => c.nombre) ?? [], filasArchivo, informe ?? []), `rechazadas-${(archivo ?? 'lote').replace(/\.csv$/i, '')}.csv`);
   };
 
   // ── Detectados ────────────────────────────────────────────────────────────────────────────────────────────────────────────────
@@ -436,13 +469,20 @@
   {:else if modo === 'lote'}
     <section aria-labelledby="{uid}-lote" data-lote>
       <h3 id="{uid}-lote">Alta masiva por archivo</h3>
-      <p>Un CSV con la cabecera <code>id_fisico, nombre, zona, via, formato, intervalo_esperado_s, canales, pasarela</code> (los canales como
-        <code>magnitud:unidad;magnitud:unidad</code>), hasta {MAX_FILAS_LOTE} filas. Primero se valida (no crea nada); después se crean solo las válidas.
-        <Boton etiqueta="Descargar un ejemplo" variante="discreto" onclick={() => descargarTexto(CSV_EJEMPLO, 'ejemplo-alta-masiva.csv')} /></p>
-      <div class="campo">
-        <label for="{uid}-archivo">Archivo CSV</label>
-        <input id="{uid}-archivo" type="file" accept=".csv,text/csv" onchange={(e) => void leerArchivo(e)} data-archivo />
-      </div>
+      {#if errorPlantilla !== null}
+        <p class="error" role="alert">{errorPlantilla} <Boton etiqueta="Reintentar" onclick={() => void cargarPlantilla()} /></p>
+      {:else if plantilla === null}
+        <p class="vacio">Cargando…</p>
+      {:else}
+        {@const p = plantilla}
+        <p data-plantilla-lote>Un CSV con la cabecera <code>{p.columnas.map((c) => c.nombre).join(', ')}</code> (obligatorias: {p.columnas.filter((c) => c.obligatoria).map((c) => c.nombre).join(', ')};
+          los canales como <code>magnitud:unidad | magnitud:unidad</code>), hasta {p.max_filas} filas. Primero se valida (no crea nada); después se crean las válidas.
+          <Boton etiqueta="Descargar un ejemplo" variante="discreto" onclick={() => descargarTexto(csvEjemplo(p), 'ejemplo-alta-masiva.csv')} /></p>
+        <div class="campo">
+          <label for="{uid}-archivo">Archivo CSV</label>
+          <input id="{uid}-archivo" type="file" accept=".csv,text/csv" onchange={(e) => void leerArchivo(e)} data-archivo />
+        </div>
+      {/if}
       {#if erroresArchivo.length > 0}
         <Aviso tipo="error" texto={`El archivo no sirve: ${erroresArchivo.join('; ')}.`} />
       {:else if archivo !== null && informe === null}
@@ -450,10 +490,6 @@
         <Boton etiqueta="Validar el archivo" etiquetaCargando="Validando…" variante="principal" cargando={validando} onclick={() => void validar()} data-validar />
       {/if}
       {#if avisoLote !== null}<Aviso tipo={avisoLote.tipo} texto={avisoLote.texto} alCerrar={() => (avisoLote = null)} />{/if}
-      {#if avance !== null && creandoLote}
-        <p role="status" data-avance>Creadas {avance.creadas} de {avance.total}</p>
-        <progress class="avance" max={avance.total} value={avance.creadas} aria-label="Avance del alta masiva"></progress>
-      {/if}
       {#if credenciales.length > 0}
         <div class="clave-una-vez" data-credenciales-lote>
           <p role="status"><strong>{credenciales.length} credenciales</strong> de las creadas. <strong>No se vuelven a mostrar</strong>: descárgalas ahora y
@@ -465,13 +501,11 @@
         </div>
       {/if}
       {#if informe !== null}
-        <p data-resumen-lote>Válidas {conteo.valida} · creadas {conteo.creada} · rechazadas {conteo.rechazada} · ya existen {conteo.existe}. Las rechazadas no bloquean a las válidas.</p>
+        <p data-resumen-lote>Válidas {conteo.valida} · creadas {conteo.creada} · rechazadas {conteo.rechazada} · ya existen {conteo.existe}. Las rechazadas no se envían; si algo cambió desde la validación, no se crea ninguna.</p>
         <span class="acciones">
-          {#if pendientes.length > 0}
-            <Boton etiqueta={`Reintentar las restantes (${pendientes.length})`} variante="principal" etiquetaCargando="Creando…" cargando={creandoLote} onclick={() => void crearValidas(pendientes)} data-reintentar-restantes />
-          {:else if validas.length > 0}
+          {#if validas.length > 0}
             <Boton etiqueta={`Crear las válidas (${validas.length})`} variante="principal" etiquetaCargando="Creando…" cargando={creandoLote}
-              ayuda={`Se crean en tandas de ${TANDA}, una tras otra; las credenciales se muestran una sola vez`} onclick={() => void crearValidas(validas)} data-crear-validas />
+              ayuda="Se crean todas en una sola petición, o ninguna; las credenciales se muestran una sola vez" onclick={() => void crearValidas(validas)} data-crear-validas />
           {/if}
           {#if conteo.rechazada > 0}<Boton etiqueta="Descargar rechazadas" onclick={bajarRechazadas} data-descargar-rechazadas />{/if}
         </span>

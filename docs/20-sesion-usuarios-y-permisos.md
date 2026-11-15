@@ -169,6 +169,8 @@ persona pidiendo un recurso de un sitio donde no tiene membresía (el administra
 | `GET /sitios/{id}/resumen`, `GET /sitios/{id}/historico`, `GET /dispositivos/{id}/historico`, `GET /dispositivos/{id}/eventos` (Etapa 4; en los eventos, el nombre de quien hizo el cambio solo para los administradores: `docs/21 §2`) | 401 | 200 | 200 | 200 | 200 | 200 | 404 |
 | `GET /sitios/{id}/ahora` (Etapa 4, 13/11/2026: lo que se mide ahora, `docs/19 §4` L6; con y sin `tendencia=si`) | 401 | 200 | 200 | 200 | 200 | 200 | 404 |
 | `POST /dispositivos/lote` y `GET /cuarentena/detectados` (Etapa 4; hoy «escribir»: administrador de sitio; con los cinco perfiles, también operador técnico; en el lote, una zona o un identificador de otro sitio no se revelan) | 401 | 403 | 403 | 200 | 200 | 200 | 404 |
+| `GET /dispositivos/lote/plantilla` (15/11/2026, `docs/19 §4` N4: las columnas y los límites del lote; la acción «escribir» en algún sitio, sin sitio propio en la ruta) | 401 | 403 | 403 | 200 | 200 | 200 | — |
+| `GET /magnitudes` (15/11/2026, `docs/19 §4` N4: el catálogo, que no es de ningún sitio) | 401 | 200 | 200 | 200 | 200 | 200 | — |
 | `GET /usuarios`, `POST /usuarios`, `PATCH /usuarios/{id}` | 401 | 403 | 403 | 403 | 200 (las membresías de sus sitios; la cuenta de quien también está en otro sitio: 403, §5) | 200 (todas las cuentas) | 404 |
 | Enlaces públicos de un sitio (Etapa 4) | 401 | 403 | 403 | 403 | 200 | 200 | 404 |
 | Auditoría de un sitio: `GET /sitios/{id}/actividad` (Etapa 4) | 401 | 403 | 403 | 403 | 200 | 200 | 404 |

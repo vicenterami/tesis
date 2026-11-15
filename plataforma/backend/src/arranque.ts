@@ -1,4 +1,5 @@
 // Decisiones de arranque que merecen prueba unitaria (docs/10 §6, docs/11 §3).
+import { MAX_BYTES_LOTE } from './alta/lote.js';
 
 // Interfaz en la que escucha la API. Por defecto SOLO este equipo; en contenedor se fija 0.0.0.0.
 // Se usa `||` y no `??` a propósito: una variable presente pero vacía (`HTTP_INTERFAZ=` en un .env)
@@ -141,7 +142,7 @@ export function rutaSinCache(ruta: string): boolean {
   return !/^\/(panel|docs)(\/|$)/i.test(ruta);
 }
 
-// Tope de bytes del cuerpo JSON fuera del alta por lote (main.ts): 100 KiB, el de fábrica del lector. El lote admite hasta 512 KiB (su
+// Tope de bytes del cuerpo JSON fuera del alta por lote (main.ts): 100 KiB, el de fábrica del lector. El lote admite hasta TOPE_CUERPO_LOTE (su
 // tope real es el de filas, lote.ts). Lo usan el atajo por Content-Length y `verify`, que cuenta lo leído cuando el cuerpo llega por
 // trozos (Transfer-Encoding: chunked, sin largo declarado).
 export const TOPE_CUERPO = 100 * 1024;
@@ -154,11 +155,12 @@ export function cuerpoExcedido(url: string | undefined, bytes: number): boolean 
 
 // Las opciones del lector de JSON y su manejador de errores viven aquí para que main.ts y su prueba (arranque-cuerpo.spec.ts) usen
 // exactamente lo mismo (revisión del 15/11/2026: la prueba llevaba una copia de las opciones y habría seguido en verde si alguien las
-// cambiaba en main.ts). El lector admite hasta 512 KiB (el alta por lote); `verify` cuenta los bytes leídos y, fuera del lote, corta en
-// 100 KiB aunque el cuerpo llegue por trozos, sin largo declarado.
-export const TOPE_CUERPO_LOTE = 512 * 1024;
+// cambiaba en main.ts). El lector admite hasta TOPE_CUERPO_LOTE (el alta por lote); `verify` cuenta los bytes leídos y, fuera del lote,
+// corta en 100 KiB aunque el cuerpo llegue por trozos, sin largo declarado. El tope del lote tiene una sola casa, MAX_BYTES_LOTE de
+// alta/lote.ts (el peor caso de 500 filas llenas, medido por lote-limites.spec.ts; 512 KiB hasta el 15/11/2026, que no alcanzaban).
+export const TOPE_CUERPO_LOTE = MAX_BYTES_LOTE;
 export const MENSAJE_TOPE_CUERPO = 'cuerpo de más de 100 KiB';
-export const MENSAJE_TOPE_LOTE = 'cuerpo de más de 512 KiB';
+export const MENSAJE_TOPE_LOTE = `cuerpo de más de ${MAX_BYTES_LOTE} bytes`;
 export function opcionesLectorJson(): { limit: number; verify: (req: { url?: string }, res: unknown, buf: Buffer) => void } {
   return {
     limit: TOPE_CUERPO_LOTE,
@@ -167,7 +169,7 @@ export function opcionesLectorJson(): { limit: number; verify: (req: { url?: str
     },
   };
 }
-// Los errores del lector de JSON (el 413 de `verify` o el del tope de 512 KiB) responden en JSON, como el resto de la API; lo demás
+// Los errores del lector de JSON (el 413 de `verify` o el del tope del lote) responden en JSON, como el resto de la API; lo demás
 // (un JSON ilegible) sigue su camino. Cuatro parámetros: así reconoce Express un manejador de errores.
 export function errorDeLectorJson(
   err: { status?: number; type?: string; message?: string } | undefined,

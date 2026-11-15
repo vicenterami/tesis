@@ -114,6 +114,8 @@ export interface Opciones {
   // Las listas paginadas (docs/19 §6 y §4 tablero v2, I): el total va en `X-Total` y el cursor de la página siguiente en `X-Siguiente`;
   // el cuerpo sigue siendo la lista. Quien las necesita pasa este oyente; quien no, no cambia nada.
   alPaginar?: (p: Paginacion) => void;
+  // Cabeceras propias de una ruta (la llave de reintento del alta por lote, `Idempotency-Key`; docs/19 §4, N8).
+  cabeceras?: Readonly<Record<string, string>>;
 }
 
 // null = la respuesta no trae la cabecera (un backend anterior, o una ruta sin paginación): quien llama decide qué hacer sin ella.
@@ -142,7 +144,7 @@ async function rechazo(r: Response, metodo: string, ruta: string, central: boole
 
 // fetch con lo común. Sin red, fetch lanza TypeError: se vuelve ErrorApi(0). Una cancelación (AbortError) se propaga tal cual.
 async function llamar(metodo: string, ruta: string, o: Opciones, acepta: string): Promise<Response> {
-  const cabeceras: Record<string, string> = { accept: acepta };
+  const cabeceras: Record<string, string> = { ...o.cabeceras, accept: acepta };
   if (o.cuerpo !== undefined) cabeceras['content-type'] = 'application/json';
   if (escribe(metodo)) cabeceras[CABECERA_PEDIDO] = VALOR_PEDIDO;
   const generacionAlPedir = generacion;

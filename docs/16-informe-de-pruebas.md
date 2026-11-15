@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 629 pruebas unitarias del backend y 344 del panel, sin matriz formal); TT-32 (sensor físico) se cubrió después, en §43, §44 y §53;
+cubre todavía: TT-27 (contrato de trama: hoy 657 pruebas unitarias del backend y 347 del panel, sin matriz formal); TT-32 (sensor físico) se cubrió después, en §43, §44 y §53;
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -3101,3 +3101,73 @@ no tienen falla plantada: invertir el orden exigiría cambiar las dependencias e
 **Lo que queda.** La recepción bajo carga con 12.4.0 (el banco, que no corre dentro del verificador) y el CI con la CLI 12, que para generar código pide Node 22.22.3 o
 posterior (el flujo usa la línea 22 sin fijar la versión menor). Las comparaciones entre 11.2.5 y 12.4.0 de esta sección se hicieron en una copia de trabajo con la
 versión anterior instalada y no quedan como guion: lo repetible son las tres pruebas nuevas.
+## 71. Alta masiva: plan por fila, todo o nada y reintento (15/11/2026)
+
+**Qué se construyó** (diseño en `docs/19 §4`, bloque N, primera parte del punto 12, con lo decidido al implementar escrito allí;
+`docs/10 §8.4` punto 67). **Backend:** `POST /dispositivos/lote` responde el plan por fila: `n` (lo manda el cliente; entero positivo,
+único y creciente, devuelto tal cual), `interpretada` (lo que se creará, o `null`), `por_defecto`, `avisos` y `motivos` por campo, y
+`motivo` como su unión; arriba, `leidas, validas, existentes, rechazadas, con_aviso` y la `huella` (SHA-256 de `[n, interpretada]` de las
+filas que entran, en JSON con las claves ordenadas). `modo=crear` exige la huella y la cabecera `Idempotency-Key`, recalcula dentro del
+candado de una creación a la vez y crea todo o nada: si el plan cambió, 409 `plan_cambio` con el plan nuevo; otra creación en curso, 409
+`lote_en_curso`; el choque que solo ve la base (23505, o `fk_dispositivo_pasarela_formato`) deshace, recalcula y responde también
+`plan_cambio`. La respuesta de una creación terminada se guarda 2 minutos por persona y llave (hasta 200), y repetir con la misma llave y
+el mismo cuerpo la devuelve sin crear nada; con otro cuerpo, 422. Rutas nuevas: `GET /dispositivos/lote/plantilla` (columnas con su
+tope, obligatorias, ayuda y ejemplo; `max_filas`, `max_bytes` y separadores; la acción «escribir») y `GET /magnitudes` (con sesión). La
+columna `decodificador` entra al lote y `canales` admite `|` y `;`. **Topes:** cada columna el suyo (identificador 63, nombre 80, `canales`
+1 197 caracteres —20 canales «magnitud:unidad» con 40 y 16 caracteres y « | » entre ellos—, 80 las demás) y 400 con la fila si una celda
+lo pasa, no es texto ni número o trae NUL. El tope del cuerpo sale del peor caso medido: 500 filas con cada columna en su tope, con
+caracteres de tres bytes en el nombre, la zona y las unidades, `n` de 16 cifras y la huella pesan 1 467 087 bytes; `MAX_BYTES_LOTE` =
+1 467 392 (1 433 KiB), el mismo en el lector de JSON (`arranque.ts`), en la plantilla y en `client_max_body_size` del proxy (que antes no
+fijaba ninguno y regía el de fábrica, 1 MiB). Los 512 KiB de antes no alcanzaban. **Panel** (adaptación mínima, sin rediseñar): `n` es la
+fila del CSV contando las vacías; columnas, obligatorias (ahora cinco, con `intervalo_esperado_s`), `max_filas` y `max_bytes` salen de la
+plantilla; una sola petición de creación con la huella y una llave nueva, que se repite con la misma llave si no hay respuesta o llega un
+502, 503 o 504; los 409 se tratan por su `codigo` (con `plan_cambio`, el informe pasa al plan nuevo). Fuera las tandas, «creadas N de M» y
+«Reintentar las restantes». Los guiones `api-smoke.sh`, `sesion-smoke.sh` y `banco/tablero-medir.sh` mandan `n`, la huella y la llave.
+
+**Pruebas nuevas y la falla plantada de cada una** (cada plantada se aplicó con un guion que reemplaza un texto exacto, se vio en rojo y
+se deshizo). Backend: 28 pruebas nuevas, en `lote.spec.ts` (10 más), `lote-limites.spec.ts` (6), `lote-controlador.spec.ts` (11) y
+`lote-servicio.spec.ts` (1 más); `arranque-cuerpo.spec.ts` cambia una.
+
+| Prueba | Plantada | Resultado |
+|---|---|---|
+| `lote.spec.ts`: invariante `validas + existentes + rechazadas = leidas`, con `con_aviso` transversal | contar como existentes solo las que traen aviso | 1 en rojo |
+| `lote.spec.ts`: el `n` del cliente se devuelve tal cual | numerar por posición | 1 en rojo |
+| `lote.spec.ts`: RF-41, un identificador de otro sitio sigue «no disponible», sin id ni `interpretada` | sin la comprobación de ajenos | 1 en rojo |
+| `lote-controlador.spec.ts`: «vista previa = creación», lo insertado es, fila por fila, lo anunciado | insertar el formato del alta en vez del resuelto (un nodo lorawan quedaría `senml`) | 1 en rojo |
+| `lote-controlador.spec.ts`: 409 `plan_cambio` si la pasarela se desactiva o cambia de formato entre validar y crear (cambios que la base no impide), con el plan nuevo y nada creado | sin comparar la huella; la huella sobre el identificador y no sobre `interpretada` | 1 y 1 en rojo |
+| `lote-controlador.spec.ts`: 409 `lote_en_curso` con otra creación en vuelo | sin el candado | 1 en rojo |
+| `lote-controlador.spec.ts` y `lote-servicio.spec.ts`: el 23505 deshace y responde `plan_cambio` con el plan recalculado | el servicio con el 409 de antes; el controlador sin recalcular | 2 y 1 en rojo |
+| `lote-controlador.spec.ts`: misma llave y mismo cuerpo, la misma respuesta y ningún dispositivo de más; otro cuerpo, 422 | sin buscar la respuesta guardada | 1 en rojo |
+| `lote-controlador.spec.ts`: la vista previa de 500 filas hace 5 consultas (los catálogos, una vez cada uno) | una consulta por fila | 1 en rojo |
+| `lote-controlador.spec.ts`: la plantilla, solo con «escribir» (consulta e investigador, 403) | sin la comprobación | 1 en rojo |
+| `lote-limites.spec.ts`: 500 filas llenas caben en `MAX_BYTES_LOTE` y el tope no las pasa en más de 16 KiB | el tope de antes, 512 KiB | 1 en rojo |
+| `lote-limites.spec.ts`: el proxy fija el mismo número | `client_max_body_size 1m` | 1 en rojo |
+| `lote-limites.spec.ts`: una celda un carácter sobre su tope, 400 con su fila (las nueve columnas) | admitir un carácter más | 1 en rojo |
+| `arranque-cuerpo.spec.ts`: el tope justo entra y un byte más es 413 en JSON | el lector con 512 KiB | 1 en rojo |
+
+Panel: 3 pruebas nuevas (`lib/lote.test.ts`, 2 más; `Alta.test.ts`, la de tandas reemplazada por dos). Plantadas: numerar después de
+descartar las filas vacías (3 en rojo), una llave nueva en cada repetición (1), no reconocer `plan_cambio` (1) y las obligatorias
+escritas en el panel en vez de las de la plantilla (1). Con la pila: `api-smoke.sh` suma 6 casos (la forma del plan, la celda sobre su
+tope, el `n` repetido, la creación sin llave, la plantilla y las magnitudes) y `sesion-smoke.sh` pasa de una creación directa a vista
+previa y creación con huella y llave, y suma «vista previa = creación» contra la base real (la ficha del creado comparada campo por campo
+con su `interpretada`), el reintento (misma respuesta, ningún dispositivo de más), la llave con otro cuerpo (422), el 409 `plan_cambio`
+con una huella vieja y las dos rutas nuevas por perfil: 404 de 404 comprobaciones.
+
+**Mediciones** (equipo de desarrollo; banco de `banco.sh encender 10`, imagen construida con este código; tres corridas por caso, cuatro en
+validar por mqtt; 500 filas de unos 91 kB; en `crear`, una petición; el tiempo es el total de curl, `time_total`).
+
+| Caso | Sin proxy (backend del banco, 3001) | Con el proxy TLS delante (`banco.sh proxy`, 8443) |
+|---|---|---|
+| validar 500, vía http | 0,012 · 0,024 · 0,031 s | 0,021 · 0,022 · 0,023 s |
+| crear 500, vía http | 0,100 · 0,112 · 0,117 s | 0,087 · 0,114 · 0,131 s |
+| validar 500, vía mqtt | 0,011 · 0,016 · 0,019 · 0,025 s | 0,021 · 0,028 · 0,053 s |
+| crear 500, vía mqtt (con las órdenes al broker) | 0,361 · 0,417 · 0,420 s | 0,463 · 0,515 · 0,609 s |
+
+Por el proxy, el peor caso de 1 467 087 bytes entra (200, 500 filas que no entran, en 0,08 s) y un cuerpo de un byte más lo corta nginx
+con 413 después de leer 65 323 bytes. Ese 413 es la página HTML de nginx, no el JSON del backend: el panel no llega a mandarlo, porque
+mide el cuerpo contra `max_bytes` antes de enviar.
+
+**Lo que queda.** La pantalla de tres pasos (N7), los lectores de CSV con `;`, `,` y tabulador, el pegado y JSON (N6), las descargas con
+`;`, BOM y la neutralización de fórmulas de ancho completo (N9) y el lector de XLSX, con sus pruebas en navegador real y sus umbrales
+(N11). El 413 del proxy en JSON. `banco.sh proxy` dio 19 de 23: las cuatro que fallan piden `/eventos` sin sesión y reciben 401; no
+tocan nada de este bloque (vienen de cuando el canal en vivo pasó a exigir sesión) y quedan anotadas para revisarlas aparte.

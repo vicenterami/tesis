@@ -1,19 +1,19 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ConflictException } from '@nestjs/common';
 import type { Pool } from 'pg';
 import { AltaService } from './alta.service.js';
 import type { DynsecService } from '../broker/dynsec.service.js';
 import * as credenciales from './credenciales.js';
-import type { AltaDeLote } from './lote.js';
+import { ChoqueDeLote, type AltaDeLote } from './lote.js';
 
-// crearLote (docs/19 §4, F2): los eventos pasan por el ayudante único (registrarEventos, una sentencia) y el 23505 de una carrera entre la
-// validación y la creación responde un mensaje propio, no «id_fisico «lote de N» ya existe».
+// crearLote (docs/19 §4, F2 y N8): los eventos pasan por el ayudante único (registrarEventos, una sentencia) y el choque que solo ve la base
+// (el 23505 de una carrera entre la validación y la creación, o el formato de la pasarela que cambió) deshace todo y lanza ChoqueDeLote, que
+// el controlador convierte en `plan_cambio` con el plan recalculado.
 const Z = '00000000-0000-4000-8000-0000000000a1';
 const altas = (n: number): AltaDeLote[] => Array.from({ length: n }, (_, i) => ({
   n: i + 2, formato: 'senml', sitio_codigo: 'uct',
   alta: { id_fisico: `nodo-${i}`, nombre: 'n', zona_id: Z, via: 'http', formato: 'senml', pasarela_id: null, decodificador: null, intervalo_esperado_s: 60, canales: [{ magnitud: 'temperatura', etiqueta: null, escala_cero: null, escala_cien: null }] },
 }));
-function armar(falla?: string) {
+function armar(falla?: string, restriccion?: string) {
   const sql: string[] = [];
   const params: unknown[][] = [];
   const cliente = {
@@ -21,7 +21,7 @@ function armar(falla?: string) {
       sql.push(texto.replace(/\s+/g, ' ').trim());
       params.push(p);
       if (texto.trim().startsWith('WITH d AS')) {
-        if (falla) return Promise.reject(Object.assign(new Error('duplicate key'), { code: falla }));
+        if (falla) return Promise.reject(Object.assign(new Error('duplicate key'), { code: falla, constraint: restriccion }));
         return Promise.resolve({ rows: (p[1] as string[]).map((f, i) => ({ id: `D${i}`, id_fisico: f, via: 'http', formato: 'senml' })) });
       }
       return Promise.resolve({ rows: [], rowCount: 2 });
@@ -58,12 +58,17 @@ describe('AltaService.crearLote', () => {
       scrypt.mockRestore();
     }
   });
-  it('23505 → 409 «un identificador del lote ya existe: vuelve a validar», sin el «lote de 2» que nombraba el mensaje genérico', async () => {
+  it('23505 → ChoqueDeLote (el controlador recalcula y responde plan_cambio), con ROLLBACK', async () => {
     const { servicio, sql } = armar('23505');
     const e = await servicio.crearLote(altas(2), 'u1').catch((x: unknown) => x);
-    expect(e).toBeInstanceOf(ConflictException);
-    expect((e as ConflictException).message).toBe('un identificador del lote ya existe: vuelve a validar');
-    expect((e as ConflictException).message).not.toContain('lote de 2');
+    expect(e).toBeInstanceOf(ChoqueDeLote);
     expect(sql).toContain('ROLLBACK');
+    expect(sql).not.toContain('COMMIT');
+  }, 20_000);
+  it('23503 de fk_dispositivo_pasarela_formato (el formato de la pasarela cambió) → ChoqueDeLote; otro 23503 sigue siendo 400', async () => {
+    expect(await armar('23503', 'fk_dispositivo_pasarela_formato').servicio.crearLote(altas(1), 'u1').catch((x: unknown) => x)).toBeInstanceOf(ChoqueDeLote);
+    const otro = await armar('23503', 'dispositivo_zona_id_fkey').servicio.crearLote(altas(1), 'u1').catch((x: unknown) => x);
+    expect(otro).not.toBeInstanceOf(ChoqueDeLote);
+    expect((otro as { getStatus(): number }).getStatus()).toBe(400);
   }, 20_000);
 });

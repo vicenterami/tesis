@@ -311,7 +311,6 @@ fieldset.regla legend { font-weight: 600; padding: 0 var(--e-1); }
 .pasos { display: flex; flex-wrap: wrap; gap: var(--e-1) var(--e-3); padding: 0; margin: 0 0 var(--e-3); list-style: none; counter-reset: paso; }
 .pasos li { color: var(--texto-secundario); }
 .pasos li[aria-current='step'] { color: var(--texto); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
-.avance { width: 100%; max-width: 30rem; height: 1rem; accent-color: var(--acento); }
 /* Lo fijo al pie (avisos, la ayuda en teléfono) no debe tapar el campo con el foco (WCAG 2.4.11; revisión del 11/11/2026): al moverse con
    Tab, el navegador deja libre abajo al menos 8rem o lo que midan los avisos (--alto-avisos, lo pone Notificaciones.svelte), y <main> suma
    ese alto al final para que siempre haya hacia dónde desplazarse; en teléfono se ven 2 avisos y el resto se pliega. */

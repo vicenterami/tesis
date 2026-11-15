@@ -1898,7 +1898,7 @@
     },
     "/dispositivos/lote": {
       "post": {
-        "description": "Recibe `filas[{id_fisico, nombre, zona, via, formato, intervalo_esperado_s, canales, pasarela}]` (el panel convierte el CSV; `zona` es el nombre o el UUID de una zona de un sitio donde la persona puede dar de alta; `canales` como «magnitud:unidad;magnitud:unidad», con la unidad canónica del catálogo; `pasarela`, su id_fisico o UUID, solo en la vía lorawan). Cada fila pasa por la misma validación del alta de a uno. Responde `validas, rechazadas, existentes` y `filas[{n, id_fisico, resultado, motivo, id, credencial, topico}]`, con `n` la fila del archivo (la 1 es la cabecera) y `resultado` en `valida | creada | rechazada | existe` (un id_fisico ya dado de alta, activo o no: `existe` con su id; reactivarlo es de su ficha). Con `modo=crear`, las válidas se crean en una transacción con dos sentencias (dispositivos, canales y credenciales; eventos), no N inserciones, y las credenciales vienen UNA sola vez. Hasta 500 filas (más: 413), 10 lotes por minuto por persona (429) y una creación por lote a la vez (409). Un id_fisico que ya usa un dispositivo o una pasarela de otro sitio se rechaza como «identificador no disponible», sin id ni estado (RF-41). **Tiempo:** cada credencial se resume con SHA-256 (docs/11 §4); una creación de 500 filas tarda menos de medio segundo en el banco (docs/16 §65; ≈ 70 s hasta el 13/11/2026, cuando el resumen era scrypt). Las credenciales se muestran una sola vez y una respuesta cortada las perdería: el cliente valida el archivo entero y crea en tandas de 50 filas (unas decenas de milisegundos cada una), como hace el panel.",
+        "description": "Recibe `filas[{n, id_fisico, nombre, zona, via, formato, intervalo_esperado_s, canales, pasarela, decodificador}]`: `n` es la fila del origen (en un CSV, la línea contando las vacías, con la cabecera en la 1; en JSON, la posición más 1), un entero positivo, único y creciente, que se devuelve tal cual. Columnas, topes y ejemplos en `GET /dispositivos/lote/plantilla`; `zona` es el nombre o el UUID de una zona de un sitio donde la persona puede dar de alta; `canales`, «magnitud:unidad | magnitud:unidad» (también con «;»), con la unidad canónica del catálogo (`GET /magnitudes`); `pasarela`, su id_fisico o UUID, solo en la vía lorawan. Cada fila pasa por la misma validación del alta de a uno. Responde `leidas, validas, existentes, rechazadas, con_aviso, huella` (validas + existentes + rechazadas = leidas; con_aviso es transversal) y `filas[{n, id_fisico, resultado, interpretada, por_defecto, avisos[{campo, texto}], motivos[{campo, texto}], motivo, id, credencial, topico}]`: `interpretada` es lo que se creará (identificador normalizado, nombre, sitio, zona, vía, formato resuelto, intervalo, canales con nombre y unidad, pasarela, decodificador y tópico) o null; `motivo`, la unión de `motivos`; `resultado` en `valida | creada | rechazada | existe`. `huella` es el SHA-256 de las `interpretada` en orden. **Con `modo=crear`** el cuerpo trae también `huella` (la de la vista previa) y la cabecera `Idempotency-Key`; se vuelve a calcular y, si el plan cambió (una fila dejó de entrar o crearía otra cosa), 409 `codigo: plan_cambio` con el plan nuevo en `plan` y nada creado; si no, las válidas se crean en una transacción (dos sentencias) y las credenciales vienen UNA sola vez. Repetir con la misma llave y el mismo cuerpo, durante 2 minutos, devuelve la misma respuesta sin crear nada. Hasta 500 filas (más: 413) y 1467392 bytes de cuerpo, 10 lotes por minuto por persona (429) y una creación a la vez (409 `codigo: lote_en_curso`). Un id_fisico que ya usa un dispositivo o una pasarela de otro sitio se rechaza como «identificador no disponible», sin id, estado ni `interpretada` (RF-41).",
         "operationId": "AltaController_lote",
         "parameters": [
           {
@@ -1914,6 +1914,15 @@
             }
           },
           {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "Obligatoria con modo=crear: de 16 a 128 caracteres entre letras, dígitos, «-» y «_», generada por el cliente para cada creación",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "X-Clave-Admin",
             "in": "header",
             "description": "Sin sesión: la clave de administrador (HTTP_CLAVE_ADMIN), como usuario del sistema (docs/20 §5)",
@@ -1925,19 +1934,22 @@
         ],
         "responses": {
           "200": {
-            "description": "Informe fila por fila"
+            "description": "El plan fila por fila (en crear, con las credenciales una sola vez)"
           },
           "400": {
-            "description": "Modo o cuerpo inválidos"
+            "description": "Modo o cuerpo inválidos (una celda sobre su tope, que no es texto ni número o con NUL; `n` que no es entero creciente; sin huella o sin Idempotency-Key en crear): `message` dice la fila"
           },
           "403": {
             "description": "Sin ningún sitio donde dar de alta, o sesión sin la cabecera X-Pedido: panel"
           },
           "409": {
-            "description": "Otra creación por lote en curso"
+            "description": "`codigo: plan_cambio` (con el plan nuevo en `plan`; nada creado) o `codigo: lote_en_curso`"
           },
           "413": {
-            "description": "Más de 500 filas"
+            "description": "Más de 500 filas o de 1467392 bytes"
+          },
+          "422": {
+            "description": "`codigo: llave_reutilizada`: la Idempotency-Key ya se usó con otro cuerpo"
           },
           "429": {
             "description": "Límite de tasa del lote"
@@ -1948,7 +1960,31 @@
             "sesion": []
           }
         ],
-        "summary": "Alta por lote: validar o crear (Etapa 4)",
+        "summary": "Alta por lote: vista previa o creación, todo o nada (Etapa 4)",
+        "tags": [
+          "dispositivos"
+        ]
+      }
+    },
+    "/dispositivos/lote/plantilla": {
+      "get": {
+        "description": "Las columnas del lote en su orden (`nombre, obligatoria, tope` en caracteres, `ayuda, ejemplo`), `max_filas`, `max_bytes` (el tope del cuerpo de POST /dispositivos/lote) y `separadores{columnas, canales}`. Exige el permiso de dar de alta en algún sitio (docs/20 §6).",
+        "operationId": "AltaController_plantilla",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "La plantilla"
+          },
+          "403": {
+            "description": "Sin ningún sitio donde dar de alta"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Plantilla del alta por lote (Etapa 4)",
         "tags": [
           "dispositivos"
         ]
@@ -2438,6 +2474,30 @@
         "summary": "Calibrar un canal (o quitar su calibración)",
         "tags": [
           "canales"
+        ]
+      }
+    },
+    "/magnitudes": {
+      "get": {
+        "description": "Las magnitudes del catálogo con `codigo, nombre, unidad` (la unidad canónica, símbolo SenML), ordenadas por código. Con cualquier sesión (docs/20 §6).",
+        "operationId": "MagnitudesController_listar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Lista de magnitudes"
+          },
+          "401": {
+            "description": "sesión requerida"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Catálogo de magnitudes (Etapa 4)",
+        "tags": [
+          "magnitudes"
         ]
       }
     },

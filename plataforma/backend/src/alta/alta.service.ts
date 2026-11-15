@@ -13,7 +13,7 @@ import { registrarEvento, registrarEventos } from '../db/evento.js';
 import { errorDeCliente } from '../db/cliente.js';
 import { generarSecreto, resumirSecreto } from './credenciales.js';
 import { FormatoPasarela, PasarelaValidada } from './pasarela.dto.js';
-import { AltaDeLote, Catalogos, PasarelaCatalogo, ZonaCatalogo } from './lote.js';
+import { AltaDeLote, Catalogos, ChoqueDeLote, PasarelaCatalogo, ZonaCatalogo } from './lote.js';
 
 export interface CanalCreado {
   id: string;
@@ -468,7 +468,7 @@ export class AltaService {
       this.pool.query<ZonaCatalogo>(
         `SELECT z.id, z.nombre, z.sitio_id, s.codigo AS sitio_codigo FROM zona z JOIN sitio s ON s.id = z.sitio_id
           WHERE s.activo AND ($1::uuid[] IS NULL OR z.sitio_id = ANY($1::uuid[]))`, [sitios]),
-      this.pool.query<{ codigo: string; unidad_canonica: string }>('SELECT codigo, unidad_canonica FROM magnitud'),
+      this.pool.query<{ codigo: string; nombre: string; unidad_canonica: string }>('SELECT codigo, nombre, unidad_canonica FROM magnitud'),
       this.pool.query<PasarelaCatalogo>(
         'SELECT id, id_fisico, sitio_id, activo, formato FROM pasarela WHERE $1::uuid[] IS NULL OR sitio_id = ANY($1::uuid[])', [sitios]),
       // Con el sitio de cada uno: lo de otro sitio no devuelve id ni estado (RF-41), solo «no disponible» (lote.ts, `ajenos`).
@@ -479,11 +479,17 @@ export class AltaService {
         'SELECT id_fisico, ($2::uuid[] IS NULL OR sitio_id = ANY($2::uuid[])) AS propio FROM pasarela WHERE id_fisico = ANY($1::text[])', [idsFisicos, sitios]),
     ]);
     return {
-      zonas: z.rows, magnitudes: new Map(m.rows.map((x) => [x.codigo, x.unidad_canonica])), pasarelas: p.rows,
+      zonas: z.rows, magnitudes: new Map(m.rows.map((x) => [x.codigo, { nombre: x.nombre, unidad: x.unidad_canonica }])), pasarelas: p.rows,
       existentes: new Map(e.rows.filter((x) => x.propio).map((x) => [x.id_fisico, { id: x.id, estado: x.estado }])),
       idsDePasarela: new Set(ip.rows.filter((x) => x.propio).map((x) => x.id_fisico)),
       ajenos: new Set([...e.rows, ...ip.rows].filter((x) => !x.propio).map((x) => x.id_fisico)),
     };
+  }
+
+  // El catálogo de magnitudes (GET /magnitudes, docs/19 §4, N4): código, nombre y unidad canónica. No es de ningún sitio.
+  async magnitudes(): Promise<{ codigo: string; nombre: string; unidad: string }[]> {
+    const r = await this.pool.query<{ codigo: string; nombre: string; unidad: string }>('SELECT codigo, nombre, unidad_canonica AS unidad FROM magnitud ORDER BY codigo');
+    return r.rows;
   }
 
   // Alta por lote: las filas válidas en dos sentencias, no N (una con UNNEST que inserta dispositivos, canales y credenciales, y la de
@@ -549,8 +555,11 @@ export class AltaService {
     } catch (e) {
       await c.query('ROLLBACK').catch(() => undefined);
       for (const id of creadosEnBroker) await this.deshacerEnBroker(id);
-      // Un 23505 aquí es un identificador que otra petición creó entre la validación y la creación: no hay uno solo que nombrar.
-      if ((e as ErrorPg).code === '23505') throw new ConflictException('un identificador del lote ya existe: vuelve a validar');
+      // Un 23505 aquí es un identificador que otra petición creó entre la validación y la creación; un 23503 de
+      // fk_dispositivo_pasarela_formato, el formato de una pasarela que cambió en el mismo intervalo. Lo que ve solo la base: se deshizo
+      // todo y el controlador recalcula y responde `plan_cambio` con el plan nuevo (docs/19 §4, N8).
+      const pg = e as ErrorPg;
+      if (pg.code === '23505' || (pg.code === '23503' && pg.constraint === 'fk_dispositivo_pasarela_formato')) throw new ChoqueDeLote();
       throw this.traducir(e, `lote de ${altas.length}`, 'alta');
     } finally {
       this.soltar(c);

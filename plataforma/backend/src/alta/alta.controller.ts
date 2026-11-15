@@ -1,4 +1,4 @@
-import { Body, ConflictException, Controller, Delete, HttpCode, HttpException, HttpStatus, Param, Patch, Post, Query, Res } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Headers, HttpCode, HttpException, HttpStatus, Param, Patch, Post, Query, Res } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
   ApiBadRequestResponse, ApiBody, ApiConflictResponse, ApiCookieAuth, ApiCreatedResponse, ApiForbiddenResponse, ApiHeader, ApiNotFoundResponse, ApiOkResponse,
@@ -16,7 +16,11 @@ import { ConfiguracionService } from './configuracion.service.js';
 import { validarCambioDispositivo } from './configuracion.dto.js';
 import { FORMA_ACTUALIZADO_EN } from './calibracion.dto.js';
 import { ConsultaService } from '../consulta/consulta.service.js';
-import { COLUMNAS_LOTE, FilaInforme, LOTES_POR_MINUTO, MAX_FILAS_LOTE, MODOS_LOTE, TANDA_CLIENTE_LOTE, TasaPorPersona, filasDelCuerpo, modoLote, totales, validarLote } from './lote.js';
+import {
+  CABECERA_LLAVE, COLUMNAS_LOTE, ChoqueDeLote, LOTES_POR_MINUTO, MAX_BYTES_LOTE, MAX_FILAS_LOTE, MODOS_LOTE, RespuestasPorLlave, TasaPorPersona, filasDelCuerpo,
+  firmaDelCuerpo, huellaDelPlan, llaveDeReintento, modoLote, plantillaLote, respuestaLote, validarLote,
+} from './lote.js';
+import type { FilaEntrada, FilaInforme, PlantillaLote, RespuestaLote } from './lote.js';
 import type { UsuarioSesion } from '../sesion/permisos.js';
 
 // Aprovisionamiento por API (docs/10 §3, §8.4 puntos 41 y 42; docs/19 P7 «Propuesta»): POST /dispositivos (HU-11, RF-19),
@@ -25,6 +29,11 @@ import type { UsuarioSesion } from '../sesion/permisos.js';
 // las protege el guardia central: sesión de administrador del sitio del dispositivo (o de la zona, en el alta) o la clave de administrador. El
 // orden no cambia: sin sesión, 401 antes de mirar nada; con rol de consulta en todos sus sitios, 403 antes de validar; después, el
 // sitio del recurso: 404 si no existe o es de otro sitio (RF-41), 403 si es suyo y su rol no puede.
+// El 409 de un plan que cambió entre la vista previa y la creación (docs/19 §4, N8): el plan nuevo va en `plan`; nada se creó.
+function planCambio(plan: RespuestaLote): HttpException {
+  return new HttpException({ statusCode: 409, error: 'Conflict', codigo: 'plan_cambio', message: 'el plan cambió desde que lo revisaste: revísalo de nuevo; no se creó ninguno', plan }, HttpStatus.CONFLICT);
+}
+
 @ApiTags('dispositivos')
 @ApiCookieAuth('sesion')
 @Controller('dispositivos')
@@ -32,6 +41,7 @@ export class AltaController {
   // El usuario de la sonda del chequeo de salud es configurable (MQTT_SONDA_USUARIO): también queda reservado.
   private readonly reservados: string[];
   private readonly tasaLote = new TasaPorPersona();
+  private readonly respuestasLote = new RespuestasPorLlave<RespuestaLote>();
   private loteEnCurso = false;
   constructor(
     private readonly alta: AltaService, private readonly alcance: AlcanceService, config: ConfigService,
@@ -88,56 +98,108 @@ export class AltaController {
     return this.alta.crear(a, u.id);
   }
 
-  // Alta masiva por archivo (docs/19 §4, F2; docs/10 §8.4 punto 65 iv). `validar` no escribe nada; `crear` inserta las válidas en una transacción (dos sentencias).
+  // Alta masiva (docs/19 §4, F2 y bloque N; docs/10 §8.4 puntos 65 iv y 67). `validar` no escribe nada y devuelve el plan por fila con su
+  // huella; `crear` recibe las filas confirmadas, la huella y una llave de reintento, vuelve a calcular y crea todo o nada.
   @Post('lote')
   @HttpCode(200)
   @ApiOperation({
-    summary: 'Alta por lote: validar o crear (Etapa 4)',
+    summary: 'Alta por lote: vista previa o creación, todo o nada (Etapa 4)',
     description:
-      `Recibe \`filas[{${COLUMNAS_LOTE.join(', ')}}]\` (el panel convierte el CSV; \`zona\` es el nombre o el UUID de una zona de un sitio donde la persona ` +
-      'puede dar de alta; `canales` como «magnitud:unidad;magnitud:unidad», con la unidad canónica del catálogo; `pasarela`, su id_fisico o UUID, solo en ' +
-      'la vía lorawan). Cada fila pasa por la misma validación del alta de a uno. Responde `validas, rechazadas, existentes` y ' +
-      '`filas[{n, id_fisico, resultado, motivo, id, credencial, topico}]`, con `n` la fila del archivo (la 1 es la cabecera) y `resultado` en ' +
-      '`valida | creada | rechazada | existe` (un id_fisico ya dado de alta, activo o no: `existe` con su id; reactivarlo es de su ficha). Con `modo=crear`, ' +
-      `las válidas se crean en una transacción con dos sentencias (dispositivos, canales y credenciales; eventos), no N inserciones, y las credenciales vienen UNA sola vez. Hasta ${MAX_FILAS_LOTE} filas (más: 413), ` +
-      `${LOTES_POR_MINUTO} lotes por minuto por persona (429) y una creación por lote a la vez (409). Un id_fisico que ya usa un dispositivo o una pasarela ` +
-      'de otro sitio se rechaza como «identificador no disponible», sin id ni estado (RF-41). **Tiempo:** cada credencial se resume con SHA-256 ' +
-      `(docs/11 §4); una creación de ${MAX_FILAS_LOTE} filas tarda menos de medio segundo en el banco (docs/16 §65; ≈ 70 s hasta el 13/11/2026, cuando el resumen era scrypt). Las ` +
-      'credenciales se muestran una sola vez y una respuesta cortada las perdería: el cliente valida el archivo entero y crea en tandas de ' +
-      `${TANDA_CLIENTE_LOTE} filas (unas decenas de milisegundos cada una), como hace el panel.`,
+      `Recibe \`filas[{n, ${COLUMNAS_LOTE.join(', ')}}]\`: \`n\` es la fila del origen (en un CSV, la línea contando las vacías, con la cabecera en la 1; en ` +
+      'JSON, la posición más 1), un entero positivo, único y creciente, que se devuelve tal cual. Columnas, topes y ejemplos en ' +
+      '`GET /dispositivos/lote/plantilla`; `zona` es el nombre o el UUID de una zona de un sitio donde la persona puede dar de alta; `canales`, ' +
+      '«magnitud:unidad | magnitud:unidad» (también con «;»), con la unidad canónica del catálogo (`GET /magnitudes`); `pasarela`, su id_fisico o UUID, ' +
+      'solo en la vía lorawan. Cada fila pasa por la misma validación del alta de a uno. Responde `leidas, validas, existentes, rechazadas, con_aviso, ' +
+      'huella` (validas + existentes + rechazadas = leidas; con_aviso es transversal) y `filas[{n, id_fisico, resultado, interpretada, por_defecto, ' +
+      'avisos[{campo, texto}], motivos[{campo, texto}], motivo, id, credencial, topico}]`: `interpretada` es lo que se creará (identificador normalizado, ' +
+      'nombre, sitio, zona, vía, formato resuelto, intervalo, canales con nombre y unidad, pasarela, decodificador y tópico) o null; `motivo`, la unión de ' +
+      '`motivos`; `resultado` en `valida | creada | rechazada | existe`. `huella` es el SHA-256 de las `interpretada` en orden. **Con `modo=crear`** el ' +
+      'cuerpo trae también `huella` (la de la vista previa) y la cabecera `Idempotency-Key`; se vuelve a calcular y, si el plan cambió (una fila dejó de ' +
+      'entrar o crearía otra cosa), 409 `codigo: plan_cambio` con el plan nuevo en `plan` y nada creado; si no, las válidas se crean en una transacción ' +
+      '(dos sentencias) y las credenciales vienen UNA sola vez. Repetir con la misma llave y el mismo cuerpo, durante 2 minutos, devuelve la misma ' +
+      `respuesta sin crear nada. Hasta ${MAX_FILAS_LOTE} filas (más: 413) y ${MAX_BYTES_LOTE} bytes de cuerpo, ${LOTES_POR_MINUTO} lotes por minuto por persona (429) y ` +
+      'una creación a la vez (409 `codigo: lote_en_curso`). Un id_fisico que ya usa un dispositivo o una pasarela de otro sitio se rechaza como ' +
+      '«identificador no disponible», sin id, estado ni `interpretada` (RF-41).',
   })
   @ApiHeader({ name: 'X-Clave-Admin', required: false, description: 'Sin sesión: la clave de administrador (HTTP_CLAVE_ADMIN), como usuario del sistema (docs/20 §5)' })
+  @ApiHeader({ name: 'Idempotency-Key', required: false, description: 'Obligatoria con modo=crear: de 16 a 128 caracteres entre letras, dígitos, «-» y «_», generada por el cliente para cada creación' })
   @ApiQuery({ name: 'modo', required: true, enum: MODOS_LOTE })
-  @ApiOkResponse({ description: 'Informe fila por fila' })
-  @ApiBadRequestResponse({ description: 'Modo o cuerpo inválidos' })
+  @ApiOkResponse({ description: 'El plan fila por fila (en crear, con las credenciales una sola vez)' })
+  @ApiBadRequestResponse({ description: 'Modo o cuerpo inválidos (una celda sobre su tope, que no es texto ni número o con NUL; `n` que no es entero creciente; sin huella o sin Idempotency-Key en crear): `message` dice la fila' })
   @ApiForbiddenResponse({ description: 'Sin ningún sitio donde dar de alta, o sesión sin la cabecera X-Pedido: panel' })
-  @ApiConflictResponse({ description: 'Otra creación por lote en curso' })
-  @ApiResponse({ status: 413, description: `Más de ${MAX_FILAS_LOTE} filas` })
+  @ApiConflictResponse({ description: '`codigo: plan_cambio` (con el plan nuevo en `plan`; nada creado) o `codigo: lote_en_curso`' })
+  @ApiResponse({ status: 413, description: `Más de ${MAX_FILAS_LOTE} filas o de ${MAX_BYTES_LOTE} bytes` })
+  @ApiResponse({ status: 422, description: '`codigo: llave_reutilizada`: la Idempotency-Key ya se usó con otro cuerpo' })
   @ApiResponse({ status: 429, description: 'Límite de tasa del lote' })
-  async lote(@Usuario() u: UsuarioSesion, @Query('modo') m: unknown, @Body() cuerpo: unknown, @Res({ passthrough: true }) res: Response) {
+  async lote(
+    @Usuario() u: UsuarioSesion, @Query('modo') m: unknown, @Body() cuerpo: unknown, @Headers(CABECERA_LLAVE) cabeceraLlave: unknown,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<RespuestaLote> {
     exigirEnAlguno(u, 'escribir');
     const modo = modoLote(m);
-    if (!this.tasaLote.admitir(u.id ?? 'sistema')) throw new HttpException(`más de ${LOTES_POR_MINUTO} lotes en un minuto: espera un momento`, HttpStatus.TOO_MANY_REQUESTS);
-    const filas = filasDelCuerpo(cuerpo);
-    const sitios = alcanceDeLectura(u)?.filter((s) => permitir(u, 'escribir', s) === 'permitido') ?? null;
-    const ids = filas.map((f) => (typeof f.id_fisico === 'string' ? f.id_fisico.trim().toLowerCase() : '')).filter((x) => x !== '');
-    const catalogos = await this.alta.catalogosLote(sitios, ids);
-    const { informe, altas } = validarLote(filas, catalogos, this.reservados);
-    if (modo === 'crear' && altas.length > 0) {
-      if (this.loteEnCurso) throw new ConflictException('hay otra alta por lote en curso: espera a que termine y vuelve a validar');
-      this.loteEnCurso = true;
-      try {
-        const creadas = await this.alta.crearLote(altas, u.id);
+    const persona = u.id ?? 'sistema';
+    // El reintento con la misma llave se atiende antes de la tasa: no crea nada y no debe quedar fuera por un 429.
+    let llave = '';
+    let firma = '';
+    if (modo === 'crear') {
+      llave = llaveDeReintento(cabeceraLlave);
+      firma = firmaDelCuerpo(cuerpo);
+      const previa = this.respuestasLote.buscar(persona, llave, firma);
+      if (previa !== undefined) {
+        res.setHeader('Cache-Control', 'no-store');
+        return previa;
+      }
+    }
+    if (!this.tasaLote.admitir(persona)) throw new HttpException(`más de ${LOTES_POR_MINUTO} lotes en un minuto: espera un momento`, HttpStatus.TOO_MANY_REQUESTS);
+    const { filas, huella } = filasDelCuerpo(cuerpo, modo);
+    if (modo === 'validar') return respuestaLote((await this.planLote(u, filas)).informe);
+    // Una creación a la vez, y el plan se recalcula dentro del candado: dos creaciones no se pisan entre la lectura y la inserción.
+    if (this.loteEnCurso) throw new HttpException({ statusCode: 409, error: 'Conflict', codigo: 'lote_en_curso', message: 'hay otra alta por lote en curso: espera a que termine y vuelve a intentarlo' }, HttpStatus.CONFLICT);
+    this.loteEnCurso = true;
+    try {
+      const { informe, altas } = await this.planLote(u, filas);
+      if (huellaDelPlan(informe) !== huella) throw planCambio(respuestaLote(informe));
+      if (altas.length > 0) {
+        let creadas: Awaited<ReturnType<AltaService['crearLote']>>;
+        try {
+          creadas = await this.alta.crearLote(altas, u.id);
+        } catch (e) {
+          if (!(e instanceof ChoqueDeLote)) throw e;
+          throw planCambio(respuestaLote((await this.planLote(u, filas)).informe));
+        }
         for (const f of informe) {
           const c = creadas.get(f.n);
           if (c !== undefined) Object.assign(f, { resultado: 'creada', id: c.id, credencial: c.credencial, topico: c.topico } satisfies Partial<FilaInforme>);
         }
-      } finally {
-        this.loteEnCurso = false;
       }
+      const respuesta = respuestaLote(informe);
+      this.respuestasLote.guardar(persona, llave, firma, respuesta);
       res.setHeader('Cache-Control', 'no-store'); // la respuesta lleva credenciales
+      return respuesta;
+    } finally {
+      this.loteEnCurso = false;
     }
-    return { ...totales(informe), filas: informe };
+  }
+
+  // Los catálogos (una vez para todo el archivo: cinco consultas, ninguna por fila) y el plan de cada fila.
+  private async planLote(u: UsuarioSesion, filas: FilaEntrada[]) {
+    const sitios = alcanceDeLectura(u)?.filter((s) => permitir(u, 'escribir', s) === 'permitido') ?? null;
+    const ids = filas.map((f) => (typeof f.id_fisico === 'string' ? f.id_fisico.trim().toLowerCase() : '')).filter((x) => x !== '');
+    return validarLote(filas, await this.alta.catalogosLote(sitios, ids), this.reservados);
+  }
+
+  // La plantilla del lote (docs/19 §4, N4): la única casa de las columnas, sus topes, `max_filas`, `max_bytes` y los separadores. La lee
+  // quien puede usar la ruta del lote (la acción «escribir», docs/20 §6).
+  @Get('lote/plantilla')
+  @ApiOperation({
+    summary: 'Plantilla del alta por lote (Etapa 4)',
+    description: 'Las columnas del lote en su orden (`nombre, obligatoria, tope` en caracteres, `ayuda, ejemplo`), `max_filas`, `max_bytes` (el tope del cuerpo de POST /dispositivos/lote) y `separadores{columnas, canales}`. Exige el permiso de dar de alta en algún sitio (docs/20 §6).',
+  })
+  @ApiOkResponse({ description: 'La plantilla' })
+  @ApiForbiddenResponse({ description: 'Sin ningún sitio donde dar de alta' })
+  plantilla(@Usuario() u: UsuarioSesion): PlantillaLote {
+    exigirEnAlguno(u, 'escribir');
+    return plantillaLote();
   }
 
   // Configurar un dispositivo desde el panel (docs/19 §4, E; docs/10 §8.4 punto 28), con bloqueo optimista; responde la ficha.

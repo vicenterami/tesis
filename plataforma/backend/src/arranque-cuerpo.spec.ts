@@ -3,12 +3,13 @@ import { Body, Controller, Post } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
 import type { AddressInfo } from 'node:net';
-import { MENSAJE_TOPE_CUERPO, MENSAJE_TOPE_LOTE, errorDeLectorJson, opcionesLectorJson } from './arranque.js';
+import { MENSAJE_TOPE_CUERPO, MENSAJE_TOPE_LOTE, TOPE_CUERPO_LOTE, errorDeLectorJson, opcionesLectorJson } from './arranque.js';
 
 // El lector de JSON de main.ts con un servidor real (docs/16 §70). Desde NestJS 12 el tipo de las opciones de `useBodyParser` excluye
 // `verify`; main.ts lo pasa igual. Este banco monta LAS MISMAS opciones y el MISMO manejador de errores que main.ts (los dos salen de
 // arranque.ts) y comprueba los dos topes: 100 KiB fuera del alta por lote, aunque el cuerpo llegue por trozos y sin largo declarado, y
-// 512 KiB en el lote; y que el 413 responde en JSON con su motivo. Si NestJS dejara de pasar `verify`, o alguien lo quitara de
+// TOPE_CUERPO_LOTE en el lote (el peor caso medido de 500 filas llenas, alta/lote.ts; 512 KiB hasta el 15/11/2026), justo en el borde; y
+// que el 413 responde en JSON con su motivo. Si NestJS dejara de pasar `verify`, o alguien lo quitara de
 // arranque.ts, el segundo caso respondería 201.
 @Controller()
 class EcoController {
@@ -68,9 +69,11 @@ describe('lector de JSON de main.ts: los topes del cuerpo rigen con NestJS 12', 
     expect((await enviar(`${base}/dispositivos/lote`, 150 * 1024)).status).toBe(201);
     expect((await enviar(`${base}/dispositivos/lote?modo=validar`, 150 * 1024)).status).toBe(201);
   });
-  it('en el alta por lote, 600 KiB → 413 en JSON con el motivo del lote', async () => {
+  it('en el alta por lote, el tope justo entra (600 KiB, que antes eran 413, también) y un byte más → 413 en JSON con el motivo del lote', async () => {
     const base = await servidor();
-    const r = await enviar(`${base}/dispositivos/lote`, 600 * 1024);
+    expect((await enviar(`${base}/dispositivos/lote`, 600 * 1024)).status).toBe(201);
+    expect((await enviar(`${base}/dispositivos/lote`, TOPE_CUERPO_LOTE)).status).toBe(201);
+    const r = await enviar(`${base}/dispositivos/lote`, TOPE_CUERPO_LOTE + 1);
     expect(r.status).toBe(413);
     expect(await r.json()).toEqual({ statusCode: 413, message: MENSAJE_TOPE_LOTE });
   });
