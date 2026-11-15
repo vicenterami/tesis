@@ -11,6 +11,7 @@
   import Aviso from './Aviso.svelte';
   import BarrasOrdenadas from './BarrasOrdenadas.svelte';
   import Boton from './Boton.svelte';
+  import FormularioAMedida from './FormularioAMedida.svelte';
   import Grafico from './Grafico.svelte';
   import GraficoSitio from './GraficoSitio.svelte';
   import SelectorRango from './SelectorRango.svelte';
@@ -22,9 +23,8 @@
   import type { EventoVivo, HistoricoSitio, ResumenSitio, Sitio } from './lib/modelo';
   import { esRangoVivo, limitador, periodoRefrescoMs, ventanaAlineada } from './lib/refresco';
   import { coloresSeries, temaVivo } from './lib/tema';
-  import { instanteDesdeLocal, localDesdeInstante } from './lib/tiempo';
   import type { PreferenciaUnidades } from './lib/unidades';
-  import { MAX_COMPARAR, MAX_VENTANA_MS, SIN_FILTROS, fragmentoComparar, fragmentoInventario, fragmentoTablero, type VentanaFija } from './lib/vista';
+  import { MAX_COMPARAR, SIN_FILTROS, fragmentoComparar, fragmentoInventario, fragmentoTablero, type VentanaFija } from './lib/vista';
   import { RECONECTADO, abrirCanalCompartido } from './lib/vivo';
 
   let {
@@ -46,10 +46,10 @@
   let mostrada = $state<{ desde: Date; hasta: Date; intervalo: string; cargadaEn: number } | null>(null);
   let cargando = $state(false);
   let error = $state<string | null>(null);
-  let errorAMedida = $state<string | null>(null);
   let aMedidaAbierto = $state(untrack(() => fija !== null));
-  let desdeLocal = $state('');
-  let hastaLocal = $state('');
+  // Con qué fechas abre el formulario a medida: lo que se muestra (o lo pedido) al pulsar «A medida».
+  let inicialAMedida = $state<VentanaFija | null>(untrack(() => fija));
+  let aperturasAMedida = $state(0); // volver a pulsar «A medida» con el formulario abierto lo reinicia con lo mostrado
   let ahora = $state(Date.now());
 
   const zona = $derived(sitio.zona_horaria);
@@ -124,29 +124,19 @@
     rangoElegido = r;
     fijaElegida = null;
     aMedidaAbierto = false;
-    errorAMedida = null;
     void cargar();
   }
   function abrirAMedida(): void {
     const v = mostrada ?? ventanaPedida();
-    desdeLocal = localDesdeInstante(v.desde, zona);
-    hastaLocal = localDesdeInstante(v.hasta, zona);
+    inicialAMedida = { desde: v.desde, hasta: v.hasta };
+    aperturasAMedida += 1;
     aMedidaAbierto = true;
   }
-  // El rango a medida (HU-07): las horas se escriben en la zona del sitio; se valida antes de pedir y el error va junto a los campos.
-  function aplicarAMedida(e: SubmitEvent): void {
-    e.preventDefault();
-    const d = instanteDesdeLocal(desdeLocal, zona);
-    const h = instanteDesdeLocal(hastaLocal, zona);
-    if (d === null || h === null) errorAMedida = 'Escribe la fecha y la hora de inicio y de fin.';
-    else if (h.getTime() <= d.getTime()) errorAMedida = 'El fin debe ser posterior al inicio.';
-    else if (h.getTime() - d.getTime() > MAX_VENTANA_MS) errorAMedida = 'Como mucho 366 días.';
-    else {
-      errorAMedida = null;
-      fijaElegida = { desde: d, hasta: h };
-      rangoElegido = null;
-      void cargar();
-    }
+  // El rango a medida (HU-07): el formulario valida (lib/vista.ts) y solo una ventana buena llega aquí.
+  function aplicarAMedida(v: VentanaFija): void {
+    fijaElegida = v;
+    rangoElegido = null;
+    void cargar();
   }
 
   // La URL cambió desde fuera (atrás, un enlace compartido): se reaplica si difiere de lo pedido.
@@ -213,14 +203,8 @@
     <Boton etiqueta="Actualizar" variante="discreto" ayuda="Con 7 o 30 días las gráficas no se actualizan solas: vuelve a pedirlas" onclick={() => void cargar()} data-actualizar />
   {/if}
 </div>
-{#if aMedidaAbierto}
-  <form class="filtros" onsubmit={aplicarAMedida} novalidate data-form-a-medida>
-    <label>Desde <input type="datetime-local" bind:value={desdeLocal} aria-describedby="a-medida-ayuda a-medida-error" data-desde /></label>
-    <label>Hasta <input type="datetime-local" bind:value={hastaLocal} aria-describedby="a-medida-ayuda a-medida-error" data-hasta /></label>
-    <Boton etiqueta="Aplicar" tipo="submit" variante="principal" data-aplicar-a-medida />
-    <span class="vivo" id="a-medida-ayuda">En la hora del sitio ({zona}); hasta 366 días.</span>
-    {#if errorAMedida !== null}<span class="error" id="a-medida-error" role="alert" data-error-a-medida>{errorAMedida}</span>{/if}
-  </form>
+{#if aMedidaAbierto && inicialAMedida !== null}
+  {#key aperturasAMedida}<FormularioAMedida {zona} inicial={inicialAMedida} alAplicar={aplicarAMedida} />{/key}
 {/if}
 <ZonaSitio {zona} />
 

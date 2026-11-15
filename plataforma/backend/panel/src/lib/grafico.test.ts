@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SERIES } from './tema';
-import { EJE_TIEMPO, NOMBRES_FECHA, RANGOS, SELLO_LEYENDA, agregarLectura, alinearSeries, decimalesDeSeries, decimalesParaRecorrido, filasEtiqueta, formatearValor, rotuloCada, puntosDe, rangoQueContiene, resolucionValida, resolucionesAdmisibles, resumenRango, rotuloIntervalo, seriesDesdeHistorico, urlHistorico, ventana, intervaloParaVentana, resolucionMasFina, ventanaDeSeleccion } from './grafico';
+import { EJE_TIEMPO, NOMBRES_FECHA, RANGOS, SELLO_LEYENDA, agregarLectura, alinearSeries, decimalesDeSeries, decimalesParaRecorrido, filasEtiqueta, formatearValor, rotuloCada, puntosDe, rangoQueContiene, resolucion, resolucionValida, resolucionesAdmisibles, resumenRango, rotuloIntervalo, seriesDesdeHistorico, urlHistorico, ventana, intervaloParaVentana, resolucionMasFina, resolucionParaVentana, ventanaDeSeleccion } from './grafico';
 
 describe('ventana y URL del histórico (docs/19 P3)', () => {
   const ahora = new Date('2026-10-12T15:00:00Z');
@@ -174,5 +174,15 @@ describe('ventanas fijas: resolución del zoom y del rango a medida', () => {
     expect(intervaloParaVentana(2 * 3_600_000)).toBe('15 minutes');
     expect(intervaloParaVentana(10 * 86_400_000)).toBe('6 hours');
     expect(intervaloParaVentana(90 * 86_400_000)).toBe('1 day');
+  });
+});
+
+describe('resolucionParaVentana: la del tablero para un rango a medida, como clave de la lista cerrada', () => {
+  it('coincide con intervaloParaVentana en cada ancho y siempre es una resolución de la lista', () => {
+    const casos: [number, string][] = [[3_600_000, '1m'], [12 * 3_600_000, '15m'], [86_400_000, '15m'], [3 * 86_400_000, '1h'], [20 * 86_400_000, '6h'], [366 * 86_400_000, '1d']];
+    for (const [ms, clave] of casos) {
+      expect(resolucionParaVentana(ms)).toBe(clave);
+      expect(resolucion(resolucionParaVentana(ms)).intervalo).toBe(intervaloParaVentana(ms));
+    }
   });
 });

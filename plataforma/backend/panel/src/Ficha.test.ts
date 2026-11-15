@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, waitFor } from '@testing-library/svelte';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Condicion, DispositivoFicha, EventoDispositivo, Historico, HistoricoDispositivo, TramaRechazada } from './lib/modelo';
 
@@ -652,6 +652,63 @@ describe('Ficha v2: zoom, banda, umbrales, todos los canales, eventos, rechazada
     g.opciones.hooks.setSelect![0]!(g.u);
     await vi.advanceTimersByTimeAsync(50);
     expect(historicos()).toHaveLength(1);
+  });
+
+  // HU-07 (docs/19 §4, D1b): elegir las fechas en la ficha. Santiago en octubre está en UTC−03:00: 08:00 del sitio son las 11:00 UTC.
+  it('a medida: «Desde» y «Hasta» en la hora del sitio; el histórico, las condiciones y el historial de eventos piden esa misma ventana y la URL la lleva', async () => {
+    const vistas: string[] = [];
+    render(Ficha, { id: ID, alCambiarVista: (f: string) => vistas.push(f) });
+    await waitFor(() => expect(graficos).toHaveLength(1));
+    screen.getByRole('button', { name: 'A medida' }).click();
+    await waitFor(() => expect(document.querySelector('[data-desde]')).toBeTruthy());
+    await fireEvent.input(document.querySelector('[data-desde]')!, { target: { value: '2026-10-10T08:00' } });
+    await fireEvent.input(document.querySelector('[data-hasta]')!, { target: { value: '2026-10-10T20:00' } });
+    await fireEvent.submit(document.querySelector('[data-form-a-medida]')!);
+    const lleva = (p: string): void => {
+      expect(p).toContain('desde=2026-10-10T11%3A00%3A00.000Z');
+      expect(p).toContain('hasta=2026-10-10T23%3A00%3A00.000Z');
+    };
+    await waitFor(() => expect(historicos()).toHaveLength(2));
+    lleva(historicos()[1]!);
+    expect(historicos()[1]).toContain('intervalo=15+minutes'); // 12 h: la resolución del menor rango de la lista que la contiene (24 h)
+    await waitFor(() => expect(peticiones.filter((p) => p.includes('/eventos?')).length).toBeGreaterThanOrEqual(2));
+    lleva(peticiones.filter((p) => p.includes('/eventos?')).at(-1)!);
+    lleva(peticiones.filter((p) => p.startsWith(`/condiciones?dispositivo=${ID}&desde=`)).at(-1)!);
+    await waitFor(() => expect(vistas.at(-1)).toBe(`#/dispositivos/${ID}?canal=c-temp&rango=24h&res=15m&desde=2026-10-10T11%3A00%3A00.000Z&hasta=2026-10-10T23%3A00%3A00.000Z`));
+    expect(document.querySelector('[data-rango-fijo]')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '24 horas' }).getAttribute('aria-pressed')).toBe('false'); // ningún preajuste: manda la ventana
+    expect(screen.getByRole('button', { name: 'A medida' }).getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('a medida inválido (fin ≤ inicio, más de 366 días, campo vacío): no pide nada y dice el motivo ligado a los campos; luego un rango bueno sí pide', async () => {
+    render(Ficha, { id: ID });
+    await waitFor(() => expect(graficos).toHaveLength(1));
+    screen.getByRole('button', { name: 'A medida' }).click();
+    await waitFor(() => expect(document.querySelector('[data-desde]')).toBeTruthy());
+    const pedidos = (): number => historicos().length + peticiones.filter((p) => p.includes('/eventos?')).length;
+    const antes = pedidos();
+    const intentar = async (d: string, h: string): Promise<string> => {
+      await fireEvent.input(document.querySelector('[data-desde]')!, { target: { value: d } });
+      await fireEvent.input(document.querySelector('[data-hasta]')!, { target: { value: h } });
+      await fireEvent.submit(document.querySelector('[data-form-a-medida]')!);
+      return document.querySelector('[data-error-a-medida]')?.textContent ?? '';
+    };
+    expect(await intentar('2026-10-10T08:00', '2026-10-10T08:00')).toBe('El fin debe ser posterior al inicio.');
+    expect(await intentar('2026-10-10T08:00', '2026-10-09T08:00')).toBe('El fin debe ser posterior al inicio.');
+    expect(await intentar('2025-10-01T08:00', '2026-10-10T08:00')).toBe('Como mucho 366 días.');
+    expect(await intentar('', '2026-10-10T08:00')).toBe('Escribe la fecha y la hora de inicio y de fin.');
+    await vi.advanceTimersByTimeAsync(100);
+    expect(pedidos()).toBe(antes); // ninguna petición nueva
+    // El error y la ayuda están ligados a los dos campos y el error se anuncia.
+    for (const c of ['[data-desde]', '[data-hasta]']) {
+      const ids = document.querySelector(c)!.getAttribute('aria-describedby')!.split(' ');
+      expect(ids.every((i) => document.getElementById(i) !== null)).toBe(true);
+    }
+    expect(document.querySelector('[data-error-a-medida]')!.getAttribute('role')).toBe('alert');
+    expect(document.querySelector('[data-rango-fijo]')).toBeNull();
+    // Lo bueno pasa y borra el error.
+    expect(await intentar('2026-10-10T08:00', '2026-10-10T20:00')).toBe('');
+    await waitFor(() => expect(historicos()).toHaveLength(2));
   });
 
   it('«Mostrar mín–máx» dibuja la banda del mismo matiz con el mínimo y el máximo de cada intervalo; sin esos campos, el botón no aparece', async () => {

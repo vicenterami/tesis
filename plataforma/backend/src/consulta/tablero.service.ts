@@ -5,7 +5,7 @@ import { isoUs } from '../db/iso-us.js';
 import {
   CUBOS_CHISPA, CanalConUltima, Cursor, Entrega, FilaCubo, FilaMagnitud, HISTORICO_SITIO, SQL_EN_LINEA, SQL_ESTADO_VISUAL, SQL_HISTORICO_SITIO,
   SQL_LECTURA_VIGENTE, TENDENCIA, alinear,
-  armarChispas, elegirCanales, entrega, esSalud, porMagnitud, sqlLimiteVigencia, ventanaChispa,
+  armarChispas, elegirCanales, entrega, esSalud, porcentajeSalud, porMagnitud, sqlLimiteVigencia, ventanaChispa,
 } from './tablero.js';
 import { AvisosAcotados } from '../arranque.js';
 import { errorDeCliente } from '../db/cliente.js';
@@ -119,7 +119,7 @@ export class TableroService {
       sitio: fila.sitio,
       ventana: { desde, hasta, intervalo },
       ...resto,
-      salud: { ...salud, porcentaje: salud.supervisados > 0 ? Math.round((1000 * salud.reportan) / salud.supervisados) / 10 : null },
+      salud: { ...salud, porcentaje: porcentajeSalud(salud.reportan, salud.supervisados) },
       ...entregasDelResumen(entrega_base, desde, hasta),
     };
   }

@@ -65,6 +65,11 @@ export function resolucionValida(clave: ClaveRango, res: ClaveResolucion | null)
 export function intervaloParaVentana(ms: number): string {
   return RANGOS.find((r) => ms <= r.ms)?.intervalo ?? '1 day';
 }
+// La resolución de un rango a medida: la misma que usa el tablero (`intervaloParaVentana`), como clave de la lista cerrada.
+export function resolucionParaVentana(ms: number): ClaveResolucion {
+  const intervalo = intervaloParaVentana(ms);
+  return RESOLUCIONES.find((r) => r.intervalo === intervalo)!.clave;
+}
 // El zoom refina (D1): la resolución más fina de la lista que da entre 2 y 2 500 puntos para la ventana. Una ventana de menos de dos
 // minutos no tiene ninguna (1 min daría menos de 2 puntos): quien hace zoom la ensancha antes (VENTANA_MINIMA_S).
 export const VENTANA_MINIMA_S = 2 * 60;

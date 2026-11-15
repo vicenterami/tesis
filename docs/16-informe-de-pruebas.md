@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 657 pruebas unitarias del backend y 347 del panel, sin matriz formal); TT-32 (sensor físico) se cubrió después, en §43, §44 y §53;
+cubre todavía: TT-27 (contrato de trama: hoy 665 pruebas unitarias del backend y 353 del panel, sin matriz formal); TT-32 (sensor físico) se cubrió después, en §43, §44 y §53;
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -3171,3 +3171,38 @@ mide el cuerpo contra `max_bytes` antes de enviar.
 `;`, BOM y la neutralización de fórmulas de ancho completo (N9) y el lector de XLSX, con sus pruebas en navegador real y sus umbrales
 (N11). El 413 del proxy en JSON. `banco.sh proxy` dio 19 de 23: las cuatro que fallan piden `/eventos` sin sesión y reciben 401; no
 tocan nada de este bloque (vienen de cuando el canal en vivo pasó a exigir sesión) y quedan anotadas para revisarlas aparte.
+
+## 72. Rango a medida en la ficha y el valor de la salud del sitio (15/11/2026)
+
+**Por qué.** A dos historias del núcleo les faltaba una sola cosa para poder cerrarse (`docs/18 §5`). HU-07 (historial por rango de fechas): la ficha
+ofrecía cuatro rangos fijos, el zoom y `desde`/`hasta` por URL, pero el formulario para **elegir** las fechas existía solo en el tablero del sitio, y
+ninguna prueba comprobaba que el rango dejara fuera lo que cae fuera. HU-16 (salud del sitio): el indicador estaba en el tablero, pero solo se probaba
+su forma, no el valor que calcula el servidor.
+
+**Qué se hizo.** Diseño primero: `docs/19 §4`, punto D1b. El formulario «A medida» pasó a un componente (`FormularioAMedida.svelte`) y su validación a una
+función (`validarAMedida`, `lib/vista.ts`); el tablero y la ficha usan los dos, con los mismos textos y el mismo tope de 366 días. En la ficha, la ventana
+elegida es una ventana fija más: va a la URL, y la gráfica, las condiciones y el historial de eventos piden esa ventana, con la resolución que el tablero
+da a ese ancho (`resolucionParaVentana`, `lib/grafico.ts`). El porcentaje de salud pasó a una función pura, `porcentajeSalud()` (`consulta/tablero.ts`): sin
+supervisados devuelve nulo, redondea al décimo y se acota entre 0 y 100 si los conteos llegaran incoherentes.
+
+**Pruebas nuevas, cada una con su falla plantada** (se puso el defecto, la prueba quedó en rojo, se quitó):
+
+| Prueba | Defecto plantado | Resultado |
+|---|---|---|
+| `Ficha.test.ts`: a medida, el histórico, las condiciones y los eventos llevan el mismo `desde` y `hasta`, y la URL lo refleja | los eventos piden las últimas 24 h; la ventana no se fija | rojo las dos |
+| `Ficha.test.ts`: a medida inválido (fin anterior al inicio, más de 366 días, vacío) no pide nada y dice el motivo junto a los campos | sin el tope de 366 días; sin comprobar el orden | rojo las dos |
+| `vista.test.ts`: `validarAMedida`, con el borde de 366 días justos | `>=` en vez de `>` | rojo |
+| `grafico.test.ts`: `resolucionParaVentana` | devolver siempre un minuto | rojo |
+| `tablero.spec.ts`: `porcentajeSalud` (13 de 14 → 92,9; 14 de 14 → 100; 0 de 14 → 0; sin supervisados → nulo; 15 de 14 → 100) | redondeo hacia abajo; sin acotar; cero en vez de nulo | rojo las tres |
+| `rango-y-salud.spec.ts`: el servicio usa `porcentajeSalud` y el SQL cuenta supervisados = no inactivos | no usarla; contar a todos | rojo las dos |
+| `rango-y-salud.spec.ts`: eventos con `ocurrido_en >= desde AND < hasta`; histórico con `tiempo >= desde AND < hasta` | `<=` en el fin; sin la cota inferior | rojo las dos |
+
+Las pruebas del rango en el servidor comprueban el texto y los parámetros de la consulta, no filas: la comprobación contra la base real son los casos
+nuevos del humo de la API (`api-smoke.sh`: un rango anterior a todo el historial no trae eventos; `hasta` es exclusivo y `desde` inclusivo; en el resumen,
+supervisados = total − inactivos, reportan ≤ supervisados y el porcentaje es su cociente con un decimal).
+
+**Cifras del bloque:** `pnpm verificar` en verde: 665 pruebas unitarias del backend en 61 archivos (eran 657 en 60) y 353 pruebas del panel (eran 347;
+355 ejecuciones en vitest, en 33 archivos).
+
+**Lo que queda.** La ficha con el formulario en un navegador real, a 1 280 y a 390 px (hasta aquí solo hay pruebas sin navegador): es condición para
+cerrar HU-07. Un rango de menos de dos minutos dibuja un solo punto, igual que en el tablero.

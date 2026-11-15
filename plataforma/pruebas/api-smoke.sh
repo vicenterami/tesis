@@ -110,6 +110,10 @@ if [[ -n "$SITIO" ]]; then
   caso "resumen del sitio: exactamente los campos del contrato" "/sitios/$SITIO/resumen" "set(r)=={'sitio','ventana','dispositivos','salud','condiciones_abiertas','tramas','atencion','magnitudes','entrega','total_activos'} and len(r['entrega'])<=50 and len(r['entrega'])==min(50, r['total_activos']) and set(r['dispositivos'])=={'total','normal','alerta','sin_senal','inactivo'} and set(r['salud'])=={'reportan','supervisados','porcentaje'} and set(r['tramas'])=={'recibidas','rechazadas','cubos'} and len(r['atencion'])<=10"
   caso "resumen: los cuatro estados suman el total" "/sitios/$SITIO/resumen" "sum(r['dispositivos'][k] for k in ('normal','alerta','sin_senal','inactivo'))==r['dispositivos']['total']"
   caso "resumen: los indicadores suman el inventario del sitio" "/sitios/$SITIO/resumen" "r['dispositivos']['total']==$(ck -s -D - -o /dev/null "$API/dispositivos?sitio=$SITIO&limite=1" | tr -d '\r' | awk 'tolower($1)=="x-total:"{print $2}')"
+  # Salud del sitio (HU-16, RF-30): los dos conteos salen del SQL y el porcentaje, de porcentajeSalud(); aquí se comprueba contra la respuesta real
+  # que supervisados = total − inactivos, que reportan ≤ supervisados y que el porcentaje es reportan ÷ supervisados con un decimal (null sin supervisados).
+  caso "resumen: salud, supervisados = total − inactivos y reportan ≤ supervisados" "/sitios/$SITIO/resumen" "r['salud']['supervisados']==r['dispositivos']['total']-r['dispositivos']['inactivo'] and 0<=r['salud']['reportan']<=r['salud']['supervisados']"
+  caso "resumen: salud, el porcentaje es reportan ÷ supervisados con un decimal (null si no hay supervisados)" "/sitios/$SITIO/resumen" "(r['salud']['porcentaje'] is None) if r['salud']['supervisados']==0 else abs(r['salud']['porcentaje']-__import__('math').floor(1000*r['salud']['reportan']/r['salud']['supervisados']+0.5)/10)<1e-9"
   # «Ahora» (docs/19 §4, L6): la forma, los conteos que cuadran con el resumen, el orden (alerta primero), el tope de tres canales con la
   # salud al final, la tendencia de 24 cubos solo cuando se pide y los 400 de limite.
   caso "ahora: exactamente los campos del contrato, sin tendencia" "/sitios/$SITIO/ahora" "set(r)=={'reportan','sin_senal','por_magnitud','dispositivos','tendencia'} and r['tendencia'] is False and len(r['dispositivos'])==min(24, r['reportan']) and all(set(d)=={'id','nombre','zona','estado_visual','visto_por_ultima_vez','intervalo_esperado_s','canales_total','canales'} and d['estado_visual'] in ('normal','alerta') and len(d['canales'])==min(3, d['canales_total']) and all(set(c)=={'id','magnitud','magnitud_nombre','unidad','salud','ultima'} for c in d['canales']) for d in r['dispositivos']) and all(set(m)=={'codigo','nombre','unidad','salud','canales','promedio','minimo','maximo'} and m['minimo']<=m['promedio']<=m['maximo'] for m in r['por_magnitud'])"
@@ -154,6 +158,14 @@ if [[ -n "${DISP:-}" ]]; then
   sig=$(ck -s -D - -o /dev/null "$API/dispositivos/$DISP/eventos?desde=2026-01-01T00:00:00Z&limite=2" | tr -d '\r' | awk 'tolower($1)=="x-siguiente:"{print $2}')
   if [[ -n "$sig" ]]; then
     caso "eventos por cursor: la página 2 sigue a la 1 sin repetir" "/dispositivos/$DISP/eventos?desde=2026-01-01T00:00:00Z&limite=2&cursor=$sig" "[e['id'] for e in r]==[e['id'] for e in $(ck -s "$API/dispositivos/$DISP/eventos?desde=2026-01-01T00:00:00Z&limite=4" | python3 -c 'import sys,json; print(json.dumps(json.load(sys.stdin)))')][2:4]"
+  fi
+  # Historial en un rango (HU-07, RF-33): [desde, hasta) deja fuera lo que cae fuera. Un rango sin eventos devuelve la lista vacía; «hasta» es
+  # exclusivo y «desde», inclusivo, probados con el instante del evento más reciente (la API trabaja al milisegundo: se compara con ese corte).
+  caso "historial: un rango anterior a todo el historial no trae eventos" "/dispositivos/$DISP/eventos?desde=2000-01-01T00:00:00Z&hasta=2000-01-02T00:00:00Z" "r==[]"
+  t_ev=$(ck -s "$API/dispositivos/$DISP/eventos?desde=2026-01-01T00:00:00Z&limite=1" | python3 -I -c "import sys,json; r=json.load(sys.stdin); print(r[0]['ocurrido_en'] if r else '')")
+  if [[ -n "$t_ev" ]]; then
+    caso "historial: «hasta» es exclusivo, el evento de ese instante no entra" "/dispositivos/$DISP/eventos?desde=2026-01-01T00:00:00Z&hasta=$t_ev&limite=500" "all(e['ocurrido_en']<'$t_ev' for e in r)"
+    caso "historial: «desde» es inclusivo y nada anterior entra" "/dispositivos/$DISP/eventos?desde=$t_ev&limite=500" "len(r)>=1 and all(e['ocurrido_en'][:23]>='${t_ev:0:23}' for e in r)"
   fi
   # Escrituras con datos que no deben pasar: nada cambia.
   code=$(esc PATCH "/dispositivos/$DISP" '{"actualizado_en":"2001-01-01T00:00:00.000001Z","nombre":"x"}')

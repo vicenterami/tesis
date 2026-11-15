@@ -1,6 +1,7 @@
 import { ORDEN_ATENCION, type EstadoVisual } from './estado-visual';
 import { RANGOS, RESOLUCIONES, type ClaveRango, type ClaveResolucion } from './grafico';
 import { VIAS } from './inventario';
+import { instanteDesdeLocal } from './tiempo';
 
 // La vista vive en la URL (docs/19 §4, incremento 1, punto 1): `#/dispositivos/<id>?canal=<uuid>&rango=24h&res=5m[&desde=&hasta=]`,
 // `#/inventario?estado=alerta&sitio=&zona=&via=&q=&pagina=2&orden=entrega` y `#/?sitio=&ver=tendencias&rango=7d` (el tablero, P1, con su
@@ -30,6 +31,20 @@ export interface VentanaFija {
   hasta: Date;
 }
 export const MAX_VENTANA_MS = 366 * 86_400_000; // el tope del servidor (docs/19 §4, incremento 2, punto 4)
+
+// El rango «a medida» (HU-07; docs/19 §4, B1 y D6): lo escrito en dos campos datetime-local, en la hora de la zona del sitio, se vuelve una
+// ventana o el motivo por el que no sirve. Una sola función para el tablero y la ficha; los textos son los que la persona lee.
+export const ERROR_A_MEDIDA_VACIO = 'Escribe la fecha y la hora de inicio y de fin.';
+export const ERROR_A_MEDIDA_ORDEN = 'El fin debe ser posterior al inicio.';
+export const ERROR_A_MEDIDA_ANCHO = 'Como mucho 366 días.';
+export function validarAMedida(desdeLocal: string, hastaLocal: string, zona: string): { ventana: VentanaFija; error: null } | { ventana: null; error: string } {
+  const d = instanteDesdeLocal(desdeLocal, zona);
+  const h = instanteDesdeLocal(hastaLocal, zona);
+  if (d === null || h === null) return { ventana: null, error: ERROR_A_MEDIDA_VACIO };
+  if (h.getTime() <= d.getTime()) return { ventana: null, error: ERROR_A_MEDIDA_ORDEN };
+  if (h.getTime() - d.getTime() > MAX_VENTANA_MS) return { ventana: null, error: ERROR_A_MEDIDA_ANCHO };
+  return { ventana: { desde: d, hasta: h }, error: null };
+}
 
 export type Vista =
   | { pantalla: 'ficha'; id: string; canal: string | null; rango: ClaveRango | null; res: ClaveResolucion | null; fija: VentanaFija | null }

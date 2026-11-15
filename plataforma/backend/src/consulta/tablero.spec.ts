@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BadRequestException } from '@nestjs/common';
-import { SQL_ESTADO_VISUAL, TIPOS_ALERTA, alinear, codificarCursor, entrega, estadoVisual, filtroInventario, intervaloParaRango, leerCursor, patronBusqueda, siguiente } from './tablero.js';
+import { SQL_ESTADO_VISUAL, TIPOS_ALERTA, alinear, codificarCursor, entrega, estadoVisual, filtroInventario, intervaloParaRango, leerCursor, patronBusqueda, porcentajeSalud, siguiente } from './tablero.js';
 import { INTERVALOS, SEGUNDOS_INTERVALO } from './validacion.js';
 import { MAX_ENTREGA_RESUMEN, diasRetencionTrama, entregasDelResumen } from './tablero.service.js';
 import { MAX_DIAS_SITIO, ventana } from './sitios.controller.js';
@@ -163,5 +163,28 @@ describe('ventana del histórico del sitio (MAX_DIAS_SITIO)', () => {
     expect(ventana(new Date(Date.parse(h) - MAX_DIAS_SITIO * 86_400_000).toISOString(), h, '1 hour', false, MAX_DIAS_SITIO).i).toBe('1 hour');
     expect(() => ventana(new Date(Date.parse(h) - (MAX_DIAS_SITIO + 1) * 86_400_000).toISOString(), h, '1 hour', false, MAX_DIAS_SITIO)).toThrow(BadRequestException);
     expect(ventana(new Date(Date.parse(h) - 90 * 86_400_000).toISOString(), h, '1 day', false).i).toBe('1 day');
+  });
+});
+
+// Salud del sitio (HU-16, RF-30): el porcentaje que el panel dibuja en la tarjeta «Salud del sitio». Los conteos (en línea y supervisados)
+// los calcula la base: ver el caso de `api-smoke.sh` que los compara con el resto de la respuesta de /sitios/{id}/resumen.
+describe('porcentajeSalud: en línea ÷ supervisados, un decimal', () => {
+  it('valores normales: 13 de 14 → 92,9; 14 de 16 → 87,5; 1 de 3 → 33,3 (redondeo al décimo)', () => {
+    expect(porcentajeSalud(13, 14)).toBe(92.9);
+    expect(porcentajeSalud(14, 16)).toBe(87.5);
+    expect(porcentajeSalud(1, 3)).toBe(33.3);
+    expect(porcentajeSalud(2, 3)).toBe(66.7);
+  });
+  it('todos en línea → 100; ninguno → 0 (supervisados sin señal no es «sin dato»)', () => {
+    expect(porcentajeSalud(14, 14)).toBe(100);
+    expect(porcentajeSalud(0, 14)).toBe(0);
+  });
+  it('sin dispositivos supervisados → null, no 0 ni NaN (un sitio vacío no está «mal»)', () => {
+    expect(porcentajeSalud(0, 0)).toBeNull();
+    expect(porcentajeSalud(3, 0)).toBeNull();
+  });
+  it('reportan nunca supera a supervisados: si la consulta lo violara, se acota a 100; un negativo, a 0', () => {
+    expect(porcentajeSalud(15, 14)).toBe(100);
+    expect(porcentajeSalud(-1, 14)).toBe(0);
   });
 });

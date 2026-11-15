@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SIN_FILTROS, SIN_FILTROS_ACTIVIDAD, fragmentoActividad, fragmentoAlta, fragmentoComparar, fragmentoFicha, fragmentoInventario, fragmentoTablero, leerVentanaFija, leerVista, redireccionVieja } from './vista';
+import { SIN_FILTROS, SIN_FILTROS_ACTIVIDAD, fragmentoActividad, fragmentoAlta, fragmentoComparar, fragmentoFicha, fragmentoInventario, fragmentoTablero, leerVentanaFija, leerVista, redireccionVieja, validarAMedida } from './vista';
 
 const ID = '00000000-0000-4000-8000-000000000001';
 const CANAL = '00000000-0000-4000-8000-0000000000c1';
@@ -123,5 +123,25 @@ describe('rutas de P6, P7, P11, P13 y P14', () => {
     expect(leerVista(fragmentoActividad(f))).toEqual({ pantalla: 'actividad', filtros: f });
     expect(fragmentoActividad(SIN_FILTROS_ACTIVIDAD)).toBe('#/actividad');
     expect(leerVista('#/actividad?tipo=DROP%20TABLE&usuario=x&sitio=a%20b')).toEqual({ pantalla: 'actividad', filtros: SIN_FILTROS_ACTIVIDAD });
+  });
+});
+
+describe('validarAMedida: el rango a medida de la ficha y del tablero (HU-07)', () => {
+  const Z = 'America/Santiago'; // en octubre y noviembre, UTC−03:00
+  it('un rango bueno: las horas son del sitio y la ventana, en instantes', () => {
+    const r = validarAMedida('2026-10-10T08:00', '2026-10-10T20:00', Z);
+    expect(r.error).toBeNull();
+    expect(r.ventana?.desde.toISOString()).toBe('2026-10-10T11:00:00.000Z');
+    expect(r.ventana?.hasta.toISOString()).toBe('2026-10-10T23:00:00.000Z');
+  });
+  it('fin igual o anterior al inicio, campo vacío o ilegible: el motivo, sin ventana', () => {
+    expect(validarAMedida('2026-10-10T08:00', '2026-10-10T08:00', Z)).toEqual({ ventana: null, error: 'El fin debe ser posterior al inicio.' });
+    expect(validarAMedida('2026-10-10T08:00', '2026-10-09T08:00', Z).error).toBe('El fin debe ser posterior al inicio.');
+    expect(validarAMedida('', '2026-10-10T08:00', Z).error).toBe('Escribe la fecha y la hora de inicio y de fin.');
+    expect(validarAMedida('2026-10-10T08:00', 'ayer', Z).error).toBe('Escribe la fecha y la hora de inicio y de fin.');
+  });
+  it('366 días pasan; un minuto más, no (el tope del servidor)', () => {
+    expect(validarAMedida('2025-10-10T08:00', '2026-10-11T08:00', Z).error).toBeNull(); // 366 días justos
+    expect(validarAMedida('2025-10-10T08:00', '2026-10-11T08:01', Z).error).toBe('Como mucho 366 días.');
   });
 });

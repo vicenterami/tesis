@@ -8,11 +8,12 @@
   import ZonaSitio from './ZonaSitio.svelte';
   import Aviso from './Aviso.svelte';
   import Boton from './Boton.svelte';
+  import FormularioAMedida from './FormularioAMedida.svelte';
   import { descargar, esCancelacion, mensajeError, obtener, obtenerPagina, ultimaGana } from './lib/api';
   import { avisoDeError, type DatosAviso } from './lib/avisos';
   import { puedeEn, type Sesion } from './lib/sesion';
   import { canalCallado, enLinea, estadoVisual, ROTULO, rotuloCondicion } from './lib/estado-visual';
-  import { RANGO_POR_DEFECTO, agregarLectura, decimalesParaRecorrido, formatearValor, rango as datosRango, rangoQueContiene, resolucion, resolucionMasFina, resolucionValida, resumenRango, rotuloIntervalo, seriesDesdeHistorico, urlHistorico, ventana, ventanaDeSeleccion, type ClaveRango, type ClaveResolucion, type Series } from './lib/grafico';
+  import { RANGO_POR_DEFECTO, agregarLectura, decimalesParaRecorrido, formatearValor, rango as datosRango, rangoQueContiene, resolucion, resolucionMasFina, resolucionParaVentana, resolucionValida, resumenRango, rotuloIntervalo, seriesDesdeHistorico, urlHistorico, ventana, ventanaDeSeleccion, type ClaveRango, type ClaveResolucion, type Series } from './lib/grafico';
   import type { Condicion, DispositivoFicha, EventoDispositivo, EventoVivo, Historico, HistoricoDispositivo, TramaRechazada } from './lib/modelo';
   import { coloresSeries, temaVivo } from './lib/tema';
   import { UNIDADES_POR_DEFECTO, conversion, convertirSerie, type PreferenciaUnidades } from './lib/unidades';
@@ -54,6 +55,10 @@
   // con la resolución más fina admisible; «Volver» deshace el último zoom (la pila vive en memoria) y el doble clic vuelve al rango.
   let fijaElegida = $state<VentanaFija | null>(untrack(() => fijaInicial));
   let zooms = $state<{ fija: VentanaFija | null; res: ClaveResolucion | null }[]>([]);
+  // El rango a medida por fechas (HU-07; docs/19 §4, D1b): el mismo formulario que el tablero; la ventana que elige es una `fija` más.
+  let aMedidaAbierto = $state(false);
+  let aperturasAMedida = $state(0); // volver a pulsar «A medida» con el formulario abierto lo reinicia con lo mostrado
+  let inicialAMedida = $state<VentanaFija | null>(null);
   // Mín–máx (D3), todos los canales (D2), condiciones del canal en la ventana (D4), eventos (D5) y rechazadas por cursor (D6).
   let mostrarMinMax = $state(false);
   let todosLosCanales = $state(false);
@@ -294,8 +299,23 @@
   function elegirRango(r: ClaveRango): void {
     rangoElegido = r;
     fijaElegida = null; // un preajuste vuelve a «ahora»
+    aMedidaAbierto = false;
     zooms = [];
     resElegida = resolucionValida(r, mostrada?.fija === null ? resElegida : null); // la elegida se conserva si sirve (y no venía de un zoom)
+    void cargarHistorico();
+  }
+  function abrirAMedida(): void {
+    const m = mostrada;
+    const fin = m?.hasta ?? new Date();
+    inicialAMedida = m !== null ? { desde: m.desde, hasta: m.hasta } : { desde: new Date(fin.getTime() - 86_400_000), hasta: fin };
+    aperturasAMedida += 1;
+    aMedidaAbierto = true;
+  }
+  // El formulario ya validó (lib/vista.ts): la ventana vale como cualquier otra `fija`, con la resolución que el tablero daría a ese ancho.
+  function aplicarAMedida(v: VentanaFija): void {
+    zooms = [];
+    fijaElegida = v;
+    resElegida = resolucionParaVentana(v.hasta.getTime() - v.desde.getTime());
     void cargarHistorico();
   }
   function elegirRes(r: ClaveResolucion | null): void {
@@ -322,6 +342,7 @@
   // Doble clic y «Volver a ahora»: el rango completo, terminando en ahora, con su resolución automática.
   function rangoCompleto(): void {
     zooms = [];
+    aMedidaAbierto = false;
     fijaElegida = null;
     resElegida = null;
     void cargarHistorico();
@@ -549,6 +570,7 @@
     <!-- Rango y resolución (incremento 2, puntos 2 y 4): mientras llega el histórico, el grupo queda ocupado y el texto dice «cargando…» -->
     <div class="filtros" role="group" aria-label="Rango del gráfico" aria-busy={cargando} data-cargando={cargando}>
       <SelectorRango rango={fijaElegida === null ? rangoElegido : null} res={resElegida} alElegirRango={elegirRango} alElegirRes={elegirRes} />
+      <Boton etiqueta="A medida" presionado={fijaElegida !== null} ayuda="Elige la fecha y la hora de inicio y de fin, en la hora del sitio" onclick={abrirAMedida} data-a-medida />
       {#if zooms.length > 0}<Boton etiqueta="Volver" ayuda="Deshace el último zoom" onclick={volverZoom} data-volver-zoom />{/if}
       {#if tieneMinMax}<Boton etiqueta="Mostrar mín–máx" presionado={mostrarMinMax} ayuda="Dibuja, alrededor del promedio, la banda entre el mínimo y el máximo de cada intervalo" onclick={() => (mostrarMinMax = !mostrarMinMax)} data-min-max />{/if}
       <Boton etiqueta="Todos los canales" presionado={todosLosCanales} ayuda="Una gráfica pequeña por canal, con la misma ventana y el cursor sincronizado" onclick={alternarTodos} data-todos-canales />
@@ -560,6 +582,9 @@
       <span class="vivo">Arrastra sobre el gráfico para acercar; doble clic para el rango completo.</span>
       <a href={fragmentoComparar([id], canalActual.magnitud, rangoElegido, resElegida)} onclick={irAComparar} data-ir-comparar>Comparar con otros dispositivos</a>
     </div>
+    {#if aMedidaAbierto && inicialAMedida !== null}
+      {#key aperturasAMedida}<FormularioAMedida zona={d.zona_horaria} inicial={inicialAMedida} idBase="a-medida-ficha" alAplicar={aplicarAMedida} />{/key}
+    {/if}
     {#if errorHistorico !== null}
       <p class="error" role="alert">{errorHistorico} <Boton etiqueta="Reintentar" onclick={() => void cargarHistorico()} data-reintentar /></p>
     {/if}

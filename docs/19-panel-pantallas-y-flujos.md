@@ -373,6 +373,14 @@ servidor.
    último zoom y el doble clic vuelve al rango completo. La ventana acotada va a la URL como `desde` y `hasta` (ISO), que es también la
    forma del **rango a medida** por fecha y hora (HU-07): un solo mecanismo. Mientras la ventana no termina en «ahora», el vivo no agrega
    puntos (es historia) y la cabecera dice «rango fijo · Volver a ahora».
+   **D1b. Elegir las fechas en la ficha (HU-07; decidido y hecho el 15/11/2026).** ✅ panel, 15/11/2026. Junto a los rangos y «Volver», un botón «A medida» abre el mismo
+   formulario del tablero (B1), un solo componente para las dos pantallas: «Desde» y «Hasta» (fecha y hora) escritos en la hora del
+   sitio, con la ayuda «En la hora del sitio (zona); hasta 366 días» y el error ligados a los dos campos. La regla es una sola función:
+   el fin debe ser posterior al inicio y el ancho, de 366 días como mucho (el tope del servidor); si no, se dice el motivo junto a los
+   campos y no se pide nada. Una ventana buena es una `fija` más: va a la URL como `desde` y `hasta`, la gráfica y el «Historial de
+   eventos del rango» (D5) piden esa misma ventana, el vivo no agrega puntos y la cabecera dice «rango fijo · Volver a ahora». La
+   resolución es la que el tablero da a ese ancho (la del menor rango de la lista que lo contiene: 1 min, 15 min, 1 h, 6 h, y 1 día más
+   allá de 30 días), siempre de la lista cerrada de la API; el zoom por arrastre sigue refinando con la más fina admisible.
 2. **Varias series sin dos ejes.** ✅ panel, 11/11/2026; ✅ backend, 11/11/2026. Botón «Todos los canales»: una gráfica pequeña por canal (misma ventana, cursor sincronizado, un eje
    cada una) en una fila que se envuelve; se pide todo de una vez con `GET /dispositivos/{id}/historico` (Etapa 4), no un pedido por canal. P3b
    (comparar dispositivos) sigue como está.
