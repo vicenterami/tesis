@@ -89,9 +89,9 @@ siga sin terminar y que sus horas sean las de `docs/04`: un elemento que se cier
 
 | Orden | Elemento | Horas | Estado | Qué falta |
 |---|---|---|---|---|
-| 1 | HU-07 Historial por rango de fechas | 4 | ⬜ | Todo |
-| 2 | HU-15 Calidad del enlace | 4 | ⬜ | Todo; necesita tráfico LoRaWAN real (`rssi` y `snr` ya quedan en la trama cruda) |
-| 3 | HU-16 Indicador de salud del sitio | 4 | ⬜ | Todo |
+| 1 | HU-07 Historial por rango de fechas | 4 | ⬜ | El historial por `desde` y `hasta` ya existe en la API y en la ficha (`docs/19 §4`, D; `docs/16 §61` y §62). Falta para cerrarla: elegir las fechas en la ficha del dispositivo (hoy solo los cuatro preajustes, hasta 30 días, y el zoom por arrastre; el campo de fecha y hora está en el tablero del sitio) y una prueba que compruebe que el historial deja fuera lo que cae fuera del rango |
+| 2 | HU-15 Calidad del enlace | 4 | ⬜ | La entrega por dispositivo (porcentaje de recepción) ya está (`docs/19 §4`, B; `docs/16 §61`). Falta RSSI y SNR del enlace de radio, que necesitan tráfico LoRaWAN real (`rssi` y `snr` ya quedan en la trama cruda, pero ninguna vista ni consulta los lee) |
+| 3 | HU-16 Indicador de salud del sitio | 4 | ⬜ | El indicador ya está en el tablero (`docs/19 §4`, B; `docs/16 §61` y §67). Falta para cerrarla: una prueba del valor que calcula el servidor (en línea ÷ supervisados), hoy solo se prueba su forma y que los estados sumen el total |
 | 4 | HU-02 Eventos LoRaWAN | 6 | 🟡 | **Probada en terreno el 20/10** con la pasarela real del campus y dos nodos de punta a punta (`docs/16 §45`); el banco cubre lo demás (`docs/16 §31`, §36 y §37). Quedan la ruta C (ChirpStack) y la coexistencia con otro broker (reporte HTTPS de la pasarela, variante prevista de la vía 2; antes «vía 4») |
 | 5 | HU-08 Exportar en CSV, XLSX y JSON | 4 | 🟡 | XLSX y la exportación por sitio con rol: necesita la sesión (HU-18) |
 | 6 | TT-12 Catálogo de sensores y unidades | 6 | 🟡 | El catálogo editable con umbrales; con él, los alias de claves y los perfiles de decodificación (`docs/08 §8`) |
