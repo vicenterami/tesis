@@ -106,9 +106,10 @@ son RFCs) son **públicos y gratuitos** — al contrario que los estándares SIA
   {"n":"bateria",     "u":"%EL",  "v":87}
 ]
 ```
-`bn` = nombre base (identidad del dispositivo, p. ej. su MAC), `bt` = tiempo base, y cada medición
-con nombre, unidad estándar y valor. **La identificación viene dentro de la trama** y se cruza con
-el registro de dispositivos de la plataforma.
+`bn` = nombre base (en la RFC, un prefijo de los nombres; el perfil de la plataforma lo ignora), `bt` = tiempo base, y cada medición
+con nombre (`n`: el código de la magnitud en el catálogo), unidad estándar y valor. **La identidad no viene dentro de la trama:** la dan el
+tópico MQTT y la credencial con que el emisor se conectó al broker (`docs/10 §4`, filtro 1), y se cruza con el registro de dispositivos de la
+plataforma. Qué toma la plataforma de SenML y qué no está escrito en `docs/10 §4`: el contrato nativo es un perfil de SenML, no la RFC completa.
 
 ### 3.2 Identificación y tipos de sensor (la pregunta del MAC)
 
@@ -116,8 +117,9 @@ Ambas cosas, combinadas:
 1. **Registro (aprovisionamiento):** al dar de alta un dispositivo en la plataforma se declara su
    identidad (MAC o ID), su **tipo** (temperatura, luz, ruido…), ubicación y credencial. La
    plataforma sabe *qué esperar* de él.
-2. **Autoidentificación en cada trama:** el mensaje trae la identidad (`bn`) y cada medición trae
-   su nombre y unidad. La plataforma **valida contra el registro**: sin credencial → lo corta el
+2. **Identidad por el tópico y la credencial, no por el cuerpo:** el tópico trae el identificador del dispositivo, que el broker ya autenticó
+   con su credencial, y cada medición trae su nombre (código de magnitud) y su unidad. Un `bn` en la trama no identifica y se ignora: un emisor no
+   puede declararse otro dispositivo escribiendo otro `bn`. La plataforma **valida contra el registro**: sin credencial → lo corta el
    broker y no llega; con credencial pero sin alta → cuarentena «no_registrado» (o «dado_de_baja»); unidad que no
    calza con el tipo → cuarentena «invalida», con el detalle de qué falló.
 

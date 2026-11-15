@@ -4,7 +4,7 @@ Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emu
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
 cubría al escribirse se agregó después: TT-32 (sensor físico) en §43, §44 y §53, y TT-30 (recuperación ante reinicio) en §11. El
-contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 731 pruebas unitarias del backend y 365 del panel.
+contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 741 pruebas unitarias del backend y 365 del panel.
 Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -3284,7 +3284,7 @@ sección en el comentario (§5.1.1 a §5.1.7); no se inventó ningún identifica
 
 **Cómo leer la columna «Prueba que la cubre».** `contrato.spec.ts · C-NN` es una prueba escrita para esta matriz (el identificador va al principio de su
 nombre). Las demás citan una prueba que ya existía, con el comienzo de su título; el guardián abre el archivo y comprueba que ese texto sigue ahí.
-«Esperado por la RFC; hoy …» marca una diferencia entre la fuente y el código que **no se corrigió**: la prueba queda como `it.todo` y la diferencia, en los hallazgos.
+«Esperado por la RFC; hoy …» marcaba una diferencia entre la fuente y el código que no se corregía y quedaba como `it.todo`; desde la decisión del 15/11/2026 (el contrato nativo es un perfil de SenML, `docs/10 §4`) no queda ninguna: cada diferencia se corrigió o se declara en los hallazgos.
 
 ### La matriz
 
@@ -3293,20 +3293,20 @@ nombre). Las demás citan una prueba que ya existía, con el comienzo de su tít
 | Id | Regla | Fuente | Resultado esperado | Prueba que la cubre |
 |---|---|---|---|---|
 | C-01 | Un registro con n, u y v produce una lectura; el nombre se pasa a minúsculas | RFC 8428 §4.2; senml.adaptador.ts | aceptada: {magnitud en minúsculas, valor, unidad} | `contrato.spec.ts` · C-01 |
-| C-02 | bn no se antepone al nombre: la magnitud es n tal cual (hallazgo H-3) | RFC 8428 §4.1 y §4.5.1 (ejemplo §5.1.2); senml.adaptador.ts, «(n ?? ctx.magnitudTopico).toLowerCase()» | aceptada: magnitud «voltage», no «urn:…:voltage» | `contrato.spec.ts` · C-02 |
+| C-02 | bn no se antepone al nombre: n es el código de magnitud del catálogo y la magnitud es n tal cual (diferencia declarada, hallazgo H-3) | RFC 8428 §4.1 y §4.5.1 (ejemplo §5.1.2); senml.adaptador.ts, «(n ?? ctx.magnitudTopico).toLowerCase()» | aceptada: magnitud «voltage», no «urn:…:voltage» (la concatenación queda para el catálogo de alias) | `contrato.spec.ts` · C-02 |
 | C-03 | bt se hereda a los registros siguientes y t es relativo a bt | RFC 8428 §4.5.3 (ejemplo §5.1.2) | aceptada: tiempo = bt + t | `contrato.spec.ts` · C-03<br>`adaptadores/adaptadores.spec.ts` · «hereda bn/bt/bu…» |
 | C-04 | bu se hereda y la u del registro gana | RFC 8428 §4.1 y §4.5.2 (ejemplo §5.1.3) | aceptada: unidad del registro, si no la base | `contrato.spec.ts` · C-04 |
 | C-05 | bt persiste aunque cambie bn; un bt posterior reemplaza al anterior | RFC 8428 §4 (ejemplo §5.1.6) | aceptada: cada registro con la base vigente | `contrato.spec.ts` · C-05 |
 | C-06 | bver igual o menor que 10 (o ausente) se acepta | RFC 8428 §4.1 y §4.4 (ejemplo §5.1.2, bver 5) | aceptada | `contrato.spec.ts` · C-06 |
-| C-07 | bver mayor que la versión que se entiende (10) se rechaza (hallazgo H-4) | RFC 8428 §4.4: «MUST NOT use this object» | esperado por la RFC: rechazada; hoy se acepta (it.todo) | `contrato.spec.ts` · C-07 |
+| C-07 | bver mayor que la versión que se entiende (10), o que no sea un entero positivo, se rechaza en cualquier registro del pack (hallazgo H-4) | RFC 8428 §4.1 (entero positivo) y §4.4: «MUST NOT use this object» | rechazada: malformada «bver 11 no se entiende…» o «bver no es un entero positivo» (corregido el 15/11/2026: antes se aceptaba) | `contrato.spec.ts` · C-07 |
 | C-08 | Un campo que no se conoce se ignora | RFC 8428 §4.4: «MUST ignore fields they don't recognize» | aceptada: el campo no cambia la lectura | `contrato.spec.ts` · C-08 |
-| C-09 | Un campo desconocido cuya etiqueta termina en «_» es un error (hallazgo H-5) | RFC 8428 §4.4: «in which case an error MUST be generated» | esperado por la RFC: rechazada; hoy se ignora (it.todo) | `contrato.spec.ts` · C-09 |
+| C-09 | Un campo desconocido cuya etiqueta termina en «_» es un error, también en un registro sin valor (hallazgo H-5) | RFC 8428 §4.4: «in which case an error MUST be generated» | rechazada: malformada «campo … desconocido y de los que no se pueden ignorar» (corregido el 15/11/2026: antes se ignoraba) | `contrato.spec.ts` · C-09 |
 | C-10 | v debe ser un número finito; cadena, nulo, booleano o desborde se rechazan | RFC 8428 §4.3 (tipo de v); senml.adaptador.ts, «typeof r.v !== 'number' || !Number.isFinite(r.v)» | rechazada: malformada «v no numérico» | `contrato.spec.ts` · C-10<br>`adaptadores/adaptadores.spec.ts` · «rechaza JSON inválido, pack vacío y valores no numéricos…» |
 | C-11 | Los registros solo con vs, vb o vd se omiten: el sistema guarda solo valores numéricos | RFC 8428 §4.2 y §5.1.5; senml.adaptador.ts, «if (r.v === undefined) continue» | aceptada: solo la lectura numérica | `contrato.spec.ts` · C-11 |
 | C-12 | Un registro con solo campos base (sin valor) no genera lectura | RFC 8428 §4 (ejemplo §5.1.7); senml.adaptador.ts, «if (r.v === undefined) continue» | aceptada: sin lectura para ese registro | `contrato.spec.ts` · C-12 |
 | C-13 | Un pack sin ninguna lectura numérica se rechaza | RFC 8428 §4.2 (el valor es obligatorio salvo con s); senml.adaptador.ts, «throw new TramaMalformada('pack sin valores')» | rechazada: malformada «pack sin valores» | `contrato.spec.ts` · C-13 |
-| C-14 | bv se suma al valor del registro (hallazgo H-6) | RFC 8428 §4.5.4: «added together to get the value» | esperado por la RFC: bv + v; hoy se ignora bv (it.todo) | `contrato.spec.ts` · C-14 |
-| C-15 | Un registro con dos campos de valor (v y vs) se rechaza (hallazgo H-7) | RFC 8428 §4.2: «Exactly one Value field MUST appear» | esperado por la RFC: rechazada; hoy se acepta y vale v (it.todo) | `contrato.spec.ts` · C-15 |
+| C-14 | bv se suma al v de su registro y de los siguientes hasta el próximo bv; sin v no hay lectura; los valores no numéricos no lo reciben; un bv no numérico o una suma que desborda se rechazan (hallazgo H-6) | RFC 8428 §4.1 y §4.5.4: «added together to get the value» | aceptada: valor = bv + v (bv 10, v 5 → 15); rechazada: malformada «bv no numérico» o «bv + v fuera del rango numérico» (corregido el 15/11/2026: antes se ignoraba bv) | `contrato.spec.ts` · C-14 |
+| C-15 | Un registro con más de un campo de valor (v, vs, vb, vd) se rechaza (hallazgo H-7) | RFC 8428 §4.2: «Exactly one Value field MUST appear» | rechazada: malformada «más de un campo de valor en un registro» (corregido el 15/11/2026: antes se aceptaba y valía v) | `contrato.spec.ts` · C-15 |
 | C-16 | Un n que no es cadena se rechaza como trama malformada (hallazgo H-1) | RFC 8428 §4.3 (n es cadena); adaptadores/adaptador.ts:13 («Lanza Error si el contenido es inválido»); recepcion.service.ts:232 | rechazada, malformada «n no es texto» (corregido el 15/11/2026: antes lanzaba TypeError) | `contrato.spec.ts` · C-16 |
 | C-17 | Un elemento del pack que no es objeto se rechaza | RFC 8428 §5; senml.adaptador.ts, «throw new TramaMalformada('registro no es objeto')» | rechazada: malformada «registro no es objeto» | `contrato.spec.ts` · C-17 |
 | C-18 | El adaptador SenML reconoce solo arreglos JSON | RFC 8428 §5: «The root JSON value consists of an array» | reconoce: arreglo sí; objeto o número no | `adaptadores/adaptadores.spec.ts` · «reconoce un pack (arreglo JSON)…» |
@@ -3316,7 +3316,7 @@ nombre). Las demás citan una prueba que ya existía, con el comienzo de su tít
 | Id | Regla | Fuente | Resultado esperado | Prueba que la cubre |
 |---|---|---|---|---|
 | C-20 | Sin marca de tiempo rige la hora de recepción | docs/13 regla 7; RFC 8428 §4.5.3 (cero = «ahora») | aceptada: tiempo de recepción, origen_tiempo recepcion | `tiempo.spec.ts` · «sin marca → hora de recepción…»<br>`recepcion.service.spec.ts` · «sin marca del emisor → origen_tiempo "recepcion"…» |
-| C-21 | Un tiempo relativo (menor que 2^28) significa «ahora»: rige la hora de recepción (se pierde el desfase, hallazgo H-8) | RFC 8428 §4.5.3; docs/13 regla 7 | aceptada: tiempo de recepción | `contrato.spec.ts` · C-21 |
+| C-21 | Un tiempo relativo (bt + t menor que 2^28) se resuelve como dice la RFC: negativo es «ahora» menos esos segundos; cero o positivo (futuro relativo) rige la hora de recepción; desde 2^28 es absoluto (hallazgo H-8) | RFC 8428 §4.5.3; docs/13 reglas 7 y 19 | t = −5: la hora de recepción menos 5 s (origen dispositivo); t = 0, 10 o 268435455: recepción; un pasado relativo anterior al año 2000: recepción (corregido el 15/11/2026: antes se perdía el desfase) | `contrato.spec.ts` · C-21 |
 | C-22 | Una marca absoluta plausible se respeta, también la antigua posterior al año 2000 (cola sin cobertura) | docs/13 regla 7 | aceptada: la marca del emisor, origen dispositivo | `tiempo.spec.ts` · «marca antigua pero posterior a 2000…»<br>`recepcion.service.spec.ts` · «marca del emisor plausible…» |
 | C-23 | El umbral es el 1 de enero de 2000 UTC: anterior (incluido 1970) rige la recepción; esa fecha exacta se respeta | docs/13 regla 7; tiempo.ts:15 | 1999-12-31T23:59:59Z y 1970: recepción; 2000-01-01T00:00:00Z: la marca | `contrato.spec.ts` · C-23<br>`tiempo.spec.ts` · «marca anterior al año 2000…» |
 | C-24 | Hasta 2 min de adelanto se respeta la marca; más, rige la recepción | docs/13 regla 7 | +120 s: la marca; +121 s o 2030: recepción | `tiempo.spec.ts` · «adelanto de hasta 2 minutos…»<br>`tiempo.spec.ts` · «más de 2 minutos en el futuro…» |
@@ -3474,18 +3474,18 @@ de `src/recepcion/` volvió a como estaba). Para el guardián se alteró la prop
 | Id | Severidad | Qué | Evidencia de cada lado |
 |---|---|---|---|
 | H-1 | Alta; **corregido el 15/11/2026** (`n` y `u` deben ser cadenas: `TramaMalformada`; prueba C-16) | Un registro SenML con `n` que no es cadena (`[{"n":5,"v":1}]`) **lanza `TypeError`**, no `TramaMalformada`: no va a cuarentena; el servicio lo relanza y el broker reintenta cuatro veces, no confirma y se reconecta, y, según el comentario de `broker.service.ts:69-71`, el broker lo reenvía al volver (no se probó con un broker real) | Código (antes de la corrección): `senml.adaptador.ts`, «(r.n ?? ctx.magnitudTopico).toLowerCase()»; `recepcion.service.ts:232` (`if (!(e instanceof TramaMalformada)) throw e`), `broker.service.ts:91-94`. Documentos: `adaptadores/adaptador.ts:13` («Lanza Error si el contenido es inválido»), `docs/10 §4.1`: la trama que no calza con el formato va a cuarentena `malformada`. Verificado con el adaptador (`n` número y `n` objeto) |
-| H-2 | Media | La identidad **no** viene en la trama: el código nunca lee `bn`; el nodo es el del tópico y la credencial. Un `bn` de otro dispositivo se acepta y se atribuye al del tópico | Código: `senml.adaptador.ts`, «bn?: string» (`bn` solo está en el tipo) y «los campos base (bn, bt, bu) se heredan» (el comentario dice que `bn` se hereda; el código solo hereda `bt` y `bu`). Documentos: `docs/06 §3.1` («La identificación viene dentro de la trama y se cruza con el registro») y §3.2 («el mensaje trae la identidad (`bn`)… La plataforma valida contra el registro»); `docs/02`, RF-15, habla de `bn` / `id_fisico`. `docs/10` filtro 1 y la ACL dicen lo contrario: la identidad es el tópico. Prueba: C-54 |
-| H-3 | Media | `bn` no se antepone al nombre y `n` debe ser el código del catálogo: el pack textual de la RFC §5.1.1 (`n` = URN) acaba en cuarentena `invalida` «canal no declarado». El proyecto es un perfil de SenML y ningún documento lo declara | RFC 8428 §4.1 («prepended to the names») y §4.5.1. Código: `senml.adaptador.ts`, «(n ?? ctx.magnitudTopico).toLowerCase()». Documentos: no declarado (revisado: `docs/06`, `docs/10`, `docs/17`, README del backend, `RESUMEN.md`). Prueba: C-02 |
-| H-4 | Media | `bver` mayor que 10 no se rechaza | RFC 8428 §4.4: «the system MUST NOT use this object». Código: `senml.adaptador.ts` no lee `bver`. Prueba pendiente: C-07 |
-| H-5 | Baja | Un campo desconocido con etiqueta terminada en `_` se ignora | RFC 8428 §4.4: «in which case an error MUST be generated». Prueba pendiente: C-09 |
-| H-6 | Media | `bv` (valor base) se ignora: `[{"bv":10,"n":"temperatura","v":5}]` guarda 5, no 15. Es un dato distinto del que dice la RFC, sin aviso | RFC 8428 §4.5.4: «added together to get the value of the measurement». Código: `senml.adaptador.ts`, el bucle «for (const r of pack as RegistroSenML[])» no lee `bv`. Documentos: no declarado (revisado: `docs/02`, `docs/06`, `docs/10`, README del backend). Prueba pendiente: C-14 |
-| H-7 | Baja | Un registro con `v` y `vs` se acepta y vale `v` | RFC 8428 §4.2: «Exactly one Value field MUST appear». Prueba pendiente: C-15 |
-| H-8 | Baja | Un tiempo relativo (`t` negativo sin `bt`, o menor que 2^28) se trata como «ahora» y se pierde el desfase: una serie `t:-5 … t:-1` queda con la misma hora de recepción | RFC 8428 §4.5.3 («A negative value indicates seconds in the past from roughly "now"»). Código: `senml.adaptador.ts`, «tiempo = seg > 0 ? new Date(seg * 1000) : undefined». Documentos: `docs/13` regla 7 no menciona tiempos relativos. Prueba: C-21 (describe lo que hace hoy) |
+| H-2 | Media; **declarado el 15/11/2026** (`bn` no identifica y se ignora: la identidad es el tópico y la credencial; `docs/06 §3` corregido, `docs/10 §4` lo declara; prueba C-54) | La identidad **no** viene en la trama: el código nunca lee `bn`; el nodo es el del tópico y la credencial. Un `bn` de otro dispositivo se acepta y se atribuye al del tópico | Código: `senml.adaptador.ts`, «bn?: string» (`bn` solo está en el tipo) y «los campos base (bn, bt, bu) se heredan» (el comentario dice que `bn` se hereda; el código solo hereda `bt` y `bu`). Documentos: `docs/06 §3.1` («La identificación viene dentro de la trama y se cruza con el registro») y §3.2 («el mensaje trae la identidad (`bn`)… La plataforma valida contra el registro»); `docs/02`, RF-15, habla de `bn` / `id_fisico`. `docs/10` filtro 1 y la ACL dicen lo contrario: la identidad es el tópico. Prueba: C-54 |
+| H-3 | Media; **declarado el 15/11/2026** (`n` es el código de magnitud del catálogo; `docs/10 §4`); la concatenación `bn` + `n` **sigue pendiente**, para el catálogo de alias | `bn` no se antepone al nombre y `n` debe ser el código del catálogo: el pack textual de la RFC §5.1.1 (`n` = URN) acaba en cuarentena `invalida` «canal no declarado». El proyecto es un perfil de SenML y ningún documento lo declara | RFC 8428 §4.1 («prepended to the names») y §4.5.1. Código: `senml.adaptador.ts`, «(n ?? ctx.magnitudTopico).toLowerCase()». Documentos: no declarado (revisado: `docs/06`, `docs/10`, `docs/17`, README del backend, `RESUMEN.md`). Prueba: C-02 |
+| H-4 | Media; **corregido el 15/11/2026** (prueba C-07, que dejó de ser `it.todo`) | `bver` mayor que 10 no se rechazaba | RFC 8428 §4.4: «the system MUST NOT use this object». Código: `senml.adaptador.ts` no lee `bver`. Prueba: C-07 (era `it.todo`) |
+| H-5 | Baja; **corregido el 15/11/2026** (prueba C-09) | Un campo desconocido con etiqueta terminada en `_` se ignoraba | RFC 8428 §4.4: «in which case an error MUST be generated». Prueba: C-09 (era `it.todo`) |
+| H-6 | Media; **corregido el 15/11/2026** (se suma a `v`; pruebas C-14 y C-97) | `bv` (valor base) se ignoraba: `[{"bv":10,"n":"temperatura","v":5}]` guarda 5, no 15. Es un dato distinto del que dice la RFC, sin aviso | RFC 8428 §4.5.4: «added together to get the value of the measurement». Código: `senml.adaptador.ts`, el bucle «for (const r of pack as RegistroSenML[])» no lee `bv`. Documentos: no declarado (revisado: `docs/02`, `docs/06`, `docs/10`, README del backend). Prueba: C-14 (era `it.todo`) |
+| H-7 | Baja; **corregido el 15/11/2026** (más de un campo de valor es malformada; prueba C-15) | Un registro con `v` y `vs` se aceptaba y valía `v` | RFC 8428 §4.2: «Exactly one Value field MUST appear». Prueba: C-15 (era `it.todo`) |
+| H-8 | Baja; **corregido el 15/11/2026** (`docs/13` regla 19; pruebas C-21 y C-98) | Un tiempo relativo (`t` negativo sin `bt`, o menor que 2^28) se trata como «ahora» y se pierde el desfase: una serie `t:-5 … t:-1` queda con la misma hora de recepción | RFC 8428 §4.5.3 («A negative value indicates seconds in the past from roughly "now"»). Código: `senml.adaptador.ts`, «tiempo = seg > 0 ? new Date(seg * 1000) : undefined». Documentos: `docs/13` regla 7 no menciona tiempos relativos. Prueba: C-21 |
 | H-9 | Media; **corregido el 15/11/2026** (el adaptador recorta el nombre a 40 y la unidad a 32 y quita los caracteres de control; prueba C-94) | El nombre y la unidad de un registro SenML llegan **crudos** al detalle de la cuarentena y al registro: un salto de línea en `n` o `u` parte la línea WARN y no hay tope de largo | Código: `recepcion.service.ts:301` y `:306` (`${l.magnitud}`, `${l.unidad}`) hacia `:486-502`. Documentos: `texto.ts:1-4` dice que el texto de afuera que va al detalle o al registro se recorta y se limpia. Los adaptadores LoRaWAN sí lo hacen (`lorawan.ts`); el de SenML no. Verificado con la recepción real. Prueba: C-94 |
 | H-10 | Baja | `docs/13` (§7) decía que los casos de marca de tiempo estaban en «casos manuales del README del backend»; el README no los trae (solo menciona una regla como ejemplo de prueba) | `docs/13` línea 153 antes del cambio; README del backend, sin casos de tiempo en «Probar los filtros 2–4». Corregido en este bloque (la fila apunta ahora a las pruebas) |
-| H-11 | Baja | `docs/02 §6.5.4` dice que las pruebas del contrato SenML «verifican la especificación real»; la matriz muestra que cubren la parte de la RFC que el adaptador implementa y que las diferencias H-3 a H-8 son un perfil, no la RFC completa | `docs/02` línea 577; matriz, grupo (a) |
+| H-11 | Baja; **corregido el 15/11/2026** (`docs/02` dice ahora «el perfil de SenML que implementa el sistema, contrastado con RFC 8428») | `docs/02 §6.5.4` decía que las pruebas del contrato SenML «verifican la especificación real»; la matriz muestra que cubren la parte de la RFC que el adaptador implementa y que las diferencias H-3 a H-8 son un perfil, no la RFC completa | `docs/02` línea 577; matriz, grupo (a) |
 
-**Defectos corregidos el mismo día, cada uno con su prueba y su falla plantada:** C-16 (H-1) y C-94 (H-9). **Pruebas dejadas pendientes** por una diferencia con la RFC: C-07 (H-4), C-09 (H-5), C-14 (H-6) y C-15 (H-7).
+**Defectos corregidos el mismo día, cada uno con su prueba y su falla plantada:** C-16 (H-1) y C-94 (H-9). **Pruebas dejadas pendientes** por una diferencia con la RFC: C-07 (H-4), C-09 (H-5), C-14 (H-6) y C-15 (H-7); pasaron a activas el mismo día, con la decisión del perfil de SenML.
 
 ### Cifras
 
@@ -3500,9 +3500,97 @@ El verificador completo (`plataforma/pruebas/verificar-todo.sh`) corrió con el 
 
 ### Lo que queda
 
-- **Decidir los hallazgos que son diseño.** H-6 altera lo que se guarda (un valor base que se ignora). H-2 y H-3 son una decisión de diseño: o el contrato exige `bn` como identidad y concatena nombres (la RFC),
-  o se declara por escrito que el contrato nativo es un perfil donde `n` es el código del catálogo y la identidad es el tópico (`docs/10`, y corregir `docs/06 §3`).
-  Al corregir cada uno, la prueba `it.todo` correspondiente pasa a `it(` y la regla cambia su «esperado».
+- **Decididos los hallazgos de diseño (15/11/2026):** el contrato nativo es un perfil de SenML (`docs/10 §4`): identidad por tópico y credencial, `n` como código de magnitud, y las demás diferencias corregidas en el sentido estricto. Queda pendiente la concatenación `bn` + `n` (catálogo de alias).
 - **Lo que esta matriz no cubre:** CBOR, XML y EXI de SenML (no se reciben: solo JSON); las reglas del alta masiva y de la consulta; el comportamiento con la
   base real (las pruebas de la recepción usan la base simulada: la inserción idempotente y los topes contra la base real los cubre el banco, `docs/16`).
 - Añadir una regla nueva al contrato exige una fila en `MATRIZ`: sin ella, la prueba del guardián falla.
+
+## 74. El contrato nativo es un perfil de SenML, declarado y estricto (15/11/2026)
+
+**Por qué.** La matriz del contrato (§73) mostró que el adaptador SenML hacía menos que RFC 8428 y que los documentos prometían más que el código: la identidad
+«venía en la trama» (`docs/06 §3`) cuando el código nunca leía `bn` (H-2), `bv` se ignoraba y guardaba un valor distinto del que dice la RFC (H-6), un `bver`
+mayor que 10 se aceptaba (H-4), y otras cuatro diferencias menores (H-5, H-7, H-8 y la frase de `docs/02` de H-11). Se decidió el 15/11/2026 que el contrato
+nativo es **un perfil de SenML, escrito y estricto**, no «SenML completo»: lo que se acepta mal se rechaza con su motivo, y lo que no se implementa se declara.
+
+**Qué se decidió** (texto completo en `docs/10 §4`, después del diagrama del pipeline):
+
+- **Identidad.** Sale del tópico y de la credencial del broker (filtro 1), no de `bn`. `bn` **se ignora**. Se eligió ignorarlo y no rechazar la trama cuando
+  nombra a otro dispositivo por dos razones: ninguna lectura lleva `bn`, así que la trama no puede declararse otro dispositivo (la atribución no lo lee); y
+  rechazar exigiría decidir qué nombra un `bn`, que en la RFC es un prefijo de nombres (§4.1) y no una identidad, y rechazaría packs válidos de la propia RFC
+  (`bn` con URN, §5.1.1 a §5.1.7) y los que emiten hoy el emulador y el firmware (`bn` = el identificador del dispositivo, que sí coincide). La concatenación
+  `bn` + `n` (§4.1, §4.5.1) **no se implementa**: queda para el catálogo de alias.
+- **`n`** es el código de magnitud del catálogo (lo que ya hacía el código); sin `n`, la magnitud del tópico.
+- **`bv`** se suma a `v` (§4.5.4) y vale para los registros siguientes hasta el próximo `bv`, como cualquier campo base (§4). Un registro con solo `bv` no
+  genera lectura (la RFC lo leería como `bv` + 0; el perfil exige `v`, y es la misma regla de C-12), y `bv` no se suma a los registros de texto, booleano o datos.
+  Un `bv` que no es un número finito, o una suma que desborda, es malformada.
+- **`bver`** mayor que 10 (§4.4) o que no sea un entero positivo (§4.1): la trama entera se rechaza, aunque el registro no traiga valor.
+- **Más de un campo de valor** en un registro (`v`, `vs`, `vb`, `vd`; §4.2): se rechaza. Se aplica también a `vs` con `vb` sin `v`, porque es la misma frase de la RFC.
+- **Etiqueta desconocida terminada en «_»** (§4.4): se rechaza; el detalle trae la etiqueta recortada y sin caracteres de control (`texto.ts`). Las demás se ignoran.
+- **Tiempo relativo** (§4.5.3; `docs/13`, regla 19, nueva). Con `bt` + `t` menor que 2^28: **negativo** es «ahora» menos esos segundos y desde ahí rige la
+  regla 7 (un pasado anterior al 2000 es la hora de recepción); **cero o positivo** rige la hora de recepción. El positivo no se toma como futuro: la RFC lo
+  reserva para actuar, una medición ya hecha no está en el futuro, y así el reloj sin inicializar que manda segundos desde el arranque (el perfil `epoch` del
+  emulador manda 0 a 86 399) no queda fechado adelante. Desde 2^28 es absoluto. «Ahora» es la hora de recepción: se agregó `recibidoEn` (opcional) a
+  `ContextoTrama`; si el servicio no lo pasa, el adaptador toma la hora de su llamada (milisegundos de diferencia). Una marca relativa depende de cuándo llega
+  la trama: **una reentrega no se detecta como duplicado** (igual que una trama sin marca).
+- **Alcance.** Son reglas del adaptador SenML. El plano interpreta `t` como instante absoluto y no tiene `bver`, `bv` ni etiquetas de la RFC; ChirpStack y
+  Milesight leen JSON ajeno a SenML. La prueba C-99 comprueba que no las aplican.
+
+**Qué cambió.** `src/recepcion/adaptadores/senml.adaptador.ts` (reglas y comentario de contrato), `src/recepcion/tiempo.ts` (`tiempoSenml`),
+`src/recepcion/lectura.ts` (`recibidoEn`), `docs/06 §3`, `docs/10 §4` (párrafo del perfil y cuatro filas en la tabla del §4.1), `docs/13` (regla 19 y una fila
+de la tabla del §4), `docs/02` (la frase de «verifican la especificación real» y RF-15, que decía `bn` como identificador) y, en §73, las filas C-02, C-07, C-09,
+C-14, C-15 y C-21 y los hallazgos H-2 a H-8 y H-11.
+
+**Pruebas** (en `contrato.spec.ts` salvo la última fila; cada una con su falla plantada: se puso el defecto, la prueba quedó en rojo, se quitó y se comprobó con
+`diff` que el archivo volvió a como estaba):
+
+| Prueba | Defecto plantado | Pruebas en rojo |
+|---|---|---|
+| C-07 `bver` mayor que 10 o no entero positivo (era `it.todo`) | `bver` mayor que 10 no se rechaza | C-07 y C-96 |
+| C-07 | `bver` 0, negativo o decimal no se rechaza | C-07 |
+| C-09 etiqueta con «_» (era `it.todo`) | solo «__» cuenta como etiqueta obligatoria | C-09 y C-96 |
+| C-15 más de un campo de valor (era `it.todo`) | el tope pasa de 1 a 2 campos | C-15 y C-96 |
+| C-14 `bv` + `v` (era `it.todo`) | `bv` no se suma | C-14, C-96 y C-97 |
+| C-14 | `bv` no se hereda al registro siguiente | C-14 y C-97 |
+| C-14 | un `bv` que no es número se ignora | C-14 y C-96 |
+| C-14 | una suma que desborda se acepta | C-14 y C-96 |
+| C-21 tiempo relativo (cambió su «esperado») | el negativo vale la hora de recepción (el comportamiento anterior) | C-21 y C-98 |
+| C-21 | el positivo vale «ahora» + esos segundos | C-21 y C-98 |
+| C-99 las reglas son de SenML | el adaptador plano aplica la regla de `bver` | C-99 |
+| `tiempo.spec.ts`: `tiempoSenml`, el borde 2^28 | el umbral pasa de `>=` a `>` | la del borde |
+
+Pruebas nuevas **de servicio** (`RecepcionService.procesar` con la base simulada): **C-96** envía una trama por cada regla (`bver` 11, `bver` no entero, dos
+campos de valor, etiqueta con «_», `bv` no numérico, suma que desborda) y comprueba una sola fila de cuarentena `malformada` con «formato declarado senml:
+<motivo>», el dispositivo atribuido, ninguna medición, el dispositivo marcado vivo y que `procesar` termina sin lanzar (el broker confirma el mensaje);
+**C-97** comprueba que `bv` 10 + `v` 5 guarda 15 y que el rango físico se evalúa sobre la suma (80 + 10 = 90 Cel va a cuarentena `invalida`); **C-98** comprueba
+que `t` = −30 se guarda con la marca de la hora de recepción menos 30 s y origen `dispositivo`, y que `t` = 0 queda sin marca y origen `recepcion`.
+
+**Matriz.** De 94 a 98 reglas (se agregan C-96 en el grupo f, C-97 en el a, C-98 en el b y C-99 en el g; la tabla de grupos de §73 citaba 93 y no contaba C-95).
+Por grupo: a 19, b 13, c 8, d 11, e 15, f 13 y g 19. Con C-99 los identificadores de dos cifras llegan a C-99: la regla siguiente exige ensanchar la expresión
+`^C-\d{2}$` del guardián (y la de las pruebas) o numerar de otra manera.
+
+**Compatibilidad: quién emite SenML hacia la plataforma.** Revisado en el repositorio: el emulador (`emulador/modelo.ts`: `bn` = identificador, `bt` absoluto;
+con el reloj roto `epoch`, `bt` entre 0 y 86 399, que es relativo positivo y sigue valiendo hora de recepción; con `futuro`, una hora adelante, igual que antes), el
+firmware (`nodo.cpp`: `bn` = identificador y `bt` absoluto cuando hay hora; sin hora, ni `bt` ni `t`), el banco (`banco.sh`, `capacidad.sh`, `proxy-limites.sh`,
+`tablero-medir.sh`: `bt` absoluto) y `vias.sh` (`bt` absoluto con `t` negativo por lectura: la suma es absoluta, no se ve afectado), el e2e del panel (`bt` = ahora)
+y los ejemplos de `docs/06`, `docs/15`, `docs/17`, el README del backend y el guion `publicar.sh`. Nadie emite `bv`, `bver`, etiquetas con «_» ni más de un campo de valor
+por registro. No se ejecutaron los guiones del banco (otro trabajo usa la pila): la revisión es de lectura.
+
+**Cifras del bloque:** `pnpm verificar` en verde: 741 pruebas unitarias del backend en 62 archivos y ninguna pendiente (eran 731 más 4 `it.todo`: +4 que dejaron de
+ser pendientes, +4 de las reglas C-96 a C-99 y +2 de `tiempoSenml`), y 365 pruebas del panel (404 ejecuciones en vitest, en 33 archivos); `pnpm build` pasa.
+
+**Hallazgos de §73 tras este bloque.**
+
+| Id | Estado |
+|---|---|
+| H-2 | Declarado: `bn` no identifica y se ignora; `docs/06 §3` y RF-15 corregidos; prueba C-54 |
+| H-3 | Declarado: `n` es el código de magnitud; la concatenación `bn` + `n` sigue pendiente (catálogo de alias) |
+| H-4 | Corregido (C-07, C-96) |
+| H-5 | Corregido (C-09, C-96) |
+| H-6 | Corregido (C-14, C-96, C-97) |
+| H-7 | Corregido (C-15, C-96) |
+| H-8 | Corregido (C-21, C-98; `docs/13`, regla 19) |
+| H-11 | Corregido: `docs/02` dice «el perfil de SenML que implementa el sistema, contrastado con RFC 8428» |
+
+**Lo que queda.** La concatenación `bn` + `n` y los alias de magnitud (catálogo). En el diseño, `s`, `bs` y `ut` se ignoran y los valores de texto, booleanos y datos se
+omiten: si algún día se guardan, se cambia primero `docs/10 §4`. En `docs/10 §4.1` queda anotada la limitación de la reentrega con marca relativa; si importa, el
+emisor debe mandar `bt` absoluto. Los textos del informe que decían que la identidad viaja en `bn` (el capítulo 2 y los anexos de requerimientos y de evaluación de la comunicación) se corrigieron con este bloque.

@@ -105,8 +105,8 @@ CBOR & Compacto y estándar & Ilegible a ojo; librería adicional en el nodo \\
 
 \section{Identificación de dispositivos}
 
-El registro (aprovisionamiento) declara identidad, tipo, ubicación y credencial; cada trama se
-autoidentifica con el campo \texttt{bn}. La validación cruza ambos: sin credencial, el broker
+El registro (aprovisionamiento) declara identidad, tipo, ubicación y credencial; la identidad de
+cada trama sale del tópico y de la credencial (su \texttt{bn} se ignora). La validación cruza ambos: sin credencial, el broker
 corta la conexión; con credencial pero sin alta (o dado de baja), la trama va a cuarentena como
 «no registrado» (o «dado de baja») y queda el intento; trama malformada de dispositivo conocido va a cuarentena; unidad
 que no corresponde al tipo declarado va a cuarentena. Un sensor nuevo no exige tocar código: se

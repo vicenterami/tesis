@@ -12,6 +12,9 @@ import { OrigenTiempo } from './lectura.js';
 //                                     decidido el 21/10/2026; revisado el 22/10: toda marca de pasarela que se reemplaza avisa):
 //                                     la pasarela publica en línea; si su marca se aleja tanto, falla su reloj
 //                                     (UG65 sin NTP, 4 días atrasada el 20/10/2026, docs/16 §45)
+//  · SenML, tiempo RELATIVO (bt + t menor que 2^28, RFC 8428 §4.5.3; regla 19 de docs/13): negativo → «ahora» menos esos segundos
+//                                     (y desde ahí rige lo de arriba: un pasado anterior a 2000 es la hora de recepción); cero o positivo
+//                                     → hora de recepción (un positivo es futuro relativo, que la RFC usa para actuar, no para medir)
 const ANIO_2000 = Date.UTC(2000, 0, 1);
 const DERIVA_MAX_MS = 2 * 60 * 1000;
 export const DESVIO_PASARELA_MAX_MS = 10 * 60 * 1000;
@@ -35,4 +38,15 @@ export function desvioDePasarela(emisor: Date | undefined, recibidoEn: Date, ori
   if (Number.isNaN(t) || t < ANIO_2000) return undefined;
   const desvio = t - recibidoEn.getTime();
   return desvio < -DESVIO_PASARELA_MAX_MS || desvio > DERIVA_MAX_MS ? desvio : undefined;
+}
+
+// Tiempo de un registro SenML (RFC 8428 §4.5.3: «Values less than 268,435,456 (2**28) represent time relative to the current time»).
+// `segundos` es bt + t ya sumados; `ahora` es la hora de recepción. Devuelve la marca del emisor o undefined (rige la hora de recepción).
+// Desde 2^28 es absoluto (segundos Unix); negativo es «ahora» menos esos segundos; cero y positivo (futuro relativo) no son una medición
+// pasada y rigen con la hora de recepción. Lo que devuelve pasa después por `tiempoPlausible` como cualquier otra marca (regla 7).
+export const SENML_ABSOLUTO_DESDE_S = 2 ** 28;
+export function tiempoSenml(segundos: number, ahora: Date): Date | undefined {
+  if (segundos >= SENML_ABSOLUTO_DESDE_S) return new Date(segundos * 1000);
+  if (segundos < 0) return new Date(ahora.getTime() + segundos * 1000);
+  return undefined;
 }

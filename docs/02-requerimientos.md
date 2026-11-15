@@ -121,7 +121,7 @@ entre pasarelas que oyen el mismo uplink la hace el servidor de red (`docs/10 §
 | **RF-12** | El sistema debe mantener **condiciones abiertas y cerradas** por dispositivo: el cruce de umbral abre la condición y la vuelta al rango la cierra | [BT] [ENT] | C1, C5 | **M** |
 | **RF-13** | El sistema debe **generar eventos por umbral** cuando una medición cruce un límite configurado | [PO] [ENT] | C1 | **M** |
 | **RF-14** | El sistema debe permitir **configurar umbrales de disparo y de restauración por dispositivo**, con banda de histéresis para evitar oscilación y un retardo de activación opcional contra picos aislados (0 por defecto) | [BT] | C5 | **S** |
-| **RF-15** | El sistema debe **correlacionar eventos con telemetría** mediante el identificador del dispositivo (`bn` / `id_fisico`) y la marca temporal, para reconstruir el contexto de un evento | [DP] | C1 | **S** |
+| **RF-15** | El sistema debe **correlacionar eventos con telemetría** mediante el identificador del dispositivo (`id_fisico`, el del tópico) y la marca temporal, para reconstruir el contexto de un evento | [DP] | C1 | **S** |
 | **RF-16** | El sistema debe **normalizar las marcas temporales** a un huso único, tolerando que el nodo no disponga de reloj confiable y usando la hora de recepción cuando corresponda | [BT] | C1 | **M** |
 | **RF-17** | El sistema debe **resolver la identidad del dispositivo** desde los metadatos del transporte cuando el mensaje no la incluya explícitamente | [DP] | C1 | **M** |
 
@@ -574,8 +574,8 @@ documentada como tal.
 fue la implementación de referencia para validar por comparación cruzada el protocolo Contact ID,
 antes del pivote del 2 de septiembre. Con el protocolo descartado (anexo del camino evaluado y
 descartado, `historico/docs/05`), esa validación cruzada no aplica a la implementación vigente: las
-pruebas automatizadas del contrato de trama SenML (TT-27) verifican la especificación real, no un
-protocolo que ya no se implementa.
+pruebas automatizadas del contrato de trama SenML (TT-27) verifican el perfil de SenML que implementa el sistema, contrastado con
+RFC 8428 (las diferencias declaradas están en `docs/16 §73`), no un protocolo que ya no se implementa.
 
 ## 6.6 Componentes de la interfaz de administración
 

@@ -126,7 +126,7 @@ export class RecepcionService implements OnModuleInit {
         'tópico fuera de los dos patrones: sitio/<sitio>/dispositivo/<id>/<magnitud> o sitio/<sitio>/pasarela/<id>/[device/]<deveui>/[event/]<evento>',
         this.cuotaSinAlta.contador('sin-patron', recibidoEn));
     }
-    const ctx: ContextoTrama = { topico, idFisico: partes[2], magnitudTopico: partes[3].toLowerCase(), carga };
+    const ctx: ContextoTrama = { topico, idFisico: partes[2], magnitudTopico: partes[3].toLowerCase(), carga, recibidoEn };
 
     // ── [1] Autenticar: credencial válida (ya la verificó el broker) ≠ dispositivo dado de alta ──
     const dispositivo = await this.buscarDispositivo(ctx.idFisico);
@@ -185,7 +185,7 @@ export class RecepcionService implements OnModuleInit {
     }
     trama.dispositivoId = nodo.id;
     trama.pasarela = idPasarela;
-    const ctx: ContextoTrama = { topico: trama.topico, idFisico: deveui, magnitudTopico: '', carga: trama.carga, deveui, decodificador: nodo.decodificador ?? undefined };
+    const ctx: ContextoTrama = { topico: trama.topico, idFisico: deveui, magnitudTopico: '', carga: trama.carga, deveui, decodificador: nodo.decodificador ?? undefined, recibidoEn: trama.recibidoEn };
     await this.filtros2a6(trama, ctx, nodo, true, cuota);
   }
 
@@ -443,7 +443,7 @@ export class RecepcionService implements OnModuleInit {
       const dispositivo = await this.buscarDispositivo(idFisico); // se lee recién cuando le toca: contadores frescos
       if (!dispositivo || dispositivo.estado === 'baja') return null; // se dio de baja entre la autenticación y aquí
       const trama: TramaRecibida = { topico, carga, recibidoEn, dispositivoId: dispositivo.id, origen: 'http' };
-      const ctx: ContextoTrama = { topico, idFisico, magnitudTopico: (magnitud ?? '').toLowerCase(), carga };
+      const ctx: ContextoTrama = { topico, idFisico, magnitudTopico: (magnitud ?? '').toLowerCase(), carga, recibidoEn };
       return this.filtros2a6(trama, ctx, dispositivo, false);
     };
     const anterior = this.enCursoHttp.get(idFisico) ?? Promise.resolve(null);

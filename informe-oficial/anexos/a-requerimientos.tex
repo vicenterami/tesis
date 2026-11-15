@@ -28,7 +28,7 @@ Catálogo actualizado al pivote del 2 de septiembre (contrato SenML sobre MQTT);
 \textbf{RF-12} & El sistema debe mantener \textbf{condiciones abiertas y cerradas} por dispositivo: el cruce de umbral abre la condición y la vuelta al rango la cierra & [BT] [ENT] & C1, C5 & \textbf{M} \\
 \textbf{RF-13} & El sistema debe \textbf{generar eventos por umbral} cuando una medición cruce un límite configurado & [PO] [ENT] & C1 & \textbf{M} \\
 \textbf{RF-14} & El sistema debe permitir \textbf{configurar umbrales de disparo y de restauración por dispositivo}, con banda de histéresis para evitar oscilación y un retardo de activación opcional contra picos aislados (0 por defecto) & [BT] & C5 & \textbf{S} \\
-\textbf{RF-15} & El sistema debe \textbf{correlacionar eventos con telemetría} mediante el identificador del dispositivo (\texttt{bn} / \texttt{id\_fisico}) y la marca temporal, para reconstruir el contexto de un evento & [DP] & C1 & \textbf{S} \\
+\textbf{RF-15} & El sistema debe \textbf{correlacionar eventos con telemetría} mediante el identificador del dispositivo (\texttt{id\_fisico}, el del tópico) y la marca temporal, para reconstruir el contexto de un evento & [DP] & C1 & \textbf{S} \\
 \textbf{RF-16} & El sistema debe \textbf{normalizar las marcas temporales} a un huso único, tolerando que el nodo no disponga de reloj confiable y usando la hora de recepción cuando corresponda & [BT] & C1 & \textbf{M} \\
 \textbf{RF-17} & El sistema debe \textbf{resolver la identidad del dispositivo} desde los metadatos del transporte cuando el mensaje no la incluya explícitamente & [DP] & C1 & \textbf{M} \\
 \end{longtable}

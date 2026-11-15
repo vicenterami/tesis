@@ -466,7 +466,7 @@ Se trasladan de la Etapa 3 a la Etapa 4 los siguientes elementos del núcleo (~2
 | **TT-21** Aislamiento entre sitios | 5 | Ídem; se valida con pruebas en la Etapa 4 |
 | **TT-22** Cifrado TLS del transporte | 4 | Ídem |
 | **HU-07** Consulta de historial | 4 | El dato se persiste en la Etapa 3; consultarlo puede seguir |
-| **TT-27** Pruebas automatizadas del contrato de trama (esquema, cuarentena, adaptadores) | 5 | Corresponde al ciclo de validación de la Etapa 4 (parcial el 15/11/2026: `docs/16 §73`) |
+| **TT-27** Pruebas automatizadas del contrato de trama (esquema, cuarentena, adaptadores) | 5 | Corresponde al ciclo de validación de la Etapa 4 (hecha el 15/11/2026: `docs/16 §73` y §74) |
 | **HU-16** Indicador agregado de salud del sitio | 4 | Depende de que la supervisión ya funcione |
 
 **Distribución real del núcleo (recalculada desde las filas el 23/09/2026):**
@@ -687,6 +687,6 @@ ejecuta contra la holgura verificada al cierre de cada etapa.
 | 2. Segundo nivel | Cifrado del transporte | TT-22 | ⬜ E3 |
 | 2. Segundo nivel | Panel de control | HU-19, HU-20, HU-21 | ✅ 24/10; 🟡 12/10 (P2 y P3 hechas; HU-20 parcial); HU-21 y HU-20 cerradas el 16/10 (`docs/16 §39` y §40) y HU-19 el 24/10 (`docs/16 §53` y §54; estado al día: `docs/18`) |
 | 2. Segundo nivel | Exportación en formato abierto | HU-08 | 🟡 E3 (CSV y JSON el 12/10; XLSX en la E4) |
-| 2. Segundo nivel | Validación formal | TT-27, TT-28, TT-29 | 🟡 E4 (TT-28 y TT-29 hechas en la E3; TT-27, la matriz del contrato y sus pruebas el 15/11/2026, `docs/16 §73`, con cuatro diferencias con RFC 8428 por resolver; estado al día: `docs/18`) |
+| 2. Segundo nivel | Validación formal | TT-27, TT-28, TT-29 | ✅ E4 (TT-28 y TT-29 hechas en la E3; TT-27, la matriz del contrato y el perfil estricto de SenML, el 15/11/2026: `docs/16 §73` y §74) |
 
 El criterio de demostración del informe (cap. 5 §5.2) y OE4 (`docs/01`) siguen este orden.

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { desvioDePasarela, tiempoPlausible } from './tiempo.js';
+import { desvioDePasarela, tiempoPlausible, tiempoSenml } from './tiempo.js';
 
 // Filtro 4, regla 7 de docs/13: la marca del emisor se acepta solo si es plausible.
 describe('tiempoPlausible', () => {
@@ -67,5 +67,20 @@ describe('tiempoPlausible con origen pasarela (tolerancia de desvío)', () => {
     expect(desvioDePasarela(undefined, recibido, 'pasarela')).toBeUndefined();
     expect(desvioDePasarela(new Date('basura'), recibido, 'pasarela')).toBeUndefined();
     expect(desvioDePasarela(new Date(0), recibido, 'pasarela')).toBeUndefined();
+  });
+});
+
+// Regla 19 de docs/13: el tiempo de un registro SenML (bt + t) menor que 2^28 es relativo a «ahora» (RFC 8428 §4.5.3).
+describe('tiempoSenml', () => {
+  const ahora = new Date('2026-09-10T12:00:00Z');
+  it('negativo → ahora menos esos segundos; cero y positivo → undefined (rige la hora de recepción)', () => {
+    expect(tiempoSenml(-5, ahora)?.toISOString()).toBe('2026-09-10T11:59:55.000Z');
+    expect(tiempoSenml(-0.5, ahora)?.getTime()).toBe(ahora.getTime() - 500);
+    expect(tiempoSenml(0, ahora)).toBeUndefined();
+    expect(tiempoSenml(1, ahora)).toBeUndefined();
+  });
+  it('el borde es 2^28: 268 435 455 es relativo (undefined) y 268 435 456 es absoluto (1978-07-04T21:24:16Z)', () => {
+    expect(tiempoSenml(268_435_455, ahora)).toBeUndefined();
+    expect(tiempoSenml(268_435_456, ahora)?.toISOString()).toBe('1978-07-04T21:24:16.000Z');
   });
 });

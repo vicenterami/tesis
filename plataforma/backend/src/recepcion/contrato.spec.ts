@@ -24,7 +24,7 @@ import { aCanonica } from './unidades.js';
 // de la matriz: la sección que va a docs/16 se genera de esta tabla. Las pruebas de abajo son las de las reglas que no tenían
 // prueba (C-NN en el nombre); las demás citan la prueba que ya existía, y el guardián del final comprueba que cada cita existe.
 // Fuentes de la RFC: RFC 8428 (SenML), copia local del 16/10/2026. «hallazgo» marca una diferencia entre la fuente y el código
-// que este bloque no corrige (ver las pruebas it.todo).
+// que el perfil declara (ver docs/10 §4, filtro 2) o que sigue pendiente.
 // Los ejemplos de RFC 8428 §5.1 (© IETF Trust) se reproducen textuales, cada uno con su sección, para probar la regla que ilustran.
 type Grupo = 'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g';
 interface Cubre { archivo: string; nombre: string }
@@ -44,26 +44,28 @@ const htp = (nombre: string): Cubre => ({ archivo: 'http/recepcion-http.controll
 const MATRIZ: Regla[] = [
   // (a) Esquema SenML
   { id: 'C-01', grupo: 'a', regla: 'Un registro con n, u y v produce una lectura; el nombre se pasa a minúsculas', fuente: 'RFC 8428 §4.2; senml.adaptador.ts', esperado: 'aceptada: {magnitud en minúsculas, valor, unidad}', cubre: [aqui('C-01')] },
-  { id: 'C-02', grupo: 'a', regla: 'bn no se antepone al nombre: la magnitud es n tal cual (hallazgo H-3)', fuente: 'RFC 8428 §4.1 y §4.5.1 (ejemplo §5.1.2); senml.adaptador.ts, «(n ?? ctx.magnitudTopico).toLowerCase()»', esperado: 'aceptada: magnitud «voltage», no «urn:…:voltage»', cubre: [aqui('C-02')] },
+  { id: 'C-02', grupo: 'a', regla: 'bn no se antepone al nombre: n es el código de magnitud del catálogo y la magnitud es n tal cual (diferencia declarada, hallazgo H-3)', fuente: 'RFC 8428 §4.1 y §4.5.1 (ejemplo §5.1.2); senml.adaptador.ts, «(n ?? ctx.magnitudTopico).toLowerCase()»', esperado: 'aceptada: magnitud «voltage», no «urn:…:voltage» (la concatenación queda para el catálogo de alias)', cubre: [aqui('C-02')] },
   { id: 'C-03', grupo: 'a', regla: 'bt se hereda a los registros siguientes y t es relativo a bt', fuente: 'RFC 8428 §4.5.3 (ejemplo §5.1.2)', esperado: 'aceptada: tiempo = bt + t', cubre: [aqui('C-03'), adp('hereda bn/bt/bu')] },
   { id: 'C-04', grupo: 'a', regla: 'bu se hereda y la u del registro gana', fuente: 'RFC 8428 §4.1 y §4.5.2 (ejemplo §5.1.3)', esperado: 'aceptada: unidad del registro, si no la base', cubre: [aqui('C-04')] },
   { id: 'C-05', grupo: 'a', regla: 'bt persiste aunque cambie bn; un bt posterior reemplaza al anterior', fuente: 'RFC 8428 §4 (ejemplo §5.1.6)', esperado: 'aceptada: cada registro con la base vigente', cubre: [aqui('C-05')] },
   { id: 'C-06', grupo: 'a', regla: 'bver igual o menor que 10 (o ausente) se acepta', fuente: 'RFC 8428 §4.1 y §4.4 (ejemplo §5.1.2, bver 5)', esperado: 'aceptada', cubre: [aqui('C-06')] },
-  { id: 'C-07', grupo: 'a', regla: 'bver mayor que la versión que se entiende (10) se rechaza (hallazgo H-4)', fuente: 'RFC 8428 §4.4: «MUST NOT use this object»', esperado: 'esperado por la RFC: rechazada; hoy se acepta (it.todo)', cubre: [aqui('C-07')] },
+  { id: 'C-07', grupo: 'a', regla: 'bver mayor que la versión que se entiende (10), o que no sea un entero positivo, se rechaza en cualquier registro del pack (hallazgo H-4)', fuente: 'RFC 8428 §4.1 (entero positivo) y §4.4: «MUST NOT use this object»', esperado: 'rechazada: malformada «bver 11 no se entiende…» o «bver no es un entero positivo» (corregido el 15/11/2026: antes se aceptaba)', cubre: [aqui('C-07')] },
   { id: 'C-08', grupo: 'a', regla: 'Un campo que no se conoce se ignora', fuente: 'RFC 8428 §4.4: «MUST ignore fields they don\'t recognize»', esperado: 'aceptada: el campo no cambia la lectura', cubre: [aqui('C-08')] },
-  { id: 'C-09', grupo: 'a', regla: 'Un campo desconocido cuya etiqueta termina en «_» es un error (hallazgo H-5)', fuente: 'RFC 8428 §4.4: «in which case an error MUST be generated»', esperado: 'esperado por la RFC: rechazada; hoy se ignora (it.todo)', cubre: [aqui('C-09')] },
+  { id: 'C-09', grupo: 'a', regla: 'Un campo desconocido cuya etiqueta termina en «_» es un error, también en un registro sin valor (hallazgo H-5)', fuente: 'RFC 8428 §4.4: «in which case an error MUST be generated»', esperado: 'rechazada: malformada «campo … desconocido y de los que no se pueden ignorar» (corregido el 15/11/2026: antes se ignoraba)', cubre: [aqui('C-09')] },
   { id: 'C-10', grupo: 'a', regla: 'v debe ser un número finito; cadena, nulo, booleano o desborde se rechazan', fuente: 'RFC 8428 §4.3 (tipo de v); senml.adaptador.ts, «typeof r.v !== \'number\' || !Number.isFinite(r.v)»', esperado: 'rechazada: malformada «v no numérico»', cubre: [aqui('C-10'), adp('rechaza JSON inválido, pack vacío y valores no numéricos')] },
   { id: 'C-11', grupo: 'a', regla: 'Los registros solo con vs, vb o vd se omiten: el sistema guarda solo valores numéricos', fuente: 'RFC 8428 §4.2 y §5.1.5; senml.adaptador.ts, «if (r.v === undefined) continue»', esperado: 'aceptada: solo la lectura numérica', cubre: [aqui('C-11')] },
+  { id: 'C-97', grupo: 'a', regla: 'De punta a punta, bv + v es el valor que se guarda (y el rango físico se evalúa sobre esa suma)', fuente: 'RFC 8428 §4.5.4; docs/10 §4 (filtros 2 y 3)', esperado: 'bv 10, v 5 en Cel: se guarda 15; bv 80, v 10: 90 Cel fuera del rango, a cuarentena invalida', cubre: [aqui('C-97')] },
   { id: 'C-12', grupo: 'a', regla: 'Un registro con solo campos base (sin valor) no genera lectura', fuente: 'RFC 8428 §4 (ejemplo §5.1.7); senml.adaptador.ts, «if (r.v === undefined) continue»', esperado: 'aceptada: sin lectura para ese registro', cubre: [aqui('C-12')] },
   { id: 'C-13', grupo: 'a', regla: 'Un pack sin ninguna lectura numérica se rechaza', fuente: 'RFC 8428 §4.2 (el valor es obligatorio salvo con s); senml.adaptador.ts, «throw new TramaMalformada(\'pack sin valores\')»', esperado: 'rechazada: malformada «pack sin valores»', cubre: [aqui('C-13')] },
-  { id: 'C-14', grupo: 'a', regla: 'bv se suma al valor del registro (hallazgo H-6)', fuente: 'RFC 8428 §4.5.4: «added together to get the value»', esperado: 'esperado por la RFC: bv + v; hoy se ignora bv (it.todo)', cubre: [aqui('C-14')] },
-  { id: 'C-15', grupo: 'a', regla: 'Un registro con dos campos de valor (v y vs) se rechaza (hallazgo H-7)', fuente: 'RFC 8428 §4.2: «Exactly one Value field MUST appear»', esperado: 'esperado por la RFC: rechazada; hoy se acepta y vale v (it.todo)', cubre: [aqui('C-15')] },
+  { id: 'C-14', grupo: 'a', regla: 'bv se suma al v de su registro y de los siguientes hasta el próximo bv; sin v no hay lectura; los valores no numéricos no lo reciben; un bv no numérico o una suma que desborda se rechazan (hallazgo H-6)', fuente: 'RFC 8428 §4.1 y §4.5.4: «added together to get the value»', esperado: 'aceptada: valor = bv + v (bv 10, v 5 → 15); rechazada: malformada «bv no numérico» o «bv + v fuera del rango numérico» (corregido el 15/11/2026: antes se ignoraba bv)', cubre: [aqui('C-14')] },
+  { id: 'C-15', grupo: 'a', regla: 'Un registro con más de un campo de valor (v, vs, vb, vd) se rechaza (hallazgo H-7)', fuente: 'RFC 8428 §4.2: «Exactly one Value field MUST appear»', esperado: 'rechazada: malformada «más de un campo de valor en un registro» (corregido el 15/11/2026: antes se aceptaba y valía v)', cubre: [aqui('C-15')] },
   { id: 'C-16', grupo: 'a', regla: 'Un n que no es cadena se rechaza como trama malformada (hallazgo H-1)', fuente: 'RFC 8428 §4.3 (n es cadena); adaptadores/adaptador.ts:13 («Lanza Error si el contenido es inválido»); recepcion.service.ts:232', esperado: 'rechazada, malformada «n no es texto» (corregido el 15/11/2026: antes lanzaba TypeError)', cubre: [aqui('C-16')] },
   { id: 'C-17', grupo: 'a', regla: 'Un elemento del pack que no es objeto se rechaza', fuente: 'RFC 8428 §5; senml.adaptador.ts, «throw new TramaMalformada(\'registro no es objeto\')»', esperado: 'rechazada: malformada «registro no es objeto»', cubre: [aqui('C-17')] },
   { id: 'C-18', grupo: 'a', regla: 'El adaptador SenML reconoce solo arreglos JSON', fuente: 'RFC 8428 §5: «The root JSON value consists of an array»', esperado: 'reconoce: arreglo sí; objeto o número no', cubre: [adp('reconoce un pack (arreglo JSON)')] },
   // (b) Tiempo
   { id: 'C-20', grupo: 'b', regla: 'Sin marca de tiempo rige la hora de recepción', fuente: 'docs/13 regla 7; RFC 8428 §4.5.3 (cero = «ahora»)', esperado: 'aceptada: tiempo de recepción, origen_tiempo recepcion', cubre: [tmp('sin marca → hora de recepción'), svc('sin marca del emisor → origen_tiempo "recepcion"')] },
-  { id: 'C-21', grupo: 'b', regla: 'Un tiempo relativo (menor que 2^28) significa «ahora»: rige la hora de recepción (se pierde el desfase, hallazgo H-8)', fuente: 'RFC 8428 §4.5.3; docs/13 regla 7', esperado: 'aceptada: tiempo de recepción', cubre: [aqui('C-21')] },
+  { id: 'C-21', grupo: 'b', regla: 'Un tiempo relativo (bt + t menor que 2^28) se resuelve como dice la RFC: negativo es «ahora» menos esos segundos; cero o positivo (futuro relativo) rige la hora de recepción; desde 2^28 es absoluto (hallazgo H-8)', fuente: 'RFC 8428 §4.5.3; docs/13 reglas 7 y 19', esperado: 't = −5: la hora de recepción menos 5 s (origen dispositivo); t = 0, 10 o 268435455: recepción; un pasado relativo anterior al año 2000: recepción (corregido el 15/11/2026: antes se perdía el desfase)', cubre: [aqui('C-21')] },
+  { id: 'C-98', grupo: 'b', regla: 'De punta a punta, un tiempo relativo negativo se guarda como la hora de recepción menos esos segundos (origen dispositivo); uno cero o positivo, con la hora de recepción', fuente: 'RFC 8428 §4.5.3; docs/13 reglas 7 y 19', esperado: 't = −30: marca del emisor ≈ ahora − 30 s; t = 0: origen_tiempo recepcion (sin marca guardada)', cubre: [aqui('C-98')] },
   { id: 'C-22', grupo: 'b', regla: 'Una marca absoluta plausible se respeta, también la antigua posterior al año 2000 (cola sin cobertura)', fuente: 'docs/13 regla 7', esperado: 'aceptada: la marca del emisor, origen dispositivo', cubre: [tmp('marca antigua pero posterior a 2000'), svc('marca del emisor plausible')] },
   { id: 'C-23', grupo: 'b', regla: 'El umbral es el 1 de enero de 2000 UTC: anterior (incluido 1970) rige la recepción; esa fecha exacta se respeta', fuente: 'docs/13 regla 7; tiempo.ts:15', esperado: '1999-12-31T23:59:59Z y 1970: recepción; 2000-01-01T00:00:00Z: la marca', cubre: [aqui('C-23'), tmp('marca anterior al año 2000')] },
   { id: 'C-24', grupo: 'b', regla: 'Hasta 2 min de adelanto se respeta la marca; más, rige la recepción', fuente: 'docs/13 regla 7', esperado: '+120 s: la marca; +121 s o 2030: recepción', cubre: [tmp('adelanto de hasta 2 minutos'), tmp('más de 2 minutos en el futuro')] },
@@ -115,6 +117,7 @@ const MATRIZ: Regla[] = [
   { id: 'C-65', grupo: 'f', regla: 'no_registrado: identificador, pasarela, nodo o sitio sin alta', fuente: 'docs/08 §2 (cuarentena); migración 19 (ck_cuarentena_motivo)', esperado: 'fila de cuarentena con motivo no_registrado y detalle', cubre: [aqui('C-65')], motivo: 'no_registrado' },
   { id: 'C-66', grupo: 'f', regla: 'dado_de_baja: dispositivo dado de baja que sigue publicando (credencial viva)', fuente: 'docs/08 §2 (cuarentena); docs/10 §4.1', esperado: 'fila de cuarentena con motivo dado_de_baja y la pista de revocar la credencial', cubre: [aqui('C-66')], motivo: 'dado_de_baja' },
   { id: 'C-67', grupo: 'f', regla: 'malformada: el adaptador del formato declarado no entiende la trama (o el tópico no calza)', fuente: 'docs/08 §2 (cuarentena); docs/10 filtro 2', esperado: 'fila de cuarentena con motivo malformada; el dispositivo autenticado se marca vivo', cubre: [aqui('C-67')], motivo: 'malformada' },
+  { id: 'C-96', grupo: 'f', regla: 'Cada regla estricta del perfil SenML termina en cuarentena malformada con su motivo, sin lecturas, y el mensaje se confirma', fuente: 'docs/10 §4.1 (la trama que no calza con el formato declarado); recepcion.service.ts, el catch del filtro 2', esperado: 'una fila malformada «formato declarado senml: <motivo>» por trama; el dispositivo se marca vivo; el procesamiento termina sin lanzar (el broker confirma)', cubre: [aqui('C-96')], motivo: 'malformada' },
   { id: 'C-68', grupo: 'f', regla: 'invalida: la lectura no pasa el filtro 3 (canal, unidad o rango)', fuente: 'docs/08 §2 (cuarentena); docs/10 filtro 3', esperado: 'fila de cuarentena con motivo invalida; las lecturas buenas de la misma trama se guardan', cubre: [aqui('C-68')], motivo: 'invalida' },
   { id: 'C-69', grupo: 'f', regla: 'tope: la trama no cabe en el presupuesto de lecturas de la hora', fuente: 'docs/10 §8.4 punto 53; migración 19', esperado: 'fila de cuarentena con motivo tope; la trama se rechaza entera', cubre: [aqui('C-69')], motivo: 'tope' },
   { id: 'C-70', grupo: 'f', regla: 'La lista de motivos del código es el dominio cerrado del CHECK de la base', fuente: 'docs/08 §6 (dominios cerrados); migración 19', esperado: 'el tipo Motivo y ck_cuarentena_motivo (última migración) tienen los mismos valores', cubre: [aqui('C-70')] },
@@ -130,6 +133,7 @@ const MATRIZ: Regla[] = [
   { id: 'C-79', grupo: 'g', adaptador: 'plano', tipo: 'valida', regla: 'Plano: un número solo (magnitud del tópico) o un objeto con v, u, t', fuente: 'plano.adaptador.ts', esperado: 'una lectura', cubre: [adp('número a secas → una lectura'), adp('objeto con nombres tolerantes')] },
   { id: 'C-80', grupo: 'g', adaptador: 'plano', tipo: 'valida', regla: 'Plano: cada sinónimo (valor, v, value; unidad, u, unit; tiempo, t, ts, time) se reconoce, y el primero de la lista gana', fuente: 'plano.adaptador.ts:34-38', esperado: 'la misma lectura con cualquiera de los nombres', cubre: [aqui('C-80')] },
   { id: 'C-81', grupo: 'g', adaptador: 'plano', tipo: 'malformada', regla: 'Plano: sin valor numérico o con JSON ilegible se rechaza', fuente: 'plano.adaptador.ts:32-35', esperado: 'rechazada: malformada', cubre: [adp('sin valor numérico → malformada'), aqui('C-81')] },
+  { id: 'C-99', grupo: 'g', adaptador: 'plano', tipo: 'valida', regla: 'Las reglas del perfil (bver, «_», un solo valor, bv, tiempo relativo) son de SenML: plano y los de pasarela no las aplican', fuente: 'docs/10 §4 (filtro 2); plano.adaptador.ts y chirpstack.adaptador.ts', esperado: 'aceptadas: un objeto plano o un evento de ChirpStack con esos nombres de campo se leen como antes', cubre: [aqui('C-99')] },
   { id: 'C-95', grupo: 'g', adaptador: 'plano', tipo: 'malformada', regla: 'Plano: un número a secas que no cabe en un número finito (más de 308 cifras) se rechaza', fuente: 'docs/10 §4.1 (la trama que no calza va a cuarentena malformada); plano.adaptador.ts, «function finito»', esperado: 'rechazada: malformada «valor fuera del rango numérico» (corregido el 15/11/2026: antes se guardaba Infinity)', cubre: [aqui('C-95')] },
   { id: 'C-82', grupo: 'g', adaptador: 'chirpstack', tipo: 'valida', regla: 'ChirpStack: un evento up con object produce lecturas con la unidad canónica del mapa y la marca del servidor de red', fuente: 'docs/10 §8.4 punto 47; chirpstack.adaptador.ts', esperado: 'lecturas con tiempo RFC 3339', cubre: [lora('lecturas desde object, con la marca del servidor de red')] },
   { id: 'C-83', grupo: 'g', adaptador: 'chirpstack', tipo: 'malformada', regla: 'ChirpStack: sin deviceInfo no hay identidad; sin object ni perfil se rechaza diciendo qué falta', fuente: 'chirpstack.adaptador.ts:33-39', esperado: 'rechazada: IdentidadNoVerificada, o malformada con la instrucción', cubre: [aqui('C-83'), lora('sin object (el perfil no tiene decodificador)')] },
@@ -247,13 +251,32 @@ describe('contrato (a): esquema SenML (RFC 8428)', () => {
     expect(senml.analizar(ctxDir('[{"bver":10,"n":"temperatura","v":1}]'))).toHaveLength(1);
     expect(senml.analizar(ctxDir('[{"n":"temperatura","v":1}]'))).toHaveLength(1);
   });
-  // Hallazgo H-4: la RFC prohíbe usar un pack con bver mayor que el que se entiende; el adaptador no mira bver.
-  it.todo('C-07 bver 11 se rechaza como malformada (RFC 8428 §4.4); hoy el adaptador la acepta porque no lee bver');
+  // Hallazgo H-4 (corregido): la RFC prohíbe usar un pack con bver mayor que el que se entiende.
+  it('C-07 bver mayor que 10, o que no es un entero positivo, es malformada (RFC 8428 §4.1 y §4.4), en cualquier registro y aunque no traiga valor', () => {
+    for (const pack of ['[{"bver":11,"n":"temperatura","v":1}]', '[{"n":"temperatura","v":1},{"bver":11,"n":"temperatura","v":2}]', '[{"bver":11,"n":"temperatura"}]', '[{"bver":1e300,"n":"temperatura","v":1}]']) {
+      expect(() => senml.analizar(ctxDir(pack)), pack).toThrow(TramaMalformada);
+    }
+    expect(() => senml.analizar(ctxDir('[{"bver":11,"n":"temperatura","v":1}]'))).toThrow('bver 11 no se entiende (se entiende hasta 10)');
+    for (const b of ['0', '-1', '10.5', '"10"', 'null', 'true', '[10]']) {
+      expect(() => senml.analizar(ctxDir(`[{"bver":${b},"n":"temperatura","v":1}]`)), b).toThrow('bver no es un entero positivo');
+    }
+    for (const b of [1, 5, 10]) expect(senml.analizar(ctxDir(`[{"bver":${b},"n":"temperatura","v":1}]`)), String(b)).toHaveLength(1);
+  });
   it('C-08 un campo desconocido se ignora y no cambia la lectura (RFC 8428 §4.4)', () => {
     expect(senml.analizar(ctxDir('[{"n":"temperatura","v":1,"campo_nuevo":"x","otro":{"a":1}}]'))).toEqual(senml.analizar(ctxDir('[{"n":"temperatura","v":1}]')));
   });
-  // Hallazgo H-5: RFC 8428 §4.4, «a label name that ends with "_" … an error MUST be generated».
-  it.todo('C-09 un campo desconocido con etiqueta terminada en «_» se rechaza (RFC 8428 §4.4); hoy se ignora como cualquier otro');
+  // Hallazgo H-5 (corregido): RFC 8428 §4.4, «a label name that ends with "_" … an error MUST be generated».
+  it('C-09 un campo desconocido con etiqueta terminada en «_» es malformada (RFC 8428 §4.4), también en un registro sin valor; sin «_» se ignora', () => {
+    for (const campo of ['"campo_":1', '"x_":"a"', '"_":true', '"bn_":"x"', '"v_":1']) {
+      expect(() => senml.analizar(ctxDir(`[{"n":"temperatura","v":1,${campo}}]`)), campo).toThrow(TramaMalformada);
+    }
+    expect(() => senml.analizar(ctxDir('[{"n":"temperatura","v":1,"campo_":1}]'))).toThrow('campo «campo_» desconocido y de los que no se pueden ignorar (termina en «_»)');
+    expect(() => senml.analizar(ctxDir('[{"n":"temperatura","v":1},{"n":"humedad","campo_":1}]'))).toThrow(TramaMalformada);
+    // La etiqueta es texto del emisor: va al detalle recortada y sin caracteres de control (texto.ts).
+    expect(() => senml.analizar(ctxDir('[{"n":"temperatura","v":1,"a\\nb_":1}]'))).toThrow('campo «a?b_»');
+    // Sin «_», o con «_» en medio, el campo se ignora (C-08), y las etiquetas que la RFC define no se confunden con extensiones.
+    expect(senml.analizar(ctxDir('[{"n":"temperatura","v":1,"campo_nuevo":1,"a_b":2,"s":3,"ut":60,"bs":4}]'))).toHaveLength(1);
+  });
   it('C-10 v solo admite un número finito: cadena, nulo, booleano o desborde (1e999) son malformada', () => {
     for (const v of ['"alto"', 'null', 'true', '1e999', '[1]', '{}']) {
       expect(() => senml.analizar(ctxDir(`[{"n":"temperatura","v":${v}}]`)), v).toThrow(TramaMalformada);
@@ -277,10 +300,34 @@ describe('contrato (a): esquema SenML (RFC 8428)', () => {
       expect(() => senml.analizar(ctxDir(pack)), pack).toThrow('pack sin valores');
     }
   });
-  // Hallazgo H-6: RFC 8428 §4.5.4, «The Base Value and Value are added together»; el adaptador ni lee bv.
-  it.todo('C-14 bv se suma a v (RFC 8428 §4.5.4): [{"bv":10,"n":"temperatura","v":5}] da 15; hoy da 5');
-  // Hallazgo H-7: RFC 8428 §4.2, «Exactly one Value field MUST appear».
-  it.todo('C-15 un registro con v y vs a la vez se rechaza (RFC 8428 §4.2); hoy se acepta y vale v');
+  // Hallazgo H-6 (corregido): RFC 8428 §4.5.4, «The Base Value and Value are added together».
+  it('C-14 bv se suma a v y se hereda hasta el próximo bv; sin v no hay lectura; un bv no numérico o una suma que desborda es malformada', () => {
+    const valores = (pack: string): number[] => senml.analizar(ctxDir(pack)).map((l) => l.valor);
+    expect(valores('[{"bv":10,"n":"temperatura","v":5}]')).toEqual([15]);
+    expect(valores('[{"bv":-10,"n":"temperatura","v":5}]')).toEqual([-5]);
+    expect(valores('[{"bv":0.5,"n":"temperatura","v":0.25}]')).toEqual([0.75]);
+    // Hereda a los registros siguientes y un bv posterior lo reemplaza (RFC 8428 §4: la base vale hasta que otro registro trae la suya).
+    expect(valores('[{"bv":10,"n":"temperatura","v":5},{"n":"temperatura","v":6},{"bv":100,"n":"temperatura","v":1},{"n":"temperatura","v":2}]')).toEqual([15, 16, 101, 102]);
+    // Un registro que solo trae bv no genera lectura (el perfil exige v), pero deja la base para los siguientes.
+    expect(valores('[{"bv":10,"n":"temperatura"},{"n":"temperatura","v":5}]')).toEqual([15]);
+    expect(() => senml.analizar(ctxDir('[{"bv":10,"n":"temperatura"}]'))).toThrow('pack sin valores');
+    // bv solo se suma a v: los registros con vs, vb o vd siguen omitiéndose y no reciben la base.
+    expect(valores('[{"bv":10,"n":"temperatura","v":1},{"n":"label","vs":"x"},{"n":"open","vb":true},{"n":"temperatura","v":2}]')).toEqual([11, 12]);
+    for (const bv of ['"10"', 'null', 'true', '[1]', '{}', '1e999']) {
+      expect(() => senml.analizar(ctxDir(`[{"bv":${bv},"n":"temperatura","v":1}]`)), bv).toThrow('bv no numérico');
+    }
+    expect(() => senml.analizar(ctxDir('[{"bv":1e308,"n":"temperatura","v":1e308}]'))).toThrow('bv + v fuera del rango numérico');
+    expect(() => senml.analizar(ctxDir('[{"bv":1e308,"n":"temperatura","v":1e308}]'))).toThrow(TramaMalformada);
+  });
+  // Hallazgo H-7 (corregido): RFC 8428 §4.2, «Exactly one Value field MUST appear».
+  it('C-15 un registro con más de un campo de valor (v, vs, vb, vd) es malformada; v con s (suma) no cuenta como dos valores', () => {
+    for (const extra of ['"vs":"x"', '"vb":true', '"vd":"aGk"', '"vs":null']) {
+      expect(() => senml.analizar(ctxDir(`[{"n":"temperatura","v":1,${extra}}]`)), extra).toThrow('más de un campo de valor en un registro (v, vs, vb, vd)');
+    }
+    expect(() => senml.analizar(ctxDir('[{"n":"temperatura","v":1},{"n":"x","vs":"a","vb":false}]'))).toThrow(TramaMalformada); // sin v, también
+    expect(senml.analizar(ctxDir('[{"n":"temperatura","v":1,"s":5}]'))).toHaveLength(1);
+    expect(senml.analizar(ctxDir('[{"n":"label","vs":"x"},{"n":"temperatura","v":1}]'))).toHaveLength(1); // un solo valor de texto: se omite (C-11)
+  });
   // Hallazgo H-1 (defecto, corregido): senml.adaptador.ts hacía «(r.n ?? ctx.magnitudTopico).toLowerCase()»: con n numérico lanza TypeError, que no es
   // TramaMalformada; el servicio lo relanza (recepcion.service.ts:232) y el broker reintenta y reconecta (broker.service.ts:91-94).
   it('C-16 un n o un u que no es cadena se rechaza con TramaMalformada (antes lanzaba TypeError y el mensaje no se confirmaba al broker)', () => {
@@ -296,15 +343,32 @@ describe('contrato (a): esquema SenML (RFC 8428)', () => {
       expect(() => senml.analizar(ctxDir(pack)), pack).toThrow('registro no es objeto');
     }
   });
+  it('C-97 de punta a punta, bv + v es el valor que se guarda, y el rango físico se evalúa sobre esa suma', async () => {
+    const { servicio, mediciones, cuarentenas } = armar({ id: 'd1', estado: 'activo' });
+    await servicio.procesar(TOP, Buffer.from('[{"bv":10,"n":"temperatura","u":"Cel","v":5},{"n":"temperatura","u":"Cel","v":6}]'));
+    expect(mediciones().map((m) => m.valor)).toEqual([15, 16]); // sin bv se habría guardado 5 y 6
+    expect(cuarentenas()).toEqual([]);
+    await servicio.procesar(TOP, Buffer.from('[{"bv":80,"n":"temperatura","u":"Cel","v":10}]')); // 90 Cel: v solo estaría en rango, la suma no
+    expect(mediciones()).toHaveLength(2);
+    expect(cuarentenas().map((c) => [c.motivo, c.detalle])).toEqual([['invalida', 'temperatura: 90 Cel fuera del rango físico [-40, 85]']]);
+  });
 });
 
 // ── (b) Tiempo ───────────────────────────────────────────────────────────────────────────────────────────────────────────────
 describe('contrato (b): marcas de tiempo (docs/13)', () => {
-  it('C-21 un tiempo relativo (menor que 2^28, RFC 8428 §4.5.3) significa «ahora»: rige la hora de recepción, con el desfase perdido', () => {
-    for (const t of [-5, 0, 10, 268_435_455]) {
-      const [l] = senml.analizar(ctxDir(`[{"n":"temperatura","t":${t},"v":1}]`));
-      expect(marcas([l])[0], `t=${t}`).toBe(RECIBIDO);
-    }
+  it('C-21 un tiempo relativo (bt + t menor que 2^28, RFC 8428 §4.5.3): negativo es «ahora» menos esos segundos; cero o positivo, la hora de recepción', () => {
+    const marca = (pack: string): Date => marcas(senml.analizar({ ...ctxDir(pack), recibidoEn: RECIBIDO }))[0];
+    expect(marca('[{"n":"temperatura","t":-5,"v":1}]').getTime()).toBe(RECIBIDO.getTime() - 5_000);
+    expect(marca('[{"n":"temperatura","t":-90.5,"v":1}]').getTime()).toBe(RECIBIDO.getTime() - 90_500);
+    expect(marca('[{"bt":-10,"n":"temperatura","t":-5,"v":1}]').getTime()).toBe(RECIBIDO.getTime() - 15_000); // bt y t suman
+    // Cero y positivo: la RFC los llama «ahora» y «futuro»; una medición ya hecha no está en el futuro, así que rige la recepción.
+    for (const t of [0, 10, 268_435_455]) expect(marca(`[{"n":"temperatura","t":${t},"v":1}]`), `t=${t}`).toBe(RECIBIDO);
+    // Un pasado relativo que cae antes del año 2000 (−1e9 s ≈ 1994) lo descarta la regla 7 como cualquier marca vieja.
+    expect(marca('[{"n":"temperatura","t":-1000000000,"v":1}]')).toBe(RECIBIDO);
+    expect(marca('[{"n":"temperatura","t":-1e300,"v":1}]')).toBe(RECIBIDO); // imposible: no lanza
+    // Desde 2^28 es absoluto: la suma decide, no cada campo por separado (RFC §4.5.3, último párrafo).
+    expect(marca('[{"bt":1757300000,"n":"temperatura","t":-5,"v":1}]').getTime()).toBe((1757300000 - 5) * 1000);
+    expect(marca('[{"bt":268435456,"n":"temperatura","v":1}]')).toBe(RECIBIDO); // 1978: antes del año 2000
   });
   it('C-23 el umbral es el 1 de enero de 2000 UTC: 1999-12-31T23:59:59Z y 1970 → recepción; 2000-01-01T00:00:00Z → la marca', () => {
     const marca = (bt: number) => marcas(senml.analizar(ctxDir(`[{"bt":${bt},"n":"temperatura","v":1}]`)))[0];
@@ -322,6 +386,18 @@ describe('contrato (b): marcas de tiempo (docs/13)', () => {
   it('C-26 una marca imposible (1e300 s) no lanza: rige la recepción', () => {
     expect(marcas(senml.analizar(ctxDir('[{"bt":1e300,"n":"temperatura","v":1}]')))[0]).toBe(RECIBIDO);
     expect(marcas(plano.analizar(ctxDir('{"v":1,"t":1e300}')))[0]).toBe(RECIBIDO);
+  });
+  it('C-98 de punta a punta, t = −30 se guarda como la hora de recepción menos 30 s (origen dispositivo); t = 0, con la hora de recepción', async () => {
+    const { servicio, mediciones } = armar({ id: 'd1', estado: 'activo' });
+    const antes = Date.now();
+    await servicio.procesar(TOP, Buffer.from('[{"n":"temperatura","u":"Cel","t":-30,"v":1}]'));
+    const despues = Date.now();
+    await servicio.procesar(TOP, Buffer.from('[{"n":"temperatura","u":"Cel","t":0,"v":2}]'));
+    const [rel, cero] = mediciones();
+    expect(rel.origen).toBe('dispositivo');
+    expect((rel.tiempo as Date).getTime()).toBeGreaterThanOrEqual(antes - 30_000);
+    expect((rel.tiempo as Date).getTime()).toBeLessThanOrEqual(despues - 30_000);
+    expect([cero.tiempo, cero.origen]).toEqual([null, 'recepcion']); // sin marca del emisor: la base pone la hora
   });
 });
 
@@ -470,6 +546,24 @@ describe('contrato (f): los motivos de cuarentena', () => {
     expect(cuarentenas().map((q) => q.motivo)).toEqual(['tope']);
     expect(mediciones()).toEqual([]);
   });
+  it('C-96 cada regla estricta del perfil SenML: cuarentena malformada con su motivo, ninguna lectura, el dispositivo vivo y el mensaje se confirma', async () => {
+    const casos: [string, string][] = [
+      ['[{"bver":11,"n":"temperatura","u":"Cel","v":21.5}]', 'bver 11 no se entiende (se entiende hasta 10)'],
+      ['[{"bver":"10","n":"temperatura","u":"Cel","v":21.5}]', 'bver no es un entero positivo'],
+      ['[{"n":"temperatura","u":"Cel","v":21.5,"vs":"x"}]', 'más de un campo de valor en un registro (v, vs, vb, vd)'],
+      ['[{"n":"temperatura","u":"Cel","v":21.5,"extension_":1}]', 'campo «extension_» desconocido y de los que no se pueden ignorar (termina en «_»)'],
+      ['[{"bv":"10","n":"temperatura","u":"Cel","v":21.5}]', 'bv no numérico'],
+      ['[{"bv":1e308,"n":"temperatura","u":"Cel","v":1e308}]', 'bv + v fuera del rango numérico'],
+    ];
+    for (const [cuerpo, motivo] of casos) {
+      const { servicio, cuarentenas, mediciones, marcarVivo, tramas } = armar(ACTIVO);
+      await expect(servicio.procesar(TOP, Buffer.from(cuerpo)), cuerpo).resolves.toBeUndefined(); // no lanza: el broker confirma el mensaje
+      expect(cuarentenas().map((c) => [c.motivo, c.detalle, c.dispositivo]), cuerpo).toEqual([['malformada', `formato declarado senml: ${motivo}`, 'd1']]);
+      expect(mediciones(), cuerpo).toEqual([]);
+      expect(tramas(), cuerpo).toHaveLength(0); // sin lecturas no se guarda la trama aceptada
+      expect(marcarVivo, cuerpo).toHaveBeenCalledTimes(1);
+    }
+  });
   it('C-70 la lista de motivos del código (type Motivo) es el dominio de ck_cuarentena_motivo en la última migración que lo define', () => {
     const tipo = /type Motivo = ([^;]+);/.exec(fuenteServicio);
     expect(tipo, 'recepcion.service.ts ya no declara type Motivo').not.toBeNull();
@@ -518,6 +612,12 @@ describe('contrato (g): adaptadores de formato', () => {
     expect(l.tiempo?.toISOString()).toBe('2022-07-18T09:34:15.775Z');
     expect(chirp.origenTiempo).toBe('pasarela');
     expect(c.fcnt).toBe(7);
+  });
+  it('C-99 las reglas del perfil son de SenML: plano y chirpstack leen como antes un bver, un campo con «_» o dos valores', () => {
+    const [p] = plano.analizar(ctxDir('{"v":1,"valor":2,"vs":"x","bver":99,"extension_":1,"bv":50}'));
+    expect(p.valor).toBe(2); // «valor» gana; bv no se suma y bver no se mira
+    const [c] = chirp.analizar(ctxPas({ deviceInfo: { devEui: DEVEUI }, bver: 99, extension_: 1, object: { temperature: 21.5, vs: 'x' } }));
+    expect(c).toMatchObject({ magnitud: 'temperatura', valor: 21.5 });
   });
   it('C-93 los adaptadores registrados son los formatos del CHECK de la base, los del módulo y los archivos del directorio', () => {
     const { servicio } = armar(undefined);

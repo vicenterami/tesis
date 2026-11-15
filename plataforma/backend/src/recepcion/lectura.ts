@@ -19,6 +19,9 @@ export interface ContextoTrama {
   idFisico: string;      // del tópico: sitio/<sitio>/dispositivo/<id_fisico>/<magnitud>
   magnitudTopico: string;
   carga: Buffer;
+  // Hora de recepción de la trama: el «ahora» de un tiempo relativo de SenML (RFC 8428 §4.5.3). Si falta, el adaptador toma la hora de su
+  // propia llamada, que difiere de la de recepción en milisegundos.
+  recibidoEn?: Date;
   // Del tópico de pasarela (sitio/<s>/pasarela/<id>/<deveui>/<evento>, docs/10 §8.4 punto 47): el adaptador exige que el DevEUI
   // del cuerpo sea este. En el tópico de un dispositivo directo no existe.
   deveui?: string;
