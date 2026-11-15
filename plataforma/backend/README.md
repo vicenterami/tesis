@@ -45,7 +45,7 @@ panel/                         # el panel (Svelte + Vite; docs/19): paquete del 
 ├── src/Legal.svelte, src/Terminos.svelte  # P11: privacidad, términos, acerca de y soporte; la aceptación obligatoria
 ├── src/Notificaciones.svelte  # avisos de condiciones agrupados por dispositivo y notificación del navegador (canal compartido)
 ├── src/app.css                # estilos propios, sin biblioteca de componentes
-├── public/avisos-de-terceros.txt  # avisos de las 180 dependencias de producción (7 licencias; el texto completo de cada una distinta de MIT), generados por generar-avisos-terceros.sh
+├── public/avisos-de-terceros.txt  # avisos de las 179 dependencias de producción (7 licencias; el texto completo de cada una distinta de MIT), generados por generar-avisos-terceros.sh
 ├── src/lib/                   # estado visual, cliente HTTP, canal en vivo con reconexión, datos del gráfico, antirrebote y lotes, tiempo
 ├── src/**/*.test.ts           # pruebas (vitest; las de pantalla, por el DOM con jsdom)
 └── vite.config.ts             # base /panel/, reenvío al backend en desarrollo, build sin .map

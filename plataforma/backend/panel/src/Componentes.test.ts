@@ -126,7 +126,11 @@ describe('BarrasOrdenadas y Medidor', () => {
     expect([...lista.querySelectorAll('li')].map((li) => li.textContent)).toEqual(['Umbral: 3', 'Sin comunicación: 1']);
     expect([...document.querySelectorAll('.barras .pista')].every((b) => b.getAttribute('aria-hidden') === 'true')).toBe(true);
     expect(document.querySelector('svg')).toBeNull(); // HTML: la letra no crece con el ancho de la pantalla
-    expect([...document.querySelectorAll('.barras .relleno')].map((b) => (b as HTMLElement).style.width)).toEqual(['100%', '33.33333333333333%']);
+    // El ancho se compara como número: el navegador (y jsdom desde la 31) serializa el porcentaje con menos decimales («33.3333%»).
+    const anchos = [...document.querySelectorAll('.barras .relleno')].map((b) => (b as HTMLElement).style.width);
+    expect(anchos.every((a) => a.endsWith('%'))).toBe(true);
+    expect(anchos.map((a) => parseFloat(a))[0]).toBe(100);
+    expect(anchos.map((a) => parseFloat(a))[1]).toBeCloseTo(100 / 3, 3);
     expect(screen.queryByRole('img')).toBeNull(); // ya no es una imagen con un solo nombre
   });
   it('el medidor con valor es un «meter» con aria-valuenow; sin dato, una imagen que dice «sin datos»', async () => {
