@@ -3,7 +3,7 @@
 Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emulador de nodos (TT-28), la prueba de
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
-cubre todavía: TT-27 (contrato de trama: hoy 610 pruebas unitarias del backend y 344 del panel, sin matriz formal); TT-32 (sensor físico) se cubrió después, en §43, §44 y §53;
+cubre todavía: TT-27 (contrato de trama: hoy 629 pruebas unitarias del backend y 344 del panel, sin matriz formal); TT-32 (sensor físico) se cubrió después, en §43, §44 y §53;
 TT-30 (recuperación ante reinicio) se agregó después, en §11. Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -2984,3 +2984,120 @@ uso (la CLI se usa en `nest build`; los tipos de `express` y `pg`, al compilar; 
 **Cifras del bloque:** 344 pruebas del panel (346 ejecuciones en vitest, en 33 archivos; una menos, la del componente quitado) y 610
 del backend; `svelte-check`, 404 archivos sin errores; la hoja de estilos queda en 33,4 kB (34,3 en §67). El verificador completo, en
 «TODO EN CONCORDANCIA».
+
+## 70. Migración a NestJS 12 (15/11/2026)
+
+**Qué se subió.** Todos los paquetes `@nestjs/*` a la vez, con la regla del proyecto (la versión más reciente con al menos 7 días de
+publicada al 15/11/2026; las posteriores al 08/11 quedaron fuera), con versiones exactas y sin tocar `pnpm-workspace.yaml` (sin cambios
+en `git diff`; no hizo falta `minimumReleaseAgeExclude`). El núcleo debe ser 12.1 o posterior por lo que dice la guía de `@Optional()`
+(más abajo). La guía no declara qué `@nestjs/swagger` acompaña a la 12: se leyó del registro, donde la 12.1.1 declara
+`@nestjs/common` y `@nestjs/core` `^12.0.0` en `peerDependencies` (la 11.4.7 pedía `^11.0.1`); `@nestjs/config` 12.1.1 declara
+`@nestjs/common` `^11.0.0||^12.0.0`.
+
+| Paquete | Antes | Después | Publicada |
+|---|---|---|---|
+| `@nestjs/common` | 11.2.5 | 12.4.0 | 06/11/2026 |
+| `@nestjs/core` | 11.2.5 | 12.4.0 | 06/11/2026 |
+| `@nestjs/platform-express` | 11.2.8 | 12.4.0 | 06/11/2026 |
+| `@nestjs/testing` | 11.2.5 | 12.4.0 | 06/11/2026 |
+| `@nestjs/swagger` | 11.4.7 | 12.1.1 | 06/11/2026 |
+| `@nestjs/config` | 4.0.4 | 12.1.1 | 06/11/2026 |
+| `@nestjs/cli` | 11.0.24 | 12.0.12 | 06/11/2026 |
+| `@nestjs/schematics` | 11.1.0 | 12.0.13 | 06/11/2026 |
+
+Quedaron fuera la 12.4.1 y la 12.4.2 (09/11), la 12.5.0 (12/11) y las de `@nestjs/swagger` 12.1.2 y `@nestjs/cli` 12.0.13 (13/11; la 12.0.13 de `@nestjs/schematics` es otra, del 06/11). `typescript` sigue en
+6.0.3 (la guía exige TypeScript 6 para `@nestjs/schematics`). Efecto en el árbol: `express` pasa de 5.2.1 a 5.3.0 (lo fija
+`@nestjs/platform-express`), `multer` sigue en 2.5.0 y el lockfile cambia 681 líneas añadidas y 619 quitadas. Se hizo a mano con pnpm: `nest upgrade --dry-run`,
+usado solo para leer, propone lo mismo (los ocho paquetes a `^12.0.0`) y avisa de lo único que la guía deja a revisión, el orden de los ganchos.
+
+**Qué pedía la guía y qué aplicaba** (<https://docs.nestjs.com/migration-guide>, copia en bruto descargada el 15/11/2026). Node.js: ejecutar la 12 pide 22.12 o posterior en la rama 22; el proyecto declara `>=22.12 <23` y la imagen es
+`node:22.23.4` (cumple); generar código con la CLI pide 22.22.3 o posterior (`@nestjs/schematics` 12.0.13 lo declara en `engines`; el
+equipo usa 22.23.2). Paquetes en ESM: el proyecto ya es `"type": "module"` desde §60, sin cambios. Pruebas con Jest, GraphQL, NATS, Terminus,
+Joi, pipes o filtros propios y multer: no se usan. Lo demás (esquemas estándar en decoradores, `StandardSchemaSerializerInterceptor`,
+`routeConflictPolicy`, `errorCode`, `@nestjs/observe`, `deploy`, Rspack): es opcional y no se adoptó. Lo que sí se revisó, punto por punto:
+
+- **Orden de los ganchos** (sección «Lifecycle hook ordering»). Se midió el orden real con la aplicación completa (`AppModule`, un pool
+  falso y el broker en un puerto sin servicio, de modo que nada sale del proceso) en una copia con 11.2.5 y en el árbol con 12.4.0, tres
+  corridas de cada una (idénticas entre sí). Resultado: las fases no cambian (inicio de módulos, luego `onModuleDestroy`, luego
+  `beforeApplicationShutdown`, luego `onApplicationShutdown`); cambia solo el orden dentro de una fase. `MetricasBrokerService` pasó a un nivel
+  posterior al de `BrokerService` y `DynsecService` (de quien depende): en 11 los tres iniciaban a la vez y ahora inicia después de ellos; al
+  cerrar, en 11 su `onModuleDestroy` corría junto al de `DynsecService` y ahora termina antes de que este empiece. Es el orden que su
+  dependencia pide, así que no hay regresión. Lo que importa, y no cambió: `RetencionService`, `SupervisionService` y las métricas
+  detienen sus temporizadores antes de cerrar la base; `EventosController.beforeApplicationShutdown` (`tiempo-real/eventos.controller.ts:200`) corta los flujos antes; `DbModule`
+  (`db/db.module.ts:38`) cierra el pool al final de todo. `RecepcionService.onModuleInit` (`recepcion/recepcion.service.ts:110`) solo agrega un
+  manejador a la lista de `BrokerService` (`alRecibir`, `broker/broker.service.ts:65`), sin depender de que la conexión exista; `SesionService.onModuleInit`
+  (`sesion/sesion.service.ts:93`) solo calcula el hash de relleno. Prueba nueva: `ciclo-de-vida.spec.ts` (1), que arma la aplicación completa y
+  exige que cada gancho de cierre corra una vez, que todo lo que usa el pool o el broker termine antes de `DbModule.onApplicationShutdown` y que
+  este sea lo último (plantada la violación, moviendo el cierre del pool a otra fase, falla; pasa con 11.2.5 y con 12.4.0).
+- **Apagado con Express** («the Express adapter now drains in-flight requests on shutdown»). Las dos pruebas de `tiempo-real/eventos.spec.ts` siguen
+  en verde con 12.4.0: «apagado con un flujo abierto» (línea 374: `app.close()` termina en menos de 1 s y el flujo se cierra) y «apagado con una
+  petición normal en curso» (línea 387: responde 200 antes del cierre). Se midió además, en la copia 11 y en la 12, el cierre con una petición
+  lenta en curso: con `Connection: close` 253 ms en ambas, y con una conexión persistente, 6 263 ms en ambas (la espera de la conexión ociosa
+  del servidor de Node, que el §14 midió en ≈ 4 s y que no depende de Nest). Lo que dicen `docs/10 §6` y el §14 de este informe sobre el apagado
+  sigue siendo cierto; no se cambió ni una palabra.
+- **Mapeo de errores HTTP** («HTTP adapter error mapping has been reworked»). Con un servidor real, el código, el tipo de contenido y el cuerpo
+  de 400 (texto y lista), 401, 403, 404, 409 (texto y objeto), 413, 429, 503 y 500 (sin el detalle del error), una ruta inexistente, un JSON
+  ilegible y un cuerpo sobre el tope del lector salen byte a byte iguales en 11.2.5 y 12.4.0 (comparados con `diff`). Quedó como
+  `errores-http.spec.ts` (14 pruebas). El OpenAPI exportado (`pnpm openapi`, 38 rutas) queda idéntico: `git diff` de `backend/openapi.json` vacío.
+- **`verify` del lector de JSON (no estaba en la guía).** `tsc` falló en `main.ts` con 12.4.0: el tipo de las opciones de `useBodyParser` excluye
+  `verify`, que Nest reserva para capturar el cuerpo crudo con `rawBody: true` (`NestExpressBodyParserOptionsFor`, en `@nestjs/platform-express`), y el
+  tipo de `type` pide `IncomingMessage` en vez de `Request`. La aplicación no usa `rawBody`, y en ejecución el adaptador pasa las opciones sin tocarlas
+  cuando no se lo pide (`adapters/utils/get-body-parser-options.util.js` de `@nestjs/platform-express` 12.4.0), así que `verify` sigue rigiendo: el tope de 100 KiB para un cuerpo sin
+  largo declarado (`arranque.ts`: `opcionesLectorJson` y `cuerpoExcedido`). Cambio: las opciones del lector de JSON y su manejador de errores salen de `arranque.ts`, no de un literal (el compilador
+  rechaza `verify` solo en un literal) y `type` recibe `IncomingMessage`. Como el tipo ahora dice que no debería funcionar, `arranque-cuerpo.spec.ts` (4 pruebas, con las mismas opciones y el mismo manejador que `main.ts`) lo
+  comprueba con un servidor real: 1 KiB por trozos responde 201 y 150 KiB por trozos, sin `Content-Length`, responde 413 en JSON con su motivo; en el alta por lote 150 KiB entran y 600 KiB responden 413 con el motivo del lote. Con la falla plantada: sin `verify`, la segunda da 201; con el manejador anulado, la última no trae el motivo.
+- **`@Optional()`.** Están en `recepcion/recepcion.service.ts:100`, `sesion/usuarios.service.ts:66` y `tiempo-real/eventos.controller.ts:49-50`. Ninguna de las tres
+  clases extiende a otra (la única herencia del código son `TramaMalformada`, `IdentidadNoVerificada` y `ErrorDynsec`, que descienden de `Error`). La regla nueva no se aplica; la
+  exigencia de 12.1 para el núcleo es por los casos de subclase sin constructor propio, que aquí no existen. La aplicación completa arranca (`ciclo-de-vida.spec.ts`).
+- **Registro** («Structured logging params»). Con un análisis del código fuente (TypeScript, no una búsqueda de texto) de los 100 archivos de
+  `src/` sin pruebas: 87 llamadas a `log`, `logger` o `new Logger(…)` y ninguna con más de un argumento, así que no hay objeto después del mensaje y la
+  novedad no se activa. El formato JSON y el de texto de `ConsoleLogger` (el único registrador propio, `main.ts:21`) salen idénticos en 11.2.5 y 12.4.0 con
+  mensajes con acentos, porcentaje y saltos de línea. Sin cambios en `structuredParams`.
+- **`@nestjs/config`.** El uso es `ConfigModule.forRoot({ isGlobal: true, envFilePath: [...] })` (`app.module.ts:38`), sin `validationSchema` ni `validationOptions`, que es lo que
+  la guía cambia. Se comparó la lectura de un archivo de variables de prueba (comillas, comentarios, `export`, `${A}` sin expansión, vacío, dos archivos con
+  precedencia del primero, valor por defecto, `getOrThrow`) en 4.0.4 y 12.1.1: salida idéntica. La biblioteca de lectura sube de `dotenv` 17 a 18 y
+  de `dotenv-expand` 12 a 13; sin efecto observable en esa prueba.
+- **`tsconfig.json`.** No se cambió. La guía muestra `target` ES2023 y `resolvePackageJsonExports` para los proyectos de v10 o v11 temprano que pasan a ESM; el
+  proyecto ya usa `module` y `moduleResolution` `nodenext`, el caso que la guía describe como «nada que cambiar» (con `resolvePackageJsonExports` en verdadero o en falso
+  `tsc` da lo mismo: el proyecto no depende de ese valor). Con `target` ES2023 también compila: no hay
+  razón para moverlo.
+- **CLI.** `pnpm build` (`nest build`) compila con 12.0.12; `nest start --watch` arranca, escucha y sirve `/panel/` (200) con el broker y la base apuntados a un puerto sin
+  servicio (variables de descarte, nada tocó la pila); `/salud` responde 500 porque esa ruta consulta la base, como se esperaba. Se detuvo con SIGINT y el puerto quedó libre.
+
+**Pruebas y auditoría.**
+
+| | Antes (11.2.5) | Después (12.4.0) |
+|---|---|---|
+| Backend | 610 pruebas, 55 archivos | 629 pruebas, 58 archivos (las 19 nuevas, arriba) |
+| Panel | 346 pruebas, 33 archivos; `svelte-check` 404 archivos, 0 errores | igual |
+| `pnpm build` | en verde | en verde |
+| `pnpm audit` | 3 avisos de desarrollo: `glob` (moderado, `@nestjs/cli`), `minimatch` (moderado, `eslint`), `deepmerge` (bajo, `@nestjs/cli` y el panel) | 2: `minimatch` (moderado, `eslint`; 33 rutas) y `deepmerge` (bajo, `@nestjs/cli` y el panel) |
+
+El aviso de `glob` desapareció porque la CLI 12 ya no depende de `glob` sino de `minimatch` 11.0.5, que está en la versión corregida. El de `minimatch` que
+queda entra por `eslint` y `typescript-eslint` (versión 10.2.6, sin cambio por esta migración). `fork-ts-checker-webpack-plugin` 9.1.0 sigue en el lockfile
+(dependencia opcional de la CLI que pnpm instala sola; ahora con TypeScript 6.0.3, antes con 5.9.3) y con él `minimatch` 3.1.5 y `deepmerge` 4.3.1; `minimatch` 3.1.5 queda fuera del rango
+afectado del aviso que `pnpm audit` informa (de 7.0.0 a 11.0.0), y `deepmerge` sigue sin parche. Ninguno entra a la imagen.
+No se comprobó qué versión de `minimatch` señala la alerta abierta en GitHub: `pnpm audit` no la nombra.
+
+**Avisos de terceros.** `generar-avisos-terceros.sh` regenerado (no necesita la pila) y `--comprobar` en verde: 180 paquetes de producción (eran 179) y 7 licencias. Cambio de
+licencia declarada: `argparse` 3.0.4, que llega con `js-yaml` 5.5.0 de `@nestjs/swagger`, declara `PSF-2.0`, no `Python-2.0`; el paso 2r del verificador
+(`PERMITIDAS` en `plataforma/pruebas/verificar-todo.sh`) no incluía `PSF-2.0`. Se agregó el 15/11/2026: su texto (47 líneas, en el paquete) es el acuerdo de la Python Software
+Foundation, versión 2 —uso, modificación y distribución sin pago, conservando el aviso—, la misma sección que ya trae `Python-2.0`, sin la parte histórica (37 de sus 38 líneas son literales); cumple RNF-15. Se actualizó el conteo del `README.md` del backend (179 → 180) y las citas de pruebas que
+vigila el paso 2t (610 → 629) en `docs/11`, `docs/15`, la cabecera de este documento y tres archivos del informe y las láminas.
+
+**Cifras del bloque:** `pnpm verificar` en verde: 629 pruebas unitarias del backend en 58 archivos y 344 pruebas del panel (346 ejecuciones en vitest, en 33 archivos); `svelte-check`, 404
+archivos sin errores; `pnpm build` y `pnpm openapi` (38 rutas) sin diferencias en el contrato.
+
+**Con la pila levantada (15/11/2026).** La imagen del backend se reconstruyó con las versiones nuevas (`pila.sh encender`: sana en 21 s, construcción incluida;
+dentro del contenedor, `@nestjs/core` 12.4.0) y el verificador completo (`verificar-todo.sh`) corrió contra ella. El apagado dentro de Docker (`docker stop`, sin flujos
+abiertos): 0,2 s, código de salida 0 y una sola señal, sin llegar al corte forzado.
+
+**Lo que dejó la revisión del bloque.** La prueba del lector de JSON llevaba una copia de las opciones de `main.ts` y habría seguido en verde si alguien las cambiaba
+allí: las opciones y el manejador de errores pasaron a `arranque.ts`, y `main.ts` y la prueba usan lo mismo. La prueba del ciclo de vida no fijaba el orden que promete
+`docs/10 §6` ni el que cambió con la 12: ahora comprueba que el supervisor y las métricas terminan antes de que el broker se desconecte, y que las métricas arrancan
+después de él (medido: retención, supervisión, métricas, broker, administración del broker, flujos en vivo y, al final, la base). Estas dos comprobaciones de orden
+no tienen falla plantada: invertir el orden exigiría cambiar las dependencias entre módulos.
+
+**Lo que queda.** La recepción bajo carga con 12.4.0 (el banco, que no corre dentro del verificador) y el CI con la CLI 12, que para generar código pide Node 22.22.3 o
+posterior (el flujo usa la línea 22 sin fijar la versión menor). Las comparaciones entre 11.2.5 y 12.4.0 de esta sección se hicieron en una copia de trabajo con la
+versión anterior instalada y no quedan como guion: lo repetible son las tres pruebas nuevas.

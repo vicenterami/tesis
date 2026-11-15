@@ -518,8 +518,9 @@ paso "2r. RNF-15: dependencias de producción del backend con licencia abierta y
 # son de código abierto (RNF-15) y una desconocida no se puede evaluar. Esta es la lista exacta: lo demás falla y lo decide
 # el estudiante. «A OR B» pasa si una de las dos está en la lista; «A AND B», solo si están las dos (08/10: pako, que trae la
 # exportación a XLSX, es «MIT AND Zlib»; Zlib, permisiva, entra a la lista el 08/10); los paréntesis se respetan y una
-# excepción (WITH) no se evalúa: la decide él.
-PERMITIDAS='["MIT","ISC","Apache-2.0","BSD-2-Clause","BSD-3-Clause","0BSD","Python-2.0","CC0-1.0","Unlicense","BlueOak-1.0.0","Zlib"]'
+# excepción (WITH) no se evalúa: la decide él. 15/11: PSF-2.0 (argparse 3, que llega con @nestjs/swagger 12) es el acuerdo de la Python
+# Software Foundation que ya forma parte de Python-2.0, sin la parte histórica; permisiva y sin pago: entra a la lista el 15/11.
+PERMITIDAS='["MIT","ISC","Apache-2.0","BSD-2-Clause","BSD-3-Clause","0BSD","Python-2.0","PSF-2.0","CC0-1.0","Unlicense","BlueOak-1.0.0","Zlib"]'
 if ! command -v pnpm >/dev/null || ! command -v jq >/dev/null; then echo "omitida: falta pnpm o jq"; omitidos="$omitidos 2r"
 elif ! (cd plataforma/backend && pnpm licenses ls --prod --json 2>/dev/null) > "$VT"/licencias.json \
      || ! jq -e 'type == "object"' "$VT"/licencias.json >/dev/null 2>&1; then

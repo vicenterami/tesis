@@ -151,3 +151,30 @@ export function esLote(url: string | undefined): boolean {
 export function cuerpoExcedido(url: string | undefined, bytes: number): boolean {
   return bytes > TOPE_CUERPO && !esLote(url);
 }
+
+// Las opciones del lector de JSON y su manejador de errores viven aquí para que main.ts y su prueba (arranque-cuerpo.spec.ts) usen
+// exactamente lo mismo (revisión del 15/11/2026: la prueba llevaba una copia de las opciones y habría seguido en verde si alguien las
+// cambiaba en main.ts). El lector admite hasta 512 KiB (el alta por lote); `verify` cuenta los bytes leídos y, fuera del lote, corta en
+// 100 KiB aunque el cuerpo llegue por trozos, sin largo declarado.
+export const TOPE_CUERPO_LOTE = 512 * 1024;
+export const MENSAJE_TOPE_CUERPO = 'cuerpo de más de 100 KiB';
+export const MENSAJE_TOPE_LOTE = 'cuerpo de más de 512 KiB';
+export function opcionesLectorJson(): { limit: number; verify: (req: { url?: string }, res: unknown, buf: Buffer) => void } {
+  return {
+    limit: TOPE_CUERPO_LOTE,
+    verify: (req, _res, buf) => {
+      if (cuerpoExcedido(req.url, buf.length)) throw Object.assign(new Error(MENSAJE_TOPE_CUERPO), { status: 413, type: 'entity.too.large' });
+    },
+  };
+}
+// Los errores del lector de JSON (el 413 de `verify` o el del tope de 512 KiB) responden en JSON, como el resto de la API; lo demás
+// (un JSON ilegible) sigue su camino. Cuatro parámetros: así reconoce Express un manejador de errores.
+export function errorDeLectorJson(
+  err: { status?: number; type?: string; message?: string } | undefined,
+  _req: unknown,
+  res: { status(codigo: number): { json(cuerpo: unknown): unknown } },
+  next: (e?: unknown) => void,
+): void {
+  if (err?.type === 'entity.too.large') return void res.status(413).json({ statusCode: 413, message: err.message === MENSAJE_TOPE_CUERPO ? err.message : MENSAJE_TOPE_LOTE });
+  next(err);
+}

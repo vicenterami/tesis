@@ -6,11 +6,12 @@ import { ConsoleLogger, Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { existsSync } from 'node:fs';
+import type { IncomingMessage } from 'node:http';
 import { join } from 'node:path';
 import type { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module.js';
-import { AvisosAcotados, TOPE_CUERPO, cuerpoExcedido, esLote, horasClaveTemporal, hostsPermitidos, interfazDeEscucha, rechazoDeHost, registrosEnJson, rutaSinCache, servirDocumentacion, claveAdmin, claveApp } from './arranque.js';
+import { AvisosAcotados, MENSAJE_TOPE_CUERPO, TOPE_CUERPO, errorDeLectorJson, esLote, opcionesLectorJson, horasClaveTemporal, hostsPermitidos, interfazDeEscucha, rechazoDeHost, registrosEnJson, rutaSinCache, servirDocumentacion, claveAdmin, claveApp } from './arranque.js';
 import { configurarOpenApi } from './openapi.js';
 
 // Punto de entrada. Levanta la aplicación Nest: al iniciarse, cada módulo se conecta a lo suyo
@@ -37,7 +38,7 @@ async function arrancar(): Promise<void> {
   // El cuerpo de la recepción por HTTP llega crudo, como por MQTT, y con el mismo tope que el broker (max_packet_size, 64 KiB). Va
   // antes del lector de JSON que Nest agrega al iniciar: para /recepcion manda este. Un cuerpo de más responde 413 en JSON.
   // Sin distinguir mayúsculas, como el enrutador de Express: con startsWith, /RECEPCION/… llegaba a la ruta con el cuerpo de JSON.
-  app.useBodyParser('raw', { type: (req: Request) => /^\/recepcion\//i.test(req.url ?? ''), limit: 64 * 1024 });
+  app.useBodyParser('raw', { type: (req: IncomingMessage) => /^\/recepcion\//i.test(req.url ?? ''), limit: 64 * 1024 });
   app.use('/recepcion', (err: { status?: number; type?: string }, _req: Request, res: Response, next: NextFunction) => {
     if (err?.type === 'entity.too.large') return void res.status(413).json({ statusCode: 413, message: 'trama de más de 64 KiB' });
     if (err) return void res.status(400).json({ statusCode: 400, message: 'cuerpo ilegible' });
@@ -51,21 +52,18 @@ async function arrancar(): Promise<void> {
   app.use((req: Request, res: Response, next: NextFunction) => {
     const largo = Number(req.headers['content-length'] ?? 0);
     if (largo > TOPE_CUERPO && !esLote(req.url) && !/^\/recepcion\//i.test(req.url ?? '')) {
-      return void res.status(413).json({ statusCode: 413, message: 'cuerpo de más de 100 KiB' });
+      return void res.status(413).json({ statusCode: 413, message: MENSAJE_TOPE_CUERPO });
     }
     next();
   });
-  app.useBodyParser('json', {
-    limit: 512 * 1024,
-    verify: (req: Request, _res: Response, buf: Buffer) => {
-      if (cuerpoExcedido(req.url, buf.length)) throw Object.assign(new Error('cuerpo de más de 100 KiB'), { status: 413, type: 'entity.too.large' });
-    },
-  });
-  // Los errores del lector de JSON (413 de arriba o del tope de 512 KiB, 400 de un JSON ilegible) responden en JSON, como el resto de la API.
-  app.use((err: { status?: number; type?: string; message?: string }, _req: Request, res: Response, next: NextFunction) => {
-    if (err?.type === 'entity.too.large') return void res.status(413).json({ statusCode: 413, message: err.message === 'cuerpo de más de 100 KiB' ? err.message : 'cuerpo de más de 512 KiB' });
-    next(err);
-  });
+  // Desde NestJS 12 el tipo de las opciones excluye `verify` (la guía de migración 11→12 no lo menciona): Nest lo reserva para capturar el
+  // cuerpo crudo con `rawBody: true`, que esta aplicación no usa. En ejecución, sin `rawBody`, el adaptador de Express pasa las opciones tal
+  // cual al lector de JSON (adapters/utils/get-body-parser-options.util.js de @nestjs/platform-express 12.4.0), así que `verify` sigue rigiendo.
+  // Las opciones vienen de arranque.ts (no de un literal, que el compilador rechazaría por la propiedad de más) y son las mismas que
+  // monta arranque-cuerpo.spec.ts: si una versión futura ignorara `verify`, o alguien lo quitara, esa prueba falla.
+  app.useBodyParser('json', opcionesLectorJson());
+  // Los errores del lector de JSON (413 de arriba o del tope de 512 KiB) responden en JSON, como el resto de la API.
+  app.use(errorDeLectorJson);
   // helmet no emite Permissions-Policy; la API no usa cámara, micrófono ni ubicación. Y toda respuesta de la API va con
   // `Cache-Control: no-store` (arranque.ts, rutaSinCache; revisión del 08/11/2026): una sola regla en vez de repetirla ruta por ruta.
   // Una ruta puede pisarla después (el canal en vivo pone la suya, también sin caché).

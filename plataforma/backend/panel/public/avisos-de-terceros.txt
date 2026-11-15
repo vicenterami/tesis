@@ -5,7 +5,7 @@ GENERADO por plataforma/backend/generar-avisos-terceros.sh desde `pnpm licenses 
 backend y del panel; las de desarrollo no viajan en la imagen). No se edita a mano: se regenera al cambiar dependencias, y el guardián
 comprueba que no falte ninguna. Una línea por paquete: nombre@versión, licencia y sitio; debajo, el copyright de su archivo de licencia.
 
-Paquetes: 179. Licencias: 0BSD, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, MIT, Python-2.0.
+Paquetes: 180. Licencias: 0BSD, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, MIT, PSF-2.0.
 
 @babel/runtime@7.29.7 · MIT · https://babel.dev/docs/en/next/babel-runtime
     Copyright (c) 2014-present Sebastian McKenzie and other contributors
@@ -23,28 +23,30 @@ Paquetes: 179. Licencias: 0BSD, Apache-2.0, BSD-2-Clause, BSD-3-Clause, ISC, MIT
     Copyright 2024 Justin Ridgewell
 @lukeed/csprng@1.1.0 · MIT · https://github.com/lukeed/csprng#readme
     Copyright (c) Luke Edwards (lukeed.com)
-@microsoft/tsdoc@0.16.0 · MIT · https://tsdoc.org/
+@microsoft/tsdoc@0.17.1 · MIT · https://tsdoc.org/
     Copyright (c) Microsoft Corporation. All rights reserved.
-@nestjs/common@11.2.5 · MIT · https://nestjs.com
+@nestjs/common@12.4.0 · MIT · https://nestjs.com
     Copyright (c) 2017-present Kamil Mysliwiec <https://kamilmysliwiec.com>
-@nestjs/config@4.0.4 · MIT · https://github.com/nestjs/config#readme
+@nestjs/config@12.1.1 · MIT · https://github.com/nestjs/config#readme
     Copyright (c) 2020-2022 Kamil Mysliwiec
-@nestjs/core@11.2.5 · MIT · https://nestjs.com
+@nestjs/core@12.4.0 · MIT · https://nestjs.com
     Copyright (c) 2017-present Kamil Mysliwiec <https://kamilmysliwiec.com>
-@nestjs/mapped-types@2.1.1 · MIT · https://github.com/nestjs/mapped-types#readme
+@nestjs/mapped-types@12.0.1 · MIT · https://github.com/nestjs/mapped-types#readme
     Copyright (c) 2020-2022 Kamil Mysliwiec
-@nestjs/platform-express@11.2.8 · MIT · https://nestjs.com
+@nestjs/platform-express@12.4.0 · MIT · https://nestjs.com
     Copyright (c) 2017-present Kamil Mysliwiec <https://kamilmysliwiec.com>
-@nestjs/swagger@11.4.7 · MIT · https://github.com/nestjs/swagger#readme
+@nestjs/swagger@12.1.1 · MIT · https://github.com/nestjs/swagger#readme
     Copyright (c) 2020-2022 Kamil Mysliwiec
 @scarf/scarf@1.4.0 · Apache-2.0 · https://github.com/scarf-sh/scarf-js
     copyright notice that is included in or attached to the work
     copyright license to reproduce, prepare Derivative Works of,
     (c) You must retain, in the Source form of any Derivative Works
+@standard-schema/spec@1.1.0 · MIT · https://standardschema.dev
+    Copyright (c) 2024 Colin McDonnell
 @sveltejs/acorn-typescript@1.0.13 · MIT · https://github.com/sveltejs/acorn-typescript#readme
     Copyright (c) 2022 Tyreal Hu
     Copyright (c) 2025 The Svelte Team
-@tokenizer/inflate@0.4.1 · MIT · https://github.com/Borewit/tokenizer-inflate#readme
+@tokenizer/inflate@0.6.0 · MIT · https://github.com/Borewit/tokenizer-inflate#readme
     Copyright (c) 2024, Borewit
     COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
 @tokenizer/token@0.3.0 · MIT · https://github.com/Borewit/tokenizer-token#readme
@@ -65,8 +67,7 @@ acorn@8.18.0 · MIT · https://github.com/acornjs/acorn
     Copyright (C) 2012-2022 by various contributors (see AUTHORS)
 append-field@1.0.0 · MIT · https://github.com/LinusU/node-append-field#readme
     Copyright (c) 2015 Linus Unnebäck
-argparse@2.0.1 · Python-2.0 · https://github.com/nodeca/argparse#readme
-    Copyright (c) 1991 - 1995, Stichting Mathematisch Centrum Amsterdam,
+argparse@3.0.4 · PSF-2.0 · https://github.com/nodeca/argparse#readme
 aria-query@5.3.1 · Apache-2.0 · https://github.com/A11yance/aria-query#readme
     copyright notice that is included in or attached to the work
     copyright license to reproduce, prepare Derivative Works of,
@@ -103,10 +104,8 @@ commist@3.2.0 · MIT · https://github.com/mcollina/commist
     Copyright (c) 2014-2022 Matteo Collina
 concat-stream@2.0.0 · MIT · https://github.com/maxogden/concat-stream#readme
     Copyright (c) 2013 Max Ogden
-content-disposition@1.1.0 · MIT · https://github.com/jshttp/content-disposition#readme
+content-disposition@2.0.1 · MIT · https://github.com/jshttp/content-disposition#readme
     Copyright (c) 2014-2017 Douglas Christopher Wilson
-content-type@1.0.5 · MIT · https://github.com/jshttp/content-type#readme
-    Copyright (c) 2015 Douglas Christopher Wilson
 content-type@2.1.0 · MIT · https://github.com/jshttp/content-type#readme
     Copyright (c) 2015 Douglas Christopher Wilson
 cookie-signature@1.2.2 · MIT · https://github.com/visionmedia/node-cookie-signature#readme
@@ -123,11 +122,11 @@ depd@2.0.0 · MIT · https://github.com/dougwilson/nodejs-depd#readme
     Copyright (c) 2014-2018 Douglas Christopher Wilson
 devalue@5.9.4 · MIT · https://github.com/sveltejs/devalue#readme
     Copyright (c) 2018-19 [these people](https://github.com/rich-harris/devalue/graphs/contributors)
-dotenv-expand@12.0.3 · BSD-2-Clause · https://github.com/motdotla/dotenv-expand#readme
+dotenv-expand@13.0.0 · BSD-2-Clause · https://github.com/motdotla/dotenv-expand#readme
     Copyright (c) 2016, Scott Motte
-dotenv@16.4.7 · BSD-2-Clause · https://github.com/motdotla/dotenv#readme
+dotenv@17.4.2 · BSD-2-Clause · https://github.com/motdotla/dotenv#readme
     Copyright (c) 2015, Scott Motte
-dotenv@17.4.1 · BSD-2-Clause · https://github.com/motdotla/dotenv#readme
+dotenv@18.0.3 · BSD-2-Clause · https://github.com/motdotla/dotenv#readme
     Copyright (c) 2015, Scott Motte
 dunder-proto@1.0.1 · MIT · https://github.com/es-shims/dunder-proto#readme
     Copyright (c) 2024 ECMAScript Shims
@@ -141,6 +140,8 @@ es-errors@1.3.0 · MIT · https://github.com/ljharb/es-errors#readme
     Copyright (c) 2024 Jordan Harband
 es-object-atoms@1.1.2 · MIT · https://github.com/ljharb/es-object-atoms#readme
     Copyright (c) 2024 Jordan Harband
+es-toolkit@1.53.1 · MIT · https://es-toolkit.dev
+    Copyright (c) 2024 Viva Republica, Inc.
 escape-html@1.0.3 · MIT · https://github.com/component/escape-html#readme
     Copyright (c) 2012-2013 TJ Holowaychuk
     Copyright (c) 2015 Andreas Lubbe
@@ -155,7 +156,7 @@ event-target-shim@5.0.1 · MIT · https://github.com/mysticatea/event-target-shi
     Copyright (c) 2015 Toru Nagashima
 events@3.3.0 · MIT · https://github.com/Gozala/events#readme
     Copyright Joyent, Inc. and other Node contributors.
-express@5.2.1 · MIT · https://expressjs.com/
+express@5.3.0 · MIT · https://expressjs.com/
     Copyright (c) 2009-2014 TJ Holowaychuk
     Copyright (c) 2013-2014 Roman Shtylman
     Copyright (c) 2014-2015 Douglas Christopher Wilson
@@ -165,7 +166,7 @@ fast-safe-stringify@2.1.1 · MIT · https://github.com/davidmarkclements/fast-sa
     Copyright (c) 2018 David Mark Clements, Matteo Collina & Ruben Bridgewater
 fast-unique-numbers@9.0.27 · MIT · https://github.com/chrisguttandin/fast-unique-numbers
     Copyright (c) 2026 Christoph Guttandin
-file-type@21.3.4 · MIT · https://github.com/sindresorhus/file-type#readme
+file-type@22.3.0 · MIT · https://github.com/sindresorhus/file-type#readme
     Copyright (c) Sindre Sorhus (https://sindresorhus.com)
 finalhandler@2.1.1 · MIT · https://github.com/pillarjs/finalhandler#readme
     Copyright (c) 2014-2022 Douglas Christopher Wilson
@@ -210,14 +211,11 @@ is-reference@3.0.3 · MIT · https://github.com/Rich-Harris/is-reference#readme
 iterare@1.2.1 · ISC · https://github.com/felixfbecker/iterare#readme
     Copyright (c) 2016, Felix Frederick Becker
     copyright notice and this permission notice appear in all copies.
-js-yaml@5.4.3 · MIT · https://github.com/nodeca/js-yaml#readme
+js-yaml@5.5.0 · MIT · https://github.com/nodeca/js-yaml#readme
     Copyright (C) 2011-2015 by Vitaly Puzrin
 load-esm@1.0.3 · MIT · https://github.com/Borewit/load-esm#readme
     Copyright © 2025 Borewit
 locate-character@3.0.0 · MIT · https://gitlab.com/Rich-Harris/locate-character#README
-lodash@4.18.1 · MIT · https://lodash.com/
-    Copyright OpenJS Foundation and other contributors <https://openjsf.org/>
-    Copyright and related rights for sample code are waived via CC0. Sample
 lru-cache@10.4.3 · ISC · https://github.com/isaacs/node-lru-cache#readme
     Copyright (c) 2010-2023 Isaac Z. Schlueter and Contributors
     copyright notice and this permission notice appear in all copies.
@@ -364,11 +362,11 @@ streamsearch@1.1.0 · MIT · https://github.com/mscdex/streamsearch#readme
 string_decoder@1.3.0 · MIT · https://github.com/nodejs/string_decoder
     Copyright Node.js contributors. All rights reserved.
     Copyright Joyent, Inc. and other Node contributors. All rights reserved.
-strtok3@10.3.5 · MIT · https://github.com/Borewit/strtok3#readme
+strtok3@10.8.0 · MIT · https://github.com/Borewit/strtok3#readme
     Copyright © 2026 Borewit
 svelte@5.57.3 · MIT · https://svelte.dev
     Copyright (c) 2016-2025 [Svelte Contributors](https://github.com/sveltejs/svelte/graphs/contributors)
-swagger-ui-dist@5.32.13 · Apache-2.0 · https://github.com/swagger-api/swagger-ui#readme
+swagger-ui-dist@5.34.1 · Apache-2.0 · https://github.com/swagger-api/swagger-ui#readme
     copyright notice that is included in or attached to the work
     copyright license to reproduce, prepare Derivative Works of,
     (c) You must retain, in the Source form of any Derivative Works
@@ -377,6 +375,8 @@ toidentifier@1.0.1 · MIT · https://github.com/component/toidentifier#readme
 token-types@6.1.2 · MIT · https://github.com/Borewit/token-types#readme
     Copyright © 2026 Borewit
 tslib@2.8.1 · 0BSD · https://www.typescriptlang.org/
+    Copyright (c) Microsoft Corporation.
+tslib@2.9.1 · 0BSD · https://www.typescriptlang.org/
     Copyright (c) Microsoft Corporation.
 type-is@1.6.18 · MIT · https://github.com/jshttp/type-is#readme
     Copyright (c) 2014 Jonathan Ong
@@ -389,7 +389,7 @@ typedarray@0.0.6 · MIT · https://github.com/substack/typedarray
     Copyright (c) 2012, Joshua Bell
 uid@2.0.2 · MIT · https://github.com/lukeed/uid#readme
     Copyright (c) Luke Edwards (lukeed.com)
-uint8array-extras@1.5.0 · MIT · https://github.com/sindresorhus/uint8array-extras#readme
+uint8array-extras@1.6.0 · MIT · https://github.com/sindresorhus/uint8array-extras#readme
     Copyright (c) Sindre Sorhus (https://sindresorhus.com)
 undici-types@6.21.0 · MIT · https://undici.nodejs.org
     Copyright (c) Matteo Collina and Undici contributors
@@ -657,7 +657,7 @@ Apache License
  See the License for the specific language governing permissions and
  limitations under the License.
 
-Texto completo de la licencia BSD-2-Clause (de dotenv-expand@12.0.3, el primer paquete que la usa):
+Texto completo de la licencia BSD-2-Clause (de dotenv-expand@13.0.0, el primer paquete que la usa):
 
 Copyright (c) 2016, Scott Motte
 All rights reserved.
@@ -715,71 +715,9 @@ LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR
 OTHER TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR
 PERFORMANCE OF THIS SOFTWARE.
 
-Texto completo de la licencia Python-2.0 (de argparse@2.0.1, el primer paquete que la usa):
-
-A. HISTORY OF THE SOFTWARE
-==========================
-
-Python was created in the early 1990s by Guido van Rossum at Stichting
-Mathematisch Centrum (CWI, see http://www.cwi.nl) in the Netherlands
-as a successor of a language called ABC. Guido remains Python's
-principal author, although it includes many contributions from others.
-
-In 1995, Guido continued his work on Python at the Corporation for
-National Research Initiatives (CNRI, see http://www.cnri.reston.va.us)
-in Reston, Virginia where he released several versions of the
-software.
-
-In May 2000, Guido and the Python core development team moved to
-BeOpen.com to form the BeOpen PythonLabs team. In October of the same
-year, the PythonLabs team moved to Digital Creations, which became
-Zope Corporation. In 2001, the Python Software Foundation (PSF, see
-https://www.python.org/psf/) was formed, a non-profit organization
-created specifically to own Python-related Intellectual Property.
-Zope Corporation was a sponsoring member of the PSF.
-
-All Python releases are Open Source (see http://www.opensource.org for
-the Open Source Definition). Historically, most, but not all, Python
-releases have also been GPL-compatible; the table below summarizes
-the various releases.
-
- Release Derived Year Owner GPL-
- from compatible? (1)
-
- 0.9.0 thru 1.2 1991-1995 CWI yes
- 1.3 thru 1.5.2 1.2 1995-1999 CNRI yes
- 1.6 1.5.2 2000 CNRI no
- 2.0 1.6 2000 BeOpen.com no
- 1.6.1 1.6 2001 CNRI yes (2)
- 2.1 2.0+1.6.1 2001 PSF no
- 2.0.1 2.0+1.6.1 2001 PSF yes
- 2.1.1 2.1+2.0.1 2001 PSF yes
- 2.1.2 2.1.1 2002 PSF yes
- 2.1.3 2.1.2 2002 PSF yes
- 2.2 and above 2.1.1 2001-now PSF yes
-
-Footnotes:
-
-(1) GPL-compatible doesn't mean that we're distributing Python under
- the GPL. All Python licenses, unlike the GPL, let you distribute
- a modified version without making your changes open source. The
- GPL-compatible licenses make it possible to combine Python with
- other software that is released under the GPL; the others don't.
-
-(2) According to Richard Stallman, 1.6.1 is not GPL-compatible,
- because its license has a choice of law clause. According to
- CNRI, however, Stallman's lawyer has told CNRI's lawyer that 1.6.1
- is "not incompatible" with the GPL.
-
-Thanks to the many outside volunteers who have worked under Guido's
-direction to make these releases possible.
-
-
-B. TERMS AND CONDITIONS FOR ACCESSING OR OTHERWISE USING PYTHON
-===============================================================
+Texto completo de la licencia PSF-2.0 (de argparse@3.0.4, el primer paquete que la usa):
 
 PYTHON SOFTWARE FOUNDATION LICENSE VERSION 2
---------------------------------------------
 
 1. This LICENSE AGREEMENT is between the Python Software Foundation
 ("PSF"), and the Individual or Organization ("Licensee") accessing and
@@ -792,7 +730,7 @@ analyze, test, perform and/or display publicly, prepare derivative works,
 distribute, and otherwise use Python alone or in any derivative version,
 provided, however, that PSF's License Agreement and PSF's notice of copyright,
 i.e., "Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
-2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020 Python Software Foundation;
+2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019 Python Software Foundation;
 All Rights Reserved" are retained in Python alone or in any derivative version
 prepared by Licensee.
 
@@ -826,148 +764,3 @@ products or services of Licensee, or any third party.
 8. By copying, installing or otherwise using Python, Licensee
 agrees to be bound by the terms and conditions of this License
 Agreement.
-
-
-BEOPEN.COM LICENSE AGREEMENT FOR PYTHON 2.0
--------------------------------------------
-
-BEOPEN PYTHON OPEN SOURCE LICENSE AGREEMENT VERSION 1
-
-1. This LICENSE AGREEMENT is between BeOpen.com ("BeOpen"), having an
-office at 160 Saratoga Avenue, Santa Clara, CA 95051, and the
-Individual or Organization ("Licensee") accessing and otherwise using
-this software in source or binary form and its associated
-documentation ("the Software").
-
-2. Subject to the terms and conditions of this BeOpen Python License
-Agreement, BeOpen hereby grants Licensee a non-exclusive,
-royalty-free, world-wide license to reproduce, analyze, test, perform
-and/or display publicly, prepare derivative works, distribute, and
-otherwise use the Software alone or in any derivative version,
-provided, however, that the BeOpen Python License is retained in the
-Software, alone or in any derivative version prepared by Licensee.
-
-3. BeOpen is making the Software available to Licensee on an "AS IS"
-basis. BEOPEN MAKES NO REPRESENTATIONS OR WARRANTIES, EXPRESS OR
-IMPLIED. BY WAY OF EXAMPLE, BUT NOT LIMITATION, BEOPEN MAKES NO AND
-DISCLAIMS ANY REPRESENTATION OR WARRANTY OF MERCHANTABILITY OR FITNESS
-FOR ANY PARTICULAR PURPOSE OR THAT THE USE OF THE SOFTWARE WILL NOT
-INFRINGE ANY THIRD PARTY RIGHTS.
-
-4. BEOPEN SHALL NOT BE LIABLE TO LICENSEE OR ANY OTHER USERS OF THE
-SOFTWARE FOR ANY INCIDENTAL, SPECIAL, OR CONSEQUENTIAL DAMAGES OR LOSS
-AS A RESULT OF USING, MODIFYING OR DISTRIBUTING THE SOFTWARE, OR ANY
-DERIVATIVE THEREOF, EVEN IF ADVISED OF THE POSSIBILITY THEREOF.
-
-5. This License Agreement will automatically terminate upon a material
-breach of its terms and conditions.
-
-6. This License Agreement shall be governed by and interpreted in all
-respects by the law of the State of California, excluding conflict of
-law provisions. Nothing in this License Agreement shall be deemed to
-create any relationship of agency, partnership, or joint venture
-between BeOpen and Licensee. This License Agreement does not grant
-permission to use BeOpen trademarks or trade names in a trademark
-sense to endorse or promote products or services of Licensee, or any
-third party. As an exception, the "BeOpen Python" logos available at
-http://www.pythonlabs.com/logos.html may be used according to the
-permissions granted on that web page.
-
-7. By copying, installing or otherwise using the software, Licensee
-agrees to be bound by the terms and conditions of this License
-Agreement.
-
-
-CNRI LICENSE AGREEMENT FOR PYTHON 1.6.1
----------------------------------------
-
-1. This LICENSE AGREEMENT is between the Corporation for National
-Research Initiatives, having an office at 1895 Preston White Drive,
-Reston, VA 20191 ("CNRI"), and the Individual or Organization
-("Licensee") accessing and otherwise using Python 1.6.1 software in
-source or binary form and its associated documentation.
-
-2. Subject to the terms and conditions of this License Agreement, CNRI
-hereby grants Licensee a nonexclusive, royalty-free, world-wide
-license to reproduce, analyze, test, perform and/or display publicly,
-prepare derivative works, distribute, and otherwise use Python 1.6.1
-alone or in any derivative version, provided, however, that CNRI's
-License Agreement and CNRI's notice of copyright, i.e., "Copyright (c)
-1995-2001 Corporation for National Research Initiatives; All Rights
-Reserved" are retained in Python 1.6.1 alone or in any derivative
-version prepared by Licensee. Alternately, in lieu of CNRI's License
-Agreement, Licensee may substitute the following text (omitting the
-quotes): "Python 1.6.1 is made available subject to the terms and
-conditions in CNRI's License Agreement. This Agreement together with
-Python 1.6.1 may be located on the Internet using the following
-unique, persistent identifier (known as a handle): 1895.22/1013. This
-Agreement may also be obtained from a proxy server on the Internet
-using the following URL: http://hdl.handle.net/1895.22/1013".
-
-3. In the event Licensee prepares a derivative work that is based on
-or incorporates Python 1.6.1 or any part thereof, and wants to make
-the derivative work available to others as provided herein, then
-Licensee hereby agrees to include in any such work a brief summary of
-the changes made to Python 1.6.1.
-
-4. CNRI is making Python 1.6.1 available to Licensee on an "AS IS"
-basis. CNRI MAKES NO REPRESENTATIONS OR WARRANTIES, EXPRESS OR
-IMPLIED. BY WAY OF EXAMPLE, BUT NOT LIMITATION, CNRI MAKES NO AND
-DISCLAIMS ANY REPRESENTATION OR WARRANTY OF MERCHANTABILITY OR FITNESS
-FOR ANY PARTICULAR PURPOSE OR THAT THE USE OF PYTHON 1.6.1 WILL NOT
-INFRINGE ANY THIRD PARTY RIGHTS.
-
-5. CNRI SHALL NOT BE LIABLE TO LICENSEE OR ANY OTHER USERS OF PYTHON
-1.6.1 FOR ANY INCIDENTAL, SPECIAL, OR CONSEQUENTIAL DAMAGES OR LOSS AS
-A RESULT OF MODIFYING, DISTRIBUTING, OR OTHERWISE USING PYTHON 1.6.1,
-OR ANY DERIVATIVE THEREOF, EVEN IF ADVISED OF THE POSSIBILITY THEREOF.
-
-6. This License Agreement will automatically terminate upon a material
-breach of its terms and conditions.
-
-7. This License Agreement shall be governed by the federal
-intellectual property law of the United States, including without
-limitation the federal copyright law, and, to the extent such
-U.S. federal law does not apply, by the law of the Commonwealth of
-Virginia, excluding Virginia's conflict of law provisions.
-Notwithstanding the foregoing, with regard to derivative works based
-on Python 1.6.1 that incorporate non-separable material that was
-previously distributed under the GNU General Public License (GPL), the
-law of the Commonwealth of Virginia shall govern this License
-Agreement only as to issues arising under or with respect to
-Paragraphs 4, 5, and 7 of this License Agreement. Nothing in this
-License Agreement shall be deemed to create any relationship of
-agency, partnership, or joint venture between CNRI and Licensee. This
-License Agreement does not grant permission to use CNRI trademarks or
-trade name in a trademark sense to endorse or promote products or
-services of Licensee, or any third party.
-
-8. By clicking on the "ACCEPT" button where indicated, or by copying,
-installing or otherwise using Python 1.6.1, Licensee agrees to be
-bound by the terms and conditions of this License Agreement.
-
- ACCEPT
-
-
-CWI LICENSE AGREEMENT FOR PYTHON 0.9.0 THROUGH 1.2
---------------------------------------------------
-
-Copyright (c) 1991 - 1995, Stichting Mathematisch Centrum Amsterdam,
-The Netherlands. All rights reserved.
-
-Permission to use, copy, modify, and distribute this software and its
-documentation for any purpose and without fee is hereby granted,
-provided that the above copyright notice appear in all copies and that
-both that copyright notice and this permission notice appear in
-supporting documentation, and that the name of Stichting Mathematisch
-Centrum or CWI not be used in advertising or publicity pertaining to
-distribution of the software without specific, written prior
-permission.
-
-STICHTING MATHEMATISCH CENTRUM DISCLAIMS ALL WARRANTIES WITH REGARD TO
-THIS SOFTWARE, INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY AND
-FITNESS, IN NO EVENT SHALL STICHTING MATHEMATISCH CENTRUM BE LIABLE
-FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
-WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
-ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
-OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.

@@ -1,0 +1,77 @@
+import { afterEach, describe, expect, it } from 'vitest';
+import { Body, Controller, Post } from '@nestjs/common';
+import type { NestExpressApplication } from '@nestjs/platform-express';
+import { Test } from '@nestjs/testing';
+import type { AddressInfo } from 'node:net';
+import { MENSAJE_TOPE_CUERPO, MENSAJE_TOPE_LOTE, errorDeLectorJson, opcionesLectorJson } from './arranque.js';
+
+// El lector de JSON de main.ts con un servidor real (docs/16 §70). Desde NestJS 12 el tipo de las opciones de `useBodyParser` excluye
+// `verify`; main.ts lo pasa igual. Este banco monta LAS MISMAS opciones y el MISMO manejador de errores que main.ts (los dos salen de
+// arranque.ts) y comprueba los dos topes: 100 KiB fuera del alta por lote, aunque el cuerpo llegue por trozos y sin largo declarado, y
+// 512 KiB en el lote; y que el 413 responde en JSON con su motivo. Si NestJS dejara de pasar `verify`, o alguien lo quitara de
+// arranque.ts, el segundo caso respondería 201.
+@Controller()
+class EcoController {
+  @Post('eco')
+  eco(@Body() cuerpo: unknown): unknown {
+    return { ok: true, tipo: typeof cuerpo };
+  }
+  @Post('dispositivos/lote')
+  lote(@Body() cuerpo: unknown): unknown {
+    return { ok: true, tipo: typeof cuerpo };
+  }
+}
+
+let app: NestExpressApplication | undefined;
+afterEach(async () => {
+  await app?.close();
+  app = undefined;
+});
+
+async function servidor(): Promise<string> {
+  const modulo = await Test.createTestingModule({ controllers: [EcoController] }).compile();
+  app = modulo.createNestApplication<NestExpressApplication>();
+  app.useBodyParser('json', opcionesLectorJson());
+  app.use(errorDeLectorJson);
+  await app.listen(0, '127.0.0.1');
+  return `http://127.0.0.1:${(app.getHttpServer().address() as AddressInfo).port}`;
+}
+
+// Un cuerpo JSON de `bytes` bytes enviado por trozos, sin Content-Length.
+function porTrozos(bytes: number): ReadableStream<Uint8Array> {
+  const texto = JSON.stringify({ x: 'a'.repeat(bytes - 8) });
+  const datos = new TextEncoder().encode(texto);
+  return new ReadableStream({
+    start(c) {
+      for (let i = 0; i < datos.length; i += 16 * 1024) c.enqueue(datos.subarray(i, i + 16 * 1024));
+      c.close();
+    },
+  });
+}
+const enviar = (url: string, bytes: number): Promise<Response> =>
+  fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: porTrozos(bytes), duplex: 'half' } as RequestInit);
+
+describe('lector de JSON de main.ts: los topes del cuerpo rigen con NestJS 12', () => {
+  it('cuerpo chico por trozos → 201', async () => {
+    const base = await servidor();
+    expect((await enviar(`${base}/eco`, 1024)).status).toBe(201);
+  });
+  it('fuera del lote, 150 KiB por trozos (sin largo declarado) → 413 en JSON con su motivo', async () => {
+    const base = await servidor();
+    const r = await enviar(`${base}/eco`, 150 * 1024);
+    expect(r.status).toBe(413);
+    expect(r.headers.get('content-type')).toMatch(/^application\/json/);
+    expect(await r.json()).toEqual({ statusCode: 413, message: MENSAJE_TOPE_CUERPO });
+  });
+  it('en el alta por lote, 150 KiB por trozos entran (con y sin parámetros en la URL)', async () => {
+    const base = await servidor();
+    expect((await enviar(`${base}/dispositivos/lote`, 150 * 1024)).status).toBe(201);
+    expect((await enviar(`${base}/dispositivos/lote?modo=validar`, 150 * 1024)).status).toBe(201);
+  });
+  it('en el alta por lote, 600 KiB → 413 en JSON con el motivo del lote', async () => {
+    const base = await servidor();
+    const r = await enviar(`${base}/dispositivos/lote`, 600 * 1024);
+    expect(r.status).toBe(413);
+    expect(await r.json()).toEqual({ statusCode: 413, message: MENSAJE_TOPE_LOTE });
+  });
+});
