@@ -42,6 +42,16 @@ hash); ningún correo ni nombre en los registros de la aplicación; en los error
 (RNF-19): se guardan el código, el mensaje acotado, la ruta sin parámetros de consulta, la versión y el identificador de la petición.
 La prueba que lo demuestra planta un error cuyo mensaje lleva un correo y comprueba que la fila guardada no lo tiene.
 
+**Previsto para la Etapa 4, aún sin construir (diseño del 16/11/2026: la vista pública por enlace, `docs/19 §4`, O).** Estas filas no están
+en el inventario de arriba porque la página de privacidad se genera de él y no debe describir lo que todavía no existe; pasan a la tabla
+de arriba, y al código que la refleja, cuando se construya la vista.
+
+| Dato | Dónde | Para qué | Cuánto tiempo | Quién accede |
+|---|---|---|---|---|
+| Dirección IP completa de quien visita la vista pública por enlace (diseño del 16/11/2026, Etapa 4; `docs/19 §4`, O) | Registros del proxy, como la de cualquier petición. El contador de accesos de `enlace_publico_acceso` guarda solo enlace, día y cuenta: **ninguna dirección** ni identificador de quien visita; la ruta `GET /publico` (Etapa 4) no entra en `auditoria`, y la pantalla no usa cookies ni carga nada de terceros | Contar cuántas veces se vio un enlace; el límite de tasa y el diagnóstico (el registro del proxy) | El contador, 90 días; el registro del proxy, lo mismo que la fila de arriba (rotación por tamaño) | El administrador de sitio ve el conteo de su enlace; quien opera el servidor, los registros |
+| Título y descripción públicos de un enlace (diseño del 16/11/2026, Etapa 4; texto libre de hasta 80 y 300 caracteres) | `enlace_publico` | Decirle al visitante qué está viendo | Mientras exista la fila del enlace | **Cualquiera que tenga el enlace**, sin cuenta. El formulario avisa junto al campo: «Este texto lo verá cualquiera con el enlace: sin nombres de personas ni datos personales» |
+| Quién creó y quién revocó cada enlace, y cuándo (diseño del 16/11/2026, Etapa 4) | `enlace_publico` (`creado_por` y quién lo revocó; nombres por fijar en la migración) y los eventos `enlace_creado`, `enlace_renovado` y `enlace_revocado` | Saber quién publicó qué y cuándo (RF-46) | La de `evento`, que hoy no se borra; tras la baja de la cuenta queda el marcador anonimizado de `docs/20 §11` | Los administradores del sitio (en la actividad del sitio, P14) y el administrador del sistema |
+
 ## 3. Terceros
 **Hoy: ninguno en el camino de los datos de personas ni de las mediciones.**
 - **Navegador.** El panel no carga scripts, fuentes, estilos, analítica ni SDK de terceros: todo va en su propio paquete, servido

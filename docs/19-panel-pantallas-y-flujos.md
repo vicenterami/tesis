@@ -9,6 +9,8 @@
 > **08/11/2026 (plan de la Etapa 4, versión 2, `docs/04 §8`):** se suman las reglas transversales de botones, tablas, paginación,
 > renderizado optimista y avisos (§6), las pantallas P11 «Legal y acerca de», P12 «Estado del sistema» y P13 «Preferencias» (§3 y §4),
 > los cinco perfiles en P10 (`docs/20 §6`) y el rediseño de P1 con una comparativa previa de referentes y de normas (§4).
+>
+> **16/11/2026 (bloque O, §4):** se diseña P9 «Vista pública por enlace» (RF-62, HU-32, dentro del núcleo): solo promedios, con vencimiento, revocación y un mínimo de dispositivos por valor.
 
 ## 1. Lo que ya está decidido y aquí se respeta
 | Decisión | Dónde | Consecuencia para el panel |
@@ -55,7 +57,7 @@ función que lo calcula es una sola, con prueba unitaria por cada fila de la tab
 | P6 | **Configurar dispositivo y canales** | Nombre, estado (activo / mantenimiento), intervalo esperado, zona; por canal, etiqueta, umbral alto, umbral bajo, histéresis y retardo de activación | Guardar con bloqueo optimista; validación en vivo (bajo < alto, histéresis dentro de la banda, rango de la magnitud) | `PATCH /dispositivos/{id}`, `PUT /canales/{id}/reglas` (Etapa 4), fijadas el 11/11/2026 (§4 tablero v2, E) | HU-06, HU-13, RF-14, punto 28 | Etapa 4, iteración 1 (exige sesión) |
 | P7 | **Alta de dispositivo** (asistente) | Paso 1 identidad y zona; paso 2 vía y formato (y pasarela si LoRaWAN); paso 3 canales y magnitudes; paso 4 credencial según la vía, mostrada una sola vez; paso 5 «esperando la primera trama» en vivo | Crear; copiar la credencial y el tópico; subir un CSV, validarlo y crear las filas válidas; dar de alta un emisor detectado | `POST /dispositivos` (API hecha el 12/10, HU-11, `docs/16 §20`); `POST /dispositivos/lote?modo=validar\|crear` y `GET /cuarentena/detectados` (Etapa 4), fijadas el 11/11/2026 (§4 tablero v2, F) | RF-50, HU-11, HU-22, punto 25 | API: Etapa 3; pantalla, lote y detectados: Etapa 4, iteración 1 |
 | P8 | **Exportar** | Dispositivo (hoy) o sitio (Etapa 4), rango, formato (CSV, XLSX, JSON); tamaño estimado antes de descargar | Descargar | Hecho el 12/10 por dispositivo: `GET /dispositivos/{id}/exportar?formato=csv\|json&desde&hasta` (flujo por tandas; CSV estándar con coma y punto decimal para R, Python y QGIS). **Propuesta** para la Etapa 4: `GET /sitios/{id}/exportar` con rol y XLSX | RF-34, HU-08 (adelantada a la Etapa 3 el 12/10) | API: Etapa 3; pantalla, XLSX y por sitio: Etapa 4 |
-| P9 | **Vista pública por enlace** | Solo lo que el administrador eligió: magnitudes agregadas, sin trama cruda ni identificadores | Ninguna | **Propuesta:** `GET /publico/{token}` | punto 6 | Etapa 4 |
+| P9 | **Vista pública por enlace** (diseñada el 16/11/2026, §4 bloque O) | Para quien visita sin cuenta: solo los promedios de las magnitudes que un administrador publicó (del sitio y, si lo eligió, de cada zona), nunca el mínimo ni el máximo; un valor sale oculto si lo aportan menos de k dispositivos. Para el administrador, «Publicar una vista» con vista previa y la lista de enlaces | Visitante: cambiar la ventana y pausar la actualización. Administrador: crear (con vencimiento), renovar y revocar | `GET /publico` (Etapa 4; token en la cabecera `X-Enlace-Publico`) y `POST /sitios/{id}/enlaces/vista-previa` (Etapa 4); crear, listar, renovar y revocar enlaces, con rutas por fijar en el OpenAPI (§4, O) | RF-62, HU-32, punto 6 | Etapa 4, iteración 1 |
 | P10 | **Sesión y usuarios** | Entrar, cambio de la clave temporal, salir; quién soy en la cabecera; usuarios de mis sitios, su perfil por sitio y la guía de perfiles (cinco desde el 08/11/2026, diseño: `docs/20 §6`) | Entrar, cambiar la clave, salir o cerrar en todos lados; dar de alta (clave temporal una vez), activar y desactivar, asignar una temporal, cambiar el rol | `POST /sesion`, `GET /sesion`, `DELETE /sesion`, `POST /sesion/clave`, `GET /usuarios`, `POST /usuarios`, `PATCH /usuarios/{id}` (`docs/20`) | RF-43, RF-44, HU-18 | Etapa 4; hecha el 08/11/2026 (§4) |
 | P11 | **Legal y acerca de** (Etapa 4) | Privacidad (generada desde `docs/21`), términos de uso con su versión, avisos de terceros, versión y commit, aviso AGPL; soporte: contacto del responsable y formulario | Leer; aceptar los términos (obligatorio al primer ingreso y al cambiar la versión); enviar un mensaje de soporte | `GET /terminos`, `POST /terminos/aceptar`, `GET /privacidad`, `GET /acerca` (versión y commit solo con sesión), `POST /soporte` y `GET /soporte` (Etapa 4); los avisos de terceros, un archivo generado al cambiar dependencias | RF-53, RF-54, RF-61, HU-27, HU-31 | Iteración 0; hecha el 11/11/2026 |
 | P12 | **Estado del sistema** (solo administrador del sistema; Etapa 4) | Recursos por contenedor en el tiempo (memoria frente a su techo, CPU), errores agrupados por huella, último respaldo y su antigüedad, condiciones del sistema abiertas; límites de los servicios | Ver el detalle de un error; ajustar un límite con bloqueo optimista | `GET /salud` y rutas nuevas sobre `metrica_recurso`, `error_sistema` y los límites (Etapa 4; `docs/10 §8.4` puntos 60 y 61) | RF-59, RF-60, RNF-19, HU-30 | Iteración 1 |
@@ -934,6 +936,131 @@ archivo), «Descargar la plantilla», «Volver a revisar» (lleva a la tabla de 
 12. **Orden.** Contrato y backend (plan por fila, `n`, huella, plantilla, magnitudes, topes, todo o nada y reintento) con sus pruebas;
     después el panel (lector, revisión, descargas); al final el lector de XLSX, que no bloquea lo anterior, y la revisión por capturas.
 
+**O. P9 Vista pública por enlace: lo que ve quien visita sin cuenta (cambia `docs/20 §7`, la fila P9 de §3 y de §7, y `docs/10 §8.4` punto 6; diseñado el 16/11/2026, antes del código, y revisado el mismo día: 15 objeciones, todas atendidas en este texto).**
+Quien pidió esta vista (entrevista del 05/10) quiere una vista de lectura para estudiantes, **sin datos crudos**. La regla que ordena
+todo el bloque: **el visitante ve solo promedios de lo que un administrador decidió publicar, la regla que protege a cada equipo se
+aplica cada vez que se sirve y no solo al publicar, y nada más responde a ese enlace.**
+
+1. **Qué se publica.** Un administrador de sitio publica una **vista**: un sitio, una lista de magnitudes del catálogo, una ventana
+   máxima (24 horas, 7 días o 30 días) y, si lo elige, el **desglose por zona** con la lista de zonas **fijada al publicar**. La vista
+   muestra, por magnitud, el **promedio** de ahora y su tendencia: el promedio del sitio, que es el de sus dispositivos (bloque M), y con
+   el desglose lo mismo por cada zona publicada, con el nombre que la zona tenía al publicar. **No se publican el mínimo ni el máximo**:
+   en el histórico del sitio son la lectura real de un equipo (`consulta/tablero.ts`, `min(x.valor)` y `max(x.valor)`), y eso es un dato
+   crudo. **Nunca** viajan: tramas, lecturas sueltas, extremos, identificadores físicos, nombres de dispositivos o de pasarelas,
+   coordenadas, condiciones, eventos, personas, ni exportación.
+2. **Un valor se publica solo si lo aportan al menos k dispositivos, y eso se comprueba al servir.** k es del enlace: **3 por omisión**;
+   quien publica puede bajarlo a 2 o a 1, con el aviso «con 1, el promedio es la lectura de ese equipo», y la lista de enlaces lo
+   muestra. El valor por omisión y el mínimo que se puede elegir son parámetros del despliegue (`PUBLICO_MINIMO_DISPOSITIVOS`, 3, y
+   `PUBLICO_MINIMO_DISPOSITIVOS_PISO`, 1), que fija el administrador del sistema: una instancia puede prohibir publicar equipos
+   solos. Cada tramo de cada serie (del
+   sitio y de cada zona) y cada valor de «ahora» sale **sin valor** cuando lo aportan menos de k dispositivos, con el texto «datos de
+   menos de k dispositivos»: un equipo que se da de baja, calla o cambia de zona después de publicar no deja al descubierto a los que
+   quedan. Para que lo oculto no se despeje por resta, en un tramo donde **exactamente una** zona quedó oculta se oculta también el total
+   del sitio. El número exacto de dispositivos no viaja: la vista dice «promedio de k o más dispositivos». Una zona creada después de
+   publicar no aparece, y una renombrada conserva el nombre publicado, hasta que el administrador publique de nuevo.
+3. **El administrador ve antes exactamente lo que verá el visitante.** La pantalla «Publicar una vista» (en la configuración del sitio)
+   dibuja la vista con los datos reales mientras se eligen las magnitudes y el desglose. Usa la ruta de vista previa
+   (`POST /sitios/{id}/enlaces/vista-previa` (Etapa 4), con la acción `enlaces`), que arma la respuesta con **la misma función** que
+   `GET /publico` (Etapa 4), incluida la regla de k: lo que hoy saldría oculto se ve oculto, con su motivo. Muestra los nombres de zona tal como
+   saldrán. Al crear, el enlace se muestra **una sola vez**, con «Copiar».
+4. **El enlace, su vencimiento y su renovación.** Un token aleatorio de 32 bytes (como el de la sesión, `docs/20 §3`); la base guarda
+   su resumen SHA-256, nunca el token, con índice único. Tablas (`docs/20 §2`): `enlace_publico` —sitio, magnitudes, ventana máxima,
+   zonas publicadas (identificador y nombre publicado), k, título (hasta 80 caracteres) y descripción (hasta 300) públicos, quién lo
+   creó y cuándo, **cuándo vence** (obligatorio), cuándo se revocó y por quién— y `enlace_publico_acceso` (enlace, día, cuenta). **Todo
+   enlace vence:** al crearlo se elige 7, 30, 90 o 180 días (una actividad, un mes, un trimestre, un semestre; 30 por omisión); el
+   máximo es un parámetro del despliegue (`PUBLICO_VENCIMIENTO_MAX_DIAS`, 180 por omisión; cuando exista la pantalla de límites del
+   administrador del sistema, P12, hoy solo diseñada, pasará a ella). **Renovar** fija el vencimiento en hoy más el plazo elegido, **sin
+   cambiar el token** (el enlace ya compartido sigue sirviendo), y avisa si con eso lo acorta. Se renueva un enlace vigente o uno vencido
+   hace **30 días o menos**; pasado ese plazo, o un año desde su creación, se crea otro. **Riesgo aceptado y dicho:** renovar un vencido
+   vuelve a servir una dirección que ya circuló; por eso tiene plazo, y por eso existe revocar, que no se deshace. Un sitio admite hasta
+   10 enlaces no revocados (`PUBLICO_MAX_ENLACES_POR_SITIO`; es un tope de administración, no de seguridad: una lista que una persona
+   puede revisar). Crear, renovar y revocar generan los eventos `enlace_creado`, `enlace_renovado` y `enlace_revocado`, con el sitio en
+   su detalle, y la actividad del sitio (P14) los muestra con quién y cuándo.
+5. **El token no queda en ningún registro, tampoco en los del propio panel.** La dirección que se comparte lleva el token en el
+   fragmento (`…/panel/#/v/<token>`): el navegador no envía el fragmento al servidor ni lo pone en la cabecera de procedencia. El panel
+   pide los datos a `GET /publico` (Etapa 4) con el token en la cabecera `X-Enlace-Publico`, no en la ruta ni en la consulta: el proxy y
+   el backend no registran cabeceras. En el panel, la ruta `#/v/` se resuelve **antes de montar la aplicación**: no pide la sesión ni la
+   salud, no lee preferencias y no pasa por la pantalla «Entrar»; nunca cuenta como «última vista» ni se puede guardar como vista, y el
+   informe de errores del panel la escribe como `#/v/…`. **Límite declarado:** la dirección completa queda donde quede cualquier
+   dirección compartida: el historial y la sincronización del navegador de quien visita, la mensajería donde se pegó, el portapapeles.
+   Por eso todo enlace vence y se puede revocar.
+6. **Lo que responde y lo que no.** `GET /publico` (Etapa 4) recibe el token y una ventana **de la lista cerrada** (24 h, 7 d o 30 d,
+   hasta la máxima del enlace; nunca fechas libres) y devuelve título, descripción, el nombre del sitio (`sitio.nombre`), las
+   magnitudes con su nombre y unidad, k, las series de promedios —del sitio y de cada zona publicada— y la hora del último dato. El
+   intervalo de cada ventana lo deriva el servidor con la misma función del tablero (`intervaloParaRango`), así que ninguna ventana
+   pasa el tope de tramos. Un token inexistente, vencido, revocado o con forma inválida recibe **la misma respuesta 404**. **La vigencia
+   se comprueba en cada petición** contra la fila (una lectura por índice): revocar corta de inmediato en todas las instancias. Con ese
+   token **ninguna otra ruta** cambia: la guardia central no lee esa cabecera; solo la lee el controlador de `GET /publico` (Etapa 4), que está
+   fuera de la matriz de `docs/20 §6`. Crear, listar, renovar, revocar y la vista previa exigen sesión y la acción `enlaces`.
+7. **Que mil visitantes no sean mil consultas, ni le quiten el tablero a quien tiene sesión.** El backend guarda **solo los datos**,
+   por enlace y ventana, 60 segundos en la memoria del proceso, acotada en cantidad y en bytes (60 segundos es el período más corto con
+   que reporta un equipo del campus: más fresco no dice nada nuevo). Mientras una respuesta se rehace, las demás peticiones del mismo
+   enlace y ventana **esperan ese resultado** en vez de consultar. El desglose se calcula en una consulta agrupada por zona, no en una
+   por zona. Lo público tiene **su propio cupo** de consultas, separado del de las tendencias del tablero, con el mismo tiempo máximo. El
+   proxy limita por dirección las peticiones a `/publico` (Etapa 4) en una zona propia (`publico`: 5 por segundo con ráfaga de 60, para que un
+   curso de 50 personas detrás de una misma dirección cargue la página a la vez y después refresque una vez por minuto; `docs/11 §4`),
+   y responde su 429 en JSON. No hay límite por enlace: cualquiera que lo tenga podría agotarlo y dejar sin vista a los demás, y la
+   respuesta guardada ya protege la base. La vista se refresca sola cada 60 segundos; no abre el canal en vivo.
+8. **Los accesos se cuentan sin escribir en cada visita y sin direcciones.** Un acceso es **una carga de la pantalla**, no cada
+   refresco. Se cuentan en memoria y se vuelcan una vez por minuto a `enlace_publico_acceso`, por día en la zona horaria del sitio; las
+   filas de más de 90 días se borran. `GET /publico` (Etapa 4) no entra en la auditoría de operaciones (`docs/10 §8.4` punto 43): no hay persona
+   a quien atribuirla y una pantalla de sala serían 1 440 filas al día. El registro del proxy guarda la dirección de quien visita, como
+   la de cualquier petición (`docs/21`).
+9. **La pantalla del visitante.** Sin el armazón del panel: título, sitio, «actualizado hace…», una tarjeta por magnitud con el
+   promedio de ahora, su unidad y «promedio de k o más dispositivos»; debajo, las gráficas de tendencia con el selector de ventana y, si
+   hay desglose, una fila por zona con su valor; lo oculto se ve como oculto, con su motivo. Tema claro y oscuro; se lee completa a
+   390 px sin desplazamiento lateral; cada gráfica tiene su tabla de datos alternativa. Botón **«Pausar actualización»** (WCAG 2.2.2); al
+   refrescar solo se anuncia el cambio de hora, sin mover el foco. Al pie, una línea fija: «Vista pública de solo lectura · promedios
+   del sitio». Si el enlace no vale: «Este enlace ya no está disponible. Pídele uno nuevo a quien te lo compartió.» La respuesta va sin
+   caché compartida y sin cookies; todo `/panel/` lleva `X-Robots-Tag: noindex`; la pantalla no carga nada de terceros (`docs/21`).
+10. **Administrar los enlaces.** En la configuración del sitio, una lista: título, qué publica (magnitudes, ventana, zonas), creado
+    por, vence el…, accesos de los últimos 7 días y estado (vigente, vence pronto, vencido, revocado), con «Renovar» y «Revocar», cada
+    uno con su confirmación. El formulario avisa junto al título y la descripción: «Este texto lo verá cualquiera con el enlace: sin
+    nombres de personas ni datos personales». El token no se puede volver a ver: si se perdió, se crea otro enlace.
+11. **Qué puede fallar y qué ve cada persona** (la regla del bloque N: qué pasó, por qué, qué texto se ve y qué se puede hacer).
+
+    | Qué pasó | Quién lo ve | Texto | Qué puede hacer |
+    |---|---|---|---|
+    | El enlace no existe, venció, se revocó o está mal copiado | Visitante | «Este enlace ya no está disponible. Pídele uno nuevo a quien te lo compartió.» | Nada más: un solo mensaje, a propósito |
+    | Demasiadas visitas desde la misma dirección (429) | Visitante | «Hay muchas visitas en este momento. La página se actualizará sola en un minuto.» | Esperar; se reintenta sola |
+    | El servicio está ocupado o la consulta pasó el tiempo máximo (503) | Visitante | «Los datos están tardando. La página volverá a intentarlo en un minuto.» | Esperar; se conserva lo último mostrado |
+    | Un valor lo aportan menos de k dispositivos | Visitante y administrador | «Datos de menos de k dispositivos.» | Administrador: quitar esa magnitud o zona, o bajar k a sabiendas (hasta el mínimo de la instancia) |
+    | No se eligió ninguna magnitud | Administrador | «Elige al menos una magnitud para publicar.» | Elegir |
+    | Una magnitud no tiene datos en la ventana | Administrador | «Sin datos de «…» en esta ventana: el visitante verá la tarjeta vacía.» | Publicar igual o quitarla |
+    | El sitio ya tiene 10 enlaces | Administrador | «Este sitio ya tiene 10 enlaces. Revoca uno para crear otro.» | Ir a la lista |
+    | Renovar acorta el vencimiento | Administrador | «Vencía el …; con este plazo vencerá antes, el …» | Confirmar o elegir otro plazo |
+    | Se intenta renovar un enlace revocado, vencido hace más de 30 días o con más de un año | Administrador | «Este enlace ya no se puede renovar. Crea uno nuevo.» | Crear |
+    | La sesión venció o falta el permiso | Administrador | Los mensajes de sesión del panel (P10, punto 4, en esta misma §4; el cliente HTTP, en §6) | Entrar de nuevo |
+
+12. **Frente a los referentes** (fuentes oficiales, leídas el 11/11/2026). Publicar un tablero sin cuenta es común: ThingsBoard CE
+    («Make the dashboard public to allow access without authentication.», thingsboard.io/docs/user-guide/dashboards/), Grafana
+    («Anyone with the URL can access the dashboard.», grafana.com/docs/grafana/latest/dashboards/share-dashboards-panels/shared-dashboards/),
+    Magistrala («Anyone with the link can view the dashboard — no login required.», absmach.eu/docs/magistrala/user-guide/dashboards/dashboards/)
+    y Ubidots («a URL to share a dashboard or a widget … without the need to logging in», help.ubidots.com/en/articles/901285).
+    OpenRemote lo condiciona a marcar antes los activos y atributos como públicos («this requires assets to be set as 'public' and
+    attributes as 'public read'», docs.openremote.io/docs/user-guide/manager-ui/) y Milesight IoT Cloud deja fijar permiso y fecha de
+    vencimiento del enlace («Set Permission and Expiry Date of this link.», support.milesight-iot.com/support/solutions/articles/73000514201-how-to-create-diagrams-on-dashboard-of-milesight-iot-cloud). Este
+    diseño toma lo segundo y lo tercero —se publica una selección explícita y todo enlace vence—. Dónde viaja el token, si se publican
+    solo agregados y con qué mínimo de equipos: **no declarado** en esas páginas (revisadas en las direcciones citadas); aquí se define
+    y se prueba.
+13. **Pruebas y medición (antes de dar por hecho).** Aislamiento: para cada ruta del OpenAPI, la respuesta con un `X-Enlace-Publico`
+    válido es idéntica, en código y cuerpo, a la respuesta sin él (falla plantada: una ruta que lea la cabecera). La respuesta pública
+    no contiene ningún identificador físico, nombre de dispositivo, coordenada, mínimo ni máximo de la base de prueba (se busca cada
+    uno en el cuerpo). La regla de k: una zona de 3 equipos a la que se le da de baja uno **deja de publicar su valor** sin tocar el
+    enlace, y el total del sitio se oculta en ese tramo; una zona creada después no aparece. Vencido, revocado, inexistente y mal formado
+    dan respuestas idénticas byte a byte. Renovar: un vencido hace 29 días vuelve a servir con el mismo token; uno de 31 días, uno
+    revocado y uno de más de un año se rechazan; el vencimiento nunca pasa el máximo. Revocar corta en la petición siguiente **con la
+    respuesta aún guardada** (falla plantada: mirar la respuesta guardada antes de validar). Cien visitas simultáneas con la respuesta
+    vencida hacen **una** consulta de datos, y la validación del enlace es una lectura por índice cada una. Con el cupo público lleno,
+    la pestaña Tendencias de una persona con sesión sigue respondiendo. El token no aparece en los registros del proxy ni del backend
+    tras una visita, ni en `preferencia.vistas`, ni en el informe de errores del panel. La vista previa del administrador y la vista del
+    visitante dan los mismos números. En navegador real: la pantalla del visitante y la de publicar, a 1 280 y 390 px, con y sin datos,
+    con y sin zonas, con un valor oculto. Cada prueba con su falla plantada. Medidas en `docs/16`: tiempo de la vista con 120 y 2 000
+    dispositivos, con 6 magnitudes y 5 zonas, antes de fijar el cupo público; y el peso de la pantalla pública.
+14. **Orden.** Migración y backend (crear, listar, renovar, revocar, vista previa, `GET /publico` (Etapa 4), la regla de k, respuesta guardada
+    con espera compartida, cupo propio, contador, eventos y su rama en la actividad) con sus pruebas; la zona de tasa del proxy;
+    después la pantalla del visitante y la de publicar; al final la revisión por capturas.
+
 ## 5. Flujos
 **F1 · Alta y primera trama.** Ya está dibujado en el diagrama de secuencia del alta (`docs/10`, figura del informe): el
 administrador crea el dispositivo (API en la Etapa 3), recibe la credencial una sola vez, configura el nodo, y el panel
@@ -1053,7 +1180,7 @@ administrador); la vista pública nunca ofrece exportar (punto 6).
 | P6 Configurar | HU-06, HU-13, RF-14 | Etapa 4, iteración 1 | Validación compartida (plantada: bajo ≥ alto falla en los dos lados); 409 con dos pestañas; retardo de activación: una medición fuera de banda menos tiempo que el retardo no abre condición, más tiempo sí; cada guardado deja un `evento` con la persona. Panel (`docs/16 §64`): los casos de la prueba del servidor repetidos contra la función del panel, el error junto al campo, «Guardando…», el 409 con la hora y «Recargar» sin pisar; con navegador real, la validación en vivo y el 409 con dos pestañas |
 | P7 Alta, lote y detectados | HU-22, RF-50, HU-11 | Etapa 4, iteración 1 | Credencial una sola vez; `modo=validar` no crea nada; desde el bloque N (15/11/2026), crear es todo o nada: una fila que no entra o un plan que cambió es 409 `plan_cambio` y no se crea ninguna, y el reintento con la misma llave no duplica (`docs/16 §71`); tope de 500 filas, del cuerpo y límite de tasa plantados; un emisor desconocido aparece en detectados y llega al asistente con su identificador. Panel: por el DOM, 121 válidas en una petición, repetida con la misma llave tras un 502, y los 409 por su `codigo` (`docs/16 §71`; hasta el 15/11, tandas de 50: `docs/16 §64`), 501 filas frenadas en el navegador, detectado → asistente; desde el 16/11/2026, la vista previa en tres pasos (`docs/16 §76`): los tres orígenes dan las mismas filas, las fórmulas salen neutralizadas y lo descargado vuelve a subirse sin cambios, las cinco tarjetas cuentan lo que muestran, «Crear» se desactiva en vuelo; con navegador real, el asistente por HTTP y un lote de 2 válidas y 1 rechazada, y el recorrido de la vista previa a 1 280 y 390 px (`banco.sh lote-navegador`, corrido el 16/11/2026: 24 de 24 en Firefox y en Chromium; faltan los umbrales de tiempo) |
 | P14 Actividad | RF-46, HU-11, HU-26 | Etapa 4, iteración 1 | Un umbral cambiado aparece con la persona que lo cambió; un administrador de un sitio no ve la actividad de otro (404); un cursor de otro sitio no trae nada. Panel (`docs/16 §64`): por el DOM, cursor, filtros en la URL, tarjetas en teléfono y nada para quien no administra; con navegador real, el umbral cambiado en P6 con quien lo cambió y sin correos |
-| P9 Vista pública | punto 6 | Etapa 4, iteración 1 (`docs/04 §8`, decisión del 13/11/2026) | Sin cuenta: solo las magnitudes agregadas elegidas; ninguna ruta cruda responde con el token |
+| P9 Vista pública | RF-62, HU-32, punto 6 | Etapa 4, iteración 1 (`docs/04 §8`, decisión del 13/11/2026; diseño del 16/11/2026 en §4, O) | Sin cuenta: solo los promedios elegidos, sin mínimo ni máximo, y un valor de menos de k dispositivos sale oculto; ninguna otra ruta cambia su respuesta con el token en la cabecera; vencido, revocado, inexistente y mal formado dan la misma respuesta; revocar corta con la respuesta guardada; la vista previa y la vista del visitante dan los mismos números; el token no queda en ningún registro; cada prueba con su falla plantada y, en navegador real, ambas pantallas a 1 280 y 390 px (§4, O, punto 13) |
 
 La etapa de cada pantalla es la de su historia en `docs/04`; mover una historia de etapa se decide con sus horas y se cambia
 primero allí (y en `docs/18`), nunca aquí. Matriz de acceso ruta × rol (`docs/11 §4`) y las pruebas de 409 con dos ediciones simultáneas |

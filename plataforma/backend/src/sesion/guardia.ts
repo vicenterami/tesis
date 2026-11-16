@@ -16,7 +16,7 @@ import { TERMINOS_VERSION } from '../legal/terminos.js';
 // petición quién la hace (`usuario`, con su mapa sitio → rol). No decide permisos por recurso: eso lo hace permitir() (permisos.ts),
 // que cada ruta llama con el sitio que resolvió el servidor. Rutas públicas: las marcadas con @Publica() (`/salud`, `POST /sesion`, la
 // recepción por HTTP, que tiene su propia credencial por dispositivo). Los archivos del panel (`/panel/*`) y `/docs` los sirve Express
-// antes de llegar a Nest: tampoco pasan por aquí. `/publico/*` (enlace público) llega con su propio bloque.
+// antes de llegar a Nest: tampoco pasan por aquí. `GET /publico` (vista pública por enlace; Etapa 4, docs/19 §4, O) llega con su propio bloque y esta guardia no lee su cabecera `X-Enlace-Publico`.
 //
 // Dos formas de identificarse:
 //  1. La cookie `__Host-sesion` (una persona). Toda ruta que escribe exige además la cabecera `X-Pedido: panel` (CSRF, decidido el 12/10/2026):

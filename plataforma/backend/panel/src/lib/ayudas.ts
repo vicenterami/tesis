@@ -18,7 +18,7 @@ export const FRASES: Readonly<Record<string, Frase>> = {
   configurar: { puede: 'configura nombre, estado, intervalo, zona y umbrales de los dispositivos', noPuede: 'no configura dispositivos ni umbrales' },
   // Los cinco perfiles (docs/20 §2 y §6; servidor: ACCIONES de sesion/permisos.ts, 11/11/2026).
   baja: { puede: 'da de baja dispositivos (revoca sus credenciales)', noPuede: 'no da de baja dispositivos' },
-  enlaces: { puede: 'crea y revoca los enlaces públicos de solo lectura del sitio', noPuede: 'no administra enlaces públicos' },
+  enlaces: { puede: 'crea, renueva y revoca los enlaces públicos de solo lectura del sitio', noPuede: 'no administra enlaces públicos' },
   auditoria: { puede: 've la actividad de las personas en sus sitios', noPuede: 'no ve la actividad de las personas' },
   sistema: { puede: 'administra el sistema: soporte, estado y límites de los servicios', noPuede: 'no administra el sistema' },
 };
@@ -31,7 +31,7 @@ function enumerar(xs: readonly string[], ultima: string): string {
   return `${xs.slice(0, -1).join(', ')} ${ultima} ${xs[xs.length - 1]}`;
 }
 
-// Acciones de la matriz que aún no tienen ninguna ruta (los enlaces públicos son de la Etapa 4, docs/19 §7): la guía no las ofrece ni las
+// Acciones de la matriz que aún no tienen ninguna ruta (los enlaces públicos son de la Etapa 4, docs/19 §4, O): la guía no las ofrece ni las
 // niega mientras no existan (corrección del 11/11/2026). Al construir la ruta, se quita de aquí.
 export const SIN_RUTA_TODAVIA: readonly string[] = ['enlaces'];
 

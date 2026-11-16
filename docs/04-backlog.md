@@ -7,6 +7,8 @@
 > el 23/09: la Etapa 3 tenía en realidad 97 h de núcleo, no las 60 que este documento afirmaba).
 > **08/11/2026:** el plan de la Etapa 4, versión 2 (§8), agregó 13 elementos fuera del núcleo (HU-26 a HU-31 y TT-42 a TT-48, 60 h)
 > y la épica EP-15: las cifras de §6.1 son ahora **79 elementos, 347 h; núcleo 34 elementos, 168 h** (el núcleo no cambia).
+> **16/11/2026:** la vista pública por enlace (HU-32, RF-62; `docs/19 §4`, O) entra **dentro del núcleo**: las cifras de §6.1 son ahora
+> **80 elementos, 359 h; núcleo 35 elementos, 180 h** (12 h más, todas en el núcleo). Lo anterior de esta nota es la instantánea del 08/11.
 
 # Backlog del proyecto
 
@@ -69,7 +71,7 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 | **EP-07** | Inventario y aprovisionamiento | M3 | OE4 | 3 · 4 | 15 |
 | **EP-08** | Supervisión de salud de enlace | M4 | OE4 | 3 · 4 | 18 |
 | **EP-09** | Seguridad y multi-tenencia | M7 | OE4 | 3 · 4 | 34 |
-| **EP-10** | Interfaz de administración | M8 | OE4 | 3 · 4 | 48 |
+| **EP-10** | Interfaz de administración | M8 | OE4 | 3 · 4 | 60 |
 | **EP-11** | Alertas y notificación | M6 | OE4 | 4 | 10 |
 | **EP-12** | Modelo de despliegue y análisis de costos | — | OE3 | 2 · 3 · 4 | 16 |
 | **EP-13** | Validación y pruebas | — | OE5 | 3 · 4 | 26 |
@@ -284,6 +286,7 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 | **HU-23** | **Como administrador de sitio**, quiero ver mi flota agrupada por tecnología de red, para entender por dónde llega cada cosa | S | 4 | 3 |
 | **HU-29** | **Como persona usuaria**, quiero elegir las unidades de visualización (°C o °F; mm, m o km), mi zona horaria y guardar vistas, para leer los datos a mi manera sin cambiar lo que guarda la base (RF-56; `docs/19 §4`, P13) — agregada el 08/11/2026; ✅ hecha el 11/11/2026 (P13; la zona horaria propia se guarda y aún no se aplica al mostrar) | S | 4 | 5 |
 | **HU-31** | **Como persona usuaria**, quiero enviar un mensaje de soporte desde el panel y ver el contacto del responsable de la instancia (RF-61; `docs/19 §4`, P11) — agregada el 08/11/2026; ✅ hecha el 11/11/2026 (P11: `POST /soporte` y el contacto configurado) | C | 4 | 2 |
+| **HU-32** | 🎯 **Como administrador de sitio**, quiero publicar una vista de solo lectura por enlace, con vencimiento y revocación, para mostrar promedios del sitio a quien no tiene cuenta (RF-62; `docs/19 §4`, O) — agregada el 16/11/2026; ⬜ sin empezar (diseño escrito) | M | 4 | **12** |
 | **TT-42** | Paginación: keyset con cursor opaco sobre `(tiempo, id)` en cuarentena, condiciones, accesos, auditoría y eventos; desplazamiento con total en usuarios e inventario (RF-57; `docs/10 §8.4` punto 58) — agregada el 08/11/2026; al 11/11/2026, keyset en cuarentena, condiciones, eventos, soporte y la actividad del sitio (que ya trae los accesos de sus personas); faltan la lista de accesos sueltos, la auditoría (keyset) y usuarios (desplazamiento) | M | 4 | 4 |
 | **TT-43** | Componentes reutilizables con etiqueta de texto y ayuda accesible (`Boton`, `Tooltip`, `Aviso`) extendidos a tablas y formularios (RF-58; `docs/19 §6`) — agregada el 08/11/2026 | M | 4 | 4 |
 | **TT-44** | Comparativa previa de referentes y de normas de usabilidad (WCAG 2.2), cada afirmación con su fuente, antes de rediseñar el tablero y las gráficas (`docs/19 §4`, P1) — agregada el 08/11/2026 | S | 4 | 3 |
@@ -295,6 +298,13 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 - Indica el momento de la última comunicación de cada dispositivo.
 - Es utilizable en un navegador móvil sin desplazamiento horizontal (RF-52).
 - Refleja los cambios de estado sin requerir recarga manual de la página.
+
+**HU-32 — criterios de aceptación** 🎯 (el diseño completo y sus pruebas están en `docs/19 §4`, O; aquí solo lo que decide si la historia está hecha)
+
+- Un administrador de sitio publica una vista de promedios con vencimiento obligatorio, la renueva y la revoca; revocar corta en la petición siguiente.
+- El visitante sin cuenta ve solo promedios, nunca mínimo, máximo, lecturas sueltas ni identificadores, y un valor aportado por menos de k dispositivos sale oculto.
+- Con el token en la cabecera, ninguna otra ruta cambia su respuesta, y el token no queda en ningún registro.
+- La vista previa del administrador y la vista del visitante dan los mismos números; ambas se leen a 390 px sin desplazamiento lateral.
 
 ## EP-11 · Alertas y notificación
 
@@ -376,21 +386,21 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 
 > Todas las cifras de esta sección se obtuvieron **sumando programáticamente** las estimaciones de los
 > elementos del backlog, no estimando el total a ojo. El procedimiento es reproducible sobre este
-> mismo documento. §6.1 está al día (79 elementos desde el 08/11/2026); §6.3 a §6.6 conservan el análisis de
+> mismo documento. §6.1 está al día (80 elementos desde el 16/11/2026); §6.3 a §6.6 conservan el análisis de
 > viabilidad con los 66 elementos de entonces, y la cuenta de la Etapa 4 que rige es la de §8.
 
 ## 6.1 Esfuerzo estimado
 
 | | Elementos | Horas |
 |---|:---:|:---:|
-| **Núcleo demostrativo** 🎯 | 34 | **168** |
+| **Núcleo demostrativo** 🎯 | 35 | **180** |
 | Fuera del núcleo | 45 | 179 |
-| **Total del backlog** | **79** | **347** |
+| **Total del backlog** | **80** | **359** |
 
-Por prioridad: **Must** 62 elementos / 287 h · **Should** 13 / 50 h · **Could** 4 / 10 h. Por etapa: la 4 tiene 37 elementos y 164 h.
+Por prioridad: **Must** 63 elementos / 299 h · **Should** 13 / 50 h · **Could** 4 / 10 h. Por etapa: la 4 tiene 38 elementos y 176 h.
 Hasta el 08/11/2026 eran 66 elementos y 287 h (Must 56 / 253 h · Should 8 / 30 h · Could 2 / 4 h); las 13 filas nuevas de la
 Etapa 4 (§8) suman 60 h, todas fuera del núcleo. La épica EP-12 decía 8 h y sus filas suman 16 desde que se agregaron TT-40 y TT-41
-(22/10/2026): corregido el 08/11/2026.
+(22/10/2026): corregido el 08/11/2026. El 16/11/2026 se agregó HU-32 (*Must*, Etapa 4, 12 h, núcleo): eran 79 elementos y 347 h (núcleo 34 y 168 h; *Must* 62 / 287 h; la Etapa 4, 37 elementos y 164 h). §6.3 a §6.6 conservan sus cifras de entonces.
 
 ## 6.2 Presupuesto disponible
 
@@ -515,7 +525,7 @@ TT-15 por un rango escrito a mano e incompleto. Recalculado sumando directamente
 | 5 | **HU-09** API de consulta externa | 4 | Bajo para la demostración |
 | 6 | Resto (HU-06, 13, 17, 18, 22, 25, TT-03–04, 08–10, 14–15, 23–26, 30–31, 34–41) | 97 | Variable |
 
-> **Lo que no se recorta bajo ninguna circunstancia:** los 34 elementos marcados 🎯. Su ausencia
+> **Lo que no se recorta bajo ninguna circunstancia:** los 35 elementos marcados 🎯 (34 hasta el 16/11/2026). Su ausencia
 > invalidaría la demostración en lugar de reducirla. Si el tiempo no alcanza para el núcleo completo, el
 > problema no se resuelve recortando: hay que **renegociar el alcance con el profesor guía y documentar
 > la desviación**, que es lo que la pauta valora frente a un incumplimiento silencioso.
@@ -527,7 +537,7 @@ El riesgo R4 («alcance excesivo para el tiempo disponible») pasa de probabilid
 mantiene bajo control mediante la separación explícita entre **núcleo comprometido** y **alcance
 condicional**, y mediante la revisión de holgura al cierre de cada etapa.
 
-**Reserva para imprevistos:** el 30 % de holgura del núcleo (72 h) constituye la única reserva. No se
+**Reserva para imprevistos:** el 30 % de holgura del núcleo (72 h; cifra de septiembre de 2026, con el núcleo en 168 h: desde el 16/11/2026 son 180 h y la holgura, 60 h, 25 %) constituye la única reserva. No se
 infló ninguna estimación individual: hacerlo habría producido un plan con apariencia de viabilidad sin
 mejorarla, y habría impedido detectar la sobrecarga que esta sección documenta.
 
@@ -556,13 +566,13 @@ no demuestran ninguna.
 | Aspecto | Estado |
 |---|---|
 | Épicas definidas | ✅ 15 (EP-15 desde el 08/11/2026), todas vinculadas a un objetivo específico |
-| Historias de usuario | ✅ 31, con rol, capacidad y beneficio (HU-26 a HU-31, agregadas el 08/11/2026) |
+| Historias de usuario | ✅ 32, con rol, capacidad y beneficio (HU-26 a HU-31, agregadas el 08/11/2026, y HU-32, el 16/11/2026) |
 | Tareas técnicas | ✅ 48 (TT-42 a TT-48, agregadas el 08/11/2026) |
-| Elementos del núcleo demostrativo | ✅ 34 elementos, 168 h |
+| Elementos del núcleo demostrativo | ✅ 35 elementos, 180 h (34 y 168 h hasta el 16/11/2026) |
 | Criterios de aceptación | ✅ Detallados en los elementos del núcleo; deliberadamente sin refinar en el resto |
-| Estimaciones | ✅ 79 elementos estimados, **347 h** en total, sumadas programáticamente (66 y 287 h hasta el 08/11/2026) |
+| Estimaciones | ✅ 80 elementos estimados, **359 h** en total, sumadas programáticamente (66 y 287 h hasta el 08/11/2026; 79 y 347 h hasta el 16/11/2026) |
 | Priorización | ✅ MoSCoW heredado del catálogo, más orden de ejecución justificado |
-| Verificación de viabilidad | 🔴 **Realizada. El backlog completo excede el presupuesto en 19 %; el núcleo cabe con 30 % de holgura. Redistribución correctiva definida.** La Etapa 4 tiene su propia cuenta, con las horas decididas el 08/11/2026 (§8) |
+| Verificación de viabilidad | 🔴 **Realizada. El backlog completo excede el presupuesto en 19 %; el núcleo cabe con 30 % de holgura (cifras de septiembre de 2026; con el núcleo en 180 h desde el 16/11/2026, 25 %). Redistribución correctiva definida.** La Etapa 4 tiene su propia cuenta, con las horas decididas el 08/11/2026 (§8) |
 
 ## 7. Plan de la Etapa 3 ordenado por criterio de la rúbrica (06/10/2026)
 
@@ -626,7 +636,7 @@ lo necesario para el tablero). El certificado público de TT-22 sigue en la 2. C
 **Decisiones del 13/11 y del 15/11/2026** (ajustan el párrafo anterior; las horas disponibles no cambian y sigue rigiendo la regla de
 que lo que no alcance de la iteración 1 pasa a la 2). (1) La **vista pública por enlace** (P9; `docs/20 §7`, `docs/10 §8.4` punto 6)
 **sube de la iteración 2 a la 1**, después del tablero y de la revisión previa del alta masiva: es la única pantalla para quien consulta
-sin cuenta. Aún no tiene fila en este backlog; se agrega con su diseño. (2) Lo que queda de las **preferencias** (HU-29: aplicar la
+sin cuenta. Desde el 16/11/2026 es **HU-32** (RF-62; `docs/19 §4`, O), **dentro del núcleo** (12 h): la pidió la entrevista del 05/10 y es lo único que puede ver quien no tiene cuenta. Esas 12 h se suman a la iteración 1 y no estaban en la cuenta del 08/11. (2) Lo que queda de las **preferencias** (HU-29: aplicar la
 zona horaria propia a las horas visibles) **vuelve a la iteración 1**, en un bloque posterior a la vista pública; en esa parte se
 revierte la decisión del 09/11. (3) La **comparación con los referentes** se escribe **por pantalla, dentro de cada diseño** de
 `docs/19` —qué hace el referente, con cita de su fuente oficial, y en qué se lo iguala o supera—, y la tabla que las reúne, en la semana
@@ -634,7 +644,7 @@ del informe (B5); el despliegue comparativo con mediciones propias (TT-40) sigue
 
 **Decisiones del 08/11/2026 que el plan supone** (cada una escrita donde manda):
 1. **Cinco perfiles con roles fijos y la matriz en el código** (`docs/20 §2`, §5 y §6; `docs/10 §8.4` punto 64): administrador del
-   sistema, administrador de sitio, investigador, operador técnico y consulta; el invitado es la vista pública por enlace, sin cuenta.
+   sistema, administrador de sitio, investigador, operador técnico y consulta; el invitado es la vista pública por enlace, sin cuenta (HU-32).
    «Exportar» pasa a administrador de sitio e investigador.
 2. **Baja de la cuenta por anonimización** (`docs/20 §11`; `docs/10 §8.4` punto 62).
 3. **Monitorización propia, sin terceros y dentro de RNF-17** (`docs/10 §8.4` puntos 60 y 61).
@@ -653,6 +663,9 @@ del informe (B5); el despliegue comparativo con mediciones propias (TT-40) sigue
 
 **Filas nuevas (08/11/2026):** HU-26 a HU-31 y TT-42 a TT-48 (13 elementos, 60 h, Etapa 4, fuera del núcleo) y la épica EP-15; los
 requisitos RF-53 a RF-61, RNF-19 y RNF-20 en `docs/02`.
+
+**Fila nueva (16/11/2026):** HU-32 (vista pública por enlace; 12 h, Etapa 4, **dentro del núcleo**) y el requisito RF-62 en `docs/02`. Es el único elemento de esta
+etapa que entra al núcleo, y se agrega a la iteración 1 que ya lo contenía (decisión del 13/11, arriba); las horas por bloque de la tabla de arriba no se recalculan: lo que rige son las de las filas.
 
 **Versión 1 (01/11/2026), conservada como registro.** Escrita el 24/10 y ajustada hasta el 01/11, ordenaba la etapa en siete bloques
 —seguridad, usuarios y roles (≈ 34 h, con el certificado de cliente por dispositivo); panel para operar una flota con pocos clics
@@ -695,6 +708,7 @@ ejecuta contra la holgura verificada al cierre de cada etapa.
 | 2. Segundo nivel | Aprovisionamiento desde la plataforma | HU-10, HU-11 | ✅ 12/10 (API; la pantalla es HU-22, E4) |
 | 2. Segundo nivel | Cifrado del transporte | TT-22 | ⬜ E3 |
 | 2. Segundo nivel | Panel de control | HU-19, HU-20, HU-21 | ✅ 24/10; 🟡 12/10 (P2 y P3 hechas; HU-20 parcial); HU-21 y HU-20 cerradas el 16/10 (`docs/16 §39` y §40) y HU-19 el 24/10 (`docs/16 §53` y §54; estado al día: `docs/18`) |
+| 2. Segundo nivel | Vista pública por enlace, de solo lectura y sin datos crudos (agregada el 16/11/2026) | HU-32 | ⬜ E4 (diseño en `docs/19 §4`, O) |
 | 2. Segundo nivel | Exportación en formato abierto | HU-08 | 🟡 E3 (CSV y JSON el 12/10; XLSX en la E4) |
 | 2. Segundo nivel | Validación formal | TT-27, TT-28, TT-29 | ✅ E4 (TT-28 y TT-29 hechas en la E3; TT-27, la matriz del contrato y el perfil estricto de SenML, el 15/11/2026: `docs/16 §73` y §74) |
 

@@ -42,7 +42,7 @@ Cada requerimiento declara su origen. Se emplean cinco tipos de fuente, con dist
 | **[ENT]** | **Entrevista directa** — declaraciones de partes interesadas registradas con la plantilla de `docs/03 §3`: `bitacora/2026-10-05-entrevista-academico-geologia.md` y `bitacora/2026-10-25-entrevista-operador-red.md` | Alto: necesidad declarada por quien usará u opera el sistema |
 
 > ✅ **Brecha cerrada el 25/10/2026** con dos entrevistas (5/10, Académico/Investigador en Ingeniería Civil Geológica; 25/10,
-> operador de la red LoRaWAN del campus): **[ENT]** queda marcada en los 26 requerimientos que alguna valida (24 funcionales y RNF-10
+> operador de la red LoRaWAN del campus): **[ENT]** queda marcada en los 27 requerimientos que alguna valida (25 funcionales, con RF-62 desde el 16/11/2026, y RNF-10
 > y RNF-12). Lo que amplían va a la Etapa 4 (`docs/04 §8`). Texto original de la brecha, conservado:
 >
 > 🔴 **Brecha declarada.** Falta la fuente **[ENT]** — entrevistas directas a las partes interesadas.
@@ -61,6 +61,10 @@ Cada requerimiento declara su origen. Se emplean cinco tipos de fuente, con dist
 > usuario configurará lo suyo) y de lo que exige operar con personas reales: perfiles, páginas legales, datos personales, ayuda y
 > monitorización. Llevan [PO] en ese sentido —una decisión del dueño del producto, no una indicación de la universidad— y la fecha en
 > su descripción. El inventario de datos personales que los sustenta está en `docs/21`.
+
+> **Requisito agregado el 16/11/2026 (RF-62).** La vista pública por enlace que pidió la entrevista del 05/10 (`bitacora/2026-10-05-entrevista-academico-geologia.md`:
+> vista de lectura para estudiantes, sin datos crudos) pasa de decisión a requisito, con su diseño en `docs/19 §4` (bloque O) y su historia HU-32
+> en `docs/04`. Lleva [PO] y [ENT] y la fecha en su descripción.
 
 ## 1.2 Convención de identificación
 
@@ -210,6 +214,7 @@ resolver. Es *Must* por coherencia con la propuesta de valor.
 | **RF-59** | La interfaz debe presentar al administrador del sistema el **estado del sistema**: recursos por contenedor, errores y último respaldo — agregado 08/11/2026 | [PO] | C5 | **M** |
 | **RF-60** | El sistema debe permitir al administrador del sistema **configurar los límites de los servicios** desde la interfaz — agregado 08/11/2026 | [PO] | C4 | **S** |
 | **RF-61** | La interfaz debe ofrecer un **formulario de soporte** que guarde el mensaje para el administrador del sistema — agregado 08/11/2026 | [PO] | C4 | **C** |
+| **RF-62** | El sistema debe permitir **publicar una vista de solo lectura por enlace**, con vencimiento y revocación, que muestre solo promedios y nunca datos crudos — agregado 16/11/2026 | [PO] [ENT] | C4 | **M** |
 
 **Justificación de RF-52.** El análisis de la oferta regional muestra que ControlTec destaca la
 supervisión desde el teléfono como característica comercial. Es una expectativa establecida del
@@ -330,15 +335,15 @@ almacenamiento en disco no tiene requisito propio y se dimensiona en `docs/14 §
 
 | Prioridad | Funcionales | No funcionales | Total |
 |---|:---:|:---:|:---:|
-| **Must** — indispensable para el producto | 40 | 18 | **58** |
+| **Must** — indispensable para el producto | 41 | 18 | **59** |
 | **Should** — importante, postergable | 17 | 2 | **19** |
 | **Could** — deseable | 4 | 0 | **4** |
 | **Won't** — fuera de alcance | — | — | ver 4.3 |
-| **Total catalogado** | **61** | **20** | **81** |
+| **Total catalogado** | **62** | **20** | **82** |
 
-Hasta el 08/11/2026 eran 70 (52 RF y 18 RNF; *Must* 51, *Should* 16, *Could* 3); ese día se agregaron RF-53 a RF-61, RNF-19 y RNF-20.
+Hasta el 08/11/2026 eran 70 (52 RF y 18 RNF; *Must* 51, *Should* 16, *Could* 3); ese día se agregaron RF-53 a RF-61, RNF-19 y RNF-20. El 16/11/2026 se agregó RF-62 (*Must*): hoy son 82 (62 RF y 20 RNF; *Must* 59, *Should* 19, *Could* 4).
 
-> ⚠️ **Tensión detectada en la priorización, declarada explícitamente.** 58 requerimientos *Must* (51 hasta el 08/11/2026)
+> ⚠️ **Tensión detectada en la priorización, declarada explícitamente.** 59 requerimientos *Must* (51 hasta el 08/11/2026)
 > representan un alcance considerable frente a la restricción **RE-01** (~15 horas semanales) y al
 > riesgo **R4**. La lectura correcta es que los *Must* definen **el producto que la tesis propone**,
 > mientras que el **núcleo demostrativo** de la sección 4.2 —el conjunto mínimo que prueba la
@@ -367,7 +372,7 @@ Hasta el 08/11/2026 eran 70 (52 RF y 18 RNF; *Must* 51, *Should* 16, *Could* 3);
 | Seguridad mínima | RF-40, RF-42, RNF-08, RNF-10 |
 | Extensibilidad verificable | RNF-12 |
 
-Son **20 requerimientos**. Ese conjunto cubre las cinco causas del problema y es alcanzable con el
+Son **20 requerimientos** (RF-62, la vista pública, es *Must* y su historia está en el núcleo del backlog desde el 16/11/2026, pero no es de estos 20: la hipótesis se demuestra sin ella). Ese conjunto cubre las cinco causas del problema y es alcanzable con el
 presupuesto de tiempo disponible. Todo lo demás es mejora del producto, no demostración de la tesis.
 
 ## 4.3 Fuera de alcance declarado (*Won't*)
@@ -396,11 +401,11 @@ como omisión.
 | **C1** Fragmentación de protocolos y formatos | RF-01…RF-03, RF-05, RF-06, RF-08, RF-10…RF-13, RF-15…RF-17, RF-20, RF-31, RF-32, RF-40, RF-42, RF-45, RF-51, RNF-16 | **21** |
 | **C2** Acoplamiento hardware-plataforma | RF-02, RF-03, RF-04, RF-51, RNF-12 | **5** |
 | **C3** Costo y dependencia de plataformas SaaS | RF-34, RF-35, RF-41, RF-53…RF-55, RNF-14, RNF-15, RNF-20 | **9** |
-| **C4** Ausencia de capacidad técnica interna | RF-18, RF-19, RF-21, RF-30, RF-33, RF-43, RF-44, RF-47, RF-49, RF-37, RF-50, RF-52, RF-56…RF-58, RF-60, RF-61 | **17** |
+| **C4** Ausencia de capacidad técnica interna | RF-18, RF-19, RF-21, RF-30, RF-33, RF-43, RF-44, RF-47, RF-49, RF-37, RF-50, RF-52, RF-56…RF-58, RF-60…RF-62 | **18** |
 | **C5** Falta de visibilidad de la conectividad | RF-07, RF-09, RF-12, RF-14, RF-18, RF-22, RF-23, RF-24…RF-30, RF-34, RF-36, RF-38, RF-39, RF-46, RF-48, RF-59, RNF-03, RNF-19 | **23** |
 
 **Verificación:** ninguna causa queda sin requerimientos asociados, y ningún requerimiento del catálogo
-carece de causa declarada. **Recalculada el 08/11/2026 desde la columna «Causa» de cada tabla**, al sumar RF-53 a RF-61: C1 listaba
+carece de causa declarada. **Recalculada el 08/11/2026 desde la columna «Causa» de cada tabla**, al sumar RF-53 a RF-61 (el 16/11/2026, C4 suma RF-62: 18): C1 listaba
 RF-04 (solo C2) y RF-14 (C5) y omitía RF-32, y decía 24 con 22 en la lista; C4 omitía RF-37 y C5, RF-09 y RF-18.
 
 ## 5.2 Trazabilidad requerimiento → objetivo → etapa
@@ -615,12 +620,12 @@ funcionamiento en navegador móvil (RF-52). Las alternativas a evaluar serán ma
 | Sección | Estado |
 |---|---|
 | 1 Metodología y fuentes | ✅ Completo, con la brecha de entrevistas declarada |
-| 2 Requerimientos funcionales (61) | ✅ Completo, sujeto a ajuste tras las entrevistas; RF-53 a RF-61 agregados el 08/11/2026 |
+| 2 Requerimientos funcionales (62) | ✅ Completo, sujeto a ajuste tras las entrevistas; RF-53 a RF-61 agregados el 08/11/2026 y RF-62 el 16/11/2026 |
 | 3 Requerimientos no funcionales (20) | ✅ Completo; RNF-19 y RNF-20 agregados el 08/11/2026 |
 | 4 Priorización MoSCoW y MVP | ✅ Completo |
 | 5 Matriz de trazabilidad | ✅ Completo, cobertura de las 5 causas verificada |
 | 6 Evaluación de alternativas | ✅ Completo. 6.5 resuelto con la experiencia del desarrollador confirmada; 6.6 diferido a la Etapa 2 |
 | 7 Restricciones y supuestos | ✅ Completo |
 
-**Total catalogado: 81 requerimientos** (70 hasta el 08/11/2026), frente a los 20 que definen el núcleo mínimo demostrable
+**Total catalogado: 82 requerimientos** (70 hasta el 08/11/2026, 81 hasta el 16/11/2026), frente a los 20 que definen el núcleo mínimo demostrable
 (sección 4.2): ningún objetivo específico compromete una cifra mínima de requerimientos catalogados.

@@ -954,8 +954,12 @@ del fabricante de la pasarela (137 afirmaciones, en un registro del autor que no
    30 días por defecto) para auditoría y re-decodificación si un adaptador tuvo un error.
 6. **Vista pública de solo lectura por enlace, no un tercer rol.** Lo que pide el entrevistado (dashboard
    simplificado para estudiantes, sin datos crudos) se resuelve con un dashboard publicable: enlace con
-   token, solo lectura, magnitudes y agregación que elige el administrador. Es el patrón de los referentes
-   (por verificar en el registro de patrones) y evita crear cuentas para cada estudiante.
+   token, solo lectura, con las magnitudes, la ventana y las zonas que elige el administrador; la agregación es solo el promedio. Es el patrón de los referentes
+   (citados en `docs/19 §4`, O, punto 12) y evita crear cuentas para cada estudiante. **Diseño del 16/11/2026
+   (Etapa 4; fuente única: `docs/19 §4`, O; RF-62, HU-32):** la vista publica solo **promedios** (nunca mínimo, máximo ni
+   lecturas) y un valor aportado por menos de k dispositivos sale oculto cada vez que se sirve; todo enlace vence y se
+   revoca; el token va en el fragmento de la dirección y en la cabecera `X-Enlace-Publico` de `GET /publico` (Etapa 4),
+   que es la única ruta que lo lee y queda fuera de la matriz de `docs/20 §6`.
 7. **Unidades propias en el catálogo.** SenML no registra `Bq/m3`; RFC 8428 §4.5.2 deja la interpretación al
    «application context». El catálogo `magnitud` es ese contexto: una fila por magnitud con su unidad canónica,
    aunque no esté en el registro IANA. Nuevas magnitudes del caso de uso: radón (`Bq/m3`), hidrógeno (`ppm`),
@@ -1239,7 +1243,7 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     que el administrador recupera:** una hypertable `auditoria` con una fila por petición HTTP (instante, `usuario_id` cuando haya
     sesión, método, ruta normalizada, recurso, código, duración en ms, bytes, `id_peticion`, origen truncado a /24 en IPv4 y /48 en
     IPv6, porque la dirección completa es un dato personal y el bloqueo por IP se lleva en memoria con la exacta); se excluyen
-    `/salud` (lo pide el chequeo cada 15 s) y los latidos del canal en vivo (el flujo deja una fila al abrirse y otra al cerrarse,
+    `/salud` (lo pide el chequeo cada 15 s), `GET /publico` (Etapa 4), porque no hay persona a quien atribuir la petición y una pantalla de sala serían 1 440 filas al día (`docs/19 §4`, O, punto 8), y los latidos del canal en vivo (el flujo deja una fila al abrirse y otra al cerrarse,
     con su duración). Con 10 usuarios y 500 peticiones diarias son 5 000 filas por día: trivial. Se suman `acceso` (`docs/20`) y
     `metrica_broker`: una muestra por minuto de los contadores `$SYS` del broker que el manual documenta
     (`publish/messages/dropped`, `store/messages/count`, `store/messages/bytes`, `clients/connected`, `heap/current`), tomada por

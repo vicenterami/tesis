@@ -63,8 +63,13 @@
   (`docs/10 §8.4` punto 43) trunca el origen a /24 porque su fin es de uso, no de seguridad. `email_intentado` se guarda solo si tiene forma
   de correo (una clave pegada en el campo equivocado no queda en la base). A los registros de la aplicación la IP va truncada a /24 y nunca
   van correos ni nombres. El inventario completo de datos personales y de terceros está en `docs/21` (08/11/2026).
-- `enlace_publico` (nueva): `id`, `sitio_id`, `token_hash`, `magnitudes` (lista), `intervalo` (de la lista cerrada), `creado_por`,
-  `expira_en`, `revocado_en`.
+- `enlace_publico` (nueva; rediseñada el 16/11/2026, `docs/19 §4` O puntos 4 y 8): `id`, `sitio_id`, `token_hash` (el resumen SHA-256 del token, con
+  índice único: la base nunca guarda el token), las `magnitudes` publicadas, la ventana máxima (de la lista cerrada), las zonas publicadas
+  (identificador y nombre publicado, fijados al publicar), el mínimo de dispositivos k, el título (hasta 80 caracteres) y la descripción
+  (hasta 300) públicos, `creado_por` y cuándo, `expira_en` (obligatorio: todo enlace vence), `revocado_en` y quién lo revocó. Los nombres exactos
+  de las columnas se fijan en la migración.
+- `enlace_publico_acceso` (nueva, mismo diseño): enlace, día (en la zona horaria del sitio) y cuenta de accesos; sin direcciones ni identificador de
+  quien visita. Las filas de más de 90 días se borran.
 
 ## 3. Sesión: una cookie opaca con estado en el servidor
 - **Qué viaja:** una cookie `__Host-sesion` (nombre con prefijo desde el 08/11/2026, §10) con 32 bytes aleatorios en base64url; en la base queda su hash. Sin JWT: con un solo
@@ -128,8 +133,9 @@
 
 ## 5. El guardia central
 - Un middleware lee la cookie, busca la sesión viva, renueva `ultima_actividad` y deja en la petición `usuario` y sus
-  `sitios: Map<sitio_id, rol>`. Sin sesión → 401 con un cuerpo fijo. Las rutas públicas (`/salud`, `/panel/*`, `/publico/*`, `POST /sesion` y `POST /recepcion/{idFisico}`, que lleva su propia credencial por dispositivo) no
-  pasan por él.
+  `sitios: Map<sitio_id, rol>`. Sin sesión → 401 con un cuerpo fijo. Las rutas públicas (`/salud`, `/panel/*`, `POST /sesion` y `POST /recepcion/{idFisico}`, que lleva su propia credencial por dispositivo) no
+  pasan por él. La vista pública, `GET /publico` (Etapa 4), tampoco, y **la guardia no lee su cabecera `X-Enlace-Publico`**: solo la lee el controlador de esa
+  ruta (§7), así que ese token no da acceso a ninguna otra.
 - Una sola función `permitir(usuario, accion, sitio_id)` con la tabla de permisos de la §6; toda ruta la llama antes de tocar
   la base. El `sitio_id` lo resuelve el servidor a partir del recurso pedido (el dispositivo, el canal), nunca del cuerpo.
 - **Un recurso de otro sitio responde 404, no 403**: no se revela que existe (RF-41). El 403 queda para «es tu sitio pero tu
@@ -152,13 +158,13 @@
 Ampliada el 08/11/2026 a los cinco perfiles (§2). **✅ 11/11/2026: vigente en el código con las siete columnas** (`permisos.ts`, migración
 24; paso 4b del guardián, `docs/16 §63`), incluido el cambio de «exportar» (administrador de sitio e investigador). La baja de dispositivos
 y pasarelas es una acción propia (`baja`), separada de `escribir`, para que el operador técnico dé de alta y no de baja. Las filas de enlaces
-públicos y de estado del sistema siguen siendo **diseño** (sus rutas no existen aún); la de auditoría de un sitio es `GET /sitios/{id}/actividad`
+públicos y de estado del sistema siguen siendo **diseño** (sus rutas no existen aún); la vista pública `GET /publico` (Etapa 4) **no está en la matriz**: no es de ningún perfil ni de ningún sitio, y se prueba aparte (§7); la de auditoría de un sitio es `GET /sitios/{id}/actividad`
 (Etapa 4). Cada celda dice qué responde la ruta a esa persona en **su** sitio; «Otro sitio» es la misma
 persona pidiendo un recurso de un sitio donde no tiene membresía (el administrador del sistema no tiene «otro sitio»: alcanza a todos).
 
 | Ruta | Sin sesión | Consulta | Investigador | Operador técnico | Administrador de sitio | Administrador del sistema | Otro sitio |
 |---|---|---|---|---|---|---|---|
-| `GET /salud`, los archivos del panel bajo `/panel/`, la vista pública `/publico/{token}` (Etapa 4) | 200 | 200 | 200 | 200 | 200 | 200 | 200 |
+| `GET /salud`, los archivos del panel bajo `/panel/` | 200 | 200 | 200 | 200 | 200 | 200 | 200 |
 | `POST /sesion` (pública), `GET /sesion`, `DELETE /sesion`, `POST /sesion/clave` (las tres valen con clave temporal) | 200 / 401 | 200 | 200 | 200 | 200 | 200 | — |
 | `GET /dispositivos`, `GET /dispositivos/{id}`, `GET /canales/{id}/historico`, `GET /condiciones`, `GET /cuarentena`, `GET /pasarelas`, `GET /eventos` | 401 | 200 (solo sus sitios en la lista; filtro por sitio en el `WHERE`) | 200 | 200 | 200 | 200 (todos los sitios) | 404 |
 | `GET /dispositivos/{id}/exportar` (datos crudos, no públicos: punto 6) | 401 | 403 | 200 | 403 | 200 | 200 | 404 |
@@ -172,16 +178,23 @@ persona pidiendo un recurso de un sitio donde no tiene membresía (el administra
 | `GET /dispositivos/lote/plantilla` (15/11/2026, `docs/19 §4` N4: las columnas y los límites del lote; la acción «escribir» en algún sitio, sin sitio propio en la ruta) | 401 | 403 | 403 | 200 | 200 | 200 | — |
 | `GET /magnitudes` (15/11/2026, `docs/19 §4` N4: el catálogo, que no es de ningún sitio) | 401 | 200 | 200 | 200 | 200 | 200 | — |
 | `GET /usuarios`, `POST /usuarios`, `PATCH /usuarios/{id}` | 401 | 403 | 403 | 403 | 200 (las membresías de sus sitios; la cuenta de quien también está en otro sitio: 403, §5) | 200 (todas las cuentas) | 404 |
-| Enlaces públicos de un sitio (Etapa 4) | 401 | 403 | 403 | 403 | 200 | 200 | 404 |
+| Administrar los enlaces públicos de un sitio (crear, listar, renovar y revocar) y su vista previa, `POST /sitios/{id}/enlaces/vista-previa` (Etapa 4), con la acción `enlaces`; las demás rutas, por fijar en el OpenAPI: `docs/19 §4` O) | 401 | 403 | 403 | 403 | 200 | 200 | 404 |
 | Auditoría de un sitio: `GET /sitios/{id}/actividad` (Etapa 4) | 401 | 403 | 403 | 403 | 200 | 200 | 404 |
 | Estado del sistema, límites de los servicios, sitios y auditoría de todos los sitios; leer el soporte (`GET /soporte` (Etapa 4)) | 401 | 403 | 403 | 403 | 403 | 200 | — |
 | Lo propio de cada persona: `GET`/`PUT /preferencias`, `GET /sesiones`, `DELETE /sesiones/{id}`, `GET /cuenta/exportar`, `POST /cuenta/baja`, `POST /terminos/aceptar`, `POST /soporte` (Etapa 4) | 401 | 200 | 200 | 200 | 200 | 200 (la baja, 409 si es el último administrador del sistema: §11) | — |
 | Páginas legales: `GET /terminos`, `GET /privacidad`, `GET /acerca` (Etapa 4; públicas, también con la sesión restringida por los términos) | 200 | 200 | 200 | 200 | 200 | 200 | — |
 
-## 7. Vista pública por enlace
-- Un administrador crea el enlace eligiendo sitio, magnitudes e intervalo de agregación; el token (32 bytes) se muestra una vez
-  y la base guarda su hash. `GET /publico/{token}` (Etapa 4) devuelve solo agregados de esas magnitudes; nunca trama cruda, identificadores
-  físicos ni exportación. Caduca y se revoca desde el panel. Límite de tasa en el proxy para esa ruta (`docs/11 §4`).
+## 7. Vista pública por enlace (rediseñada el 16/11/2026; fuente única: `docs/19 §4`, O)
+- Un administrador de sitio publica **promedios** de un sitio y, si quiere, de sus zonas; nunca el mínimo, el máximo ni un dato crudo, y un valor
+  que aportan menos de k dispositivos (3 por omisión) sale oculto cada vez que se sirve.
+- El token (32 bytes, como el de la sesión) se muestra una vez y la base guarda solo su resumen SHA-256; todo enlace vence, se renueva sin
+  cambiar el token y se revoca.
+- `GET /publico` (Etapa 4) recibe el token en la cabecera `X-Enlace-Publico`, comprueba su vigencia en cada petición y es la única ruta que responde
+  a ese token; la guardia central no lo lee y la ruta queda fuera de la matriz de la §6.
+- Crear, listar, renovar, revocar y la vista previa exigen sesión y la acción `enlaces`; sus eventos (`enlace_creado`, `enlace_renovado`,
+  `enlace_revocado`) quedan en la actividad del sitio.
+- Todo lo demás (qué se publica, la regla de k, la renovación, la respuesta guardada, el límite de tasa, lo que se cuenta y lo que se prueba)
+  vive en `docs/19 §4`, O, y no se repite aquí; los controles del proxy, en `docs/11 §4`, y los datos personales, en `docs/21 §2`.
 
 ## 8. Pruebas que lo demuestran (antes de dar por hecho)
 - La matriz de la §6 completa, con una sesión por rol y un recurso de otro sitio: cada celda es un caso.
@@ -320,7 +333,7 @@ optimista). El cliente HTTP del panel pone `X-Pedido: panel` en todo lo que escr
 al arrancar, declarada en `.env.example` y pasada por el compose (guardianes 2d y 2z). En la pantalla de administración de límites (plan de
 la Etapa 4) este valor pasará a configurarse desde el panel.
 
-**Lo que falta** (no cambia el diseño): la vista pública por enlace (§7 y `enlace_publico`), `auditoria` con su middleware (`docs/10 §8.4`
+**Lo que falta** (no cambia el diseño): la vista pública por enlace (HU-32; §7, `enlace_publico` y `docs/19 §4`, O), `auditoria` con su middleware (`docs/10 §8.4`
 punto 43), el «quién» en los eventos de alta, baja y calibración, y retirar `HTTP_CLAVE_ADMIN` del `.env` del servidor una vez creado el
 primer administrador. El recorrido del banco con navegador (`banco.sh navegador`, `e2e/p3.mjs`) ya entra como usuario del sistema, con la
 clave del banco por cabecera (`docs/16 §59`).
