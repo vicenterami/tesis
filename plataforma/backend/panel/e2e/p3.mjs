@@ -1,5 +1,5 @@
 // Pantallas P3 (ficha del dispositivo), P3b (comparación) y P2 (inventario) en un navegador real con Playwright, contra el banco
-// (docs/19 §6 y §7, filas P3 e incremento 2; docs/16 §39 y §52). Lo lanza `banco.sh navegador`, que siembra el histórico y pasa los
+// (docs/19 §6 y §7, filas P3 e incremento 2; docs/16 §39, §52 y §75). Lo lanza `banco.sh navegador`, que siembra el histórico y pasa los
 // datos; no se corre suelto contra la pila de desarrollo (detiene y arranca el backend del banco).
 //   node e2e/p3.mjs <url_base> <dispositivo_id> <canal_id> <id_fisico> <sitio> <red_docker> <imagen_broker> <contenedor_backend> <captura.png>
 // Variables (las pone banco.sh): NAVEGADOR=firefox (por defecto) o chromium; E2E_DISP2 y E2E_ID2, el segundo emulado con temperatura
@@ -11,6 +11,7 @@ import { chromium, firefox } from 'playwright';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 
+const INICIO = Date.now(); // banco.sh sembró las lecturas de hace 50, 35 y 20 minutos un instante antes de lanzar esta prueba (paso «a medida»)
 const [BASE, dispId, canalId, idFisico, sitio, red, imagen, backend, captura] = process.argv.slice(2);
 if (!captura) {
   console.log('FALLA faltan argumentos (ver la cabecera de e2e/p3.mjs)');
@@ -316,6 +317,97 @@ try {
     await pagina.waitForFunction((d) => document.querySelector(`[data-fila-comparar="${d}"] [data-ultima]`)?.textContent === '31,5 Cel', disp2, { timeout: 15000 })
       .then(() => ok('P3b: una trama MQTT del segundo emulado actualiza su fila de la tabla en vivo sin recargar (31,5 Cel)'), () => falla('P3b: la fila en vivo no se actualizó'));
     await pagina.screenshot({ path: captura.replace(/\.png$/, '-p3b.png'), fullPage: true });
+  });
+
+  // HU-07 (docs/19 §4, D1b; docs/16 §72): el rango «A medida» de la ficha en un navegador real, a 1 280 y a 390 px. banco.sh sembró
+  // lecturas de temperatura de este emulado 50, 35 y 20 minutos antes de lanzar la prueba, y los pasos 3 y 4 publicaron otras dos al
+  // empezar: la ventana [inicio − 40 min, inicio − 10 min) debe traer las de 35 y 20 y dejar fuera la de 50 y las recientes. Las fechas
+  // se teclean como lo haría una persona: en la hora del sitio, en los dos campos de fecha y hora.
+  await paso('a medida (HU-07)', async () => {
+    const zonaSitio = (await api(`/dispositivos/${dispId}`)).zona_horaria;
+    const alMinuto = (ms) => new Date(Math.floor(ms / 60000) * 60000);
+    const desde = alMinuto(INICIO - 40 * 60000);
+    const hasta = alMinuto(INICIO - 10 * 60000);
+    const partes = (d) => Object.fromEntries(new Intl.DateTimeFormat('en-CA', { timeZone: zonaSitio, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(d).map((x) => [x.type, x.value]));
+    const enElSitio = (d) => { const p = partes(d); return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`; };
+    const horaEnElSitio = (d) => { const p = partes(d); return `${p.hour}:${p.minute}`; };
+    const [isoDesde, isoHasta] = [desde.toISOString(), hasta.toISOString()];
+    for (const ancho of [1280, 390]) {
+      const p = await navegador.newPage({ viewport: { width: ancho, height: 844 }, extraHTTPHeaders: CABECERAS });
+      vigilar(p);
+      const pedidos = []; // toda petición que lleve una ventana (`desde`), para saber cuál pidió la página
+      p.on('request', (r) => { const u = new URL(r.url()); if (u.searchParams.has('desde')) pedidos.push(u); });
+      const con = (trozo, d, h) => pedidos.filter((u) => u.pathname.includes(trozo) && u.searchParams.get('desde') === d && u.searchParams.get('hasta') === h);
+      try {
+        await p.goto(`${BASE}/panel/#/dispositivos/${dispId}?canal=${canalId}`);
+        await p.waitForSelector('[data-historico]', { timeout: 15000 });
+        await asentar(p);
+        const antes = await estadoGrafico(p);
+        await p.click('[data-a-medida]');
+        await p.waitForSelector('[data-form-a-medida]', { timeout: 5000 });
+        // a) Un rango imposible (el fin antes del inicio): el motivo junto a los dos campos, la URL intacta y ninguna petición con él.
+        await p.fill('[data-form-a-medida] [data-desde]', enElSitio(hasta));
+        await p.fill('[data-form-a-medida] [data-hasta]', enElSitio(desde));
+        await p.click('[data-aplicar-a-medida]');
+        await p.waitForTimeout(600);
+        const motivo = ((await p.locator('[data-error-a-medida]').textContent({ timeout: 3000 }).catch(() => '')) ?? '').trim();
+        const marcados = await p.locator('[data-form-a-medida] input[aria-invalid="true"]').count();
+        const trasError = await estadoGrafico(p);
+        if (motivo !== '' && marcados === 2 && con('/', isoHasta, isoDesde).length === 0 && trasError.hash === antes.hash) ok(`a medida a ${ancho} px: con el fin antes del inicio dice «${motivo}» junto a los dos campos y no pide nada`);
+        else falla(`a medida a ${ancho} px, rango imposible: motivo «${motivo}», campos marcados ${marcados}, peticiones ${con('/', isoHasta, isoDesde).length}, hash «${antes.hash}» → «${trasError.hash}»`);
+        // b) El rango válido: va a la URL como el instante que corresponde a la hora del sitio tecleada.
+        await p.fill('[data-form-a-medida] [data-desde]', enElSitio(desde));
+        await p.fill('[data-form-a-medida] [data-hasta]', enElSitio(hasta));
+        await p.click('[data-aplicar-a-medida]');
+        await p.waitForFunction(() => new URLSearchParams(location.hash.split('?')[1] ?? '').has('desde'), null, { timeout: 15000 }).catch(() => {});
+        await asentar(p);
+        const e = await estadoGrafico(p);
+        const q = new URLSearchParams(e.hash.split('?')[1] ?? '');
+        if (e.hash.startsWith(`#/dispositivos/${dispId}?`) && Date.parse(q.get('desde') ?? '') === desde.getTime() && Date.parse(q.get('hasta') ?? '') === hasta.getTime()) ok(`a medida a ${ancho} px: «${enElSitio(desde)}» a «${enElSitio(hasta)}» (hora de ${zonaSitio}) queda en la URL como ${isoDesde} a ${isoHasta}`);
+        else falla(`a medida a ${ancho} px, URL: hash «${e.hash}» (se esperaba desde=${isoDesde} y hasta=${isoHasta})`);
+        // c) La gráfica, las condiciones y el historial de eventos piden esa misma ventana.
+        const [ph, pc, pe] = [con(`/canales/${canalId}/historico`, isoDesde, isoHasta), con('/condiciones', isoDesde, isoHasta), con(`/dispositivos/${dispId}/eventos`, isoDesde, isoHasta)];
+        if (ph.length >= 1 && pc.length >= 1 && pe.length >= 1) ok(`a medida a ${ancho} px: el histórico, las condiciones y los eventos se piden con el mismo «desde» y «hasta»`);
+        else falla(`a medida a ${ancho} px, peticiones con la ventana: histórico ${ph.length}, condiciones ${pc.length}, eventos ${pe.length}`);
+        // d) Lo dibujado es lo que la API tiene para esa ventana, y el texto dice el rango en la hora del sitio.
+        const intervalo = ph[0]?.searchParams.get('intervalo') ?? '';
+        const consulta = (d, h) => api(`/canales/${canalId}/historico?${new URLSearchParams({ desde: d.toISOString(), hasta: h.toISOString(), intervalo }).toString()}`);
+        const ventana = await consulta(desde, hasta);
+        const puntosPagina = Number(await p.getAttribute('.grafico', 'data-puntos'));
+        if (ventana.puntos >= 2 && e.texto.startsWith(`${ventana.puntos} puntos`) && puntosPagina === ventana.puntos && e.texto.includes(horaEnElSitio(desde)) && e.texto.includes(horaEnElSitio(hasta))) ok(`a medida a ${ancho} px: el gráfico tiene los ${ventana.puntos} puntos de la API para esa ventana y el texto dice el rango («${e.texto.replace(/\s+/g, ' ').trim().slice(0, 110)}»)`);
+        else falla(`a medida a ${ancho} px, puntos: API ${ventana.puntos}, gráfico ${puntosPagina}, texto «${e.texto}»`);
+        // e) Lo que cae fuera queda fuera: con la misma resolución, una ventana más ancha tiene puntos antes y después, y la elegida
+        // trae solo los de dentro (los tiempos de la API van en segundos).
+        const ancha = await consulta(new Date(desde.getTime() - 20 * 60000), new Date());
+        const [dS, hS] = [desde.getTime() / 1000, hasta.getTime() / 1000];
+        const antesDe = ancha.tiempos.filter((t) => t < dS).length;
+        const despuesDe = ancha.tiempos.filter((t) => t >= hS).length;
+        const dentro = ancha.tiempos.filter((t) => t >= dS && t < hS).length;
+        const todosDentro = ventana.tiempos.every((t) => t >= dS && t < hS);
+        if (antesDe >= 1 && despuesDe >= 1 && todosDentro && dentro === ventana.puntos) ok(`a medida a ${ancho} px: la ventana deja fuera ${antesDe} punto(s) anteriores y ${despuesDe} posteriores que sí existen (resolución ${intervalo})`);
+        else falla(`a medida a ${ancho} px, lo de fuera: antes ${antesDe}, después ${despuesDe}, dentro ${dentro} de ${ventana.puntos}, todos dentro ${todosDentro} (resolución ${intervalo})`);
+        // f) Con el formulario abierto y el rango aplicado, la página no se desplaza a lo ancho (RF-52), en el peor de 6 muestras.
+        let sobra = 0;
+        for (let i = 0; i < 6; i++) {
+          sobra = Math.max(sobra, await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth));
+          await p.waitForTimeout(200);
+        }
+        const formulario = await p.locator('[data-form-a-medida]').boundingBox();
+        if (sobra <= 0 && formulario !== null && formulario.x >= 0 && formulario.x + formulario.width <= ancho + 0.5) ok(`a medida a ${ancho} px: el formulario cabe (${Math.round(formulario.width)} px) y la página no se desplaza a lo ancho`);
+        else falla(`a medida a ${ancho} px: la página se desplaza ${sobra} px a lo ancho; formulario ${formulario === null ? 'ausente' : `de ${Math.round(formulario.x)} a ${Math.round(formulario.x + formulario.width)} px`}`);
+        await p.screenshot({ path: captura.replace(/\.png$/, `-a-medida-${ancho}.png`), fullPage: true });
+        // g) La URL basta: al recargar, la misma ventana, los mismos puntos y «A medida» marcado.
+        await p.reload();
+        await p.waitForSelector('[data-historico]', { timeout: 15000 });
+        await asentar(p);
+        const r = await estadoGrafico(p);
+        const marcado = await p.getAttribute('[data-a-medida]', 'aria-pressed');
+        if (r.hash === e.hash && r.puntos === ventana.puntos && marcado === 'true') ok(`a medida a ${ancho} px: al recargar, la misma ventana con sus ${r.puntos} puntos y «A medida» marcado`);
+        else falla(`a medida a ${ancho} px, recarga: hash «${r.hash}», puntos ${r.puntos} (eran ${ventana.puntos}), «A medida» aria-pressed=${marcado}`);
+      } finally {
+        await p.close();
+      }
+    }
   });
 
   // RF-52 (docs/19 §1): en un teléfono la página no se desplaza a lo ancho; las tablas sí, dentro de su caja. banco.sh deja a un emulado

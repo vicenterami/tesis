@@ -86,7 +86,7 @@ esperado, la misma tolerancia de `en_linea`: el equipo reporta, pero esa magnitu
 validación manda a cuarentena; en la corrida de 24 h la presión calló 3 h 30 min con el equipo en «Normal», `docs/16 §53`). La
 cabecera suma «N canal(es) callado(s)». Es regla de presentación, como §2: no abre condición ni cambia el estado visual del
 dispositivo; volverla alerta exige una condición en la base. Debajo, el gráfico del
-canal elegido: rango (última hora, 24 h, 7 días, 30 días; el rango a medida por fechas es HU-07: su formulario existe desde el 15/11/2026, D1b, y falta probarlo en un navegador real), cada uno con un intervalo de
+canal elegido: rango (última hora, 24 h, 7 días, 30 días; el rango a medida por fechas es HU-07: su formulario existe desde el 15/11/2026, D1b, y está probado en navegador real desde el 16/11/2026, `docs/16 §75`), cada uno con un intervalo de
 agregación fijo de la lista cerrada de la API (1 minuto, 15 minutos, 1 hora, 6 horas);
 el panel pide el histórico y abre el canal en vivo filtrado por dispositivo; cada `medicion` nueva del canal visible se añade al
 final sin volver a pedir el histórico; cada `visto` actualiza «hace cuánto»; cada `condicion` actualiza la lista de condiciones y el
@@ -128,7 +128,7 @@ declara intervalo observado ni desvío de reloj. Lo que se toma, lo que no y lo 
    la señal explícita de Magistrala y la hace verificable.
 Pruebas (§6): por el DOM, ida y vuelta URL ↔ estado en P2 y P3, el texto y el botón del rango vacío, el intervalo con sus dos avisos, la alerta
 del reloj; en el backend, unitaria del contrato y de las piezas de la consulta (OpenAPI regenerado); la mediana se contrasta en la base, porque las unitarias corren sin ella. Lo que no entra en este incremento: filtros guardados por
-persona, rango a medida (HU-07: su formulario llegó el 15/11/2026, D1b; falta la prueba en navegador real) y la administración de pasarelas (incremento 3).
+persona, rango a medida (HU-07: su formulario llegó el 15/11/2026, D1b; probado en navegador real el 16/11/2026, `docs/16 §75`) y la administración de pasarelas (incremento 3).
 
 **Incremento 2 de P3 y P2: leyenda sin sorpresas, cambio de rango sin pantalla en blanco, hora del sitio, resolución elegible y
 comparación entre nodos (diseñado el 22/10/2026, antes del código, como manda la regla de concordancia).** Qué lo motiva: al revisar la
@@ -193,7 +193,7 @@ de dispositivos en un gráfico ni aviso por la zona del navegador (no declarado,
    `GET /dispositivos/{id}/exportar` con la ventana visible (la pantalla P8 sigue en la Etapa 4; un enlace no es la pantalla).
 Pruebas (§6): las de navegador se suman al recorrido de `banco.sh navegador` (el mismo arranque de Firefox); por el DOM y funciones puras:
 resoluciones admisibles por rango, desfase de zona, alineación de series y lectura y escritura de la URL de P3b. Lo que no entra: rango a
-medida por fechas (HU-07: hecho el formulario el 15/11/2026, D1b; falta la prueba en navegador real), tableros guardados por persona, y una serie en miniatura por fila en P2 (una petición por fila: se mide antes).
+medida por fechas (HU-07: hecho el formulario el 15/11/2026, D1b, y probado en navegador real el 16/11/2026, `docs/16 §75`), tableros guardados por persona, y una serie en miniatura por fila en P2 (una petición por fila: se mide antes).
 **Hecho el 22/10/2026 (`docs/16 §52`).** Medido en el banco con la serie de 30 días a una lectura cada 10 s: toda resolución de un rango lee
 las mismas filas crudas salvo dos o tres por el borde del cubo (≈ 8 600 en 24 h, 60 500 en 7 días y 259 200 en 30 días; la tabla exacta
 está en `docs/16 §52`), así que la resolución más fina cuesta poco más en tiempo

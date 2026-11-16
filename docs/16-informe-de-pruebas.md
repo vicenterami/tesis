@@ -3266,7 +3266,7 @@ supervisados = total − inactivos, reportan ≤ supervisados y el porcentaje es
 355 ejecuciones en vitest, en 33 archivos).
 
 **Lo que queda.** La ficha con el formulario en un navegador real, a 1 280 y a 390 px (hasta aquí solo hay pruebas sin navegador): es condición para
-cerrar HU-07. Un rango de menos de dos minutos dibuja un solo punto, igual que en el tablero.
+cerrar HU-07 (hecho el 16/11/2026: §75). Un rango de menos de dos minutos dibuja un solo punto, igual que en el tablero.
 
 ## 73. Matriz del contrato de trama (15/11/2026)
 
@@ -3594,3 +3594,38 @@ ser pendientes, +4 de las reglas C-96 a C-99 y +2 de `tiempoSenml`), y 365 prueb
 **Lo que queda.** La concatenación `bn` + `n` y los alias de magnitud (catálogo). En el diseño, `s`, `bs` y `ut` se ignoran y los valores de texto, booleanos y datos se
 omiten: si algún día se guardan, se cambia primero `docs/10 §4`. En `docs/10 §4.1` queda anotada la limitación de la reentrega con marca relativa; si importa, el
 emisor debe mandar `bt` absoluto. Los textos del informe que decían que la identidad viaja en `bn` (el capítulo 2 y los anexos de requerimientos y de evaluación de la comunicación) se corrigieron con este bloque.
+
+## 75. El rango a medida de la ficha en un navegador real (16/11/2026)
+
+**Por qué.** A HU-07 (historial por rango de fechas) le faltaba una sola cosa (§72): ver el formulario «A medida» de la ficha en un navegador real, en
+escritorio y en teléfono. Las pruebas de §72 no usan navegador: no dicen si los campos de fecha y hora se pueden teclear, si la hora del sitio se
+convierte bien al instante que se pide, ni si el formulario cabe a 390 px.
+
+**Qué se hizo.** Un paso nuevo, «a medida (HU-07)», en el recorrido de la ficha con Playwright (`plataforma/backend/panel/e2e/p3.mjs`, que lanza
+`banco.sh navegador` contra el banco). El banco siembra lecturas de temperatura de un emulado 50, 35 y 20 minutos antes de la prueba, y la propia
+prueba publica otras dos al empezar; el paso elige la ventana que va de 40 a 10 minutos antes del inicio, tecleando las fechas **en la hora del
+sitio**, como lo haría una persona. Por cada ancho (1 280 y 390 px) comprueba siete cosas:
+
+| Comprobación | Qué exige |
+|---|---|
+| Rango imposible (el fin antes del inicio) | El motivo junto a los dos campos, marcados como inválidos; la URL no cambia y no sale ninguna petición con ese rango |
+| La ventana va a la URL | `desde` y `hasta` del fragmento son el instante que corresponde a la hora del sitio tecleada |
+| Un solo rango para todo | El histórico del canal, las condiciones y los eventos se piden con el mismo `desde` y `hasta` |
+| Lo dibujado es lo que hay | El gráfico y el texto tienen los puntos que la API devuelve para esa ventana, y el texto dice el rango en la hora del sitio |
+| Lo de fuera queda fuera | Con la misma resolución, una ventana más ancha tiene puntos antes y después; la elegida trae solo los de dentro |
+| Cabe | Con el formulario abierto, la página no se desplaza a lo ancho y el formulario queda dentro de la ventana (RF-52) |
+| La URL basta | Al recargar: la misma ventana, los mismos puntos y «A medida» marcado |
+
+**Resultado.** `banco.sh navegador`: **50 de 50 comprobaciones** en Firefox 157 y en Chromium 156 (eran 36; las 14 nuevas son las siete de la tabla a
+los dos anchos). A 390 px el formulario mide 358 px; a 1 280 px, 992 px. La ventana tecleada como 16:01 a 16:31 en la hora del sitio quedó en la URL
+como 19:01 a 19:31 UTC, y la gráfica mostró 2 puntos a un minuto, dejando fuera uno anterior y uno posterior (en Firefox, con el banco recién
+encendido; en la corrida siguiente sobre el mismo banco, la de Chromium, fueron 4 puntos y 2 a cada lado, porque quedaban las lecturas sembradas
+por la primera: la comprobación compara con la API, no con un número fijo). Capturas de los dos anchos en la carpeta privada del banco.
+
+**Falla plantada.** Con dos defectos puestos a propósito en el panel —los eventos piden las últimas 24 horas en vez de la ventana; el formulario con
+un ancho mínimo de 520 px— la corrida quedó con **3 de 50 comprobaciones con falla**, justo las esperadas: «peticiones con la ventana: histórico 1,
+condiciones 1, eventos 0» a los dos anchos y «la página se desplaza 146 px a lo ancho» a 390 px. Quitados los defectos, 50 de 50.
+
+**Límites.** En el navegador se comprueba que los eventos se **piden** con la ventana; en el banco ese rango no tenía eventos y la lista mostró su
+mensaje de vacío. Que el servidor deje fuera las filas de fuera del rango se prueba contra la base en el humo de la API (§72). El recorrido corre
+contra el banco y no es un paso del verificador (detiene y arranca el backend del banco): se corre a mano al tocar la ficha.

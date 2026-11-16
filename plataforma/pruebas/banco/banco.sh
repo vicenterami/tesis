@@ -18,7 +18,7 @@
 #   bash plataforma/pruebas/banco/banco.sh tope                tope por emisor en las dos vías (docs/10 §8.4 punto 53): presupuesto de lecturas por HTTP y cuota de cuarentena por MQTT
 #   bash plataforma/pruebas/banco/banco.sh nodo                contrato del nodo ESP32 (fase 2, docs/17 §6.2) sin la placa: alta con seis canales, calibración por API (400, 200, 409), el pack del firmware con QoS 1 → medicion, ficha, histórico y en vivo
 #   bash plataforma/pruebas/banco/banco.sh navegador           P3, P3b y P2 en un navegador real con Playwright: puntos contra /historico, vivo sin recargar, caída y vuelta (docs/16 §39);
-#                                                              leyenda, rangos, resoluciones, rango vacío, zona horaria y comparación (docs/16 §52). NAVEGADOR=firefox (por defecto) o chromium
+#                                                              leyenda, rangos, resoluciones, rango vacío, zona horaria y comparación (docs/16 §52); rango a medida (docs/16 §75). NAVEGADOR=firefox (por defecto) o chromium
 #   bash plataforma/pruebas/banco/banco.sh historico           el promedio del sitio es el de sus dispositivos: los cinco casos de docs/19 §4 M7 con datos sembrados a propósito (docs/16 §68)
 #   bash plataforma/pruebas/banco/banco.sh cola                cola del broker vigilada: backend detenido + 200 emulados → descartes → condición broker_descarte (docs/16 §22)
 #   bash plataforma/pruebas/banco/banco.sh estado | logs [servicio] | sql ["CONSULTA"]
