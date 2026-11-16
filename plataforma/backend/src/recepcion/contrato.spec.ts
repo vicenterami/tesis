@@ -55,6 +55,8 @@ const MATRIZ: Regla[] = [
   { id: 'C-10', grupo: 'a', regla: 'v debe ser un número finito; cadena, nulo, booleano o desborde se rechazan', fuente: 'RFC 8428 §4.3 (tipo de v); senml.adaptador.ts, «typeof r.v !== \'number\' || !Number.isFinite(r.v)»', esperado: 'rechazada: malformada «v no numérico»', cubre: [aqui('C-10'), adp('rechaza JSON inválido, pack vacío y valores no numéricos')] },
   { id: 'C-11', grupo: 'a', regla: 'Los registros solo con vs, vb o vd se omiten: el sistema guarda solo valores numéricos', fuente: 'RFC 8428 §4.2 y §5.1.5; senml.adaptador.ts, «if (r.v === undefined) continue»', esperado: 'aceptada: solo la lectura numérica', cubre: [aqui('C-11')] },
   { id: 'C-97', grupo: 'a', regla: 'De punta a punta, bv + v es el valor que se guarda (y el rango físico se evalúa sobre esa suma)', fuente: 'RFC 8428 §4.5.4; docs/10 §4 (filtros 2 y 3)', esperado: 'bv 10, v 5 en Cel: se guarda 15; bv 80, v 10: 90 Cel fuera del rango, a cuarentena invalida', cubre: [aqui('C-97')] },
+  { id: 'C-104', grupo: 'a', regla: 'bt, t, bu, n y u con un tipo equivocado (bt o t que no es un número finito; bu, n o u que no es texto) se rechazan, también en un registro sin valor', fuente: 'RFC 8428 §4.3, Tabla 1 (bt y t: número; bu: cadena); senml.adaptador.ts, revisarPerfil', esperado: 'rechazada: malformada «bt no numérico», «t no numérico» o «bu no es texto» (antes se ignoraban en silencio)', cubre: [aqui('C-104')] },
+  { id: 'C-105', grupo: 'a', regla: 'Todos los registros de un pack tienen la misma versión: un bver distinto del vigente se rechaza (un registro sin bver cuenta como 10 hasta que un bver explícito fije la versión)', fuente: 'RFC 8428 §4.4: «All SenML Records in a Pack MUST have the same version number»', esperado: 'rechazada: malformada «bver 5 distinto del 10 del resto del pack…»; un solo bver en el primer registro, o el mismo repetido, se acepta', cubre: [aqui('C-105')] },
   { id: 'C-12', grupo: 'a', regla: 'Un registro con solo campos base (sin valor) no genera lectura', fuente: 'RFC 8428 §4 (ejemplo §5.1.7); senml.adaptador.ts, «if (r.v === undefined) continue»', esperado: 'aceptada: sin lectura para ese registro', cubre: [aqui('C-12')] },
   { id: 'C-13', grupo: 'a', regla: 'Un pack sin ninguna lectura numérica se rechaza', fuente: 'RFC 8428 §4.2 (el valor es obligatorio salvo con s); senml.adaptador.ts, «throw new TramaMalformada(\'pack sin valores\')»', esperado: 'rechazada: malformada «pack sin valores»', cubre: [aqui('C-13')] },
   { id: 'C-14', grupo: 'a', regla: 'bv se suma al v de su registro y de los siguientes hasta el próximo bv; sin v no hay lectura; los valores no numéricos no lo reciben; un bv no numérico o una suma que desborda se rechazan (hallazgo H-6)', fuente: 'RFC 8428 §4.1 y §4.5.4: «added together to get the value»', esperado: 'aceptada: valor = bv + v (bv 10, v 5 → 15); rechazada: malformada «bv no numérico» o «bv + v fuera del rango numérico» (corregido el 15/11/2026: antes se ignoraba bv)', cubre: [aqui('C-14')] },
@@ -66,6 +68,8 @@ const MATRIZ: Regla[] = [
   { id: 'C-20', grupo: 'b', regla: 'Sin marca de tiempo rige la hora de recepción', fuente: 'docs/13 regla 7; RFC 8428 §4.5.3 (cero = «ahora»)', esperado: 'aceptada: tiempo de recepción, origen_tiempo recepcion', cubre: [tmp('sin marca → hora de recepción'), svc('sin marca del emisor → origen_tiempo "recepcion"')] },
   { id: 'C-21', grupo: 'b', regla: 'Un tiempo relativo (bt + t menor que 2^28) se resuelve como dice la RFC: negativo es «ahora» menos esos segundos; cero o positivo (futuro relativo) rige la hora de recepción; desde 2^28 es absoluto (hallazgo H-8)', fuente: 'RFC 8428 §4.5.3; docs/13 reglas 7 y 19', esperado: 't = −5: la hora de recepción menos 5 s (origen dispositivo); t = 0, 10 o 268435455: recepción; un pasado relativo anterior al año 2000: recepción (corregido el 15/11/2026: antes se perdía el desfase)', cubre: [aqui('C-21')] },
   { id: 'C-98', grupo: 'b', regla: 'De punta a punta, un tiempo relativo negativo se guarda como la hora de recepción menos esos segundos (origen dispositivo); uno cero o positivo, con la hora de recepción', fuente: 'RFC 8428 §4.5.3; docs/13 reglas 7 y 19', esperado: 't = −30: marca del emisor ≈ ahora − 30 s; t = 0: origen_tiempo recepcion (sin marca guardada)', cubre: [aqui('C-98')] },
+  { id: 'C-102', grupo: 'b', regla: 'El «ahora» de los tiempos relativos es uno solo por trama: todos los registros de un pack comparten el mismo instante cuando falta recibidoEn', fuente: 'RFC 8428 §4.5.3 («relative to the current time»); senml.adaptador.ts, «const ahora»', esperado: 'tres registros con t = −10: tres marcas iguales y una sola lectura del reloj', cubre: [aqui('C-102')] },
+  { id: 'C-103', grupo: 'b', regla: 'La hora de recepción que llega a la lectura es la que la vía tomó al entrar la trama, por MQTT y por HTTP, aunque la base tarde en responder', fuente: 'docs/10 §4 (filtro 2); recepcion.service.ts, procesar y procesarHttp', esperado: 'recibidoEn del adaptador y recibido_en de la medición son el instante de entrada; t = −5 se guarda como ese instante menos 5 s', cubre: [aqui('C-103')] },
   { id: 'C-22', grupo: 'b', regla: 'Una marca absoluta plausible se respeta, también la antigua posterior al año 2000 (cola sin cobertura)', fuente: 'docs/13 regla 7', esperado: 'aceptada: la marca del emisor, origen dispositivo', cubre: [tmp('marca antigua pero posterior a 2000'), svc('marca del emisor plausible')] },
   { id: 'C-23', grupo: 'b', regla: 'El umbral es el 1 de enero de 2000 UTC: anterior (incluido 1970) rige la recepción; esa fecha exacta se respeta', fuente: 'docs/13 regla 7; tiempo.ts:15', esperado: '1999-12-31T23:59:59Z y 1970: recepción; 2000-01-01T00:00:00Z: la marca', cubre: [aqui('C-23'), tmp('marca anterior al año 2000')] },
   { id: 'C-24', grupo: 'b', regla: 'Hasta 2 min de adelanto se respeta la marca; más, rige la recepción', fuente: 'docs/13 regla 7', esperado: '+120 s: la marca; +121 s o 2030: recepción', cubre: [tmp('adelanto de hasta 2 minutos'), tmp('más de 2 minutos en el futuro')] },
@@ -79,6 +83,8 @@ const MATRIZ: Regla[] = [
   // (c) Unidades y magnitudes
   { id: 'C-32', grupo: 'c', regla: 'La unidad canónica o la ausencia de unidad deja el valor tal cual', fuente: 'lectura.ts: «si falta, se asume la canónica»; unidades.ts', esperado: 'aceptada: mismo valor', cubre: [uni('misma unidad o sin unidad')] },
   { id: 'C-33', grupo: 'c', regla: 'Alias convertibles: K, °F y F a Cel; Pa, kPa y bar a hPa; % a %RH o %EL; mV a V', fuente: 'unidades.ts; docs/10 §8.4 punto 51; RFC 8798 §3', esperado: 'aceptada: valor en la unidad canónica', cubre: [uni('Kelvin y Fahrenheit'), uni('presión: Pa, kPa y bar'), uni('porcentaje genérico'), uni('mV (unidad secundaria'), aqui('C-33')] },
+  { id: 'C-100', grupo: 'c', regla: 'Un valor finito que deja de serlo al convertirse a la unidad canónica (1e306 bar son 1e309 hPa) se rechaza aunque el canal no tenga rango máximo', fuente: 'docs/10 §4.1 (la lectura imposible no se guarda); recepcion.service.ts, «Number.isFinite(convertido)»', esperado: 'rechazada: invalida «no cabe en un número finito al convertirlo a hPa»; lo que cabe (1e305 bar) se guarda', cubre: [aqui('C-100')] },
+  { id: 'C-101', grupo: 'c', regla: 'Un -0 (en v, en bv o como resultado de una conversión) se guarda como 0', fuente: 'RFC 8428 §4.3 (v es un número JSON; la copia local de la RFC no dice nada del cero negativo); docs/10 §4.1; recepcion.service.ts, «convertido === 0 ? 0 : convertido»', esperado: 'aceptada: se guarda 0, nunca -0', cubre: [aqui('C-101')] },
   { id: 'C-34', grupo: 'c', regla: 'Una unidad que no se sabe convertir se rechaza', fuente: 'unidades.ts: «mejor rechazar que adivinar»; docs/10 filtro 3', esperado: 'rechazada: invalida «unidad X no convertible a Y»', cubre: [svc('filtro 3: unidad no convertible')] },
   { id: 'C-35', grupo: 'c', regla: 'No existe la conversión inversa ni entre magnitudes distintas', fuente: 'unidades.ts', esperado: 'sin conversión: la lectura se rechaza como en C-34', cubre: [uni('pareja desconocida'), uni('V a mV no se inventa')] },
   { id: 'C-36', grupo: 'c', regla: 'Una magnitud sin canal declarado se rechaza', fuente: 'docs/10 filtro 3; recepcion.service.ts:301', esperado: 'rechazada: invalida «canal no declarado»', cubre: [svc('filtro 3: canal no declarado')] },
@@ -102,7 +108,7 @@ const MATRIZ: Regla[] = [
   { id: 'C-51', grupo: 'e', regla: 'Un identificador sin alta se rechaza', fuente: 'docs/10 §4 filtro 1; docs/06 §3.2', esperado: 'rechazada: no_registrado; no se marca vivo', cubre: [svc('dispositivo no registrado'), aqui('C-65')] },
   { id: 'C-52', grupo: 'e', regla: 'Un dispositivo dado de baja se rechaza, atribuido a él', fuente: 'docs/10 §4.1; docs/06 §3.2', esperado: 'rechazada: dado_de_baja; no se marca vivo', cubre: [svc('dispositivo dado de baja'), svc('no registrado → sin dispositivo_id; dado de baja')] },
   { id: 'C-53', grupo: 'e', regla: 'El sitio del tópico debe ser el del alta', fuente: 'docs/10 §8.4 punto 24', esperado: 'rechazada: no_registrado «registrado en el sitio X, no en Y»', cubre: [svc('filtro 1: tópico con el sitio de otra sede')] },
-  { id: 'C-54', grupo: 'e', regla: 'La identidad sale del tópico y la credencial, no del cuerpo: un bn de otro dispositivo no cambia a quién se atribuye (hallazgo H-2)', fuente: 'docs/10 filtro 1 (el tópico); contradice docs/06 §3.1 y §3.2 («la identificación viene dentro de la trama»)', esperado: 'aceptada y atribuida al dispositivo del tópico; bn no se compara', cubre: [aqui('C-54')] },
+  { id: 'C-54', grupo: 'e', regla: 'La identidad sale del tópico y la credencial, no del cuerpo: un bn de otro dispositivo no cambia a quién se atribuye (hallazgo H-2)', fuente: 'docs/10 §4 (perfil de SenML: «No identifica `bn`») y filtro 1 (el tópico y la credencial); docs/06 §3 («La identidad no viene dentro de la trama»); recepcion.service.ts, la consulta del filtro 1 recibe el identificador del tópico', esperado: 'aceptada y atribuida al dispositivo del tópico; ninguna consulta recibe el bn', cubre: [aqui('C-54')] },
   { id: 'C-55', grupo: 'e', regla: 'El nombre del registro gana; si falta, rige la magnitud del tópico', fuente: 'senml.adaptador.ts, «(n ?? ctx.magnitudTopico).toLowerCase()»; README del backend', esperado: 'magnitud del registro; sin n, la del tópico', cubre: [aqui('C-55'), adp('sin nombre en el registro, la magnitud sale del tópico')] },
   { id: 'C-56', grupo: 'e', regla: 'La magnitud del tópico se pasa a minúsculas', fuente: 'recepcion.service.ts:127', esperado: 'una trama en «…/Temperatura» usa el canal «temperatura»', cubre: [aqui('C-56')] },
   { id: 'C-57', grupo: 'e', regla: 'Una pasarela sin alta, inactiva o de otro sitio se rechaza, con cualquier evento', fuente: 'docs/10 §8.4 punto 47', esperado: 'rechazada: no_registrado; nadie se marca vivo', cubre: [svc('pasarela sin alta, inactiva o de otro sitio')] },
@@ -180,8 +186,9 @@ const marcas = (ls: Lectura[], origen: 'dispositivo' | 'pasarela' = 'dispositivo
 // ── Recepción real con la base simulada (la misma tubería que MQTT y HTTP) ──────────────────────────────────────────────────────
 type Disp = { id: string; estado: string; sitio_codigo?: string; formato?: string; pasarela_id?: string | null; intervalo_esperado_s?: number; canales?: number;
   ventana_inicio?: Date | null; ventana_lecturas?: number };
-const CANALES: Record<string, { unidad: string; min: number; max: number }> = { temperatura: { unidad: 'Cel', min: -40, max: 85 }, humedad: { unidad: '%RH', min: 0, max: 100 } };
-function armar(dispositivo: Disp | undefined, pasarela?: { id: string; activo: boolean; sitio_codigo: string }) {
+type Canal = { unidad: string; min: number | null; max: number | null };
+const CANALES: Record<string, Canal> = { temperatura: { unidad: 'Cel', min: -40, max: 85 }, humedad: { unidad: '%RH', min: 0, max: 100 } };
+function armar(dispositivo: Disp | undefined, pasarela?: { id: string; activo: boolean; sitio_codigo: string }, extra: Record<string, Canal> = {}) {
   const query = vi.fn((sql: string, params?: unknown[]) => {
     if (sql.startsWith('SELECT d.id, d.estado, d.formato, d.pasarela_id, s.codigo AS sitio_codigo')) {
       const fila = { sitio_codigo: 'uct', formato: 'senml', pasarela_id: null, decodificador: null, ultimo_fcnt: null, intervalo_esperado_s: 60, canales: 2,
@@ -190,7 +197,7 @@ function armar(dispositivo: Disp | undefined, pasarela?: { id: string; activo: b
     }
     if (sql.startsWith('SELECT p.id, p.activo, s.codigo AS sitio_codigo FROM pasarela')) return Promise.resolve({ rows: pasarela ? [pasarela] : [], rowCount: pasarela ? 1 : 0 });
     if (sql.trimStart().startsWith('SELECT c.id, m.codigo AS magnitud')) {
-      const c = CANALES[String(params?.[1])];
+      const c = { ...CANALES, ...extra }[String(params?.[1])];
       return Promise.resolve(c ? { rows: [{ id: 'k-' + String(params?.[1]), magnitud: params?.[1], unidad_canonica: c.unidad, rango_min: c.min, rango_max: c.max, escala_cero: null, escala_cien: null }], rowCount: 1 } : { rows: [], rowCount: 0 });
     }
     if (sql.trimStart().startsWith('INSERT INTO medicion')) return Promise.resolve({ rows: [{ tiempo: new Date('2026-11-15T12:00:00.123456Z') }], rowCount: 1 });
@@ -343,6 +350,38 @@ describe('contrato (a): esquema SenML (RFC 8428)', () => {
       expect(() => senml.analizar(ctxDir(pack)), pack).toThrow('registro no es objeto');
     }
   });
+  it('C-104 bt, t, bu, n o u con un tipo equivocado es malformada, también en un registro sin valor (antes se ignoraban en silencio)', () => {
+    for (const [campo, mensaje, malos] of [
+      ['bt', 'bt no numérico', ['"1757300000"', 'null', 'true', '[1]', '{}', '1e999']],
+      ['t', 't no numérico', ['"-5"', 'null', 'false', '[1]', '{}', '-1e999']],
+      ['bu', 'bu no es texto', ['5', 'null', 'true', '["Cel"]', '{}']],
+    ] as const) {
+      for (const malo of malos) {
+        expect(() => senml.analizar(ctxDir(`[{"${campo}":${malo},"n":"temperatura","v":1}]`)), `${campo} ${malo}`).toThrow(mensaje);
+        expect(() => senml.analizar(ctxDir(`[{"n":"temperatura","v":1},{"${campo}":${malo}}]`)), `${campo} ${malo} sin valor`).toThrow(TramaMalformada);
+      }
+    }
+    // n y u se revisan también en un registro sin valor: antes solo en el que traía v, y un u numérico suelto se ignoraba.
+    expect(() => senml.analizar(ctxDir('[{"n":"temperatura","v":1},{"u":5}]'))).toThrow('u no es texto');
+    expect(() => senml.analizar(ctxDir('[{"n":7},{"n":"temperatura","v":1}]'))).toThrow('n no es texto');
+    // Lo legítimo pasa: un número (incluso enorme pero finito, que C-26 resuelve con la hora de recepción), 0, y un bu de texto (aunque vacío).
+    expect(senml.analizar(ctxDir('[{"bt":1757300000,"bu":"Cel","t":-1,"n":"temperatura","v":1},{"bt":0,"t":0,"bu":"","n":"temperatura","v":2}]'))).toHaveLength(2);
+    expect(senml.analizar(ctxDir('[{"bt":1e300,"n":"temperatura","v":1}]'))).toHaveLength(1);
+  });
+  it('C-105 un bver distinto del vigente en otro registro del pack es malformada (RFC 8428 §4.4); sin bver cuenta como 10 hasta que uno lo fije', () => {
+    const distinto = (pack: string, vigente: number, nuevo: number): void => {
+      expect(() => senml.analizar(ctxDir(pack)), pack).toThrow(`bver ${nuevo} distinto del ${vigente} del resto del pack (todos los registros tienen la misma versión)`);
+      expect(() => senml.analizar(ctxDir(pack)), pack).toThrow(TramaMalformada);
+    };
+    distinto('[{"bver":10,"n":"temperatura","v":1},{"bver":5,"n":"temperatura","v":2}]', 10, 5);
+    distinto('[{"bver":5,"n":"temperatura","v":1},{"bver":6,"n":"temperatura","v":2}]', 5, 6);
+    distinto('[{"bver":5,"n":"temperatura"},{"n":"temperatura","v":1},{"bver":6}]', 5, 6); // aunque el registro no traiga valor
+    distinto('[{"n":"temperatura","v":1},{"bver":5,"n":"temperatura","v":2}]', 10, 5); // el primero, sin bver, era versión 10
+    // Lo legítimo: un bver solo en el primer registro (RFC §5.1.2 usa 5), el mismo repetido, o 10 explícito después de la versión por defecto.
+    expect(senml.analizar(ctxDir('[{"bver":5,"n":"temperatura","v":1},{"n":"temperatura","v":2}]'))).toHaveLength(2);
+    expect(senml.analizar(ctxDir('[{"bver":5,"n":"temperatura","v":1},{"bver":5,"n":"temperatura","v":2}]'))).toHaveLength(2);
+    expect(senml.analizar(ctxDir('[{"n":"temperatura","v":1},{"bver":10,"n":"temperatura","v":2}]'))).toHaveLength(2);
+  });
   it('C-97 de punta a punta, bv + v es el valor que se guarda, y el rango físico se evalúa sobre esa suma', async () => {
     const { servicio, mediciones, cuarentenas } = armar({ id: 'd1', estado: 'activo' });
     await servicio.procesar(TOP, Buffer.from('[{"bv":10,"n":"temperatura","u":"Cel","v":5},{"n":"temperatura","u":"Cel","v":6}]'));
@@ -401,6 +440,53 @@ describe('contrato (b): marcas de tiempo (docs/13)', () => {
   });
 });
 
+describe('contrato (b): la hora de recepción de la trama', () => {
+  it('C-102 el «ahora» de los tiempos relativos es uno solo por trama: sin recibidoEn, todos los registros comparten el instante', () => {
+    const RealDate = Date;
+    let relojes = 0; // cuántas veces se leyó el reloj («new Date()» sin argumentos)
+    class RelojQueAvanza extends RealDate {
+      constructor(...a: unknown[]) {
+        super(...((a.length === 0 ? [RealDate.UTC(2026, 10, 16, 10, 0, ++relojes)] : a) as [number])); // cada lectura del reloj: un segundo después
+      }
+    }
+    vi.stubGlobal('Date', RelojQueAvanza);
+    try {
+      const ls = senml.analizar(ctxDir('[{"n":"temperatura","t":-10,"v":1},{"n":"temperatura","t":-10,"v":2},{"n":"temperatura","t":-10,"v":3}]'));
+      expect(ls.map((l) => (l.tiempo as Date).getTime())).toEqual(Array(3).fill(RealDate.UTC(2026, 10, 16, 9, 59, 51))); // la única lectura del reloj (10:00:01) menos 10 s
+      expect(relojes).toBe(1);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+  it('C-103 la hora de recepción que llega a la lectura es la de la entrada de la trama, por MQTT y por HTTP, aunque pase el tiempo hasta que responda la base', async () => {
+    const T0 = new Date('2026-11-16T10:00:00.000Z');
+    const T1 = new Date('2026-11-16T10:07:00.000Z'); // lo que tarda la base en responder, a propósito exagerado
+    const cuerpo = Buffer.from('[{"n":"temperatura","u":"Cel","t":-5,"v":21}]');
+    vi.useFakeTimers({ toFake: ['Date'] }); // solo el reloj: las promesas siguen su curso
+    const espia = vi.spyOn(senml, 'analizar');
+    try {
+      for (const via of ['mqtt', 'http'] as const) {
+        espia.mockClear();
+        vi.setSystemTime(T0);
+        const { servicio, query } = armar({ id: 'd1', estado: 'activo' });
+        const trabajo = via === 'mqtt' ? servicio.procesar(TOP, cuerpo) : servicio.procesarHttp('dev-0001', cuerpo, undefined);
+        vi.setSystemTime(T1); // la trama ya entró: el reloj sigue, pero la hora de recepción no se vuelve a leer
+        await trabajo;
+        const ctx = espia.mock.calls[0][0];
+        expect(ctx.recibidoEn?.toISOString(), via).toBe(T0.toISOString());
+        const insercion = query.mock.calls.find(([sql]) => String(sql).trimStart().startsWith('INSERT INTO medicion'));
+        expect(insercion, via).toBeDefined();
+        const [, p] = insercion as [string, unknown[]];
+        expect((p[1] as Date).toISOString(), via).toBe(new Date(T0.getTime() - 5_000).toISOString()); // el relativo, contra la entrada
+        expect((p[4] as Date).toISOString(), via).toBe(T0.toISOString()); // recibido_en
+      }
+    } finally {
+      espia.mockRestore();
+      vi.useRealTimers();
+    }
+  });
+});
+
 // ── (c) Unidades y magnitudes ────────────────────────────────────────────────────────────────────────────────────────────────
 describe('contrato (c): unidades, rango y catálogo', () => {
   it('C-33 de punta a punta: 300 K se guarda como 26,85 Cel y 77 °F como 25 Cel y 55 % como 55 %RH', async () => {
@@ -418,6 +504,27 @@ describe('contrato (c): unidades, rango y catálogo', () => {
     expect(mediciones().map((m) => Number(m.valor.toFixed(2)))).toEqual([85, -40, 85]); // 85, −40 y 358,15 K = 85 °C
     expect(cuarentenas().map((c) => c.motivo)).toEqual(['invalida', 'invalida', 'invalida']);
     expect(cuarentenas()[2].detalle).toMatch(/^temperatura: 86\.85\d* Cel fuera del rango físico \[-40, 85\]$/);
+  });
+  it('C-100 un valor finito que desborda al convertir (1e306 bar → 1e309 hPa) se rechaza aunque el canal no tenga rango máximo', async () => {
+    const sinRango = { presion: { unidad: 'hPa', min: null, max: null } };
+    const { servicio, mediciones, cuarentenas } = armar({ id: 'd1', estado: 'activo' }, undefined, sinRango);
+    await servicio.procesar(TOP, Buffer.from('[{"n":"presion","u":"bar","v":1e306},{"n":"presion","u":"bar","v":-1e306},{"n":"presion","u":"bar","v":1e305},{"n":"presion","u":"bar","v":1.013}]'));
+    expect(mediciones().map((m) => [m.unidad, Number(m.valor.toPrecision(10))])).toEqual([['hPa', 1e308], ['hPa', 1013]]); // 1e305 bar son 1e308 hPa: todavía cabe
+    expect(Number.isFinite(1e306 * 1000)).toBe(false); // la premisa: ni la v ni la conversión desbordan por separado
+    expect(cuarentenas().map((c) => [c.motivo, c.detalle])).toEqual([['invalida',
+      'presion: 1e+306 bar no cabe en un número finito al convertirlo a hPa; presion: -1e+306 bar no cabe en un número finito al convertirlo a hPa']]);
+  });
+  it('C-101 un -0 (en v, en bv o tras convertir) se guarda como 0', async () => {
+    const { servicio, mediciones, cuarentenas } = armar({ id: 'd1', estado: 'activo', formato: 'senml' }, undefined, { presion: { unidad: 'hPa', min: null, max: null } });
+    await servicio.procesar(TOP, Buffer.from('[{"bv":-0,"n":"temperatura","u":"Cel","v":-0},{"n":"presion","u":"Pa","v":-0},{"bv":0,"n":"temperatura","u":"Cel","v":-0}]'));
+    expect(cuarentenas()).toEqual([]);
+    const valores = mediciones().map((m) => m.valor);
+    expect(valores).toEqual([0, 0, 0]);
+    expect(valores.filter((v) => Object.is(v, -0))).toEqual([]); // toEqual no distingue -0 de 0: Object.is sí
+    expect(Object.is(-0 / 100, -0)).toBe(true); // la premisa: la conversión Pa → hPa de un -0 da -0
+    const plano = armar({ id: 'd1', estado: 'activo', formato: 'plano' });
+    await plano.servicio.procesar(TOP, Buffer.from('-0'));
+    expect(plano.mediciones().map((m) => Object.is(m.valor, 0))).toEqual([true]);
   });
   it('C-39 todo destino de una conversión es una unidad canónica del catálogo sembrado en las migraciones', () => {
     const fuente = readFileSync(join(DIR, 'unidades.ts'), 'utf8');
@@ -482,11 +589,19 @@ describe('contrato (d): forma y tamaño de la trama', () => {
 // ── (e) Identidad y tópico ───────────────────────────────────────────────────────────────────────────────────────────────────
 describe('contrato (e): lo que la trama puede y no puede decir de quién es', () => {
   it('C-54 un bn que nombra a otro dispositivo no cambia la atribución: la lectura es del dispositivo del tópico (hallazgo H-2)', async () => {
-    const { servicio, mediciones, cuarentenas, tramas } = armar({ id: 'd1', estado: 'activo' });
+    const { servicio, mediciones, cuarentenas, tramas, query } = armar({ id: 'd1', estado: 'activo' });
     await servicio.procesar(TOP, Buffer.from('[{"bn":"dev-9999","n":"temperatura","u":"Cel","v":21.5}]'));
     expect(cuarentenas()).toEqual([]);
     expect(mediciones().map((m) => m.canal)).toEqual(['k-temperatura']); // el canal que se consultó fue el de d1
     expect(tramas()).toHaveLength(1);
+    // El doble de la base responde igual a cualquier parámetro, así que lo que prueba la atribución es lo que la consulta RECIBE: la del
+    // filtro 1 lleva el identificador del tópico y de la credencial, y el del bn no aparece en ningún parámetro (salvo en el cuerpo crudo,
+    // que se conserva tal cual como bytes: es un Buffer).
+    const busquedas = query.mock.calls.filter(([sql]) => String(sql).startsWith('SELECT d.id, d.estado, d.formato'));
+    expect(busquedas.map(([, p]) => p)).toEqual([['dev-0001']]);
+    const textos = query.mock.calls.flatMap(([, p]) => (p ?? [])).filter((x) => !Buffer.isBuffer(x)).map((x) => JSON.stringify(x));
+    expect(textos.length).toBeGreaterThan(0); // si no se recogió ningún parámetro, esta comprobación no probaría nada
+    expect(textos.filter((x) => x.includes('dev-9999'))).toEqual([]);
   });
   it('C-55 el nombre del registro gana sobre la magnitud del tópico; sin nombre rige la del tópico', () => {
     expect(senml.analizar(ctxDir('[{"n":"humedad","v":1}]', 'temperatura'))[0].magnitud).toBe('humedad');
@@ -554,6 +669,10 @@ describe('contrato (f): los motivos de cuarentena', () => {
       ['[{"n":"temperatura","u":"Cel","v":21.5,"extension_":1}]', 'campo «extension_» desconocido y de los que no se pueden ignorar (termina en «_»)'],
       ['[{"bv":"10","n":"temperatura","u":"Cel","v":21.5}]', 'bv no numérico'],
       ['[{"bv":1e308,"n":"temperatura","u":"Cel","v":1e308}]', 'bv + v fuera del rango numérico'],
+      ['[{"bt":"1757300000","n":"temperatura","u":"Cel","v":21.5}]', 'bt no numérico'],
+      ['[{"t":null,"n":"temperatura","u":"Cel","v":21.5}]', 't no numérico'],
+      ['[{"bu":5,"n":"temperatura","v":21.5}]', 'bu no es texto'],
+      ['[{"bver":10,"n":"temperatura","u":"Cel","v":21.5},{"bver":5,"n":"temperatura","u":"Cel","v":21.6}]', 'bver 5 distinto del 10 del resto del pack (todos los registros tienen la misma versión)'],
     ];
     for (const [cuerpo, motivo] of casos) {
       const { servicio, cuarentenas, mediciones, marcarVivo, tramas } = armar(ACTIVO);
@@ -640,7 +759,7 @@ describe('contrato: guardián de cobertura de la matriz', () => {
   it('los identificadores son únicos y cada grupo tiene reglas', () => {
     const ids = MATRIZ.map((r) => r.id);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(ids.every((i) => /^C-\d{2}$/.test(i))).toBe(true);
+    expect(ids.every((i) => /^C-\d{2,3}$/.test(i))).toBe(true);
     for (const g of ['a', 'b', 'c', 'd', 'e', 'f', 'g'] as const) expect(MATRIZ.some((r) => r.grupo === g), `grupo ${g}`).toBe(true);
     expect(MATRIZ.every((r) => r.regla && r.fuente && r.esperado && r.cubre.length > 0)).toBe(true);
   });
@@ -661,7 +780,7 @@ describe('contrato: guardián de cobertura de la matriz', () => {
     expect(faltan).toEqual([]);
   });
   it('cada prueba C-NN de este archivo tiene su fila en la matriz', () => {
-    const enPruebas = [...propio.matchAll(/^\s*it(?:\.todo)?\('(C-\d{2}) /gm)].map((m) => m[1]);
+    const enPruebas = [...propio.matchAll(/^\s*it(?:\.todo)?\('(C-\d{2,3}) /gm)].map((m) => m[1]);
     expect(enPruebas.length).toBeGreaterThanOrEqual(30);
     const enMatriz = new Set(MATRIZ.map((r) => r.id));
     expect(enPruebas.filter((i) => !enMatriz.has(i))).toEqual([]);

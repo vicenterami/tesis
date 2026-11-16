@@ -186,6 +186,27 @@ if [ "$n" -lt 1 ]; then echo "FALLA no hay PDF versionados: no se revisó nada";
 elif [ -n "$con_fecha" ]; then echo "FALLA PDF versionados con fecha y hora en sus metadatos:$con_fecha"; fallos=$((fallos+1))
 else echo "OK    $n PDF versionados sin fecha ni hora en sus metadatos"; fi
 
+paso "2f5. Sin identificadores de 16 hexadecimales con forma de dato real (DevEUI, EUI-64) en archivos versionados o nuevos: solo los sintéticos de la lista (16/11/2026)"
+# Un DevEUI o un EUI-64 son 16 hexadecimales, y uno de ejemplo con forma de dato real se trata como real (regla de las MAC de ejemplo del 22/09).
+# Se buscan cadenas de EXACTAMENTE 16 hexadecimales seguidos (sin otro hexadecimal al lado: una huella más larga, un UUID o un color no las contienen;
+# sí cuentan las pegadas a «0x», a «_» o a una letra) y las de ocho pares separados por «:» o «-», que es como suele escribirse un EUI-64, en
+# todo archivo de texto que entraría al repositorio (archivos_repo; `grep -I` salta los binarios, como los PDF). Los lockfiles se revisan igual: hoy
+# no dan falsos positivos. Lo permitido es esta lista corta, con su origen; ampliarla es decidir que ese valor no identifica a nadie:
+#   0000000000000001 0102030405060708 0101010101010101 0202020202020202 ffffffffffffffff aaaaaaaaaaaaaaaa a1b2c3d4e5f60708 abcdef1234567890
+#       sintéticos con patrón evidente (el 0101… es el del ejemplo oficial de ChirpStack; 0000…01, 0102…08, 0202…, ffff…, aaaa… y a1b2… los de las pruebas)
+#   10e2073a01080063   el identificador del ejemplo textual de RFC 8428 §5.1 (se cita como lo trae la RFC, no se inventa otro)
+#   123418138100007b 1234181158010037   mensajes Contact ID de ejemplo de los documentos históricos (16 dígitos de DC-05 con su suma de verificación, no un EUI)
+# Lo hallado se muestra enmascarado (archivo:línea y 4 caracteres): si fuera real, no se repite entero en pantalla.
+PERMITIDOS_16HEX=" 0000000000000001 0102030405060708 0101010101010101 0202020202020202 ffffffffffffffff aaaaaaaaaaaaaaaa a1b2c3d4e5f60708 abcdef1234567890 10e2073a01080063 123418138100007b 1234181158010037 "
+archivos16=$(archivos_repo | while IFS= read -r f; do [ -f "$f" ] && printf '%s\n' "$f"; done)
+n16=$(grep -c . <<<"$archivos16")
+crudas16=$(tr '\n' '\0' <<<"$archivos16" | xargs -0 grep -IHnoP '(?<![0-9a-fA-F])[0-9a-fA-F]{16}(?![0-9a-fA-F])|(?<![0-9a-fA-F:-])(?:[0-9a-fA-F]{2}[:-]){7}[0-9a-fA-F]{2}(?![0-9a-fA-F:-])' 2>/dev/null)
+total16=$(grep -c . <<<"$crudas16")
+ajenos16=$(while IFS= read -r l; do [ -z "$l" ] && continue; f16=${l%%:*}; r16=${l#*:}; v=${r16#*:}; v=${v//[:-]/}; v=${v,,}; case "$PERMITIDOS_16HEX" in *" $v "*) ;; *) echo "$f16:${r16%%:*}: ${v:0:4}…(16)";; esac; done <<<"$crudas16")
+if [ "$n16" -lt 100 ] || [ "$total16" -lt 1 ]; then echo "FALLA revisó $n16 archivos y encontró $total16 cadenas de 16 hexadecimales: algo no se leyó (no revisó nada)"; fallos=$((fallos+1))
+elif [ -n "$ajenos16" ]; then echo "FALLA cadenas de 16 hexadecimales con forma de dato real (no están en la lista de sintéticos del paso):"; echo "$ajenos16" | cut -c1-140 | sed 's/^/  /'; fallos=$((fallos+1))
+else echo "OK    $n16 archivos revisados; $total16 cadenas de 16 hexadecimales, todas de la lista de sintéticos"; fi
+
 paso "2g. Migraciones citadas en prosa (docs e informe) == archivos NN-*.sql en disco"
 # Hallazgo del 26/09: informe y docs/12 decían «6 migraciones» cuando ya había 7 en disco (la 07 del 23/09).
 n_disco=$(ls plataforma/db/init/*.sql | wc -l)
@@ -216,6 +237,50 @@ dom_doc=$(awk '/^## 11\. /,/^## 12\. /' docs/20-sesion-usuarios-y-permisos.md | 
 if [ -z "$dom_fn" ] || [ -z "$dom_doc" ]; then echo "FALLA no encontré el dominio del correo anonimizado (función: «$dom_fn», docs/20 §11: «$dom_doc»)"; fallos=$((fallos+1))
 elif [ "$dom_doc" != "$dom_fn" ]; then echo "FALLA docs/20 §11 cita $(echo $dom_doc) y fn_anonimizar_usuario escribe $dom_fn"; fallos=$((fallos+1))
 else echo "OK    el correo anonimizado que cita docs/20 §11 usa el dominio de fn_anonimizar_usuario ($dom_fn)"; fi
+
+paso "2g2. Matriz del contrato de trama: los C-NN de contrato.spec.ts == los de la tabla de docs/16, y las cifras citadas (total y por grupo) son las de la tabla (16/11/2026)"
+# 16/11: docs/16 decía 94 reglas y su tabla no listaba C-96 ni C-99 con 98 en la prueba; los encabezados por grupo decían 18, 12 y 12 con 19, 13 y 13.
+# La MATRIZ de contrato.spec.ts manda; este paso compara su conjunto de identificadores con el de la tabla de docs/16 (la sección titulada «Matriz del
+# contrato de trama», entre «### La matriz» y el siguiente «###»), el número de filas de cada grupo con el «(N reglas)» de su encabezado, y el total con
+# cada «matriz … N reglas» de los documentos y el informe. Las bitácoras son instantáneas fechadas y no se comparan.
+python3 -I - <<'PY' || fallos=$((fallos+1))
+import re, sys, pathlib
+spec = pathlib.Path('plataforma/backend/src/recepcion/contrato.spec.ts').read_text(encoding='utf-8')
+filas_spec = re.findall(r"^  \{ id: '(C-\d+)', grupo: '([a-g])'", spec, re.M)
+ids_spec = [i for i, _ in filas_spec]
+doc = pathlib.Path('docs/16-informe-de-pruebas.md').read_text(encoding='utf-8')
+sec = re.search(r'(?ms)^## \d+\. Matriz del contrato de trama.*?(?=^## )', doc + '\n## fin\n')
+mat = re.search(r'(?ms)^### La matriz\n(.*?)(?=^### |\Z)', sec.group(0)) if sec else None
+if len(ids_spec) < 50 or mat is None:
+    print(f'FALLA no leí la matriz: {len(ids_spec)} identificadores en contrato.spec.ts, tabla de docs/16 {"encontrada" if mat else "no encontrada"} (no revisó nada)'); sys.exit(1)
+malos, grupo, filas_doc, cuenta, citado = [], None, [], {}, {}
+for linea in mat.group(1).splitlines():
+    g = re.match(r'\*\*\(([a-g])\) .*\*\* \((\d+) reglas\)', linea)
+    if g: grupo = g.group(1); citado[grupo] = int(g.group(2)); continue
+    f = re.match(r'\| (C-\d+) \|', linea)
+    if f: filas_doc.append((f.group(1), grupo)); cuenta[grupo] = cuenta.get(grupo, 0) + 1
+ids_doc = [i for i, _ in filas_doc]
+for i in sorted(set(ids_spec) - set(ids_doc)): malos.append(f'{i} está en la MATRIZ de contrato.spec.ts y no en la tabla de docs/16')
+for i in sorted(set(ids_doc) - set(ids_spec)): malos.append(f'{i} está en la tabla de docs/16 y no en la MATRIZ de contrato.spec.ts')
+for i in sorted({i for i in ids_doc if ids_doc.count(i) > 1}): malos.append(f'{i} aparece más de una vez en la tabla de docs/16')
+grupos_spec = {}
+for i, g in filas_spec: grupos_spec[g] = grupos_spec.get(g, 0) + 1
+for g in sorted(set(grupos_spec) | set(cuenta) | set(citado)):
+    if not (grupos_spec.get(g) == cuenta.get(g) == citado.get(g)):
+        malos.append(f'grupo ({g}): {grupos_spec.get(g)} reglas en la MATRIZ, {cuenta.get(g)} filas en la tabla y el encabezado dice {citado.get(g)}')
+total = len(ids_spec); n_citas = 0
+fuentes = [*sorted(pathlib.Path('docs').glob('*.md')), *sorted(pathlib.Path('informe-oficial').rglob('*.tex')), *map(pathlib.Path, ('README.md', 'RESUMEN.md', 'PLAN-MAESTRO.md'))]
+for f in fuentes:
+    if f.name.startswith('12-') or not f.is_file(): continue
+    t = re.sub(r'\s+', ' ', f.read_text(encoding='utf-8'))
+    for m in re.finditer(r'matriz(?: del contrato de trama)?\**:? (?:de |con |tiene )?\**(\d+)\** reglas', t, re.I):
+        n_citas += 1
+        if int(m.group(1)) != total: malos.append(f'{f}: «{m.group(0)}»; la MATRIZ tiene {total}')
+if n_citas < 3: malos.append(f'solo {n_citas} cita(s) «matriz … N reglas» en docs y en el informe (se esperan al menos 3): ¿cambió la redacción? (no revisó esa parte)')
+for m in malos: print('FALLA', m)
+if not malos: print(f'OK    {total} reglas: la MATRIZ y la tabla de docs/16 tienen los mismos identificadores, {len(grupos_spec)} grupos con su cifra, y {n_citas} cita(s) dicen {total}')
+sys.exit(1 if malos else 0)
+PY
 
 paso "2h. Rutas HTTP citadas en prosa (glosario, docs/10, docs/12, docs/15) == rutas reales del OpenAPI"
 # Hallazgo del 26/09: el glosario citaba GET /mediciones, ruta que nunca existió en el backend.

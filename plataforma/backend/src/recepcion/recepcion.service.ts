@@ -314,11 +314,18 @@ export class RecepcionService implements OnModuleInit {
         rechazos.push(`${l.magnitud}: canal no declarado para este dispositivo`);
         continue;
       }
-      const valor = aCanonica(l.valor, l.unidad, canal.unidad_canonica);
-      if (valor === undefined) {
+      const convertido = aCanonica(l.valor, l.unidad, canal.unidad_canonica);
+      if (convertido === undefined) {
         rechazos.push(`${l.magnitud}: unidad ${l.unidad} no convertible a ${canal.unidad_canonica}`);
         continue;
       }
+      // Un valor finito deja de serlo al convertir (1e306 bar son 1e309 hPa): con un canal sin rango máximo, Infinity pasaría la comparación
+      // de abajo y se guardaría. Se rechaza aquí, sobre el valor ya convertido (docs/10 §4.1).
+      if (!Number.isFinite(convertido)) {
+        rechazos.push(`${l.magnitud}: ${l.valor} ${l.unidad} no cabe en un número finito al convertirlo a ${canal.unidad_canonica}`);
+        continue;
+      }
+      const valor = convertido === 0 ? 0 : convertido; // -0 se guarda como 0 (docs/10 §4.1): un cero no tiene signo físico
       if ((canal.rango_min !== null && valor < canal.rango_min) || (canal.rango_max !== null && valor > canal.rango_max)) {
         rechazos.push(`${l.magnitud}: ${valor} ${canal.unidad_canonica} fuera del rango físico [${canal.rango_min ?? '−∞'}, ${canal.rango_max ?? '∞'}]`);
         continue;

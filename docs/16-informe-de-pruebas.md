@@ -4,7 +4,7 @@ Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emu
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
 cubría al escribirse se agregó después: TT-32 (sensor físico) en §43, §44 y §53, y TT-30 (recuperación ante reinicio) en §11. El
-contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 741 pruebas unitarias del backend y 365 del panel.
+contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 747 pruebas unitarias del backend y 365 del panel.
 Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -3271,7 +3271,7 @@ cerrar HU-07 (hecho el 16/11/2026: §75). Un rango de menos de dos minutos dibuj
 ## 73. Matriz del contrato de trama (15/11/2026)
 
 **Qué es y por qué.** TT-27 pedía pruebas del contrato de trama «regla por regla». Hasta hoy había muchas pruebas unitarias de la recepción, pero
-nada decía qué regla cubría cada una ni fallaba si una regla quedaba sin prueba. Esta sección fija la **matriz**: 94 reglas del contrato (93 el 15/11/2026; la revisión del mismo día sumó C-95), cada una
+nada decía qué regla cubría cada una ni fallaba si una regla quedaba sin prueba. Esta sección fija la **matriz**: 104 reglas del contrato (93 al principio del 15/11/2026; las revisiones del mismo día sumaron C-95, C-96 a C-99 y C-100 a C-105), cada una
 con su fuente, su resultado esperado y la prueba que la cubre. La matriz vive como datos en `plataforma/backend/src/recepcion/contrato.spec.ts`
 (constante `MATRIZ`, una sola fuente: la tabla de abajo se generó de ella) y un **guardián de cobertura** dentro de las mismas pruebas la compara con el código.
 
@@ -3288,7 +3288,7 @@ nombre). Las demás citan una prueba que ya existía, con el comienzo de su tít
 
 ### La matriz
 
-**(a) Esquema SenML** (18 reglas)
+**(a) Esquema SenML** (21 reglas)
 
 | Id | Regla | Fuente | Resultado esperado | Prueba que la cubre |
 |---|---|---|---|---|
@@ -3310,8 +3310,11 @@ nombre). Las demás citan una prueba que ya existía, con el comienzo de su tít
 | C-16 | Un n que no es cadena se rechaza como trama malformada (hallazgo H-1) | RFC 8428 §4.3 (n es cadena); adaptadores/adaptador.ts:13 («Lanza Error si el contenido es inválido»); recepcion.service.ts:232 | rechazada, malformada «n no es texto» (corregido el 15/11/2026: antes lanzaba TypeError) | `contrato.spec.ts` · C-16 |
 | C-17 | Un elemento del pack que no es objeto se rechaza | RFC 8428 §5; senml.adaptador.ts, «throw new TramaMalformada('registro no es objeto')» | rechazada: malformada «registro no es objeto» | `contrato.spec.ts` · C-17 |
 | C-18 | El adaptador SenML reconoce solo arreglos JSON | RFC 8428 §5: «The root JSON value consists of an array» | reconoce: arreglo sí; objeto o número no | `adaptadores/adaptadores.spec.ts` · «reconoce un pack (arreglo JSON)…» |
+| C-97 | De punta a punta, bv + v es el valor que se guarda (y el rango físico se evalúa sobre esa suma) | RFC 8428 §4.5.4; docs/10 §4 (filtros 2 y 3) | bv 10, v 5 en Cel: se guarda 15; bv 80, v 10: 90 Cel fuera del rango, a cuarentena invalida | `contrato.spec.ts` · C-97 |
+| C-104 | bt, t, bu, n y u con un tipo equivocado (bt o t que no es un número finito; bu, n o u que no es texto) se rechazan, también en un registro sin valor | RFC 8428 §4.3, Tabla 1 (bt y t: número; bu: cadena); senml.adaptador.ts, revisarPerfil | rechazada: malformada «bt no numérico», «t no numérico» o «bu no es texto» (antes se ignoraban en silencio) | `contrato.spec.ts` · C-104 |
+| C-105 | Todos los registros de un pack tienen la misma versión: un bver distinto del vigente se rechaza (un registro sin bver cuenta como 10 hasta que un bver explícito fije la versión) | RFC 8428 §4.4: «All SenML Records in a Pack MUST have the same version number» | rechazada: malformada «bver 5 distinto del 10 del resto del pack…»; un solo bver en el primer registro, o el mismo repetido, se acepta | `contrato.spec.ts` · C-105 |
 
-**(b) Tiempo** (12 reglas)
+**(b) Tiempo** (15 reglas)
 
 | Id | Regla | Fuente | Resultado esperado | Prueba que la cubre |
 |---|---|---|---|---|
@@ -3327,8 +3330,11 @@ nombre). Las demás citan una prueba que ya existía, con el comienzo de su tít
 | C-29 | La hora de una trama LoRaWAN es RFC 3339 con zona; sin zona no se adivina | docs/13 regla 17; lorawan.ts:46-49 | con zona: marca de pasarela; sin zona: sin marca | `adaptadores/lorawan.spec.ts` · «una hora sin zona → sin marca…»<br>`adaptadores/lorawan.spec.ts` · «time sin zona → sin marca…» |
 | C-30 | origen_tiempo dice quién puso la marca: dispositivo, pasarela o recepcion | docs/10 §8.4 punto 12; docs/13 regla 7 | columna origen_tiempo según el adaptador y la plausibilidad | `recepcion.service.spec.ts` · «marca del emisor plausible…»<br>`recepcion.service.spec.ts` · «sin marca del emisor → origen_tiempo "recepcion"…» |
 | C-31 | La misma lectura (canal más instante del emisor) dos veces cuenta una sola | docs/10 §4.1 (RF-10); recepcion.service.ts:324 | duplicada: sin evento nuevo ni umbral | `recepcion.service.spec.ts` · «TT-39: lectura repetida…» |
+| C-98 | De punta a punta, un tiempo relativo negativo se guarda como la hora de recepción menos esos segundos (origen dispositivo); uno cero o positivo, con la hora de recepción | RFC 8428 §4.5.3; docs/13 reglas 7 y 19 | t = −30: marca del emisor ≈ ahora − 30 s; t = 0: origen_tiempo recepcion (sin marca guardada) | `contrato.spec.ts` · C-98 |
+| C-102 | El «ahora» de los tiempos relativos es uno solo por trama: todos los registros de un pack comparten el mismo instante cuando falta recibidoEn | RFC 8428 §4.5.3 («relative to the current time»); senml.adaptador.ts, «const ahora» | tres registros con t = −10: tres marcas iguales y una sola lectura del reloj | `contrato.spec.ts` · C-102 |
+| C-103 | La hora de recepción que llega a la lectura es la que la vía tomó al entrar la trama, por MQTT y por HTTP, aunque la base tarde en responder | docs/10 §4 (filtro 2); recepcion.service.ts, procesar y procesarHttp | recibidoEn del adaptador y recibido_en de la medición son el instante de entrada; t = −5 se guarda como ese instante menos 5 s | `contrato.spec.ts` · C-103 |
 
-**(c) Unidades y magnitudes** (8 reglas)
+**(c) Unidades y magnitudes** (10 reglas)
 
 | Id | Regla | Fuente | Resultado esperado | Prueba que la cubre |
 |---|---|---|---|---|
@@ -3340,6 +3346,8 @@ nombre). Las demás citan una prueba que ya existía, con el comienzo de su tít
 | C-37 | El rango físico se evalúa sobre el valor ya convertido y sus límites son inclusivos | docs/08 (magnitud.rango_min y rango_max); recepcion.service.ts:309 | 85 °C se guarda; 85,01 °C y 360 K se rechazan: invalida «fuera del rango físico» | `contrato.spec.ts` · C-37<br>`recepcion.service.spec.ts` · «filtro 3: valor fuera del rango físico…» |
 | C-38 | Cada clave del mapa de claves apunta a una magnitud del catálogo con su unidad canónica | docs/10 §8.4 punto 47; mapa-claves.ts | ninguna clave apunta a una magnitud inexistente | `adaptadores/lorawan.spec.ts` · «cada clave del mapa → una magnitud del catálogo…» |
 | C-39 | Todo destino de una conversión es una unidad canónica del catálogo | unidades.ts; docs/08 (magnitud.unidad_canonica) | ninguna conversión desemboca en una unidad que ninguna magnitud usa | `contrato.spec.ts` · C-39 |
+| C-100 | Un valor finito que deja de serlo al convertirse a la unidad canónica (1e306 bar son 1e309 hPa) se rechaza aunque el canal no tenga rango máximo | docs/10 §4.1 (la lectura imposible no se guarda); recepcion.service.ts, «Number.isFinite(convertido)» | rechazada: invalida «no cabe en un número finito al convertirlo a hPa»; lo que cabe (1e305 bar) se guarda | `contrato.spec.ts` · C-100 |
+| C-101 | Un -0 (en v, en bv o como resultado de una conversión) se guarda como 0 | RFC 8428 §4.3 (v es un número JSON; la copia local de la RFC no dice nada del cero negativo); docs/10 §4.1; recepcion.service.ts, «convertido === 0 ? 0 : convertido» | aceptada: se guarda 0, nunca -0 | `contrato.spec.ts` · C-101 |
 
 **(d) Tamaño y forma del sobre** (11 reglas)
 
@@ -3365,7 +3373,7 @@ nombre). Las demás citan una prueba que ya existía, con el comienzo de su tít
 | C-51 | Un identificador sin alta se rechaza | docs/10 §4 filtro 1; docs/06 §3.2 | rechazada: no_registrado; no se marca vivo | `recepcion.service.spec.ts` · «dispositivo no registrado…»<br>`contrato.spec.ts` · C-65 |
 | C-52 | Un dispositivo dado de baja se rechaza, atribuido a él | docs/10 §4.1; docs/06 §3.2 | rechazada: dado_de_baja; no se marca vivo | `recepcion.service.spec.ts` · «dispositivo dado de baja…»<br>`recepcion.service.spec.ts` · «no registrado → sin dispositivo_id; dado de baja…» |
 | C-53 | El sitio del tópico debe ser el del alta | docs/10 §8.4 punto 24 | rechazada: no_registrado «registrado en el sitio X, no en Y» | `recepcion.service.spec.ts` · «filtro 1: tópico con el sitio de otra sede…» |
-| C-54 | La identidad sale del tópico y la credencial, no del cuerpo: un bn de otro dispositivo no cambia a quién se atribuye (hallazgo H-2) | docs/10 filtro 1 (el tópico); contradice docs/06 §3.1 y §3.2 («la identificación viene dentro de la trama») | aceptada y atribuida al dispositivo del tópico; bn no se compara | `contrato.spec.ts` · C-54 |
+| C-54 | La identidad sale del tópico y la credencial, no del cuerpo: un bn de otro dispositivo no cambia a quién se atribuye (hallazgo H-2) | docs/10 §4 (perfil de SenML: «No identifica `bn`») y filtro 1 (el tópico y la credencial); docs/06 §3 («La identidad no viene dentro de la trama»); recepcion.service.ts, la consulta del filtro 1 recibe el identificador del tópico | aceptada y atribuida al dispositivo del tópico; ninguna consulta recibe el bn | `contrato.spec.ts` · C-54 |
 | C-55 | El nombre del registro gana; si falta, rige la magnitud del tópico | senml.adaptador.ts, «(n ?? ctx.magnitudTopico).toLowerCase()»; README del backend | magnitud del registro; sin n, la del tópico | `contrato.spec.ts` · C-55<br>`adaptadores/adaptadores.spec.ts` · «sin nombre en el registro, la magnitud sale del tópico…» |
 | C-56 | La magnitud del tópico se pasa a minúsculas | recepcion.service.ts:127 | una trama en «…/Temperatura» usa el canal «temperatura» | `contrato.spec.ts` · C-56 |
 | C-57 | Una pasarela sin alta, inactiva o de otro sitio se rechaza, con cualquier evento | docs/10 §8.4 punto 47 | rechazada: no_registrado; nadie se marca vivo | `recepcion.service.spec.ts` · «pasarela sin alta, inactiva o de otro sitio…» |
@@ -3377,7 +3385,7 @@ nombre). Las demás citan una prueba que ya existía, con el comienzo de su tít
 | C-63 | Un DevEUI con caracteres que no son letras ASCII, dígitos ni guion no identifica al nodo | docs/10 §4.1 (tabla de casos); lorawan.ts:33 | rechazada: malformada (IdentidadNoVerificada); el nodo no se marca vivo | `adaptadores/lorawan.spec.ts` · «un DevEUI del cuerpo con controles…» |
 | C-64 | Por HTTP, el identificador y el token deben tener su forma antes de consultar la base | docs/10 §8.4 punto 52 | HTTP 401 sin consultar la base y sin contar para los bloqueos | `http/recepcion-http.controller.spec.ts` · «token ausente, con otra forma o un id imposible…»<br>`http/recepcion-http.controller.spec.ts` · «un token sin forma o un id imposible dan 401…» |
 
-**(f) Cuarentena** (12 reglas)
+**(f) Cuarentena** (13 reglas)
 
 | Id | Regla | Fuente | Resultado esperado | Prueba que la cubre |
 |---|---|---|---|---|
@@ -3393,8 +3401,9 @@ nombre). Las demás citan una prueba que ya existía, con el comienzo de su tít
 | C-74 | Una trama LoRaWAN que repite el fCnt de la última guardada se descarta sin cuarentena | docs/10 §4.1 | sin lecturas ni fila de cuarentena; el nodo se marca vivo | `recepcion.service.spec.ts` · «el mismo fCnt que la última trama guardada…» |
 | C-75 | Un rechazo del filtro 2 o 3 marca vivo al dispositivo autenticado; uno del filtro 1 o sin identidad verificada, no | docs/10 §4 y §4.1 | visto_por_ultima_vez solo para quien pasó el filtro 1 | `recepcion.service.spec.ts` · «trama malformada de un dispositivo conocido…»<br>`recepcion.service.spec.ts` · «cuerpo sin DevEUI, JSON roto o sin la forma…» |
 | C-76 | La cuarentena guarda la trama cruda y atribuye el dispositivo cuando se sabe cuál es | docs/08 §4 (decisión de cuarentena) | payload_crudo y dispositivo_id (nulo si no hay alta) | `recepcion.service.spec.ts` · «no registrado → sin dispositivo_id…» |
+| C-96 | Cada regla estricta del perfil SenML termina en cuarentena malformada con su motivo, sin lecturas, y el mensaje se confirma | docs/10 §4.1 (la trama que no calza con el formato declarado); recepcion.service.ts, el catch del filtro 2 | una fila malformada «formato declarado senml: <motivo>» por trama; el dispositivo se marca vivo; el procesamiento termina sin lanzar (el broker confirma) | `contrato.spec.ts` · C-96 |
 
-**(g) Adaptadores** (18 reglas)
+**(g) Adaptadores** (19 reglas)
 
 | Id | Regla | Fuente | Resultado esperado | Prueba que la cubre |
 |---|---|---|---|---|
@@ -3416,6 +3425,7 @@ nombre). Las demás citan una prueba que ya existía, con el comienzo de su tít
 | C-91 | Mapa de claves: una clave desconocida se ignora y se anota; si no queda ninguna conocida, se rechaza | docs/10 §8.4 punto 47; lorawan.ts:60-85 | ctx.ignoradas con las claves; sin ninguna conocida: malformada | `adaptadores/lorawan.spec.ts` · «una clave que no está en el mapa se ignora…»<br>`adaptadores/lorawan.spec.ts` · «resuelve sin distinguir mayúsculas…» |
 | C-92 | Mapa de claves: dos claves de la misma magnitud valen la primera; la otra se anota como repetida | lorawan.ts:77 | una lectura; la segunda en ignoradas con «(repetida)» | `adaptadores/lorawan.spec.ts` · «dos claves que apuntan a la misma magnitud…» |
 | C-93 | Los adaptadores registrados son los de los formatos que admite la base (ck_dispositivo_formato) y el módulo | docs/10 §8.4 punto 47; migración 15; recepcion.module.ts | senml, plano, chirpstack y milesight en el servicio, el módulo, los archivos y el CHECK | `contrato.spec.ts` · C-93 |
+| C-99 | Las reglas del perfil (bver, «_», un solo valor, bv, tiempo relativo) son de SenML: plano y los de pasarela no las aplican | docs/10 §4 (filtro 2); plano.adaptador.ts y chirpstack.adaptador.ts | aceptadas: un objeto plano o un evento de ChirpStack con esos nombres de campo se leen como antes | `contrato.spec.ts` · C-99 |
 
 ### Qué pruebas son nuevas y cómo están hechas
 
@@ -3530,8 +3540,16 @@ nativo es **un perfil de SenML, escrito y estricto**, no «SenML completo»: lo 
   regla 7 (un pasado anterior al 2000 es la hora de recepción); **cero o positivo** rige la hora de recepción. El positivo no se toma como futuro: la RFC lo
   reserva para actuar, una medición ya hecha no está en el futuro, y así el reloj sin inicializar que manda segundos desde el arranque (el perfil `epoch` del
   emulador manda 0 a 86 399) no queda fechado adelante. Desde 2^28 es absoluto. «Ahora» es la hora de recepción: se agregó `recibidoEn` (opcional) a
-  `ContextoTrama`; si el servicio no lo pasa, el adaptador toma la hora de su llamada (milisegundos de diferencia). Una marca relativa depende de cuándo llega
+  `ContextoTrama`; si el servicio no lo pasa, el adaptador toma la hora de su llamada (milisegundos de diferencia), **una sola vez por trama**: todos los registros de
+  un pack comparten el mismo «ahora» (C-102); y la vía (MQTT o HTTP) lo toma al entrar la trama, no cuando responde la base (C-103). Una marca relativa depende de cuándo llega
   la trama: **una reentrega no se detecta como duplicado** (igual que una trama sin marca).
+- **Tipos y versión (cierre de la revisión del 16/11/2026).** `bt` y `t` que no son un número finito y `bu` que no es texto (§4.3, Tabla 1) se **rechazan** (C-104); hasta
+  entonces un `"t":"-5"` se ignoraba en silencio y la lectura quedaba con la hora de recepción. Y un `bver` **distinto entre registros del mismo pack** también
+  (§4.4: «All SenML Records in a Pack MUST have the same version number»; C-105): un registro sin `bver` cuenta como 10 hasta que un `bver` explícito fije la
+  versión, así que `bver` 5 en el segundo registro de un pack que empezó sin `bver` es un cambio de versión, y `bver` 5 en el primero y nada después no lo es.
+- **Números.** Un valor finito que deja de serlo al convertirse a la unidad canónica (1e306 bar son 1e309 hPa) se rechaza como `invalida` aunque el canal no tenga
+  rango máximo (C-100: sin esa guardia `Infinity` pasaba la comparación del rango). Un `-0` (en `v`, en `bv` o tras convertir) se guarda como `0` (C-101): la copia
+  local de la RFC no dice nada del cero negativo, para la base y para quien compare `-0` y `0` son datos distintos, y una magnitud física no tiene signo en el cero.
 - **Alcance.** Son reglas del adaptador SenML. El plano interpreta `t` como instante absoluto y no tiene `bver`, `bv` ni etiquetas de la RFC; ChirpStack y
   Milesight leen JSON ajeno a SenML. La prueba C-99 comprueba que no las aplican.
 
@@ -3565,8 +3583,42 @@ campos de valor, etiqueta con «_», `bv` no numérico, suma que desborda) y com
 que `t` = −30 se guarda con la marca de la hora de recepción menos 30 s y origen `dispositivo`, y que `t` = 0 queda sin marca y origen `recepcion`.
 
 **Matriz.** De 94 a 98 reglas (se agregan C-96 en el grupo f, C-97 en el a, C-98 en el b y C-99 en el g; la tabla de grupos de §73 citaba 93 y no contaba C-95).
-Por grupo: a 19, b 13, c 8, d 11, e 15, f 13 y g 19. Con C-99 los identificadores de dos cifras llegan a C-99: la regla siguiente exige ensanchar la expresión
-`^C-\d{2}$` del guardián (y la de las pruebas) o numerar de otra manera.
+Por grupo: a 19, b 13, c 8, d 11, e 15, f 13 y g 19. Con C-99 los identificadores de dos cifras llegaban a C-99: el cierre del 16/11/2026 ensanchó la expresión
+del guardián y la de las pruebas a `^C-\d{2,3}$` y sumó seis reglas (C-100 a C-105), con lo que la matriz tiene **104 reglas**: a 21, b 15, c 10, d 11, e 15, f 13 y g 19.
+
+**Cierre de lo pendiente (16/11/2026).** La lectura del bloque dejó estos puntos chicos; ninguno cambió el diseño, y cada cambio de comportamiento tiene su regla y su prueba:
+
+| Punto | Qué se hizo | Regla |
+|---|---|---|
+| La prueba de la identidad no fallaba si se tomaba del `bn` | La prueba exige que la consulta del filtro 1 reciba exactamente `dev-0001` y que `dev-9999` no aparezca en ningún parámetro (salvo el cuerpo crudo, que son bytes); la «Fuente» de la fila se actualizó a lo que hoy dicen `docs/10 §4` y `docs/06 §3` | C-54 |
+| Un valor finito pasa a infinito al convertir (`bar` a `hPa`, 1e306) | Se rechaza como `invalida` con «no cabe en un número finito al convertirlo a hPa»; se comprueba sobre el valor ya convertido, con un canal sin rango máximo (con rango, `Infinity` ya lo rechazaba) | C-100 |
+| `-0` (también con `bv`) | Se guarda `0`: la copia local de RFC 8428 no dice nada del cero negativo y para la base `-0` y `0` son datos distintos; vale también para el plano y tras una conversión | C-101 |
+| «Ahora» se calculaba por registro cuando faltaba `recibidoEn` | Se calcula una vez por trama, fuera del bucle | C-102 |
+| El instante que llega a la lectura | Una prueba por cada vía (MQTT y HTTP) con el reloj movido siete minutos mientras responde la base: el adaptador y la columna `recibido_en` reciben el instante de entrada | C-103 |
+| `bt`, `t` o `bu` de tipo equivocado se ignoraban | Se rechazan (`bt no numérico`, `t no numérico`, `bu no es texto`), también en un registro sin valor; `n` y `u`, que solo se revisaban en el registro con valor, igual | C-104 |
+| `bver` distinto entre registros del pack | Se rechaza (§4.4: «All SenML Records in a Pack MUST have the same version number»). La cita «§4.1» del comentario del valor base pasó a «§4», porque «apply … up to, but not including, the next Record that has that same base field» está en el encabezado de la §4 | C-105 |
+| Cifras de la matriz sin guardián | Paso 2g2 del verificador: los identificadores de `contrato.spec.ts` contra los de la tabla de §73, las filas de cada grupo contra el «(N reglas)» de su encabezado y el total contra cada «matriz … N reglas» de los documentos y el informe (las bitácoras, fechadas, no se comparan). La tabla no listaba C-96 a C-99 y decía 94 reglas con 98 en la prueba | (verificador) |
+| Identificadores de 16 hexadecimales con forma real | Paso 2f5: ninguna cadena de exactamente 16 hexadecimales (con límites de palabra) en un archivo de texto versionado o nuevo, salvo una lista corta de sintéticos escrita en el propio guion; lo hallado se muestra enmascarado | (verificador) |
+
+La prueba C-96 (cuarentena de cada regla estricta) recibió cuatro casos más: `bt`, `t`, `bu` y `bver` distinto. `docs/10 §4` y su tabla de casos del §4.1 dicen lo mismo que el código
+(las reglas nuevas, el desborde y el `-0`), y aclaran que `bn` no llega a la medición ni al detalle pero el cuerpo crudo sí se conserva: en `trama.payload` si alguna lectura se guardó y en
+`cuarentena.payload_crudo` si se rechazó.
+
+Cada prueba nueva se comprobó plantando su falla y quitándola (el archivo volvió idéntico):
+
+| Defecto plantado | Mensaje con que cayó |
+|---|---|
+| La identidad del filtro 1 se toma del `bn` | C-54: `expected [ [ 'dev-9999' ] ] to deeply equal [ [ 'dev-0001' ] ]` |
+| Sin comprobar que el valor convertido sea finito | C-100: `expected [ [ 'hPa', Infinity ], …(3) ] to deeply equal [ [ 'hPa', 1e+308 ], [ 'hPa', 1013 ] ]` |
+| Sin normalizar `-0` | C-101: `expected [ -0, -0, +0 ] to deeply equal [ +0, +0, +0 ]` |
+| «Ahora» por registro | C-102: marcas de segundos distintos en vez de tres iguales |
+| `recibidoEn` de HTTP leído dentro del trabajo, después de la espera | C-103: `http: expected '2026-11-16T10:07:00.000Z' to be '2026-11-16T10:00:00.000Z'` |
+| `bt` y `t` sin revisar | C-104 y C-96: `bt "1757300000": expected [Function] to throw an error` |
+| `bu` sin revisar | C-104 y C-96: `bu 5: expected [Function] to throw an error` |
+| `bver` distinto aceptado | C-105 y C-96: `…{"bver":5…}]: expected [Function] to throw an error` |
+
+Y los dos pasos del verificador, aislados (la pila no corrió): 2g2 cae con una fila quitada de la tabla, con la cifra del total cambiada, con el encabezado de un grupo cambiado y con una regla
+agregada a la matriz sin su fila; 2f5 cae con una cadena de 16 hexadecimales plantada en un archivo versionable (y pasa al quitarla). No se corrió el verificador completo.
 
 **Compatibilidad: quién emite SenML hacia la plataforma.** Revisado en el repositorio: el emulador (`emulador/modelo.ts`: `bn` = identificador, `bt` absoluto;
 con el reloj roto `epoch`, `bt` entre 0 y 86 399, que es relativo positivo y sigue valiendo hora de recepción; con `futuro`, una hora adelante, igual que antes), el
@@ -3575,8 +3627,8 @@ firmware (`nodo.cpp`: `bn` = identificador y `bt` absoluto cuando hay hora; sin 
 y los ejemplos de `docs/06`, `docs/15`, `docs/17`, el README del backend y el guion `publicar.sh`. Nadie emite `bv`, `bver`, etiquetas con «_» ni más de un campo de valor
 por registro. No se ejecutaron los guiones del banco (otro trabajo usa la pila): la revisión es de lectura.
 
-**Cifras del bloque:** `pnpm verificar` en verde: 741 pruebas unitarias del backend en 62 archivos y ninguna pendiente (eran 731 más 4 `it.todo`: +4 que dejaron de
-ser pendientes, +4 de las reglas C-96 a C-99 y +2 de `tiempoSenml`), y 365 pruebas del panel (404 ejecuciones en vitest, en 33 archivos); `pnpm build` pasa.
+**Cifras del bloque:** `pnpm verificar` en verde: 747 pruebas unitarias del backend en 62 archivos y ninguna pendiente (741 al cerrar el perfil: eran 731 más 4 `it.todo`, +4 que dejaron de
+ser pendientes, +4 de las reglas C-96 a C-99 y +2 de `tiempoSenml`; y +6 del cierre del 16/11/2026, una por regla C-100 a C-105), y 365 pruebas del panel (404 ejecuciones en vitest, en 33 archivos); `pnpm build` pasa.
 
 **Hallazgos de §73 tras este bloque.**
 
@@ -3620,7 +3672,7 @@ sitio**, como lo haría una persona. Por cada ancho (1 280 y 390 px) comprueba s
 los dos anchos). A 390 px el formulario mide 358 px; a 1 280 px, 992 px. La ventana tecleada como 16:01 a 16:31 en la hora del sitio quedó en la URL
 como 19:01 a 19:31 UTC, y la gráfica mostró 2 puntos a un minuto, dejando fuera uno anterior y uno posterior (en Firefox, con el banco recién
 encendido; en la corrida siguiente sobre el mismo banco, la de Chromium, fueron 4 puntos y 2 a cada lado, porque quedaban las lecturas sembradas
-por la primera: la comprobación compara con la API, no con un número fijo). Capturas de los dos anchos en la carpeta privada del banco.
+por la primera: la comprobación compara con la API, no con un número fijo). Capturas de los dos anchos en la carpeta privada del banco (no se versionan).
 
 **Falla plantada.** Con dos defectos puestos a propósito en el panel —los eventos piden las últimas 24 horas en vez de la ventana; el formulario con
 un ancho mínimo de 520 px— la corrida quedó con **3 de 50 comprobaciones con falla**, justo las esperadas: «peticiones con la ventana: histórico 1,
