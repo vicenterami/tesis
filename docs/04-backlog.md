@@ -376,7 +376,7 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 |---|---|:---:|:---:|:---:|
 | **HU-30** | **Como administrador del sistema**, quiero una pantalla «Estado del sistema» con los recursos por contenedor, los errores y el último respaldo, y ajustar desde el panel los límites de los servicios (RF-59, RF-60; `docs/19 §4`, P12) — agregada el 08/11/2026 | M | 4 | 5 |
 | **TT-45** | Monitorización propia en la base: `error_sistema` con un filtro global de excepciones, errores del navegador sin datos personales y con límite de tasa, colector de recursos por cgroups a `metrica_recurso` (sin `docker.sock`), condiciones `error_repetido`, `memoria_alta` y `respaldo_atrasado`, latido externo (RNF-19; `docs/10 §8.4` puntos 60 y 61) — agregada el 08/11/2026 | M | 4 | 8 |
-| **TT-46** | Respaldos: cifrado en reposo, guion versionado, simulacro mensual de borrado accidental con restauración, guardia «último respaldo de menos de 26 h» y papelera de dispositivos de 30 días (`docs/10 §9.5`) — agregada el 08/11/2026 | M | 4 | 8 |
+| **TT-46** | Respaldos: cifrado en reposo, guion versionado, simulacro mensual de borrado accidental con restauración, guardia «último respaldo de menos de 26 h» y papelera de dispositivos de 30 días (`docs/10 §9.5`) — agregada el 08/11/2026; 🟡 16/11/2026: guion versionado con huella y simulacro de restauración en el verificador (`docs/16 §77`); faltan el cifrado, la guardia y la papelera | M | 4 | 8 |
 | **TT-47** | Backend en ES modules (`docs/10 §8.4` punto 63) — agregada el 08/11/2026; ✅ hecha el 11/11/2026 (`docs/16 §60`) | C | 4 | 4 |
 | **TT-48** | Pruebas de extremo a extremo en el CI, las que corran sin hardware ni secretos — agregada el 08/11/2026 | S | 4 | 3 |
 

@@ -3771,3 +3771,49 @@ revisión a los dos anchos y del resultado, en la carpeta privada del banco (no 
 
 **Lo que falta.** Medir el primer dibujo de 500 filas y cada «Mostrar 100 más» (umbral de `docs/19 §4` punto 11: bajo 1 s a 390 px). El lector
 de XLSX queda para el bloque siguiente.
+
+## 77. Respaldo con huella y simulacro de restauración (16/11/2026)
+
+**Por qué.** El servidor de prueba ya guarda mediciones reales y cada despliegue empieza por un respaldo, pero el guion que lo toma vivía
+solo en ese servidor y lo único que se comprobaba al restaurar era el número de filas de una tabla. Ese día `pg_dump` avisó que el
+volcado «podría no restaurarse» por unas claves foráneas circulares del catálogo de TimescaleDB. La regla del diseño es que un respaldo
+que no se restauró no es respaldo (`docs/10 §9.5`): había que poder demostrarlo con cada respaldo, no suponerlo.
+
+**Qué se hizo** (primera parte de TT-46).
+- `plataforma/pruebas/respaldar.sh`: el respaldo, versionado. Deja el volcado (`pg_dump -Fc`), el archivo de credenciales del broker y la
+  **huella** de la base: por cada tabla, cuántas filas y una suma de comprobación calculada fila por fila, más las extensiones, las
+  hipertablas con su intervalo, sus trozos, los objetos del esquema y los permisos de cada rol
+  (`plataforma/db/pruebas/huella-respaldo.sql`; fija la zona horaria y el formato de fechas, números y bytes de la sesión, para que dos
+  bases iguales se escriban igual). El volcado y la huella salen de **una sola transacción de solo lectura**: `pg_dump` vuelca la
+  instantánea que esa transacción exporta, así que lo que entre mientras se respalda queda fuera de los dos. La carpeta queda con
+  permisos 700 y los archivos con 600; corre un respaldo a la vez por carpeta; el volcado es el último en recibir su nombre
+  definitivo, y lo antiguo se borra solo después de terminar bien el de hoy.
+- `plataforma/pruebas/simulacro-restauracion.sh`: levanta una base desechable con la misma imagen, sin red y con los datos en memoria;
+  restaura en el orden que pide TimescaleDB (crear la base, la extensión, `timescaledb_pre_restore()`, `pg_restore`,
+  `timescaledb_post_restore()`); calcula la huella de lo restaurado y exige que sea **idéntica, línea por línea**, a la del respaldo.
+  No toca la base de la plataforma ni ningún volumen, y borra el contenedor al terminar.
+- El verificador corre las dos cosas en cada pasada (paso 4e; con él son 56 pasos): un cambio del esquema que rompa la restauración se ve
+  ese día y no cuando haga falta restaurar.
+
+**Resultado, con la base de desarrollo.** Respaldo de 712 247 bytes; restaurado sin ningún error de `pg_restore`; huella idéntica: 48
+líneas, 22 tablas, 29 326 filas, 5 hipertablas reconocidas por TimescaleDB con sus intervalos, las tres extensiones, los mismos índices,
+restricciones, funciones, disparadores y valores por omisión, y los mismos permisos del rol de la aplicación. El simulacro completo
+tardó 4 s. El aviso de `pg_dump` sobre las claves circulares
+aparece también aquí y no impide restaurar: es del catálogo de TimescaleDB, que se restaura entre `pre_restore` y `post_restore`.
+
+**Falla plantada** (cada una con un respaldo estropeado a propósito; el simulacro, o el propio respaldo, debe decir que no sirve):
+
+| Qué se estropeó | Qué dijo el simulacro | Salida |
+|---|---|---|
+| La huella esperada dice una fila menos en una tabla | «la huella restaurada difiere de la del respaldo en 2 línea(s)», con la tabla y los dos conteos | 1 |
+| El volcado cortado a la mitad | «pg_restore salió con 1 y 1 línea(s) de error: could not read from input file: end of file», y las 22 tablas ausentes | 1 |
+| La huella tomada en otro instante (la base siguió recibiendo y difería en **una fila**) | difiere en la tabla que recibió esa fila, con su conteo y su suma | 1 |
+| El respaldo sin su huella | «no encuentro la huella del respaldo: sin ella solo se sabría que restaura, no que restaura lo mismo» | 2 |
+| La huella con solo una parte de sus líneas | «la huella del respaldo está incompleta …: no sirve para comparar» | 2 |
+| `pg_dump` falla al respaldar (una opción que no existe) | El respaldo dice «pg_dump no dejó el volcado: no hay respaldo» y no queda ningún archivo con nombre definitivo | 1 |
+| Dos respaldos a la vez sobre la misma carpeta | El segundo dice «ya hay un respaldo corriendo» y queda un solo volcado | 1 |
+
+**Límites.** Medido con los datos de desarrollo: el tiempo con el volumen real del servidor se medirá allá. El volcado de una base no
+trae los roles del servidor: el simulacro crea los que la huella nombra, y una recuperación real aplica después
+`db/init/14-rol-aplicacion.sql` (`docs/10 §9.5`). El respaldo todavía no va cifrado, no hay alarma si el último tiene más de 26 horas y
+no existe la papelera de dispositivos: es lo que queda de TT-46. El simulacro sobre el respaldo del servidor de prueba está pendiente.

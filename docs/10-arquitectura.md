@@ -1921,6 +1921,13 @@ construirlo por anticipado. Cada afirmación sobre una herramienta tiene su fuen
   el guion de respaldo y restauración, versionado; un **simulacro mensual de borrado accidental** (se borra en una copia, se restaura y se
   cuentan filas); la guardia «último respaldo de menos de 26 h», que abre `respaldo_atrasado` (§8.4 punto 61); y una **papelera de
   dispositivos**: la baja de un dispositivo se puede deshacer durante 30 días sin tocar un respaldo (su pantalla, primero en `docs/19`).
+- **Hecho el 16/11/2026 (primera parte de TT-46; `docs/16 §77`):** el guion de respaldo está versionado (`plataforma/pruebas/respaldar.sh`)
+  y deja, junto al volcado, su **huella**: filas y suma de comprobación de cada tabla, hipertablas, objetos y permisos, tomadas en la
+  misma instantánea que el volcado (`db/pruebas/huella-respaldo.sql`). El simulacro (`plataforma/pruebas/simulacro-restauracion.sh`)
+  restaura un volcado en una base desechable, sin red y con los datos en memoria, y exige que la huella de lo restaurado sea idéntica
+  a la del respaldo; el verificador lo corre en cada pasada (paso 4e). El volcado de una base no trae los **roles** (son del servidor
+  entero): en una recuperación real, tras restaurar se aplica `db/init/14-rol-aplicacion.sql`, que crea el rol de la aplicación con su
+  clave. Falta de TT-46: el cifrado en reposo, la guardia de 26 h y la papelera.
 
 ### 9.6 Tramas irregulares: periodos distintos, latencia, ráfagas
 
