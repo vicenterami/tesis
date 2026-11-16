@@ -367,14 +367,16 @@ for (const caso of casos) {
         `${nuevo}-l1,lote e2e 1,zona e2e,http,senml,60,temperatura,`, `${nuevo}-l2,lote e2e 2,zona e2e,http,senml,60,temperatura,`,
         `${nuevo}-l3,lote e2e 3,zona que no existe,http,senml,60,temperatura,`].join('\n');
       await p.locator('[data-archivo]').setInputFiles({ name: 'lote-e2e.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
-      await p.getByRole('button', { name: 'Validar el archivo' }).click();
-      await p.locator('[data-resumen-lote]').waitFor({ timeout: 15000 });
-      comprobar((await p.locator('[data-resumen-lote]').textContent()).includes('Válidas 2 · creadas 0 · rechazadas 1'), `${etiqueta}: P7: validar informa 2 válidas y 1 rechazada sin crear nada`);
+      // Desde el bloque N (docs/19 §4): origen → revisión (no crea nada) → resultado; las tarjetas de la revisión llevan los conteos.
+      await p.locator('[data-revisar]').click();
+      await p.locator('[data-paso-lote="2"]').waitFor({ timeout: 15000 });
+      const cuenta = async (f) => (await p.locator(`[data-filtro-lote="${f}"] [data-cifra]`).textContent()).trim();
+      comprobar((await cuenta('valida')) === '2' && (await cuenta('rechazada')) === '1', `${etiqueta}: P7: la revisión informa 2 que se crean y 1 que no entra, sin crear nada`);
       const antes = await p.evaluate(async (s) => { const x = (await (await fetch('/sitios')).json()).find((y) => y.codigo === s); return Number((await fetch(`/dispositivos?sitio=${x.id}&limite=1`)).headers.get('x-total')); }, sitio);
-      await p.getByRole('button', { name: 'Crear las válidas (2)' }).click();
-      await p.waitForFunction(() => document.querySelector('[data-resumen-lote]')?.textContent?.includes('creadas 2'), null, { timeout: 30000 });
+      await p.locator('[data-crear-lote]').click();
+      await p.locator('[data-paso-lote="3"]').waitFor({ timeout: 30000 });
       const despues = await p.evaluate(async (s) => { const x = (await (await fetch('/sitios')).json()).find((y) => y.codigo === s); return Number((await fetch(`/dispositivos?sitio=${x.id}&limite=1`)).headers.get('x-total')); }, sitio);
-      comprobar(despues === antes + 2, `${etiqueta}: … «Crear las válidas» crea solo las 2 válidas`, `${antes} → ${despues}`);
+      comprobar(despues === antes + 2, `${etiqueta}: … «Crear 2 dispositivos» crea solo las 2 que entran`, `${antes} → ${despues}`);
       const [descarga] = await Promise.all([p.waitForEvent('download', { timeout: 15000 }), p.getByRole('button', { name: 'Descargar credenciales (CSV)' }).click()]);
       const lineas = readFileSync(await descarga.path(), 'utf8').trim().split(/\r?\n/);
       comprobar(lineas[0] === 'id_fisico,id,credencial,topico' && lineas.length === 3, `${etiqueta}: … las credenciales se descargan una vez en CSV (${lineas.length - 1} filas)`);

@@ -20,6 +20,7 @@
     variante?: 'normal' | 'principal' | 'peligro' | 'discreto' | 'barra'; // «barra»: los de la barra superior y el menú (L1)
     presionado?: boolean;
     icono?: NombreIcono | null;
+    cifra?: number | null; // un número grande sobre la etiqueta: las tarjetas que filtran (docs/19 §4, N7)
   };
   let {
     etiqueta,
@@ -31,6 +32,7 @@
     variante = 'normal',
     presionado = undefined,
     icono = null,
+    cifra = null,
     ...resto
   }: Propias & Omit<HTMLButtonAttributes, 'type' | 'disabled' | 'children' | 'aria-describedby' | 'aria-pressed' | 'aria-busy'> = $props();
 
@@ -56,7 +58,7 @@
     aria-busy={cargando || undefined}
     aria-pressed={presionado}
     aria-describedby={describe}
-  >{#if icono !== null}<Icono nombre={icono} />{/if}{cargando ? etiquetaCargando || `${etiqueta}…` : etiqueta}</button>
+  >{#if icono !== null}<Icono nombre={icono} />{/if}{#if cifra !== null}<span class="n" data-cifra>{cifra}</span>{' '}{/if}{cargando ? etiquetaCargando || `${etiqueta}…` : etiqueta}</button>
 {/snippet}
 
 <span class="boton-envoltura">

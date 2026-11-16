@@ -1,4 +1,4 @@
-// P7, alta masiva por archivo (docs/19 §4, F2 y bloque N). El CSV se lee en el navegador (nunca se sube el archivo: se convierte en
+// P7, alta masiva (docs/19 §4, F2 y bloque N). El origen (archivo CSV, lo pegado o JSON) se lee en el navegador (nunca se sube el archivo: se convierte en
 // `filas` y va como JSON, cada una con `n`, su fila en el archivo contando las vacías, con la cabecera en la 1). Las columnas, sus topes y
 // los límites salen de `GET /dispositivos/lote/plantilla`: el panel no guarda copia. Se valida completo con `modo=validar` (no crea nada) y
 // las válidas se crean con `modo=crear` en UNA petición, todo o nada, con la `huella` del plan revisado y una llave de reintento
@@ -6,7 +6,7 @@
 // credenciales llegan UNA sola vez y viven solo en memoria hasta que la persona las descarga.
 import { ErrorApi } from './api';
 
-// La columna que «Descargar rechazadas» agrega para que se lea el porqué; al volver a subir el archivo corregido, se ignora.
+// La columna que «Descargar las que no entran» agrega para que se lea el porqué; al volver a subir el archivo corregido, se ignora.
 export const COLUMNA_MOTIVO = 'motivo';
 
 // ── La plantilla del servidor (GET /dispositivos/lote/plantilla) ───────────────────────────────────────────────────────────────────
@@ -26,67 +26,104 @@ export interface LecturaCsv {
   errores: Problema[];
 }
 
-// RFC 4180: comas, comillas dobles (con "" dentro), saltos CRLF o LF, y la marca BOM que deja Excel. Una celda entre comillas puede
-// llevar comas y saltos de línea. Devuelve cada registro con su número (`n`, desde 1) contando los vacíos, que se descartan: así el
-// número es la fila que la persona ve en su planilla aunque haya filas vacías en medio.
-export function celdasCsv(texto: string): { n: number; celdas: string[] }[] {
-  const t = texto.replace(/^﻿/, '');
+// Los orígenes (docs/19 §4, N6): un archivo CSV, lo pegado desde la planilla (separado por tabuladores) y una lista JSON terminan en la
+// misma lista `filas`, cada una con su `n` (la fila del origen contando las vacías, con la cabecera en la 1; en JSON, la posición más 1).
+// El archivo y lo pegado van por el mismo lector de tablas (`leerCsv`); el JSON arma las mismas celdas y pasa por la misma comprobación.
+// Las columnas que el lector ignora al volver a subir lo que se descargó: `fila` y `motivo`.
+interface Registro { n: number; celdas: string[] }
+export const COLUMNA_FILA = 'fila';
+const IGNORADAS: readonly string[] = [COLUMNA_FILA, COLUMNA_MOTIVO];
+
+// El separador de columnas: el que más veces aparece en la cabecera, fuera de comillas, entre los que publica la plantilla. Sin ninguno, la
+// cabecera es de una sola columna (y se avisa).
+function detectarSeparador(t: string, candidatos: readonly string[]): string {
+  const cuenta = new Map(candidatos.map((c) => [c, 0]));
+  let comillas = false;
+  for (const c of t) {
+    if (c === '"') comillas = !comillas;
+    else if (!comillas && (c === '\n' || c === '\r')) break;
+    else if (!comillas && cuenta.has(c)) cuenta.set(c, (cuenta.get(c) ?? 0) + 1);
+  }
+  let mejor = candidatos[0] ?? ',';
+  for (const [c, n] of cuenta) if (n > (cuenta.get(mejor) ?? 0)) mejor = c;
+  return mejor;
+}
+
+// RFC 4180 con el separador dado: comillas dobles (con "" dentro), saltos CRLF o LF, y la marca BOM que deja Excel. Una celda entre comillas
+// puede llevar el separador y saltos de línea. Devuelve cada registro con su número (`n`, desde 1) contando los vacíos, que se descartan:
+// así el número es la fila que la persona ve en su planilla aunque haya filas vacías en medio. Una comilla sin cerrar o texto pegado a una
+// comilla de cierre no se pierde en silencio: se dice con la fila (revisión del 16/11/2026).
+export function celdasTabla(texto: string, separadores: readonly string[]): { registros: Registro[]; errores: Problema[] } {
+  const t = texto.replace(/^\uFEFF/, '');
+  const sep = detectarSeparador(t, separadores);
   const registros: string[][] = [];
+  const errores: Problema[] = [];
   let fila: string[] = [];
   let celda = '';
   let comillas = false;
+  let cerrada = false; // la celda acaba de cerrar su comilla: solo puede seguir un separador o el fin de la fila
+  let pegado = false; // ya se dijo, en este registro, que hay texto pegado a una comilla de cierre
+  const n = (): number => registros.length + 1;
   for (let i = 0; i < t.length; i++) {
     const c = t[i]!;
     if (comillas) {
       if (c === '"' && t[i + 1] === '"') {
         celda += '"';
         i++;
-      } else if (c === '"') comillas = false;
-      else celda += c;
-    } else if (c === '"' && celda === '') comillas = true;
-    else if (c === ',') {
+      } else if (c === '"') {
+        comillas = false;
+        cerrada = true;
+      } else celda += c;
+    } else if (c === '"' && celda === '' && !cerrada) comillas = true;
+    else if (c === sep) {
       fila.push(celda);
       celda = '';
+      cerrada = false;
     } else if (c === '\n' || c === '\r') {
       if (c === '\r' && t[i + 1] === '\n') i++;
       fila.push(celda);
       registros.push(fila);
       fila = [];
       celda = '';
-    } else celda += c;
+      cerrada = false;
+      pegado = false;
+    } else {
+      if (cerrada && !pegado) {
+        errores.push({ caso: 'celda_invalida', texto: `Fila ${n()}: hay texto pegado a una comilla de cierre; separa las celdas con «${sep === '\t' ? 'tabulador' : sep}».` });
+        pegado = true;
+      }
+      celda += c;
+    }
   }
+  if (comillas) errores.push({ caso: 'celda_invalida', texto: `Fila ${n()}: comilla sin cerrar.` });
   if (celda !== '' || fila.length > 0) {
     fila.push(celda);
     registros.push(fila);
   }
-  return registros.map((celdas, i) => ({ n: i + 1, celdas })).filter((r) => r.celdas.some((x) => x.trim() !== ''));
+  return { registros: registros.map((celdas, i) => ({ n: i + 1, celdas })).filter((r) => r.celdas.some((x) => x.trim() !== '')), errores };
 }
 
-// El archivo → filas con la cabecera de la plantilla. Lo que se puede ver antes de enviar se ve aquí, con la fila y la columna (docs/19 §4,
-// N8b): la pantalla es la ayuda; el servidor sigue siendo la guarda real (filasDelCuerpo). Las reglas de las celdas salen de la plantilla
-// (tope y `texto_libre` de cada columna), no de una copia.
+// Lo que se puede ver antes de enviar se ve aquí, con la fila y la columna (docs/19 §4, N8b): la pantalla es la ayuda; el servidor sigue
+// siendo la guarda real (filasDelCuerpo). Las reglas de las celdas salen de la plantilla (tope y `texto_libre` de cada columna), no de una copia.
 const ASCII_IMPRIMIBLE = /^[\x20\x21\x23-\x5b\x5d-\x7e]*$/; // la misma regla de alta/lote.ts para las columnas que no son texto libre
 const CONTROL = /\p{Cc}/u;
 const SUSTITUTO_SUELTO = /\p{Cs}/u;
 const MAX_PROBLEMAS = 10;
-export function leerCsv(texto: string, p: PlantillaLote): LecturaCsv {
+// La descarga antepone un apóstrofo a una celda con forma de fórmula (punto 9); el lector lo quita para que lo descargado y vuelto a subir
+// sin tocar dé el mismo plan.
+const CON_APOSTROFO = /^'[=+\-@\t\r\n＝＋－＠]/;
+const sinApostrofo = (v: string): string => (CON_APOSTROFO.test(v) ? v.slice(1) : v);
+
+// El camino común de los tres orígenes: la cabecera y los registros (ya con sus `n`) → filas o los problemas del archivo.
+function comprobar(cabecera: string[], datos: Registro[], p: PlantillaLote, sinDatos: Problema): LecturaCsv {
   const errores: Problema[] = [];
   const columnas = p.columnas.map((c) => c.nombre);
-  const bytes = new TextEncoder().encode(texto).length;
-  if (bytes > p.max_bytes) return { filas: [], errores: [{ caso: 'archivo_pesado', texto: textoPesado(bytes, p.max_bytes) }] };
-  const registros = celdasCsv(texto);
-  if (registros.length === 0) return { filas: [], errores: [{ caso: 'archivo_vacio', texto: 'El archivo está vacío.' }] };
-  const cabecera = registros[0]!.celdas.map((x) => x.trim().toLowerCase());
-  if (cabecera.length === 1 && columnas.length > 1) {
-    return { filas: [], errores: [{ caso: 'una_columna', texto: `La cabecera tiene una sola columna («${recorte(registros[0]!.celdas[0] ?? '')}»): el archivo no está separado por comas. Una planilla en español suele guardar con «;»; descarga la plantilla y copia tus datos en ella.` }] };
-  }
-  for (const x of cabecera.filter((x) => x !== COLUMNA_MOTIVO && !columnas.includes(x))) {
+  for (const x of cabecera.filter((x) => !IGNORADAS.includes(x) && !columnas.includes(x))) {
     errores.push({ caso: 'columna_desconocida', texto: `La columna «${recorte(x)}» no es de la plantilla. Las columnas son: ${columnas.join(', ')}.` });
   }
   for (const c of p.columnas.filter((c) => c.obligatoria && !cabecera.includes(c.nombre))) errores.push({ caso: 'falta_obligatoria', texto: `Falta la columna obligatoria «${c.nombre}».` });
   for (const x of new Set(cabecera.filter((x, i) => cabecera.indexOf(x) !== i))) errores.push({ caso: 'columna_repetida', texto: `La columna «${recorte(x)}» está repetida en la cabecera.` });
-  const datos = registros.slice(1);
-  if (datos.length === 0) errores.push({ caso: 'solo_cabecera', texto: 'El archivo trae la cabecera pero ninguna fila de datos.' });
+  if (datos.length === 0) errores.push(sinDatos);
   if (datos.length > p.max_filas) errores.push({ caso: 'demasiadas_filas', texto: `El archivo trae ${datos.length} filas y el máximo es ${p.max_filas}: divídelo en partes de ${p.max_filas} o menos.` });
   if (errores.length > 0) return { filas: [], errores };
   // Por fila: el número de celdas y cada celda contra su columna.
@@ -99,7 +136,7 @@ export function leerCsv(texto: string, p: PlantillaLote): LecturaCsv {
     }
     cabecera.forEach((col, i) => {
       const c = porNombre.get(col);
-      const v = (d.celdas[i] ?? '').trim();
+      const v = sinApostrofo(d.celdas[i] ?? '').trim();
       if (c === undefined || v === '' || errores.length >= MAX_PROBLEMAS) return;
       const donde = `Fila ${d.n}, columna «${col}»`;
       if (SUSTITUTO_SUELTO.test(v) || CONTROL.test(v)) errores.push({ caso: 'celda_invalida', texto: `${donde}: trae un carácter que no se admite (un salto de línea, un tabulador u otro carácter de control).` });
@@ -111,13 +148,75 @@ export function leerCsv(texto: string, p: PlantillaLote): LecturaCsv {
   const filas = datos.map((d) => {
     const f: FilaLote = { n: d.n };
     cabecera.forEach((col, i) => {
-      if (col === COLUMNA_MOTIVO) return;
-      const v = (d.celdas[i] ?? '').trim();
+      if (IGNORADAS.includes(col)) return;
+      const v = sinApostrofo(d.celdas[i] ?? '').trim();
       if (v !== '') f[col] = v;
     });
     return f;
   });
   return { filas, errores: [] };
+}
+
+// Un archivo CSV o lo pegado desde la planilla (tabuladores): el mismo lector.
+export function leerCsv(texto: string, p: PlantillaLote): LecturaCsv {
+  const { registros, errores } = celdasTabla(texto, p.separadores.columnas);
+  if (errores.length > 0) return { filas: [], errores };
+  if (registros.length === 0) return { filas: [], errores: [{ caso: 'archivo_vacio', texto: 'El archivo está vacío.' }] };
+  const cabecera = registros[0]!.celdas.map((x) => x.trim().toLowerCase());
+  if (cabecera.length === 1 && p.columnas.length > 1) {
+    return { filas: [], errores: [{ caso: 'una_columna', texto: `La cabecera tiene una sola columna («${recorte(registros[0]!.celdas[0] ?? '')}»): no hay «;», «,» ni tabulador entre las columnas. Descarga la plantilla y copia tus datos en ella.` }] };
+  }
+  return comprobar(cabecera, registros.slice(1), p, { caso: 'solo_cabecera', texto: 'El archivo trae la cabecera pero ninguna fila de datos.' });
+}
+
+// Una lista de objetos con las columnas de la plantilla. `n` es la posición más 1. Un número se vuelve texto, como llega en un CSV.
+export function leerJson(texto: string, p: PlantillaLote): LecturaCsv {
+  const malo = (t: string): LecturaCsv => ({ filas: [], errores: [{ caso: 'celda_invalida', texto: t }] });
+  let lista: unknown;
+  try {
+    lista = JSON.parse(texto.replace(/^\uFEFF/, ''));
+  } catch {
+    return malo('El JSON no se puede leer: debe ser una lista de objetos con las columnas de la plantilla.');
+  }
+  if (!Array.isArray(lista) || lista.some((x) => typeof x !== 'object' || x === null || Array.isArray(x))) return malo('El JSON debe ser una lista de objetos con las columnas de la plantilla.');
+  if (lista.length === 0) return { filas: [], errores: [{ caso: 'archivo_vacio', texto: 'El archivo está vacío.' }] };
+  const objetos = lista as Record<string, unknown>[];
+  const problemas: Problema[] = [];
+  // Dos claves que solo difieren en mayúsculas o en espacios son la misma columna: se dice, no se toma la última en silencio.
+  for (const o of objetos) {
+    const vistas = Object.keys(o).map((k) => k.trim().toLowerCase());
+    for (const x of new Set(vistas.filter((x, i) => vistas.indexOf(x) !== i))) {
+      if (!problemas.some((q) => q.texto.includes(`«${recorte(x)}»`))) problemas.push({ caso: 'columna_repetida', texto: `La columna «${recorte(x)}» está repetida en la cabecera.` });
+    }
+  }
+  if (problemas.length > 0) return { filas: [], errores: problemas };
+  const cabecera = [...new Set(objetos.flatMap((o) => Object.keys(o).map((k) => k.trim().toLowerCase())))];
+  const datos: Registro[] = objetos.map((o, i) => {
+    const porClave = new Map(Object.entries(o).map(([k, v]) => [k.trim().toLowerCase(), v]));
+    const celdas = cabecera.map((col) => {
+      const v = porClave.get(col);
+      if (v === undefined || v === null) return '';
+      if (typeof v === 'string') return v;
+      // Un número ya perdió su escritura al leerse (`12345678901234567890` queda en `12345678901234567000`): solo se admiten los enteros que se
+      // escriben igual.
+      if (typeof v === 'number' && Number.isSafeInteger(v)) return String(v);
+      if (problemas.length < MAX_PROBLEMAS) {
+        problemas.push({ caso: 'celda_invalida', texto: typeof v === 'number' ? `Fila ${i + 1}, columna «${recorte(col)}»: el número no se puede leer tal como está escrito; escríbelo entre comillas.` : `Fila ${i + 1}, columna «${recorte(col)}»: no es texto ni número.` });
+      }
+      return '';
+    });
+    return { n: i + 1, celdas };
+  });
+  if (problemas.length > 0) return { filas: [], errores: problemas };
+  return comprobar(cabecera, datos.filter((d) => d.celdas.some((x) => x.trim() !== '')), p, { caso: 'archivo_vacio', texto: 'El archivo está vacío.' });
+}
+
+// El único punto de entrada de la pantalla: el tamaño primero (un origen que pasa `max_bytes` tampoco cabría como cuerpo), después el JSON
+// (empieza con «[» o «{») o la tabla.
+export function leerOrigen(texto: string, p: PlantillaLote): LecturaCsv {
+  const bytes = new TextEncoder().encode(texto).length;
+  if (bytes > p.max_bytes) return { filas: [], errores: [{ caso: 'archivo_pesado', texto: textoPesado(bytes, p.max_bytes) }] };
+  return /^[\uFEFF\s]*[[{]/.test(texto) ? leerJson(texto, p) : leerCsv(texto, p);
 }
 const recorte = (t: string, max = 80): string => (t.length > max ? `${t.slice(0, max)}…` : t);
 export const textoPesado = (bytes: number, max: number): string => `El archivo pesa ${megas(bytes)} MB y el máximo es ${megas(max)} MB: divídelo en partes más chicas.`;
@@ -153,10 +252,9 @@ export interface InformeLote {
   huella: string;
   filas: FilaInforme[];
 }
-export const ROTULO_RESULTADO: Readonly<Record<ResultadoFila, string>> = { valida: 'Válida', creada: 'Creada', rechazada: 'Rechazada', existe: 'Ya existe' };
 
 // ── Crear: una petición, y la misma llave si la respuesta se pierde ────────────────────────────────────────────────────────────────
-// Se repite solo cuando no se sabe qué pasó (sin respuesta, o un 502/503/504 de un intermediario, sin `codigo` del backend); un 4xx o un
+// Se repite solo cuando no se sabe qué pasó (sin respuesta, o un 5xx —un 500 del servidor o un 502/503/504 de un intermediario— sin `codigo` del backend: pudo crear y fallar después); un 4xx o un
 // fallo con `codigo` (`nada_creado`, `lote_incierto`) es una respuesta y se devuelve. Un 409 `lote_en_curso` al repetir puede ser la
 // propia petición anterior todavía en curso: también se repite, tras la espera. El intento en que llegó la respuesta viaja con ella: un
 // 409 en un intento posterior al primero no prueba que no se creó nada (revisión del 15/11/2026).
@@ -164,7 +262,7 @@ export const INTENTOS_CREAR = 3;
 export function hayQueRepetir(e: unknown): boolean {
   if (!(e instanceof ErrorApi)) return false;
   if (typeof e.cuerpo.codigo === 'string') return false;
-  return e.codigo === 0 || e.codigo === 502 || e.codigo === 503 || e.codigo === 504;
+  return e.codigo === 0 || e.codigo >= 500;
 }
 export const codigoDeConflicto = (e: unknown): string | null =>
   e instanceof ErrorApi && e.codigo === 409 && typeof e.cuerpo.codigo === 'string' ? e.cuerpo.codigo : null;
@@ -217,7 +315,7 @@ export const AVISO_SIN_RESPUESTA = 'No llegó la respuesta de la creación y no 
 export const TEXTO_DE: Readonly<Record<CasoError, string>> = {
   archivo_vacio: 'El archivo está vacío.',
   solo_cabecera: 'El archivo trae la cabecera pero ninguna fila de datos.',
-  una_columna: 'La cabecera tiene una sola columna: el archivo no está separado por comas.',
+  una_columna: 'La cabecera tiene una sola columna: no hay «;», «,» ni tabulador entre las columnas.',
   columna_desconocida: 'El archivo trae una columna que no es de la plantilla.',
   falta_obligatoria: 'Falta una columna obligatoria.',
   columna_repetida: 'Una columna está repetida en la cabecera.',
@@ -302,34 +400,48 @@ export function nuevaLlave(): string {
   return crypto.randomUUID();
 }
 
-// ── Lo que se descarga (por el ayudante único `descargarTexto`, docs/19 §6) ───────────────────────────────────────────────────────
-// Una celda de CSV: entre comillas si hace falta; y si empieza con = + - @ (una fórmula para una planilla), con un apóstrofo delante,
-// salvo en las credenciales, que son para máquinas y no se pueden alterar (inyección de fórmulas: OWASP «CSV Injection»).
+// ── Lo que se descarga (por el ayudante único `descargarTexto`, docs/19 §6 y §4 N9) ────────────────────────────────────────────────
+// La plantilla y «las que no entran» van con «;», BOM y CRLF: una planilla en español los abre en columnas. Una celda entre comillas si hace
+// falta; y si empieza con = + - @, tabulador, retorno o salto de línea, o con sus variantes de ancho completo, con un apóstrofo delante
+// (inyección de fórmulas: OWASP «CSV Injection»); la única excepción es una celda que ENTERA sea un número (`-5`, `+3,2`). Las credenciales
+// van `literal`: son para máquinas y no se pueden alterar.
+const FORMULA = /^[=+\-@\t\r\n＝＋－＠]/;
+const NUMERO = /^[+-]?\d+(?:[.,]\d+)?$/;
 export function celda(v: string | number | null | undefined, literal = false): string {
   let s = v === null || v === undefined ? '' : String(v);
-  if (!literal && /^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+  if (!literal && FORMULA.test(s) && !NUMERO.test(s)) s = `'${s}`;
   return /[",\r\n;]/.test(s) || /^\s|\s$/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
-const lineaCsv = (xs: readonly string[]): string => xs.join(',');
+const lineaCsv = (xs: readonly string[], separador = ','): string => xs.join(separador);
+const BOM = '\uFEFF';
+const tablaCsv = (lineas: readonly string[]): string => `${BOM}${lineas.join('\r\n')}\r\n`;
 
-// Las credenciales de las creadas: id_fisico, id, credencial, tópico. CRLF (RFC 4180).
+// Las credenciales de las creadas: id_fisico, id, credencial, tópico. CRLF (RFC 4180); es para máquinas: con coma y sin BOM.
 export function csvCredenciales(filas: readonly FilaInforme[]): string {
   const creadas = filas.filter((f) => f.resultado === 'creada');
-  return [lineaCsv(['id_fisico', 'id', 'credencial', 'topico']), ...creadas.map((f) => lineaCsv([celda(f.id_fisico), celda(f.id, true), celda(f.credencial, true), celda(f.topico, true)]))].join('\r\n') + '\r\n';
+  return [lineaCsv(['id_fisico', 'id', 'credencial', 'topico']), ...creadas.map((f) => lineaCsv([celda(f.id_fisico, true), celda(f.id, true), celda(f.credencial, true), celda(f.topico, true)]))].join('\r\n') + '\r\n';
 }
 
-// Las rechazadas, con las columnas de la plantilla y el motivo al final: se corrigen y se vuelven a subir tal cual (el lector ignora `motivo`).
+// Las que no entran, con las columnas de la plantilla en su orden y, al final, `fila` (la del origen) y `motivo`: se corrigen y se vuelven
+// a subir tal cual (el lector ignora esas dos).
 export function csvRechazadas(columnas: readonly string[], original: readonly FilaLote[], filas: readonly FilaInforme[]): string {
   const porN = new Map(original.map((f) => [f.n, f]));
   const malas = filas.filter((f) => f.resultado === 'rechazada');
   const cuerpo = malas.map((f) => {
     const o = porN.get(f.n) ?? { n: f.n };
-    return lineaCsv([...columnas.map((c) => celda(o[c])), celda(f.motivo)]);
+    return lineaCsv([...columnas.map((c) => celda(o[c])), celda(f.n), celda(f.motivo)], ';');
   });
-  return [lineaCsv([...columnas, COLUMNA_MOTIVO]), ...cuerpo].join('\r\n') + '\r\n';
+  return tablaCsv([lineaCsv([...columnas, COLUMNA_FILA, COLUMNA_MOTIVO], ';'), ...cuerpo]);
 }
 
-// Un ejemplo para descargar antes de empezar: la cabecera y una fila con el ejemplo de cada columna de la plantilla.
-export function csvEjemplo(p: PlantillaLote): string {
-  return `${lineaCsv(p.columnas.map((c) => c.nombre))}\r\n${lineaCsv(p.columnas.map((c) => celda(c.ejemplo)))}\r\n`;
+// La plantilla para descargar antes de empezar: la cabecera y una fila con el ejemplo de cada columna.
+export function csvPlantilla(p: PlantillaLote): string {
+  return tablaCsv([lineaCsv(p.columnas.map((c) => c.nombre), ';'), lineaCsv(p.columnas.map((c) => celda(c.ejemplo)), ';')]);
+}
+
+// El nombre de la descarga de «las que no entran», a partir del del origen: sin extensión y solo con el alfabeto que admite `nombreDeArchivo`
+// (lib/api.ts); un nombre como «lote (1).csv» no cae al nombre por omisión.
+export function baseDeDescarga(origen: string | null): string {
+  const base = (origen ?? '').replace(/\.(csv|json|tsv|txt)$/i, '').replace(/[^\p{L}\p{N}_.\- ]/gu, '').trim().replace(/^\.+/, '').slice(0, 100).trim();
+  return base === '' ? 'lote' : base;
 }

@@ -286,9 +286,9 @@ td.acciones, .acciones { display: flex; flex-wrap: wrap; gap: 0.3rem var(--e-2);
 
 /* Inventario v2 (C): paginación con total y tarjetas bajo 700 px (A5). */
 .paginacion { display: flex; flex-wrap: wrap; gap: var(--e-2); align-items: center; margin: var(--e-3) 0; }
-.tarjetas-inventario { list-style: none; padding: 0; margin: 0; display: grid; gap: var(--e-2); }
-.tarjeta-inventario { background: var(--superficie); border: 1px solid var(--borde-tenue); border-radius: var(--radio); padding: var(--e-3); display: grid; gap: var(--e-1); min-width: 0; }
-.tarjeta-inventario .fila-1 { display: flex; flex-wrap: wrap; gap: var(--e-1) var(--e-2); align-items: center; }
+.tarjetas-inventario, .tarjetas-lote { list-style: none; padding: 0; margin: 0; display: grid; gap: var(--e-2); }
+.tarjeta-inventario, .tarjeta-lote { background: var(--superficie); border: 1px solid var(--borde-tenue); border-radius: var(--radio); padding: var(--e-3); display: grid; gap: var(--e-1); min-width: 0; }
+.tarjeta-inventario .fila-1, .tarjeta-lote .fila-1 { display: flex; flex-wrap: wrap; gap: var(--e-1) var(--e-2); align-items: center; }
 .tarjeta-inventario .fila-1 a { font-weight: 600; min-height: var(--objetivo); display: inline-flex; align-items: center; overflow-wrap: anywhere; }
 .tarjeta-inventario dl { display: grid; grid-template-columns: max-content 1fr; gap: var(--e-1) var(--e-3); margin: var(--e-1) 0 0; }
 .tarjeta-inventario dt { color: var(--texto-secundario); font-size: var(--t-xs); }
@@ -499,3 +499,23 @@ main { padding-bottom: calc(var(--e-4) + var(--alto-avisos, 0px)); }
 .hueco-indicadores { height: 92px; margin: 0 0 var(--e-5); }
 .hueco-ahora { height: 22rem; margin: 0 0 var(--e-5); }
 .hueco-graficas { height: 40rem; }
+
+/* Alta masiva (P7, docs/19 §4 N7): la frase de «Qué pasa» con su icono, las notas junto a su campo y el detalle campo por campo. El tono es el de
+   los estados (§2) y nunca va solo: lo dicen el icono y el texto. */
+.frase-lote, .nota-lote { display: inline-flex; gap: var(--e-1); align-items: flex-start; max-width: 100%; padding: 0.1rem 0.5rem; border-radius: var(--radio); overflow-wrap: anywhere; }
+.frase-lote { font-weight: 600; }
+.frase-lote .icono, .nota-lote .icono { flex: none; margin-top: 0.15rem; }
+.frase-lote.normal { background: var(--estado-normal-fondo); color: var(--estado-normal); }
+.frase-lote.inactivo { background: var(--estado-inactivo-fondo); color: var(--estado-inactivo); }
+.frase-lote.sin_senal, .nota-lote.sin_senal { background: var(--estado-sin-senal-fondo); color: var(--estado-sin-senal); }
+.frase-lote.alerta, .nota-lote.alerta { background: var(--estado-alerta-fondo); color: var(--estado-alerta); }
+.que-pasa { display: flex; flex-wrap: wrap; gap: var(--e-1); min-width: 0; }
+.detalle-lote { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--e-1) var(--e-3); margin: var(--e-1) 0; }
+.detalle-lote dt { color: var(--texto-secundario); font-size: var(--t-xs); }
+.detalle-lote dd { margin: 0; min-width: 0; display: flex; flex-wrap: wrap; gap: var(--e-1) var(--e-2); align-items: baseline; overflow-wrap: anywhere; }
+.detalle-sueltas { list-style: none; padding: 0; margin: var(--e-1) 0; display: grid; gap: var(--e-1); }
+.marca-omision { font-size: var(--t-xs); color: var(--texto-secundario); border: 1px solid var(--borde-control); border-radius: var(--radio); padding: 0 0.35rem; }
+.fila-detalle td { background: var(--superficie-tenue); }
+[data-informe-lote] code { overflow-wrap: anywhere; }
+[data-informe-lote]:focus { outline: none; }
+@media (max-width: 700px) { .detalle-lote { grid-template-columns: minmax(0, 1fr); } }

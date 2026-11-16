@@ -2,7 +2,7 @@
   // Iconos propios (docs/19 §4, bloque L, punto 1f): trazos SVG dibujados para este proyecto, en una cuadrícula de 24 px, sin biblioteca
   // de terceros ni fuente de iconos (la CSP no admite recursos externos y no se suma una licencia). Solo líneas rectas, arcos y círculos;
   // el color es el del texto (`currentColor`) y el icono queda oculto al lector de pantalla: el nombre es el del control que lo lleva.
-  export type NombreIcono = 'tablero' | 'inventario' | 'actividad' | 'usuarios' | 'alta' | 'legal' | 'menu' | 'luna' | 'sol' | 'cuenta' | 'pausa' | 'reanudar' | 'cerrar';
+  export type NombreIcono = 'tablero' | 'inventario' | 'actividad' | 'usuarios' | 'alta' | 'legal' | 'menu' | 'luna' | 'sol' | 'cuenta' | 'pausa' | 'reanudar' | 'cerrar' | 'existe' | 'aviso';
   const TRAZOS: Readonly<Record<NombreIcono, string>> = {
     // cuatro paneles de distinto alto, como un tablero
     tablero: 'M4 4h7v8H4z M13 4h7v5h-7z M13 11h7v9h-7z M4 14h7v6H4z',
@@ -30,6 +30,10 @@
     reanudar: 'M7 5l12 7-12 7z',
     // un aspa
     cerrar: 'M7 7l10 10 M17 7L7 17',
+    // una marca de verificación (ya existe: no se toca)
+    existe: 'M5 12.5l4.5 4.5L19 7',
+    // un triángulo con una exclamación
+    aviso: 'M12 3.5L2.5 20h19z M12 10v4.5 M12 17.4v.1',
   };
   export const NOMBRES_ICONO = Object.keys(TRAZOS) as NombreIcono[];
 </script>

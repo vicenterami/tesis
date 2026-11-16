@@ -4,7 +4,7 @@ Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emu
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
 cubría al escribirse se agregó después: TT-32 (sensor físico) en §43, §44 y §53, y TT-30 (recuperación ante reinicio) en §11. El
-contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 747 pruebas unitarias del backend y 365 del panel.
+contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 747 pruebas unitarias del backend y 404 del panel.
 Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -3681,3 +3681,93 @@ condiciones 1, eventos 0» a los dos anchos y «la página se desplaza 146 px a 
 **Límites.** En el navegador se comprueba que los eventos se **piden** con la ventana; en el banco ese rango no tenía eventos y la lista mostró su
 mensaje de vacío. Que el servidor deje fuera las filas de fuera del rango se prueba contra la base en el humo de la API (§72). El recorrido corre
 contra el banco y no es un paso del verificador (detiene y arranca el backend del banco): se corre a mano al tocar la ficha.
+
+## 76. Alta masiva: la vista previa en el panel (16/11/2026)
+
+**Por qué.** El backend del bloque N ya devolvía el plan por fila (§71), pero el panel seguía con la pantalla de F2: una tabla de cuatro columnas
+con una palabra por fila, un solo origen (un CSV con coma) y las rechazadas descargadas con coma. Esta sección cubre lo que se hizo del lado del
+panel: los lectores (punto 6, sin el XLSX), la pantalla en tres pasos (punto 7) y las descargas (punto 9) de `docs/19 §4`, bloque N.
+
+**Qué se hizo.**
+- **Lectores, un solo camino** (`lib/lote.ts`). Archivo CSV, pegado desde la planilla y JSON terminan en la misma lista `filas`. El CSV y lo pegado
+  van por el mismo lector, que detecta el separador (`;`, `,` o tabulador, entre los que publica la plantilla del servidor) en la cabecera fuera de
+  comillas; el JSON arma las mismas celdas y pasa por la misma comprobación de columnas, topes y caracteres. `n` es la fila de la planilla (las vacías
+  cuentan) y, en JSON, la posición más 1. Una fila con más o menos celdas que la cabecera no se envía; una sola columna se avisa antes de enviar; el
+  lector ignora las columnas `fila` y `motivo` y quita el apóstrofo que agrega la descarga.
+- **Descargas.** La plantilla y «las que no entran» van con `;`, BOM y CRLF; la segunda lleva las columnas de la plantilla en su orden más `fila` y
+  `motivo`. Toda celda que empieza con `=`, `+`, `-`, `@`, tabulador, retorno o salto de línea, o con sus variantes de ancho completo, lleva un
+  apóstrofo delante, salvo la que entera es un número. El archivo de credenciales no cambió.
+- **Pantalla en tres pasos** (`AltaLote.svelte`, con `lib/revision.ts` para lo que no es dibujo). Origen: archivo o pegado, plantilla para descargar y
+  los límites leídos de la API. Revisión: cinco tarjetas que son botones de filtro con `aria-pressed`, la tabla «Fila · Identificador · Qué pasa ·
+  Detalle» (en teléfono, una tarjeta por fila), el detalle campo por campo con «por omisión», avisos y motivos junto a su campo, de a 100 filas.
+  Resultado: cuántos se crearon y las credenciales, que se descargan una vez. De los 22 mensajes de error de `docs/19 §4` 8b, 21 se heredaron de
+  `explicarError` sin cambios y el de «una sola columna» se ajustó (el separador ahora se detecta). Desaparecieron de `Alta.svelte` el lote viejo, `ROTULO_RESULTADO`, «Descargar un ejemplo» y la tabla de cuatro
+  columnas.
+
+**Pruebas nuevas y su defecto plantado.** Cada una se probó poniendo el defecto a propósito y viendo que la prueba cae; luego se deshizo.
+
+| Qué se comprueba | Prueba | Defecto plantado | Qué cayó |
+|---|---|---|---|
+| El lector quita el apóstrofo de la descarga; lo descargado y vuelto a subir da las mismas filas | `lib/lote.test.ts` | el lector no quita el apóstrofo | 2 |
+| `-5` y `+3,2` quedan intactos | `lib/lote.test.ts` | sin la excepción del número entero | 1 |
+| `＝1+2` sale neutralizada | `lib/lote.test.ts` | sin las variantes de ancho completo | 1 |
+| El separador se detecta en la cabecera (`;`, tabulador, coma) y lo pegado se lee igual que el archivo | `lib/lote.test.ts`, `Alta.test.ts` | separador siempre coma | 7 |
+| En JSON, `n` es la posición más 1 | `lib/lote.test.ts` | `n` = posición | 2 |
+| Una fila con más o menos celdas que la cabecera no se envía | `lib/lote.test.ts`, `Alta.test.ts` | sin comprobar el número de celdas | 3 |
+| La fila vacía en medio cuenta en los números | `lib/lote.test.ts`, `Alta.test.ts` | los números ignoran las vacías | 5 |
+| «Las que no entran» trae `fila` y `motivo` | `lib/lote.test.ts`, `Alta.test.ts` | sin la columna `fila` | 3 |
+| Las descargas llevan BOM | `lib/lote.test.ts`, `Alta.test.ts` | descarga sin BOM | 4 |
+| Las cinco tarjetas cuentan lo que muestran; «Con aviso» es transversal | `lib/revision.test.ts`, `Alta.test.ts` | «Con aviso» cuenta todas | 2 |
+| La revisión abre en «No entran» si hay alguna | `lib/revision.test.ts`, `Alta.test.ts` | abre siempre en «Leídas» | 4 |
+| «Por omisión» donde corresponde | `lib/revision.test.ts`, `Alta.test.ts` | sin la marca | 2 |
+| «Crear N» se desactiva en vuelo y no manda dos peticiones | `Alta.test.ts` | sin `cargando`; sin la guarda | 1 y 1 |
+| «Volver» conserva el origen | `Alta.test.ts` | «Volver» borra el origen | 1 |
+| 250 filas dibujan 100 y «Mostrar 100 más» | `Alta.test.ts` | dibuja todas | 1 |
+| `plan_cambio` lleva a la revisión nueva y dice cuáles cambiaron | `Alta.test.ts` | sin pasar al plan nuevo | 2 |
+| El foco va al encabezado de cada paso | `Alta.test.ts` | sin mover el foco | 1 |
+
+Mensajes con que cayeron, a modo de muestra: sin la excepción del número, `expected [ '\'-5', '"\'+3,2"', '\'+3.2' ] to deeply equal [ '-5', '"+3,2"', '+3.2' ]`;
+con los números ignorando las vacías, `expected [ 60, 61, 62, 63 ] to deeply equal [ 60, 61, 63, 64 ]`; sin la guarda de la creación,
+`expected [ … ] to have a length of 1 but got 3`; dibujando todas las filas, `expected [ Array(250) ] to have a length of 100 but got 250`.
+
+**Cifras.** `pnpm verificar` en verde: backend, 747 pruebas en 62 archivos (sin cambios); panel, `svelte-check` con 408 archivos y 0 errores,
+**404 pruebas** declaradas (eran 365: +39, 25 de la primera entrega y 14 de las correcciones de abajo) y **443 ejecuciones** en vitest (eran 404), en 34 archivos (uno más: `lib/revision.test.ts`); `pnpm build` pasa.
+
+**Correcciones posteriores (16/11/2026).** Una revisión del cambio encontró huecos de lógica y seguridad, y cada uno se corrigió con su prueba, plantando el
+defecto y viendo que cae:
+
+| Qué se corrigió | Prueba | Defecto plantado | Qué cayó |
+|---|---|---|---|
+| Con credenciales sin descargar, «Ir al inventario» está desactivado con su motivo y un enlace del menú pide confirmar; descargadas, ya no se pregunta | `Alta.test.ts` | el botón sin motivo; sin interceptar el enlace | 1 y 1 |
+| Cerrar la pestaña con la creación en vuelo pide confirmar; «Volver» se desactiva mientras se crea | `Alta.test.ts` | `beforeunload` sin la creación en vuelo; «Volver» siempre activo | 1 y 1 |
+| La respuesta de una revisión vieja no abre la revisión con las filas de otro origen | `Alta.test.ts` | sin descartar la respuesta; el origen nuevo sin cancelar la petición | 1 y 2 |
+| Volver a elegir el mismo archivo lo lee otra vez; una lectura vieja no pisa una más nueva | `Alta.test.ts` | el campo sin limpiar; lectura vieja que pisa | 1 y 1 |
+| Un 500 sin `codigo` al crear se trata como «no se sabe si se creó»: misma llave, y al agotarse, «Ir al inventario» | `lib/lote.test.ts`, `Alta.test.ts` | el 500 no se repite | 2 |
+| El CSV de credenciales deja el identificador tal cual | `lib/lote.test.ts` | `id_fisico` sin `literal` | 1 |
+| Comilla sin cerrar o texto pegado a una comilla de cierre se dicen con su fila | `lib/lote.test.ts`, `Alta.test.ts` | sin el aviso de la comilla; sin el del texto pegado | 2 y 1 |
+| «Las que no entran» de «lote (1).csv» se descarga con un nombre propio | `lib/lote.test.ts`, `Alta.test.ts` | nombre sin sanear | 2 |
+| JSON: claves que solo difieren en mayúsculas y números que pierden su escritura | `lib/lote.test.ts` | sin detectar las claves; `isFinite` en vez de entero seguro | 1 y 1 |
+| Una fila interpretada sin `canales` no rompe la tabla | `lib/revision.test.ts` | sin `?? []` | 1 |
+| El error de lectura del origen recibe el foco | `Alta.test.ts` | sin el foco | 1 |
+| La ida y vuelta con espacios en los bordes y con un valor escrito a mano que empieza con `=` | `lib/lote.test.ts` | el lector sin recortar; sin comillas para valores con espacios; el apóstrofo escrito a mano se conserva | 1, 1 y 3 |
+| Una línea junto a las credenciales avisa que una planilla puede alterar las que empiezan con «-» | `Alta.test.ts` | sin la línea | 1 |
+
+Mensajes con que cayeron, a modo de muestra: sin interceptar el enlace, `expected true to be false`; con el 500 sin repetir, `expected [ 'llave-1234567890ab' ]
+to deeply equal [ 'llave-1234567890ab', …(2) ]`; con el nombre sin sanear, `expected 'descarga.csv' to be 'no-entran-lote 1.csv'`; sin cancelar el origen viejo,
+`expected 'lenta.csv: 2 filas leídas.' to be 'rapida.csv: 1 filas leídas.'`; con el número sin escritura segura, `expected [] to deeply equal [ { caso: 'celda_invalida', …(1) } ]`.
+En las pruebas por el DOM, las dos que solo comprobaban que un botón existía ahora lo pulsan y comprueban su efecto, y en el recorrido de navegador
+«subido sin tocar da el mismo plan» compara todas las frases de la revisión, no la primera. El botón «atrás» y la barra de direcciones cambian el fragmento sin
+pasar por un clic y no se pueden detener desde la pantalla: con credenciales sin descargar, ahí solo vale el aviso de la pestaña.
+
+**En navegador real.** El recorrido `e2e/lote.mjs` (lo lanza `banco.sh lote-navegador` contra el banco) dio **24 de 24 comprobaciones** en
+Firefox 157 y en Chromium 156, a 1 280 y a 390 px: se pega un lote con una fila vacía en medio y una fila que no entra; la revisión abre en
+«No entran» y los números de fila son los de la planilla (2, 4 y 5); el detalle marca «por omisión» la vía y el formato; «las que no entran»
+se descarga con BOM, `;`, `fila` y `motivo`, y vuelta a subir sin tocar da el mismo plan; «Volver» conserva lo pegado; sin la fila mala, «Crear
+2 dispositivos» lleva al resultado, las credenciales se descargan una vez, nunca se dibujan en la página y los dos dispositivos quedan en el
+inventario; a 390 px cada fila es una tarjeta y la página no se desplaza a lo ancho con el detalle abierto; el foco pasa al encabezado de cada
+paso. Corrido varias veces seguidas contra el mismo banco, el recorrido alcanzó el límite de validaciones por minuto: la pantalla mostró su
+aviso con los segundos de espera y el botón «Reintentar», y el recorrido hace lo que haría una persona (espera y lo pulsa). Capturas de la
+revisión a los dos anchos y del resultado, en la carpeta privada del banco (no se versionan).
+
+**Lo que falta.** Medir el primer dibujo de 500 filas y cada «Mostrar 100 más» (umbral de `docs/19 §4` punto 11: bajo 1 s a 390 px). El lector
+de XLSX queda para el bloque siguiente.

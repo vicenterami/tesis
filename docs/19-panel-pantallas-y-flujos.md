@@ -752,7 +752,8 @@ sitio» es un solo equipo, y el rótulo dice «promedio de 9 dispositivos») y *
 reintento, con sus pruebas; `alta/lote.ts`, `alta/alta.controller.ts` y `alta/magnitudes.controller.ts`; `docs/10 §8.4` punto 67; probado y
 medido en `docs/16 §71`). El panel de hoy quedó adaptado al contrato sin rediseñarse (`n` contando las filas vacías, columnas y límites
 leídos de la plantilla, una sola petición con la huella y la llave, los 409 por su `codigo`); la pantalla de tres pasos (7), los lectores
-(6), las descargas (9) y el XLSX quedan para el bloque siguiente.
+(6), las descargas (9) y el XLSX quedan para el bloque siguiente. ✅ panel, 16/11/2026: los lectores (6, sin el XLSX), la pantalla de tres pasos
+(7) y las descargas (9); `docs/16 §76`. Queda el lector de XLSX.
 El alta masiva de F2 (11/11/2026) valida bien y explica poco. Lo que se observa en el código y en la pantalla de hoy:
 
 | Hoy | Por qué no alcanza |
@@ -784,7 +785,7 @@ El alta masiva de F2 (11/11/2026) valida bien y explica poco. Lo que se observa 
    la unidad se omitió y se asume la canónica; la zona se resolvió por nombre (se dice en qué sitio); el formato declarado en un nodo
    LoRaWAN coincide con el de su pasarela y se ignora; el nombre se repite en otra fila del archivo. El aviso se marca en la fila y
    cuenta en la tarjeta «Con aviso»; no fuerza la fila en otros filtros. Si hay válidas con aviso, una línea sobre la tabla lo dice
-   («N filas que se crean traen avisos: ver») y lleva a ese filtro.
+   («N filas que se crean traen avisos: ver») y lleva a ese filtro. ✅ panel, 16/11/2026 (la línea, con el botón «Ver las filas con aviso»).
 4. **Los límites y la plantilla tienen una sola casa.** ✅ backend, 15/11/2026 (las dos rutas; el panel de hoy ya lee la plantilla). `GET /dispositivos/lote/plantilla` publica las
    columnas (nombre, si es obligatoria, tope de caracteres, ayuda y ejemplo), `max_filas`, `max_bytes` y los separadores admitidos; la
    lee quien puede usar la ruta del lote (la acción «escribir» de `docs/20 §6`: operador técnico y administradores). El panel no guarda
@@ -808,6 +809,11 @@ El alta masiva de F2 (11/11/2026) valida bien y explica poco. Lo que se observa 
    cabecera Y» (hoy las que sobran se pierden en silencio). Dentro de `canales` el separador documentado pasa a ser `|`
    (`temperatura:Cel | humedad:%RH`), porque `;` es ahora el de columnas; el servidor admite `|` y `;` siempre, y el ejemplo que se
    descarga deja de traer `;` sin comillas. ✅ la parte del servidor, 15/11/2026 (`canales` con `|` y `;`; la columna `decodificador`).
+   ✅ panel, 16/11/2026, sin el XLSX (`lib/lote.ts`: `leerCsv` para el archivo y lo pegado, `leerJson`, `leerOrigen` como entrada única de la pantalla).
+   Decidido al implementar (16/11/2026): el separador es el que más veces aparece en la cabecera, fuera de comillas, entre los de
+   `separadores.columnas` de la plantilla, así que «una sola columna» solo se avisa cuando la cabecera no trae ninguno (por ejemplo, separada con
+   `|`); un JSON que no es una lista de objetos o trae una celda que no es texto ni número usa el caso `celda_invalida` (con su propio texto), y
+   una lista vacía, `archivo_vacio`; `fila` y `motivo` se ignoran en la cabecera.
    **XLSX (decidido el 15/11/2026: lector propio, sin dependencia nueva; cambia el control de `docs/11 §4`, que pedía una biblioteca
    auditada, y allí se anota el porqué).** Se descarga solo al elegir un `.xlsx` y lee textos y números de la primera hoja. Como abre
    un archivo que puede venir de un tercero, sus límites van escritos: solo se leen `xl/workbook.xml`, sus relaciones,
@@ -823,10 +829,20 @@ El alta masiva de F2 (11/11/2026) valida bien y explica poco. Lo que se observa 
    crea en Zona norte (sitio uct)», «Ya existe: no se toca», «Ya existe, dado de baja: se reactiva desde su ficha», «No entra: zona
    vacía») con icono y texto, nunca solo color. Al abrir una
    fila se ve lo interpretado campo por campo, con la marca «por omisión» donde corresponde, los avisos y los motivos junto al campo
-   que los causa. Si hay filas que no entran, la revisión abre con ese filtro. Abajo: «Volver» (conserva el origen), «Descargar las que
+   que los causa. Si hay filas que no entran, la revisión abre con ese filtro. Abajo: «Volver» (conserva el origen; desactivado, con su motivo, mientras se crea), «Descargar las que
    no entran (CSV)» y «Crear N dispositivos», que se desactiva mientras su petición está en vuelo. La tabla dibuja de a 100 filas
    («Mostrar 100 más»); en teléfono cada fila es una tarjeta.
    (iii) *Resultado:* cuántos se crearon y las credenciales, que se descargan una sola vez como hoy.
+   ✅ panel, 16/11/2026 (`AltaLote.svelte`, con `lib/revision.ts`; el asistente y los detectados siguen en `Alta.svelte`; las cinco tarjetas son el botón común con su cifra, `Boton` y su propiedad `cifra`, no un botón aparte). Decidido al implementar
+   (16/11/2026): el botón del primer paso se llama «Revisar las filas»; «Ya existe» dice, si la fila está en otro estado, «Ya existe, dado de baja»
+   o «Ya existe, en <estado>: se reactiva desde su ficha»; la fila con avisos suma a «Qué pasa» una marca «Con N aviso(s)»; el icono de cada frase es
+   propio (se sumaron `existe` y `aviso` a `Icono.svelte`); la columna «Detalle» lleva el resumen de lo que se crea y el botón que abre el detalle;
+   en el paso 3, «Dar de alta otro lote» y «Ir al inventario» esperan a que se descarguen las credenciales (con su motivo escrito al lado), una línea
+   dice que el archivo de credenciales es para cargarlo en los equipos o abrirlo con un editor de texto, porque una planilla puede alterar las que
+   empiezan con «-», y un enlace del panel (el menú) pide confirmar mientras haya credenciales sin descargar; cerrar o recargar la pestaña
+   pide confirmar también mientras la creación está en vuelo. El botón «atrás» y la barra de direcciones cambian el fragmento sin pasar por un
+   clic y no se pueden detener desde la pantalla: ahí solo vale el aviso. Cambiar de origen cancela la revisión en vuelo y descarta su respuesta;
+   elegir de nuevo el mismo archivo, ya corregido, lo lee otra vez.
 8. **Confirmar es una petición, todo o nada (decidido el 15/11/2026).** ✅ backend, 15/11/2026 (la llave viaja en la cabecera
    `Idempotency-Key`, de 16 a 128 caracteres; la misma llave con otro cuerpo responde 422 `llave_reutilizada`; decidido al implementar).
    `modo=crear` recibe las filas que la persona confirmó, la
@@ -846,13 +862,14 @@ El alta masiva de F2 (11/11/2026) valida bien y explica poco. Lo que se observa 
    petición con la misma llave y el servidor devuelve la misma respuesta: la guarda dos minutos en la memoria del proceso y después la
    borra (vale con una instancia, como «una creación a la vez»: `docs/11 §4`). Solo se guarda lo que creó algo, con topes de 200
    entradas, 3 por persona y 16 MiB; el reintento tiene su propio cupo de 10 por minuto y exige que la persona conserve «escribir» en los
-   sitios de lo creado (revisión del 15/11/2026). Si tras tres intentos no hay respuesta, la pantalla lo dice con el remedio. Desaparecen las tandas, «creadas N de M», «Reintentar
+   sitios de lo creado (revisión del 15/11/2026). Se repite solo cuando no se sabe qué pasó: sin respuesta o un 5xx sin `codigo` (un 500 del servidor también: pudo crear y fallar después; ofrecer una creación
+   nueva con otra llave devolvería las filas como «ya existe» y las credenciales no se recuperan). Si tras tres intentos no hay respuesta, la pantalla lo dice con el remedio. Desaparecen las tandas, «creadas N de M», «Reintentar
    las restantes» y la constante `TANDA_CLIENTE_LOTE`; un alta de 500 son dos peticiones, y cada «Volver» y nueva revisión cuenta en
    el tope de 10 por minuto.
 **8b. Qué puede fallar en el alta masiva, por qué, qué ve la persona y qué puede hacer (diseñado y hecho el 15/11/2026, en la
-revisión del bloque).** ✅ panel y backend, 15/11/2026 (la traducción única es `explicarError` y la lectura `leerCsv`, de
+revisión del bloque).** ✅ panel y backend, 15/11/2026 (la traducción única es `explicarError` y la lectura `leerOrigen` (sobre `leerCsv` y `leerJson`), de
 `panel/src/lib/lote.ts`; los mensajes y las acciones, en `TEXTO_DE` y `ACCION_DE`, y una prueba falla si un caso se queda sin ellos;
-`docs/16 §71`). Todo error se muestra en un aviso con `role="alert"` que recibe el foco, con el botón del remedio; el archivo leído
+`docs/16 §71`). Todo error se muestra en un aviso con `role="alert"` que recibe el foco (también los de lectura del origen), con el botón del remedio; el archivo leído
 **se conserva** en todos los casos (también si la sesión vence: queda en la memoria de la pestaña y se retoma al volver de «Entrar»).
 Lo que se puede ver al leer el archivo se ve antes de enviar, con la fila y la columna, usando la plantilla del servidor (tope y
 `texto_libre` de cada columna); el servidor sigue siendo la guarda real. Los botones: «Elegir otro archivo» (lleva al campo del
@@ -863,14 +880,14 @@ archivo), «Descargar la plantilla», «Volver a revisar» (lleva a la tabla de 
 |---|---|---|---|
 | El archivo está vacío | No trae ni la cabecera | «El archivo está vacío.» | Elegir otro archivo |
 | Trae solo la cabecera | No hay filas de datos | «El archivo trae la cabecera pero ninguna fila de datos.» | Elegir otro archivo |
-| La cabecera tiene una sola columna | El archivo no está separado por comas (una planilla en español suele guardar con `;`) | «La cabecera tiene una sola columna («…»): el archivo no está separado por comas. Una planilla en español suele guardar con «;»; descarga la plantilla y copia tus datos en ella.» | Descargar la plantilla |
+| La cabecera tiene una sola columna | Entre las columnas no hay ninguno de los separadores que se leen: `;`, `,` o tabulador (texto ajustado el 16/11/2026: desde que el separador se detecta, un archivo con `;` ya no cae aquí) | «La cabecera tiene una sola columna («…»): no hay «;», «,» ni tabulador entre las columnas. Descarga la plantilla y copia tus datos en ella.» | Descargar la plantilla |
 | Una columna no es de la plantilla | La cabecera trae un nombre que el sistema no conoce | «La columna «color» no es de la plantilla. Las columnas son: id_fisico, nombre, zona, via, formato, intervalo_esperado_s, canales, pasarela, decodificador.» | Descargar la plantilla |
 | Falta una columna obligatoria | La cabecera no la trae | «Falta la columna obligatoria «zona».» | Descargar la plantilla |
-| Una columna está repetida | La cabecera la trae dos veces | «La columna «nombre» está repetida en la cabecera.» | Descargar la plantilla |
+| Una columna está repetida | La cabecera la trae dos veces (en un JSON, dos claves que solo difieren en mayúsculas) | «La columna «nombre» está repetida en la cabecera.» | Descargar la plantilla |
 | Una fila trae más o menos celdas que la cabecera | Una coma de más o de menos en esa fila | «La fila 7 trae 9 celdas y la cabecera 8.» | Elegir otro archivo |
 | Demasiadas filas | Pasa el máximo de la plantilla (500) | «El archivo trae 501 filas y el máximo es 500: divídelo en partes de 500 o menos.» (si lo dice el servidor: «el lote trae 501 filas y el máximo es 500: divídelo.») | Elegir otro archivo |
 | El archivo pesa demasiado | Pasa `max_bytes` de la plantilla | «El archivo pesa 1,6 MB y el máximo es 1,1 MB: divídelo en partes más chicas.» (si lo dice el servidor: «cuerpo de más de 1147904 bytes.») | Elegir otro archivo |
-| Una celda pasa su tope, trae un carácter que no se admite o no es texto | El tope de la columna, un salto de línea o tabulador dentro de la celda, o un carácter que no es ASCII en una columna de códigos | «Fila 2, columna «nombre»: tiene 81 caracteres y el máximo es 80.» · «Fila 2, columna «id_fisico»: solo admite letras sin acento, dígitos y signos ASCII, sin comillas dobles ni barra invertida («…»).» · «Fila 2, columna «nombre»: trae un carácter que no se admite (un salto de línea, un tabulador u otro carácter de control).» | Elegir otro archivo |
+| Una celda pasa su tope, trae un carácter que no se admite o no es texto | El tope de la columna, un salto de línea o tabulador dentro de la celda, o un carácter que no es ASCII en una columna de códigos | «Fila 2, columna «nombre»: tiene 81 caracteres y el máximo es 80.» · «Fila 2, columna «id_fisico»: solo admite letras sin acento, dígitos y signos ASCII, sin comillas dobles ni barra invertida («…»).» · «Fila 2, columna «nombre»: trae un carácter que no se admite (un salto de línea, un tabulador u otro carácter de control).» · «Fila 2: comilla sin cerrar.» · «Fila 2: hay texto pegado a una comilla de cierre; separa las celdas con «;».» · del JSON: «El JSON no se puede leer: debe ser una lista de objetos con las columnas de la plantilla.» · «El JSON debe ser una lista de objetos con las columnas de la plantilla.» · «Fila 1, columna «nombre»: no es texto ni número.» · «Fila 1, columna «id_fisico»: el número no se puede leer tal como está escrito; escríbelo entre comillas.» | Elegir otro archivo |
 | El servidor rechazó el archivo (lo que la pantalla no alcanzó a ver) | Una regla del servidor (`codigo: cuerpo_invalido`) | «El servidor rechazó el archivo. Corrígelo y vuelve a elegirlo.» y la lista de sus motivos, con la fila | Elegir otro archivo |
 | Filas que no entran en la revisión | La validación de cada fila | La fila «Rechazada» con su motivo por campo (como hoy) | Descargar rechazadas |
 | La sesión venció | Pasó el tiempo de inactividad o de vida de la sesión | «Tu sesión venció. Entra de nuevo: el archivo leído se conserva en esta pestaña y lo vuelves a validar antes de crear.» Al volver de «Entrar»: «Tu sesión había vencido. El archivo leído se conservó: valídalo de nuevo antes de crear.» | Iniciar sesión; al volver, Reintentar |
@@ -878,7 +895,7 @@ archivo), «Descargar la plantilla», «Volver a revisar» (lleva a la tabla de 
 | Hay otra creación en curso | El servidor crea un lote a la vez | «Hay otra alta por lote en curso en el servidor. Espera a que termine y reintenta; no se creó ninguno.» | Reintentar |
 | El plan cambió desde la revisión | Algo cambió en la base entre validar y crear | «Cambió algo desde que lo revisaste y no se creó ninguno. La revisión ya muestra lo de ahora; míralo y vuelve a crear.» y la lista de lo que cambió: «Fila 12 (nodo-12): se crea → ya existe: ya está dado de alta», «Fila 30 (nodo-30): se crea → no entra: la pasarela ug65 está dada de baja», «Fila 31 (nodo-31): sigue entrando, pero cambió formato milesight → chirpstack» | Volver a revisar (con el plan nuevo ya cargado) |
 | Demasiadas peticiones en un minuto | 10 validaciones o creaciones por minuto por persona | «Hiciste demasiadas validaciones o creaciones en un minuto. Espera 37 s y reintenta.» (los segundos los da el servidor) | Reintentar |
-| No llegó la respuesta y no se sabe si se creó | La conexión se cortó tras tres intentos con la misma llave, o un 409 llegó en un reintento (la primera petición pudo crear y perder su respuesta) | «No llegó la respuesta de la creación y no se sabe si se crearon. Revisa el inventario: las filas que al validar de nuevo salgan «ya existe» se crearon, y sus credenciales no se pueden recuperar: rota la credencial de cada una desde su ficha.» | Ir al inventario |
+| No llegó la respuesta y no se sabe si se creó | La conexión se cortó o el servidor respondió un 5xx sin `codigo` tras tres intentos con la misma llave, o un 409 llegó en un reintento (la primera petición pudo crear y perder su respuesta) | «No llegó la respuesta de la creación y no se sabe si se crearon. Revisa el inventario: las filas que al validar de nuevo salgan «ya existe» se crearon, y sus credenciales no se pueden recuperar: rota la credencial de cada una desde su ficha.» | Ir al inventario |
 | Sin respuesta al validar | La conexión se cortó; validar no crea nada | «No hubo respuesta del servidor. Validar no crea nada: reintenta cuando vuelva la conexión.» | Reintentar |
 | No se creó nada porque el broker o la base no respondieron | Falló antes de abrir la transacción o se deshizo (`codigo: nada_creado`) | «No se creó ninguno: el servidor no logró hablar con el broker o con la base de datos. Reintenta en un momento.» | Reintentar |
 | El servidor no pudo confirmar | El COMMIT respondió con error y no se pudo saber si se aplicó (`codigo: lote_incierto`) | «El servidor no pudo confirmar si se crearon. Revisa el inventario: los que aparezcan quedaron creados y necesitan rotar su credencial desde su ficha; si no aparecen, avisa al administrador del servidor.» | Ir al inventario |
@@ -890,13 +907,19 @@ archivo), «Descargar la plantilla», «Volver a revisar» (lleva a la tabla de 
    apóstrofo a toda celda que empiece con `=`, `+`, `-`, `@`, tabulador, retorno o salto de línea, o con sus variantes de ancho
    completo (`＝`, `＋`, `－`, `＠`); la única excepción es una celda que **entera** sea un número (`-5`, `+3,2`). El lector quita ese
    apóstrofo inicial cuando lo sigue uno de esos caracteres, para que lo descargado y vuelto a subir sin tocar dé el mismo plan. El
-   archivo de credenciales no cambia: es para máquinas.
+   apóstrofo es solo para deshacer lo que la descarga agregó: un valor escrito a mano que empieza con `=` se guarda tal cual, y toda descarga lo
+   neutraliza al salir (y uno que ya traiga el apóstrofo se lee sin él, igual que el de la descarga). Una comilla sin cerrar o texto pegado a una
+   comilla de cierre se dicen con su fila. El nombre de «las que no entran» sale del del origen, solo con letras, dígitos, espacio, `_`, `.` y `-`.
+   El archivo de credenciales no cambia: es para máquinas (el identificador también va tal cual). ✅ panel, 16/11/2026 (`celda`, `csvPlantilla`, `csvRechazadas`; la plantilla no lleva `fila`
+   ni `motivo`, que son solo de «las que no entran»).
 10. **Lo que no cambia, y lo que cambia en otros documentos.** ✅ 15/11/2026, salvo lo del XLSX en `docs/11 §4`, que va con el lector. No cambia lo que no se revela de otros sitios (RF-41: un
     identificador ajeno sigue siendo «no disponible», sin `interpretada`), los 10 lotes por minuto por persona, una creación a la vez
     y las credenciales una sola vez. Cambian junto con el código de este bloque, porque describen lo que rige: `docs/10 §8.4` punto 65 iv y la fila del alta masiva
     de `docs/11 §4` («las rechazadas no bloquean a las válidas» pasa a «las que no entran no se envían; si al confirmar el plan
     cambió, 409 y nada»; el tope del cuerpo; el XLSX), y `docs/20 §6` suma las dos rutas nuevas.
-11. **Pruebas y medición (antes de dar por hecho).** ✅ lo del servidor, 15/11/2026 (`docs/16 §71`); lo del navegador, con el panel. «Vista previa = creación»: crear y comparar el informe con lo anunciado, fila por
+11. **Pruebas y medición (antes de dar por hecho).** ✅ lo del servidor, 15/11/2026 (`docs/16 §71`); lo del panel por el DOM, 16/11/2026 (lectores,
+    descargas y pantalla, cada prueba con su defecto plantado: `docs/16 §76`); lo del navegador, escrito (`e2e/lote.mjs`, que lanza
+    `banco.sh lote-navegador`, a 1 280 y 390 px) corrido el 16/11/2026: 24 de 24 comprobaciones en Firefox y en Chromium (`docs/16 §76`); faltan los umbrales de tiempo. «Vista previa = creación»: crear y comparar el informe con lo anunciado, fila por
     fila. El 409 de `plan_cambio` se prueba con un cambio que la base **no** impide (desactivar la pasarela o cambiarle el formato
     entre validar y crear): un identificador duplicado lo frenaría la restricción única aunque faltara la segunda validación, y la
     prueba pasaría con el defecto puesto. El límite, **en el límite**: 500 filas con cada columna en su tope caben en el cuerpo, y 501
@@ -1028,7 +1051,7 @@ administrador); la vista pública nunca ofrece exportar (punto 6).
 | P1 Tablero v3 (armazón, pestañas, «Ahora», gráficas vivas) | RF-30, RF-52, RF-58, HU-07, HU-15, HU-16, TT-44 | Etapa 4, iteración 1 (diseñado y construido el 13/11/2026) | `docs/16 §67`: por el DOM, dos pedidos al entrar, la franja con enlaces por rótulo y cifra, «Ahora» vivo sin pedir nada por cada trama, el resumen como mucho una vez por minuto, `sitio_id`, «Pausar»/«Reanudar» (tablero y ficha), refresco solo en 1 h y 24 h con la ventana alineada, puntos y eje de enteros, la etiqueta flotante, el menú contraído, el cajón y el tema por un solo escritor; con navegador real (paso 4c), el cajón con el teclado, el menú contraído con sus nombres, el tema que alterna y el alto de la pestaña Resumen a 390 × 844 con la semilla completa, sin desplazamiento horizontal en ninguna pestaña |
 | P2 y P3 v2 | RF-33, RF-47, RF-49, RF-57, HU-07, TT-42 | Etapa 4, iteración 1 | El estado visual del servidor coincide con `estadoVisual()` fila por fila; paginación con total en la cabecera; un zoom cambia la resolución y la URL; banda mín–máx; umbrales y condiciones dibujados; tramas rechazadas agrupadas con «× N»; unidades según la preferencia con ida y vuelta exacta |
 | P6 Configurar | HU-06, HU-13, RF-14 | Etapa 4, iteración 1 | Validación compartida (plantada: bajo ≥ alto falla en los dos lados); 409 con dos pestañas; retardo de activación: una medición fuera de banda menos tiempo que el retardo no abre condición, más tiempo sí; cada guardado deja un `evento` con la persona. Panel (`docs/16 §64`): los casos de la prueba del servidor repetidos contra la función del panel, el error junto al campo, «Guardando…», el 409 con la hora y «Recargar» sin pisar; con navegador real, la validación en vivo y el 409 con dos pestañas |
-| P7 Alta, lote y detectados | HU-22, RF-50, HU-11 | Etapa 4, iteración 1 | Credencial una sola vez; `modo=validar` no crea nada; desde el bloque N (15/11/2026), crear es todo o nada: una fila que no entra o un plan que cambió es 409 `plan_cambio` y no se crea ninguna, y el reintento con la misma llave no duplica (`docs/16 §71`); tope de 500 filas, del cuerpo y límite de tasa plantados; un emisor desconocido aparece en detectados y llega al asistente con su identificador. Panel: por el DOM, 121 válidas en una petición, repetida con la misma llave tras un 502, y los 409 por su `codigo` (`docs/16 §71`; hasta el 15/11, tandas de 50: `docs/16 §64`), 501 filas frenadas en el navegador, detectado → asistente; con navegador real, el asistente por HTTP y un lote de 2 válidas y 1 rechazada |
+| P7 Alta, lote y detectados | HU-22, RF-50, HU-11 | Etapa 4, iteración 1 | Credencial una sola vez; `modo=validar` no crea nada; desde el bloque N (15/11/2026), crear es todo o nada: una fila que no entra o un plan que cambió es 409 `plan_cambio` y no se crea ninguna, y el reintento con la misma llave no duplica (`docs/16 §71`); tope de 500 filas, del cuerpo y límite de tasa plantados; un emisor desconocido aparece en detectados y llega al asistente con su identificador. Panel: por el DOM, 121 válidas en una petición, repetida con la misma llave tras un 502, y los 409 por su `codigo` (`docs/16 §71`; hasta el 15/11, tandas de 50: `docs/16 §64`), 501 filas frenadas en el navegador, detectado → asistente; desde el 16/11/2026, la vista previa en tres pasos (`docs/16 §76`): los tres orígenes dan las mismas filas, las fórmulas salen neutralizadas y lo descargado vuelve a subirse sin cambios, las cinco tarjetas cuentan lo que muestran, «Crear» se desactiva en vuelo; con navegador real, el asistente por HTTP y un lote de 2 válidas y 1 rechazada, y el recorrido de la vista previa a 1 280 y 390 px (`banco.sh lote-navegador`, corrido el 16/11/2026: 24 de 24 en Firefox y en Chromium; faltan los umbrales de tiempo) |
 | P14 Actividad | RF-46, HU-11, HU-26 | Etapa 4, iteración 1 | Un umbral cambiado aparece con la persona que lo cambió; un administrador de un sitio no ve la actividad de otro (404); un cursor de otro sitio no trae nada. Panel (`docs/16 §64`): por el DOM, cursor, filtros en la URL, tarjetas en teléfono y nada para quien no administra; con navegador real, el umbral cambiado en P6 con quien lo cambió y sin correos |
 | P9 Vista pública | punto 6 | Etapa 4, iteración 1 (`docs/04 §8`, decisión del 13/11/2026) | Sin cuenta: solo las magnitudes agregadas elegidas; ninguna ruta cruda responde con el token |
 
