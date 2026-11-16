@@ -623,6 +623,15 @@ iteración 2 (HU-02, HU-08, TT-12 y TT-27; 21 h) **suben a la iteración 1**, po
 las preferencias de unidades y zona horaria (HU-29), la papelera de dispositivos y la comparativa completa de referentes (lo que exceda a
 lo necesario para el tablero). El certificado público de TT-22 sigue en la 2. Cada viernes se mide el avance contra este plan.
 
+**Decisiones del 13/11 y del 15/11/2026** (ajustan el párrafo anterior; las horas disponibles no cambian y sigue rigiendo la regla de
+que lo que no alcance de la iteración 1 pasa a la 2). (1) La **vista pública por enlace** (P9; `docs/20 §7`, `docs/10 §8.4` punto 6)
+**sube de la iteración 2 a la 1**, después del tablero y de la revisión previa del alta masiva: es la única pantalla para quien consulta
+sin cuenta. Aún no tiene fila en este backlog; se agrega con su diseño. (2) Lo que queda de las **preferencias** (HU-29: aplicar la
+zona horaria propia a las horas visibles) **vuelve a la iteración 1**, en un bloque posterior a la vista pública; en esa parte se
+revierte la decisión del 09/11. (3) La **comparación con los referentes** se escribe **por pantalla, dentro de cada diseño** de
+`docs/19` —qué hace el referente, con cita de su fuente oficial, y en qué se lo iguala o supera—, y la tabla que las reúne, en la semana
+del informe (B5); el despliegue comparativo con mediciones propias (TT-40) sigue en la iteración 2.
+
 **Decisiones del 08/11/2026 que el plan supone** (cada una escrita donde manda):
 1. **Cinco perfiles con roles fijos y la matriz en el código** (`docs/20 §2`, §5 y §6; `docs/10 §8.4` punto 64): administrador del
    sistema, administrador de sitio, investigador, operador técnico y consulta; el invitado es la vista pública por enlace, sin cuenta.
@@ -657,7 +666,7 @@ versión 2 cambia tres cosas: más horas por semana, el panel y la identidad pri
 de la versión 1 que la tabla de arriba no nombra (canal callado y valor congelado, ciclo de vida de las alertas, alias de claves,
 testamento de MQTT, vista pública por enlace, magnitudes de gases, transporte celular, canal en vivo por WebSocket, costo por sitio,
 dimensionar el proxy, rotación con dos valores vigentes, escaneo de secretos en el CI) no se descarta: queda en la iteración 2, con su
-diseño donde ya estaba escrito.
+diseño donde ya estaba escrito, salvo la vista pública por enlace, que subió a la 1 el 13/11/2026 (arriba).
 
 ## Seguimiento de ejecución
 
