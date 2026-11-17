@@ -1725,8 +1725,10 @@ entra. Lo que aquí se marca «a fijar al implementar» es un detalle que el dis
     reconoce por su ruta: a fijar al implementar (candidato: un `cgroup_parent` propio por servicio en el compose), verificado en el
     servidor de prueba, que es donde importa la versión de cgroups. (iii) **Condiciones:** `memoria_alta` (el uso supera una fracción del
     techo durante varias muestras seguidas) y `respaldo_atrasado` (el último respaldo terminado tiene más de 26 h: el diario más un
-    margen), con el mismo ciclo de las condiciones del sistema. (iv) **Prueba:** un servicio que reserva memoria hasta cerca de su techo
-    abre `memoria_alta`; un respaldo detenido abre `respaldo_atrasado`.
+    margen), con el mismo ciclo de las condiciones del sistema. La comprobación de `respaldo_atrasado` ya existe como guion
+    (`plataforma/pruebas/guardia-respaldo.sh`, 17/11/2026; §9.5): el colector la corre y traduce su código de salida en abrir o cerrar la
+    condición. (iv) **Prueba:** un servicio que reserva memoria hasta cerca de su techo abre `memoria_alta`; un respaldo detenido abre
+    `respaldo_atrasado`.
 62. **Baja de la cuenta por anonimización, no por borrado (RF-55, HU-28; iteración 0).** Borrar la fila de `usuario` rompería `evento`,
     `acceso` y la auditoría, que la referencian, y desactivarla sin más conservaría datos personales sin un fin. Se reemplazan nombre y
     correo por marcadores derivados del id, se invalida el hash, se revocan las sesiones y se marca `anonimizado_en`; la fila queda para que
@@ -1927,7 +1929,50 @@ construirlo por anticipado. Cada afirmación sobre una herramienta tiene su fuen
   restaura un volcado en una base desechable, sin red y con los datos en memoria, y exige que la huella de lo restaurado sea idéntica
   a la del respaldo; el verificador lo corre en cada pasada (paso 4e). El volcado de una base no trae los **roles** (son del servidor
   entero): en una recuperación real, tras restaurar se aplica `db/init/14-rol-aplicacion.sql`, que crea el rol de la aplicación con su
-  clave. Falta de TT-46: el cifrado en reposo, la guardia de 26 h y la papelera.
+  clave. El cifrado en reposo y la guardia de 26 h se hicieron el 17/11/2026 (punto siguiente).
+- **Hecho el 17/11/2026 (segunda parte de TT-46; `docs/16 §78`): cifrado en reposo y guardia de 26 h.**
+  - **Cifrado con `age`, asimétrico.** El servidor guarda solo la clave **pública** (el «destinatario», `age1…`) en un archivo que nombra
+    `RESPALDO_DESTINATARIOS`; la clave privada se genera y vive **fuera del servidor** (el equipo del operador y una copia guardada aparte).
+    Quien entre al servidor puede cifrar respaldos nuevos, pero no leer los existentes. Se aceptan solo destinatarios nativos `age1…`:
+    `age` admite también claves SSH, pero el guion rechaza cualquier otra línea para que haya una sola forma de clave que custodiar. Se
+    elige `age` y no `gpg` porque cifra a un destinatario de una línea, sin anillo de claves que administrar: «small explicit keys, post-quantum support,
+    no config options» (https://github.com/FiloSottile/age, consultado el 17/11/2026); sale con 0 solo si procesó la entrada entera: «`age`
+    will exit 0 if and only if encryption or decryption are successful for the full length of the input»; y si descifrar falla a la mitad
+    puede haber entregado ya trozos, pero solo autenticados: «partial output might still be generated, but only if it was possible to
+    securely authenticate it» (las dos, https://github.com/FiloSottile/age/blob/main/doc/age.1.ronn, consultado el 17/11/2026). Licencia
+    «BSD-3-Clause» y paquete de Debian 12 y Ubuntu 22.04 en adelante («apt install age»; https://github.com/FiloSottile/age, consultado el
+    17/11/2026). Admite varios destinatarios, uno por línea: «Every recipient will be able to decrypt the file»
+    (README de https://github.com/FiloSottile/age, consultado el 17/11/2026). **Decidido el
+    17/11/2026: dos destinatarios**, la clave del operador y una **clave de emergencia** cuya parte privada se guarda sin conexión y nunca
+    en el servidor: perder una no pierde los respaldos. Las dos privadas se generan fuera del servidor; al servidor llegan solo las dos
+    públicas, en el mismo archivo.
+  - **En flujo y cerrado ante la falla.** `pg_dump` escribe por la salida de la misma sesión que fija la instantánea, y el flujo pasa por
+    `age` antes de tocar un disco: el volcado en claro no se escribe ni en el servidor ni dentro del contenedor. Se cifran el volcado
+    (`.dump.age`) y el archivo de credenciales del broker (`.json.age`, trae los resúmenes de sus claves). Si se pidió cifrar (la variable
+    definida, aunque vacía, o `RESPALDO_EXIGIR_CIFRADO=1`) y falta `age`, el archivo o una clave pública válida, **no se escribe nada**: un
+    respaldo en claro de reemplazo sería peor que ninguno, porque nadie lo notaría. Un archivo de destinatarios con una clave privada se
+    rechaza. Sin la variable, el guion respalda en claro como antes y lo dice en su línea de salida. El servicio del respaldo y el de la
+    guardia llevan los dos `RESPALDO_EXIGIR_CIFRADO=1` (`docs/14 §7`): si la variable de los destinatarios se pierde, el respaldo falla
+    en vez de escribir en claro.
+  - **La huella y las sumas quedan en claro.** La huella son conteos, sumas de comprobación de 64 bits, nombres de tablas y de roles y
+    versiones: ninguna fila. En claro permite comprobar un respaldo sin la clave. **Decidido el 17/11/2026:** la guardia exige este
+    archivo de sumas (un respaldo sin él no es «OK»). Un archivo nuevo, `plataforma-<marca>.sha256`, guarda la
+    suma SHA-256 del volcado, la huella y el archivo del broker tal como quedaron escritos: detecta sin descifrar la **corrupción
+    accidental** (un archivo truncado en la copia, un disco que falla). No detecta una alteración deliberada: las sumas no van firmadas, y
+    quien puede escribir en el servidor puede regenerarlas; tampoco el cifrado lo impide, porque con la clave pública cualquiera cifra, y
+    descifrar no prueba quién cifró. Contra eso protege la copia fuera del servidor, no las sumas.
+  - **El simulacro restaura un respaldo cifrado** donde está la clave privada (`RESPALDO_IDENTIDAD`): descifra en flujo hacia un disco en
+    memoria del contenedor desechable; sin la clave, o con otra, se niega con un mensaje. Una clave privada protegida con frase de paso
+    hace que `age` la pida por la terminal: el simulacro lo detecta y, sin terminal, sale con un mensaje en vez de quedarse esperando.
+  - **La guardia** (`plataforma/pruebas/guardia-respaldo.sh`) mira el respaldo más reciente y responde `OK` (sale con 0) o `ATRASADO`
+    con el motivo (sale con 1): ninguno, más de 26 h, vacío o por debajo del tamaño mínimo, sin huella o sin sumas, una suma que no
+    coincide, fechado en el futuro, o en claro cuando se exige cifrado o cuando en la carpeta ya hay respaldos cifrados (una vuelta al
+    claro sin aviso). La antigüedad es la mayor entre la marca del nombre y la hora del archivo: ni un `touch` ni un archivo viejo
+    renombrado la engañan. `OK` dice que el respaldo existe, está entero y es reciente, no que restaura: eso lo prueba el simulacro. Mientras
+    no exista la monitorización propia (TT-45), la correrá un temporizador del sistema después del respaldo diario, **por crear** al
+    activarla en el servidor, y su código de salida es la señal; cuando exista, el colector la corre y abre o cierra `respaldo_atrasado`
+    (§8.4 punto 61). Cómo se activa en un servidor: `docs/14 §7`.
+  - **Falta de TT-46:** la papelera de dispositivos.
 
 ### 9.6 Tramas irregulares: periodos distintos, latencia, ráfagas
 

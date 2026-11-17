@@ -1218,20 +1218,38 @@ paso "4d. Semilla de demostración: respeta la clave de quien ya eligió la suya
 bash plataforma/pruebas/personas-semilla-prueba.sh; r=$?
 if [ "$r" = 3 ]; then omitidos="$omitidos 4d"; elif [ "$r" != 0 ]; then fallos=$((fallos+1)); fi
 
-paso "4e. Respaldo y restauración: el respaldo de la base viva se restaura en una base desechable y da la misma huella (docs/10 §9.5; TT-46)"
+paso "4e. Respaldo y restauración: el respaldo de la base viva, en claro y cifrado, se restaura en una base desechable y da la misma huella (docs/10 §9.5; TT-46)"
 # 16/11/2026: «un respaldo que no se restauró no es respaldo». Cada corrida toma un respaldo de la base de desarrollo (solo lee) con el
 # guion versionado, lo restaura en un contenedor aparte, sin red y con los datos en memoria, y compara la huella de lo restaurado con
 # la del respaldo (filas y suma de comprobación por tabla, hipertablas, objetos y permisos): un cambio del esquema que rompa la
 # restauración se ve aquí y no el día en que haga falta. El respaldo vive en la carpeta de trabajo de la corrida y se borra al salir.
+# 17/11/2026: además, la guardia de 26 h debe dar OK sobre ese respaldo, y se repite todo CIFRADO con age para una clave de descarte
+# que se genera en la carpeta de trabajo y se borra con ella: el respaldo cifrado se restaura con la clave e idéntico, y sin la clave
+# el simulacro se niega. Sin `age` instalado, esa mitad se OMITE con aviso (nunca «OK» sin haber probado).
 # Sin la base o sin el broker de la pila, el paso se OMITE con aviso. El sondeo se hace desde plataforma/, como el guion de respaldo,
 # para mirar la misma pila que él.
 if (cd plataforma && docker compose exec -T timescaledb true && docker compose exec -T mosquitto true) >/dev/null 2>&1; then
-  if bash plataforma/pruebas/respaldar.sh "$VT/respaldo" > "$VT/respaldo.txt" 2>&1; then
+  # La mitad en claro no hereda las variables de cifrado de quien corre el verificador (si las tiene, el respaldo saldría cifrado o fallaría).
+  if env -u RESPALDO_DESTINATARIOS -u RESPALDO_EXIGIR_CIFRADO -u RESPALDO_ACEPTAR_CLARO bash plataforma/pruebas/respaldar.sh "$VT/respaldo" > "$VT/respaldo.txt" 2>&1; then
     echo "OK    $(tail -1 "$VT/respaldo.txt" | sed -E 's|: /.*$||')"
     bash plataforma/pruebas/simulacro-restauracion.sh "$VT"/respaldo/plataforma-*.dump > "$VT/simulacro.txt" 2>&1; r=$?
     grep -E '^(OK|FALLA|SIMULACRO|      )' "$VT/simulacro.txt"
     [ "$r" = 0 ] || fallos=$((fallos+1))
+    env -u RESPALDO_EXIGIR_CIFRADO -u RESPALDO_ACEPTAR_CLARO bash plataforma/pruebas/guardia-respaldo.sh "$VT/respaldo" || fallos=$((fallos+1))
   else echo "FALLA no se pudo tomar el respaldo:"; tail -5 "$VT/respaldo.txt" | cut -c1-200 | sed 's/^/      /'; fallos=$((fallos+1)); fi
+  if command -v age >/dev/null && command -v age-keygen >/dev/null; then
+    (umask 077; age-keygen -o "$VT/descarte.clave" 2>/dev/null) && age-keygen -y "$VT/descarte.clave" > "$VT/descarte.destinatario"
+    if RESPALDO_DESTINATARIOS="$VT/descarte.destinatario" bash plataforma/pruebas/respaldar.sh "$VT/cifrado" > "$VT/cifrado.txt" 2>&1; then
+      echo "OK    $(tail -1 "$VT/cifrado.txt" | sed -E 's|: /.*$||')"
+      RESPALDO_IDENTIDAD="$VT/descarte.clave" bash plataforma/pruebas/simulacro-restauracion.sh "$VT"/cifrado/plataforma-*.dump.age > "$VT/simulacro-cifrado.txt" 2>&1; r=$?
+      grep -E '^(FALLA|SIMULACRO|      )|^OK +volcado descifrado' "$VT/simulacro-cifrado.txt"
+      [ "$r" = 0 ] || fallos=$((fallos+1))
+      env -u RESPALDO_IDENTIDAD bash plataforma/pruebas/simulacro-restauracion.sh "$VT"/cifrado/plataforma-*.dump.age > "$VT/sin-clave.txt" 2>&1; r=$?
+      if [ "$r" = 2 ] && grep -q RESPALDO_IDENTIDAD "$VT/sin-clave.txt"; then echo "OK    sin la clave privada, el simulacro se niega a restaurar el respaldo cifrado (sale con 2)"
+      else echo "FALLA sin la clave privada el simulacro salió con $r (se esperaba 2 y un mensaje que pida RESPALDO_IDENTIDAD): $(head -c 200 "$VT/sin-clave.txt")"; fallos=$((fallos+1)); fi
+      RESPALDO_EXIGIR_CIFRADO=1 bash plataforma/pruebas/guardia-respaldo.sh "$VT/cifrado" || fallos=$((fallos+1))
+    else echo "FALLA no se pudo tomar el respaldo cifrado:"; tail -5 "$VT/cifrado.txt" | cut -c1-200 | sed 's/^/      /'; fallos=$((fallos+1)); fi
+  else echo "omitido: age no está instalado; el respaldo cifrado no se probó (apt install age)"; omitidos="$omitidos 4e-cifrado"; fi
 else echo "omitido: la base o el broker de la pila no responden (docker compose up -d en plataforma/)"; omitidos="$omitidos 4e"; fi
 
 # «TODO» solo si todo corrió: un paso omitido no se cuenta como aprobado (27/09: con el backend

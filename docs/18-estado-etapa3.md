@@ -56,7 +56,8 @@ HU-07 🎯 (historial por rango) ✅ el 16/11/2026: el formulario «A medida» d
 eventos, y deja fuera lo que cae fuera (`docs/16 §75`).
 
 **En curso en la Etapa 4:** TT-46 (respaldos) 🟡 desde el 16/11/2026: el guion de respaldo está versionado, cada respaldo lleva su huella y
-el verificador lo restaura en una base desechable y compara (`docs/16 §77`); faltan el cifrado en reposo, la guardia de 26 h y la papelera.
+el verificador lo restaura en una base desechable y compara (`docs/16 §77`); desde el 17/11/2026 el respaldo se cifra con `age` (la clave
+privada, fuera del servidor) y una guardia avisa si el último tiene más de 26 h (`docs/16 §78`); falta la papelera.
 
 **Adelantados de la Etapa 4:** TT-20 (autenticación de la recepción) ✅ (`docs/12 §3`); TT-29 (carga) ✅ preliminar
 (`docs/16 §5`); TT-22 (TLS) 🟡: MQTT por el proxy, probado en el banco (`docs/16 §9`), y el canal en vivo por HTTPS (`docs/16 §14`); TT-30 (recuperación) 🟡: falta el

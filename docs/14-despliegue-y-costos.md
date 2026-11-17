@@ -232,7 +232,7 @@ decisiones están en `docs/10 §8.4` punto 55 y los controles que exige, en `doc
 | Secretos | Generados **en el servidor** con `openssl rand`; nunca se copia el `.env` de desarrollo | `docs/11 §8` y `docs/11 §5`: un `.env` por entorno |
 | Forma de producción | `COMPOSE_FILE=docker-compose.yml:proxy/compose.proxy.yml` en el `.env` del servidor | Compose ignora el `override` de desarrollo aunque esté en el árbol (verificado el 01/11/2026: `docker compose config` publica solo los tres puertos del proxy) |
 | Arranque | `restart: unless-stopped`, `live-restore` del demonio, el demonio espera a la red privada (`After=`) y `net.ipv4.ip_nonlocal_bind=1` | Corrección candidata del hallazgo de la demostración del 28/10/2026 (un proxy «Up» sin red porque su dirección aún no existía al arrancar, `bitacora/2026-10-28`); se verifica reiniciando dos veces |
-| Respaldo | `pg_dump -Fc` diario más el archivo del plugin del broker, 30 días en el servidor, copia periódica fuera por la red privada, **restauración probada** (`timescaledb_pre_restore` → `pg_restore` → `timescaledb_post_restore`); desde el 16/11/2026 el guion está versionado (`plataforma/pruebas/respaldar.sh`), cada respaldo lleva su huella y `plataforma/pruebas/simulacro-restauracion.sh` lo restaura en una base desechable y compara (`docs/16 §77`); **sin cifrado en reposo todavía** (pendiente, `docs/10 §9.5`) | `docs/10 §9.5` (RPO 24 h, RTO 1 h) y `docs/11 §8` |
+| Respaldo | `pg_dump -Fc` diario más el archivo del plugin del broker, 30 días en el servidor, copia periódica fuera por la red privada, **restauración probada** (`timescaledb_pre_restore` → `pg_restore` → `timescaledb_post_restore`); desde el 16/11/2026 el guion está versionado (`plataforma/pruebas/respaldar.sh`), cada respaldo lleva su huella y `plataforma/pruebas/simulacro-restauracion.sh` lo restaura en una base desechable y compara (`docs/16 §77`); desde el 17/11/2026, **cifrado en reposo** con `age` cuando se define `RESPALDO_DESTINATARIOS`: un archivo con **dos claves públicas** `age1…` (decidido el 17/11/2026: la del operador y la de emergencia; las dos privadas se generan fuera del servidor y la de emergencia se guarda sin conexión), y la **guardia** `plataforma/pruebas/guardia-respaldo.sh`, que sale con 1 si el último respaldo tiene más de 26 h, está incompleto o volvió al claro (`docs/10 §9.5`, `docs/16 §78`). El servicio del respaldo y el de la guardia llevan los dos `RESPALDO_EXIGIR_CIFRADO=1`: si se pierde la variable de los destinatarios, el respaldo falla en vez de escribir en claro. El temporizador de la guardia, después del respaldo diario, está **por crear**; en el servidor de prueba, cifrado y guardia por activar | `docs/10 §9.5` (RPO 24 h, RTO 1 h) y `docs/11 §8` |
 | Avisos | Vigilante externo por latido (§7.2) | Un servidor caído no puede avisar que se cayó |
 | Actualizar | `git pull --ff-only` con una llave de despliegue de solo lectura → `escanear-imagenes.sh` → `docker compose up -d --build` → `GET /salud` | Lo construido se escanea antes de correr (`docs/11 §8`); en un paso con `desplegar.sh` (Etapa 4). Las migraciones no llevan tabla de versiones: `db/init` corre solo con el volumen vacío; en una base existente se aplican a mano y el guardián (paso 2) las verifica por huella |
 
@@ -253,7 +253,9 @@ El detalle con salidas esperadas es operación y no se versiona; el orden sí, p
 5. **Plataforma:** repositorio con llave de solo lectura; `.env` nuevo; certificado; `docker compose config` revisado: tres puertos publicados y
    todos del proxy (443, 8883 y el 80, que solo redirige a 443).
 6. **Construir, escanear, levantar;** prueba de reinicio; sitio, zona, pasarela y dispositivos de prueba.
-7. **Respaldo con restauración probada; latido probado;** rotación de todo antes de llamarlo producción (`docs/11 §7`).
+7. **Respaldo cifrado con restauración probada** (los dos pares de claves de `age`, operador y emergencia, se generan fuera del servidor;
+   al servidor llegan solo las dos públicas; la privada de emergencia se guarda sin conexión) **y su guardia de 26 h en un temporizador
+   por crear, los dos servicios con `RESPALDO_EXIGIR_CIFRADO=1`; latido probado;** rotación de todo antes de llamarlo producción (`docs/11 §7`).
 
 ### 7.2 Vigilante externo por latido («hombre muerto»)
 
@@ -283,11 +285,13 @@ explícita: los usuarios y servicios ajenos se explicaron y el equipo se acepta 
   base y los respaldos. Por eso los secretos son propios de este entorno y no se reutilizan, se rotan al dejar el equipo, y solo se cargan datos de prueba mientras sea compartido (`docs/11 §4`).
 - **Igual que lo planeado:** red privada de administración (SSH y 443/80 solo ahí; llave sin expiración, nombres de la red, aprobación manual
   de equipos), CA propia creada fuera del servidor con la clave cifrada, secretos generados en el servidor, `COMPOSE_FILE` sin override, 8883
-  en todas las interfaces, respaldo diario con restauración probada y copia fuera del servidor (sin cifrado en reposo aún).
+  en todas las interfaces, respaldo diario con restauración probada y copia fuera del servidor (sin cifrado en reposo aún: listo en el guion
+  desde el 17/11/2026, falta activarlo allí).
 - **Verificado en ejecución** (bitácora del 03–04/11, tabla de §4): las dos vías de dispositivo con TLS, los rechazos sin credencial, con
   credencial incorrecta, sin TLS y sin token, solo los puertos del contrato, TLS 1.1 fuera, la pila que vuelve sola tras `docker compose restart`,
   y la restauración del respaldo con los mismos conteos.
-- **Pendiente:** latido del vigilante (§7.2), reinicio del equipo con su responsable, cifrado en reposo del respaldo (`docs/10 §9.5`), y una
+- **Pendiente:** latido del vigilante (§7.2), reinicio del equipo con su responsable, activar el cifrado en reposo del respaldo y la guardia de
+  26 h (`docs/10 §9.5`, listos en los guiones desde el 17/11/2026), y una
   dirección de entrada desde Internet (pedida a la institución) para dispositivos fuera de la red del campus.
 
 En paralelo, la institución entregó un namespace de Kubernetes para estudiantes: medido en 17 pruebas (bitácora del 03/11), cabe en cuota y

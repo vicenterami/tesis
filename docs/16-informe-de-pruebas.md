@@ -3816,10 +3816,107 @@ aparece también aquí y no impide restaurar: es del catálogo de TimescaleDB, q
 **Límites.** Los tiempos son los de una base chica (decenas de miles de filas): crecerán con el histórico y se vuelven a medir con él. El volcado de una base no
 trae los roles del servidor: el simulacro crea los que la huella nombra, y una recuperación real aplica después
 `db/init/14-rol-aplicacion.sql` (`docs/10 §9.5`). El respaldo todavía no va cifrado, no hay alarma si el último tiene más de 26 horas y
-no existe la papelera de dispositivos: es lo que queda de TT-46.
+no existe la papelera de dispositivos: es lo que queda de TT-46 (el cifrado y la guardia, hechos el 17/11/2026: §78).
 
 **En el servidor de prueba (16/11/2026).** El guion versionado tomó el respaldo de la base que recibe los nodos del campus (247 669
 bytes) y el simulacro lo restauró **allá mismo**, en un contenedor aparte: `pg_restore` sin errores y huella idéntica, 47 líneas, 22
 tablas, 18 647 filas, en 9 s; no quedó ningún contenedor. Copiado por la red privada a otro equipo, el mismo respaldo dio allí el
 mismo resultado (18 647 filas en 22 tablas, idénticas, en 4 s): con la copia de fuera y el repositorio se reconstruye la base del
 servidor. El respaldo diario del servidor llama desde ese día al guion versionado.
+
+## 78. Respaldo cifrado con la clave fuera del servidor y guardia de 26 h (17/11/2026)
+
+**Por qué.** El respaldo trae lo mismo que la base: resúmenes de contraseñas y de credenciales, correos y mediciones que no se publican
+antes de su publicación científica (`docs/10 §9.5`). Quien se lleve una copia, del servidor o de la copia de fuera, se lleva todo eso. Y
+un respaldo diario que deja de correr no avisa: se descubre el día en que hace falta.
+
+**Qué se hizo** (segunda parte de TT-46).
+- `plataforma/pruebas/respaldar.sh`, con `RESPALDO_DESTINATARIOS=<archivo>`, cifra con `age` para las claves **públicas** de ese archivo
+  el volcado (`.dump.age`) y el archivo del broker (`.json.age`). El volcado sale por la salida de la sesión que fija la instantánea y
+  pasa por `age` sin escribirse en claro en ningún disco, ni dentro del contenedor; un `pg_dump` que muere a la mitad no deja su marca de
+  «terminado» y no hay respaldo. Si se pidió cifrar y no se puede, no escribe nada. Sin la variable respalda en claro, como el 16/11, y lo
+  dice en su línea de salida. Cada respaldo trae ahora un cuarto archivo, `plataforma-<marca>.sha256`, con la suma de los otros tres.
+  Acepta solo destinatarios `age1…` (decidido: dos, el del operador y uno de emergencia cuya clave privada se guarda sin conexión);
+  `RESPALDO_EXIGIR_CIFRADO` vale 0 o 1; la carpeta, si la crea, queda con 700, y si ya existe abierta a otros, se rechaza.
+- `plataforma/pruebas/simulacro-restauracion.sh` acepta un `.dump.age` y lo descifra con la clave privada de `RESPALDO_IDENTIDAD` hacia un
+  disco en memoria del contenedor desechable; antes comprueba las sumas.
+- `plataforma/pruebas/guardia-respaldo.sh`: `OK` y 0, o `ATRASADO` con el motivo y 1. Exige el archivo de sumas (decidido el
+  17/11/2026) y un volcado de al menos `RESPALDO_MIN_BYTES` (16 384; el volcado de solo el esquema, sin filas, mide 109 269); un último
+  respaldo en claro con respaldos cifrados en la carpeta es `ATRASADO` salvo `RESPALDO_ACEPTAR_CLARO=1`.
+- Paso 4e del verificador (siguen siendo 56 pasos): además del respaldo en claro, la guardia sobre él y la vuelta completa cifrada con
+  una clave de descarte que se genera en la carpeta de trabajo de la corrida y se borra con ella; sin `age` instalado, esa mitad se
+  omite con aviso. La mitad en claro corre sin las variables de cifrado de quien verifica, y la prueba «sin la clave» sin
+  `RESPALDO_IDENTIDAD` (`env -u`).
+
+**Resultado.** Con una pila desechable aparte (proyecto propio, sin puertos publicados, borrada al terminar), su base recién creada y
+20 000 filas sintéticas, y `age` 1.2.1 (paquete de Alpine 3.22, desde un contenedor): respaldo cifrado de 338 343 bytes, que empieza con
+`age-encryption.org/v1` y no contiene la cadena `PGDMP`; restaurado con la clave privada, huella idéntica (44 líneas, 22 tablas, 20 010
+filas, 5 hipertablas) en 4 s; el archivo del broker se descifra a un JSON con sus 2 clientes. Dentro del contenedor de la base solo quedan,
+mientras dura el respaldo, la huella y la marca de «terminado»; ningún volcado. Con 1 520 010 filas: respaldo cifrado de 16 071 466 bytes
+en 5 s y simulacro idéntico en 6 s. La guardia da `OK` sobre los dos. El paso 4e, extraído del verificador y corrido contra esa pila: los
+dos simulacros `OK`, la guardia `OK` dos veces y «sin la clave privada, el simulacro se niega»; con `age` fuera del camino, la mitad
+cifrada sale «omitido» y la corrida lo cuenta entre los omitidos. Con `age` 1.2.1 instalado en el equipo de desarrollo, el mismo bloque
+corre entero, sin omitidos, y también con un entorno hostil (`RESPALDO_DESTINATARIOS` a un archivo que no existe, `RESPALDO_EXIGIR_CIFRADO=1`
+y `RESPALDO_IDENTIDAD` de otra clave); sin los `env -u`, ese entorno da 2 fallas («no puedo leer el archivo de destinatarios» y «sin la
+clave privada el simulacro salió con 1»). Con dos destinatarios, el volcado se descifra con cualquiera de las dos claves y el simulacro
+con la de emergencia da huella idéntica.
+
+Las fallas plantadas fuera del paso 4e se hicieron sobre copias temporales de los guiones o con envoltorios temporales (un `age` que
+falla a la mitad, uno lento para cortar la corrida), que no se versionan.
+
+**Falla plantada, en el respaldo** (en ningún caso queda un archivo con nombre definitivo):
+
+| Qué se plantó | Qué dijo | Salida |
+|---|---|---|
+| `RESPALDO_DESTINATARIOS` definida y vacía | «se pidió cifrar y RESPALDO_DESTINATARIOS está vacía o no definida: no se escribe un respaldo en claro»; ni siquiera crea la carpeta | 2 |
+| `RESPALDO_EXIGIR_CIFRADO=1` sin destinatarios | el mismo mensaje | 2 |
+| El archivo de destinatarios no existe | «no puedo leer el archivo de destinatarios …: no se escribe un respaldo en claro» | 2 |
+| El archivo de destinatarios trae la clave **privada** | «contiene una clave PRIVADA de age: sácala del servidor» | 2 |
+| Una clave pública con un carácter de menos | «age no acepta el archivo de destinatarios (¿una clave mal copiada?)» | 2 |
+| `age` no está instalado | «se pidió cifrar y age no está instalado: no se escribe un respaldo en claro» | 2 |
+| Una línea `ssh-ed25519 …` junto a las claves `age1…` | «trae 1 línea(s) que no son una clave pública age1… (las claves SSH no se aceptan)» | 2 |
+| `RESPALDO_EXIGIR_CIFRADO=si` | «debe valer 0 o 1 (vale «si»)»; no crea la carpeta | 2 |
+| La carpeta de destino ya existe con permisos 755 | «deja entrar o leer a otros (permisos 755): ciérrala con chmod 700»; no escribe nada en ella (con 700, o creada por el guion, termina bien; el candado queda con 600) | 2 |
+| `pg_dump` con una opción que no existe | «el flujo de pg_dump no empieza con la cabecera PGDMP» y «no hay respaldo» | 1 |
+| `pg_dump` entrega 2 000 bytes con cabecera válida y sale con 1 | «pg_dump no terminó bien: no hay respaldo» | 1 |
+| El cifrado falla a la mitad (un `age` que dice «no space left on device» tras 4 KiB) | «el volcado no se pudo escribir (pg_dump, psql, el cifrado o el disco): no hay respaldo» | 1 |
+| `kill -9` a la mitad de un respaldo cifrado | queda solo un `.dump.age.tmp`; la guardia dice «no hay ningún respaldo»; el respaldo siguiente borra ese resto y termina bien | — |
+| Dos respaldos a la vez sobre la misma carpeta | «ya hay un respaldo corriendo» | 1 |
+
+**Falla plantada, en el simulacro:**
+
+| Qué se plantó | Qué dijo | Salida |
+|---|---|---|
+| Respaldo cifrado sin `RESPALDO_IDENTIDAD` | «el volcado está cifrado: indica la clave privada de age con RESPALDO_IDENTIDAD» | 2 |
+| Otra clave privada | «no se pudo descifrar el volcado (¿clave equivocada o archivo truncado?): age: error: no identity matched any of the recipients» | 1 |
+| El `.dump.age` truncado a la mitad, con su archivo de sumas | la guardia lo detecta sin la clave (abajo) | — |
+| El mismo truncado, sin archivo de sumas | «no se pudo descifrar el volcado …: age: error: failed to decrypt and authenticate payload chunk» | 1 |
+| Una clave privada con frase de paso (binaria o en armadura de texto) y sin terminal | «está protegida con frase de paso y no hay terminal para pedirla» | 2 |
+
+**Falla plantada, en la guardia** (cada caso sobre una copia del respaldo con otra marca, otra hora y sus sumas coherentes):
+
+| Qué se plantó | Qué dijo | Salida |
+|---|---|---|
+| Respaldo legítimo de 1 h (en claro; y cifrado con `RESPALDO_EXIGIR_CIFRADO=1`) | `OK el último respaldo tiene 1 h 0 min (…, huella y sumas coinciden)` | 0 |
+| La carpeta no existe / está vacía | «no existe la carpeta de respaldos» / «no hay ningún respaldo» | 1 |
+| Respaldo de 27 h | «el último respaldo tiene 27 h 0 min (más de 26 h)»; con `RESPALDO_MAX_HORAS=30`, `OK` | 1 |
+| El de 27 h con `touch` (hora del archivo de hoy, marca de ayer) | «tiene 27 h 0 min» | 1 |
+| Un volcado de hace 27 h renombrado con la marca de hoy | «tiene 27 h 0 min» | 1 |
+| El más reciente de 0 bytes | «el último respaldo está vacío (0 bytes)» | 1 |
+| Sin huella / la huella cortada | «no tiene huella …: no se puede demostrar qué contiene» / «la huella … está incompleta» | 1 |
+| Sin archivo de sumas / sin archivo del broker | «no tiene su archivo de sumas» / «le falta el archivo del broker» | 1 |
+| Volcado truncado (en claro, y el cifrado de arriba) | «no coincide con su suma SHA-256: se truncó o se alteró después del respaldo» | 1 |
+| En claro con `RESPALDO_EXIGIR_CIFRADO=1` | «el último respaldo está EN CLARO y se exige cifrado» | 1 |
+| Se pierde la variable de los destinatarios: un respaldo en claro después de uno cifrado, guardia sin `RESPALDO_EXIGIR_CIFRADO` | «está EN CLARO y en la carpeta hay respaldos cifrados anteriores: el cifrado se perdió»; con `RESPALDO_ACEPTAR_CLARO=1`, `OK`; con `=si`, salida 2; una carpeta solo en claro sigue dando `OK` | 1 |
+| Un `.dump.age` de 21 bytes (solo la cabecera de age) con huella y sumas coherentes | «mide 21 bytes, menos que el mínimo de un volcado (16384)» | 1 |
+| `RESPALDO_EXIGIR_CIFRADO=si` | «debe valer 0 o 1 (vale «si»)» | 2 |
+| La hora del archivo, o la marca y la hora, 2 h en el futuro | «está fechado en el futuro (…): un reloj está mal y no se puede saber su antigüedad» | 1 |
+| `RESPALDO_MAX_HORAS=abc` | «RESPALDO_MAX_HORAS debe ser un número entero de horas»; dentro del paso 4e, contada como falla | 2 |
+
+**Límites.** `OK` de la guardia dice que el respaldo existe, está entero y es reciente, **no que restaura**: eso lo prueba el simulacro.
+La guardia no valida el contenido del archivo del broker, solo su suma (el respaldo sí exige un JSON completo antes de escribirlo). Las
+sumas no van firmadas: detectan la corrupción accidental, no a quien escribe en el servidor y las regenera (`docs/10 §9.5`). No se activó en el servidor de prueba: se hace en el orden de `docs/14 §7.1` (paso 7), con la clave generada fuera de él. La
+guardia es un guion con código de salida; la condición `respaldo_atrasado` del panel llega con la monitorización propia (TT-45). El
+simulacro descifra en memoria: con un volcado del tamaño de la memoria libre habrá que descifrar a un disco cifrado; con los tamaños de
+hoy (16 MB con millón y medio de filas) sobra. Un `kill -9` deja en el contenedor de la base la huella y la marca de esa corrida (conteos,
+sin filas) hasta que el contenedor se recrea. Perder la clave privada es perder los respaldos: por eso se recomiendan dos destinatarios.
