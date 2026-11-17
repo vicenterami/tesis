@@ -1,7 +1,7 @@
 # 16/11/2026 — HU-07 en navegador real, la vista previa del alta masiva en pantalla y el diseño de la vista pública
 
 **Contexto.** Dentro del plan de la Etapa 4 (`docs/04 §8`), la jornada siguió el ciclo de siempre —diseño escrito antes del código,
-construcción, revisión independiente, verificador en verde y un commit por bloque— y cerró cinco bloques. El núcleo pasó de 28 a 29
+construcción, revisión independiente, verificador en verde y un commit por bloque— y cerró seis bloques. El núcleo pasó de 28 a 29
 elementos hechos; al sumar la vista pública como elemento nuevo del núcleo (HU-32) queda en 29 de 35 (80 % de sus horas).
 
 **Plan.** La vista pública por enlace y lo que queda de las preferencias (aplicar la zona horaria propia) pasan a la iteración 1; la
@@ -35,7 +35,14 @@ no puede guardarse como «vista» ni llegar al informe de errores del panel; y l
 quitarle el tablero a quien tiene sesión. Todo enlace vence y se puede renovar o revocar. La vista entra al backlog como HU-32, dentro del
 núcleo, con su requisito RF-62: no tenía ninguno de los dos.
 
-**Revisiones de la jornada.** Cuatro pasadas independientes sobre el código y una sobre el diseño; cada hallazgo se verificó antes de
+**Respaldo que se demuestra restaurando (primera parte de TT-46).** Tras redesplegar el servidor de prueba quedó a la vista que el guion
+de respaldo vivía solo allá y que restaurar se comprobaba contando las filas de una tabla. Ahora el respaldo está versionado y deja,
+junto al volcado, la huella de la base —filas y suma de comprobación por tabla, tomadas en la misma instantánea—; un simulacro lo
+restaura en una base desechable, sin red, y exige una huella idéntica; y el verificador lo hace en cada pasada (56 pasos). En el
+servidor de prueba: 18 647 filas en 22 tablas, restauradas e idénticas, allá y en una copia llevada a otro equipo (`docs/16 §77`).
+Quedan el cifrado del respaldo, la alarma por respaldo atrasado y la papelera.
+
+**Revisiones de la jornada.** Cinco pasadas independientes sobre el código y una sobre el diseño; cada hallazgo se verificó antes de
 corregir. Lo que el verificador no habría visto: en el alta masiva, las credenciales se perdían al ir al inventario sin descargarlas; la
 respuesta de una revisión vieja podía caer sobre un archivo recién elegido; y un error del servidor al crear ofrecía reintentar con una
 llave nueva, que habría dejado las credenciales sin recuperar. Y lo que el verificador sí vio y la construcción no: un botón hecho fuera
@@ -46,4 +53,5 @@ no al publicar. (2) Al propagar una cifra se busca el número solo: en el inform
 búsqueda con el formato de los documentos no encontró tres lugares que el verificador sí. (3) Un recorrido de navegador que se corre
 varias veces seguidas topa con los límites del propio sistema: la prueba hace lo que haría una persona —esperar lo que dice el aviso y
 reintentar— y de paso prueba ese aviso. (4) Las reglas del verificador que aplican a una pantalla se leen antes de construirla, no
-después. (5) Una prueba que solo comprueba que un botón existe no prueba lo que hace.
+después. (5) Una prueba que solo comprueba que un botón existe no prueba lo que hace. (6) Un respaldo se da por bueno cuando restaurarlo
+reproduce la base, no cuando el comando termina: un volcado cortado empieza igual que uno completo.

@@ -3813,7 +3813,13 @@ aparece también aquí y no impide restaurar: es del catálogo de TimescaleDB, q
 | `pg_dump` falla al respaldar (una opción que no existe) | El respaldo dice «pg_dump no dejó el volcado: no hay respaldo» y no queda ningún archivo con nombre definitivo | 1 |
 | Dos respaldos a la vez sobre la misma carpeta | El segundo dice «ya hay un respaldo corriendo» y queda un solo volcado | 1 |
 
-**Límites.** Medido con los datos de desarrollo: el tiempo con el volumen real del servidor se medirá allá. El volcado de una base no
+**Límites.** Los tiempos son los de una base chica (decenas de miles de filas): crecerán con el histórico y se vuelven a medir con él. El volcado de una base no
 trae los roles del servidor: el simulacro crea los que la huella nombra, y una recuperación real aplica después
 `db/init/14-rol-aplicacion.sql` (`docs/10 §9.5`). El respaldo todavía no va cifrado, no hay alarma si el último tiene más de 26 horas y
-no existe la papelera de dispositivos: es lo que queda de TT-46. El simulacro sobre el respaldo del servidor de prueba está pendiente.
+no existe la papelera de dispositivos: es lo que queda de TT-46.
+
+**En el servidor de prueba (16/11/2026).** El guion versionado tomó el respaldo de la base que recibe los nodos del campus (247 669
+bytes) y el simulacro lo restauró **allá mismo**, en un contenedor aparte: `pg_restore` sin errores y huella idéntica, 47 líneas, 22
+tablas, 18 647 filas, en 9 s; no quedó ningún contenedor. Copiado por la red privada a otro equipo, el mismo respaldo dio allí el
+mismo resultado (18 647 filas en 22 tablas, idénticas, en 4 s): con la copia de fuera y el repositorio se reconstruye la base del
+servidor. El respaldo diario del servidor llama desde ese día al guion versionado.
