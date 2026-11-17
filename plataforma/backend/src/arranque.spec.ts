@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  claveApp, AvisosAcotados, claveAdmin, horasClaveTemporal, claveOpcional, HOSTS_LOCALES, hostsPermitidos, interfazDeEscucha, nombreDeHost, rechazoDeHost, registrosEnJson, rutaSinCache, servirDocumentacion, TOPE_CUERPO, cuerpoExcedido } from './arranque.js';
+  claveApp, AvisosAcotados, claveAdmin, horasClaveTemporal, claveOpcional, HOSTS_LOCALES, hostsPermitidos, interfazDeEscucha, nombreDeHost, rechazoDeHost, registrosEnJson, rutaSinCache, rutaSinIndexar, servirDocumentacion, TOPE_CUERPO, cuerpoExcedido } from './arranque.js';
 
 describe('registrosEnJson (docs/10 §6): JSON en contenedor, texto en desarrollo', () => {
   it('sin variable → texto', () => expect(registrosEnJson(undefined)).toBe(false));
@@ -159,5 +159,14 @@ describe('cuerpoExcedido', () => {
     expect(cuerpoExcedido('post', '/DISPOSITIVOS/LOTE', 200 * 1024)).toBe(false);
     expect(cuerpoExcedido('POST', '/dispositivos/lote-falso', 200 * 1024)).toBe(true);
     for (const m of ['PUT', 'PATCH', 'DELETE', 'GET']) expect(cuerpoExcedido(m, '/dispositivos/lote', 200 * 1024)).toBe(true);
+  });
+});
+
+describe('rutaSinIndexar (17/11/2026; docs/19 §4, O, punto 9): X-Robots-Tag noindex en el panel y en la vista pública, no en el resto de la API', () => {
+  it('panel y /publico, sin distinguir mayúsculas', () => {
+    for (const r of ['/panel', '/panel/', '/panel/index.html', '/PANEL/assets/a.js', '/publico', '/publico/', '/Publico']) expect(rutaSinIndexar(r)).toBe(true);
+  });
+  it('lo demás no lleva la cabecera (ni un prefijo parecido)', () => {
+    for (const r of ['/', '/sesion', '/sitios/x/enlaces', '/publicos', '/panelito', '/docs']) expect(rutaSinIndexar(r)).toBe(false);
   });
 });

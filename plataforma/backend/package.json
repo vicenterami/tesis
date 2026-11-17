@@ -14,9 +14,9 @@
     "build": "nest build",
     "start": "node dist/main.js",
     "start:dev": "nest start --watch",
-    "lint": "eslint \"src/**/*.ts\"",
+    "lint": "eslint \"src/**/*.ts\" \"integracion/**/*.ts\"",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p integracion",
     "verificar": "pnpm typecheck && pnpm lint && pnpm test && pnpm --filter panel verificar",
     "openapi": "nest build && node dist/exportar-openapi.js",
     "emulador": "tsx src/emulador/emulador.ts"

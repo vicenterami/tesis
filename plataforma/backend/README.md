@@ -29,6 +29,7 @@ src/
 ├── sesion/                    # sesión por cookie, guardia central, permisos de los cinco perfiles (permisos.ts) y usuarios (docs/20)
 ├── cuenta/                    # lo propio de cada persona: preferencias, sesiones, exportar la cuenta y la baja por anonimización (docs/20 §11)
 ├── legal/                     # términos, privacidad (desde el inventario de docs/21), acerca de y soporte (P11)
+├── publico/                   # vista pública por enlace (docs/19 §4, O): GET /publico, los enlaces del sitio, la regla de k, la respuesta guardada y el contador
 ├── retencion/                 # borra lo vencido de medicion, trama, cuarentena y metrica_broker por la función acotada fn_retencion_drop_chunks (migración 14)
 ├── openapi.ts                 # contrato OpenAPI generado desde los decoradores; /docs
 └── salud/salud.controller.ts  # GET /salud: base, cola del broker (descartes, condición abierta) y aprovisionamiento en curso
@@ -67,6 +68,10 @@ bash ../pruebas/panel-sesion-e2e.sh   # paso 4c: Chromium y Firefox a 390 y 1280
 ```bash
 pnpm verificar        # = pnpm typecheck && pnpm lint && pnpm test, y lo mismo del panel  (≈ 14 s, sin base ni broker)
 ```
+
+La vista pública por enlace tiene además una prueba contra una base real (`integracion/publico.ts`, fuera de `src/`: no entra a la imagen
+ni a `pnpm test`, pero sí a `pnpm typecheck` y `pnpm lint`); la corre `bash plataforma/pruebas/publico-integracion.sh`, que levanta y borra su
+propia base desechable. La zona de tasa del proxy la prueba `bash plataforma/pruebas/publico-proxy.sh`, con un nginx desechable (`docs/16 §79`).
 
 | Capa | Herramienta | Qué atrapa |
 |---|---|---|
@@ -220,6 +225,8 @@ describir rutas que no existen. Con el backend corriendo, la documentación inte
 | `GET /terminos`, `GET /privacidad`, `GET /acerca` (Etapa 4) | términos con su versión, privacidad generada desde `docs/21 §2` y «acerca de» (versión, commit, AGPL, avisos de terceros) | públicas; con los términos pendientes, toda ruta de datos responde 403 `terminos_pendientes` hasta `POST /terminos/aceptar` (Etapa 4) |
 | `POST /soporte`, `GET /soporte` (Etapa 4) | enviar un mensaje (1–2 000 caracteres, 5 por hora) y leerlos por cursor | leer: solo el administrador del sistema |
 | `GET /sitios/:id/actividad?desde&hasta&tipo&usuario&cursor` (Etapa 4) | actividad del sitio (P14): eventos con quién y accesos de sus personas, con texto para personas; sin correos ni IP | administrador del sitio o del sistema; keyset con `X-Siguiente` |
+| `GET /sitios/:id/enlaces?incluir=todos`, `POST /sitios/:id/enlaces`, `POST /sitios/:id/enlaces/vista-previa`, `POST /sitios/:id/enlaces/:enlace/renovar`, `DELETE /sitios/:id/enlaces/:enlace`, `GET`/`PUT /sitios/:id/enlaces/tope`, `GET`/`PUT /sitios/:id/enlaces/minimo` | enlaces públicos del sitio (`docs/19 §4`, O): la lista (por omisión, solo los vivos); crear (el token una sola vez, a la base su SHA-256; con `avisos` de lo que un visitante podría deducir); la vista previa, con la misma función que `GET /publico` y su propio cupo; renovar sin cambiar el token; revocar; el tope de enlaces vivos y el k de la vista pública del sitio (1 a 20; bajarlo responde `avisos`: afecta a todos sus enlaces), que fija el administrador | administrador del sitio o del sistema; 409 `tope_enlaces`, `no_renovable` o `acorta` |
+| `GET /publico?ventana&carga` (cabecera `X-Enlace-Publico`) | la vista pública por enlace: solo promedios de lo publicado, del sitio y de cada zona; un valor de menos de k dispositivos sale null, como uno sin datos, y la magnitud dice `protegido` | sin sesión; inexistente, vencido, revocado o mal formado: la misma 404; datos guardados 60 s por enlace y ventana; zona `publico` del proxy |
 
 Las rutas que escriben aceptan la clave por cabecera o una sesión con el perfil que la matriz de `docs/20 §6` exige (con `X-Pedido: panel`):
 desde el 11/11/2026, cinco perfiles (administrador del sistema, administrador de sitio, investigador, operador técnico y consulta; `sesion/permisos.ts`).

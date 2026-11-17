@@ -78,6 +78,25 @@ DO $$ BEGIN
     GRANT UPDATE (administrador_sistema, desactivado_en, desactivado_por, motivo_baja, terminos_version_aceptada, terminos_aceptados_en) ON usuario TO plataforma_app;
   END IF;
 END $$;
+-- Desde la migración 25, la vista pública por enlace (docs/19 §4, O): INSERT en enlace_publico y enlace_publico_acceso, UPDATE de lo que
+-- cambian renovar, revocar y el contador, y la función acotada que limpia el contador. Nacen después de esta: aquí se repiten solo si ya existen.
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'fn_limpiar_accesos_publicos') AND EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'fn_anonimizar_enlaces_publicos')
+     AND EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'enlace_publico_acceso') THEN
+    GRANT EXECUTE ON FUNCTION fn_limpiar_accesos_publicos(integer) TO plataforma_app;
+    GRANT EXECUTE ON FUNCTION fn_anonimizar_enlaces_publicos() TO plataforma_app;
+    GRANT INSERT (sitio_id, token_hash, magnitudes, ventana_maxima, zonas, titulo, descripcion, creado_por, expira_en, retencion_dias) ON enlace_publico TO plataforma_app;
+    GRANT INSERT ON enlace_publico_acceso TO plataforma_app;
+    GRANT UPDATE (expira_en, renovado_en, revocado_en, revocado_por) ON enlace_publico TO plataforma_app;
+    GRANT UPDATE (cuenta) ON enlace_publico_acceso TO plataforma_app;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'sitio' AND column_name = 'enlaces_publicos_max') THEN
+      GRANT UPDATE (enlaces_publicos_max) ON sitio TO plataforma_app;
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'sitio' AND column_name = 'publico_minimo_dispositivos') THEN
+      GRANT UPDATE (publico_minimo_dispositivos) ON sitio TO plataforma_app;
+    END IF;
+  END IF;
+END $$;
 ALTER DEFAULT PRIVILEGES FOR ROLE plataforma IN SCHEMA public REVOKE INSERT, UPDATE ON TABLES FROM plataforma_app;
 ALTER DEFAULT PRIVILEGES FOR ROLE plataforma IN SCHEMA public GRANT SELECT ON TABLES TO plataforma_app;
 

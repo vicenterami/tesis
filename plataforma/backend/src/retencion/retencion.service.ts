@@ -2,6 +2,7 @@ import { Inject, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nest
 import { ConfigService } from '@nestjs/config';
 import { Pool } from 'pg';
 import { POOL } from '../db/db.module.js';
+import { DIAS_CONTADOR } from '../publico/publico.js';
 
 // Retención de datos (docs/10 §8.4 punto 11). La edición Apache de TimescaleDB no trae add_retention_policy,
 // pero sí drop_chunks: borra fragmentos enteros (archivos), sin filas muertas ni vacuum. Esta tarea lo llama
@@ -108,6 +109,29 @@ export class RetencionService implements OnModuleInit, OnModuleDestroy {
       borrados.sesiones = 'error';
       partes.push('sesiones=error');
       this.log.error(`limpieza de sesiones vencidas falló, se reintenta en la próxima corrida: ${(e as Error).message}`);
+    }
+    // El contador de la vista pública por enlace (docs/19 §4, O, punto 8; migración 25): sus filas de más de 90 días, con la función del dueño.
+    try {
+      const r = await this.pool.query<{ n: number }>('SELECT fn_limpiar_accesos_publicos($1) AS n', [DIAS_CONTADOR]);
+      borrados.accesos_publicos = Number(r.rows[0].n);
+      partes.push(`accesos_publicos=${borrados.accesos_publicos}`);
+    } catch (e) {
+      fallos++;
+      borrados.accesos_publicos = 'error';
+      partes.push('accesos_publicos=error');
+      this.log.error(`limpieza del contador de accesos públicos falló, se reintenta en la próxima corrida: ${(e as Error).message}`);
+    }
+    // El texto de los enlaces públicos que dejaron de valer hace más de su plazo (decidido el 17/11/2026; migración 25): título, descripción y
+    // nombres de zona se anonimizan; la fila queda para la actividad del sitio.
+    try {
+      const r = await this.pool.query<{ n: number }>('SELECT fn_anonimizar_enlaces_publicos() AS n');
+      borrados.enlaces_anonimizados = Number(r.rows[0].n);
+      partes.push(`enlaces_anonimizados=${borrados.enlaces_anonimizados}`);
+    } catch (e) {
+      fallos++;
+      borrados.enlaces_anonimizados = 'error';
+      partes.push('enlaces_anonimizados=error');
+      this.log.error(`anonimización de enlaces públicos falló, se reintenta en la próxima corrida: ${(e as Error).message}`);
     }
     const duracion = Date.now() - inicio;
     const linea = `resumen fragmentos_borrados ${partes.join(' ')} fallos=${fallos} duration_ms=${duracion}`;

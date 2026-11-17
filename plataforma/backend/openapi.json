@@ -3072,11 +3072,1030 @@
           "legal"
         ]
       }
+    },
+    "/publico": {
+      "get": {
+        "description": "Sin sesión: el token del enlace en la cabecera `X-Enlace-Publico` (nunca en la ruta ni en la consulta). SOLO promedios: cada valor es el promedio de los dispositivos que aportan (docs/19 §4, M) y es null cuando no hay datos o cuando lo aportan menos de k dispositivos —los dos casos se ven igual, a propósito—; `protegido` (si k > 1) avisa que algún tramo puede ocultarse. El total del sitio se publica solo si los dispositivos de las zonas del sitio con menos de k (el k es del sitio: todos sus enlaces ocultan lo mismo) suman 0 o al menos k (no se despeja por resta). Cada lectura cuenta en la zona donde estaba el equipo cuando se tomó. Nunca mínimo, máximo, lecturas sueltas, identificadores, nombres de dispositivos ni cuántos aportan. Un token inexistente, vencido, revocado, con forma inválida o de un sitio inactivo recibe la misma 404. Con `carga=si` la petición cuenta como una carga de la pantalla (los refrescos no la llevan). Los datos se guardan 60 s por enlace y ventana (también un cálculo que pasó el tiempo máximo, como 503); la vigencia del enlace se lee en cada petición.",
+        "operationId": "PublicoController_ver",
+        "parameters": [
+          {
+            "name": "carga",
+            "required": false,
+            "in": "query",
+            "description": "`si` en la primera petición de la pantalla: cuenta un acceso; los refrescos no la llevan",
+            "schema": {
+              "enum": [
+                "si"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "ventana",
+            "required": false,
+            "in": "query",
+            "description": "Por defecto 24h; hasta la ventana máxima del enlace",
+            "schema": {
+              "enum": [
+                "24h",
+                "7d",
+                "30d"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Enlace-Publico",
+            "in": "header",
+            "description": "El token del enlace: 43 caracteres base64url (el fragmento de la dirección …/panel/#/v/<token>)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "La vista: solo promedios de lo publicado; lo oculto, como un valor sin datos",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "titulo",
+                    "descripcion",
+                    "sitio",
+                    "zona_horaria",
+                    "minimo_dispositivos",
+                    "ventana",
+                    "ventanas",
+                    "intervalo",
+                    "desde",
+                    "hasta",
+                    "ultimo_dato",
+                    "tiempos",
+                    "magnitudes"
+                  ],
+                  "properties": {
+                    "titulo": {
+                      "type": "string"
+                    },
+                    "descripcion": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "sitio": {
+                      "type": "string",
+                      "description": "Nombre del sitio"
+                    },
+                    "zona_horaria": {
+                      "type": "string"
+                    },
+                    "minimo_dispositivos": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 20,
+                      "description": "k que rige: el del sitio (todos sus enlaces ocultan lo mismo), nunca menos que el piso del despliegue"
+                    },
+                    "ventana": {
+                      "type": "string",
+                      "enum": [
+                        "24h",
+                        "7d",
+                        "30d"
+                      ]
+                    },
+                    "ventanas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "24h",
+                          "7d",
+                          "30d"
+                        ]
+                      }
+                    },
+                    "intervalo": {
+                      "type": "string"
+                    },
+                    "desde": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "hasta": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "ultimo_dato": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true,
+                      "description": "Inicio del tramo de la lectura más reciente de lo publicado"
+                    },
+                    "tiempos": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer"
+                      },
+                      "description": "Segundos Unix, comunes a todas las series; solo los tramos que publican algún valor"
+                    },
+                    "magnitudes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "codigo",
+                          "nombre",
+                          "unidad",
+                          "ahora",
+                          "serie",
+                          "protegido",
+                          "zonas"
+                        ],
+                        "properties": {
+                          "codigo": {
+                            "type": "string"
+                          },
+                          "nombre": {
+                            "type": "string"
+                          },
+                          "unidad": {
+                            "type": "string"
+                          },
+                          "ahora": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "serie": {
+                            "type": "array",
+                            "items": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "description": "Un valor por cada uno de `tiempos`"
+                          },
+                          "protegido": {
+                            "type": "boolean",
+                            "description": "true si k > 1: algún tramo puede ocultarse para proteger a equipos individuales (depende solo de la configuración)"
+                          },
+                          "zonas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "required": [
+                                "nombre",
+                                "ahora",
+                                "serie"
+                              ],
+                              "properties": {
+                                "nombre": {
+                                  "type": "string"
+                                },
+                                "ahora": {
+                                  "type": "number",
+                                  "nullable": true
+                                },
+                                "serie": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "number",
+                                    "nullable": true
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "ventana fuera de la lista o más larga que la máxima del enlace (solo con un token vigente)"
+          },
+          "404": {
+            "description": "«enlace no disponible»: inexistente, vencido, revocado o mal formado; la misma respuesta en todos los casos"
+          },
+          "429": {
+            "description": "Demasiadas peticiones desde la misma dirección (zona `publico` del proxy), en JSON"
+          },
+          "503": {
+            "description": "Los datos tardaron más de 5 s o hay demasiadas vistas calculándose: la pantalla reintenta en un minuto"
+          }
+        },
+        "summary": "Vista pública por enlace (RF-62)",
+        "tags": [
+          "publico"
+        ]
+      }
+    },
+    "/sitios/{id}/enlaces": {
+      "get": {
+        "description": "Del más reciente al más antiguo. Por omisión, solo los vivos (no revocados, vigentes o aún renovables); con `incluir=todos`, también los revocados y los que ya no se pueden renovar (sus filas no se borran: su texto se anonimiza a su plazo). Cada uno: `id, titulo, descripcion, magnitudes[{codigo, nombre, unidad}], ventana_maxima, zonas[{id, nombre}]` (el nombre publicado), `creado_por{id, nombre}|null, creado_en, expira_en, renovado_en, revocado_en, revocado_por{id, nombre}|null`, `accesos_7d` (cargas de la pantalla de los últimos 7 días del sitio), `estado` (vigente, vence_pronto —7 días o menos—, vencido, revocado), `renovable`, `retencion_dias` y `anonimizado_en` (cuándo se anonimizó su texto, o null). Nunca el token.",
+        "operationId": "EnlacesController_listar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "UUID del sitio",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "incluir",
+            "required": false,
+            "in": "query",
+            "description": "`todos`: también los enlaces muertos",
+            "schema": {
+              "enum": [
+                "todos"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lista de enlaces del sitio"
+          },
+          "400": {
+            "description": "UUID inválido o `incluir` distinto de `todos`"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "403": {
+            "description": "Un perfil sin la acción «enlaces» (docs/20 §6), o sesión sin la cabecera X-Pedido: panel en lo que escribe"
+          },
+          "404": {
+            "description": "Sitio (o enlace) inexistente o de otro sitio"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Enlaces públicos del sitio (P9)",
+        "tags": [
+          "enlaces"
+        ]
+      },
+      "post": {
+        "description": "Crea el enlace y devuelve, UNA sola vez, `token` y `direccion` (`/panel/#/v/<token>`: el token va en el fragmento). La base guarda solo su resumen SHA-256. `id, titulo, descripcion, magnitudes[{codigo, nombre, unidad}], ventana_maxima, zonas[{id, nombre}]` (el nombre publicado), `creado_por{id, nombre}|null, creado_en, expira_en, renovado_en, revocado_en, revocado_por{id, nombre}|null`, `accesos_7d` (cargas de la pantalla de los últimos 7 días del sitio), `estado` (vigente, vence_pronto —7 días o menos—, vencido, revocado), `renovable`, `retencion_dias` y `anonimizado_en` (cuándo se anonimizó su texto, o null). Nunca el token. Un sitio admite hasta su tope de enlaces vivos (GET /sitios/{id}/enlaces/tope; 50 por omisión): el siguiente, 409 `codigo: tope_enlaces` con ese número en el texto. Deja el evento `enlace_creado` con el k del sitio que rige (el enlace no lleva k: es del sitio, PUT /sitios/{id}/enlaces/minimo) y cuántos avisos se mostraron. `avisos`: lo que un visitante podría deducir, por magnitud (la protección por omisión es de la plataforma; bajarla, del administrador del sitio).",
+        "operationId": "EnlacesController_crear",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "UUID del sitio",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "titulo",
+                  "magnitudes",
+                  "ventana_maxima"
+                ],
+                "properties": {
+                  "titulo": {
+                    "type": "string",
+                    "maxLength": 80,
+                    "description": "Público: lo verá cualquiera con el enlace (sin nombres de personas ni datos personales)"
+                  },
+                  "descripcion": {
+                    "type": "string",
+                    "maxLength": 300,
+                    "nullable": true,
+                    "description": "Pública, con el mismo aviso; vacía o null = sin descripción"
+                  },
+                  "magnitudes": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 12,
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Códigos del catálogo (GET /magnitudes), en el orden en que se muestran. Vacía: 400 «Elige al menos una magnitud para publicar.»"
+                  },
+                  "ventana_maxima": {
+                    "type": "string",
+                    "enum": [
+                      "24h",
+                      "7d",
+                      "30d"
+                    ],
+                    "description": "La ventana más larga que podrá pedir quien visita"
+                  },
+                  "zonas": {
+                    "type": "array",
+                    "maxItems": 20,
+                    "items": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "description": "Desglose por zona: las zonas del sitio que se publican, con el nombre que tienen hoy (queda fijado). Vacía o ausente = sin desglose"
+                  },
+                  "retencion_dias": {
+                    "type": "integer",
+                    "minimum": 31,
+                    "maximum": 365,
+                    "description": "Días que se conservan título, descripción y nombres de zona después de que el enlace deja de valer (por omisión 90); después se anonimizan"
+                  },
+                  "plazo_dias": {
+                    "type": "integer",
+                    "enum": [
+                      7,
+                      30,
+                      90,
+                      180
+                    ],
+                    "description": "Vence en hoy + plazo (por omisión 30); solo los plazos que no pasan PUBLICO_VENCIMIENTO_MAX_DIAS"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Enlace creado: el token y la dirección, una sola vez, y `avisos` (lo que un visitante podría deducir de lo publicado)"
+          },
+          "400": {
+            "description": "Cuerpo inválido: sin magnitudes, una magnitud fuera del catálogo, una zona que no es del sitio, un plazo fuera de lo permitido, un campo de más (también `minimo_dispositivos`: k es del sitio)"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "403": {
+            "description": "Un perfil sin la acción «enlaces» (docs/20 §6), o sesión sin la cabecera X-Pedido: panel en lo que escribe"
+          },
+          "404": {
+            "description": "Sitio (o enlace) inexistente o de otro sitio"
+          },
+          "409": {
+            "description": "`codigo: tope_enlaces`: «Este sitio ya tiene N enlaces. Revoca uno para crear otro.», con N el tope del sitio"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Publicar una vista: crear un enlace (P9)",
+        "tags": [
+          "enlaces"
+        ]
+      }
+    },
+    "/sitios/{id}/enlaces/tope": {
+      "get": {
+        "description": "El tope que rige (`max_enlaces`), si lo fijó el administrador (`fijado`), el valor por omisión del despliegue (`por_omision`), el techo (`techo`) y cuántos enlaces vivos hay (`vivos`).",
+        "operationId": "EnlacesController_leerTope",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "UUID del sitio",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "El tope de enlaces del sitio"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "403": {
+            "description": "Un perfil sin la acción «enlaces» (docs/20 §6), o sesión sin la cabecera X-Pedido: panel en lo que escribe"
+          },
+          "404": {
+            "description": "Sitio (o enlace) inexistente o de otro sitio"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Tope de enlaces vivos del sitio (P9)",
+        "tags": [
+          "enlaces"
+        ]
+      },
+      "put": {
+        "description": "Lo fija el administrador del sitio, de 1 al techo del despliegue (PUBLICO_MAX_ENLACES_TECHO, 200 por omisión). Bajarlo no revoca nada: impide crear otro hasta que haya lugar. Deja el evento `enlace_tope`.",
+        "operationId": "EnlacesController_fijarTope",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "UUID del sitio",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "max_enlaces"
+                ],
+                "properties": {
+                  "max_enlaces": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Hasta el techo del despliegue"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "El tope nuevo"
+          },
+          "400": {
+            "description": "Fuera de 1 al techo, o un campo de más"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "403": {
+            "description": "Un perfil sin la acción «enlaces» (docs/20 §6), o sesión sin la cabecera X-Pedido: panel en lo que escribe"
+          },
+          "404": {
+            "description": "Sitio (o enlace) inexistente o de otro sitio"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Fijar el tope de enlaces vivos del sitio (P9)",
+        "tags": [
+          "enlaces"
+        ]
+      }
+    },
+    "/sitios/{id}/enlaces/minimo": {
+      "get": {
+        "description": "k es del sitio: todos sus enlaces ocultan lo mismo (docs/19 §4, O, punto 2). `minimo_dispositivos` (el que rige, nunca bajo el piso), `fijado` (si lo fijó el administrador), `por_omision`, `piso` y `maximo`.",
+        "operationId": "EnlacesController_leerMinimo",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "UUID del sitio",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "El k del sitio"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "403": {
+            "description": "Un perfil sin la acción «enlaces» (docs/20 §6), o sesión sin la cabecera X-Pedido: panel en lo que escribe"
+          },
+          "404": {
+            "description": "Sitio (o enlace) inexistente o de otro sitio"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Mínimo de dispositivos (k) de la vista pública del sitio (P9)",
+        "tags": [
+          "enlaces"
+        ]
+      },
+      "put": {
+        "description": "De PUBLICO_MINIMO_DISPOSITIVOS_PISO a 20. Rige en la petición siguiente de TODOS los enlaces del sitio. Responde el k nuevo y `avisos`: «afecta a todos los enlaces públicos de este sitio» y lo que un visitante podría deducir con ese k (con 1, la lectura de un equipo solo sale tal cual). Deja el evento `enlace_minimo`.",
+        "operationId": "EnlacesController_fijarMinimo",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "UUID del sitio",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "minimo_dispositivos"
+                ],
+                "properties": {
+                  "minimo_dispositivos": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 20,
+                    "description": "Desde el piso del despliegue"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "El k nuevo con sus avisos"
+          },
+          "400": {
+            "description": "Fuera del piso a 20, o un campo de más"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "403": {
+            "description": "Un perfil sin la acción «enlaces» (docs/20 §6), o sesión sin la cabecera X-Pedido: panel en lo que escribe"
+          },
+          "404": {
+            "description": "Sitio (o enlace) inexistente o de otro sitio"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Fijar el mínimo de dispositivos (k) de la vista pública del sitio (P9)",
+        "tags": [
+          "enlaces"
+        ]
+      }
+    },
+    "/sitios/{id}/enlaces/vista-previa": {
+      "post": {
+        "description": "Con el mismo formulario que crear (el título puede ir vacío) y `ventana` (cuál dibujar, hasta `ventana_maxima`; por defecto 24h): la MISMA respuesta que GET /publico, armada con la misma función y la regla de k, con los datos de hoy y los nombres de zona que quedarían publicados. No guarda nada ni crea un enlace. Tiene su propio cupo, separado del de las visitas (503 si pasa 5 s o no hay cupo). Más `avisos`: lo que un visitante podría deducir de lo que se va a publicar, para mostrarlo antes de publicar.",
+        "operationId": "EnlacesController_previa",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "UUID del sitio",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "magnitudes"
+                ],
+                "properties": {
+                  "titulo": {
+                    "type": "string",
+                    "maxLength": 80,
+                    "description": "Público: lo verá cualquiera con el enlace (sin nombres de personas ni datos personales)"
+                  },
+                  "descripcion": {
+                    "type": "string",
+                    "maxLength": 300,
+                    "nullable": true,
+                    "description": "Pública, con el mismo aviso; vacía o null = sin descripción"
+                  },
+                  "magnitudes": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 12,
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "Códigos del catálogo (GET /magnitudes), en el orden en que se muestran. Vacía: 400 «Elige al menos una magnitud para publicar.»"
+                  },
+                  "ventana_maxima": {
+                    "type": "string",
+                    "enum": [
+                      "24h",
+                      "7d",
+                      "30d"
+                    ],
+                    "description": "La ventana más larga que podrá pedir quien visita"
+                  },
+                  "zonas": {
+                    "type": "array",
+                    "maxItems": 20,
+                    "items": {
+                      "type": "string",
+                      "format": "uuid"
+                    },
+                    "description": "Desglose por zona: las zonas del sitio que se publican, con el nombre que tienen hoy (queda fijado). Vacía o ausente = sin desglose"
+                  },
+                  "retencion_dias": {
+                    "type": "integer",
+                    "minimum": 31,
+                    "maximum": 365,
+                    "description": "Días que se conservan título, descripción y nombres de zona después de que el enlace deja de valer (por omisión 90); después se anonimizan"
+                  },
+                  "plazo_dias": {
+                    "type": "integer",
+                    "enum": [
+                      7,
+                      30,
+                      90,
+                      180
+                    ],
+                    "description": "Vence en hoy + plazo (por omisión 30); solo los plazos que no pasan PUBLICO_VENCIMIENTO_MAX_DIAS"
+                  },
+                  "ventana": {
+                    "type": "string",
+                    "enum": [
+                      "24h",
+                      "7d",
+                      "30d"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "La vista como la verá quien visita (la misma forma que GET /publico) y `avisos`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "titulo",
+                    "descripcion",
+                    "sitio",
+                    "zona_horaria",
+                    "minimo_dispositivos",
+                    "ventana",
+                    "ventanas",
+                    "intervalo",
+                    "desde",
+                    "hasta",
+                    "ultimo_dato",
+                    "tiempos",
+                    "magnitudes",
+                    "avisos"
+                  ],
+                  "properties": {
+                    "titulo": {
+                      "type": "string"
+                    },
+                    "descripcion": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "sitio": {
+                      "type": "string",
+                      "description": "Nombre del sitio"
+                    },
+                    "zona_horaria": {
+                      "type": "string"
+                    },
+                    "minimo_dispositivos": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 20,
+                      "description": "k que rige: el del sitio (todos sus enlaces ocultan lo mismo), nunca menos que el piso del despliegue"
+                    },
+                    "ventana": {
+                      "type": "string",
+                      "enum": [
+                        "24h",
+                        "7d",
+                        "30d"
+                      ]
+                    },
+                    "ventanas": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "24h",
+                          "7d",
+                          "30d"
+                        ]
+                      }
+                    },
+                    "intervalo": {
+                      "type": "string"
+                    },
+                    "desde": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "hasta": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "ultimo_dato": {
+                      "type": "string",
+                      "format": "date-time",
+                      "nullable": true,
+                      "description": "Inicio del tramo de la lectura más reciente de lo publicado"
+                    },
+                    "tiempos": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer"
+                      },
+                      "description": "Segundos Unix, comunes a todas las series; solo los tramos que publican algún valor"
+                    },
+                    "magnitudes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "codigo",
+                          "nombre",
+                          "unidad",
+                          "ahora",
+                          "serie",
+                          "protegido",
+                          "zonas"
+                        ],
+                        "properties": {
+                          "codigo": {
+                            "type": "string"
+                          },
+                          "nombre": {
+                            "type": "string"
+                          },
+                          "unidad": {
+                            "type": "string"
+                          },
+                          "ahora": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "serie": {
+                            "type": "array",
+                            "items": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "description": "Un valor por cada uno de `tiempos`"
+                          },
+                          "protegido": {
+                            "type": "boolean",
+                            "description": "true si k > 1: algún tramo puede ocultarse para proteger a equipos individuales (depende solo de la configuración)"
+                          },
+                          "zonas": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "required": [
+                                "nombre",
+                                "ahora",
+                                "serie"
+                              ],
+                              "properties": {
+                                "nombre": {
+                                  "type": "string"
+                                },
+                                "ahora": {
+                                  "type": "number",
+                                  "nullable": true
+                                },
+                                "serie": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "number",
+                                    "nullable": true
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      }
+                    },
+                    "avisos": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Avisos para quien publica, por magnitud (con más de una con datos, cada aviso empieza por su nombre): k bajo, una zona de un equipo, lo deducible por resta, lo que saldrá sin valor"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Cuerpo inválido (como al crear)"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "403": {
+            "description": "Un perfil sin la acción «enlaces» (docs/20 §6), o sesión sin la cabecera X-Pedido: panel en lo que escribe"
+          },
+          "404": {
+            "description": "Sitio (o enlace) inexistente o de otro sitio"
+          },
+          "503": {
+            "description": "La consulta pasó su tiempo máximo o no hay cupo"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Vista previa de lo que verá quien visita (P9)",
+        "tags": [
+          "enlaces"
+        ]
+      }
+    },
+    "/sitios/{id}/enlaces/{enlace}/renovar": {
+      "post": {
+        "description": "Fija el vencimiento en hoy + `plazo_dias`, sin cambiar el token (el enlace ya compartido sigue sirviendo). Solo un enlace no revocado, vigente o vencido hace 30 días o menos y con menos de 365 días desde su creación; si no, 409 `codigo: no_renovable`. Si el plazo acorta el vencimiento, 409 `codigo: acorta` con `expira_en_actual` y `expira_en_nueva`, salvo que venga `acortar: true`. Responde el enlace con `expira_en_anterior` y `acorta`. Deja el evento `enlace_renovado`.",
+        "operationId": "EnlacesController_renovar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "UUID del sitio",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "enlace",
+            "required": true,
+            "in": "path",
+            "description": "UUID del enlace",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "plazo_dias"
+                ],
+                "properties": {
+                  "plazo_dias": {
+                    "type": "integer",
+                    "enum": [
+                      7,
+                      30,
+                      90,
+                      180
+                    ],
+                    "description": "Vence en hoy + plazo (por omisión 30); solo los plazos que no pasan PUBLICO_VENCIMIENTO_MAX_DIAS"
+                  },
+                  "acortar": {
+                    "type": "boolean",
+                    "description": "Confirma un plazo que acorta el vencimiento"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Enlace renovado"
+          },
+          "400": {
+            "description": "UUID o plazo inválidos"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "403": {
+            "description": "Un perfil sin la acción «enlaces» (docs/20 §6), o sesión sin la cabecera X-Pedido: panel en lo que escribe"
+          },
+          "404": {
+            "description": "Sitio (o enlace) inexistente o de otro sitio"
+          },
+          "409": {
+            "description": "`no_renovable` («Este enlace ya no se puede renovar. Crea uno nuevo.») o `acorta`"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Renovar un enlace (P9)",
+        "tags": [
+          "enlaces"
+        ]
+      }
+    },
+    "/sitios/{id}/enlaces/{enlace}": {
+      "delete": {
+        "description": "Revoca el enlace: no se deshace y corta en la petición siguiente (también con la respuesta guardada). La fila queda, revocada. Deja el evento `enlace_revocado`.",
+        "operationId": "EnlacesController_revocar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "UUID del sitio",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "enlace",
+            "required": true,
+            "in": "path",
+            "description": "UUID del enlace",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Enlace revocado"
+          },
+          "400": {
+            "description": "UUID inválido"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "403": {
+            "description": "Un perfil sin la acción «enlaces» (docs/20 §6), o sesión sin la cabecera X-Pedido: panel en lo que escribe"
+          },
+          "404": {
+            "description": "Sitio (o enlace) inexistente o de otro sitio"
+          },
+          "409": {
+            "description": "Ya estaba revocado"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Revocar un enlace (P9)",
+        "tags": [
+          "enlaces"
+        ]
+      }
     }
   },
   "info": {
     "title": "Registro, gestión y monitoreo de dispositivos IoT",
-    "description": "API del sistema: consulta (M5) y canal de tiempo real (SSE) para el panel; recepción de tramas por HTTP; administración (alta, baja, rotación de credenciales y calibración); sesión, usuarios y roles por sitio (M7). Salvo /salud, POST /sesion y la recepción, toda ruta exige la cookie `__Host-sesion` (o, mientras siga configurada, la cabecera X-Clave-Admin) y cada una responde solo con lo de los sitios del usuario; con sesión, las que escriben exigen además `X-Pedido: panel`. Todos los instantes en ISO 8601 UTC (sufijo Z); las agregaciones por día se calculan en la zona horaria del sitio. Rangos semiabiertos [desde, hasta).",
+    "description": "API del sistema: consulta (M5) y canal de tiempo real (SSE) para el panel; recepción de tramas por HTTP; administración (alta, baja, rotación de credenciales y calibración); sesión, usuarios y roles por sitio (M7). Salvo /salud, POST /sesion, GET /publico (con el token de su enlace) y la recepción, toda ruta exige la cookie `__Host-sesion` (o, mientras siga configurada, la cabecera X-Clave-Admin) y cada una responde solo con lo de los sitios del usuario; con sesión, las que escriben exigen además `X-Pedido: panel`. Todos los instantes en ISO 8601 UTC (sufijo Z); las agregaciones por día se calculan en la zona horaria del sitio. Rangos semiabiertos [desde, hasta).",
     "version": "0.1.0",
     "contact": {}
   },
@@ -3120,6 +4139,14 @@
     {
       "name": "usuarios",
       "description": "Usuarios y sus roles por sitio (HU-18, RF-43, RF-44)"
+    },
+    {
+      "name": "publico",
+      "description": "Vista pública por enlace, sin sesión: solo promedios de lo publicado (RF-62, HU-32)"
+    },
+    {
+      "name": "enlaces",
+      "description": "Enlaces públicos de un sitio y su vista previa (RF-62, HU-32)"
     }
   ],
   "servers": [],

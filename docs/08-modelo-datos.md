@@ -42,8 +42,11 @@ uniformidad es la que resuelve la causa C1 (formatos dispares).
 | 20 | **acceso** | Un intento de inicio de sesión o un cierre (RF-46): instante, usuario si existe, email intentado, IP, resultado (`ok`, `clave_incorrecta`, `bloqueado`, `inactivo`, `cierre`) y sesión | **Hypertable**, solo inserción, retención 90 días (`RETENCION_ACCESO_DIAS`, migración 22); desde la 24, `id` (desempate del cursor de la actividad del sitio) |
 | 21 | **preferencia** | Cómo quiere ver los datos una persona (HU-29, RF-56; `docs/19 §4`, H): unidades de temperatura y longitud, zona horaria («sitio» o una IANA), tema, tipos de condición con notificación, vistas guardadas y sitio por defecto | Una fila por persona (la clave es `usuario_id`), con `actualizado_en` y su disparador (bloqueo optimista de `PUT /preferencias`). La base sigue guardando la unidad estándar: solo cambia la visualización. Se borra con la baja (migración 24) |
 | 22 | **mensaje_soporte** | Un mensaje del formulario de soporte (RF-61, HU-31): texto de 1 a 2 000 caracteres, quién y cuándo; `leido_en` | Lo lee el administrador del sistema (`GET /soporte`, por cursor); se borra con la baja de la cuenta (migración 24) |
+| 23 | **enlace_publico** | Una vista publicada por enlace (RF-62, HU-32; `docs/19 §4`, O): sitio, magnitudes, ventana máxima, zonas publicadas con su nombre de entonces, título y descripción públicos, quién lo creó y cuándo, cuándo vence, la última renovación y la revocación | La base guarda el **SHA-256 del token** (`token_hash`, índice único), nunca el token; todo enlace vence (`expira_en` obligatorio, como mucho 180 días desde la creación o la renovación, por CHECK); la aplicación solo cambia el vencimiento, la renovación y la revocación, y un disparador no deja deshacer una revocación ni fechar en el futuro; pasados `retencion_dias` (31 a 365, 90 por omisión) desde que dejó de valer, su título, descripción y nombres de zona se anonimizan (`fn_anonimizar_enlaces_publicos`) y la fila queda. El tope de enlaces vivos de cada sitio, en `sitio.enlaces_publicos_max`, y el mínimo de dispositivos k de su vista pública, en `sitio.publico_minimo_dispositivos` (1 a 20; nulo = el del despliegue; la migración lo deja nulo en todos): k es del sitio, no de cada enlace (`enlace_publico.minimo_dispositivos` queda en desuso, con el valor que tenían los enlaces de antes; migración 25) |
+| 24 | **enlace_publico_acceso** | Cuántas veces se cargó la pantalla de un enlace, por día en la zona horaria del sitio | Sin direcciones ni nada de quien visita; el backend cuenta en memoria y suma una vez por minuto; las filas de más de 90 días las borra `fn_limpiar_accesos_publicos` (migración 25) |
+| 25 | **dispositivo_zona** | En qué zona estuvo cada dispositivo y desde cuándo (`desde`, `hasta`; `hasta` nulo = la zona actual) | La llena un disparador al crear el dispositivo y al cambiarle la zona (cierra la estadía abierta y abre otra, a la hora del reloj); la aplicación solo la lee. Las estadías de un equipo no se solapan (`EXCLUDE` con `btree_gist`) y no se borran en cascada (`ON DELETE RESTRICT` hacia `dispositivo` y `zona`). La vista pública atribuye cada lectura a la zona donde estaba el equipo cuando se tomó: mover un equipo no cambia el pasado de ninguna zona (`docs/19 §4`, O, punto 2). Al migrar, cada dispositivo entra con su zona actual desde `-infinity` (un cambio de zona anterior no quedó guardado; migración 25) |
 
-22 entidades (OE3 pide ≥ 8). Cinco son hypertables, particionadas por tiempo: `medicion` (la serie de tiempo),
+25 entidades (OE3 pide ≥ 8). Cinco son hypertables, particionadas por tiempo: `medicion` (la serie de tiempo),
 desde la migración 09 `trama` y `cuarentena`, desde la 13 `metrica_broker` y desde la 22 `acceso` (para borrar lo vencido por
 fragmentos enteros con `drop_chunks`). El resto son tablas relacionales normales de PostgreSQL.
 
@@ -63,6 +66,11 @@ erDiagram
     dispositivo ||--o{ cuarentena : cuarentena
     pasarela ||--o{ dispositivo : dispositivo
     zona ||--o{ dispositivo : dispositivo
+    dispositivo ||--o{ dispositivo_zona : dispositivo_zona
+    zona ||--o{ dispositivo_zona : dispositivo_zona
+    sitio ||--o{ enlace_publico : enlace_publico
+    usuario ||--o{ enlace_publico : enlace_publico
+    enlace_publico ||--o{ enlace_publico_acceso : enlace_publico_acceso
     dispositivo ||--o{ estado_dispositivo : estado_dispositivo
     dispositivo ||--o{ evento : evento
     usuario ||--o{ evento : evento
@@ -144,6 +152,36 @@ erDiagram
         text formato FK
         uuid pasarela_id FK
         text decodificador
+    }
+    dispositivo_zona {
+        uuid dispositivo_id PK,FK
+        uuid zona_id FK
+        timestamptz desde PK
+        timestamptz hasta
+    }
+    enlace_publico {
+        uuid id PK
+        uuid sitio_id FK
+        text token_hash
+        ARRAY magnitudes
+        text ventana_maxima
+        jsonb zonas
+        smallint minimo_dispositivos "deprecada"
+        text titulo
+        text descripcion
+        uuid creado_por FK
+        timestamptz creado_en
+        timestamptz expira_en
+        timestamptz renovado_en
+        timestamptz revocado_en
+        uuid revocado_por FK
+        smallint retencion_dias
+        timestamptz anonimizado_en
+    }
+    enlace_publico_acceso {
+        uuid enlace_id PK,FK
+        date dia PK
+        int cuenta
     }
     estado_dispositivo {
         uuid dispositivo_id PK,FK
@@ -246,6 +284,8 @@ erDiagram
         timestamptz actualizado_en
         bool activo
         text codigo
+        smallint enlaces_publicos_max
+        smallint publico_minimo_dispositivos
     }
     trama {
         uuid id PK

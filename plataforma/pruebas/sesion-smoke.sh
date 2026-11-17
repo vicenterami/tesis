@@ -4,7 +4,7 @@
 # otro sitio), los términos de uso (§12), la baja por anonimización (§11), la cuenta propia (preferencias, sesiones, exportar), el soporte y
 # la actividad del sitio (docs/19 §4, G, H y P11).
 #   bash plataforma/pruebas/sesion-smoke.sh
-# Requiere la pila arriba (backend en 127.0.0.1:3000 con las migraciones 22 a 24) y HTTP_CLAVE_ADMIN en plataforma/.env: con ella se crea el
+# Requiere la pila arriba (backend en 127.0.0.1:3000 con las migraciones 22 a 25) y HTTP_CLAVE_ADMIN en plataforma/.env: con ella se crea el
 # primer administrador (docs/20 §4), que crea a su vez un usuario de consulta. Datos de prueba propios y desechables: dos sitios
 # (A, el de las dos personas, y B, «otro sitio»), una zona, dos dispositivos HTTP y un canal en cada uno; correos @ejemplo.invalid
 # (dominio reservado, RFC 2606). Todo lo creado se borra al salir, también si algo falla (trap), con el dueño de la base.
@@ -56,6 +56,13 @@ CREATE TEMP TABLE u_prueba AS SELECT id FROM usuario WHERE email LIKE '%$dom'
   OR (anonimizado_en IS NOT NULL AND id IN (SELECT us.usuario_id FROM usuario_sitio us JOIN sitio s ON s.id = us.sitio_id WHERE s.codigo IN ('$sa', '$sb')));
 DELETE FROM preferencia WHERE usuario_id IN (SELECT id FROM u_prueba) OR sitio_predeterminado IN (SELECT id FROM sitio WHERE codigo IN ('$sa', '$sb'));
 DELETE FROM mensaje_soporte WHERE usuario_id IN (SELECT id FROM u_prueba);
+-- Enlaces públicos (migración 25; 17/11/2026): de los sitios de prueba o de sus personas, con su contador, antes que sitios y personas.
+CREATE TEMP TABLE e_prueba AS SELECT id FROM enlace_publico WHERE sitio_id IN (SELECT id FROM sitio WHERE codigo IN ('$sa', '$sb'))
+  OR creado_por IN (SELECT id FROM u_prueba) OR revocado_por IN (SELECT id FROM u_prueba);
+DELETE FROM evento WHERE tipo LIKE 'enlace_%' AND (detalle->>'enlace_id' IN (SELECT id::text FROM e_prueba)
+  OR detalle->>'sitio_id' IN (SELECT id::text FROM sitio WHERE codigo IN ('$sa', '$sb')));
+DELETE FROM enlace_publico_acceso WHERE enlace_id IN (SELECT id FROM e_prueba);
+DELETE FROM enlace_publico WHERE id IN (SELECT id FROM e_prueba);
 UPDATE usuario SET desactivado_por = NULL WHERE desactivado_por IN (SELECT id FROM u_prueba);
 DELETE FROM medicion WHERE canal_id IN (SELECT id FROM canal WHERE dispositivo_id IN (SELECT id FROM d_prueba));
 DELETE FROM condicion WHERE dispositivo_id IN (SELECT id FROM d_prueba);
@@ -67,6 +74,7 @@ DELETE FROM evento WHERE dispositivo_id IN (SELECT id FROM d_prueba) OR (tipo LI
                       OR usuario_id IN (SELECT id FROM u_prueba);
 DELETE FROM estado_dispositivo WHERE dispositivo_id IN (SELECT id FROM d_prueba);
 DELETE FROM canal WHERE dispositivo_id IN (SELECT id FROM d_prueba);
+DELETE FROM dispositivo_zona WHERE dispositivo_id IN (SELECT id FROM d_prueba) OR zona_id IN (SELECT id FROM zona WHERE sitio_id IN (SELECT id FROM sitio WHERE codigo IN ('$sa', '$sb')));
 DELETE FROM dispositivo WHERE id IN (SELECT id FROM d_prueba);
 DELETE FROM credencial WHERE pasarela_id IN (SELECT id FROM pasarela WHERE sitio_id IN (SELECT id FROM sitio WHERE codigo IN ('$sa', '$sb')));
 DELETE FROM pasarela WHERE sitio_id IN (SELECT id FROM sitio WHERE codigo IN ('$sa', '$sb'));
@@ -679,6 +687,31 @@ sig=$(pedir_cabecera adm "/sitios/$SITIO_A/actividad?limite=2" X-Siguiente); P1=
 caso "actividad: página 2 con el cursor" 200 adm GET "/sitios/$SITIO_A/actividad?limite=2&cursor=$sig"
 python3 -I -c "import sys,json,ast; a=ast.literal_eval(sys.argv[1]); b=[x['id'] for x in json.load(open(sys.argv[2]))]; sys.exit(0 if len(a)==2 and b and not set(a)&set(b) else 1)" "$P1" "$T/r" \
   && ok "actividad por cursor: la página 2 sigue a la 1 sin repetir" || falla "actividad por cursor: $P1 | $(head -c 200 "$T/r")"
+# ── 3f. Enlaces públicos (docs/20 §6, fila «Administrar los enlaces públicos»; docs/19 §4, O; 17/11/2026) ──────────────────────────────
+# Solo lo que no deja filas: la lista, la vista previa (no guarda nada) y lo que se rechaza. Crear, renovar y revocar contra una base real los
+# prueba pruebas/publico-integracion.sh, en una base desechable (docs/16 §79).
+caso "sin sesión: GET /sitios/{id}/enlaces → 401" 401 anon GET "/sitios/$SITIO_A/enlaces"
+for q in con inv ope; do caso "$q: GET /sitios/{id}/enlaces → 403" 403 "$q" GET "/sitios/$SITIO_A/enlaces"; done
+for q in con inv ope; do caso "$q: POST /sitios/{id}/enlaces/vista-previa con un cuerpo cualquiera → 403 (antes de mirar el cuerpo)" 403 "$q" POST "/sitios/$SITIO_A/enlaces/vista-previa" '{"basura":1}'; done
+caso "administrador: GET /sitios/{id}/enlaces → 200" 200 adm GET "/sitios/$SITIO_A/enlaces"
+caso "administrador, otro sitio: GET /sitios/{id}/enlaces → 404" 404 adm GET "/sitios/$SITIO_B/enlaces"
+caso "administrador del sistema: GET /sitios/{id}/enlaces del sitio B → 200" 200 sis GET "/sitios/$SITIO_B/enlaces"
+caso "administrador: POST /sitios/{id}/enlaces/vista-previa → 200 (no guarda nada)" 200 adm POST "/sitios/$SITIO_A/enlaces/vista-previa" '{"magnitudes":["temperatura"]}'
+caso "administrador: vista previa sin magnitudes → 400" 400 adm POST "/sitios/$SITIO_A/enlaces/vista-previa" '{"magnitudes":[]}'
+SIN_PEDIDO=1 caso "administrador: vista previa sin X-Pedido: panel → 403" 403 adm POST "/sitios/$SITIO_A/enlaces/vista-previa" '{"magnitudes":["temperatura"]}'
+caso "administrador: revocar un enlace que no existe → 404" 404 adm DELETE "/sitios/$SITIO_A/enlaces/00000000-0000-4000-8000-000000000000"
+caso "sin sesión: GET /publico sin token → 404 (la misma respuesta que un token inexistente)" 404 anon GET /publico
+for q in con inv ope; do caso "$q: GET /sitios/{id}/enlaces/tope → 403" 403 "$q" GET "/sitios/$SITIO_A/enlaces/tope"; done
+caso "administrador: GET /sitios/{id}/enlaces/tope → 200" 200 adm GET "/sitios/$SITIO_A/enlaces/tope"
+caso "administrador: PUT /sitios/{id}/enlaces/tope fuera del techo → 400" 400 adm PUT "/sitios/$SITIO_A/enlaces/tope" '{"max_enlaces":100000}'
+caso "administrador: PUT /sitios/{id}/enlaces/tope → 200 (el sitio de prueba se borra al salir)" 200 adm PUT "/sitios/$SITIO_A/enlaces/tope" '{"max_enlaces":5}'
+# El k de la vista pública es del sitio (tercera revisión del 17/11/2026): solo su administrador lo lee y lo fija, de 1 a 20.
+for q in con inv ope; do caso "$q: PUT /sitios/{id}/enlaces/minimo → 403" 403 "$q" PUT "/sitios/$SITIO_A/enlaces/minimo" '{"minimo_dispositivos":5}'; done
+caso "administrador: GET /sitios/{id}/enlaces/minimo → 200" 200 adm GET "/sitios/$SITIO_A/enlaces/minimo"
+caso "administrador, otro sitio: PUT /sitios/{id}/enlaces/minimo → 404" 404 adm PUT "/sitios/$SITIO_B/enlaces/minimo" '{"minimo_dispositivos":5}'
+caso "administrador: PUT /sitios/{id}/enlaces/minimo con 21 → 400" 400 adm PUT "/sitios/$SITIO_A/enlaces/minimo" '{"minimo_dispositivos":21}'
+caso "administrador: PUT /sitios/{id}/enlaces/minimo → 200 (el sitio de prueba se borra al salir)" 200 adm PUT "/sitios/$SITIO_A/enlaces/minimo" '{"minimo_dispositivos":5}'
+caso "administrador: crear un enlace con minimo_dispositivos → 400 (k es del sitio)" 400 adm POST "/sitios/$SITIO_A/enlaces" '{"titulo":"Con k","magnitudes":["temperatura"],"minimo_dispositivos":3}'
 # Reactivar (revisión del 11/11/2026): una baja hecha por el administrador del sistema solo la deshace el alcance global, y toda
 # reactivación trae una clave temporal nueva (la de antes no vuelve).
 M=$(marca "$INV_ID")

@@ -1,0 +1,7 @@
+{
+  // Las pruebas de integración (fuera de src/: no entran a la imagen ni a `pnpm test`) se revisan con los mismos tipos y el mismo lint que
+  // el código: `pnpm typecheck` y `pnpm lint` las incluyen (package.json).
+  "extends": "../tsconfig.json",
+  "compilerOptions": { "rootDir": "..", "noEmit": true },
+  "include": ["./**/*.ts", "../src/**/*.ts"]
+}

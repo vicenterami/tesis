@@ -4,7 +4,7 @@ Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emu
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
 cubría al escribirse se agregó después: TT-32 (sensor físico) en §43, §44 y §53, y TT-30 (recuperación ante reinicio) en §11. El
-contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 747 pruebas unitarias del backend y 404 del panel.
+contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 824 pruebas unitarias del backend y 404 del panel.
 Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -3920,3 +3920,208 @@ guardia es un guion con código de salida; la condición `respaldo_atrasado` del
 simulacro descifra en memoria: con un volcado del tamaño de la memoria libre habrá que descifrar a un disco cifrado; con los tamaños de
 hoy (16 MB con millón y medio de filas) sobra. Un `kill -9` deja en el contenedor de la base la huella y la marca de esa corrida (conteos,
 sin filas) hasta que el contenedor se recrea. Perder la clave privada es perder los respaldos: por eso se recomiendan dos destinatarios.
+
+## 79. Vista pública por enlace: base, backend y proxy (17/11/2026)
+
+**Por qué.** La vista pública (RF-62, HU-32; diseño en `docs/19 §4`, O) es lo único que ve alguien sin cuenta y lo único que responde a
+cualquier persona de internet que tenga un enlace. Lo que había que demostrar antes de construir las pantallas: que solo viajan
+promedios, que la regla de k se aplica cada vez que se sirve (también cuando un equipo se da de baja después de publicar), que lo oculto
+no se despeja por resta, que revocar corta de inmediato aunque la respuesta esté guardada, que mil visitas no son mil consultas y que el
+token no queda en ningún registro.
+
+**Qué se construyó.** La migración 25 (`enlace_publico`, con el SHA-256 del token y un índice único, la retención de su texto y un
+disparador que no deja deshacer una revocación ni fechar en el futuro; `enlace_publico_acceso`, el contador sin direcciones;
+`sitio.enlaces_publicos_max` y `sitio.publico_minimo_dispositivos`, el tope y el k que fija el administrador; `dispositivo_zona`, la
+historia de zonas de cada equipo, por disparador; `fn_limpiar_accesos_publicos` y `fn_anonimizar_enlaces_publicos`, desde
+la retención; permisos de la aplicación sin DELETE); el módulo `backend/src/publico/` (`GET /publico`, la lista, crear, renovar, revocar,
+el tope, el k del sitio y la vista previa, que arma la respuesta con la misma función y trae los avisos para quien publica; la respuesta guardada con
+espera compartida, que guarda también un cálculo que pasó el tiempo máximo; los cupos de lo público y de la vista previa; el contador; los
+eventos y su rama en la actividad); la zona `publico` del proxy con su 429 en JSON, y las escrituras de los enlaces en la zona de
+administración. Lo decidido al implementar y lo que decidió la persona el mismo día, en `docs/19 §4`, O, al final del bloque.
+
+**Revisión del mismo día.** Tres revisiones independientes (seguridad, concordancia y privacidad) encontraron, entre otras cosas, que la
+regla de la resta escrita al principio («se oculta el total si exactamente una zona publicada quedó oculta») dejaba despejar una zona no
+publicada, dos zonas ocultas o la combinación de dos enlaces; que «ahora» y la serie promediaban poblaciones distintas; que lo oculto y lo
+vacío se distinguían tramo a tramo; y que un cálculo que vencía el tiempo no se guardaba. Se corrigió primero el diseño (punto 2 y «Decidido
+al implementar») y después el código; cada corrección tiene su prueba con la falla plantada (abajo).
+
+**Segunda revisión del mismo día** (seguridad, intentando romper las correcciones). (1) Dos enlaces del mismo sitio con k distinto
+despejaban un equipo: la regla de la resta usaba el k de cada enlace, y una zona oculta en el de k mayor podía salir publicada en el otro
+(zonas de 3, 1 y 10 equipos; k = 3 con la de 3 y la de 10; k = 4 sin zonas: 14·T − 3·A − 10·E = B). Ahora «oculta en todas partes» es la
+zona con menos que el menor k de los enlaces vivos del sitio, y ese k entra a la clave de lo guardado. (2) Mover un equipo de zona
+reescribía la historia de la zona nueva: cuentan solo sus lecturas desde el cambio (`dispositivo.zona_desde`, por disparador); la zona de
+origen todavía pierde su historia, y eso queda propuesto para decidir (abajo). (3) `protegido` dependía de lo oculto en la ventana: ahora
+solo de k > 1; `ultimo_dato` va redondeado al inicio de su tramo. (4) El tiempo máximo valía por sentencia (3 × 5 s): ahora es del cálculo
+entero, en una transacción de solo lectura, y la espera en la fila del cupo también tiene tope. (5) Título y descripción rechazan las
+categorías Unicode Cc y Cf y U+2028–U+2029. (6) La aplicación inserta solo en las columnas que escribe; el disparador exige que `creado_en`
+sea la hora de la creación y que una revocación se feche al hacerla. (7) Los avisos cuentan los mismos equipos que la vista. (8) El OpenAPI
+declara el máximo real de k (20). (9) El 429 del proxy suma `X-Content-Type-Options: nosniff`.
+
+**Tercera revisión del mismo día** (seguridad, sobre las correcciones de la segunda). (1) El menor k de los enlaces vivos no alcanzaba:
+dos enlaces de magnitudes o ventanas distintas (temperatura con A y E, k = 3; humedad sin zonas, k bajo) vuelven a armar 14·T − 3·A −
+10·E = B. Decidido: **k es del sitio** (`sitio.publico_minimo_dispositivos`, 1 a 20, 3 por omisión, nunca menos que el piso al servir),
+lo fija su administrador (`GET`/`PUT /sitios/{id}/enlaces/minimo`, evento `enlace_minimo`) y bajarlo responde con el aviso «afecta a
+todos los enlaces públicos de este sitio» y lo deducible; los enlaces ya no llevan k. (2) La marca `zona_desde` dejaba sin historia a la
+zona de origen y cambiaba el total: comparar la vista de antes y la de después de mover un equipo lo despejaba (10·T_antes − 9·T_después).
+Decidido: **cada lectura cuenta en la zona donde estaba el equipo cuando se tomó** (`dispositivo_zona`, que llena un disparador; la
+aplicación solo la lee), en la serie, en «ahora» y en los avisos. Al construirlo apareció otro caso: en el tramo del cambio el equipo
+aportaba a las dos zonas y el total lo contaba dos veces (dos equipos pasaban por tres); ahora cada canal aporta una vez por tramo, con su
+estadía más reciente (en la revisión final, la más antigua: ver abajo). (3) El disparador de `enlace_publico` comparaba «no futuro» con `now()`, la hora del inicio de la transacción:
+ahora con el reloj (`clock_timestamp()`, con 5 s de margen); y un enlace revocado o anonimizado ya no cambia su vencimiento ni su
+renovación; un enlace anonimizado no se sirve. (4) El plazo del cálculo lo vigila también el reloj del proceso: una conexión que no
+responde se suelta con error (sin `ROLLBACK`, que también colgaría) y no deja tomado el cupo; el plazo cuenta desde antes de la fila del
+cupo. (5) Título y descripción usan la regla de `recepcion/texto.ts` (`\p{C}`, `\p{Z}` y los caracteres de relleno, salvo el espacio y el
+salto de línea en la descripción), el título exige al menos una letra o un número y no se aceptan cuatro marcas combinantes seguidas.
+
+**Revisión final del mismo día** (seguridad; confirmó la regla de k por sitio y la historia de zonas y, fuera de los riesgos declarados, no
+encontró combinaciones que despejen). Lo que dejó, verificado y corregido: (1) la migración copiaba en el k del sitio el menor de los
+enlaces no revocados, incluidos los vencidos, muertos y anonimizados (un enlace k = 1 vencido habría bajado el k de todo el sitio, hacia
+atrás y sin rastro): ahora **empieza sin fijar** (rige el de omisión) y, en una base con la versión anterior, un k que nadie fijó (sin
+evento `enlace_minimo`) y menor que 3 vuelve a sin fijar; (2) en el tramo del cambio ganaba la estadía más reciente, así que mover un
+equipo cambiaba el tramo en curso, ya servido, de la zona de origen (4·Z₁ − 3·Z₂): ahora gana la **más antigua** y el equipo entra a la de
+destino desde el tramo siguiente; (3) los avisos contaban la unión de las magnitudes: ahora cuentan **por magnitud**, como la regla, y con
+más de una magnitud con datos cada aviso dice de cuál es; (4) la historia de zonas se borraba en cascada con el dispositivo o la zona:
+ahora `ON DELETE RESTRICT` (la aplicación no borra ni uno ni otro; los guiones de prueba y la semilla de demostración borran antes la
+historia); (5) nada impedía estadías solapadas: ahora un `EXCLUDE` con `btree_gist` (está en la imagen de la base), y la población de
+«ahora» parte de las estadías en zonas del sitio, sin el filtro redundante que tenía; (6) el disparador de la historia fechaba con
+`now()` y reconocía «el mismo cambio en la misma transacción» por esa hora: ahora fecha con el reloj y lo reconoce por el `xmin` de la
+estadía abierta, y el cierre nunca queda antes del inicio (dos transacciones a la vez ya no violan el CHECK); (7) un fallo al pedir la
+conexión que no era el vencimiento se guardaba como consulta lenta y se perdía: ahora queda en el registro y sigue como error, y el
+`ROLLBACK` tras un error también tiene tope; (8) bajar `PUBLICO_MINIMO_DISPOSITIVOS` baja el k de los sitios sin fijar sin rastro: es
+responsabilidad del operador (`docs/19 §4`, O, punto 2) y, si es menor que 3, el backend lo dice en el registro al arrancar; (9) textos
+viejos del código y del OpenAPI («el menor k de los enlaces», «el k elegido» por enlace).
+
+**Pruebas sin base** (`pnpm verificar`, en `backend/src/publico/`): 71 pruebas en cinco archivos, más 6 en archivos que ya existían (la
+rama de la actividad, con `enlace_tope` y `enlace_minimo`, la retención, el `X-Robots-Tag` y la versión de la privacidad).
+
+| Qué se prueba | Dónde | Falla plantada (debe fallar) |
+|---|---|---|
+| La regla de k: un valor de menos de k dispositivos sale sin valor, igual que uno sin datos; un tramo con solo valores ocultos no entra al eje | `publico.spec.ts` | publicar con n ≥ 1; dejar en el eje los tramos con solo ocultos |
+| La resta: una zona no publicada, dos zonas ocultas y dos enlaces del mismo sitio dejan oculto el total; con los ocultos sumando k, se publica | `publico.spec.ts` | la regla anterior («exactamente una zona publicada») |
+| El k que rige nunca baja del piso vigente; k sube hasta 20 | `publico.spec.ts`, `vista-publica.spec.ts` | usar el k del enlace sin el piso |
+| Ninguna columna de más llega a la respuesta (n, mínimo, máximo, identificadores, nombres) | `publico.spec.ts`, `vista-publica.spec.ts` | (filas de la base con esas columnas: no deben aparecer) |
+| Ausente, repetido, mal formado e inexistente: la misma 404; una ventana inválida con un token que no vale es 404 | `vista-publica.spec.ts` | — |
+| Revocar corta en la petición siguiente aunque la respuesta siga guardada | `vista-publica.spec.ts` | mirar lo guardado antes de validar |
+| Cien pedidos simultáneos de una clave: un cálculo; un cálculo que venció el tiempo se guarda y las peticiones siguientes reciben 503 sin consultar | `memoria.spec.ts`, `vista-publica.spec.ts` | sin la espera compartida; sin guardar el fallo |
+| Con el cupo público lleno, 503 sin tocar la base, y el histórico del sitio (Tendencias) sigue respondiendo | `vista-publica.spec.ts` | — |
+| El contador cuenta cargas, no refrescos; si el volcado falla, lo contado vuelve | `vista-publica.spec.ts` | contar también los refrescos |
+| Solo `GET /publico` lee `X-Enlace-Publico`: en el código, en el OpenAPI y en la guardia central | `aislamiento.spec.ts` | una guardia que lea la cabecera |
+| Quién puede (la fila de enlaces de `docs/20 §6`), el 403 antes del cuerpo, la lista de vivos y el tope | `enlaces.spec.ts` | — |
+| Crear (el token una vez, a la base su resumen; el k y los avisos en el evento), el tope del sitio con su número, renovar y revocar | `enlaces.spec.ts`, `publico.spec.ts` | — |
+| k es del sitio: enlaces de temperatura con A y E y de humedad sin zonas, en ventanas distintas, ocultan lo mismo (con un k por enlace de 4, el total saldría); el k del sitio entra a la clave de lo guardado y rige en la petición siguiente; un enlace no trae k (400) | `publico.spec.ts`, `vista-publica.spec.ts`, `enlaces.spec.ts` | servir sin el k del sitio; aceptar `minimo_dispositivos` en el enlace |
+| `protegido` depende solo de k > 1 | `publico.spec.ts`, `vista-publica.spec.ts` | calcularlo con lo oculto de la ventana |
+| El plazo es del cálculo entero: cada consulta recibe lo que queda y, si ya no queda, 503 sin consultar; la espera en el cupo tiene tope | `vista-publica.spec.ts`, `memoria.spec.ts` | el plazo por sentencia; la espera sin tope |
+| Título y descripción con la regla de `recepcion/texto.ts`: sin `\p{C}`, `\p{Z}` (salvo el espacio y, en la descripción, el salto de línea) ni rellenos; el título con al menos una letra o un número; sin cuatro marcas combinantes seguidas | `publico.spec.ts` | aceptar U+202E; el filtro anterior (sin Cf); un título sin letra ni número |
+| Una conexión que no responde: el reloj del proceso la da por vencida (503), la suelta con error y sin `ROLLBACK`, y el cupo queda libre | `vista-publica.spec.ts` | sin el tope del lado del proceso |
+| Fijar el k del sitio: quién puede, del piso a 20, el evento `enlace_minimo` y los avisos («afecta a todos los enlaces públicos de este sitio») | `enlaces.spec.ts`, `publico.spec.ts`, `actividad.spec.ts` | — |
+| Los avisos cuentan por magnitud: una zona con 3 equipos de temperatura y 1 de humedad avisa por la humedad, con su nombre | `publico.spec.ts` | contar la unión de las magnitudes |
+| Sin conexión por otra causa que el plazo: no es consulta lenta, no se guarda y queda en el registro; un `ROLLBACK` que no vuelve tiene tope | `vista-publica.spec.ts` | tratar todo fallo de conexión como lento; el `ROLLBACK` sin tope |
+| Un k de omisión menor que 3 queda dicho en el registro al arrancar | `vista-publica.spec.ts` | sin el aviso |
+| Los avisos para quien publica; vivo y muerto; la retención del texto entre 31 y 365 días | `publico.spec.ts` | — |
+
+Fallas plantadas sin base, en tres tandas el mismo día: la guardia que lee la cabecera, contar los refrescos, quitar la resta en «ahora» y
+olvidar el piso dieron 6 de 50 en rojo; publicar con n ≥ 1, mirar lo guardado antes de validar y quitar la espera compartida, 4 de 50; ya
+con la regla nueva, aceptar U+202E, dejar en el eje los tramos con solo ocultos y no guardar el fallo por tiempo, 3 de 55; y la regla de la
+resta anterior más la guardia que lee la cabecera, 5 de 55; y, tras la segunda revisión, el k del enlace en vez del menor del sitio,
+`protegido` calculado con lo oculto, el filtro sin Cf, el plazo por sentencia y la espera sin tope, 7 de 63; y, tras la tercera, servir
+sin el k del sitio (2 de 66), aceptar `minimo_dispositivos` en el enlace (1), un título sin letra ni número (1) y sin el tope del lado del
+proceso (2: la conexión colgada y el cupo lleno); y, tras la revisión final, tratar como lento todo fallo de conexión (1 de 70), el
+`ROLLBACK` sin tope (1), sin el aviso del k de omisión (1) y los avisos con la unión de las magnitudes (1). Cada vez, las que debían;
+quitadas, todas en verde.
+
+**Contra una base real** (`bash plataforma/pruebas/publico-integracion.sh`): levanta una base desechable con la imagen de la plataforma y
+todas las migraciones, solo en 127.0.0.1 y con claves generadas al vuelo; compila el backend; los servicios entran con el rol de la
+aplicación, como en la pila. Siembra un sitio con tres zonas (tres, tres y un equipo; después una cuarta, Este, con uno y luego dos), 26
+horas de temperatura cada 300 s y dos lecturas extremas que nunca deben verse; y un segundo sitio con zonas A, B y E de 3, 1 y 10 equipos
+para los enlaces combinados y el equipo movido. Resultado: **57 de 57 comprobaciones** (tres corridas seguidas). Entre ellas: con
+un equipo oculto en el sitio, el total no se publica, tampoco en un enlace que no publica esa zona ni en dos enlaces de una zona cada uno;
+con dos zonas ocultas que suman 2, tampoco; con los ocultos sumando k (1 + 2), el total se publica y es, tramo a tramo, el de
+`GET /sitios/{id}/historico` (289 tramos); un equipo en mantenimiento que reporta cuenta igual en «ahora» y en la serie; una zona de tres a
+la que se le da de baja un equipo deja de publicarse sin tocar el enlace; una zona creada después no aparece y una renombrada conserva su
+nombre; la vista previa y la del visitante dan los mismos números; inexistente, mal formado, ausente, vencido y revocado, la misma 404;
+renovar a los 29 días sirve, a los 31, revocado o con más de un año, 409; cien visitas simultáneas hacen **1** cálculo y **100** lecturas por
+el índice; el contador suma 101 cargas desde dos procesos; el tope que fija el administrador rige, con su número en el 409, y ni un
+revocado ni un vencido hace 31 días ocupan lugar; un enlace muerto hace más de su plazo queda con su texto anonimizado y la actividad lo
+sigue nombrando; bajar el k del sitio a 1 avisa que afecta a todos sus enlaces y rige en la petición siguiente de un enlace ya creado, y
+queda en la actividad con quién; la vista previa avisa lo que un visitante podría deducir; una revocación no se deshace ni se fecha nada en
+el futuro, tampoco por el dueño, un enlace nace ahora, una revocación se fecha al hacerla y un revocado no cambia su vencimiento; renovar y
+revocar a la vez no chocan con el disparador; un enlace anonimizado no se sirve; la aplicación no puede borrar, cambiar el resumen ni
+insertar `creado_en`; con k = 3 en el sitio, ni el enlace de A y E (24 h) ni el del total (24 h y 7 días) publican el total; con k = 4, A
+se oculta en todos y el total sale; con k = 4, mover un equipo de E a A deja el total del enlace sin desglose **idéntico tramo a tramo**
+antes y después (24 h y 7 días), y la serie de E y la de A (oculta) también; el disparador cierra la estadía en E y abre otra en A, y la
+aplicación no puede escribir ni borrar `dispositivo_zona`; en el tramo del cambio, con una lectura del equipo justo antes y otra justo
+después, ningún total cuenta más que los 14 equipos del sitio, y el tramo en curso, ya servido, de la zona de origen y del total es
+idéntico antes y después del cambio (el equipo entra a la de destino en el tramo siguiente); dos transacciones que mueven el mismo equipo
+(la segunda empezada antes de que la primera confirme) dejan dos estadías contiguas, y dos cambios en una transacción, una sola; la base
+no acepta estadías solapadas ni borra en cascada la historia de un dispositivo o de una zona, tampoco para el dueño; los avisos de una
+vista de temperatura y humedad cuentan cada magnitud (Sur: 1 equipo con humedad, aviso; 3 con temperatura, sin aviso); y, con la
+aplicación compilada entera en un puerto efímero,
+**114 pares de peticiones** a las rutas del OpenAPI responden igual con y sin un `X-Enlace-Publico` válido. **Fallas plantadas:** publicar
+con n ≥ 1 (5 en rojo), mirar lo guardado antes de validar (2), sin la espera compartida (1: 21 cálculos en vez de 1), la regla de la resta
+anterior, «ahora» con otra población y una guardia que lee la cabecera (6 en rojo, entre ellas el aislamiento) y contar los enlaces no
+revocados en vez de los vivos (2 en rojo); y, tras la segunda revisión, el k del enlace en vez del menor del sitio, sin el filtro de
+`zona_desde` y sin la regla de `creado_en` al insertar (3 de 46 en rojo: k 3 y 4, el equipo movido y la fecha de creación; k 3 y 2 sigue en
+verde también con la regla anterior, porque ahí los dos k ocultan lo mismo); y, tras la tercera, atribuir cada lectura a la zona actual
+del equipo (2 de 53 en rojo: el total y las zonas antes y después de mover el equipo), contar el equipo movido en las dos zonas del tramo
+del cambio (1: un total de 15 equipos en un sitio de 14), servir sin el k del sitio (4: el k que rige en la petición siguiente, k = 4 y el
+equipo movido) y el disparador sin la regla de los revocados con `vigente()` sin mirar `anonimizado_en` (2); y, tras la revisión final,
+la estadía más reciente en el tramo del cambio con los avisos por la unión de las magnitudes (2 de 57 en rojo: el tramo en curso, donde el
+total pasó a sin valor, y los avisos de humedad), y el disparador con `now()` con la historia en cascada y sin `EXCLUDE` (2: la segunda
+transacción violó `ck_dispositivo_zona_intervalo`, y el dueño insertó una estadía solapada y borró una zona con historia). Una corrida
+intermedia dio en rojo el tramo en curso sin falla plantada: la lectura del equipo quedaba fechada en el mismo milisegundo que el `hasta`
+de la vista de antes y no entraba; se corrigió la prueba (la lectura, un segundo antes), no el código.
+
+**Costo de la historia de zonas** (`EXPLAIN ANALYZE` dentro de la prueba de integración, mediana de cinco corridas, con su siembra: 14
+equipos con una lectura cada 300 s durante 26 h): la serie pública del sitio de los enlaces combinados tarda 12,9 ms en 24 h (tramos de 5
+min) y 3,2 ms en 7 días (tramos de una hora), frente a 6,8 ms y 2,8 ms del histórico del sitio (`SQL_HISTORICO_SITIO`) sobre los mismos
+datos: cerca del doble en 24 h, por la unión por intervalo y el paso que deja un aporte por canal y tramo (tras la revisión final, igual:
+12,9 a 13,1 ms y 3,3 a 3,4 ms en tres corridas). Es una siembra chica: el costo con
+120 y 2 000 dispositivos es parte de la medición del punto 13, pendiente.
+
+**La migración.** Antes de la tercera revisión: aplicada dos veces seguidas sobre una base con datos (la de la semilla de demostración) y con la 14 reejecutada después:
+sin errores, los permisos se conservan y las convenciones del esquema siguen en 7 de 7. En una base nueva con las 25 migraciones, el paso 2
+del verificador da 25 líneas OK y la base tiene 24 tablas. **Reaplicable sobre la versión anterior de la 25** (la que ya tiene la base de
+la pila): en una base desechable con las migraciones 01 a 24, la 25 anterior, la semilla y un enlace, la 25 nueva se aplicó dos veces y la
+14 después, sin errores; el esquema (`pg_dump -s`) y los permisos de la aplicación quedan iguales a los de una base nueva (salvo los
+comentarios de una función que la 14 reescribe, como antes), el enlace existente conserva sus valores y todo dispositivo queda con
+`zona_desde = -infinity` (ninguna lectura deja de contar); el paso 2 del verificador, 25 de 25. **Tras la tercera revisión, reaplicable
+sobre las dos versiones anteriores** (la primera, sin retención ni marca de zona, y la segunda, con `zona_desde`, la que tiene la base de la
+pila): en bases desechables con las migraciones 01 a 24, la 25 vieja y datos (dos sitios; en uno, tres equipos, dos enlaces vivos con k 5
+y 4 y uno revocado con k 2, y un equipo movido), la 25 nueva se aplicó dos veces sin errores; el esquema (`pg_dump -s`) y los 477 permisos
+de la aplicación quedan iguales a los de una base nueva, y siguen iguales tras reejecutar la 14 y la 25; el sitio con enlaces queda con k =
+4 (el menor de los no revocados) y el otro sin fijar (el del despliegue); `zona_desde` desaparece; cada equipo tiene su estadía abierta,
+desde `-infinity`, salvo el que la versión segunda había marcado como movido, que entra desde esa hora (sus lecturas de antes siguen sin
+contar, como hasta entonces); un cambio de zona posterior deja dos filas; la columna `enlace_publico.minimo_dispositivos` queda en desuso,
+con sus valores (la migración es aditiva: no se borra); el paso 2 del verificador, 25 de 25 en las dos. **Tras la revisión final,
+reaplicable sobre las tres versiones anteriores** (la tercera es la que tiene hoy la base de la pila), con los mismos datos más un enlace
+k = 1 vencido hace 45 días en el primer sitio, un sitio con un enlace k = 4, y, en la tercera, un sitio cuyo k fijó su administrador en 2
+(con su evento) y la 25 de esa versión reaplicada con los enlaces puestos (como en la pila, copia el menor k: 1 en el primer sitio, 4 en
+el otro): la 25 nueva se aplicó dos veces sin errores en las tres; el esquema y los 477 permisos, iguales a los de una base nueva (también
+tras reejecutar la 14 y la 25); el k de todos los sitios queda sin fijar en la primera y la segunda, y en la tercera el 1 copiado vuelve a
+sin fijar, el 4 copiado se conserva y el 2 del administrador también; el paso 2, 25 de 25. Con la copia de antes plantada, el primer
+sitio queda con k = 1, el del enlace vencido. En la base nueva, la semilla de demostración (la básica y la completa dos veces) se aplica
+sin errores con la historia en `RESTRICT`: 12 dispositivos, 12 estadías.
+
+**El proxy** (`bash plataforma/pruebas/publico-proxy.sh`, un nginx desechable con la imagen y la plantilla del proxy y un backend de
+prueba): **6 de 6 comprobaciones**. Tras una primera petición, 80 simultáneas a `/publico` desde una dirección dan 60 con 200 y 20 con 429;
+el 429 va en JSON, sin caché, sin indexar, con `nosniff` y con HSTS; 30 `POST` seguidos a la vista previa de un sitio, 11 pasan y 19 reciben 429 (zona de
+administración); 30 lecturas de la lista de enlaces, ninguna limitada; el registro guarda la ruta `/publico` y nunca el token.
+
+**Cifras.** `pnpm verificar` del backend: tipos (175 archivos de `src/` y la prueba de integración) y lint (176) sin errores; 824 pruebas
+unitarias del backend en 67 archivos, todas en verde (747 antes del bloque); el panel no cambió (404 del panel). El
+contrato OpenAPI pasa a 47 rutas y 59 operaciones (`GET`/`PUT /sitios/{id}/enlaces/minimo`). La página de privacidad, a la versión 2. La
+figura del modelo de datos, regenerada desde una base desechable con las 25 migraciones: 25 entidades, con `dispositivo_zona`.
+
+**Lo que falta y lo que no se midió.** Las dos pantallas, la revisión por capturas y la medición del punto 13 (120 y 2 000 dispositivos, 6
+magnitudes y 5 zonas, el peso de la pantalla): hasta entonces los cupos y la zona del proxy son provisorios. El banco no se corrió.
+**Riesgo aceptado y dicho** (`docs/19 §4`, O, punto 2): la diferenciación en el tiempo y entre ventanas sigue abierta; la historia de
+zonas empieza con la migración (un cambio de zona anterior no quedó guardado).
+
+**Contra la pila, con la versión final** (respaldo de la base antes; la migración 25 y la 14 reaplicadas sobre la base con datos, que ya
+tenía la segunda versión de la 25; pila y proxy reconstruidos): `/salud` con 25 tablas; `generar-figuras.sh` regeneró la figura del modelo
+de datos; `sesion-smoke.sh` **437 de 437** (con los casos de los enlaces y del k del sitio); `api-smoke.sh` TODO OK (47 rutas y 59
+operaciones servidas, iguales a las versionadas); y el verificador completo en «TODO EN CONCORDANCIA». Lo mismo se había corrido, también
+en verde, sobre la primera y la segunda versión del bloque. **Después de la revisión final** la migración 25 cambió otra vez (k sin
+fijar, `RESTRICT`, `EXCLUDE` con `btree_gist`, el disparador de la historia) y los guiones `sesion-smoke.sh`, `panel-sesion-e2e.sh`,
+`banco/historico-sitio.sh` y la semilla completa borran la historia antes que los dispositivos y zonas: falta reaplicar la 25 y la 14 a
+la base de la pila (probado arriba sobre la versión que tiene) y volver a correr esos guiones y el verificador contra ella.

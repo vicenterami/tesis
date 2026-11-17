@@ -16,7 +16,7 @@
 - **Sin terceros en el camino de los datos** (RNF-20): ni el navegador ni el servidor envían datos de personas ni mediciones a otro.
 - **Lo que se muestra sale de aquí.** La página de privacidad, la de términos y la ayuda de «Mi cuenta» citan este inventario.
 
-## 2. Inventario de datos personales (al 11/11/2026)
+## 2. Inventario de datos personales (al 17/11/2026)
 | Dato | Dónde | Para qué | Cuánto tiempo | Quién accede |
 |---|---|---|---|---|
 | Nombre | `usuario.nombre` (1–80 caracteres) | Identificar a la persona en el panel, en la lista de usuarios y en la auditoría | Mientras exista la cuenta; con la baja, un marcador derivado del id (`docs/20 §11`) | La persona; los administradores de sus sitios; el administrador del sistema |
@@ -34,6 +34,9 @@
 | Quién hizo el cambio (la persona que dio de alta, configuró, calibró, rotó o dio de baja) | `evento.usuario_id` (migración 23; nulo = el sistema) | Saber quién hizo qué sobre cada equipo (HU-11; «registrado por N» en la ficha) | La de `evento`, que hoy no se borra; tras la baja de la cuenta queda el marcador anonimizado de `docs/20 §11`, no el nombre | El nombre lo ven solo los administradores de ese sitio y el administrador del sistema (`GET /dispositivos/{id}/eventos`); los demás perfiles reciben `usuario: null` (decidido el 11/11/2026) |
 | Preferencias (unidades de visualización, zona horaria, tema, notificaciones, vistas guardadas) | `preferencia` (migración 24) | Mostrar los datos como la persona eligió | Hasta la baja por anonimización (una cuenta solo desactivada los conserva) | La persona |
 | Mensajes de soporte (texto, cuenta que lo envía, instante) | `mensaje_soporte` (migración 24; RF-61) | Atender la consulta | Hasta la baja por anonimización (una cuenta solo desactivada los conserva) | La persona; el administrador del sistema |
+| Dirección IP completa de quien visita la vista pública por enlace | Registros del proxy, como la de cualquier petición. El contador `enlace_publico_acceso` (migración 25) guarda solo enlace, día y cuenta: **ninguna dirección** ni identificador de quien visita; la ruta `GET /publico` no entra en `auditoria`; la pantalla del visitante (pendiente) no usará cookies ni cargará nada de terceros (`docs/19 §4`, O, punto 9) | Contar cuántas veces se vio un enlace; el límite de tasa y el diagnóstico (el registro del proxy) | El contador, 90 días (`fn_limpiar_accesos_publicos`); el registro del proxy, con la misma rotación por tamaño que el resto de sus registros | El administrador de sitio ve el conteo de su enlace; quien opera el servidor, los registros |
+| Título, descripción, nombre del sitio y nombres de zona publicados en un enlace (texto libre; el título hasta 80 caracteres y la descripción hasta 300) | `enlace_publico.titulo`, `enlace_publico.descripcion` y `enlace_publico.zonas` (los nombres de zona fijados al publicar; migración 25), y `sitio.nombre` | Decirle al visitante qué está viendo | Título, descripción y nombres de zona: hasta `retencion_dias` después de que el enlace deja de valer (90 días por omisión, de 31 a 365, lo elige el administrador del sitio al publicar); después se anonimizan (`fn_anonimizar_enlaces_publicos`) y la fila queda para la actividad. El nombre del sitio, mientras exista el sitio | **Cualquiera que tenga el enlace**, sin cuenta, mientras el enlace valga. La pantalla de publicar (pendiente) avisará junto a esos campos: «Este texto lo verá cualquiera con el enlace: sin nombres de personas ni datos personales», y que el nombre del sitio y los de zona también se verán |
+| Quién creó y quién revocó cada enlace, y cuándo; quién fijó el tope de enlaces y el mínimo de dispositivos de la vista pública del sitio | `enlace_publico.creado_por`, `creado_en`, `revocado_por` y `revocado_en` (migración 25) y los eventos `enlace_creado`, `enlace_renovado`, `enlace_revocado`, `enlace_tope` y `enlace_minimo` | Saber quién publicó qué y cuándo (RF-46) | La de `evento`, que hoy no se borra; tras la baja de la cuenta queda el marcador anonimizado de `docs/20 §11` | Los administradores del sitio (en la lista de enlaces y en la actividad del sitio, P14) y el administrador del sistema |
 | Todo lo anterior | Respaldos de la base (`docs/10 §9.5`) | Recuperar ante la pérdida del disco o un borrado | 30 días (retención de los respaldos); cifrados en reposo desde la iteración 1 | Quien opera el servidor, con la clave del cifrado fuera de él |
 
 **Lo que no se guarda.** Ninguna clave (solo su hash; la temporal se muestra una vez); ningún identificador de sesión (solo su
@@ -42,15 +45,7 @@ hash); ningún correo ni nombre en los registros de la aplicación; en los error
 (RNF-19): se guardan el código, el mensaje acotado, la ruta sin parámetros de consulta, la versión y el identificador de la petición.
 La prueba que lo demuestra planta un error cuyo mensaje lleva un correo y comprueba que la fila guardada no lo tiene.
 
-**Previsto para la Etapa 4, aún sin construir (diseño del 16/11/2026: la vista pública por enlace, `docs/19 §4`, O).** Estas filas no están
-en el inventario de arriba porque la página de privacidad se genera de él y no debe describir lo que todavía no existe; pasan a la tabla
-de arriba, y al código que la refleja, cuando se construya la vista.
-
-| Dato | Dónde | Para qué | Cuánto tiempo | Quién accede |
-|---|---|---|---|---|
-| Dirección IP completa de quien visita la vista pública por enlace (diseño del 16/11/2026, Etapa 4; `docs/19 §4`, O) | Registros del proxy, como la de cualquier petición. El contador de accesos de `enlace_publico_acceso` guarda solo enlace, día y cuenta: **ninguna dirección** ni identificador de quien visita; la ruta `GET /publico` (Etapa 4) no entra en `auditoria`, y la pantalla no usa cookies ni carga nada de terceros | Contar cuántas veces se vio un enlace; el límite de tasa y el diagnóstico (el registro del proxy) | El contador, 90 días; el registro del proxy, lo mismo que la fila de arriba (rotación por tamaño) | El administrador de sitio ve el conteo de su enlace; quien opera el servidor, los registros |
-| Título y descripción públicos de un enlace (diseño del 16/11/2026, Etapa 4; texto libre de hasta 80 y 300 caracteres) | `enlace_publico` | Decirle al visitante qué está viendo | Mientras exista la fila del enlace | **Cualquiera que tenga el enlace**, sin cuenta. El formulario avisa junto al campo: «Este texto lo verá cualquiera con el enlace: sin nombres de personas ni datos personales» |
-| Quién creó y quién revocó cada enlace, y cuándo (diseño del 16/11/2026, Etapa 4) | `enlace_publico` (`creado_por` y quién lo revocó; nombres por fijar en la migración) y los eventos `enlace_creado`, `enlace_renovado` y `enlace_revocado` | Saber quién publicó qué y cuándo (RF-46) | La de `evento`, que hoy no se borra; tras la baja de la cuenta queda el marcador anonimizado de `docs/20 §11` | Los administradores del sitio (en la actividad del sitio, P14) y el administrador del sistema |
+Las tres filas de la vista pública por enlace se sumaron el 17/11/2026, con la migración 25 (privacidad, versión 2).
 
 ## 3. Terceros
 **Hoy: ninguno en el camino de los datos de personas ni de las mediciones.**

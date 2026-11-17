@@ -23,6 +23,8 @@ const TEXTOS_EVENTO: Readonly<Record<string, (d: string) => string>> = {
 // Eventos sin dispositivo (corrección del 11/11/2026): `o` es el nombre de la pasarela o de la persona sobre la que se hizo, o null.
 const p = (o: string | null): string => (o === null ? 'una pasarela' : `la pasarela «${o}»`);
 const c = (o: string | null): string => (o === null ? 'una cuenta' : `la cuenta de «${o}»`);
+// Enlaces públicos (docs/19 §4, O, punto 4): `o` es el título del enlace (público por definición), o null.
+const e = (o: string | null): string => (o === null ? 'un enlace público' : `el enlace público «${o}»`);
 const TEXTOS_SIN_DISPOSITIVO: Readonly<Record<string, (o: string | null) => string>> = {
   pasarela_alta: (o) => `dio de alta ${p(o)}`,
   pasarela_baja: (o) => `dio de baja ${p(o)}`,
@@ -32,6 +34,9 @@ const TEXTOS_SIN_DISPOSITIVO: Readonly<Record<string, (o: string | null) => stri
   usuario_baja: () => 'se dio de baja (cuenta anonimizada)',
   usuario_clave: () => 'cambió su clave',
   terminos_aceptados: () => 'aceptó los términos de uso',
+  enlace_creado: (o) => `publicó ${e(o)}`,
+  enlace_renovado: (o) => `renovó ${e(o)}`,
+  enlace_revocado: (o) => `revocó ${e(o)}`,
 };
 const TEXTOS_ACCESO: Readonly<Record<string, string>> = {
   ok: 'entró al sistema',
@@ -43,6 +48,16 @@ const TEXTOS_ACCESO: Readonly<Record<string, string>> = {
 
 export function textoActividad(clase: ClaseActividad, tipo: string, dispositivo: string | null, detalle?: unknown, objeto: string | null = null): string {
   if (clase === 'acceso') return TEXTOS_ACCESO[tipo] ?? `acceso: ${tipo}`;
+  // El tope de enlaces públicos del sitio (decidido el 17/11/2026): el número sale del detalle, solo si es un entero.
+  if (tipo === 'enlace_tope') {
+    const n = (detalle as { max_enlaces?: unknown } | undefined)?.max_enlaces;
+    return Number.isInteger(n) ? `fijó en ${String(n)} el tope de enlaces públicos del sitio` : 'cambió el tope de enlaces públicos del sitio';
+  }
+  // El k de la vista pública del sitio (decidido el 17/11/2026, tras la tercera revisión).
+  if (tipo === 'enlace_minimo') {
+    const n = (detalle as { minimo_dispositivos?: unknown } | undefined)?.minimo_dispositivos;
+    return Number.isInteger(n) ? `fijó en ${String(n)} el mínimo de dispositivos de la vista pública del sitio` : 'cambió el mínimo de dispositivos de la vista pública del sitio';
+  }
   const sin = dispositivo === null ? TEXTOS_SIN_DISPOSITIVO[tipo] : undefined;
   if (sin !== undefined) return sin(objeto);
   const d = dispositivo === null ? 'un dispositivo' : `«${dispositivo}»`;

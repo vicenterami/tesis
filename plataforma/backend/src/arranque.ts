@@ -146,9 +146,16 @@ export function rutaSinCache(ruta: string): boolean {
 // `Cache-Control: no-store` (rutaSinCache; revisión del 08/11/2026): una sola regla en vez de repetirla ruta por ruta. Una ruta puede
 // pisarla después (el canal en vivo pone la suya, también sin caché). main.ts la monta primero, para que valga también en los rechazos
 // que se dan antes de leer el cuerpo.
+// `X-Robots-Tag: noindex` en todo `/panel/` y en `GET /publico` (docs/19 §4, O, punto 9; 17/11/2026): la vista pública se comparte por un
+// enlace, no se busca; un buscador que llegara a una dirección compartida no la indexa. Sin distinguir mayúsculas, como Express.
+export function rutaSinIndexar(ruta: string): boolean {
+  return /^\/(panel|publico)(\/|$)/i.test(ruta);
+}
 export function cabecerasDeLaApi(req: { path?: string; url?: string }, res: { setHeader(k: string, v: string): unknown }, next: () => void): void {
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
-  if (rutaSinCache(req.path ?? (req.url ?? '').split('?')[0] ?? '')) res.setHeader('Cache-Control', 'no-store');
+  const ruta = req.path ?? (req.url ?? '').split('?')[0] ?? '';
+  if (rutaSinCache(ruta)) res.setHeader('Cache-Control', 'no-store');
+  if (rutaSinIndexar(ruta)) res.setHeader('X-Robots-Tag', 'noindex');
   next();
 }
 

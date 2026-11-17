@@ -22,7 +22,9 @@ export interface FilaActividad {
 // Los eventos SIN dispositivo también (corrección del 11/11/2026: antes se perdían): las pasarelas del sitio (`pasarela_*`, por
 // `detalle.pasarela_id`), las cuentas de personas que están o estuvieron en él (`usuario_*`, por `detalle.usuario_id`: las mismas que ve en
 // su lista de usuarios, así se ve también la baja o el sitio quitado) y los términos que aceptaron quienes tienen membresía activa
-// (`terminos_aceptados`, por quien lo hizo). El nombre de esa pasarela o de esa persona va en `objeto`, solo para el texto.
+// (`terminos_aceptados`, por quien lo hizo). El nombre de esa pasarela o de esa persona va en `objeto`, solo para el texto. Desde el
+// 17/11/2026, los enlaces públicos del sitio (`enlace_*`, por `detalle.enlace_id` y el sitio de la fila del enlace, no el del detalle), con
+// su título como `objeto` (docs/19 §4, O, punto 4); y el tope y el k de la vista pública del sitio (`enlace_tope`, `enlace_minimo`, por `detalle.sitio_id`).
 @Injectable()
 export class ActividadService {
   constructor(@Inject(POOL) private readonly pool: Pool) {}
@@ -42,16 +44,19 @@ export class ActividadService {
              AND ($4::text IS NULL OR e.tipo = $4) AND ($5::uuid IS NULL OR e.usuario_id = $5)
              AND ($6::timestamptz IS NULL OR (e.ocurrido_en, e.id) < ($6::timestamptz, $7::uuid))
           UNION ALL
-          SELECT e.id, e.ocurrido_en, 'evento', e.tipo, e.detalle, e.usuario_id, NULL, NULL, coalesce(pa.nombre, pe.nombre)
+          SELECT e.id, e.ocurrido_en, 'evento', e.tipo, e.detalle, e.usuario_id, NULL, NULL, coalesce(pa.nombre, pe.nombre, ep.titulo)
             FROM evento e
             LEFT JOIN pasarela pa ON starts_with(e.tipo, 'pasarela_') AND pa.id::text = e.detalle->>'pasarela_id'
             LEFT JOIN usuario pe ON starts_with(e.tipo, 'usuario_') AND pe.id::text = e.detalle->>'usuario_id'
+            LEFT JOIN enlace_publico ep ON starts_with(e.tipo, 'enlace_') AND ep.id::text = e.detalle->>'enlace_id'
            WHERE e.dispositivo_id IS NULL AND e.ocurrido_en >= $2 AND e.ocurrido_en < $3
              AND ($4::text IS NULL OR e.tipo = $4) AND ($5::uuid IS NULL OR e.usuario_id = $5)
              AND ($6::timestamptz IS NULL OR (e.ocurrido_en, e.id) < ($6::timestamptz, $7::uuid))
              AND ((starts_with(e.tipo, 'pasarela_') AND pa.sitio_id = $1)
                OR (starts_with(e.tipo, 'usuario_') AND pe.id IN (SELECT us.usuario_id FROM usuario_sitio us WHERE us.sitio_id = $1))
-               OR (e.tipo = 'terminos_aceptados' AND e.usuario_id IN (SELECT us.usuario_id FROM usuario_sitio us WHERE us.sitio_id = $1 AND us.activo)))
+               OR (e.tipo = 'terminos_aceptados' AND e.usuario_id IN (SELECT us.usuario_id FROM usuario_sitio us WHERE us.sitio_id = $1 AND us.activo))
+               OR (starts_with(e.tipo, 'enlace_') AND ep.sitio_id = $1)
+               OR (e.tipo IN ('enlace_tope', 'enlace_minimo') AND e.detalle->>'sitio_id' = $1::text))
           UNION ALL
           SELECT a.id, a.instante, 'acceso', a.resultado, NULL, a.usuario_id, NULL, NULL, NULL
             FROM acceso a

@@ -116,6 +116,11 @@ services:
       TOPE_LECTURAS_MINIMO:
       TOPE_CUARENTENA_HORA:
       CLAVE_TEMPORAL_HORAS:                       # vigencia de la clave temporal de personas, 1–72 h; 2 por defecto (docs/20 §4)
+      PUBLICO_MINIMO_DISPOSITIVOS:                # vista pública por enlace (docs/19 §4, O): k de un sitio que no lo fijó (3), su piso (1), el vencimiento
+      PUBLICO_MINIMO_DISPOSITIVOS_PISO:           # máximo (180 días), los enlaces por sitio (50) y su techo (200); sin valor aquí, el del código
+      PUBLICO_VENCIMIENTO_MAX_DIAS:
+      PUBLICO_MAX_ENLACES_POR_SITIO:
+      PUBLICO_MAX_ENLACES_TECHO:
       RESPONSABLE_NOMBRE:                         # responsable de la instancia y su contacto, para privacidad, términos y soporte (docs/21 §6); vacíos, las páginas lo dicen
       RESPONSABLE_CONTACTO:
       CODIGO_FUENTE_URL:                          # enlace al código fuente que exige la AGPL en «Acerca de» (docs/19 P11)

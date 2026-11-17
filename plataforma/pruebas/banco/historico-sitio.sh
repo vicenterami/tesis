@@ -39,6 +39,7 @@ DELETE FROM medicion WHERE canal_id IN (SELECT c.id FROM canal c JOIN dispositiv
 DELETE FROM estado_dispositivo WHERE dispositivo_id IN (SELECT id FROM dispositivo WHERE id_fisico LIKE 'm7-%');
 DELETE FROM condicion WHERE dispositivo_id IN (SELECT id FROM dispositivo WHERE id_fisico LIKE 'm7-%');
 DELETE FROM canal WHERE dispositivo_id IN (SELECT id FROM dispositivo WHERE id_fisico LIKE 'm7-%');
+DELETE FROM dispositivo_zona WHERE dispositivo_id IN (SELECT id FROM dispositivo WHERE id_fisico LIKE 'm7-%');
 DELETE FROM dispositivo WHERE id_fisico LIKE 'm7-%';
 INSERT INTO sitio (codigo, nombre, zona_horaria) VALUES ('m7-promedio', 'Banco: promedio por dispositivos', 'America/Santiago') ON CONFLICT (codigo) DO NOTHING;
 INSERT INTO zona (sitio_id, nombre) SELECT id, 'Casos de M7' FROM sitio WHERE codigo = 'm7-promedio' ON CONFLICT (sitio_id, nombre) DO NOTHING;

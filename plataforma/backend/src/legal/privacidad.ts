@@ -4,8 +4,10 @@
 // página lo dice en vez de mostrar un contacto inventado. Ningún dato personal vive en el código.
 import { INVENTARIO, FilaInventario } from './inventario.js';
 
-export const PRIVACIDAD_VERSION = 1;
-export const PRIVACIDAD_FECHA = '2026-11-11';
+// Versión 2 (17/11/2026): el inventario suma los datos de la vista pública por enlace (docs/21 §2). Sube cuando cambian los datos que se
+// guardan; los términos, solo si cambia su texto (decidido el 17/11/2026).
+export const PRIVACIDAD_VERSION = 2;
+export const PRIVACIDAD_FECHA = '2026-11-17';
 export const MAX_RESPONSABLE = 200;
 
 export interface Responsable { nombre: string; contacto: string }

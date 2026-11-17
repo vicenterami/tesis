@@ -57,7 +57,7 @@ función que lo calcula es una sola, con prueba unitaria por cada fila de la tab
 | P6 | **Configurar dispositivo y canales** | Nombre, estado (activo / mantenimiento), intervalo esperado, zona; por canal, etiqueta, umbral alto, umbral bajo, histéresis y retardo de activación | Guardar con bloqueo optimista; validación en vivo (bajo < alto, histéresis dentro de la banda, rango de la magnitud) | `PATCH /dispositivos/{id}`, `PUT /canales/{id}/reglas` (Etapa 4), fijadas el 11/11/2026 (§4 tablero v2, E) | HU-06, HU-13, RF-14, punto 28 | Etapa 4, iteración 1 (exige sesión) |
 | P7 | **Alta de dispositivo** (asistente) | Paso 1 identidad y zona; paso 2 vía y formato (y pasarela si LoRaWAN); paso 3 canales y magnitudes; paso 4 credencial según la vía, mostrada una sola vez; paso 5 «esperando la primera trama» en vivo | Crear; copiar la credencial y el tópico; subir un CSV, validarlo y crear las filas válidas; dar de alta un emisor detectado | `POST /dispositivos` (API hecha el 12/10, HU-11, `docs/16 §20`); `POST /dispositivos/lote?modo=validar\|crear` y `GET /cuarentena/detectados` (Etapa 4), fijadas el 11/11/2026 (§4 tablero v2, F) | RF-50, HU-11, HU-22, punto 25 | API: Etapa 3; pantalla, lote y detectados: Etapa 4, iteración 1 |
 | P8 | **Exportar** | Dispositivo (hoy) o sitio (Etapa 4), rango, formato (CSV, XLSX, JSON); tamaño estimado antes de descargar | Descargar | Hecho el 12/10 por dispositivo: `GET /dispositivos/{id}/exportar?formato=csv\|json&desde&hasta` (flujo por tandas; CSV estándar con coma y punto decimal para R, Python y QGIS). **Propuesta** para la Etapa 4: `GET /sitios/{id}/exportar` con rol y XLSX | RF-34, HU-08 (adelantada a la Etapa 3 el 12/10) | API: Etapa 3; pantalla, XLSX y por sitio: Etapa 4 |
-| P9 | **Vista pública por enlace** (diseñada el 16/11/2026, §4 bloque O) | Para quien visita sin cuenta: solo los promedios de las magnitudes que un administrador publicó (del sitio y, si lo eligió, de cada zona), nunca el mínimo ni el máximo; un valor sale oculto si lo aportan menos de k dispositivos. Para el administrador, «Publicar una vista» con vista previa y la lista de enlaces | Visitante: cambiar la ventana y pausar la actualización. Administrador: crear (con vencimiento), renovar y revocar | `GET /publico` (Etapa 4; token en la cabecera `X-Enlace-Publico`) y `POST /sitios/{id}/enlaces/vista-previa` (Etapa 4); crear, listar, renovar y revocar enlaces, con rutas por fijar en el OpenAPI (§4, O) | RF-62, HU-32, punto 6 | Etapa 4, iteración 1 |
+| P9 | **Vista pública por enlace** (diseñada el 16/11/2026, §4 bloque O) | Para quien visita sin cuenta: solo los promedios de las magnitudes que un administrador publicó (del sitio y, si lo eligió, de cada zona), nunca el mínimo ni el máximo; un valor sale oculto si lo aportan menos de k dispositivos. Para el administrador, «Publicar una vista» con vista previa y la lista de enlaces | Visitante: cambiar la ventana y pausar la actualización. Administrador: crear (con vencimiento), renovar y revocar | `GET /publico` (token en la cabecera `X-Enlace-Publico`) y `POST /sitios/{id}/enlaces/vista-previa`; crear y listar, `GET`/`POST /sitios/{id}/enlaces`, renovar, `POST /sitios/{id}/enlaces/{enlace}/renovar`, revocar, `DELETE /sitios/{id}/enlaces/{enlace}`, y el tope de enlaces y el k del sitio, `GET`/`PUT /sitios/{id}/enlaces/tope` y `GET`/`PUT /sitios/{id}/enlaces/minimo`, fijadas en el OpenAPI el 17/11/2026 (§4, O) | RF-62, HU-32, punto 6 | Etapa 4, iteración 1 |
 | P10 | **Sesión y usuarios** | Entrar, cambio de la clave temporal, salir; quién soy en la cabecera; usuarios de mis sitios, su perfil por sitio y la guía de perfiles (cinco desde el 08/11/2026, diseño: `docs/20 §6`) | Entrar, cambiar la clave, salir o cerrar en todos lados; dar de alta (clave temporal una vez), activar y desactivar, asignar una temporal, cambiar el rol | `POST /sesion`, `GET /sesion`, `DELETE /sesion`, `POST /sesion/clave`, `GET /usuarios`, `POST /usuarios`, `PATCH /usuarios/{id}` (`docs/20`) | RF-43, RF-44, HU-18 | Etapa 4; hecha el 08/11/2026 (§4) |
 | P11 | **Legal y acerca de** (Etapa 4) | Privacidad (generada desde `docs/21`), términos de uso con su versión, avisos de terceros, versión y commit, aviso AGPL; soporte: contacto del responsable y formulario | Leer; aceptar los términos (obligatorio al primer ingreso y al cambiar la versión); enviar un mensaje de soporte | `GET /terminos`, `POST /terminos/aceptar`, `GET /privacidad`, `GET /acerca` (versión y commit solo con sesión), `POST /soporte` y `GET /soporte` (Etapa 4); los avisos de terceros, un archivo generado al cambiar dependencias | RF-53, RF-54, RF-61, HU-27, HU-31 | Iteración 0; hecha el 11/11/2026 |
 | P12 | **Estado del sistema** (solo administrador del sistema; Etapa 4) | Recursos por contenedor en el tiempo (memoria frente a su techo, CPU), errores agrupados por huella, último respaldo y su antigüedad, condiciones del sistema abiertas; límites de los servicios | Ver el detalle de un error; ajustar un límite con bloqueo optimista | `GET /salud` y rutas nuevas sobre `metrica_recurso`, `error_sistema` y los límites (Etapa 4; `docs/10 §8.4` puntos 60 y 61) | RF-59, RF-60, RNF-19, HU-30 | Iteración 1 |
@@ -937,6 +937,8 @@ archivo), «Descargar la plantilla», «Volver a revisar» (lleva a la tabla de 
     después el panel (lector, revisión, descargas); al final el lector de XLSX, que no bloquea lo anterior, y la revisión por capturas.
 
 **O. P9 Vista pública por enlace: lo que ve quien visita sin cuenta (cambia `docs/20 §7`, la fila P9 de §3 y de §7, y `docs/10 §8.4` punto 6; diseñado el 16/11/2026, antes del código, y revisado el mismo día: 15 objeciones, todas atendidas en este texto).**
+✅ base, backend y proxy, 17/11/2026 (migración 25, `backend/src/publico/`, la zona `publico` de `proxy/nginx.conf`; probado en `docs/16 §79`); las dos
+pantallas y la medición del punto 13, pendientes. Lo decidido al implementar va al final del bloque, después del punto 14.
 Quien pidió esta vista (entrevista del 05/10) quiere una vista de lectura para estudiantes, **sin datos crudos**. La regla que ordena
 todo el bloque: **el visitante ve solo promedios de lo que un administrador decidió publicar, la regla que protege a cada equipo se
 aplica cada vez que se sirve y no solo al publicar, y nada más responde a ese enlace.**
@@ -948,24 +950,54 @@ aplica cada vez que se sirve y no solo al publicar, y nada más responde a ese e
    en el histórico del sitio son la lectura real de un equipo (`consulta/tablero.ts`, `min(x.valor)` y `max(x.valor)`), y eso es un dato
    crudo. **Nunca** viajan: tramas, lecturas sueltas, extremos, identificadores físicos, nombres de dispositivos o de pasarelas,
    coordenadas, condiciones, eventos, personas, ni exportación.
-2. **Un valor se publica solo si lo aportan al menos k dispositivos, y eso se comprueba al servir.** k es del enlace: **3 por omisión**;
-   quien publica puede bajarlo a 2 o a 1, con el aviso «con 1, el promedio es la lectura de ese equipo», y la lista de enlaces lo
-   muestra. El valor por omisión y el mínimo que se puede elegir son parámetros del despliegue (`PUBLICO_MINIMO_DISPOSITIVOS`, 3, y
-   `PUBLICO_MINIMO_DISPOSITIVOS_PISO`, 1), que fija el administrador del sistema: una instancia puede prohibir publicar equipos
-   solos. Cada tramo de cada serie (del
-   sitio y de cada zona) y cada valor de «ahora» sale **sin valor** cuando lo aportan menos de k dispositivos, con el texto «datos de
-   menos de k dispositivos»: un equipo que se da de baja, calla o cambia de zona después de publicar no deja al descubierto a los que
-   quedan. Para que lo oculto no se despeje por resta, en un tramo donde **exactamente una** zona quedó oculta se oculta también el total
-   del sitio. El número exacto de dispositivos no viaja: la vista dice «promedio de k o más dispositivos». Una zona creada después de
-   publicar no aparece, y una renombrada conserva el nombre publicado, hasta que el administrador publique de nuevo.
+2. **Un valor se publica solo si lo aportan al menos k dispositivos, y eso se comprueba al servir.** **k es del sitio, no del enlace**
+   (decidido el 17/11/2026, tras la tercera revisión): todos los enlaces de un sitio ocultan lo mismo. Si cada enlace tuviera su k,
+   combinar enlaces con k, magnitudes o ventanas distintas despejaría promedios de menos de k (una zona oculta en uno y publicada en otro,
+   restada de un total). k lo fija el administrador del sitio (`GET`/`PUT /sitios/{id}/enlaces/minimo`, con su evento en la actividad), de 1
+   a 20; mientras no lo fije rige `PUBLICO_MINIMO_DISPOSITIVOS` (3), y al servir nunca baja del piso del despliegue
+   (`PUBLICO_MINIMO_DISPOSITIVOS_PISO`, 1: una instancia puede prohibir publicar equipos solos). **Bajar el valor por omisión es
+   responsabilidad del operador** (revisión final del 17/11/2026): rige en todo sitio que no fijó el suyo, y ese cambio no deja evento en
+   su actividad; por eso, si es menor que 3, el backend lo dice en el registro cada vez que arranca. Al bajarlo, la respuesta avisa que «afecta a
+   todos los enlaces públicos de este sitio» y lo que un visitante podría deducir; con 1, el promedio es la lectura de ese equipo. Cada tramo
+   de cada serie (del sitio y de cada zona) y cada valor de «ahora» sale **sin valor** cuando lo aportan menos de k dispositivos: un equipo
+   que se da de baja o calla después de publicar no deja al descubierto a los que quedan. **Lo oculto y lo que no tiene datos se ven
+   igual**, tramo a tramo (un hueco): si se distinguieran, cada hueco «oculto» diría cuándo reportó un equipo solo. La vista lleva el aviso
+   «algunos tramos se ocultan para proteger a equipos individuales» siempre que k sea mayor que 1, haya o no algo oculto ahora: depende
+   solo de la configuración (segunda revisión del 17/11/2026; si dependiera de lo oculto en la ventana, su cambio delataría cuándo reporta
+   un grupo chico). **Que lo oculto no se despeje por resta:** con el k del sitio, una zona con entre 1 y k−1 equipos se oculta en todo
+   enlace, y el total del sitio de un tramo (y el de «ahora») se publica solo si los equipos de esas zonas —todas las del sitio, publicadas
+   o no— suman 0 o al menos k. Así cualquier combinación de lo publicado, en uno o en varios enlaces, son grupos de k o más equipos: zonas
+   grandes enteras o la unión de las chicas. (Lo que se probó antes y no alcanzaba, en `docs/16 §79`: «exactamente una zona publicada
+   oculta», que dejaba despejar una zona no publicada o dos ocultas; y el menor k de los enlaces del sitio, que no cubría enlaces con
+   magnitudes o ventanas distintas.) El conteo de cada zona se calcula en la consulta y nunca viaja: la vista dice «promedio de k o más
+   dispositivos». La respuesta guardada lleva el k del sitio en su clave: cambiarlo rige en la petición siguiente, en todas las instancias.
+   **Cada lectura cuenta en la zona donde estaba el equipo cuando se tomó** (decidido el 17/11/2026, tras la tercera revisión): una tabla
+   `dispositivo_zona` guarda en qué zona estuvo cada dispositivo y desde cuándo, la llena un disparador al crearlo y al cambiarle la zona
+   (o el sitio, que va con la zona) a la hora del reloj, y la aplicación no la escribe; las estadías de un equipo no se solapan, y la
+   historia no se borra en cascada con el dispositivo o la zona. Mover un equipo no cambia el pasado de ninguna zona ni del total: si
+   las lecturas siguieran a la zona actual, comparar la serie de antes y la de después despejaría al equipo movido (en su zona de origen,
+   en la de destino o en el total: 10·T_antes − 9·T_después = D). En el tramo del cambio el equipo aporta una sola vez, en la zona
+   de **origen** (revisión final del 17/11/2026; sus lecturas de ese tramo posteriores al cambio no cuentan, y entra a la de destino desde
+   el tramo siguiente): contarlo en las dos inflaría el conteo, y dos equipos pasarían por tres frente a k = 3; y si contara en la de
+   destino, el tramo en curso de la zona de origen, ya servido, cambiaría y comparar su valor de antes y el de después despejaría al
+   equipo (4·Z₁ − 3·Z₂). Cada equipo aporta a lo más una vez por tramo, y el total es la unión de las zonas, que es lo que la regla de la
+   resta necesita. **La misma población en la serie y en
+   «ahora»**: las dos promedian los dispositivos con lectura vigente (la regla del bloque M) en la zona donde se tomó, sin mirar su estado
+   visual; si «ahora» dejara fuera a un equipo en mantenimiento y la serie no, la diferencia entre las dos despejaría su lectura.
+   **Riesgo aceptado y dicho: la diferenciación en el tiempo y entre ventanas.** Si de un tramo al siguiente, de «ahora» al último tramo
+   o de una ventana a otra el conjunto que aporta pasa de k+1 a k equipos, comparar los dos promedios publicados acota la lectura del que
+   salió o entró. No se mitiga redondeando (la vista dejaría de coincidir con el histórico del sitio, que es su definición): lo acotan k y
+   que la vista solo publica promedios. Una zona creada después de publicar no aparece, y una renombrada conserva el nombre publicado,
+   hasta que el administrador publique de nuevo.
 3. **El administrador ve antes exactamente lo que verá el visitante.** La pantalla «Publicar una vista» (en la configuración del sitio)
    dibuja la vista con los datos reales mientras se eligen las magnitudes y el desglose. Usa la ruta de vista previa
-   (`POST /sitios/{id}/enlaces/vista-previa` (Etapa 4), con la acción `enlaces`), que arma la respuesta con **la misma función** que
-   `GET /publico` (Etapa 4), incluida la regla de k: lo que hoy saldría oculto se ve oculto, con su motivo. Muestra los nombres de zona tal como
-   saldrán. Al crear, el enlace se muestra **una sola vez**, con «Copiar».
+   (`POST /sitios/{id}/enlaces/vista-previa`, con la acción `enlaces`), que arma la respuesta con **la misma función** que
+   `GET /publico`, incluida la regla de k del sitio: lo que hoy saldría oculto se ve como lo verá el visitante, un hueco con el aviso de
+   la magnitud. Muestra el nombre del sitio y los de zona tal como saldrán, y los avisos de lo que un visitante podría deducir. Al crear, el enlace se muestra **una sola vez**, con «Copiar».
 4. **El enlace, su vencimiento y su renovación.** Un token aleatorio de 32 bytes (como el de la sesión, `docs/20 §3`); la base guarda
    su resumen SHA-256, nunca el token, con índice único. Tablas (`docs/20 §2`): `enlace_publico` —sitio, magnitudes, ventana máxima,
-   zonas publicadas (identificador y nombre publicado), k, título (hasta 80 caracteres) y descripción (hasta 300) públicos, quién lo
+   zonas publicadas (identificador y nombre publicado), título (hasta 80 caracteres) y descripción (hasta 300) públicos (k es del sitio,
+   punto 2), quién lo
    creó y cuándo, **cuándo vence** (obligatorio), cuándo se revocó y por quién— y `enlace_publico_acceso` (enlace, día, cuenta). **Todo
    enlace vence:** al crearlo se elige 7, 30, 90 o 180 días (una actividad, un mes, un trimestre, un semestre; 30 por omisión); el
    máximo es un parámetro del despliegue (`PUBLICO_VENCIMIENTO_MAX_DIAS`, 180 por omisión; cuando exista la pantalla de límites del
@@ -973,50 +1005,56 @@ aplica cada vez que se sirve y no solo al publicar, y nada más responde a ese e
    cambiar el token** (el enlace ya compartido sigue sirviendo), y avisa si con eso lo acorta. Se renueva un enlace vigente o uno vencido
    hace **30 días o menos**; pasado ese plazo, o un año desde su creación, se crea otro. **Riesgo aceptado y dicho:** renovar un vencido
    vuelve a servir una dirección que ya circuló; por eso tiene plazo, y por eso existe revocar, que no se deshace. Un sitio admite hasta
-   10 enlaces no revocados (`PUBLICO_MAX_ENLACES_POR_SITIO`; es un tope de administración, no de seguridad: una lista que una persona
-   puede revisar). Crear, renovar y revocar generan los eventos `enlace_creado`, `enlace_renovado` y `enlace_revocado`, con el sitio en
+   un tope de enlaces (`PUBLICO_MAX_ENLACES_POR_SITIO`; es un tope de administración, no de seguridad: una lista que una persona puede
+   revisar; **decidido el 17/11/2026:** lo fija el administrador del sitio y cuentan solo los enlaces vivos, al final del bloque). Crear, renovar y revocar generan los eventos `enlace_creado`, `enlace_renovado` y `enlace_revocado`, con el sitio en
    su detalle, y la actividad del sitio (P14) los muestra con quién y cuándo.
 5. **El token no queda en ningún registro, tampoco en los del propio panel.** La dirección que se comparte lleva el token en el
    fragmento (`…/panel/#/v/<token>`): el navegador no envía el fragmento al servidor ni lo pone en la cabecera de procedencia. El panel
-   pide los datos a `GET /publico` (Etapa 4) con el token en la cabecera `X-Enlace-Publico`, no en la ruta ni en la consulta: el proxy y
+   pide los datos a `GET /publico` con el token en la cabecera `X-Enlace-Publico`, no en la ruta ni en la consulta: el proxy y
    el backend no registran cabeceras. En el panel, la ruta `#/v/` se resuelve **antes de montar la aplicación**: no pide la sesión ni la
    salud, no lee preferencias y no pasa por la pantalla «Entrar»; nunca cuenta como «última vista» ni se puede guardar como vista, y el
    informe de errores del panel la escribe como `#/v/…`. **Límite declarado:** la dirección completa queda donde quede cualquier
    dirección compartida: el historial y la sincronización del navegador de quien visita, la mensajería donde se pegó, el portapapeles.
    Por eso todo enlace vence y se puede revocar.
-6. **Lo que responde y lo que no.** `GET /publico` (Etapa 4) recibe el token y una ventana **de la lista cerrada** (24 h, 7 d o 30 d,
-   hasta la máxima del enlace; nunca fechas libres) y devuelve título, descripción, el nombre del sitio (`sitio.nombre`), las
+6. **Lo que responde y lo que no.** `GET /publico` recibe el token y una ventana **de la lista cerrada** (24 h, 7 d o 30 d,
+   hasta la máxima del enlace; nunca fechas libres) y devuelve título, descripción, el nombre del sitio (el campo `sitio`), las
    magnitudes con su nombre y unidad, k, las series de promedios —del sitio y de cada zona publicada— y la hora del último dato. El
    intervalo de cada ventana lo deriva el servidor con la misma función del tablero (`intervaloParaRango`), así que ninguna ventana
    pasa el tope de tramos. Un token inexistente, vencido, revocado o con forma inválida recibe **la misma respuesta 404**. **La vigencia
    se comprueba en cada petición** contra la fila (una lectura por índice): revocar corta de inmediato en todas las instancias. Con ese
-   token **ninguna otra ruta** cambia: la guardia central no lee esa cabecera; solo la lee el controlador de `GET /publico` (Etapa 4), que está
+   token **ninguna otra ruta** cambia: la guardia central no lee esa cabecera; solo la lee el controlador de `GET /publico`, que está
    fuera de la matriz de `docs/20 §6`. Crear, listar, renovar, revocar y la vista previa exigen sesión y la acción `enlaces`.
 7. **Que mil visitantes no sean mil consultas, ni le quiten el tablero a quien tiene sesión.** El backend guarda **solo los datos**,
    por enlace y ventana, 60 segundos en la memoria del proceso, acotada en cantidad y en bytes (60 segundos es el período más corto con
    que reporta un equipo del campus: más fresco no dice nada nuevo). Mientras una respuesta se rehace, las demás peticiones del mismo
    enlace y ventana **esperan ese resultado** en vez de consultar. El desglose se calcula en una consulta agrupada por zona, no en una
-   por zona. Lo público tiene **su propio cupo** de consultas, separado del de las tendencias del tablero, con el mismo tiempo máximo. El
-   proxy limita por dirección las peticiones a `/publico` (Etapa 4) en una zona propia (`publico`: 5 por segundo con ráfaga de 60, para que un
+   por zona. Lo público tiene **su propio cupo** de consultas, separado del de las tendencias del tablero, con el mismo tiempo máximo (y la
+   vista previa del administrador, otro, decidido el 17/11/2026: la visita no la deja sin respuesta). El
+   proxy limita por dirección las peticiones a `/publico` en una zona propia (`publico`: 5 por segundo con ráfaga de 60, para que un
    curso de 50 personas detrás de una misma dirección cargue la página a la vez y después refresque una vez por minuto; `docs/11 §4`),
    y responde su 429 en JSON. No hay límite por enlace: cualquiera que lo tenga podría agotarlo y dejar sin vista a los demás, y la
    respuesta guardada ya protege la base. La vista se refresca sola cada 60 segundos; no abre el canal en vivo.
 8. **Los accesos se cuentan sin escribir en cada visita y sin direcciones.** Un acceso es **una carga de la pantalla**, no cada
    refresco. Se cuentan en memoria y se vuelcan una vez por minuto a `enlace_publico_acceso`, por día en la zona horaria del sitio; las
-   filas de más de 90 días se borran. `GET /publico` (Etapa 4) no entra en la auditoría de operaciones (`docs/10 §8.4` punto 43): no hay persona
+   filas de más de 90 días se borran. `GET /publico` no entra en la auditoría de operaciones (`docs/10 §8.4` punto 43): no hay persona
    a quien atribuirla y una pantalla de sala serían 1 440 filas al día. El registro del proxy guarda la dirección de quien visita, como
-   la de cualquier petición (`docs/21`).
+   la de cualquier petición (`docs/21`). **Límite declarado:** cualquiera con el enlace puede inflar el contador pidiendo como si cargara
+   la pantalla; es un indicador de uso para quien administra, no una cifra de seguridad, y el límite de tasa del proxy lo acota.
 9. **La pantalla del visitante.** Sin el armazón del panel: título, sitio, «actualizado hace…», una tarjeta por magnitud con el
    promedio de ahora, su unidad y «promedio de k o más dispositivos»; debajo, las gráficas de tendencia con el selector de ventana y, si
-   hay desglose, una fila por zona con su valor; lo oculto se ve como oculto, con su motivo. Tema claro y oscuro; se lee completa a
+   hay desglose, una fila por zona con su valor; lo oculto se ve como un hueco, igual que un tramo sin datos, y la tarjeta de una
+   magnitud con algo oculto lleva el aviso «algunos tramos se ocultan para proteger a equipos individuales». Tema claro y oscuro; se lee completa a
    390 px sin desplazamiento lateral; cada gráfica tiene su tabla de datos alternativa. Botón **«Pausar actualización»** (WCAG 2.2.2); al
    refrescar solo se anuncia el cambio de hora, sin mover el foco. Al pie, una línea fija: «Vista pública de solo lectura · promedios
    del sitio». Si el enlace no vale: «Este enlace ya no está disponible. Pídele uno nuevo a quien te lo compartió.» La respuesta va sin
    caché compartida y sin cookies; todo `/panel/` lleva `X-Robots-Tag: noindex`; la pantalla no carga nada de terceros (`docs/21`).
-10. **Administrar los enlaces.** En la configuración del sitio, una lista: título, qué publica (magnitudes, ventana, zonas), creado
+10. **Administrar los enlaces.** En la configuración del sitio, una lista (por omisión, solo los enlaces vivos; los muertos, con «ver
+    todos»: decidido el 17/11/2026): título, qué publica (magnitudes, ventana, zonas), creado
     por, vence el…, accesos de los últimos 7 días y estado (vigente, vence pronto, vencido, revocado), con «Renovar» y «Revocar», cada
     uno con su confirmación. El formulario avisa junto al título y la descripción: «Este texto lo verá cualquiera con el enlace: sin
-    nombres de personas ni datos personales». El token no se puede volver a ver: si se perdió, se crea otro enlace.
+    nombres de personas ni datos personales»; y junto a la elección de zonas, que el nombre del sitio y el de cada zona publicada también
+    los verá cualquiera con el enlace (revisión del 17/11/2026: son texto libre y pueden traer el nombre de una persona). El token no se
+    puede volver a ver: si se perdió, se crea otro enlace.
 11. **Qué puede fallar y qué ve cada persona** (la regla del bloque N: qué pasó, por qué, qué texto se ve y qué se puede hacer).
 
     | Qué pasó | Quién lo ve | Texto | Qué puede hacer |
@@ -1024,10 +1062,10 @@ aplica cada vez que se sirve y no solo al publicar, y nada más responde a ese e
     | El enlace no existe, venció, se revocó o está mal copiado | Visitante | «Este enlace ya no está disponible. Pídele uno nuevo a quien te lo compartió.» | Nada más: un solo mensaje, a propósito |
     | Demasiadas visitas desde la misma dirección (429) | Visitante | «Hay muchas visitas en este momento. La página se actualizará sola en un minuto.» | Esperar; se reintenta sola |
     | El servicio está ocupado o la consulta pasó el tiempo máximo (503) | Visitante | «Los datos están tardando. La página volverá a intentarlo en un minuto.» | Esperar; se conserva lo último mostrado |
-    | Un valor lo aportan menos de k dispositivos | Visitante y administrador | «Datos de menos de k dispositivos.» | Administrador: quitar esa magnitud o zona, o bajar k a sabiendas (hasta el mínimo de la instancia) |
+    | Un valor lo aportan menos de k dispositivos | Visitante y administrador | Un hueco, como un tramo sin datos, y una vez por magnitud: «Algunos tramos se ocultan para proteger a equipos individuales.» | Administrador: quitar esa magnitud o zona, o bajar el k del sitio a sabiendas (afecta a todos sus enlaces; hasta el mínimo de la instancia) |
     | No se eligió ninguna magnitud | Administrador | «Elige al menos una magnitud para publicar.» | Elegir |
     | Una magnitud no tiene datos en la ventana | Administrador | «Sin datos de «…» en esta ventana: el visitante verá la tarjeta vacía.» | Publicar igual o quitarla |
-    | El sitio ya tiene 10 enlaces | Administrador | «Este sitio ya tiene 10 enlaces. Revoca uno para crear otro.» | Ir a la lista |
+    | El sitio llegó a su tope de enlaces vivos | Administrador | «Este sitio ya tiene N enlaces. Revoca uno para crear otro.» (N, el tope del sitio) | Ir a la lista o subir el tope (hasta el techo de la instancia) |
     | Renovar acorta el vencimiento | Administrador | «Vencía el …; con este plazo vencerá antes, el …» | Confirmar o elegir otro plazo |
     | Se intenta renovar un enlace revocado, vencido hace más de 30 días o con más de un año | Administrador | «Este enlace ya no se puede renovar. Crea uno nuevo.» | Crear |
     | La sesión venció o falta el permiso | Administrador | Los mensajes de sesión del panel (P10, punto 4, en esta misma §4; el cliente HTTP, en §6) | Entrar de nuevo |
@@ -1047,7 +1085,8 @@ aplica cada vez que se sirve y no solo al publicar, y nada más responde a ese e
     válido es idéntica, en código y cuerpo, a la respuesta sin él (falla plantada: una ruta que lea la cabecera). La respuesta pública
     no contiene ningún identificador físico, nombre de dispositivo, coordenada, mínimo ni máximo de la base de prueba (se busca cada
     uno en el cuerpo). La regla de k: una zona de 3 equipos a la que se le da de baja uno **deja de publicar su valor** sin tocar el
-    enlace, y el total del sitio se oculta en ese tramo; una zona creada después no aparece. Vencido, revocado, inexistente y mal formado
+    enlace, y el total del sitio se oculta en ese tramo mientras los equipos ocultos del sitio sumen entre 1 y k−1; ni una zona no
+    publicada, ni dos zonas ocultas, ni dos enlaces del mismo sitio dejan despejar lo oculto por resta; una zona creada después no aparece. Vencido, revocado, inexistente y mal formado
     dan respuestas idénticas byte a byte. Renovar: un vencido hace 29 días vuelve a servir con el mismo token; uno de 31 días, uno
     revocado y uno de más de un año se rechazan; el vencimiento nunca pasa el máximo. Revocar corta en la petición siguiente **con la
     respuesta aún guardada** (falla plantada: mirar la respuesta guardada antes de validar). Cien visitas simultáneas con la respuesta
@@ -1057,9 +1096,89 @@ aplica cada vez que se sirve y no solo al publicar, y nada más responde a ese e
     visitante dan los mismos números. En navegador real: la pantalla del visitante y la de publicar, a 1 280 y 390 px, con y sin datos,
     con y sin zonas, con un valor oculto. Cada prueba con su falla plantada. Medidas en `docs/16`: tiempo de la vista con 120 y 2 000
     dispositivos, con 6 magnitudes y 5 zonas, antes de fijar el cupo público; y el peso de la pantalla pública.
-14. **Orden.** Migración y backend (crear, listar, renovar, revocar, vista previa, `GET /publico` (Etapa 4), la regla de k, respuesta guardada
+14. **Orden.** Migración y backend (crear, listar, renovar, revocar, vista previa, `GET /publico`, la regla de k, respuesta guardada
     con espera compartida, cupo propio, contador, eventos y su rama en la actividad) con sus pruebas; la zona de tasa del proxy;
     después la pantalla del visitante y la de publicar; al final la revisión por capturas.
+
+**Decidido al implementar (17/11/2026), en lo que el bloque no fijaba** (base, backend y proxy; el contrato completo, en el OpenAPI):
+- **Rutas.** Listar y crear, `GET`/`POST /sitios/{id}/enlaces`; la vista previa, `POST /sitios/{id}/enlaces/vista-previa`; renovar,
+  `POST /sitios/{id}/enlaces/{enlace}/renovar` con `plazo_dias`; revocar, `DELETE /sitios/{id}/enlaces/{enlace}` (la fila queda, revocada).
+  Las que escriben, en la zona `administracion` del proxy, como el resto de la administración. El orden de los códigos es el de las demás
+  rutas que escriben (`docs/20 §10`): 401, 403 sin la acción en ningún sitio (antes de mirar el cuerpo), 400, y el sitio, 404 o 403.
+- **La respuesta de `GET /publico`** (y de la vista previa, la misma): `titulo, descripcion, sitio, zona_horaria, minimo_dispositivos,
+  ventana, ventanas, intervalo, desde, hasta, ultimo_dato, tiempos` y, por magnitud, `codigo, nombre, unidad, ahora` (número o null),
+  `serie` (un número o null por tramo), `protegido` (true si k > 1: el aviso del punto 2, que depende solo de la configuración) y
+  `zonas[{nombre, ahora, serie}]`. Las zonas viajan por su nombre publicado, sin su identificador. `ultimo_dato` es el inicio del tramo de
+  la lectura más reciente de los «ahora» del sitio que se publican (segunda revisión del 17/11/2026: la hora exacta diría cuándo reportó
+  un equipo); un valor oculto no la delata.
+- **Un sitio inactivo** responde la misma 404 que un enlace que no vale; **revocar uno ya revocado**, 409.
+- **Un cálculo que pasa el tiempo máximo** también se guarda, como fallo, 60 s por enlace y ventana: mientras tanto esas peticiones reciben
+  503 sin consultar (revisión del 17/11/2026: si no, un enlace de una vista pesada pedido cada segundo ocuparía el cupo sin fin).
+- **La base protege el registro del enlace** (migración 25, disparador `trg_enlace_publico_tiempos`): una revocación no se deshace, y
+  `creado_en`, `renovado_en` y `revocado_en` no pueden quedar en el futuro (comparado con la hora del reloj y unos segundos de margen, no
+  con la del inicio de la transacción, para que renovar y revocar a la vez no choquen; tercera revisión del 17/11/2026); al insertar,
+  `creado_en` es la hora de la transacción, y una revocación nueva se fecha en el último minuto (segunda revisión). Un enlace revocado o
+  anonimizado no cambia su vencimiento ni su renovación, y uno anonimizado no se sirve aunque no haya vencido. La aplicación inserta solo
+  en las columnas que escribe.
+- **Título y descripción** usan la regla de texto de la recepción (`recepcion/texto.ts`): nada invisible ni de control (`\p{C}`), ningún
+  separador salvo el espacio común (`\p{Z}`) y ninguno de los rellenos que se ven en blanco; la descripción admite además el salto de
+  línea. El título lleva al menos una letra o un número, y ninguno admite más de tres marcas combinantes seguidas (tercera revisión del
+  17/11/2026: harían que lo que se lee no sea lo que está escrito).
+
+**Decidido el 17/11/2026** (por la persona; la regla que ordena estas decisiones: **la protección por omisión es de la plataforma y la
+decisión de bajarla es del administrador del sitio**, que la toma sabiendo y deja su rastro en la actividad; lo que el administrador puede
+ajustar, lo ajusta él, dentro de los límites de la instancia):
+- **El administrador decide y la plataforma avisa.** La vista previa y la respuesta de crear traen `avisos`: lo que un visitante podría
+  deducir de lo que se va a publicar, en palabras (el k del sitio bajo el de omisión; «la zona X tiene 1 equipo: con k = 1 su lectura sale
+  tal cual»; una zona que hoy saldrá sin valor; el total que saldrá sin valor; «combinando el total del sitio con las zonas publicadas se
+  puede deducir el promedio de las no publicadas»). La pantalla los muestra antes de publicar. Se calculan con los equipos de hoy de cada
+  zona **por magnitud**, como la regla, los mismos que cuenta la vista (con una lectura vigente de esa magnitud, en la zona donde se tomó;
+  revisión final del 17/11/2026: la unión de las magnitudes contaría 3 en una zona con 3 equipos de temperatura y 1 de humedad); con más
+  de una magnitud con datos, cada aviso dice de cuál es. Son un aviso, no la regla, que se aplica tramo a tramo. El evento `enlace_creado` registra el k del sitio que rige y cuántos avisos se mostraron.
+- **k es del sitio** (tercera revisión; punto 2): lo lee (`GET /sitios/{id}/enlaces/minimo`: el que rige, si está fijado, el de omisión,
+  el piso y el máximo) y lo fija su administrador con `PUT /sitios/{id}/enlaces/minimo`, de 1 a 20 (sin bajar del
+  piso de la instancia al servir), con el evento `enlace_minimo` en la actividad; la respuesta trae `avisos`: «afecta a todos los enlaces
+  públicos de este sitio» y lo que un visitante podría deducir con ese k en todo el sitio. Subirlo nunca expone; bajarlo es decisión del
+  administrador, que la toma sabiendo. Los enlaces ya no llevan k. **La migración deja el k de cada sitio sin fijar** (rige el de omisión;
+  revisión final del 17/11/2026: copiar el menor de los enlaces existentes podía tomar el de uno vencido o muerto y publicar hacia atrás
+  sin rastro; si un sitio necesita uno más bajo, lo baja su administrador y queda su evento). En una base con la versión anterior, que sí
+  lo copiaba, un k que nadie fijó y menor que 3 vuelve a sin fijar; uno mayor se conserva, porque oculta más. La columna del enlace queda
+  sin uso (no se borra: la migración es aditiva y conserva lo que se eligió antes).
+- **La historia de zonas** (`dispositivo_zona`, punto 2) empieza con la migración: cada dispositivo entra con su zona actual desde
+  siempre, porque un cambio de zona anterior no quedó guardado; uno que ya tenía marcado su último cambio (la versión anterior de la
+  migración) entra desde esa hora, y sus lecturas de antes siguen sin contar en ninguna zona, como hasta entonces.
+- **El tope de enlaces por sitio lo fija su administrador** (`GET`/`PUT /sitios/{id}/enlaces/tope`, con un evento `enlace_tope` en la
+  actividad), de 1 al techo de la instancia (`PUBLICO_MAX_ENLACES_TECHO`, 200 por omisión); sin fijarlo rige
+  `PUBLICO_MAX_ENLACES_POR_SITIO`, 50. **Cuentan solo los enlaces vivos**: no revocados y vigentes o aún renovables; uno revocado o
+  vencido hace más de 30 días (o de más de un año) ya no vuelve y no ocupa lugar. El 409 `tope_enlaces` dice el número del sitio. Bajar el
+  tope no revoca nada: impide crear otro hasta que haya lugar. Con el techo, la memoria sigue acotada igual: la respuesta guardada tiene
+  topes propios (300 entradas y 8 MiB) que no dependen de cuántos enlaces haya; más enlaces solo significan más cálculos, que limita el cupo.
+- **La lista muestra por omisión solo los vivos**; `?incluir=todos` suma los muertos. Las filas no se borran: la actividad conserva el rastro.
+- **Retención del texto de los enlaces muertos:** pasados `retencion_dias` desde que el enlace dejó de valer (venció o se revocó, lo que
+  pasó primero), título, descripción y nombres de zona se anonimizan (`fn_anonimizar_enlaces_publicos`, desde la retención; queda
+  `anonimizado_en`); el plazo lo elige el administrador al publicar, 90 días por omisión, de 31 (más que los 30 en que aún se puede renovar)
+  a 365. La actividad sigue nombrando el enlace, ya como «Enlace retirado».
+- **La vista previa tiene su propio cupo**, separado del de las visitas.
+- **La página de privacidad sube a la versión 2**, porque cambian los datos que se guardan (el inventario de `docs/21 §2` suma la vista
+  pública). Los términos de uso no cambian de versión: su texto no cambió.
+- **Una carga de la pantalla** (punto 8) la marca el panel con `?carga=si` en su primera petición; los refrescos no la llevan.
+- **k:** es del sitio (punto 2), de 1 a 20. Al servir rige el mayor entre el k del sitio y el piso vigente: si el operador sube el piso,
+  todos los sitios lo cumplen. Los parámetros del despliegue se validan al arrancar (un valor inválido lo detiene);
+  `PUBLICO_VENCIMIENTO_MAX_DIAS` va de 7 a 180.
+- **Renovar:** un plazo que acorta el vencimiento responde 409 `codigo: acorta` con las dos fechas, salvo que venga `acortar: true`: el
+  aviso del punto 4 lo confirma el servidor, no solo la pantalla. «Vence pronto», siete días o menos.
+- **Topes:** hasta 12 magnitudes y 20 zonas por enlace (los mismos CHECK de la migración 25). El tope de enlaces, con un candado por sitio
+  para dos altas simultáneas (lo que cuenta, al final del bloque).
+- **Cupo y respuesta guardada** (punto 7, provisorios hasta la medición del punto 13): una consulta pública a la vez y veinte en fila (con
+  la fila llena, 503), con el tiempo máximo del histórico del sitio (5 s) **para el cálculo entero**, no por sentencia (segunda revisión del
+  17/11/2026: las tres consultas corren en una transacción de solo lectura y cada una recibe lo que queda del plazo), y la espera en la
+  fila del cupo también tiene ese tope (si no, 503); el plazo se mide desde antes de pedir el cupo y lo vigila también el proceso, no solo
+  la base: una conexión que no responde se suelta con error y destruida, y no deja tomados ni el cupo ni la fila (tercera revisión del
+  17/11/2026), y el `ROLLBACK` tras un error también tiene tope; no conseguir conexión por otra causa (la base caída) no es una consulta
+  lenta: queda en el registro, no se guarda como fallo y responde como error (revisión final); hasta 300 respuestas y 8 MiB guardadas. La vista previa, una a la vez y cinco en
+  fila, en su propio cupo, y no guarda nada.
+- **El desglose** se calcula con `SQL_PUBLICO_SERIES` (`consulta/tablero.ts`): la definición del bloque M agrupada por magnitud y zona en
+  una sola consulta; la prueba de integración compara su total del sitio con `GET /sitios/{id}/historico` sobre los mismos datos.
 
 ## 5. Flujos
 **F1 · Alta y primera trama.** Ya está dibujado en el diagrama de secuencia del alta (`docs/10`, figura del informe): el

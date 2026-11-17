@@ -48,6 +48,7 @@ DELETE FROM medicion   WHERE canal_id IN (SELECT c.id FROM canal c WHERE c.dispo
 DELETE FROM trama      WHERE dispositivo_id IN (SELECT id FROM semilla_lista);
 DELETE FROM cuarentena WHERE dispositivo_id IN (SELECT id FROM semilla_lista) OR topico = 'sitio/uct/dispositivo/desconocido-01/temperatura';
 DELETE FROM evento     WHERE dispositivo_id IN (SELECT id FROM semilla_lista);
+DELETE FROM dispositivo_zona WHERE dispositivo_id IN (SELECT id FROM semilla_lista);   -- la historia de zonas no va en cascada (migración 25)
 DELETE FROM dispositivo WHERE id IN (SELECT id FROM semilla_lista);   -- canal, regla, condición, credencial y estado van en cascada
 DELETE FROM pasarela   WHERE id_fisico IN ('demo-pasarela-01', 'demo-pasarela-02');
 DELETE FROM condicion_sistema WHERE detalle->>'origen' = 'semilla';

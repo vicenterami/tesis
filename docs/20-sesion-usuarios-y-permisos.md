@@ -66,10 +66,12 @@
 - `enlace_publico` (nueva; rediseñada el 16/11/2026, `docs/19 §4` O puntos 4 y 8): `id`, `sitio_id`, `token_hash` (el resumen SHA-256 del token, con
   índice único: la base nunca guarda el token), las `magnitudes` publicadas, la ventana máxima (de la lista cerrada), las zonas publicadas
   (identificador y nombre publicado, fijados al publicar), el mínimo de dispositivos k, el título (hasta 80 caracteres) y la descripción
-  (hasta 300) públicos, `creado_por` y cuándo, `expira_en` (obligatorio: todo enlace vence), `revocado_en` y quién lo revocó. Los nombres exactos
-  de las columnas se fijan en la migración.
+  (hasta 300) públicos, `creado_por` y cuándo, `expira_en` (obligatorio: todo enlace vence), `revocado_en` y quién lo revocó. ✅ Migración 25
+  (17/11/2026): `token_hash`, `magnitudes`, `ventana_maxima`, `zonas` (`[{id, nombre}]`), `minimo_dispositivos`, `titulo`, `descripcion`,
+  `creado_por`, `creado_en`, `expira_en`, `renovado_en` (la última renovación), `revocado_en` y `revocado_por`.
 - `enlace_publico_acceso` (nueva, mismo diseño): enlace, día (en la zona horaria del sitio) y cuenta de accesos; sin direcciones ni identificador de
-  quien visita. Las filas de más de 90 días se borran.
+  quien visita. Las filas de más de 90 días se borran. ✅ Migración 25: `enlace_id`, `dia` y `cuenta`; las borra `fn_limpiar_accesos_publicos`, desde
+  `RetencionService`.
 
 ## 3. Sesión: una cookie opaca con estado en el servidor
 - **Qué viaja:** una cookie `__Host-sesion` (nombre con prefijo desde el 08/11/2026, §10) con 32 bytes aleatorios en base64url; en la base queda su hash. Sin JWT: con un solo
@@ -134,7 +136,7 @@
 ## 5. El guardia central
 - Un middleware lee la cookie, busca la sesión viva, renueva `ultima_actividad` y deja en la petición `usuario` y sus
   `sitios: Map<sitio_id, rol>`. Sin sesión → 401 con un cuerpo fijo. Las rutas públicas (`/salud`, `/panel/*`, `POST /sesion` y `POST /recepcion/{idFisico}`, que lleva su propia credencial por dispositivo) no
-  pasan por él. La vista pública, `GET /publico` (Etapa 4), tampoco, y **la guardia no lee su cabecera `X-Enlace-Publico`**: solo la lee el controlador de esa
+  pasan por él. La vista pública, `GET /publico`, tampoco, y **la guardia no lee su cabecera `X-Enlace-Publico`**: solo la lee el controlador de esa
   ruta (§7), así que ese token no da acceso a ninguna otra.
 - Una sola función `permitir(usuario, accion, sitio_id)` con la tabla de permisos de la §6; toda ruta la llama antes de tocar
   la base. El `sitio_id` lo resuelve el servidor a partir del recurso pedido (el dispositivo, el canal), nunca del cuerpo.
@@ -158,7 +160,7 @@
 Ampliada el 08/11/2026 a los cinco perfiles (§2). **✅ 11/11/2026: vigente en el código con las siete columnas** (`permisos.ts`, migración
 24; paso 4b del guardián, `docs/16 §63`), incluido el cambio de «exportar» (administrador de sitio e investigador). La baja de dispositivos
 y pasarelas es una acción propia (`baja`), separada de `escribir`, para que el operador técnico dé de alta y no de baja. Las filas de enlaces
-públicos y de estado del sistema siguen siendo **diseño** (sus rutas no existen aún); la vista pública `GET /publico` (Etapa 4) **no está en la matriz**: no es de ningún perfil ni de ningún sitio, y se prueba aparte (§7); la de auditoría de un sitio es `GET /sitios/{id}/actividad`
+públicos (desde el 17/11/2026, con sus rutas en el OpenAPI y la acción `enlaces`) y de estado del sistema (diseño: sus rutas no existen aún) completan la tabla; la vista pública `GET /publico` **no está en la matriz**: no es de ningún perfil ni de ningún sitio, y se prueba aparte (§7); la de auditoría de un sitio es `GET /sitios/{id}/actividad`
 (Etapa 4). Cada celda dice qué responde la ruta a esa persona en **su** sitio; «Otro sitio» es la misma
 persona pidiendo un recurso de un sitio donde no tiene membresía (el administrador del sistema no tiene «otro sitio»: alcanza a todos).
 
@@ -178,7 +180,7 @@ persona pidiendo un recurso de un sitio donde no tiene membresía (el administra
 | `GET /dispositivos/lote/plantilla` (15/11/2026, `docs/19 §4` N4: las columnas y los límites del lote; la acción «escribir» en algún sitio, sin sitio propio en la ruta) | 401 | 403 | 403 | 200 | 200 | 200 | — |
 | `GET /magnitudes` (15/11/2026, `docs/19 §4` N4: el catálogo, que no es de ningún sitio) | 401 | 200 | 200 | 200 | 200 | 200 | — |
 | `GET /usuarios`, `POST /usuarios`, `PATCH /usuarios/{id}` | 401 | 403 | 403 | 403 | 200 (las membresías de sus sitios; la cuenta de quien también está en otro sitio: 403, §5) | 200 (todas las cuentas) | 404 |
-| Administrar los enlaces públicos de un sitio (crear, listar, renovar y revocar) y su vista previa, `POST /sitios/{id}/enlaces/vista-previa` (Etapa 4), con la acción `enlaces`; las demás rutas, por fijar en el OpenAPI: `docs/19 §4` O) | 401 | 403 | 403 | 403 | 200 | 200 | 404 |
+| Administrar los enlaces públicos de un sitio con la acción `enlaces` (17/11/2026, `docs/19 §4` O): listar y crear, `GET`/`POST /sitios/{id}/enlaces`; la vista previa, `POST /sitios/{id}/enlaces/vista-previa`; renovar, `POST /sitios/{id}/enlaces/{enlace}/renovar`; revocar, `DELETE /sitios/{id}/enlaces/{enlace}`; el tope de enlaces del sitio, `GET`/`PUT /sitios/{id}/enlaces/tope`; el k de su vista pública, `GET`/`PUT /sitios/{id}/enlaces/minimo` | 401 | 403 | 403 | 403 | 200 | 200 | 404 |
 | Auditoría de un sitio: `GET /sitios/{id}/actividad` (Etapa 4) | 401 | 403 | 403 | 403 | 200 | 200 | 404 |
 | Estado del sistema, límites de los servicios, sitios y auditoría de todos los sitios; leer el soporte (`GET /soporte` (Etapa 4)) | 401 | 403 | 403 | 403 | 403 | 200 | — |
 | Lo propio de cada persona: `GET`/`PUT /preferencias`, `GET /sesiones`, `DELETE /sesiones/{id}`, `GET /cuenta/exportar`, `POST /cuenta/baja`, `POST /terminos/aceptar`, `POST /soporte` (Etapa 4) | 401 | 200 | 200 | 200 | 200 | 200 (la baja, 409 si es el último administrador del sistema: §11) | — |
@@ -189,10 +191,11 @@ persona pidiendo un recurso de un sitio donde no tiene membresía (el administra
   que aportan menos de k dispositivos (3 por omisión) sale oculto cada vez que se sirve.
 - El token (32 bytes, como el de la sesión) se muestra una vez y la base guarda solo su resumen SHA-256; todo enlace vence, se renueva sin
   cambiar el token y se revoca.
-- `GET /publico` (Etapa 4) recibe el token en la cabecera `X-Enlace-Publico`, comprueba su vigencia en cada petición y es la única ruta que responde
+- `GET /publico` recibe el token en la cabecera `X-Enlace-Publico`, comprueba su vigencia en cada petición y es la única ruta que responde
   a ese token; la guardia central no lo lee y la ruta queda fuera de la matriz de la §6.
 - Crear, listar, renovar, revocar y la vista previa exigen sesión y la acción `enlaces`; sus eventos (`enlace_creado`, `enlace_renovado`,
-  `enlace_revocado`) quedan en la actividad del sitio.
+  `enlace_revocado`) quedan en la actividad del sitio. ✅ Base, backend y proxy, 17/11/2026 (migración 25: `enlace_publico` y
+  `enlace_publico_acceso`; las rutas, en la fila de la §6; `docs/16 §79`); las pantallas, pendientes.
 - Todo lo demás (qué se publica, la regla de k, la renovación, la respuesta guardada, el límite de tasa, lo que se cuenta y lo que se prueba)
   vive en `docs/19 §4`, O, y no se repite aquí; los controles del proxy, en `docs/11 §4`, y los datos personales, en `docs/21 §2`.
 
@@ -333,7 +336,7 @@ optimista). El cliente HTTP del panel pone `X-Pedido: panel` en todo lo que escr
 al arrancar, declarada en `.env.example` y pasada por el compose (guardianes 2d y 2z). En la pantalla de administración de límites (plan de
 la Etapa 4) este valor pasará a configurarse desde el panel.
 
-**Lo que falta** (no cambia el diseño): la vista pública por enlace (HU-32; §7, `enlace_publico` y `docs/19 §4`, O), `auditoria` con su middleware (`docs/10 §8.4`
+**Lo que falta** (no cambia el diseño): las pantallas de la vista pública por enlace (HU-32; §7 y `docs/19 §4`, O; la base, el backend y el proxy, desde el 17/11/2026), `auditoria` con su middleware (`docs/10 §8.4`
 punto 43), el «quién» en los eventos de alta, baja y calibración, y retirar `HTTP_CLAVE_ADMIN` del `.env` del servidor una vez creado el
 primer administrador. El recorrido del banco con navegador (`banco.sh navegador`, `e2e/p3.mjs`) ya entra como usuario del sistema, con la
 clave del banco por cabecera (`docs/16 §59`).
@@ -387,7 +390,7 @@ en solo `administrador`, el caso «investigador exporta → 200» debe fallar; c
   `usuario_*` de las personas que están o estuvieron en él y `terminos_aceptados` de quienes tienen membresía activa, cada uno con su texto
   («dio de alta la cuenta de «Ana»», «aceptó los términos de uso»); y `acceso` de quienes tienen membresía **activa** en el sitio (quien
   salió del sitio deja de mostrarle sus entradas a su administrador), por cursor `(instante, id)`; para eso `acceso` gana `id`
-  (migración 24). Ventana por defecto de 7 días, hasta 92. Nunca correos ni direcciones, ni el `detalle` de los eventos (el motivo de una
+  (migración 24). Ventana por defecto de 7 días, hasta 92. Desde el 17/11/2026, también los eventos de los enlaces públicos del sitio (`enlace_creado`, `enlace_renovado`, `enlace_revocado`, por el sitio de la fila del enlace, con su título; y `enlace_tope` y `enlace_minimo`, por `detalle.sitio_id`: «fijó en N el tope de enlaces públicos del sitio», «fijó en N el mínimo de dispositivos de la vista pública del sitio»; `docs/19 §4`, O). Nunca correos ni direcciones, ni el `detalle` de los eventos (el motivo de una
   baja no sale).
 - **R30 · Soporte.** 5 mensajes por persona y hora (en memoria, como los bloqueos); los lee el administrador del sistema por cursor; se
   conservan mientras exista la cuenta y se borran con la baja (`docs/21 §2`). Marcarlos leídos (`leido_en`) queda para la pantalla P12.

@@ -515,7 +515,7 @@ cliente ──HTTP──► Express ⊂ NestJS ──► servicio ──► pg �
 
 - **Express** es la biblioteca de servidor HTTP más usada de Node.js; NestJS la usa por debajo
   (`@nestjs/platform-express`). El proceso de Node es el servidor; Express recibe cada petición y
-  entrega la respuesta. Es **la API**: 39 rutas REST (48 operaciones, la recepción por HTTP, la sesión, los usuarios, el tablero v2, desde el 11/11/2026 la cuenta propia, lo legal, el soporte y la actividad, y desde el 15/11/2026 la plantilla del alta por lote y el catálogo de magnitudes incluidos) y el canal SSE `/eventos` (§5), descritos en el contrato OpenAPI (40 rutas y 49 operaciones contando `/eventos`; el paso 2h2 del guardián compara estas cifras con `openapi.json`). Desde el 08/11/2026, antes de cada ruta corre el guardia central de la sesión (`docs/20 §5`). Express no toca la base.
+  entrega la respuesta. Es **la API**: 46 rutas REST (58 operaciones, la recepción por HTTP, la sesión, los usuarios, el tablero v2, desde el 11/11/2026 la cuenta propia, lo legal, el soporte y la actividad, desde el 15/11/2026 la plantilla del alta por lote y el catálogo de magnitudes, y desde el 17/11/2026 la vista pública por enlace y la administración de sus enlaces, con el tope y el k de cada sitio, incluidos) y el canal SSE `/eventos` (§5), descritos en el contrato OpenAPI (47 rutas y 59 operaciones contando `/eventos`; el paso 2h2 del guardián compara estas cifras con `openapi.json`). Desde el 08/11/2026, antes de cada ruta corre el guardia central de la sesión (`docs/20 §5`). Express no toca la base.
 - **`pg`** (node-postgres) es el conductor de la base: mantiene un *pool* de 5 conexiones
   (`db/db.module.ts`) y envía **SQL directo** con parámetros `$1, $2…`; el valor nunca se pega dentro
   del texto SQL, lo que evita la inyección. Sin ORM, por la razón de `docs/07` (series de tiempo con
@@ -958,8 +958,9 @@ del fabricante de la pasarela (137 afirmaciones, en un registro del autor que no
    (citados en `docs/19 §4`, O, punto 12) y evita crear cuentas para cada estudiante. **Diseño del 16/11/2026
    (Etapa 4; fuente única: `docs/19 §4`, O; RF-62, HU-32):** la vista publica solo **promedios** (nunca mínimo, máximo ni
    lecturas) y un valor aportado por menos de k dispositivos sale oculto cada vez que se sirve; todo enlace vence y se
-   revoca; el token va en el fragmento de la dirección y en la cabecera `X-Enlace-Publico` de `GET /publico` (Etapa 4),
-   que es la única ruta que lo lee y queda fuera de la matriz de `docs/20 §6`.
+   revoca; el token va en el fragmento de la dirección y en la cabecera `X-Enlace-Publico` de `GET /publico`,
+   que es la única ruta que lo lee y queda fuera de la matriz de `docs/20 §6`. ✅ Base, backend y proxy, 17/11/2026 (migración 25; `backend/src/publico/`;
+   `docs/16 §79`); las pantallas del visitante y de publicar, pendientes.
 7. **Unidades propias en el catálogo.** SenML no registra `Bq/m3`; RFC 8428 §4.5.2 deja la interpretación al
    «application context». El catálogo `magnitud` es ese contexto: una fila por magnitud con su unidad canónica,
    aunque no esté en el registro IANA. Nuevas magnitudes del caso de uso: radón (`Bq/m3`), hidrógeno (`ppm`),
@@ -1243,7 +1244,7 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     que el administrador recupera:** una hypertable `auditoria` con una fila por petición HTTP (instante, `usuario_id` cuando haya
     sesión, método, ruta normalizada, recurso, código, duración en ms, bytes, `id_peticion`, origen truncado a /24 en IPv4 y /48 en
     IPv6, porque la dirección completa es un dato personal y el bloqueo por IP se lleva en memoria con la exacta); se excluyen
-    `/salud` (lo pide el chequeo cada 15 s), `GET /publico` (Etapa 4), porque no hay persona a quien atribuir la petición y una pantalla de sala serían 1 440 filas al día (`docs/19 §4`, O, punto 8), y los latidos del canal en vivo (el flujo deja una fila al abrirse y otra al cerrarse,
+    `/salud` (lo pide el chequeo cada 15 s), `GET /publico`, porque no hay persona a quien atribuir la petición y una pantalla de sala serían 1 440 filas al día (`docs/19 §4`, O, punto 8), y los latidos del canal en vivo (el flujo deja una fila al abrirse y otra al cerrarse,
     con su duración). Con 10 usuarios y 500 peticiones diarias son 5 000 filas por día: trivial. Se suman `acceso` (`docs/20`) y
     `metrica_broker`: una muestra por minuto de los contadores `$SYS` del broker que el manual documenta
     (`publish/messages/dropped`, `store/messages/count`, `store/messages/bytes`, `clients/connected`, `heap/current`), tomada por
@@ -1294,7 +1295,7 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     Los registros de Mosquitto y de los demás servicios no viajan: quedan en el disco del servidor (§6); si algún día se
     centralizan, ese envío cumple R1 y R2. Hecho el 13/10 en el broker: el rol `admin` del plugin, que de fábrica lee todo,
     quedó acotado a `$CONTROL/dynamic-security/#` y `$SYS/#` (probado en el banco). En la base, hecho el 13/10
-    (migración 14): el backend entra como `plataforma_app`, que lee todo, inserta solo en las tablas donde el código inserta (11 hasta la migración 21; desde la 22 también `usuario`, `usuario_sitio`, `sesion` y `acceso`) y actualiza solo en
+    (migración 14): el backend entra como `plataforma_app`, que lee todo, inserta solo en las tablas donde el código inserta (11 hasta la migración 21; desde la 22 también `usuario`, `usuario_sitio`, `sesion` y `acceso`; desde la 23, `regla_umbral`; desde la 24, `preferencia` y `mensaje_soporte`; desde la 25, `enlace_publico` y `enlace_publico_acceso`, más la columna `sitio.enlaces_publicos_max` entre lo que actualiza) y actualiza solo en
     5 (desde la migración 16 también inserta en `pasarela` y actualiza solo su columna `activo`, para el alta y la baja por API; ni DELETE, ni TRUNCATE, ni DDL; `evento`, `medicion` y `trama` no se pueden reescribir, solo agregar);
     el dueño queda para migraciones y semillas. La retención, que usa `drop_chunks` y este exige ser dueño de la hypertable, pasa
     por una sola función del dueño (`fn_retencion_drop_chunks`, `SECURITY DEFINER`, lista blanca de cinco tablas (`acceso` desde la migración 22), mínimo de días,

@@ -293,6 +293,89 @@ export const SQL_HISTORICO_SITIO = `
         FROM suyo s FULL JOIN ajeno a USING (b)
        ORDER BY b`;
 
+// ── La vista pública por enlace: la misma definición, por magnitud y por zona (docs/19 §4, O, puntos 1, 2 y 7) ──────────────────────
+// El mismo cálculo que SQL_HISTORICO_SITIO (bloque M: cada dispositivo aporta un valor por tramo, el promedio de sus lecturas o su última
+// lectura vigente), con dos diferencias: (1) varias magnitudes a la vez y (2) agrupado en UNA consulta por magnitud y tramo (el total del
+// sitio, `zona_id` nulo) y por magnitud, zona y tramo (TODAS las zonas del sitio, publicadas o no: la regla de la resta las necesita;
+// las no publicadas nunca llegan a la respuesta), no una consulta por zona. Solo el promedio y `n` (cuántos aportan), que deciden la
+// regla de k (publico/publico.ts, armarDatos); ni el mínimo ni el máximo salen de la base.
+// Parámetros: $1 sitio, $2 desde, $3 hasta, $4 intervalo, $5 zona horaria, $6 magnitudes (text[]) y $7 cota inferior de lo que se lee
+// (como en el histórico del sitio). Un tramo sin aportes no sale (no es 0). La prueba de integración compara su total del sitio con
+// SQL_HISTORICO_SITIO sobre los mismos datos (docs/16 §79). Una diferencia, a propósito (decidido el 17/11/2026, tras la tercera revisión):
+// cada lectura cuenta en la zona donde estaba el equipo cuando se tomó (`dispositivo_zona`, migración 25), no en la actual; cada estadía de
+// un canal en una zona es una serie aparte, y lo que arrastra una lectura vigente no pasa del fin de su estadía. Así mover un equipo no cambia
+// el pasado de ninguna zona ni del total (si siguiera a la zona actual, comparar la serie de antes y la de después lo despejaría). En el tramo
+// del cambio cada canal aporta UNA vez (`aporte`, DISTINCT ON): contarlo en las dos zonas inflaría `n` y dos equipos pasarían por tres
+// frente a k = 3. Gana la estadía MÁS ANTIGUA del tramo (revisión final del 17/11/2026): el equipo entra a la zona de destino desde el tramo
+// siguiente, y lo ya servido del tramo en curso no cambia (si ganara la más reciente, la zona de origen perdería al equipo en ese tramo y
+// comparar su valor de antes y el de después lo despejaría). El total es la unión de las zonas, que es lo que la regla de la resta necesita.
+export const SQL_PUBLICO_SERIES = `
+      WITH c AS (
+        SELECT c.id, c.magnitud_codigo AS magnitud, h.zona_id, d.intervalo_esperado_s, greatest($7::timestamptz, h.desde) AS desde_lectura,
+               least($3::timestamptz, coalesce(h.hasta, 'infinity')) AS hasta_lectura, h.hasta
+          FROM dispositivo_zona h JOIN zona z ON z.id = h.zona_id JOIN dispositivo d ON d.id = h.dispositivo_id
+          JOIN canal c ON c.dispositivo_id = d.id
+         WHERE z.sitio_id = $1 AND c.magnitud_codigo = ANY($6::text[]) AND h.desde < $3 AND (h.hasta IS NULL OR h.hasta > $7)),
+      rejilla AS (
+        SELECT array_agg(b ORDER BY b) AS b
+          FROM (SELECT DISTINCT time_bucket($4::interval, g, $5) AS b
+                  FROM generate_series(time_bucket($4::interval, $2::timestamptz, $5), $3::timestamptz, $4::interval, $5) g
+                 WHERE g < $3) u),
+      propio AS (
+        SELECT c.id AS canal_id, c.magnitud, c.zona_id, c.intervalo_esperado_s, c.hasta, p.*
+          FROM c CROSS JOIN LATERAL (
+            SELECT g.b, g.v, g.ut, g.uv, lead(g.b) OVER (ORDER BY g.b) AS b_sig
+              FROM (SELECT CASE WHEN x.tiempo < $2 THEN '-infinity' ELSE time_bucket($4::interval, x.tiempo, $5) END AS b,
+                           avg(x.valor) AS v, max(x.tiempo) AS ut, last(x.valor, x.tiempo) AS uv
+                      FROM medicion x
+                     WHERE x.canal_id = c.id AND x.tiempo >= c.desde_lectura AND x.tiempo < c.hasta_lectura
+                       AND ${sqlLecturaVigente('x.tiempo', 'time_bucket($4::interval, $2::timestamptz, $5)', 'c.intervalo_esperado_s')}
+                     GROUP BY 1) g) p),
+      orden AS (SELECT u.b, u.i::int AS i FROM rejilla r CROSS JOIN LATERAL unnest(r.b) WITH ORDINALITY u(b, i)),
+      arrastre AS (
+        SELECT p.canal_id, p.magnitud, p.zona_id, u.b, p.uv, p.hasta
+          FROM (SELECT p.canal_id, p.magnitud, p.zona_id, p.uv, p.ut, p.intervalo_esperado_s, p.hasta, coalesce(o0.i, 0) AS i0,
+                       least(coalesce(o1.i, (SELECT cardinality(b) FROM rejilla) + 1) - 1,
+                             coalesce(o0.i, 0) + 1 + ceil(p.intervalo_esperado_s * 2 / extract(epoch FROM $4::interval))::int) AS i1
+                  FROM propio p LEFT JOIN orden o0 ON o0.b = p.b LEFT JOIN orden o1 ON o1.b = p.b_sig
+                 WHERE p.b_sig IS NULL OR p.b_sig > p.b + $4::interval) p
+         CROSS JOIN rejilla r CROSS JOIN LATERAL unnest(r.b[p.i0 + 1 : p.i1]) u(b)
+         WHERE ${sqlLecturaVigente('p.ut', 'u.b', 'p.intervalo_esperado_s')} AND (p.hasta IS NULL OR u.b < p.hasta)),
+      aporte AS (
+        SELECT DISTINCT ON (canal_id, b) magnitud, zona_id, b, v
+          FROM (SELECT canal_id, magnitud, zona_id, b, v, hasta, 0 AS arrastrada FROM propio WHERE b > '-infinity'
+                UNION ALL
+                SELECT canal_id, magnitud, zona_id, b, uv, hasta, 1 FROM arrastre) a
+         ORDER BY canal_id, b, hasta ASC NULLS LAST, arrastrada)
+      SELECT magnitud, CASE WHEN grouping(zona_id) = 1 THEN NULL ELSE zona_id END AS zona_id, extract(epoch FROM b)::bigint AS t,
+             round(avg(v)::numeric, 3)::float AS v, count(*)::int AS n
+        FROM aporte
+       GROUP BY GROUPING SETS ((magnitud, b), (magnitud, zona_id, b))
+       ORDER BY 1, 2 NULLS FIRST, 3`;
+
+// La población de «ahora» en la vista pública, y de los avisos para quien publica (la MISMA, a propósito): la última lectura de cada canal de
+// las magnitudes pedidas, si sigue vigente (SQL_LECTURA_VIGENTE, la regla del bloque M), atribuida a la zona donde estaba el equipo cuando se
+// tomó (`dispositivo_zona`), si esa zona es del sitio: parte de las estadías en zonas del sitio, y la última lectura cae en a lo más una
+// (las estadías de un equipo no se solapan, por EXCLUDE en la migración 25). Sin mirar el estado visual (revisión del 17/11/2026: si «ahora» dejara fuera a un
+// equipo en mantenimiento y la serie no, la diferencia entre las dos despejaría su lectura). Parámetros: $1 sitio, $2 magnitudes (text[]).
+export const SQL_PUBLICO_LECTURA_VIGENTE = `
+        SELECT dev.id AS dispositivo_id, c.magnitud_codigo AS magnitud, h.zona_id, u.valor, u.tiempo
+          FROM zona z JOIN dispositivo_zona h ON h.zona_id = z.id JOIN dispositivo dev ON dev.id = h.dispositivo_id
+          JOIN canal c ON c.dispositivo_id = dev.id
+         CROSS JOIN LATERAL (SELECT x.valor, x.tiempo FROM medicion x WHERE x.canal_id = c.id ORDER BY x.tiempo DESC LIMIT 1) u
+         WHERE z.sitio_id = $1 AND c.magnitud_codigo = ANY($2::text[]) AND u.tiempo >= h.desde AND (h.hasta IS NULL OR u.tiempo < h.hasta)
+           AND ${SQL_LECTURA_VIGENTE}`;
+// «Ahora» de la vista pública: sobre esa población, el promedio y cuántos aportan, por magnitud (total del sitio, `zona_id` nulo) y por
+// magnitud y zona (todas las del sitio, como la serie); `ultimo`, el INICIO DEL TRAMO (de la ventana, en la zona del sitio) de la lectura
+// más reciente de las que aportan: la hora exacta diría cuándo reportó un equipo. Sin mínimo ni máximo.
+// Parámetros: $1 sitio, $2 magnitudes (text[]), $3 intervalo de los tramos, $4 zona horaria del sitio.
+export const SQL_PUBLICO_AHORA = `
+      WITH lectura AS (${SQL_PUBLICO_LECTURA_VIGENTE})
+      SELECT magnitud, CASE WHEN grouping(zona_id) = 1 THEN NULL ELSE zona_id END AS zona_id,
+             round(avg(valor)::numeric, 3)::float AS v, count(*)::int AS n, iso_utc(time_bucket($3::interval, max(tiempo), $4)) AS ultimo
+        FROM lectura
+       GROUP BY GROUPING SETS ((magnitud), (magnitud, zona_id))`;
+
 // Por magnitud, sobre la última lectura vigente de cada canal: promedio, mínimo, máximo y cuántos canales aportan (una fila por magnitud,
 // de la base). Aquí, la marca de salud, el promedio con tres decimales y el orden: las magnitudes de salud al final; dentro, por código.
 // Una magnitud sin ninguna lectura vigente no llega de la base: no aparece (no es 0).

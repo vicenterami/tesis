@@ -26,6 +26,10 @@ describe('privacidad: el inventario del código es la tabla de docs/21 §2', () 
     expect(filas.at(-1)![0]).toBe('Todo lo anterior');
     expect(INVENTARIO.map((f) => [f.dato, f.donde, f.para_que, f.cuanto_tiempo, f.quien_accede])).toEqual(filas);
   });
+  it('la página de privacidad lleva su versión: 2 desde que el inventario suma la vista pública por enlace (17/11/2026)', () => {
+    expect(privacidad(null)).toMatchObject({ version: 2, fecha: '2026-11-17' });
+    expect(INVENTARIO.some((f) => f.donde.includes('enlace_publico'))).toBe(true);
+  });
   it('sin responsable configurado, la página lo dice en vez de inventar un contacto; con él, lo muestra', () => {
     expect(privacidad(null)).toMatchObject({ responsable: null, aviso_responsable: AVISO_SIN_RESPONSABLE });
     expect(privacidad(responsableDeEntorno('Organización', 'soporte@example.org')).responsable).toEqual({ nombre: 'Organización', contacto: 'soporte@example.org' });

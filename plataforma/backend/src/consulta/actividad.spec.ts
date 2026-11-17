@@ -25,6 +25,15 @@ describe('textoActividad', () => {
     expect(textoActividad('evento', 'terminos_aceptados', null)).toBe('aceptó los términos de uso');
     expect(textoActividad('evento', 'alta', 'Nodo 1', {}, 'ignorado')).toBe('dio de alta «Nodo 1»'); // con dispositivo, lo de siempre
   });
+  it('enlaces públicos (17/11/2026; docs/19 §4, O, punto 4): publicó, renovó y revocó, con el título del enlace', () => {
+    expect(textoActividad('evento', 'enlace_creado', null, { sitio_id: 'x' }, 'Aula de física')).toBe('publicó el enlace público «Aula de física»');
+    expect(textoActividad('evento', 'enlace_renovado', null, {}, 'Aula de física')).toBe('renovó el enlace público «Aula de física»');
+    expect(textoActividad('evento', 'enlace_revocado', null)).toBe('revocó un enlace público');
+    expect(textoActividad('evento', 'enlace_tope', null, { sitio_id: 'x', max_enlaces: 20 })).toBe('fijó en 20 el tope de enlaces públicos del sitio');
+    expect(textoActividad('evento', 'enlace_tope', null, { max_enlaces: '20; texto' })).toBe('cambió el tope de enlaces públicos del sitio');
+    expect(textoActividad('evento', 'enlace_minimo', null, { sitio_id: 'x', minimo_dispositivos: 4, anterior: 3 })).toBe('fijó en 4 el mínimo de dispositivos de la vista pública del sitio');
+    expect(textoActividad('evento', 'enlace_minimo', null, { minimo_dispositivos: '4<b>' })).toBe('cambió el mínimo de dispositivos de la vista pública del sitio');
+  });
   it('el filtro tipo: minúsculas y guion bajo, hasta 40', () => {
     expect(tipoValido('reglas_cambiadas')).toBe(true);
     expect(tipoValido("x' OR 1=1")).toBe(false);

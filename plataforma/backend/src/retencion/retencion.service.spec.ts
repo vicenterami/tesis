@@ -33,6 +33,8 @@ describe('RetencionService', () => {
     // pool.query: la limpieza de sesiones (fn_limpiar_sesiones, migración 22) y la fila de la corrida en `evento`.
     const registrar = vi.fn((sql: string, _params?: unknown[]) => {
       if (sql.includes('fn_limpiar_sesiones')) return fallaEn === 'sesiones' ? Promise.reject(new Error('sin conexión')) : Promise.resolve({ rows: [{ n: 3 }] });
+      if (sql.includes('fn_limpiar_accesos_publicos')) return fallaEn === 'accesos_publicos' ? Promise.reject(new Error('sin conexión')) : Promise.resolve({ rows: [{ n: 5 }] });
+      if (sql.includes('fn_anonimizar_enlaces_publicos')) return fallaEn === 'enlaces' ? Promise.reject(new Error('sin conexión')) : Promise.resolve({ rows: [{ n: 2 }] });
       return Promise.resolve({ rows: [] });
     });
     const pool = { connect: vi.fn(() => Promise.resolve({ query, release })), query: registrar } as unknown as Pool;
@@ -50,13 +52,17 @@ describe('RetencionService', () => {
     expect(release).toHaveBeenCalledTimes(4);
     // Las sesiones que dejaron de valer se limpian con el plazo de acceso (90 días), por la función del dueño.
     expect(registrar.mock.calls[0]).toEqual(['SELECT fn_limpiar_sesiones($1) AS n', [90]]);
+    // El contador de la vista pública (migración 25): sus filas de más de 90 días, por la función del dueño.
+    expect(registrar.mock.calls[1]).toEqual(['SELECT fn_limpiar_accesos_publicos($1) AS n', [90]]);
+    // Y el texto de los enlaces que dejaron de valer hace más de su plazo (decidido el 17/11/2026).
+    expect(registrar.mock.calls[2]).toEqual(['SELECT fn_anonimizar_enlaces_publicos() AS n']);
     // Borrar es destructivo: la corrida queda en la base, no solo en el log que vence.
-    expect(registrar).toHaveBeenCalledTimes(2);
-    const [sql, params] = registrar.mock.calls[1];
+    expect(registrar).toHaveBeenCalledTimes(4);
+    const [sql, params] = registrar.mock.calls[3];
     expect(sql).toContain("'retencion'");
     expect(params?.[0]).toMatchObject({
       plazos_dias: { medicion: null, trama: 30, cuarentena: 30, acceso: 90 },
-      fragmentos_borrados: { medicion: 'sin_limite', trama: 2, cuarentena: 0, acceso: 0, sesiones: 3 },
+      fragmentos_borrados: { medicion: 'sin_limite', trama: 2, cuarentena: 0, acceso: 0, sesiones: 3, accesos_publicos: 5, enlaces_anonimizados: 2 },
       fallos: 0,
     });
   });
@@ -98,13 +104,26 @@ describe('RetencionService', () => {
     expect(query.mock.calls.filter(([sql]) => String(sql) === 'ROLLBACK')).toHaveLength(1);
     expect(query.mock.calls.filter(([, p]) => p?.[0] === 'cuarentena')).toHaveLength(1);
     expect(release).toHaveBeenCalledTimes(4);
-    expect(registrar.mock.calls[1][1]?.[0]).toMatchObject({ fragmentos_borrados: { trama: 'error' }, fallos: 1 });
+    expect(registrar.mock.calls[3][1]?.[0]).toMatchObject({ fragmentos_borrados: { trama: 'error' }, fallos: 1 });
   });
 
   it('si la limpieza de sesiones falla, las tablas se recortan igual y la corrida cuenta la falla', async () => {
     const { servicio, query, registrar } = armar('sesiones');
     await expect(servicio.corridaSegura()).resolves.toBeUndefined();
     expect(query.mock.calls.filter(([sql]) => String(sql).includes('drop_chunks'))).toHaveLength(4);
-    expect(registrar.mock.calls[1][1]?.[0]).toMatchObject({ fragmentos_borrados: { sesiones: 'error', acceso: 0 }, fallos: 1 });
+    expect(registrar.mock.calls[3][1]?.[0]).toMatchObject({ fragmentos_borrados: { sesiones: 'error', acceso: 0, accesos_publicos: 5 }, fallos: 1 });
+  });
+
+  it('si la limpieza del contador de accesos públicos falla, lo demás se limpia igual y la corrida cuenta la falla', async () => {
+    const { servicio, query, registrar } = armar('accesos_publicos');
+    await expect(servicio.corridaSegura()).resolves.toBeUndefined();
+    expect(query.mock.calls.filter(([sql]) => String(sql).includes('drop_chunks'))).toHaveLength(4);
+    expect(registrar.mock.calls[3][1]?.[0]).toMatchObject({ fragmentos_borrados: { sesiones: 3, accesos_publicos: 'error' }, fallos: 1 });
+  });
+
+  it('si la anonimización de enlaces falla, lo demás se limpia igual y la corrida cuenta la falla', async () => {
+    const { servicio, registrar } = armar('enlaces');
+    await expect(servicio.corridaSegura()).resolves.toBeUndefined();
+    expect(registrar.mock.calls[3][1]?.[0]).toMatchObject({ fragmentos_borrados: { accesos_publicos: 5, enlaces_anonimizados: 'error' }, fallos: 1 });
   });
 });

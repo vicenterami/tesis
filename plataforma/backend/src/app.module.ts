@@ -11,6 +11,7 @@ import { AltaModule } from './alta/alta.module.js';
 import { SesionModule } from './sesion/sesion.module.js';
 import { CuentaModule } from './cuenta/cuenta.module.js';
 import { LegalModule } from './legal/legal.module.js';
+import { PublicoModule } from './publico/publico.module.js';
 
 // Módulo raíz. Cada módulo de aquí corresponde a un módulo funcional del diseño (docs/10 §1):
 //   DbModule        → acceso a TimescaleDB (infraestructura compartida)
@@ -30,6 +31,7 @@ import { LegalModule } from './legal/legal.module.js';
 //                     cada ruta decide con permitir() sobre el sitio del recurso (docs/10 §8.4 punto 36). Va antes que los que lo usan.
 //   CuentaModule    → lo propio de cada persona (Etapa 4): /preferencias, /sesiones, /cuenta/exportar y /cuenta/baja (docs/20 §11)
 //   LegalModule     → términos con su versión y aceptación, privacidad, acerca de y soporte (Etapa 4; docs/19 §4, P11; docs/21 §7)
+//   PublicoModule   → vista pública por enlace (Etapa 4; docs/19 §4, O; RF-62): GET /publico sin sesión y los enlaces de cada sitio
 // M8 es el panel (backend/panel).
 @Module({
   imports: [
@@ -47,6 +49,7 @@ import { LegalModule } from './legal/legal.module.js';
     AltaModule,
     CuentaModule,
     LegalModule,
+    PublicoModule,
   ],
 })
 export class AppModule {}
