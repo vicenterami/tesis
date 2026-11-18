@@ -4,7 +4,7 @@ Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emu
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
 cubría al escribirse se agregó después: TT-32 (sensor físico) en §43, §44 y §53, y TT-30 (recuperación ante reinicio) en §11. El
-contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 826 pruebas unitarias del backend y 451 del panel.
+contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 828 pruebas unitarias del backend y 452 del panel.
 Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -4287,3 +4287,49 @@ borraron al terminar; `pnpm` 12.3.4):
 el estado de la última corrida publicada, no el del commit que se está por publicar: ese lo dirá el CI. Solo audita `plataforma/backend`
 (el panel va dentro de él, con las mismas dos órdenes); una carpeta nueva con su propio lockfile necesitaría su llamada. Y un aviso que
 GitHub retira o publica después de la corrida local sigue siendo posible: por eso el CI corre además cada semana.
+
+## 82. Página de privacidad para personas, icono de la pestaña y cifrado exacto (18/11/2026)
+
+**Por qué.** Las capturas del servidor de prueba del 17/11/2026 mostraron tres cosas. La página de privacidad enseñaba a quien la lee
+rutas de documentos («docs/21 §8»), nombres de funciones y variables, fichas («P14») y etapas («por construir en la iteración 0»): la
+trazabilidad interna viajaba a la pantalla. El navegador pedía `/favicon.ico` a la raíz y recibía 404 (el panel solo se sirve bajo
+`/panel/`). Y la fila «Todo lo anterior» decía «cifrados en reposo desde la iteración 1», cuando el 17/11/2026 se había construido el
+cifrado del respaldo (§78) pero no el de la base en uso. Un cuarto punto, el estado «Normal» de dos equipos que nunca enviaron una trama,
+se comprobó contra el diseño y **no se cambió**: `docs/19 §2` dice que sin ninguna trama todavía el dispositivo se muestra «Normal» hasta la
+primera.
+
+**Qué se hizo.**
+- `docs/21` suma §2.1, «Lo que lee la persona»: la misma tabla de §2, fila por fila y en el mismo orden, en lenguaje llano y en presente
+  (qué dato, dónde, para qué, cuánto tiempo, quién lo ve). §2 queda como trazabilidad y no viaja a la pantalla. Lo que no existe se dice
+  «todavía no disponible» (el registro de auditoría de la aplicación, `auditoria`, que sigue sin tabla ni middleware); lo construido pasa a presente (la
+  pantalla del visitante sin cookies, el aviso de texto público al publicar, las sesiones propias, «Exportar mis datos»).
+- `legal/inventario.ts` se copia ahora de §2.1; `legal/privacidad.ts` quita los «(docs/21 §N)» de los títulos y del aviso sin responsable.
+- Cifrado en reposo, comprobado en la fuente (`docs/10 §9.5`, `docs/16 §78`, `docs/14 §7.1`, `respaldar.sh`): están cifrados el volcado y el
+  archivo de credenciales del broker, con `age`, para claves públicas; la privada está fuera del servidor. **No** está cifrada la base en
+  uso («Sin cifrado de disco…», `docs/14 §7.1`) y la huella y las sumas del respaldo quedan en claro. Sin `RESPALDO_DESTINATARIOS` el guion
+  respalda en claro; el despliegue documentado exige cifrar (`RESPALDO_EXIGIR_CIFRADO=1`). La fila dice ahora exactamente eso, en llano.
+- `panel/public/favicon.svg` (creación propia: el color de acento del tema y un punto con dos arcos de señal) y su enlace en
+  `panel/index.html`. Vite lo publica con la base (`/panel/favicon.svg`), la misma ruta y el mismo origen que el panel, así que entra en
+  `img-src 'self'` de la política de contenido sin cambiarla. Con un icono declarado, el navegador no pide `/favicon.ico`.
+- No se cambió la versión del texto de privacidad (sigue en 2, con fecha del 17/11/2026); si una corrección como esta debe subirla queda
+  por decidir.
+
+| Qué se comprueba | Prueba | Falla plantada | Qué cayó |
+|---|---|---|---|
+| El arreglo del código es la tabla §2.1, celda por celda | `legal.spec.ts` (mismas filas, mismo orden, mismas celdas) | una frase de más en una fila del arreglo | 2 de 15 |
+| §2 y §2.1 tienen las mismas filas en el mismo orden | `legal.spec.ts` | una fila de más en §2 | 1 de 15 |
+| Nada que viaje a la pantalla trae jerga interna (rutas de documentos, `fn_…`, variables, rutas de la API, fichas, etapas, comillas de código) | `legal.spec.ts` | «por construir en la iteración 0 (fn_limpiar_sesiones)» en una celda; «(docs/21 §3)» en un título | 2 de 15; 1 de 15 |
+| `index.html` enlaza un icono y el archivo existe en `public/` y es un SVG | `panel/src/lib/icono-pagina.test.ts` | el archivo renombrado; el enlace quitado | 1 de 1, las dos veces |
+
+**Resultado.** `pnpm verificar` en el backend: 67 archivos y 828 pruebas del backend, 39 archivos y 452 del panel declaradas (491 ejecuciones en vitest), `svelte-check` con 418
+archivos y 0 errores. Se agregaron 2 pruebas al backend (la de §2 contra §2.1 y la de jerga; la de celda por celda ya existía y ahora
+compara §2.1) y 1 al panel. El enlace del icono se comprobó también en la compilación: `dist/index.html` trae `/panel/favicon.svg` y
+`dist/favicon.svg` existe.
+
+**Revisión del mismo día.** Una revisión independiente del cambio dejó tres correcciones en el texto que lee la persona, aplicadas en
+§2.1 y en el arreglo del código: (1) quién puede abrir los respaldos: decía que quien opera el servidor no puede leerlos, y sí puede quien
+opera la plataforma, con la clave que guarda fuera; ahora distingue a quien solo tiene acceso al servidor; (2) el cifrado de los respaldos
+se afirma con su condición (lo exige la instalación documentada; sin configurarlo, el guion respalda en claro), porque la página la muestra
+cualquier instalación; (3) «registro de actividad» nombraba a la vez lo que existe (la actividad que muestra el panel) y lo que aún no
+(la auditoría de peticiones): la fila de lo que falta dice ahora «registro de auditoría». Además, `docs/14 §7.4` seguía diciendo que el
+cifrado en reposo del respaldo estaba por activarse en el servidor de prueba: puesto al día con `docs/16 §78`.

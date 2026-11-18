@@ -286,13 +286,12 @@ explícita: los usuarios y servicios ajenos se explicaron y el equipo se acepta 
   base y los respaldos. Por eso los secretos son propios de este entorno y no se reutilizan, se rotan al dejar el equipo, y solo se cargan datos de prueba mientras sea compartido (`docs/11 §4`).
 - **Igual que lo planeado:** red privada de administración (SSH y 443/80 solo ahí; llave sin expiración, nombres de la red, aprobación manual
   de equipos), CA propia creada fuera del servidor con la clave cifrada, secretos generados en el servidor, `COMPOSE_FILE` sin override, 8883
-  en todas las interfaces, respaldo diario con restauración probada y copia fuera del servidor (sin cifrado en reposo aún: listo en el guion
-  desde el 17/11/2026, falta activarlo allí).
+  en todas las interfaces, respaldo diario con restauración probada y copia fuera del servidor (cifrado en reposo y con su guardia de 26 h desde
+  el 17/11/2026, `docs/16 §78`).
 - **Verificado en ejecución** (bitácora del 03–04/11, tabla de §4): las dos vías de dispositivo con TLS, los rechazos sin credencial, con
   credencial incorrecta, sin TLS y sin token, solo los puertos del contrato, TLS 1.1 fuera, la pila que vuelve sola tras `docker compose restart`,
   y la restauración del respaldo con los mismos conteos.
-- **Pendiente:** latido del vigilante (§7.2), reinicio del equipo con su responsable, activar el cifrado en reposo del respaldo y la guardia de
-  26 h (`docs/10 §9.5`, listos en los guiones desde el 17/11/2026), y una
+- **Pendiente:** latido del vigilante (§7.2), reinicio del equipo con su responsable, y una
   dirección de entrada desde Internet (pedida a la institución) para dispositivos fuera de la red del campus.
 
 En paralelo, la institución entregó un namespace de Kubernetes para estudiantes: medido en 17 pruebas (bitácora del 03/11), cabe en cuota y

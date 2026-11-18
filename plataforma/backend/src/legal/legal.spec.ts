@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { acerca, commitDeEntorno, urlCodigoFuente, versionDelPaquete } from './acerca.js';
 import { INVENTARIO } from './inventario.js';
-import { AVISO_SIN_RESPONSABLE, privacidad, responsableDeEntorno, textoDeEntorno } from './privacidad.js';
+import { AVISO_SIN_RESPONSABLE, SECCIONES, privacidad, responsableDeEntorno, textoDeEntorno } from './privacidad.js';
 import { MAX_MENSAJES, TasaSoporte, VENTANA_MS, textoDeSoporte } from './soporte.js';
 import { HttpException } from '@nestjs/common';
 import { LegalController } from './legal.controller.js';
@@ -12,23 +12,40 @@ import { TERMINOS_VERSION, terminos, terminosPendientes } from './terminos.js';
 
 // Legal y acerca de (docs/21 §7; docs/19 §4, P11; docs/20 §12).
 
-// Concordancia (regla del 23/09/2026): la página de privacidad sale del inventario de docs/21 §2, no de un texto aparte. La tabla del
-// documento y el arreglo del código deben decir lo mismo, fila por fila y celda por celda.
-describe('privacidad: el inventario del código es la tabla de docs/21 §2', () => {
+// Concordancia (regla del 23/09/2026): la página de privacidad sale del inventario de docs/21, no de un texto aparte. Desde el 18/11/2026 lo
+// que viaja a la pantalla es §2.1 (texto para personas); §2 es la trazabilidad interna (tablas, funciones, variables) y no viaja. El
+// arreglo del código y la tabla §2.1 deben decir lo mismo, fila por fila y celda por celda, y §2 y §2.1 deben tener las mismas filas.
+const JERGA = /docs\/\d|§|\bfn_|\b[A-Z]{3,}(_[A-Z]+)+\b|\b[a-z]+_[a-z_]+\b|\b(GET|POST|PUT|DELETE) \/|\bEtapa\b|iteración|migración|\bP\d{1,2}\b|\bB\d\b|\b(RF|RNF|HU)-\d|por construir|\(pendiente\)/i;
+describe('privacidad: el inventario del código es la tabla de docs/21 §2.1', () => {
   const doc = readFileSync(join(import.meta.dirname, '..', '..', '..', '..', 'docs', '21-datos-personales-y-terceros.md'), 'utf8');
-  const seccion = doc.slice(doc.indexOf('## 2. Inventario'), doc.indexOf('**Lo que no se guarda'));
-  // slice(1): solo la cabecera. El separador («|---|») no empieza con «| » y ya quedó fuera (corrección del 11/11/2026: con slice(2) se
-  // saltaba también la primera fila, «Nombre», y la página de privacidad no la mostraba sin que la prueba lo notara).
-  const filas = seccion.split('\n').filter((l) => l.startsWith('| ')).slice(1).map((l) => l.trim().replace(/^\|\s*|\s*\|$/g, '').split(' | ').map((c) => c.trim()));
+  const filasDe = (texto: string): string[][] =>
+    // slice(1): solo la cabecera. El separador («|---|») no empieza con «| » y ya quedó fuera (corrección del 11/11/2026: con slice(2) se
+    // saltaba también la primera fila, «Nombre», y la página de privacidad no la mostraba sin que la prueba lo notara).
+    texto.split('\n').filter((l) => l.startsWith('| ')).slice(1).map((l) => l.trim().replace(/^\|\s*|\s*\|$/g, '').split(' | ').map((c) => c.trim()));
+  const tecnica = filasDe(doc.slice(doc.indexOf('## 2. Inventario'), doc.indexOf('**Lo que no se guarda')));
+  const filas = filasDe(doc.slice(doc.indexOf('### 2.1'), doc.indexOf('## 3. Terceros')));
   it('mismas filas, mismo orden, mismas celdas', () => {
     expect(filas.length).toBeGreaterThan(10);
     expect(filas[0]?.[0]).toBe('Nombre'); // la primera fila de datos también se compara
     expect(filas.at(-1)![0]).toBe('Todo lo anterior');
     expect(INVENTARIO.map((f) => [f.dato, f.donde, f.para_que, f.cuanto_tiempo, f.quien_accede])).toEqual(filas);
   });
+  it('§2 (trazabilidad) y §2.1 (texto para personas) tienen las mismas filas en el mismo orden', () => {
+    expect(tecnica.length).toBe(filas.length);
+    expect(tecnica[0]?.[0]).toBe(filas[0]?.[0]);
+    expect(tecnica.at(-1)![0]).toBe(filas.at(-1)![0]);
+  });
+  it('lo que viaja a la pantalla no trae jerga interna: documentos, funciones, variables, rutas de la API, fichas ni etapas', () => {
+    const textos = [
+      ...INVENTARIO.flatMap((f) => [f.dato, f.donde, f.para_que, f.cuanto_tiempo, f.quien_accede]),
+      ...SECCIONES.flatMap((s) => [s.titulo, ...s.parrafos]),
+      AVISO_SIN_RESPONSABLE,
+    ];
+    expect(textos.filter((t) => JERGA.test(t.replace(/__Host-sesion/g, '')) || (t.includes('`') && !t.includes('__Host-sesion')))).toEqual([]);
+  });
   it('la página de privacidad lleva su versión: 2 desde que el inventario suma la vista pública por enlace (17/11/2026)', () => {
     expect(privacidad(null)).toMatchObject({ version: 2, fecha: '2026-11-17' });
-    expect(INVENTARIO.some((f) => f.donde.includes('enlace_publico'))).toBe(true);
+    expect(INVENTARIO.some((f) => f.dato.includes('vista pública por enlace'))).toBe(true);
   });
   it('sin responsable configurado, la página lo dice en vez de inventar un contacto; con él, lo muestra', () => {
     expect(privacidad(null)).toMatchObject({ responsable: null, aviso_responsable: AVISO_SIN_RESPONSABLE });
