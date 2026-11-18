@@ -232,7 +232,7 @@ describe('armazón: llegada, menú lateral, cajón, sitio, legal y tema', () => 
     expect(document.querySelector('[data-selector-sitio]')).toBeNull();
     expect(document.querySelector('[data-sitio-nombre]')!.textContent).toBe('Campus');
     const enlaces = [...nav().querySelectorAll('a')];
-    expect(enlaces.map((a) => a.textContent!.trim())).toEqual(['Tablero', 'Inventario', 'Actividad', 'Usuarios', 'Dar de alta', 'Legal y acerca de']);
+    expect(enlaces.map((a) => a.textContent!.trim())).toEqual(['Tablero', 'Inventario', 'Actividad', 'Usuarios', 'Dar de alta', 'Vista pública', 'Legal y acerca de']);
     for (const a of enlaces) expect(a.querySelector('svg')!.getAttribute('aria-hidden')).toBe('true'); // el icono no es el nombre
     expect(screen.getByRole('link', { name: 'Tablero' }).getAttribute('aria-current')).toBe('page');
     expect(screen.getByRole('link', { name: 'Inventario' }).getAttribute('href')).toBe('#/inventario');

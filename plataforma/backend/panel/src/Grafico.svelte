@@ -417,7 +417,8 @@
 </div>
 {#if leyenda.length > 0}
   <ul class="leyenda-fija" aria-label="Series de {titulo}" data-leyenda-fija>
-    {#each leyenda as l (l.nombre)}<li><span class="muestra-linea" class:banda={l.banda} style:background={l.color}></span>{l.nombre}</li>{/each}
+    <!-- Por posición, no por nombre: dos series pueden llamarse igual (una zona «Promedio del sitio» en la vista pública) -->
+    {#each leyenda as l, i (i)}<li><span class="muestra-linea" class:banda={l.banda} style:background={l.color}></span>{l.nombre}</li>{/each}
   </ul>
 {/if}
 <details class="datos-grafico" ontoggle={(e) => (datosAbiertos = e.currentTarget.open)} data-datos-grafico>

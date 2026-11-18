@@ -44,6 +44,7 @@ const SQL_LISTA = `
        ORDER BY e.creado_en DESC, e.id DESC`;
 
 export const TOPE_ENLACES = (n: number): string => `Este sitio ya tiene ${n} enlaces. Revoca uno para crear otro.`;
+export const MINIMO_CAMBIO = (k: number): string => `Alguien cambió el mínimo de este sitio entretanto: ahora es k = ${k}. Revísalo antes de cambiarlo.`;
 export interface MinimoSitio { minimo_dispositivos: number; fijado: boolean; por_omision: number; piso: number; maximo: number }
 export interface TopeEnlaces { max_enlaces: number; fijado: boolean; por_omision: number; techo: number; vivos: number }
 
@@ -222,10 +223,14 @@ export class EnlacesService {
   // Fijarlo: rige en la petición siguiente de todos los enlaces del sitio (entra a la clave de lo guardado). Deja el evento `enlace_minimo`
   // y responde con los avisos: «afecta a todos los enlaces públicos de este sitio» y lo que un visitante podría deducir con ese k, contando
   // los equipos de hoy en todas las magnitudes del catálogo.
-  async fijarMinimo(sitioId: string, k: number, usuarioId: string | null): Promise<MinimoSitio & { avisos: string[] }> {
+  // Con `anterior` (el k que leyó quien lo cambia), si ya no es el que rige: 409 `minimo_cambio` con el que rige, sin cambiar nada.
+  async fijarMinimo(sitioId: string, k: number, usuarioId: string | null, anterior: number | null = null): Promise<MinimoSitio & { avisos: string[] }> {
     return this.enTransaccion(async (c) => {
       await c.query("SELECT pg_advisory_xact_lock(hashtext('enlace_publico:' || $1::text))", [sitioId]);
       const antes = await this.leerMinimo(c, sitioId);
+      if (anterior !== null && anterior !== antes.minimo_dispositivos) {
+        throw new ConflictException({ statusCode: 409, error: 'Conflict', codigo: 'minimo_cambio', minimo_dispositivos: antes.minimo_dispositivos, message: MINIMO_CAMBIO(antes.minimo_dispositivos) });
+      }
       await c.query('UPDATE sitio SET publico_minimo_dispositivos = $2 WHERE id = $1', [sitioId, k]);
       await registrarEvento(c, { dispositivoId: null, tipo: 'enlace_minimo', usuarioId, detalle: { sitio_id: sitioId, minimo_dispositivos: k, anterior: antes.minimo_dispositivos } });
       const despues = await this.leerMinimo(c, sitioId);

@@ -57,6 +57,8 @@
   const veActividad = $derived(sesion !== null && !sesion.sistema && (puedeEnAlguno(sesion, 'auditoria') || sesion.administrador_sistema === true));
   // P7 Alta: quien puede escribir en algún sitio (el servidor decide igual).
   const daDeAlta = $derived(sesion !== null && puedeEnAlguno(sesion, 'escribir'));
+  // P9 «Vista pública» (docs/19 §4, O, puntos 3 y 10): quien tiene la acción `enlaces` en algún sitio (administrador de sitio y del sistema).
+  const publicaVistas = $derived(sesion !== null && (puedeEnAlguno(sesion, 'enlaces') || (!sesion.sistema && sesion.administrador_sistema === true)));
   // La última vista de datos abierta (tablero, inventario o ficha): P13 la ofrece para guardarla con un nombre.
   let ultimaVista = $state<string | null>(null);
   $effect(() => {
@@ -185,6 +187,7 @@
     if (veActividad) lista.push({ ruta: '#/actividad', texto: 'Actividad', icono: 'actividad', activo: vista.pantalla === 'actividad', dato: 'actividad' });
     if (administraUsuarios) lista.push({ ruta: '#/usuarios', texto: 'Usuarios', icono: 'usuarios', activo: vista.pantalla === 'usuarios', dato: 'usuarios' });
     if (daDeAlta) lista.push({ ruta: '#/alta', texto: 'Dar de alta', icono: 'alta', activo: vista.pantalla === 'alta', dato: 'alta-menu' });
+    if (publicaVistas) lista.push({ ruta: '#/publicar', texto: 'Vista pública', icono: 'publico', activo: vista.pantalla === 'publicar', dato: 'publicar' });
     return lista;
   });
 
@@ -488,6 +491,14 @@
         {#await import('./Alta.svelte') then { default: Alta }}<Alta modo={vista.modo} idFisico={vista.idFisico} sitio={vista.sitio} {sesion} {sitios} />{:catch}{@render sinPantalla()}{/await}
       {:else if vista.pantalla === 'preferencias'}
         {#await import('./Preferencias.svelte') then { default: Preferencias }}<Preferencias {sesion} {sitios} {ultimaVista} {alCambiarPreferencias} {alDarseDeBaja} />{:catch}{@render sinPantalla()}{/await}
+      {:else if vista.pantalla === 'publicar'}
+        {#if publicaVistas}
+          {#await import('./Publicar.svelte') then { default: Publicar }}<Publicar sitio={vista.sitio} {sesion} {sitios} {alCambiarVista} />{:catch}{@render sinPantalla()}{/await}
+        {:else}
+          <p class="vacio" data-sin-publicar>Tu rol no publica vistas en ningún sitio: lo hace quien administra el tuyo. <a href="#/">Volver al tablero</a></p>
+        {/if}
+      {:else if vista.pantalla === 'publico'}
+        <p class="vacio">Abriendo la vista pública…</p>
       {:else if vista.pantalla === 'actividad'}
         {#await import('./Actividad.svelte') then { default: Actividad }}<Actividad filtros={vista.filtros} {sesion} {sitios} {alCambiarVista} />{:catch}{@render sinPantalla()}{/await}
       {:else if vista.pantalla === 'usuarios'}

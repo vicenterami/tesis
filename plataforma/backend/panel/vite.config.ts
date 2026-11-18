@@ -13,8 +13,9 @@ const BACKEND = process.env.PANEL_BACKEND ?? 'http://127.0.0.1:3000';
 // Desde el 08/11/2026 también la sesión, los usuarios y las pasarelas (docs/20): la cookie viaja por el mismo origen del reenvío.
 // Desde el 11/11/2026, las del tablero v2 (docs/19 §4, I): sitios (resumen, histórico, actividad), preferencias y sesiones propias.
 // Desde el 11/11/2026 (P11 y P13), las páginas legales, el soporte y la cuenta propia.
+// Desde el 17/11/2026 (P9), el catálogo de magnitudes y la vista pública por enlace.
 const RUTAS_API = ['/dispositivos', '/canales', '/condiciones', '/cuarentena', '/eventos', '/salud', '/docs', '/sesion', '/usuarios', '/pasarelas', '/sitios', '/preferencias', '/sesiones',
-  '/terminos', '/privacidad', '/acerca', '/soporte', '/cuenta'];
+  '/terminos', '/privacidad', '/acerca', '/soporte', '/cuenta', '/magnitudes', '/publico'];
 
 export default defineConfig({
   base: '/panel/',

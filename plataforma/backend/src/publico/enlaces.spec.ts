@@ -4,7 +4,7 @@ import type { Pool } from 'pg';
 import type { AlcanceService } from '../sesion/alcance.service.js';
 import { Rol, UsuarioSesion, exigir, usuarioSistema } from '../sesion/permisos.js';
 import { EnlacesController } from './enlaces.controller.js';
-import { EnlacesService, TOPE_ENLACES } from './enlaces.service.js';
+import { EnlacesService, MINIMO_CAMBIO, TOPE_ENLACES } from './enlaces.service.js';
 import { LimitesPublico, hashToken, validarRenovacion, validarVista } from './publico.js';
 import type { VistaPublicaService } from './vista-publica.service.js';
 
@@ -67,7 +67,10 @@ describe('EnlacesController: quién puede y en qué orden', () => {
     expect(await codigo(c.fijarMinimo(adm, S, { minimo_dispositivos: 21 }))).toBe(400);
     expect(await codigo(c.fijarMinimo(adm, OTRO, { minimo_dispositivos: 2 }))).toBe(404);
     await c.fijarMinimo(adm, S, { minimo_dispositivos: 2 });
-    expect(servicio.fijarMinimo).toHaveBeenCalledWith(S, 2, 'u1');
+    expect(servicio.fijarMinimo).toHaveBeenCalledWith(S, 2, 'u1', null);
+    await c.fijarMinimo(adm, S, { minimo_dispositivos: 2, anterior: 3 });
+    expect(servicio.fijarMinimo).toHaveBeenLastCalledWith(S, 2, 'u1', 3);
+    expect(await codigo(c.fijarMinimo(adm, S, { minimo_dispositivos: 2, anterior: 'tres' }))).toBe(400);
     expect(await codigo(c.leerMinimo(persona([[S, 'consulta']]), S))).toBe(403);
   });
   it('con permiso: el servicio recibe el sitio de la ruta, lo validado y quién lo hace', async () => {
@@ -155,6 +158,15 @@ describe('EnlacesService: el k del sitio', () => {
     expect(b.sql.some((x) => x.startsWith('UPDATE sitio SET publico_minimo_dispositivos'))).toBe(true);
     expect(r.avisos[0]).toBe('Este mínimo afecta a todos los enlaces públicos de este sitio.');
     expect(b.sql.indexOf('COMMIT')).toBeGreaterThan(0);
+  });
+  it('con `anterior` distinto del k que rige: 409 minimo_cambio con el que rige, sin UPDATE ni evento; igual al que rige, cambia', async () => {
+    const b = servicio();
+    const e = await b.s.fijarMinimo(S, 2, 'u1', 5).catch((x: unknown) => x);
+    expect(e).toBeInstanceOf(ConflictException);
+    expect((e as ConflictException).getResponse()).toMatchObject({ codigo: 'minimo_cambio', minimo_dispositivos: 3, message: MINIMO_CAMBIO(3) });
+    expect(b.sql.some((x) => x.startsWith('UPDATE sitio') || x.startsWith('INSERT INTO evento'))).toBe(false);
+    expect(b.sql.at(-1)).toBe('ROLLBACK');
+    expect((await servicio().s.fijarMinimo(S, 2, 'u1', 3)).minimo_dispositivos).toBeGreaterThan(0);
   });
 });
 

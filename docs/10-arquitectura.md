@@ -960,7 +960,7 @@ del fabricante de la pasarela (137 afirmaciones, en un registro del autor que no
    lecturas) y un valor aportado por menos de k dispositivos sale oculto cada vez que se sirve; todo enlace vence y se
    revoca; el token va en el fragmento de la dirección y en la cabecera `X-Enlace-Publico` de `GET /publico`,
    que es la única ruta que lo lee y queda fuera de la matriz de `docs/20 §6`. ✅ Base, backend y proxy, 17/11/2026 (migración 25; `backend/src/publico/`;
-   `docs/16 §79`); las pantallas del visitante y de publicar, pendientes.
+   `docs/16 §79`); ✅ las pantallas del visitante y de publicar, el mismo día (`docs/16 §80`); la medición del punto 13, pendiente.
 7. **Unidades propias en el catálogo.** SenML no registra `Bq/m3`; RFC 8428 §4.5.2 deja la interpretación al
    «application context». El catálogo `magnitud` es ese contexto: una fila por magnitud con su unidad canónica,
    aunque no esté en el registro IANA. Nuevas magnitudes del caso de uso: radón (`Bq/m3`), hidrógeno (`ppm`),
@@ -1970,8 +1970,8 @@ construirlo por anticipado. Cada afirmación sobre una herramienta tiene su fuen
     coincide, fechado en el futuro, o en claro cuando se exige cifrado o cuando en la carpeta ya hay respaldos cifrados (una vuelta al
     claro sin aviso). La antigüedad es la mayor entre la marca del nombre y la hora del archivo: ni un `touch` ni un archivo viejo
     renombrado la engañan. `OK` dice que el respaldo existe, está entero y es reciente, no que restaura: eso lo prueba el simulacro. Mientras
-    no exista la monitorización propia (TT-45), la correrá un temporizador del sistema después del respaldo diario, **por crear** al
-    activarla en el servidor, y su código de salida es la señal; cuando exista, el colector la corre y abre o cierra `respaldo_atrasado`
+    no exista la monitorización propia (TT-45), la corre un temporizador del sistema una hora después del respaldo diario (activado en el
+    servidor de prueba el 17/11/2026), y su código de salida es la señal; cuando exista, el colector la corre y abre o cierra `respaldo_atrasado`
     (§8.4 punto 61). Cómo se activa en un servidor: `docs/14 §7`.
   - **Falta de TT-46:** la papelera de dispositivos.
 

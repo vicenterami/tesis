@@ -1,6 +1,7 @@
 import { ORDEN_ATENCION, type EstadoVisual } from './estado-visual';
 import { RANGOS, RESOLUCIONES, type ClaveRango, type ClaveResolucion } from './grafico';
 import { VIAS } from './inventario';
+import { esRutaPublica } from './publico';
 import { instanteDesdeLocal } from './tiempo';
 
 // La vista vive en la URL (docs/19 §4, incremento 1, punto 1): `#/dispositivos/<id>?canal=<uuid>&rango=24h&res=5m[&desde=&hasta=]`,
@@ -61,6 +62,10 @@ export type Vista =
   | { pantalla: 'alta'; modo: ModoAlta; idFisico: string; sitio: string } // P7: `#/alta?modo=lote|detectados&id_fisico=&sitio=`
   | { pantalla: 'preferencias' } // P13: `#/preferencias`
   | { pantalla: 'actividad'; filtros: FiltrosActividad } // P14: `#/actividad?sitio=&tipo=&usuario=&desde=&hasta=`
+  | { pantalla: 'publicar'; sitio: string } // P9, quien publica: `#/publicar?sitio=<código>` (docs/19 §4, O, puntos 3 y 10)
+  // P9, quien visita: `#/v/<token>`. La resuelve main.ts antes de montar la aplicación; si App la ve (un cambio de fragmento antes de la
+  // recarga), no la trata como ninguna otra pantalla: nunca es «última vista» ni se guarda como vista (punto 5).
+  | { pantalla: 'publico' }
   | { pantalla: 'tablero'; sitio: string; ver: VerTablero; rango: ClaveRango | null; fija: VentanaFija | null }
   | { pantalla: 'inventario'; filtros: FiltrosInventario };
 
@@ -139,6 +144,10 @@ export function leerVista(fragmento: string): Vista {
     return (SECCIONES_LEGALES as readonly string[]).includes(s ?? '') ? { pantalla: 'legal', seccion: s as SeccionLegal } : { pantalla: 'legal' };
   }
   if (ruta === '/preferencias') return { pantalla: 'preferencias' };
+  // La MISMA regla que main.ts (esRutaPublica): `#/v?x` no es la vista pública en ninguno de los dos (si lo fuera aquí y no allá, la
+  // aplicación quedaría en «Abriendo la vista pública…»; revisión del 17/11/2026).
+  if (esRutaPublica(`#${(nueva ?? fragmento).replace(/^#/, '')}`)) return { pantalla: 'publico' };
+  if (ruta === '/publicar') return { pantalla: 'publicar', sitio: leerSitio(q.get('sitio')) };
   if (ruta === '/alta') {
     const m = q.get('modo');
     const idf = (q.get('id_fisico') ?? '').trim().toLowerCase();
@@ -253,4 +262,9 @@ export function fragmentoAlta(modo: ModoAlta, idFisico = '', sitio = ''): string
   if (sitio !== '') q.set('sitio', sitio);
   const s = q.toString();
   return s === '' ? '#/alta' : `#/alta?${s}`;
+}
+
+// P9, quien publica: el sitio cuyos enlaces se administran (el código; sin él, el primero de los que la persona administra).
+export function fragmentoPublicar(sitio: string): string {
+  return sitio === '' ? '#/publicar' : `#/publicar?${new URLSearchParams({ sitio }).toString()}`;
 }

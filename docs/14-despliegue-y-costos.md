@@ -255,7 +255,8 @@ El detalle con salidas esperadas es operación y no se versiona; el orden sí, p
 6. **Construir, escanear, levantar;** prueba de reinicio; sitio, zona, pasarela y dispositivos de prueba.
 7. **Respaldo cifrado con restauración probada** (los dos pares de claves de `age`, operador y emergencia, se generan fuera del servidor;
    al servidor llegan solo las dos públicas; la privada de emergencia se guarda sin conexión) **y su guardia de 26 h en un temporizador
-   por crear, los dos servicios con `RESPALDO_EXIGIR_CIFRADO=1`; latido probado;** rotación de todo antes de llamarlo producción (`docs/11 §7`).
+   del usuario una hora después del respaldo, los dos servicios con `RESPALDO_EXIGIR_CIFRADO=1` (activado en el servidor de prueba el
+   17/11/2026, `docs/16 §78`); latido probado;** rotación de todo antes de llamarlo producción (`docs/11 §7`).
 
 ### 7.2 Vigilante externo por latido («hombre muerto»)
 

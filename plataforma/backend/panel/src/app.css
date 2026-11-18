@@ -519,3 +519,84 @@ main { padding-bottom: calc(var(--e-4) + var(--alto-avisos, 0px)); }
 [data-informe-lote] code { overflow-wrap: anywhere; }
 [data-informe-lote]:focus { outline: none; }
 @media (max-width: 700px) { .detalle-lote { grid-template-columns: minmax(0, 1fr); } }
+
+/* ── P9 Vista pública por enlace (docs/19 §4, O, puntos 3, 9 y 10) ─────────────────────────────────────────────────────────────────── */
+/* Quien visita: sin armazón, una columna de lectura; lo que se recuerda es el promedio de ahora, grande, con su unidad. Se lee completa a
+   390 px sin desplazamiento lateral (las tarjetas bajan a una columna; la tabla de cada gráfica se desplaza dentro de su caja). */
+.pagina-publica { min-height: 100vh; display: flex; flex-direction: column; }
+.pagina-publica main { max-width: 64rem; flex: 1 0 auto; }
+.vp-barra { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--e-1) var(--e-2); max-width: 64rem; width: 100%; box-sizing: border-box; margin: 0 auto; padding: var(--e-2) var(--e-5) 0; }
+/* Columnas flexibles y no rejillas: un hijo de rejilla mide como mínimo su contenido, y el lienzo de uPlot ensanchaba la página. */
+.vista-publica { display: flex; flex-direction: column; gap: var(--e-5); min-width: 0; }
+.vp-cabecera { display: grid; gap: var(--e-1); border-bottom: 1px solid var(--borde-tenue); padding-bottom: var(--e-4); }
+.vp-titulo { margin: 0; font-size: var(--t-xxl); line-height: 1.15; overflow-wrap: anywhere; }
+.vp-sitio { margin: 0; font-size: var(--t-l); color: var(--texto-secundario); overflow-wrap: anywhere; }
+.vp-descripcion { margin: var(--e-1) 0 0; max-width: 42rem; white-space: pre-line; overflow-wrap: anywhere; }
+.vp-hora { margin: var(--e-1) 0 0; }
+.vp-tarjetas { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(17rem, 100%), 1fr)); gap: var(--e-3); }
+.vp-tarjeta { background: var(--superficie); border: 1px solid var(--borde-tenue); border-top: 4px solid var(--acento); border-radius: var(--radio); padding: var(--e-3) var(--e-4); display: grid; gap: var(--e-1); align-content: start; min-width: 0; }
+.vp-magnitud { margin: 0; font-size: var(--t-m); font-weight: 600; overflow-wrap: anywhere; }
+.vp-valor { margin: 0; font-size: 2.6rem; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.vp-valor.sin-valor { font-size: var(--t-xl); font-weight: 600; color: var(--texto-secundario); }
+.vp-zonas { margin-top: var(--e-2); background: transparent; }
+.vp-zonas th { background: transparent; font-weight: 400; color: var(--texto-secundario); overflow-wrap: anywhere; }
+.vp-zonas td { text-align: right; white-space: nowrap; font-weight: 600; }
+.vp-protegido { margin-top: var(--e-2); padding: var(--e-2) var(--e-3); background: var(--aviso-fondo); color: var(--aviso); border-left: 3px solid var(--aviso-borde); border-radius: var(--radio); font-size: var(--t-s); }
+.vp-protegido p { margin: 0; display: flex; gap: var(--e-1); align-items: flex-start; }
+.vp-protegido .icono { flex: none; margin-top: 0.1rem; }
+.vp-protegido summary { cursor: pointer; min-height: var(--objetivo); display: inline-flex; align-items: center; text-decoration: underline; }
+.vp-tendencia { display: flex; flex-direction: column; gap: var(--e-4); min-width: 0; }
+.vp-tendencia-cabecera { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--e-2); }
+.vp-seccion { margin: 0; font-size: var(--t-xl); }
+.vp-ventanas { display: flex; flex-wrap: wrap; gap: var(--e-1); }
+.vp-grafica { display: flex; flex-direction: column; gap: var(--e-1); min-width: 0; }
+.vp-grafica p { margin: 0; }
+.vp-pie { margin-top: var(--e-5); padding: var(--e-3) 0; border-top: 1px solid var(--borde-tenue); font-size: var(--t-s); color: var(--texto-secundario); }
+.vp-no-disponible { font-size: var(--t-l); max-width: 36rem; padding: var(--e-4); background: var(--superficie); border: 1px solid var(--borde); border-radius: var(--radio); }
+@media (max-width: 700px) {
+  .vp-barra { padding: var(--e-2) var(--e-4) 0; }
+  .vp-titulo { font-size: var(--t-xl); }
+  .vp-valor { font-size: 2.2rem; }
+}
+/* La vista previa dentro de «Publicar»: el mismo cuerpo, en un marco que dice que es una muestra. */
+.vista-previa { margin: var(--e-4) 0; min-width: 0; }
+.marco-previa { border: 2px dashed var(--borde-control); border-radius: var(--radio-l); padding: var(--e-4); background: var(--fondo); min-width: 0; }
+.vista-previa .vp-titulo { font-size: var(--t-xl); }
+.vista-previa .vp-pie { margin-top: 0; }
+/* Quien publica: el formulario, los avisos antes de publicar, la dirección una vez, la lista y los ajustes del sitio. */
+.intro-publicar { max-width: 46rem; }
+.selector-publicar { display: inline-flex; gap: var(--e-2); align-items: center; margin-bottom: var(--e-3); max-width: 100%; }
+.selector-publicar select, .formulario-publicar select, .formulario-publicar input[type='number'], .fila-campos input { font: inherit; color: var(--texto); background: var(--superficie); padding: 0.3rem 0.4rem; min-height: var(--objetivo); min-width: 0; max-width: 100%; border: 1px solid var(--borde-control); border-radius: var(--radio); }
+.publicar-nueva, .lista-enlaces, .ajustes-publico { margin-top: var(--e-5); min-width: 0; }
+.formulario-publicar { display: flex; flex-direction: column; gap: var(--e-3); max-width: 64rem; min-width: 0; }
+.formulario-publicar textarea { resize: vertical; }
+.formulario-publicar fieldset { border: 1px solid var(--borde-tenue); border-radius: var(--radio); padding: var(--e-2) var(--e-3); margin: 0; min-width: 0; }
+.formulario-publicar legend { font-weight: 600; padding: 0 var(--e-1); }
+.casillas { display: flex; flex-wrap: wrap; gap: var(--e-1) var(--e-4); }
+.casilla { display: inline-flex; gap: var(--e-1); align-items: center; min-height: var(--objetivo); overflow-wrap: anywhere; }
+.casilla input { width: 1.1rem; height: 1.1rem; flex: none; }
+.aviso-publico { margin: 0; font-size: var(--t-s); padding: var(--e-1) var(--e-2); border-left: 3px solid var(--aviso-borde); background: var(--aviso-fondo); color: var(--aviso); }
+.fila-campos { display: flex; flex-wrap: wrap; gap: var(--e-2) var(--e-4); align-items: flex-end; }
+.fila-campos label { display: inline-flex; flex-direction: column; gap: 0.2rem; min-width: 0; max-width: 100%; }
+.avisos-antes { border: 2px solid var(--aviso-borde); background: var(--aviso-fondo); color: var(--aviso); border-radius: var(--radio); padding: var(--e-2) var(--e-3); }
+.avisos-antes p { margin: var(--e-1) 0; }
+.avisos-publicar { margin: var(--e-1) 0; padding-left: 1.2rem; display: grid; gap: var(--e-1); overflow-wrap: anywhere; }
+.enlace-una-vez { border: 2px solid var(--aviso-borde); background: var(--aviso-fondo); color: var(--aviso); border-radius: var(--radio); padding: var(--e-3) var(--e-4); margin: var(--e-3) 0; }
+.enlace-una-vez h3 { margin: 0 0 var(--e-1); }
+.enlace-una-vez .direccion { display: block; padding: var(--e-2); margin: var(--e-2) 0; background: var(--superficie); color: var(--texto); border: 1px dashed var(--aviso-borde); overflow-wrap: anywhere; user-select: all; }
+.enlaces { list-style: none; margin: var(--e-2) 0 0; padding: 0; display: grid; gap: var(--e-2); }
+.enlace { background: var(--superficie); border: 1px solid var(--borde-tenue); border-radius: var(--radio); padding: var(--e-3); display: grid; gap: var(--e-1); min-width: 0; }
+.enlace-cabeza { display: flex; flex-wrap: wrap; gap: var(--e-1) var(--e-2); align-items: baseline; overflow-wrap: anywhere; }
+.enlace p { margin: 0; overflow-wrap: anywhere; }
+.estado-enlace { display: inline-block; padding: 0.05rem 0.5rem; border-radius: 999px; font-size: var(--t-xs); font-weight: 600; border: 1px solid; }
+.estado-enlace.vigente { background: var(--estado-normal-fondo); color: var(--estado-normal); }
+.estado-enlace.vence_pronto { background: var(--estado-alerta-fondo); color: var(--estado-alerta); }
+.estado-enlace.vencido, .estado-enlace.revocado { background: var(--estado-inactivo-fondo); color: var(--estado-inactivo); }
+.datos-enlace { display: flex; flex-wrap: wrap; gap: var(--e-1) var(--e-5); margin: var(--e-1) 0; }
+.datos-enlace div { min-width: 0; }
+.datos-enlace dt { font-size: var(--t-xs); color: var(--texto-secundario); }
+.datos-enlace dd { margin: 0; overflow-wrap: anywhere; }
+.confirmacion { border-left: 3px solid var(--error-borde); background: var(--superficie-tenue); padding: var(--e-2) var(--e-3); border-radius: var(--radio); display: grid; gap: var(--e-2); }
+.confirmacion p { margin: 0; }
+.ajuste { background: var(--superficie); border: 1px solid var(--borde-tenue); border-radius: var(--radio); padding: var(--e-3) var(--e-4); margin-bottom: var(--e-3); display: grid; gap: var(--e-2); min-width: 0; }
+.ajuste h4, .ajuste p { margin: 0; }

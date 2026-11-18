@@ -11,7 +11,7 @@ import type { UsuarioSesion } from '../sesion/permisos.js';
 import { EnlaceCreado, EnlaceListado, EnlaceRenovado, EnlacesService, MinimoSitio, TopeEnlaces, VistaPrevia } from './enlaces.service.js';
 import {
   MAX_DESCRIPCION, MAX_MAGNITUDES, MAX_TITULO, MAX_ZONAS, PLAZOS_DIAS, PLAZO_POR_OMISION, PUBLICO, RENOVAR_HASTA_EDAD_DIAS, RENOVAR_VENCIDO_HASTA_DIAS,
-  K_MAXIMO, RETENCION_TEXTO, SIN_MAGNITUDES, validarMinimo, validarTope, VENCE_PRONTO_DIAS, VENTANAS_PUBLICAS, validarRenovacion, validarVista,
+  K_MAXIMO, RETENCION_TEXTO, SIN_MAGNITUDES, validarCambioDeMinimo, validarTope, VENCE_PRONTO_DIAS, VENTANAS_PUBLICAS, validarRenovacion, validarVista,
 } from './publico.js';
 import { VistaPublicaService } from './vista-publica.service.js';
 import { ESQUEMA_VISTA } from './publico.controller.js';
@@ -92,18 +92,20 @@ export class EnlacesController {
     summary: 'Fijar el mínimo de dispositivos (k) de la vista pública del sitio (P9)',
     description:
       `De PUBLICO_MINIMO_DISPOSITIVOS_PISO a ${K_MAXIMO}. Rige en la petición siguiente de TODOS los enlaces del sitio. Responde el k nuevo y \`avisos\`: «afecta a ` +
-      'todos los enlaces públicos de este sitio» y lo que un visitante podría deducir con ese k (con 1, la lectura de un equipo solo sale tal cual). Deja el evento `enlace_minimo`.',
+      'todos los enlaces públicos de este sitio» y lo que un visitante podría deducir con ese k (con 1, la lectura de un equipo solo sale tal cual). Deja el evento `enlace_minimo`. ' +
+      'Con `anterior` (el k que se leyó), si ya no es el que rige: 409 `codigo: minimo_cambio` con `minimo_dispositivos` (el que rige), sin cambiar nada.',
   })
   @ApiParam({ name: 'id', description: 'UUID del sitio' })
-  @ApiBody({ schema: { type: 'object', required: ['minimo_dispositivos'], properties: { minimo_dispositivos: { type: 'integer', minimum: 1, maximum: K_MAXIMO, description: 'Desde el piso del despliegue' } } } })
+  @ApiBody({ schema: { type: 'object', required: ['minimo_dispositivos'], properties: { minimo_dispositivos: { type: 'integer', minimum: 1, maximum: K_MAXIMO, description: 'Desde el piso del despliegue' }, anterior: { type: 'integer', minimum: 1, maximum: K_MAXIMO, description: 'El k que rige y que se leyó (GET …/minimo): si cambió entretanto, 409 (bloqueo optimista)' } } } })
   @ApiOkResponse({ description: 'El k nuevo con sus avisos' })
-  @ApiBadRequestResponse({ description: 'Fuera del piso a 20, o un campo de más' })
+  @ApiBadRequestResponse({ description: 'Fuera del piso a 20, `anterior` fuera de 1 a 20, o un campo de más' })
+  @ApiConflictResponse({ description: '`codigo: minimo_cambio`: el k cambió desde que se leyó (`anterior`); trae el que rige en `minimo_dispositivos`' })
   async fijarMinimo(@Usuario() u: UsuarioSesion, @Param('id') id: string, @Body() cuerpo: unknown): Promise<MinimoSitio & { avisos: string[] }> {
     exigirEnAlguno(u, 'enlaces');
-    const k = validarMinimo(cuerpo, this.vista.limites);
+    const { k, anterior } = validarCambioDeMinimo(cuerpo, this.vista.limites);
     const sitioId = uuid(id, 'sitio');
     await this.alcance.exigirSitio(u, 'enlaces', sitioId);
-    return this.enlaces.fijarMinimo(sitioId, k, u.id);
+    return this.enlaces.fijarMinimo(sitioId, k, u.id, anterior);
   }
 
   @Put('tope')

@@ -3604,7 +3604,7 @@
         ]
       },
       "put": {
-        "description": "De PUBLICO_MINIMO_DISPOSITIVOS_PISO a 20. Rige en la petición siguiente de TODOS los enlaces del sitio. Responde el k nuevo y `avisos`: «afecta a todos los enlaces públicos de este sitio» y lo que un visitante podría deducir con ese k (con 1, la lectura de un equipo solo sale tal cual). Deja el evento `enlace_minimo`.",
+        "description": "De PUBLICO_MINIMO_DISPOSITIVOS_PISO a 20. Rige en la petición siguiente de TODOS los enlaces del sitio. Responde el k nuevo y `avisos`: «afecta a todos los enlaces públicos de este sitio» y lo que un visitante podría deducir con ese k (con 1, la lectura de un equipo solo sale tal cual). Deja el evento `enlace_minimo`. Con `anterior` (el k que se leyó), si ya no es el que rige: 409 `codigo: minimo_cambio` con `minimo_dispositivos` (el que rige), sin cambiar nada.",
         "operationId": "EnlacesController_fijarMinimo",
         "parameters": [
           {
@@ -3632,6 +3632,12 @@
                     "minimum": 1,
                     "maximum": 20,
                     "description": "Desde el piso del despliegue"
+                  },
+                  "anterior": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 20,
+                    "description": "El k que rige y que se leyó (GET …/minimo): si cambió entretanto, 409 (bloqueo optimista)"
                   }
                 }
               }
@@ -3643,7 +3649,7 @@
             "description": "El k nuevo con sus avisos"
           },
           "400": {
-            "description": "Fuera del piso a 20, o un campo de más"
+            "description": "Fuera del piso a 20, `anterior` fuera de 1 a 20, o un campo de más"
           },
           "401": {
             "description": "sesión requerida"
@@ -3653,6 +3659,9 @@
           },
           "404": {
             "description": "Sitio (o enlace) inexistente o de otro sitio"
+          },
+          "409": {
+            "description": "`codigo: minimo_cambio`: el k cambió desde que se leyó (`anterior`); trae el que rige en `minimo_dispositivos`"
           }
         },
         "security": [

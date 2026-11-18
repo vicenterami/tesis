@@ -195,7 +195,7 @@ persona pidiendo un recurso de un sitio donde no tiene membresía (el administra
   a ese token; la guardia central no lo lee y la ruta queda fuera de la matriz de la §6.
 - Crear, listar, renovar, revocar y la vista previa exigen sesión y la acción `enlaces`; sus eventos (`enlace_creado`, `enlace_renovado`,
   `enlace_revocado`) quedan en la actividad del sitio. ✅ Base, backend y proxy, 17/11/2026 (migración 25: `enlace_publico` y
-  `enlace_publico_acceso`; las rutas, en la fila de la §6; `docs/16 §79`); las pantallas, pendientes.
+  `enlace_publico_acceso`; las rutas, en la fila de la §6; `docs/16 §79`); las dos pantallas, el mismo día (`docs/16 §80`).
 - Todo lo demás (qué se publica, la regla de k, la renovación, la respuesta guardada, el límite de tasa, lo que se cuenta y lo que se prueba)
   vive en `docs/19 §4`, O, y no se repite aquí; los controles del proxy, en `docs/11 §4`, y los datos personales, en `docs/21 §2`.
 
@@ -336,7 +336,7 @@ optimista). El cliente HTTP del panel pone `X-Pedido: panel` en todo lo que escr
 al arrancar, declarada en `.env.example` y pasada por el compose (guardianes 2d y 2z). En la pantalla de administración de límites (plan de
 la Etapa 4) este valor pasará a configurarse desde el panel.
 
-**Lo que falta** (no cambia el diseño): las pantallas de la vista pública por enlace (HU-32; §7 y `docs/19 §4`, O; la base, el backend y el proxy, desde el 17/11/2026), `auditoria` con su middleware (`docs/10 §8.4`
+**Lo que falta** (no cambia el diseño): la medición del punto 13 de la vista pública por enlace (HU-32, hecha el 17/11/2026 con sus dos pantallas: `docs/16 §79` y §80; §7 y `docs/19 §4`, O), `auditoria` con su middleware (`docs/10 §8.4`
 punto 43), el «quién» en los eventos de alta, baja y calibración, y retirar `HTTP_CLAVE_ADMIN` del `.env` del servidor una vez creado el
 primer administrador. El recorrido del banco con navegador (`banco.sh navegador`, `e2e/p3.mjs`) ya entra como usuario del sistema, con la
 clave del banco por cabecera (`docs/16 §59`).

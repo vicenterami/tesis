@@ -108,17 +108,24 @@ export function avisoKOmision(kPorOmision: number): string | null {
     ? `PUBLICO_MINIMO_DISPOSITIVOS=${kPorOmision}, menos que ${K_RECOMENDADO}: rige en todos los sitios que no fijaron su k, y ese cambio no queda en su actividad (responsabilidad del operador; docs/19 §4, O)`
     : null;
 }
-// El k del sitio (PUT /sitios/{id}/enlaces/minimo): entero del piso del despliegue a 20.
+// El k del sitio (PUT /sitios/{id}/enlaces/minimo): entero del piso del despliegue a 20. `anterior` (opcional; decidido el 17/11/2026, tras
+// la revisión de las pantallas): el k que rige y que leyó quien lo cambia; si ya no es el que rige, 409 (bloqueo optimista, como el resto
+// del panel): quien baja k de 3 a 2 sin saber que otro lo subió a 5 decide sobre un dato viejo.
 export function validarMinimo(cuerpo: unknown, l: LimitesPublico): number {
+  return validarCambioDeMinimo(cuerpo, l).k;
+}
+export function validarCambioDeMinimo(cuerpo: unknown, l: LimitesPublico): { k: number; anterior: number | null } {
   if (typeof cuerpo !== 'object' || cuerpo === null || Array.isArray(cuerpo)) throw new BadRequestException(['el cuerpo debe ser un objeto JSON']);
   const c = cuerpo as Record<string, unknown>;
-  const motivos = Object.keys(c).filter((k) => k !== 'minimo_dispositivos').map((k) => `campo no admitido: ${k}`);
+  const motivos = Object.keys(c).filter((k) => k !== 'minimo_dispositivos' && k !== 'anterior').map((k) => `campo no admitido: ${k}`);
   const k = c.minimo_dispositivos;
   if (typeof k !== 'number' || !Number.isInteger(k) || k < l.kPiso || k > K_MAXIMO) {
     motivos.push(`minimo_dispositivos debe ser un entero entre ${l.kPiso} y ${K_MAXIMO} (con 1, el promedio es la lectura de ese equipo)`);
   }
+  const a = c.anterior;
+  if (a !== undefined && (typeof a !== 'number' || !Number.isInteger(a) || a < 1 || a > K_MAXIMO)) motivos.push(`anterior debe ser el k que leíste: un entero entre 1 y ${K_MAXIMO}`);
   if (motivos.length > 0) throw new BadRequestException(motivos);
-  return k as number;
+  return { k: k as number, anterior: a === undefined ? null : (a as number) };
 }
 
 // ── El token (punto 4; como el de la sesión, docs/20 §3) ───────────────────────────────────────────────────────────────────────────

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SIN_FILTROS, SIN_FILTROS_ACTIVIDAD, fragmentoActividad, fragmentoAlta, fragmentoComparar, fragmentoFicha, fragmentoInventario, fragmentoTablero, errorDeVentana, leerVentanaFija, leerVista, redireccionVieja, validarAMedida } from './vista';
+import { SIN_FILTROS, SIN_FILTROS_ACTIVIDAD, fragmentoActividad, fragmentoAlta, fragmentoComparar, fragmentoFicha, fragmentoInventario, fragmentoPublicar, fragmentoTablero, errorDeVentana, leerVentanaFija, leerVista, redireccionVieja, validarAMedida } from './vista';
 
 const ID = '00000000-0000-4000-8000-000000000001';
 const CANAL = '00000000-0000-4000-8000-0000000000c1';
@@ -123,6 +123,16 @@ describe('rutas de P6, P7, P11, P13 y P14', () => {
     expect(leerVista(fragmentoActividad(f))).toEqual({ pantalla: 'actividad', filtros: f });
     expect(fragmentoActividad(SIN_FILTROS_ACTIVIDAD)).toBe('#/actividad');
     expect(leerVista('#/actividad?tipo=DROP%20TABLE&usuario=x&sitio=a%20b')).toEqual({ pantalla: 'actividad', filtros: SIN_FILTROS_ACTIVIDAD });
+  });
+  // P9 (docs/19 §4, O, punto 5): «#/v/…» nunca es una pantalla de la aplicación (ni el tablero, que guardaría la ruta como última vista).
+  it('vista pública: «#/v/<token>» es la pantalla pública, con o sin token válido; «#/publicar» lleva el sitio de ida y vuelta', () => {
+    expect(leerVista(`#/v/${'a'.repeat(43)}`)).toEqual({ pantalla: 'publico' });
+    expect(leerVista('#/v/basura?sitio=uct')).toEqual({ pantalla: 'publico' });
+    expect(leerVista('#/v?x=1').pantalla).toBe('tablero'); // la misma regla que main.ts: no es la vista pública
+    expect(leerVista('/v/abc')).toEqual({ pantalla: 'publico' });
+    expect(leerVista(fragmentoPublicar('uct'))).toEqual({ pantalla: 'publicar', sitio: 'uct' });
+    expect(fragmentoPublicar('')).toBe('#/publicar');
+    expect(leerVista('#/publicar?sitio=a%20b')).toEqual({ pantalla: 'publicar', sitio: '' });
   });
 });
 

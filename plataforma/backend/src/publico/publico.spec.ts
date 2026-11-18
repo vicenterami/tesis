@@ -3,7 +3,7 @@ import { BadRequestException } from '@nestjs/common';
 import {
   FilaAhoraPublica, FilaSeriePublica, LimitesPublico, NO_RENOVABLE, SIN_MAGNITUDES, armarDatos, totalPublicable, diaEnZona, direccionDelEnlace, estadoEnlace, generarToken,
   hashToken, kSitio, leerToken, limitesPublico, mismoResumen, nuevoVencimiento, plazosPermitidos, renovable, validarRenovacion, validarVista,
-  ventanaPedida, ventanasDe, vivo, validarTope, avisosDePublicacion, avisosDeMinimo, avisosPorMagnitud, validarMinimo, AVISO_TODOS_LOS_ENLACES,
+  ventanaPedida, ventanasDe, vivo, validarTope, avisosDePublicacion, avisosDeMinimo, avisosPorMagnitud, validarMinimo, validarCambioDeMinimo, AVISO_TODOS_LOS_ENLACES,
   avisoKOmision,
 } from './publico.js';
 
@@ -83,6 +83,13 @@ describe('validarVista (crear y vista previa)', () => {
     expect(validarMinimo({ minimo_dispositivos: 20 }, L)).toBe(20);
     for (const malo of [{ minimo_dispositivos: 1 }, { minimo_dispositivos: 21 }, { minimo_dispositivos: 2.5 }, { minimo_dispositivos: 3, otro: 1 }, []]) {
       expect(() => validarMinimo(malo, { ...L, kPiso: 2 })).toThrow(BadRequestException);
+    }
+  });
+  it('`anterior` (el k leído) es opcional, de 1 a 20; sin él, el cambio es como antes (bloqueo optimista del k, revisión del 17/11/2026)', () => {
+    expect(validarCambioDeMinimo({ minimo_dispositivos: 2, anterior: 3 }, L)).toEqual({ k: 2, anterior: 3 });
+    expect(validarCambioDeMinimo({ minimo_dispositivos: 2 }, L)).toEqual({ k: 2, anterior: null });
+    for (const malo of [{ minimo_dispositivos: 2, anterior: 0 }, { minimo_dispositivos: 2, anterior: 21 }, { minimo_dispositivos: 2, anterior: '3' }, { minimo_dispositivos: 2, anterior: 2.5 }]) {
+      expect(() => validarCambioDeMinimo(malo, L)).toThrow(BadRequestException);
     }
   });
   it('el plazo, de la lista y sin pasar el máximo del despliegue (el vencimiento nunca pasa el máximo)', () => {

@@ -57,7 +57,7 @@ función que lo calcula es una sola, con prueba unitaria por cada fila de la tab
 | P6 | **Configurar dispositivo y canales** | Nombre, estado (activo / mantenimiento), intervalo esperado, zona; por canal, etiqueta, umbral alto, umbral bajo, histéresis y retardo de activación | Guardar con bloqueo optimista; validación en vivo (bajo < alto, histéresis dentro de la banda, rango de la magnitud) | `PATCH /dispositivos/{id}`, `PUT /canales/{id}/reglas` (Etapa 4), fijadas el 11/11/2026 (§4 tablero v2, E) | HU-06, HU-13, RF-14, punto 28 | Etapa 4, iteración 1 (exige sesión) |
 | P7 | **Alta de dispositivo** (asistente) | Paso 1 identidad y zona; paso 2 vía y formato (y pasarela si LoRaWAN); paso 3 canales y magnitudes; paso 4 credencial según la vía, mostrada una sola vez; paso 5 «esperando la primera trama» en vivo | Crear; copiar la credencial y el tópico; subir un CSV, validarlo y crear las filas válidas; dar de alta un emisor detectado | `POST /dispositivos` (API hecha el 12/10, HU-11, `docs/16 §20`); `POST /dispositivos/lote?modo=validar\|crear` y `GET /cuarentena/detectados` (Etapa 4), fijadas el 11/11/2026 (§4 tablero v2, F) | RF-50, HU-11, HU-22, punto 25 | API: Etapa 3; pantalla, lote y detectados: Etapa 4, iteración 1 |
 | P8 | **Exportar** | Dispositivo (hoy) o sitio (Etapa 4), rango, formato (CSV, XLSX, JSON); tamaño estimado antes de descargar | Descargar | Hecho el 12/10 por dispositivo: `GET /dispositivos/{id}/exportar?formato=csv\|json&desde&hasta` (flujo por tandas; CSV estándar con coma y punto decimal para R, Python y QGIS). **Propuesta** para la Etapa 4: `GET /sitios/{id}/exportar` con rol y XLSX | RF-34, HU-08 (adelantada a la Etapa 3 el 12/10) | API: Etapa 3; pantalla, XLSX y por sitio: Etapa 4 |
-| P9 | **Vista pública por enlace** (diseñada el 16/11/2026, §4 bloque O) | Para quien visita sin cuenta: solo los promedios de las magnitudes que un administrador publicó (del sitio y, si lo eligió, de cada zona), nunca el mínimo ni el máximo; un valor sale oculto si lo aportan menos de k dispositivos. Para el administrador, «Publicar una vista» con vista previa y la lista de enlaces | Visitante: cambiar la ventana y pausar la actualización. Administrador: crear (con vencimiento), renovar y revocar | `GET /publico` (token en la cabecera `X-Enlace-Publico`) y `POST /sitios/{id}/enlaces/vista-previa`; crear y listar, `GET`/`POST /sitios/{id}/enlaces`, renovar, `POST /sitios/{id}/enlaces/{enlace}/renovar`, revocar, `DELETE /sitios/{id}/enlaces/{enlace}`, y el tope de enlaces y el k del sitio, `GET`/`PUT /sitios/{id}/enlaces/tope` y `GET`/`PUT /sitios/{id}/enlaces/minimo`, fijadas en el OpenAPI el 17/11/2026 (§4, O) | RF-62, HU-32, punto 6 | Etapa 4, iteración 1 |
+| P9 | **Vista pública por enlace** (diseñada el 16/11/2026, §4 bloque O; ✅ base, backend, proxy y las dos pantallas, 17/11/2026, `docs/16 §79` y §80) | Para quien visita sin cuenta: solo los promedios de las magnitudes que un administrador publicó (del sitio y, si lo eligió, de cada zona), nunca el mínimo ni el máximo; un valor sale oculto si lo aportan menos de k dispositivos. Para el administrador, «Publicar una vista» con vista previa y la lista de enlaces | Visitante: cambiar la ventana y pausar la actualización. Administrador: crear (con vencimiento), renovar y revocar | `GET /publico` (token en la cabecera `X-Enlace-Publico`) y `POST /sitios/{id}/enlaces/vista-previa`; crear y listar, `GET`/`POST /sitios/{id}/enlaces`, renovar, `POST /sitios/{id}/enlaces/{enlace}/renovar`, revocar, `DELETE /sitios/{id}/enlaces/{enlace}`, y el tope de enlaces y el k del sitio, `GET`/`PUT /sitios/{id}/enlaces/tope` y `GET`/`PUT /sitios/{id}/enlaces/minimo`, fijadas en el OpenAPI el 17/11/2026 (§4, O) | RF-62, HU-32, punto 6 | Etapa 4, iteración 1 |
 | P10 | **Sesión y usuarios** | Entrar, cambio de la clave temporal, salir; quién soy en la cabecera; usuarios de mis sitios, su perfil por sitio y la guía de perfiles (cinco desde el 08/11/2026, diseño: `docs/20 §6`) | Entrar, cambiar la clave, salir o cerrar en todos lados; dar de alta (clave temporal una vez), activar y desactivar, asignar una temporal, cambiar el rol | `POST /sesion`, `GET /sesion`, `DELETE /sesion`, `POST /sesion/clave`, `GET /usuarios`, `POST /usuarios`, `PATCH /usuarios/{id}` (`docs/20`) | RF-43, RF-44, HU-18 | Etapa 4; hecha el 08/11/2026 (§4) |
 | P11 | **Legal y acerca de** (Etapa 4) | Privacidad (generada desde `docs/21`), términos de uso con su versión, avisos de terceros, versión y commit, aviso AGPL; soporte: contacto del responsable y formulario | Leer; aceptar los términos (obligatorio al primer ingreso y al cambiar la versión); enviar un mensaje de soporte | `GET /terminos`, `POST /terminos/aceptar`, `GET /privacidad`, `GET /acerca` (versión y commit solo con sesión), `POST /soporte` y `GET /soporte` (Etapa 4); los avisos de terceros, un archivo generado al cambiar dependencias | RF-53, RF-54, RF-61, HU-27, HU-31 | Iteración 0; hecha el 11/11/2026 |
 | P12 | **Estado del sistema** (solo administrador del sistema; Etapa 4) | Recursos por contenedor en el tiempo (memoria frente a su techo, CPU), errores agrupados por huella, último respaldo y su antigüedad, condiciones del sistema abiertas; límites de los servicios | Ver el detalle de un error; ajustar un límite con bloqueo optimista | `GET /salud` y rutas nuevas sobre `metrica_recurso`, `error_sistema` y los límites (Etapa 4; `docs/10 §8.4` puntos 60 y 61) | RF-59, RF-60, RNF-19, HU-30 | Iteración 1 |
@@ -937,8 +937,9 @@ archivo), «Descargar la plantilla», «Volver a revisar» (lleva a la tabla de 
     después el panel (lector, revisión, descargas); al final el lector de XLSX, que no bloquea lo anterior, y la revisión por capturas.
 
 **O. P9 Vista pública por enlace: lo que ve quien visita sin cuenta (cambia `docs/20 §7`, la fila P9 de §3 y de §7, y `docs/10 §8.4` punto 6; diseñado el 16/11/2026, antes del código, y revisado el mismo día: 15 objeciones, todas atendidas en este texto).**
-✅ base, backend y proxy, 17/11/2026 (migración 25, `backend/src/publico/`, la zona `publico` de `proxy/nginx.conf`; probado en `docs/16 §79`); las dos
-pantallas y la medición del punto 13, pendientes. Lo decidido al implementar va al final del bloque, después del punto 14.
+✅ base, backend y proxy, 17/11/2026 (migración 25, `backend/src/publico/`, la zona `publico` de `proxy/nginx.conf`; probado en `docs/16 §79`); ✅ las dos
+pantallas, el mismo día (`panel/src/Publico.svelte` y `Publicar.svelte`, con su recorrido en navegador real; `docs/16 §80`); la medición del
+punto 13 (120 y 2 000 equipos, el peso de la pantalla), pendiente. Lo decidido al implementar va al final del bloque, después del punto 14.
 Quien pidió esta vista (entrevista del 05/10) quiere una vista de lectura para estudiantes, **sin datos crudos**. La regla que ordena
 todo el bloque: **el visitante ve solo promedios de lo que un administrador decidió publicar, la regla que protege a cada equipo se
 aplica cada vez que se sirve y no solo al publicar, y nada más responde a ese enlace.**
@@ -1043,7 +1044,8 @@ aplica cada vez que se sirve y no solo al publicar, y nada más responde a ese e
 9. **La pantalla del visitante.** Sin el armazón del panel: título, sitio, «actualizado hace…», una tarjeta por magnitud con el
    promedio de ahora, su unidad y «promedio de k o más dispositivos»; debajo, las gráficas de tendencia con el selector de ventana y, si
    hay desglose, una fila por zona con su valor; lo oculto se ve como un hueco, igual que un tramo sin datos, y la tarjeta de una
-   magnitud con algo oculto lleva el aviso «algunos tramos se ocultan para proteger a equipos individuales». Tema claro y oscuro; se lee completa a
+   magnitud lleva el aviso «algunos tramos se ocultan para proteger a equipos individuales» siempre que k > 1 (`protegido`, punto 2: no depende de
+   los datos, para no delatar cuándo reporta un grupo chico). Tema claro y oscuro; se lee completa a
    390 px sin desplazamiento lateral; cada gráfica tiene su tabla de datos alternativa. Botón **«Pausar actualización»** (WCAG 2.2.2); al
    refrescar solo se anuncia el cambio de hora, sin mover el foco. Al pie, una línea fija: «Vista pública de solo lectura · promedios
    del sitio». Si el enlace no vale: «Este enlace ya no está disponible. Pídele uno nuevo a quien te lo compartió.» La respuesta va sin
@@ -1180,6 +1182,55 @@ ajustar, lo ajusta él, dentro de los límites de la instancia):
 - **El desglose** se calcula con `SQL_PUBLICO_SERIES` (`consulta/tablero.ts`): la definición del bloque M agrupada por magnitud y zona en
   una sola consulta; la prueba de integración compara su total del sitio con `GET /sitios/{id}/historico` sobre los mismos datos.
 
+**Decidido al implementar las pantallas (17/11/2026)**, en lo que el bloque no fijaba o no se podía hacer tal cual (`docs/16 §80`):
+- **Dónde vive «Publicar una vista».** Los puntos 3 y 10 la ponen «en la configuración del sitio», pero el panel no tiene esa pantalla. Vive
+  en `#/publicar?sitio=<código>`, con la entrada «Vista pública» en el menú para quien tiene la acción `enlaces` en algún sitio (o es
+  administrador del sistema), y un selector de sitio si administra más de uno. Cuando exista una configuración del sitio, la entrada se muda
+  allí sin cambiar la pantalla.
+- **La vista previa se pide al cambiar magnitudes, zonas o ventanas**, una sola vez tras una pausa de 400 ms; el título y la descripción se
+  dibujan desde el formulario, recortados como los devuelve el servidor. Pedirla en cada tecla gastaría el cupo de la vista previa y la
+  zona de administración del proxy (11 de 30 `POST` seguidos pasan; `docs/16 §79`). **«Publicar» espera esa vista previa** (revisión del
+  mismo día): se desactiva, con el motivo «Espera la vista previa…» (o «La vista previa no se pudo cargar…»), mientras la pausa corre, la
+  vista previa está en vuelo o falló, o fue de otra selección (se guarda la firma de magnitudes, zonas y ventana máxima que la produjo); los
+  avisos solo se muestran si son de la selección actual. Sin esto se podía publicar sin haber visto los avisos de lo que se publica (punto
+  3). Al cambiar de sitio o al empezar a crear, la vista previa en vuelo y su pausa se cancelan; un enlace creado mientras se cambió de sitio
+  no muestra su dirección en la pantalla del otro (queda en la lista del suyo). Sin vista previa no se publica, y tampoco mientras se guarda
+  el k del sitio (la vista previa se rehace con él). Mientras se publica, el selector de sitio se desactiva con su motivo; el menú o «Atrás»
+  pueden cambiar de sitio igual, y entonces vale lo anterior. Guardar el k o el tope con la petición en vuelo y cambiar de sitio no escribe
+  la respuesta del anterior en el nuevo; el cambio de sitio olvida además los avisos, «Copiada» y la ventana de la vista previa.
+- **Bajar el k del sitio se confirma en la pantalla antes del `PUT`**, con «afecta a todos los enlaces públicos de este sitio» y lo que un
+  visitante podría deducir con ese k; después se muestran los avisos que trae la respuesta. Subirlo no pide confirmar (nunca expone).
+  **Con bloqueo optimista** (revisión del mismo día): el `PUT /sitios/{id}/enlaces/minimo` lleva `anterior`, el k que la pantalla leyó; si
+  otra persona lo cambió entretanto, el servidor responde 409 `minimo_cambio` con el que rige y no cambia nada (si no, bajar de 5 a 4
+  creyendo que regía 3 no pedía confirmar). La pantalla relee y, si lo pedido baja el k de ahora, pide confirmar otra vez; una
+  confirmación abierta se cierra si al releer cambió el k. `anterior` es opcional en el contrato: sin él, el cambio es como antes.
+- **La dirección se muestra una sola vez y entera** (con el token en el fragmento), con «Copiar» y «Ya la guardé: ocultar»; el token no se
+  muestra aparte: es la parte final de la dirección. Al salir de la pantalla también se olvida, y cuando la página entra a la caché de ida y
+  vuelta del navegador (`pagehide` con `persisted`), para que «Atrás» no la devuelva (no en todo `pagehide`: en un teléfono, pasar a otra
+  aplicación para pegarla también lo dispara); va con `translate="no"` (un traductor del navegador no la manda a
+  otro servicio). La dirección se arma con el nombre con que entró quien publica: si es local (localhost, loopback, una red privada o la de
+  direcciones compartidas, una IPv4 mapeada en IPv6, un nombre de una sola etiqueta o uno `.local`, `.lan`, `.internal` o `.home.arpa`),
+  se avisa al lado: «Esta dirección usa el nombre con que entraste; para compartirla, entra
+  por el nombre público del servidor.»
+- **Lo que quien visita lee cuando no hay respuesta:** sin red, «No hay conexión con el servicio. La página volverá a intentarlo en un
+  minuto.»; cualquier otro error del servidor, el texto del 503 (se conserva lo último mostrado). Un 429 del proxy o la falta de red no
+  llegan al backend: la siguiente petición todavía lleva `carga=si`.
+- **La unidad, con su símbolo para personas** (`lib/unidades.ts`: «Cel» → «°C»), sin convertir: quien visita no tiene preferencias. El tema
+  es el del sistema operativo y un botón lo cambia solo para esa visita (no se guarda nada en el navegador).
+- **La pantalla del visitante es un paquete propio**, cargado a pedido por `main.ts` antes de montar nada: la aplicación con sesión no se
+  monta ni pide nada. Su código sigue en el paquete inicial (bloque L, P4) y el visitante lo descarga sin ejecutarlo; el peso real de la
+  pantalla pública es parte de la medición del punto 13. Si el fragmento pasa de una a otra (del panel a un `#/v/…` o al revés, o a otro
+  token), la página se recarga: ninguna hereda nada de la otra. `main.ts` y el ruteo de la aplicación usan la misma regla (`esRutaPublica`):
+  `#/v?x` no es la vista pública en ninguno. La petición a `GET /publico` no sigue redirecciones (`redirect: 'error'`).
+- **El informe de errores del panel no existe todavía** (`POST /errores-panel` (ruta prevista); `docs/10 §8.4` punto 60, TT-45): hoy ninguna
+  parte del panel escribe la dirección en un registro ni en la consola; `sinToken` (`lib/publico.ts`) deja `#/v/…` y es la que debe usar
+  ese informe cuando exista. El recorrido en navegador comprueba que el token no aparece en la consola.
+- **La gráfica de cada magnitud lleva el total del sitio y cada zona publicada**, con los colores de la paleta en orden (con más de cinco
+  zonas se repiten: el nombre de cada línea está en la leyenda fija y en «Ver los datos»).
+- **La lista de enlaces va en tarjetas a todo ancho** (no en tabla): cada una con título, qué publica, quién la creó, cuándo vence o se
+  revocó, visitas de los últimos 7 días y estado; renovar abre el plazo (30 días por omisión) y su confirmación junto a la tarjeta. El
+  formulario empieza con la ventana máxima de 7 días y el vencimiento de 30.
+
 ## 5. Flujos
 **F1 · Alta y primera trama.** Ya está dibujado en el diagrama de secuencia del alta (`docs/10`, figura del informe): el
 administrador crea el dispositivo (API en la Etapa 3), recibe la credencial una sola vez, configura el nodo, y el panel
@@ -1299,7 +1350,7 @@ administrador); la vista pública nunca ofrece exportar (punto 6).
 | P6 Configurar | HU-06, HU-13, RF-14 | Etapa 4, iteración 1 | Validación compartida (plantada: bajo ≥ alto falla en los dos lados); 409 con dos pestañas; retardo de activación: una medición fuera de banda menos tiempo que el retardo no abre condición, más tiempo sí; cada guardado deja un `evento` con la persona. Panel (`docs/16 §64`): los casos de la prueba del servidor repetidos contra la función del panel, el error junto al campo, «Guardando…», el 409 con la hora y «Recargar» sin pisar; con navegador real, la validación en vivo y el 409 con dos pestañas |
 | P7 Alta, lote y detectados | HU-22, RF-50, HU-11 | Etapa 4, iteración 1 | Credencial una sola vez; `modo=validar` no crea nada; desde el bloque N (15/11/2026), crear es todo o nada: una fila que no entra o un plan que cambió es 409 `plan_cambio` y no se crea ninguna, y el reintento con la misma llave no duplica (`docs/16 §71`); tope de 500 filas, del cuerpo y límite de tasa plantados; un emisor desconocido aparece en detectados y llega al asistente con su identificador. Panel: por el DOM, 121 válidas en una petición, repetida con la misma llave tras un 502, y los 409 por su `codigo` (`docs/16 §71`; hasta el 15/11, tandas de 50: `docs/16 §64`), 501 filas frenadas en el navegador, detectado → asistente; desde el 16/11/2026, la vista previa en tres pasos (`docs/16 §76`): los tres orígenes dan las mismas filas, las fórmulas salen neutralizadas y lo descargado vuelve a subirse sin cambios, las cinco tarjetas cuentan lo que muestran, «Crear» se desactiva en vuelo; con navegador real, el asistente por HTTP y un lote de 2 válidas y 1 rechazada, y el recorrido de la vista previa a 1 280 y 390 px (`banco.sh lote-navegador`, corrido el 16/11/2026: 24 de 24 en Firefox y en Chromium; faltan los umbrales de tiempo) |
 | P14 Actividad | RF-46, HU-11, HU-26 | Etapa 4, iteración 1 | Un umbral cambiado aparece con la persona que lo cambió; un administrador de un sitio no ve la actividad de otro (404); un cursor de otro sitio no trae nada. Panel (`docs/16 §64`): por el DOM, cursor, filtros en la URL, tarjetas en teléfono y nada para quien no administra; con navegador real, el umbral cambiado en P6 con quien lo cambió y sin correos |
-| P9 Vista pública | RF-62, HU-32, punto 6 | Etapa 4, iteración 1 (`docs/04 §8`, decisión del 13/11/2026; diseño del 16/11/2026 en §4, O) | Sin cuenta: solo los promedios elegidos, sin mínimo ni máximo, y un valor de menos de k dispositivos sale oculto; ninguna otra ruta cambia su respuesta con el token en la cabecera; vencido, revocado, inexistente y mal formado dan la misma respuesta; revocar corta con la respuesta guardada; la vista previa y la vista del visitante dan los mismos números; el token no queda en ningún registro; cada prueba con su falla plantada y, en navegador real, ambas pantallas a 1 280 y 390 px (§4, O, punto 13) |
+| P9 Vista pública | RF-62, HU-32, punto 6 | Etapa 4, iteración 1 (`docs/04 §8`, decisión del 13/11/2026; diseño del 16/11/2026 en §4, O) | Sin cuenta: solo los promedios elegidos, sin mínimo ni máximo, y un valor de menos de k dispositivos sale oculto; ninguna otra ruta cambia su respuesta con el token en la cabecera; vencido, revocado, inexistente y mal formado dan la misma respuesta; revocar corta con la respuesta guardada; la vista previa y la vista del visitante dan los mismos números; el token no queda en ningún registro; cada prueba con su falla plantada y, en navegador real, ambas pantallas a 1 280 y 390 px (§4, O, punto 13). Hecho el 17/11/2026: `docs/16 §79` (base, backend y proxy) y §80 (las pantallas: por el DOM y con `pruebas/panel-publico-e2e.sh`, paso 4c, en Chromium y Firefox); la medición, pendiente |
 
 La etapa de cada pantalla es la de su historia en `docs/04`; mover una historia de etapa se decide con sus horas y se cambia
 primero allí (y en `docs/18`), nunca aquí. Matriz de acceso ruta × rol (`docs/11 §4`) y las pruebas de 409 con dos ediciones simultáneas |

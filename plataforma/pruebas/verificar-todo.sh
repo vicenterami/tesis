@@ -1207,11 +1207,15 @@ paso "4b. Sesión y permisos (docs/20 §6 y §8): la matriz ruta × rol con una 
 # 08/11/2026: el primer administrador con X-Clave-Admin, un usuario de consulta, dos sitios propios de la prueba; todo se borra al salir.
 if curl -s -m 2 http://127.0.0.1:3000/salud >/dev/null; then bash plataforma/pruebas/sesion-smoke.sh || fallos=$((fallos+1)); else echo "omitida: backend no está corriendo"; omitidos="$omitidos 4b"; fi
 
-paso "4c. Panel con sesión en navegadores reales (P10; docs/19 §4 y §6): entrar, clave temporal, inventario, exportar, usuarios, vencer y salir, a 390 y 1280 px, en Chromium y Firefox"
+paso "4c. Panel con sesión en navegadores reales (P10; docs/19 §4 y §6): entrar, clave temporal, inventario, exportar, usuarios, vencer y salir, a 390 y 1280 px, en Chromium y Firefox; y la vista pública por enlace (P9)"
 # 08/11/2026: el e2e de la pantalla de inicio de sesión contra la pila de desarrollo (el panel servido por la imagen del backend). Sin el backend
 # o sin los navegadores de Playwright, el guion sale con 3 y el paso se OMITE con aviso: nunca «OK» sin haber probado.
 bash plataforma/pruebas/panel-sesion-e2e.sh; r=$?
 if [ "$r" = 3 ]; then omitidos="$omitidos 4c"; elif [ "$r" != 0 ]; then fallos=$((fallos+1)); fi
+# 17/11/2026: P9 (docs/19 §4, O; docs/16 §80): publicar con vista previa y avisos, visitar sin sesión (lo dibujado = GET /publico; el token
+# solo en la cabecera, ni en direcciones, almacenamiento, cookies o consola), renovar, el k del sitio y revocar. Mismas reglas de omisión.
+bash plataforma/pruebas/panel-publico-e2e.sh; r=$?
+if [ "$r" = 3 ]; then omitidos="$omitidos 4c-publico"; elif [ "$r" != 0 ]; then fallos=$((fallos+1)); fi
 
 paso "4d. Semilla de demostración: respeta la clave de quien ya eligió la suya (persona_temporal en conservar y rotar, con una persona de descarte)"
 # 13/11/2026: cada corrida de la semilla anulaba la clave propia de las personas de demostración y cortaba sus sesiones. La prueba usa una

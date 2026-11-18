@@ -4,7 +4,7 @@ Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emu
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
 cubría al escribirse se agregó después: TT-32 (sensor físico) en §43, §44 y §53, y TT-30 (recuperación ante reinicio) en §11. El
-contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 824 pruebas unitarias del backend y 404 del panel.
+contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 826 pruebas unitarias del backend y 451 del panel.
 Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -3915,7 +3915,7 @@ falla a la mitad, uno lento para cortar la corrida), que no se versionan.
 
 **Límites.** `OK` de la guardia dice que el respaldo existe, está entero y es reciente, **no que restaura**: eso lo prueba el simulacro.
 La guardia no valida el contenido del archivo del broker, solo su suma (el respaldo sí exige un JSON completo antes de escribirlo). Las
-sumas no van firmadas: detectan la corrupción accidental, no a quien escribe en el servidor y las regenera (`docs/10 §9.5`). No se activó en el servidor de prueba: se hace en el orden de `docs/14 §7.1` (paso 7), con la clave generada fuera de él. La
+sumas no van firmadas: detectan la corrupción accidental, no a quien escribe en el servidor y las regenera (`docs/10 §9.5`). **En el servidor de prueba, activado el 17/11/2026** en el orden de `docs/14 §7.1` (paso 7), con las dos claves generadas fuera de él: respaldo cifrado a mano para 2 destinatarios, la guardia `OK` sobre él, el respaldo diario ya cifrando y la guardia diaria a las 04:30 UTC; el respaldo traído al equipo de desarrollo y restaurado con la clave del operador, **SIMULACRO OK (20 104 filas en 22 tablas restauradas e idénticas, en 4 s)**, y sin la clave el simulacro se niega (salida 2). La
 guardia es un guion con código de salida; la condición `respaldo_atrasado` del panel llega con la monitorización propia (TT-45). El
 simulacro descifra en memoria: con un volcado del tamaño de la memoria libre habrá que descifrar a un disco cifrado; con los tamaños de
 hoy (16 MB con millón y medio de filas) sobra. Un `kill -9` deja en el contenedor de la base la huella y la marca de esa corrida (conteos,
@@ -4112,7 +4112,7 @@ unitarias del backend en 67 archivos, todas en verde (747 antes del bloque); el 
 contrato OpenAPI pasa a 47 rutas y 59 operaciones (`GET`/`PUT /sitios/{id}/enlaces/minimo`). La página de privacidad, a la versión 2. La
 figura del modelo de datos, regenerada desde una base desechable con las 25 migraciones: 25 entidades, con `dispositivo_zona`.
 
-**Lo que falta y lo que no se midió.** Las dos pantallas, la revisión por capturas y la medición del punto 13 (120 y 2 000 dispositivos, 6
+**Lo que falta y lo que no se midió.** Las dos pantallas y la revisión por capturas (hechas el mismo día: §80) y la medición del punto 13 (120 y 2 000 dispositivos, 6
 magnitudes y 5 zonas, el peso de la pantalla): hasta entonces los cupos y la zona del proxy son provisorios. El banco no se corrió.
 **Riesgo aceptado y dicho** (`docs/19 §4`, O, punto 2): la diferenciación en el tiempo y entre ventanas sigue abierta; la historia de
 zonas empieza con la migración (un cambio de zona anterior no quedó guardado).
@@ -4125,3 +4125,105 @@ en verde, sobre la primera y la segunda versión del bloque. **Después de la re
 fijar, `RESTRICT`, `EXCLUDE` con `btree_gist`, el disparador de la historia) y los guiones `sesion-smoke.sh`, `panel-sesion-e2e.sh`,
 `banco/historico-sitio.sh` y la semilla completa borran la historia antes que los dispositivos y zonas: falta reaplicar la 25 y la 14 a
 la base de la pila (probado arriba sobre la versión que tiene) y volver a correr esos guiones y el verificador contra ella.
+
+## 80. Vista pública por enlace: las dos pantallas (17/11/2026)
+
+**Por qué.** Con la base, el backend y el proxy probados (§79), faltaba lo que ve una persona: quien visita sin cuenta y quien publica
+(`docs/19 §4`, O, puntos 3, 5, 9, 10 y 11). Lo que había que demostrar: que el token se lee antes de montar la aplicación y viaja solo en la
+cabecera, que no queda en el navegador ni en una dirección pedida, que lo dibujado es lo que responde `GET /publico`, que la vista previa
+muestra lo mismo que verá el visitante con sus avisos antes de publicar, y que renovar, revocar y el k del sitio hacen lo que dice el diseño.
+
+**Qué se construyó.**
+- **Quien visita** (`panel/src/Publico.svelte`, `VistaPublicaCuerpo.svelte`, `lib/publico.ts`). `main.ts` mira el fragmento antes de montar
+  nada: con `#/v/<token>` carga solo esta pantalla, sin pedir la sesión, la salud ni los sitios y sin leer preferencias. La petición va sin
+  cookies (`credentials: 'omit'`), sin caché y sin procedencia, con el token en `X-Enlace-Publico`; la primera lleva `carga=si`, los
+  refrescos (cada 60 s) no. Una tarjeta por magnitud con el promedio de ahora y «Promedio de k o más dispositivos», una fila por zona, el
+  aviso de lo oculto con su explicación cuando `protegido`; la tendencia con las ventanas que permite el enlace y una gráfica por magnitud
+  con el total y cada zona (y «Ver los datos»); toda hora en la zona del sitio; «Pausar actualización»; los textos de 404, 429 y 503; al
+  pie, la línea fija del punto 9.
+- **Quien publica** (`panel/src/Publicar.svelte`, `lib/enlaces.ts`), en `#/publicar?sitio=<código>` con la entrada «Vista pública» del menú
+  para quien tiene la acción `enlaces`: el formulario con los avisos de texto público junto al título, la descripción y las zonas; la
+  vista previa con el mismo componente que el visitante y sus avisos (más «Sin datos de…») antes de «Publicar»; la dirección una sola vez
+  con «Copiar»; la lista de vivos (y «Ver todos») con «Renovar» (el 409 `acorta` con las dos fechas y «Renovar igual») y «Revocar» con
+  confirmación; el k del sitio (bajarlo se confirma con «afecta a todos los enlaces públicos de este sitio» y lo deducible; después, los
+  avisos de la respuesta) y el tope de enlaces vivos. Lo que el bloque no fijaba (dónde vive la pantalla, cuándo se pide la vista previa y
+  los demás), en `docs/19 §4`, O, «Decidido al implementar las pantallas».
+- `lib/vista.ts` reconoce `#/v/…` como pantalla pública (nunca como tablero ni «última vista») y `#/publicar`; el menú suma la entrada y
+  un icono propio; Vite reenvía en desarrollo `/magnitudes` y `/publico`.
+
+**Pruebas sin base y su falla plantada** (vitest; cada una se probó plantando el defecto y viendo que cae, y deshaciéndolo).
+
+| Qué se comprueba | Prueba | Falla plantada | Qué cayó |
+|---|---|---|---|
+| El token se lee del fragmento (43 caracteres base64url); otra forma no se pide; `sinToken` escribe `#/v/…` | `lib/publico.test.ts` | — | — |
+| La consulta lleva la ventana y `carga=si` solo la primera vez; el token, solo en la cabecera, sin cookies, sin caché, sin procedencia | `lib/publico.test.ts`, `Publico.test.ts` | el token en la consulta; `carga=si` en toda petición | 3 de 18 |
+| 404, 429, 503, otro error y sin red, cada uno con su texto; 404 deja un solo mensaje y no vuelve a pedir; 429 y 503 conservan lo mostrado | `lib/publico.test.ts`, `Publico.test.ts` | — | — |
+| Lo oculto y lo vacío se ven igual («Sin dato»); el aviso de lo oculto solo con `protegido`; la unidad con su símbolo | `lib/publico.test.ts`, `Publico.test.ts` | — | — |
+| «Pausar actualización» detiene los refrescos; la ventana pide la suya sin `carga`; nada se guarda en el almacenamiento del navegador | `Publico.test.ts` | — | — |
+| Sin título ni magnitudes no se publica, con su motivo; los avisos de texto público junto a sus campos | `Publicar.test.ts`, `lib/enlaces.test.ts` | — | — |
+| La vista previa se pide una vez por cambio y sus avisos van antes de «Publicar»; la dirección, una vez | `Publicar.test.ts` | — | — |
+| Al abrir, cargan el catálogo, la lista, el k y el tope del sitio | `Publicar.test.ts` | el catálogo con la misma cancelación que los ajustes (el error que mostró la captura, abajo) | 3 de 9 |
+| El 409 `tope_enlaces` con su número; `no_renovable`; el 409 `acorta` y «Renovar igual» con `acortar: true`; revocar se confirma | `Publicar.test.ts`, `lib/enlaces.test.ts` | — | — |
+| Bajar k se confirma con su aviso y muestra los de la respuesta; subirlo no | `Publicar.test.ts` | — | — |
+| `#/v/…` es la pantalla pública y `#/publicar` lleva el sitio, de ida y vuelta | `lib/vista.test.ts` | — | — |
+
+**En navegador real** (`bash plataforma/pruebas/panel-publico-e2e.sh`, que corre `backend/panel/e2e/publico.mjs`; sumado al paso 4c del
+verificador). Contra la pila, con un sitio de descarte de tres zonas (Norte, 3 equipos; Sur, 2; Este, 1) y una persona administradora por
+caso: **166 de 166 comprobaciones** en Chromium 158 y Firefox 159, a 390 y a 1 280 px (42 a 390 px y 41 a 1 280 px, en cada navegador; tras la revisión de abajo, **178 de 178**: 45 y 44). Por caso: la entrada del menú;
+al abrir, el k (3) y el tope; los avisos de texto público; la vista previa avisa que Sur (2 equipos) saldrá sin valor y que con el total
+se deduce Este, y esos avisos están antes del botón; publicar muestra la dirección una vez y «ocultar» la borra; el visitante, en un
+contexto sin la sesión, dibuja exactamente lo que responde `GET /publico` (título, sitio, «ahora» por magnitud y zona, aviso, ventanas) y
+lo mismo que mostró la vista previa; el token no aparece en la dirección de ninguna petición, ni en `localStorage`, `sessionStorage`,
+cookies o la consola, y viaja en `X-Enlace-Publico`; la primera petición lleva `carga=si` y la de otra ventana no; no pide la sesión, la salud,
+las preferencias ni los sitios; sin desplazamiento horizontal; renovar a 7 días da el 409 `acorta`, se confirma y el enlace queda «vence
+pronto» con el mismo token; bajar k a 1 se confirma con su aviso, la respuesta avisa que Este tiene 1 equipo, y en la visita siguiente Sur
+sale con valor y sin el aviso de lo oculto; subirlo a 3 no pide confirmar; revocar se confirma y el visitante ve «Este enlace ya no está
+disponible. Pídele uno nuevo a quien te lo compartió.» y nada más. Al salir borra sitio, equipos, lecturas, enlaces, eventos y personas, y
+antes espera a que el backend vuelque los accesos contados (abajo); revisado después: ninguna fila de la corrida en la base.
+
+**Fallas plantadas en el recorrido** (con el panel de `pnpm dev`, `E2E_PANEL=http://localhost:5173`, sin reconstruir la imagen; Chromium,
+los dos anchos): el token en la consulta y `carga=si` en toda petición dieron **8 comprobaciones en rojo**, las esperadas (esa corrida registró 81 comprobaciones y no las 83 de una corrida completa en Chromium; no se volvió a medir cuáles faltaron) (por ancho: el token en la
+dirección de las peticiones, la primera petición, la ventana sin `carga` y el token en toda la visita); quitadas, en verde.
+
+**Lo que encontraron las pruebas al construir.** (1) A los dos anchos la página del visitante se desplazaba a lo ancho (224 px a 390 y 88 a
+1 280): el lienzo de uPlot dentro de una rejilla CSS ensanchaba la columna; las columnas pasaron a ser flexibles. (2) La captura de la
+pantalla de publicar mostró «Cargando…» para siempre en los ajustes del sitio: el catálogo usaba la misma cancelación que el k y el tope y
+los cancelaba; ahora tiene la suya, y el doble de `fetch` de las pruebas respeta la cancelación (con el defecto, 3 de 9 en rojo). (3) Las
+unidades salían con el código de SenML («Cel»): ahora con su símbolo. (4) Con `pnpm dev`, un módulo del panel se llama `…/publico.ts`: el
+recorrido distingue la ruta `/publico` de la API por su camino. (5) Del backend, sin cambiarlo: si se borra un enlace con accesos contados en
+memoria y aún sin volcar, el volcado de cada minuto falla (clave foránea) y devuelve todo lo contado, también lo de otros enlaces. La
+aplicación no borra enlaces (no tiene `DELETE`); solo un guion de prueba lo hace, y este espera el volcado antes de borrar.
+
+**Revisión del mismo día** (tres revisiones independientes; privacidad y concordancia, sin hallazgos altos ni medios; seguridad, uno medio y
+ocho menores). Cada uno se verificó antes de corregir, con el diseño primero (`docs/19 §4`, O, «Decidido al implementar las pantallas»):
+
+| Qué se corrigió | Prueba | Falla plantada | Qué cayó |
+|---|---|---|---|
+| (Media) Se podía publicar sin haber visto los avisos de la selección actual: «Publicar» ahora espera la vista previa de esa selección (firma de magnitudes, zonas y ventana máxima), con su motivo, mientras corre la pausa, está en vuelo, falló o es de otra | `Publicar.test.ts`, `lib/enlaces.test.ts`, `e2e/publico.mjs` | el botón sin esperar la vista previa | 1 de 12 por el DOM; en el recorrido (Chromium, `pnpm dev`), la comprobación a los dos anchos, y el clic de prueba publicó de verdad, lo que cortó el resto del caso (13 de 30 en rojo) |
+| Respuestas viejas: cambiar de sitio y empezar a crear cancelan la vista previa en vuelo y su pausa; un enlace creado mientras se cambió de sitio no muestra su dirección en el otro | `Publicar.test.ts` | — | — |
+| Bajar k con un k leído viejo: `PUT …/minimo` acepta `anterior` y responde 409 `minimo_cambio` con el que rige, sin cambiar nada; la pantalla relee y vuelve a pedir confirmar | `publico.spec.ts`, `enlaces.spec.ts`, `Publicar.test.ts` | — | — |
+| La dirección se olvida en `pagehide` (la caché de ida y vuelta) y va con `translate="no"`; si se entró por un nombre local, un aviso al lado | `Publicar.test.ts`, `lib/enlaces.test.ts`, `e2e/publico.mjs` | — | — |
+| Una zona llamada «Promedio del sitio» rompía la página (clave repetida en la leyenda de `Grafico.svelte`): ahora por posición | `Publico.test.ts` | (la prueba se escribió antes de corregir: cayó) | 1 de 8 |
+| El recorrido no imprime tokens (ni en los mensajes de Playwright), tapa la dirección en su captura y solo acepta `chromium` y `firefox` en `E2E_NAVEGADORES` | `e2e/publico.mjs`, `panel-publico-e2e.sh` | `E2E_NAVEGADORES='chromium;id'` | sale con 2 antes de llegar a `node` |
+| `main.ts` y el ruteo usan la misma regla para `#/v` (`#/v?x` no quedaba en «Abriendo la vista pública…»); `GET /publico` no sigue redirecciones | `lib/vista.test.ts`, `lib/publico.test.ts` | — | — |
+
+La corrida con la falla plantada dejó un enlace sin revocar en su sitio de descarte: la limpieza lo borró igual (comprobado en la base).
+
+Una última revisión de la pantalla de publicar dejó, verificados y corregidos: guardar el k o el tope con la petición en vuelo y cambiar de
+sitio escribía la respuesta del anterior en el nuevo (ahora se compara el sitio tras la respuesta; con el defecto plantado, 1 de 15 en
+rojo); el selector de sitio se desactiva con su motivo mientras se publica (con el defecto, 1 de 15); «Publicar» exige una vista previa y
+espera mientras se guarda el k; el cambio de sitio olvida avisos, «Copiada» y la ventana de la vista previa; la dirección se olvida solo
+cuando la página entra a la caché de ida y vuelta (`pagehide` con `persisted`), no al pasar a otra aplicación; el aviso de nombre local
+reconoce también nombres de una etiqueta, `.lan`, `.internal`, `.home.arpa` y una IPv4 mapeada en IPv6; y el recorrido exige tener el token
+antes de comprobar que no aparece (si no, la comprobación pasaba en falso). El recorrido, de nuevo **178 de 178**.
+
+**Cifras.** Panel: `svelte-check` con 417 archivos y 0 errores; **451 del panel** declaradas (eran 404: +47) y **490 ejecuciones** en vitest
+(eran 443), en 38 archivos (cuatro nuevos); `pnpm build` pasa: la pantalla del visitante suma 2,9 kB y su cuerpo, compartido con la vista
+previa, 5,0 kB, más el paquete inicial y uPlot, que ya existían. Backend: **826 pruebas** en 67 archivos (eran 824: las dos del bloqueo
+optimista del k); el OpenAPI se regeneró (47 rutas y 59 operaciones, sin cambios en la cuenta; `PUT …/minimo` suma `anterior` y su 409). Pasos estáticos del verificador sobre el
+cambio: 2y3 (33 componentes, ningún `<button` fuera de `Boton.svelte`) y 2y4 (173 selectores de 4 guiones) en verde.
+
+**Lo que falta y lo que no se midió.** La medición del punto 13 (120 y 2 000 dispositivos, 6 magnitudes y 5 zonas, y el peso de la pantalla
+pública, que hoy descarga también el paquete inicial del panel sin ejecutarlo): hasta entonces, los cupos y la zona del proxy siguen
+provisorios. El recorrido no pasa por el proxy (va al backend en 127.0.0.1:3000; la zona `publico` y su 429 se probaron en §79). El texto
+de 429 se probó por el DOM, no en navegador real. Las capturas a 390 y 1 280 px son de revisión y no se versionan.
