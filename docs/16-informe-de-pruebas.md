@@ -4227,3 +4227,63 @@ cambio: 2y3 (33 componentes, ningún `<button` fuera de `Boton.svelte`) y 2y4 (1
 pública, que hoy descarga también el paquete inicial del panel sin ejecutarlo): hasta entonces, los cupos y la zona del proxy siguen
 provisorios. El recorrido no pasa por el proxy (va al backend en 127.0.0.1:3000; la zona `publico` y su 429 se probaron en §79). El texto
 de 429 se probó por el DOM, no en navegador real. Las capturas a 390 y 1 280 px son de revisión y no se versionan.
+
+**En el servidor de prueba (17/11/2026).** Al desplegar `f486e73`: la migración 25 y `14-rol-aplicacion.sql` corrieron sin ninguna línea `ERROR`;
+la base pasó de 22 a 25 tablas; el escáner de imágenes no dejó nada «con parche» y mostró los avisos ya conocidos; los cuatro contenedores
+quedaron «healthy». Compose avisó que un volumen del broker existía de antes y no lo había creado Compose: no afecta, y queda anotado
+para revisarlo. El respaldo cifrado tomado antes del despliegue se llevó a otro equipo y se restauró: «SIMULACRO OK», 20 186 filas en 22
+tablas (es lo correcto: es anterior a la migración). **Queda pendiente:** la comprobación en el navegador contra el servidor (crear, abrir y
+revocar un enlace de prueba) y un respaldo nuevo, ya con 25 tablas, restaurado fuera.
+
+## 81. La auditoría de dependencias también en el verificador local (18/11/2026)
+
+**Por qué.** Las corridas 117 y 118 del CI, las de los dos empujes de la vista pública (`b30aa8c` y `f486e73`), quedaron en rojo en el
+paso `pnpm audit --audit-level=high`, mientras que `pnpm verificar` pasó en las dos. El `pnpm-lock.yaml` no cambió entre la última
+corrida en verde (`b700637`) y las rojas (`git diff --stat` vacío). La causa fue un aviso de `picomatch` (GHSA-fc5q-39xc-vjpf, alto, sin
+versión corregida, versiones hasta la 4.0.7) que GitHub dio por revisado el 17/11/2026 y **retiró el 18/11/2026** (campos
+`github_reviewed_at` y `withdrawn_at` de su API de avisos). Llegaba solo por herramientas de desarrollo (`typescript-eslint` → … →
+`tinyglobby` → `picomatch`): `pnpm audit --prod` daba 0. Con el aviso ya retirado, la auditoría completa sale hoy con 0 altos y queda un
+aviso moderado de desarrollo (`minimatch`, GHSA-g3hv-75wg-m249). No hizo falta ninguna excepción. Pero el verificador local no corría la
+auditoría (el paso 2q solo vigila las excepciones declaradas), y su corrida de cierre del 17/11 dijo «TODO EN CONCORDANCIA» con el CI en
+rojo: un verde que no había consultado lo que el CI sí consulta (los casos anteriores del CI, en §12 y §56).
+
+**Qué se hizo.** Un paso nuevo del verificador, el 2q2, justo después del 2q, en dos mitades.
+- **La auditoría, como el CI.** Corre en `plataforma/backend` las dos órdenes de `.github/workflows/verificar.yml`: el árbol entero
+  (`pnpm audit`, que falla con avisos altos o críticos; un alto exceptuado en `audit.ignore` no falla, sale como `AVISO`, igual que en el CI) y producción (`pnpm audit --prod`, que no admite ningún aviso, contado en el
+  `metadata` del JSON). `pnpm audit` sale distinto de 0 tanto con avisos como sin poder consultar, así que el paso decide por el contenido: sin un
+  JSON con `metadata` no hay veredicto. Tres resultados: `OK` (con cuántos avisos menores quedan), `FALLA` (por cada aviso alto o crítico:
+  paquete, severidad, GHSA y si tiene versión corregida; y aparte si producción trae alguno) u `omitida` (sin `pnpm`, sin `jq`, sin red o
+  con error del registro), que suma `2q2` a los omitidos y deja la corrida en «incompleta».
+- **Lo publicado.** Con `gh`, la última corrida del flujo `verificar` en `main`. Terminada en rojo: `FALLA` si `HEAD` ya está publicado (igual o anterior a
+  `origin/main`) y no hay cambios, tampoco archivos nuevos que git no ignore (nada local puede arreglarla), y `AVISO` si hay commits o cambios por delante; el
+  mensaje trae el número de corrida, el commit y las órdenes para verla (`gh run view <id> --log-failed`) y relanzarla (`gh run rerun <id> --failed`).
+  En curso, `AVISO`; en verde, `OK`; sin `gh`, sin red o sin corridas, `omitida`.
+- Para plantar fallas, la carpeta auditada (`VERIFICAR_AUDITORIA_DIR`) y la respuesta de `gh` (`VERIFICAR_CI_JSON`) se pueden sustituir.
+
+**Falla plantada** (el bloque extraído a un guion aparte con el preámbulo mínimo, sin correr el verificador entero; las carpetas de prueba se
+borraron al terminar; `pnpm` 12.3.4):
+
+| Qué se comprueba | Falla plantada | Qué salió |
+|---|---|---|
+| El repo de hoy, con el CI sustituido por «success» | — | `OK` en la auditoría (0 altos, 0 de producción, 1 menor de desarrollo) y `OK` en el CI |
+| Aviso alto solo en desarrollo | carpeta temporal con `lodash` 4.17.20 como dependencia de desarrollo (`pnpm audit` crudo: 4 avisos, altos incluidos) | `FALLA 2 aviso(s) alto(s)`: `lodash · high · GHSA-35jh-r3h4-6jhm · corregido en >=4.17.21` y `GHSA-r5fr-rjxr-66jc · corregido en >=4.18.1`; 1 falla |
+| Producción con avisos, también críticos | `minimist` 1.2.0 como dependencia de producción | `FALLA` por el crítico (`GHSA-xvch-5gv4-984h`) y `FALLA producción trae 2 aviso(s)`; 2 fallas |
+| Producción con un aviso que la primera orden del CI deja pasar | `word-wrap` 1.2.3 (moderado; `pnpm audit --audit-level=high` crudo sale con 0) | `FALLA producción trae 1 aviso(s)`: `GHSA-j8xg-fqg3-53r7`; la orden con `--audit-level=high` sola habría dado verde |
+| Registro inalcanzable | `pnpm_config_registry` a un puerto sin servicio | `omitida: la auditoría no devolvió un resultado (¿sin red o registro caído?)` con el motivo de `pnpm` (`ERR_PNPM_AUDIT_BAD_RESPONSE`); `2q2` entre los omitidos; ningún `OK` |
+| Sin `pnpm` | `PATH` sin `pnpm` | `omitida: pnpm no está en el PATH`; `2q2` entre los omitidos |
+| CI en rojo, árbol idéntico a lo publicado | respuesta sustituida con `failure` y un clon limpio con `HEAD` igual a `origin/main` | `FALLA … terminó en ROJO · verla: gh run view 777 --log-failed · relanzarla: gh run rerun 777 --failed (… nada local puede arreglarlo)`; 1 falla |
+| CI en rojo con algo por delante | la misma respuesta, con cambios locales en un archivo rastreado, y con `HEAD` por delante de `origin/main` | `AVISO … (hay commits o cambios locales por delante …)`; 0 fallas, en los dos casos |
+| Aviso alto exceptuado en desarrollo (`audit.ignore`) | `semver` 5.7.1 en desarrollo con su GHSA en el `pnpm-workspace.yaml` de la carpeta. Medido con pnpm 12.3.4: `pnpm audit --audit-level=high` sale con 0, `.metadata` sigue contando 1 alto y `.advisories` queda vacío | `AVISO 1 aviso(s) alto(s) o crítico(s) exceptuado(s) en audit.ignore (GHSA-c2qf-rxjj-qqgw)`; 0 fallas, como el CI. Sin la excepción, `FALLA` con paquete, GHSA y «corregido en >=5.7.2» |
+| El mismo aviso exceptuado, pero en producción | `semver` 5.7.1 en producción con la misma excepción (código de salida 0; `.metadata` de `--prod` cuenta 1) | `FALLA producción trae 1 aviso(s)` y la lista de los exceptuados leída de `audit.ignore`; 1 falla (el CI no admite ninguno en producción, ni exceptuado) |
+| Un archivo nuevo sin rastrear con el CI en rojo | árbol igual a lo publicado más un archivo nuevo que git no ignora; y, aparte, solo archivos que git ignora | con el archivo nuevo, `AVISO` (podría arreglar el CI); con solo lo ignorado, `FALLA` |
+| Sin respuesta del CI | `VERIFICAR_CI_JSON` a un archivo que no existe, y a uno vacío | en los dos, `omitida: … no existe o está vacío; no se sabe el estado del CI` y `2q2` entre los omitidos |
+| Una de las dos consultas de la auditoría sin resultado | un `pnpm` doble en el `PATH` que devuelve vacío o `{"error":"x"}` para el árbol entero con producción válida, o al revés, o ambos vacíos | en todos, `omitida: la auditoría no devolvió un resultado …` y `2q2` entre los omitidos; antes de la corrección, el archivo válido tapaba al inválido y no salía veredicto de la auditoría. Con los dos válidos, `OK` |
+| Sin poder comparar con lo publicado | CI en `failure`, clon sin `origin/main`; y fuera de un repositorio | `AVISO … no se pudo comparar con lo publicado` (no `FALLA`). Ojo: `git rev-parse origin/main` sin `--verify` imprime el nombre si no existe y parece un hash; se usa `--verify -q` |
+| `HEAD` ya publicado pero no igual | CI en `failure`, `HEAD` un commit detrás de `origin/main`, árbol limpio | `FALLA … el árbol local ya está publicado y sin cambios` |
+| CI en verde, en curso, o sin corridas | `success`; `in_progress`; lista vacía | `OK`; `AVISO … sigue en curso`; `omitida: sin corridas del flujo verificar en main` |
+| El estado real de hoy | `gh` sin sustituir: la corrida 118 (`44213796881`, commit `f486e73`) sigue en rojo mientras nadie la relance | en un clon limpio, `FALLA` con esa corrida y las dos órdenes; en la copia con los cambios de este bloque, `AVISO`; la auditoría, `OK` |
+
+**Lo que no cubre.** Necesita red: sin ella el paso queda `omitida` y la corrida entera sale «incompleta» (sale con 2), nunca en verde. Mira
+el estado de la última corrida publicada, no el del commit que se está por publicar: ese lo dirá el CI. Solo audita `plataforma/backend`
+(el panel va dentro de él, con las mismas dos órdenes); una carpeta nueva con su propio lockfile necesitaría su llamada. Y un aviso que
+GitHub retira o publica después de la corrida local sigue siendo posible: por eso el CI corre además cada semana.

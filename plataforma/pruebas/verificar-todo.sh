@@ -578,6 +578,78 @@ else
   done
 fi
 
+paso "2q2. Auditoría de dependencias como el CI: avisos altos o críticos y estado de la última corrida publicada (docs/11 §4, docs/16 §81)"
+# 18/11/2026: el CI quedó rojo dos corridas (117 y 118) en `pnpm audit --audit-level=high` sin que cambiara el lockfile: GitHub dio por
+# revisado el 17/11 un aviso de picomatch sin versión corregida y lo retiró el 18/11. Este verificador no corría la auditoría (el 2q solo
+# vigila las excepciones declaradas) y dijo «TODO EN CONCORDANCIA» con el CI en rojo. Aquí corren las mismas dos órdenes del CI
+# (.github/workflows/verificar.yml) y se mira la última corrida del flujo `verificar` en main. Tres veredictos y nunca verde sin consultar:
+# OK, FALLA u omitida (sin pnpm, jq o red, o error del registro). `pnpm audit` sale distinto de 0 tanto con avisos como sin poder consultar,
+# así que se decide por el contenido (JSON con `.metadata`), no por el código de salida. Sustituibles para plantar fallas:
+# VERIFICAR_AUDITORIA_DIR (carpeta con package.json y lockfile) y VERIFICAR_CI_JSON (lo que devolvería `gh run list --json ...`).
+AD="${VERIFICAR_AUDITORIA_DIR:-plataforma/backend}"
+if ! command -v pnpm >/dev/null; then echo "omitida: pnpm no está en el PATH; la auditoría no se consultó"; omitidos="$omitidos 2q2"
+elif ! command -v jq >/dev/null; then echo "omitida: jq no está en el PATH; la auditoría no se consultó"; omitidos="$omitidos 2q2"
+elif [ ! -f "$AD/pnpm-lock.yaml" ]; then echo "FALLA no existe $AD/pnpm-lock.yaml: no se pudo auditar"; fallos=$((fallos+1))
+else
+  (cd "$AD" && timeout 120 pnpm audit --json) > "$VT/audit-todo.json" 2> "$VT/audit-todo.err"
+  (cd "$AD" && timeout 120 pnpm audit --prod --json) > "$VT/audit-prod.json" 2> "$VT/audit-prod.err"
+  # Cada archivo se valida por separado y cada conteo debe ser un entero: un archivo vacío o con {"error":…} (por ejemplo, el timeout mató la
+  # primera llamada) no puede quedar tapado por el otro, y con un conteo vacío no se sigue (nunca verde ni veredicto a medias).
+  n_meta=$(jq -e '.metadata.vulnerabilities | .high + .critical' "$VT/audit-todo.json" 2>/dev/null); n_prod=$(jq -e '.metadata.vulnerabilities | add' "$VT/audit-prod.json" 2>/dev/null)
+  n_alto=$(jq -e '[.advisories[]? | select(.severity == "high" or .severity == "critical")] | length' "$VT/audit-todo.json" 2>/dev/null)
+  n_otros=$(jq -e '.metadata.vulnerabilities | add - .high - .critical' "$VT/audit-todo.json" 2>/dev/null)
+  if ! [[ "$n_meta" =~ ^[0-9]+$ && "$n_prod" =~ ^[0-9]+$ && "$n_alto" =~ ^[0-9]+$ && "$n_otros" =~ ^[0-9]+$ ]]; then
+    echo "omitida: la auditoría no devolvió un resultado (¿sin red o registro caído?); no se sabe si hay avisos: $(cat "$VT/audit-todo.err" "$VT/audit-prod.err" 2>/dev/null | tr -s '\n ' ' ' | cut -c1-160)"; omitidos="$omitidos 2q2"
+  else
+    # El veredicto de todo el árbol es el del CI: `pnpm audit` respeta audit.ignore, así que los avisos exceptuados desaparecen de
+    # `.advisories` y de su código de salida, pero `.metadata` los sigue contando (probado con pnpm 12.3.4). Alto o crítico que sigue
+    # en `.advisories` = FALLA; el que está en `.metadata` y no en `.advisories` está exceptuado = AVISO. Producción no admite ninguno.
+    exc=$(grep -v '^[[:space:]]*#' "$AD/pnpm-workspace.yaml" 2>/dev/null | grep -oE 'GHSA-[a-z0-9]{4}-[a-z0-9]{4}-[a-z0-9]{4}' | sort -u | tr '\n' ' ')
+    if [ "$n_alto" -gt 0 ]; then
+      echo "FALLA $n_alto aviso(s) alto(s) o crítico(s): el CI (pnpm audit --audit-level=high) se pondría en rojo"; fallos=$((fallos+1))
+      jq -r '.advisories | to_entries[].value | select(.severity == "high" or .severity == "critical") | "      \(.module_name) · \(.severity) · \(.github_advisory_id // .url) · \(if ((.patched_versions // "") == "" or .patched_versions == "<0.0.0") then "sin versión corregida" else "corregido en " + .patched_versions end)"' "$VT/audit-todo.json"
+    elif [ "$n_meta" -gt 0 ]; then
+      echo "AVISO $n_meta aviso(s) alto(s) o crítico(s) exceptuado(s) en audit.ignore (${exc:-no se leyó ninguno en $AD/pnpm-workspace.yaml}): el CI no los cuenta; el paso 2q vigila que sigan vigentes"
+    fi
+    if [ "$n_prod" -gt 0 ]; then
+      echo "FALLA producción trae $n_prod aviso(s) (el CI no admite ninguno, ni exceptuado):"; fallos=$((fallos+1))
+      jq -r '.advisories[]? | "      \(.module_name) · \(.severity) · \(.github_advisory_id // .url) · \(if ((.patched_versions // "") == "" or .patched_versions == "<0.0.0") then "sin versión corregida" else "corregido en " + .patched_versions end)"' "$VT/audit-prod.json"
+      echo "      (los que no aparecen arriba están exceptuados en audit.ignore: ${exc:-ninguno leído})"
+    fi
+    if [ "$n_meta" -eq 0 ] && [ "$n_prod" -eq 0 ]; then echo "OK    la auditoría no trae avisos altos ni críticos ni de producción ($n_otros aviso(s) menores, solo de desarrollo, no bloquean)"; fi
+  fi
+fi
+# Lo publicado: la última corrida del flujo `verificar` en main. Si el CI está en rojo, el verificador local no puede decir «todo bien».
+CJ="${VERIFICAR_CI_JSON:-}"; ci_dicho=
+if [ -z "$CJ" ]; then
+  CJ="$VT/ci.json"
+  if ! command -v gh >/dev/null; then : > "$CJ"; echo "omitida: gh no está en el PATH; no se miró el estado del CI"; omitidos="$omitidos 2q2"; ci_dicho=1
+  elif ! gh run list --workflow verificar --branch main --limit 1 --json databaseId,status,conclusion,headSha > "$CJ" 2>"$VT/ci.err"; then
+    : > "$CJ"; echo "omitida: no se pudo consultar el CI con gh (¿sin red o sin sesión?)"; omitidos="$omitidos 2q2"; ci_dicho=1
+  fi
+fi
+if [ ! -s "$CJ" ]; then
+  # Nunca en silencio: sin respuesta (archivo ausente o vacío) no hay veredicto; si gh ya dijo «omitida» arriba, no se repite.
+  if [ -z "${ci_dicho:-}" ]; then echo "omitida: $CJ no existe o está vacío; no se sabe el estado del CI"; omitidos="$omitidos 2q2"; fi
+else
+  if ! jq -e 'type == "array" and length > 0' "$CJ" >/dev/null 2>&1; then echo "omitida: sin corridas del flujo verificar en main (o respuesta ilegible); no se sabe el estado del CI"; omitidos="$omitidos 2q2"
+  else
+    ci_id=$(jq -r '.[0].databaseId' "$CJ"); ci_sha=$(jq -r '.[0].headSha[0:7]' "$CJ"); ci_est=$(jq -r '.[0].status' "$CJ"); ci_res=$(jq -r '.[0].conclusion // ""' "$CJ")
+    if [ "$ci_est" != "completed" ]; then echo "AVISO la corrida $ci_id del CI (commit $ci_sha) sigue en curso ($ci_est): el estado publicado aún no se conoce"
+    elif [ "$ci_res" = "success" ]; then echo "OK    la última corrida del CI en main (corrida $ci_id, commit $ci_sha) terminó en verde"
+    elif [ "$ci_res" = "failure" ]; then
+      ci_msg="la última corrida del CI en main (corrida $ci_id, commit $ci_sha) terminó en ROJO · verla: gh run view $ci_id --log-failed · relanzarla: gh run rerun $ci_id --failed"
+      # --verify: sin él, rev-parse imprime el nombre tal cual cuando no existe y parecería un hash
+      loc=$(git rev-parse --verify -q "HEAD^{commit}" 2>/dev/null); pub=$(git rev-parse --verify -q "origin/main^{commit}" 2>/dev/null)
+      if [ -z "$loc" ] || [ -z "$pub" ]; then
+        echo "AVISO $ci_msg (no se pudo comparar con lo publicado: falta origin/main o esto no es un repositorio)"
+      elif git merge-base --is-ancestor HEAD origin/main 2>/dev/null && [ -z "$(git status --porcelain 2>/dev/null)" ]; then
+        echo "FALLA $ci_msg (el árbol local ya está publicado y sin cambios: nada local puede arreglarlo)"; fallos=$((fallos+1))
+      else echo "AVISO $ci_msg (hay commits o cambios locales por delante: confirmar que lo arreglan antes de publicar)"; fi
+    else echo "AVISO la última corrida del CI en main (corrida $ci_id, commit $ci_sha) terminó en «$ci_res»: revisarla (gh run view $ci_id)"; fi
+  fi
+fi
+
 paso "2r. RNF-15: dependencias de producción del backend con licencia abierta y permisiva (docs/02, RNF-15)"
 # 08/10: una dependencia copyleft (GPL, AGPL) dentro del backend obligaría a distribuir el conjunto bajo una licencia
 # compatible con la suya y cerraría la opción de una licencia comercial adicional; las de fuente disponible (SSPL, BUSL) no
