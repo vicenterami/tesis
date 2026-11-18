@@ -45,6 +45,7 @@ let pedidas: { metodo: string; ruta: string; cuerpo: unknown }[] = [];
 let crear: () => Response;
 let renovarAcorta = true;
 let respuestaPrevia: () => Response;
+let catalogoFalla = false; // `GET /magnitudes` responde 500 mientras sea true
 let kServidor = 3; // el k que rige en el servidor (otra persona puede cambiarlo)
 // Una petición que se queda en vuelo hasta que la prueba la suelta (para cambiar de sitio mientras tanto).
 let retener: (metodo: string, ruta: string) => Promise<void> | null = () => null;
@@ -54,6 +55,7 @@ beforeEach(() => {
   pedidas = [];
   renovarAcorta = true;
   kServidor = 3;
+  catalogoFalla = false;
   retener = () => null;
   respuestaPrevia = () => json(PREVIA);
   crear = () => json({ ...ENLACE, id: 'e2', titulo: 'Clima del invernadero', token: TOKEN, direccion: `/panel/#/v/${TOKEN}`, avisos: PREVIA.avisos }, 201);
@@ -66,10 +68,12 @@ beforeEach(() => {
     const cuerpo = typeof init.body === 'string' ? JSON.parse(init.body) : undefined;
     pedidas.push({ metodo, ruta, cuerpo });
     await retener(metodo, ruta);
+    if (init.signal?.aborted) throw new DOMException('cancelada', 'AbortError'); // también si se canceló mientras esperaba
     // El segundo sitio (Magallanes): sin enlaces, k = 7 y tope 9.
     if (ruta === '/sitios/s2/enlaces' && metodo === 'GET') return json([]);
     if (ruta === '/sitios/s2/enlaces/minimo' && metodo === 'GET') return json({ minimo_dispositivos: 7, fijado: true, por_omision: 3, piso: 1, maximo: 20 });
     if (ruta === '/sitios/s2/enlaces/tope' && metodo === 'GET') return json({ max_enlaces: 9, fijado: true, por_omision: 50, techo: 200, vivos: 0 });
+    if (ruta === '/magnitudes' && catalogoFalla) return json({ statusCode: 500, message: 'falla' }, 500);
     if (ruta === '/magnitudes') return json([{ codigo: 'humedad', nombre: 'Humedad', unidad: '%RH' }, { codigo: 'temperatura', nombre: 'Temperatura', unidad: 'Cel' }]);
     if (ruta.startsWith('/sitios/s1/enlaces?incluir=todos')) return json([ENLACE, { ...ENLACE, id: 'e0', estado: 'revocado', renovable: false, revocado_en: '2026-11-12T15:00:00Z', revocado_por: { id: 'u1', nombre: 'Ana' } }]);
     if (ruta === '/sitios/s1/enlaces' && metodo === 'GET') return json([ENLACE]);
@@ -274,6 +278,60 @@ describe('P9, quien publica', () => {
     ($('[data-confirmar-minimo]') as HTMLButtonElement).click();
     await waitFor(() => expect(texto('[data-minimo-actual]')).toBe('k = 4'));
     expect(pedidas.filter((p) => p.metodo === 'PUT').at(-1)!.cuerpo).toEqual({ minimo_dispositivos: 4, anterior: 5 });
+  });
+
+  it('si falla el catálogo de magnitudes, tiene su propio aviso con su «Reintentar» (pide `/magnitudes`, no la vista previa) y no se publica; la vista previa tiene el suyo', async () => {
+    catalogoFalla = true;
+    render(Publicar, { sitio: 'uct', sesion: SESION, sitios: SITIOS, alCambiarVista: () => undefined });
+    await waitFor(() => expect(document.querySelector('[data-enlace="e1"]')).toBeTruthy());
+    const aviso = (): Element | null => $('[data-formulario-publicar] fieldset').querySelector('[data-aviso]');
+    await waitFor(() => expect(aviso()).toBeTruthy());
+    expect(aviso()!.textContent).toContain('No se pudo cargar el catálogo de magnitudes.');
+    expect(document.querySelector('[data-vista-previa] [data-aviso]')).toBeNull(); // la vista previa no hereda el error del catálogo
+    expect(document.querySelector('[data-sin-magnitudes]')).toBeNull();
+    await fireEvent.input($('[data-titulo-enlace]'), { target: { value: 'Clima' } });
+    expect($<HTMLButtonElement>('[data-publicar-crear]').disabled).toBe(true);
+    expect(texto('[data-formulario-publicar] [data-motivo-desactivado]')).toBe('El catálogo de magnitudes no se pudo cargar: reintenta antes de publicar.');
+    // Reintentar: pide `/magnitudes` otra vez y ninguna vista previa.
+    catalogoFalla = false;
+    pedidas = [];
+    await fireEvent.click(aviso()!.querySelector('[data-aviso-accion]')!);
+    await waitFor(() => expect(document.querySelector('[data-magnitud-enlace="temperatura"]')).toBeTruthy());
+    expect(aviso()).toBeNull();
+    expect(pedidas.map((p) => p.ruta)).toEqual(['/magnitudes']);
+    expect(texto('[data-formulario-publicar] [data-motivo-desactivado]')).toBe('Elige al menos una magnitud para publicar.');
+    // Con el catálogo, las magnitudes se eligen y la vista previa sigue su camino; si esa falla, su aviso es el suyo y su «Reintentar» pide la vista previa.
+    respuestaPrevia = () => json({ statusCode: 500, message: 'falla' }, 500);
+    await elegir('[data-magnitud-enlace="temperatura"]');
+    await waitFor(() => expect(document.querySelector('[data-vista-previa] [data-aviso]')).toBeTruthy());
+    expect($('[data-formulario-publicar] fieldset').querySelector('[data-aviso]')).toBeNull();
+    respuestaPrevia = () => json(PREVIA);
+    pedidas = [];
+    await fireEvent.click($('[data-vista-previa] [data-aviso-accion]'));
+    await previaLista();
+    expect(pedidas.map((p) => p.ruta)).toEqual(['/sitios/s1/enlaces/vista-previa']);
+    expect(document.querySelector('[data-vista-previa] [data-aviso]')).toBeNull();
+  });
+
+  it('el 409 `minimo_cambio` y, mientras se relee, se cambia de sitio: la relectura del sitio anterior no pisa el k, el aviso ni la confirmación del nuevo', async () => {
+    const r = render(Publicar, { sitio: 'uct', sesion: SESION_DOS, sitios: DOS, alCambiarVista: () => undefined });
+    await waitFor(() => expect(texto('[data-minimo-actual]')).toBe('k = 3'));
+    kServidor = 5; // otra persona lo subió entretanto
+    const pausa = soltable();
+    retener = (metodo, ruta) => (metodo === 'GET' && ruta === '/sitios/s1/enlaces/minimo' ? pausa.promesa : null); // la relectura tras el 409
+    await fireEvent.input($('[data-minimo-campo]'), { target: { value: '2' } });
+    ($('[data-guardar-minimo]') as HTMLButtonElement).click(); // 2 baja el k leído (3): se confirma antes del PUT
+    await waitFor(() => expect(document.querySelector('[data-confirmar-minimo]')).toBeTruthy());
+    ($('[data-confirmar-minimo]') as HTMLButtonElement).click();
+    await waitFor(() => expect(pedidas.filter((p) => p.metodo === 'GET' && p.ruta === '/sitios/s1/enlaces/minimo')).toHaveLength(2)); // 409 y relectura en vuelo
+    await r.rerender({ sitio: 'mag', sesion: SESION_DOS, sitios: DOS, alCambiarVista: () => undefined });
+    await waitFor(() => expect(texto('[data-minimo-actual]')).toBe('k = 7'));
+    pausa.soltar();
+    await new Promise((x) => setTimeout(x, 50));
+    expect(texto('[data-minimo-actual]')).toBe('k = 7');
+    expect($<HTMLInputElement>('[data-minimo-campo]').value).toBe('7'); // no el 2 pedido en el sitio anterior
+    expect(document.body.textContent).not.toContain('Alguien cambió el mínimo');
+    expect(document.querySelector('[data-confirmar-minimo-aviso]')).toBeNull();
   });
 
   it('al salir de la página (pagehide, también hacia la caché de ida y vuelta) la dirección con el token se olvida', async () => {

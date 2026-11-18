@@ -1198,6 +1198,7 @@ ajustar, lo ajusta él, dentro de los límites de la instancia):
   el k del sitio (la vista previa se rehace con él). Mientras se publica, el selector de sitio se desactiva con su motivo; el menú o «Atrás»
   pueden cambiar de sitio igual, y entonces vale lo anterior. Guardar el k o el tope con la petición en vuelo y cambiar de sitio no escribe
   la respuesta del anterior en el nuevo; el cambio de sitio olvida además los avisos, «Copiada» y la ventana de la vista previa.
+- **El catálogo de magnitudes tiene su propio aviso** (corrección del 18/11/2026): si `GET /magnitudes` falla, el aviso va junto a las magnitudes («No se pudo cargar el catálogo de magnitudes. …») con su «Reintentar», que vuelve a pedir el catálogo y no la vista previa; mientras falte, «Publicar» queda desactivado con el motivo «El catálogo de magnitudes no se pudo cargar: reintenta antes de publicar.». El aviso de la vista previa queda solo para la vista previa.
 - **Bajar el k del sitio se confirma en la pantalla antes del `PUT`**, con «afecta a todos los enlaces públicos de este sitio» y lo que un
   visitante podría deducir con ese k; después se muestran los avisos que trae la respuesta. Subirlo no pide confirmar (nunca expone).
   **Con bloqueo optimista** (revisión del mismo día): el `PUT /sitios/{id}/enlaces/minimo` lleva `anterior`, el k que la pantalla leyó; si

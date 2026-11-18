@@ -4,7 +4,7 @@ Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emu
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
 cubría al escribirse se agregó después: TT-32 (sensor físico) en §43, §44 y §53, y TT-30 (recuperación ante reinicio) en §11. El
-contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 828 pruebas unitarias del backend y 452 del panel.
+contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 828 pruebas unitarias del backend y 454 del panel.
 Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -4333,3 +4333,30 @@ se afirma con su condición (lo exige la instalación documentada; sin configura
 cualquier instalación; (3) «registro de actividad» nombraba a la vez lo que existe (la actividad que muestra el panel) y lo que aún no
 (la auditoría de peticiones): la fila de lo que falta dice ahora «registro de auditoría». Además, `docs/14 §7.4` seguía diciendo que el
 cifrado en reposo del respaldo estaba por activarse en el servidor de prueba: puesto al día con `docs/16 §78`.
+
+## 83. Aviso propio del catálogo de magnitudes y prueba del cambio de sitio en el 409 `minimo_cambio` (18/11/2026)
+
+**Por qué.** Una revisión de la pantalla de publicar (17/11/2026) dejó dos puntos. (1) Si fallaba `GET /magnitudes`, el error se escribía en
+`avisoPrevia`, el aviso de la vista previa, cuyo «Reintentar» vuelve a pedir la vista previa y no el catálogo: la persona reintentaba y
+nada cambiaba; además, sin catálogo el motivo de «Publicar» decía «Elige al menos una magnitud», que no se puede cumplir. (2) La corrección
+del 17/11/2026 para el caso en que se cambia de sitio mientras se relee el k tras un 409 `minimo_cambio` (la guarda posterior a
+`await cargarAjustes()` en `guardarK`) no tenía prueba propia.
+
+**Qué se hizo.**
+- `Publicar.svelte`: el catálogo tiene su propio aviso (`avisoCatalogo`) junto a las magnitudes («No se pudo cargar el catálogo de
+  magnitudes. …») con «Reintentar», que vuelve a pedir `/magnitudes` con la cancelación propia del catálogo (`ultimaGana`, separada de la
+  de los ajustes del sitio). Mientras falte, «Publicar» se desactiva con el motivo «El catálogo de magnitudes no se pudo cargar: reintenta
+  antes de publicar.» (`FALLO_CATALOGO`, en `lib/enlaces.ts`) y no se dibuja el «Elige al menos una magnitud» de debajo. El aviso de la
+  vista previa queda solo para la vista previa.
+- El texto del aviso y del motivo quedó fijado en `docs/19 §4`, bloque O, «Decidido al implementar las pantallas».
+- `Publicar.test.ts`: el `fetch` simulado rechaza con `AbortError` también si la petición se cancela mientras espera, como el `fetch` real.
+- Sobre el punto (2), la guarda existente sí cubre el caso: sin ella, la relectura del sitio anterior dejaba en el sitio nuevo el k pedido
+  en el anterior, el aviso de conflicto y la confirmación abierta.
+
+| Qué se comprueba | Prueba | Falla plantada | Qué cayó |
+|---|---|---|---|
+| Un fallo del catálogo muestra su propio aviso junto a las magnitudes, desactiva «Publicar» con su motivo, y su «Reintentar» pide solo `/magnitudes`; al responder bien el aviso desaparece y se elige una magnitud; un fallo de la vista previa tiene su propio aviso y su propio reintento | `Publicar.test.ts` | el error del catálogo escrito otra vez en el aviso de la vista previa | 1 de 17 (no hay aviso junto a las magnitudes) |
+| El «Reintentar» del catálogo no pide la vista previa | `Publicar.test.ts` | el «Reintentar» del catálogo apuntando a la vista previa | 1 de 17 |
+| Cambiar de sitio mientras se relee el k tras el 409 `minimo_cambio`: la relectura del sitio anterior no pisa el k, el aviso ni la confirmación del nuevo | `Publicar.test.ts` | quitar la guarda que sigue a la relectura | 1 de 17 (el campo mostraba 2 en vez de 7) |
+
+**Resultado.** Se agregaron 0 pruebas al backend y 2 al panel. Sin los cambios plantados, las 17 pruebas de `Publicar.test.ts` pasan.

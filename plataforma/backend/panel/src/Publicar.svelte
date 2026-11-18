@@ -20,7 +20,7 @@
   import {
     AVISO_NOMBRES_PUBLICOS, AVISO_TEXTO_PUBLICO, AVISO_TODOS_LOS_ENLACES, FORMULARIO_VACIO, MAX_DESCRIPCION, MAX_TITULO, PLAZOS, RETENCION, ROTULO_ESTADO,
     ROTULO_PLAZO, SIN_MAGNITUDES, TOKEN_UNA_VEZ, acortaDe, avisoDeEnlace, avisosSinDatos, cuerpoPrevia, cuerpoVista, deduciblePorK, direccionCompleta,
-    AVISO_ORIGEN_LOCAL, faltaParaPublicar, firmaDeSeleccion, minimoQueRige, motivoPorPrevia, origenLocal, quePublica, sitiosQuePublica, textoAcorta, tituloDe,
+    AVISO_ORIGEN_LOCAL, FALLO_CATALOGO, faltaParaPublicar, firmaDeSeleccion, minimoQueRige, motivoPorPrevia, origenLocal, quePublica, sitiosQuePublica, textoAcorta, tituloDe,
     ventanaPreviaValida,
     type EnlaceCreado, type EnlaceListado, type FormularioVista, type MagnitudCatalogo, type MinimoSitio, type TopeEnlaces, type VistaPrevia,
   } from './lib/enlaces';
@@ -39,6 +39,8 @@
 
   // ── Datos del sitio ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
   let catalogo = $state<MagnitudCatalogo[]>([]);
+  let avisoCatalogo = $state<DatosAviso | null>(null); // el catálogo de magnitudes tiene su propio aviso: «Reintentar» pide `/magnitudes`, no la vista previa
+  const cargaCatalogo = ultimaGana(); // su propia cancelación: con la de los ajustes del sitio, pedir uno cancelaba el otro
   let enlaces = $state<EnlaceListado[] | null>(null);
   let todos = $state(false);
   let minimo = $state<MinimoSitio | null>(null);
@@ -54,6 +56,15 @@
       avisoLista = null;
     } catch (e) {
       if (!esCancelacion(e)) avisoLista = avisoDeEnlace(e);
+    }
+  }
+  async function cargarCatalogo(): Promise<void> {
+    try {
+      catalogo = await obtener<MagnitudCatalogo[]>('/magnitudes', cargaCatalogo.senal());
+      avisoCatalogo = null;
+    } catch (e) {
+      if (esCancelacion(e)) return;
+      avisoCatalogo = avisoDeError(e);
     }
   }
   async function cargarAjustes(): Promise<void> {
@@ -89,7 +100,7 @@
   let esperandoPrevia = $state(false);
   const firmaActual = $derived(firmaDeSeleccion(f));
   const previaVigente = $derived(previa !== null && !cargandoPrevia && !esperandoPrevia && firmaPrevia === firmaActual);
-  const falta = $derived(faltaParaPublicar(f) ?? motivoPorPrevia({ hayPrevia: previa !== null, firmaActual, firmaPrevia, esperando: esperandoPrevia, cargando: cargandoPrevia, fallo: avisoPrevia !== null, guardandoMinimo: guardandoK }));
+  const falta = $derived((avisoCatalogo !== null ? FALLO_CATALOGO : null) ?? faltaParaPublicar(f) ?? motivoPorPrevia({ hayPrevia: previa !== null, firmaActual, firmaPrevia, esperando: esperandoPrevia, cargando: cargandoPrevia, fallo: avisoPrevia !== null, guardandoMinimo: guardandoK }));
   const sinDatos = $derived(previa === null ? [] : avisosSinDatos(previa));
   // El nombre con que entró quien publica solo sirve en su equipo o su red: se le avisa junto a la dirección.
   const nombreLocal = origenLocal(window.location.hostname);
@@ -345,18 +356,14 @@
     });
   });
   onMount(() => {
-    // Su propia cancelación: con la de los ajustes del sitio, pedir uno cancelaba el otro.
-    const cargaCatalogo = new AbortController();
-    void obtener<MagnitudCatalogo[]>('/magnitudes', cargaCatalogo.signal).then((m) => (catalogo = m)).catch((e: unknown) => {
-      if (!esCancelacion(e)) avisoPrevia = avisoDeError(e);
-    });
+    void cargarCatalogo();
     // «Atrás» puede devolver la página desde la caché de ida y vuelta del navegador: la dirección con el token se olvida cuando la página
     // entra a esa caché (`persisted`). No siempre: en un teléfono, pasar a otra aplicación para pegarla también puede disparar `pagehide`.
     const alSalir = (e: PageTransitionEvent): void => { if (e.persisted) creado = null; };
     window.addEventListener('pagehide', alSalir);
     return () => {
       window.removeEventListener('pagehide', alSalir);
-      cargaCatalogo.abort();
+      cargaCatalogo.cancelar();
       cargaLista.cancelar();
       cargaSitio.cancelar();
       cargaPrevia.cancelar();
@@ -421,13 +428,14 @@
 
       <fieldset>
         <legend>Magnitudes</legend>
-        {#if catalogo.length === 0}<p class="vivo">Cargando el catálogo…</p>{/if}
+        {#if avisoCatalogo !== null}<Aviso tipo={avisoCatalogo.tipo} texto={`No se pudo cargar el catálogo de magnitudes. ${avisoCatalogo.texto}`} accion={{ etiqueta: 'Reintentar', alHacer: () => void cargarCatalogo() }} />
+        {:else if catalogo.length === 0}<p class="vivo" data-catalogo-cargando>Cargando el catálogo…</p>{/if}
         <div class="casillas">
           {#each catalogo as m (m.codigo)}
             <label class="casilla"><input type="checkbox" checked={f.magnitudes.includes(m.codigo)} onchange={(e) => alternar('magnitudes', m.codigo, e.currentTarget.checked)} data-magnitud-enlace={m.codigo} /> {m.nombre} ({simbolo(m.unidad)})</label>
           {/each}
         </div>
-        {#if f.magnitudes.length === 0}<p class="vivo" data-sin-magnitudes>{SIN_MAGNITUDES}</p>{/if}
+        {#if f.magnitudes.length === 0 && avisoCatalogo === null}<p class="vivo" data-sin-magnitudes>{SIN_MAGNITUDES}</p>{/if}
       </fieldset>
 
       <fieldset>
