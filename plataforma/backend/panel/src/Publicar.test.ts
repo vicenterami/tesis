@@ -7,7 +7,7 @@ import type { VistaPublica } from './lib/publico';
 import type { Sesion } from './lib/sesion';
 
 // P9, la pantalla de quien publica (docs/19 §4, O, puntos 2, 3, 4, 10 y 11), por el DOM: la vista previa con sus avisos antes de
-// «Publicar», la dirección una sola vez, renovar (con el 409 `acorta`), revocar con confirmación, el k del sitio con su aviso y el tope.
+// «Publicar», la dirección una sola vez, renovar (con el 409 `acorta`), revocar con confirmación, la línea de lectura del k y del tope (que se cambian en «Ajustes del sitio», P15).
 vi.mock('uplot', () => {
   class UPlotFalso {
     constructor(_o: unknown, _d: unknown, el: HTMLElement) { el.appendChild(document.createElement('canvas')); }
@@ -129,8 +129,19 @@ describe('P9, quien publica', () => {
     expect(texto('[data-aviso-nombres-publicos]')).toContain('El nombre del sitio y el de cada zona publicada también los verá cualquiera con el enlace');
     expect(pedidas.some((p) => p.ruta.endsWith('/vista-previa'))).toBe(false);
     // Al abrir, sin hacer nada, cargan el catálogo, la lista y los ajustes del sitio (el k y el tope).
-    await waitFor(() => expect(texto('[data-minimo-actual]')).toBe('k = 3'));
+    await waitFor(() => expect(texto('[data-minimo-actual]')).toBe('3'));
     expect(texto('[data-tope-actual]')).toBe('50');
+  });
+
+  // P15 (docs/19 §4, Q, punto 4): el k y el tope ya no se cambian aquí; queda la lectura y el enlace a «Ajustes del sitio».
+  it('el k y el tope son una línea de lectura con los valores reales y el enlace «Cambiar en Ajustes del sitio»; no hay campos ni botones para cambiarlos', async () => {
+    kServidor = 5;
+    await montar();
+    await waitFor(() => expect(texto('[data-lectura-ajustes]')).toBe('Mínimo de dispositivos por valor publicado: 5 · Tope de enlaces vivos: 50 · Cambiar en Ajustes del sitio'));
+    const enlace = $<HTMLAnchorElement>('[data-lectura-ajustes] [data-cambiar-en-ajustes]');
+    expect(enlace.getAttribute('href')).toBe('#/sitio/ajustes?sitio=uct');
+    expect(document.querySelector('[data-minimo-campo], [data-guardar-minimo], [data-tope-campo], [data-guardar-tope], [data-confirmar-minimo-aviso]')).toBeNull();
+    expect(pedidas.some((p) => p.metodo === 'PUT')).toBe(false);
   });
 
   it('elegir una magnitud pide la vista previa (la misma forma que GET /publico) y sus avisos se ven ANTES del botón «Publicar»', async () => {
@@ -218,34 +229,6 @@ describe('P9, quien publica', () => {
     await waitFor(() => expect(pedidas.some((p) => p.metodo === 'DELETE' && p.ruta === '/sitios/s1/enlaces/e1')).toBe(true));
   });
 
-  it('bajar el k del sitio pide confirmar, dice que afecta a todos los enlaces y lo deducible; después muestra los avisos del servidor', async () => {
-    await montar();
-    await waitFor(() => expect(texto('[data-minimo-actual]')).toBe('k = 3'));
-    expect(texto('[data-aviso-todos]')).toBe('Este mínimo afecta a todos los enlaces públicos de este sitio.');
-    await fireEvent.input($('[data-minimo-campo]'), { target: { value: '1' } });
-    ($('[data-guardar-minimo]') as HTMLButtonElement).click();
-    await waitFor(() => expect(document.querySelector('[data-confirmar-minimo-aviso]')).toBeTruthy());
-    expect(texto('[data-confirmar-minimo-aviso] p')).toContain('afecta a todos los enlaces públicos de este sitio');
-    expect(texto('[data-confirmar-minimo-aviso] p')).toContain('es la lectura de ese equipo');
-    expect(pedidas.some((p) => p.metodo === 'PUT')).toBe(false);
-    ($('[data-confirmar-minimo]') as HTMLButtonElement).click();
-    await waitFor(() => expect(document.querySelectorAll('[data-aviso-minimo]')).toHaveLength(2));
-    expect(pedidas.find((p) => p.metodo === 'PUT')!.cuerpo).toEqual({ minimo_dispositivos: 1, anterior: 3 });
-    expect(texto('[data-minimo-actual]')).toBe('k = 1');
-  });
-
-  it('subir el k no pide confirmar; el tope se fija con su número', async () => {
-    await montar();
-    await waitFor(() => expect(document.querySelector('[data-tope-campo]')).toBeTruthy());
-    await fireEvent.input($('[data-minimo-campo]'), { target: { value: '5' } });
-    ($('[data-guardar-minimo]') as HTMLButtonElement).click();
-    await waitFor(() => expect(texto('[data-minimo-actual]')).toBe('k = 5'));
-    expect(document.querySelector('[data-confirmar-minimo-aviso]')).toBeNull();
-    await fireEvent.input($('[data-tope-campo]'), { target: { value: '10' } });
-    ($('[data-guardar-tope]') as HTMLButtonElement).click();
-    await waitFor(() => expect(texto('[data-tope-actual]')).toBe('10'));
-  });
-
   it('«Publicar» espera la vista previa de la selección actual: tras cambiarla, desactivado con su motivo; si la previa falla, también', async () => {
     await montar();
     await fireEvent.input($('[data-titulo-enlace]'), { target: { value: 'Clima' } });
@@ -262,22 +245,6 @@ describe('P9, quien publica', () => {
     await elegir('[data-zona-enlace="Sur"]');
     await waitFor(() => expect(texto('[data-formulario-publicar] [data-motivo-desactivado]')).toBe('La vista previa no se pudo cargar: reintenta antes de publicar.'));
     expect($<HTMLButtonElement>('[data-publicar-crear]').disabled).toBe(true);
-  });
-
-  it('bajar k con un k leído viejo: el 409 relee el que rige y pide confirmar otra vez', async () => {
-    await montar();
-    await waitFor(() => expect(texto('[data-minimo-actual]')).toBe('k = 3'));
-    kServidor = 5; // otra persona lo subió entretanto
-    await fireEvent.input($('[data-minimo-campo]'), { target: { value: '4' } });
-    ($('[data-guardar-minimo]') as HTMLButtonElement).click(); // con el k leído (3), 4 no lo baja: no se pregunta
-    await waitFor(() => expect(texto('[data-minimo-actual]')).toBe('k = 5'));
-    expect(pedidas.filter((p) => p.metodo === 'PUT').map((p) => p.cuerpo)).toEqual([{ minimo_dispositivos: 4, anterior: 3 }]);
-    expect(document.body.textContent).toContain('Alguien cambió el mínimo de este sitio entretanto: ahora es k = 5.');
-    await waitFor(() => expect(document.querySelector('[data-confirmar-minimo-aviso]')).toBeTruthy());
-    expect(texto('[data-confirmar-minimo-aviso] p')).toContain('Vas a bajar k de 5 a 4');
-    ($('[data-confirmar-minimo]') as HTMLButtonElement).click();
-    await waitFor(() => expect(texto('[data-minimo-actual]')).toBe('k = 4'));
-    expect(pedidas.filter((p) => p.metodo === 'PUT').at(-1)!.cuerpo).toEqual({ minimo_dispositivos: 4, anterior: 5 });
   });
 
   it('si falla el catálogo de magnitudes, tiene su propio aviso con su «Reintentar» (pide `/magnitudes`, no la vista previa) y no se publica; la vista previa tiene el suyo', async () => {
@@ -313,27 +280,6 @@ describe('P9, quien publica', () => {
     expect(document.querySelector('[data-vista-previa] [data-aviso]')).toBeNull();
   });
 
-  it('el 409 `minimo_cambio` y, mientras se relee, se cambia de sitio: la relectura del sitio anterior no pisa el k, el aviso ni la confirmación del nuevo', async () => {
-    const r = render(Publicar, { sitio: 'uct', sesion: SESION_DOS, sitios: DOS, alCambiarVista: () => undefined });
-    await waitFor(() => expect(texto('[data-minimo-actual]')).toBe('k = 3'));
-    kServidor = 5; // otra persona lo subió entretanto
-    const pausa = soltable();
-    retener = (metodo, ruta) => (metodo === 'GET' && ruta === '/sitios/s1/enlaces/minimo' ? pausa.promesa : null); // la relectura tras el 409
-    await fireEvent.input($('[data-minimo-campo]'), { target: { value: '2' } });
-    ($('[data-guardar-minimo]') as HTMLButtonElement).click(); // 2 baja el k leído (3): se confirma antes del PUT
-    await waitFor(() => expect(document.querySelector('[data-confirmar-minimo]')).toBeTruthy());
-    ($('[data-confirmar-minimo]') as HTMLButtonElement).click();
-    await waitFor(() => expect(pedidas.filter((p) => p.metodo === 'GET' && p.ruta === '/sitios/s1/enlaces/minimo')).toHaveLength(2)); // 409 y relectura en vuelo
-    await r.rerender({ sitio: 'mag', sesion: SESION_DOS, sitios: DOS, alCambiarVista: () => undefined });
-    await waitFor(() => expect(texto('[data-minimo-actual]')).toBe('k = 7'));
-    pausa.soltar();
-    await new Promise((x) => setTimeout(x, 50));
-    expect(texto('[data-minimo-actual]')).toBe('k = 7');
-    expect($<HTMLInputElement>('[data-minimo-campo]').value).toBe('7'); // no el 2 pedido en el sitio anterior
-    expect(document.body.textContent).not.toContain('Alguien cambió el mínimo');
-    expect(document.querySelector('[data-confirmar-minimo-aviso]')).toBeNull();
-  });
-
   it('al salir de la página (pagehide, también hacia la caché de ida y vuelta) la dirección con el token se olvida', async () => {
     await montar();
     await fireEvent.input($('[data-titulo-enlace]'), { target: { value: 'Clima' } });
@@ -351,27 +297,6 @@ describe('P9, quien publica', () => {
   const SESION_DOS: Sesion = { ...SESION, sitios: [...(SESION as Extract<Sesion, { sistema: false }>).sitios, { sitio_id: 's2', codigo: 'mag', nombre: 'Magallanes', rol: 'administrador' }] } as Sesion;
   const soltable = (): { promesa: Promise<void>; soltar: () => void } => { let soltar = (): void => undefined; const promesa = new Promise<void>((ok) => (soltar = ok)); return { promesa, soltar }; };
 
-  it('guardar el k con el PUT en vuelo y cambiar de sitio: la respuesta del sitio anterior no se escribe en el nuevo; «Publicar» espera mientras se guarda', async () => {
-    const r = render(Publicar, { sitio: 'uct', sesion: SESION_DOS, sitios: DOS, alCambiarVista: () => undefined });
-    await waitFor(() => expect(texto('[data-minimo-actual]')).toBe('k = 3'));
-    await fireEvent.input($('[data-titulo-enlace]'), { target: { value: 'Clima' } });
-    await elegir('[data-magnitud-enlace="temperatura"]');
-    await previaLista();
-    const pausa = soltable();
-    retener = (metodo, ruta) => (metodo === 'PUT' && ruta === '/sitios/s1/enlaces/minimo' ? pausa.promesa : null);
-    await fireEvent.input($('[data-minimo-campo]'), { target: { value: '5' } });
-    ($('[data-guardar-minimo]') as HTMLButtonElement).click();
-    await waitFor(() => expect(texto('[data-formulario-publicar] [data-motivo-desactivado]')).toBe('Espera a que se guarde el mínimo del sitio: los avisos de la vista previa dependen de él.'));
-    expect($<HTMLButtonElement>('[data-publicar-crear]').disabled).toBe(true);
-    await r.rerender({ sitio: 'mag', sesion: SESION_DOS, sitios: DOS, alCambiarVista: () => undefined });
-    await waitFor(() => expect(texto('[data-minimo-actual]')).toBe('k = 7'));
-    pausa.soltar();
-    await new Promise((x) => setTimeout(x, 50));
-    expect(texto('[data-minimo-actual]')).toBe('k = 7'); // no el 5 que respondió el sitio anterior
-    expect(document.querySelector('[data-avisos-minimo]')).toBeNull();
-    expect($('[data-guardar-minimo]').getAttribute('aria-busy')).toBeNull();
-  });
-
   it('mientras se publica, el selector de sitio se desactiva con su motivo; al cambiar de sitio se olvidan los avisos del anterior', async () => {
     crear = () => json({ statusCode: 409, codigo: 'tope_enlaces', message: 'Este sitio ya tiene 5 enlaces. Revoca uno para crear otro.' }, 409);
     const r = render(Publicar, { sitio: 'uct', sesion: SESION_DOS, sitios: DOS, alCambiarVista: () => undefined });
@@ -388,7 +313,7 @@ describe('P9, quien publica', () => {
     await waitFor(() => expect(document.body.textContent).toContain('Este sitio ya tiene 5 enlaces.'));
     expect($<HTMLSelectElement>('[data-sitio-publicar]').disabled).toBe(false);
     await r.rerender({ sitio: 'mag', sesion: SESION_DOS, sitios: DOS, alCambiarVista: () => undefined });
-    await waitFor(() => expect(texto('[data-minimo-actual]')).toBe('k = 7'));
+    await waitFor(() => expect(texto('[data-minimo-actual]')).toBe('7'));
     expect(document.body.textContent).not.toContain('Este sitio ya tiene 5 enlaces.');
   });
 

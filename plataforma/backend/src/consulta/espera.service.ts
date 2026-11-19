@@ -4,6 +4,19 @@ import { POOL } from '../db/db.module.js';
 import { errorDeCliente } from '../db/cliente.js';
 import { registrarEvento } from '../db/evento.js';
 import { ESPERA_CAMBIO, ESPERA_PRIMERA_TRAMA, EsperaSitio } from './espera.js';
+import { SQL_ESPERA_HASTA } from './tablero.js';
+
+// Cuántos equipos ACTIVOS del sitio que nunca enviaron una trama están hoy dentro de su plazo y con el propuesto quedarían vencidos. «Hoy
+// dentro»: la misma expresión del estado visual (SQL_ESPERA_HASTA, el plazo del sitio) todavía en el futuro; «vencido con el propuesto»: su
+// en_servicio_desde más el propuesto, ya pasado o ahora. Nunca enviaron: sin fila de estado o sin última trama (como el estado visual).
+// En mantenimiento, de baja, ya vencidos, los de otro sitio y los que ya figuran «Sin señal» por una condición `sin_comunicacion` abierta
+// (pueden estar dentro del plazo tras alargarlo, hasta el barrido siguiente: el estado visual ya los muestra así) no cuentan. Una sola consulta, de solo lectura.
+export const SQL_AFECTADOS_POR_PLAZO = `SELECT count(*)::int AS n
+  FROM dispositivo d JOIN zona z ON z.id = d.zona_id LEFT JOIN estado_dispositivo e ON e.dispositivo_id = d.id
+  WHERE z.sitio_id = $1 AND d.estado = 'activo' AND e.visto_por_ultima_vez IS NULL
+    AND NOT EXISTS (SELECT 1 FROM condicion cv WHERE cv.dispositivo_id = d.id AND cv.cerrada_en IS NULL AND cv.tipo = 'sin_comunicacion')
+    AND now() < ${SQL_ESPERA_HASTA}
+    AND d.en_servicio_desde + $2 * INTERVAL '1 hour' <= now()`;
 
 // Leer y fijar el plazo de la primera trama de un sitio (docs/19 §4, P; docs/10 §8.4 punto 68). El permiso (leer o `ajustes` en ese sitio)
 // lo resuelve el controlador antes de llegar aquí; el sitio es siempre el de la ruta.
@@ -11,8 +24,13 @@ import { ESPERA_CAMBIO, ESPERA_PRIMERA_TRAMA, EsperaSitio } from './espera.js';
 export class EsperaService {
   constructor(@Inject(POOL) private readonly pool: Pool) {}
 
-  async leer(sitioId: string): Promise<EsperaSitio> {
-    return this.leerCon(this.pool, sitioId, false);
+  // Con `propuesto` (horas, ya validadas), suma `afectados` (SQL_AFECTADOS_POR_PLAZO): el aviso para quien acorta el plazo. Sin él, la respuesta
+  // es la de siempre.
+  async leer(sitioId: string, propuesto: number | null = null): Promise<EsperaSitio> {
+    const r = await this.leerCon(this.pool, sitioId, false);
+    if (propuesto === null) return r;
+    const n = await this.pool.query<{ n: number }>(SQL_AFECTADOS_POR_PLAZO, [sitioId, propuesto]);
+    return { ...r, afectados: n.rows[0]?.n ?? 0 };
   }
 
   // Fijarlo, con el mecanismo del k de la vista pública (EnlacesService.fijarMinimo): en una transacción, la fila del sitio bloqueada

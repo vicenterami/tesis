@@ -59,6 +59,8 @@
   const daDeAlta = $derived(sesion !== null && puedeEnAlguno(sesion, 'escribir'));
   // P9 «Vista pública» (docs/19 §4, O, puntos 3 y 10): quien tiene la acción `enlaces` en algún sitio (administrador de sitio y del sistema).
   const publicaVistas = $derived(sesion !== null && (puedeEnAlguno(sesion, 'enlaces') || (!sesion.sistema && sesion.administrador_sistema === true)));
+  // P15 «Ajustes del sitio» (docs/19 §4, Q): quien tiene la acción `ajustes` o `enlaces` en algún sitio (hoy, los mismos perfiles).
+  const ajustaSitio = $derived(sesion !== null && (puedeEnAlguno(sesion, 'ajustes') || puedeEnAlguno(sesion, 'enlaces') || (!sesion.sistema && sesion.administrador_sistema === true)));
   // La última vista de datos abierta (tablero, inventario o ficha): P13 la ofrece para guardarla con un nombre.
   let ultimaVista = $state<string | null>(null);
   $effect(() => {
@@ -188,6 +190,7 @@
     if (administraUsuarios) lista.push({ ruta: '#/usuarios', texto: 'Usuarios', icono: 'usuarios', activo: vista.pantalla === 'usuarios', dato: 'usuarios' });
     if (daDeAlta) lista.push({ ruta: '#/alta', texto: 'Dar de alta', icono: 'alta', activo: vista.pantalla === 'alta', dato: 'alta-menu' });
     if (publicaVistas) lista.push({ ruta: '#/publicar', texto: 'Vista pública', icono: 'publico', activo: vista.pantalla === 'publicar', dato: 'publicar' });
+    if (ajustaSitio) lista.push({ ruta: '#/sitio/ajustes', texto: 'Ajustes del sitio', icono: 'ajustes', activo: vista.pantalla === 'ajustes', dato: 'ajustes-sitio' });
     return lista;
   });
 
@@ -496,6 +499,12 @@
           {#await import('./Publicar.svelte') then { default: Publicar }}<Publicar sitio={vista.sitio} {sesion} {sitios} {alCambiarVista} />{:catch}{@render sinPantalla()}{/await}
         {:else}
           <p class="vacio" data-sin-publicar>Tu rol no publica vistas en ningún sitio: lo hace quien administra el tuyo. <a href="#/">Volver al tablero</a></p>
+        {/if}
+      {:else if vista.pantalla === 'ajustes'}
+        {#if ajustaSitio}
+          {#await import('./AjustesSitio.svelte') then { default: AjustesSitio }}<AjustesSitio sitio={vista.sitio} {sesion} {sitios} {alCambiarVista} />{:catch}{@render sinPantalla()}{/await}
+        {:else}
+          <p class="vacio" data-sin-ajustes>Tu rol no cambia ajustes en ningún sitio: los cambia quien administra el tuyo. <a href="#/">Volver al tablero</a></p>
         {/if}
       {:else if vista.pantalla === 'publico'}
         <p class="vacio">Abriendo la vista pública…</p>

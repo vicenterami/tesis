@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ErrorApi } from './api';
 import {
-  ESPERA_MINIMO, ESPERA_PREVIA, FALLO_PREVIA, FORMULARIO_VACIO, NO_RENOVABLE, firmaDeSeleccion, minimoQueRige, motivoPorPrevia, octetosLocales, origenLocal, SIN_MAGNITUDES, acortaDe, avisoDeEnlace, avisosSinDatos, cuerpoPrevia, cuerpoVista, direccionCompleta, faltaParaPublicar,
+  ESPERA_PREVIA, FALLO_PREVIA, FORMULARIO_VACIO, NO_RENOVABLE, firmaDeSeleccion, minimoQueRige, motivoPorPrevia, octetosLocales, origenLocal, SIN_MAGNITUDES, acortaDe, avisoDeEnlace, avisosSinDatos, cuerpoPrevia, cuerpoVista, direccionCompleta, faltaParaPublicar,
   quePublica, sitiosQuePublica, textoAcorta, tituloDe, ventanaPreviaValida,
 } from './enlaces';
 import type { Sitio } from './modelo';
@@ -86,7 +86,7 @@ describe('lo que la revisión del 17/11/2026 sumó', () => {
     const f = { ...FORMULARIO_VACIO, magnitudes: ['temperatura'] };
     expect(firmaDeSeleccion({ ...f, titulo: 'otro', plazo_dias: 7 } as typeof f)).toBe(firmaDeSeleccion(f));
     expect(firmaDeSeleccion({ ...f, zonas: ['z1'] })).not.toBe(firmaDeSeleccion(f));
-    const base = { hayPrevia: true, firmaActual: firmaDeSeleccion(f), firmaPrevia: firmaDeSeleccion(f), esperando: false, cargando: false, fallo: false, guardandoMinimo: false };
+    const base = { hayPrevia: true, firmaActual: firmaDeSeleccion(f), firmaPrevia: firmaDeSeleccion(f), esperando: false, cargando: false, fallo: false };
     expect(motivoPorPrevia(base)).toBeNull();
     expect(motivoPorPrevia({ ...base, esperando: true })).toBe(ESPERA_PREVIA);
     expect(motivoPorPrevia({ ...base, cargando: true })).toBe(ESPERA_PREVIA);
@@ -94,7 +94,6 @@ describe('lo que la revisión del 17/11/2026 sumó', () => {
     expect(motivoPorPrevia({ ...base, firmaPrevia: firmaDeSeleccion({ ...f, zonas: ['z1'] }) })).toBe(ESPERA_PREVIA);
     expect(motivoPorPrevia({ ...base, fallo: true })).toBe(FALLO_PREVIA);
     expect(motivoPorPrevia({ ...base, hayPrevia: false })).toBe(ESPERA_PREVIA); // con la firma igual, pero sin vista previa
-    expect(motivoPorPrevia({ ...base, guardandoMinimo: true })).toBe(ESPERA_MINIMO);
   });
   it('el 409 `minimo_cambio` trae el k que rige; otro error, null', () => {
     expect(minimoQueRige(error(409, { codigo: 'minimo_cambio', minimo_dispositivos: 5, message: 'x' }))).toBe(5);

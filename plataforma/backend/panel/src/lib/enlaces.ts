@@ -113,10 +113,8 @@ export const firmaDeSeleccion = (f: Pick<FormularioVista, 'magnitudes' | 'zonas'
 export const ESPERA_PREVIA = 'Espera la vista previa: lo que verá quien visite y sus avisos se muestran antes de publicar.';
 export const FALLO_PREVIA = 'La vista previa no se pudo cargar: reintenta antes de publicar.';
 export const FALLO_CATALOGO = 'El catálogo de magnitudes no se pudo cargar: reintenta antes de publicar.';
-export const ESPERA_MINIMO = 'Espera a que se guarde el mínimo del sitio: los avisos de la vista previa dependen de él.';
-// Sin vista previa no se publica; mientras se guarda el k del sitio, tampoco (la vista previa y sus avisos se rehacen con el k nuevo).
-export function motivoPorPrevia(x: { hayPrevia: boolean; firmaActual: string; firmaPrevia: string | null; esperando: boolean; cargando: boolean; fallo: boolean; guardandoMinimo: boolean }): string | null {
-  if (x.guardandoMinimo) return ESPERA_MINIMO;
+// Sin vista previa no se publica. (Hasta el 18/11/2026 tampoco mientras se guardaba el k del sitio; el k se cambia ahora en «Ajustes del sitio».)
+export function motivoPorPrevia(x: { hayPrevia: boolean; firmaActual: string; firmaPrevia: string | null; esperando: boolean; cargando: boolean; fallo: boolean }): string | null {
   if (x.esperando || x.cargando) return ESPERA_PREVIA;
   if (x.fallo) return FALLO_PREVIA;
   return x.hayPrevia && x.firmaPrevia === x.firmaActual ? null : ESPERA_PREVIA;

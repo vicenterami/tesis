@@ -5,8 +5,8 @@
 // «Vista pública»; publica con vista previa y avisos visibles antes de «Publicar»; abre la dirección como visitante en un contexto sin
 // sesión y comprueba que lo dibujado es lo que responde GET /publico, que el token no va en la dirección de ninguna petición (solo en la
 // cabecera), ni en el almacenamiento del navegador, ni en cookies, ni en la consola; que la primera petición cuenta la carga y los
-// refrescos no; renueva con un plazo que acorta (409 `acorta` y confirmación); baja el k del sitio a 1 con su aviso (el visitante ve la zona
-// que antes salía oculta) y lo devuelve a 3; y revoca: el visitante ve «enlace no disponible». Al final escribe «CARGAS n» (los accesos
+// refrescos no; renueva con un plazo que acorta (409 `acorta` y confirmación); visita «Ajustes del sitio» (a 390 y 1 280 px: los tres controles, el plazo cambiado y devuelto), baja allí el k del sitio a 1 con su aviso
+// (el visitante ve la zona que antes salía oculta) y lo devuelve a 3; y revoca: el visitante ve «enlace no disponible». Al final escribe «CARGAS n» (los accesos
 // que el backend contó: el guion espera a que se vuelquen antes de borrar los enlaces).
 import { readFileSync } from 'node:fs';
 import { chromium, firefox } from 'playwright';
@@ -74,6 +74,18 @@ const iniciar = async (p, c) => {
   }, c);
   if (r !== 'ok') throw new Error(`no se pudo entrar: ${r}`);
 };
+// Devuelve un ajuste del sitio a su valor de partida por la API (desde la página, con su sesión), también tras un fallo a medias: el sitio de
+// prueba no queda cambiado (revisión del 18/11/2026). `ruta` sin el prefijo `/sitios/{id}`; el sitio se busca por su código.
+const restaurar = async (p, ruta, cuerpo) => {
+  const r = await p.evaluate(async ({ codigo, ruta, cuerpo }) => {
+    const h = { 'content-type': 'application/json', accept: 'application/json', 'X-Pedido': 'panel' };
+    const s = (await (await fetch('/sitios')).json()).find((x) => x.codigo === codigo);
+    if (!s) return 'sitio no encontrado';
+    const a = await fetch(`/sitios/${s.id}${ruta}`, { method: 'PUT', headers: h, body: JSON.stringify(cuerpo) });
+    return a.ok ? 'ok' : `PUT ${ruta} ${a.status}`;
+  }, { codigo: sitio, ruta, cuerpo });
+  if (r !== 'ok') falla(`no se pudo restaurar ${ruta}: ${r}`);
+};
 // Lo que responde GET /publico para un token (desde Node: sin navegador, sin cookies, sin `carga`).
 const vistaDeLaApi = async (token, ventana = '24h') => {
   const r = await fetch(`${api}/publico?ventana=${ventana}`, { headers: { 'X-Enlace-Publico': token } });
@@ -132,10 +144,11 @@ for (const caso of casos) {
     await p.reload();
     await p.locator('[data-formulario-publicar]').waitFor({ timeout: 15000 });
     comprobar((await p.locator('[data-ir-publicar]').count()) === 1, `${etiqueta}: «Vista pública» está en el menú de quien administra el sitio`);
-    await p.waitForFunction(() => document.querySelector('[data-minimo-actual]')?.textContent?.trim() === 'k = 3' && document.querySelector('[data-tope-actual]') !== null, null, { timeout: 10000 })
-      .then(() => ok(`${etiqueta}: al abrir, la pantalla dice el k que rige en el sitio (3, el de omisión) y su tope de enlaces`))
+    await p.waitForFunction(() => document.querySelector('[data-minimo-actual]')?.textContent?.trim() === '3' && document.querySelector('[data-tope-actual]') !== null, null, { timeout: 10000 })
+      .then(() => ok(`${etiqueta}: al abrir, la línea de lectura dice el k que rige en el sitio (3, el de omisión) y su tope de enlaces`))
       .catch(() => falla(`${etiqueta}: al abrir, no aparecen el k ni el tope del sitio`));
-    comprobar(limpio(await p.textContent('[data-aviso-todos]').catch(() => '')) === TODOS_LOS_ENLACES, `${etiqueta}: junto al k, «${TODOS_LOS_ENLACES}»`);
+    comprobar((await p.locator('[data-lectura-ajustes] [data-cambiar-en-ajustes]').count()) === 1 && (await p.locator('[data-minimo-campo], [data-guardar-minimo], [data-tope-campo]').count()) === 0,
+      `${etiqueta}: «Publicar» solo lee el k y el tope: el enlace «Cambiar en Ajustes del sitio» y ningún campo para cambiarlos`);
     comprobar(limpio(await p.textContent('[data-aviso-texto-publico]')) === 'Este texto lo verá cualquiera con el enlace: sin nombres de personas ni datos personales.',
       `${etiqueta}: junto al título y la descripción, el aviso de que los verá cualquiera`);
     comprobar(limpio(await p.textContent('[data-aviso-nombres-publicos]')).startsWith('El nombre del sitio y el de cada zona publicada también los verá cualquiera con el enlace'),
@@ -249,7 +262,48 @@ for (const caso of casos) {
     comprobar(a.status === 200, `${etiqueta}: renovar no cambia el token: el enlace sigue sirviendo`);
   });
 
+  // P15 (docs/19 §4, Q): los ajustes del sitio, con el enlace de «Publicar», a 390 y 1 280 px: los tres controles y el plazo cambiado y devuelto.
+  let plazoOriginal = null; // lo que rige antes de tocarlo: se restaura aunque el paso se corte
+  await paso(`${etiqueta}: ajustes del sitio`, async () => {
+    try {
+      // La ayuda de «Renovar» (paso anterior) dura mientras el foco siga en el botón (WCAG 1.4.13) y en pantalla angosta se fija abajo:
+      // a 390 px tapa esta línea. Se descarta con Escape, como lo haría una persona (18/11/2026: el clic se cortaba solo a ese ancho).
+      await p.keyboard.press('Escape');
+      await p.click('[data-cambiar-en-ajustes]');
+      await p.locator('[data-ajustes-sitio]').waitFor({ timeout: 15000 });
+      comprobar((await p.locator('[data-ir-ajustes-sitio]').count()) === 1, `${etiqueta}: «Ajustes del sitio» está en el menú de quien administra el sitio`);
+      await p.waitForFunction(() => document.querySelector('[data-espera-actual]') !== null && document.querySelector('[data-minimo-actual]') !== null && document.querySelector('[data-tope-actual]') !== null, null, { timeout: 15000 });
+      comprobar((await p.locator('[data-espera-campo]').count()) === 1 && (await p.locator('[data-minimo-campo]').count()) === 1 && (await p.locator('[data-tope-campo]').count()) === 1,
+        `${etiqueta}: los tres controles (plazo de la primera trama, k y tope), cada uno con su campo`);
+      comprobar(limpio(await p.textContent('[data-espera-al-vencer]')).includes('pasa a «Sin señal» y se abre la alarma de falta de comunicación'), `${etiqueta}: el plazo dice qué pasa al vencer`);
+      comprobar(limpio(await p.textContent('[data-aviso-todos]').catch(() => '')) === TODOS_LOS_ENLACES, `${etiqueta}: junto al k, «${TODOS_LOS_ENLACES}»`);
+      await sinDesborde(p, `${etiqueta}, ajustes del sitio`);
+      await foto(p, '3b-ajustes-del-sitio');
+      // El plazo: se alarga un día y se devuelve. Alargar no pregunta; devolverlo es acortar, que pregunta a cuántos equipos afecta (si hay alguno, se confirma).
+      const original = Number(limpio(await p.textContent('[data-espera-actual]')));
+      plazoOriginal = original;
+      await p.fill('[data-espera-campo]', String(original + 24));
+      await p.click('[data-guardar-espera]');
+      await p.waitForFunction((h) => document.querySelector('[data-espera-actual]')?.textContent?.trim() === String(h), original + 24, { timeout: 15000 });
+      comprobar((await p.locator('[data-confirmar-espera-aviso]').count()) === 0, `${etiqueta}: alargar el plazo (${original} → ${original + 24} h) no pide confirmar`);
+      await p.fill('[data-espera-campo]', String(original));
+      await p.click('[data-guardar-espera]');
+      await p.waitForFunction((h) => document.querySelector('[data-espera-actual]')?.textContent?.trim() === String(h) || document.querySelector('[data-confirmar-espera-aviso]') !== null, original, { timeout: 15000 });
+      if ((await p.locator('[data-confirmar-espera-aviso]').count()) === 1) {
+        comprobar(/^Con este plazo, \d+ equipos? que esperan? su primera trama pasar(á|án) a «Sin señal»/.test(limpio(await p.textContent('[data-confirmar-espera-aviso] p'))), `${etiqueta}: acortar con equipos afectados pide confirmar y dice cuántos`);
+        await p.click('[data-confirmar-espera]');
+      } else ok(`${etiqueta}: acortar sin equipos afectados se guarda directo`);
+      await p.waitForFunction((h) => document.querySelector('[data-espera-actual]')?.textContent?.trim() === String(h), original, { timeout: 15000 });
+      ok(`${etiqueta}: el plazo vuelve a ${original} h`);
+    } finally {
+      // La restauración no tapa el error del paso: si también falla, queda anotada aparte.
+      if (plazoOriginal !== null) await restaurar(p, '/espera-primera-trama', { espera_primera_trama_h: plazoOriginal })
+        .catch((e) => falla(`${etiqueta}: no se pudo devolver el plazo de partida (${e.message})`));
+    }
+  });
+
   await paso(`${etiqueta}: el k del sitio, con su aviso`, async () => {
+    try {
     await p.fill('[data-minimo-campo]', '1');
     await p.click('[data-guardar-minimo]');
     await p.locator('[data-confirmar-minimo-aviso]').waitFor({ timeout: 10000 });
@@ -272,6 +326,15 @@ for (const caso of casos) {
     await p.click('[data-guardar-minimo]');
     await p.waitForFunction(() => document.querySelector('[data-minimo-actual]')?.textContent?.trim() === 'k = 3', null, { timeout: 15000 });
     ok(`${etiqueta}: subir k a 3 no pide confirmar y vuelve a regir`);
+    } finally {
+      await restaurar(p, '/enlaces/minimo', { minimo_dispositivos: 3 }) // el k de partida (el de omisión): el sitio de prueba no queda con otro
+        .catch((e) => falla(`${etiqueta}: no se pudo devolver el k de partida (${e.message})`));
+    }
+    // De vuelta a «Publicar» por el menú: el siguiente paso revoca el enlace desde su lista. A ancho angosto el menú es un cajón:
+    // primero se abre con «Menú» (como en e2e/sesion.mjs).
+    if (await p.evaluate(() => matchMedia('(max-width: 999.98px)').matches)) await p.locator('[data-menu]').click(); // = CONSULTA_CAJON (lib/medios.ts)
+    await p.click('[data-ir-publicar]');
+    await p.locator('[data-lista-enlaces]').waitFor({ timeout: 15000 });
   });
 
   await paso(`${etiqueta}: revocar`, async () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SIN_FILTROS, SIN_FILTROS_ACTIVIDAD, fragmentoActividad, fragmentoAlta, fragmentoComparar, fragmentoFicha, fragmentoInventario, fragmentoPublicar, fragmentoTablero, errorDeVentana, leerVentanaFija, leerVista, redireccionVieja, validarAMedida } from './vista';
+import { SIN_FILTROS, SIN_FILTROS_ACTIVIDAD, fragmentoActividad, fragmentoAlta, fragmentoComparar, fragmentoFicha, fragmentoAjustes, fragmentoInventario, fragmentoPublicar, fragmentoTablero, errorDeVentana, leerVentanaFija, leerVista, redireccionVieja, validarAMedida } from './vista';
 
 const ID = '00000000-0000-4000-8000-000000000001';
 const CANAL = '00000000-0000-4000-8000-0000000000c1';
@@ -133,6 +133,15 @@ describe('rutas de P6, P7, P11, P13 y P14', () => {
     expect(leerVista(fragmentoPublicar('uct'))).toEqual({ pantalla: 'publicar', sitio: 'uct' });
     expect(fragmentoPublicar('')).toBe('#/publicar');
     expect(leerVista('#/publicar?sitio=a%20b')).toEqual({ pantalla: 'publicar', sitio: '' });
+  });
+  // P15 (docs/19 §4, Q, punto 1): `#/sitio/ajustes?sitio=<código>`, con el patrón de `#/publicar`; no es ninguna de las vistas de datos.
+  it('ajustes del sitio: «#/sitio/ajustes» lleva el sitio de ida y vuelta, ignora un código con forma inválida y no se confunde con otra ruta', () => {
+    expect(leerVista(fragmentoAjustes('uct'))).toEqual({ pantalla: 'ajustes', sitio: 'uct' });
+    expect(fragmentoAjustes('uct')).toBe('#/sitio/ajustes?sitio=uct');
+    expect(fragmentoAjustes('')).toBe('#/sitio/ajustes');
+    expect(leerVista('#/sitio/ajustes')).toEqual({ pantalla: 'ajustes', sitio: '' });
+    expect(leerVista('#/sitio/ajustes?sitio=a%20b')).toEqual({ pantalla: 'ajustes', sitio: '' });
+    expect(leerVista('#/sitio/otra?sitio=uct').pantalla).toBe('tablero');
   });
 });
 

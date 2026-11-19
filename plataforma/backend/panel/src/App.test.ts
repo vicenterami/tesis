@@ -47,6 +47,7 @@ const SESION = {
   sitios: [{ sitio_id: 's1', codigo: 'uct', nombre: 'Campus', rol: 'administrador' }], expira_en: null, inactividad_vence_en: null,
   permisos: { administrador: ['leer', 'exportar', 'escribir', 'baja', 'configurar', 'usuarios', 'enlaces', 'auditoria'], consulta: ['leer'] },
 };
+let sesionActual: object = SESION; // la sesión que responde `GET /sesion` (cada prueba puede cambiarla; afterEach la devuelve)
 class FuenteInerte {
   readyState = 1;
   onopen = null;
@@ -64,7 +65,7 @@ beforeEach(() => {
   vi.stubGlobal('EventSource', FuenteInerte);
   vi.stubGlobal('fetch', vi.fn(async (ruta: string) => {
     peticiones.push(ruta);
-    if (ruta === '/sesion') return new Response(JSON.stringify(SESION));
+    if (ruta === '/sesion') return new Response(JSON.stringify(sesionActual));
     const inv = inventarioSimulado(ruta, inventario, [], AHORA);
     if (inv !== null) return inv;
     if (ruta === '/sitios') return new Response(JSON.stringify(sitios));
@@ -84,6 +85,7 @@ afterEach(() => {
   vi.useRealTimers();
   history.replaceState(null, '', '#/');
   sitios = [SITIO];
+  sesionActual = SESION;
   document.documentElement.removeAttribute('data-theme');
   olvidarPreferencias();
 });
@@ -232,7 +234,7 @@ describe('armazón: llegada, menú lateral, cajón, sitio, legal y tema', () => 
     expect(document.querySelector('[data-selector-sitio]')).toBeNull();
     expect(document.querySelector('[data-sitio-nombre]')!.textContent).toBe('Campus');
     const enlaces = [...nav().querySelectorAll('a')];
-    expect(enlaces.map((a) => a.textContent!.trim())).toEqual(['Tablero', 'Inventario', 'Actividad', 'Usuarios', 'Dar de alta', 'Vista pública', 'Legal y acerca de']);
+    expect(enlaces.map((a) => a.textContent!.trim())).toEqual(['Tablero', 'Inventario', 'Actividad', 'Usuarios', 'Dar de alta', 'Vista pública', 'Ajustes del sitio', 'Legal y acerca de']);
     for (const a of enlaces) expect(a.querySelector('svg')!.getAttribute('aria-hidden')).toBe('true'); // el icono no es el nombre
     expect(screen.getByRole('link', { name: 'Tablero' }).getAttribute('aria-current')).toBe('page');
     expect(screen.getByRole('link', { name: 'Inventario' }).getAttribute('href')).toBe('#/inventario');
@@ -247,6 +249,34 @@ describe('armazón: llegada, menú lateral, cajón, sitio, legal y tema', () => 
     expect(enfocables[0]!.matches('[data-saltar]')).toBe(true);
     expect(enfocables.indexOf(menu())).toBeLessThan(enfocables.indexOf(screen.getByRole('link', { name: 'Tablero' })));
     expect(enfocables.indexOf(screen.getByRole('link', { name: 'Tablero' }))).toBeLessThan(enfocables.indexOf(document.querySelector<HTMLElement>('[data-pestana="resumen"]')!));
+  });
+
+  // P15 (docs/19 §4, Q, punto 1): «Ajustes del sitio» aparece con cualquiera de las dos acciones, `ajustes` o `enlaces`, y no sin ninguna.
+  const conPermisos = (acciones: string[], rol = 'administrador'): void => {
+    sesionActual = { ...SESION, sitios: [{ sitio_id: 's1', codigo: 'uct', nombre: 'Campus', rol }], permisos: { [rol]: acciones } };
+  };
+  it.each([['ajustes'], ['enlaces']])('el menú trae «Ajustes del sitio» a quien tiene la acción %s (y lleva a #/sitio/ajustes)', async (accion) => {
+    conPermisos(['leer', accion!]);
+    render(App);
+    await waitFor(() => expect(screen.getByRole('link', { name: 'Ajustes del sitio' })).toBeTruthy());
+    const a = screen.getByRole('link', { name: 'Ajustes del sitio' });
+    expect(a.getAttribute('href')).toBe('#/sitio/ajustes');
+    expect(a.querySelector('svg')!.getAttribute('aria-hidden')).toBe('true');
+  });
+  it('sin ninguna de las dos acciones no hay entrada en el menú, y la ruta dice que tu rol no cambia ajustes', async () => {
+    conPermisos(['leer'], 'consulta');
+    history.replaceState(null, '', '#/sitio/ajustes?sitio=uct');
+    render(App);
+    await waitFor(() => expect(document.querySelector('[data-sin-ajustes]')).toBeTruthy());
+    expect(screen.queryByRole('link', { name: 'Ajustes del sitio' })).toBeNull();
+    expect(document.querySelector('[data-ajustes-sitio]')).toBeNull();
+  });
+  it('quien tiene la acción llega a la pantalla por su ruta, con su entrada del menú activa', async () => {
+    conPermisos(['leer', 'ajustes']);
+    history.replaceState(null, '', '#/sitio/ajustes?sitio=uct');
+    render(App);
+    await waitFor(() => expect(document.querySelector('[data-ajustes-sitio]')).toBeTruthy());
+    expect(screen.getByRole('link', { name: 'Ajustes del sitio' }).getAttribute('aria-current')).toBe('page');
   });
 
   it('«Saltar al contenido» lleva el foco a <main> sin cambiar la ruta del panel', async () => {

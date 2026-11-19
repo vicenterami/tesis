@@ -2,7 +2,7 @@
   // Iconos propios (docs/19 §4, bloque L, punto 1f): trazos SVG dibujados para este proyecto, en una cuadrícula de 24 px, sin biblioteca
   // de terceros ni fuente de iconos (la CSP no admite recursos externos y no se suma una licencia). Solo líneas rectas, arcos y círculos;
   // el color es el del texto (`currentColor`) y el icono queda oculto al lector de pantalla: el nombre es el del control que lo lleva.
-  export type NombreIcono = 'tablero' | 'inventario' | 'actividad' | 'usuarios' | 'alta' | 'legal' | 'menu' | 'luna' | 'sol' | 'cuenta' | 'pausa' | 'reanudar' | 'cerrar' | 'existe' | 'aviso' | 'publico';
+  export type NombreIcono = 'tablero' | 'inventario' | 'actividad' | 'usuarios' | 'alta' | 'legal' | 'menu' | 'luna' | 'sol' | 'cuenta' | 'pausa' | 'reanudar' | 'cerrar' | 'existe' | 'aviso' | 'publico' | 'ajustes';
   const TRAZOS: Readonly<Record<NombreIcono, string>> = {
     // cuatro paneles de distinto alto, como un tablero
     tablero: 'M4 4h7v8H4z M13 4h7v5h-7z M13 11h7v9h-7z M4 14h7v6H4z',
@@ -36,6 +36,8 @@
     aviso: 'M12 3.5L2.5 20h19z M12 10v4.5 M12 17.4v.1',
     // un ojo: lo que se deja ver (la vista pública, P9)
     publico: 'M2.5 12c2.4-4.4 5.6-6.5 9.5-6.5s7.1 2.1 9.5 6.5c-2.4 4.4-5.6 6.5-9.5 6.5S4.9 16.4 2.5 12z M12 9a3 3 0 1 0 0 6a3 3 0 1 0 0-6z',
+    // dos reglas con su deslizador: lo que se ajusta (P15)
+    ajustes: 'M4 7h6.5 M15.5 7H20 M13 4.5a2.5 2.5 0 1 0 0 5a2.5 2.5 0 1 0 0-5z M4 17h2.5 M11.5 17H20 M9 14.5a2.5 2.5 0 1 0 0 5a2.5 2.5 0 1 0 0-5z',
   };
   export const NOMBRES_ICONO = Object.keys(TRAZOS) as NombreIcono[];
 </script>

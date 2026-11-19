@@ -572,11 +572,11 @@ main { padding-bottom: calc(var(--e-4) + var(--alto-avisos, 0px)); }
 .marco-previa { border: 2px dashed var(--borde-control); border-radius: var(--radio-l); padding: var(--e-4); background: var(--fondo); min-width: 0; }
 .vista-previa .vp-titulo { font-size: var(--t-xl); }
 .vista-previa .vp-pie { margin-top: 0; }
-/* Quien publica: el formulario, los avisos antes de publicar, la dirección una vez, la lista y los ajustes del sitio. */
+/* Quien publica: el formulario, los avisos antes de publicar, la dirección una vez, la lista y la línea con los ajustes del sitio (que se cambian en P15). */
 .intro-publicar { max-width: 46rem; }
 .selector-publicar { display: inline-flex; gap: var(--e-2); align-items: center; margin-bottom: var(--e-3); max-width: 100%; }
 .selector-publicar select, .formulario-publicar select, .formulario-publicar input[type='number'], .fila-campos input { font: inherit; color: var(--texto); background: var(--superficie); padding: 0.3rem 0.4rem; min-height: var(--objetivo); min-width: 0; max-width: 100%; border: 1px solid var(--borde-control); border-radius: var(--radio); }
-.publicar-nueva, .lista-enlaces, .ajustes-publico { margin-top: var(--e-5); min-width: 0; }
+.publicar-nueva, .lista-enlaces, .ajustes-publico, .ajustes-sitio { margin-top: var(--e-5); min-width: 0; }
 .formulario-publicar { display: flex; flex-direction: column; gap: var(--e-3); max-width: 64rem; min-width: 0; }
 .formulario-publicar textarea { resize: vertical; }
 .formulario-publicar fieldset { border: 1px solid var(--borde-tenue); border-radius: var(--radio); padding: var(--e-2) var(--e-3); margin: 0; min-width: 0; }

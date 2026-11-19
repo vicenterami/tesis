@@ -3,8 +3,9 @@ import { BadRequestException, ConflictException, HttpException } from '@nestjs/c
 import type { Pool } from 'pg';
 import type { AlcanceService } from '../sesion/alcance.service.js';
 import { Accion, Rol, UsuarioSesion, exigir, usuarioSistema } from '../sesion/permisos.js';
-import { ESPERA_CAMBIO, ESPERA_PRIMERA_TRAMA, validarEspera } from './espera.js';
-import { EsperaService } from './espera.service.js';
+import { ESPERA_CAMBIO, ESPERA_PRIMERA_TRAMA, validarEspera, validarPropuesto } from './espera.js';
+import { EsperaService, SQL_AFECTADOS_POR_PLAZO } from './espera.service.js';
+import { SQL_ESPERA_HASTA } from './tablero.js';
 import { SitiosController } from './sitios.controller.js';
 import type { TableroService } from './tablero.service.js';
 import type { ActividadService } from './actividad.service.js';
@@ -109,5 +110,62 @@ describe('EsperaService.fijar: bloqueo optimista por valor, evento con quién y 
     const { servicio, llamadas } = armar(168);
     await servicio.fijar(S, 168, 'u1', null);
     expect(llamadas.some(([s]) => s.startsWith('UPDATE sitio') || s.startsWith('INSERT INTO evento'))).toBe(false);
+  });
+});
+
+// 18/11/2026: el aviso de quien acorta el plazo, `GET …/espera-primera-trama?propuesto=<h>` → `afectados` (docs/19 §4, P y Q). Los casos contra una
+// base real (dentro, borde, ya vencido, otro sitio, mantenimiento) están en integracion/espera.ts.
+describe('validarPropuesto: el `?propuesto=` se valida como el PUT', () => {
+  it('ausente → null; un entero de 1 a 2 160 → ese número', () => {
+    expect(validarPropuesto(undefined)).toBeNull();
+    expect(validarPropuesto('1')).toBe(1);
+    expect(validarPropuesto('2160')).toBe(2160);
+  });
+  it('vacío, 0, 2 161, decimal, signo, texto o repetido (arreglo) → 400', () => {
+    for (const malo of ['', '0', '2161', '1.5', '-5', '+5', '24h', ' 24', '00000', ['24', '48'], 24]) {
+      expect(() => validarPropuesto(malo), JSON.stringify(malo)).toThrow(BadRequestException);
+    }
+  });
+});
+
+describe('EsperaService.leer con `propuesto`: una sola consulta, con la regla del estado visual', () => {
+  const armar = (n: number) => {
+    const consultas: [string, unknown[]][] = [];
+    const pool = { query: vi.fn((sql: string, p: unknown[] = []) => { consultas.push([sql, p]); return Promise.resolve({ rows: sql.includes('count(*)') ? [{ n }] : [{ h: 168 }] }); }) };
+    return { servicio: new EsperaService(pool as unknown as Pool), consultas };
+  };
+  it('sin `propuesto` la respuesta es la de siempre: ni `afectados` ni segunda consulta', async () => {
+    const { servicio, consultas } = armar(5);
+    const r = await servicio.leer(S);
+    expect(r).toEqual({ espera_primera_trama_h: 168, por_omision: 168, minimo: 1, maximo: 2160 });
+    expect('afectados' in r).toBe(false);
+    expect(consultas).toHaveLength(1);
+  });
+  it('con `propuesto` suma `afectados` con UNA consulta más, del sitio y de las horas pedidas', async () => {
+    const { servicio, consultas } = armar(3);
+    expect(await servicio.leer(S, 24)).toEqual({ espera_primera_trama_h: 168, por_omision: 168, minimo: 1, maximo: 2160, afectados: 3 });
+    expect(consultas).toHaveLength(2);
+    expect(consultas[1]?.[1]).toEqual([S, 24]);
+  });
+  it('la consulta usa la expresión del estado visual (no una copia) y cuenta solo activos que nunca enviaron, dentro de su plazo y vencidos con el propuesto', () => {
+    const sql = SQL_AFECTADOS_POR_PLAZO.replace(/\s+/g, ' ');
+    expect(sql).toContain(`now() < ${SQL_ESPERA_HASTA.replace(/\s+/g, ' ')}`);
+    expect(sql).toContain("d.estado = 'activo'");
+    expect(sql).toContain('e.visto_por_ultima_vez IS NULL');
+    expect(sql).toContain("NOT EXISTS (SELECT 1 FROM condicion cv WHERE cv.dispositivo_id = d.id AND cv.cerrada_en IS NULL AND cv.tipo = 'sin_comunicacion')");
+    expect(sql).toContain("d.en_servicio_desde + $2 * INTERVAL '1 hour' <= now()");
+    expect(sql).toContain('z.sitio_id = $1');
+  });
+  it('el controlador: `propuesto` inválido → 400 (antes del sitio); válido, se lo pasa al servicio; cualquier perfil del sitio puede leer; otro sitio, 404', async () => {
+    const espera = { leer: vi.fn(() => Promise.resolve({})), fijar: vi.fn() };
+    const alcance = { exigirSitio: vi.fn((u: UsuarioSesion, accion: Accion, id: string) => Promise.resolve().then(() => exigir(u, accion, [S, OTRO].includes(id) ? id : null, 'sitio no encontrado'))) };
+    const c = new SitiosController({} as TableroService, alcance as unknown as AlcanceService, {} as ActividadService, espera as unknown as EsperaService);
+    expect(await codigo(c.leerEspera(persona([[S, 'consulta']]), S, '0'))).toBe(400);
+    expect(espera.leer).not.toHaveBeenCalled();
+    expect(await codigo(c.leerEspera(persona([[S, 'consulta']]), S, '24'))).toBe(200);
+    expect(espera.leer).toHaveBeenCalledWith(S, 24);
+    expect(await codigo(c.leerEspera(persona([[S, 'consulta']]), S))).toBe(200);
+    expect(espera.leer).toHaveBeenLastCalledWith(S, null);
+    expect(await codigo(c.leerEspera(persona([[S, 'administrador']]), OTRO, '24'))).toBe(404);
   });
 });

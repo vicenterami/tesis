@@ -204,6 +204,31 @@ async function principal() {
   await supervisor.barrer();
   comprobar(await abiertas(enOtroSitio) === 0, 'alargar el plazo del sitio (24 → 48 h) devuelve a la espera a quien había vencido: el barrido cierra su condición');
 
+  // ── 3b. El aviso de quien acorta el plazo: GET …/espera-primera-trama?propuesto=<h> suma `afectados` (18/11/2026) ────────────────
+  // Un sitio propio con plazo de 100 h, para que ningún barrido anterior ni posterior toque sus equipos (el de otro sitio, también aparte).
+  const c3 = await sitio('espera-c', 100);
+  const c4 = await sitio('espera-d', 100);
+  await equipo(dueno, c3.zona, 'av-dentro-50h', { enServicioHaceS: 50 * H });
+  await equipo(dueno, c3.zona, 'av-dentro-20h', { enServicioHaceS: 20 * H });
+  await equipo(dueno, c3.zona, 'av-ya-vencido', { enServicioHaceS: 101 * H }); // ya vencido con el plazo de hoy: no cuenta
+  await equipo(dueno, c3.zona, 'av-mantenimiento', { enServicioHaceS: 50 * H, estado: 'mantenimiento' }); // en mantenimiento: no cuenta
+  await equipo(dueno, c3.zona, 'av-ya-envio', { enServicioHaceS: 50 * H, vistoHaceS: 60 }); // ya envió una trama: no cuenta
+  const conCondicion = await equipo(dueno, c3.zona, 'av-con-condicion', { enServicioHaceS: 50 * H }); // ya figura «Sin señal» por una condición abierta (alargó el plazo): no cuenta
+  await q(`INSERT INTO condicion (dispositivo_id, tipo, abierta_en) VALUES ($1, 'sin_comunicacion', now() - INTERVAL '1 day')`, [conCondicion]);
+  await equipo(dueno, c4.zona, 'av-otro-sitio', { enServicioHaceS: 50 * H }); // de otro sitio: no cuenta en c3
+  const afectados = async (sitioId: string, h: number): Promise<number | undefined> => (await espera.leer(sitioId, h)).afectados;
+  comprobar((await espera.leer(c3.sitio)).afectados === undefined, 'sin `propuesto`, la lectura del plazo no trae `afectados`');
+  comprobar(await afectados(c3.sitio, 40) === 1, 'propuesto 40 h: cuenta al de 50 h (dentro de las 100 y vencido con 40), no al de 20 h, ni al ya vencido, ni al de mantenimiento, ni al que ya envió, ni al que ya tiene su condición abierta, ni al de otro sitio', String(await afectados(c3.sitio, 40)));
+  comprobar(await afectados(c3.sitio, 10) === 2, 'propuesto 10 h: cuenta a los dos que esperan dentro de su plazo (50 h y 20 h)', String(await afectados(c3.sitio, 10)));
+  comprobar(await afectados(c3.sitio, 50) === 1 && await afectados(c3.sitio, 51) === 0,
+    'el borde: con exactamente 50 h el de 50 h queda vencido (<=), con 51 h todavía no', `${await afectados(c3.sitio, 50)} / ${await afectados(c3.sitio, 51)}`);
+  comprobar(await afectados(c3.sitio, 100) === 0 && await afectados(c3.sitio, 2160) === 0, 'alargar o dejar igual el plazo no afecta a nadie');
+  comprobar(await afectados(c4.sitio, 40) === 1, 'el otro sitio cuenta solo lo suyo (uno)');
+  const antesAv = (await q(`SELECT count(*)::int AS n FROM condicion WHERE tipo = 'sin_comunicacion' AND cerrada_en IS NULL`)).rows[0].n as number;
+  await afectados(c3.sitio, 10);
+  const despuesAv = (await q(`SELECT count(*)::int AS n FROM condicion WHERE tipo = 'sin_comunicacion' AND cerrada_en IS NULL`)).rows[0].n as number;
+  comprobar(antesAv === despuesAv, 'preguntar no cambia nada: ninguna condición se abre ni se cierra');
+
   // ── 4. Lo que lee el panel: estado, entrega, en_servicio_desde y espera_hasta; el resumen del sitio ─────────────────────────────
   const inv = (await consulta.inventario([s.sitio], {})).filas;
   const de = (id: string) => inv.find((x) => x.id === id)!;

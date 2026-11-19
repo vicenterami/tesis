@@ -9,7 +9,7 @@ import { DIAS_ACTIVIDAD_POR_DEFECTO, MAX_DIAS_ACTIVIDAD, tipoValido } from './ac
 import { ActividadService, FilaActividad } from './actividad.service.js';
 import { CUBOS_CHISPA, HISTORICO_SITIO, LIMITE_AHORA, MAGNITUDES_SALUD, MAX_CANALES_AHORA, TENDENCIA, intervaloParaRango, leerCursor, siguiente } from './tablero.js';
 import { MAX_ENTREGA_RESUMEN, TableroService } from './tablero.service.js';
-import { ESPERA_PRIMERA_TRAMA, EsperaSitio, validarEspera } from './espera.js';
+import { ESPERA_PRIMERA_TRAMA, EsperaSitio, validarEspera, validarPropuesto } from './espera.js';
 import { EsperaService } from './espera.service.js';
 
 // El histórico del sitio lee TODOS los canales de la magnitud: medido en el banco (docs/16 §61), 30 días de 120 canales a una lectura cada
@@ -188,12 +188,15 @@ export class SitiosController {
       `\`espera_primera_trama_h\` (el que rige), \`por_omision\` (${ESPERA_PRIMERA_TRAMA.porOmision}), \`minimo\` y \`maximo\` (${ESPERA_PRIMERA_TRAMA.minimo} a ${ESPERA_PRIMERA_TRAMA.maximo}).`,
   })
   @ApiParam({ name: 'id', description: 'UUID del sitio' })
-  @ApiOkResponse({ description: 'El plazo del sitio' })
+  @ApiQuery({ name: 'propuesto', required: false, description: `Horas (entero de ${ESPERA_PRIMERA_TRAMA.minimo} a ${ESPERA_PRIMERA_TRAMA.maximo}): suma \`afectados\` a la respuesta, cuántos equipos activos del sitio que nunca enviaron una trama están hoy dentro de su plazo y con ese plazo quedarían vencidos (el aviso de quien lo acorta; no una garantía)` })
+  @ApiOkResponse({ description: 'El plazo del sitio (y `afectados`, con `propuesto`)' })
+  @ApiBadRequestResponse({ description: '`propuesto` que no es un entero de horas dentro del rango' })
   @ApiNotFoundResponse({ description: 'Sitio inexistente o de otro' })
-  async leerEspera(@Usuario() u: UsuarioSesion, @Param('id') id: string): Promise<EsperaSitio> {
+  async leerEspera(@Usuario() u: UsuarioSesion, @Param('id') id: string, @Query('propuesto') propuesto?: string): Promise<EsperaSitio> {
     const sitioId = uuid(id, 'sitio');
+    const horas = validarPropuesto(propuesto);
     await this.alcance.exigirSitio(u, 'leer', sitioId);
-    return this.espera.leer(sitioId);
+    return this.espera.leer(sitioId, horas);
   }
 
   @Put(':id/espera-primera-trama')

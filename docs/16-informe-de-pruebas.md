@@ -4,7 +4,7 @@ Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emu
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
 cubría al escribirse se agregó después: TT-32 (sensor físico) en §43, §44 y §53, y TT-30 (recuperación ante reinicio) en §11. El
-contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 858 pruebas unitarias del backend y 458 del panel.
+contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 864 pruebas unitarias del backend y 480 del panel.
 Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -4547,3 +4547,64 @@ Que las sentencias únicas no dejen un evento sin condición, ni dos aperturas, 
 | El aviso en vivo de cada cierre sale después del `COMMIT`, en el `PATCH` a mantenimiento y en la baja; si no se confirma, no sale | `alta/configuracion.service.spec.ts`, `alta/baja-rotacion.spec.ts` | sin publicar; publicando antes del `COMMIT` | 1 de cada prueba, en las dos variantes |
 
 Tras las correcciones, contra una base real: `bash plataforma/pruebas/espera-integracion.sh`, **43 de 43 comprobaciones** (eran 37: el caso de la condición abierta en mantenimiento se reescribió y se agregaron el cierre por la API, la vuelta a servicio y que un equipo en mantenimiento no abre tope ni reloj desviado).
+
+## 86. Ajustes del sitio: el plazo de la primera trama, el k y el tope en una pantalla propia, y el aviso de a cuántos equipos afecta acortar el plazo (18/11/2026)
+
+**Por qué.** Tres ajustes rigen a todo un sitio y no tenían lugar propio: el plazo de la primera trama (hasta hoy solo por la API, `docs/19 §4`,
+bloque P, punto 4, «por decidir») y el mínimo de dispositivos (k) y el tope de enlaces vivos de la vista pública, que vivían al pie de
+«Publicar una vista». Decidido el 18/11/2026: una pantalla, P15 «Ajustes del sitio» (`docs/19 §4`, bloque Q), adonde se mudan también el k y el
+tope. La revisión del bloque del plazo dejó un punto medio: **acortar el plazo puede abrir decenas de alarmas de golpe** en el barrido
+siguiente y nada lo avisaba antes. Lo que había que demostrar: que el k y el tope se mudaron sin perder ninguna prueba ni ninguna guarda;
+que el plazo se guarda con bloqueo optimista y no manda nada si no cambia; que acortar pregunta a cuántos equipos afecta y no guarda hasta
+confirmar, que alargar nunca pregunta y que sin afectados no hay confirmación; que cada sección se ve solo con su acción; y que «Publicar»
+queda con una línea de lectura y el enlace.
+
+**Qué se construyó.**
+- **Panel.** `#/sitio/ajustes?sitio=<código>` (`lib/vista.ts`, con ida y vuelta y el código inválido ignorado), la entrada «Ajustes del sitio» del
+  menú con su icono propio (visible con `ajustes` o `enlaces`), `AjustesSitio.svelte` (selector de sitio y las dos secciones, cada una por su
+  acción) y un componente por ajuste, cada uno con su carga y su cancelación propias: `AjusteEspera.svelte` (el plazo, su equivalencia en
+  días, qué pasa al vencer y por qué existe; «Guardar el plazo» con `anterior`; el 409 `espera_cambio` relee y dice el valor nuevo; el mismo
+  valor no manda nada; **acortar pide `?propuesto=H` y, con afectados, confirma antes del `PUT`**), `AjusteMinimo.svelte` y `AjusteTope.svelte`
+  (el k y el tope, mudados sin cambiar su comportamiento). Lo puro, en `lib/ajustes.ts`. «Publicar» deja una línea de lectura con los valores
+  reales y, con la acción `enlaces`, «Cambiar en Ajustes del sitio»; desaparece de «Publicar» la espera «Espera a que se guarde el mínimo del
+  sitio…» (ya no hay un guardado del k en vuelo en esa pantalla).
+- **Backend.** `GET /sitios/{id}/espera-primera-trama?propuesto=<h>` (mismos permisos y aislamiento; `propuesto` validado como el `PUT`: entero
+  de 1 a 2 160, si no 400) suma `afectados`: los equipos **activos** del sitio que nunca enviaron una trama, hoy dentro de su plazo y
+  vencidos con el propuesto. Una sola consulta (`SQL_AFECTADOS_POR_PLAZO`, `consulta/espera.service.ts`) que reutiliza la expresión del
+  estado visual (`SQL_ESPERA_HASTA`) y no repite la regla. Sin `propuesto`, la respuesta no cambia. El conteo de rutas y de operaciones del
+  OpenAPI no cambia: es un parámetro.
+- **Documentos.** `docs/19` (§3 fila P15, §4 bloque O: dónde se cambian el k y el tope; bloque P, puntos 2 y 4; bloque nuevo Q; §7 fila P15),
+  `docs/20 §6` (la fila del `GET`) y `docs/10 §8.4` punto 68.
+
+| Qué se comprueba | Prueba | Falla plantada | Qué cayó |
+|---|---|---|---|
+| El plazo se muestra con su equivalencia en días, qué pasa al vencer y por qué existe; el campo tiene su etiqueta | `AjustesSitio.test.ts` | (sin plantar: texto fijo del diseño) | |
+| Alargar guarda directo con `anterior` y sin preguntar nada a la API | `AjustesSitio.test.ts` | el `PUT` sin `anterior` | 4 pruebas del plazo (el cuerpo no trae `anterior`) |
+| Acortar con afectados pregunta con `?propuesto=`, pide confirmar, sin confirmar no hay `PUT`, y al confirmar se guarda con `anterior` | `AjustesSitio.test.ts` | acortar guarda sin preguntar | 4 (no hay confirmación, hay `PUT`) |
+| Acortar con afectados pide confirmar | `AjustesSitio.test.ts` | el conteo ignorado (nunca confirma) | 2 |
+| Acortar sin afectados no pide confirmar y guarda directo | `AjustesSitio.test.ts` | confirmar siempre | 1 |
+| Alargar no pregunta | `AjustesSitio.test.ts` | preguntar también al alargar | 5 |
+| Cancelar la confirmación no guarda y el campo vuelve al plazo que rige; si la pregunta falla, se dice y no se guarda | `AjustesSitio.test.ts` | acortar guarda sin preguntar | incluidas en las 4 de arriba |
+| Fuera de 1 a 2 160, vacío, decimal o el mismo valor: sin petición y con el motivo escrito | `AjustesSitio.test.ts`, `lib/ajustes.test.ts` | (el rango y el mismo valor son lo que prueban las dos) | |
+| El 409 `espera_cambio` relee, dice el valor nuevo, deja lo pedido en el campo y vuelve a decidir con el plazo de ahora | `AjustesSitio.test.ts` | el `PUT` sin `anterior` (nunca hay 409) | la misma que arriba |
+| Guardar el plazo con la petición en vuelo y cambiar de sitio no escribe la respuesta del anterior | `AjustesSitio.test.ts` | quitar la guarda del cambio de sitio | 1 |
+| Cada sección se ve con su acción; sin ninguna, el mensaje | `AjustesSitio.test.ts`, `lib/ajustes.test.ts` | `puedeEnSitio` siempre verdadero; la sección del plazo sin mirar la acción | 3 (puro y DOM) y 1 |
+| El menú: «Ajustes del sitio» con `ajustes` o con `enlaces`, y ausente sin ninguna; la ruta lleva al mensaje | `App.test.ts` | menú sin mirar `enlaces`; menú siempre visible | 2 y 1 |
+| `#/sitio/ajustes` de ida y vuelta, con el código inválido ignorado | `lib/vista.test.ts` | (la ruta reconocida a mano) | |
+| «Publicar»: línea de lectura con los valores reales, el enlace con su dirección y ningún campo para cambiarlos | `Publicar.test.ts` | quitar el enlace | 1 |
+| La consulta de `afectados`: solo activos, que nunca enviaron, dentro del plazo de hoy y vencidos con el propuesto (`<=`, el borde); una sola consulta con la expresión del estado visual | `consulta/espera.spec.ts` | sin el filtro de activos; sin «dentro del plazo de hoy»; el borde estricto | 1 cada una (el texto de la consulta) |
+| `propuesto` inválido → 400 antes del sitio; válido se pasa al servicio; sin él la respuesta no cambia y no hay segunda consulta | `consulta/espera.spec.ts` | `propuesto` sin rango; el controlador sin pasarlo; consultar siempre | 2, 1 y 1 |
+| Contra una base real: dentro, el borde exacto, ya vencido, otro sitio, mantenimiento y quien ya envió no cuentan; preguntar no abre ni cierra ninguna condición | `integracion/espera.ts` (`espera-integracion.sh`) | la consulta sin filtrar los activos ni la condición abierta | 3 de 50 (dentro del plazo, propuesto de 10 h y el borde) |
+| Las cinco pruebas del k y del tope que estaban en «Publicar» se mudaron sin perder ninguna: cuatro con su nombre y su cuerpo, y la quinta («guardar el k con el `PUT` en vuelo y cambiar de sitio…») sin la mención final «; «Publicar» espera mientras se guarda» ni su aserción, porque «Publicar» ya no guarda el k | `AjustesSitio.test.ts` | el k sin la guarda del cambio de sitio, en el `PUT` y en la relectura | 1 y 1 |
+| Mientras se consulta a cuántos afecta, el campo del plazo se bloquea; si cambia igual, la respuesta de la consulta se descarta (ni confirmación ni `PUT`, con o sin afectados): lo que se guarda es lo que se consultó | `AjustesSitio.test.ts` | quitar el descarte de la respuesta con el campo distinto; quitar el bloqueo del campo | 1 y 1 |
+| Con una confirmación abierta, volver a pulsar «Guardar» la cierra antes de preguntar otra vez (no queda una vieja activa) | `AjustesSitio.test.ts` | no cerrar la confirmación al empezar a preguntar | 1 |
+| La consulta de `afectados` no cuenta a quien ya figura «Sin señal» por una condición de falta de comunicación abierta (dentro del plazo tras alargarlo, hasta el barrido siguiente) | `consulta/espera.spec.ts`; `integracion/espera.ts` | quitar el `NOT EXISTS` de la condición abierta | 1 (el texto de la consulta) |
+
+**Resultado.** Se agregaron 6 pruebas al backend y 23 al panel (más 5 del k y del tope que se mudaron de `Publicar.test.ts` a
+`AjustesSitio.test.ts`, sin quitar ninguna). Una comprobación de «Publicar» desapareció con su causa: la espera mientras se guarda el k.
+Contra una base real (`espera-integracion.sh`): **50 de 50 comprobaciones** (eran 43; las 7 nuevas son de la vista previa de los afectados).
+Con navegador real (`panel-publico-e2e.sh`, Chromium y Firefox, a 390 y 1 280 px): **210 de 210 comprobaciones** (eran 178). La primera
+corrida encontró lo que las pruebas sin navegador no ven: a 390 px el clic en «Cambiar en Ajustes del sitio» no llegaba. Una sonda del
+elemento bajo el enlace mostró que lo tapaba la ayuda de «Renovar», que en pantalla angosta se fija abajo y dura mientras el foco siga
+en el botón (WCAG 1.4.13, `docs/19 §4`, bloque L); y la vuelta a «Publicar» por el menú necesitaba abrir antes el cajón. El recorrido
+descarta la ayuda con Escape y abre el cajón con «Menú», como lo haría una persona.

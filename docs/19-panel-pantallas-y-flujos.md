@@ -76,12 +76,13 @@ tabla de casos**, un archivo del panel que leen las tres (`panel/src/lib/estado-
 | P6 | **Configurar dispositivo y canales** | Nombre, estado (activo / mantenimiento), intervalo esperado, zona; por canal, etiqueta, umbral alto, umbral bajo, histéresis y retardo de activación | Guardar con bloqueo optimista; validación en vivo (bajo < alto, histéresis dentro de la banda, rango de la magnitud) | `PATCH /dispositivos/{id}`, `PUT /canales/{id}/reglas` (Etapa 4), fijadas el 11/11/2026 (§4 tablero v2, E) | HU-06, HU-13, RF-14, punto 28 | Etapa 4, iteración 1 (exige sesión) |
 | P7 | **Alta de dispositivo** (asistente) | Paso 1 identidad y zona; paso 2 vía y formato (y pasarela si LoRaWAN); paso 3 canales y magnitudes; paso 4 credencial según la vía, mostrada una sola vez; paso 5 «esperando la primera trama» en vivo | Crear; copiar la credencial y el tópico; subir un CSV, validarlo y crear las filas válidas; dar de alta un emisor detectado | `POST /dispositivos` (API hecha el 12/10, HU-11, `docs/16 §20`); `POST /dispositivos/lote?modo=validar\|crear` y `GET /cuarentena/detectados` (Etapa 4), fijadas el 11/11/2026 (§4 tablero v2, F) | RF-50, HU-11, HU-22, punto 25 | API: Etapa 3; pantalla, lote y detectados: Etapa 4, iteración 1 |
 | P8 | **Exportar** | Dispositivo (hoy) o sitio (Etapa 4), rango, formato (CSV, XLSX, JSON); tamaño estimado antes de descargar | Descargar | Hecho el 12/10 por dispositivo: `GET /dispositivos/{id}/exportar?formato=csv\|json&desde&hasta` (flujo por tandas; CSV estándar con coma y punto decimal para R, Python y QGIS). **Propuesta** para la Etapa 4: `GET /sitios/{id}/exportar` con rol y XLSX | RF-34, HU-08 (adelantada a la Etapa 3 el 12/10) | API: Etapa 3; pantalla, XLSX y por sitio: Etapa 4 |
-| P9 | **Vista pública por enlace** (diseñada el 16/11/2026, §4 bloque O; ✅ base, backend, proxy y las dos pantallas, 17/11/2026, `docs/16 §79` y §80) | Para quien visita sin cuenta: solo los promedios de las magnitudes que un administrador publicó (del sitio y, si lo eligió, de cada zona), nunca el mínimo ni el máximo; un valor sale oculto si lo aportan menos de k dispositivos. Para el administrador, «Publicar una vista» con vista previa y la lista de enlaces | Visitante: cambiar la ventana y pausar la actualización. Administrador: crear (con vencimiento), renovar y revocar | `GET /publico` (token en la cabecera `X-Enlace-Publico`) y `POST /sitios/{id}/enlaces/vista-previa`; crear y listar, `GET`/`POST /sitios/{id}/enlaces`, renovar, `POST /sitios/{id}/enlaces/{enlace}/renovar`, revocar, `DELETE /sitios/{id}/enlaces/{enlace}`, y el tope de enlaces y el k del sitio, `GET`/`PUT /sitios/{id}/enlaces/tope` y `GET`/`PUT /sitios/{id}/enlaces/minimo`, fijadas en el OpenAPI el 17/11/2026 (§4, O) | RF-62, HU-32, punto 6 | Etapa 4, iteración 1 |
+| P9 | **Vista pública por enlace** (diseñada el 16/11/2026, §4 bloque O; ✅ base, backend, proxy y las dos pantallas, 17/11/2026, `docs/16 §79` y §80) | Para quien visita sin cuenta: solo los promedios de las magnitudes que un administrador publicó (del sitio y, si lo eligió, de cada zona), nunca el mínimo ni el máximo; un valor sale oculto si lo aportan menos de k dispositivos. Para el administrador, «Publicar una vista» con vista previa y la lista de enlaces | Visitante: cambiar la ventana y pausar la actualización. Administrador: crear (con vencimiento), renovar y revocar | `GET /publico` (token en la cabecera `X-Enlace-Publico`) y `POST /sitios/{id}/enlaces/vista-previa`; crear y listar, `GET`/`POST /sitios/{id}/enlaces`, renovar, `POST /sitios/{id}/enlaces/{enlace}/renovar`, revocar, `DELETE /sitios/{id}/enlaces/{enlace}`, y el tope de enlaces y el k del sitio, `GET`/`PUT /sitios/{id}/enlaces/tope` y `GET`/`PUT /sitios/{id}/enlaces/minimo`, fijadas en el OpenAPI el 17/11/2026 (§4, O); desde el 18/11/2026 el k y el tope se cambian en P15 «Ajustes del sitio» (§4, Q) | RF-62, HU-32, punto 6 | Etapa 4, iteración 1 |
 | P10 | **Sesión y usuarios** | Entrar, cambio de la clave temporal, salir; quién soy en la cabecera; usuarios de mis sitios, su perfil por sitio y la guía de perfiles (cinco desde el 08/11/2026, diseño: `docs/20 §6`) | Entrar, cambiar la clave, salir o cerrar en todos lados; dar de alta (clave temporal una vez), activar y desactivar, asignar una temporal, cambiar el rol | `POST /sesion`, `GET /sesion`, `DELETE /sesion`, `POST /sesion/clave`, `GET /usuarios`, `POST /usuarios`, `PATCH /usuarios/{id}` (`docs/20`) | RF-43, RF-44, HU-18 | Etapa 4; hecha el 08/11/2026 (§4) |
 | P11 | **Legal y acerca de** (Etapa 4) | Privacidad (generada desde `docs/21`), términos de uso con su versión, avisos de terceros, versión y commit, aviso AGPL; soporte: contacto del responsable y formulario | Leer; aceptar los términos (obligatorio al primer ingreso y al cambiar la versión); enviar un mensaje de soporte | `GET /terminos`, `POST /terminos/aceptar`, `GET /privacidad`, `GET /acerca` (versión y commit solo con sesión), `POST /soporte` y `GET /soporte` (Etapa 4); los avisos de terceros, un archivo generado al cambiar dependencias | RF-53, RF-54, RF-61, HU-27, HU-31 | Iteración 0; hecha el 11/11/2026 |
 | P12 | **Estado del sistema** (solo administrador del sistema; Etapa 4) | Recursos por contenedor en el tiempo (memoria frente a su techo, CPU), errores agrupados por huella, último respaldo y su antigüedad, condiciones del sistema abiertas; límites de los servicios | Ver el detalle de un error; ajustar un límite con bloqueo optimista | `GET /salud` y rutas nuevas sobre `metrica_recurso`, `error_sistema` y los límites (Etapa 4; `docs/10 §8.4` puntos 60 y 61) | RF-59, RF-60, RNF-19, HU-30 | Iteración 1 |
 | P13 | **Preferencias** (mi cuenta; Etapa 4) | Unidades de visualización (°C o °F; mm, m o km), zona horaria propia o la del sitio, vistas guardadas; mis datos y mis sesiones abiertas (por decidir: sin fila en el backlog) y la versión de términos aceptada; darme de baja | Guardar; exportar mis datos de cuenta; cerrar una sesión; darme de baja (con la clave actual) | `GET`/`PUT /preferencias`, `GET /sesiones`, `DELETE /sesiones/{id}` (Etapa 4), fijadas el 11/11/2026 (§4 tablero v2, H); la baja, `docs/20 §11` | RF-55, RF-56, HU-28, HU-29 | Iteración 1 (la baja, en la 0) |
 | P14 | **Actividad** (administrador de sitio en sus sitios; el del sistema en todos; diseñada el 11/11/2026) | Lo que hicieron las personas en el sitio (eventos con quién, de `evento.usuario_id`) y sus entradas, salidas y bloqueos (`acceso`), con filtros por persona, tipo y rango, en texto para personas | Filtrar; abrir la ficha del dispositivo o la persona | `GET /sitios/{id}/actividad?desde&hasta&tipo&usuario&cursor` (Etapa 4) (§4 tablero v2, G) | RF-46, HU-11, HU-26 | Iteración 1 |
+| P15 | **Ajustes del sitio** (diseñada el 18/11/2026, §4 bloque Q; quien tiene la acción `ajustes` o `enlaces` en el sitio: administrador del sitio y del sistema) | Lo que rige a todo el sitio, en dos secciones: **Primera trama** (el plazo en horas, de 1 a 2 160, con su equivalencia en días; qué pasa al vencer y por qué existe el plazo) y **Vista pública** (el mínimo de dispositivos por valor, k, y el tope de enlaces vivos) | Cambiar el plazo, el k (bajarlo se confirma) y el tope, cada uno con su «Guardar» y su bloqueo optimista; elegir sitio si se administra más de uno | `GET`/`PUT /sitios/{id}/espera-primera-trama`, `GET`/`PUT /sitios/{id}/enlaces/minimo` y `GET`/`PUT /sitios/{id}/enlaces/tope` (las tres ya existen; no se agrega ninguna ruta) | RF-62, HU-32, §2 (estado «Esperando primera trama») | Etapa 4, iteración 1 |
 
 Lo que **no** se construye, y por qué: mapa (ningún requisito lo pide; el caso de uso tiene decenas de dispositivos, no cientos
 dispersos), informes programados y disparadores con varias condiciones (más que el umbral con histéresis decidido; candidatos
@@ -1209,7 +1210,8 @@ ajustar, lo ajusta él, dentro de los límites de la instancia):
 - **Dónde vive «Publicar una vista».** Los puntos 3 y 10 la ponen «en la configuración del sitio», pero el panel no tiene esa pantalla. Vive
   en `#/publicar?sitio=<código>`, con la entrada «Vista pública» en el menú para quien tiene la acción `enlaces` en algún sitio (o es
   administrador del sistema), y un selector de sitio si administra más de uno. Cuando exista una configuración del sitio, la entrada se muda
-  allí sin cambiar la pantalla.
+  allí sin cambiar la pantalla. (18/11/2026: existe P15 «Ajustes del sitio», bloque Q, con el plazo de la primera trama, el k y el
+  tope; la entrada «Publicar una vista» no se mudó: sigue en su ruta y en el menú.)
 - **La vista previa se pide al cambiar magnitudes, zonas o ventanas**, una sola vez tras una pausa de 400 ms; el título y la descripción se
   dibujan desde el formulario, recortados como los devuelve el servidor. Pedirla en cada tecla gastaría el cupo de la vista previa y la
   zona de administración del proxy (11 de 30 `POST` seguidos pasan; `docs/16 §79`). **«Publicar» espera esa vista previa** (revisión del
@@ -1217,12 +1219,18 @@ ajustar, lo ajusta él, dentro de los límites de la instancia):
   vista previa está en vuelo o falló, o fue de otra selección (se guarda la firma de magnitudes, zonas y ventana máxima que la produjo); los
   avisos solo se muestran si son de la selección actual. Sin esto se podía publicar sin haber visto los avisos de lo que se publica (punto
   3). Al cambiar de sitio o al empezar a crear, la vista previa en vuelo y su pausa se cancelan; un enlace creado mientras se cambió de sitio
-  no muestra su dirección en la pantalla del otro (queda en la lista del suyo). Sin vista previa no se publica, y tampoco mientras se guarda
-  el k del sitio (la vista previa se rehace con él). Mientras se publica, el selector de sitio se desactiva con su motivo; el menú o «Atrás»
+  no muestra su dirección en la pantalla del otro (queda en la lista del suyo). Sin vista previa no se publica (hasta el 18/11/2026 tampoco
+  mientras se guardaba el k del sitio, que entonces se cambiaba en esta pantalla; ver «Dónde se cambian el k y el tope»). Mientras se publica, el selector de sitio se desactiva con su motivo; el menú o «Atrás»
   pueden cambiar de sitio igual, y entonces vale lo anterior. Guardar el k o el tope con la petición en vuelo y cambiar de sitio no escribe
-  la respuesta del anterior en el nuevo; el cambio de sitio olvida además los avisos, «Copiada» y la ventana de la vista previa.
+  la respuesta del anterior en el nuevo (hoy en P15, bloque Q); el cambio de sitio olvida además, en «Publicar», los avisos, «Copiada» y la ventana de la vista previa.
 - **El catálogo de magnitudes tiene su propio aviso** (corrección del 18/11/2026): si `GET /magnitudes` falla, el aviso va junto a las magnitudes («No se pudo cargar el catálogo de magnitudes. …») con su «Reintentar», que vuelve a pedir el catálogo y no la vista previa; mientras falte, «Publicar» queda desactivado con el motivo «El catálogo de magnitudes no se pudo cargar: reintenta antes de publicar.». El aviso de la vista previa queda solo para la vista previa.
-- **Bajar el k del sitio se confirma en la pantalla antes del `PUT`**, con «afecta a todos los enlaces públicos de este sitio» y lo que un
+- **Dónde se cambian el k y el tope** (decidido el 18/11/2026; hasta ese día vivían al pie de «Publicar una vista»): en P15 «Ajustes del
+  sitio» (bloque Q), sección «Vista pública», con el mismo comportamiento que se describe en este punto y en el siguiente. «Publicar una
+  vista» conserva solo una línea de lectura («Mínimo de dispositivos por valor publicado: 3 · Tope de enlaces vivos: 50») y, para quien tiene
+  la acción `enlaces`, el enlace «Cambiar en Ajustes del sitio». Ya no hay un `PUT` del k en vuelo dentro de «Publicar»: desaparece la espera
+  «Espera a que se guarde el mínimo del sitio…». La vista previa la calcula siempre el servidor con el k de ese momento; la línea de lectura
+  muestra el k y el tope de cuando se abrió «Publicar».
+- **Bajar el k del sitio se confirma en la pantalla antes del `PUT`** (en P15, desde el 18/11/2026), con «afecta a todos los enlaces públicos de este sitio» y lo que un
   visitante podría deducir con ese k; después se muestran los avisos que trae la respuesta. Subirlo no pide confirmar (nunca expone).
   **Con bloqueo optimista** (revisión del mismo día): el `PUT /sitios/{id}/enlaces/minimo` lleva `anterior`, el k que la pantalla leyó; si
   otra persona lo cambió entretanto, el servidor responde 409 `minimo_cambio` con el que rige y no cambia nada (si no, bajar de 5 a 4
@@ -1265,19 +1273,73 @@ ajustar, lo ajusta él, dentro de los límites de la instancia):
    perfil del sitio: `espera_primera_trama_h`, `por_omision`, `minimo`, `maximo`) y se fija con `PUT` del mismo camino, con el mecanismo del
    k de la vista pública (bloque O): el valor nuevo y, si se manda, `anterior` (el que se leyó); si ya no es el que rige, 409
    `codigo: espera_cambio` con el vigente, sin cambiar nada. Lo fija quien administra el sitio (la acción `ajustes`, `docs/20 §6`) y deja el
-   evento `espera_primera_trama` con quién, el valor y el anterior, que la actividad del sitio (P14) muestra en palabras. Cambiarlo rige en
+   evento `espera_primera_trama` con quién, el valor y el anterior, que la actividad del sitio (P14) muestra en palabras. **Acortarlo puede
+   abrir muchas alarmas de golpe** (decidido el 18/11/2026, tras la revisión del bloque): `GET …/espera-primera-trama?propuesto=<h>` (mismos
+   permisos y aislamiento que el `GET`; `propuesto` se valida como el `PUT`, entero de 1 a 2 160, y si no, 400) suma `afectados`, cuántos
+   equipos **activos** del sitio que nunca enviaron una trama hoy están dentro de su plazo (`en_servicio_desde` + el plazo actual, aún en
+   el futuro) y con el propuesto quedarían vencidos (`en_servicio_desde` + el propuesto, ya pasado o ahora); la regla del plazo es la misma
+   del estado visual (`SQL_ESPERA_HASTA`), sin duplicarla. Sin `propuesto` la respuesta no cambia. Quien ya venció, ya figura «Sin señal» por una condición de falta
+   de comunicación abierta (puede estar dentro del plazo tras alargarlo, hasta el barrido siguiente), está en mantenimiento, dado de baja o es
+   de otro sitio no cuenta. Cambiarlo rige en
    el barrido siguiente: alargarlo devuelve a «Esperando» a quien había vencido (el supervisor cierra su condición) y acortarlo la abre.
 3. **Panel.** El estado nuevo en las fichas de conteo y el filtro de P2, en la franja de P1 y en P3b, con su palabra, su icono y su tono
    (§2). La ficha (P3) de un equipo que espera dice «Esperando primera trama desde el ‹fecha y hora› (pasa a «Sin señal» el ‹fecha y
    hora›)», en la zona del sitio con el UTC al pasar el cursor, como toda hora (§1); si ya venció sin ninguna trama, «Nunca envió una trama:
    el plazo de su primera trama venció el ‹fecha y hora›». Su entrega es «—».
-4. **Dónde se cambia el plazo en el panel: por decidir.** No hay hoy una pantalla de ajustes del sitio (los dos ajustes del sitio que
-   existen, el k y el tope de enlaces, viven en «Publicar una vista», P9, porque son de la vista pública): mientras se decide, el plazo se
-   cambia por la API, como se hizo con la configuración antes de P6.
+4. **Dónde se cambia el plazo en el panel: decidido el 18/11/2026, una pantalla propia, P15 «Ajustes del sitio» (bloque Q).** Los tres
+   ajustes que rigen a todo un sitio (el plazo de la primera trama, el k y el tope de enlaces de la vista pública) viven juntos allí; el k y
+   el tope se mudaron desde «Publicar una vista» (P9). Antes de esa decisión el plazo solo se cambiaba por la API, como se hizo con la
+   configuración antes de P6.
 5. **Pruebas.** La misma tabla de casos para las tres implementaciones de §2; contra una base real con la migración aplicada
    (`plataforma/pruebas/espera-integracion.sh`): la migración sobre datos y repetida, el `CHECK` del plazo, el supervisor (abre al vencer,
    no antes, no dos veces, no al volver de mantenimiento, cierra con la primera trama y al alargar el plazo), la entrega nula y la API con
    sus permisos.
+
+**Q. P15 Ajustes del sitio (decidido el 18/11/2026, antes del código; RF-62, HU-32 y el estado «Esperando primera trama», §2).** Una
+pantalla para lo que rige a todo un sitio y no es de un equipo. Hasta el 18/11/2026 el plazo de la primera trama solo se cambiaba por la
+API, y el k y el tope de enlaces vivos vivían al pie de «Publicar una vista» (bloque O, punto «Dónde se cambian el k y el tope»).
+1. **Ruta y menú.** `#/sitio/ajustes?sitio=<código>`, con el mismo patrón que `#/publicar?sitio=<código>`: el código del sitio (sin él,
+   el primero de los que la persona puede ajustar); un código con forma inválida se ignora. La entrada «Ajustes del sitio» del menú (icono
+   propio, dos reglas con su deslizador) aparece a quien tiene la acción `ajustes` o `enlaces` en algún sitio (o es administrador del
+   sistema); hoy las dos acciones las tienen los mismos perfiles (administrador del sitio y del sistema, `docs/20 §6`). Quien llega sin
+   ninguna ve «Tu rol no cambia ajustes en ningún sitio: los cambia quien administra el tuyo» con el enlace al tablero. La ruta nunca es
+   «última vista» (la de P13 se toma solo del tablero, el inventario y la ficha). Con más de un sitio, un selector de sitio como el de
+   «Publicar»; con uno, su nombre.
+2. **Sección «Primera trama»** (con la acción `ajustes` en ese sitio). Un campo numérico «Horas de espera, de 1 a 2160» y, a su lado, su
+   equivalencia en días («168 horas son 7 días»; con horas que no son días justos, un decimal con coma; menos de 24, «menos de un día»). Dos
+   textos llanos: **qué pasa al vencer** («Si un equipo no envía ninguna trama en ese plazo, contado desde que entró en servicio, pasa a «Sin señal»
+   y se abre la alarma de falta de comunicación») y **por qué existe** («Un alta masiva suele hacerse días antes de instalar los equipos: el
+   plazo evita que figuren sin señal mientras tanto»), más que el cambio rige en la revisión siguiente del sistema (alargarlo devuelve a
+   «Esperando primera trama» a quien había vencido; acortarlo puede abrir la alarma). **Acortarlo se confirma antes si afecta a alguien:** al
+   pulsar «Guardar el plazo» con un plazo menor que el que rige, la pantalla pide `GET …?propuesto=H`; con `afectados` mayor que 0 muestra «Con
+   este plazo, N equipos que esperan su primera trama pasarán a «Sin señal» y abrirán su alarma de falta de comunicación en la revisión
+   siguiente del sistema. ¿Guardar igual?» con «Guardar igual» y «Cancelar», y no manda el `PUT` hasta que se confirma; con 0, guarda
+   directo; lo que se guarda es exactamente el valor que se consultó (el campo se bloquea mientras se consulta, una respuesta que llega con el
+   campo ya distinto se descarta, y pulsar «Guardar» de nuevo cierra cualquier confirmación abierta antes de preguntar otra vez); si la consulta falla, se dice y no se guarda (la pregunta no se salta). Alargarlo nunca pregunta. Es un aviso, no una garantía:
+   el conteo puede cambiar entre la pregunta y el guardado (llegan tramas, entran equipos); el `PUT` sigue yendo con `anterior`. «Guardar el plazo» manda `PUT` con `anterior`, el que
+   la pantalla leyó (bloqueo optimista): si otra persona lo cambió, el 409 `espera_cambio` relee, deja el valor pedido en el campo y dice
+   el valor nuevo que puso la otra persona («Alguien cambió el plazo… ahora es de N h»), sin guardar nada; guardar el mismo valor que
+   rige no manda ninguna petición (el botón queda desactivado con el motivo «es el que ya rige»). Un valor fuera de rango o no entero
+   tampoco se manda: el motivo se escribe junto al botón. Al guardar, el aviso de éxito dice el plazo y sus días.
+3. **Sección «Vista pública»** (con la acción `enlaces` en ese sitio): el k y el tope, con **exactamente** el comportamiento del bloque O
+   (puntos «Bajar el k…» y «El tope…»), mudado sin cambios: la confirmación al bajar el k con «afecta a todos los enlaces públicos de este
+   sitio» y lo deducible; los avisos de la respuesta; el 409 `minimo_cambio` con relectura (y la confirmación otra vez si lo pedido baja
+   el k de ahora); la protección de cambiar de sitio mientras hay una petición o una relectura en vuelo (la respuesta del sitio anterior
+   no se escribe en el nuevo); el tope con sus errores y el aviso de que bajarlo no revoca nada. Cada ajuste es un componente con su
+   propia carga y su propia cancelación (el 17/11/2026 compartir la cancelación hizo que el catálogo cancelara los ajustes).
+4. **«Publicar una vista» queda solo con lo suyo.** Donde estaban el k y el tope, una línea de lectura con los valores reales y, para quien
+   tiene la acción `enlaces` en el sitio, el enlace «Cambiar en Ajustes del sitio» (lleva a `#/sitio/ajustes?sitio=<código>`). La vista
+   previa y sus avisos no cambian. Consecuencia: ya no hay un guardado del k en vuelo dentro de «Publicar», así que desaparece su espera.
+5. **Accesibilidad y forma.** Cada campo con su etiqueta; los avisos con el componente `Aviso`; todo botón es `Boton`; sin desplazamiento
+   horizontal a 390 y a 1 280 px.
+6. **Decidido al diseñar** (el diseño anterior no lo fijaba): (a) la pantalla es P15, el siguiente número libre de §3; (b) cada sección se
+   muestra por su acción, no por el perfil: si algún día `ajustes` y `enlaces` se reparten entre perfiles distintos, cada uno ve solo lo suyo;
+   (c) los tres ajustes se guardan por separado, cada uno con su botón (cambiar uno no guarda los otros); (d) acortar el plazo pide confirmar solo
+   si hay equipos afectados (punto 2); alargarlo, nunca.
+7. **Pruebas.** Por el DOM, las del k y el tope se mudaron desde «Publicar» sin perder ninguna (`docs/16 §86`), más las del plazo (guardar,
+   rango, 409 con relectura, mismo valor sin petición, sin la acción no se muestra), las del menú (con cualquiera de las dos acciones,
+   oculto sin ninguna) y las de «Publicar» (la línea de lectura y el enlace); con navegador real, el paso del k de
+   `panel/e2e/publico.mjs` pasa por esta pantalla y una visita comprueba los tres controles a 390 y 1 280 px.
 
 ## 5. Flujos
 **F1 · Alta y primera trama.** Ya está dibujado en el diagrama de secuencia del alta (`docs/10`, figura del informe): el
@@ -1402,6 +1464,7 @@ administrador); la vista pública nunca ofrece exportar (punto 6).
 | P7 Alta, lote y detectados | HU-22, RF-50, HU-11 | Etapa 4, iteración 1 | Credencial una sola vez; `modo=validar` no crea nada; desde el bloque N (15/11/2026), crear es todo o nada: una fila que no entra o un plan que cambió es 409 `plan_cambio` y no se crea ninguna, y el reintento con la misma llave no duplica (`docs/16 §71`); tope de 500 filas, del cuerpo y límite de tasa plantados; un emisor desconocido aparece en detectados y llega al asistente con su identificador. Panel: por el DOM, 121 válidas en una petición, repetida con la misma llave tras un 502, y los 409 por su `codigo` (`docs/16 §71`; hasta el 15/11, tandas de 50: `docs/16 §64`), 501 filas frenadas en el navegador, detectado → asistente; desde el 16/11/2026, la vista previa en tres pasos (`docs/16 §76`): los tres orígenes dan las mismas filas, las fórmulas salen neutralizadas y lo descargado vuelve a subirse sin cambios, las cinco tarjetas cuentan lo que muestran, «Crear» se desactiva en vuelo; con navegador real, el asistente por HTTP y un lote de 2 válidas y 1 rechazada, y el recorrido de la vista previa a 1 280 y 390 px (`banco.sh lote-navegador`, corrido el 16/11/2026: 24 de 24 en Firefox y en Chromium; faltan los umbrales de tiempo) |
 | P14 Actividad | RF-46, HU-11, HU-26 | Etapa 4, iteración 1 | Un umbral cambiado aparece con la persona que lo cambió; un administrador de un sitio no ve la actividad de otro (404); un cursor de otro sitio no trae nada. Panel (`docs/16 §64`): por el DOM, cursor, filtros en la URL, tarjetas en teléfono y nada para quien no administra; con navegador real, el umbral cambiado en P6 con quien lo cambió y sin correos |
 | P2 y P3 con «Esperando primera trama» | RF-24, RF-30, HU-19, HU-14 | Etapa 4, iteración 1 (18/11/2026) | `docs/16 §85`: la regla del estado visual contra la base con la misma tabla de casos que el panel (24 casos, bordes incluidos); el supervisor abre a quien nunca reportó solo al vencer el plazo de su sitio, una vez aunque corran dos barridos, y no abre al volver de mantenimiento; pasar a mantenimiento cierra las condiciones abiertas con su evento; la primera trama cierra la condición; el inventario y la ficha lo muestran con su palabra y su entrega «—»; la guía de perfiles nombra `ajustes` (`bash plataforma/pruebas/espera-integracion.sh`) |
+| P15 Ajustes del sitio | RF-62, HU-32, §2 (estado «Esperando primera trama») | Etapa 4, iteración 1 (decidida el 18/11/2026, §4, Q) | Sin cambios de ruta: el plazo, el k y el tope ya tienen sus pruebas de API (`docs/16 §85` y §79). Panel (`docs/16 §86`): por el DOM, el plazo con su bloqueo optimista y la relectura del 409, el mismo valor sin petición, el k y el tope mudados desde «Publicar» sin perder prueba alguna, el menú por acción y la línea de lectura de «Publicar»; con navegador real, el k bajado desde esta pantalla y una visita a 390 y 1 280 px |
 | P9 Vista pública | RF-62, HU-32, punto 6 | Etapa 4, iteración 1 (`docs/04 §8`, decisión del 13/11/2026; diseño del 16/11/2026 en §4, O) | Sin cuenta: solo los promedios elegidos, sin mínimo ni máximo, y un valor de menos de k dispositivos sale oculto; ninguna otra ruta cambia su respuesta con el token en la cabecera; vencido, revocado, inexistente y mal formado dan la misma respuesta; revocar corta con la respuesta guardada; la vista previa y la vista del visitante dan los mismos números; el token no queda en ningún registro; cada prueba con su falla plantada y, en navegador real, ambas pantallas a 1 280 y 390 px (§4, O, punto 13). Hecho el 17/11/2026: `docs/16 §79` (base, backend y proxy) y §80 (las pantallas: por el DOM y con `pruebas/panel-publico-e2e.sh`, paso 4c, en Chromium y Firefox); la medición, pendiente |
 
 La etapa de cada pantalla es la de su historia en `docs/04`; mover una historia de etapa se decide con sus horas y se cambia

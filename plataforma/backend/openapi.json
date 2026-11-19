@@ -1895,11 +1895,23 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "propuesto",
+            "required": false,
+            "in": "query",
+            "description": "Horas (entero de 1 a 2160): suma `afectados` a la respuesta, cuántos equipos activos del sitio que nunca enviaron una trama están hoy dentro de su plazo y con ese plazo quedarían vencidos (el aviso de quien lo acorta; no una garantía)",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "El plazo del sitio"
+            "description": "El plazo del sitio (y `afectados`, con `propuesto`)"
+          },
+          "400": {
+            "description": "`propuesto` que no es un entero de horas dentro del rango"
           },
           "401": {
             "description": "sesión requerida"

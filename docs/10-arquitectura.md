@@ -1872,7 +1872,7 @@ entra. Lo que aquí se marca «a fijar al implementar» es un detalle que el dis
     `en_servicio_desde` (antes, `creado_en`); para quien espera, nula. (v) **Salud del sitio:** quien espera no es supervisado todavía
     (no entra en el denominador). (vi) **El plazo** se lee y se fija en `GET`/`PUT /sitios/{id}/espera-primera-trama` con la acción nueva
     `ajustes` (administrador de sitio y del sistema, `docs/20 §6`), bloqueo optimista por valor (`anterior`; 409 `codigo: espera_cambio`) y
-    el evento `espera_primera_trama` con quién lo fijó. (vii) **Cambio del contrato de la API:** el estado visual `esperando`, la `entrega`
+    el evento `espera_primera_trama` con quién lo fijó. Con `GET …?propuesto=<h>` (mismos permisos y aislamiento; entero de 1 a 2 160 o 400) la respuesta suma `afectados`: cuántos equipos activos del sitio que nunca enviaron una trama, sin una condición de falta de comunicación abierta, están hoy dentro de su plazo y con el propuesto quedarían vencidos (un aviso para quien acorta el plazo, no una garantía: el conteo puede cambiar antes de guardar). (`docs/16 §86`). (vii) **Cambio del contrato de la API:** el estado visual `esperando`, la `entrega`
     nula de quien espera y los campos `en_servicio_desde` y `espera_hasta` del inventario y de la ficha son un cambio del contrato de
     `GET /dispositivos` y `GET /dispositivos/{id}` (campos y un valor nuevos; `openapi.json`), no una vista nueva. Probado con la falla plantada en `docs/16 §85`.
 

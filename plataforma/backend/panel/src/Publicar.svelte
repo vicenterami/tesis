@@ -9,8 +9,8 @@
   //  · Al crear, la dirección (con el token en el fragmento) UNA sola vez, con «Copiar»; nunca se vuelve a ver.
   //  · La lista de enlaces vivos (con «Ver todos», `?incluir=todos`), con «Renovar» (plazo; el 409 `acorta` pide confirmar con las dos
   //    fechas) y «Revocar» (con confirmación; no se deshace).
-  //  · El k del sitio («afecta a todos los enlaces públicos de este sitio» y lo que un visitante podría deducir; bajarlo pide confirmar) y el
-  //    tope de enlaces vivos.
+  //  · Una línea con el k del sitio y el tope de enlaces vivos (solo lectura) y, para quien tiene la acción, «Cambiar en Ajustes del sitio»:
+  //    desde el 18/11/2026 el k y el tope se cambian en P15 (AjustesSitio.svelte, docs/19 §4, Q), no aquí.
   import { onMount, untrack } from 'svelte';
   import Aviso from './Aviso.svelte';
   import Boton from './Boton.svelte';
@@ -18,9 +18,9 @@
   import { esCancelacion, obtener, pedir, ultimaGana } from './lib/api';
   import { avisoDeError, type DatosAviso } from './lib/avisos';
   import {
-    AVISO_NOMBRES_PUBLICOS, AVISO_TEXTO_PUBLICO, AVISO_TODOS_LOS_ENLACES, FORMULARIO_VACIO, MAX_DESCRIPCION, MAX_TITULO, PLAZOS, RETENCION, ROTULO_ESTADO,
-    ROTULO_PLAZO, SIN_MAGNITUDES, TOKEN_UNA_VEZ, acortaDe, avisoDeEnlace, avisosSinDatos, cuerpoPrevia, cuerpoVista, deduciblePorK, direccionCompleta,
-    AVISO_ORIGEN_LOCAL, FALLO_CATALOGO, faltaParaPublicar, firmaDeSeleccion, minimoQueRige, motivoPorPrevia, origenLocal, quePublica, sitiosQuePublica, textoAcorta, tituloDe,
+    AVISO_NOMBRES_PUBLICOS, AVISO_TEXTO_PUBLICO, FORMULARIO_VACIO, MAX_DESCRIPCION, MAX_TITULO, PLAZOS, RETENCION, ROTULO_ESTADO,
+    ROTULO_PLAZO, SIN_MAGNITUDES, TOKEN_UNA_VEZ, acortaDe, avisoDeEnlace, avisosSinDatos, cuerpoPrevia, cuerpoVista, direccionCompleta,
+    AVISO_ORIGEN_LOCAL, FALLO_CATALOGO, faltaParaPublicar, firmaDeSeleccion, motivoPorPrevia, origenLocal, quePublica, sitiosQuePublica, textoAcorta, tituloDe,
     ventanaPreviaValida,
     type EnlaceCreado, type EnlaceListado, type FormularioVista, type MagnitudCatalogo, type MinimoSitio, type TopeEnlaces, type VistaPrevia,
   } from './lib/enlaces';
@@ -29,7 +29,8 @@
   import type { Sesion } from './lib/sesion';
   import { fechaHora } from './lib/tiempo';
   import { simbolo } from './lib/unidades';
-  import { fragmentoPublicar } from './lib/vista';
+  import { puedeEnSitio } from './lib/ajustes';
+  import { fragmentoAjustes, fragmentoPublicar } from './lib/vista';
 
   let { sitio: codigoPedido, sesion, sitios, alCambiarVista }: { sitio: string; sesion: Sesion; sitios: Sitio[] | null; alCambiarVista: (f: string) => void } = $props();
 
@@ -40,7 +41,7 @@
   // ── Datos del sitio ─────────────────────────────────────────────────────────────────────────────────────────────────────────────
   let catalogo = $state<MagnitudCatalogo[]>([]);
   let avisoCatalogo = $state<DatosAviso | null>(null); // el catálogo de magnitudes tiene su propio aviso: «Reintentar» pide `/magnitudes`, no la vista previa
-  const cargaCatalogo = ultimaGana(); // su propia cancelación: con la de los ajustes del sitio, pedir uno cancelaba el otro
+  const cargaCatalogo = ultimaGana(); // su propia cancelación: con la de la lectura de los ajustes del sitio, pedir uno cancelaba el otro
   let enlaces = $state<EnlaceListado[] | null>(null);
   let todos = $state(false);
   let minimo = $state<MinimoSitio | null>(null);
@@ -67,17 +68,17 @@
       avisoCatalogo = avisoDeError(e);
     }
   }
+  // Solo lectura: el k y el tope que rigen, para la línea de arriba (se cambian en P15). Un fallo se dice junto a la línea.
   async function cargarAjustes(): Promise<void> {
     if (sitio === null) return;
     const s = cargaSitio.senal();
+    const deSitio = sitio.id;
     try {
-      const id = encodeURIComponent(sitio.id);
+      const id = encodeURIComponent(deSitio);
       const [m, tp] = await Promise.all([obtener<MinimoSitio>(`/sitios/${id}/enlaces/minimo`, s), obtener<TopeEnlaces>(`/sitios/${id}/enlaces/tope`, s)]);
-      // Si el k que rige cambió (otra persona), una confirmación abierta hablaba del de antes: se cierra.
-      if (minimo !== null && m.minimo_dispositivos !== minimo.minimo_dispositivos) confirmarK = false;
+      if (sitio?.id !== deSitio) return;
       [minimo, tope] = [m, tp];
-      kElegido = m.minimo_dispositivos;
-      topeElegido = tp.max_enlaces;
+      avisoAjustes = null;
     } catch (e) {
       if (!esCancelacion(e)) avisoAjustes = avisoDeError(e);
     }
@@ -96,11 +97,10 @@
   // «Publicar» espera la vista previa de ESTA selección (docs/19 §4, O, «Decidido al implementar las pantallas»): la firma de lo que la
   // produjo, y si hay una pausa, una petición en vuelo o un fallo, el botón se desactiva con su motivo.
   let firmaPrevia = $state<string | null>(null);
-  let guardandoK = $state(false); // el PUT del k en vuelo (aquí arriba: «Publicar» también lo espera)
   let esperandoPrevia = $state(false);
   const firmaActual = $derived(firmaDeSeleccion(f));
   const previaVigente = $derived(previa !== null && !cargandoPrevia && !esperandoPrevia && firmaPrevia === firmaActual);
-  const falta = $derived((avisoCatalogo !== null ? FALLO_CATALOGO : null) ?? faltaParaPublicar(f) ?? motivoPorPrevia({ hayPrevia: previa !== null, firmaActual, firmaPrevia, esperando: esperandoPrevia, cargando: cargandoPrevia, fallo: avisoPrevia !== null, guardandoMinimo: guardandoK }));
+  const falta = $derived((avisoCatalogo !== null ? FALLO_CATALOGO : null) ?? faltaParaPublicar(f) ?? motivoPorPrevia({ hayPrevia: previa !== null, firmaActual, firmaPrevia, esperando: esperandoPrevia, cargando: cargandoPrevia, fallo: avisoPrevia !== null }));
   const sinDatos = $derived(previa === null ? [] : avisosSinDatos(previa));
   // El nombre con que entró quien publica solo sirve en su equipo o su red: se le avisa junto a la dirección.
   const nombreLocal = origenLocal(window.location.hostname);
@@ -186,7 +186,7 @@
       f = { ...FORMULARIO_VACIO, magnitudes: [], zonas: [] };
       previa = null;
       firmaPrevia = null;
-      await Promise.all([cargarLista(), cargarAjustes()]);
+      await cargarLista();
       queueMicrotask(() => document.querySelector<HTMLElement>('[data-enlace-una-vez] h3')?.focus());
     } catch (x) {
       avisoCrear = avisoDeEnlace(x);
@@ -248,7 +248,7 @@
       await pedir('DELETE', `/sitios/${encodeURIComponent(sitio.id)}/enlaces/${encodeURIComponent(e.id)}`);
       revocando = null;
       avisoFila = { id: e.id, aviso: { tipo: 'exito', texto: 'Revocado: quien tenga el enlace ya no ve la vista.' } };
-      await Promise.all([cargarLista(), cargarAjustes()]);
+      await cargarLista();
     } catch (x) {
       avisoFila = { id: e.id, aviso: avisoDeEnlace(x) };
     } finally {
@@ -256,75 +256,8 @@
     }
   }
 
-  // ── El k del sitio y el tope ────────────────────────────────────────────────────────────────────────────────────────────────────
-  let kElegido = $state(3);
-  let confirmarK = $state(false);
-  let avisosK = $state<string[]>([]);
-  let topeElegido = $state(50);
-  let guardandoTope = $state(false);
+  // La lectura del k y del tope (docs/19 §4, Q, punto 4); se cambian en P15.
   let avisoAjustes = $state<DatosAviso | null>(null);
-  const kInvalido = $derived(minimo === null || !Number.isInteger(kElegido) || kElegido < minimo.piso || kElegido > minimo.maximo
-    ? `elige un número entero entre ${minimo?.piso ?? 1} y ${minimo?.maximo ?? 20}` : kElegido === minimo.minimo_dispositivos ? 'es el que ya rige' : null);
-  const topeInvalido = $derived(tope === null || !Number.isInteger(topeElegido) || topeElegido < 1 || topeElegido > tope.techo
-    ? `elige un número entero entre 1 y ${tope?.techo ?? 200}` : topeElegido === tope.max_enlaces ? 'es el que ya rige' : null);
-
-  function pedirGuardarK(): void {
-    if (minimo === null || kInvalido !== null) return;
-    if (kElegido < minimo.minimo_dispositivos) confirmarK = true; // bajarlo expone más: se confirma sabiendo lo que implica
-    else void guardarK();
-  }
-  async function guardarK(): Promise<void> {
-    if (sitio === null || guardandoK) return;
-    const deSitio = sitio.id;
-    guardandoK = true;
-    avisoAjustes = null;
-    const pedido = kElegido;
-    try {
-      // `anterior`: el k que esta pantalla leyó; si otra persona lo cambió entretanto, el servidor responde 409 sin cambiar nada.
-      const cuerpo = minimo === null ? { minimo_dispositivos: pedido } : { minimo_dispositivos: pedido, anterior: minimo.minimo_dispositivos };
-      const r = await pedir<MinimoSitio>('PUT', `/sitios/${encodeURIComponent(deSitio)}/enlaces/minimo`, { cuerpo });
-      // Si mientras tanto se eligió otro sitio, la respuesta es del anterior: no se escribe en la pantalla del nuevo.
-      if (sitio?.id !== deSitio) return;
-      minimo = r;
-      kElegido = r.minimo_dispositivos;
-      avisosK = r.avisos ?? [];
-      confirmarK = false;
-      if (f.magnitudes.length > 0) void pedirPrevia(); // la vista previa aplica el k nuevo
-    } catch (x) {
-      if (sitio?.id !== deSitio) return;
-      const rige = minimoQueRige(x);
-      if (rige === null) avisoAjustes = avisoDeError(x);
-      else {
-        // Se relee y se vuelve a decidir con el k de ahora: si lo pedido lo baja, se confirma otra vez.
-        confirmarK = false;
-        await cargarAjustes();
-        if (sitio?.id !== deSitio) return; // durante la relectura se eligió otro sitio
-        kElegido = pedido;
-        avisoAjustes = { tipo: 'conflicto', texto: avisoDeEnlace(x).texto };
-        if (minimo !== null && pedido < minimo.minimo_dispositivos) confirmarK = true;
-      }
-    } finally {
-      if (sitio?.id === deSitio) guardandoK = false; // el otro sitio puede tener su propio guardado en vuelo
-    }
-  }
-  async function guardarTope(): Promise<void> {
-    if (sitio === null || guardandoTope || topeInvalido !== null) return;
-    const deSitio = sitio.id;
-    guardandoTope = true;
-    avisoAjustes = null;
-    try {
-      const r = await pedir<TopeEnlaces>('PUT', `/sitios/${encodeURIComponent(deSitio)}/enlaces/tope`, { cuerpo: { max_enlaces: topeElegido } });
-      if (sitio?.id !== deSitio) return; // la respuesta es del sitio anterior
-      tope = r;
-      topeElegido = r.max_enlaces;
-      avisoAjustes = { tipo: 'exito', texto: `El tope de enlaces vivos de este sitio es ahora ${r.max_enlaces}.` };
-    } catch (x) {
-      if (sitio?.id !== deSitio) return;
-      avisoAjustes = avisoDeError(x);
-    } finally {
-      if (sitio?.id === deSitio) guardandoTope = false;
-    }
-  }
 
   // Otro sitio es otra pantalla: se olvida lo escrito, lo creado y lo cargado, y se pide lo suyo.
   const idSitio = $derived(sitio?.id ?? null);
@@ -339,15 +272,11 @@
       enlaces = null;
       minimo = null;
       tope = null;
-      avisosK = [];
-      confirmarK = false;
       avisoCrear = null;
       avisoAjustes = null;
       avisoLista = null;
       copiada = 'no';
       ventanaPrevia = '24h';
-      guardandoK = false;
-      guardandoTope = false;
       renovando = acorta = null;
       revocando = null;
       f = { ...FORMULARIO_VACIO, magnitudes: [], zonas: [] };
@@ -567,50 +496,14 @@
     {/if}
   </section>
 
-  <section aria-labelledby="{uid}-ajustes" class="ajustes-publico">
-    <h3 id="{uid}-ajustes">Protección y límites de este sitio</h3>
+  <section aria-labelledby="{uid}-ajustes" class="ajustes-publico" data-ajustes-lectura>
+    <h3 id="{uid}-ajustes">Límites de la vista pública de este sitio</h3>
     {#if avisoAjustes !== null}<Aviso tipo={avisoAjustes.tipo} texto={avisoAjustes.texto} alCerrar={() => (avisoAjustes = null)} />{/if}
     {#if minimo === null || tope === null}
       <p class="vacio" aria-busy="true">Cargando…</p>
     {:else}
-      <div class="ajuste" data-ajuste-minimo>
-        <h4>Mínimo de dispositivos por valor (k)</h4>
-        <p>Rige <strong data-minimo-actual>k = {minimo.minimo_dispositivos}</strong>{minimo.fijado ? ', fijado para este sitio' : `, el de omisión de esta instalación (${minimo.por_omision})`}.
-          Un promedio que aportan menos de k dispositivos sale en blanco, igual que un tramo sin datos.</p>
-        <p class="aviso-publico" data-aviso-todos>{AVISO_TODOS_LOS_ENLACES}</p>
-        <div class="fila-campos">
-          <label>k, de {minimo.piso} a {minimo.maximo}
-            <input type="number" min={minimo.piso} max={minimo.maximo} step="1" bind:value={kElegido} oninput={() => (confirmarK = false)} data-minimo-campo />
-          </label>
-          <Boton etiqueta="Guardar el mínimo" cargando={guardandoK} etiquetaCargando="Guardando…" motivoDesactivado={guardandoK || confirmarK ? null : kInvalido} onclick={pedirGuardarK} data-guardar-minimo />
-        </div>
-        {#if confirmarK}
-          <div class="confirmacion" role="alert" data-confirmar-minimo-aviso>
-            <p>Vas a bajar k de {minimo.minimo_dispositivos} a {kElegido}. {AVISO_TODOS_LOS_ENLACES} {deduciblePorK(kElegido)}</p>
-            <span class="acciones">
-              <Boton etiqueta={`Bajar a ${kElegido}`} variante="peligro" cargando={guardandoK} etiquetaCargando="Guardando…" onclick={() => void guardarK()} data-confirmar-minimo />
-              <Boton etiqueta="Cancelar" onclick={() => { confirmarK = false; kElegido = minimo?.minimo_dispositivos ?? kElegido; }} />
-            </span>
-          </div>
-        {/if}
-        {#if avisosK.length > 0}
-          <div role="status" data-avisos-minimo>
-            <p>Guardado: rige desde la próxima visita de cada enlace. Lo que un visitante podría deducir ahora:</p>
-            <ul class="avisos-publicar">{#each avisosK as a (a)}<li data-aviso-minimo>{a}</li>{/each}</ul>
-          </div>
-        {/if}
-      </div>
-      <div class="ajuste" data-ajuste-tope>
-        <h4>Tope de enlaces vivos</h4>
-        <p>Hay <strong data-vivos>{tope.vivos}</strong> de <strong data-tope-actual>{tope.max_enlaces}</strong>{tope.fijado ? ', fijado para este sitio' : ` (el de omisión, ${tope.por_omision})`}.
-          Bajarlo no revoca nada: impide crear otro hasta que haya lugar.</p>
-        <div class="fila-campos">
-          <label>Tope, de 1 a {tope.techo}
-            <input type="number" min="1" max={tope.techo} step="1" bind:value={topeElegido} data-tope-campo />
-          </label>
-          <Boton etiqueta="Guardar el tope" cargando={guardandoTope} etiquetaCargando="Guardando…" motivoDesactivado={guardandoTope ? null : topeInvalido} onclick={() => void guardarTope()} data-guardar-tope />
-        </div>
-      </div>
+      <p class="vivo" data-lectura-ajustes>Mínimo de dispositivos por valor publicado: <strong data-minimo-actual>{minimo.minimo_dispositivos}</strong> · Tope de enlaces vivos: <strong data-tope-actual>{tope.max_enlaces}</strong>
+        {#if puedeEnSitio(sesion, sitio, 'enlaces')}· <a href={fragmentoAjustes(sitio.codigo)} data-cambiar-en-ajustes>Cambiar en Ajustes del sitio</a>{/if}</p>
     {/if}
   </section>
 {/if}
