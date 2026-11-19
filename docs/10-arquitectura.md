@@ -225,7 +225,7 @@ persona y cifrado por SSH. Así se cumplen R1 y R2 del punto 44 sin exponer nada
    sola conexión del navegador. Hacia el backend va una conexión por petición o por flujo, dentro del mismo servidor.
    **Por qué no HTTP/2 también hacia el backend** (14/10/2026). Lo nuevo no es mejor por ser nuevo: es mejor si resuelve un
    problema que tenemos. nginx podría hacerlo (`proxy_http_version 2`, desde la versión 1.29.4 según su documentación; usamos la
-   1.30.6), pero el backend corre sobre Express, que habla HTTP/1.1. Lo que gana HTTP/2 es multiplexar sobre redes con latencia, y
+   1.30.7), pero el backend corre sobre Express, que habla HTTP/1.1. Lo que gana HTTP/2 es multiplexar sobre redes con latencia, y
    el tramo proxy→backend no sale del servidor: abrir una conexión ahí es casi gratis (medido: cada flujo SSE abierto cuesta del
    orden de 0,1 a 0,2 MiB, `docs/16 §25`). Cambiarlo exigiría otro servidor HTTP en el backend sin ganancia medible. Se revisa si
    el backend pasa a otra máquina o si los flujos simultáneos llegan a miles.
@@ -1057,7 +1057,7 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     marcan vivo) pero el filtro 5 **no abre** condiciones de umbral; una ya abierta sí se cierra al volver a rango. El
     silencio ya excluía a los no activos. El registro del período de mantenimiento llega con M3 (cambio de estado por
     API → `evento`). Coherente con §8.1: `estado` es la decisión administrativa; lo que ocurre son condiciones.
-22. **Capa del proxy implementada y probada (07/10/2026; `plataforma/proxy/`).** nginx `1.30.5-alpine` (desde el 22/10/2026, `1.30.6-alpine` por el parche de seguridad de nginx; versión fijada; desde el 08/10/2026 con parches de Alpine en `plataforma/proxy/Dockerfile`, `docs/16 §12`),
+22. **Capa del proxy implementada y probada (07/10/2026; `plataforma/proxy/`).** nginx `1.30.5-alpine` (desde el 22/10/2026, `1.30.6-alpine` por el parche de seguridad de nginx, y desde el 18/11/2026, `1.30.7-alpine` por otro; versión fijada; desde el 08/10/2026 con parches de Alpine en `plataforma/proxy/Dockerfile`, `docs/16 §12`),
     variante A: TLS 1.2+ en 443 → backend y en 8883 (`stream`) → broker; HSTS lo pone el proxy; registro JSON por
     petición y por conexión (ahí queda la IP real del dispositivo); resolución del nombre del servicio en cada conexión
     (`resolver 127.0.0.11`), para que recrear un contenedor no deje al proxy apuntando a una IP vieja. Probado de punta a

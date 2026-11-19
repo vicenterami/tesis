@@ -4636,3 +4636,23 @@ descarta la ayuda con Escape y abre el cajón con «Menú», como lo haría una 
 | El anexo incluye las figuras | quitar el `\input` de `modelo-anexo` del anexo | `DIFIERE el anexo del modelo de datos no incluye figuras/modelo-anexo` |
 
 **Resultado.** Letra estimada en el informe: cuerpo, 7,2 pt, en un PDF de 1012 × 1291 pt (antes, ≈ 1 pt); anexo, de 6,5 a 7,4 pt según la figura. Compilado: cuerpo en 30 páginas (igual que antes), cero desbordes, cero referencias sin resolver; el anexo nuevo suma 9 páginas fuera del cuerpo.
+
+## 88. Parche de seguridad de nginx 1.30.7 en el proxy (18/11/2026)
+
+**Por qué.** Al desplegar en el servidor de prueba el 18/11/2026, el escáner de imágenes (`plataforma/pruebas/escanear-imagenes.sh`) dijo
+«HAY QUE ACTUAR»: la imagen del proxy traía cinco vulnerabilidades altas con versión corregida publicada, todas en el paquete de nginx
+mismo (1.30.6-r1 → 1.30.7-r0: CVE-2026-113425, -121810, -123007, -123633 y -123634). No las trajo el código del día: la construcción reusó
+las capas anteriores, así que el proxy que ya corría las tenía. El paquete de nginx viene del repositorio de nginx y no del de Alpine: no
+se corrige con `apk upgrade`, sino subiendo la imagen base (como el 22/10/2026).
+
+**Qué se hizo.** El `FROM` de `plataforma/proxy/Dockerfile` pasa a `nginx:1.30.7-alpine`, publicada ese mismo día, fijada por su digest de
+índice (`docs/11 §3`, fila 7); la lista de parches de Alpine del mismo archivo no cambia.
+
+| Imagen | Antes (críticas / altas / con parche) | Después |
+|---|---|---|
+| proxy | 0 / 5 / 5 | 0 / 0 / 0 |
+| backend, base y broker | sin cambio: ninguna con versión corregida fuera de los residuos documentados | sin cambio |
+
+**Resultado.** El escáner, con todo construido en limpio (`--pull --no-cache`) en el portátil: «OK 4 imágenes: ninguna vulnerabilidad
+alta o crítica con versión corregida publicada fuera de los residuos documentados». En el servidor de prueba, el proxy se actualiza con el
+despliegue siguiente.
