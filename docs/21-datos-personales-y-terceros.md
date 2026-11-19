@@ -53,9 +53,9 @@ la pantalla. Esta tabla dice lo mismo **para quien lee**: qué dato, dónde, par
 presente; lo que aún no existe se dice «todavía no disponible», sin jerga. Una fila por cada fila de §2, en el mismo orden. Es la que
 copia `plataforma/backend/src/legal/inventario.ts` y la que muestra la página (§7). Cambiar un dato de §2 obliga a revisar su fila aquí.
 Una frase de esta tabla no cita un archivo, una función, una variable de entorno, una ruta de la API, una ficha ni una etapa: la prueba
-`legal.spec.ts` lo comprueba. La **versión** del texto subió hasta hoy una vez, porque cambiaron los datos que se guardan
-(17/11/2026, `docs/19 §4`, O). Esta reescritura (18/11/2026) es solo de redacción y no la sube; si un cambio de redacción debe subirla
-(y obligar a aceptar de nuevo) no está decidido.
+`legal.spec.ts` lo comprueba. **Toda actualización de este texto sube la versión de la
+página y su fecha** (decidido el 18/11/2026), también una corrección de redacción: no depende de acordarse, lo exige una prueba y un paso
+del verificador (§7, «Historial de versiones»). La reescritura del 18/11/2026 es la versión 3.
 
 | Dato | Dónde se guarda | Para qué | Cuánto tiempo | Quién lo ve |
 |---|---|---|---|---|
@@ -98,6 +98,10 @@ Una frase de esta tabla no cita un archivo, una función, una variable de entorn
 - **Una sola cookie:** `__Host-sesion` (`HttpOnly`, `Secure`, `SameSite=Lax`, `Path=/`, sin `Max-Age`; `docs/20 §3`). Es
   estrictamente necesaria: sin ella no hay sesión. Por eso no se pide consentimiento para ella, se informa en la página de privacidad
   (criterio por verificar con la normativa vigente). No hay cookies de analítica, de publicidad ni de terceros.
+- **Plazos de la sesión (texto de la página de privacidad):** vence a los **30 minutos sin actividad o a las 8 horas de abierta**, lo que
+  ocurra primero (`INACTIVIDAD_MS` y `VIDA_ABSOLUTA_MS`, `sesion/cookie.ts`, constantes del código: no se configuran por instancia); la cookie
+  se borra al salir o al cerrar el navegador (no lleva `Max-Age`). La página arma esas frases con esas constantes, así que no puede decir
+  otra cosa que el código; si el plazo cambia, cambia el texto y, por §7, la versión.
 - **Sin almacenamiento local:** el panel no usa `localStorage`, `sessionStorage` ni IndexedDB (búsqueda en el código del panel el
   08/11/2026); las casillas de «comparar» viven en memoria (`panel/src/lib/comparar.ts`). Las preferencias (iteración 1) se guardan en
   la base, no en el navegador: siguen a la persona entre equipos y no quedan en un equipo compartido.
@@ -134,6 +138,47 @@ tiene su aviso; por cada licencia distinta de MIT el archivo trae además su tex
 público del proyecto; sin él, «pídelo al responsable (Soporte)»), y solo con sesión la versión del `package.json` y el commit de la imagen
 (`pila.sh encender` lo pasa como `--build-arg COMMIT`; corrección del 11/11/2026: la versión exacta no se publica a cualquiera).
 
+**Historial de versiones (decidido el 18/11/2026).** Toda actualización del texto que viaja a la pantalla sube su versión en 1 y pone la
+fecha del cambio, sin excepción por erratas, y no depende de acordarse. Vale para la página de privacidad y, con el mismo mecanismo, para los
+términos. Qué cuenta como «el texto»: lo que el servidor envía y **no depende de la instancia**. Para la privacidad, el inventario de §2.1, los
+apartados de §3, §4 (con los plazos de la sesión, tomados de las constantes del código), §5 y §8 resumidos en `legal/privacidad.ts` y el aviso sin responsable; quedan fuera el responsable y su contacto (§6), la
+versión y la fecha. Para los términos, todo su texto. La **huella** es el SHA-256 (64 hexadecimales) de una forma canónica de ese texto: JSON
+con las claves de cada objeto en orden alfabético, los arreglos en su orden y las cadenas en Unicode NFC (`legal/huella.ts`). Cualquier cambio
+de un carácter la cambia. Cada texto tiene su tabla; **la última fila es la versión vigente y las filas publicadas no se reescriben: las nuevas
+se agregan al final.**
+- Primera guardia, `legal.spec.ts` (`pnpm test`): la huella calculada hoy es la de la última fila; la versión y la fecha del código son las de
+  esa fila; las versiones suben de uno en uno desde 1, las fechas no retroceden y ninguna huella se repite. Si el texto cambia sin más, la
+  prueba dice qué hacer: subir la versión y la fecha en el código y agregar la fila.
+- Segunda guardia, paso 2w7 del verificador: toda fila que ya exista en la versión publicada de este documento (`origin/main`; sin esa
+  referencia, `HEAD`) debe estar idéntica aquí. Sin ella se podría «arreglar» la primera guardia cambiando la huella de la versión vigente sin
+  subirla. Si la versión publicada aún no tiene la tabla, el historial es nuevo y el paso lo dice; sin git o sin referencia, se omite.
+- Subir la versión de **privacidad** solo cambia lo que la página muestra («Versión N, del …»); no pide nada a nadie. Subir la de los
+  **términos** obliga a todas las personas a aceptar de nuevo en su siguiente petición (`legal/terminos.ts`, `sesion/sesion.service.ts`).
+
+#### Historial de la privacidad
+| Versión | Fecha | Huella | Qué cambió |
+|---|---|---|---|
+| 1 | 11/11/2026 | — | Primera versión: inventario de datos, terceros, cookies, permisos y derechos. |
+| 2 | 17/11/2026 | — | El inventario suma los datos de la vista pública por enlace. |
+| 3 | 18/11/2026 | `69c5ce0cc3138b4fe68cecc0344611bf47cc315730e930846f359443fe0b97f2` | Texto para personas (§2.1, sin jerga interna); la fila de los respaldos dice lo que hay y con su condición; el registro que falta se llama de auditoría; la sección de cookies dice los plazos de la sesión (tomados del código) y deja de repetirse en el panel. |
+
+Las versiones 1 y 2 son anteriores al mecanismo: no tienen huella («—»), porque no se calculó con el texto de entonces.
+
+#### Historial de los términos
+| Versión | Fecha | Huella | Qué cambió |
+|---|---|---|---|
+| 1 | 11/11/2026 | `8e985704d16122f2fa1dbdfaa4040e1d7415c55669f0075cb5f6d047f88d0ca4` | Primera versión; su fila registra por primera vez la huella (18/11/2026), sin cambio de texto. |
+
+**Qué es «texto legal» y qué es rótulo de la interfaz (frontera, 18/11/2026).** La regla de versión y fecha cubre la **privacidad** y los
+**términos**; «Acerca de» (versión del programa, commit, aviso de la licencia, avisos de terceros) **no se versiona**. Dentro de la página de
+privacidad es texto legal, y por tanto lo sirve el servidor y entra en la huella, todo lo que afirma qué se hace con los datos de la persona:
+las celdas del inventario, los apartados (terceros, cookies y sus plazos, permisos, derechos), el aviso sin responsable y los títulos de esos
+apartados. Es rótulo de la interfaz, y puede vivir en el panel sin versión: los nombres de los apartados de la pantalla («Privacidad»,
+«Términos de uso», «Acerca de», «Soporte»), el encabezado del inventario («Qué datos se guardan») y los nombres de sus columnas («Dónde»,
+«Cuánto tiempo», «Quién accede»), «Responsable de los datos», los mensajes de carga y de error, y el formulario de soporte. Si un rótulo
+empezara a afirmar algo sobre los datos (un plazo, un destinatario), deja de ser rótulo: pasa al servidor. El panel no dibuja ningún párrafo
+de privacidad propio (hasta el 18/11/2026 dibujaba el de las cookies, con sus plazos escritos a mano; ahora sale de la API).
+
 **Términos de uso:** qué es el servicio y qué no garantiza (es un prototipo, sin compromiso de disponibilidad); la cuenta es personal
 y la clave no se comparte; uso aceptable (no probar la seguridad sin autorización, no cargar datos de otros sin permiso); los datos de
 un sitio pertenecen a la organización del sitio y se pueden exportar siempre (RF-34); licencia del código (AGPL-3.0-only,
@@ -158,5 +203,6 @@ generados desde `pnpm licenses` (los comprueba el verificador: ninguna dependenc
 
 ## 9. Cómo se mantiene
 Una tabla o columna nueva con datos de personas, un registro nuevo o un tercero nuevo se escribe **primero aquí** (con dónde, para qué,
-cuánto tiempo y quién accede) y después en el código; la página de privacidad se regenera desde este inventario. Candidato a guardián:
+cuánto tiempo y quién accede) y después en el código; la página de privacidad se regenera desde este inventario. Si cambia el texto que lee la persona (aunque sea una palabra), sube la versión y la fecha y se agrega su fila al historial de §7: sin eso
+falla `pnpm test`. Candidato a guardián:
 un paso que falle si el panel usa `localStorage`, `sessionStorage` o `document.cookie`, o si carga un recurso de otro origen.

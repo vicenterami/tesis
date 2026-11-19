@@ -14,7 +14,7 @@ const json = (x: unknown, status = 200, h: Record<string, string> = {}): Respons
 const PRIVACIDAD = {
   version: 1, fecha: '2026-11-11', responsable: null, aviso_responsable: 'Quien opera esta instancia aún no configuró su nombre ni su contacto.',
   datos: [{ dato: 'Correo', donde: '`usuario.email`', para_que: 'Iniciar sesión', cuanto_tiempo: 'Mientras exista la cuenta', quien_accede: 'La persona' }],
-  secciones: [{ titulo: 'Terceros', parrafos: ['Ningún tercero recibe tus datos.'] }],
+  secciones: [{ titulo: 'Terceros', parrafos: ['Ningún tercero recibe tus datos.'] }, { titulo: 'Cookies', parrafos: ['La sesión vence a los 30 minutos sin actividad o a las 8 horas de abierta.'] }],
 };
 const TERMINOS = { version: 3, fecha: '2026-11-11', texto: '## Tu cuenta\n- La cuenta es **personal**.\n\n<script>alert(1)</script>' };
 const ACERCA = { nombre: 'Sistema', version: '0.9.0', commit: 'abc1234', licencia: 'AGPL-3.0-only', aviso_licencia: 'x', codigo_fuente: null, avisos_terceros: '/panel/avisos-de-terceros.txt' };
@@ -76,12 +76,16 @@ describe('P11 Legal y acerca de', () => {
     await waitFor(() => expect(document.querySelector('[data-inventario-privacidad]')).toBeTruthy());
     expect(document.querySelector('[data-inventario-privacidad]')!.textContent).toContain('Correo: Iniciar sesión. Dónde: usuario.email.');
     expect(document.querySelector('[data-sin-responsable]')!.textContent).toContain('aún no configuró');
-    await waitFor(() => expect(document.querySelector('[data-legal-terminos] [data-version-legal]')?.textContent).toBe('Versión 3, del 2026-11-11.'));
+    await waitFor(() => expect(document.querySelector('[data-legal-terminos] [data-version-legal]')?.textContent).toBe('Versión 3, del 11/11/2026.'));
     expect(document.querySelector('[data-legal-terminos] li')!.textContent).toBe('La cuenta es personal.');
     expect(document.querySelector('[data-legal-terminos] script')).toBeNull();
     expect(document.querySelector('[data-legal-terminos]')!.textContent).toContain('<script>alert(1)</script>');
     await waitFor(() => expect(document.querySelector('[data-acerca-commit]')?.textContent).toBe('abc1234'));
-    expect(document.querySelector('[data-legal-cookie]')).toBeTruthy(); // lo de antes sigue
+    // La privacidad: versión y fecha como DD/MM/AAAA; y todo su texto (cookies y plazos incluidos) sale de la API, no del panel.
+    expect(document.querySelector('[data-legal-privacidad] [data-version-legal]')?.textContent).toBe('Versión 1, del 11/11/2026.');
+    expect(document.querySelector('[data-legal-cookie]')).toBeNull();
+    expect(document.querySelector('[data-legal-privacidad]')!.textContent).toContain('La sesión vence a los 30 minutos sin actividad');
+    expect(document.body.textContent).not.toContain('El panel usa una sola cookie');
   });
 
   it('AGPL §13 (decidido el 11/11/2026): el aviso del servidor siempre; sin enlace configurado, «pídelo al responsable (Soporte)»; con él, el enlace', async () => {

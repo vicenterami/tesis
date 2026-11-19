@@ -3,12 +3,14 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { acerca, commitDeEntorno, urlCodigoFuente, versionDelPaquete } from './acerca.js';
 import { INVENTARIO } from './inventario.js';
-import { AVISO_SIN_RESPONSABLE, SECCIONES, privacidad, responsableDeEntorno, textoDeEntorno } from './privacidad.js';
+import { AVISO_SIN_RESPONSABLE, PRIVACIDAD_FECHA, PRIVACIDAD_VERSION, SECCIONES, huellaPrivacidad, plazo, privacidad, responsableDeEntorno, textoDeEntorno } from './privacidad.js';
+import { formaCanonica, huella } from './huella.js';
+import { INACTIVIDAD_MS, VIDA_ABSOLUTA_MS } from '../sesion/cookie.js';
 import { MAX_MENSAJES, TasaSoporte, VENTANA_MS, textoDeSoporte } from './soporte.js';
 import { HttpException } from '@nestjs/common';
 import { LegalController } from './legal.controller.js';
 import { usuarioSistema } from '../sesion/permisos.js';
-import { TERMINOS_VERSION, terminos, terminosPendientes } from './terminos.js';
+import { TERMINOS_FECHA, TERMINOS_VERSION, huellaTerminos, terminos, terminosPendientes } from './terminos.js';
 
 // Legal y acerca de (docs/21 §7; docs/19 §4, P11; docs/20 §12).
 
@@ -43,8 +45,8 @@ describe('privacidad: el inventario del código es la tabla de docs/21 §2.1', (
     ];
     expect(textos.filter((t) => JERGA.test(t.replace(/__Host-sesion/g, '')) || (t.includes('`') && !t.includes('__Host-sesion')))).toEqual([]);
   });
-  it('la página de privacidad lleva su versión: 2 desde que el inventario suma la vista pública por enlace (17/11/2026)', () => {
-    expect(privacidad(null)).toMatchObject({ version: 2, fecha: '2026-11-17' });
+  it('la página lleva la versión y la fecha del código y el inventario incluye la vista pública por enlace', () => {
+    expect(privacidad(null)).toMatchObject({ version: PRIVACIDAD_VERSION, fecha: PRIVACIDAD_FECHA });
     expect(INVENTARIO.some((f) => f.dato.includes('vista pública por enlace'))).toBe(true);
   });
   it('sin responsable configurado, la página lo dice en vez de inventar un contacto; con él, lo muestra', () => {
@@ -53,6 +55,84 @@ describe('privacidad: el inventario del código es la tabla de docs/21 §2.1', (
     expect(responsableDeEntorno('Organización', '  ')).toBeNull(); // las dos o ninguna
     expect(textoDeEntorno('linea\nnueva')).toBe('linea nueva'); // sin saltos ni caracteres de control
     expect(textoDeEntorno('x'.repeat(500))?.length).toBe(200);
+  });
+});
+
+// Historial de versiones (decidido el 18/11/2026, docs/21 §7): toda actualización del texto sube su versión y su fecha. La huella del texto que
+// se sirve debe ser la de la última fila de la tabla de su historial; así un cambio de una palabra, también una errata, no pasa sin versión.
+// El paso 2w7 del verificador cierra el atajo que esta prueba deja: cambiar la huella de una fila ya publicada.
+interface FilaHistorial { version: number; fecha: string; huella: string | null; cambio: string }
+const DOC21 = readFileSync(join(import.meta.dirname, '..', '..', '..', '..', 'docs', '21-datos-personales-y-terceros.md'), 'utf8');
+function filasDeHistorial(bloque: string, titulo: string): FilaHistorial[] {
+  return bloque.split('\n').filter((l) => l.startsWith('| ')).slice(1).map((l) => {
+    const celdas = l.trim().replace(/^\|\s*|\s*\|$/g, '').split(' | ').map((x) => x.trim());
+    if (celdas.length !== 4) throw new Error(`fila mal formada en «${titulo}» (${celdas.length} celdas en vez de 4; ¿una celda trae « | »?): ${l}`);
+    const [v, f, h, c] = celdas as [string, string, string, string];
+    const fecha = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(f);
+    if (!/^\d+$/.test(v) || !fecha || c === '' || !(h === '—' || /^`[0-9a-f]{64}`$/.test(h))) throw new Error(`fila mal formada en «${titulo}»: ${l}`);
+    return { version: Number(v), fecha: `${fecha[3]}-${fecha[2]}-${fecha[1]}`, huella: h === '—' ? null : h.slice(1, -1), cambio: c };
+  });
+}
+function historialDe(titulo: string): FilaHistorial[] {
+  const ini = DOC21.indexOf(`#### ${titulo}\n`);
+  if (ini < 0) throw new Error(`docs/21 §7 no tiene el apartado «${titulo}»`);
+  const resto = DOC21.slice(ini + titulo.length + 6);
+  const fin = resto.search(/\n(#|\*\*)/);
+  return filasDeHistorial(fin < 0 ? resto : resto.slice(0, fin), titulo);
+}
+const QUE_HACER = 'el texto cambió: sube la versión y la fecha en el código y agrega la fila al historial de docs/21 §7';
+function exigirHistorial(filas: FilaHistorial[], vigente: { version: number; fecha: string; huella: string }): void {
+  expect(filas.length, 'el historial no tiene filas').toBeGreaterThan(0);
+  const ultima = filas.at(-1)!;
+  expect(vigente.huella, `${QUE_HACER} (huella de hoy ${vigente.huella}; la última fila, versión ${ultima.version}, dice ${ultima.huella})`).toBe(ultima.huella);
+  expect(vigente.version, `la versión del código no es la de la última fila: ${QUE_HACER}`).toBe(ultima.version);
+  expect(vigente.fecha, `la fecha del código no es la de la última fila: ${QUE_HACER}`).toBe(ultima.fecha);
+}
+function exigirOrden(filas: FilaHistorial[]): void {
+  filas.forEach((f, i) => expect(f.version, `la fila ${i + 1} debe ser la versión ${i + 1}: las versiones suben de uno en uno desde 1`).toBe(i + 1));
+  filas.slice(1).forEach((f, i) => expect(f.fecha >= filas[i].fecha, `la fecha de la versión ${f.version} retrocede`).toBe(true));
+  const huellas = filas.map((f) => f.huella).filter((h): h is string => h !== null);
+  expect(new Set(huellas).size, 'una huella se repite: dos versiones no pueden tener el mismo texto').toBe(huellas.length);
+}
+describe('historial de versiones (docs/21 §7)', () => {
+  it('la huella de la privacidad de hoy, su versión y su fecha son los de la última fila de «Historial de la privacidad»', () => {
+    exigirHistorial(historialDe('Historial de la privacidad'), { version: PRIVACIDAD_VERSION, fecha: PRIVACIDAD_FECHA, huella: huellaPrivacidad() });
+  });
+  it('la huella de los términos de hoy, su versión y su fecha son los de la última fila de «Historial de los términos»', () => {
+    exigirHistorial(historialDe('Historial de los términos'), { version: TERMINOS_VERSION, fecha: TERMINOS_FECHA, huella: huellaTerminos() });
+  });
+  it('privacidad: las versiones suben de uno en uno, las fechas no retroceden y ninguna huella se repite', () => {
+    exigirOrden(historialDe('Historial de la privacidad'));
+  });
+  it('términos: las versiones suben de uno en uno, las fechas no retroceden y ninguna huella se repite', () => {
+    exigirOrden(historialDe('Historial de los términos'));
+  });
+  it('una fila con una celda que trae « | » (o con celdas de más o de menos) es una fila mal formada, no columnas corridas', () => {
+    const cab = '| Versión | Fecha | Huella | Qué cambió |\n|---|---|---|---|\n';
+    const h = `\`${'a'.repeat(64)}\``;
+    expect(filasDeHistorial(`${cab}| 1 | 11/11/2026 | ${h} | Primera |\n`, 'x')).toHaveLength(1);
+    expect(() => filasDeHistorial(`${cab}| 1 | 11/11/2026 | ${h} | Primera | y segunda |\n`, 'x')).toThrow(/fila mal formada/);
+    expect(() => filasDeHistorial(`${cab}| 1 | 11/11/2026 | ${h} |\n`, 'x')).toThrow(/fila mal formada/);
+  });
+  it('el texto de las cookies sale de las constantes de la sesión: los plazos del código son los que lee la persona', () => {
+    expect(plazo(30 * 60_000)).toBe('30 minutos');
+    expect(plazo(8 * 3600_000)).toBe('8 horas');
+    expect(plazo(60 * 60_000)).toBe('1 hora');
+    const cookies = SECCIONES.find((s) => s.titulo.startsWith('Cookies'))!.parrafos.join(' ');
+    expect(cookies).toContain(`vence a los ${plazo(INACTIVIDAD_MS)} sin actividad o a las ${plazo(VIDA_ABSOLUTA_MS)} de abierta`);
+  });
+  it('la huella rechaza lo que JSON volvería null: NaN e Infinity', () => {
+    expect(() => huella({ a: Number.NaN })).toThrow(/no finito/);
+    expect(() => huella({ a: [Number.POSITIVE_INFINITY] })).toThrow(/no finito/);
+    expect(huella({ a: 0 })).toMatch(/^[0-9a-f]{64}$/);
+  });
+  it('la forma canónica ordena las claves, respeta el orden de los arreglos y la huella cambia con un solo carácter', () => {
+    expect(formaCanonica({ b: [2, 1], a: 'x' })).toBe('{"a":"x","b":[2,1]}');
+    expect(huella({ a: 1, b: 2 })).toBe(huella({ b: 2, a: 1 }));
+    expect(huella({ a: ['x', 'y'] })).not.toBe(huella({ a: ['y', 'x'] }));
+    expect(huella({ t: 'Cookies' })).not.toBe(huella({ t: 'Cookie' }));
+    expect(huella({ t: 'e\u0301' })).toBe(huella({ t: '\u00e9' })); // Unicode NFC: la misma letra escrita de dos formas
+    expect(huellaPrivacidad()).toMatch(/^[0-9a-f]{64}$/);
   });
 });
 

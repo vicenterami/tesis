@@ -1162,7 +1162,11 @@ ajustar, lo ajusta él, dentro de los límites de la instancia):
   a 365. La actividad sigue nombrando el enlace, ya como «Enlace retirado».
 - **La vista previa tiene su propio cupo**, separado del de las visitas.
 - **La página de privacidad sube a la versión 2**, porque cambian los datos que se guardan (el inventario de `docs/21 §2` suma la vista
-  pública). Los términos de uso no cambian de versión: su texto no cambió.
+  pública). Los términos de uso no cambian de versión: su texto no cambió. **Regla general (decidida el 18/11/2026, `docs/21 §7`):** toda
+  actualización del texto de privacidad que viaja a la pantalla, también una corrección de redacción, sube la versión en 1 y pone la fecha del
+  cambio; vale igual para los términos. La reescritura para personas del 18/11/2026 es la versión 3. No depende de acordarse: la huella del
+  texto debe coincidir con la última fila de un historial en `docs/21 §7`, lo comprueba `legal.spec.ts` y el paso 2w7 del verificador impide
+  reescribir filas ya publicadas. El panel muestra «Versión N, del …» con la versión y la fecha que sirve la API (`Legal.svelte`).
 - **Una carga de la pantalla** (punto 8) la marca el panel con `?carga=si` en su primera petición; los refrescos no la llevan.
 - **k:** es del sitio (punto 2), de 1 a 20. Al servir rige el mayor entre el k del sitio y el piso vigente: si el operador sube el piso,
   todos los sitios lo cumplen. Los parámetros del despliegue se validan al arrancar (un valor inválido lo detiene);

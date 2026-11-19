@@ -460,11 +460,7 @@ describe('armazón: llegada, menú lateral, cajón, sitio, legal y tema', () => 
     render(App);
     await waitFor(() => expect(document.querySelector('[data-legal]')).toBeTruthy());
     expect(document.querySelector('[data-legal]')!.textContent).toContain('GNU Affero General Public License, versión 3');
-    const cookie = document.querySelector('[data-legal-cookie]')!.textContent!;
-    expect(cookie).toContain('__Host-sesion');
-    expect(cookie).toContain('30 minutos sin actividad');
-    expect(cookie).toContain('8 horas');
-    expect(cookie).toContain('No hay cookies de');
+    expect(document.querySelector('[data-legal-cookie]')).toBeNull(); // el texto de cookies y sus plazos lo sirve la API (con la privacidad), no el panel
     expect(document.querySelector('[data-avisos-terceros]')!.getAttribute('href')).toBe(`${import.meta.env.BASE_URL}avisos-de-terceros.txt`); // bajo /panel/ en el build
     expect(screen.getByRole('link', { name: 'Legal y acerca de' }).getAttribute('href')).toBe('#/legal'); // el pie, también sin sesión
     expect(screen.queryByRole('heading', { name: 'Entrar' })).toBeNull();

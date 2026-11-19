@@ -1132,6 +1132,63 @@ if not malos: print(f'OK    {citas} citas a secciones de docs/, todas a una secc
 sys.exit(1 if malos else 0)
 PY
 
+paso "2w7. Historial de versiones de privacidad y términos (docs/21 §7): lo ya publicado no se reescribe, las filas nuevas se agregan al final"
+# 18/11/2026: toda actualización del texto legal sube su versión y su fecha (decidido ese día). La prueba legal.spec.ts compara la huella del
+# texto servido con la ÚLTIMA fila del historial; deja abierto un atajo: cambiar la huella de la versión vigente en vez de subir la versión.
+# Este paso lo cierra: toda fila del historial que ya exista en la versión publicada del documento (origin/main; sin esa referencia, HEAD)
+# debe estar idéntica en el árbol de trabajo, y las filas nuevas solo se agregan al final. Si la versión publicada aún no trae la tabla, el
+# historial es nuevo y pasa diciéndolo. Sin git o sin ninguna de las dos referencias, se OMITE (nunca verde sin haber revisado). Se usa
+# `rev-parse --verify -q «ref^{commit}»` porque `rev-parse` a secas devuelve el nombre tal cual aunque la referencia no exista.
+python3 -I - <<'PY'; rc=$?
+import re, sys, pathlib, subprocess
+DOC = 'docs/21-datos-personales-y-terceros.md'
+TITULOS = ['Historial de la privacidad', 'Historial de los términos']
+def filas(texto, titulo):
+    ini = texto.find(f'#### {titulo}\n')
+    if ini < 0: return None
+    resto = texto[ini + len(titulo) + 6:]
+    m = re.search(r'\n(#|\*\*)', resto)
+    bloque = resto if m is None else resto[:m.start()]
+    cuerpo = [[c.strip() for c in re.sub(r'^\|\s*|\s*\|$', '', l.strip()).split(' | ')] for l in bloque.split('\n') if l.startswith('| ')][1:]
+    for f in cuerpo:
+        if len(f) != 4: raise ValueError(f'fila mal formada en «{titulo}» ({len(f)} celdas en vez de 4; ¿una celda trae « | »?): {" | ".join(f)[:100]}')
+    return cuerpo
+def git(*a):
+    try: return subprocess.run(['git', *a], capture_output=True, text=True)
+    except FileNotFoundError: return None
+ref = None
+for r in ('origin/main', 'HEAD'):
+    c = git('rev-parse', '--verify', '-q', f'{r}^{{commit}}')
+    if c is not None and c.returncode == 0 and re.fullmatch(r'[0-9a-f]{40}', c.stdout.strip()): ref = r; break
+if ref is None: print('omitida: sin git o sin referencia origin/main ni HEAD; no se sabe qué está publicado'); sys.exit(3)
+trabajo = pathlib.Path(DOC).read_text(encoding='utf-8')
+# «El archivo no existe en esa referencia» (historial nuevo) se distingue de cualquier otro fallo de git (omitida): `ls-tree` sale con 0 y
+# sin salida si la ruta no está en la referencia; si sale con otro código, no se sabe qué está publicado.
+c = git('ls-tree', '--name-only', ref, '--', DOC)
+if c is None or c.returncode != 0: print(f'omitida: git ls-tree falló en {ref} ({(c.stderr if c is not None else "sin git").strip()[:120]}); no se sabe qué está publicado'); sys.exit(3)
+if c.stdout.strip() == '': publicado = ''
+else:
+    c = git('show', f'{ref}:{DOC}')
+    if c is None or c.returncode != 0: print(f'omitida: git show falló en {ref} ({(c.stderr if c is not None else "sin git").strip()[:120]}); no se sabe qué está publicado'); sys.exit(3)
+    publicado = c.stdout
+malos, resumen = [], []
+for titulo in TITULOS:
+    try: hoy = filas(trabajo, titulo)
+    except ValueError as e: print('FALLA', e); sys.exit(1)
+    if not hoy: print(f'FALLA «{titulo}» no existe o no tiene filas en {DOC}'); sys.exit(1)
+    try: antes = filas(publicado, titulo) or []
+    except ValueError as e: print('FALLA la versión publicada: ' + str(e)); sys.exit(1)
+    if not antes: resumen.append(f'«{titulo}»: historial nuevo (con {len(hoy)} fila(s)), nada publicado que comparar'); continue
+    if len(hoy) < len(antes): malos.append(f'«{titulo}»: la versión publicada en {ref} tiene {len(antes)} filas y aquí hay {len(hoy)}: se borraron filas')
+    for i, fila in enumerate(antes[:len(hoy)]):
+        if hoy[i] != fila: malos.append(f'«{titulo}», fila {i + 1} (versión {fila[0]}): ya está publicada en {ref} y aquí cambió; el historial publicado no se reescribe: agrega una versión nueva al final\n      publicada: {" | ".join(fila)[:150]}\n      ahora:     {" | ".join(hoy[i])[:150]}')
+    resumen.append(f'«{titulo}»: {len(antes)} filas publicadas en {ref} idénticas, {len(hoy) - len(antes)} nuevas al final')
+for m in malos: print('FALLA', m)
+if not malos: print('OK    ' + '; '.join(resumen))
+sys.exit(1 if malos else 0)
+PY
+if [ "$rc" = 3 ]; then omitidos="$omitidos 2w7"; elif [ "$rc" != 0 ]; then fallos=$((fallos+1)); fi
+
 paso "2y2. Sintaxis de los guiones: bash -n de cada *.sh versionado o nuevo (no ignorado)"
 # 16/10: una línea de comentario sin «#» dejó banco.sh entero sin interpretarse y el guardián no lo veía (solo lo vio la siguiente
 # corrida del banco). bash -n no ejecuta nada: solo lee el guion.

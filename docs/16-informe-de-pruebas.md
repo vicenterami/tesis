@@ -4,7 +4,7 @@ Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emu
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
 cubría al escribirse se agregó después: TT-32 (sensor físico) en §43, §44 y §53, y TT-30 (recuperación ante reinicio) en §11. El
-contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 828 pruebas unitarias del backend y 454 del panel.
+contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 836 pruebas unitarias del backend y 455 del panel.
 Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -4360,3 +4360,62 @@ del 17/11/2026 para el caso en que se cambia de sitio mientras se relee el k tra
 | Cambiar de sitio mientras se relee el k tras el 409 `minimo_cambio`: la relectura del sitio anterior no pisa el k, el aviso ni la confirmación del nuevo | `Publicar.test.ts` | quitar la guarda que sigue a la relectura | 1 de 17 (el campo mostraba 2 en vez de 7) |
 
 **Resultado.** Se agregaron 0 pruebas al backend y 2 al panel. Sin los cambios plantados, las 17 pruebas de `Publicar.test.ts` pasan.
+
+## 84. Versión y fecha de los textos legales que no dependen de acordarse (18/11/2026)
+
+**Por qué.** El 18/11/2026 el texto de la página de privacidad cambió (la tabla de `docs/21 §2.1`, `legal/inventario.ts` y `legal/privacidad.ts`:
+texto para personas, la fila de los respaldos con su condición, el registro que falta llamado de auditoría) y la versión seguía en 2, con
+fecha del 17/11/2026; los comentarios y `docs/21 §2.1` decían que subirla «no está decidido». Quedó decidido: toda actualización del texto que
+viaja a la pantalla sube la versión en 1 y pone la fecha del cambio, también una errata, y **no puede depender de acordarse**. Vale para la
+privacidad y, con el mismo mecanismo, para los términos. Hoy la versión de la privacidad solo se muestra («Versión N, del …»); la de los
+términos, además, obliga a todas las personas a aceptar de nuevo (`docs/20 §12`).
+
+**Qué se hizo.**
+- `legal/huella.ts`: la huella es el SHA-256 de una forma canónica del texto servido que no depende de la instancia (JSON con las claves en orden
+  alfabético, los arreglos en su orden, cadenas en Unicode NFC). `huellaPrivacidad()` cubre el inventario, los apartados y el aviso sin
+  responsable (deja fuera el responsable, su contacto, la versión y la fecha); `huellaTerminos()`, todo el texto.
+- El texto de las cookies, con los plazos de la sesión, deja de vivir en el panel: lo sirve la API dentro de lo que cubre la huella, y los plazos
+  se arman con `INACTIVIDAD_MS` y `VIDA_ABSOLUTA_MS` (`sesion/cookie.ts`, constantes del código). `docs/21 §4` los dice primero y `docs/21 §7`
+  escribe la frontera entre texto legal (en la huella) y rótulo de la interfaz (en el panel); «Acerca de» no se versiona. La versión y la
+  fecha se muestran como `DD/MM/AAAA` (`fechaCivil`, `panel/src/lib/tiempo.ts`).
+- `docs/21 §7` guarda el historial, una tabla por texto («versión · fecha · huella · qué cambió»), fuente única. La privacidad pasa a la
+  versión 3 con fecha 18/11/2026; las versiones 1 y 2 son anteriores al mecanismo y llevan «—» en la huella. Los términos conservan la versión 1
+  (su texto no cambió) y su fila registra por primera vez la huella.
+- Primera guardia, `legal.spec.ts`: la huella de hoy, la versión y la fecha del código son los de la última fila; las versiones suben de uno
+  en uno desde 1, las fechas no retroceden y ninguna huella se repite. La falla dice qué hacer.
+- Segunda guardia, paso 2w7 del verificador: toda fila del historial ya publicada (`origin/main`; sin esa referencia, `HEAD`) debe estar
+  idéntica en el árbol de trabajo y las nuevas solo se agregan al final. Cierra el atajo de «arreglar» la primera guardia cambiando la huella
+  de la versión vigente sin subirla. Si la versión publicada aún no trae la tabla, el historial es nuevo y pasa diciéndolo; sin git o sin
+  referencia, se omite. La referencia se resuelve con `rev-parse --verify -q «ref^{commit}»`, porque `rev-parse` a secas devuelve el nombre
+  tal cual aunque no exista.
+
+| Qué se comprueba | Prueba | Falla plantada | Qué cayó |
+|---|---|---|---|
+| El texto de privacidad que se sirve es el de la última fila del historial | `legal.spec.ts` (historial de versiones) | una palabra cambiada a la vez en una celda de `inventario.ts` y en `docs/21 §2.1`, sin tocar la versión | 1 de 23, con el mensaje «el texto cambió: sube la versión y la fecha en el código y agrega la fila al historial de docs/21 §7» y las dos huellas |
+| La versión del código es la de la última fila | `legal.spec.ts` | `PRIVACIDAD_VERSION` en 4 sin agregar la fila | 1 de 23 («la versión del código no es la de la última fila») |
+| Subir la versión con su fila y su huella nueva pasa | `legal.spec.ts` | (caso legítimo) palabra cambiada, fila 4 con la huella nueva, versión 4 y fecha 19/11/2026 | 0 de 23 |
+| Los términos: el texto servido es el de la última fila | `legal.spec.ts` | una errata en el texto de los términos sin tocar la versión | 1 de 23 (la misma instrucción y las dos huellas) |
+| Versiones de una en una, fechas sin retroceso, huellas sin repetir | `legal.spec.ts` | la fila 2 con versión 3; la fecha de la fila 3 en 10/11/2026; la huella de la fila 3 copiada a la 2 | 1, 2 y 1 de 23 |
+| La forma canónica no depende del orden de las claves, sí del de los arreglos, y un carácter cambia la huella | `legal.spec.ts` | (comprobada contra valores fijos, sin plantar) | 0 de 23 |
+| Lo publicado no se reescribe (privacidad) | paso 2w7 del verificador | la huella de la fila vigente cambiada en un dígito, con esa fila ya publicada | FALLA, fila 3 (versión 3), con la fila publicada y la actual |
+| Lo publicado no se reescribe (términos) | paso 2w7 | la fecha de la fila 1 de los términos cambiada | FALLA, fila 1 (versión 1) |
+| Las filas borradas se notan | paso 2w7 | la fila 1 de la privacidad borrada | FALLA, filas 1 y 2 desplazadas |
+| Una fila nueva al final pasa | paso 2w7 | (caso legítimo) fila 4 agregada al final | OK, 3 filas publicadas idénticas y 1 nueva |
+| Historial nuevo, solo `HEAD` y sin referencia | paso 2w7 | versión publicada sin tablas; sin `origin/main`; sin ninguna referencia | OK («historial nuevo»); OK con `HEAD`; omitida (sale con 3) |
+| El texto de cookies y sus plazos entra en la huella (antes lo dibujaba el panel con los plazos escritos a mano) | `legal.spec.ts` | «lo que ocurra primero» cambiado a «antes» en el apartado de cookies; `INACTIVIDAD_MS` de 30 a 20 minutos en `sesion/cookie.ts` | 1 de 23 (huella distinta); 2 de 23 (la huella y el plazo del texto) |
+| El plazo en palabras sale de las constantes de la sesión | `legal.spec.ts` | (el plazo de 20 minutos de arriba) | ver la fila anterior |
+| El panel no dibuja un párrafo de cookies propio | `Legal.test.ts`, `App.test.ts` | un `<p data-legal-cookie>` agregado a `Legal.svelte` | 2 de 38 (los tres archivos corridos) |
+| Una celda del historial con « | » (o celdas de más o de menos) es una fila mal formada | `legal.spec.ts`; paso 2w7 | « | » dentro de la primera celda de la versión 1, en el árbol de trabajo y, aparte, en la versión publicada | 2 de 23 («fila mal formada … 5 celdas en vez de 4»); paso 2w7: FALLA con el mismo mensaje en las dos |
+| La huella rechaza `NaN` e `Infinity` | `legal.spec.ts` | (prueba directa con ambos valores) | 0 de 23: lanzan «no finito» |
+| Un fallo de git no se toma por «historial nuevo» | paso 2w7 | `git ls-tree` que falla; `git show` que falla; archivo ausente en la referencia | omitida (sale con 3), omitida, OK «historial nuevo» |
+| La fecha de la versión se muestra como `DD/MM/AAAA`, sin pasar por zonas | `tiempo.test.ts`, `Legal.test.ts` | (`2026-01-01` no retrocede a diciembre) | 0 de 38 |
+
+**Límite.** Hasta que la tabla del historial esté publicada por primera vez (en `origin/main`), el paso 2w7 no tiene con qué comparar: lo dice («historial nuevo») y pasa; la protección contra reescribir filas rige desde la primera publicación.
+
+El paso 2w7 se probó extrayéndolo del guion y corriéndolo con un `git` simulado (que contesta `rev-parse` y `show` para las referencias que se
+le den), más una corrida con el `git` real contra `origin/main`, cuya versión publicada aún no trae la tabla.
+
+**Resultado.** `pnpm verificar` en el backend pasa (tipos, lint, pruebas del backend y del panel, `svelte-check` con 418 archivos y 0 errores,
+compilación del panel). Se agregaron 8 pruebas al backend (`legal.spec.ts`: la huella y la versión de cada texto contra su última fila, el
+orden del historial de cada texto, la forma canónica, las filas mal formadas, los plazos de las cookies y los números no finitos) y 1 al panel
+(`fechaCivil`); las de `Legal.test.ts` y `App.test.ts` se ajustaron. Se agregó 1 paso al verificador (2w7).

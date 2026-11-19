@@ -34,6 +34,13 @@ export function fechaHora(iso: string, zona: string): string {
   return `${dia}, ${hora}`;
 }
 
+// Una fecha civil «AAAA-MM-DD» (la que sirve el servidor sin hora, p. ej. la de un texto legal) como «DD/MM/AAAA». No es un instante: no se
+// convierte de zona (pasarla por `Date` la correría un día en husos al oeste de UTC). Si no tiene esa forma, se devuelve tal cual.
+export function fechaCivil(f: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(f);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : f;
+}
+
 // «hace 42 s» mientras sea reciente (la señal de «en vivo» de la ficha, docs/19 §4 punto 5); después, como haceCuanto.
 export function haceSegundos(iso: string, ahora: Date): string {
   const s = Math.max(0, Math.floor((ahora.getTime() - Date.parse(iso)) / 1000));

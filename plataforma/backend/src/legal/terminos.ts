@@ -1,7 +1,10 @@
 // Términos de uso (docs/21 §7; docs/20 §12; RF-53, HU-27). La versión vigente es esta constante: subirla obliga a todas las personas a
 // aceptar de nuevo en su siguiente petición (la sesión queda restringida mientras `usuario.terminos_version_aceptada` sea menor). Cambiar
-// el texto sin subir la versión no obliga a nadie: un cambio de fondo SIEMPRE sube la versión y la fecha. Sin datos personales: el
-// responsable y su contacto los pone la página de privacidad desde las variables de entorno (privacidad.ts).
+// el texto sin subir la versión no obligaría a nadie: por eso TODO cambio del texto, también una errata, sube la versión y la fecha
+// (decidido el 18/11/2026, docs/21 §7). No depende de acordarse: `huellaTerminos()` calcula el SHA-256 del texto y legal.spec.ts lo compara
+// con la última fila de «Historial de los términos» en docs/21 §7; el paso 2w7 del verificador impide reescribir las filas ya publicadas.
+// Sin datos personales: el responsable y su contacto los pone la página de privacidad desde las variables de entorno (privacidad.ts).
+import { huella } from './huella.js';
 
 export const TERMINOS_VERSION = 1;
 export const TERMINOS_FECHA = '2026-11-11';
@@ -33,6 +36,9 @@ están en «Acerca de».
 
 ## Cambios
 Si estos términos cambian, la versión sube y el sistema te pedirá aceptarlos de nuevo antes de seguir.`;
+
+// Huella del texto de los términos (todo el texto servido; versión y fecha quedan fuera): ver huella.ts.
+export function huellaTerminos(): string { return huella({ texto: TERMINOS_TEXTO }); }
 
 export interface Terminos {
   version: number;

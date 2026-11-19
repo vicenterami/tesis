@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { desfase, duracion, fechaHora, haceCuanto, haceSegundos, horaLocal, relojSitio, instanteDesdeLocal, localDesdeInstante } from './tiempo';
+import { desfase, duracion, fechaCivil, fechaHora, haceCuanto, haceSegundos, horaLocal, relojSitio, instanteDesdeLocal, localDesdeInstante } from './tiempo';
 
 describe('haceCuanto', () => {
   const ahora = new Date('2026-10-12T15:00:00Z');
@@ -77,5 +77,13 @@ describe('rango a medida: hora del sitio ↔ instante', () => {
   it('un texto que no es fecha y hora no da instante (nunca se adivina)', () => {
     expect(instanteDesdeLocal('ayer', 'America/Santiago')).toBeNull();
     expect(instanteDesdeLocal('2026-11-10', 'America/Santiago')).toBeNull();
+  });
+});
+
+describe('fechaCivil: una fecha sin hora, tal cual, sin pasar por zonas', () => {
+  it('AAAA-MM-DD → DD/MM/AAAA; cualquier otra forma se devuelve igual', () => {
+    expect(fechaCivil('2026-11-18')).toBe('18/11/2026');
+    expect(fechaCivil('2026-01-01')).toBe('01/01/2026'); // el primer día del año no retrocede a diciembre por la zona
+    expect(fechaCivil('2026-11-18T10:00:00Z')).toBe('2026-11-18T10:00:00Z');
   });
 });

@@ -3,13 +3,17 @@
 // lee: sin rutas de documentos, funciones, variables, fichas ni etapas (la trazabilidad vive en docs/21 §2; legal.spec.ts lo comprueba). El
 // responsable y su contacto salen de variables de entorno (docs/21 §6): RESPONSABLE_NOMBRE y RESPONSABLE_CONTACTO; mientras no estén, la
 // página lo dice en vez de mostrar un contacto inventado. Ningún dato personal vive en el código.
+import { INACTIVIDAD_MS, VIDA_ABSOLUTA_MS } from '../sesion/cookie.js';
+import { huella } from './huella.js';
 import { INVENTARIO, FilaInventario } from './inventario.js';
 
-// Versión 2 (17/11/2026): el inventario suma los datos de la vista pública por enlace (docs/21 §2). Sube cuando cambian los datos que se
-// guardan (única subida hasta hoy); los términos, solo si cambia su texto (decidido el 17/11/2026). La reescritura del 18/11/2026 (texto para
-// personas, docs/21 §2.1) es solo de redacción: no sube la versión ni la fecha (si debe subirla, está por decidir).
-export const PRIVACIDAD_VERSION = 2;
-export const PRIVACIDAD_FECHA = '2026-11-17';
+// Versión y fecha del texto (decidido el 18/11/2026, docs/21 §7): TODO cambio del texto que viaja a la pantalla (el inventario, los apartados y
+// el aviso sin responsable; lo que no depende de la instancia) sube la versión en 1 y pone la fecha del cambio, también una errata. No
+// depende de acordarse: `huellaPrivacidad()` calcula el SHA-256 de ese texto y legal.spec.ts lo compara con la última fila del historial de
+// docs/21 §7 («Historial de la privacidad»); si el texto cambió sin subir la versión y agregar la fila, `pnpm test` falla. El paso 2w7 del
+// verificador impide además reescribir las filas ya publicadas. El contenido de la subida va primero en esa fila, después aquí.
+export const PRIVACIDAD_VERSION = 3;
+export const PRIVACIDAD_FECHA = '2026-11-18';
 export const MAX_RESPONSABLE = 200;
 
 export interface Responsable { nombre: string; contacto: string }
@@ -37,6 +41,13 @@ export function responsableDeEntorno(nombre: string | undefined, contacto: strin
   return n === null || c === null ? null : { nombre: n, contacto: c };
 }
 
+// Un plazo en palabras, calculado de las constantes de la sesión (sesion/cookie.ts): el texto no puede decir 30 si el código dice otra cosa.
+export function plazo(ms: number): string {
+  const min = Math.round(ms / 60_000);
+  if (min % 60 === 0) return `${min / 60} ${min === 60 ? 'hora' : 'horas'}`;
+  return `${min} ${min === 1 ? 'minuto' : 'minutos'}`;
+}
+
 export const SECCIONES: readonly Seccion[] = [
   {
     titulo: 'Terceros',
@@ -50,6 +61,7 @@ export const SECCIONES: readonly Seccion[] = [
     titulo: 'Cookies y almacenamiento del navegador',
     parrafos: [
       'Una sola cookie, `__Host-sesion`, estrictamente necesaria para la sesión (HttpOnly, Secure, SameSite=Lax). No hay cookies de analítica, de publicidad ni de terceros.',
+      `La sesión vence a los ${plazo(INACTIVIDAD_MS)} sin actividad o a las ${plazo(VIDA_ABSOLUTA_MS)} de abierta, lo que ocurra primero; la cookie se borra al salir o al cerrar el navegador.`,
       'El panel no guarda nada en el almacenamiento local del navegador: tus preferencias viven en la base y te siguen entre equipos.',
     ],
   },
@@ -76,4 +88,10 @@ export function privacidad(responsable: Responsable | null): Privacidad {
     version: PRIVACIDAD_VERSION, fecha: PRIVACIDAD_FECHA, responsable, aviso_responsable: responsable === null ? AVISO_SIN_RESPONSABLE : null,
     datos: INVENTARIO, secciones: [...SECCIONES],
   };
+}
+
+// Huella del texto que lee la persona: el inventario, los apartados y el aviso sin responsable. Deja fuera lo que depende de la instancia
+// (responsable, contacto) y lo que no es texto (versión y fecha): ver huella.ts.
+export function huellaPrivacidad(): string {
+  return huella({ datos: INVENTARIO, secciones: SECCIONES, aviso_sin_responsable: AVISO_SIN_RESPONSABLE });
 }

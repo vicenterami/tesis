@@ -3,8 +3,9 @@
   // antes de entrar y con la sesión restringida por términos (las páginas legales responden 200 en ese caso, docs/20 §12). Cuatro
   // apartados: Privacidad (`GET /privacidad`, generada en el servidor desde el inventario de docs/21 con el responsable configurado),
   // Términos de uso (`GET /terminos`, con versión y fecha), Acerca de (`GET /acerca`: versión, commit, AGPL, avisos de terceros) y
-  // Soporte (`POST /soporte`, texto sin adjuntos, con límite de tasa: un 429 dice cuántos segundos esperar). Más la licencia y la cookie,
-  // que no dependen del servidor. Los textos se muestran como texto, nunca como HTML (lib/legal.ts).
+  // Soporte (`POST /soporte`, texto sin adjuntos, con límite de tasa: un 429 dice cuántos segundos esperar). Más el párrafo de la licencia,
+  // que no depende del servidor y es de «Acerca de», que no se versiona. Todo texto de privacidad (también el de las cookies y sus plazos)
+  // llega de la API y entra en su huella; aquí solo hay rótulos de la interfaz (docs/21 §7, «frontera»). Los textos se muestran como texto, nunca como HTML (lib/legal.ts).
   // Desde el tablero v3 (docs/19 §4, bloque L, punto 1d), con sesión, «Acerca de» dice también el estado del servicio («servicio: ok, base
   // conectada, N tablas»), que antes iba en la cabecera de toda pantalla: describe la instalación y no ayuda a quien mira datos.
   import { onMount } from 'svelte';
@@ -14,6 +15,7 @@
   import { avisoDeError, type DatosAviso } from './lib/avisos';
   import { MAX_SOPORTE, bloquesDeTexto, esPrivacidad, limpio, textoDe, type Privacidad, type TextoLegal } from './lib/legal';
   import type { Salud } from './lib/modelo';
+  import { fechaCivil } from './lib/tiempo';
   import type { SeccionLegal } from './lib/vista';
 
   let { seccion = undefined, conSesion = false }: { seccion?: SeccionLegal; conSesion?: boolean } = $props();
@@ -62,7 +64,7 @@
   {:else if t === 'error'}
     <p class="vacio" data-legal-sin-texto>No se pudo leer {que} del servicio: recarga en un momento.</p>
   {:else}
-    {#if t.version !== undefined}<p class="vivo" data-version-legal>Versión {t.version}{t.fecha ? `, del ${t.fecha}` : ''}.</p>{/if}
+    {#if t.version !== undefined}<p class="vivo" data-version-legal>Versión {t.version}{t.fecha ? `, del ${fechaCivil(t.fecha)}` : ''}.</p>{/if}
     <div class="texto-legal">
       {#each bloquesDeTexto(t.texto) as b, i (i)}
         {#if b.tipo === 'titulo'}<h4>{b.texto}</h4>
@@ -87,7 +89,7 @@
       <p class="vacio" data-legal-sin-texto>No se pudo leer la página de privacidad del servicio: recarga en un momento.</p>
     {:else}
       {@const pv = privacidad}
-      <p class="vivo" data-version-legal>Versión {pv.version}, del {pv.fecha}.</p>
+      <p class="vivo" data-version-legal>Versión {pv.version}, del {fechaCivil(pv.fecha)}.</p>
       {#if pv.responsable !== null}
         <p data-responsable>Responsable de los datos: <strong>{pv.responsable.nombre}</strong> · contacto: {pv.responsable.contacto}</p>
       {:else if pv.aviso_responsable !== null}
@@ -104,12 +106,6 @@
         {#each s.parrafos as par, j (j)}<p>{limpio(par)}</p>{/each}
       {/each}
     {/if}
-  </section>
-  <section aria-labelledby="titulo-cookies">
-    <h3 id="titulo-cookies">Cookies</h3>
-    <p data-legal-cookie>El panel usa una sola cookie, <code>__Host-sesion</code>: la de la sesión, estrictamente necesaria para entrar. Vence a los
-      30 minutos sin actividad o a las 8 horas de abierta, lo que ocurra primero; se borra al salir o al cerrar el navegador. No hay cookies de
-      terceros ni de analítica.</p>
   </section>
   <section id="legal-terminos" aria-labelledby="titulo-terminos" data-legal-terminos>
     <h3 id="titulo-terminos">Términos de uso</h3>
