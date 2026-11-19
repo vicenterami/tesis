@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # P7, el alta masiva sin fricción (docs/19 §4, bloques N y S; docs/16), de extremo a extremo en navegadores reales contra la pila de
 # desarrollo. Por cada navegador (Chromium y Firefox, los de Playwright) y cada ancho (390 px, teléfono; 1 280 px, escritorio), una persona de
-# descarte que administra un sitio de descarte recorre el catálogo fijo de escenarios (backend/panel/e2e/datos/lote-escenarios.*), un lote de
+# descarte que administra un sitio de descarte recorre el catálogo fijo de escenarios (backend/panel/e2e/datos/lote-escenarios.*, también como
+# libro .xlsx de LibreOffice, que llega a la misma revisión: docs/19 §4, bloque N, punto 6), un lote de
 # 500 filas con sus umbrales de tiempo, crea dos equipos por HTTP (sin clientes del broker) y prueba «atrás» con credenciales sin descargar. El
 # recorrido lo hace backend/panel/e2e/lote.mjs. Reemplaza a `banco.sh lote-navegador` (hasta el 19/11/2026), que corría contra el banco y
 # dejaba allí los dos equipos que creaba.

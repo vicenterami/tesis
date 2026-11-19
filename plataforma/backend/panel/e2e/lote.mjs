@@ -3,7 +3,10 @@
 // equipo que ya existe; otro con un equipo ajeno) y las personas de descarte (administración del sitio), pasa los datos por la ENTRADA
 // ESTÁNDAR (las claves nunca van en la línea de órdenes ni se imprimen) y lo borra todo al final, también lo que esta prueba crea.
 // Por cada caso (navegador × ancho), con el catálogo fijo de escenarios (e2e/datos/lote-escenarios.*):
-//   S9  un libro de Excel se reconoce; S1 el archivo de 60 casos abre la revisión (las 2 mal formadas «No entran» con su motivo);
+//   N6  el lector de libros .xlsx no entra en la primera carga ni al abrir el alta masiva: se descarga al elegir un libro y pesa menos de
+//       10 kB comprimido; un libro dañado se dice con su remedio, y el catálogo guardado como .xlsx por LibreOffice llega a la MISMA
+//       revisión que su CSV (cada fila con su resultado y su frase; solo cambia la de la celda de más, que en un libro es una columna sin nombre);
+//   S1  el archivo de 60 casos abre la revisión (las 2 mal formadas «No entran» con su motivo);
 //   S3  la zona por nombre se dice una vez y la línea de avisos y «Con aviso» cuentan lo mismo; S4 ningún texto a la vista trae jerga;
 //   S5  «Ya existe» en ámbar con «Abrir su ficha»; S6 «Volver» y «Crear» se pulsan como persona (nada los tapa) y la ayuda emergente no
 //   recibe toques bajo 700 px; S7 «atrás» y «adelante» con credenciales sin descargar las conservan; S8 el foco tras «Mostrar 100 más» y
@@ -11,6 +14,7 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { crc32, deflateRawSync, gzipSync, inflateRawSync } from 'node:zlib';
 import { chromium, firefox } from 'playwright';
 
 const { base, navegador: NAV, prefijo: P, sitio_nombre: SITIO, capturas, casos } = JSON.parse(readFileSync(0, 'utf8'));
@@ -20,6 +24,11 @@ const DATOS = new URL('./datos/', import.meta.url);
 const ESCENARIOS = JSON.parse(readFileSync(new URL('lote-escenarios.json', DATOS), 'utf8'));
 // El catálogo con el prefijo de esta corrida (minúsculas y, en la fila de las mayúsculas, mayúsculas).
 const CATALOGO = readFileSync(new URL('lote-escenarios.csv', DATOS), 'utf8').replaceAll(ESCENARIOS.prefijo, P).replaceAll(ESCENARIOS.prefijo.toUpperCase(), P.toUpperCase());
+// El mismo catálogo guardado como .xlsx por LibreOffice 26.8 (importado sin evaluar fórmulas; docs/16 §91), con el prefijo de esta corrida.
+const LIBRO = libroConPrefijo(readFileSync(new URL('lote-escenarios.xlsx', DATOS)), ESCENARIOS.prefijo, P);
+// El lector de libros, comprimido, no pasa de 10 kB (docs/19 §4, bloque N, punto 11).
+const UMBRAL_LECTOR_BYTES = 10_000;
+const ES_LECTOR = /\/assets\/xlsx-lector-[^/]+\.js$/;
 // Los umbrales del bloque S (punto 11), medidos el 19/11/2026 muy por debajo: la revisión de 500 filas y cada «Mostrar 100 más».
 const UMBRAL_REVISION_MS = 1000;
 const UMBRAL_MOSTRAR_MS = 300;
@@ -33,6 +42,47 @@ const falla = (m) => { total++; fallos++; console.log(`FALLA [${NAV}] ${m}`); };
 const comprobar = (cond, m, detalle = '') => (cond ? ok(m) : falla(`${m}${detalle ? `: ${detalle}` : ''}`));
 const limpio = (s) => (s ?? '').replace(/\s+/g, ' ').trim();
 const medidas = [];
+
+// Un libro con el texto de sus partes XML cambiado (el prefijo del catálogo por el de la corrida): se abre cada parte con node:zlib y se vuelve a
+// armar el zip (cabecera local, datos con deflate, directorio central y su fin; APPNOTE §4.3.7, §4.3.12 y §4.3.16). Lo que LibreOffice escribió
+// en cada parte (tipos de celda, estilos, cadenas compartidas) no cambia.
+function libroConPrefijo(b, de, a) {
+  const fin = b.length - 22;
+  if (b.readUInt32LE(fin) !== 0x06054b50) throw new Error('el libro del catálogo no termina en su fin de directorio');
+  const partes = [];
+  let p = b.readUInt32LE(fin + 16);
+  for (let k = 0; k < b.readUInt16LE(fin + 10); k++) {
+    const nl = b.readUInt16LE(p + 28);
+    const nombre = b.subarray(p + 46, p + 46 + nl);
+    const local = b.readUInt32LE(p + 42);
+    const desde = local + 30 + b.readUInt16LE(local + 26) + b.readUInt16LE(local + 28);
+    const datos = b.subarray(desde, desde + b.readUInt32LE(p + 20));
+    let crudo = b.readUInt16LE(p + 10) === 8 ? inflateRawSync(datos) : datos;
+    if (nombre.toString('utf8').endsWith('.xml')) crudo = Buffer.from(crudo.toString('utf8').replaceAll(de, a).replaceAll(de.toUpperCase(), a.toUpperCase()));
+    partes.push({ nombre, crudo });
+    p += 46 + nl + b.readUInt16LE(p + 30) + b.readUInt16LE(p + 32);
+  }
+  const salida = [];
+  const central = [];
+  let pos = 0;
+  for (const x of partes) {
+    const comprimido = deflateRawSync(x.crudo);
+    const crc = crc32(x.crudo);
+    const h = Buffer.alloc(30);
+    h.writeUInt32LE(0x04034b50, 0); h.writeUInt16LE(20, 4); h.writeUInt16LE(0x0800, 6); h.writeUInt16LE(8, 8);
+    h.writeUInt32LE(crc, 14); h.writeUInt32LE(comprimido.length, 18); h.writeUInt32LE(x.crudo.length, 22); h.writeUInt16LE(x.nombre.length, 26);
+    const c = Buffer.alloc(46);
+    c.writeUInt32LE(0x02014b50, 0); c.writeUInt16LE(20, 4); c.writeUInt16LE(20, 6); c.writeUInt16LE(0x0800, 8); c.writeUInt16LE(8, 10);
+    c.writeUInt32LE(crc, 16); c.writeUInt32LE(comprimido.length, 20); c.writeUInt32LE(x.crudo.length, 24); c.writeUInt16LE(x.nombre.length, 28); c.writeUInt32LE(pos, 42);
+    salida.push(h, x.nombre, comprimido);
+    central.push(c, x.nombre);
+    pos += 30 + x.nombre.length + comprimido.length;
+  }
+  const directorio = Buffer.concat(central);
+  const e = Buffer.alloc(22);
+  e.writeUInt32LE(0x06054b50, 0); e.writeUInt16LE(partes.length, 8); e.writeUInt16LE(partes.length, 10); e.writeUInt32LE(directorio.length, 12); e.writeUInt32LE(pos, 16);
+  return Buffer.concat([...salida, directorio, e]);
+}
 
 const motor = await motores[NAV].launch();
 console.log(`navegador: ${NAV} ${motor.version()}`);
@@ -48,6 +98,9 @@ for (const c of casos) {
   p.on('pageerror', (e) => errores.push(String(e).slice(0, 200)));
   const dialogos = [];
   p.on('dialog', (d) => { dialogos.push(d.message()); void d.dismiss(); });
+  // Cuándo se pide el lector de libros (N6): nunca en la primera carga ni al abrir el alta masiva; sí al elegir un libro.
+  const lector = [];
+  p.on('request', (r) => { if (ES_LECTOR.test(new URL(r.url()).pathname)) lector.push(r.url()); });
   const paso = async (nombre, f) => {
     try { await f(); } catch (e) {
       const visto = limpio(await p.textContent('main').catch(() => '')).slice(0, 240);
@@ -118,17 +171,27 @@ for (const c of casos) {
     await p.waitForSelector('[data-archivo]', { timeout: 15000 });
   });
 
-  // ── S9: un libro de Excel elegido con «Todos los archivos» ────────────────────────────────────────────────────────────────────
-  await paso('S9 libro de Excel', async () => {
+  // ── N6: el lector de libros se descarga al elegir uno; un libro dañado se dice con su remedio; su peso ──────────────────────────
+  await paso('N6 lector a pedido y libro dañado', async () => {
+    comprobar(lector.length === 0, `${A} px, N6: el lector de libros no se pidió en la primera carga ni al abrir el alta masiva`, lector.join(' '));
     await p.setInputFiles('[data-archivo]', { name: 'planilla.xlsx', mimeType: 'application/octet-stream', buffer: Buffer.from('PK\u0003\u0004\u0014\u0000\u0006\u0000\u0008\u0000[Content_Types].xml') });
-    await p.waitForSelector('[data-error-archivo="libro_excel"]', { timeout: 5000 });
+    await p.waitForSelector('[data-error-archivo="libro_ilegible"]', { timeout: 10000 });
     const t = await texto('[data-error-archivo]');
-    comprobar(t.includes('Es un libro de Excel. Guárdalo como CSV (Archivo → Guardar como) o copia las celdas y pégalas aquí.') && !t.includes('PK'),
-      `${A} px, S9: un .xlsx se reconoce como libro de Excel, con el remedio`, `«${t}»`);
+    comprobar(t.includes('El libro no se puede leer: está incompleto o dañado. Guárdalo de nuevo desde tu planilla (como .xlsx o como CSV) o copia las celdas y pégalas aquí.') && !t.includes('PK')
+      && (await texto('[data-error-archivo] [data-remedio]')) === 'Elegir otro archivo', `${A} px, N6: un libro dañado se dice, con su remedio`, `«${t}»`);
+    comprobar(lector.length === 1, `${A} px, N6: al elegir el libro se pidió el lector, una vez`, lector.join(' '));
+    const r = await p.request.get(lector[0]);
+    const cuerpo = await r.body();
+    const gz = gzipSync(cuerpo, { level: 9 }).length;
+    comprobar(r.ok() && gz < UMBRAL_LECTOR_BYTES, `${A} px, N6: el lector pesa ${cuerpo.length} bytes y ${gz} comprimido con gzip (umbral ${UMBRAL_LECTOR_BYTES})`, `HTTP ${r.status()}`);
+    medidas.push({ ancho: A, lector_bytes: cuerpo.length, lector_gzip: gz, lector_codificacion: r.headers()['content-encoding'] ?? 'ninguna' });
   });
 
   // ── S1, S3, S4: el catálogo de 60 escenarios ─────────────────────────────────────────────────────────────────────────────────
   let frasesPrimera = null;
+  // Cada fila de la revisión: su número, su resultado y su frase de «Qué pasa» (con el filtro «Leídas», todas a la vista: son 60).
+  let planCsv = null;
+  const planVisto = () => p.$$eval('[data-fila-lote]', (es) => es.map((e) => [Number(e.getAttribute('data-fila-lote')), e.getAttribute('data-resultado'), e.querySelector('[data-que-pasa]')?.textContent.replace(/\s+/g, ' ').trim() ?? '']));
   await paso('S1 catálogo de 60', async () => {
     await elegir('escenarios.csv', CATALOGO);
     await leido('escenarios\\.csv: 60 filas leídas');
@@ -151,6 +214,7 @@ for (const c of casos) {
     comprobar(await p.evaluate(() => document.querySelector('[data-remedio-no-entran]')?.textContent.includes('corrígelas y vuelve a subirlas') === true), `${A} px, S6: «corrígelas y vuelve a subirlas», a la vista`);
     // Cada escenario: su resultado y su texto (en «Qué pasa» o en el detalle). La fila vacía cuenta: no hay fila 22 y sí 23.
     await p.click('[data-filtro-lote="leidas"]');
+    planCsv = await planVisto();
     comprobar((await p.$('[data-fila-lote="22"]')) === null && (await p.$('[data-fila-lote="23"]')) !== null, `${A} px: los números de fila son los de la planilla (la vacía cuenta)`);
     const malos = [];
     for (const e of ESCENARIOS.casos) {
@@ -212,6 +276,30 @@ for (const c of casos) {
     const iguales = frasesPrimera.filter((f) => frases.includes(f));
     comprobar((await p.$('[data-error-archivo]')) === null && iguales.length === frasesPrimera.length - 2, `${A} px: vuelto a subir sin tocar, ${iguales.length} de ${frasesPrimera.length} filas dicen lo mismo (la repetida y la de la celda de más ya no fallan por eso)`,
       JSON.stringify(frasesPrimera.filter((f) => !frases.includes(f))));
+    await p.click('[data-volver]');
+    await p.waitForSelector('[data-paso-lote="1"]', { timeout: 5000 });
+  });
+
+  // ── N6: el catálogo guardado como .xlsx por LibreOffice llega a la misma revisión que su CSV ─────────────────────────────────
+  await paso('N6 libro real', async () => {
+    await p.setInputFiles('[data-archivo]', { name: 'escenarios.xlsx', mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', buffer: LIBRO });
+    await leido('escenarios\\.xlsx: 60 filas leídas');
+    comprobar((await p.$('[data-error-archivo]')) === null && (await texto('[data-filas-leidas]')) === 'escenarios.xlsx: 60 filas leídas. 2 están mal escritas y no entran: la revisión dice por qué.',
+      `${A} px, N6: el libro se lee en el navegador: 60 filas y las mismas 2 mal escritas que en su CSV`, await texto('[data-filas-leidas]'));
+    const r = await revisar();
+    comprobar(r.error === null, `${A} px, N6: la revisión del libro abre`, r.error ?? '');
+    const t = ESCENARIOS.totales;
+    const vistas = [await cifra('leidas'), await cifra('valida'), await cifra('existe'), await cifra('rechazada'), await cifra('aviso')];
+    comprobar(vistas.join(' ') === [t.leidas, t.valida, t.existe, t.rechazada, t.aviso].join(' '), `${A} px, N6: las tarjetas del libro cuentan lo mismo que las del CSV (${vistas.join(', ')})`, vistas.join(' '));
+    await p.click('[data-filtro-lote="leidas"]');
+    const planLibro = await planVisto();
+    const CELDA_DE_MAS = ESCENARIOS.casos.find((e) => e.caso.includes('celda') && e.donde === 'panel')?.n ?? 60;
+    const distintas = planLibro.filter((f, i) => JSON.stringify(f) !== JSON.stringify(planCsv?.[i]));
+    comprobar(planCsv !== null && planLibro.length === planCsv.length && planLibro.every((f, i) => f[0] === planCsv[i][0] && f[1] === planCsv[i][1])
+      && distintas.length === 1 && distintas[0][0] === CELDA_DE_MAS && distintas[0][2] === 'No entra: la fila trae «sobra» en la columna H, que no tiene cabecera',
+      `${A} px, N6: las 60 filas del libro con el mismo número y resultado que las del CSV, y la misma frase salvo la de la celda de más («en la columna H, que no tiene cabecera»)`,
+      JSON.stringify(distintas).slice(0, 400));
+    await foto('revision-xlsx');
     await p.click('[data-volver]');
     await p.waitForSelector('[data-paso-lote="1"]', { timeout: 5000 });
   });

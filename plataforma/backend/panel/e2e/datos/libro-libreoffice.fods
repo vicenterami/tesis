@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+  xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"
+  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+  xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
+  xmlns:number="urn:oasis:names:tc:opendocument:xmlns:datastyle:1.0"
+  xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"
+  xmlns:of="urn:oasis:names:tc:opendocument:xmlns:of:1.2"
+  office:version="1.3" office:mimetype="application/vnd.oasis.opendocument.spreadsheet">
+ <office:automatic-styles>
+  <number:date-style style:name="N37">
+   <number:day number:style="long"/><number:text>/</number:text><number:month number:style="long"/><number:text>/</number:text><number:year number:style="long"/>
+  </number:date-style>
+  <number:number-style style:name="N2"><number:number number:decimal-places="2" number:min-integer-digits="1"/></number:number-style>
+  <style:style style:name="ce1" style:family="table-cell" style:parent-style-name="Default" style:data-style-name="N37"/>
+  <style:style style:name="ce2" style:family="table-cell" style:parent-style-name="Default" style:data-style-name="N2"/>
+ </office:automatic-styles>
+ <office:body>
+  <office:spreadsheet>
+   <table:table table:name="Dispositivos">
+    <table:table-row>
+     <table:table-cell office:value-type="string"><text:p>id_fisico</text:p></table:table-cell>
+     <table:table-cell office:value-type="string"><text:p>nombre</text:p></table:table-cell>
+     <table:table-cell office:value-type="string"><text:p>zona</text:p></table:table-cell>
+     <table:table-cell office:value-type="string"><text:p>via</text:p></table:table-cell>
+     <table:table-cell office:value-type="string"><text:p>formato</text:p></table:table-cell>
+     <table:table-cell office:value-type="string"><text:p>intervalo_esperado_s</text:p></table:table-cell>
+     <table:table-cell office:value-type="string"><text:p>canales</text:p></table:table-cell>
+    </table:table-row>
+    <table:table-row>
+     <table:table-cell office:value-type="string"><text:p>nodo-a01</text:p></table:table-cell>
+     <table:table-cell office:value-type="string"><text:p>Sensor uno</text:p></table:table-cell>
+     <table:table-cell office:value-type="string"><text:p>Norte</text:p></table:table-cell>
+     <table:table-cell table:number-columns-repeated="2"/>
+     <table:table-cell office:value-type="float" office:value="300"><text:p>300</text:p></table:table-cell>
+     <table:table-cell office:value-type="string"><text:p>temperatura:Cel | humedad:%RH</text:p></table:table-cell>
+    </table:table-row>
+    <table:table-row>
+     <table:table-cell office:value-type="float" office:value="7"><text:p>7</text:p></table:table-cell>
+     <table:table-cell office:value-type="string"><text:p>Identificador escrito como número</text:p></table:table-cell>
+     <table:table-cell office:value-type="string"><text:p>Norte</text:p></table:table-cell>
+     <table:table-cell table:number-columns-repeated="2"/>
+     <table:table-cell office:value-type="float" office:value="60"><text:p>60</text:p></table:table-cell>
+     <table:table-cell office:value-type="string"><text:p>temperatura</text:p></table:table-cell>
+    </table:table-row>
+    <table:table-row>
+     <table:table-cell office:value-type="string"><text:p>nodo-a03</text:p></table:table-cell>
+     <table:table-cell table:style-name="ce1" office:value-type="date" office:date-value="2026-11-19"><text:p>19/11/2026</text:p></table:table-cell>
+     <table:table-cell office:value-type="string"><text:p>Norte</text:p></table:table-cell>
+     <table:table-cell table:number-columns-repeated="2"/>
+     <table:table-cell office:value-type="float" office:value="60"><text:p>60</text:p></table:table-cell>
+     <table:table-cell office:value-type="string"><text:p>temperatura</text:p></table:table-cell>
+    </table:table-row>
+    <table:table-row>
+     <table:table-cell office:value-type="string"><text:p>nodo-a04</text:p></table:table-cell>
+     <table:table-cell table:formula="of:=&quot;Sensor &quot;&amp;&quot;cuatro&quot;" office:value-type="string" office:string-value="Sensor cuatro"><text:p>Sensor cuatro</text:p></table:table-cell>
+     <table:table-cell office:value-type="string"><text:p>Norte</text:p></table:table-cell>
+     <table:table-cell table:number-columns-repeated="2"/>
+     <table:table-cell table:formula="of:=60*5" office:value-type="float" office:value="300"><text:p>300</text:p></table:table-cell>
+     <table:table-cell office:value-type="string"><text:p>temperatura</text:p></table:table-cell>
+    </table:table-row>
+    <table:table-row>
+     <table:table-cell office:value-type="string"><text:p>nodo-a05</text:p></table:table-cell>
+     <table:table-cell office:value-type="string"><text:p>2.000</text:p></table:table-cell>
+     <table:table-cell office:value-type="string"><text:p>Norte</text:p></table:table-cell>
+     <table:table-cell table:number-columns-repeated="2"/>
+     <table:table-cell table:style-name="ce2" office:value-type="float" office:value="12.375"><text:p>12,38</text:p></table:table-cell>
+     <table:table-cell office:value-type="string"><text:p>temperatura</text:p></table:table-cell>
+    </table:table-row>
+    <table:table-row>
+     <table:table-cell office:value-type="string"><text:p>nodo-a06</text:p></table:table-cell>
+     <table:table-cell office:value-type="string"><text:p>Suma de coma flotante</text:p></table:table-cell>
+     <table:table-cell office:value-type="string"><text:p>Norte</text:p></table:table-cell>
+     <table:table-cell table:number-columns-repeated="2"/>
+     <table:table-cell table:formula="of:=0.1+0.2" office:value-type="float" office:value="0.3"><text:p>0,3</text:p></table:table-cell>
+     <table:table-cell office:value-type="string"><text:p>temperatura</text:p></table:table-cell>
+    </table:table-row>
+    <table:table-row>
+     <table:table-cell table:number-columns-repeated="7"/>
+    </table:table-row>
+    <table:table-row>
+     <table:table-cell office:value-type="string"><text:p>nodo-a08</text:p></table:table-cell>
+     <table:table-cell/>
+     <table:table-cell office:value-type="string"><text:p>Norte</text:p></table:table-cell>
+     <table:table-cell table:number-columns-repeated="2"/>
+     <table:table-cell office:value-type="float" office:value="60"><text:p>60</text:p></table:table-cell>
+     <table:table-cell office:value-type="string"><text:p>temperatura</text:p></table:table-cell>
+    </table:table-row>
+    <table:table-row>
+     <table:table-cell office:value-type="string"><text:p>nodo-a09</text:p></table:table-cell>
+     <table:table-cell office:value-type="string"><text:p>Valor lógico en la vía</text:p></table:table-cell>
+     <table:table-cell office:value-type="string"><text:p>Norte</text:p></table:table-cell>
+     <table:table-cell office:value-type="boolean" office:boolean-value="true"><text:p>VERDADERO</text:p></table:table-cell>
+     <table:table-cell/>
+     <table:table-cell office:value-type="float" office:value="60"><text:p>60</text:p></table:table-cell>
+     <table:table-cell office:value-type="string"><text:p>temperatura</text:p></table:table-cell>
+    </table:table-row>
+    <table:table-row>
+     <table:table-cell office:value-type="string"><text:p>nodo-a10</text:p></table:table-cell>
+     <table:table-cell table:formula="of:=1/0" office:value-type="float" office:value="0"><text:p>#DIV/0!</text:p></table:table-cell>
+     <table:table-cell office:value-type="string"><text:p>Norte</text:p></table:table-cell>
+     <table:table-cell table:number-columns-repeated="2"/>
+     <table:table-cell office:value-type="float" office:value="60"><text:p>60</text:p></table:table-cell>
+     <table:table-cell office:value-type="string"><text:p>temperatura</text:p></table:table-cell>
+    </table:table-row>
+    <table:table-row>
+     <table:table-cell office:value-type="string"><text:p>nodo-a11</text:p></table:table-cell>
+     <table:table-cell office:value-type="string"><text:p>Dos</text:p><text:p>líneas</text:p></table:table-cell>
+     <table:table-cell office:value-type="string"><text:p>Galpón &amp; «Sur» _x0041_</text:p></table:table-cell>
+     <table:table-cell table:number-columns-repeated="2"/>
+     <table:table-cell office:value-type="float" office:value="60"><text:p>60</text:p></table:table-cell>
+     <table:table-cell office:value-type="string"><text:p>temperatura</text:p></table:table-cell>
+    </table:table-row>
+   </table:table>
+   <table:table table:name="Otra hoja">
+    <table:table-row>
+     <table:table-cell office:value-type="string"><text:p>columna_de_otra_hoja</text:p></table:table-cell>
+    </table:table-row>
+    <table:table-row>
+     <table:table-cell office:value-type="string"><text:p>no se lee</text:p></table:table-cell>
+    </table:table-row>
+   </table:table>
+  </office:spreadsheet>
+ </office:body>
+</office:document>

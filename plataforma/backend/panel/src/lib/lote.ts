@@ -1,10 +1,11 @@
-// P7, alta masiva (docs/19 §4, F2 y bloque N). El origen (archivo CSV, lo pegado o JSON) se lee en el navegador (nunca se sube el archivo: se convierte en
+// P7, alta masiva (docs/19 §4, F2 y bloque N). El origen (archivo CSV, lo pegado, JSON o un libro .xlsx) se lee en el navegador (nunca se sube el archivo: se convierte en
 // `filas` y va como JSON, cada una con `n`, su fila en el archivo contando las vacías, con la cabecera en la 1). Las columnas, sus topes y
 // los límites salen de `GET /dispositivos/lote/plantilla`: el panel no guarda copia. Se valida completo con `modo=validar` (no crea nada) y
 // las válidas se crean con `modo=crear` en UNA petición, todo o nada, con la `huella` del plan revisado y una llave de reintento
 // (`Idempotency-Key`): si la respuesta se pierde, se repite con la misma llave y el servidor devuelve la misma, sin crear de más. Las
 // credenciales llegan UNA sola vez y viven solo en memoria hasta que la persona las descarga.
 import { ErrorApi } from './api';
+import type { CeldaLibro, Libro } from './xlsx-lector'; // solo tipos: el lector se carga a pedido (leerArchivoLote)
 
 // La columna que «Descargar las que no entran» agrega para que se lea el porqué; al volver a subir el archivo corregido, se ignora.
 export const COLUMNA_MOTIVO = 'motivo';
@@ -155,7 +156,8 @@ const sinApostrofo = (v: string): string => (CON_APOSTROFO.test(v) ? v.slice(1) 
 function comprobar(cabecera: string[], datos: Registro[], p: PlantillaLote, sinDatos: Problema): LecturaCsv {
   const errores: Problema[] = [];
   const columnas = p.columnas.map((c) => c.nombre);
-  for (const x of cabecera.filter((x) => !IGNORADAS.includes(x) && !columnas.includes(x))) {
+  // Cada nombre desconocido una vez (una cabecera con muchas celdas vacías no repite el mismo error por cada una).
+  for (const x of new Set(cabecera.filter((x) => !IGNORADAS.includes(x) && !columnas.includes(x)))) {
     errores.push({ caso: 'columna_desconocida', texto: `La columna «${recorte(x)}» no es de la plantilla. Las columnas son: ${columnas.join(', ')}.` });
   }
   for (const c of p.columnas.filter((c) => c.obligatoria && !cabecera.includes(c.nombre))) errores.push({ caso: 'falta_obligatoria', texto: `Falta la columna obligatoria «${c.nombre}».` });
@@ -243,14 +245,119 @@ export function leerJson(texto: string, p: PlantillaLote): LecturaCsv {
   return comprobar(cabecera, datos.filter((d) => d.celdas.some((x) => x.trim() !== '') || (d.motivos ?? []).length > 0), p, { caso: 'archivo_vacio', texto: 'El archivo está vacío.' });
 }
 
-// El único punto de entrada de la pantalla: el tamaño primero (un origen que pasa `max_bytes` tampoco cabría como cuerpo), después el JSON
-// (empieza con «[» o «{») o la tabla.
+// Lo pegado y el texto de un archivo: el tamaño primero (un origen que pasa `max_bytes` tampoco cabría como cuerpo), después el JSON (empieza
+// con «[» o «{») o la tabla.
 export function leerOrigen(texto: string, p: PlantillaLote): LecturaCsv {
   const bytes = new TextEncoder().encode(texto).length;
   if (bytes > p.max_bytes) return { filas: [], errores: [{ caso: 'archivo_pesado', texto: textoPesado(bytes, p.max_bytes) }] };
-  // Un libro de Excel elegido con «Todos los archivos» (bloque S, punto 9): empieza con la firma de un zip, «PK» y los bytes 3 y 4.
-  if (/^PK\u0003\u0004/.test(texto)) return { filas: [], errores: [{ caso: 'libro_excel', texto: TEXTO_DE.libro_excel }] };
   return /^[\uFEFF\s]*[[{]/.test(texto) ? leerJson(texto, p) : leerCsv(texto, p);
+}
+
+// ── El libro de Excel (docs/19 §4, bloque N, punto 6; 19/11/2026) ────────────────────────────────────────────────────────────────
+// El único punto de entrada de un archivo elegido: por su firma, un libro .xlsx (un zip: «PK» y los bytes 3 y 4, o un zip vacío, 5 y 6) va al
+// lector propio, que se descarga recién aquí (`cargar`, un `import()` dinámico: no entra en la primera carga ni en la del alta masiva); el
+// contenedor del Office antiguo (un .xls, o un .xlsx protegido con contraseña, que Excel guarda cifrado dentro de él) se dice; todo lo demás
+// se lee como texto UTF-8, como hasta el bloque S. Desde aquí el libro es el mismo camino que un CSV: `comprobar`, las mismas reglas de S1 y S2,
+// y la revisión del servidor.
+const empiezaCon = (b: Uint8Array, firma: readonly number[]): boolean => firma.every((x, i) => b[i] === x);
+const FIRMAS_ZIP = [[0x50, 0x4b, 0x03, 0x04], [0x50, 0x4b, 0x05, 0x06]] as const;
+const FIRMA_OFFICE_ANTIGUO = [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1] as const;
+type ModuloLector = typeof import('./xlsx-lector');
+const problema = (caso: CasoError, texto: string): LecturaCsv => ({ filas: [], errores: [{ caso, texto }] });
+export const textoLibro = (caso: 'libro_ilegible' | 'libro_grande', razon: string): string =>
+  caso === 'libro_ilegible'
+    ? `El libro no se puede leer: ${razon}. Guárdalo de nuevo desde tu planilla (como .xlsx o como CSV) o copia las celdas y pégalas aquí.`
+    : `El libro es demasiado grande para leerlo: ${razon}. Guárdalo de nuevo solo con la hoja de los dispositivos, o copia las celdas y pégalas aquí.`;
+
+export async function leerArchivoLote(bytes: Uint8Array, p: PlantillaLote, cargar: () => Promise<ModuloLector> = () => import('./xlsx-lector')): Promise<LecturaCsv> {
+  if (bytes.length > p.max_bytes) return problema('archivo_pesado', textoPesado(bytes.length, p.max_bytes));
+  if (empiezaCon(bytes, FIRMA_OFFICE_ANTIGUO)) return problema('libro_ilegible', textoLibro('libro_ilegible', 'es un libro de Excel antiguo (.xls) o está protegido con contraseña'));
+  if (!FIRMAS_ZIP.some((f) => empiezaCon(bytes, f))) return leerOrigen(new TextDecoder().decode(bytes), p);
+  let m: ModuloLector;
+  try {
+    m = await cargar();
+  } catch {
+    return problema('libro_sin_lector', 'No se pudo cargar el lector de libros de Excel (¿se cortó la conexión?). Elige el archivo de nuevo, o copia las celdas y pégalas aquí.');
+  }
+  try {
+    return deLibro(await m.leerXlsx(bytes, { ...m.TOPES_XLSX, maxFilas: p.max_filas }), p);
+  } catch (e) {
+    if (!(e instanceof m.FallaLibro)) return problema('libro_ilegible', textoLibro('libro_ilegible', 'está dañado'));
+    if (e.tipo === 'sin_lector') return problema('libro_sin_lector', TEXTO_DE.libro_sin_lector);
+    const caso = e.tipo === 'grande' ? 'libro_grande' : 'libro_ilegible';
+    return problema(caso, textoLibro(caso, e.razon));
+  }
+}
+
+// Las palabras de una celda del libro que no se puede tomar como texto (`${rótulo}: …`). Un identificador que la planilla guardó como número
+// pudo perder sus ceros a la izquierda o redondearse, y una celda con formato de fecha guarda un número de días: ninguno se adivina.
+export const TEXTOS_LIBRO = {
+  numero: 'la planilla lo guarda como número, y pudo quitarle ceros a la izquierda o redondearlo; escríbelo como texto',
+  fecha: 'la planilla lo guarda con formato de fecha; escríbelo como texto',
+  error: (v: string): string => `la planilla muestra el error «${recorte(v, 20)}»; corrígelo en la planilla o escribe el valor`,
+  sinValor: 'es una fórmula sin su resultado guardado; ábrela y guárdala de nuevo en tu planilla, o escribe el valor',
+  noNumero: 'trae un número que no se puede leer; escríbelo de nuevo en la planilla',
+} as const;
+// Las columnas que identifican algo (el equipo, su pasarela): un número ahí se rechaza en vez de escribirse.
+const COLUMNAS_IDENTIFICADOR: readonly string[] = ['id_fisico', 'pasarela'];
+
+// Un número de la planilla como se ve en una planilla en español: coma decimal, sin separador de miles y con a lo más 15 cifras significativas,
+// la precisión de Excel («Number precision 15 digits», Microsoft, «Excel specifications and limits»). Así el 0.30000000000000004 que guarda
+// una suma de coma flotante se lee «0,3», como lo muestra la planilla: no se inventan decimales (regla de los números de planilla).
+// Uno que no es finito («1e400» desborda a Infinity) no se escribe como «Infinity»: se devuelve tal como venía (el lector ya lo rechaza, y
+// `celdaComoTexto` también).
+export function textoDeNumero(v: string): string {
+  const x = Number(v);
+  return Number.isFinite(x) ? String(Number(x.toPrecision(15))).replace('.', ',').replace('e', 'E') : v.trim();
+}
+const llena = (c: CeldaLibro | undefined): boolean => c !== undefined && !(c.tipo === 'texto' && c.v.trim() === '');
+const textoDeCabecera = (c: CeldaLibro | undefined): string => (c === undefined || c.tipo === 'sin_valor' ? '' : c.tipo === 'numero' ? textoDeNumero(c.v) : c.v);
+// La letra de una columna (0 → A, 26 → AA), para decir dónde está lo que sobra.
+export function columnaEnLetras(i: number): string {
+  let s = '';
+  for (let n = i + 1; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + ((n - 1) % 26)) + s;
+  return s;
+}
+
+// Una celda del libro como el texto que llevaría el CSV, o el motivo por el que su fila no entra. `col`: la columna de la plantilla (sin ella,
+// una columna que se ignora o que no es de la plantilla, solo se convierte).
+function celdaComoTexto(c: CeldaLibro | undefined, col: ColumnaPlantilla | undefined): { texto: string; motivo: string | null } {
+  if (c === undefined || c.tipo === 'texto') return { texto: c?.v ?? '', motivo: null };
+  const no = (m: string): { texto: string; motivo: string | null } => ({ texto: '', motivo: col === undefined ? null : `${col.rotulo ?? col.nombre}: ${m}` });
+  if (c.tipo === 'numero' && !c.fecha && !Number.isFinite(Number(c.v))) return no(TEXTOS_LIBRO.noNumero);
+  if (c.tipo === 'numero' && !c.fecha) return col !== undefined && COLUMNAS_IDENTIFICADOR.includes(col.nombre) ? no(TEXTOS_LIBRO.numero) : { texto: textoDeNumero(c.v), motivo: null };
+  if (c.tipo === 'numero' || c.tipo === 'fecha') return no(TEXTOS_LIBRO.fecha);
+  if (c.tipo === 'logico') return no(TEXTOS_CELDA.tipo);
+  return no(c.tipo === 'error' ? TEXTOS_LIBRO.error(c.v) : TEXTOS_LIBRO.sinValor);
+}
+
+// La primera hoja del libro → las mismas filas que daría su CSV: la cabecera es su primera fila con datos y `n`, el número de fila de la
+// planilla. Lo que no se puede tomar como texto deja fuera su fila con su motivo (S1); un dato en una columna sin cabecera, también.
+export function deLibro(l: Libro, p: PlantillaLote): LecturaCsv {
+  const [primera, ...resto] = l.filas;
+  if (primera === undefined) return problema('archivo_vacio', `La primera hoja del libro («${recorte(l.hoja)}») está vacía: se lee solo la primera hoja.`);
+  let ancho = primera.celdas.length;
+  while (ancho > 0 && !llena(primera.celdas[ancho - 1])) ancho--;
+  const cabecera = Array.from({ length: ancho }, (_, i) => textoDeCabecera(primera.celdas[i]).trim().toLowerCase());
+  const porNombre = new Map(p.columnas.map((c) => [c.nombre, c]));
+  const datos: Registro[] = resto.map((f) => {
+    const motivos: Nota[] = [];
+    const celdas = cabecera.map((col, i) => {
+      const r = celdaComoTexto(f.celdas[i], IGNORADAS.includes(col) ? undefined : porNombre.get(col));
+      if (r.motivo !== null) motivos.push({ campo: col, texto: r.motivo });
+      return r.texto;
+    });
+    const sobran = f.celdas.flatMap((c, i) => (i >= ancho && llena(c) ? [{ v: recorte(textoDeCabecera(c).trim(), 20), col: columnaEnLetras(i) }] : []));
+    if (sobran.length === 1) motivos.unshift({ campo: 'fila', texto: `la fila trae «${sobran[0]!.v}» en la columna ${sobran[0]!.col}, que no tiene cabecera` });
+    else if (sobran.length > 1) motivos.unshift({ campo: 'fila', texto: `la fila trae datos en ${sobran.length} columnas sin cabecera: ${sobran.map((x) => `«${x.v}» (${x.col})`).join(', ')}` });
+    return { n: f.n, celdas, motivos };
+  });
+  const r = comprobar(cabecera, datos, p, { caso: 'solo_cabecera', texto: 'El libro trae la cabecera pero ninguna fila de datos.' });
+  // La lectura se detuvo en max_filas + 1 filas de datos: no se sabe cuántas trae, solo que son más que el máximo.
+  if (l.cortado) {
+    r.errores = r.errores.map((e) => (e.caso === 'demasiadas_filas' ? { caso: e.caso, texto: `La primera hoja del libro trae más de ${p.max_filas} filas y el máximo es ${p.max_filas}: divídelo en partes de ${p.max_filas} o menos.` } : e));
+  }
+  return r;
 }
 const recorte = (t: string, max = 80): string => (t.length > max ? `${t.slice(0, max)}…` : t);
 export const textoPesado = (bytes: number, max: number): string => `El archivo pesa ${megas(bytes)} MB y el máximo es ${megas(max)} MB: divídelo en partes más chicas.`;
@@ -344,20 +451,20 @@ export async function crearConReintento<T>(
 // Desde el bloque S (punto 1), una fila con celdas de más o de menos ya no es un error del archivo (era `celdas_de_mas_o_de_menos`): es un
 // motivo de esa fila. `celda_invalida` queda para lo que impide leer el archivo (una comilla sin cerrar, un JSON que no es una lista).
 export const CASOS_ERROR = [
-  'archivo_vacio', 'solo_cabecera', 'una_columna', 'libro_excel', 'columna_desconocida', 'falta_obligatoria', 'columna_repetida',
+  'archivo_vacio', 'solo_cabecera', 'una_columna', 'libro_ilegible', 'libro_grande', 'libro_sin_lector', 'columna_desconocida', 'falta_obligatoria', 'columna_repetida',
   'demasiadas_filas', 'archivo_pesado', 'celda_invalida', 'rechazo_del_servidor', 'sesion_vencida', 'sin_permiso', 'lote_en_curso', 'plan_cambio',
   'demasiadas_peticiones', 'sin_respuesta', 'sin_conexion', 'nada_creado', 'lote_incierto', 'llave_reutilizada', 'otro',
 ] as const;
 export type CasoError = (typeof CASOS_ERROR)[number];
-export const ACCIONES_LOTE = ['otro_archivo', 'plantilla', 'revisar', 'reintentar', 'inventario', 'sesion'] as const;
+export const ACCIONES_LOTE = ['otro_archivo', 'pegar', 'plantilla', 'revisar', 'reintentar', 'inventario', 'sesion'] as const;
 export type AccionLote = (typeof ACCIONES_LOTE)[number];
 export const ROTULO_ACCION: Readonly<Record<AccionLote, string>> = {
-  otro_archivo: 'Elegir otro archivo', plantilla: 'Descargar la plantilla', revisar: 'Volver a revisar', reintentar: 'Reintentar',
+  otro_archivo: 'Elegir otro archivo', pegar: 'Pegar las celdas', plantilla: 'Descargar la plantilla', revisar: 'Volver a revisar', reintentar: 'Reintentar',
   inventario: 'Ir al inventario', sesion: 'Iniciar sesión',
 };
 // La acción de cada caso (la tabla de N8b). Una prueba recorre CASOS_ERROR y falla si alguno se queda sin acción o sin mensaje.
 export const ACCION_DE: Readonly<Record<CasoError, AccionLote>> = {
-  archivo_vacio: 'otro_archivo', solo_cabecera: 'otro_archivo', una_columna: 'plantilla', libro_excel: 'otro_archivo', columna_desconocida: 'plantilla', falta_obligatoria: 'plantilla',
+  archivo_vacio: 'otro_archivo', solo_cabecera: 'otro_archivo', una_columna: 'plantilla', libro_ilegible: 'otro_archivo', libro_grande: 'otro_archivo', libro_sin_lector: 'pegar', columna_desconocida: 'plantilla', falta_obligatoria: 'plantilla',
   columna_repetida: 'plantilla', demasiadas_filas: 'otro_archivo', archivo_pesado: 'otro_archivo',
   celda_invalida: 'otro_archivo', rechazo_del_servidor: 'otro_archivo', sesion_vencida: 'sesion', sin_permiso: 'inventario', lote_en_curso: 'reintentar',
   plan_cambio: 'revisar', demasiadas_peticiones: 'reintentar', sin_respuesta: 'inventario', sin_conexion: 'reintentar', nada_creado: 'reintentar',
@@ -369,7 +476,10 @@ export const TEXTO_DE: Readonly<Record<CasoError, string>> = {
   archivo_vacio: 'El archivo está vacío.',
   solo_cabecera: 'El archivo trae la cabecera pero ninguna fila de datos.',
   una_columna: 'La cabecera tiene una sola columna: no hay «;», «,» ni tabulador entre las columnas.',
-  libro_excel: 'Es un libro de Excel. Guárdalo como CSV (Archivo → Guardar como) o copia las celdas y pégalas aquí.',
+  // Los del libro .xlsx (bloque N, punto 6): el texto que se ve lleva además la razón (`textoLibro`).
+  libro_ilegible: 'El libro no se puede leer: guárdalo de nuevo desde tu planilla (como .xlsx o como CSV) o copia las celdas y pégalas aquí.',
+  libro_grande: 'El libro es demasiado grande para leerlo: guárdalo de nuevo solo con la hoja de los dispositivos, o copia las celdas y pégalas aquí.',
+  libro_sin_lector: 'Este navegador no puede abrir libros de Excel: copia las celdas en tu planilla y pégalas aquí, o guarda el libro como CSV.',
   columna_desconocida: 'El archivo trae una columna que no es de la plantilla.',
   falta_obligatoria: 'Falta una columna obligatoria.',
   columna_repetida: 'Una columna está repetida en la cabecera.',

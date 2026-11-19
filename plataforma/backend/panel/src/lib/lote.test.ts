@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { ErrorApi, descargarTexto } from './api';
 import {
   ACCION_DE, ACCIONES_LOTE, CASOS_ERROR, FalloDeCreacion, ROTULO_ACCION, TEXTO_DE, baseDeDescarga, celda, celdasTabla, crearConReintento, csvCredenciales, csvPlantilla,
-  csvRechazadas, describirCambios, excedeBytes, explicarError, filaQueNoEntra, leerCsv, leerJson, leerOrigen, mezclarPlan, motivoDeCelda, type CasoError, type FilaInforme, type PlantillaLote,
+  csvRechazadas, columnaEnLetras, deLibro, describirCambios, excedeBytes, explicarError, filaQueNoEntra, leerArchivoLote, leerCsv, leerJson, leerOrigen, megas, mezclarPlan, motivoDeCelda, textoDeNumero,
+  type CasoError, type FilaInforme, type PlantillaLote,
 } from './lote';
 // Las palabras del servidor para una celda mal formada (alta/lote.ts, TEXTOS_CELDA), como texto: el panel no puede decir otras (S1 y S4).
 import fuenteLote from '../../../src/alta/lote.ts?raw';
@@ -10,6 +11,10 @@ import fuentePanel from './lote.ts?raw';
 // El catálogo fijo de escenarios del alta masiva (docs/19 §4, S11): el mismo archivo que recorre el e2e en navegador real.
 import ESCENARIOS_CSV from '../../e2e/datos/lote-escenarios.csv?raw';
 import ESCENARIOS from '../../e2e/datos/lote-escenarios.json';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { TOPES_XLSX } from './xlsx-lector';
+import { cadenasXml, cs, estilosXml, fi, hojaXml, libro, nu, tx } from './xlsx-prueba';
 
 // P7, alta masiva (docs/19 §4, F2 y bloque N): el CSV en el navegador con la plantilla del servidor, el `n` de cada fila contando las
 // vacías, y la creación en una petición con la misma llave si la respuesta se pierde.
@@ -293,10 +298,23 @@ const DEL_ARCHIVO: [string, string, CasoError, string][] = [
   ['una columna que no es de la plantilla', `${CAB},color\nn-1,Uno,Lab,,,60,temperatura,,,rojo`, 'columna_desconocida', 'La columna «color» no es de la plantilla'],
   ['falta una obligatoria', 'id_fisico,nombre,zona,canales\nx,y,z,w', 'falta_obligatoria', 'Falta la columna obligatoria «intervalo_esperado_s»'],
   ['una columna repetida', `${CAB},zona\nx`, 'columna_repetida', 'La columna «zona» está repetida'],
-  ['un libro de Excel (la firma de un zip)', 'PK\u0003\u0004\u0014\u0000\u0006\u0000[Content_Types].xml', 'libro_excel', 'Es un libro de Excel. Guárdalo como CSV (Archivo → Guardar como) o copia las celdas y pégalas aquí.'],
   ['demasiadas filas', `${CAB}\n${'n,a,b,,,60,t,,\n'.repeat(501)}`, 'demasiadas_filas', 'El archivo trae 501 filas y el máximo es 500'],
   ['muy pesado', 'x'.repeat(2_000_000), 'archivo_pesado', 'El archivo pesa 2 MB y el máximo es 1,1 MB'],
   ['una comilla sin cerrar (lo que impide leer el resto del archivo)', `${CAB}\nn-1,"Uno,Lab,,,60,temperatura,,`, 'celda_invalida', 'Fila 2: comilla sin cerrar.'],
+];
+
+// Las fallas del lector de libros (docs/19 §4, bloque N, punto 6): [qué pasó, el archivo, caso, el texto debe contener, cómo se carga el lector].
+const PK = (): Uint8Array => Uint8Array.from([...new TextEncoder().encode('PK\u0003\u0004\u0014\u0000\u0006\u0000[Content_Types].xml')]);
+const DEL_LIBRO: [string, () => Uint8Array, CasoError, string, (() => Promise<typeof import('./xlsx-lector')>) | undefined][] = [
+  ['un zip dañado (la firma y nada más)', PK, 'libro_ilegible', 'El libro no se puede leer: está incompleto o dañado. Guárdalo de nuevo desde tu planilla (como .xlsx o como CSV) o copia las celdas y pégalas aquí.', undefined],
+  ['un .xls antiguo o un .xlsx con contraseña', () => Uint8Array.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1, 0, 0]), 'libro_ilegible', 'es un libro de Excel antiguo (.xls) o está protegido con contraseña', undefined],
+  ['un <!DOCTYPE>', () => libro({ hoja: hojaXml('').replace('?>\n', '?>\n<!DOCTYPE x>') }), 'libro_ilegible', 'trae una declaración de tipo de documento', undefined],
+  ['zip bomba', () => libro({ cadenas: cadenasXml(['a'.repeat(TOPES_XLSX.bytesPorParte)]) }), 'libro_grande', `El libro es demasiado grande para leerlo: una de sus partes ocupa más de ${megas(TOPES_XLSX.bytesPorParte)} MB al abrirla.`, undefined],
+  ['el lector no se pudo cargar', () => libro(), 'libro_sin_lector', 'No se pudo cargar el lector de libros de Excel', () => Promise.reject(new Error('sin red'))],
+  ['el navegador no trae DecompressionStream', () => libro(), 'libro_sin_lector', 'Este navegador no puede abrir libros de Excel', async () => {
+    const m = await import('./xlsx-lector');
+    return { ...m, leerXlsx: () => Promise.reject(new m.FallaLibro('sin_lector', 'sin descompresor')) };
+  }],
 ];
 
 describe('la tabla de errores del alta masiva (docs/19 §4, N8b)', () => {
@@ -306,8 +324,8 @@ describe('la tabla de errores del alta masiva (docs/19 §4, N8b)', () => {
     }
     for (const a of ACCIONES_LOTE) expect(ROTULO_ACCION[a].length).toBeGreaterThan(3);
   });
-  it('cada caso de la tabla tiene su prueba aquí (del servidor o del archivo)', () => {
-    const probados = new Set<CasoError>([...DEL_SERVIDOR.map((x) => x[3]), ...DEL_ARCHIVO.map((x) => x[2])]);
+  it('cada caso de la tabla tiene su prueba aquí (del servidor, del archivo o del libro .xlsx)', () => {
+    const probados = new Set<CasoError>([...DEL_SERVIDOR.map((x) => x[3]), ...DEL_ARCHIVO.map((x) => x[2]), ...DEL_LIBRO.map((x) => x[2])]);
     expect(CASOS_ERROR.filter((c) => !probados.has(c))).toEqual([]);
   });
   for (const [que, e, ctx, caso, contiene] of DEL_SERVIDOR) {
@@ -315,6 +333,14 @@ describe('la tabla de errores del alta masiva (docs/19 §4, N8b)', () => {
       const x = explicarError(e, ctx);
       expect([x.caso, x.accion]).toEqual([caso, ACCION_DE[caso]]);
       expect(x.texto).toContain(contiene);
+    });
+  }
+  for (const [que, bytes, caso, contiene, cargar] of DEL_LIBRO) {
+    it(`libro: ${que} → ${caso}, antes de enviar`, async () => {
+      const l = await leerArchivoLote(bytes(), PLANTILLA, cargar);
+      expect(l.filas).toEqual([]);
+      expect([l.errores[0]?.caso, ACCION_DE[l.errores[0]!.caso]]).toEqual([caso, caso === 'libro_sin_lector' ? 'pegar' : 'otro_archivo']);
+      expect(l.errores[0]?.texto).toContain(contiene);
     });
   }
   for (const [que, texto, caso, contiene] of DEL_ARCHIVO) {
@@ -361,5 +387,100 @@ describe('el catálogo fijo de escenarios (docs/19 §4, S11; e2e/datos/lote-esce
     // Vuelto a subir sin tocar: la de la tilde no entra otra vez con el mismo motivo; la de la celda de más ya viene alineada y la revisa el servidor.
     const otra = leerOrigen(csv.join('\r\n'), PLANTILLA);
     expect([otra.errores, otra.filas.map((f) => f.id_fisico), otra.noEntran?.map((x) => x.motivos[0]!.texto)]).toEqual([[], ['xprefijo-e58'], [locales[0]!.motivo]]);
+  });
+});
+
+describe('el libro .xlsx: el mismo camino que un CSV (docs/19 §4, bloque N, punto 6)', () => {
+  const DATOS = join(import.meta.dirname, '../../e2e/datos');
+  const real = (nombre: string): Uint8Array => new Uint8Array(readFileSync(join(DATOS, nombre)));
+  const CAB7 = ['id_fisico', 'nombre', 'zona', 'via', 'formato', 'intervalo_esperado_s', 'canales'];
+  const cabecera = fi(1, ...CAB7.map((c, i) => tx(`${columnaEnLetras(i)}1`, c)));
+  it('el catálogo de 60 escenarios guardado como .xlsx por LibreOffice da LAS MISMAS filas que su CSV; solo cambia el motivo de la celda de más', async () => {
+    const csv = leerOrigen(ESCENARIOS_CSV, PLANTILLA);
+    const xlsx = await leerArchivoLote(real('lote-escenarios.xlsx'), PLANTILLA);
+    expect(xlsx.errores).toEqual([]);
+    expect(xlsx.filas).toEqual(csv.filas);
+    expect(xlsx.noEntran!.map((x) => x.fila)).toEqual(csv.noEntran!.map((x) => x.fila));
+    expect(xlsx.noEntran!.map((x) => x.motivos.map((m) => m.texto))).toEqual([
+      csv.noEntran![0]!.motivos.map((m) => m.texto), // la tilde en el identificador: el mismo motivo
+      ['la fila trae «sobra» en la columna H, que no tiene cabecera'], // en un libro no hay separadores: es una columna sin nombre
+    ]);
+  });
+  it('un libro real de LibreOffice: cada tipo de celda con su regla (identificador como número, fecha, fórmulas, coma flotante, valor lógico, error, salto de línea)', async () => {
+    const l = await leerArchivoLote(real('libro-libreoffice.xlsx'), PLANTILLA);
+    expect(l.errores).toEqual([]);
+    expect(l.filas.map((f) => [f.n, f.nombre, f.intervalo_esperado_s, f.via])).toEqual([
+      [2, 'Sensor uno', '300', undefined], [5, 'Sensor cuatro', '300', undefined], [6, '2.000', '12,375', undefined], [7, 'Suma de coma flotante', '0,3', undefined],
+      [9, undefined, '60', undefined], [10, 'Valor lógico en la vía', '60', '1'], // LibreOffice guarda VERDADERO como el número 1: así llega al servidor, que dice que esa vía no existe
+    ]);
+    expect(l.noEntran!.map((x) => [x.fila.n, x.motivos.map((m) => `${m.campo} → ${m.texto}`)])).toEqual([
+      [3, ['id_fisico → Identificador: la planilla lo guarda como número, y pudo quitarle ceros a la izquierda o redondearlo; escríbelo como texto']],
+      [4, ['nombre → Nombre: la planilla lo guarda con formato de fecha; escríbelo como texto']],
+      [11, ['nombre → Nombre: la planilla muestra el error «#DIV/0!»; corrígelo en la planilla o escribe el valor']],
+      [12, ['nombre → Nombre: trae un salto de línea, un tabulador u otro carácter de control, que no se admite']],
+    ]);
+  });
+  it('la primera hoja de la exportación por sitio es «Acerca de»: sus columnas no son de la plantilla (se lee la primera hoja, nada más)', async () => {
+    const l = await leerArchivoLote(real('libro-exportado.xlsx'), PLANTILLA);
+    expect(l.errores.map((e) => e.caso)).toEqual(['columna_desconocida', 'columna_desconocida', 'falta_obligatoria', 'falta_obligatoria', 'falta_obligatoria', 'falta_obligatoria', 'falta_obligatoria']);
+    expect(l.errores[0]!.texto).toBe(`La columna «campo» no es de la plantilla. Las columnas son: ${COLS.join(', ')}.`);
+  });
+  it('números de planilla: como se ven en una planilla en español, con 15 cifras significativas como mucho (no se inventan decimales)', () => {
+    expect(['60', '60.5', '0.30000000000000004', '12.375', '-0', '1E+21', '1.5E-7', '123456789012345678', '  7 ', '1e400'].map(textoDeNumero))
+      .toEqual(['60', '60,5', '0,3', '12,375', '0', '1E+21', '1,5E-7', '123456789012346000', '7', '1e400']); // el que desborda no se escribe «Infinity»
+    // Si un número que desborda llegara igual (el lector ya lo rechaza), su fila no entra.
+    const l = deLibro({ hoja: 'Hoja1', cortado: false, filas: [
+      { n: 1, celdas: ['id_fisico', 'nombre', 'zona', 'intervalo_esperado_s', 'canales'].map((v) => ({ tipo: 'texto' as const, v })) },
+      { n: 2, celdas: [{ tipo: 'texto', v: 'n-1' }, { tipo: 'texto', v: 'Uno' }, { tipo: 'texto', v: 'Norte' }, { tipo: 'numero', v: '1e400', fecha: false }, { tipo: 'texto', v: 't' }] },
+    ] }, PLANTILLA);
+    expect(l.noEntran!.map((x) => x.motivos.map((m) => m.texto))).toEqual([['Cada cuánto reporta: trae un número que no se puede leer; escríbelo de nuevo en la planilla']]);
+    expect([0, 25, 26, 701, 702, 16383].map(columnaEnLetras)).toEqual(['A', 'Z', 'AA', 'ZZ', 'AAA', 'XFD']);
+  });
+  it('identificadores (también la pasarela) que llegan como número y celdas con formato de fecha dejan fuera su fila; en otras columnas el número se escribe; lo de «fila» y «motivo» se ignora', async () => {
+    const cab = fi(1, ...[...CAB7, 'pasarela', 'fila', 'motivo'].map((c, i) => tx(`${columnaEnLetras(i)}1`, c)));
+    const b = libro({
+      estilos: estilosXml([0, 14]),
+      hoja: hojaXml(cab +
+        fi(2, tx('A2', 'n-1'), nu('B2', 42), tx('C2', 'Norte'), nu('F2', 60), tx('G2', 't'), nu('I2', 2), tx('J2', 'el motivo de antes')) +
+        fi(3, tx('A3', 'n-2'), tx('B3', 'Dos'), tx('C3', 'Norte'), tx('D3', 'lorawan'), nu('F3', 60), tx('G3', 't'), nu('H3', 1234)) +
+        fi(4, tx('A4', 'n-3'), tx('B4', 'Tres'), tx('C4', 'Norte'), nu('F4', 45000, 1), tx('G4', 't')) +
+        fi(5, tx('A5', 'n-4'), tx('B5', 'Cuatro'), tx('C5', 'Norte'), '<c r="D5" t="b"><v>1</v></c>', '<c r="F5"><f>A1*2</f></c>', tx('G5', 't'))),
+    });
+    const l = await leerArchivoLote(b, PLANTILLA);
+    expect([l.errores, l.filas]).toEqual([[], [{ n: 2, id_fisico: 'n-1', nombre: '42', zona: 'Norte', intervalo_esperado_s: '60', canales: 't' }]]);
+    expect(l.noEntran!.map((x) => [x.fila.n, x.motivos.map((m) => m.texto)])).toEqual([
+      [3, ['Pasarela: la planilla lo guarda como número, y pudo quitarle ceros a la izquierda o redondearlo; escríbelo como texto']],
+      [4, ['Cada cuánto reporta: la planilla lo guarda con formato de fecha; escríbelo como texto']],
+      [5, ['Vía: no es texto ni número', 'Cada cuánto reporta: es una fórmula sin su resultado guardado; ábrela y guárdala de nuevo en tu planilla, o escribe el valor']],
+    ]);
+  });
+  it('«_x000D_» dentro de un texto es un retorno de carro: deja fuera su fila como en un CSV (en un borde, se recorta como en un CSV); datos en columnas sin cabecera también; la cabecera puede ser cadena compartida y estar más abajo', async () => {
+    const b = libro({
+      cadenas: cadenasXml(CAB7),
+      hoja: hojaXml(fi(3, ...CAB7.map((_, i) => cs(`${columnaEnLetras(i)}3`, i))) +
+        fi(4, tx('A4', 'n-1'), tx('B4', 'Uno_x000D_dos'), tx('C4', 'Norte'), nu('F4', 60), tx('G4', 't')) +
+        fi(6, tx('A6', 'n-2'), tx('B6', 'Dos'), tx('C6', 'Norte'), nu('F6', 60), tx('G6', 't'), tx('J6', 'x'), nu('K6', 1))),
+    });
+    const l = await leerArchivoLote(b, PLANTILLA);
+    expect(l.noEntran!.map((x) => [x.fila.n, x.motivos.map((m) => m.texto)])).toEqual([
+      [4, ['Nombre: trae un salto de línea, un tabulador u otro carácter de control, que no se admite']],
+      [6, ['la fila trae datos en 2 columnas sin cabecera: «x» (J), «1» (K)']],
+    ]);
+  });
+  it('501 filas: «más de 500» (la lectura se detuvo); 500 entran; la primera hoja vacía y la que solo trae la cabecera se dicen', async () => {
+    const filas = (k: number): string => cabecera + Array.from({ length: k }, (_, i) => fi(i + 2, tx(`A${i + 2}`, `n-${i}`), tx(`B${i + 2}`, 'x'), tx(`C${i + 2}`, 'Norte'), nu(`F${i + 2}`, 60), tx(`G${i + 2}`, 't'))).join('');
+    const a = await leerArchivoLote(libro({ hoja: hojaXml(filas(501)) }), PLANTILLA);
+    expect(a.errores).toEqual([{ caso: 'demasiadas_filas', texto: 'La primera hoja del libro trae más de 500 filas y el máximo es 500: divídelo en partes de 500 o menos.' }]);
+    expect((await leerArchivoLote(libro({ hoja: hojaXml(filas(500)) }), PLANTILLA)).filas).toHaveLength(500);
+    expect((await leerArchivoLote(libro(), PLANTILLA)).errores).toEqual([{ caso: 'archivo_vacio', texto: 'La primera hoja del libro («Hoja1») está vacía: se lee solo la primera hoja.' }]);
+    expect((await leerArchivoLote(libro({ hoja: hojaXml(cabecera) }), PLANTILLA)).errores).toEqual([{ caso: 'solo_cabecera', texto: 'El libro trae la cabecera pero ninguna fila de datos.' }]);
+  });
+  it('lo que no empieza con la firma de un zip se lee como texto, igual que antes; un archivo sobre max_bytes ni se mira', async () => {
+    const csv = `${CAB}\nn-1,Uno,Lab,,,60,temperatura,,`;
+    expect(await leerArchivoLote(new TextEncoder().encode(`﻿${csv}`), PLANTILLA)).toEqual(leerOrigen(csv, PLANTILLA));
+    const cargar = vi.fn(() => import('./xlsx-lector'));
+    expect((await leerArchivoLote(new Uint8Array(PLANTILLA.max_bytes + 1), PLANTILLA, cargar)).errores[0]!.caso).toBe('archivo_pesado');
+    await leerArchivoLote(new TextEncoder().encode(csv), PLANTILLA, cargar);
+    expect(cargar).not.toHaveBeenCalled(); // el lector de libros no se descarga si no hay un libro
   });
 });

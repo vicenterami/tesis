@@ -1,6 +1,7 @@
 <script lang="ts">
   // P7 Alta masiva en tres pasos (docs/19 §4, bloque N, puntos 6 a 9):
-  //  1. Origen: un archivo CSV o JSON, o lo pegado desde la planilla. Se lee en el navegador (lib/lote.ts) con las columnas y los límites de
+  //  1. Origen: un archivo CSV, JSON o un libro .xlsx (su primera hoja, con el lector propio de lib/xlsx-lector.ts, que se descarga solo al
+  //     elegir uno: bloque N, punto 6), o lo pegado desde la planilla. Se lee en el navegador (lib/lote.ts) con las columnas y los límites de
   //     `GET /dispositivos/lote/plantilla`: el panel no guarda copia de ellos.
   //  2. Revisión: lo que el servidor haría con cada fila (`modo=validar`, no crea nada), con cinco filtros, el detalle campo por campo y, si
   //     la persona confirma, UNA petición `modo=crear`, todo o nada, con la huella del plan que vio y una llave de reintento.
@@ -8,7 +9,7 @@
   // Nada de esto es optimista: muestra secretos una vez y crea filas (docs/19 §6). El bloque S (docs/19 §4) le quitó fricción: una fila mal
   // formada no frena a las demás (1), avisos que distinguen y la zona por nombre dicha una vez (3), las palabras del servidor (4), «Ya existe»
   // en ámbar con «Abrir su ficha» (5), los botones y las ayudas esenciales a la vista sobre la lista (6), las credenciales que sobreviven a
-  // «atrás» (7), el foco tras «Mostrar 100 más» y «Ya las guardé» (8), el libro de Excel reconocido (9) y la lectura que descarta la anterior (10).
+  // «atrás» (7), el foco tras «Mostrar 100 más» y «Ya las guardé» (8), el libro de Excel reconocido (9; desde el 19/11/2026, leído) y la lectura que descarta la anterior (10).
   import { onMount, tick, untrack } from 'svelte';
   import Boton from './Boton.svelte';
   import Icono from './Icono.svelte';
@@ -16,7 +17,7 @@
   import { avisoDeError } from './lib/avisos';
   import {
     ACCION_DE, FalloDeCreacion, ROTULO_ACCION, TEXTO_SESION_RETOMADA, baseDeDescarga, borradorLote, crearConReintento, credencialesLote, csvCredenciales, csvPlantilla, csvRechazadas,
-    excedeBytes, explicarError, filaQueNoEntra, leerOrigen, megas, mezclarPlan, nuevaLlave, olvidarCredencialesLote, retomarLoteDe, textoPesado, type AccionLote, type ErrorExplicado, type FilaInforme,
+    excedeBytes, explicarError, filaQueNoEntra, leerArchivoLote, leerOrigen, megas, mezclarPlan, nuevaLlave, olvidarCredencialesLote, retomarLoteDe, textoPesado, type AccionLote, type ErrorExplicado, type FilaInforme,
     type FilaLote, type FilaNoEntra, type InformeLote, type LecturaCsv, type PlantillaLote, type Problema, type ZonaPorNombre,
   } from './lib/lote';
   import { seguirAngosto } from './lib/medios';
@@ -57,6 +58,7 @@
   let cajaError = $state<HTMLDivElement | null>(null);
   let cajaArchivo = $state<HTMLDivElement | null>(null);
   let campoArchivo = $state<HTMLInputElement | null>(null);
+  let campoPegado = $state<HTMLTextAreaElement | null>(null);
   let zonaInforme = $state<HTMLDivElement | null>(null);
   let encabezadoPaso = $state<HTMLHeadingElement | null>(null);
   // Las credenciales de las creadas: solo en memoria hasta que la persona las descarga y pulsa «olvidar». Viven también en la memoria del
@@ -151,8 +153,9 @@
     aplicarLectura(f.name, { filas: [], errores: [] });
     leyendo = true;
     try {
-      const texto = await f.text();
-      if (mia === generacion) aplicarLectura(f.name, leerOrigen(texto, plantilla)); // una lectura que termina después de otra más nueva se descarta
+      // Los bytes: por su firma, un libro .xlsx va al lector propio (cargado recién ahora); lo demás se lee como texto UTF-8.
+      const lectura = await leerArchivoLote(new Uint8Array(await f.arrayBuffer()), plantilla);
+      if (mia === generacion) aplicarLectura(f.name, lectura); // una lectura que termina después de otra más nueva se descarta
     } finally {
       if (mia === generacion) leyendo = false;
     }
@@ -169,6 +172,10 @@
     if (a === 'otro_archivo') {
       paso = 1;
       void tick().then(() => campoArchivo?.focus());
+    } else if (a === 'pegar') {
+      // Donde el navegador no puede abrir un libro, la pantalla ofrece pegar las celdas (bloque N, punto 6).
+      paso = 1;
+      void tick().then(() => campoPegado?.focus());
     } else if (a === 'plantilla' && plantilla !== null) descargarTexto(csvPlantilla(plantilla), 'plantilla-alta-masiva.csv');
     else if (a === 'revisar') {
       paso = informe === null ? 1 : 2;
@@ -450,8 +457,8 @@
         <p class="vacio">Cargando…</p>
       {:else}
         {@const p = plantilla}
-        <p data-plantilla-lote>Hasta {p.max_filas} filas y {megas(p.max_bytes)} MB por lote. Elige un archivo CSV o JSON, o pega las filas desde tu planilla, con la fila de
-          cabecera. Columnas obligatorias: {p.columnas.filter((c) => c.obligatoria).map((c) => c.nombre).join(', ')}. Separadores de columnas: {p.separadores.columnas.map(rotuloSeparador).join(', ')};
+        <p data-plantilla-lote>Hasta {p.max_filas} filas y {megas(p.max_bytes)} MB por lote. Elige un archivo CSV, JSON o un libro de Excel (.xlsx, del que se lee la primera
+          hoja), o pega las filas desde tu planilla, con la fila de cabecera. Columnas obligatorias: {p.columnas.filter((c) => c.obligatoria).map((c) => c.nombre).join(', ')}. Separadores de columnas: {p.separadores.columnas.map(rotuloSeparador).join(', ')};
           entre canales, {p.separadores.canales.map(rotuloSeparador).join(' o ')}. Primero se revisa lo que se haría con cada fila (no crea nada); después confirmas.
           <Boton etiqueta="Descargar la plantilla (CSV)" variante="discreto" onclick={() => descargarTexto(csvPlantilla(p), 'plantilla-alta-masiva.csv')} data-plantilla /></p>
         <details class="datos-grafico" data-columnas>
@@ -462,12 +469,12 @@
         </details>
         <div class="formulario-configurar">
           <div class="campo">
-            <label for="{uid}-archivo">Archivo CSV o JSON</label>
-            <input id="{uid}-archivo" type="file" accept=".csv,.tsv,.txt,.json,text/csv,application/json" onchange={(e) => void leerArchivo(e)} bind:this={campoArchivo} data-archivo />
+            <label for="{uid}-archivo">Archivo CSV, JSON o Excel (.xlsx)</label>
+            <input id="{uid}-archivo" type="file" accept=".csv,.tsv,.txt,.json,.xlsx,text/csv,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onchange={(e) => void leerArchivo(e)} bind:this={campoArchivo} data-archivo />
           </div>
           <div class="campo">
             <label for="{uid}-pegado">O pega las filas desde tu planilla</label>
-            <textarea id="{uid}-pegado" rows="6" spellcheck="false" bind:value={pegado} data-pegado></textarea>
+            <textarea id="{uid}-pegado" rows="6" spellcheck="false" bind:value={pegado} bind:this={campoPegado} data-pegado></textarea>
             <span class="ayuda-campo">Copia las celdas con su fila de cabecera y pégalas aquí.</span>
             <span class="acciones"><Boton etiqueta="Leer lo pegado" motivoDesactivado={pegado.trim() === '' ? 'pega primero las filas' : null} onclick={leerPegado} data-leer-pegado /></span>
           </div>

@@ -63,7 +63,14 @@ beforeEach(() => {
     return await responder(metodo, ruta, cuerpo);
   }));
   let ultimo: Blob | null = null;
-  vi.stubGlobal('URL', Object.assign(Object.create(URL), { createObjectURL: (b: Blob) => { ultimo = b; return 'blob:x'; }, revokeObjectURL: () => {} }));
+  // Un URL que sigue siendo constructor (el `import()` del lector de libros lo usa al cargar el módulo) y que guarda lo que se descarga.
+  vi.stubGlobal('URL', class extends URL {
+    static createObjectURL(b: Blob): string {
+      ultimo = b;
+      return 'blob:x';
+    }
+    static revokeObjectURL(): void {}
+  });
   vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) { descargas.push({ nombre: this.download, contenido: ultimo!.text(), bytes: ultimo!.arrayBuffer() }); });
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
@@ -162,12 +169,12 @@ describe('P7: foco, errores por campo y credenciales que no quedan', () => {
   });
 
   it('un CSV de más de max_bytes (de la plantilla) se rechaza por su tamaño ANTES de leerlo (no se carga entero en memoria)', async () => {
-    const leer = vi.spyOn(Blob.prototype, 'text');
+    const leer = [vi.spyOn(Blob.prototype, 'text'), vi.spyOn(Blob.prototype, 'arrayBuffer')];
     render(Alta, { modo: 'lote', sesion: SESION, sitios: SITIOS });
     await waitFor(() => expect(document.querySelector('[data-archivo]')).toBeTruthy());
     await fireEvent.change(document.querySelector('[data-archivo]')!, { target: { files: [new File(['x'.repeat(PLANTILLA.max_bytes + 1)], 'enorme.csv')] } });
     await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('y el máximo es 1,1 MB: divídelo'));
-    expect(leer).not.toHaveBeenCalled();
+    for (const x of leer) expect(x).not.toHaveBeenCalled();
   });
 
   it('la credencial del asistente se olvida al perder la sesión; cerrar la pestaña con credenciales del lote sin descargar pide confirmar', async () => {
@@ -387,7 +394,7 @@ describe('P7: alta masiva, qué falló y qué hacer (docs/19 §4, N8b): lo que s
     ['una sola columna', 'id_fisico|nombre|zona\nx|y|z', 'no hay «;», «,» ni tabulador entre las columnas', 'Descargar la plantilla'],
     ['solo la cabecera', `${CAB}\n`, 'ninguna fila de datos', 'Elegir otro archivo'],
     ['vacío', ' ', 'El archivo está vacío', 'Elegir otro archivo'],
-    ['un libro de Excel elegido con «Todos los archivos»', 'PK\u0003\u0004\u0014\u0000[Content_Types].xml', 'Es un libro de Excel. Guárdalo como CSV (Archivo → Guardar como) o copia las celdas y pégalas aquí.', 'Elegir otro archivo'],
+    ['un libro de Excel dañado (la firma de un zip y nada más)', 'PK\u0003\u0004\u0014\u0000[Content_Types].xml', 'El libro no se puede leer: está incompleto o dañado. Guárdalo de nuevo desde tu planilla (como .xlsx o como CSV) o copia las celdas y pégalas aquí.', 'Elegir otro archivo'],
   ];
   for (const [caso, csv, texto, accion] of AL_LEER) {
     it(`al leer, ${caso}: se ve antes de enviar, con el botón «${accion}»`, async () => {
@@ -731,7 +738,7 @@ describe('P7: alta masiva en tres pasos (docs/19 §4, N7)', () => {
     Object.defineProperty(campo, 'value', { configurable: true, get: () => '', set: (v: string) => { escritos.push(v); } });
     const lenta = new File([csv(2)], 'lenta.csv');
     let terminar: (t: string) => void = () => undefined;
-    Object.defineProperty(lenta, 'text', { value: () => new Promise<string>((ok) => { terminar = ok; }) });
+    Object.defineProperty(lenta, 'arrayBuffer', { value: () => new Promise<ArrayBuffer>((ok) => { terminar = (t) => ok(new TextEncoder().encode(t).buffer); }) });
     await fireEvent.change(campo, { target: { files: [lenta] } });
     await fireEvent.change(campo, { target: { files: [new File([csv(1)], 'rapida.csv')] } });
     await waitFor(() => expect(document.querySelector('[data-filas-leidas]')!.textContent).toBe('rapida.csv: 1 filas leídas.'));
@@ -957,6 +964,45 @@ describe('P7: alta masiva en tres pasos (docs/19 §4, N7)', () => {
     await fireEvent.click(boton('Ya las guardé: olvidarlas'));
     await waitFor(() => expect(document.activeElement).toBe(document.querySelector('[data-sin-credenciales]')));
   });
+  // El lector de libros .xlsx (docs/19 §4, bloque N, punto 6): un libro real llega a la misma revisión que su CSV.
+  const DATOS = join(import.meta.dirname, '../e2e/datos');
+  const subirLibro = async (nombre: string): Promise<void> => {
+    await waitFor(() => expect(document.querySelector('[data-archivo]')).toBeTruthy());
+    await fireEvent.change(document.querySelector('[data-archivo]')!, { target: { files: [new File([readFileSync(join(DATOS, nombre))], nombre)] } });
+  };
+  it('N6: el catálogo guardado como .xlsx por LibreOffice se lee en el navegador y manda al servidor LAS MISMAS filas que su CSV', async () => {
+    responder = (_m, _r, cuerpo) => json(plan(cuerpo.filas!, 'validar'));
+    const enviadas: unknown[] = [];
+    const leidas: string[] = [];
+    for (const nombre of ['lote-escenarios.csv', 'lote-escenarios.xlsx']) {
+      render(Alta, { modo: 'lote', sesion: SESION, sitios: SITIOS });
+      await subirLibro(nombre);
+      await waitFor(() => expect(document.querySelector('[data-filas-leidas]:not([data-leyendo])')?.textContent).toMatch(new RegExp(`^${nombre.replace('.', '\\.')}: 60 filas leídas\\.`)));
+      leidas.push(document.querySelector('[data-filas-leidas]')!.textContent!.slice(nombre.length));
+      await revisar();
+      enviadas.push(pedidos.filter((p) => p.ruta.endsWith('modo=validar')).at(-1)!.cuerpo.filas);
+      expect(document.querySelector('[data-filtro-lote="leidas"] [data-cifra]')!.textContent!.trim()).toBe('60');
+      cleanup();
+      Object.assign(borradorLote, { archivo: null, filas: [], noEntran: [], aviso: null });
+    }
+    expect(leidas[1]).toBe(leidas[0]);
+    expect((enviadas[0] as unknown[]).length).toBeGreaterThan(20);
+    expect(enviadas[1]).toEqual(enviadas[0]);
+  });
+  it('N6: sin el descompresor del navegador, el aviso lo dice y ofrece «Pegar las celdas», que lleva al campo de pegar', async () => {
+    vi.stubGlobal('DecompressionStream', undefined);
+    try {
+      render(Alta, { modo: 'lote', sesion: SESION, sitios: SITIOS });
+      await subirLibro('libro-libreoffice.xlsx');
+      await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('Este navegador no puede abrir libros de Excel: copia las celdas en tu planilla y pégalas aquí, o guarda el libro como CSV.'));
+      expect(document.querySelector('[data-error-archivo]')!.getAttribute('data-error-archivo')).toBe('libro_sin_lector');
+      await fireEvent.click(boton('Pegar las celdas'));
+      await waitFor(() => expect(document.activeElement).toBe(document.querySelector('[data-pegado]')));
+      expect(pedidos.filter((p) => p.ruta.startsWith('/dispositivos/lote?'))).toEqual([]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
   it('S10: mientras se lee un archivo nuevo, el anterior ya no cuenta: «Revisar las filas» se desactiva con su motivo hasta terminar', async () => {
     responder = (_m, _r, cuerpo) => json(plan(cuerpo.filas!, 'validar'));
     render(Alta, { modo: 'lote', sesion: SESION, sitios: SITIOS });
@@ -964,7 +1010,7 @@ describe('P7: alta masiva en tres pasos (docs/19 §4, N7)', () => {
     await waitFor(() => expect(document.querySelector('[data-filas-leidas]')!.textContent).toBe('primero.csv: 3 filas leídas.'));
     let terminar: (t: string) => void = () => {};
     const lento = new File(['x'], 'segundo.csv');
-    Object.defineProperty(lento, 'text', { value: () => new Promise<string>((ok) => { terminar = ok; }) });
+    Object.defineProperty(lento, 'arrayBuffer', { value: () => new Promise<ArrayBuffer>((ok) => { terminar = (t) => ok(new TextEncoder().encode(t).buffer); }) });
     await fireEvent.change(document.querySelector('[data-archivo]')!, { target: { files: [lento] } });
     await waitFor(() => expect(document.querySelector('[data-filas-leidas]')!.textContent).toBe('Leyendo segundo.csv…'));
     expect(boton('Revisar las filas').disabled).toBe(true);

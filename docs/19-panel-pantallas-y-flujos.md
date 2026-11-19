@@ -775,7 +775,7 @@ reintento, con sus pruebas; `alta/lote.ts`, `alta/alta.controller.ts` y `alta/ma
 medido en `docs/16 §71`). El panel de hoy quedó adaptado al contrato sin rediseñarse (`n` contando las filas vacías, columnas y límites
 leídos de la plantilla, una sola petición con la huella y la llave, los 409 por su `codigo`); la pantalla de tres pasos (7), los lectores
 (6), las descargas (9) y el XLSX quedan para el bloque siguiente. ✅ panel, 16/11/2026: los lectores (6, sin el XLSX), la pantalla de tres pasos
-(7) y las descargas (9); `docs/16 §76`. Queda el lector de XLSX.
+(7) y las descargas (9); `docs/16 §76`. ✅ panel, 19/11/2026: el lector de XLSX (6); `docs/16 §91`.
 El alta masiva de F2 (11/11/2026) valida bien y explica poco. Lo que se observa en el código y en la pantalla de hoy:
 
 | Hoy | Por qué no alcanza |
@@ -848,6 +848,40 @@ El alta masiva de F2 (11/11/2026) valida bien y explica poco. Lo que se observa 
    fila, del de la fila. Un identificador que llega como número se rechaza («escríbelo como texto»: la planilla ya pudo redondearlo)
    y una celda con formato de fecha, también. Antes de construirlo se comprueba en una fuente primaria en qué navegadores existe
    `DecompressionStream('deflate-raw')`; donde no exista, la pantalla ofrece pegar.
+   ✅ panel, 19/11/2026 (`lib/xlsx-lector.ts`, que no importa nada y se carga con `import()` desde `leerArchivoLote` de `lib/lote.ts`, el
+   único punto de entrada de un archivo elegido; `docs/16 §91`). La fuente primaria (browser-compat-data de MDN, la entrada
+   `DecompressionStream.deflate-raw`): Chrome 103, Edge 103 (espejo de Chrome), Firefox 113 y Safari 16.4; el objetivo de compilación del
+   panel (el de Vite 8.3.6: `chrome111`, `edge111`, `firefox114`, `safari16.4`) ya los incluye, así que pegar queda para un navegador más
+   viejo y para cuando el lector no se pudo descargar. Decidido al construir (19/11/2026): (1) además de lo nombrado se lee la tabla de
+   estilos, solo sus `numFmts` y `cellXfs`: sin ella no se sabe qué celda tiene formato de fecha (ECMA-376 Parte 1, §18.8.30 y §18.8.10; los
+   formatos implícitos de fecha y hora salen de sus cuatro tablas, la de todos los idiomas, «zh-tw and zh-cn», «ja-jp and ko-kr» y «th-th», y
+   un id que no está en ellas no se toma por fecha); el
+   libro tiene que estar en `xl/workbook.xml` con su tipo de contenido de libro, y las cadenas, los estilos y la hoja se ubican por las
+   relaciones del libro sin salir de `xl/` (una ruta con `..`, hacia otra parte del paquete o externa lo hace ilegible); un `.ods` y un `.xlsb`
+   se nombran. (2) «La primera hoja» es la primera **visible** en el orden de `<sheets>`: una oculta delante se salta y, si es un gráfico, se
+   dice. (3) Los topes: 8 MiB descomprimidos por parte y 16 MiB en total (500 filas con cada celda en su tope y cada carácter escrito
+   `&amp;` ocupan menos de 5 MB, lo mide una prueba), 1 000 partes en el zip y 50 000 cadenas compartidas. La hoja se lee mientras se
+   descomprime y se corta al juntar la cabecera y `max_filas` + 1 filas con datos: el aviso dice «trae más de 500 filas», porque no se sabe
+   cuántas son. La pantalla dice los topes en su unidad (10^6 bytes, como el tope del archivo): 8,4 MB y 16,8 MB. Al terminar una parte, su
+   tamaño y su CRC-32 deben ser los del directorio del zip; una parte cifrada, con otra compresión que
+   deflate o repetida con el mismo nombre lo hace ilegible; ZIP64 se lee. (4) Se rechaza toda declaración `<!…`, no solo `<!DOCTYPE`, y toda
+   entidad que no es una de las cinco de XML ni una referencia numérica a un carácter que XML admite. Una etiqueta de más de 16 KiB lo hace
+   ilegible y los atributos se leen en una sola pasada, con su forma `nombre="valor"` (lo que no la tiene, mal formado); el texto se entrega
+   a medida que llega y una marca sin cerrar recuerda hasta dónde se buscó su cierre; la forma de un número y la de un formato de fecha se
+   miran sin retroceso (corrección del mismo día, tras una revisión independiente: una etiqueta de 300 000 caracteres, en un libro de menos
+   de 5 kB, tardaba 70 s en leerse). (5) La regla de cada celda: el número
+   en un identificador se rechaza en `id_fisico` y en `pasarela`, las dos columnas que identifican algo; la fecha, en toda columna (por su
+   estilo o por el tipo `d`); un valor lógico es «no es texto ni número», como en el JSON; un error de la planilla («#DIV/0!») y una fórmula
+   sin resultado guardado se dicen con su remedio. Cada uno deja fuera solo su fila (S1). Un número que desborda («1e400») hace ilegible el
+   libro. Un número va como lo muestra una planilla en
+   español: coma decimal, sin separador de miles y con 15 cifras significativas como mucho, la precisión de Excel, así la suma que la
+   planilla guardó como `0.30000000000000004` se lee «0,3» y no se inventan decimales. Un dato en una columna sin cabecera deja fuera su
+   fila con «la fila trae «sobra» en la columna H, que no tiene cabecera»: en un libro no hay separador que culpar. (6) Los casos de N8b: el
+   de S9 (`libro_excel`) se reemplaza por `libro_ilegible` y `libro_grande` («Elegir otro archivo»), y `libro_sin_lector` («Pegar las
+   celdas», que lleva al campo de pegar, con un `Boton` nuevo en `ACCIONES_LOTE`); un archivo con la firma del contenedor del Office antiguo
+   (un `.xls`, o un `.xlsx` protegido con contraseña, que Excel guarda dentro de él) es `libro_ilegible` con esa razón. Lo que no empieza con
+   la firma de un zip se lee como hasta ahora, como texto UTF-8. (7) Peso medido: 11 423 bytes y 5 014 con gzip; no se pide en la primera
+   carga ni al abrir el alta masiva, sí al elegir un libro (el e2e lo comprueba en cada navegador y ancho).
 7. **La pantalla (`#/alta?modo=lote`), en tres pasos.** (i) *Origen:* elegir archivo o pegar, con la plantilla para descargar y los
    límites leídos de la API. (ii) *Revisión:* cinco tarjetas que son botones de filtro (`aria-pressed`) —«Leídas», «Se crean», «Ya
    existen», «No entran», «Con aviso»— y una tabla con «Fila», «Identificador», «Qué pasa» y «Detalle»; «Qué pasa» es una frase («Se
@@ -914,7 +948,9 @@ archivo), «Descargar la plantilla», «Volver a revisar» (lleva a la tabla de 
 | El archivo pesa demasiado | Pasa `max_bytes` de la plantilla | «El archivo pesa 1,6 MB y el máximo es 1,1 MB: divídelo en partes más chicas.» (si lo dice el servidor: «cuerpo de más de 1147904 bytes.») | Elegir otro archivo |
 | Una celda pasa su tope, trae un carácter que no se admite o no es texto (cambia con S1, 19/11/2026: solo la comilla sin cerrar, el texto pegado a una comilla de cierre y el JSON que no es una lista de objetos siguen rechazando el archivo; lo demás deja fuera su fila, «No entra», con «Identificador: trae «ó», que no se admite: …», «Nombre: tiene 81 caracteres y el máximo es 80» o «Nombre: no es texto ni número», las mismas palabras que usa el servidor) | El tope de la columna, un salto de línea o tabulador dentro de la celda, o un carácter que no es ASCII en una columna de códigos | «Fila 2, columna «nombre»: tiene 81 caracteres y el máximo es 80.» · «Fila 2, columna «id_fisico»: solo admite letras sin acento, dígitos y signos ASCII, sin comillas dobles ni barra invertida («…»).» · «Fila 2, columna «nombre»: trae un carácter que no se admite (un salto de línea, un tabulador u otro carácter de control).» · «Fila 2: comilla sin cerrar.» · «Fila 2: hay texto pegado a una comilla de cierre; separa las celdas con «;».» · del JSON: «El JSON no se puede leer: debe ser una lista de objetos con las columnas de la plantilla.» · «El JSON debe ser una lista de objetos con las columnas de la plantilla.» · «Fila 1, columna «nombre»: no es texto ni número.» · «Fila 1, columna «id_fisico»: el número no se puede leer tal como está escrito; escríbelo entre comillas.» | Elegir otro archivo |
 | El servidor rechazó el archivo (lo que la pantalla no alcanzó a ver) | Una regla del servidor (`codigo: cuerpo_invalido`) | «El servidor rechazó el archivo. Corrígelo y vuelve a elegirlo.» y la lista de sus motivos, con la fila (cambia con S1 y S4, 19/11/2026: «fila 8, Nombre: trae un salto de línea, un tabulador u otro carácter de control, que no se admite», las palabras del panel) | Elegir otro archivo |
-| Es un libro de Excel (nuevo con S9, 19/11/2026) | Se eligió un `.xlsx` con «Todos los archivos»: empieza con la firma de un zip | «Es un libro de Excel. Guárdalo como CSV (Archivo → Guardar como) o copia las celdas y pégalas aquí.» | Elegir otro archivo |
+| El libro no se puede leer (reemplaza el aviso de S9, «Es un libro de Excel. Guárdalo como CSV…», desde que el lector existe: 19/11/2026) | Está dañado, no es un `.xlsx` (un `.ods`, un `.xlsb`, un `.xls` antiguo), está protegido con contraseña, trae un `<!DOCTYPE>`, una etiqueta de más de 16 KiB, una relación que sale del libro o le falta su primera hoja (`libro_ilegible`) | «El libro no se puede leer: está incompleto o dañado. Guárdalo de nuevo desde tu planilla (como .xlsx o como CSV) o copia las celdas y pégalas aquí.» (la razón cambia según el caso) | Elegir otro archivo |
+| El libro es demasiado grande para leerlo (19/11/2026) | Una parte pasa los 8 MiB al abrirla (8,4 MB), todas juntas los 16 MiB (16,8 MB), trae más de 1 000 partes o más de 50 000 textos distintos (`libro_grande`) | «El libro es demasiado grande para leerlo: una de sus partes ocupa más de 8,4 MB al abrirla. Guárdalo de nuevo solo con la hoja de los dispositivos, o copia las celdas y pégalas aquí.» | Elegir otro archivo |
+| El navegador no puede abrir el libro (19/11/2026) | No trae `DecompressionStream('deflate-raw')`, o el lector no se pudo descargar (`libro_sin_lector`) | «Este navegador no puede abrir libros de Excel: copia las celdas en tu planilla y pégalas aquí, o guarda el libro como CSV.» | Pegar las celdas (lleva al campo de pegar) |
 | Filas que no entran en la revisión | La validación de cada fila | La fila «Rechazada» con su motivo por campo (como hoy; desde S1, 19/11/2026, también las mal formadas, que no se envían) | Descargar rechazadas |
 | La sesión venció | Pasó el tiempo de inactividad o de vida de la sesión | «Tu sesión venció. Entra de nuevo: el archivo leído se conserva en esta pestaña y lo vuelves a validar antes de crear.» Al volver de «Entrar»: «Tu sesión había vencido. El archivo leído se conservó: valídalo de nuevo antes de crear.» | Iniciar sesión; al volver, Reintentar |
 | No tiene permiso | Su perfil no da de alta | «Tu perfil no permite dar de alta dispositivos (lo hacen el operador técnico y los administradores). No se creó ninguno.» | Ir al inventario |
@@ -939,7 +975,7 @@ archivo), «Descargar la plantilla», «Volver a revisar» (lleva a la tabla de 
    El archivo de credenciales no cambia: es para máquinas (el identificador también va tal cual). Cambia con S (19/11/2026): su cuarta
    columna es `destino`, a dónde envía cada equipo según su vía (el bloque S, «Decidido al implementar», 12). ✅ panel, 16/11/2026 (`celda`, `csvPlantilla`, `csvRechazadas`; la plantilla no lleva `fila`
    ni `motivo`, que son solo de «las que no entran»).
-10. **Lo que no cambia, y lo que cambia en otros documentos.** ✅ 15/11/2026, salvo lo del XLSX en `docs/11 §4`, que va con el lector. No cambia lo que no se revela de otros sitios (RF-41: un
+10. **Lo que no cambia, y lo que cambia en otros documentos.** ✅ 15/11/2026, salvo lo del XLSX en `docs/11 §4`, que va con el lector (✅ 19/11/2026). No cambia lo que no se revela de otros sitios (RF-41: un
     identificador ajeno sigue siendo «no disponible», sin `interpretada`; desde S5, 19/11/2026, «ese identificador ya está en uso en la plataforma: elige otro»), los 10 lotes por minuto por persona, una creación a la vez
     y las credenciales una sola vez. Cambian junto con el código de este bloque, porque describen lo que rige: `docs/10 §8.4` punto 65 iv y la fila del alta masiva
     de `docs/11 §4` («las rechazadas no bloquean a las válidas» pasa a «las que no entran no se envían; si al confirmar el plan
@@ -954,7 +990,8 @@ archivo), «Descargar la plantilla», «Volver a revisar» (lleva a la tabla de 
     (catálogos una vez; ninguna por fila). Reintento con la misma llave: misma respuesta, ningún dispositivo de más. Fórmulas:
     `-1+cmd|…` y `＝1+2` salen neutralizadas, `-5` intacto, y el archivo descargado, vuelto a subir sin tocar, da el mismo plan. Un
     pegado desde una planilla, un CSV con `;` y otro con `,`, y una fila con una celda de más. XLSX: uno real con una celda
-    numérica, y tres hostiles (relación de compresión enorme, una hoja de un millón de filas, un XML con `<!DOCTYPE`). En navegador
+    numérica, y tres hostiles (relación de compresión enorme, una hoja de un millón de filas, un XML con `<!DOCTYPE`) (✅ 19/11/2026, con
+    libros de LibreOffice y de la exportación por sitio, y el umbral de peso medido: `docs/16 §91`). En navegador
     real: las tres pantallas a 1 280 y 390 px y el foco al cambiar de paso. Umbrales: el primer dibujo de la revisión de 500 filas y
     cada «Mostrar 100 más», bajo 1 s a 390 px; el lector de XLSX no suma más de 10 kB comprimidos y no entra en la primera carga.
     Medidas en `docs/16`: validar y crear 500 por cada vía, con el proxy delante.
@@ -1540,7 +1577,8 @@ desplazamiento horizontal ni errores de JavaScript, y los tres orígenes dan el 
 8. **El foco no se pierde.** Tras el último «Mostrar 100 más», al texto «Se ven N de N»; tras «Ya las guardé», al párrafo que lo confirma.
 9. **Un .xlsx se reconoce.** Un archivo que empieza con la firma de un zip («PK» y los bytes 3 y 4) se reconoce como libro de Excel: «Es un
    libro de Excel. Guárdalo como CSV (Archivo → Guardar como) o copia las celdas y pégalas aquí». El lector propio (bloque N, punto 6) va en
-   el bloque siguiente.
+   el bloque siguiente. ✅ 19/11/2026: el lector ya está y el reconocimiento por la firma pasó a ser el camino normal (`leerArchivoLote`):
+   un libro se lee, y ese aviso dejó su lugar a los tres casos del libro en la tabla de N8b.
 10. **Leer un archivo nuevo descarta el anterior:** «Revisar las filas» se desactiva hasta terminar de leerlo.
 11. **Pruebas.** El archivo de 60 casos del recorrido queda como catálogo fijo de escenarios; por el DOM, cada punto; con navegador real,
     el recorrido en dos navegadores a 390 y 1 280 px, que crea por HTTP y borra al salir lo que creó (0 filas; hasta este bloque, el e2e
@@ -1584,7 +1622,7 @@ la lista y debajo de ella, con el resumen «60 leídas: 44 se crean, 1 ya existe
 en la primera carga. Se borra también con un 401 y al salir de la pantalla con las credenciales ya descargadas. Como salir ya no las pierde,
 el aviso del menú dice «Quedan en esta pestaña hasta que cierres la sesión o la pestaña: vuelve al alta masiva para descargarlas». (8) «Se
 ven N de N» y el párrafo de las credenciales olvidadas reciben el foco con `tabindex="-1"`, sin ser parte del recorrido con Tab. (9) La
-firma se mira en `leerOrigen`, antes que nada, con el caso `libro_excel` y el botón «Elegir otro archivo». (10) Al elegir un archivo, el
+firma se mira en `leerOrigen`, antes que nada, con el caso `libro_excel` y el botón «Elegir otro archivo». Desde el 19/11/2026 la mira `leerArchivoLote` y un libro se lee (bloque N, punto 6). (10) Al elegir un archivo, el
 anterior se descarta en el acto: la pantalla dice «Leyendo …», y «Revisar las filas» queda desactivado con su motivo («se está leyendo el
 archivo»). Cancelar la ventana de elegir archivo conserva el anterior y no corta una revisión en vuelo. (11) El catálogo vive en `panel/e2e/datos/lote-escenarios.csv`, con
 lo esperado de cada escenario, los totales y las zonas en `lote-escenarios.json`. «xprefijo» se reemplaza por el prefijo de cada corrida.

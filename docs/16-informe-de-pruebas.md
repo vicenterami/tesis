@@ -4,7 +4,7 @@ Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emu
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
 cubría al escribirse se agregó después: TT-32 (sensor físico) en §43, §44 y §53, y TT-30 (recuperación ante reinicio) en §11. El
-contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 919 pruebas unitarias del backend y 539 del panel.
+contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 919 pruebas unitarias del backend y 583 del panel.
 Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -4934,4 +4934,113 @@ las 599 ejecuciones del panel en 43 archivos y el paquete construido.
 Con la regla de `app.css`, que vale para todo el panel, se cierra también el caso de la ayuda emergente al pie bajo 700 px que el `§89` dejaba
 pendiente.
 
-**Lo que queda.** El lector XLSX propio (bloque N, punto 6).
+**Lo que queda.** El lector XLSX propio (bloque N, punto 6): hecho en el §91.
+
+## 91. Lector propio de libros .xlsx en el alta masiva: el mismo camino que un CSV, con sus topes (19/11/2026)
+
+**Por qué.** Hasta el bloque S, un `.xlsx` elegido en el alta masiva se reconocía por la firma del zip y se pedía guardarlo como CSV (S9). El
+bloque N (punto 6 de `docs/19 §4`) decidió el 15/11/2026 leerlo en el navegador con código propio, sin dependencia nueva, con sus límites
+escritos, y que desde ahí siga el mismo camino que un CSV: la comprobación de la cabecera y de cada celda (S1 y S2) y la revisión del servidor.
+
+**Fuente primaria, antes del código.** browser-compat-data de MDN (`api/DecompressionStream.json`, último commit que lo tocó
+`0eaec968cd2352d49daf25fb7b67e5a7fc2a0532`), la especificación Compression de WHATWG y la página de MDN del constructor, descargadas el
+19/11/2026 con su huella. La entrada `DecompressionStream.deflate-raw` dice `"version_added": "103"` para Chrome (Edge, espejo), `"113"` para
+Firefox y `"16.4"` para Safari; la especificación: «If format is unsupported in DecompressionStream, then throw a TypeError» y «It is an error
+if there is additional input data after the final block indicated by the BFINAL flag». El objetivo de compilación del panel (Vite 8.3.6:
+`chrome111`, `edge111`, `firefox114`, `safari16.4`) ya los incluye: el remedio de pegar queda para un navegador más viejo y para cuando el
+lector no se pudo descargar. No contradice el diseño. La regla de los números usa la precisión de Excel de la página de Microsoft «Excel
+specifications and limits» (descargada el mismo día): «Number precision 15 digits».
+
+**Qué se construyó.** `panel/src/lib/xlsx-lector.ts` (nuevo, sin importaciones): el zip (fin de directorio, ZIP64, directorio central,
+cabecera local, métodos 0 y 8, CRC-32), un lector de XML por trozos y las partes del libro, con los topes de `TOPES_XLSX`. En `lib/lote.ts`,
+`leerArchivoLote` (el único punto de entrada de un archivo elegido: por la firma, el libro va al lector, cargado con `import()`; el contenedor
+del Office antiguo se dice; lo demás se lee como texto UTF-8, como antes), `deLibro` (la primera hoja → cabecera y filas con su `n` de la
+planilla, y de ahí a `comprobar`), `textoDeNumero`, `columnaEnLetras` y `TEXTOS_LIBRO`; los casos `libro_ilegible`, `libro_grande` y
+`libro_sin_lector` reemplazan a `libro_excel`, y la acción `pegar` («Pegar las celdas»). `comprobar` dice cada columna desconocida una vez. En
+`AltaLote.svelte`, la lectura por bytes, el campo que acepta `.xlsx` y el remedio que lleva al campo de pegar. Lo decidido al construir quedó
+en el punto 6 del bloque N.
+
+**Los libros de prueba.** Reales, en `panel/e2e/datos/`: `lote-escenarios.xlsx`, el catálogo de 60 escenarios importado por LibreOffice
+v26.8.2.2 desde `lote-escenarios.csv` (`libreoffice --headless --infilter="CSV:59,34,76,1,,0,false,false,false,false,false,0,false"
+--convert-to xlsx`, con un perfil propio en una carpeta temporal: `-env:UserInstallation=file:///…`); el decimotercer valor en `false` es
+«evaluar fórmulas»: con él, LibreOffice convierte la celda `=HYPERLINK(…)` en una fórmula que en su idioma da `#NAME?`, y el libro ya no
+sería el mismo archivo que el CSV. `libro-libreoffice.xlsx`, hecho con `--convert-to xlsx` desde `libro-libreoffice.fods` (su fuente, en
+la misma carpeta): dos hojas, un identificador como número, una fecha, fórmulas de texto y de número con su resultado, «0.00» sobre 12,375,
+un error `#DIV/0!`, un valor lógico (LibreOffice lo guarda como el número 1), un salto de línea y un «_x0041_» literal. `libro-exportado.xlsx`,
+escrito por el escritor propio del backend (`escribirExportacionSitio`, HU-08) con datos sintéticos: celdas sin referencia `r`, texto en
+línea y «Acerca de» como primera hoja. Ninguno lleva datos de personas (el autor de LibreOffice va vacío). Armados a mano
+(`panel/src/lib/xlsx-prueba.ts`, solo para las pruebas): cada límite y cada ataque.
+
+**Por unidad.** Panel: **583 pruebas (647 ejecuciones) en 44 archivos** (antes 539 y 599 en 43). `xlsx-lector.test.ts`, 33 nuevas (25 de
+la construcción y 8 de las correcciones del mismo día, más abajo): los
+tres libros reales; la celda sin `r` y con `<c/>`; corridas, lecturas fonéticas, «_x000D_», «_x005F_x0041_», CDATA y referencias
+numéricas; fórmulas con y sin resultado guardado; 13 formatos de número contra la regla de fecha; la primera hoja visible según `<sheets>`;
+prefijos de espacio de nombres, partes sin comprimir y ZIP64; 501 y 502 filas; una hoja de un millón de filas (49 000 246 bytes al abrirla, 49 MB de 10^6 bytes; 144 kB el
+libro) cortada en la fila 502; la zip bomba, también con el tamaño declarado en 100 bytes; el tope total con tres partes; 500 filas llenas
+con cada carácter escrito «&amp;» (menos de 5 MB, bajo el tope de 8 MiB, que la pantalla dice «8,4 MB»); 1 000 y 1 001 partes; 50 000 y 50 001 cadenas; el `<!DOCTYPE>`
+(con la «bomba de mil millones de risas») en cada una de las seis partes que se leen; entidades no definidas; tres rutas que salen de
+`xl/` y una externa; la hoja que falta, un gráfico y un libro sin hojas visibles; contraseña, CRC, tamaño, nombre local distinto, nombres
+repetidos (también con otras mayúsculas), otra compresión y un deflate cortado; un `.ods`, un `.xlsb`, un `.docx` y un zip vacío; XML mal
+formado o incompleto, UTF-16, filas y celdas fuera de orden, una cadena compartida que no existe, y el navegador sin `DecompressionStream`.
+`lote.test.ts`, 9 más (14 ejecuciones, y una menos: el caso `libro_excel`): el catálogo como libro da **las mismas filas** que su CSV y
+las mismas 2 que no entran (solo cambia el motivo de la celda de más); cada tipo de celda del libro de LibreOffice con su regla; la
+exportación por sitio se rechaza por sus columnas («se lee la primera hoja»); los números de planilla (`0.30000000000000004` → «0,3»,
+`60.5` → «60,5»); identificador y pasarela como número, fecha por estilo, valor lógico y fórmula sin resultado; «_x000D_» dentro de un
+texto; datos en columnas sin cabecera; 500 y 501 filas, hoja vacía y solo la cabecera; un archivo que no es un libro no descarga el lector;
+y los seis casos del libro en la tabla de errores (cada caso con su prueba). `Alta.test.ts`, 2 más, por el DOM: el catálogo como `.xlsx`
+manda al servidor las mismas filas que su CSV, y sin el descompresor el aviso ofrece «Pegar las celdas», que lleva al campo. Tres pruebas
+viejas leían el archivo con `text()` y ahora lo leen con `arrayBuffer()`; el doble de `URL` de esas pruebas pasó a ser un constructor
+(el `import()` del lector lo usa). Backend: sin cambios, **942 de 942 en 73 archivos**.
+
+**Fallas plantadas** (cada una deshecha después y las pruebas en verde otra vez):
+
+| Falla plantada | Dónde | Qué cayó |
+|---|---|---|
+| El tope por parte con el tamaño que declara el zip, sin contar mientras se descomprime | `xlsx-lector.ts` (`Zip.trozos`) | 2 pruebas: la zip bomba que declara 100 bytes, y la hoja de un millón de filas, que el tamaño declarado (49 MB) rechazaba antes de leer las primeras 502 |
+| Leer la última hoja de `<sheets>` en vez de la primera visible | `xlsx-lector.ts` (`leerXlsx`) | 5 pruebas: los libros de LibreOffice y de la exportación, en el lector y en `lote.test.ts`, y la del orden de `<sheets>` |
+| Saltar el `<!DOCTYPE>` en vez de rechazarlo | `xlsx-lector.ts` (`LectorXml`) | 2 pruebas: la de las seis partes y el caso del libro en la tabla de errores |
+| No detenerse en `max_filas` + 1 filas | `xlsx-lector.ts` (`leerXlsx`) | 1 prueba: la hoja de un millón de filas cae por el tope por parte |
+| Escribir como texto el identificador guardado como número | `lote.ts` (`COLUMNAS_IDENTIFICADOR` vacía) | 2 pruebas: el libro de LibreOffice y la del identificador y la pasarela |
+| La expresión de atributos de antes (`([^\s=/]+)\s*=\s*…`), con el tope de 16 KiB puesto | `xlsx-lector.ts` (`LectorXml.etiqueta`) | 2 pruebas: las 40 etiquetas de 16 000 caracteres (sin error y fuera de tiempo) y la de los atributos mal formados |
+| La forma del número de antes (`\d+\.?\d*`) | `xlsx-lector.ts` (`NUMERO_XSD`) | 1 prueba: los 100 000 dígitos con una letra al final (15,1 s medidos con el lector anterior) |
+| Sin el tope de 16 KiB por etiqueta | `xlsx-lector.ts` (`LectorXml.alimentar`) | 2 pruebas: la etiqueta de 300 000 caracteres y el atributo sin cerrar de 8 MiB |
+| El lector anterior a las correcciones, entero, contra las pruebas nuevas | `xlsx-lector.ts` | caen el formato de número hostil (29,7 s), las 40 etiquetas (8,0 s, sin error), el número que desborda, la etiqueta de 300 000 caracteres (70,1 s, sin error) y el atributo sin cerrar de 8 MiB (5,2 s); la prueba del texto de 7 MB pasa igual (1,8 s; 1,25 s con las correcciones): no distingue, solo comprueba que se lee entero |
+
+**Correcciones del mismo día, tras una revisión independiente** (cada una con su prueba): (a) la expresión que leía los atributos
+retrocedía sobre un tramo largo sin espacios, «=» ni «/»: una etiqueta de 300 000 caracteres, en un libro de menos de 5 kB, tardaba 70,1 s
+(medido aquí; la revisión midió 7,8 s con 100 000). Ahora una etiqueta de más de 16 KiB hace ilegible el libro y los atributos se leen en una
+sola pasada, con su forma `nombre="valor"`: la misma etiqueta se rechaza en 22 ms. Con la misma forma de riesgo se rehicieron la forma de un
+número (`\d+\.?\d*` retrocedía sobre 100 000 dígitos: 15,1 s; ahora 5 ms) y la regla de un formato de fecha (recorría el resto del formato
+por cada «[» sin cerrar: la prueba con 200 000 «[» y otros dos formatos hostiles tardaba 29,7 s; ahora se recorre una vez). (b) Una marca sin cerrar se volvía a recorrer entera con cada trozo (8 MiB
+en un atributo sin cerrar: 5,2 s); ahora recuerda hasta dónde se buscó y el texto se entrega a medida que llega: 22 ms. (c) Los
+formatos implícitos de fecha 27 a 36, 50 a 58 y 71 a 81 tienen su fuente: las tablas «zh-tw and zh-cn», «ja-jp and ko-kr» y «th-th» de la
+misma §18.8.30 de ECMA-376 Parte 1 (pp. 1778 a 1781), con una prueba por cada borde de rango y por los id que no están en ninguna tabla.
+(d) El nombre de la hoja que viene del archivo va recortado a 60 caracteres en los mensajes. (e) Los topes se dicen en la unidad de la
+pantalla (10^6 bytes): «8,4 MB» y «16,8 MB», y una prueba compara el texto del lector con `megas`. (f) Un número que desborda («1e400»)
+hace ilegible el libro y, si llegara igual, su fila no entra; ya no se escribe «Infinity». (g) Lo comprimido entra al descompresor en
+tajadas de 8 KiB, a pedido.
+
+**En navegador real.** `bash plataforma/pruebas/panel-lote-e2e.sh`, contra la pila de desarrollo con el backend reconstruido con sus tres
+capas y `--no-deps`: **178 de 178 comprobaciones** (antes 150; repetido tras las correcciones, también 178 de 178), 89 en Chromium 158 y 89 en Firefox 159, a 390 px (teléfono táctil
+emulado) y a 1 280 px. El paso del libro de Excel reconocido (S9) se reemplazó por dos: (a) el lector no se pidió en la primera carga ni al
+abrir el alta masiva; un libro dañado se dice, con «Elegir otro archivo»; al elegirlo se pidió el lector, una vez, y pesa menos de 10 kB con
+gzip; (b) el catálogo como `.xlsx` (el de LibreOffice con el prefijo de la corrida: el e2e abre cada parte, cambia el texto y vuelve a armar
+el zip) se lee en el navegador, 60 filas y las mismas 2 mal escritas, y la revisión trae las mismas tarjetas (60, 44, 1, 15 y 3) y las 60
+filas con el mismo número y resultado que las del CSV, y la misma frase salvo la de la celda de más («No entra: la fila trae «sobra» en la
+columna H, que no tiene cabecera»). Al salir, el conteo de lo que quedó fue 0 en sitios, zonas, dispositivos, credenciales, personas,
+eventos, sesiones y permisos. En la corrida tras las correcciones, la revisión de 500 filas: 64 y 66 ms en Chromium y 79 y 60 ms en Firefox
+(390 y 1 280 px).
+
+**Peso** (en el paquete construido): el lector es su propio trozo, `assets/xlsx-lector-*.js`, de **12 605 bytes y 5 413 con gzip** (nivel 9;
+el umbral del bloque N es 10 kB; antes de las correcciones, 11 423 y 5 014), sin importaciones; solo lo nombra el trozo del alta (`Alta-*.js`) en su `import()`; `index.html` y el trozo
+de entrada no lo nombran, y el e2e confirma que no se pide hasta elegir un libro. El backend lo sirve sin comprimir (en 127.0.0.1:3000).
+
+`pnpm verificar` en `plataforma/backend`: tipos, lint, 942 de 942 del backend en 73 archivos, `svelte-check` sin errores en 435 archivos,
+las 647 ejecuciones del panel en 44 archivos y el paquete construido.
+
+**Lo que no cubre.** No hay un libro guardado por Microsoft Excel ni por Google Sheets entre los de prueba (solo LibreOffice y el escritor
+propio): las formas que escribe Excel (cadenas compartidas, formatos implícitos de fecha, `t="b"`, `t="e"`, resultados de fórmula con 17
+cifras) están en los libros armados a mano. Un número se escribe con coma decimal, como en una planilla en español, aunque la planilla de
+la persona use punto; y el formato de porcentaje no se aplica (se toma el valor guardado: 0,5 y no 50 %). La regla del número se aplica solo
+a `id_fisico` y `pasarela`: un nombre escrito como número que la planilla convirtió («007» → 7) llega como «7», y un entero de 16 cifras o
+más en una columna que no es un identificador se redondea a 15 cifras significativas (`123456789012345678` llega como «123456789012346000»).
