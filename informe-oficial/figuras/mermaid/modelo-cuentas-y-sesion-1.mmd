@@ -1,0 +1,47 @@
+---
+config:
+  layout: elk
+  er:
+    entityPadding: 6
+    minEntityWidth: 60
+---
+erDiagram
+    direction LR
+    sitio ||--o{ usuario_sitio : ""
+    usuario ||--o{ mensaje_soporte : ""
+    usuario ||--o{ usuario : ""
+    usuario ||--o{ usuario_sitio : ""
+    mensaje_soporte {
+        uuid id PK
+        uuid usuario_id FK
+        text texto
+        timestamptz creado_en
+        timestamptz leido_en
+    }
+    usuario {
+        uuid id PK
+        text nombre
+        text email
+        text hash_password
+        timestamptz creado_en
+        timestamptz actualizado_en
+        bool activo
+        bool clave_temporal
+        timestamptz clave_temporal_vence_en
+        bool administrador_sistema
+        timestamptz desactivado_en
+        uuid desactivado_por FK
+        text motivo_baja
+        timestamptz anonimizado_en
+        int terminos_version_aceptada
+        timestamptz terminos_aceptados_en
+    }
+    usuario_sitio {
+        uuid usuario_id PK,FK
+        uuid sitio_id PK,FK
+        text rol
+        timestamptz actualizado_en
+        bool activo
+    }
+    sitio
+    style sitio fill:#F2F4F3,stroke:#55635B,stroke-dasharray:4 3

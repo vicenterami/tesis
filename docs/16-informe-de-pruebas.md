@@ -4608,3 +4608,31 @@ corrida encontró lo que las pruebas sin navegador no ven: a 390 px el clic en �
 elemento bajo el enlace mostró que lo tapaba la ayuda de «Renovar», que en pantalla angosta se fija abajo y dura mientras el foco siga
 en el botón (WCAG 1.4.13, `docs/19 §4`, bloque L); y la vuelta a «Publicar» por el menú necesitaba abrir antes el cajón. El recorrido
 descarta la ayuda con Escape y abre el cajón con «Menú», como lo haría una persona.
+
+## 87. Diagrama del modelo de datos por dominios, con las columnas en un anexo (18/11/2026)
+
+**Por qué.** El diagrama entidad-relación del informe metía las 25 tablas con todas sus columnas en 13,5 cm de ancho: la letra salía en ≈ 1 pt y no se podía leer. El estudiante decidió (18/11/2026) un diagrama por dominios en el cuerpo, solo con entidades y relaciones, y el modelo completo, con columnas y partido por dominio, en un anexo; con una sola fuente para el dominio de cada tabla y una verificación que lo compruebe.
+
+**Qué se hizo.**
+- `docs/08` §2, «Dominios del modelo»: una tabla «Dominio · tablas · de qué se ocupa» con cinco dominios (sitios y dispositivos; recepción y mediciones; alertas y actividad; cuentas y sesión; vista pública). Es la única fuente del dominio de cada tabla. Los grupos de tablas separados por «;» son las partes en que el anexo dibuja un dominio con muchas columnas (sitios y dispositivos en tres, cuentas y sesión en dos): medido con la imagen de `mermaid-cli` del proyecto, un dominio entero de 40 a 70 columnas no pasaba de 3 a 5 pt.
+- `informe-oficial/figuras/dominios.py` (lo llama `generar-figuras.sh`): lee el ER completo que sale de la base y esa tabla, y escribe el diagrama del cuerpo (`dominios.mmd`: un `flowchart` con un recuadro por dominio, una flecha por cada par de tablas relacionadas por clave foránea dentro de cada recuadro (el ER de la base hace un `SELECT DISTINCT` del par: `dispositivo` → `pasarela` y `enlace_publico` → `usuario` tienen dos claves y se dibujan como una; la cardinalidad se dibuja siempre «uno a muchos» aunque `estado_dispositivo` → `dispositivo` y `preferencia` → `usuario` sean uno a uno: comprobado en la base) y **una sola flecha por par de dominios**, de recuadro a recuadro y rotulada con las tablas referidas —«sitio», «usuario», «canal, dispositivo»—; diseño ELK porque el de dagre solapa los grupos. Con una flecha por clave foránea entre dominios, las líneas rodeaban el dibujo por los bordes y no se veía qué apuntaba a qué. Los recuadros siguen el orden de las filas de la tabla de `docs/08`, con «Cuentas y sesión» arriba, que es el que menos rodea), un `erDiagram` por dominio o parte (`modelo-*.mmd`: las tablas de otros dominios o partes a las que apunta una clave foránea van sin columnas y con borde punteado) y `modelo-anexo.tex` (las figuras del anexo, con el pie sacado de la columna «De qué se ocupa»).
+- `figuras/render/modelo-datos.pdf` (el ER completo, ya sin uso en el informe) se retiró tras comprobar con `grep` que nada lo referencia.
+- `generar-figuras.sh`: llama a `dominios.py`; ya no dibuja el ER completo (sigue en `docs/08` §3 y se sigue contrastando con la base); compara las fuentes nuevas y `modelo-anexo.tex`; comprueba que existe el PDF de cada figura y que el cuerpo y el anexo las incluyen; y estima la letra de cada figura con su tamaño real y el alto que le deja la página.
+- Informe: `figuras/modelo-datos.tex` pasa a ser el diagrama por dominios; anexo nuevo «Modelo de datos por dominio» (`anexos/i-modelo-datos.tex`); `cap-diseno.tex` presenta los cinco dominios y remite al anexo; `anexos/e-seguimiento.tex` (TT-07) dice dónde está cada vista.
+
+| Qué se comprueba | Falla plantada | Qué cayó |
+|---|---|---|
+| Toda tabla de la base tiene dominio | quitar `evento` del reparto en `docs/08` | `FALLA reparto en dominios … la tabla evento de la base no tiene dominio` |
+| Ninguna tabla tiene dos dominios | agregar `sesion` a «Vista pública» | `FALLA … la tabla sesion está en dos dominios` |
+| Todo dominio nombra tablas que existen | agregar `fantasma` a «Sitios y dispositivos» | `FALLA … nombra fantasma, que no existe en la base` |
+| Las figuras son las que salen de la base y de `docs/08` | mover `evento` de dominio sin regenerar | `DIFIERE` en `dominios.mmd`, en las dos figuras afectadas y en `modelo-anexo.tex` |
+| Toda clave foránea que cruza dos dominios figura en la flecha resumen de su par | quitar «canal» del rótulo de la flecha de sitios y dispositivos a recepción y mediciones | `DIFIERE dominios.mmd` |
+| Ninguna flecha entre dominios falta | borrar la flecha «sitio» de sitios y dispositivos a vista pública | `DIFIERE dominios.mmd` |
+| La figura del cuerpo no se edita a mano | agregar una flecha a `dominios.mmd` | `DIFIERE dominios.mmd` |
+| El anexo no se edita a mano | agregar una línea a `modelo-anexo.tex` | `DIFIERE modelo-anexo.tex` |
+| Nada sobra en el informe | una `modelo-*.mmd` o un `render/modelo-*.pdf` que ya no salen del reparto (y `modelo-datos.pdf`, retirado) | `SOBRA …` en cada caso |
+| La tabla de dominios se lee entera | un `;` final; una tabla sin comillas invertidas; una fila con la forma rota | `FALLA docs/08: … una parte sin tablas`; `… texto que no es una tabla`; `… filas «\| **…» y solo N legibles` |
+| Cada figura tiene su PDF | mover `modelo-vista-publica.pdf` | `FALTA … modelo-vista-publica.pdf` |
+| El anexo incluye las figuras | quitar el `\input` de `modelo-anexo` del anexo | `DIFIERE el anexo del modelo de datos no incluye figuras/modelo-anexo` |
+
+**Resultado.** Letra estimada en el informe: cuerpo, 7,2 pt, en un PDF de 1012 × 1291 pt (antes, ≈ 1 pt); anexo, de 6,5 a 7,4 pt según la figura. Compilado: cuerpo en 30 páginas (igual que antes), cero desbordes, cero referencias sin resolver; el anexo nuevo suma 9 páginas fuera del cuerpo.

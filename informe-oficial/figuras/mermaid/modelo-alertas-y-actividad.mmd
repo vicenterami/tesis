@@ -1,0 +1,52 @@
+---
+config:
+  layout: elk
+  er:
+    entityPadding: 6
+    minEntityWidth: 60
+---
+erDiagram
+    canal ||--o{ regla_umbral : ""
+    dispositivo ||--o{ condicion : ""
+    dispositivo ||--o{ evento : ""
+    regla_umbral ||--o{ condicion : ""
+    usuario ||--o{ evento : ""
+    condicion {
+        uuid id PK
+        uuid dispositivo_id FK
+        uuid regla_id FK
+        text tipo
+        timestamptz abierta_en
+        timestamptz cerrada_en
+    }
+    condicion_sistema {
+        uuid id PK
+        text tipo
+        jsonb detalle
+        timestamptz abierta_en
+        timestamptz cerrada_en
+    }
+    evento {
+        uuid id PK
+        uuid dispositivo_id FK
+        text tipo
+        jsonb detalle
+        timestamptz ocurrido_en
+        uuid usuario_id FK
+    }
+    regla_umbral {
+        uuid id PK
+        uuid canal_id FK
+        float umbral_alto
+        float umbral_bajo
+        float histeresis
+        timestamptz actualizado_en
+        int retardo_s
+        timestamptz fuera_de_banda_desde
+    }
+    canal
+    dispositivo
+    usuario
+    style canal fill:#F2F4F3,stroke:#55635B,stroke-dasharray:4 3
+    style dispositivo fill:#F2F4F3,stroke:#55635B,stroke-dasharray:4 3
+    style usuario fill:#F2F4F3,stroke:#55635B,stroke-dasharray:4 3

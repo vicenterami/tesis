@@ -102,7 +102,7 @@ sobrepeso**; la regla sigue siendo agregar dependencias solo con justificación 
 
 | Diagrama | Dónde (se renderiza en GitHub) | En el informe |
 |---|---|---|
-| Entidad-relación (25 entidades) | `docs/08-modelo-datos.md` §3 — **generado desde la base real** | ✅ `figuras/render/modelo-datos.pdf` |
+| Entidad-relación (25 entidades) | `docs/08-modelo-datos.md` §3 — **generado desde la base real**; dominios en su §2 | ✅ cuerpo: `figuras/render/dominios.pdf` (por dominios); anexo: `figuras/render/modelo-*.pdf` (con columnas) |
 | Contenedores C4, topología de red, 3 secuencias UML, despliegue | `docs/10-arquitectura.md` §1–§6 | ✅ `figuras/render/*.pdf`, generados por `generar-figuras.sh` desde la misma fuente; las secuencias van apaisadas en el anexo desde el 23/09 para que se lean |
 | Pipeline de 6 filtros, árbol del problema (Etapa 1) | `informe-oficial/figuras/pipeline.tex`, `arbol.tex` | ✅ TikZ, **a mano**: son las dos únicas figuras sin fuente única; el orden de los filtros en `pipeline.tex` lo vigila el guardián 2e (el 23/09 se encontró desactualizada) |
 

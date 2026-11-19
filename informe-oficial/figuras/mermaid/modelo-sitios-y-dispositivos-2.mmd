@@ -1,0 +1,49 @@
+---
+config:
+  layout: elk
+  er:
+    entityPadding: 6
+    minEntityWidth: 60
+---
+erDiagram
+    dispositivo ||--o{ dispositivo_zona : ""
+    dispositivo ||--o{ estado_dispositivo : ""
+    pasarela ||--o{ dispositivo : ""
+    zona ||--o{ dispositivo : ""
+    zona ||--o{ dispositivo_zona : ""
+    dispositivo {
+        uuid id PK
+        uuid zona_id FK
+        text id_fisico
+        text nombre
+        text estado
+        int intervalo_esperado_s
+        timestamptz visto_por_ultima_vez "deprecada"
+        timestamptz creado_en
+        timestamptz actualizado_en
+        text via
+        text formato FK
+        uuid pasarela_id FK
+        text decodificador
+        timestamptz en_servicio_desde
+    }
+    dispositivo_zona {
+        uuid dispositivo_id PK,FK
+        uuid zona_id FK
+        timestamptz desde PK
+        timestamptz hasta
+    }
+    estado_dispositivo {
+        uuid dispositivo_id PK,FK
+        timestamptz visto_por_ultima_vez
+        bigint ultimo_fcnt
+        timestamptz ventana_inicio
+        int ventana_lecturas
+        int ventana_cuarentena
+        int ventana_sobre_tope
+        int ventana_omitidas
+    }
+    pasarela
+    zona
+    style pasarela fill:#F2F4F3,stroke:#55635B,stroke-dasharray:4 3
+    style zona fill:#F2F4F3,stroke:#55635B,stroke-dasharray:4 3

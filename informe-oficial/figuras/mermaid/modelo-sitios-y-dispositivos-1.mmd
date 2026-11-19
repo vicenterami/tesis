@@ -1,0 +1,40 @@
+---
+config:
+  layout: elk
+  er:
+    entityPadding: 6
+    minEntityWidth: 60
+---
+erDiagram
+    sitio ||--o{ pasarela : ""
+    sitio ||--o{ zona : ""
+    pasarela {
+        uuid id PK
+        uuid sitio_id FK
+        text id_fisico
+        text nombre
+        bool activo
+        timestamptz visto_por_ultima_vez
+        timestamptz creado_en
+        timestamptz actualizado_en
+        text formato
+    }
+    sitio {
+        uuid id PK
+        text nombre
+        text descripcion
+        timestamptz creado_en
+        text zona_horaria
+        timestamptz actualizado_en
+        bool activo
+        text codigo
+        smallint enlaces_publicos_max
+        smallint publico_minimo_dispositivos
+        int espera_primera_trama_h
+    }
+    zona {
+        uuid id PK
+        uuid sitio_id FK
+        text nombre
+        timestamptz actualizado_en
+    }

@@ -1,0 +1,42 @@
+---
+config:
+  layout: elk
+  er:
+    entityPadding: 6
+    minEntityWidth: 60
+---
+erDiagram
+    dispositivo ||--o{ canal : ""
+    dispositivo ||--o{ credencial : ""
+    magnitud ||--o{ canal : ""
+    pasarela ||--o{ credencial : ""
+    canal {
+        uuid id PK
+        uuid dispositivo_id FK
+        text magnitud_codigo FK
+        text etiqueta
+        timestamptz actualizado_en
+        float escala_cero
+        float escala_cien
+    }
+    credencial {
+        uuid id PK
+        uuid dispositivo_id FK
+        text hash
+        bool activa
+        timestamptz creada_en
+        timestamptz actualizado_en
+        uuid pasarela_id FK
+    }
+    magnitud {
+        text codigo PK
+        text nombre
+        text unidad_canonica
+        float rango_min
+        float rango_max
+        timestamptz actualizado_en
+    }
+    dispositivo
+    pasarela
+    style dispositivo fill:#F2F4F3,stroke:#55635B,stroke-dasharray:4 3
+    style pasarela fill:#F2F4F3,stroke:#55635B,stroke-dasharray:4 3

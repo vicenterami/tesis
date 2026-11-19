@@ -1,0 +1,50 @@
+---
+config:
+  layout: elk
+  er:
+    entityPadding: 6
+    minEntityWidth: 60
+---
+erDiagram
+    direction LR
+    canal ||--o{ medicion : ""
+    dispositivo ||--o{ cuarentena : ""
+    dispositivo ||--o{ trama : ""
+    cuarentena {
+        uuid id PK
+        text origen
+        text topico
+        text motivo
+        bytea payload_crudo
+        timestamptz recibido_en PK
+        text detalle
+        uuid dispositivo_id FK
+    }
+    medicion {
+        uuid canal_id FK
+        timestamptz tiempo
+        float valor
+        text unidad
+        timestamptz recibido_en
+        text origen_tiempo
+    }
+    metrica_broker {
+        timestamptz tiempo PK
+        bigint mensajes_descartados
+        int mensajes_en_cola
+        bigint bytes_en_cola
+        int clientes_conectados
+        bigint memoria_bytes
+    }
+    trama {
+        uuid id PK
+        uuid dispositivo_id FK
+        timestamptz recibido_en PK
+        text topico
+        bytea payload
+        text adaptador
+    }
+    canal
+    dispositivo
+    style canal fill:#F2F4F3,stroke:#55635B,stroke-dasharray:4 3
+    style dispositivo fill:#F2F4F3,stroke:#55635B,stroke-dasharray:4 3

@@ -1,0 +1,6 @@
+\chapter[Modelo de datos por dominio]{Modelo de datos por dominio}
+\label{anx:modelo-datos}
+
+El diagrama del capítulo~\ref{cap:diseno} (figura~\ref{fig:modelo-datos}) muestra las entidades y sus relaciones por dominio, sin columnas. Aquí está el mismo modelo con las columnas de cada tabla, partido por dominio para que cada figura se lea al tamaño de la página; un dominio con muchas columnas se parte en varias figuras. Todas se generan desde el esquema real de la base de datos y desde la tabla de dominios de la documentación del modelo, la única fuente del dominio de cada tabla: una tabla de la base sin dominio, o con dos, hace fallar la verificación. Las claves primarias (\texttt{PK}) y foráneas (\texttt{FK}) van marcadas en cada tabla; una columna \texttt{deprecada} sigue en la base hasta que una migración la quite.
+
+\input{figuras/modelo-anexo}

@@ -50,6 +50,32 @@ uniformidad es la que resuelve la causa C1 (formatos dispares).
 desde la migración 09 `trama` y `cuarentena`, desde la 13 `metrica_broker` y desde la 22 `acceso` (para borrar lo vencido por
 fragmentos enteros con `drop_chunks`). El resto son tablas relacionales normales de PostgreSQL.
 
+### Dominios del modelo
+
+Las 25 entidades se agrupan en cinco dominios, y **cada tabla pertenece a uno solo**. Esta tabla es la **única fuente** de ese
+reparto: `informe-oficial/figuras/generar-figuras.sh` la lee para dibujar el diagrama por dominios del cuerpo del informe y, en su
+anexo, un diagrama con columnas por cada dominio, y `generar-figuras.sh --verificar` falla si una tabla de la base no figura aquí,
+figura dos veces o se nombra una que no existe. Una tabla nueva se agrega aquí, en su dominio, en la misma migración que la crea.
+El orden de las filas es el de arriba abajo en el diagrama del cuerpo. Los grupos de tablas separados por «;» son las partes en que el anexo dibuja un dominio con muchas columnas, que no cabe legible en una sola figura; el cuerpo lo dibuja entero.
+
+| Dominio | Tablas | De qué se ocupa |
+|---|---|---|
+| **Cuentas y sesión** | `usuario`, `usuario_sitio`, `mensaje_soporte`; `sesion`, `acceso`, `preferencia` | Las personas: quién entra a qué sitio y con qué rol, sus sesiones e intentos de acceso, sus preferencias y sus mensajes de soporte |
+| **Sitios y dispositivos** | `sitio`, `zona`, `pasarela`; `dispositivo`, `dispositivo_zona`, `estado_dispositivo`; `credencial`, `canal`, `magnitud` | El inventario: dónde está cada equipo, quién lo identifica ante el broker, qué magnitudes reporta y cuál es su estado actual |
+| **Recepción y mediciones** | `trama`, `cuarentena`, `medicion`, `metrica_broker` | Lo que entra: la trama cruda aceptada o rechazada, la serie de tiempo normalizada y las muestras del propio broker |
+| **Alertas y actividad** | `regla_umbral`, `condicion`, `condicion_sistema`, `evento` | Lo que el sistema vigila y lo que pasó: umbrales, estados anómalos abiertos y el registro histórico |
+| **Vista pública** | `enlace_publico`, `enlace_publico_acceso` | Los enlaces que publican una vista de un sitio sin iniciar sesión, y su contador de visitas |
+
+**Cómo leer el diagrama por dominios del informe.** Cada recuadro es un dominio. Dentro de un recuadro, una flecha por cada par de tablas
+relacionadas por clave foránea, de la tabla referida (el «uno») a la que la contiene (los «muchos»). Entre recuadros, **una sola flecha por
+par de dominios**, del dominio de la tabla referida al de la que la contiene, rotulada con las tablas referidas (por ejemplo, «sitio»:
+tablas de ese dominio apuntan a `sitio`); el detalle, tabla por tabla, está en las figuras con columnas del anexo «Modelo de datos por
+dominio». Dos limitaciones del ER de la base, que el diagrama hereda: dos claves foráneas entre el mismo par de tablas se dibujan como una
+(hoy, `dispositivo` → `pasarela`, que tiene dos, y `enlace_publico` → `usuario`, por `creado_por` y `revocado_por`), y la cardinalidad
+se dibuja siempre «uno a muchos» aunque la relación sea uno a uno (`estado_dispositivo` → `dispositivo`, `preferencia` → `usuario`) o la
+clave sea opcional (verificado en la base el 18/11/2026). La flecha resumen sale de la base: si una clave foránea cruza dos dominios y no
+figura en el rótulo, `generar-figuras.sh --verificar` falla.
+
 ## 3. Diagrama entidad-relación
 
 > Diagrama **generado desde la base de datos real** por `informe-oficial/figuras/generar-figuras.sh` (`db/pruebas/er-mermaid.sql`). No editar a mano: si el esquema cambia, se regenera.

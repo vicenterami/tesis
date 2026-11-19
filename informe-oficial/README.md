@@ -27,6 +27,7 @@ latexmk -pdf -outdir=build main.tex     # SIEMPRE desde esta carpeta, nunca desd
 | `anexos/e-seguimiento.tex` | Seguimiento de las Etapas 2 y 3, retroalimentación, calendario y riesgos |
 | `anexos/g-pruebas.tex` | Detalle de cada prueba y cómo repetirla |
 | `anexos/f-figuras.tex` | Figuras complementarias del capítulo de diseño |
+| `anexos/i-modelo-datos.tex` | Modelo de datos con columnas, una figura por dominio (o por parte de un dominio), generada desde la base y `docs/08` |
 | `referencias.bib` | Bibliografía en biblatex/APA |
 
 El logo del departamento (`images/Logo_depto_ing_informatica.png`) no se versiona porque es de la plantilla del curso: quien
@@ -41,7 +42,9 @@ Las figuras de diseño **no se dibujan a mano**, salvo las dos que dibuja el aut
 `docs/10-arquitectura.md`, genera el modelo de datos desde el esquema real de la base
 (`plataforma/db/pruebas/er-mermaid.sql`) y los renderiza a PDF vectorial en `figuras/render/` con
 `mermaid-cli` dentro de Docker (imagen fijada; nada que instalar). Los `.tex` de `figuras/` solo
-incluyen el PDF con su leyenda APA.
+incluyen el PDF con su leyenda APA. El dominio de cada tabla sale de una sola tabla, en `docs/08` §2 («Dominios del modelo»): de ella y de la base
+`figuras/dominios.py` deriva el diagrama por dominios del cuerpo y los del anexo (con su `modelo-anexo.tex`), y `--verificar` falla
+si una tabla no tiene dominio o tiene dos.
 
 ```bash
 bash informe-oficial/figuras/generar-figuras.sh              # regenerar (requiere la pila arriba)

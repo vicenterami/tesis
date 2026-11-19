@@ -1,0 +1,72 @@
+---
+config:
+  layout: elk
+  elk:
+    mergeEdges: false
+---
+%%{init: {"themeVariables": {"fontSize": "28px"}, "flowchart": {"nodeSpacing": 14, "rankSpacing": 30, "padding": 4}}}%%
+flowchart TB
+    subgraph D0["Cuentas y sesión"]
+        usuario
+        usuario_sitio
+        mensaje_soporte
+        sesion
+        acceso
+        preferencia
+    end
+    subgraph D1["Sitios y dispositivos"]
+        sitio
+        zona
+        pasarela
+        dispositivo
+        dispositivo_zona
+        estado_dispositivo
+        credencial
+        canal
+        magnitud
+    end
+    subgraph D2["Recepción y mediciones"]
+        trama
+        cuarentena
+        medicion
+        metrica_broker
+    end
+    subgraph D3["Alertas y actividad"]
+        regla_umbral
+        condicion
+        condicion_sistema
+        evento
+    end
+    subgraph D4["Vista pública"]
+        enlace_publico
+        enlace_publico_acceso
+    end
+    dispositivo --> canal
+    dispositivo --> credencial
+    dispositivo --> dispositivo_zona
+    dispositivo --> estado_dispositivo
+    enlace_publico --> enlace_publico_acceso
+    magnitud --> canal
+    pasarela --> credencial
+    pasarela --> dispositivo
+    regla_umbral --> condicion
+    sitio --> pasarela
+    sitio --> zona
+    usuario --> acceso
+    usuario --> mensaje_soporte
+    usuario --> preferencia
+    usuario --> sesion
+    usuario --> usuario
+    usuario --> usuario_sitio
+    zona --> dispositivo
+    zona --> dispositivo_zona
+    D1 -- "canal, dispositivo" --> D2
+    D1 -- "canal, dispositivo" --> D3
+    D1 -- "sitio" --> D4
+    D1 -- "sitio" --> D0
+    D0 -- "usuario" --> D4
+    D0 -- "usuario" --> D3
+    D0 ~~~ D1
+    D1 ~~~ D2
+    D2 ~~~ D3
+    D3 ~~~ D4

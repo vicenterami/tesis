@@ -17,6 +17,12 @@ TMP=$(mktemp -d); trap 'rm -rf "$TMP"' EXIT
 docker compose -f plataforma/docker-compose.yml exec -T timescaledb \
   psql -U plataforma -d plataforma -tA < plataforma/db/pruebas/er-mermaid.sql > "$TMP/modelo-datos.mmd"
 
+# 1b) Dominios del modelo (decisión del 18/11/2026): el diagrama del cuerpo (un recuadro por dominio, solo entidades y claves foráneas) y los del
+#     anexo (uno por dominio, o por parte, con sus columnas) salen del ER de arriba y de la tabla «Dominios del modelo» de docs/08, que
+#     es la única fuente del dominio de cada tabla. dominios.py sale con error si una tabla de la base no tiene dominio, tiene dos, o
+#     un dominio nombra una que no existe (también con --verificar).
+python3 informe-oficial/figuras/dominios.py "$TMP/modelo-datos.mmd" docs/08-modelo-datos.md "$TMP"
+
 # 2) Arquitectura: los seis bloques de docs/10, en su orden (26/10: «resumen», la vista resumida para las láminas, va primero;
 #    01/11: «contenedores» ya no es Mermaid: la figura 4.1 es un .drawio en figuras/drawio/, que revisa el guardián 3d)
 python3 - "$TMP" <<'PY'
@@ -34,6 +40,24 @@ if [[ "${1:-}" == "--verificar" ]]; then
     n=$(basename "$f")
     if ! diff -q "$f" "$MMD/$n" >/dev/null 2>&1; then echo "DIFIERE  $n (docs/base vs informe)"; fallo=1; else echo "OK       $n"; fi
   done
+  # el anexo (.tex con los pies de figura, sacados de docs/08) y los PDF de cada figura
+  if ! diff -q "$TMP/modelo-anexo.tex" informe-oficial/figuras/modelo-anexo.tex >/dev/null 2>&1; then echo "DIFIERE  modelo-anexo.tex (docs/08 vs informe)"; fallo=1; else echo "OK       modelo-anexo.tex"; fi
+  for f in "$TMP"/*.mmd; do n=$(basename "$f" .mmd); [[ $n == modelo-datos ]] && continue
+    [[ -f "$OUT/$n.pdf" ]] || { echo "FALTA    $OUT/$n.pdf (correr generar-figuras.sh)"; fallo=1; }
+  done
+  # Sobrantes: lo que hay en el informe con prefijo «modelo-» o «dominios» y ya no sale del reparto (modelo-datos.mmd es legítimo; su PDF, no)
+  for f in "$MMD"/dominios.mmd "$MMD"/modelo-*.mmd; do [[ -e "$f" ]] || continue; n=$(basename "$f" .mmd)
+    [[ $n == modelo-datos || -f "$TMP/$n.mmd" ]] || { echo "SOBRA    $MMD/$n.mmd (ya no sale de docs/08 ni de la base)"; fallo=1; }
+  done
+  for f in "$OUT"/dominios.pdf "$OUT"/modelo-*.pdf; do [[ -e "$f" ]] || continue; n=$(basename "$f" .pdf)
+    [[ $n != modelo-datos && -f "$TMP/$n.mmd" ]] || { echo "SOBRA    $OUT/$n.pdf (ya no sale de docs/08 ni de la base)"; fallo=1; }
+  done
+  # el cuerpo usa el diagrama por dominios y el anexo, todas las figuras
+  grep -q "render/dominios.pdf" informe-oficial/figuras/modelo-datos.tex || { echo "DIFIERE  el cuerpo no incluye render/dominios.pdf"; fallo=1; }
+  grep -q 'input{figuras/modelo-anexo}' informe-oficial/anexos/i-modelo-datos.tex || { echo "DIFIERE  el anexo del modelo de datos no incluye figuras/modelo-anexo"; fallo=1; }
+  for f in "$TMP"/modelo-*.mmd; do n=$(basename "$f" .mmd); [[ $n == modelo-datos ]] && continue
+    grep -q "render/$n.pdf" informe-oficial/figuras/modelo-anexo.tex || { echo "DIFIERE  $n no está en el anexo (modelo-anexo.tex)"; fallo=1; }
+  done
   # docs/08 debe contener exactamente el ER de la base
   python3 - "$TMP/modelo-datos.mmd" <<'PY' || fallo=1
 import re, sys, pathlib
@@ -50,7 +74,8 @@ fi
 #    Los PDF de mermaid-cli no son deterministas (bytes distintos con el mismo dibujo): solo se
 #    renderiza lo que cambió o no existe, para no ensuciar git en cada corrida.
 CAMBIADOS=""
-for f in "$TMP"/*.mmd; do n=$(basename "$f" .mmd)
+# modelo-datos (el ER completo) ya no se dibuja en el informe: lo muestra docs/08 §3 y se sigue contrastando con la base (arriba y abajo).
+for f in "$TMP"/*.mmd; do n=$(basename "$f" .mmd); [[ $n == modelo-datos ]] && continue
   if ! diff -q "$f" "$MMD/$n.mmd" >/dev/null 2>&1 || [[ ! -f "$OUT/$n.pdf" ]]; then CAMBIADOS="$CAMBIADOS $n"; fi
 done
 # Las fuentes se copian al informe DESPUÉS de renderizar cada una (paso 4). Hasta el 09/10 se copiaban antes: un render que
@@ -70,8 +95,9 @@ PY
 
 # 4) Render a PDF (vectorial) y PNG (revisión)
 mkdir -p "$OUT" privado/previsualizaciones
-[[ "${1:-}" == "--forzar" ]] && CAMBIADOS=$(cd "$TMP" && ls *.mmd | sed 's/\.mmd$//')
+[[ "${1:-}" == "--forzar" ]] && CAMBIADOS=$(cd "$TMP" && ls *.mmd | sed 's/\.mmd$//' | grep -vx modelo-datos)
 [[ -z "$CAMBIADOS" ]] && echo "figuras sin cambios: no se vuelve a renderizar (usa --forzar para rehacerlas)"
+cp "$TMP/modelo-anexo.tex" informe-oficial/figuras/modelo-anexo.tex
 cp "$MMD/tema.json" "$TMP/tema.json"
 for n in $CAMBIADOS; do
   docker run --rm -u "$(id -u):$(id -g)" -v "$TMP:/in:ro" -v "$PWD/$OUT:/out" "$IMG" \
@@ -88,9 +114,18 @@ done
 cp "$TMP"/*.mmd "$MMD/"   # las que no cambiaron: mismo contenido
 # Legibilidad, medida y no supuesta (07/10): a 13,5 cm de ancho (383,8 pt) la letra del diagrama (≈ 12 pt en el PDF
 # generado) queda en 12 × 383,8 / ancho. Las apaisadas (sec-*) disponen del alto de página: no se estiman aquí.
+# Las del modelo de datos (18/11) se estiman con su tamaño de letra real (px × 0,75 = pt en el PDF) y con el alto que les deja la
+# página (el 82 % del texto útil, ≈ 540 pt: lo que una figura ocupa en el anexo; la del cuerpo lleva un pie corto): la letra es la
+# del menor de los dos factores de escala. La letra de las entidades del ER es la de er.fontSize de tema.json (14 px).
 for f in "$OUT"/*.pdf; do
-  n=$(basename "$f" .pdf); [[ $n == sec-* ]] && continue
-  ancho=$(pdfinfo "$f" 2>/dev/null | awk '/Page size/{print $3}')
-  [ -n "$ancho" ] && printf 'letra    %-14s ≈ %s pt en el informe (ancho %s pt)\n' "$n" "$(awk -v a="$ancho" 'BEGIN{printf "%.1f", 12*383.8/a}')" "$ancho"
+  n=$(basename "$f" .pdf); [[ $n == sec-* || $n == modelo-datos ]] && continue
+  read -r ancho alto < <(pdfinfo "$f" 2>/dev/null | awk '/Page size/{print $3, $5}')
+  [[ -n "${ancho:-}" ]] || continue
+  case "$n" in
+    dominios) fpt=21;   hmax=443 ;;   # fontSize 28 px del flowchart
+    modelo-*) fpt=10.5; hmax=443 ;;   # 14 px
+    *)        fpt=12;   hmax=1e9 ;;
+  esac
+  printf 'letra    %-34s ≈ %s pt en el informe (%s × %s pt)\n' "$n" "$(awk -v a="$ancho" -v h="$alto" -v f="$fpt" -v m="$hmax" 'BEGIN{s=383.8/a; t=m/h; if (t<s) s=t; printf "%.1f", f*s}')" "$ancho" "$alto"
 done
 echo "listo: $OUT/*.pdf (para LaTeX) y privado/previsualizaciones/*.png (para revisar)"

@@ -1,0 +1,39 @@
+---
+config:
+  layout: elk
+  er:
+    entityPadding: 6
+    minEntityWidth: 60
+---
+erDiagram
+    enlace_publico ||--o{ enlace_publico_acceso : ""
+    sitio ||--o{ enlace_publico : ""
+    usuario ||--o{ enlace_publico : ""
+    enlace_publico {
+        uuid id PK
+        uuid sitio_id FK
+        text token_hash
+        ARRAY magnitudes
+        text ventana_maxima
+        jsonb zonas
+        smallint minimo_dispositivos "deprecada"
+        text titulo
+        text descripcion
+        uuid creado_por FK
+        timestamptz creado_en
+        timestamptz expira_en
+        timestamptz renovado_en
+        timestamptz revocado_en
+        uuid revocado_por FK
+        smallint retencion_dias
+        timestamptz anonimizado_en
+    }
+    enlace_publico_acceso {
+        uuid enlace_id PK,FK
+        date dia PK
+        int cuenta
+    }
+    sitio
+    usuario
+    style sitio fill:#F2F4F3,stroke:#55635B,stroke-dasharray:4 3
+    style usuario fill:#F2F4F3,stroke:#55635B,stroke-dasharray:4 3

@@ -1,0 +1,48 @@
+---
+config:
+  layout: elk
+  er:
+    entityPadding: 6
+    minEntityWidth: 60
+---
+erDiagram
+    direction LR
+    sitio ||--o{ preferencia : ""
+    usuario ||--o{ acceso : ""
+    usuario ||--o{ preferencia : ""
+    usuario ||--o{ sesion : ""
+    acceso {
+        timestamptz instante
+        uuid usuario_id FK
+        text email_intentado
+        inet ip
+        text resultado
+        text sesion_id
+        uuid id
+    }
+    preferencia {
+        uuid usuario_id PK,FK
+        text unidad_temperatura
+        text unidad_longitud
+        text zona_horaria
+        text tema
+        ARRAY notificar
+        jsonb vistas
+        uuid sitio_predeterminado FK
+        timestamptz creado_en
+        timestamptz actualizado_en
+    }
+    sesion {
+        text id PK
+        uuid usuario_id FK
+        timestamptz creada_en
+        timestamptz ultima_actividad
+        timestamptz expira_en
+        timestamptz revocada_en
+        inet ip
+        text agente
+    }
+    sitio
+    usuario
+    style sitio fill:#F2F4F3,stroke:#55635B,stroke-dasharray:4 3
+    style usuario fill:#F2F4F3,stroke:#55635B,stroke-dasharray:4 3
