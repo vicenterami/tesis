@@ -74,6 +74,18 @@ describe('rango a medida: hora del sitio ↔ instante', () => {
     expect(localDesdeInstante(new Date('2026-11-10T11:30:00Z'), 'America/Santiago')).toBe('2026-11-10T08:30');
     expect(localDesdeInstante(instanteDesdeLocal('2026-07-10T23:59', 'Europe/Madrid')!, 'Europe/Madrid')).toBe('2026-07-10T23:59');
   });
+  // Corrección del 19/11/2026: al oeste de UTC, la hora que no existe caía una hora antes (el 00:00 del cambio en Santiago, a las 23:00 del 5/9).
+  it('cambio de hora: la hora que no existe cae en la siguiente válida, al oeste y al este de UTC; la repetida, en su primera vez', () => {
+    const S = 'America/Santiago'; // el 6/9/2026 a las 00:00 (−04) el reloj salta a la 01:00 (−03); el 5/4/2026 a las 00:00 (−03) vuelve a las 23:00 (−04)
+    expect(instanteDesdeLocal('2026-09-06T00:00', S)?.toISOString()).toBe('2026-09-06T04:00:00.000Z'); // la 01:00 del 6/9
+    expect(instanteDesdeLocal('2026-09-06T00:30', S)?.toISOString()).toBe('2026-09-06T04:30:00.000Z'); // la 01:30
+    expect(instanteDesdeLocal('2026-09-05T23:59', S)?.toISOString()).toBe('2026-09-06T03:59:00.000Z'); // el último minuto antes del salto, intacto
+    expect(instanteDesdeLocal('2026-09-06T01:00', S)?.toISOString()).toBe('2026-09-06T04:00:00.000Z');
+    expect(instanteDesdeLocal('2026-03-08T02:30', 'America/New_York')?.toISOString()).toBe('2026-03-08T07:30:00.000Z'); // las 03:30 EDT
+    expect(instanteDesdeLocal('2026-03-29T02:30', 'Europe/Madrid')?.toISOString()).toBe('2026-03-29T01:30:00.000Z'); // las 03:30 CEST
+    expect(instanteDesdeLocal('2026-04-04T23:30', S)?.toISOString()).toBe('2026-04-05T02:30:00.000Z'); // repetida: la primera, en −03
+    expect(instanteDesdeLocal('2026-04-05T00:00', S)?.toISOString()).toBe('2026-04-05T04:00:00.000Z');
+  });
   it('un texto que no es fecha y hora no da instante (nunca se adivina)', () => {
     expect(instanteDesdeLocal('ayer', 'America/Santiago')).toBeNull();
     expect(instanteDesdeLocal('2026-11-10', 'America/Santiago')).toBeNull();

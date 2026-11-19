@@ -1,15 +1,13 @@
-import { BadRequestException, Controller, Get, HttpException, HttpStatus, Logger, Param, Query, Res } from '@nestjs/common';
-import { once } from 'node:events';
+import { BadRequestException, Controller, Get, Logger, Param, Query, Res } from '@nestjs/common';
 import {
   ApiBadRequestResponse, ApiCookieAuth, ApiForbiddenResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiProduces, ApiQuery, ApiTags,
-  ApiUnauthorizedResponse,
+  ApiServiceUnavailableResponse, ApiTooManyRequestsResponse, ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { ConsultaService } from './consulta.service.js';
 import { CABECERA_CSV, FORMATOS, filaCsv, filaJson, formato, nombreDeArchivo, rangoRazonable } from './exportar.js';
-
-// Exportaciones simultáneas admitidas por proceso: cada una ocupa una conexión a la base durante toda la descarga.
-export const MAX_EXPORTACIONES = 2;
+import { CODIGO_CUPO, CupoExportaciones, MAX_EXPORTACIONES } from './cupo-exportaciones.js';
+import { DescargaCortada, escritorDeDescarga, responderFalla } from './descarga.js';
 import { CABECERA_X_SIGUIENTE, CABECERA_X_TOTAL, ISO_8601, INTERVALOS, MAX_CUBOS, MAX_DIAS_VENTANA, fecha, limite, uuid } from './validacion.js';
 import { ESTADOS_VISUALES, ORDENES_INVENTARIO, ORDEN_ATENCION, filtroInventario, leerCursor, siguiente } from './tablero.js';
 import { TableroService } from './tablero.service.js';
@@ -37,8 +35,10 @@ export function conAutor<T extends { usuario: unknown }>(filas: readonly T[], ve
 @Controller('dispositivos')
 export class DispositivosController {
   private readonly log = new Logger('exportar');
-  private exportacionesEnCurso = 0;
-  constructor(private readonly consulta: ConsultaService, private readonly alcance: AlcanceService, private readonly tablero: TableroService) {}
+  constructor(
+    private readonly consulta: ConsultaService, private readonly alcance: AlcanceService, private readonly tablero: TableroService,
+    private readonly cupo: CupoExportaciones,
+  ) {}
 
   // Inventario con estado: base de la vista "salud del sitio" (HU-19).
   @Get()
@@ -167,6 +167,8 @@ export class DispositivosController {
   @ApiBadRequestResponse({ description: 'UUID, fecha o formato inválidos' })
   @ApiForbiddenResponse({ description: 'Consulta u operador técnico: exportar es del administrador (de sitio o del sistema) y del investigador (docs/20 §6)' })
   @ApiNotFoundResponse({ description: 'Dispositivo inexistente o de otro sitio' })
+  @ApiTooManyRequestsResponse({ description: `\`codigo: ${CODIGO_CUPO}\`: ya hay ${MAX_EXPORTACIONES} exportaciones o estimaciones en curso en el proceso (cupo único con GET /sitios/{id}/exportar y GET /sitios/{id}/exportar/estimacion)` })
+  @ApiServiceUnavailableResponse({ description: 'La exportación falló antes de enviar nada (la primera consulta): 503 en JSON; si falla a mitad, se corta la conexión' })
   async exportar(
     @Usuario() u: UsuarioSesion,
     @Param('id') id: string,
@@ -188,35 +190,30 @@ export class DispositivosController {
     const motivo = rangoRazonable(d, h);
     if (motivo !== null) throw new BadRequestException(motivo);
     const { id_fisico } = await this.consulta.identidad(dispositivoId); // 404 antes de escribir cabeceras
-    if (this.exportacionesEnCurso >= MAX_EXPORTACIONES) {
-      throw new HttpException(`hay ${MAX_EXPORTACIONES} exportaciones en curso; inténtalo en un momento`, HttpStatus.TOO_MANY_REQUESTS);
-    }
-    this.exportacionesEnCurso++;
-    res.setHeader('Content-Type', fmt === 'csv' ? 'text/csv; charset=utf-8' : 'application/json; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${nombreDeArchivo(id_fisico, d, h, fmt)}"`);
-    res.setHeader('Cache-Control', 'no-store');
-    // Cada escritura respeta la contrapresión: si el socket está lleno, se espera `drain` antes de pedir la siguiente tanda,
-    // así un cliente lento no hace que Node acumule el archivo entero en memoria.
-    const escribir = async (trozo: string): Promise<void> => {
-      if (!res.write(trozo)) await once(res, 'drain');
-    };
+    this.cupo.tomar(); // 429 al tercero, contando las de GET /sitios/{id}/exportar y sus estimaciones (cupo-exportaciones.ts)
     try {
-      await escribir(fmt === 'csv' ? CABECERA_CSV + '\r\n' : '[');
+      res.setHeader('Content-Type', fmt === 'csv' ? 'text/csv; charset=utf-8' : 'application/json; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${nombreDeArchivo(id_fisico, d, h, fmt)}"`);
+      res.setHeader('Cache-Control', 'no-store');
+      // Cada escritura respeta la contrapresión y falla si el cliente cerró la conexión: se deja de consultar. Los primeros 64 KiB se
+      // retienen: si la primera consulta falla, todavía se puede responder 503 en vez de cortar (descarga.ts).
+      const descarga = escritorDeDescarga(res);
+      await descarga.escribir(fmt === 'csv' ? CABECERA_CSV + '\r\n' : '[');
       let primera = true;
       for await (const fila of this.consulta.mediciones(dispositivoId, d, h)) {
-        if (res.destroyed) return; // el cliente cortó la descarga: se deja de consultar
-        await escribir(fmt === 'csv' ? filaCsv(fila) : (primera ? '' : ',') + '\n' + filaJson(fila));
+        await descarga.escribir(fmt === 'csv' ? filaCsv(fila) : (primera ? '' : ',') + '\n' + filaJson(fila));
         primera = false;
       }
-      if (fmt === 'json') await escribir('\n]\n');
-      res.end();
+      if (fmt === 'json') await descarga.escribir('\n]\n');
+      await descarga.terminar();
     } catch (e) {
-      // Las cabeceras ya salieron: no hay cómo responder un error limpio. Se corta la conexión para que el cliente vea un
-      // archivo incompleto en vez de uno que parece entero, y queda en el registro.
-      this.log.error(`exportación interrumpida (${id_fisico}): ${(e as Error).message}`);
-      res.destroy(e as Error);
+      // Sin cabeceras enviadas, 503 en JSON; con ellas, se corta la conexión para que el cliente vea un archivo incompleto en vez de uno
+      // que parece entero. Queda en el registro.
+      const hecho = responderFalla(res, e);
+      if (e instanceof DescargaCortada) this.log.warn(`exportación cortada (${id_fisico}): el cliente cerró la conexión`);
+      else this.log.error(`exportación ${hecho === 'respondida' ? 'no empezó (503)' : 'interrumpida'} (${id_fisico}): ${(e as Error).message}`);
     } finally {
-      this.exportacionesEnCurso--;
+      this.cupo.soltar();
     }
   }
 }

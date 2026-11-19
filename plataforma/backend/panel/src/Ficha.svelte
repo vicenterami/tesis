@@ -20,7 +20,8 @@
   import { agruparRechazadas, rotuloMotivo, textoEvento } from './lib/ficha';
   import type { VentanaFija } from './lib/vista';
   import { duracion, fechaHora, haceCuanto, haceSegundos, horaLocal } from './lib/tiempo';
-  import { fragmentoComparar, fragmentoFicha } from './lib/vista';
+  import { fragmentoComparar, fragmentoExportar, fragmentoFicha } from './lib/vista';
+  import { avisoDeExportacion, puedeExportarEn } from './lib/exportar';
   import { recordarMarcados } from './lib/comparar';
   import { RECONECTADO, abrirCanal, type EstadoCanal } from './lib/vivo';
   import { antirrebote, porLotes } from './lib/antirrebote';
@@ -445,7 +446,9 @@
       const r = await descargar(ruta, `${d?.id_fisico ?? 'dispositivo'}.csv`);
       avisoDescarga = { tipo: 'exito', texto: `Descargado ${r.nombre} (${r.bytes.toLocaleString('es-CL')} bytes).` };
     } catch (e) {
-      avisoDescarga = avisoDeError(e);
+      // Los mismos avisos que la exportación del sitio (comparten el cupo del servidor desde el 19/11/2026): el 429 por su código, el 503 y
+      // el corte a mitad, en llano.
+      avisoDescarga = avisoDeExportacion(e);
     } finally {
       descargando = false;
     }
@@ -540,6 +543,10 @@
   {#if puedeEn(sesion, 'configurar', d.sitio_codigo) && d.estado !== 'baja'}
     <!-- P6 (docs/19 §4, tablero v2, E): desde la ficha, para quien puede configurar en el sitio -->
     <p><a href={`#/dispositivos/${d.id}/configurar`} data-ir-configurar>Configurar el dispositivo y sus umbrales</a></p>
+  {/if}
+  {#if puedeExportarEn(sesion, d.sitio_codigo)}
+    <!-- P8 (docs/19 §4, R, punto 6): todo el sitio del dispositivo, con mediciones, tramas y eventos; los dos botones de CSV siguen abajo -->
+    <p><a href={fragmentoExportar(d.sitio_codigo)} data-exportar-sitio>Exportar todo el sitio</a></p>
   {/if}
   <dl class="identidad">
     <div><dt>Identificador</dt><dd><code>{d.id_fisico}</code></dd></div>

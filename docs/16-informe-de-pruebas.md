@@ -4,7 +4,7 @@ Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emu
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
 cubría al escribirse se agregó después: TT-32 (sensor físico) en §43, §44 y §53, y TT-30 (recuperación ante reinicio) en §11. El
-contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 864 pruebas unitarias del backend y 480 del panel.
+contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 906 pruebas unitarias del backend y 518 del panel.
 Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -532,7 +532,7 @@ como toda la API (`docs/11 §4`); XLSX y la exportación por sitio con rol llega
 
 | Comprobación | Resultado |
 |---|---|
-| 8 pruebas en `exportar.spec.ts` (funciones puras): fila CSV con el instante exacto (microsegundos), celdas con coma, comillas y saltos de línea, protección contra inyección de fórmulas en toda columna de texto (`=`, `+`, `-`, `@`, tabulador, retorno), columna numérica, rango razonable, JSON por fila, nombre del archivo saneado, formato por defecto y rechazo de uno desconocido o repetido | ✅ |
+| 9 pruebas en `exportar.spec.ts` (funciones puras): fila CSV con el instante exacto (microsegundos), celdas con coma, comillas y saltos de línea, protección contra inyección de fórmulas en toda columna de texto (`=`, `+`, `-`, `@`, tabulador, retorno), columna numérica, rango razonable, JSON por fila, nombre del archivo saneado, formato por defecto y rechazo de uno desconocido o repetido | ✅ |
 | Humo (pila de desarrollo): cabecera fija del CSV, descarga con nombre `.csv` (`Content-Disposition`), primera fila con instante de seis decimales (microsegundos: con milisegundos la última fila de cada tanda se repetía en la siguiente), JSON como lista con `tiempo_utc` y `valor`, formato desconocido → 400, `desde` posterior a `hasta` → 400, dispositivo inexistente → 404; contrato servido con 8 rutas igual al versionado | ✅ (7 casos nuevos) |
 | 404 antes de escribir cabeceras; si el cliente corta la descarga, se deja de consultar (`res.destroyed`); un error a mitad de flujo corta la conexión y queda en el registro; contrapresión por `drain`; como mucho 2 simultáneas (429) y 30 s por consulta | ✅ (lectura del código; sin prueba de corte ni de cliente lento) |
 
@@ -4656,3 +4656,195 @@ se corrige con `apk upgrade`, sino subiendo la imagen base (como el 22/10/2026).
 **Resultado.** El escáner, con todo construido en limpio (`--pull --no-cache`) en el portátil: «OK 4 imágenes: ninguna vulnerabilidad
 alta o crítica con versión corregida publicada fuera de los residuos documentados». En el servidor de prueba, el proxy se actualiza con el
 despliegue siguiente.
+
+**En el servidor de prueba (18/11/2026).** Desplegado el commit de este parche: respaldo previo correcto (25 tablas, cifrado para los
+dos destinatarios) y la guardia del respaldo en 0 h 0 min; el escáner con el proxy en 0 / 0 / 0 y «OK 4 imágenes» (lo que queda en el backend
+y en la base no tiene versión corregida publicada, con el aviso conocido de PostgreSQL 16.16); los cuatro contenedores sanos. Los dos avisos de
+esa corrida ya estaban documentados: el de `pg_dump` sobre la dependencia circular de los agregados continuos y el del volumen del broker
+creado fuera de Compose.
+
+## 89. Exportación por sitio: mediciones, tramas y eventos en CSV, XLSX y JSON, con código propio (19/11/2026)
+
+**Por qué.** HU-08 pedía exportar «un sitio» y hasta hoy solo se exportaban las mediciones de un dispositivo (`GET /dispositivos/{id}/exportar`,
+`§19`). El diseño (`docs/19 §4`, bloque R, del mismo día) fija tres conjuntos en un archivo —mediciones, tramas aceptadas con su carga exacta y
+su huella, y eventos del ciclo de vida—, tres formatos, el XLSX escrito con código propio y la exigencia de HU-08: que el archivo traiga
+todo, exacto. Lo que había que demostrar: ida y vuelta con **0 diferencias** contra la base en los tres formatos, leyendo con lectores escritos
+en la prueba; nada del otro sitio (RF-41) ni de personas; la matriz de permisos de las dos rutas; el cupo compartido; que la consulta deja de
+pedir tandas cuando el cliente se va; los planes, el tiempo y la memoria con 1 000 000 de mediciones.
+
+**Fuentes primarias, antes del código** (descargadas el 19/11/2026 y guardadas con su huella SHA-256 fuera del repositorio):
+- PKWARE, APPNOTE.TXT 6.3.10: cabecera local (§4.3.7, firma 0x04034b50), directorio central (§4.3.12, 0x02014b50), fin de directorio (§4.3.16,
+  0x06054b50); bit 3 (§4.4.4): «the fields crc-32, compressed size and uncompressed size are set to zero in the local header. The correct values
+  are put in the data descriptor»; descriptor con su firma opcional 0x08074b50, que §4.3.9.4 recomienda escribir; método 8, deflate (§4.4.5);
+  ZIP64 cuando un campo no alcanza (§4.4.1.4): tamaños y desplazamientos de 32 bits, 65 535 entradas.
+- ECMA-376, 5.ª edición: Parte 1 §12.2 (paquete mínimo: tipos de contenido, relaciones, libro, hojas) y §12.3.20 (un único Styles Part);
+  §18.3.1.4 y §18.18.11 (`t="inlineStr"` con `<is><t>`); §18.4.12 (`xml:space`); §22.9.2.19, ST_Xstring (un carácter que XML 1.0 no admite
+  se escribe `_xHHHH_`); §22.4.2.4 (el literal se protege: «stored as _x005F_»); §18.8.30 (formato propio con id ≥ 164; «Time 4:36:03.75
+  h:mm:ss.00»); §18.17.4.1 (sistema 1900, día 0 = 30/12/1899); §18.3.1.66 (panel congelado). Parte 2: `[Content_Types].xml` y sus espacios de
+  nombres. Parte 4 §10.2: los espacios de nombres Transitional, los que se escriben.
+- Node.js 22, `zlib.crc32`: «Added in: v22.2.0» (la imagen usa 22.23.4).
+- Ningún conflicto con el diseño. Una precisión: la protección del literal está escrita para `bstr` (§22.4.2.4), no en ST_Xstring; se aplica la
+  misma regla (bloque R, «Decidido al implementar», f).
+
+**Qué se construyó.**
+- `consulta/zip.ts`: zip en flujo (deflate nivel 6 con `node:zlib`, CRC incremental con `zlib.crc32`, descriptor de datos con firma tras cada
+  entrada, directorio central al final), con contrapresión (lo que sale de deflate espera a la salida) y topes sin ZIP64: 1 GiB sin comprimir por
+  entrada (`cabe()` lo anticipa), 4 GiB − 64 MiB en total (se corta con error antes de entregar el trozo que lo pasaría) y 1 000 entradas.
+- `consulta/xlsx.ts`: libro mínimo (tipos de contenido, relaciones, estilos con la fecha `yyyy-mm-dd hh:mm:ss.000` y la cabecera en negrita),
+  hojas en flujo con `inlineStr`, números como número, primera fila fija, escape `_xHHHH_` con la protección del literal y el retorno como
+  `&#13;`; una hoja sigue en «Mediciones (2)» al llegar a 1 048 575 filas o antes de que su parte pase el tope de bytes; «Acerca de» se escribe
+  al final y es la primera pestaña.
+- `consulta/exportar-sitio.ts`: los tres formatos sobre tres fuentes que se recorren una vez; el CSV en un zip con `LEEME.txt` (y
+  `mediciones-2.csv` si una entrada se llena), la carga de una trama partida en hasta tres columnas de 32 000 caracteres en el XLSX, el JSON con
+  `conteos` al final; la estimación y sus bytes por fila.
+- `consulta/exportar.ts`: `celdaCsv` con el apóstrofo reversible (cero o más apóstrofos y un carácter de fórmula del conjunto del panel, con
+  el salto de línea y las formas de ancho completo); la exportación por dispositivo la usa igual.
+- `consulta/consulta.service.ts`: `conConexionExportacion` (una conexión por descarga, 30 s por consulta), `medicionesSitio` por canal,
+  `tramasSitio` y `eventosSitio` por dispositivo, con paginación por clave dentro de cada uno; la huella (`sha256`), el tamaño y el base64 salen
+  de la base; `estimarSitio` cuenta con tope.
+- Rutas en `sitios.controller.ts`: `GET /sitios/{id}/exportar` y `GET /sitios/{id}/exportar/estimacion` (OpenAPI regenerado: 50 rutas y 63
+  operaciones); `cupo-exportaciones.ts`, un proveedor con el cupo de 2 para las dos exportaciones y la estimación (429 con `codigo:
+  exportaciones_en_curso`; la estimación, además, con 10 s por consulta: cancelarla en el panel no cancela su consulta en la base, y el pool
+  de 5 conexiones lo comparte la recepción); `descarga.ts`, la escritura que espera `drain` o el cierre del cliente, ahora también en
+  `GET /dispositivos/{id}/exportar`, que retiene los primeros 64 KiB para que una falla de la primera consulta responda 503 en JSON en vez
+  de cortar; y `prestarCliente` en `consulta.service.ts`: el cliente que la base corta vuelve al pool con su error (`release(err)`) y se
+  descarta (revisión del mismo día).
+- Proxy: una `location` para las dos exportaciones con `proxy_buffering off` y las mismas líneas de tasa que «location /».
+- `evento.detalle`: revisado en cada escritor de eventos de un equipo (alta, baja, rotación, calibración, configuración, reglas, condiciones
+  del supervisor y de las alertas): ninguno lleva nombre, correo ni id de persona. La persona vive en `evento.usuario_id`, que no se exporta.
+
+**Pruebas sin base** (vitest; de 887 a 929 casos en 72 archivos).
+
+| Qué se comprueba | Prueba | Casos |
+|---|---|---|
+| El apóstrofo reversible: 25 textos difíciles vuelven exactos con la regla inversa; ancho completo, salto, `'=`, `''+`, apóstrofo solo | `exportar.spec.ts` | 9 (antes 8) |
+| Lo escrito se lee con `inflateRaw` por el directorio central, el CRC y los tamaños del descriptor coinciden; la misma salida con una salida lenta; topes por entrada, total y de entradas; la salida que falla corta | `zip.spec.ts` | 8 |
+| El escape sin pérdida (21 textos, incluidos controles, sustitutos sueltos, `_x0041_` y `_xABCD` seguido de un control); números (−12,5, 1e-7, el mayor double); la fecha de serie y sus milisegundos; el paquete mínimo y el orden de las pestañas; el paso a la hoja siguiente por filas (tope reducido a 3) y por bytes | `xlsx.spec.ts` | 9 |
+| Formato y nombre; el corte de la carga en 0, 31 999, 32 000, 32 001 y 87 384 caracteres; los tres formatos con fuentes de prueba; `mediciones-2.csv` sin perder filas; que la fuente deja de entregar filas si la salida falla; la estimación con tope | `exportar-sitio.spec.ts` | 11 |
+| El orden de los códigos (404 y 403 antes que 400); el cupo único entre exportaciones y estimaciones (429 `exportaciones_en_curso` al tercero, de un sitio, de un dispositivo o una estimación); la estimación con 10 s y su 503; la falla de la primera consulta da 503 en JSON sin `Content-Disposition` (sitio y dispositivo) y con cabeceras ya enviadas se corta; la retención inicial, `drain` o cierre; la `location` del proxy contra la de «location /» y contra las rutas de Express | `exportar-rutas.spec.ts` | 9 |
+| El cliente que la base corta vuelve al pool con su error (`release(err)`), sin RESET; el sano, con RESET y su tope; también si falla el RESET; lo mismo en la exportación por dispositivo | `consulta.service.spec.ts` (con un doble del pool) | 4 nuevos |
+
+Fallas plantadas (cada una se vio caer y se deshizo): `celdaCsv` con la expresión de antes → 2 casos de `exportar.spec.ts`; el descriptor sin
+su firma → 2 de `zip.spec.ts`; sin la protección del `_x` → 2 de `xlsx.spec.ts`; `release()` sin el error → 4 de `consulta.service.spec.ts`.
+
+**Prueba de integración** (`plataforma/pruebas/exportar-integracion.sh`, nueva: base desechable sin red con las 26 migraciones, la aplicación
+compilada en un puerto efímero de 127.0.0.1). **43 de 43** comprobaciones, más tres externas: `unzip -t` del zip y del libro («No errors
+detected») y el analizador XML de Python (cada parte del libro, XML bien formado). Siembra un sitio con los casos límite del punto 7 del bloque
+(instantes con microsegundos, `desde` incluido y `hasta` excluido; −12,5, 1e-7 y el mayor double; una unidad con coma y comillas; textos que
+empiezan con `=`, `'=` y un apóstrofo solo; saltos, tabulador, controles y un `_x0041_` literal; una trama que no es UTF-8, cuyo base64 empieza
+con «+», otra de 64 KiB y otra vacía; dos tramas y dos eventos con el mismo instante; un `detalle` con tildes y emoji; equipos activo, en
+mantenimiento y de baja) y otro sitio con siete marcas propias. Comprueba: la matriz de las dos rutas (401, 403 a consulta y operador técnico,
+404 a otro sitio e inexistente con el mismo cuerpo, 200 a investigador y administrador); la ida y vuelta de los tres formatos con 0
+diferencias en 53 filas, cada `sha256` igual al de su carga y la fecha de planilla igual al milisegundo de cada instante; los conteos de
+`LEEME.txt`, de «Acerca de» y de `conteos`; ninguna marca del otro sitio y ningún dato de personas; que con tandas de 2 filas las tres fuentes
+dan lo mismo que con una; la estimación; que si la primera consulta falla (plantada en la prueba) la exportación del sitio, en csv y en xlsx,
+y la del dispositivo responden 503 en JSON sin `Content-Disposition` y sueltan el cupo; el cupo (dos descargas abiertas y sin leer, y la
+tercera 429 `exportaciones_en_curso` sea exportación de sitio, de dispositivo o estimación); y el corte: al cerrar el cliente, el cupo vuelve a 0, no se pide ninguna tanda más en 1,5 s y las conexiones vuelven
+al pool. Fallas plantadas: sin la protección del `_x` cayeron 2 comprobaciones (la unidad «_x0041_ y _xABCD␁» volvía como «A y ꯍx0001_»);
+con las tramas y los eventos dejando pasar un equipo del otro sitio, 7 (entre ellas RF-41, con las siete marcas).
+
+`sesion-smoke.sh`: las dos rutas en cada columna de la matriz (18 filas nuevas, incluida la que comprueba que la descarga es un zip): **469 de
+469** con la pila local (tres capas de Compose). A través del proxy, las dos rutas de exportar llegan al backend, también con mayúsculas y
+barra final.
+
+**Medición** (1 000 000 de mediciones de 20 canales en 25 días, 100 000 tramas SenML de ≈ 120 bytes y 10 000 eventos; en la misma base, otro
+sitio de 380 canales con 950 000 mediciones en la misma ventana). La aplicación compilada en un proceso aparte (`node dist/main.js`, como en la
+imagen); su memoria residente, de `/proc` cada 20 ms; el cliente lee y descarta.
+
+| Formato | Tiempo | Descargado (bytes; MB de 10^6) | Memoria residente del proceso, al empezar → pico (MB de 10^6) |
+|---|---|---|---|
+| csv (.zip) | 5,2 s | 14 350 925 (14,4 MB) | 145,2 → 275,6 MB |
+| xlsx | 7,4 s | 25 436 001 (25,4 MB) | 275,7 → 287,1 MB |
+| json | 3,7 s | 214 507 221 (214,5 MB) | 287,1 → 288,4 MB |
+| csv y json a la vez (el cupo lleno) | 5,9 s | 228 858 147 (228,9 MB) | 286,2 → 289,8 MB |
+
+MB de 10^6 bytes, los que muestra el panel (`lib/exportar.ts`); hasta la revisión del mismo día esta tabla daba MiB rotulados MB. La primera
+exportación lleva el proceso de ≈ 145 a ≈ 276 MB y ahí queda (el montón de V8 crece y no se devuelve); empezando por el JSON pasa lo mismo
+(148 → 264 MB), y con tandas de 2 000 filas en vez de 10 000 el pico no bajó (281 MB): es el ritmo de asignación, no el zip ni el tamaño de
+la tanda. Con el cupo lleno, 290 MB, bajo el límite de 512 MiB (537 MB) del contenedor del backend (la prueba exige menos de 450 MB).
+
+**Planes** (`EXPLAIN (ANALYZE, BUFFERS)` sobre esos datos; ninguno recorre `medicion`, `trama` ni `evento` de forma secuencial).
+
+| Consulta | Índice | Tiempo | Búferes |
+|---|---|---|---|
+| Mediciones, primera tanda de 10 000 de un canal | `uq_medicion_canal_tiempo` (por fragmento, hacia atrás) | 7,0 ms | 2 456 |
+| Mediciones, tanda del medio | `uq_medicion_canal_tiempo` (bitmap) | 22,9 ms | 5 909 |
+| Tramas, tanda del medio de un dispositivo (250) | `idx_trama_dispositivo_id` | 1,2 ms | 17 |
+| Eventos de un dispositivo, primera tanda (≈ 500 filas) | `idx_evento_dispositivo_id` (bitmap y orden aparte) | 0,5 ms | 16 |
+| Eventos de un dispositivo, tanda siguiente (con clave) | `idx_evento_dispositivo_ocurrido_en_id` (bitmap) | 0,3 ms | 14 |
+| Estimación: contar 1 000 000 de mediciones (tope 1 000 001) | `uq_medicion_canal_tiempo` por canal | 479 ms | 236 448 |
+| Estimación: contar 100 000 tramas | `idx_trama_dispositivo_id` por dispositivo | 46 ms | 4 794 |
+| Estimación: la trama más antigua del rango | `idx_trama_dispositivo_id`, solo índice | 0,3 ms | 247 |
+
+`idx_evento_dispositivo_id` (sobre `dispositivo_id`) no aparece por su nombre en `db/init`: lo crea la convención de claves foráneas de la
+migración 05 (`'idx_' || tabla || '_' || columna`), y la 23 lo nombra en su comentario; la prueba lista los índices de `evento` de la base y
+fija ese nombre completo en su comprobación. Con un dispositivo de ≈ 500 eventos el planificador prefiere leerlos todos por él y ordenarlos;
+con la clave de una tanda siguiente usa el de la paginación, `idx_evento_dispositivo_ocurrido_en_id` (migración 23).
+
+Con solo los 20 canales del sitio en la base, el planificador elige el índice de tiempo de la hypertable y filtra por canal (≈ 15 ms por
+tanda; forzado el de canal, ≈ 9 ms): con tan pocos canales los dos son baratos. Con los 380 canales del otro sitio pasa a
+`uq_medicion_canal_tiempo` y el costo de la tanda deja de depender del resto de la instalación (medido en una base aparte y en la prueba, que
+lo comprueba). Una cuenta de un millón tarda ≈ 0,5 s porque visita el montón (base recién cargada, sin el mapa de visibilidad).
+
+**Bytes por fila** del archivo descargado (bytes de cada entrada o lista ÷ filas), los de la estimación: csv 8,9 (mediciones), 51,9 (tramas)
+y 29,9 (eventos), más 1 776 fijos; xlsx 19, 60,6 y 37,8, más 4 337; json 172,9, 395,5 y 208,2, más 284. La prueba compara la estimación del
+banco con lo descargado (exige menos de 25 % de diferencia; en la última corrida, 0,0 % en csv y 0,1 % en xlsx y json). Las tramas del banco pesan ≈ 120 bytes: una de 64 KiB pesa mucho más
+y la estimación la subestima.
+
+**Revisión con LibreOffice** (conversión sin interfaz de un libro de muestra a CSV por hoja, 19/11/2026; no es parte de la prueba): abre las
+cuatro hojas sin error; `_x005F_x0041_` vuelve como `_x0041_` y `_x0001_` como el control; `=SUMA(A1)` queda como texto; la fecha sale con
+sus milisegundos; la carga partida, en 32 000, 32 000 y 23 384 caracteres. En el CSV que escribe LibreOffice, el retorno de carro dentro de
+una celda sale como salto de línea (no se averiguó si lo cambia al leer o al escribir); el lector de la prueba lo recupera exacto.
+
+**Apertura con LibreOffice Calc, mirada como la vería una persona** (19/11/2026; el libro que deja `exportar-integracion.sh`, datos sintéticos,
+abierto y llevado a PDF por LibreOffice y revisado página por página): abre sin aviso de error, con las cuatro hojas; «Acerca de» dice formato,
+sitio, rango, retención, cada columna y los conteos (43 mediciones, 5 tramas y 5 eventos, los mismos de la base); la cabecera en negrita;
+`fecha_utc` se muestra como fecha y hora con sus milisegundos («2026-11-14 10:00:00,123») junto al texto exacto con microsegundos; las dos
+tramas recibidas en el mismo microsegundo salen las dos.
+
+**Panel: la pantalla P8** (bloque R, puntos 6 y 8; mismo día). `Exportar.svelte` en `#/exportar?sitio=<código>`, con lo puro en
+`lib/exportar.ts`; la entrada «Exportar datos» del menú; el enlace «Exportar todo el sitio» de la ficha; `nombreDeArchivo` con `.zip` y `.xlsx`
+y el `Accept` de `descargar()` con los dos tipos nuevos. Lo decidido fuera del diseño, en `docs/19 §4`, R, «Decidido al implementar la
+pantalla».
+
+Por el DOM y funciones puras (vitest): de 480 a 518 pruebas del panel (it/test) en 43 archivos (antes 41), 582 ejecuciones (antes 544);
+la corrección del mismo día tras la revisión independiente y el cupo compartido con la estimación (abajo) sumó 5 de esas pruebas.
+
+| Qué se comprueba | Prueba | Casos |
+|---|---|---|
+| Al abrir, los últimos 30 días con el texto, el tamaño del formato elegido y la retención; cada rango con su ventana; una estimación a la vez (la anterior, cancelada); la respuesta vieja de otro rango y de otro sitio, descartada aunque llegue; «Entre fechas» en la hora del sitio (Isla de Pascua) con sus errores junto a los campos y sin petición; sin filas; la estimación que falla, con «Reintentar»; los tres formatos con su nombre y el aviso; la confirmación sobre 250 MB (sin petición hasta «Descargar igual»); «Cancelar»; el 429 del cupo, sin red y el corte a mitad sin archivo guardado; salir de la pantalla corta lo que está en vuelo; sin la acción, quién exporta; desde la corrección: escribir una fecha no pide una estimación por tecla (una sola, tras la pausa), el 429 del cupo al estimar con un solo reintento (si responde, sin aviso; si se repite, el aviso en llano con «Reintentar», sin un tercer intento solo, y «Descargar» que espera y se activa al llegar la estimación), un cambio de rango que anula el reintento pendiente, el 503 de la estimación sin reintento, y en la descarga el 429 reconocido por su código (el texto de siempre sin el código es otro caso) y el 503 | `Exportar.test.ts` | 17 |
+| Los cinco rangos, «Entre fechas» en dos zonas, el día del cambio de hora (23 horas), los días que no sirven, el piso del año 2000, las rutas y la clave; textos de la estimación (singular, tope, sin filas), tamaños, retención (con el margen), umbral de confirmación en el borde, avisos (429 del cupo por su código y del proxy, 503, sin red, corte, cancelación; los de la estimación) y quién exporta según la matriz | `lib/exportar.test.ts` | 15 |
+| El menú con y sin la acción y la ruta (`App.test.ts`, 2 nuevos y el orden del menú); el enlace de la ficha solo con la acción (`Ficha.test.ts`, 1); la ruta de ida y vuelta (`vista.test.ts`, 1); `.zip` y `.xlsx` aceptados y siete extensiones rechazadas, y el `Accept` (`api.test.ts`, 1 nuevo y 1 ampliado); la hora que no existe por el cambio de hora al oeste y al este de UTC (`tiempo.test.ts`, 1) | varios | 6 |
+
+Fallas plantadas (cada una se vio caer y se deshizo, comparando el archivo con su copia): la estimación sin cancelar (una señal nueva en vez
+de la de `ultimaGana`) → 1 caso de `Exportar.test.ts`; sin descartar la respuesta de otra clave → 2; `instanteDesdeLocal` de antes y la
+retención sin margen → 3 casos entre `tiempo.test.ts` y `lib/exportar.test.ts`. En la corrección: reconocer el 429 por el texto del mensaje
+(el de hoy) en vez de por su código → 5 casos (3 de `Exportar.test.ts` y 2 de `lib/exportar.test.ts`); pedir la estimación sin la pausa → 2;
+sin el reintento único → 2.
+
+**Corrección del mismo día** (revisión independiente y cambio del backend: el 429 de las tres rutas trae `codigo: 'exportaciones_en_curso'`,
+la estimación comparte el cupo y tiene 10 s por consulta, y las exportaciones responden 503 en JSON si fallan antes de enviar el archivo). El
+panel reconoce el cupo por el código (el cuerpo ya llegaba entero en `ErrorApi.cuerpo`, sin cambiar `lib/api.ts`); pide la estimación 300 ms
+después del último cambio; ante el 429 la reintenta una sola vez a los 1,5 s; dice el 429 que se repite y el 503 en llano con «Reintentar»; y
+el 503 de la descarga, también. La ficha usa los mismos avisos en sus dos descargas de CSV. Reglas en `docs/19 §4`, R, «Decidido al
+implementar la pantalla», (c), (e) y (f).
+
+Con navegador real: `bash plataforma/pruebas/panel-exportar-e2e.sh` (nuevo; recorre `panel/e2e/exportar.mjs`), contra la pila local de tres
+capas con el backend reconstruido. Siembra un sitio desechable en Isla de Pascua (`Pacific/Easter`, UTC−05:00 en noviembre) con 2 equipos, 72
+mediciones, 10 tramas y 2 eventos, y una persona de descarte con perfil de investigación por caso (`@ejemplo.invalid`); el navegador corre en
+la zona de Tokio. Por caso: de la ficha a la pantalla con «Exportar todo el sitio»; la entrada del menú; la estimación dice lo sembrado y la
+retención; los tres formatos bajan con el nombre `sitio_<código>_<desde>_<hasta>`, el zip y el xlsx empiezan con `PK\x03\x04` y el JSON se
+interpreta con el sitio y los conteos sembrados; «Entre fechas» abre con la última semana y la pide de 00:00 a 00:00 en la hora del sitio; un
+último día después de hoy se dice junto a los campos sin pedir nada; sin desplazamiento horizontal ni errores de JavaScript. Todo se borra al
+salir. **76 de 76** comprobaciones en Chromium 158 y Firefox 159, a 390 y a 1 280 px (corrida también tras la corrección, con el backend
+reconstruido: 76 de 76; el paso de «Entre fechas» espera la respuesta de la estimación, que ahora llega tras la pausa). Las dos primeras corridas encontraron dos fallas reales,
+corregidas antes de esta: la retención decía «solo desde hoy» en «Últimos 30 días» (el corte se comparaba sin margen, con milisegundos de
+diferencia) y, en Firefox a 390 px, la ayuda emergente de «Descargar», que bajo 700 px se fija al pie de la pantalla, tapaba el propio botón
+(el `Tooltip` común tiene ese caso con cualquier botón que quede al pie; aquí se quitó la ayuda de los dos botones).
+
+`pnpm verificar` en `plataforma/backend`, tras la corrección: tipos, lint, 929 de 929 del backend en 72 archivos, `svelte-check` sin errores
+en 430 archivos, las 518 pruebas del panel (582 ejecuciones) en 43 archivos y el paquete construido.
+
+**Lo que queda.** La apertura en Excel, con su salida esperada (punto 7; la de LibreOffice está arriba); el lector XLSX del alta masiva (bloque
+N, punto 6), decidido y sin construir; y el caso del `Tooltip` al pie de la pantalla bajo 700 px, que no es solo de esta pantalla.
+`panel-exportar-e2e.sh` ya corre en el paso 4c del guardián, junto a los otros dos e2e del panel.

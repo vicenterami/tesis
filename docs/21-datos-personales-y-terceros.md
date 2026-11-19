@@ -45,6 +45,11 @@ hash); ningún correo ni nombre en los registros de la aplicación; en los error
 (RNF-19): se guardan el código, el mensaje acotado, la ruta sin parámetros de consulta, la versión y el identificador de la petición.
 La prueba que lo demuestra planta un error cuyo mensaje lleva un correo y comprueba que la fila guardada no lo tiene.
 
+**Lo que no sale en una exportación.** La exportación de un sitio (`GET /sitios/{id}/exportar`, HU-08, desde el 19/11/2026; `docs/19 §4`
+bloque R) trae mediciones, tramas y eventos de los equipos, y ningún dato de personas: ni quién hizo cada cambio (`evento.usuario_id`), ni
+nombres, correos o identificadores de usuario en el detalle de los eventos (revisado en cada escritor de eventos de un equipo); los
+eventos de ajustes del sitio, que no son de un equipo, tampoco entran. Quién hizo qué se consulta en «Actividad» (P14), con su permiso.
+
 Las tres filas de la vista pública por enlace se sumaron el 17/11/2026, con la migración 25 (privacidad, versión 2).
 
 ### 2.1 Lo que lee la persona (texto de la página de privacidad)

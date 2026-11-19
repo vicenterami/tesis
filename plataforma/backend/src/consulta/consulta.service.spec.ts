@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { EventEmitter } from 'node:events';
 import { NotFoundException } from '@nestjs/common';
 import { Pool } from 'pg';
 import { ConsultaService, SQL_INTERVALO_OBSERVADO } from './consulta.service.js';
@@ -46,5 +47,51 @@ describe('ConsultaService.dispositivo: intervalo_observado_s', () => {
     const { servicio, consultas } = armar(undefined);
     await expect(servicio.dispositivo(ID)).rejects.toBeInstanceOf(NotFoundException);
     expect(consultas).toHaveLength(1);
+  });
+});
+
+// Cliente prestado para las exportaciones y la estimación (revisión del 19/11/2026): si la base corta la conexión mientras está prestado, el
+// cliente vuelve al pool con su error (`release(err)`) y pg-pool lo descarta; si no, vuelve sano, con su tope reiniciado.
+describe('ConsultaService: el cliente roto no vuelve al pool', () => {
+  function doble(fallaReset = false) {
+    const cliente = Object.assign(new EventEmitter(), {
+      consultas: [] as string[],
+      query: vi.fn(function (this: { consultas: string[] }, sql: string) {
+        cliente.consultas.push(sql);
+        if (sql.startsWith('RESET') && fallaReset) return Promise.reject(new Error('conexión cerrada'));
+        return Promise.resolve({ rows: [] });
+      }),
+      release: vi.fn(),
+    });
+    cliente.on('error', () => undefined); // como pg: el servicio pone el suyo además
+    const pool = { connect: vi.fn(() => Promise.resolve(cliente)) };
+    return { servicio: new ConsultaService(pool as unknown as Pool), cliente };
+  }
+  it('conConexionExportacion: un «error» del cliente durante la consulta → release(ese error), sin RESET', async () => {
+    const { servicio, cliente } = doble();
+    const corte = new Error('terminating connection due to administrator command');
+    await servicio.conConexionExportacion(() => { cliente.emit('error', corte); return Promise.resolve(); });
+    expect(cliente.release).toHaveBeenCalledWith(corte);
+    expect(cliente.consultas).toEqual(['SET statement_timeout TO 30000']);
+  });
+  it('conConexionExportacion sana: release() sin error, con RESET; el tope de la estimación es el que se pide', async () => {
+    const { servicio, cliente } = doble();
+    await servicio.conConexionExportacion(() => Promise.resolve(), 10_000);
+    expect(cliente.release).toHaveBeenCalledWith(undefined);
+    expect(cliente.consultas).toEqual(['SET statement_timeout TO 10000', 'RESET statement_timeout']);
+  });
+  it('si el RESET final falla, el cliente también se descarta', async () => {
+    const { servicio, cliente } = doble(true);
+    await servicio.conConexionExportacion(() => Promise.resolve());
+    expect((cliente.release.mock.calls[0] as unknown[])[0]).toBeInstanceOf(Error);
+  });
+  it('mediciones() (la exportación por dispositivo): el mismo trato', async () => {
+    const { servicio, cliente } = doble();
+    const corte = new Error('conexión cortada');
+    const g = servicio.mediciones('00000000-0000-4000-8000-000000000001', new Date(0), new Date());
+    cliente.query.mockImplementationOnce((sql: string) => { cliente.consultas.push(sql); return Promise.resolve({ rows: [] }); }); // el SET
+    cliente.query.mockImplementationOnce(() => { cliente.emit('error', corte); return Promise.reject(corte); }); // la primera tanda
+    await expect(g.next()).rejects.toBe(corte);
+    expect(cliente.release).toHaveBeenCalledWith(corte);
   });
 });

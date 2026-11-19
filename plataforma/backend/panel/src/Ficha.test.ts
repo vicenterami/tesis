@@ -593,6 +593,19 @@ describe('Ficha (P3) con sesión: exportar según el rol y descargas que fallan'
     expect(document.querySelector('[data-motivo-desactivado]')).toBeNull();
   });
 
+  // P8 (docs/19 §4, R, punto 6): el enlace al sitio entero, solo con la acción `exportar`; los dos botones de CSV no cambian.
+  it('«Exportar todo el sitio» lleva a #/exportar con el código del sitio del dispositivo, solo con la acción `exportar`', async () => {
+    render(Ficha, { id: ID, sesion: sesionCon('administrador') });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Descargar CSV de este rango' })).toBeTruthy());
+    expect(screen.getByRole('link', { name: 'Exportar todo el sitio' }).getAttribute('href')).toBe('#/exportar?sitio=uct');
+    expect(screen.getByRole('button', { name: 'Descargar CSV de este rango' })).toBeTruthy(); // el botón de CSV sigue
+    cleanup();
+    render(Ficha, { id: ID, sesion: sesionCon('consulta') });
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Descargar CSV de este rango' })).toBeTruthy());
+    expect(screen.queryByRole('link', { name: 'Exportar todo el sitio' })).toBeNull();
+    expect(document.querySelector('[data-exportar-sitio]')).toBeNull();
+  });
+
   it('la descarga con la sesión vencida (401) no descarga nada y avisa al manejo central; un 403 se muestra en un aviso', async () => {
     const { alPerderSesion } = await import('./lib/api');
     const motivos: string[] = [];

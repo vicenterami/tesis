@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { SIN_FILTROS, SIN_FILTROS_ACTIVIDAD, fragmentoActividad, fragmentoAlta, fragmentoComparar, fragmentoFicha, fragmentoAjustes, fragmentoInventario, fragmentoPublicar, fragmentoTablero, errorDeVentana, leerVentanaFija, leerVista, redireccionVieja, validarAMedida } from './vista';
+import { SIN_FILTROS, SIN_FILTROS_ACTIVIDAD, fragmentoActividad, fragmentoAlta, fragmentoComparar, fragmentoExportar, fragmentoFicha, fragmentoAjustes, fragmentoInventario, fragmentoPublicar, fragmentoTablero, errorDeVentana, leerVentanaFija, leerVista, redireccionVieja, validarAMedida } from './vista';
 
 const ID = '00000000-0000-4000-8000-000000000001';
 const CANAL = '00000000-0000-4000-8000-0000000000c1';
@@ -142,6 +142,16 @@ describe('rutas de P6, P7, P11, P13 y P14', () => {
     expect(leerVista('#/sitio/ajustes')).toEqual({ pantalla: 'ajustes', sitio: '' });
     expect(leerVista('#/sitio/ajustes?sitio=a%20b')).toEqual({ pantalla: 'ajustes', sitio: '' });
     expect(leerVista('#/sitio/otra?sitio=uct').pantalla).toBe('tablero');
+  });
+  // P8 (docs/19 §4, R, punto 6): `#/exportar?sitio=<código>`, el mismo patrón; un código inválido se ignora (rige el primer sitio).
+  it('exportar: «#/exportar» lleva el sitio de ida y vuelta, ignora un código con forma inválida y no se confunde con otra ruta', () => {
+    expect(fragmentoExportar('uct')).toBe('#/exportar?sitio=uct');
+    expect(leerVista(fragmentoExportar('uct'))).toEqual({ pantalla: 'exportar', sitio: 'uct' });
+    expect(fragmentoExportar('')).toBe('#/exportar');
+    expect(leerVista('#/exportar')).toEqual({ pantalla: 'exportar', sitio: '' });
+    expect(leerVista('#/exportar?sitio=a%20b')).toEqual({ pantalla: 'exportar', sitio: '' });
+    expect(leerVista('#/exportar?sitio=..%2F..')).toEqual({ pantalla: 'exportar', sitio: '' });
+    expect(leerVista('#/exportar/otra?sitio=uct').pantalla).toBe('tablero');
   });
 });
 

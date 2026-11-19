@@ -519,7 +519,7 @@ cliente ──HTTP──► Express ⊂ NestJS ──► servicio ──► pg �
 
 - **Express** es la biblioteca de servidor HTTP más usada de Node.js; NestJS la usa por debajo
   (`@nestjs/platform-express`). El proceso de Node es el servidor; Express recibe cada petición y
-  entrega la respuesta. Es **la API**: 47 rutas REST (60 operaciones, la recepción por HTTP, la sesión, los usuarios, el tablero v2, desde el 11/11/2026 la cuenta propia, lo legal, el soporte y la actividad, desde el 15/11/2026 la plantilla del alta por lote y el catálogo de magnitudes, desde el 17/11/2026 la vista pública por enlace y la administración de sus enlaces, con el tope y el k de cada sitio, y desde el 18/11/2026 el plazo de la primera trama de cada sitio, incluidos) y el canal SSE `/eventos` (§5), descritos en el contrato OpenAPI (48 rutas y 61 operaciones contando `/eventos`; el paso 2h2 del guardián compara estas cifras con `openapi.json`). Desde el 08/11/2026, antes de cada ruta corre el guardia central de la sesión (`docs/20 §5`). Express no toca la base.
+  entrega la respuesta. Es **la API**: 49 rutas REST (62 operaciones, la recepción por HTTP, la sesión, los usuarios, el tablero v2, desde el 11/11/2026 la cuenta propia, lo legal, el soporte y la actividad, desde el 15/11/2026 la plantilla del alta por lote y el catálogo de magnitudes, desde el 17/11/2026 la vista pública por enlace y la administración de sus enlaces, con el tope y el k de cada sitio, desde el 18/11/2026 el plazo de la primera trama de cada sitio y desde el 19/11/2026 la exportación por sitio y su estimación, incluidos) y el canal SSE `/eventos` (§5), descritos en el contrato OpenAPI (50 rutas y 63 operaciones contando `/eventos`; el paso 2h2 del guardián compara estas cifras con `openapi.json`). Desde el 08/11/2026, antes de cada ruta corre el guardia central de la sesión (`docs/20 §5`). Express no toca la base.
 - **`pg`** (node-postgres) es el conductor de la base: mantiene un *pool* de 5 conexiones
   (`db/db.module.ts`) y envía **SQL directo** con parámetros `$1, $2…`; el valor nunca se pega dentro
   del texto SQL, lo que evita la inyección. Sin ORM, por la razón de `docs/07` (series de tiempo con
@@ -640,12 +640,19 @@ autorización por canal antes de abrir el flujo y límite de flujos por usuario;
 **Exportación (RF-34, implementada el 12/10/2026; HU-08 adelantada a la Etapa 3):** `GET /dispositivos/{id}/exportar?formato=csv|json
 &desde&hasta` escribe las mediciones crudas del dispositivo fila a fila al responder, por tandas de 10 000 con paginación por
 clave `(tiempo, canal_id)`; el instante viaja como texto exacto de la base (microsegundos) y es la clave de la tanda siguiente.
-CSV estándar (coma, punto decimal, UTF-8, CRLF, cabecera `tiempo_utc,magnitud,valor,unidad,canal_id`; todo texto que empiece
-con `=`, `+`, `-`, `@`, tabulador o retorno se protege con apóstrofo contra la inyección de fórmulas) o JSON como lista.
+CSV estándar (coma, punto decimal, UTF-8, CRLF, cabecera `tiempo_utc,magnitud,valor,unidad,canal_id`; todo texto que, tras cero o más
+apóstrofos, empiece con `=`, `+`, `-`, `@`, tabulador, retorno, salto de línea o sus formas de ancho completo lleva un apóstrofo más contra la
+inyección de fórmulas, y quitándole uno se recupera el original: desde el 19/11/2026, `docs/19 §4` bloque R punto 2) o JSON como lista.
 Descarga con nombre saneado; `Cache-Control: no-store`; rango acotado (desde el año 2000, hasta un día en el futuro); como
-mucho dos exportaciones simultáneas por proceso (429) y 30 s de tope por consulta en una conexión del pool compartido, para no quedarse con
+mucho dos exportaciones simultáneas por proceso (429; desde el 19/11/2026, un cupo único con la exportación por sitio y su estimación, con `codigo: exportaciones_en_curso`) y 30 s de tope por consulta en una conexión del pool compartido, para no quedarse con
 el pool de la recepción; cada escritura espera `drain` (contrapresión); un error a mitad de flujo corta la conexión y queda en
-el registro. XLSX y la exportación por sitio con rol llegan con la sesión (`docs/20`). Pruebas: `docs/16 §19`.
+el registro. Pruebas: `docs/16 §19`. **Por sitio (diseñada el 19/11/2026, `docs/19 §4` bloque R; HU-08):** `GET /sitios/{id}/exportar
+?formato=csv|xlsx|json&desde&hasta` con la acción `exportar` sobre el sitio (`docs/20 §6`) trae en un solo archivo las mediciones, las
+tramas aceptadas con su carga exacta en base64 y su huella SHA-256 (RF-31) y los eventos del ciclo de vida, sin datos de personas; el CSV
+va en un zip con `LEEME.txt` y el XLSX es un libro de cuatro hojas, los dos escritos en flujo con código propio sobre `node:zlib`; las
+consultas van por canal y por dispositivo para usar los índices existentes; un cupo único de 2 exportaciones o estimaciones por proceso para las dos
+rutas de exportar y la estimación; `GET /sitios/{id}/exportar/estimacion` cuenta con tope lo que trae un rango antes de descargarlo. Construida el 19/11/2026 (backend y
+proxy; pruebas y mediciones en `docs/16 §89`).
 
 **Implementado el 09/10 (TT-39):** `GET /eventos`, con filtro opcional `?dispositivo=` o `?canal=` (un UUID; otro valor,
 400). Emite `medicion`, `visto` y `condicion`, cada uno después de quedar guardado en la base (desde el 13/11/2026, con el `sitio_id` de
@@ -1165,8 +1172,10 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     las listas lo llevan en el `WHERE`. Probado con una sesión por rol y dos sitios (paso 4b del guardián, `docs/16 §58`). Los cambios de
     usuarios dejan su `evento` con quién; el «quién» en los eventos de alta, baja, rotación y calibración llega con la auditoría (punto 43).
 37. **Exportación en CSV, XLSX y JSON** (RF-34, HU-08). El Académico/Investigador en Ingeniería Civil Geológica la pidió «crítico y no negociable» en CSV o XLSX para
-    trabajar en Python, R, MATLAB o QGIS. JSON sale de la misma consulta; XLSX necesita una biblioteca, que se elige con licencia
-    permisiva y sin avisos de seguridad (los revisan el guardián y la auditoría). Solo datos del sitio de quien exporta (RF-41).
+    trabajar en Python, R, MATLAB o QGIS. JSON sale de la misma consulta. XLSX: con código propio y sin dependencia nueva (decidido el
+    19/11/2026, `docs/19 §4` bloque R, con el mismo criterio que el lector del alta masiva del 15/11): un zip en flujo sobre `node:zlib` y
+    hojas XML con texto en línea, dentro de los límites oficiales de Excel (filas por hoja y caracteres por celda). Solo datos del sitio de
+    quien exporta (RF-41).
 38. **Imágenes fijadas por digest y actualizadas con Dependabot.** Cada `FROM`, la imagen de registro del compose y las que
     usan los guiones llevan su etiqueta legible y su `@sha256` (paso 2u del guardián). El digest fija la base; la capa de
     parches (`apk upgrade`) se resuelve al construir, así que se escanea la imagen construida y se despliega esa misma

@@ -1,6 +1,7 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
 import type { FilaExportada } from './exportar.js';
-import { Pool } from 'pg';
+import type { FilaEventoSitio, FilaMedicionSitio, FilaTramaSitio } from './exportar-sitio.js';
+import { Pool, type PoolClient } from 'pg';
 import { POOL } from '../db/db.module.js';
 import { errorDeCliente } from '../db/cliente.js';
 import { porcentaje } from './escala.js';
@@ -260,11 +261,9 @@ export class ConsultaService {
   // 30 s por consulta, para que una exportación larga no se quede con el pool de la recepción; el plan de la consulta se mide
   // en el banco antes de afirmar nada sobre índices (pendiente). El llamador escribe cada fila al flujo de salida.
   async *mediciones(dispositivoId: string, desde: Date, hasta: Date, tanda = 10_000): AsyncGenerator<FilaExportada> {
-    const cliente = await this.pool.connect();
     // Una exportación larga tiene su cliente prestado minutos: si la base corta la conexión a mitad, falla esta descarga y no el proceso.
-    cliente.on('error', errorDeCliente);
+    const { cliente, devolver } = await this.prestarCliente(30_000);
     try {
-      await cliente.query('SET statement_timeout TO 30000');
       let ultimoTiempo: string | null = null;
       let ultimoCanal: string | null = null;
       for (;;) {
@@ -286,10 +285,157 @@ export class ConsultaService {
         ultimoCanal = ultima.canal_id;
       }
     } finally {
-      await cliente.query('RESET statement_timeout').catch(() => undefined);
-      cliente.off('error', errorDeCliente);
-      cliente.release();
+      await devolver();
     }
+  }
+
+  // Un cliente prestado del pool para una consulta larga, con su tope por consulta (statement_timeout, en milisegundos). Si la base corta
+  // la conexión mientras está prestado, el evento 'error' se guarda y el cliente se devuelve con ese error, `release(err)`, para que
+  // pg-pool lo descarte en vez de dejar en el pool una conexión rota (revisión del 19/11/2026); lo mismo si falla el RESET final.
+  private async prestarCliente(topeMs: number): Promise<{ cliente: PoolClient; devolver: () => Promise<void> }> {
+    if (!Number.isInteger(topeMs) || topeMs <= 0) throw new Error(`tope de consulta inválido: ${topeMs}`);
+    const cliente = await this.pool.connect();
+    let roto: Error | undefined;
+    const alError = (e: Error): void => { roto = e; errorDeCliente(e); };
+    cliente.on('error', alError);
+    const devolver = async (): Promise<void> => {
+      const fallaReset = roto === undefined ? await cliente.query('RESET statement_timeout').then(() => undefined, (e: unknown) => e as Error) : undefined;
+      cliente.off('error', alError);
+      cliente.release(roto ?? fallaReset);
+    };
+    try {
+      await cliente.query(`SET statement_timeout TO ${topeMs}`);
+    } catch (e) {
+      cliente.off('error', alError);
+      cliente.release(roto ?? (e as Error));
+      throw e;
+    }
+    return { cliente, devolver };
+  }
+
+  // ── Exportación por sitio (HU-08; docs/19 §4, bloque R, puntos 1, 3 y 5; 19/11/2026) ──────────────────────────────────────────────
+  // Una conexión propia por descarga, con 30 s de tope por consulta (prestarCliente, como mediciones()): las tres fuentes corren en ella,
+  // una tras otra; la estimación toma otra, con 10 s. Las consultas van por canal (mediciones) y por dispositivo (tramas y eventos), con paginación por clave
+  // dentro de cada uno, para que cada tanda use los índices que ya existen (uq_medicion_canal_tiempo, idx_trama_dispositivo_id,
+  // idx_evento_dispositivo_ocurrido_en_id) y el costo crezca con los datos del sitio, no con los de toda la instalación (planes medidos
+  // con EXPLAIN (ANALYZE, BUFFERS) en docs/16 §89). Todos los dispositivos del sitio en cualquier estado: un equipo no cambia de sitio, solo
+  // de zona dentro del mismo (configuracion.service.ts), así que su sitio actual basta para RF-41.
+  // `topeMs`: 30 s para la exportación; la estimación pasa 10 s (sitios.controller.ts).
+  async conConexionExportacion<T>(fn: (c: PoolClient) => Promise<T>, topeMs = 30_000): Promise<T> {
+    const { cliente, devolver } = await this.prestarCliente(topeMs);
+    try {
+      return await fn(cliente);
+    } finally {
+      await devolver();
+    }
+  }
+
+  // Código y nombre del sitio, para el nombre del archivo y su cabecera (404 si no existe: el controlador ya lo comprobó con exigirSitio).
+  async sitioExportable(sitioId: string): Promise<{ codigo: string; nombre: string }> {
+    const r = await this.pool.query<{ codigo: string; nombre: string }>('SELECT codigo, nombre FROM sitio WHERE id = $1', [sitioId]);
+    if (!r.rows[0]) throw new NotFoundException('sitio no encontrado');
+    return r.rows[0];
+  }
+
+  private async dispositivosDelSitio(c: Pick<PoolClient, 'query'>, sitioId: string): Promise<{ id: string; id_fisico: string }[]> {
+    return (await c.query<{ id: string; id_fisico: string }>(
+      'SELECT d.id, d.id_fisico FROM dispositivo d JOIN zona z ON z.id = d.zona_id WHERE z.sitio_id = $1 ORDER BY d.id_fisico', [sitioId])).rows;
+  }
+
+  // Mediciones del sitio, canal por canal (por dispositivo y magnitud), y dentro de cada canal por tiempo: (canal_id, tiempo) es único
+  // (migración 06), así que la clave de la página es el tiempo, que viaja como texto exacto de la base (microsegundos).
+  async *medicionesSitio(c: Pick<PoolClient, 'query'>, sitioId: string, desde: Date, hasta: Date, tanda = 10_000): AsyncGenerator<FilaMedicionSitio> {
+    const canales = await c.query<{ id: string; id_fisico: string; magnitud: string }>(
+      `SELECT ca.id, d.id_fisico, ca.magnitud_codigo AS magnitud
+         FROM canal ca JOIN dispositivo d ON d.id = ca.dispositivo_id JOIN zona z ON z.id = d.zona_id
+        WHERE z.sitio_id = $1 ORDER BY d.id_fisico, ca.magnitud_codigo`, [sitioId]);
+    for (const k of canales.rows) {
+      let ultimo: string | null = null;
+      for (;;) {
+        const r: { rows: { tiempo_utc: string; valor: number; unidad: string }[] } = await c.query(
+          `SELECT ${isoUs('m.tiempo')} AS tiempo_utc, m.valor, m.unidad
+             FROM medicion m
+            WHERE m.canal_id = $1 AND m.tiempo >= $2 AND m.tiempo < $3 AND ($4::timestamptz IS NULL OR m.tiempo > $4::timestamptz)
+            ORDER BY m.tiempo LIMIT $5`, [k.id, desde, hasta, ultimo, tanda]);
+        for (const x of r.rows) yield { tiempo_utc: x.tiempo_utc, id_fisico: k.id_fisico, magnitud: k.magnitud, valor: x.valor, unidad: x.unidad, canal_id: k.id };
+        const ult = r.rows[r.rows.length - 1];
+        if (r.rows.length < tanda || ult === undefined) break;
+        ultimo = ult.tiempo_utc;
+      }
+    }
+  }
+
+  // Tramas aceptadas del sitio, dispositivo por dispositivo y por (recibido_en, id). La huella y el tamaño los calcula la base sobre los
+  // bytes guardados; la carga va en base64 sin los saltos de línea que encode() pone cada 76 caracteres. Tandas chicas: una trama pesa
+  // hasta 64 KiB (87 384 caracteres en base64), y 250 son ≈ 22 MB en el peor caso. La condición `recibido_en >= clave` acota el recorrido
+  // del índice (que no tiene `id`): sin ella, cada página volvería a leer desde `desde`.
+  async *tramasSitio(c: Pick<PoolClient, 'query'>, sitioId: string, desde: Date, hasta: Date, tanda = 250): AsyncGenerator<FilaTramaSitio> {
+    for (const d of await this.dispositivosDelSitio(c, sitioId)) {
+      let clave: { t: string; id: string } | null = null;
+      for (;;) {
+        const r: { rows: (Omit<FilaTramaSitio, 'id_fisico'> & { id: string })[] } = await c.query(
+          `SELECT ${isoUs('t.recibido_en')} AS recibido_en_utc, t.id, t.topico, t.adaptador, octet_length(t.payload) AS bytes,
+                  encode(sha256(t.payload), 'hex') AS sha256, translate(encode(t.payload, 'base64'), E'\n', '') AS payload_base64
+             FROM trama t
+            WHERE t.dispositivo_id = $1 AND t.recibido_en >= $2 AND t.recibido_en < $3
+              AND ($4::timestamptz IS NULL OR (t.recibido_en >= $4::timestamptz AND (t.recibido_en, t.id) > ($4::timestamptz, $5::uuid)))
+            ORDER BY t.recibido_en, t.id LIMIT $6`, [d.id, desde, hasta, clave?.t ?? null, clave?.id ?? null, tanda]);
+        for (const x of r.rows) {
+          yield { recibido_en_utc: x.recibido_en_utc, id_fisico: d.id_fisico, topico: x.topico, adaptador: x.adaptador, bytes: x.bytes, sha256: x.sha256, payload_base64: x.payload_base64 };
+        }
+        const ult = r.rows[r.rows.length - 1];
+        if (r.rows.length < tanda || ult === undefined) break;
+        clave = { t: ult.recibido_en_utc, id: ult.id };
+      }
+    }
+  }
+
+  // Eventos del ciclo de vida de los dispositivos del sitio (los de GET /eventos, RF-33), por (ocurrido_en, id) con el índice de la
+  // migración 23. Sin `usuario_id`: quién lo hizo es un dato personal y se queda en «Actividad» (docs/21; bloque R, punto 1).
+  async *eventosSitio(c: Pick<PoolClient, 'query'>, sitioId: string, desde: Date, hasta: Date, tanda = 10_000): AsyncGenerator<FilaEventoSitio> {
+    for (const d of await this.dispositivosDelSitio(c, sitioId)) {
+      let clave: { t: string; id: string } | null = null;
+      for (;;) {
+        const r: { rows: { ocurrido_en_utc: string; id: string; tipo: string; detalle: unknown }[] } = await c.query(
+          `SELECT ${isoUs('e.ocurrido_en')} AS ocurrido_en_utc, e.id, e.tipo, e.detalle
+             FROM evento e
+            WHERE e.dispositivo_id = $1 AND e.ocurrido_en >= $2 AND e.ocurrido_en < $3
+              AND ($4::timestamptz IS NULL OR (e.ocurrido_en >= $4::timestamptz AND (e.ocurrido_en, e.id) > ($4::timestamptz, $5::uuid)))
+            ORDER BY e.ocurrido_en, e.id LIMIT $6`, [d.id, desde, hasta, clave?.t ?? null, clave?.id ?? null, tanda]);
+        for (const x of r.rows) yield { ocurrido_en_utc: x.ocurrido_en_utc, id_fisico: d.id_fisico, tipo: x.tipo, detalle: x.detalle };
+        const ult = r.rows[r.rows.length - 1];
+        if (r.rows.length < tanda || ult === undefined) break;
+        clave = { t: ult.ocurrido_en_utc, id: ult.id };
+      }
+    }
+  }
+
+  // Estimación antes de descargar (bloque R, punto 5): cuántas filas trae cada conjunto, contadas con tope. El LIMIT de adentro corta cada
+  // canal o dispositivo y el de afuera, el total: ninguna cuenta recorre más de `tope + 1` entradas del índice. `tramas_desde`: la trama más
+  // antigua del rango (las tramas vencen a los RETENCION_TRAMA_DIAS), o null si no hay.
+  async estimarSitio(c: Pick<PoolClient, 'query'>, sitioId: string, desde: Date, hasta: Date, tope: number) {
+    const contar = async (sql: string): Promise<number> => (await c.query<{ n: number }>(sql, [sitioId, desde, hasta, tope + 1])).rows[0]?.n ?? 0;
+    const mediciones = await contar(`
+      SELECT count(*)::int AS n FROM (
+        SELECT 1 FROM canal ca JOIN dispositivo d ON d.id = ca.dispositivo_id JOIN zona z ON z.id = d.zona_id
+         CROSS JOIN LATERAL (SELECT 1 FROM medicion m WHERE m.canal_id = ca.id AND m.tiempo >= $2 AND m.tiempo < $3 LIMIT $4) x
+         WHERE z.sitio_id = $1 LIMIT $4) y`);
+    const tramas = await contar(`
+      SELECT count(*)::int AS n FROM (
+        SELECT 1 FROM dispositivo d JOIN zona z ON z.id = d.zona_id
+         CROSS JOIN LATERAL (SELECT 1 FROM trama t WHERE t.dispositivo_id = d.id AND t.recibido_en >= $2 AND t.recibido_en < $3 LIMIT $4) x
+         WHERE z.sitio_id = $1 LIMIT $4) y`);
+    const eventos = await contar(`
+      SELECT count(*)::int AS n FROM (
+        SELECT 1 FROM dispositivo d JOIN zona z ON z.id = d.zona_id
+         CROSS JOIN LATERAL (SELECT 1 FROM evento e WHERE e.dispositivo_id = d.id AND e.ocurrido_en >= $2 AND e.ocurrido_en < $3 LIMIT $4) x
+         WHERE z.sitio_id = $1 LIMIT $4) y`);
+    const primera = await c.query<{ t: Date | null }>(`
+      SELECT min(x.t) AS t FROM dispositivo d JOIN zona z ON z.id = d.zona_id
+       CROSS JOIN LATERAL (SELECT t.recibido_en AS t FROM trama t WHERE t.dispositivo_id = d.id AND t.recibido_en >= $2 AND t.recibido_en < $3
+                            ORDER BY t.recibido_en LIMIT 1) x
+       WHERE z.sitio_id = $1`, [sitioId, desde, hasta]);
+    return { mediciones, tramas, eventos, tramasDesde: primera.rows[0]?.t ?? null };
   }
 
   // La carga cruda se devuelve acotada: es para diagnosticar, no para reprocesar. payload_legible (migración 09)

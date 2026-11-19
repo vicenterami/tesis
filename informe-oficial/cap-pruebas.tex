@@ -3,7 +3,7 @@
 
 \section{Qué está implementado}
 
-El cuadro~\ref{tab:implementado} resume cada módulo; en horas, el núcleo mínimo (OE4) está hecho en un 87\,\% (sección~\ref{sec:seguimiento}).
+El cuadro~\ref{tab:implementado} resume cada módulo; en horas, el núcleo mínimo (OE4) está hecho en un 89\,\% (sección~\ref{sec:seguimiento}).
 
 \begin{table}[tb]
 \centering\footnotesize
@@ -29,7 +29,7 @@ M8 Panel & Semáforo; inventario filtrable; ficha; salud del sitio; canal callad
 
 \section{Método de prueba}
 
-Se prueba en tres niveles, todos repetibles con un comando (anexo~\ref{anx:pruebas}). Las 864 pruebas unitarias del backend y las 480 del panel corren sin base ni broker, con tipos estrictos y análisis estático. \textbf{Banco
+Se prueba en tres niveles, todos repetibles con un comando (anexo~\ref{anx:pruebas}). Las 906 pruebas unitarias del backend y las 518 del panel corren sin base ni broker, con tipos estrictos y análisis estático. \textbf{Banco
 desechable}: una segunda pila con base, broker con su plugin de seguridad, backend y proxy reales, datos en memoria y un
 emulador de nodos que imita relojes rotos, pérdidas y deriva; sobre él corren casos fijos de carga, carreras,
 caídas, TLS, alta por API, LoRaWAN y cola del broker. \textbf{Verificador de concordancia}: 58 pasos que comparan informe, documentación, base y API. Cada comprobación nueva se ejecuta primero contra el error \emph{plantado}: una prueba vale solo si falla ante la falla.

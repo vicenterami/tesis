@@ -64,6 +64,7 @@ export type Vista =
   | { pantalla: 'actividad'; filtros: FiltrosActividad } // P14: `#/actividad?sitio=&tipo=&usuario=&desde=&hasta=`
   | { pantalla: 'publicar'; sitio: string } // P9, quien publica: `#/publicar?sitio=<código>` (docs/19 §4, O, puntos 3 y 10)
   | { pantalla: 'ajustes'; sitio: string } // P15, ajustes del sitio: `#/sitio/ajustes?sitio=<código>` (docs/19 §4, Q)
+  | { pantalla: 'exportar'; sitio: string } // P8, exportar un sitio: `#/exportar?sitio=<código>` (docs/19 §4, R, punto 6)
   // P9, quien visita: `#/v/<token>`. La resuelve main.ts antes de montar la aplicación; si App la ve (un cambio de fragmento antes de la
   // recarga), no la trata como ninguna otra pantalla: nunca es «última vista» ni se guarda como vista (punto 5).
   | { pantalla: 'publico' }
@@ -150,6 +151,7 @@ export function leerVista(fragmento: string): Vista {
   if (esRutaPublica(`#${(nueva ?? fragmento).replace(/^#/, '')}`)) return { pantalla: 'publico' };
   if (ruta === '/publicar') return { pantalla: 'publicar', sitio: leerSitio(q.get('sitio')) };
   if (ruta === '/sitio/ajustes') return { pantalla: 'ajustes', sitio: leerSitio(q.get('sitio')) };
+  if (ruta === '/exportar') return { pantalla: 'exportar', sitio: leerSitio(q.get('sitio')) };
   if (ruta === '/alta') {
     const m = q.get('modo');
     const idf = (q.get('id_fisico') ?? '').trim().toLowerCase();
@@ -274,4 +276,9 @@ export function fragmentoPublicar(sitio: string): string {
 // P15, ajustes del sitio: el sitio cuyos ajustes se cambian (el código; sin él, el primero de los que la persona puede ajustar).
 export function fragmentoAjustes(sitio: string): string {
   return sitio === '' ? '#/sitio/ajustes' : `#/sitio/ajustes?${new URLSearchParams({ sitio }).toString()}`;
+}
+
+// P8, exportar un sitio: el sitio que se exporta (el código; sin él, el primero de los que la persona puede exportar).
+export function fragmentoExportar(sitio: string): string {
+  return sitio === '' ? '#/exportar' : `#/exportar?${new URLSearchParams({ sitio }).toString()}`;
 }

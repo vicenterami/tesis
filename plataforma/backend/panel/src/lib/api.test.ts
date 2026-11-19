@@ -132,11 +132,27 @@ describe('descargar', () => {
     expect(nombreDeArchivo('attachment; filename="../../etc/passwd"', 'x.csv')).toBe('x.csv');
     expect(nombreDeArchivo(null, 'x.csv')).toBe('x.csv');
   });
-  it('nombreDeArchivo: solo .csv y .json (lo que la API entrega); otra extensión da el nombre de por defecto', () => {
+  it('nombreDeArchivo: solo .csv, .json, .zip y .xlsx (lo que la API entrega); otra extensión da el nombre de por defecto', () => {
     expect(nombreDeArchivo('attachment; filename="datos.exe"', 'x.csv')).toBe('x.csv');
     expect(nombreDeArchivo('attachment; filename="pagina.html"', 'x.csv')).toBe('x.csv');
     expect(nombreDeArchivo('attachment; filename="sin-extension"', 'x.json')).toBe('x.json');
     expect(nombreDeArchivo('attachment; filename="dev-0001.JSON"', 'x.json')).toBe('dev-0001.JSON');
+    // La exportación de un sitio (docs/19 §4, R, punto 6): el CSV llega en un .zip; el XLSX, como libro.
+    expect(nombreDeArchivo('attachment; filename="sitio_uct_2026-10-20_2026-11-19.zip"', 'sitio_uct.zip')).toBe('sitio_uct_2026-10-20_2026-11-19.zip');
+    expect(nombreDeArchivo('attachment; filename="sitio_uct_2026-10-20_2026-11-19.xlsx"', 'sitio_uct.xlsx')).toBe('sitio_uct_2026-10-20_2026-11-19.xlsx');
+    expect(nombreDeArchivo('attachment; filename="SITIO.XLSX"', 'x.xlsx')).toBe('SITIO.XLSX');
+    // Ni sus parientes con macros o ejecutables, ni una extensión de más tras la buena, ni un nombre que es solo la extensión.
+    for (const malo of ['libro.xlsm', 'libro.xls', 'datos.zip.exe', 'datos.7z', 'datos.zipx', '.zip', 'a/b.zip']) {
+      expect(nombreDeArchivo(`attachment; filename="${malo}"`, 'sitio_uct.zip'), malo).toBe('sitio_uct.zip');
+    }
+  });
+  it('descargar acepta los tipos de la exportación por sitio (el .zip y el XLSX) además del CSV y el JSON', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(new Uint8Array([0x50, 0x4b, 3, 4]), { headers: { 'content-disposition': 'attachment; filename="sitio_uct_2026-11-12_2026-11-19.zip"' } })));
+    const g = { crearUrl: () => 'blob:x', liberarUrl: () => undefined, pulsar: vi.fn() };
+    await expect(descargar('/sitios/s1/exportar?formato=csv', 'sitio_uct.zip', undefined, g)).resolves.toEqual({ nombre: 'sitio_uct_2026-11-12_2026-11-19.zip', bytes: 4 });
+    const acepta = (llamadas()[0]![1].headers as Record<string, string>).accept!.split(',').map((x) => x.trim());
+    expect(acepta).toEqual(['text/csv', 'application/json', 'application/zip', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']);
+    vi.unstubAllGlobals();
   });
   it('nombreDeArchivo: un «%» mal formado (URIError al decodificar) da el nombre por defecto, sin lanzar', () => {
     expect(nombreDeArchivo("attachment; filename*=UTF-8''medici%E0%A4n.json", 'x.json')).toBe('x.json');

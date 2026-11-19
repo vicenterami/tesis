@@ -710,7 +710,7 @@ ejecuta contra la holgura verificada al cierre de cada etapa.
 | 2. Segundo nivel | Cifrado del transporte | TT-22 | ⬜ E3 |
 | 2. Segundo nivel | Panel de control | HU-19, HU-20, HU-21 | ✅ 24/10; 🟡 12/10 (P2 y P3 hechas; HU-20 parcial); HU-21 y HU-20 cerradas el 16/10 (`docs/16 §39` y §40) y HU-19 el 24/10 (`docs/16 §53` y §54; estado al día: `docs/18`) |
 | 2. Segundo nivel | Vista pública por enlace, de solo lectura y sin datos crudos (agregada el 16/11/2026) | HU-32 | ✅ E4, 17/11/2026: base, backend y proxy (`docs/16 §79`) y las dos pantallas (`docs/16 §80`); la medición del punto 13, pendiente (`docs/19 §4`, O) |
-| 2. Segundo nivel | Exportación en formato abierto | HU-08 | 🟡 E3 (CSV y JSON el 12/10; XLSX en la E4) |
+| 2. Segundo nivel | Exportación en formato abierto | HU-08 | ✅ E4 (CSV y JSON por dispositivo el 12/10; el sitio entero, XLSX y la pantalla el 19/11) |
 | 2. Segundo nivel | Validación formal | TT-27, TT-28, TT-29 | ✅ E4 (TT-28 y TT-29 hechas en la E3; TT-27, la matriz del contrato y el perfil estricto de SenML, el 15/11/2026: `docs/16 §73` y §74) |
 
 El criterio de demostración del informe (cap. 5 §5.2) y OE4 (`docs/01`) siguen este orden.

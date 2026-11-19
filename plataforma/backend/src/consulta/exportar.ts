@@ -21,11 +21,16 @@ export function filaCsv(f: FilaExportada): string {
   return [celdaCsv(f.tiempo_utc), celdaCsv(f.magnitud), celdaNumerica(f.valor), celdaCsv(f.unidad), celdaCsv(f.canal_id)].join(',') + '\r\n';
 }
 
-// Una celda de TEXTO con coma, comillas o salto de línea va entre comillas, con las comillas internas duplicadas. Si empieza con
-// =, +, -, @, tabulador o retorno de carro se antepone un apóstrofo: una planilla lo interpretaría como fórmula (inyección CSV).
-// Se aplica a toda columna de texto aunque hoy salga de un catálogo cerrado: la defensa no depende del catálogo.
+// Una celda de TEXTO con coma, comillas o salto de línea va entre comillas, con las comillas internas duplicadas.
+// Protección contra fórmulas REVERSIBLE (docs/19 §4, bloque R, punto 2; desde el 19/11/2026): a todo texto que, después de cero o más
+// apóstrofos, empiece con =, +, -, @, tabulador, retorno, salto de línea o sus formas de ancho completo (el conjunto de FORMULA del panel,
+// panel/src/lib/lote.ts) se le antepone un apóstrofo: una planilla lo interpretaría como fórmula (inyección CSV, OWASP). Para reimportar, a
+// un texto que empieza con apóstrofos seguidos de uno de esos caracteres se le quita UNO, y se recupera el original exacto: antes solo se
+// protegía lo que empezaba con el carácter, y un texto que ya empezaba con «'=» salía igual que uno protegido (un `payload_base64` puede
+// empezar con «+»). Se aplica a toda columna de texto aunque hoy salga de un catálogo cerrado: la defensa no depende del catálogo.
+export const FORMULA_CSV = /^'*[=+\-@\t\r\n＝＋－＠]/;
 export function celdaCsv(v: string): string {
-  const protegida = /^[=+\-@\t\r]/.test(v) ? `'${v}` : v;
+  const protegida = FORMULA_CSV.test(v) ? `'${v}` : v;
   return /[",\r\n]/.test(protegida) ? `"${protegida.replace(/"/g, '""')}"` : protegida;
 }
 
@@ -42,15 +47,19 @@ export function filaJson(f: FilaExportada): string {
 // Nombre del archivo descargado: identificador físico saneado y el rango, sin nada que un navegador o un sistema de archivos
 // pueda interpretar (solo letras, dígitos, guion, punto y guion bajo).
 export function nombreDeArchivo(idFisico: string, desde: Date, hasta: Date, formato: Formato): string {
-  const limpio = idFisico.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 60) || 'dispositivo';
+  return `${nombreSaneado(idFisico, 'dispositivo', desde, hasta)}.${formato}`;
+}
+// La parte común con la exportación por sitio (`sitio_<código>_<desde>_<hasta>`, exportar-sitio.ts): el nombre saneado y el rango por día.
+export function nombreSaneado(nombre: string, porDefecto: string, desde: Date, hasta: Date): string {
+  const limpio = nombre.replace(/[^A-Za-z0-9._-]/g, '_').slice(0, 60) || porDefecto;
   const dia = (d: Date): string => d.toISOString().slice(0, 10);
-  return `${limpio}_${dia(desde)}_${dia(hasta)}.${formato}`;
+  return `${limpio}_${dia(desde)}_${dia(hasta)}`;
 }
 
 // Rango razonable para no mandar a la base fechas que `timestamptz` no admite (año −5000) ni pedir el futuro.
 export function rangoRazonable(desde: Date, hasta: Date, ahora = new Date()): string | null {
   if (desde >= hasta) return 'desde debe ser anterior a hasta';
-  if (desde.getUTCFullYear() < 2000) return 'desde debe ser posterior al año 2000';
+  if (desde.getUTCFullYear() < 2000) return 'desde no puede ser anterior al año 2000'; // el 1/1/2000 a las 00:00 UTC se admite
   if (hasta.getTime() > ahora.getTime() + 86_400_000) return 'hasta no puede estar más de un día en el futuro';
   return null;
 }

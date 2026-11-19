@@ -114,7 +114,9 @@ else echo "OK    sin «ingesta» ni «heterogéneo»"; fi
 
 paso "2d. Variables de entorno: toda variable que lee el backend está declarada en plataforma/.env.example (docs/11 §7)"
 # Cualquier objeto (config, cfg, this.config) y cualquier comilla: el 27/09 `cfg.get("X")` pasaba sin verse.
-leidas=$(grep -rhoE "(\.get(OrThrow)?(<[^>]+>)?\(\s*['\"\`]|process\.env\.)[A-Z_]+" plataforma/backend/src --include=*.ts | grep -v spec | grep -oE "[A-Z_]{3,}$" | grep -vx TZ | sort -u)
+# 19/11/2026: las pruebas se excluyen por nombre de archivo. Antes un `grep -v spec` filtraba la SALIDA de `grep -h -o`, que no lleva el nombre
+# del archivo, así que no excluía nada: `zip.get('LEEME.txt')` de una prueba salió como si el código leyera la variable LEEME.
+leidas=$(grep -rhoE "(\.get(OrThrow)?(<[^>]+>)?\(\s*['\"\`]|process\.env\.)[A-Z_]+" plataforma/backend/src --include=*.ts --exclude='*.spec.ts' | grep -oE "[A-Z_]{3,}$" | grep -vx TZ | sort -u)
 declaradas=$(grep -oE "^#?[A-Z_]+=" plataforma/.env.example | tr -d '#=' | sort -u)
 faltan=$(comm -23 <(echo "$leidas") <(echo "$declaradas"))
 if [ "$(echo "$leidas" | grep -c .)" -lt 10 ]; then
@@ -174,8 +176,10 @@ paso "2f3. Sin direcciones IPv4 reales: solo loopback, 0.0.0.0 y las de document
 # 16/10: una prueba del banco usaba la dirección de un resolvedor público real como dirección falsa, y unitarias, una de red privada;
 # ningún paso lo veía. Una dirección con forma real es un dato real a efectos de la regla: los ejemplos van en 192.0.2.0/24,
 # 198.51.100.0/24 o 203.0.113.0/24. Se cuentan las encontradas: si el patrón no encuentra ninguna (ni 127.0.0.1), no revisó nada.
-git grep --untracked -I -n -o -E '\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' -- ':!privado' ':!historico' ':!*.pdf' > "$VT"/ipv4.txt 2>&1; rc=$?
-total=$(wc -l < "$VT"/ipv4.txt); ajenas=$(grep -vE ':(127\.[0-9]+\.[0-9]+\.[0-9]+|0\.0\.0\.0|192\.0\.2\.[0-9]+|198\.51\.100\.[0-9]+|203\.0\.113\.[0-9]+)$' "$VT"/ipv4.txt)
+# 19/11/2026: un número de sección de una norma con cuatro niveles (§4.3.9.4 de la especificación ZIP, §22.9.2.19 de ECMA-376) tiene la
+# forma de una dirección; con «§» delante es una sección y no cuenta. Se captura el «§» para distinguirlo; sin él, la regla es la de siempre.
+git grep --untracked -I -n -o -E '(§)?\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' -- ':!privado' ':!historico' ':!*.pdf' > "$VT"/ipv4.txt 2>&1; rc=$?
+total=$(wc -l < "$VT"/ipv4.txt); ajenas=$(grep -vE ':(§[0-9.]+|127\.[0-9]+\.[0-9]+\.[0-9]+|0\.0\.0\.0|192\.0\.2\.[0-9]+|198\.51\.100\.[0-9]+|203\.0\.113\.[0-9]+)$' "$VT"/ipv4.txt)
 if [ "$rc" -gt 1 ] || [ "$total" -lt 1 ]; then echo "FALLA git grep falló ($rc) o no encontró ninguna dirección: no se revisó nada"; fallos=$((fallos+1))
 elif [ -n "$ajenas" ]; then echo "FALLA direcciones IPv4 que no son de loopback ni de documentación:"; echo "$ajenas" | cut -c1-120 | sed 's/^/  /'; fallos=$((fallos+1))
 else echo "OK    $total direcciones IPv4 en archivos versionados o nuevos: todas de loopback, 0.0.0.0 o de documentación"; fi
@@ -1337,7 +1341,7 @@ paso "4b. Sesión y permisos (docs/20 §6 y §8): la matriz ruta × rol con una 
 # 08/11/2026: el primer administrador con X-Clave-Admin, un usuario de consulta, dos sitios propios de la prueba; todo se borra al salir.
 if curl -s -m 2 http://127.0.0.1:3000/salud >/dev/null; then bash plataforma/pruebas/sesion-smoke.sh || fallos=$((fallos+1)); else echo "omitida: backend no está corriendo"; omitidos="$omitidos 4b"; fi
 
-paso "4c. Panel con sesión en navegadores reales (P10; docs/19 §4 y §6): entrar, clave temporal, inventario, exportar, usuarios, vencer y salir, a 390 y 1280 px, en Chromium y Firefox; y la vista pública por enlace (P9)"
+paso "4c. Panel con sesión en navegadores reales (P10; docs/19 §4 y §6): entrar, clave temporal, inventario, exportar, usuarios, vencer y salir, a 390 y 1280 px, en Chromium y Firefox; la vista pública por enlace (P9) y la exportación del sitio (P8)"
 # 08/11/2026: el e2e de la pantalla de inicio de sesión contra la pila de desarrollo (el panel servido por la imagen del backend). Sin el backend
 # o sin los navegadores de Playwright, el guion sale con 3 y el paso se OMITE con aviso: nunca «OK» sin haber probado.
 bash plataforma/pruebas/panel-sesion-e2e.sh; r=$?
@@ -1346,6 +1350,10 @@ if [ "$r" = 3 ]; then omitidos="$omitidos 4c"; elif [ "$r" != 0 ]; then fallos=$
 # solo en la cabecera, ni en direcciones, almacenamiento, cookies o consola), renovar, el k del sitio y revocar. Mismas reglas de omisión.
 bash plataforma/pruebas/panel-publico-e2e.sh; r=$?
 if [ "$r" = 3 ]; then omitidos="$omitidos 4c-publico"; elif [ "$r" != 0 ]; then fallos=$((fallos+1)); fi
+# 19/11/2026: P8 (docs/19 §4, R; docs/16 §89): exportar el sitio desde la ficha, la estimación contra lo sembrado, los tres formatos con su
+# nombre y su firma, «Entre fechas» en la hora del sitio y sin desplazamiento horizontal; borra lo sembrado al final. Mismas reglas de omisión.
+bash plataforma/pruebas/panel-exportar-e2e.sh; r=$?
+if [ "$r" = 3 ]; then omitidos="$omitidos 4c-exportar"; elif [ "$r" != 0 ]; then fallos=$((fallos+1)); fi
 
 paso "4d. Semilla de demostración: respeta la clave de quien ya eligió la suya (persona_temporal en conservar y rotar, con una persona de descarte)"
 # 13/11/2026: cada corrida de la semilla anulaba la clave propia de las personas de demostración y cortaba sus sesiones. La prueba usa una

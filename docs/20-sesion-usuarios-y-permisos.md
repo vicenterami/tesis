@@ -170,6 +170,7 @@ persona pidiendo un recurso de un sitio donde no tiene membresía (el administra
 | `POST /sesion` (pública), `GET /sesion`, `DELETE /sesion`, `POST /sesion/clave` (las tres valen con clave temporal) | 200 / 401 | 200 | 200 | 200 | 200 | 200 | — |
 | `GET /dispositivos`, `GET /dispositivos/{id}`, `GET /canales/{id}/historico`, `GET /condiciones`, `GET /cuarentena`, `GET /pasarelas`, `GET /eventos` | 401 | 200 (solo sus sitios en la lista; filtro por sitio en el `WHERE`) | 200 | 200 | 200 | 200 (todos los sitios) | 404 |
 | `GET /dispositivos/{id}/exportar` (datos crudos, no públicos: punto 6) | 401 | 403 | 200 | 403 | 200 | 200 | 404 |
+| `GET /sitios/{id}/exportar`, `GET /sitios/{id}/exportar/estimacion` (el sitio entero; diseñadas el 19/11/2026, `docs/19 §4` bloque R; HU-08) | 401 | 403 | 200 | 403 | 200 | 200 | 404 |
 | `POST /dispositivos`, `POST /dispositivos/{id}/credencial`, `PATCH /canales/{id}` (calibración), `POST /pasarelas`, `POST /pasarelas/{id}/credencial` | 401 | 403 | 403 | 200 / 409 | 200 / 409 | 200 / 409 | 404 |
 | `DELETE /dispositivos/{id}`, `DELETE /pasarelas/{id}` (baja: el equipo deja de recibir datos) | 401 | 403 | 403 | 403 | 200 / 409 | 200 / 409 | 404 |
 | Configurar un dispositivo, sus reglas de umbral y su estado (mantenimiento), y mudarlo (Etapa 4, rutas por fijar en el OpenAPI) | 401 | 403 | 403 | 200 / 409 | 200 / 409 | 200 / 409 | 404 |

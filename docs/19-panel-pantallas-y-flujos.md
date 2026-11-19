@@ -75,7 +75,7 @@ tabla de casos**, un archivo del panel que leen las tres (`panel/src/lib/estado-
 | P5 | **Cuarentena** | Últimas tramas rechazadas: cuándo, por qué (`no_registrado`, `dado_de_baja`, `malformada`, `invalida`), detalle, dispositivo si se conoce, la trama cruda plegada | Copiar la trama; ir al alta si el motivo es `no_registrado` | `GET /cuarentena?limite` | RF-11 a RF-13 | Etapa 4 (lista sobre lo que la API ya devuelve) |
 | P6 | **Configurar dispositivo y canales** | Nombre, estado (activo / mantenimiento), intervalo esperado, zona; por canal, etiqueta, umbral alto, umbral bajo, histéresis y retardo de activación | Guardar con bloqueo optimista; validación en vivo (bajo < alto, histéresis dentro de la banda, rango de la magnitud) | `PATCH /dispositivos/{id}`, `PUT /canales/{id}/reglas` (Etapa 4), fijadas el 11/11/2026 (§4 tablero v2, E) | HU-06, HU-13, RF-14, punto 28 | Etapa 4, iteración 1 (exige sesión) |
 | P7 | **Alta de dispositivo** (asistente) | Paso 1 identidad y zona; paso 2 vía y formato (y pasarela si LoRaWAN); paso 3 canales y magnitudes; paso 4 credencial según la vía, mostrada una sola vez; paso 5 «esperando la primera trama» en vivo | Crear; copiar la credencial y el tópico; subir un CSV, validarlo y crear las filas válidas; dar de alta un emisor detectado | `POST /dispositivos` (API hecha el 12/10, HU-11, `docs/16 §20`); `POST /dispositivos/lote?modo=validar\|crear` y `GET /cuarentena/detectados` (Etapa 4), fijadas el 11/11/2026 (§4 tablero v2, F) | RF-50, HU-11, HU-22, punto 25 | API: Etapa 3; pantalla, lote y detectados: Etapa 4, iteración 1 |
-| P8 | **Exportar** | Dispositivo (hoy) o sitio (Etapa 4), rango, formato (CSV, XLSX, JSON); tamaño estimado antes de descargar | Descargar | Hecho el 12/10 por dispositivo: `GET /dispositivos/{id}/exportar?formato=csv\|json&desde&hasta` (flujo por tandas; CSV estándar con coma y punto decimal para R, Python y QGIS). **Propuesta** para la Etapa 4: `GET /sitios/{id}/exportar` con rol y XLSX | RF-34, HU-08 (adelantada a la Etapa 3 el 12/10) | API: Etapa 3; pantalla, XLSX y por sitio: Etapa 4 |
+| P8 | **Exportar** (el sitio, diseñada el 19/11/2026, §4 bloque R) | Dispositivo (hoy) o sitio (Etapa 4), rango, formato (CSV, XLSX, JSON); tamaño estimado antes de descargar | Descargar | Hecho el 12/10 por dispositivo: `GET /dispositivos/{id}/exportar?formato=csv\|json&desde&hasta` (flujo por tandas; CSV estándar con coma y punto decimal para R, Python y QGIS). Por sitio (bloque R): `GET /sitios/{id}/exportar?formato=csv\|xlsx\|json` con mediciones, tramas y eventos, y `GET /sitios/{id}/exportar/estimacion` | RF-34, HU-08 (adelantada a la Etapa 3 el 12/10) | API: Etapa 3; pantalla, XLSX y por sitio: Etapa 4 |
 | P9 | **Vista pública por enlace** (diseñada el 16/11/2026, §4 bloque O; ✅ base, backend, proxy y las dos pantallas, 17/11/2026, `docs/16 §79` y §80) | Para quien visita sin cuenta: solo los promedios de las magnitudes que un administrador publicó (del sitio y, si lo eligió, de cada zona), nunca el mínimo ni el máximo; un valor sale oculto si lo aportan menos de k dispositivos. Para el administrador, «Publicar una vista» con vista previa y la lista de enlaces | Visitante: cambiar la ventana y pausar la actualización. Administrador: crear (con vencimiento), renovar y revocar | `GET /publico` (token en la cabecera `X-Enlace-Publico`) y `POST /sitios/{id}/enlaces/vista-previa`; crear y listar, `GET`/`POST /sitios/{id}/enlaces`, renovar, `POST /sitios/{id}/enlaces/{enlace}/renovar`, revocar, `DELETE /sitios/{id}/enlaces/{enlace}`, y el tope de enlaces y el k del sitio, `GET`/`PUT /sitios/{id}/enlaces/tope` y `GET`/`PUT /sitios/{id}/enlaces/minimo`, fijadas en el OpenAPI el 17/11/2026 (§4, O); desde el 18/11/2026 el k y el tope se cambian en P15 «Ajustes del sitio» (§4, Q) | RF-62, HU-32, punto 6 | Etapa 4, iteración 1 |
 | P10 | **Sesión y usuarios** | Entrar, cambio de la clave temporal, salir; quién soy en la cabecera; usuarios de mis sitios, su perfil por sitio y la guía de perfiles (cinco desde el 08/11/2026, diseño: `docs/20 §6`) | Entrar, cambiar la clave, salir o cerrar en todos lados; dar de alta (clave temporal una vez), activar y desactivar, asignar una temporal, cambiar el rol | `POST /sesion`, `GET /sesion`, `DELETE /sesion`, `POST /sesion/clave`, `GET /usuarios`, `POST /usuarios`, `PATCH /usuarios/{id}` (`docs/20`) | RF-43, RF-44, HU-18 | Etapa 4; hecha el 08/11/2026 (§4) |
 | P11 | **Legal y acerca de** (Etapa 4) | Privacidad (generada desde `docs/21`), términos de uso con su versión, avisos de terceros, versión y commit, aviso AGPL; soporte: contacto del responsable y formulario | Leer; aceptar los términos (obligatorio al primer ingreso y al cambiar la versión); enviar un mensaje de soporte | `GET /terminos`, `POST /terminos/aceptar`, `GET /privacidad`, `GET /acerca` (versión y commit solo con sesión), `POST /soporte` y `GET /soporte` (Etapa 4); los avisos de terceros, un archivo generado al cambiar dependencias | RF-53, RF-54, RF-61, HU-27, HU-31 | Iteración 0; hecha el 11/11/2026 |
@@ -1341,6 +1341,160 @@ API, y el k y el tope de enlaces vivos vivían al pie de «Publicar una vista» 
    oculto sin ninguna) y las de «Publicar» (la línea de lectura y el enlace); con navegador real, el paso del k de
    `panel/e2e/publico.mjs` pasa por esta pantalla y una visita comprueba los tres controles a 390 y 1 280 px.
 
+**R. P8 Exportar un sitio (HU-08, RF-34, RF-31, RF-41; diseñado el 19/11/2026, antes del código).** Hoy se exportan las mediciones de un
+dispositivo (`GET /dispositivos/{id}/exportar`, 12/10/2026), y eso no cambia salvo la protección contra fórmulas (punto 2). Lo que falta para
+cerrar HU-08, en el orden en que se construye:
+1. **Qué se exporta.** ✅ backend, 19/11/2026 (`consulta.service.ts`: `medicionesSitio`, `tramasSitio`, `eventosSitio`; revisado cada escritor de
+   `evento` con equipo: ningún `detalle` lleva nombre, correo ni id de persona). Los criterios de HU-08 usan «eventos» en dos sentidos y se cubren los dos: las **tramas aceptadas** con el mensaje
+   original (RF-31 llama «evento aceptado» al mensaje y «su interpretación» a las mediciones) y los **eventos del ciclo de vida** (alta,
+   baja, mantenimiento, condiciones: los de `GET /eventos`, RF-33). Tres conjuntos del rango [desde, hasta), de todos los dispositivos del
+   sitio en cualquier estado (un equipo no cambia de sitio, solo de zona dentro del mismo, `configuracion.service.ts`: el sitio actual basta
+   para RF-41):
+   - **mediciones**: `tiempo_utc, id_fisico, magnitud, valor, unidad, canal_id` (las columnas de la exportación por dispositivo más `id_fisico`);
+   - **tramas**: `recibido_en_utc, id_fisico, topico, adaptador, bytes, sha256, payload_base64`: el contenido exacto en base64 y su huella
+     SHA-256 calculada en la base, para que cualquiera compruebe que llegó íntegro;
+   - **eventos**: `ocurrido_en_utc, id_fisico, tipo, detalle_json`.
+   Nada de personas en el archivo (`docs/21`, minimización): quién hizo cada cambio se queda en «Actividad» (P14). Antes de construir se
+   revisa que `evento.detalle` no lleve datos de personas en ningún tipo; si alguno los lleva, ese dato se omite. Las tramas se guardan
+   `RETENCION_TRAMA_DIAS` (30 por omisión): del rango salen las que existan, y el archivo lo dice. La cuarentena no se exporta (es lo
+   rechazado, no un dato aceptado del sitio). Los instantes van como texto exacto de la base (UTC, microsegundos), igual que hoy.
+2. **Ruta y formatos.** ✅ backend, 19/11/2026 (`sitios.controller.ts`, `exportar-sitio.ts`; `celdaCsv` reversible en `exportar.ts`, también para la
+   exportación por dispositivo). `GET /sitios/{id}/exportar?formato=csv|xlsx|json&desde&hasta` (por omisión `csv` y los últimos 30 días; el mismo
+   rango razonable de hoy). Acción `exportar` sobre el sitio: 401 sin sesión, 403 a consulta y operador técnico, 200 a investigador y
+   administradores, 404 a otro sitio o a uno inexistente (`docs/20 §6`). Respuesta en flujo con `Content-Disposition: attachment`,
+   `Cache-Control: no-store` y nombre `sitio_<código>_<desde>_<hasta>.<extensión>`, saneado como hoy.
+   - **csv** → un `.zip` con `mediciones.csv`, `tramas.csv`, `eventos.csv` (el CSV estándar de hoy: coma, punto decimal, UTF-8, CRLF) y
+     `LEEME.txt`: sitio, rango, hora de generación, versión del formato (`exportacion-sitio/1`), qué es cada columna, la retención de las
+     tramas, la regla del apóstrofo y **cuántas filas trae cada archivo** (se escribe al final: una descarga cortada se nota).
+   - **xlsx** → un libro con las hojas «Acerca de» (lo mismo que `LEEME.txt`; primera pestaña, escrita al final), «Mediciones», «Tramas» y
+     «Eventos», con la primera fila fija; además del instante exacto como texto, una columna con la fecha nativa de planilla (UTC,
+     milisegundos, formato `yyyy-mm-dd hh:mm:ss.000`) para graficar sin convertir.
+   - **json** → un objeto `{formato, sitio: {codigo, nombre}, desde, hasta, generado_en, mediciones: […], tramas: […], eventos: […],
+     conteos: {…}}`, con `conteos` al final por la misma razón; `detalle` va como objeto, no como texto.
+   **Protección contra fórmulas reversible** (CSV; el XLSX escribe texto que la planilla nunca evalúa): se antepone un apóstrofo a todo texto
+   que, después de cero o más apóstrofos, empiece con `=`, `+`, `-`, `@`, tabulador, retorno, salto de línea o sus formas de ancho completo
+   (el conjunto de `panel/src/lib/lote.ts`); para reimportar, a un texto que empieza con apóstrofos seguidos de uno de esos caracteres se le
+   quita uno. Así la protección no pierde nada: hoy `celdaCsv` antepone el apóstrofo y no hay cómo saber si ya estaba (un `payload_base64`
+   puede empezar con `+`). La exportación por dispositivo pasa a la misma regla, porque comparte `celdaCsv`.
+3. **Escala.** ✅ backend y proxy, 19/11/2026 (`cupo-exportaciones.ts`, `descarga.ts`, la `location` de las dos exportaciones en `proxy/nginx.conf`;
+   planes en `docs/16 §89`). Una conexión propia por descarga, 30 s de tope por consulta, contrapresión (`drain`) y corte si el cliente se va, como hoy.
+   Las consultas van por canal (mediciones) y por dispositivo (tramas y eventos), con paginación por clave dentro de cada uno, para que
+   cada tanda use los índices que ya existen (`medicion (canal_id, tiempo)`, `trama (dispositivo_id, recibido_en)`, `evento (dispositivo_id,
+   ocurrido_en, id)`) y el costo crezca con los datos del sitio y no con los de toda la instalación; el plan se mide en el banco antes de
+   afirmarlo (`docs/16`). El orden de salida queda por dispositivo, magnitud y tiempo. El cupo de 2 exportaciones simultáneas por proceso
+   pasa a ser uno solo para las dos rutas (429 a la tercera). El proxy deja pasar estas descargas sin guardarlas en su disco (`location`
+   propia con `proxy_buffering off` y los mismos topes de tasa).
+4. **XLSX con código propio, sin dependencia nueva** ✅ backend, 19/11/2026 (`zip.ts`, `xlsx.ts`; las fuentes, comprobadas y guardadas con su huella
+   antes del código: `docs/16 §89`) (el mismo criterio que el lector del 15/11/2026, bloque N punto 6; cambia el
+   control de `docs/11 §4`). Un zip en flujo sobre `node:zlib` (deflate y `crc32`, presente en Node 22), con descriptor de datos tras cada
+   entrada, y las hojas como XML con texto en línea (`inlineStr`, sin tabla de cadenas compartidas: cada fila se escribe y se olvida).
+   Límites, de la fuente oficial (Microsoft, «Excel specifications and limits», descargada el 19/11/2026): «1,048,576 rows by 16,384
+   columns» por hoja y «32,767 characters» por celda. Por eso: (a) una hoja que llega a 1 048 575 filas de datos sigue en «Mediciones (2)»,
+   y así; (b) la carga de una trama (hasta 64 KiB, el tope del broker y del receptor HTTP: 87 384 caracteres en base64) se parte en hasta
+   tres columnas `payload_base64`, `payload_base64_2` y `payload_base64_3` de 32 000 caracteres como mucho, que se concatenan para
+   reimportar; (c) los caracteres de control que XML no admite se escriben con el escape de la norma (`_xHHHH_`) y un `_xHHHH_` literal se
+   protege, sin pérdida. Sin ZIP64: ninguna entrada pasa de 1 GiB sin comprimir (se parte como en (a), también los CSV: `mediciones-2.csv`)
+   y el total se corta con error antes de 4 GiB. Antes de construir se comprueban en las fuentes primarias (la especificación ZIP de PKWARE
+   y ECMA-376) el descriptor de datos y el escape, y se guardan con su huella.
+5. **Estimación antes de descargar.** ✅ backend, 19/11/2026 (bytes por fila medidos en `docs/16 §89`). `GET /sitios/{id}/exportar/estimacion?desde&hasta` (mismos permisos): cuántas mediciones, tramas y
+   eventos trae el rango, contadas con tope (como mucho 1 000 000 por conjunto: el conteo nunca recorre más; por encima, «más de
+   1 000 000»), los bytes aproximados por formato (filas × bytes por fila medidos en el banco) y desde cuándo hay tramas.
+6. **Pantalla P8** ✅ panel, 19/11/2026 (`Exportar.svelte`, con `lib/exportar.ts`; `docs/16 §89`, apartado del panel) (`#/exportar?sitio=<código>`; entrada «Exportar datos» del menú para quien tiene la acción `exportar` en algún sitio; con
+   más de un sitio, el selector de «Publicar»). Tres decisiones en una columna: **rango** (Últimas 24 horas, Últimos 7 días, Últimos 30
+   días, Todo el historial —desde el año 2000—, o Entre fechas: días completos en la zona horaria del sitio, `docs/13`); **formato**, con
+   una línea de para qué sirve cada uno («CSV: para R, Python o QGIS; tres archivos en un .zip», «XLSX: para Excel o LibreOffice; una hoja
+   por tipo de dato», «JSON: para programas»); y la **estimación**, que se pide al cambiar el rango (una a la vez; la anterior se cancela)
+   y dice, por ejemplo, «≈ 45 210 mediciones, 9 044 tramas y 37 eventos; unos 1,2 MB», con la línea de la retención («Las tramas originales
+   se guardan 30 días: de este rango, solo desde el 20/10/2026»). «Descargar» usa `descargar()` (§6), con «Cancelar» mientras baja; por
+   sobre 250 MB estimados pide confirmar («Tu navegador arma el archivo en memoria: con un rango menor es más seguro»). El aviso de éxito
+   dice el nombre y el tamaño. `nombreDeArchivo` del panel admite `.zip` y `.xlsx` además de `.csv` y `.json`. La ficha (P3) conserva sus
+   dos botones de CSV y suma el enlace «Exportar todo el sitio». Sin desplazamiento horizontal a 390 y a 1 280 px.
+7. **Reimportar sin pérdida** (criterio 4 de HU-08). ✅ backend, 19/11/2026 (`pruebas/exportar-integracion.sh`, 0 diferencias en los tres
+   formatos; la apertura en Excel o Google Sheets y en LibreOffice con la pantalla sigue siendo del estudiante). No se construye una importación: se demuestra que el archivo trae todo, exacto.
+   Una prueba de integración por formato exporta un sitio de prueba con casos límite (instantes con microsegundos; valores negativos,
+   `1e-7` y el mayor `double`; una unidad con coma y comillas; una trama que no es UTF-8 y otra de 64 KiB; un texto que empieza con `=`,
+   otro con `'=` y otro con apóstrofo solo; un `detalle` con tildes y emoji), lee el archivo con un lector escrito en la prueba (no con el
+   código que lo escribe) y lo compara fila a fila con la base: **0 diferencias**, y cada `sha256` coincide con el de su carga. Con otro
+   sitio sembrado con marcas propias, ninguna aparece en el archivo (RF-41). La apertura en LibreOffice Calc y en Excel (o Google Sheets) la
+   hace el estudiante con su salida esperada: se abre sin «reparar», con cuatro hojas y la fecha como fecha.
+8. **Pruebas.** ✅ lo del backend, 19/11/2026 (unitarias, `sesion-smoke`, cupo, corte y banco: `docs/16 §89`); ✅ panel, 19/11/2026: lo del DOM
+   (`Exportar.test.ts` y `lib/exportar.test.ts`) y el navegador real (`pruebas/panel-exportar-e2e.sh` con `panel/e2e/exportar.mjs`), `docs/16 §89`.
+   Unitarias del zip (lo escrito se lee con `inflateRaw` y el CRC coincide), del escape, de los números, del apóstrofo
+   reversible, del corte de la carga (0, 31 999, 32 000, 32 001 y 87 384 caracteres) y del paso a la hoja siguiente (con el tope reducido en
+   la prueba); la matriz de permisos de las dos rutas en `sesion-smoke`; el cupo compartido (429); el corte cuando el cliente se va; por el
+   DOM, P8 (rango, estimación cancelable, confirmación sobre 250 MB, oculta sin la acción, nombre del archivo); con navegador real, las tres
+   descargas a 390 y a 1 280 px; y en el banco, el tiempo y la memoria de exportar 1 000 000 de mediciones (`docs/16`).
+9. **Decidido al diseñar** (19/11/2026): (a) un archivo por descarga con los tres conjuntos (el CSV, en un zip); (b) nada de personas en el
+   archivo; (c) la exportación por dispositivo sigue igual salvo el apóstrofo reversible; (d) la descarga del panel sigue siendo la de §6,
+   con la estimación y la confirmación; (e) las horas de HU-08 en el backlog no cambian (4): el esfuerzo real queda en la bitácora.
+
+**Decidido al implementar (19/11/2026)**, en lo que el bloque no fijaba (backend y proxy; el contrato completo, en el OpenAPI; `docs/16 §89`):
+(a) **Eventos:** solo los de un equipo del sitio (`evento.dispositivo_id`); los del sitio sin equipo (el plazo de la primera trama, los
+enlaces públicos) no entran: son ajustes del sitio, no el ciclo de vida de un equipo. `evento.usuario_id` no sale nunca.
+(b) **Orden:** equipos por `id_fisico`; dentro, canales por código de magnitud; tramas y eventos por (instante, id), que desempata los
+iguales. (c) **Tandas:** 10 000 filas en mediciones y eventos; 250 en tramas (una pesa hasta 64 KiB). (d) **JSON:** suma
+`retencion_tramas_dias` después de `generado_en`, para que los tres formatos digan la retención; `valor` no finito sale `null`, como el
+vacío del CSV. (e) **CSV partido:** `mediciones-2.csv`, `-3`…, cada uno con su cabecera; `LEEME.txt` dice las filas de cada archivo y el
+total, en pares «campo: valor» con CRLF, los mismos que la hoja «Acerca de». (f) **XLSX:** la fecha de planilla es la columna `fecha_utc`,
+justo después del instante en texto, con los milisegundos **truncados** (como un `Date`); espacios de nombres de la clase Transitional
+(ECMA-376 Parte 4), que leen todas las planillas; cabecera en negrita; celdas sin referencia `r` (es opcional; la fila sí la lleva); el
+retorno de carro va como `&#13;` (un lector XML lo convertiría en salto); un `_` seguido de `x` y cuatro dígitos hexadecimales se protege
+con `_x005F_` aunque no lo cierre un `_`, porque el `_` de un escape siguiente lo cerraría (la norma escribe la protección del literal para
+`bstr`, §22.4.2.4, y aquí se aplica igual); un texto de más de 32 767 caracteres o una carga de más de 96 000 en base64 cortan la
+descarga con el motivo, en vez de recortar en silencio (con los topes de hoy no ocurre). (g) **Zip:** deflate nivel 6, descriptor con su
+firma, nombres ASCII (sin el bit 11), hora MS-DOS de la generación, tope de 1 000 entradas y del total en 4 GiB − 64 MiB. (h) **Códigos:**
+404 o 403 del sitio, después 400 del formato y del rango, y al final 429 del cupo. El 429 de las tres rutas (las dos exportaciones y la
+estimación) lleva `codigo: exportaciones_en_curso` y dice «hay 2 exportaciones o estimaciones en curso; inténtalo en un momento» (revisión
+del mismo día). Si la exportación falla antes de enviar nada (la primera consulta), 503 en JSON, sin `Content-Disposition`; a mitad, se
+corta la conexión. `Content-Type`: `application/zip`, el de SpreadsheetML o `application/json; charset=utf-8`. (i) **Estimación:** `{desde,
+hasta, tope_conteo, mediciones{filas, supera_tope}, tramas{filas, supera_tope, desde}, eventos{…}, retencion_tramas_dias,
+bytes_aproximados{csv, xlsx, json}}`, en una conexión propia con 10 s por consulta (contar 1 000 000 tarda ≈ 0,5 s; si los pasa, 503) y
+**con el mismo cupo** que las exportaciones (revisión del mismo día): el pool tiene 5 conexiones y lo comparte la recepción, y cancelar la
+estimación en el panel (la anterior, al cambiar el rango) **no cancela la consulta en la base**, que sigue con su conexión tomada; sin
+cupo, unas cuantas estimaciones seguidas y dos exportaciones agotaban el pool. Con el cupo, entre exportaciones y estimaciones se toman a
+lo más 2 y quedan 3 para la recepción. (j) **Corte:** la escritura espera `drain` o el cierre del cliente, lo que llegue primero, y falla
+si el cliente se fue (`descarga.ts`); la exportación por dispositivo usa la misma (antes miraba `res.destroyed` en su bucle). Los primeros
+64 KiB (las cabeceras del zip o del libro, o la del CSV) se retienen hasta después de la primera consulta, para poder responder el 503.
+Un cliente prestado que la base corta vuelve al pool con su error (`release(err)`) y pg-pool lo descarta. (k) **Proxy:** `proxy_buffering off` ya regía para todo el servidor (por el canal en vivo); la
+`location` de las exportaciones lo deja escrito para ellas, y la estimación sigue en «location /».
+
+**Decidido al implementar la pantalla (19/11/2026)**, en lo que el punto 6 no fijaba (`docs/16 §89`, apartado del panel):
+(a) **Menú:** «Exportar datos» va justo después de «Inventario», con las pantallas de datos (es lo que el investigador usa además del tablero y
+el inventario); icono propio, una flecha que baja a una bandeja. Sin la acción en ningún sitio, la ruta dice quién exporta **según la matriz de
+la sesión** («los exportan los perfiles de administrador e investigación»), no con un texto fijo. (b) **Rango:** por omisión «Últimos 30 días»,
+el mismo del servidor; no va en la URL (solo el sitio). «Entre fechas» abre con la última semana hasta hoy en el sitio, y el último día es
+como mucho hoy en el sitio (el servidor admite `hasta` hasta un día en el futuro: el fin de hoy cabe); un sitio al este de UTC que pide desde
+el 1/1/2000 se acota al piso del servidor. Los rangos relativos se calculan al pulsar «Descargar» («las últimas 24 horas» son las de ese
+momento, no las de cuando se estimó). (c) **Estimación:** se pide 300 ms después del último cambio de sitio, rango o días (escribir una fecha
+no es una petición por tecla; cancelar en el panel no cancela la consulta en la base, que además ocupa un lugar del cupo de exportaciones del
+servidor); cada cambio cancela al instante la que estaba en vuelo, y se descarta la respuesta cuya clave (sitio y rango; los relativos no
+cambian de clave al correr el reloj) ya no es la elegida; cambiar el formato no pide otra (trae los tres tamaños). Ante el 429 del cupo, un
+solo reintento solo a los 1,5 s; si vuelve el 429 («No se pudo estimar ahora: hay otras exportaciones en curso…») o llega un 503 («…la base
+no respondió a tiempo…»), un aviso en llano con «Reintentar», sin más intentos solos; un cambio de sitio o de rango anula el reintento
+pendiente. El texto va
+con el formato elegido («unos 1,2 MB en CSV»); con más filas que el tope, «más de» en el conteo y en el tamaño, sin «≈»; sin filas, lo dice y
+que se elija un rango más amplio (bajar el archivo vacío sigue permitido). (d) **Retención:** «este rango las trae todas», «de este rango, solo
+desde el DD/MM/AAAA» (fecha del sitio) o «este rango no trae ninguna»; el corte lleva 5 minutos de margen, porque «Últimos 30 días» con 30
+días de retención empieza justo en el corte y la respuesta llega instantes después (la primera corrida con navegador real decía «solo desde
+hoy»). (e) **Confirmación:** sobre 250 000 000 bytes (los MB de mil, como el alta masiva) en el formato elegido **o** con algún conjunto
+sobre el tope del conteo (el tamaño es entonces solo un mínimo: «más de 13,7 MB, sin saber cuánto más»); «Descargar igual» y «Cancelar»;
+cambiar el rango o el formato la cierra. Sin estimación, «Descargar» queda desactivado con su motivo (sin ella no se sabe si pasa de
+250 MB): «espera a que se calcule el tamaño» mientras se cuenta o se reintenta, «no se pudo calcular el tamaño: reinténtalo arriba» si falló;
+al llegar la estimación por «Reintentar», se activa. (f) **Descarga:** mientras baja, el rango, el formato y el sitio quedan desactivados; cambiar de sitio por el menú o «Atrás», o
+salir de la pantalla, la corta. El aviso de éxito («Descargado <nombre> (13,7 MB).») se quita al cambiar el sitio o el rango. El 429 del cupo
+se reconoce por su `codigo` (`exportaciones_en_curso`, en las tres rutas), nunca por el texto del mensaje, que puede cambiar; el cuerpo
+entero ya llegaba a la pantalla en `ErrorApi.cuerpo`. Otro 429 (el del proxy) usa el aviso de siempre. El 503 (la exportación falló antes de
+enviar nada) dice que no pudo empezar porque la base no respondió y que no se guardó ningún archivo. La ficha usa los mismos avisos en sus dos
+descargas de CSV, que comparten el cupo. Un corte a mitad del cuerpo dice
+que no se guardó nada (el archivo se arma en memoria antes de entregarlo: nunca queda uno a medias). «Descargar» y «Cancelar» van sin
+ayuda emergente: bajo 700 px la ayuda se fija al pie de la pantalla y tapaba el propio botón cuando quedaba abajo (lo encontró Firefox a 390 px;
+el `Tooltip` común tiene ese caso con cualquier botón al pie, queda anotado). (g) **Ficha:** el enlace «Exportar todo el sitio» va bajo el de
+«Configurar», con la misma regla de quién exporta que la pantalla (incluido el administrador del sistema). (h) **Guía de perfiles:** la frase de
+`exportar` pasa a «exporta sus datos (mediciones, tramas y eventos)». (i) **Corrección de `instanteDesdeLocal`** (`lib/tiempo.ts`, también la
+usa el rango a medida del tablero y la ficha): en las zonas al oeste de UTC, la hora que no existe por el cambio de hora caía una hora antes
+(el 00:00 del 6/9/2026 en Santiago daba las 23:00 del 5/9: un rango que terminaba el 5/9 perdía su última hora y uno que empezaba el 6/9 sumaba esa hora); ahora cae en la siguiente válida,
+como decía su comentario, y una hora repetida sigue siendo la primera vez.
+
 ## 5. Flujos
 **F1 · Alta y primera trama.** Ya está dibujado en el diagrama de secuencia del alta (`docs/10`, figura del informe): el
 administrador crea el dispositivo (API en la Etapa 3), recibe la credencial una sola vez, configura el nodo, y el panel
@@ -1452,7 +1606,8 @@ administrador); la vista pública nunca ofrece exportar (punto 6).
 | P3 y P2, incremento 2: leyenda informativa, cambio de rango sin blanco, hora del sitio, resolución elegible, comparación entre nodos (P3b), resumen y CSV del rango | RF-33, RF-34, RF-47, RF-49, HU-20, HU-21 | Etapa 3 (22/10/2026) | `docs/16 §52`: con navegador real (29 comprobaciones en Firefox y en Chromium; contra el build anterior, 9 fallan), los clics de leyenda, rango, resolución, «Ver la última medición» y canal dejan la ficha en su URL con puntos o con el mensaje de vacío; el aviso de zona con el contexto del navegador en otra zona; P3b con dos emulados; por el DOM y funciones puras (26 pruebas nuevas del panel): resoluciones por rango, desfase, alineación, URL de P3b; 2 del backend (tope de 5 000 cubos); medición rango × resolución antes y después |
 | P4 Condiciones, P5 Cuarentena | HU-05, RF-11 a RF-13, RF-24, RF-57, TT-42 | Etapa 4 | Trama fuera de rango → fila en P4 en vivo; trama de un desconocido → fila en P5 con motivo `no_registrado`; paginación: una fila nueva entre dos páginas no se repite ni se pierde (`docs/10 §8.4` punto 58) |
 | P1 Resumen (tablero) | RF-30, HU-16, TT-44 | Etapa 4 (HU-16 en la iteración 0; el rediseño en la 1) | Los conteos por estado suman el total del inventario; cambian en vivo con F3; la comparativa escrita con sus fuentes antes del código; zoom, rango y varias series con navegador real, a 390 y 1280 px |
-| P8 Exportar (API) | RF-34, HU-08 | Etapa 3 (12/10): 6 pruebas de las funciones puras y 7 casos de humo; la pantalla, el XLSX y la exportación por sitio, en la Etapa 4 |
+| P8 Exportar (API) | RF-34, HU-08 | Etapa 3 (12/10): 6 pruebas de las funciones puras y 7 casos de humo; la pantalla, el XLSX y la exportación por sitio, en la Etapa 4 | Funciones puras y humo de la API (`docs/16 §19`) |
+| P8 Exportar un sitio (pantalla) | RF-34, RF-31, RF-41, HU-08 | Etapa 4, iteración 1 (diseñada el 19/11/2026, §4, R; backend y pantalla el mismo día) | Backend: `docs/16 §89` (unitarias, `exportar-integracion.sh` con 0 diferencias en los tres formatos, `sesion-smoke`, cupo, corte y banco). Panel (`docs/16 §89`, apartado del panel): por el DOM, 17 casos en `Exportar.test.ts` (estimación al abrir y por rango, tras una pausa y no por tecla, una a la vez con la anterior cancelada, la respuesta vieja de otro rango y de otro sitio descartada, el cupo lleno con un solo reintento y su aviso con «Reintentar», el 503, «Entre fechas» en la zona del sitio con sus errores junto a los campos, sin filas, la estimación que falla con «Reintentar», la descarga de los tres formatos con su nombre, la confirmación sobre 250 MB, «Cancelar», el 429 del cupo, sin red y el corte a mitad, salir de la pantalla y la ruta sin la acción; el 429 reconocido por su código, no por el texto), 15 de funciones puras en `lib/exportar.test.ts` (los cinco rangos, el cambio de hora, textos, retención, umbral y avisos), y el menú, la ruta, el enlace de la ficha, `nombreDeArchivo` con `.zip` y `.xlsx` y el `Accept` en `App`, `Ficha`, `vista` y `api`; con navegador real, `pruebas/panel-exportar-e2e.sh` (`e2e/exportar.mjs`): 76 de 76 en Chromium y Firefox a 390 y 1 280 px (de la ficha a la pantalla, la estimación de lo sembrado, los tres formatos con su nombre, el zip y el xlsx con la firma `PK\x03\x04`, el JSON con sus conteos, «Entre fechas» en la hora del sitio con el navegador en otra zona, sin desplazamiento horizontal). Pendiente: abrir los archivos en Excel o Google Sheets y en LibreOffice (punto 7) |
 | P10 Sesión y usuarios | HU-18, RF-43, RF-44 (los cinco perfiles: HU-26, iteración 0) | Etapa 4 (08/11/2026) | `docs/16 §59`: por el DOM (vitest) el cliente HTTP (cabecera, 401, 403 temporal, 409, 429, sin red, gana la última, descarga por Blob), la guía de perfiles contra la matriz y contra las acciones del servidor, las reglas de la clave contra los números del servidor, los componentes y los flujos de entrar, cambiar, vencer, renovar y salir; con navegador real (paso 4c del guardián, `pruebas/panel-sesion-e2e.sh`) en Chromium y Firefox, a 390 y 1280 px |
 | P11 Legal y acerca de | RF-53, RF-54, RF-61, HU-27, HU-31 | Etapa 4, iteración 0 | Sesión sin aceptar: 403 en una lectura y 200 en las páginas legales; aceptar la normaliza; subir la versión la restringe otra vez (`docs/20 §12`); ningún aviso de terceros falta frente a las dependencias de producción (verificador). Panel (`docs/16 §64`): por el DOM, privacidad, términos y acerca de como texto (un `<script>` del servidor queda como texto), soporte con su 429 en segundos, la pantalla de términos sin ningún dato ni canal hasta aceptar y el 403 `terminos_pendientes` de cualquier lectura que la abre; con navegador real, legal antes de entrar y la aceptación tras el primer ingreso |
 | P12 Estado del sistema | RF-59, RF-60, RNF-19, HU-30 | Etapa 4, iteración 1 | Solo el administrador del sistema la ve (403 a los demás, `docs/20 §6`); un error plantado con un correo aparece agrupado y sin el correo; un servicio cerca de su techo abre `memoria_alta`; un límite cambiado con dos ediciones a la vez da 409 a la segunda |

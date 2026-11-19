@@ -256,7 +256,7 @@ describe('SitiosController.ahora: entrada validada antes de tocar la base', () =
   function armar() {
     const ahora = vi.fn(() => Promise.resolve({}));
     const exigirSitio = vi.fn(() => Promise.resolve());
-    const c = new SitiosController({ ahora } as unknown as TableroService, { exigirSitio } as unknown as AlcanceService, {} as never, {} as never);
+    const c = new SitiosController({ ahora } as unknown as TableroService, { exigirSitio } as unknown as AlcanceService, {} as never, {} as never, {} as never, {} as never);
     return { c, ahora, exigirSitio };
   }
   it('limite fuera de 1–60, no entero o repetido → 400, sin consultar el alcance ni la base', async () => {

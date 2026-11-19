@@ -1254,6 +1254,12 @@
           },
           "404": {
             "description": "Dispositivo inexistente o de otro sitio"
+          },
+          "429": {
+            "description": "`codigo: exportaciones_en_curso`: ya hay 2 exportaciones o estimaciones en curso en el proceso (cupo único con GET /sitios/{id}/exportar y GET /sitios/{id}/exportar/estimacion)"
+          },
+          "503": {
+            "description": "La exportación falló antes de enviar nada (la primera consulta): 503 en JSON; si falla a mitad, se corta la conexión"
           }
         },
         "security": [
@@ -1877,6 +1883,168 @@
           }
         ],
         "summary": "Actividad del sitio (Etapa 4; P14)",
+        "tags": [
+          "sitios"
+        ]
+      }
+    },
+    "/sitios/{id}/exportar": {
+      "get": {
+        "description": "Un archivo por descarga con los tres conjuntos del rango [desde, hasta) de todos los dispositivos del sitio, en cualquier estado, sin datos de personas (versión del formato `exportacion-sitio/1`): mediciones (`tiempo_utc, id_fisico, magnitud, valor, unidad, canal_id`), tramas aceptadas con su carga exacta en base64 y su huella SHA-256 calculada en la base (`recibido_en_utc, id_fisico, topico, adaptador, bytes, sha256, payload_base64`; solo las que siguen guardadas: RETENCION_TRAMA_DIAS, 30 por omisión) y eventos del ciclo de vida (`ocurrido_en_utc, id_fisico, tipo, detalle_json`), ordenados por dispositivo, magnitud y tiempo. `csv` (por omisión): un .zip con mediciones.csv, tramas.csv, eventos.csv (coma, punto decimal, UTF-8, CRLF; apóstrofo reversible contra fórmulas) y LEEME.txt con los conteos al final; un CSV que pasaría de 1 GiB sigue en `mediciones-2.csv`. `xlsx`: un libro con las hojas «Acerca de» (primera pestaña), «Mediciones», «Tramas» y «Eventos», la primera fila fija, una columna `fecha_utc` con la fecha nativa de planilla y la carga partida en `payload_base64`, `payload_base64_2` y `payload_base64_3`; una hoja que llega a 1 048 575 filas sigue en «Mediciones (2)». `json`: `{formato, sitio{codigo, nombre}, desde, hasta, generado_en, retencion_tramas_dias, mediciones[], tramas[], eventos[], conteos{}}`, con `detalle` como objeto. Por omisión, los últimos 30 días; instantes en UTC con microsegundos. Nombre: `sitio_<código>_<desde>_<hasta>.<zip|xlsx|json>`. Cupo de 2 exportaciones o estimaciones simultáneas por proceso, compartido con GET /dispositivos/{id}/exportar y GET /sitios/{id}/exportar/estimacion. Si falla antes de enviar nada (la primera consulta), 503 en JSON; a mitad, se corta la conexión.",
+        "operationId": "SitiosController_exportar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "UUID del sitio",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "formato",
+            "required": false,
+            "in": "query",
+            "description": "csv (por omisión, un .zip), xlsx o json",
+            "schema": {
+              "enum": [
+                "csv",
+                "xlsx",
+                "json"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "desde",
+            "required": false,
+            "in": "query",
+            "description": "ISO 8601; una fecha sin hora (AAAA-MM-DD) es las 00:00 UTC, no la medianoche del sitio; por defecto hasta − 30 días; no antes del año 2000",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": false,
+            "in": "query",
+            "description": "ISO 8601; una fecha sin hora (AAAA-MM-DD) es las 00:00 UTC, no la medianoche del sitio; por defecto ahora; como mucho un día en el futuro",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Archivo descargable en flujo",
+            "headers": {
+              "Content-Disposition": {
+                "description": "attachment; filename=\"sitio_<código>_<desde>_<hasta>.<zip|xlsx|json>\"",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Cache-Control": {
+                "description": "no-store",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "UUID, fecha, rango o formato inválidos"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "403": {
+            "description": "Consulta u operador técnico: exportar es del administrador (de sitio o del sistema) y del investigador (docs/20 §6)"
+          },
+          "404": {
+            "description": "Sitio inexistente o de otro"
+          },
+          "429": {
+            "description": "`codigo: exportaciones_en_curso`: ya hay 2 exportaciones o estimaciones en curso en el proceso (cupo único con GET /dispositivos/{id}/exportar y GET /sitios/{id}/exportar/estimacion)"
+          },
+          "503": {
+            "description": "La exportación falló antes de enviar nada (la primera consulta): 503 en JSON; si falla a mitad, se corta la conexión"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Exportar todo el sitio: mediciones, tramas y eventos (HU-08)",
+        "tags": [
+          "sitios"
+        ]
+      }
+    },
+    "/sitios/{id}/exportar/estimacion": {
+      "get": {
+        "description": "Mismos permisos y mismo rango que GET /sitios/{id}/exportar. `mediciones`, `tramas` y `eventos`: `{filas, supera_tope}`, contadas con tope (`tope_conteo`, 1000000: el conteo nunca recorre más; con `supera_tope`, «más de 1000000»); `tramas.desde`: la trama más antigua del rango (las tramas se guardan `retencion_tramas_dias`), o null si no hay; `bytes_aproximados{csv, xlsx, json}`: filas × bytes por fila medidos en el banco (docs/16 §89; con `supera_tope`, un mínimo). Toma el mismo cupo que las exportaciones (2 por proceso: cancelarla en el panel no cancela su consulta en la base) y tiene 10 s por consulta (si los pasa, 503).",
+        "operationId": "SitiosController_estimacion",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "UUID del sitio",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "desde",
+            "required": false,
+            "in": "query",
+            "description": "ISO 8601; una fecha sin hora (AAAA-MM-DD) es las 00:00 UTC, no la medianoche del sitio; por defecto hasta − 30 días; no antes del año 2000",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "hasta",
+            "required": false,
+            "in": "query",
+            "description": "ISO 8601; una fecha sin hora (AAAA-MM-DD) es las 00:00 UTC, no la medianoche del sitio; por defecto ahora; como mucho un día en el futuro",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Conteos con tope y tamaño aproximado por formato"
+          },
+          "400": {
+            "description": "UUID, fecha o rango inválidos"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "403": {
+            "description": "Consulta u operador técnico (docs/20 §6)"
+          },
+          "404": {
+            "description": "Sitio inexistente o de otro"
+          },
+          "429": {
+            "description": "`codigo: exportaciones_en_curso`: ya hay 2 exportaciones o estimaciones en curso en el proceso"
+          },
+          "503": {
+            "description": "Una consulta pasó de 10 s"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Cuánto trae la exportación de un sitio, antes de descargarla (HU-08)",
         "tags": [
           "sitios"
         ]

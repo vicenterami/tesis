@@ -103,16 +103,23 @@ function minutosDeDesfase(zona: string, instante: number): number {
   const enZona = Date.UTC(p.year!, p.month! - 1, p.day!, p.hour!, p.minute!, p.second!);
   return Math.round((enZona - Math.floor(instante / 1000) * 1000) / 60_000);
 }
-// «2026-11-10T08:30» en la zona → el instante. Se prueba el desfase dos veces (cerca de un cambio de hora, el primero puede ser el del
-// otro lado). Una hora que no existe en la zona (el salto de primavera) cae en la siguiente válida; un texto inválido → null.
+// «2026-11-10T08:30» en la zona → el instante. Cerca de un cambio de hora rigen dos desfases: el de antes y el de después (ninguna zona se
+// aparta más de 14 h de UTC, así que se miran 14 h antes y 14 h después). Sirve el que, aplicado, vuelve a dar esa hora en la zona. Una hora
+// repetida (al atrasar el reloj) es la primera vez; una que no existe (al adelantarlo) cae en la siguiente válida, con el desfase de antes
+// del salto: en Santiago, el 00:30 del día del cambio es la 01:30. Un texto inválido → null.
+// Corrección del 19/11/2026 (la exportación por días del sitio, docs/19 §4, R): se probaba el desfase dos veces a partir de la misma hora
+// tomada como UTC, y en las zonas al oeste de UTC la hora que no existe caía una hora ANTES (el 00:00 del cambio en Santiago daba las 23:00
+// del día anterior: un día exportado de 00:00 a 00:00 perdía su última hora).
 export function instanteDesdeLocal(texto: string, zona: string): Date | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/.exec(texto);
   if (!m) return null;
   const comoUtc = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6] ?? 0));
   if (Number.isNaN(comoUtc)) return null;
-  let t = comoUtc - minutosDeDesfase(zona, comoUtc) * 60_000;
-  t = comoUtc - minutosDeDesfase(zona, t) * 60_000;
-  return new Date(t);
+  const antes = minutosDeDesfase(zona, comoUtc - 14 * 3_600_000);
+  const despues = minutosDeDesfase(zona, comoUtc + 14 * 3_600_000);
+  const sirven = [antes, despues].filter((o) => minutosDeDesfase(zona, comoUtc - o * 60_000) === o);
+  const o = sirven.length > 0 ? Math.max(...sirven) : Math.min(antes, despues);
+  return new Date(comoUtc - o * 60_000);
 }
 // El instante → «2026-11-10T08:30» en la zona (el valor que el campo datetime-local muestra).
 export function localDesdeInstante(instante: Date, zona: string): string {

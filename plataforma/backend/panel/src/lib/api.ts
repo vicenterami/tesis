@@ -204,11 +204,12 @@ export function ultimaGana(): { senal(): AbortSignal; cancelar(): void } {
 }
 export const esCancelacion = (e: unknown): boolean => e instanceof DOMException && e.name === 'AbortError';
 
-// ── Descargas (exportar CSV/JSON) ────────────────────────────────────────────────────────────────────────────────────────────
+// ── Descargas (exportar CSV, JSON, el .zip y el XLSX de un sitio) ─────────────────────────────────────────────────────────────
 // Por fetch con la sesión y un Blob, en UN solo ayudante; nunca un <a href> directo a la API ni un token en la URL (docs/19 §6,
 // decidido al implementar el 08/11/2026): con la sesión vencida, un enlace directo abría el JSON del 401 en una pestaña; aquí el 401
 // pasa por el manejo central (vuelve al inicio de sesión) y la persona ve un aviso, no un archivo roto. El archivo se arma en memoria:
-// la exportación de un dispositivo (por tandas, tope por petición en el servidor) cabe; una por sitio (Etapa 4) se medirá antes.
+// la exportación de un dispositivo (por tandas, tope por petición en el servidor) cabe; la de un sitio (P8, docs/19 §4, R) avisa antes con
+// su estimación y pide confirmar sobre 250 MB.
 export function nombreDeArchivo(cabecera: string | null, porDefecto: string): string {
   const m = cabecera === null ? null : /filename\*?=(?:UTF-8'')?"?([^";]+)"?/i.exec(cabecera);
   let nombre = '';
@@ -218,8 +219,9 @@ export function nombreDeArchivo(cabecera: string | null, porDefecto: string): st
     nombre = ''; // un «%» mal formado (URIError): el nombre de por defecto, nunca una descarga que falla
   }
   // Solo el nombre: nada de rutas ni caracteres que un sistema de archivos interprete; y solo las extensiones que la API entrega
-  // (.csv y .json, corrección del 11/11/2026): un «.exe» o un «.html» ajeno nunca llega al disco con ese nombre.
-  return /^[\p{L}\p{N}_.\- ]{1,120}$/u.test(nombre) && !nombre.startsWith('.') && /\.(csv|json)$/i.test(nombre) ? nombre : porDefecto;
+  // (.csv y .json, corrección del 11/11/2026; .zip y .xlsx desde la exportación por sitio, 19/11/2026): un «.exe» o un «.html» ajeno
+  // nunca llega al disco con ese nombre.
+  return /^[\p{L}\p{N}_.\- ]{1,120}$/u.test(nombre) && !nombre.startsWith('.') && /\.(csv|json|zip|xlsx)$/i.test(nombre) ? nombre : porDefecto;
 }
 
 export interface Guardador {
@@ -239,8 +241,10 @@ const guardadorDelNavegador: Guardador = {
   },
 };
 
+// Lo que el panel acepta en una descarga: el CSV y el JSON de un dispositivo, y el .zip (CSV) y el XLSX de un sitio.
+export const TIPOS_DESCARGA = 'text/csv, application/json, application/zip, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 export async function descargar(ruta: string, porDefecto: string, abortar?: AbortSignal, g: Guardador = guardadorDelNavegador): Promise<{ nombre: string; bytes: number }> {
-  const r = await llamar('GET', ruta, { abortar }, 'text/csv, application/json');
+  const r = await llamar('GET', ruta, { abortar }, TIPOS_DESCARGA);
   const blob = await r.blob();
   return entregar(blob, nombreDeArchivo(r.headers.get('content-disposition'), porDefecto), g);
 }

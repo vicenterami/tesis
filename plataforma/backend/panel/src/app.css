@@ -609,3 +609,16 @@ main { padding-bottom: calc(var(--e-4) + var(--alto-avisos, 0px)); }
 .confirmacion p { margin: 0; }
 .ajuste { background: var(--superficie); border: 1px solid var(--borde-tenue); border-radius: var(--radio); padding: var(--e-3) var(--e-4); margin-bottom: var(--e-3); display: grid; gap: var(--e-2); min-width: 0; }
 .ajuste h4, .ajuste p { margin: 0; }
+/* Exportar un sitio (P8): tres decisiones en una columna; lo que trae el archivo, en grande, es lo que se lee antes de descargar. */
+.formulario-exportar { display: flex; flex-direction: column; gap: var(--e-3); max-width: 46rem; min-width: 0; margin-top: var(--e-3); }
+.formulario-exportar fieldset { border: 1px solid var(--borde-tenue); border-radius: var(--radio); padding: var(--e-2) var(--e-3); margin: 0; min-width: 0; }
+.formulario-exportar legend { font-weight: 600; padding: 0 var(--e-1); }
+.opciones-exportar { display: flex; flex-wrap: wrap; gap: var(--e-1) var(--e-4); }
+.dias-exportar { margin-top: var(--e-2); }
+.formulario-exportar fieldset > .vivo, .formulario-exportar fieldset > .error-campo { margin: var(--e-1) 0 0; }
+.formatos-exportar { display: grid; gap: var(--e-1); }
+.formato-exportar p { margin: 0 0 0 1.6rem; }
+.estimacion-exportar { border-left: 3px solid var(--enlace); background: var(--superficie); border-radius: var(--radio); padding: var(--e-2) var(--e-3); min-width: 0; }
+.estimacion-exportar h3 { margin: 0 0 var(--e-1); font-size: var(--t-m); }
+.cifra-estimacion { margin: 0; font-size: var(--t-l); font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.estimacion-exportar .vivo { margin: var(--e-1) 0 0; }

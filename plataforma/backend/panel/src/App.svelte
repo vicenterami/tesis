@@ -25,6 +25,7 @@
   import Tooltip from './Tooltip.svelte';
   import { ErrorApi, alPerderSesion, esCancelacion, obtener, pedir, ultimaGana } from './lib/api';
   import { avisoDeError, type DatosAviso } from './lib/avisos';
+  import { textoSinExportar } from './lib/exportar';
   import { olvidarMarcados } from './lib/comparar';
   import { fijarPreferencias, guardarPreferencias, olvidarPreferencias, suscribirPreferencias } from './lib/escritor-preferencias';
   import { seguirArmazon, type AnchoArmazon } from './lib/medios';
@@ -61,6 +62,8 @@
   const publicaVistas = $derived(sesion !== null && (puedeEnAlguno(sesion, 'enlaces') || (!sesion.sistema && sesion.administrador_sistema === true)));
   // P15 «Ajustes del sitio» (docs/19 §4, Q): quien tiene la acción `ajustes` o `enlaces` en algún sitio (hoy, los mismos perfiles).
   const ajustaSitio = $derived(sesion !== null && (puedeEnAlguno(sesion, 'ajustes') || puedeEnAlguno(sesion, 'enlaces') || (!sesion.sistema && sesion.administrador_sistema === true)));
+  // P8 «Exportar datos» (docs/19 §4, R, punto 6): quien tiene la acción `exportar` en algún sitio (administrador de sitio y del sistema, investigador).
+  const exportaDatos = $derived(sesion !== null && (puedeEnAlguno(sesion, 'exportar') || (!sesion.sistema && sesion.administrador_sistema === true)));
   // La última vista de datos abierta (tablero, inventario o ficha): P13 la ofrece para guardarla con un nombre.
   let ultimaVista = $state<string | null>(null);
   $effect(() => {
@@ -186,6 +189,8 @@
       { ruta: '#/', texto: 'Tablero', icono: 'tablero', activo: vista.pantalla === 'tablero', dato: 'tablero' },
       { ruta: '#/inventario', texto: 'Inventario', icono: 'inventario', activo: vista.pantalla === 'inventario' || vista.pantalla === 'ficha' || vista.pantalla === 'comparar' || vista.pantalla === 'configurar', dato: 'inventario' },
     ];
+    // Junto a las pantallas de datos: es lo que el investigador usa además del tablero y el inventario.
+    if (exportaDatos) lista.push({ ruta: '#/exportar', texto: 'Exportar datos', icono: 'exportar', activo: vista.pantalla === 'exportar', dato: 'exportar' });
     if (veActividad) lista.push({ ruta: '#/actividad', texto: 'Actividad', icono: 'actividad', activo: vista.pantalla === 'actividad', dato: 'actividad' });
     if (administraUsuarios) lista.push({ ruta: '#/usuarios', texto: 'Usuarios', icono: 'usuarios', activo: vista.pantalla === 'usuarios', dato: 'usuarios' });
     if (daDeAlta) lista.push({ ruta: '#/alta', texto: 'Dar de alta', icono: 'alta', activo: vista.pantalla === 'alta', dato: 'alta-menu' });
@@ -505,6 +510,12 @@
           {#await import('./AjustesSitio.svelte') then { default: AjustesSitio }}<AjustesSitio sitio={vista.sitio} {sesion} {sitios} {alCambiarVista} />{:catch}{@render sinPantalla()}{/await}
         {:else}
           <p class="vacio" data-sin-ajustes>Tu rol no cambia ajustes en ningún sitio: los cambia quien administra el tuyo. <a href="#/">Volver al tablero</a></p>
+        {/if}
+      {:else if vista.pantalla === 'exportar'}
+        {#if exportaDatos}
+          {#await import('./Exportar.svelte') then { default: Exportar }}<Exportar sitio={vista.sitio} {sesion} {sitios} {alCambiarVista} />{:catch}{@render sinPantalla()}{/await}
+        {:else}
+          <p class="vacio" data-sin-exportar>{textoSinExportar(sesion.permisos)} <a href="#/">Volver al tablero</a></p>
         {/if}
       {:else if vista.pantalla === 'publico'}
         <p class="vacio">Abriendo la vista pública…</p>

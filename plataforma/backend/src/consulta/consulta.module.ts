@@ -8,13 +8,14 @@ import { SitiosController } from './sitios.controller.js';
 import { ActividadService } from './actividad.service.js';
 import { TableroService } from './tablero.service.js';
 import { EsperaService } from './espera.service.js';
+import { CupoExportaciones } from './cupo-exportaciones.js';
 
 // M5 Persistencia y consulta — la API que consumirá el panel (patrón B: el navegador solo habla con el backend).
 // Solo lectura, salvo el plazo de la primera trama del sitio (docs/19 §4, P; 18/11/2026). Desde el 08/11/2026 con sesión (M7, docs/20): el guardia central identifica a quien pregunta y cada ruta filtra o
 // decide con permitir() por el sitio del recurso (AlcanceService, del módulo global de sesión).
 @Module({
   controllers: [DispositivosController, CanalesController, CondicionesController, CuarentenaController, SitiosController],
-  providers: [ConsultaService, TableroService, ActividadService, EsperaService],
+  providers: [ConsultaService, TableroService, ActividadService, EsperaService, CupoExportaciones],
   exports: [ConsultaService],
 })
 export class ConsultaModule {}

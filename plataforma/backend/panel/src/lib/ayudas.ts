@@ -10,7 +10,8 @@ interface Frase {
 }
 export const FRASES: Readonly<Record<string, Frase>> = {
   leer: { puede: 've dispositivos, históricos, condiciones y cuarentena de sus sitios', noPuede: 'no ve los datos de sus sitios' },
-  exportar: { puede: 'exporta las mediciones crudas', noPuede: 'no exporta' },
+  // Desde el 19/11/2026 exporta también un sitio entero (P8, docs/19 §4, R): las mediciones, las tramas originales y los eventos.
+  exportar: { puede: 'exporta sus datos (mediciones, tramas y eventos)', noPuede: 'no exporta' },
   // La baja es otra acción (`baja`, solo administradores): corrección del 11/11/2026, antes la guía del operador técnico decía que da de baja.
   escribir: { puede: 'da de alta y calibra dispositivos y pasarelas', noPuede: 'no cambia nada' },
   usuarios: { puede: 'da de alta personas y les asigna su rol en sus sitios', noPuede: 'no administra personas' },

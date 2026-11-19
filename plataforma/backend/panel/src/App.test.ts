@@ -234,7 +234,7 @@ describe('armazón: llegada, menú lateral, cajón, sitio, legal y tema', () => 
     expect(document.querySelector('[data-selector-sitio]')).toBeNull();
     expect(document.querySelector('[data-sitio-nombre]')!.textContent).toBe('Campus');
     const enlaces = [...nav().querySelectorAll('a')];
-    expect(enlaces.map((a) => a.textContent!.trim())).toEqual(['Tablero', 'Inventario', 'Actividad', 'Usuarios', 'Dar de alta', 'Vista pública', 'Ajustes del sitio', 'Legal y acerca de']);
+    expect(enlaces.map((a) => a.textContent!.trim())).toEqual(['Tablero', 'Inventario', 'Exportar datos', 'Actividad', 'Usuarios', 'Dar de alta', 'Vista pública', 'Ajustes del sitio', 'Legal y acerca de']);
     for (const a of enlaces) expect(a.querySelector('svg')!.getAttribute('aria-hidden')).toBe('true'); // el icono no es el nombre
     expect(screen.getByRole('link', { name: 'Tablero' }).getAttribute('aria-current')).toBe('page');
     expect(screen.getByRole('link', { name: 'Inventario' }).getAttribute('href')).toBe('#/inventario');
@@ -277,6 +277,33 @@ describe('armazón: llegada, menú lateral, cajón, sitio, legal y tema', () => 
     render(App);
     await waitFor(() => expect(document.querySelector('[data-ajustes-sitio]')).toBeTruthy());
     expect(screen.getByRole('link', { name: 'Ajustes del sitio' }).getAttribute('aria-current')).toBe('page');
+  });
+
+  // P8 (docs/19 §4, R, punto 6): «Exportar datos» aparece con la acción `exportar` en algún sitio, junto a las pantallas de datos; sin ella, no,
+  // y la ruta dice quién exporta (de la matriz) con el enlace al tablero. Nunca es «última vista».
+  it('con la acción `exportar` el menú trae «Exportar datos» (icono propio) y la ruta abre la pantalla del sitio con su entrada activa', async () => {
+    conPermisos(['leer', 'exportar'], 'investigador');
+    history.replaceState(null, '', '#/exportar?sitio=uct');
+    render(App);
+    await waitFor(() => expect(document.querySelector('[data-exportar]')).toBeTruthy());
+    const a = screen.getByRole('link', { name: 'Exportar datos' });
+    expect(a.getAttribute('href')).toBe('#/exportar');
+    expect(a.getAttribute('aria-current')).toBe('page');
+    expect(a.querySelector('svg')!.getAttribute('data-icono')).toBe('exportar');
+    expect([...nav().querySelectorAll('a')].map((x) => x.textContent!.trim())).toEqual(['Tablero', 'Inventario', 'Exportar datos', 'Legal y acerca de']);
+    await waitFor(() => expect(peticiones.some((p) => p.startsWith('/sitios/s1/exportar/estimacion?'))).toBe(true));
+    expect(document.querySelector('[data-sitio-exportar-nombre]')!.textContent).toBe('Sitio: Campus');
+  });
+  it('sin la acción `exportar` no hay entrada en el menú, y la ruta dice quién exporta, con el enlace al tablero, sin pedir nada', async () => {
+    sesionActual = { ...SESION, sitios: [{ sitio_id: 's1', codigo: 'uct', nombre: 'Campus', rol: 'consulta' }], permisos: { administrador: ['leer', 'exportar'], investigador: ['leer', 'exportar'], consulta: ['leer'] } };
+    history.replaceState(null, '', '#/exportar?sitio=uct');
+    render(App);
+    await waitFor(() => expect(document.querySelector('[data-sin-exportar]')).toBeTruthy());
+    expect(document.querySelector('[data-sin-exportar]')!.textContent).toContain('Tu rol no exporta datos en ningún sitio: los exportan los perfiles de administrador e investigación.');
+    expect(document.querySelector('[data-sin-exportar] a')!.getAttribute('href')).toBe('#/');
+    expect(screen.queryByRole('link', { name: 'Exportar datos' })).toBeNull();
+    expect(document.querySelector('[data-exportar]')).toBeNull();
+    expect(peticiones.some((p) => p.includes('/exportar'))).toBe(false);
   });
 
   it('«Saltar al contenido» lleva el foco a <main> sin cambiar la ruta del panel', async () => {

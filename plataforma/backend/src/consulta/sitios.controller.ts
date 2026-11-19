@@ -1,8 +1,8 @@
-import { BadRequestException, Body, Controller, Get, Param, Put, Query, Res } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Logger, Param, Put, Query, Res, ServiceUnavailableException } from '@nestjs/common';
 import type { Response } from 'express';
 import {
-  ApiBadRequestResponse, ApiBody, ApiConflictResponse, ApiCookieAuth, ApiForbiddenResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiQuery,
-  ApiServiceUnavailableResponse, ApiTags, ApiUnauthorizedResponse,
+  ApiBadRequestResponse, ApiBody, ApiConflictResponse, ApiCookieAuth, ApiForbiddenResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiProduces,
+  ApiQuery, ApiServiceUnavailableResponse, ApiTags, ApiTooManyRequestsResponse, ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { CABECERA_X_SIGUIENTE, ISO_8601, INTERVALOS, MAX_CUBOS, MAX_DIAS_VENTANA, SEGUNDOS_INTERVALO, exigirTopeCubos, fecha, intervalo, limite, uuid } from './validacion.js';
 import { DIAS_ACTIVIDAD_POR_DEFECTO, MAX_DIAS_ACTIVIDAD, tipoValido } from './actividad.js';
@@ -11,6 +11,15 @@ import { CUBOS_CHISPA, HISTORICO_SITIO, LIMITE_AHORA, MAGNITUDES_SALUD, MAX_CANA
 import { MAX_ENTREGA_RESUMEN, TableroService } from './tablero.service.js';
 import { ESPERA_PRIMERA_TRAMA, EsperaSitio, validarEspera, validarPropuesto } from './espera.js';
 import { EsperaService } from './espera.service.js';
+import { ConsultaService } from './consulta.service.js';
+import { CODIGO_CUPO, CupoExportaciones, MAX_EXPORTACIONES } from './cupo-exportaciones.js';
+import { DescargaCortada, escritorDeDescarga, responderFalla } from './descarga.js';
+import { rangoRazonable } from './exportar.js';
+import {
+  COLUMNAS, FORMATOS_SITIO, TIEMPO_ESTIMACION_MS, TIPO_CONTENIDO, TOPE_ESTIMACION, VERSION_FORMATO, estimacion, escribirExportacionSitio, formatoSitio,
+  nombreDeArchivoSitio,
+} from './exportar-sitio.js';
+import { diasRetencionTrama } from './tablero.service.js';
 
 // El histórico del sitio lee TODOS los canales de la magnitud: medido en el banco (docs/16 §61), 30 días de 120 canales a una lectura cada
 // 300 s (1 036 800 filas) tardan ≈ 1,1 s, ≈ 1 µs por lectura. Con el tope general de 366 días serían ≈ 13 s: se acota a 31 (un mes entero
@@ -29,9 +38,10 @@ import type { UsuarioSesion } from '../sesion/permisos.js';
 @ApiUnauthorizedResponse({ description: 'sesión requerida' })
 @Controller('sitios')
 export class SitiosController {
+  private readonly log = new Logger('exportar');
   constructor(
     private readonly tablero: TableroService, private readonly alcance: AlcanceService, private readonly actividadSitio: ActividadService,
-    private readonly espera: EsperaService,
+    private readonly espera: EsperaService, private readonly consulta: ConsultaService, private readonly cupo: CupoExportaciones,
   ) {}
 
   @Get()
@@ -176,6 +186,122 @@ export class SitiosController {
     return filas;
   }
 
+  // GET /sitios/:id/exportar?formato=csv|xlsx|json&desde&hasta — el sitio entero en un archivo (HU-08; docs/19 §4, bloque R; 19/11/2026).
+  // Orden de los códigos, como en la exportación por dispositivo: el sitio (404 si no existe o es de otro, 403 si su perfil no exporta), el
+  // formato y el rango (400) y, al final, el cupo compartido (429). Después, el archivo en flujo: un error antes de enviar nada responde 503
+  // en JSON; uno a mitad corta la conexión (el cliente ve un archivo incompleto, no uno que parece entero). Los dos quedan en el registro.
+  @Get(':id/exportar')
+  @ApiOperation({
+    summary: 'Exportar todo el sitio: mediciones, tramas y eventos (HU-08)',
+    description:
+      `Un archivo por descarga con los tres conjuntos del rango [desde, hasta) de todos los dispositivos del sitio, en cualquier estado, sin datos de personas ` +
+      `(versión del formato \`${VERSION_FORMATO}\`): mediciones (\`${COLUMNAS.mediciones.join(', ')}\`), tramas aceptadas con su carga exacta en base64 y su huella ` +
+      `SHA-256 calculada en la base (\`${COLUMNAS.tramas.join(', ')}\`; solo las que siguen guardadas: RETENCION_TRAMA_DIAS, 30 por omisión) y eventos del ciclo ` +
+      `de vida (\`${COLUMNAS.eventos.join(', ')}\`), ordenados por dispositivo, magnitud y tiempo. \`csv\` (por omisión): un .zip con mediciones.csv, tramas.csv, ` +
+      'eventos.csv (coma, punto decimal, UTF-8, CRLF; apóstrofo reversible contra fórmulas) y LEEME.txt con los conteos al final; un CSV que pasaría de 1 GiB sigue en ' +
+      '`mediciones-2.csv`. `xlsx`: un libro con las hojas «Acerca de» (primera pestaña), «Mediciones», «Tramas» y «Eventos», la primera fila fija, una columna ' +
+      '`fecha_utc` con la fecha nativa de planilla y la carga partida en `payload_base64`, `payload_base64_2` y `payload_base64_3`; una hoja que llega a 1 048 575 ' +
+      'filas sigue en «Mediciones (2)». `json`: `{formato, sitio{codigo, nombre}, desde, hasta, generado_en, retencion_tramas_dias, mediciones[], tramas[], ' +
+      'eventos[], conteos{}}`, con `detalle` como objeto. Por omisión, los últimos 30 días; instantes en UTC con microsegundos. Nombre: ' +
+      '`sitio_<código>_<desde>_<hasta>.<zip|xlsx|json>`. Cupo de ' + MAX_EXPORTACIONES + ' exportaciones o estimaciones simultáneas por proceso, compartido con ' +
+      'GET /dispositivos/{id}/exportar y GET /sitios/{id}/exportar/estimacion. Si falla antes de enviar nada (la primera consulta), 503 en JSON; a mitad, se ' +
+      'corta la conexión.',
+  })
+  @ApiParam({ name: 'id', description: 'UUID del sitio' })
+  @ApiQuery({ name: 'formato', required: false, enum: FORMATOS_SITIO, description: 'csv (por omisión, un .zip), xlsx o json' })
+  @ApiQuery({ name: 'desde', required: false, description: `${ISO_8601}; por defecto hasta − 30 días; no antes del año 2000` })
+  @ApiQuery({ name: 'hasta', required: false, description: `${ISO_8601}; por defecto ahora; como mucho un día en el futuro` })
+  @ApiProduces(TIPO_CONTENIDO.csv, TIPO_CONTENIDO.xlsx, 'application/json')
+  @ApiOkResponse({
+    description: 'Archivo descargable en flujo',
+    headers: {
+      'Content-Disposition': { description: 'attachment; filename="sitio_<código>_<desde>_<hasta>.<zip|xlsx|json>"', schema: { type: 'string' } },
+      'Cache-Control': { description: 'no-store', schema: { type: 'string' } },
+    },
+  })
+  @ApiBadRequestResponse({ description: 'UUID, fecha, rango o formato inválidos' })
+  @ApiForbiddenResponse({ description: 'Consulta u operador técnico: exportar es del administrador (de sitio o del sistema) y del investigador (docs/20 §6)' })
+  @ApiNotFoundResponse({ description: 'Sitio inexistente o de otro' })
+  @ApiTooManyRequestsResponse({ description: `\`codigo: ${CODIGO_CUPO}\`: ya hay ${MAX_EXPORTACIONES} exportaciones o estimaciones en curso en el proceso (cupo único con GET /dispositivos/{id}/exportar y GET /sitios/{id}/exportar/estimacion)` })
+  @ApiServiceUnavailableResponse({ description: 'La exportación falló antes de enviar nada (la primera consulta): 503 en JSON; si falla a mitad, se corta la conexión' })
+  async exportar(
+    @Usuario() u: UsuarioSesion, @Param('id') id: string, @Res() res: Response,
+    @Query('formato') f?: string, @Query('desde') desde?: string, @Query('hasta') hasta?: string,
+  ): Promise<void> {
+    const sitioId = uuid(id, 'sitio');
+    await this.alcance.exigirSitio(u, 'exportar', sitioId);
+    let fmt;
+    try {
+      fmt = formatoSitio(f);
+    } catch (e) {
+      throw new BadRequestException((e as Error).message);
+    }
+    const { d, h } = rangoExportacion(desde, hasta);
+    const sitio = await this.consulta.sitioExportable(sitioId);
+    this.cupo.tomar();
+    try {
+      const meta = { ...sitio, desde: d, hasta: h, generadoEn: new Date(), retencionTramasDias: diasRetencionTrama() };
+      res.setHeader('Content-Type', TIPO_CONTENIDO[fmt]);
+      res.setHeader('Content-Disposition', `attachment; filename="${nombreDeArchivoSitio(sitio.codigo, d, h, fmt)}"`);
+      res.setHeader('Cache-Control', 'no-store');
+      // Los primeros 64 KiB (las cabeceras del zip o del libro) se retienen hasta después de la primera consulta (descarga.ts).
+      const descarga = escritorDeDescarga(res);
+      await this.consulta.conConexionExportacion((c) => escribirExportacionSitio(fmt, {
+        mediciones: () => this.consulta.medicionesSitio(c, sitioId, d, h),
+        tramas: () => this.consulta.tramasSitio(c, sitioId, d, h),
+        eventos: () => this.consulta.eventosSitio(c, sitioId, d, h),
+      }, meta, (b) => descarga.escribir(b)));
+      await descarga.terminar();
+    } catch (e) {
+      const hecho = responderFalla(res, e);
+      if (e instanceof DescargaCortada) this.log.warn(`exportación del sitio ${sitio.codigo} cortada: el cliente cerró la conexión`);
+      else this.log.error(`exportación del sitio ${sitio.codigo} ${hecho === 'respondida' ? 'no empezó (503)' : 'interrumpida'}: ${(e as Error).message}`);
+    } finally {
+      this.cupo.soltar();
+    }
+  }
+
+  @Get(':id/exportar/estimacion')
+  @ApiOperation({
+    summary: 'Cuánto trae la exportación de un sitio, antes de descargarla (HU-08)',
+    description:
+      `Mismos permisos y mismo rango que GET /sitios/{id}/exportar. \`mediciones\`, \`tramas\` y \`eventos\`: \`{filas, supera_tope}\`, contadas con tope ` +
+      `(\`tope_conteo\`, ${TOPE_ESTIMACION}: el conteo nunca recorre más; con \`supera_tope\`, «más de ${TOPE_ESTIMACION}»); \`tramas.desde\`: la trama más antigua ` +
+      'del rango (las tramas se guardan `retencion_tramas_dias`), o null si no hay; `bytes_aproximados{csv, xlsx, json}`: filas × bytes por fila medidos en el ' +
+      'banco (docs/16 §89; con `supera_tope`, un mínimo). Toma el mismo cupo que las exportaciones (' + MAX_EXPORTACIONES + ' por proceso: cancelarla en el ' +
+      `panel no cancela su consulta en la base) y tiene ${TIEMPO_ESTIMACION_MS / 1000} s por consulta (si los pasa, 503).`,
+  })
+  @ApiParam({ name: 'id', description: 'UUID del sitio' })
+  @ApiQuery({ name: 'desde', required: false, description: `${ISO_8601}; por defecto hasta − 30 días; no antes del año 2000` })
+  @ApiQuery({ name: 'hasta', required: false, description: `${ISO_8601}; por defecto ahora; como mucho un día en el futuro` })
+  @ApiOkResponse({ description: 'Conteos con tope y tamaño aproximado por formato' })
+  @ApiBadRequestResponse({ description: 'UUID, fecha o rango inválidos' })
+  @ApiForbiddenResponse({ description: 'Consulta u operador técnico (docs/20 §6)' })
+  @ApiNotFoundResponse({ description: 'Sitio inexistente o de otro' })
+  @ApiTooManyRequestsResponse({ description: `\`codigo: ${CODIGO_CUPO}\`: ya hay ${MAX_EXPORTACIONES} exportaciones o estimaciones en curso en el proceso` })
+  @ApiServiceUnavailableResponse({ description: `Una consulta pasó de ${TIEMPO_ESTIMACION_MS / 1000} s` })
+  async estimacion(@Usuario() u: UsuarioSesion, @Param('id') id: string, @Query('desde') desde?: string, @Query('hasta') hasta?: string) {
+    const sitioId = uuid(id, 'sitio');
+    await this.alcance.exigirSitio(u, 'exportar', sitioId);
+    const { d, h } = rangoExportacion(desde, hasta);
+    // Con cupo (revisión del 19/11/2026): el panel cancela la estimación anterior al cambiar el rango, pero cancelar la petición NO cancela
+    // la consulta en la base, que sigue hasta terminar con su conexión tomada. El cupo compartido con las exportaciones (a lo más 2
+    // conexiones pesadas, de las 5 del pool) y el tope de 10 s por consulta (contar 1 000 000 tarda ≈ 0,5 s, docs/16 §89) acotan lo que
+    // pueden ocupar las que quedaron huérfanas.
+    this.cupo.tomar();
+    try {
+      const n = await this.consulta.conConexionExportacion((c) => this.consulta.estimarSitio(c, sitioId, d, h, TOPE_ESTIMACION), TIEMPO_ESTIMACION_MS);
+      return estimacion(d, h, n, diasRetencionTrama());
+    } catch (e) {
+      if ((e as { code?: string }).code === '57014') {
+        throw new ServiceUnavailableException(`la estimación tardó más de ${TIEMPO_ESTIMACION_MS / 1000} s: prueba con un rango más corto o en un momento`);
+      }
+      throw e;
+    } finally {
+      this.cupo.soltar();
+    }
+  }
+
   // El plazo de la primera trama del sitio (docs/19 §2 y §4, P; docs/10 §8.4 punto 68; docs/20 §6): leerlo, cualquier perfil del sitio (la
   // ficha dice cuándo pasaría a «Sin señal»); fijarlo, la acción `ajustes` (quien administra el sitio). Orden de los códigos, como en las
   // demás rutas que escriben (docs/20 §10): sin la acción en ningún sitio, 403 antes de mirar el cuerpo; el cuerpo, 400; el sitio: 404 si no
@@ -225,6 +351,15 @@ export class SitiosController {
     await this.alcance.exigirSitio(u, 'ajustes', sitioId);
     return this.espera.fijar(sitioId, horas, u.id, anterior);
   }
+}
+
+// El rango de las dos exportaciones: por omisión, los últimos 30 días; el mismo rango razonable que la exportación por dispositivo.
+export function rangoExportacion(desde: unknown, hasta: unknown): { d: Date; h: Date } {
+  const h = fecha(hasta, new Date(), 'hasta');
+  const d = fecha(desde, new Date(h.getTime() - 30 * 86_400_000), 'desde');
+  const motivo = rangoRazonable(d, h);
+  if (motivo !== null) throw new BadRequestException(motivo);
+  return { d, h };
 }
 
 // La ventana de una lectura del tablero: por defecto, las últimas 24 h; los topes de siempre (validacion.ts), antes de tocar la base.

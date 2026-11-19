@@ -21,13 +21,13 @@ describe('ayudaDeRol y guiaDePerfiles', () => {
       'Consulta: ve dispositivos, históricos, condiciones y cuarentena de sus sitios; no exporta, no cambia nada, no administra personas ni configura dispositivos ni umbrales.',
     );
     expect(ayudaDeRol('administrador', MATRIZ)).toBe(
-      'Administrador: ve dispositivos, históricos, condiciones y cuarentena de sus sitios, exporta las mediciones crudas, da de alta y calibra dispositivos y pasarelas, da de alta personas y les asigna su rol en sus sitios y configura nombre, estado, intervalo, zona y umbrales de los dispositivos.',
+      'Administrador: ve dispositivos, históricos, condiciones y cuarentena de sus sitios, exporta sus datos (mediciones, tramas y eventos), da de alta y calibra dispositivos y pasarelas, da de alta personas y les asigna su rol en sus sitios y configura nombre, estado, intervalo, zona y umbrales de los dispositivos.',
     );
     expect(guiaDePerfiles(MATRIZ).map((g) => g.rol)).toEqual(['administrador', 'consulta']);
   });
   it('si la matriz cambia, la ayuda cambia sola: con «exportar» para consulta, la guía lo dice y deja de negarlo', () => {
     const otra = { ...MATRIZ, consulta: ['leer', 'exportar'] };
-    expect(ayudaDeRol('consulta', otra)).toBe('Consulta: ve dispositivos, históricos, condiciones y cuarentena de sus sitios y exporta las mediciones crudas; no cambia nada, no administra personas ni configura dispositivos ni umbrales.');
+    expect(ayudaDeRol('consulta', otra)).toBe('Consulta: ve dispositivos, históricos, condiciones y cuarentena de sus sitios y exporta sus datos (mediciones, tramas y eventos); no cambia nada, no administra personas ni configura dispositivos ni umbrales.');
   });
   it('una acción que el diccionario no conoce se nombra tal cual (nunca se calla) y un rol sin acciones lo dice', () => {
     expect(ayudaDeRol('administrador', { administrador: ['leer', 'auditar'], consulta: [] })).toContain('puede «auditar»');
