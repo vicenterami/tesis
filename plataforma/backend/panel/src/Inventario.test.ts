@@ -11,7 +11,7 @@ import { recordarMarcados } from './lib/comparar';
 const AHORA = new Date('2026-10-12T15:00:00Z');
 const base = (p: Partial<DispositivoInventario>): DispositivoInventario => ({
   id: '00000000-0000-4000-8000-000000000001', id_fisico: 'dev-0001', nombre: 'Sensor', estado: 'activo', via: 'mqtt',
-  formato: 'senml', intervalo_esperado_s: 60, visto_por_ultima_vez: '2026-10-12T14:59:30Z', en_linea: true, zona: 'Lab',
+  formato: 'senml', intervalo_esperado_s: 60, visto_por_ultima_vez: '2026-10-12T14:59:30Z', en_linea: true, en_servicio_desde: '2026-01-01T00:00:00Z', espera_hasta: null, zona: 'Lab',
   sitio: 'Campus', sitio_codigo: 'uct', zona_id: 'z-lab', zona_horaria: 'America/Santiago', condiciones_abiertas: 0, canales: [], ...p,
 });
 const dispositivos: DispositivoInventario[] = [
@@ -182,7 +182,7 @@ describe('Inventario (P2): semáforo, orden y filtros leídos del DOM', () => {
     expect(inventarios).toBe(1); // sin volver a pedir la página: el panel recalcula el estado con las condiciones nuevas (§6)
   });
 
-  it('tope medido del vivo: 100 avisos de condición en 3 s → una sola tanda de 5 peticiones (abiertas y 4 conteos), nunca la página', async () => {
+  it('tope medido del vivo: 100 avisos de condición en 3 s → una sola tanda de 6 peticiones (abiertas y 5 conteos: uno por estado de docs/19 §2), nunca la página', async () => {
     const oyentes = new Map<string, (ev: MessageEvent) => void>();
     class Fuente { readyState = 1; onopen: ((e: Event) => void) | null = null; onerror = null; addEventListener(t: string, f: (ev: MessageEvent) => void): void { oyentes.set(t, f); } close(): void {} }
     vi.stubGlobal('EventSource', Fuente);
@@ -200,9 +200,9 @@ describe('Inventario (P2): semáforo, orden y filtros leídos del DOM', () => {
     }
     await vi.advanceTimersByTimeAsync(3000);
     const tanda = pedidas.slice(antes);
-    expect(tanda).toHaveLength(5);
+    expect(tanda).toHaveLength(6);
     expect(tanda.filter((r) => r.startsWith('/condiciones'))).toHaveLength(1);
-    expect(tanda.filter((r) => r.includes('limite=1&'))).toHaveLength(4);
+    expect(tanda.filter((r) => r.includes('limite=1&'))).toHaveLength(5);
     expect(tanda.some((r) => r.startsWith('/dispositivos?') && r.includes('limite=50&'))).toBe(false); // la página no se repide
   });
 
@@ -362,5 +362,30 @@ describe('Inventario v2: paginación, estado del servidor, tarjetas en angosto, 
     // Lo ordena el servidor (todas las páginas), no el panel la visible; y la columna dice su ventana: las últimas 24 h.
     expect(vi.mocked(fetch).mock.calls.map(([r]) => String(r)).some((r) => r.startsWith('/dispositivos?') && r.includes('orden=entrega') && r.includes('limite=50'))).toBe(true);
     expect(document.querySelector('[data-ordenar-entrega]')!.textContent).toContain('Entrega (24 h)');
+  });
+
+  it('«Esperando primera trama» (docs/19 §2, 18/11/2026): su palabra y su icono, cuenta aparte, filtra, entrega «—», va antes de Inactivo y, al vencer el plazo, pasa sola a «Sin señal»', async () => {
+    const nuevo = base({ id: '00000000-0000-4000-8000-000000000009', nombre: 'Recién instalado', id_fisico: 'dev-0009', visto_por_ultima_vez: null, en_linea: null,
+      en_servicio_desde: '2026-10-12T14:00:00Z', espera_hasta: '2026-10-12T15:00:20Z', entrega: null });
+    vi.stubGlobal('fetch', servidor([...dispositivos, nuevo]));
+    render(Inventario);
+    await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(6));
+    const filas = () => screen.getAllByRole('row').slice(1);
+    expect(filas().map((f) => f.getAttribute('data-estado'))).toEqual(['sin_senal', 'alerta', 'normal', 'esperando', 'inactivo']);
+    const fila = filas().find((f) => f.textContent?.includes('Recién instalado'))!;
+    const chip = fila.querySelector('.estado')!;
+    expect(chip.textContent).toBe('Esperando primera trama'); // la palabra, no solo el color
+    expect(chip.classList.contains('esperando')).toBe(true); // la clase que pone el reloj delante (app.css)
+    expect(fila.querySelector('[data-entrega]')!.textContent).toBe('—'); // nunca «0 %»
+    expect(document.querySelector('[data-conteo="esperando"] .n')!.textContent).toBe('1');
+    expect(document.querySelector('[data-conteo="normal"] .n')!.textContent).toBe('1'); // ya no cuenta como Normal
+    document.querySelector<HTMLButtonElement>('[data-conteo="esperando"]')!.click();
+    await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(2));
+    expect(vi.mocked(fetch).mock.calls.map(([r]) => String(r)).some((r) => r.includes('estado=esperando'))).toBe(true);
+    document.querySelector<HTMLButtonElement>('[data-conteo="esperando"]')!.click();
+    await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(6));
+    // El reloj del panel (cada 10 s) recalcula sin repedir: a los 30 s el plazo (15:00:20) ya venció.
+    await vi.advanceTimersByTimeAsync(30_000);
+    await waitFor(() => expect(filas().find((f) => f.textContent?.includes('Recién instalado'))!.getAttribute('data-estado')).toBe('sin_senal'));
   });
 });

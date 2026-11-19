@@ -13,7 +13,7 @@
   import { ErrorApi, URL_ABIERTAS, mensajeError, obtener } from './lib/api';
   import { antirrebote, porLotes } from './lib/antirrebote';
   import { recordarMarcados } from './lib/comparar';
-  import { enLinea, estadoVisual, ROTULO } from './lib/estado-visual';
+  import { estadoVisual, ROTULO } from './lib/estado-visual';
   import { coloresSeries, temaVivo } from './lib/tema';
   import { RANGO_POR_DEFECTO, alinearSeries, formatearValor, resolucionValida, rotuloIntervalo, urlHistorico, ventana, type ClaveRango, type ClaveResolucion } from './lib/grafico';
   import type { CanalFicha, Condicion, DispositivoFicha, EventoVivo, Historico } from './lib/modelo';
@@ -291,7 +291,7 @@
               {#if f.motivo !== null}<span class="vivo" data-motivo> · {f.motivo}</span>{/if}
             </td>
             {#if f.ficha !== null}
-              {@const e = estadoVisual({ estado: f.ficha.estado, en_linea: enLinea(f.ficha.visto_por_ultima_vez, f.ficha.intervalo_esperado_s, ahora) }, tiposPorDispositivo.get(f.id) ?? [])}
+              {@const e = estadoVisual(f.ficha, tiposPorDispositivo.get(f.id) ?? [], ahora)}
               <td data-ultima>{f.canal === null ? '—' : formatearValor(f.canal.ultima_medicion?.valor ?? null, f.canal.unidad)}</td>
               <td title={f.canal?.ultima_medicion ? horaLocal(f.canal.ultima_medicion.tiempo, f.ficha.zona_horaria) : ''}>{f.canal?.ultima_medicion ? haceCuanto(f.canal.ultima_medicion.tiempo, ahora) : 'sin lecturas'}</td>
               <td><span class="estado {e}" data-estado={e}>{ROTULO[e]}</span></td>

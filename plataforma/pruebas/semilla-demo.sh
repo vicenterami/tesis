@@ -73,7 +73,7 @@ if [ "${1:-}" = "--completa" ]; then
   # visto_por_ultima_vez, y la entrega de 24 h (recibidas ÷ esperadas, la regla de consulta/tablero.ts) es la de la cabecera.
   comprobar "toda medición de la semilla tiene su trama" "SELECT count(*) FROM medicion m JOIN canal c ON c.id=m.canal_id JOIN dispositivo d ON d.id=c.dispositivo_id WHERE d.id_fisico IN ($L) AND NOT EXISTS (SELECT 1 FROM trama t WHERE t.dispositivo_id=d.id AND t.recibido_en=m.recibido_en)" 0
   comprobar "la última trama de cada uno es su visto_por_ultima_vez" "SELECT count(*) FROM dispositivo d JOIN estado_dispositivo e ON e.dispositivo_id=d.id WHERE d.id_fisico IN ($L) AND e.visto_por_ultima_vez IS DISTINCT FROM (SELECT max(recibido_en) FROM trama t WHERE t.dispositivo_id=d.id)" 0
-  ENTREGA="SELECT d.id_fisico, round(least(100, round(1000.0 * (SELECT count(*) FROM trama t WHERE t.dispositivo_id=d.id AND t.recibido_en >= now() - INTERVAL '24 hours') / floor(86400.0 / d.intervalo_esperado_s)) / 10), 1) AS p FROM dispositivo d WHERE d.id_fisico IN ($L) AND d.estado='activo' AND d.creado_en <= now() - INTERVAL '24 hours'"
+  ENTREGA="SELECT d.id_fisico, round(least(100, round(1000.0 * (SELECT count(*) FROM trama t WHERE t.dispositivo_id=d.id AND t.recibido_en >= now() - INTERVAL '24 hours') / floor(86400.0 / d.intervalo_esperado_s)) / 10), 1) AS p FROM dispositivo d WHERE d.id_fisico IN ($L) AND d.estado='activo' AND d.en_servicio_desde <= now() - INTERVAL '24 hours'"
   comprobar "entrega de 24 h por dispositivo, la de la cabecera" "SELECT string_agg(id_fisico||'='||p, ',' ORDER BY id_fisico) FROM ($ENTREGA) x WHERE id_fisico IN ('demo-aire-01','demo-suelo-01','demo-silencioso','demo-lora-01','demo-lora-02')" "demo-aire-01=100.0,demo-lora-01=97.5,demo-lora-02=37.5,demo-silencioso=0.0,demo-suelo-01=91.7"
   comprobar "al menos tres valores de entrega distintos entre los dispositivos de la semilla" "SELECT (count(DISTINCT p) >= 3)::int FROM ($ENTREGA) x" 1
   comprobar "tramas de las últimas 24 h en uct: las de la cabecera (no casi cero)" "SELECT count(*) FROM trama t JOIN dispositivo d ON d.id=t.dispositivo_id JOIN zona z ON z.id=d.zona_id JOIN sitio s ON s.id=z.sitio_id WHERE s.codigo='uct' AND d.id_fisico IN ($L) AND t.recibido_en >= now() - INTERVAL '24 hours'" 718
@@ -86,12 +86,15 @@ if [ "${1:-}" = "--completa" ]; then
   # Desde el 08/11/2026 la lista exige sesión (docs/20 §6): se lee con la clave de administrador del .env (usuario del sistema).
   api=$(printf 'X-Clave-Admin: %s\n' "$(leer_env "$AQUI/../.env" HTTP_CLAVE_ADMIN 2>/dev/null)" | curl -s -m 5 -H @- "$API/dispositivos" | python3 -I -c "
 import sys, json
-r = {d['id_fisico']: d['en_linea'] for d in json.load(sys.stdin)}
+filas = json.load(sys.stdin)
+r = {d['id_fisico']: d['en_linea'] for d in filas}
+ev = {d['id_fisico']: d.get('estado_visual') for d in filas}
 esperado = {'demo-aire-01': True, 'demo-suelo-01': True, 'demo-silencioso': False, 'demo-mantenimiento': True, 'demo-baja': False,
             'demo-http-01': None, 'demo-lora-01': True, 'demo-lora-02': True, 'd03': True, 'demo-identificador-en-el-limite-de-sesenta-y-tres-caracteres-ok': True, 'demo-mag-01': True}
 malos = [f'{k}: API {r.get(k, \"ausente\")}, esperado {v}' for k, v in esperado.items() if r.get(k, 'ausente') != v]
+if ev.get('demo-http-01') != 'esperando': malos.append(f'demo-http-01: estado_visual {ev.get(\"demo-http-01\")}, esperado esperando (docs/19 §2)')
 print('; '.join(malos) or 'ok')" 2>&1)
-  [ "$api" = ok ] && echo "OK    GET /dispositivos: en_linea de los 11 como dice la cabecera" || { echo "FALLA GET /dispositivos: $api"; fallos=$((fallos+1)); }
+  [ "$api" = ok ] && echo "OK    GET /dispositivos: en_linea de los 11 como dice la cabecera, y demo-http-01 «esperando» su primera trama" || { echo "FALLA GET /dispositivos: $api"; fallos=$((fallos+1)); }
 fi
 
 # Personas de demostración: se crean (o, según el modo, se les asigna una temporal nueva) al final, y lo que pasó con cada una se imprime

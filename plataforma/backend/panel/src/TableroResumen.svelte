@@ -15,7 +15,7 @@
   import { antirrebote, porLotes } from './lib/antirrebote';
   import { esCancelacion, obtener } from './lib/api';
   import { avisoDeError } from './lib/avisos';
-  import { ROTULO, rotuloCondicion } from './lib/estado-visual';
+  import { ROTULO, rotuloCondicion, type EstadoVisual } from './lib/estado-visual';
   import type { AhoraSitio, EventoVivo, ResumenSitio, Sitio } from './lib/modelo';
   import { haceCuanto, horaLocal } from './lib/tiempo';
   import type { PreferenciaUnidades } from './lib/unidades';
@@ -144,9 +144,10 @@
     };
   });
 
-  const inventario = (estado: 'normal' | 'alerta' | 'sin_senal' | 'inactivo' | null): string => fragmentoInventario({ ...SIN_FILTROS, sitio: sitio.codigo, estado });
-  const sumaEstados = $derived(resumen === null ? 0 : resumen.dispositivos.normal + resumen.dispositivos.alerta + resumen.dispositivos.sin_senal + resumen.dispositivos.inactivo);
-  const ESTADOS = ['normal', 'alerta', 'sin_senal', 'inactivo'] as const;
+  const inventario = (estado: EstadoVisual | null): string => fragmentoInventario({ ...SIN_FILTROS, sitio: sitio.codigo, estado });
+  // Los cinco estados de docs/19 §2, en el orden de la franja (L2a); «Esperando primera trama» desde el 18/11/2026.
+  const ESTADOS = ['normal', 'alerta', 'sin_senal', 'esperando', 'inactivo'] as const satisfies readonly EstadoVisual[];
+  const sumaEstados = $derived(resumen === null ? 0 : ESTADOS.reduce((n, e) => n + resumen!.dispositivos[e], 0));
   const rotuloEstado = (e: (typeof ESTADOS)[number]): string => (e === 'inactivo' ? 'Inactivos' : ROTULO[e]);
 </script>
 
@@ -173,7 +174,7 @@
     </li>
     {#each ESTADOS as e (e)}
       <li class="indicador" data-indicador={e}>
-        <a class="enlace-extendido" href={inventario(e)}><span class="rotulo"><span class="estado {e}">{rotuloEstado(e)}</span></span><span class="solo-lector">:</span> <span class="cifra" data-valor>{resumen.dispositivos[e].toLocaleString('es-CL')}</span></a>
+        <a class="enlace-extendido" href={inventario(e)}><span class="rotulo" title={rotuloEstado(e)}><span class="estado {e}">{rotuloEstado(e)}</span></span><span class="solo-lector">:</span> <span class="cifra" data-valor>{resumen.dispositivos[e].toLocaleString('es-CL')}</span></a>
       </li>
     {/each}
     <li class="indicador" data-indicador="tramas">
@@ -183,7 +184,7 @@
     <li class="indicador ancho" data-indicador="salud">
       <a class="enlace-extendido" href={fragmentoInventario({ ...SIN_FILTROS, sitio: sitio.codigo })}><span class="rotulo">Salud del sitio</span><span class="solo-lector">:</span> <span class="cifra" data-valor>{resumen.salud.porcentaje === null ? '—' : `${Math.round(resumen.salud.porcentaje)} %`}</span></a>
       <Medidor porcentaje={resumen.salud.porcentaje} etiqueta="Salud del sitio" />
-      <span class="detalle" title="En línea ÷ supervisados (sin los inactivos)" data-detalle>{resumen.salud.reportan} de {resumen.salud.supervisados} reportan</span>
+      <span class="detalle" title="En línea ÷ supervisados (sin los inactivos ni los que esperan su primera trama)" data-detalle>{resumen.salud.reportan} de {resumen.salud.supervisados} reportan</span>
     </li>
   </ul>
 

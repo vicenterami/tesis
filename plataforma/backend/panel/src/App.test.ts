@@ -25,7 +25,7 @@ const AHORA = new Date('2026-10-12T15:00:00Z');
 const ID = '00000000-0000-4000-8000-000000000001';
 const TEMP = '00000000-0000-4000-8000-0000000000c1';
 const HUM = '00000000-0000-4000-8000-0000000000c2';
-const comun = { id_fisico: 'dev-0001', estado: 'activo' as const, via: 'mqtt', formato: 'senml', intervalo_esperado_s: 60, visto_por_ultima_vez: '2026-10-12T14:59:30Z', en_linea: true, zona: 'Lab', sitio: 'Campus', zona_horaria: 'America/Santiago', sitio_codigo: 'uct', zona_id: 'z-lab' };
+const comun = { id_fisico: 'dev-0001', estado: 'activo' as const, via: 'mqtt', formato: 'senml', intervalo_esperado_s: 60, visto_por_ultima_vez: '2026-10-12T14:59:30Z', en_linea: true, en_servicio_desde: '2026-01-01T00:00:00Z', espera_hasta: null, zona: 'Lab', sitio: 'Campus', zona_horaria: 'America/Santiago', sitio_codigo: 'uct', zona_id: 'z-lab' };
 const ficha: DispositivoFicha = {
   ...comun, id: ID, nombre: 'Invernadero', creado_en: '2026-10-01T12:00:00Z', intervalo_observado_s: 60,
   canales: [

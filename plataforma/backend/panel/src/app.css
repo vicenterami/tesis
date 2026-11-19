@@ -173,6 +173,15 @@ main:focus { outline: none; }
 .estado.alerta { background: var(--estado-alerta-fondo); color: var(--estado-alerta); }
 .estado.sin_senal { background: var(--estado-sin-senal-fondo); color: var(--estado-sin-senal); }
 .estado.inactivo { background: var(--estado-inactivo-fondo); color: var(--estado-inactivo); }
+/* El reloj de abajo es de creación propia (un círculo y dos trazos simples; no viene de ninguna biblioteca de iconos).
+   «Esperando primera trama» (docs/19 §2, 18/11/2026): tono informativo con la pareja de la píldora de navegación (sin colores nuevos), un
+   borde punteado que lo separa de Inactivo aun en blanco y negro, y un reloj delante; la palabra va siempre. */
+.estado.esperando { background: var(--pildora); color: var(--sobre-pildora); border: 1px dashed currentColor; padding: calc(0.1rem - 1px) calc(0.5rem - 1px); }
+.estado.esperando::before {
+  content: ''; display: inline-block; width: 0.95em; height: 0.95em; margin-right: 0.3em; vertical-align: -0.12em; background: currentColor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3 2'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3 2'/%3E%3C/svg%3E") center / contain no-repeat;
+}
 .tabla { overflow-x: auto; }
 table { border-collapse: collapse; width: 100%; background: var(--superficie); }
 th, td { text-align: left; padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--borde-tenue); vertical-align: top; }
@@ -401,7 +410,7 @@ main { padding-bottom: calc(var(--e-4) + var(--alto-avisos, 0px)); }
   .pestanas a { flex: 1 1 0; padding: 0 var(--e-2); }
 }
 /* L2a Franja de indicadores: fichas compactas; el enlace es el rótulo con su cifra y su área activa cubre la ficha. */
-.indicadores-v3 { list-style: none; margin: 0 0 var(--e-5); padding: 0; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)) minmax(0, 1.6fr); gap: var(--e-2); }
+.indicadores-v3 { list-style: none; margin: 0 0 var(--e-5); padding: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)) minmax(0, 1.6fr); gap: var(--e-2); }
 .indicador { position: relative; min-width: 0; display: grid; gap: 2px; align-content: start; padding: var(--e-2) var(--e-3); background: var(--superficie-elevada);
   border: 1px solid var(--borde-tenue); border-radius: var(--radio-l); box-shadow: var(--sombra); }
 .indicador:hover { border-color: var(--borde-control); }

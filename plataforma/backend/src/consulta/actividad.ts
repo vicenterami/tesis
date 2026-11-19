@@ -58,6 +58,11 @@ export function textoActividad(clase: ClaseActividad, tipo: string, dispositivo:
     const n = (detalle as { minimo_dispositivos?: unknown } | undefined)?.minimo_dispositivos;
     return Number.isInteger(n) ? `fijó en ${String(n)} el mínimo de dispositivos de la vista pública del sitio` : 'cambió el mínimo de dispositivos de la vista pública del sitio';
   }
+  // El plazo de la primera trama del sitio (docs/19 §4, P; 18/11/2026).
+  if (tipo === 'espera_primera_trama') {
+    const n = (detalle as { espera_primera_trama_h?: unknown } | undefined)?.espera_primera_trama_h;
+    return Number.isInteger(n) ? `fijó en ${String(n)} h el plazo de la primera trama de los equipos del sitio` : 'cambió el plazo de la primera trama de los equipos del sitio';
+  }
   const sin = dispositivo === null ? TEXTOS_SIN_DISPOSITIVO[tipo] : undefined;
   if (sin !== undefined) return sin(objeto);
   const d = dispositivo === null ? 'un dispositivo' : `«${dispositivo}»`;

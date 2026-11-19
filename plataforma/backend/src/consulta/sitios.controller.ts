@@ -1,13 +1,16 @@
-import { BadRequestException, Controller, Get, Param, Query, Res } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, Param, Put, Query, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import {
-  ApiBadRequestResponse, ApiCookieAuth, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiQuery, ApiServiceUnavailableResponse, ApiTags, ApiUnauthorizedResponse,
+  ApiBadRequestResponse, ApiBody, ApiConflictResponse, ApiCookieAuth, ApiForbiddenResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiQuery,
+  ApiServiceUnavailableResponse, ApiTags, ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { CABECERA_X_SIGUIENTE, ISO_8601, INTERVALOS, MAX_CUBOS, MAX_DIAS_VENTANA, SEGUNDOS_INTERVALO, exigirTopeCubos, fecha, intervalo, limite, uuid } from './validacion.js';
 import { DIAS_ACTIVIDAD_POR_DEFECTO, MAX_DIAS_ACTIVIDAD, tipoValido } from './actividad.js';
 import { ActividadService, FilaActividad } from './actividad.service.js';
 import { CUBOS_CHISPA, HISTORICO_SITIO, LIMITE_AHORA, MAGNITUDES_SALUD, MAX_CANALES_AHORA, TENDENCIA, intervaloParaRango, leerCursor, siguiente } from './tablero.js';
 import { MAX_ENTREGA_RESUMEN, TableroService } from './tablero.service.js';
+import { ESPERA_PRIMERA_TRAMA, EsperaSitio, validarEspera } from './espera.js';
+import { EsperaService } from './espera.service.js';
 
 // El histórico del sitio lee TODOS los canales de la magnitud: medido en el banco (docs/16 §61), 30 días de 120 canales a una lectura cada
 // 300 s (1 036 800 filas) tardan ≈ 1,1 s, ≈ 1 µs por lectura. Con el tope general de 366 días serían ≈ 13 s: se acota a 31 (un mes entero
@@ -15,7 +18,7 @@ import { MAX_ENTREGA_RESUMEN, TableroService } from './tablero.service.js';
 export const MAX_DIAS_SITIO = 31;
 import { AlcanceService } from '../sesion/alcance.service.js';
 import { Usuario } from '../sesion/guardia.js';
-import { alcanceDeLectura } from '../sesion/permisos.js';
+import { alcanceDeLectura, exigirEnAlguno } from '../sesion/permisos.js';
 import type { UsuarioSesion } from '../sesion/permisos.js';
 
 // Tablero del sitio (docs/19 §4, bloque «Tablero v2», B e I; docs/10 §8.4 punto 65). Lecturas con sesión: consulta o más en su sitio;
@@ -26,7 +29,10 @@ import type { UsuarioSesion } from '../sesion/permisos.js';
 @ApiUnauthorizedResponse({ description: 'sesión requerida' })
 @Controller('sitios')
 export class SitiosController {
-  constructor(private readonly tablero: TableroService, private readonly alcance: AlcanceService, private readonly actividadSitio: ActividadService) {}
+  constructor(
+    private readonly tablero: TableroService, private readonly alcance: AlcanceService, private readonly actividadSitio: ActividadService,
+    private readonly espera: EsperaService,
+  ) {}
 
   @Get()
   @ApiOperation({
@@ -43,14 +49,14 @@ export class SitiosController {
   @ApiOperation({
     summary: 'Resumen del sitio para el tablero (Etapa 4)',
     description:
-      'Una consulta por petición (docs/10 §8.4 punto 65 iii). `sitio`, `ventana{desde, hasta, intervalo}`, `dispositivos{total, normal, alerta, sin_senal, inactivo}` ' +
-      '(estado visual de docs/19 §2), `salud{reportan, supervisados, porcentaje}` (en línea ÷ no inactivos), `condiciones_abiertas[{tipo, n}]`, ' +
+      'Una consulta por petición (docs/10 §8.4 punto 65 iii). `sitio`, `ventana{desde, hasta, intervalo}`, `dispositivos{total, normal, alerta, sin_senal, esperando, inactivo}` ' +
+      '(estado visual de docs/19 §2), `salud{reportan, supervisados, porcentaje}` (en línea ÷ supervisados: ni inactivos ni esperando su primera trama), `condiciones_abiertas[{tipo, n}]`, ' +
       '`tramas{recibidas, rechazadas, cubos[{tiempo, recibidas, rechazadas}]}` (tiempo en segundos Unix, como `tiempos` de los históricos; cubos en la zona del ' +
       'sitio; los cubos sin datos no se emiten: no son 0), ' +
       '`atencion[{id, nombre, estado_visual, visto_por_ultima_vez, tipos}]` (hasta diez, sin señal primero), `magnitudes[{codigo, nombre, unidad, canales}]` ' +
       `y \`entrega[{id, nombre, recibidas, esperadas, porcentaje}]\`: los ${MAX_ENTREGA_RESUMEN} dispositivos activos con peor entrega, de peor a mejor, y ` +
       '`total_activos`, cuántos hay (todos, en `GET /dispositivos?orden=entrega`). Porcentaje nulo si no hay una trama esperada completa en la ventana, contada ' +
-      'desde su alta y dentro de la retención de tramas (medida desde ahora); 0 % si se esperaban y no llegó ninguna. Sin `intervalo`, el más fino que deja la ' +
+      'desde su entrada en servicio (`en_servicio_desde`) y dentro de la retención de tramas (medida desde ahora), y nulo para quien espera su primera trama; 0 % si se esperaban y no llegó ninguna. Sin `intervalo`, el más fino que deja la ' +
       'ventana en 300 cubos o menos.',
   })
   @ApiParam({ name: 'id', description: 'UUID del sitio' })
@@ -168,6 +174,53 @@ export class SitiosController {
     const sig = siguiente(filas, l, (f) => ({ t: f.instante, id: f.id }));
     if (sig !== null) res.setHeader('X-Siguiente', sig);
     return filas;
+  }
+
+  // El plazo de la primera trama del sitio (docs/19 §2 y §4, P; docs/10 §8.4 punto 68; docs/20 §6): leerlo, cualquier perfil del sitio (la
+  // ficha dice cuándo pasaría a «Sin señal»); fijarlo, la acción `ajustes` (quien administra el sitio). Orden de los códigos, como en las
+  // demás rutas que escriben (docs/20 §10): sin la acción en ningún sitio, 403 antes de mirar el cuerpo; el cuerpo, 400; el sitio: 404 si no
+  // existe o es de otro, 403 si es suyo y su perfil no puede.
+  @Get(':id/espera-primera-trama')
+  @ApiOperation({
+    summary: 'Plazo de la primera trama del sitio (Etapa 4)',
+    description:
+      'Cuántas horas espera el sitio la primera trama de un equipo desde que entró en servicio antes de darlo por «Sin señal» (docs/19 §2): ' +
+      `\`espera_primera_trama_h\` (el que rige), \`por_omision\` (${ESPERA_PRIMERA_TRAMA.porOmision}), \`minimo\` y \`maximo\` (${ESPERA_PRIMERA_TRAMA.minimo} a ${ESPERA_PRIMERA_TRAMA.maximo}).`,
+  })
+  @ApiParam({ name: 'id', description: 'UUID del sitio' })
+  @ApiOkResponse({ description: 'El plazo del sitio' })
+  @ApiNotFoundResponse({ description: 'Sitio inexistente o de otro' })
+  async leerEspera(@Usuario() u: UsuarioSesion, @Param('id') id: string): Promise<EsperaSitio> {
+    const sitioId = uuid(id, 'sitio');
+    await this.alcance.exigirSitio(u, 'leer', sitioId);
+    return this.espera.leer(sitioId);
+  }
+
+  @Put(':id/espera-primera-trama')
+  @ApiOperation({
+    summary: 'Fijar el plazo de la primera trama del sitio (Etapa 4)',
+    description:
+      `De ${ESPERA_PRIMERA_TRAMA.minimo} a ${ESPERA_PRIMERA_TRAMA.maximo} horas. Lo fija quien administra el sitio (acción \`ajustes\`, docs/20 §6) y rige en el ` +
+      'barrido siguiente del supervisor: alargarlo devuelve a «Esperando primera trama» a quien había vencido (y cierra su condición); acortarlo puede ' +
+      'abrirla. Deja el evento `espera_primera_trama` con quién, el valor y el anterior (si no cambia nada, ninguno). Con `anterior` (el plazo que se leyó), ' +
+      'si ya no es el que rige: 409 `codigo: espera_cambio` con `espera_primera_trama_h` (el que rige), sin cambiar nada.',
+  })
+  @ApiParam({ name: 'id', description: 'UUID del sitio' })
+  @ApiBody({ schema: { type: 'object', required: ['espera_primera_trama_h'], properties: {
+    espera_primera_trama_h: { type: 'integer', minimum: ESPERA_PRIMERA_TRAMA.minimo, maximum: ESPERA_PRIMERA_TRAMA.maximo, description: 'Horas' },
+    anterior: { type: 'integer', minimum: ESPERA_PRIMERA_TRAMA.minimo, maximum: ESPERA_PRIMERA_TRAMA.maximo, description: 'El plazo que rige y que se leyó (GET …/espera-primera-trama): si cambió entretanto, 409 (bloqueo optimista)' },
+  } } })
+  @ApiOkResponse({ description: 'El plazo nuevo' })
+  @ApiBadRequestResponse({ description: `Fuera de ${ESPERA_PRIMERA_TRAMA.minimo} a ${ESPERA_PRIMERA_TRAMA.maximo}, no entero, o un campo de más` })
+  @ApiForbiddenResponse({ description: 'Un perfil sin la acción «ajustes» (docs/20 §6), o sesión sin la cabecera X-Pedido: panel' })
+  @ApiConflictResponse({ description: '`codigo: espera_cambio`: el plazo cambió desde que se leyó (`anterior`); trae el que rige en `espera_primera_trama_h`' })
+  @ApiNotFoundResponse({ description: 'Sitio inexistente o de otro' })
+  async fijarEspera(@Usuario() u: UsuarioSesion, @Param('id') id: string, @Body() cuerpo: unknown): Promise<EsperaSitio> {
+    exigirEnAlguno(u, 'ajustes');
+    const { horas, anterior } = validarEspera(cuerpo);
+    const sitioId = uuid(id, 'sitio');
+    await this.alcance.exigirSitio(u, 'ajustes', sitioId);
+    return this.espera.fijar(sitioId, horas, u.id, anterior);
   }
 }
 

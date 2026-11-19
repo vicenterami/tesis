@@ -70,7 +70,7 @@ function armar(opciones: { existe?: boolean; vigente?: string; antes?: { cero: n
     release: vi.fn(), on: vi.fn(), off: vi.fn(),
   };
   const pool = { connect: () => Promise.resolve(cliente) } as unknown as Pool;
-  return { servicio: new AltaService(pool, { disponible: true } as unknown as DynsecService), sql, params, cliente };
+  return { servicio: new AltaService(pool, { disponible: true } as unknown as DynsecService, { publicar() {} } as never), sql, params, cliente };
 }
 
 describe('AltaService.calibrar: bloqueo optimista, evento y respuesta (docs/10 §8.4 punto 51)', () => {

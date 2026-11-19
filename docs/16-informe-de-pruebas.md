@@ -4,7 +4,7 @@ Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emu
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
 cubría al escribirse se agregó después: TT-32 (sensor físico) en §43, §44 y §53, y TT-30 (recuperación ante reinicio) en §11. El
-contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 836 pruebas unitarias del backend y 455 del panel.
+contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 858 pruebas unitarias del backend y 458 del panel.
 Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -598,7 +598,7 @@ RF-45; controles en `docs/11 §3`). Qué se probó y cómo:
 
 | Comprobación | Resultado |
 |---|---|
-| Unitarias, sin broker ni base: 13 pruebas en `baja-rotacion.spec.ts`. Baja: `FOR NO KEY UPDATE` → estado → credenciales inactivas → condiciones cerradas → evento → `deleteClient` → COMMIT; 409 si ya estaba de baja y 404 si no existe, sin escribir ni tocar el broker; «not found» del plugin cuenta como borrado y se confirma; sin respuesta → 502 con ROLLBACK y nada que deshacer; vía `http` sin orden al broker; vía `mqtt` sin administración → 503 antes de escribir. Rotación: fila nueva con `scrypt` y la anterior inactiva, `setClientPassword` con el secreto antes del COMMIT, el secreto no está en ningún parámetro SQL, `conexion` con tópico y ejemplo como en el alta; 409 de baja y 400 lorawan sin escribir; «not found» → `createClient` con su rol; sin respuesta → 502 con «repetir la rotación»; la base no confirma → 500 con el mismo remedio; 429 con dos operaciones en curso, también para baja y rotación | ✅ 185 en total al 13/10 (`pnpm test`; 193 al 15/10) |
+| Unitarias, sin broker ni base: 14 pruebas en `baja-rotacion.spec.ts` (13 el 13/10/2026; la 14.ª, del 18/11/2026, comprueba que el aviso en vivo de las condiciones cerradas por la baja sale después del COMMIT, `docs/16 §85`). Baja: `FOR NO KEY UPDATE` → estado → credenciales inactivas → condiciones cerradas → evento → `deleteClient` → COMMIT; 409 si ya estaba de baja y 404 si no existe, sin escribir ni tocar el broker; «not found» del plugin cuenta como borrado y se confirma; sin respuesta → 502 con ROLLBACK y nada que deshacer; vía `http` sin orden al broker; vía `mqtt` sin administración → 503 antes de escribir. Rotación: fila nueva con `scrypt` y la anterior inactiva, `setClientPassword` con el secreto antes del COMMIT, el secreto no está en ningún parámetro SQL, `conexion` con tópico y ejemplo como en el alta; 409 de baja y 400 lorawan sin escribir; «not found» → `createClient` con su rol; sin respuesta → 502 con «repetir la rotación»; la base no confirma → 500 con el mismo remedio; 429 con dos operaciones en curso, también para baja y rotación | ✅ 185 en total al 13/10 (`pnpm test`; 193 al 15/10) |
 | `banco.sh alta` ampliado (20 emulados; las 19 comprobaciones del alta, 19 nuevas y, desde la tarde, 2 de mínimo privilegio: el administrador del broker ya no puede suscribirse a `sitio/#` (135) y sí a `$SYS`): rotación → 201 con credencial nueva de 32 caracteres y `Cache-Control: no-store`; con la anterior el broker no deja conectar; con la nueva publica (`RC:0`); 2 filas de `credencial`, 1 activa; evento `rotacion`; sin cabecera → 401. Baja → 200 con estado anterior y credenciales revocadas; con la credencial nueva ya no conecta (cliente borrado); estado `baja` y 0 activas; evento `baja`; el inventario lo lista con estado `baja`; repetir la baja → 409; rotar un dado de baja → 409; UUID inexistente → 404; sin cabecera → 401; ninguna de las dos credenciales aparece en el registro del backend | ✅ 40 de 40 |
 | Humo (`api-smoke.sh`): `DELETE` y `POST …/credencial` sin cabecera → 401 (503 sin clave configurada), antes de mirar el UUID; OpenAPI con 9 rutas y 11 operaciones | ✅ |
 
@@ -4079,7 +4079,7 @@ datos: cerca del doble en 24 h, por la unión por intervalo y el paso que deja u
 120 y 2 000 dispositivos es parte de la medición del punto 13, pendiente.
 
 **La migración.** Antes de la tercera revisión: aplicada dos veces seguidas sobre una base con datos (la de la semilla de demostración) y con la 14 reejecutada después:
-sin errores, los permisos se conservan y las convenciones del esquema siguen en 7 de 7. En una base nueva con las 25 migraciones, el paso 2
+sin errores, los permisos se conservan y las convenciones del esquema siguen en 7 de 7. En una base nueva con las migraciones de la 01 a la 25, el paso 2
 del verificador da 25 líneas OK y la base tiene 24 tablas. **Reaplicable sobre la versión anterior de la 25** (la que ya tiene la base de
 la pila): en una base desechable con las migraciones 01 a 24, la 25 anterior, la semilla y un enlace, la 25 nueva se aplicó dos veces y la
 14 después, sin errores; el esquema (`pg_dump -s`) y los permisos de la aplicación quedan iguales a los de una base nueva (salvo los
@@ -4110,7 +4110,7 @@ administración); 30 lecturas de la lista de enlaces, ninguna limitada; el regis
 **Cifras.** `pnpm verificar` del backend: tipos (175 archivos de `src/` y la prueba de integración) y lint (176) sin errores; 824 pruebas
 unitarias del backend en 67 archivos, todas en verde (747 antes del bloque); el panel no cambió (404 del panel). El
 contrato OpenAPI pasa a 47 rutas y 59 operaciones (`GET`/`PUT /sitios/{id}/enlaces/minimo`). La página de privacidad, a la versión 2. La
-figura del modelo de datos, regenerada desde una base desechable con las 25 migraciones: 25 entidades, con `dispositivo_zona`.
+figura del modelo de datos, regenerada desde una base desechable con las migraciones de la 01 a la 25: 25 entidades, con `dispositivo_zona`.
 
 **Lo que falta y lo que no se midió.** Las dos pantallas y la revisión por capturas (hechas el mismo día: §80) y la medición del punto 13 (120 y 2 000 dispositivos, 6
 magnitudes y 5 zonas, el peso de la pantalla): hasta entonces los cupos y la zona del proxy son provisorios. El banco no se corrió.
@@ -4419,3 +4419,131 @@ le den), más una corrida con el `git` real contra `origin/main`, cuya versión 
 compilación del panel). Se agregaron 8 pruebas al backend (`legal.spec.ts`: la huella y la versión de cada texto contra su última fila, el
 orden del historial de cada texto, la forma canónica, las filas mal formadas, los plazos de las cookies y los números no finitos) y 1 al panel
 (`fechaCivil`); las de `Legal.test.ts` y `App.test.ts` se ajustaron. Se agregó 1 paso al verificador (2w7).
+
+## 85. Esperando primera trama: «en servicio desde», plazo del sitio y la alarma de quien nunca reportó (18/11/2026)
+
+**Por qué.** En el servidor de prueba había dos equipos dados de alta que nunca enviaron una trama y el inventario los mostraba «Normal», con
+entrega 0 %. Era lo que decía el diseño («sin ninguna trama todavía… se muestra Normal hasta la primera», `docs/19 §2` hasta esa fecha), pero
+un equipo así contaba como sano y **no alarmaba nunca**: el supervisor compara contra la última trama y la consulta de caídos exige
+`visto_por_ultima_vez`, que no existe. Decidido el 18/11/2026: un estado propio, «Esperando primera trama», y, pasado un plazo del sitio desde
+que el equipo entró en servicio, «Sin señal» con la condición de falta de comunicación como cualquier otro (RF-24 enmendado). Un alta masiva
+hecha días antes de instalar no debe llenar el tablero de alarmas: por eso el plazo, de 168 horas por omisión. Lo que había que demostrar: que
+la regla es una sola en sus tres implementaciones, que el supervisor abre a quien venció (una vez) y a nadie más, que volver de mantenimiento
+no abre una alarma falsa, que la primera trama la cierra, que la entrega de quien espera es nula y que solo quien administra el sitio cambia
+el plazo.
+
+**Qué se construyó.**
+- **Base (migración 26, `db/init/26-espera-primera-trama.sql`).** `dispositivo.en_servicio_desde` (`NOT NULL`, `now()` por omisión; las filas
+  que ya existían toman su `creado_en`, en la misma transacción, antes del `NOT NULL`) y `sitio.espera_primera_trama_h` (1 a 2 160 horas, 168
+  por omisión, `ck_sitio_espera_primera_trama_h`), con sus comentarios. La aplicación recibe `UPDATE` solo de esa columna de `sitio`
+  (repetido en la 14). El paso 2 del verificador suma su línea («26 dispositivo.en_servicio_desde … y sitio.espera_primera_trama_h …»), que
+  pide además que las columnas de `sitio` que cambia la aplicación sean exactamente tres.
+- **Una regla, tres implementaciones** (`docs/19 §2`): `estadoVisual()` del servidor y `SQL_ESTADO_VISUAL` (`consulta/tablero.ts`) y
+  `estadoVisual()` del panel (`lib/estado-visual.ts`), con **una sola tabla de casos** (`panel/src/lib/estado-visual-casos.json`, 24 casos con
+  sus bordes) que leen las tres pruebas. `en_linea` cuenta desde el más reciente entre la última trama y `en_servicio_desde` y es nulo sin
+  tramas (en SQL, con una guarda: `greatest` ignora los nulos). El orden de atención suma `esperando` entre Normal e Inactivo.
+- **Supervisor** (`supervision/supervision.service.ts`): caídos con `greatest(visto, en_servicio_desde)`; un paso nuevo para quien nunca
+  reportó y venció su plazo (el `INSERT` vuelve a mirar en la misma sentencia que siga activo, sin fila de estado y vencido), con
+  `nunca_reporto` en el evento; la red de seguridad cierra por la misma regla (también a quien volvió de mantenimiento o cuyo plazo se
+  alargó) y ahora deja su evento `condicion_cerrada` (`por: barrido`).
+- **`PATCH /dispositivos/{id}`** pone `en_servicio_desde` en `now()` al pasar de `mantenimiento` a `activo`, en el mismo `UPDATE`.
+- **Entrega, inventario, ficha y resumen:** las tramas esperadas se cuentan desde `en_servicio_desde`; quien espera tiene entrega nula; cada
+  fila y la ficha traen `en_servicio_desde` y `espera_hasta`; el resumen cuenta `esperando` y lo deja fuera de los supervisados.
+- **API del plazo:** `GET`/`PUT /sitios/{id}/espera-primera-trama` (leerlo, cualquier perfil del sitio; fijarlo, la acción nueva `ajustes`,
+  administrador de sitio y del sistema, `docs/20 §6`), con `anterior` (409 `espera_cambio`) y el evento `espera_primera_trama`, que la
+  actividad del sitio muestra en palabras. OpenAPI regenerado.
+- **Panel:** el estado nuevo en las fichas de conteo y el filtro del inventario, en la franja del tablero y en P3b, con su palabra, un reloj
+  delante y el tono de la píldora (`--pildora`), sin colores nuevos; la ficha dice desde cuándo espera y cuándo pasaría a «Sin señal», o que
+  el plazo venció sin ninguna trama; la guía de perfiles nombra la acción `ajustes`.
+- **Lo que cambió de significado:** la semilla de demostración fija `en_servicio_desde` = alta (sin eso, un nodo callado hace dos días saldría
+  en línea) y `semilla-demo.sh` comprueba que `demo-http-01` espera su primera trama; las semillas del banco mueven `en_servicio_desde` junto
+  con `creado_en`; `api-smoke.sh`, `sesion-smoke.sh` (las filas del plazo en la matriz) y el recorrido `e2e/sesion.mjs` cuentan cinco estados.
+
+**Pruebas sin base y su falla plantada** (vitest; cada defecto se plantó, se vio caer y se deshizo).
+
+| Qué se comprueba | Prueba | Falla plantada | Qué cayó |
+|---|---|---|---|
+| La regla del servidor con la tabla de casos, bordes incluidos (el plazo vence en `espera_hasta` exacto; 2 × intervalo exacto sigue en línea) | `consulta/tablero.spec.ts` | `<=` en vez de `<` en el plazo | 1 caso (el del borde) |
+| Vuelto de mantenimiento con la última trama vieja: en línea por `en_servicio_desde` | `consulta/tablero.spec.ts`; `lib/estado-visual.test.ts` | sin `en_servicio_desde` en `en_linea` (servidor; panel) | 2 casos en cada uno |
+| Quien nunca envió ya no es Normal | `consulta/tablero.spec.ts`; `lib/estado-visual.test.ts`, `Inventario.test.ts`, `Ficha.test.ts` | la regla de antes (sin trama → normal) | 7 en el servidor; 8 en el panel |
+| El SQL tiene las ramas en el orden de la regla y la guarda del nulo en `en_linea` | `consulta/tablero.spec.ts` | `greatest` sin la guarda | 1 |
+| El orden de atención (esperando entre Normal e Inactivo), en el servidor y el panel | `consulta/tablero.spec.ts`; `lib/estado-visual.test.ts`, `Inventario.test.ts` | esperando al final | 1; 2 |
+| Entrega nula para quien espera; las esperadas desde `en_servicio_desde` | `consulta/tablero.spec.ts` | la entrega calculada para quien espera | 1 |
+| Salud: quien espera no es supervisado | `consulta/rango-y-salud.spec.ts` | supervisados = no inactivos (lo de antes) | 1 |
+| Supervisor: caídos desde `greatest`; quien nunca reportó, con su evento y el `INSERT` que vuelve a mirar; el cierre del barrido con evento | `supervision/supervision.service.spec.ts` | sin `greatest`; sin volver a mirar; sin el paso nuevo; cierre sin `por` | 1 en cada caso |
+| `PATCH` de mantenimiento a activo mueve `en_servicio_desde`; otros cambios no | `alta/configuracion.service.spec.ts` | nunca lo mueve | 1 |
+| El plazo: 1 a 2 160, entero, sin campos de más; 403 antes de mirar el cuerpo; 404 desde otro sitio; 409 con `anterior` viejo; evento con quién; sin evento si no cambia | `consulta/espera.spec.ts`, `sesion/permisos.spec.ts` | sin bloqueo optimista; el cuerpo antes que el permiso; sin evento; mínimo 0; `ajustes` también para el operador | 1; 1; 1; 4; 4 |
+| El estado nuevo en el inventario: su palabra, su clase, cuenta aparte, filtra, entrega «—», va antes de Inactivo y pasa solo a «Sin señal» al vencer | `Inventario.test.ts` | rótulo vacío (solo color) | 2 |
+| La ficha: desde cuándo espera y cuándo pasaría a «Sin señal», en la zona del sitio con el UTC en la ayuda; vencido, lo dice | `Ficha.test.ts` | sin el texto de la espera | 1 |
+| La franja del tablero: ocho fichas y los cinco estados suman el total | `Tablero.test.ts` | la franja sin esperando | 1 |
+| Contraste del tono de la píldora en los dos temas | `lib/tema.test.ts` | `--sobre-pildora` claro | 1 |
+| La guía de perfiles nombra `ajustes` | `lib/ayudas.test.ts` | — | — |
+
+**Contra una base real** (`bash plataforma/pruebas/espera-integracion.sh`): base desechable sin red y en memoria, conexión por socket, con
+las migraciones hasta la 25; siembra cinco dispositivos, aplica la 26 **dos veces** moviendo entre una y otra un `en_servicio_desde` y el plazo,
+reaplica la 14, corre la línea 26 del paso 2 y las convenciones del esquema (7 de 7), y después `integracion/espera.ts` con el rol de la
+aplicación: **37 de 37 comprobaciones** — la migración sobre datos y repetida, el `CHECK` (0 y 2 161 rechazados), el permiso por columna,
+los 24 casos de la tabla contra `SQL_ESTADO_VISUAL` en una transacción (bordes exactos), el supervisor (abre a quien venció, una vez con dos
+barridos a la vez, no a quien está en plazo, usa el plazo de su sitio, no abre al volver de mantenimiento ni abre y cierra, cierra la que
+quedó de antes, la primera trama la cierra por `marcarVivo` con la fila de estado recién creada y el barrido no la reabre, alargar el plazo la
+cierra), el inventario, la ficha y el resumen, y la API del plazo con la aplicación compilada (lectura con consulta, 403 al operador, 400
+fuera de rango, 404 desde otro sitio, 409 con `anterior` viejo, 200 con el evento y quién, 403 sin `X-Pedido`, la actividad del sitio y la
+del otro).
+
+**Fallas plantadas contra la base:** `greatest` sin la guarda del nulo, la red de seguridad sin la rama de quien nunca envió y `ajustes`
+también para el operador dieron **6 de 37 en rojo** (la guarda, alargar el plazo, el inventario de quien espera, el 403 al operador y los dos
+que siguen a su escritura); los caídos sin `greatest`, **1 de 37** (vuelto de mantenimiento: la primera versión de esa comprobación solo
+miraba que no quedara abierta y pasaba, porque el mismo barrido la abría y la cerraba; ahora exige que no haya evento de apertura); la 26
+llenando con `now()` en vez de `creado_en`, las dos líneas del guion y **1 de 37**.
+
+**Lo que no se decidió aquí:** dónde se cambia el plazo en el panel (no hay pantalla de ajustes del sitio; mientras tanto, por la API,
+`docs/19 §4`, P, punto 4).
+
+**Resultado.** Se agregaron 15 pruebas al backend y 3 al panel (contadas por `it(`; las de la tabla de casos corren una vez por caso), y la
+prueba de integración `espera-integracion.sh`. `pnpm verificar` en verde.
+
+**Revisión del mismo día.** Tres revisiones independientes del bloque dejaron correcciones aceptadas, aplicadas así:
+
+- **Pasar a mantenimiento no cerraba las condiciones abiertas** (la baja sí). `PATCH /dispositivos/{id}` ahora cierra, en la misma transacción y
+  bajo el mismo bloqueo de fila, todas las condiciones abiertas del equipo, con un evento `condicion_cerrada` por cada una (`por: mantenimiento`,
+  con la persona); el barrido del supervisor cierra, con su evento, las de los equipos que ya estaban en mantenimiento (datos existentes o
+  un cambio hecho sin la API). Antes, el resumen podía contar una falta de comunicación con cero equipos en «Sin señal». Verificado en el
+  filtro de alertas: con el equipo en mantenimiento no abre condiciones de umbral; lo que queda como ventana es una trama que ya había
+  leído el estado `activo` y se confirma después del cambio (el estado se lee al empezar la trama), y esa la cierra el barrido siguiente.
+- **La condición y su evento no eran atómicos** (pasos (1), (2) y (3) del barrido, con la numeración de `docs/10` punto 68; y `abrirTope` y `abrirRelojDesviado`): una sola sentencia con CTE por cada apertura y cada cierre; el
+  evento toma sus valores (silencio, plazo, fecha de entrada en servicio) de la propia sentencia y no de la búsqueda anterior.
+- **Un equipo en mantenimiento no abre ninguna condición** (decidido tras la segunda revisión; RF-22). La red de seguridad del paso (4) cerraba
+  cada minuto lo que `abrirTope` y `abrirRelojDesviado` (y el paso (1)) volvían a abrir con la trama siguiente, porque la recepción solo
+  rechaza la baja: un bucle de abrir y cerrar con eventos y avisos cada vez. Ahora esas aperturas solo abren a un equipo `activo`, dentro de
+  la misma sentencia, sin evento ni aviso si no abrieron; y el paso (3) cierra solo a los activos, para que a los de mantenimiento los cierre
+  siempre el paso (4), con su motivo. Se revisaron todas las aperturas de condiciones de dispositivo (`INSERT INTO condicion`): la de
+  umbral (alertas) ya miraba el estado; no hay otra.
+- **Aviso en vivo de los cierres por la API:** el `PATCH` a mantenimiento y la baja publican en el canal en vivo cada condición cerrada,
+  después del `COMMIT` (si la transacción se deshace, no sale ningún aviso). El comentario sobre el bloqueo de fila se corrigió: serializa
+  un `PATCH` contra otro, no contra quien abre condiciones.
+- **El evento de cierre del barrido no decía por qué cerró:** lleva `motivo` (comunicación restablecida, de vuelta en servicio, de vuelta
+  dentro del plazo de la primera trama).
+- El comentario del barrido prometía que una primera trama confirmada entre la búsqueda y la apertura no abre la condición: con instantáneas
+  de lectura confirmada puede abrirse y la cierra el paso 2 del barrido siguiente; el comentario y `docs/10` lo dicen ahora tal cual.
+- Concordancia: el orden `atencion` y la entrega nula de quien espera en `docs/19` y `docs/10`; «cinco valores» donde decía cuatro (con la
+  nota de que fueron cuatro hasta el 18/11/2026); los permisos de `plataforma_app` sobre `sitio` (tres columnas, con la migración 26);
+  RNF-03 y los criterios de HU-14 distinguen a quien ya reportó de quien nunca envió una trama (RF-24); la fila de trazabilidad de
+  `docs/19 §7`; que cambiar un equipo de zona no reinicia su plazo; y el cambio de contrato de la API del inventario y la ficha. La
+  migración 26 dice que su relleno cambia una vez la marca de bloqueo optimista de todos los equipos.
+
+Que las sentencias únicas no dejen un evento sin condición, ni dos aperturas, lo prueba la integración contra una base real
+(`espera-integracion.sh`); las pruebas unitarias solo comprueban su forma (que sea una sola sentencia y lleve la guarda del estado).
+
+| Qué se corrigió | Prueba | Falla plantada | Qué cayó |
+|---|---|---|---|
+| Pasar a mantenimiento cierra todas las abiertas, con un evento por cada una, antes del `COMMIT` | `alta/configuracion.service.spec.ts` | sin el cierre en el `PATCH` | 1 |
+| Un cambio de nombre, o volver a `activo`, no toca condiciones | `alta/configuracion.service.spec.ts` | — (acota la anterior) | — |
+| Pasar a mantenimiento por la API cierra las dos condiciones de un equipo (de dos tipos) con la persona; el barrido siguiente no las reabre | `integracion/espera.ts` (base real) | sin el cierre en el `PATCH` | 1 |
+| La red de seguridad cierra la condición de un equipo puesto en mantenimiento por SQL directo, con su evento | `supervision/supervision.service.spec.ts`; `integracion/espera.ts` | el estado `mantenimiento` cambiado por otro en la sentencia | 1; 1 |
+| La condición y su evento son una sola sentencia (apertura de caídos y de quien nunca reportó) | `supervision/supervision.service.spec.ts` | la condición insertada aparte, en una sentencia previa | 3 |
+| El evento de cierre del barrido lleva `motivo` | `supervision/supervision.service.spec.ts`; `integracion/espera.ts` | la sentencia sin el `motivo` | 1; 1 |
+| Un equipo en mantenimiento no abre tope ni reloj desviado; uno activo sí, una vez cada uno; dos barridos no producen ningún par abrir/cerrar | `integracion/espera.ts` (base real); `supervision/supervision.service.spec.ts` | las aperturas de tope y reloj sin la guarda `d.estado = 'activo'` | 1 de la integración; 5 unitarias (plantada junto con la guarda de los pasos (1) y (3)) |
+| El paso (3) no cierra a los de mantenimiento (los cierra el (4), con su motivo) | `supervision/supervision.service.spec.ts` | sin `AND d.estado = 'activo'` en el paso (3) | 1 (plantada junto con la anterior) |
+| El aviso en vivo de cada cierre sale después del `COMMIT`, en el `PATCH` a mantenimiento y en la baja; si no se confirma, no sale | `alta/configuracion.service.spec.ts`, `alta/baja-rotacion.spec.ts` | sin publicar; publicando antes del `COMMIT` | 1 de cada prueba, en las dos variantes |
+
+Tras las correcciones, contra una base real: `bash plataforma/pruebas/espera-integracion.sh`, **43 de 43 comprobaciones** (eran 37: el caso de la condición abierta en mantenimiento se reescribió y se agregaron el cierre por la API, la vuelta a servicio y que un equipo en mantenimiento no abre tope ni reloj desviado).

@@ -34,7 +34,8 @@ DELETE FROM medicion WHERE tiempo >= now() - INTERVAL '24 hours'
 DELETE FROM trama WHERE recibido_en >= now() - INTERVAL '24 hours'
    AND dispositivo_id IN (SELECT id FROM dispositivo WHERE id_fisico LIKE 'emu-%');
 \endif
-UPDATE dispositivo SET intervalo_esperado_s = 3600, creado_en = least(creado_en, now() - INTERVAL '31 days') WHERE id_fisico LIKE 'emu-%';
+UPDATE dispositivo SET intervalo_esperado_s = 3600, creado_en = least(creado_en, now() - INTERVAL '31 days'),
+       en_servicio_desde = least(en_servicio_desde, now() - INTERVAL '31 days') WHERE id_fisico LIKE 'emu-%';
 -- Por hora y con un CHECKPOINT tras cada una: de una vez, con 5 s, el registro de escritura (WAL, también en RAM) más los datos pasaban el
 -- techo de la base y el contenedor se reiniciaba vacío (13/11/2026). Todas las horas parten del mismo instante `t0`.
 SELECT now() AS t0 \gset

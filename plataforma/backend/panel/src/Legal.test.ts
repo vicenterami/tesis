@@ -62,7 +62,7 @@ beforeEach(() => {
     }
     if (datosRestringidos) return json({ statusCode: 403, codigo: 'terminos_pendientes', version: 3, message: 'debes aceptar los términos de uso (versión 3) antes de seguir (GET /terminos y POST /terminos/aceptar)' }, 403);
     if (ruta === '/sitios') return json([{ id: 's1', codigo: 'uct', nombre: 'Campus', zona_horaria: 'America/Santiago', rol: 'administrador', zonas: [] }]);
-    if (ruta.startsWith('/dispositivos?')) return json([{ id: 'd1', id_fisico: 'dev-1', nombre: 'Invernadero', estado: 'activo', via: 'mqtt', formato: 'senml', intervalo_esperado_s: 60, visto_por_ultima_vez: null, en_linea: null, zona: 'Lab', sitio: 'Campus', zona_horaria: 'America/Santiago', sitio_codigo: 'uct', zona_id: 'z', condiciones_abiertas: 0, canales: [], estado_visual: 'normal' }], 200, { 'X-Total': '1' });
+    if (ruta.startsWith('/dispositivos?')) return json([{ id: 'd1', id_fisico: 'dev-1', nombre: 'Invernadero', estado: 'activo', via: 'mqtt', formato: 'senml', intervalo_esperado_s: 60, visto_por_ultima_vez: null, en_linea: null, en_servicio_desde: '2026-01-01T00:00:00Z', espera_hasta: '2099-01-01T00:00:00Z', zona: 'Lab', sitio: 'Campus', zona_horaria: 'America/Santiago', sitio_codigo: 'uct', zona_id: 'z', condiciones_abiertas: 0, canales: [], estado_visual: 'normal' }], 200, { 'X-Total': '1' });
     if (ruta.startsWith('/condiciones?')) return json([{ id: 'c1', tipo: 'umbral', dispositivo_id: 'd1', dispositivo: 'Invernadero', abierta_en: 'x', cerrada_en: null, duracion_s: 1, id_fisico: 'dev-1', sitio: 'Campus', umbral_alto: 30, umbral_bajo: null, magnitud: 'temperatura' }]);
     return json({ message: 'no' }, 404);
   }));

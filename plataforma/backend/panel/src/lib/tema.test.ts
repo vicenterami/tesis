@@ -25,6 +25,7 @@ const TEXTO: [string, string][] = [
   ['enlace', 'fondo'], ['enlace', 'superficie'],
   ['estado-normal', 'estado-normal-fondo'], ['estado-alerta', 'estado-alerta-fondo'], ['estado-sin-senal', 'estado-sin-senal-fondo'],
   ['estado-inactivo', 'estado-inactivo-fondo'], ['estado-sin-senal', 'superficie'], ['aviso', 'aviso-fondo'],
+  ['sobre-pildora', 'pildora'], // también el estado «Esperando primera trama» (docs/19 §2)
   ['sobre-acento', 'acento'], ['sobre-acento-secundario', 'acento'], ['tooltip-texto', 'tooltip-fondo'], ['grafico-texto', 'superficie'],
 ];
 const CONTROLES: [string, string][] = [['borde-control', 'superficie'], ['borde-control', 'fondo'], ['foco', 'superficie'], ['foco', 'fondo']];

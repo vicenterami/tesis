@@ -6,7 +6,7 @@ import { errorDeCliente } from '../db/cliente.js';
 import { porcentaje } from './escala.js';
 import { isoUs } from '../db/iso-us.js';
 import { Intervalo } from './validacion.js';
-import { Cursor, FiltroInventario, SQL_EN_LINEA, SQL_ESTADO_VISUAL, entrega, patronBusqueda } from './tablero.js';
+import { Cursor, FiltroInventario, SQL_EN_LINEA, SQL_ESPERA_HASTA, SQL_ESTADO_VISUAL, SQL_ORDEN_ATENCION, entrega, patronBusqueda } from './tablero.js';
 
 // Consultas de lectura. SQL explícito y parametrizado ($1, $2…): se lee, se audita, se explica.
 // Las fechas salen como Date → JSON las serializa en ISO 8601 con 'Z' (UTC), regla 5 de docs/13.
@@ -32,20 +32,28 @@ export const SQL_INTERVALO_OBSERVADO = `(
 export const SQL_ULTIMA_MEDICION = `(SELECT json_build_object('valor', x.valor, 'tiempo', iso_utc(x.tiempo)) FROM medicion x
                WHERE x.canal_id = c.id ORDER BY x.tiempo DESC LIMIT 1)`;
 
-// Prefijo del ORDER BY del inventario por `orden` (lista cerrada de tablero.ts: nunca texto del cliente). `atencion`: el orden de docs/19 §2
-// (sin señal, alerta, normal, inactivo) y, dentro, por nombre (y después el de siempre, para que el orden sea total).
+// Prefijo del ORDER BY del inventario por `orden` (lista cerrada de tablero.ts: nunca texto del cliente). `atencion`: el orden de docs/19 §4
+// (ORDEN_ATENCION: sin señal, alerta, normal, esperando, inactivo) y, dentro, por nombre (y después el de siempre, para que el orden sea total).
 const ORDEN_SQL: Readonly<Record<NonNullable<FiltroInventario['orden']>, string>> = {
   nombre: '',
-  entrega: 'inv.entrega_orden ASC NULLS LAST, ',
-  atencion: "CASE inv.estado_visual WHEN 'sin_senal' THEN 0 WHEN 'alerta' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END, inv.nombre, ",
+  entrega: "(CASE WHEN inv.estado_visual = 'esperando' THEN NULL ELSE inv.entrega_orden END) ASC NULLS LAST, ",
+  atencion: `${SQL_ORDEN_ATENCION('inv.estado_visual')}, inv.nombre, `,
 };
+
+// La entrega de una fila del inventario (punto 65 vii): nula si no está activo (RF-22) o si espera su primera trama (docs/19 §2: aún no se
+// le exige reportar); si no, entrega() desde lo más tardío entre la ventana de 24 h y su entrada en servicio.
+export function entregaDeFila(x: { estado: string; estado_visual: string; recibidas_24h: number; en_servicio_desde: Date; intervalo_esperado_s: number }, ahora: Date): number | null {
+  if (x.estado !== 'activo' || x.estado_visual === 'esperando') return null;
+  const ventana = new Date(ahora.getTime() - 24 * 3600 * 1000);
+  return entrega(x.recibidas_24h, ventana, ahora, x.en_servicio_desde, x.intervalo_esperado_s, ventana).porcentaje;
+}
 
 @Injectable()
 export class ConsultaService {
   constructor(@Inject(POOL) private readonly pool: Pool) {}
 
-  // Un dispositivo está "en línea" si su último mensaje cae dentro de 2 × su intervalo esperado
-  // (mismo criterio que el supervisor: un mensaje perdido no es una caída; dos seguidos, sí).
+  // Un dispositivo está "en línea" si su último mensaje cae dentro de 2 × su intervalo esperado, contado desde el más reciente entre ese
+  // mensaje y su entrada en servicio (mismo criterio que el supervisor: un mensaje perdido no es una caída; dos seguidos, sí).
   // `sitios`: el alcance de quien pregunta (docs/20 §5; docs/10 §8.4 punto 36), en el WHERE; null = todos (usuario del sistema).
   async dispositivos(sitios: string[] | null = null) {
     return (await this.inventario(sitios, {})).filas;
@@ -62,11 +70,14 @@ export class ConsultaService {
       p.push(f.limite, f.desplazamiento ?? 0);
       pagina = `LIMIT $${p.length - 1} OFFSET $${p.length}`;
     }
-    const r = await this.pool.query<Record<string, unknown> & { total: string; recibidas_24h: number; creado_en: Date; intervalo_esperado_s: number }>(`
+    const r = await this.pool.query<Record<string, unknown> & { total: string; recibidas_24h: number; en_servicio_desde: Date; intervalo_esperado_s: number; estado: string; estado_visual: string }>(`
       WITH inv AS (
       SELECT d.id, d.id_fisico, d.nombre, d.estado, d.via, d.formato, d.intervalo_esperado_s,
              e.visto_por_ultima_vez,
              ${SQL_EN_LINEA} AS en_linea,
+             -- Desde el 18/11/2026 (docs/19 §2): desde cuándo se espera que reporte y, si aún no envió nada, hasta cuándo espera su primera trama.
+             d.en_servicio_desde,
+             CASE WHEN e.visto_por_ultima_vez IS NULL THEN ${SQL_ESPERA_HASTA} END AS espera_hasta,
              z.nombre AS zona, s.nombre AS sitio, s.zona_horaria,
              -- Identidades para filtrar (docs/19 P2): el código del sitio es único y el id de la zona también; los nombres pueden repetirse.
              s.codigo AS sitio_codigo, z.id AS zona_id,
@@ -77,14 +88,14 @@ export class ConsultaService {
              -- Entrega (punto 65 vii): tramas de las últimas 24 h, contadas UNA vez por dispositivo (el LATERAL de abajo, por el índice
              -- (dispositivo_id, recibido_en DESC)); el % lo calcula entrega(). Antes se contaban dos veces (dos subplanes): docs/16 §61.
              t24.n AS recibidas_24h,
-             d.creado_en,
-             -- Solo para ordenar por entrega en la base (la página se corta aquí): la misma regla que entrega(), con la ventana de 24 h
-             -- que empieza en el alta si es posterior; nulo si no está activo o no hay una trama esperada completa. El valor que se
-             -- devuelve lo calcula entrega() (tablero.ts); la prueba de humo comprueba que el orden y los valores coinciden. NULLIF:
-             -- un intervalo 0 no divide (la base lo impide desde la migración 23, ck_dispositivo_intervalo_esperado_s).
+             -- Solo para ordenar por entrega en la base (la página se corta aquí): la misma regla que entregaDeFila(), con la ventana de 24 h
+             -- que empieza en la entrada en servicio si es posterior; nulo si no está activo o si no hay una trama esperada completa (quien
+             -- espera su primera trama queda nulo en el ORDER BY, ORDEN_SQL, por su estado visual). El valor que se devuelve lo calcula
+             -- entregaDeFila(); la prueba de humo comprueba que el orden y los valores coinciden. NULLIF: un intervalo 0 no divide (la base
+             -- lo impide desde la migración 23, ck_dispositivo_intervalo_esperado_s).
              (SELECT CASE WHEN d.estado = 'activo' AND w.esperadas >= 1
                           THEN least(100, round(1000.0 * t24.n / w.esperadas) / 10) END
-                FROM (SELECT floor(extract(epoch FROM now() - greatest(now() - INTERVAL '24 hours', d.creado_en)) / NULLIF(d.intervalo_esperado_s, 0)) AS esperadas) w) AS entrega_orden
+                FROM (SELECT floor(extract(epoch FROM now() - greatest(now() - INTERVAL '24 hours', d.en_servicio_desde)) / NULLIF(d.intervalo_esperado_s, 0)) AS esperadas) w) AS entrega_orden
         FROM dispositivo d
         LEFT JOIN LATERAL (SELECT count(*)::int AS n FROM trama t WHERE t.dispositivo_id = d.id AND t.recibido_en >= now() - INTERVAL '24 hours') t24 ON true
         LEFT JOIN estado_dispositivo e ON e.dispositivo_id = d.id
@@ -102,12 +113,11 @@ export class ConsultaService {
     // Una página más allá del final no trae filas de donde leer el total: solo en ese caso se cuenta aparte, con los mismos filtros.
     if (r.rows.length === 0 && (f.desplazamiento ?? 0) > 0) total = (await this.inventario(sitios, { ...f, limite: undefined, desplazamiento: undefined })).total;
     const ahora = new Date();
-    const ventana = new Date(ahora.getTime() - 24 * 3600 * 1000);
     const filas = r.rows.map((x) => {
-      const { total: _total, recibidas_24h, creado_en, entrega_orden: _orden, ...resto } = x;
-      void _total; void _orden;
-      // Un dispositivo en mantenimiento o de baja no tiene tramas esperadas (RF-22): su entrega no se calcula (nulo), como en el resumen.
-      return { ...resto, entrega: x.estado === 'activo' ? entrega(recibidas_24h, ventana, ahora, creado_en, x.intervalo_esperado_s, ventana).porcentaje : null };
+      const { total: _total, recibidas_24h: _recibidas, entrega_orden: _orden, ...resto } = x;
+      void _total; void _orden; void _recibidas;
+      // En mantenimiento o de baja (RF-22) o esperando su primera trama, sin tramas esperadas: entrega nula, como en el resumen.
+      return { ...resto, entrega: entregaDeFila(x, ahora) };
     });
     return { filas, total };
   }
@@ -117,7 +127,8 @@ export class ConsultaService {
       SELECT d.id, d.id_fisico, d.nombre, d.estado, d.via, d.formato, d.intervalo_esperado_s, e.visto_por_ultima_vez, d.creado_en,
              -- Marca del bloqueo optimista de PATCH /dispositivos/{id} (Etapa 4; docs/10 §8.4 punto 28), con microsegundos, como texto.
              ${isoUs('d.actualizado_en')} AS actualizado_en,
-             (e.visto_por_ultima_vez >= now() - d.intervalo_esperado_s * 2 * INTERVAL '1 second') AS en_linea,
+             ${SQL_EN_LINEA} AS en_linea,
+             d.en_servicio_desde, CASE WHEN e.visto_por_ultima_vez IS NULL THEN ${SQL_ESPERA_HASTA} END AS espera_hasta,
              z.nombre AS zona, s.nombre AS sitio, s.zona_horaria, s.codigo AS sitio_codigo, z.id AS zona_id,
              ${SQL_INTERVALO_OBSERVADO} AS intervalo_observado_s
         FROM dispositivo d LEFT JOIN estado_dispositivo e ON e.dispositivo_id = d.id

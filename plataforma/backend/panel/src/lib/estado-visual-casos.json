@@ -1,0 +1,30 @@
+{
+  "descripcion": "La tabla de casos de la regla del estado visual (docs/19 §2), una sola para sus tres implementaciones: estadoVisual() del panel (lib/estado-visual.test.ts), estadoVisual() del servidor (src/consulta/tablero.spec.ts) y SQL_ESTADO_VISUAL contra una base real (integracion/espera.ts). Los instantes son relativos a `ahora`, en segundos hacia atrás: `visto_hace_s` (null = nunca envió una trama) y `en_servicio_hace_s`; `espera_h` es la espera de la primera trama del sitio.",
+  "ahora": "2026-11-18T12:00:00.000Z",
+  "casos": [
+    { "nombre": "mantenimiento con un umbral abierto y fuera de línea", "estado": "mantenimiento", "visto_hace_s": 86400, "en_servicio_hace_s": 2592000, "espera_h": 168, "intervalo_s": 300, "abiertas": ["umbral"], "esperado": "inactivo" },
+    { "nombre": "de baja, nunca envió", "estado": "baja", "visto_hace_s": null, "en_servicio_hace_s": 2592000, "espera_h": 168, "intervalo_s": 300, "abiertas": [], "esperado": "inactivo" },
+    { "nombre": "mantenimiento, nunca envió y con el plazo vencido", "estado": "mantenimiento", "visto_hace_s": null, "en_servicio_hace_s": 2592000, "espera_h": 168, "intervalo_s": 300, "abiertas": [], "esperado": "inactivo" },
+    { "nombre": "nunca envió, dentro del plazo (en servicio hace 1 h, espera 168 h)", "estado": "activo", "visto_hace_s": null, "en_servicio_hace_s": 3600, "espera_h": 168, "intervalo_s": 300, "abiertas": [], "esperado": "esperando" },
+    { "nombre": "nunca envió, plazo vencido (hace 169 h)", "estado": "activo", "visto_hace_s": null, "en_servicio_hace_s": 608400, "espera_h": 168, "intervalo_s": 300, "abiertas": [], "esperado": "sin_senal" },
+    { "nombre": "nunca envió, justo en el borde (hace 168 h exactas): vencido", "estado": "activo", "visto_hace_s": null, "en_servicio_hace_s": 604800, "espera_h": 168, "intervalo_s": 300, "abiertas": [], "esperado": "sin_senal" },
+    { "nombre": "nunca envió, un segundo antes del borde", "estado": "activo", "visto_hace_s": null, "en_servicio_hace_s": 604799, "espera_h": 168, "intervalo_s": 300, "abiertas": [], "esperado": "esperando" },
+    { "nombre": "nunca envió, con el plazo corto del sitio (1 h) vencido hace 1 h", "estado": "activo", "visto_hace_s": null, "en_servicio_hace_s": 7200, "espera_h": 1, "intervalo_s": 300, "abiertas": [], "esperado": "sin_senal" },
+    { "nombre": "nunca envió y su intervalo ya pasó varias veces, pero dentro del plazo: la espera manda, no el intervalo", "estado": "activo", "visto_hace_s": null, "en_servicio_hace_s": 86400, "espera_h": 168, "intervalo_s": 60, "abiertas": [], "esperado": "esperando" },
+    { "nombre": "nunca envió, dentro del plazo, con la condición sin_comunicacion abierta (el barrido aún no la cerró)", "estado": "activo", "visto_hace_s": null, "en_servicio_hace_s": 3600, "espera_h": 168, "intervalo_s": 300, "abiertas": ["sin_comunicacion"], "esperado": "sin_senal" },
+    { "nombre": "ya envió, en plazo (hace 60 s, intervalo 300 s)", "estado": "activo", "visto_hace_s": 60, "en_servicio_hace_s": 2592000, "espera_h": 168, "intervalo_s": 300, "abiertas": [], "esperado": "normal" },
+    { "nombre": "ya envió, vencido (hace 601 s, intervalo 300 s)", "estado": "activo", "visto_hace_s": 601, "en_servicio_hace_s": 2592000, "espera_h": 168, "intervalo_s": 300, "abiertas": [], "esperado": "sin_senal" },
+    { "nombre": "ya envió, justo en el borde (hace 600 s exactos = 2 × intervalo): en línea", "estado": "activo", "visto_hace_s": 600, "en_servicio_hace_s": 2592000, "espera_h": 168, "intervalo_s": 300, "abiertas": [], "esperado": "normal" },
+    { "nombre": "vuelto de mantenimiento hace 60 s con la última trama de hace 3 días", "estado": "activo", "visto_hace_s": 259200, "en_servicio_hace_s": 60, "espera_h": 168, "intervalo_s": 300, "abiertas": [], "esperado": "normal" },
+    { "nombre": "vuelto de mantenimiento hace 600 s exactos con la última trama vieja: aún en línea", "estado": "activo", "visto_hace_s": 259200, "en_servicio_hace_s": 600, "espera_h": 168, "intervalo_s": 300, "abiertas": [], "esperado": "normal" },
+    { "nombre": "vuelto de mantenimiento hace 601 s y sin reportar desde entonces", "estado": "activo", "visto_hace_s": 259200, "en_servicio_hace_s": 601, "espera_h": 168, "intervalo_s": 300, "abiertas": [], "esperado": "sin_senal" },
+    { "nombre": "ya envió y en línea, con sin_comunicacion y umbral abiertas: sin señal antes que alerta", "estado": "activo", "visto_hace_s": 60, "en_servicio_hace_s": 2592000, "espera_h": 168, "intervalo_s": 300, "abiertas": ["sin_comunicacion", "umbral"], "esperado": "sin_senal" },
+    { "nombre": "ya envió y fuera de línea, con un umbral abierto", "estado": "activo", "visto_hace_s": 3600, "en_servicio_hace_s": 2592000, "espera_h": 168, "intervalo_s": 300, "abiertas": ["umbral"], "esperado": "sin_senal" },
+    { "nombre": "en línea con umbral abierto", "estado": "activo", "visto_hace_s": 60, "en_servicio_hace_s": 2592000, "espera_h": 168, "intervalo_s": 300, "abiertas": ["umbral"], "esperado": "alerta" },
+    { "nombre": "en línea con batería abierta", "estado": "activo", "visto_hace_s": 60, "en_servicio_hace_s": 2592000, "espera_h": 168, "intervalo_s": 300, "abiertas": ["bateria"], "esperado": "alerta" },
+    { "nombre": "en línea con manipulación abierta", "estado": "activo", "visto_hace_s": 60, "en_servicio_hace_s": 2592000, "espera_h": 168, "intervalo_s": 300, "abiertas": ["manipulacion"], "esperado": "alerta" },
+    { "nombre": "en línea con tope_superado abierta", "estado": "activo", "visto_hace_s": 60, "en_servicio_hace_s": 2592000, "espera_h": 168, "intervalo_s": 300, "abiertas": ["tope_superado"], "esperado": "alerta" },
+    { "nombre": "en línea con reloj_desviado abierta", "estado": "activo", "visto_hace_s": 60, "en_servicio_hace_s": 2592000, "espera_h": 168, "intervalo_s": 300, "abiertas": ["reloj_desviado"], "esperado": "alerta" },
+    { "nombre": "reloj_desviado y sin_comunicacion abiertas: manda sin señal", "estado": "activo", "visto_hace_s": 60, "en_servicio_hace_s": 2592000, "espera_h": 168, "intervalo_s": 300, "abiertas": ["reloj_desviado", "sin_comunicacion"], "esperado": "sin_senal" }
+  ]
+}

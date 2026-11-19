@@ -48,6 +48,7 @@ export const ROTULO_TIPO_ACTIVIDAD: Readonly<Record<string, string>> = {
   usuario_baja: 'Bajas de cuentas',
   usuario_clave: 'Cambios de clave',
   terminos_aceptados: 'Términos aceptados',
+  espera_primera_trama: 'Plazo de la primera trama del sitio', // desde el 18/11/2026 (docs/19 §4, P)
   ok: 'Entradas',
   cierre: 'Salidas',
   bloqueado: 'Bloqueos por intentos',

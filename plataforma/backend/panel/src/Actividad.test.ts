@@ -62,7 +62,7 @@ describe('P14 Actividad', () => {
   it('los rótulos del filtro son los de los códigos reales del servidor (eventos y resultados de acceso)', () => {
     const reales = ['ok', 'cierre', 'bloqueado', 'clave_incorrecta', 'inactivo', 'alta', 'baja', 'rotacion', 'reglas_cambiadas', 'dispositivo_configurado',
       'canal_calibrado', 'condicion_abierta', 'condicion_cerrada', 'pasarela_alta', 'pasarela_baja', 'pasarela_rotacion', 'usuario_alta', 'usuario_cambio',
-      'usuario_baja', 'usuario_clave', 'terminos_aceptados'];
+      'usuario_baja', 'usuario_clave', 'terminos_aceptados', 'espera_primera_trama'];
     expect(Object.keys(ROTULO_TIPO_ACTIVIDAD).sort()).toEqual([...reales].sort());
     expect(rotuloTipoActividad('ok')).toBe('Entradas');
     expect(rotuloTipoActividad('cierre')).toBe('Salidas');

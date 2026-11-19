@@ -28,12 +28,13 @@ vi.mock('uplot', () => {
 });
 vi.mock('uplot/dist/uPlot.min.css', () => ({}));
 import Ficha from './Ficha.svelte';
+import { fechaHora, horaLocal } from './lib/tiempo';
 
 const ID = '00000000-0000-4000-8000-000000000001';
 const AHORA = new Date('2026-10-12T15:00:00Z');
 const ficha: DispositivoFicha = {
   id: ID, id_fisico: 'dev-0001', nombre: 'Invernadero', estado: 'activo', via: 'mqtt', formato: 'senml', intervalo_esperado_s: 60,
-  visto_por_ultima_vez: '2026-10-12T14:59:30Z', en_linea: true, zona: 'Lab', sitio: 'Campus', zona_horaria: 'America/Santiago', sitio_codigo: 'uct', zona_id: 'z-lab',
+  visto_por_ultima_vez: '2026-10-12T14:59:30Z', en_linea: true, en_servicio_desde: '2026-01-01T00:00:00Z', espera_hasta: null, zona: 'Lab', sitio: 'Campus', zona_horaria: 'America/Santiago', sitio_codigo: 'uct', zona_id: 'z-lab',
   creado_en: '2026-10-01T12:00:00Z', intervalo_observado_s: 60,
   canales: [
     { id: 'c-temp', magnitud: 'temperatura', magnitud_nombre: 'Temperatura', unidad: 'Cel', etiqueta: null, reglas: [{ id: 'r1', umbral_alto: 30, umbral_bajo: 5, histeresis: 0.5 }], ultima_medicion: { valor: 21.5, tiempo: '2026-10-12T14:59:30Z', porcentaje: null } },
@@ -119,6 +120,30 @@ describe('Ficha (P3): identidad, canales, gráfico, condiciones y rechazadas, le
     expect(lecturas).toEqual(['21,5 °C', '—']); // sin lectura: raya, sin unidad
     expect(screen.getByText(/umbrales: 5 °C a 30 °C \(histéresis 0,5 °C\)/)).toBeTruthy();
     expect(screen.getByText('sin umbrales')).toBeTruthy();
+  });
+
+  it('esperando su primera trama (docs/19 §2 y §4, P): el estado con su palabra y desde cuándo espera y cuándo pasaría a «Sin señal», en la zona del sitio con el UTC al pasar el cursor; vencido, lo dice', async () => {
+    const original = vi.mocked(fetch).getMockImplementation()!;
+    const conFicha = (f: DispositivoFicha) => vi.mocked(fetch).mockImplementation(async (ruta, init) =>
+      String(ruta) === `/dispositivos/${ID}` ? new Response(JSON.stringify(f)) : original(ruta, init));
+    const espera = { ...ficha, visto_por_ultima_vez: null, en_linea: null, en_servicio_desde: '2026-10-12T13:00:00Z', espera_hasta: '2026-10-19T13:00:00Z' };
+    conFicha(espera);
+    render(Ficha, { id: ID });
+    await waitFor(() => expect(document.querySelector('[data-estado]')?.getAttribute('data-estado')).toBe('esperando'));
+    expect(document.querySelector('[data-estado]')!.textContent).toBe('Esperando primera trama');
+    const texto = document.querySelector('[data-espera]')!;
+    expect(texto.textContent!.replace(/\s+/g, ' ').trim()).toBe(
+      `Esperando primera trama desde el ${fechaHora('2026-10-12T13:00:00Z', 'America/Santiago')} (pasa a «Sin señal» el ${fechaHora('2026-10-19T13:00:00Z', 'America/Santiago')})`);
+    expect([...texto.querySelectorAll('span')].map((x) => x.getAttribute('title'))).toEqual([
+      horaLocal('2026-10-12T13:00:00Z', 'America/Santiago'), horaLocal('2026-10-19T13:00:00Z', 'America/Santiago')]);
+    expect(document.querySelector('[data-espera-vencida]')).toBeNull();
+    cleanup();
+    conFicha({ ...espera, en_servicio_desde: '2026-10-01T13:00:00Z', espera_hasta: '2026-10-08T13:00:00Z' });
+    render(Ficha, { id: ID });
+    await waitFor(() => expect(document.querySelector('[data-estado]')?.getAttribute('data-estado')).toBe('sin_senal'));
+    expect(document.querySelector('[data-espera]')).toBeNull();
+    expect(document.querySelector('[data-espera-vencida]')!.textContent!.replace(/\s+/g, ' ').trim())
+      .toBe(`Nunca envió una trama: el plazo de su primera trama venció el ${fechaHora('2026-10-08T13:00:00Z', 'America/Santiago')}`);
   });
 
   it('pide el histórico del primer canal con el rango por defecto (24 h, 15 minutes) y se lo entrega al gráfico', async () => {

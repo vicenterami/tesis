@@ -47,7 +47,7 @@ function armar(falla?: string, restriccion?: string, o: Opciones = {}) {
   };
   const ordenes: unknown[][] = [];
   const dynsec = { disponible: true, ordenar: vi.fn((x: unknown[]) => { ordenes.push(x); return Promise.resolve([]); }) };
-  const servicio = new AltaService(pool as unknown as Pool, dynsec as unknown as DynsecService);
+  const servicio = new AltaService(pool as unknown as Pool, dynsec as unknown as DynsecService, { publicar() {} } as never);
   return { servicio, sql, params, ordenes, pool, cliente, consultasPool };
 }
 

@@ -46,7 +46,7 @@ function armar(opciones: { sitio?: { codigo: string; activo: boolean } | null; f
     },
   } as unknown as DynsecService;
   const pool = { connect: () => Promise.resolve(cliente) } as unknown as Pool;
-  return { servicio: new AltaService(pool, dynsec), sql, params, ordenes };
+  return { servicio: new AltaService(pool, dynsec, { publicar() {} } as never), sql, params, ordenes };
 }
 
 describe('validarPasarela', () => {

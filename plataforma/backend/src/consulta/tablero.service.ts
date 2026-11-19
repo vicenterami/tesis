@@ -27,13 +27,18 @@ export function diasRetencionTrama(valor = process.env.RETENCION_TRAMA_DIAS): nu
 
 // La entrega del resumen (punto 65 vii): por dispositivo activo, con entrega(), de peor a mejor; solo los MAX_ENTREGA_RESUMEN peores (el
 // panel muestra diez y «ver todos» va al inventario con orden=entrega) y `total_activos`, cuántos hay. El horizonte de retención se mide
-// desde AHORA, no desde `hasta`: una ventana pasada que cae entera antes de él no tiene tramas con qué contar y da nulo, no 0 %.
+// desde AHORA, no desde `hasta`: una ventana pasada que cae entera antes de él no tiene tramas con qué contar y da nulo, no 0 %. Las
+// esperadas se cuentan desde `en_servicio_desde` (desde el 18/11/2026; antes, el alta) y quien espera su primera trama no tiene entrega
+// (nula, docs/19 §2), aunque cuenta en `total_activos`.
 export const MAX_ENTREGA_RESUMEN = 50;
-export interface BaseEntrega { id: string; nombre: string; recibidas: number; creado_en: string; intervalo_esperado_s: number }
+export interface BaseEntrega { id: string; nombre: string; recibidas: number; en_servicio_desde: string; intervalo_esperado_s: number; esperando: boolean }
 export function entregasDelResumen(base: readonly BaseEntrega[], desde: Date, hasta: Date, ahora = new Date(), dias = diasRetencionTrama()) {
   const retencion = new Date(ahora.getTime() - dias * 86_400_000);
   const todas = base
-    .map((x) => ({ id: x.id, nombre: x.nombre, ...entrega(x.recibidas, desde, hasta, new Date(x.creado_en), x.intervalo_esperado_s, retencion) }))
+    .map((x) => {
+      const e = entrega(x.recibidas, desde, hasta, new Date(x.en_servicio_desde), x.intervalo_esperado_s, retencion);
+      return { id: x.id, nombre: x.nombre, ...(x.esperando ? { ...e, porcentaje: null } : e) };
+    })
     .sort(peorPrimero);
   return { entrega: todas.slice(0, MAX_ENTREGA_RESUMEN), total_activos: todas.length };
 }
@@ -67,7 +72,7 @@ export class TableroService {
     const r = await this.pool.query<{ sitio: Record<string, unknown> | null; r: Record<string, unknown> & { entrega_base: BaseEntrega[] } }>(`
       WITH s AS (SELECT id, codigo, nombre, zona_horaria FROM sitio WHERE id = $1),
       dev AS (
-        SELECT d.id, d.nombre, d.estado, d.intervalo_esperado_s, d.creado_en, e.visto_por_ultima_vez,
+        SELECT d.id, d.nombre, d.estado, d.intervalo_esperado_s, d.en_servicio_desde, e.visto_por_ultima_vez,
                ${SQL_EN_LINEA} AS en_linea, ${SQL_ESTADO_VISUAL} AS estado_visual,
                (SELECT coalesce(array_agg(DISTINCT cv.tipo), '{}') FROM condicion cv WHERE cv.dispositivo_id = d.id AND cv.cerrada_en IS NULL) AS tipos
           FROM dispositivo d JOIN zona z ON z.id = d.zona_id LEFT JOIN estado_dispositivo e ON e.dispositivo_id = d.id
@@ -89,10 +94,12 @@ export class TableroService {
             'normal', (count(*) FILTER (WHERE estado_visual = 'normal'))::int,
             'alerta', (count(*) FILTER (WHERE estado_visual = 'alerta'))::int,
             'sin_senal', (count(*) FILTER (WHERE estado_visual = 'sin_senal'))::int,
+            'esperando', (count(*) FILTER (WHERE estado_visual = 'esperando'))::int,
             'inactivo', (count(*) FILTER (WHERE estado_visual = 'inactivo'))::int) FROM dev),
+        -- Supervisados: ni inactivos ni esperando su primera trama (docs/19 §2: a estos aún no se les exige reportar).
         'salud', (SELECT json_build_object(
-            'reportan', (count(*) FILTER (WHERE estado_visual <> 'inactivo' AND en_linea IS TRUE))::int,
-            'supervisados', (count(*) FILTER (WHERE estado_visual <> 'inactivo'))::int) FROM dev),
+            'reportan', (count(*) FILTER (WHERE estado_visual NOT IN ('inactivo', 'esperando') AND en_linea IS TRUE))::int,
+            'supervisados', (count(*) FILTER (WHERE estado_visual NOT IN ('inactivo', 'esperando')))::int) FROM dev),
         'condiciones_abiertas', (SELECT coalesce(json_agg(json_build_object('tipo', k.tipo, 'n', k.n) ORDER BY k.n DESC, k.tipo), '[]'::json)
             FROM (SELECT c.tipo, count(*)::int AS n FROM condicion c
                    WHERE c.cerrada_en IS NULL AND c.dispositivo_id IN (SELECT id FROM dev) GROUP BY c.tipo) k),
@@ -108,7 +115,8 @@ export class TableroService {
             FROM (SELECT c.magnitud_codigo, count(*)::int AS n FROM canal c JOIN dev ON dev.id = c.dispositivo_id
                    WHERE dev.estado <> 'baja' GROUP BY c.magnitud_codigo) k JOIN magnitud m ON m.codigo = k.magnitud_codigo),
         'entrega_base', (SELECT coalesce(json_agg(json_build_object('id', dev.id, 'nombre', dev.nombre, 'recibidas', coalesce(t.n, 0),
-                                     'creado_en', iso_utc(dev.creado_en), 'intervalo_esperado_s', dev.intervalo_esperado_s)), '[]'::json)
+                                     'en_servicio_desde', iso_utc(dev.en_servicio_desde), 'intervalo_esperado_s', dev.intervalo_esperado_s,
+                                     'esperando', dev.estado_visual = 'esperando')), '[]'::json)
             FROM dev LEFT JOIN (SELECT dispositivo_id, count(*)::int AS n FROM tr GROUP BY dispositivo_id) t ON t.dispositivo_id = dev.id
            WHERE dev.estado = 'activo')
       ) AS r`, [sitioId, desde, hasta, intervalo]);

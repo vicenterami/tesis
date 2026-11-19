@@ -20,6 +20,8 @@ export const FRASES: Readonly<Record<string, Frase>> = {
   baja: { puede: 'da de baja dispositivos (revoca sus credenciales)', noPuede: 'no da de baja dispositivos' },
   enlaces: { puede: 'crea, renueva y revoca los enlaces públicos de solo lectura del sitio', noPuede: 'no administra enlaces públicos' },
   auditoria: { puede: 've la actividad de las personas en sus sitios', noPuede: 'no ve la actividad de las personas' },
+  // Desde el 18/11/2026 (docs/20 §6; servidor: PUT /sitios/{id}/espera-primera-trama).
+  ajustes: { puede: 'fija los ajustes del sitio (el plazo de la primera trama de los equipos)', noPuede: 'no cambia los ajustes del sitio' },
   sistema: { puede: 'administra el sistema: soporte, estado y límites de los servicios', noPuede: 'no administra el sistema' },
 };
 

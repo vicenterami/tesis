@@ -47,7 +47,7 @@ Catálogo actualizado al pivote del 2 de septiembre (contrato SenML sobre MQTT);
 \section{M4 --- Supervisión de salud de enlace}
 \begin{longtable}{@{}C{1.3cm}L{6.1cm}L{1.6cm}L{1.2cm}C{0.7cm}@{}}
 \filaencab \encab{ID} & \encab{Requerimiento} & \encab{Fuente} & \encab{Causa} & \encab{Pr.} \\ \midrule \endhead
-\textbf{RF-24} & El sistema debe \textbf{detectar la pérdida de comunicación} de un dispositivo cuando no reporte durante un número configurable de intervalos, y abrir la condición correspondiente & [PO] [BT] [ENT] & \textbf{C5} & \textbf{M} \\
+\textbf{RF-24} & El sistema debe \textbf{detectar la pérdida de comunicación} de un dispositivo cuando no reporte durante un número configurable de intervalos o cuando no envíe su primera trama dentro de un plazo configurable por sitio desde que entró en servicio, y abrir la condición correspondiente & [PO] [BT] [ENT] & \textbf{C5} & \textbf{M} \\
 \textbf{RF-25} & El sistema debe \textbf{detectar la restauración} del dispositivo y cerrar la condición, registrando la duración de la interrupción & [BT] [ENT] & C5 & \textbf{M} \\
 \textbf{RF-26} & El sistema debe registrar la \textbf{última vez que se recibió} comunicación de cada dispositivo & [PO] & C5 & \textbf{M} \\
 \textbf{RF-27} & El sistema debe \textbf{presentar la calidad del enlace} por dispositivo (RSSI, SNR y porcentaje de recepción) cuando el transporte la provea & [BT] [ENT] & C5 & \textbf{M} \\
@@ -113,7 +113,7 @@ Catálogo actualizado al pivote del 2 de septiembre (contrato SenML sobre MQTT);
 \filaencab \encab{ID} & \encab{Requerimiento} & \encab{Verificación} & \encab{Fuente} & \encab{Pr.} \\ \midrule \endhead
 \textbf{RNF-01} & El sistema debe sostener la recepción de \textbf{$\geq$ 50 tramas por segundo} sin pérdida & Prueba de carga con generador sintético & [DP] & \textbf{M} \\
 \textbf{RNF-02} & El tiempo desde la recepción de un evento hasta su disponibilidad para consulta debe ser \textbf{$\leq$ 2 segundos} en el percentil 95 & Medición instrumentada & [DP] & \textbf{M} \\
-\textbf{RNF-03} & El sistema debe \textbf{detectar la pérdida de supervisión} de un dispositivo en \textbf{$\leq$ 2 intervalos} de reporte configurados & Prueba funcional con nodo silenciado & [PO] & \textbf{M} \\
+\textbf{RNF-03} & El sistema debe \textbf{detectar la pérdida de supervisión} de un dispositivo en \textbf{$\leq$ 2 intervalos} de reporte configurados (para quien ya reportó; quien nunca envió una trama se rige por el plazo de su sitio, RF-24) & Prueba funcional con nodo silenciado & [PO] & \textbf{M} \\
 \textbf{RNF-04} & Una consulta de historial de 30 días de un dispositivo debe responder en \textbf{$\leq$ 3 segundos} & Medición con volumen sintético & [DP] & \textbf{S} \\
 \textbf{RNF-05} & Ningún evento aceptado y confirmado puede perderse ante un reinicio del sistema & Prueba de recuperación ante falla & [BT] & \textbf{M} \\
 \textbf{RNF-06} & El sistema debe \textbf{reanudar la recepción automáticamente} tras recuperarse de una interrupción, sin intervención manual & Prueba de reinicio & [BT] & \textbf{M} \\

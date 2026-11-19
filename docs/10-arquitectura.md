@@ -411,7 +411,11 @@ en condición, en lugar de acumular filas).
 **Un supervisor aparte, por tiempo:** el filtro 6 solo corre cuando *llega* una trama. Para detectar
 el caso contrario —un dispositivo que **dejó de** transmitir— hay una tarea periódica (cada minuto)
 que compara `visto_por_ultima_vez` contra `intervalo_esperado_s` (el silencio máximo normal declarado, §8.4 punto 23) y abre la condición
-`sin_comunicacion`. Sin ella, un sensor caído sería invisible.
+`sin_comunicacion`. Sin ella, un sensor caído sería invisible. Desde el 18/11/2026 (§8.4 punto 68) el silencio se cuenta desde el más
+reciente entre la última trama y `dispositivo.en_servicio_desde`, y la misma tarea abre la condición a quien **nunca** envió una trama
+cuando vence el plazo de espera de su sitio (`sitio.espera_primera_trama_h`): antes, sin última trama, no había con qué comparar y ese
+equipo no alarmaba nunca. Cada apertura y cada cierre del barrido escriben la condición y su evento en **una sola sentencia** (si el
+proceso muere a mitad no queda una sin el otro), y un equipo en `mantenimiento` no conserva condiciones abiertas (RF-22; punto 68, 4).
 
 ### 4.1 Entrega «al menos una vez», caídas y duplicados (RF-06, RF-10)
 
@@ -515,7 +519,7 @@ cliente ──HTTP──► Express ⊂ NestJS ──► servicio ──► pg �
 
 - **Express** es la biblioteca de servidor HTTP más usada de Node.js; NestJS la usa por debajo
   (`@nestjs/platform-express`). El proceso de Node es el servidor; Express recibe cada petición y
-  entrega la respuesta. Es **la API**: 46 rutas REST (58 operaciones, la recepción por HTTP, la sesión, los usuarios, el tablero v2, desde el 11/11/2026 la cuenta propia, lo legal, el soporte y la actividad, desde el 15/11/2026 la plantilla del alta por lote y el catálogo de magnitudes, y desde el 17/11/2026 la vista pública por enlace y la administración de sus enlaces, con el tope y el k de cada sitio, incluidos) y el canal SSE `/eventos` (§5), descritos en el contrato OpenAPI (47 rutas y 59 operaciones contando `/eventos`; el paso 2h2 del guardián compara estas cifras con `openapi.json`). Desde el 08/11/2026, antes de cada ruta corre el guardia central de la sesión (`docs/20 §5`). Express no toca la base.
+  entrega la respuesta. Es **la API**: 47 rutas REST (60 operaciones, la recepción por HTTP, la sesión, los usuarios, el tablero v2, desde el 11/11/2026 la cuenta propia, lo legal, el soporte y la actividad, desde el 15/11/2026 la plantilla del alta por lote y el catálogo de magnitudes, desde el 17/11/2026 la vista pública por enlace y la administración de sus enlaces, con el tope y el k de cada sitio, y desde el 18/11/2026 el plazo de la primera trama de cada sitio, incluidos) y el canal SSE `/eventos` (§5), descritos en el contrato OpenAPI (48 rutas y 61 operaciones contando `/eventos`; el paso 2h2 del guardián compara estas cifras con `openapi.json`). Desde el 08/11/2026, antes de cada ruta corre el guardia central de la sesión (`docs/20 §5`). Express no toca la base.
 - **`pg`** (node-postgres) es el conductor de la base: mantiene un *pool* de 5 conexiones
   (`db/db.module.ts`) y envía **SQL directo** con parámetros `$1, $2…`; el valor nunca se pega dentro
   del texto SQL, lo que evita la inyección. Sin ORM, por la razón de `docs/07` (series de tiempo con
@@ -1295,7 +1299,7 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     Los registros de Mosquitto y de los demás servicios no viajan: quedan en el disco del servidor (§6); si algún día se
     centralizan, ese envío cumple R1 y R2. Hecho el 13/10 en el broker: el rol `admin` del plugin, que de fábrica lee todo,
     quedó acotado a `$CONTROL/dynamic-security/#` y `$SYS/#` (probado en el banco). En la base, hecho el 13/10
-    (migración 14): el backend entra como `plataforma_app`, que lee todo, inserta solo en las tablas donde el código inserta (11 hasta la migración 21; desde la 22 también `usuario`, `usuario_sitio`, `sesion` y `acceso`; desde la 23, `regla_umbral`; desde la 24, `preferencia` y `mensaje_soporte`; desde la 25, `enlace_publico` y `enlace_publico_acceso`, más la columna `sitio.enlaces_publicos_max` entre lo que actualiza) y actualiza solo en
+    (migración 14): el backend entra como `plataforma_app`, que lee todo, inserta solo en las tablas donde el código inserta (11 hasta la migración 21; desde la 22 también `usuario`, `usuario_sitio`, `sesion` y `acceso`; desde la 23, `regla_umbral`; desde la 24, `preferencia` y `mensaje_soporte`; desde la 25, `enlace_publico` y `enlace_publico_acceso`; de `sitio` actualiza solo tres columnas: `enlaces_publicos_max` y `publico_minimo_dispositivos` (migración 25) y, desde la 26, `espera_primera_trama_h`) y actualiza solo en
     5 (desde la migración 16 también inserta en `pasarela` y actualiza solo su columna `activo`, para el alta y la baja por API; ni DELETE, ni TRUNCATE, ni DDL; `evento`, `medicion` y `trama` no se pueden reescribir, solo agregar);
     el dueño queda para migraciones y semillas. La retención, que usa `drop_chunks` y este exige ser dueño de la hypertable, pasa
     por una sola función del dueño (`fn_retencion_drop_chunks`, `SECURITY DEFINER`, lista blanca de cinco tablas (`acceso` desde la migración 22), mínimo de días,
@@ -1755,8 +1759,8 @@ entra. Lo que aquí se marca «a fijar al implementar» es un detalle que el dis
     `POST /dispositivos/lote` (Etapa 4), `/preferencias`, `/sesiones`) y los cambios compatibles (mínimo y máximo por cubo; filtros, paginación,
     `estado_visual` y `entrega` en el inventario) están en `docs/19 §4` (tablero v2, I) con el perfil que usa cada una (`docs/20 §6`).
     Decisiones: (i) **ninguna respuesta cambia de forma:** los totales (`X-Total`) y los cursores (`X-Siguiente`) van en cabeceras y los
-    campos nuevos se suman; así los humos y el panel anterior siguen valiendo mientras se construye. (ii) **El estado visual de cuatro
-    valores se calcula también en SQL** (la regla de `docs/19 §2`) para filtrar y paginar en el servidor; el panel conserva su función
+    campos nuevos se suman; así los humos y el panel anterior siguen valiendo mientras se construye. (ii) **El estado visual de cinco
+    valores (cuatro cuando se diseñó, el 11/11/2026; el quinto, `esperando`, desde el 18/11/2026: punto 68) se calcula también en SQL** (la regla de `docs/19 §2`) para filtrar y paginar en el servidor; el panel conserva su función
     para recalcular en vivo, y una prueba comprueba que coinciden: dos implementaciones de una sola regla escrita, probadas entre sí.
     (iii) **El resumen del sitio es una consulta por petición**, no una tabla materializada: con decenas de dispositivos y los cubos de la
     resolución del rango cuesta milisegundos (se mide como `docs/16 §52`); un agregado por tarea queda para cuando la medición lo pida.
@@ -1768,7 +1772,7 @@ entra. Lo que aquí se marca «a fijar al implementar» es un detalle que el dis
     fuente de «quién lo hizo» (HU-11); la retención de `evento` no cambia. (vi) **Retardo de activación** (RF-14): el filtro alertar abre
     la condición de umbral solo cuando la medición lleva al menos `retardo_s` fuera de la banda (0 = como hoy); desde cuándo está fuera
     se guarda por canal en la base, no en memoria, para que sobreviva a un reinicio. (vii) **Entrega** (HU-15) = tramas recibidas en la
-    ventana ÷ esperadas (ventana ÷ intervalo esperado), acotada a 100 %; nula si el dispositivo no está activo o si en la ventana no cabe una trama esperada completa (así, sin tramas retenidas no se inventa); 0 % si esperaba y no llegó nada.
+    ventana ÷ esperadas (ventana ÷ intervalo esperado), acotada a 100 %; nula si el dispositivo no está activo, si espera su primera trama (punto 68) o si en la ventana no cabe una trama esperada completa (así, sin tramas retenidas no se inventa); 0 % si esperaba y no llegó nada.
     (viii) **«Ahora» (`GET /sitios/{id}/ahora`, tablero v3, `docs/19 §4` L3 y L6; 13/11/2026):** lo que mide cada dispositivo que reporta
     (estado visual normal o alerta, la regla de (ii)) con como mucho tres consultas por petición, ninguna por fila: una para los
     dispositivos, los conteos, la página ordenada (alerta primero, después zona y nombre; `limite` de 1 a 60) y el resumen por magnitud,
@@ -1834,6 +1838,43 @@ entra. Lo que aquí se marca «a fijar al implementar» es un detalle que el dis
     esa ruta una petición sin la cookie de sesión ni `X-Clave-Admin` es 401 antes de leer el cuerpo. Los 413 del proxy salen en JSON. (vii) `GET /dispositivos/lote/plantilla`
     publica columnas, topes, `max_filas`, `max_bytes` y separadores (la acción «escribir»); `GET /magnitudes`, el catálogo, a cualquier
     sesión (`docs/20 §6`). Probado con la falla plantada y medido en `docs/16 §71`.
+68. **Esperando primera trama y «en servicio desde» (`docs/19 §2` y §4, P; 18/11/2026; migración 26).** Un equipo dado de alta que nunca
+    envió una trama se mostraba «Normal» y el supervisor no lo veía: la consulta de caídos exige `visto_por_ultima_vez`. Decidido: (i)
+    `dispositivo.en_servicio_desde`, el instante desde el cual se espera que reporte: nace con el alta (`DEFAULT now()`, también en el alta
+    masiva) y `PATCH /dispositivos/{id}` lo pone en `now()` cuando el estado pasa de `mantenimiento` a `activo`, en la misma transacción y
+    bajo el mismo bloqueo de fila; (ii) `sitio.espera_primera_trama_h`, el plazo de la primera trama (1 a 2 160 horas, 168 por omisión: un
+    alta masiva suele ir días antes de instalar). El **barrido** (§4) hace, en este orden: (1) **caídos**: activos con fila en
+    `estado_dispositivo` cuyo `greatest(visto_por_ultima_vez, en_servicio_desde)` es anterior a 2 × intervalo esperado (volver de
+    mantenimiento con la última trama vieja ya no abre una alarma en el primer barrido); (2) **nunca reportaron**: activos sin fila en
+    `estado_dispositivo` cuyo `en_servicio_desde` + plazo del sitio ya pasó; abre `sin_comunicacion` con el evento
+    `{tipo, nunca_reporto: true, en_servicio_desde, espera_primera_trama_h}`; el `INSERT` vuelve a mirar, en la misma sentencia, que siga
+    activo, sin fila de estado y vencido, y toma el plazo y la fecha del evento de lo que ve en ese momento, no de la búsqueda; con las instantáneas de
+    lectura confirmada, una primera trama confirmada justo entre la búsqueda y la apertura puede no verse todavía y la condición se abre igual:
+    la cierra el paso (3) en el barrido siguiente, o `marcarVivo` si la trama llega después. La condición y su evento son **una sola
+    sentencia** (CTE: si el proceso muere a mitad no queda una sin el otro; también en el paso (1), en `abrirTope` y en `abrirRelojDesviado`); (3) **red de seguridad**: cierra la
+    `sin_comunicacion` abierta de quien ya no está callado por la misma regla (ya envió y está dentro de su intervalo contado desde
+    `en_servicio_desde`, o nunca envió y su plazo aún no vence: volvió de mantenimiento o se alargó el plazo), ahora **con su evento**
+    `condicion_cerrada` `{tipo, por: 'barrido', motivo}` (el motivo dice por qué cerró: comunicación restablecida, de vuelta en servicio o de
+    vuelta dentro del plazo de la primera trama), que antes no dejaba; (4) **mantenimiento** (RF-22): **un equipo en mantenimiento no abre ninguna condición**
+    (aunque siga entregando tramas) **ni conserva las que tenía**. Las aperturas del supervisor (los pasos (1) y (2), `abrirTope` y
+    `abrirRelojDesviado`) son una sentencia con su evento que solo abre a un equipo `activo`, sin evento ni aviso si no abrió, y el filtro
+    de alertas no abre umbrales (`alertas.service.ts`: `enMantenimiento`, que sale del estado leído al empezar la trama). `PATCH
+    /dispositivos/{id}` que pasa un equipo a `mantenimiento` cierra, en la misma transacción que el cambio, **todas** sus condiciones
+    abiertas, como la baja, con un evento `condicion_cerrada` por cada una (`{tipo, condicion_id, por: 'mantenimiento'}`, con la persona), y
+    avisa al canal en vivo de cada cierre **después del COMMIT** (la baja también). El bloqueo de fila de `dispositivo` serializa el PATCH
+    contra otros PATCH, no contra quien abre condiciones: la única que puede quedar abierta en mantenimiento es la de una trama en vuelo que
+    leyó `activo` antes del cambio, y el barrido (este paso (4)) cierra, con su evento, toda condición abierta de un equipo en mantenimiento,
+    que ya la tuviera por datos anteriores, por un cambio hecho sin la API o por esa trama. El paso (3) cierra solo a los equipos `activo`. Una abierta a la vez por dispositivo: el índice único parcial de
+    siempre (`condicion_abierta_unica`), así que dos barridos a la vez no la abren dos veces. La primera trama la cierra por el camino de
+    siempre: el filtro 6 crea la fila de `estado_dispositivo` y en seguida `marcarVivo` cierra la abierta (probado contra una base real).
+    (iii) **La regla del estado visual** suma «Esperando primera trama» (`esperando`) y tiene tres implementaciones (SQL, TypeScript del
+    servidor y del panel) probadas con una sola tabla de casos. (iv) **Entrega:** las tramas esperadas se cuentan desde
+    `en_servicio_desde` (antes, `creado_en`); para quien espera, nula. (v) **Salud del sitio:** quien espera no es supervisado todavía
+    (no entra en el denominador). (vi) **El plazo** se lee y se fija en `GET`/`PUT /sitios/{id}/espera-primera-trama` con la acción nueva
+    `ajustes` (administrador de sitio y del sistema, `docs/20 §6`), bloqueo optimista por valor (`anterior`; 409 `codigo: espera_cambio`) y
+    el evento `espera_primera_trama` con quién lo fijó. (vii) **Cambio del contrato de la API:** el estado visual `esperando`, la `entrega`
+    nula de quien espera y los campos `en_servicio_desde` y `espera_hasta` del inventario y de la ficha son un cambio del contrato de
+    `GET /dispositivos` y `GET /dispositivos/{id}` (campos y un valor nuevos; `openapi.json`), no una vista nueva. Probado con la falla plantada en `docs/16 §85`.
 
 ## 9. Crecimiento, resiliencia y respaldo (aprobado el 06/10/2026)
 

@@ -7,11 +7,11 @@ const MATRIZ = { administrador: ['leer', 'exportar', 'escribir', 'usuarios', 'co
 // La matriz de los cinco perfiles (docs/20 §6; PERMISOS de sesion/permisos.ts, 11/11/2026), para comprobar que cada acción del servidor
 // tiene su frase y que la copia de la prueba no se quedó atrás.
 const MATRIZ_CINCO = {
-  administrador: ['leer', 'exportar', 'escribir', 'baja', 'configurar', 'usuarios', 'enlaces', 'auditoria'],
+  administrador: ['leer', 'exportar', 'escribir', 'baja', 'configurar', 'usuarios', 'enlaces', 'auditoria', 'ajustes'],
   investigador: ['leer', 'exportar'],
   operador: ['leer', 'escribir', 'configurar'],
   consulta: ['leer'],
-  sistema: ['leer', 'exportar', 'escribir', 'baja', 'configurar', 'usuarios', 'enlaces', 'auditoria', 'sistema'],
+  sistema: ['leer', 'exportar', 'escribir', 'baja', 'configurar', 'usuarios', 'enlaces', 'auditoria', 'ajustes', 'sistema'],
 };
 
 // Guía de perfiles derivada de la matriz (docs/19 §6; docs/20 §6): el texto de cada rol sale de sus acciones, no de una frase aparte.
@@ -49,5 +49,9 @@ describe('ayudaDeRol y guiaDePerfiles', () => {
     expect(operador).not.toMatch(/da de alta, da de baja/);
     expect(guiaDePerfiles(MATRIZ_CINCO).some((g) => /enlaces/.test(g.texto))).toBe(false);
     expect(ayudaDeRol('administrador', MATRIZ_CINCO)).toContain('da de baja dispositivos (revoca sus credenciales)');
+  });
+  it('18/11/2026: los ajustes del sitio (el plazo de la primera trama) son de quien lo administra; el operador técnico no los cambia', () => {
+    expect(ayudaDeRol('administrador', MATRIZ_CINCO)).toContain('fija los ajustes del sitio (el plazo de la primera trama de los equipos)');
+    expect(ayudaDeRol('operador', MATRIZ_CINCO)).toContain('no cambia los ajustes del sitio');
   });
 });

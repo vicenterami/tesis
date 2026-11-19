@@ -71,7 +71,7 @@ let resumen: ResumenSitio;
 const base = (): ResumenSitio => ({
   sitio: { id: '00000000-0000-4000-8000-000000000001', codigo: 'uct', nombre: 'Campus', zona_horaria: 'America/Santiago' },
   ventana: { desde: '2026-11-10T15:00:00Z', hasta: '2026-11-11T15:00:00Z', intervalo: '15 minutes' },
-  dispositivos: { total: 16, normal: 11, alerta: 2, sin_senal: 1, inactivo: 2 },
+  dispositivos: { total: 16, normal: 11, alerta: 2, sin_senal: 1, esperando: 0, inactivo: 2 },
   salud: { reportan: 13, supervisados: 14, porcentaje: 92.857 },
   condiciones_abiertas: [{ tipo: 'sin_comunicacion', n: 1 }, { tipo: 'umbral', n: 3 }],
   tramas: { recibidas: 1200, rechazadas: 4, cubos: [{ tiempo: 1794405600, recibidas: 50, rechazadas: 1 }, { tiempo: 1794406500, recibidas: 48, rechazadas: 0 }] },
@@ -174,7 +174,7 @@ describe('Resumen (L2, L3): dos pedidos, indicadores y «Ahora»', () => {
     expect(screen.getByRole('link', { name: 'Tendencias' }).getAttribute('href')).toBe('#/?sitio=uct&ver=tendencias');
   });
 
-  it('la franja: el enlace de cada ficha se llama por su rótulo y su cifra y lleva al inventario filtrado; los cuatro estados suman el total; «Tramas (24 h)» lleva a Red', async () => {
+  it('la franja: el enlace de cada ficha se llama por su rótulo y su cifra y lleva al inventario filtrado; los cinco estados suman el total; «Tramas (24 h)» lleva a Red', async () => {
     montar();
     await waitFor(() => expect(valor('total')).toBe('16'));
     expect(screen.getByRole('link', { name: 'Sin señal: 1' }).getAttribute('href')).toBe('#/inventario?estado=sin_senal&sitio=uct');
@@ -182,13 +182,13 @@ describe('Resumen (L2, L3): dos pedidos, indicadores y «Ahora»', () => {
     expect(screen.getByRole('link', { name: 'Dispositivos: 16' }).getAttribute('href')).toBe('#/inventario?sitio=uct');
     expect(screen.getByRole('link', { name: 'Tramas (24 h): 1.200' }).getAttribute('href')).toBe('#/?sitio=uct&ver=red&rango=24h');
     expect(screen.getByRole('link', { name: 'Salud del sitio: 93 %' })).toBeTruthy();
-    expect(['normal', 'alerta', 'sin_senal', 'inactivo'].map((k) => Number(valor(k))).reduce((a, b) => a + b, 0)).toBe(16);
+    expect(['normal', 'alerta', 'sin_senal', 'esperando', 'inactivo'].map((k) => Number(valor(k))).reduce((a, b) => a + b, 0)).toBe(16);
     expect(document.querySelector('[data-indicador="salud"] [data-detalle]')!.textContent).toContain('13 de 14 reportan');
     expect(document.querySelector('[data-medidor]')!.getAttribute('aria-valuenow')).toBe('93');
-    // Ya no hay un «Ver en el inventario» por ficha: cada una de las siete lleva un solo enlace (el suyo) y ningún botón.
+    // Ya no hay un «Ver en el inventario» por ficha: cada una de las ocho (con «Esperando primera trama», 18/11/2026) lleva un solo enlace (el suyo) y ningún botón.
     const fichas = [...document.querySelectorAll('[data-indicadores] > li')];
-    expect(fichas).toHaveLength(7);
-    expect(fichas.map((f) => `${f.querySelectorAll('a').length}/${f.querySelectorAll('button').length}/${f.textContent!.includes('Ver en el inventario')}`)).toEqual(Array(7).fill('1/0/false'));
+    expect(fichas).toHaveLength(8);
+    expect(fichas.map((f) => `${f.querySelectorAll('a').length}/${f.querySelectorAll('button').length}/${f.textContent!.includes('Ver en el inventario')}`)).toEqual(Array(8).fill('1/0/false'));
     // Atención: en el orden del servidor, con la condición en palabras; las condiciones por tipo, de más a menos.
     expect([...document.querySelectorAll('[data-atencion-fila]')].map((f) => f.textContent!.replace(/\s+/g, ' ').trim())).toEqual([
       'Sin señal Pozo hace 2 h · Sin comunicación', 'Alerta Azotea hace 1 min · Umbral',
@@ -197,7 +197,7 @@ describe('Resumen (L2, L3): dos pedidos, indicadores y «Ahora»', () => {
   });
 
   it('en los dos sentidos: si el desglose no suma el total, la ficha lo dice (no se disimula)', async () => {
-    resumen = { ...base(), dispositivos: { total: 17, normal: 11, alerta: 2, sin_senal: 1, inactivo: 2 } };
+    resumen = { ...base(), dispositivos: { total: 17, normal: 11, alerta: 2, sin_senal: 1, esperando: 0, inactivo: 2 } };
     montar();
     await waitFor(() => expect(valor('total')).toBe('17'));
     expect(document.querySelector('[data-indicador="total"] [data-detalle]')!.textContent).toContain('no suma el total');
@@ -355,7 +355,7 @@ describe('Resumen (L2, L3): dos pedidos, indicadores y «Ahora»', () => {
   });
 
   it('vacíos con camino: sin dispositivos, el alta', async () => {
-    resumen = { ...base(), dispositivos: { total: 0, normal: 0, alerta: 0, sin_senal: 0, inactivo: 0 } };
+    resumen = { ...base(), dispositivos: { total: 0, normal: 0, alerta: 0, sin_senal: 0, esperando: 0, inactivo: 0 } };
     montar();
     await waitFor(() => expect(document.querySelector('[data-tablero-vacio]')).toBeTruthy());
     expect(document.querySelector('[data-indicadores]')).toBeNull();

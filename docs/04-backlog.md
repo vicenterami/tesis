@@ -242,7 +242,8 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 **HU-14 — criterios de aceptación** 🎯 — *elemento central de la tesis*
 
 - La plataforma abre una condición `sin_comunicacion` cuando un dispositivo no reporta durante el número configurado de intervalos (RF-24).
-- La detección ocurre en **≤ 2 intervalos** de reporte (RNF-03).
+- La detección ocurre en **≤ 2 intervalos** de reporte (RNF-03), para quien ya reportó.
+- Quien nunca envió una trama no se mide por intervalos: se le abre la condición cuando vence el plazo de su sitio contado desde que entró en servicio (RF-24).
 - El intervalo esperado es configurable por dispositivo, no global.
 - Al reaparecer el dispositivo, la condición se cierra y se registra la duración de la interrupción (RF-25).
 - El *keep-alive* y el testamento (*Last Will*) de MQTT cuentan como evidencia de supervisión activa (RF-29).
@@ -294,7 +295,7 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 **HU-19 — criterios de aceptación** 🎯
 
 - Presenta el total de dispositivos, cuántos en línea, cuántos con condición abierta y cuántos sin supervisión.
-- Cada dispositivo muestra un estado visual de cuatro valores: Normal, Alerta, Sin señal e Inactivo (`docs/19 §2`; decidido el 12/10/2026 a partir de una nube comercial de referencia, en reemplazo de los tres niveles del borrador).
+- Cada dispositivo muestra un estado visual de cuatro valores: Normal, Alerta, Sin señal e Inactivo (`docs/19 §2`; decidido el 12/10/2026 a partir de una nube comercial de referencia, en reemplazo de los tres niveles del borrador); desde el 18/11/2026, un quinto: «Esperando primera trama», para el equipo que aún no envía su primera trama dentro del plazo de su sitio.
 - Indica el momento de la última comunicación de cada dispositivo.
 - Es utilizable en un navegador móvil sin desplazamiento horizontal (RF-52).
 - Refleja los cambios de estado sin requerir recarga manual de la página.

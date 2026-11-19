@@ -97,6 +97,14 @@ DO $$ BEGIN
     END IF;
   END IF;
 END $$;
+-- Desde la migración 26, el plazo de la primera trama del sitio (PUT /sitios/{id}/espera-primera-trama): UPDATE de esa sola columna de
+-- `sitio`. `dispositivo.en_servicio_desde` no pide nada: la aplicación ya inserta y actualiza `dispositivo`. Nace después de esta: aquí se
+-- repite solo si ya existe.
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'sitio' AND column_name = 'espera_primera_trama_h') THEN
+    GRANT UPDATE (espera_primera_trama_h) ON sitio TO plataforma_app;
+  END IF;
+END $$;
 ALTER DEFAULT PRIVILEGES FOR ROLE plataforma IN SCHEMA public REVOKE INSERT, UPDATE ON TABLES FROM plataforma_app;
 ALTER DEFAULT PRIVILEGES FOR ROLE plataforma IN SCHEMA public GRANT SELECT ON TABLES TO plataforma_app;
 

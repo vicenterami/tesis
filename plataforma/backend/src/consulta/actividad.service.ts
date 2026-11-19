@@ -24,7 +24,8 @@ export interface FilaActividad {
 // su lista de usuarios, así se ve también la baja o el sitio quitado) y los términos que aceptaron quienes tienen membresía activa
 // (`terminos_aceptados`, por quien lo hizo). El nombre de esa pasarela o de esa persona va en `objeto`, solo para el texto. Desde el
 // 17/11/2026, los enlaces públicos del sitio (`enlace_*`, por `detalle.enlace_id` y el sitio de la fila del enlace, no el del detalle), con
-// su título como `objeto` (docs/19 §4, O, punto 4); y el tope y el k de la vista pública del sitio (`enlace_tope`, `enlace_minimo`, por `detalle.sitio_id`).
+// su título como `objeto` (docs/19 §4, O, punto 4); y el tope y el k de la vista pública del sitio (`enlace_tope`, `enlace_minimo`, por `detalle.sitio_id`); desde el 18/11/2026, el plazo de
+// la primera trama del sitio (`espera_primera_trama`, por `detalle.sitio_id`).
 @Injectable()
 export class ActividadService {
   constructor(@Inject(POOL) private readonly pool: Pool) {}
@@ -56,7 +57,7 @@ export class ActividadService {
                OR (starts_with(e.tipo, 'usuario_') AND pe.id IN (SELECT us.usuario_id FROM usuario_sitio us WHERE us.sitio_id = $1))
                OR (e.tipo = 'terminos_aceptados' AND e.usuario_id IN (SELECT us.usuario_id FROM usuario_sitio us WHERE us.sitio_id = $1 AND us.activo))
                OR (starts_with(e.tipo, 'enlace_') AND ep.sitio_id = $1)
-               OR (e.tipo IN ('enlace_tope', 'enlace_minimo') AND e.detalle->>'sitio_id' = $1::text))
+               OR (e.tipo IN ('enlace_tope', 'enlace_minimo', 'espera_primera_trama') AND e.detalle->>'sitio_id' = $1::text))
           UNION ALL
           SELECT a.id, a.instante, 'acceso', a.resultado, NULL, a.usuario_id, NULL, NULL, NULL
             FROM acceso a

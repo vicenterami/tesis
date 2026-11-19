@@ -160,7 +160,7 @@
 Ampliada el 08/11/2026 a los cinco perfiles (§2). **✅ 11/11/2026: vigente en el código con las siete columnas** (`permisos.ts`, migración
 24; paso 4b del guardián, `docs/16 §63`), incluido el cambio de «exportar» (administrador de sitio e investigador). La baja de dispositivos
 y pasarelas es una acción propia (`baja`), separada de `escribir`, para que el operador técnico dé de alta y no de baja. Las filas de enlaces
-públicos (desde el 17/11/2026, con sus rutas en el OpenAPI y la acción `enlaces`) y de estado del sistema (diseño: sus rutas no existen aún) completan la tabla; la vista pública `GET /publico` **no está en la matriz**: no es de ningún perfil ni de ningún sitio, y se prueba aparte (§7); la de auditoría de un sitio es `GET /sitios/{id}/actividad`
+públicos (desde el 17/11/2026, con sus rutas en el OpenAPI y la acción `enlaces`), la de los ajustes del sitio (desde el 18/11/2026, la acción `ajustes`: lo que rige a todos los equipos del sitio, como el plazo de la primera trama; lo fija quien administra el sitio, igual que el k y el tope de la vista pública) y de estado del sistema (diseño: sus rutas no existen aún) completan la tabla; la vista pública `GET /publico` **no está en la matriz**: no es de ningún perfil ni de ningún sitio, y se prueba aparte (§7); la de auditoría de un sitio es `GET /sitios/{id}/actividad`
 (Etapa 4). Cada celda dice qué responde la ruta a esa persona en **su** sitio; «Otro sitio» es la misma
 persona pidiendo un recurso de un sitio donde no tiene membresía (el administrador del sistema no tiene «otro sitio»: alcanza a todos).
 
@@ -181,6 +181,8 @@ persona pidiendo un recurso de un sitio donde no tiene membresía (el administra
 | `GET /magnitudes` (15/11/2026, `docs/19 §4` N4: el catálogo, que no es de ningún sitio) | 401 | 200 | 200 | 200 | 200 | 200 | — |
 | `GET /usuarios`, `POST /usuarios`, `PATCH /usuarios/{id}` | 401 | 403 | 403 | 403 | 200 (las membresías de sus sitios; la cuenta de quien también está en otro sitio: 403, §5) | 200 (todas las cuentas) | 404 |
 | Administrar los enlaces públicos de un sitio con la acción `enlaces` (17/11/2026, `docs/19 §4` O): listar y crear, `GET`/`POST /sitios/{id}/enlaces`; la vista previa, `POST /sitios/{id}/enlaces/vista-previa`; renovar, `POST /sitios/{id}/enlaces/{enlace}/renovar`; revocar, `DELETE /sitios/{id}/enlaces/{enlace}`; el tope de enlaces del sitio, `GET`/`PUT /sitios/{id}/enlaces/tope`; el k de su vista pública, `GET`/`PUT /sitios/{id}/enlaces/minimo` | 401 | 403 | 403 | 403 | 200 | 200 | 404 |
+| El plazo de espera de la primera trama del sitio (18/11/2026, `docs/19 §4` P): leerlo, `GET /sitios/{id}/espera-primera-trama` | 401 | 200 | 200 | 200 | 200 | 200 | 404 |
+| Fijar los ajustes del sitio con la acción `ajustes` (18/11/2026; hoy, el plazo de espera de la primera trama): `PUT /sitios/{id}/espera-primera-trama` | 401 | 403 | 403 | 403 | 200 / 409 | 200 / 409 | 404 |
 | Auditoría de un sitio: `GET /sitios/{id}/actividad` (Etapa 4) | 401 | 403 | 403 | 403 | 200 | 200 | 404 |
 | Estado del sistema, límites de los servicios, sitios y auditoría de todos los sitios; leer el soporte (`GET /soporte` (Etapa 4)) | 401 | 403 | 403 | 403 | 403 | 200 | — |
 | Lo propio de cada persona: `GET`/`PUT /preferencias`, `GET /sesiones`, `DELETE /sesiones/{id}`, `GET /cuenta/exportar`, `POST /cuenta/baja`, `POST /terminos/aceptar`, `POST /soporte` (Etapa 4) | 401 | 200 | 200 | 200 | 200 | 200 (la baja, 409 si es el último administrador del sistema: §11) | — |

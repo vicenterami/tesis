@@ -20,10 +20,10 @@ uniformidad es la que resuelve la causa C1 (formatos dispares).
 
 | # | Entidad | Qué representa | Notas |
 |---|---|---|---|
-| 1 | **sitio** | Organización o instalación que agrupa dispositivos | Declara su **zona horaria** (IANA) y su **código**, el segmento del tópico (`sitio/<codigo>/…`, migración 11); el caso de validación es el Campus Dr. Luis Rivas del Canto (código `uct`) |
+| 1 | **sitio** | Organización o instalación que agrupa dispositivos | Declara su **zona horaria** (IANA) y su **código**, el segmento del tópico (`sitio/<codigo>/…`, migración 11); el caso de validación es el Campus Dr. Luis Rivas del Canto (código `uct`). Desde la migración 26 (18/11/2026), `espera_primera_trama_h`: cuántas horas espera el sitio la primera trama de un equipo desde que entró en servicio antes de darlo por «Sin señal» (1 a 2 160, 168 por omisión; `docs/19 §2`) |
 | 2 | **zona** | Subdivisión lógica de un sitio (edificio, sector, sala) | Un sitio tiene muchas zonas |
 | 3 | **magnitud** | Catálogo de lo que se puede medir (temperatura, humedad, nivel…) | Define la unidad canónica y el rango válido |
-| 4 | **dispositivo** | Un nodo físico que reporta (ESP32, sensor LoRa…) | Pertenece a una zona; se identifica por un id físico (MAC/DevEUI, lista blanca `[a-z0-9-]`); declara su **vía** (mqtt, http, lorawan), su **formato** (`senml` o `plano` si llega directo; en la vía lorawan, el de su pasarela: `milesight` o `chirpstack`) y, si llega por LoRaWAN, su **pasarela** (migraciones 11 y 15) y, si su pasarela entrega la trama sin decodificar, su **perfil de decodificación** (`decodificador`, migración 17) |
+| 4 | **dispositivo** | Un nodo físico que reporta (ESP32, sensor LoRa…) | Pertenece a una zona; se identifica por un id físico (MAC/DevEUI, lista blanca `[a-z0-9-]`); declara su **vía** (mqtt, http, lorawan), su **formato** (`senml` o `plano` si llega directo; en la vía lorawan, el de su pasarela: `milesight` o `chirpstack`) y, si llega por LoRaWAN, su **pasarela** (migraciones 11 y 15) y, si su pasarela entrega la trama sin decodificar, su **perfil de decodificación** (`decodificador`, migración 17). Desde la migración 26, `en_servicio_desde`: desde cuándo se espera que reporte (el alta, y cada vuelta a `activo` desde `mantenimiento`; las filas anteriores, su `creado_en`), de donde se cuentan el plazo de la primera trama, el silencio que vigila el supervisor y las tramas esperadas de la entrega (`docs/10 §8.4` punto 68) |
 | 5 | **canal** | Una magnitud concreta que un dispositivo reporta | Un dispositivo puede tener varios canales (temp + humedad) |
 | 6 | **credencial** | Secreto de autenticación de un dispositivo o de una pasarela (exactamente uno de los dos es su titular, migración 16) | Permite rotación sin borrar al titular. `hash` guarda solo el resumen, nunca el secreto: `sha256$<base64>` desde el 13/11/2026; las anteriores, `scrypt$…`, siguen valiendo y la vía HTTP las convierte en su primera trama válida (`docs/11 §4`) |
 | 7 | **medicion** | Una lectura: valor + unidad + tiempo | **Hypertable** de TimescaleDB (serie de tiempo) |
@@ -152,6 +152,7 @@ erDiagram
         text formato FK
         uuid pasarela_id FK
         text decodificador
+        timestamptz en_servicio_desde
     }
     dispositivo_zona {
         uuid dispositivo_id PK,FK
@@ -286,6 +287,7 @@ erDiagram
         text codigo
         smallint enlaces_publicos_max
         smallint publico_minimo_dispositivos
+        int espera_primera_trama_h
     }
     trama {
         uuid id PK
@@ -349,7 +351,9 @@ erDiagram
 - La **API REST** (patrón B) lee de estas tablas para el dashboard: histórico desde `medicion` con
   `time_bucket`, estado desde `dispositivo`, `estado_dispositivo` y `condicion`.
 - La **supervisión de salud** compara `estado_dispositivo.visto_por_ultima_vez` contra `intervalo_esperado_s` —el **silencio máximo normal** del dispositivo, no su periodo: periodo más las pérdidas que admite el medio, regla práctica 2 × periodo (decisión del 07/10/2026, `docs/10 §8.4` punto 23, migración 10)— para abrir
-  condiciones de tipo `sin_comunicacion`.
+  condiciones de tipo `sin_comunicacion`. Desde la migración 26 el silencio se cuenta desde el más reciente entre esa última trama y
+  `dispositivo.en_servicio_desde`, y a quien nunca envió una trama se le abre la misma condición cuando `en_servicio_desde` +
+  `sitio.espera_primera_trama_h` ya pasó (`docs/10 §8.4` punto 68).
 
 ## 6. Convenciones del esquema (aplicadas en la migración 05)
 
@@ -384,7 +388,7 @@ Tres tipos de dato que se confunden y que aquí tienen destino distinto:
 
 | Tipo | Ejemplo | Dónde vive | Cuándo se calcula |
 |---|---|---|---|
-| **Derivado al leer** | `en_linea` (¿última trama hace menos de 2 × intervalo?) | se calcula en la consulta, no se guarda | cada lectura de la API; nunca escribe |
+| **Derivado al leer** | `en_linea` (¿la más reciente entre la última trama y `en_servicio_desde`, hace menos de 2 × intervalo?; nulo sin tramas) y `espera_hasta` (`en_servicio_desde` + la espera del sitio, mientras no haya enviado ninguna) | se calcula en la consulta, no se guarda | cada lectura de la API; nunca escribe |
 | **Persistido por proceso** | `condicion` tipo `sin_comunicacion` | fila en `condicion`, la abre el barrido periódico (M4) | cada 60 s, una sola vez por transición |
 | **Persistido por trama** | `condicion` tipo `tope_superado` y los contadores `ventana_*` de `estado_dispositivo` | los escribe el pipeline (filtros 3 y 6) al rechazar una trama que no cabe en el presupuesto de la hora y al cerrar la hora dentro del presupuesto (`docs/10 §8.4` punto 53) | en cada trama; la condición, una sola vez por transición |
 | **Persistido por trama** | `condicion` tipo `reloj_desviado` | la abre el pipeline (filtro 4) cuando la marca de una pasarela difiere más de 10 min de la llegada y la cierra con la primera marca de pasarela plausible del mismo dispositivo (`docs/10 §8.4` punto 54, migración 20) | en cada trama; la condición, una sola vez por transición |

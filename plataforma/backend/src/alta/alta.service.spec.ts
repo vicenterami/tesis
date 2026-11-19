@@ -55,7 +55,7 @@ function armar(opciones: { insertFalla?: string; insertRestriccion?: string; com
     },
   } as unknown as DynsecService;
   const pool = { connect: () => Promise.resolve(cliente) } as unknown as Pool;
-  return { servicio: new AltaService(pool, dynsec), sql, params, ordenes, cliente };
+  return { servicio: new AltaService(pool, dynsec, { publicar() {} } as never), sql, params, ordenes, cliente };
 }
 
 describe('AltaService.crear (HU-11): todo o nada entre la base y el broker', () => {

@@ -1,10 +1,11 @@
 import { BadRequestException, ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import type { Pool, PoolClient } from 'pg';
 import { POOL } from '../db/db.module.js';
-import { registrarEvento } from '../db/evento.js';
+import { registrarEvento, registrarEventos } from '../db/evento.js';
 import { isoUs } from '../db/iso-us.js';
 import { CambioDispositivo, ReglaValidada, rechazo, validarReglas } from './configuracion.dto.js';
 import { errorDeCliente } from '../db/cliente.js';
+import { EventosService } from '../tiempo-real/eventos.service.js';
 
 // Configuración desde el panel (docs/19 §4, E; docs/10 §8.4 punto 28) con BLOQUEO OPTIMISTA: el cambio exige el `actualizado_en` que
 // entregó la ficha y es `UPDATE … WHERE id = $1 AND actualizado_en = $2`; si otra persona cambió la fila entretanto, 409 con el vigente y
@@ -44,7 +45,7 @@ function conflicto(vigente: string): ConflictException {
 @Injectable()
 export class ConfiguracionService {
   private readonly log = new Logger('configuracion');
-  constructor(@Inject(POOL) private readonly pool: Pool) {}
+  constructor(@Inject(POOL) private readonly pool: Pool, private readonly eventos: EventosService) {}
 
   private async transaccion<T>(trabajo: (c: PoolClient) => Promise<T>): Promise<T> {
     const c = await this.pool.connect();
@@ -68,7 +69,8 @@ export class ConfiguracionService {
   // PATCH /dispositivos/{id}: nombre, estado (activo o mantenimiento), intervalo esperado y zona (solo del mismo sitio). Devuelve el
   // `actualizado_en` nuevo; el controlador responde con la ficha completa.
   async cambiarDispositivo(id: string, cambio: CambioDispositivo, usuarioId: string | null): Promise<void> {
-    await this.transaccion(async (c) => {
+    const cerradas = await this.transaccion(async (c) => {
+      let cerradas: { id: string; tipo: string }[] = [];
       const a = await c.query<DispositivoBloqueado>(
         `SELECT d.id, d.nombre, d.estado, d.intervalo_esperado_s, d.zona_id, z.sitio_id, ${isoUs('d.actualizado_en')} AS actualizado_en,
                 (d.actualizado_en = $2::timestamptz) AS al_dia
@@ -88,12 +90,30 @@ export class ConfiguracionService {
         intervalo_esperado_s: cambio.intervalo_esperado_s ?? antes.intervalo_esperado_s, zona_id: cambio.zona_id ?? antes.zona_id,
       };
       const cambiados = (Object.keys(despues) as (keyof typeof despues)[]).filter((k) => despues[k] !== antes[k]);
-      if (cambiados.length === 0) return; // nada cambia: sin UPDATE ni evento, la marca sigue siendo la vigente
+      if (cambiados.length === 0) return cerradas; // nada cambia: sin UPDATE ni evento, la marca sigue siendo la vigente
+      // Volver a `activo` desde mantenimiento es volver a servicio (docs/19 §2; docs/10 §8.4 punto 68): `en_servicio_desde` pasa a este
+      // instante, en el mismo UPDATE y bajo el mismo bloqueo de fila; el supervisor y la entrega cuentan desde ahí (sin falsa alarma por
+      // la última trama vieja). Cualquier otro cambio no lo toca.
+      const vuelveAServicio = antes.estado !== 'activo' && despues.estado === 'activo';
       const u = await c.query(
-        `UPDATE dispositivo SET nombre = $2, estado = $3, intervalo_esperado_s = $4, zona_id = $5
+        `UPDATE dispositivo SET nombre = $2, estado = $3, intervalo_esperado_s = $4, zona_id = $5,
+                en_servicio_desde = CASE WHEN $7::boolean THEN now() ELSE en_servicio_desde END
           WHERE id = $1 AND actualizado_en = $6::timestamptz`,
-        [id, despues.nombre, despues.estado, despues.intervalo_esperado_s, despues.zona_id, cambio.actualizado_en]);
+        [id, despues.nombre, despues.estado, despues.intervalo_esperado_s, despues.zona_id, cambio.actualizado_en, vuelveAServicio]);
       if (u.rowCount === 0) throw conflicto(antes.actualizado_en);
+      // Pasar a mantenimiento cierra las condiciones abiertas del equipo (RF-22: un equipo fuera de servicio no genera alertas; docs/19 §2;
+      // docs/10 §8.4 punto 68), todas, como la baja, con un evento por cada una, en la misma transacción que el cambio de estado. El bloqueo
+      // de fila de `dispositivo` serializa este PATCH contra otros PATCH, no contra quien abre condiciones: mientras esté en mantenimiento
+      // nadie abre ninguna (alertas, tope, reloj y supervisor miran el estado), salvo la trama en vuelo que leyó `activo` antes del cambio,
+      // que cierra la red de seguridad del supervisor (paso 4). El aviso al canal en vivo sale después del COMMIT, abajo.
+      if (antes.estado !== 'mantenimiento' && despues.estado === 'mantenimiento') {
+        const cc = await c.query<{ id: string; tipo: string }>(
+          'UPDATE condicion SET cerrada_en = now() WHERE dispositivo_id = $1 AND cerrada_en IS NULL RETURNING id, tipo', [id]);
+        cerradas = cc.rows;
+        await registrarEventos(c, cerradas.map((k) => ({
+          dispositivoId: id, tipo: 'condicion_cerrada', usuarioId, detalle: { tipo: k.tipo, condicion_id: k.id, por: 'mantenimiento' },
+        })));
+      }
       await registrarEvento(c, {
         dispositivoId: id, tipo: 'dispositivo_configurado', usuarioId,
         detalle: {
@@ -103,7 +123,10 @@ export class ConfiguracionService {
         },
       });
       this.log.log(`configuración: dispositivo ${id} (${cambiados.join(', ')})`);
+      return cerradas;
     });
+    // Después del COMMIT (si la transacción se deshace no sale ningún aviso).
+    for (const k of cerradas) this.eventos.publicar({ tipo: 'condicion', dispositivo_id: id, condicion: k.tipo as 'umbral', estado: 'cerrada' });
   }
 
   // PUT /canales/{id}/reglas: REEMPLAZA las reglas del canal (y su etiqueta). La marca es la del canal (`canal.actualizado_en`, la misma

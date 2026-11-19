@@ -61,6 +61,7 @@ CREATE TEMP TABLE e_prueba AS SELECT id FROM enlace_publico WHERE sitio_id IN (S
   OR creado_por IN (SELECT id FROM u_prueba) OR revocado_por IN (SELECT id FROM u_prueba);
 DELETE FROM evento WHERE tipo LIKE 'enlace_%' AND (detalle->>'enlace_id' IN (SELECT id::text FROM e_prueba)
   OR detalle->>'sitio_id' IN (SELECT id::text FROM sitio WHERE codigo IN ('$sa', '$sb')));
+DELETE FROM evento WHERE tipo = 'espera_primera_trama' AND detalle->>'sitio_id' IN (SELECT id::text FROM sitio WHERE codigo IN ('$sa', '$sb'));
 DELETE FROM enlace_publico_acceso WHERE enlace_id IN (SELECT id FROM e_prueba);
 DELETE FROM enlace_publico WHERE id IN (SELECT id FROM e_prueba);
 UPDATE usuario SET desactivado_por = NULL WHERE desactivado_por IN (SELECT id FROM u_prueba);
@@ -712,6 +713,18 @@ caso "administrador, otro sitio: PUT /sitios/{id}/enlaces/minimo → 404" 404 ad
 caso "administrador: PUT /sitios/{id}/enlaces/minimo con 21 → 400" 400 adm PUT "/sitios/$SITIO_A/enlaces/minimo" '{"minimo_dispositivos":21}'
 caso "administrador: PUT /sitios/{id}/enlaces/minimo → 200 (el sitio de prueba se borra al salir)" 200 adm PUT "/sitios/$SITIO_A/enlaces/minimo" '{"minimo_dispositivos":5}'
 caso "administrador: crear un enlace con minimo_dispositivos → 400 (k es del sitio)" 400 adm POST "/sitios/$SITIO_A/enlaces" '{"titulo":"Con k","magnitudes":["temperatura"],"minimo_dispositivos":3}'
+# ── 3g. El plazo de la primera trama del sitio (docs/20 §6, filas del plazo; docs/19 §4, P; 18/11/2026) ──────────────────────────────
+# Leerlo, cualquier perfil del sitio; fijarlo, la acción `ajustes` (quien administra el sitio). El supervisor, la entrega y el evento con quién,
+# contra una base real en pruebas/espera-integracion.sh.
+caso "sin sesión: GET /sitios/{id}/espera-primera-trama → 401" 401 anon GET "/sitios/$SITIO_A/espera-primera-trama"
+for q in con inv ope adm; do caso "$q: GET /sitios/{id}/espera-primera-trama → 200" 200 "$q" GET "/sitios/$SITIO_A/espera-primera-trama"; done
+caso "administrador, otro sitio: GET /sitios/{id}/espera-primera-trama → 404" 404 adm GET "/sitios/$SITIO_B/espera-primera-trama"
+for q in con inv ope; do caso "$q: PUT /sitios/{id}/espera-primera-trama con un cuerpo cualquiera → 403 (antes de mirar el cuerpo)" 403 "$q" PUT "/sitios/$SITIO_A/espera-primera-trama" '{"basura":1}'; done
+caso "administrador: PUT /sitios/{id}/espera-primera-trama con 2161 → 400" 400 adm PUT "/sitios/$SITIO_A/espera-primera-trama" '{"espera_primera_trama_h":2161}'
+caso "administrador, otro sitio: PUT /sitios/{id}/espera-primera-trama → 404" 404 adm PUT "/sitios/$SITIO_B/espera-primera-trama" '{"espera_primera_trama_h":24}'
+SIN_PEDIDO=1 caso "administrador: PUT del plazo sin X-Pedido: panel → 403" 403 adm PUT "/sitios/$SITIO_A/espera-primera-trama" '{"espera_primera_trama_h":24}'
+caso "administrador: PUT /sitios/{id}/espera-primera-trama → 200 (el sitio de prueba se borra al salir)" 200 adm PUT "/sitios/$SITIO_A/espera-primera-trama" '{"espera_primera_trama_h":24}'
+caso "administrador del sistema: PUT del plazo del sitio B → 200" 200 sis PUT "/sitios/$SITIO_B/espera-primera-trama" '{"espera_primera_trama_h":24}'
 # Reactivar (revisión del 11/11/2026): una baja hecha por el administrador del sistema solo la deshace el alcance global, y toda
 # reactivación trae una clave temporal nueva (la de antes no vuelve).
 M=$(marca "$INV_ID")

@@ -18,8 +18,8 @@ const MATRIZ_DOCS_20: Record<string, readonly string[]> = {
   consulta: ['leer'],
   investigador: ['leer', 'exportar'],
   operador: ['leer', 'escribir', 'configurar'],
-  administrador: ['leer', 'exportar', 'escribir', 'baja', 'configurar', 'usuarios', 'enlaces', 'auditoria'],
-  administrador_sistema: ['leer', 'exportar', 'escribir', 'baja', 'configurar', 'usuarios', 'enlaces', 'auditoria', 'sistema'],
+  administrador: ['leer', 'exportar', 'escribir', 'baja', 'configurar', 'usuarios', 'enlaces', 'auditoria', 'ajustes'],
+  administrador_sistema: ['leer', 'exportar', 'escribir', 'baja', 'configurar', 'usuarios', 'enlaces', 'auditoria', 'ajustes', 'sistema'],
 };
 
 describe('permitir(usuario, accion, sitio): la tabla de docs/20 §6 con los cinco perfiles', () => {

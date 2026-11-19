@@ -20,6 +20,10 @@ export interface DispositivoInventario {
   intervalo_esperado_s: number;
   visto_por_ultima_vez: string | null;
   en_linea: boolean | null;
+  // Desde el 18/11/2026 (docs/19 §2): desde cuándo se espera que reporte (el alta o la última vuelta a activo) y, si aún no envió ninguna
+  // trama, hasta cuándo espera la primera (en_servicio_desde + la espera del sitio); null si ya envió alguna.
+  en_servicio_desde: string;
+  espera_hasta: string | null;
   zona: string;
   sitio: string;
   zona_horaria: string;
@@ -30,7 +34,7 @@ export interface DispositivoInventario {
   canales: CanalResumen[];
   // Tablero v2 (docs/19 §4, C): el estado visual con la regla de §2 escrita en SQL y la entrega del rango (B4c), en porcentaje o null
   // sin intervalo esperado. Opcionales: un backend anterior no los manda, y el panel recalcula el estado igual.
-  estado_visual?: 'inactivo' | 'sin_senal' | 'alerta' | 'normal';
+  estado_visual?: 'inactivo' | 'sin_senal' | 'alerta' | 'esperando' | 'normal';
   entrega?: number | null;
 }
 
@@ -124,7 +128,7 @@ export interface Sitio {
 export interface ResumenSitio {
   sitio: { id: string; codigo: string; nombre: string; zona_horaria: string };
   ventana: { desde: string; hasta: string; intervalo: string };
-  dispositivos: { total: number; normal: number; alerta: number; sin_senal: number; inactivo: number };
+  dispositivos: { total: number; normal: number; alerta: number; sin_senal: number; esperando: number; inactivo: number };
   salud: { reportan: number; supervisados: number; porcentaje: number | null };
   condiciones_abiertas: { tipo: string; n: number }[];
   // cubos[].tiempo en segundos Unix, como `tiempos` de los históricos (lo declara el OpenAPI del resumen).

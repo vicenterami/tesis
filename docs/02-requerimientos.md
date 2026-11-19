@@ -144,7 +144,7 @@ entre pasarelas que oyen el mismo uplink la hace el servidor de red (`docs/10 §
 
 | ID | Requerimiento | Fuente | Causa | Prior. |
 |---|---|---|---|:---:|
-| **RF-24** | El sistema debe **detectar la pérdida de comunicación** de un dispositivo cuando no reporte durante un número configurable de intervalos, y abrir la condición correspondiente | [PO] [BT] [ENT] | **C5** | **M** |
+| **RF-24** | El sistema debe **detectar la pérdida de comunicación** de un dispositivo cuando no reporte durante un número configurable de intervalos o cuando no envíe su primera trama dentro de un plazo configurable por sitio desde que entró en servicio, y abrir la condición correspondiente | [PO] [BT] [ENT] | **C5** | **M** |
 | **RF-25** | El sistema debe **detectar la restauración** del dispositivo y cerrar la condición, registrando la duración de la interrupción | [BT] [ENT] | C5 | **M** |
 | **RF-26** | El sistema debe registrar la **última vez que se recibió** comunicación de cada dispositivo | [PO] | C5 | **M** |
 | **RF-27** | El sistema debe **presentar la calidad del enlace** por dispositivo (RSSI, SNR y porcentaje de recepción) cuando el transporte la provea | [BT] [ENT] | C5 | **M** |
@@ -232,7 +232,7 @@ Clasificados según las características de calidad de **ISO/IEC 25010**.
 |---|---|---|---|:---:|
 | **RNF-01** | El sistema debe sostener la recepción de **≥ 50 tramas por segundo** sin pérdida | Prueba de carga con generador sintético | [DP] | **M** |
 | **RNF-02** | El tiempo desde la recepción de un evento hasta su disponibilidad para consulta debe ser **≤ 2 segundos** en el percentil 95 | Medición instrumentada | [DP] | **M** |
-| **RNF-03** | El sistema debe **detectar la pérdida de supervisión** de un dispositivo en **≤ 2 intervalos** de reporte configurados | Prueba funcional con nodo silenciado | [PO] | **M** |
+| **RNF-03** | El sistema debe **detectar la pérdida de supervisión** de un dispositivo en **≤ 2 intervalos** de reporte configurados (para quien ya reportó; quien nunca envió una trama se rige por el plazo de su sitio, RF-24) | Prueba funcional con nodo silenciado | [PO] | **M** |
 | **RNF-04** | Una consulta de historial de 30 días de un dispositivo debe responder en **≤ 3 segundos** | Medición con volumen sintético | [DP] | **S** |
 
 > **Fundamento de las cifras (agregado el 21/09/2026 tras la retroalimentación).** La carga del caso de

@@ -14,7 +14,7 @@ const MARCA_D = '2026-11-11T12:00:00.123456Z';
 const MARCA_C = '2026-11-11T12:00:00.654321Z';
 const ficha = (): DispositivoFicha => ({
   id: ID, id_fisico: 'dev-0001', nombre: 'Invernadero', estado: 'activo', via: 'mqtt', formato: 'senml', intervalo_esperado_s: 60, visto_por_ultima_vez: null,
-  en_linea: null, zona: 'Lab', sitio: 'Campus', zona_horaria: 'America/Santiago', sitio_codigo: 'uct', zona_id: 'z-lab', creado_en: 'x', intervalo_observado_s: null,
+  en_linea: null, en_servicio_desde: '2026-01-01T00:00:00Z', espera_hasta: '2099-01-01T00:00:00Z', zona: 'Lab', sitio: 'Campus', zona_horaria: 'America/Santiago', sitio_codigo: 'uct', zona_id: 'z-lab', creado_en: 'x', intervalo_observado_s: null,
   actualizado_en: MARCA_D,
   canales: [{ id: TEMP, magnitud: 'temperatura', magnitud_nombre: 'Temperatura', unidad: 'Cel', etiqueta: null, actualizado_en: MARCA_C,
     reglas: [{ id: REGLA, umbral_alto: 30, umbral_bajo: 5, histeresis: 1, retardo_s: 0 }], ultima_medicion: null }],

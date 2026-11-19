@@ -29,7 +29,7 @@ const canal = (cid: string, magnitud: string, unidad: string, valor: number | nu
 });
 const ficha = (n: number, nombre: string, canales: CanalFicha[]): DispositivoFicha => ({
   id: id(n), id_fisico: `dev-000${n}`, nombre, estado: 'activo', via: 'mqtt', formato: 'senml', intervalo_esperado_s: 60,
-  visto_por_ultima_vez: '2026-10-12T14:59:30Z', en_linea: true, zona: 'Lab', sitio: 'Campus', zona_horaria: 'America/Santiago', sitio_codigo: 'uct',
+  visto_por_ultima_vez: '2026-10-12T14:59:30Z', en_linea: true, en_servicio_desde: '2026-01-01T00:00:00Z', espera_hasta: null, zona: 'Lab', sitio: 'Campus', zona_horaria: 'America/Santiago', sitio_codigo: 'uct',
   zona_id: 'z', creado_en: '2026-10-01T00:00:00Z', intervalo_observado_s: 60, canales,
 });
 const fichas: Record<string, DispositivoFicha> = {

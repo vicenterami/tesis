@@ -1,41 +1,63 @@
 import { describe, expect, it } from 'vitest';
 import { BadRequestException } from '@nestjs/common';
-import { SQL_ESTADO_VISUAL, TIPOS_ALERTA, alinear, codificarCursor, entrega, estadoVisual, filtroInventario, intervaloParaRango, leerCursor, patronBusqueda, porcentajeSalud, siguiente } from './tablero.js';
+import { readFileSync } from 'node:fs';
+import {
+  DatosEstado, ESTADOS_VISUALES, ORDEN_ATENCION, SQL_EN_LINEA, SQL_ESTADO_VISUAL, SQL_ORDEN_ATENCION, TIPOS_ALERTA, alinear, codificarCursor, entrega, estadoVisual,
+  filtroInventario, intervaloParaRango, leerCursor, patronBusqueda, porcentajeSalud, siguiente,
+} from './tablero.js';
 import { INTERVALOS, SEGUNDOS_INTERVALO } from './validacion.js';
 import { MAX_ENTREGA_RESUMEN, diasRetencionTrama, entregasDelResumen } from './tablero.service.js';
 import { MAX_DIAS_SITIO, ventana } from './sitios.controller.js';
 
-// Estado visual en el servidor (docs/19 §2; docs/10 §8.4 punto 65 ii): los mismos cuatro casos y el orden entre filas que prueba
-// estadoVisual() del panel (panel/src/lib/estado-visual.test.ts). Dos implementaciones de una sola regla, probadas con los mismos casos.
-describe('estadoVisual (servidor): la primera regla que aplica manda', () => {
-  it('mantenimiento o baja → inactivo, aunque tenga condiciones abiertas o esté fuera de línea', () => {
-    expect(estadoVisual('mantenimiento', false, ['umbral'])).toBe('inactivo');
-    expect(estadoVisual('baja', true, [])).toBe('inactivo');
+// Estado visual en el servidor (docs/19 §2; docs/10 §8.4 punto 65 ii): LA tabla de casos del panel (panel/src/lib/estado-visual-casos.json),
+// la misma que prueba estadoVisual() del panel y que integracion/espera.ts corre contra SQL_ESTADO_VISUAL en una base real. Tres
+// implementaciones de una sola regla, con los mismos casos: un caso nuevo se agrega una vez y lo prueban las tres.
+interface CasoEstado {
+  nombre: string; estado: string; visto_hace_s: number | null; en_servicio_hace_s: number; espera_h: number; intervalo_s: number;
+  abiertas: string[]; esperado: string;
+}
+const TABLA = JSON.parse(readFileSync(new URL('../../panel/src/lib/estado-visual-casos.json', import.meta.url), 'utf8')) as { ahora: string; casos: CasoEstado[] };
+function datosDelCaso(c: CasoEstado, ahora: Date): DatosEstado {
+  const antes = (s: number): string => new Date(ahora.getTime() - s * 1000).toISOString();
+  const enServicio = antes(c.en_servicio_hace_s);
+  return {
+    estado: c.estado, visto_por_ultima_vez: c.visto_hace_s === null ? null : antes(c.visto_hace_s), intervalo_esperado_s: c.intervalo_s,
+    en_servicio_desde: enServicio, espera_hasta: c.visto_hace_s === null ? new Date(Date.parse(enServicio) + c.espera_h * 3_600_000).toISOString() : null,
+  };
+}
+describe('estadoVisual (servidor): la tabla de casos de docs/19 §2', () => {
+  const ahora = new Date(TABLA.ahora);
+  it('la tabla tiene casos de los cinco estados y de cada fila de docs/19 §2', () => {
+    expect(TABLA.casos.length).toBeGreaterThanOrEqual(20);
+    expect(new Set(TABLA.casos.map((c) => c.esperado))).toEqual(new Set(ESTADOS_VISUALES));
   });
-  it('sin_comunicacion abierta, o fuera de línea → sin_senal, antes que alerta', () => {
-    expect(estadoVisual('activo', true, ['sin_comunicacion', 'umbral'])).toBe('sin_senal');
-    expect(estadoVisual('activo', false, [])).toBe('sin_senal');
-  });
-  it('umbral, bateria, manipulacion, tope_superado o reloj_desviado abiertas, en línea → alerta', () => {
-    for (const t of ['umbral', 'bateria', 'manipulacion', 'tope_superado', 'reloj_desviado']) expect(estadoVisual('activo', true, [t])).toBe('alerta');
-  });
-  it('activo, en línea y sin condiciones → normal; sin tramas aún (null) también', () => {
-    expect(estadoVisual('activo', true, [])).toBe('normal');
-    expect(estadoVisual('activo', null, [])).toBe('normal');
-  });
+  for (const c of TABLA.casos) {
+    it(`${c.nombre} → ${c.esperado}`, () => expect(estadoVisual(datosDelCaso(c, ahora), c.abiertas, ahora)).toBe(c.esperado));
+  }
   it('la versión SQL tiene las mismas ramas en el mismo orden, y `en_linea` nulo no cuenta como fuera de línea (IS FALSE)', () => {
     const sql = SQL_ESTADO_VISUAL.replace(/\s+/g, ' ');
-    const orden = ["THEN 'inactivo'", "THEN 'sin_senal'", "THEN 'alerta'", "ELSE 'normal'"].map((x) => sql.indexOf(x));
+    const orden = ["THEN 'inactivo'", "cv.tipo = 'sin_comunicacion') THEN 'sin_senal'", "THEN 'esperando' ELSE 'sin_senal'", ") IS FALSE THEN 'sin_senal'", "THEN 'alerta'", "ELSE 'normal'"].map((x) => sql.indexOf(x));
     expect(orden.every((p, i) => p > 0 && (i === 0 || p > orden[i - 1]))).toBe(true);
     expect(sql).toContain("WHEN d.estado <> 'activo' THEN 'inactivo'");
-    expect(sql).toContain("cv.tipo = 'sin_comunicacion'");
-    expect(sql).toContain(') IS FALSE THEN');
+    expect(sql).toContain('WHEN e.visto_por_ultima_vez IS NULL THEN CASE WHEN now() <');
     // «alerta» enumera los cinco tipos, como el panel (TIPOS_DE_ALERTA en panel/src/lib/estado-visual.ts), no «cualquier otra condición».
     expect(sql).toContain("cv.tipo IN ('umbral', 'bateria', 'manipulacion', 'tope_superado', 'reloj_desviado')) THEN 'alerta'");
+    // GREATEST ignora los nulos: sin la guarda, un equipo sin tramas saldría en línea por su en_servicio_desde.
+    expect(SQL_EN_LINEA.replace(/\s+/g, ' ')).toContain('CASE WHEN e.visto_por_ultima_vez IS NULL THEN NULL ELSE greatest(e.visto_por_ultima_vez, d.en_servicio_desde)');
   });
-  it('un tipo que no es de la lista no pone en alerta (en ninguna de las dos versiones)', () => {
+  it('un tipo que no es de la lista no pone en alerta (en ninguna de las implementaciones)', () => {
     expect([...TIPOS_ALERTA]).toEqual(['umbral', 'bateria', 'manipulacion', 'tope_superado', 'reloj_desviado']);
-    expect(estadoVisual('activo', true, ['tipo_futuro'])).toBe('normal');
+    const enLinea = TABLA.casos.find((c) => c.esperado === 'normal' && c.visto_hace_s === 60);
+    expect(enLinea).toBeDefined();
+    expect(estadoVisual(datosDelCaso(enLinea!, ahora), ['tipo_futuro'], ahora)).toBe('normal');
+  });
+  it('sin `espera_hasta` (no debería pasar: la API lo trae siempre que no hay tramas), quien nunca envió no queda «esperando» para siempre', () => {
+    const c = datosDelCaso(TABLA.casos.find((x) => x.esperado === 'esperando')!, ahora);
+    expect(estadoVisual({ ...c, espera_hasta: null }, [], ahora)).toBe('sin_senal');
+  });
+  it('el orden de atención (docs/19 §4, P2): sin señal, alerta, normal, esperando, inactivo; el SQL de orden=atencion sale de él', () => {
+    expect([...ORDEN_ATENCION]).toEqual(['sin_senal', 'alerta', 'normal', 'esperando', 'inactivo']);
+    expect(SQL_ORDEN_ATENCION('x')).toBe("CASE x WHEN 'sin_senal' THEN 0 WHEN 'alerta' THEN 1 WHEN 'normal' THEN 2 WHEN 'esperando' THEN 3 WHEN 'inactivo' THEN 4 ELSE 5 END");
   });
 });
 
@@ -128,7 +150,7 @@ describe('alinear e intervaloParaRango (históricos del tablero)', () => {
 describe('entregasDelResumen', () => {
   const ahora = new Date('2026-11-11T12:00:00Z');
   const dias = (n: number): Date => new Date(ahora.getTime() - n * 86_400_000);
-  const base = (i: number, recibidas: number) => ({ id: `d${i}`, nombre: `nodo ${String(i).padStart(3, '0')}`, recibidas, creado_en: dias(400).toISOString(), intervalo_esperado_s: 3600 });
+  const base = (i: number, recibidas: number, esperando = false) => ({ id: `d${i}`, nombre: `nodo ${String(i).padStart(3, '0')}`, recibidas, en_servicio_desde: dias(400).toISOString(), intervalo_esperado_s: 3600, esperando });
   it('ventana de hace 60 a hace 45 días, con 30 de retención: fuera de la retención → porcentaje nulo, no 0 %', () => {
     const r = entregasDelResumen([base(1, 0)], dias(60), dias(45), ahora, 30);
     expect(r.entrega[0]?.porcentaje).toBeNull();
@@ -138,6 +160,15 @@ describe('entregasDelResumen', () => {
   });
   it('dentro de la retención y sin tramas → 0 % (se esperaban y no llegó ninguna)', () => {
     expect(entregasDelResumen([base(1, 0)], dias(1), ahora, ahora, 30).entrega[0]?.porcentaje).toBe(0);
+  });
+  it('quien espera su primera trama (docs/19 §2): entrega nula, no 0 %, y cuenta en total_activos', () => {
+    const r = entregasDelResumen([base(1, 0, true), base(2, 0)], dias(1), ahora, ahora, 30);
+    expect(r.entrega.map((x) => [x.id, x.porcentaje])).toEqual([['d2', 0], ['d1', null]]);
+    expect(r.total_activos).toBe(2);
+  });
+  it('las esperadas se cuentan desde en_servicio_desde: vuelto a servicio hace 6 h con 3 tramas de 1 h → 50 %, no 12,5 %', () => {
+    const x = { ...base(1, 3), en_servicio_desde: new Date(ahora.getTime() - 6 * 3_600_000).toISOString() };
+    expect(entregasDelResumen([x], dias(1), ahora, ahora, 30).entrega[0]).toMatchObject({ esperadas: 6, porcentaje: 50 });
   });
   it(`120 activos → los ${MAX_ENTREGA_RESUMEN} peores, de peor a mejor, y total_activos 120`, () => {
     const r = entregasDelResumen(Array.from({ length: 120 }, (_, i) => base(i, i % 25)), dias(1), ahora, ahora, 30);

@@ -95,6 +95,7 @@ erDiagram
         text formato FK
         uuid pasarela_id FK
         text decodificador
+        timestamptz en_servicio_desde
     }
     dispositivo_zona {
         uuid dispositivo_id PK,FK
@@ -229,6 +230,7 @@ erDiagram
         text codigo
         smallint enlaces_publicos_max
         smallint publico_minimo_dispositivos
+        int espera_primera_trama_h
     }
     trama {
         uuid id PK

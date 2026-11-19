@@ -12,7 +12,7 @@
   import { descargar, esCancelacion, mensajeError, obtener, obtenerPagina, ultimaGana } from './lib/api';
   import { avisoDeError, type DatosAviso } from './lib/avisos';
   import { puedeEn, type Sesion } from './lib/sesion';
-  import { canalCallado, enLinea, estadoVisual, ROTULO, rotuloCondicion } from './lib/estado-visual';
+  import { canalCallado, estadoVisual, ROTULO, rotuloCondicion } from './lib/estado-visual';
   import { RANGO_POR_DEFECTO, agregarLectura, decimalesParaRecorrido, formatearValor, rango as datosRango, rangoQueContiene, resolucion, resolucionMasFina, resolucionParaVentana, resolucionValida, resumenRango, rotuloIntervalo, seriesDesdeHistorico, urlHistorico, ventana, ventanaDeSeleccion, type ClaveRango, type ClaveResolucion, type Series } from './lib/grafico';
   import type { Condicion, DispositivoFicha, EventoDispositivo, EventoVivo, Historico, HistoricoDispositivo, TramaRechazada } from './lib/modelo';
   import { coloresSeries, temaVivo } from './lib/tema';
@@ -94,7 +94,7 @@
   const abiertas = $derived(condiciones.filter((c) => c.cerrada_en === null));
   const ordenadas = $derived([...abiertas, ...condiciones.filter((c) => c.cerrada_en !== null)]);
   const estado = $derived(
-    d === null ? null : estadoVisual({ estado: d.estado, en_linea: enLinea(d.visto_por_ultima_vez, d.intervalo_esperado_s, ahora) }, abiertas.map((c) => c.tipo)),
+    d === null ? null : estadoVisual(d, abiertas.map((c) => c.tipo), ahora),
   );
   const canalActual = $derived(d?.canales.find((c) => c.id === canalElegido) ?? null);
   const canalMostrado = $derived(mostrada === null ? null : (d?.canales.find((c) => c.id === mostrada!.canal) ?? null));
@@ -520,6 +520,17 @@
       <p class="aviso" data-callados>{callados.size === 1 ? '1 canal callado' : `${callados.size} canales callados`}: el equipo reporta, pero sin lecturas de esa magnitud dentro de 2 × su intervalo esperado</p>
     {/if}
     <div class="zona-sitio"><ZonaSitio zona={d.zona_horaria} /></div>
+    {#if estado === 'esperando' && d.espera_hasta !== null}
+      <!-- docs/19 §2 y §4, P: desde cuándo espera y cuándo pasaría a «Sin señal», en la zona del sitio (el UTC al pasar el cursor) -->
+      <p class="vivo" data-espera>
+        Esperando primera trama desde el <span title={horaLocal(d.en_servicio_desde, d.zona_horaria)}>{fechaHora(d.en_servicio_desde, d.zona_horaria)}</span>
+        (pasa a «Sin señal» el <span title={horaLocal(d.espera_hasta, d.zona_horaria)}>{fechaHora(d.espera_hasta, d.zona_horaria)}</span>)
+      </p>
+    {:else if d.estado === 'activo' && d.visto_por_ultima_vez === null && d.espera_hasta !== null}
+      <p class="vivo" data-espera-vencida>
+        Nunca envió una trama: el plazo de su primera trama venció el <span title={horaLocal(d.espera_hasta, d.zona_horaria)}>{fechaHora(d.espera_hasta, d.zona_horaria)}</span>
+      </p>
+    {/if}
     {#if relojDesviado !== null}
       <p class="error" role="status" data-reloj-desviado>
         Reloj de pasarela desviado: las mediciones se fechan al llegar · <span title={horaLocal(relojDesviado.abierta_en, d.zona_horaria)}>{haceCuanto(relojDesviado.abierta_en, ahora)}</span>
@@ -537,6 +548,7 @@
     <div><dt>Intervalo esperado</dt><dd>{duracion(d.intervalo_esperado_s)}</dd></div>
     <div><dt>Última trama</dt><dd title={d.visto_por_ultima_vez === null ? '' : horaLocal(d.visto_por_ultima_vez, d.zona_horaria)}>{haceCuanto(d.visto_por_ultima_vez, ahora)}</dd></div>
     <div><dt>Registrado</dt><dd title={horaLocal(d.creado_en, d.zona_horaria)}>{haceCuanto(d.creado_en, ahora)}</dd></div>
+    <div><dt>En servicio desde</dt><dd title={horaLocal(d.en_servicio_desde, d.zona_horaria)} data-en-servicio>{haceCuanto(d.en_servicio_desde, ahora)}</dd></div>
   </dl>
 
   <h3>Canales</h3>

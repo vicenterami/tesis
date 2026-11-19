@@ -207,7 +207,7 @@ describe('plantilla y magnitudes por perfil (docs/20 §6)', () => {
   });
   it('las magnitudes: cualquier sesión (la ruta no pide permiso propio), con código, nombre y unidad, ordenadas por código', async () => {
     const pool = { query: vi.fn((_texto: string) => Promise.resolve({ rows: [{ codigo: 'humedad', nombre: 'Humedad relativa', unidad: '%RH' }] })) };
-    const ctrl = new MagnitudesController(new AltaService(pool as unknown as Pool, {} as DynsecService));
+    const ctrl = new MagnitudesController(new AltaService(pool as unknown as Pool, {} as DynsecService, { publicar() {} } as never));
     expect(await ctrl.listar()).toEqual([{ codigo: 'humedad', nombre: 'Humedad relativa', unidad: '%RH' }]);
     expect(pool.query.mock.calls[0]?.[0]).toBe('SELECT codigo, nombre, unidad_canonica AS unidad FROM magnitud ORDER BY codigo');
     expect(ctrl.listar.length).toBe(0); // sin usuario: ninguna comprobación de perfil más allá de la sesión del guardia central
@@ -241,7 +241,7 @@ function conBaseFalsa() {
     }),
   };
   const dynsec = { disponible: true, ordenar: vi.fn(() => Promise.resolve([])) } as unknown as DynsecService;
-  const ctrl = new AltaController(new AltaService(pool as unknown as Pool, dynsec), {} as never, config, {} as never, {} as never);
+  const ctrl = new AltaController(new AltaService(pool as unknown as Pool, dynsec, { publicar() {} } as never), {} as never, config, {} as never, {} as never);
   return { ctrl, consultasPool, insertados };
 }
 

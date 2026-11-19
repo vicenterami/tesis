@@ -578,7 +578,7 @@
     },
     "/dispositivos": {
       "get": {
-        "description": "Cada dispositivo de los sitios del usuario con su sitio y zona (nombres, y `sitio_codigo` y `zona_id` para filtrar: los nombres pueden repetirse), zona horaria, canales, `en_linea` (última trama hace menos de 2 × intervalo esperado), número de condiciones abiertas, `estado_visual` (docs/19 §2: inactivo, sin_senal, alerta o normal) y `entrega` (% de tramas recibidas sobre las esperadas en las últimas 24 h, acotado a 100; nulo si no hay una trama esperada completa en la ventana). Filtros opcionales en el servidor (docs/19 §4, C) y, con `limite` o `desplazamiento`, una página; el total que cumple los filtros va en la cabecera `X-Total` (Etapa 4). Sin parámetros, la lista completa como antes. `entrega` usa siempre una ventana fija de 24 h (la del resumen del sitio es la del rango pedido); `orden=entrega` ordena de peor a mejor con los nulos al final; `orden=atencion`, por estado visual (sin señal, alerta, normal, inactivo) y nombre.",
+        "description": "Cada dispositivo de los sitios del usuario con su sitio y zona (nombres, y `sitio_codigo` y `zona_id` para filtrar: los nombres pueden repetirse), zona horaria, canales, `en_linea` (la más reciente entre la última trama y `en_servicio_desde`, hace menos de 2 × intervalo esperado; nulo sin tramas), `en_servicio_desde` (desde cuándo se espera que reporte: el alta o la última vuelta a activo), `espera_hasta` (hasta cuándo espera su primera trama: `en_servicio_desde` + la espera del sitio; nulo si ya envió alguna), número de condiciones abiertas, `estado_visual` (docs/19 §2: inactivo, sin_senal, alerta, esperando, normal) y `entrega` (% de tramas recibidas sobre las esperadas en las últimas 24 h, contadas desde `en_servicio_desde` si es posterior, acotado a 100; nulo si no hay una trama esperada completa en la ventana, si no está activo o si espera su primera trama). Filtros opcionales en el servidor (docs/19 §4, C) y, con `limite` o `desplazamiento`, una página; el total que cumple los filtros va en la cabecera `X-Total` (Etapa 4). Sin parámetros, la lista completa como antes. `entrega` usa siempre una ventana fija de 24 h (la del resumen del sitio es la del rango pedido); `orden=entrega` ordena de peor a mejor con los nulos al final; `orden=atencion`, por estado visual (sin_senal, alerta, normal, esperando, inactivo) y nombre.",
         "operationId": "DispositivosController_listar",
         "parameters": [
           {
@@ -599,7 +599,7 @@
             "name": "orden",
             "required": false,
             "in": "query",
-            "description": "nombre (por defecto: sitio, zona, nombre), entrega (de peor a mejor, nulos al final) o atencion (sin señal, alerta, normal, inactivo; dentro, por nombre)",
+            "description": "nombre (por defecto: sitio, zona, nombre), entrega (de peor a mejor, nulos al final) o atencion (sin_senal, alerta, normal, esperando, inactivo; dentro, por nombre)",
             "schema": {
               "enum": [
                 "nombre",
@@ -626,6 +626,7 @@
                 "inactivo",
                 "sin_senal",
                 "alerta",
+                "esperando",
                 "normal"
               ],
               "type": "string"
@@ -1006,7 +1007,7 @@
     },
     "/dispositivos/{id}": {
       "get": {
-        "description": "Canales con sus reglas de umbral y última medición, y condiciones abiertas. `intervalo_observado_s` (entero o null): mediana, en segundos, de las diferencias entre los instantes de recepción (truncados al segundo) de las últimas 20 tramas del dispositivo; null con menos de 3 instantes o sin tramas retenidas (RETENCION_TRAMA_DIAS, 30 días por defecto). Informa: la alarma de silencio usa `intervalo_esperado_s`. Por canal: `escala_cero` y `escala_cien` (calibración; null sin ella), `porcentaje` en la última medición, y `actualizado_en` (ISO 8601 UTC con microsegundos), el que se manda tal cual en `PATCH /canales/{id}` (bloqueo optimista).",
+        "description": "Canales con sus reglas de umbral y última medición, y condiciones abiertas. `en_linea`, `en_servicio_desde` y `espera_hasta`, como en el inventario (docs/19 §2). `intervalo_observado_s` (entero o null): mediana, en segundos, de las diferencias entre los instantes de recepción (truncados al segundo) de las últimas 20 tramas del dispositivo; null con menos de 3 instantes o sin tramas retenidas (RETENCION_TRAMA_DIAS, 30 días por defecto). Informa: la alarma de silencio usa `intervalo_esperado_s`. Por canal: `escala_cero` y `escala_cien` (calibración; null sin ella), `porcentaje` en la última medición, y `actualizado_en` (ISO 8601 UTC con microsegundos), el que se manda tal cual en `PATCH /canales/{id}` (bloqueo optimista).",
         "operationId": "DispositivosController_detalle",
         "parameters": [
           {
@@ -1558,7 +1559,7 @@
     },
     "/sitios/{id}/resumen": {
       "get": {
-        "description": "Una consulta por petición (docs/10 §8.4 punto 65 iii). `sitio`, `ventana{desde, hasta, intervalo}`, `dispositivos{total, normal, alerta, sin_senal, inactivo}` (estado visual de docs/19 §2), `salud{reportan, supervisados, porcentaje}` (en línea ÷ no inactivos), `condiciones_abiertas[{tipo, n}]`, `tramas{recibidas, rechazadas, cubos[{tiempo, recibidas, rechazadas}]}` (tiempo en segundos Unix, como `tiempos` de los históricos; cubos en la zona del sitio; los cubos sin datos no se emiten: no son 0), `atencion[{id, nombre, estado_visual, visto_por_ultima_vez, tipos}]` (hasta diez, sin señal primero), `magnitudes[{codigo, nombre, unidad, canales}]` y `entrega[{id, nombre, recibidas, esperadas, porcentaje}]`: los 50 dispositivos activos con peor entrega, de peor a mejor, y `total_activos`, cuántos hay (todos, en `GET /dispositivos?orden=entrega`). Porcentaje nulo si no hay una trama esperada completa en la ventana, contada desde su alta y dentro de la retención de tramas (medida desde ahora); 0 % si se esperaban y no llegó ninguna. Sin `intervalo`, el más fino que deja la ventana en 300 cubos o menos.",
+        "description": "Una consulta por petición (docs/10 §8.4 punto 65 iii). `sitio`, `ventana{desde, hasta, intervalo}`, `dispositivos{total, normal, alerta, sin_senal, esperando, inactivo}` (estado visual de docs/19 §2), `salud{reportan, supervisados, porcentaje}` (en línea ÷ supervisados: ni inactivos ni esperando su primera trama), `condiciones_abiertas[{tipo, n}]`, `tramas{recibidas, rechazadas, cubos[{tiempo, recibidas, rechazadas}]}` (tiempo en segundos Unix, como `tiempos` de los históricos; cubos en la zona del sitio; los cubos sin datos no se emiten: no son 0), `atencion[{id, nombre, estado_visual, visto_por_ultima_vez, tipos}]` (hasta diez, sin señal primero), `magnitudes[{codigo, nombre, unidad, canales}]` y `entrega[{id, nombre, recibidas, esperadas, porcentaje}]`: los 50 dispositivos activos con peor entrega, de peor a mejor, y `total_activos`, cuántos hay (todos, en `GET /dispositivos?orden=entrega`). Porcentaje nulo si no hay una trama esperada completa en la ventana, contada desde su entrada en servicio (`en_servicio_desde`) y dentro de la retención de tramas (medida desde ahora), y nulo para quien espera su primera trama; 0 % si se esperaban y no llegó ninguna. Sin `intervalo`, el más fino que deja la ventana en 300 cubos o menos.",
         "operationId": "SitiosController_resumen",
         "parameters": [
           {
@@ -1876,6 +1877,114 @@
           }
         ],
         "summary": "Actividad del sitio (Etapa 4; P14)",
+        "tags": [
+          "sitios"
+        ]
+      }
+    },
+    "/sitios/{id}/espera-primera-trama": {
+      "get": {
+        "description": "Cuántas horas espera el sitio la primera trama de un equipo desde que entró en servicio antes de darlo por «Sin señal» (docs/19 §2): `espera_primera_trama_h` (el que rige), `por_omision` (168), `minimo` y `maximo` (1 a 2160).",
+        "operationId": "SitiosController_leerEspera",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "UUID del sitio",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "El plazo del sitio"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "404": {
+            "description": "Sitio inexistente o de otro"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Plazo de la primera trama del sitio (Etapa 4)",
+        "tags": [
+          "sitios"
+        ]
+      },
+      "put": {
+        "description": "De 1 a 2160 horas. Lo fija quien administra el sitio (acción `ajustes`, docs/20 §6) y rige en el barrido siguiente del supervisor: alargarlo devuelve a «Esperando primera trama» a quien había vencido (y cierra su condición); acortarlo puede abrirla. Deja el evento `espera_primera_trama` con quién, el valor y el anterior (si no cambia nada, ninguno). Con `anterior` (el plazo que se leyó), si ya no es el que rige: 409 `codigo: espera_cambio` con `espera_primera_trama_h` (el que rige), sin cambiar nada.",
+        "operationId": "SitiosController_fijarEspera",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "UUID del sitio",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "espera_primera_trama_h"
+                ],
+                "properties": {
+                  "espera_primera_trama_h": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2160,
+                    "description": "Horas"
+                  },
+                  "anterior": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2160,
+                    "description": "El plazo que rige y que se leyó (GET …/espera-primera-trama): si cambió entretanto, 409 (bloqueo optimista)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "El plazo nuevo"
+          },
+          "400": {
+            "description": "Fuera de 1 a 2160, no entero, o un campo de más"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "403": {
+            "description": "Un perfil sin la acción «ajustes» (docs/20 §6), o sesión sin la cabecera X-Pedido: panel"
+          },
+          "404": {
+            "description": "Sitio inexistente o de otro"
+          },
+          "409": {
+            "description": "`codigo: espera_cambio`: el plazo cambió desde que se leyó (`anterior`); trae el que rige en `espera_primera_trama_h`"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Fijar el plazo de la primera trama del sitio (Etapa 4)",
         "tags": [
           "sitios"
         ]

@@ -11,7 +11,7 @@ import { CABECERA_CSV, FORMATOS, filaCsv, filaJson, formato, nombreDeArchivo, ra
 // Exportaciones simultáneas admitidas por proceso: cada una ocupa una conexión a la base durante toda la descarga.
 export const MAX_EXPORTACIONES = 2;
 import { CABECERA_X_SIGUIENTE, CABECERA_X_TOTAL, ISO_8601, INTERVALOS, MAX_CUBOS, MAX_DIAS_VENTANA, fecha, limite, uuid } from './validacion.js';
-import { ORDENES_INVENTARIO, filtroInventario, leerCursor, siguiente } from './tablero.js';
+import { ESTADOS_VISUALES, ORDENES_INVENTARIO, ORDEN_ATENCION, filtroInventario, leerCursor, siguiente } from './tablero.js';
 import { TableroService } from './tablero.service.js';
 import { ventana } from './sitios.controller.js';
 import { AlcanceService } from '../sesion/alcance.service.js';
@@ -46,19 +46,21 @@ export class DispositivosController {
     summary: 'Inventario de dispositivos con estado',
     description:
       'Cada dispositivo de los sitios del usuario con su sitio y zona (nombres, y `sitio_codigo` y `zona_id` para filtrar: los nombres pueden repetirse), zona ' +
-      'horaria, canales, `en_linea` (última trama hace menos de 2 × intervalo esperado), número de condiciones abiertas, `estado_visual` (docs/19 §2: ' +
-      'inactivo, sin_senal, alerta o normal) y `entrega` (% de tramas recibidas sobre las esperadas en las últimas 24 h, acotado a 100; nulo si no hay una ' +
-      'trama esperada completa en la ventana). Filtros opcionales en el servidor (docs/19 §4, C) y, con `limite` o `desplazamiento`, una página; el total ' +
+      'horaria, canales, `en_linea` (la más reciente entre la última trama y `en_servicio_desde`, hace menos de 2 × intervalo esperado; nulo sin ' +
+      'tramas), `en_servicio_desde` (desde cuándo se espera que reporte: el alta o la última vuelta a activo), `espera_hasta` (hasta cuándo espera su ' +
+      'primera trama: `en_servicio_desde` + la espera del sitio; nulo si ya envió alguna), número de condiciones abiertas, `estado_visual` (docs/19 §2: ' +
+      `${ESTADOS_VISUALES.join(', ')}) y \`entrega\` (% de tramas recibidas sobre las esperadas en las últimas 24 h, contadas desde \`en_servicio_desde\` si es ` +
+      'posterior, acotado a 100; nulo si no hay una trama esperada completa en la ventana, si no está activo o si espera su primera trama). Filtros opcionales en el servidor (docs/19 §4, C) y, con `limite` o `desplazamiento`, una página; el total ' +
       'que cumple los filtros va en la cabecera `X-Total` (Etapa 4). Sin parámetros, la lista completa como antes. `entrega` usa siempre una ventana fija de 24 h ' +
       '(la del resumen del sitio es la del rango pedido); `orden=entrega` ordena de peor a mejor con los nulos al final; `orden=atencion`, por estado visual ' +
-      '(sin señal, alerta, normal, inactivo) y nombre.',
+      `(${ORDEN_ATENCION.join(', ')}) y nombre.`,
   })
   @ApiQuery({ name: 'sitio', required: false, description: 'UUID del sitio' })
   @ApiQuery({ name: 'zona', required: false, description: 'UUID de la zona' })
   @ApiQuery({ name: 'via', required: false, enum: ['mqtt', 'http', 'lorawan'] })
-  @ApiQuery({ name: 'estado', required: false, enum: ['inactivo', 'sin_senal', 'alerta', 'normal'], description: 'Estado visual' })
+  @ApiQuery({ name: 'estado', required: false, enum: [...ESTADOS_VISUALES], description: 'Estado visual' })
   @ApiQuery({ name: 'q', required: false, description: 'Busca en id_fisico y nombre, sin distinguir mayúsculas (hasta 80 caracteres)' })
-  @ApiQuery({ name: 'orden', required: false, enum: ORDENES_INVENTARIO, description: 'nombre (por defecto: sitio, zona, nombre), entrega (de peor a mejor, nulos al final) o atencion (sin señal, alerta, normal, inactivo; dentro, por nombre)' })
+  @ApiQuery({ name: 'orden', required: false, enum: ORDENES_INVENTARIO, description: `nombre (por defecto: sitio, zona, nombre), entrega (de peor a mejor, nulos al final) o atencion (${ORDEN_ATENCION.join(', ')}; dentro, por nombre)` })
   @ApiQuery({ name: 'limite', required: false, description: '1–500; con desplazamiento y sin limite, 50' })
   @ApiQuery({ name: 'desplazamiento', required: false, description: 'Filas a saltar (0 por defecto)' })
   @ApiOkResponse({ description: 'Lista de dispositivos; cabecera X-Total con el total que cumple los filtros', headers: { ...CABECERA_X_TOTAL } })
@@ -130,7 +132,8 @@ export class DispositivosController {
   @ApiOperation({
     summary: 'Ficha de un dispositivo',
     description:
-      'Canales con sus reglas de umbral y última medición, y condiciones abiertas. `intervalo_observado_s` (entero o null): mediana, ' +
+      'Canales con sus reglas de umbral y última medición, y condiciones abiertas. `en_linea`, `en_servicio_desde` y `espera_hasta`, como en ' +
+      'el inventario (docs/19 §2). `intervalo_observado_s` (entero o null): mediana, ' +
       'en segundos, de las diferencias entre los instantes de recepción (truncados al segundo) de las últimas 20 tramas del ' +
       'dispositivo; null con menos de 3 instantes o sin tramas retenidas (RETENCION_TRAMA_DIAS, 30 días por defecto). Informa: la alarma de silencio ' +
       'usa `intervalo_esperado_s`. Por canal: `escala_cero` y `escala_cien` (calibración; null sin ella), `porcentaje` en la última ' +

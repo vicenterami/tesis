@@ -25,32 +25,51 @@
 | Toda hora se muestra en la zona del sitio, con el instante UTC disponible | `docs/13` | Cada hora visible lleva el UTC al pasar el cursor; la zona se lee de `zona_horaria` |
 | Utilizable desde un navegador móvil | RF-52 | Una columna en pantallas angostas; tablas con desplazamiento horizontal; gráficos al ancho disponible |
 
-## 2. Vocabulario visual: el estado de un dispositivo en cuatro valores
+## 2. Vocabulario visual: el estado de un dispositivo en cinco valores
 La referencia observada en una nube comercial (cuatro estados con conteo visible, la misma leyenda en la lista y en el resumen)
 es exactamente lo que piden RF-30, RF-47 y RF-48. Se adopta como **regla de presentación**, calculada en el servidor (en SQL, para filtrar y paginar, desde el 11/11/2026) y en el panel (para actualizar en vivo) a partir de
-campos que la API ya devuelve (`estado`, `en_linea`, `condiciones_abiertas` y el `tipo` de cada condición abierta). No cambia
-el modelo de datos.
+campos que la API ya devuelve (`estado`, `visto_por_ultima_vez`, `intervalo_esperado_s`, `en_servicio_desde`, `espera_hasta`, `condiciones_abiertas` y el `tipo` de cada condición abierta).
+**Quinto valor desde el 18/11/2026: «Esperando primera trama».** Hasta entonces un dispositivo dado de alta que nunca envió una trama se
+mostraba «Normal» y no alarmaba nunca: el supervisor compara contra la última trama, que no existía (en el servidor de prueba, dos equipos
+así figuraban «Normal» con entrega 0 %). Desde esa fecha espera su primera trama un plazo que fija cada sitio (`sitio.espera_primera_trama_h`,
+de 1 a 2 160 horas, 168 por omisión: un alta masiva suele ir días antes de instalar los equipos) contado desde que **entró en servicio**
+(`dispositivo.en_servicio_desde`: el alta, y cada vuelta a `activo` desde `mantenimiento`; migración 26); vencido el plazo, pasa a «Sin señal»
+y el supervisor abre la condición de falta de comunicación como a cualquier otro (RF-24; `docs/10 §4`).
 
 | Estado visual | Regla (en este orden; la primera que aplica manda) | Qué significa para quien mira |
 |---|---|---|
 | **Inactivo** | `estado` es `mantenimiento` o `baja` | Nadie espera datos de él; no genera alertas (RF-22) |
-| **Sin señal** | hay una condición `sin_comunicacion` abierta, o `en_linea` es falso | Dejó de reportar más allá de su intervalo esperado (RF-24) |
+| **Sin señal** | hay una condición `sin_comunicacion` abierta | El supervisor lo dio por callado (RF-24) |
+| **Esperando primera trama** | nunca envió una trama y aún no vence `en_servicio_desde` + la espera del sitio (`espera_hasta`) | Recién dado de alta o vuelto a servicio: todavía no se le exige reportar |
+| **Sin señal** | nunca envió una trama y ya venció `espera_hasta`; o ya envió, y el más reciente entre su última trama y `en_servicio_desde` es anterior a 2 × su intervalo esperado (`en_linea` falso) | Dejó de reportar más allá de su intervalo esperado, o nunca reportó dentro del plazo (RF-24) |
 | **Alerta** | hay una condición abierta de tipo `umbral`, `bateria`, `manipulacion`, `tope_superado` (manda más de lo que cabe en su hora, `docs/10 §8.4` punto 53) o `reloj_desviado` («Reloj de pasarela desviado»: los datos siguen entrando, pero fechados por la recepción, `docs/10 §8.4` punto 54) | Reporta, pero algo está fuera de lo normal |
 | **Normal** | ninguna de las anteriores | Reporta a tiempo y dentro de rango |
 
-`en_linea` lo trae la API, pero el panel lo recalcula con la misma regla (visto dentro de 2 × intervalo esperado) para que cambie
-con cada `visto` del canal en vivo y con el paso del tiempo sin volver a pedir el inventario; sin ninguna trama todavía es nulo y el
-dispositivo se muestra **Normal** hasta la primera.
+Los bordes: el plazo vence en el instante `espera_hasta` exacto (desde ahí, «Sin señal»); una trama vista exactamente 2 × intervalo atrás
+todavía está en línea. `en_linea` lo trae la API, pero el panel lo recalcula con la misma regla (el más reciente entre `visto` y
+`en_servicio_desde`, dentro de 2 × intervalo esperado) para que cambie con cada `visto` del canal en vivo y con el paso del tiempo sin volver
+a pedir el inventario; sin ninguna trama todavía es nulo (ni en línea ni fuera de línea) y manda la espera. Contar desde
+`en_servicio_desde` evita la falsa alarma de quien vuelve de mantenimiento con su última trama vieja: se le da otra vez un intervalo
+completo, como a uno recién instalado. `espera_hasta` lo calcula la API (`en_servicio_desde` + la espera del sitio) y es nulo si el
+equipo ya envió alguna trama. Cambiar un equipo de zona o de sitio **no** reinicia su plazo: cuenta desde que entró en servicio, no desde dónde
+está, así que mudarlo no le da más tiempo ni se lo quita (el plazo que rige es el del sitio donde esté en ese momento). Pasar un equipo a
+mantenimiento cierra las condiciones que tuviera abiertas, de cualquier tipo, con su evento (`por: mantenimiento`) y su aviso en vivo, y
+mientras siga en mantenimiento no se le abre ninguna, aunque envíe tramas (el barrido cierra las que ya existían): quien está inactivo no genera alertas (RF-22) y el resumen no puede contar una falta de
+comunicación con cero equipos en «Sin señal». Quien espera **no es supervisado todavía**: no cuenta en la salud del sitio (§4, B2) ni en «Ahora», su
+entrega es nula («—», no «0 %») y va en el orden de atención después de Normal y antes de Inactivo (no requiere acción).
 
-El estado nunca se comunica solo por color: lleva su palabra al lado (accesibilidad, y porque los colores se imprimen mal). La
-función que lo calcula es una sola, con prueba unitaria por cada fila de la tabla y por el orden entre filas.
+El estado nunca se comunica solo por color: lleva su palabra al lado (accesibilidad, y porque los colores se imprimen mal); «Esperando
+primera trama» lleva además un icono de reloj y un tono informativo (el de la píldora de navegación, `--pildora`), distinto del gris de
+Inactivo, sin colores nuevos. La función que lo calcula es una sola, con prueba unitaria por cada fila de la tabla y por el orden entre
+filas; desde el 18/11/2026 las dos implementaciones (la del servidor, en TypeScript y en SQL, y la del panel) se prueban con **la misma
+tabla de casos**, un archivo del panel que leen las tres (`panel/src/lib/estado-visual-casos.json`).
 
 ## 3. Mapa de pantallas
 | # | Pantalla | Qué muestra | Acciones | Datos (ruta real o propuesta) | Requisitos | Cuándo |
 |---|---|---|---|---|---|---|
 | P1 | **Resumen del sitio (tablero)** | En tres pestañas desde el 13/11/2026 (§4, bloque L): **Resumen** (conteo por estado visual, salud del sitio, «Ahora» por magnitud y por dispositivo, «Requiere atención» y condiciones abiertas por tipo), **Tendencias** (una gráfica por magnitud) y **Red** (tramas recibidas y rechazadas, y entrega por dispositivo); rediseñado en la Etapa 4 después de una comparativa de referentes y de WCAG 2.2 (§4). El estado del servicio pasó a «Legal y acerca de» (L1d) | Ir a cada lista filtrada; cambiar de pestaña y, en Tendencias y Red, de rango; pausar; abrir P3b desde una magnitud | `GET /sitios`, `GET /sitios/{id}/resumen`, `GET /sitios/{id}/ahora`, `GET /sitios/{id}/historico` (Etapa 4), diseños del 11/11/2026 (§4 tablero v2) y del 13/11/2026 (bloque L) | RF-30, HU-15, HU-16, HU-07, TT-44 | Etapa 4 (`docs/04`); los conteos por estado ya aparecen en P2 desde la Etapa 3; diseñado el 11/11/2026 y el 13/11/2026, iteración 1 |
 | P2 | **Inventario** | Tabla: estado visual, nombre, identificador físico, vía, zona, última trama (hace cuánto), condiciones abiertas; filtros por estado, sitio (si hay más de uno), zona y vía con conteo | Abrir la ficha; filtrar; buscar por nombre o identificador | `GET /dispositivos` y `GET /condiciones?abiertas=true&limite=500` (el tipo de cada condición abierta decide el estado, §2; desde el 11/11/2026 la API filtra, ordena y pagina, y el panel recalcula en vivo) | Semáforo y tabla: RF-47, RF-48, HU-10, HU-19. Filtros y búsqueda: RF-51, HU-20 (adelantada a la Etapa 3 el 12/10) | Etapa 3, tramo 2 |
-| P3 | **Ficha del dispositivo** | Identidad (nombre, identificador, vía, formato, zona, sitio, intervalo esperado, desde cuándo); estado visual; por canal: última lectura con unidad y, si el canal tiene calibración, su porcentaje (`docs/10 §8.4` punto 51), y reglas de umbral; gráfico histórico por canal (rango elegible; la agregación la fija el rango) que sigue en vivo; condiciones abiertas y cerradas del dispositivo; sus tramas rechazadas | Cambiar canal y rango (el intervalo lo fija cada rango); pausar el vivo; ir a configurar (P6) o a mudar (Etapa 4) | `GET /dispositivos/{id}`, `GET /canales/{id}/historico?desde&hasta&intervalo`, `GET /eventos?dispositivo=`, `GET /condiciones?dispositivo=&abiertas=true&limite=500` (todas las abiertas) más `?dispositivo=&limite=50` (las recientes), `GET /cuarentena?dispositivo=&limite=20` | RF-33, RF-49 (identidad, condiciones y serie; su «historial de eventos» queda con la Etapa 4), HU-21 (adelantada a la Etapa 3 el 12/10, con sus 7 h); el rango a medida por fechas es HU-07 (Etapa 4) | Etapa 3, tramo 3 |
+| P3 | **Ficha del dispositivo** | Identidad (nombre, identificador, vía, formato, zona, sitio, intervalo esperado, desde cuándo); estado visual (si espera su primera trama, desde cuándo y cuándo pasaría a «Sin señal», §2); por canal: última lectura con unidad y, si el canal tiene calibración, su porcentaje (`docs/10 §8.4` punto 51), y reglas de umbral; gráfico histórico por canal (rango elegible; la agregación la fija el rango) que sigue en vivo; condiciones abiertas y cerradas del dispositivo; sus tramas rechazadas | Cambiar canal y rango (el intervalo lo fija cada rango); pausar el vivo; ir a configurar (P6) o a mudar (Etapa 4) | `GET /dispositivos/{id}`, `GET /canales/{id}/historico?desde&hasta&intervalo`, `GET /eventos?dispositivo=`, `GET /condiciones?dispositivo=&abiertas=true&limite=500` (todas las abiertas) más `?dispositivo=&limite=50` (las recientes), `GET /cuarentena?dispositivo=&limite=20` | RF-33, RF-49 (identidad, condiciones y serie; su «historial de eventos» queda con la Etapa 4), HU-21 (adelantada a la Etapa 3 el 12/10, con sus 7 h); el rango a medida por fechas es HU-07 (Etapa 4) | Etapa 3, tramo 3 |
 | P3b | **Comparar dispositivos** (`#/comparar`; incremento 2) | La misma magnitud de 2 a 6 dispositivos en un gráfico de historia (promedios por cubo; misma ventana y resolución que P3) y, debajo, la tabla en tiempo real con la última lectura, hace cuánto y el estado de cada uno; selector de magnitud; entradas desde las casillas de P2 y el enlace de P3 | Abrir la ficha de cada dispositivo; volver al inventario con las casillas marcadas | `GET /dispositivos/{id}` por dispositivo, `GET /canales/{id}/historico`, `GET /condiciones?abiertas`, `GET /eventos` | — | — |
 | P4 | **Condiciones** | Lista con tipo, dispositivo, magnitud y umbral, abierta en, duración; filtro abiertas / todas; al cerrarse, el resumen del episodio, y el reconocimiento con su clasificación (`docs/10 §8.4` punto 49) | Abrir la ficha del dispositivo | `GET /condiciones?abiertas&limite` | HU-05, RF-24 | Etapa 4 (lista sobre lo que la API ya devuelve) |
 | P5 | **Cuarentena** | Últimas tramas rechazadas: cuándo, por qué (`no_registrado`, `dado_de_baja`, `malformada`, `invalida`), detalle, dispositivo si se conoce, la trama cruda plegada | Copiar la trama; ir al alta si el motivo es `no_registrado` | `GET /cuarentena?limite` | RF-11 a RF-13 | Etapa 4 (lista sobre lo que la API ya devuelve) |
@@ -69,10 +88,10 @@ dispersos), informes programados y disparadores con varias condiciones (más que
 para después de la Etapa 4 si sobra tiempo), compartir dispositivos entre cuentas (lo cubren los roles por sitio).
 
 ## 4. Las pantallas en detalle, en el orden en que se construyen
-**P2 Inventario con semáforo (tramo 2, Etapa 3; es HU-19).** Es la pantalla de entrada mientras no exista P1. Arriba, cuatro fichas con el conteo por estado
+**P2 Inventario con semáforo (tramo 2, Etapa 3; es HU-19).** Es la pantalla de entrada mientras no exista P1. Arriba, una ficha por estado visual (cinco desde el 18/11/2026, §2) con el conteo por estado
 visual, que al pulsarlas filtran la tabla (misma leyenda que en P1 y P3). Columnas: estado visual, nombre, identificador físico,
 vía, zona, última trama como «hace 3 min» con la hora exacta al pasar el cursor, condiciones abiertas. Orden por defecto: los
-que requieren atención primero (Sin señal, Alerta, luego Normal, luego Inactivo), y dentro de cada grupo por nombre. Filtros
+que requieren atención primero (Sin señal, Alerta, luego Normal, luego Esperando primera trama, luego Inactivo), y dentro de cada grupo por nombre. Filtros
 por zona y vía con conteo y búsqueda por texto: HU-20, en el mismo tramo (adelantada el 12/10). **Varios sitios (16/10):** si el
 inventario trae más de uno, aparece el filtro por sitio y la columna Sitio; la zona se elige dentro del sitio elegido. Se filtra por
 el código del sitio (único) y el id de la zona, nunca por el nombre: dos sedes pueden tener una zona con el mismo nombre. Con un solo
@@ -258,7 +277,7 @@ hoy no hace falta). El estado del servicio muestra `GET /salud` y si el canal en
 escrita de cómo resuelven el tablero ThingsBoard CE, OpenRemote, Magistrala y Milesight IoT Cloud (zoom y rango, varias series, agregados,
 lectura en pantallas angostas) y de lo que pide WCAG 2.2 (contraste, foco visible, tamaño de los objetivos táctiles, información que no
 depende solo del color), **cada afirmación con su cita de la fuente oficial**; lo que una fuente no declara se escribe «no declarado», no
-como ausencia (la misma regla del incremento 1). Con eso: el tablero del sitio (los cuatro conteos de §2, condiciones abiertas, salud del
+como ausencia (la misma regla del incremento 1). Con eso: el tablero del sitio (los conteos de §2, condiciones abiertas, salud del
 sitio de HU-16) y gráficas que admiten zoom por arrastre y vuelta atrás, varias series con su leyenda informativa (incremento 2, punto 1),
 agregados con su nombre («promedio por hora») y un ancho que se adapta del teléfono al escritorio; probado en teléfono con capturas.
 **Comparativa hecha el 11/11/2026: `docs/22`** (siete referentes, incluido Grafana, que dibuja con uPlot como este panel; 31 filas
@@ -305,7 +324,7 @@ referentes, y las reglas de visualización de §6 (colores validados, un solo ej
    menú se pliega tras un botón «Menú» con texto (nunca solo un icono). El pie «Legal y acerca de» (P11) va en todas las pantallas. La
    pantalla de llegada tras entrar es el tablero (P1), no el inventario.
 2. **Tokens de diseño en `app.css`** ✅ panel, 11/11/2026; y ningún color escrito suelto en un componente: superficie y superficie elevada, texto primario y
-   secundario, borde, acento (`#0b3954`, el de hoy), los cuatro estados (los de hoy: todos entre 6,6:1 y 8:1 de contraste, medidos el
+   secundario, borde, acento (`#0b3954`, el de hoy), los estados de §2 (los cuatro de entonces: todos entre 6,6:1 y 8:1 de contraste, medidos el
    11/11/2026), los seis colores de series (punto 3), espaciado en pasos de 4 px (4, 8, 12, 16, 24, 32), escala tipográfica (0,8 · 0,9 ·
    1 · 1,15 · 1,4 · 2 rem, `system-ui`: la CSP no admite fuentes externas), números tabulares (`font-variant-numeric: tabular-nums`) en
    tarjetas y tablas, radios de 6 y 10 px, sombra suave solo en tarjetas elevadas y el foco visible de 3 px que ya existe. **Tema claro y
@@ -320,7 +339,7 @@ referentes, y las reglas de visualización de §6 (colores validados, un solo ej
    `#1f8fc9` (pasan las seis; la pareja rosa–celeste queda en 7,6 para daltonismo, admisible solo con leyenda y tabla, que se exigen
    igual). El orden es parte de la validación: cambiarlo exige volver a validar. En la ficha, «promedio» pasa al azul de la paleta y
    «lectura actual» al naranja: el azul oscuro y el rojo de hoy no pasan (luminosidad y croma fuera de banda). Nunca dos ejes verticales
-   en un gráfico: dos magnitudes distintas son dos gráficos alineados en el tiempo. Series de estado (los cuatro colores de §2) nunca se
+   en un gráfico: dos magnitudes distintas son dos gráficos alineados en el tiempo. Series de estado (los colores de §2) nunca se
    reutilizan como series de datos. **Excepción explícita a WCAG 1.4.11 (decidido al implementar, 11/11/2026):** medidos contra la
    superficie del gráfico del tema claro (`#ffffff`), amarillo `#e69f00` da 2,25:1, celeste `#56b4e9` 2,31:1 y rosa `#cc79a7` 3,06:1; el
    rosa sí llega a 3:1, así que la excepción cubre solo amarillo y celeste, y se acepta porque toda gráfica con varias series lleva leyenda
@@ -339,9 +358,9 @@ referentes, y las reglas de visualización de §6 (colores validados, un solo ej
 1. **Una sola fila de filtros** *(desde L2: la fila del rango va en las pestañas Tendencias y Red; el Resumen no la lleva)* ✅ panel, 11/11/2026 (el sitio, en la cabecera) (regla de los tableros de monitoreo: los filtros arriba y alcanzan a todo lo que está debajo): sitio (si
    hay varios), rango temporal (última hora, 24 h, 7 días, 30 días y **a medida**, con fecha y hora de inicio y fin: HU-07) y el aviso de
    zona horaria. El rango va en la URL (`#/?sitio=&rango=7d`, o `&desde=&hasta=` en ISO), como toda vista.
-2. **Fila de indicadores** *(desde L2a, la ficha entera es el enlace y «Tramas» va en la misma franja)* ✅ panel, 11/11/2026; ✅ backend, 11/11/2026 (los cuatro estados de §2 más el total; «en línea», en la tarjeta de salud) (tarjetas de valor, no gráficos de una barra): Dispositivos (total) · Normal · Alerta · Sin señal ·
-   Inactivos (los cuatro suman el total; «en línea» va en la tarjeta de salud), cada una un botón que abre el inventario filtrado (como hoy las fichas de conteo); **Salud del sitio** = en línea ÷ (total
-   − inactivos), en porcentaje con un medidor de una sola rampa y en texto («14 de 16 reportan»), que es el indicador agregado de RF-30;
+2. **Fila de indicadores** *(desde L2a, la ficha entera es el enlace y «Tramas» va en la misma franja)* ✅ panel, 11/11/2026; ✅ backend, 11/11/2026 (los estados de §2 más el total; «en línea», en la tarjeta de salud) (tarjetas de valor, no gráficos de una barra): Dispositivos (total) · Normal · Alerta · Sin señal ·
+   Esperando primera trama (desde el 18/11/2026) · Inactivos (todos suman el total; «en línea» va en la tarjeta de salud), cada una un botón que abre el inventario filtrado (como hoy las fichas de conteo); **Salud del sitio** = en línea ÷ (total
+   − inactivos − los que esperan su primera trama, que aún no se supervisan: §2), en porcentaje con un medidor de una sola rampa y en texto («14 de 16 reportan»), que es el indicador agregado de RF-30;
    condiciones abiertas por tipo (barras horizontales ordenadas, un solo matiz) y las tramas del rango, recibidas y rechazadas. Todo sale
    de una sola respuesta, `GET /sitios/{id}/resumen` (Etapa 4), y cambia en vivo con los eventos del canal (F3) sin repedir el resumen por cada
    evento (antirrebote de §6).
@@ -461,7 +480,7 @@ mis datos» (JSON por `descargar`) y «Darme de baja» (`docs/20 §11`).
 | `GET /sitios/{id}/historico?magnitud&desde&hasta&intervalo` | por cubo: promedio, mínimo, máximo, lecturas y n de todos los canales de esa magnitud del sitio (desde el bloque M: promedio y banda **entre dispositivos**, cada uno con su lectura propia o vigente; `n`, los que aportan); 5 000 cubos y **31 días** (lee todos los canales de la magnitud: 30 días de 120 canales cada 300 s tardan ≈ 1,1 s, `docs/16 §61`; más largo, por canal o exportación) y, desde M5, 5 s de tiempo máximo de la consulta (si no, 503) | consulta o más (Etapa 4) |
 | `GET /canales/{id}/historico` | además del promedio, mínimo y máximo por cubo (campos nuevos) | como hoy |
 | `GET /dispositivos/{id}/historico?desde&hasta&intervalo` | todos los canales del dispositivo en una respuesta, alineados por cubo | consulta o más (Etapa 4) |
-| `GET /dispositivos` | filtros `sitio, zona, via, estado, q` (`sitio` y `zona` son ids; el panel traduce el código de su URL con `GET /sitios`), `orden` (`nombre` por defecto, `entrega` de peor a mejor con los nulos al final, o `atencion`: sin señal, alerta, normal, inactivo y dentro por nombre) y paginación `limite, desplazamiento`; `estado_visual` y `entrega` (sobre las últimas 24 h; nulo si el dispositivo no está activo o si en la ventana no cabe una trama esperada completa; 0 % si esperaba y no llegó nada) por fila; total en `X-Total` | como hoy |
+| `GET /dispositivos` | filtros `sitio, zona, via, estado, q` (`sitio` y `zona` son ids; el panel traduce el código de su URL con `GET /sitios`), `orden` (`nombre` por defecto, `entrega` de peor a mejor con los nulos al final, o `atencion`: sin señal, alerta, normal, esperando, inactivo y dentro por nombre) y paginación `limite, desplazamiento`; `estado_visual` y `entrega` (sobre las últimas 24 h; nulo si el dispositivo no está activo, si espera su primera trama o si en la ventana no cabe una trama esperada completa; 0 % si esperaba y no llegó nada) por fila; total en `X-Total` | como hoy |
 | `GET /dispositivos/{id}/eventos?desde&hasta&cursor` · `GET /condiciones` · `GET /cuarentena` · `GET /sitios/{id}/actividad` | keyset (`docs/10 §8.4` punto 58): el cursor de la página siguiente en la cabecera `X-Siguiente`; el cuerpo sigue siendo la lista; `GET /condiciones` admite además `desde` y `hasta` (las franjas del gráfico de la ficha; con 500 filas el panel avisa que muestra las más recientes) | según la ruta (Etapa 4) |
 | `GET /cuarentena/detectados?sitio` | emisores no registrados de los últimos 7 días: identificador o tópico, cuántas tramas, última | administrador de sitio hoy; operador técnico cuando exista el perfil (Etapa 4) |
 | `PATCH /dispositivos/{id}` | nombre, estado, intervalo esperado, zona; `actualizado_en` obligatorio; 409 si cambió | administrador de sitio hoy; operador técnico cuando exista el perfil (Etapa 4) |
@@ -474,7 +493,7 @@ mis datos» (JSON por `descargar`) y «Darme de baja» (`docs/20 §11`).
 Compatibilidad: ninguna respuesta cambia de forma (los totales y los cursores van en cabeceras; los campos nuevos se suman); el OpenAPI se
 regenera y el paso 4b del guardián suma una fila por ruta y perfil. **Campos** (los nombres son los de las columnas, como en todo el
 panel; el OpenAPI generado es la fuente una vez construido): `/sitios` → `id, codigo, nombre, zona_horaria, rol, zonas[{id, nombre}]`;
-`/sitios/{id}/resumen` → `sitio, ventana{desde, hasta, intervalo}, dispositivos{total, normal, alerta, sin_senal, inactivo}, salud{reportan,
+`/sitios/{id}/resumen` → `sitio, ventana{desde, hasta, intervalo}, dispositivos{total, normal, alerta, sin_senal, esperando, inactivo}, salud{reportan,
 supervisados, porcentaje}, condiciones_abiertas[{tipo, n}], tramas{recibidas, rechazadas, cubos[{tiempo, recibidas, rechazadas}]},
 atencion[{id, nombre, estado_visual, visto_por_ultima_vez, tipos}], magnitudes[{codigo, nombre, unidad, canales}], entrega[{id, nombre,
 recibidas, esperadas, porcentaje}]` (los 50 peores), `total_activos`; `/sitios/{id}/ahora` → `reportan, sin_senal, por_magnitud[{codigo,
@@ -558,7 +577,7 @@ segundo para mover un cubo de seis horas) y volver a pedir datos por cada trama 
    de las últimas 24 horas, y así se rotulan). **Tendencias** (una gráfica por magnitud, B4b) y **Red** (las tramas por cubo, B4a, y
    la entrega por dispositivo, B4c) llevan la fila del rango (B1). Solo se pide lo de la pestaña abierta: al entrar, el resumen y
    «Ahora» (dos pedidos; hoy son siete). (a) **Franja de indicadores:** fichas compactas —Dispositivos, Normal, Alerta, Sin señal,
-   Inactivos, Tramas (24 h) y Salud del sitio—; el enlace de cada ficha es su rótulo con su cifra («Sin señal: 5») y su área activa
+   Esperando primera trama (desde el 18/11/2026), Inactivos, Tramas (24 h) y Salud del sitio—; el enlace de cada ficha es su rótulo con su cifra («Sin señal: 5») y su área activa
    cubre la ficha entera; ya no hay un «Ver en el inventario» por ficha; «Tramas» lleva a la pestaña Red. En teléfono, tres por fila
    y la salud a lo ancho. (b) Un nombre largo ocupa una línea con puntos suspensivos y se lee entero en la ayuda; nunca parte la
    fila. (c) Las barras ordenadas (condiciones por tipo, entrega) usan el tamaño de texto del cuerpo y **todas las pistas de una lista miden lo
@@ -641,8 +660,8 @@ segundo para mover un cubo de seis horas) y volver a pedir datos por cada trama 
    tendencia está en la respuesta; `false` si no se pidió o si se omitió, ver abajo) y, con `tendencia: true`, `chispa{desde, intervalo,
    puntos}`: 24 cubos de una hora que terminan en la hora en curso (el último, parcial), alineados a la hora UTC (es una tendencia
    sin eje, no una serie para leer valores); un cubo sin lecturas es `null`, no 0. El estado visual sale de la misma regla en SQL
-   que el inventario (C); por esa regla, un dispositivo activo que aún no envía nada es Normal y aparece con sus canales en `null` y
-   `visto_por_ultima_vez` nulo (es el «esperando la primera trama» de F1). Cada petición hace como mucho tres consultas, tenga el sitio
+   que el inventario (C); por esa regla, un dispositivo activo que aún no envía nada espera su primera trama (desde el 18/11/2026; antes se mostraba Normal y
+   aparecía aquí con sus canales en `null`) y no está entre los que reportan. Cada petición hace como mucho tres consultas, tenga el sitio
    uno o dos mil dispositivos (corrección del 13/11/2026, medida en `docs/16 §66`): la primera calcula **en la base** el agregado por
    magnitud, así que al proceso no viajan los canales de todo el sitio; la segunda trae solo los canales de los dispositivos de la página
    (ninguna si la página está vacía); la tercera, la tendencia, solo si se pidió y hay canales que mostrar. **La tendencia tiene dos topes**
@@ -1236,10 +1255,36 @@ ajustar, lo ajusta él, dentro de los límites de la instancia):
   revocó, visitas de los últimos 7 días y estado; renovar abre el plazo (30 días por omisión) y su confirmación junto a la tarjeta. El
   formulario empieza con la ventana máxima de 7 días y el vencimiento de 30.
 
+**P. Esperando primera trama (decidido el 18/11/2026; la regla, en §2).** Lo que cambia, en el orden en que se construye:
+1. **Modelo (`docs/08`, migración 26):** `dispositivo.en_servicio_desde` (nace con el alta, también la masiva; vuelve a «ahora» cada vez que
+   el equipo pasa de `mantenimiento` a `activo`, en la misma transacción que el cambio de P6; las filas que ya existían, su `creado_en`) y
+   `sitio.espera_primera_trama_h` (de 1 a 2 160, 168 por omisión).
+2. **API.** Cada fila de `GET /dispositivos` y la ficha `GET /dispositivos/{id}` suman `en_servicio_desde` y `espera_hasta` (nulo si ya envió
+   alguna trama); `en_linea` cuenta desde el más reciente entre la última trama y `en_servicio_desde`; `estado` del filtro admite `esperando`;
+   el resumen del sitio suma `dispositivos.esperando`. El plazo del sitio se lee con `GET /sitios/{id}/espera-primera-trama` (cualquier
+   perfil del sitio: `espera_primera_trama_h`, `por_omision`, `minimo`, `maximo`) y se fija con `PUT` del mismo camino, con el mecanismo del
+   k de la vista pública (bloque O): el valor nuevo y, si se manda, `anterior` (el que se leyó); si ya no es el que rige, 409
+   `codigo: espera_cambio` con el vigente, sin cambiar nada. Lo fija quien administra el sitio (la acción `ajustes`, `docs/20 §6`) y deja el
+   evento `espera_primera_trama` con quién, el valor y el anterior, que la actividad del sitio (P14) muestra en palabras. Cambiarlo rige en
+   el barrido siguiente: alargarlo devuelve a «Esperando» a quien había vencido (el supervisor cierra su condición) y acortarlo la abre.
+3. **Panel.** El estado nuevo en las fichas de conteo y el filtro de P2, en la franja de P1 y en P3b, con su palabra, su icono y su tono
+   (§2). La ficha (P3) de un equipo que espera dice «Esperando primera trama desde el ‹fecha y hora› (pasa a «Sin señal» el ‹fecha y
+   hora›)», en la zona del sitio con el UTC al pasar el cursor, como toda hora (§1); si ya venció sin ninguna trama, «Nunca envió una trama:
+   el plazo de su primera trama venció el ‹fecha y hora›». Su entrega es «—».
+4. **Dónde se cambia el plazo en el panel: por decidir.** No hay hoy una pantalla de ajustes del sitio (los dos ajustes del sitio que
+   existen, el k y el tope de enlaces, viven en «Publicar una vista», P9, porque son de la vista pública): mientras se decide, el plazo se
+   cambia por la API, como se hizo con la configuración antes de P6.
+5. **Pruebas.** La misma tabla de casos para las tres implementaciones de §2; contra una base real con la migración aplicada
+   (`plataforma/pruebas/espera-integracion.sh`): la migración sobre datos y repetida, el `CHECK` del plazo, el supervisor (abre al vencer,
+   no antes, no dos veces, no al volver de mantenimiento, cierra con la primera trama y al alargar el plazo), la entrega nula y la API con
+   sus permisos.
+
 ## 5. Flujos
 **F1 · Alta y primera trama.** Ya está dibujado en el diagrama de secuencia del alta (`docs/10`, figura del informe): el
 administrador crea el dispositivo (API en la Etapa 3), recibe la credencial una sola vez, configura el nodo, y el panel
-muestra «esperando la primera trama» hasta que llega un `visto` por el canal en vivo.
+muestra «esperando la primera trama» hasta que llega un `visto` por el canal en vivo. Desde el 18/11/2026 ese texto es también su estado
+visual en P1, P2 y P3 (§2), con el plazo del sitio: si la primera trama no llega antes de `espera_hasta`, pasa a «Sin señal» y el supervisor
+abre la condición de falta de comunicación, con el detalle `nunca_reporto` en su evento.
 
 **F2 · Cambiar un umbral con conflicto (Etapa 4).** 1) El administrador abre P6; el panel guarda el `actualizado_en` que leyó.
 2) Edita umbral alto y bajo; la validación vive en la misma función que usa el guardado. 3) Guarda: `PUT` con el
@@ -1250,8 +1295,9 @@ reevalúa con esa trama (punto 28); la auditoría deja un `evento`.
 **F3 · Silencio, condición y mantenimiento.** 1) Un dispositivo deja de reportar; el supervisor abre `sin_comunicacion` tras
 dos intervalos esperados. 2) El canal en vivo emite `condicion`; en P2 el dispositivo sube al grupo «Sin señal» y en P1 cambia
 el conteo, sin recargar. 3) El administrador lo revisa en terreno y lo marca «en mantenimiento» (P6, Etapa 4; hasta entonces,
-por SQL o API): pasa a «Inactivo» y no genera alertas (RF-22). 4) Al volver a reportar como activo, el supervisor cierra la
-condición y el estado vuelve a «Normal».
+por SQL o API): pasa a «Inactivo» y no genera alertas (RF-22). 4) Al volver a `activo`, `en_servicio_desde` pasa a ese instante (§2): el siguiente barrido cierra la condición
+que quedó abierta de antes (el equipo vuelve a tener un intervalo completo, sin falsa alarma) y, con la primera trama, el estado vuelve a
+«Normal»; si no reporta dentro de 2 × su intervalo, el supervisor la abre de nuevo.
 
 **F4 · El canal en vivo se cae.** `EventSource` reintenta solo ante un corte de red, no ante un 503 (cupo lleno) ni un 403.
 El panel envuelve el canal: si recibe 503 o 403, o si pasan 60 s sin latido (el backend manda uno cada 25 s), cierra y vuelve
@@ -1343,7 +1389,7 @@ administrador); la vista pública nunca ofrece exportar (punto 6).
 | P2 y P3, incremento 1: vista en la URL, rango vacío, intervalo observado, reloj de pasarela, «en vivo» con prueba | RF-33, RF-47, RF-49, HU-20, HU-21 | Etapa 3 (22/10/2026) | `docs/16 §50`: 23 pruebas nuevas del panel por el DOM y de funciones puras (ida y vuelta URL ↔ estado en P2 y P3 con valor inválido y `hashchange` externo, texto y botón del rango vacío y su ausencia con puntos, el intervalo con sus dos avisos y el nulo, la alerta del reloj que aparece y se va sin recargar, «conectado, sin lecturas») y 4 del backend (contrato de `intervalo_observado_s`, `openapi.json` regenerado); la mediana, contrastada en la base de desarrollo; el paquete servido, con `pruebas/panel-desarrollo.sh` |
 | P3 y P2, incremento 2: leyenda informativa, cambio de rango sin blanco, hora del sitio, resolución elegible, comparación entre nodos (P3b), resumen y CSV del rango | RF-33, RF-34, RF-47, RF-49, HU-20, HU-21 | Etapa 3 (22/10/2026) | `docs/16 §52`: con navegador real (29 comprobaciones en Firefox y en Chromium; contra el build anterior, 9 fallan), los clics de leyenda, rango, resolución, «Ver la última medición» y canal dejan la ficha en su URL con puntos o con el mensaje de vacío; el aviso de zona con el contexto del navegador en otra zona; P3b con dos emulados; por el DOM y funciones puras (26 pruebas nuevas del panel): resoluciones por rango, desfase, alineación, URL de P3b; 2 del backend (tope de 5 000 cubos); medición rango × resolución antes y después |
 | P4 Condiciones, P5 Cuarentena | HU-05, RF-11 a RF-13, RF-24, RF-57, TT-42 | Etapa 4 | Trama fuera de rango → fila en P4 en vivo; trama de un desconocido → fila en P5 con motivo `no_registrado`; paginación: una fila nueva entre dos páginas no se repite ni se pierde (`docs/10 §8.4` punto 58) |
-| P1 Resumen (tablero) | RF-30, HU-16, TT-44 | Etapa 4 (HU-16 en la iteración 0; el rediseño en la 1) | Los cuatro conteos suman el total del inventario; cambian en vivo con F3; la comparativa escrita con sus fuentes antes del código; zoom, rango y varias series con navegador real, a 390 y 1280 px |
+| P1 Resumen (tablero) | RF-30, HU-16, TT-44 | Etapa 4 (HU-16 en la iteración 0; el rediseño en la 1) | Los conteos por estado suman el total del inventario; cambian en vivo con F3; la comparativa escrita con sus fuentes antes del código; zoom, rango y varias series con navegador real, a 390 y 1280 px |
 | P8 Exportar (API) | RF-34, HU-08 | Etapa 3 (12/10): 6 pruebas de las funciones puras y 7 casos de humo; la pantalla, el XLSX y la exportación por sitio, en la Etapa 4 |
 | P10 Sesión y usuarios | HU-18, RF-43, RF-44 (los cinco perfiles: HU-26, iteración 0) | Etapa 4 (08/11/2026) | `docs/16 §59`: por el DOM (vitest) el cliente HTTP (cabecera, 401, 403 temporal, 409, 429, sin red, gana la última, descarga por Blob), la guía de perfiles contra la matriz y contra las acciones del servidor, las reglas de la clave contra los números del servidor, los componentes y los flujos de entrar, cambiar, vencer, renovar y salir; con navegador real (paso 4c del guardián, `pruebas/panel-sesion-e2e.sh`) en Chromium y Firefox, a 390 y 1280 px |
 | P11 Legal y acerca de | RF-53, RF-54, RF-61, HU-27, HU-31 | Etapa 4, iteración 0 | Sesión sin aceptar: 403 en una lectura y 200 en las páginas legales; aceptar la normaliza; subir la versión la restringe otra vez (`docs/20 §12`); ningún aviso de terceros falta frente a las dependencias de producción (verificador). Panel (`docs/16 §64`): por el DOM, privacidad, términos y acerca de como texto (un `<script>` del servidor queda como texto), soporte con su 429 en segundos, la pantalla de términos sin ningún dato ni canal hasta aceptar y el 403 `terminos_pendientes` de cualquier lectura que la abre; con navegador real, legal antes de entrar y la aceptación tras el primer ingreso |
@@ -1355,6 +1401,7 @@ administrador); la vista pública nunca ofrece exportar (punto 6).
 | P6 Configurar | HU-06, HU-13, RF-14 | Etapa 4, iteración 1 | Validación compartida (plantada: bajo ≥ alto falla en los dos lados); 409 con dos pestañas; retardo de activación: una medición fuera de banda menos tiempo que el retardo no abre condición, más tiempo sí; cada guardado deja un `evento` con la persona. Panel (`docs/16 §64`): los casos de la prueba del servidor repetidos contra la función del panel, el error junto al campo, «Guardando…», el 409 con la hora y «Recargar» sin pisar; con navegador real, la validación en vivo y el 409 con dos pestañas |
 | P7 Alta, lote y detectados | HU-22, RF-50, HU-11 | Etapa 4, iteración 1 | Credencial una sola vez; `modo=validar` no crea nada; desde el bloque N (15/11/2026), crear es todo o nada: una fila que no entra o un plan que cambió es 409 `plan_cambio` y no se crea ninguna, y el reintento con la misma llave no duplica (`docs/16 §71`); tope de 500 filas, del cuerpo y límite de tasa plantados; un emisor desconocido aparece en detectados y llega al asistente con su identificador. Panel: por el DOM, 121 válidas en una petición, repetida con la misma llave tras un 502, y los 409 por su `codigo` (`docs/16 §71`; hasta el 15/11, tandas de 50: `docs/16 §64`), 501 filas frenadas en el navegador, detectado → asistente; desde el 16/11/2026, la vista previa en tres pasos (`docs/16 §76`): los tres orígenes dan las mismas filas, las fórmulas salen neutralizadas y lo descargado vuelve a subirse sin cambios, las cinco tarjetas cuentan lo que muestran, «Crear» se desactiva en vuelo; con navegador real, el asistente por HTTP y un lote de 2 válidas y 1 rechazada, y el recorrido de la vista previa a 1 280 y 390 px (`banco.sh lote-navegador`, corrido el 16/11/2026: 24 de 24 en Firefox y en Chromium; faltan los umbrales de tiempo) |
 | P14 Actividad | RF-46, HU-11, HU-26 | Etapa 4, iteración 1 | Un umbral cambiado aparece con la persona que lo cambió; un administrador de un sitio no ve la actividad de otro (404); un cursor de otro sitio no trae nada. Panel (`docs/16 §64`): por el DOM, cursor, filtros en la URL, tarjetas en teléfono y nada para quien no administra; con navegador real, el umbral cambiado en P6 con quien lo cambió y sin correos |
+| P2 y P3 con «Esperando primera trama» | RF-24, RF-30, HU-19, HU-14 | Etapa 4, iteración 1 (18/11/2026) | `docs/16 §85`: la regla del estado visual contra la base con la misma tabla de casos que el panel (24 casos, bordes incluidos); el supervisor abre a quien nunca reportó solo al vencer el plazo de su sitio, una vez aunque corran dos barridos, y no abre al volver de mantenimiento; pasar a mantenimiento cierra las condiciones abiertas con su evento; la primera trama cierra la condición; el inventario y la ficha lo muestran con su palabra y su entrega «—»; la guía de perfiles nombra `ajustes` (`bash plataforma/pruebas/espera-integracion.sh`) |
 | P9 Vista pública | RF-62, HU-32, punto 6 | Etapa 4, iteración 1 (`docs/04 §8`, decisión del 13/11/2026; diseño del 16/11/2026 en §4, O) | Sin cuenta: solo los promedios elegidos, sin mínimo ni máximo, y un valor de menos de k dispositivos sale oculto; ninguna otra ruta cambia su respuesta con el token en la cabecera; vencido, revocado, inexistente y mal formado dan la misma respuesta; revocar corta con la respuesta guardada; la vista previa y la vista del visitante dan los mismos números; el token no queda en ningún registro; cada prueba con su falla plantada y, en navegador real, ambas pantallas a 1 280 y 390 px (§4, O, punto 13). Hecho el 17/11/2026: `docs/16 §79` (base, backend y proxy) y §80 (las pantallas: por el DOM y con `pruebas/panel-publico-e2e.sh`, paso 4c, en Chromium y Firefox); la medición, pendiente |
 
 La etapa de cada pantalla es la de su historia en `docs/04`; mover una historia de etapa se decide con sus horas y se cambia

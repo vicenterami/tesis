@@ -8,7 +8,7 @@
   // resultado, sin depender de la versión.
   import { onMount, untrack } from 'svelte';
   import { LIMITE_ABIERTAS, URL_ABIERTAS, esCancelacion, mensajeError, obtener, obtenerPagina } from './lib/api';
-  import { compararAtencion, conteoPorEstado, enLinea, estadoVisual, ORDEN_ATENCION, ROTULO, rotuloCondicion, type EstadoVisual } from './lib/estado-visual';
+  import { compararAtencion, conteoPorEstado, estadoVisual, ORDEN_ATENCION, ROTULO, rotuloCondicion, type EstadoVisual } from './lib/estado-visual';
   import type { Condicion, DispositivoInventario, EventoVivo, Sitio, TipoCondicion } from './lib/modelo';
   import { haceCuanto, horaLocal } from './lib/tiempo';
   import { RECONECTADO, abrirCanalCompartido, type EstadoCanal } from './lib/vivo';
@@ -61,7 +61,7 @@
   const filasSinOrden = $derived(
     dispositivos.map((d) => {
       const tipos = tiposPorDispositivo.get(d.id) ?? [];
-      const delPanel = (): EstadoVisual => estadoVisual({ estado: d.estado, en_linea: enLinea(d.visto_por_ultima_vez, d.intervalo_esperado_s, ahora) }, tipos);
+      const delPanel = (): EstadoVisual => estadoVisual(d, tipos, ahora);
       return { d, tipos, nombre: d.nombre, estado: !recalcular && d.estado_visual !== undefined ? d.estado_visual : delPanel() };
     }),
   );

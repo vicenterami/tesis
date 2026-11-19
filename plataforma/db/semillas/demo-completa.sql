@@ -19,7 +19,7 @@
 --     demo-silencioso      uct             mqtt/plano         activo         no        1 sin_com 0 %           cada 300 s durante el día anterior a quedarse callado, visto hace 2 días
 --     demo-mantenimiento   uct             mqtt/senml         mantenimiento  sí        0         —             batería y RSSI cada hora; el supervisor no lo mira
 --     demo-baja            uct             mqtt/senml         baja           no        0         —             credencial inactiva, cuarentena «dado_de_baja», condición cerrada al darlo de baja
---     demo-http-01         uct             http/senml         activo         null      0         —             nunca visto: «esperando la primera trama»
+--     demo-http-01         uct             http/senml         activo         null      0         —             nunca visto: estado «Esperando primera trama» (docs/19 §2) hasta 7 días después de la corrida
 --     demo-lora-01         uct             lorawan/milesight  activo         sí        0         97,5 %        con pasarela; cada 180 s (la alarma abre a 2 × intervalo, 6 min), 12 de 480 tramas perdidas
 --     demo-lora-02         uct             lorawan/milesight  activo         sí        1 batería 37,5 %        cada 180 s, pierde 5 de cada 8 tramas; condición de batería abierta (ningún código la abre aún) y manipulación cerrada
 --     demo-mag-01          magallanes      mqtt/senml         activo         sí        0         100 %         otro sitio y otra zona horaria; PM2,5 y PM10
@@ -75,8 +75,9 @@ INSERT INTO pasarela (sitio_id, id_fisico, nombre, activo, formato) VALUES
 
 -- ── 2. Dispositivos ─────────────────────────────────────────────────────────────────────────────────────────────────
 -- El intervalo esperado de cada uno es el ritmo al que se siembran sus tramas (sección 4): la entrega del tablero cuenta con él.
-INSERT INTO dispositivo (zona_id, id_fisico, nombre, estado, intervalo_esperado_s, via, formato, pasarela_id, creado_en)
-SELECT z::uuid, f, n, e, i, v, fo, (SELECT id FROM pasarela WHERE id_fisico = p), now() - c * INTERVAL '1 day'
+-- en_servicio_desde (migración 26) = el alta: si no, nacería «ahora» y un nodo callado hace 2 días saldría en línea (docs/19 §2).
+INSERT INTO dispositivo (zona_id, id_fisico, nombre, estado, intervalo_esperado_s, via, formato, pasarela_id, creado_en, en_servicio_desde)
+SELECT z::uuid, f, n, e, i, v, fo, (SELECT id FROM pasarela WHERE id_fisico = p), now() - c * INTERVAL '1 day', now() - c * INTERVAL '1 day'
 FROM (VALUES
   ('00000000-0000-0000-0000-000000000002', 'demo-aire-01',       'Aire del laboratorio',          'activo',        3600, 'mqtt',    'senml',     NULL, 31),
   ('00000000-0000-0000-0000-0000000000a2', 'demo-suelo-01',      'Suelo del invernadero',         'activo',        3600, 'mqtt',    'senml',     NULL, 20),

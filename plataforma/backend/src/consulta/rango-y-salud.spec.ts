@@ -46,7 +46,7 @@ describe('HU-16: la salud del sitio sale de los conteos de la base', () => {
   const fila = (reportan: number, supervisados: number) => ({
     sitio: { id: SITIO, codigo: 'uct', nombre: 'Campus', zona_horaria: 'America/Santiago' },
     r: {
-      dispositivos: { total: supervisados, normal: 0, alerta: 0, sin_senal: 0, inactivo: 0 }, salud: { reportan, supervisados },
+      dispositivos: { total: supervisados, normal: 0, alerta: 0, sin_senal: 0, esperando: 0, inactivo: 0 }, salud: { reportan, supervisados },
       condiciones_abiertas: [], tramas: { recibidas: 0, rechazadas: 0, cubos: [] }, atencion: [], magnitudes: [], entrega_base: [],
     },
   });
@@ -59,12 +59,13 @@ describe('HU-16: la salud del sitio sale de los conteos de la base', () => {
     expect((await new TableroService(b.pool).resumen(SITIO, DESDE, HASTA, '15 minutes')).salud).toEqual({ reportan: 0, supervisados: 0, porcentaje: null });
   });
 
-  it('el SQL define «supervisados» como los no inactivos y «reportan» como los no inactivos en línea (así reportan ≤ supervisados y supervisados = total − inactivos)', async () => {
+  it('el SQL define «supervisados» como ni inactivos ni esperando su primera trama y «reportan» como los supervisados en línea (así reportan ≤ supervisados y supervisados = total − inactivos − esperando; docs/19 §2)', async () => {
     const { pool: p, llamadas } = pool(() => [fila(1, 1)]);
     await new TableroService(p).resumen(SITIO, DESDE, HASTA, '15 minutes');
     const sql = llamadas[0].sql;
-    expect(sql).toContain("'reportan', (count(*) FILTER (WHERE estado_visual <> 'inactivo' AND en_linea IS TRUE))::int");
-    expect(sql).toContain("'supervisados', (count(*) FILTER (WHERE estado_visual <> 'inactivo'))::int");
+    expect(sql).toContain("'reportan', (count(*) FILTER (WHERE estado_visual NOT IN ('inactivo', 'esperando') AND en_linea IS TRUE))::int");
+    expect(sql).toContain("'supervisados', (count(*) FILTER (WHERE estado_visual NOT IN ('inactivo', 'esperando')))::int");
     expect(sql).toContain("'inactivo', (count(*) FILTER (WHERE estado_visual = 'inactivo'))::int");
+    expect(sql).toContain("'esperando', (count(*) FILTER (WHERE estado_visual = 'esperando'))::int");
   });
 });

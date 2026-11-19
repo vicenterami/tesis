@@ -17,16 +17,19 @@ function armar(opciones: {
 } = {}) {
   const sql: string[] = [];
   const params: unknown[][] = [];
+  let confirmado = false;
+  const avisos: [unknown, boolean][] = []; // [aviso, ¿ya estaba confirmada la transacción?]
   const fila = opciones.fila === undefined ? { estado: 'activo' as const, via: 'mqtt' as const } : opciones.fila;
   const cliente = {
     query: async (texto: string, p: unknown[] = []) => {
       await Promise.resolve();
       sql.push(texto);
       params.push(p);
+      if (texto === 'COMMIT' && !opciones.commitFalla) confirmado = true;
       if (texto.startsWith('SELECT d.id, d.id_fisico, d.estado')) return { rows: fila === null ? [] : [{ id: ID, id_fisico: 'nodo-07', pasarela_id: null, sitio_codigo: 'uct', ...fila }] };
       if (texto.startsWith('SELECT c.id, c.magnitud_codigo')) return { rows: [{ id: 'C1', magnitud: 'humedad', unidad: '%RH', etiqueta: 'suelo' }, { id: 'C2', magnitud: 'temperatura', unidad: 'Cel', etiqueta: null }] };
       if (texto.startsWith('UPDATE credencial')) return { rows: [], rowCount: 1 };
-      if (texto.startsWith('UPDATE condicion')) return { rows: [], rowCount: 2 };
+      if (texto.startsWith('UPDATE condicion')) return { rows: [{ tipo: 'sin_comunicacion' }, { tipo: 'umbral' }], rowCount: 2 };
       if (texto.startsWith('INSERT INTO evento')) return { rows: [{ ocurrido_en: new Date('2026-10-13T21:00:00Z') }], rowCount: 1 };
       if (texto === 'COMMIT' && opciones.commitFalla) throw new Error('la base se fue');
       return { rows: [], rowCount: 0 };
@@ -45,7 +48,7 @@ function armar(opciones: {
     },
   } as unknown as DynsecService;
   const pool = { connect: () => Promise.resolve(cliente) } as unknown as Pool;
-  return { servicio: new AltaService(pool, dynsec), sql, params, ordenes, cliente };
+  return { servicio: new AltaService(pool, dynsec, { publicar: (e: unknown) => { avisos.push([e, confirmado]); } } as never), sql, params, ordenes, cliente, avisos };
 }
 const comandos = (ordenes: OrdenDynsec[][]) => ordenes.map((o) => o[0].command);
 
@@ -66,6 +69,20 @@ describe('AltaService.darDeBaja: estado baja, credenciales revocadas, condicione
     expect(ordenes).toEqual([[{ command: 'deleteClient', username: 'nodo-07' }]]);
     expect(r).toMatchObject({ id: ID, id_fisico: 'nodo-07', estado: 'baja', estado_anterior: 'activo', via: 'mqtt', credenciales_revocadas: 1, condiciones_cerradas: 2, dado_de_baja_en: '2026-10-13T21:00:00.000Z' });
     expect(cliente.release).toHaveBeenCalledTimes(1);
+  });
+
+  it('cada condición cerrada por la baja se avisa al canal en vivo, DESPUÉS del COMMIT; si no se confirma, no sale ningún aviso', async () => {
+    const { servicio, avisos } = armar();
+    await servicio.darDeBaja(ID);
+    expect(avisos).toEqual([
+      [{ tipo: 'condicion', dispositivo_id: ID, condicion: 'sin_comunicacion', estado: 'cerrada' }, true],
+      [{ tipo: 'condicion', dispositivo_id: ID, condicion: 'umbral', estado: 'cerrada' }, true]]);
+    const cae = armar({ commitFalla: true });
+    await expect(cae.servicio.darDeBaja(ID)).rejects.toThrow();
+    expect(cae.avisos).toEqual([]);
+    const broker = armar({ brokerFalla: { deleteClient: new ErrorDynsec('deleteClient', 'sin respuesta del broker en 5000 ms', true) } });
+    await expect(broker.servicio.darDeBaja(ID)).rejects.toBeInstanceOf(BadGatewayException);
+    expect(broker.avisos).toEqual([]);
   });
 
   it('ya dado de baja → 409 con ROLLBACK, sin escribir ni tocar el broker', async () => {

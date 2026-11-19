@@ -21,8 +21,10 @@ export type Perfil = (typeof PERFILES)[number];
 //   usuarios    alta y cambios de usuarios y de sus perfiles (y ver el nombre de quien hizo un cambio: docs/21 §2)
 //   enlaces     enlaces públicos del sitio (Etapa 4, §7)
 //   auditoria   actividad del sitio (GET /sitios/{id}/actividad, P14)
+//   ajustes     lo que rige a todos los equipos del sitio: el plazo de la primera trama (PUT /sitios/{id}/espera-primera-trama, desde el
+//               18/11/2026); quien administra el sitio, como el k y el tope de la vista pública (docs/20 §6)
 //   sistema     lo global: soporte, estado del sistema, límites; solo el administrador del sistema (permitirGlobal)
-export const ACCIONES = ['leer', 'exportar', 'escribir', 'baja', 'configurar', 'usuarios', 'enlaces', 'auditoria', 'sistema'] as const;
+export const ACCIONES = ['leer', 'exportar', 'escribir', 'baja', 'configurar', 'usuarios', 'enlaces', 'auditoria', 'ajustes', 'sistema'] as const;
 export type Accion = (typeof ACCIONES)[number];
 
 const TODOS: readonly Perfil[] = PERFILES;
@@ -35,6 +37,7 @@ export const PERMISOS: Readonly<Record<Accion, readonly Perfil[]>> = {
   usuarios: ['administrador', PERFIL_SISTEMA],
   enlaces: ['administrador', PERFIL_SISTEMA],
   auditoria: ['administrador', PERFIL_SISTEMA],
+  ajustes: ['administrador', PERFIL_SISTEMA],
   sistema: [PERFIL_SISTEMA],
 };
 

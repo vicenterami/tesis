@@ -14,6 +14,7 @@ import { errorDeCliente } from '../db/cliente.js';
 import { generarSecreto, resumirSecreto } from './credenciales.js';
 import { FormatoPasarela, PasarelaValidada } from './pasarela.dto.js';
 import { AltaDeLote, Catalogos, ChoqueDeLote, PasarelaCatalogo, ZonaCatalogo } from './lote.js';
+import { EventosService } from '../tiempo-real/eventos.service.js';
 
 // El COMMIT del lote falló y no se pudo saber si se aplicó (crearLote): no se deshace nada en el broker.
 class LoteIncierto extends Error {}
@@ -190,6 +191,7 @@ export class AltaService {
   constructor(
     @Inject(POOL) private readonly pool: Pool,
     private readonly dynsec: DynsecService,
+    private readonly eventos: EventosService,
   ) {}
 
   // Operaciones de aprovisionamiento en curso (las ve GET /salud, docs/10 §8.4 punto 43).
@@ -267,13 +269,15 @@ export class AltaService {
       if (d.via === 'mqtt' && !this.dynsec.disponible) throw this.sinBroker();
       await c.query('UPDATE dispositivo SET estado = $2 WHERE id = $1', [id, 'baja']);
       const cred = await c.query('UPDATE credencial SET activa = false WHERE dispositivo_id = $1 AND activa', [id]);
-      const cond = await c.query('UPDATE condicion SET cerrada_en = now() WHERE dispositivo_id = $1 AND cerrada_en IS NULL', [id]);
+      const cond = await c.query<{ tipo: string }>('UPDATE condicion SET cerrada_en = now() WHERE dispositivo_id = $1 AND cerrada_en IS NULL RETURNING tipo', [id]);
       const ocurrido = await registrarEvento(c, {
         dispositivoId: id, tipo: 'baja', usuarioId,
         detalle: { via: d.via, estado_anterior: d.estado, credenciales_revocadas: cred.rowCount ?? 0, condiciones_cerradas: cond.rowCount ?? 0, origen: 'api' },
       });
       if (d.via === 'mqtt') await this.borrarEnBroker(d.id_fisico);
       await c.query('COMMIT');
+      // Después del COMMIT: el panel se entera de cada condición cerrada por la baja (si se deshiciera, no sale ningún aviso).
+      for (const k of cond.rows) this.eventos.publicar({ tipo: 'condicion', dispositivo_id: id, condicion: k.tipo as 'umbral', estado: 'cerrada' });
       this.log.log(`baja: ${d.id_fisico} (${d.via}; ${cred.rowCount ?? 0} credencial(es) revocada(s), ${cond.rowCount ?? 0} condición(es) cerrada(s))`);
       return {
         id, id_fisico: d.id_fisico, estado: 'baja', estado_anterior: d.estado, via: d.via, credenciales_revocadas: cred.rowCount ?? 0,

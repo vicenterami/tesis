@@ -8,7 +8,7 @@
 -- 11/11/2026. Para ellas, un banco nuevo o vaciar antes `trama` (TRUNCATE trama, solo en el banco).
 -- Los dispositivos se fechan 31 días atrás para que la entrega cuente la ventana entera.
 \timing on
-UPDATE dispositivo SET creado_en = now() - INTERVAL '31 days' WHERE id_fisico LIKE 'emu-%';
+UPDATE dispositivo SET creado_en = now() - INTERVAL '31 days', en_servicio_desde = now() - INTERVAL '31 days' WHERE id_fisico LIKE 'emu-%';
 INSERT INTO medicion (canal_id, tiempo, valor, unidad, recibido_en, origen_tiempo)
 SELECT c.id, t, 20 + 5 * sin(extract(epoch FROM t) / 3600.0) + random(), 'Cel', t, 'dispositivo'
   FROM canal c JOIN dispositivo d ON d.id = c.dispositivo_id

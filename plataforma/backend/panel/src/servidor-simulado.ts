@@ -2,7 +2,7 @@
 // sobre una lista: filtra por sitio, zona, vía, estado y texto, pagina con `limite` y `desplazamiento`, pone el total en `X-Total` y
 // suma `estado_visual` (con la regla de §2, la misma función del panel: el servidor la escribe en SQL; que digan lo mismo fila por fila
 // lo comprueba el backend) y `entrega`. Sin parámetros (`/dispositivos` a secas, un backend anterior) devuelve todo, sin cabecera.
-import { ORDEN_ATENCION, enLinea, estadoVisual } from './lib/estado-visual';
+import { ORDEN_ATENCION, estadoVisual } from './lib/estado-visual';
 import type { Condicion, DispositivoInventario } from './lib/modelo';
 
 // `sitio` es el id del sitio, como en la API (las filas traen su código): `sitios` dice qué id tiene cada código. `orden=entrega`
@@ -13,7 +13,7 @@ export function inventarioSimulado(ruta: string, dispositivos: readonly Disposit
   const q = new URLSearchParams(ruta.slice(ruta.indexOf('?') + 1));
   const conEstado = dispositivos.map((d) => ({
     ...d,
-    estado_visual: d.estado_visual ?? estadoVisual({ estado: d.estado, en_linea: enLinea(d.visto_por_ultima_vez, d.intervalo_esperado_s, ahora) }, abiertas.filter((c) => c.dispositivo_id === d.id).map((c) => c.tipo)),
+    estado_visual: d.estado_visual ?? estadoVisual(d, abiertas.filter((c) => c.dispositivo_id === d.id).map((c) => c.tipo), ahora),
   }));
   const texto = (q.get('q') ?? '').toLowerCase();
   const filas = conEstado.filter(
@@ -25,7 +25,7 @@ export function inventarioSimulado(ruta: string, dispositivos: readonly Disposit
       (texto === '' || d.nombre.toLowerCase().includes(texto) || d.id_fisico.toLowerCase().includes(texto)),
   );
   if (q.get('orden') === 'entrega') filas.sort((a, b) => (a.entrega ?? Infinity) - (b.entrega ?? Infinity));
-  // `orden=atencion` (11/11/2026): sin señal, alerta, normal, inactivo; dentro, por nombre (como el ORDER BY del servidor).
+  // `orden=atencion` (11/11/2026): sin señal, alerta, normal, esperando (18/11/2026), inactivo; dentro, por nombre (como el ORDER BY del servidor).
   if (q.get('orden') === 'atencion') filas.sort((a, b) => ORDEN_ATENCION.indexOf(a.estado_visual) - ORDEN_ATENCION.indexOf(b.estado_visual) || a.nombre.localeCompare(b.nombre, 'es'));
   const limite = Number(q.get('limite') ?? '50');
   const desde = Number(q.get('desplazamiento') ?? '0');

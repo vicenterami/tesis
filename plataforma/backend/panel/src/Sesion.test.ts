@@ -18,8 +18,8 @@ const PERMISOS = { administrador: ['leer', 'exportar', 'escribir', 'usuarios'], 
 const TEMPORAL = 'temporal-de-prueba-24-car';
 const NUEVA = 'una frase larga de prueba';
 const inventario: DispositivoInventario[] = [
-  { id: '00000000-0000-4000-8000-000000000001', id_fisico: 'dev-0001', nombre: 'Invernadero', estado: 'activo', via: 'mqtt', formato: 'senml', intervalo_esperado_s: 60, visto_por_ultima_vez: '2026-11-08T14:59:30Z', en_linea: true, zona: 'Lab', sitio: 'Campus', zona_horaria: 'America/Santiago', sitio_codigo: 'uct', zona_id: 'z', condiciones_abiertas: 0, canales: [] },
-  { id: '00000000-0000-4000-8000-000000000003', id_fisico: 'dev-0003', nombre: 'Pozo', estado: 'activo', via: 'http', formato: 'senml', intervalo_esperado_s: 60, visto_por_ultima_vez: '2026-11-08T14:59:30Z', en_linea: true, zona: 'Lab', sitio: 'Campus', zona_horaria: 'America/Santiago', sitio_codigo: 'uct', zona_id: 'z', condiciones_abiertas: 0, canales: [] },
+  { id: '00000000-0000-4000-8000-000000000001', id_fisico: 'dev-0001', nombre: 'Invernadero', estado: 'activo', via: 'mqtt', formato: 'senml', intervalo_esperado_s: 60, visto_por_ultima_vez: '2026-11-08T14:59:30Z', en_linea: true, en_servicio_desde: '2026-01-01T00:00:00Z', espera_hasta: null, zona: 'Lab', sitio: 'Campus', zona_horaria: 'America/Santiago', sitio_codigo: 'uct', zona_id: 'z', condiciones_abiertas: 0, canales: [] },
+  { id: '00000000-0000-4000-8000-000000000003', id_fisico: 'dev-0003', nombre: 'Pozo', estado: 'activo', via: 'http', formato: 'senml', intervalo_esperado_s: 60, visto_por_ultima_vez: '2026-11-08T14:59:30Z', en_linea: true, en_servicio_desde: '2026-01-01T00:00:00Z', espera_hasta: null, zona: 'Lab', sitio: 'Campus', zona_horaria: 'America/Santiago', sitio_codigo: 'uct', zona_id: 'z', condiciones_abiertas: 0, canales: [] },
 ];
 
 // El backend falso: una persona («Ana», administradora de Campus), su clave y el estado de su sesión.

@@ -21,7 +21,8 @@ BEGIN
 END $guarda$;
 \timing on
 TRUNCATE medicion, trama;
-UPDATE dispositivo SET intervalo_esperado_s = :paso, creado_en = least(creado_en, now() - (:dias + 1) * INTERVAL '1 day') WHERE id_fisico LIKE 'emu-%';
+UPDATE dispositivo SET intervalo_esperado_s = :paso, creado_en = least(creado_en, now() - (:dias + 1) * INTERVAL '1 day'),
+       en_servicio_desde = least(en_servicio_desde, now() - (:dias + 1) * INTERVAL '1 day') WHERE id_fisico LIKE 'emu-%';
 SELECT now() AS t0 \gset
 -- Cada emulado con su desfase dentro del paso (por su número), para que no reporten todos en el mismo segundo, como en la realidad.
 SELECT format($f$INSERT INTO medicion (canal_id, tiempo, valor, unidad, recibido_en, origen_tiempo)

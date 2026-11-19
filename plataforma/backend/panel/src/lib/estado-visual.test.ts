@@ -1,54 +1,59 @@
 import { describe, expect, it } from 'vitest';
-import { canalCallado, compararAtencion, conteoPorEstado, enLinea, estadoVisual, rotuloCondicion } from './estado-visual';
+import { canalCallado, compararAtencion, conteoPorEstado, enLinea, estadoVisual, ORDEN_ATENCION, ROTULO, rotuloCondicion, type DatosEstado } from './estado-visual';
 import type { TipoCondicion } from './modelo';
+import TABLA from './estado-visual-casos.json';
 
-describe('estadoVisual (docs/19 §2): la primera regla que aplica manda', () => {
-  it('mantenimiento o baja → Inactivo, aunque tenga condiciones abiertas o esté fuera de línea', () => {
-    expect(estadoVisual({ estado: 'mantenimiento', en_linea: false }, ['umbral'])).toBe('inactivo');
-    expect(estadoVisual({ estado: 'baja', en_linea: true }, [])).toBe('inactivo');
+// La tabla de casos de docs/19 §2 (estado-visual-casos.json): la misma que prueba estadoVisual() del servidor (src/consulta/tablero.spec.ts)
+// y la versión SQL contra una base real (integracion/espera.ts). Un caso nuevo se agrega una vez y lo prueban las tres.
+function datosDelCaso(c: (typeof TABLA.casos)[number], ahora: Date): DatosEstado {
+  const antes = (s: number): string => new Date(ahora.getTime() - s * 1000).toISOString();
+  const enServicio = antes(c.en_servicio_hace_s);
+  return {
+    estado: c.estado as DatosEstado['estado'], visto_por_ultima_vez: c.visto_hace_s === null ? null : antes(c.visto_hace_s), intervalo_esperado_s: c.intervalo_s,
+    en_servicio_desde: enServicio, espera_hasta: c.visto_hace_s === null ? new Date(Date.parse(enServicio) + c.espera_h * 3_600_000).toISOString() : null,
+  };
+}
+describe('estadoVisual (docs/19 §2): la tabla de casos, la primera regla que aplica manda', () => {
+  const ahora = new Date(TABLA.ahora);
+  it('la tabla trae casos de los cinco estados', () => expect(new Set(TABLA.casos.map((c) => c.esperado))).toEqual(new Set(ORDEN_ATENCION)));
+  for (const c of TABLA.casos) {
+    it(`${c.nombre} → ${c.esperado}`, () => expect(estadoVisual(datosDelCaso(c, ahora), c.abiertas as TipoCondicion[], ahora)).toBe(c.esperado));
+  }
+  it('el paso del tiempo, sin repedir nada: quien espera pasa a «Sin señal» al vencer su plazo, y con su primera trama a «Normal»', () => {
+    const c = datosDelCaso(TABLA.casos.find((x) => x.esperado === 'esperando' && x.en_servicio_hace_s === 3600)!, ahora);
+    expect(estadoVisual(c, [], new Date(Date.parse(c.espera_hasta!) - 1000))).toBe('esperando');
+    expect(estadoVisual(c, [], new Date(Date.parse(c.espera_hasta!)))).toBe('sin_senal');
+    expect(estadoVisual({ ...c, visto_por_ultima_vez: ahora.toISOString(), espera_hasta: null }, [], ahora)).toBe('normal');
   });
-  it('condición sin_comunicacion abierta, o fuera de línea → Sin señal, antes que Alerta', () => {
-    expect(estadoVisual({ estado: 'activo', en_linea: true }, ['sin_comunicacion', 'umbral'])).toBe('sin_senal');
-    expect(estadoVisual({ estado: 'activo', en_linea: false }, [])).toBe('sin_senal');
-  });
-  it('umbral, batería o manipulación abiertas, en línea → Alerta', () => {
-    expect(estadoVisual({ estado: 'activo', en_linea: true }, ['umbral'])).toBe('alerta');
-    expect(estadoVisual({ estado: 'activo', en_linea: true }, ['bateria'])).toBe('alerta');
-    expect(estadoVisual({ estado: 'activo', en_linea: true }, ['manipulacion'])).toBe('alerta');
-    expect(estadoVisual({ estado: 'activo', en_linea: true }, ['tope_superado'])).toBe('alerta');
-  });
-  it('reloj_desviado abierta, en línea → Alerta (los datos entran, fechados por la recepción); Sin señal manda sobre ella', () => {
-    expect(estadoVisual({ estado: 'activo', en_linea: true }, ['reloj_desviado'])).toBe('alerta');
-    expect(estadoVisual({ estado: 'activo', en_linea: true }, ['reloj_desviado', 'sin_comunicacion'])).toBe('sin_senal');
-  });
-  it('activo, en línea y sin condiciones → Normal; sin tramas aún (null) también, hasta que haya datos', () => {
-    expect(estadoVisual({ estado: 'activo', en_linea: true }, [])).toBe('normal');
-    expect(estadoVisual({ estado: 'activo', en_linea: null }, [])).toBe('normal');
-  });
+  it('el rótulo del estado nuevo es el de docs/19 §2', () => expect(ROTULO.esperando).toBe('Esperando primera trama'));
 });
 
-describe('enLinea: la misma regla que la API (visto dentro de 2 × intervalo esperado)', () => {
+describe('enLinea: la misma regla que la API (el más reciente entre visto y en_servicio_desde, dentro de 2 × intervalo esperado)', () => {
   const ahora = new Date('2026-10-12T15:00:00Z');
   it('visto hace 59 s con intervalo 30 s → en línea; hace 61 s → no', () => {
     expect(enLinea('2026-10-12T14:59:01Z', 30, ahora)).toBe(true);
     expect(enLinea('2026-10-12T14:58:59Z', 30, ahora)).toBe(false);
   });
-  it('sin tramas → null', () => expect(enLinea(null, 30, ahora)).toBeNull());
+  it('visto hace un día pero en servicio desde hace 30 s (volvió de mantenimiento) → en línea', () => {
+    expect(enLinea('2026-10-11T15:00:00Z', 30, ahora, '2026-10-12T14:59:30Z')).toBe(true);
+  });
+  it('sin tramas → null, aunque esté en servicio', () => expect(enLinea(null, 30, ahora, '2026-10-12T14:59:30Z')).toBeNull());
 });
 
 describe('conteo y orden de atención', () => {
-  it('cuenta los cuatro estados aunque alguno sea cero', () =>
-    expect(conteoPorEstado(['normal', 'alerta', 'normal'])).toEqual({ sin_senal: 0, alerta: 1, normal: 2, inactivo: 0 }));
-  it('Sin señal primero, Inactivo al final; dentro del mismo estado, por nombre sin distinguir mayúsculas ni acentos', () => {
+  it('cuenta los cinco estados aunque alguno sea cero', () =>
+    expect(conteoPorEstado(['normal', 'alerta', 'normal', 'esperando'])).toEqual({ sin_senal: 0, alerta: 1, normal: 2, esperando: 1, inactivo: 0 }));
+  it('Sin señal primero, Esperando primera trama antes de Inactivo, Inactivo al final; dentro del mismo estado, por nombre sin distinguir mayúsculas ni acentos', () => {
     const filas = [
       { estado: 'inactivo' as const, nombre: 'a' },
       { estado: 'normal' as const, nombre: 'Único' },
       { estado: 'normal' as const, nombre: 'ambiente' },
       { estado: 'sin_senal' as const, nombre: 'z' },
       { estado: 'alerta' as const, nombre: 'b' },
+      { estado: 'esperando' as const, nombre: 'a nuevo' },
     ];
     expect(filas.sort(compararAtencion).map((f) => `${f.estado}:${f.nombre}`)).toEqual([
-      'sin_senal:z', 'alerta:b', 'normal:ambiente', 'normal:Único', 'inactivo:a',
+      'sin_senal:z', 'alerta:b', 'normal:ambiente', 'normal:Único', 'esperando:a nuevo', 'inactivo:a',
     ]);
   });
 });

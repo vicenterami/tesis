@@ -1,33 +1,60 @@
-// Funciones puras del tablero v2 (docs/19 §4, bloque «Tablero v2», I; docs/10 §8.4 puntos 58 y 65): el estado visual de cuatro valores,
-// la entrega (HU-15), el cursor opaco de las listas por clave y los filtros del inventario. Sin base ni Nest: cada una con su prueba.
+// Funciones puras del tablero v2 (docs/19 §4, bloque «Tablero v2», I; docs/10 §8.4 puntos 58 y 65): el estado visual de cinco valores
+// (cuatro hasta el 18/11/2026; el quinto, `esperando`: docs/19 §2), la entrega (HU-15), el cursor opaco de las listas por clave y los filtros del inventario. Sin base ni Nest: cada una con su prueba.
 import { BadRequestException } from '@nestjs/common';
 
 // ── Estado visual (docs/19 §2; punto 65 ii) ────────────────────────────────────────────────────────────────────────────────────────
-// La regla está escrita una vez en docs/19 §2 y tiene dos implementaciones probadas entre sí: esta (y su versión SQL de abajo, que
-// filtra y pagina en el servidor) y estadoVisual() del panel, que recalcula en vivo sin repedir la página.
-export const ESTADOS_VISUALES = ['inactivo', 'sin_senal', 'alerta', 'normal'] as const;
+// La regla está escrita una vez en docs/19 §2 y tiene tres implementaciones probadas con UNA tabla de casos (panel/src/lib/
+// estado-visual-casos.json): esta, su versión SQL de abajo (que filtra y pagina en el servidor; la prueba contra una base real,
+// integracion/espera.ts) y estadoVisual() del panel, que recalcula en vivo sin repedir la página. «esperando» desde el 18/11/2026.
+export const ESTADOS_VISUALES = ['inactivo', 'sin_senal', 'alerta', 'esperando', 'normal'] as const;
 export type EstadoVisual = (typeof ESTADOS_VISUALES)[number];
 
 // Los tipos de condición que ponen un dispositivo en «alerta» (docs/19 §2), enumerados como en el panel: un tipo nuevo no cae en alerta
-// sin decidirlo (la regla y sus dos implementaciones se cambian juntas). `sin_comunicacion` es «sin señal», no alerta.
+// sin decidirlo (la regla y sus implementaciones se cambian juntas). `sin_comunicacion` es «sin señal», no alerta.
 export const TIPOS_ALERTA = ['umbral', 'bateria', 'manipulacion', 'tope_superado', 'reloj_desviado'] as const;
-export function estadoVisual(estado: string, enLinea: boolean | null, abiertas: readonly string[]): EstadoVisual {
-  if (estado !== 'activo') return 'inactivo';
-  if (abiertas.includes('sin_comunicacion') || enLinea === false) return 'sin_senal';
+
+// Lo que la regla necesita de un dispositivo, con los nombres de la API (instantes en ISO 8601). `espera_hasta`: en_servicio_desde + la
+// espera del sitio; solo rige si nunca envió una trama.
+export interface DatosEstado {
+  estado: string; visto_por_ultima_vez: string | null; intervalo_esperado_s: number; en_servicio_desde: string; espera_hasta: string | null;
+}
+// ¿En línea? El más reciente entre la última trama y en_servicio_desde, dentro de 2 × intervalo esperado (el borde, en línea); nulo sin
+// ninguna trama (ni en línea ni fuera: manda la espera).
+export function enLinea(d: Pick<DatosEstado, 'visto_por_ultima_vez' | 'intervalo_esperado_s' | 'en_servicio_desde'>, ahora: Date): boolean | null {
+  if (d.visto_por_ultima_vez === null) return null;
+  const desde = Math.max(Date.parse(d.visto_por_ultima_vez), Date.parse(d.en_servicio_desde));
+  return ahora.getTime() - desde <= d.intervalo_esperado_s * 2 * 1000;
+}
+export function estadoVisual(d: DatosEstado, abiertas: readonly string[], ahora: Date): EstadoVisual {
+  if (d.estado !== 'activo') return 'inactivo';
+  if (abiertas.includes('sin_comunicacion')) return 'sin_senal';
+  if (d.visto_por_ultima_vez === null) return d.espera_hasta !== null && ahora.getTime() < Date.parse(d.espera_hasta) ? 'esperando' : 'sin_senal';
+  if (enLinea(d, ahora) === false) return 'sin_senal';
   if (abiertas.some((t) => (TIPOS_ALERTA as readonly string[]).includes(t))) return 'alerta';
   return 'normal';
 }
 
-// La misma regla en SQL, sobre `dispositivo d` y `estado_dispositivo e` (LEFT JOIN). `en_linea` nulo (sin tramas aún) no es «fuera de
-// línea»: por eso `IS FALSE` y no `NOT`. Texto fijo del código, sin datos: se interpola en las consultas como SQL_INTERVALO_OBSERVADO.
-export const SQL_EN_LINEA = `(e.visto_por_ultima_vez >= now() - d.intervalo_esperado_s * 2 * INTERVAL '1 second')`;
+// La misma regla en SQL, sobre `dispositivo d` y `estado_dispositivo e` (LEFT JOIN). GREATEST ignora los nulos: sin la guarda de
+// `visto` nulo, un equipo sin tramas saldría «en línea» por su en_servicio_desde. El plazo del sitio se lee por la zona del dispositivo
+// (dos búsquedas por clave primaria): así la regla no exige que la consulta que la usa una el sitio con un alias fijo. Texto fijo del
+// código, sin datos: se interpola en las consultas como SQL_INTERVALO_OBSERVADO.
+export const SQL_EN_LINEA = `(CASE WHEN e.visto_por_ultima_vez IS NULL THEN NULL
+        ELSE greatest(e.visto_por_ultima_vez, d.en_servicio_desde) >= now() - d.intervalo_esperado_s * 2 * INTERVAL '1 second' END)`;
+export const SQL_ESPERA_HASTA = `(SELECT d.en_servicio_desde + se.espera_primera_trama_h * INTERVAL '1 hour'
+                  FROM zona ze JOIN sitio se ON se.id = ze.sitio_id WHERE ze.id = d.zona_id)`;
 export const SQL_ESTADO_VISUAL = `(CASE
         WHEN d.estado <> 'activo' THEN 'inactivo'
-        WHEN EXISTS (SELECT 1 FROM condicion cv WHERE cv.dispositivo_id = d.id AND cv.cerrada_en IS NULL AND cv.tipo = 'sin_comunicacion')
-             OR ${SQL_EN_LINEA} IS FALSE THEN 'sin_senal'
+        WHEN EXISTS (SELECT 1 FROM condicion cv WHERE cv.dispositivo_id = d.id AND cv.cerrada_en IS NULL AND cv.tipo = 'sin_comunicacion') THEN 'sin_senal'
+        WHEN e.visto_por_ultima_vez IS NULL THEN CASE WHEN now() < ${SQL_ESPERA_HASTA} THEN 'esperando' ELSE 'sin_senal' END
+        WHEN ${SQL_EN_LINEA} IS FALSE THEN 'sin_senal'
         WHEN EXISTS (SELECT 1 FROM condicion cv WHERE cv.dispositivo_id = d.id AND cv.cerrada_en IS NULL
                        AND cv.tipo IN (${TIPOS_ALERTA.map((t) => `'${t}'`).join(', ')})) THEN 'alerta'
         ELSE 'normal' END)`;
+// El orden de atención (docs/19 §4, P2): lo que requiere acción primero; quien espera su primera trama, después de Normal (aún no se le
+// exige nada) y antes de Inactivo. El ORDER BY de `orden=atencion` sale de aquí.
+export const ORDEN_ATENCION: readonly EstadoVisual[] = ['sin_senal', 'alerta', 'normal', 'esperando', 'inactivo'];
+export const SQL_ORDEN_ATENCION = (columna: string): string =>
+  `CASE ${columna} ${ORDEN_ATENCION.map((e, i) => `WHEN '${e}' THEN ${i}`).join(' ')} ELSE ${ORDEN_ATENCION.length} END`;
 
 // ── Salud del sitio (HU-16, RF-30) ───────────────────────────────────────────────────────────────────────────────────────────────
 // En línea ÷ supervisados (los no inactivos), en porcentaje con un decimal; null sin dispositivos
@@ -41,11 +68,13 @@ export function porcentajeSalud(reportan: number, supervisados: number): number 
 
 // ── Entrega (HU-15; punto 65 vii) ────────────────────────────────────────────────────────────────────────────────────────────────
 // Tramas recibidas en la ventana ÷ esperadas (ventana ÷ intervalo esperado), acotada a 100 %. La ventana efectiva empieza en lo más
-// tardío entre `desde`, el alta del dispositivo y el horizonte de retención de `trama` (antes no hay con qué contar). Sin una trama
-// esperada completa en esa ventana (recién creado, o una ventana entera fuera de la retención), no se calcula: nulo, nunca inventado.
+// tardío entre `desde`, el momento en que el dispositivo entró en servicio (`en_servicio_desde`, desde el 18/11/2026; antes, su alta) y el
+// horizonte de retención de `trama` (antes no hay con qué contar). Sin una trama esperada completa en esa ventana (recién creado o vuelto
+// a servicio, o una ventana entera fuera de la retención), no se calcula: nulo, nunca inventado. Quien espera su primera trama tampoco
+// (docs/19 §2): lo decide quien llama, con su estado visual.
 export interface Entrega { recibidas: number; esperadas: number; porcentaje: number | null }
-export function entrega(recibidas: number, desde: Date, hasta: Date, creadoEn: Date, intervaloS: number, retencionDesde: Date): Entrega {
-  const inicio = Math.max(desde.getTime(), creadoEn.getTime(), retencionDesde.getTime());
+export function entrega(recibidas: number, desde: Date, hasta: Date, enServicioDesde: Date, intervaloS: number, retencionDesde: Date): Entrega {
+  const inicio = Math.max(desde.getTime(), enServicioDesde.getTime(), retencionDesde.getTime());
   const ventanaS = Math.max(0, (hasta.getTime() - inicio) / 1000);
   const esperadas = intervaloS > 0 ? Math.floor(ventanaS / intervaloS) : 0;
   if (esperadas < 1) return { recibidas, esperadas: 0, porcentaje: null };
@@ -89,7 +118,7 @@ export function siguiente<T>(filas: readonly T[], limite: number, clave: (f: T) 
 // ── Filtros del inventario (docs/19 §4, C) ───────────────────────────────────────────────────────────────────────────────────────
 export const VIAS_FILTRO = ['mqtt', 'http', 'lorawan'] as const;
 // `orden`: por nombre (sitio, zona, nombre: el de siempre), por entrega de las últimas 24 h (de peor a mejor y sin cálculo al final) o por
-// atención (docs/19 §2: sin señal, alerta, normal, inactivo; dentro de cada uno, por nombre).
+// atención (ORDEN_ATENCION: sin señal, alerta, normal, esperando, inactivo; dentro de cada uno, por nombre).
 export const ORDENES_INVENTARIO = ['nombre', 'entrega', 'atencion'] as const;
 export interface FiltroInventario {
   sitio?: string; zona?: string; via?: string; estado?: EstadoVisual; q?: string; limite?: number; desplazamiento?: number;

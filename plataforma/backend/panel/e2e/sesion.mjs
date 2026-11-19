@@ -163,14 +163,15 @@ for (const caso of casos) {
   await paso(`${etiqueta}: tablero`, async () => {
     await p.evaluate(() => { location.hash = '#/'; });
     await p.locator('[data-indicadores]').waitFor({ timeout: 15000 });
-    // Los cuatro estados suman el total y el total es el del inventario del sitio (X-Total), sin dos cálculos distintos (A4).
+    // Los cinco estados (docs/19 §2; «Esperando primera trama» desde el 18/11/2026) suman el total y el total es el del inventario del sitio
+    // (X-Total), sin dos cálculos distintos (A4).
     const valores = await p.locator('[data-indicadores] [data-valor]').allTextContents();
     const inventario = await p.evaluate(async (codigo) => {
       const s = (await (await fetch('/sitios')).json()).find((x) => x.codigo === codigo);
       return Number((await fetch(`/dispositivos?sitio=${s.id}&limite=1`)).headers.get('x-total'));
     }, sitio);
     const n = valores.map((v) => Number(v.replace(/\D/g, '')));
-    comprobar(n.length >= 5 && n[0] === inventario && n.slice(1, 5).reduce((a, b) => a + b, 0) === n[0], `${etiqueta}: P1: los indicadores suman el total y el total es el del inventario (${inventario})`, JSON.stringify(n));
+    comprobar(n.length >= 6 && n[0] === inventario && n.slice(1, 6).reduce((a, b) => a + b, 0) === n[0], `${etiqueta}: P1: los indicadores suman el total y el total es el del inventario (${inventario})`, JSON.stringify(n));
     await sinDesborde(p, `${etiqueta}, tablero`);
     await foto(p, '6-tablero');
   });
