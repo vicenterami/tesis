@@ -1341,7 +1341,7 @@ paso "4b. Sesión y permisos (docs/20 §6 y §8): la matriz ruta × rol con una 
 # 08/11/2026: el primer administrador con X-Clave-Admin, un usuario de consulta, dos sitios propios de la prueba; todo se borra al salir.
 if curl -s -m 2 http://127.0.0.1:3000/salud >/dev/null; then bash plataforma/pruebas/sesion-smoke.sh || fallos=$((fallos+1)); else echo "omitida: backend no está corriendo"; omitidos="$omitidos 4b"; fi
 
-paso "4c. Panel con sesión en navegadores reales (P10; docs/19 §4 y §6): entrar, clave temporal, inventario, exportar, usuarios, vencer y salir, a 390 y 1280 px, en Chromium y Firefox; la vista pública por enlace (P9) y la exportación del sitio (P8)"
+paso "4c. Panel con sesión en navegadores reales (P10; docs/19 §4 y §6): entrar, clave temporal, inventario, exportar, usuarios, vencer y salir, a 390 y 1280 px, en Chromium y Firefox; la vista pública por enlace (P9), la exportación del sitio (P8) y el alta masiva (P7)"
 # 08/11/2026: el e2e de la pantalla de inicio de sesión contra la pila de desarrollo (el panel servido por la imagen del backend). Sin el backend
 # o sin los navegadores de Playwright, el guion sale con 3 y el paso se OMITE con aviso: nunca «OK» sin haber probado.
 bash plataforma/pruebas/panel-sesion-e2e.sh; r=$?
@@ -1354,6 +1354,11 @@ if [ "$r" = 3 ]; then omitidos="$omitidos 4c-publico"; elif [ "$r" != 0 ]; then 
 # nombre y su firma, «Entre fechas» en la hora del sitio y sin desplazamiento horizontal; borra lo sembrado al final. Mismas reglas de omisión.
 bash plataforma/pruebas/panel-exportar-e2e.sh; r=$?
 if [ "$r" = 3 ]; then omitidos="$omitidos 4c-exportar"; elif [ "$r" != 0 ]; then fallos=$((fallos+1)); fi
+# 19/11/2026: P7, el alta masiva sin fricción (docs/19 §4, S): el catálogo fijo de escenarios, 500 filas con sus umbrales de tiempo, crear por
+# HTTP, «atrás» con credenciales sin descargar y la ayuda emergente que no recibe toques bajo 700 px; borra lo sembrado y lo creado y cuenta
+# que no quede nada. Reemplaza a `banco.sh lote-navegador`. Mismas reglas de omisión.
+bash plataforma/pruebas/panel-lote-e2e.sh; r=$?
+if [ "$r" = 3 ]; then omitidos="$omitidos 4c-lote"; elif [ "$r" != 0 ]; then fallos=$((fallos+1)); fi
 
 paso "4d. Semilla de demostración: respeta la clave de quien ya eligió la suya (persona_temporal en conservar y rotar, con una persona de descarte)"
 # 13/11/2026: cada corrida de la semilla anulaba la clave propia de las personas de demostración y cortaba sus sesiones. La prueba usa una

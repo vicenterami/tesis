@@ -329,7 +329,7 @@
       </span>
     </section>
   {:else if modo === 'lote'}
-    <AltaLote />
+    <AltaLote persona={sesion === null ? null : sesion.sistema ? 'sistema' : sesion.usuario.id} />
   {:else}
     <section aria-labelledby="{uid}-detectados" data-detectados>
       <h3 id="{uid}-detectados">Detectados sin alta (últimos 7 días)</h3>

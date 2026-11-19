@@ -251,6 +251,11 @@ th .ordenar { font: inherit; }
 /* En teléfono, la ayuda va fija al pie de la pantalla, a todo el ancho con su margen: anclada al botón, una ayuda larga de un botón que no
    empieza en el borde izquierdo se salía por la derecha y la página se desplazaba a lo ancho (A5; lo encontró el paso 4c el 11/11/2026). */
 @media (max-width: 700px) { .tooltip { position: fixed; left: var(--e-3); right: var(--e-3); top: auto; bottom: var(--e-3); width: auto; max-width: none; } }
+/* Con una pantalla táctil (sin puntero que pase por encima: `hover: none`), además, no recibe toques ni clics (docs/19 §4, bloque S, punto 6):
+   fija al pie, tapaba el botón que quedaba debajo (el 19/11/2026, «Volver» y «Crear» de la revisión del alta masiva a 390 px) y el toque iba a
+   la ayuda. Se lee igual y se descarta con Escape. Con ratón, en cualquier ancho, sigue admitiendo el puntero encima (WCAG 2.2, 1.4.13).
+   Comprobado con Chromium y Firefox emulando un teléfono táctil (los dos dan `hover: none`) y con una ventana de 390 px con ratón. */
+@media (max-width: 700px) and (hover: none) { .tooltip { pointer-events: none; } }
 .aviso-caja { display: flex; flex-wrap: wrap; gap: 0.4rem 0.8rem; align-items: center; margin: var(--e-2) 0; padding: var(--e-2) var(--e-3); border-radius: var(--radio); border: 1px solid; background: var(--superficie); }
 .aviso-caja .aviso-texto { flex: 1 1 14rem; min-width: 0; overflow-wrap: anywhere; }
 .aviso-caja.exito { border-color: var(--estado-normal); background: var(--estado-normal-fondo); color: var(--estado-normal); }
@@ -523,6 +528,7 @@ main { padding-bottom: calc(var(--e-4) + var(--alto-avisos, 0px)); }
 .detalle-lote dt { color: var(--texto-secundario); font-size: var(--t-xs); }
 .detalle-lote dd { margin: 0; min-width: 0; display: flex; flex-wrap: wrap; gap: var(--e-1) var(--e-2); align-items: baseline; overflow-wrap: anywhere; }
 .detalle-sueltas { list-style: none; padding: 0; margin: var(--e-1) 0; display: grid; gap: var(--e-1); }
+.zonas-lote { margin: var(--e-1) 0; padding-left: 1.1rem; }
 .marca-omision { font-size: var(--t-xs); color: var(--texto-secundario); border: 1px solid var(--borde-control); border-radius: var(--radio); padding: 0 0.35rem; }
 .fila-detalle td { background: var(--superficie-tenue); }
 [data-informe-lote] code { overflow-wrap: anywhere; }

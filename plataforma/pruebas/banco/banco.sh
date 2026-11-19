@@ -19,7 +19,6 @@
 #   bash plataforma/pruebas/banco/banco.sh nodo                contrato del nodo ESP32 (fase 2, docs/17 §6.2) sin la placa: alta con seis canales, calibración por API (400, 200, 409), el pack del firmware con QoS 1 → medicion, ficha, histórico y en vivo
 #   bash plataforma/pruebas/banco/banco.sh navegador           P3, P3b y P2 en un navegador real con Playwright: puntos contra /historico, vivo sin recargar, caída y vuelta (docs/16 §39);
 #                                                              leyenda, rangos, resoluciones, rango vacío, zona horaria y comparación (docs/16 §52); rango a medida (docs/16 §75). NAVEGADOR=firefox (por defecto) o chromium
-#   bash plataforma/pruebas/banco/banco.sh lote-navegador      alta masiva en tres pasos en un navegador real (1 280 y 390 px): pegar con una fila vacía y una mala, descargar las que no entran y volver a subirlas, crear y bajar las credenciales una vez (docs/19 §4 N11; docs/16 §76). NAVEGADOR=firefox (por defecto) o chromium
 #   bash plataforma/pruebas/banco/banco.sh historico           el promedio del sitio es el de sus dispositivos: los cinco casos de docs/19 §4 M7 con datos sembrados a propósito (docs/16 §68)
 #   bash plataforma/pruebas/banco/banco.sh cola                cola del broker vigilada: backend detenido + 200 emulados → descartes → condición broker_descarte (docs/16 §22)
 #   bash plataforma/pruebas/banco/banco.sh estado | logs [servicio] | sql ["CONSULTA"]
@@ -836,18 +835,6 @@ SQL
     echo; [ $fallos -eq 0 ] && echo "COLA OK" || { echo "$fallos comprobación(es) con falla"; exit 1; } ;;
   consultable) bash "$(dirname "$YO")/consultable.sh" http://127.0.0.1:3001 ;;   # docs/16 §48: todo dispositivo del banco es consultable de punta a punta
   vias) bash "$(dirname "$YO")/vias.sh" ;;   # docs/16 §49: la misma serie por las tres entradas (MQTT directo, HTTP y pasarela); mide pérdidas, duplicados, latencia y consumo
-  lote-navegador)
-    # P7, el alta masiva en tres pasos en un navegador real (docs/19 §4, N11; docs/16 §76), con la misma forma que «navegador»: Playwright
-    # maneja Firefox o Chromium, la clave de administrador del banco va por la entrada estándar, y no se siembran lecturas: la prueba crea
-    # dos dispositivos de descarte («lote-<sufijo>-a» y «-b») en la zona de emu-0001. La captura queda en la carpeta privada del banco.
-    NAVEGADOR="${NAVEGADOR:-firefox}"
-    case "$NAVEGADOR" in firefox|chromium) ;; *) echo "FALLA NAVEGADOR=$NAVEGADOR: firefox o chromium"; exit 2 ;; esac
-    [ "$(dc ps --format '{{.Status}}' backend | grep -c healthy)" = 1 ] || { echo "FALLA el banco no está arriba: «banco.sh encender» primero"; exit 1; }
-    (cd backend/panel && pnpm -s exec playwright install "$NAVEGADOR" >/dev/null) || { echo "FALLA no se pudo preparar $NAVEGADOR para Playwright"; exit 1; }
-    zona=$(psql_ -tA -c "SELECT z.nombre FROM dispositivo d JOIN zona z ON z.id = d.zona_id WHERE d.id_fisico = 'emu-0001'")
-    [ -n "$zona" ] || { echo "FALLA no está emu-0001 con su zona (¿«encender» sin emulados?)"; exit 1; }
-    printf '%s\n' "$(leer HTTP_CLAVE_ADMIN)" | (cd backend/panel && NAVEGADOR="$NAVEGADOR" node e2e/lote.mjs http://127.0.0.1:3001 "$zona" "$PRIV/lote.png")
-    r=$?; echo "captura: $PRIV/lote.png"; exit $r ;;
   historico) bash "$(dirname "$YO")/historico-sitio.sh" ;;   # docs/16 §68: GET /sitios/{id}/historico contra los cinco casos de docs/19 §4 M7
   apagar)
     # Sin el archivo de claves (vive en /run/user, que el sistema puede vaciar), Compose no interpola el proyecto y `down` no baja

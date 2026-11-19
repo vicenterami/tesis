@@ -10,7 +10,9 @@ import { ErrorApi } from './api';
 export const COLUMNA_MOTIVO = 'motivo';
 
 // ── La plantilla del servidor (GET /dispositivos/lote/plantilla) ───────────────────────────────────────────────────────────────────
-export interface ColumnaPlantilla { nombre: string; obligatoria: boolean; tope: number; texto_libre?: boolean; ayuda: string; ejemplo: string }
+// `rotulo`: el nombre de la columna para las personas; `simbolos`: lo que una columna de códigos admite además del ASCII imprimible (en
+// `canales`, «°» y «º»), con el tope contado en bytes UTF-8 (docs/19 §4, bloque S, puntos 2 y 4). Los dos los publica el servidor.
+export interface ColumnaPlantilla { nombre: string; obligatoria: boolean; tope: number; texto_libre?: boolean; ayuda: string; ejemplo: string; rotulo?: string; simbolos?: string }
 export interface PlantillaLote {
   columnas: ColumnaPlantilla[];
   max_filas: number;
@@ -21,16 +23,21 @@ export interface PlantillaLote {
 export type FilaLote = { n: number } & Partial<Record<string, string | number>>;
 // Un problema del archivo, con su caso de la tabla de docs/19 §4, N8b (qué pasó, por qué, qué se ve y qué se puede hacer).
 export interface Problema { caso: CasoError; texto: string }
+// Una fila mal formada (docs/19 §4, bloque S, punto 1): más o menos celdas que la cabecera, un carácter que no se admite o más larga que
+// el tope de su columna. No frena a las demás: no se envía, se muestra en la revisión como «No entra» con sus motivos (campo = la columna,
+// o `fila`) y va al CSV de las que no entran. `fila` lleva lo que la persona escribió, alineado a la cabecera (lo que sobra, en el motivo).
+export interface FilaNoEntra { fila: FilaLote; motivos: Nota[] }
 export interface LecturaCsv {
   filas: FilaLote[];
   errores: Problema[];
+  noEntran?: FilaNoEntra[];
 }
 
 // Los orígenes (docs/19 §4, N6): un archivo CSV, lo pegado desde la planilla (separado por tabuladores) y una lista JSON terminan en la
 // misma lista `filas`, cada una con su `n` (la fila del origen contando las vacías, con la cabecera en la 1; en JSON, la posición más 1).
 // El archivo y lo pegado van por el mismo lector de tablas (`leerCsv`); el JSON arma las mismas celdas y pasa por la misma comprobación.
 // Las columnas que el lector ignora al volver a subir lo que se descargó: `fila` y `motivo`.
-interface Registro { n: number; celdas: string[] }
+interface Registro { n: number; celdas: string[]; motivos?: Nota[] }
 export const COLUMNA_FILA = 'fila';
 const IGNORADAS: readonly string[] = [COLUMNA_FILA, COLUMNA_MOTIVO];
 
@@ -104,17 +111,47 @@ export function celdasTabla(texto: string, separadores: readonly string[]): { re
 }
 
 // Lo que se puede ver antes de enviar se ve aquí, con la fila y la columna (docs/19 §4, N8b): la pantalla es la ayuda; el servidor sigue
-// siendo la guarda real (filasDelCuerpo). Las reglas de las celdas salen de la plantilla (tope y `texto_libre` de cada columna), no de una copia.
-const ASCII_IMPRIMIBLE = /^[\x20\x21\x23-\x5b\x5d-\x7e]*$/; // la misma regla de alta/lote.ts para las columnas que no son texto libre
+// siendo la guarda real (filasDelCuerpo). Las reglas de las celdas salen de la plantilla (tope, `texto_libre` y `simbolos` de cada columna), no
+// de una copia. Desde el bloque S (punto 1) una celda mal formada deja su FILA fuera («No entra», con su motivo), no el archivo entero.
+const IMPRIMIBLE = /[\x20\x21\x23-\x5b\x5d-\x7e]/; // la misma regla de alta/lote.ts para las columnas que no son texto libre
 const CONTROL = /\p{Cc}/u;
 const SUSTITUTO_SUELTO = /\p{Cs}/u;
-const MAX_PROBLEMAS = 10;
+// Las MISMAS palabras que usa el servidor cuando una fila mal formada le llega igual (alta/lote.ts, TEXTOS_CELDA: lote.test.ts compara los
+// dos bloques letra por letra). `admitidos`: lo que la columna sí admite además del ASCII; `dobles`: los símbolos de la celda que el tope
+// cuenta como dos (bytes UTF-8).
+export const TEXTOS_CELDA = {
+  control: 'trae un salto de línea, un tabulador u otro carácter de control, que no se admite',
+  sustituto: 'trae un carácter dañado que no se puede leer',
+  simbolo: (c: string, admitidos = ''): string =>
+    `trae «${c}», que no se admite: solo letras sin tilde ni eñe, dígitos y signos simples${admitidos === '' ? '' : `, y también ${[...admitidos].map((x) => `«${x}»`).join(' y ')}`}, sin comillas dobles ni barra invertida`,
+  largo: (n: number, tope: number, dobles = ''): string =>
+    `tiene ${n} caracteres${dobles === '' ? '' : `, contando como dos cada ${[...dobles].map((x) => `«${x}»`).join(' y ')},`} y el máximo es ${tope}`,
+  tipo: 'no es texto ni número',
+} as const;
+const bytesUtf8 = (t: string): number => new TextEncoder().encode(t).length;
+// Lo que tiene mal una celda contra su columna, en palabras de la persona («Identificador: trae «ó», que no se admite…»), o null.
+export function motivoDeCelda(c: ColumnaPlantilla, v: string): string | null {
+  const rotulo = c.rotulo ?? c.nombre;
+  if (SUSTITUTO_SUELTO.test(v)) return `${rotulo}: ${TEXTOS_CELDA.sustituto}`;
+  if (CONTROL.test(v)) return `${rotulo}: ${TEXTOS_CELDA.control}`;
+  if (c.texto_libre !== true) {
+    for (const x of v) if (!IMPRIMIBLE.test(x) && !(c.simbolos ?? '').includes(x)) return `${rotulo}: ${TEXTOS_CELDA.simbolo(x, c.simbolos ?? '')}`;
+  }
+  // En las columnas de códigos, el tope en bytes UTF-8 (un «°» vale dos), como el servidor, y el texto dice cómo se contó; en el texto
+  // libre, en caracteres.
+  const largo = c.texto_libre === true ? v.length : bytesUtf8(v);
+  const dobles = c.texto_libre === true ? '' : [...new Set(v.replace(/[\x20-\x7e]/g, ''))].join('');
+  return largo > c.tope ? `${rotulo}: ${TEXTOS_CELDA.largo(largo, c.tope, dobles)}` : null;
+}
+const celdasDe = (k: number): string => (k === 1 ? '1 celda' : `${k} celdas`);
 // La descarga antepone un apóstrofo a una celda con forma de fórmula (punto 9); el lector lo quita para que lo descargado y vuelto a subir
 // sin tocar dé el mismo plan.
 const CON_APOSTROFO = /^'[=+\-@\t\r\n＝＋－＠]/;
 const sinApostrofo = (v: string): string => (CON_APOSTROFO.test(v) ? v.slice(1) : v);
 
-// El camino común de los tres orígenes: la cabecera y los registros (ya con sus `n`) → filas o los problemas del archivo.
+// El camino común de los tres orígenes: la cabecera y los registros (ya con sus `n`) → filas, las que no entran o los problemas del archivo.
+// El archivo entero se rechaza solo cuando no se puede leer (columnas desconocidas, repetidas u obligatorias que faltan, sin filas o más
+// filas que el tope); una fila mal formada pasa a «No entra» con su motivo y las demás se revisan (docs/19 §4, bloque S, punto 1).
 function comprobar(cabecera: string[], datos: Registro[], p: PlantillaLote, sinDatos: Problema): LecturaCsv {
   const errores: Problema[] = [];
   const columnas = p.columnas.map((c) => c.nombre);
@@ -125,36 +162,31 @@ function comprobar(cabecera: string[], datos: Registro[], p: PlantillaLote, sinD
   for (const x of new Set(cabecera.filter((x, i) => cabecera.indexOf(x) !== i))) errores.push({ caso: 'columna_repetida', texto: `La columna «${recorte(x)}» está repetida en la cabecera.` });
   if (datos.length === 0) errores.push(sinDatos);
   if (datos.length > p.max_filas) errores.push({ caso: 'demasiadas_filas', texto: `El archivo trae ${datos.length} filas y el máximo es ${p.max_filas}: divídelo en partes de ${p.max_filas} o menos.` });
-  if (errores.length > 0) return { filas: [], errores };
-  // Por fila: el número de celdas y cada celda contra su columna.
+  if (errores.length > 0) return { filas: [], errores, noEntran: [] };
+  // Por fila: el número de celdas y cada celda contra su columna. Lo que la persona escribió se conserva, alineado a la cabecera.
   const porNombre = new Map(p.columnas.map((c) => [c.nombre, c]));
+  const filas: FilaLote[] = [];
+  const noEntran: FilaNoEntra[] = [];
   for (const d of datos) {
-    if (errores.length >= MAX_PROBLEMAS) break;
-    if (d.celdas.length !== cabecera.length) {
-      errores.push({ caso: 'celdas_de_mas_o_de_menos', texto: `La fila ${d.n} trae ${d.celdas.length} celdas y la cabecera ${cabecera.length}.` });
-      continue;
-    }
-    cabecera.forEach((col, i) => {
-      const c = porNombre.get(col);
-      const v = sinApostrofo(d.celdas[i] ?? '').trim();
-      if (c === undefined || v === '' || errores.length >= MAX_PROBLEMAS) return;
-      const donde = `Fila ${d.n}, columna «${col}»`;
-      if (SUSTITUTO_SUELTO.test(v) || CONTROL.test(v)) errores.push({ caso: 'celda_invalida', texto: `${donde}: trae un carácter que no se admite (un salto de línea, un tabulador u otro carácter de control).` });
-      else if (c.texto_libre !== true && !ASCII_IMPRIMIBLE.test(v)) errores.push({ caso: 'celda_invalida', texto: `${donde}: solo admite letras sin acento, dígitos y signos ASCII, sin comillas dobles ni barra invertida («${recorte(v, 40)}»).` });
-      else if (v.length > c.tope) errores.push({ caso: 'celda_invalida', texto: `${donde}: tiene ${v.length} caracteres y el máximo es ${c.tope}.` });
-    });
-  }
-  if (errores.length > 0) return { filas: [], errores };
-  const filas = datos.map((d) => {
     const f: FilaLote = { n: d.n };
+    const motivos: Nota[] = [...(d.motivos ?? [])];
     cabecera.forEach((col, i) => {
       if (IGNORADAS.includes(col)) return;
       const v = sinApostrofo(d.celdas[i] ?? '').trim();
       if (v !== '') f[col] = v;
+      const c = porNombre.get(col);
+      const m = c === undefined || v === '' ? null : motivoDeCelda(c, v);
+      if (m !== null) motivos.push({ campo: col, texto: m });
     });
-    return f;
-  });
-  return { filas, errores: [] };
+    const k = d.celdas.length - cabecera.length;
+    if (k > 0) {
+      const sobran = d.celdas.slice(cabecera.length).map((x) => `«${recorte(x.trim(), 20)}»`).join(', ');
+      motivos.unshift({ campo: 'fila', texto: `la fila trae ${celdasDe(k)} más que la cabecera (${sobran}): ¿un separador de más dentro de una celda?` });
+    } else if (k < 0) motivos.unshift({ campo: 'fila', texto: `la fila trae ${celdasDe(-k)} menos que la cabecera: ¿falta un separador?` });
+    if (motivos.length > 0) noEntran.push({ fila: f, motivos });
+    else filas.push(f);
+  }
+  return { filas, errores: [], noEntran };
 }
 
 // Un archivo CSV o lo pegado desde la planilla (tabuladores): el mismo lector.
@@ -191,24 +223,24 @@ export function leerJson(texto: string, p: PlantillaLote): LecturaCsv {
   }
   if (problemas.length > 0) return { filas: [], errores: problemas };
   const cabecera = [...new Set(objetos.flatMap((o) => Object.keys(o).map((k) => k.trim().toLowerCase())))];
+  const rotulos = new Map(p.columnas.map((c) => [c.nombre, c.rotulo ?? c.nombre]));
   const datos: Registro[] = objetos.map((o, i) => {
     const porClave = new Map(Object.entries(o).map(([k, v]) => [k.trim().toLowerCase(), v]));
+    const motivos: Nota[] = [];
     const celdas = cabecera.map((col) => {
       const v = porClave.get(col);
       if (v === undefined || v === null) return '';
       if (typeof v === 'string') return v;
       // Un número ya perdió su escritura al leerse (`12345678901234567890` queda en `12345678901234567000`): solo se admiten los enteros que se
-      // escriben igual.
+      // escriben igual. Desde el bloque S (punto 1), una celda así deja fuera su fila, no el archivo.
       if (typeof v === 'number' && Number.isSafeInteger(v)) return String(v);
-      if (problemas.length < MAX_PROBLEMAS) {
-        problemas.push({ caso: 'celda_invalida', texto: typeof v === 'number' ? `Fila ${i + 1}, columna «${recorte(col)}»: el número no se puede leer tal como está escrito; escríbelo entre comillas.` : `Fila ${i + 1}, columna «${recorte(col)}»: no es texto ni número.` });
-      }
+      const rotulo = rotulos.get(col) ?? recorte(col);
+      motivos.push({ campo: col, texto: typeof v === 'number' ? `${rotulo}: el número no se puede leer tal como está escrito; escríbelo entre comillas` : `${rotulo}: ${TEXTOS_CELDA.tipo}` });
       return '';
     });
-    return { n: i + 1, celdas };
+    return { n: i + 1, celdas, motivos };
   });
-  if (problemas.length > 0) return { filas: [], errores: problemas };
-  return comprobar(cabecera, datos.filter((d) => d.celdas.some((x) => x.trim() !== '')), p, { caso: 'archivo_vacio', texto: 'El archivo está vacío.' });
+  return comprobar(cabecera, datos.filter((d) => d.celdas.some((x) => x.trim() !== '') || (d.motivos ?? []).length > 0), p, { caso: 'archivo_vacio', texto: 'El archivo está vacío.' });
 }
 
 // El único punto de entrada de la pantalla: el tamaño primero (un origen que pasa `max_bytes` tampoco cabría como cuerpo), después el JSON
@@ -216,6 +248,8 @@ export function leerJson(texto: string, p: PlantillaLote): LecturaCsv {
 export function leerOrigen(texto: string, p: PlantillaLote): LecturaCsv {
   const bytes = new TextEncoder().encode(texto).length;
   if (bytes > p.max_bytes) return { filas: [], errores: [{ caso: 'archivo_pesado', texto: textoPesado(bytes, p.max_bytes) }] };
+  // Un libro de Excel elegido con «Todos los archivos» (bloque S, punto 9): empieza con la firma de un zip, «PK» y los bytes 3 y 4.
+  if (/^PK\u0003\u0004/.test(texto)) return { filas: [], errores: [{ caso: 'libro_excel', texto: TEXTO_DE.libro_excel }] };
   return /^[\uFEFF\s]*[[{]/.test(texto) ? leerJson(texto, p) : leerCsv(texto, p);
 }
 const recorte = (t: string, max = 80): string => (t.length > max ? `${t.slice(0, max)}…` : t);
@@ -238,7 +272,11 @@ export interface FilaInforme {
   id: string | null;
   credencial: string | null;
   topico: string | null;
+  // A dónde envía el equipo creado según su vía (solo al crear; docs/19 §4, bloque S): el tópico MQTT, «POST /recepcion/<id>» o «por su pasarela <id>».
+  destino?: string | null;
   interpretada?: Record<string, unknown> | null;
+  // Lo interpretado en palabras de personas, escrito por el servidor (docs/19 §4, bloque S, punto 4): dónde se crea, el resumen y cada campo.
+  legible?: { donde: string; resumen: string; campos: Record<string, string> } | null;
   por_defecto?: string[];
   avisos?: Nota[];
   motivos?: Nota[];
@@ -250,8 +288,21 @@ export interface InformeLote {
   existentes: number;
   con_aviso?: number;
   huella: string;
+  zonas_por_nombre?: ZonaPorNombre[];
   filas: FilaInforme[];
 }
+// Las zonas escritas por su nombre en las filas que entran (bloque S, punto 3): la revisión lo dice una vez sobre la lista.
+export interface ZonaPorNombre { zona: string; sitio: string; filas: number }
+// Una fila mal formada, como fila del plan: «No entra», con sus motivos, sin pasar por el servidor (bloque S, punto 1).
+export function filaQueNoEntra(x: FilaNoEntra): FilaInforme {
+  const id = x.fila.id_fisico;
+  return {
+    n: x.fila.n, id_fisico: id === undefined ? '' : String(id), resultado: 'rechazada', motivo: x.motivos.map((m) => m.texto).join('; '), id: null, credencial: null,
+    topico: null, interpretada: null, legible: null, por_defecto: [], avisos: [], motivos: x.motivos,
+  };
+}
+// El plan del servidor y las filas que no entran por cómo están escritas, en el orden del origen.
+export const mezclarPlan = (servidor: readonly FilaInforme[], locales: readonly FilaInforme[]): FilaInforme[] => [...servidor, ...locales].sort((a, b) => a.n - b.n);
 
 // ── Crear: una petición, y la misma llave si la respuesta se pierde ────────────────────────────────────────────────────────────────
 // Se repite solo cuando no se sabe qué pasó (sin respuesta, o un 5xx —un 500 del servidor o un 502/503/504 de un intermediario— sin `codigo` del backend: pudo crear y fallar después); un 4xx o un
@@ -290,8 +341,10 @@ export async function crearConReintento<T>(
 }
 
 // ── Qué falló, por qué y qué hacer (docs/19 §4, N8b): una sola traducción de cada error a su mensaje y su acción ─────────────────────
+// Desde el bloque S (punto 1), una fila con celdas de más o de menos ya no es un error del archivo (era `celdas_de_mas_o_de_menos`): es un
+// motivo de esa fila. `celda_invalida` queda para lo que impide leer el archivo (una comilla sin cerrar, un JSON que no es una lista).
 export const CASOS_ERROR = [
-  'archivo_vacio', 'solo_cabecera', 'una_columna', 'columna_desconocida', 'falta_obligatoria', 'columna_repetida', 'celdas_de_mas_o_de_menos',
+  'archivo_vacio', 'solo_cabecera', 'una_columna', 'libro_excel', 'columna_desconocida', 'falta_obligatoria', 'columna_repetida',
   'demasiadas_filas', 'archivo_pesado', 'celda_invalida', 'rechazo_del_servidor', 'sesion_vencida', 'sin_permiso', 'lote_en_curso', 'plan_cambio',
   'demasiadas_peticiones', 'sin_respuesta', 'sin_conexion', 'nada_creado', 'lote_incierto', 'llave_reutilizada', 'otro',
 ] as const;
@@ -304,8 +357,8 @@ export const ROTULO_ACCION: Readonly<Record<AccionLote, string>> = {
 };
 // La acción de cada caso (la tabla de N8b). Una prueba recorre CASOS_ERROR y falla si alguno se queda sin acción o sin mensaje.
 export const ACCION_DE: Readonly<Record<CasoError, AccionLote>> = {
-  archivo_vacio: 'otro_archivo', solo_cabecera: 'otro_archivo', una_columna: 'plantilla', columna_desconocida: 'plantilla', falta_obligatoria: 'plantilla',
-  columna_repetida: 'plantilla', celdas_de_mas_o_de_menos: 'otro_archivo', demasiadas_filas: 'otro_archivo', archivo_pesado: 'otro_archivo',
+  archivo_vacio: 'otro_archivo', solo_cabecera: 'otro_archivo', una_columna: 'plantilla', libro_excel: 'otro_archivo', columna_desconocida: 'plantilla', falta_obligatoria: 'plantilla',
+  columna_repetida: 'plantilla', demasiadas_filas: 'otro_archivo', archivo_pesado: 'otro_archivo',
   celda_invalida: 'otro_archivo', rechazo_del_servidor: 'otro_archivo', sesion_vencida: 'sesion', sin_permiso: 'inventario', lote_en_curso: 'reintentar',
   plan_cambio: 'revisar', demasiadas_peticiones: 'reintentar', sin_respuesta: 'inventario', sin_conexion: 'reintentar', nada_creado: 'reintentar',
   lote_incierto: 'inventario', llave_reutilizada: 'revisar', otro: 'reintentar',
@@ -316,10 +369,10 @@ export const TEXTO_DE: Readonly<Record<CasoError, string>> = {
   archivo_vacio: 'El archivo está vacío.',
   solo_cabecera: 'El archivo trae la cabecera pero ninguna fila de datos.',
   una_columna: 'La cabecera tiene una sola columna: no hay «;», «,» ni tabulador entre las columnas.',
+  libro_excel: 'Es un libro de Excel. Guárdalo como CSV (Archivo → Guardar como) o copia las celdas y pégalas aquí.',
   columna_desconocida: 'El archivo trae una columna que no es de la plantilla.',
   falta_obligatoria: 'Falta una columna obligatoria.',
   columna_repetida: 'Una columna está repetida en la cabecera.',
-  celdas_de_mas_o_de_menos: 'Una fila trae más o menos celdas que la cabecera.',
   demasiadas_filas: 'El archivo trae más filas que el máximo: divídelo.',
   archivo_pesado: 'El archivo pesa más que el máximo: divídelo.',
   celda_invalida: 'Una celda pasa su tope o trae un carácter que no se admite.',
@@ -393,9 +446,9 @@ export function explicarError(e: unknown, ctx: { operacion: 'validar' | 'crear';
   return explicado('otro', TEXTO_DE.otro, motivos);
 }
 
-// Lo que se conserva de la pantalla en la memoria de la pestaña mientras la persona vuelve a entrar (la sesión venció: la aplicación muestra
-// «Entrar» y, al volver, el alta masiva retoma el archivo leído). Nunca las credenciales: esas se olvidan al perder la sesión.
-export const borradorLote: { archivo: string | null; filas: FilaLote[]; aviso: ErrorExplicado | null } = { archivo: null, filas: [], aviso: null };
+// La memoria del alta masiva en la pestaña (el borrador del origen y las credenciales sin descargar) vive en lib/lote-memoria.ts: la usa
+// también App.svelte al cerrar la sesión, sin cargar este módulo en la primera carga.
+export { borradorLote, credencialesLote, olvidarCredencialesLote, olvidarLote, retomarLoteDe } from './lote-memoria';
 export function nuevaLlave(): string {
   return crypto.randomUUID();
 }
@@ -416,10 +469,12 @@ const lineaCsv = (xs: readonly string[], separador = ','): string => xs.join(sep
 const BOM = '\uFEFF';
 const tablaCsv = (lineas: readonly string[]): string => `${BOM}${lineas.join('\r\n')}\r\n`;
 
-// Las credenciales de las creadas: id_fisico, id, credencial, tópico. CRLF (RFC 4180); es para máquinas: con coma y sin BOM.
+// Las credenciales de las creadas: id_fisico, id, credencial y destino, a dónde envía cada uno según su vía (desde el bloque S; antes, `topico`,
+// vacío fuera de MQTT): el tópico MQTT, «POST /recepcion/<id_fisico>» o «por su pasarela <id_fisico>», con la credencial vacía (la
+// pasarela autentica a los LoRaWAN). CRLF (RFC 4180); es para máquinas: con coma y sin BOM.
 export function csvCredenciales(filas: readonly FilaInforme[]): string {
   const creadas = filas.filter((f) => f.resultado === 'creada');
-  return [lineaCsv(['id_fisico', 'id', 'credencial', 'topico']), ...creadas.map((f) => lineaCsv([celda(f.id_fisico, true), celda(f.id, true), celda(f.credencial, true), celda(f.topico, true)]))].join('\r\n') + '\r\n';
+  return [lineaCsv(['id_fisico', 'id', 'credencial', 'destino']), ...creadas.map((f) => lineaCsv([celda(f.id_fisico, true), celda(f.id, true), celda(f.credencial, true), celda(f.destino ?? f.topico, true)]))].join('\r\n') + '\r\n';
 }
 
 // Las que no entran, con las columnas de la plantilla en su orden y, al final, `fila` (la del origen) y `motivo`: se corrigen y se vuelven

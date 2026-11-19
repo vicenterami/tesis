@@ -1810,7 +1810,7 @@ entra. Lo que aquí se marca «a fijar al implementar» es un detalle que el dis
     período), que las ocho cumplen; la más lenta, 1 088 ms.
 67. **Alta masiva: plan por fila, todo o nada y reintento (`docs/19 §4`, N; 15/11/2026).** `POST /dispositivos/lote?modo=validar|crear`
     (Etapa 4) responde `{leidas, validas, existentes, rechazadas, con_aviso, huella, filas}` (validas + existentes + rechazadas = leidas;
-    `con_aviso` es transversal) y cada fila suma, a lo que ya traía (`n, id_fisico, resultado, motivo, id, credencial, topico`: ninguna
+    `con_aviso` cuenta las filas con avisos, que desde el 19/11/2026 son solo las que entran: punto viii) y cada fila suma, a lo que ya traía (`n, id_fisico, resultado, motivo, id, credencial, topico`: ninguna
     respuesta cambia de forma, punto 65 i), `interpretada` (lo que se creará: identificador normalizado, nombre, sitio, zona y su id, vía,
     formato resuelto, intervalo, canales con nombre y unidad, pasarela y su id, decodificador y tópico; `null` si no entra o ya existe),
     `por_defecto`, `avisos` y `motivos` (listas de `{campo, texto}`; `motivo` es la unión de `motivos`). Decisiones: (i) **`n` lo manda el
@@ -1846,7 +1846,17 @@ entra. Lo que aquí se marca «a fijar al implementar» es un detalle que el dis
     plantilla y en el `location` del lote del proxy; ese tope es solo de `POST` a esa ruta (las demás, 100 KiB; en el proxy, 128 KiB), y en
     esa ruta una petición sin la cookie de sesión ni `X-Clave-Admin` es 401 antes de leer el cuerpo. Los 413 del proxy salen en JSON. (vii) `GET /dispositivos/lote/plantilla`
     publica columnas, topes, `max_filas`, `max_bytes` y separadores (la acción «escribir»); `GET /magnitudes`, el catálogo, a cualquier
-    sesión (`docs/20 §6`). Probado con la falla plantada y medido en `docs/16 §71`.
+    sesión (`docs/20 §6`). Probado con la falla plantada y medido en `docs/16 §71`. (viii) **Sin fricción (`docs/19 §4`, S; 19/11/2026),
+    todo aditivo:** la respuesta suma `zonas_por_nombre` (las zonas escritas por su nombre en las filas que entran, con el sitio por su
+    nombre y cuántas filas; ya no es un aviso por fila) y cada fila que entra, `legible` (dónde, el resumen y cada campo como se leen, fuera de
+    la huella); solo las filas que entran traen avisos. El `texto` de avisos y motivos va en palabras para personas (`campo` sigue nombrando
+    la columna); `validarAlta` conserva los textos de la API del alta de a uno, y el lote los traduce. En `canales`, la unidad se acepta como
+    la del catálogo o con una escritura común de la misma (`alta/unidades.ts`, la única tabla: «°C», «ºC», «C» o «degC» por `Cel`; «%» por
+    la unidad porcentual de la magnitud), que se guarda como la del catálogo, con aviso; otra unidad no entra ni se convierte. Por eso `canales`
+    admite también «°» y «º», y en las columnas de códigos el tope se cuenta en bytes UTF-8: el peor caso y `MAX_BYTES_LOTE` no cambian. La
+    plantilla suma `rotulo` y `simbolos` en cada columna, y los 400 de una celda dicen «fila N, Rótulo: …» con las palabras del panel. En
+    `modo=crear`, cada fila creada trae `destino`, a dónde envía según su vía (el tópico MQTT, `POST /recepcion/{id_fisico}` o «por su
+    pasarela <id_fisico>»), que es la cuarta columna del archivo de credenciales del panel.
 68. **Esperando primera trama y «en servicio desde» (`docs/19 §2` y §4, P; 18/11/2026; migración 26).** Un equipo dado de alta que nunca
     envió una trama se mostraba «Normal» y el supervisor no lo veía: la consulta de caídos exige `visto_por_ultima_vez`. Decidido: (i)
     `dispositivo.en_servicio_desde`, el instante desde el cual se espera que reporte: nace con el alta (`DEFAULT now()`, también en el alta

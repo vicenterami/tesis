@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { FilaInforme } from './lote';
-import { DE_A, FILTROS, camposDeFila, coincide, conAvisoQueSeCrean, contar, filtroInicial, fraseDeFila, resumenDeFila } from './revision';
+import { DE_A, FILTROS, ROTULO_TOPICO, camposDeFila, coincide, conAvisoQueSeCrean, contar, filtroInicial, fraseDeFila, resumenDeFila, resumenRevision } from './revision';
 
 // La revisión del alta masiva (docs/19 §4, N7): la frase de cada fila, los cinco filtros que cuentan lo que muestran y el detalle por campo.
 const base = { id: null, credencial: null, topico: null } as const;
@@ -32,7 +32,7 @@ describe('los cinco filtros', () => {
 describe('«Qué pasa»: una frase con su icono', () => {
   it('se crea (con su zona y su sitio), ya existe (y el caso dado de baja) y no entra (con su primer motivo y cuántos más)', () => {
     expect(fraseDeFila(SE_CREA)).toEqual({ tono: 'normal', icono: 'alta', texto: 'Se crea en Zona norte (sitio uct)' });
-    expect(fraseDeFila(EXISTE)).toEqual({ tono: 'inactivo', icono: 'existe', texto: 'Ya existe: no se toca' });
+    expect(fraseDeFila(EXISTE)).toEqual({ tono: 'alerta', icono: 'existe', texto: 'Ya existe: no se toca' });
     expect(fraseDeFila(EXISTE_BAJA).texto).toBe('Ya existe, dado de baja: se reactiva desde su ficha');
     expect(fraseDeFila(NO_ENTRA)).toEqual({ tono: 'sin_senal', icono: 'cerrar', texto: 'No entra: zona vacía (y 2 más)' });
     expect(fraseDeFila({ ...NO_ENTRA, motivos: [NO_ENTRA.motivos![0]!] }).texto).toBe('No entra: zona vacía');
@@ -71,5 +71,36 @@ describe('el detalle campo por campo', () => {
     expect(campos.find((c) => c.campo === 'canales')).toMatchObject({ valor: 'x', motivos: ['falta'] });
     expect(campos.some((c) => c.campo === 'topico')).toBe(false);
     expect(sueltas).toEqual([{ tipo: 'motivo', campo: 'fila', texto: 'otra cosa' }]);
+  });
+});
+
+describe('bloque S: las palabras del servidor, el resumen y «Ya existe» en ámbar (docs/19 §4)', () => {
+  const COLS = ['id_fisico', 'nombre', 'zona', 'via', 'formato', 'intervalo_esperado_s', 'canales', 'pasarela', 'decodificador'];
+  const ROTULOS = { id_fisico: 'Identificador', nombre: 'Nombre', zona: 'Zona', via: 'Vía', formato: 'Formato', intervalo_esperado_s: 'Cada cuánto reporta', canales: 'Canales', pasarela: 'Pasarela', decodificador: 'Decodificador' };
+  const LEGIBLE = {
+    donde: 'Zona norte (sitio Campus)', resumen: 'MQTT, SenML, cada 5 min: temperatura (°C), humedad (% de humedad)',
+    campos: { id_fisico: 'n-1', nombre: 'Uno', zona: 'Zona norte (sitio Campus)', via: 'MQTT', formato: 'SenML', intervalo_esperado_s: 'cada 5 min', canales: 'temperatura en °C | humedad en % de humedad', pasarela: '', decodificador: '', topico: 'uct/n-1/senml' },
+  };
+  const CON_PALABRAS: FilaInforme = { ...SE_CREA, avisos: [], legible: LEGIBLE };
+  it('S4: la frase, el resumen y el detalle usan lo que escribió el servidor (el sitio por su nombre, «MQTT», «cada 5 min», «°C»), con el rótulo de cada campo', () => {
+    expect(fraseDeFila(CON_PALABRAS).texto).toBe('Se crea en Zona norte (sitio Campus)');
+    expect(resumenDeFila(CON_PALABRAS)).toBe(LEGIBLE.resumen);
+    const { campos } = camposDeFila(CON_PALABRAS, undefined, COLS, ROTULOS);
+    expect(campos.map((c) => [c.rotulo, c.valor])).toEqual([
+      ['Identificador', 'n-1'], ['Nombre', 'Uno'], ['Zona', 'Zona norte (sitio Campus)'], ['Vía', 'MQTT'], ['Formato', 'SenML'], ['Cada cuánto reporta', 'cada 5 min'],
+      ['Canales', 'temperatura en °C | humedad en % de humedad'], ['Pasarela', ''], ['Decodificador', ''], [ROTULO_TOPICO, 'uct/n-1/senml'],
+    ]);
+    // Ningún rótulo ni valor a la vista trae un nombre de columna o de variable, ni el código de una vía o un formato.
+    const JERGA = /\b[a-z]+_[a-z_]+\b|\b(mqtt|senml)\b|%RH/;
+    expect(campos.filter((c) => c.campo !== 'topico').flatMap((c) => [c.rotulo, c.valor]).filter((t) => JERGA.test(t))).toEqual([]);
+  });
+  it('S5: «Ya existe» va en ámbar (alerta) con su icono, no con la cruz roja', () => {
+    expect([fraseDeFila(EXISTE).tono, fraseDeFila(EXISTE).icono]).toEqual(['alerta', 'existe']);
+    expect(fraseDeFila(EXISTE_BAJA).tono).toBe('alerta');
+  });
+  it('S6: el resumen sobre la lista dice cuántas se leyeron, se crean, ya existen y no entran', () => {
+    expect(resumenRevision(contar(TODAS))).toBe('4 leídas: 1 se crea, 2 ya existen y 1 no entra.');
+    expect(resumenRevision(contar([SE_CREA]))).toBe('1 leída: 1 se crea.');
+    expect(resumenRevision({ leidas: 60, valida: 44, existe: 1, rechazada: 15, aviso: 3 })).toBe('60 leídas: 44 se crean, 1 ya existe y 15 no entran.');
   });
 });

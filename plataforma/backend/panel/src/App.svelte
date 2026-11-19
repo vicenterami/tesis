@@ -27,6 +27,7 @@
   import { avisoDeError, type DatosAviso } from './lib/avisos';
   import { textoSinExportar } from './lib/exportar';
   import { olvidarMarcados } from './lib/comparar';
+  import { olvidarLote } from './lib/lote-memoria';
   import { fijarPreferencias, guardarPreferencias, olvidarPreferencias, suscribirPreferencias } from './lib/escritor-preferencias';
   import { seguirArmazon, type AnchoArmazon } from './lib/medios';
   import type { Preferencias as DatosPreferencias, Salud, Sitio } from './lib/modelo';
@@ -287,6 +288,7 @@
 
   // Al salir o al darse de baja, la persona siguiente no hereda nada: ni la pantalla, ni el sitio, ni el tema, ni las preferencias.
   function dejarLimpio(): void {
+    olvidarLote(); // el archivo del alta masiva y sus credenciales sin descargar no pasan a quien entre después (docs/19 §4, bloque S, punto 7)
     olvidarMarcados();
     olvidarPreferencias();
     rutaGuardada = null;

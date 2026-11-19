@@ -1,16 +1,29 @@
 import { describe, expect, it, vi } from 'vitest';
 import { ErrorApi, descargarTexto } from './api';
 import {
-  ACCION_DE, ACCIONES_LOTE, CASOS_ERROR, FalloDeCreacion, ROTULO_ACCION, TEXTO_DE, baseDeDescarga, celda, celdasTabla, crearConReintento, csvCredenciales, csvPlantilla, csvRechazadas,
-  describirCambios, excedeBytes, explicarError, leerCsv, leerJson, leerOrigen, type CasoError, type FilaInforme, type PlantillaLote,
+  ACCION_DE, ACCIONES_LOTE, CASOS_ERROR, FalloDeCreacion, ROTULO_ACCION, TEXTO_DE, baseDeDescarga, celda, celdasTabla, crearConReintento, csvCredenciales, csvPlantilla,
+  csvRechazadas, describirCambios, excedeBytes, explicarError, filaQueNoEntra, leerCsv, leerJson, leerOrigen, mezclarPlan, motivoDeCelda, type CasoError, type FilaInforme, type PlantillaLote,
 } from './lote';
+// Las palabras del servidor para una celda mal formada (alta/lote.ts, TEXTOS_CELDA), como texto: el panel no puede decir otras (S1 y S4).
+import fuenteLote from '../../../src/alta/lote.ts?raw';
+import fuentePanel from './lote.ts?raw';
+// El catálogo fijo de escenarios del alta masiva (docs/19 §4, S11): el mismo archivo que recorre el e2e en navegador real.
+import ESCENARIOS_CSV from '../../e2e/datos/lote-escenarios.csv?raw';
+import ESCENARIOS from '../../e2e/datos/lote-escenarios.json';
 
 // P7, alta masiva (docs/19 §4, F2 y bloque N): el CSV en el navegador con la plantilla del servidor, el `n` de cada fila contando las
 // vacías, y la creación en una petición con la misma llave si la respuesta se pierde.
 const COLS = ['id_fisico', 'nombre', 'zona', 'via', 'formato', 'intervalo_esperado_s', 'canales', 'pasarela', 'decodificador'];
 const OBLIGATORIAS = ['id_fisico', 'nombre', 'zona', 'intervalo_esperado_s', 'canales'];
+// Los rótulos y los símbolos de la plantilla del servidor (alta/lote.ts, ROTULOS y SIMBOLOS_COLUMNA).
+const ROTULOS: Record<string, string> = {
+  id_fisico: 'Identificador', nombre: 'Nombre', zona: 'Zona', via: 'Vía', formato: 'Formato', intervalo_esperado_s: 'Cada cuánto reporta', canales: 'Canales', pasarela: 'Pasarela', decodificador: 'Decodificador',
+};
 const PLANTILLA: PlantillaLote = {
-  columnas: COLS.map((nombre) => ({ nombre, obligatoria: OBLIGATORIAS.includes(nombre), tope: 80, texto_libre: nombre === 'nombre' || nombre === 'zona', ayuda: '', ejemplo: nombre === 'canales' ? 'temperatura:Cel | humedad:%RH' : nombre === 'id_fisico' ? 'nodo-ejemplo-01' : '' })),
+  columnas: COLS.map((nombre) => ({
+    nombre, obligatoria: OBLIGATORIAS.includes(nombre), tope: 80, texto_libre: nombre === 'nombre' || nombre === 'zona', ayuda: '', ejemplo: nombre === 'canales' ? 'temperatura:Cel | humedad:%RH' : nombre === 'id_fisico' ? 'nodo-ejemplo-01' : '',
+    rotulo: ROTULOS[nombre], simbolos: nombre === 'canales' ? '°º' : '',
+  })),
   max_filas: 500, max_bytes: 1_147_904, separadores: { columnas: [';', ',', '\t'], canales: ['|', ';'] },
 };
 const CAB = COLS.join(',');
@@ -41,9 +54,36 @@ describe('el CSV', () => {
     expect(leerCsv('', PLANTILLA).errores).toEqual([{ caso: 'archivo_vacio', texto: 'El archivo está vacío.' }]);
     expect(leerOrigen('x'.repeat(11), { ...PLANTILLA, max_bytes: 10 }).errores[0]?.caso).toBe('archivo_pesado');
   });
-  it('una fila con más o menos celdas que la cabecera no se envía y dice cuántas trae y cuántas la cabecera', () => {
-    expect(leerCsv(`${CAB}\nn-1,Uno,Lab,,,60,temperatura,,,sobra`, PLANTILLA)).toEqual({ filas: [], errores: [{ caso: 'celdas_de_mas_o_de_menos', texto: 'La fila 2 trae 10 celdas y la cabecera 9.' }] });
-    expect(leerCsv(`${CAB}\nn-1,Uno,Lab,,,60,temperatura,,\nn-2,Dos,Lab`, PLANTILLA).errores).toEqual([{ caso: 'celdas_de_mas_o_de_menos', texto: 'La fila 3 trae 3 celdas y la cabecera 9.' }]);
+  it('S1: una fila con más o menos celdas que la cabecera no se envía y NO frena a las demás: «No entra», con lo que sobra o falta dicho en su motivo', () => {
+    const l = leerCsv(`${CAB}\nn-1,Uno,Lab,,,60,temperatura,,,sobra\nn-2,Dos,Lab,,,60,temperatura,,\nn-3,Tres,Lab`, PLANTILLA);
+    expect(l.errores).toEqual([]);
+    expect(l.filas.map((f) => f.n)).toEqual([3]);
+    expect(l.noEntran).toEqual([
+      { fila: { n: 2, id_fisico: 'n-1', nombre: 'Uno', zona: 'Lab', intervalo_esperado_s: '60', canales: 'temperatura' }, motivos: [{ campo: 'fila', texto: 'la fila trae 1 celda más que la cabecera («sobra»): ¿un separador de más dentro de una celda?' }] },
+      { fila: { n: 4, id_fisico: 'n-3', nombre: 'Tres', zona: 'Lab' }, motivos: [{ campo: 'fila', texto: 'la fila trae 6 celdas menos que la cabecera: ¿falta un separador?' }] },
+    ]);
+  });
+  it('S1: una celda con un carácter que no se admite, de control o sobre su tope deja fuera su fila, con todos sus motivos por campo, en las palabras de la persona', () => {
+    const l = leerCsv(`${CAB}\nnodo-ñ,${'N'.repeat(81)},Lab,,,60,temperatura,,\nn-2,"Uno\nDos",Lab,,,60,temperatura:°C | humedad:%,,\nn-3,Tres,Lab,,,60,temperatura:°F,,`, PLANTILLA);
+    expect(l.errores).toEqual([]);
+    expect(l.noEntran?.map((x) => [x.fila.n, x.motivos])).toEqual([
+      [2, [{ campo: 'id_fisico', texto: 'Identificador: trae «ñ», que no se admite: solo letras sin tilde ni eñe, dígitos y signos simples, sin comillas dobles ni barra invertida' },
+        { campo: 'nombre', texto: 'Nombre: tiene 81 caracteres y el máximo es 80' }]],
+      [3, [{ campo: 'nombre', texto: 'Nombre: trae un salto de línea, un tabulador u otro carácter de control, que no se admite' }]],
+    ]);
+    // «°» se admite en `canales` (la plantilla lo publica en `simbolos`), así que «°C» y «°F» llegan al servidor, que decide la unidad (S2).
+    expect(l.filas.map((f) => f.n)).toEqual([4]);
+    expect(motivoDeCelda(PLANTILLA.columnas.find((c) => c.nombre === 'canales')!, `${'°'.repeat(40)}x`)).toBe('Canales: tiene 81 caracteres, contando como dos cada «°», y el máximo es 80'); // en bytes, como el servidor, y dicho
+  });
+  it('S1 y S4: las palabras de una celda mal formada son las del servidor (alta/lote.ts): el bloque TEXTOS_CELDA es el mismo, letra por letra', () => {
+    const bloque = (fuente: string): string => /export const TEXTOS_CELDA = \{[\s\S]*?\} as const;/.exec(fuente)?.[0] ?? 'no está';
+    expect(bloque(fuentePanel)).toBe(bloque(fuenteLote));
+    expect(bloque(fuenteLote)).not.toBe('no está');
+    // Lo que se admite y cómo se contó, dicho (S2): en `canales`, «°» y «º» sí; el tope en bytes, con cada «°» como dos.
+    const canales = PLANTILLA.columnas.find((c) => c.nombre === 'canales')!;
+    expect(motivoDeCelda(canales, 'temperatura:é')).toBe('Canales: trae «é», que no se admite: solo letras sin tilde ni eñe, dígitos y signos simples, y también «°» y «º», sin comillas dobles ni barra invertida');
+    expect(motivoDeCelda(PLANTILLA.columnas[0]!, 'nodo-é')).toBe('Identificador: trae «é», que no se admite: solo letras sin tilde ni eñe, dígitos y signos simples, sin comillas dobles ni barra invertida');
+    expect(motivoDeCelda(canales, 'x'.repeat(81))).toBe('Canales: tiene 81 caracteres y el máximo es 80');
   });
   it('una sola columna (ningún separador de la plantilla) se avisa antes de enviar; con «;» o tabulador la cabecera se separa sola', () => {
     const l = leerCsv('id_fisico|nombre|zona\nx|y|z', PLANTILLA);
@@ -88,10 +128,13 @@ describe('los tres orígenes dan las mismas filas (docs/19 §4, N6)', () => {
     expect(leerJson('{"a":1}', PLANTILLA).errores[0]).toEqual({ caso: 'celda_invalida', texto: 'El JSON debe ser una lista de objetos con las columnas de la plantilla.' });
     expect(leerJson('[1, 2]', PLANTILLA).errores[0]?.caso).toBe('celda_invalida');
     expect(leerJson('[{', PLANTILLA).errores[0]?.texto).toContain('no se puede leer');
-    expect(leerJson(JSON.stringify([{ ...A, nombre: true }]), PLANTILLA).errores).toEqual([{ caso: 'celda_invalida', texto: 'Fila 1, columna «nombre»: no es texto ni número.' }]);
+    // S1: una celda que no es texto ni número deja fuera su fila, no el archivo.
+    const j = leerJson(JSON.stringify([{ ...A, nombre: true }, B]), PLANTILLA);
+    expect([j.errores, j.filas.map((f) => f.n), j.noEntran?.map((x) => [x.fila.n, x.motivos])]).toEqual([[], [2], [[1, [{ campo: 'nombre', texto: 'Nombre: no es texto ni número' }]]]]);
+    expect(leerJson(JSON.stringify([{ ...A, id_fisico: 12345678901234567890 }]), PLANTILLA).noEntran?.[0]?.motivos[0]?.texto).toBe('Identificador: el número no se puede leer tal como está escrito; escríbelo entre comillas');
     expect(leerJson(JSON.stringify([{ ...A, color: 'rojo' }]), PLANTILLA).errores[0]?.caso).toBe('columna_desconocida');
     expect(leerJson('[]', PLANTILLA).errores[0]?.caso).toBe('archivo_vacio');
-    expect(leerJson(JSON.stringify([{ ...A, nombre: 'N'.repeat(81) }]), PLANTILLA).errores[0]?.texto).toContain('Fila 1, columna «nombre»: tiene 81 caracteres');
+    expect(leerJson(JSON.stringify([{ ...A, nombre: 'N'.repeat(81) }]), PLANTILLA).noEntran?.[0]?.motivos[0]?.texto).toBe('Nombre: tiene 81 caracteres y el máximo es 80');
   });
 });
 
@@ -99,8 +142,16 @@ describe('lo que se descarga (docs/19 §4, N9)', () => {
   const rechazada = (n: number, motivo: string): FilaInforme => ({ n, id_fisico: 'n-2', resultado: 'rechazada', motivo, id: null, credencial: null, topico: null });
   it('credenciales tal cual (son para máquinas, con coma); el ejemplo sale de la plantilla con «;», BOM y CRLF', () => {
     const creada: FilaInforme = { n: 2, id_fisico: 'n-1', resultado: 'creada', motivo: null, id: 'u1', credencial: '-abc,1', topico: 't/1' };
-    expect(csvCredenciales([creada])).toBe('id_fisico,id,credencial,topico\r\nn-1,u1,"-abc,1",t/1\r\n');
+    expect(csvCredenciales([creada])).toBe('id_fisico,id,credencial,destino\r\nn-1,u1,"-abc,1",t/1\r\n');
     expect(csvPlantilla(PLANTILLA)).toBe(`﻿${COLS.join(';')}\r\nnodo-ejemplo-01;;;;;;temperatura:Cel | humedad:%RH;;\r\n`);
+  });
+  it('el archivo de credenciales dice a dónde envía cada equipo según su vía: MQTT, su tópico; HTTP, POST /recepcion/<id>; LoRaWAN, por su pasarela, sin credencial', () => {
+    const creada = (id_fisico: string, credencial: string | null, destino: string): FilaInforme => ({ n: 2, id_fisico, resultado: 'creada', motivo: null, id: `u-${id_fisico}`, credencial, topico: null, destino });
+    expect(csvCredenciales([
+      creada('n-1', 'c1', 'sitio/uct/dispositivo/n-1/<magnitud>'), creada('n-2', 'c2', 'POST /recepcion/n-2'), creada('0101010101010101', null, 'por su pasarela ug65-campus'),
+    ]).split('\r\n')).toEqual([
+      'id_fisico,id,credencial,destino', 'n-1,u-n-1,c1,sitio/uct/dispositivo/n-1/<magnitud>', 'n-2,u-n-2,c2,POST /recepcion/n-2', '0101010101010101,u-0101010101010101,,por su pasarela ug65-campus', '',
+    ]);
   });
   it('fórmulas: «-1+cmd|…» y «＝1+2» salen con apóstrofo; un número entero («-5», «+3,2») queda intacto; tabulador y salto de línea también se neutralizan', () => {
     expect(celda('-1+cmd|\'!A0')).toBe("'-1+cmd|'!A0");
@@ -139,7 +190,7 @@ describe('lo que se descarga (docs/19 §4, N9)', () => {
   });
   it('el CSV de credenciales deja el identificador tal cual, aunque empiece con un carácter de fórmula', () => {
     const creada: FilaInforme = { n: 2, id_fisico: '-nodo', resultado: 'creada', motivo: null, id: 'u1', credencial: '-abc', topico: 't/1' };
-    expect(csvCredenciales([creada])).toBe('id_fisico,id,credencial,topico\r\n-nodo,u1,-abc,t/1\r\n');
+    expect(csvCredenciales([creada])).toBe('id_fisico,id,credencial,destino\r\n-nodo,u1,-abc,t/1\r\n');
   });
   it('el nombre de la descarga de «las que no entran» conserva lo que admite el alfabeto de nombreDeArchivo y no cae al de por omisión', () => {
     expect(baseDeDescarga('lote (1).csv')).toBe('lote 1');
@@ -163,7 +214,7 @@ describe('comillas mal cerradas y números que pierden precisión', () => {
   it('JSON: dos claves que solo difieren en mayúsculas son una columna repetida; un número que pierde su escritura se rechaza, un entero seguro pasa', () => {
     expect(leerJson('[{"id_fisico":"a","ID_FISICO":"b"}]', PLANTILLA).errores).toEqual([{ caso: 'columna_repetida', texto: 'La columna «id_fisico» está repetida en la cabecera.' }]);
     const grande = leerJson('[{"id_fisico":12345678901234567890,"nombre":"x","zona":"Lab","intervalo_esperado_s":60,"canales":"humedad"}]', PLANTILLA);
-    expect(grande.errores).toEqual([{ caso: 'celda_invalida', texto: 'Fila 1, columna «id_fisico»: el número no se puede leer tal como está escrito; escríbelo entre comillas.' }]);
+    expect([grande.errores, grande.filas, grande.noEntran?.[0]?.motivos]).toEqual([[], [], [{ campo: 'id_fisico', texto: 'Identificador: el número no se puede leer tal como está escrito; escríbelo entre comillas' }]]);
     expect(leerJson('[{"id_fisico":"12345678901234567890","nombre":"x","zona":"Lab","intervalo_esperado_s":60,"canales":"humedad"}]', PLANTILLA).filas[0]).toMatchObject({ id_fisico: '12345678901234567890', intervalo_esperado_s: '60' });
   });
 });
@@ -242,12 +293,10 @@ const DEL_ARCHIVO: [string, string, CasoError, string][] = [
   ['una columna que no es de la plantilla', `${CAB},color\nn-1,Uno,Lab,,,60,temperatura,,,rojo`, 'columna_desconocida', 'La columna «color» no es de la plantilla'],
   ['falta una obligatoria', 'id_fisico,nombre,zona,canales\nx,y,z,w', 'falta_obligatoria', 'Falta la columna obligatoria «intervalo_esperado_s»'],
   ['una columna repetida', `${CAB},zona\nx`, 'columna_repetida', 'La columna «zona» está repetida'],
-  ['una fila con celdas de más', `${CAB}\nn-1,Uno,Lab,,,60,temperatura,,,de más`, 'celdas_de_mas_o_de_menos', 'La fila 2 trae 10 celdas y la cabecera 9'],
+  ['un libro de Excel (la firma de un zip)', 'PK\u0003\u0004\u0014\u0000\u0006\u0000[Content_Types].xml', 'libro_excel', 'Es un libro de Excel. Guárdalo como CSV (Archivo → Guardar como) o copia las celdas y pégalas aquí.'],
   ['demasiadas filas', `${CAB}\n${'n,a,b,,,60,t,,\n'.repeat(501)}`, 'demasiadas_filas', 'El archivo trae 501 filas y el máximo es 500'],
   ['muy pesado', 'x'.repeat(2_000_000), 'archivo_pesado', 'El archivo pesa 2 MB y el máximo es 1,1 MB'],
-  ['una celda sobre su tope', `${CAB}\nn-1,${'N'.repeat(81)},Lab,,,60,temperatura,,`, 'celda_invalida', 'Fila 2, columna «nombre»: tiene 81 caracteres y el máximo es 80'],
-  ['un carácter no admitido en un código', `${CAB}\nnodo-ñ,Uno,Lab,,,60,temperatura,,`, 'celda_invalida', 'Fila 2, columna «id_fisico»: solo admite letras sin acento'],
-  ['un carácter de control', `${CAB}\nn-1,"Uno\nDos",Lab,,,60,temperatura,,`, 'celda_invalida', 'Fila 2, columna «nombre»: trae un carácter que no se admite'],
+  ['una comilla sin cerrar (lo que impide leer el resto del archivo)', `${CAB}\nn-1,"Uno,Lab,,,60,temperatura,,`, 'celda_invalida', 'Fila 2: comilla sin cerrar.'],
 ];
 
 describe('la tabla de errores del alta masiva (docs/19 §4, N8b)', () => {
@@ -283,5 +332,34 @@ describe('la tabla de errores del alta masiva (docs/19 §4, N8b)', () => {
       'Fila 31 (nodo-31): sigue entrando, pero cambió formato milesight → chirpstack',
     ]);
     expect(explicarError(new FalloDeCreacion(api(409, { codigo: 'plan_cambio', plan: { filas: NUEVO } }), 1), { operacion: 'crear', visto: VISTO }).detalles).toHaveLength(3);
+  });
+});
+
+describe('el catálogo fijo de escenarios (docs/19 §4, S11; e2e/datos/lote-escenarios.*)', () => {
+  const COLS7 = ['id_fisico', 'nombre', 'zona', 'via', 'formato', 'intervalo_esperado_s', 'canales'];
+  it('S1: las 60 filas se leen; las dos mal formadas (tilde en el identificador y una celda de más) no entran con su motivo y las otras 58 se envían', () => {
+    const l = leerOrigen(ESCENARIOS_CSV, PLANTILLA);
+    expect(l.errores).toEqual([]);
+    expect(l.filas).toHaveLength(ESCENARIOS.totales.enviadas);
+    expect(l.filas.length + (l.noEntran ?? []).length).toBe(ESCENARIOS.totales.leidas);
+    const delPanel = ESCENARIOS.casos.filter((c) => c.donde === 'panel');
+    expect((l.noEntran ?? []).map((x) => x.fila.n)).toEqual(delPanel.map((c) => c.n));
+    for (const c of delPanel) expect([c.caso, l.noEntran!.find((x) => x.fila.n === c.n)!.motivos.map((m) => m.texto).join('; ')]).toEqual([c.caso, expect.stringContaining(c.contiene)]);
+    // Los números de fila son los de la planilla: la vacía después de la fila de datos 20 cuenta.
+    expect(l.filas.slice(18, 22).map((f) => f.n)).toEqual([20, 21, 23, 24]);
+  });
+  it('S1: las que no entran por cómo están escritas van al plan con su motivo, en el orden del archivo, y al CSV de las que no entran, alineadas a la cabecera', () => {
+    const l = leerOrigen(ESCENARIOS_CSV, PLANTILLA);
+    const locales = (l.noEntran ?? []).map(filaQueNoEntra);
+    const servidor: FilaInforme[] = l.filas.map((f) => ({ n: f.n, id_fisico: String(f.id_fisico), resultado: 'valida', motivo: null, id: null, credencial: null, topico: null }));
+    const plan = mezclarPlan(servidor, locales);
+    expect(plan.map((f) => f.n)).toEqual([...plan.map((f) => f.n)].sort((a, b) => a - b));
+    expect(plan.filter((f) => f.resultado === 'rechazada').map((f) => [f.n, f.motivos![0]!.campo])).toEqual([[59, 'id_fisico'], [60, 'fila']]);
+    const csv = csvRechazadas(COLS7, [...l.filas, ...(l.noEntran ?? []).map((x) => x.fila)], plan).split('\r\n');
+    expect(csv[1]).toBe('xprefijo-sensór;Nodo 57 invernadero;Galpón Sur;;;60;"temperatura:Cel;humedad:%RH";59;"Identificador: trae «ó», que no se admite: solo letras sin tilde ni eñe, dígitos y signos simples, sin comillas dobles ni barra invertida"');
+    expect(csv[2]).toMatch(/^xprefijo-e58;Nodo 58 invernadero;Norte;;;60;"temperatura:Cel;humedad:%RH";60;la fila trae 1 celda más que la cabecera \(«sobra»\)/);
+    // Vuelto a subir sin tocar: la de la tilde no entra otra vez con el mismo motivo; la de la celda de más ya viene alineada y la revisa el servidor.
+    const otra = leerOrigen(csv.join('\r\n'), PLANTILLA);
+    expect([otra.errores, otra.filas.map((f) => f.id_fisico), otra.noEntran?.map((x) => x.motivos[0]!.texto)]).toEqual([[], ['xprefijo-e58'], [locales[0]!.motivo]]);
   });
 });

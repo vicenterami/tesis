@@ -7,6 +7,7 @@ import { createHash } from 'node:crypto';
 import { BadRequestException, HttpException, HttpStatus, PayloadTooLargeException } from '@nestjs/common';
 import { AltaValidada, Formato, MAX_CANALES, validarAlta } from './alta.dto.js';
 import { PERFILES } from '../recepcion/adaptadores/perfiles.js';
+import { SIMBOLOS_UNIDAD, comoSeLee, unidadEscrita } from './unidades.js';
 
 // Una sola constante para el tope de filas (la usan la validación, la plantilla y la documentación del contrato).
 export const MAX_FILAS_LOTE = 500;
@@ -47,7 +48,10 @@ export const SEPARADORES_LOTE = { columnas: [';', ',', '\t'], canales: ['|', ';'
 
 // `texto_libre`: admite cualquier carácter imprimible (nombre y zona); las demás, solo ASCII imprimible sin «"» ni «\» (filasDelCuerpo). Lo
 // publica la plantilla para que la pantalla compruebe lo mismo antes de enviar (revisión del 15/11/2026), sin copiar la lista.
-export interface ColumnaPlantilla { nombre: ColumnaLote; obligatoria: boolean; tope: number; texto_libre: boolean; ayuda: string; ejemplo: string }
+// `rotulo` (bloque S, punto 4): el nombre de la columna para las personas, el que usan los motivos y el detalle de la revisión. `simbolos`
+// (bloque S, punto 2): lo que una columna de códigos admite además del ASCII imprimible (en `canales`, «°» y «º» de «°C»); en esas columnas el
+// tope se cuenta en bytes UTF-8, así cada uno de esos símbolos vale dos y el peor caso del cuerpo (MAX_BYTES_LOTE) no cambia.
+export interface ColumnaPlantilla { nombre: ColumnaLote; obligatoria: boolean; tope: number; texto_libre: boolean; ayuda: string; ejemplo: string; rotulo: string; simbolos: string }
 export interface PlantillaLote {
   columnas: ColumnaPlantilla[];
   max_filas: number;
@@ -61,14 +65,40 @@ const AYUDAS: Readonly<Record<ColumnaLote, [obligatoria: boolean, ayuda: string,
   via: [false, 'mqtt, http o lorawan; vacía, mqtt.', 'mqtt'],
   formato: [false, 'senml o plano (vías mqtt y http); vacío, senml. Un nodo lorawan hereda el de su pasarela.', 'senml'],
   intervalo_esperado_s: [true, 'Segundos esperados entre tramas: un entero de 5 a 86400.', '300'],
-  canales: [true, `De 1 a ${MAX_CANALES} canales «magnitud:unidad» separados por «|» (también se admite «;»); la unidad es opcional y, si va, la canónica del catálogo (GET /magnitudes).`, 'temperatura:Cel | humedad:%RH'],
+  canales: [true, `De 1 a ${MAX_CANALES} canales «magnitud:unidad» separados por «|» (también se admite «;»); la unidad es opcional y, si va, la del catálogo (GET /magnitudes) o una forma común de escribirla: «°C» o «C» por Cel, «%» por %RH o %EL.`, 'temperatura:Cel | humedad:%RH'],
   pasarela: [false, 'Solo vía lorawan, y ahí obligatoria: id_fisico o UUID de una pasarela activa del mismo sitio.', ''],
   decodificador: [false, `Solo vía lorawan, opcional: perfil con que la plataforma decodifica la carga (${PERFILES.join(', ')}).`, ''],
 };
+// ── Las palabras de la persona (bloque S, punto 4) ───────────────────────────────────────────────────────────────────────────────
+// El `campo` de cada motivo y aviso queda para las máquinas; el texto los nombra así. Lo publica la plantilla (`rotulo`) para que el panel
+// diga lo mismo al leer el archivo y en el detalle de la revisión.
+export const ROTULOS: Readonly<Record<ColumnaLote, string>> = {
+  id_fisico: 'Identificador', nombre: 'Nombre', zona: 'Zona', via: 'Vía', formato: 'Formato', intervalo_esperado_s: 'Cada cuánto reporta',
+  canales: 'Canales', pasarela: 'Pasarela', decodificador: 'Decodificador',
+};
+export const NOMBRE_VIA: Readonly<Record<string, string>> = { mqtt: 'MQTT', http: 'HTTP', lorawan: 'LoRaWAN' };
+export const NOMBRE_FORMATO: Readonly<Record<string, string>> = { senml: 'SenML', plano: 'texto plano', milesight: 'Milesight', chirpstack: 'ChirpStack' };
+// Lo que puede tener mal una celda, con las MISMAS palabras que usa el panel al leer el archivo (panel/src/lib/lote.ts, `motivoDeCelda`; una
+// prueba del panel compara este bloque con el suyo, letra por letra). El servidor lo dice como «fila N, Rótulo: texto»; el panel, en la fila,
+// «Rótulo: texto». `admitidos`: los símbolos que la columna sí admite además del ASCII (en `canales`, «°» y «º»); `dobles`: los de la celda,
+// que el tope cuenta como dos (bytes UTF-8).
+export const TEXTOS_CELDA = {
+  control: 'trae un salto de línea, un tabulador u otro carácter de control, que no se admite',
+  sustituto: 'trae un carácter dañado que no se puede leer',
+  simbolo: (c: string, admitidos = ''): string =>
+    `trae «${c}», que no se admite: solo letras sin tilde ni eñe, dígitos y signos simples${admitidos === '' ? '' : `, y también ${[...admitidos].map((x) => `«${x}»`).join(' y ')}`}, sin comillas dobles ni barra invertida`,
+  largo: (n: number, tope: number, dobles = ''): string =>
+    `tiene ${n} caracteres${dobles === '' ? '' : `, contando como dos cada ${[...dobles].map((x) => `«${x}»`).join(' y ')},`} y el máximo es ${tope}`,
+  tipo: 'no es texto ni número',
+} as const;
+// Los símbolos que una columna de códigos admite además del ASCII imprimible: los de las escrituras de unidad (unidades.ts), solo en `canales`.
+export const SIMBOLOS_COLUMNA: Readonly<Partial<Record<ColumnaLote, string>>> = { canales: SIMBOLOS_UNIDAD };
+
 export function plantillaLote(): PlantillaLote {
   return {
     columnas: COLUMNAS_LOTE.map((nombre) => ({
       nombre, obligatoria: AYUDAS[nombre][0], tope: TOPES_COLUMNA[nombre], texto_libre: COLUMNAS_TEXTO_LIBRE.includes(nombre), ayuda: AYUDAS[nombre][1], ejemplo: AYUDAS[nombre][2],
+      rotulo: ROTULOS[nombre], simbolos: SIMBOLOS_COLUMNA[nombre] ?? '',
     })),
     max_filas: MAX_FILAS_LOTE, max_bytes: MAX_BYTES_LOTE, separadores: SEPARADORES_LOTE,
   };
@@ -81,7 +111,7 @@ export interface CanalInterpretado { magnitud: string; nombre: string; unidad: s
 export interface Interpretada {
   id_fisico: string;
   nombre: string;
-  sitio: string; // código del sitio
+  sitio: string; // código del sitio (el nombre, para las personas, va en `legible`)
   zona: string; // nombre de la zona
   zona_id: string;
   via: string;
@@ -101,12 +131,21 @@ export interface FilaInforme {
   id: string | null;
   credencial: string | null;
   topico: string | null;
+  // A dónde envía el equipo creado, según su vía (solo en `crear`, con la credencial; docs/19 §4, bloque S, decidido al implementar):
+  // MQTT, su tópico; HTTP, «POST /recepcion/<id_fisico>»; LoRaWAN, «por su pasarela <id_fisico de la pasarela>». `topico` sigue como estaba.
+  destino: string | null;
   interpretada: Interpretada | null; // lo que se creará; null si la fila no entra (o ya existe)
+  // Lo mismo en palabras de personas (bloque S, punto 4; aditivo, fuera de la huella): dónde se crea («Norte (sitio Campus)»), el resumen
+  // de una línea y cada campo como se lee («MQTT», «SenML», «cada 5 min», «temperatura en °C»). null si la fila no entra.
+  legible: Legible | null;
   por_defecto: string[];
   avisos: Nota[];
   motivos: Nota[];
 }
-export interface ZonaCatalogo { id: string; nombre: string; sitio_id: string; sitio_codigo: string }
+export interface Legible { donde: string; resumen: string; campos: Record<string, string> }
+// Las zonas escritas por su nombre en las filas que entran (bloque S, punto 3): ya no es un aviso por fila; la revisión lo dice una vez.
+export interface ZonaPorNombre { zona: string; sitio: string; filas: number }
+export interface ZonaCatalogo { id: string; nombre: string; sitio_id: string; sitio_codigo: string; sitio_nombre?: string }
 export interface PasarelaCatalogo { id: string; id_fisico: string; sitio_id: string; activo: boolean; formato: Formato }
 export interface MagnitudCatalogo { nombre: string; unidad: string }
 export interface Catalogos {
@@ -115,7 +154,8 @@ export interface Catalogos {
   pasarelas: readonly PasarelaCatalogo[];
   existentes: ReadonlyMap<string, { id: string; estado: string }>; // dispositivos de SUS sitios con el id_fisico de alguna fila
   idsDePasarela: ReadonlySet<string>; // id_fisico ya usados por una pasarela de sus sitios (comparten espacio de nombres: migración 11)
-  // id_fisico de alguna fila que ya usa un dispositivo o una pasarela de OTRO sitio: no se revela de quién ni su id ni su estado (RF-41).
+  // id_fisico de alguna fila que ya usa un dispositivo o una pasarela de OTRO sitio: no se revela de quién ni su id ni su estado (RF-41):
+  // «ese identificador ya está en uso en la plataforma: elige otro».
   // Sigue sin poder usarse (id_fisico es único en toda la plataforma): la fila se rechaza con un motivo que no dice más.
   ajenos: ReadonlySet<string>;
 }
@@ -151,7 +191,16 @@ export const FORMA_HUELLA = /^[0-9a-f]{64}$/;
 // (`canales`: códigos de magnitud y unidades canónicas del catálogo, todas ASCII hoy; una unidad que no lo fuera exigiría revisar esto).
 export const COLUMNAS_TEXTO_LIBRE: readonly ColumnaLote[] = ['nombre', 'zona'];
 // ASCII imprimible sin «"» ni «\»: ningún código, identificador, número ni unidad del catálogo los usa, y el JSON los escribe con dos bytes.
-const ASCII_IMPRIMIBLE = /^[\x20\x21\x23-\x5b\x5d-\x7e]*$/;
+// Una columna de códigos admite además sus `SIMBOLOS_COLUMNA` (en `canales`, «°» y «º»), que el JSON escribe tal cual en UTF-8.
+const IMPRIMIBLE = /[\x20\x21\x23-\x5b\x5d-\x7e]/;
+// El primer carácter que una columna de códigos no admite, o null si los admite todos.
+export function caracterNoAdmitido(t: string, simbolos = ''): string | null {
+  for (const c of t) if (!IMPRIMIBLE.test(c) && !simbolos.includes(c)) return c;
+  return null;
+}
+// El largo contra el tope: en el texto libre, en caracteres (unidades UTF-16, como hasta el 15/11/2026); en las columnas de códigos, en bytes
+// UTF-8 (igual a los caracteres mientras sean ASCII; un «°» vale dos): así el peor caso del cuerpo no cambia al admitir los símbolos.
+export const largoDeCelda = (columna: ColumnaLote, t: string): number => (COLUMNAS_TEXTO_LIBRE.includes(columna) ? t.length : Buffer.byteLength(t));
 const CONTROL = /\p{Cc}/u;
 const SUSTITUTO_SUELTO = /\p{Cs}/u; // en modo «u», un par de sustitutos es un solo punto de código: solo calzan los sueltos
 const MAX_MOTIVOS_CUERPO = 20;
@@ -195,16 +244,20 @@ export function filasDelCuerpo(cuerpo: unknown, modo: ModoLote = 'validar'): { f
         motivos.push(`${etiqueta}: columna no admitida: ${recorte(k)}`);
         continue;
       }
+      // Con las palabras con que el panel dice lo mismo al leer el archivo (bloque S, puntos 1 y 4): «fila 8, Nombre: …».
+      const donde = `${etiqueta}, ${ROTULOS[k]}`;
       const tope = TOPES_COLUMNA[k];
       if (typeof v === 'number' ? !Number.isFinite(v) : typeof v !== 'string') {
-        motivos.push(`${etiqueta}: ${k} debe ser texto o número`);
+        motivos.push(`${donde}: ${TEXTOS_CELDA.tipo}`);
         continue;
       }
       const t = String(v);
-      if (SUSTITUTO_SUELTO.test(t)) motivos.push(`${etiqueta}: ${k} trae un carácter no válido (un sustituto UTF-16 suelto)`);
-      else if (CONTROL.test(t)) motivos.push(`${etiqueta}: ${k} trae un carácter de control`);
-      else if (!COLUMNAS_TEXTO_LIBRE.includes(k) && !ASCII_IMPRIMIBLE.test(t)) motivos.push(`${etiqueta}: ${k} admite solo caracteres ASCII imprimibles, sin comillas dobles ni barra invertida`);
-      else if (t.length > tope) motivos.push(`${etiqueta}: ${k} pasa su tope de ${tope} caracteres (trae ${t.length})`);
+      const libre = COLUMNAS_TEXTO_LIBRE.includes(k);
+      const otro = libre ? null : caracterNoAdmitido(t, SIMBOLOS_COLUMNA[k]);
+      if (SUSTITUTO_SUELTO.test(t)) motivos.push(`${donde}: ${TEXTOS_CELDA.sustituto}`);
+      else if (CONTROL.test(t)) motivos.push(`${donde}: ${TEXTOS_CELDA.control}`);
+      else if (otro !== null) motivos.push(`${donde}: ${TEXTOS_CELDA.simbolo(otro, SIMBOLOS_COLUMNA[k])}`);
+      else if (largoDeCelda(k, t) > tope) motivos.push(`${donde}: ${TEXTOS_CELDA.largo(largoDeCelda(k, t), tope, libre ? '' : [...new Set(t.replace(/[\x20-\x7e]/g, ''))].join(''))}`);
     }
     salida.push(o as FilaEntrada);
   });
@@ -216,24 +269,65 @@ export function filasDelCuerpo(cuerpo: unknown, modo: ModoLote = 'validar'): { f
   return { filas: salida, huella };
 }
 
-// `canales` como en la planilla: «magnitud:unidad | magnitud:unidad» (también con «;»). La unidad es opcional; si viene, la canónica.
+// `canales` como en la planilla: «magnitud:unidad | magnitud:unidad» (también con «;»). La unidad es opcional; si viene, la del catálogo o
+// una escritura común de la misma (unidades.ts; bloque S, punto 2), que se guarda como la del catálogo y se dice como aviso.
 export function leerCanales(v: unknown, magnitudes: ReadonlyMap<string, MagnitudCatalogo>, motivos: Nota[], avisos: Nota[]): { magnitud: string }[] {
   const t = texto(v);
-  if (t === '') {
-    motivos.push({ campo: 'canales', texto: 'canales vacío: «magnitud:unidad | magnitud:unidad»' });
+  const partes = t.split(/[|;]/).map((x) => x.trim()).filter((x) => x !== '');
+  // Una celda que solo trae separadores («|», «;») tampoco trae canales: el mismo motivo que la vacía, no el genérico «la fila no entra».
+  if (partes.length === 0) {
+    motivos.push({ campo: 'canales', texto: 'faltan los canales: escribe «magnitud:unidad», como «temperatura:°C | humedad:%»' });
     return [];
   }
   const canales: { magnitud: string }[] = [];
-  for (const parte of t.split(/[|;]/).map((x) => x.trim()).filter((x) => x !== '')) {
+  for (const parte of partes) {
     const [m = '', u] = parte.split(':').map((x) => x.trim());
     const magnitud = m.toLowerCase();
     const cat = magnitudes.get(magnitud);
-    if (cat === undefined) motivos.push({ campo: 'canales', texto: `magnitud desconocida: ${magnitud || '(vacía)'}` });
-    else if (u !== undefined && u !== '' && u !== cat.unidad) motivos.push({ campo: 'canales', texto: `${magnitud}: la unidad es ${cat.unidad}, no ${u}` });
-    else if (u === undefined || u === '') avisos.push({ campo: 'canales', texto: `${magnitud} sin unidad: se asume ${cat.unidad}` });
+    if (magnitud === '') motivos.push({ campo: 'canales', texto: 'un canal no trae magnitud: escribe «magnitud:unidad», como «temperatura:°C»' });
+    else if (cat === undefined) motivos.push({ campo: 'canales', texto: magnitudDesconocida(magnitud, magnitudes) });
+    else if (u === undefined || u === '') avisos.push({ campo: 'canales', texto: `${magnitud} sin unidad: se usa ${comoSeLee(cat.unidad)}` });
+    else {
+      const escrita = unidadEscrita(u, cat.unidad);
+      if (escrita === null) motivos.push({ campo: 'canales', texto: `${magnitud} va en ${comoSeLee(cat.unidad)}: «${recorte(u, 20)}» es otra unidad y no se convierte` });
+      else if (escrita === 'escritura') avisos.push({ campo: 'canales', texto: `${magnitud}: ${u} se leyó como ${cat.unidad} (${comoSeLee(cat.unidad)})` });
+    }
     canales.push({ magnitud });
   }
   return canales;
+}
+
+// «magnitud desconocida «temperatur»: ¿quisiste decir «temperatura»?» (bloque S, punto 5): la más cercana del catálogo, solo si hay UNA a
+// poca distancia (dos ediciones o menos); si no, la lista del catálogo, que es corta.
+export function magnitudDesconocida(m: string, magnitudes: ReadonlyMap<string, MagnitudCatalogo>): string {
+  const parecida = masCercana(m, [...magnitudes.keys()]);
+  if (parecida !== null) return `magnitud desconocida «${recorte(m, 40)}»: ¿quisiste decir «${parecida}»?`;
+  return `magnitud desconocida «${recorte(m, 40)}»: las del catálogo son ${[...magnitudes.keys()].sort().join(', ')}`;
+}
+export function masCercana(m: string, opciones: readonly string[], maxima = 2): string | null {
+  let mejor: string | null = null;
+  let menor = Infinity;
+  let empate = false;
+  for (const o of opciones) {
+    const d = distancia(m, o);
+    if (d < menor) [mejor, menor, empate] = [o, d, false];
+    else if (d === menor) empate = true;
+  }
+  return mejor !== null && !empate && menor <= maxima ? mejor : null;
+}
+// Distancia de edición (Levenshtein) entre dos códigos cortos (hasta 40 caracteres: el tope de la magnitud).
+function distancia(a: string, b: string): number {
+  const d = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    let diagonal = d[0];
+    d[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const arriba = d[j];
+      d[j] = Math.min(arriba + 1, d[j - 1] + 1, diagonal + (a[i - 1] === b[j - 1] ? 0 : 1));
+      diagonal = arriba;
+    }
+  }
+  return d[b.length];
 }
 
 // El campo de un motivo de validarAlta, por su comienzo (los textos empiezan con el nombre del campo del alta de a uno).
@@ -245,13 +339,56 @@ function campoDe(m: string): string {
   return columna ?? 'fila';
 }
 
+// «Cada cuánto reporta» distingue la celda vacía, la mal escrita y la fuera de rango (bloque S, punto 4).
+function textoIntervalo(t: string): string {
+  if (t === '') return 'falta cada cuánto reporta: un número entero de segundos, de 5 a 86 400';
+  if (!/^\d+$/.test(t)) return `cada cuánto reporta va en segundos enteros, sin decimales, letras ni signos: «${recorte(t, 20)}» no se puede leer`;
+  return `cada cuánto reporta va de 5 a 86 400 segundos: ${t} es ${Number(t) < 5 ? 'muy poco' : 'demasiado'}`;
+}
+
+// Los motivos de validarAlta (la misma función del alta de a uno, que sigue decidiendo: bloque N, punto 1) en las palabras de la persona
+// (bloque S, punto 4). Su texto es el de la API del alta de a uno, para máquinas («intervalo_esperado_s debe ser…»); aquí se dice qué
+// pasa y qué hacer. null = ya lo dice otro motivo de la misma fila. Lo que no se reconoce pasa tal cual: la prueba de las palabras
+// (lote.spec.ts) recorre cada regla de validarAlta y falla si un texto trae un nombre de columna o de variable.
+interface ContextoFila { id: string; nombre: string; via: string; formato: string; decodificador: string; intervalo: string; canales: number; motivos: readonly Nota[] }
+function enPalabras(m: string, x: ContextoFila): Nota | null {
+  const ya = (campo: string): boolean => x.motivos.some((n) => n.campo === campo);
+  let r: RegExpExecArray | null;
+  if (/^id_fisico debe tener entre/.test(m)) return { campo: 'id_fisico', texto: x.id === '' ? 'falta el identificador' : `el identificador debe tener entre 3 y 63 caracteres (trae ${x.id.length})` };
+  if (/^id_fisico: minúsculas/.test(m)) return { campo: 'id_fisico', texto: `el identificador «${recorte(x.id, 40)}» solo admite minúsculas, dígitos y guiones, sin tildes, espacios ni otros signos, y no empieza con guion` };
+  if ((r = /^id_fisico reservado para el sistema: (.*)$/.exec(m)) !== null) return { campo: 'id_fisico', texto: `el identificador «${r[1]}» está reservado para el sistema: elige otro` };
+  if (/^nombre debe tener entre/.test(m)) return { campo: 'nombre', texto: x.nombre === '' ? 'falta el nombre' : 'el nombre debe tener entre 1 y 80 caracteres' };
+  if (/^via debe ser una de/.test(m)) return { campo: 'via', texto: `la vía «${recorte(x.via, 40)}» no existe: escribe MQTT, HTTP o LoRaWAN (vacía, MQTT)` };
+  if (/^formato debe ser una de/.test(m)) return { campo: 'formato', texto: `el formato «${recorte(x.formato, 40)}» no existe: escribe SenML o plano (vacío, SenML)` };
+  if (/^formato: un dispositivo lorawan/.test(m)) return { campo: 'formato', texto: 'un equipo LoRaWAN no declara formato: usa el de su pasarela' };
+  if (/^pasarela_id (no es un UUID|debe tener entre)/.test(m)) return ya('pasarela') ? null : { campo: 'pasarela', texto: 'la pasarela no existe en tus sitios' };
+  if (/necesita pasarela_id/.test(m)) return { campo: 'pasarela', texto: 'falta la pasarela: un equipo LoRaWAN la necesita (su identificador)' };
+  if (/^pasarela_id solo aplica/.test(m)) return { campo: 'pasarela', texto: 'la pasarela solo va en un equipo LoRaWAN: deja esa celda vacía o cambia la vía' };
+  if (/^decodificador solo aplica/.test(m)) return { campo: 'decodificador', texto: 'el decodificador solo va en un equipo LoRaWAN: deja esa celda vacía' };
+  if ((r = /^decodificador debe ser una de: (.*)$/.exec(m)) !== null) return { campo: 'decodificador', texto: `el decodificador «${recorte(x.decodificador, 40)}» no existe: los que hay son ${r[1]}` };
+  if (/^intervalo_esperado_s debe ser/.test(m)) return { campo: 'intervalo_esperado_s', texto: textoIntervalo(x.intervalo) };
+  if (/^canales debe ser una lista de/.test(m)) return x.canales === 0 ? null : { campo: 'canales', texto: `trae ${x.canales} canales y el máximo es ${MAX_CANALES}` };
+  if ((r = /^canales\[(\d+)\]\.magnitud repetida: (.*)$/.exec(m)) !== null) return { campo: 'canales', texto: `el canal ${Number(r[1]) + 1} repite la magnitud «${r[2]}»` };
+  if (/^canales\[\d+\]\.magnitud debe tener/.test(m)) return ya('canales') ? null : { campo: 'canales', texto: 'un canal no trae magnitud' };
+  if (/^zona_id /.test(m)) return null; // la zona ya trae su motivo (validarLote)
+  return { campo: campoDe(m), texto: m };
+}
+
 function topicoDe(via: string, sitio: string, idFisico: string, pasarela: string | null): string {
   if (via === 'http') return `/recepcion/${idFisico}`;
   if (via === 'lorawan') return `sitio/${sitio}/pasarela/${pasarela ?? '?'}/${idFisico}/<evento>`;
   return `sitio/${sitio}/dispositivo/${idFisico}/<magnitud>`;
 }
+// A dónde envía un equipo según su vía (el archivo de credenciales lo dice por equipo; docs/19 §4, bloque S).
+export function destinoDe(i: Pick<Interpretada, 'via' | 'id_fisico' | 'pasarela' | 'topico'>): string {
+  if (i.via === 'http') return `POST /recepcion/${i.id_fisico}`;
+  if (i.via === 'lorawan') return `por su pasarela ${i.pasarela ?? '?'}`;
+  return i.topico;
+}
+// Un intervalo como se lee: «cada 5 min», «cada 1 h», «cada 45 s».
+export const cadaCuanto = (s: number): string => `cada ${s % 3600 === 0 ? `${s / 3600} h` : s % 60 === 0 ? `${s / 60} min` : `${s} s`}`;
 
-export function validarLote(filas: readonly FilaEntrada[], cat: Catalogos, reservados: readonly string[] = []): { informe: FilaInforme[]; altas: AltaDeLote[] } {
+export function validarLote(filas: readonly FilaEntrada[], cat: Catalogos, reservados: readonly string[] = []): { informe: FilaInforme[]; altas: AltaDeLote[]; zonas: ZonaPorNombre[] } {
   const informe: FilaInforme[] = [];
   const altas: AltaDeLote[] = [];
   const vistos = new Map<string, number>();
@@ -267,6 +404,8 @@ export function validarLote(filas: readonly FilaEntrada[], cat: Catalogos, reser
   for (const x of cat.zonas) zonasPorNombre.set(x.nombre.toLowerCase(), [...(zonasPorNombre.get(x.nombre.toLowerCase()) ?? []), x]);
   const pasarelasPorId = new Map(cat.pasarelas.map((x) => [x.id, x]));
   const pasarelasPorIdFisico = new Map(cat.pasarelas.map((x) => [x.id_fisico, x]));
+  // Las zonas escritas por su nombre en las filas que entran, por zona (bloque S, punto 3), en el orden en que aparecen.
+  const porNombre = new Map<string, ZonaPorNombre>();
   for (const f of filas) {
     const n = f.n;
     const crudo = texto(f.id_fisico);
@@ -275,19 +414,20 @@ export function validarLote(filas: readonly FilaEntrada[], cat: Catalogos, reser
     const avisos: Nota[] = [];
     const porDefecto: string[] = [];
     const fila = (resultado: Resultado, extra: Partial<FilaInforme> = {}): FilaInforme => ({
-      n, id_fisico: idFisico, resultado, motivo: motivos.length > 0 ? motivos.map((m) => m.texto).join('; ') : null, id: null, credencial: null, topico: null,
-      interpretada: null, por_defecto: porDefecto, avisos, motivos, ...extra,
+      n, id_fisico: idFisico, resultado, motivo: motivos.length > 0 ? motivos.map((m) => m.texto).join('; ') : null, id: null, credencial: null, topico: null, destino: null,
+      interpretada: null, legible: null, por_defecto: porDefecto, avisos, motivos, ...extra,
     });
     // Lo que no es de la fila: el identificador repetido, ajeno o ya dado de alta se responde sin mirar más (y sin avisos: RF-41).
     const antes = vistos.get(idFisico);
     if (idFisico !== '' && antes !== undefined) {
-      motivos.push({ campo: 'id_fisico', texto: `id_fisico repetido: ya está en la fila ${antes}` });
+      motivos.push({ campo: 'id_fisico', texto: `el identificador se repite en el archivo: ya está en la fila ${antes}` });
       informe.push(fila('rechazada'));
       continue;
     }
     if (idFisico !== '') vistos.set(idFisico, n);
     if (cat.ajenos.has(idFisico)) {
-      motivos.push({ campo: 'id_fisico', texto: 'identificador no disponible' });
+      // Sin decir dónde ni de quién (RF-41), con el remedio (bloque S, punto 5).
+      motivos.push({ campo: 'id_fisico', texto: 'ese identificador ya está en uso en la plataforma: elige otro' });
       informe.push(fila('rechazada'));
       continue;
     }
@@ -298,22 +438,22 @@ export function validarLote(filas: readonly FilaEntrada[], cat: Catalogos, reser
       informe.push(fila('existe', { id: existente.id }));
       continue;
     }
-    if (crudo !== idFisico) avisos.push({ campo: 'id_fisico', texto: `venía con mayúsculas: se guardará como «${idFisico}»` });
-    if (cat.idsDePasarela.has(idFisico)) motivos.push({ campo: 'id_fisico', texto: `id_fisico «${idFisico}» ya lo usa una pasarela` });
+    if (crudo !== idFisico) avisos.push({ campo: 'id_fisico', texto: `el identificador venía con mayúsculas: se guardará como «${idFisico}»` });
+    if (cat.idsDePasarela.has(idFisico)) motivos.push({ campo: 'id_fisico', texto: `el identificador «${idFisico}» ya lo usa una pasarela: elige otro` });
     const otras = (nombres.get(texto(f.nombre).toLowerCase()) ?? []).filter((x) => x !== n);
     if (otras.length > 0) avisos.push({ campo: 'nombre', texto: `el nombre se repite en la fila ${otras[0]}${otras.length > 1 ? ` y ${otras.length - 1} más` : ''}` });
 
-    // Zona: su UUID o su nombre, entre las zonas de los sitios donde quien carga puede dar de alta.
+    // Zona: su UUID o su nombre, entre las zonas de los sitios donde quien carga puede dar de alta. Por su nombre, si calza con una sola, ya
+    // no es aviso (bloque S, punto 3): la revisión lo dice una vez sobre la lista (`zonas_por_nombre`).
     const z = texto(f.zona);
     const porId = UUID.test(z);
     const porIdZona = porId ? zonasPorId.get(z.toLowerCase()) : undefined;
     const candidatas = porId ? (porIdZona === undefined ? [] : [porIdZona]) : (zonasPorNombre.get(z.toLowerCase()) ?? []);
     let zona: ZonaCatalogo | undefined;
-    if (z === '') motivos.push({ campo: 'zona', texto: 'zona vacía' });
-    else if (candidatas.length === 0) motivos.push({ campo: 'zona', texto: `zona «${z}» no existe en tus sitios` });
-    else if (candidatas.length > 1) motivos.push({ campo: 'zona', texto: `zona «${z}» existe en más de un sitio: usa su id` });
+    if (z === '') motivos.push({ campo: 'zona', texto: 'falta la zona: su nombre, o su UUID si el nombre se repite en dos sitios' });
+    else if (candidatas.length === 0) motivos.push({ campo: 'zona', texto: `la zona «${recorte(z, 40)}» no existe en tus sitios: revisa cómo se escribe` });
+    else if (candidatas.length > 1) motivos.push({ campo: 'zona', texto: `hay una zona «${recorte(z, 40)}» en más de un sitio: escribe su UUID en vez del nombre` });
     else zona = candidatas[0];
-    if (zona !== undefined && !porId) avisos.push({ campo: 'zona', texto: `zona «${zona.nombre}» del sitio ${zona.sitio_codigo}` });
 
     const viaTexto = texto(f.via).toLowerCase();
     if (viaTexto === '') porDefecto.push('via');
@@ -323,15 +463,17 @@ export function validarLote(filas: readonly FilaEntrada[], cat: Catalogos, reser
     let pasarela: PasarelaCatalogo | undefined;
     if (p !== '') {
       pasarela = UUID.test(p) ? pasarelasPorId.get(p.toLowerCase()) : pasarelasPorIdFisico.get(p.toLowerCase());
-      if (pasarela === undefined) motivos.push({ campo: 'pasarela', texto: `pasarela «${p}» no existe` });
-      else if (zona !== undefined && pasarela.sitio_id !== zona.sitio_id) motivos.push({ campo: 'pasarela', texto: `la pasarela ${pasarela.id_fisico} pertenece a otro sitio` });
-      else if (!pasarela.activo) motivos.push({ campo: 'pasarela', texto: `la pasarela ${pasarela.id_fisico} está dada de baja` });
+      if (pasarela === undefined) motivos.push({ campo: 'pasarela', texto: `la pasarela «${recorte(p, 40)}» no existe en tus sitios` });
+      else if (zona !== undefined && pasarela.sitio_id !== zona.sitio_id) motivos.push({ campo: 'pasarela', texto: `la pasarela «${pasarela.id_fisico}» es de otro sitio que la zona` });
+      else if (!pasarela.activo) motivos.push({ campo: 'pasarela', texto: `la pasarela «${pasarela.id_fisico}» está dada de baja` });
     }
-    let formato: string | undefined = texto(f.formato).toLowerCase() || undefined;
+    const formatoTexto = texto(f.formato).toLowerCase();
+    let formato: string | undefined = formatoTexto || undefined;
     if (formato === undefined) porDefecto.push('formato');
     if (via === 'lorawan' && formato !== undefined) {
-      if (pasarela !== undefined && formato !== pasarela.formato) motivos.push({ campo: 'formato', texto: `formato: un nodo lorawan hereda el de su pasarela (${pasarela.formato})` });
-      else if (pasarela !== undefined) avisos.push({ campo: 'formato', texto: `se ignora: un nodo lorawan hereda el formato de su pasarela (${pasarela.formato})` });
+      const suyo = pasarela === undefined ? '' : NOMBRE_FORMATO[pasarela.formato] ?? pasarela.formato;
+      if (pasarela !== undefined && formato !== pasarela.formato) motivos.push({ campo: 'formato', texto: `un equipo LoRaWAN usa el formato de su pasarela (${suyo}): deja el formato vacío` });
+      else if (pasarela !== undefined) avisos.push({ campo: 'formato', texto: `el formato se ignora: un equipo LoRaWAN usa el de su pasarela (${suyo})` });
       formato = undefined;
     }
     const canales = leerCanales(f.canales, cat.magnitudes, motivos, avisos);
@@ -344,17 +486,24 @@ export function validarLote(filas: readonly FilaEntrada[], cat: Catalogos, reser
     if (p !== '') cuerpo.pasarela_id = pasarela?.id ?? p;
     const d = texto(f.decodificador);
     if (d !== '') cuerpo.decodificador = d;
-    // La misma validación del alta de a uno (forma del id_fisico, reservados, vía, formato, intervalo, canales repetidos, decodificador…).
+    // La misma validación del alta de a uno (forma del id_fisico, reservados, vía, formato, intervalo, canales repetidos, decodificador…),
+    // con sus motivos dichos en las palabras de la persona.
     let alta: AltaValidada | undefined;
     try {
       alta = validarAlta(cuerpo, reservados);
     } catch (e) {
       const r = e instanceof BadRequestException ? (e.getResponse() as { message?: unknown }).message : undefined;
       const lista: string[] = Array.isArray(r) ? r.map((x) => (typeof x === 'string' ? x : JSON.stringify(x))) : [typeof r === 'string' ? r : (e as Error).message];
-      for (const m of lista) if (!motivos.some((x) => x.texto === m)) motivos.push({ campo: campoDe(m), texto: m });
+      const contexto: ContextoFila = { id: idFisico, nombre: texto(f.nombre), via: viaTexto, formato: formatoTexto, decodificador: d, intervalo: intervaloTexto, canales: canales.length, motivos };
+      for (const m of lista) {
+        const nota = enPalabras(m, contexto);
+        if (nota !== null && !motivos.some((x) => x.texto === nota.texto)) motivos.push(nota);
+      }
     }
     if (motivos.length > 0 || alta === undefined || zona === undefined) {
-      if (motivos.length === 0) motivos.push({ campo: 'fila', texto: 'fila inválida' });
+      if (motivos.length === 0) motivos.push({ campo: 'fila', texto: 'la fila no entra' });
+      // Los avisos son de lo que se va a crear (bloque S, punto 3): una fila que no entra no los trae.
+      avisos.length = 0;
       informe.push(fila('rechazada'));
       continue;
     }
@@ -367,9 +516,30 @@ export function validarLote(filas: readonly FilaEntrada[], cat: Catalogos, reser
       pasarela: pasarela?.id_fisico ?? null, pasarela_id: alta.pasarela_id, decodificador: alta.decodificador,
       topico: topicoDe(alta.via, zona.sitio_codigo, alta.id_fisico, pasarela?.id_fisico ?? null),
     };
-    informe.push(fila('valida', { interpretada }));
+    const sitioNombre = zona.sitio_nombre ?? zona.sitio_codigo;
+    if (!porId) {
+      const y = porNombre.get(zona.id) ?? { zona: zona.nombre, sitio: sitioNombre, filas: 0 };
+      y.filas++;
+      porNombre.set(zona.id, y);
+    }
+    informe.push(fila('valida', { interpretada, legible: legibleDe(interpretada, sitioNombre) }));
   }
-  return { informe, altas };
+  return { informe, altas, zonas: [...porNombre.values()] };
+}
+
+// Lo que se creará, en palabras de personas (bloque S, punto 4): el panel lo muestra tal cual en «Qué pasa», el resumen y el detalle.
+function legibleDe(i: Interpretada, sitioNombre: string): Legible {
+  const via = NOMBRE_VIA[i.via] ?? i.via;
+  const formato = NOMBRE_FORMATO[i.formato] ?? i.formato;
+  const donde = `${i.zona} (sitio ${sitioNombre})`;
+  return {
+    donde,
+    resumen: `${via}, ${formato}, ${cadaCuanto(i.intervalo_esperado_s)}: ${i.canales.map((k) => `${k.magnitud} (${comoSeLee(k.unidad)})`).join(', ')}`,
+    campos: {
+      id_fisico: i.id_fisico, nombre: i.nombre, zona: donde, via, formato, intervalo_esperado_s: cadaCuanto(i.intervalo_esperado_s),
+      canales: i.canales.map((k) => `${k.magnitud} en ${comoSeLee(k.unidad)}`).join(' | '), pasarela: i.pasarela ?? '', decodificador: i.decodificador ?? '', topico: i.topico,
+    },
+  };
 }
 
 // La huella del plan (bloque N, punto 2): SHA-256 de la forma canónica (JSON con las claves ordenadas, sin espacios) de la lista
@@ -396,10 +566,13 @@ export interface RespuestaLote {
   rechazadas: number;
   con_aviso: number;
   huella: string;
+  // Las zonas escritas por su nombre en las filas que entran, con su sitio y cuántas filas (bloque S, punto 3; aditivo).
+  zonas_por_nombre: ZonaPorNombre[];
   filas: FilaInforme[];
 }
-// Invariante (con prueba): validas + existentes + rechazadas = leidas; `con_aviso` es transversal (cuenta filas de cualquier resultado).
-export function totales(informe: readonly FilaInforme[]): Omit<RespuestaLote, 'huella' | 'filas'> {
+// Invariante (con prueba): validas + existentes + rechazadas = leidas. `con_aviso` cuenta las filas con avisos; desde el bloque S (punto 3)
+// solo las que entran los traen, así que es la misma cifra que «N filas que se crean traen avisos».
+export function totales(informe: readonly FilaInforme[]): Omit<RespuestaLote, 'huella' | 'filas' | 'zonas_por_nombre'> {
   return {
     leidas: informe.length,
     validas: informe.filter((f) => f.resultado === 'valida' || f.resultado === 'creada').length,
@@ -408,8 +581,8 @@ export function totales(informe: readonly FilaInforme[]): Omit<RespuestaLote, 'h
     con_aviso: informe.filter((f) => f.avisos.length > 0).length,
   };
 }
-export function respuestaLote(informe: FilaInforme[]): RespuestaLote {
-  return { ...totales(informe), huella: huellaDelPlan(informe), filas: informe };
+export function respuestaLote(informe: FilaInforme[], zonas: ZonaPorNombre[] = []): RespuestaLote {
+  return { ...totales(informe), huella: huellaDelPlan(informe), zonas_por_nombre: zonas, filas: informe };
 }
 
 // ── Reintento de `modo=crear` con la misma llave (bloque N, punto 8) ──────────────────────────────────────────────────────────────────

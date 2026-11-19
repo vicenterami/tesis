@@ -18,7 +18,7 @@ import { FORMA_ACTUALIZADO_EN } from './calibracion.dto.js';
 import { ConsultaService } from '../consulta/consulta.service.js';
 import {
   CABECERA_LLAVE, COLUMNAS_LOTE, ChoqueDeLote, LOTES_POR_MINUTO, REINTENTOS_POR_MINUTO, MAX_BYTES_LOTE, MAX_FILAS_LOTE, MODOS_LOTE, RespuestasPorLlave, TasaPorPersona, filasDelCuerpo,
-  firmaDelCuerpo, huellaDelPlan, llaveDeReintento, modoLote, plantillaLote, respuestaLote, validarLote,
+  destinoDe, firmaDelCuerpo, huellaDelPlan, llaveDeReintento, modoLote, plantillaLote, respuestaLote, validarLote,
 } from './lote.js';
 import type { FilaEntrada, FilaInforme, PlantillaLote, RespuestaLote } from './lote.js';
 import type { UsuarioSesion } from '../sesion/permisos.js';
@@ -114,20 +114,25 @@ export class AltaController {
       `Recibe \`filas[{n, ${COLUMNAS_LOTE.join(', ')}}]\`: \`n\` es la fila del origen (en un CSV, la línea contando las vacías, con la cabecera en la 1; en ` +
       'JSON, la posición más 1), un entero positivo, único y creciente, que se devuelve tal cual. Columnas, topes y ejemplos en ' +
       '`GET /dispositivos/lote/plantilla`; `zona` es el nombre o el UUID de una zona de un sitio donde la persona puede dar de alta; `canales`, ' +
-      '«magnitud:unidad | magnitud:unidad» (también con «;»), con la unidad canónica del catálogo (`GET /magnitudes`); `pasarela`, su id_fisico o UUID, ' +
+      '«magnitud:unidad | magnitud:unidad» (también con «;»), con la unidad del catálogo (`GET /magnitudes`) o una escritura común de la misma («°C», «ºC», «C» o «degC» por Cel; ' +
+      '«%» por la unidad porcentual de la magnitud), que se guarda como la del catálogo, con aviso; `pasarela`, su id_fisico o UUID, ' +
       'solo en la vía lorawan. Cada fila pasa por la misma validación del alta de a uno. Responde `leidas, validas, existentes, rechazadas, con_aviso, ' +
-      'huella` (validas + existentes + rechazadas = leidas; con_aviso es transversal) y `filas[{n, id_fisico, resultado, interpretada, por_defecto, ' +
-      'avisos[{campo, texto}], motivos[{campo, texto}], motivo, id, credencial, topico}]`: `interpretada` es lo que se creará (identificador normalizado, ' +
+      'huella` (validas + existentes + rechazadas = leidas; solo las filas que entran traen avisos), `zonas_por_nombre[{zona, sitio, filas}]` (las zonas escritas ' +
+      'por su nombre en las filas que entran) y `filas[{n, id_fisico, resultado, interpretada, legible, por_defecto, ' +
+      'avisos[{campo, texto}], motivos[{campo, texto}], motivo, id, credencial, topico}]`: el `texto` de avisos y motivos está en palabras para personas y `campo` ' +
+      'nombra la columna; `legible` es lo interpretado como se lee (`donde`, `resumen` y `campos`) o null; `interpretada` es lo que se creará (identificador normalizado, ' +
       'nombre, sitio, zona, vía, formato resuelto, intervalo, canales con nombre y unidad, pasarela, decodificador y tópico) o null; `motivo`, la unión de ' +
       '`motivos`; `resultado` en `valida | creada | rechazada | existe`. `huella` es el SHA-256 de `[n, interpretada]` de las filas que entran, en orden ' +
-      '(JSON con las claves ordenadas). Cada celda, dentro de su tope, sin caracteres de control y, salvo `nombre` y `zona`, solo ASCII imprimible; una ' +
+      '(JSON con las claves ordenadas). Cada celda, dentro de su tope, sin caracteres de control y, salvo `nombre` y `zona`, solo ASCII imprimible (en `canales`, ' +
+      'también «°» y «º», y el tope en bytes UTF-8); una ' +
       'columna que no es de la plantilla es 400. **Con `modo=crear`** el ' +
       'cuerpo trae también `huella` (la de la vista previa) y la cabecera `Idempotency-Key`; se vuelve a calcular y, si el plan cambió (una fila dejó de ' +
       'entrar o crearía otra cosa) o alguna fila no entra o ya existe, 409 `codigo: plan_cambio` con el plan nuevo en `plan` y nada creado; si no, todas se crean en una transacción ' +
       '(dos sentencias) y las credenciales vienen UNA sola vez. Repetir con la misma llave y el mismo cuerpo, durante 2 minutos, devuelve la misma ' +
       `respuesta sin crear nada (con su propio cupo de ${REINTENTOS_POR_MINUTO} por minuto, y si la persona conserva el permiso en los sitios de lo creado). Hasta ${MAX_FILAS_LOTE} filas (más: 413) y ${MAX_BYTES_LOTE} bytes de cuerpo, ${LOTES_POR_MINUTO} lotes por minuto por persona (429) y ` +
       'una creación a la vez (409 `codigo: lote_en_curso`). Un id_fisico que ya usa un dispositivo o una pasarela de otro sitio se rechaza como ' +
-      '«identificador no disponible», sin id, estado ni `interpretada` (RF-41).',
+      '«ese identificador ya está en uso en la plataforma: elige otro», sin id, estado ni `interpretada` (RF-41). En `crear`, cada fila creada trae ' +
+      '`destino`, a dónde envía según su vía: el tópico MQTT, «POST /recepcion/<id_fisico>» o «por su pasarela <id_fisico>».',
   })
   @ApiHeader({ name: 'X-Clave-Admin', required: false, description: 'Sin sesión: la clave de administrador (HTTP_CLAVE_ADMIN), como usuario del sistema (docs/20 §5)' })
   @ApiHeader({ name: 'Idempotency-Key', required: false, description: 'Obligatoria con modo=crear: de 16 a 128 caracteres entre letras, dígitos, «-» y «_», generada por el cliente para cada creación' })
@@ -166,28 +171,34 @@ export class AltaController {
     }
     if (!this.tasaLote.admitir(persona)) throw demasiadas(`más de ${LOTES_POR_MINUTO} lotes en un minuto`, this.tasaLote.esperaS(persona));
     const { filas, huella } = filasDelCuerpo(cuerpo, modo);
-    if (modo === 'validar') return respuestaLote((await this.planLote(u, filas)).informe);
+    if (modo === 'validar') {
+      const plan = await this.planLote(u, filas);
+      return respuestaLote(plan.informe, plan.zonas);
+    }
     const firma = firmaDelCuerpo(cuerpo);
     // Una creación a la vez, y el plan se recalcula dentro del candado: dos creaciones no se pisan entre la lectura y la inserción.
     if (this.loteEnCurso) throw new HttpException({ statusCode: 409, error: 'Conflict', codigo: 'lote_en_curso', message: 'hay otra alta por lote en curso: espera a que termine y vuelve a intentarlo' }, HttpStatus.CONFLICT);
     this.loteEnCurso = true;
     try {
-      const { informe, altas } = await this.planLote(u, filas);
+      const { informe, altas, zonas } = await this.planLote(u, filas);
       // Todo o nada al pie de la letra (revisión del 15/11/2026): en `crear` toda fila debe entrar; una que no entra o que ya existe es un
       // plan distinto del confirmado, aunque la huella (que solo mira las que entran) coincida.
-      if (huellaDelPlan(informe) !== huella || informe.some((f) => f.resultado !== 'valida')) throw planCambio(respuestaLote(informe));
+      if (huellaDelPlan(informe) !== huella || informe.some((f) => f.resultado !== 'valida')) throw planCambio(respuestaLote(informe, zonas));
       let creadas: Awaited<ReturnType<AltaService['crearLote']>>;
       try {
         creadas = await this.alta.crearLote(altas, u.id);
       } catch (e) {
         if (!(e instanceof ChoqueDeLote)) throw e;
-        throw planCambio(respuestaLote((await this.planLote(u, filas)).informe));
+        const nuevo = await this.planLote(u, filas);
+        throw planCambio(respuestaLote(nuevo.informe, nuevo.zonas));
       }
       for (const f of informe) {
         const c = creadas.get(f.n);
-        if (c !== undefined) Object.assign(f, { resultado: 'creada', id: c.id, credencial: c.credencial, topico: c.topico } satisfies Partial<FilaInforme>);
+        if (c !== undefined && f.interpretada !== null) {
+          Object.assign(f, { resultado: 'creada', id: c.id, credencial: c.credencial, topico: c.topico, destino: destinoDe(f.interpretada) } satisfies Partial<FilaInforme>);
+        }
       }
-      const respuesta = respuestaLote(informe);
+      const respuesta = respuestaLote(informe, zonas);
       // Solo se guarda lo que creó algo (siempre, desde que toda fila debe entrar), con los sitios de lo creado.
       if (creadas.size > 0) this.respuestasLote.guardar(persona, llave, firma, respuesta, [...new Set(altas.map((a) => a.sitio_id))], Buffer.byteLength(JSON.stringify(respuesta)));
       res.setHeader('Cache-Control', 'no-store'); // la respuesta lleva credenciales
@@ -209,7 +220,7 @@ export class AltaController {
   @Get('lote/plantilla')
   @ApiOperation({
     summary: 'Plantilla del alta por lote (Etapa 4)',
-    description: 'Las columnas del lote en su orden (`nombre, obligatoria, tope` en caracteres, `ayuda, ejemplo`), `max_filas`, `max_bytes` (el tope del cuerpo de POST /dispositivos/lote) y `separadores{columnas, canales}`. Exige el permiso de dar de alta en algún sitio (docs/20 §6).',
+    description: 'Las columnas del lote en su orden (`nombre, obligatoria, tope` en caracteres, `texto_libre, ayuda, ejemplo`, `rotulo` para las personas y `simbolos`, lo que una columna de códigos admite además del ASCII, con el tope en bytes UTF-8), `max_filas`, `max_bytes` (el tope del cuerpo de POST /dispositivos/lote) y `separadores{columnas, canales}`. Exige el permiso de dar de alta en algún sitio (docs/20 §6).',
   })
   @ApiOkResponse({ description: 'La plantilla' })
   @ApiUnauthorizedResponse({ description: 'sesión requerida' })

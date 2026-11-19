@@ -4,7 +4,7 @@ Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emu
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
 cubría al escribirse se agregó después: TT-32 (sensor físico) en §43, §44 y §53, y TT-30 (recuperación ante reinicio) en §11. El
-contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 906 pruebas unitarias del backend y 518 del panel.
+contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 919 pruebas unitarias del backend y 539 del panel.
 Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -4800,7 +4800,9 @@ una celda sale como salto de línea (no se averiguó si lo cambia al leer o al e
 abierto y llevado a PDF por LibreOffice y revisado página por página): abre sin aviso de error, con las cuatro hojas; «Acerca de» dice formato,
 sitio, rango, retención, cada columna y los conteos (43 mediciones, 5 tramas y 5 eventos, los mismos de la base); la cabecera en negrita;
 `fecha_utc` se muestra como fecha y hora con sus milisegundos («2026-11-14 10:00:00,123») junto al texto exacto con microsegundos; las dos
-tramas recibidas en el mismo microsegundo salen las dos.
+tramas recibidas en el mismo microsegundo salen las dos. El mismo libro, abierto con la interfaz de LibreOffice Calc y en Excel para la web
+(19/11/2026, con captura): los dos lo abren sin aviso de reparación, con las cuatro pestañas y «Acerca de» completo. Con eso se cumple el
+punto 7 del bloque R (la apertura en una planilla real).
 
 **Panel: la pantalla P8** (bloque R, puntos 6 y 8; mismo día). `Exportar.svelte` en `#/exportar?sitio=<código>`, con lo puro en
 `lib/exportar.ts`; la entrada «Exportar datos» del menú; el enlace «Exportar todo el sitio» de la ficha; `nombreDeArchivo` con `.zip` y `.xlsx`
@@ -4845,6 +4847,91 @@ diferencia) y, en Firefox a 390 px, la ayuda emergente de «Descargar», que baj
 `pnpm verificar` en `plataforma/backend`, tras la corrección: tipos, lint, 929 de 929 del backend en 72 archivos, `svelte-check` sin errores
 en 430 archivos, las 518 pruebas del panel (582 ejecuciones) en 43 archivos y el paquete construido.
 
-**Lo que queda.** La apertura en Excel, con su salida esperada (punto 7; la de LibreOffice está arriba); el lector XLSX del alta masiva (bloque
-N, punto 6), decidido y sin construir; y el caso del `Tooltip` al pie de la pantalla bajo 700 px, que no es solo de esta pantalla.
+**Lo que queda.** El lector XLSX del alta masiva (bloque N, punto 6), decidido y sin construir; y el caso del `Tooltip` al pie de la pantalla bajo 700 px, que no es solo de esta pantalla.
 `panel-exportar-e2e.sh` ya corre en el paso 4c del guardián, junto a los otros dos e2e del panel.
+
+## 90. Alta masiva sin fricción: la fila mal formada, las unidades, los avisos, las palabras y el teléfono (19/11/2026)
+
+**Por qué.** Un recorrido en navegador real del mismo día (Chromium y Firefox, a 390 y 1 280 px) mostró que la velocidad sobraba y la
+fricción no: con 60 filas, dos mal formadas rechazaban el archivo entero sin revisión; «°C» y «%» no entraban; «zona resuelta por su nombre»
+salía como aviso en 500 de 500 filas y la línea de avisos no contaba lo mismo que su tarjeta; los motivos traían nombres de columna
+(«id_fisico repetido», «intervalo_esperado_s debe ser…»); a 390 px Playwright no pudo pulsar «Volver» ni «Crear» porque la ayuda emergente,
+fija al pie, recibía el clic; «atrás» con credenciales sin descargar las perdía; un `.xlsx` decía «la cabecera tiene una sola columna
+(«PK…»)»; y el e2e del lote dejaba dos equipos en el banco. El diseño es el bloque S de `docs/19 §4`; lo que no fijaba quedó al final
+del bloque.
+
+**Qué se construyó.** Backend: `alta/unidades.ts` (la única tabla de escrituras de unidad y cómo se lee cada una); en `alta/lote.ts`, los
+motivos y avisos en palabras de la persona (los de `validarAlta` se traducen; sus textos de la API no cambian), los avisos solo en las filas
+que entran, `zonas_por_nombre`, `legible`, `rotulo` y `simbolos` en la plantilla, la magnitud más cercana y los 400 de una celda con las
+palabras del panel; el nombre del sitio en la consulta de los catálogos. Panel: `lib/lote.ts` deja fuera solo la fila mal formada
+(`noEntran`, `motivoDeCelda`, `filaQueNoEntra`, `mezclarPlan`) y reconoce un libro de Excel; `lib/lote-memoria.ts` guarda el borrador y
+las credenciales sin descargar; `lib/revision.ts` usa lo que escribe el servidor y suma el resumen; `AltaLote.svelte`, los botones y las
+ayudas a la vista, «Abrir su ficha», el foco y la lectura que descarta la anterior; `app.css`, la ayuda emergente que no recibe toques en
+una pantalla táctil. Pruebas: el catálogo fijo `panel/e2e/datos/lote-escenarios.csv` (60 filas sintéticas, con lo esperado en `.json`) y
+`pruebas/panel-lote-e2e.sh`, que reemplaza a `banco.sh lote-navegador` y corre en el paso 4c del guardián.
+
+**Correcciones del mismo día, tras una revisión independiente** (cada una con su prueba): (a) el borrador sobrevivía a una sesión vencida y
+lo veía quien entrara después en la pestaña: ahora guarda quién lo leyó y, si entra otra persona, se descarta entero (la misma lo
+retoma); (b) la ayuda emergente dejaba de admitir el puntero en una ventana angosta con ratón: la regla pasó a `(max-width: 700px) and
+(hover: none)`; (c) el texto viejo «identificador no disponible» seguía en la descripción del OpenAPI, en `docs/11`, `docs/19`, el README del
+backend y la prueba `sesion-smoke.sh`; (d) un `canales` con solo separadores caía en «la fila no entra»; (e) cancelar la ventana de elegir
+archivo cortaba una revisión en vuelo; (f) el texto del largo decía «caracteres» donde se cuentan bytes, y el de un símbolo no nombraba que
+«°» y «º» sí se admiten en `canales`, y la familia Celsius se lee ahora sin distinguir mayúsculas; (g) el archivo de credenciales dice, por
+equipo, a dónde envía (`destino`); (h) el e2e borra el directorio temporal de las credenciales de descarte. Al repetir los e2e del panel
+apareció un daño propio del bloque: `e2e/sesion.mjs` pulsaba `[data-crear-lote]` con un localizador estricto, que con los botones repetidos
+encuentra dos; ahora pulsa el de arriba, y su comprobación del archivo de credenciales espera `destino`.
+
+**Por unidad.** Backend: 942 de 942 en 73 archivos (antes 929 en 72): 13 pruebas nuevas, entre ellas el catálogo contra `validarLote`
+(58 filas enviadas, 44 se crean, 1 ya existe, 13 no entran y 3 con aviso; con las 2 que deja fuera el panel, 60 y 15), «°C» y «%» con su
+aviso y el mismo plan que con la unidad del catálogo, otra unidad que no entra, la zona por su nombre dicha una vez, cada regla del alta
+de a uno en palabras sin jerga, «°C» en `canales` en el límite del tope en bytes (cabe en `MAX_BYTES_LOTE`, un byte más es 400, con el
+texto que dice cómo se contó), la familia Celsius sin distinguir mayúsculas, el `canales` con solo separadores y el `destino` de cada vía.
+Panel: 539 pruebas (599 ejecuciones) en 43 archivos (antes 518 y 582): la fila mal formada que no frena a las demás, el bloque de textos de
+una celda igual al del servidor, letra por letra, el catálogo leído (58 enviadas y 2 que no entran, con su motivo), el archivo de
+credenciales con su `destino` en las tres vías y, por el DOM, cada punto de S1 a S10, con la otra persona que entra tras un vencimiento y
+la ventana de elegir archivo cancelada.
+
+**Fallas plantadas** (cada una deshecha después y la prueba en verde otra vez):
+
+| Falla plantada | Dónde | Qué cayó |
+|---|---|---|
+| Volver a rechazar el archivo entero si una fila está mal formada | `panel/src/lib/lote.ts` (`comprobar`) | caen 8 casos del panel: los de S1 en `lote.test.ts` (también el catálogo) y en `Alta.test.ts` |
+| La ayuda emergente fija al pie vuelve a recibir clics (sin `pointer-events: none`; en la primera versión de la regla) | `panel/src/app.css` | la prueba de S6 en `Alta.test.ts` y, con el panel de `pnpm dev`, el e2e en Chromium a 390 px («la ayuda … deja pasar toques»: `pointerEvents` «auto» y el centro de la ayuda es la ayuda) |
+| Lo anterior más la ayuda emergente de vuelta en «Volver» y «Crear» (el estado del recorrido) | `AltaLote.svelte` y `app.css` | el e2e en Chromium a 390 px: «<span role="tooltip"> intercepts pointer events» al pulsar el «Volver» de abajo, el mismo defecto que vio el recorrido |
+| El aviso de la zona por su nombre en todas las filas | `src/alta/lote.ts` | 4 pruebas del backend (avisos, S3 y dos del catálogo) |
+| «°C» y las demás escrituras de unidad rechazadas | `src/alta/unidades.ts` | 2 pruebas del backend (S2 y lo legible) |
+| Un motivo de `validarAlta` sin traducir («intervalo_esperado_s debe ser…») | `src/alta/lote.ts` (`enPalabras`) | 3 pruebas del backend (los motivos por campo, la prueba de la jerga y la del catálogo) |
+| Sin descartar el borrador de otra persona al abrir el alta masiva | `AltaLote.svelte` (`retomarLoteDe`) | la prueba por el DOM de la otra persona que entra tras un vencimiento |
+| `nuevoOrigen()` antes de mirar si se eligió archivo | `AltaLote.svelte` (`leerArchivo`) | la prueba por el DOM de la ventana cancelada durante una revisión en vuelo |
+
+**En navegador real.** `bash plataforma/pruebas/panel-lote-e2e.sh`, contra la pila de desarrollo con el backend reconstruido con sus tres capas
+(`docker-compose.yml`, el override y `proxy/compose.proxy.yml`) y `--no-deps`: **150 de 150 comprobaciones**, 75 en Chromium 158 y 75 en
+Firefox 159, a 390 px (un teléfono táctil emulado, `hasTouch` e `isMobile`: los dos navegadores dan `hover: none`) y a 1 280 px. Al salir, lo sembrado y lo creado se borró y el conteo de lo que quedó fue 0 en sitios, zonas, dispositivos,
+credenciales, personas, eventos, sesiones y permisos. Comprueba: el libro de Excel reconocido; el catálogo de 60 que abre la revisión con
+las tarjetas 60, 44, 1, 15 y 3, la línea de avisos igual a su tarjeta, las dos zonas dichas una vez con el nombre del sitio, los 20
+escenarios con su resultado y su texto, y ningún texto a la vista con jerga entre más de 100; «Ya existe» en ámbar con «Abrir su ficha»,
+que abre la ficha; lo descargado, que vuelve a subirse y dice lo mismo en 13 de 15 filas (la repetida y la de la celda de más ya no fallan
+por eso); el «Volver» de abajo y «Crear» pulsados como persona; dos equipos creados por HTTP, con su destino `POST /recepcion/{id_fisico}` en el
+archivo de credenciales, «atrás» y «adelante» con sus credenciales sin descargar (vuelven, nunca dibujadas ni en la dirección ni en el
+almacenamiento del navegador) y el foco tras «Ya las guardé»; la ayuda emergente del inventario en el teléfono, que deja pasar el toque,
+se lee entera (12,8 px de letra, 366 px de ancho) y no desplaza la página, y con ratón, a 390 px y en escritorio, admite el puntero encima.
+Los otros e2e que tocan el alta masiva, repetidos tras las correcciones: `panel-sesion-e2e.sh`, **330 de 330**; `sesion-smoke.sh`, **469 de
+469**.
+
+**Mediciones** (la revisión de 500 filas, del clic a la tabla pintada, y cada «Mostrar 100 más», en la página con `performance.now()`, en el
+equipo de desarrollo, sin la CPU frenada):
+
+| Navegador | Ancho | Revisión de 500 (umbral 1 s) | Cada «Mostrar 100 más» (umbral 0,3 s) |
+|---|---|---|---|
+| Chromium 158 | 390 px | 65 ms | 44, 44, 44 y 44 ms |
+| Chromium 158 | 1 280 px | 66 ms | 41, 43, 44 y 45 ms |
+| Firefox 159 | 390 px | 72 ms | 42, 43, 41 y 57 ms |
+| Firefox 159 | 1 280 px | 79 ms | 34, 59, 38 y 40 ms |
+
+`pnpm verificar` en `plataforma/backend`: tipos, lint, 942 de 942 del backend en 73 archivos, `svelte-check` sin errores en 432 archivos,
+las 599 ejecuciones del panel en 43 archivos y el paquete construido.
+
+Con la regla de `app.css`, que vale para todo el panel, se cierra también el caso de la ayuda emergente al pie bajo 700 px que el `§89` dejaba
+pendiente.
+
+**Lo que queda.** El lector XLSX propio (bloque N, punto 6).

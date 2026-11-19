@@ -3,7 +3,12 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/sv
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Sesion } from './lib/sesion';
 import Alta from './Alta.svelte';
-import { borradorLote } from './lib/lote';
+import { borradorLote, credencialesLote, olvidarCredencialesLote, olvidarLote } from './lib/lote';
+import { obtener } from './lib/api';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+// La hoja de estilos del panel, como texto: la regla de la ayuda emergente bajo 700 px (docs/19 §4, S6).
+const estilos = readFileSync(join(import.meta.dirname, 'app.css'), 'utf8');
 
 // P7 Alta (docs/19 §4, tablero v2, F; docs/16 §61) por el DOM: el asistente con la credencial una sola vez y la espera de la primera trama;
 // el alta masiva que lee las columnas y los límites de la plantilla del servidor, valida antes de crear (cada fila con su `n`) y crea en
@@ -21,8 +26,12 @@ let pedidos: { metodo: string; ruta: string; cuerpo: CuerpoLote; cabeceras: Reco
 let responder: (metodo: string, ruta: string, cuerpo: CuerpoLote) => Response | Promise<Response>;
 const COLS = ['id_fisico', 'nombre', 'zona', 'via', 'formato', 'intervalo_esperado_s', 'canales', 'pasarela', 'decodificador'];
 const OBLIGATORIAS = ['id_fisico', 'nombre', 'zona', 'intervalo_esperado_s', 'canales'];
+const ROTULOS_SERVIDOR: Record<string, string> = {
+  id_fisico: 'Identificador', nombre: 'Nombre', zona: 'Zona', via: 'Vía', formato: 'Formato', intervalo_esperado_s: 'Cada cuánto reporta', canales: 'Canales', pasarela: 'Pasarela', decodificador: 'Decodificador',
+};
 const PLANTILLA = {
-  columnas: COLS.map((nombre) => ({ nombre, obligatoria: OBLIGATORIAS.includes(nombre), tope: 80, ayuda: '', ejemplo: '' })),
+  // `rotulo` y `simbolos` como los publica el servidor (alta/lote.ts, ROTULOS y SIMBOLOS_COLUMNA; docs/19 §4, S2 y S4).
+  columnas: COLS.map((nombre) => ({ nombre, obligatoria: OBLIGATORIAS.includes(nombre), tope: 80, ayuda: '', ejemplo: '', simbolos: nombre === 'canales' ? '°º' : '', rotulo: ROTULOS_SERVIDOR[nombre] })),
   max_filas: 500, max_bytes: 1_147_904, separadores: { columnas: [';', ',', '\t'], canales: ['|', ';'] },
 };
 let descargas: { nombre: string; contenido: Promise<string>; bytes: Promise<ArrayBuffer> }[] = [];
@@ -39,7 +48,8 @@ class Fuente {
 }
 
 beforeEach(() => {
-  Object.assign(borradorLote, { archivo: null, filas: [], aviso: null }); // el borrador de la pestaña no pasa de una prueba a otra
+  Object.assign(borradorLote, { archivo: null, filas: [], noEntran: [], aviso: null }); // el borrador de la pestaña no pasa de una prueba a otra
+  olvidarCredencialesLote(); // tampoco las credenciales sin descargar (docs/19 §4, S7: viven en la memoria del módulo)
   pedidos = [];
   descargas = [];
   Fuente.todas.length = 0;
@@ -59,7 +69,8 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 const escribir = (sel: string, v: string): Promise<boolean> => fireEvent.input(document.querySelector(sel)!, { target: { value: v } });
-const boton = (nombre: string | RegExp): HTMLButtonElement => screen.getByRole('button', { name: nombre }) as HTMLButtonElement;
+// «Volver» y «Crear N dispositivos» van sobre la lista y debajo de ella (docs/19 §4, S6): se pulsa el primero, el de arriba.
+const boton = (nombre: string | RegExp): HTMLButtonElement => screen.getAllByRole('button', { name: nombre })[0] as HTMLButtonElement;
 
 describe('P7: asistente', () => {
   it('cinco pasos con el motivo al lado de «Siguiente»; crear → la credencial y el tópico UNA vez con «Copiar»; luego espera la primera trama en vivo', async () => {
@@ -248,7 +259,7 @@ describe('P7: alta masiva en una petición', () => {
     await fireEvent.click(boton('Descargar credenciales (CSV)'));
     expect(descargas[1]!.nombre).toMatch(/^credenciales-\d{4}-\d{2}-\d{2}\.csv$/);
     const csv = (await descargas[1]!.contenido).split('\r\n');
-    expect(csv[0]).toBe('id_fisico,id,credencial,topico');
+    expect(csv[0]).toBe('id_fisico,id,credencial,destino');
     expect(csv.filter((l) => l.startsWith('n-'))).toHaveLength(121);
     await fireEvent.click(boton('Ya las guardé: olvidarlas'));
     expect(document.querySelector('[data-credenciales-lote]')).toBeNull();
@@ -376,9 +387,7 @@ describe('P7: alta masiva, qué falló y qué hacer (docs/19 §4, N8b): lo que s
     ['una sola columna', 'id_fisico|nombre|zona\nx|y|z', 'no hay «;», «,» ni tabulador entre las columnas', 'Descargar la plantilla'],
     ['solo la cabecera', `${CAB}\n`, 'ninguna fila de datos', 'Elegir otro archivo'],
     ['vacío', ' ', 'El archivo está vacío', 'Elegir otro archivo'],
-    ['celdas de más', `${CAB}\nn-1,Uno,Lab,,,60,temperatura,,sobra`, 'La fila 2 trae 9 celdas y la cabecera 8', 'Elegir otro archivo'],
-    ['celda sobre su tope', `${CAB}\nn-1,${'N'.repeat(81)},Lab,,,60,temperatura,`, 'Fila 2, columna «nombre»: tiene 81 caracteres y el máximo es 80', 'Elegir otro archivo'],
-    ['carácter no admitido', `${CAB}\nnodo-ñ,Uno,Lab,,,60,temperatura,`, 'Fila 2, columna «id_fisico»: solo admite letras sin acento', 'Elegir otro archivo'],
+    ['un libro de Excel elegido con «Todos los archivos»', 'PK\u0003\u0004\u0014\u0000[Content_Types].xml', 'Es un libro de Excel. Guárdalo como CSV (Archivo → Guardar como) o copia las celdas y pégalas aquí.', 'Elegir otro archivo'],
   ];
   for (const [caso, csv, texto, accion] of AL_LEER) {
     it(`al leer, ${caso}: se ve antes de enviar, con el botón «${accion}»`, async () => {
@@ -757,6 +766,214 @@ describe('P7: alta masiva en tres pasos (docs/19 §4, N7)', () => {
     await revisar();
     await fireEvent.click(boton('Descargar las que no entran (CSV)'));
     expect(descargas.at(-1)!.nombre).toBe('no-entran-lote 1.csv');
+  });
+
+  // ── Bloque S (docs/19 §4): el alta masiva sin fricción, por el DOM ──────────────────────────────────────────────────────────
+  const legible = (id: string) => ({
+    donde: 'Zona norte (sitio Campus)', resumen: 'MQTT, SenML, cada 1 min: temperatura (°C)',
+    campos: { id_fisico: id, nombre: `Nodo ${id}`, zona: 'Zona norte (sitio Campus)', via: 'MQTT', formato: 'SenML', intervalo_esperado_s: 'cada 1 min', canales: 'temperatura en °C', pasarela: '', decodificador: '', topico: `uct/${id}/senml` },
+  });
+  const conPalabras = (p: ReturnType<typeof plan>) => ({ ...p, filas: p.filas.map((f) => (f.interpretada === null ? f : { ...f, legible: legible(f.id_fisico) })) });
+  it('S1: una fila mal formada no rechaza el archivo: la revisión abre, esa fila «No entra» con su motivo (sin enviarla) y va al CSV de las que no entran', async () => {
+    responder = (_m, _r, cuerpo) => json(conPalabras(plan(cuerpo.filas!, 'validar')));
+    render(Alta, { modo: 'lote', sesion: SESION, sitios: SITIOS });
+    await subir(`${CAB}\nn-1,Uno,Lab,mqtt,senml,60,temperatura:Cel,\nnodo-ñ,Dos,Lab,mqtt,senml,60,temperatura,\nn-3,Tres,Lab,mqtt,senml,60,temperatura,,sobra\nn-4,Cuatro,Lab,mqtt,senml,60,temperatura:°C,`);
+    await waitFor(() => expect(document.querySelector('[data-filas-leidas]')!.textContent).toBe('nodos.csv: 4 filas leídas. 2 están mal escritas y no entran: la revisión dice por qué.'));
+    expect(screen.queryByRole('alert')).toBeNull(); // nada de «Lo que elegiste no se puede usar todavía»
+    await revisar();
+    expect(pedidos.filter((p) => p.ruta.endsWith('modo=validar'))[0]!.cuerpo.filas!.map((f) => f.n)).toEqual([2, 5]); // solo las bien formadas
+    expect(filas()).toEqual(['3', '4']); // abre en «No entran»
+    expect(document.querySelector('[data-fila-lote="3"] [data-que-pasa]')!.textContent).toBe('No entra: Identificador: trae «ñ», que no se admite: solo letras sin tilde ni eñe, dígitos y signos simples, sin comillas dobles ni barra invertida');
+    expect(document.querySelector('[data-fila-lote="4"] [data-que-pasa]')!.textContent).toContain('No entra: la fila trae 1 celda más que la cabecera («sobra»)');
+    expect([...document.querySelectorAll('[data-filtro-lote] [data-cifra]')].map((e) => e.textContent)).toEqual(['4', '2', '0', '2', '0']);
+    await fireEvent.click(boton('Ver el detalle de la fila 4'));
+    expect(document.querySelector('[data-detalle-de="4"] [data-motivo-fila]')!.textContent).toBe('la fila trae 1 celda más que la cabecera («sobra»): ¿un separador de más dentro de una celda?'); // sin «fila:» delante
+    await fireEvent.click(boton('Descargar las que no entran (CSV)'));
+    const bajado = (await descargas.at(-1)!.contenido).split('\r\n');
+    expect(bajado.slice(1, 3).map((l) => l.split(';').slice(0, 2).join(';'))).toEqual(['nodo-ñ;Dos', 'n-3;Tres']);
+    await fireEvent.click(boton('Crear 2 dispositivos')); // las bien formadas se crean igual (S1: no frena a las demás)
+    expect(pedidos.filter((p) => p.ruta.endsWith('modo=crear'))[0]!.cuerpo.filas!.map((f) => f.n)).toEqual([2, 5]);
+  });
+  it('S1: si ninguna fila está bien formada, la revisión las muestra sin preguntar al servidor y «Crear» queda desactivado con su motivo', async () => {
+    render(Alta, { modo: 'lote', sesion: SESION, sitios: SITIOS });
+    await subir(`${CAB}\nnodo-ñ,Uno,Lab,,,60,temperatura,`);
+    await revisar();
+    expect(pedidos.filter((p) => p.ruta.startsWith('/dispositivos/lote?'))).toEqual([]);
+    expect(filas()).toEqual(['2']);
+    expect(boton('Crear 0 dispositivos').disabled).toBe(true);
+    expect(document.querySelector('[data-acciones-revision="arriba"]')!.textContent).toContain('ninguna fila se crearía');
+  });
+  it('S3 y S4: la zona por su nombre se dice una vez sobre la lista; la línea de avisos y la tarjeta «Con aviso» cuentan lo mismo; lo que se ve está en palabras de la persona', async () => {
+    responder = (_m, _r, cuerpo) => {
+      const p = conPalabras(plan(cuerpo.filas!, 'validar', { existen: ['n-3'] }));
+      p.filas = p.filas.map((f) => (f.id_fisico === 'n-2' ? { ...f, avisos: [{ campo: 'id_fisico', texto: 'el identificador venía con mayúsculas: se guardará como «n-2»' }] } : f));
+      return json({ ...p, zonas_por_nombre: [{ zona: 'Zona norte', sitio: 'Campus', filas: 2 }] });
+    };
+    render(Alta, { modo: 'lote', sesion: SESION, sitios: SITIOS });
+    await subir(csv(3));
+    await revisar();
+    expect(document.querySelector('[data-zonas-lote]')!.textContent).toBe('Zona «Zona norte» → sitio «Campus»: 2 filas');
+    expect(document.querySelector('[data-avisos-lote]')!.textContent).toContain('1 fila que se crea trae avisos');
+    expect(document.querySelector('[data-filtro-lote="aviso"] [data-cifra]')!.textContent).toBe('1');
+    expect(document.querySelector('[data-resumen-lote]')!.textContent).toBe('3 leídas: 2 se crean y 1 ya existe.');
+    expect(document.querySelector('[data-fila-lote="2"] [data-que-pasa]')!.textContent).toBe('Se crea en Zona norte (sitio Campus)');
+    expect(document.querySelector('[data-fila-lote="2"] [data-resumen-fila]')!.textContent).toBe('MQTT, SenML, cada 1 min: temperatura (°C)');
+    await fireEvent.click(boton('Ver el detalle de la fila 2'));
+    const vistos = [...document.querySelectorAll('[data-detalle-lote="2"] dd')].map((e) => e.textContent!.replace(/\s+/g, ' ').trim());
+    expect(vistos).toEqual(['n-1', 'Nodo n-1', 'Zona norte (sitio Campus)', 'MQTT por omisión', 'SenML por omisión', 'cada 1 min', 'temperatura en °C', 'vacío', 'vacío', 'uct/n-1/senml']);
+  });
+  it('S4: el detalle nombra cada campo con el rótulo que publica la plantilla, no con el nombre de la columna', async () => {
+    const ROT: Record<string, string> = { ...ROTULOS_SERVIDOR, intervalo_esperado_s: 'Cada cuánto reporta (prueba)' };
+    const conRotulos = { ...PLANTILLA, columnas: PLANTILLA.columnas.map((c) => ({ ...c, rotulo: ROT[c.nombre] })) };
+    vi.stubGlobal('fetch', vi.fn(async (ruta: string, init: RequestInit = {}) => {
+      const cuerpo = typeof init.body === 'string' ? JSON.parse(init.body) : {};
+      pedidos.push({ metodo: init.method ?? 'GET', ruta, cuerpo, cabeceras: {} });
+      return ruta === '/dispositivos/lote/plantilla' ? json(conRotulos) : json(conPalabras(plan(cuerpo.filas, 'validar')));
+    }));
+    render(Alta, { modo: 'lote', sesion: SESION, sitios: SITIOS });
+    await subir(csv(1));
+    await revisar();
+    await fireEvent.click(boton('Ver el detalle de la fila 2'));
+    const rotulos = [...document.querySelectorAll('[data-detalle-lote="2"] dt')].map((e) => e.textContent);
+    expect(rotulos).toEqual([...Object.values(ROT), 'Tópico donde publicará']);
+    expect(rotulos.filter((t) => /_/.test(t!))).toEqual([]);
+  });
+  it('S5: «Ya existe» va en ámbar, sin la cruz roja, y con «Abrir su ficha», que lleva a la ficha del equipo', async () => {
+    responder = (_m, _r, cuerpo) => json(plan(cuerpo.filas!, 'validar', { existen: ['n-1'] }));
+    render(Alta, { modo: 'lote', sesion: SESION, sitios: SITIOS });
+    await subir(csv(2));
+    await revisar();
+    const fila = document.querySelector('[data-fila-lote="2"]')!;
+    expect(fila.querySelector('[data-que-pasa]')!.className).toContain('alerta');
+    await fireEvent.click(boton('Ver el detalle de la fila 2'));
+    const motivo = document.querySelector('[data-detalle-lote="2"] [data-motivo-campo]')!;
+    expect([motivo.className.includes('alerta'), motivo.className.includes('sin_senal')]).toEqual([true, false]);
+    await fireEvent.click(fila.querySelector('[data-abrir-ficha]')!);
+    expect(window.location.hash).toBe('#/dispositivos/d-n-1');
+    history.replaceState(null, '', '#/');
+    expect(document.querySelector('[data-fila-lote="3"] [data-abrir-ficha]')).toBeNull(); // solo las que ya existen
+  });
+  it('S6: el resumen, «Volver» y «Crear N» van también sobre la lista; las ayudas esenciales están escritas, sin ayuda emergente; «corrígelas y vuelve a subirlas», visible', async () => {
+    responder = (_m, _r, cuerpo) => json(plan(cuerpo.filas!, 'validar', { malas: { 'n-3': 'falta la zona' } }));
+    render(Alta, { modo: 'lote', sesion: SESION, sitios: SITIOS });
+    await subir(csv(150));
+    await revisar();
+    const arriba = document.querySelector('[data-acciones-revision="arriba"]')!;
+    const lista = document.querySelector('[data-informe-lote]')!;
+    expect(arriba.compareDocumentPosition(lista) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy(); // antes de la lista
+    expect([...arriba.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Volver', 'Crear 149 dispositivos']);
+    expect(document.querySelectorAll('[data-crear-lote]')).toHaveLength(2);
+    expect(document.querySelectorAll('[data-paso-lote="2"] [data-tooltip]')).toHaveLength(0); // ninguna ayuda emergente en la revisión
+    expect(document.querySelector('[data-ayuda-crear]')!.textContent).toContain('en una sola petición, o ninguno');
+    expect(document.querySelector('[data-remedio-no-entran]')!.textContent).toContain('corrígelas y vuelve a subirlas');
+    await fireEvent.click(document.querySelector('[data-volver="arriba"]')!);
+    expect(document.querySelector('[data-paso-lote="1"]')).toBeTruthy();
+  });
+  it('S6: bajo 700 px la ayuda va fija al pie; con pantalla táctil (hover: none) no recibe toques ni clics; con ratón, sigue alcanzable (WCAG 1.4.13)', () => {
+    const angosta = /@media \(max-width: 700px\) \{ \.tooltip \{([^}]*)\} \}/.exec(estilos)?.[1] ?? '';
+    expect(angosta).toContain('position: fixed');
+    expect(angosta).not.toContain('pointer-events'); // con ratón, en una ventana angosta, el puntero puede pasar por encima
+    const tactil = /@media \(max-width: 700px\) and \(hover: none\) \{ \.tooltip \{([^}]*)\} \}/.exec(estilos)?.[1] ?? '';
+    expect(tactil).toContain('pointer-events: none');
+    expect(estilos.match(/pointer-events: none/g)?.length).toBe(2); // esa y la de la etiqueta flotante del gráfico; ninguna otra regla la quita
+  });
+  it('S7: «atrás» desmonta la pantalla con credenciales sin descargar: al volver, el paso 3 las tiene (nunca dibujadas); descargadas y fuera, se olvidan', async () => {
+    await llegarAlResultado();
+    cleanup(); // «atrás»: el fragmento pasa a otra pantalla
+    expect(credencialesLote.filas).toHaveLength(2);
+    render(Alta, { modo: 'lote', sesion: SESION, sitios: SITIOS });
+    await waitFor(() => expect(document.querySelector('[data-paso-lote="3"]')).toBeTruthy());
+    expect(document.querySelector('[data-credenciales-lote]')!.textContent).toContain('2 credenciales');
+    expect(document.body.textContent).not.toContain('c-n-1');
+    expect(JSON.stringify({ ...localStorage }) + JSON.stringify({ ...sessionStorage }) + window.location.href).not.toContain('c-n-1');
+    await fireEvent.click(boton('Descargar credenciales (CSV)'));
+    expect((await descargas.at(-1)!.contenido).split('\r\n').filter((l) => l.startsWith('n-'))).toHaveLength(2);
+    cleanup(); // salir ya descargadas: se olvidan
+    expect(credencialesLote.filas).toEqual([]);
+    render(Alta, { modo: 'lote', sesion: SESION, sitios: SITIOS });
+    await waitFor(() => expect(document.querySelector('[data-paso-lote="1"]')).toBeTruthy());
+  });
+  it('S7: al cerrar la sesión (o vencer) las credenciales sin descargar se olvidan', async () => {
+    await llegarAlResultado();
+    cleanup();
+    olvidarLote(); // lo que hace App.svelte al cerrar la sesión
+    expect([credencialesLote.filas, borradorLote.archivo]).toEqual([[], null]);
+    await llegarAlResultado();
+    cleanup();
+    vi.stubGlobal('fetch', vi.fn(async () => json({ statusCode: 401, message: 'sesión requerida' }, 401)));
+    await expect(obtener('/sesion/algo')).rejects.toBeTruthy(); // un 401 cualquiera avisa «sin sesión» a toda la aplicación
+    expect(credencialesLote.filas).toEqual([]);
+  });
+  it('S1 (revisión): la sesión vence con un archivo leído; si entra OTRA persona en la pestaña no ve nada (archivo, filas, aviso ni credenciales); la misma persona lo retoma', async () => {
+    const OTRA: Sesion = { ...SESION, usuario: { id: 'u2', nombre: 'Bruno', email: 'bruno@ejemplo.invalid' } } as Sesion;
+    const vencer = async (): Promise<void> => {
+      responder = (_m, ruta) => (ruta.endsWith('modo=validar') ? json({ statusCode: 401, message: 'sesión requerida' }, 401) : json([]));
+      render(Alta, { modo: 'lote', sesion: SESION, sitios: SITIOS });
+      await subir(csv(2), 'de-ana.csv');
+      await waitFor(() => expect(boton('Revisar las filas')).toBeTruthy());
+      await fireEvent.click(boton('Revisar las filas'));
+      await waitFor(() => expect(document.querySelector('[data-error-lote="sesion_vencida"]')).toBeTruthy());
+      cleanup(); // la aplicación muestra «Entrar»
+    };
+    await vencer();
+    Object.assign(credencialesLote, { filas: [{ n: 2, id_fisico: 'n-1', resultado: 'creada', motivo: null, id: 'x', credencial: 'secreto-de-ana', topico: null }], creadas: 1, descargadas: false });
+    render(Alta, { modo: 'lote', sesion: OTRA, sitios: SITIOS });
+    await waitFor(() => expect(document.querySelector('[data-paso-lote="1"]')).toBeTruthy());
+    expect([document.querySelector('[data-filas-leidas]'), document.querySelector('[data-error-lote]'), document.querySelector('[data-credenciales-lote]')]).toEqual([null, null, null]);
+    expect(document.body.textContent).not.toContain('de-ana.csv');
+    expect([borradorLote.archivo, borradorLote.filas, credencialesLote.filas]).toEqual([null, [], []]);
+    cleanup();
+    await vencer();
+    render(Alta, { modo: 'lote', sesion: SESION, sitios: SITIOS }); // la misma persona: lo retoma, con su aviso
+    await waitFor(() => expect(document.querySelector('[data-error-lote]')!.textContent).toContain('El archivo leído se conservó'));
+    expect(document.querySelector('[data-filas-leidas]')!.textContent).toBe('de-ana.csv: 2 filas leídas.');
+  });
+  it('S10 (revisión): un `change` sin archivo (se canceló la ventana de elegir) no descarta el origen ni la revisión en vuelo', async () => {
+    let responderYa: () => void = () => {};
+    responder = (_m, _r, cuerpo) => new Promise<Response>((ok) => { responderYa = () => ok(json(plan(cuerpo.filas!, 'validar'))); });
+    render(Alta, { modo: 'lote', sesion: SESION, sitios: SITIOS });
+    await subir(csv(2), 'primero.csv');
+    await waitFor(() => expect(boton('Revisar las filas')).toBeTruthy());
+    await fireEvent.click(boton('Revisar las filas'));
+    await waitFor(() => expect(pedidos.filter((p) => p.ruta.endsWith('modo=validar'))).toHaveLength(1));
+    await fireEvent.change(document.querySelector('[data-archivo]')!, { target: { files: [] } }); // abrir y cancelar mientras se revisa
+    responderYa();
+    await waitFor(() => expect(document.querySelector('[data-paso-lote="2"]')).toBeTruthy()); // la revisión en vuelo no se canceló
+    expect(filas()).toEqual(['2', '3']);
+  });
+  it('S8: tras el último «Mostrar 100 más», el foco va a «Se ven N de N»; tras «Ya las guardé», al párrafo que lo confirma (nunca a body)', async () => {
+    responder = (_m, ruta, cuerpo) => json(plan(cuerpo.filas!, ruta.endsWith('modo=crear') ? 'crear' : 'validar'));
+    render(Alta, { modo: 'lote', sesion: SESION, sitios: SITIOS });
+    await subir(csv(150));
+    await revisar();
+    const mas = boton('Mostrar 100 más');
+    mas.focus();
+    await fireEvent.click(mas);
+    await waitFor(() => expect(document.activeElement).toBe(document.querySelector('[data-mostrando]')));
+    expect(document.activeElement!.textContent).toContain('Se ven 150 de 150');
+    await fireEvent.click(boton('Crear 150 dispositivos'));
+    await waitFor(() => expect(document.querySelector('[data-paso-lote="3"]')).toBeTruthy());
+    await fireEvent.click(boton('Descargar credenciales (CSV)'));
+    await fireEvent.click(boton('Ya las guardé: olvidarlas'));
+    await waitFor(() => expect(document.activeElement).toBe(document.querySelector('[data-sin-credenciales]')));
+  });
+  it('S10: mientras se lee un archivo nuevo, el anterior ya no cuenta: «Revisar las filas» se desactiva con su motivo hasta terminar', async () => {
+    responder = (_m, _r, cuerpo) => json(plan(cuerpo.filas!, 'validar'));
+    render(Alta, { modo: 'lote', sesion: SESION, sitios: SITIOS });
+    await subir(csv(3), 'primero.csv');
+    await waitFor(() => expect(document.querySelector('[data-filas-leidas]')!.textContent).toBe('primero.csv: 3 filas leídas.'));
+    let terminar: (t: string) => void = () => {};
+    const lento = new File(['x'], 'segundo.csv');
+    Object.defineProperty(lento, 'text', { value: () => new Promise<string>((ok) => { terminar = ok; }) });
+    await fireEvent.change(document.querySelector('[data-archivo]')!, { target: { files: [lento] } });
+    await waitFor(() => expect(document.querySelector('[data-filas-leidas]')!.textContent).toBe('Leyendo segundo.csv…'));
+    expect(boton('Revisar las filas').disabled).toBe(true);
+    expect(boton('Revisar las filas').closest('.boton-envoltura')!.textContent).toContain('se está leyendo el archivo');
+    await fireEvent.click(boton('Revisar las filas'));
+    expect(pedidos.filter((p) => p.ruta.startsWith('/dispositivos/lote?'))).toEqual([]); // nada con las filas del anterior
+    terminar(csv(5));
+    await waitFor(() => expect(document.querySelector('[data-filas-leidas]')!.textContent).toBe('segundo.csv: 5 filas leídas.'));
+    expect(boton('Revisar las filas').disabled).toBe(false);
   });
 });
 

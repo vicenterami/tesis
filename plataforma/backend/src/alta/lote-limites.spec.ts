@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { BadRequestException, PayloadTooLargeException } from '@nestjs/common';
-import { COLUMNAS_LOTE, COLUMNAS_TEXTO_LIBRE, MAX_BYTES_LOTE, MAX_FILAS_LOTE, TOPES_COLUMNA, TOPE_CANALES, filasDelCuerpo, plantillaLote } from './lote.js';
+import { COLUMNAS_LOTE, COLUMNAS_TEXTO_LIBRE, MAX_BYTES_LOTE, MAX_FILAS_LOTE, ROTULOS, TOPES_COLUMNA, TOPE_CANALES, filasDelCuerpo, plantillaLote } from './lote.js';
 import { MENSAJE_TOPE_CUERPO, MENSAJE_TOPE_LOTE, TOPE_CUERPO_LOTE, esLote } from '../arranque.js';
 
 // Los límites del alta por lote, en el límite (docs/19 §4, N5 y N11): el peor caso de 500 filas con cada columna en su tope se MIDE en
@@ -24,7 +24,7 @@ const admite = (columna: string, v: string): boolean => {
   }
 };
 const CANDIDATOS = [
-  ...Array.from({ length: 0x80 }, (_, i) => String.fromCharCode(i)), '\u0085', '\u00a0', 'ñ', '€', '\u2028', '\ufeff', '😀', '\ud800', '\udfff',
+  ...Array.from({ length: 0x80 }, (_, i) => String.fromCharCode(i)), '\u0085', '\u00a0', 'ñ', '€', '\u2028', '\ufeff', '😀', '\ud800', '\udfff', '°', 'º',
 ];
 const motivosDe = (fila: Record<string, unknown>): string[] => {
   try {
@@ -49,6 +49,17 @@ describe('el tope del cuerpo sale del peor caso medido de lo que se acepta', () 
     expect(MAX_BYTES_LOTE - bytes).toBeLessThan(16 * 1024);
     expect(TOPE_CUERPO_LOTE).toBe(MAX_BYTES_LOTE); // el lector de JSON usa el mismo número
   });
+  it('S2: en `canales` el tope se cuenta en bytes UTF-8, así «°» vale dos y el peor caso no cambia: lleno de «°C» hasta el tope, cabe; un byte más, no', () => {
+    const grados = 'x'.repeat(TOPE_CANALES % 3) + '°C'.repeat(Math.floor(TOPE_CANALES / 3)); // «°C» son 3 bytes
+    expect(Buffer.byteLength(grados)).toBe(TOPE_CANALES);
+    expect(motivosDe({ n: 8, canales: grados })).toEqual([]);
+    // El texto dice cómo se contó: «tiene 1198 caracteres, contando como dos cada «°», y el máximo es 1197».
+    expect(motivosDe({ n: 8, canales: `${grados}x` })).toEqual([`fila 8, Canales: tiene ${TOPE_CANALES + 1} caracteres, contando como dos cada «°», y el máximo es ${TOPE_CANALES}`]);
+    const cuerpo = peorCaso();
+    for (const f of cuerpo.filas) f.canales = grados;
+    expect(() => filasDelCuerpo(cuerpo, 'crear')).not.toThrow();
+    expect(Buffer.byteLength(JSON.stringify(cuerpo))).toBeLessThanOrEqual(MAX_BYTES_LOTE);
+  });
   it('nadie lo supera con caracteres admisibles: por columna, el carácter admitido más caro en el JSON, repetido hasta el tope, sigue cabiendo', () => {
     const fila: Record<string, unknown> = {};
     for (const c of COLUMNAS_LOTE) {
@@ -62,12 +73,19 @@ describe('el tope del cuerpo sale del peor caso medido de lo que se acepta', () 
     expect(Buffer.byteLength(JSON.stringify(cuerpo))).toBeLessThanOrEqual(MAX_BYTES_LOTE);
   });
   it('lo que el JSON escribe con más bytes no entra: controles, sustitutos sueltos y, en las columnas de códigos, «"», «\\» y lo que no es ASCII', () => {
-    for (const x of ['\u0000', '\u0001', '\t', '\u007f', '\u0085']) expect(motivosDe({ n: 8, nombre: `a${x}b` })).toEqual(['fila 8: nombre trae un carácter de control']);
-    expect(motivosDe({ n: 8, zona: 'a\ud800' })).toEqual(['fila 8: zona trae un carácter no válido (un sustituto UTF-16 suelto)']);
+    // Con las palabras con que el panel dice lo mismo al leer (docs/19 §4, S1 y S4): «fila 8, Nombre: …», sin el nombre de la columna.
+    for (const x of ['\u0000', '\u0001', '\t', '\u007f', '\u0085']) expect(motivosDe({ n: 8, nombre: `a${x}b` })).toEqual(['fila 8, Nombre: trae un salto de línea, un tabulador u otro carácter de control, que no se admite']);
+    expect(motivosDe({ n: 8, zona: 'a\ud800' })).toEqual(['fila 8, Zona: trae un carácter dañado que no se puede leer']);
     expect(motivosDe({ n: 8, nombre: 'Ñandú 😀 «€»' })).toEqual([]); // el texto libre admite lo imprimible
     for (const c of COLUMNAS_LOTE.filter((x) => !COLUMNAS_TEXTO_LIBRE.includes(x))) {
-      for (const x of ['"', '\\', 'é', '€']) expect(motivosDe({ n: 8, [c]: x })).toEqual([`fila 8: ${c} admite solo caracteres ASCII imprimibles, sin comillas dobles ni barra invertida`]);
+      // En `canales` el motivo nombra también lo que sí se admite («°» y «º»: S2).
+      const tambien = c === 'canales' ? ', y también «°» y «º»' : '';
+      for (const x of ['"', '\\', 'é', '€']) expect(motivosDe({ n: 8, [c]: `a${x}` })).toEqual([`fila 8, ${ROTULOS[c]}: trae «${x}», que no se admite: solo letras sin tilde ni eñe, dígitos y signos simples${tambien}, sin comillas dobles ni barra invertida`]);
     }
+    // S2: «°» y «º» (de «°C») solo en `canales`; en otra columna de códigos, no.
+    expect(motivosDe({ n: 8, canales: 'temperatura:°C | humedad:%' })).toEqual([]);
+    expect(motivosDe({ n: 8, canales: 'temperatura:ºC' })).toEqual([]);
+    expect(motivosDe({ n: 8, id_fisico: 'nodo-°' })).toEqual(['fila 8, Identificador: trae «°», que no se admite: solo letras sin tilde ni eñe, dígitos y signos simples, sin comillas dobles ni barra invertida']);
   });
   it('501 filas es 413 con `codigo: demasiadas_filas`; un cuerpo inválido es 400 con `codigo: cuerpo_invalido` y la lista de motivos', () => {
     expect(() => filasDelCuerpo(peorCaso(MAX_FILAS_LOTE + 1), 'crear')).toThrow(PayloadTooLargeException);
@@ -78,11 +96,11 @@ describe('el tope del cuerpo sale del peor caso medido de lo que se acepta', () 
   it('una celda un carácter sobre su tope es 400 con su fila; también una que no es texto ni número', () => {
     for (const c of COLUMNAS_LOTE) {
       const t = TOPES_COLUMNA[c];
-      expect(motivosDe({ ...llena(7), [c]: 'x'.repeat(t + 1) })).toEqual([`fila 7: ${c} pasa su tope de ${t} caracteres (trae ${t + 1})`]);
+      expect(motivosDe({ ...llena(7), [c]: 'x'.repeat(t + 1) })).toEqual([`fila 7, ${ROTULOS[c]}: tiene ${t + 1} caracteres y el máximo es ${t}`]);
     }
-    expect(motivosDe({ n: 8, nombre: true })).toEqual(['fila 8: nombre debe ser texto o número']);
-    expect(motivosDe({ n: 8, nombre: null })).toEqual(['fila 8: nombre debe ser texto o número']);
-    expect(motivosDe({ n: 8, canales: ['temperatura'] })).toEqual(['fila 8: canales debe ser texto o número']);
+    expect(motivosDe({ n: 8, nombre: true })).toEqual(['fila 8, Nombre: no es texto ni número']);
+    expect(motivosDe({ n: 8, nombre: null })).toEqual(['fila 8, Nombre: no es texto ni número']);
+    expect(motivosDe({ n: 8, canales: ['temperatura'] })).toEqual(['fila 8, Canales: no es texto ni número']);
     expect(motivosDe({ n: 8, intervalo_esperado_s: 60 })).toEqual([]); // un número es una celda válida
   });
   it('una columna que no es de la plantilla es 400 con su fila, con la clave recortada a 80 caracteres; también __proto__, constructor y toString', () => {
@@ -127,5 +145,8 @@ describe('el tope del cuerpo sale del peor caso medido de lo que se acepta', () 
     expect(p).toMatchObject({ max_filas: MAX_FILAS_LOTE, max_bytes: MAX_BYTES_LOTE, separadores: { columnas: [';', ',', '\t'], canales: ['|', ';'] } });
     expect(p.columnas.find((c) => c.nombre === 'canales')?.ejemplo).not.toContain(';');
     expect(p.columnas.filter((c) => c.texto_libre).map((c) => c.nombre)).toEqual([...COLUMNAS_TEXTO_LIBRE]); // la pantalla comprueba lo mismo que filasDelCuerpo // el ejemplo ya no trae «;» sin comillas
+    // S2 y S4: el rótulo de cada columna para las personas y los símbolos que admite una columna de códigos (solo `canales`: «°» y «º»).
+    expect(Object.fromEntries(p.columnas.map((c) => [c.nombre, c.rotulo]))).toEqual(ROTULOS);
+    expect(p.columnas.filter((c) => c.simbolos !== '').map((c) => [c.nombre, c.simbolos])).toEqual([['canales', '°º']]);
   });
 });

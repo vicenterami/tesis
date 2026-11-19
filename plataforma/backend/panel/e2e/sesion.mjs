@@ -374,13 +374,15 @@ for (const caso of casos) {
       const cuenta = async (f) => (await p.locator(`[data-filtro-lote="${f}"] [data-cifra]`).textContent()).trim();
       comprobar((await cuenta('valida')) === '2' && (await cuenta('rechazada')) === '1', `${etiqueta}: P7: la revisión informa 2 que se crean y 1 que no entra, sin crear nada`);
       const antes = await p.evaluate(async (s) => { const x = (await (await fetch('/sitios')).json()).find((y) => y.codigo === s); return Number((await fetch(`/dispositivos?sitio=${x.id}&limite=1`)).headers.get('x-total')); }, sitio);
-      await p.locator('[data-crear-lote]').click();
+      // «Crear N dispositivos» va sobre la lista y debajo de ella (docs/19 §4, S6): el de arriba (el localizador es estricto).
+      await p.locator('[data-crear-lote="arriba"]').click();
       await p.locator('[data-paso-lote="3"]').waitFor({ timeout: 30000 });
       const despues = await p.evaluate(async (s) => { const x = (await (await fetch('/sitios')).json()).find((y) => y.codigo === s); return Number((await fetch(`/dispositivos?sitio=${x.id}&limite=1`)).headers.get('x-total')); }, sitio);
       comprobar(despues === antes + 2, `${etiqueta}: … «Crear 2 dispositivos» crea solo las 2 que entran`, `${antes} → ${despues}`);
       const [descarga] = await Promise.all([p.waitForEvent('download', { timeout: 15000 }), p.getByRole('button', { name: 'Descargar credenciales (CSV)' }).click()]);
       const lineas = readFileSync(await descarga.path(), 'utf8').trim().split(/\r?\n/);
-      comprobar(lineas[0] === 'id_fisico,id,credencial,topico' && lineas.length === 3, `${etiqueta}: … las credenciales se descargan una vez en CSV (${lineas.length - 1} filas)`);
+      // Desde el bloque S, la cuarta columna dice a dónde envía cada equipo según su vía (`destino`).
+      comprobar(lineas[0] === 'id_fisico,id,credencial,destino' && lineas.length === 3, `${etiqueta}: … las credenciales se descargan una vez en CSV (${lineas.length - 1} filas)`);
       await sinDesborde(p, `${etiqueta}, alta masiva`);
       await foto(p, '10-alta-masiva');
     });

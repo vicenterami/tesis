@@ -1,0 +1,165 @@
+{
+ "descripcion": "Catálogo fijo de escenarios del alta masiva (docs/19 §4, bloque S, punto 11): 60 filas sintéticas con «;», BOM, CRLF y una fila vacía después de la fila de datos 20, como las deja una planilla en español. «xprefijo» se reemplaza por el prefijo de cada corrida (y «XPREFIJO» por el mismo en mayúsculas); «xprefijo-existe» es un equipo que ya existe en el sitio de la persona y «xprefijo-ajeno» uno de otro sitio. Las zonas son «Norte» y «Galpón Sur» de un sitio de la persona. `n` es la fila del archivo (la cabecera es la 1, la vacía cuenta); `donde` dice quién lo decide: el panel al leer (fila mal formada) o el servidor; `contiene`, un trozo del motivo o del aviso.",
+ "archivo": "lote-escenarios.csv",
+ "prefijo": "xprefijo",
+ "totales": {
+  "leidas": 60,
+  "valida": 44,
+  "existe": 1,
+  "rechazada": 15,
+  "aviso": 3,
+  "enviadas": 58
+ },
+ "zonas_por_nombre": [
+  {
+   "zona": "Galpón Sur",
+   "filas": 22
+  },
+  {
+   "zona": "Norte",
+   "filas": 22
+  }
+ ],
+ "casos": [
+  {
+   "caso": "repetido_en_archivo",
+   "n": 41,
+   "resultado": "rechazada",
+   "donde": "servidor",
+   "contiene": "el identificador se repite en el archivo: ya está en la fila 6"
+  },
+  {
+   "caso": "existe_en_sitio",
+   "n": 42,
+   "resultado": "existe",
+   "donde": "servidor",
+   "contiene": "ya está dado de alta"
+  },
+  {
+   "caso": "de_otro_sitio",
+   "n": 43,
+   "resultado": "rechazada",
+   "donde": "servidor",
+   "contiene": "ese identificador ya está en uso en la plataforma: elige otro"
+  },
+  {
+   "caso": "magnitud_desconocida",
+   "n": 44,
+   "resultado": "rechazada",
+   "donde": "servidor",
+   "contiene": "magnitud desconocida «temperatur»: ¿quisiste decir «temperatura»?"
+  },
+  {
+   "caso": "intervalo_bajo",
+   "n": 45,
+   "resultado": "rechazada",
+   "donde": "servidor",
+   "contiene": "cada cuánto reporta va de 5 a 86 400 segundos: 2 es muy poco"
+  },
+  {
+   "caso": "intervalo_alto",
+   "n": 46,
+   "resultado": "rechazada",
+   "donde": "servidor",
+   "contiene": "cada cuánto reporta va de 5 a 86 400 segundos: 100000 es demasiado"
+  },
+  {
+   "caso": "intervalo_coma_decimal",
+   "n": 47,
+   "resultado": "rechazada",
+   "donde": "servidor",
+   "contiene": "«60,5» no se puede leer"
+  },
+  {
+   "caso": "formula_en_nombre",
+   "n": 48,
+   "resultado": "valida",
+   "donde": "servidor",
+   "contiene": ""
+  },
+  {
+   "caso": "formula_en_id",
+   "n": 49,
+   "resultado": "rechazada",
+   "donde": "servidor",
+   "contiene": "solo admite minúsculas, dígitos y guiones"
+  },
+  {
+   "caso": "unidad_equivocada",
+   "n": 50,
+   "resultado": "rechazada",
+   "donde": "servidor",
+   "contiene": "temperatura va en °C: «F» es otra unidad y no se convierte"
+  },
+  {
+   "caso": "mayusculas_en_id",
+   "n": 51,
+   "resultado": "valida",
+   "donde": "servidor",
+   "contiene": "el identificador venía con mayúsculas"
+  },
+  {
+   "caso": "zona_inexistente",
+   "n": 52,
+   "resultado": "rechazada",
+   "donde": "servidor",
+   "contiene": "la zona «Zona Fantasma» no existe en tus sitios"
+  },
+  {
+   "caso": "lorawan_sin_pasarela",
+   "n": 53,
+   "resultado": "rechazada",
+   "donde": "servidor",
+   "contiene": "falta la pasarela: un equipo LoRaWAN la necesita"
+  },
+  {
+   "caso": "nombre_vacio",
+   "n": 54,
+   "resultado": "rechazada",
+   "donde": "servidor",
+   "contiene": "falta el nombre"
+  },
+  {
+   "caso": "canal_repetido",
+   "n": 55,
+   "resultado": "rechazada",
+   "donde": "servidor",
+   "contiene": "el canal 2 repite la magnitud «temperatura»"
+  },
+  {
+   "caso": "via_mayusculas_y_plano",
+   "n": 56,
+   "resultado": "valida",
+   "donde": "servidor",
+   "contiene": ""
+  },
+  {
+   "caso": "nombre_repetido",
+   "n": 57,
+   "resultado": "valida",
+   "donde": "servidor",
+   "contiene": "el nombre se repite en la fila 2"
+  },
+  {
+   "caso": "intervalo_vacio",
+   "n": 58,
+   "resultado": "rechazada",
+   "donde": "servidor",
+   "contiene": "falta cada cuánto reporta"
+  },
+  {
+   "caso": "tilde_en_id",
+   "n": 59,
+   "resultado": "rechazada",
+   "donde": "panel",
+   "contiene": "Identificador: trae «ó», que no se admite"
+  },
+  {
+   "caso": "celda_de_mas",
+   "n": 60,
+   "resultado": "rechazada",
+   "donde": "panel",
+   "contiene": "la fila trae 1 celda más que la cabecera («sobra»)"
+  }
+ ]
+}

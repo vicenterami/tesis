@@ -66,6 +66,9 @@ describe('POST /dispositivos/lote?modo=crear: todo o nada', () => {
     const hecho = await ctrl.lote(u, 'crear', { filas, huella: vista.huella }, LLAVE, r);
     expect(hecho.huella).toBe(vista.huella);
     expect(hecho.filas.map((f) => [f.n, f.resultado, f.credencial])).toEqual([[2, 'creada', 'cred-2'], [4, 'creada', null]]);
+    // A dónde envía cada uno, por su vía (el archivo de credenciales lo dice por equipo): HTTP y LoRaWAN, por su pasarela (sin credencial).
+    expect(hecho.filas.map((f) => f.destino)).toEqual(['POST /recepcion/nodo-01', 'por su pasarela ug65-campus']);
+    expect(vista.filas.map((f) => f.destino)).toEqual([null, null]); // la vista previa no lo trae
     expect(hecho.filas.map((f) => f.interpretada)).toEqual(vista.filas.map((f) => f.interpretada));
     expect(r.cabeceras['Cache-Control']).toBe('no-store');
   });

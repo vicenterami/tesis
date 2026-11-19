@@ -485,12 +485,12 @@ export class AltaService {
   async catalogosLote(sitios: string[] | null, idsFisicos: string[]): Promise<Catalogos> {
     const [z, m, p, e, ip] = await Promise.all([
       this.pool.query<ZonaCatalogo>(
-        `SELECT z.id, z.nombre, z.sitio_id, s.codigo AS sitio_codigo FROM zona z JOIN sitio s ON s.id = z.sitio_id
+        `SELECT z.id, z.nombre, z.sitio_id, s.codigo AS sitio_codigo, s.nombre AS sitio_nombre FROM zona z JOIN sitio s ON s.id = z.sitio_id
           WHERE s.activo AND ($1::uuid[] IS NULL OR z.sitio_id = ANY($1::uuid[]))`, [sitios]),
       this.pool.query<{ codigo: string; nombre: string; unidad_canonica: string }>('SELECT codigo, nombre, unidad_canonica FROM magnitud'),
       this.pool.query<PasarelaCatalogo>(
         'SELECT id, id_fisico, sitio_id, activo, formato FROM pasarela WHERE $1::uuid[] IS NULL OR sitio_id = ANY($1::uuid[])', [sitios]),
-      // Con el sitio de cada uno: lo de otro sitio no devuelve id ni estado (RF-41), solo «no disponible» (lote.ts, `ajenos`).
+      // Con el sitio de cada uno: lo de otro sitio no devuelve id ni estado (RF-41), solo «ese identificador ya está en uso en la plataforma» (lote.ts, `ajenos`).
       this.pool.query<{ id: string; id_fisico: string; estado: string; propio: boolean }>(
         `SELECT d.id, d.id_fisico, d.estado, ($2::uuid[] IS NULL OR z.sitio_id = ANY($2::uuid[])) AS propio
            FROM dispositivo d JOIN zona z ON z.id = d.zona_id WHERE d.id_fisico = ANY($1::text[])`, [idsFisicos, sitios]),
