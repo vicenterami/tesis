@@ -877,6 +877,13 @@ for m in malos: print('FALLA', m)
 if not malos: print(f'OK    {n_from} FROM, {n_reg} imágenes de registro de los compose y {n_arch} guiones y documentos: todo fijado por digest')
 sys.exit(1 if malos else 0)
 PY
+# 20/11: las versiones que Trivy no ve (el servidor PostgreSQL compilado de la base y el binario de Node del backend) las compara
+# escanear-imagenes.sh contra lo publicado; aquí, sin red, se prueba su lógica con casos plantados (8 de PostgreSQL, 6 de Node).
+for q in pg:8 node:6; do
+  o=$(bash plataforma/pruebas/escanear-imagenes.sh --probar-${q%%:*}); r=$?; n=$(grep -c '^OK' <<<"$o")
+  if [ "$r" -eq 0 ] && [ "$n" -eq "${q##*:}" ]; then echo "OK    escanear-imagenes.sh --probar-${q%%:*}: $n de ${q##*:} casos"
+  else echo "FALLA escanear-imagenes.sh --probar-${q%%:*}: salida $r, $n de ${q##*:} casos"; grep -v '^OK' <<<"$o" | head -3; fallos=$((fallos+1)); fi
+done
 
 paso "2v. Backlog: el anexo B del informe tiene las mismas historias y tareas que docs/04, con la misma prioridad, etapa y horas"
 # 08/10: TT-39 decía «WebSocket o SSE» en docs/04 y SSE en el anexo. La descripción del anexo es un resumen a propósito y se

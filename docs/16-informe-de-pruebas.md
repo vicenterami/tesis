@@ -4850,6 +4850,10 @@ en 430 archivos, las 518 pruebas del panel (582 ejecuciones) en 43 archivos y el
 **Lo que queda.** El lector XLSX del alta masiva (bloque N, punto 6), decidido y sin construir; y el caso del `Tooltip` al pie de la pantalla bajo 700 px, que no es solo de esta pantalla.
 `panel-exportar-e2e.sh` ya corre en el paso 4c del guardián, junto a los otros dos e2e del panel.
 
+**En el servidor de prueba (desplegado el 19/11/2026, comprobado en el navegador el 20/11).** «Acerca de» muestra el commit del despliegue;
+«Exportar datos» del sitio del campus descargó el XLSX; en el teléfono, los botones de la exportación se pulsan sin que una ayuda los tape.
+Sin novedades. El escáner de ese despliegue dio «HAY QUE ACTUAR» por el servidor PostgreSQL de la base, no por estos cambios (§92).
+
 ## 90. Alta masiva sin fricción: la fila mal formada, las unidades, los avisos, las palabras y el teléfono (19/11/2026)
 
 **Por qué.** Un recorrido en navegador real del mismo día (Chromium y Firefox, a 390 y 1 280 px) mostró que la velocidad sobraba y la
@@ -5044,3 +5048,62 @@ cifras) están en los libros armados a mano. Un número se escribe con coma deci
 la persona use punto; y el formato de porcentaje no se aplica (se toma el valor guardado: 0,5 y no 50 %). La regla del número se aplica solo
 a `id_fisico` y `pasarela`: un nombre escrito como número que la planilla convirtió («007» → 7) llega como «7», y un entero de 16 cifras o
 más en una columna que no es un identificador se redondea a 15 cifras significativas (`123456789012345678` llega como «123456789012346000»).
+
+**Un libro guardado por Excel (20/11/2026).** Un libro nuevo de Excel para la web con las siete cabeceras y tres filas, descargado como
+`.xlsx` y leído en el portátil: «3 filas leídas. 1 está mal escrita y no entra», sin aviso de libro ilegible; la revisión, 3 leídas, 2 se
+crean (con aviso) y 1 no entra: el `123456` que Excel guardó como número, con el motivo «la planilla lo guarda como número, y pudo quitarle
+ceros a la izquierda o redondearlo; escríbelo como texto». Confirmado el lote, se crearon los 2 y el resultado ofreció sus 2 credenciales
+una sola vez, con «Ir al inventario» y «Dar de alta otro lote» esperando a que se descarguen. Las formas que escribe Excel ya no son solo las
+de los libros armados a mano.
+
+**En el servidor de prueba (comprobado el 20/11/2026).** Un libro `.xlsx` en «Alta masiva por archivo» → «Revisar las filas» muestra la
+revisión con sus tarjetas, sin «no se puede leer el libro», y se volvió sin confirmar (son datos reales); en el teléfono, los botones de la
+revisión se pulsan sin que una ayuda los tape. Sin novedades.
+
+## 92. Parches de seguridad de la base (TimescaleDB 2.32.1, PostgreSQL 16.16) y de Node 22.23.5 (20/11/2026)
+
+**Por qué.** Al desplegar en el servidor de prueba el 19/11/2026, el escáner dijo «HAY QUE ACTUAR»: el servidor PostgreSQL de la imagen de
+la base era 16.15 y `timescale/timescaledb:latest-pg16-oss` ya traía 16.16 (el riesgo aceptado transitorio de `docs/11 §4`, abierto el
+13/11). Consultado el 20/11 con `docker buildx imagetools inspect`: la `2.31.0-pg16-oss` y la `2.32.0-pg16-oss` (la que proponía
+Dependabot) dicen `PG_VERSION=16.15`; la primera con 16.16 es la `2.32.1-pg16-oss`, publicada el 19/11/2026, la misma imagen que
+`latest-pg16-oss`. Sus notas de versión dicen además: «Previous TimescaleDB patch versions are affected by a background worker issue on
+these newer PostgreSQL minor releases: every job run by the scheduler fails»; y las de la 2.32.0, que es «compatible only with PostgreSQL
+versions up to 18.6, 17.11, and 16.15» (https://github.com/timescale/timescaledb/releases/tag/2.32.1 y `…/tag/2.32.0`, consultadas el
+20/11/2026): la 2.32.1 era la única opción correcta. El mismo día se revisó la actualización de Node que Dependabot
+proponía (22.23.4 → 22.23.5): es un parche de seguridad publicado el 11/11/2026 («This is a security release.»: ocho cambios de severidad alta, seis CVE distintas,
+en http2, TLS y HTTP; https://github.com/nodejs/node/releases/tag/v22.23.5, consultada el 20/11/2026), que la
+espera de siete días de Dependabot había retenido. Se aplicó junto con la base.
+
+**Qué cambió de TimescaleDB entre 2.30.2 y 2.32.1, y qué toca al sistema.** Leídas las notas de 2.31.0, 2.32.0 y 2.32.1: el cambio de
+nombre de `enable_columnarscan`, la compresión adaptativa de enteros y la columnstore no aplican (la edición Apache no comprime, y ningún
+archivo del sistema usa esas opciones; `git grep`). Lo que sí podía tocarlo: desde 2.32.x TimescaleDB ya no cambia al dueño del catálogo
+para crear índices y restricciones de un fragmento nuevo, y los fragmentos nuevos los crea `plataforma_app`, que no es dueño de las
+hipertablas (migración 14). Se probó en la base actualizada, dentro de una transacción deshecha al final: como `plataforma_app`, una
+medición en 2031 creó su fragmento (dueño `plataforma`, 2 índices) y `fn_retencion_drop_chunks('trama', 3650)` respondió; después del
+`ROLLBACK`, los mismos 11 fragmentos. Los dos trabajos de fondo siguen programados, sin errores en el registro.
+
+**Qué se hizo.** El `FROM` de `plataforma/db/imagen/Dockerfile` pasa a `timescale/timescaledb:2.32.1-pg16-oss` y el de las dos etapas de
+`plataforma/backend/Dockerfile` a `node:22.23.5-trixie-slim`, ambos fijados por su digest de índice, comprobado contra el registro. La base
+de desarrollo se actualizó con el procedimiento de `docs/11 §8`: respaldo (`respaldar.sh`, 25 tablas) y simulacro de restauración en una
+base desechable con la imagen anterior (30 287 filas en 25 tablas, idénticas, 6 s); recrear solo la base con la imagen nueva (servidor
+16.16, extensión todavía 2.30.2); `ALTER EXTENSION timescaledb UPDATE` con `psql -X` (2.32.1); y la huella de las 25 tablas, idéntica a
+la del respaldo salvo la línea de la versión de la extensión.
+
+| Imagen | Antes (críticas / altas / con parche) | Después |
+|---|---|---|
+| base | servidor PostgreSQL 16.15 («HAY QUE ACTUAR» en el servidor de prueba, 19/11) | 1 / 25 / 0, todas en `gosu` (residuo documentado); servidor 16.16, «OK» |
+| backend | Node 22.23.4 | 0 / 46 / 0; `node --version` en la imagen construida: v22.23.5 |
+| proxy y broker | sin cambio | 0 / 0 / 0 |
+
+**Resultado.** El escáner, con todo construido en limpio (`--pull --no-cache`) en el portátil: «OK el servidor PostgreSQL de la imagen de
+la base es 16.16, la última publicada de su serie» y «OK 4 imágenes: ninguna vulnerabilidad alta o crítica con versión corregida
+publicada fuera de los residuos documentados». El riesgo aceptado transitorio de `docs/11 §4` queda cerrado. En el servidor de prueba, la
+base se actualiza en el despliegue siguiente con el mismo procedimiento (respaldo, recrear, `ALTER EXTENSION`, huella).
+
+**El hueco que dejó ver, cerrado el mismo día.** El parche de Node pasó nueve días sin aviso: Trivy no ve el binario de Node de la imagen
+del backend (como no veía el servidor PostgreSQL compilado de la base) y Dependabot espera siete días antes de proponer. El escáner suma
+una comprobación igual a la de PostgreSQL: el `NODE_VERSION` de la imagen construida frente al de `node:<mayor>-<variante>` (la variante,
+del `FROM`): al día, OK; hay uno más nuevo de la misma serie, «HAY QUE ACTUAR» y sale 1; no se pudo consultar, FALLA. Su prueba sin red
+(`--probar-node`: seis casos plantados, con el orden 22.9.0 < 22.10.0 y dos versiones ilegibles) da 6 de 6; plantada sin `sort -V`, 5 de 6
+y en rojo. Con la imagen del backend anterior (Node 22.23.4) la consulta real dice «HAY QUE ACTUAR … ya se publicó 22.23.5»; con la nueva,
+OK. El paso 2u del verificador corre ahora las dos pruebas sin red (8 de PostgreSQL y 6 de Node) y falla si una no da todos sus casos.

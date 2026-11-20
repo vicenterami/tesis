@@ -5,7 +5,7 @@ flowchart LR
         C5["proxy<br/>nginx · TLS · límite 0,1 GB<br/>publica 443 y 8883 (y 80, solo redirección)"]
         C1["mosquitto<br/>eclipse-mosquitto 2.1.2-alpine<br/>límite 0,25 GB"]
         C4["backend<br/>imagen propia: NestJS + panel en /panel<br/>límite 0,5 GB · sin estado"]
-        C3["timescaledb<br/>timescale/timescaledb 2.30.2-pg16-oss<br/>(edición Apache) + parches · límite 0,75 GB"]
+        C3["timescaledb<br/>timescale/timescaledb 2.32.1-pg16-oss<br/>(edición Apache) + parches · límite 0,75 GB"]
         C2["chirpstack + puente de pasarelas + redis<br/>solo ruta A (opcional, diseñada)<br/>límite 0,35 GB (por medir)"]
         V4[("certificados: carpeta del<br/>anfitrión, solo lectura")]
         V2[("vol: datos-mosquitto")]

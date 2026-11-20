@@ -6,10 +6,11 @@
 # 09/11/2026: digest de la reconstrucción de 22.23.4-trixie-slim del 05/11 (trae apt 3.0.4, CVE-2026-109518) en las dos
 # etapas; zlib1g (CVE-2026-76844 y CVE-2026-85091, corregido en 1:1.3.dfsg+really1.3.1-1+deb13u1) todavía no viene en la
 # imagen oficial y se actualiza en la etapa final (docs/16 §12). Cuando la oficial lo traiga, esa línea sobra.
+# 20/11/2026: Node 22.23.5, parche de seguridad del 11/11/2026 (6 CVE de severidad alta en http2, TLS y HTTP), en las dos etapas (docs/16 §92).
 
 # ── Etapa 1: compilar ─────────────────────────────────────────────────────────────────────────
 # Aquí se usan pnpm y las herramientas de desarrollo; de esta etapa solo viaja dist/ a la imagen final.
-FROM node:22.23.4-trixie-slim@sha256:be1e2a3dc2c4fd68cdfadad2a696a280e0d2749098bee509230174d72fb768c6 AS build
+FROM node:22.23.5-trixie-slim@sha256:68c76cfad89921b927eae28ba21407475e29d0ce450afcdbe70c1532db042b64 AS build
 WORKDIR /app
 RUN corepack enable
 # Copiar antes que el resto: si solo cambia el código, esta capa se reutiliza de caché.
@@ -28,7 +29,7 @@ COPY panel ./panel
 RUN pnpm --filter panel build
 
 # ── Etapa 2: imagen que corre ─────────────────────────────────────────────────────────────────
-FROM node:22.23.4-trixie-slim@sha256:be1e2a3dc2c4fd68cdfadad2a696a280e0d2749098bee509230174d72fb768c6 AS runtime
+FROM node:22.23.5-trixie-slim@sha256:68c76cfad89921b927eae28ba21407475e29d0ce450afcdbe70c1532db042b64 AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 # Parches de Debian que la imagen oficial todavía no trae (09/11/2026; solo los listados, sin upgrade general).

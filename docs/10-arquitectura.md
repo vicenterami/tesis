@@ -678,7 +678,7 @@ flowchart LR
         C5["proxy<br/>nginx · TLS · límite 0,1 GB<br/>publica 443 y 8883 (y 80, solo redirección)"]
         C1["mosquitto<br/>eclipse-mosquitto 2.1.2-alpine<br/>límite 0,25 GB"]
         C4["backend<br/>imagen propia: NestJS + panel en /panel<br/>límite 0,5 GB · sin estado"]
-        C3["timescaledb<br/>timescale/timescaledb 2.30.2-pg16-oss<br/>(edición Apache) + parches · límite 0,75 GB"]
+        C3["timescaledb<br/>timescale/timescaledb 2.32.1-pg16-oss<br/>(edición Apache) + parches · límite 0,75 GB"]
         C2["chirpstack + puente de pasarelas + redis<br/>solo ruta A (opcional, diseñada)<br/>límite 0,35 GB (por medir)"]
         V4[("certificados: carpeta del<br/>anfitrión, solo lectura")]
         V2[("vol: datos-mosquitto")]
@@ -998,7 +998,7 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     hace TCP/UDP con un módulo externo no oficial; HAProxy comunitario no hace UDP; Traefik no declara servidor de
     archivos estáticos. Lo que la variante A pierde (el broker ve la IP del proxy, no la del dispositivo; sin
     identidad por certificado) queda documentado. La comparación va al anexo de evaluación del informe.
-11. **Base de datos: edición Apache 2.0 de TimescaleDB** (`timescale/timescaledb:2.24.0-pg16-oss`; desde el 08/10/2026, `2.30.2-pg16-oss` con parches de seguridad: `docs/16 §12`; desde el 13/11/2026, sin la copia de PostgreSQL y de Python que arrastraba el paquete de PL/Python —el servidor que corre y sus herramientas son los compilados en `/usr/local`— y sin PL/Python; ese servidor, 16.15, va un parche menor detrás de la 16.16 publicada mientras TimescaleDB no la traiga: riesgo aceptado transitorio en `docs/11 §4`). Probado con el
+11. **Base de datos: edición Apache 2.0 de TimescaleDB** (`timescale/timescaledb:2.24.0-pg16-oss`; desde el 08/10/2026, `2.30.2-pg16-oss` con parches de seguridad: `docs/16 §12`; desde el 13/11/2026, sin la copia de PostgreSQL y de Python que arrastraba el paquete de PL/Python —el servidor que corre y sus herramientas son los compilados en `/usr/local`— y sin PL/Python; desde el 20/11/2026, `2.32.1-pg16-oss`, la primera con el servidor PostgreSQL 16.16: cierra el riesgo aceptado transitorio de `docs/11 §4`, `docs/16 §92`). Probado con el
     esquema real: fallan solo la compresión y su política, `add_retention_policy` y los agregados continuos; todo lo
     que el sistema usa (hypertable, `time_bucket` con zona, `drop_chunks`) funciona. Se quitan las líneas de
     compresión del esquema, la retención de `medicion` (2 años; **corregido por el punto 19: no vence por defecto**), `trama` y `cuarentena` (30 días) la ejecuta una

@@ -97,7 +97,9 @@ PY
 mkdir -p "$OUT" privado/previsualizaciones
 [[ "${1:-}" == "--forzar" ]] && CAMBIADOS=$(cd "$TMP" && ls *.mmd | sed 's/\.mmd$//' | grep -vx modelo-datos)
 [[ -z "$CAMBIADOS" ]] && echo "figuras sin cambios: no se vuelve a renderizar (usa --forzar para rehacerlas)"
-cp "$TMP/modelo-anexo.tex" informe-oficial/figuras/modelo-anexo.tex
+# 20/11/2026: solo si cambió. Copiarlo siempre le movía la fecha sin cambiar el contenido; latexmk (que compara por contenido)
+# no recompilaba, y el paso 3b del verificador (que compara por fecha con build/main.log) quedaba omitido en cada corrida.
+cmp -s "$TMP/modelo-anexo.tex" informe-oficial/figuras/modelo-anexo.tex || cp "$TMP/modelo-anexo.tex" informe-oficial/figuras/modelo-anexo.tex
 cp "$MMD/tema.json" "$TMP/tema.json"
 for n in $CAMBIADOS; do
   docker run --rm -u "$(id -u):$(id -g)" -v "$TMP:/in:ro" -v "$PWD/$OUT:/out" "$IMG" \

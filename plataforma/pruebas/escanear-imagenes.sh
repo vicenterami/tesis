@@ -19,6 +19,12 @@
 #   bash plataforma/pruebas/escanear-imagenes.sh
 #   bash plataforma/pruebas/escanear-imagenes.sh --probar-pg   sin red ni Docker: la comparación contra ocho casos plantados (los cuatro
 #                                                              veredictos, el orden 16.9 < 16.10 y dos versiones ilegibles); sale 1 si uno falla
+# Lo mismo para Node (20/11/2026): Trivy tampoco ve el binario de Node de la imagen del backend, y el parche de seguridad de Node del
+# 11/11/2026 pasó nueve días sin aviso (Dependabot espera siete). Se compara el NODE_VERSION de la imagen construida con el de
+# node:<mayor>-<variante> (la variante, del FROM de backend/Dockerfile): al día → OK; hay una más nueva de la misma serie → HAY QUE ACTUAR
+# (sale 1: la serie 22 está en mantenimiento y sus versiones son de seguridad o de corrección; se leen sus notas y se sube la huella, docs/16 §92);
+# no se pudo consultar → FALLA (sale 1).
+#   bash plataforma/pruebas/escanear-imagenes.sh --probar-node sin red ni Docker: seis casos plantados; sale 1 si uno falla
 set -u -o pipefail
 cd "$(dirname "$0")/.." || { echo "FALLA no se encontró plataforma/"; exit 1; }
 # comparar_pg NUESTRA OFICIAL TIMESCALE → escribe el veredicto y devuelve 0 (al día o aviso) o 1 (hay que actuar o no se pudo comparar).
@@ -35,6 +41,33 @@ comparar_pg() {
   echo "AVISO el servidor PostgreSQL de la imagen de la base es $nuestra y ya se publicó $oficial; TimescaleDB todavía no trae una imagen con ella (la última, $ts): riesgo declarado en docs/11 §4; repetir este guion cada día"
   return 0
 }
+# comparar_node NUESTRA OFICIAL → escribe el veredicto y devuelve 0 (al día) o 1 (hay que actuar o no se pudo comparar).
+comparar_node() {
+  local nuestra=$1 oficial=$2 forma='^[0-9]+\.[0-9]+\.[0-9]+$'
+  if ! [[ "$nuestra" =~ $forma && "$oficial" =~ $forma ]]; then
+    echo "FALLA no se pudo comparar el Node de la imagen del backend (imagen «${nuestra:-?}», oficial «${oficial:-?}»)"; return 1
+  fi
+  if [ "$(printf '%s\n%s\n' "$nuestra" "$oficial" | sort -V | tail -1)" = "$nuestra" ]; then
+    echo "OK    el Node de la imagen del backend es $nuestra, el último publicado de su serie"; return 0
+  fi
+  echo "HAY QUE ACTUAR: el Node de la imagen del backend es $nuestra y ya se publicó $oficial: leer sus notas y subir la huella de backend/Dockerfile (docs/11 §8; docs/16 §92)"; return 1
+}
+if [ "${1:-}" = --probar-node ]; then
+  mal=0
+  while read -r nu of sal ver; do
+    [ "$nu" = - ] && nu=""; [ "$of" = - ] && of=""
+    v=$(comparar_node "$nu" "$of"); r=$?
+    if [ "$r" = "$sal" ] && [[ "$v" == "$ver"* ]]; then echo "OK    ${nu:-?} · ${of:-?} → $ver (salida $r)"; else echo "FALLA ${nu:-?} · ${of:-?} → salida $r «$v» (esperado $sal y «$ver…»)"; mal=1; fi
+  done <<'CASOS'
+22.23.5 22.23.5 0 OK
+22.23.6 22.23.5 0 OK
+22.23.4 22.23.5 1 HAY QUE ACTUAR
+22.9.0 22.10.0 1 HAY QUE ACTUAR
+22.23.5 - 1 FALLA
+v22.23.5 22.23.5 1 FALLA
+CASOS
+  exit "$mal"
+fi
 if [ "${1:-}" = --probar-pg ]; then
   # NUESTRA OFICIAL TIMESCALE · salida esperada · comienzo esperado del veredicto
   mal=0
@@ -107,13 +140,20 @@ if [ "$escaneadas" -lt "$esperadas" ]; then echo "FALLA se escanearon $escaneada
 # El servidor PostgreSQL de la imagen de la base (ver la cabecera): su PG_VERSION frente a la publicada.
 img_base=$(dc config --format json | jq -r '.services.timescaledb.image // empty')
 plataforma=$(docker version -f '{{.Server.Os}}/{{.Server.Arch}}' 2>/dev/null || echo linux/amd64)
+# env_de IMAGEN [VARIABLE]: el valor de esa variable de entorno (por omisión PG_VERSION) en la imagen publicada.
 env_de() { docker buildx imagetools inspect --format '{{json .Image}}' "$1" 2>/dev/null \
-  | jq -r --arg p "$plataforma" 'if has("config") then .config.Env else .[$p].config.Env end | .[]? | select(startswith("PG_VERSION=")) | ltrimstr("PG_VERSION=")'; }
+  | jq -r --arg p "$plataforma" --arg v "${2:-PG_VERSION}=" 'if has("config") then .config.Env else .[$p].config.Env end | .[]? | select(startswith($v)) | ltrimstr($v)'; }
 nuestra=$( [ -n "$img_base" ] && docker image inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$img_base" 2>/dev/null | sed -n 's/^PG_VERSION=//p')
 mayor_pg=${nuestra%%.*}
 oficial=$( [[ "$mayor_pg" =~ ^[0-9]+$ ]] && env_de "postgres:$mayor_pg-alpine")
 ultima_ts=$( [[ "$mayor_pg" =~ ^[0-9]+$ ]] && env_de "timescale/timescaledb:latest-pg$mayor_pg-oss")
 comparar_pg "$nuestra" "$oficial" "$ultima_ts" || accion=1
+# El Node de la imagen del backend (ver la cabecera): su NODE_VERSION frente al último publicado de su serie y variante.
+img_back=$(grep -E '(^|/)plataforma-backend(:|$)' <<<"$imgs" | head -1); case "$img_back" in *:*) ;; ?*) img_back="$img_back:latest" ;; esac
+node_nuestra=$( [ -n "$img_back" ] && docker image inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$img_back" 2>/dev/null | sed -n 's/^NODE_VERSION=//p')
+variante=$(sed -nE 's/^FROM node:[0-9.]+-([a-z0-9-]+)@.*/\1/p' backend/Dockerfile | sort -u)
+node_oficial=$( [[ "$node_nuestra" =~ ^[0-9]+\. && "$variante" =~ ^[a-z0-9-]+$ ]] && env_de "node:${node_nuestra%%.*}-$variante" NODE_VERSION)
+comparar_node "$node_nuestra" "$node_oficial" || accion=1
 if [ "$accion" -eq 0 ]; then echo "OK    $escaneadas imágenes: ninguna vulnerabilidad alta o crítica con versión corregida publicada fuera de los residuos documentados"
 else echo "HAY QUE ACTUAR: vulnerabilidades altas o críticas con versión corregida publicada, o un escaneo que no se completó (ver arriba)"; fi
 exit "$accion"

@@ -15,10 +15,13 @@
 #     también las cuatro bibliotecas de PL/Python de /usr/local/lib/postgresql y sus ocho archivos de extensión (*plpython3u*), para
 #     que pedir esa extensión diga «no disponible» en vez de fallar al cargar. Se suman krb5-libs (1.22.1-r0 → 1.22.3-r0, 16 altas)
 #     y libxslt (1.1.43-r3 → r4, 3 altas), que sí son dependencias del servidor que corre (.postgresql-rundeps). 12 MB menos.
+#   · 20/11/2026: TimescaleDB 2.30.2 → 2.32.1, la primera imagen con el servidor PostgreSQL 16.16 (la 2.31.0 y la 2.32.0 traen
+#     16.15; las anteriores a la 2.32.1 fallan en sus trabajos de fondo con 16.16, según sus notas de versión). Cierra el riesgo
+#     aceptado transitorio de docs/11 §4. Una base existente necesita ALTER EXTENSION timescaledb UPDATE (docs/11 §8; docs/16 §92).
 # Queda, documentado: gosu (el arranque lo usa para bajar privilegios) y el servidor compilado en /usr/local, que el escáner de
 # paquetes no ve: escanear-imagenes.sh compara su versión con la publicada (docs/11 §4). Cuando la imagen oficial se reconstruya con
 # los parches, este archivo vuelve a ser casi solo el FROM.
-FROM timescale/timescaledb:2.30.2-pg16-oss@sha256:df09d239ecc10f30dcd03165b9d8d61e30ef6465af05bceb9ab20f1c7e0f3469
+FROM timescale/timescaledb:2.32.1-pg16-oss@sha256:eec164a9ff39c609612338eea30c707433227385dde35d271b1b21a9f46c20aa
 RUN apk del --no-cache postgresql16-plpython3 \
     && apk upgrade --no-cache zlib musl musl-utils krb5-libs libxslt \
     && rm -f /usr/local/bin/timescaledb-parallel-copy /usr/local/bin/timescaledb-tune \
