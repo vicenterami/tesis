@@ -83,6 +83,7 @@ tabla de casos**, un archivo del panel que leen las tres (`panel/src/lib/estado-
 | P13 | **Preferencias** (mi cuenta; Etapa 4) | Unidades de visualización (°C o °F; mm, m o km), zona horaria propia o la del sitio, vistas guardadas; mis datos y mis sesiones abiertas (por decidir: sin fila en el backlog) y la versión de términos aceptada; darme de baja | Guardar; exportar mis datos de cuenta; cerrar una sesión; darme de baja (con la clave actual) | `GET`/`PUT /preferencias`, `GET /sesiones`, `DELETE /sesiones/{id}` (Etapa 4), fijadas el 11/11/2026 (§4 tablero v2, H); la baja, `docs/20 §11` | RF-55, RF-56, HU-28, HU-29 | Iteración 1 (la baja, en la 0) |
 | P14 | **Actividad** (administrador de sitio en sus sitios; el del sistema en todos; diseñada el 11/11/2026) | Lo que hicieron las personas en el sitio (eventos con quién, de `evento.usuario_id`) y sus entradas, salidas y bloqueos (`acceso`), con filtros por persona, tipo y rango, en texto para personas | Filtrar; abrir la ficha del dispositivo o la persona | `GET /sitios/{id}/actividad?desde&hasta&tipo&usuario&cursor` (Etapa 4) (§4 tablero v2, G) | RF-46, HU-11, HU-26 | Iteración 1 |
 | P15 | **Ajustes del sitio** (diseñada el 18/11/2026, §4 bloque Q; quien tiene la acción `ajustes` o `enlaces` en el sitio: administrador del sitio y del sistema) | Lo que rige a todo el sitio, en dos secciones: **Primera trama** (el plazo en horas, de 1 a 2 160, con su equivalencia en días; qué pasa al vencer y por qué existe el plazo) y **Vista pública** (el mínimo de dispositivos por valor, k, y el tope de enlaces vivos) | Cambiar el plazo, el k (bajarlo se confirma) y el tope, cada uno con su «Guardar» y su bloqueo optimista; elegir sitio si se administra más de uno | `GET`/`PUT /sitios/{id}/espera-primera-trama`, `GET`/`PUT /sitios/{id}/enlaces/minimo` y `GET`/`PUT /sitios/{id}/enlaces/tope` (las tres ya existen; no se agrega ninguna ruta) | RF-62, HU-32, §2 (estado «Esperando primera trama») | Etapa 4, iteración 1 |
+| P16 | **Catálogo** (diseñada el 20/11/2026, §4 bloque T; solo el administrador del sistema, acción `sistema`) | **Magnitudes** (nombre, código, unidad, rango válido, umbral sugerido, alias y en cuántos canales se usa) y **Recetas de decodificación** (largo, campos y en cuántos equipos se usa) | Crear y editar una magnitud (achicar el rango se confirma si afecta mediciones); crear una receta, probarla con bytes sin guardar y reemplazar una por otra; en P6, «Usar el sugerido» | `GET /magnitudes` (ampliada) y, nuevas, `POST /magnitudes`, `PATCH /magnitudes/{codigo}`, `GET /magnitudes/{codigo}/impacto`, `GET`/`POST /recetas-decodificacion`, `POST /recetas-decodificacion/probar` y `POST /recetas-decodificacion/{codigo}/reemplazar` (Etapa 4), con sus perfiles en `docs/20 §6` | TT-12, RF-11, RF-14 | Etapa 4, iteración 1 |
 
 Lo que **no** se construye, y por qué: mapa (ningún requisito lo pide; el caso de uso tiene decenas de dispositivos, no cientos
 dispersos), informes programados y disparadores con varias condiciones (más que el umbral con histéresis decidido; candidatos
@@ -433,10 +434,11 @@ agrupado por dispositivo (`aria-live`) en cualquier pantalla; en P13 cada person
 del navegador** (permiso pedido al activarla, `docs/21 §5`), con un cuerpo genérico («N condiciones nuevas en» el sitio; el detalle, en
 la pantalla). En teléfono se ven 2 avisos y el resto queda plegado en «y N más», para no tapar el campo con el foco (WCAG 2.4.11;
 corrección del 11/11/2026). No hay correo saliente (`docs/20 §4`): un canal saliente por sitio
-(webhook) queda diseñado para la iteración 2.
+(webhook) queda diseñado para la iteración 2. Desde el 20/11/2026 (bloque T, punto 8), el editor de reglas suma «Usar el sugerido»: llena una regla con el umbral sugerido de la
+magnitud, sin guardar.
 
 **F. P7 Alta: asistente, alta masiva y bandeja de detectados (HU-22, RF-50; decididas el 25/10/2026).**
-1. **Asistente** ✅ panel, 11/11/2026 (`#/alta`; sin el perfil de decodificación, que sigue por API) de cinco pasos (§3): identidad y zona; vía y formato (pasarela si LoRaWAN; perfil de decodificación si lo hay); canales
+1. **Asistente** ✅ panel, 11/11/2026 (`#/alta`; sin la receta de decodificación —antes «perfil de decodificación», migración 17—, que sigue por API) de cinco pasos (§3): identidad y zona; vía y formato (pasarela si LoRaWAN; receta de decodificación si la hay); canales
    y magnitudes del catálogo; credencial mostrada una sola vez con «Copiar» y el tópico; «esperando la primera trama» en vivo. Un
    identificador que ya existe inactivo ofrece reactivarlo (409 con la ficha), no crea un duplicado. Construido así (11/11/2026): cada
    paso con su encabezado «Paso N de 5», que recibe el foco al cambiar de paso, y los errores del paso 1 ligados a cada campo; la magnitud
@@ -796,7 +798,7 @@ El alta masiva de F2 (11/11/2026) valida bien y explica poco. Lo que se observa 
    las claves ordenadas: así la creación, que recibe solo esas filas, da la misma; decidido al implementar). `POST /dispositivos/lote?modo=validar|crear` responde `{leidas, validas, existentes, rechazadas,
    con_aviso, huella, filas}` y cada fila trae: `n`, `id_fisico`, `resultado` (`valida`, `creada`, `existe`, `rechazada`; no cambian),
    `interpretada` (lo que se creará, o `null` si no entra: identificador ya normalizado, nombre, sitio y zona por su nombre, vía, formato
-   resuelto, intervalo, canales con nombre y unidad canónica, pasarela, perfil de decodificación y el tópico en que publicará),
+   resuelto, intervalo, canales con nombre y unidad canónica, pasarela, receta de decodificación y el tópico en que publicará),
    `por_defecto` (los campos que la persona dejó vacíos y el servidor completó), `avisos` y `motivos` (listas de `{campo, texto}`), `id`
    (el creado en `crear`, y el del dispositivo que ya existe en las filas `existe`, también en `validar`), y `credencial` y `topico` solo
    en `crear`. Los campos nuevos **se suman**: `motivo` se conserva como la unión de `motivos`
@@ -1556,7 +1558,9 @@ desplazamiento horizontal ni errores de JavaScript, y los tres orígenes dan el 
    magnitud (`%RH`, `%EL`…). Se guarda la del catálogo y la revisión lo dice como aviso («°C se leyó como Cel»). La tabla de escrituras
    vive una sola vez en el servidor y la usa el alta por lote, por la API y por el panel (el alta de a uno no recibe unidad: la fija el
    catálogo por la magnitud); el panel no la repite. No convierte valores ni
-   acepta una unidad distinta (°F para temperatura sigue sin entrar): eso es el catálogo editable (TT-12) y las unidades de visualización.
+   acepta una unidad distinta (°F para temperatura sigue sin entrar). Aceptar otra unidad y convertirla al recibir, y las unidades de
+   visualización por magnitud, quedan fuera del catálogo editable de TT-12 (bloque T; `docs/10 §8.4` punto 69, xi), como trabajo futuro;
+   mostrar una medición en °F ya lo hace la preferencia de cada persona (H).
 3. **Avisos que distinguen** (cambia el punto 3 del bloque N). Una zona escrita por su nombre que calza con una sola zona de los sitios de
    la persona deja de ser aviso: la revisión lo dice una vez sobre la lista («Zona «Norte» → sitio «Campus»: 500 filas»). Los avisos se
    calculan solo para las filas que entran, y la línea de arriba y la tarjeta «Con aviso» cuentan lo mismo.
@@ -1635,6 +1639,86 @@ su cuarta columna: `topico` pasa a `destino`, a dónde envía cada equipo según
 (`sitio/<código>/dispositivo/<id_fisico>/<magnitud>`); HTTP, `POST /recepcion/{id_fisico}`; LoRaWAN, «por su pasarela <id_fisico de la
 pasarela>», con la credencial vacía. Lo calcula el servidor (`destinoDe`, de lo interpretado) y cada fila creada lo trae en `destino`,
 aditivo; `topico` no cambia. Hasta este bloque, la columna `topico` quedaba vacía en un equipo HTTP o LoRaWAN.
+
+**T. P16 Catálogo: magnitudes y recetas de decodificación (TT-12, RF-11, RF-14; diseñado el 20/11/2026, antes del código; solo el
+administrador del sistema).** Hasta este bloque el catálogo de magnitudes solo se leía (el selector del alta, la ayuda del lote) y se
+cambiaba por migración; los alias de claves y la decodificación de los nodos LoRaWAN vivían en el código. Las reglas y su porqué están en
+`docs/10 §8.4` punto 69 y el esquema en `docs/08 §8`; aquí, solo lo que ve y hace la persona. «Receta de decodificación» es lo que antes
+se llamaba «perfil de decodificación»: en el panel, «perfil» ya nombra los roles de las personas (P10).
+1. **Ruta y menú.** `#/catalogo?seccion=magnitudes|recetas` (sin `seccion`, magnitudes; un valor desconocido se ignora). La entrada
+   «Catálogo» del menú, junto a «Estado del sistema», aparece solo al administrador del sistema (la acción `sistema`, `docs/20 §6`). Quien
+   llega sin serlo ve «El catálogo lo administra quien administra el sistema. Las magnitudes que existen se eligen al dar de alta un
+   equipo.» con el enlace al tablero. La ruta nunca es «última vista». Dos secciones con su pestaña: **Magnitudes** y **Recetas de
+   decodificación**.
+2. **Magnitudes: la lista.** Una fila por magnitud (tarjetas bajo 700 px), por nombre: nombre y código; la unidad como se lee («°C») con
+   su símbolo SenML al pasar el cursor; el rango («de −40 a 85 °C»); el umbral sugerido («alto 30 °C · histéresis 0,5» o «sin
+   sugerido»); los alias («temperature, temperatura») y en cuántos canales se usa («en 14 canales»; el conteo, que abarca todos los
+   sitios, solo lo entrega la API con la acción `sistema`, la misma que abre esta pantalla: `docs/20 §6`). Arriba, «Crear magnitud». Cada fila,
+   «Editar». Sin magnitudes (solo en una base sin sembrar): «El catálogo está vacío: crea la primera magnitud».
+3. **Editar una magnitud.** Un formulario con: **Nombre**; **Código** y **Unidad** como texto de lectura, con el motivo escrito («No
+   cambian: los citan los canales, las reglas y las mediciones guardadas»); **Rango válido** (mínimo y máximo); **Umbral sugerido**
+   (alto, bajo e histéresis, todos opcionales, con la línea «Se ofrece al configurar un canal de esta magnitud; no crea alertas solo»); y
+   **Alias** (cada uno con «Quitar», y un campo «Agregar alias» con la regla a la vista: «minúsculas, números, «_», «.» y «-», hasta 64»).
+   La validación en vivo usa las reglas del servidor (bajo < alto; histéresis menor que la mitad de la banda; los sugeridos dentro del
+   rango; mínimo < máximo; un alias con la forma y fuera de la lista de reservados, `docs/08 §8`); el servidor decide. «Guardar» manda el
+   `actualizado_en` leído (bloqueo optimista) y no se activa si nada cambió («no hay cambios»).
+   **Achicar el rango se confirma antes si afecta mediciones** (como acortar el plazo, bloque Q, punto 2): si el mínimo sube o el máximo
+   baja, al pulsar «Guardar» la pantalla pide el impacto del rango propuesto y, si alguna medición de los últimos 7 días habría quedado
+   fuera, muestra «Con este rango, N mediciones de los últimos 7 días, de K canales, habrían quedado fuera y habrían ido a cuarentena. Lo
+   ya guardado no cambia; rige desde la próxima trama. ¿Guardar igual?» con «Guardar igual» y «Cancelar»; con 0, guarda directo. Se
+   guarda exactamente el rango consultado (los campos se bloquean mientras se consulta; una respuesta que llega con los campos ya
+   distintos se descarta); si la consulta falla, se dice y no se guarda. Ampliar el rango nunca pregunta.
+   **Errores, en palabras:** el rango que deja fuera algo existente es 409 con la lista: «El rango nuevo deja fuera: la regla del canal
+   «Sala 3 · Temperatura» (alto 90 °C); la calibración del canal «Parcela 2 · Humedad del suelo»…» (diez a la vista y «y N más»), cada una
+   con el enlace a su ficha, y nada se guarda; otro cambio entretanto, 409 con relectura y lo escrito conservado («Alguien cambió esta
+   magnitud a las 10:42: revisa los valores nuevos y vuelve a guardar»); un alias que ya existe, «La clave «temp» ya es alias de
+   «Temperatura del suelo»: una clave apunta a una sola magnitud»; un alias reservado, «deveui lo usa la pasarela para otra cosa: no puede
+   ser alias». Al guardar: «Guardado. Rige desde la próxima trama.»
+4. **Crear una magnitud.** Código (con su forma a la vista: «minúsculas, números y «_», empieza con letra; no se podrá cambiar»),
+   nombre, unidad (un selector de la lista cerrada, cada una como se lee y su símbolo: «°C (Cel)»; «no se podrá cambiar») y rango (los
+   dos extremos, obligatorios: el filtro 3 los usa y la base los exigirá, `docs/08 §8`); el umbral sugerido y los alias, opcionales, como al editar. Un código que
+   ya existe: «Ya hay una magnitud con ese código». No hay «Borrar»: en este corte no se borra ninguna magnitud (`docs/10 §8.4` punto 69,
+   ii), y la pantalla lo dice en la ayuda de la sección.
+5. **Recetas: la lista.** Una fila por receta: código y nombre; el largo («10 bytes»); los campos en una línea legible («temperatura:
+   entero de 16 bits con signo en el byte 5, ÷ 100 · humedad: …»); en cuántos equipos se usa («en 2 equipos»). Acciones: «Crear receta»,
+   «Crear a partir de esta» (abre el formulario con sus campos y el código con «-v2» al final) y, si está en uso, «Reemplazar por…». Sin
+   recetas: «No hay recetas. Una receta traduce los bytes de un equipo LoRaWAN cuya pasarela entrega la trama sin decodificar».
+6. **Crear una receta.** Código (forma a la vista), nombre y **largo exacto en bytes** (1 a 255). Debajo, los campos (de 1 a 32; «Agregar
+   campo», «Quitar»): magnitud (selector del catálogo, cada una a lo más una vez), byte de inicio (el primero es el 0), tipo (con nombre
+   legible y una línea de ayuda por tipo: «i16be: entero de 2 bytes con signo; orden de bytes: el más significativo primero»; «u16le:
+   entero de 2 bytes sin signo; orden de bytes: el menos significativo primero»; «u8: un byte, de 0 a 255»), «sumar antes» (de −1 000 000
+   a 1 000 000), «multiplicar por» y «dividir por» (enteros de 1 a 1 000 000), con la fórmula escrita al lado y al día: «valor = (crudo +
+   200) × 1 ÷ 100», y bajo ella qué es el crudo: «crudo: el número entero que se lee en esos bytes, antes de la fórmula». En vivo: un
+   campo que no cabe en el largo («la trama tiene 10 bytes, del 0 al 9: el campo 3 empieza en el byte 9 y ocupa 2, así que se sale»), una
+   magnitud repetida, cero campos. Arriba del botón de crear,
+   siempre visible: «Una receta no se edita después de creada: para corregirla, crea otra y usa «Reemplazar por»».
+   **Probar sin guardar.** Un campo «Bytes de prueba» y un selector **Hexadecimal | Base64** (no se adivina: «deadbeef» es válido en los
+   dos). El hexadecimal admite espacios entre bytes. «Probar» manda la receta tal como está escrita y los bytes; no guarda nada. Resultado:
+   una tabla magnitud · valor · unidad («temperatura 18,16 °C»), o el motivo en palabras («se esperaban 10 bytes y llegaron 9»; «eso no es
+   hexadecimal: «zz» en la posición 3»). Si después se cambia la receta o los bytes, el resultado anterior se tacha con «la receta cambió:
+   vuelve a probar» (nunca queda a la vista un resultado de otra receta). Probar no es obligatorio para crear, pero el botón de crear
+   recuerda «sin probar» mientras no haya un resultado al día.
+7. **Reemplazar por.** Desde una receta en uso: un selector con las demás recetas y la confirmación «N equipos pasan de
+   «campus-heltec-v3-v1» a «campus-heltec-v3-v2». Las tramas ya guardadas no cambian; las siguientes se decodifican con la nueva.»
+   con «Reemplazar» y «Cancelar». Todo o nada: si falla, ningún equipo cambia y se dice por qué. Al terminar: «N equipos usan ahora
+   «…-v2». La receta anterior queda sin uso y se conserva». No hay «Borrar» ni «Editar» (punto 69, vii).
+8. **«Usar el sugerido» en P6 (cambia el bloque E).** En el editor de reglas de un canal cuya magnitud tiene umbral sugerido, un botón
+   «Usar el sugerido (alto 30 °C · histéresis 0,5)» llena una regla nueva con esos valores **sin guardar**: la persona los revisa y
+   guarda como siempre, con su bloqueo optimista y su evento. Con las 4 reglas del canal ya puestas, el botón se desactiva con su motivo
+   («el canal ya tiene 4 reglas»); sin sugerido, no aparece. Los sugeridos salen del catálogo, que P6 ya puede leer con cualquier sesión;
+   P6 no cambia de permisos. El alta (P7) no crea reglas: los canales nuevos nacen sin reglas, como hoy.
+9. **Accesibilidad y forma.** Cada campo con su etiqueta; los avisos con el componente `Aviso`; todo botón es `Boton`; los errores junto
+   a su campo y repetidos en un resumen arriba del formulario; sin desplazamiento horizontal a 390 y a 1 280 px; ningún texto para la
+   persona trae un nombre de columna o de variable (como en el bloque S, punto 4), salvo los códigos, que son lo que se escribe.
+10. **Decidido al diseñar:** (a) la pantalla es P16, el siguiente número libre de §3; (b) el selector hexadecimal/base64 en vez de
+    adivinar; (c) «Crear a partir de esta» como el camino corto para la `-v2`; (d) una magnitud nueva lleva siempre los dos extremos del rango (la base también lo exigirá con la migración prevista, `docs/08 §8`). **Si el tiempo aprieta**, la pantalla puede limitarse a las magnitudes y a probar y crear una receta; «Reemplazar por»
+    queda entonces solo en la API.
+11. **Pruebas.** Por el DOM: el menú (visible solo con la acción `sistema`) y el texto para quien no la tiene; cada sección vacía y con
+    datos; la confirmación al achicar el rango (con N > 0, con 0, la consulta que falla, la respuesta vieja descartada), el 409 con la
+    lista y el de relectura; un alias repetido y uno reservado; probar con la captura real (02 00 00 00 8f 07 18 19 98 af → 18,16 °C,
+    65,52 % y 3,75 V) en hexadecimal y en base64, y el resultado tachado al cambiar la receta; «Reemplazar por» con su confirmación; en P6,
+    «Usar el sugerido» llena sin guardar y se desactiva con 4 reglas. Con navegador real, en dos navegadores a 390 y 1 280 px: crear una
+    magnitud, crear y probar una receta, y el sugerido en P6.
 
 ## 5. Flujos
 **F1 · Alta y primera trama.** Ya está dibujado en el diagrama de secuencia del alta (`docs/10`, figura del informe): el
@@ -1761,6 +1845,7 @@ administrador); la vista pública nunca ofrece exportar (punto 6).
 | P14 Actividad | RF-46, HU-11, HU-26 | Etapa 4, iteración 1 | Un umbral cambiado aparece con la persona que lo cambió; un administrador de un sitio no ve la actividad de otro (404); un cursor de otro sitio no trae nada. Panel (`docs/16 §64`): por el DOM, cursor, filtros en la URL, tarjetas en teléfono y nada para quien no administra; con navegador real, el umbral cambiado en P6 con quien lo cambió (el correo, solo dentro de `usuario{}`; el texto nunca lleva correos) |
 | P2 y P3 con «Esperando primera trama» | RF-24, RF-30, HU-19, HU-14 | Etapa 4, iteración 1 (18/11/2026) | `docs/16 §85`: la regla del estado visual contra la base con la misma tabla de casos que el panel (24 casos, bordes incluidos); el supervisor abre a quien nunca reportó solo al vencer el plazo de su sitio, una vez aunque corran dos barridos, y no abre al volver de mantenimiento; pasar a mantenimiento cierra las condiciones abiertas con su evento; la primera trama cierra la condición; el inventario y la ficha lo muestran con su palabra y su entrega «—»; la guía de perfiles nombra `ajustes` (`bash plataforma/pruebas/espera-integracion.sh`) |
 | P15 Ajustes del sitio | RF-62, HU-32, §2 (estado «Esperando primera trama») | Etapa 4, iteración 1 (decidida el 18/11/2026, §4, Q) | Sin cambios de ruta: el plazo, el k y el tope ya tienen sus pruebas de API (`docs/16 §85` y §79). Panel (`docs/16 §86`): por el DOM, el plazo con su bloqueo optimista y la relectura del 409, el mismo valor sin petición, el k y el tope mudados desde «Publicar» sin perder prueba alguna, el menú por acción y la línea de lectura de «Publicar»; con navegador real, el k bajado desde esta pantalla y una visita a 390 y 1 280 px |
+| P16 Catálogo | TT-12, RF-11, RF-14 | Etapa 4, iteración 1 (diseñada el 20/11/2026, §4, T) | API: la receta sembrada da lo mismo que la decodificación actual (captura real y todos los valores de 8 y 16 bits) y las fallas plantadas de `docs/10 §8.4` punto 69 (xii). Panel: por el DOM, lo del punto 11 del bloque T; con navegador real, en dos navegadores a 390 y 1 280 px |
 | P9 Vista pública | RF-62, HU-32, punto 6 | Etapa 4, iteración 1 (`docs/04 §8`, decisión del 13/11/2026; diseño del 16/11/2026 en §4, O) | Sin cuenta: solo los promedios elegidos, sin mínimo ni máximo, y un valor de menos de k dispositivos sale oculto; ninguna otra ruta cambia su respuesta con el token en la cabecera; vencido, revocado, inexistente y mal formado dan la misma respuesta; revocar corta con la respuesta guardada; la vista previa y la vista del visitante dan los mismos números; el token no queda en ningún registro; cada prueba con su falla plantada y, en navegador real, ambas pantallas a 1 280 y 390 px (§4, O, punto 13). Hecho el 17/11/2026: `docs/16 §79` (base, backend y proxy) y §80 (las pantallas: por el DOM y con `pruebas/panel-publico-e2e.sh`, paso 4c, en Chromium y Firefox); la medición, pendiente |
 
 La etapa de cada pantalla es la de su historia en `docs/04`; mover una historia de etapa se decide con sus horas y se cambia

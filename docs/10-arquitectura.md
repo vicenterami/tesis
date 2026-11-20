@@ -1372,8 +1372,8 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     en la unidad canónica del catálogo, consumido por una sola función (`resolverClave`) que los adaptadores reciben: **hoy el mapa
     vive en el código** (`mapa-claves.ts`: `temperature` → temperatura, `humidity` → humedad, `battery` → batería, `pressure` →
     presión), porque solo hay dos decodificadores que importen y nadie puede editar el catálogo todavía; **pasa al catálogo**
-    (`magnitud.alias`, sembrado desde esa misma lista) cuando el panel administre magnitudes (Etapa 4, pantalla de configuración de
-    `docs/19`): es la regla de `docs/08 §4`, y la función cambia de implementación sin tocar los adaptadores. Una clave que no está en
+    con TT-12, como tabla `magnitud_alias` sembrada desde esa misma lista (no como la columna `magnitud.alias` que se escribió aquí el
+    15/10: el porqué y cómo llega a los adaptadores, en el punto 69): es la regla de `docs/08 §4`. Una clave que no está en
     el mapa se ignora y se nombra en la línea de registro de la trama (cuántas y las cinco primeras); un `up` sin ninguna clave del mapa va a cuarentena
     `malformada` («ninguna clave conocida») y el nodo se marca vivo, como con cualquier trama malformada de un dispositivo
     autenticado (§4). En la ruta C, `rssi` y `snr` del `rxInfo` quedan en la trama cruda para HU-15
@@ -1409,8 +1409,8 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     (18,16 °C, 65,52 % y 3,75 V). Una `data` que no es base64 o no mide 10 bytes es `malformada` y el nodo se marca vivo, porque su
     DevEUI ya se verificó (§4.1). El identificador interno y la secuencia no son magnitudes: no se guardan como lecturas y quedan en la
     trama cruda. La tensión es una magnitud nueva, `tension` (V, de 0 a 5): pasarla a porcentaje exigiría una curva de descarga que
-    nadie ha declarado, y el porcentaje queda para quien lo reporte (`bateria`). En la Etapa 4 los perfiles pasan al catálogo editable,
-    por el mismo camino que el mapa de claves. (iii) **Hora:** en la forma sin códec, `time` con zona es la marca del servidor de red
+    nadie ha declarado, y el porcentaje queda para quien lo reporte (`bateria`). Con TT-12 los perfiles pasan al catálogo editable como
+    recetas de decodificación declarativas, sin código del usuario (punto 69). (iii) **Hora:** en la forma sin códec, `time` con zona es la marca del servidor de red
     (regla 17 de `docs/13`, origen `pasarela`); sin zona, rige la hora de recepción. (iv) **Contador de trama:** el `fCnt` del uplink
     (Milesight y ChirpStack) viaja con la trama cuando la trae y el filtro 3 descarta la que repite el de la última guardada del nodo
     (§4.1; el 0 y el ausente no se comparan); el uplink con códec y Metadata de Milesight normalmente no lo trae (Metadata agrega DevEUI, nombre y aplicación), y si lo
@@ -1894,6 +1894,93 @@ entra. Lo que aquí se marca «a fijar al implementar» es un detalle que el dis
     el evento `espera_primera_trama` con quién lo fijó. Con `GET …?propuesto=<h>` (mismos permisos y aislamiento; entero de 1 a 2 160 o 400) la respuesta suma `afectados`: cuántos equipos activos del sitio que nunca enviaron una trama, sin una condición de falta de comunicación abierta, están hoy dentro de su plazo y con el propuesto quedarían vencidos (un aviso para quien acorta el plazo, no una garantía: el conteo puede cambiar antes de guardar). (`docs/16 §86`). (vii) **Cambio del contrato de la API:** el estado visual `esperando`, la `entrega`
     nula de quien espera y los campos `en_servicio_desde` y `espera_hasta` del inventario y de la ficha son un cambio del contrato de
     `GET /dispositivos` y `GET /dispositivos/{id}` (campos y un valor nuevos; `openapi.json`), no una vista nueva. Probado con la falla plantada en `docs/16 §85`.
+69. **Catálogo editable: magnitudes, umbral sugerido, alias y recetas de decodificación (TT-12; diseñado el 20/11/2026, antes del código;
+    migración 27 prevista, `docs/08 §8`; pantalla «Catálogo», `docs/19 §4`, T).** Hasta aquí el catálogo `magnitud` solo se leía
+    (`GET /magnitudes`) y se cambiaba por migración, y el mapa de claves y el perfil de decodificación vivían en el código (punto 47).
+    TT-12 pide un catálogo con la unidad canónica, el rango válido y la condición de disparo de cada magnitud (`docs/04`, sus criterios).
+    Decisiones:
+    (i) **Quién edita.** Leer el catálogo: cualquier sesión (el alta de a uno y por lote lo necesitan). Escribirlo: la acción `sistema`,
+    solo el administrador del sistema (`permitirGlobal`, `sesion/permisos.ts`), porque el catálogo no es de ningún sitio y un cambio rige
+    para todos. La matriz, en `docs/20 §6`.
+    (ii) **Qué es inmutable.** El código de una magnitud: lo citan canales, reglas, enlaces públicos y la exportación. La unidad canónica
+    se elige al crear la magnitud, de una lista cerrada (`docs/08 §8`), y después no cambia: la medición guarda su unidad como foto
+    (`docs/08 §7`), pero una misma serie quedaría con valores en dos unidades, y los umbrales y calibraciones de sus canales dejarían de
+    significar lo que se escribió. **En este corte no se borra ninguna magnitud:** las 10 tienen canales; las sembradas volverían a
+    aparecer al reaplicar sus migraciones (`ON CONFLICT DO NOTHING`); y un enlace público podría quedar apuntando a una que no existe.
+    Crear magnitudes, sí, siempre con los dos extremos del rango: la migración 27 prevista exige que no sean nulos (las 10 sembradas
+    los traen), y así el `CHECK` de los sugeridos compara siempre contra un rango cierto (`docs/08 §8`).
+    (iii) **El rango, su bloqueo y su aviso.** Cambiar el rango cambia qué acepta el filtro 3 desde ese momento; lo guardado no se toca.
+    La recepción lee la unidad y el rango de la base con cada lectura (`buscarCanal`, `recepcion/recepcion.service.ts`): el rango nuevo
+    rige al instante en todas las instancias, sin caché. Achicarlo se **bloquea** (409 con la lista) si deja fuera un umbral, un sugerido
+    o una calibración existentes, y antes de guardar se **avisa**: una consulta de impacto, que no guarda nada, dice cuántas mediciones de
+    los últimos 7 días y de cuántos canales habrían quedado fuera, como el aviso de a cuántos equipos afecta acortar el plazo de la primera
+    trama (punto 68 vi). El cambio lleva bloqueo optimista por `actualizado_en` (como la calibración, migración 21) y toma `FOR UPDATE`
+    de la magnitud; guardar las reglas de un canal toma `FOR SHARE` de la suya, para que una regla nueva y un rango más chico no se crucen.
+    (iv) **El umbral sugerido rellena el editor; no crea reglas en el alta.** Cada magnitud puede guardar un umbral alto, uno bajo y una
+    histéresis sugeridos (nulos hasta que se fijen). En el editor de reglas del canal (P6), «Usar el sugerido» copia esos valores al
+    formulario y la regla se guarda como cualquier otra, con su evento y la persona que la guardó. Se descartó crear la regla en el alta:
+    abriría alarmas con la primera trama sin que nadie las pidiera, obligaría a tocar la transacción del alta masiva y su vista previa
+    (punto 67), y un sugerido válido para la base podría ser una regla que `erroresDeRegla` rechaza. Por eso el sugerido se valida al
+    guardarlo con esa misma función (`alta/configuracion.dto.ts`) y el rango de la magnitud. Las reglas existentes no cambian nunca por un
+    sugerido. Así cada magnitud declara su condición de disparo (criterio de TT-12) y RF-14 sigue igual: la que rige es la del canal, con
+    su histéresis como condición de restauración.
+    (v) **Los alias se leen con cada trama, sin memoria.** Llegan en la misma consulta que ya busca el dispositivo en cada trama
+    (`buscarDispositivo`, `recepcion/recepcion.service.ts`), solo cuando su formato es `milesight` o `chirpstack`, y el adaptador recibe
+    el resolvedor en el contexto de la trama, no inyectado al arrancar (`RESOLVER_CLAVE`). Un alias nuevo vale desde la trama siguiente
+    en todas las instancias y el backend sigue sin estado (§9.2). Se descartó un mapa en memoria recargado con `LISTEN/NOTIFY` y cada
+    60 s: pedía una conexión dedicada por instancia (el grupo de la aplicación tiene 5), su reconexión y una ventana en la que dos
+    instancias resolverían distinto. Reglas: una clave apunta a una sola magnitud en todo el catálogo, en minúsculas, con la forma y sin
+    las claves reservadas de `docs/08 §8`; el valor se espera en la unidad canónica, como hoy. Quitar un alias lo hace una función acotada
+    del dueño (punto ix). Los alias son de los formatos de pasarela: SenML no los usa.
+    (vi) **Recetas de decodificación declarativas.** Es lo que el punto 47 (ii) llamaba «perfil de decodificación»; cambia de nombre
+    porque «perfil» ya nombra los roles de las personas (punto 64). Una receta escrita como código (un guion que el servidor ejecutara)
+    sería una puerta de ejecución remota en manos de quien edita el catálogo. Por eso la receta es **solo dato**: el largo exacto de la
+    trama y hasta 32 campos, cada uno con su magnitud, su desplazamiento, su tipo (entero de 8, 16 o 32 bits, con o sin signo; los de 16
+    y 32, en orden *big-endian* o *little-endian*) y tres enteros: **valor = (crudo + sumar_antes) × multiplicar_por ÷ dividir_por**,
+    en ese orden (el esquema, en `docs/08 §8`). Sin expresiones, bucles ni condiciones. El intérprete comprueba los límites antes de cada
+    lectura, exige que cada factor sea un número finito, trata una receta sin campos como trama malformada y convierte cualquier error
+    interno en `TramaMalformada`: un error imprevisto por el tópico de una pasarela deja al nodo sin marcar vivo (`sinIdentidad`, en
+    `recepcion/recepcion.service.ts`), y una receta mal escrita no debe poder causar eso. La receta viaja en la misma consulta del nodo
+    (un `LEFT JOIN LATERAL` solo si el nodo tiene receta, con sus columnas al final), sin caché: un cambio rige al instante en todas las
+    instancias. Antes de retirar la función actual (`recepcion/adaptadores/perfiles.ts`), una prueba la congela y compara: la misma salida
+    para la captura real (02 00 00 00 8f 07 18 19 98 af → 18,16 °C; 65,52 %; 3,75 V) y para todos los valores de 8 y 16 bits, con
+    igualdad estricta; los textos de error que hoy prueba C-89 (`docs/16`) se conservan.
+    (vii) **Escritura única y «reemplazar por».** Una receta no se edita ni se borra. Corregirla es crear otra (`…-v2`) y usar
+    «reemplazar por», que mueve todos los dispositivos de una a la otra en una sola transacción, con su evento. **La receta y sus campos
+    se crean juntos, una sola vez,** por `fn_crear_receta`, una función del dueño (una transacción; exige al menos un campo y rechaza un
+    código que ya existe): la aplicación no tiene `INSERT` directo en `receta_decodificacion` ni en `receta_campo`, así que una receta en
+    uso no puede ganar campos después. «Reemplazar por» no necesita función: cambia `dispositivo.decodificador`, que la aplicación ya
+    actualiza, y escribe su `evento`. Así una trama guardada
+    nunca cambia de significado (`docs/08 §7`, foto por valor), y la trama cruda sigue disponible para re-decodificar con la receta nueva.
+    Además, `decodificador` entra a `PATCH /dispositivos/{id}` (hoy no lo admite: `alta/configuracion.dto.ts`), para reasignar un
+    equipo solo. La lista de recetas del alta de a uno, del lote y de la ayuda de la plantilla sale de la base, no de una lista del código
+    ni de un `enum` del OpenAPI; la violación de la clave foránea nueva (23503) se traduce a 400 en el alta y a `plan_cambio` en el lote.
+    (viii) **Probar sin guardar.** Una ruta recibe la definición de una receta y unos bytes, en hexadecimal o en base64, y devuelve las
+    lecturas o el motivo por el que no se entienden, sin tocar la base; el panel la usa mientras se escribe la receta. Valida la receta
+    con **el mismo validador que crearla** (forma del código, largo de 1 a 255, de 1 a 32 campos, cada uno dentro del largo, factores y
+    `sumar_antes` en sus cotas), y los bytes deben medir exactamente `largo_bytes` (como mucho 255); lleva tope de cuerpo y la acción
+    `sistema`. Así lo que se prueba es lo que se podría guardar, y la ruta no sirve para mandarle al intérprete algo más grande.
+    (ix) **Permisos: la aplicación sigue sin `DELETE`.** Ninguna tabla le da `DELETE` (migración 14; lo vigila el guardián). Lo que
+    haya que borrar, y la receta con sus campos (vii), pasa por funciones del dueño, `SECURITY DEFINER` y acotadas, como
+    `fn_quitar_reglas` (migración 23): con `SET search_path = public, pg_temp`, `REVOKE EXECUTE … FROM PUBLIC` y `GRANT EXECUTE` solo a
+    `plataforma_app`. El `UPDATE` de `magnitud`, solo por columnas: nunca `codigo` ni `unidad_canonica` (`docs/08 §8`). Tres guardianes
+    cambian con la migración 27 prevista: el chequeo 14 de `verificar-todo.sh` (hoy exige que la aplicación no inserte en `magnitud`), el
+    chequeo 17 (hoy exige el `CHECK` `ck_dispositivo_decodificador`, que pasa a ser clave foránea) y `pruebas/base-rol-app.sh` (hoy planta
+    un `INSERT` en `magnitud` que debe fallar).
+    (x) **El registro del autor.** La actividad de P14 es por sitio y el catálogo no es de ningún sitio: cada cambio deja, en la misma
+    transacción, un `evento` `catalogo_cambio` con `dispositivo_id` nulo, la persona en `usuario_id` y `{objeto, codigo, antes, despues}`.
+    (xi) **Fuera de este corte, declarado:** borrar magnitudes y recetas; recargar alias con `LISTEN/NOTIFY`; crear reglas en el alta;
+    aceptar al recibir una unidad distinta de la canónica (°F para temperatura) y unidades de visualización por magnitud (la preferencia
+    de cada persona, °C o °F, ya existe: `docs/19 §4`, H); alias para SenML; campos de bits, largo variable, recetas por puerto (`fPort`)
+    y fórmulas no lineales. Quedan como trabajo futuro.
+    (xii) **Rutas** (`docs/20 §6`): el catálogo suma a cada magnitud el rango, los sugeridos y los alias (`GET /magnitudes`, aditivo);
+    **los conteos de uso** (en cuántos canales se usa cada magnitud y en cuántos equipos cada receta) se calculan sobre todos los sitios,
+    así que solo los recibe quien tiene la acción `sistema`, por la misma razón que el impacto de un rango; las demás sesiones reciben el
+    catálogo y las recetas sin conteos. Se agregan crear y cambiar una magnitud, el impacto de un rango propuesto, listar y crear recetas,
+    probar una receta y reemplazar una por otra. **Lo que decide si está bien:** la equivalencia de (vi); el banco LoRaWAN y el puente sin
+    cambios; el p95 de la recepción no empeora con la consulta ampliada (medido); y las fallas plantadas: un campo que no cabe en el
+    largo, un alias repetido, un rango que deja fuera un umbral, un operador técnico que escribe el catálogo (403) y, con dos instancias,
+    un alias creado en una que vale en la otra desde la trama siguiente.
 
 ## 9. Crecimiento, resiliencia y respaldo (aprobado el 06/10/2026)
 
@@ -1921,7 +2008,8 @@ construirlo por anticipado. Cada afirmación sobre una herramienta tiene su fuen
    una sola instancia mediante un cerrojo (`pg_advisory_lock`) y el bus pasaría a `LISTEN/NOTIFY` de PostgreSQL,
    porque con varias instancias cada una solo avisaría a los navegadores conectados a ella. El orden entre
    tramas del mismo dispositivo deja de estar garantizado entre instancias; la clave única `(canal, tiempo)` sigue
-   evitando duplicados, y la hora de la medición viene en la trama, no del orden de llegada.
+   evitando duplicados, y la hora de la medición viene en la trama, no del orden de llegada. El catálogo editable (§8.4 punto 69,
+   20/11/2026) no cambia esto: rango, alias y recetas de decodificación se leen de la base con cada trama, sin caché que invalidar.
 2. **El broker es un punto único por decisión**: RNF-14 pide un servidor y RNF-15 excluye los brokers con clúster
    (de pago o BSL). Su capacidad sobra para el caso; la cifra de Mosquitto no está declarada por el fabricante y se
    mide en TT-29.

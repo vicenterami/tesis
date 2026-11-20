@@ -443,11 +443,60 @@ consistente para reportes.
 - [x] **Declarar vía, formato y pasarela en el alta (HU-11, hecho el 12/10) y que el filtro 2 use el formato declarado** (15/10,
       `docs/10 §8.4` punto 47, `docs/16 §27`): un dispositivo directo declara `senml` o `plano`; uno lorawan no lo envía y copia el de su
       pasarela. La demostración pasó a publicar solo SenML, que es lo que declara `dev-0001` (`docs/15` §3 y §4).
-- [ ] **Alias de claves en el catálogo (`magnitud.alias`), Etapa 4, obligatorio** (decidido el 15/10/2026; `docs/10 §8.4` punto 47). Hoy
-      el mapa «clave del JSON decodificado → magnitud» vive en el código (`mapa-claves.ts`) detrás de una sola función (`resolverClave`),
-      porque solo hay dos decodificadores que importen y nadie puede editar el catálogo hasta que el panel lo administre. Entonces el
-      mapa pasa a una columna `alias text[]` del catálogo, sembrada desde la misma lista del código, y la función lee de la base: los
-      adaptadores no cambian. Es la regla de §4: lo que administra el usuario vive en un catálogo.
+- [ ] **Alias de claves en el catálogo: tabla `magnitud_alias`, prevista en la migración 27** (TT-12; decidido el 15/10/2026 como
+      columna y cambiado a tabla el 20/11/2026; `docs/10 §8.4` puntos 47 y 69). Hoy el mapa «clave del JSON decodificado → magnitud»
+      vive en el código (`mapa-claves.ts`: 8 claves hacia 4 magnitudes) detrás de una sola función (`resolverClave`), porque nadie puede
+      editar el catálogo hasta que el panel lo administre. Lo escrito el 15/10 era una columna `magnitud.alias text[]`; **se cambia por
+      una tabla** `magnitud_alias` (`clave text` como clave primaria, en minúsculas y con la forma `^[a-z0-9_.-]{1,64}$` por `CHECK`;
+      `magnitud_codigo`, clave foránea a `magnitud` en cascada), sembrada con las 8 claves del código. **Porqué:** la regla «una clave
+      apunta a una sola magnitud en todo el catálogo» la garantiza la clave primaria; con un arreglo por magnitud haría falta un
+      disparador que revisara las demás filas. No se admiten como alias las claves que los formatos de pasarela usan para otra cosa
+      (`deveui`, `devicename`, `applicationid`, `applicationname`, `fcnt`, `fport`, `data`, `time`, `rxinfo`, `txinfo`, `deviceinfo`,
+      `object`). Es la regla de §4: lo que administra el usuario vive en un catálogo. La migración 27, prevista, aún no existe: la tabla entra a §2,
+      al diagrama de §3 y al conteo de entidades cuando se aplique.
+- [ ] **Catálogo editable: lo demás de la migración 27 prevista** (TT-12, 20/11/2026; las reglas y su porqué, en `docs/10 §8.4` punto 69;
+      la pantalla, en `docs/19 §4`, T). Aditiva, como todas:
+      (a) **`magnitud`** gana `umbral_alto_sugerido` y `umbral_bajo_sugerido` (nulos) e `histeresis_sugerida` (≥ 0, 0 por omisión), con
+      `CHECK` de que los sugeridos caen dentro del rango y bajo < alto; nacen nulos, así que nada cambia hasta que el administrador del
+      sistema los fije. Suma también el `CHECK` de que `rango_min` y `rango_max` **no son nulos**, son finitos y `rango_min < rango_max`
+      (hoy un `NaN` pasaría y el filtro 3 aceptaría cualquier valor; las 10 magnitudes sembradas en las migraciones 01, 05, 17 y 18 traen
+      los dos extremos, así que el `CHECK` entra sin `NOT VALID`). Con el rango siempre presente, el `CHECK` de los sugeridos compara contra
+      valores ciertos: un sugerido nulo no se compara (no hay umbral de ese lado) y uno presente debe caer en `[rango_min, rango_max]`. Y, para las magnitudes nuevas, la forma del código `^[a-z][a-z0-9_]{0,39}$` (las
+      10 sembradas ya la cumplen). La unidad canónica sale de una lista cerrada que vive en un solo archivo del backend (el registro de
+      unidades de RFC 8428 §12.1 más las que ya usa el catálogo).
+      (b) **Recetas de decodificación**, dos tablas. Hasta aquí el concepto se llamaba «perfil de decodificación» (migración 17, entrada
+      siguiente); desde el 20/11/2026 se llama **receta de decodificación**, porque «perfil» ya nombra los roles de las personas
+      (`docs/20 §2`); donde un documento cite «perfil» junto a la migración 17, es esta misma receta. `receta_decodificacion`: `codigo` (clave primaria, `^[a-z0-9][a-z0-9-]{2,62}$`), `nombre`, `largo_bytes` (1 a 255:
+      la trama debe medir exactamente eso) y `creado_en` (sin `actualizado_en` ni su disparador: una receta no se edita). `receta_campo`: `receta_codigo`, `orden` (1 a 32; la clave primaria es
+      `(receta_codigo, orden)`), `magnitud_codigo` (clave foránea; cada magnitud a lo más una vez por receta, `UNIQUE`), `desplazamiento`
+      (≥ 0), `tipo` (`u8`, `i8`, `u16be`, `u16le`, `i16be`, `i16le`, `u32be`, `u32le`, `i32be` o `i32le`), `sumar_antes` (entero
+      de −10⁶ a 10⁶), `multiplicar_por` y `dividir_por` (enteros de 1 a 10⁶), los tres acotados por `CHECK`. **valor = (crudo + sumar_antes) × multiplicar_por ÷ dividir_por**, de
+      izquierda a derecha: así se reproduce `(200 + b) / 100` sin error de coma flotante, que `× 0,01` sí tendría. Los tres son `int4`,
+      nunca `numeric` ni `bigint`: el controlador de PostgreSQL de Node entrega esos dos como texto, y `143 + '200'` concatena en vez de
+      sumar. `receta_campo` copia `largo_bytes` con una clave foránea compuesta hacia la receta (el mismo recurso de la migración 15 para
+      el formato de la pasarela), y así un `CHECK (desplazamiento + ancho del tipo <= largo_bytes)` asegura que cada campo cabe en la
+      trama. **Una receta y sus campos se crean juntos y una sola vez** por `fn_crear_receta`, una función del dueño (ver (d)): en una
+      transacción inserta la receta y sus campos, exige al menos uno y rechaza un código que ya existe; así una receta en uso no puede
+      ganar campos después. Sembrada: `campus-heltec-v3-v1` (10 bytes:
+      temperatura `i16be` en el byte 5, ÷ 100; humedad `u16be` en el 7, ÷ 100; tensión `u8` en el 9, + 200, ÷ 100), la misma
+      decodificación que hoy hace el código (`perfiles.ts`).
+      (c) **`dispositivo.decodificador`**: el `CHECK` contra la lista del código pasa a ser una **clave foránea** a
+      `receta_decodificacion (codigo)` con `ON DELETE RESTRICT`; el `CHECK` que lo admite solo en la vía `lorawan` se conserva. La
+      migración 27 prevista siembra la receta **antes** de cambiar el `CHECK` por la clave foránea, y el bloque de la migración 17 que redefine el
+      `CHECK` pasa a ejecutarse solo si la clave foránea no existe (si no, reaplicar la 17 la desharía).
+      (d) **Permisos de `plataforma_app`**, en un bloque de la 27 que se repite dentro de la 14 (su `REVOKE ALL` borraría lo demás al
+      reaplicarse): `INSERT` en `magnitud` y `magnitud_alias`; `UPDATE` de `magnitud` solo por columnas (`nombre`, el rango y los
+      sugeridos; nunca `codigo` ni `unidad_canonica`); **ningún `INSERT` directo en `receta_decodificacion` ni en `receta_campo`** y
+      **ningún `DELETE`** (§6, migración 14). Lo que la aplicación no puede escribir directo pasa por dos funciones del dueño,
+      `SECURITY DEFINER` y acotadas, como `fn_quitar_reglas` (migración 23): `fn_crear_receta` (la receta con sus campos, ver (b)) y la
+      que quita un alias. Las dos con `SET search_path = public, pg_temp`, `REVOKE EXECUTE … FROM PUBLIC` y `GRANT EXECUTE` solo a
+      `plataforma_app`. «Reemplazar por» no necesita función: cambia `dispositivo.decodificador`, que la aplicación ya actualiza, y
+      escribe su `evento`. Las recetas no se editan ni se borran (`docs/10 §8.4` punto 69).
+      (e) **Guardianes que cambian con la migración 27 prevista:** el chequeo 14 de `verificar-todo.sh` (hoy exige que la aplicación no
+      inserte en `magnitud`), el 17 (hoy exige el `CHECK` `ck_dispositivo_decodificador`, que pasa a ser clave foránea) y
+      `pruebas/base-rol-app.sh` (hoy planta un `INSERT` en `magnitud` que debe fallar).
+      (f) **Quién cambió el catálogo:** cada cambio deja, en la misma transacción, una fila de `evento` con `dispositivo_id` nulo (como los
+      de la pasarela), `tipo = catalogo_cambio`, `usuario_id` de la persona y `detalle {objeto, codigo, antes, despues}` (§7: foto por valor).
 - [x] **Vía, formato y pasarela: el esquema** (decidido el 08/10/2026, `docs/10 §8.4` punto 25; migración 11):
       `dispositivo.via` (`CHECK`: `mqtt`, `http`, `lorawan`), `dispositivo.formato` (`CHECK`: el código de un
       adaptador: `senml`, `plano`, `milesight` y, desde la migración 15, `chirpstack`; lo interpreta el código, §6) y `dispositivo.pasarela_id` (FK opcional,
@@ -462,7 +511,8 @@ consistente para reportes.
       (texto, nulo; `CHECK` contra la lista de perfiles del código, `campus-heltec-v3-v1`, y otro que lo admite solo en la vía `lorawan`),
       `estado_dispositivo.ultimo_fcnt` (`bigint`, nulo, de 0 a 2³²−1: el contador de 32 bits del servidor de red) y la magnitud
       `tension` (`V`, de 0 a 5), la tensión de batería que reportan los nodos de la red del campus. Los perfiles pasan al catálogo
-      editable en la Etapa 4, como el mapa de claves.
+      editable como recetas de decodificación declarativas, con su propia tabla, en la migración 27 prevista (entrada «Catálogo editable» de
+      arriba).
 - [x] **Suelo del nodo propio** (migración 18, 16/10/2026; `docs/10 §8.4` punto 51): `temperatura_suelo` (`Cel`, −55 a 125) y
       `humedad_suelo` (`V`, 0 a 3,3: la tensión cruda del sensor capacitivo; el % se calcula), y la calibración por canal
       `canal.escala_cero` y `canal.escala_cien` (las dos o ninguna, distintas).
@@ -472,7 +522,8 @@ consistente para reportes.
       `plataforma_app` recibe `UPDATE` solo en `escala_cero` y `escala_cien`. Cada cambio deja un `evento` de tipo **`canal_calibrado`** del
       dispositivo, con la foto `{canal_id, magnitud, antes: {cero, cien}, despues: {cero, cien}, origen: 'api'}` (§7: foto por valor).
 - [ ] **Magnitudes nuevas** del caso de uso (entrevista del 05/10): `radon` (`Bq/m3`, unidad propia: el catálogo
-      es el «application context» de RFC 8428 §4.5.2) e `hidrogeno` (`ppm`). Cada una con su rango físico.
+      es el «application context» de RFC 8428 §4.5.2) e `hidrogeno` (`ppm`). Cada una con su rango físico. Con el catálogo editable
+      (migración 27 prevista) las crea el administrador del sistema desde el panel, si su unidad está en la lista cerrada de unidades.
 - [ ] **Tercera forma normal, revisada con cada cambio**: al agregar `pasarela` y `trama`, comprobar que ningún
       atributo dependa de otro que no sea la clave y que no aparezcan dependencias multivaluadas (lo que
       justificaría 4FN). Si aparecieran, se documenta aquí y se normaliza; mientras no, 3FN basta (§6).
