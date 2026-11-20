@@ -5241,6 +5241,11 @@ Pruebas nuevas del panel: 6 en `lib/tiempo.test.ts` (zona propia, sin ella, zona
 **Panel, cifras.** **599 pruebas escritas** (`it(`; 587 antes: 12 nuevas), que `vitest` ejecuta como **663 de 663 en 45 archivos**; `pnpm --filter
 panel verificar` en verde. Cifra al día en la cabecera de este documento, `docs/18` y el capítulo, el anexo y la presentación del informe.
 
+**El último aviso de dependencias, cerrado (20/11/2026).** Quedaba abierto el aviso moderado de `minimatch` (GHSA-g3hv-75wg-m249, solo de
+desarrollo): `eslint` 10.14.0 y `typescript-eslint` 8.72.2 pedían la serie 10, y la corrección está en la 11.0.1, así que la herramienta de
+dependencias no podía subirla sola. `eslint` 10.15.0 (publicada el 13/11) y `typescript-eslint` 8.73.0 (16/11) ya piden la serie 11: con esas
+dos versiones, `pnpm audit` dice «No known vulnerabilities found», sin forzar versiones; `pnpm verificar` en verde (961 y 663 ejecuciones).
+
 **Lo que queda.** Una amplificación pequeña, aceptada: una petición sin sesión a `/salud` con una cookie de forma válida pero inventada
 hace una segunda consulta a la base (la búsqueda de la sesión por su clave primaria) además de la de las tablas; `/salud` cae en la zona general
 del límite de tasa del proxy. Nada del panel respecto de `/salud`: el aviso de servicio de la aplicación solo usa `base` cuando el estado no es `ok`,
