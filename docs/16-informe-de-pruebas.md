@@ -5100,6 +5100,12 @@ la base es 16.16, la última publicada de su serie» y «OK 4 imágenes: ninguna
 publicada fuera de los residuos documentados». El riesgo aceptado transitorio de `docs/11 §4` queda cerrado. En el servidor de prueba, la
 base se actualiza en el despliegue siguiente con el mismo procedimiento (respaldo, recrear, `ALTER EXTENSION`, huella).
 
+**En el servidor de prueba (20/11/2026).** Con el backend detenido: respaldo previo correcto (25 tablas, cifrado para los dos
+destinatarios; la guardia, 0 h 0 min); el escáner, las tres líneas OK (PostgreSQL 16.16, Node 22.23.5, 4 imágenes); recreada solo la
+base, servidor 16.16 y extensión todavía 2.30.2; `ALTER EXTENSION timescaledb UPDATE` sin errores; y la huella de las 25 tablas, idéntica a
+la del respaldo salvo la línea de la versión de la extensión (2.30.2 → 2.32.1). Levantado todo: los cuatro contenedores sanos y
+`node --version` en el backend, v22.23.5. El despliegue llevó además los cambios del mismo día (§93 y la actualización de dependencias).
+
 **El hueco que dejó ver, cerrado el mismo día.** El parche de Node pasó nueve días sin aviso: Trivy no ve el binario de Node de la imagen
 del backend (como no veía el servidor PostgreSQL compilado de la base) y Dependabot espera siete días antes de proponer. El escáner suma
 una comprobación igual a la de PostgreSQL: el `NODE_VERSION` de la imagen construida frente al de `node:<mayor>-<variante>` (la variante,
