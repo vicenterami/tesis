@@ -18,7 +18,7 @@
 # Queda, documentado: gosu (el arranque lo usa para bajar privilegios) y el servidor compilado en /usr/local, que el escáner de
 # paquetes no ve: escanear-imagenes.sh compara su versión con la publicada (docs/11 §4). Cuando la imagen oficial se reconstruya con
 # los parches, este archivo vuelve a ser casi solo el FROM.
-FROM timescale/timescaledb:2.30.2-pg16-oss@sha256:df09d239ecc10f30dcd03165b9d8d61e30ef6465af05bceb9ab20f1c7e0f3469
+FROM timescale/timescaledb:2.32.0-pg16-oss@sha256:3aa1fb6faff8928f220e343b83536752d6649aaa0352f0daba43504e2a96762d
 RUN apk del --no-cache postgresql16-plpython3 \
     && apk upgrade --no-cache zlib musl musl-utils krb5-libs libxslt \
     && rm -f /usr/local/bin/timescaledb-parallel-copy /usr/local/bin/timescaledb-tune \
