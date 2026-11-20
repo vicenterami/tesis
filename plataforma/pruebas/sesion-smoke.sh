@@ -549,6 +549,18 @@ caso "investigador: GET /sesion" 200 inv GET /sesion
 [ "$(campo "(v['administrador_sistema'], [s['rol'] for s in v['sitios']], sorted(v['permisos']['investigador']))")" = "(False, ['investigador'], ['exportar', 'leer'])" ] \
   && ok "GET /sesion del investigador: su perfil por sitio y la matriz de cinco perfiles" || falla "GET /sesion del investigador: $(head -c 300 "$T/r")"
 
+# GET /salud según quién pregunta (docs/10 §6, docs/20 §6; 20/11/2026): 200 para todos; el detalle (base, tablas, broker, aprovisionamiento)
+# solo con la acción `sistema` (la clave y el administrador del sistema); sin sesión y los perfiles de sitio, exactamente {"estado":"ok"}.
+for q in anon inv ope adm; do
+  caso "$q: GET /salud" 200 "$q" GET /salud
+  [ "$(campo "sorted(v)")" = "['estado']" ] && ok "$q: GET /salud trae solo «estado», sin estadísticas de operación" || falla "$q: GET /salud trae más que «estado»: $(head -c 160 "$T/r")"
+done
+for q in clave sis; do
+  caso "$q: GET /salud" 200 "$q" GET /salud
+  [ "$(campo "sorted(v) == ['aprovisionamiento_en_curso', 'base', 'broker', 'estado', 'tablas'] and 'clientes_conectados' in v['broker']")" = True ] \
+    && ok "$q: GET /salud con el detalle (base, tablas, broker, aprovisionamiento en curso)" || falla "$q: GET /salud sin el detalle: $(head -c 160 "$T/r")"
+done
+
 # Lecturas: los tres perfiles nuevos en su sitio; el del sistema, también en B (todos los sitios).
 for q in inv ope sis; do
   for r in /dispositivos "/dispositivos/$DA" "/canales/$CA/historico" /condiciones /cuarentena /pasarelas /sitios "/sitios/$SITIO_A/resumen" "/sitios/$SITIO_A/ahora" "/dispositivos/$DA/historico" "/dispositivos/$DA/eventos"; do

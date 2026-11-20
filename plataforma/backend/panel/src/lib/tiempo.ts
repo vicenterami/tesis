@@ -1,4 +1,12 @@
-// Toda hora se muestra en la zona del sitio y lleva el instante UTC al lado (docs/13, docs/19 §1).
+// Toda hora se muestra en la zona del sitio y lleva el instante UTC al lado (docs/13, docs/19 §1); si la persona eligió una zona propia en
+// sus preferencias (P13), las horas que se MUESTRAN van en esa (`zonaVista`). Lo que la persona escribe (`instanteDesdeLocal`) y los días
+// que se piden a la API siguen en la zona del sitio.
+import { zonaPropia } from './zona-propia.svelte';
+
+// La zona en que se muestran las horas: la propia si la hay, si no la del sitio.
+export const zonaVista = (zonaSitio: string): string => zonaPropia() ?? zonaSitio;
+// ¿La persona ve las horas en una zona distinta de la del sitio? (con una propia igual a la del sitio, nada cambia)
+export const veEnOtraZona = (zonaSitio: string): boolean => zonaVista(zonaSitio) !== zonaSitio;
 
 // «hace 3 min», «hace 2 h», «hace 5 d»; null → «sin tramas aún». Nunca negativo: un reloj adelantado muestra «ahora».
 export function haceCuanto(iso: string | null, ahora: Date): string {
@@ -11,7 +19,11 @@ export function haceCuanto(iso: string | null, ahora: Date): string {
 }
 
 // Hora local del sitio (zona IANA) y, entre paréntesis, el instante UTC tal como lo guarda la base.
-export function horaLocal(iso: string, zona: string): string {
+export function horaLocal(iso: string, zonaSitio: string): string {
+  return horaEn(iso, zonaVista(zonaSitio));
+}
+// Igual, en la zona exacta que se pide (sin la preferencia): para lo que debe decir UTC, p. ej.
+export function horaEn(iso: string, zona: string): string {
   const fecha = new Date(iso);
   const local = new Intl.DateTimeFormat('es-CL', { timeZone: zona, dateStyle: 'short', timeStyle: 'medium' }).format(fecha);
   return `${local} (${fecha.toISOString()} UTC)`;
@@ -26,7 +38,11 @@ export function duracion(s: number): string {
 }
 
 // Fecha y hora en la zona del sitio, en palabras («20 de octubre de 2026, 14:05»), sin el UTC: el UTC va en el título (docs/13).
-export function fechaHora(iso: string, zona: string): string {
+export function fechaHora(iso: string, zonaSitio: string): string {
+  return fechaHoraEn(iso, zonaVista(zonaSitio));
+}
+// Igual, en la zona exacta que se pide (sin la preferencia).
+export function fechaHoraEn(iso: string, zona: string): string {
   // Fecha y hora por separado: el conector entre las dos («, » o « a las ») cambia entre versiones de ICU y de navegador.
   const fecha = new Date(iso);
   const dia = new Intl.DateTimeFormat('es-CL', { timeZone: zona, day: 'numeric', month: 'long', year: 'numeric' }).format(fecha);

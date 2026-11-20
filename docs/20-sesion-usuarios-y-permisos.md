@@ -136,7 +136,8 @@
 ## 5. El guardia central
 - Un middleware lee la cookie, busca la sesión viva, renueva `ultima_actividad` y deja en la petición `usuario` y sus
   `sitios: Map<sitio_id, rol>`. Sin sesión → 401 con un cuerpo fijo. Las rutas públicas (`/salud`, `/panel/*`, `POST /sesion` y `POST /recepcion/{idFisico}`, que lleva su propia credencial por dispositivo) no
-  pasan por él. La vista pública, `GET /publico`, tampoco, y **la guardia no lee su cabecera `X-Enlace-Publico`**: solo la lee el controlador de esa
+  pasan por él; `/salud` sí lo consulta, sin exigirlo, para decidir si entrega el detalle (`docs/10 §6`): una `X-Clave-Admin` equivocada
+  es 401 como en todas partes, y una cookie que no vale se trata como «sin sesión». La vista pública, `GET /publico`, tampoco, y **la guardia no lee su cabecera `X-Enlace-Publico`**: solo la lee el controlador de esa
   ruta (§7), así que ese token no da acceso a ninguna otra.
 - Una sola función `permitir(usuario, accion, sitio_id)` con la tabla de permisos de la §6; toda ruta la llama antes de tocar
   la base. El `sitio_id` lo resuelve el servidor a partir del recurso pedido (el dispositivo, el canal), nunca del cuerpo.
@@ -166,7 +167,8 @@ persona pidiendo un recurso de un sitio donde no tiene membresía (el administra
 
 | Ruta | Sin sesión | Consulta | Investigador | Operador técnico | Administrador de sitio | Administrador del sistema | Otro sitio |
 |---|---|---|---|---|---|---|---|
-| `GET /salud`, los archivos del panel bajo `/panel/` | 200 | 200 | 200 | 200 | 200 | 200 | 200 |
+| `GET /salud` (desde el 20/11/2026: el detalle de la base, el broker y el aprovisionamiento solo con la acción `sistema`; a los demás, solo `{ "estado" }`, `docs/10 §6`) | 200 (solo `estado`) | 200 (solo `estado`) | 200 (solo `estado`) | 200 (solo `estado`) | 200 (solo `estado`) | 200 (con detalle) | — |
+| Los archivos del panel bajo `/panel/` | 200 | 200 | 200 | 200 | 200 | 200 | 200 |
 | `POST /sesion` (pública), `GET /sesion`, `DELETE /sesion`, `POST /sesion/clave` (las tres valen con clave temporal) | 200 / 401 | 200 | 200 | 200 | 200 | 200 | — |
 | `GET /dispositivos`, `GET /dispositivos/{id}`, `GET /canales/{id}/historico`, `GET /condiciones`, `GET /cuarentena`, `GET /pasarelas`, `GET /eventos` | 401 | 200 (solo sus sitios en la lista; filtro por sitio en el `WHERE`) | 200 | 200 | 200 | 200 (todos los sitios) | 404 |
 | `GET /dispositivos/{id}/exportar` (datos crudos, no públicos: punto 6) | 401 | 403 | 200 | 403 | 200 | 200 | 404 |

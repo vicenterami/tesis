@@ -34,6 +34,7 @@
   import { crearRenovador, puedeEnAlguno, quienSoy, trasAvisoDeSesion, type Fase, type Sesion, type SesionAbierta } from './lib/sesion';
   import { aplicarTema, leerPreferenciaTema, temaVivo } from './lib/tema';
   import { preferenciaUnidades } from './lib/unidades';
+  import { fijarZonaPropia } from './lib/zona-propia.svelte';
   import { fragmentoInventario, fragmentoTablero, leerVista, redireccionVieja } from './lib/vista';
 
   let fase = $state<Fase>('comprobando');
@@ -76,6 +77,8 @@
   // Términos pendientes (docs/20 §12): la clave temporal va primero; después, la aceptación.
   const fasePorSesion = (s: Sesion): Fase => (!s.sistema && s.clave_temporal ? 'cambiar' : !s.sistema && s.terminos?.pendiente === true ? 'terminos' : 'dentro');
   const unidades = $derived(preferenciaUnidades(sesion?.preferencias));
+  // La zona horaria propia (P13): un solo lugar, `lib/tiempo.ts` la lee para toda hora que se muestra; sin sesión, o con «la de cada sitio», ninguna.
+  $effect(() => fijarZonaPropia(sesion?.preferencias?.zona_horaria ?? null));
 
   // Los sitios de la persona (`GET /sitios`) para el selector de la barra superior, que aparece solo con más de uno; el sitio vive en la
   // URL (`?sitio=<código>`) y, si no viene, rige la preferencia `sitio_predeterminado` o el primero.
@@ -346,7 +349,7 @@
     window.addEventListener('hashchange', alCambiar);
     // El estado del servicio se lee en «Legal y acerca de»; aquí solo importa si falla, y se dice con un aviso.
     void obtener<Salud>('/salud')
-      .then((s) => (avisoServicio = s.estado === 'ok' ? null : `el servicio responde con estado «${s.estado}» (base ${s.base}).`))
+      .then((s) => (avisoServicio = s.estado === 'ok' ? null : `el servicio responde con estado «${s.estado}»${s.base === undefined ? '' : ` (base ${s.base})`}.`))
       .catch((e: unknown) => (avisoServicio = `no responde (${avisoDeError(e).texto})`));
     // Lo que vale para toda la aplicación (lib/api.ts): 401 → «Entrar» guardando la ruta y olvidando la temporal recién escrita; 403
     // por clave temporal → cambio obligatorio, solo con sesión (lib/sesion.ts, trasAvisoDeSesion).

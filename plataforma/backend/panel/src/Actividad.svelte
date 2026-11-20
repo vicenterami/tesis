@@ -13,7 +13,7 @@
   import { rotuloPersona } from './lib/persona';
   import type { Sitio } from './lib/modelo';
   import { puedeEn, type Sesion } from './lib/sesion';
-  import { fechaHora, horaLocal, instanteDesdeLocal, localDesdeInstante } from './lib/tiempo';
+  import { fechaHora, horaLocal, instanteDesdeLocal, localDesdeInstante, veEnOtraZona, zonaVista } from './lib/tiempo';
   import { fragmentoActividad, fragmentoFicha, type FiltrosActividad } from './lib/vista';
 
   let {
@@ -126,7 +126,7 @@
       <label>Hasta <input type="datetime-local" bind:value={hastaTexto} data-filtro-hasta /></label>
       <Boton etiqueta="Aplicar el rango" motivoDesactivado={ventanaPedida.motivo} onclick={() => cambiar({ fija: ventanaPedida.fija })} data-aplicar-rango />
       {#if filtros.fija !== null || filtros.tipo !== '' || filtros.usuario !== ''}<Boton etiqueta="Quitar los filtros" variante="discreto" onclick={() => cambiar({ tipo: '', usuario: '', fija: null })} />{/if}
-      <span class="vivo" id="{uid}-zona">Horas en la zona del sitio ({zona}).</span>
+      <span class="vivo" id="{uid}-zona">{#if veEnOtraZona(zona)}Desde y Hasta, en la zona del sitio ({zona}); la lista, en la tuya ({zonaVista(zona)}).{:else}Horas en la zona del sitio ({zona}).{/if}</span>
     </form>
 
     {#if error !== null}

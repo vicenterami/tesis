@@ -4,7 +4,7 @@ Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emu
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
 cubría al escribirse se agregó después: TT-32 (sensor físico) en §43, §44 y §53, y TT-30 (recuperación ante reinicio) en §11. El
-contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 924 pruebas unitarias del backend y 587 del panel.
+contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 938 pruebas unitarias del backend y 599 del panel.
 Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -5164,3 +5164,84 @@ verificador), no las ejecuciones: el backend pasó de 919 a **924** y el panel, 
 de la fila de actividad, y los mensajes de soporte (solo del administrador del sistema) llevan `usuario{id, nombre}` sin correo: dos homónimos
 siguen sin distinguirse ahí. Una prueba plantada contra una base real de la guarda de anonimización dentro de `db/pruebas/` no se añadió (el
 fragmento viviría duplicado en SQL y en TypeScript); la guarda la cubren las pruebas unitarias y la comprobación de solo lectura de arriba.
+
+## 94. Supervisión con su intervalo en producción y `/salud` sin estadísticas para quien no tiene sesión (20/11/2026)
+
+Dos correcciones del backend. El diseño se escribió primero en `docs/10 §4.1` y `§6`, `docs/20 §5` y `§6` y `docs/11` (tabla de accesos); el
+código lo sigue.
+
+**1. `SUPERVISION_INTERVALO_S` llega al servidor y se valida al arrancar.** Hasta hoy solo la fijaba el override de desarrollo (5 s): el compose
+base no la reenviaba, así que en el servidor regía el valor del código aunque el `.env` dijera otro, y un valor vacío o con texto llegaba a
+`setInterval` como 0 o `NaN`. Ahora:
+- `docker-compose.yml` la reenvía al backend sin valor propio, como `RETENCION_*`: definida en el `.env` llega tal cual (vacía también, y
+  entonces el arranque falla a la vista en vez de convertirse en un 60 callado); ausente, rige el 60 del código. Comprobado con
+  `docker compose config`: sin la variable, no llega (`null`); con 30, llega 30; vacía, llega vacía; con el override, 5.
+- `supervision.service.ts` (`intervaloSupervision`): ausente → 60; un entero de 1 a 3600 se respeta; vacía, con decimales, negativa, cero, mayor
+  que 3600 o con texto detienen el arranque con «SUPERVISION_INTERVALO_S="…" no es válido: se espera un entero de segundos entre 1 y 3600
+  (por defecto 60)». Se valida en el constructor, antes de que ningún módulo se conecte a la base o al broker.
+- El paso 2z del verificador suma la variable a la familia que debe estar en `.env.example` y en el compose. Plantada la violación (el compose
+  sin la línea), el paso la nombra como faltante; restaurado, pasa con 22 variables.
+
+| Prueba | Resultado |
+|---|---|
+| Contenedor reconstruido con el override | `healthy`; registro «barrido de salud cada 5 s» |
+| Arranque del contenedor con `SUPERVISION_INTERVALO_S` vacía, `abc`, `0`, `1.5`, `-5` y `3601` (sin dependencias, sin llegar a conectarse) | los seis terminan con código 1 y el mensaje de arriba con el valor recibido |
+| Ausente | 60 (prueba unitaria; con el compose base, la variable no llega al contenedor) |
+| Plantada: el constructor vuelve a `Number(…)` sin validar | la prueba «un valor vacío no llega a programar un barrido sin pausa» falla; restaurado, pasa |
+
+**2. `GET /salud` sin credencial responde solo `{ "estado": "ok" }`.** Antes respondía a cualquiera las tablas, la cola del broker, los
+clientes conectados, los descartes, la condición abierta y las altas en curso. Decisión (`docs/10 §6`): **la misma ruta**, con el detalle
+según la credencial, y no una ruta aparte: los consumidores que solo miran el código o `estado` no cambian, los que leen el detalle ya
+mandan la clave, y el contrato no suma una ruta para el mismo dato. El código HTTP no depende de quién pregunta (200 con la base conectada,
+500 si su consulta falla), porque de él viven el chequeo de la imagen, el del proxy y el vigilante externo. El detalle va a quien tiene la
+acción `sistema` (`permitirGlobal`): la clave de administrador o la sesión de un administrador del sistema. La ruta sigue pública; una marca
+nueva del guardia central (`@IdentificacionOpcional()`) la deja identificar a quien pregunta sin exigirlo: una `X-Clave-Admin` equivocada es
+401 como en toda ruta; una cookie que no vale, o una sesión con la clave temporal o los términos pendientes, se trata como «sin sesión», sin
+401 ni borrar la cookie, y consultar el estado no renueva la sesión.
+
+Consumidores revisados (`grep -rn '/salud' plataforma docs informe-oficial`):
+
+| Consumidor | Qué lee | Qué se hizo |
+|---|---|---|
+| `HEALTHCHECK` de la imagen, chequeo del proxy (`curl -f`), `integracion/exportar.ts`, esperas de los guiones e2e del panel, `panel-desarrollo.sh`, `personas-semilla-prueba.sh`, `vias.sh`, `banco.sh` (8443, nombres ajenos, reinicio), `proxy-limites.sh`, `capacidad.sh`, `publico-proxy.sh`, `verificar-todo.sh` | el código HTTP | nada: no cambia |
+| `vigilar-corrida.sh`, `caidas.sh`, `banco.sh` (HTTPS 8443), el vigilante externo del servidor (`docs/14 §7.2`) | `"estado":"ok"` en el cuerpo | nada: sigue en la respuesta pública |
+| `api-smoke.sh` | `tablas` (con la clave, por `ck`) | sin cambio en ese caso; el de «sin sesión» exige ahora exactamente `{"estado":"ok"}`, y uno nuevo, 401 con una clave equivocada |
+| `sesion-smoke.sh` | — | nuevo: sin sesión, investigador, operador y administrador de sitio reciben solo `estado`; la clave y el administrador del sistema, el detalle |
+| `banco.sh cola` y `banco.sh estado` | `broker.*` | piden con la clave del banco (`api_leer`, por la entrada estándar) |
+| `pila.sh estado` | imprime la respuesta | con `HTTP_CLAVE_ADMIN` en el `.env`, el detalle (la clave entra a curl por la entrada estándar y no se imprime); sin ella, el estado |
+| Panel: «Legal y acerca de» y el aviso de servicio de la aplicación | `estado`, `base`, `tablas` | muestra `estado` y, solo si vienen, `base` y `tablas` (ver «Panel: `/salud` sin detalle») |
+| `plataforma/README.md`, `backend/README.md`, `openapi.json` (regenerado: cambian la descripción y el resumen de `/salud`) | — | al día |
+
+| Prueba | Resultado |
+|---|---|
+| `guardia.spec.ts` (5 nuevas) | sin credencial, sin usuario y sin tocar la base; clave buena → usuario del sistema, mala → 401, sin configurar → 503; cookie viva → la persona, con `renovar: false`; cookie que no vale → sin usuario ni `Set-Cookie`; clave temporal o términos pendientes → como sin sesión; una ruta pública sin la marca sigue sin mirar nada |
+| `salud.controller.spec.ts` (4, archivo nuevo) | sin credencial, exactamente `{ estado: "ok" }`; clave o administrador del sistema, el detalle completo; los cuatro perfiles de sitio, solo `estado`; con la base caída, rechaza para todos. Plantada: el controlador entrega siempre el detalle → fallan 2 de 4; restaurado, pasan |
+| Contenedor reconstruido, `curl /salud` sin nada | `{"estado":"ok"}` y 200 |
+| `api-smoke.sh` | **TODO OK, 133 comprobaciones** (132 antes) |
+| `sesion-smoke.sh` | **484 de 484** (472 antes: 12 nuevas de `/salud`) |
+
+**Pruebas.** Backend: **938 pruebas escritas** (`it(`; 924 antes: 5 del intervalo, 5 de la guardia y 4 del controlador), que `vitest` ejecuta
+como **961 de 961 en 75 archivos** (947 en 74 antes). `pnpm verificar` (tipos, lint, backend y panel) en verde. Cifra del backend al día en
+`docs/11`, `docs/15`, `docs/16` (cabecera), `docs/18` (también 75 archivos), el capítulo y el anexo de pruebas del informe y la presentación.
+
+**Panel: `/salud` sin detalle.** «Legal y acerca de» escribe `estado` y, solo si vienen, `base` y `tablas` (la interfaz `Salud` los trae
+opcionales); el aviso de servicio de la aplicación hace lo mismo con la base. Prueba en `Legal.test.ts`: con el detalle, «ok, base conectada, 20
+tablas»; con `{ estado: "ok" }`, «ok», sin «undefined» en la página.
+
+**Zona horaria propia (panel).** La preferencia de P13 se guardaba y las pantallas seguían en la zona del sitio. Lo que rige está escrito
+en `docs/19 §4` (P13, «qué rige dónde»): lo que el panel **muestra** va en la zona propia (texto, hora exacta, ejes, etiqueta y tabla alternativa
+de las gráficas, listas, la pausa del tablero); lo que la persona **escribe** y lo que se **pide** a la API (rango a medida, filtro de la
+actividad, días de exportación) sigue en la zona del sitio, y la ayuda de cada campo lo dice. Se aplica en un solo lugar (`lib/tiempo.ts`, con la
+zona fijada desde la sesión en `App.svelte`) y cubre ficha, inventario, comparar, tablero y gráficas, actividad, alta, publicar y gráficos; el aviso
+«Hora en tu zona…» sale en las cuatro primeras y reemplaza al del navegador. «Usuarios» no tiene zona de sitio: el vencimiento de la clave temporal
+va en la zona propia y, sin ella, en UTC escrito (antes, en la del navegador). Las sesiones de P13 siguen en UTC.
+Pruebas nuevas del panel: 6 en `lib/tiempo.test.ts` (zona propia, sin ella, zona inválida, lo escrito en la del sitio, un cambio de hora),
+3 en `ZonaSitio.test.ts`, 1 en `App.test.ts` (ficha con la sesión), 1 en `Usuarios.test.ts` y 1 en `Legal.test.ts`.
+
+**Panel, cifras.** **599 pruebas escritas** (`it(`; 587 antes: 12 nuevas), que `vitest` ejecuta como **663 de 663 en 45 archivos**; `pnpm --filter
+panel verificar` en verde. Cifra al día en la cabecera de este documento, `docs/18` y el capítulo, el anexo y la presentación del informe.
+
+**Lo que queda.** Una amplificación pequeña, aceptada: una petición sin sesión a `/salud` con una cookie de forma válida pero inventada
+hace una segunda consulta a la base (la búsqueda de la sesión por su clave primaria) además de la de las tablas; `/salud` cae en la zona general
+del límite de tasa del proxy. Nada del panel respecto de `/salud`: el aviso de servicio de la aplicación solo usa `base` cuando el estado no es `ok`,
+y hoy la respuesta, cuando no es `ok`, es un 500.

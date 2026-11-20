@@ -19,7 +19,7 @@
   import { TIPOS_NOTIFICABLES, alternarNotificacion, enlaceDeVista, guardarVista, zonasIana } from './lib/preferencias';
   import { ROTULO_ROL, type Sesion } from './lib/sesion';
   import { aplicarTema, leerPreferenciaTema } from './lib/tema';
-  import { fechaHora } from './lib/tiempo';
+  import { fechaHoraEn } from './lib/tiempo';
 
   let {
     sesion,
@@ -211,7 +211,7 @@
             <option value="sitio">La de cada sitio (recomendado)</option>
             {#each zonas as z (z)}<option value={z}>{z}</option>{/each}
           </select>
-          <span class="ayuda-campo" id="{uid}-zona-ayuda">Con «la de cada sitio», las horas van en la zona del sitio del dato; con una propia, todas en la tuya, y la cabecera lo dice.</span>
+          <span class="ayuda-campo" id="{uid}-zona-ayuda">Con «la de cada sitio», las horas van en la zona del sitio del dato; con una propia, todas las que se muestran van en la tuya y las pantallas con horas de un sitio lo dicen; las fechas que escribes en un filtro o una exportación siguen en la zona del sitio.</span>
         </div>
         <div class="campo">
           <label for="{uid}-tema">Tema</label>
@@ -282,7 +282,7 @@
           {#each sesiones as s (s.id)}
             <li data-sesion-abierta={s.id}>
               <strong>{s.agente ?? 'navegador sin nombre'}</strong>{#if s.actual} <span class="vivo">(esta)</span>{/if}<br />
-              <span class="vivo">desde {s.origen ?? 'origen desconocido'} · abierta el {fechaHora(s.creada_en, 'UTC')} UTC · última actividad {fechaHora(s.ultima_actividad, 'UTC')} UTC</span>
+              <span class="vivo">desde {s.origen ?? 'origen desconocido'} · abierta el {fechaHoraEn(s.creada_en, 'UTC')} UTC · última actividad {fechaHoraEn(s.ultima_actividad, 'UTC')} UTC</span>
               <Boton etiqueta="Cerrar esta sesión" etiquetaCargando="Cerrando…" cargando={cerrando === s.id}
                 motivoDesactivado={s.actual ? 'es la sesión que usas ahora: para cerrarla, «Salir»' : null} onclick={() => void cerrarSesion(s)} data-cerrar-sesion={s.id} />
             </li>

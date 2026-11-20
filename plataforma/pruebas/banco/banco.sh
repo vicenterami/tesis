@@ -116,7 +116,7 @@ case "${1:-}" in
     [ $fallos -eq 0 ] || exit 1 ;;
   estado)
     dc ps --format 'table {{.Service}}\t{{.Status}}\t{{.Ports}}'
-    printf 'GET /salud (banco, 3001) → '; curl -s -m 3 http://127.0.0.1:3001/salud || echo "sin respuesta"; echo ;;
+    printf 'GET /salud (banco, 3001) → '; api_leer -s -m 3 http://127.0.0.1:3001/salud || echo "sin respuesta"; echo ;;   # con la clave: el detalle
   logs) dc logs -f --no-color --since 1m "${@:2}" ;;
   sql)
     if [ -n "${2:-}" ]; then psql_ -c "$2"; else dc exec timescaledb psql -U plataforma -d plataforma; fi ;;
@@ -806,7 +806,7 @@ SQL
     # cada 10 s (compose.banco.yml). Comprobaciones: /salud trae los contadores; el contador de descartes creció (el tope rige);
     # la condición abierta con motivo «descartes», su evento y el aviso en /salud; muestras en metrica_broker; cierre automático.
     fallos=0; ok() { echo "OK    $1"; }; falla() { echo "FALLA $1"; fallos=$((fallos+1)); }
-    salud() { curl -s -m 3 http://127.0.0.1:3001/salud; }
+    salud() { api_leer -s -m 3 http://127.0.0.1:3001/salud; }   # el detalle del broker, solo con la clave (docs/10 §6, 20/11/2026)
     campo() { python3 -c "import sys,json; v=json.load(sys.stdin)['broker']['$1']; print('' if v is None else v)"; }
     d0=$(salud | campo mensajes_descartados)
     [ -n "$d0" ] && ok "GET /salud trae los contadores \$SYS del broker (descartados hasta ahora: $d0)" || { echo "FALLA /salud sin contadores del broker (¿la administradora no lee \$SYS?)"; exit 1; }

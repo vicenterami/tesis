@@ -494,7 +494,11 @@ esperado**, y corre cada `SUPERVISION_INTERVALO_S` segundos (60 por defecto). La
 lo tanto, entre 2 intervalos y 2 intervalos **más un período de barrido**. Con los intervalos reales
 del caso (5 a 30 minutos) el exceso es de un minuto, menos de 0,2 intervalos. Con el sensor de la
 demostración, que reporta cada 5 s, un barrido de 60 s tardó entre 25 y 68 s (hasta 14 intervalos):
-por eso el override de desarrollo fija `SUPERVISION_INTERVALO_S=5`. El costo no depende de cuántas
+por eso el override de desarrollo fija `SUPERVISION_INTERVALO_S=5`. Desde el 20/11/2026 el compose base la reenvía al backend
+como las de retención (sin valor propio: definida en el `.env` llega tal cual; ausente, rige la del código): antes solo la fijaba el
+override, y en el servidor regía el valor del código sin que el `.env` pudiera cambiarlo. El backend la valida al arrancar: ausente, 60; presente, un entero de 1 a 3600 segundos; vacía, con decimales,
+negativa, cero, mayor que 3600 o con texto, el arranque se detiene con un mensaje que dice qué se espera (antes un vacío daba un
+barrido sin pausa y un texto, un temporizador `NaN`). El costo no depende de cuántas
 mediciones haya: cada barrido es **una** consulta sobre la tabla `dispositivo` (decenas a miles de
 filas), no sobre `medicion`; mil dispositivos son una consulta por período, no mil.
 **Decisión pendiente:** RNF-03 dice «≤ 2 intervalos» sin tolerancia, y en rigor el diseño siempre la
@@ -502,7 +506,7 @@ excede por hasta un período de barrido. Dos salidas: declarar la tolerancia en 
 («≤ 2 intervalos + período de barrido») o adelantar el umbral en un período. Se decide antes de la
 prueba formal de la Etapa 4, no en el código de hoy.
 
-**Límite conocido de `/salud` (mismo hallazgo).** El `estado` del endpoint depende solo de la base (desde el 13/10 la respuesta informa además el broker, sin cambiar `estado`); con el broker
+**Límite conocido de `/salud` (mismo hallazgo).** El `estado` del endpoint depende solo de la base (desde el 13/10 la respuesta informa además el broker, sin cambiar `estado`; desde el 20/11/2026 ese detalle solo con la acción `sistema`, §6); con el broker
 caído responde `200 ok` igual, porque `BrokerService` reconecta solo y no lo consulta. No es un error:
 hoy nada depende de que `/salud` refleje el broker, y `BrokerService` ya registra sus propios avisos
 de conexión. Si más adelante el healthcheck del contenedor necesita reflejar también el broker, es un
@@ -747,6 +751,19 @@ si el broker no responde en 3 s, cuenta como caído. `sonda` tiene el mínimo pr
 lee `$SYS/#`, no puede publicar ni leer ningún tópico de datos (`acl`, `docs/11 §7`). El backend: su
 imagen llama a `GET /salud`, que confirma también la conexión con la base. Esas conexiones de `sonda`
 son las que aparecen cada 15 s en el registro del broker; `pila.sh logs` las oculta de la vista.
+
+**Qué responde `GET /salud` según quién pregunta (decidido el 20/11/2026).** La ruta sigue siendo pública y su código HTTP no
+cambia (200 con la base conectada; 500 si la consulta a la base falla), porque de ese código dependen el chequeo de la imagen, el del
+proxy y el vigilante externo, y ninguno se identifica. Lo que cambia es el cuerpo: **sin credencial, solo `{ "estado": "ok" }`**; el detalle
+(`base`, `tablas`, `broker{…}` con la cola, los descartes, los clientes conectados y la condición abierta, y `aprovisionamiento_en_curso`)
+solo para quien tiene la acción `sistema` (`docs/20 §6`): la clave de administrador por `X-Clave-Admin` o la sesión de un administrador
+del sistema. Una persona con sesión de otro perfil, o con la clave temporal o los términos pendientes, recibe lo mismo que sin sesión.
+Una `X-Clave-Admin` equivocada responde 401, como en cualquier otra ruta («si viene, manda ella», `docs/20 §5`): un guion con la clave
+mal escrita falla a la vista en vez de leer un cuerpo recortado. **Misma ruta y no una aparte (`/salud/detalle`):** los consumidores
+que solo miran el código o `estado` (el chequeo del contenedor y del proxy, el vigilante, las esperas de los guiones) no cambian; los que
+leen el detalle (los guiones de prueba y el banco) ya mandan o pasan a mandar la clave; y no se agrega una ruta al contrato para el mismo
+dato. Un externo no necesita saber cuántos clientes hay conectados, cuánta cola tiene el broker ni si hay altas en curso: son señales para
+elegir el momento de un ataque, no para saber si el servicio responde.
 
 **Vigilante externo (01/11/2026).** Los chequeos de arriba viven dentro del servidor: si el servidor se apaga o pierde la red,
 nadie los ve. En el servidor de prueba un temporizador del sistema consulta `GET /salud` cada 5 min y, solo si responde `ok`, envía un
@@ -1269,8 +1286,8 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     reenvía en una cabecera, así una línea del proxy, una del backend y la fila de `auditoria` se cruzan por el mismo valor. Lo que
     escribe (alta, baja, rotación) y todo error dejan una línea con conteos e identificadores, nunca datos de la persona ni
     secretos; las lecturas no se registran (están en la tabla). **(3) Métricas, los números en el tiempo:** sin Prometheus; los
-    números viven en `metrica_broker` y en `GET /salud` ampliado (cola del broker, descartes, conexiones, altas en
-    curso). **Qué pasa cuando la base cae:** el middleware nunca bloquea la petición: las filas se acumulan en memoria (cola de
+    números viven en `metrica_broker` y en `GET /salud` ampliado, con la acción `sistema` (§6) (cola del broker, descartes, conexiones, altas en
+    curso; desde el 20/11/2026, solo con la acción `sistema`: §6). **Qué pasa cuando la base cae:** el middleware nunca bloquea la petición: las filas se acumulan en memoria (cola de
     1 000, vaciada cada 5 s) y, si se llena, se descartan las más viejas **contando** lo descartado en una línea de registro (ruido,
     no silencio); el pipeline de tramas sigue como en §4.1 (sin confirmar al broker, que las guarda). **La cola del broker, con
     topes explícitos y alarma:** `max_queued_messages 10000`, `max_queued_bytes 20971520` (20 MB) y `autosave_interval 300` en
@@ -1288,8 +1305,8 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     la conexión administradora, abre `broker_descarte` cuando el contador de descartes crece o la cola llega al 80 % de
     `METRICA_BROKER_COLA_TOPE` (el mismo número que `max_queued_messages`: lo comprueba el guardián 2l), la cierra tras dos
     muestras normales y, al arrancar, compara con la última muestra guardada, así un descarte ocurrido con el backend caído se
-    nota al volver; el evento `sistema` viaja por el canal en vivo (solo a los flujos sin filtro) y `GET /salud` muestra cola,
-    descartes, conexiones, condición abierta y operaciones de aprovisionamiento en curso. Probado plantando la violación en el
+    nota al volver; el evento `sistema` viaja por el canal en vivo (solo a los flujos sin filtro) y `GET /salud` muestra, con la acción `sistema` (§6), cola,
+    descartes, conexiones, condición abierta y operaciones de aprovisionamiento en curso (a quien tiene la acción `sistema`: §6). Probado plantando la violación en el
     banco (`banco.sh cola`, `docs/16 §22`).
 
 44. **Identidad, cifrado y mínimo privilegio en cada tramo: una regla para todos** (decidido el 13/10/2026, a pregunta del

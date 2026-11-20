@@ -5,6 +5,7 @@
 // cuando se conoce y, si no, lo dice el 400 del servidor junto al campo.
 import { ErrorApi } from './api';
 import type { CanalFicha, DispositivoFicha } from './modelo';
+import { zonaVista } from './tiempo';
 
 export interface ErrorCampo {
   campo: string;
@@ -171,5 +172,5 @@ export function horaDelConflicto(e: unknown, zona: string): string | null {
   if (!m) return null;
   const d = new Date(m[1]!);
   if (Number.isNaN(d.getTime())) return null;
-  return new Intl.DateTimeFormat('es-CL', { timeZone: zona, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(d);
+  return new Intl.DateTimeFormat('es-CL', { timeZone: zonaVista(zona), hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(d);
 }

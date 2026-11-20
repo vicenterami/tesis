@@ -28,6 +28,8 @@
   let enviando = $state(false);
   let avisoSoporte = $state<DatosAviso | null>(null);
   let salud = $state<string | null>(null);
+  // `estado` siempre; base y tablas solo si el servidor las mandó (quien no administra el sistema recibe solo `estado`).
+  const textoSalud = (s: Salud): string => [s.estado, ...(s.base === undefined ? [] : [`base ${s.base}`]), ...(s.tablas === undefined ? [] : [`${s.tablas} tablas`])].join(', ');
 
   // central: false → estas páginas se leen también sin sesión: un 401 aquí no lleva a «Entrar».
   const leer = (ruta: string): Promise<unknown> => pedir<unknown>('GET', ruta, { central: false });
@@ -35,7 +37,7 @@
     void leer('/privacidad').then((x) => (privacidad = esPrivacidad(x) ? x : 'error')).catch(() => (privacidad = 'error'));
     void leer('/terminos').then((x) => (terminos = textoDe(x) ?? 'error')).catch(() => (terminos = 'error'));
     void leer('/acerca').then((x) => (acerca = typeof x === 'object' && x !== null ? (x as Record<string, unknown>) : 'error')).catch(() => (acerca = 'error'));
-    if (conSesion) void obtener<Salud>('/salud').then((s) => (salud = `${s.estado}, base ${s.base}, ${s.tablas} tablas`)).catch(() => (salud = 'sin respuesta'));
+    if (conSesion) void obtener<Salud>('/salud').then((s) => (salud = textoSalud(s))).catch(() => (salud = 'sin respuesta'));
     if (seccion !== undefined) queueMicrotask(() => document.getElementById(`legal-${seccion}`)?.scrollIntoView?.());
   });
 

@@ -49,7 +49,12 @@ case "${1:-}" in
     bash "$YO" estado ;;
   estado)
     dc ps --format 'table {{.Service}}\t{{.Status}}\t{{.Ports}}'
-    printf 'GET /salud → '; curl -s -m 3 http://127.0.0.1:3000/salud || echo "sin respuesta"; echo ;;
+    # Con HTTP_CLAVE_ADMIN en el .env, el detalle (base, tablas, broker, aprovisionamiento); sin ella, lo que ve cualquiera: solo
+    # «estado» (docs/10 §6, 20/11/2026). La clave entra a curl por la entrada estándar y no se imprime.
+    clave=$(grep -E '^HTTP_CLAVE_ADMIN=' .env 2>/dev/null | tail -1 | cut -d= -f2- | sed -E 's/^"(.*)"$/\1/; s/^'"'"'(.*)'"'"'$/\1/' | tr -d '\r')
+    if [ -n "$clave" ]; then printf 'GET /salud (con la clave de administrador) → '; printf 'X-Clave-Admin: %s\n' "$clave" | curl -s -m 3 -H @- http://127.0.0.1:3000/salud || echo "sin respuesta"
+    else printf 'GET /salud (sin clave: solo el estado) → '; curl -s -m 3 http://127.0.0.1:3000/salud || echo "sin respuesta"; fi
+    unset clave; echo ;;
   logs)
     mkdir -p "$LOGS"; f="$LOGS/pila-$(date +%F-%H%M%S).log"
     echo "copia cruda en $f (Ctrl+C para salir)"

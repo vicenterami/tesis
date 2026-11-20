@@ -406,13 +406,14 @@ malos=$(grep -lE '^\. "\$\(dirname "\$0"\)' plataforma/pruebas/*.sh plataforma/p
 if [ -n "$malos" ]; then echo "FALLA cargan con ruta relativa a \$0 (fallan según desde dónde se llamen):"; echo "$malos" | sed 's/^/  /'; fallos=$((fallos+1))
 else echo "OK    ningún guion carga lib-dynsec.sh con una ruta relativa a \$0"; fi
 
-paso "2z. Toda variable RETENCION_*, METRICA_BROKER_*, TOPE_*, PROXY_SECRETO, CLAVE_TEMPORAL_HORAS, RESPONSABLE_*, CODIGO_FUENTE_URL y PUBLICO_* del .env.example llega al backend por el compose (14/10; topes y secreto del proxy, 17/10; vigencia de la clave temporal, 08/11; responsable y código fuente, 11/11; vista pública, 17/11)"
-# Hasta el 14/10 el compose no las reenviaba: cambiarlas en el .env no tenía efecto y nadie lo notaba.
-faltan=$(grep -oE '^#?((RETENCION|METRICA_BROKER|TOPE|RESPONSABLE|PUBLICO)_[A-Z_]+|PROXY_SECRETO|CLAVE_TEMPORAL_HORAS|CODIGO_FUENTE_URL)' plataforma/.env.example | tr -d '#' | sort -u | while read -r v; do grep -qE "^\s+$v:" plataforma/docker-compose.yml || echo "$v"; done)
-n=$(grep -cE '^#?((RETENCION|METRICA_BROKER|TOPE|RESPONSABLE|PUBLICO)_[A-Z_]+|PROXY_SECRETO|CLAVE_TEMPORAL_HORAS|CODIGO_FUENTE_URL)=' plataforma/.env.example)
-if [ "$n" -lt 17 ]; then echo "FALLA solo $n variables RETENCION_/METRICA_BROKER_/TOPE_/RESPONSABLE_/PUBLICO_/PROXY_SECRETO/CLAVE_TEMPORAL_HORAS/CODIGO_FUENTE_URL en .env.example: revisó de menos"; fallos=$((fallos+1))
+paso "2z. Toda variable RETENCION_*, METRICA_BROKER_*, TOPE_*, PROXY_SECRETO, CLAVE_TEMPORAL_HORAS, RESPONSABLE_*, CODIGO_FUENTE_URL, PUBLICO_* y SUPERVISION_INTERVALO_S del .env.example llega al backend por el compose (14/10; topes y secreto del proxy, 17/10; vigencia de la clave temporal, 08/11; responsable y código fuente, 11/11; vista pública, 17/11; período del barrido, 20/11)"
+# Hasta el 14/10 el compose no las reenviaba: cambiarlas en el .env no tenía efecto y nadie lo notaba. El 20/11, lo mismo con
+# SUPERVISION_INTERVALO_S: solo la fijaba el override de desarrollo y en el servidor no llegaba.
+faltan=$(grep -oE '^#?((RETENCION|METRICA_BROKER|TOPE|RESPONSABLE|PUBLICO)_[A-Z_]+|PROXY_SECRETO|CLAVE_TEMPORAL_HORAS|CODIGO_FUENTE_URL|SUPERVISION_INTERVALO_S)' plataforma/.env.example | tr -d '#' | sort -u | while read -r v; do grep -qE "^\s+$v:" plataforma/docker-compose.yml || echo "$v"; done)
+n=$(grep -cE '^#?((RETENCION|METRICA_BROKER|TOPE|RESPONSABLE|PUBLICO)_[A-Z_]+|PROXY_SECRETO|CLAVE_TEMPORAL_HORAS|CODIGO_FUENTE_URL|SUPERVISION_INTERVALO_S)=' plataforma/.env.example)
+if [ "$n" -lt 18 ]; then echo "FALLA solo $n variables RETENCION_/METRICA_BROKER_/TOPE_/RESPONSABLE_/PUBLICO_/PROXY_SECRETO/CLAVE_TEMPORAL_HORAS/CODIGO_FUENTE_URL/SUPERVISION_INTERVALO_S en .env.example: revisó de menos"; fallos=$((fallos+1))
 elif [ -n "$faltan" ]; then echo "FALLA declaradas en .env.example pero el compose no las pasa al backend: $(echo $faltan)"; fallos=$((fallos+1))
-else echo "OK    las $n variables de limpieza, cola, topes, secreto del proxy, vigencia de la clave temporal, responsable, código fuente y vista pública llegan al backend por el compose"; fi
+else echo "OK    las $n variables de limpieza, cola, topes, secreto del proxy, vigencia de la clave temporal, responsable, código fuente, vista pública y período del barrido llegan al backend por el compose"; fi
 
 paso "2z2. Tope por emisor: las vías que docs/11 §3 declara con tope son exactamente las que entran por filtros2a6 (docs/10 §8.4 punto 53)"
 # 17/10: el tope vive en filtros2a6; una vía nueva que no pase por ahí no tendría tope. La fila de docs/11 nombra las vías; el código

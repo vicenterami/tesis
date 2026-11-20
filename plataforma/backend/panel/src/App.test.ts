@@ -151,6 +151,27 @@ describe('P3: canal y rango en la URL', () => {
     expect(historicos().every((p) => p.includes(TEMP))).toBe(true);
     await graficoListo();
   });
+
+  // Zona propia (docs/19 §4, H y D7): `GET /sesion` trae la preferencia y las horas visibles de la ficha la usan, con el aviso; sin ella, las del sitio.
+  it('con una zona propia en las preferencias, la ficha muestra sus horas en ella y lo dice; con «sitio», en la del sitio', async () => {
+    const conPrefs = (zona: string): void => { sesionActual = { ...SESION, preferencias: { ...PREFS_BASE, zona_horaria: zona } }; };
+    conPrefs('Asia/Tokyo');
+    history.replaceState(null, '', `#/dispositivos/${ID}`);
+    render(App);
+    await waitFor(() => expect(document.querySelector('[data-zona-propia]')).toBeTruthy());
+    expect(document.querySelector('[data-zona-propia]')!.textContent).toContain('Asia/Tokyo (UTC+09:00)');
+    expect(document.querySelector('[data-aviso-zona-propia]')!.textContent).toContain('America/Santiago');
+    const hora = document.querySelector<HTMLElement>('[title*="2026-10-12T14:59:30.000Z UTC"]')!;
+    expect(hora.title).toMatch(/(23:59:30|11:59:30 p\. ?m\.)/); // 14:59:30 UTC en Tokio; el instante UTC al lado no cambia
+    await graficoListo();
+    cleanup();
+    conPrefs('sitio');
+    render(App);
+    await waitFor(() => expect(document.querySelector('[data-hora-sitio]')).toBeTruthy());
+    expect(document.querySelector('[data-zona-propia]')).toBeNull();
+    expect(document.querySelector('[data-hora-sitio]')!.textContent).toContain('Hora en el sitio:');
+    await graficoListo();
+  });
 });
 
 describe('P2: filtros en la URL', () => {

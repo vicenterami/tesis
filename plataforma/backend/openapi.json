@@ -2172,14 +2172,15 @@
     },
     "/salud": {
       "get": {
+        "description": "Pública. Sin credencial (o con la sesión de un perfil que no tiene la acción «sistema») responde solo `{ estado }`; con `X-Clave-Admin` o la sesión de un administrador del sistema, el detalle. El código HTTP no depende de quién pregunta: 200 con la base conectada, 500 si la consulta a la base falla. Una `X-Clave-Admin` equivocada responde 401, como en las demás rutas.",
         "operationId": "SaludController_estado",
         "parameters": [],
         "responses": {
           "200": {
-            "description": "{ estado, base, tablas, broker: { conectado, administracion, ultima_muestra, mensajes_descartados, mensajes_en_cola, bytes_en_cola, clientes_conectados, cola_tope, condicion_abierta }, aprovisionamiento_en_curso }"
+            "description": "Sin la acción «sistema»: { estado }. Con ella: { estado, base, tablas, broker: { conectado, administracion, ultima_muestra, mensajes_descartados, mensajes_en_cola, bytes_en_cola, clientes_conectados, cola_tope, condicion_abierta }, aprovisionamiento_en_curso }"
           }
         },
-        "summary": "Estado del servicio, de su conexión a la base y de la cola del broker",
+        "summary": "Estado del servicio; con la acción «sistema», también la base, la cola del broker y el aprovisionamiento en curso",
         "tags": [
           "salud"
         ]

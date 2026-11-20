@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/sv
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Sesion } from './lib/sesion';
 import { aplicarRespuesta, type UsuarioListado } from './lib/usuarios';
+import { fijarZonaPropia } from './lib/zona-propia.svelte';
 import Usuarios from './Usuarios.svelte';
 
 // Pantalla de usuarios (P10; docs/20 §4 y §6) por el DOM: la guía de perfiles sale de la matriz; el alta muestra la clave temporal una
@@ -137,7 +138,7 @@ describe('Usuarios (P10)', () => {
     expect(pedidos.find((p) => p.metodo === 'PATCH')).toMatchObject({ cuerpo: { actualizado_en: '2026-11-08T12:30:00.123456Z', clave_temporal: true } });
     // La hora del vencimiento, en formato de 24 h (docs/19 §6: nunca «p. m.»; lo mostró la primera captura con navegador)
     const estado = filaDe('bea@ejemplo.invalid').querySelector('[data-estado-usuario]')!.textContent!;
-    expect(estado).toMatch(/vence el \S+ \d{2}:\d{2}/);
+    expect(estado).toMatch(/vence el .+, \d{2}:\d{2} UTC/);
     expect(estado).not.toMatch(/[ap]\.\s?m\./);
   });
 
@@ -231,10 +232,25 @@ describe('Usuarios (P10)', () => {
     await waitFor(() => expect(filaDe('bea@ejemplo.invalid')).toBeTruthy());
     await fireEvent.click(filaDe('bea@ejemplo.invalid').querySelector('[data-asignar-temporal]')!);
     await waitFor(() => expect(document.querySelector('[data-vence-temporal]')).toBeTruthy());
-    const esperado = new Date(vence).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short', hourCycle: 'h23' });
+    const esperado = '8 de noviembre de 2026, 16:00 UTC'; // sin zona propia: UTC dicho explícitamente
     expect(document.querySelector('[data-vence-temporal]')!.textContent).toBe(esperado);
     expect(document.querySelector('[data-clave-una-vez]')!.textContent).not.toMatch(/24 horas|24 h\b/);
     expect(document.body.textContent).not.toContain('(24 h)');
+  });
+
+  // Pantalla global, sin zona de sitio (docs/19 §4, H): con zona propia, el vencimiento va en ella; sin ella, en UTC dicho.
+  it('el vencimiento de la temporal va en la zona propia si la hay', async () => {
+    fijarZonaPropia('Asia/Tokyo');
+    try {
+      respuestaPatch = () => new Response(JSON.stringify({ ...bea, clave_temporal: true, clave_temporal_vence_en: '2026-11-08T16:00:00Z', clave: 'Otra-temporal-987654321' }));
+      render(Usuarios, { sesion: SESION });
+      await waitFor(() => expect(filaDe('bea@ejemplo.invalid')).toBeTruthy());
+      await fireEvent.click(filaDe('bea@ejemplo.invalid').querySelector('[data-asignar-temporal]')!);
+      await waitFor(() => expect(document.querySelector('[data-vence-temporal]')).toBeTruthy());
+      expect(document.querySelector('[data-vence-temporal]')!.textContent).toBe('9 de noviembre de 2026, 01:00');
+    } finally {
+      fijarZonaPropia(null);
+    }
   });
 });
 

@@ -57,8 +57,9 @@ export interface Condicion {
 
 export interface Salud {
   estado: string;
-  base: string;
-  tablas: number;
+  // El detalle llega solo a quien tiene la acción `sistema` (docs/10 §6): sin ella, la respuesta es `{ estado }`.
+  base?: string;
+  tablas?: number;
 }
 
 export type EventoVivo =

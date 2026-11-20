@@ -25,7 +25,7 @@
   import 'uplot/dist/uPlot.min.css';
   import { EJE_TIEMPO, MAX_PUNTOS_DIBUJADOS, NOMBRES_FECHA, SELLO_LEYENDA, altoGrafico, decimalesDeSeries, filasEtiqueta, formatearNumero, horaEtiqueta, resumenRango, textoAportan, type FilaEtiqueta } from './lib/grafico';
   import { LIENZO, colorLecturaActual, colorPromedio, temaVivo, type Tema } from './lib/tema';
-  import { fechaHora } from './lib/tiempo';
+  import { fechaHora, zonaVista } from './lib/tiempo';
 
   import { cargarUplot } from './lib/cargar-uplot';
 
@@ -196,7 +196,7 @@
     const y = o.top - m.top + top;
     etiqueta = {
       x, y, derecha: left > o.width / 2, arriba: top > o.height / 2,
-      hora: horaEtiqueta(t, zona),
+      hora: horaEtiqueta(t, zonaVista(zona)),
       filas: filasEtiqueta(untrack(() => series), untrack(() => lista), untrack(() => banda), i, unidad, untrack(() => decimales), untrack(() => aportes)),
     };
   }
@@ -223,7 +223,7 @@
     return {
       width: ancho,
       height: altoVigente,
-      tzDate: (ts) => UPlot.tzDate(new Date(ts * 1000), zona),
+      tzDate: (ts) => UPlot.tzDate(new Date(ts * 1000), zonaVista(zona)),
       fmtDate: (tpl) => UPlot.fmtDate(tpl, NOMBRES_FECHA), // meses y días en español (docs/19 §6)
       scales: {
         x: { time: true, range: rangoX as uPlotTipo.Scale.Range },
@@ -427,7 +427,7 @@
     <div class="tabla-desplazable">
       <table data-tabla-grafico>
         <caption class="solo-lector">{titulo}</caption>
-        <thead><tr><th scope="col">Hora ({zona})</th>{#each nombres as n, k (k)}<th scope="col">{n} ({unidad})</th>{/each}{#if aportes !== null}<th scope="col">Dispositivos que aportan</th>{/if}</tr></thead>
+        <thead><tr><th scope="col">Hora ({zonaVista(zona)})</th>{#each nombres as n, k (k)}<th scope="col">{n} ({unidad})</th>{/each}{#if aportes !== null}<th scope="col">Dispositivos que aportan</th>{/if}</tr></thead>
         <tbody>
           {#each series[0] ?? [] as t, i (i)}
             <tr><th scope="row">{t === null ? '—' : fechaHora(new Date(t * 1000).toISOString(), zona)}</th>{#each nombres as _n, k (k)}<td>{celda(k + 1, i)}</td>{/each}{#if aportes !== null}<td data-celda-aportan>{aportes[i] === null || aportes[i] === undefined ? '—' : textoAportan(aportes[i])}</td>{/if}</tr>

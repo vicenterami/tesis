@@ -7,7 +7,7 @@ import { Reflector } from '@nestjs/core';
 import type { Request, Response } from 'express';
 import { AvisosAcotados, claveAdmin } from '../arranque.js';
 import { CABECERA_CLAVE_ADMIN, rechazoDeClaveAdmin } from '../alta/clave-admin.guard.js';
-import { cabeceraBorrarCookie, leerCookie } from './cookie.js';
+import { cabeceraBorrarCookie, hashIdentificador, leerCookie } from './cookie.js';
 import { UsuarioSesion, usuarioSistema } from './permisos.js';
 import { MENSAJE_SIN_SESION, SesionService } from './sesion.service.js';
 import { TERMINOS_VERSION } from '../legal/terminos.js';
@@ -30,11 +30,18 @@ export const VALOR_PEDIDO = 'panel';
 const RUTA_PUBLICA = 'ruta_publica';
 const CON_CLAVE_TEMPORAL = 'con_clave_temporal';
 const CON_TERMINOS_PENDIENTES = 'con_terminos_pendientes';
+const IDENTIFICACION_OPCIONAL = 'identificacion_opcional';
 // Código del 403 de una sesión restringida por los términos (docs/20 §12): el panel lo convierte en la pantalla «Términos de uso».
 export const CODIGO_TERMINOS_PENDIENTES = 'terminos_pendientes';
 
 // Ruta sin guardia (docs/20 §6, primera fila).
 export const Publica = (): MethodDecorator & ClassDecorator => SetMetadata(RUTA_PUBLICA, true);
+// Ruta pública que entrega más a quien se identifica (`GET /salud`, docs/10 §6, 20/11/2026): la guardia no exige nada, pero si viene
+// `X-Clave-Admin` la valida como en toda ruta (equivocada → 401: «si viene, manda ella») y, si viene una cookie de sesión viva sin clave
+// temporal ni términos pendientes, deja a la persona en `req.usuario`. Una cookie que no vale se trata como «sin sesión» (sin 401 ni
+// borrarla: el chequeo de salud no es el lugar) y la sesión no se renueva (consultar el estado no es actividad de la persona).
+// El controlador decide con permitirGlobal(req.usuario, …); sin usuario, la respuesta es la de cualquiera.
+export const IdentificacionOpcional = (): MethodDecorator & ClassDecorator => SetMetadata(IDENTIFICACION_OPCIONAL, true);
 // Ruta que puede usar una persona con clave temporal (la que le asignó un administrador): ver su sesión, cerrarla y cambiar la clave.
 // Todo lo demás le responde 403 hasta que la cambie (docs/20 §4).
 export const ConClaveTemporal = (): MethodDecorator => SetMetadata(CON_CLAVE_TEMPORAL, true);
@@ -78,20 +85,16 @@ export class GuardiaCentral implements CanActivate {
   async canActivate(ctx: ExecutionContext): Promise<boolean> {
     if (ctx.getType() !== 'http') return true;
     const objetivos = [ctx.getHandler(), ctx.getClass()];
-    if (this.reflector.getAllAndOverride<boolean>(RUTA_PUBLICA, objetivos)) return true;
     const req = ctx.switchToHttp().getRequest<PeticionConUsuario>();
+    if (this.reflector.getAllAndOverride<boolean>(RUTA_PUBLICA, objetivos)) {
+      if (this.reflector.getAllAndOverride<boolean>(IDENTIFICACION_OPCIONAL, objetivos)) await this.identificarSiViene(req);
+      return true;
+    }
 
     // 1. Clave de administrador por cabecera: si viene, manda ella.
-    const cabecera = req.headers[CABECERA_CLAVE_ADMIN];
-    if (cabecera !== undefined) {
-      const rechazo = rechazoDeClaveAdmin(cabecera, this.clave);
-      if (rechazo === null) {
-        req.usuario = usuarioSistema();
-        return true;
-      }
-      if (rechazo === 'sin_configurar') throw new ServiceUnavailableException('sin administrador configurado (HTTP_CLAVE_ADMIN)');
-      this.avisar(`clave de administrador ${rechazo} (${req.method} ${req.path})`);
-      throw new UnauthorizedException('clave de administrador ausente o incorrecta');
+    if (req.headers[CABECERA_CLAVE_ADMIN] !== undefined) {
+      this.validarClaveAdmin(req);
+      return true;
     }
 
     // 2. Cookie de sesión.
@@ -115,6 +118,30 @@ export class GuardiaCentral implements CanActivate {
     }
     req.usuario = usuario;
     return true;
+  }
+
+  // La clave por cabecera, cuando viene: válida → usuario del sistema; mal escrita o sin configurar en el servidor → la misma excepción
+  // en una ruta con guardia y en una pública con identificación opcional.
+  private validarClaveAdmin(req: PeticionConUsuario): void {
+    const rechazo = rechazoDeClaveAdmin(req.headers[CABECERA_CLAVE_ADMIN], this.clave);
+    if (rechazo === null) {
+      req.usuario = usuarioSistema();
+      return;
+    }
+    if (rechazo === 'sin_configurar') throw new ServiceUnavailableException('sin administrador configurado (HTTP_CLAVE_ADMIN)');
+    this.avisar(`clave de administrador ${rechazo} (${req.method} ${req.path})`);
+    throw new UnauthorizedException('clave de administrador ausente o incorrecta');
+  }
+
+  private async identificarSiViene(req: PeticionConUsuario): Promise<void> {
+    if (req.headers[CABECERA_CLAVE_ADMIN] !== undefined) {
+      this.validarClaveAdmin(req);
+      return;
+    }
+    const identificador = leerCookie(req.headers.cookie);
+    if (identificador === null) return;
+    const usuario = await this.sesiones.cargarPorId(hashIdentificador(identificador), { renovar: false });
+    if (usuario !== null && !usuario.claveTemporal && !usuario.terminosPendientes) req.usuario = usuario;
   }
 
   private avisar(motivo: string): void {

@@ -110,6 +110,7 @@ services:
       RETENCION_ACCESO_DIAS:                     # bitácora de accesos (RF-46, docs/20 §2): 90 días por defecto
       RETENCION_INTERVALO_H:
       METRICA_BROKER_INTERVALO_S:
+      SUPERVISION_INTERVALO_S:                    # período del barrido de silencios, 1–3600 s; 60 por defecto (docs/10 §4.1; el override fija 5)
       METRICA_BROKER_COLA_TOPE:
       # Tope por emisor (docs/10 §8.4 punto 53, 17/10): mismo mecanismo, con los valores por defecto del código si no están en el .env.
       TOPE_LECTURAS_FACTOR:

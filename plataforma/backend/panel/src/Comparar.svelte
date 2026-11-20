@@ -227,10 +227,8 @@
 {:else if !cargado}
   <p class="vacio">Cargando…</p>
 {:else}
-  {#if zonas.length === 1}
-    <ZonaSitio zona={zonas[0]!} />
-  {:else if zonas.length > 1}
-    <p class="vivo" data-hora-sitio>{zonas.length} zonas horarias: cada fila va en la de su sitio</p>
+  {#if zonas.length > 0}
+    <ZonaSitio zona={zonas[0]!} zonasDeLaLista={zonas.length} />
   {/if}
   <div class="filtros">
     <label>

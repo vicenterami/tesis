@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ExecutionContext, ForbiddenException, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
-import { CODIGO_TERMINOS_PENDIENTES, ConClaveTemporal, ConTerminosPendientes, GuardiaCentral, Publica, escribe, traePedidoDelPanel } from './guardia.js';
+import { CODIGO_TERMINOS_PENDIENTES, ConClaveTemporal, ConTerminosPendientes, GuardiaCentral, IdentificacionOpcional, Publica, escribe, traePedidoDelPanel } from './guardia.js';
 import { UsuarioSesion, usuarioSistema } from './permisos.js';
 import type { SesionService } from './sesion.service.js';
 
@@ -13,6 +13,7 @@ const ANA: UsuarioSesion = { ...usuarioSistema(), id: 'u1', nombre: 'Ana', email
 
 class Rutas {
   @Publica() publica(): void { /* ruta pública */ }
+  @Publica() @IdentificacionOpcional() salud(): void { /* GET /salud: pública, con más detalle para quien se identifica */ }
   privada(): void { /* ruta con guardia */ }
   @ConClaveTemporal() quienSoy(): void { /* admitida con clave temporal */ }
   @ConTerminosPendientes() aceptar(): void { /* admitida con los términos pendientes */ }
@@ -21,8 +22,9 @@ class Rutas {
 
 function armar(opciones: { clave?: string; usuario?: UsuarioSesion | null } = {}) {
   const cargar = vi.fn(() => Promise.resolve(opciones.usuario === undefined ? ANA : opciones.usuario));
+  const cargarPorId = vi.fn((_id: string, _o: { renovar: boolean }) => Promise.resolve(opciones.usuario === undefined ? ANA : opciones.usuario));
   const config = { get: (k: string) => (k === 'HTTP_CLAVE_ADMIN' ? opciones.clave : undefined) } as unknown as ConfigService;
-  const guardia = new GuardiaCentral(new Reflector(), { cargar } as unknown as SesionService, config);
+  const guardia = new GuardiaCentral(new Reflector(), { cargar, cargarPorId } as unknown as SesionService, config);
   const pedir = async (metodo: string, ruta: keyof Rutas, headers: Record<string, string> = {}) => {
     const req: Record<string, unknown> = { method: metodo, path: '/x', headers };
     const cabeceras: Record<string, string> = {};
@@ -37,7 +39,7 @@ function armar(opciones: { clave?: string; usuario?: UsuarioSesion | null } = {}
     try { await guardia.canActivate(ctx); } catch (e) { error = e; }
     return { error, usuario: req.usuario as UsuarioSesion | undefined, cabeceras };
   };
-  return { pedir, cargar };
+  return { pedir, cargar, cargarPorId };
 }
 
 describe('GuardiaCentral', () => {
@@ -116,5 +118,56 @@ describe('GuardiaCentral: términos pendientes', () => {
   });
   it('aceptados: todo vuelve a la normalidad', async () => {
     expect((await armar({ usuario: { ...ANA, terminosPendientes: false } }).pedir('GET', 'privada', { cookie: `__Host-sesion=${ID}` })).error).toBeNull();
+  });
+});
+
+// GET /salud (docs/10 §6; 20/11/2026): pública, pero si quien pregunta se identifica, la guardia lo deja en la petición para que el
+// controlador decida si entrega el detalle. Nada de esto puede convertir la ruta en una que exige sesión.
+describe('GuardiaCentral: identificación opcional (GET /salud)', () => {
+  it('sin cookie ni clave: pasa, sin usuario y sin tocar la base', async () => {
+    const { pedir, cargar, cargarPorId } = armar();
+    const r = await pedir('GET', 'salud');
+    expect(r.error).toBeNull();
+    expect(r.usuario).toBeUndefined();
+    expect(cargar).not.toHaveBeenCalled();
+    expect(cargarPorId).not.toHaveBeenCalled();
+  });
+
+  it('X-Clave-Admin correcta → usuario del sistema; equivocada → 401, como en toda ruta; sin configurar en el servidor → 503', async () => {
+    const conClave = armar({ clave: CLAVE });
+    const ok = await conClave.pedir('GET', 'salud', { 'x-clave-admin': CLAVE });
+    expect(ok.error).toBeNull();
+    expect(ok.usuario).toEqual(usuarioSistema());
+    expect((await conClave.pedir('GET', 'salud', { 'x-clave-admin': 'otra' })).error).toBeInstanceOf(UnauthorizedException);
+    expect((await armar().pedir('GET', 'salud', { 'x-clave-admin': CLAVE })).error).toBeInstanceOf(ServiceUnavailableException);
+  });
+
+  it('cookie viva: deja a la persona, sin renovar la sesión; una que no vale → pasa sin usuario, sin 401 ni borrar la cookie', async () => {
+    const viva = armar();
+    const r = await viva.pedir('GET', 'salud', { cookie: `__Host-sesion=${ID}` });
+    expect(r.error).toBeNull();
+    expect(r.usuario).toBe(ANA);
+    expect(viva.cargarPorId).toHaveBeenCalledWith(expect.stringMatching(/^[0-9a-f]{64}$/), { renovar: false });
+    expect(viva.cargar).not.toHaveBeenCalled();
+    const vencida = await armar({ usuario: null }).pedir('GET', 'salud', { cookie: `__Host-sesion=${ID}` });
+    expect(vencida.error).toBeNull();
+    expect(vencida.usuario).toBeUndefined();
+    expect(vencida.cabeceras['Set-Cookie']).toBeUndefined();
+  });
+
+  it('con la clave temporal o los términos pendientes: pasa como «sin sesión» (sin 403: el estado del servicio no es una pantalla)', async () => {
+    for (const u of [{ ...ANA, claveTemporal: true }, { ...ANA, terminosPendientes: true }]) {
+      const r = await armar({ usuario: u }).pedir('GET', 'salud', { cookie: `__Host-sesion=${ID}` });
+      expect(r.error).toBeNull();
+      expect(r.usuario).toBeUndefined();
+    }
+  });
+
+  it('una ruta pública sin la marca sigue sin mirar nada, aunque traiga una clave equivocada', async () => {
+    const { pedir, cargarPorId } = armar({ clave: CLAVE });
+    const r = await pedir('GET', 'publica', { 'x-clave-admin': 'otra', cookie: `__Host-sesion=${ID}` });
+    expect(r.error).toBeNull();
+    expect(r.usuario).toBeUndefined();
+    expect(cargarPorId).not.toHaveBeenCalled();
   });
 });

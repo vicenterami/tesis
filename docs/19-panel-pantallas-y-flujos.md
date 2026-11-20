@@ -182,7 +182,7 @@ de dispositivos en un gráfico ni aviso por la zona del navegador (no declarado,
    horas de esta pantalla van en la zona del sitio». En P2, con una sola zona entre los dispositivos listados, la misma línea; con varias, «N
    zonas horarias: cada fila va en la de su sitio» (la hora exacta por fila ya está al pasar el cursor). Prueba: unitaria del desfase (zona e
    instante → «UTC−03:00», «UTC+02:00», y una fecha de invierno y otra de verano de Chile); con navegador, el contexto de Playwright fijado en
-   otra zona muestra el aviso y, fijado en la del sitio, no.
+   otra zona muestra el aviso y, fijado en la del sitio, no. Con una zona propia elegida en P13 (desde el 20/11/2026) rige la regla de H: las horas van en ella y este aviso se reemplaza por «Hora en tu zona».
 4. **Resolución elegible, con el costo medido antes de ofrecerla.** Junto a los rangos, un selector «resolución»: «auto» (la fija de cada
    rango, la de hoy) y las de la lista cerrada de la API (1 min, 5 min, 15 min, 1 h, 6 h, 1 día) que den entre 2 y 2 500 puntos para el rango
    elegido (30 días admite desde 1 h; 7 días desde 5 min; 24 h desde 1 min). La resolución va en la URL (`&res=5m`) solo cuando no es «auto»;
@@ -273,7 +273,7 @@ P5 la trama cruda va plegada (es texto largo) con un botón de copiar.
 
 **P1 Resumen (Etapa 4).** Se arma con lo que ya devuelven las rutas: los conteos por estado visual salen de `GET
 /dispositivos` (en la Etapa 3 los calcula el panel; cuando haya cientos de dispositivos, una ruta de resumen en el servidor, que
-hoy no hace falta). El estado del servicio muestra `GET /salud` y si el canal en vivo está conectado.
+hoy no hace falta). El estado del servicio muestra `GET /salud` y si el canal en vivo está conectado; desde el 20/11/2026 esa ruta responde solo `estado` a quien no administra el sistema, y la línea de «Legal y acerca de» agrega base y tablas únicamente si vienen.
 
 **P1 rediseñado: tablero y gráficas, con una comparativa antes (Etapa 4, iteración 1; TT-44).** Antes de dibujarlo, una comparativa
 escrita de cómo resuelven el tablero ThingsBoard CE, OpenRemote, Magistrala y Milesight IoT Cloud (zoom y rango, varias series, agregados,
@@ -303,12 +303,30 @@ frente al límite de RNF-17; los errores agrupados por huella con su conteo y la
 personales; y los **límites de los servicios** que hoy viven en el `.env` y pasan a configurarse aquí (primero la vigencia de la clave
 temporal, `docs/20 §4`), cada uno con su rango válido, su valor por defecto y bloqueo optimista.
 
-**P13 Preferencias (Etapa 4, iteración 1; HU-29, HU-28).** ✅ panel, 11/11/2026 (salvo la zona horaria propia aplicada a las horas visibles: la preferencia se guarda y las pantallas siguen en la zona del sitio; pendiente). Unidades de visualización (temperatura en °C o °F; longitudes en mm, m o km):
+**P13 Preferencias (Etapa 4, iteración 1; HU-29, HU-28).** ✅ panel, 11/11/2026; la zona horaria propia se aplica a las horas visibles desde el 20/11/2026 (regla completa tras este párrafo). Unidades de visualización (temperatura en °C o °F; longitudes en mm, m o km):
 la base guarda siempre la unidad estándar del catálogo y la conversión ocurre solo al mostrar, con la unidad escrita al lado de cada
 valor; zona horaria: la del sitio (por defecto, `docs/13`) o la propia, dicha en la cabecera como hoy el aviso de zona (incremento 2,
 punto 3); vistas guardadas (filtros de P2, rango y resolución de P3), guardadas en la base y no en el navegador (`docs/21 §4`). En «Mi
 cuenta»: nombre, correo, sitios y perfiles, sesiones abiertas (con «cerrar»), versión de términos aceptada, exportar mis datos de cuenta y
 «Darme de baja», que explica qué se borra y qué queda (`docs/20 §11`) y pide la clave actual.
+
+**Zona horaria propia: qué rige dónde (definido el 20/11/2026).** Con «la del sitio» (el valor por defecto) nada cambia. Con una zona IANA propia
+distinta de la del sitio: (1) **toda hora que el panel muestra** —texto, hora exacta al pasar el cursor, eje y etiqueta de las gráficas y su
+tabla alternativa, fechas de las listas, «desde las HH:MM» de una pausa— va en la zona propia, y el instante UTC de la hora exacta sigue al
+lado; las horas que dicen UTC (las sesiones abiertas de P13) siguen en UTC; (2) lo que la persona **escribe** y lo que se **pide a la API**
+sigue en la zona del sitio: los campos «Desde» y «Hasta» (rango a medida de P3 y filtro de la actividad) se interpretan como hora del sitio, los días de la
+exportación (P8) son días completos del sitio, y la ayuda de cada campo ya lo dice («En la hora del sitio»); así el mismo rango en la URL
+significa lo mismo para todas las personas de un sitio, y un día exportado no cambia de contenido según quién lo pida; (3) el aviso de
+zona (incremento 2, punto 3) pasa a decir «Hora en tu zona: … · Europe/Madrid (UTC+02:00)» y, debajo, «Elegiste ver las horas en Europe/Madrid
+en lugar de la del sitio (America/Santiago, UTC−03:00); las fechas que escribes en un filtro o una exportación siguen en la zona del sitio» (con
+varias zonas en la lista, «…en lugar de la de cada sitio»), y deja de avisar por la zona del navegador, porque la persona ya eligió; si la
+propia es igual a la del sitio, todo queda como sin preferencia; en la actividad del sitio, la línea de los filtros dice que los campos van en
+la zona del sitio y la lista en la tuya; (4) una zona que el navegador no conoce vale como «la del sitio»; (5) se aplica en un solo lugar
+(`lib/tiempo.ts`, que lee `lib/zona-propia.svelte.ts`, fijada desde la sesión y las preferencias en `App.svelte`) y al guardarla en P13 las horas
+visibles cambian al instante; (6) la vista pública por enlace (P9) no tiene sesión y siempre va en la hora del sitio. En «Usuarios» (pantalla global, sin zona de
+sitio) el vencimiento de una clave temporal va en la zona propia y, sin ella, en UTC escrito («8 de noviembre de 2026, 16:00 UTC»); ya no en
+la del navegador. Prueba: unitaria (zona propia, sin ella,
+zona inválida, escritura en la del sitio y un cambio de hora de Madrid), del aviso y de la ficha con la sesión.
 
 **Tablero v2 y experiencia de uso (diseñado el 11/11/2026, antes del código, como manda la regla de concordancia; iteración 1 del plan
 v2, `docs/04 §8`).** Qué lo motiva: la presentación del 05/11 dejó claro que lo que se evalúa es lo que se ve y se opera (`docs/18 §1`):
@@ -443,7 +461,7 @@ magnitud, sin guardar.
    identificador que ya existe inactivo ofrece reactivarlo (409 con la ficha), no crea un duplicado. Construido así (11/11/2026): cada
    paso con su encabezado «Paso N de 5», que recibe el foco al cambiar de paso, y los errores del paso 1 ligados a cada campo; la magnitud
    se escribe por su **código** del catálogo (el selector del catálogo queda pendiente); la hora de la primera trama va en la zona del
-   sitio (la **zona propia** de P13 se guarda y aún no se aplica); un identificador que ya existe responde 409 y remite al inventario (la
+   sitio, o en la zona propia de P13 si la hay (regla en P13); un identificador que ya existe responde 409 y remite al inventario (la
    reactivación desde el asistente queda pendiente).
 2. **Alta masiva por archivo:** ✅ backend, 11/11/2026; ✅ panel, 11/11/2026 (`#/alta?modo=lote`). **Reemplazado por el bloque N el
    15/11/2026** (vista previa con el plan por fila y creación todo o nada en una petición; lo que rige está allí y en `docs/11 §4`). Lo

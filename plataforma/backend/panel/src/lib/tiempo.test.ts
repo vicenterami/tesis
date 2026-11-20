@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { desfase, duracion, fechaCivil, fechaHora, haceCuanto, haceSegundos, horaLocal, relojSitio, instanteDesdeLocal, localDesdeInstante } from './tiempo';
+import { afterEach, describe, expect, it } from 'vitest';
+import { fijarZonaPropia } from './zona-propia.svelte';
+import { fechaHoraEn, veEnOtraZona, zonaVista, desfase, duracion, fechaCivil, fechaHora, haceCuanto, haceSegundos, horaLocal, relojSitio, instanteDesdeLocal, localDesdeInstante } from './tiempo';
 
 describe('haceCuanto', () => {
   const ahora = new Date('2026-10-12T15:00:00Z');
@@ -97,5 +98,46 @@ describe('fechaCivil: una fecha sin hora, tal cual, sin pasar por zonas', () => 
     expect(fechaCivil('2026-11-18')).toBe('18/11/2026');
     expect(fechaCivil('2026-01-01')).toBe('01/01/2026'); // el primer día del año no retrocede a diciembre por la zona
     expect(fechaCivil('2026-11-18T10:00:00Z')).toBe('2026-11-18T10:00:00Z');
+  });
+});
+
+// Zona horaria propia (docs/19 §4, H y D7): lo que se MUESTRA va en la zona elegida; sin ella, en la del sitio; lo que se escribe, siempre en la del sitio.
+describe('zona propia aplicada a las horas que se muestran', () => {
+  const INSTANTE = '2026-10-22T12:00:00.000Z'; // Santiago ya en horario de verano (UTC−03:00); Madrid sigue en el de invierno (UTC+02:00)
+  afterEach(() => fijarZonaPropia(null));
+
+  it('sin preferencia (o «sitio»), la hora va en la zona del sitio', () => {
+    expect(zonaVista('America/Santiago')).toBe('America/Santiago');
+    fijarZonaPropia('sitio');
+    expect(horaLocal(INSTANTE, 'America/Santiago')).toMatch(/9:00:00.*\(2026-10-22T12:00:00\.000Z UTC\)$/); // el formato de fecha de es-CL cambia entre versiones de ICU: se mira la hora
+    expect(veEnOtraZona('America/Santiago')).toBe(false);
+  });
+  it('con una zona propia, horaLocal y fechaHora la usan; el instante UTC no cambia', () => {
+    fijarZonaPropia('Europe/Madrid');
+    expect(horaLocal(INSTANTE, 'America/Santiago')).toMatch(/(14:00:00|2:00:00 p\. ?m\.).*\(2026-10-22T12:00:00\.000Z UTC\)$/);
+    expect(fechaHora(INSTANTE, 'America/Santiago')).toBe('22 de octubre de 2026, 14:00');
+    expect(veEnOtraZona('America/Santiago')).toBe(true);
+  });
+  it('una zona propia inválida vale como «la del sitio»', () => {
+    fijarZonaPropia('Marte/Olimpo');
+    expect(zonaVista('America/Santiago')).toBe('America/Santiago');
+  });
+  it('horaEn y fechaHoraEn ignoran la preferencia (lo que dice UTC es UTC)', () => {
+    fijarZonaPropia('Europe/Madrid');
+    expect(fechaHoraEn(INSTANTE, 'UTC')).toBe('22 de octubre de 2026, 12:00');
+  });
+  it('lo que se escribe sigue en la zona del sitio aunque haya zona propia', () => {
+    fijarZonaPropia('Asia/Tokyo');
+    expect(instanteDesdeLocal('2026-10-22T09:00', 'America/Santiago')!.toISOString()).toBe(INSTANTE);
+    expect(localDesdeInstante(new Date(INSTANTE), 'America/Santiago')).toBe('2026-10-22T09:00');
+  });
+  it('cambio de hora: el instante cercano al salto se muestra con el desfase de ese día en la zona propia', () => {
+    // Madrid atrasa el reloj el 25/10/2026 a las 03:00 (de +02:00 a +01:00); Santiago lo adelantó el 06/09/2026 a las 00:00 (de −04:00 a −03:00).
+    fijarZonaPropia('Europe/Madrid');
+    expect(fechaHora('2026-10-25T00:30:00Z', 'America/Santiago')).toBe('25 de octubre de 2026, 02:30'); // aún verano (+02:00)
+    expect(fechaHora('2026-10-25T01:30:00Z', 'America/Santiago')).toBe('25 de octubre de 2026, 02:30'); // ya invierno (+01:00): la misma hora en el reloj
+    expect(horaLocal('2026-10-25T01:30:00Z', 'America/Santiago')).toContain('(2026-10-25T01:30:00.000Z UTC)');
+    // y escribir una hora que no existe en el sitio (00:30 del 06/09) cae en la siguiente válida, la 01:30, sin que la preferencia lo toque
+    expect(instanteDesdeLocal('2026-09-06T00:30', 'America/Santiago')!.toISOString()).toBe('2026-09-06T04:30:00.000Z');
   });
 });

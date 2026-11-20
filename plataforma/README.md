@@ -75,7 +75,8 @@ Probar el backend contenedorizado (`docker compose ps` debe mostrarlo `healthy`;
 puerto solo en `127.0.0.1`, igual que el resto):
 
 ```bash
-curl http://127.0.0.1:3000/salud    # {"estado":"ok","base":"conectada","tablas":20,"broker":{...}}
+curl http://127.0.0.1:3000/salud    # {"estado":"ok"}: sin credencial, solo el estado (docs/10 §6)
+bash pruebas/pila.sh estado          # con HTTP_CLAVE_ADMIN en el .env, el detalle: base, tablas, broker, aprovisionamiento
 # http://127.0.0.1:3000/docs en el navegador → contrato OpenAPI
 ```
 

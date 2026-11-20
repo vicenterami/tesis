@@ -8,6 +8,22 @@ const MOTIVO_REPORTA = 'comunicación restablecida';
 const MOTIVO_EN_SERVICIO = 'de vuelta en servicio (otra vez un intervalo completo)';
 const MOTIVO_DENTRO_DEL_PLAZO = 'de vuelta dentro del plazo de la primera trama';
 
+// Período del barrido (docs/10 §4.1): ausente, 60 s; presente, un entero de 1 a 3600. Vacía, decimal, negativa, cero, mayor que 3600 o con
+// texto detienen el arranque (20/11/2026): Number('') es 0 y daba un barrido sin pausa, y un texto, un temporizador NaN. El compose base la
+// reenvía sin valor propio, como RETENCION_*: definida en el .env llega tal cual (vacía también, y entonces falla aquí); ausente, rige el 60.
+export const SUPERVISION_INTERVALO_S_POR_DEFECTO = 60;
+export const SUPERVISION_INTERVALO_S_MAXIMO = 3600;
+export function intervaloSupervision(valor: string | number | undefined): number {
+  if (valor === undefined) return SUPERVISION_INTERVALO_S_POR_DEFECTO;
+  const texto = String(valor);
+  const v = texto.trim();
+  const n = Number(v);
+  if (!/^\d+$/.test(v) || n < 1 || n > SUPERVISION_INTERVALO_S_MAXIMO) {
+    throw new Error(`SUPERVISION_INTERVALO_S="${texto.slice(0, 20)}" no es válido: se espera un entero de segundos entre 1 y ${SUPERVISION_INTERVALO_S_MAXIMO} (por defecto ${SUPERVISION_INTERVALO_S_POR_DEFECTO})`);
+  }
+  return n;
+}
+
 // M4 Supervisión de salud — filtro 6 completo.
 //
 // El pipeline solo corre cuando LLEGA una trama; por eso no puede notar que un dispositivo DEJÓ
@@ -21,15 +37,19 @@ const MOTIVO_DENTRO_DEL_PLAZO = 'de vuelta dentro del plazo de la primera trama'
 export class SupervisionService implements OnModuleInit, OnModuleDestroy {
   private readonly log = new Logger('supervision');
   private temporizador?: NodeJS.Timeout;
+  private readonly cadaSeg: number;
 
   constructor(
     @Inject(POOL) private readonly pool: Pool,
-    private readonly config: ConfigService,
+    config: ConfigService,
     private readonly eventos: EventosService,
-  ) {}
+  ) {
+    // Se valida en el constructor, como la retención: un valor malo detiene el arranque antes de tocar la base.
+    this.cadaSeg = intervaloSupervision(config.get<string | number>('SUPERVISION_INTERVALO_S'));
+  }
 
   onModuleInit(): void {
-    const cadaSeg = this.config.get<number>('SUPERVISION_INTERVALO_S', 60);
+    const cadaSeg = this.cadaSeg;
     this.temporizador = setInterval(() => void this.barridoSeguro(), cadaSeg * 1000);
     this.log.log(`barrido de salud cada ${cadaSeg} s`);
   }

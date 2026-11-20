@@ -289,10 +289,8 @@
 <p class="vivo {canal}" data-canal={canal}>
   en vivo: {canal === 'en_vivo' ? 'conectado' : canal === 'conectando' ? 'conectando…' : `reconectando (${motivoCanal ?? ''})`}
 </p>
-{#if zonasListadas.length === 1}
-  <ZonaSitio zona={zonasListadas[0]!} />
-{:else if zonasListadas.length > 1}
-  <p class="vivo" data-hora-sitio>{zonasListadas.length} zonas horarias: cada fila va en la de su sitio</p>
+{#if zonasListadas.length > 0}
+  <ZonaSitio zona={zonasListadas[0]!} zonasDeLaLista={zonasListadas.length} />
 {/if}
 
 <ul class="fichas" aria-label="Dispositivos por estado">

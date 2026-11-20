@@ -2,7 +2,7 @@ import { describe, expect, it, vi, type Mock } from 'vitest';
 import { ConfigService } from '@nestjs/config';
 import { Pool } from 'pg';
 import { EventoPanel, EventosService } from '../tiempo-real/eventos.service.js';
-import { SupervisionService } from './supervision.service.js';
+import { SupervisionService, intervaloSupervision } from './supervision.service.js';
 
 // La consulta de quien nunca reportó (docs/10 §8.4 punto 68) empieza igual que la de caídos: se distingue por el plazo del sitio.
 const esNunca = (sql: string): boolean => sql.startsWith('SELECT d.id, d.id_fisico') && sql.includes('espera_primera_trama_h');
@@ -221,5 +221,37 @@ describe('SupervisionService: condición reloj_desviado', () => {
     await nada.servicio.cerrarRelojDesviado('n1', '0101010101010101', { pasarela: 'ug65-campus' });
     expect(nada.query).toHaveBeenCalledTimes(1);
     expect(nada.publicados).toEqual([]);
+  });
+});
+
+// SUPERVISION_INTERVALO_S (docs/10 §4.1; 20/11/2026): ausente → 60; un entero de 1 a 3600; todo lo demás detiene el arranque.
+describe('intervaloSupervision: el período del barrido, 1–3600 s, 60 por defecto', () => {
+  const MENSAJE = /^SUPERVISION_INTERVALO_S=".*" no es válido: se espera un entero de segundos entre 1 y 3600 \(por defecto 60\)$/;
+  it('ausente → 60', () => expect(intervaloSupervision(undefined)).toBe(60));
+  it('un entero entre 1 y 3600 se respeta (también con espacios, y el número que entrega una configuración ya convertida)', () => {
+    expect(intervaloSupervision('1')).toBe(1);
+    expect(intervaloSupervision(' 5 ')).toBe(5);
+    expect(intervaloSupervision('3600')).toBe(3600);
+    expect(intervaloSupervision(60)).toBe(60);
+  });
+  it('vacía, con decimales, negativa, cero, mayor que 3600 o con texto → el arranque se detiene con un mensaje que dice qué se espera', () => {
+    for (const malo of ['', ' ', '1.5', '-5', '0', '3601', 'sesenta', '60s', '1e2', 'NaN']) expect(() => intervaloSupervision(malo)).toThrow(MENSAJE);
+  });
+  it('el servicio la valida al construirse: un valor vacío no llega a programar un barrido sin pausa', () => {
+    const config = { get: () => '' } as unknown as ConfigService;
+    expect(() => new SupervisionService({ query: vi.fn() } as unknown as Pool, config, new EventosService())).toThrow(MENSAJE);
+  });
+  it('y con el valor por defecto programa el barrido cada 60 s', () => {
+    vi.useFakeTimers();
+    try {
+      const espiar = vi.spyOn(globalThis, 'setInterval');
+      const servicio = new SupervisionService({ query: vi.fn() } as unknown as Pool, { get: () => undefined } as unknown as ConfigService, new EventosService());
+      servicio.onModuleInit();
+      expect(espiar).toHaveBeenCalledWith(expect.any(Function), 60_000);
+      servicio.onModuleDestroy();
+    } finally {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    }
   });
 });

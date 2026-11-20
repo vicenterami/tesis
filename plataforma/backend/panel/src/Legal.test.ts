@@ -22,6 +22,7 @@ let pedidos: { metodo: string; ruta: string; cuerpo: unknown }[] = [];
 let soporte: () => Response;
 let sesion: Record<string, unknown>;
 let datosRestringidos = false;
+let salud: Record<string, unknown> = { estado: 'ok' }; // lo que responde `GET /salud`
 
 class Fuente {
   static todas: Fuente[] = [];
@@ -39,6 +40,7 @@ beforeEach(() => {
   pedidos = [];
   Fuente.todas.length = 0;
   datosRestringidos = false;
+  salud = { estado: 'ok', base: 'conectada', tablas: 20 };
   soporte = () => json({ id: 'm1', creado_en: 'x' }, 201);
   sesion = {
     sistema: false, usuario: { id: 'u1', nombre: 'Ana', email: 'ana@ejemplo.invalid' }, clave_temporal: false, expira_en: null, inactividad_vence_en: null,
@@ -53,7 +55,7 @@ beforeEach(() => {
     if (ruta === '/terminos') return json(TERMINOS);
     if (ruta === '/acerca') return json(ACERCA);
     if (ruta === '/soporte') return soporte();
-    if (ruta === '/salud') return json({ estado: 'ok', base: 'conectada', tablas: 20 });
+    if (ruta === '/salud') return json(salud);
     if (ruta === '/sesion' && metodo === 'GET') return json(sesion);
     if (ruta === '/sesion' && metodo === 'DELETE') return json({ cerrada: true });
     if (ruta === '/terminos/aceptar') {
@@ -71,6 +73,15 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); history.replaceState(null, '', '#/'); });
 
 describe('P11 Legal y acerca de', () => {
+  it('servicio: con el detalle dice estado, base y tablas; con la respuesta pública (solo estado), solo el estado, sin «undefined»', async () => {
+    render(Legal, { conSesion: true });
+    await waitFor(() => expect(document.querySelector('[data-salud]')!.textContent).toBe('ok, base conectada, 20 tablas'));
+    cleanup();
+    salud = { estado: 'ok' };
+    render(Legal, { conSesion: true });
+    await waitFor(() => expect(document.querySelector('[data-salud]')!.textContent).toBe('ok'));
+    expect(document.body.textContent).not.toContain('undefined');
+  });
   it('privacidad (inventario y responsable no configurado), términos con versión y acerca de con commit; todo como texto, un <script> del servidor no se interpreta', async () => {
     render(Legal, { conSesion: true });
     await waitFor(() => expect(document.querySelector('[data-inventario-privacidad]')).toBeTruthy());

@@ -32,7 +32,7 @@ src/
 ├── publico/                   # vista pública por enlace (docs/19 §4, O): GET /publico, los enlaces del sitio, la regla de k, la respuesta guardada y el contador
 ├── retencion/                 # borra lo vencido de medicion, trama, cuarentena y metrica_broker por la función acotada fn_retencion_drop_chunks (migración 14)
 ├── openapi.ts                 # contrato OpenAPI generado desde los decoradores; /docs
-└── salud/salud.controller.ts  # GET /salud: base, cola del broker (descartes, condición abierta) y aprovisionamiento en curso
+└── salud/salud.controller.ts  # GET /salud: estado para cualquiera; base, cola del broker y aprovisionamiento en curso, solo con la acción sistema
 panel/                         # el panel (Svelte + Vite; docs/19): paquete del mismo workspace de pnpm
 ├── index.html, src/main.ts    # entrada (sin scripts en línea: la CSP del backend los prohíbe)
 ├── src/App.svelte             # ruteo por fragmento (#/ inventario, #/dispositivos/<id> ficha) y estado del servicio
@@ -175,7 +175,8 @@ UPDATE dispositivo SET intervalo_esperado_s = 5 WHERE id_fisico = 'dev-0001';
 docker compose exec timescaledb psql -U plataforma -d plataforma -c "SELECT tipo, abierta_en, cerrada_en FROM condicion ORDER BY abierta_en DESC LIMIT 5; SELECT tipo, detalle, ocurrido_en FROM evento ORDER BY ocurrido_en DESC LIMIT 5;"
 ```
 
-`SUPERVISION_INTERVALO_S` en el `.env` cambia la frecuencia del barrido (60 s por defecto).
+`SUPERVISION_INTERVALO_S` en el `.env` cambia la frecuencia del barrido: un entero de 1 a 3600 s, 60 por defecto; vacía o mal escrita,
+el backend no arranca y dice qué espera (el compose la reenvía al contenedor; el override de desarrollo fija 5).
 
 Pendiente del pipeline: la notificación de condiciones por correo (al panel ya llegan por el canal en vivo, más abajo). Los adaptadores
 «milesight» (ruta B) y «chirpstack» (ruta C) existen desde el 15/10/2026 y los prueba el banco (`banco.sh lorawan`).
@@ -204,7 +205,7 @@ describir rutas que no existen. Con el backend corriendo, la documentación inte
 | `POST /sesion` (cabecera `X-Pedido: panel`) | inicio de sesión con email y clave: cookie de sesión; 401 con el mismo mensaje exista o no la cuenta; 429 con bloqueo | `docs/20 §3–§4` |
 | `GET /sesion`, `DELETE /sesion`, `POST /sesion/clave` | quién soy (renueva la actividad); cierre (revoca en la base y borra la cookie); cambio de clave (rota la sesión) | con clave temporal solo valen estas tres |
 | `GET /usuarios`, `POST /usuarios`, `PATCH /usuarios/:id` | usuarios de mis sitios; alta con clave temporal mostrada una vez (el primer administrador, con `X-Clave-Admin`); activar/desactivar, temporal nueva y roles por sitio, con bloqueo optimista | solo administradores |
-| `GET /salud` | estado del backend, la base y el broker (cola, descartes, condición del sistema) | pública; lo usa el `HEALTHCHECK` |
+| `GET /salud` | sin credencial, solo `{ estado }`; con `X-Clave-Admin` o la sesión de un administrador del sistema, también la base, el broker (cola, descartes, condición del sistema) y el aprovisionamiento en curso (`docs/10 §6`) | pública; lo usan el `HEALTHCHECK`, el proxy y el vigilante, que miran el código o `estado` |
 | `PATCH /canales/:id` (cabecera `X-Clave-Admin`) | calibración: `{escala_cero, escala_cien, actualizado_en}` (las dos con valor, o las dos `null` para quitarla), evento `canal_calibrado` (`docs/10 §8.4` punto 51) | 200 con el canal y su `actualizado_en` nuevo; 400 motivos; 404; 409 si otro lo cambió desde la ficha (bloqueo optimista, 22/10) |
 | `POST /dispositivos/:id/credencial` (cabecera `X-Clave-Admin`) | rotación: credencial nueva (mostrada una vez), la anterior inactiva, evento `rotacion`, `setClientPassword` en el broker; todo o nada | 201 con `conexion`; 409 de baja; 400 lorawan; si la respuesta no llega, repetir (13/10) |
 | `GET /sitios` (Etapa 4) | mis sitios: `id, codigo, nombre, zona_horaria, rol, zonas[{id, nombre}]` | el usuario del sistema ve todos, como administrador |

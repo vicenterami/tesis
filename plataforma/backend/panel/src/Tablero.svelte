@@ -10,7 +10,7 @@
   import TableroResumen from './TableroResumen.svelte';
   import type { ClaveRango } from './lib/grafico';
   import type { Sitio } from './lib/modelo';
-  import { relojSitio } from './lib/tiempo';
+  import { relojSitio, zonaVista } from './lib/tiempo';
   import type { PreferenciaUnidades } from './lib/unidades';
   import { fragmentoTablero, type VentanaFija, type VerTablero } from './lib/vista';
   import { abrirCanalCompartido, type EstadoCanal } from './lib/vivo';
@@ -62,7 +62,7 @@
   </nav>
   <div class="tablero-vivo">
     <span class="vivo {pausado ? 'en_pausa' : canal}" data-canal={canal}>
-      {#if pausado}en pausa{#if pausadoDesde !== null}<span data-pausa-desde>{` desde las ${relojSitio(sitio.zona_horaria, pausadoDesde).slice(11)}`}</span>{/if}{:else}en vivo: {canal === 'en_vivo' ? 'conectado' : canal === 'conectando' ? 'conectando…' : 'reconectando'}{/if}
+      {#if pausado}en pausa{#if pausadoDesde !== null}<span data-pausa-desde>{` desde las ${relojSitio(zonaVista(sitio.zona_horaria), pausadoDesde).slice(11)}`}</span>{/if}{:else}en vivo: {canal === 'en_vivo' ? 'conectado' : canal === 'conectando' ? 'conectando…' : 'reconectando'}{/if}
     </span>
     <Boton etiqueta={pausado ? 'Reanudar' : 'Pausar'} icono={pausado ? 'reanudar' : 'pausa'} variante="barra" presionado={pausado}
       ayuda={pausado ? 'Vuelve a pedir lo que se muestra y sigue actualizándolo' : 'Detiene toda actualización automática de esta pantalla'} onclick={alternarPausa} data-pausar />

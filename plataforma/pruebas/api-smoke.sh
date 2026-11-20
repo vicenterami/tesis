@@ -269,5 +269,12 @@ for ruta in /dispositivos "/dispositivos/${DISP:-00000000-0000-4000-8000-0000000
   if [ "$code" = 401 ] && grep -q '"message":"sesión requerida"' <<<"$cuerpo"; then echo "OK    sin sesión: GET $ruta → 401 «sesión requerida»"
   else echo "FALLA sin sesión: GET $ruta → HTTP $code ${cuerpo:0:80} (esperado 401 «sesión requerida»)"; fallos=$((fallos+1)); fi
 done
-code=$(curl -s -o /dev/null -w '%{http_code}' -m 3 "$API/salud"); [ "$code" = 200 ] && echo "OK    sin sesión: GET /salud → 200 (pública)" || { echo "FALLA GET /salud sin sesión → $code"; fallos=$((fallos+1)); }
+# /salud sin credencial (docs/10 §6, 20/11/2026): 200 y SOLO `estado`; el detalle (tablas, broker, aprovisionamiento) lo vio arriba el caso con
+# la clave. Una clave equivocada es 401, como en toda ruta (va por la entrada estándar como la buena, aunque no sea secreta).
+r=$(curl -s -m 3 -w '\n%{http_code}' "$API/salud"); code=${r##*$'\n'}; cuerpo=${r%$'\n'*}
+if [ "$code" = 200 ] && python3 -c "import sys,json; sys.exit(0 if json.loads(sys.stdin.read())=={'estado':'ok'} else 1)" <<<"$cuerpo" 2>/dev/null; then
+  echo "OK    sin sesión: GET /salud → 200 con solo {\"estado\":\"ok\"} (pública, sin estadísticas de operación)"
+else echo "FALLA GET /salud sin sesión → HTTP $code ${cuerpo:0:120} (esperado 200 y solo estado)"; fallos=$((fallos+1)); fi
+code=$(printf 'X-Clave-Admin: %s\n' "clave-equivocada-$RANDOM-no-es-la-clave" | curl -s -o /dev/null -w '%{http_code}' -m 3 -H @- "$API/salud")
+[ "$code" = 401 ] && echo "OK    GET /salud con una X-Clave-Admin equivocada → 401 (si viene, manda ella)" || { echo "FALLA GET /salud con clave equivocada → $code (esperado 401)"; fallos=$((fallos+1)); }
 echo; [[ $fallos -eq 0 ]] && echo "TODO OK" || { echo "$fallos caso(s) con falla"; exit 1; }

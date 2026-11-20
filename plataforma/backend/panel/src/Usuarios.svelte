@@ -13,6 +13,8 @@
   import { ayudaDeRol, guiaDePerfiles } from './lib/ayudas';
   import { avisoDeError, type DatosAviso } from './lib/avisos';
   import type { Sitio } from './lib/modelo';
+  import { fechaHora as fechaHora_, fechaHoraEn } from './lib/tiempo';
+  import { zonaPropia } from './lib/zona-propia.svelte';
   import { ROTULO_ROL, type Rol, type Sesion } from './lib/sesion';
   import {
     AVISO_MOTIVO, MAX_MOTIVO, ROLES_DE_SITIO, aplicarRespuesta, cambioBaja, cambioReactivar, cambioRol, cambioTemporal, cuerpoAlta, motivoDeBajaInvalido,
@@ -69,7 +71,8 @@
   }
 
   // La hora de vencimiento la dice el servidor (CLAVE_TEMPORAL_HORAS, 1–72 h; 2 por defecto): el panel no supone un plazo fijo.
-  const fechaHora = (iso: string): string => new Date(iso).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short', hourCycle: 'h23' });
+  // Pantalla global (sin zona de sitio): la zona propia de P13 y, sin ella, UTC dicho explícitamente (docs/19 §4, H).
+  const fechaHora = (iso: string): string => (zonaPropia() === null ? `${fechaHoraEn(iso, 'UTC')} UTC` : fechaHora_(iso, 'UTC'));
 
   function mostrarClave(u: UsuarioConClave): void {
     unaVez = { nombre: u.nombre, email: u.email, clave: u.clave, vence: u.clave_temporal_vence_en };
