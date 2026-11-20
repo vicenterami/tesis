@@ -17,8 +17,8 @@ const sesion = (rol: 'administrador' | 'consulta'): Sesion => ({
   sitios: [{ sitio_id: 's1', codigo: 'uct', nombre: 'Campus', rol }, { sitio_id: 's2', codigo: 'mag', nombre: 'Magallanes', rol: 'consulta' }],
   permisos: { administrador: ['leer', 'usuarios', 'auditoria'], consulta: ['leer'] },
 });
-const FILA = { instante: '2026-11-11T13:00:00Z', clase: 'evento', tipo: 'reglas_cambiadas', texto: 'cambió los umbrales de Temperatura del Invernadero', usuario: { id: 'u2', nombre: 'Bea' }, dispositivo: { id: '00000000-0000-4000-8000-000000000001', nombre: 'Invernadero' } };
-const ACCESO = { instante: '2026-11-11T12:00:00Z', clase: 'acceso', tipo: 'ok', texto: 'entró al sistema', usuario: { id: 'u2', nombre: 'Bea' }, dispositivo: null };
+const FILA = { instante: '2026-11-11T13:00:00Z', clase: 'evento', tipo: 'reglas_cambiadas', texto: 'cambió los umbrales de Temperatura del Invernadero', usuario: { id: 'u2', nombre: 'Bea', correo: 'bea.uno@example.org' }, dispositivo: { id: '00000000-0000-4000-8000-000000000001', nombre: 'Invernadero' } };
+const ACCESO = { instante: '2026-11-11T12:00:00Z', clase: 'acceso', tipo: 'ok', texto: 'entró al sistema', usuario: { id: 'u3', nombre: 'Bea', correo: 'bea.dos@example.org' }, dispositivo: null };
 let peticiones: string[] = [];
 let angosto = false;
 
@@ -28,7 +28,7 @@ beforeEach(() => {
   vi.stubGlobal('matchMedia', (q: string) => ({ matches: angosto && q.includes('700px'), addEventListener() {}, removeEventListener() {} }));
   vi.stubGlobal('fetch', vi.fn(async (ruta: string) => {
     peticiones.push(ruta);
-    if (ruta === '/usuarios') return new Response(JSON.stringify([{ id: 'u2', nombre: 'Bea', sitios: [{ sitio_id: 's1' }] }, { id: 'u9', nombre: 'De otro sitio', sitios: [{ sitio_id: 's2' }] }]));
+    if (ruta === '/usuarios') return new Response(JSON.stringify([{ id: 'u2', nombre: 'Bea', email: 'bea.uno@example.org', sitios: [{ sitio_id: 's1' }] }, { id: 'u3', nombre: 'Bea', email: 'bea.dos@example.org', sitios: [{ sitio_id: 's1' }] }, { id: 'u9', nombre: 'De otro sitio', email: 'otro@example.org', sitios: [{ sitio_id: 's2' }] }]));
     if (ruta.startsWith('/sitios/s1/actividad')) {
       return ruta.includes('cursor=') ? new Response(JSON.stringify([ACCESO])) : new Response(JSON.stringify([FILA]), { headers: { 'X-Siguiente': 'c2' } });
     }
@@ -51,7 +51,7 @@ describe('P14 Actividad', () => {
     await waitFor(() => expect(document.querySelectorAll('[data-fila-actividad]')).toHaveLength(2));
     expect(peticiones.at(-1)).toBe('/sitios/s1/actividad?cursor=c2&limite=50');
     expect(document.querySelector('[data-actividad-mas]')).toBeNull(); // sin cursor, no hay más
-    expect([...(document.querySelector('[data-filtro-persona]') as HTMLSelectElement).options].map((o) => o.textContent)).toEqual(['todas', 'Bea']);
+    expect([...(document.querySelector('[data-filtro-persona]') as HTMLSelectElement).options].map((o) => o.textContent)).toEqual(['todas', 'Bea — bea.uno@example.org', 'Bea — bea.dos@example.org']); // dos «Bea»: se distinguen por el correo
     const tipo = document.querySelector('[data-filtro-tipo]') as HTMLSelectElement;
     expect([...tipo.options].map((o) => o.textContent)).toEqual(['todos', 'Entradas', 'Cambios de umbrales']);
     tipo.value = 'ok';
@@ -79,5 +79,42 @@ describe('P14 Actividad', () => {
     render(Actividad, { filtros: SIN_FILTROS_ACTIVIDAD, sesion: sesion('consulta'), sitios: SITIOS });
     expect(document.querySelector('[data-sin-actividad]')).toBeTruthy();
     expect(peticiones.filter((p) => p.includes('/actividad'))).toEqual([]);
+  });
+
+  it('dos personas con el mismo nombre se distinguen por el correo, con el nombre y el correo en su propio elemento, en la tabla y en las tarjetas; la cuenta anonimizada, solo su marcador; lo del sistema, sin persona', async () => {
+    const ANONIMA = { ...ACCESO, usuario: { id: 'u4', nombre: 'Cuenta dada de baja · 3f2a', correo: null } };
+    const SISTEMA = { ...FILA, usuario: null };
+    vi.stubGlobal('fetch', vi.fn(async (ruta: string) => {
+      peticiones.push(ruta);
+      if (ruta === '/usuarios') return new Response('[]');
+      return new Response(JSON.stringify([FILA, ACCESO, ANONIMA, SISTEMA]));
+    }));
+    for (const estrecho of [false, true]) {
+      angosto = estrecho;
+      render(Actividad, { filtros: SIN_FILTROS_ACTIVIDAD, sesion: sesion('administrador'), sitios: SITIOS });
+      await waitFor(() => expect(document.querySelectorAll('[data-fila-actividad]')).toHaveLength(4));
+      const filas = [...document.querySelectorAll('[data-fila-actividad]')];
+      const personas = filas.map((f) => f.querySelector('[data-persona]'));
+      expect(personas.map((p) => p?.querySelector('[data-persona-correo]')?.textContent ?? null), estrecho ? 'tarjetas' : 'tabla').toEqual(['bea.uno@example.org', 'bea.dos@example.org', null, null]);
+      expect(personas.slice(0, 2).map((p) => (p!.textContent ?? '').replace(/\s+/g, ' ').trim())).toEqual(['Bea bea.uno@example.org', 'Bea bea.dos@example.org']);
+      expect(personas[2]!.textContent).toBe('Cuenta dada de baja · 3f2a'); // sin correo: solo el marcador
+      expect(personas[3]).toBeNull(); // el sistema: ninguna persona, el texto de reemplazo
+      expect(filas[3]!.textContent).toContain('el sistema');
+      cleanup();
+    }
+  });
+
+  it('el filtro «Persona» no escribe el correo de una cuenta anonimizada (solo su marcador), aunque /usuarios lo traiga', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (ruta: string) => {
+      peticiones.push(ruta);
+      if (ruta === '/usuarios') return new Response(JSON.stringify([
+        { id: 'u2', nombre: 'Bea', email: 'bea.uno@example.org', anonimizado: false, sitios: [{ sitio_id: 's1' }] },
+        { id: 'u4', nombre: 'Cuenta dada de baja · 3f2a', email: 'baja-x@cuenta-anonimizada.invalid', anonimizado: true, sitios: [{ sitio_id: 's1' }] },
+      ]));
+      return new Response('[]');
+    }));
+    render(Actividad, { filtros: SIN_FILTROS_ACTIVIDAD, sesion: sesion('administrador'), sitios: SITIOS });
+    await waitFor(() => expect((document.querySelector('[data-filtro-persona]') as HTMLSelectElement).options).toHaveLength(3));
+    expect([...(document.querySelector('[data-filtro-persona]') as HTMLSelectElement).options].map((o) => o.textContent)).toEqual(['todas', 'Bea — bea.uno@example.org', 'Cuenta dada de baja · 3f2a']);
   });
 });

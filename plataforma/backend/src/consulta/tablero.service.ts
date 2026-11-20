@@ -2,6 +2,8 @@ import { BadRequestException, Inject, Injectable, Logger, NotFoundException, Ser
 import { Pool, PoolClient } from 'pg';
 import { POOL } from '../db/db.module.js';
 import { isoUs } from '../db/iso-us.js';
+import { sqlPersona } from '../db/persona.js';
+import type { PersonaAutor } from '../db/persona.js';
 import {
   CUBOS_CHISPA, CanalConUltima, Cursor, Entrega, FilaCubo, FilaMagnitud, HISTORICO_SITIO, SQL_EN_LINEA, SQL_ESTADO_VISUAL, SQL_HISTORICO_SITIO,
   SQL_LECTURA_VIGENTE, TENDENCIA, alinear,
@@ -363,9 +365,9 @@ export class TableroService {
   // GET /dispositivos/{id}/eventos (docs/19 §4, D5; punto 58): por clave (ocurrido_en, id) descendente con
   // idx_evento_dispositivo_ocurrido_en_id (migración 23). `usuario` = quién lo hizo si fue una persona (HU-11); nulo = el sistema.
   async eventosDispositivo(dispositivoId: string, desde: Date, hasta: Date, limite: number, cursor?: Cursor) {
-    const r = await this.pool.query<{ id: string; tipo: string; detalle: unknown; ocurrido_en: string; usuario: { id: string; nombre: string } | null }>(`
+    const r = await this.pool.query<{ id: string; tipo: string; detalle: unknown; ocurrido_en: string; usuario: PersonaAutor | null }>(`
       SELECT ev.id, ev.tipo, ev.detalle, ${isoUs('ev.ocurrido_en')} AS ocurrido_en,
-             CASE WHEN u.id IS NULL THEN NULL ELSE json_build_object('id', u.id, 'nombre', u.nombre) END AS usuario
+             ${sqlPersona('u')} AS usuario
         FROM evento ev LEFT JOIN usuario u ON u.id = ev.usuario_id
        WHERE ev.dispositivo_id = $1 AND ev.ocurrido_en >= $2 AND ev.ocurrido_en < $3
          AND ($4::timestamptz IS NULL OR (ev.ocurrido_en, ev.id) < ($4::timestamptz, $5::uuid))

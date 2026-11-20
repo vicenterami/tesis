@@ -17,7 +17,8 @@
   import type { Condicion, DispositivoFicha, EventoDispositivo, EventoVivo, Historico, HistoricoDispositivo, TramaRechazada } from './lib/modelo';
   import { coloresSeries, temaVivo } from './lib/tema';
   import { UNIDADES_POR_DEFECTO, conversion, convertirSerie, type PreferenciaUnidades } from './lib/unidades';
-  import { agruparRechazadas, rotuloMotivo, textoEvento } from './lib/ficha';
+  import { agruparRechazadas, rotuloMotivo, textoEvento, verboAutor } from './lib/ficha';
+  import Persona from './Persona.svelte';
   import type { VentanaFija } from './lib/vista';
   import { duracion, fechaHora, haceCuanto, haceSegundos, horaLocal } from './lib/tiempo';
   import { fragmentoComparar, fragmentoExportar, fragmentoFicha } from './lib/vista';
@@ -687,7 +688,7 @@
   {:else}
     <ul class="eventos" data-eventos>
       {#each eventos as e (e.id)}
-        <li data-evento={e.id}><span title={horaLocal(e.ocurrido_en, d.zona_horaria)}>{fechaHora(e.ocurrido_en, d.zona_horaria)}</span> · {textoEvento(e)}</li>
+        <li data-evento={e.id}><span title={horaLocal(e.ocurrido_en, d.zona_horaria)}>{fechaHora(e.ocurrido_en, d.zona_horaria)}</span> · {textoEvento(e)}{#if e.usuario !== null}{' '}· {verboAutor(e)} por <Persona persona={e.usuario} />{/if}</li>
       {/each}
     </ul>
     {#if eventosSiguiente !== null}

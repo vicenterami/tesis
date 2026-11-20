@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { TramaRechazada } from './modelo';
-import { agruparRechazadas, textoEvento } from './ficha';
+import { agruparRechazadas, textoEvento, verboAutor } from './ficha';
 
 const t = (id: string, motivo: TramaRechazada['motivo'], detalle: string | null, recibido_en: string): TramaRechazada =>
   ({ id, origen: 'mqtt', topico: null, motivo, detalle, dispositivo: 'dev-0001', recibido_en, payload: id, payload_formato: 'texto' });
@@ -18,11 +18,15 @@ describe('ficha v2: rechazadas agrupadas (D6) y eventos en palabras (D5)', () =>
     expect(agruparRechazadas([])).toEqual([]);
   });
   it('un evento dice quién lo hizo, o que fue el sistema', () => {
-    expect(textoEvento({ id: '1', tipo: 'umbrales', detalle: null, ocurrido_en: 'x', usuario: { id: 'u', nombre: 'Ana' } })).toBe('Cambio de umbrales · cambiado por Ana');
-    expect(textoEvento({ id: '1b', tipo: 'alta', detalle: null, ocurrido_en: 'x', usuario: { id: 'u', nombre: 'Ana' } })).toBe('Alta del dispositivo · registrado por Ana');
+    const ana = { id: 'u', nombre: 'Ana', correo: 'ana@example.org' };
+    expect(textoEvento({ id: '1', tipo: 'umbrales', detalle: null, ocurrido_en: 'x', usuario: ana })).toBe('Cambio de umbrales');
+    expect(verboAutor({ id: '1', tipo: 'umbrales', detalle: null, ocurrido_en: 'x', usuario: ana })).toBe('cambiado'); // la persona, con su correo, la escribe Persona.svelte
+    expect(textoEvento({ id: '1b', tipo: 'alta', detalle: null, ocurrido_en: 'x', usuario: ana })).toBe('Alta del dispositivo');
+    expect(verboAutor({ id: '1b', tipo: 'alta', detalle: null, ocurrido_en: 'x', usuario: ana })).toBe('registrado');
     // usuario null (quien mira no administra el sitio, o lo hizo el sistema): no se inventa nada sobre quién (G1, 11/11/2026)
     expect(textoEvento({ id: '2', tipo: 'mantenimiento', detalle: null, ocurrido_en: 'x', usuario: null })).toBe('Pasó a mantenimiento');
     expect(textoEvento({ id: '3', tipo: 'otro_tipo', detalle: null, ocurrido_en: 'x', usuario: null })).toBe('otro tipo');
     expect(textoEvento({ id: '4', tipo: 'reglas_cambiadas', detalle: null, ocurrido_en: 'x', usuario: null })).toBe('Cambio de umbrales');
+    expect(verboAutor({ id: '2', tipo: 'mantenimiento', detalle: null, ocurrido_en: 'x', usuario: null })).toBeNull();
   });
 });

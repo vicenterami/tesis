@@ -38,7 +38,7 @@ const PREVIA: VistaPublica & { avisos: string[] } = {
 };
 const ENLACE: EnlaceListado = {
   id: 'e1', titulo: 'Clima', descripcion: null, magnitudes: [{ codigo: 'temperatura', nombre: 'Temperatura', unidad: 'Cel' }], ventana_maxima: '7d',
-  zonas: [{ id: 'z1', nombre: 'Norte' }], creado_por: { id: 'u1', nombre: 'Ana' }, creado_en: '2026-11-10T15:00:00Z', expira_en: '2026-12-17T15:00:00Z',
+  zonas: [{ id: 'z1', nombre: 'Norte' }], creado_por: { id: 'u1', nombre: 'Ana', correo: 'ana@example.org' }, creado_en: '2026-11-10T15:00:00Z', expira_en: '2026-12-17T15:00:00Z',
   renovado_en: null, revocado_en: null, revocado_por: null, accesos_7d: 4, estado: 'vigente', renovable: true, retencion_dias: 90, anonimizado_en: null,
 };
 let pedidas: { metodo: string; ruta: string; cuerpo: unknown }[] = [];
@@ -75,7 +75,7 @@ beforeEach(() => {
     if (ruta === '/sitios/s2/enlaces/tope' && metodo === 'GET') return json({ max_enlaces: 9, fijado: true, por_omision: 50, techo: 200, vivos: 0 });
     if (ruta === '/magnitudes' && catalogoFalla) return json({ statusCode: 500, message: 'falla' }, 500);
     if (ruta === '/magnitudes') return json([{ codigo: 'humedad', nombre: 'Humedad', unidad: '%RH' }, { codigo: 'temperatura', nombre: 'Temperatura', unidad: 'Cel' }]);
-    if (ruta.startsWith('/sitios/s1/enlaces?incluir=todos')) return json([ENLACE, { ...ENLACE, id: 'e0', estado: 'revocado', renovable: false, revocado_en: '2026-11-12T15:00:00Z', revocado_por: { id: 'u1', nombre: 'Ana' } }]);
+    if (ruta.startsWith('/sitios/s1/enlaces?incluir=todos')) return json([ENLACE, { ...ENLACE, id: 'e0', estado: 'revocado', renovable: false, revocado_en: '2026-11-12T15:00:00Z', revocado_por: { id: 'u3', nombre: 'Ana', correo: 'ana.otra@example.org' } }]);
     if (ruta === '/sitios/s1/enlaces' && metodo === 'GET') return json([ENLACE]);
     if (ruta === '/sitios/s1/enlaces' && metodo === 'POST') return crear();
     if (ruta === '/sitios/s1/enlaces/vista-previa') return respuestaPrevia();
@@ -196,10 +196,13 @@ describe('P9, quien publica', () => {
     expect(texto('[data-enlace="e1"] [data-que-publica]')).toBe('Temperatura; hasta 7 días; zona Norte');
     expect(texto('[data-enlace="e1"] [data-estado-enlace]')).toBe('vigente');
     expect(texto('[data-enlace="e1"] [data-accesos-enlace]')).toBe('4');
+    expect(texto('[data-enlace="e1"] .datos-enlace')).toContain('Ana ana@example.org, el'); // el correo, para distinguir homónimos
     ($('[data-ver-todos]') as HTMLButtonElement).click();
     await waitFor(() => expect(document.querySelector('[data-enlace="e0"]')).toBeTruthy());
     expect(pedidas.at(-1)!.ruta).toBe('/sitios/s1/enlaces?incluir=todos');
     expect(texto('[data-enlace="e0"] [data-estado-enlace]')).toBe('revocado');
+    expect(texto('[data-enlace="e0"] .datos-enlace')).toContain('Ana ana@example.org'); // la misma Ana que quien revocó, otra cuenta
+    expect(texto('[data-enlace="e0"] .datos-enlace')).toContain(', por Ana ana.otra@example.org');
     expect(document.querySelector('[data-enlace="e0"] [data-renovar]')).toBeNull();
   });
 

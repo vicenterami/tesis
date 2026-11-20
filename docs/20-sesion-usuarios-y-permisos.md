@@ -393,8 +393,14 @@ en solo `administrador`, el caso «investigador exporta → 200» debe fallar; c
   `usuario_*` de las personas que están o estuvieron en él y `terminos_aceptados` de quienes tienen membresía activa, cada uno con su texto
   («dio de alta la cuenta de «Ana»», «aceptó los términos de uso»); y `acceso` de quienes tienen membresía **activa** en el sitio (quien
   salió del sitio deja de mostrarle sus entradas a su administrador), por cursor `(instante, id)`; para eso `acceso` gana `id`
-  (migración 24). Ventana por defecto de 7 días, hasta 92. Desde el 17/11/2026, también los eventos de los enlaces públicos del sitio (`enlace_creado`, `enlace_renovado`, `enlace_revocado`, por el sitio de la fila del enlace, con su título; y `enlace_tope` y `enlace_minimo`, por `detalle.sitio_id`: «fijó en N el tope de enlaces públicos del sitio», «fijó en N el mínimo de dispositivos de la vista pública del sitio»; `docs/19 §4`, O). Nunca correos ni direcciones, ni el `detalle` de los eventos (el motivo de una
-  baja no sale).
+  (migración 24). Ventana por defecto de 7 días, hasta 92. Desde el 17/11/2026, también los eventos de los enlaces públicos del sitio (`enlace_creado`, `enlace_renovado`, `enlace_revocado`, por el sitio de la fila del enlace, con su título; y `enlace_tope` y `enlace_minimo`, por `detalle.sitio_id`: «fijó en N el tope de enlaces públicos del sitio», «fijó en N el mínimo de dispositivos de la vista pública del sitio»; `docs/19 §4`, O). Con el correo de quien lo hizo y sin direcciones IP, ni el `detalle` de los eventos (el motivo de una
+  baja no sale). **Cambio del 20/11/2026:** la regla era «sin correos ni direcciones IP»; pasa a «con el correo, sin IP». Dos cuentas con
+  el mismo nombre (dos «Marta») se veían iguales y RF-46 («saber quién hizo qué») fallaba con homónimos; la persona viaja como `{ id, nombre, correo }`
+  (`correo` nulo si la cuenta está anonimizada: queda solo el marcador, sin correo) en la actividad del sitio, en los eventos de la ficha del dispositivo
+  y en «creado por» y «revocado por» de los enlaces públicos. El correo llega exactamente a quien ya veía el nombre en esos cuatro lugares, que son solo de
+  administradores; eso incluye a personas que no aparecen en `GET /usuarios` del sitio: quien actuó en él y ya salió, y el administrador del
+  sistema que actuó sin ser miembro (`docs/21 §2`: «quien administra un sitio donde la persona hizo algo ve su nombre y su correo»). Los
+  perfiles consulta e investigador siguen sin ver autor. El `texto` de la fila sigue sin correos.
 - **R30 · Soporte.** 5 mensajes por persona y hora (en memoria, como los bloqueos); los lee el administrador del sistema por cursor; se
   conservan mientras exista la cuenta y se borran con la baja (`docs/21 §2`). Marcarlos leídos (`leido_en`) queda para la pantalla P12.
 - **R31 · Avisos de terceros.** `plataforma/backend/generar-avisos-terceros.sh` escribe `panel/public/avisos-de-terceros.txt` desde

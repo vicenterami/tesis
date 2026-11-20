@@ -6,13 +6,14 @@ import { avisoDeError, type DatosAviso } from './avisos';
 import type { Sesion } from './sesion';
 import type { Sitio } from './modelo';
 import { ROTULO_VENTANA, type VentanaPublica, type VistaPublica } from './publico';
+import type { Persona } from './persona';
 import { fechaHora } from './tiempo';
 
 export type EstadoEnlace = 'vigente' | 'vence_pronto' | 'vencido' | 'revocado';
 export interface EnlaceListado {
   id: string; titulo: string; descripcion: string | null; magnitudes: { codigo: string; nombre: string; unidad: string }[]; ventana_maxima: VentanaPublica;
-  zonas: { id: string; nombre: string }[]; creado_por: { id: string; nombre: string } | null; creado_en: string; expira_en: string;
-  renovado_en: string | null; revocado_en: string | null; revocado_por: { id: string; nombre: string } | null; accesos_7d: number;
+  zonas: { id: string; nombre: string }[]; creado_por: Persona | null; creado_en: string; expira_en: string;
+  renovado_en: string | null; revocado_en: string | null; revocado_por: Persona | null; accesos_7d: number;
   estado: EstadoEnlace; renovable: boolean; retencion_dias: number; anonimizado_en: string | null;
 }
 export interface EnlaceCreado extends EnlaceListado { token: string; direccion: string; avisos: string[] }

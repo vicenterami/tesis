@@ -3,6 +3,7 @@ import { Pool } from 'pg';
 import { POOL } from '../db/db.module.js';
 import { isoUs } from '../db/iso-us.js';
 import { ClaseActividad, textoActividad } from './actividad.js';
+import type { PersonaAutor } from '../db/persona.js';
 import type { Cursor } from './tablero.js';
 
 export interface FilaActividad {
@@ -11,7 +12,7 @@ export interface FilaActividad {
   clase: ClaseActividad;
   tipo: string;
   texto: string;
-  usuario: { id: string; nombre: string } | null;
+  usuario: PersonaAutor | null;
   dispositivo: { id: string; nombre: string } | null;
 }
 
@@ -32,10 +33,11 @@ export class ActividadService {
 
   async actividad(sitioId: string, f: { desde: Date; hasta: Date; tipo?: string; usuario?: string; limite: number; cursor?: Cursor }): Promise<FilaActividad[]> {
     const r = await this.pool.query<{
-      id: string; instante: string; clase: ClaseActividad; tipo: string; detalle: unknown; usuario_id: string | null; usuario_nombre: string | null;
+      id: string; instante: string; clase: ClaseActividad; tipo: string; detalle: unknown; usuario_id: string | null; usuario_nombre: string | null; usuario_correo: string | null;
       dispositivo_id: string | null; dispositivo_nombre: string | null; objeto: string | null;
     }>(`
-      SELECT x.id, ${isoUs('x.instante')} AS instante, x.clase, x.tipo, x.detalle, x.usuario_id, u.nombre AS usuario_nombre, x.dispositivo_id, x.dispositivo_nombre,
+      SELECT x.id, ${isoUs('x.instante')} AS instante, x.clase, x.tipo, x.detalle, x.usuario_id, u.nombre AS usuario_nombre,
+             CASE WHEN u.anonimizado_en IS NULL THEN u.email END AS usuario_correo, x.dispositivo_id, x.dispositivo_nombre,
              x.objeto
         FROM (
           SELECT e.id, e.ocurrido_en AS instante, 'evento' AS clase, e.tipo, e.detalle, e.usuario_id, d.id AS dispositivo_id, d.nombre AS dispositivo_nombre,
@@ -70,7 +72,7 @@ export class ActividadService {
       [sitioId, f.desde, f.hasta, f.tipo ?? null, f.usuario ?? null, f.cursor?.t ?? null, f.cursor?.id ?? null, f.limite]);
     return r.rows.map((x) => ({
       id: x.id, instante: x.instante, clase: x.clase, tipo: x.tipo, texto: textoActividad(x.clase, x.tipo, x.dispositivo_nombre, x.detalle, x.objeto),
-      usuario: x.usuario_id === null ? null : { id: x.usuario_id, nombre: x.usuario_nombre ?? '' },
+      usuario: x.usuario_id === null ? null : { id: x.usuario_id, nombre: x.usuario_nombre ?? '', correo: x.usuario_correo },
       dispositivo: x.dispositivo_id === null ? null : { id: x.dispositivo_id, nombre: x.dispositivo_nombre ?? '' },
     }));
   }

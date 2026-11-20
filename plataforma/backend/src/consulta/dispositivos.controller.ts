@@ -99,7 +99,7 @@ export class DispositivosController {
   @ApiOperation({
     summary: 'Eventos de un dispositivo, por páginas (Etapa 4)',
     description:
-      '`id, tipo, detalle, ocurrido_en, usuario{id, nombre}|null` (quién lo hizo, si fue una persona: HU-11; el nombre lo reciben solo el administrador de ese ' +
+      '`id, tipo, detalle, ocurrido_en, usuario{id, nombre, correo}|null` (quién lo hizo, si fue una persona: HU-11; el correo distingue a dos personas con el mismo nombre y es null en una cuenta anonimizada; el nombre y el correo los reciben solo el administrador de ese ' +
       'sitio y el del sistema, los demás perfiles reciben `usuario: null`: docs/21 §2), del más reciente al más antiguo, en [desde, hasta) ' +
       '(por defecto, los últimos 30 días). Página por clave: si hay más, la cabecera `X-Siguiente` trae el cursor que se devuelve tal cual en `cursor`.',
   })

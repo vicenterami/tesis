@@ -3,6 +3,8 @@ import { Pool, PoolClient } from 'pg';
 import { POOL } from '../db/db.module.js';
 import { errorDeCliente } from '../db/cliente.js';
 import { registrarEvento } from '../db/evento.js';
+import { sqlPersona } from '../db/persona.js';
+import type { PersonaAutor } from '../db/persona.js';
 import { SQL_PUBLICO_LECTURA_VIGENTE } from '../consulta/tablero.js';
 import {
   EstadoEnlace, FilaVigencia, MagnitudCatalogo, NO_RENOVABLE, RenovacionValidada, VentanaPublica, VistaPublica, VistaValidada, ZonaPublicada,
@@ -14,8 +16,8 @@ import { VistaPublicaService } from './vista-publica.service.js';
 // al crear.
 export interface EnlaceListado {
   id: string; titulo: string; descripcion: string | null; magnitudes: MagnitudCatalogo[]; ventana_maxima: VentanaPublica;
-  zonas: ZonaPublicada[]; creado_por: { id: string; nombre: string } | null; creado_en: string;
-  expira_en: string; renovado_en: string | null; revocado_en: string | null; revocado_por: { id: string; nombre: string } | null;
+  zonas: ZonaPublicada[]; creado_por: PersonaAutor | null; creado_en: string;
+  expira_en: string; renovado_en: string | null; revocado_en: string | null; revocado_por: PersonaAutor | null;
   accesos_7d: number; estado: EstadoEnlace; renovable: boolean; retencion_dias: number; anonimizado_en: string | null;
 }
 export interface EnlaceCreado extends EnlaceListado { token: string; direccion: string; avisos: string[] }
@@ -31,8 +33,8 @@ const SQL_LISTA = `
              (SELECT coalesce(json_agg(json_build_object('codigo', m.codigo, 'nombre', m.nombre, 'unidad', m.unidad_canonica)
                                        ORDER BY array_position(e.magnitudes, m.codigo)), '[]'::json)
                 FROM magnitud m WHERE m.codigo = ANY(e.magnitudes)) AS magnitudes,
-             CASE WHEN uc.id IS NULL THEN NULL ELSE json_build_object('id', uc.id, 'nombre', uc.nombre) END AS creado_por,
-             CASE WHEN ur.id IS NULL THEN NULL ELSE json_build_object('id', ur.id, 'nombre', ur.nombre) END AS revocado_por,
+             ${sqlPersona('uc')} AS creado_por,
+             ${sqlPersona('ur')} AS revocado_por,
              iso_utc(e.creado_en) AS creado_en, iso_utc(e.expira_en) AS expira_en, iso_utc(e.renovado_en) AS renovado_en,
              iso_utc(e.revocado_en) AS revocado_en,
              (SELECT coalesce(sum(a.cuenta), 0)::int FROM enlace_publico_acceso a

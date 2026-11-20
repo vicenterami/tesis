@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/svelte';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import Aviso from './Aviso.svelte';
 import Boton from './Boton.svelte';
+import Persona from './Persona.svelte';
 
 // Regla de componentes (docs/19 §6, 08/11/2026): botón con etiqueta obligatoria, ayuda al pasar el ratón Y al enfocar con el teclado,
 // enlazada con aria-describedby; cargando; motivo de desactivado visible. Aviso con su rol según el tipo.
@@ -141,5 +142,21 @@ describe('BarrasOrdenadas y Medidor', () => {
     render(Medidor, { porcentaje: null, etiqueta: 'Salud del sitio' });
     expect(screen.queryByRole('meter')).toBeNull();
     expect(screen.getByRole('img', { name: 'Salud del sitio: sin datos' })).toBeTruthy();
+  });
+});
+
+describe('Persona', () => {
+  it('el nombre y, al lado, el correo en su propio elemento; sin correo, solo el nombre; sin persona, el texto de reemplazo', () => {
+    const { container } = render(Persona, { persona: { id: 'u', nombre: 'Marta', correo: 'marta.a@example.org' } });
+    expect(container.querySelector('[data-persona]')!.textContent).toBe('Marta marta.a@example.org');
+    expect(container.querySelector('[data-persona-correo]')!.textContent).toBe('marta.a@example.org');
+    cleanup();
+    const anonima = render(Persona, { persona: { id: 'u', nombre: 'Cuenta dada de baja · 3f2a', correo: null } });
+    expect(anonima.container.querySelector('[data-persona]')!.textContent).toBe('Cuenta dada de baja · 3f2a');
+    expect(anonima.container.querySelector('[data-persona-correo]')).toBeNull();
+    cleanup();
+    const nadie = render(Persona, { persona: null, vacio: 'el sistema' });
+    expect(nadie.container.querySelector('[data-persona]')).toBeNull();
+    expect(nadie.container.textContent).toBe('el sistema');
   });
 });

@@ -14,6 +14,7 @@
   import { onMount, untrack } from 'svelte';
   import Aviso from './Aviso.svelte';
   import Boton from './Boton.svelte';
+  import Persona from './Persona.svelte';
   import VistaPublicaCuerpo from './VistaPublicaCuerpo.svelte';
   import { esCancelacion, obtener, pedir, ultimaGana } from './lib/api';
   import { avisoDeError, type DatosAviso } from './lib/avisos';
@@ -444,9 +445,9 @@
             </div>
             <p class="vivo" data-que-publica>{quePublica(e)}</p>
             <dl class="datos-enlace">
-              <div><dt>Creado por</dt><dd>{e.creado_por?.nombre ?? 'alguien que ya no está'}, el {fechaHora(e.creado_en, zona)}</dd></div>
+              <div><dt>Creado por</dt><dd><Persona persona={e.creado_por} vacio="alguien que ya no está" />, el {fechaHora(e.creado_en, zona)}</dd></div>
               {#if e.revocado_en !== null}
-                <div><dt>Revocado</dt><dd>el {fechaHora(e.revocado_en, zona)}{e.revocado_por !== null ? `, por ${e.revocado_por.nombre}` : ''}</dd></div>
+                <div><dt>Revocado</dt><dd>el {fechaHora(e.revocado_en, zona)}{#if e.revocado_por !== null}, por <Persona persona={e.revocado_por} />{/if}</dd></div>
               {:else}
                 <div><dt>{e.estado === 'vencido' ? 'Venció' : 'Vence'}</dt><dd data-vence-enlace>el {fechaHora(e.expira_en, zona)}</dd></div>
               {/if}

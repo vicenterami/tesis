@@ -12,8 +12,8 @@ import { INVENTARIO, FilaInventario } from './inventario.js';
 // depende de acordarse: `huellaPrivacidad()` calcula el SHA-256 de ese texto y legal.spec.ts lo compara con la última fila del historial de
 // docs/21 §7 («Historial de la privacidad»); si el texto cambió sin subir la versión y agregar la fila, `pnpm test` falla. El paso 2w7 del
 // verificador impide además reescribir las filas ya publicadas. El contenido de la subida va primero en esa fila, después aquí.
-export const PRIVACIDAD_VERSION = 3;
-export const PRIVACIDAD_FECHA = '2026-11-18';
+export const PRIVACIDAD_VERSION = 4;
+export const PRIVACIDAD_FECHA = '2026-11-20';
 export const MAX_RESPONSABLE = 200;
 
 export interface Responsable { nombre: string; contacto: string }

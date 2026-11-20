@@ -150,8 +150,8 @@ export class SitiosController {
     summary: 'Actividad del sitio (Etapa 4; P14)',
     description:
       'Lo que hicieron las personas sobre los dispositivos del sitio (eventos, con quién) y las entradas, salidas y bloqueos de quienes tienen membresía activa ' +
-      'en él (accesos), mezclados del más reciente al más antiguo: `id, instante, clase (evento|acceso), tipo, texto, usuario{id, nombre}|null, dispositivo{id, nombre}|null`. ' +
-      'Sin correos ni direcciones IP. Filtros: `tipo` (un tipo de evento o un resultado de acceso), `usuario` (UUID) y [desde, hasta) (por defecto, los últimos ' +
+      'en él (accesos), mezclados del más reciente al más antiguo: `id, instante, clase (evento|acceso), tipo, texto, usuario{id, nombre, correo}|null, dispositivo{id, nombre}|null`. ' +
+      'Con el correo de quien lo hizo (null en una cuenta anonimizada; distingue a dos personas con el mismo nombre) y sin direcciones IP. Filtros: `tipo` (un tipo de evento o un resultado de acceso), `usuario` (UUID) y [desde, hasta) (por defecto, los últimos ' +
       `${DIAS_ACTIVIDAD_POR_DEFECTO} días; hasta ${MAX_DIAS_ACTIVIDAD}). Página por clave: la cabecera \`X-Siguiente\` trae el cursor de la siguiente. ` +
       'Administrador del sitio en sus sitios; administrador del sistema en todos; los demás perfiles, 403; otro sitio, 404.',
   })

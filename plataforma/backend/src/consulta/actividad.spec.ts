@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { textoActividad, tipoValido } from './actividad.js';
 
-// Actividad del sitio (P14; docs/19 §4, G): texto para personas por tipo, sin correos ni direcciones.
+// Actividad del sitio (P14; docs/19 §4, G): texto para personas por tipo; el correo va solo dentro de `usuario{}` y el texto nunca lleva correos ni direcciones.
 describe('textoActividad', () => {
   it('eventos con persona: verbo y dispositivo entre comillas', () => {
     expect(textoActividad('evento', 'reglas_cambiadas', 'Nodo invernadero')).toBe('cambió los umbrales de «Nodo invernadero»');

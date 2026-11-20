@@ -4,7 +4,7 @@ Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emu
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
 cubría al escribirse se agregó después: TT-32 (sensor físico) en §43, §44 y §53, y TT-30 (recuperación ante reinicio) en §11. El
-contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 919 pruebas unitarias del backend y 583 del panel.
+contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 924 pruebas unitarias del backend y 587 del panel.
 Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -5107,3 +5107,54 @@ del `FROM`): al día, OK; hay uno más nuevo de la misma serie, «HAY QUE ACTUAR
 (`--probar-node`: seis casos plantados, con el orden 22.9.0 < 22.10.0 y dos versiones ilegibles) da 6 de 6; plantada sin `sort -V`, 5 de 6
 y en rojo. Con la imagen del backend anterior (Node 22.23.4) la consulta real dice «HAY QUE ACTUAR … ya se publicó 22.23.5»; con la nueva,
 OK. El paso 2u del verificador corre ahora las dos pruebas sin red (8 de PostgreSQL y 6 de Node) y falla si una no da todos sus casos.
+
+## 93. Homónimos: la persona se distingue por su correo donde se muestra quién lo hizo (20/11/2026)
+
+**Por qué.** Dos cuentas con el mismo nombre (dos «Marta») se veían iguales en «Actividad», y RF-46 («saber quién hizo qué») fallaba con
+homónimos. El diseño estaba decidido y verificado en el código el 19/11/2026; el orden fue el de la regla de concordancia: documentos,
+después código y pruebas.
+
+**Qué cambió.**
+- **Documentos.** `docs/20 §10` (R29: «sin correos ni direcciones IP» pasa a «con el correo, sin IP», con fecha y motivo), `docs/19 §4` (G, la ficha,
+  los enlaces y el contrato de la API), `docs/21` (la fila Correo de §2 y de §2.1, y la de quién hizo el cambio: el nombre y el correo los ven los
+  mismos que ya ven el nombre; no amplía quién ve el correo) y la **página de privacidad sube a la versión 4** (20/11/2026).
+- **Servidor.** La persona viaja como `{ id, nombre, correo }` en los cuatro lugares de administradores: la actividad del sitio
+  (`consulta/actividad.service.ts`), los eventos de la ficha (`tablero.service.ts`) y «creado por» y «revocado por» de los enlaces
+  (`publico/enlaces.service.ts`). La forma y la guarda de la anonimización están en un solo lugar (`db/persona.ts`): con `anonimizado_en` no
+  nulo, `correo` es `null` y queda solo el marcador del nombre (el correo técnico de la baja nunca sale). `openapi.json` regenerado (50 rutas;
+  cambian cuatro descripciones).
+- **Panel.** Un ayudante único, `Persona.svelte` (el nombre y, al lado, el correo en texto secundario), usado en la tabla y las tarjetas de
+  «Actividad», en los eventos de la ficha y en «Creado por» y «Revocado» de los enlaces; el filtro de «Actividad» escribe «Nombre — correo»
+  (`lib/persona.ts`, `rotuloPersona`). Los roles consulta e investigador siguen sin ver autor (sin cambio).
+
+**Huella de la versión 4.** No se calculó a mano: la prueba `legal.spec.ts` la calcula con `huellaPrivacidad()` (SHA-256 de la forma canónica del
+inventario, los apartados y el aviso sin responsable: `legal/huella.ts`), la misma función que dio la de la versión 3. Tras copiar las dos filas
+cambiadas de `docs/21 §2.1` a `legal/inventario.ts` y subir la versión y la fecha en `legal/privacidad.ts`, la prueba falló con el mensaje «huella de
+hoy b85188b8…»; esa huella y su fila se agregaron al final del historial (las filas 1 a 3 no se tocaron) y la prueba pasó.
+
+**Pruebas.**
+- Backend: **924 pruebas escritas** (`it(`; 919 antes), que `vitest` ejecuta como **947 de 947 en 74 archivos** (942 en 73 antes; las
+  parametrizadas cuentan una vez por caso): `db/persona.spec.ts`, 5 nuevas. Dos homónimos salen con el mismo nombre y correos
+  distintos en los tres servicios; la cuenta anonimizada, con `correo: null`; sin persona, `null`; el texto de la actividad sigue sin `@`; el SQL de
+  cada servicio pide el correo con la guarda de la anonimización. La guarda se probó además contra PostgreSQL, solo lectura, sobre una relación
+  de ejemplo (dos homónimos, una cuenta anonimizada y una fila sin cuenta): `correo` salió en los dos primeros y `null` en el tercero, y la
+  fila sin cuenta dio `NULL`.
+- Panel: **587 pruebas declaradas (651 ejecuciones) en 45 archivos** (583 y 647 en 44 antes: 4 nuevas y un archivo, `lib/persona.test.ts`).
+  Las del DOM comprueban los cuatro lugares (tabla y tarjetas de «Actividad» con dos «Bea» y una cuenta anonimizada; el evento de la ficha;
+  «Creado por» y «Revocado» de un enlace) y el filtro («Bea — correo» ×2). `svelte-check`: 438 archivos, 0 errores (435 antes).
+- `sesion-smoke.sh`: **472 de 472** (469 antes): la actividad y los eventos del dispositivo traen la persona con su correo; ninguna fila de
+  texto lleva `@`; tras la baja por anonimización, la actividad filtrada por esa cuenta la trae con su marcador y `correo: null`, sin el correo de
+  antes ni el técnico de la baja (plantada: sin la guarda en la consulta de actividad, esa comprobación falla y es la única; restaurada, 472 de
+  472); consulta e investigador siguen sin autor (403 o `usuario: null`).
+- Filtro «Persona» de «Actividad»: una cuenta anonimizada de `/usuarios` (`anonimizado: true`) no escribe correo en el rótulo (prueba nueva).
+- `panel-sesion-e2e.sh`: **334 de 334** en Chromium y Firefox (330 antes: la comprobación «sin correos en la actividad» pasó a «con su correo
+  junto al nombre» y «sin direcciones IP», a 390 y 1 280 px).
+
+**Cifras al día en documentos e informe.** Los totales citados cuentan las pruebas escritas (`it(` y `test(`, como el paso 2t del
+verificador), no las ejecuciones: el backend pasó de 919 a **924** y el panel, de 583 a **587** pruebas, al día en `docs/11`, `docs/15`, `docs/16` (cabecera),
+`docs/18`, el capítulo y el anexo de pruebas del informe y la presentación.
+
+**Lo que este bloque no cubre.** El **destinatario** de una acción («dio de alta la cuenta de «Marta»») sigue escrito solo con el nombre en el texto
+de la fila de actividad, y los mensajes de soporte (solo del administrador del sistema) llevan `usuario{id, nombre}` sin correo: dos homónimos
+siguen sin distinguirse ahí. Una prueba plantada contra una base real de la guarda de anonimización dentro de `db/pruebas/` no se añadió (el
+fragmento viviría duplicado en SQL y en TypeScript); la guarda la cubren las pruebas unitarias y la comprobación de solo lectura de arriba.

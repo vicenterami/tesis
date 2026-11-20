@@ -342,7 +342,9 @@ for (const caso of casos) {
     await p.locator('[data-fila-actividad]').first().waitFor({ timeout: 15000 });
     const filas = await p.locator('[data-fila-actividad]').allTextContents();
     comprobar(filas.some((f) => f.includes(caso.nombre) && /umbral/i.test(f)), `${etiqueta}: P14: el cambio de umbrales aparece con la persona que lo hizo`, filas.slice(0, 3).join(' | ').slice(0, 200));
-    comprobar(!(await p.content()).includes(caso.email), `${etiqueta}: … sin correos en la actividad`);
+    // 20/11/2026: la persona se escribe con su nombre y su correo (para distinguir homónimos); direcciones IP, nunca.
+    comprobar(filas.some((f) => f.includes(caso.nombre) && f.includes(caso.email) && /umbral/i.test(f)), `${etiqueta}: … con su correo junto al nombre`, filas.slice(0, 3).join(' | ').slice(0, 200));
+    comprobar(!/\b\d{1,3}(\.\d{1,3}){3}\b/.test((await p.locator('[data-actividad]').innerText())), `${etiqueta}: … sin direcciones IP en la actividad`);
     await sinDesborde(p, `${etiqueta}, actividad`);
   });
 

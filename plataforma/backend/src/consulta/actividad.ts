@@ -1,7 +1,7 @@
 // Actividad de un sitio (P14; docs/19 §4, G; RF-46, HU-11, HU-26): lo que hicieron las personas sobre los dispositivos del sitio (`evento`
 // con `usuario_id`) y las entradas, salidas y bloqueos de quienes tienen membresía activa en él (`acceso`), mezclados por cursor
 // (instante, id). La respuesta lleva el nombre de la persona (solo la ven quienes administran el sitio: docs/21 §2) y un texto para personas;
-// nunca correos ni direcciones IP. Aquí, lo puro: el texto por tipo y la validación del filtro; la consulta, en ActividadService.
+// el correo va solo dentro de `usuario{}` (para distinguir homónimos; nulo en una cuenta anonimizada) y el texto nunca lleva correos ni direcciones IP. Aquí, lo puro: el texto por tipo y la validación del filtro; la consulta, en ActividadService.
 
 export const CLASES_ACTIVIDAD = ['evento', 'acceso'] as const;
 export type ClaseActividad = (typeof CLASES_ACTIVIDAD)[number];

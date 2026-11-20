@@ -413,7 +413,7 @@ servidor.
    30 °C») y la banda de histéresis sombreada; las condiciones de ese canal dentro de la ventana, como franjas verticales (de `abierta_en`
    a `cerrada_en` o hasta ahora) con su tipo al pasar el cursor. Así se ve por qué sonó una alerta.
 5. **Historial de eventos del dispositivo en el rango** ✅ panel, 11/11/2026; ✅ backend, 11/11/2026 (HU-07): lista por cursor, `GET /dispositivos/{id}/eventos?desde&hasta` (Etapa 4), con
-   quién lo hizo cuando hubo persona (HU-11, G1).
+   quién lo hizo cuando hubo persona (HU-11, G1), con su nombre y, al lado, su correo (20/11/2026, G; dos cuentas con el mismo nombre se distinguen por él).
 6. **Tramas rechazadas agrupadas:** ✅ panel, 11/11/2026; filas iguales (mismo motivo y detalle) se muestran una vez con «× N» y la última fecha; paginación por
    cursor. Hoy la ficha lista veinte filas idénticas.
 7. **Unidades para personas:** ✅ panel, 11/11/2026; los códigos de unidad de SenML se muestran con su símbolo («Cel» → «°C», «%RH», «hPa», «dBm», «V») desde
@@ -457,10 +457,12 @@ corrección del 11/11/2026). No hay correo saliente (`docs/20 §4`): un canal sa
 1. ✅ backend, 11/11/2026 (columna y su uso en las escrituras; usuarios, aún con su detalle). `evento` gana `usuario_id` (nulo para lo que hace el sistema): toda escritura con sesión lo deja (alta, baja, mantenimiento,
    umbrales, calibración, credenciales, usuarios), y `GET /dispositivos/{id}` y la ficha muestran «registrado por N». «Registrado por N» solo
    para administradores: el nombre lo reciben el administrador de ese sitio y el del sistema; los demás perfiles, `usuario: null`
-   (`docs/21 §2`; decidido el 11/11/2026).
+   (`docs/21 §2`; decidido el 11/11/2026). **Desde el 20/11/2026** la persona viaja como `{ id, nombre, correo }` y el panel escribe el nombre y,
+   al lado y en texto secundario, el correo (un solo ayudante, `Persona.svelte`, en la ficha, en «Actividad» y en los enlaces públicos): dos cuentas con el mismo
+   nombre ya no se ven iguales. Una cuenta anonimizada muestra solo su marcador, sin correo. No amplía quién ve el correo (`docs/21 §2`: los mismos que ven el nombre).
 2. **P14 Actividad** ✅ panel, 11/11/2026 (el menú, según la acción `auditoria` de la matriz del servidor; la persona y el tipo del filtro salen de `GET /usuarios` y de los tipos recibidos) (`#/actividad`; administrador de sitio en sus sitios, administrador del sistema en todos): una lista por cursor que
    mezcla `evento` (con persona y dispositivo) y `acceso` (entradas, salidas y bloqueos de las personas de esos sitios), con filtros por
-   persona, tipo y rango, y texto para personas («cambió los umbrales de Humedad del invernadero»); de
+   persona (cada opción, «Nombre — correo», para distinguir homónimos), tipo y rango, el «Quién» con nombre y correo (20/11/2026), y texto para personas («cambió los umbrales de Humedad del invernadero»); de
    `GET /sitios/{id}/actividad?desde&hasta&tipo&usuario&cursor` (Etapa 4). La auditoría por petición HTTP de `docs/10 §8.4` punto 43 sigue
    siendo de la monitorización (B4) y no se muestra aquí.
 
@@ -503,7 +505,7 @@ intervalo_esperado_s, canales_total, canales[{id, magnitud, magnitud_nombre, uni
 chispa?}]}], tendencia, chispa?{desde, intervalo, puntos}` (las `chispa`, solo con `tendencia: true`; L6); `/sitios/{id}/historico` → la forma de `Historico` más `minimos, maximos, n` y `magnitud, unidad`;
 `/canales/{id}/historico` → `minimos, maximos` además de lo de hoy; `/dispositivos/{id}/historico` → `tiempos, canales[{id, magnitud,
 magnitud_nombre, unidad, valores, minimos, maximos, muestras}]`; cada fila de `/dispositivos` suma `estado_visual` y `entrega`;
-`/dispositivos/{id}/eventos` → `id, tipo, detalle, ocurrido_en, usuario{id, nombre}|null`; `/cuarentena/detectados` → `sitio_codigo, emisor, topico,
+`/dispositivos/{id}/eventos` → `id, tipo, detalle, ocurrido_en, usuario{id, nombre, correo}|null`; `/cuarentena/detectados` → `sitio_codigo, emisor, topico,
 tramas, ultima` (una fila por sitio y emisor); `PATCH /dispositivos/{id}` (Etapa 4) recibe `actualizado_en` y los campos que cambian, y responde la ficha o 409 con el
 `actualizado_en` vigente; `PUT /canales/{id}/reglas` (Etapa 4) recibe `actualizado_en, etiqueta, reglas[{id?, umbral_alto, umbral_bajo, histeresis,
 retardo_s}]` (con `id`, cambia esa regla; sin `id`, una nueva; las que no vienen se quitan: decidido el 11/11/2026); `POST /dispositivos/lote` (Etapa 4) recibe `filas[{id_fisico, nombre, zona, via, formato, intervalo_esperado_s, canales, pasarela}]`
@@ -513,7 +515,7 @@ zona_horaria (sitio|IANA), tema (sistema|claro|oscuro), notificar[tipos], vistas
 actualizado_en`, con `parametros` un objeto texto → texto en el panel y en el servidor (la ruta del panel que abre la vista va en `ruta`,
 `{ruta: '/inventario?estado=alerta'}`; corrección del 11/11/2026: el panel la mandaba como texto y el servidor rechazaba toda vista);
 `/sesiones` → `id, creada_en, ultima_actividad, agente, origen, actual`; `/sitios/{id}/actividad?desde&hasta&tipo&usuario&cursor&limite` →
-`id, instante, clase (evento|acceso), tipo, texto, usuario{id, nombre}|null, dispositivo{id, nombre}|null`; cada fila de `/condiciones`
+`id, instante, clase (evento|acceso), tipo, texto, usuario{id, nombre, correo}|null, dispositivo{id, nombre}|null` (`correo` nulo en una cuenta anonimizada); cada fila de `/condiciones`
 suma `sitio` (el nombre: el cuerpo genérico de la notificación del navegador).
 
 **J. Pruebas y medición (antes de dar por hecho).** Por el DOM: cada pantalla en los dos sentidos (lo que debe verse y lo que debe
@@ -1226,7 +1228,7 @@ ajustar, lo ajusta él, dentro de los límites de la instancia):
 - **La página de privacidad sube a la versión 2**, porque cambian los datos que se guardan (el inventario de `docs/21 §2` suma la vista
   pública). Los términos de uso no cambian de versión: su texto no cambió. **Regla general (decidida el 18/11/2026, `docs/21 §7`):** toda
   actualización del texto de privacidad que viaja a la pantalla, también una corrección de redacción, sube la versión en 1 y pone la fecha del
-  cambio; vale igual para los términos. La reescritura para personas del 18/11/2026 es la versión 3. No depende de acordarse: la huella del
+  cambio; vale igual para los términos. La reescritura para personas del 18/11/2026 es la versión 3 y la del 20/11/2026 (homónimos), la 4. No depende de acordarse: la huella del
   texto debe coincidir con la última fila de un historial en `docs/21 §7`, lo comprueba `legal.spec.ts` y el paso 2w7 del verificador impide
   reescribir filas ya publicadas. El panel muestra «Versión N, del …» con la versión y la fecha que sirve la API (`Legal.svelte`).
 - **Una carga de la pantalla** (punto 8) la marca el panel con `?carga=si` en su primera petición; los refrescos no la llevan.
@@ -1301,8 +1303,8 @@ ajustar, lo ajusta él, dentro de los límites de la instancia):
   ese informe cuando exista. El recorrido en navegador comprueba que el token no aparece en la consola.
 - **La gráfica de cada magnitud lleva el total del sitio y cada zona publicada**, con los colores de la paleta en orden (con más de cinco
   zonas se repiten: el nombre de cada línea está en la leyenda fija y en «Ver los datos»).
-- **La lista de enlaces va en tarjetas a todo ancho** (no en tabla): cada una con título, qué publica, quién la creó, cuándo vence o se
-  revocó, visitas de los últimos 7 días y estado; renovar abre el plazo (30 días por omisión) y su confirmación junto a la tarjeta. El
+- **La lista de enlaces va en tarjetas a todo ancho** (no en tabla): cada una con título, qué publica, quién la creó (nombre y correo, desde el 20/11/2026: para distinguir homónimos), cuándo vence o se
+  revocó (y quién la revocó, igual), visitas de los últimos 7 días y estado; renovar abre el plazo (30 días por omisión) y su confirmación junto a la tarjeta. El
   formulario empieza con la ventana máxima de 7 días y el vencimiento de 30.
 
 **P. Esperando primera trama (decidido el 18/11/2026; la regla, en §2).** Lo que cambia, en el orden en que se construye:
@@ -1756,7 +1758,7 @@ administrador); la vista pública nunca ofrece exportar (punto 6).
 | P2 y P3 v2 | RF-33, RF-47, RF-49, RF-57, HU-07, TT-42 | Etapa 4, iteración 1 | El estado visual del servidor coincide con `estadoVisual()` fila por fila; paginación con total en la cabecera; un zoom cambia la resolución y la URL; banda mín–máx; umbrales y condiciones dibujados; tramas rechazadas agrupadas con «× N»; unidades según la preferencia con ida y vuelta exacta |
 | P6 Configurar | HU-06, HU-13, RF-14 | Etapa 4, iteración 1 | Validación compartida (plantada: bajo ≥ alto falla en los dos lados); 409 con dos pestañas; retardo de activación: una medición fuera de banda menos tiempo que el retardo no abre condición, más tiempo sí; cada guardado deja un `evento` con la persona. Panel (`docs/16 §64`): los casos de la prueba del servidor repetidos contra la función del panel, el error junto al campo, «Guardando…», el 409 con la hora y «Recargar» sin pisar; con navegador real, la validación en vivo y el 409 con dos pestañas |
 | P7 Alta, lote y detectados | HU-22, RF-50, HU-11 | Etapa 4, iteración 1 | Credencial una sola vez; `modo=validar` no crea nada; desde el bloque N (15/11/2026), crear es todo o nada: una fila que no entra o un plan que cambió es 409 `plan_cambio` y no se crea ninguna, y el reintento con la misma llave no duplica (`docs/16 §71`); tope de 500 filas, del cuerpo y límite de tasa plantados; un emisor desconocido aparece en detectados y llega al asistente con su identificador. Panel: por el DOM, 121 válidas en una petición, repetida con la misma llave tras un 502, y los 409 por su `codigo` (`docs/16 §71`; hasta el 15/11, tandas de 50: `docs/16 §64`), 501 filas frenadas en el navegador, detectado → asistente; desde el 16/11/2026, la vista previa en tres pasos (`docs/16 §76`): los tres orígenes dan las mismas filas, las fórmulas salen neutralizadas y lo descargado vuelve a subirse sin cambios, las cinco tarjetas cuentan lo que muestran, «Crear» se desactiva en vuelo; con navegador real, el asistente por HTTP y un lote de 2 válidas y 1 rechazada, y el recorrido de la vista previa a 1 280 y 390 px (`banco.sh lote-navegador`, corrido el 16/11/2026: 24 de 24 en Firefox y en Chromium; faltan los umbrales de tiempo); desde el 19/11/2026 (bloque S), `pruebas/panel-lote-e2e.sh` contra la pila de desarrollo, con el catálogo fijo de 60 escenarios, 500 filas con sus umbrales de tiempo, la creación por HTTP y 0 filas al salir (`docs/16 §90`) |
-| P14 Actividad | RF-46, HU-11, HU-26 | Etapa 4, iteración 1 | Un umbral cambiado aparece con la persona que lo cambió; un administrador de un sitio no ve la actividad de otro (404); un cursor de otro sitio no trae nada. Panel (`docs/16 §64`): por el DOM, cursor, filtros en la URL, tarjetas en teléfono y nada para quien no administra; con navegador real, el umbral cambiado en P6 con quien lo cambió y sin correos |
+| P14 Actividad | RF-46, HU-11, HU-26 | Etapa 4, iteración 1 | Un umbral cambiado aparece con la persona que lo cambió; un administrador de un sitio no ve la actividad de otro (404); un cursor de otro sitio no trae nada. Panel (`docs/16 §64`): por el DOM, cursor, filtros en la URL, tarjetas en teléfono y nada para quien no administra; con navegador real, el umbral cambiado en P6 con quien lo cambió (el correo, solo dentro de `usuario{}`; el texto nunca lleva correos) |
 | P2 y P3 con «Esperando primera trama» | RF-24, RF-30, HU-19, HU-14 | Etapa 4, iteración 1 (18/11/2026) | `docs/16 §85`: la regla del estado visual contra la base con la misma tabla de casos que el panel (24 casos, bordes incluidos); el supervisor abre a quien nunca reportó solo al vencer el plazo de su sitio, una vez aunque corran dos barridos, y no abre al volver de mantenimiento; pasar a mantenimiento cierra las condiciones abiertas con su evento; la primera trama cierra la condición; el inventario y la ficha lo muestran con su palabra y su entrega «—»; la guía de perfiles nombra `ajustes` (`bash plataforma/pruebas/espera-integracion.sh`) |
 | P15 Ajustes del sitio | RF-62, HU-32, §2 (estado «Esperando primera trama») | Etapa 4, iteración 1 (decidida el 18/11/2026, §4, Q) | Sin cambios de ruta: el plazo, el k y el tope ya tienen sus pruebas de API (`docs/16 §85` y §79). Panel (`docs/16 §86`): por el DOM, el plazo con su bloqueo optimista y la relectura del 409, el mismo valor sin petición, el k y el tope mudados desde «Publicar» sin perder prueba alguna, el menú por acción y la línea de lectura de «Publicar»; con navegador real, el k bajado desde esta pantalla y una visita a 390 y 1 280 px |
 | P9 Vista pública | RF-62, HU-32, punto 6 | Etapa 4, iteración 1 (`docs/04 §8`, decisión del 13/11/2026; diseño del 16/11/2026 en §4, O) | Sin cuenta: solo los promedios elegidos, sin mínimo ni máximo, y un valor de menos de k dispositivos sale oculto; ninguna otra ruta cambia su respuesta con el token en la cabecera; vencido, revocado, inexistente y mal formado dan la misma respuesta; revocar corta con la respuesta guardada; la vista previa y la vista del visitante dan los mismos números; el token no queda en ningún registro; cada prueba con su falla plantada y, en navegador real, ambas pantallas a 1 280 y 390 px (§4, O, punto 13). Hecho el 17/11/2026: `docs/16 §79` (base, backend y proxy) y §80 (las pantallas: por el DOM y con `pruebas/panel-publico-e2e.sh`, paso 4c, en Chromium y Firefox); la medición, pendiente |

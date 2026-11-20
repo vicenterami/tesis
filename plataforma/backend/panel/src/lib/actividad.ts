@@ -1,6 +1,7 @@
 // P14 Actividad (docs/19 §4, tablero v2, G2; RF-46, HU-11, HU-26): lo que hicieron las personas en un sitio (`evento` con quién) y sus
 // entradas, salidas y bloqueos (`acceso`), por cursor. Solo para quien administra el sitio (el del sistema, en todos): lo decide el
 // servidor; el panel oculta el menú a los demás según `GET /sesion`. El texto para personas lo arma el servidor (`texto`).
+import type { Persona } from './persona';
 import type { FiltrosActividad } from './vista';
 
 export interface FilaActividad {
@@ -8,7 +9,7 @@ export interface FilaActividad {
   clase: 'evento' | 'acceso';
   tipo: string;
   texto: string;
-  usuario: { id: string; nombre: string } | null;
+  usuario: Persona | null;
   dispositivo: { id: string; nombre: string } | null;
 }
 

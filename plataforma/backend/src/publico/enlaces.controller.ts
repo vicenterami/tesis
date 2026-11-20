@@ -31,7 +31,7 @@ const AVISOS = { type: 'array', items: { type: 'string' }, description: 'Avisos 
 
 const DESCRIPCION_ENLACE =
   '`id, titulo, descripcion, magnitudes[{codigo, nombre, unidad}], ventana_maxima, zonas[{id, nombre}]` (el nombre publicado), ' +
-  '`creado_por{id, nombre}|null, creado_en, expira_en, renovado_en, revocado_en, revocado_por{id, nombre}|null`, `accesos_7d` (cargas de la pantalla ' +
+  '`creado_por{id, nombre, correo}|null, creado_en, expira_en, renovado_en, revocado_en, revocado_por{id, nombre, correo}|null` (el correo distingue a dos personas con el mismo nombre; null en una cuenta anonimizada), `accesos_7d` (cargas de la pantalla ' +
   `de los últimos 7 días del sitio), \`estado\` (vigente, vence_pronto —${VENCE_PRONTO_DIAS} días o menos—, vencido, revocado), \`renovable\`, ` +
   '`retencion_dias` y `anonimizado_en` (cuándo se anonimizó su texto, o null). Nunca el token.';
 

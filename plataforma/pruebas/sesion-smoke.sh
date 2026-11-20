@@ -465,7 +465,7 @@ n=$(sql -c "SELECT count(*) FROM evento WHERE dispositivo_id = '$DA' AND tipo IN
 [ "$n" = 3 ] && ok "cada guardado deja su evento con quién lo hizo (evento.usuario_id = el administrador): 3 de 3" || falla "eventos con usuario_id del administrador: $n (esperado 3)"
 # «Quién hizo el cambio» es un dato personal (docs/21 §2; decidido el 11/11/2026): el nombre, solo para quien administra el sitio.
 caso "administrador: GET /dispositivos/{id}/eventos muestra quién (usuario{id, nombre})" 200 adm GET "/dispositivos/$DA/eventos"
-[ "$(campo "sum(1 for e in v if e['usuario'] and e['usuario']['id']=='$ADM_UID' and e['tipo'] in ('dispositivo_configurado','reglas_cambiadas'))")" = 3 ] && ok "administrador: los eventos del dispositivo traen la persona que configuró" || falla "administrador: eventos sin la persona: $(head -c 200 "$T/r")"
+[ "$(campo "sum(1 for e in v if e['usuario'] and e['usuario']['id']=='$ADM_UID' and e['usuario']['correo']=='$ADM_EMAIL' and e['tipo'] in ('dispositivo_configurado','reglas_cambiadas'))")" = 3 ] && ok "administrador: los eventos del dispositivo traen la persona que configuró, con su nombre y su correo" || falla "administrador: eventos sin la persona: $(head -c 200 "$T/r")"
 caso "consulta: GET /dispositivos/{id}/eventos (su sitio)" 200 con GET "/dispositivos/$DA/eventos"
 [ "$(campo "(len([e for e in v if e['tipo'] in ('dispositivo_configurado','reglas_cambiadas')]), sum(1 for e in v if e['usuario'] is not None))")" = "(3, 0)" ] && ok "consulta: ve los 3 eventos, pero sin el nombre de quien los hizo (usuario: null)" || falla "consulta ve quién: $(head -c 200 "$T/r")"
 # Alta por lote (docs/19 §4, N): vista previa con el n de cada fila, creación con su huella y la llave; las que no entran se informan.
@@ -701,7 +701,11 @@ caso "administrador: GET /sitios/{id}/actividad" 200 adm GET "/sitios/$SITIO_A/a
   && ok "actividad: también lo que no tiene dispositivo (altas de cuentas de A, términos aceptados, la pasarela de A), nada de B" || falla "actividad sin dispositivo: $(head -c 300 "$T/r")"
 [ "$(campo "(any(a['tipo']=='reglas_cambiadas' and a['usuario'] and a['usuario']['id']=='$ADM_UID' and a['texto'].startswith('cambió los umbrales de') for a in v), any(a['clase']=='acceso' and a['tipo']=='ok' for a in v))")" = "(True, True)" ] \
   && ok "actividad: «cambió los umbrales de …» con la persona, y las entradas (acceso) de las personas del sitio" || falla "actividad: $(head -c 300 "$T/r")"
-grep -qE '@|\b[0-9]{1,3}(\.[0-9]{1,3}){3}\b' "$T/r" && falla "actividad: la respuesta trae un correo o una dirección IP" || ok "actividad: sin correos ni direcciones IP en la respuesta"
+# 20/11/2026 (homónimos): la persona viaja con su correo ({id, nombre, correo}) para distinguir a dos cuentas con el mismo nombre; el
+# `texto` de cada fila sigue sin correos y nunca hay una dirección IP (la cuenta anonimizada, más abajo, tras su baja).
+[ "$(campo "(any(a['usuario'] and a['usuario']['id']=='$ADM_UID' and a['usuario']['correo']=='$ADM_EMAIL' for a in v), any('@' in a['texto'] for a in v))")" = "(True, False)" ] \
+  && ok "actividad: la persona trae su correo ({id, nombre, correo}); el texto de las filas, sin correos" || falla "actividad: la persona sin su correo, o un correo en el texto: $(head -c 300 "$T/r")"
+grep -qE '\b[0-9]{1,3}(\.[0-9]{1,3}){3}\b' "$T/r" && falla "actividad: la respuesta trae una dirección IP" || ok "actividad: sin direcciones IP en la respuesta"
 grep -q "$DB" "$T/r" && falla "actividad del sitio A trae el dispositivo de B" || ok "actividad del sitio A: nada del sitio B"
 sig=$(pedir_cabecera adm "/sitios/$SITIO_A/actividad?limite=2" X-Siguiente); P1=$(campo "[a['id'] for a in v]")
 caso "actividad: página 2 con el cursor" 200 adm GET "/sitios/$SITIO_A/actividad?limite=2&cursor=$sig"
@@ -771,6 +775,12 @@ caso "baja: la sesión ya no vale" 401 baj GET /sesion
 c=$(entrar baj2 "baja$DOM" <<<"$NUEVA_ULTIMA"); [ "$c" = 401 ] && ok "baja: el correo de antes ya no entra → 401" || falla "baja: el correo de antes entra → $c"
 M=$(sql -c "SELECT to_char(actualizado_en AT TIME ZONE 'UTC', 'YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"') FROM usuario WHERE id = '$BAJ_ID'")
 caso "baja: una cuenta anonimizada no se reactiva → 409" 409 sis PATCH "/usuarios/$BAJ_ID" "{\"actualizado_en\":\"$M\",\"activo\":true,\"clave_temporal\":true}"
+# 20/11/2026: la cuenta anonimizada, ya con eventos suyos en la actividad del sitio A (su baja deja el evento `usuario_baja`
+# a su nombre), sale con su marcador y `correo: null`; ni el correo técnico de la baja ni el de antes viajan. Falla si se quita la guarda.
+caso "baja: la actividad del sitio A filtrada por la cuenta anonimizada → 200" 200 adm GET "/sitios/$SITIO_A/actividad?usuario=$BAJ_ID&limite=500"
+[ "$(campo "(len(v) > 0, all(a['usuario'] and a['usuario']['id']=='$BAJ_ID' and a['usuario']['correo'] is None and 'Persona que se va' not in a['usuario']['nombre'] for a in v))")" = "(True, True)" ] \
+  && ! grep -q "baja$DOM\|cuenta-anonimizada.invalid" "$T/r" \
+  && ok "baja: en la actividad, la cuenta anonimizada sale con su marcador y correo null (ni el correo de antes ni el técnico de la baja)" || falla "baja: la actividad de la cuenta anonimizada: $(head -c 300 "$T/r")"
 if [ "$otros" = 0 ]; then
   caso "el último administrador del sistema no se da de baja → 409" 409 sis POST /cuenta/baja "$(python3 -I -c "import sys,json; print(json.dumps({'clave': sys.argv[1]}))" "$SIS_CLAVE")"
 fi

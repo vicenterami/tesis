@@ -628,3 +628,5 @@ main { padding-bottom: calc(var(--e-4) + var(--alto-avisos, 0px)); }
 .estimacion-exportar h3 { margin: 0 0 var(--e-1); font-size: var(--t-m); }
 .cifra-estimacion { margin: 0; font-size: var(--t-l); font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .estimacion-exportar .vivo { margin: var(--e-1) 0 0; }
+/* El correo junto al nombre de quien hizo algo (Persona.svelte): texto secundario, sin el peso del nombre; el correo largo se parte en vez de ensanchar la fila. */
+.persona-correo { font-size: 0.85em; font-weight: 400; color: var(--texto-secundario); overflow-wrap: anywhere; }

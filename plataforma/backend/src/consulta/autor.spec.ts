@@ -6,13 +6,14 @@ import type { Rol, UsuarioSesion } from '../sesion/permisos.js';
 // «Quién hizo el cambio» (docs/21 §2; decidido el 11/11/2026): el nombre, solo para quien administra el sitio y el usuario del sistema.
 const S = '00000000-0000-4000-8000-000000000001';
 const persona = (rol: Rol): UsuarioSesion => ({ id: 'u', nombre: 'n', email: 'e', sistema: false, todos: false, sitios: new Map([[S, rol]]), claveTemporal: false, terminosPendientes: false, sesionId: 's' });
-const filas = [{ id: 'e1', usuario: { id: 'u1', nombre: 'Ana' } }, { id: 'e2', usuario: null }];
+const filas = [{ id: 'e1', usuario: { id: 'u1', nombre: 'Ana', correo: 'ana@example.org' } }, { id: 'e2', usuario: null }];
 
 describe('verAutor y conAutor', () => {
-  it('administrador del sitio y usuario del sistema ven el nombre; consulta recibe usuario null en todas las filas', () => {
-    expect(conAutor(filas, verAutor(persona('administrador'), S))[0].usuario).toEqual({ id: 'u1', nombre: 'Ana' });
-    expect(conAutor(filas, verAutor(usuarioSistema(), S))[0].usuario).toEqual({ id: 'u1', nombre: 'Ana' });
+  it('administrador del sitio y usuario del sistema ven el nombre y el correo; consulta recibe usuario null (el objeto entero, sin correo) en todas las filas', () => {
+    expect(conAutor(filas, verAutor(persona('administrador'), S))[0].usuario).toEqual({ id: 'u1', nombre: 'Ana', correo: 'ana@example.org' });
+    expect(conAutor(filas, verAutor(usuarioSistema(), S))[0].usuario).toEqual({ id: 'u1', nombre: 'Ana', correo: 'ana@example.org' });
     expect(conAutor(filas, verAutor(persona('consulta'), S)).map((f) => f.usuario)).toEqual([null, null]);
+    expect(JSON.stringify(conAutor(filas, verAutor(persona('investigador'), S)))).not.toContain('ana@example.org');
   });
   it('no cambia las filas recibidas (copia)', () => {
     conAutor(filas, false);

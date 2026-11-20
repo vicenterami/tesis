@@ -810,13 +810,14 @@ describe('Ficha v2: zoom, banda, umbrales, todos los canales, eventos, rechazada
   });
 
   it('historial de eventos del rango, con quién lo hizo, y «Más antiguos» por cursor; rechazadas iguales agrupadas con «× N»', async () => {
-    eventos = [{ id: 'e1', tipo: 'umbrales', detalle: null, ocurrido_en: '2026-10-12T14:00:00Z', usuario: { id: 'u1', nombre: 'Ana' } }];
+    eventos = [{ id: 'e1', tipo: 'umbrales', detalle: null, ocurrido_en: '2026-10-12T14:00:00Z', usuario: { id: 'u1', nombre: 'Ana', correo: 'ana@example.org' } }];
     eventosSiguiente = 'cursor-2';
     const iguales = [0, 1, 2].map((i) => ({ ...rechazadas[0]!, id: `q${i}`, recibido_en: `2026-10-12T1${i}:00:00Z` }));
     const base = globalThis.fetch;
     vi.stubGlobal('fetch', vi.fn(async (ruta: string) => (ruta.startsWith('/cuarentena?') ? new Response(JSON.stringify(ruta.includes('cursor=') ? [] : iguales), { headers: ruta.includes('cursor=') ? {} : { 'X-Siguiente': 'r2' } }) : base(ruta))));
     render(Ficha, { id: ID });
-    await waitFor(() => expect(document.querySelector('[data-evento="e1"]')?.textContent).toContain('Cambio de umbrales · cambiado por Ana'));
+    await waitFor(() => expect(document.querySelector('[data-evento="e1"]')?.textContent).toContain('Cambio de umbrales · cambiado por Ana ana@example.org'));
+    expect(document.querySelector('[data-evento="e1"] [data-persona-correo]')!.textContent).toBe('ana@example.org');
     expect(document.querySelectorAll('[data-grupo-rechazadas]')).toHaveLength(1);
     expect(document.querySelector('[data-veces]')!.textContent).toBe('× 3');
     eventos = [{ id: 'e0', tipo: 'mantenimiento', detalle: null, ocurrido_en: '2026-10-12T09:00:00Z', usuario: null }];

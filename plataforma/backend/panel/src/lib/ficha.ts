@@ -39,10 +39,13 @@ const ROTULO_EVENTO: Readonly<Record<string, string>> = {
   // Los tipos que registra el backend del tablero v2 (registrarEvento, src/db/evento.ts):
   dispositivo_configurado: 'Cambio de configuración', reglas_cambiadas: 'Cambio de umbrales', canal_calibrado: 'Cambio de calibración', rotacion: 'Credencial nueva',
 };
-// «Registrado por N» en el alta y «cambiado por N» en lo demás, SOLO cuando el servidor manda la persona (G1): a quien no administra el
-// sitio le llega `usuario: null`, que no significa «lo hizo el sistema»; entonces no se dice nada de quién (11/11/2026).
+// Qué pasó, sin quién. «Registrado por N» en el alta y «cambiado por N» en lo demás, SOLO cuando el servidor manda la persona (G1): a quien no
+// administra el sitio le llega `usuario: null`, que no significa «lo hizo el sistema»; entonces no se dice nada de quién (11/11/2026).
 export function textoEvento(e: EventoDispositivo): string {
-  const que = ROTULO_EVENTO[e.tipo] ?? rotuloCondicion(e.tipo).replace(/_/g, ' ');
-  if (e.usuario === null) return que;
-  return `${que} · ${e.tipo === 'alta' ? 'registrado' : 'cambiado'} por ${e.usuario.nombre}`;
+  return ROTULO_EVENTO[e.tipo] ?? rotuloCondicion(e.tipo).replace(/_/g, ' ');
+}
+// «registrado» en el alta y «cambiado» en lo demás; null si no hay persona (a quien no administra el sitio le llega `usuario: null`). La persona
+// misma, con su correo, la escribe Persona.svelte junto a este verbo (20/11/2026: homónimos).
+export function verboAutor(e: EventoDispositivo): 'registrado' | 'cambiado' | null {
+  return e.usuario === null ? null : e.tipo === 'alta' ? 'registrado' : 'cambiado';
 }

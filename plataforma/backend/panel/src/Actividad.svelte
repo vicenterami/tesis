@@ -5,10 +5,12 @@
   // 700 px, tarjetas en vez de tabla (A5).
   import { onMount, untrack } from 'svelte';
   import Boton from './Boton.svelte';
+  import Persona from './Persona.svelte';
   import { esCancelacion, obtener, obtenerPagina, ultimaGana } from './lib/api';
   import { avisoDeError } from './lib/avisos';
   import { rotuloTipoActividad, urlActividad, type FilaActividad } from './lib/actividad';
   import { seguirAngosto } from './lib/medios';
+  import { rotuloPersona } from './lib/persona';
   import type { Sitio } from './lib/modelo';
   import { puedeEn, type Sesion } from './lib/sesion';
   import { fechaHora, horaLocal, instanteDesdeLocal, localDesdeInstante } from './lib/tiempo';
@@ -33,7 +35,7 @@
   let cargado = $state(false);
   let error = $state<string | null>(null);
   let angosto = $state(false);
-  let personas = $state<{ id: string; nombre: string }[]>([]);
+  let personas = $state<{ id: string; nombre: string; correo: string | null }[]>([]);
   // Los tipos vistos (el filtro ofrece los que aparecieron más el elegido): el servidor admite el código; aquí no se inventa un catálogo.
   let tiposVistos = $state<string[]>([]);
   const carga = ultimaGana();
@@ -65,8 +67,8 @@
     if (sitio === null) return;
     const id = sitio.id;
     untrack(() => {
-      void obtener<{ id: string; nombre: string; sitios: { sitio_id: string }[] }[]>('/usuarios')
-        .then((l) => (personas = l.filter((u) => u.sitios.some((s) => s.sitio_id === id)).map((u) => ({ id: u.id, nombre: u.nombre }))))
+      void obtener<{ id: string; nombre: string; email: string; anonimizado?: boolean; sitios: { sitio_id: string }[] }[]>('/usuarios')
+        .then((l) => (personas = l.filter((u) => u.sitios.some((s) => s.sitio_id === id)).map((u) => ({ id: u.id, nombre: u.nombre, correo: u.anonimizado === true ? null : u.email }))))
         .catch(() => (personas = []));
     });
   });
@@ -97,7 +99,8 @@
     if (h.getTime() <= d.getTime()) return { fija: null, motivo: '«hasta» debe ser después de «desde»' };
     return { fija: { desde: d, hasta: h }, motivo: null };
   });
-  const quien = (f: FilaActividad): string => f.usuario?.nombre ?? (f.clase === 'evento' ? 'el sistema' : 'persona sin nombre');
+  // Sin persona: lo del sistema (un evento) o un acceso de una cuenta sin nombre; con persona, su nombre y su correo (Persona.svelte).
+  const sinPersona = (f: FilaActividad): string => (f.clase === 'evento' ? 'el sistema' : 'persona sin nombre');
 </script>
 
 <div class="actividad" data-actividad>
@@ -113,7 +116,7 @@
       {/if}
       <label>Persona <select value={filtros.usuario} onchange={(e) => cambiar({ usuario: e.currentTarget.value })} data-filtro-persona>
         <option value="">todas</option>
-        {#each personas as u (u.id)}<option value={u.id}>{u.nombre}</option>{/each}
+        {#each personas as u (u.id)}<option value={u.id}>{rotuloPersona(u)}</option>{/each}
       </select></label>
       <label>Tipo <select value={filtros.tipo} onchange={(e) => cambiar({ tipo: e.currentTarget.value })} data-filtro-tipo>
         <option value="">todos</option>
@@ -136,7 +139,7 @@
       <ul class="lista-actividad" data-tarjetas-actividad>
         {#each filas as f, i (`${f.instante}-${i}`)}
           <li data-fila-actividad>
-            <strong>{quien(f)}</strong> {f.texto}<br />
+            <strong><Persona persona={f.usuario} vacio={sinPersona(f)} /></strong> {f.texto}<br />
             <span class="vivo" title={horaLocal(f.instante, zona)}>{fechaHora(f.instante, zona)}</span>
             {#if f.dispositivo !== null} · <a href={fragmentoFicha(f.dispositivo.id, null, '24h')}>{f.dispositivo.nombre}</a>{/if}
           </li>
@@ -150,7 +153,7 @@
             {#each filas as f, i (`${f.instante}-${i}`)}
               <tr data-fila-actividad>
                 <td title={horaLocal(f.instante, zona)}>{fechaHora(f.instante, zona)}</td>
-                <td>{quien(f)}</td>
+                <td><Persona persona={f.usuario} vacio={sinPersona(f)} /></td>
                 <td>{f.texto}</td>
                 <td>{#if f.dispositivo !== null}<a href={fragmentoFicha(f.dispositivo.id, null, '24h')}>{f.dispositivo.nombre}</a>{/if}</td>
               </tr>
