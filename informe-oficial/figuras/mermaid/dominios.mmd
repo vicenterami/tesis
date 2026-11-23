@@ -24,6 +24,9 @@ flowchart TB
         credencial
         canal
         magnitud
+        magnitud_alias
+        receta_decodificacion
+        receta_campo
     end
     subgraph D2["Recepción y mediciones"]
         trama
@@ -47,8 +50,12 @@ flowchart TB
     dispositivo --> estado_dispositivo
     enlace_publico --> enlace_publico_acceso
     magnitud --> canal
+    magnitud --> magnitud_alias
+    magnitud --> receta_campo
     pasarela --> credencial
     pasarela --> dispositivo
+    receta_decodificacion --> dispositivo
+    receta_decodificacion --> receta_campo
     regla_umbral --> condicion
     sitio --> pasarela
     sitio --> zona

@@ -18,22 +18,29 @@
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=\linewidth,height=0.82\textheight,keepaspectratio]{figuras/render/modelo-sitios-y-dispositivos-1.pdf}
-\caption[Modelo de datos: Sitios y dispositivos (parte 1 de 3)]{Modelo de datos, dominio «Sitios y dispositivos» (parte 1 de 3). El inventario: dónde está cada equipo, quién lo identifica ante el broker, qué magnitudes reporta y cuál es su estado actual. Tablas de esta figura: \texttt{sitio}, \texttt{zona}, \texttt{pasarela}.}
+\caption[Modelo de datos: Sitios y dispositivos (parte 1 de 4)]{Modelo de datos, dominio «Sitios y dispositivos» (parte 1 de 4). El inventario: dónde está cada equipo, quién lo identifica ante el broker, qué magnitudes reporta y cuál es su estado actual; y el catálogo con que se lee lo que envía (magnitudes, alias y recetas de decodificación). Tablas de esta figura: \texttt{sitio}, \texttt{zona}, \texttt{pasarela}.}
 \label{fig:modelo-sitios-y-dispositivos-1}
 \end{figure}
 
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=\linewidth,height=0.82\textheight,keepaspectratio]{figuras/render/modelo-sitios-y-dispositivos-2.pdf}
-\caption[Modelo de datos: Sitios y dispositivos (parte 2 de 3)]{Modelo de datos, dominio «Sitios y dispositivos» (parte 2 de 3). Tablas de esta figura: \texttt{dispositivo}, \texttt{dispositivo\_zona}, \texttt{estado\_dispositivo}. Con borde punteado y sin columnas, las tablas a las que apuntan claves foráneas de estas y que se dibujan en otra figura: \texttt{pasarela}, \texttt{zona}.}
+\caption[Modelo de datos: Sitios y dispositivos (parte 2 de 4)]{Modelo de datos, dominio «Sitios y dispositivos» (parte 2 de 4). Tablas de esta figura: \texttt{dispositivo}, \texttt{dispositivo\_zona}, \texttt{estado\_dispositivo}. Con borde punteado y sin columnas, las tablas a las que apuntan claves foráneas de estas y que se dibujan en otra figura: \texttt{pasarela}, \texttt{receta\_decodificacion}, \texttt{zona}.}
 \label{fig:modelo-sitios-y-dispositivos-2}
 \end{figure}
 
 \begin{figure}[!htbp]
 \centering
 \includegraphics[width=\linewidth,height=0.82\textheight,keepaspectratio]{figuras/render/modelo-sitios-y-dispositivos-3.pdf}
-\caption[Modelo de datos: Sitios y dispositivos (parte 3 de 3)]{Modelo de datos, dominio «Sitios y dispositivos» (parte 3 de 3). Tablas de esta figura: \texttt{credencial}, \texttt{canal}, \texttt{magnitud}. Con borde punteado y sin columnas, las tablas a las que apuntan claves foráneas de estas y que se dibujan en otra figura: \texttt{dispositivo}, \texttt{pasarela}.}
+\caption[Modelo de datos: Sitios y dispositivos (parte 3 de 4)]{Modelo de datos, dominio «Sitios y dispositivos» (parte 3 de 4). Tablas de esta figura: \texttt{credencial}, \texttt{canal}. Con borde punteado y sin columnas, las tablas a las que apuntan claves foráneas de estas y que se dibujan en otra figura: \texttt{dispositivo}, \texttt{magnitud}, \texttt{pasarela}.}
 \label{fig:modelo-sitios-y-dispositivos-3}
+\end{figure}
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\linewidth,height=0.82\textheight,keepaspectratio]{figuras/render/modelo-sitios-y-dispositivos-4.pdf}
+\caption[Modelo de datos: Sitios y dispositivos (parte 4 de 4)]{Modelo de datos, dominio «Sitios y dispositivos» (parte 4 de 4). Tablas de esta figura: \texttt{magnitud}, \texttt{magnitud\_alias}, \texttt{receta\_decodificacion}, \texttt{receta\_campo}.}
+\label{fig:modelo-sitios-y-dispositivos-4}
 \end{figure}
 
 \begin{figure}[!htbp]

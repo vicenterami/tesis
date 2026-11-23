@@ -9,6 +9,7 @@ erDiagram
     dispositivo ||--o{ dispositivo_zona : ""
     dispositivo ||--o{ estado_dispositivo : ""
     pasarela ||--o{ dispositivo : ""
+    receta_decodificacion ||--o{ dispositivo : ""
     zona ||--o{ dispositivo : ""
     zona ||--o{ dispositivo_zona : ""
     dispositivo {
@@ -24,7 +25,7 @@ erDiagram
         text via
         text formato FK
         uuid pasarela_id FK
-        text decodificador
+        text decodificador FK
         timestamptz en_servicio_desde
     }
     dispositivo_zona {
@@ -44,6 +45,8 @@ erDiagram
         int ventana_omitidas
     }
     pasarela
+    receta_decodificacion
     zona
     style pasarela fill:#F2F4F3,stroke:#55635B,stroke-dasharray:4 3
+    style receta_decodificacion fill:#F2F4F3,stroke:#55635B,stroke-dasharray:4 3
     style zona fill:#F2F4F3,stroke:#55635B,stroke-dasharray:4 3

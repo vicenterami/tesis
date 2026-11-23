@@ -22,7 +22,7 @@ uniformidad es la que resuelve la causa C1 (formatos dispares).
 |---|---|---|---|
 | 1 | **sitio** | Organización o instalación que agrupa dispositivos | Declara su **zona horaria** (IANA) y su **código**, el segmento del tópico (`sitio/<codigo>/…`, migración 11); el caso de validación es el Campus Dr. Luis Rivas del Canto (código `uct`). Desde la migración 26 (18/11/2026), `espera_primera_trama_h`: cuántas horas espera el sitio la primera trama de un equipo desde que entró en servicio antes de darlo por «Sin señal» (1 a 2 160, 168 por omisión; `docs/19 §2`) |
 | 2 | **zona** | Subdivisión lógica de un sitio (edificio, sector, sala) | Un sitio tiene muchas zonas |
-| 3 | **magnitud** | Catálogo de lo que se puede medir (temperatura, humedad, nivel…) | Define la unidad canónica y el rango válido |
+| 3 | **magnitud** | Catálogo de lo que se puede medir (temperatura, humedad, nivel…) | Define la unidad canónica (fija desde que se crea) y el rango válido (obligatorio, finito y con mínimo < máximo); desde la migración 27, el umbral alto, el bajo y la histéresis **sugeridos** (nulos hasta que se fijen; no crean reglas, rellenan el editor de reglas del canal). La aplicación crea magnitudes y cambia nombre, rango y sugeridos; ninguna se borra |
 | 4 | **dispositivo** | Un nodo físico que reporta (ESP32, sensor LoRa…) | Pertenece a una zona; se identifica por un id físico (MAC/DevEUI, lista blanca `[a-z0-9-]`); declara su **vía** (mqtt, http, lorawan), su **formato** (`senml` o `plano` si llega directo; en la vía lorawan, el de su pasarela: `milesight` o `chirpstack`) y, si llega por LoRaWAN, su **pasarela** (migraciones 11 y 15) y, si su pasarela entrega la trama sin decodificar, su **perfil de decodificación** (`decodificador`, migración 17). Desde la migración 26, `en_servicio_desde`: desde cuándo se espera que reporte (el alta, y cada vuelta a `activo` desde `mantenimiento`; las filas anteriores, su `creado_en`), de donde se cuentan el plazo de la primera trama, el silencio que vigila el supervisor y las tramas esperadas de la entrega (`docs/10 §8.4` punto 68) |
 | 5 | **canal** | Una magnitud concreta que un dispositivo reporta | Un dispositivo puede tener varios canales (temp + humedad) |
 | 6 | **credencial** | Secreto de autenticación de un dispositivo o de una pasarela (exactamente uno de los dos es su titular, migración 16) | Permite rotación sin borrar al titular. `hash` guarda solo el resumen, nunca el secreto: `sha256$<base64>` desde el 13/11/2026; las anteriores, `scrypt$…`, siguen valiendo y la vía HTTP las convierte en su primera trama válida (`docs/11 §4`) |
@@ -45,14 +45,17 @@ uniformidad es la que resuelve la causa C1 (formatos dispares).
 | 23 | **enlace_publico** | Una vista publicada por enlace (RF-62, HU-32; `docs/19 §4`, O): sitio, magnitudes, ventana máxima, zonas publicadas con su nombre de entonces, título y descripción públicos, quién lo creó y cuándo, cuándo vence, la última renovación y la revocación | La base guarda el **SHA-256 del token** (`token_hash`, índice único), nunca el token; todo enlace vence (`expira_en` obligatorio, como mucho 180 días desde la creación o la renovación, por CHECK); la aplicación solo cambia el vencimiento, la renovación y la revocación, y un disparador no deja deshacer una revocación ni fechar en el futuro; pasados `retencion_dias` (31 a 365, 90 por omisión) desde que dejó de valer, su título, descripción y nombres de zona se anonimizan (`fn_anonimizar_enlaces_publicos`) y la fila queda. El tope de enlaces vivos de cada sitio, en `sitio.enlaces_publicos_max`, y el mínimo de dispositivos k de su vista pública, en `sitio.publico_minimo_dispositivos` (1 a 20; nulo = el del despliegue; la migración lo deja nulo en todos): k es del sitio, no de cada enlace (`enlace_publico.minimo_dispositivos` queda en desuso, con el valor que tenían los enlaces de antes; migración 25) |
 | 24 | **enlace_publico_acceso** | Cuántas veces se cargó la pantalla de un enlace, por día en la zona horaria del sitio | Sin direcciones ni nada de quien visita; el backend cuenta en memoria y suma una vez por minuto; las filas de más de 90 días las borra `fn_limpiar_accesos_publicos` (migración 25) |
 | 25 | **dispositivo_zona** | En qué zona estuvo cada dispositivo y desde cuándo (`desde`, `hasta`; `hasta` nulo = la zona actual) | La llena un disparador al crear el dispositivo y al cambiarle la zona (cierra la estadía abierta y abre otra, a la hora del reloj); la aplicación solo la lee. Las estadías de un equipo no se solapan (`EXCLUDE` con `btree_gist`) y no se borran en cascada (`ON DELETE RESTRICT` hacia `dispositivo` y `zona`). La vista pública atribuye cada lectura a la zona donde estaba el equipo cuando se tomó: mover un equipo no cambia el pasado de ninguna zona (`docs/19 §4`, O, punto 2). Al migrar, cada dispositivo entra con su zona actual desde `-infinity` (un cambio de zona anterior no quedó guardado; migración 25) |
+| 26 | **magnitud_alias** | Una clave del JSON decodificado por la pasarela (formatos `milesight` y `chirpstack`) y la magnitud a la que corresponde | La clave es la clave primaria: una clave apunta a una sola magnitud en todo el catálogo; en minúsculas, con forma acotada y sin las claves que esos formatos usan para otra cosa. Sembrada con las 8 que antes vivían en el código. La aplicación inserta; quitar uno, solo por `fn_quitar_alias` (migración 27) |
+| 27 | **receta_decodificacion** | Cómo leer la `data` en base64 de un nodo LoRaWAN cuando su pasarela la entrega sin decodificar: código, nombre y largo exacto de la trama | Solo dato, sin expresiones; **escritura única**: no se edita ni se borra (corregir es crear la `-v2` y «reemplazar por»). La crea, junto con sus campos, `fn_crear_receta`; `dispositivo.decodificador` es clave foránea hacia ella (migración 27) |
+| 28 | **receta_campo** | Un campo de una receta: magnitud, desplazamiento, tipo de entero (8, 16 o 32 bits, con o sin signo, *big* o *little-endian*) y valor = (crudo + `sumar_antes`) × `multiplicar_por` ÷ `dividir_por` | Copia `largo_bytes` de su receta por clave foránea compuesta, y un `CHECK` asegura que cabe en la trama; de 1 a 32 por receta, cada magnitud a lo más una vez; enteros `int4` (migración 27) |
 
-25 entidades (OE3 pide ≥ 8). Cinco son hypertables, particionadas por tiempo: `medicion` (la serie de tiempo),
+28 entidades (OE3 pide ≥ 8). Cinco son hypertables, particionadas por tiempo: `medicion` (la serie de tiempo),
 desde la migración 09 `trama` y `cuarentena`, desde la 13 `metrica_broker` y desde la 22 `acceso` (para borrar lo vencido por
 fragmentos enteros con `drop_chunks`). El resto son tablas relacionales normales de PostgreSQL.
 
 ### Dominios del modelo
 
-Las 25 entidades se agrupan en cinco dominios, y **cada tabla pertenece a uno solo**. Esta tabla es la **única fuente** de ese
+Las 28 entidades se agrupan en cinco dominios, y **cada tabla pertenece a uno solo**. Esta tabla es la **única fuente** de ese
 reparto: `informe-oficial/figuras/generar-figuras.sh` la lee para dibujar el diagrama por dominios del cuerpo del informe y, en su
 anexo, un diagrama con columnas por cada dominio, y `generar-figuras.sh --verificar` falla si una tabla de la base no figura aquí,
 figura dos veces o se nombra una que no existe. Una tabla nueva se agrega aquí, en su dominio, en la misma migración que la crea.
@@ -61,7 +64,7 @@ El orden de las filas es el de arriba abajo en el diagrama del cuerpo. Los grupo
 | Dominio | Tablas | De qué se ocupa |
 |---|---|---|
 | **Cuentas y sesión** | `usuario`, `usuario_sitio`, `mensaje_soporte`; `sesion`, `acceso`, `preferencia` | Las personas: quién entra a qué sitio y con qué rol, sus sesiones e intentos de acceso, sus preferencias y sus mensajes de soporte |
-| **Sitios y dispositivos** | `sitio`, `zona`, `pasarela`; `dispositivo`, `dispositivo_zona`, `estado_dispositivo`; `credencial`, `canal`, `magnitud` | El inventario: dónde está cada equipo, quién lo identifica ante el broker, qué magnitudes reporta y cuál es su estado actual |
+| **Sitios y dispositivos** | `sitio`, `zona`, `pasarela`; `dispositivo`, `dispositivo_zona`, `estado_dispositivo`; `credencial`, `canal`; `magnitud`, `magnitud_alias`, `receta_decodificacion`, `receta_campo` | El inventario: dónde está cada equipo, quién lo identifica ante el broker, qué magnitudes reporta y cuál es su estado actual; y el catálogo con que se lee lo que envía (magnitudes, alias y recetas de decodificación) |
 | **Recepción y mediciones** | `trama`, `cuarentena`, `medicion`, `metrica_broker` | Lo que entra: la trama cruda aceptada o rechazada, la serie de tiempo normalizada y las muestras del propio broker |
 | **Alertas y actividad** | `regla_umbral`, `condicion`, `condicion_sistema`, `evento` | Lo que el sistema vigila y lo que pasó: umbrales, estados anómalos abiertos y el registro histórico |
 | **Vista pública** | `enlace_publico`, `enlace_publico_acceso` | Los enlaces que publican una vista de un sitio sin iniciar sesión, y su contador de visitas |
@@ -91,6 +94,7 @@ erDiagram
     pasarela ||--o{ credencial : credencial
     dispositivo ||--o{ cuarentena : cuarentena
     pasarela ||--o{ dispositivo : dispositivo
+    receta_decodificacion ||--o{ dispositivo : dispositivo
     zona ||--o{ dispositivo : dispositivo
     dispositivo ||--o{ dispositivo_zona : dispositivo_zona
     zona ||--o{ dispositivo_zona : dispositivo_zona
@@ -100,11 +104,14 @@ erDiagram
     dispositivo ||--o{ estado_dispositivo : estado_dispositivo
     dispositivo ||--o{ evento : evento
     usuario ||--o{ evento : evento
+    magnitud ||--o{ magnitud_alias : magnitud_alias
     canal ||--o{ medicion : medicion
     usuario ||--o{ mensaje_soporte : mensaje_soporte
     sitio ||--o{ pasarela : pasarela
     sitio ||--o{ preferencia : preferencia
     usuario ||--o{ preferencia : preferencia
+    magnitud ||--o{ receta_campo : receta_campo
+    receta_decodificacion ||--o{ receta_campo : receta_campo
     canal ||--o{ regla_umbral : regla_umbral
     usuario ||--o{ sesion : sesion
     dispositivo ||--o{ trama : trama
@@ -177,7 +184,7 @@ erDiagram
         text via
         text formato FK
         uuid pasarela_id FK
-        text decodificador
+        text decodificador FK
         timestamptz en_servicio_desde
     }
     dispositivo_zona {
@@ -235,6 +242,14 @@ erDiagram
         float rango_min
         float rango_max
         timestamptz actualizado_en
+        float umbral_alto_sugerido
+        float umbral_bajo_sugerido
+        float histeresis_sugerida
+    }
+    magnitud_alias {
+        text clave PK
+        text magnitud_codigo FK
+        timestamptz creado_en
     }
     medicion {
         uuid canal_id FK
@@ -281,6 +296,23 @@ erDiagram
         uuid sitio_predeterminado FK
         timestamptz creado_en
         timestamptz actualizado_en
+    }
+    receta_campo {
+        text receta_codigo PK,FK
+        int largo_bytes FK
+        int orden PK
+        text magnitud_codigo FK
+        int desplazamiento
+        text tipo
+        int sumar_antes
+        int multiplicar_por
+        int dividir_por
+    }
+    receta_decodificacion {
+        text codigo PK
+        text nombre
+        int largo_bytes
+        timestamptz creado_en
     }
     regla_umbral {
         uuid id PK
@@ -399,7 +431,7 @@ PostgreSQL en producción y se verificaron contra la base real (`plataforma/prue
 | JSON solo para fotos | `jsonb` únicamente para capturar un contenido tal como fue (`evento.detalle`); nunca para datos de dominio consultables | Lo consultable va en columnas con tipo y FK | ✅ |
 | Ledger sobre contador | Las series (`medicion`) y los hechos (`evento`, `condicion`) son registros que se acumulan; `visto_por_ultima_vez` es un derivado recalculable, no la fuente | Un contador se corrompe en silencio; un registro se audita y se recalcula | ✅ |
 | Comentarios en el modelo | `COMMENT ON` en toda columna cuya razón de ser no es obvia (qué es, quién la escribe, qué no hacer con ella) | El comentario viaja con la base y lo ve quien lea el esquema sin abrir el informe | ✅ cada migración comenta sus columnas (el conteo lo da la base: `pg_description`; el «10» escrito a mano el 23/09 llevaba semanas desactualizado) |
-| Migraciones idempotentes | Cada `NN-*.sql` puede reejecutarse sin duplicar ni pisar nada (`IF NOT EXISTS`, `ON CONFLICT DO NOTHING`, `CREATE OR REPLACE`). La 14 (permisos del rol de la aplicación) es la única que se **edita y reaplica** cuando una migración posterior agrega tablas o columnas que la aplicación escribe (16, 21, 22, 23). Una regla que redefinen varias migraciones: la última la reemplaza y las anteriores solo la crean si no existe (los motivos de cuarentena: 07, 09 y 12) | Permite aplicar el mismo archivo en cualquier ambiente sin miedo | ✅ desde el 16/10, de la 02 a la última en cada `banco.sh encender`: se reaplican y el esquema (con permisos y comentarios) y el catálogo deben quedar idénticos (`banco.sh migraciones`, `docs/16 §37`); antes, 02–06 y 07, 09, 11 y 12 a mano en bases desechables (`docs/16 §13`). La 01 es el esquema base y no se repite |
+| Migraciones idempotentes | Cada `NN-*.sql` puede reejecutarse sin duplicar ni pisar nada (`IF NOT EXISTS`, `ON CONFLICT DO NOTHING`, `CREATE OR REPLACE`). La 14 (permisos del rol de la aplicación) es la única que se **edita y reaplica** cuando una migración posterior agrega tablas o columnas que la aplicación escribe (16, 21, 22, 23). Una regla que redefinen varias migraciones: la última la reemplaza y las anteriores solo la crean si no existe (los motivos de cuarentena: 07, 09 y 12; el decodificador del dispositivo: la 17 crea su `CHECK` solo si no existe la clave foránea de la 27) | Permite aplicar el mismo archivo en cualquier ambiente sin miedo | ✅ desde el 16/10, de la 02 a la última en cada `banco.sh encender`: se reaplican y el esquema (con permisos y comentarios) y el catálogo deben quedar idénticos (`banco.sh migraciones`, `docs/16 §37`); antes, 02–06 y 07, 09, 11 y 12 a mano en bases desechables (`docs/16 §13`). La 01 es el esquema base y no se repite |
 | Tercera forma normal | Cada hecho vive en una sola tabla; las relaciones muchos a muchos se resuelven con entidades de asociación con identidad propia (`canal` = dispositivo × magnitud, `usuario_sitio` = usuario × sitio); ningún atributo depende de otro que no sea la clave | Sin redundancia no hay anomalías de actualización: cambiar el nombre de un dispositivo se hace en una fila. **¿Por qué no más allá?** Más formas normales no es mejor por sí solo: cada una elimina un tipo específico de anomalía. La 4FN y la 5FN resuelven dependencias multivaluadas o de reunión, que en este modelo no existen; no aportarían nada y cada tabla extra agregaría un JOIN a cada consulta. No es una ley universal: es que aquí no están las anomalías que esas formas resuelven | ✅ |
 | Redundancia solo como foto | Las únicas copias son las «fotos por valor» (fila anterior): están **desnormalizadas a propósito** porque el pasado no debe reinterpretarse | Una desnormalización se documenta con su razón; si no tiene razón, es un error | ✅ |
 | Clave natural única | Además del `id`, cada tabla declara qué la hace única en el dominio: `medicion (canal_id, tiempo)`, `canal (dispositivo_id, magnitud_codigo)`, `dispositivo.id_fisico`, `usuario.email`, `usuario_sitio (usuario_id, sitio_id)` | El `id` evita duplicar filas por accidente solo si existe la clave natural; en `medicion` sostiene la idempotencia ante reentregas QoS 1 (migración 06) | ✅ |
@@ -443,7 +475,7 @@ consistente para reportes.
 - [x] **Declarar vía, formato y pasarela en el alta (HU-11, hecho el 12/10) y que el filtro 2 use el formato declarado** (15/10,
       `docs/10 §8.4` punto 47, `docs/16 §27`): un dispositivo directo declara `senml` o `plano`; uno lorawan no lo envía y copia el de su
       pasarela. La demostración pasó a publicar solo SenML, que es lo que declara `dev-0001` (`docs/15` §3 y §4).
-- [ ] **Alias de claves en el catálogo: tabla `magnitud_alias`, prevista en la migración 27** (TT-12; decidido el 15/10/2026 como
+- [x] **Alias de claves en el catálogo: tabla `magnitud_alias`, migración 27 (23/11/2026)** (TT-12; decidido el 15/10/2026 como
       columna y cambiado a tabla el 20/11/2026; `docs/10 §8.4` puntos 47 y 69). Hoy el mapa «clave del JSON decodificado → magnitud»
       vive en el código (`mapa-claves.ts`: 8 claves hacia 4 magnitudes) detrás de una sola función (`resolverClave`), porque nadie puede
       editar el catálogo hasta que el panel lo administre. Lo escrito el 15/10 era una columna `magnitud.alias text[]`; **se cambia por
@@ -452,9 +484,9 @@ consistente para reportes.
       apunta a una sola magnitud en todo el catálogo» la garantiza la clave primaria; con un arreglo por magnitud haría falta un
       disparador que revisara las demás filas. No se admiten como alias las claves que los formatos de pasarela usan para otra cosa
       (`deveui`, `devicename`, `applicationid`, `applicationname`, `fcnt`, `fport`, `data`, `time`, `rxinfo`, `txinfo`, `deviceinfo`,
-      `object`). Es la regla de §4: lo que administra el usuario vive en un catálogo. La migración 27, prevista, aún no existe: la tabla entra a §2,
-      al diagrama de §3 y al conteo de entidades cuando se aplique.
-- [ ] **Catálogo editable: lo demás de la migración 27 prevista** (TT-12, 20/11/2026; las reglas y su porqué, en `docs/10 §8.4` punto 69;
+      `object`). Es la regla de §4: lo que administra el usuario vive en un catálogo. La tabla ya está en §2, en el diagrama de §3 y en el
+      conteo de entidades; la recepción todavía resuelve las claves con `mapa-claves.ts` hasta que lea los alias de la base (TT-12, bloque 3).
+- [x] **Catálogo editable: el esquema de la migración 27** (TT-12, diseñado el 20/11/2026 y aplicado el 23/11/2026; el código que lo usa llega por bloques, `docs/10 §8.4` punto 69; las reglas y su porqué, en `docs/10 §8.4` punto 69;
       la pantalla, en `docs/19 §4`, T). Aditiva, como todas:
       (a) **`magnitud`** gana `umbral_alto_sugerido` y `umbral_bajo_sugerido` (nulos) e `histeresis_sugerida` (≥ 0, 0 por omisión), con
       `CHECK` de que los sugeridos caen dentro del rango y bajo < alto; nacen nulos, así que nada cambia hasta que el administrador del
@@ -482,7 +514,7 @@ consistente para reportes.
       decodificación que hoy hace el código (`perfiles.ts`).
       (c) **`dispositivo.decodificador`**: el `CHECK` contra la lista del código pasa a ser una **clave foránea** a
       `receta_decodificacion (codigo)` con `ON DELETE RESTRICT`; el `CHECK` que lo admite solo en la vía `lorawan` se conserva. La
-      migración 27 prevista siembra la receta **antes** de cambiar el `CHECK` por la clave foránea, y el bloque de la migración 17 que redefine el
+      migración 27 siembra la receta **antes** de cambiar el `CHECK` por la clave foránea, y el bloque de la migración 17 que redefine el
       `CHECK` pasa a ejecutarse solo si la clave foránea no existe (si no, reaplicar la 17 la desharía).
       (d) **Permisos de `plataforma_app`**, en un bloque de la 27 que se repite dentro de la 14 (su `REVOKE ALL` borraría lo demás al
       reaplicarse): `INSERT` en `magnitud` y `magnitud_alias`; `UPDATE` de `magnitud` solo por columnas (`nombre`, el rango y los
@@ -492,9 +524,10 @@ consistente para reportes.
       que quita un alias. Las dos con `SET search_path = public, pg_temp`, `REVOKE EXECUTE … FROM PUBLIC` y `GRANT EXECUTE` solo a
       `plataforma_app`. «Reemplazar por» no necesita función: cambia `dispositivo.decodificador`, que la aplicación ya actualiza, y
       escribe su `evento`. Las recetas no se editan ni se borran (`docs/10 §8.4` punto 69).
-      (e) **Guardianes que cambian con la migración 27 prevista:** el chequeo 14 de `verificar-todo.sh` (hoy exige que la aplicación no
-      inserte en `magnitud`), el 17 (hoy exige el `CHECK` `ck_dispositivo_decodificador`, que pasa a ser clave foránea) y
-      `pruebas/base-rol-app.sh` (hoy planta un `INSERT` en `magnitud` que debe fallar).
+      (e) **Guardianes que cambiaron con la migración 27:** el chequeo 14 de `verificar-todo.sh` (antes exigía que la aplicación no
+      insertara en `magnitud`; ahora, que no cambie su `codigo` ni su `unidad_canonica`), el 17 (acepta el `CHECK` de la 17 o la clave
+      foránea de la 27), uno nuevo, el 27, y `pruebas/base-rol-app.sh` (planta cambiar la unidad canónica, insertar una receta sin su
+      función y borrar un alias). Las reglas de la 27, plantadas una por una, en `db/pruebas/catalogo-editable.sql` (paso 1c, `docs/16 §95`).
       (f) **Quién cambió el catálogo:** cada cambio deja, en la misma transacción, una fila de `evento` con `dispositivo_id` nulo (como los
       de la pasarela), `tipo = catalogo_cambio`, `usuario_id` de la persona y `detalle {objeto, codigo, antes, despues}` (§7: foto por valor).
 - [x] **Vía, formato y pasarela: el esquema** (decidido el 08/10/2026, `docs/10 §8.4` punto 25; migración 11):
@@ -511,7 +544,7 @@ consistente para reportes.
       (texto, nulo; `CHECK` contra la lista de perfiles del código, `campus-heltec-v3-v1`, y otro que lo admite solo en la vía `lorawan`),
       `estado_dispositivo.ultimo_fcnt` (`bigint`, nulo, de 0 a 2³²−1: el contador de 32 bits del servidor de red) y la magnitud
       `tension` (`V`, de 0 a 5), la tensión de batería que reportan los nodos de la red del campus. Los perfiles pasan al catálogo
-      editable como recetas de decodificación declarativas, con su propia tabla, en la migración 27 prevista (entrada «Catálogo editable» de
+      editable como recetas de decodificación declarativas, con su propia tabla, en la migración 27 (entrada «Catálogo editable» de
       arriba).
 - [x] **Suelo del nodo propio** (migración 18, 16/10/2026; `docs/10 §8.4` punto 51): `temperatura_suelo` (`Cel`, −55 a 125) y
       `humedad_suelo` (`V`, 0 a 3,3: la tensión cruda del sensor capacitivo; el % se calcula), y la calibración por canal
@@ -523,7 +556,7 @@ consistente para reportes.
       dispositivo, con la foto `{canal_id, magnitud, antes: {cero, cien}, despues: {cero, cien}, origen: 'api'}` (§7: foto por valor).
 - [ ] **Magnitudes nuevas** del caso de uso (entrevista del 05/10): `radon` (`Bq/m3`, unidad propia: el catálogo
       es el «application context» de RFC 8428 §4.5.2) e `hidrogeno` (`ppm`). Cada una con su rango físico. Con el catálogo editable
-      (migración 27 prevista) las crea el administrador del sistema desde el panel, si su unidad está en la lista cerrada de unidades.
+      (migración 27) las crea el administrador del sistema desde el panel, si su unidad está en la lista cerrada de unidades.
 - [ ] **Tercera forma normal, revisada con cada cambio**: al agregar `pasarela` y `trama`, comprobar que ningún
       atributo dependa de otro que no sea la clave y que no aparezcan dependencias multivaluadas (lo que
       justificaría 4FN). Si aparecieran, se documenta aquí y se normaliza; mientras no, 3FN basta (§6).

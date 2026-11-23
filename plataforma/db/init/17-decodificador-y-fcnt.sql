@@ -12,16 +12,27 @@ BEGIN;
 SET LOCAL lock_timeout = '5s';
 
 -- a) Perfil de decodificación. La última migración que define la lista la reemplaza (como ck_dispositivo_formato en la 15).
+--    Desde la migración 27 la lista es la tabla receta_decodificacion y el CHECK pasa a ser la clave foránea fk_dispositivo_decodificador:
+--    si ya existe, este bloque no corre (reaplicar la 17 deshacía el cambio; revisión del diseño del 20/11/2026).
 ALTER TABLE dispositivo ADD COLUMN IF NOT EXISTS decodificador text;
-ALTER TABLE dispositivo DROP CONSTRAINT IF EXISTS ck_dispositivo_decodificador;
-ALTER TABLE dispositivo ADD CONSTRAINT ck_dispositivo_decodificador CHECK (decodificador IN ('campus-heltec-v3-v1'));
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_dispositivo_decodificador' AND conrelid = 'dispositivo'::regclass) THEN
+    ALTER TABLE dispositivo DROP CONSTRAINT IF EXISTS ck_dispositivo_decodificador;
+    ALTER TABLE dispositivo ADD CONSTRAINT ck_dispositivo_decodificador CHECK (decodificador IN ('campus-heltec-v3-v1'));
+  END IF;
+END $$;
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_dispositivo_decodificador_via') THEN
     ALTER TABLE dispositivo ADD CONSTRAINT ck_dispositivo_decodificador_via CHECK (decodificador IS NULL OR via = 'lorawan');
   END IF;
 END $$;
-COMMENT ON COLUMN dispositivo.decodificador IS
-  'Perfil con que la plataforma decodifica la data en base64 de un nodo LoRaWAN cuando su pasarela la entrega sin decodificar; nulo = sin perfil (lo interpreta el código, docs/08 §6; docs/10 §8.4 punto 47).';
+-- El comentario de la columna lo reescribe la migración 27; aquí solo se pone si aún no la hay.
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_dispositivo_decodificador' AND conrelid = 'dispositivo'::regclass) THEN
+    COMMENT ON COLUMN dispositivo.decodificador IS
+      'Perfil con que la plataforma decodifica la data en base64 de un nodo LoRaWAN cuando su pasarela la entrega sin decodificar; nulo = sin perfil (lo interpreta el código, docs/08 §6; docs/10 §8.4 punto 47).';
+  END IF;
+END $$;
 
 -- b) Contador de la última trama guardada. Lo escribe el filtro 6, después de guardar las lecturas (docs/10 §4.1).
 ALTER TABLE estado_dispositivo ADD COLUMN IF NOT EXISTS ultimo_fcnt bigint

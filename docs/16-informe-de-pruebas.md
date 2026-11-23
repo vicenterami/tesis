@@ -4,7 +4,7 @@ Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emu
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
 cubría al escribirse se agregó después: TT-32 (sensor físico) en §43, §44 y §53, y TT-30 (recuperación ante reinicio) en §11. El
-contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 938 pruebas unitarias del backend y 599 del panel.
+contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 950 pruebas unitarias del backend y 599 del panel.
 Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -3421,7 +3421,7 @@ nombre). Las demás citan una prueba que ya existía, con el comienzo de su tít
 | C-87 | Milesight: hereda fCnt cuando el decodificador lo deja | milesight.adaptador.ts:16-18 | ctx.fcnt anotado; no cuenta como clave ignorada | `adaptadores/lorawan.spec.ts` · «con códec: si la trama trae fCnt…» |
 | C-88 | Perfil campus-heltec-v3-v1: 10 bytes de la trama sin códec → temperatura, humedad y tensión | docs/10 §8.4 punto 47; perfiles.ts | 18,16 °C, 65,52 %RH y 3,75 V con la marca del servidor de red | `adaptadores/lorawan.spec.ts` · «la captura con perfil…» |
 | C-89 | Perfil: data que no es base64 estricto, que no mide 10 bytes o de un perfil desconocido se rechaza | perfiles.ts:21 y :39 | rechazada: malformada | `adaptadores/lorawan.spec.ts` · «data que no es base64 estricto o no mide 10 bytes…»<br>`adaptadores/lorawan.spec.ts` · «un perfil que el código no conoce…» |
-| C-90 | La lista de perfiles del código es la del CHECK de la base y sus lecturas existen en el catálogo | docs/10 §8.4 punto 47; migración 17 | PERFILES igual al dominio de ck_dispositivo_decodificador | `adaptadores/lorawan.spec.ts` · «PERFILES == el dominio de ck_dispositivo_decodificador…» |
+| C-90 | La lista de perfiles del código es la de las recetas sembradas en la base y sus lecturas existen en el catálogo | docs/10 §8.4 puntos 47 y 69; migraciones 17 y 27 | PERFILES igual a las recetas sembradas con fn_crear_receta | `adaptadores/lorawan.spec.ts` · «PERFILES == las recetas sembradas con fn_crear_receta…» |
 | C-91 | Mapa de claves: una clave desconocida se ignora y se anota; si no queda ninguna conocida, se rechaza | docs/10 §8.4 punto 47; lorawan.ts:60-85 | ctx.ignoradas con las claves; sin ninguna conocida: malformada | `adaptadores/lorawan.spec.ts` · «una clave que no está en el mapa se ignora…»<br>`adaptadores/lorawan.spec.ts` · «resuelve sin distinguir mayúsculas…» |
 | C-92 | Mapa de claves: dos claves de la misma magnitud valen la primera; la otra se anota como repetida | lorawan.ts:77 | una lectura; la segunda en ignoradas con «(repetida)» | `adaptadores/lorawan.spec.ts` · «dos claves que apuntan a la misma magnitud…» |
 | C-93 | Los adaptadores registrados son los de los formatos que admite la base (ck_dispositivo_formato) y el módulo | docs/10 §8.4 punto 47; migración 15; recepcion.module.ts | senml, plano, chirpstack y milesight en el servicio, el módulo, los archivos y el CHECK | `contrato.spec.ts` · C-93 |
@@ -4727,7 +4727,7 @@ pedir tandas cuando el cliente se va; los planes, el tiempo y la memoria con 1 0
 Fallas plantadas (cada una se vio caer y se deshizo): `celdaCsv` con la expresión de antes → 2 casos de `exportar.spec.ts`; el descriptor sin
 su firma → 2 de `zip.spec.ts`; sin la protección del `_x` → 2 de `xlsx.spec.ts`; `release()` sin el error → 4 de `consulta.service.spec.ts`.
 
-**Prueba de integración** (`plataforma/pruebas/exportar-integracion.sh`, nueva: base desechable sin red con las 26 migraciones, la aplicación
+**Prueba de integración** (`plataforma/pruebas/exportar-integracion.sh`, nueva: base desechable sin red con todas las migraciones de `db/init`, la aplicación
 compilada en un puerto efímero de 127.0.0.1). **43 de 43** comprobaciones, más tres externas: `unzip -t` del zip y del libro («No errors
 detected») y el analizador XML de Python (cada parte del libro, XML bien formado). Siembra un sitio con los casos límite del punto 7 del bloque
 (instantes con microsegundos, `desde` incluido y `hasta` excluido; −12,5, 1e-7 y el mayor double; una unidad con coma y comillas; textos que
@@ -5250,3 +5250,85 @@ dos versiones, `pnpm audit` dice «No known vulnerabilities found», sin forzar 
 hace una segunda consulta a la base (la búsqueda de la sesión por su clave primaria) además de la de las tablas; `/salud` cae en la zona general
 del límite de tasa del proxy. Nada del panel respecto de `/salud`: el aviso de servicio de la aplicación solo usa `base` cuando el estado no es `ok`,
 y hoy la respuesta, cuando no es `ok`, es un 500.
+
+## 95. Catálogo editable, bloque 1: la migración 27 y sus guardianes (TT-12; 23/11/2026)
+
+**Qué entra.** El esquema del catálogo editable, tal como lo fija `docs/08 §8` y lo justifica `docs/10 §8.4` punto 69: `magnitud` con su
+rango obligatorio, finito y ordenado, la forma del código y los tres sugeridos; las tablas `magnitud_alias` (8 alias sembradas, las de
+`mapa-claves.ts`), `receta_decodificacion` y `receta_campo` (la receta `campus-heltec-v3-v1` sembrada con sus 3 campos, la misma
+decodificación de `perfiles.ts`); `dispositivo.decodificador` como clave foránea a la receta en vez del `CHECK` de la migración 17; y los
+permisos de `plataforma_app`, repetidos en la 14, con dos funciones del dueño (`fn_crear_receta`, `fn_quitar_alias`). El código de la
+recepción, la API y el panel todavía no usan nada de esto: llegan en los bloques 2 a 6.
+
+**Base desechable (imagen de la base del proyecto, red cerrada, sin tocar la pila local).** Con las 27 migraciones de `db/init`:
+convenciones 7 de 7; reaplicar de la 02 a la 27 deja el esquema, los permisos, los comentarios, el catálogo, los alias y los campos de la
+receta idénticos (la misma huella antes y después, como `banco.sh migraciones`). **La guarda de la 17, probada sola:** reaplicar la 17
+**vieja** después de la 27 vuelve a poner `ck_dispositivo_decodificador` junto a la clave foránea; con la 17 nueva no aparece. La
+reaplicación completa no lo detecta (la 27 lo quita otra vez), por eso se probó la 17 aislada.
+
+**Reglas plantadas (`db/pruebas/catalogo-editable.sql`, nuevo, paso 1c del verificador).** 38 casos que deben rechazarse y uno legítimo, en
+una transacción que termina en `ROLLBACK`; cada caso aceptado por error se deshace en el acto para no contaminar a los siguientes. Rango
+`NaN` en cada extremo, infinito, sin máximo y mínimo = máximo (`ck_magnitud_rango`); código con mayúscula; sugerido fuera del rango, bajo
+= alto y `NaN`; histéresis sugerida negativa e infinita; alias reservado, con mayúscula y una clave hacia dos magnitudes; receta sin
+campos, código repetido, campo que no cabe en el largo, magnitud repetida, divisor 0, tipo inexistente, magnitud inexistente y código con
+mayúscula; un campo que cambia su largo sin su receta (`fk_receta_campo_receta`); borrar una receta en uso (cualquiera de sus dos claves
+foráneas: el orden en que PostgreSQL las revisa no está garantizado). La forma de cada campo en `fn_crear_receta`: una clave mal escrita
+(`dividir_pro`), un desplazamiento decimal, un factor como texto, nulo o enorme (10³⁰), un tipo que no es texto y un campo que no es objeto. Como `plataforma_app`,
+**sin permiso**: insertar una receta o un campo directo, cambiar `unidad_canonica` o `codigo`, borrar un alias o una magnitud, editar una
+receta. Lo legítimo, como `plataforma_app`: crear una magnitud y su alias, cambiar el rango y los sugeridos, quitar el alias con su función y
+crear una receta (u16le con −10, ×3, ÷2). Resultado: **40 de 40 OK** en la base desechable. **Plantado:** sin
+`ck_magnitud_rango`, fallan exactamente sus 5 casos; con la versión anterior de `fn_crear_receta`, fallan los 7 casos de forma.
+
+**Corregido tras la revisión del bloque.** `fn_crear_receta` ignoraba en silencio una clave mal escrita: el campo tomaba el valor por
+omisión y, como la receta no se edita, quedaba mal para siempre; y un decimal o un número enorme salían como error de conversión, no
+como rechazo propio. Ahora revisa la forma de cada campo antes de insertar y todo rechazo sale como `check_violation` con el prefijo
+`fn_crear_receta:`. También: el chequeo 27 exige el `search_path` fijo de las dos funciones; la leyenda de la figura del modelo y la lista
+de permisos de `docs/10` decían el estado anterior a la 27; tres comentarios del código citaban el `CHECK` retirado o una columna
+`magnitud.alias` que nunca existió.
+
+**Guardianes del paso 2.** El chequeo 14 ya no exige que la aplicación no inserte en `magnitud` (ahora inserta, por columnas): exige que no
+cambie su `codigo` ni su `unidad_canonica`. El 17 acepta el `CHECK` o la clave foránea. El 27, nuevo, revisa tablas, columnas, `CHECK`,
+alias y receta sembrados, la clave foránea `RESTRICT`, las dos funciones (`SECURITY DEFINER`, no ejecutables por `PUBLIC`) y la lista
+exacta de columnas que la aplicación puede actualizar en `magnitud`. Probado plantando: con `INSERT (orden)` en `receta_campo` para la
+aplicación, falla el 27; con `UPDATE (unidad_canonica)` en `magnitud`, fallan el 14 y el 27. `base-rol-app.sh` cambió el `INSERT` en
+`magnitud` que plantaba por cambiar la unidad canónica, insertar una receta sin su función y borrar un alias: «ROL DE APLICACIÓN OK».
+
+**Unitarias.** La prueba que comparaba `PERFILES` con el `CHECK` de la 17 (C-90) ahora lo compara con las recetas sembradas por
+`fn_crear_receta`; plantado: con otro código en la semilla, falla. Recepción 231 de 231.
+
+**Base local.** Respaldo previo con `pg_dump` (legible con `pg_restore -l`), la 27 aplicada sin errores y la 17 y
+la 14 reaplicadas encima; 28 tablas; los 3 equipos con receta pasaron a la clave foránea sin cambios.
+
+## 96. Catálogo editable, bloque 2: el intérprete de recetas (TT-12; 23/11/2026)
+
+**Qué entra.** `recepcion/adaptadores/receta.ts`, una función pura (no toca la base) que aplica una receta a los bytes de una trama, y
+`erroresDeReceta`, el validador que compartirán crear una receta y probarla sin guardar (`docs/10 §8.4` punto 69 vi y viii). Nadie la
+llama todavía: la recepción la usa desde el bloque 3. Comprueba el largo y los límites antes de cada lectura, exige factores enteros,
+finitos y dentro de sus cotas, trata una receta sin campos como malformada y convierte cualquier error interno en `TramaMalformada`.
+
+**Pruebas (`receta.spec.ts`: 12 `it(` y 4 `it.each`, que `vitest` ejecuta como 53).** Backend: **950 pruebas escritas** (`it(`; 938 antes),
+que `vitest` ejecuta como **1 014 de 1 014 en 76 archivos** (961 en 75 antes); `pnpm verificar` en verde. (1) **Equivalencia:** la receta del campus se lee tal cual de la semilla de la migración 27 (y las
+unidades, de las magnitudes sembradas) y se compara con la función de `perfiles.ts`, congelada dentro de la prueba, con igualdad estricta
+(`Object.is`) en los 65 536 valores de la temperatura, los 65 536 de la humedad y los 256 de la tensión, **un campo a la vez** con los otros dos
+en los valores de la captura (los tres campos son independientes: cada uno lee sus propios bytes): 131 328 casos, 0 distintos; la captura real da 18,16 °C, 65,52 %RH y 3,75 V. (2) El largo distinto conserva el texto de C-89 («perfil campus-heltec-v3-v1: se esperaban
+10 bytes y llegaron 9»). (3) Los diez tipos de entero, con valores que distinguen orden y signo. (4) Las cotas, los tipos, el ancho de cada tipo
+(contra su rama exacta del `CHECK` de cabida) y las formas de los códigos son los de la migración 27, leídos del SQL; y el validador acepta
+los valores límite que el SQL acepta (32 campos, 255 bytes, ±1 000 000). (5) **Recetas malas plantadas:** 14 (sin campos, 33 campos, desplazamiento fuera,
+negativo o decimal, tipo desconocido, divisor 0, factor `NaN`, infinito, fuera de cota o llegado como texto, sin unidad, largo inválido,
+campos que no son lista), más sin bytes, la misma magnitud dos veces y un código enorme o que no es texto: todas `TramaMalformada`; y tres
+errores internos (un campo nulo, un campo cuya lectura lanza, la receta nula) salen como «no se pudo aplicar la receta». (6) **Barrido aleatorio:** 20 000 recetas y tramas al azar (con
+valores raros a propósito) dan lecturas finitas o `TramaMalformada`, nunca otro error; más de 1 000 son válidas para el validador y
+todas decodifican. (7) El validador, con 14 definiciones malas (entre ellas una clave mal escrita, `dividir_pro`, que no se ignora) y una buena.
+
+**Plantado.** Con `× (1 ÷ dividir_por)` en vez de `÷ dividir_por`, falla la equivalencia (error de coma flotante). Sin la comprobación
+de límites (y sin convertir los errores), fallan los tres casos de desplazamiento y el barrido aleatorio. Sin convertir los errores, con la
+comprobación en su lugar, fallan exactamente los tres de error interno.
+
+**Corregido tras la revisión del bloque.** El validador ignoraba las claves que no conocía y no miraba el nombre: una receta con
+`dividir_pro` pasaba «probar» y `fn_crear_receta` la rechazaba; ahora rechaza toda clave fuera de las suyas, como la función. La
+conversión de errores internos no la ejercía ninguna prueba (todos los casos fallaban antes, de forma explícita). La comprobación de anchos
+contra el SQL era en parte tautológica (aceptaba el `ELSE 4` para cualquier tipo). El intérprete no rechazaba una magnitud repetida, y el
+nombre de la receta en el mensaje se calculaba fuera de la conversión. La definición de la API y del panel nombra la magnitud `magnitud`;
+al guardar va a `receta_campo.magnitud_codigo` (bloque 5). Al medir, el barrido mostró 114
+recetas «válidas» que no decodificaban: todas tenían algún factor sin escribir, que el validador acepta porque la base pone 0 y 1 por
+omisión; la prueba ahora aplica esos valores, como los entrega la base.

@@ -132,10 +132,11 @@ BEGIN
   BEGIN
     UPDATE dispositivo SET decodificador = 'perfil-inexistente' WHERE id_fisico = 'prueba-identidad-n';
     INSERT INTO resultado VALUES (16, 'FALLA se aceptó un perfil que no está en la lista');
-  EXCEPTION WHEN check_violation THEN
+  -- Desde la migración 27 la lista es la tabla receta_decodificacion: lo rechaza la clave foránea, ya no el CHECK de la 17.
+  EXCEPTION WHEN foreign_key_violation THEN
     GET STACKED DIAGNOSTICS restriccion = CONSTRAINT_NAME;
-    INSERT INTO resultado VALUES (16, CASE WHEN restriccion = 'ck_dispositivo_decodificador' THEN 'OK    perfil fuera de la lista: rechazado'
-      ELSE 'FALLA perfil fuera de la lista rechazado por otra regla: ' || restriccion END);
+    INSERT INTO resultado VALUES (16, CASE WHEN restriccion = 'fk_dispositivo_decodificador' THEN 'OK    receta de decodificación que no existe: rechazada'
+      ELSE 'FALLA receta inexistente rechazada por otra regla: ' || restriccion END);
   END;
   BEGIN
     UPDATE dispositivo SET decodificador = 'campus-heltec-v3-v1' WHERE id_fisico = 'prueba-identidad-n';

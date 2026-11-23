@@ -31,7 +31,7 @@ r=$(PGPASSWORD="clave-equivocada-de-prueba-xxxxxx" $DC exec -T -e PGPASSWORD tim
 grep -q 'password authentication failed' <<<"$r" && ok "con otra clave NO entra (la verificación de arriba de verdad prueba la clave)" || falla "con otra clave: ${r:0:80}"
 [ "$(como_app "SELECT rolsuper FROM pg_roles WHERE rolname = current_user")" = f ] && ok "no es superusuario" || falla "es superusuario"
 r=$(como_app 'SELECT count(*) FROM dispositivo'); [[ "$r" =~ ^[0-9]+$ ]] && ok "lee (SELECT dispositivo: $r)" || falla "no lee: $r"
-for s in 'DELETE FROM evento WHERE false' 'UPDATE evento SET tipo = tipo WHERE false' 'UPDATE medicion SET valor = valor WHERE false' 'INSERT INTO magnitud (codigo, nombre, unidad_canonica) VALUES (null, null, null)' 'TRUNCATE trama' 'DROP TABLE trama' 'CREATE TABLE intrusa (x int)' 'ALTER TABLE dispositivo ADD COLUMN x int' \
+for s in 'DELETE FROM evento WHERE false' 'UPDATE evento SET tipo = tipo WHERE false' 'UPDATE medicion SET valor = valor WHERE false' 'UPDATE magnitud SET unidad_canonica = unidad_canonica WHERE false' 'INSERT INTO receta_decodificacion (codigo, nombre, largo_bytes) VALUES (null, null, null)' 'DELETE FROM magnitud_alias WHERE false' 'TRUNCATE trama' 'DROP TABLE trama' 'CREATE TABLE intrusa (x int)' 'ALTER TABLE dispositivo ADD COLUMN x int' \
          "SELECT drop_chunks('trama'::regclass, older_than => now() - INTERVAL '3650 days')" "SELECT fn_retencion_drop_chunks('dispositivo', 30)" "SELECT fn_retencion_drop_chunks('medicion', 7)" "SELECT fn_retencion_drop_chunks('trama', 3)"; do
   r=$(como_app "$s"); grep -qiE 'permission denied|must be owner|lista blanca|plazo válido' <<<"$r" && ok "rechazado: $s" || falla "NO rechazado: $s → ${r:0:80}"
 done

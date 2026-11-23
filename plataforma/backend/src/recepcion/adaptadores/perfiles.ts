@@ -4,8 +4,8 @@ import { TramaMalformada } from './adaptador.js';
 
 // Perfiles de decodificación por dispositivo (docs/10 §8.4 punto 47; migración 17). Cuando la pasarela entrega el uplink sin
 // decodificar (`data` en base64), el nodo puede declarar en el alta con qué perfil la decodifica la plataforma. La lista es la misma
-// del CHECK ck_dispositivo_decodificador (una prueba unitaria compara las dos): agregar un perfil exige migración, no solo código.
-// En la Etapa 4 los perfiles pasan al catálogo editable, por el mismo camino que el mapa de claves.
+// de las recetas sembradas en receta_decodificacion (migración 27; una prueba unitaria compara las dos): dispositivo.decodificador es clave
+// foránea a esa tabla. En el bloque 3 de TT-12 la recepción aplica la receta de la base (receta.ts) y esta lista se retira.
 export const PERFILES = ['campus-heltec-v3-v1'] as const;
 export type Perfil = (typeof PERFILES)[number];
 
@@ -34,7 +34,7 @@ export const esPerfil = (v: unknown): v is Perfil => typeof v === 'string' && (P
 const BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
 
 export function decodificar(perfil: string, data: unknown, tiempo: Date | undefined): Lectura[] {
-  // El CHECK de la base ya cierra la lista; esto cubre una base sin migrar o un perfil retirado del código.
+  // La clave foránea de la base ya cierra la lista; esto cubre una base sin migrar o una receta que el código aún no aplica.
   if (!esPerfil(perfil)) throw new TramaMalformada(`perfil de decodificación desconocido: ${limpia(perfil)}`);
   if (typeof data !== 'string' || data === '' || !BASE64.test(data)) throw new TramaMalformada('data no es base64');
   return DECODIFICADORES[perfil](Buffer.from(data, 'base64')).map((l) => ({ ...l, tiempo }));

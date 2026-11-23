@@ -8,6 +8,7 @@ erDiagram
     pasarela ||--o{ credencial : credencial
     dispositivo ||--o{ cuarentena : cuarentena
     pasarela ||--o{ dispositivo : dispositivo
+    receta_decodificacion ||--o{ dispositivo : dispositivo
     zona ||--o{ dispositivo : dispositivo
     dispositivo ||--o{ dispositivo_zona : dispositivo_zona
     zona ||--o{ dispositivo_zona : dispositivo_zona
@@ -17,11 +18,14 @@ erDiagram
     dispositivo ||--o{ estado_dispositivo : estado_dispositivo
     dispositivo ||--o{ evento : evento
     usuario ||--o{ evento : evento
+    magnitud ||--o{ magnitud_alias : magnitud_alias
     canal ||--o{ medicion : medicion
     usuario ||--o{ mensaje_soporte : mensaje_soporte
     sitio ||--o{ pasarela : pasarela
     sitio ||--o{ preferencia : preferencia
     usuario ||--o{ preferencia : preferencia
+    magnitud ||--o{ receta_campo : receta_campo
+    receta_decodificacion ||--o{ receta_campo : receta_campo
     canal ||--o{ regla_umbral : regla_umbral
     usuario ||--o{ sesion : sesion
     dispositivo ||--o{ trama : trama
@@ -94,7 +98,7 @@ erDiagram
         text via
         text formato FK
         uuid pasarela_id FK
-        text decodificador
+        text decodificador FK
         timestamptz en_servicio_desde
     }
     dispositivo_zona {
@@ -152,6 +156,14 @@ erDiagram
         float rango_min
         float rango_max
         timestamptz actualizado_en
+        float umbral_alto_sugerido
+        float umbral_bajo_sugerido
+        float histeresis_sugerida
+    }
+    magnitud_alias {
+        text clave PK
+        text magnitud_codigo FK
+        timestamptz creado_en
     }
     medicion {
         uuid canal_id FK
@@ -198,6 +210,23 @@ erDiagram
         uuid sitio_predeterminado FK
         timestamptz creado_en
         timestamptz actualizado_en
+    }
+    receta_campo {
+        text receta_codigo PK,FK
+        int largo_bytes FK
+        int orden PK
+        text magnitud_codigo FK
+        int desplazamiento
+        text tipo
+        int sumar_antes
+        int multiplicar_por
+        int dividir_por
+    }
+    receta_decodificacion {
+        text codigo PK
+        text nombre
+        int largo_bytes
+        timestamptz creado_en
     }
     regla_umbral {
         uuid id PK

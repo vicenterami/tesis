@@ -1,0 +1,44 @@
+---
+config:
+  layout: elk
+  er:
+    entityPadding: 6
+    minEntityWidth: 60
+---
+erDiagram
+    magnitud ||--o{ magnitud_alias : ""
+    magnitud ||--o{ receta_campo : ""
+    receta_decodificacion ||--o{ receta_campo : ""
+    magnitud {
+        text codigo PK
+        text nombre
+        text unidad_canonica
+        float rango_min
+        float rango_max
+        timestamptz actualizado_en
+        float umbral_alto_sugerido
+        float umbral_bajo_sugerido
+        float histeresis_sugerida
+    }
+    magnitud_alias {
+        text clave PK
+        text magnitud_codigo FK
+        timestamptz creado_en
+    }
+    receta_campo {
+        text receta_codigo PK,FK
+        int largo_bytes FK
+        int orden PK
+        text magnitud_codigo FK
+        int desplazamiento
+        text tipo
+        int sumar_antes
+        int multiplicar_por
+        int dividir_por
+    }
+    receta_decodificacion {
+        text codigo PK
+        text nombre
+        int largo_bytes
+        timestamptz creado_en
+    }

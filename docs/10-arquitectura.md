@@ -1325,7 +1325,7 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     Los registros de Mosquitto y de los demás servicios no viajan: quedan en el disco del servidor (§6); si algún día se
     centralizan, ese envío cumple R1 y R2. Hecho el 13/10 en el broker: el rol `admin` del plugin, que de fábrica lee todo,
     quedó acotado a `$CONTROL/dynamic-security/#` y `$SYS/#` (probado en el banco). En la base, hecho el 13/10
-    (migración 14): el backend entra como `plataforma_app`, que lee todo, inserta solo en las tablas donde el código inserta (11 hasta la migración 21; desde la 22 también `usuario`, `usuario_sitio`, `sesion` y `acceso`; desde la 23, `regla_umbral`; desde la 24, `preferencia` y `mensaje_soporte`; desde la 25, `enlace_publico` y `enlace_publico_acceso`; de `sitio` actualiza solo tres columnas: `enlaces_publicos_max` y `publico_minimo_dispositivos` (migración 25) y, desde la 26, `espera_primera_trama_h`) y actualiza solo en
+    (migración 14): el backend entra como `plataforma_app`, que lee todo, inserta solo en las tablas donde el código inserta (11 hasta la migración 21; desde la 22 también `usuario`, `usuario_sitio`, `sesion` y `acceso`; desde la 23, `regla_umbral`; desde la 24, `preferencia` y `mensaje_soporte`; desde la 25, `enlace_publico` y `enlace_publico_acceso`; de `sitio` actualiza solo tres columnas: `enlaces_publicos_max` y `publico_minimo_dispositivos` (migración 25) y, desde la 26, `espera_primera_trama_h`; desde la 27, `magnitud` por columnas y `magnitud_alias`, y crea recetas y quita alias solo por `fn_crear_receta` y `fn_quitar_alias`) y actualiza solo en
     5 (desde la migración 16 también inserta en `pasarela` y actualiza solo su columna `activo`, para el alta y la baja por API; ni DELETE, ni TRUNCATE, ni DDL; `evento`, `medicion` y `trama` no se pueden reescribir, solo agregar);
     el dueño queda para migraciones y semillas. La retención, que usa `drop_chunks` y este exige ser dueño de la hypertable, pasa
     por una sola función del dueño (`fn_retencion_drop_chunks`, `SECURITY DEFINER`, lista blanca de cinco tablas (`acceso` desde la migración 22), mínimo de días,
@@ -1912,7 +1912,7 @@ entra. Lo que aquí se marca «a fijar al implementar» es un detalle que el dis
     nula de quien espera y los campos `en_servicio_desde` y `espera_hasta` del inventario y de la ficha son un cambio del contrato de
     `GET /dispositivos` y `GET /dispositivos/{id}` (campos y un valor nuevos; `openapi.json`), no una vista nueva. Probado con la falla plantada en `docs/16 §85`.
 69. **Catálogo editable: magnitudes, umbral sugerido, alias y recetas de decodificación (TT-12; diseñado el 20/11/2026, antes del código;
-    migración 27 prevista, `docs/08 §8`; pantalla «Catálogo», `docs/19 §4`, T).** Hasta aquí el catálogo `magnitud` solo se leía
+    migración 27, aplicada el 23/11/2026, `docs/08 §8`; pantalla «Catálogo», `docs/19 §4`, T; el código, por bloques).** Hasta aquí el catálogo `magnitud` solo se leía
     (`GET /magnitudes`) y se cambiaba por migración, y el mapa de claves y el perfil de decodificación vivían en el código (punto 47).
     TT-12 pide un catálogo con la unidad canónica, el rango válido y la condición de disparo de cada magnitud (`docs/04`, sus criterios).
     Decisiones:
@@ -1924,7 +1924,7 @@ entra. Lo que aquí se marca «a fijar al implementar» es un detalle que el dis
     (`docs/08 §7`), pero una misma serie quedaría con valores en dos unidades, y los umbrales y calibraciones de sus canales dejarían de
     significar lo que se escribió. **En este corte no se borra ninguna magnitud:** las 10 tienen canales; las sembradas volverían a
     aparecer al reaplicar sus migraciones (`ON CONFLICT DO NOTHING`); y un enlace público podría quedar apuntando a una que no existe.
-    Crear magnitudes, sí, siempre con los dos extremos del rango: la migración 27 prevista exige que no sean nulos (las 10 sembradas
+    Crear magnitudes, sí, siempre con los dos extremos del rango: la migración 27 exige que no sean nulos (las 10 sembradas
     los traen), y así el `CHECK` de los sugeridos compara siempre contra un rango cierto (`docs/08 §8`).
     (iii) **El rango, su bloqueo y su aviso.** Cambiar el rango cambia qué acepta el filtro 3 desde ese momento; lo guardado no se toca.
     La recepción lee la unidad y el rango de la base con cada lectura (`buscarCanal`, `recepcion/recepcion.service.ts`): el rango nuevo
@@ -1981,9 +1981,10 @@ entra. Lo que aquí se marca «a fijar al implementar» es un detalle que el dis
     haya que borrar, y la receta con sus campos (vii), pasa por funciones del dueño, `SECURITY DEFINER` y acotadas, como
     `fn_quitar_reglas` (migración 23): con `SET search_path = public, pg_temp`, `REVOKE EXECUTE … FROM PUBLIC` y `GRANT EXECUTE` solo a
     `plataforma_app`. El `UPDATE` de `magnitud`, solo por columnas: nunca `codigo` ni `unidad_canonica` (`docs/08 §8`). Tres guardianes
-    cambian con la migración 27 prevista: el chequeo 14 de `verificar-todo.sh` (hoy exige que la aplicación no inserte en `magnitud`), el
-    chequeo 17 (hoy exige el `CHECK` `ck_dispositivo_decodificador`, que pasa a ser clave foránea) y `pruebas/base-rol-app.sh` (hoy planta
-    un `INSERT` en `magnitud` que debe fallar).
+    cambiaron con la migración 27: el chequeo 14 de `verificar-todo.sh` (antes exigía que la aplicación no insertara en `magnitud`;
+    ahora, que no cambie su código ni su unidad canónica), el chequeo 17 (acepta el `CHECK` o la clave foránea que lo reemplaza) y
+    `pruebas/base-rol-app.sh` (planta cambiar la unidad canónica, insertar una receta sin su función y borrar un alias); el chequeo 27 y
+    `db/pruebas/catalogo-editable.sql` (`docs/16 §95`) son nuevos.
     (x) **El registro del autor.** La actividad de P14 es por sitio y el catálogo no es de ningún sitio: cada cambio deja, en la misma
     transacción, un `evento` `catalogo_cambio` con `dispositivo_id` nulo, la persona en `usuario_id` y `{objeto, codigo, antes, despues}`.
     (xi) **Fuera de este corte, declarado:** borrar magnitudes y recetas; recargar alias con `LISTEN/NOTIFY`; crear reglas en el alta;

@@ -1,7 +1,7 @@
 // Mapa «clave del JSON decodificado → magnitud del catálogo» (docs/10 §8.4 punto 47). Las claves las decide un decodificador que
 // este sistema no administra: el códec de la pasarela Milesight o el decodificador del perfil en ChirpStack. Hoy el mapa vive aquí;
-// cuando el panel administre el catálogo de magnitudes (Etapa 4), pasa a la columna `magnitud.alias`, sembrada desde esta misma
-// lista, y `resolverClave` lee de la base. Los adaptadores reciben el resolvedor y nunca la lista: así ese cambio no los toca.
+// la tabla `magnitud_alias` ya existe (migración 27), sembrada desde esta misma lista, y en el bloque 3 de TT-12 `resolverClave`
+// lee de ella. Los adaptadores reciben el resolvedor y nunca la lista: así ese cambio no los toca.
 // Los valores se esperan en la unidad canónica de su magnitud; la unidad viaja igual con la lectura para que el filtro 4 la verifique.
 
 export interface DestinoClave {
@@ -27,7 +27,7 @@ export const CLAVES: Readonly<Record<string, DestinoClave>> = {
 
 export type ResolverClave = (clave: string) => DestinoClave | undefined;
 
-// Token de inyección: el módulo de recepción entrega esta implementación; en la Etapa 4, una que lea `magnitud.alias`.
+// Token de inyección: el módulo de recepción entrega esta implementación; en el bloque 3 de TT-12, una que lea `magnitud_alias`.
 export const RESOLVER_CLAVE = Symbol('RESOLVER_CLAVE');
 
 export const resolverClave: ResolverClave = (clave) =>

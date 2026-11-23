@@ -105,7 +105,8 @@ export function validarAlta(cuerpo: unknown, reservadosExtra: readonly string[] 
   const pasarela_id = c.pasarela_id === undefined || c.pasarela_id === null ? null : m.uuid(c.pasarela_id, 'pasarela_id');
   if (via === 'lorawan' && pasarela_id === null) m.lista.push('un dispositivo lorawan necesita pasarela_id');
   if (via !== 'lorawan' && pasarela_id !== null) m.lista.push('pasarela_id solo aplica a la vía lorawan');
-  // El mismo dominio que ck_dispositivo_decodificador y ck_dispositivo_decodificador_via (migración 17), con el mensaje claro.
+  // Las recetas que el código aplica (las sembradas: fk_dispositivo_decodificador, migración 27) y ck_dispositivo_decodificador_via (migración 17),
+  // con el mensaje claro. En el bloque 5 de TT-12 la lista sale de la base.
   let decodificador: Perfil | null = null;
   if (c.decodificador !== undefined && c.decodificador !== null) {
     if (via !== 'lorawan') m.lista.push('decodificador solo aplica a la vía lorawan');

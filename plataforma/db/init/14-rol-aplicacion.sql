@@ -105,6 +105,20 @@ DO $$ BEGIN
     GRANT UPDATE (espera_primera_trama_h) ON sitio TO plataforma_app;
   END IF;
 END $$;
+-- Desde la migración 27, el catálogo editable (TT-12, docs/10 §8.4 punto 69): INSERT de magnitud y magnitud_alias por columnas, UPDATE de
+-- magnitud solo en nombre, rango y sugeridos (nunca codigo ni unidad_canonica) y las dos funciones acotadas; ningún INSERT directo en las
+-- recetas. Nacen después de esta: aquí se repiten solo si ya existen.
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'fn_crear_receta') AND EXISTS (SELECT 1 FROM pg_proc WHERE proname = 'fn_quitar_alias')
+     AND EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'magnitud' AND column_name = 'histeresis_sugerida') THEN
+    GRANT INSERT (codigo, nombre, unidad_canonica, rango_min, rango_max, umbral_alto_sugerido, umbral_bajo_sugerido, histeresis_sugerida)
+      ON magnitud TO plataforma_app;
+    GRANT UPDATE (nombre, rango_min, rango_max, umbral_alto_sugerido, umbral_bajo_sugerido, histeresis_sugerida) ON magnitud TO plataforma_app;
+    GRANT INSERT (clave, magnitud_codigo) ON magnitud_alias TO plataforma_app;
+    GRANT EXECUTE ON FUNCTION fn_crear_receta(text, text, integer, jsonb) TO plataforma_app;
+    GRANT EXECUTE ON FUNCTION fn_quitar_alias(text) TO plataforma_app;
+  END IF;
+END $$;
 ALTER DEFAULT PRIVILEGES FOR ROLE plataforma IN SCHEMA public REVOKE INSERT, UPDATE ON TABLES FROM plataforma_app;
 ALTER DEFAULT PRIVILEGES FOR ROLE plataforma IN SCHEMA public GRANT SELECT ON TABLES TO plataforma_app;
 

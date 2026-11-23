@@ -269,14 +269,15 @@ describe('perfil campus-heltec-v3-v1 con la captura de la UG65 del campus (migra
   });
 });
 
-describe('perfiles: la lista del código es la del CHECK y cada lectura existe en el catálogo (migración 17)', () => {
+describe('perfiles: la lista del código es la de las recetas sembradas y cada lectura existe en el catálogo (migraciones 17 y 27)', () => {
   const sql = readdirSync(join(import.meta.dirname, '../../../../db/init')).filter((x) => x.endsWith('.sql')).sort()
     .map((f) => readFileSync(join(import.meta.dirname, '../../../../db/init', f), 'utf8')).join('\n');
-  it('PERFILES == el dominio de ck_dispositivo_decodificador en la última migración que lo define', () => {
-    const definiciones = [...sql.matchAll(/ADD CONSTRAINT ck_dispositivo_decodificador CHECK \(decodificador IN \(([^)]*)\)\)/g)];
-    expect(definiciones.length).toBeGreaterThanOrEqual(1);
-    const enLaBase = [...definiciones[definiciones.length - 1][1].matchAll(/'([^']+)'/g)].map((m) => m[1]).sort();
-    expect([...PERFILES].sort()).toEqual(enLaBase);
+  // Desde la migración 27 la lista vive en receta_decodificacion (clave foránea de dispositivo.decodificador): hasta que la recepción lea
+  // las recetas de la base (TT-12, bloque 3), cada perfil del código debe ser una receta sembrada y viceversa.
+  it('PERFILES == las recetas sembradas con fn_crear_receta en db/init', () => {
+    const sembradas = [...sql.matchAll(/PERFORM fn_crear_receta\('([^']+)'/g)].map((m) => m[1]).sort();
+    expect(sembradas.length).toBeGreaterThanOrEqual(1);
+    expect([...PERFILES].sort()).toEqual(sembradas);
   });
   it('cada lectura del perfil → una magnitud del catálogo con su unidad canónica (si no, iría a cuarentena «canal no declarado»)', () => {
     const catalogo = new Map<string, string>();
