@@ -60,6 +60,12 @@ exige "$VT"/identidad.txt "${PIPESTATUS[0]}" 33 || fallos=$((fallos+1))
 docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -X -U plataforma -d plataforma -v ON_ERROR_STOP=1 -tA \
   < plataforma/db/pruebas/catalogo-editable.sql | tee "$VT"/catalogo.txt
 exige "$VT"/catalogo.txt "${PIPESTATUS[0]}" 40 || fallos=$((fallos+1))
+# Y la API del catálogo de punta a punta (TT-12, bloque 4; docs/16 §98) en una base DESECHABLE: crea magnitudes, y una magnitud no se borra.
+# Probada plantando: sin el bloqueo del rango más chico fallan 5 casos; sin el candado o sin traducir el 23505, el suyo (docs/16 §98).
+if command -v docker >/dev/null && command -v pnpm >/dev/null; then
+  bash plataforma/pruebas/catalogo-integracion.sh > "$VT"/catalogo-integracion.txt 2>&1; s=$?; tail -3 "$VT"/catalogo-integracion.txt
+  { [ $s -eq 0 ] && grep -q '^CATÁLOGO OK$' "$VT"/catalogo-integracion.txt; } || { grep '^FALLA' "$VT"/catalogo-integracion.txt | head -5; fallos=$((fallos+1)); }
+else echo "omitida: la integración del catálogo necesita docker y pnpm"; fi
 # fn_anonimizar_usuario (SECURITY DEFINER; corrección del 11/11/2026): el último administrador del sistema y `por` nulo, rechazados dentro de
 # la función; el correo de sus intentos de acceso y el motivo de sus eventos, anulados; con otro administrador activo, la baja pasa.
 docker compose -f plataforma/docker-compose.yml exec -T timescaledb psql -X -U plataforma -d plataforma -v ON_ERROR_STOP=1 -tA \

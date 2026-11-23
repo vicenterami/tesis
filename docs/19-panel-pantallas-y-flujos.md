@@ -1693,7 +1693,7 @@ se llamaba «perfil de decodificación»: en el panel, «perfil» ya nombra los 
    «Temperatura del suelo»: una clave apunta a una sola magnitud»; un alias reservado, «deveui lo usa la pasarela para otra cosa: no puede
    ser alias». Al guardar: «Guardado. Rige desde la próxima trama.»
 4. **Crear una magnitud.** Código (con su forma a la vista: «minúsculas, números y «_», empieza con letra; no se podrá cambiar»),
-   nombre, unidad (un selector de la lista cerrada, cada una como se lee y su símbolo: «°C (Cel)»; «no se podrá cambiar») y rango (los
+   nombre, unidad (un selector de la lista cerrada, que el panel lee de `GET /magnitudes/unidades`, cada una como se lee y su símbolo: «°C (Cel)»; «no se podrá cambiar») y rango (los
    dos extremos, obligatorios: el filtro 3 los usa y la base los exigirá, `docs/08 §8`); el umbral sugerido y los alias, opcionales, como al editar. Un código que
    ya existe: «Ya hay una magnitud con ese código». No hay «Borrar»: en este corte no se borra ninguna magnitud (`docs/10 §8.4` punto 69,
    ii), y la pantalla lo dice en la ayuda de la sección.

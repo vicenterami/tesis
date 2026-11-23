@@ -16,7 +16,7 @@ export function diaExiste(v: string): boolean {
   const ymd = v.slice(0, 10);
   return new Date(`${ymd}T12:00:00Z`).toISOString().slice(0, 10) === ymd;
 }
-function marca(v: unknown, errores: Error400[]): string {
+export function marca(v: unknown, errores: Error400[]): string {
   if (typeof v !== 'string' || !FORMA_ACTUALIZADO_EN.test(v) || Number.isNaN(new Date(v).getTime()) || !diaExiste(v)) {
     errores.push({ campo: 'actualizado_en', motivo: 'obligatorio: el instante ISO 8601 que entregó la ficha, tal cual' });
     return '';

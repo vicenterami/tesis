@@ -523,7 +523,7 @@ cliente ──HTTP──► Express ⊂ NestJS ──► servicio ──► pg �
 
 - **Express** es la biblioteca de servidor HTTP más usada de Node.js; NestJS la usa por debajo
   (`@nestjs/platform-express`). El proceso de Node es el servidor; Express recibe cada petición y
-  entrega la respuesta. Es **la API**: 49 rutas REST (62 operaciones, la recepción por HTTP, la sesión, los usuarios, el tablero v2, desde el 11/11/2026 la cuenta propia, lo legal, el soporte y la actividad, desde el 15/11/2026 la plantilla del alta por lote y el catálogo de magnitudes, desde el 17/11/2026 la vista pública por enlace y la administración de sus enlaces, con el tope y el k de cada sitio, desde el 18/11/2026 el plazo de la primera trama de cada sitio y desde el 19/11/2026 la exportación por sitio y su estimación, incluidos) y el canal SSE `/eventos` (§5), descritos en el contrato OpenAPI (50 rutas y 63 operaciones contando `/eventos`; el paso 2h2 del guardián compara estas cifras con `openapi.json`). Desde el 08/11/2026, antes de cada ruta corre el guardia central de la sesión (`docs/20 §5`). Express no toca la base.
+  entrega la respuesta. Es **la API**: 52 rutas REST (66 operaciones, la recepción por HTTP, la sesión, los usuarios, el tablero v2, desde el 11/11/2026 la cuenta propia, lo legal, el soporte y la actividad, desde el 15/11/2026 la plantilla del alta por lote y el catálogo de magnitudes, desde el 17/11/2026 la vista pública por enlace y la administración de sus enlaces, con el tope y el k de cada sitio, desde el 18/11/2026 el plazo de la primera trama de cada sitio y desde el 19/11/2026 la exportación por sitio y su estimación, y desde el 23/11/2026 el catálogo editable de magnitudes, incluidos) y el canal SSE `/eventos` (§5), descritos en el contrato OpenAPI (53 rutas y 67 operaciones contando `/eventos`; el paso 2h2 del guardián compara estas cifras con `openapi.json`). Desde el 08/11/2026, antes de cada ruta corre el guardia central de la sesión (`docs/20 §5`). Express no toca la base.
 - **`pg`** (node-postgres) es el conductor de la base: mantiene un *pool* de 5 conexiones
   (`db/db.module.ts`) y envía **SQL directo** con parámetros `$1, $2…`; el valor nunca se pega dentro
   del texto SQL, lo que evita la inyección. Sin ORM, por la razón de `docs/07` (series de tiempo con
@@ -1928,8 +1928,9 @@ entra. Lo que aquí se marca «a fijar al implementar» es un detalle que el dis
     los traen), y así el `CHECK` de los sugeridos compara siempre contra un rango cierto (`docs/08 §8`).
     (iii) **El rango, su bloqueo y su aviso.** Cambiar el rango cambia qué acepta el filtro 3 desde ese momento; lo guardado no se toca.
     La recepción lee la unidad y el rango de la base con cada lectura (`buscarCanal`, `recepcion/recepcion.service.ts`): el rango nuevo
-    rige al instante en todas las instancias, sin caché. Achicarlo se **bloquea** (409 con la lista) si deja fuera un umbral, un sugerido
-    o una calibración existentes, y antes de guardar se **avisa**: una consulta de impacto, que no guarda nada, dice cuántas mediciones de
+    rige al instante en todas las instancias, sin caché. Achicarlo se **bloquea** (409 con la lista) si deja fuera una regla o una calibración
+    existentes (los sugeridos son de la misma magnitud que se edita: uno que quede fuera del rango final es 400 en su campo; la calibración se
+    revisa solo al achicar, no al guardarla; corregido tras la revisión del 23/11/2026), y antes de guardar se **avisa**: una consulta de impacto, que no guarda nada, dice cuántas mediciones de
     los últimos 7 días y de cuántos canales habrían quedado fuera, como el aviso de a cuántos equipos afecta acortar el plazo de la primera
     trama (punto 68 vi). El cambio lleva bloqueo optimista por `actualizado_en` (como la calibración, migración 21) y toma `FOR UPDATE`
     de la magnitud; guardar las reglas de un canal toma `FOR SHARE` de la suya, para que una regla nueva y un rango más chico no se crucen.
@@ -1948,7 +1949,8 @@ entra. Lo que aquí se marca «a fijar al implementar» es un detalle que el dis
     60 s: pedía una conexión dedicada por instancia (el grupo de la aplicación tiene 5), su reconexión y una ventana en la que dos
     instancias resolverían distinto. Reglas: una clave apunta a una sola magnitud en todo el catálogo, en minúsculas, con la forma y sin
     las claves reservadas de `docs/08 §8`; el valor se espera en la unidad canónica, como hoy. Quitar un alias lo hace una función acotada
-    del dueño (punto ix). Los alias son de los formatos de pasarela: SenML no los usa.
+    del dueño (punto ix), y vale desde la trama siguiente: las tramas que traen esa clave dejan de reconocerla (con todos quitados, «ninguna
+    clave conocida»). La API no lo impide; la pantalla del bloque 6 lo advierte antes de guardar. Los alias son de los formatos de pasarela: SenML no los usa.
     (vi) **Recetas de decodificación declarativas.** Es lo que el punto 47 (ii) llamaba «perfil de decodificación»; cambia de nombre
     porque «perfil» ya nombra los roles de las personas (punto 64). Una receta escrita como código (un guion que el servidor ejecutara)
     sería una puerta de ejecución remota en manos de quien edita el catálogo. Por eso la receta es **solo dato**: el largo exacto de la

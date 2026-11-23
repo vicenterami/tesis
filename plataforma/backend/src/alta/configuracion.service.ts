@@ -135,12 +135,14 @@ export class ConfiguracionService {
   // otros umbrales): una con `id` actualiza esa regla (la condición abierta sigue con ella y se reevalúa con la trama siguiente); una sin
   // `id` es nueva; las guardadas que no vienen se cierran (con su evento) y se borran por fn_quitar_reglas (migración 23).
   // `fuera_de_banda_desde` vuelve a nulo: con umbrales nuevos, la cuenta del retardo empieza de cero.
+  // FOR SHARE OF m (TT-12, docs/10 §8.4 punto 69 iii): cambiar el rango de la magnitud toma FOR UPDATE; así una regla nueva no se valida contra
+  // un rango que otra transacción está achicando, ni el rango se achica sin ver la regla que se está guardando.
   async reemplazarReglas(canalId: string, cuerpo: unknown, usuarioId: string | null): Promise<CanalConReglas> {
     return this.transaccion(async (c) => {
       const a = await c.query<CanalBloqueado>(
         `SELECT c.id, c.dispositivo_id, c.magnitud_codigo AS magnitud, m.unidad_canonica AS unidad, c.etiqueta, m.rango_min, m.rango_max,
                 ${isoUs('c.actualizado_en')} AS actualizado_en
-           FROM canal c JOIN magnitud m ON m.codigo = c.magnitud_codigo WHERE c.id = $1 FOR NO KEY UPDATE OF c`, [canalId]);
+           FROM canal c JOIN magnitud m ON m.codigo = c.magnitud_codigo WHERE c.id = $1 FOR NO KEY UPDATE OF c FOR SHARE OF m`, [canalId]);
       const canal = a.rows[0];
       if (canal === undefined) throw new NotFoundException('canal no encontrado');
       const v = validarReglas(cuerpo, canal);

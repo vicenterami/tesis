@@ -4,7 +4,7 @@ Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emu
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
 cubría al escribirse se agregó después: TT-32 (sensor físico) en §43, §44 y §53, y TT-30 (recuperación ante reinicio) en §11. El
-contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 950 pruebas unitarias del backend y 599 del panel.
+contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 956 pruebas unitarias del backend y 599 del panel.
 Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -5365,3 +5365,59 @@ el bloque cambia de dónde sale el catálogo, no qué se prueba) y panel 663.
 compara con la copia congelada dentro de la prueba); los simuladores de la base de `contrato.spec.ts` y `recepcion.service.spec.ts` decían
 reproducir «la consulta real», pero arman la fila en TypeScript con su forma (el SQL lo prueban el banco y el `EXPLAIN`); y la prueba de los
 alias (C-38, con su nombre al día en la matriz) ahora exige los 8 sembrados, para que una extracción rota no pase en silencio.
+
+## 98. Catálogo editable, bloque 4: la API de magnitudes (TT-12; 23/11/2026)
+
+**Qué entra** (`docs/10 §8.4` punto 69 i a v y x; `docs/19 §4`, T; la matriz en `docs/20 §6`). `GET /magnitudes` suma a cada magnitud el
+rango, los tres sugeridos, los alias y `actualizado_en` (la marca del bloqueo optimista), sin cambiar de forma; el conteo de canales, que
+abarca todos los sitios, solo para el administrador del sistema. Nuevas: `GET /magnitudes/unidades` (la lista cerrada de unidades, a
+cualquier sesión, para el selector del panel), `POST /magnitudes`, `PATCH /magnitudes/{codigo}` y `GET /magnitudes/{codigo}/impacto`, las
+tres solo con la acción `sistema`. Cada escritura, en una transacción con su evento `catalogo_cambio` (la persona, sin dispositivo,
+`{objeto, codigo, antes, despues}` con solo lo que cambió). El código y la unidad no cambian; los sugeridos se validan con la misma función
+que las reglas del canal (`erroresDeRegla`) contra el rango final; los alias son una lista que reemplaza a la vigente (los que salen, por
+`fn_quitar_alias`); un alias de otra magnitud es 409 que la nombra. Achicar el rango toma `FOR UPDATE` de la magnitud y es 409 con la lista
+(hasta 50 y el total) si deja fuera una regla o una calibración; guardar las reglas de un canal toma ahora `FOR SHARE` de su magnitud.
+Contrato: 53 rutas y 67 operaciones (50 y 63 antes).
+
+**La lista cerrada de unidades** (`alta/unidades.ts`), leída en la fuente descargada el 16/10/2026: el registro de RFC 8428 §12.1 sin las
+**ocho** que marca con asterisco, «NOT RECOMMENDED» para implementaciones nuevas (g, l, l/s, Bspl, %, 1/min, beat/min y beats; el asterisco
+de cuatro de ellas está en la línea de continuación de la tabla, y un primer conteo que miró solo la primera línea dio cuatro), más hPa, dBm
+y ug/m3, que ya usa el catálogo y RFC 8798 define como unidades secundarias: 53 unidades (50 del registro y 3).
+
+**Integración contra una base real** (`plataforma/pruebas/catalogo-integracion.sh` y `backend/integracion/catalogo.ts`, nuevos; base
+desechable sin red con todas las migraciones, la aplicación compilada con `plataforma_app`). Va en una base desechable y no en
+`sesion-smoke.sh` porque crea magnitudes, y una magnitud no se borra. **28 de 28** (24 en la primera versión; las 4 nuevas, abajo): lectura con y sin conteo; la lista de unidades; crear
+(403 del administrador de un sitio, 200 del administrador del sistema, alias en minúsculas, el evento con la persona y la foto); código
+repetido y alias de otra magnitud (409, sin dejar nada creado); unidad fuera de la lista (400); marca vieja (409 con la vigente), 403 y
+404; un sugerido fuera del rango guardado (400); el impacto (3 mediciones de 1 canal en los últimos 7 días; la de hace 9 días no cuenta; 403
+para el administrador de un sitio); achicar el rango bajo una regla y bajo una calibración (409 con cada una, nada cambia); ampliar el
+rango, fijar el sugerido y cambiar los alias (200, marca nueva, el evento con solo lo cambiado); guardar lo mismo (400); y la
+**concurrencia**: con un `FOR SHARE` de la magnitud abierto (el de guardar reglas), el `PATCH` espera a que termine y después guarda;
+guardar reglas sigue funcionando. **Plantado:** sin el bloqueo del rango más chico, fallaron 5 de 24. La primera corrida mostró además
+`MaxListenersExceededWarning`: la transacción del servicio ponía el oyente de error del cliente y no lo quitaba al devolverlo al pool (los
+demás servicios sí); corregido, el aviso no vuelve a salir. El paso 1c del verificador la corre.
+
+**Matriz ruta × rol** (`sesion-smoke.sh`, contra la pila local, sin crear nada): 21 casos nuevos (401 sin sesión; 403 de consulta,
+investigador, operador y administrador de sitio en las tres escrituras; sin y con conteo; 400, 409, impacto y 404 del administrador del
+sistema): **505 de 505** (484 antes). `api-smoke.sh`: el contrato con 53 rutas y 67 operaciones, el catálogo con rango, alias y marca, y la
+lista de unidades: TODO OK. La base local siguió intacta (3 sitios, 18 equipos, 15 488 mediciones, 10 magnitudes).
+
+**Unitarias.** `magnitudes.dto.spec.ts` (28 ejecuciones): las reservadas y la forma del alias son las del SQL de la migración 27; toda unidad
+del catálogo sembrado está en la lista y ninguna de las ocho no recomendadas; 16 altas malas y 6 cambios malos con su motivo; los sugeridos
+contra el rango final. Backend: **956 pruebas escritas** (950 antes), que `vitest` ejecuta como **1 042 de 1 042 en 77 archivos**.
+
+**Corregido tras la revisión del bloque** (8 hallazgos, 5 medios, todos ciertos). (1) Dos escrituras que agregaban el mismo alias a la vez
+no se veían entre sí y la segunda chocaba con la clave primaria como **500**: ahora las escrituras del catálogo van de a una (un candado de
+la transacción, `pg_advisory_xact_lock`) y un 23505 que igual llegue es 409. Una primera prueba con dos altas en paralelo pasaba **aun sin
+ninguna de las dos defensas** (las peticiones no llegaban a cruzarse): se reemplazó por dos pruebas deterministas, una con un alias insertado
+por otra transacción que confirma mientras el alta espera (409; plantado sin la traducción del 23505, sale 500 y falla) y otra con el
+candado tomado por otra transacción (el alta espera; plantado sin el candado, no espera y falla). (2) Una espera de bloqueo vencida o una
+consulta cortada por tiempo salían como 500: ahora 503 «reintenta», como el resto de la API. (3) `FOR UPDATE` de la magnitud hacía esperar
+al alta de un canal de esa magnitud (su clave foránea toma `FOR KEY SHARE`): ahora `FOR NO KEY UPDATE`, que sigue chocando con el
+`FOR SHARE` de guardar reglas. (4) Calibrar un canal toma ahora también `FOR SHARE` de su magnitud; la calibración se revisa contra el rango
+solo al achicarlo (escrito en `docs/10 §8.4` punto 69 iii). (5) El diseño decía 409 para un sugerido que quedara fuera del rango; el código da
+400 en su campo, porque el sugerido es de la misma magnitud que se edita: se corrigió el texto del diseño y se agregó la prueba (achicar a
+25 °C con un sugerido de 30 → 400, nada cambia). (6) La lista cerrada tiene **53** unidades, no 51 (50 del registro y 3); la prueba fija el
+total. (7) El impacto corre con su tope de tiempo (10 s). (8) Quitar alias corta su reconocimiento desde la trama siguiente: escrito en el
+diseño; la pantalla del bloque 6 lo advertirá. También se agregó el caso del administrador de un sitio, que lee el catálogo sin el conteo.
+Integración **28 de 28**; `pnpm verificar` en verde (1 042 y 663).

@@ -2778,7 +2778,7 @@
     },
     "/magnitudes": {
       "get": {
-        "description": "Las magnitudes del catálogo con `codigo, nombre, unidad` (la unidad canónica, símbolo SenML), ordenadas por código. Con cualquier sesión (docs/20 §6).",
+        "description": "Las magnitudes ordenadas por código: `codigo, nombre, unidad` (la unidad canónica, símbolo SenML), el rango válido, los umbrales y la histéresis sugeridos, los alias y `actualizado_en` (la marca para PATCH). Con cualquier sesión; `canales` (en cuántos canales se usa, en todos los sitios) solo para el administrador del sistema (docs/20 §6).",
         "operationId": "MagnitudesController_listar",
         "parameters": [],
         "responses": {
@@ -2795,6 +2795,324 @@
           }
         ],
         "summary": "Catálogo de magnitudes (Etapa 4)",
+        "tags": [
+          "magnitudes"
+        ]
+      },
+      "post": {
+        "description": "El código y la unidad se eligen aquí y no cambian después; el rango, obligatorio; sugeridos y alias, opcionales. Deja un evento `catalogo_cambio`. 409 si el código ya existe o un alias ya es de otra magnitud.",
+        "operationId": "MagnitudesController_crear",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "codigo",
+                  "nombre",
+                  "unidad",
+                  "rango_min",
+                  "rango_max"
+                ],
+                "properties": {
+                  "codigo": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_]{0,39}$"
+                  },
+                  "unidad": {
+                    "type": "string",
+                    "enum": [
+                      "m",
+                      "kg",
+                      "s",
+                      "A",
+                      "K",
+                      "cd",
+                      "mol",
+                      "Hz",
+                      "rad",
+                      "sr",
+                      "N",
+                      "Pa",
+                      "J",
+                      "W",
+                      "C",
+                      "V",
+                      "F",
+                      "Ohm",
+                      "S",
+                      "Wb",
+                      "T",
+                      "H",
+                      "Cel",
+                      "lm",
+                      "lx",
+                      "Bq",
+                      "Gy",
+                      "Sv",
+                      "kat",
+                      "m2",
+                      "m3",
+                      "m/s",
+                      "m/s2",
+                      "m3/s",
+                      "W/m2",
+                      "cd/m2",
+                      "bit",
+                      "bit/s",
+                      "lat",
+                      "lon",
+                      "pH",
+                      "dB",
+                      "dBW",
+                      "count",
+                      "/",
+                      "%RH",
+                      "%EL",
+                      "EL",
+                      "1/s",
+                      "S/m",
+                      "hPa",
+                      "dBm",
+                      "ug/m3"
+                    ]
+                  },
+                  "nombre": {
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  "rango_min": {
+                    "type": "number"
+                  },
+                  "rango_max": {
+                    "type": "number"
+                  },
+                  "umbral_alto_sugerido": {
+                    "type": "number",
+                    "nullable": true
+                  },
+                  "umbral_bajo_sugerido": {
+                    "type": "number",
+                    "nullable": true
+                  },
+                  "histeresis_sugerida": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "alias": {
+                    "type": "array",
+                    "maxItems": 32,
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9_.-]{1,64}$"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "La magnitud creada"
+          },
+          "400": {
+            "description": "Validación: lista `{campo, motivo}`"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "403": {
+            "description": "No eres administrador del sistema"
+          },
+          "409": {
+            "description": "El código ya existe, o un alias ya es de otra magnitud"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Crear una magnitud (TT-12; administrador del sistema)",
+        "tags": [
+          "magnitudes"
+        ]
+      }
+    },
+    "/magnitudes/unidades": {
+      "get": {
+        "description": "La lista cerrada con que se crea una magnitud: el registro de SenML (RFC 8428 §12.1) sin las «NOT RECOMMENDED», más hPa, dBm y ug/m3. Con cualquier sesión.",
+        "operationId": "MagnitudesController_unidades",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Lista de símbolos SenML"
+          },
+          "401": {
+            "description": "sesión requerida"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Unidades canónicas admitidas (TT-12)",
+        "tags": [
+          "magnitudes"
+        ]
+      }
+    },
+    "/magnitudes/{codigo}": {
+      "patch": {
+        "description": "Nombre, rango, sugeridos y alias (la lista reemplaza a la vigente), con bloqueo optimista por `actualizado_en`. El código y la unidad no cambian. 409 si otro la cambió, si un alias ya es de otra magnitud, o si el rango deja fuera una regla o una calibración existentes (`fuera`, hasta 50, y `total`). Deja un evento `catalogo_cambio`.",
+        "operationId": "MagnitudesController_cambiar",
+        "parameters": [
+          {
+            "name": "codigo",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "actualizado_en"
+                ],
+                "properties": {
+                  "actualizado_en": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "nombre": {
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  "rango_min": {
+                    "type": "number"
+                  },
+                  "rango_max": {
+                    "type": "number"
+                  },
+                  "umbral_alto_sugerido": {
+                    "type": "number",
+                    "nullable": true
+                  },
+                  "umbral_bajo_sugerido": {
+                    "type": "number",
+                    "nullable": true
+                  },
+                  "histeresis_sugerida": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "alias": {
+                    "type": "array",
+                    "maxItems": 32,
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9_.-]{1,64}$"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "La magnitud como quedó"
+          },
+          "400": {
+            "description": "Validación: lista `{campo, motivo}`"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "403": {
+            "description": "No eres administrador del sistema"
+          },
+          "404": {
+            "description": "No existe esa magnitud"
+          },
+          "409": {
+            "description": "Cambio concurrente, alias de otra magnitud, o rango que deja fuera reglas o calibraciones"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Cambiar una magnitud (TT-12; administrador del sistema)",
+        "tags": [
+          "magnitudes"
+        ]
+      }
+    },
+    "/magnitudes/{codigo}/impacto": {
+      "get": {
+        "description": "Cuántas mediciones de los últimos 7 días, y de cuántos canales, habrían quedado fuera de `[rango_min, rango_max]`. No guarda nada. Cuenta en todos los sitios.",
+        "operationId": "MagnitudesController_impacto",
+        "parameters": [
+          {
+            "name": "codigo",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "rango_min",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "rango_max",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "`{codigo, rango_min, rango_max, dias, mediciones, canales}`"
+          },
+          "400": {
+            "description": "Rango no válido"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "403": {
+            "description": "No eres administrador del sistema"
+          },
+          "404": {
+            "description": "No existe esa magnitud"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Impacto de un rango propuesto (TT-12; administrador del sistema)",
         "tags": [
           "magnitudes"
         ]

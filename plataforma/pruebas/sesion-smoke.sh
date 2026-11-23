@@ -616,6 +616,26 @@ caso "investigador: GET /dispositivos/lote/plantilla → 403" 403 inv GET /dispo
 caso "operador técnico: GET /dispositivos/lote/plantilla → 200" 200 ope GET /dispositivos/lote/plantilla
 caso "administrador del sistema: GET /dispositivos/lote/plantilla → 200" 200 sis GET /dispositivos/lote/plantilla
 caso "investigador: GET /magnitudes → 200" 200 inv GET /magnitudes
+# ── Catálogo editable (TT-12; docs/20 §6): leer, cualquier sesión; escribir y medir el impacto, solo el administrador del sistema. Nada de
+#    esto crea filas: una magnitud no se borra (docs/10 §8.4 punto 69 ii), así que el flujo completo va contra una base desechable
+#    (catalogo-integracion.sh, docs/16 §98).
+caso "sin sesión: GET /magnitudes/unidades" 401 anon GET /magnitudes/unidades
+caso "sin sesión: POST /magnitudes" 401 anon POST /magnitudes '{}'
+caso "consulta: GET /magnitudes/unidades → 200" 200 con GET /magnitudes/unidades
+pedir con GET /magnitudes >/dev/null
+[ "$(campo "any('canales' in m for m in v)")" = False ] && ok "consulta: GET /magnitudes sin el conteo de canales (abarca todos los sitios)" || falla "consulta: GET /magnitudes trae el conteo de canales: $(head -c 160 "$T/r")"
+pedir sis GET /magnitudes >/dev/null
+[ "$(campo "len(v) > 0 and all(isinstance(m.get('canales'), int) for m in v)")" = True ] && ok "administrador del sistema: GET /magnitudes con el conteo de canales" || falla "administrador del sistema: GET /magnitudes sin el conteo: $(head -c 160 "$T/r")"
+MT=$(campo "[m['actualizado_en'] for m in v if m['codigo'] == 'temperatura'][0]")
+for q in con inv ope adm; do
+  caso "$q: POST /magnitudes → 403" 403 $q POST /magnitudes '{"codigo":"x_prueba","nombre":"x","unidad":"Cel","rango_min":0,"rango_max":1}'
+  caso "$q: PATCH /magnitudes/{codigo} → 403" 403 $q PATCH /magnitudes/temperatura "{\"actualizado_en\":\"$MT\",\"nombre\":\"x\"}"
+  caso "$q: GET /magnitudes/{codigo}/impacto → 403" 403 $q GET "/magnitudes/temperatura/impacto?rango_min=0&rango_max=1"
+done
+caso "administrador del sistema: POST /magnitudes con una unidad fuera de la lista → 400 (no crea nada)" 400 sis POST /magnitudes '{"codigo":"x_prueba","nombre":"x","unidad":"ppm","rango_min":0,"rango_max":1}'
+caso "administrador del sistema: PATCH /magnitudes/{codigo} con una marca vieja → 409 (no cambia nada)" 409 sis PATCH /magnitudes/temperatura '{"actualizado_en":"2026-01-01T00:00:00.000000Z","nombre":"x"}'
+caso "administrador del sistema: GET /magnitudes/{codigo}/impacto → 200" 200 sis GET "/magnitudes/temperatura/impacto?rango_min=-40&rango_max=85"
+caso "administrador del sistema: impacto de una magnitud que no existe → 404" 404 sis GET "/magnitudes/no_existe/impacto?rango_min=0&rango_max=1"
 caso "investigador: GET /cuarentena/detectados → 403" 403 inv GET /cuarentena/detectados
 caso "operador técnico: GET /cuarentena/detectados?sitio= → 200" 200 ope GET "/cuarentena/detectados?sitio=$SITIO_A"
 caso "administrador del sistema: GET /cuarentena/detectados?sitio= (B) → 200" 200 sis GET "/cuarentena/detectados?sitio=$SITIO_B"

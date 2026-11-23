@@ -332,7 +332,9 @@ export class AltaService {
   // con la hora del cambio, como hará el panel configurable (docs/19). La fila se lee bloqueada (FOR NO KEY UPDATE: las mediciones que la referencian siguen
   // entrando) para que «antes» sea exactamente lo que el UPDATE reemplaza; el evento `canal_calibrado` va en la misma transacción. Nada
   // guardado se reescribe: el % sale con la escala vigente en la siguiente consulta o lectura (consulta/escala.ts). No pasa por el cupo de
-  // las operaciones de aprovisionamiento: no espera al broker y dura lo que dos sentencias.
+  // las operaciones de aprovisionamiento: no espera al broker y dura lo que dos sentencias. FOR SHARE OF m (TT-12, 23/11/2026): achicar el
+  // rango de la magnitud toma FOR NO KEY UPDATE y revisa las calibraciones; así no se cruza con una calibración en curso. La calibración no
+  // se valida contra el rango al guardarla: solo al achicarlo (docs/10 §8.4 punto 69 iii).
   async calibrar(id: string, cal: CalibracionValidada, usuarioId: string | null = null): Promise<CanalCalibrado> {
     const c = await this.pool.connect();
     try {
@@ -340,7 +342,7 @@ export class AltaService {
       const a = await c.query<CanalBloqueado>(
         `SELECT c.id, c.dispositivo_id, c.magnitud_codigo AS magnitud, m.unidad_canonica AS unidad, c.etiqueta, c.escala_cero, c.escala_cien,
                 ${isoUs('c.actualizado_en')} AS actualizado_en
-           FROM canal c JOIN magnitud m ON m.codigo = c.magnitud_codigo WHERE c.id = $1 FOR NO KEY UPDATE OF c`,
+           FROM canal c JOIN magnitud m ON m.codigo = c.magnitud_codigo WHERE c.id = $1 FOR NO KEY UPDATE OF c FOR SHARE OF m`,
         [id],
       );
       const antes = a.rows[0];
@@ -529,11 +531,6 @@ export class AltaService {
   }
 
   // El catálogo de magnitudes (GET /magnitudes, docs/19 §4, N4): código, nombre y unidad canónica. No es de ningún sitio.
-  async magnitudes(): Promise<{ codigo: string; nombre: string; unidad: string }[]> {
-    const r = await this.pool.query<{ codigo: string; nombre: string; unidad: string }>('SELECT codigo, nombre, unidad_canonica AS unidad FROM magnitud ORDER BY codigo');
-    return r.rows;
-  }
-
   // Alta por lote: las filas válidas en dos sentencias, no N (una con UNNEST que inserta dispositivos, canales y credenciales, y la de
   // los eventos por registrarEventos), en una transacción, y las credenciales de las vías mqtt en el broker antes de confirmar, en tandas de 100 órdenes por
   // mensaje (el plugin las ejecuta en orden; un mensaje con 500 pasaría el tope de paquete del broker). Si el broker o la base fallan,

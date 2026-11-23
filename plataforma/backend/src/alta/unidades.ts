@@ -30,3 +30,14 @@ const COMO_SE_LEE: Readonly<Record<string, string>> = {
   Cel: '°C', '%RH': '% de humedad', '%EL': '% de batería', hPa: 'hPa', dBm: 'dBm', 'ug/m3': 'µg/m³', V: 'V',
 };
 export const comoSeLee = (unidad: string): string => COMO_SE_LEE[unidad] ?? unidad;
+
+// La lista CERRADA de unidades canónicas con que se puede crear una magnitud (TT-12; docs/08 §8 (a); docs/10 §8.4 punto 69 ii): el registro
+// de unidades de SenML (RFC 8428 §12.1, copia del 16/10/2026) sin las ocho que marca con asterisco, «NOT RECOMMENDED» para implementaciones
+// nuevas (g, l, l/s, Bspl, %, 1/min, beat/min y beats; el de cuatro de ellas está en la línea de continuación de la tabla), más las tres que ya usa el catálogo y que RFC 8798 define como unidades secundarias (hPa, dBm, ug/m3). Una sola casa:
+// la API la usa para validar y la entrega al panel; agregar una unidad es cambiar esta lista, no la base.
+export const UNIDADES_CANONICAS: readonly string[] = [
+  'm', 'kg', 's', 'A', 'K', 'cd', 'mol', 'Hz', 'rad', 'sr', 'N', 'Pa', 'J', 'W', 'C', 'V', 'F', 'Ohm', 'S', 'Wb', 'T', 'H', 'Cel', 'lm',
+  'lx', 'Bq', 'Gy', 'Sv', 'kat', 'm2', 'm3', 'm/s', 'm/s2', 'm3/s', 'W/m2', 'cd/m2', 'bit', 'bit/s', 'lat', 'lon', 'pH', 'dB', 'dBW',
+  'count', '/', '%RH', '%EL', 'EL', '1/s', 'S/m',
+  'hPa', 'dBm', 'ug/m3',
+];

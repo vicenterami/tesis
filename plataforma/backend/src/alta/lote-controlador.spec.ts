@@ -6,6 +6,7 @@ import type { Pool } from 'pg';
 import { AltaController } from './alta.controller.js';
 import { AltaService } from './alta.service.js';
 import { MagnitudesController } from './magnitudes.controller.js';
+import { MagnitudesService } from './magnitudes.service.js';
 import type { DynsecService } from '../broker/dynsec.service.js';
 import { usuarioSistema, type Rol, type UsuarioSesion } from '../sesion/permisos.js';
 import { AltaDeLote, Catalogos, ChoqueDeLote, MAX_FILAS_LOTE, RespuestaLote, plantillaLote } from './lote.js';
@@ -208,12 +209,15 @@ describe('plantilla y magnitudes por perfil (docs/20 §6)', () => {
     for (const rol of ['consulta', 'investigador'] as const) await expect(ctrl.lote(persona(rol), 'validar', { filas }, undefined, res())).rejects.toBeInstanceOf(ForbiddenException);
     expect(servicio.catalogosLote).not.toHaveBeenCalled();
   });
-  it('las magnitudes: cualquier sesión (la ruta no pide permiso propio), con código, nombre y unidad, ordenadas por código', async () => {
-    const pool = { query: vi.fn((_texto: string) => Promise.resolve({ rows: [{ codigo: 'humedad', nombre: 'Humedad relativa', unidad: '%RH' }] })) };
-    const ctrl = new MagnitudesController(new AltaService(pool as unknown as Pool, {} as DynsecService, { publicar() {} } as never));
-    expect(await ctrl.listar()).toEqual([{ codigo: 'humedad', nombre: 'Humedad relativa', unidad: '%RH' }]);
-    expect(pool.query.mock.calls[0]?.[0]).toBe('SELECT codigo, nombre, unidad_canonica AS unidad FROM magnitud ORDER BY codigo');
-    expect(ctrl.listar.length).toBe(0); // sin usuario: ninguna comprobación de perfil más allá de la sesión del guardia central
+  it('las magnitudes: cualquier sesión las lee; el conteo de canales (todos los sitios) solo el administrador del sistema (docs/20 §6)', async () => {
+    const fila = { codigo: 'humedad', nombre: 'Humedad relativa', unidad: '%RH' };
+    const pool = { query: vi.fn((_texto: string) => Promise.resolve({ rows: [fila] })) };
+    const ctrl = new MagnitudesController(new MagnitudesService(pool as unknown as Pool));
+    expect(await ctrl.listar(persona('consulta'))).toEqual([fila]);
+    expect(pool.query.mock.calls[0]?.[0]).not.toContain('AS canales');
+    expect(pool.query.mock.calls[0]?.[0]).toContain('ORDER BY m.codigo');
+    await ctrl.listar(usuarioSistema());
+    expect(pool.query.mock.calls[1]?.[0]).toContain('AS canales');
   });
 });
 
