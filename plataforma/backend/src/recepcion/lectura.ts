@@ -1,3 +1,6 @@
+import type { ResolverClave } from './adaptadores/mapa-claves.js';
+import type { Receta } from './adaptadores/receta.js';
+
 // Una "lectura" es la unidad mínima que sale del filtro 2 (analizar) y viaja por el resto del
 // pipeline: qué magnitud, qué valor, en qué unidad y cuándo. Todo adaptador, venga de donde venga
 // la trama, debe producir exactamente esto. Así los filtros 3–6 no saben ni les importa el formato
@@ -25,9 +28,13 @@ export interface ContextoTrama {
   // Del tópico de pasarela (sitio/<s>/pasarela/<id>/<deveui>/<evento>, docs/10 §8.4 punto 47): el adaptador exige que el DevEUI
   // del cuerpo sea este. En el tópico de un dispositivo directo no existe.
   deveui?: string;
-  // Perfil de decodificación del nodo (dispositivo.decodificador, migración 17): con él, un adaptador de pasarela decodifica la
-  // `data` en base64 cuando la pasarela la entrega sin decodificar (docs/10 §8.4 punto 47).
+  // Receta de decodificación del nodo (dispositivo.decodificador, migraciones 17 y 27): su código y la receta que la recepción leyó de la
+  // base en la misma consulta del nodo. Con ella, un adaptador de pasarela decodifica la `data` en base64 cuando la pasarela la entrega
+  // sin decodificar (docs/10 §8.4 puntos 47 y 69 vi).
   decodificador?: string;
+  receta?: Receta;
+  // Los alias del catálogo (magnitud_alias), leídos en la misma consulta: solo los formatos de pasarela los usan (docs/10 §8.4 punto 69 v).
+  resolver?: ResolverClave;
   // Salida del adaptador: el contador de trama LoRaWAN (fCnt), con el que el filtro 3 descarta la trama repetida (docs/10 §4.1).
   fcnt?: number;
   // Salida del adaptador: claves del JSON decodificado que no están en el mapa (la línea de registro de la trama dice cuántas y nombra las cinco primeras).

@@ -1,10 +1,8 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ContextoTrama, Lectura } from '../lectura.js';
 import { Adaptador, TramaMalformada } from './adaptador.js';
-import { IdentidadNoVerificada, anotarFcnt, exigirDevEui, lecturasDe, objetoJson, tiempoDe } from './lorawan.js';
-import { RESOLVER_CLAVE } from './mapa-claves.js';
-import type { ResolverClave } from './mapa-claves.js';
-import { decodificar } from './perfiles.js';
+import { IdentidadNoVerificada, anotarFcnt, decodificarData, exigirDevEui, lecturasDe, objetoJson, tiempoDe } from './lorawan.js';
+import { SIN_ALIAS } from './mapa-claves.js';
 
 // Uplink del servidor de red embebido de una pasarela Milesight (UG63, UG65 y familia; ruta B; docs/10 §8.4 punto 47). Dos formas:
 //   con «Payload Codec» y «Metadata»: lo que devuelve el decodificador más devEUI, deviceName y applicationID. Ejemplo:
@@ -22,8 +20,6 @@ export class MilesightAdaptador implements Adaptador {
   readonly nombre = 'milesight';
   readonly origenTiempo = 'pasarela';
 
-  constructor(@Inject(RESOLVER_CLAVE) private readonly resolver: ResolverClave) {}
-
   reconoce(ctx: ContextoTrama): boolean {
     return ctx.carga.toString('utf8').trimStart().startsWith('{');
   }
@@ -38,10 +34,9 @@ export class MilesightAdaptador implements Adaptador {
         throw new TramaMalformada('llegó sin decodificar: activar Payload Codec y Metadata en la aplicación de la pasarela, o declarar el perfil de decodificación del nodo');
       }
       anotarFcnt(cuerpo.fCnt, ctx);
-      ctx.ignoradas = [];
-      return decodificar(ctx.decodificador, cuerpo.data, tiempoDe(cuerpo.time));
+      return decodificarData(ctx, cuerpo.data, tiempoDe(cuerpo.time));
     }
     anotarFcnt(cuerpo.fCnt, ctx);
-    return lecturasDe(cuerpo, this.resolver, ctx, undefined, METADATOS);
+    return lecturasDe(cuerpo, ctx.resolver ?? SIN_ALIAS, ctx, undefined, METADATOS);
   }
 }

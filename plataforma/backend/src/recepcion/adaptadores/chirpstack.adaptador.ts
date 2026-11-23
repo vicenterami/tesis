@@ -1,10 +1,8 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ContextoTrama, Lectura } from '../lectura.js';
 import { Adaptador, TramaMalformada } from './adaptador.js';
-import { IdentidadNoVerificada, anotarFcnt, exigirDevEui, lecturasDe, objetoJson, tiempoDe } from './lorawan.js';
-import { RESOLVER_CLAVE } from './mapa-claves.js';
-import type { ResolverClave } from './mapa-claves.js';
-import { decodificar } from './perfiles.js';
+import { IdentidadNoVerificada, anotarFcnt, decodificarData, exigirDevEui, lecturasDe, objetoJson, tiempoDe } from './lorawan.js';
+import { SIN_ALIAS } from './mapa-claves.js';
 
 // Evento `up` de la integración MQTT de ChirpStack v4 (docs/10 §8.4 punto 47; ruta C, y la A si algún día hay un ChirpStack propio).
 // JSON por defecto (`json=true`), con el mapeo JSON de Protocol Buffers: nombres en camelCase. Lo que se usa:
@@ -19,8 +17,6 @@ import { decodificar } from './perfiles.js';
 export class ChirpstackAdaptador implements Adaptador {
   readonly nombre = 'chirpstack';
   readonly origenTiempo = 'pasarela';
-
-  constructor(@Inject(RESOLVER_CLAVE) private readonly resolver: ResolverClave) {}
 
   reconoce(ctx: ContextoTrama): boolean {
     const texto = ctx.carga.toString('utf8').trimStart();
@@ -38,9 +34,8 @@ export class ChirpstackAdaptador implements Adaptador {
       if (!ctx.decodificador) {
         throw new TramaMalformada('sin object: el perfil del dispositivo en ChirpStack no tiene decodificador, ni el nodo un perfil de decodificación');
       }
-      ctx.ignoradas = [];
-      return decodificar(ctx.decodificador, evento.data, tiempoDe(evento.time));
+      return decodificarData(ctx, evento.data, tiempoDe(evento.time));
     }
-    return lecturasDe(objeto as Record<string, unknown>, this.resolver, ctx, tiempoDe(evento.time));
+    return lecturasDe(objeto as Record<string, unknown>, ctx.resolver ?? SIN_ALIAS, ctx, tiempoDe(evento.time));
   }
 }

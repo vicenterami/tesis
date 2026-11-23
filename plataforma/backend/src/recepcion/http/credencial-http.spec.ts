@@ -5,7 +5,6 @@ import { BrokerService } from '../../broker/broker.service.js';
 import { SupervisionService } from '../../supervision/supervision.service.js';
 import { EventosService } from '../../tiempo-real/eventos.service.js';
 import { ChirpstackAdaptador } from '../adaptadores/chirpstack.adaptador.js';
-import { resolverClave } from '../adaptadores/mapa-claves.js';
 import { MilesightAdaptador } from '../adaptadores/milesight.adaptador.js';
 import { PlanoAdaptador } from '../adaptadores/plano.adaptador.js';
 import { SenmlAdaptador } from '../adaptadores/senml.adaptador.js';
@@ -15,7 +14,7 @@ import { RecepcionService } from '../recepcion.service.js';
 function servicio(fila: { id: string; via: string; estado: string; credencial_id: string | null; hash: string | null } | undefined, rowCount?: number) {
   const query = vi.fn(() => Promise.resolve({ rows: fila ? [fila] : [], rowCount: rowCount ?? (fila ? 1 : 0) }));
   const s = new RecepcionService({ query } as unknown as Pool, { alRecibir: vi.fn() } as unknown as BrokerService, {} as AlertasService,
-    {} as SupervisionService, new EventosService(), new SenmlAdaptador(), new PlanoAdaptador(), new ChirpstackAdaptador(resolverClave), new MilesightAdaptador(resolverClave));
+    {} as SupervisionService, new EventosService(), new SenmlAdaptador(), new PlanoAdaptador(), new ChirpstackAdaptador(), new MilesightAdaptador());
   return { s, query };
 }
 

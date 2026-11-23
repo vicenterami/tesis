@@ -7,7 +7,7 @@ import { BrokerService } from '../broker/broker.service.js';
 import { SupervisionService } from '../supervision/supervision.service.js';
 import { EventoPanel, EventosService } from '../tiempo-real/eventos.service.js';
 import { ChirpstackAdaptador } from './adaptadores/chirpstack.adaptador.js';
-import { resolverClave } from './adaptadores/mapa-claves.js';
+import { ALIAS_SEMILLA, recetaSiSembrada } from './adaptadores/catalogo-semilla.prueba.js';
 import { MilesightAdaptador } from './adaptadores/milesight.adaptador.js';
 import { PlanoAdaptador } from './adaptadores/plano.adaptador.js';
 import { SenmlAdaptador } from './adaptadores/senml.adaptador.js';
@@ -36,8 +36,11 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
     const query = vi.fn((sql: string, params?: unknown[]) => {
       // El dispositivo de prueba está registrado en el sitio «uct», el mismo del tópico, salvo que la prueba diga otro.
       if (sql.startsWith('SELECT d.id, d.estado, d.formato, d.pasarela_id, s.codigo AS sitio_codigo, d.decodificador, e.ultimo_fcnt, d.intervalo_esperado_s')) {
-        const fila = { sitio_codigo: 'uct', formato: 'plano', pasarela_id: null, decodificador: null, ultimo_fcnt: null, intervalo_esperado_s: 60, canales: 1,
+        const base = { sitio_codigo: 'uct', formato: 'plano', pasarela_id: null, decodificador: null as string | null | undefined, ultimo_fcnt: null, intervalo_esperado_s: 60, canales: 1,
           ventana_inicio: null, ventana_lecturas: 0, ventana_cuarentena: 0, ventana_sobre_tope: 0, ventana_omitidas: 0, reloj_desviado: false, ...dispositivo };
+        // Con la forma que devuelve la consulta real (migración 27): la receta si el nodo tiene una, y los alias solo en los formatos de
+        // pasarela. El SQL de esa consulta no corre aquí: lo prueban el banco (lorawan, vias, puente) y su EXPLAIN (docs/16 §97).
+        const fila = { ...base, receta: recetaSiSembrada(base.decodificador), alias: ['milesight', 'chirpstack'].includes(base.formato) ? ALIAS_SEMILLA : null };
         return Promise.resolve({ rows: dispositivo ? [fila] : [], rowCount: dispositivo ? 1 : 0 });
       }
       if (sql.startsWith('SELECT p.id, p.activo, s.codigo AS sitio_codigo FROM pasarela')) {
@@ -68,7 +71,7 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
     eventos.flujo().subscribe((e) => publicados.push(e));
     const config = { get: (clave: string) => topes[clave] } as unknown as ConfigService;
     const servicio = new RecepcionService(pool, broker, alertas, supervision, eventos, new SenmlAdaptador(), new PlanoAdaptador(),
-      new ChirpstackAdaptador(resolverClave), new MilesightAdaptador(resolverClave), config);
+      new ChirpstackAdaptador(), new MilesightAdaptador(), config);
     return { servicio, query, marcarVivo, abrirTope, cerrarTope, abrirRelojDesviado, cerrarRelojDesviado, evaluar, publicados };
   }
 

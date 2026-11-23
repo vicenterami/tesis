@@ -2,6 +2,7 @@ import { ContextoTrama, Lectura } from '../lectura.js';
 import { limpia } from '../texto.js';
 import { TramaMalformada } from './adaptador.js';
 import { ResolverClave } from './mapa-claves.js';
+import { aplicarReceta } from './receta.js';
 
 // Lo común a los dos adaptadores LoRaWAN (docs/10 §8.4 punto 47): el DevEUI del cuerpo debe ser el del tópico, y las claves
 // decodificadas se traducen con el mapa único.
@@ -85,4 +86,18 @@ export function lecturasDe(valores: Record<string, unknown>, resolver: ResolverC
     throw new TramaMalformada(`ninguna clave conocida${vistas ? ` (llegaron: ${vistas})` : ''}`);
   }
   return lecturas;
+}
+
+// Base64 estricto (RFC 4648 §4, con relleno): Buffer.from(…, 'base64') ignora en silencio lo que no es base64, y una `data`
+// corrupta se decodificaría como otros bytes en vez de rechazarse.
+const BASE64 = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
+
+// La `data` sin decodificar, con la receta que la recepción leyó de la base para este nodo (docs/10 §8.4 punto 69 vi). Los textos de
+// error son los de antes (C-89, docs/16): sin receta para su código, «perfil de decodificación desconocido»; luego «data no es base64»;
+// el largo y lo demás, los de aplicarReceta. La hora la pone el adaptador.
+export function decodificarData(ctx: ContextoTrama, data: unknown, tiempo: Date | undefined): Lectura[] {
+  if (!ctx.receta) throw new TramaMalformada(`perfil de decodificación desconocido: ${limpia(ctx.decodificador ?? '')}`);
+  if (typeof data !== 'string' || data === '' || !BASE64.test(data)) throw new TramaMalformada('data no es base64');
+  ctx.ignoradas = [];
+  return aplicarReceta(ctx.receta, Buffer.from(data, 'base64')).map((l) => ({ ...l, tiempo }));
 }

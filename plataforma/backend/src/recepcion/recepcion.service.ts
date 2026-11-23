@@ -20,6 +20,8 @@ import { desvioDePasarela, tiempoPlausible } from './tiempo.js';
 import { limpia } from './texto.js';
 import { aCanonica } from './unidades.js';
 import { porcentaje } from '../consulta/escala.js';
+import { DestinoClave, resolverDesde } from './adaptadores/mapa-claves.js';
+import type { Receta } from './adaptadores/receta.js';
 
 // Forma del tópico acordada: sitio/<sitio>/dispositivo/<id_fisico>/<magnitud>
 const PATRON_TOPICO = /^sitio\/([^/]+)\/dispositivo\/([^/]+)\/([^/]+)$/;
@@ -40,6 +42,10 @@ interface Dispositivo {
   // ¿Tiene abierta la condición reloj_desviado? (docs/10 §8.4 punto 54): la trae la misma consulta del filtro 1, así abrir y cerrar
   // escriben solo en la transición, sin una consulta más por trama.
   reloj_desviado: boolean;
+  // Catálogo editable (TT-12, docs/10 §8.4 punto 69 v y vi), en la misma consulta y sin memoria: la receta del nodo si tiene una, y los
+  // alias solo si su formato es de pasarela. JSON: node-postgres lo entrega ya como objeto, con los int4 como números.
+  receta: Receta | null;
+  alias: Record<string, DestinoClave> | null;
 }
 interface Pasarela { id: string; activo: boolean; sitio_codigo: string }
 // Dominio cerrado: el mismo CHECK de la migración 19 (antes 09). Agregar un motivo exige migración, no solo código.
@@ -185,7 +191,8 @@ export class RecepcionService implements OnModuleInit {
     }
     trama.dispositivoId = nodo.id;
     trama.pasarela = idPasarela;
-    const ctx: ContextoTrama = { topico: trama.topico, idFisico: deveui, magnitudTopico: '', carga: trama.carga, deveui, decodificador: nodo.decodificador ?? undefined, recibidoEn: trama.recibidoEn };
+    const ctx: ContextoTrama = { topico: trama.topico, idFisico: deveui, magnitudTopico: '', carga: trama.carga, deveui, decodificador: nodo.decodificador ?? undefined,
+      receta: nodo.receta ?? undefined, resolver: resolverDesde(nodo.alias), recibidoEn: trama.recibidoEn };
     await this.filtros2a6(trama, ctx, nodo, true, cuota);
   }
 
@@ -477,7 +484,16 @@ export class RecepcionService implements OnModuleInit {
               (SELECT count(*)::int FROM canal c WHERE c.dispositivo_id = d.id) AS canales, e.ventana_inicio,
               COALESCE(e.ventana_lecturas, 0) AS ventana_lecturas, COALESCE(e.ventana_cuarentena, 0) AS ventana_cuarentena,
               COALESCE(e.ventana_sobre_tope, 0) AS ventana_sobre_tope, COALESCE(e.ventana_omitidas, 0) AS ventana_omitidas,
-              EXISTS (SELECT 1 FROM condicion rc WHERE rc.dispositivo_id = d.id AND rc.tipo = 'reloj_desviado' AND rc.cerrada_en IS NULL) AS reloj_desviado
+              EXISTS (SELECT 1 FROM condicion rc WHERE rc.dispositivo_id = d.id AND rc.tipo = 'reloj_desviado' AND rc.cerrada_en IS NULL) AS reloj_desviado,
+              CASE WHEN d.decodificador IS NOT NULL THEN (
+                SELECT json_build_object('codigo', r.codigo, 'largo_bytes', r.largo_bytes, 'campos',
+                         (SELECT json_agg(json_build_object('magnitud', f.magnitud_codigo, 'unidad', fm.unidad_canonica, 'desplazamiento', f.desplazamiento,
+                                 'tipo', f.tipo, 'sumar_antes', f.sumar_antes, 'multiplicar_por', f.multiplicar_por, 'dividir_por', f.dividir_por) ORDER BY f.orden)
+                            FROM receta_campo f JOIN magnitud fm ON fm.codigo = f.magnitud_codigo WHERE f.receta_codigo = r.codigo))
+                  FROM receta_decodificacion r WHERE r.codigo = d.decodificador) END AS receta,
+              CASE WHEN d.formato IN ('milesight', 'chirpstack') THEN (
+                SELECT json_object_agg(a.clave, json_build_object('magnitud', a.magnitud_codigo, 'unidad', am.unidad_canonica))
+                  FROM magnitud_alias a JOIN magnitud am ON am.codigo = a.magnitud_codigo) END AS alias
          FROM dispositivo d
          JOIN zona z ON z.id = d.zona_id JOIN sitio s ON s.id = z.sitio_id
          LEFT JOIN estado_dispositivo e ON e.dispositivo_id = d.id

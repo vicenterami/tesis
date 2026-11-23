@@ -5,6 +5,7 @@
     "node_modules",
     "dist",
     "**/*.spec.ts",
+    "**/*.prueba.ts",
     "src/emulador"
   ]
 }

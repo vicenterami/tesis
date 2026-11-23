@@ -3344,7 +3344,7 @@ nombre). Las demás citan una prueba que ya existía, con el comienzo de su tít
 | C-35 | No existe la conversión inversa ni entre magnitudes distintas | unidades.ts | sin conversión: la lectura se rechaza como en C-34 | `unidades.spec.ts` · «pareja desconocida…»<br>`unidades.spec.ts` · «V a mV no se inventa…» |
 | C-36 | Una magnitud sin canal declarado se rechaza | docs/10 filtro 3; recepcion.service.ts:301 | rechazada: invalida «canal no declarado» | `recepcion.service.spec.ts` · «filtro 3: canal no declarado…» |
 | C-37 | El rango físico se evalúa sobre el valor ya convertido y sus límites son inclusivos | docs/08 (magnitud.rango_min y rango_max); recepcion.service.ts:309 | 85 °C se guarda; 85,01 °C y 360 K se rechazan: invalida «fuera del rango físico» | `contrato.spec.ts` · C-37<br>`recepcion.service.spec.ts` · «filtro 3: valor fuera del rango físico…» |
-| C-38 | Cada clave del mapa de claves apunta a una magnitud del catálogo con su unidad canónica | docs/10 §8.4 punto 47; mapa-claves.ts | ninguna clave apunta a una magnitud inexistente | `adaptadores/lorawan.spec.ts` · «cada clave del mapa → una magnitud del catálogo…» |
+| C-38 | Cada alias sembrado del catálogo apunta a una magnitud del catálogo que existe | docs/10 §8.4 puntos 47 y 69; migración 27 | ninguna clave apunta a una magnitud inexistente | `adaptadores/lorawan.spec.ts` · «los 8 alias sembrados apuntan a magnitudes del catálogo que existen…» |
 | C-39 | Todo destino de una conversión es una unidad canónica del catálogo | unidades.ts; docs/08 (magnitud.unidad_canonica) | ninguna conversión desemboca en una unidad que ninguna magnitud usa | `contrato.spec.ts` · C-39 |
 | C-100 | Un valor finito que deja de serlo al convertirse a la unidad canónica (1e306 bar son 1e309 hPa) se rechaza aunque el canal no tenga rango máximo | docs/10 §4.1 (la lectura imposible no se guarda); recepcion.service.ts, «Number.isFinite(convertido)» | rechazada: invalida «no cabe en un número finito al convertirlo a hPa»; lo que cabe (1e305 bar) se guarda | `contrato.spec.ts` · C-100 |
 | C-101 | Un -0 (en v, en bv o como resultado de una conversión) se guarda como 0 | RFC 8428 §4.3 (v es un número JSON; la copia local de la RFC no dice nada del cero negativo); docs/10 §4.1; recepcion.service.ts, «convertido === 0 ? 0 : convertido» | aceptada: se guarda 0, nunca -0 | `contrato.spec.ts` · C-101 |
@@ -5332,3 +5332,36 @@ nombre de la receta en el mensaje se calculaba fuera de la conversión. La defin
 al guardar va a `receta_campo.magnitud_codigo` (bloque 5). Al medir, el barrido mostró 114
 recetas «válidas» que no decodificaban: todas tenían algún factor sin escribir, que el validador acepta porque la base pone 0 y 1 por
 omisión; la prueba ahora aplica esos valores, como los entrega la base.
+
+## 97. Catálogo editable, bloque 3: la recepción lee la receta y los alias de la base (TT-12; 23/11/2026)
+
+**Qué cambia.** La consulta que busca el nodo en cada trama (`buscarDispositivo`, `recepcion.service.ts`) trae además, como JSON, la receta
+del nodo con la unidad canónica de cada campo (solo si tiene `decodificador`) y los alias del catálogo con su magnitud y unidad (solo si su
+formato es `milesight` o `chirpstack`); cada una va en un `CASE WHEN … THEN (subconsulta)`, que no se evalúa para quien no la necesita.
+Sin memoria: un alias o una receta nuevos valen desde la trama siguiente en todas las instancias (`docs/10 §8.4` punto 69 v). La receta y
+el resolvedor viajan en el contexto de la trama; los adaptadores `milesight` y `chirpstack` ya no reciben nada inyectado al arrancar y
+decodifican con `aplicarReceta` (`receta.ts`, §96). Salen del código de producción el mapa fijo de claves (`CLAVES`, `resolverClave`,
+`RESOLVER_CLAVE`) y la función de decodificación de `perfiles.ts`; de ese archivo queda solo la lista que valida el alta (el bloque 5 la
+saca de la base). Los textos de error de C-89 se conservan. Las pruebas toman el catálogo sembrado de la migración 27, leído del SQL
+(`catalogo-semilla.prueba.ts`, que `tsconfig.build.json` excluye de la compilación: no llega a la imagen; comprobado dentro del
+contenedor del banco).
+
+**Consulta, en la base local.** `EXPLAIN ANALYZE` de la consulta del nodo para un nodo del campus con receta, tres veces cada una: la anterior
+0,34, 0,27 y 0,22 ms; la nueva 0,54, 0,50 y 0,52 ms (≈ +0,25 ms por trama de pasarela). La receta y los 8 alias llegan con los tipos
+correctos (enteros como números, no como texto).
+
+**Banco, antes y después, con el mismo comando** (`banco.sh encender` y `banco.sh vias`; la línea base, con el código del bloque 2).
+Por pasarela (10 bytes con la receta, `fCnt`): antes 180 de 180, p50 4 ms, p95 4 ms, máximo 7 ms; después 180 de 180, p50 4 ms, p95 4 ms,
+máximo 6 ms. Las demás vías, sin cambios; «VIAS OK (28/28)» las dos veces. **Criterio del diseño** (`docs/10 §8.4` punto 69; p95 +1 ms o
+más, o la consulta sin sus índices → memoria corta con recarga): no se cumple ninguna de las dos, así que **sin memoria**. `banco.sh lorawan`:
+46 de 46 en la segunda corrida; en la primera, 45 y una falla de la prueba, no del código: la trama de «reloj corregido» guardó sus 3
+lecturas y cerró la condición (registro del backend), pero la comprobación consulta la base 2 s después de publicar y la publicación tardó
+casi eso en llegar. `banco.sh puente`: «PUENTE OK».
+
+**Unitarias.** `pnpm verificar` en verde a la primera tras el cambio: backend 1 014 de 1 014 en 76 archivos (las mismas 950 pruebas escritas:
+el bloque cambia de dónde sale el catálogo, no qué se prueba) y panel 663.
+
+**Corregido tras la revisión del bloque.** El título de la equivalencia nombraba una función que ya no existe en `perfiles.ts` (ahora dice que
+compara con la copia congelada dentro de la prueba); los simuladores de la base de `contrato.spec.ts` y `recepcion.service.spec.ts` decían
+reproducir «la consulta real», pero arman la fila en TypeScript con su forma (el SQL lo prueban el banco y el `EXPLAIN`); y la prueba de los
+alias (C-38, con su nombre al día en la matriz) ahora exige los 8 sembrados, para que una extracción rota no pase en silencio.

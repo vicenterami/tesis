@@ -476,16 +476,16 @@ consistente para reportes.
       `docs/10 §8.4` punto 47, `docs/16 §27`): un dispositivo directo declara `senml` o `plano`; uno lorawan no lo envía y copia el de su
       pasarela. La demostración pasó a publicar solo SenML, que es lo que declara `dev-0001` (`docs/15` §3 y §4).
 - [x] **Alias de claves en el catálogo: tabla `magnitud_alias`, migración 27 (23/11/2026)** (TT-12; decidido el 15/10/2026 como
-      columna y cambiado a tabla el 20/11/2026; `docs/10 §8.4` puntos 47 y 69). Hoy el mapa «clave del JSON decodificado → magnitud»
-      vive en el código (`mapa-claves.ts`: 8 claves hacia 4 magnitudes) detrás de una sola función (`resolverClave`), porque nadie puede
-      editar el catálogo hasta que el panel lo administre. Lo escrito el 15/10 era una columna `magnitud.alias text[]`; **se cambia por
+      columna y cambiado a tabla el 20/11/2026; `docs/10 §8.4` puntos 47 y 69). Hasta el 23/11/2026 el mapa «clave del JSON decodificado →
+      magnitud» vivía en el código (`mapa-claves.ts`: 8 claves hacia 4 magnitudes), porque nadie podía editar el catálogo; desde el
+      bloque 3 de TT-12 la recepción lo lee de esta tabla. Lo escrito el 15/10 era una columna `magnitud.alias text[]`; **se cambia por
       una tabla** `magnitud_alias` (`clave text` como clave primaria, en minúsculas y con la forma `^[a-z0-9_.-]{1,64}$` por `CHECK`;
       `magnitud_codigo`, clave foránea a `magnitud` en cascada), sembrada con las 8 claves del código. **Porqué:** la regla «una clave
       apunta a una sola magnitud en todo el catálogo» la garantiza la clave primaria; con un arreglo por magnitud haría falta un
       disparador que revisara las demás filas. No se admiten como alias las claves que los formatos de pasarela usan para otra cosa
       (`deveui`, `devicename`, `applicationid`, `applicationname`, `fcnt`, `fport`, `data`, `time`, `rxinfo`, `txinfo`, `deviceinfo`,
       `object`). Es la regla de §4: lo que administra el usuario vive en un catálogo. La tabla ya está en §2, en el diagrama de §3 y en el
-      conteo de entidades; la recepción todavía resuelve las claves con `mapa-claves.ts` hasta que lea los alias de la base (TT-12, bloque 3).
+      conteo de entidades; desde el bloque 3 de TT-12 (23/11/2026) la recepción lee los alias de la base con cada trama (`docs/16 §97`).
 - [x] **Catálogo editable: el esquema de la migración 27** (TT-12, diseñado el 20/11/2026 y aplicado el 23/11/2026; el código que lo usa llega por bloques, `docs/10 §8.4` punto 69; las reglas y su porqué, en `docs/10 §8.4` punto 69;
       la pantalla, en `docs/19 §4`, T). Aditiva, como todas:
       (a) **`magnitud`** gana `umbral_alto_sugerido` y `umbral_bajo_sugerido` (nulos) e `histeresis_sugerida` (≥ 0, 0 por omisión), con
@@ -511,7 +511,7 @@ consistente para reportes.
       transacción inserta la receta y sus campos, exige al menos uno y rechaza un código que ya existe; así una receta en uso no puede
       ganar campos después. Sembrada: `campus-heltec-v3-v1` (10 bytes:
       temperatura `i16be` en el byte 5, ÷ 100; humedad `u16be` en el 7, ÷ 100; tensión `u8` en el 9, + 200, ÷ 100), la misma
-      decodificación que hoy hace el código (`perfiles.ts`).
+      decodificación que hacía el código (`perfiles.ts`, retirada de la recepción en el bloque 3; `docs/16 §96` y §97).
       (c) **`dispositivo.decodificador`**: el `CHECK` contra la lista del código pasa a ser una **clave foránea** a
       `receta_decodificacion (codigo)` con `ON DELETE RESTRICT`; el `CHECK` que lo admite solo en la vía `lorawan` se conserva. La
       migración 27 siembra la receta **antes** de cambiar el `CHECK` por la clave foránea, y el bloque de la migración 17 que redefine el

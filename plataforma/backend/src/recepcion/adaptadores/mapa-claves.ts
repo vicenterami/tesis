@@ -1,7 +1,10 @@
-// Mapa «clave del JSON decodificado → magnitud del catálogo» (docs/10 §8.4 punto 47). Las claves las decide un decodificador que
-// este sistema no administra: el códec de la pasarela Milesight o el decodificador del perfil en ChirpStack. Hoy el mapa vive aquí;
-// la tabla `magnitud_alias` ya existe (migración 27), sembrada desde esta misma lista, y en el bloque 3 de TT-12 `resolverClave`
-// lee de ella. Los adaptadores reciben el resolvedor y nunca la lista: así ese cambio no los toca.
+// Mapa «clave del JSON decodificado → magnitud del catálogo» (docs/10 §8.4 puntos 47 y 69 v). Las claves las decide un decodificador que
+// este sistema no administra: el códec de la pasarela Milesight o el decodificador del perfil en ChirpStack. Desde el bloque 3 de TT-12
+// (23/11/2026) el mapa vive en la tabla magnitud_alias (migración 27), que lo administra quien administra el catálogo: la recepción lo lee
+// con cada trama, en la misma consulta que busca el nodo (sin memoria: un alias nuevo vale desde la trama siguiente en todas las
+// instancias), y el adaptador recibe el resolvedor en el contexto de la trama. Las 8 claves sembradas salen de la guía oficial del códec de
+// Milesight (temperature, humidity, battery), de sus decodificadores oficiales (https://github.com/Milesight-IoT/SensorDecoders, GPL-3.0:
+// solo leídos, nunca copiados) y de sinónimos en español para decodificadores propios.
 // Los valores se esperan en la unidad canónica de su magnitud; la unidad viaja igual con la lectura para que el filtro 4 la verifique.
 
 export interface DestinoClave {
@@ -9,26 +12,14 @@ export interface DestinoClave {
   unidad: string; // unidad en que llega el valor (la canónica de esa magnitud)
 }
 
-// Claves en minúsculas. Fuentes: el ejemplo de la guía oficial del códec de Milesight (temperature, humidity, battery:
-// https://support.milesight-iot.com/support/solutions/articles/73000600064-how-to-use-payload-codec-on-milesight-gateway) y los
-// decodificadores oficiales (https://github.com/Milesight-IoT/SensorDecoders, GPL-3.0: solo leídos, nunca copiados). Qué claves trae el
-// `object` de ChirpStack lo decide el decodificador de cada perfil: no declarado hasta ver una trama real. Sinónimos en español para
-// decodificadores propios.
-export const CLAVES: Readonly<Record<string, DestinoClave>> = {
-  temperature: { magnitud: 'temperatura', unidad: 'Cel' },
-  temperatura: { magnitud: 'temperatura', unidad: 'Cel' },
-  humidity: { magnitud: 'humedad', unidad: '%RH' },
-  humedad: { magnitud: 'humedad', unidad: '%RH' },
-  battery: { magnitud: 'bateria', unidad: '%EL' },
-  bateria: { magnitud: 'bateria', unidad: '%EL' },
-  pressure: { magnitud: 'presion', unidad: 'hPa' },
-  presion: { magnitud: 'presion', unidad: 'hPa' },
-};
-
 export type ResolverClave = (clave: string) => DestinoClave | undefined;
 
-// Token de inyección: el módulo de recepción entrega esta implementación; en el bloque 3 de TT-12, una que lea `magnitud_alias`.
-export const RESOLVER_CLAVE = Symbol('RESOLVER_CLAVE');
-
-export const resolverClave: ResolverClave = (clave) =>
-  Object.prototype.hasOwnProperty.call(CLAVES, clave.toLowerCase()) ? CLAVES[clave.toLowerCase()] : undefined;
+// Las claves se guardan en minúsculas (CHECK de magnitud_alias) y se buscan en minúsculas; una propiedad heredada («toString») no es clave.
+export function resolverDesde(alias: Readonly<Record<string, DestinoClave>> | null | undefined): ResolverClave {
+  const mapa = alias ?? {};
+  return (clave) => {
+    const k = clave.toLowerCase();
+    return Object.prototype.hasOwnProperty.call(mapa, k) ? mapa[k] : undefined;
+  };
+}
+export const SIN_ALIAS: ResolverClave = resolverDesde(null);

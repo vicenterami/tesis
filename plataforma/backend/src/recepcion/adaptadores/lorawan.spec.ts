@@ -5,9 +5,10 @@ import { ContextoTrama } from '../lectura.js';
 import { TramaMalformada } from './adaptador.js';
 import { ChirpstackAdaptador } from './chirpstack.adaptador.js';
 import { IdentidadNoVerificada } from './lorawan.js';
-import { CLAVES, resolverClave } from './mapa-claves.js';
+import { ALIAS_SEMILLA, recetaSiSembrada, resolverSemilla } from './catalogo-semilla.prueba.js';
 import { MilesightAdaptador } from './milesight.adaptador.js';
-import { PERFILES, decodificar } from './perfiles.js';
+import { PERFILES } from './perfiles.js';
+import { aplicarReceta } from './receta.js';
 
 // Adaptadores LoRaWAN (docs/10 §8.4 punto 47) contra el JSON de las fuentes oficiales.
 // Identificadores: el DevEUI 0101010101010101 es el del ejemplo oficial de ChirpStack (sintético). El gatewayId del ejemplo y el
@@ -15,6 +16,7 @@ import { PERFILES, decodificar } from './perfiles.js';
 const DEVEUI = '0101010101010101';
 const ctx = (cuerpo: string, deveui: string | undefined = DEVEUI): ContextoTrama => ({
   topico: `sitio/uct/pasarela/chirpstack-campus/${deveui ?? 'x'}/up`, idFisico: deveui ?? 'x', magnitudTopico: '', carga: Buffer.from(cuerpo, 'utf8'), deveui,
+  resolver: resolverSemilla, // los alias sembrados (migración 27), como los entrega la consulta del nodo
 });
 
 // Evento «up» del ejemplo oficial (chirpstack.io/docs/chirpstack/integrations/events.html, copia del 15/10/2026), más un `object`.
@@ -46,19 +48,20 @@ describe('mapa de claves (docs/10 §8.4 punto 47)', () => {
     expect(catalogo.size).toBeGreaterThanOrEqual(7);
   });
   // Un solo it que recorre el mapa (no it.each): así la cifra de pruebas que cuenta el guardián es la misma que informa vitest.
-  it('cada clave del mapa → una magnitud del catálogo con su unidad canónica', () => {
-    const malas = Object.entries(CLAVES).filter(([, d]) => catalogo.get(d.magnitud) !== d.unidad).map(([k, d]) => `${k} → ${d.magnitud} (${d.unidad})`);
+  it('los 8 alias sembrados apuntan a magnitudes del catálogo que existen (si no, irían a cuarentena «canal no declarado»)', () => {
+    expect(Object.keys(ALIAS_SEMILLA)).toHaveLength(8); // una regex de extracción rota no pasa en silencio
+    const malas = Object.entries(ALIAS_SEMILLA).filter(([, d]) => catalogo.get(d.magnitud) !== d.unidad).map(([k, d]) => `${k} → ${d.magnitud} (${d.unidad})`);
     expect(malas).toEqual([]);
   });
   it('resuelve sin distinguir mayúsculas y no confunde propiedades heredadas con claves', () => {
-    expect(resolverClave('Temperature')?.magnitud).toBe('temperatura');
-    expect(resolverClave('toString')).toBeUndefined();
-    expect(resolverClave('fCnt')).toBeUndefined();
+    expect(resolverSemilla('Temperature')?.magnitud).toBe('temperatura');
+    expect(resolverSemilla('toString')).toBeUndefined();
+    expect(resolverSemilla('fCnt')).toBeUndefined();
   });
 });
 
 describe('ChirpstackAdaptador (evento up de ChirpStack v4)', () => {
-  const a = new ChirpstackAdaptador(resolverClave);
+  const a = new ChirpstackAdaptador();
   it('reconoce el evento y no un pack SenML ni el JSON de Milesight', () => {
     expect(a.reconoce(ctx(eventoUp()))).toBe(true);
     expect(a.reconoce(ctx('[{"n":"temperatura","v":1}]'))).toBe(false);
@@ -138,7 +141,7 @@ describe('ChirpstackAdaptador (evento up de ChirpStack v4)', () => {
 });
 
 describe('MilesightAdaptador (servidor de red embebido, con códec y Metadata)', () => {
-  const a = new MilesightAdaptador(resolverClave);
+  const a = new MilesightAdaptador();
   // Forma de la guía oficial de códec con Metadata (devEUI, deviceName, applicationID más los valores decodificados):
   // https://support.milesight-iot.com/support/solutions/articles/73000600064-how-to-use-payload-codec-on-milesight-gateway (15/10/2026).
   // El de «sin códec» sigue la tabla del uplink: https://www.milesight.com/docs/en/mini-gateway/application-guide/uplink-data.html
@@ -186,7 +189,7 @@ const CAPTURA_UG65 = {
   txInfo: { adr: true, codeRate: '4/5', dataRate: { bandwidth: 125, modulation: 'LORA', spreadFactor: 7 }, frequency: 917000000 },
 };
 const PERFIL = 'campus-heltec-v3-v1';
-const conPerfil = (cuerpo: object, perfil: string | undefined = PERFIL): ContextoTrama => ({ ...ctx(JSON.stringify(cuerpo)), decodificador: perfil });
+const conPerfil = (cuerpo: object, perfil: string | undefined = PERFIL): ContextoTrama => ({ ...ctx(JSON.stringify(cuerpo)), decodificador: perfil, receta: recetaSiSembrada(perfil) ?? undefined });
 // Los 10 bytes del perfil con los valores que se quieran probar (nodo 2, secuencia 143).
 const datos = (centesimasC: number, centesimasHR: number, bateria: number): string => {
   const b = Buffer.alloc(10);
@@ -195,7 +198,7 @@ const datos = (centesimasC: number, centesimasHR: number, bateria: number): stri
 };
 
 describe('perfil campus-heltec-v3-v1 con la captura de la UG65 del campus (migración 17; docs/10 §8.4 punto 47 y §4.1)', () => {
-  const a = new MilesightAdaptador(resolverClave);
+  const a = new MilesightAdaptador();
   it('la captura con perfil → 18,16 °C, 65,52 % y 3,75 V con la marca del servidor de red; fCnt anotado; nada ignorado', () => {
     const c = conPerfil(CAPTURA_UG65);
     const t = new Date('2026-10-15T15:34:56.340Z');
@@ -256,7 +259,7 @@ describe('perfil campus-heltec-v3-v1 con la captura de la UG65 del campus (migra
     expect(() => a.analizar(conPerfil({ ...CAPTURA_UG65, devEUI: 'ffffffffffffffff' }))).toThrow(IdentidadNoVerificada);
   });
   it('ChirpStack sin object y con perfil → decodifica data con la marca del evento y anota fCnt; con object, el perfil no se usa', () => {
-    const cs = new ChirpstackAdaptador(resolverClave);
+    const cs = new ChirpstackAdaptador();
     const sinObjeto = JSON.parse(eventoUp({ data: CAPTURA_UG65.data, fCnt: 7 })) as Record<string, unknown>;
     delete sinObjeto.object;
     const c = conPerfil(sinObjeto);
@@ -284,7 +287,7 @@ describe('perfiles: la lista del código es la de las recetas sembradas y cada l
     for (const bloque of sql.match(/INSERT INTO magnitud[\s\S]*?;/g) ?? []) {
       for (const m of bloque.matchAll(/\(\s*'([a-z0-9_]+)',\s*'[^']*',\s*'([^']+)'/g)) catalogo.set(m[1], m[2]);
     }
-    const malas = PERFILES.flatMap((p) => decodificar(p, CAPTURA_UG65.data, undefined))
+    const malas = PERFILES.flatMap((p) => aplicarReceta(recetaSiSembrada(p)!, Buffer.from(CAPTURA_UG65.data, 'base64')))
       .filter((l) => catalogo.get(l.magnitud) !== l.unidad).map((l) => `${l.magnitud} (${l.unidad})`);
     expect(catalogo.get('tension')).toBe('V');
     expect(malas).toEqual([]);

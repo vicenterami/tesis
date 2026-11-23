@@ -9,7 +9,7 @@ import { EventosService } from '../tiempo-real/eventos.service.js';
 import { TramaMalformada } from './adaptadores/adaptador.js';
 import { ChirpstackAdaptador } from './adaptadores/chirpstack.adaptador.js';
 import { IdentidadNoVerificada } from './adaptadores/lorawan.js';
-import { resolverClave } from './adaptadores/mapa-claves.js';
+import { ALIAS_SEMILLA, recetaSiSembrada, resolverSemilla } from './adaptadores/catalogo-semilla.prueba.js';
 import { MilesightAdaptador } from './adaptadores/milesight.adaptador.js';
 import { PlanoAdaptador } from './adaptadores/plano.adaptador.js';
 import { SenmlAdaptador } from './adaptadores/senml.adaptador.js';
@@ -89,7 +89,7 @@ const MATRIZ: Regla[] = [
   { id: 'C-35', grupo: 'c', regla: 'No existe la conversión inversa ni entre magnitudes distintas', fuente: 'unidades.ts', esperado: 'sin conversión: la lectura se rechaza como en C-34', cubre: [uni('pareja desconocida'), uni('V a mV no se inventa')] },
   { id: 'C-36', grupo: 'c', regla: 'Una magnitud sin canal declarado se rechaza', fuente: 'docs/10 filtro 3; recepcion.service.ts:301', esperado: 'rechazada: invalida «canal no declarado»', cubre: [svc('filtro 3: canal no declarado')] },
   { id: 'C-37', grupo: 'c', regla: 'El rango físico se evalúa sobre el valor ya convertido y sus límites son inclusivos', fuente: 'docs/08 (magnitud.rango_min y rango_max); recepcion.service.ts:309', esperado: '85 °C se guarda; 85,01 °C y 360 K se rechazan: invalida «fuera del rango físico»', cubre: [aqui('C-37'), svc('filtro 3: valor fuera del rango físico')] },
-  { id: 'C-38', grupo: 'c', regla: 'Cada clave del mapa de claves apunta a una magnitud del catálogo con su unidad canónica', fuente: 'docs/10 §8.4 punto 47; mapa-claves.ts', esperado: 'ninguna clave apunta a una magnitud inexistente', cubre: [lora('cada clave del mapa → una magnitud del catálogo')] },
+  { id: 'C-38', grupo: 'c', regla: 'Cada alias sembrado del catálogo apunta a una magnitud del catálogo que existe', fuente: 'docs/10 §8.4 puntos 47 y 69; migración 27', esperado: 'ninguna clave apunta a una magnitud inexistente', cubre: [lora('los 8 alias sembrados apuntan a magnitudes del catálogo que existen')] },
   { id: 'C-39', grupo: 'c', regla: 'Todo destino de una conversión es una unidad canónica del catálogo', fuente: 'unidades.ts; docs/08 (magnitud.unidad_canonica)', esperado: 'ninguna conversión desemboca en una unidad que ninguna magnitud usa', cubre: [aqui('C-39')] },
   // (d) Tamaño y forma del sobre
   { id: 'C-40', grupo: 'd', regla: 'Un cuerpo vacío no lo reconoce ningún formato', fuente: 'docs/10 §4.1 (tabla de casos); recepcion.service.ts:223', esperado: 'rechazada: malformada «la trama no tiene esa forma»; el dispositivo se marca vivo', cubre: [svc('cuerpo vacío → ningún adaptador lo reconoce')] },
@@ -169,15 +169,15 @@ function dominioDelCheck(sql: string, nombre: string): string[] {
 
 const senml = new SenmlAdaptador();
 const plano = new PlanoAdaptador();
-const chirp = new ChirpstackAdaptador(resolverClave);
-const mile = new MilesightAdaptador(resolverClave);
+const chirp = new ChirpstackAdaptador();
+const mile = new MilesightAdaptador();
 const DEVEUI = '0101010101010101'; // el del ejemplo oficial de ChirpStack (sintético)
 const ctxDir = (cuerpo: string, magnitud = 'temperatura'): ContextoTrama => ({
   topico: `sitio/uct/dispositivo/dev-0001/${magnitud}`, idFisico: 'dev-0001', magnitudTopico: magnitud, carga: Buffer.from(cuerpo, 'utf8'),
 });
 const ctxPas = (cuerpo: object | string, deveui: string | undefined = DEVEUI): ContextoTrama => ({
   topico: `sitio/uct/pasarela/chirpstack-campus/${deveui ?? 'x'}/up`, idFisico: deveui ?? 'x', magnitudTopico: '',
-  carga: Buffer.from(typeof cuerpo === 'string' ? cuerpo : JSON.stringify(cuerpo), 'utf8'), deveui,
+  carga: Buffer.from(typeof cuerpo === 'string' ? cuerpo : JSON.stringify(cuerpo), 'utf8'), deveui, resolver: resolverSemilla,
 });
 const RECIBIDO = new Date('2026-11-15T12:00:00Z');
 // La marca que acaba guardada: la misma función que usa la recepción real tras el adaptador.
@@ -191,8 +191,11 @@ const CANALES: Record<string, Canal> = { temperatura: { unidad: 'Cel', min: -40,
 function armar(dispositivo: Disp | undefined, pasarela?: { id: string; activo: boolean; sitio_codigo: string }, extra: Record<string, Canal> = {}) {
   const query = vi.fn((sql: string, params?: unknown[]) => {
     if (sql.startsWith('SELECT d.id, d.estado, d.formato, d.pasarela_id, s.codigo AS sitio_codigo')) {
-      const fila = { sitio_codigo: 'uct', formato: 'senml', pasarela_id: null, decodificador: null, ultimo_fcnt: null, intervalo_esperado_s: 60, canales: 2,
+      const base = { sitio_codigo: 'uct', formato: 'senml', pasarela_id: null, decodificador: null as string | null, ultimo_fcnt: null, intervalo_esperado_s: 60, canales: 2,
         ventana_inicio: null, ventana_lecturas: 0, ventana_cuarentena: 0, ventana_sobre_tope: 0, ventana_omitidas: 0, reloj_desviado: false, ...dispositivo };
+      // Con la forma que devuelve la consulta real (migración 27): la receta si el nodo tiene una, y los alias solo en los formatos de
+        // pasarela. El SQL de esa consulta no corre aquí: lo prueban el banco (lorawan, vias, puente) y su EXPLAIN (docs/16 §97).
+      const fila = { ...base, receta: recetaSiSembrada(base.decodificador), alias: ['milesight', 'chirpstack'].includes(base.formato) ? ALIAS_SEMILLA : null };
       return Promise.resolve({ rows: dispositivo ? [fila] : [], rowCount: dispositivo ? 1 : 0 });
     }
     if (sql.startsWith('SELECT p.id, p.activo, s.codigo AS sitio_codigo FROM pasarela')) return Promise.resolve({ rows: pasarela ? [pasarela] : [], rowCount: pasarela ? 1 : 0 });

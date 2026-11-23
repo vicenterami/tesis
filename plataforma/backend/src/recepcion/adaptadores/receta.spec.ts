@@ -1,31 +1,13 @@
-import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { TramaMalformada } from './adaptador.js';
+import { M27, RECETA_CAMPUS } from './catalogo-semilla.prueba.js';
 import { ANCHO_TIPO, CampoReceta, MAGNITUD_CODIGO, RECETA_CODIGO, RECETA_LIMITES, Receta, TIPOS_CAMPO, aplicarReceta, erroresDeReceta } from './receta.js';
 
 // Intérprete de recetas (TT-12, bloque 2; docs/10 §8.4 punto 69 vi). La receta sembrada sale de la migración 27 tal cual, y las unidades,
-// de las magnitudes sembradas: así la prueba de equivalencia compara la semilla real de la base con la función que hoy decodifica.
-const DIR = join(import.meta.dirname, '../../../../db/init');
-const sql = readdirSync(DIR).filter((x) => x.endsWith('.sql')).sort().map((f) => readFileSync(join(DIR, f), 'utf8')).join('\n');
-const m27 = readFileSync(join(DIR, '27-catalogo-editable.sql'), 'utf8');
-
-const unidades = new Map<string, string>();
-for (const bloque of sql.match(/INSERT INTO magnitud[\s\S]*?;/g) ?? []) {
-  for (const m of bloque.matchAll(/\(\s*'([a-z0-9_]+)',\s*'[^']*',\s*'([^']+)'/g)) unidades.set(m[1], m[2]);
-}
-function recetaSembrada(codigo: string): Receta {
-  const m = new RegExp(`PERFORM fn_crear_receta\\('${codigo}', '[^']*', (\\d+), '(\\[[\\s\\S]*?\\])'::jsonb`).exec(m27);
-  if (!m) throw new Error(`la migración 27 no siembra ${codigo}`);
-  const campos = (JSON.parse(m[2]) as Record<string, unknown>[]).map((c): CampoReceta => ({
-    magnitud: c.magnitud_codigo as string, unidad: unidades.get(c.magnitud_codigo as string) ?? '',
-    desplazamiento: c.desplazamiento as number, tipo: c.tipo as CampoReceta['tipo'],
-    sumar_antes: (c.sumar_antes as number | undefined) ?? 0, multiplicar_por: (c.multiplicar_por as number | undefined) ?? 1,
-    dividir_por: (c.dividir_por as number | undefined) ?? 1,
-  }));
-  return { codigo, largo_bytes: Number(m[1]), campos };
-}
-const CAMPUS = recetaSembrada('campus-heltec-v3-v1');
+// de las magnitudes sembradas (catalogo-semilla.prueba.ts): la prueba de equivalencia compara la semilla real de la base con la función
+// que decodificaba hasta el bloque 3.
+const m27 = M27;
+const CAMPUS = RECETA_CAMPUS;
 // La definición, como la escribiría alguien en la API o el panel: sin la unidad, que sale de la magnitud.
 const definicion = (r: Receta) => ({ ...r, campos: r.campos.map(({ unidad: _u, ...c }) => c) });
 const CAPTURA = Buffer.from('020000008f07181998af', 'hex'); // la captura real del 15/10 (docs/16 C-88)
@@ -38,7 +20,7 @@ const congelada = (b: Buffer) => [
   { magnitud: 'tension', valor: (200 + b.readUInt8(9)) / 100, unidad: 'V' },
 ];
 
-describe('receta del campus: la semilla de la migración 27 decodifica igual que la función de perfiles.ts', () => {
+describe('receta del campus: la semilla de la migración 27 decodifica igual que la función que tenía perfiles.ts (congelada abajo)', () => {
   it('la captura real → 18,16 °C; 65,52 %RH; 3,75 V', () => {
     expect(aplicarReceta(CAMPUS, CAPTURA)).toEqual([
       { magnitud: 'temperatura', valor: 18.16, unidad: 'Cel' }, { magnitud: 'humedad', valor: 65.52, unidad: '%RH' },
