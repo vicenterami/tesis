@@ -65,7 +65,7 @@ peso de la pantalla pública); hasta entonces los cupos de lo público y la zona
 **Adelantados de la Etapa 4:** TT-20 (autenticación de la recepción) ✅ (`docs/12 §3`); TT-29 (carga) ✅ preliminar
 (`docs/16 §5`); TT-22 (TLS) 🟡: MQTT por el proxy, probado en el banco (`docs/16 §9`), y el canal en vivo por HTTPS (`docs/16 §14`); TT-30 (recuperación) 🟡: falta el
 broker de producción (`docs/16 §11`); HU-04 (adaptador de otro formato) 🟡: adaptador plano, se cierra con la trama real
-(`docs/12 §3`). **Pendiente de la Etapa 2, cerrado el 16/10:** HU-01 ✅: a la recepción por MQTT se suma la recepción por HTTP (RF-01),
+(`docs/12 §3`). **Pendiente de la Etapa 2, cerrado el 23/11/2026:** TT-12 ✅, con el catálogo editable (arriba; `docs/12` es el corte al 23/09 y conserva su estado de entonces). **Pendiente de la Etapa 2, cerrado el 16/10:** HU-01 ✅: a la recepción por MQTT se suma la recepción por HTTP (RF-01),
 con los mismos filtros, token del alta y topes medidos (`docs/10 §8.4` punto 52, `docs/16 §41`). **Etapa 1:** TT-34 (documento de la etapa) ✅, entregado el 4/09; TT-33 (entrevistas) ✅: dos, el 5/10
 (`bitacora/2026-10-05-entrevista-academico-geologia.md`) y el 25/10 (`bitacora/2026-10-25-entrevista-operador-red.md`), con la fuente `[ENT]` marcada en `docs/02`; TT-38 (bitácora) 🟡: continua hasta la Etapa 4.
 
@@ -98,7 +98,8 @@ vuelve a la Etapa 4 con su registro aquí y en `docs/04`.
 El estado de cada elemento manda en §1 y §2; esta lista ordena lo que falta. El guardián (paso 2w5) comprueba que cada elemento
 siga sin terminar y que sus horas sean las de `docs/04`: un elemento que se cierra se quita de aquí en el mismo cambio.
 
-**Núcleo (🎯): 5 elementos, 24 h.** Dos cerrados en la Etapa 4 (HU-08 y TT-12), dos parciales y uno sin empezar, en el orden de trabajo de la Etapa 4 (plan del 08/11/2026; por decisión del 09/11 los cuatro del núcleo que quedaban en la iteración 2 van en la 1; HU-16 y TT-27 se cerraron el 15/11/2026 y HU-07 el 16/11/2026; HU-32 entró al núcleo el 16/11/2026 y se cerró el 17/11/2026):
+**Núcleo (🎯): 5 elementos, 24 h.** Dos cerrados en la Etapa 4 (HU-08 y TT-12, que siguen en la tabla con su fecha de cierre); quedan 3
+elementos y 14 h: dos parciales y uno sin empezar, en el orden de trabajo de la Etapa 4 (plan del 08/11/2026; por decisión del 09/11 los cuatro del núcleo que quedaban en la iteración 2 van en la 1; HU-16 y TT-27 se cerraron el 15/11/2026 y HU-07 el 16/11/2026; HU-32 entró al núcleo el 16/11/2026 y se cerró el 17/11/2026):
 
 | Orden | Elemento | Horas | Estado | Qué falta |
 |---|---|---|---|---|

@@ -45,7 +45,9 @@ describe('credenciales: secreto aleatorio y hash scrypt (claves de personas y cr
     expect(await verificarScrypt('otra frase de persona', h)).toBe(false);
     expect(ms).toBeGreaterThan(20); // cuatro veces el trabajo y la memoria de 2^15 (128 MiB); el costo medido va en docs/16 §58
     expect(ms).toBeLessThan(5000);
-  });
+  // Tres scrypt de 128 MiB: solos, ≈ 335 ms cada uno; en la suite completa, en paralelo con los demás archivos y a batería, pasaban los 5 s
+  // del límite de vitest (23/11/2026, tres corridas seguidas). El tope de un hash sigue siendo 5 s (arriba); el de la prueba entera, 20 s.
+  }, 20_000);
   it('I2: una huella sha256$… no verifica nunca como clave de persona (la sesión verifica solo con scrypt), ni con su propio secreto', async () => {
     const secreto = generarSecreto();
     expect(await verificarScrypt(secreto, resumirSecreto(secreto))).toBe(false);

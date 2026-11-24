@@ -146,6 +146,10 @@
         const tocado = <K extends keyof FormMagnitud>(k: K): boolean => leido === null || JSON.stringify(escrito[k]) !== JSON.stringify(leido[k]);
         for (const k of Object.keys(fresco) as (keyof FormMagnitud)[]) if (tocado(k)) (fresco as unknown as Record<string, unknown>)[k] = escrito[k];
         marca = nueva.actualizado_en; base = formDe(nueva); f = fresco;
+      } else {
+        // Ya no está en el catálogo (la aplicación no borra magnitudes: solo pasaría por una operación directa en la base): se cierra.
+        abierto = null;
+        return { tipo: 'conflicto', texto: `La magnitud «${editando.codigo}» ya no está en el catálogo: se recargó la lista.` };
       }
       const hora = new Date(c.actualizado_en).toLocaleTimeString('es-CL', { hour: '2-digit', minute: '2-digit' });
       return { tipo: 'conflicto', texto: `Alguien cambió esta magnitud a las ${hora}: revisa los valores nuevos y vuelve a guardar.` };

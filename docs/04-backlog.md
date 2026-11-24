@@ -697,7 +697,7 @@ recepción, normalización, supervisión de caída y consulta básica». Dentro 
 distingue desde ahora un **primer nivel**, que es el compromiso mínimo, y un **segundo nivel** que se
 ejecuta contra la holgura verificada al cierre de cada etapa.
 
-| Nivel | Capacidad | Ítems | Estado al 21/09 |
+| Nivel | Capacidad | Ítems | Estado (al 21/09, salvo lo fechado) |
 |---|---|---|---|
 | **1. Núcleo mínimo** | Recepción por MQTT autenticada | HU-03, TT-11, TT-20, TT-01, TT-02 | ✅ |
 | **1. Núcleo mínimo** | Normalización al modelo interno | TT-16, TT-17, TT-18, TT-19, TT-12 | ✅ (TT-12 cerrado el 23/11/2026 con el catálogo editable, `docs/16 §95` a §100) |

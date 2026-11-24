@@ -5282,7 +5282,9 @@ crear una receta (u16le con −10, ×3, ÷2). Resultado: **40 de 40 OK** en la b
 **Corregido tras la revisión del bloque.** `fn_crear_receta` ignoraba en silencio una clave mal escrita: el campo tomaba el valor por
 omisión y, como la receta no se edita, quedaba mal para siempre; y un decimal o un número enorme salían como error de conversión, no
 como rechazo propio. Ahora revisa la forma de cada campo antes de insertar y todo rechazo sale como `check_violation` con el prefijo
-`fn_crear_receta:`. También: el chequeo 27 exige el `search_path` fijo de las dos funciones; la leyenda de la figura del modelo y la lista
+`fn_crear_receta:`. También: el chequeo 27 exige el `search_path` fijo de las dos funciones (su primera versión usaba `bool_and`, que ignora
+los nulos: una función sin `search_path` daba nulo y el chequeo seguía en verde; se encontró plantando la falla y se corrigió con
+`coalesce`); la leyenda de la figura del modelo y la lista
 de permisos de `docs/10` decían el estado anterior a la 27; tres comentarios del código citaban el `CHECK` retirado o una columna
 `magnitud.alias` que nunca existió.
 
@@ -5497,3 +5499,10 @@ repetida en el resumen de errores; una histéresis vacía viajaba como `null`; p
 foco no iba al formulario ni al resumen de errores; «reemplazar» no decía que los dados de baja no se mueven; «sin probar» solo era un
 tooltip; un sumando negativo se escribía «+ -200». Quedan anotados como pendientes: los enlaces a la ficha en el 409 con la lista, los
 `aria-describedby` de cada error y las etiquetas de los botones repetidos, y no perder un formulario abierto al cambiar de pestaña.
+
+**Pruebas de tiempo (23/11/2026).** En la suite completa, con la CPU ocupada (una e2e o una reconstrucción de Docker en paralelo) o con el
+portátil a batería, fallaron dos pruebas de tiempo que pasan solas: la del lector XLSX («7 MB en menos de 3 s»: 3,3 y 4,0 s) y la de las
+claves de personas de `credenciales.spec.ts` (tres scrypt de 128 MiB contra el límite de 5 s de vitest; sola, cada uno mide 335 ms). La
+segunda falló tres veces seguidas y recibió su propio tope de 20 s, sin tocar el de un hash (5 s). La primera, medida en la suite completa
+(3,5 a 3,9 s; sola, ≈ 1 s), sube a 10 s: no mide rendimiento, atrapa un lector cuadrático, y el caso del 19/11 tardaba 70 s; su vecina del tope
+total, que pasaba el límite de 5 s de vitest, recibe 20 s.

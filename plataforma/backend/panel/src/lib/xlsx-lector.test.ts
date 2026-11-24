@@ -151,7 +151,7 @@ describe('los topes (bloque N, punto 6): contados mientras se descomprime, nunca
   it('el tope total: tres partes bajo el tope por parte que juntas lo pasan', async () => {
     const casi = 'b'.repeat(TOPES.bytesPorParte - 1000);
     await falla(libro({ cadenas: cadenasXml([casi]), estilos: `${XML}<styleSheet ${NS}><!-- ${casi} --></styleSheet>`, hoja: hojaXml(fi(1, cs('A1', 0)) + `<!-- ${casi} -->`) }), 'grande', `sus partes ocupan más de ${megas(TOPES.bytesTotales)} MB al abrirlas`);
-  });
+  }, 20_000); // en la suite completa, con la CPU ocupada o a batería, pasaba el límite de 5 s de vitest (23/11/2026)
   it('500 filas llenas (cada celda en su tope y cada carácter escrito «&amp;») caben bajo el tope por parte', async () => {
     const topes = [63, 80, 80, 80, 80, 80, 1197, 80, 80];
     const letra = (i: number): string => String.fromCharCode(65 + i);
@@ -220,13 +220,15 @@ describe('ataques y archivos dañados', () => {
     expect(performance.now() - t0).toBeLessThan(1000);
     await falla(libro({ hoja: hojaXml(fi(1, nu('A1', '1e400'))) }), 'ilegible', 'una celda numérica trae algo que no es un número');
   });
-  it('un texto, un comentario y una sección CDATA de 7 MB cada uno, que llegan en muchos trozos, se leen enteros (y en menos de 3 s)', async () => {
+  it('un texto, un comentario y una sección CDATA de 7 MB cada uno, que llegan en muchos trozos, se leen enteros (y en menos de 10 s: un lector cuadrático tardaba 70 s)', async () => {
     const largo = 'x'.repeat(7_000_000);
     const b = libro({ hoja: hojaXml(`<!-- ${largo} -->${fi(1, tx('A1', `<![CDATA[${largo}]]>`), tx('B1', `${largo}&amp;`))}`) });
     const t0 = performance.now();
     const l = await leerXlsx(b, { ...TOPES, bytesPorParte: 32 * 2 ** 20, bytesTotales: 64 * 2 ** 20 });
     expect([(l.filas[0]!.celdas[0] as { v: string }).v.length, (l.filas[0]!.celdas[1] as { v: string }).v.length]).toEqual([7_000_000, 7_000_001]);
-    expect(performance.now() - t0).toBeLessThan(3000);
+    // El tope no es una medida de rendimiento: atrapa un lector cuadrático (el 19/11/2026, una etiqueta de 1 kB tardaba 70 s). Solo mide ≈ 1 s;
+    // en la suite completa con la CPU ocupada o a batería, 3,5 a 3,9 s (23/11/2026). 10 s sigue atrapando aquel caso con margen.
+    expect(performance.now() - t0).toBeLessThan(10_000);
   });
   it('una etiqueta sin cerrar no se vuelve a recorrer entera en cada trozo: 8 MiB en un atributo sin cerrar se rechazan en menos de 1 s', async () => {
     const b = libro({ hoja: hojaXml(fi(1, `<c r="A1" t="${'a'.repeat(TOPES.bytesPorParte - 1000)}/>`)) });
