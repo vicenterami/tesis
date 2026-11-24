@@ -7,7 +7,6 @@ import { ChirpstackAdaptador } from './chirpstack.adaptador.js';
 import { IdentidadNoVerificada } from './lorawan.js';
 import { ALIAS_SEMILLA, recetaSiSembrada, resolverSemilla } from './catalogo-semilla.prueba.js';
 import { MilesightAdaptador } from './milesight.adaptador.js';
-import { PERFILES } from './perfiles.js';
 import { aplicarReceta } from './receta.js';
 
 // Adaptadores LoRaWAN (docs/10 §8.4 punto 47) contra el JSON de las fuentes oficiales.
@@ -272,24 +271,23 @@ describe('perfil campus-heltec-v3-v1 con la captura de la UG65 del campus (migra
   });
 });
 
-describe('perfiles: la lista del código es la de las recetas sembradas y cada lectura existe en el catálogo (migraciones 17 y 27)', () => {
+describe('recetas sembradas: cada una cita magnitudes del catálogo y la del campus decodifica la captura (migraciones 17 y 27)', () => {
   const sql = readdirSync(join(import.meta.dirname, '../../../../db/init')).filter((x) => x.endsWith('.sql')).sort()
     .map((f) => readFileSync(join(import.meta.dirname, '../../../../db/init', f), 'utf8')).join('\n');
-  // Desde la migración 27 la lista vive en receta_decodificacion (clave foránea de dispositivo.decodificador): hasta que la recepción lea
-  // las recetas de la base (TT-12, bloque 3), cada perfil del código debe ser una receta sembrada y viceversa.
-  it('PERFILES == las recetas sembradas con fn_crear_receta en db/init', () => {
-    const sembradas = [...sql.matchAll(/PERFORM fn_crear_receta\('([^']+)'/g)].map((m) => m[1]).sort();
-    expect(sembradas.length).toBeGreaterThanOrEqual(1);
-    expect([...PERFILES].sort()).toEqual(sembradas);
+  // Desde el bloque 5 de TT-12 no hay lista de recetas en el código: la recepción, el alta y el lote las leen de receta_decodificacion.
+  const sembradas = [...sql.matchAll(/PERFORM fn_crear_receta\('([^']+)'/g)].map((m) => m[1]);
+  it('las recetas sembradas con fn_crear_receta: al menos la del campus', () => {
+    expect(sembradas).toContain('campus-heltec-v3-v1');
   });
-  it('cada lectura del perfil → una magnitud del catálogo con su unidad canónica (si no, iría a cuarentena «canal no declarado»)', () => {
+  it('cada campo de cada receta sembrada → una magnitud del catálogo con su unidad canónica (si no, iría a cuarentena «canal no declarado»)', () => {
     const catalogo = new Map<string, string>();
-    for (const bloque of sql.match(/INSERT INTO magnitud[\s\S]*?;/g) ?? []) {
+    for (const bloque of sql.match(/INSERT INTO magnitud[\s(][\s\S]*?;/g) ?? []) {
       for (const m of bloque.matchAll(/\(\s*'([a-z0-9_]+)',\s*'[^']*',\s*'([^']+)'/g)) catalogo.set(m[1], m[2]);
     }
-    const malas = PERFILES.flatMap((p) => aplicarReceta(recetaSiSembrada(p)!, Buffer.from(CAPTURA_UG65.data, 'base64')))
-      .filter((l) => catalogo.get(l.magnitud) !== l.unidad).map((l) => `${l.magnitud} (${l.unidad})`);
+    const malas = sembradas.flatMap((p): { magnitud: string; unidad: string }[] => [...(recetaSiSembrada(p)?.campos ?? [{ magnitud: `${p}: sin campos`, unidad: '' }])])
+      .filter((c) => catalogo.get(c.magnitud) !== c.unidad || c.unidad === '').map((c) => `${c.magnitud} (${c.unidad})`);
     expect(catalogo.get('tension')).toBe('V');
     expect(malas).toEqual([]);
+    expect(aplicarReceta(recetaSiSembrada('campus-heltec-v3-v1')!, Buffer.from(CAPTURA_UG65.data, 'base64')).map((l) => l.valor)).toEqual([18.16, 65.52, 3.75]);
   });
 });

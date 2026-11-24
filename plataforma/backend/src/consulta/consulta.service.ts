@@ -125,7 +125,7 @@ export class ConsultaService {
 
   async dispositivo(id: string) {
     const d = await this.pool.query(`
-      SELECT d.id, d.id_fisico, d.nombre, d.estado, d.via, d.formato, d.intervalo_esperado_s, e.visto_por_ultima_vez, d.creado_en,
+      SELECT d.id, d.id_fisico, d.nombre, d.estado, d.via, d.formato, d.decodificador, d.intervalo_esperado_s, e.visto_por_ultima_vez, d.creado_en,
              -- Marca del bloqueo optimista de PATCH /dispositivos/{id} (Etapa 4; docs/10 §8.4 punto 28), con microsegundos, como texto.
              ${isoUs('d.actualizado_en')} AS actualizado_en,
              ${SQL_EN_LINEA} AS en_linea,

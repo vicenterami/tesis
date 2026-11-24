@@ -33,12 +33,16 @@ describe('validarAlta (HU-11): el cuerpo limpio o los motivos', () => {
     expect(validarAlta({ ...bueno, via: 'lorawan', pasarela_id: Z }).formato).toBeNull();
     expect(motivos({ ...bueno, via: 'lorawan', pasarela_id: Z, formato: 'milesight' })).toEqual(expect.arrayContaining([expect.stringContaining('hereda el de su pasarela')]));
   });
-  it('decodificador (migración 17): solo en la vía lorawan y de la lista de perfiles; ausente o nulo → null', () => {
+  it('decodificador (migraciones 17 y 27): solo en la vía lorawan; con la lista de recetas (el lote), de esa lista; sin ella (el alta de a uno), la forma del código y decide la clave foránea', () => {
     expect(validarAlta({ ...bueno, via: 'lorawan', pasarela_id: Z, decodificador: 'campus-heltec-v3-v1' }).decodificador).toBe('campus-heltec-v3-v1');
+    expect(validarAlta({ ...bueno, via: 'lorawan', pasarela_id: Z, decodificador: 'receta-nueva-v2' }).decodificador).toBe('receta-nueva-v2'); // la existencia la dice la base
     expect(validarAlta({ ...bueno, via: 'lorawan', pasarela_id: Z }).decodificador).toBeNull();
     expect(validarAlta({ ...bueno, decodificador: null }).decodificador).toBeNull();
     expect(motivos({ ...bueno, decodificador: 'campus-heltec-v3-v1' })).toEqual(['decodificador solo aplica a la vía lorawan']);
-    expect(motivos({ ...bueno, via: 'lorawan', pasarela_id: Z, decodificador: 'otro' })).toEqual(['decodificador debe ser una de: campus-heltec-v3-v1']);
+    expect(motivos({ ...bueno, via: 'lorawan', pasarela_id: Z, decodificador: 'Otro' })).toEqual(['decodificador debe ser el código de una receta de decodificación (GET /recetas-decodificacion)']);
+    const conLista = (d: unknown, recetas: string[]) => { try { validarAlta({ ...bueno, via: 'lorawan', pasarela_id: Z, decodificador: d }, [], recetas); return []; } catch (e) { return (e as { getResponse: () => { message: string[] } }).getResponse().message; } };
+    expect(conLista('otro', ['campus-heltec-v3-v1', 'receta-b'])).toEqual(['decodificador debe ser una de: campus-heltec-v3-v1, receta-b']);
+    expect(conLista('campus-heltec-v3-v1', [])).toEqual(['decodificador: no hay recetas de decodificación en el catálogo']);
   });
   it('la vía manda sobre la pasarela: lorawan la exige; las otras la prohíben', () => {
     expect(motivos({ ...bueno, via: 'lorawan' })).toEqual(expect.arrayContaining([expect.stringContaining('pasarela_id')]));

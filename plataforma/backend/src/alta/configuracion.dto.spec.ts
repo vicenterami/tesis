@@ -37,6 +37,12 @@ describe('validarReglas', () => {
 });
 
 describe('validarCambioDispositivo', () => {
+  it('decodificador (TT-12): el código de una receta o null; otra cosa, 400', () => {
+    expect(validarCambioDispositivo({ actualizado_en: MARCA, decodificador: 'campus-heltec-v3-v2' })).toEqual({ actualizado_en: MARCA, decodificador: 'campus-heltec-v3-v2' });
+    expect(validarCambioDispositivo({ actualizado_en: MARCA, decodificador: null })).toEqual({ actualizado_en: MARCA, decodificador: null });
+    expect(() => validarCambioDispositivo({ actualizado_en: MARCA, decodificador: 'Mala Receta' })).toThrow();
+    expect(() => validarCambioDispositivo({ actualizado_en: MARCA, decodificador: 7 })).toThrow();
+  });
   it('cambia solo lo que viene; la baja no es un estado configurable; nada que cambiar es 400', () => {
     expect(validarCambioDispositivo({ actualizado_en: MARCA, estado: 'mantenimiento', nombre: ' Sala ' })).toEqual({ actualizado_en: MARCA, estado: 'mantenimiento', nombre: 'Sala' });
     expect(errores(() => validarCambioDispositivo({ actualizado_en: MARCA, estado: 'baja' }))[0]?.campo).toBe('estado');

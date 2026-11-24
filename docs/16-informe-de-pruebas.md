@@ -4,7 +4,7 @@ Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emu
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
 cubría al escribirse se agregó después: TT-32 (sensor físico) en §43, §44 y §53, y TT-30 (recuperación ante reinicio) en §11. El
-contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 956 pruebas unitarias del backend y 599 del panel.
+contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 960 pruebas unitarias del backend y 599 del panel.
 Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -3419,9 +3419,9 @@ nombre). Las demás citan una prueba que ya existía, con el comienzo de su tít
 | C-85 | Milesight: con códec y Metadata, las claves decodificadas pasan por el mapa; los metadatos no son claves ignoradas | docs/10 §8.4 punto 47; milesight.adaptador.ts | lecturas sin marca de tiempo (rige la recepción) | `adaptadores/lorawan.spec.ts` · «lecturas de los valores decodificados…» |
 | C-86 | Milesight: sin códec ni perfil, o sin Metadata, se rechaza diciendo qué activar | milesight.adaptador.ts:34-38 | rechazada: malformada con la instrucción | `adaptadores/lorawan.spec.ts` · «sin códec (data en base64…»<br>`adaptadores/lorawan.spec.ts` · «con códec pero sin Metadata…» |
 | C-87 | Milesight: hereda fCnt cuando el decodificador lo deja | milesight.adaptador.ts:16-18 | ctx.fcnt anotado; no cuenta como clave ignorada | `adaptadores/lorawan.spec.ts` · «con códec: si la trama trae fCnt…» |
-| C-88 | Perfil campus-heltec-v3-v1: 10 bytes de la trama sin códec → temperatura, humedad y tensión | docs/10 §8.4 punto 47; perfiles.ts | 18,16 °C, 65,52 %RH y 3,75 V con la marca del servidor de red | `adaptadores/lorawan.spec.ts` · «la captura con perfil…» |
-| C-89 | Perfil: data que no es base64 estricto, que no mide 10 bytes o de un perfil desconocido se rechaza | perfiles.ts:21 y :39 | rechazada: malformada | `adaptadores/lorawan.spec.ts` · «data que no es base64 estricto o no mide 10 bytes…»<br>`adaptadores/lorawan.spec.ts` · «un perfil que el código no conoce…» |
-| C-90 | La lista de perfiles del código es la de las recetas sembradas en la base y sus lecturas existen en el catálogo | docs/10 §8.4 puntos 47 y 69; migraciones 17 y 27 | PERFILES igual a las recetas sembradas con fn_crear_receta | `adaptadores/lorawan.spec.ts` · «PERFILES == las recetas sembradas con fn_crear_receta…» |
+| C-88 | Perfil campus-heltec-v3-v1: 10 bytes de la trama sin códec → temperatura, humedad y tensión | docs/10 §8.4 puntos 47 y 69; receta.ts y la receta sembrada (migración 27) | 18,16 °C, 65,52 %RH y 3,75 V con la marca del servidor de red | `adaptadores/lorawan.spec.ts` · «la captura con perfil…» |
+| C-89 | Perfil: data que no es base64 estricto, que no mide 10 bytes o de un perfil desconocido se rechaza | lorawan.ts (decodificarData) y receta.ts (aplicarReceta) | rechazada: malformada | `adaptadores/lorawan.spec.ts` · «data que no es base64 estricto o no mide 10 bytes…»<br>`adaptadores/lorawan.spec.ts` · «un perfil que el código no conoce…» |
+| C-90 | Cada receta sembrada en la base cita magnitudes del catálogo con su unidad canónica (desde TT-12 no hay lista de recetas en el código) | docs/10 §8.4 puntos 47 y 69; migraciones 17 y 27 | ningún campo apunta a una magnitud inexistente o con otra unidad | `adaptadores/lorawan.spec.ts` · «cada campo de cada receta sembrada → una magnitud del catálogo…» |
 | C-91 | Mapa de claves: una clave desconocida se ignora y se anota; si no queda ninguna conocida, se rechaza | docs/10 §8.4 punto 47; lorawan.ts:60-85 | ctx.ignoradas con las claves; sin ninguna conocida: malformada | `adaptadores/lorawan.spec.ts` · «una clave que no está en el mapa se ignora…»<br>`adaptadores/lorawan.spec.ts` · «resuelve sin distinguir mayúsculas…» |
 | C-92 | Mapa de claves: dos claves de la misma magnitud valen la primera; la otra se anota como repetida | lorawan.ts:77 | una lectura; la segunda en ignoradas con «(repetida)» | `adaptadores/lorawan.spec.ts` · «dos claves que apuntan a la misma magnitud…» |
 | C-93 | Los adaptadores registrados son los de los formatos que admite la base (ck_dispositivo_formato) y el módulo | docs/10 §8.4 punto 47; migración 15; recepcion.module.ts | senml, plano, chirpstack y milesight en el servicio, el módulo, los archivos y el CHECK | `contrato.spec.ts` · C-93 |
@@ -5421,3 +5421,45 @@ solo al achicarlo (escrito en `docs/10 §8.4` punto 69 iii). (5) El diseño dec�
 total. (7) El impacto corre con su tope de tiempo (10 s). (8) Quitar alias corta su reconocimiento desde la trama siguiente: escrito en el
 diseño; la pantalla del bloque 6 lo advertirá. También se agregó el caso del administrador de un sitio, que lee el catálogo sin el conteo.
 Integración **28 de 28**; `pnpm verificar` en verde (1 042 y 663).
+
+## 99. Catálogo editable, bloque 5: recetas por API y el alta desde la base (TT-12; 23/11/2026)
+
+**Qué entra** (`docs/10 §8.4` punto 69 vi a viii; `docs/19 §4`, T, puntos 5 a 7; la matriz en `docs/20 §6`). `GET /recetas-decodificacion`
+(cualquier sesión; en cuántos equipos se usa cada una, solo el administrador del sistema), `POST /recetas-decodificacion` (la receta y sus
+campos, juntos y una sola vez, por `fn_crear_receta`, con su evento `catalogo_cambio` y el candado del catálogo), `POST
+/recetas-decodificacion/probar` (decodifica unos bytes en hexadecimal, con espacios, o en base64, con una receta no guardada validada como al
+crearla; solo lee las unidades; `{ok, lecturas}` o `{ok: false, motivo}`) y `POST /recetas-decodificacion/{codigo}/reemplazar` (todos los
+equipos de una receta a otra en una transacción, con un evento por equipo, que la actividad de su sitio muestra, y uno del catálogo). Las tres
+escrituras, solo con la acción `sistema`. **El alta lee las recetas de la base:** el lote las trae en su catálogo y dice «decodificador debe
+ser una de: …»; el alta de a uno revisa la forma del código y la clave foránea decide (23503 → 400 que lo dice); la ayuda de la plantilla
+nombra las recetas de la base; el OpenAPI ya no fija un `enum`. `decodificador` entra a `PATCH /dispositivos/{id}` (solo en un nodo
+lorawan y de una receta del catálogo; `null` la quita). **Sale `perfiles.ts`**: no queda ninguna lista de recetas en el código; C-90 pasa a
+exigir que cada receta sembrada cite magnitudes del catálogo con su unidad. Contrato: 56 rutas y 71 operaciones (53 y 67 antes).
+
+**Integración** (`catalogo-integracion.sh`, ahora **54 de 54**; 26 nuevas, 6 de ellas tras la revisión): la lista con y sin conteo; crear (403 del administrador de un
+sitio, 200, el evento con la persona; código repetido 409; magnitud inexistente, clave mal escrita y campo que no cabe, 400, y ninguna mala
+guardada); probar con la captura real en hexadecimal con espacios y sin código, y en base64 (18,16; 65,52; 3,75); con 9 bytes, 200 y «se
+esperaban 10 bytes y llegaron 9»; «zz», 400 con la posición; 403 para el administrador de un sitio, y ninguna receta guardada al probar;
+reemplazar por sí misma (400) y por la v2 (el nodo pasa a la v2, con su evento); `PATCH` del decodificador (cambia; receta inexistente y
+equipo no lorawan, 400). **Plantado:** con un «reemplazar por» que no mueve nada, falla el suyo.
+
+**Matriz ruta × rol** (`sesion-smoke.sh`, sin escribir nada): 18 casos nuevos (401 sin sesión; 403 de los cuatro roles de sitio en crear,
+probar y reemplazar; la lista sin conteo; 400 al crear sin campos, probar con 200 y el byte 0x64 → 100, 400 al reemplazar por sí misma):
+**523 de 523** (505 antes). `api-smoke.sh`: el contrato con 56 rutas y 71 operaciones y la receta del campus con sus 3 campos: TODO OK. La
+base local siguió intacta (1 receta, 10 magnitudes, 15 488 mediciones).
+
+**Unitarias.** `recetas.dto.spec.ts` (11): el nombre al crear, los bytes (hexadecimal con espacios, base64, posición del carácter malo, dígito
+suelto, sin relleno, más de 255, texto largo, receta mala, campo de más) y «reemplazar por»; `alta.dto.spec.ts` con y sin la lista de
+recetas; `configuracion.dto.spec.ts` con el decodificador del `PATCH`; la plantilla con las recetas de la base y la vista previa del lote con
+una consulta más (las recetas: 6). Backend: **960 pruebas escritas** (956 antes), que `vitest` ejecuta como **1 054 de 1 054 en 78
+archivos**.
+
+**Corregido tras la revisión del bloque** (11 hallazgos, 4 medios, todos ciertos). La ficha (`GET /dispositivos/{id}`) no traía
+`decodificador`: el `PATCH` lo cambiaba y la respuesta no lo mostraba; ahora sí. La matriz de `docs/20 §6` no tenía la fila de
+`PATCH /dispositivos/{id}` (faltaba desde antes de este bloque; ahora con el decodificador), «reemplazar por» prometía 409 y responde 400 o
+404, y «probar» decía bytes de largo exacto (acepta hasta 255 y responde el motivo). «Reemplazar por» ya no mueve los equipos dados de baja y
+**avisa**, sin impedirlo, si la receta nueva tiene otro largo o lee magnitudes que la anterior no leía. Un 23514 sin nombre de restricción ya no
+devuelve el texto de la base (va al registro). El nombre de una receta rechaza caracteres de control e invisibles. La ayuda de la plantilla
+nombra hasta 10 recetas. C-88 y C-89 citaban `perfiles.ts`, que ya no existe. Pruebas nuevas: el evento del catálogo de «reemplazar por» y sus
+404 y 400, el `PATCH` con `null` (y la ficha que lo muestra), y el **alta de a uno de un nodo con la receta v2 recién creada por la API** (la
+razón del bloque) y con una inexistente (400, nada creado). Integración **54 de 54**; `pnpm verificar` en verde (1 054 y 663).

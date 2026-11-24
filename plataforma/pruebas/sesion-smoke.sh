@@ -636,6 +636,21 @@ caso "administrador del sistema: POST /magnitudes con una unidad fuera de la lis
 caso "administrador del sistema: PATCH /magnitudes/{codigo} con una marca vieja → 409 (no cambia nada)" 409 sis PATCH /magnitudes/temperatura '{"actualizado_en":"2026-01-01T00:00:00.000000Z","nombre":"x"}'
 caso "administrador del sistema: GET /magnitudes/{codigo}/impacto → 200" 200 sis GET "/magnitudes/temperatura/impacto?rango_min=-40&rango_max=85"
 caso "administrador del sistema: impacto de una magnitud que no existe → 404" 404 sis GET "/magnitudes/no_existe/impacto?rango_min=0&rango_max=1"
+# Recetas de decodificación (TT-12, bloque 5): leerlas, cualquier sesión; crear, probar y reemplazar, solo el administrador del sistema. Nada
+# de esto escribe: crear va con un cuerpo malo (400), probar no guarda nada y reemplazar va con la misma receta (400).
+caso "sin sesión: GET /recetas-decodificacion" 401 anon GET /recetas-decodificacion
+pedir con GET /recetas-decodificacion >/dev/null
+[ "$(campo "len(v) > 0 and not any('equipos' in x for x in v)")" = True ] && ok "consulta: GET /recetas-decodificacion sin el conteo de equipos" || falla "consulta: GET /recetas-decodificacion: $(head -c 160 "$T/r")"
+PRUEBA_RECETA='{"receta":{"codigo":"prueba-smoke","largo_bytes":1,"campos":[{"magnitud":"bateria","desplazamiento":0,"tipo":"u8"}]},"bytes":"64","codificacion":"hex"}'
+for q in con inv ope adm; do
+  caso "$q: POST /recetas-decodificacion → 403" 403 $q POST /recetas-decodificacion '{"codigo":"x-prueba","nombre":"x","largo_bytes":1,"campos":[]}'
+  caso "$q: POST /recetas-decodificacion/probar → 403" 403 $q POST /recetas-decodificacion/probar "$PRUEBA_RECETA"
+  caso "$q: POST /recetas-decodificacion/{codigo}/reemplazar → 403" 403 $q POST /recetas-decodificacion/campus-heltec-v3-v1/reemplazar '{"por":"campus-heltec-v3-v1"}'
+done
+caso "administrador del sistema: POST /recetas-decodificacion sin campos → 400 (no crea nada)" 400 sis POST /recetas-decodificacion '{"codigo":"x-prueba","nombre":"x","largo_bytes":1,"campos":[]}'
+caso "administrador del sistema: probar una receta → 200 (no guarda nada)" 200 sis POST /recetas-decodificacion/probar "$PRUEBA_RECETA"
+[ "$(campo "v.get('ok') is True and v['lecturas'][0]['valor'] == 100")" = True ] && ok "probar: el byte 0x64 como bateria → 100" || falla "probar: $(head -c 160 "$T/r")"
+caso "administrador del sistema: reemplazar una receta por sí misma → 400 (no mueve nada)" 400 sis POST /recetas-decodificacion/campus-heltec-v3-v1/reemplazar '{"por":"campus-heltec-v3-v1"}'
 caso "investigador: GET /cuarentena/detectados → 403" 403 inv GET /cuarentena/detectados
 caso "operador técnico: GET /cuarentena/detectados?sitio= → 200" 200 ope GET "/cuarentena/detectados?sitio=$SITIO_A"
 caso "administrador del sistema: GET /cuarentena/detectados?sitio= (B) → 200" 200 sis GET "/cuarentena/detectados?sitio=$SITIO_B"

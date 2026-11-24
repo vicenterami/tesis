@@ -43,6 +43,7 @@ const cat: Catalogos = {
   pasarelas: [],
   existentes: new Map([['xprefijo-existe', { id: '00000000-0000-4000-8000-0000000000d1', estado: 'activo' }]]),
   idsDePasarela: new Set(),
+  recetas: ['campus-heltec-v3-v1'], // la receta sembrada (migración 27): el lote lee las recetas de la base
   ajenos: new Set(['xprefijo-ajeno']),
 };
 

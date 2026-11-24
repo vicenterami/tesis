@@ -30,6 +30,13 @@ const SELECT_MAGNITUD = (conteos: boolean): string =>
           ${conteos ? ', (SELECT count(*)::int FROM canal c WHERE c.magnitud_codigo = m.codigo) AS canales' : ''}
      FROM magnitud m`;
 
+// Las escrituras del catálogo (magnitudes y recetas), de a una (pocas y de una sola persona: el administrador del sistema). Sin esto, dos
+// altas o dos cambios que agregan el mismo alias a la vez no se ven en exigirAliasLibres y el segundo chocaba con la clave primaria como 500
+// (revisión del 23/11/2026). Es un candado de la transacción: se suelta solo con el COMMIT o el ROLLBACK.
+export async function candadoDelCatalogo(c: PoolClient): Promise<void> {
+  await c.query("SELECT pg_advisory_xact_lock(hashtext('catalogo_magnitudes'))");
+}
+
 const conflicto = (vigente: string): ConflictException => new ConflictException({
   statusCode: 409, error: 'Conflict', actualizado_en: vigente,
   message: `alguien cambió esta magnitud a las ${vigente.slice(11, 16)} UTC (${vigente}); revisa los valores nuevos y vuelve a guardar`,
@@ -46,8 +53,8 @@ export class MagnitudesService {
   }
 
   async crear(n: MagnitudNueva, usuarioId: string | null): Promise<Magnitud> {
-    return this.transaccion(async (c) => {
-      await this.candadoDelCatalogo(c);
+    return transaccionDelCatalogo(this.pool, async (c) => {
+      await candadoDelCatalogo(c);
       await this.exigirAliasLibres(c, n.codigo, n.alias);
       try {
         await c.query(
@@ -69,8 +76,8 @@ export class MagnitudesService {
   }
 
   async cambiar(codigo: string, cambio: CambioMagnitud, usuarioId: string | null): Promise<Magnitud> {
-    return this.transaccion(async (c) => {
-      await this.candadoDelCatalogo(c);
+    return transaccionDelCatalogo(this.pool, async (c) => {
+      await candadoDelCatalogo(c);
       // FOR NO KEY UPDATE: choca con el FOR SHARE que toman guardar las reglas de un canal y calibrarlo (configuracion.service.ts,
       // alta.service.ts), así una regla o una calibración nuevas y un rango más chico no se cruzan (docs/10 §8.4 punto 69 iii); y, como el
       // UPDATE no cambia la clave, no hace esperar al alta de un canal de esta magnitud (su clave foránea toma FOR KEY SHARE: revisión del
@@ -131,7 +138,7 @@ export class MagnitudesService {
   // todos los sitios: solo la acción `sistema` (docs/20 §6). El valor guardado está en la unidad canónica, la misma del rango.
   async impacto(codigo: string, rango_min: number, rango_max: number): Promise<{ codigo: string; rango_min: number; rango_max: number; dias: number; mediciones: number; canales: number }> {
     // En una transacción corta solo por su statement_timeout (10 s): recorre 7 días de `medicion` y el pool de la aplicación tiene 5 conexiones.
-    return this.transaccion(async (c) => {
+    return transaccionDelCatalogo(this.pool, async (c) => {
     const m = await c.query('SELECT 1 FROM magnitud WHERE codigo = $1', [codigo]);
     if (m.rowCount !== 1) throw new NotFoundException('magnitud no encontrada');
     const r = await c.query<{ mediciones: number; canales: number }>(
@@ -141,13 +148,6 @@ export class MagnitudesService {
       [codigo, rango_min, rango_max]);
     return { codigo, rango_min, rango_max, dias: 7, ...(r.rows[0] ?? { mediciones: 0, canales: 0 }) };
     });
-  }
-
-  // Las escrituras del catálogo, de a una (pocas y de una sola persona: el administrador del sistema). Sin esto, dos altas o dos cambios
-  // que agregan el mismo alias a la vez no se ven en exigirAliasLibres y el segundo chocaba con la clave primaria como 500 (revisión del
-  // 23/11/2026). Es un candado de la transacción: se suelta solo con el COMMIT o el ROLLBACK.
-  private async candadoDelCatalogo(c: PoolClient): Promise<void> {
-    await c.query("SELECT pg_advisory_xact_lock(hashtext('catalogo_magnitudes'))");
   }
 
   private async leer(c: PoolClient, codigo: string): Promise<Magnitud> {
@@ -188,33 +188,35 @@ export class MagnitudesService {
       [codigo, min, max]);
     return { total: r.rows[0]?.total ?? 0, lista: r.rows.map(({ total: _t, ...x }) => x) };
   }
+}
 
-  private async transaccion<T>(trabajo: (c: PoolClient) => Promise<T>): Promise<T> {
-    const c = await this.pool.connect();
-    c.on('error', errorDeCliente);
-    try {
-      await c.query('BEGIN');
-      await c.query("SET LOCAL lock_timeout = '5s'");
-      await c.query("SET LOCAL statement_timeout = '10s'");
-      const r = await trabajo(c);
-      await c.query('COMMIT');
-      return r;
-    } catch (e) {
-      await c.query('ROLLBACK').catch(() => undefined);
-      const codigoPg = (e as { code?: string }).code;
-      // Una espera de bloqueo vencida o una consulta cortada por tiempo: 503 «reintenta», como alta.service.ts y usuarios.service.ts.
-      if (codigoPg === '55P03' || codigoPg === '57014' || codigoPg === '25P03') {
-        throw new ServiceUnavailableException('otro cambio del catálogo está en curso o la base no responde; reintenta en unos segundos');
-      }
-      // Lo que la validación dejó pasar y la base no acepta: 23505 (una carrera que el candado no cubrió) es 409; 23514, 400 con su motivo.
-      if (codigoPg === '23505') throw new ConflictException({ statusCode: 409, error: 'Conflict', message: 'el catálogo cambió entretanto (un código o un alias ya existe); recarga y vuelve a intentar' });
-      if (codigoPg === '23514') {
-        throw new BadRequestException({ statusCode: 400, error: 'Bad Request', message: [`la base rechazó el cambio (${(e as { constraint?: string }).constraint ?? 'CHECK'})`] });
-      }
-      throw traducirFecha(e);
-    } finally {
-      c.off('error', errorDeCliente);
-      c.release();
+// La transacción de las escrituras del catálogo (magnitudes y recetas): topes de espera y de duración, y los errores de la base en palabras.
+export async function transaccionDelCatalogo<T>(pool: Pool, trabajo: (c: PoolClient) => Promise<T>): Promise<T> {
+  const c = await pool.connect();
+  c.on('error', errorDeCliente);
+  try {
+    await c.query('BEGIN');
+    await c.query("SET LOCAL lock_timeout = '5s'");
+    await c.query("SET LOCAL statement_timeout = '10s'");
+    const r = await trabajo(c);
+    await c.query('COMMIT');
+    return r;
+  } catch (e) {
+    await c.query('ROLLBACK').catch(() => undefined);
+    const codigoPg = (e as { code?: string }).code;
+    // Una espera de bloqueo vencida o una consulta cortada por tiempo: 503 «reintenta», como alta.service.ts y usuarios.service.ts.
+    if (codigoPg === '55P03' || codigoPg === '57014' || codigoPg === '25P03') {
+      throw new ServiceUnavailableException('otro cambio del catálogo está en curso o la base no responde; reintenta en unos segundos');
     }
+    // Lo que la validación dejó pasar y la base no acepta: 23505 (una carrera que el candado no cubrió) es 409; 23514, 400 con su motivo.
+    if (codigoPg === '23505') throw new ConflictException({ statusCode: 409, error: 'Conflict', message: 'el catálogo cambió entretanto (un código o un alias ya existe); recarga y vuelve a intentar' });
+    if (codigoPg === '23514') {
+      new Logger('catalogo').warn(`la base rechazó un cambio del catálogo: ${(e as Error).message}`);
+      throw new BadRequestException({ statusCode: 400, error: 'Bad Request', message: [`la base rechazó el cambio (${(e as { constraint?: string }).constraint || 'una regla del catálogo'})`] });
+    }
+    throw traducirFecha(e);
+  } finally {
+    c.off('error', errorDeCliente);
+    c.release();
   }
 }

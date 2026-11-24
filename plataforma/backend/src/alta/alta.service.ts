@@ -484,8 +484,13 @@ export class AltaService {
   // Catálogos del alta por lote (docs/10 §8.4 punto 65 iv), leídos una vez para todo el archivo (no una consulta por fila): las zonas de
   // los sitios donde quien carga puede dar de alta (`sitios` null = todos), las magnitudes, las pasarelas de esos sitios, los dispositivos
   // que ya tienen alguno de los id_fisico del archivo y los id_fisico de pasarela (comparten espacio de nombres, migración 11).
+  // Los códigos de las recetas de decodificación (TT-12): el lote y la ayuda de la plantilla los leen de la base, no de una lista del código.
+  async recetas(): Promise<string[]> {
+    return (await this.pool.query<{ codigo: string }>('SELECT codigo FROM receta_decodificacion ORDER BY codigo')).rows.map((x) => x.codigo);
+  }
+
   async catalogosLote(sitios: string[] | null, idsFisicos: string[]): Promise<Catalogos> {
-    const [z, m, p, e, ip] = await Promise.all([
+    const [z, m, p, e, ip, r] = await Promise.all([
       this.pool.query<ZonaCatalogo>(
         `SELECT z.id, z.nombre, z.sitio_id, s.codigo AS sitio_codigo, s.nombre AS sitio_nombre FROM zona z JOIN sitio s ON s.id = z.sitio_id
           WHERE s.activo AND ($1::uuid[] IS NULL OR z.sitio_id = ANY($1::uuid[]))`, [sitios]),
@@ -498,12 +503,14 @@ export class AltaService {
            FROM dispositivo d JOIN zona z ON z.id = d.zona_id WHERE d.id_fisico = ANY($1::text[])`, [idsFisicos, sitios]),
       this.pool.query<{ id_fisico: string; propio: boolean }>(
         'SELECT id_fisico, ($2::uuid[] IS NULL OR sitio_id = ANY($2::uuid[])) AS propio FROM pasarela WHERE id_fisico = ANY($1::text[])', [idsFisicos, sitios]),
+      this.recetas(),
     ]);
     return {
       zonas: z.rows, magnitudes: new Map(m.rows.map((x) => [x.codigo, { nombre: x.nombre, unidad: x.unidad_canonica }])), pasarelas: p.rows,
       existentes: new Map(e.rows.filter((x) => x.propio).map((x) => [x.id_fisico, { id: x.id, estado: x.estado }])),
       idsDePasarela: new Set(ip.rows.filter((x) => x.propio).map((x) => x.id_fisico)),
       ajenos: new Set([...e.rows, ...ip.rows].filter((x) => !x.propio).map((x) => x.id_fisico)),
+      recetas: r,
     };
   }
 
@@ -828,6 +835,8 @@ export class AltaService {
       case '23503': // foreign_key_violation: la zona o la pasarela desaparecieron entre la comprobación y el INSERT
         // …o el formato de la pasarela cambió entre la lectura y el INSERT (fk_dispositivo_pasarela_formato, migración 15).
         if (pg.constraint === 'fk_dispositivo_pasarela_formato') return new ConflictException('el formato de la pasarela cambió durante el alta: repetirla');
+        // …o el decodificador no es una receta del catálogo (fk_dispositivo_decodificador, migración 27; TT-12 bloque 5).
+        if (pg.constraint === 'fk_dispositivo_decodificador') return new BadRequestException(['decodificador: no es una receta de decodificación del catálogo (GET /recetas-decodificacion)']);
         return new BadRequestException(['zona_id o pasarela_id no existe']);
       case '23514': // check_violation: la base exige algo que el validador no cubrió; el detalle (trae la fila) va al registro, no a la API
         this.log.warn(`${op} de ${idFisico}: la base rechazó la fila (${pg.constraint ?? 'restricción'}): ${pg.detail ?? pg.message}`);

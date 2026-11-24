@@ -2,7 +2,7 @@
 // contrario. Devuelve el cuerpo limpio o lanza 400 con la lista de motivos. Lo que solo pone el sistema (estado inicial,
 // instantes, credencial) no está en el tipo de entrada: ningún cliente puede mandarlo.
 import { BadRequestException } from '@nestjs/common';
-import { PERFILES, Perfil } from '../recepcion/adaptadores/perfiles.js';
+import { RECETA_CODIGO } from '../recepcion/adaptadores/receta.js';
 
 export const VIAS = ['mqtt', 'http', 'lorawan'] as const;
 // Formatos que declara un dispositivo directo (mqtt, http). Uno lorawan no declara formato: hereda el de su pasarela
@@ -34,7 +34,7 @@ export interface AltaValidada {
   via: Via;
   formato: Formato | null; // null en lorawan: lo pone el servicio desde la pasarela
   pasarela_id: string | null;
-  decodificador: Perfil | null; // solo lorawan: perfil de decodificación cuando la pasarela entrega la trama sin decodificar (migración 17)
+  decodificador: string | null; // solo lorawan: receta de decodificación cuando la pasarela entrega la trama sin decodificar (migraciones 17 y 27)
   intervalo_esperado_s: number;
   canales: CanalAlta[];
 }
@@ -86,7 +86,9 @@ export function validarEscalas(cero: unknown, cien: unknown, prefijo: string, mo
   return { escala_cero: cero as number, escala_cien: cien as number };
 }
 
-export function validarAlta(cuerpo: unknown, reservadosExtra: readonly string[] = []): AltaValidada {
+// `recetas`: las recetas de la base, cuando quien llama ya las leyó (el lote, en su catálogo): la que no está se dice aquí, con la lista. Sin
+// ella (el alta de a uno) solo se revisa la forma del código y lo decide la clave foránea fk_dispositivo_decodificador (23503 → 400).
+export function validarAlta(cuerpo: unknown, reservadosExtra: readonly string[] = [], recetas?: readonly string[]): AltaValidada {
   if (typeof cuerpo !== 'object' || cuerpo === null || Array.isArray(cuerpo)) throw new BadRequestException(['el cuerpo debe ser un objeto JSON']);
   const c = cuerpo as Record<string, unknown>;
   const m = new Motivos();
@@ -105,12 +107,15 @@ export function validarAlta(cuerpo: unknown, reservadosExtra: readonly string[] 
   const pasarela_id = c.pasarela_id === undefined || c.pasarela_id === null ? null : m.uuid(c.pasarela_id, 'pasarela_id');
   if (via === 'lorawan' && pasarela_id === null) m.lista.push('un dispositivo lorawan necesita pasarela_id');
   if (via !== 'lorawan' && pasarela_id !== null) m.lista.push('pasarela_id solo aplica a la vía lorawan');
-  // Las recetas que el código aplica (las sembradas: fk_dispositivo_decodificador, migración 27) y ck_dispositivo_decodificador_via (migración 17),
-  // con el mensaje claro. En el bloque 5 de TT-12 la lista sale de la base.
-  let decodificador: Perfil | null = null;
+  // Una receta de la base (fk_dispositivo_decodificador, migración 27; TT-12 bloque 5) y solo en la vía lorawan (ck_dispositivo_decodificador_via,
+  // migración 17), con el mensaje claro.
+  let decodificador: string | null = null;
   if (c.decodificador !== undefined && c.decodificador !== null) {
     if (via !== 'lorawan') m.lista.push('decodificador solo aplica a la vía lorawan');
-    else decodificador = m.opcion(c.decodificador, 'decodificador', PERFILES, PERFILES[0]);
+    else if (recetas !== undefined && recetas.length > 0) decodificador = m.opcion(c.decodificador, 'decodificador', recetas, recetas[0]);
+    else if (recetas !== undefined) m.lista.push('decodificador: no hay recetas de decodificación en el catálogo');
+    else if (typeof c.decodificador === 'string' && RECETA_CODIGO.test(c.decodificador)) decodificador = c.decodificador;
+    else m.lista.push('decodificador debe ser el código de una receta de decodificación (GET /recetas-decodificacion)');
   }
   const intervalo = c.intervalo_esperado_s;
   const intervaloValido = typeof intervalo === 'number' && Number.isInteger(intervalo) && intervalo >= 5 && intervalo <= 86_400;

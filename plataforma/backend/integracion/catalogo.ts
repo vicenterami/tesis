@@ -43,7 +43,7 @@ const magnitud = async (codigo: string) => (await q(
      FROM magnitud m WHERE codigo = $1`, [codigo])).rows[0] as { rango_min: number; rango_max: number; umbral_alto_sugerido: number | null; histeresis_sugerida: number; alias: string[] } | undefined;
 const marcaDe = (lista: unknown, codigo: string): string => ((lista as { codigo: string; actualizado_en: string }[]).find((m) => m.codigo === codigo)?.actualizado_en ?? '');
 
-async function sembrar(): Promise<{ sitio: string; canalT: string; canalS: string }> {
+async function sembrar(): Promise<{ sitio: string; canalT: string; canalS: string; directo: string; nodo: string; zona: string; pasarela: string }> {
   const sitio = (await q(`INSERT INTO sitio (nombre, codigo, zona_horaria) VALUES ('Catálogo', 'cat', 'America/Santiago') RETURNING id`)).rows[0].id as string;
   const zona = (await q('INSERT INTO zona (sitio_id, nombre) VALUES ($1, $2) RETURNING id', [sitio, 'Zona'])).rows[0].id as string;
   const equipo = (await q(`INSERT INTO dispositivo (zona_id, id_fisico, nombre, intervalo_esperado_s) VALUES ($1, 'cat-1', 'Sala 3', 300) RETURNING id`, [zona])).rows[0].id as string;
@@ -56,7 +56,11 @@ async function sembrar(): Promise<{ sitio: string; canalT: string; canalS: strin
       [canalT, i * 10 + 1, i < 3 ? 75 + i : 20 + i]);
   }
   await q(`INSERT INTO medicion (canal_id, tiempo, valor, unidad, recibido_en, origen_tiempo) VALUES ($1, now() - interval '9 days', 80, 'Cel', now(), 'recepcion')`, [canalT]);
-  return { sitio, canalT, canalS };
+  // Un nodo LoRaWAN de una pasarela Milesight con la receta del campus (para «reemplazar por» y el PATCH del decodificador).
+  const pasarela = (await q(`INSERT INTO pasarela (sitio_id, id_fisico, nombre, formato) VALUES ($1, 'cat-pasarela', 'Pasarela', 'milesight') RETURNING id`, [sitio])).rows[0].id as string;
+  const nodo = (await q(`INSERT INTO dispositivo (zona_id, id_fisico, nombre, intervalo_esperado_s, via, formato, pasarela_id, decodificador)
+                         VALUES ($1, 'cat-nodo', 'Nodo', 300, 'lorawan', 'milesight', $2, 'campus-heltec-v3-v1') RETURNING id`, [zona, pasarela])).rows[0].id as string;
+  return { sitio, canalT, canalS, directo: equipo, nodo, zona, pasarela };
 }
 
 async function principal() {
@@ -208,6 +212,80 @@ async function principal() {
     } finally {
       c.release();
     }
+    // ── Recetas de decodificación (bloque 5) ────────────────────────────────────────────────────────────────────────────────────────
+    r = await pedir(consulta, 'GET', '/recetas-decodificacion');
+    const rc = (r.cuerpo as unknown as Record<string, unknown>[]).find((x) => x.codigo === 'campus-heltec-v3-v1');
+    comprobar(r.estado === 200 && (rc?.campos as unknown[] | undefined)?.length === 3 && !('equipos' in (rc ?? {})), 'GET /recetas-decodificacion con consulta: la receta del campus con sus 3 campos, sin el conteo de equipos', JSON.stringify(rc).slice(0, 300));
+    r = await pedir(sistema, 'GET', '/recetas-decodificacion');
+    comprobar((r.cuerpo as unknown as Record<string, unknown>[]).find((x) => x.codigo === 'campus-heltec-v3-v1')?.equipos === 1, 'GET /recetas-decodificacion del administrador del sistema: en cuántos equipos se usa (1)');
+    const v2 = { codigo: 'campus-heltec-v3-v2', nombre: 'Heltec V3, versión 2', largo_bytes: 10, campos: [
+      { magnitud: 'temperatura', desplazamiento: 5, tipo: 'i16be', dividir_por: 100 }, { magnitud: 'humedad', desplazamiento: 7, tipo: 'u16be', dividir_por: 100 },
+      { magnitud: 'tension', desplazamiento: 9, tipo: 'u8', sumar_antes: 200, dividir_por: 100 }] };
+    r = await pedir(admin, 'POST', '/recetas-decodificacion', v2);
+    comprobar(r.estado === 403, 'POST /recetas-decodificacion del administrador de un sitio → 403', String(r.estado));
+    r = await pedir(sistema, 'POST', '/recetas-decodificacion', v2);
+    comprobar(r.estado === 200 && (r.cuerpo.campos as unknown[] | undefined)?.length === 3, 'POST /recetas-decodificacion del administrador del sistema → 200 con sus campos', `${r.estado} ${JSON.stringify(r.cuerpo).slice(0, 200)}`);
+    const evR = (await q(`SELECT usuario_id, detalle FROM evento WHERE tipo = 'catalogo_cambio' AND detalle->>'objeto' = 'receta' ORDER BY ocurrido_en DESC LIMIT 1`)).rows[0] as { usuario_id: string; detalle: Record<string, unknown> } | undefined;
+    comprobar(evR?.usuario_id === sistema.id && evR.detalle.codigo === 'campus-heltec-v3-v2' && evR.detalle.antes === null, 'crear una receta deja su evento catalogo_cambio con la persona', JSON.stringify(evR));
+    r = await pedir(sistema, 'POST', '/recetas-decodificacion', v2);
+    comprobar(r.estado === 409 && String(r.cuerpo.message).includes('Ya hay una receta con ese código'), 'una receta con un código que ya existe → 409 (escritura única)', JSON.stringify(r.cuerpo));
+    r = await pedir(sistema, 'POST', '/recetas-decodificacion', { ...v2, codigo: 'mala-v1', campos: [{ magnitud: 'no_existe', desplazamiento: 0, tipo: 'u8' }] });
+    comprobar(r.estado === 400 && JSON.stringify(r.cuerpo).includes('no_existe no es una magnitud del catálogo'), 'un campo con una magnitud que no existe → 400 que la nombra', JSON.stringify(r.cuerpo));
+    r = await pedir(sistema, 'POST', '/recetas-decodificacion', { ...v2, codigo: 'mala-v2', campos: [{ magnitud: 'humedad', desplazamiento: 0, tipo: 'u8', dividir_pro: 100 }] });
+    comprobar(r.estado === 400 && JSON.stringify(r.cuerpo).includes('dividir_pro'), 'una clave mal escrita en un campo → 400 (no se ignora)', JSON.stringify(r.cuerpo));
+    r = await pedir(sistema, 'POST', '/recetas-decodificacion', { ...v2, codigo: 'mala-v3', campos: [{ magnitud: 'humedad', desplazamiento: 9, tipo: 'u16be' }] });
+    comprobar(r.estado === 400 && JSON.stringify(r.cuerpo).includes('no cabe'), 'un campo que no cabe en el largo → 400', JSON.stringify(r.cuerpo));
+    comprobar((await q(`SELECT count(*)::int AS n FROM receta_decodificacion WHERE codigo LIKE 'mala-%'`)).rows[0].n === 0, 'ninguna receta mala quedó guardada');
+    // Probar sin guardar
+    const recetas0 = (await q('SELECT count(*)::int AS n FROM receta_decodificacion')).rows[0].n as number;
+    r = await pedir(sistema, 'POST', '/recetas-decodificacion/probar', { receta: { ...v2, codigo: '' }, bytes: '02 00 00 00 8f 07 18 19 98 af', codificacion: 'hex' });
+    comprobar(r.estado === 200 && r.cuerpo.ok === true && JSON.stringify((r.cuerpo.lecturas as { valor: number }[]).map((l) => l.valor)) === '[18.16,65.52,3.75]',
+      'probar con la captura en hexadecimal, con espacios y sin código → 18,16; 65,52; 3,75', JSON.stringify(r.cuerpo));
+    r = await pedir(sistema, 'POST', '/recetas-decodificacion/probar', { receta: v2, bytes: 'AgAAAI8HGBmYrw==', codificacion: 'base64' });
+    comprobar(r.estado === 200 && r.cuerpo.ok === true, 'probar con la misma captura en base64 → las mismas lecturas', JSON.stringify(r.cuerpo));
+    r = await pedir(sistema, 'POST', '/recetas-decodificacion/probar', { receta: v2, bytes: '020000008f07181998', codificacion: 'hex' });
+    comprobar(r.estado === 200 && r.cuerpo.ok === false && r.cuerpo.motivo === 'se esperaban 10 bytes y llegaron 9', 'probar con 9 bytes → 200 con el motivo «se esperaban 10 bytes y llegaron 9»', JSON.stringify(r.cuerpo));
+    r = await pedir(sistema, 'POST', '/recetas-decodificacion/probar', { receta: v2, bytes: '02zz', codificacion: 'hex' });
+    comprobar(r.estado === 400 && JSON.stringify(r.cuerpo).includes('eso no es hexadecimal: «z» en la posición 3'), 'bytes que no son hexadecimal → 400 con la posición', JSON.stringify(r.cuerpo));
+    r = await pedir(admin, 'POST', '/recetas-decodificacion/probar', { receta: v2, bytes: '00', codificacion: 'hex' });
+    comprobar(r.estado === 403 && (await q('SELECT count(*)::int AS n FROM receta_decodificacion')).rows[0].n === recetas0, 'probar del administrador de un sitio → 403; probar no guardó ninguna receta', String(r.estado));
+    // Reemplazar por
+    r = await pedir(sistema, 'POST', '/recetas-decodificacion/campus-heltec-v3-v1/reemplazar', { por: 'campus-heltec-v3-v1' });
+    comprobar(r.estado === 400, 'reemplazar una receta por sí misma → 400', String(r.estado));
+    r = await pedir(sistema, 'POST', '/recetas-decodificacion/campus-heltec-v3-v1/reemplazar', { por: 'campus-heltec-v3-v2' });
+    const nodoTras = (await q('SELECT decodificador FROM dispositivo WHERE id = $1', [s.nodo])).rows[0]?.decodificador as string;
+    const evNodo = (await q(`SELECT count(*)::int AS n FROM evento WHERE dispositivo_id = $1 AND tipo = 'dispositivo_configurado' AND detalle->>'origen' = 'reemplazar_receta'`, [s.nodo])).rows[0].n as number;
+    comprobar(r.estado === 200 && r.cuerpo.dispositivos === 1 && nodoTras === 'campus-heltec-v3-v2' && evNodo === 1 && JSON.stringify(r.cuerpo.avisos) === '[]',
+      '«reemplazar por» mueve el nodo a la v2 (mismo largo y magnitudes: sin avisos), con su evento en la actividad del equipo', `${r.estado} ${JSON.stringify(r.cuerpo)} ${nodoTras} ${evNodo}`);
+    const evRe = (await q(`SELECT usuario_id, detalle FROM evento WHERE tipo = 'catalogo_cambio' AND detalle->>'accion' = 'reemplazar' ORDER BY ocurrido_en DESC LIMIT 1`)).rows[0] as { usuario_id: string; detalle: Record<string, unknown> } | undefined;
+    comprobar(evRe?.usuario_id === sistema.id && evRe.detalle.codigo === 'campus-heltec-v3-v1' && evRe.detalle.por === 'campus-heltec-v3-v2' && evRe.detalle.dispositivos === 1,
+      '«reemplazar por» deja también su evento catalogo_cambio: de cuál a cuál, cuántos equipos y quién', JSON.stringify(evRe));
+    r = await pedir(sistema, 'POST', '/recetas-decodificacion/no-existe-v1/reemplazar', { por: 'campus-heltec-v3-v2' });
+    comprobar(r.estado === 404, 'reemplazar una receta que no existe → 404', String(r.estado));
+    r = await pedir(sistema, 'POST', '/recetas-decodificacion/campus-heltec-v3-v2/reemplazar', { por: 'no-existe-v1' });
+    comprobar(r.estado === 400 && JSON.stringify(r.cuerpo).includes('no es una receta del catálogo'), 'reemplazar por una receta que no existe → 400', JSON.stringify(r.cuerpo));
+    // El alta de a uno con la receta recién creada por la API (la razón del bloque 5: ninguna lista del código la limita), y con una que no existe.
+    const nodoNuevo = (receta: string, id: string) => ({ id_fisico: id, nombre: id, zona_id: s.zona, via: 'lorawan', pasarela_id: s.pasarela, decodificador: receta,
+      intervalo_esperado_s: 300, canales: [{ magnitud: 'temperatura' }] });
+    r = await pedir(sistema, 'POST', '/dispositivos', nodoNuevo('campus-heltec-v3-v2', 'cat-nodo-v2'));
+    comprobar((r.estado === 200 || r.estado === 201) && (await q(`SELECT decodificador FROM dispositivo WHERE id_fisico = 'cat-nodo-v2'`)).rows[0]?.decodificador === 'campus-heltec-v3-v2',
+      'el alta de a uno de un nodo lorawan con la receta v2 recién creada por la API', `${r.estado} ${JSON.stringify(r.cuerpo).slice(0, 300)}`);
+    r = await pedir(sistema, 'POST', '/dispositivos', nodoNuevo('no-existe-v1', 'cat-nodo-x'));
+    comprobar(r.estado === 400 && JSON.stringify(r.cuerpo).includes('no es una receta de decodificación del catálogo') && (await q(`SELECT 1 FROM dispositivo WHERE id_fisico = 'cat-nodo-x'`)).rowCount === 0,
+      'el alta de a uno con una receta que no existe → 400 (la clave foránea, en palabras) y nada creado', `${r.estado} ${JSON.stringify(r.cuerpo).slice(0, 300)}`);
+    // PATCH /dispositivos/{id} con decodificador (configurar, en su sitio)
+    const marcaNodo = async (id: string) => (await q(`SELECT to_char(actualizado_en AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS x FROM dispositivo WHERE id = $1`, [id])).rows[0].x as string;
+    r = await pedir(admin, 'PATCH', `/dispositivos/${s.nodo}`, { actualizado_en: await marcaNodo(s.nodo), decodificador: 'campus-heltec-v3-v1' });
+    comprobar(r.estado === 200 && (await q('SELECT decodificador FROM dispositivo WHERE id = $1', [s.nodo])).rows[0]?.decodificador === 'campus-heltec-v3-v1',
+      'PATCH /dispositivos/{id} del administrador del sitio: cambia la receta de un nodo lorawan', `${r.estado} ${JSON.stringify(r.cuerpo).slice(0, 200)}`);
+    r = await pedir(admin, 'PATCH', `/dispositivos/${s.nodo}`, { actualizado_en: await marcaNodo(s.nodo), decodificador: 'no-existe-v1' });
+    comprobar(r.estado === 400 && JSON.stringify(r.cuerpo).includes('no es una receta'), 'PATCH con una receta que no existe → 400', JSON.stringify(r.cuerpo));
+    r = await pedir(admin, 'PATCH', `/dispositivos/${s.directo}`, { actualizado_en: await marcaNodo(s.directo), decodificador: 'campus-heltec-v3-v1' });
+    comprobar(r.estado === 400 && JSON.stringify(r.cuerpo).includes('vía lorawan'), 'PATCH con receta en un equipo que no es lorawan → 400', JSON.stringify(r.cuerpo));
+    r = await pedir(admin, 'PATCH', `/dispositivos/${s.nodo}`, { actualizado_en: await marcaNodo(s.nodo), decodificador: null });
+    comprobar(r.estado === 200 && r.cuerpo.decodificador === null && (await q('SELECT decodificador FROM dispositivo WHERE id = $1', [s.nodo])).rows[0]?.decodificador === null,
+      'PATCH con decodificador null quita la receta, y la ficha que responde lo muestra', `${r.estado} ${JSON.stringify(r.cuerpo).slice(0, 200)}`);
+
     const plan = (await q(`EXPLAIN SELECT 1 FROM canal c JOIN magnitud m ON m.codigo = c.magnitud_codigo WHERE c.id = $1 FOR NO KEY UPDATE OF c FOR SHARE OF m`, [s.canalT])).rows.length;
     comprobar(plan > 0, 'la consulta de guardar reglas con FOR NO KEY UPDATE OF c FOR SHARE OF m es válida en esta versión de PostgreSQL');
     r = await pedir(sistema, 'PUT', `/canales/${s.canalT}/reglas`, {

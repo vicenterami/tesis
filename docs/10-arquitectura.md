@@ -523,7 +523,7 @@ cliente ──HTTP──► Express ⊂ NestJS ──► servicio ──► pg �
 
 - **Express** es la biblioteca de servidor HTTP más usada de Node.js; NestJS la usa por debajo
   (`@nestjs/platform-express`). El proceso de Node es el servidor; Express recibe cada petición y
-  entrega la respuesta. Es **la API**: 52 rutas REST (66 operaciones, la recepción por HTTP, la sesión, los usuarios, el tablero v2, desde el 11/11/2026 la cuenta propia, lo legal, el soporte y la actividad, desde el 15/11/2026 la plantilla del alta por lote y el catálogo de magnitudes, desde el 17/11/2026 la vista pública por enlace y la administración de sus enlaces, con el tope y el k de cada sitio, desde el 18/11/2026 el plazo de la primera trama de cada sitio y desde el 19/11/2026 la exportación por sitio y su estimación, y desde el 23/11/2026 el catálogo editable de magnitudes, incluidos) y el canal SSE `/eventos` (§5), descritos en el contrato OpenAPI (53 rutas y 67 operaciones contando `/eventos`; el paso 2h2 del guardián compara estas cifras con `openapi.json`). Desde el 08/11/2026, antes de cada ruta corre el guardia central de la sesión (`docs/20 §5`). Express no toca la base.
+  entrega la respuesta. Es **la API**: 55 rutas REST (70 operaciones, la recepción por HTTP, la sesión, los usuarios, el tablero v2, desde el 11/11/2026 la cuenta propia, lo legal, el soporte y la actividad, desde el 15/11/2026 la plantilla del alta por lote y el catálogo de magnitudes, desde el 17/11/2026 la vista pública por enlace y la administración de sus enlaces, con el tope y el k de cada sitio, desde el 18/11/2026 el plazo de la primera trama de cada sitio y desde el 19/11/2026 la exportación por sitio y su estimación, y desde el 23/11/2026 el catálogo editable de magnitudes y de recetas de decodificación, incluidos) y el canal SSE `/eventos` (§5), descritos en el contrato OpenAPI (56 rutas y 71 operaciones contando `/eventos`; el paso 2h2 del guardián compara estas cifras con `openapi.json`). Desde el 08/11/2026, antes de cada ruta corre el guardia central de la sesión (`docs/20 §5`). Express no toca la base.
 - **`pg`** (node-postgres) es el conductor de la base: mantiene un *pool* de 5 conexiones
   (`db/db.module.ts`) y envía **SQL directo** con parámetros `$1, $2…`; el valor nunca se pega dentro
   del texto SQL, lo que evita la inyección. Sin ORM, por la razón de `docs/07` (series de tiempo con
@@ -1965,7 +1965,9 @@ entra. Lo que aquí se marca «a fijar al implementar» es un detalle que el dis
     para la captura real (02 00 00 00 8f 07 18 19 98 af → 18,16 °C; 65,52 %; 3,75 V) y para todos los valores de 8 y 16 bits, con
     igualdad estricta; los textos de error que hoy prueba C-89 (`docs/16`) se conservan.
     (vii) **Escritura única y «reemplazar por».** Una receta no se edita ni se borra. Corregirla es crear otra (`…-v2`) y usar
-    «reemplazar por», que mueve todos los dispositivos de una a la otra en una sola transacción, con su evento. **La receta y sus campos
+    «reemplazar por», que mueve todos los dispositivos de una a la otra en una sola transacción, con su evento (los dados de baja no se mueven;
+    si la nueva tiene otro largo o lee magnitudes que la anterior no leía, la respuesta lo avisa y no lo impide: el firmware y la receta pueden
+    cambiar juntos; revisión del 23/11/2026). **La receta y sus campos
     se crean juntos, una sola vez,** por `fn_crear_receta`, una función del dueño (una transacción; exige al menos un campo y rechaza un
     código que ya existe): la aplicación no tiene `INSERT` directo en `receta_decodificacion` ni en `receta_campo`, así que una receta en
     uso no puede ganar campos después. «Reemplazar por» no necesita función: cambia `dispositivo.decodificador`, que la aplicación ya
@@ -1973,7 +1975,9 @@ entra. Lo que aquí se marca «a fijar al implementar» es un detalle que el dis
     nunca cambia de significado (`docs/08 §7`, foto por valor), y la trama cruda sigue disponible para re-decodificar con la receta nueva.
     Además, `decodificador` entra a `PATCH /dispositivos/{id}` (hoy no lo admite: `alta/configuracion.dto.ts`), para reasignar un
     equipo solo. La lista de recetas del alta de a uno, del lote y de la ayuda de la plantilla sale de la base, no de una lista del código
-    ni de un `enum` del OpenAPI; la violación de la clave foránea nueva (23503) se traduce a 400 en el alta y a `plan_cambio` en el lote.
+    ni de un `enum` del OpenAPI; la violación de la clave foránea nueva (23503) se traduce a 400 en el alta; el lote valida contra las recetas que leyó en su catálogo, y como
+    una receta no se borra, una que pasó la validación no puede faltar al crear (no hace falta `plan_cambio` para eso; hecho el 23/11/2026,
+    `docs/16 §99`).
     (viii) **Probar sin guardar.** Una ruta recibe la definición de una receta y unos bytes, en hexadecimal o en base64, y devuelve las
     lecturas o el motivo por el que no se entienden, sin tocar la base; el panel la usa mientras se escribe la receta. Valida la receta
     con **el mismo validador que crearla** (forma del código, largo de 1 a 255, de 1 a 32 campos, cada uno dentro del largo, factores y

@@ -24,6 +24,7 @@ const cat: Catalogos = {
   pasarelas: [{ id: P1, id_fisico: 'ug65-campus', sitio_id: S1, activo: true, formato: 'milesight' }],
   existentes: new Map([['nodo-viejo', { id: '00000000-0000-4000-8000-0000000000d1', estado: 'baja' }]]),
   idsDePasarela: new Set(['ug65-campus']),
+  recetas: ['campus-heltec-v3-v1'], // la receta sembrada (migración 27): el lote lee las recetas de la base
   ajenos: new Set(['nodo-de-otro', 'pasarela-de-otro']),
 };
 const fila = (x: Record<string, unknown> = {}, n = 2): FilaEntrada =>

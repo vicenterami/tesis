@@ -53,6 +53,8 @@ export function erroresDeReceta(r: unknown): string[] {
   for (const k of Object.keys(x)) if (!CLAVES_RECETA.includes(k)) e.push(`clave desconocida: ${k.slice(0, 40)}`);
   if (x.nombre !== undefined && (typeof x.nombre !== 'string' || x.nombre.trim().length < 1 || x.nombre.trim().length > 120)) {
     e.push('nombre: de 1 a 120 caracteres');
+  } else if (typeof x.nombre === 'string' && /[\p{Cc}\p{Cf}]/u.test(x.nombre)) {
+    e.push('nombre: sin caracteres de control ni invisibles');
   }
   if (typeof x.codigo !== 'string' || !RECETA_CODIGO.test(x.codigo)) {
     e.push('codigo: de 3 a 63 caracteres, minúsculas, dígitos y guiones, sin empezar por guion');

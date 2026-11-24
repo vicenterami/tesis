@@ -3,6 +3,7 @@
 // aplica las mismas reglas antes de enviar; esta es la que decide.
 import { BadRequestException } from '@nestjs/common';
 import { FORMA_ACTUALIZADO_EN } from './calibracion.dto.js';
+import { RECETA_CODIGO } from '../recepcion/adaptadores/receta.js';
 
 export interface Error400 { campo: string; motivo: string }
 export function rechazo(errores: readonly Error400[]): BadRequestException {
@@ -32,6 +33,7 @@ export interface CambioDispositivo {
   estado?: (typeof ESTADOS_CONFIGURABLES)[number];
   intervalo_esperado_s?: number;
   zona_id?: string;
+  decodificador?: string | null; // TT-12: la receta de un nodo lorawan; null la quita
 }
 export function validarCambioDispositivo(cuerpo: unknown): CambioDispositivo {
   if (typeof cuerpo !== 'object' || cuerpo === null || Array.isArray(cuerpo)) throw rechazo([{ campo: '(cuerpo)', motivo: 'debe ser un objeto JSON' }]);
@@ -56,8 +58,12 @@ export function validarCambioDispositivo(cuerpo: unknown): CambioDispositivo {
     if (typeof c.zona_id === 'string' && UUID.test(c.zona_id)) r.zona_id = c.zona_id.toLowerCase();
     else errores.push({ campo: 'zona_id', motivo: 'UUID de una zona del mismo sitio' });
   }
-  for (const k of Object.keys(c)) if (!['actualizado_en', 'nombre', 'estado', 'intervalo_esperado_s', 'zona_id'].includes(k)) errores.push({ campo: k, motivo: 'campo no admitido' });
-  if (errores.length === 0 && Object.keys(r).length === 1) errores.push({ campo: '(cuerpo)', motivo: 'nada que cambiar: nombre, estado, intervalo_esperado_s o zona_id' });
+  if (c.decodificador !== undefined) {
+    if (c.decodificador === null || (typeof c.decodificador === 'string' && RECETA_CODIGO.test(c.decodificador))) r.decodificador = c.decodificador;
+    else errores.push({ campo: 'decodificador', motivo: 'el código de una receta de decodificación (GET /recetas-decodificacion), o null para quitarla' });
+  }
+  for (const k of Object.keys(c)) if (!['actualizado_en', 'nombre', 'estado', 'intervalo_esperado_s', 'zona_id', 'decodificador'].includes(k)) errores.push({ campo: k, motivo: 'campo no admitido' });
+  if (errores.length === 0 && Object.keys(r).length === 1) errores.push({ campo: '(cuerpo)', motivo: 'nada que cambiar: nombre, estado, intervalo_esperado_s, zona_id o decodificador' });
   if (errores.length > 0) throw rechazo(errores);
   return r;
 }

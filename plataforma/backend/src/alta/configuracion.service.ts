@@ -14,6 +14,7 @@ import { EventosService } from '../tiempo-real/eventos.service.js';
 
 interface DispositivoBloqueado {
   id: string; nombre: string; estado: string; intervalo_esperado_s: number; zona_id: string; sitio_id: string; actualizado_en: string; al_dia: boolean;
+  via: string; decodificador: string | null;
 }
 interface CanalBloqueado {
   id: string; dispositivo_id: string; magnitud: string; unidad: string; etiqueta: string | null; actualizado_en: string;
@@ -72,7 +73,7 @@ export class ConfiguracionService {
     const cerradas = await this.transaccion(async (c) => {
       let cerradas: { id: string; tipo: string }[] = [];
       const a = await c.query<DispositivoBloqueado>(
-        `SELECT d.id, d.nombre, d.estado, d.intervalo_esperado_s, d.zona_id, z.sitio_id, ${isoUs('d.actualizado_en')} AS actualizado_en,
+        `SELECT d.id, d.nombre, d.estado, d.intervalo_esperado_s, d.zona_id, z.sitio_id, d.via, d.decodificador, ${isoUs('d.actualizado_en')} AS actualizado_en,
                 (d.actualizado_en = $2::timestamptz) AS al_dia
            FROM dispositivo d JOIN zona z ON z.id = d.zona_id WHERE d.id = $1 FOR NO KEY UPDATE OF d`, [id, cambio.actualizado_en]);
       const antes = a.rows[0];
@@ -88,7 +89,14 @@ export class ConfiguracionService {
       const despues = {
         nombre: cambio.nombre ?? antes.nombre, estado: cambio.estado ?? antes.estado,
         intervalo_esperado_s: cambio.intervalo_esperado_s ?? antes.intervalo_esperado_s, zona_id: cambio.zona_id ?? antes.zona_id,
+        decodificador: cambio.decodificador !== undefined ? cambio.decodificador : antes.decodificador,
       };
+      // La receta: solo en un nodo lorawan (ck_dispositivo_decodificador_via) y del catálogo (fk_dispositivo_decodificador; TT-12, punto 69 vii).
+      if (despues.decodificador !== antes.decodificador && despues.decodificador !== null) {
+        if (antes.via !== 'lorawan') throw rechazo([{ campo: 'decodificador', motivo: 'solo aplica a un dispositivo de la vía lorawan' }]);
+        const r = await c.query('SELECT 1 FROM receta_decodificacion WHERE codigo = $1', [despues.decodificador]);
+        if (r.rowCount !== 1) throw rechazo([{ campo: 'decodificador', motivo: 'no es una receta de decodificación del catálogo (GET /recetas-decodificacion)' }]);
+      }
       const cambiados = (Object.keys(despues) as (keyof typeof despues)[]).filter((k) => despues[k] !== antes[k]);
       if (cambiados.length === 0) return cerradas; // nada cambia: sin UPDATE ni evento, la marca sigue siendo la vigente
       // Volver a `activo` desde mantenimiento es volver a servicio (docs/19 §2; docs/10 §8.4 punto 68): `en_servicio_desde` pasa a este
@@ -96,10 +104,10 @@ export class ConfiguracionService {
       // la última trama vieja). Cualquier otro cambio no lo toca.
       const vuelveAServicio = antes.estado !== 'activo' && despues.estado === 'activo';
       const u = await c.query(
-        `UPDATE dispositivo SET nombre = $2, estado = $3, intervalo_esperado_s = $4, zona_id = $5,
+        `UPDATE dispositivo SET nombre = $2, estado = $3, intervalo_esperado_s = $4, zona_id = $5, decodificador = $8,
                 en_servicio_desde = CASE WHEN $7::boolean THEN now() ELSE en_servicio_desde END
           WHERE id = $1 AND actualizado_en = $6::timestamptz`,
-        [id, despues.nombre, despues.estado, despues.intervalo_esperado_s, despues.zona_id, cambio.actualizado_en, vuelveAServicio]);
+        [id, despues.nombre, despues.estado, despues.intervalo_esperado_s, despues.zona_id, cambio.actualizado_en, vuelveAServicio, despues.decodificador]);
       if (u.rowCount === 0) throw conflicto(antes.actualizado_en);
       // Pasar a mantenimiento cierra las condiciones abiertas del equipo (RF-22: un equipo fuera de servicio no genera alertas; docs/19 §2;
       // docs/10 §8.4 punto 68), todas, como la baja, con un evento por cada una, en la misma transacción que el cambio de estado. El bloqueo

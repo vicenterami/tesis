@@ -6,7 +6,6 @@ import {
 } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { AltaValidada, FORMATOS_DIRECTOS, FORMA_ID_FISICO, MAX_CANALES, VIAS, validarAlta } from './alta.dto.js';
-import { PERFILES } from '../recepcion/adaptadores/perfiles.js';
 import { AltaService, CredencialRotada, DispositivoCreado, DispositivoDadoDeBaja } from './alta.service.js';
 import { uuid } from '../consulta/validacion.js';
 import { AlcanceService } from '../sesion/alcance.service.js';
@@ -78,7 +77,7 @@ export class AltaController {
         via: { type: 'string', enum: [...VIAS] },
         formato: { type: 'string', enum: [...FORMATOS_DIRECTOS], default: 'senml', description: 'Solo vías mqtt y http; un dispositivo lorawan no lo envía: hereda el de su pasarela' },
         pasarela_id: { type: 'string', format: 'uuid', nullable: true, description: 'Obligatoria si la vía es lorawan; prohibida si no' },
-        decodificador: { type: 'string', enum: [...PERFILES], nullable: true, description: 'Solo vía lorawan: perfil con que la plataforma decodifica la carga cuando la pasarela la entrega sin decodificar' },
+        decodificador: { type: 'string', pattern: '^[a-z0-9][a-z0-9-]{2,62}$', nullable: true, description: 'Solo vía lorawan: el código de una receta de decodificación (GET /recetas-decodificacion) con que la plataforma decodifica la carga cuando la pasarela la entrega sin decodificar' },
         intervalo_esperado_s: { type: 'integer', minimum: 5, maximum: 86400 },
         canales: {
           type: 'array', minItems: 1, maxItems: MAX_CANALES,
@@ -225,9 +224,9 @@ export class AltaController {
   @ApiOkResponse({ description: 'La plantilla' })
   @ApiUnauthorizedResponse({ description: 'sesión requerida' })
   @ApiForbiddenResponse({ description: 'Sin ningún sitio donde dar de alta' })
-  plantilla(@Usuario() u: UsuarioSesion): PlantillaLote {
+  async plantilla(@Usuario() u: UsuarioSesion): Promise<PlantillaLote> {
     exigirEnAlguno(u, 'escribir');
-    return plantillaLote();
+    return plantillaLote(await this.alta.recetas());
   }
 
   // Configurar un dispositivo desde el panel (docs/19 §4, E; docs/10 §8.4 punto 28), con bloqueo optimista; responde la ficha.
@@ -236,7 +235,7 @@ export class AltaController {
   @ApiOperation({
     summary: 'Configurar un dispositivo (Etapa 4)',
     description:
-      'Cambia `nombre`, `estado` (activo o mantenimiento; la baja es DELETE), `intervalo_esperado_s` (5–86400) y `zona_id` (otra zona del mismo sitio). ' +
+      'Cambia `nombre`, `estado` (activo o mantenimiento; la baja es DELETE), `intervalo_esperado_s` (5–86400), `zona_id` (otra zona del mismo sitio) y, en un nodo lorawan, `decodificador` (una receta del catálogo, o null). ' +
       '`actualizado_en` es obligatorio: el de la ficha, tal cual (microsegundos); si el dispositivo cambió desde entonces, 409 con el vigente y nada se pisa. ' +
       'Deja el evento `dispositivo_configurado` con lo que cambió (antes y después) y quién. Responde la ficha (`GET /dispositivos/{id}`). Validación: 400 con ' +
       '`errores[{campo, motivo}]`.',
@@ -250,6 +249,7 @@ export class AltaController {
         actualizado_en: { type: 'string', pattern: FORMA_ACTUALIZADO_EN.source },
         nombre: { type: 'string', maxLength: 80 }, estado: { type: 'string', enum: ['activo', 'mantenimiento'] },
         intervalo_esperado_s: { type: 'integer', minimum: 5, maximum: 86400 }, zona_id: { type: 'string', format: 'uuid' },
+        decodificador: { type: 'string', nullable: true, pattern: '^[a-z0-9][a-z0-9-]{2,62}$', description: 'Solo vía lorawan: la receta de decodificación (GET /recetas-decodificacion); null la quita (TT-12)' },
       },
     },
   })

@@ -756,11 +756,9 @@
                   },
                   "decodificador": {
                     "type": "string",
-                    "enum": [
-                      "campus-heltec-v3-v1"
-                    ],
+                    "pattern": "^[a-z0-9][a-z0-9-]{2,62}$",
                     "nullable": true,
-                    "description": "Solo vía lorawan: perfil con que la plataforma decodifica la carga cuando la pasarela la entrega sin decodificar"
+                    "description": "Solo vía lorawan: el código de una receta de decodificación (GET /recetas-decodificacion) con que la plataforma decodifica la carga cuando la pasarela la entrega sin decodificar"
                   },
                   "intervalo_esperado_s": {
                     "type": "integer",
@@ -1042,7 +1040,7 @@
         ]
       },
       "patch": {
-        "description": "Cambia `nombre`, `estado` (activo o mantenimiento; la baja es DELETE), `intervalo_esperado_s` (5–86400) y `zona_id` (otra zona del mismo sitio). `actualizado_en` es obligatorio: el de la ficha, tal cual (microsegundos); si el dispositivo cambió desde entonces, 409 con el vigente y nada se pisa. Deja el evento `dispositivo_configurado` con lo que cambió (antes y después) y quién. Responde la ficha (`GET /dispositivos/{id}`). Validación: 400 con `errores[{campo, motivo}]`.",
+        "description": "Cambia `nombre`, `estado` (activo o mantenimiento; la baja es DELETE), `intervalo_esperado_s` (5–86400), `zona_id` (otra zona del mismo sitio) y, en un nodo lorawan, `decodificador` (una receta del catálogo, o null). `actualizado_en` es obligatorio: el de la ficha, tal cual (microsegundos); si el dispositivo cambió desde entonces, 409 con el vigente y nada se pisa. Deja el evento `dispositivo_configurado` con lo que cambió (antes y después) y quién. Responde la ficha (`GET /dispositivos/{id}`). Validación: 400 con `errores[{campo, motivo}]`.",
         "operationId": "AltaController_configurar",
         "parameters": [
           {
@@ -1097,6 +1095,12 @@
                   "zona_id": {
                     "type": "string",
                     "format": "uuid"
+                  },
+                  "decodificador": {
+                    "type": "string",
+                    "nullable": true,
+                    "pattern": "^[a-z0-9][a-z0-9-]{2,62}$",
+                    "description": "Solo vía lorawan: la receta de decodificación (GET /recetas-decodificacion); null la quita (TT-12)"
                   }
                 }
               }
@@ -3115,6 +3119,343 @@
         "summary": "Impacto de un rango propuesto (TT-12; administrador del sistema)",
         "tags": [
           "magnitudes"
+        ]
+      }
+    },
+    "/recetas-decodificacion": {
+      "get": {
+        "description": "Las recetas por código, con sus campos (cada uno con la unidad de su magnitud). Con cualquier sesión; `equipos` (en cuántos se usa, en todos los sitios) solo para el administrador del sistema (docs/20 §6).",
+        "operationId": "RecetasController_listar",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Lista de recetas"
+          },
+          "401": {
+            "description": "sesión requerida"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Recetas de decodificación (TT-12)",
+        "tags": [
+          "recetas-decodificacion"
+        ]
+      },
+      "post": {
+        "description": "La receta y sus campos, juntos y una sola vez (fn_crear_receta). Escritura única: no se edita ni se borra; para corregirla, crear otra y usar «reemplazar». Deja un evento `catalogo_cambio`. 409 si el código ya existe.",
+        "operationId": "RecetasController_crear",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "codigo",
+                  "nombre",
+                  "largo_bytes",
+                  "campos"
+                ],
+                "properties": {
+                  "codigo": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9][a-z0-9-]{2,62}$"
+                  },
+                  "nombre": {
+                    "type": "string",
+                    "maxLength": 120
+                  },
+                  "largo_bytes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 255
+                  },
+                  "campos": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 32,
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "magnitud",
+                        "desplazamiento",
+                        "tipo"
+                      ],
+                      "properties": {
+                        "magnitud": {
+                          "type": "string"
+                        },
+                        "desplazamiento": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "tipo": {
+                          "type": "string",
+                          "enum": [
+                            "u8",
+                            "i8",
+                            "u16be",
+                            "u16le",
+                            "i16be",
+                            "i16le",
+                            "u32be",
+                            "u32le",
+                            "i32be",
+                            "i32le"
+                          ]
+                        },
+                        "sumar_antes": {
+                          "type": "integer",
+                          "minimum": -1000000,
+                          "maximum": 1000000,
+                          "default": 0
+                        },
+                        "multiplicar_por": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 1000000,
+                          "default": 1
+                        },
+                        "dividir_por": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 1000000,
+                          "default": 1
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "La receta creada"
+          },
+          "400": {
+            "description": "Validación: lista `{campo, motivo}`"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "403": {
+            "description": "No eres administrador del sistema"
+          },
+          "409": {
+            "description": "El código ya existe"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Crear una receta (TT-12; administrador del sistema)",
+        "tags": [
+          "recetas-decodificacion"
+        ]
+      }
+    },
+    "/recetas-decodificacion/probar": {
+      "post": {
+        "description": "Decodifica unos bytes (hexadecimal, con espacios entre bytes, o base64; `codificacion` lo dice) con una receta escrita y no guardada, validada como al crearla. No escribe nada. `{ok: true, lecturas}` o `{ok: false, motivo}` si la trama no se entiende con esa receta.",
+        "operationId": "RecetasController_probar",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "receta",
+                  "bytes",
+                  "codificacion"
+                ],
+                "properties": {
+                  "receta": {
+                    "type": "object",
+                    "required": [
+                      "codigo",
+                      "largo_bytes",
+                      "campos"
+                    ],
+                    "properties": {
+                      "codigo": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9][a-z0-9-]{2,62}$"
+                      },
+                      "nombre": {
+                        "type": "string",
+                        "maxLength": 120
+                      },
+                      "largo_bytes": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 255
+                      },
+                      "campos": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 32,
+                        "items": {
+                          "type": "object",
+                          "required": [
+                            "magnitud",
+                            "desplazamiento",
+                            "tipo"
+                          ],
+                          "properties": {
+                            "magnitud": {
+                              "type": "string"
+                            },
+                            "desplazamiento": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "tipo": {
+                              "type": "string",
+                              "enum": [
+                                "u8",
+                                "i8",
+                                "u16be",
+                                "u16le",
+                                "i16be",
+                                "i16le",
+                                "u32be",
+                                "u32le",
+                                "i32be",
+                                "i32le"
+                              ]
+                            },
+                            "sumar_antes": {
+                              "type": "integer",
+                              "minimum": -1000000,
+                              "maximum": 1000000,
+                              "default": 0
+                            },
+                            "multiplicar_por": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 1000000,
+                              "default": 1
+                            },
+                            "dividir_por": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 1000000,
+                              "default": 1
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "bytes": {
+                    "type": "string",
+                    "maxLength": 1024
+                  },
+                  "codificacion": {
+                    "type": "string",
+                    "enum": [
+                      "hex",
+                      "base64"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Las lecturas o el motivo"
+          },
+          "400": {
+            "description": "Receta o bytes no válidos"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "403": {
+            "description": "No eres administrador del sistema"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Probar una receta sin guardarla (TT-12; administrador del sistema)",
+        "tags": [
+          "recetas-decodificacion"
+        ]
+      }
+    },
+    "/recetas-decodificacion/{codigo}/reemplazar": {
+      "post": {
+        "description": "Todos los equipos de la receta `codigo` pasan a la receta `por`, en una transacción, con un evento por equipo y uno del catálogo. Las tramas ya guardadas no cambian.",
+        "operationId": "RecetasController_reemplazar",
+        "parameters": [
+          {
+            "name": "codigo",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "por"
+                ],
+                "properties": {
+                  "por": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "`{codigo, por, dispositivos, avisos}`: los dados de baja no se mueven; `avisos`, si la receta nueva tiene otro largo o lee magnitudes que la anterior no leía"
+          },
+          "400": {
+            "description": "`por` no es otra receta del catálogo"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "403": {
+            "description": "No eres administrador del sistema"
+          },
+          "404": {
+            "description": "No existe esa receta"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "«Reemplazar por» (TT-12; administrador del sistema)",
+        "tags": [
+          "recetas-decodificacion"
         ]
       }
     },

@@ -6,7 +6,6 @@
 import { createHash } from 'node:crypto';
 import { BadRequestException, HttpException, HttpStatus, PayloadTooLargeException } from '@nestjs/common';
 import { AltaValidada, Formato, MAX_CANALES, validarAlta } from './alta.dto.js';
-import { PERFILES } from '../recepcion/adaptadores/perfiles.js';
 import { SIMBOLOS_UNIDAD, comoSeLee, unidadEscrita } from './unidades.js';
 
 // Una sola constante para el tope de filas (la usan la validación, la plantilla y la documentación del contrato).
@@ -67,7 +66,7 @@ const AYUDAS: Readonly<Record<ColumnaLote, [obligatoria: boolean, ayuda: string,
   intervalo_esperado_s: [true, 'Segundos esperados entre tramas: un entero de 5 a 86400.', '300'],
   canales: [true, `De 1 a ${MAX_CANALES} canales «magnitud:unidad» separados por «|» (también se admite «;»); la unidad es opcional y, si va, la del catálogo (GET /magnitudes) o una forma común de escribirla: «°C» o «C» por Cel, «%» por %RH o %EL.`, 'temperatura:Cel | humedad:%RH'],
   pasarela: [false, 'Solo vía lorawan, y ahí obligatoria: id_fisico o UUID de una pasarela activa del mismo sitio.', ''],
-  decodificador: [false, `Solo vía lorawan, opcional: perfil con que la plataforma decodifica la carga (${PERFILES.join(', ')}).`, ''],
+  decodificador: [false, 'Solo vía lorawan, opcional: la receta de decodificación con que la plataforma decodifica la carga (las del catálogo; GET /recetas-decodificacion).', ''],
 };
 // ── Las palabras de la persona (bloque S, punto 4) ───────────────────────────────────────────────────────────────────────────────
 // El `campo` de cada motivo y aviso queda para las máquinas; el texto los nombra así. Lo publica la plantilla (`rotulo`) para que el panel
@@ -94,10 +93,13 @@ export const TEXTOS_CELDA = {
 // Los símbolos que una columna de códigos admite además del ASCII imprimible: los de las escrituras de unidad (unidades.ts), solo en `canales`.
 export const SIMBOLOS_COLUMNA: Readonly<Partial<Record<ColumnaLote, string>>> = { canales: SIMBOLOS_UNIDAD };
 
-export function plantillaLote(): PlantillaLote {
+// `recetas`: las de la base al pedir la plantilla (TT-12): la ayuda del decodificador las nombra, sin una lista fija en el código.
+export function plantillaLote(recetas: readonly string[] = []): PlantillaLote {
+  const ayuda = (nombre: ColumnaLote): string => nombre === 'decodificador' && recetas.length > 0
+    ? `Solo vía lorawan, opcional: la receta de decodificación con que la plataforma decodifica la carga (${recetas.slice(0, 10).join(', ')}${recetas.length > 10 ? `, y ${recetas.length - 10} más: GET /recetas-decodificacion` : ''}).` : AYUDAS[nombre][1];
   return {
     columnas: COLUMNAS_LOTE.map((nombre) => ({
-      nombre, obligatoria: AYUDAS[nombre][0], tope: TOPES_COLUMNA[nombre], texto_libre: COLUMNAS_TEXTO_LIBRE.includes(nombre), ayuda: AYUDAS[nombre][1], ejemplo: AYUDAS[nombre][2],
+      nombre, obligatoria: AYUDAS[nombre][0], tope: TOPES_COLUMNA[nombre], texto_libre: COLUMNAS_TEXTO_LIBRE.includes(nombre), ayuda: ayuda(nombre), ejemplo: AYUDAS[nombre][2],
       rotulo: ROTULOS[nombre], simbolos: SIMBOLOS_COLUMNA[nombre] ?? '',
     })),
     max_filas: MAX_FILAS_LOTE, max_bytes: MAX_BYTES_LOTE, separadores: SEPARADORES_LOTE,
@@ -158,6 +160,7 @@ export interface Catalogos {
   // «ese identificador ya está en uso en la plataforma: elige otro».
   // Sigue sin poder usarse (id_fisico es único en toda la plataforma): la fila se rechaza con un motivo que no dice más.
   ajenos: ReadonlySet<string>;
+  recetas: readonly string[]; // los códigos de las recetas de decodificación de la base (TT-12)
 }
 export interface AltaDeLote { n: number; alta: AltaValidada; formato: Formato; sitio_codigo: string; sitio_id: string }
 export type FilaEntrada = Record<string, unknown> & { n: number };
@@ -490,7 +493,7 @@ export function validarLote(filas: readonly FilaEntrada[], cat: Catalogos, reser
     // con sus motivos dichos en las palabras de la persona.
     let alta: AltaValidada | undefined;
     try {
-      alta = validarAlta(cuerpo, reservados);
+      alta = validarAlta(cuerpo, reservados, cat.recetas);
     } catch (e) {
       const r = e instanceof BadRequestException ? (e.getResponse() as { message?: unknown }).message : undefined;
       const lista: string[] = Array.isArray(r) ? r.map((x) => (typeof x === 'string' ? x : JSON.stringify(x))) : [typeof r === 'string' ? r : (e as Error).message];

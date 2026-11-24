@@ -24,7 +24,7 @@ const catalogos = (x: Partial<Catalogos> = {}): Catalogos => ({
   zonas: [{ id: Z1, nombre: 'Laboratorio', sitio_id: S1, sitio_codigo: 'uct' }],
   magnitudes: new Map([['temperatura', { nombre: 'Temperatura', unidad: 'Cel' }], ['humedad', { nombre: 'Humedad relativa', unidad: '%RH' }]]),
   pasarelas: [{ id: P1, id_fisico: 'ug65-campus', sitio_id: S1, activo: true, formato: 'milesight' }],
-  existentes: new Map(), idsDePasarela: new Set(['ug65-campus']), ajenos: new Set(), ...x,
+  existentes: new Map(), idsDePasarela: new Set(['ug65-campus']), ajenos: new Set(), recetas: ['campus-heltec-v3-v1'], ...x,
 });
 const filas = [
   { n: 2, id_fisico: 'nodo-01', nombre: 'Uno', zona: 'Laboratorio', via: 'http', intervalo_esperado_s: '60', canales: 'temperatura:Cel' },
@@ -41,6 +41,7 @@ function conServicioFalso(cat: () => Catalogos) {
   const creadas: AltaDeLote[][] = [];
   const servicio = {
     catalogosLote: vi.fn(() => Promise.resolve(cat())),
+    recetas: vi.fn(() => Promise.resolve(['campus-heltec-v3-v1'])),
     crearLote: vi.fn(async (altas: readonly AltaDeLote[]) => {
       await Promise.resolve();
       creadas.push([...altas]);
@@ -198,11 +199,13 @@ describe('POST /dispositivos/lote?modo=crear: todo o nada', () => {
 });
 
 describe('plantilla y magnitudes por perfil (docs/20 §6)', () => {
-  it('la plantilla: operador técnico, administrador de sitio y del sistema sí; consulta e investigador, 403', () => {
+  it('la plantilla: operador técnico, administrador de sitio y del sistema sí; consulta e investigador, 403; la ayuda del decodificador nombra las recetas de la base', async () => {
     const { ctrl } = conServicioFalso(() => catalogos());
-    for (const rol of ['operador', 'administrador'] as const) expect(ctrl.plantilla(persona(rol))).toEqual(plantillaLote());
-    expect(ctrl.plantilla(usuarioSistema())).toEqual(plantillaLote());
-    for (const rol of ['consulta', 'investigador'] as const) expect(() => ctrl.plantilla(persona(rol))).toThrow(ForbiddenException);
+    const esperada = plantillaLote(['campus-heltec-v3-v1']);
+    for (const rol of ['operador', 'administrador'] as const) expect(await ctrl.plantilla(persona(rol))).toEqual(esperada);
+    expect(await ctrl.plantilla(usuarioSistema())).toEqual(esperada);
+    expect(esperada.columnas.find((c) => c.nombre === 'decodificador')?.ayuda).toContain('campus-heltec-v3-v1');
+    for (const rol of ['consulta', 'investigador'] as const) await expect(ctrl.plantilla(persona(rol))).rejects.toBeInstanceOf(ForbiddenException);
   });
   it('el lote: consulta e investigador, 403 antes de leer el cuerpo', async () => {
     const { ctrl, servicio } = conServicioFalso(() => catalogos());
@@ -276,11 +279,11 @@ describe('con el servicio real', () => {
     expect(hecho.filas.map((f) => [f.n, f.resultado])).toEqual([[2, 'creada'], [4, 'creada'], [7, 'creada'], [9, 'creada']]);
     expect(hecho.filas[2]?.topico).toBe(anunciadas[2]?.topico);
   });
-  it(`la vista previa de ${MAX_FILAS_LOTE} filas hace 5 consultas (los catálogos, una vez cada uno), ninguna por fila`, async () => {
+  it(`la vista previa de ${MAX_FILAS_LOTE} filas hace 6 consultas (los catálogos, una vez cada uno: zonas, magnitudes, pasarelas, existentes, pasarelas por id y recetas), ninguna por fila`, async () => {
     const { ctrl, consultasPool } = conBaseFalsa();
     const muchas = Array.from({ length: MAX_FILAS_LOTE }, (_, i) => ({ n: i + 2, id_fisico: `nodo-${i}`, nombre: `N ${i}`, zona: 'Laboratorio', via: 'http', intervalo_esperado_s: '60', canales: 'temperatura' }));
     const r = await ctrl.lote(usuarioSistema(), 'validar', { filas: muchas }, undefined, res());
     expect(r.validas).toBe(MAX_FILAS_LOTE);
-    expect(consultasPool).toHaveLength(5);
+    expect(consultasPool).toHaveLength(6);
   });
 });
