@@ -700,7 +700,7 @@ ejecuta contra la holgura verificada al cierre de cada etapa.
 | Nivel | Capacidad | Ítems | Estado al 21/09 |
 |---|---|---|---|
 | **1. Núcleo mínimo** | Recepción por MQTT autenticada | HU-03, TT-11, TT-20, TT-01, TT-02 | ✅ |
-| **1. Núcleo mínimo** | Normalización al modelo interno | TT-16, TT-17, TT-18, TT-19, TT-12 | ✅ (TT-12 parcial: sensores reales) |
+| **1. Núcleo mínimo** | Normalización al modelo interno | TT-16, TT-17, TT-18, TT-19, TT-12 | ✅ (TT-12 cerrado el 23/11/2026 con el catálogo editable, `docs/16 §95` a §100) |
 | **1. Núcleo mínimo** | Supervisión de caída | HU-14, HU-05 | ✅ |
 | **1. Núcleo mínimo** | Consulta básica por API | HU-07, TT-13 | ✅ |
 | **1. Núcleo mínimo** | Sensor real de extremo a extremo | HU-02 (ruta B: pasarela con servidor de red embebido; ChirpStack solo en la ruta A) o HU-03 con el nodo del compañero | ⬜ octubre |
