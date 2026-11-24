@@ -1658,7 +1658,7 @@ su cuarta columna: `topico` pasa a `destino`, a dónde envía cada equipo según
 pasarela>», con la credencial vacía. Lo calcula el servidor (`destinoDe`, de lo interpretado) y cada fila creada lo trae en `destino`,
 aditivo; `topico` no cambia. Hasta este bloque, la columna `topico` quedaba vacía en un equipo HTTP o LoRaWAN.
 
-**T. P16 Catálogo: magnitudes y recetas de decodificación (TT-12, RF-11, RF-14; diseñado el 20/11/2026, antes del código; solo el
+**T. P16 Catálogo: magnitudes y recetas de decodificación (TT-12, RF-11, RF-14; diseñado el 20/11/2026, antes del código, y construido el 23/11/2026, `docs/16 §100`; solo el
 administrador del sistema).** Hasta este bloque el catálogo de magnitudes solo se leía (el selector del alta, la ayuda del lote) y se
 cambiaba por migración; los alias de claves y la decodificación de los nodos LoRaWAN vivían en el código. Las reglas y su porqué están en
 `docs/10 §8.4` punto 69 y el esquema en `docs/08 §8`; aquí, solo lo que ve y hace la persona. «Receta de decodificación» es lo que antes

@@ -65,6 +65,8 @@
   // P15 «Ajustes del sitio» (docs/19 §4, Q): quien tiene la acción `ajustes` o `enlaces` en algún sitio (hoy, los mismos perfiles).
   const ajustaSitio = $derived(sesion !== null && (puedeEnAlguno(sesion, 'ajustes') || puedeEnAlguno(sesion, 'enlaces') || (!sesion.sistema && sesion.administrador_sistema === true)));
   // P8 «Exportar datos» (docs/19 §4, R, punto 6): quien tiene la acción `exportar` en algún sitio (administrador de sitio y del sistema, investigador).
+  // P16 «Catálogo» (docs/19 §4, T, punto 1): solo la acción `sistema`: el administrador del sistema o el usuario del sistema (la clave).
+  const administraCatalogo = $derived(sesion !== null && (sesion.sistema || sesion.administrador_sistema === true));
   const exportaDatos = $derived(sesion !== null && (puedeEnAlguno(sesion, 'exportar') || (!sesion.sistema && sesion.administrador_sistema === true)));
   // La última vista de datos abierta (tablero, inventario o ficha): P13 la ofrece para guardarla con un nombre.
   let ultimaVista = $state<string | null>(null);
@@ -200,6 +202,7 @@
     if (daDeAlta) lista.push({ ruta: '#/alta', texto: 'Dar de alta', icono: 'alta', activo: vista.pantalla === 'alta', dato: 'alta-menu' });
     if (publicaVistas) lista.push({ ruta: '#/publicar', texto: 'Vista pública', icono: 'publico', activo: vista.pantalla === 'publicar', dato: 'publicar' });
     if (ajustaSitio) lista.push({ ruta: '#/sitio/ajustes', texto: 'Ajustes del sitio', icono: 'ajustes', activo: vista.pantalla === 'ajustes', dato: 'ajustes-sitio' });
+    if (administraCatalogo) lista.push({ ruta: '#/catalogo', texto: 'Catálogo', icono: 'catalogo', activo: vista.pantalla === 'catalogo', dato: 'catalogo' });
     return lista;
   });
 
@@ -521,6 +524,12 @@
           {#await import('./Exportar.svelte') then { default: Exportar }}<Exportar sitio={vista.sitio} {sesion} {sitios} {alCambiarVista} />{:catch}{@render sinPantalla()}{/await}
         {:else}
           <p class="vacio" data-sin-exportar>{textoSinExportar(sesion.permisos)} <a href="#/">Volver al tablero</a></p>
+        {/if}
+      {:else if vista.pantalla === 'catalogo'}
+        {#if administraCatalogo}
+          {#await import('./Catalogo.svelte') then { default: Catalogo }}<Catalogo seccion={vista.seccion} {alCambiarVista} />{:catch}{@render sinPantalla()}{/await}
+        {:else}
+          <p class="vacio" data-sin-catalogo>El catálogo lo administra quien administra el sistema. Las magnitudes que existen se eligen al dar de alta un equipo. <a href="#/">Volver al tablero</a></p>
         {/if}
       {:else if vista.pantalla === 'publico'}
         <p class="vacio">Abriendo la vista pública…</p>

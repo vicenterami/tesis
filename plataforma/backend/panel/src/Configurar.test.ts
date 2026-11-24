@@ -44,6 +44,27 @@ const campoRegla = (k: string): HTMLInputElement => document.querySelector(`[dat
 const botonReglas = (): HTMLButtonElement => document.querySelector(`[data-config-canal="${TEMP}"] [data-guardar-reglas]`) as HTMLButtonElement;
 
 describe('P6 Configurar', () => {
+  it('«Usar el sugerido» (docs/19 §4, T, punto 8): llena una regla nueva con el sugerido del catálogo sin guardar; con 4 reglas se desactiva con su motivo; sin sugerido no aparece', async () => {
+    const catalogo = [{ codigo: 'temperatura', nombre: 'Temperatura', unidad: 'Cel', rango_min: -40, rango_max: 85, umbral_alto_sugerido: 30, umbral_bajo_sugerido: null, histeresis_sugerida: 0.5, alias: [], actualizado_en: MARCA_C }];
+    responder = (metodo, ruta) => (metodo === 'GET' && ruta === `/dispositivos/${ID}` ? json(ficha()) : ruta === '/magnitudes' ? json(catalogo) : json({ message: 'no' }, 404));
+    render(Configurar, { id: ID, sesion: sesion('administrador'), sitios: SITIOS });
+    const boton = async () => { await waitFor(() => expect(document.querySelector(`[data-usar-sugerido="${TEMP}"]`)).not.toBeNull()); return document.querySelector(`[data-usar-sugerido="${TEMP}"]`) as HTMLButtonElement; };
+    expect((await boton()).textContent).toContain('Usar el sugerido (alto 30 °C · histéresis 0,5)');
+    await fireEvent.click(await boton());
+    const nueva = (k: string) => (document.querySelector(`[data-config-canal="${TEMP}"] [data-regla="1"] [data-campo="${k}"]`) as HTMLInputElement).value;
+    expect([nueva('umbral_alto'), nueva('umbral_bajo'), nueva('histeresis')]).toEqual(['30', '', '0.5']);
+    expect(pedidos.some((p) => p.metodo !== 'GET')).toBe(false); // no guarda nada
+    await fireEvent.click(await boton());
+    await fireEvent.click(await boton());
+    expect((await boton()).getAttribute('aria-disabled') === 'true' || (await boton()).disabled).toBe(true);
+    expect(document.body.textContent).toContain('el canal ya tiene 4 reglas');
+    cleanup();
+    responder = (metodo, ruta) => (metodo === 'GET' && ruta === `/dispositivos/${ID}` ? json(ficha()) : ruta === '/magnitudes' ? json([{ ...catalogo[0], umbral_alto_sugerido: null, histeresis_sugerida: 0 }]) : json({ message: 'no' }, 404));
+    render(Configurar, { id: ID, sesion: sesion('administrador'), sitios: SITIOS });
+    await waitFor(() => expect(document.querySelector(`[data-config-canal="${TEMP}"] [data-guardar-reglas]`)).not.toBeNull());
+    await new Promise((r) => setTimeout(r, 20));
+    expect(document.querySelector(`[data-usar-sugerido="${TEMP}"]`)).toBeNull();
+  });
   it('validación en vivo con el error junto al campo: bajo ≥ alto frena «Guardar las reglas» con el motivo; corregido, el PUT lleva el id de la regla y el actualizado_en leído, y lo guardado llega del servidor', async () => {
     render(Configurar, { id: ID, sesion: sesion('administrador'), sitios: SITIOS });
     await waitFor(() => expect(campoRegla('umbral_bajo')).toBeTruthy());

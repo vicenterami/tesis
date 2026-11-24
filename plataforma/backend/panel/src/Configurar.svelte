@@ -13,13 +13,14 @@
   import { ErrorApi, esCancelacion, obtener, pedir, ultimaGana } from './lib/api';
   import { avisoDeError, type DatosAviso } from './lib/avisos';
   import {
-    ESTADOS_CONFIGURABLES, MAX_REGLAS, REGLA_NUEVA, cuerpoDispositivo, cuerpoReglas, erroresDeDispositivo, erroresPorCampo, formularioDe,
+    ESTADOS_CONFIGURABLES, MAX_REGLAS, REGLA_NUEVA, reglaSugerida, cuerpoDispositivo, cuerpoReglas, erroresDeDispositivo, erroresPorCampo, formularioDe,
     horaDelConflicto, motivoDe, reglasDe, validarReglas, type ErrorCampo, type FormularioDispositivo, type ReglaFormulario,
   } from './lib/configurar';
   import type { CanalFicha, DispositivoFicha, ReglaUmbral, Sitio } from './lib/modelo';
   import { puedeEn, type Sesion } from './lib/sesion';
   import { simbolo } from './lib/unidades';
   import { fragmentoFicha } from './lib/vista';
+  import { textoSugerido, type Magnitud } from './lib/catalogo';
 
   let { id, sesion = null, sitios = null }: { id: string; sesion?: Sesion | null; sitios?: Sitio[] | null } = $props();
   const uid = $props.id();
@@ -33,6 +34,13 @@
   // Por canal: la etiqueta y las reglas que se editan, los errores del servidor y el aviso propio.
   let canales = $state<Record<string, { etiqueta: string; reglas: ReglaFormulario[]; servidor: ErrorCampo[]; guardando: boolean; aviso: DatosAviso | null }>>({});
   const carga = ultimaGana();
+  // El catálogo de magnitudes, solo para «Usar el sugerido» (docs/19 §4, T, punto 8): cualquier sesión puede leerlo; si falla, el botón no aparece.
+  let catalogo = $state<Magnitud[]>([]);
+  const cargaCatalogo = ultimaGana();
+  const sugeridaDe = (magnitud: string): Magnitud | null => {
+    const m = catalogo.find((x) => x.codigo === magnitud);
+    return m !== undefined && reglaSugerida(m) !== null ? m : null;
+  };
 
   async function cargar(): Promise<void> {
     try {
@@ -49,7 +57,8 @@
   }
   onMount(() => {
     void cargar();
-    return () => carga.cancelar();
+    obtener<Magnitud[]>('/magnitudes', cargaCatalogo.senal()).then((m) => (catalogo = m), () => undefined);
+    return () => { carga.cancelar(); cargaCatalogo.cancelar(); };
   });
 
   const zonas = $derived(sitios?.find((s) => s.codigo === d?.sitio_codigo)?.zonas ?? (d === null ? [] : [{ id: d.zona_id, nombre: d.zona }]));
@@ -117,6 +126,10 @@
   };
   const agregarRegla = (cid: string): void => {
     canales[cid]!.reglas = [...canales[cid]!.reglas, { ...REGLA_NUEVA }];
+  };
+  const usarSugerido = (cid: string, m: Magnitud): void => {
+    const r = reglaSugerida(m);
+    if (r !== null) canales[cid]!.reglas = [...canales[cid]!.reglas, r];
   };
   const recargar = (): void => {
     aviso = null;
@@ -210,6 +223,11 @@
             {/each}
             <span class="acciones">
               <Boton etiqueta="Agregar una regla" motivoDesactivado={k.reglas.length >= MAX_REGLAS ? `como mucho ${MAX_REGLAS} reglas por canal` : null} onclick={() => agregarRegla(c.id)} />
+              {#if sugeridaDe(c.magnitud) !== null}
+                {@const ms = sugeridaDe(c.magnitud)!}
+                <Boton etiqueta={`Usar el sugerido (${textoSugerido(ms)})`} motivoDesactivado={k.reglas.length >= MAX_REGLAS ? `el canal ya tiene ${MAX_REGLAS} reglas` : null}
+                  ayuda="Llena una regla nueva con el umbral sugerido del catálogo; revísala y guarda" onclick={() => usarSugerido(c.id, ms)} data-usar-sugerido={c.id} />
+              {/if}
               <Boton tipo="submit" variante="principal" etiqueta="Guardar las reglas" etiquetaCargando="Guardando…" cargando={k.guardando}
                 motivoDesactivado={k.guardando ? null : motivoPermiso ?? (c.actualizado_en === undefined ? 'el servidor no entregó la marca de este canal: recarga' : v.errores[0] ? `${v.errores[0].campo}: ${v.errores[0].motivo}` : null)}
                 ayuda="Reemplaza las reglas de este canal; las que quitaste dejan de regir" data-guardar-reglas />

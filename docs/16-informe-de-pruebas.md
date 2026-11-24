@@ -4,7 +4,7 @@ Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emu
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
 cubría al escribirse se agregó después: TT-32 (sensor físico) en §43, §44 y §53, y TT-30 (recuperación ante reinicio) en §11. El
-contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 960 pruebas unitarias del backend y 599 del panel.
+contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 960 pruebas unitarias del backend y 614 del panel.
 Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -5463,3 +5463,37 @@ devuelve el texto de la base (va al registro). El nombre de una receta rechaza c
 nombra hasta 10 recetas. C-88 y C-89 citaban `perfiles.ts`, que ya no existe. Pruebas nuevas: el evento del catálogo de «reemplazar por» y sus
 404 y 400, el `PATCH` con `null` (y la ficha que lo muestra), y el **alta de a uno de un nodo con la receta v2 recién creada por la API** (la
 razón del bloque) y con una inexistente (400, nada creado). Integración **54 de 54**; `pnpm verificar` en verde (1 054 y 663).
+
+## 100. Catálogo editable, bloque 6: la pantalla «Catálogo» y «Usar el sugerido» (TT-12; 23/11/2026)
+
+**Qué entra** (`docs/19 §4`, T, puntos 1 a 9). La ruta `#/catalogo?seccion=magnitudes|recetas` y la entrada «Catálogo» del menú, solo con la
+acción `sistema` (el administrador del sistema o el usuario del sistema); quien no la tiene lee «El catálogo lo administra quien administra el
+sistema…». **Magnitudes:** la lista (unidad como se lee, rango, sugerido, alias, en cuántos canales; tarjetas bajo 700 px), crear y editar con
+validación en vivo de las mismas reglas del servidor; achicar el rango consulta el impacto antes y guarda exactamente el rango consultado (con
+0 mediciones afectadas, sin preguntar; si la consulta falla, se dice y no se guarda); el 409 con la lista nombra la regla o la calibración
+que queda fuera; el 409 de relectura relee y conserva **solo lo que la persona cambió** respecto de lo que leyó al abrir (lo demás muestra
+lo nuevo). **Recetas:** la lista con los campos en palabras, crear y «Crear a partir de esta» (`-v2`), la fórmula al día, probar sin guardar
+en hexadecimal o base64 (valida antes, en palabras; el resultado se tacha si la receta o los bytes cambian) y «Reemplazar por» con su
+confirmación. **P6:** «Usar el sugerido (alto 30 °C · histéresis 0,5)» llena una regla nueva sin guardar y se desactiva con 4 reglas; sin
+sugerido no aparece.
+
+**Pruebas por el DOM** (`Catalogo.test.ts`, 13; más 1 en `Configurar.test.ts` y 1 en `Sesion.test.ts`): las listas con datos y vacías; la
+confirmación con N > 0, con 0 y con la consulta que falla; el 409 con la lista y el de relectura (con un máximo que otra persona cambió:
+se muestra el nuevo y el siguiente `PATCH` lleva solo el nombre que se tocó); el alias reservado; probar con la captura real en hexadecimal y
+base64 y el resultado tachado; probar sin magnitud elegida no envía nada; «Reemplazar por»; el menú del usuario del sistema y el texto para
+quien no administra el sistema. **Plantado:** sin la consulta del impacto fallan 2; con la relectura que restaura todo lo escrito, falla la
+suya. Panel: **614 pruebas escritas** (599 antes), que `vitest` ejecuta como **678 de 678 en 46 archivos**; `svelte-check` sin errores ni avisos.
+
+**Navegadores reales** (`plataforma/pruebas/panel-catalogo-e2e.sh` y `backend/panel/e2e/catalogo.mjs`, nuevos; Chromium y Firefox, 390 y
+1 280 px; un administrador del sistema de descarte): crear una magnitud (alias en minúsculas), achicar su rango sin mediciones (guarda sin
+preguntar), crear y probar una receta (03 E8, u16be ÷ 10 → 100; al cambiarla, «vuelve a probar»), y «Usar el sugerido» en P6; sin
+desplazamiento horizontal ni errores de JavaScript. Todo lo creado se borra al salir, como dueño de la base (la aplicación no puede borrar
+magnitudes ni recetas). **68 de 68.** Las primeras corridas encontraron: la sesión no se leía sin recargar la página tras entrar por la API
+(la prueba ahora recarga, como las demás e2e), y el formulario de receta se salía 11 a 42 px a 390 px (los selectores tomaban el ancho de su
+opción más larga: ahora ocupan la línea).
+
+**Corregido tras la revisión del bloque** (12 hallazgos, todos ciertos): la relectura tras un 409 pisaba el cambio ajeno (arriba); clave
+repetida en el resumen de errores; una histéresis vacía viajaba como `null`; probar sin validar mostraba nombres de campo del servidor; el
+foco no iba al formulario ni al resumen de errores; «reemplazar» no decía que los dados de baja no se mueven; «sin probar» solo era un
+tooltip; un sumando negativo se escribía «+ -200». Quedan anotados como pendientes: los enlaces a la ficha en el 409 con la lista, los
+`aria-describedby` de cada error y las etiquetas de los botones repetidos, y no perder un formulario abierto al cambiar de pestaña.

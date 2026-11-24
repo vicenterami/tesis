@@ -2,10 +2,12 @@
   // Iconos propios (docs/19 §4, bloque L, punto 1f): trazos SVG dibujados para este proyecto, en una cuadrícula de 24 px, sin biblioteca
   // de terceros ni fuente de iconos (la CSP no admite recursos externos y no se suma una licencia). Solo líneas rectas, arcos y círculos;
   // el color es el del texto (`currentColor`) y el icono queda oculto al lector de pantalla: el nombre es el del control que lo lleva.
-  export type NombreIcono = 'tablero' | 'inventario' | 'actividad' | 'usuarios' | 'alta' | 'legal' | 'menu' | 'luna' | 'sol' | 'cuenta' | 'pausa' | 'reanudar' | 'cerrar' | 'existe' | 'aviso' | 'publico' | 'ajustes' | 'exportar';
+  export type NombreIcono = 'tablero' | 'inventario' | 'actividad' | 'usuarios' | 'alta' | 'legal' | 'menu' | 'luna' | 'sol' | 'cuenta' | 'pausa' | 'reanudar' | 'cerrar' | 'existe' | 'aviso' | 'publico' | 'ajustes' | 'exportar' | 'catalogo';
   const TRAZOS: Readonly<Record<NombreIcono, string>> = {
     // cuatro paneles de distinto alto, como un tablero
     tablero: 'M4 4h7v8H4z M13 4h7v5h-7z M13 11h7v9h-7z M4 14h7v6H4z',
+    // un fichero con sus pestañas: el catálogo de lo que se mide y de cómo se lee
+    catalogo: 'M4 7h16v13H4z M4 7l2-3h5l2 3 M8 12h8 M8 16h5',
     // tres renglones con su viñeta
     inventario: 'M9 6h11 M9 12h11 M9 18h11 M4.5 6h1 M4.5 12h1 M4.5 18h1',
     // un pulso

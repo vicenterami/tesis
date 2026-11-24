@@ -89,6 +89,12 @@ export function reglasDe(c: CanalFicha): ReglaFormulario[] {
   return (c.reglas ?? []).map((r) => ({ id: r.id, umbral_alto: texto(r.umbral_alto), umbral_bajo: texto(r.umbral_bajo), histeresis: texto(r.histeresis ?? 0), retardo_s: texto((r as { retardo_s?: number }).retardo_s ?? 0) }));
 }
 export const REGLA_NUEVA: ReglaFormulario = { umbral_alto: '', umbral_bajo: '', histeresis: '0', retardo_s: '0' };
+// «Usar el sugerido» (docs/19 §4, T, punto 8): una regla nueva con los umbrales y la histéresis sugeridos de la magnitud, SIN guardar: la persona
+// la revisa y guarda como siempre. Sin ningún umbral sugerido no hay regla que proponer (null).
+export function reglaSugerida(m: { umbral_alto_sugerido: number | null; umbral_bajo_sugerido: number | null; histeresis_sugerida: number }): ReglaFormulario | null {
+  if (m.umbral_alto_sugerido === null && m.umbral_bajo_sugerido === null) return null;
+  return { umbral_alto: texto(m.umbral_alto_sugerido), umbral_bajo: texto(m.umbral_bajo_sugerido), histeresis: texto(m.histeresis_sugerida), retardo_s: '0' };
+}
 
 // La regla del formulario, en números, con los errores de forma (lo que el servidor diría «número finito o null»).
 function leerRegla(r: ReglaFormulario, i: number, e: ErrorCampo[]): ReglaNumerica {

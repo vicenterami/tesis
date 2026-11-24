@@ -3,6 +3,7 @@ import { RANGOS, RESOLUCIONES, type ClaveRango, type ClaveResolucion } from './g
 import { VIAS } from './inventario';
 import { esRutaPublica } from './publico';
 import { instanteDesdeLocal } from './tiempo';
+import type { SeccionCatalogo } from './catalogo';
 
 // La vista vive en la URL (docs/19 §4, incremento 1, punto 1): `#/dispositivos/<id>?canal=<uuid>&rango=24h&res=5m[&desde=&hasta=]`,
 // `#/inventario?estado=alerta&sitio=&zona=&via=&q=&pagina=2&orden=entrega` y `#/?sitio=&ver=tendencias&rango=7d` (el tablero, P1, con su
@@ -65,6 +66,7 @@ export type Vista =
   | { pantalla: 'publicar'; sitio: string } // P9, quien publica: `#/publicar?sitio=<código>` (docs/19 §4, O, puntos 3 y 10)
   | { pantalla: 'ajustes'; sitio: string } // P15, ajustes del sitio: `#/sitio/ajustes?sitio=<código>` (docs/19 §4, Q)
   | { pantalla: 'exportar'; sitio: string } // P8, exportar un sitio: `#/exportar?sitio=<código>` (docs/19 §4, R, punto 6)
+  | { pantalla: 'catalogo'; seccion: SeccionCatalogo } // P16, catálogo: `#/catalogo?seccion=magnitudes|recetas` (docs/19 §4, T, punto 1)
   // P9, quien visita: `#/v/<token>`. La resuelve main.ts antes de montar la aplicación; si App la ve (un cambio de fragmento antes de la
   // recarga), no la trata como ninguna otra pantalla: nunca es «última vista» ni se guarda como vista (punto 5).
   | { pantalla: 'publico' }
@@ -152,6 +154,8 @@ export function leerVista(fragmento: string): Vista {
   if (ruta === '/publicar') return { pantalla: 'publicar', sitio: leerSitio(q.get('sitio')) };
   if (ruta === '/sitio/ajustes') return { pantalla: 'ajustes', sitio: leerSitio(q.get('sitio')) };
   if (ruta === '/exportar') return { pantalla: 'exportar', sitio: leerSitio(q.get('sitio')) };
+  // Sin `seccion`, magnitudes; un valor desconocido se ignora (docs/19 §4, T, punto 1).
+  if (ruta === '/catalogo') return { pantalla: 'catalogo', seccion: q.get('seccion') === 'recetas' ? 'recetas' : 'magnitudes' };
   if (ruta === '/alta') {
     const m = q.get('modo');
     const idf = (q.get('id_fisico') ?? '').trim().toLowerCase();

@@ -273,5 +273,22 @@ describe('P10: vencer, renovar y salir', () => {
     await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(3));
     expect(document.querySelector('[data-ir-usuarios]')).toBeNull();
   });
+  it('«Catálogo» (P16, docs/19 §4, T, punto 1): el usuario del sistema lo ve en el menú; una persona sin el perfil de administrador del sistema no, y en #/catalogo lee por qué', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (ruta: string, init?: RequestInit) =>
+      ruta === '/sesion' ? json({ sistema: true, nombre: 'sistema', sitios: 'todos', rol: 'administrador', permisos: PERMISOS }) : (srv.sesion = 'viva', backend(ruta, init))));
+    render(App);
+    await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(3));
+    expect(document.querySelector('[data-ir-catalogo]')!.getAttribute('href')).toBe('#/catalogo');
+    cleanup();
+    vi.stubGlobal('fetch', vi.fn(backend));
+    srv.sesion = 'viva';
+    srv.temporal = false;
+    location.hash = '#/catalogo';
+    render(App);
+    await waitFor(() => expect(document.querySelector('[data-sin-catalogo]')).not.toBeNull());
+    expect(document.querySelector('[data-sin-catalogo]')!.textContent).toContain('El catálogo lo administra quien administra el sistema');
+    expect(document.querySelector('[data-ir-catalogo]')).toBeNull();
+    location.hash = '';
+  });
 });
 
