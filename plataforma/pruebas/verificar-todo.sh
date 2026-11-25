@@ -450,7 +450,7 @@ if [ "$r" = 3 ]; then omitidos="$omitidos 2i2"; elif [ "$r" != 0 ]; then fallos=
 paso "2i3. Resumen de la ventana de 72 horas: la regla de disponible y el veredicto, caso por caso con CSV sintéticos (docs/16 §104)"
 # 25/11/2026: el resumen podía decir «APRUEBA» sin datos guardados, con el emisor caído, con una ventana de una hora o con las mejores 72 h
 # elegidas de 80. resumen-prueba.sh arma CSV sintéticos (sin tocar la base: la consulta va contra un docker falso) y exige la salida, el
-# texto y el número de minutos no disponibles de 35 casos; plantados con el resumen de cada vuelta anterior, fallaban 14 y luego 12.
+# texto y el número de minutos no disponibles de 42 casos; plantados con el resumen de cada vuelta anterior, fallaban 14, luego 12 y luego 8.
 bash plataforma/pruebas/ventana/resumen-prueba.sh > "$VT/resumen-ventana.txt" 2>&1; r=$?
 grep -E '^(OK|FALLA|RESUMEN|omitida)|casos con falla' "$VT/resumen-ventana.txt" | tail -40
 if [ "$r" = 3 ]; then omitidos="$omitidos 2i3"; elif [ "$r" != 0 ]; then fallos=$((fallos+1)); fi

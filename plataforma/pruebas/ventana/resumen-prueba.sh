@@ -19,7 +19,10 @@ chmod +x "$T/bin/docker"
 # Generador: gen <carpeta> <minutos> '<opciones JSON>'. Inicio 2026-11-01 00:00Z. El equipo j publica una vez por minuto a los 6·j s; cada
 # mensaje confirmado deja una marca (equipo, ms) en confirmados.csv y suma en emisor.csv. Opciones: equipos (10), conf (equipos con marca
 # por minuto), env (enviados por minuto), conectados, mudo (equipos que nunca confirman), artefacto ([minuto, equipo]: su marca pasa al
-# minuto siguiente, que queda con dos), malos / dobles / vacio / faltan_sonda / frescura (como antes), sonda_desde y em_desde (primer
+# minuto siguiente, que queda con dos; artefactos: una lista de esos), atraso ([desde el minuto, equipo, segundos]: el temporizador del equipo se atrasa esos segundos
+# desde ese minuto, como un setInterval que acumula atraso), quitar y duplicar ([[minuto, equipo], …]: una marca menos o repetida tal
+# cual), em_doble (minutos con dos líneas en emisor.csv: un reinicio), malos / dobles / vacio / faltan_sonda / frescura (como antes),
+# sonda_desde y em_desde (primer
 # minuto con línea; negativo = antes del inicio), emisor ('ok'|'none'), conf_csv ('ok'|'vacio'|'corto'|'none'), nan_en, periodo,
 # psql ('todos'|'vacio'|'falta_uno'|'ajenos').
 gen() {
@@ -44,15 +47,19 @@ with open(f'{d}/sonda.csv', 'w') as f:
         elif i in dobles: f.write(linea(False)); f.write(linea(True))
         else: f.write(linea(i not in malos))
 eq = op.get('equipos', 10); conf = op.get('conf', eq); env = op.get('env', eq); con = op.get('conectados', eq); per = op.get('periodo', 60)
-mudo = cj('mudo'); art = op.get('artefacto')
+mudo = cj('mudo'); atr = op.get('atraso')
+arts = {tuple(x) for x in op.get('artefactos', [])} | ({tuple(op['artefacto'])} if op.get('artefacto') else set())
+quitar = {tuple(x) for x in op.get('quitar', [])}; duplicar = {tuple(x) for x in op.get('duplicar', [])}
 marcas = {}
 for i in range(op.get('em_desde', 0), mins):
     t = t0 + timedelta(minutes=i)
     for j in range(conf):
-        if j in mudo: continue
+        if j in mudo or (i, j) in quitar: continue
         ms = int((t + timedelta(seconds=6 * j)).timestamp() * 1000)
-        if art and i == art[0] and j == art[1]: ms += 60000 + 3000   # cruza el borde: cae en el minuto siguiente, que queda con dos
+        if (i, j) in arts: ms += 60000 + 3000   # cruza el borde: cae en el minuto siguiente, que queda con dos
+        if atr and i >= atr[0] and j == atr[1]: ms += atr[2] * 1000   # temporizador atrasado
         marcas.setdefault((ms // 60000) * 60000, []).append((f'e{j:02d}', ms))
+        if (i, j) in duplicar: marcas[(ms // 60000) * 60000].append((f'e{j:02d}', ms))
 lineas = [m for k in sorted(marcas) for m in marcas[k]]
 if op.get('emisor', 'ok') != 'none':
     with open(f'{d}/emisor.csv', 'w') as fe:
@@ -61,6 +68,7 @@ if op.get('emisor', 'ok') != 'none':
             t = t0 + timedelta(minutes=i); k = int(t.timestamp() * 1000)
             c = 'nan' if i == op.get('nan_en') else str(len(marcas.get(k, [])))
             fe.write(f"{t:%Y-%m-%dT%H:%M:%SZ},{env},{c},0,{con},0,{eq},{per}\n")
+            if i in set(op.get('em_doble', [])): fe.write(f"{t:%Y-%m-%dT%H:%M:%SZ},0,0,0,{con},0,{eq},{per}\n")
 modo = op.get('conf_csv', 'ok')
 if modo != 'none':
     with open(f'{d}/confirmados.csv', 'w') as fc:
@@ -70,7 +78,7 @@ if modo != 'none':
         fc.writelines(f'{e},{ms}\n' for e, ms in sel)
 pm = op.get('psql', 'todos')
 with open(f'{d}/psql.txt', 'w') as fp:
-    sel = [] if pm == 'vacio' else lineas[1:] if pm == 'falta_uno' else lineas
+    sel = [] if pm == 'vacio' else lineas[1:] if pm == 'falta_uno' else list(dict.fromkeys(lineas))
     fp.writelines(f'{e} {ms}\n' for e, ms in sel)
     if pm == 'ajenos': fp.writelines(f'otro-{j} {ms + 1}\n' for j, (_, ms) in enumerate(lineas[:500]))
     fp.write(f'resumen {eq} {2 * len(sel)} 0\n')
@@ -98,7 +106,12 @@ rango() { python3 -I -c "import json,sys; print(json.dumps(list(range(int(sys.ar
 
 # Aprueba o no, por la regla (el camino de la base, con el docker falso).
 caso limpio-72h               0 '**APRUEBA**'                 - 0    4320 '{}' "${B[@]}"
-caso artefacto-de-borde       0 '**APRUEBA**'                 - 0    4320 '{"artefacto": [1000, 3]}' "${B[@]}"
+caso marca-que-cruza-el-borde 0 '**APRUEBA**'                 - 1    4320 '{"artefacto": [1000, 3]}' "${B[@]}"
+caso temporizador-atrasado    0 '**APRUEBA**'                 - 1    4320 '{"atraso": [2000, 9, 7]}' "${B[@]}"
+caso patron-0-2-1             0 '**NO APRUEBA**'              - 1440 4320 "{\"artefactos\": $(python3 -I -c 'import json; print(json.dumps([[m, 4] for m in range(0, 4320, 3)]))')}" "${B[@]}"
+caso linea-repetida-afuera    0 '**APRUEBA**'                 - 1    4380 '{"quitar": [[4319, 5]], "duplicar": [[4320, 5]]}' "${B[@]}"
+caso reinicio-del-emisor      0 '**APRUEBA**'                 - 0    4320 '{"em_doble": [1500]}' "${B[@]}"
+caso reinicio-con-perdida     0 '**APRUEBA**'                 - 1    4320 '{"em_doble": [1500], "quitar": [[1500, 2]], "duplicar": [[1501, 2]]}' "${B[@]}"
 caso borde-43-de-4320         0 '**APRUEBA**'                 - 43   4320 "{\"malos\": $(rango 100 143)}" "${B[@]}"
 caso borde-44-de-4320         0 '**NO APRUEBA**'              - 44   4320 "{\"malos\": $(rango 100 144)}" "${B[@]}"
 caso base-sin-guardados       0 'faltan 43200 mensajes'       '**APRUEBA**' 0 4320 '{"psql": "vacio"}' "${B[@]}"
@@ -126,9 +139,11 @@ caso valor-no-numerico        3 'valor no válido'             '**APRUEBA**' - 4
 caso periodo-mayor-a-60       3 'período ≤ 60 s'              '**APRUEBA**' - 4320 '{"periodo": 120}' "${B[@]}"
 caso guardados-a-mano         3 'se dio a mano'               '**APRUEBA**' - 4320 '{}' --desde 2026-11-01T00:00Z --horas 72 --equipos 10 --guardados 43200
 caso sin-guardados-ni-sitio   3 'no hay guardados'            '**APRUEBA**' - 4320 '{}' --desde 2026-11-01T00:00Z --horas 72 --equipos 10
-caso sonda-con-horas-previas  3 'sin --fuera-motivo'          '**APRUEBA**' - 4500 '{}' --desde 2026-11-01T03:00Z --horas 72 --equipos 10 --sitio prueba
-caso mejores-72-de-80-horas   3 '**480 no eran disponibles**' '**APRUEBA**' - 4800 "{\"malos\": $(rango 0 480)}" --desde 2026-11-01T08:00Z --horas 72 --equipos 10 --sitio prueba
-caso horas-previas-declaradas 0 'Motivo declarado'            - 0    4500 '{}' --desde 2026-11-01T03:00Z --horas 72 --equipos 10 --sitio prueba --fuera-motivo 'la sonda se arrancó 3 h antes para comprobarla'
+caso sonda-con-horas-previas  0 '**APRUEBA**'                 - 0    4500 '{}' --desde 2026-11-01T03:00Z --horas 72 --equipos 10 --sitio prueba
+caso mejores-72-de-80-horas   0 '**NO APRUEBA**'              - 0    4800 "{\"malos\": $(rango 0 480)}" --desde 2026-11-01T08:00Z --horas 72 --equipos 10 --sitio prueba
+caso mejores-72-con-motivo    0 '**NO APRUEBA**'              - 0    4800 "{\"malos\": $(rango 0 480)}" --desde 2026-11-01T08:00Z --horas 72 --equipos 10 --sitio prueba --fuera-motivo '.'
+caso horas-previas-con-nota   0 'Nota: «la sonda se arrancó 3 h antes para comprobarla»' - 0 4500 '{}' --desde 2026-11-01T03:00Z --horas 72 --equipos 10 --sitio prueba --fuera-motivo 'la sonda se arrancó 3 h antes para comprobarla'
+caso sonda-despues-del-fin    0 '**APRUEBA**'                 - 0    4500 '{}' "${B[@]}"
 caso ventana-de-1-hora        0 'sin veredicto del requisito' '**APRUEBA**' 0 60 '{}' --desde 2026-11-01T00:00Z --horas 1 --equipos 10 --sitio prueba
 caso criticos-recortados      2 'no puede quitar'             '**APRUEBA**' - 4320 '{}' "${B[@]}" --criticos backend
 caso sin-equipos              2 'falta --equipos'             '**APRUEBA**' - 4320 '{}' --desde 2026-11-01T00:00Z --horas 72 --sitio prueba

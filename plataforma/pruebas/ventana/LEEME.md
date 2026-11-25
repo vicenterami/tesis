@@ -9,8 +9,8 @@ real) y que lo que el broker confirmó quedó guardado. El método y los resulta
 | `emisor.mjs` | Hace de 10 equipos reales: un cliente MQTT por credencial (el identificador es su usuario), por TLS a través del proxy y verificando el certificado; cada 60 s publica en SenML dos magnitudes con su marca de tiempo, con QoS 1, y reconecta con espera creciente. Escribe en `emisor.csv` una línea por minuto: enviados, confirmados (PUBACK), reconexiones, conectados, en vuelo, equipos y período; y en `confirmados.csv` una línea por mensaje confirmado (equipo y marca de tiempo), en el instante del PUBACK. Nunca imprime una clave. |
 | `compose.ventana.yml` | Corre el emisor como contenedor con reinicio automático, con la imagen del backend que ya está en el equipo, en un proyecto aparte (`ventana`) unido a la red de la pila. Sin puertos. Chequeo de salud propio: `emisor.csv` con una línea de hace menos de 120 s y equipos conectados en ella. |
 | `sonda.sh` | Una ejecución, una línea de `sonda.csv` (para `cron` cada minuto): salud por HTTPS a través del proxy (código y milisegundos), frescura del último dato del sitio de la prueba por su vista pública, y por servicio estado, salud, reinicios, tiempo arriba y memoria; disco libre. Si algo no responde, escribe la línea igual con el campo vacío. |
-| `resumen.sh` | De los tres CSV y para la ventana que se le PIDE (`--desde` y `--hasta`, o `--horas`): minutos disponibles con la regla de abajo, el veredicto de RNF-18 (solo con 72 h o más; con menos, «ensayo del instrumento: sin veredicto del requisito»), la cifra de solo el emisor y la de solo `/salud`, cada incidente con su causa, p95 de la salud (rango más cercano), memoria mediana y máxima por servicio y total, reinicios, disco, confirmados frente a guardados (consulta de solo lectura por equipo y marca de tiempo; `--guardados N` es un número a mano, para la prueba y un ensayo sin base, y no da veredicto) y cada caída provocada con su tiempo de detección. Pide `--equipos N`. Escribe `resumen.md` y `memoria.csv`. Salidas: 0 resumen completo; 1 la sonda no cubre la ventana (sin veredicto); 2 error de uso (falta `--equipos`, o `--criticos` sin el broker o la base); 3 sin veredicto: falta `emisor.csv` o `confirmados.csv`, sin las columnas o el formato esperados o con valores no numéricos; el emisor sin equipos, con otro número que `--equipos` o con un período de más de 60 s; `confirmados.csv` vacío o que no cuadra con `emisor.csv`; lo guardado a mano o sin consultar; o la sonda con líneas a más de 2 minutos de la ventana sin `--fuera-motivo`. Con varias causas a la vez, manda la 3. |
-| `resumen-prueba.sh` | Prueba del resumen con CSV sintéticos, sin tocar la base (el camino de la consulta se prueba con un `docker` falso que devuelve una salida de psql conocida): exige la salida, el texto y el número de minutos no disponibles de 35 casos (un caso limpio que aprueba, el artefacto de borde, los bordes 43 y 44 de 4 320, la base vacía, con uno de menos o con ajenos, un equipo mudo, 9 enviados y 8 confirmados, 100 horas con 60 minutos caídos, el emisor antes que la sonda, `confirmados.csv` vacío o corto, guardados a mano, horas previas con y sin motivo…). Correrla antes de arrancar; también la corre el guardián. |
+| `resumen.sh` | De los tres CSV y para la ventana que se le PIDE (`--desde` y `--hasta`, o `--horas`): minutos disponibles con la regla de abajo, el veredicto de RNF-18 (solo con 72 h o más; con menos, «ensayo del instrumento: sin veredicto del requisito»), la cifra de solo el emisor y la de solo `/salud`, cada incidente con su causa, p95 de la salud (rango más cercano), memoria mediana y máxima por servicio y total, reinicios, disco, confirmados frente a guardados (consulta de solo lectura por equipo y marca de tiempo; `--guardados N` es un número a mano, para la prueba y un ensayo sin base, y no da veredicto) y cada caída provocada con su tiempo de detección. Pide `--equipos N`. Escribe `resumen.md` y `memoria.csv`. Salidas: 0 resumen completo; 1 la sonda no cubre la ventana (sin veredicto); 2 error de uso (falta `--equipos`, o `--criticos` sin el broker o la base); 3 sin veredicto: falta `emisor.csv` o `confirmados.csv`, sin las columnas o el formato esperados o con valores no numéricos; el emisor sin equipos, con otro número que `--equipos` o con un período de más de 60 s; `confirmados.csv` vacío o que no cuadra con `emisor.csv`; o lo guardado a mano o sin consultar. Con varias causas a la vez, manda la 3. |
+| `resumen-prueba.sh` | Prueba del resumen con CSV sintéticos, sin tocar la base (el camino de la consulta se prueba con un `docker` falso que devuelve una salida de psql conocida): exige la salida, el texto y el número de minutos no disponibles de 42 casos (un caso limpio que aprueba, la marca que cruza el borde y el temporizador atrasado, los bordes 43 y 44 de 4 320, la base vacía, con uno de menos o con ajenos, un equipo mudo, 9 enviados y 8 confirmados, 100 horas con 60 minutos caídos, el emisor antes que la sonda, `confirmados.csv` vacío o corto, guardados a mano, horas previas (se juzga la peor ventana), líneas después del fin, una línea repetida, el reinicio del emisor…). Correrla antes de arrancar; también la corre el guardián. |
 
 ## Cómo se arranca
 
@@ -28,13 +28,13 @@ real) y que lo que el broker confirmó quedó guardado. El método y los resulta
    corrida que no termina deja su minuto sin línea, y eso cuenta como no disponible, igual que un minuto en que «otra sonda sigue
    corriendo»). Si el usuario no puede usar `cron`, el mismo guion en un bucle dentro de `tmux` (pierde el arranque automático tras un
    reinicio del equipo: se declara). Anotar el instante UTC del arranque: es el `--desde` del resumen.
-5. Al cerrar: quitar la línea de `crontab` justo al cumplirse las 72 h (la sonda no debe escribir más de 2 minutos después del fin) y
-   detener el emisor DESPUÉS del fin de la ventana más 1 minuto (`docker compose -f compose.ventana.yml stop`; antes, el último minuto
-   quedaría sin su línea del emisor). Luego `bash resumen.sh --datos ~/ventana-72h/datos --sitio <código> --equipos 10 --desde <instante
-   UTC del arranque> --horas 72 --planeada <instante UTC de cada caída provocada>` (una `--planeada` por caída: la del backend y la del
-   broker). La ventana es la pedida, no la que la sonda alcanzó a escribir. Que el emisor arranque antes que la sonda y se detenga después
-   es lo correcto y no produce aviso; si la sonda escribió más de 2 minutos fuera de la ventana, no hay veredicto salvo que
-   `--fuera-motivo «…»` diga por qué (queda escrito en el resumen).
+5. Al cerrar: quitar la línea de `crontab` al cumplirse las 72 h (si te atrasas, no importa: las líneas de la sonda después del fin no
+   cuentan) y detener el emisor DESPUÉS del fin de la ventana más 1 minuto (`docker compose -f compose.ventana.yml stop`; antes, el último
+   minuto quedaría sin su línea del emisor). Luego `bash resumen.sh --datos ~/ventana-72h/datos --sitio <código> --equipos 10 --desde
+   <instante UTC del arranque> --horas 72 --planeada <instante UTC de cada caída provocada>` (una `--planeada` por caída: la del backend y
+   la del broker). La ventana es la pedida, no la que la sonda alcanzó a escribir. Que el emisor arranque antes que la sonda y se detenga
+   después es lo correcto y no produce aviso. Si la sonda registró minutos ANTES del inicio pedido (por ejemplo, el ensayo de 1 hora previo),
+   el resumen juzga además la peor ventana de 72 h sobre todo lo registrado y el veredicto usa la peor; `--fuera-motivo «…»` deja una nota.
 
 ## Cómo se interpreta
 
@@ -42,14 +42,19 @@ real) y que lo que el broker confirmó quedó guardado. El método y los resulta
   más de una, manda la peor y el resumen avisa cuántos minutos la tuvieron); (2) `/salud` respondió 200 a través del proxy; (3) el broker
   y la base están arriba y sanos (`--criticos` puede agregar servicios, nunca quitar esos dos); (4) hay línea del emisor para ese minuto,
   con todos sus equipos conectados y a lo más 1 mensaje en vuelo al cerrarlo, y CADA equipo tiene en `confirmados.csv` un mensaje
-  confirmado con marca de tiempo en ese minuto, salvo el artefacto de borde (le falta en este minuto y tiene dos en el minuto vecino: su
-  temporizador cruzó el borde); (5) el dato llega: la frescura existe y no pasa de 480 s. Un minuto **sin línea** de la sonda o del emisor
-  cuenta como no disponible, también al principio y al final.
-- **Las tolerancias, con su fundamento.** En vuelo al cerrar el minuto, 1 mensaje: los equipos publican desfasados (60 s / 10 equipos =
-  6 s) y un PUBACK tarda milisegundos, así que en el instante del borde cabe a lo más uno. **Presupuesto total de marcas faltantes: 2 por
-  equipo** (uno en cada extremo de la ventana, donde el desfase de un temporizador puede dejar su mensaje justo fuera): confirmados con
-  marca en la ventana ≥ equipos × minutos − 2 × equipos. **Consistencia:** las marcas de `confirmados.csv` en la ventana y la suma de
-  confirmados de `emisor.csv` difieren a lo más en 2 × equipos (los mismos bordes) y no pueden ser 0; si no, no hay veredicto. 480 s de
+  confirmado con marca de tiempo en ese minuto, sin excepciones; (5) el dato llega: la frescura existe y no pasa de 480 s. Un minuto **sin
+  línea** de la sonda o del emisor cuenta como no disponible, también al principio y al final.
+- **Por qué sin excepciones.** El emisor publica alineado al reloj: el equipo j, en el segundo 6·j de cada minuto, recalculado contra el
+  reloj en cada envío. Medido 30 minutos dentro de su contenedor con el límite de CPU (`cpus: 0.25`): con el `setInterval` anterior el
+  atraso crecía unos 6 ms por minuto (hasta 188 ms en 30 min; unos 27 s en 72 h, lo bastante para que varios equipos cruzaran de minuto);
+  alineado al reloj, a lo más 8 ms y sin acumular. Así la marca de cada equipo cae siempre en su minuto, y un reinicio del emisor no cambia
+  las fases. Para que un envío caiga en el minuto siguiente haría falta una pausa de más de 6 s del proceso; si pasa, ese minuto cuenta como
+  no disponible (en contra del sistema).
+- **Las tolerancias, con su fundamento.** En vuelo al cerrar el minuto, 1 mensaje: los equipos publican separados 6 s y un PUBACK tarda
+  milisegundos, así que en el instante del borde cabe a lo más uno. **Consistencia de los archivos del emisor:** las marcas de
+  `confirmados.csv` en la ventana y la suma de confirmados de `emisor.csv` difieren a lo más en 2 × equipos (uno cuenta por la marca del
+  mensaje y el otro por el minuto del PUBACK: un PUBACK que llega después de un borde de la ventana, uno en cada extremo) y no pueden ser 0;
+  si no, no hay veredicto. No hay presupuesto aparte de marcas faltantes: cada marca que falta ya vuelve no disponible su minuto. 480 s de
   frescura: abajo.
 - **Las otras dos cifras**, para ver la diferencia: la de solo el emisor (minutos con su línea, todos los equipos conectados, a lo más 1 en
   vuelo y la marca confirmada de cada equipo: lo más cercano al texto original de RNF-18, que contaba ventanas sin confirmación; un minuto
@@ -57,8 +62,8 @@ real) y que lo que el broker confirmó quedó guardado. El método y los resulta
   broker caído `/salud` sigue en 200: por eso la regla las exige todas.
 - **Veredicto**: juzga 72 horas exactas (4 320 minutos). Con una ventana más larga, juzga la PEOR ventana deslizante de 72 h y dice desde
   cuándo (una caída no se diluye en más horas); con menos, el resultado dice «ensayo del instrumento: sin veredicto del requisito».
-  Aprueba si los minutos no disponibles de esa ventana son a lo más el 1 % redondeado hacia abajo (43 de 4 320), no se pasa el presupuesto
-  de marcas y no falta en la base ningún mensaje confirmado (comparación uno por uno con `--sitio`; con `--guardados` no hay veredicto); el
+  Aprueba si los minutos no disponibles de esa ventana son a lo más el 1 % redondeado hacia abajo (43 de 4 320) y no falta en la base
+  ningún mensaje confirmado (comparación uno por uno con `--sitio`; con `--guardados` no hay veredicto); el
   porcentaje se muestra truncado. Las caídas provocadas no se descuentan.
 - **Frescura**: `ultimo_dato` de la vista pública es el inicio del tramo de 5 minutos de la lectura más reciente y la respuesta se guarda
   60 s; con datos al día queda entre 0 y unos 420 s. Sobre 480 s (umbral por omisión) el dato dejó de llegar o se atrasó.
@@ -79,6 +84,10 @@ real) y que lo que el broker confirmó quedó guardado. El método y los resulta
 - El emisor comparte la red de la pila: a nivel de red alcanza también la base y el broker. Sus permisos los acota la ACL del broker (solo
   publica en el tópico de cada equipo) y la base exige su propia clave, que el emisor no tiene; se acepta para no tocar el proxy.
 - La sonda tiene resolución de un minuto: un corte de segundos entre dos ejecuciones puede no verse.
+- Tolerancia de cuentas: hasta 2 × equipos de diferencia entre las marcas de `confirmados.csv` y la suma de `emisor.csv` (los bordes) no
+  quitan el veredicto; las marcas que faltan, en cambio, cuentan cada una como minuto no disponible, y lo confirmado que falta en la base
+  tiene tolerancia 0.
+- Un reinicio del emisor o una pausa de más de 6 s de su proceso cuentan en contra del sistema (minutos no disponibles), no a su favor.
 - La memoria es la de `docker stats`, la herramienta que nombra RNF-17: descuenta la caché de archivos inactiva del contenedor, así que
   no es exactamente la cifra que vigila el techo de `deploy.resources.limits.memory` (que la incluye).
 - El emisor publica a la escala del caso real (10 equipos cada 60 s); no es una prueba de carga: RNF-17 queda cubierto aquí en reposo y con

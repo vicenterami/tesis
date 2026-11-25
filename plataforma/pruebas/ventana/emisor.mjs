@@ -132,7 +132,9 @@ function arrancar(eq, i) {
   // El mensaje de error de la biblioteca no trae la clave; igual se muestra solo su código o su primera frase, acotada.
   c.on('error', (e) => console.log(`error ${eq.id}: ${String(e.code ?? e.message ?? 'error').slice(0, 120)}`));
   clientes.push(c);
-  // Fase propia dentro del período: los diez no publican en el mismo instante.
+  // Fase propia dentro del período, ALINEADA AL RELOJ: el equipo i publica en el instante período·k + fase (con 60 s, en el segundo 6·i de
+  // cada minuto). Cada envío se programa contra el reloj (no con setInterval, que acumula su atraso vuelta a vuelta: medido en docs/16
+  // §104), así la marca de cada equipo cae siempre en su minuto, y un reinicio del emisor no cambia las fases.
   const fase = Math.round((i / equipos.length) * PERIODO_S * 1000);
   const publicar = () => {
     const t = Date.now() / 1000;
@@ -150,7 +152,14 @@ function arrancar(eq, i) {
       m.confirmados++;
     });
   };
-  setTimeout(() => { publicar(); setInterval(publicar, PERIODO_S * 1000); }, fase);
+  const P = PERIODO_S * 1000;
+  const programar = () => {
+    const ahora = Date.now();
+    let siguiente = Math.floor(ahora / P) * P + fase;
+    if (siguiente <= ahora) siguiente += P;
+    setTimeout(() => { publicar(); programar(); }, siguiente - ahora);
+  };
+  programar();
 }
 
 console.log(`emisor: ${equipos.length} equipos, cada ${PERIODO_S} s, mqtts://${HOST}:${PUERTO} (certificado verificado para «${NOMBRE}»${CA ? ', CA propia' : ''}), salida ${SALIDA}`);

@@ -12,33 +12,35 @@
 #   2  error de uso (falta --equipos, o se intentó quitar el broker o la base de --criticos);
 #   3  sin veredicto: falta emisor.csv o confirmados.csv, o no tienen las columnas o el formato esperados, o traen valores que no son
 #      números; el emisor no tiene equipos, son más o menos que --equipos, o su período pasa de 60 s; confirmados.csv está vacío o no cuadra
-#      con emisor.csv; lo guardado se dio a mano (--guardados) o no se pudo consultar; o la sonda tiene líneas más de 2 minutos fuera de la
-#      ventana sin --fuera-motivo. Con varias causas a la vez, manda la 3.
+#      con emisor.csv; o lo guardado se dio a mano (--guardados) o no se pudo consultar. Con varias causas a la vez, manda la 3.
 # Regla de DISPONIBLE (la misma que dicen docs/02, RNF-18, el LEEME.md y docs/16 §104). Un minuto UTC de la ventana es disponible solo si:
 #   1. tiene al menos una línea de la sonda y TODAS sus líneas cumplen 2, 3 y 5 (si hay más de una, manda la peor; se avisa cuántas hubo);
 #   2. /salud respondió 200 a través del proxy;
 #   3. los servicios críticos están arriba y sanos (por omisión y como mínimo, el broker y la base: «mosquitto timescaledb»);
 #   4. hay línea del emisor para ese minuto, con TODOS sus equipos conectados y a lo más 1 mensaje en vuelo al cerrarlo, y CADA equipo tiene
-#      en confirmados.csv un mensaje confirmado con marca de tiempo en ese minuto (o es el artefacto de borde: le falta en este minuto y
-#      tiene dos en el minuto vecino, porque su temporizador cruzó el borde);
+#      en confirmados.csv un mensaje confirmado con marca de tiempo en ese minuto (sin excepciones: el emisor publica alineado al reloj, así
+#      que la marca de cada equipo cae siempre en su minuto; un minuto sin la marca de un equipo es no disponible, en contra del sistema);
 #   5. los datos llegan: la frescura del último dato del sitio (vista pública) existe y no pasa de --umbral-frescura (480 s).
-# Tolerancias, con su fundamento. En vuelo al cerrar el minuto: 1 mensaje (los equipos publican desfasados período / equipos, 6 s con 10
-# equipos cada 60 s, y un PUBACK tarda milisegundos: en el instante del borde cabe a lo más uno). Presupuesto TOTAL de marcas faltantes en la
-# ventana: 2 por equipo (uno en cada extremo: el mensaje de un equipo puede caer justo fuera de la ventana por el desfase de su temporizador);
-# es decir, confirmados con marca en la ventana ≥ equipos × minutos − 2 × equipos. Consistencia: las marcas de la ventana y la suma de
-# confirmados de emisor.csv en esos minutos difieren a lo más en 2 × equipos (los mismos bordes: emisor.csv cuenta por el minuto del PUBACK y
-# confirmados.csv por la marca del mensaje), y no pueden ser 0.
+# Tolerancias, con su fundamento. En vuelo al cerrar el minuto: 1 mensaje (los equipos publican en su segundo fijo, separados período /
+# equipos, 6 s con 10 equipos cada 60 s, y un PUBACK tarda milisegundos: en el instante del borde cabe a lo más uno). Consistencia entre los
+# dos archivos del emisor: las marcas de la ventana y la suma de confirmados de emisor.csv en esos minutos pueden diferir en a lo más 2 por
+# equipo (emisor.csv cuenta por el minuto del PUBACK y confirmados.csv por la marca del mensaje: un PUBACK que llega después de un borde de
+# la ventana, uno en cada extremo) y no pueden ser 0; es la única tolerancia sobre las cuentas, y solo decide si hay veredicto, no lo aprueba.
+# No hay presupuesto aparte de marcas faltantes: cada marca que falta ya vuelve no disponible su minuto, y esos minutos cuentan en el margen
+# de 43. (Hasta el 25/11/2026 había una excepción de borde y un presupuesto de 2 por equipo, para un temporizador que acumulaba atraso; con
+# los envíos alineados al reloj ese atraso no existe: medido en docs/16 §104.)
 # Umbral de frescura: ultimo_dato es el inicio del tramo de 5 min de la lectura más reciente y la respuesta se guarda 60 s, así que con
 # datos al día queda entre 0 y unos 420 s; 480 s deja un minuto de margen. Una frescura vacía (sin respuesta o sin dato) no es disponible.
 # Además, el veredicto exige que lo GUARDADO cubra lo CONFIRMADO: cada mensaje confirmado (confirmados.csv: equipo y marca de tiempo, escrito
 # en el instante del PUBACK) con marca de tiempo en la ventana debe estar en `medicion` (--sitio: consulta de solo lectura, uno por uno, por
 # equipo y marca de tiempo). Tolerancia 0: los dos lados se atribuyen por la marca de tiempo del mensaje. Con --guardados N (un número dado a
 # mano: para la prueba y un ensayo sin base) se compara la cantidad y NO hay veredicto. El veredicto se calcula con enteros (aprueba si los
-# minutos no disponibles de la ventana de 72 h juzgada son a lo más el 1 % redondeado hacia abajo, 43 de 4 320, no se pasa el presupuesto
-# de marcas y no falta ningún confirmado en la base); el porcentaje se muestra truncado.
-# La ventana es la PEDIDA, nunca la que la sonda alcanzó a escribir. Fuera de ella cuentan solo los minutos con línea de la sonda: si la
-# sonda escribió más de 2 minutos antes del inicio o después del fin, no hay veredicto salvo que --fuera-motivo declare por qué (el motivo
-# queda escrito en el resumen). Las líneas del emisor fuera de la ventana no cuentan (arranca antes que la sonda y se detiene después).
+# minutos no disponibles de la ventana de 72 h juzgada son a lo más el 1 % redondeado hacia abajo, 43 de 4 320, y no falta ningún
+# confirmado en la base); el porcentaje se muestra truncado.
+# La ventana es la PEDIDA, nunca la que la sonda alcanzó a escribir. Las líneas de la sonda DESPUÉS del fin no cuentan (no sirven para
+# elegir horas). Si la sonda registró minutos ANTES del inicio, el resumen juzga además la peor ventana de 72 h sobre todo lo registrado y
+# el veredicto usa la peor de las dos: empezar más tarde no esconde minutos malos. --fuera-motivo es solo una nota que queda escrita. Las
+# líneas del emisor fuera de la ventana no cuentan (arranca antes que la sonda y se detiene después).
 # --planeada (repetible) marca una caída provocada: se le atribuye solo un incidente que EMPIEZA entre su minuto y dos minutos después, con
 # su tiempo de detección; si no hay, se dice. Las caídas planeadas NO se descuentan. Detener el emisor antes del resumen.
 set -u
@@ -188,7 +190,7 @@ elif equipos_n is not None and any(x['equipos'] != N for x in em_min_todo.values
     sin_veredicto.append(f'el emisor escribe {sorted({x["equipos"] for x in em_min_todo.values()})} equipos y --equipos dice {N}')
 em_min = {k: v for k, v in em_min_todo.items() if en_ventana(k)}
 
-conf_set = set(); marcas = {}; ids = set()
+conf_set = set(); marcas = {}; ids = set(); vistas = set()
 ruta_conf = os.path.join(datos, 'confirmados.csv')
 if not os.path.exists(ruta_conf):
     sin_veredicto.append('no hay confirmados.csv (el emisor lo escribe junto a emisor.csv)')
@@ -199,7 +201,9 @@ else:
         mt = re.fullmatch(r'([A-Za-z0-9][A-Za-z0-9._-]{0,62}),([0-9]{10,16})', linea)
         if not mt: sin_veredicto.append(f'confirmados.csv, línea {n_linea}: no es «equipo,marca_ms»'); break
         bt = datetime.fromtimestamp(int(mt.group(2)) / 1000, tz=timezone.utc)
-        if (mt.group(1), int(mt.group(2))) in conf_set: continue
+        par = (mt.group(1), int(mt.group(2)))
+        if par in vistas: continue   # una línea repetida (dentro o fuera de la ventana) cuenta una vez
+        vistas.add(par)
         ids.add(mt.group(1)); k = (mt.group(1), minuto(bt)); marcas[k] = marcas.get(k, 0) + 1
         if ini <= bt < fin_excl: conf_set.add((mt.group(1), int(mt.group(2))))
 conf = len(conf_set)
@@ -209,15 +213,12 @@ if os.path.exists(ruta_conf) and em_min_todo:
     if conf == 0: sin_veredicto.append('confirmados.csv no trae ninguna confirmación en la ventana')
     elif abs(conf - suma_em) > 2 * N:
         sin_veredicto.append(f'confirmados.csv ({conf} en la ventana) no cuadra con emisor.csv ({suma_em}): la diferencia pasa de 2 × {N} (los bordes)')
-def faltan_marcas(mm):   # equipos sin marca en el minuto, salvo el artefacto de borde (dos marcas en un minuto vecino)
-    f = sum(1 for e in ids if marcas.get((e, mm), 0) == 0 and marcas.get((e, mm - UN_MIN), 0) < 2 and marcas.get((e, mm + UN_MIN), 0) < 2)
-    return f + max(0, N - len(ids))
+def faltan_marcas(mm):   # equipos sin marca en el minuto (sin excepciones: los envíos van alineados al reloj)
+    return sum(1 for e in ids if marcas.get((e, mm), 0) == 0) + max(0, N - len(ids))
 def emisor_ok(mm, tabla):
     x = tabla.get(mm)
     if x is None or not x['equipos']: return False
     return x['conectados'] == x['equipos'] and x['en_vuelo'] <= TOL and faltan_marcas(mm) == 0
-presupuesto = N * total - 2 * N
-fuera_presupuesto = max(0, presupuesto - conf)
 
 # ── Guardados ──
 msjs = None; faltan = None; lect = nd = cuar = None
@@ -253,15 +254,28 @@ if total > MIN_72H:
         s += malos[k] - malos[k - MIN_72H]
         if s > peor_no: peor_no, peor_ini = s, grilla[k - MIN_72H + 1]
 tope = MIN_72H // 100 if total >= MIN_72H else total // 100
-aprueba = peor_no <= tope and (faltan or 0) == 0 and fuera_presupuesto == 0
+aprueba = peor_no <= tope and (faltan or 0) == 0
 
 # Fuera de la ventana: solo los minutos con línea de la sonda (el emisor arranca antes y se detiene después, a propósito).
 fuera = sorted(k for k in por_min_todo if not en_ventana(k))
 fuera_no = sum(1 for k in fuera if not disponible(k, por_min_todo, em_min_todo))
 antes = [k for k in fuera if k < ini]; despues = [k for k in fuera if k > fin]
-lejos = [k for k in fuera if k < ini - 2 * UN_MIN or k > fin + 2 * UN_MIN]
-if lejos and not motivo_fuera.strip():
-    sin_veredicto.append(f'la sonda tiene {len(lejos)} minuto(s) con línea a más de 2 minutos de la ventana pedida, sin --fuera-motivo')
+antes_no = sum(1 for k in antes if not disponible(k, por_min_todo, em_min_todo))
+# Líneas de la sonda DESPUÉS del fin: se aceptan (no sirven para elegir horas). ANTES del inicio: además de la ventana pedida, se juzga la
+# peor ventana de 72 h sobre TODO lo que la sonda registró desde su primera línea hasta el fin pedido, y el veredicto usa la peor de las
+# dos: empezar la ventana más tarde no puede esconder minutos malos. --fuera-motivo es solo una nota.
+peor_ext = None
+if antes and total >= MIN_72H:
+    ext = []
+    m = min(antes)
+    while m <= fin: ext.append(m); m += UN_MIN
+    malos_e = [0 if disponible(k, por_min_todo, em_min_todo) else 1 for k in ext]
+    s = sum(malos_e[:MIN_72H]); peor_ext, peor_ext_ini = s, ext[0]
+    for k in range(MIN_72H, len(ext)):
+        s += malos_e[k] - malos_e[k - MIN_72H]
+        if s > peor_ext: peor_ext, peor_ext_ini = s, ext[k - MIN_72H + 1]
+    if peor_ext > peor_no: peor_no, peor_ini = peor_ext, peor_ext_ini
+    aprueba = peor_no <= tope and (faltan or 0) == 0
 
 def causa(ms):
     partes = []
@@ -309,12 +323,12 @@ recon = sum(x['reconexiones'] for x in em_min.values())
 
 o = []
 o.append(f'**Ventana pedida:** {h(ini)} a {h(fin_excl)} ({total} minutos); la sonda escribió {len(filas)} líneas en ella.\n')
-if lejos:
-    o.append(f'**FUERA DE LA VENTANA PEDIDA HAY LÍNEAS DE LA SONDA:** {len(antes)} minuto(s) antes del inicio ({len(antes) / 60:.1f} h) y'
-             f' {len(despues)} después del fin ({len(despues) / 60:.1f} h); de esos {len(fuera)} minutos, **{fuera_no} no eran disponibles**.'
-             + (f' Motivo declarado: «{motivo_fuera.strip()}».' if motivo_fuera.strip() else ' Sin --fuera-motivo no hay veredicto: la ventana no se elige a conveniencia.') + '\n')
-elif fuera:
-    o.append(f'La sonda escribió {len(fuera)} minuto(s) en los 2 minutos de borde fuera de la ventana (arranque y cierre): no cuentan.\n')
+if antes:
+    o.append(f'**LA SONDA REGISTRÓ {len(antes)} MINUTO(S) ANTES DEL INICIO PEDIDO** ({len(antes) / 60:.1f} h; **{antes_no} no disponibles**):'
+             + (f' se juzga también la peor ventana de 72 h sobre todo lo registrado ({peor_ext} minutos no disponibles, desde {h(peor_ext_ini)}) y el veredicto usa la peor.' if peor_ext is not None else ' (ventana de menos de 72 h: sin veredicto del requisito de todos modos).')
+             + (f' Nota: «{motivo_fuera.strip()}».' if motivo_fuera.strip() else '') + '\n')
+if despues:
+    o.append(f'La sonda escribió {len(despues)} minuto(s) después del fin: no cuentan (no sirven para elegir horas).\n')
 if not cubre:
     o.append(f'**NO CUBRE LA VENTANA PEDIDA:** la sonda empieza después del inicio o termina antes del fin (primera línea '
              f'{h(primera) if primera else "ninguna"}, última {h(ultima) if ultima else "ninguna"}); los minutos sin línea cuentan como no disponibles.\n')
@@ -334,7 +348,6 @@ elif not es_72h:
 else:
     juzgada = f'la ventana de 72 h juzgada es la peor de las {total - MIN_72H + 1} posibles, desde {h(peor_ini)}: ' if total > MIN_72H else ''
     motivo = (f'{juzgada}{peor_no} minutos no disponibles; el 99 % admite {tope} de {MIN_72H}'
-              + (f'; **faltan {fuera_presupuesto} marcas de confirmación más allá del presupuesto**' if fuera_presupuesto else '')
               + (f'; **faltan {faltan} mensajes confirmados en la base**' if faltan else '; no falta ningún confirmado en la base'))
     o.append(f'| **Veredicto RNF-18 (≥ 99 %)** | **{"APRUEBA" if aprueba else "NO APRUEBA"}**: {motivo} |')
 o.append(f'| Solo el emisor (minutos con su línea, todos los equipos conectados, a lo más {TOL} en vuelo y la marca confirmada de cada equipo) | {ok_emisor} de {total} ({pct(ok_emisor, total)} %); {sin_em} minutos sin línea del emisor |')
@@ -351,7 +364,7 @@ if disco:
     o.append(f'| Disco libre | de {disco[0]:.0f} a {disco[-1]:.0f} MiB (crecimiento del uso: {disco[0] - disco[-1]:.0f} MiB; mínimo {min(disco):.0f} MiB; {len(disco_bajo)} línea(s) bajo {umbral_disco} MiB) |')
 if em_min:
     o.append(f'| Emisor: enviados / confirmados en el minuto (PUBACK) | {env} / {conf_min}; reconexiones: {recon}; {equipos_n} equipos cada {periodo} s (una marca por equipo y minuto) |')
-o.append(f'| Confirmados con marca de tiempo en la ventana (confirmados.csv) | {conf} de {N * total} esperados ({N} equipos × {total} minutos); presupuesto de faltantes 2 × {N} = {2 * N}: {"dentro" if not fuera_presupuesto else f"**se pasa en {fuera_presupuesto}**"}; emisor.csv suma {suma_em} |')
+o.append(f'| Confirmados con marca de tiempo en la ventana (confirmados.csv) | {conf} de {N * total} esperados ({N} equipos × {total} minutos; cada marca que falta vuelve no disponible su minuto); emisor.csv suma {suma_em} |')
 if msjs is not None:
     origen = f'consulta de solo lectura, sitio {sitio}, {nd} equipos, {lect} lecturas, {cuar} en cuarentena' if base_res == 'sitio' else 'dato entregado a mano'
     o.append(f'| Guardados con marca de tiempo en la ventana ({origen}) | {msjs} mensajes distintos; **{"no falta ningún confirmado" if not faltan else f"faltan {faltan} confirmados"}**'
