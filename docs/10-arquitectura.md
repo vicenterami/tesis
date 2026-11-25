@@ -431,7 +431,7 @@ transporte. Fuente: OASIS, *MQTT Version 5.0*, §4.3 (`mqttoasis` en la bibliogr
 
 | Situación | Qué pasa | Por qué basta |
 |---|---|---|
-| El **backend** cae | El broker conserva en cola los mensajes QoS 1 de `sitio/#` (sesión persistente: `clientId` fijo + `clean: false`, `persistence true` en Mosquitto) y los entrega al reconectar | Nada se pierde mientras el broker viva **y la cola no pase de 10 000 mensajes o 20 MB** (`max_queued_messages` y `max_queued_bytes`, fijados el 13/10/2026, §8.4 punto 43; los siguientes se descartan en silencio y lo delata la condición `broker_descarte`). Con el sensor de la demo, cada 5 s, son unas 14 h de backend caído; con 20 sensores cada 60 s, unas 8 h; `restart: unless-stopped` levanta el backend en segundos |
+| El **backend** cae | El broker conserva en cola los mensajes QoS 1 de `sitio/#` (sesión persistente: `clientId` fijo + `clean: false`, `persistence true` en Mosquitto; desde el 25/11/2026 el identificador es el usuario `backend`, y nadie más puede tomar esa sesión: §8.4 punto 70) y los entrega al reconectar | Nada se pierde mientras el broker viva **y la cola no pase de 10 000 mensajes o 20 MB** (`max_queued_messages` y `max_queued_bytes`, fijados el 13/10/2026, §8.4 punto 43; los siguientes se descartan en silencio y lo delata la condición `broker_descarte`). Con el sensor de la demo, cada 5 s, son unas 14 h de backend caído; con 20 sensores cada 60 s, unas 8 h; `restart: unless-stopped` levanta el backend en segundos |
 | El **broker** cae | Docker lo reinicia; el backend reintenta cada 2 s. Los nodos Wi-Fi con QoS 1 reintentan la publicación; ChirpStack reintenta según su integración | El broker es la pieza más simple y estable de la pila; su caída es corta |
 | La **base** cae | El INSERT falla; el manejador reintenta el mismo mensaje (1, 2, 4 y 8 s) y, si sigue fallando, **no confirma** al broker y reconecta: con sesión persistente el broker lo reenvía al volver y el índice único absorbe la repetición. Mientras tanto, los demás mensajes esperan en la cola del broker (`max_queued_messages`). Nada se pierde en silencio: cada reintento queda en el registro (decisión 4, 07/10/2026) |
 | La misma trama llega **dos veces** (reentrega QoS 1 tras reconexión; nodo que reenvía su cola) | El INSERT es idempotente: índice único `(canal_id, tiempo)` + `ON CONFLICT DO NOTHING`; la repetida se ignora y **no** vuelve a evaluar umbrales | «Al menos una vez» + operación idempotente = efecto de exactamente una |
@@ -787,14 +787,18 @@ configurarlo. Fuera de Docker, en desarrollo, el valor por defecto es texto con 
 terminal. Los registros de la pila se guardan con `plataforma/pruebas/pila.sh logs`, que los sigue en
 vivo, los muestra en una línea legible y los copia sin tocar a `privado/logs/` (ignorado por git);
 `pila.sh buscar` y `pila.sh resumen` los consultan. **Un solo backend a la vez**, y no solo por el
-puerto 3000: dos procesos con el mismo `MQTT_CLIENT_ID` se echan mutuamente del broker (lo hace el
+puerto 3000: dos procesos con el mismo usuario del broker se echan mutuamente (lo hace el
 propio protocolo con identificadores duplicados), y si comparten la sesión persistente se reparten los
-mensajes en cola.
+mensajes en cola. Desde el 25/11/2026 el broker usa el usuario como identificador de cliente (§8.4 punto 70): **`MQTT_CLIENT_ID`
+queda sin efecto con el broker del servidor** (lo reemplaza por `backend`); sigue rigiendo en brokers sin la opción, como el del
+banco de pruebas, donde fija el identificador de la sesión persistente.
 
 **Escalado.** Una sola instancia del backend, a propósito. Con `clientId` fijo y sesión persistente el
 broker conserva la cola mientras el backend está caído (§4.1); dos instancias con el mismo
 identificador se desconectarían mutuamente, y con identificadores distintos recibirían ambas todas las
-tramas. Dentro del servidor no hace falta más: Node delega la entrada y salida al núcleo del sistema,
+tramas. Con el usuario como identificador (§8.4 punto 70), **cada réplica necesitaría su propio usuario del broker** (por ejemplo
+`backend-1`, `backend-2`, con el rol `recepcion`, cada uno con su clave en el `.env` de su réplica): cambiar `MQTT_CLIENT_ID` ya no
+basta. Dentro del servidor no hace falta más: Node delega la entrada y salida al núcleo del sistema,
 que sí es multihilo, y la carga de RNF-01 (50 tramas/s) se medirá en el banco de pruebas de `docs/09`
 sobre esta única instancia. Si algún día hiciera falta repartir carga entre varias, el camino
 documentado es: suscripciones compartidas de MQTT 5 (`$share/<grupo>/sitio/#`, admitidas por
@@ -1257,11 +1261,14 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     broker, con dueño 1883 y modo 600, y va dentro del respaldo (`docs/11 §7`). Lo inicializa una vez
     `pruebas/broker-inicializar.sh` a partir del `.env`: administrador `backend-admin` (clave `MQTT_ADMIN_CLAVE`), roles
     `recepcion` (cliente `backend`: se suscribe y recibe `sitio/#`), `sonda` (chequeo de salud: `$SYS/#`) y `dispositivo`
-    (publica solo en `sitio/+/dispositivo/%u/+`); los tres roles llevan negaciones explícitas (publicar en cualquier otro tópico y
+    (publica solo en `sitio/+/dispositivo/%u/+`), más `pasarela` desde el 15/10 (punto 47); todos llevan negaciones explícitas (publicar en cualquier otro tópico y
     en `$CONTROL`, suscribirse a cualquiera) y el acceso por defecto del plugin se fija en deny, así que ningún rol depende de él,
-    y los clientes `backend` y `sonda`, cuya clave verifica entrando al broker. Repetirlo con un `.env` cambiado rota las claves de
-    `backend` y `sonda`; la del administrador se rota poniendo la vigente en `MQTT_ADMIN_CLAVE_ANTERIOR` y la nueva en
-    `MQTT_ADMIN_CLAVE`. Mosquitto y su plugin: «dual licensed under the Eclipse Public License 2.0 OR the Eclipse Distribution
+    y los clientes `backend` y `sonda`, cuya clave verifica comparándola con el resumen del archivo del plugin, sin conectarse
+    (desde el 25/11/2026; hasta entonces entraba al broker con ella: punto 70); desde esa fecha crea también `admin-guiones`, el administrador de los guiones (rol
+    `admin`, la misma clave; punto 70), y `--roles` aplica solo los roles a un broker que ya corre. Repetirlo con un `.env` cambiado
+    rota las claves de `backend` y `sonda`; la del administrador se rota poniendo la vigente en `MQTT_ADMIN_CLAVE_ANTERIOR` y la nueva
+    en `MQTT_ADMIN_CLAVE` (cambia `backend-admin` y `admin-guiones` en el mismo bloque y lo da por hecho solo si los dos aceptan la
+    nueva y ninguno la anterior). Mosquitto y su plugin: «dual licensed under the Eclipse Public License 2.0 OR the Eclipse Distribution
     License 1.0» (LICENSE.txt del repositorio oficial, leído el 12/10/2026). El backend crea el cliente de cada dispositivo en el alta (punto 41) y lo borrará o rotará con las
     órdenes de `broker/dynsec.ts` (baja y rotación por API, hechas el 13/10/2026: §3); a mano, `pruebas/broker-cliente.sh` (demo y emergencias). Se adopta
     Mosquitto **2.1.2-alpine** fijada por digest (0 vulnerabilidades altas o críticas en el escaneo del 12/10): en 2.0.22 el patrón
@@ -2005,6 +2012,30 @@ entra. Lo que aquí se marca «a fijar al implementar» es un detalle que el dis
     cambios; el p95 de la recepción no empeora con la consulta ampliada (medido); y las fallas plantadas: un campo que no cabe en el
     largo, un alias repetido, un rango que deja fuera un umbral, un operador técnico que escribe el catálogo (403) y, con dos instancias,
     un alias creado en una que vale en la otra desde la trama siguiente.
+70. **El identificador de cliente del broker es el usuario (`use_username_as_clientid`)** (decidido y hecho el 25/11/2026; se
+    detectó al revisar el diseño; `docs/11 §7`, amenaza A10; `docs/16 §102`). **Problema:** MQTT asocia la sesión al identificador de
+    cliente que elige quien se conecta, y el backend recibe con una sesión persistente de identificador conocido (`backend`, §4.1).
+    Con la credencial de un solo equipo, cualquiera podía conectarse con ese identificador: heredaba la suscripción a `sitio/#` y la
+    cola (leía la telemetría de todos los sitios), expulsaba al backend y, con sesión limpia, le borraba la cola; peleando por el
+    identificador se perdía cerca de la mitad de los mensajes (medido en un broker desechable con la configuración del proyecto).
+    **Opciones medidas:** (a) `use_username_as_clientid true` en el listener: el broker reemplaza el identificador por el usuario
+    («it is possible to prevent one client disconnecting another by using the same clientid», `mosquitto.conf(5)`,
+    https://mosquitto.org/man/mosquitto-conf-5.html, consultado el 25/11/2026: vale por listener, «not reloaded on reload signal»); cierra los tres ataques.
+    (b) `publishClientReceive '#' deny` en el rol del dispositivo: sola, cambia la fuga por pérdida (el atacante no recibe,
+    pero la cola igual se entrega a su conexión y se descarta). (c) Atar el identificador del cliente `backend` en el plugin: no
+    reserva el identificador frente a otros usuarios. **Decisión:** (a) como control y (b), también en el rol `pasarela`, como
+    defensa en profundidad. **Consecuencias:** el broker rechaza a quien conecta sin usuario (ya lo hacía `allow_anonymous false`);
+    `MQTT_CLIENT_ID` queda sin efecto con el broker del servidor (§6); dos conexiones con el mismo usuario se expulsan entre sí, así que una réplica del backend
+    necesita su propio usuario (§6, «Escalado»), y si una pasarela o un puente abrieran más de una conexión con la misma credencial,
+    se expulsarían entre sí; ningún guion se conecta con la credencial de otro para probarla (`pruebas/publicar.sh` sí publica como el equipo que se
+    le indica, a propósito, y advierte que lo expulsa si está conectado): `verificar_clave` (`pruebas/lib-dynsec.sh`) la compara con el resumen del
+    archivo del plugin, y los guiones administran como `admin-guiones` (rol `admin`, la misma clave del administrador, creado por
+    `broker-inicializar.sh`), no con la conexión de administración del backend. El firmware y la sonda ya usaban identificador = usuario.
+    El banco de pruebas **no** lleva la opción, declarado en su archivo: rechazaría a los emulados anónimos; la configuración del
+    servidor la prueba `pruebas/broker-sesion.sh` en un broker desechable (paso 2i2 del guardián). Un broker ya inicializado recibe
+    los roles nuevos con `broker-inicializar.sh --roles` (idempotente, no toca ninguna clave) y la opción reiniciando solo el broker;
+    si el broker que corre no cargó `mosquitto.conf` (comparación por fecha y, en el inicializador, el registro en vivo), `--roles`
+    avisa y sale con 2, y la inicialización completa y el guardián (paso 2i) fallan.
 
 ## 9. Crecimiento, resiliencia y respaldo (aprobado el 06/10/2026)
 
@@ -2027,7 +2058,8 @@ construirlo por anticipado. Cada afirmación sobre una herramienta tiene su fuen
 ### 9.2 Por qué escala así
 
 1. **El backend no guarda estado**: todo vive en la base. Copiar instancias es trivial. Lo único «con dueño» es
-   la suscripción MQTT (una sesión persistente por `clientId`), el barrido del supervisor y, desde el 09/10, el bus
+   la suscripción MQTT (una sesión persistente por `clientId`, que desde el 25/11/2026 es el usuario: una réplica, un usuario del
+   broker, §8.4 punto 70), el barrido del supervisor y, desde el 09/10, el bus
    del canal en vivo (§5), que vive en la memoria del proceso: el broker reparte con `$share`, el barrido corre en
    una sola instancia mediante un cerrojo (`pg_advisory_lock`) y el bus pasaría a `LISTEN/NOTIFY` de PostgreSQL,
    porque con varias instancias cada una solo avisaría a los navegadores conectados a ella. El orden entre

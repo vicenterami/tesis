@@ -66,9 +66,10 @@ case "${1:-}" in
     # «emulado»: los emulados (sin usuario) publican bajo sitio/+/dispositivo/+/+ y nada más (ni $CONTROL ni suscribirse).
     esperar_plugin 30 || { echo "FALLA el plugin del broker del banco no responde"; dc logs --no-color mosquitto | tail -5; exit 1; }
     roles_del_sistema || exit 1
+    admin_de_guiones >/dev/null || exit 1   # desde aquí el banco administra como admin-guiones, no con la conexión del backend (25/11)
     cliente_del_sistema backend recepcion "$(leer MQTT_BACKEND_CLAVE)" >/dev/null || exit 1
     cliente_del_sistema sonda sonda "$(leer MQTT_SONDA_CLAVE)" >/dev/null || exit 1
-    rol emulado publishClientSend 'sitio/+/dispositivo/+/+' allow  publishClientSend '#' deny  publishClientSend '$CONTROL/#' deny  subscribePattern '#' deny  subscribeLiteral '#' deny || exit 1
+    rol emulado publishClientSend 'sitio/+/dispositivo/+/+' allow  publishClientSend '#' deny  publishClientSend '$CONTROL/#' deny  subscribePattern '#' deny  subscribeLiteral '#' deny  publishClientReceive '#' deny || exit 1
     exigir "createGroup anonimos" ctrl createGroup anonimos && exigir "addGroupRole anonimos emulado" ctrl addGroupRole anonimos emulado && exigir "setAnonymousGroup anonimos" ctrl setAnonymousGroup anonimos || exit 1
     echo "plugin del broker listo: roles $(ctrl listRoles | tr '\n' ' ')· clientes $(ctrl listClients | tr '\n' ' ')· anónimos = grupo con rol emulado (solo en el banco)"
     dc up -d --build || exit 1
@@ -240,11 +241,17 @@ case "${1:-}" in
     r=$(pub "$CRED" "sitio/banco/dispositivo/emu-0001/temperatura" "$carga"); [[ "$r" == *"RC:135"* ]] && ok "con su credencial NO puede publicar como otro dispositivo (RC:135)" || falla "publicar como otro: $r"
     r=$(pub "clave-equivocada-de-prueba-123456" "$topico" "$carga"); [[ "$r" == *"Connection error"* ]] && ok "con otra clave el broker no lo deja conectar" || falla "con otra clave: $r"
     r=$(pub_anon '$CONTROL/dynamic-security/v1' '{"commands":[{"command":"listClients"}]}'); [[ "$r" == *"RC:135"* ]] && ok "un anónimo (emulado) NO puede dar órdenes al plugin (RC:135)" || falla "anónimo contra \$CONTROL: $r"
-    r=$(pub_como backend "$(leer MQTT_BACKEND_CLAVE)" "$topico" "$carga"); [[ "$r" == *"RC:135"* ]] && ok "el usuario backend (rol recepcion) NO puede publicar como dispositivo (RC:135)" || falla "backend publicando: $r"
-    # Mínimo privilegio del administrador (13/10, docs/11 §9): backend-admin lee $SYS pero ya no puede suscribirse a las tramas.
-    sub_admin() { printf '%s\n' "$(leer MQTT_ADMIN_CLAVE)" | docker run --rm -i --network "$red" "$IMG_BROKER" sh -c 'IFS= read -r C; mosquitto_sub -V mqttv5 -d -h mosquitto -i "verif-admin-$$" -u backend-admin -P "$C" -t "$1" -W 2 -C 1 2>&1' sh "$1" | grep -oE "Subscribed \(mid: [0-9]+\): [0-9]+" | head -1; }
-    r=$(sub_admin 'sitio/#'); [[ "$r" == *": 135" ]] && ok "backend-admin NO puede suscribirse a sitio/# (135; mínimo privilegio)" || falla "backend-admin suscrito a sitio/#: «$r»"
-    r=$(sub_admin '$SYS/broker/clients/connected'); [[ "$r" == *": 0" ]] && ok "backend-admin SÍ lee \$SYS (lo necesita el muestreo de la cola)" || falla "backend-admin y \$SYS: «$r»"
+    # El rol recepcion no publica. Con un cliente de descarte con ese rol, no con `backend` (25/11/2026, docs/11 §7): en el servidor el
+    # usuario es el identificador de cliente, y conectarse como backend con sesión limpia le borraría la sesión y la cola.
+    REC=$(openssl rand -hex 16); dyn_elegir   # el administrador de las órdenes de abajo, elegido una vez (admin-guiones)
+    exigir "createClient dev-prueba-recepcion" ctrlc "$REC" createClient dev-prueba-recepcion -p @C@ && exigir "rol" ctrl addClientRole dev-prueba-recepcion recepcion || falla "no se pudo crear el cliente de descarte con el rol recepcion"
+    r=$(pub_como dev-prueba-recepcion "$REC" "$topico" "$carga"); [[ "$r" == *"RC:135"* ]] && ok "un cliente con el rol recepcion (el del backend) NO puede publicar como dispositivo (RC:135)" || falla "rol recepcion publicando: $r"
+    exigir "deleteClient dev-prueba-recepcion" ctrl deleteClient dev-prueba-recepcion || falla "no se pudo borrar el cliente de descarte"; unset REC
+    # Mínimo privilegio del rol admin (13/10, docs/11 §9): lee $SYS pero ya no puede suscribirse a las tramas. Se prueba con admin-guiones
+    # (mismo rol y clave que backend-admin; 25/11/2026): con backend-admin, en el servidor, se expulsaría la conexión de administración del backend.
+    sub_admin() { printf '%s\n' "$(leer MQTT_ADMIN_CLAVE)" | docker run --rm -i --network "$red" "$IMG_BROKER" sh -c 'IFS= read -r C; mosquitto_sub -V mqttv5 -d -h mosquitto -i "verif-admin-$$" -u admin-guiones -P "$C" -t "$1" -W 2 -C 1 2>&1' sh "$1" | grep -oE "Subscribed \(mid: [0-9]+\): [0-9]+" | head -1; }
+    r=$(sub_admin 'sitio/#'); [[ "$r" == *": 135" ]] && ok "el rol admin NO puede suscribirse a sitio/# (135; mínimo privilegio)" || falla "rol admin suscrito a sitio/#: «$r»"
+    r=$(sub_admin '$SYS/broker/clients/connected'); [[ "$r" == *": 0" ]] && ok "el rol admin SÍ lee \$SYS (lo necesita el muestreo de la cola)" || falla "rol admin y \$SYS: «$r»"
     code=$(post_admin -d "$cuerpo" | tail -1); [ "$code" = 409 ] && ok "repetir el mismo alta → 409" || falla "repetir el alta → $code"
     code=$(post -d "$cuerpo" | tail -1); [ "$code" = 401 ] && ok "sin X-Clave-Admin → 401" || falla "sin clave → $code"
     code=$(post -H "X-Clave-Admin: no-es-la-clave-de-nadie-123456" -d "$cuerpo" | tail -1); [ "$code" = 401 ] && ok "con clave incorrecta → 401" || falla "clave incorrecta → $code"
@@ -311,11 +318,13 @@ case "${1:-}" in
     # broker la desconectó «por acción administrativa» antes de su plazo de 30 s y su salida muestra que se había suscrito. --init hace
     # que matarla termine el contenedor.
     bitacora_broker() { dc logs --no-color --since 2m mosquitto 2>/dev/null; }
-    abrir_sesion() { S_ID="lwl-$RANDOM$RANDOM"; : > "$PRIV/sesion.log"
+    # Con `use_username_as_clientid` (el servidor la lleva; el banco no, docs/11 §7) el registro anota al cliente por su usuario: S_REG es
+    # el nombre con que el broker lo registra.
+    abrir_sesion() { S_ID="lwl-$RANDOM$RANDOM"; S_REG="$S_ID"; grep -qE '^\s*use_username_as_clientid\s+true' pruebas/banco/mosquitto/mosquitto.conf && S_REG="$1"; : > "$PRIV/sesion.log"
       printf '%s\n' "$2" | docker run --rm -i --init --network "$red" "$IMG_BROKER" sh -c 'IFS= read -r C; mosquitto_sub -V mqttv5 -d -h mosquitto -i "$3" -u "$1" -P "$C" -t "$2" -W 30' sh "$1" "$3" "$S_ID" > "$PRIV/sesion.log" 2>&1 & S_PID=$!; S_T0=$SECONDS
-      for _ in $(seq 1 20); do bitacora_broker | grep -q "as $S_ID (" && break; sleep 0.5; done; sleep 1; }
-    sesion_suscrita() { kill -0 "$S_PID" 2>/dev/null && bitacora_broker | grep -q "as $S_ID ("; }
-    sesion_cortada() { ! kill -0 "$S_PID" 2>/dev/null && [ $((SECONDS - S_T0)) -lt 28 ] && bitacora_broker | grep -q "Client $S_ID \[.*\] disconnected: administrative action" && grep -qE 'Subscribed \(mid: [0-9]+\): [0-2]$' "$PRIV/sesion.log"; }
+      for _ in $(seq 1 20); do bitacora_broker | grep -q "as $S_REG (" && break; sleep 0.5; done; sleep 1; }
+    sesion_suscrita() { kill -0 "$S_PID" 2>/dev/null && bitacora_broker | grep -q "as $S_REG ("; }
+    sesion_cortada() { ! kill -0 "$S_PID" 2>/dev/null && [ $((SECONDS - S_T0)) -lt 28 ] && bitacora_broker | grep -q "Client $S_REG \[.*\] disconnected: administrative action" && grep -qE 'Subscribed \(mid: [0-9]+\): [0-2]$' "$PRIV/sesion.log"; }
     cerrar_sesion() { kill "$S_PID" 2>/dev/null; wait "$S_PID" 2>/dev/null; }
     # Espera a que la cuarentena del tópico muestre el motivo esperado (en vez de un sleep fijo) y deja medio segundo al filtro 6.
     esperar_cuarentena() { local c=""; for _ in $(seq 1 20); do c=$(cuarentena "$1"); [[ "$c" == $2 ]] && break; sleep 0.25; done; sleep 0.5; printf '%s' "$c"; }

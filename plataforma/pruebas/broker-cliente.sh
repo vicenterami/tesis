@@ -20,7 +20,7 @@ SONDA_U=$(leer_env .env MQTT_SONDA_USUARIO); SONDA_U=${SONDA_U:-sonda}   # el us
 borrar=0; [ "${1:-}" = "--borrar" ] && { borrar=1; shift; }
 ID="${1:-}"
 [[ "$ID" =~ ^[a-z0-9][a-z0-9-]{2,62}$ ]] || { sed -n '7,8p' "$0" | sed 's/^# *//'; exit 1; }
-case "$ID" in sonda|backend|backend-admin|admin|"$SONDA_U") echo "«$ID» no es un dispositivo: su clave vive en .env y la fija broker-inicializar.sh"; exit 1 ;; esac
+case "$ID" in sonda|backend|backend-admin|admin-guiones|admin|"$SONDA_U") echo "«$ID» no es un dispositivo: su clave vive en .env y la fija broker-inicializar.sh"; exit 1 ;; esac
 esperar_plugin 5 || { echo "FALLA el broker no responde al administrador (¿pila apagada o MQTT_ADMIN_CLAVE distinta?)"; exit 1; }
 
 if [ $borrar = 1 ]; then
@@ -36,17 +36,15 @@ else
   fi
 fi
 
-# Verificación del resultado, no del comando. Para crear/rotar: el dispositivo conecta con la clave nueva y la ACL lo frena en
-# un tópico ajeno (RC:135 = «no autorizado» con la conexión aceptada: prueba la clave sin que llegue nada al pipeline). Con un
-# identificador de cliente propio: con el del dispositivo, el broker expulsaría la sesión del titular si está conectado.
+# Verificación del resultado, no del comando. Para crear/rotar: el plugin acepta la clave nueva (verificar_clave la compara con el
+# resumen de su archivo) y el cliente tiene el rol dispositivo. Sin conectarse (25/11/2026): con `use_username_as_clientid` el
+# broker usa el usuario como identificador, y conectarse con la credencial del equipo expulsaría su sesión si está conectado.
 clientes=$(ctrl listClients)
 if [ $borrar = 1 ]; then
   grep -qx "$ID" <<<"$clientes" && { echo "FALLA: $ID sigue en el plugin"; exit 1; }
   echo "OK    $ID eliminado; el broker ya no lo acepta"
 else
-  r=$(printf '%s\n' "$CLAVE" | docker compose exec -T mosquitto sh -c 'IFS= read -r C; mosquitto_pub -V mqttv5 -d -q 1 -i "verif-$$" -u "$1" -P "$C" -t sitio/verificacion/dispositivo/otro/x -m 1 2>&1' sh "$ID")
-  if grep -q "RC:135" <<<"$r"; then echo "OK    el broker acepta la clave nueva de $ID y su ACL lo limita a su tópico (guárdala en el gestor si aún no lo hiciste)"
-  elif grep -q "Connection error" <<<"$r"; then echo "FALLA: el broker rechaza la clave nueva de $ID ($(grep -oE 'Connection error: .*' <<<"$r" | head -1))"; exit 1
-  else echo "FALLA: resultado inesperado al publicar en un tópico ajeno: $(tail -1 <<<"$r")"; exit 1; fi
+  if verificar_clave "$ID" "$CLAVE"; then echo "OK    el plugin acepta la clave nueva de $ID (guárdala en el gestor si aún no lo hiciste)"
+  else echo "FALLA: el plugin no tiene la clave nueva de $ID"; exit 1; fi
   grep -q "dispositivo" <<<"$(ctrl getClient "$ID")" || { echo "FALLA: $ID no tiene el rol dispositivo"; exit 1; }
 fi

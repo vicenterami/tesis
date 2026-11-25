@@ -71,7 +71,9 @@ bash plataforma/pruebas/publicar.sh temperatura '[{"bn":"dev-0001","n":"temperat
 ```
 
 (`publicar.sh` publica como `dev-0001` con QoS 1 y la clave de `CLAVE_DEV`; es el mismo `mosquitto_pub`
-de siempre, con menos que teclear en vivo.)
+de siempre, con menos que teclear en vivo. **Ojo:** desde el 25/11/2026 el broker usa el usuario como identificador de cliente
+(`docs/11 §7`): si el nodo físico `dev-0001` está conectado, publicar como él lo expulsa y la supervisión lo anota como caída. En
+la demo con el nodo encendido, usar otro equipo dado de alta: `DISPOSITIVO=<otro> CLAVE_DEV=<su clave>`.)
 
 **Ver:** terminal A → `dev-0001: 1/1 lecturas guardadas vía senml` («1/1» = una lectura de una en la
 trama; «vía senml» = el adaptador que la entendió). Luego:

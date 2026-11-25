@@ -382,6 +382,70 @@ done
 if [ -z "$mal" ]; then echo "OK    mosquitto.conf sin passwd/acl y con el plugin; archivo del plugin de 1883 con modo 600; roles y clientes del sistema presentes"
 else echo "FALLA broker:$mal (inicializar o reparar con bash plataforma/pruebas/broker-inicializar.sh)"; fallos=$((fallos+1)); fi
 [ -e "$MC/passwd" ] && echo "AVISO $MC/passwd ya no lo lee el broker: bórralo cuando quieras"
+# 25/11/2026 (docs/11 §7; docs/16 §102): con la credencial de un equipo se podía tomar la sesión persistente del backend eligiendo su
+# identificador de cliente. Control: `use_username_as_clientid true` en CADA listener de la pila (vale por listener); el banco la omite
+# a propósito, porque rechazaría a los emulados anónimos, y lo declara en su archivo. Defensa en profundidad: los roles dispositivo y
+# pasarela niegan recibir lo ajeno. La prueba en ejecución es el paso 2i2; esto es la guardia barata del texto.
+# Por bloque, no por conteo: cada `listener` hasta el siguiente debe traer la opción («per-listener basis», mosquitto.conf(5)); dos
+# líneas bajo un mismo listener, o una antes del primero, no cubren a otro listener. Manda el ÚLTIMO valor del bloque (un `false`
+# posterior anula el `true`), y un `include_dir` o `include` hace fallar: podría sumar un listener que esta guardia no ve.
+bl=$(awk '/^[[:space:]]*listener[[:space:]]/ { if (n) print (ok ? "si" : "no"); n++; ok = 0; next }
+  n && /^[[:space:]]*use_username_as_clientid[[:space:]]+true[[:space:]]*$/ { ok = 1 }
+  n && /^[[:space:]]*use_username_as_clientid[[:space:]]+false[[:space:]]*$/ { ok = 0 }
+  END { if (n) print (ok ? "si" : "no") }' "$MC/mosquitto.conf")
+nl=$(grep -c . <<<"$bl"); nsin=$(grep -cx no <<<"$bl")
+if grep -qE '^[[:space:]]*include(_dir)?[[:space:]]' "$MC/mosquitto.conf"; then
+  echo "FALLA mosquitto.conf incluye otros archivos (include/include_dir): podrían sumar un listener sin use_username_as_clientid que esta guardia no ve"; fallos=$((fallos+1))
+elif [ -n "$bl" ] && [ "$nsin" = 0 ]; then echo "OK    mosquitto.conf: los $nl listener(s) traen use_username_as_clientid true en su bloque, como último valor (nadie toma la sesión de otro usuario)"
+else echo "FALLA mosquitto.conf: $nsin de $nl listener(s) sin use_username_as_clientid true en su bloque: con la credencial de un equipo se toma la sesión del backend (docs/11 §7)"; fallos=$((fallos+1)); fi
+# El texto no basta: use_username_as_clientid «not reloaded on reload signal» (mosquitto.conf(5)), hay que reiniciar el broker. La
+# comparación vive en config_cargada (lib-dynsec.sh, la misma del inicializador): aquí solo POR FECHA (arranque del contenedor contra
+# la última modificación del archivo), porque el verificador no da órdenes al plugin; el inicializador suma la prueba en vivo.
+r_cc=0; m_cc=$(cd plataforma && . pruebas/lib-dynsec.sh && config_cargada mosquitto/config/mosquitto.conf) || r_cc=$?
+if [ "$r_cc" = 0 ]; then echo "OK    el broker de la pila arrancó después de la última modificación de mosquitto.conf (por fecha)"
+elif [ "$r_cc" = 1 ]; then echo "FALLA el broker de la pila no cargó mosquitto.conf → cd plataforma && docker compose restart mosquitto && bash pruebas/broker-inicializar.sh --roles"; echo "$m_cc" | sed 's/^/  /'; fallos=$((fallos+1))
+else echo "──    no hay broker de la pila corriendo: no se comprueba si cargó mosquitto.conf (el bloque de arriba ya exige la pila)"; fi
+# Nadie se conecta como el usuario de recepción ni como el de administración del backend: con el usuario como identificador, un
+# cliente `backend` con sesión limpia expulsa al backend y le borra la sesión y la cola (docs/16 §102), y uno `backend-admin` expulsa
+# su conexión de administración. Ve -u, --username, con espacio, «=» o pegado, con o sin comillas, en archivos rastreados Y en los
+# nuevos sin rastrear (--untracked). No ve un usuario que llega por variable (-u "$U"). Fuera del laboratorio con broker propio
+# (lab-dynsec-anonimos.sh), ninguna guía ni guion lo hace. Plantado el 25/11/2026 con cada forma y en un archivo sin rastrear.
+comoback=$(git grep --untracked -nE -- '(^|[^-[:alnum:]_])(-u|--username)[[:space:]=]*["'"'"']?backend(-admin)?([^-[:alnum:]_]|$)' -- '*.md' '*.sh' ':!plataforma/pruebas/lab-dynsec-anonimos.sh')
+if [ -z "$comoback" ]; then echo "OK    ninguna guía ni guion (rastreado o nuevo) se conecta al broker como backend ni como backend-admin (fuera del laboratorio con broker propio)"
+else echo "FALLA se conecta como backend o backend-admin (expulsa esa conexión del backend; con backend, le borra la cola): usar un cliente de descarte"; echo "$comoback" | sed 's/^/  /'; fallos=$((fallos+1)); fi
+BC=plataforma/pruebas/banco/mosquitto/mosquitto.conf
+if ! grep -qE '^\s*use_username_as_clientid\s+true' "$BC" && grep -qE '^\s*allow_anonymous\s+true' "$BC" && grep -q 'SEGUNDA diferencia deliberada' "$BC"; then
+  echo "OK    el banco omite use_username_as_clientid y lo declara (sus emulados son anónimos; la configuración del servidor la prueba el paso 2i2)"
+else echo "FALLA $BC: o trae use_username_as_clientid (rechazaría a los emulados anónimos) o dejó de declarar la diferencia"; fallos=$((fallos+1)); fi
+python3 -I - plataforma/pruebas/lib-dynsec.sh <<'PY' || fallos=$((fallos+1))
+import re, sys
+t = re.sub(r'\\\n\s*', ' ', open(sys.argv[1], encoding='utf-8').read())
+malos = []
+for rol in ('dispositivo', 'pasarela'):
+    m = re.search(rf'^\s*rol {rol}\s(.*?)\|\| return 1', t, re.M)
+    if not m: malos.append(f'no encontré «rol {rol} …» en roles_del_sistema')
+    elif not re.search(r"publishClientReceive '#' deny", m.group(1)): malos.append(f'el rol {rol} no niega recibir lo ajeno (publishClientReceive \'#\' deny)')
+m = re.search(r'^\s*rol pasarela\s(.*?)\|\| return 1', t, re.M)
+if m and not re.search(r"publishClientReceive 'sitio/\+/pasarela/%u/\+/command/#' allow", m.group(1)): malos.append('la pasarela perdió su permiso de recibir sus comandos')
+for x in malos: print('FALLA', x)
+if not malos: print("OK    lib-dynsec.sh: dispositivo y pasarela niegan recibir lo ajeno; la pasarela conserva sus comandos (prioridad mayor)")
+sys.exit(1 if malos else 0)
+PY
+# El broker de la pila local se reinicializa a mano (no lo hace el verificador): si todavía no tiene los roles nuevos o el administrador
+# de los guiones, se avisa sin fallar; el remedio es idempotente y no rota claves.
+if [ -n "$n" ] && ! grep -qF '"username":"admin-guiones"' <<<"$n"; then
+  echo "AVISO el broker de la pila no tiene admin-guiones: los guiones administran como backend-admin y expulsan una vez su conexión del backend → bash plataforma/pruebas/broker-inicializar.sh --roles"
+fi
+
+paso "2i2. Sesión del broker: con la credencial de un dispositivo nadie toma la sesión persistente del backend (broker desechable con la configuración del servidor y los roles reales; docs/11 §7)"
+# 25/11/2026 (docs/16 §102): tres ataques (heredar la cola, expulsar y borrar con sesión limpia, pelear por el identificador) contra un
+# cliente con el rol del backend; la víctima debe conservar su sesión y recibirlo todo, y el registro del broker anotar al atacante con
+# su propio usuario; además verificar_clave y la rotación de los dos administradores. Plantado sin use_username_as_clientid: fallan 7
+# comprobaciones del cliente y 3 del registro. No toca la pila: el
+# broker es un contenedor propio (tmp-sesion-prueba-<pid>) que se borra al salir. Sin docker o sin node, sale con 3 y se OMITE.
+bash plataforma/pruebas/broker-sesion.sh > "$VT/sesion.txt" 2>&1; r=$?
+grep -E '^(OK|FALLA|SESIÓN|ATAQUES|omitida|──)|bloque\(s\)|comprobación' "$VT/sesion.txt"
+if [ "$r" = 3 ]; then omitidos="$omitidos 2i2"; elif [ "$r" != 0 ]; then fallos=$((fallos+1)); fi
 
 paso "2j. Repositorio público: ningún archivo versionado nombra a personas de la lista privada"
 # La lista vive fuera del repo (NOMBRES_VETADOS; un nombre en este script sería la fuga). Una línea por nombre; palabra

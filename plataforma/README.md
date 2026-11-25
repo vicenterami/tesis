@@ -33,7 +33,7 @@ cp .env.example .env                 # editar las claves
 openssl rand -base64 24              # generar una clave por variable
 
 # Credenciales del broker: viven en su plugin Dynamic Security, en el volumen de datos (docs/11 §7). Un solo comando las crea
-# a partir del .env (administrador backend-admin, los roles y los clientes backend y sonda) y levanta la pila; repetirlo
+# a partir del .env (administradores backend-admin y admin-guiones, los roles y los clientes backend y sonda) y levanta la pila; repetirlo
 # aplica una rotación. Las claves entran al contenedor por la entrada estándar: ni historial ni ps del equipo.
 bash pruebas/broker-inicializar.sh
 # Credencial del dispositivo de la demo (dev-0001; la semilla lo crea en la base sin credencial): clave oculta y verificada.
@@ -65,11 +65,17 @@ docker compose exec timescaledb psql -U plataforma -d plataforma \
   -c "SELECT hypertable_name FROM timescaledb_information.hypertables;"
 ```
 
-Probar el broker (un dispositivo de prueba necesita su credencial en el plugin: `pruebas/broker-cliente.sh`):
+Probar el broker (un dispositivo de prueba necesita su credencial en el plugin: `pruebas/broker-cliente.sh`). Lo que llega se ve en
+el registro del backend, que es quien lo recibe:
 
 ```bash
-read -rs -p "clave de backend: " C && echo && docker compose exec mosquitto mosquitto_sub -u backend -P "$C" -t 'sitio/#' -v; unset C
+docker compose logs -f backend
 ```
+
+**No** te suscribas con el usuario `backend`: desde el 25/11/2026 el broker usa el usuario como identificador de cliente
+(`docs/11 §7`), y un `mosquitto_sub` con ese usuario (sesión limpia por defecto) expulsa al backend y le **borra su sesión y su cola**.
+Para leer `sitio/#` a mano, un cliente de descarte con el rol `recepcion` que se crea y se borra al terminar, como hace
+`pruebas/banco/banco.sh alta` con `dev-prueba-recepcion`. El guardián (paso 2i) falla si una guía o un guion se conecta como `backend`.
 
 Probar el backend contenedorizado (`docker compose ps` debe mostrarlo `healthy`; el override publica su
 puerto solo en `127.0.0.1`, igual que el resto):

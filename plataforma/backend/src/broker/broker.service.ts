@@ -31,7 +31,9 @@ export class BrokerService implements OnModuleInit, OnModuleDestroy {
       // los mensajes QoS 1 de sitio/# y los entrega al reconectar (Mosquitto: persistence true,
       // max_queued_messages). Con clean:true la cola se descartaba: "al menos una vez" solo valía
       // mientras la conexión estuviera viva. Una segunda instancia con el mismo id desconecta a la
-      // primera: es deliberado, el pipeline debe correr en un solo proceso.
+      // primera: es deliberado, el pipeline debe correr en un solo proceso. Desde el 25/11/2026 el broker del servidor ignora este
+      // valor y usa el usuario (`use_username_as_clientid`, docs/10 §8.4 punto 70): así nadie con otra credencial toma esta sesión.
+      // En brokers sin la opción (el del banco) sigue rigiendo.
       clientId: this.config.get<string>('MQTT_CLIENT_ID', 'backend'),
       clean: false,
       // MQTT 3.1.1 explícito: un envío en vivo llega con retain = 0, y el descarte de retenidos de abajo depende de eso (punto 50).

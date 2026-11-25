@@ -13,8 +13,10 @@ export const FORMATOS = [...FORMATOS_DIRECTOS, ...FORMATOS_PASARELA] as const;
 export type Via = (typeof VIAS)[number];
 export type Formato = (typeof FORMATOS)[number];
 
-// Nombres que el broker reserva para el propio sistema (docs/11 §7): nunca pueden ser un dispositivo.
-export const RESERVADOS = ['backend', 'backend-admin', 'sonda', 'admin'] as const;
+// Nombres que el broker reserva para el propio sistema (docs/11 §7): nunca pueden ser un dispositivo. `admin-guiones` (25/11/2026)
+// es el administrador con que operan los guiones de pruebas/ (lib-dynsec.sh): con el usuario como identificador de cliente, un
+// dispositivo con ese nombre chocaría con él.
+export const RESERVADOS = ['backend', 'backend-admin', 'admin-guiones', 'sonda', 'admin'] as const;
 // La misma lista blanca que exige la base (ck_dispositivo_id_fisico, migración 11): minúsculas, dígitos y guion, de 3 a 63.
 // Es también el usuario del broker y se sustituye en el tópico de la ACL (%u), por eso no admite «_», «:» ni mayúsculas.
 export const FORMA_ID_FISICO = /^[a-z0-9][a-z0-9-]{2,62}$/;

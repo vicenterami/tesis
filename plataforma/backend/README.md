@@ -98,8 +98,9 @@ curl -s http://127.0.0.1:3000/salud
 ```
 
 El backend lee `plataforma/.env` (el mismo del Compose): `DB_*` y `MQTT_BACKEND_CLAVE`. Opcional:
-`MQTT_CLIENT_ID` (por defecto `backend`). La sesión MQTT es **persistente**: si el backend cae, el broker
-guarda los mensajes QoS 1 y los entrega al volver; una segunda instancia con el mismo id desconecta a la
+`MQTT_CLIENT_ID` (por defecto `backend`), sin efecto con el broker del servidor desde el 25/11/2026: usa el usuario como identificador
+de cliente (`docs/10 §8.4` punto 70); sigue rigiendo en brokers sin la opción, como el del banco. La sesión MQTT es **persistente**: si el backend cae, el broker
+guarda los mensajes QoS 1 y los entrega al volver; una segunda instancia con el mismo usuario desconecta a la
 primera (deliberado: el pipeline corre en un solo proceso). Detalle en `docs/10 §4.1`.
 
 ## Probar el filtro 1

@@ -21,6 +21,7 @@ describe('validarAlta (HU-11): el cuerpo limpio o los motivos', () => {
     expect(motivos({ ...bueno, id_fisico: 'con espacio' })).toEqual(expect.arrayContaining([expect.stringContaining('id_fisico')]));
     expect(motivos({ ...bueno, id_fisico: 'con_guion_bajo' })).toEqual(expect.arrayContaining([expect.stringContaining('id_fisico')])); // la base tampoco lo admite
     expect(motivos({ ...bueno, id_fisico: 'backend-admin' })).toEqual(expect.arrayContaining([expect.stringContaining('reservado')]));
+    expect(motivos({ ...bueno, id_fisico: 'admin-guiones' })).toEqual(expect.arrayContaining([expect.stringContaining('reservado')]));
     expect(validarAlta({ ...bueno, id_fisico: 'a'.repeat(63) }).id_fisico).toHaveLength(63);
     expect(() => validarAlta({ ...bueno, id_fisico: 'vigia' }, ['vigia'])).toThrow(BadRequestException); // el usuario de la sonda, si no se llama sonda
     expect(motivos({ ...bueno, id_fisico: 'a'.repeat(64) }).length).toBeGreaterThan(0);

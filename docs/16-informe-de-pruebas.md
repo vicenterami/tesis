@@ -4,7 +4,7 @@ Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emu
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
 cubría al escribirse se agregó después: TT-32 (sensor físico) en §43, §44 y §53, y TT-30 (recuperación ante reinicio) en §11. El
-contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 1007 pruebas unitarias del backend y 643 del panel.
+contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 1007 pruebas unitarias del backend y 649 del panel.
 Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -5611,3 +5611,122 @@ las celdas del lote rechazan también los separadores de línea y de párrafo de
 guarda del recorrido compara el nombre del sitio por igualdad. Backend: **1 101 de 1 101 ejecuciones en 80 archivos**, 1 007 `it(`;
 panel: **708 de 708 en 47 archivos**, 643 `it(` y `test(`; `svelte-check`, 448 archivos sin errores; `sitios-zonas-integracion.sh`, 51 de
 51 y las dos del guion; el recorrido en navegadores, 124 de 124 y 0 en las ocho cuentas; el verificador completo, **TODO EN CONCORDANCIA**.
+
+## 102. Sesión persistente del broker: nadie toma la del backend con la credencial de un equipo (25/11/2026)
+
+**Qué se prueba.** Un defecto que se detectó al revisar el diseño (`docs/11 §7`, amenaza A10; `docs/10 §8.4` punto 70): el backend recibe con una
+sesión persistente de identificador conocido (`backend`, `clean: false`), MQTT asocia la sesión al identificador de cliente y no al
+usuario, y nada impedía que otro usuario lo eligiera. La pregunta: ¿qué logra quien tiene la credencial de **un** dispositivo?
+
+**Método.** Broker desechable con la imagen fijada del proyecto (Mosquitto 2.1.2) y su `mosquitto.conf` copiado (solo las rutas de datos
+cambian, a una carpeta neutra montada en `/c`, sin el arranque de la imagen), el plugin con un administrador de descarte y los roles de
+`pruebas/lib-dynsec.sh`; identidades `dev-prueba-*` con claves aleatorias de la misma invocación, nunca impresas. La víctima hace lo mismo
+que el backend (MQTT 3.1.1, `clean: false`, suscrita a `sitio/#` con QoS 1); el atacante tiene el rol `dispositivo` y elige el
+identificador de la víctima. Tres ataques: **A**, con la víctima caída y 5 mensajes en su cola, el atacante entra con sesión persistente
+y se publican 3 más en vivo; **B**, con la víctima conectada, el atacante entra con sesión limpia, y después lo repite con la víctima caída
+y 5 en cola; **C**, los dos reconectan cada 300 ms peleando por el identificador mientras se publican 50 mensajes. Cuatro variantes: sin
+cambios, solo `publishClientReceive '#' deny` en el rol del dispositivo, solo el identificador atado al cliente de la víctima en el
+plugin, y solo `use_username_as_clientid true` en el listener. Evidencia: CONNACK (sesión presente), mensajes contados por prefijo y el
+registro del broker. **De qué corrida sale cada número:** la última columna y «Solo negar» los reproduce la prueba de regresión (su
+corrida normal y su plantado: la configuración sin la opción, con los roles reales); «Sin cambios» y «Solo atar el identificador» son de
+una corrida hecha a mano en el mismo broker desechable, sin guion en el repositorio. En la fila C, «Solo negar» da las dos corridas, la
+hecha a mano y la del guion.
+
+| Ataque (lo que se mide) | Sin cambios | Solo negar «recibir» al dispositivo | Solo atar el identificador en el plugin | `use_username_as_clientid` |
+|---|---|---|---|---|
+| A: lo que recibe el atacante, de 8 | 5 de la cola y 3 en vivo (lee todos los sitios) | 0 | 5 y 3 | 0 |
+| A: lo que recibe la víctima al volver, de 8 | 0 | 0 (se perdieron) | 0 | **8**, sesión presente |
+| B: la víctima conectada, cuando entra el atacante | expulsada | expulsada | expulsada | no expulsada |
+| B: la cola de la víctima tras la sesión limpia del atacante | borrada con la suscripción (0 de 5; 0 de 3 sin volver a suscribirse) | igual | igual | **5 de 5** y 3 de 3 sin volver a suscribirse |
+| C: lo que recibe la víctima, de 50, según el atacante conserve la sesión o la abra limpia | 27 y 24 (12 reconexiones de la víctima) | a mano: 24 y 25; guion: 24 y 24 (12 reconexiones en cada una) | 30 y 24 | **50 y 50** (1 conexión; guion) |
+
+Negar «recibir» solo cambia la fuga por pérdida: la cola igual se entrega a la conexión del atacante y el broker la descarta. Atar el
+identificador al cliente de la víctima no reserva ese identificador para nadie más. Con `use_username_as_clientid` el broker reemplaza
+el identificador del atacante por su propio usuario y su sesión queda aparte. **Decisión:** la opción como control y la negación de
+«recibir» (en `dispositivo` y en `pasarela`, que conserva su subárbol de comandos con prioridad mayor) como defensa en profundidad.
+
+**Prueba de regresión** (`plataforma/pruebas/broker-sesion.sh` y `broker-sesion.mjs`, nuevos; paso 2i2 del verificador). Repite A, B y C
+(C en sus dos variantes: el atacante con sesión persistente y con sesión limpia) con la configuración del servidor tal cual y los roles reales, y exige: la víctima conserva su sesión y recibe toda su cola y lo publicado
+en vivo; el atacante no recibe nada; el registro anota al atacante con su propio usuario, ninguna conexión suya con el identificador de la
+víctima y ninguna toma de su sesión por otro usuario (las tomas por sus propias reconexiones se cuentan aparte); además, que la pasarela
+con su rol real se suscribe a su subárbol de comandos y recibe lo que llega ahí; que el atacante de verdad se conectó en B y en C (sin
+eso, «no expulsada» no probaría nada); que `verificar_clave` acepta la clave correcta y rechaza otra y la de un cliente deshabilitado,
+sin conectarse; y que `rotar_admin` deja a los dos administradores con la clave nueva y a ninguno con la anterior. Resultado: **24 de 24**
+comprobaciones, unos 45 s. **Plantado** (la misma configuración sin la línea, que con los roles reales es la columna «Solo negar»): fallan
+**7 comprobaciones del cliente y 3 del registro** (la víctima recibe 0 de 8 en A, es expulsada en B, y en C recibe 24 de 50 con 12
+reconexiones en cada variante; 25 conexiones del atacante con el identificador de la víctima y 24 tomas de su sesión), y la prueba sale
+con 1 (los «24 y 24» de la tabla). Plantados también: un atacante cuya clave no entra
+(fallan las 5 comprobaciones de que se conectó, en A, B y las dos variantes de C); `verificar_clave` sin mirar `disabled` y la rotación anterior, que cambiaba solo
+`backend-admin` (falla cada una: el segundo administrador conservaba la clave anterior); y un ataque que se cuelga (el tope de 90 s del
+cliente corta y, sin él, el de 120 s del guion: sale 1, nunca cuelga al verificador). Sin la imagen fijada en el equipo, o sin `openssl`,
+`python3` o `timeout`, sale con 3 (omitida) en vez de fallar: plantado con un digest inexistente. La guardia barata del texto va en el paso 2i: la
+opción **en el bloque de cada** listener de la pila y como último valor (no basta contar líneas: una antes del primer `listener` no cubre
+a ninguno, y un `false` posterior la anula), sin `include` que pueda sumar listeners, su ausencia declarada en el banco, la negación en
+los dos roles, que ninguna guía ni guion, rastreado o nuevo, se conecte como `backend` o `backend-admin` (`-u`, `--username`, con
+espacio, «=» o pegado) y que el broker de la pila haya arrancado después de la última modificación de `mosquitto.conf`
+(`use_username_as_clientid` no se relee con la señal de recarga: hay que reiniciar el broker; comparación por fecha en
+`config_cargada`, de `lib-dynsec.sh`, que el inicializador refuerza en vivo: el registro debe anotar a `admin-guiones` por su
+usuario). Plantadas: sin la línea, con la línea en el banco, sin la negación, la opción antes del listener (el conteo anterior la daba
+por buena), un `false` después, un `include_dir`, la guía anterior de `plataforma/README.md` (que se suscribía como `backend`), ocho
+formas de conectarse como `backend` o `backend-admin` en un archivo sin rastrear, y el broker local sin reiniciar tras el cambio:
+fallan todas.
+
+**Lo que la opción cambió en los guiones** (cada uno medido antes en un broker desechable): (1) probar la clave de un usuario
+conectándose con ella ahora toma su sesión; conectarse como `backend` con sesión limpia, como hacía `verificar_clave`, le borraba la
+sesión y la cola (sesión presente 0 y 0 de 5 al volver). `verificar_clave` compara ahora la clave con el resumen del archivo del plugin
+(`$7$`: PBKDF2-SHA512 con sal), sin conectarse; lo usan `broker-inicializar.sh`, `broker-cliente.sh` y el banco. (2) `mosquitto_ctrl`
+con el usuario `backend-admin` expulsaba una vez la conexión de administración del backend en cada orden: los guiones administran como
+`admin-guiones` (rol `admin`, la misma clave del administrador, sin secreto nuevo), que crea el inicializador; si aún no existe, usan
+`backend-admin` como antes. `admin-guiones` pasa a ser un nombre reservado del alta. (3) El caso `alta` del banco ya no publica como
+`backend`: usa un cliente de descarte con el rol `recepcion` y lo borra; el mínimo privilegio del rol `admin` se prueba con
+`admin-guiones`. (4) Las sesiones del caso `lorawan` buscan en el registro el nombre con que el broker registra al cliente (su usuario si
+el broker tiene la opción). (5) El banco **no** lleva la opción, declarado en su archivo: rechazaría a los emulados anónimos; la
+configuración del servidor la prueba el paso 2i2. (6) Un broker ya inicializado recibe los roles nuevos con
+`broker-inicializar.sh --roles`: probado sobre roles creados con la biblioteca anterior, agrega la negación sin tocar lo demás, y repetido
+no cambia nada ni da error; al final avisa (y sale con 2) si el broker no cargó `mosquitto.conf`, con el remedio, y la inicialización
+completa lo cuenta como falla. (7) La rotación de la clave del administrador cambia **los dos** usuarios con el rol `admin` (`backend-admin` y
+`admin-guiones`) en el mismo bloque, cada uno desde el otro, y dice «rotada» solo si los dos aceptan la nueva y ninguno la anterior:
+antes cambiaba solo `backend-admin`, y la clave que se quería revocar seguía sirviendo en `admin-guiones`. (8) `plataforma/README.md`
+ya no enseña a suscribirse como `backend` (expulsaba al backend y le borraba la cola): remite al registro del backend o a un cliente
+de descarte con el rol `recepcion`. (9) `pruebas/publicar.sh` se conecta como el equipo que se le indica: su cabecera y `docs/15 §2`
+advierten que, si ese equipo está conectado, el broker lo expulsa; desde el 25/11/2026 la clave le entra por la entrada estándar, no por
+los argumentos del proceso (comprobado en un broker desechable con un envoltorio de `docker` que anota sus argumentos: la versión anterior
+dejaba la clave ahí). (10) `exigir` falla si la orden no llegó a correr en el contenedor del broker (antes daba 0 con el broker caído)
+y también ante «Connection error: Not authorized» y «Connection lost» de `mosquitto_ctrl`, que sale con 0 (comprobado contra el broker;
+plantado con una clave equivocada); un candado (`flock`) serializa las órdenes de administración de los guiones, que comparten
+`admin-guiones` y se expulsarían entre sí (plantado: dos órdenes en paralelo ya no se solapan), y si no lo obtiene en su plazo la
+orden falla (plantado con el candado tomado por otro proceso); `acotar_admin` exige leer el rol antes de darlo por acotado (plantado con
+una respuesta «Connection error», que antes pasaba); la comprobación de que un administrador
+«todavía acepta la clave anterior» se repite antes de declararla (plantado con una lectura atrasada del archivo del plugin); y
+`verificar_clave` ya no consume la entrada estándar de quien la llama.
+
+**Banco después de los cambios** (pila «banco», backend construido desde este código): `encender` sin fallas (las migraciones
+reaplicadas sin cambiar el esquema: idempotentes); `alta`, 40 de 40; `lorawan`, 46 de 46 (las cuatro sesiones abiertas y cortadas por rotación y baja,
+incluidas); `carrera`, 6 de 6; `vias`, 28 de 28; `correr` de 30 s con 100 emulados, 1 508 tramas, 3 016 lecturas, 0 perdidas y p95 de
+5 ms. Repetidos después de las correcciones (7) a (9), y otra vez después de cada parte de la (10), que cambia cómo los guiones dan órdenes al
+plugin: `encender` sin fallas, `alta` 40 de 40, `lorawan` 46 de 46 y `vias` 28 de 28 las tres veces.
+
+**Pila local.** Respaldo previo con `pg_dump`. `--roles` sobre el broker sin reiniciar dio el aviso y salió con 2 (el plantado natural
+de la guardia nueva); tras `docker compose restart mosquitto`, `ROLES APLICADOS`, el registro del broker anota al backend como
+`backend (p4, c0…)` (su usuario, sesión persistente) y el backend volvió a suscribirse a `sitio/#`; `/salud` en verde.
+`sesion-smoke.sh`, 541 de 541; `api-smoke.sh`, TODO OK.
+
+## 103. Confirmación antes de «Asignar clave temporal» (docs/19 §4, P10; 25/11/2026)
+
+**Qué se prueba.** Asignar una clave temporal no se deshace (reemplaza la clave, cierra las sesiones de esa persona y la temporal se ve
+una sola vez), y el botón la asignaba al primer clic. Ahora abre en la fila una confirmación que nombra a la persona (`docs/19 §4`,
+`docs/20 §4`); el servidor no cambia.
+
+**Pruebas del panel** (`Usuarios.test.ts`, seis nuevas): el primer clic no envía nada y la confirmación nombra a la persona; Cancelar y
+Escape cierran sin enviar y devuelven el foco al botón; confirmar envía un solo PATCH y muestra el aviso de «una vez»; si ya tiene una
+temporal sin usar y vigente, lo dice, y vencida no; un solo formulario en línea a la vez (la baja y la temporal se cierran entre sí); y
+si la fila cambia con la confirmación abierta (queda inactiva), se cierra y no reaparece al reactivarse; y con otro cambio en vuelo,
+confirmar no envía nada y la confirmación sigue abierta aunque haya un aviso de éxito (de un alta que terminó entretanto). La
+confirmación se cierra solo si su propio cambio se aplicó (`cambiar` lo devuelve), y lo mismo la de la baja. **Plantados:** sin el
+cierre automático, la confirmación reaparecía sola; cerrándola por el aviso de éxito, se cerraba sin haber asignado nada. El botón de confirmar repite el motivo de desactivación del de la fila.
+Las pruebas que ya asignaban la temporal agregan el clic de confirmar.
+
+**Resultado.** Backend: **1101 de 1101 ejecuciones en 80 archivos**, 1007 `it(`; `tsc` y lint sin errores. Panel: **714 de 714 en 47
+archivos**, 649 `it(` y `test(`; `svelte-check`, 448 archivos sin errores. El recorrido en navegadores con sesión (`e2e/sesion.mjs`, que
+ahora confirma antes de asignar la temporal), 334 de 334 en Chromium y Firefox; el de sitios y zonas, 124 de 124, con su comprobación
+previa ampliada a los intentos de acceso de sus correos (`panel-estructura-e2e.sh`; la limpieza ya los borraba).

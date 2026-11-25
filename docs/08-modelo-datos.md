@@ -589,7 +589,7 @@ consistente para reportes.
       LoRaWAN (HU-02, `docs/10 §8.4` punto 47) no la escribe: la «última vez vista» de una pasarela se deriva de sus nodos. Cuando se
       supervise la pasarela por sí misma (HU-15), pasa a una tabla de estado, como la del dispositivo (punto 27).
 - [ ] **Motivo de cuarentena propio para el sitio ajeno** (`sitio_ajeno`; hoy cae en `no_registrado` con el detalle) y
-      **nombres reservados del broker** (`backend`, `sonda`, `admin`) fuera de `id_fisico` (revisión del 09/10): en la
+      **nombres reservados del broker** (los de `RESERVADOS` en `alta/alta.dto.ts`: `backend`, `backend-admin`, `admin-guiones`, `sonda`, `admin`) fuera de `id_fisico` (revisión del 09/10): en la
       próxima migración de esquema.
 - [ ] **Eliminar `dispositivo.visto_por_ultima_vez`** (DEPRECADA desde la migración 11) en una migración posterior, cuando
       ningún backend desplegado la lea (convención de deprecación, §6).
