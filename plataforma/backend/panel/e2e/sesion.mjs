@@ -466,6 +466,7 @@ for (const caso of casos) {
       // «Olvidé mi clave»: una temporal nueva para la misma persona. Se ve UNA vez (solo en el aviso, nunca en la fila de la lista) y la
       // del alta deja de estar en la página; al ocultarla, ninguna de las dos queda.
       await p.locator(`[data-usuario="${caso.consulta.email}"] [data-asignar-temporal]`).click();
+      await p.locator(`[data-usuario="${caso.consulta.email}"] [data-confirmar-temporal]`).click(); // pide confirmar (25/11/2026)
       await p.waitForFunction((anterior) => { const t = document.querySelector('[data-clave-temporal]')?.textContent?.trim(); return !!t && t !== anterior; }, clave, { timeout: 15000 });
       const otra = (await p.locator('[data-clave-temporal]').textContent()).trim();
       const html = await p.content();

@@ -130,6 +130,8 @@
   12/10/2026); si vence antes de entregarla, el administrador emite otra. Un valor inválido detiene el arranque (`arranque.ts`,
   `horasClaveTemporal`); la vigencia se prueba con reloj simulado y se corrobora con el instante guardado, y el panel muestra la hora de
   vencimiento que devuelve el servidor (`clave_temporal_vence_en`), nunca un plazo propio.
+  El panel pide confirmar antes de asignarla (25/11/2026), porque no se deshace: la clave anterior no vuelve, se cierran todas las sesiones
+  de esa persona y la temporal se muestra una sola vez; el servidor no cambia (`docs/19 §4`, P10).
 - **Alta de usuarios:** solo un administrador; sin registro abierto. Un usuario se desactiva, no se borra (su rastro en
   `evento` y `acceso` lo necesita); al darse de baja, se anonimiza (§11).
 

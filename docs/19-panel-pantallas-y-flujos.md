@@ -257,7 +257,13 @@ persona lo encuentra:
    muestra la clave temporal **una sola vez**, con «Copiar» y el aviso de que no se vuelve a ver; «Ya la entregué: ocultar» la borra de la
    página. Un correo de una cuenta inactiva (409 `reactivable`) ofrece «Reactivar» en vez de crear otra. «Desactivar» pide el **motivo**
    (1–300, con el aviso «sin nombres ni datos personales»: queda en el registro de cambios) antes de enviar; «Activar» reactiva con una
-   clave temporal nueva, que se muestra una vez (la de antes no vuelve; correcciones del 11/11/2026). Todo cambio lleva el
+   clave temporal nueva, que se muestra una vez (la de antes no vuelve; correcciones del 11/11/2026). «Asignar clave temporal» no se ejecuta
+   al primer clic (25/11/2026: se apretó sin querer, y no se deshace: reemplaza la clave, cierra sus sesiones y la temporal se ve una sola
+   vez y vence en pocas horas): abre en la misma fila una confirmación, con el patrón de la baja y un solo formulario en línea abierto a la
+   vez, que dice «Vas a asignar una clave temporal a «nombre». Su clave actual deja de servir y se cierran sus sesiones abiertas. La
+   temporal se muestra una sola vez y vence en pocas horas: si no la usa a tiempo, habrá que asignar otra. No se puede deshacer.» (y, si ya
+   tiene una sin usar y vigente, «Ya tiene una temporal sin usar (vence el …): también deja de servir.»), con «Asignar clave temporal»
+   (confirma) y «Cancelar»; Cancelar o Escape devuelven el foco al botón. «Activar» sigue en un clic. Todo cambio lleva el
    `actualizado_en` leído: un 409 muestra «Alguien lo cambió entretanto: recarga» con el botón «Recargar», y el selector vuelve a lo
    leído (nunca pisa). Los botones que no aplican dicen por qué al lado («no puedes desactivarte a ti mismo», «actívalo primero», «es
    administrador del sistema: solo otro administrador del sistema cambia su cuenta»).

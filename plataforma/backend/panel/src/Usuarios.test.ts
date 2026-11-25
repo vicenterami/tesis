@@ -134,12 +134,115 @@ describe('Usuarios (P10)', () => {
     expect(filaDe('dani@ejemplo.invalid').querySelector<HTMLButtonElement>('[data-asignar-temporal]')!.disabled).toBe(true);
     expect(filaDe('dani@ejemplo.invalid').textContent).toContain('actívalo primero');
     await fireEvent.click(filaDe('bea@ejemplo.invalid').querySelector('[data-asignar-temporal]')!);
+    await fireEvent.click(filaDe('bea@ejemplo.invalid').querySelector('[data-confirmar-temporal]')!);
     await waitFor(() => expect(document.querySelector('[data-clave-temporal]')?.textContent).toBe('Otra-temporal-987654321'));
     expect(pedidos.find((p) => p.metodo === 'PATCH')).toMatchObject({ cuerpo: { actualizado_en: '2026-11-08T12:30:00.123456Z', clave_temporal: true } });
     // La hora del vencimiento, en formato de 24 h (docs/19 §6: nunca «p. m.»; lo mostró la primera captura con navegador)
     const estado = filaDe('bea@ejemplo.invalid').querySelector('[data-estado-usuario]')!.textContent!;
     expect(estado).toMatch(/vence el .+, \d{2}:\d{2} UTC/);
     expect(estado).not.toMatch(/[ap]\.\s?m\./);
+  });
+
+  it('asignar la temporal pide confirmar: el primer clic no envía nada y nombra a la persona; Cancelar no envía y devuelve el foco', async () => {
+    render(Usuarios, { sesion: SESION });
+    await waitFor(() => expect(filaDe('bea@ejemplo.invalid')).toBeTruthy());
+    const boton = filaDe('bea@ejemplo.invalid').querySelector<HTMLButtonElement>('[data-asignar-temporal]')!;
+    pedidos.length = 0;
+    await fireEvent.click(boton);
+    expect(pedidos.filter((p) => p.metodo === 'PATCH')).toHaveLength(0);
+    const aviso = filaDe('bea@ejemplo.invalid').querySelector('[data-confirmar-temporal-aviso]')!;
+    expect(aviso.textContent).toContain('Vas a asignar una clave temporal a Bea.');
+    expect(aviso.textContent).toContain('No se puede deshacer');
+    expect(aviso.querySelector('[data-temporal-previa]')).toBeNull();
+    await fireEvent.click(filaDe('bea@ejemplo.invalid').querySelector('[data-cancelar-temporal]')!);
+    expect(pedidos.filter((p) => p.metodo === 'PATCH')).toHaveLength(0);
+    expect(filaDe('bea@ejemplo.invalid').querySelector('[data-confirmar-temporal-aviso]')).toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(boton));
+    // Escape cierra igual y devuelve el foco
+    await fireEvent.click(boton);
+    await fireEvent.keyDown(filaDe('bea@ejemplo.invalid').querySelector('[data-confirmar-temporal]')!, { key: 'Escape' });
+    expect(filaDe('bea@ejemplo.invalid').querySelector('[data-confirmar-temporal-aviso]')).toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(boton));
+    expect(pedidos.filter((p) => p.metodo === 'PATCH')).toHaveLength(0);
+  });
+
+  it('confirmar envía el PATCH y muestra el aviso de «una vez»', async () => {
+    respuestaPatch = () => new Response(JSON.stringify({ ...bea, clave_temporal: true, clave_temporal_vence_en: '2026-11-09T12:00:00Z', clave: 'Otra-temporal-987654321' }));
+    render(Usuarios, { sesion: SESION });
+    await waitFor(() => expect(filaDe('bea@ejemplo.invalid')).toBeTruthy());
+    await fireEvent.click(filaDe('bea@ejemplo.invalid').querySelector('[data-asignar-temporal]')!);
+    expect(pedidos.filter((p) => p.metodo === 'PATCH')).toHaveLength(0);
+    await fireEvent.click(filaDe('bea@ejemplo.invalid').querySelector('[data-confirmar-temporal]')!);
+    await waitFor(() => expect(document.querySelector('[data-clave-una-vez]')!.textContent).toContain('No se vuelve a mostrar'));
+    expect(pedidos.filter((p) => p.metodo === 'PATCH')).toHaveLength(1);
+    expect(filaDe('bea@ejemplo.invalid').querySelector('[data-confirmar-temporal-aviso]')).toBeNull();
+  });
+
+  it('si ya tiene una temporal sin usar y vigente, la confirmación lo dice; vencida, no', async () => {
+    const futuro = new Date(Date.now() + 3600_000).toISOString();
+    const pasado = new Date(Date.now() - 3600_000).toISOString();
+    lista = [yo, { ...bea, clave_temporal: true, clave_temporal_vence_en: futuro }, { ...bea, id: 'u-eli', nombre: 'Eli', email: 'eli@ejemplo.invalid', clave_temporal: true, clave_temporal_vence_en: pasado }];
+    render(Usuarios, { sesion: SESION });
+    await waitFor(() => expect(filaDe('eli@ejemplo.invalid')).toBeTruthy());
+    await fireEvent.click(filaDe('bea@ejemplo.invalid').querySelector('[data-asignar-temporal]')!);
+    expect(filaDe('bea@ejemplo.invalid').querySelector('[data-temporal-previa]')!.textContent).toContain('Ya tiene una temporal sin usar (vence el');
+    await fireEvent.click(filaDe('eli@ejemplo.invalid').querySelector('[data-asignar-temporal]')!);
+    expect(filaDe('eli@ejemplo.invalid').querySelector('[data-temporal-previa]')).toBeNull();
+  });
+
+  it('un solo formulario en línea a la vez: abrir la confirmación de la temporal cierra la baja, y al revés', async () => {
+    render(Usuarios, { sesion: SESION });
+    await waitFor(() => expect(filaDe('bea@ejemplo.invalid')).toBeTruthy());
+    const fila = () => filaDe('bea@ejemplo.invalid');
+    await fireEvent.click(fila().querySelector('[data-alternar-activo]')!);
+    expect(fila().querySelector('[data-baja-motivo]')).not.toBeNull();
+    await fireEvent.click(fila().querySelector('[data-asignar-temporal]')!);
+    expect(fila().querySelector('[data-baja-motivo]')).toBeNull();
+    expect(fila().querySelector('[data-confirmar-temporal-aviso]')).not.toBeNull();
+    await fireEvent.click(fila().querySelector('[data-alternar-activo]')!);
+    expect(fila().querySelector('[data-confirmar-temporal-aviso]')).toBeNull();
+    expect(fila().querySelector('[data-baja-motivo]')).not.toBeNull();
+  });
+
+  it('si la fila cambia con la confirmación abierta (queda inactiva), la confirmación se cierra y no reaparece al reactivarse', async () => {
+    render(Usuarios, { sesion: SESION });
+    await waitFor(() => expect(filaDe('bea@ejemplo.invalid')).toBeTruthy());
+    const fila = () => filaDe('bea@ejemplo.invalid');
+    await fireEvent.click(fila().querySelector('[data-asignar-temporal]')!);
+    expect(fila().querySelector('[data-confirmar-temporal-aviso]')).not.toBeNull();
+    // Un cambio de rol responde con la fila inactiva (otra persona la desactivó entretanto): la confirmación se cierra
+    await fireEvent.change(fila().querySelector('[data-rol-sitio="uct"]')!, { target: { value: 'administrador' } });
+    await waitFor(() => expect(fila().querySelector('[data-confirmar-temporal-aviso]')).toBeNull());
+    // Vuelve a estar activa: la confirmación no reaparece sola
+    respuestaPatch = () => new Response(JSON.stringify({ ...bea, activo: true, actualizado_en: '2026-11-08T14:00:00.000000Z' }));
+    await fireEvent.change(fila().querySelector('[data-rol-sitio="uct"]')!, { target: { value: 'consulta' } });
+    await waitFor(() => expect(fila().querySelector<HTMLButtonElement>('[data-asignar-temporal]')!.disabled).toBe(false));
+    expect(fila().querySelector('[data-confirmar-temporal-aviso]')).toBeNull();
+    expect(pedidos.filter((p) => p.metodo === 'PATCH' && (p.cuerpo as { clave_temporal?: boolean }).clave_temporal === true)).toHaveLength(0);
+  });
+
+  it('con otro cambio en vuelo, confirmar la temporal no envía nada y la confirmación sigue abierta (aunque haya un aviso de éxito)', async () => {
+    const cami: UsuarioListado = { ...bea, id: 'u-cami', nombre: 'Cami', email: 'cami@ejemplo.invalid' };
+    lista = [yo, bea, cami];
+    respuestaPatch = () => new Response(JSON.stringify({ ...cami, actualizado_en: '2026-11-08T13:00:00.000000Z', sitios: [{ sitio_id: 's-uct', codigo: 'uct', rol: 'administrador' }] }));
+    render(Usuarios, { sesion: SESION });
+    await waitFor(() => expect(filaDe('cami@ejemplo.invalid')).toBeTruthy());
+    // Un cambio que termina bien deja un aviso de éxito
+    await fireEvent.change(filaDe('cami@ejemplo.invalid').querySelector('[data-rol-sitio="uct"]')!, { target: { value: 'administrador' } });
+    await waitFor(() => expect(document.body.textContent).toContain('Cami es ahora'));
+    await fireEvent.click(filaDe('bea@ejemplo.invalid').querySelector('[data-asignar-temporal]')!);
+    // Otro cambio queda en vuelo (el servidor no responde todavía)
+    respuestaPatch = (() => new Promise<Response>(() => {})) as unknown as () => Response;
+    await fireEvent.change(filaDe('cami@ejemplo.invalid').querySelector('[data-rol-sitio="uct"]')!, { target: { value: 'consulta' } });
+    // Mientras tanto, un alta termina bien y deja su aviso de éxito (el alta no espera a los cambios de fila)
+    await fireEvent.input(screen.getByLabelText('Nombre'), { target: { value: 'Ceci' } });
+    await fireEvent.input(screen.getByLabelText('Correo'), { target: { value: 'ceci@ejemplo.invalid' } });
+    await fireEvent.click(screen.getByRole('button', { name: 'Dar de alta' }));
+    await waitFor(() => expect(document.querySelector('[data-clave-temporal]')?.textContent).toBe('Tmp-una-sola-vez-123456'));
+    await fireEvent.click(filaDe('bea@ejemplo.invalid').querySelector('[data-confirmar-temporal]')!);
+    await new Promise((r) => setTimeout(r, 50));
+    expect(pedidos.filter((p) => p.metodo === 'PATCH' && (p.cuerpo as { clave_temporal?: boolean }).clave_temporal === true)).toHaveLength(0);
+    expect(filaDe('bea@ejemplo.invalid').querySelector('[data-confirmar-temporal-aviso]')).not.toBeNull();
   });
 
   it('el servidor simulado exige lo mismo que el real: una baja sin motivo y una reactivación sin clave temporal → 400', async () => {
@@ -217,6 +320,7 @@ describe('Usuarios (P10)', () => {
     render(Usuarios, { sesion: SESION });
     await waitFor(() => expect(filaDe('bea@ejemplo.invalid')).toBeTruthy());
     await fireEvent.click(filaDe('bea@ejemplo.invalid').querySelector('[data-asignar-temporal]')!);
+    await fireEvent.click(filaDe('bea@ejemplo.invalid').querySelector('[data-confirmar-temporal]')!);
     await waitFor(() => expect(document.querySelector('[data-clave-temporal]')).toBeTruthy());
     const code = document.querySelector('[data-clave-temporal]')!;
     expect(code.closest('[role="status"], [aria-live]')).toBeNull();
@@ -231,6 +335,7 @@ describe('Usuarios (P10)', () => {
     render(Usuarios, { sesion: SESION });
     await waitFor(() => expect(filaDe('bea@ejemplo.invalid')).toBeTruthy());
     await fireEvent.click(filaDe('bea@ejemplo.invalid').querySelector('[data-asignar-temporal]')!);
+    await fireEvent.click(filaDe('bea@ejemplo.invalid').querySelector('[data-confirmar-temporal]')!);
     await waitFor(() => expect(document.querySelector('[data-vence-temporal]')).toBeTruthy());
     const esperado = '8 de noviembre de 2026, 16:00 UTC'; // sin zona propia: UTC dicho explícitamente
     expect(document.querySelector('[data-vence-temporal]')!.textContent).toBe(esperado);
@@ -246,6 +351,7 @@ describe('Usuarios (P10)', () => {
       render(Usuarios, { sesion: SESION });
       await waitFor(() => expect(filaDe('bea@ejemplo.invalid')).toBeTruthy());
       await fireEvent.click(filaDe('bea@ejemplo.invalid').querySelector('[data-asignar-temporal]')!);
+      await fireEvent.click(filaDe('bea@ejemplo.invalid').querySelector('[data-confirmar-temporal]')!);
       await waitFor(() => expect(document.querySelector('[data-vence-temporal]')).toBeTruthy());
       expect(document.querySelector('[data-vence-temporal]')!.textContent).toBe('9 de noviembre de 2026, 01:00');
     } finally {

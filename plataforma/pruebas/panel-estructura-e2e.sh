@@ -47,7 +47,7 @@ restos() {
   sql -F ' ' -c "SELECT (SELECT count(*) FROM sitio WHERE codigo = '$SA' OR codigo LIKE 'sede-e2e-$P%'), (SELECT count(*) FROM zona z JOIN sitio s ON s.id = z.sitio_id WHERE s.codigo = '$SA' OR s.codigo LIKE 'sede-e2e-$P%'),
     (SELECT count(*) FROM dispositivo WHERE id_fisico LIKE '$P%'), (SELECT count(*) FROM usuario WHERE email LIKE '%$DOM'), (SELECT count(*) FROM evento e WHERE e.detalle::text LIKE '%$P%'),
     (SELECT count(*) FROM sesion se JOIN usuario u ON u.id = se.usuario_id WHERE u.email LIKE '%$DOM'), (SELECT count(*) FROM usuario_sitio us JOIN usuario u ON u.id = us.usuario_id WHERE u.email LIKE '%$DOM'),
-    (SELECT count(*) FROM preferencia pr JOIN usuario u ON u.id = pr.usuario_id WHERE u.email LIKE '%$DOM');"
+    (SELECT count(*) FROM preferencia pr JOIN usuario u ON u.id = pr.usuario_id WHERE u.email LIKE '%$DOM'), (SELECT count(*) FROM acceso WHERE email_intentado LIKE '%$DOM');"
 }
 # Lo que esta corrida escribió FUERA de sus sitios: eventos de sitio o de zona de sus personas cuyo sitio no es de la corrida, y cualquier evento
 # de ellas sobre un equipo que no es de la corrida. Son la huella de una escritura en un sitio real; deben ser 0.
@@ -119,16 +119,16 @@ COMMIT;
 SQL
   local r
   r=$(restos)
-  echo "lo que quedó de la corrida $N (sitios zonas dispositivos personas eventos sesiones usuario_sitio preferencias): $r"
+  echo "lo que quedó de la corrida $N (sitios zonas dispositivos personas eventos sesiones usuario_sitio preferencias accesos): $r"
   rm -rf "$T"
-  [ "$r" = "0 0 0 0 0 0 0 0" ] || { echo "FALLA quedaron filas de la corrida $N en la base"; exit 1; }
+  [ "$r" = "0 0 0 0 0 0 0 0 0" ] || { echo "FALLA quedaron filas de la corrida $N en la base"; exit 1; }
 }
 # El identificador tiene que estar libre ANTES de armar la limpieza: si ya hay algo con él (un sitio es<N> o sede-e2e-es<N>…, personas *-<N>@…,
-# equipos es<N>-…, eventos que lo nombran), la limpieza lo borraría sin haberlo creado. Se elige otro, pocas veces; si no, se sale sin limpiar.
+# equipos es<N>-…, eventos que lo nombran, intentos de acceso con esos correos), la limpieza lo borraría sin haberlo creado. Se elige otro, pocas veces; si no, se sale sin limpiar.
 libre=""
 for intento in 1 2 3 4 5; do
   r=$(restos 2>/dev/null) || { echo "FALLA no se pudo comprobar en la base si el identificador de la corrida está libre"; exit 1; }
-  [ "$r" = "0 0 0 0 0 0 0 0" ] && { libre=1; break; }
+  [ "$r" = "0 0 0 0 0 0 0 0 0" ] && { libre=1; break; }
   echo "AVISO el identificador $P ya está en uso en la base ($r): se elige otro"
   nueva_corrida
 done

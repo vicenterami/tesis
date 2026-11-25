@@ -5,7 +5,7 @@
   // cuatro perfiles en cada uno de sus sitios (el administrador del sistema, además, el perfil global). Todo cambio lleva el `actualizado_en` leído: si otra persona
   // lo cambió entretanto, 409 y el aviso pide recargar (nunca pisa). La guía de perfiles sale de la matriz de permisos del servidor
   // (lib/ayudas.ts): no puede decir algo distinto de lo que el servidor permite.
-  import { onMount } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import Aviso from './Aviso.svelte';
   import Boton from './Boton.svelte';
   import Tooltip from './Tooltip.svelte';
@@ -57,6 +57,18 @@
   // La baja: el motivo se escribe en la fila antes de confirmar (el servidor lo exige; migración 24).
   let bajaDe = $state<string | null>(null);
   let motivoBaja = $state('');
+  // La temporal: se confirma en la fila antes de enviar (no se deshace: reemplaza la clave, cierra sus sesiones y se ve una sola vez).
+  let temporalDe = $state<string | null>(null);
+  // Por qué no se le puede asignar (null si se puede): lo usan el botón de la fila y el de confirmar.
+  const motivoTemporal = (u: UsuarioListado): string | null =>
+    u.id === yo ? 'tu clave la cambias tú, desde la cabecera' : !u.activo ? 'actívalo primero' : intocable(u);
+  // Si la fila cambia con la confirmación abierta (la lista se recarga y la persona quedó inactiva o pasó a administradora del
+  // sistema, o desapareció), la confirmación se cierra y no reaparece sola cuando la condición vuelve a cumplirse.
+  $effect(() => {
+    if (temporalDe === null) return;
+    const u = usuarios.find((x) => x.id === temporalDe);
+    if (u === undefined || motivoTemporal(u) !== null) temporalDe = null;
+  });
 
   const lista = ultimaGana(); // una recarga nueva cancela la anterior: la respuesta vieja nunca pisa a la nueva
   async function cargar(): Promise<void> {
@@ -100,8 +112,9 @@
     }
   }
 
-  async function cambiar(u: UsuarioListado, cambio: CambioUsuario, exito: string): Promise<void> {
-    if (ocupado !== null) return;
+  // Devuelve true solo si este cambio se aplicó (no si se descartó porque otro estaba en vuelo, ni si falló).
+  async function cambiar(u: UsuarioListado, cambio: CambioUsuario, exito: string): Promise<boolean> {
+    if (ocupado !== null) return false;
     ocupado = u.id;
     aviso = null;
     try {
@@ -111,9 +124,11 @@
       if (clave !== null) mostrarClave({ ...r, clave });
       usuarios = nueva;
       aviso = { tipo: 'exito', texto: exito };
+      return true;
     } catch (x) {
       aviso = avisoDeError(x);
       version++;
+      return false;
     } finally {
       ocupado = null;
     }
@@ -139,14 +154,28 @@
   }
 
   function abrirBaja(u: UsuarioListado): void {
+    temporalDe = null;
     bajaDe = u.id;
     motivoBaja = '';
+  }
+  function abrirTemporal(u: UsuarioListado): void {
+    bajaDe = null;
+    temporalDe = u.id;
+  }
+  // Cancelar o Escape: cierra y devuelve el foco al botón que abrió la confirmación.
+  function cerrarTemporal(u: UsuarioListado): void {
+    temporalDe = null;
+    void tick().then(() => document.querySelector<HTMLElement>(`[data-usuario="${CSS.escape(u.email)}"] [data-asignar-temporal]`)?.focus());
+  }
+  async function confirmarTemporal(u: UsuarioListado): Promise<void> {
+    if (motivoTemporal(u) !== null) return;
+    // Se cierra solo si ESTA asignación se hizo: con otro cambio en vuelo, cambiar no envía nada y la confirmación sigue abierta.
+    if (await cambiar(u, cambioTemporal(u), `${u.nombre} tiene una clave temporal nueva.`)) temporalDe = null;
   }
   async function confirmarBaja(e: SubmitEvent, u: UsuarioListado): Promise<void> {
     e.preventDefault();
     if (motivoDeBajaInvalido(motivoBaja) !== null) return;
-    await cambiar(u, cambioBaja(u, motivoBaja), `${u.nombre} quedó inactivo.`);
-    if (aviso?.tipo === 'exito') bajaDe = null;
+    if (await cambiar(u, cambioBaja(u, motivoBaja), `${u.nombre} quedó inactivo.`)) bajaDe = null;
   }
 
   function alCambiarRol(u: UsuarioListado, sitioId: string, valor: string): void {
@@ -303,9 +332,22 @@
                   ayuda={u.activo ? 'Pide el motivo; corta sus sesiones y ya no puede entrar; su rastro se conserva' : 'Vuelve a poder entrar con una clave temporal nueva que verás una vez (la de antes no vuelve)'}
                   motivoDesactivado={u.id === yo ? 'no puedes desactivarte a ti mismo' : intocable(u)} cargando={ocupado === u.id}
                   onclick={() => (u.activo ? abrirBaja(u) : void cambiar(u, cambioReactivar(u), `${u.nombre} quedó activo, con una clave temporal nueva.`))} data-alternar-activo />
-                <Boton etiqueta="Asignar clave temporal" ayuda="Para quien olvidó su clave: una temporal nueva, de vigencia corta, que verás una vez; corta sus sesiones"
-                  motivoDesactivado={u.id === yo ? 'tu clave la cambias tú, desde la cabecera' : !u.activo ? 'actívalo primero' : intocable(u)} cargando={ocupado === u.id}
-                  onclick={() => void cambiar(u, cambioTemporal(u), `${u.nombre} tiene una clave temporal nueva.`)} data-asignar-temporal />
+                <Boton etiqueta="Asignar clave temporal" ayuda="Para quien olvidó su clave: pide confirmar; luego una temporal nueva, de vigencia corta, que verás una vez; corta sus sesiones"
+                  motivoDesactivado={motivoTemporal(u)} cargando={ocupado === u.id}
+                  onclick={() => abrirTemporal(u)} data-asignar-temporal />
+                {#if temporalDe === u.id && motivoTemporal(u) === null}
+                  <!-- svelte-ignore a11y_no_noninteractive_element_interactions: Escape se escucha en el formulario, no en un control propio -->
+                  <form class="baja-motivo" aria-labelledby={`temporal-${u.id}`} onsubmit={(e) => { e.preventDefault(); void confirmarTemporal(u); }}
+                    onkeydown={(e) => { if (e.key === 'Escape') cerrarTemporal(u); }} novalidate data-confirmar-temporal-aviso>
+                    <p id={`temporal-${u.id}`}>Vas a asignar una clave temporal a <strong>{u.nombre}</strong>. Su clave actual deja de servir y se cierran sus sesiones
+                      abiertas. La temporal se muestra una sola vez y vence en pocas horas: si no la usa a tiempo, habrá que asignar otra. No se puede deshacer.
+                      {#if u.clave_temporal && u.clave_temporal_vence_en !== null && new Date(u.clave_temporal_vence_en).getTime() > Date.now()}
+                        <span data-temporal-previa>Ya tiene una temporal sin usar (vence el {fechaHora(u.clave_temporal_vence_en)}): también deja de servir.</span>{/if}</p>
+                    <Boton variante="peligro" etiqueta="Asignar clave temporal" cargando={ocupado === u.id} etiquetaCargando="Asignando…" tipo="submit"
+                      motivoDesactivado={ocupado === u.id ? null : motivoTemporal(u)} data-confirmar-temporal />
+                    <Boton etiqueta="Cancelar" onclick={() => cerrarTemporal(u)} data-cancelar-temporal />
+                  </form>
+                {/if}
                 {#if bajaDe === u.id && u.activo}
                   <form class="baja-motivo" onsubmit={(e) => void confirmarBaja(e, u)} novalidate data-baja-motivo>
                     <label for={`motivo-${u.id}`}>Motivo de la baja</label>
