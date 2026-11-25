@@ -1,0 +1,55 @@
+# Emisor de la ventana de 72 horas (LEEME.md de esta carpeta; docs/16 §104). Proyecto APARTE de la pila (`name: ventana`): se levanta y se
+# detiene sin tocar los servicios de la plataforma. Usa la MISMA imagen del backend que ya está en el equipo (trae node y el paquete mqtt), se
+# une a la red de la pila como externa y entra por el proxy (proxy:8883, TLS verificado), como un equipo real. Sin puertos: no escucha nada.
+#   VENTANA_DIR=<carpeta de la prueba> VENTANA_UID=$(id -u) VENTANA_GID=$(id -g) docker compose -f compose.ventana.yml up -d
+# En VENTANA_DIR: credenciales.csv (600), ca.crt y la carpeta datos/ (donde escribe emisor.csv; si no existe o no es del usuario, el emisor
+# sale con 2). VENTANA_CA_ARCHIVO cambia la CA montada. La red de la pila es compartida: a nivel de red el emisor alcanza también la base y el
+# broker (sus permisos los acota la ACL del broker y la base exige su clave); se acepta y se declara en el LEEME.
+name: ventana
+
+services:
+  emisor:
+    image: ${VENTANA_IMAGEN:-plataforma-backend:latest}
+    restart: unless-stopped                     # vuelve solo tras un reinicio del equipo o una caída del proceso
+    user: "${VENTANA_UID:-1000}:${VENTANA_GID:-1000}"   # el dueño de VENTANA_DIR: puede leer las credenciales (600) y escribir en datos/
+    command: ["node", "/ventana/emisor.mjs"]
+    read_only: true                             # no escribe nada fuera de datos/
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:                                    # registros acotados, con los mismos valores que la pila (docs/11 §4: 10 MB × 5)
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+    # Chequeo propio: la imagen del backend trae uno contra /salud, que aquí siempre fallaría (no hay servidor). Sano = emisor.csv recibió
+    # una línea hace menos de 120 s (escribe una por minuto) y esa línea tiene equipos conectados (columna 5). Sin node: `stat` y `tail`.
+    healthcheck:
+      test: ["CMD-SHELL", "f=/ventana/datos/emisor.csv; [ -s $$f ] && [ $$(( $$(date +%s) - $$(stat -c %Y $$f) )) -lt 120 ] && [ $$(tail -n 1 $$f | cut -d, -f5) -gt 0 ]"]
+      interval: 60s
+      timeout: 5s
+      retries: 2
+      start_period: 90s
+    environment:
+      VENTANA_MQTT_HOST: ${VENTANA_MQTT_HOST:-proxy}
+      VENTANA_MQTT_PUERTO: ${VENTANA_MQTT_PUERTO:-8883}
+      VENTANA_MQTT_NOMBRE: ${VENTANA_MQTT_NOMBRE:-proxy}
+      VENTANA_PERIODO_S: ${VENTANA_PERIODO_S:-60}
+      VENTANA_CREDENCIALES: /ventana/credenciales.csv
+      VENTANA_CA: /ventana/ca.crt
+      VENTANA_SALIDA: /ventana/datos/emisor.csv
+    volumes:
+      - ./emisor.mjs:/ventana/emisor.mjs:ro
+      - ${VENTANA_DIR:?define VENTANA_DIR con la carpeta de la prueba}/credenciales.csv:/ventana/credenciales.csv:ro
+      - ${VENTANA_CA_ARCHIVO:-${VENTANA_DIR}/ca.crt}:/ventana/ca.crt:ro
+      - ${VENTANA_DIR}/datos:/ventana/datos
+    networks: [pila]
+    deploy:
+      resources:
+        limits:
+          memory: 96M
+          cpus: "0.25"
+
+networks:
+  pila:
+    external: true
+    name: ${VENTANA_RED:-plataforma_default}

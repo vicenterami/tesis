@@ -447,6 +447,14 @@ bash plataforma/pruebas/broker-sesion.sh > "$VT/sesion.txt" 2>&1; r=$?
 grep -E '^(OK|FALLA|SESIÓN|ATAQUES|omitida|──)|bloque\(s\)|comprobación' "$VT/sesion.txt"
 if [ "$r" = 3 ]; then omitidos="$omitidos 2i2"; elif [ "$r" != 0 ]; then fallos=$((fallos+1)); fi
 
+paso "2i3. Resumen de la ventana de 72 horas: la regla de disponible y el veredicto, caso por caso con CSV sintéticos (docs/16 §104)"
+# 25/11/2026: el resumen podía decir «APRUEBA» sin datos guardados, con el emisor caído, con una ventana de una hora o con las mejores 72 h
+# elegidas de 80. resumen-prueba.sh arma CSV sintéticos (sin tocar la base: la consulta va contra un docker falso) y exige la salida, el
+# texto y el número de minutos no disponibles de 35 casos; plantados con el resumen de cada vuelta anterior, fallaban 14 y luego 12.
+bash plataforma/pruebas/ventana/resumen-prueba.sh > "$VT/resumen-ventana.txt" 2>&1; r=$?
+grep -E '^(OK|FALLA|RESUMEN|omitida)|casos con falla' "$VT/resumen-ventana.txt" | tail -40
+if [ "$r" = 3 ]; then omitidos="$omitidos 2i3"; elif [ "$r" != 0 ]; then fallos=$((fallos+1)); fi
+
 paso "2j. Repositorio público: ningún archivo versionado nombra a personas de la lista privada"
 # La lista vive fuera del repo (NOMBRES_VETADOS; un nombre en este script sería la fuga). Una línea por nombre; palabra
 # completa, sin distinguir mayúsculas. Si el archivo no existe, el paso se omite y lo dice. Se normaliza como la de 2f.
@@ -590,10 +598,15 @@ paso "2n. Registros acotados y sin escalada de privilegios: cada servicio de cad
 python3 -I - <<'PY' || fallos=$((fallos+1))
 import json, re, subprocess, sys
 malos, n = [], 0
+# 25/11/2026: también el Compose del instrumento de la ventana de 72 horas (docs/16 §104), que corre en el servidor junto a la pila; pide
+# VENTANA_DIR, que aquí es solo un nombre para leer la configuración (no se monta ni se crea nada).
+import os
+entorno = dict(os.environ, VENTANA_DIR='/ventana-solo-para-leer-la-configuracion')
 for juego in (['plataforma/docker-compose.yml', 'plataforma/docker-compose.override.yml', 'plataforma/proxy/compose.proxy.yml'],
-              ['plataforma/docker-compose.yml', 'plataforma/pruebas/banco/compose.banco.yml']):
+              ['plataforma/docker-compose.yml', 'plataforma/pruebas/banco/compose.banco.yml'],
+              [os.environ.get('VENTANA_COMPOSE', 'plataforma/pruebas/ventana/compose.ventana.yml')]):
     p = subprocess.run(['docker', 'compose'] + [x for f in juego for x in ('-f', f)] + ['--profile', '*', 'config', '--format', 'json'],
-                       capture_output=True, text=True)
+                       capture_output=True, text=True, env=entorno)
     if p.returncode != 0: malos.append(f'docker compose config falló con {" + ".join(juego)} (salida {p.returncode})'); continue
     for s, d in json.loads(p.stdout).get('services', {}).items():
         n += 1
@@ -602,9 +615,9 @@ for juego in (['plataforma/docker-compose.yml', 'plataforma/docker-compose.overr
             malos.append(f'{juego[-1]}: servicio {s} sin logging acotado y bien formado (max-size {op.get("max-size")!r}, max-file {op.get("max-file")!r})')
         if 'no-new-privileges:true' not in (d.get('security_opt') or []):
             malos.append(f'{juego[-1]}: servicio {s} sin no-new-privileges:true')
-if n < 7: malos.append(f'revisó solo {n} servicios (se esperan >= 7: 4 en la pila con el proxy y 3 en el banco)')
+if n < 8: malos.append(f'revisó solo {n} servicios (se esperan >= 8: 4 en la pila con el proxy, 3 en el banco y el emisor de la ventana)')
 for m in malos: print('FALLA', m)
-if not malos: print(f'OK    {n} servicios en las dos combinaciones de compose: todos con logging acotado y no-new-privileges')
+if not malos: print(f'OK    {n} servicios en las tres combinaciones de compose (pila, banco y ventana): todos con logging acotado y no-new-privileges')
 sys.exit(1 if malos else 0)
 PY
 
@@ -1295,6 +1308,14 @@ while IFS= read -r g; do n=$((n+1)); bash -n "$g" 2>/dev/null || malos="$malos $
 if [ "$n" -lt 15 ]; then echo "FALLA revisé solo $n guiones (¿cambió el listado?)"; fallos=$((fallos+1))
 elif [ -n "$malos" ]; then echo "FALLA guiones con error de sintaxis:$malos"; fallos=$((fallos+1))
 else echo "OK    $n guiones con la sintaxis de bash correcta (bash -n)"; fi
+# 25/11/2026: también los módulos de node de plataforma/pruebas (el emisor de la ventana, docs/16 §104, y la prueba de la sesión del
+# broker): node --check solo los lee. Los del panel (e2e) los cubre 2y4.
+malos=""; n=0
+while IFS= read -r g; do n=$((n+1)); node --check "$g" 2>/dev/null || malos="$malos $g"; done < <(git ls-files -co --exclude-standard 'plataforma/pruebas/*.mjs')
+if ! command -v node >/dev/null; then echo "──    sin node: no se revisa la sintaxis de los .mjs de plataforma/pruebas"
+elif [ "$n" -lt 2 ]; then echo "FALLA revisé solo $n módulos .mjs en plataforma/pruebas (se esperan el emisor de la ventana y broker-sesion.mjs)"; fallos=$((fallos+1))
+elif [ -n "$malos" ]; then echo "FALLA módulos con error de sintaxis:$malos"; fallos=$((fallos+1))
+else echo "OK    $n módulos .mjs de plataforma/pruebas con la sintaxis correcta (node --check)"; fi
 
 paso "2y2b. Sitios y zonas: las constantes repetidas entre el backend y el panel dicen lo mismo (topes de nombres y descripción, forma del código)"
 # 24/11/2026: sitios-zonas.ts (backend) y lib/estructura.ts (panel) repiten MAX_NOMBRE_ZONA, MAX_NOMBRE_SITIO, MAX_DESCRIPCION_SITIO y la
