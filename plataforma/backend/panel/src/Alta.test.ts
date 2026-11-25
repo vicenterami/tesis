@@ -642,6 +642,20 @@ describe('P7: alta masiva en tres pasos (docs/19 §4, N7)', () => {
     expect(boton('Crear 2 dispositivos')).toBeTruthy();
   });
 
+  it('409 plan_cambio con zonas_nuevas_excedidas: el plan nuevo trae el aviso del tope', async () => {
+    const CON_AJUSTES: Sesion = { ...SESION, permisos: { administrador: ['leer', 'escribir', 'configurar', 'ajustes'], consulta: ['leer'] } };
+    responder = (_m, ruta, cuerpo) => {
+      if (ruta.endsWith('modo=validar')) return json(plan(cuerpo.filas!, 'validar'));
+      return json({ statusCode: 409, codigo: 'plan_cambio', message: 'cambió', plan: { ...plan(cuerpo.filas!, 'validar', { huella: 'd'.repeat(64) }), zonas_nuevas_excedidas: { pedidas: 25, maximo: 20 } } }, 409);
+    };
+    render(Alta, { modo: 'lote', sesion: CON_AJUSTES, sitios: SITIOS, sitioActivo: SITIOS[0] });
+    await subir(csv(3));
+    await revisar();
+    expect(document.querySelector('[data-zonas-excedidas]')).toBeNull();
+    await fireEvent.click(boton('Crear 3 dispositivos'));
+    await waitFor(() => expect(document.querySelector('[data-zonas-excedidas]')?.textContent).toContain('El archivo crearía 25 zonas nuevas y el máximo por lote es 20'));
+  });
+
   it('en teléfono (bajo 700 px) cada fila es una tarjeta, con su detalle, y no hay tabla', async () => {
     vi.stubGlobal('matchMedia', (q: string) => ({ matches: q.includes('700px'), media: q, addEventListener() {}, removeEventListener() {} }));
     responder = (_m, _r, cuerpo) => json(plan(cuerpo.filas!, 'validar', { malas: { 'n-2': 'zona vacía' } }));
@@ -1020,6 +1034,212 @@ describe('P7: alta masiva en tres pasos (docs/19 §4, N7)', () => {
     terminar(csv(5));
     await waitFor(() => expect(document.querySelector('[data-filas-leidas]')!.textContent).toBe('segundo.csv: 5 filas leídas.'));
     expect(boton('Revisar las filas').disabled).toBe(false);
+  });
+
+  // Zonas nuevas desde el alta masiva (docs/19 §4, U2): la casilla es del sitio activo del panel y de quien tiene `ajustes` en él.
+  describe('zonas nuevas (U2)', () => {
+    const CON_AJUSTES: Sesion = { ...SESION, permisos: { administrador: ['leer', 'escribir', 'configurar', 'ajustes'], consulta: ['leer'] } };
+    const validar = (cuerpo: CuerpoLote, extra: Record<string, unknown> = {}) => ({ ...plan(cuerpo.filas!, 'validar'), ...extra });
+    const montar = async (sesion: Sesion, sitioActivo: (typeof SITIOS)[number] | null = SITIOS[0]!): Promise<void> => {
+      render(Alta, { modo: 'lote', sesion, sitios: SITIOS, sitioActivo });
+      await subir(csv(3));
+      await revisar();
+    };
+    const validaciones = (): CuerpoLote[] => pedidos.filter((p) => p.ruta.endsWith('modo=validar')).map((p) => p.cuerpo);
+
+    it('sin la acción `ajustes` en ningún sitio no hay casilla (aunque la persona dé de alta); sin sitio activo, el único con `ajustes` es el de por omisión', async () => {
+      responder = (_m, _r, cuerpo) => json(validar(cuerpo));
+      await montar(SESION);
+      expect(document.querySelector('[data-crear-zonas-lote]')).toBeNull();
+      cleanup();
+      await montar(CON_AJUSTES, null);
+      expect(document.querySelector('[data-crear-zonas-lote]')!.textContent).toContain('«Campus»');
+    });
+
+    describe('con `ajustes` en más de un sitio', () => {
+      const DOS = [...SITIOS, { id: 's2', codigo: 'mag', nombre: 'Magallanes', zona_horaria: 'America/Punta_Arenas', rol: 'administrador', zonas: [{ id: 'z-m', nombre: 'Costa' }] }];
+      const SESION_DOS: Sesion = { ...CON_AJUSTES, sitios: [...(CON_AJUSTES as Extract<Sesion, { sistema: false }>).sitios, { sitio_id: 's2', codigo: 'mag', nombre: 'Magallanes', rol: 'administrador' }] } as Sesion;
+      const montarDos = async (activo: (typeof DOS)[number]): Promise<void> => {
+        render(Alta, { modo: 'lote', sesion: SESION_DOS, sitios: DOS, sitioActivo: activo });
+        await subir(csv(3));
+        await revisar();
+      };
+
+      it('aparece el selector, con el sitio activo elegido por omisión; el cuerpo lleva el id del sitio elegido y cambiarlo vuelve a revisar', async () => {
+        responder = (_m, _r, cuerpo) => json(validar(cuerpo));
+        await montarDos(DOS[1]!);
+        const sel = document.querySelector('[data-sitio-zonas-lote]') as HTMLSelectElement;
+        expect([...sel.options].map((o) => o.textContent)).toEqual(['Campus', 'Magallanes']);
+        expect(sel.value).toBe('s2');
+        await fireEvent.click(document.querySelector('[data-casilla-crear-zonas]')!);
+        await waitFor(() => expect(validaciones()).toHaveLength(2));
+        expect(validaciones()[1]).toMatchObject({ zonas_nuevas_en: 's2' });
+        sel.value = 's1';
+        await fireEvent.change(sel);
+        await waitFor(() => expect(validaciones()).toHaveLength(3));
+        expect(validaciones()[2]).toMatchObject({ zonas_nuevas_en: 's1' });
+      });
+
+      it('«Volver» y otro archivo dejan la casilla desmarcada y el sitio en su valor por omisión (docs/19 §4 U2)', async () => {
+        responder = (_m, _r, cuerpo) => json(validar(cuerpo));
+        await montarDos(DOS[1]!);
+        const casilla = (): HTMLInputElement => document.querySelector('[data-casilla-crear-zonas]') as HTMLInputElement;
+        const sel = (): HTMLSelectElement => document.querySelector('[data-sitio-zonas-lote]') as HTMLSelectElement;
+        const marcarEnCampus = async (esperadas: number): Promise<void> => {
+          sel().value = 's1';
+          await fireEvent.change(sel());
+          await fireEvent.click(casilla());
+          await waitFor(() => expect(validaciones()).toHaveLength(esperadas));
+          expect(casilla().checked).toBe(true);
+        };
+        await marcarEnCampus(2);
+        await fireEvent.click(boton('Volver'));
+        await waitFor(() => expect(document.querySelector('[data-paso-lote="1"]')).toBeTruthy());
+        await revisar();
+        expect(casilla().checked).toBe(false);
+        expect(sel().value).toBe('s2');
+        expect(validaciones()[2]).not.toHaveProperty('zonas_nuevas_en');
+        await marcarEnCampus(4);
+        await fireEvent.click(boton('Volver'));
+        await subir(csv(2), 'otro.csv');
+        await revisar();
+        expect(casilla().checked).toBe(false);
+        expect(sel().value).toBe('s2');
+        expect(validaciones()[4]).not.toHaveProperty('zonas_nuevas_en');
+      });
+
+      it('con uno solo, sin selector', async () => {
+        responder = (_m, _r, cuerpo) => json(validar(cuerpo));
+        await montar(CON_AJUSTES);
+        expect(document.querySelector('[data-sitio-zonas-lote]')).toBeNull();
+      });
+    });
+
+    it('desmarcada por omisión: el cuerpo no lleva zonas_nuevas_en; marcada, lo lleva al revisar y al crear, y se anuncian las zonas nuevas', async () => {
+      responder = (_m, ruta, cuerpo) => {
+        const nuevas = cuerpo.zonas_nuevas_en === 's1';
+        const extra = nuevas ? { zonas_por_nombre: [{ zona: 'Invernadero', sitio: 'Campus', filas: 3, nueva: true }] } : {};
+        return json(ruta.endsWith('modo=validar') ? validar(cuerpo, extra) : { ...plan(cuerpo.filas!, 'crear'), ...extra });
+      };
+      await montar(CON_AJUSTES);
+      const casilla = document.querySelector('[data-casilla-crear-zonas]') as HTMLInputElement;
+      expect(casilla.checked).toBe(false);
+      expect(document.querySelector('[data-crear-zonas-lote]')!.textContent).toContain('Crear las zonas que no existan en «Campus»');
+      expect(document.querySelector('[data-sitio-zonas-lote]')).toBeNull(); // sin selector de sitio: es el sitio activo
+      expect(validaciones()[0]).not.toHaveProperty('zonas_nuevas_en');
+      expect(document.querySelector('[data-zonas-nuevas-lote]')).toBeNull();
+      await fireEvent.click(casilla);
+      await waitFor(() => expect(validaciones()).toHaveLength(2));
+      expect(validaciones()[1]).toMatchObject({ zonas_nuevas_en: 's1' });
+      await waitFor(() => expect(document.querySelector('[data-zonas-nuevas-lote]')?.textContent).toContain('Se crearán 1 zona nueva en «Campus»'));
+      expect(document.querySelector('[data-zonas-nuevas-lote]')!.textContent).toContain('Invernadero (3 filas)');
+      await fireEvent.click(boton(/^Crear 3 dispositivos/));
+      await waitFor(() => expect(pedidos.some((p) => p.ruta.endsWith('modo=crear'))).toBe(true));
+      expect(pedidos.find((p) => p.ruta.endsWith('modo=crear'))!.cuerpo).toMatchObject({ zonas_nuevas_en: 's1' });
+    });
+
+    it('desmarcarla vuelve a revisar sin zonas_nuevas_en', async () => {
+      responder = (_m, _r, cuerpo) => json(validar(cuerpo));
+      await montar(CON_AJUSTES);
+      const casilla = document.querySelector('[data-casilla-crear-zonas]') as HTMLInputElement;
+      await fireEvent.click(casilla);
+      await waitFor(() => expect(validaciones()).toHaveLength(2));
+      await fireEvent.click(casilla);
+      await waitFor(() => expect(validaciones()).toHaveLength(3));
+      expect(validaciones()[1]).toHaveProperty('zonas_nuevas_en', 's1');
+      expect(validaciones()[2]).not.toHaveProperty('zonas_nuevas_en');
+    });
+
+    it('si el archivo pediría más zonas nuevas que el tope, se avisa con el remedio y no se anuncia ninguna como nueva', async () => {
+      responder = (_m, _r, cuerpo) => json(validar(cuerpo, cuerpo.zonas_nuevas_en === undefined ? {} : { zonas_nuevas_excedidas: { pedidas: 25, maximo: 20 } }));
+      await montar(CON_AJUSTES);
+      expect(document.querySelector('[data-zonas-excedidas]')).toBeNull();
+      await fireEvent.click(document.querySelector('[data-casilla-crear-zonas]')!);
+      await waitFor(() => expect(document.querySelector('[data-zonas-excedidas]')).toBeTruthy());
+      expect(document.querySelector('[data-zonas-excedidas]')!.textContent!.replace(/\s+/g, ' ')).toContain(
+        'El archivo crearía 25 zonas nuevas y el máximo por lote es 20. Si se corrió una columna, corrige el archivo; si de verdad son tantas, créalas antes en Ajustes del sitio → Zonas o divide el archivo.');
+      expect(document.querySelector('[data-zonas-nuevas-lote]')).toBeNull();
+    });
+  });
+});
+
+
+// «+ Nueva zona…» del asistente (docs/19 §4, U2): solo con `ajustes` en el sitio elegido; crea y deja elegida la zona.
+describe('P7: asistente, «+ Nueva zona…»', () => {
+  const CON_AJUSTES: Sesion = { ...SESION, permisos: { administrador: ['leer', 'escribir', 'configurar', 'ajustes'], consulta: ['leer'] } };
+  const abrir = async (): Promise<void> => {
+    await fireEvent.click(boton('+ Nueva zona…'));
+    expect(document.querySelector('[data-campo-nueva-zona]')).toBeTruthy();
+  };
+  const campo = (): HTMLInputElement => document.querySelector('[data-campo-nueva-zona] input') as HTMLInputElement;
+
+  it('el botón solo aparece con `ajustes` en el sitio elegido', () => {
+    render(Alta, { sesion: SESION, sitios: SITIOS });
+    expect(document.querySelector('[data-nueva-zona]')).toBeNull();
+    cleanup();
+    render(Alta, { sesion: CON_AJUSTES, sitios: SITIOS });
+    expect(document.querySelector('[data-nueva-zona]')).toBeTruthy();
+  });
+
+  it('crear envía POST /sitios/{id}/zonas con el nombre recortado, deja elegida la zona nueva y cierra el campo', async () => {
+    responder = (metodo, ruta) => (metodo === 'POST' && ruta === '/sitios/s1/zonas' ? json({ id: 'z-nueva', sitio_id: 's1', nombre: 'Invernadero', activo: true, dispositivos: 0 }, 201) : json([]));
+    render(Alta, { sesion: CON_AJUSTES, sitios: SITIOS });
+    await abrir();
+    await fireEvent.input(campo(), { target: { value: '  Invernadero ' } });
+    await fireEvent.click(boton('Crear zona'));
+    await waitFor(() => expect(document.querySelector('[data-campo-nueva-zona]')).toBeNull());
+    expect(pedidos.find((p) => p.metodo === 'POST')).toMatchObject({ ruta: '/sitios/s1/zonas', cuerpo: { nombre: 'Invernadero' } });
+    const zona = document.querySelector('[data-campo="zona"]') as HTMLSelectElement;
+    expect(zona.value).toBe('z-nueva');
+    expect([...zona.options].map((o) => o.textContent)).toEqual(['Lab', 'Invernadero']);
+  });
+
+  it('un 409 (zona repetida, o ya existe y está retirada) muestra el mensaje del servidor junto al campo y lo deja abierto', async () => {
+    for (const [codigo, message] of [['zona_repetida', 'Ya hay una zona «Lab» en este sitio.'], ['zona_retirada', 'Ya existe una zona «Bodega» retirada en este sitio: vuelve a ofrecerla en Ajustes del sitio → Zonas en vez de crear otra.']]) {
+      responder = () => json({ statusCode: 409, codigo, message }, 409);
+      render(Alta, { sesion: CON_AJUSTES, sitios: SITIOS });
+      await abrir();
+      await fireEvent.input(campo(), { target: { value: 'Lab' } });
+      await fireEvent.click(boton('Crear zona'));
+      await waitFor(() => expect(document.querySelector('[data-error-nueva-zona]')!.textContent).toBe(message));
+      expect(document.querySelector('[data-campo-nueva-zona]')).toBeTruthy();
+      expect((document.querySelector('[data-campo="zona"]') as HTMLSelectElement).value).toBe('z-lab');
+      cleanup();
+    }
+  });
+
+  it('la zona queda en el sitio donde se pidió aunque la respuesta tarde; el selector de sitio se desactiva mientras tanto', async () => {
+    const DOS = [...SITIOS, { id: 's2', codigo: 'mag', nombre: 'Magallanes', zona_horaria: 'America/Punta_Arenas', rol: 'administrador', zonas: [{ id: 'z-m', nombre: 'Costa' }] }];
+    const SESION_DOS = { ...CON_AJUSTES, sitios: [...(CON_AJUSTES as Extract<Sesion, { sistema: false }>).sitios, { sitio_id: 's2', codigo: 'mag', nombre: 'Magallanes', rol: 'administrador' }] } as Sesion;
+    let soltar: (r: Response) => void = () => {};
+    responder = (metodo) => (metodo === 'POST' ? new Promise<Response>((r) => { soltar = r; }) : json([]));
+    render(Alta, { sesion: SESION_DOS, sitios: DOS });
+    const sitio = document.querySelector('[data-campo="sitio"]') as HTMLSelectElement;
+    const zona = document.querySelector('[data-campo="zona"]') as HTMLSelectElement;
+    expect(sitio.value).toBe('uct');
+    await abrir();
+    await fireEvent.input(campo(), { target: { value: 'Invernadero' } });
+    await fireEvent.click(boton('Crear zona'));
+    await waitFor(() => expect(sitio.disabled).toBe(true));
+    // Aunque el control llegue a cambiar con la petición en vuelo, la zona es del sitio donde se pidió.
+    sitio.value = 'mag';
+    await fireEvent.change(sitio);
+    soltar(json({ id: 'z-nueva', sitio_id: 's1', nombre: 'Invernadero', activo: true, dispositivos: 0 }, 201));
+    await waitFor(() => expect(sitio.disabled).toBe(false));
+    expect(pedidos.find((p) => p.metodo === 'POST')).toMatchObject({ ruta: '/sitios/s1/zonas' });
+    expect([...zona.options].map((o) => o.textContent)).toEqual(['Costa']);
+    sitio.value = 'uct';
+    await fireEvent.change(sitio);
+    await waitFor(() => expect([...zona.options].map((o) => o.textContent)).toEqual(['Lab', 'Invernadero']));
+  });
+
+  it('un nombre vacío no envía nada y lo dice', async () => {
+    render(Alta, { sesion: CON_AJUSTES, sitios: SITIOS });
+    await abrir();
+    await fireEvent.input(campo(), { target: { value: '   ' } });
+    await fireEvent.click(boton('Crear zona'));
+    expect(document.querySelector('[data-error-nueva-zona]')!.textContent).toBe('Escribe el nombre de la zona.');
+    expect(pedidos.filter((p) => p.metodo === 'POST')).toHaveLength(0);
   });
 });
 

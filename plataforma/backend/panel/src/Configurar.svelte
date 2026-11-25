@@ -61,7 +61,9 @@
     return () => { carga.cancelar(); cargaCatalogo.cancelar(); };
   });
 
-  const zonas = $derived(sitios?.find((s) => s.codigo === d?.sitio_codigo)?.zonas ?? (d === null ? [] : [{ id: d.zona_id, nombre: d.zona }]));
+  // Una zona retirada no recibe dispositivos (migración 28); la actual se sigue mostrando aunque lo esté.
+  const zonas = $derived((sitios?.find((s) => s.codigo === d?.sitio_codigo)?.zonas ?? (d === null ? [] : [{ id: d.zona_id, nombre: d.zona }]))
+    .filter((z) => z.activo !== false || z.id === d?.zona_id));
   const motivoPermiso = $derived(d === null || puedeEn(sesion, 'configurar', d.sitio_codigo) ? null : 'configurar exige el perfil de operador técnico o de administrador en este sitio');
   const erroresVivos = $derived(erroresDeDispositivo(form));
   const errores = $derived([...erroresVivos, ...erroresServidor]);

@@ -3,6 +3,7 @@
 // (`por_defecto`), qué entra pero conviene ver (`avisos`) y por qué no entra (`motivos`). La vista previa y la creación usan esta misma
 // función; la creación vuelve a calcular y, si el plan cambió (otra `huella`), no crea nada. Función pura: los catálogos los trae el
 // servicio; aquí no hay base ni broker.
+import { INVISIBLE, MAX_NOMBRE_ZONA, TEXTO_INVISIBLE, claveZona } from '../consulta/sitios-zonas.js';
 import { createHash } from 'node:crypto';
 import { BadRequestException, HttpException, HttpStatus, PayloadTooLargeException } from '@nestjs/common';
 import { AltaValidada, Formato, MAX_CANALES, validarAlta } from './alta.dto.js';
@@ -146,8 +147,11 @@ export interface FilaInforme {
 }
 export interface Legible { donde: string; resumen: string; campos: Record<string, string> }
 // Las zonas escritas por su nombre en las filas que entran (bloque S, punto 3): ya no es un aviso por fila; la revisión lo dice una vez.
-export interface ZonaPorNombre { zona: string; sitio: string; filas: number }
-export interface ZonaCatalogo { id: string; nombre: string; sitio_id: string; sitio_codigo: string; sitio_nombre?: string }
+// `nueva`: la zona no existe y se creará al confirmar (`zonas_nuevas_en`, docs/19 §4 U2).
+export interface ZonaPorNombre { zona: string; sitio: string; filas: number; nueva?: boolean }
+// Una zona `nueva` es la que el lote creará (U2): su id es `nueva:<nombre normalizado>` hasta que crearLote la inserte. Una `retirada`
+// (migración 28) está en el catálogo solo para decir por qué la fila no entra (corregido el 24/11/2026: antes caía en «no existe»).
+export interface ZonaCatalogo { id: string; nombre: string; sitio_id: string; sitio_codigo: string; sitio_nombre?: string; nueva?: true; retirada?: true }
 export interface PasarelaCatalogo { id: string; id_fisico: string; sitio_id: string; activo: boolean; formato: Formato }
 export interface MagnitudCatalogo { nombre: string; unidad: string }
 export interface Catalogos {
@@ -161,8 +165,12 @@ export interface Catalogos {
   // Sigue sin poder usarse (id_fisico es único en toda la plataforma): la fila se rechaza con un motivo que no dice más.
   ajenos: ReadonlySet<string>;
   recetas: readonly string[]; // los códigos de las recetas de decodificación de la base (TT-12)
+  // Con `zonas_nuevas_en` (U2): por clave de zona (claveZona), el motivo de una zona escrita por su nombre que no se ofrece como nueva
+  // (ya existe en el sitio con otra escritura; trae un carácter invisible). Sin el campo, vacío.
+  zonasNoOfrecidas?: ReadonlyMap<string, string>;
 }
-export interface AltaDeLote { n: number; alta: AltaValidada; formato: Formato; sitio_codigo: string; sitio_id: string }
+// `zonaNueva`: la zona que crearLote inserta antes del dispositivo (U2); entonces `alta.zona_id` es el id provisional `nueva:<nombre>`.
+export interface AltaDeLote { n: number; alta: AltaValidada; formato: Formato; sitio_codigo: string; sitio_id: string; zonaNueva?: { sitio_id: string; nombre: string } }
 export type FilaEntrada = Record<string, unknown> & { n: number };
 
 // El choque que solo ve la base al insertar (23505: otra petición creó el identificador entre la validación y la inserción; o el formato de
@@ -204,7 +212,7 @@ export function caracterNoAdmitido(t: string, simbolos = ''): string | null {
 // El largo contra el tope: en el texto libre, en caracteres (unidades UTF-16, como hasta el 15/11/2026); en las columnas de códigos, en bytes
 // UTF-8 (igual a los caracteres mientras sean ASCII; un «°» vale dos): así el peor caso del cuerpo no cambia al admitir los símbolos.
 export const largoDeCelda = (columna: ColumnaLote, t: string): number => (COLUMNAS_TEXTO_LIBRE.includes(columna) ? t.length : Buffer.byteLength(t));
-const CONTROL = /\p{Cc}/u;
+const CONTROL = /[\p{Cc}\p{Zl}\p{Zp}]/u; // control y los separadores de línea y de párrafo de Unicode (U+2028, U+2029)
 const SUSTITUTO_SUELTO = /\p{Cs}/u; // en modo «u», un par de sustitutos es un solo punto de código: solo calzan los sueltos
 const MAX_MOTIVOS_CUERPO = 20;
 // Un texto que viene del cliente, recortado antes de ponerlo en un motivo (una clave puede medir lo que el cuerpo permita).
@@ -219,7 +227,8 @@ export function filasDelCuerpo(cuerpo: unknown, modo: ModoLote = 'validar'): { f
     throw new PayloadTooLargeException({ statusCode: 413, error: 'Payload Too Large', codigo: 'demasiadas_filas', message: `el lote trae ${filas.length} filas y el máximo es ${MAX_FILAS_LOTE}: divídelo` });
   }
   const motivos: string[] = [];
-  for (const k of Object.keys(c)) if (k !== 'filas' && k !== 'huella') motivos.push(`campo no admitido en el cuerpo: ${recorte(k)}`);
+  for (const k of Object.keys(c)) if (k !== 'filas' && k !== 'huella' && k !== 'zonas_nuevas_en') motivos.push(`campo no admitido en el cuerpo: ${recorte(k)}`);
+  if (c.zonas_nuevas_en !== undefined && (typeof c.zonas_nuevas_en !== 'string' || !UUID.test(c.zonas_nuevas_en))) motivos.push('zonas_nuevas_en: el UUID del sitio donde crear las zonas que falten');
   let huella: string | null = null;
   if (c.huella !== undefined) {
     if (typeof c.huella === 'string' && FORMA_HUELLA.test(c.huella)) huella = c.huella;
@@ -404,7 +413,7 @@ export function validarLote(filas: readonly FilaEntrada[], cat: Catalogos, reser
   // Zonas y pasarelas por su id y por su nombre o id_fisico, una vez por petición (revisión del 15/11/2026: antes, un recorrido por fila).
   const zonasPorId = new Map(cat.zonas.map((x) => [x.id, x]));
   const zonasPorNombre = new Map<string, ZonaCatalogo[]>();
-  for (const x of cat.zonas) zonasPorNombre.set(x.nombre.toLowerCase(), [...(zonasPorNombre.get(x.nombre.toLowerCase()) ?? []), x]);
+  for (const x of cat.zonas) zonasPorNombre.set(claveZona(x.nombre), [...(zonasPorNombre.get(claveZona(x.nombre)) ?? []), x]);
   const pasarelasPorId = new Map(cat.pasarelas.map((x) => [x.id, x]));
   const pasarelasPorIdFisico = new Map(cat.pasarelas.map((x) => [x.id_fisico, x]));
   // Las zonas escritas por su nombre en las filas que entran, por zona (bloque S, punto 3), en el orden en que aparecen.
@@ -447,16 +456,20 @@ export function validarLote(filas: readonly FilaEntrada[], cat: Catalogos, reser
     if (otras.length > 0) avisos.push({ campo: 'nombre', texto: `el nombre se repite en la fila ${otras[0]}${otras.length > 1 ? ` y ${otras.length - 1} más` : ''}` });
 
     // Zona: su UUID o su nombre, entre las zonas de los sitios donde quien carga puede dar de alta. Por su nombre, si calza con una sola, ya
-    // no es aviso (bloque S, punto 3): la revisión lo dice una vez sobre la lista (`zonas_por_nombre`).
+    // no es aviso (bloque S, punto 3): la revisión lo dice una vez sobre la lista (`zonas_por_nombre`). Una zona retirada no recibe altas:
+    // tiene su propio motivo; si el nombre calza con una activa y con una retirada (de otro sitio), gana la activa, y «en más de un sitio»
+    // se cuenta solo entre activas (corregido el 24/11/2026).
     const z = texto(f.zona);
     const porId = UUID.test(z);
     const porIdZona = porId ? zonasPorId.get(z.toLowerCase()) : undefined;
-    const candidatas = porId ? (porIdZona === undefined ? [] : [porIdZona]) : (zonasPorNombre.get(z.toLowerCase()) ?? []);
+    const candidatas = porId ? (porIdZona === undefined ? [] : [porIdZona]) : (zonasPorNombre.get(claveZona(z)) ?? []);
+    const activas = candidatas.filter((x) => !x.retirada);
     let zona: ZonaCatalogo | undefined;
     if (z === '') motivos.push({ campo: 'zona', texto: 'falta la zona: su nombre, o su UUID si el nombre se repite en dos sitios' });
-    else if (candidatas.length === 0) motivos.push({ campo: 'zona', texto: `la zona «${recorte(z, 40)}» no existe en tus sitios: revisa cómo se escribe` });
-    else if (candidatas.length > 1) motivos.push({ campo: 'zona', texto: `hay una zona «${recorte(z, 40)}» en más de un sitio: escribe su UUID en vez del nombre` });
-    else zona = candidatas[0];
+    else if (activas.length === 1) zona = activas[0];
+    else if (activas.length > 1) motivos.push({ campo: 'zona', texto: `hay una zona «${recorte(z, 40)}» en más de un sitio: escribe su UUID en vez del nombre` });
+    else if (candidatas.length > 0) motivos.push({ campo: 'zona', texto: ZONA_RETIRADA_LOTE(recorte(z, 40)) });
+    else motivos.push({ campo: 'zona', texto: (porId ? undefined : cat.zonasNoOfrecidas?.get(claveZona(z))) ?? ZONA_INEXISTENTE_LOTE(recorte(z, 40)) });
 
     const viaTexto = texto(f.via).toLowerCase();
     if (viaTexto === '') porDefecto.push('via');
@@ -482,7 +495,8 @@ export function validarLote(filas: readonly FilaEntrada[], cat: Catalogos, reser
     const canales = leerCanales(f.canales, cat.magnitudes, motivos, avisos);
     const intervaloTexto = texto(f.intervalo_esperado_s);
     const cuerpo: Record<string, unknown> = {
-      id_fisico: idFisico, nombre: texto(f.nombre), zona_id: zona?.id ?? '00000000-0000-0000-0000-000000000000', via,
+      // Una zona nueva (U2) todavía no tiene UUID: se valida con el de relleno y se le pone su id provisional después.
+      id_fisico: idFisico, nombre: texto(f.nombre), zona_id: zona === undefined || zona.nueva ? '00000000-0000-0000-0000-000000000000' : zona.id, via,
       intervalo_esperado_s: /^\d+$/.test(intervaloTexto) ? Number(intervaloTexto) : intervaloTexto, canales,
     };
     if (formato !== undefined) cuerpo.formato = formato;
@@ -494,6 +508,7 @@ export function validarLote(filas: readonly FilaEntrada[], cat: Catalogos, reser
     let alta: AltaValidada | undefined;
     try {
       alta = validarAlta(cuerpo, reservados, cat.recetas);
+      if (zona?.nueva) alta = { ...alta, zona_id: zona.id };
     } catch (e) {
       const r = e instanceof BadRequestException ? (e.getResponse() as { message?: unknown }).message : undefined;
       const lista: string[] = Array.isArray(r) ? r.map((x) => (typeof x === 'string' ? x : JSON.stringify(x))) : [typeof r === 'string' ? r : (e as Error).message];
@@ -511,7 +526,7 @@ export function validarLote(filas: readonly FilaEntrada[], cat: Catalogos, reser
       continue;
     }
     const formatoFinal: Formato = alta.formato ?? pasarela?.formato ?? 'senml';
-    altas.push({ n, alta, formato: formatoFinal, sitio_codigo: zona.sitio_codigo, sitio_id: zona.sitio_id });
+    altas.push({ n, alta, formato: formatoFinal, sitio_codigo: zona.sitio_codigo, sitio_id: zona.sitio_id, ...(zona.nueva ? { zonaNueva: { sitio_id: zona.sitio_id, nombre: zona.nombre } } : {}) });
     const interpretada: Interpretada = {
       id_fisico: alta.id_fisico, nombre: alta.nombre, sitio: zona.sitio_codigo, zona: zona.nombre, zona_id: zona.id, via: alta.via, formato: formatoFinal,
       intervalo_esperado_s: alta.intervalo_esperado_s,
@@ -521,7 +536,7 @@ export function validarLote(filas: readonly FilaEntrada[], cat: Catalogos, reser
     };
     const sitioNombre = zona.sitio_nombre ?? zona.sitio_codigo;
     if (!porId) {
-      const y = porNombre.get(zona.id) ?? { zona: zona.nombre, sitio: sitioNombre, filas: 0 };
+      const y = porNombre.get(zona.id) ?? { zona: zona.nombre, sitio: sitioNombre, filas: 0, ...(zona.nueva ? { nueva: true } : {}) };
       y.filas++;
       porNombre.set(zona.id, y);
     }
@@ -571,11 +586,13 @@ export interface RespuestaLote {
   huella: string;
   // Las zonas escritas por su nombre en las filas que entran, con su sitio y cuántas filas (bloque S, punto 3; aditivo).
   zonas_por_nombre: ZonaPorNombre[];
+  // Solo si el archivo pedía más zonas nuevas que MAX_ZONAS_NUEVAS_LOTE (U2; aditivo, 24/11/2026): no se ofreció ninguna.
+  zonas_nuevas_excedidas?: ZonasNuevasExcedidas;
   filas: FilaInforme[];
 }
 // Invariante (con prueba): validas + existentes + rechazadas = leidas. `con_aviso` cuenta las filas con avisos; desde el bloque S (punto 3)
 // solo las que entran los traen, así que es la misma cifra que «N filas que se crean traen avisos».
-export function totales(informe: readonly FilaInforme[]): Omit<RespuestaLote, 'huella' | 'filas' | 'zonas_por_nombre'> {
+export function totales(informe: readonly FilaInforme[]): Omit<RespuestaLote, 'huella' | 'filas' | 'zonas_por_nombre' | 'zonas_nuevas_excedidas'> {
   return {
     leidas: informe.length,
     validas: informe.filter((f) => f.resultado === 'valida' || f.resultado === 'creada').length,
@@ -584,8 +601,8 @@ export function totales(informe: readonly FilaInforme[]): Omit<RespuestaLote, 'h
     con_aviso: informe.filter((f) => f.avisos.length > 0).length,
   };
 }
-export function respuestaLote(informe: FilaInforme[], zonas: ZonaPorNombre[] = []): RespuestaLote {
-  return { ...totales(informe), huella: huellaDelPlan(informe), zonas_por_nombre: zonas, filas: informe };
+export function respuestaLote(informe: FilaInforme[], zonas: ZonaPorNombre[] = [], excedidas: ZonasNuevasExcedidas | null = null): RespuestaLote {
+  return { ...totales(informe), huella: huellaDelPlan(informe), zonas_por_nombre: zonas, ...(excedidas === null ? {} : { zonas_nuevas_excedidas: excedidas }), filas: informe };
 }
 
 // ── Reintento de `modo=crear` con la misma llave (bloque N, punto 8) ──────────────────────────────────────────────────────────────────
@@ -693,4 +710,80 @@ export class TasaPorPersona {
     if (this.marcas.size > 1000) for (const [k, v] of this.marcas) if (v.every((t) => ahora - t >= this.ventanaMs)) this.marcas.delete(k);
     return true;
   }
+}
+
+// Los motivos de zona del lote, en palabras de la persona (docs/19 §4 U punto 1 y U2 punto 1; corregidos el 24/11/2026). El de la zona
+// inexistente no ofrece «desde esta misma alta»: para un operador técnico, que no tiene `ajustes`, era falso.
+export const ZONA_INEXISTENTE_LOTE = (z: string): string =>
+  `la zona «${z}» no existe en tus sitios: revisa cómo se escribe; si es nueva, pídele a quien administra el sitio que la cree (Ajustes del sitio → Zonas)`;
+export const ZONA_RETIRADA_LOTE = (z: string): string => `la zona «${z}» está retirada: vuelve a ofrecerla en Ajustes del sitio → Zonas, o elige otra`;
+export const ZONA_OTRA_ESCRITURA_LOTE = (z: string): string =>
+  `la zona «${z}» ya existe en el sitio con otra escritura: escríbela como aparece en Ajustes del sitio → Zonas`;
+export const ZONA_OTRA_ESCRITURA_ARCHIVO_LOTE = (z: string, primera: string): string =>
+  `la zona «${z}» es la misma que «${primera}» de otra fila, con otra escritura: escríbela igual en todas las filas`;
+export const ZONA_INVISIBLE_LOTE = (z: string): string => `la zona «${z}» ${TEXTO_INVISIBLE}: escríbela de nuevo sin copiarla`;
+
+// Sitios y zonas desde el panel (docs/19 §4 U2): el sitio donde crear las zonas que falten, si el cuerpo lo trae (ya validado como UUID en
+// filasDelCuerpo); null si no.
+export function zonasNuevasEn(cuerpo: unknown): string | null {
+  const v = (cuerpo as Record<string, unknown> | null)?.zonas_nuevas_en;
+  return typeof v === 'string' && UUID.test(v) ? v.toLowerCase() : null;
+}
+
+// El tope de zonas nuevas por lote (corregido el 24/11/2026; docs/19 §4 U2 punto 1): una planilla con una columna corrida pondría en
+// `zona` cientos de valores distintos, y una zona no se borra (solo se retira). Por encima del tope no se ofrece ninguna.
+export const MAX_ZONAS_NUEVAS_LOTE = 20;
+export interface ZonasNuevasExcedidas { pedidas: number; maximo: number }
+
+// Las zonas escritas por su nombre que podrían ser nuevas: ni vacías, ni UUID (un UUID nunca crea zonas), ni conocidas (una zona del
+// catálogo, activa o retirada, de cualquier sitio de quien carga, por claveZona), ni más largas que el tope de POST /sitios/{id}/zonas,
+// ni con caracteres de control o invisibles. Una por clave, con el nombre como lo escribió la primera fila. El servicio pregunta a la base
+// qué clave le da a cada una y cuáles ya existen en el sitio destino (AltaService.zonasEnLaBase).
+export function candidatasZonasNuevas(filas: readonly FilaEntrada[], existentes: readonly ZonaCatalogo[]): string[] {
+  const conocidas = new Set(existentes.map((x) => claveZona(x.nombre)));
+  const nuevas = new Map<string, string>();
+  for (const f of filas) {
+    const z = texto(f.zona);
+    const clave = claveZona(z);
+    if (z === '' || UUID.test(z) || conocidas.has(clave) || nuevas.has(clave)) continue;
+    if ([...z].length > MAX_NOMBRE_ZONA || CONTROL.test(z) || INVISIBLE.test(z)) continue; // no se crea una zona inválida
+    nuevas.set(clave, z);
+  }
+  return [...nuevas.values()];
+}
+
+// La clave que la base da a un nombre (lower(btrim())) y si ya existe en el sitio destino (AltaService.zonasEnLaBase).
+export interface ClaveEnLaBase { clave: string; existe: boolean }
+
+// Las zonas `nueva` del sitio indicado, a partir de las candidatas, agrupadas por la clave de la BASE (`enLaBase`, por cada texto de
+// candidatasZonasNuevas): la que ya existe en el sitio no se ofrece, y de dos candidatas del mismo archivo que para la base son la misma
+// (y para JS no), solo la primera; la otra quedaría como una segunda zona que el índice rechaza al crear. Devuelve también los motivos de
+// lo que no se ofrece (`Catalogos.zonasNoOfrecidas`): «otra escritura» y «trae un carácter invisible». Si quedan más de
+// MAX_ZONAS_NUEVAS_LOTE, no se ofrece ninguna y `excedidas` dice cuántas pedía el archivo (esas filas siguen fuera con el motivo de zona
+// inexistente).
+export function zonasNuevasDelLote(
+  filas: readonly FilaEntrada[], existentes: readonly ZonaCatalogo[], sitio: { id: string; codigo: string; nombre: string }, enLaBase: ReadonlyMap<string, ClaveEnLaBase>,
+): { zonas: ZonaCatalogo[]; noOfrecidas: Map<string, string>; excedidas: ZonasNuevasExcedidas | null } {
+  const noOfrecidas = new Map<string, string>();
+  const conocidas = new Set(existentes.map((x) => claveZona(x.nombre)));
+  for (const f of filas) {
+    const z = texto(f.zona);
+    const clave = claveZona(z);
+    if (z !== '' && !UUID.test(z) && !conocidas.has(clave) && INVISIBLE.test(z) && !noOfrecidas.has(clave)) noOfrecidas.set(clave, ZONA_INVISIBLE_LOTE(recorte(z, 40)));
+  }
+  const nuevas: ZonaCatalogo[] = [];
+  const primeraPorClaveBase = new Map<string, string>();
+  for (const nombre of candidatasZonasNuevas(filas, existentes)) {
+    const clave = claveZona(nombre);
+    const base = enLaBase.get(nombre) ?? { clave, existe: false };
+    const primera = primeraPorClaveBase.get(base.clave);
+    if (base.existe) noOfrecidas.set(clave, ZONA_OTRA_ESCRITURA_LOTE(recorte(nombre, 40)));
+    else if (primera !== undefined) noOfrecidas.set(clave, ZONA_OTRA_ESCRITURA_ARCHIVO_LOTE(recorte(nombre, 40), recorte(primera, 40)));
+    else {
+      primeraPorClaveBase.set(base.clave, nombre);
+      nuevas.push({ id: `nueva:${clave}`, nombre, sitio_id: sitio.id, sitio_codigo: sitio.codigo, sitio_nombre: sitio.nombre, nueva: true });
+    }
+  }
+  if (nuevas.length > MAX_ZONAS_NUEVAS_LOTE) return { zonas: [], noOfrecidas, excedidas: { pedidas: nuevas.length, maximo: MAX_ZONAS_NUEVAS_LOTE } };
+  return { zonas: nuevas, noOfrecidas, excedidas: null };
 }

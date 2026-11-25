@@ -331,4 +331,17 @@ describe('P9, quien publica', () => {
     await new Promise((x) => setTimeout(x, 20));
     expect(document.querySelector('[data-enlace-una-vez]')).toBeTruthy();
   });
+
+  // Bloque U (docs/19 §4): una zona retirada no se ofrece para un enlace nuevo; la que ya está elegida en el formulario sigue visible.
+  it('una zona retirada no se ofrece para un enlace nuevo; si ya estaba elegida, se sigue mostrando', async () => {
+    const con = (activo: boolean): Sitio[] => [{ ...SITIOS[0]!, zonas: [{ id: 'z1', nombre: 'Norte', activo: true }, { id: 'z2', nombre: 'Sur', activo }, { id: 'z3', nombre: 'Bodega', activo: false }] }];
+    const r = render(Publicar, { sitio: 'uct', sesion: SESION, sitios: con(true), alCambiarVista: () => undefined });
+    await waitFor(() => expect(document.querySelector('[data-magnitud-enlace="temperatura"]')).toBeTruthy());
+    expect(document.querySelector('[data-zona-enlace="Norte"]')).not.toBeNull();
+    expect(document.querySelector('[data-zona-enlace="Bodega"]')).toBeNull();
+    await elegir('[data-zona-enlace="Sur"]');
+    await r.rerender({ sitio: 'uct', sesion: SESION, sitios: con(false), alCambiarVista: () => undefined }); // «Sur» se retira con la zona ya marcada
+    expect(document.querySelector('[data-zona-enlace="Sur"]')).not.toBeNull();
+    expect(document.querySelector('[data-zona-enlace="Bodega"]')).toBeNull();
+  });
 });

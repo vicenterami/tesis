@@ -202,6 +202,7 @@
     if (daDeAlta) lista.push({ ruta: '#/alta', texto: 'Dar de alta', icono: 'alta', activo: vista.pantalla === 'alta', dato: 'alta-menu' });
     if (publicaVistas) lista.push({ ruta: '#/publicar', texto: 'Vista pública', icono: 'publico', activo: vista.pantalla === 'publicar', dato: 'publicar' });
     if (ajustaSitio) lista.push({ ruta: '#/sitio/ajustes', texto: 'Ajustes del sitio', icono: 'ajustes', activo: vista.pantalla === 'ajustes', dato: 'ajustes-sitio' });
+    if (administraCatalogo) lista.push({ ruta: '#/sitios', texto: 'Sitios', icono: 'sitios', activo: vista.pantalla === 'sitios', dato: 'sitios' });
     if (administraCatalogo) lista.push({ ruta: '#/catalogo', texto: 'Catálogo', icono: 'catalogo', activo: vista.pantalla === 'catalogo', dato: 'catalogo' });
     return lista;
   });
@@ -504,7 +505,7 @@
       {:else if vista.pantalla === 'configurar'}
         {#key vista.id}{#await import('./Configurar.svelte') then { default: Configurar }}<Configurar id={vista.id} {sesion} {sitios} />{:catch}{@render sinPantalla()}{/await}{/key}
       {:else if vista.pantalla === 'alta'}
-        {#await import('./Alta.svelte') then { default: Alta }}<Alta modo={vista.modo} idFisico={vista.idFisico} sitio={vista.sitio} {sesion} {sitios} />{:catch}{@render sinPantalla()}{/await}
+        {#await import('./Alta.svelte') then { default: Alta }}<Alta modo={vista.modo} idFisico={vista.idFisico} sitio={vista.sitio} {sesion} {sitios} sitioActivo={sitioNombrado} />{:catch}{@render sinPantalla()}{/await}
       {:else if vista.pantalla === 'preferencias'}
         {#await import('./Preferencias.svelte') then { default: Preferencias }}<Preferencias {sesion} {sitios} {ultimaVista} {alCambiarPreferencias} {alDarseDeBaja} />{:catch}{@render sinPantalla()}{/await}
       {:else if vista.pantalla === 'publicar'}
@@ -515,7 +516,7 @@
         {/if}
       {:else if vista.pantalla === 'ajustes'}
         {#if ajustaSitio}
-          {#await import('./AjustesSitio.svelte') then { default: AjustesSitio }}<AjustesSitio sitio={vista.sitio} {sesion} {sitios} {alCambiarVista} />{:catch}{@render sinPantalla()}{/await}
+          {#await import('./AjustesSitio.svelte') then { default: AjustesSitio }}<AjustesSitio sitio={vista.sitio} {sesion} {sitios} {alCambiarVista} alCambiarSitios={cargarSitios} />{:catch}{@render sinPantalla()}{/await}
         {:else}
           <p class="vacio" data-sin-ajustes>Tu rol no cambia ajustes en ningún sitio: los cambia quien administra el tuyo. <a href="#/">Volver al tablero</a></p>
         {/if}
@@ -524,6 +525,12 @@
           {#await import('./Exportar.svelte') then { default: Exportar }}<Exportar sitio={vista.sitio} {sesion} {sitios} {alCambiarVista} />{:catch}{@render sinPantalla()}{/await}
         {:else}
           <p class="vacio" data-sin-exportar>{textoSinExportar(sesion.permisos)} <a href="#/">Volver al tablero</a></p>
+        {/if}
+      {:else if vista.pantalla === 'sitios'}
+        {#if administraCatalogo}
+          {#await import('./Sitios.svelte') then { default: Sitios }}<Sitios {sitios} alCambiar={cargarSitios} />{:catch}{@render sinPantalla()}{/await}
+        {:else}
+          <p class="vacio" data-sin-sitios>Los sitios los crea quien administra el sistema. Las zonas de tu sitio están en Ajustes del sitio. <a href="#/">Volver al tablero</a></p>
         {/if}
       {:else if vista.pantalla === 'catalogo'}
         {#if administraCatalogo}

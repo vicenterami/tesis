@@ -229,7 +229,7 @@ describe('ataques y archivos dañados', () => {
     // El tope no es una medida de rendimiento: atrapa un lector cuadrático (el 19/11/2026, una etiqueta de 1 kB tardaba 70 s). Solo mide ≈ 1 s;
     // en la suite completa con la CPU ocupada o a batería, 3,5 a 3,9 s (23/11/2026). 10 s sigue atrapando aquel caso con margen.
     expect(performance.now() - t0).toBeLessThan(10_000);
-  });
+  }, 20_000); // su propia cota es 10 s; el límite de 5 s de vitest lo cortaba con la suite en paralelo y a batería (24/11/2026, como la del 23/11)
   it('una etiqueta sin cerrar no se vuelve a recorrer entera en cada trozo: 8 MiB en un atributo sin cerrar se rechazan en menos de 1 s', async () => {
     const b = libro({ hoja: hojaXml(fi(1, `<c r="A1" t="${'a'.repeat(TOPES.bytesPorParte - 1000)}/>`)) });
     const t0 = performance.now();

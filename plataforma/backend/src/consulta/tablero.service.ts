@@ -46,7 +46,7 @@ export function entregasDelResumen(base: readonly BaseEntrega[], desde: Date, ha
 }
 
 export interface SitioDeSesion {
-  id: string; codigo: string; nombre: string; zona_horaria: string; rol: string; zonas: { id: string; nombre: string }[];
+  id: string; codigo: string; nombre: string; zona_horaria: string; descripcion: string | null; rol: string; zonas: { id: string; nombre: string; activo: boolean; dispositivos: number }[];
 }
 
 @Injectable()
@@ -56,8 +56,9 @@ export class TableroService {
   // GET /sitios: los sitios activos del alcance (null = todos, el usuario del sistema) con sus zonas; el rol lo pone el controlador.
   async sitios(alcance: string[] | null): Promise<Omit<SitioDeSesion, 'rol'>[]> {
     const r = await this.pool.query<Omit<SitioDeSesion, 'rol'>>(`
-      SELECT s.id, s.codigo, s.nombre, s.zona_horaria,
-             (SELECT coalesce(json_agg(json_build_object('id', z.id, 'nombre', z.nombre) ORDER BY z.nombre), '[]'::json)
+      SELECT s.id, s.codigo, s.nombre, s.zona_horaria, s.descripcion,
+             (SELECT coalesce(json_agg(json_build_object('id', z.id, 'nombre', z.nombre, 'activo', z.activo,
+                      'dispositivos', (SELECT count(*) FROM dispositivo d WHERE d.zona_id = z.id AND d.estado <> 'baja')) ORDER BY z.nombre), '[]'::json)
                 FROM zona z WHERE z.sitio_id = s.id) AS zonas
         FROM sitio s
        WHERE s.activo AND ($1::uuid[] IS NULL OR s.id = ANY($1::uuid[]))

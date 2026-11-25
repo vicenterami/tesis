@@ -78,6 +78,8 @@ describe('el CSV', () => {
     ]);
     // «°» se admite en `canales` (la plantilla lo publica en `simbolos`), así que «°C» y «°F» llegan al servidor, que decide la unidad (S2).
     expect(l.filas.map((f) => f.n)).toEqual([4]);
+    // Los separadores de línea y de párrafo de Unicode (U+2028, U+2029) cuentan como control, igual que en el servidor (alta/lote.ts, CONTROL).
+    for (const x of ['\u2028', '\u2029']) expect(motivoDeCelda(PLANTILLA.columnas.find((c) => c.nombre === 'nombre')!, `Uno${x}Dos`)).toBe('Nombre: trae un salto de línea, un tabulador u otro carácter de control, que no se admite');
     expect(motivoDeCelda(PLANTILLA.columnas.find((c) => c.nombre === 'canales')!, `${'°'.repeat(40)}x`)).toBe('Canales: tiene 81 caracteres, contando como dos cada «°», y el máximo es 80'); // en bytes, como el servidor, y dicho
   });
   it('S1 y S4: las palabras de una celda mal formada son las del servidor (alta/lote.ts): el bloque TEXTOS_CELDA es el mismo, letra por letra', () => {
@@ -279,6 +281,7 @@ const DEL_SERVIDOR: [string, unknown, Parameters<typeof explicarError>[1], CasoE
   ['sin permiso', api(403), { operacion: 'validar' }, 'sin_permiso', 'Tu perfil no permite dar de alta'],
   ['otra creación en curso', new FalloDeCreacion(api(409, { codigo: 'lote_en_curso' }), 1), { operacion: 'crear' }, 'lote_en_curso', 'Hay otra alta por lote en curso'],
   ['el plan cambió', new FalloDeCreacion(api(409, { codigo: 'plan_cambio', plan: { filas: NUEVO } }), 1), { operacion: 'crear', visto: VISTO }, 'plan_cambio', 'no se creó ninguno'],
+  ['una zona nueva que solo cambia en mayúsculas o espacios choca en la base con el mismo plan', new FalloDeCreacion(api(409, { codigo: 'choque_sin_cambio' }), 1), { operacion: 'crear' }, 'choque_sin_cambio', 'Escríbela igual en todas las filas y vuelve a validar'],
   ['demasiadas peticiones, con la espera', api(429, { codigo: 'demasiadas_peticiones', reintentar_en_s: 37 }, [], 37), { operacion: 'validar' }, 'demasiadas_peticiones', 'Espera 37 s'],
   ['sin respuesta tras los intentos', new FalloDeCreacion(api(0), 3), { operacion: 'crear' }, 'sin_respuesta', 'no se sabe si se crearon'],
   ['un 409 en un intento posterior al primero', new FalloDeCreacion(api(409, { codigo: 'plan_cambio', plan: { filas: NUEVO } }), 2), { operacion: 'crear', visto: VISTO }, 'sin_respuesta', 'no se sabe si se crearon'],

@@ -119,6 +119,16 @@ DO $$ BEGIN
     GRANT EXECUTE ON FUNCTION fn_quitar_alias(text) TO plataforma_app;
   END IF;
 END $$;
+-- Desde la migración 28, sitios y zonas desde el panel (docs/19 §4 U): INSERT y UPDATE por columna de `sitio` y `zona`, ningún DELETE.
+-- Nace después de esta: aquí se repite solo si ya existe la columna `zona.activo`.
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'zona' AND column_name = 'activo') THEN
+    GRANT INSERT (nombre, codigo, zona_horaria, descripcion) ON sitio TO plataforma_app;
+    GRANT UPDATE (nombre, descripcion) ON sitio TO plataforma_app;
+    GRANT INSERT (sitio_id, nombre) ON zona TO plataforma_app;
+    GRANT UPDATE (nombre, activo) ON zona TO plataforma_app;
+  END IF;
+END $$;
 ALTER DEFAULT PRIVILEGES FOR ROLE plataforma IN SCHEMA public REVOKE INSERT, UPDATE ON TABLES FROM plataforma_app;
 ALTER DEFAULT PRIVILEGES FOR ROLE plataforma IN SCHEMA public GRANT SELECT ON TABLES TO plataforma_app;
 

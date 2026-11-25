@@ -17,9 +17,10 @@ import { FORMA_ACTUALIZADO_EN } from './calibracion.dto.js';
 import { ConsultaService } from '../consulta/consulta.service.js';
 import {
   CABECERA_LLAVE, COLUMNAS_LOTE, ChoqueDeLote, LOTES_POR_MINUTO, REINTENTOS_POR_MINUTO, MAX_BYTES_LOTE, MAX_FILAS_LOTE, MODOS_LOTE, RespuestasPorLlave, TasaPorPersona, filasDelCuerpo,
-  destinoDe, firmaDelCuerpo, huellaDelPlan, llaveDeReintento, modoLote, plantillaLote, respuestaLote, validarLote,
+  MAX_ZONAS_NUEVAS_LOTE, candidatasZonasNuevas, destinoDe, firmaDelCuerpo, huellaDelPlan, llaveDeReintento, modoLote, plantillaLote, respuestaLote, validarLote,
+  zonasNuevasDelLote, zonasNuevasEn,
 } from './lote.js';
-import type { FilaEntrada, FilaInforme, PlantillaLote, RespuestaLote } from './lote.js';
+import type { FilaEntrada, FilaInforme, PlantillaLote, RespuestaLote, ZonasNuevasExcedidas } from './lote.js';
 import type { UsuarioSesion } from '../sesion/permisos.js';
 
 // Aprovisionamiento por API (docs/10 §3, §8.4 puntos 41 y 42; docs/19 P7 «Propuesta»): POST /dispositivos (HU-11, RF-19),
@@ -36,6 +37,15 @@ function demasiadas(texto: string, esperaS: number): HttpException {
 // El 409 de un plan que cambió entre la vista previa y la creación (docs/19 §4, N8): el plan nuevo va en `plan`; nada se creó.
 function planCambio(plan: RespuestaLote): HttpException {
   return new HttpException({ statusCode: 409, error: 'Conflict', codigo: 'plan_cambio', message: 'el plan cambió desde que lo revisaste: revísalo de nuevo; no se creó ninguno', plan }, HttpStatus.CONFLICT);
+}
+
+// El choque que solo ve la base cuando el plan recalculado es EL MISMO (misma huella y todas las filas siguen entrando): no es un plan que
+// cambió, y responder `plan_cambio` llevaría a la persona a confirmar lo mismo una y otra vez (corregido el 24/11/2026). Su caso típico es
+// una zona nueva que choca con el índice normalizado de la base sin que el cálculo en memoria lo vea (docs/19 §4 U2 punto 1); el plan ya
+// agrupa las candidatas y pregunta a la base con su propia normalización, así que queda como defensa ante lo que el plan no alcance a ver.
+export const CHOQUE_SIN_CAMBIO = 'Una zona nueva del archivo coincide con otra (del mismo archivo o del sitio) que solo cambia en mayúsculas o espacios. Escríbela igual en todas las filas y vuelve a validar.';
+function choqueSinCambio(): HttpException {
+  return new HttpException({ statusCode: 409, error: 'Conflict', codigo: 'choque_sin_cambio', message: CHOQUE_SIN_CAMBIO }, HttpStatus.CONFLICT);
 }
 
 @ApiTags('dispositivos')
@@ -116,8 +126,8 @@ export class AltaController {
       '«magnitud:unidad | magnitud:unidad» (también con «;»), con la unidad del catálogo (`GET /magnitudes`) o una escritura común de la misma («°C», «ºC», «C» o «degC» por Cel; ' +
       '«%» por la unidad porcentual de la magnitud), que se guarda como la del catálogo, con aviso; `pasarela`, su id_fisico o UUID, ' +
       'solo en la vía lorawan. Cada fila pasa por la misma validación del alta de a uno. Responde `leidas, validas, existentes, rechazadas, con_aviso, ' +
-      'huella` (validas + existentes + rechazadas = leidas; solo las filas que entran traen avisos), `zonas_por_nombre[{zona, sitio, filas}]` (las zonas escritas ' +
-      'por su nombre en las filas que entran) y `filas[{n, id_fisico, resultado, interpretada, legible, por_defecto, ' +
+      'huella` (validas + existentes + rechazadas = leidas; solo las filas que entran traen avisos), `zonas_por_nombre[{zona, sitio, filas, nueva?}]` (las zonas escritas ' +
+      'por su nombre en las filas que entran; `nueva: true` si el lote la creará) y `filas[{n, id_fisico, resultado, interpretada, legible, por_defecto, ' +
       'avisos[{campo, texto}], motivos[{campo, texto}], motivo, id, credencial, topico}]`: el `texto` de avisos y motivos está en palabras para personas y `campo` ' +
       'nombra la columna; `legible` es lo interpretado como se lee (`donde`, `resumen` y `campos`) o null; `interpretada` es lo que se creará (identificador normalizado, ' +
       'nombre, sitio, zona, vía, formato resuelto, intervalo, canales con nombre y unidad, pasarela, decodificador y tópico) o null; `motivo`, la unión de ' +
@@ -131,15 +141,33 @@ export class AltaController {
       `respuesta sin crear nada (con su propio cupo de ${REINTENTOS_POR_MINUTO} por minuto, y si la persona conserva el permiso en los sitios de lo creado). Hasta ${MAX_FILAS_LOTE} filas (más: 413) y ${MAX_BYTES_LOTE} bytes de cuerpo, ${LOTES_POR_MINUTO} lotes por minuto por persona (429) y ` +
       'una creación a la vez (409 `codigo: lote_en_curso`). Un id_fisico que ya usa un dispositivo o una pasarela de otro sitio se rechaza como ' +
       '«ese identificador ya está en uso en la plataforma: elige otro», sin id, estado ni `interpretada` (RF-41). En `crear`, cada fila creada trae ' +
-      '`destino`, a dónde envía según su vía: el tópico MQTT, «POST /recepcion/<id_fisico>» o «por su pasarela <id_fisico>».',
+      '`destino`, a dónde envía según su vía: el tópico MQTT, «POST /recepcion/<id_fisico>» o «por su pasarela <id_fisico>». ' +
+      '**Zonas nuevas** (docs/19 §4 U2): con `zonas_nuevas_en` (el UUID de un sitio donde la persona tiene la acción `ajustes`; si no, 403; ajeno o inexistente, 404), ' +
+      'una zona escrita por su nombre que no existe en los sitios de la persona entra como zona nueva de ese sitio (una por nombre, sin distinguir mayúsculas ni ' +
+      'espacios en los extremos) y se crea en la misma transacción, con su evento `zona_alta`. No se ofrece como nueva: la que coincide con una zona retirada ' +
+      '(«está retirada»), la que la base ya tiene en ese sitio escrita de otra forma («ya existe en el sitio con otra escritura») ni la que trae un carácter ' +
+      `invisible. Más de ${MAX_ZONAS_NUEVAS_LOTE} zonas nuevas distintas: no se ofrece ninguna y la respuesta (también el \`plan\` del 409) suma ` +
+      `\`zonas_nuevas_excedidas: {pedidas, maximo}\` (maximo = ${MAX_ZONAS_NUEVAS_LOTE}). Si al crear la base rechaza algo que el plan recalculado no ve (misma huella y ` +
+      'todas las filas entran), 409 `codigo: choque_sin_cambio`, sin `plan` y nada creado.',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object', required: ['filas'],
+      properties: {
+        filas: { type: 'array', minItems: 1, maxItems: MAX_FILAS_LOTE, items: { type: 'object', required: ['n'], properties: { n: { type: 'integer', minimum: 1 } }, additionalProperties: { type: 'string' } } },
+        huella: { type: 'string', pattern: '^[0-9a-f]{64}$', description: 'Obligatoria con modo=crear: la de la vista previa' },
+        zonas_nuevas_en: { type: 'string', format: 'uuid', description: 'Opcional: el sitio donde crear las zonas que falten; exige la acción `ajustes` en ese sitio (403); ajeno o inexistente, 404' },
+      },
+    },
   })
   @ApiHeader({ name: 'X-Clave-Admin', required: false, description: 'Sin sesión: la clave de administrador (HTTP_CLAVE_ADMIN), como usuario del sistema (docs/20 §5)' })
   @ApiHeader({ name: 'Idempotency-Key', required: false, description: 'Obligatoria con modo=crear: de 16 a 128 caracteres entre letras, dígitos, «-» y «_», generada por el cliente para cada creación' })
   @ApiQuery({ name: 'modo', required: true, enum: MODOS_LOTE })
   @ApiOkResponse({ description: 'El plan fila por fila (en crear, con las credenciales una sola vez)' })
   @ApiBadRequestResponse({ description: 'Modo o cuerpo inválidos (una celda sobre su tope, que no es texto ni número o con NUL; `n` que no es entero creciente; sin huella o sin Idempotency-Key en crear): `message` dice la fila' })
-  @ApiForbiddenResponse({ description: 'Sin ningún sitio donde dar de alta, sesión sin la cabecera X-Pedido: panel, o un reintento de quien ya no puede dar de alta en un sitio de lo creado' })
-  @ApiConflictResponse({ description: '`codigo: plan_cambio` (con el plan nuevo en `plan`; nada creado) o `codigo: lote_en_curso`' })
+  @ApiForbiddenResponse({ description: 'Sin ningún sitio donde dar de alta, sin la acción `ajustes` en el sitio de `zonas_nuevas_en`, sesión sin la cabecera X-Pedido: panel, o un reintento de quien ya no puede dar de alta en un sitio de lo creado' })
+  @ApiNotFoundResponse({ description: 'El sitio de `zonas_nuevas_en` no existe, está inactivo o es de otro (RF-41)' })
+  @ApiConflictResponse({ description: '`codigo: plan_cambio` (con el plan nuevo en `plan`, que puede traer `zonas_nuevas_excedidas`; nada creado), `codigo: choque_sin_cambio` (la base rechazó algo que el plan no ve, por ejemplo una zona nueva que ya existe con otra escritura; nada creado) o `codigo: lote_en_curso`' })
   @ApiUnauthorizedResponse({ description: 'Sin sesión (sin la cookie de sesión ni X-Clave-Admin, antes de leer el cuerpo), o sesión inválida' })
   @ApiResponse({ status: 413, description: `Más de ${MAX_FILAS_LOTE} filas o de ${MAX_BYTES_LOTE} bytes (solo con POST; otro método, 100 KiB)` })
   @ApiResponse({ status: 422, description: '`codigo: llave_reutilizada`: la Idempotency-Key ya se usó con otro cuerpo' })
@@ -170,26 +198,29 @@ export class AltaController {
     }
     if (!this.tasaLote.admitir(persona)) throw demasiadas(`más de ${LOTES_POR_MINUTO} lotes en un minuto`, this.tasaLote.esperaS(persona));
     const { filas, huella } = filasDelCuerpo(cuerpo, modo);
+    const sitioZonas = zonasNuevasEn(cuerpo);
+    if (sitioZonas !== null) await this.alcance.exigirSitio(u, 'ajustes', sitioZonas); // crear zonas: `ajustes` en ese sitio (U2); 404 si es de otro
     if (modo === 'validar') {
-      const plan = await this.planLote(u, filas);
-      return respuestaLote(plan.informe, plan.zonas);
+      const plan = await this.planLote(u, filas, sitioZonas);
+      return respuestaLote(plan.informe, plan.zonas, plan.excedidas);
     }
     const firma = firmaDelCuerpo(cuerpo);
     // Una creación a la vez, y el plan se recalcula dentro del candado: dos creaciones no se pisan entre la lectura y la inserción.
     if (this.loteEnCurso) throw new HttpException({ statusCode: 409, error: 'Conflict', codigo: 'lote_en_curso', message: 'hay otra alta por lote en curso: espera a que termine y vuelve a intentarlo' }, HttpStatus.CONFLICT);
     this.loteEnCurso = true;
     try {
-      const { informe, altas, zonas } = await this.planLote(u, filas);
+      const { informe, altas, zonas, excedidas } = await this.planLote(u, filas, sitioZonas);
       // Todo o nada al pie de la letra (revisión del 15/11/2026): en `crear` toda fila debe entrar; una que no entra o que ya existe es un
       // plan distinto del confirmado, aunque la huella (que solo mira las que entran) coincida.
-      if (huellaDelPlan(informe) !== huella || informe.some((f) => f.resultado !== 'valida')) throw planCambio(respuestaLote(informe, zonas));
+      if (huellaDelPlan(informe) !== huella || informe.some((f) => f.resultado !== 'valida')) throw planCambio(respuestaLote(informe, zonas, excedidas));
       let creadas: Awaited<ReturnType<AltaService['crearLote']>>;
       try {
         creadas = await this.alta.crearLote(altas, u.id);
       } catch (e) {
         if (!(e instanceof ChoqueDeLote)) throw e;
-        const nuevo = await this.planLote(u, filas);
-        throw planCambio(respuestaLote(nuevo.informe, nuevo.zonas));
+        const nuevo = await this.planLote(u, filas, sitioZonas);
+        if (huellaDelPlan(nuevo.informe) === huella && nuevo.informe.every((f) => f.resultado === 'valida')) throw choqueSinCambio();
+        throw planCambio(respuestaLote(nuevo.informe, nuevo.zonas, nuevo.excedidas));
       }
       for (const f of informe) {
         const c = creadas.get(f.n);
@@ -197,7 +228,7 @@ export class AltaController {
           Object.assign(f, { resultado: 'creada', id: c.id, credencial: c.credencial, topico: c.topico, destino: destinoDe(f.interpretada) } satisfies Partial<FilaInforme>);
         }
       }
-      const respuesta = respuestaLote(informe, zonas);
+      const respuesta = respuestaLote(informe, zonas, excedidas);
       // Solo se guarda lo que creó algo (siempre, desde que toda fila debe entrar), con los sitios de lo creado.
       if (creadas.size > 0) this.respuestasLote.guardar(persona, llave, firma, respuesta, [...new Set(altas.map((a) => a.sitio_id))], Buffer.byteLength(JSON.stringify(respuesta)));
       res.setHeader('Cache-Control', 'no-store'); // la respuesta lleva credenciales
@@ -207,11 +238,20 @@ export class AltaController {
     }
   }
 
-  // Los catálogos (una vez para todo el archivo: cinco consultas, ninguna por fila) y el plan de cada fila.
-  private async planLote(u: UsuarioSesion, filas: FilaEntrada[]) {
+  // Los catálogos (una vez para todo el archivo: seis consultas, ninguna por fila) y el plan de cada fila.
+  // Con `sitioZonas` (U2, ya autorizado), las zonas escritas por su nombre que no existen en ningún sitio de la persona se suman al catálogo
+  // como zonas nuevas de ese sitio: entran, y crearLote las inserta en la misma transacción. Su id provisional (`nueva:<nombre>`) entra en
+  // la huella, así que el plan confirmado es el mismo que se vio. Dos consultas más: el sitio, y cuáles de las candidatas ya existen en él
+  // según la base (las que sí, no se ofrecen y la fila dice por qué). Más de MAX_ZONAS_NUEVAS_LOTE: ninguna, y `excedidas`.
+  private async planLote(u: UsuarioSesion, filas: FilaEntrada[], sitioZonas: string | null = null): Promise<ReturnType<typeof validarLote> & { excedidas: ZonasNuevasExcedidas | null }> {
     const sitios = alcanceDeLectura(u)?.filter((s) => permitir(u, 'escribir', s) === 'permitido') ?? null;
     const ids = filas.map((f) => (typeof f.id_fisico === 'string' ? f.id_fisico.trim().toLowerCase() : '')).filter((x) => x !== '');
-    return validarLote(filas, await this.alta.catalogosLote(sitios, ids), this.reservados);
+    const cat = await this.alta.catalogosLote(sitios, ids);
+    if (sitioZonas === null) return { ...validarLote(filas, cat, this.reservados), excedidas: null };
+    const sitio = await this.alta.sitioParaZonasNuevas(sitioZonas);
+    const enLaBase = await this.alta.zonasEnLaBase(sitio.id, candidatasZonasNuevas(filas, cat.zonas));
+    const nuevas = zonasNuevasDelLote(filas, cat.zonas, sitio, enLaBase);
+    return { ...validarLote(filas, { ...cat, zonas: [...cat.zonas, ...nuevas.zonas], zonasNoOfrecidas: nuevas.noOfrecidas }, this.reservados), excedidas: nuevas.excedidas };
   }
 
   // La plantilla del lote (docs/19 §4, N4): la única casa de las columnas, sus topes, `max_filas`, `max_bytes` y los separadores. La lee

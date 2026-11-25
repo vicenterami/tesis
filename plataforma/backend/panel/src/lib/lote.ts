@@ -115,7 +115,7 @@ export function celdasTabla(texto: string, separadores: readonly string[]): { re
 // siendo la guarda real (filasDelCuerpo). Las reglas de las celdas salen de la plantilla (tope, `texto_libre` y `simbolos` de cada columna), no
 // de una copia. Desde el bloque S (punto 1) una celda mal formada deja su FILA fuera («No entra», con su motivo), no el archivo entero.
 const IMPRIMIBLE = /[\x20\x21\x23-\x5b\x5d-\x7e]/; // la misma regla de alta/lote.ts para las columnas que no son texto libre
-const CONTROL = /\p{Cc}/u;
+const CONTROL = /[\p{Cc}\p{Zl}\p{Zp}]/u; // la misma de alta/lote.ts: control y los separadores U+2028 y U+2029
 const SUSTITUTO_SUELTO = /\p{Cs}/u;
 // Las MISMAS palabras que usa el servidor cuando una fila mal formada le llega igual (alta/lote.ts, TEXTOS_CELDA: lote.test.ts compara los
 // dos bloques letra por letra). `admitidos`: lo que la columna sí admite además del ASCII; `dobles`: los símbolos de la celda que el tope
@@ -396,10 +396,12 @@ export interface InformeLote {
   con_aviso?: number;
   huella: string;
   zonas_por_nombre?: ZonaPorNombre[];
+  zonas_nuevas_excedidas?: { pedidas: number; maximo: number }; // el archivo pediría más zonas nuevas que el tope: ninguna se ofrece como nueva
   filas: FilaInforme[];
 }
 // Las zonas escritas por su nombre en las filas que entran (bloque S, punto 3): la revisión lo dice una vez sobre la lista.
-export interface ZonaPorNombre { zona: string; sitio: string; filas: number }
+// `nueva`: no existe y se creará al confirmar (`zonas_nuevas_en`, docs/19 §4 U2).
+export interface ZonaPorNombre { zona: string; sitio: string; filas: number; nueva?: boolean }
 // Una fila mal formada, como fila del plan: «No entra», con sus motivos, sin pasar por el servidor (bloque S, punto 1).
 export function filaQueNoEntra(x: FilaNoEntra): FilaInforme {
   const id = x.fila.id_fisico;
@@ -452,7 +454,7 @@ export async function crearConReintento<T>(
 // motivo de esa fila. `celda_invalida` queda para lo que impide leer el archivo (una comilla sin cerrar, un JSON que no es una lista).
 export const CASOS_ERROR = [
   'archivo_vacio', 'solo_cabecera', 'una_columna', 'libro_ilegible', 'libro_grande', 'libro_sin_lector', 'columna_desconocida', 'falta_obligatoria', 'columna_repetida',
-  'demasiadas_filas', 'archivo_pesado', 'celda_invalida', 'rechazo_del_servidor', 'sesion_vencida', 'sin_permiso', 'lote_en_curso', 'plan_cambio',
+  'demasiadas_filas', 'archivo_pesado', 'celda_invalida', 'rechazo_del_servidor', 'sesion_vencida', 'sin_permiso', 'lote_en_curso', 'plan_cambio', 'choque_sin_cambio',
   'demasiadas_peticiones', 'sin_respuesta', 'sin_conexion', 'nada_creado', 'lote_incierto', 'llave_reutilizada', 'otro',
 ] as const;
 export type CasoError = (typeof CASOS_ERROR)[number];
@@ -467,7 +469,7 @@ export const ACCION_DE: Readonly<Record<CasoError, AccionLote>> = {
   archivo_vacio: 'otro_archivo', solo_cabecera: 'otro_archivo', una_columna: 'plantilla', libro_ilegible: 'otro_archivo', libro_grande: 'otro_archivo', libro_sin_lector: 'pegar', columna_desconocida: 'plantilla', falta_obligatoria: 'plantilla',
   columna_repetida: 'plantilla', demasiadas_filas: 'otro_archivo', archivo_pesado: 'otro_archivo',
   celda_invalida: 'otro_archivo', rechazo_del_servidor: 'otro_archivo', sesion_vencida: 'sesion', sin_permiso: 'inventario', lote_en_curso: 'reintentar',
-  plan_cambio: 'revisar', demasiadas_peticiones: 'reintentar', sin_respuesta: 'inventario', sin_conexion: 'reintentar', nada_creado: 'reintentar',
+  plan_cambio: 'revisar', choque_sin_cambio: 'otro_archivo', demasiadas_peticiones: 'reintentar', sin_respuesta: 'inventario', sin_conexion: 'reintentar', nada_creado: 'reintentar',
   lote_incierto: 'inventario', llave_reutilizada: 'revisar', otro: 'reintentar',
 };
 export const AVISO_SIN_RESPUESTA = 'No llegó la respuesta de la creación y no se sabe si se crearon. Revisa el inventario: las filas que al validar de nuevo salgan «ya existe» se crearon, y sus credenciales no se pueden recuperar: rota la credencial de cada una desde su ficha.';
@@ -491,6 +493,8 @@ export const TEXTO_DE: Readonly<Record<CasoError, string>> = {
   sin_permiso: 'Tu perfil no permite dar de alta dispositivos (lo hacen el operador técnico y los administradores). No se creó ninguno.',
   lote_en_curso: 'Hay otra alta por lote en curso en el servidor. Espera a que termine y reintenta; no se creó ninguno.',
   plan_cambio: 'Cambió algo desde que lo revisaste y no se creó ninguno. La revisión ya muestra lo de ahora; míralo y vuelve a crear.',
+  // 409 `choque_sin_cambio` (docs/19 §4 U2): la base rechazó lo que el plan no ve y recalcular da el mismo plan; reintentar repetiría el choque.
+  choque_sin_cambio: 'Una zona nueva del archivo coincide con otra (del mismo archivo o del sitio) que solo cambia en mayúsculas o espacios. Escríbela igual en todas las filas y vuelve a validar.',
   demasiadas_peticiones: 'Hiciste demasiadas validaciones o creaciones en un minuto. Espera un momento y reintenta.',
   sin_respuesta: AVISO_SIN_RESPUESTA,
   sin_conexion: 'No hubo respuesta del servidor. Validar no crea nada: reintenta cuando vuelva la conexión.',
@@ -543,6 +547,7 @@ export function explicarError(e: unknown, ctx: { operacion: 'validar' | 'crear';
     const cambios = describirCambios(ctx.visto ?? [], plan?.filas ?? []);
     return explicado('plan_cambio', TEXTO_DE.plan_cambio, cambios.length > 0 ? cambios : ['No se pudo decir qué fila cambió: revisa el informe completo.']);
   }
+  if (codigo === 'choque_sin_cambio') return explicado('choque_sin_cambio');
   if (codigo === 'llave_reutilizada') return explicado('llave_reutilizada');
   if (causa.codigo === 429) {
     const s = causa.reintentarEnS;

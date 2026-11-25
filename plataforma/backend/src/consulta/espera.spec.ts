@@ -44,7 +44,7 @@ describe('SitiosController: el plazo, quién puede y en qué orden (docs/20 §6 
     const espera = { leer: vi.fn(() => Promise.resolve({})), fijar: vi.fn(() => Promise.resolve({})) };
     // El sitio existe solo si es S u OTRO; exigir() decide 404/403 como en la pila (permisos.ts).
     const alcance = { exigirSitio: vi.fn((u: UsuarioSesion, accion: Accion, id: string) => Promise.resolve().then(() => exigir(u, accion, [S, OTRO].includes(id) ? id : null, 'sitio no encontrado'))) };
-    const c = new SitiosController({} as TableroService, alcance as unknown as AlcanceService, {} as ActividadService, espera as unknown as EsperaService, {} as never, {} as never);
+    const c = new SitiosController({} as TableroService, alcance as unknown as AlcanceService, {} as ActividadService, espera as unknown as EsperaService, {} as never, {} as never, {} as never);
     return { c, espera };
   }
   it('leerlo: cualquier perfil del sitio (200); otro sitio o inexistente, 404', async () => {
@@ -159,7 +159,7 @@ describe('EsperaService.leer con `propuesto`: una sola consulta, con la regla de
   it('el controlador: `propuesto` inválido → 400 (antes del sitio); válido, se lo pasa al servicio; cualquier perfil del sitio puede leer; otro sitio, 404', async () => {
     const espera = { leer: vi.fn(() => Promise.resolve({})), fijar: vi.fn() };
     const alcance = { exigirSitio: vi.fn((u: UsuarioSesion, accion: Accion, id: string) => Promise.resolve().then(() => exigir(u, accion, [S, OTRO].includes(id) ? id : null, 'sitio no encontrado'))) };
-    const c = new SitiosController({} as TableroService, alcance as unknown as AlcanceService, {} as ActividadService, espera as unknown as EsperaService, {} as never, {} as never);
+    const c = new SitiosController({} as TableroService, alcance as unknown as AlcanceService, {} as ActividadService, espera as unknown as EsperaService, {} as never, {} as never, {} as never);
     expect(await codigo(c.leerEspera(persona([[S, 'consulta']]), S, '0'))).toBe(400);
     expect(espera.leer).not.toHaveBeenCalled();
     expect(await codigo(c.leerEspera(persona([[S, 'consulta']]), S, '24'))).toBe(200);

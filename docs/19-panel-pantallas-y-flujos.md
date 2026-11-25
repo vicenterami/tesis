@@ -74,7 +74,7 @@ tabla de casos**, un archivo del panel que leen las tres (`panel/src/lib/estado-
 | P4 | **Condiciones** | Lista con tipo, dispositivo, magnitud y umbral, abierta en, duración; filtro abiertas / todas; al cerrarse, el resumen del episodio, y el reconocimiento con su clasificación (`docs/10 §8.4` punto 49) | Abrir la ficha del dispositivo | `GET /condiciones?abiertas&limite` | HU-05, RF-24 | Etapa 4 (lista sobre lo que la API ya devuelve) |
 | P5 | **Cuarentena** | Últimas tramas rechazadas: cuándo, por qué (`no_registrado`, `dado_de_baja`, `malformada`, `invalida`), detalle, dispositivo si se conoce, la trama cruda plegada | Copiar la trama; ir al alta si el motivo es `no_registrado` | `GET /cuarentena?limite` | RF-11 a RF-13 | Etapa 4 (lista sobre lo que la API ya devuelve) |
 | P6 | **Configurar dispositivo y canales** | Nombre, estado (activo / mantenimiento), intervalo esperado, zona; por canal, etiqueta, umbral alto, umbral bajo, histéresis y retardo de activación | Guardar con bloqueo optimista; validación en vivo (bajo < alto, histéresis dentro de la banda, rango de la magnitud) | `PATCH /dispositivos/{id}`, `PUT /canales/{id}/reglas` (Etapa 4), fijadas el 11/11/2026 (§4 tablero v2, E) | HU-06, HU-13, RF-14, punto 28 | Etapa 4, iteración 1 (exige sesión) |
-| P7 | **Alta de dispositivo** (asistente) | Paso 1 identidad y zona; paso 2 vía y formato (y pasarela si LoRaWAN); paso 3 canales y magnitudes; paso 4 credencial según la vía, mostrada una sola vez; paso 5 «esperando la primera trama» en vivo | Crear; copiar la credencial y el tópico; subir un CSV, validarlo y crear las filas válidas (el alta masiva: §4, bloques N y, desde el 19/11/2026, S); dar de alta un emisor detectado | `POST /dispositivos` (API hecha el 12/10, HU-11, `docs/16 §20`); `POST /dispositivos/lote?modo=validar\|crear` y `GET /cuarentena/detectados` (Etapa 4), fijadas el 11/11/2026 (§4 tablero v2, F) | RF-50, HU-11, HU-22, punto 25 | API: Etapa 3; pantalla, lote y detectados: Etapa 4, iteración 1 |
+| P7 | **Alta de dispositivo** (asistente) | Paso 1 identidad y zona; paso 2 vía y formato (y pasarela si LoRaWAN); paso 3 canales y magnitudes; paso 4 credencial según la vía, mostrada una sola vez; paso 5 «esperando la primera trama» en vivo | Crear; copiar la credencial y el tópico; subir un CSV, validarlo y crear las filas válidas (el alta masiva: §4, bloques N y, desde el 19/11/2026, S); dar de alta un emisor detectado; «+ Nueva zona…» en el selector de zona (con `ajustes`) y, en el alta masiva, la casilla para crear las zonas que no existan (bloque U2) | `POST /dispositivos` (API hecha el 12/10, HU-11, `docs/16 §20`); `POST /dispositivos/lote?modo=validar\|crear` y `GET /cuarentena/detectados` (Etapa 4), fijadas el 11/11/2026 (§4 tablero v2, F) | RF-50, HU-11, HU-22, punto 25 | API: Etapa 3; pantalla, lote y detectados: Etapa 4, iteración 1 |
 | P8 | **Exportar** (el sitio, diseñada el 19/11/2026, §4 bloque R) | Dispositivo (hoy) o sitio (Etapa 4), rango, formato (CSV, XLSX, JSON); tamaño estimado antes de descargar | Descargar | Hecho el 12/10 por dispositivo: `GET /dispositivos/{id}/exportar?formato=csv\|json&desde&hasta` (flujo por tandas; CSV estándar con coma y punto decimal para R, Python y QGIS). Por sitio (bloque R): `GET /sitios/{id}/exportar?formato=csv\|xlsx\|json` con mediciones, tramas y eventos, y `GET /sitios/{id}/exportar/estimacion` | RF-34, HU-08 (adelantada a la Etapa 3 el 12/10) | API: Etapa 3; pantalla, XLSX y por sitio: Etapa 4 |
 | P9 | **Vista pública por enlace** (diseñada el 16/11/2026, §4 bloque O; ✅ base, backend, proxy y las dos pantallas, 17/11/2026, `docs/16 §79` y §80) | Para quien visita sin cuenta: solo los promedios de las magnitudes que un administrador publicó (del sitio y, si lo eligió, de cada zona), nunca el mínimo ni el máximo; un valor sale oculto si lo aportan menos de k dispositivos. Para el administrador, «Publicar una vista» con vista previa y la lista de enlaces | Visitante: cambiar la ventana y pausar la actualización. Administrador: crear (con vencimiento), renovar y revocar | `GET /publico` (token en la cabecera `X-Enlace-Publico`) y `POST /sitios/{id}/enlaces/vista-previa`; crear y listar, `GET`/`POST /sitios/{id}/enlaces`, renovar, `POST /sitios/{id}/enlaces/{enlace}/renovar`, revocar, `DELETE /sitios/{id}/enlaces/{enlace}`, y el tope de enlaces y el k del sitio, `GET`/`PUT /sitios/{id}/enlaces/tope` y `GET`/`PUT /sitios/{id}/enlaces/minimo`, fijadas en el OpenAPI el 17/11/2026 (§4, O); desde el 18/11/2026 el k y el tope se cambian en P15 «Ajustes del sitio» (§4, Q) | RF-62, HU-32, punto 6 | Etapa 4, iteración 1 |
 | P10 | **Sesión y usuarios** | Entrar, cambio de la clave temporal, salir; quién soy en la cabecera; usuarios de mis sitios, su perfil por sitio y la guía de perfiles (cinco desde el 08/11/2026, diseño: `docs/20 §6`) | Entrar, cambiar la clave, salir o cerrar en todos lados; dar de alta (clave temporal una vez), activar y desactivar, asignar una temporal, cambiar el rol | `POST /sesion`, `GET /sesion`, `DELETE /sesion`, `POST /sesion/clave`, `GET /usuarios`, `POST /usuarios`, `PATCH /usuarios/{id}` (`docs/20`) | RF-43, RF-44, HU-18 | Etapa 4; hecha el 08/11/2026 (§4) |
@@ -82,8 +82,10 @@ tabla de casos**, un archivo del panel que leen las tres (`panel/src/lib/estado-
 | P12 | **Estado del sistema** (solo administrador del sistema; Etapa 4) | Recursos por contenedor en el tiempo (memoria frente a su techo, CPU), errores agrupados por huella, último respaldo y su antigüedad, condiciones del sistema abiertas; límites de los servicios | Ver el detalle de un error; ajustar un límite con bloqueo optimista | `GET /salud` y rutas nuevas sobre `metrica_recurso`, `error_sistema` y los límites (Etapa 4; `docs/10 §8.4` puntos 60 y 61) | RF-59, RF-60, RNF-19, HU-30 | Iteración 1 |
 | P13 | **Preferencias** (mi cuenta; Etapa 4) | Unidades de visualización (°C o °F; mm, m o km), zona horaria propia o la del sitio, vistas guardadas; mis datos y mis sesiones abiertas (por decidir: sin fila en el backlog) y la versión de términos aceptada; darme de baja | Guardar; exportar mis datos de cuenta; cerrar una sesión; darme de baja (con la clave actual) | `GET`/`PUT /preferencias`, `GET /sesiones`, `DELETE /sesiones/{id}` (Etapa 4), fijadas el 11/11/2026 (§4 tablero v2, H); la baja, `docs/20 §11` | RF-55, RF-56, HU-28, HU-29 | Iteración 1 (la baja, en la 0) |
 | P14 | **Actividad** (administrador de sitio en sus sitios; el del sistema en todos; diseñada el 11/11/2026) | Lo que hicieron las personas en el sitio (eventos con quién, de `evento.usuario_id`) y sus entradas, salidas y bloqueos (`acceso`), con filtros por persona, tipo y rango, en texto para personas | Filtrar; abrir la ficha del dispositivo o la persona | `GET /sitios/{id}/actividad?desde&hasta&tipo&usuario&cursor` (Etapa 4) (§4 tablero v2, G) | RF-46, HU-11, HU-26 | Iteración 1 |
-| P15 | **Ajustes del sitio** (diseñada el 18/11/2026, §4 bloque Q; quien tiene la acción `ajustes` o `enlaces` en el sitio: administrador del sitio y del sistema) | Lo que rige a todo el sitio, en dos secciones: **Primera trama** (el plazo en horas, de 1 a 2 160, con su equivalencia en días; qué pasa al vencer y por qué existe el plazo) y **Vista pública** (el mínimo de dispositivos por valor, k, y el tope de enlaces vivos) | Cambiar el plazo, el k (bajarlo se confirma) y el tope, cada uno con su «Guardar» y su bloqueo optimista; elegir sitio si se administra más de uno | `GET`/`PUT /sitios/{id}/espera-primera-trama`, `GET`/`PUT /sitios/{id}/enlaces/minimo` y `GET`/`PUT /sitios/{id}/enlaces/tope` (las tres ya existen; no se agrega ninguna ruta) | RF-62, HU-32, §2 (estado «Esperando primera trama») | Etapa 4, iteración 1 |
+| P15 | **Ajustes del sitio** (diseñada el 18/11/2026, §4 bloque Q; quien tiene la acción `ajustes` o `enlaces` en el sitio: administrador del sitio y del sistema) | Lo que rige a todo el sitio, en tres secciones: **Primera trama** (el plazo en horas, de 1 a 2 160, con su equivalencia en días; qué pasa al vencer y por qué existe el plazo), **Vista pública** (el mínimo de dispositivos por valor, k, y el tope de enlaces vivos) y, desde el 24/11/2026, **Zonas** (§4 bloque U, punto 5: las zonas del sitio con sus dispositivos activos) | Cambiar el plazo, el k (bajarlo se confirma) y el tope, cada uno con su «Guardar» y su bloqueo optimista; agregar, renombrar, retirar y volver a ofrecer zonas; elegir sitio si se administra más de uno | `GET`/`PUT /sitios/{id}/espera-primera-trama`, `GET`/`PUT /sitios/{id}/enlaces/minimo` y `GET`/`PUT /sitios/{id}/enlaces/tope`; para «Zonas», `GET /sitios` (las zonas con `activo` y `dispositivos`), `POST /sitios/{id}/zonas` y `PATCH /zonas/{id}` (nuevas, 24/11/2026) | RF-62, HU-32, §2 (estado «Esperando primera trama») | Etapa 4, iteración 1 |
 | P16 | **Catálogo** (diseñada el 20/11/2026, §4 bloque T; solo el administrador del sistema, acción `sistema`) | **Magnitudes** (nombre, código, unidad, rango válido, umbral sugerido, alias y en cuántos canales se usa) y **Recetas de decodificación** (largo, campos y en cuántos equipos se usa) | Crear y editar una magnitud (achicar el rango se confirma si afecta mediciones); crear una receta, probarla con bytes sin guardar y reemplazar una por otra; en P6, «Usar el sugerido» | `GET /magnitudes` (ampliada) y, nuevas, `POST /magnitudes`, `PATCH /magnitudes/{codigo}`, `GET /magnitudes/{codigo}/impacto`, `GET`/`POST /recetas-decodificacion`, `POST /recetas-decodificacion/probar` y `POST /recetas-decodificacion/{codigo}/reemplazar` (Etapa 4), con sus perfiles en `docs/20 §6` | TT-12, RF-11, RF-14 | Etapa 4, iteración 1 |
+| P17 | **Sitios** (diseñada el 24/11/2026, §4 bloque U; solo el administrador del sistema, acción `sistema`) | Los sitios con su código, zona horaria, descripción, zonas y dispositivos | Crear un sitio con su primera zona y, opcional, su descripción; cambiar nombre y descripción en la misma fila; ir a agregar personas (P10) | `GET /sitios` (con `descripcion` y las zonas con `activo` y `dispositivos`), `POST /sitios`, `PATCH /sitios/{id}` | HU-12, RF-21 | Etapa 4 (24/11/2026) |
+| P18 | **Pasarelas** (diseñada el 24/11/2026, §4 bloques V y W; pestaña de P2; ver con `leer`, crear y rotar con `escribir`, baja con `baja`) | Las pasarelas del sitio con formato, estado, nodos y última señal | Crear (credencial una sola vez), rotar la credencial, dar de baja, dar de alta sus nodos | `GET`/`POST /pasarelas`, `POST /pasarelas/{id}/credencial`, `DELETE /pasarelas/{id}` | HU-02, RF-50 | Etapa 4 (24/11/2026) |
 
 Lo que **no** se construye, y por qué: mapa (ningún requisito lo pide; el caso de uso tiene decenas de dispositivos, no cientos
 dispersos), informes programados y disparadores con varias condiciones (más que el umbral con histéresis decidido; candidatos
@@ -497,7 +499,7 @@ mis datos» (JSON por `descargar`) y «Darme de baja» (`docs/20 §11`).
 **I. Contrato de la API que este diseño fija** (rutas nuevas o cambiadas; el código por perfil, en `docs/20 §6`). ✅ backend, 11/11/2026: todas (`/sitios/{id}/actividad`, `/preferencias` y `/sesiones`, el mismo día: `docs/16 §63`; `/sitios/{id}/ahora`, el 13/11/2026: `docs/16 §66`); medido en `docs/16 §61`.
 | Ruta | Qué devuelve o hace | Quién |
 |---|---|---|
-| `GET /sitios` | mis sitios con código, nombre, zona horaria, zonas y mi perfil en cada uno (el administrador del sistema, todos) | con sesión (Etapa 4) |
+| `GET /sitios` | mis sitios con código, nombre, zona horaria, `descripcion` (texto o `null`; desde el 24/11/2026), zonas y mi perfil en cada uno (el administrador del sistema, todos); cada zona con su `activo` (falso si está retirada) y `dispositivos` (los que no están de baja) | con sesión (Etapa 4) |
 | `GET /sitios/{id}/resumen?desde&hasta[&intervalo]` | conteos por estado visual, condiciones abiertas por tipo, tramas recibidas y rechazadas por cubo (resolución del rango, o `intervalo` de la lista cerrada; la respuesta la declara en `ventana.intervalo` y el panel rotula con eso; los cubos sin datos no se emiten: no son 0), entrega de los 50 dispositivos con peor entrega en el rango pedido y cuántos activos hay, magnitudes medidas con cuántos canales, «requiere atención» | consulta o más (Etapa 4) |
 | `GET /sitios/{id}/ahora?limite&tendencia` (L6, 13/11/2026) | lo que se mide ahora: cuántos reportan y cuántos están sin señal, el promedio, mínimo y máximo por magnitud de la última lectura vigente de cada canal, y hasta 60 tarjetas (24 por defecto) de los que reportan, alerta primero, con hasta tres canales y su última lectura; con `tendencia=si`, 24 promedios por hora por canal (si su cálculo no alcanza el tiempo o el cupo, `tendencia: false`) | consulta o más (Etapa 4) |
 | `GET /sitios/{id}/historico?magnitud&desde&hasta&intervalo` | por cubo: promedio, mínimo, máximo, lecturas y n de todos los canales de esa magnitud del sitio (desde el bloque M: promedio y banda **entre dispositivos**, cada uno con su lectura propia o vigente; `n`, los que aportan); 5 000 cubos y **31 días** (lee todos los canales de la magnitud: 30 días de 120 canales cada 300 s tardan ≈ 1,1 s, `docs/16 §61`; más largo, por canal o exportación) y, desde M5, 5 s de tiempo máximo de la consulta (si no, 503) | consulta o más (Etapa 4) |
@@ -508,14 +510,18 @@ mis datos» (JSON por `descargar`) y «Darme de baja» (`docs/20 §11`).
 | `GET /cuarentena/detectados?sitio` | emisores no registrados de los últimos 7 días: identificador o tópico, cuántas tramas, última | administrador de sitio hoy; operador técnico cuando exista el perfil (Etapa 4) |
 | `PATCH /dispositivos/{id}` | nombre, estado, intervalo esperado, zona y, en un nodo lorawan, la receta de decodificación (TT-12, 23/11/2026); `actualizado_en` obligatorio; 409 si cambió | la acción `configurar`: operador técnico, administrador del sitio y del sistema (`docs/20 §6`) |
 | `PUT /canales/{id}/reglas` | reemplaza las reglas del canal (alto, bajo, histéresis, retardo); `actualizado_en`; 409 | administrador de sitio hoy; operador técnico cuando exista el perfil (Etapa 4) |
-| `POST /dispositivos/lote?modo=validar\|crear` | informe fila por fila; en `crear`, las credenciales una sola vez; desde el bloque N, el plan por fila con su huella, y en `crear` la huella y `Idempotency-Key`, todo o nada (409 `plan_cambio` o `lote_en_curso`) | administrador de sitio hoy; operador técnico cuando exista el perfil (Etapa 4) |
+| `POST /dispositivos/lote?modo=validar\|crear` | informe fila por fila; en `crear`, las credenciales una sola vez; desde el bloque N, el plan por fila con su huella, y en `crear` la huella y `Idempotency-Key`, todo o nada (409 `plan_cambio` o `lote_en_curso`); desde el 24/11/2026 (bloque U2), el campo opcional `zonas_nuevas_en: <UUID del sitio>` (exige `ajustes` en él: 403; sitio ajeno o inexistente: 404) crea las zonas que no existan en la misma transacción, con un tope de 20 zonas nuevas por lote (si el archivo pide más, ninguna se ofrece y la respuesta suma `zonas_nuevas_excedidas: {pedidas, maximo}`); `zonas_por_nombre` marca `nueva: true`; 409 `choque_sin_cambio` si la base rechaza algo que el plan recalculado no ve (misma huella) | administrador de sitio hoy; operador técnico cuando exista el perfil (Etapa 4) |
 | `GET /dispositivos/lote/plantilla` (bloque N) | columnas del lote (nombre, obligatoria, tope, ayuda, ejemplo), `max_filas`, `max_bytes` y separadores | operador técnico y administradores (la acción «escribir») |
 | `GET /magnitudes` (bloque N) | el catálogo: código, nombre y unidad canónica | con sesión |
+| `POST /sitios` (§4 U, 24/11/2026) | crea un sitio con su primera zona y, opcional, su descripción; 201 con el sitio y sus zonas; 409 `codigo_repetido` | la acción `sistema`: el administrador del sistema |
+| `PATCH /sitios/{id}` (§4 U) | cambia el nombre o la descripción; 200 con el sitio y sus zonas | la acción `sistema` |
+| `POST /sitios/{id}/zonas` (§4 U) | crea una zona; 201; 409 `zona_repetida` o `zona_retirada` | la acción `ajustes` en el sitio: administrador del sitio y del sistema |
+| `PATCH /zonas/{id}` (§4 U) | renombra, retira o vuelve a ofrecer una zona; 200; 409 `zona_repetida`, `zona_retirada` o `zona_con_dispositivos` | la acción `ajustes` en el sitio de la zona |
 | `GET /preferencias` · `PUT /preferencias` | las propias; bloqueo optimista | con sesión (Etapa 4) |
 | `GET /sesiones` · `DELETE /sesiones/{id}` | las propias | con sesión (Etapa 4) |
 Compatibilidad: ninguna respuesta cambia de forma (los totales y los cursores van en cabeceras; los campos nuevos se suman); el OpenAPI se
 regenera y el paso 4b del guardián suma una fila por ruta y perfil. **Campos** (los nombres son los de las columnas, como en todo el
-panel; el OpenAPI generado es la fuente una vez construido): `/sitios` → `id, codigo, nombre, zona_horaria, rol, zonas[{id, nombre}]`;
+panel; el OpenAPI generado es la fuente una vez construido): `/sitios` → `id, codigo, nombre, zona_horaria, descripcion, rol, zonas[{id, nombre, activo, dispositivos}]` (`descripcion`, `activo` y `dispositivos` desde el 24/11/2026, §4 U);
 `/sitios/{id}/resumen` → `sitio, ventana{desde, hasta, intervalo}, dispositivos{total, normal, alerta, sin_senal, esperando, inactivo}, salud{reportan,
 supervisados, porcentaje}, condiciones_abiertas[{tipo, n}], tramas{recibidas, rechazadas, cubos[{tiempo, recibidas, rechazadas}]},
 atencion[{id, nombre, estado_visual, visto_por_ultima_vez, tipos}], magnitudes[{codigo, nombre, unidad, canales}], entrega[{id, nombre,
@@ -1737,6 +1743,151 @@ se llamaba «perfil de decodificación»: en el panel, «perfil» ya nombra los 
     65,52 % y 3,75 V) en hexadecimal y en base64, y el resultado tachado al cambiar la receta; «Reemplazar por» con su confirmación; en P6,
     «Usar el sugerido» llena sin guardar y se desactiva con 4 reglas. Con navegador real, en dos navegadores a 390 y 1 280 px: crear una
     magnitud, crear y probar una receta, y el sugerido en P6.
+
+**U. P17 Sitios y la sección «Zonas» de P15 (HU-12 en su interfaz, RF-21; diseñado el 24/11/2026, antes del código, y construido el 24/11/2026, `docs/16 §101`).** Hasta hoy un sitio y
+sus zonas se creaban con SQL en la base (la semilla, las pruebas y el servidor de prueba el 03/11/2026): no había ruta para crearlos
+(`sitios.controller.ts` solo lee y fija el plazo de la primera trama) y el rol de la aplicación no puede insertar en `sitio` ni en `zona`.
+El alta masiva rechaza la fila cuya zona no existe (`alta/lote.ts`: «la zona «X» no existe en tus sitios»), así que una instalación nueva
+exigía la terminal antes de la planilla. Lo motiva un pedido del 24/11/2026: dar de alta una flota en un sitio o una zona nuevos sin salir
+del panel. En el orden en que se construye:
+1. **Quién (decidido el 24/11/2026: solo administradores).** Crear un sitio y cambiar su nombre o descripción: acción `sistema` (solo el
+   administrador del sistema). Crear, renombrar y retirar las zonas de un sitio: acción `ajustes` en ese sitio (administrador del sitio y
+   del sistema). No hace falta una acción nueva. El operador técnico, el investigador y la consulta no crean estructura: cuando el alta de
+   un operador trae una zona que no existe, el motivo agrega el remedio: «la zona «X» no existe en tus sitios: revisa cómo se escribe; si
+   es nueva, pídele a quien administra el sitio que la cree (Ajustes del sitio → Zonas)» (corregido el 24/11/2026: decía también «o desde
+   esta misma alta», falso para quien no tiene `ajustes`).
+2. **Base (migración 28, aditiva).** `zona.activo boolean NOT NULL DEFAULT true`; un índice único `(sitio_id, lower(btrim(nombre)))` que
+   antes comprueba que los datos no lo violan y, si lo violan, aborta nombrando los pares (no corrige solo); permisos del rol de la
+   aplicación por columna: `INSERT (nombre, codigo, zona_horaria, descripcion)` y `UPDATE (nombre, descripcion)` en `sitio`, `INSERT
+   (sitio_id, nombre)` y `UPDATE (nombre, activo)` en `zona`. Nada se borra: retirar una zona es `activo = false`, solo si no tiene
+   dispositivos activos; los dados de baja conservan su historia en `dispositivo_zona` (`docs/08`).
+3. **Rutas** (sus códigos por perfil, en `docs/20 §6`). `POST /sitios` `{nombre, codigo, zona_horaria, primera_zona?, descripcion?}` crea
+   el sitio **con su primera zona** («General» si no viene), para que el alta funcione al tiro, todo o nada; 201 con `{id, codigo, nombre,
+   zona_horaria, descripcion, zonas[{id, sitio_id, nombre, activo, dispositivos}]}`; 409 `codigo_repetido` si el código ya existe; el
+   código cumple `ck_sitio_codigo`; la descripción, hasta 500 caracteres, recortada (vacía = sin descripción); la zona horaria **se valida
+   contra la base** (`pg_timezone_names`, la misma lista de su disparador `validar_zona_horaria`): el backend solo mira la forma y, si la base
+   no la conoce, 400 con el nombre (corregido el 24/11/2026: antes se validaba contra la lista de Node, que no es la de la base, y una
+   discrepancia salía como 500). `PATCH /sitios/{id}` `{nombre?, descripcion?}`, 200 con la misma forma. `POST /sitios/{id}/zonas` `{nombre}`
+   (201 `{id, sitio_id, nombre, activo, dispositivos}`); `PATCH /zonas/{id}` `{nombre?, activo?}` (200, igual). Si el nombre ya existe en el
+   sitio sin distinguir mayúsculas ni espacios en los extremos: en una zona activa, 409 `zona_repetida`; en una **retirada**, 409
+   `zona_retirada` («vuelve a ofrecerla en Ajustes del sitio → Zonas en vez de crear otra»); al retirar una zona con dispositivos activos,
+   409 `zona_con_dispositivos` con cuántos. Un sitio inactivo cuenta como inexistente (404); otro cambio en curso sobre lo mismo, 503. Los
+   nombres de sitio y de zona no admiten caracteres de control ni invisibles (ancho cero, inversión bidireccional). `GET /sitios` suma a
+   cada sitio `descripcion` y a cada zona `activo` y `dispositivos` (los que no están de baja). Una zona retirada no se ofrece en el alta ni
+   en P6 (un enlace público nuevo), y **sigue visible en el filtro de zona del inventario** (que lista las zonas del sitio, retiradas incluidas)
+   y en la historia, para poder ver los dispositivos que conserva dados de baja.
+4. **Eventos** (P14 Actividad, con la persona): `sitio_alta`, `sitio_cambio`, `zona_alta` y `zona_cambio` (renombrada o retirada, con el
+   nombre de antes y el de después). Se ven en P14 y su filtro por tipo los acepta (corregido el 24/11/2026: la consulta de la actividad no
+   los traía); el servidor escribe la frase («creó la zona «Norte»», «cambió el nombre de la zona «Norte» a «Sur»», «retiró la zona «Sur»»,
+   «creó la zona «Norte» al dar de alta por lote»…) y el panel la muestra tal cual.
+5. **P15 → sección «Zonas»** (acción `ajustes`): la lista con cuántos dispositivos activos tiene cada una, «Agregar zona», renombrar en la
+   misma fila y «Retirar», desactivado con su motivo («tiene 3 dispositivos activos: muévelos de zona o dalos de baja») cuando corresponde. Si la dirección de
+   Ajustes pide un sitio que no es de la persona, **no se cae a otro** (podría cambiar ajustes de un sitio que no quería): dice «Ese sitio no
+   existe o no lo administras.» y ofrece la lista de los suyos; solo cuando la dirección no pide ninguno se toma el primero.
+6. **P17 Sitios** (menú del administrador del sistema, acción `sistema`): la lista de sitios con su código, zona horaria, zonas y
+   dispositivos, y «Crear sitio»: nombre; código sugerido desde el nombre (minúsculas, sin tildes, guiones), editable, con la regla escrita;
+   zona horaria, por omisión la del navegador; primera zona, «General» por omisión, editable; descripción, opcional. En la misma fila de
+   cada sitio se cambian su nombre y su descripción (`PATCH /sitios/{id}`). Al crearlo: «Agregar personas a este sitio» lleva a P10
+   Usuarios, que ya maneja las membresías.
+7. **Pruebas, y dónde vive cada una.** **Unitarias** (vitest, sin base; `backend/src/consulta/sitios-zonas.spec.ts`): los validadores (forma
+   del código y de la zona horaria, topes, caracteres invisibles), el orden de los códigos por perfil en los controladores y el servicio con
+   una base simulada (zona horaria desconocida, sitio inactivo, bloqueo agotado). **Integración en una base desechable**
+   (`pruebas/sitios-zonas-integracion.sh`, todas las migraciones, el rol de la aplicación): cada ruta con los perfiles `consulta`,
+   `investigador`, operador técnico, administrador de otro sitio (404) y del sistema; retirar con y sin dispositivos activos; `zona_repetida`
+   y `zona_retirada`; código repetido y zona horaria que la base no conoce; el rol de la aplicación sin permiso de borrar (42501); la
+   actividad y su filtro; y la migración plantando un par duplicado («Norte» y «norte » en el mismo sitio) y viendo que aborta nombrándolo, y
+   que corregido pasa y deja el índice. **Humo por perfil contra la pila local** (`pruebas/sesion-smoke.sh`), solo con casos que no crean
+   nada: sin sesión 401 y los perfiles sin permiso 403 en las cuatro rutas. **Panel por el DOM** (vitest, jsdom; `panel/src/Estructura.test.ts`,
+   `AjustesSitio.test.ts`, `Publicar.test.ts` y `Actividad.test.ts`): la sección «Zonas» (agregar, renombrar, retirar, el 409 y que lo escrito
+   solo se borra si salió bien), la pantalla «Sitios» (crear, editar en la misma fila, descripción y zona horaria inicial), un sitio de la
+   dirección que no es de la persona, una zona retirada que no se ofrece para un enlace nuevo y los rótulos del filtro de la actividad.
+   **E2E en navegadores reales** (Chromium y Firefox, 390 y 1 280 px; `pruebas/panel-estructura-e2e.sh`, escrito el 24/11/2026, corrido
+   desde el 25/11/2026 en el paso 4c del verificador, `docs/16 §101`): crear un sitio y editarlo, agregar, renombrar, repetir, retirar y volver
+   a ofrecer una zona; con datos propios que borra al salir.
+
+**U2. Zonas nuevas desde el alta masiva y desde el alta de a uno (cambia el punto 3 del bloque S; diseñado y construido el 24/11/2026, `docs/16 §101`).**
+1. **Masiva.** Quien tiene `ajustes` en algún sitio ve sobre la lista la casilla «Crear las zonas que no existan en
+   <sitio>», **desmarcada por omisión** (decidido al probar, 24/11/2026: marcada, una zona mal escrita entraba como zona nueva sin que se
+   notara). Sin marcarla, la revisión es la de siempre: «No entra», con el remedio. Al
+   marcarla, se vuelve a revisar: las filas con una zona escrita por su nombre que no existe en los sitios de la persona entran, y la
+   revisión lo dice una vez sobre la lista, en ámbar, «Se crearán 2 zonas nuevas en «Campus Dr. Luis Rivas del Canto»: Norte (120 filas),
+   Galpón Sur (8 filas). Revisa que estén bien escritas: se crean al confirmar.». Al confirmar, `POST
+   /dispositivos/lote` recibe `zonas_nuevas_en` (el sitio elegido) y crea las zonas y los dispositivos **en la misma transacción** (todo o nada, como hoy),
+   con un evento `zona_alta` por zona. Sin la casilla, o sin `ajustes`, esas filas siguen fuera con su motivo (y el remedio del punto 1 de
+   U); la API sin el campo se comporta igual que antes. El nombre se compara sin mayúsculas ni espacios de más, para no crear «norte» al
+   lado de «Norte», y se guarda como lo escribió la primera fila. El sitio de las zonas nuevas es, por omisión, el **sitio activo
+   del panel** (el que nombra la cabecera; si ahí no tiene `ajustes`, el primero donde sí); con `ajustes` en **más de un sitio** aparece junto a la
+   casilla el selector de sitio (cambiarlo vuelve a revisar), y con uno solo no hay selector. No se ofrecen como nuevas (y la fila sigue fuera con su motivo):
+   un nombre que coincide con una zona **retirada** («la zona «X» está retirada: vuelve a ofrecerla en Ajustes del sitio → Zonas, o elige
+   otra»; también si la fila trae su UUID), uno que la base ya tiene en el sitio escrito de otra forma (la existencia la decide la base con
+   su propia normalización, porque la de JS no coincide en todo Unicode: «la zona «X» ya existe en el sitio con otra escritura: escríbela
+   como aparece en Ajustes del sitio → Zonas») y uno con un carácter invisible. **Tope: 20 zonas nuevas por lote.** Si el archivo pediría
+   más, no se ofrece ninguna y la respuesta suma `zonas_nuevas_excedidas: {pedidas, maximo}`: una planilla con una columna corrida pondría
+   en `zona` cientos de valores distintos y crearía cientos de zonas que no se pueden borrar (solo retirar). Si al crear la base rechaza
+   algo que el plan recalculado no ve (misma huella y todas las filas entran; por ejemplo, dos zonas nuevas que para la base son la misma),
+   409 `choque_sin_cambio` con su remedio en vez de un `plan_cambio` que la persona confirmaría sin fin. En la API, `zonas_nuevas_en: <UUID
+   del sitio>` (exige `ajustes` en ese sitio, si no 403; de otro sitio o inexistente, 404; decidido al implementar en vez de
+   `crear_zonas: true`, porque el lote no trae columna de sitio y la zona nueva necesita uno explícito); la respuesta marca `nueva: true` en
+   `zonas_por_nombre`.
+2. **De a uno (P7).** Al final del selector de zona del asistente, «+ Nueva zona…» (solo con `ajustes`): un campo en la misma línea que la
+   crea con `POST /sitios/{id}/zonas` y la deja elegida; un nombre repetido muestra el 409 junto al campo.
+3. **Pruebas.** **Unitarias** (vitest; `backend/src/alta/lote-zonas-nuevas.spec.ts`, `lote-controlador.spec.ts` y `lote-servicio.spec.ts`): las
+   candidatas a zona nueva, cada motivo (retirada, otra escritura, invisible, inexistente), el tope, el cuerpo `zonas_nuevas_en`, el 409
+   `choque_sin_cambio` del controlador y el bloqueo de las zonas del lote con una base simulada. **Integración en base desechable**
+   (`pruebas/sitios-zonas-integracion.sh`): lote con zonas nuevas (entran; la zona queda creada una sola vez aunque venga en 120 filas
+   escritas de tres maneras), sin el campo (no entran, con el remedio), con un perfil sin `ajustes` (403) y con un sitio ajeno (404); una zona
+   retirada no recibe filas; 21 zonas distintas (ninguna, con `zonas_nuevas_excedidas`); una falla a mitad del lote (un identificador creado
+   por otra vía entre validar y crear, y un rechazo de la base después de insertar la zona) no deja la zona creada; validar, retirar la zona y
+   crear con la huella vieja da `plan_cambio`. **Panel por el DOM** (`panel/src/Alta.test.ts` y `lib/lote.test.ts`): la casilla (solo con
+   `ajustes`, desmarcada, con el cuerpo con y sin `zonas_nuevas_en` al validar y al crear, el selector con uno y con dos sitios, el aviso
+   del tope también en un `plan_cambio`, el texto de `choque_sin_cambio`) y «+ Nueva zona…» (solo con `ajustes`, crea y deja elegida la zona, el
+   409 junto al campo, el nombre vacío). **E2E en navegadores** (`pruebas/panel-estructura-e2e.sh`, en el paso 4c del verificador desde el 25/11/2026, `docs/16 §101`): «+ Nueva zona…» y un lote
+   de 3 equipos en una zona que no existe, sin la casilla (no entran) y con ella (quedan en la zona nueva).
+
+**V. P18 Pasarelas en el panel (diseñado el 24/11/2026, antes del código).** La API ya existe (`alta/pasarelas.controller.ts`: listar,
+crear con su credencial y sus plantillas de tópico una sola vez, rotar la credencial, dar de baja); falta la pantalla. Hoy, sumar una
+pasarela LoRaWAN exige la terminal (así se registró la pasarela del campus).
+1. **Dónde y quién.** P2 Inventario suma la pestaña «Pasarelas» del sitio (quien puede `leer` ve la lista; los botones según el permiso:
+   crear y rotar con `escribir`, la baja con `baja`, como la API).
+2. **Lista** (de `GET /pasarelas`): nombre, identificador, formato (Milesight o ChirpStack), estado, cuántos nodos y la última señal (W).
+3. **Crear:** identificador, nombre y formato. La respuesta se muestra **una sola vez** con el patrón de la credencial de un dispositivo
+   (vive en la memoria del módulo, nunca en el almacenamiento del navegador ni en la dirección; «Ya la guardé»): usuario y clave, servidor y
+   puerto (8883 con TLS), la plantilla de tópico del formato y el aviso de cargar el certificado de la autoridad. Después, «Dar de alta sus
+   nodos» lleva a P7 (de a uno o por lote) con la pasarela elegida.
+4. **Rotar la credencial** (con confirmación: «la pasarela deja de publicar hasta que cargues la nueva») y **dar de baja** (con
+   confirmación que nombra los nodos que quedan sin pasarela).
+5. **Pruebas.** Por el DOM: la lista vacía y con datos, cada botón según el perfil, la credencial mostrada una vez y borrada al confirmar;
+   con navegador real, crear → ver la credencial → rotar → dar de baja.
+
+**W. La última señal de cada pasarela (diseñado el 24/11/2026).**
+1. En P18 y en la pestaña **Red** del tablero, una tarjeta por pasarela: «última trama hace X», nodos que reportan / total, y su estado:
+   «Con señal» si alguno de sus nodos reportó dentro de 2 × el menor intervalo esperado de sus nodos activos; «Sin señal» si no; «Esperando
+   primera trama» si ninguno reportó nunca. Es la regla de los dispositivos (§2), calculada en el backend (se suma a `GET /pasarelas`).
+2. Lo que **no** promete, escrito en su ayuda: se calcula desde las tramas de sus nodos; la conexión de la pasarela con el broker no la ve
+   el backend (queda en el registro del broker).
+3. **Pruebas.** Unitaria de la regla con reloj simulado (con señal, sin señal, nunca, sin nodos activos); por el DOM, la tarjeta en P18 y
+   en Red.
+
+**X. «Usar el intervalo observado» en P6 (diseñado el 24/11/2026; lo motiva el 24/11: los nodos del campus enviaban tramas mucho más
+seguido que su intervalo esperado de 180 s).**
+1. `GET /dispositivos/{id}` suma `intervalo_observado_s`: la mediana de las diferencias entre las últimas 20 tramas válidas de las últimas
+   24 h, si hay al menos 5; si no, `null`. Redondeo: a 5 s bajo un minuto; al minuto desde ahí.
+2. **P6:** junto al intervalo esperado, «Observado: cada 15 s (mediana de las últimas 20 tramas)» y el botón «Usar el observado», que llena
+   el campo **sin guardar**, con la consecuencia escrita: «se marcará sin señal si pasan 30 s sin tramas». La persona decide: una red
+   LoRaWAN pierde tramas, y un intervalo muy justo abre condiciones de más.
+3. **P3:** un aviso discreto cuando el observado difiere en más de 50 % del esperado, con enlace a P6.
+4. **Pruebas.** Unitaria de la mediana (con huecos, con menos de 5 tramas, el redondeo); por el DOM, el botón llena sin guardar y no
+   aparece sin observado.
+
+**Y. «Dar de alta otro como este» (diseñado el 24/11/2026).**
+1. En P3 (acción `escribir`), el botón abre `#/alta?modo=uno&como=<id>`: el asistente llega con zona, vía, formato, pasarela, receta de
+   decodificación, canales e intervalo; identificador y nombre vacíos.
+2. No copia la credencial, los umbrales ni la historia (copiar umbrales queda como trabajo futuro: no mezcla la configuración de alertas
+   con el alta).
+3. **Pruebas.** Por el DOM: el prellenado, y que ningún dato de credencial viaja en la dirección ni en la petición.
+
+**Orden y corte (24/11/2026).** U y U2, V, W, X, Y, en ese orden, entre el 24 y el 27/11/2026 (10 a 14 h estimadas). Desde el 28/11
+el trabajo es el informe: lo que no cierre el 27/11 se declara trabajo futuro, no se estira.
 
 ## 5. Flujos
 **F1 · Alta y primera trama.** Ya está dibujado en el diagrama de secuencia del alta (`docs/10`, figura del informe): el

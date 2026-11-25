@@ -330,6 +330,12 @@ caso "sin sesión: DELETE /pasarelas/{id}" 401 anon DELETE "/pasarelas/$PA"
 caso "sin sesión: POST /pasarelas/{id}/credencial" 401 anon POST "/pasarelas/$PA/credencial"
 caso "sin sesión: PATCH /usuarios/{id}" 401 anon PATCH "/usuarios/$CON_ID" '{}'
 caso "sin sesión: DELETE /sesion" 401 anon DELETE /sesion
+# Sitios y zonas desde el panel (docs/19 §4 U; docs/20 §6; 24/11/2026): solo casos que no crean nada (cuerpo vacío: el 401 y el 403 van
+# antes de leerlo; si uno fallara, sería un 400 y tampoco crearía).
+caso "sin sesión: POST /sitios" 401 anon POST /sitios '{}'
+caso "sin sesión: PATCH /sitios/{id}" 401 anon PATCH "/sitios/$SITIO_A" '{}'
+caso "sin sesión: POST /sitios/{id}/zonas" 401 anon POST "/sitios/$SITIO_A/zonas" '{}'
+caso "sin sesión: PATCH /zonas/{id}" 401 anon PATCH "/zonas/$ZA" '{}'
 c=$(entrar nadie "nadie$DOM" <<<"no-es-la-clave-de-nadie"); [ "$c" = 401 ] && ok "sin sesión: POST /sesion con credenciales malas → 401" || falla "POST /sesion malas → $c"
 
 caso "consulta: GET /dispositivos" 200 con GET /dispositivos
@@ -347,6 +353,10 @@ caso "consulta: PATCH /canales/{id}" 403 con PATCH "/canales/$CA" "$CAL"
 caso "consulta: POST /usuarios" 403 con POST /usuarios '{}'
 caso "consulta: PATCH /usuarios/{id}" 403 con PATCH "/usuarios/$CON_ID" '{}'
 caso "consulta: GET /usuarios" 403 con GET /usuarios
+caso "consulta: POST /sitios" 403 con POST /sitios '{}'
+caso "consulta: PATCH /sitios/{id}" 403 con PATCH "/sitios/$SITIO_A" '{}'
+caso "consulta: POST /sitios/{id}/zonas" 403 con POST "/sitios/$SITIO_A/zonas" '{}'
+caso "consulta: PATCH /zonas/{id}" 403 con PATCH "/zonas/$ZA" '{}'
 caso "consulta, otro sitio: GET /dispositivos/{id}" 404 con GET "/dispositivos/$DB"
 cp "$T/r" "$T/otro.json"; pedir con GET "/dispositivos/$FALSO" >/dev/null
 cmp -s "$T/r" "$T/otro.json" && ok "otro sitio responde lo mismo que un dispositivo inexistente (mismo 404 y mismo cuerpo)" || falla "otro sitio e inexistente difieren: $(cat "$T/otro.json") ≠ $(cat "$T/r")"
@@ -573,6 +583,16 @@ for q in inv ope; do
   caso "$q, otro sitio: GET /sitios/{id}/ahora" 404 "$q" GET "/sitios/$SITIO_B/ahora"
 done
 caso "administrador del sistema: GET /sitios/{id}/ahora del sitio B (todos los sitios)" 200 sis GET "/sitios/$SITIO_B/ahora"
+# Sitios y zonas (docs/19 §4 U; docs/20 §6; 24/11/2026), sin crear nada: crear y cambiar sitios es solo del administrador del sistema
+# (acción `sistema`); las zonas, de quien tiene `ajustes` en el sitio. El investigador y el operador técnico, 403 en las cuatro rutas.
+for q in inv ope; do
+  caso "$q: POST /sitios → 403" 403 "$q" POST /sitios '{}'
+  caso "$q: PATCH /sitios/{id} → 403" 403 "$q" PATCH "/sitios/$SITIO_A" '{}'
+  caso "$q: POST /sitios/{id}/zonas → 403" 403 "$q" POST "/sitios/$SITIO_A/zonas" '{}'
+  caso "$q: PATCH /zonas/{id} → 403" 403 "$q" PATCH "/zonas/$ZA" '{}'
+done
+caso "administrador de sitio: POST /sitios → 403 (solo el del sistema)" 403 adm POST /sitios '{}'
+caso "administrador de sitio: PATCH /sitios/{id} → 403 (solo el del sistema)" 403 adm PATCH "/sitios/$SITIO_A" '{}'
 caso "administrador del sistema: GET /dispositivos/{id} del sitio B (todos los sitios)" 200 sis GET "/dispositivos/$DB"
 pedir sis GET /dispositivos >/dev/null; lista=$(campo "' '.join(d['id'] for d in v)")
 grep -q "$DA" <<<"$lista" && grep -q "$DB" <<<"$lista" && ok "administrador del sistema: la lista trae A y B" || falla "administrador del sistema: la lista no trae los dos sitios"

@@ -1545,7 +1545,7 @@
     },
     "/sitios": {
       "get": {
-        "description": "Los sitios activos de la sesión con `id, codigo, nombre, zona_horaria, rol` (el perfil de la persona en ese sitio) y `zonas[{id, nombre}]`. El administrador del sistema y el usuario del sistema ven todos, con rol administrador (su perfil global va en `administrador_sistema` de GET /sesion).",
+        "description": "Los sitios activos de la sesión con `id, codigo, nombre, zona_horaria`, `descripcion` (la del sitio: texto o null), `rol` (el perfil de la persona en ese sitio) y `zonas[{id, nombre, activo, dispositivos}]` (por zona: `activo` false = zona retirada, que no se ofrece en el alta; `dispositivos`, los que no están de baja). El administrador del sistema y el usuario del sistema ven todos, con rol administrador (su perfil global va en `administrador_sistema` de GET /sesion).",
         "operationId": "SitiosController_listar",
         "parameters": [],
         "responses": {
@@ -1562,6 +1562,216 @@
           }
         ],
         "summary": "Mis sitios (Etapa 4)",
+        "tags": [
+          "sitios"
+        ]
+      },
+      "post": {
+        "description": "Solo el administrador del sistema (acción `sistema`). Crea el sitio y su primera zona (por omisión «General») en una transacción, con los eventos `sitio_alta` y `zona_alta`. El código va en los tópicos (`sitio/<codigo>/…`) y no cambia después; la zona horaria tampoco. La zona horaria se valida contra la base (`pg_timezone_names`). Responde `{id, codigo, nombre, zona_horaria, descripcion, zonas[{id, sitio_id, nombre, activo, dispositivos}]}`.",
+        "operationId": "SitiosController_crearSitio",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "nombre",
+                  "codigo",
+                  "zona_horaria"
+                ],
+                "properties": {
+                  "nombre": {
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  "codigo": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9][a-z0-9-]{1,62}$",
+                    "description": "Segmento del tópico; único"
+                  },
+                  "zona_horaria": {
+                    "type": "string",
+                    "description": "Nombre IANA, como America/Santiago"
+                  },
+                  "primera_zona": {
+                    "type": "string",
+                    "maxLength": 80,
+                    "description": "Por omisión «General»"
+                  },
+                  "descripcion": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "description": "Opcional; se recorta; vacía = sin descripción"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "El sitio creado con sus zonas"
+          },
+          "400": {
+            "description": "Cuerpo inválido: nombre, código, zona horaria (forma, o un nombre que la base no conoce), primera zona o descripción; un nombre con caracteres de control o invisibles"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "403": {
+            "description": "No es el administrador del sistema (docs/20 §6), o sesión sin la cabecera X-Pedido: panel"
+          },
+          "409": {
+            "description": "`codigo: codigo_repetido`: ya existe un sitio con ese código"
+          },
+          "503": {
+            "description": "Otro cambio sobre este sitio está en curso (bloqueo agotado): reintentar"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Crear un sitio con su primera zona (Etapa 4)",
+        "tags": [
+          "sitios"
+        ]
+      }
+    },
+    "/sitios/{id}": {
+      "patch": {
+        "description": "Solo el administrador del sistema (acción `sistema`). El código y la zona horaria no cambian. Deja el evento `sitio_cambio` si algo cambia.",
+        "operationId": "SitiosController_cambiarSitio",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "UUID del sitio",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nombre": {
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  "descripcion": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 500,
+                    "description": "null o vacía la borra"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "El sitio con sus zonas (la misma forma que POST /sitios)"
+          },
+          "400": {
+            "description": "Cuerpo inválido o nada que cambiar"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "403": {
+            "description": "No es el administrador del sistema (docs/20 §6), o sesión sin la cabecera X-Pedido: panel"
+          },
+          "404": {
+            "description": "Sitio inexistente o inactivo"
+          },
+          "503": {
+            "description": "Otro cambio sobre este sitio está en curso (bloqueo agotado): reintentar"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Cambiar el nombre o la descripción de un sitio (Etapa 4)",
+        "tags": [
+          "sitios"
+        ]
+      }
+    },
+    "/sitios/{id}/zonas": {
+      "post": {
+        "description": "Quien administra el sitio (acción `ajustes`). El nombre no se repite en el sitio sin distinguir mayúsculas ni espacios en los extremos. Deja el evento `zona_alta`.",
+        "operationId": "SitiosController_crearZona",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "UUID del sitio",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "nombre"
+                ],
+                "properties": {
+                  "nombre": {
+                    "type": "string",
+                    "maxLength": 80
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "La zona creada"
+          },
+          "400": {
+            "description": "Nombre vacío, demasiado largo o con caracteres de control o invisibles"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "403": {
+            "description": "Un perfil sin la acción «ajustes» (docs/20 §6), o sesión sin la cabecera X-Pedido: panel"
+          },
+          "404": {
+            "description": "Sitio inexistente, inactivo o de otro"
+          },
+          "409": {
+            "description": "`codigo: zona_repetida` (ya hay una zona activa con ese nombre en el sitio) o `zona_retirada` (la hay, retirada: se vuelve a ofrecer con PATCH /zonas/{id})"
+          },
+          "503": {
+            "description": "Otro cambio sobre este sitio está en curso (bloqueo agotado): reintentar"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Crear una zona en un sitio (Etapa 4)",
         "tags": [
           "sitios"
         ]
@@ -1826,7 +2036,7 @@
             "name": "tipo",
             "required": false,
             "in": "query",
-            "description": "Tipo de evento (alta, baja, reglas_cambiadas, …) o resultado de acceso (ok, cierre, clave_incorrecta, bloqueado, inactivo)",
+            "description": "Tipo de evento (alta, baja, reglas_cambiadas, sitio_alta, sitio_cambio, zona_alta, zona_cambio, …) o resultado de acceso (ok, cierre, clave_incorrecta, bloqueado, inactivo)",
             "schema": {
               "type": "string"
             }
@@ -2174,6 +2384,74 @@
         ]
       }
     },
+    "/zonas/{id}": {
+      "patch": {
+        "description": "Quien administra el sitio (acción `ajustes`). `activo: false` la retira: deja de ofrecerse en el alta y al configurar, y se sigue viendo en la historia; solo sin dispositivos activos (los de mantenimiento cuentan). `activo: true` la vuelve a ofrecer. Deja el evento `zona_cambio`.",
+        "operationId": "ZonasController_cambiar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "UUID de la zona",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "nombre": {
+                    "type": "string",
+                    "maxLength": 80
+                  },
+                  "activo": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "La zona `{id, sitio_id, nombre, activo, dispositivos}` (dispositivos: cuántos activos tiene)"
+          },
+          "400": {
+            "description": "Cuerpo inválido o nada que cambiar; un nombre con caracteres de control o invisibles"
+          },
+          "401": {
+            "description": "sesión requerida"
+          },
+          "403": {
+            "description": "Un perfil sin la acción «ajustes» (docs/20 §6), o sesión sin la cabecera X-Pedido: panel"
+          },
+          "404": {
+            "description": "Zona inexistente, de otro sitio o de un sitio inactivo"
+          },
+          "409": {
+            "description": "`codigo: zona_repetida` (el nombre ya existe en el sitio, en una zona activa), `zona_retirada` (existe en una retirada: se vuelve a ofrecer esa) o `zona_con_dispositivos` (con `dispositivos`: cuántos activos impiden retirarla)"
+          },
+          "503": {
+            "description": "Otro cambio sobre esta zona está en curso (bloqueo agotado): reintentar"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Renombrar o retirar una zona (Etapa 4)",
+        "tags": [
+          "sitios"
+        ]
+      }
+    },
     "/salud": {
       "get": {
         "description": "Pública. Sin credencial (o con la sesión de un perfil que no tiene la acción «sistema») responde solo `{ estado }`; con `X-Clave-Admin` o la sesión de un administrador del sistema, el detalle. El código HTTP no depende de quién pregunta: 200 con la base conectada, 500 si la consulta a la base falla. Una `X-Clave-Admin` equivocada responde 401, como en las demás rutas.",
@@ -2192,7 +2470,7 @@
     },
     "/dispositivos/lote": {
       "post": {
-        "description": "Recibe `filas[{n, id_fisico, nombre, zona, via, formato, intervalo_esperado_s, canales, pasarela, decodificador}]`: `n` es la fila del origen (en un CSV, la línea contando las vacías, con la cabecera en la 1; en JSON, la posición más 1), un entero positivo, único y creciente, que se devuelve tal cual. Columnas, topes y ejemplos en `GET /dispositivos/lote/plantilla`; `zona` es el nombre o el UUID de una zona de un sitio donde la persona puede dar de alta; `canales`, «magnitud:unidad | magnitud:unidad» (también con «;»), con la unidad del catálogo (`GET /magnitudes`) o una escritura común de la misma («°C», «ºC», «C» o «degC» por Cel; «%» por la unidad porcentual de la magnitud), que se guarda como la del catálogo, con aviso; `pasarela`, su id_fisico o UUID, solo en la vía lorawan. Cada fila pasa por la misma validación del alta de a uno. Responde `leidas, validas, existentes, rechazadas, con_aviso, huella` (validas + existentes + rechazadas = leidas; solo las filas que entran traen avisos), `zonas_por_nombre[{zona, sitio, filas}]` (las zonas escritas por su nombre en las filas que entran) y `filas[{n, id_fisico, resultado, interpretada, legible, por_defecto, avisos[{campo, texto}], motivos[{campo, texto}], motivo, id, credencial, topico}]`: el `texto` de avisos y motivos está en palabras para personas y `campo` nombra la columna; `legible` es lo interpretado como se lee (`donde`, `resumen` y `campos`) o null; `interpretada` es lo que se creará (identificador normalizado, nombre, sitio, zona, vía, formato resuelto, intervalo, canales con nombre y unidad, pasarela, decodificador y tópico) o null; `motivo`, la unión de `motivos`; `resultado` en `valida | creada | rechazada | existe`. `huella` es el SHA-256 de `[n, interpretada]` de las filas que entran, en orden (JSON con las claves ordenadas). Cada celda, dentro de su tope, sin caracteres de control y, salvo `nombre` y `zona`, solo ASCII imprimible (en `canales`, también «°» y «º», y el tope en bytes UTF-8); una columna que no es de la plantilla es 400. **Con `modo=crear`** el cuerpo trae también `huella` (la de la vista previa) y la cabecera `Idempotency-Key`; se vuelve a calcular y, si el plan cambió (una fila dejó de entrar o crearía otra cosa) o alguna fila no entra o ya existe, 409 `codigo: plan_cambio` con el plan nuevo en `plan` y nada creado; si no, todas se crean en una transacción (dos sentencias) y las credenciales vienen UNA sola vez. Repetir con la misma llave y el mismo cuerpo, durante 2 minutos, devuelve la misma respuesta sin crear nada (con su propio cupo de 10 por minuto, y si la persona conserva el permiso en los sitios de lo creado). Hasta 500 filas (más: 413) y 1147904 bytes de cuerpo, 10 lotes por minuto por persona (429) y una creación a la vez (409 `codigo: lote_en_curso`). Un id_fisico que ya usa un dispositivo o una pasarela de otro sitio se rechaza como «ese identificador ya está en uso en la plataforma: elige otro», sin id, estado ni `interpretada` (RF-41). En `crear`, cada fila creada trae `destino`, a dónde envía según su vía: el tópico MQTT, «POST /recepcion/<id_fisico>» o «por su pasarela <id_fisico>».",
+        "description": "Recibe `filas[{n, id_fisico, nombre, zona, via, formato, intervalo_esperado_s, canales, pasarela, decodificador}]`: `n` es la fila del origen (en un CSV, la línea contando las vacías, con la cabecera en la 1; en JSON, la posición más 1), un entero positivo, único y creciente, que se devuelve tal cual. Columnas, topes y ejemplos en `GET /dispositivos/lote/plantilla`; `zona` es el nombre o el UUID de una zona de un sitio donde la persona puede dar de alta; `canales`, «magnitud:unidad | magnitud:unidad» (también con «;»), con la unidad del catálogo (`GET /magnitudes`) o una escritura común de la misma («°C», «ºC», «C» o «degC» por Cel; «%» por la unidad porcentual de la magnitud), que se guarda como la del catálogo, con aviso; `pasarela`, su id_fisico o UUID, solo en la vía lorawan. Cada fila pasa por la misma validación del alta de a uno. Responde `leidas, validas, existentes, rechazadas, con_aviso, huella` (validas + existentes + rechazadas = leidas; solo las filas que entran traen avisos), `zonas_por_nombre[{zona, sitio, filas, nueva?}]` (las zonas escritas por su nombre en las filas que entran; `nueva: true` si el lote la creará) y `filas[{n, id_fisico, resultado, interpretada, legible, por_defecto, avisos[{campo, texto}], motivos[{campo, texto}], motivo, id, credencial, topico}]`: el `texto` de avisos y motivos está en palabras para personas y `campo` nombra la columna; `legible` es lo interpretado como se lee (`donde`, `resumen` y `campos`) o null; `interpretada` es lo que se creará (identificador normalizado, nombre, sitio, zona, vía, formato resuelto, intervalo, canales con nombre y unidad, pasarela, decodificador y tópico) o null; `motivo`, la unión de `motivos`; `resultado` en `valida | creada | rechazada | existe`. `huella` es el SHA-256 de `[n, interpretada]` de las filas que entran, en orden (JSON con las claves ordenadas). Cada celda, dentro de su tope, sin caracteres de control y, salvo `nombre` y `zona`, solo ASCII imprimible (en `canales`, también «°» y «º», y el tope en bytes UTF-8); una columna que no es de la plantilla es 400. **Con `modo=crear`** el cuerpo trae también `huella` (la de la vista previa) y la cabecera `Idempotency-Key`; se vuelve a calcular y, si el plan cambió (una fila dejó de entrar o crearía otra cosa) o alguna fila no entra o ya existe, 409 `codigo: plan_cambio` con el plan nuevo en `plan` y nada creado; si no, todas se crean en una transacción (dos sentencias) y las credenciales vienen UNA sola vez. Repetir con la misma llave y el mismo cuerpo, durante 2 minutos, devuelve la misma respuesta sin crear nada (con su propio cupo de 10 por minuto, y si la persona conserva el permiso en los sitios de lo creado). Hasta 500 filas (más: 413) y 1147904 bytes de cuerpo, 10 lotes por minuto por persona (429) y una creación a la vez (409 `codigo: lote_en_curso`). Un id_fisico que ya usa un dispositivo o una pasarela de otro sitio se rechaza como «ese identificador ya está en uso en la plataforma: elige otro», sin id, estado ni `interpretada` (RF-41). En `crear`, cada fila creada trae `destino`, a dónde envía según su vía: el tópico MQTT, «POST /recepcion/<id_fisico>» o «por su pasarela <id_fisico>». **Zonas nuevas** (docs/19 §4 U2): con `zonas_nuevas_en` (el UUID de un sitio donde la persona tiene la acción `ajustes`; si no, 403; ajeno o inexistente, 404), una zona escrita por su nombre que no existe en los sitios de la persona entra como zona nueva de ese sitio (una por nombre, sin distinguir mayúsculas ni espacios en los extremos) y se crea en la misma transacción, con su evento `zona_alta`. No se ofrece como nueva: la que coincide con una zona retirada («está retirada»), la que la base ya tiene en ese sitio escrita de otra forma («ya existe en el sitio con otra escritura») ni la que trae un carácter invisible. Más de 20 zonas nuevas distintas: no se ofrece ninguna y la respuesta (también el `plan` del 409) suma `zonas_nuevas_excedidas: {pedidas, maximo}` (maximo = 20). Si al crear la base rechaza algo que el plan recalculado no ve (misma huella y todas las filas entran), 409 `codigo: choque_sin_cambio`, sin `plan` y nada creado.",
         "operationId": "AltaController_lote",
         "parameters": [
           {
@@ -2226,6 +2504,51 @@
             }
           }
         ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "filas"
+                ],
+                "properties": {
+                  "filas": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 500,
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "n"
+                      ],
+                      "properties": {
+                        "n": {
+                          "type": "integer",
+                          "minimum": 1
+                        }
+                      },
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "huella": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$",
+                    "description": "Obligatoria con modo=crear: la de la vista previa"
+                  },
+                  "zonas_nuevas_en": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "Opcional: el sitio donde crear las zonas que falten; exige la acción `ajustes` en ese sitio (403); ajeno o inexistente, 404"
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "El plan fila por fila (en crear, con las credenciales una sola vez)"
@@ -2237,10 +2560,13 @@
             "description": "Sin sesión (sin la cookie de sesión ni X-Clave-Admin, antes de leer el cuerpo), o sesión inválida"
           },
           "403": {
-            "description": "Sin ningún sitio donde dar de alta, sesión sin la cabecera X-Pedido: panel, o un reintento de quien ya no puede dar de alta en un sitio de lo creado"
+            "description": "Sin ningún sitio donde dar de alta, sin la acción `ajustes` en el sitio de `zonas_nuevas_en`, sesión sin la cabecera X-Pedido: panel, o un reintento de quien ya no puede dar de alta en un sitio de lo creado"
+          },
+          "404": {
+            "description": "El sitio de `zonas_nuevas_en` no existe, está inactivo o es de otro (RF-41)"
           },
           "409": {
-            "description": "`codigo: plan_cambio` (con el plan nuevo en `plan`; nada creado) o `codigo: lote_en_curso`"
+            "description": "`codigo: plan_cambio` (con el plan nuevo en `plan`, que puede traer `zonas_nuevas_excedidas`; nada creado), `codigo: choque_sin_cambio` (la base rechazó algo que el plan no ve, por ejemplo una zona nueva que ya existe con otra escritura; nada creado) o `codigo: lote_en_curso`"
           },
           "413": {
             "description": "Más de 500 filas o de 1147904 bytes (solo con POST; otro método, 100 KiB)"

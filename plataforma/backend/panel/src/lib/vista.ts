@@ -66,6 +66,7 @@ export type Vista =
   | { pantalla: 'publicar'; sitio: string } // P9, quien publica: `#/publicar?sitio=<código>` (docs/19 §4, O, puntos 3 y 10)
   | { pantalla: 'ajustes'; sitio: string } // P15, ajustes del sitio: `#/sitio/ajustes?sitio=<código>` (docs/19 §4, Q)
   | { pantalla: 'exportar'; sitio: string } // P8, exportar un sitio: `#/exportar?sitio=<código>` (docs/19 §4, R, punto 6)
+  | { pantalla: 'sitios' } // P17, sitios: `#/sitios` (docs/19 §4, U, punto 6)
   | { pantalla: 'catalogo'; seccion: SeccionCatalogo } // P16, catálogo: `#/catalogo?seccion=magnitudes|recetas` (docs/19 §4, T, punto 1)
   // P9, quien visita: `#/v/<token>`. La resuelve main.ts antes de montar la aplicación; si App la ve (un cambio de fragmento antes de la
   // recarga), no la trata como ninguna otra pantalla: nunca es «última vista» ni se guarda como vista (punto 5).
@@ -154,6 +155,7 @@ export function leerVista(fragmento: string): Vista {
   if (ruta === '/publicar') return { pantalla: 'publicar', sitio: leerSitio(q.get('sitio')) };
   if (ruta === '/sitio/ajustes') return { pantalla: 'ajustes', sitio: leerSitio(q.get('sitio')) };
   if (ruta === '/exportar') return { pantalla: 'exportar', sitio: leerSitio(q.get('sitio')) };
+  if (ruta === '/sitios') return { pantalla: 'sitios' };
   // Sin `seccion`, magnitudes; un valor desconocido se ignora (docs/19 §4, T, punto 1).
   if (ruta === '/catalogo') return { pantalla: 'catalogo', seccion: q.get('seccion') === 'recetas' ? 'recetas' : 'magnitudes' };
   if (ruta === '/alta') {

@@ -52,7 +52,7 @@ function armar(cupo = new CupoExportaciones()) {
     conConexionExportacion: vi.fn((_fn: unknown, _tope?: number) => new Promise<unknown>((r) => { soltar = () => r(N0); })),
     estimarSitio: vi.fn(),
   };
-  const c = new SitiosController({} as TableroService, alcance as unknown as AlcanceService, {} as never, {} as never, consulta as unknown as ConsultaService, cupo);
+  const c = new SitiosController({} as TableroService, alcance as unknown as AlcanceService, {} as never, {} as never, consulta as unknown as ConsultaService, cupo, {} as never);
   return { c, consulta, cupo, soltar: () => soltar() };
 }
 function dispositivos(cupo: CupoExportaciones, mediciones: () => AsyncGenerator<unknown> = async function* () { /* vacío */ }) {

@@ -125,7 +125,8 @@ export interface Sitio {
   nombre: string;
   zona_horaria: string;
   rol: string;
-  zonas: { id: string; nombre: string }[];
+  descripcion?: string | null;
+  zonas: { id: string; nombre: string; activo?: boolean; dispositivos?: number }[]; // activo false = retirada (migración 28)
 }
 
 export interface ResumenSitio {

@@ -63,6 +63,9 @@ export function textoActividad(clase: ClaseActividad, tipo: string, dispositivo:
     const n = (detalle as { espera_primera_trama_h?: unknown } | undefined)?.espera_primera_trama_h;
     return Number.isInteger(n) ? `fijó en ${String(n)} h el plazo de la primera trama de los equipos del sitio` : 'cambió el plazo de la primera trama de los equipos del sitio';
   }
+  // La estructura del sitio (docs/19 §4 U, punto 4; 24/11/2026): `objeto` es el nombre (de después) del sitio o de la zona; el de antes y
+  // el estado salen del detalle, solo si son texto o booleanos.
+  if (dispositivo === null && ESTRUCTURA.has(tipo)) return textoEstructura(tipo, detalle, objeto);
   const sin = dispositivo === null ? TEXTOS_SIN_DISPOSITIVO[tipo] : undefined;
   if (sin !== undefined) return sin(objeto);
   const d = dispositivo === null ? 'un dispositivo' : `«${dispositivo}»`;
@@ -71,6 +74,33 @@ export function textoActividad(clase: ClaseActividad, tipo: string, dispositivo:
   const det = typeof detalle === 'object' && detalle !== null ? (detalle as Record<string, unknown>) : {};
   const magnitud = typeof det.magnitud === 'string' && det.magnitud.length <= 40 ? det.magnitud : null;
   return magnitud === null ? base : `${base} (${magnitud})`;
+}
+
+const ESTRUCTURA = new Set(['sitio_alta', 'sitio_cambio', 'zona_alta', 'zona_cambio']);
+// Las frases que muestra P14 (el panel las muestra tal cual; sus pruebas esperan estos textos).
+function textoEstructura(tipo: string, detalle: unknown, objeto: string | null): string {
+  const d = typeof detalle === 'object' && detalle !== null ? (detalle as Record<string, unknown>) : {};
+  const corto = (v: unknown): string | null => (typeof v === 'string' && v.length <= 80 ? v : null);
+  const nombre = corto(d.nombre) ?? objeto;
+  const antes = corto(d.nombre_anterior);
+  const renombrada = antes !== null && nombre !== null && nombre !== antes;
+  const sitio = nombre === null ? 'un sitio' : `el sitio «${nombre}»`;
+  const zona = nombre === null ? 'una zona' : `la zona «${nombre}»`;
+  switch (tipo) {
+    case 'sitio_alta': return `creó ${sitio}`;
+    case 'sitio_cambio':
+      if (renombrada) return `cambió el nombre del sitio «${antes}» a «${nombre}»`;
+      return `cambió la descripción ${nombre === null ? 'de un sitio' : `del sitio «${nombre}»`}`;
+    case 'zona_alta': return `creó ${zona}${d.origen === 'lote' ? ' al dar de alta por lote' : ''}`;
+    default: {
+      const retiro = d.activo === false && d.activo_anterior === true;
+      const vuelta = d.activo === true && d.activo_anterior === false;
+      if (renombrada) return `cambió el nombre de la zona «${antes}» a «${nombre}»${retiro ? ' y la retiró' : vuelta ? ' y la volvió a ofrecer' : ''}`;
+      if (retiro) return `retiró ${zona}`;
+      if (vuelta) return `volvió a ofrecer ${zona}`;
+      return `cambió ${zona}`;
+    }
+  }
 }
 
 // El filtro `tipo`: un tipo de evento o un resultado de acceso, en minúsculas y con guion bajo (no se valida contra una lista: un tipo que no

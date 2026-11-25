@@ -4,7 +4,7 @@ Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emu
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
 cubría al escribirse se agregó después: TT-32 (sensor físico) en §43, §44 y §53, y TT-30 (recuperación ante reinicio) en §11. El
-contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 960 pruebas unitarias del backend y 614 del panel.
+contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 1007 pruebas unitarias del backend y 643 del panel.
 Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -5260,7 +5260,7 @@ decodificación de `perfiles.ts`); `dispositivo.decodificador` como clave forán
 permisos de `plataforma_app`, repetidos en la 14, con dos funciones del dueño (`fn_crear_receta`, `fn_quitar_alias`). El código de la
 recepción, la API y el panel todavía no usan nada de esto: llegan en los bloques 2 a 6.
 
-**Base desechable (imagen de la base del proyecto, red cerrada, sin tocar la pila local).** Con las 27 migraciones de `db/init`:
+**Base desechable (imagen de la base del proyecto, red cerrada, sin tocar la pila local).** Con todas las migraciones de `db/init` de ese día (27):
 convenciones 7 de 7; reaplicar de la 02 a la 27 deja el esquema, los permisos, los comentarios, el catálogo, los alias y los campos de la
 receta idénticos (la misma huella antes y después, como `banco.sh migraciones`). **La guarda de la 17, probada sola:** reaplicar la 17
 **vieja** después de la 27 vuelve a poner `ck_dispositivo_decodificador` junto a la clave foránea; con la 17 nueva no aparece. La
@@ -5506,3 +5506,108 @@ claves de personas de `credenciales.spec.ts` (tres scrypt de 128 MiB contra el l
 segunda falló tres veces seguidas y recibió su propio tope de 20 s, sin tocar el de un hash (5 s). La primera, medida en la suite completa
 (3,5 a 3,9 s; sola, ≈ 1 s), sube a 10 s: no mide rendimiento, atrapa un lector cuadrático, y el caso del 19/11 tardaba 70 s; su vecina del tope
 total, que pasaba el límite de 5 s de vitest, recibe 20 s.
+
+## 101. Sitios y zonas desde el panel (docs/19 §4 U y U2; HU-12; 24/11/2026)
+
+**Qué se prueba.** Crear un sitio con su primera zona y cambiar su nombre (solo el administrador del sistema); crear, renombrar y retirar
+zonas (quien administra el sitio); que una zona retirada no reciba equipos; y el alta masiva que crea las zonas que faltan en la misma
+transacción (`zonas_nuevas_en`). Lo motiva que hasta hoy un sitio o una zona nuevos exigían SQL en la base antes de la planilla.
+
+**Migración 28, en una base de descarte** (imagen de la base del proyecto, sin red ni volumen, las 28 migraciones): el índice
+`uq_zona_sitio_nombre_normalizado` rechaza «norte » junto a «Norte»; plantado ese par sin el índice, reaplicar la 28 **aborta nombrando el
+sitio y las dos zonas**; corregido, se reaplica sin daño (comprobado a mano el 24/11/2026 y, desde la corrección de más abajo, por la
+integración en cada corrida); el rol de la aplicación inserta y actualiza por columna, sin `DELETE`. En la pila
+local, antes de aplicarla, un respaldo con `pg_dump` (322 entradas legibles con `pg_restore -l`) y 0 choques previos; después, la 14
+reaplicada para los permisos y la pila sana con 28 tablas.
+
+**Integración** (`plataforma/pruebas/sitios-zonas-integracion.sh` y `backend/integracion/sitios-zonas.ts`, nuevos; base desechable, la
+aplicación compilada con el rol `plataforma_app`): la primera versión, **22 comprobaciones**; tras las correcciones de más abajo,
+**51 de 51**, más las dos del guion sobre la migración 28. En la primera versión: un administrador de sitio no crea sitios (403); el sitio nace con «General»;
+código repetido, 409; el código no cambia (400); el operador no crea zonas (403) y un sitio ajeno es 404; nombre repetido con otras
+mayúsculas, 409; retirar con un equipo activo, 409 con cuántos; mover un equipo a una zona retirada, rechazado por estar retirada; el rol de
+la aplicación no borra zonas, no cambia el código de un sitio ni mueve una zona de sitio (42501); el lote sin `zonas_nuevas_en` deja fuera la
+zona inexistente, con un operador es 403, y con un administrador entran las dos filas y al crear queda **una sola** zona con los dos nodos.
+**Plantado:** sin el rechazo de la zona retirada al mover un equipo, fallan 2 casos. La primera versión del caso pasaba igual con la falta
+plantada, porque el cuerpo era inválido por otra razón (le faltaba la marca de la ficha): desde entonces exige el motivo «retirada». Se suma
+al verificador: la integración corre en el paso 1c, y la comprobación de la migración 28 en la base de la pila (columna, índice y permisos)
+está en el paso 2 (`mig.txt`).
+
+**Unitarias.** Backend: validadores, el orden de los códigos por perfil y las zonas nuevas del lote (una por nombre normalizado, las
+retiradas y los UUID no crean, la huella cambia con ellas y es estable) — en la primera versión, 1 072 de 1 072 ejecuciones de vitest en
+80 archivos; tras las correcciones, **1 100 de 1 100 en 80 archivos**, con 1 006 `it(` escritos en los 80 `*.spec.ts` (vitest cuenta
+ejecuciones: un `it` dentro de un bucle cuenta una vez por vuelta, así que las dos cifras no son la misma). Panel: «Zonas» (motivo al
+retirar con equipos, agregar, el 409 con el texto del servidor), «Sitios» (código sugerido, regla del código) y las reglas puras — en
+la primera versión, 685 de 685 ejecuciones en 47 archivos; tras las correcciones, **706 de 706 en 47 archivos**, con 641 `it(` y `test(`
+escritos; `svelte-check`, 448 archivos sin errores. De paso, la prueba del lector XLSX de 7 MB recibió su tope de
+20 s (su propia cota es 10 s; el de 5 s de vitest la cortaba con la suite en paralelo y a batería, como la vecina del 23/11).
+
+**En navegadores reales** (`plataforma/pruebas/panel-estructura-e2e.sh` y `backend/panel/e2e/estructura.mjs`; corrido por primera vez el
+25/11/2026, con la pila local reconstruida desde el código de este bloque). Chromium y Firefox, a 390 y 1 280 px, cada caso con un
+administrador del sistema de descarte: crear un sitio desde «Sitios» con el código sugerido y editarlo en la misma fila; en sus Ajustes,
+agregar, renombrar, repetir con otras mayúsculas (dice por qué), retirar y volver a ofrecer una zona; «+ Nueva zona…» en el alta de a uno;
+un lote de 3 equipos en una zona que no existe, con la casilla desmarcada por omisión (las 3 filas «No entran») y marcada (se crean, en la
+zona nueva); y que «Actividad» cuente cada cosa, con su filtro por tipo. En cada pantalla, sin desplazamiento horizontal ni errores de
+JavaScript. **124 de 124** comprobaciones, dos corridas seguidas sin cambios en el producto ni en la prueba; al salir, lo que quedó de cada
+corrida es 0 en las ocho cuentas (sitios, zonas, dispositivos, personas, eventos, sesiones, accesos a sitios y preferencias), y antes de
+borrar la limpieza comprueba que ninguna persona de la corrida dejó eventos fuera de sus sitios. Se suma al paso 4c del verificador, junto
+a los demás recorridos en navegadores.
+
+**Cierre del bloque (25/11/2026), con la pila local reconstruida.** `sesion-smoke.sh`, 541 de 541; `api-smoke.sh`, 136 OK;
+`sitios-zonas-integracion.sh`, 51 de 51 y las dos del guion. La primera corrida del verificador completo encontró una falla: las figuras
+del modelo de datos del informe no tenían la columna `activo` de `zona` (se había compilado sin regenerarlas); regeneradas desde la base,
+la siguiente dio **TODO EN CONCORDANCIA** en sus 59 pasos, con 1 835 líneas OK, el recorrido de sitios y zonas incluido (124 de 124).
+Informe: 30 páginas de cuerpo y ningún desborde mayor de 6 pt.
+
+**Corregido tras la revisión del bloque (24/11/2026).** Lo encontrado y cómo se probó cada cosa; cada prueba nueva se vio fallar con la falta
+plantada a propósito (y el código restaurado después):
+- **Carrera entre el lote y el retiro de una zona.** `crearLote` solo bloqueaba las pasarelas: la clave foránea del `INSERT` toma un bloqueo
+  que no choca con el de `PATCH /zonas/{id}`, así que un retiro concurrente podía dejar equipos en una zona retirada. Ahora bloquea también
+  las zonas existentes del lote (`FOR SHARE`, exigiendo que sigan activas). Unitaria con base simulada; plantado (sin la comprobación): la
+  prueba falla porque el lote se crea. En la integración, validar → retirar la zona → crear con la huella vieja da 409 `plan_cambio`, cero
+  equipos y las filas rechazadas por «está retirada».
+- **Actividad.** Los eventos `sitio_alta`, `sitio_cambio`, `zona_alta` y `zona_cambio` no llegaban a P14: la consulta de eventos sin
+  dispositivo no los admitía. Ahora entran por el sitio del detalle, con frases propias («creó la zona «Norte»», «retiró la zona «Sur»»…).
+  Integración: crear, renombrar y retirar una zona y crear y renombrar un sitio aparecen con la persona, el filtro por tipo los acepta y la
+  actividad de otro sitio no los trae. Plantado (sin la rama nueva): fallan tres comprobaciones con la lista vacía.
+- **El bloqueo, con dos conexiones.** Una conexión propia de la prueba sostiene `FOR SHARE` sobre una zona vacía (lo que toma un alta en
+  curso); retirarla responde 503 «otro cambio … en curso» al agotarse la espera de 5 s, y soltado el bloqueo el mismo retiro pasa.
+  Plantado (la misma consulta sin `FOR SHARE`): el retiro responde 200 y la comprobación falla. El caso secuencial (validar, retirar la zona
+  y crear con la huella vieja) prueba que el plan se recalcula al crear, no la carrera.
+- **Alta masiva con zonas nuevas.** Una zona retirada tiene su propio motivo («está retirada»; antes caía en «no existe»); si la base ya
+  tiene el nombre en el sitio con otra escritura (su `lower()` y el de JS no coinciden en todo Unicode), la fila queda fuera con ese motivo;
+  un nombre con un carácter invisible (ancho cero, inversión bidi) tampoco se ofrece; el motivo de zona inexistente ya no promete «desde esta
+  misma alta», falso para un operador. Dos candidatas del mismo archivo que para la base son la misma zona (y para JS no) ya no se ofrecen
+  como dos: las candidatas se agrupan con la clave que da la base y la segunda queda con «otra escritura» (unitaria; plantado sin la
+  agrupación, se ofrecen las dos). Tope de 20 zonas nuevas por lote: sobre él no se ofrece ninguna y la respuesta lo dice
+  (`zonas_nuevas_excedidas`). Si la base rechaza algo que el plan recalculado no ve (misma huella, todas entran), 409 `choque_sin_cambio` en
+  vez de un `plan_cambio` que se repetiría sin fin, con la causa y el remedio: escribir la zona igual en todas las filas y volver a validar. Unitarias de cada motivo, del tope y del 409 nuevo, cada una vista fallar con su falta
+  plantada; en la integración, plantado sin el tope fallan sus dos comprobaciones y plantado sin `choque_sin_cambio` falla la suya (sale
+  `plan_cambio`).
+- **Sitios y zonas.** `POST /sitios` acepta `descripcion` y `GET /sitios` la devuelve; la descripción es de una línea y rechaza (400) los
+  caracteres de control y los invisibles: plantado sin ese control, un NUL daba 500 en la integración, al crear y al cambiar; la zona horaria se valida contra la base
+  (`pg_timezone_names`, la lista de su disparador) y no contra la de Node: plantado sin esa consulta, la integración recibe el 500 de antes;
+  un sitio inactivo es 404 al cambiarlo o al cambiar sus zonas; un bloqueo agotado es 503 y no 500; crear o renombrar con el nombre de una
+  zona retirada es 409 `zona_retirada`. Unitarias con base simulada, cada una vista fallar con su falta plantada.
+- **Integración** (`sitios-zonas-integracion.sh`): **51 de 51** comprobaciones en TypeScript y dos más del guion, que automatizan lo que se
+  había hecho a mano: sin el índice, el par «Norte»/«norte » hace que reaplicar la 28 aborte con `migración 28:` nombrando las dos, y
+  corregido el par se reaplica y deja el índice. Suma los perfiles `consulta`, `investigador` y operador técnico (403 en cada ruta nueva),
+  el administrador de sitio en las rutas de sitios (403; en las de zonas, permitido en su sitio y 404 en uno ajeno), el lote con
+  `zonas_nuevas_en` ajeno (404), una zona de otro sitio (404), renombrar a un nombre que choca (409), 120 filas con la misma zona escrita
+  de tres maneras (una sola zona), un `id_fisico` creado por otra vía entre validar y crear (409 y ninguna zona nueva) y un rechazo de la
+  base después de insertar la zona dentro de la transacción (la zona tampoco queda). La base desechable usa 512 MB de memoria para los datos.
+- **Guardián.** Paso nuevo 2y2b: las constantes repetidas entre el backend y el panel (topes de nombres y descripción, forma del código)
+  deben coincidir; probado con copias plantadas fuera del repositorio (un tope distinto, la expresión distinta y una constante ausente:
+  falla en los tres; las de verdad: pasa). El humo por perfil (`sesion-smoke.sh`) suma sin sesión 401 y los perfiles sin permiso 403 en las
+  cuatro rutas, sin crear nada.
+
+**Correcciones finales (25/11/2026).** Seis ajustes chicos, cada uno con su prueba, vista fallar con el código anterior: (1) «+ Nueva
+zona…» fija el sitio antes de esperar la respuesta y desactiva el selector de sitio mientras tanto (antes, cambiar de sitio con la
+petición en vuelo atribuía la zona al otro sitio); (2) en el alta masiva, «Volver», otro archivo u otro lote dejan la casilla de zonas
+nuevas desmarcada y el sitio en su valor por omisión, y «Volver» descarta la revisión en vuelo; (3) si la limpieza del recorrido se
+detiene (escritura fuera de sus sitios, o no se pudo comprobar), antes de salir revoca las sesiones de las personas de descarte, les quita
+el perfil de administrador del sistema y las desactiva, sin borrar ningún evento; (4) el recorrido comprueba que su identificador está
+libre antes de armar la limpieza y, si no, elige otro (nunca limpia lo que no creó); (5) los nombres de sitio y de zona, la descripción y
+las celdas del lote rechazan también los separadores de línea y de párrafo de Unicode (U+2028, U+2029), en el servidor y en el panel; (6) la
+guarda del recorrido compara el nombre del sitio por igualdad. Backend: **1 101 de 1 101 ejecuciones en 80 archivos**, 1 007 `it(`;
+panel: **708 de 708 en 47 archivos**, 643 `it(` y `test(`; `svelte-check`, 448 archivos sin errores; `sitios-zonas-integracion.sh`, 51 de
+51 y las dos del guion; el recorrido en navegadores, 124 de 124 y 0 en las ocho cuentas; el verificador completo, **TODO EN CONCORDANCIA**.

@@ -13,7 +13,7 @@ const altas = (n: number): AltaDeLote[] => Array.from({ length: n }, (_, i) => (
   n: i + 2, formato: 'senml', sitio_codigo: 'uct', sitio_id: '00000000-0000-4000-8000-000000000001',
   alta: { id_fisico: `nodo-${i}`, nombre: 'n', zona_id: Z, via: 'http', formato: 'senml', pasarela_id: null, decodificador: null, intervalo_esperado_s: 60, canales: [{ magnitud: 'temperatura', etiqueta: null, escala_cero: null, escala_cien: null }] },
 }));
-interface Opciones { commitFalla?: boolean; quedo?: 'si' | 'no' | 'uno' | 'error'; pasarelasActivas?: number }
+interface Opciones { commitFalla?: boolean; quedo?: 'si' | 'no' | 'uno' | 'error'; pasarelasActivas?: number; zonasActivas?: number }
 function armar(falla?: string, restriccion?: string, o: Opciones = {}) {
   const sql: string[] = [];
   const params: unknown[][] = [];
@@ -27,6 +27,8 @@ function armar(falla?: string, restriccion?: string, o: Opciones = {}) {
       }
       if (texto === 'SELECT pg_backend_pid() AS pid') return Promise.resolve({ rows: [{ pid: 4242 }] });
       if (texto.startsWith('SELECT id FROM pasarela')) return Promise.resolve({ rows: Array.from({ length: o.pasarelasActivas ?? (p[0] as string[]).length }, (_, i) => ({ id: `P${i}` })) });
+      if (texto.startsWith('INSERT INTO zona')) return Promise.resolve({ rows: [{ id: 'Z-nueva' }] });
+      if (texto.startsWith('SELECT id FROM zona')) return Promise.resolve({ rows: Array.from({ length: o.zonasActivas ?? (p[0] as string[]).length }, (_, i) => ({ id: `Z${i}` })) });
       if (texto === 'COMMIT' && o.commitFalla) return Promise.reject(new Error('Connection terminated unexpectedly'));
       return Promise.resolve({ rows: [], rowCount: 2 });
     }),
@@ -141,6 +143,20 @@ describe('AltaService.crearLote', () => {
     expect(mala.sql).toContain('SELECT id FROM pasarela WHERE id = ANY($1::uuid[]) AND activo FOR SHARE');
     const buena = con(2);
     await buena.servicio.crearLote(lora(), 'u1');
+    expect(buena.sql.at(-1)).toBe('COMMIT');
+  }, 20_000);
+  it('una zona del lote retirada entre el plan y la inserción (las zonas existentes se bloquean FOR SHARE exigiendo activo, como las pasarelas) → ChoqueDeLote, sin INSERT; las zonas nuevas no se consultan', async () => {
+    const Z2 = '00000000-0000-4000-8000-0000000000a2';
+    const dos = (): AltaDeLote[] => altas(3).map((a, i) => ({ ...a, alta: { ...a.alta, zona_id: [Z, Z2, 'nueva:norte'][i] }, ...(i === 2 ? { zonaNueva: { sitio_id: a.sitio_id, nombre: 'Norte' } } : {}) }));
+    const mala = armar(undefined, undefined, { zonasActivas: 1 });
+    expect(await mala.servicio.crearLote(dos(), 'u1').catch((x: unknown) => x)).toBeInstanceOf(ChoqueDeLote);
+    expect(mala.sql.some((x) => x.startsWith('WITH d AS') || x.startsWith('INSERT INTO zona'))).toBe(false);
+    const i = mala.sql.indexOf('SELECT id FROM zona WHERE id = ANY($1::uuid[]) AND activo FOR SHARE');
+    expect(i).toBeGreaterThan(-1);
+    expect(mala.params[i][0]).toEqual([Z, Z2]); // las dos existentes, una vez cada una; la nueva no
+    expect(mala.sql.at(-1)).toBe('ROLLBACK');
+    const buena = armar(undefined, undefined, {});
+    await buena.servicio.crearLote(dos(), 'u1');
     expect(buena.sql.at(-1)).toBe('COMMIT');
   }, 20_000);
 });

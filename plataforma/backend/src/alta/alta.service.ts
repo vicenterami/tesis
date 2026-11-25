@@ -13,7 +13,7 @@ import { registrarEvento, registrarEventos } from '../db/evento.js';
 import { errorDeCliente } from '../db/cliente.js';
 import { generarSecreto, resumirSecreto } from './credenciales.js';
 import { FormatoPasarela, PasarelaValidada } from './pasarela.dto.js';
-import { AltaDeLote, Catalogos, ChoqueDeLote, PasarelaCatalogo, ZonaCatalogo } from './lote.js';
+import { AltaDeLote, Catalogos, ChoqueDeLote, ClaveEnLaBase, PasarelaCatalogo, ZonaCatalogo } from './lote.js';
 import { EventosService } from '../tiempo-real/eventos.service.js';
 
 // El COMMIT del lote falló y no se pudo saber si se aplicó (crearLote): no se deshace nada en el broker.
@@ -489,10 +489,31 @@ export class AltaService {
     return (await this.pool.query<{ codigo: string }>('SELECT codigo FROM receta_decodificacion ORDER BY codigo')).rows.map((x) => x.codigo);
   }
 
+  // El sitio donde el lote crea las zonas que faltan (docs/19 §4 U2; el permiso `ajustes` ya lo exigió el controlador). 404 si no existe o
+  // está inactivo.
+  async sitioParaZonasNuevas(sitioId: string): Promise<{ id: string; codigo: string; nombre: string }> {
+    const s = await this.pool.query<{ id: string; codigo: string; nombre: string }>('SELECT id, codigo, nombre FROM sitio WHERE id = $1 AND activo', [sitioId]);
+    if (s.rows.length === 0) throw new NotFoundException('sitio no encontrado');
+    return s.rows[0];
+  }
+
+  // Cada nombre candidato a zona nueva (lote.ts, candidatasZonasNuevas) con la clave que le da la BASE (lower(btrim()), la del índice
+  // uq_zona_sitio_nombre_normalizado) y si esa clave ya existe en el sitio, activa o retirada. La normalización de JS (claveZona) no coincide
+  // en todo Unicode: la existencia, y qué candidatas son la misma zona, las decide la base. Una entrada por cada texto recibido.
+  async zonasEnLaBase(sitioId: string, nombres: readonly string[]): Promise<Map<string, ClaveEnLaBase>> {
+    if (nombres.length === 0) return new Map();
+    const r = await this.pool.query<{ n: string; clave: string; existe: boolean }>(
+      `SELECT n, lower(btrim(n)) AS clave,
+              EXISTS (SELECT 1 FROM zona z WHERE z.sitio_id = $1 AND lower(btrim(z.nombre)) = lower(btrim(n))) AS existe
+         FROM unnest($2::text[]) AS n`, [sitioId, nombres]);
+    return new Map(r.rows.map((x) => [x.n, { clave: x.clave, existe: x.existe }]));
+  }
+
   async catalogosLote(sitios: string[] | null, idsFisicos: string[]): Promise<Catalogos> {
     const [z, m, p, e, ip, r] = await Promise.all([
-      this.pool.query<ZonaCatalogo>(
-        `SELECT z.id, z.nombre, z.sitio_id, s.codigo AS sitio_codigo, s.nombre AS sitio_nombre FROM zona z JOIN sitio s ON s.id = z.sitio_id
+      // Las retiradas también (migración 28), marcadas: no reciben altas, pero la fila dice por qué (corregido el 24/11/2026).
+      this.pool.query<Omit<ZonaCatalogo, 'retirada'> & { retirada?: boolean }>(
+        `SELECT z.id, z.nombre, z.sitio_id, s.codigo AS sitio_codigo, s.nombre AS sitio_nombre, NOT z.activo AS retirada FROM zona z JOIN sitio s ON s.id = z.sitio_id
           WHERE s.activo AND ($1::uuid[] IS NULL OR z.sitio_id = ANY($1::uuid[]))`, [sitios]),
       this.pool.query<{ codigo: string; nombre: string; unidad_canonica: string }>('SELECT codigo, nombre, unidad_canonica FROM magnitud'),
       this.pool.query<PasarelaCatalogo>(
@@ -506,7 +527,7 @@ export class AltaService {
       this.recetas(),
     ]);
     return {
-      zonas: z.rows, magnitudes: new Map(m.rows.map((x) => [x.codigo, { nombre: x.nombre, unidad: x.unidad_canonica }])), pasarelas: p.rows,
+      zonas: z.rows.map(({ retirada, ...x }) => (retirada === true ? { ...x, retirada: true as const } : x)), magnitudes: new Map(m.rows.map((x) => [x.codigo, { nombre: x.nombre, unidad: x.unidad_canonica }])), pasarelas: p.rows,
       existentes: new Map(e.rows.filter((x) => x.propio).map((x) => [x.id_fisico, { id: x.id, estado: x.estado }])),
       idsDePasarela: new Set(ip.rows.filter((x) => x.propio).map((x) => x.id_fisico)),
       ajenos: new Set([...e.rows, ...ip.rows].filter((x) => !x.propio).map((x) => x.id_fisico)),
@@ -563,6 +584,29 @@ export class AltaService {
         const activas = await c.query<{ id: string }>('SELECT id FROM pasarela WHERE id = ANY($1::uuid[]) AND activo FOR SHARE', [pasarelas]);
         if (activas.rows.length !== pasarelas.length) throw new ChoqueDeLote();
       }
+      // Las zonas existentes del lote, igual (corregido el 24/11/2026): FOR SHARE choca con el FOR NO KEY UPDATE con que PATCH /zonas/{id}
+      // retira una zona después de contar sus equipos. Sin esto, la FK del INSERT solo toma FOR KEY SHARE, que no choca, y un retiro
+      // concurrente podía dejar equipos en una zona retirada. Si alguna ya no está activa, es un plan que cambió.
+      const zonas = [...new Set(altas.map((x) => x.alta.zona_id).filter((z) => !z.startsWith('nueva:')))];
+      if (zonas.length > 0) {
+        const vivas = await c.query<{ id: string }>('SELECT id FROM zona WHERE id = ANY($1::uuid[]) AND activo FOR SHARE', [zonas]);
+        if (vivas.rows.length !== zonas.length) throw new ChoqueDeLote();
+      }
+      // Las zonas nuevas del lote (docs/19 §4 U2): una por id provisional `nueva:<nombre>`, insertada aquí, con su evento; las filas pasan a
+      // su UUID. Si otra petición creó la misma zona entre la vista previa y ahora (23505), es un plan que cambió: el controlador lo recalcula
+      // y la persona confirma de nuevo.
+      const zonaDe = new Map<string, string>();
+      for (const x of altas) {
+        const z = x.alta.zona_id;
+        if (!z.startsWith('nueva:') || zonaDe.has(z)) continue;
+        const nueva = x.zonaNueva;
+        if (nueva === undefined) throw new ChoqueDeLote();
+        const r = await c.query<{ id: string }>('INSERT INTO zona (sitio_id, nombre) VALUES ($1, $2) RETURNING id', [nueva.sitio_id, nueva.nombre])
+          .catch((e: unknown) => { if ((e as { code?: string }).code === '23505') throw new ChoqueDeLote(); throw e; });
+        zonaDe.set(z, r.rows[0].id);
+        await registrarEvento(c, { dispositivoId: null, tipo: 'zona_alta', usuarioId, detalle: { sitio_id: nueva.sitio_id, zona_id: r.rows[0].id, nombre: nueva.nombre, origen: 'lote' } });
+      }
+      const zonaReal = (z: string): string => zonaDe.get(z) ?? z;
       const canales = altas.flatMap((x) => x.alta.canales.map((k) => [x.alta.id_fisico, k.magnitud] as const));
       const credenciales = altas.flatMap((x, i) => (hashes[i] === null ? [] : [[x.alta.id_fisico, hashes[i]] as const]));
       const r = await c.query<{ id: string; id_fisico: string; via: string; formato: string }>(
@@ -580,7 +624,7 @@ export class AltaService {
            RETURNING 1)
          SELECT d.id, d.id_fisico, d.via, d.formato FROM d`,
         [
-          altas.map((x) => x.alta.zona_id), altas.map((x) => x.alta.id_fisico), altas.map((x) => x.alta.nombre),
+          altas.map((x) => zonaReal(x.alta.zona_id)), altas.map((x) => x.alta.id_fisico), altas.map((x) => x.alta.nombre),
           altas.map((x) => x.alta.intervalo_esperado_s), altas.map((x) => x.alta.via), altas.map((x) => x.formato),
           altas.map((x) => x.alta.pasarela_id), altas.map((x) => x.alta.decodificador),
           canales.map((x) => x[0]), canales.map((x) => x[1]), credenciales.map((x) => x[0]), credenciales.map((x) => x[1]),
@@ -747,8 +791,11 @@ export class AltaService {
 
   // La zona existe y, si hay pasarela, es del mismo sitio y está activa. Lo que falta aquí es 400: es un dato del cuerpo.
   private async sitioDe(c: PoolClient, a: AltaValidada): Promise<{ id: string; codigo: string; formatoPasarela: Formato | null }> {
-    const z = await c.query<{ sitio_id: string; codigo: string }>('SELECT z.sitio_id, s.codigo FROM zona z JOIN sitio s ON s.id = z.sitio_id WHERE z.id = $1', [a.zona_id]);
+    // FOR SHARE de la zona: un retiro en curso (PATCH /zonas/{id}, FOR NO KEY UPDATE) espera a este alta o este alta lo ve retirado.
+    const z = await c.query<{ sitio_id: string; codigo: string; activo: boolean }>(
+      'SELECT z.sitio_id, s.codigo, z.activo FROM zona z JOIN sitio s ON s.id = z.sitio_id WHERE z.id = $1 FOR SHARE OF z', [a.zona_id]);
     if (z.rows.length === 0) throw new BadRequestException(['zona_id no existe']);
+    if (!z.rows[0].activo) throw new BadRequestException(['la zona está retirada: elige otra o vuelve a ofrecerla en Ajustes del sitio → Zonas']);
     const sitio: { id: string; codigo: string; formatoPasarela: Formato | null } = { id: z.rows[0].sitio_id, codigo: z.rows[0].codigo, formatoPasarela: null };
     if (a.pasarela_id !== null) {
       // FOR SHARE: una baja de la pasarela en curso (FOR NO KEY UPDATE) espera a este alta o este alta espera a la baja; sin el

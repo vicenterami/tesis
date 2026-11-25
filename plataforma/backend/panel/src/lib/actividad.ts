@@ -50,6 +50,10 @@ export const ROTULO_TIPO_ACTIVIDAD: Readonly<Record<string, string>> = {
   usuario_clave: 'Cambios de clave',
   terminos_aceptados: 'Términos aceptados',
   espera_primera_trama: 'Plazo de la primera trama del sitio', // desde el 18/11/2026 (docs/19 §4, P)
+  sitio_alta: 'Sitios creados', // desde el 24/11/2026 (docs/19 §4, U): el servidor escribe la frase («creó el sitio «X»»); aquí, solo el rótulo del filtro
+  sitio_cambio: 'Cambios de sitios',
+  zona_alta: 'Zonas creadas',
+  zona_cambio: 'Cambios de zonas (nombre, retirada)',
   ok: 'Entradas',
   cierre: 'Salidas',
   bloqueado: 'Bloqueos por intentos',

@@ -370,11 +370,11 @@
 
       <fieldset>
         <legend>Desglose por zona (opcional)</legend>
-        {#if sitio.zonas.length === 0}
-          <p class="vivo">Este sitio no tiene zonas: la vista muestra solo el promedio del sitio.</p>
+        {#if sitio.zonas.every((x) => x.activo === false && !f.zonas.includes(x.id))}
+          <p class="vivo">Este sitio no tiene zonas para publicar: la vista muestra solo el promedio del sitio.</p>
         {:else}
           <div class="casillas">
-            {#each sitio.zonas as z (z.id)}
+            {#each sitio.zonas.filter((x) => x.activo !== false || f.zonas.includes(x.id)) as z (z.id)}
               <label class="casilla"><input type="checkbox" checked={f.zonas.includes(z.id)} onchange={(e) => alternar('zonas', z.id, e.currentTarget.checked)} aria-describedby="{uid}-aviso-nombres" data-zona-enlace={z.nombre} /> {z.nombre}</label>
             {/each}
           </div>

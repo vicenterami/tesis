@@ -14,11 +14,14 @@
   import { avisoDeError, type DatosAviso } from './lib/avisos';
   import type { EventoVivo, Sitio } from './lib/modelo';
   import { puedeEn, type Sesion } from './lib/sesion';
+  import { puedeEnSitio } from './lib/ajustes';
+  import { textoDeError } from './lib/estructura';
   import { fechaHora, horaLocal } from './lib/tiempo';
   import { abrirCanal, type Canal } from './lib/vivo';
   import { fragmentoAlta, fragmentoFicha, type ModoAlta } from './lib/vista';
 
-  let { modo = 'uno', idFisico = '', sitio = '', sesion = null, sitios = null }: { modo?: ModoAlta; idFisico?: string; sitio?: string; sesion?: Sesion | null; sitios?: Sitio[] | null } = $props();
+  // `sitioActivo`: el sitio que nombra la cabecera del panel (App.svelte, `sitioNombrado`); el alta masiva ofrece crear ahí las zonas que falten (con `ajustes` en más de un sitio, también en otro de los suyos).
+  let { modo = 'uno', idFisico = '', sitio = '', sesion = null, sitios = null, sitioActivo = null }: { modo?: ModoAlta; idFisico?: string; sitio?: string; sesion?: Sesion | null; sitios?: Sitio[] | null; sitioActivo?: Sitio | null } = $props();
   const uid = $props.id();
 
   // Solo los sitios donde la persona puede dar de alta (el servidor decide igual: un 403 se muestra).
@@ -42,7 +45,37 @@
   $effect(() => {
     if (misSitios.length > 0 && !misSitios.some((s) => s.codigo === a.sitio)) untrack(() => (a.sitio = misSitios[0]!.codigo));
   });
-  const zonasDelSitio = $derived(misSitios.find((s) => s.codigo === a.sitio)?.zonas ?? []);
+  // Las zonas retiradas no se ofrecen (migración 28; docs/19 §4 U); las creadas aquí con «+ Nueva zona…» se suman sin esperar a recargar.
+  let zonasCreadas = $state<{ id: string; nombre: string; sitio: string }[]>([]);
+  const sitioElegido = $derived(misSitios.find((s) => s.codigo === a.sitio) ?? null);
+  const zonasDelSitio = $derived([
+    ...(sitioElegido?.zonas ?? []).filter((z) => z.activo !== false),
+    ...zonasCreadas.filter((z) => z.sitio === a.sitio && !(sitioElegido?.zonas ?? []).some((y) => y.id === z.id)),
+  ]);
+  const creaZonas = $derived(sesion !== null && sitioElegido !== null && puedeEnSitio(sesion, sitioElegido, 'ajustes'));
+  let nuevaZona = $state<string | null>(null); // con texto (aunque vacío), el campo de «+ Nueva zona…» está abierto
+  let errorNuevaZona = $state<string | null>(null);
+  let creandoZona = $state(false);
+  async function crearZona(): Promise<void> {
+    if (nuevaZona === null || sitioElegido === null || creandoZona) return;
+    const nombre = nuevaZona.trim();
+    if (nombre === '') { errorNuevaZona = 'Escribe el nombre de la zona.'; return; }
+    // El sitio se fija ANTES de esperar: `sitioElegido` es derivado y, leído después del `await`, atribuiría la zona al sitio que la persona
+    // eligiera con la petición en vuelo (el selector de sitio, además, se desactiva mientras tanto).
+    const destino = sitioElegido;
+    creandoZona = true;
+    errorNuevaZona = null;
+    try {
+      const z = await pedir<{ id: string; nombre: string }>('POST', `/sitios/${encodeURIComponent(destino.id)}/zonas`, { cuerpo: { nombre } });
+      zonasCreadas = [...zonasCreadas, { id: z.id, nombre: z.nombre, sitio: destino.codigo }];
+      if (a.sitio === destino.codigo) a.zona_id = z.id;
+      nuevaZona = null;
+    } catch (e) {
+      errorNuevaZona = textoDeError(e);
+    } finally {
+      creandoZona = false;
+    }
+  }
   $effect(() => {
     if (zonasDelSitio.length > 0 && !zonasDelSitio.some((z) => z.id === a.zona_id)) untrack(() => (a.zona_id = zonasDelSitio[0]!.id));
   });
@@ -233,7 +266,7 @@
           <div class="campo">
             <label for="{uid}-sitio">Sitio</label>
             <select id="{uid}-sitio" bind:value={a.sitio} onblur={() => (tocados.sitio = true)} aria-invalid={visible('sitio') !== null}
-              aria-describedby="{uid}-sitio-error" data-campo="sitio">
+              disabled={creandoZona} aria-describedby="{uid}-sitio-error" data-campo="sitio">
               {#each misSitios as s (s.id)}<option value={s.codigo}>{s.nombre}</option>{/each}
             </select>
             <span class="error-campo" id="{uid}-sitio-error" data-error-campo="sitio">{visible('sitio') ?? ''}</span>
@@ -245,6 +278,20 @@
               {#each zonasDelSitio as z (z.id)}<option value={z.id}>{z.nombre}</option>{/each}
             </select>
             <span class="error-campo" id="{uid}-zona-error" data-error-campo="zona">{visible('zona') ?? ''}</span>
+            {#if creaZonas}
+              {#if nuevaZona === null}
+                <Boton etiqueta="+ Nueva zona…" variante="discreto" onclick={() => { nuevaZona = ''; errorNuevaZona = null; }} data-nueva-zona />
+              {:else}
+                <div class="nueva-zona" data-campo-nueva-zona>
+                  <label for="{uid}-nueva-zona">Nombre de la zona nueva</label>
+                  <input id="{uid}-nueva-zona" bind:value={nuevaZona} maxlength="80" aria-invalid={errorNuevaZona !== null} aria-describedby="{uid}-nueva-zona-error"
+                    onkeydown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void crearZona(); } }} />
+                  <Boton etiqueta="Crear zona" cargando={creandoZona} onclick={() => void crearZona()} data-crear-zona />
+                  <Boton etiqueta="Cancelar" variante="discreto" onclick={() => { nuevaZona = null; errorNuevaZona = null; }} />
+                  <span class="error-campo" id="{uid}-nueva-zona-error" role="alert" data-error-nueva-zona>{errorNuevaZona ?? ''}</span>
+                </div>
+              {/if}
+            {/if}
           </div>
         </div>
       {:else if paso === 2}
@@ -329,7 +376,9 @@
       </span>
     </section>
   {:else if modo === 'lote'}
-    <AltaLote persona={sesion === null ? null : sesion.sistema ? 'sistema' : sesion.usuario.id} />
+    <AltaLote persona={sesion === null ? null : sesion.sistema ? 'sistema' : sesion.usuario.id}
+      zonasEn={sesion === null ? [] : misSitios.filter((x) => puedeEnSitio(sesion, x, 'ajustes')).map((x) => ({ id: x.id, nombre: x.nombre }))}
+      sitioActivo={sitioActivo?.id ?? null} />
   {:else}
     <section aria-labelledby="{uid}-detectados" data-detectados>
       <h3 id="{uid}-detectados">Detectados sin alta (últimos 7 días)</h3>

@@ -31,7 +31,7 @@ function armar(opciones: { insertFalla?: string; insertRestriccion?: string; com
       await Promise.resolve();
       sql.push(texto);
       params.push(p);
-      if (texto.startsWith('SELECT z.sitio_id')) return { rows: p[0] === Z ? [{ sitio_id: 'S1', codigo: 'uct' }] : [] };
+      if (texto.startsWith('SELECT z.sitio_id')) return { rows: p[0] === Z ? [{ sitio_id: 'S1', codigo: 'uct', activo: true }] : [] };
       if (texto.startsWith('SELECT sitio_id, activo, formato, id_fisico FROM pasarela')) return { rows: opciones.pasarela === null ? [] : [{ formato: 'milesight', id_fisico: 'pas-01', ...(opciones.pasarela ?? { sitio_id: 'S1', activo: true }) }] };
       if (texto.startsWith('SELECT codigo, unidad_canonica')) return { rows: [{ codigo: 'humedad', unidad_canonica: '%RH' }, { codigo: 'temperatura', unidad_canonica: 'Cel' }] };
       if (texto.startsWith('INSERT INTO dispositivo')) {

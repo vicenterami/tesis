@@ -34,6 +34,20 @@ describe('textoActividad', () => {
     expect(textoActividad('evento', 'enlace_minimo', null, { sitio_id: 'x', minimo_dispositivos: 4, anterior: 3 })).toBe('fijó en 4 el mínimo de dispositivos de la vista pública del sitio');
     expect(textoActividad('evento', 'enlace_minimo', null, { minimo_dispositivos: '4<b>' })).toBe('cambió el mínimo de dispositivos de la vista pública del sitio');
   });
+  describe('la estructura del sitio (24/11/2026; docs/19 §4 U, punto 4): una frase por caso, con el nombre del detalle', () => {
+    it('sitio_alta', () => expect(textoActividad('evento', 'sitio_alta', null, { sitio_id: 'x', codigo: 'sede-norte', nombre: 'Sede Norte' }, 'Sede Norte')).toBe('creó el sitio «Sede Norte»'));
+    it('sitio_cambio con otro nombre', () => expect(textoActividad('evento', 'sitio_cambio', null, { nombre: 'Sede Sur', nombre_anterior: 'Sede Norte', descripcion_cambiada: false }, 'Sede Sur')).toBe('cambió el nombre del sitio «Sede Norte» a «Sede Sur»'));
+    it('sitio_cambio solo de la descripción', () => expect(textoActividad('evento', 'sitio_cambio', null, { nombre: 'Sede Sur', nombre_anterior: 'Sede Sur', descripcion_cambiada: true }, 'Sede Sur')).toBe('cambió la descripción del sitio «Sede Sur»'));
+    it('zona_alta', () => expect(textoActividad('evento', 'zona_alta', null, { nombre: 'Norte' }, 'Norte')).toBe('creó la zona «Norte»'));
+    it('zona_alta desde el lote', () => expect(textoActividad('evento', 'zona_alta', null, { nombre: 'Norte', origen: 'lote' }, 'Norte')).toBe('creó la zona «Norte» al dar de alta por lote'));
+    it('zona_cambio con otro nombre', () => expect(textoActividad('evento', 'zona_cambio', null, { nombre: 'Sur', nombre_anterior: 'Norte', activo: true, activo_anterior: true }, 'Sur')).toBe('cambió el nombre de la zona «Norte» a «Sur»'));
+    it('zona_cambio: retirada', () => expect(textoActividad('evento', 'zona_cambio', null, { nombre: 'Sur', nombre_anterior: 'Sur', activo: false, activo_anterior: true }, 'Sur')).toBe('retiró la zona «Sur»'));
+    it('zona_cambio: vuelta a ofrecer', () => expect(textoActividad('evento', 'zona_cambio', null, { nombre: 'Sur', nombre_anterior: 'Sur', activo: true, activo_anterior: false }, 'Sur')).toBe('volvió a ofrecer la zona «Sur»'));
+    it('zona_cambio: nombre y retiro a la vez; nombre y vuelta a la vez', () => {
+      expect(textoActividad('evento', 'zona_cambio', null, { nombre: 'Sur', nombre_anterior: 'Norte', activo: false, activo_anterior: true }, 'Sur')).toBe('cambió el nombre de la zona «Norte» a «Sur» y la retiró');
+      expect(textoActividad('evento', 'zona_cambio', null, { nombre: 'Sur', nombre_anterior: 'Norte', activo: true, activo_anterior: false }, 'Sur')).toBe('cambió el nombre de la zona «Norte» a «Sur» y la volvió a ofrecer');
+    });
+  });
   it('el filtro tipo: minúsculas y guion bajo, hasta 40', () => {
     expect(tipoValido('reglas_cambiadas')).toBe(true);
     expect(tipoValido("x' OR 1=1")).toBe(false);

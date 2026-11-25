@@ -74,7 +74,7 @@ describe('el tope del cuerpo sale del peor caso medido de lo que se acepta', () 
   });
   it('lo que el JSON escribe con más bytes no entra: controles, sustitutos sueltos y, en las columnas de códigos, «"», «\\» y lo que no es ASCII', () => {
     // Con las palabras con que el panel dice lo mismo al leer (docs/19 §4, S1 y S4): «fila 8, Nombre: …», sin el nombre de la columna.
-    for (const x of ['\u0000', '\u0001', '\t', '\u007f', '\u0085']) expect(motivosDe({ n: 8, nombre: `a${x}b` })).toEqual(['fila 8, Nombre: trae un salto de línea, un tabulador u otro carácter de control, que no se admite']);
+    for (const x of ['\u0000', '\u0001', '\t', '\u007f', '\u0085', '\u2028', '\u2029']) expect(motivosDe({ n: 8, nombre: `a${x}b` })).toEqual(['fila 8, Nombre: trae un salto de línea, un tabulador u otro carácter de control, que no se admite']);
     expect(motivosDe({ n: 8, zona: 'a\ud800' })).toEqual(['fila 8, Zona: trae un carácter dañado que no se puede leer']);
     expect(motivosDe({ n: 8, nombre: 'Ñandú 😀 «€»' })).toEqual([]); // el texto libre admite lo imprimible
     for (const c of COLUMNAS_LOTE.filter((x) => !COLUMNAS_TEXTO_LIBRE.includes(x))) {

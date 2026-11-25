@@ -257,6 +257,16 @@ describe('P15, el plazo de la primera trama', () => {
     expect($('[data-guardar-espera]').getAttribute('aria-busy')).toBeNull();
   });
 
+  it('un sitio pedido que no es de la persona no se reemplaza por otro: se dice y se ofrecen los suyos; sin sitio pedido, rige el primero', async () => {
+    const r = render(AjustesSitio, { sitio: 'ajeno', sesion: SESION_DOS, sitios: DOS, alCambiarVista: () => undefined });
+    await waitFor(() => expect(texto('[data-sitio-no-encontrado]')).toContain('Ese sitio no existe o no lo administras.'));
+    expect([...document.querySelectorAll('[data-sitios-de-ajustes] a')].map((x) => [x.textContent, x.getAttribute('href')])).toEqual([['Campus', '#/sitio/ajustes?sitio=uct'], ['Magallanes', '#/sitio/ajustes?sitio=mag']]);
+    expect(document.querySelector('[data-seccion-zonas], [data-seccion-primera-trama], [data-guardar-espera]')).toBeNull(); // ningún ajuste de otro sitio
+    await r.rerender({ sitio: '', sesion: SESION_DOS, sitios: DOS, alCambiarVista: () => undefined });
+    await waitFor(() => expect(document.querySelector('[data-sitio-no-encontrado]')).toBeNull());
+    expect($<HTMLSelectElement>('[data-sitio-ajustes]').value).toBe('uct');
+  });
+
   it('cada sección se ve con su acción: sin `ajustes` no hay plazo; sin `enlaces` no hay k ni tope; sin ninguna, el mensaje de quien no ajusta nada', async () => {
     await montar(persona(SITIOS, { administrador: ['leer', 'enlaces'] }));
     expect(document.querySelector('[data-seccion-primera-trama]')).toBeNull();

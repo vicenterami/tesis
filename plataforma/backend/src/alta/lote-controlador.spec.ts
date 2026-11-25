@@ -127,6 +127,18 @@ describe('POST /dispositivos/lote?modo=crear: todo o nada', () => {
     expect(cuerpo.plan.filas.map((f) => f.resultado)).toEqual(['existe', 'valida']);
     expect(servicio.catalogosLote).toHaveBeenCalledTimes(3); // validar, crear y el recálculo tras el choque
   });
+  it('el choque que solo ve la base con el MISMO plan al recalcular (misma huella, todas entran): 409 choque_sin_cambio, no plan_cambio (si no, la persona confirmaría lo mismo sin fin)', async () => {
+    const { ctrl, servicio } = conServicioFalso(() => catalogos());
+    servicio.crearLote.mockImplementationOnce(async () => { await Promise.resolve(); throw new ChoqueDeLote(); });
+    const u = usuarioSistema();
+    const vista = await ctrl.lote(u, 'validar', { filas }, undefined, res());
+    const e = await error(ctrl.lote(u, 'crear', { filas, huella: vista.huella }, LLAVE, res()));
+    const cuerpo = e.getResponse() as { codigo: string; message: string; plan?: unknown };
+    expect([e.getStatus(), cuerpo.codigo]).toEqual([409, 'choque_sin_cambio']);
+    expect(cuerpo.message).toBe('Una zona nueva del archivo coincide con otra (del mismo archivo o del sitio) que solo cambia en mayúsculas o espacios. Escríbela igual en todas las filas y vuelve a validar.');
+    expect(cuerpo.plan).toBeUndefined();
+    expect(servicio.catalogosLote).toHaveBeenCalledTimes(3);
+  });
   it('reintento con la misma llave y el mismo cuerpo: la misma respuesta y ningún dispositivo de más; otro cuerpo con esa llave, 422', async () => {
     const { ctrl, servicio } = conServicioFalso(() => catalogos());
     const u = usuarioSistema();
@@ -241,6 +253,7 @@ function conBaseFalsa() {
       query: async (texto: string, p: unknown[] = []) => {
         await Promise.resolve();
         if (texto.startsWith('SELECT id FROM pasarela')) return { rows: (p[0] as string[]).map((id) => ({ id })) }; // activas y bloqueadas
+        if (texto.startsWith('SELECT id FROM zona')) return { rows: (p[0] as string[]).map((id) => ({ id })) }; // las zonas, igual
         if (texto.trim().startsWith('WITH d AS')) {
           insertados.push(p);
           return { rows: (p[1] as string[]).map((f, i) => ({ id: `D${i}`, id_fisico: f, via: (p[4] as string[])[i], formato: (p[5] as string[])[i] })) };

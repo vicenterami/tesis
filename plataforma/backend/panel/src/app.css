@@ -630,3 +630,19 @@ main { padding-bottom: calc(var(--e-4) + var(--alto-avisos, 0px)); }
 .estimacion-exportar .vivo { margin: var(--e-1) 0 0; }
 /* El correo junto al nombre de quien hizo algo (Persona.svelte): texto secundario, sin el peso del nombre; el correo largo se parte en vez de ensanchar la fila. */
 .persona-correo { font-size: 0.85em; font-weight: 400; color: var(--texto-secundario); overflow-wrap: anywhere; }
+/* Sitios y zonas desde el panel (docs/19 §4 U y U2): la sección «Zonas» de Ajustes, «+ Nueva zona…» del alta y el formulario de «Sitios». Cada
+   fila y cada formulario se acomoda en varias líneas en el teléfono (sin desplazamiento horizontal de la página). */
+.lista-zonas { list-style: none; margin: var(--e-3) 0; padding: 0; display: grid; gap: var(--e-2); }
+.lista-zonas li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-1) var(--e-3); min-width: 0; padding: var(--e-2) var(--e-3); background: var(--superficie); border: 1px solid var(--borde-tenue); border-radius: var(--radio); }
+.lista-zonas li.vacio { display: block; }
+.lista-zonas li.retirada { border: 1px dashed var(--borde-control); background: var(--superficie-tenue); } /* además del borde discontinuo, la fila dice «retirada» con letras */
+.lista-zonas .nombre-zona { flex: 1 1 12rem; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
+.lista-zonas li.retirada .nombre-zona { font-weight: 400; color: var(--texto-secundario); }
+.lista-zonas input { flex: 1 1 12rem; font: inherit; color: var(--texto); background: var(--superficie); padding: 0.35rem 0.45rem; min-height: var(--objetivo); min-width: 0; max-width: 100%; border: 1px solid var(--borde-control); border-radius: var(--radio); }
+.agregar-zona, .nueva-zona { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--e-2) var(--e-3); min-width: 0; max-width: 100%; margin: var(--e-2) 0; }
+.agregar-zona label, .nueva-zona label { flex: 1 1 100%; font-weight: 600; }
+.agregar-zona input, .nueva-zona input { flex: 1 1 14rem; font: inherit; color: var(--texto); background: var(--superficie); padding: 0.35rem 0.45rem; min-height: var(--objetivo); min-width: 0; max-width: 100%; border: 1px solid var(--borde-control); border-radius: var(--radio); }
+.nueva-zona .error-campo { flex: 1 1 100%; }
+.formulario-sitio { max-width: 46rem; margin-top: var(--e-4); }
+.formulario-sitio > :not(.campo) { grid-column: 1 / -1; }
+.formulario-sitio h3 { margin: 0; }

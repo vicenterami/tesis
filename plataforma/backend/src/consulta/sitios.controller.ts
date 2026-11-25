@@ -1,7 +1,7 @@
-import { BadRequestException, Body, Controller, Get, Logger, Param, Put, Query, Res, ServiceUnavailableException } from '@nestjs/common';
+import { BadRequestException, Body, Controller, Get, HttpCode, Logger, Param, Patch, Post, Put, Query, Res, ServiceUnavailableException } from '@nestjs/common';
 import type { Response } from 'express';
 import {
-  ApiBadRequestResponse, ApiBody, ApiConflictResponse, ApiCookieAuth, ApiForbiddenResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiProduces,
+  ApiBadRequestResponse, ApiBody, ApiConflictResponse, ApiCookieAuth, ApiCreatedResponse, ApiForbiddenResponse, ApiNotFoundResponse, ApiOkResponse, ApiOperation, ApiParam, ApiProduces,
   ApiQuery, ApiServiceUnavailableResponse, ApiTags, ApiTooManyRequestsResponse, ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { CABECERA_X_SIGUIENTE, ISO_8601, INTERVALOS, MAX_CUBOS, MAX_DIAS_VENTANA, SEGUNDOS_INTERVALO, exigirTopeCubos, fecha, intervalo, limite, uuid } from './validacion.js';
@@ -27,7 +27,9 @@ import { diasRetencionTrama } from './tablero.service.js';
 export const MAX_DIAS_SITIO = 31;
 import { AlcanceService } from '../sesion/alcance.service.js';
 import { Usuario } from '../sesion/guardia.js';
-import { alcanceDeLectura, exigirEnAlguno } from '../sesion/permisos.js';
+import { alcanceDeLectura, exigirEnAlguno, exigirGlobal } from '../sesion/permisos.js';
+import { FORMA_CODIGO_SITIO, MAX_DESCRIPCION_SITIO, MAX_NOMBRE_SITIO, MAX_NOMBRE_ZONA, ZONA_INICIAL_POR_OMISION, validarCambioSitio, validarSitioNuevo, validarZonaNueva } from './sitios-zonas.js';
+import { SitioCreado, SitiosZonasService, ZonaDeSitio } from './sitios-zonas.service.js';
 import type { UsuarioSesion } from '../sesion/permisos.js';
 
 // Tablero del sitio (docs/19 §4, bloque «Tablero v2», B e I; docs/10 §8.4 punto 65). Lecturas con sesión: consulta o más en su sitio;
@@ -42,17 +44,82 @@ export class SitiosController {
   constructor(
     private readonly tablero: TableroService, private readonly alcance: AlcanceService, private readonly actividadSitio: ActividadService,
     private readonly espera: EsperaService, private readonly consulta: ConsultaService, private readonly cupo: CupoExportaciones,
+    private readonly estructura: SitiosZonasService,
   ) {}
 
   @Get()
   @ApiOperation({
     summary: 'Mis sitios (Etapa 4)',
-    description: 'Los sitios activos de la sesión con `id, codigo, nombre, zona_horaria, rol` (el perfil de la persona en ese sitio) y `zonas[{id, nombre}]`. El administrador del sistema y el usuario del sistema ven todos, con rol administrador (su perfil global va en `administrador_sistema` de GET /sesion).',
+    description: 'Los sitios activos de la sesión con `id, codigo, nombre, zona_horaria`, `descripcion` (la del sitio: texto o null), `rol` (el perfil de la persona en ese sitio) y `zonas[{id, nombre, activo, dispositivos}]` (por zona: `activo` false = zona retirada, que no se ofrece en el alta; `dispositivos`, los que no están de baja). El administrador del sistema y el usuario del sistema ven todos, con rol administrador (su perfil global va en `administrador_sistema` de GET /sesion).',
   })
   @ApiOkResponse({ description: 'Lista de sitios' })
   async listar(@Usuario() u: UsuarioSesion) {
     const filas = await this.tablero.sitios(alcanceDeLectura(u));
     return filas.map((s) => ({ ...s, rol: u.todos ? 'administrador' : (u.sitios.get(s.id) ?? 'consulta') }));
+  }
+
+  // Crear un sitio con su primera zona y cambiar su nombre o descripción (docs/19 §4 U; docs/20 §6): solo el administrador del sistema
+  // (acción `sistema`, sin sitio en la ruta: un sitio nuevo no es de nadie todavía). 403 antes de mirar el cuerpo; el cuerpo, 400.
+  @Post()
+  @HttpCode(201)
+  @ApiOperation({
+    summary: 'Crear un sitio con su primera zona (Etapa 4)',
+    description:
+      'Solo el administrador del sistema (acción `sistema`). Crea el sitio y su primera zona (por omisión «' + ZONA_INICIAL_POR_OMISION + '») en una transacción, ' +
+      'con los eventos `sitio_alta` y `zona_alta`. El código va en los tópicos (`sitio/<codigo>/…`) y no cambia después; la zona horaria tampoco. ' +
+      'La zona horaria se valida contra la base (`pg_timezone_names`). Responde `{id, codigo, nombre, zona_horaria, descripcion, zonas[{id, sitio_id, nombre, activo, dispositivos}]}`.',
+  })
+  @ApiBody({ schema: { type: 'object', required: ['nombre', 'codigo', 'zona_horaria'], properties: {
+    nombre: { type: 'string', maxLength: MAX_NOMBRE_SITIO },
+    codigo: { type: 'string', pattern: FORMA_CODIGO_SITIO.source, description: 'Segmento del tópico; único' },
+    zona_horaria: { type: 'string', description: 'Nombre IANA, como America/Santiago' },
+    primera_zona: { type: 'string', maxLength: MAX_NOMBRE_ZONA, description: `Por omisión «${ZONA_INICIAL_POR_OMISION}»` },
+    descripcion: { type: 'string', maxLength: MAX_DESCRIPCION_SITIO, description: 'Opcional; se recorta; vacía = sin descripción' },
+  } } })
+  @ApiCreatedResponse({ description: 'El sitio creado con sus zonas' })
+  @ApiBadRequestResponse({ description: 'Cuerpo inválido: nombre, código, zona horaria (forma, o un nombre que la base no conoce), primera zona o descripción; un nombre con caracteres de control o invisibles' })
+  @ApiForbiddenResponse({ description: 'No es el administrador del sistema (docs/20 §6), o sesión sin la cabecera X-Pedido: panel' })
+  @ApiConflictResponse({ description: '`codigo: codigo_repetido`: ya existe un sitio con ese código' })
+  @ApiServiceUnavailableResponse({ description: 'Otro cambio sobre este sitio está en curso (bloqueo agotado): reintentar' })
+  async crearSitio(@Usuario() u: UsuarioSesion, @Body() cuerpo: unknown): Promise<SitioCreado> {
+    exigirGlobal(u, 'sistema');
+    return this.estructura.crearSitio(validarSitioNuevo(cuerpo), u.id);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Cambiar el nombre o la descripción de un sitio (Etapa 4)', description: 'Solo el administrador del sistema (acción `sistema`). El código y la zona horaria no cambian. Deja el evento `sitio_cambio` si algo cambia.' })
+  @ApiParam({ name: 'id', description: 'UUID del sitio' })
+  @ApiBody({ schema: { type: 'object', properties: { nombre: { type: 'string', maxLength: MAX_NOMBRE_SITIO }, descripcion: { type: 'string', nullable: true, maxLength: MAX_DESCRIPCION_SITIO, description: 'null o vacía la borra' } } } })
+  @ApiOkResponse({ description: 'El sitio con sus zonas (la misma forma que POST /sitios)' })
+  @ApiBadRequestResponse({ description: 'Cuerpo inválido o nada que cambiar' })
+  @ApiForbiddenResponse({ description: 'No es el administrador del sistema (docs/20 §6), o sesión sin la cabecera X-Pedido: panel' })
+  @ApiNotFoundResponse({ description: 'Sitio inexistente o inactivo' })
+  @ApiServiceUnavailableResponse({ description: 'Otro cambio sobre este sitio está en curso (bloqueo agotado): reintentar' })
+  async cambiarSitio(@Usuario() u: UsuarioSesion, @Param('id') id: string, @Body() cuerpo: unknown): Promise<SitioCreado> {
+    exigirGlobal(u, 'sistema');
+    const cambio = validarCambioSitio(cuerpo);
+    return this.estructura.cambiarSitio(uuid(id, 'sitio'), cambio, u.id);
+  }
+
+  // Crear una zona en un sitio (docs/19 §4 U; docs/20 §6): la acción `ajustes` en ese sitio. Mismo orden de códigos que las demás rutas
+  // que escriben: sin la acción en ningún sitio, 403; el cuerpo, 400; el sitio: 404 si no existe o es de otro, 403 si su perfil no puede.
+  @Post(':id/zonas')
+  @HttpCode(201)
+  @ApiOperation({ summary: 'Crear una zona en un sitio (Etapa 4)', description: 'Quien administra el sitio (acción `ajustes`). El nombre no se repite en el sitio sin distinguir mayúsculas ni espacios en los extremos. Deja el evento `zona_alta`.' })
+  @ApiParam({ name: 'id', description: 'UUID del sitio' })
+  @ApiBody({ schema: { type: 'object', required: ['nombre'], properties: { nombre: { type: 'string', maxLength: MAX_NOMBRE_ZONA } } } })
+  @ApiCreatedResponse({ description: 'La zona creada' })
+  @ApiBadRequestResponse({ description: 'Nombre vacío, demasiado largo o con caracteres de control o invisibles' })
+  @ApiForbiddenResponse({ description: 'Un perfil sin la acción «ajustes» (docs/20 §6), o sesión sin la cabecera X-Pedido: panel' })
+  @ApiConflictResponse({ description: '`codigo: zona_repetida` (ya hay una zona activa con ese nombre en el sitio) o `zona_retirada` (la hay, retirada: se vuelve a ofrecer con PATCH /zonas/{id})' })
+  @ApiNotFoundResponse({ description: 'Sitio inexistente, inactivo o de otro' })
+  @ApiServiceUnavailableResponse({ description: 'Otro cambio sobre este sitio está en curso (bloqueo agotado): reintentar' })
+  async crearZona(@Usuario() u: UsuarioSesion, @Param('id') id: string, @Body() cuerpo: unknown): Promise<ZonaDeSitio> {
+    exigirEnAlguno(u, 'ajustes');
+    const nombre = validarZonaNueva(cuerpo);
+    const sitioId = uuid(id, 'sitio');
+    await this.alcance.exigirSitio(u, 'ajustes', sitioId);
+    return this.estructura.crearZona(sitioId, nombre, u.id);
   }
 
   @Get(':id/resumen')
@@ -158,7 +225,7 @@ export class SitiosController {
   @ApiParam({ name: 'id', description: 'UUID del sitio' })
   @ApiQuery({ name: 'desde', required: false, description: `${ISO_8601}; por defecto hasta − ${DIAS_ACTIVIDAD_POR_DEFECTO} días` })
   @ApiQuery({ name: 'hasta', required: false, description: `${ISO_8601}; por defecto ahora` })
-  @ApiQuery({ name: 'tipo', required: false, description: 'Tipo de evento (alta, baja, reglas_cambiadas, …) o resultado de acceso (ok, cierre, clave_incorrecta, bloqueado, inactivo)' })
+  @ApiQuery({ name: 'tipo', required: false, description: 'Tipo de evento (alta, baja, reglas_cambiadas, sitio_alta, sitio_cambio, zona_alta, zona_cambio, …) o resultado de acceso (ok, cierre, clave_incorrecta, bloqueado, inactivo)' })
   @ApiQuery({ name: 'usuario', required: false, description: 'UUID de la persona' })
   @ApiQuery({ name: 'limite', required: false, description: '1–500, por defecto 100' })
   @ApiQuery({ name: 'cursor', required: false, description: 'El de la cabecera X-Siguiente de la página anterior' })

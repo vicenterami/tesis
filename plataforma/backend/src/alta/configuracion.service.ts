@@ -82,9 +82,11 @@ export class ConfiguracionService {
       if (!antes.al_dia) throw conflicto(antes.actualizado_en);
       if (antes.estado === 'baja') throw new ConflictException('el dispositivo está dado de baja: no se configura');
       if (cambio.zona_id !== undefined && cambio.zona_id !== antes.zona_id) {
-        const z = await c.query<{ sitio_id: string }>('SELECT sitio_id FROM zona WHERE id = $1', [cambio.zona_id]);
+        const z = await c.query<{ sitio_id: string; activo: boolean }>('SELECT sitio_id, activo FROM zona WHERE id = $1 FOR SHARE', [cambio.zona_id]);
         // Otra zona del mismo sitio; una de otro sitio (o que no existe) se dice igual: no se revela que existe (RF-41).
         if (z.rows[0]?.sitio_id !== antes.sitio_id) throw rechazo([{ campo: 'zona_id', motivo: 'no es una zona de este sitio' }]);
+        // Una zona retirada no recibe dispositivos (migración 28; docs/19 §4 U).
+        if (!z.rows[0].activo) throw rechazo([{ campo: 'zona_id', motivo: 'la zona está retirada: elige otra' }]);
       }
       const despues = {
         nombre: cambio.nombre ?? antes.nombre, estado: cambio.estado ?? antes.estado,

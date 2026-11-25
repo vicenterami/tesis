@@ -24,7 +24,16 @@
   import { DE_A, FILTROS, camposDeFila, coincide, conAvisoQueSeCrean, contar, filtroInicial, fraseDeFila, resumenDeFila, resumenRevision, type FiltroLote } from './lib/revision';
 
   // `persona`: quién está dentro (su id, o «sistema»). Lo que guarda la memoria de la pestaña se retoma solo si lo leyó ella.
-  let { persona = null }: { persona?: string | null } = $props();
+  // `zonasEn`: los sitios donde la persona puede crear zonas (acción `ajustes`; docs/19 §4 U2); `sitioActivo`: el id del que nombra la cabecera
+  // del panel, que es el de por omisión (si ahí no tiene `ajustes`, el primero de la lista). Con al menos uno, la revisión ofrece crear las
+  // zonas que falten (la casilla, desmarcada) y, con más de uno, el selector del sitio; sin ninguno, una zona inexistente sigue siendo
+  // «No entra» con su remedio.
+  let { persona = null, zonasEn = [], sitioActivo = null }: { persona?: string | null; zonasEn?: { id: string; nombre: string }[]; sitioActivo?: string | null } = $props();
+  // Desmarcada por omisión (docs/19 §4 U2): marcada, una zona mal escrita entraría como zona nueva sin que se notara; crear zonas es una decisión explícita.
+  let crearZonas = $state(false);
+  let elegido = $state<string | null>(null);
+  const sitioZonas = $derived(zonasEn.find((x) => x.id === elegido) ?? zonasEn.find((x) => x.id === sitioActivo) ?? zonasEn[0] ?? null);
+  const conZonasNuevas = (c: Record<string, unknown>): Record<string, unknown> => (crearZonas && sitioZonas !== null ? { ...c, zonas_nuevas_en: sitioZonas.id } : c);
   retomarLoteDe(untrack(() => persona));
   const uid = $props.id();
   const PASOS = ['Origen', 'Revisión', 'Resultado'] as const;
@@ -43,6 +52,8 @@
   // Mientras se lee un archivo nuevo, el anterior ya no cuenta y «Revisar las filas» espera (bloque S, punto 10).
   let leyendo = $state(false);
   let zonasPorNombre = $state<ZonaPorNombre[]>([]);
+  let zonasExcedidas = $state<{ pedidas: number; maximo: number } | null>(null); // el archivo pediría más zonas nuevas que el tope por lote (U2)
+  const zonasNuevas = $derived(zonasPorNombre.filter((z) => z.nueva === true)); // las que se crearán al confirmar (U2)
   let pegado = $state('');
   let informe = $state<FilaInforme[] | null>(null);
   let huella = $state<string | null>(null);
@@ -124,6 +135,7 @@
     informe = null;
     huella = null;
     zonasPorNombre = [];
+    zonasExcedidas = null;
     errorLote = null;
   }
   // Cada cambio de origen (archivo o pegado) es una generación nueva: cancela la revisión en vuelo y descarta lo que una lectura o una
@@ -134,7 +146,14 @@
     carga.cancelar();
     validando = false;
     olvidarRevision();
+    olvidarZonasNuevas();
     return generacion;
+  }
+  // Otro origen, o volver al paso 1: la casilla de zonas nuevas vuelve a desmarcada y el sitio a su valor por omisión (docs/19 §4 U2). Crear
+  // zonas es una decisión sobre UN archivo revisado; no se arrastra al siguiente.
+  function olvidarZonasNuevas(): void {
+    crearZonas = false;
+    elegido = null;
   }
   async function leerArchivo(ev: Event): Promise<void> {
     const entrada = ev.currentTarget as HTMLInputElement;
@@ -202,10 +221,11 @@
       errorLote = null;
       huella = null;
       zonasPorNombre = [];
+      zonasExcedidas = null;
       abrirRevision(locales());
       return;
     }
-    const cuerpo = { filas: filasArchivo };
+    const cuerpo = conZonasNuevas({ filas: filasArchivo });
     errorLote = null;
     if (excedeBytes(cuerpo, plantilla)) {
       mostrarError({ caso: 'archivo_pesado', texto: textoPesado(new TextEncoder().encode(JSON.stringify(cuerpo)).length, plantilla.max_bytes), accion: ACCION_DE.archivo_pesado, detalles: [] });
@@ -219,6 +239,7 @@
       if (mia !== generacion) return; // el origen cambió mientras tanto: esta respuesta es de otro
       huella = r.huella;
       zonasPorNombre = r.zonas_por_nombre ?? [];
+      zonasExcedidas = r.zonas_nuevas_excedidas ?? null;
       abrirRevision(mezclarPlan(r.filas, locales()));
     } catch (e) {
       if (!esCancelacion(e) && mia === generacion) mostrarError(explicarError(e, { operacion: 'validar' }));
@@ -226,9 +247,22 @@
       if (mia === generacion) validando = false;
     }
   }
+  // Marcar o desmarcar la casilla con una revisión en vuelo: esa respuesta ya es de otra pregunta; se descarta y se revisa de nuevo (sin esto,
+  // el cambio se ignoraba y la revisión en pantalla no correspondía a la casilla).
+  function cambiarCasillaZonas(): void {
+    generacion++;
+    carga.cancelar();
+    validando = false;
+    void revisar();
+  }
   function volver(): void {
     if (creandoLote) return;
+    // Una revisión en vuelo (la que dispara la casilla) se descarta: si no, al llegar reabriría el paso 2 con la casilla ya reiniciada.
+    generacion++;
+    carga.cancelar();
+    validando = false;
     olvidarRevision();
+    olvidarZonasNuevas();
     paso = 1;
   }
 
@@ -268,7 +302,7 @@
   async function crearValidas(filas: number[]): Promise<void> {
     if (creandoLote || filas.length === 0 || huella === null) return;
     const pedidas = new Set(filas);
-    const cuerpo = { filas: filasArchivo.filter((f) => pedidas.has(f.n)), huella };
+    const cuerpo = conZonasNuevas({ filas: filasArchivo.filter((f) => pedidas.has(f.n)), huella });
     creandoLote = true;
     errorLote = null;
     try {
@@ -297,6 +331,7 @@
         const porFila = new Map(plan.filas.map((f) => [f.n, f]));
         huella = plan.huella;
         zonasPorNombre = plan.zonas_por_nombre ?? zonasPorNombre;
+        zonasExcedidas = plan.zonas_nuevas_excedidas ?? null;
         abrirRevision(visto.map((f) => porFila.get(f.n) ?? f));
       }
       mostrarError(x);
@@ -349,6 +384,7 @@
     pegado = '';
     creadas = 0;
     olvidarRevision();
+    olvidarZonasNuevas();
     borradorLote.archivo = null;
     borradorLote.filas = [];
     borradorLote.noEntran = [];
@@ -505,10 +541,35 @@
         <p data-avisos-lote>{avisadas === 1 ? '1 fila que se crea trae avisos' : `${avisadas} filas que se crean traen avisos`}:
           <Boton etiqueta="Ver las filas con aviso" variante="discreto" onclick={() => elegirFiltro('aviso')} data-ver-avisos /></p>
       {/if}
-      {#if zonasPorNombre.length > 0}
+      {#if sitioZonas !== null}
+        <!-- Zonas nuevas desde el alta (docs/19 §4 U2): en el sitio activo del panel, o en otro de los suyos si puede elegir; cambiar la casilla o el sitio vuelve a revisar. -->
+        <div data-crear-zonas-lote>
+          <label class="casilla"><input type="checkbox" bind:checked={crearZonas} disabled={creandoLote} onchange={cambiarCasillaZonas} data-casilla-crear-zonas />
+            Crear las zonas que no existan en{#if zonasEn.length === 1}{' '}«{sitioZonas.nombre}»{/if}</label>
+          {#if zonasEn.length > 1}
+            <select value={sitioZonas.id} onchange={(e) => { elegido = e.currentTarget.value; if (crearZonas) cambiarCasillaZonas(); }} disabled={creandoLote}
+              aria-label="Sitio donde crear las zonas" data-sitio-zonas-lote>
+              {#each zonasEn as x (x.id)}<option value={x.id}>{x.nombre}</option>{/each}
+            </select>
+          {/if}
+        </div>
+      {/if}
+      {#if zonasExcedidas !== null}
+        <p class="aviso-publico" role="status" data-zonas-excedidas>
+          El archivo crearía {zonasExcedidas.pedidas} zonas nuevas y el máximo por lote es {zonasExcedidas.maximo}. Si se corrió una columna, corrige el archivo; si de
+          verdad son tantas, créalas antes en Ajustes del sitio → Zonas o divide el archivo.
+        </p>
+      {/if}
+      {#if zonasNuevas.length > 0}
+        <p class="aviso-publico" role="status" data-zonas-nuevas-lote>
+          Se crearán {zonasNuevas.length === 1 ? '1 zona nueva' : `${zonasNuevas.length} zonas nuevas`} en «{zonasNuevas[0]!.sitio}»:
+          {zonasNuevas.map((z) => `${z.zona} (${z.filas === 1 ? '1 fila' : `${z.filas} filas`})`).join(', ')}. Revisa que estén bien escritas: se crean al confirmar.
+        </p>
+      {/if}
+      {#if zonasPorNombre.length > zonasNuevas.length}
         <!-- La zona escrita por su nombre se dice una vez, no como aviso en cada fila (bloque S, punto 3). -->
         <ul class="zonas-lote" aria-label="Zonas escritas por su nombre" data-zonas-lote>
-          {#each zonasPorNombre as z, i (i)}<li>Zona «{z.zona}» → sitio «{z.sitio}»: {z.filas === 1 ? '1 fila' : `${z.filas} filas`}</li>{/each}
+          {#each zonasPorNombre.filter((z) => z.nueva !== true) as z, i (i)}<li>Zona «{z.zona}» → sitio «{z.sitio}»: {z.filas === 1 ? '1 fila' : `${z.filas} filas`}</li>{/each}
         </ul>
       {/if}
       <p data-resumen-lote><strong>{resumenRevision(conteo)}</strong></p>

@@ -62,11 +62,29 @@ describe('P14 Actividad', () => {
   it('los rótulos del filtro son los de los códigos reales del servidor (eventos y resultados de acceso)', () => {
     const reales = ['ok', 'cierre', 'bloqueado', 'clave_incorrecta', 'inactivo', 'alta', 'baja', 'rotacion', 'reglas_cambiadas', 'dispositivo_configurado',
       'canal_calibrado', 'condicion_abierta', 'condicion_cerrada', 'pasarela_alta', 'pasarela_baja', 'pasarela_rotacion', 'usuario_alta', 'usuario_cambio',
-      'usuario_baja', 'usuario_clave', 'terminos_aceptados', 'espera_primera_trama'];
+      'usuario_baja', 'usuario_clave', 'terminos_aceptados', 'espera_primera_trama', 'sitio_alta', 'sitio_cambio', 'zona_alta', 'zona_cambio'];
     expect(Object.keys(ROTULO_TIPO_ACTIVIDAD).sort()).toEqual([...reales].sort());
     expect(rotuloTipoActividad('ok')).toBe('Entradas');
     expect(rotuloTipoActividad('cierre')).toBe('Salidas');
     expect(rotuloTipoActividad('tipo_futuro')).toBe('tipo futuro');
+  });
+
+  it('sitios y zonas (docs/19 §4, U): sus cuatro tipos tienen rótulo en el filtro y su frase, escrita por el servidor, se ve tal cual', async () => {
+    const filas = [
+      { tipo: 'sitio_alta', texto: 'creó el sitio «Sede Norte»' }, { tipo: 'sitio_cambio', texto: 'cambió el nombre del sitio «Sede Norte» a «Sede Sur»' },
+      { tipo: 'zona_alta', texto: 'creó la zona «Patio» al dar de alta por lote' }, { tipo: 'zona_cambio', texto: 'retiró la zona «Patio»' },
+    ].map((x, i) => ({ instante: `2026-11-24T1${i}:00:00Z`, clase: 'evento', usuario: null, dispositivo: null, ...x }));
+    vi.stubGlobal('fetch', vi.fn(async (ruta: string) => {
+      peticiones.push(ruta);
+      if (ruta === '/usuarios') return new Response('[]');
+      return new Response(JSON.stringify(filas));
+    }));
+    render(Actividad, { filtros: SIN_FILTROS_ACTIVIDAD, sesion: sesion('administrador'), sitios: SITIOS });
+    await waitFor(() => expect(document.querySelectorAll('[data-fila-actividad]')).toHaveLength(4));
+    const texto = document.body.textContent ?? '';
+    for (const f of filas) expect(texto).toContain(f.texto);
+    const tipo = document.querySelector('[data-filtro-tipo]') as HTMLSelectElement;
+    expect([...tipo.options].map((o) => o.textContent)).toEqual(['todos', 'Sitios creados', 'Cambios de sitios', 'Zonas creadas', 'Cambios de zonas (nombre, retirada)']);
   });
 
   it('en teléfono, tarjetas (sin tabla); sin sitios que administre, lo dice y no pide nada', async () => {
