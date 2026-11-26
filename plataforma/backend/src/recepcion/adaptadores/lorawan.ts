@@ -60,29 +60,34 @@ export function anotarFcnt(v: unknown, ctx: ContextoTrama): void {
   ctx.fcnt = v;
 }
 
-// La señal del enlace de la trama (docs/10 §8.4 punto 71): del arreglo `rxInfo`, el MEJOR receptor, el de mayor SNR y, en empate, el de mayor
-// RSSI (el SNR satura con señal fuerte). El SNR se llama `snr` en ChirpStack v4 y `loRaSNR` en la pasarela Milesight sin códec. Un valor que no
-// es un número finito se omite; un elemento sin ningún número no compite; un `rxInfo` vacío, ausente o que no es un arreglo no deja nada.
-// `snrAusenteEsCero`: en ChirpStack v4 el elemento es un `gw.UplinkRxInfo` serializado con pbjson SIN `emit_fields()` (api/rust/build.rs),
-// así que un SNR de 0 dB llega ausente; un elemento con `rssi` y sin `snr` vale 0 dB. En la pasarela Milesight, ausente es ausente.
+// La señal del enlace de la trama (docs/10 §8.4 punto 71): del arreglo `rxInfo`, el MEJOR receptor, el de mayor SNR medido y, en empate (o
+// entre receptores sin SNR medido), el de mayor RSSI (el SNR satura con señal fuerte). El SNR se llama `snr` en ChirpStack v4 y `loRaSNR` en
+// la pasarela Milesight sin códec. Un valor que no es un número finito se omite; un elemento sin ningún número no compite; un `rxInfo` vacío,
+// ausente o que no es un arreglo no deja nada.
+// `inferirSnr`: en ChirpStack v4 el elemento es un `gw.UplinkRxInfo` serializado con pbjson SIN `emit_fields()` (api/rust/build.rs), así
+// que un SNR de 0 dB llega ausente. Quien llama lo pide solo con modulación LoRa declarada en la trama (con FSK no hay SNR que omitir). Ese 0
+// se infiere solo con un RSSI dentro de −150 a 0 dBm y NO compite como medido: para elegir el receptor cuenta como «sin SNR», así que nunca
+// le gana a uno con SNR real (corrección del 25/11/2026). En la pasarela Milesight, ausente es ausente.
 // Nunca lanza: la señal no es un dato del sensor y no puede mandar la trama a cuarentena.
-export function enlaceDe(rxInfo: unknown, snrAusenteEsCero = false): Enlace | undefined {
+export function enlaceDe(rxInfo: unknown, inferirSnr = false): Enlace | undefined {
   if (!Array.isArray(rxInfo)) return undefined;
   const numero = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
-  let mejor: Enlace | undefined;
+  const peso = (x: number | undefined): number => x ?? -Infinity;
+  let mejor: { rssi?: number; snr?: number; medido?: number } | undefined;
   for (const r of rxInfo as unknown[]) {
     if (typeof r !== 'object' || r === null || Array.isArray(r)) continue;
     const e = r as Record<string, unknown>;
     const rssi = numero(e.rssi);
-    let snr = numero(e.snr) ?? numero(e.loRaSNR);
-    if (snr === undefined && snrAusenteEsCero && rssi !== undefined && !('snr' in e) && !('loRaSNR' in e)) snr = 0;
+    const medido = numero(e.snr) ?? numero(e.loRaSNR);
+    let snr = medido;
+    if (snr === undefined && inferirSnr && rssi !== undefined && rssi >= -150 && rssi <= 0 && !('snr' in e) && !('loRaSNR' in e)) snr = 0;
     if (rssi === undefined && snr === undefined) continue;
-    const peso = (x: number | undefined): number => x ?? -Infinity;
-    if (mejor === undefined || peso(snr) > peso(mejor.snr) || (peso(snr) === peso(mejor.snr) && peso(rssi) > peso(mejor.rssi))) {
-      mejor = { ...(rssi !== undefined ? { rssi } : {}), ...(snr !== undefined ? { snr } : {}) };
+    if (mejor === undefined || peso(medido) > peso(mejor.medido) || (peso(medido) === peso(mejor.medido) && peso(rssi) > peso(mejor.rssi))) {
+      mejor = { rssi, snr, medido };
     }
   }
-  return mejor;
+  if (mejor === undefined) return undefined;
+  return { ...(mejor.rssi !== undefined ? { rssi: mejor.rssi } : {}), ...(mejor.snr !== undefined ? { snr: mejor.snr } : {}) };
 }
 
 // Traduce las claves conocidas a lecturas; las desconocidas se anotan en ctx.ignoradas para la línea de registro de la trama.
@@ -91,22 +96,26 @@ export function lecturasDe(valores: Record<string, unknown>, resolver: ResolverC
   excluir: ReadonlySet<string> = new Set()): Lectura[] {
   const lecturas: Lectura[] = [];
   const ignoradas: string[] = [];
+  const crudas: string[] = [];
   for (const [clave, valor] of Object.entries(valores)) {
     if (excluir.has(clave)) continue;
     const destino = resolver(clave);
     if (!destino) {
       ignoradas.push(limpiaClave(clave));
+      crudas.push(clave);
       continue;
     }
     if (typeof valor !== 'number' || !Number.isFinite(valor)) throw new TramaMalformada(`${limpiaClave(clave)}: no es un número`);
     // Dos claves que apuntan a la misma magnitud (un sinónimo, otra mayúscula): vale la primera; la otra se anota como ignorada.
     if (lecturas.some((l) => l.magnitud === destino.magnitud)) {
       ignoradas.push(`${limpiaClave(clave)} (repetida)`);
+      crudas.push(clave);
       continue;
     }
     lecturas.push({ magnitud: destino.magnitud, valor, unidad: destino.unidad, tiempo });
   }
   ctx.ignoradas = ignoradas;
+  ctx.ignoradasCrudas = crudas;
   if (lecturas.length === 0) {
     const vistas = ignoradas.slice(0, MAX_LISTA).join(', ') + (ignoradas.length > MAX_LISTA ? ', …' : '');
     throw new TramaMalformada(`ninguna clave conocida${vistas ? ` (llegaron: ${vistas})` : ''}`);
@@ -125,5 +134,6 @@ export function decodificarData(ctx: ContextoTrama, data: unknown, tiempo: Date 
   if (!ctx.receta) throw new TramaMalformada(`perfil de decodificación desconocido: ${limpia(ctx.decodificador ?? '')}`);
   if (typeof data !== 'string' || data === '' || !BASE64.test(data)) throw new TramaMalformada('data no es base64');
   ctx.ignoradas = [];
+  ctx.ignoradasCrudas = [];
   return aplicarReceta(ctx.receta, Buffer.from(data, 'base64')).map((l) => ({ ...l, tiempo }));
 }

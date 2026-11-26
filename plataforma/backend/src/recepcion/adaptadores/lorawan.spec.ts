@@ -311,7 +311,15 @@ describe('enlaceDe: la señal del mejor receptor de rxInfo', () => {
     expect(enlaceDe([{ rssi: -80 }])).toEqual({ rssi: -80 });
     expect(enlaceDe([{ rssi: -80, snr: 'roto' }], true)).toEqual({ rssi: -80 }); // presente e inválido no es «ausente»
     expect(enlaceDe([{ gatewayId: 'aaaaaaaaaaaaaaaa' }], true)).toBeUndefined(); // sin RSSI no hay evidencia de que la pasarela midiera
-    expect(enlaceDe([{ rssi: -80 }, { rssi: -60, snr: -1 }], true)).toEqual({ rssi: -80, snr: 0 }); // el 0 compite como cualquier SNR
+  });
+  // Corrección del 25/11/2026 (docs/10 §8.4 punto 71): el 0 inferido no es una medición. No le gana a un receptor con SNR real (antes,
+  // [{−100}, {−80, −15}] elegía la pasarela peor con un SNR inventado) y no se infiere con un RSSI fuera de −150 a 0 dBm.
+  it('el SNR inferido no compite como medido; entre receptores sin SNR medido decide el RSSI; con un RSSI imposible no se infiere', () => {
+    expect(enlaceDe([{ rssi: -100 }, { rssi: -80, snr: -15 }], true)).toEqual({ rssi: -80, snr: -15 });
+    expect(enlaceDe([{ rssi: -80 }, { rssi: -60, snr: -1 }], true)).toEqual({ rssi: -60, snr: -1 });
+    expect(enlaceDe([{ rssi: -100 }, { rssi: -70 }], true)).toEqual({ rssi: -70, snr: 0 });
+    expect(enlaceDe([{ rssi: 50 }], true)).toEqual({ rssi: 50 });
+    expect(enlaceDe([{ rssi: -151 }], true)).toEqual({ rssi: -151 });
   });
 });
 
@@ -321,10 +329,15 @@ describe('los adaptadores dejan la señal en ctx.enlace y no cambian sus lectura
     expect(new ChirpstackAdaptador().analizar(c).map((l) => l.magnitud)).toEqual(['temperatura', 'humedad']);
     expect(c.enlace).toEqual({ rssi: -36, snr: 10.5 });
   });
-  it('ChirpStack: un receptor sin snr (0 dB omitido por el JSON) → snr 0; sin rxInfo → nada', () => {
+  it('ChirpStack: un receptor sin snr (0 dB omitido por el JSON) → snr 0 solo con modulación LoRa declarada; con FSK o sin txInfo, no; sin rxInfo → nada', () => {
     const c = ctx(eventoUp({ rxInfo: [{ gatewayId: 'aaaaaaaaaaaaaaaa', rssi: -101 }] }));
     new ChirpstackAdaptador().analizar(c);
     expect(c.enlace).toEqual({ rssi: -101, snr: 0 });
+    for (const txInfo of [{ frequency: 868100000, modulation: { fsk: { datarate: 50000 } } }, undefined, { frequency: 868100000 }]) {
+      const otra = ctx(eventoUp({ rxInfo: [{ gatewayId: 'aaaaaaaaaaaaaaaa', rssi: -101 }], txInfo }));
+      new ChirpstackAdaptador().analizar(otra);
+      expect(otra.enlace).toEqual({ rssi: -101 });
+    }
     const sin = ctx(eventoUp({ rxInfo: undefined }));
     new ChirpstackAdaptador().analizar(sin);
     expect(sin.enlace).toBeUndefined();

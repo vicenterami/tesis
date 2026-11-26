@@ -79,6 +79,7 @@ async function principal() {
   };
   const up = (deveui: string, rxInfo: unknown, objeto: object = { temperature: 21.5 }, segundos = 0) => Buffer.from(JSON.stringify({
     time: new Date(Date.now() - 30_000 + segundos * 1000).toISOString(), deviceInfo: { devEui: deveui }, object: objeto, rxInfo,
+    txInfo: { frequency: 916800000, modulation: { lora: { bandwidth: 125000, spreadingFactor: 7, codeRate: 'CR_4_5' } } }, // como lo manda ChirpStack v4
   }));
   const topico = (deveui: string) => `sitio/en-campus/pasarela/en-pasarela/${deveui}/up`;
   const lecturas = async (id: string): Promise<string> => (await q(`SELECT string_agg(c.magnitud_codigo || '=' || m.valor, ',' ORDER BY m.tiempo, c.magnitud_codigo) AS s
@@ -124,7 +125,7 @@ async function principal() {
     comprobar((await lecturas(con)).endsWith('rssi=-95,temperatura=22') && await cuarentenas(con) === 0,
       'snr de 40 dB (fuera de −32 a 32): se omite SIN cuarentena; el rssi y la lectura se guardan', await lecturas(con));
     await recepcion.procesar(topico(CON), up(CON, [{ rssi: -101 }], { temperature: 23 }, 10));
-    comprobar((await lecturas(con)).endsWith('rssi=-101,snr=0,temperatura=23'), 'ChirpStack: un receptor con rssi y sin snr (0 dB omitido por el JSON) → snr 0', await lecturas(con));
+    comprobar((await lecturas(con)).endsWith('rssi=-101,snr=0,temperatura=23'), 'ChirpStack con modulación LoRa: un receptor con rssi y sin snr (0 dB omitido por el JSON) → snr 0', await lecturas(con));
     await recepcion.procesar(topico(CON), up(CON, RX, { temperature: 999 }, 15));
     comprobar(!(await lecturas(con)).includes('999') && (await lecturas(con)).split(',').length === 8 && await cuarentenas(con) === 1,
       'sin una lectura del sensor guardada (999 °C), la señal no se guarda; la cuarentena es la del sensor', await lecturas(con));
@@ -149,8 +150,11 @@ async function principal() {
     await recepcion.procesar(topico(SIN), up(SIN, RX, { temperature: 20, co2: 415 }, 20));
     r = await pedir(operador, 'GET', `/dispositivos/${sin}/sin-guardar`);
     const claves = (r.cuerpo.claves ?? []) as { clave: string; magnitud: string | null; valor: number | null; origen: string }[];
-    comprobar(r.estado === 200 && JSON.stringify(claves.map((c) => [c.clave, c.magnitud, c.valor, c.origen])) === JSON.stringify([['co2', null, 415, 'carga'], ['rssi', 'rssi', -87, 'enlace'], ['snr', 'snr', 7.5, 'enlace']]),
-      'GET …/sin-guardar: relee las tramas retenidas y ofrece lo que el equipo no guarda (co2 sin magnitud, la señal con la suya)', JSON.stringify(r.cuerpo));
+    comprobar(r.estado === 200 && JSON.stringify(claves.map((c) => [c.clave, c.magnitud, c.valor, c.origen])) === JSON.stringify([['rssi', 'rssi', -87, 'enlace'], ['snr', 'snr', 7.5, 'enlace'], ['co2', null, 415, 'carga']]),
+      'GET …/sin-guardar: relee las tramas retenidas y ofrece lo que el equipo no guarda (primero la señal, con su magnitud; después co2, sin ella)', JSON.stringify(r.cuerpo));
+    r = await pedir(operador, 'GET', `/dispositivos/${sin}/sin-guardar`);
+    comprobar(r.estado === 429 && r.cuerpo.codigo === 'sin_guardar_espera' && typeof r.cuerpo.reintentar_en_s === 'number' && r.cuerpo.reintentar_en_s > 0,
+      'GET …/sin-guardar otra vez antes de 10 s, la misma persona y el mismo equipo → 429 sin_guardar_espera con reintentar_en_s', `${r.estado} ${JSON.stringify(r.cuerpo)}`);
     r = await pedir(operador, 'GET', `/dispositivos/${con}/sin-guardar`);
     comprobar(r.estado === 200 && !JSON.stringify(r.cuerpo.claves).includes('"rssi"'), 'GET …/sin-guardar de un equipo con rssi y snr: la señal no se ofrece', JSON.stringify(r.cuerpo));
     comprobar(Number((await q('SELECT count(*) AS n FROM trama WHERE dispositivo_id = $1', [sin])).rows[0].n) >= 1, 'releer no escribe: las tramas siguen ahí y no hay tabla nueva');

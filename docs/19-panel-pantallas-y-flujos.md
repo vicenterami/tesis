@@ -1997,7 +1997,8 @@ antes del código; la regla del pipeline, en `docs/10 §8.4` punto 71).**
    «Nodo» (snr)».
 4. **«Red → Calidad del enlace»**, después de la entrega: una lista por equipo con canal de señal (`enlace[]` de
    `GET /sitios/{id}/resumen`): nombre, última intensidad y última relación señal/ruido con su unidad, y hace cuánto; sin lectura todavía,
-   «sin lecturas de señal»; de peor a mejor (sin lectura primero, después por intensidad). Debajo, dos gráficas del sitio, «Intensidad de
+   «sin lecturas de señal»; de peor a mejor (sin lectura primero, después por intensidad), hasta 50 equipos (`total_enlace` dice cuántos
+   hay; con más, una línea lo dice). Debajo, dos gráficas del sitio, «Intensidad de
    la señal» y «Relación señal/ruido», con el histórico del sitio que ya existe (`…/historico?magnitud=rssi|snr`). Sin equipos con esos
    canales, una línea dice cómo agregarlos (P6 o el alta). No clasifica la señal en «buena» o «mala»: no hay fuente que lo sostenga.
 5. **Tarjetas y «Tendencias».** La señal es salud del equipo: en la tarjeta de «Ahora» va al final, después de la batería y la tensión
@@ -2011,7 +2012,10 @@ antes del código; la regla del pipeline, en `docs/10 §8.4` punto 71).**
    demás, «pídelo a quien administra el sistema». Sin nada que ofrecer, una línea lo dice con cuántas tramas se revisaron. **De dónde
    sale** (decidido para no guardar nada nuevo): de las tramas ya retenidas del equipo, `trama` (30 días) y `cuarentena`, las 20 más
    recientes, releídas con el adaptador de su formato en cada petición (`GET /dispositivos/{id}/sin-guardar`, `docs/10 §8.4` punto 72).
-   Ninguna tabla ni columna nueva: lo que se muestra vence con la retención de las tramas.
+   Ninguna tabla ni columna nueva: lo que se muestra vence con la retención de las tramas. Primero la señal y las claves con magnitud;
+   a lo más 50. **Topes** (`docs/10 §8.4` punto 72 i): una relectura a la vez en el servidor y una cada 10 s por persona y equipo (si no,
+   429 con `reintentar_en_s`, y el aviso de siempre: «Demasiados intentos: espera N s y reintenta»); 5 s como máximo (si no, 503 y «La
+   relectura tardó demasiado: inténtalo de nuevo»). Ninguno de esos avisos borra la lista que ya se ve, y «Volver a revisar» la repide.
 7. **«Elegir qué ver» por persona** (RF-56, HU-29; ampliación del 25/11/2026, rediseñada tras la refutación). Nada oculto por omisión:
    la persona marca qué magnitudes NO quiere ver en el Resumen («Ahora») y en «Tendencias»; se guarda en sus preferencias
    (`preferencia.magnitudes_ocultas`, migración 30, a lo más 50 códigos). **Dónde se cambia:** el botón «Elegir qué ver» del Resumen (una
@@ -2021,7 +2025,7 @@ antes del código; la regla del pipeline, en `docs/10 §8.4` punto 71).**
    siendo como mucho tres); el panel la aplica en «Tendencias» antes de cortar en seis. **Dónde no:** la ficha muestra siempre todo, «Red»
    muestra siempre el enlace y el usuario del sistema (sin persona) ve todo. El Resumen dice cuántas oculta («2 magnitudes ocultas:
    Elegir qué ver»), para que nadie crea que no se miden; y cada tarjeta, cuántas de sus magnitudes oculta («Todas sus magnitudes están
-   ocultas por «Elegir qué ver»: se ven en su ficha»), sin perder su estado «Alerta» ni su lugar (revisión del 25/11/2026).
+   ocultas por «Elegir qué ver»: se ven en su ficha»), sin perder su estado «Alerta» ni su lugar (corrección del 25/11/2026).
 8. **Responsivo.** Todo lo nuevo de este bloque se lee y se usa a 390 px sin desplazamiento horizontal y con objetivos táctiles de al
    menos `--objetivo`, y a 1 280 px; con los componentes y estilos del panel (`Boton`, `Aviso`, `.panel-seccion`, `.marcar`). El recorrido en
    navegadores, `panel/e2e/enlace.mjs` con su guion `pruebas/panel-enlace-e2e.sh`, comprueba el desborde en los dos anchos.

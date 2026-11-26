@@ -1,4 +1,4 @@
-# Casos de validación compartidos por las tres implementaciones de las reglas de `configurar` (revisión del 25/11/2026): el firmware
+# Casos de validación compartidos por las tres implementaciones de las reglas de `configurar` (corrección del 25/11/2026): el firmware
 # (include/protocolo.h, herramientas/prueba-protocolo.cpp), el guion (cargar-equipo.py, prueba_cargar_equipo.py) y el panel (lib/serie.ts,
 # lib/serie.test.ts). Cada línea: el campo que debe rechazarse (o «ninguno») <TAB> un fragmento JSON que reemplaza ese campo en una orden
 # válida. Con un nulo (\u0000) el firmware rechaza la línea entera como mal formada antes de mirar los campos: también es un rechazo.

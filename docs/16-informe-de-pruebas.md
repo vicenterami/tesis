@@ -4,7 +4,7 @@ Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emu
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
 cubría al escribirse se agregó después: TT-32 (sensor físico) en §43, §44 y §53, y TT-30 (recuperación ante reinicio) en §11. El
-contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 1051 pruebas unitarias del backend y 702 del panel.
+contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 1057 pruebas unitarias del backend y 704 del panel.
 Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -962,6 +962,7 @@ rechazado en `mqtt`, el alta con perfil, la captura decodificada, el `fCnt` repe
 **Lo que no prueba todavía:** la pasarela real ni el puente de Mosquitto (prueba en la misma red local prevista para el 20/10/2026);
 un `fCnt` igual a 0 en ChirpStack, que el JSON de Protocol Buffers omite, no se deduplica; una repetición no consecutiva (N, N+1, N)
 pasa el filtro 3 y solo la absorbe el índice único si trae la misma hora (`docs/10 §4.1`).
+*Nota del 25/11/2026: ChirpStack v4 sí emite el `fCnt` 0; lo corregido y su prueba, en §106.*
 
 **Revisión del bloque (16/10):** el diagrama de secuencia y el comentario del filtro 6 no mostraban el contador (corregidos y
 regenerada la figura); una trama que repetía el `fCnt` y el adaptador no entendía se anotaba además como «repetida» (corregido:
@@ -5946,7 +5947,7 @@ archivo del plugin del broker y sin clave, que no quede ningún cliente de la co
 de abajo, y la clave de la red enviada en una petición): 26 de 82 comprobaciones de Chromium fallaron, cada una por su causa (la clave en
 el DOM, la carga que se corta en «otro firmware», «ninguna clave en las peticiones»); restaurado, 82 de 82 (84 con el caso del permiso).
 
-**Correcciones de la revisión de seguridad** (cada una con su prueba, que falla sin ella):
+**Correcciones de seguridad** (cada una con su prueba, que falla sin ella):
 
 - El panel y el guion tomaban un error de forma sin orden (`{"ok":false,"orden":"","error":"json"}`, lo que el firmware responde a una
   línea mal formada, por ejemplo un trozo que quedó en su búfer) como la respuesta a `hola` y decían «no tiene el firmware de la plataforma»
@@ -5964,7 +5965,7 @@ el DOM, la carga que se corta en «otro firmware», «ninguna clave en las petic
   `campo` o un `ultimo_error` del equipo que no es texto ya no lo corta; si el cable se desconecta con el puerto abierto, lo dice en una
   línea (antes, un error de Python).
 
-**Segunda revisión del mismo día (24 hallazgos; los aplicados, cada uno con su prueba, que falla sin él).**
+**Segunda tanda de correcciones del mismo día (cada una con su prueba, que falla sin ella).**
 
 - **La carrera del reinicio (la más grave).** Tras aceptar `configurar`, el firmware seguía contestando unos 300 ms con la configuración
   vieja; recargar el MISMO identificador (cambio de red, credencial rotada) tomaba el `hola` y el `estado` de la sesión vieja y decía «el
@@ -6018,9 +6019,9 @@ Hoy son 1010 pruebas unitarias del backend y 684 del panel.
 
 | Nivel | Con qué | Resultado |
 |---|---|---|
-| Unitarias del backend | vitest: `lorawan.spec.ts` (`enlaceDe`), `recepcion.service.spec.ts` (el pipeline con y sin los canales, el tope, el fCnt 0 de ChirpStack), `sin-guardar.spec.ts`, `agregar-canal.spec.ts`, `ahora.spec.ts`, `preferencias.spec.ts` | 1145 de 1145 ejecuciones en 82 archivos |
-| Unitarias del panel | vitest: `lib/senal.test.ts`, `Alta.test.ts` (las casillas de la señal junto a la ficha y «Cargar en el equipo»), `Configurar.test.ts`, `Tablero.test.ts`, `Preferencias.test.ts` | 824 de 824 ejecuciones en 50 archivos |
-| Integración en una base desechable | `plataforma/pruebas/enlace-integracion.sh` (todas las migraciones, sin red): la ruta, el resumen, la preferencia aplicada por la base, la 29 y la 30 dos veces y la semilla dos veces | 30 de 30 comprobaciones y 9 de las migraciones y la semilla |
+| Unitarias del backend | vitest: `lorawan.spec.ts` (`enlaceDe`), `recepcion.service.spec.ts` (el pipeline con y sin los canales, el tope, el fCnt 0 de ChirpStack), `sin-guardar.spec.ts`, `agregar-canal.spec.ts`, `ahora.spec.ts`, `preferencias.spec.ts` | 1151 de 1151 ejecuciones en 82 archivos |
+| Unitarias del panel | vitest: `lib/senal.test.ts`, `Alta.test.ts` (las casillas de la señal junto a la ficha y «Cargar en el equipo»), `Configurar.test.ts`, `Tablero.test.ts`, `Preferencias.test.ts` | 826 de 826 ejecuciones en 50 archivos |
+| Integración en una base desechable | `plataforma/pruebas/enlace-integracion.sh` (todas las migraciones, sin red): la ruta, el resumen, la preferencia aplicada por la base, la 29 y la 30 dos veces y la semilla dos veces | 31 de 31 comprobaciones y 9 de las migraciones y la semilla |
 | Banco: LoRaWAN | `banco.sh lorawan` | 47 de 47; la nueva: un nodo con `rssi` y `snr` guarda −46 dBm y 10,2 dB junto a sus 3 lecturas, sin cuarentena; las demás, con sus mismos conteos |
 | Banco: las cinco entradas | `banco.sh vias` | 28 de 28: las mismas 180 lecturas por cada entrada, sin pérdidas |
 | Navegadores reales | `plataforma/pruebas/panel-enlace-e2e.sh` (`e2e/enlace.mjs`; paso 4c), Chromium 158 y Firefox 159, a 390 y 1 280 px | 72 de 72 comprobaciones |
@@ -6042,7 +6043,7 @@ compartía un nodo entre los cuatro casos (tras «Agregar snr» del primero, los
 respuesta y esperaba una relación señal/ruido que el nodo no guarda; y una casilla de Preferencias medía 18 × 24 px a 390 px (corregida
 en `app.css`: la casilla ya no se encoge con un nombre largo).
 
-**Correcciones de la revisión propia** (cada una con su prueba, que falla sin ella):
+**Correcciones** (cada una con su prueba, que falla sin ella):
 
 - **La señal ya no hace rechazar una trama que sin ella entraba.** Las lecturas del enlace contaban contra el tope por emisor antes de
   decidir: con 598 de 600 aceptadas en la hora, una trama de 1 lectura del sensor entraba sin la señal y, con ella, se rechazaba entera.
@@ -6061,9 +6062,34 @@ en `app.css`: la casilla ya no se encoge con un nombre largo).
   adaptador y `docs/10 §4.1` decían que lo omitía. Ninguna lógica dependía de eso (el 0 presente nunca se compara y deja el contador en 0);
   una prueba nueva fija la re-unión con el 0 presente.
 
-**Lo que NO está probado.** Un ChirpStack real (la ruta C) y los dos nodos del campus con la señal declarada: hoy están desconectados, y
-de su señal real solo está el rango medido en el servidor el 24/11/2026 (migración 29). HU-15 queda en construcción hasta ver la señal de esas
+**Segunda tanda de correcciones del mismo día** (cada una con su prueba, que falla sin ella; los casos se reprodujeron antes con las
+funciones reales):
+
+- **La relectura de tramas tiene topes de concurrencia**, no solo por petición: una a la vez por proceso (429), una cada 10 s por persona y
+  equipo (429 con los segundos que faltan) y todas sus consultas en una sola conexión del grupo, en una transacción de solo lectura con
+  `statement_timeout` de 5 s, que la base cancela (503). Antes, cada petición podía tomar hasta cuatro conexiones del grupo que comparte con
+  la recepción, y el tiempo máximo era del cliente. Una carga de 64 KiB con 5 503 claves sigue costando de 70 a 85 ms de CPU por petición:
+  el tope es que haya una a la vez.
+- **Primero la señal y lo que tiene magnitud.** Con una trama de más de 50 claves desconocidas, `rssi` y `snr` no se ofrecían (50 claves,
+  0 de la señal); ahora van primero (50 claves, 2 de la señal). El valor se busca con la clave tal como llegó: una clave de 40 caracteres o
+  con un carácter invisible salía «sin valor numérico».
+- **El SNR inferido no compite como medido.** En ChirpStack, un receptor sin `snr` (que vale 0 dB) le ganaba a uno con SNR real negativo
+  y se guardaba la pasarela peor: de `[{−100 dBm}, {−80 dBm, −15 dB}]` salía `{−100, 0}`; ahora `{−80, −15}`. Solo se infiere con
+  modulación LoRa declarada en la trama y con un RSSI dentro de −150 a 0 dBm (`docs/10 §8.4` punto 71).
+- **La señal lleva su unidad** (dBm, dB): con otra canónica en el catálogo se omite, en vez de guardarse con la etiqueta equivocada; y
+  **no consume presupuesto si no se intentó** (sin ninguna lectura del sensor guardada). El motivo del rechazo por el tope cuenta las del
+  sensor y nombra aparte las de la señal.
+- **El panel:** si «Agregar una magnitud» se confirma y la relectura del equipo falla, dice que quedó agregada y que recargue (antes, un
+  error que invitaba a repetir); «el equipo ya la guardaba» cuando el servidor responde `agregada: false`; y «Volver a revisar» con el
+  tope del servidor dice cuánto esperar sin borrar la lista.
+- **El firmware y el guion:** tras `borrar`, la partición se vuelve a inicializar (ESP-IDF 4.4.7: «the partition has to be initialized
+  again to be used») y se guarda el contador de arranques (antes, dos `borrar` seguidos arrancaban los dos con el número 1); el guion
+  marca como el backend todo lo invisible de lo que manda el equipo (un U+202E invertía el identificador). Sin placa: la imagen compila
+  (`nodo`, `nodo-s3` y `diagnostico`, sin avisos en `src/` ni en `include/`); el arranque tras `borrar` se comprueba en el laboratorio.
+
+**Lo que NO está probado.** Un ChirpStack real (la ruta C) y los dos nodos del campus con la señal declarada; de su
+señal real solo está el rango medido en el servidor el 24/11/2026 (migración 29). HU-15 queda en construcción hasta ver la señal de esas
 tramas en «Red → Calidad del enlace» en el servidor (laboratorio aparte). Que el umbral de una magnitud de señal sirva para anticipar fallas
 no se evaluó: no se clasifica la señal en buena o mala sin una fuente que lo sostenga.
 
-Hoy son 1051 pruebas unitarias del backend y 702 del panel.
+Hoy son 1057 pruebas unitarias del backend y 704 del panel.

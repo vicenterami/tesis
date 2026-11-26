@@ -1636,8 +1636,9 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     unitarias del presupuesto, de la cuota, del cierre y de las tres entradas; `banco.sh tope` de punta a punta (HTTP para el presupuesto,
     MQTT para la cuota, y el cierre adelantando la ventana en la base); `docs/16 §42`. (vii) **Lecturas del enlace** (desde el 25/11/2026,
     punto 71): las de un nodo LoRaWAN que declaró `rssi` o `snr` se suman a las de la trama **antes** de decidir si cabe (una trama con 3
-    lecturas del sensor y 2 del enlace trae 5) y cuentan en `ventana_lecturas` como cualquier lectura examinada; un nodo sin esos canales
-    consume exactamente lo de antes. Pero la señal nunca hace rechazar una trama que sin ella cabía (revisión del 25/11/2026): si las del
+    lecturas del sensor y 2 del enlace trae 5) y cuentan en `ventana_lecturas` como cualquier lectura examinada, pero solo si se intentaron
+    (con al menos una del sensor guardada; corrección del 25/11/2026); el motivo de un rechazo por el tope cuenta las del sensor y nombra
+    aparte las de la señal; un nodo sin esos canales consume exactamente lo de antes, con el mismo motivo. Pero la señal nunca hace rechazar una trama que sin ella cabía (corrección del 25/11/2026): si las del
     sensor caben y con las del enlace no, se guardan las del sensor y la señal se omite, sin cuarentena, nombrada en la línea de registro
     («señal omitida por el tope»); si las del sensor no caben, la trama se rechaza entera como antes.
 54. **Tolerancia de desvío de la marca de pasarela y condición `reloj_desviado` (decidido el 21/10/2026).** Origen: en la prueba de
@@ -2064,11 +2065,15 @@ entra. Lo que aquí se marca «a fijar al implementar» es un detalle que el dis
     que no es un número finito se omite. **El SNR de 0 dB en ChirpStack v4:** el elemento de `rxInfo` es un `gw.UplinkRxInfo` (`float snr
     = 7`, `api/proto/gw/gw.proto`) que se serializa con `pbjson_build` **sin** `emit_fields()` («Output fields with their default values»,
     `pbjson-build/src/lib.rs`), a diferencia del propio `UplinkEvent`, que sí lo lleva (`api/rust/build.rs`, rama principal consultada el
-    25/11/2026: https://github.com/chirpstack/chirpstack/blob/master/api/rust/build.rs); por eso un SNR de 0 dB llega **ausente**. Regla:
-    en el formato `chirpstack`, un elemento con `rssi` numérico y sin `snr` vale SNR 0; en el de la pasarela Milesight, ausente es ausente.
+    25/11/2026: https://github.com/chirpstack/chirpstack/blob/master/api/rust/build.rs); por eso un SNR de 0 dB llega **ausente**. Regla
+    (corregida el 25/11/2026): en el formato `chirpstack`, un elemento con `rssi` numérico **dentro de −150 a 0 dBm** y sin `snr` vale SNR 0
+    **solo si la trama declara modulación LoRa** (`txInfo.modulation.lora`, `gw.UplinkTxInfo` y `gw.Modulation` en `api/proto/gw/gw.proto`,
+    commit `53f94c6`, consultado el 25/11/2026: con FSK o LR-FHSS no hay SNR que omitir). Ese 0 **inferido no compite como medido**: para
+    elegir el mejor receptor cuenta como «sin SNR», así que nunca le gana a un receptor con SNR real; si gana (por RSSI, entre receptores sin
+    SNR medido), se guarda 0. En el de la pasarela Milesight, ausente es ausente.
     (iii) **En el pipeline** (`recepcion.service.ts`): la consulta del filtro 1 trae las magnitudes declaradas del nodo; se suman las del
     enlace que el nodo declaró y que el sensor no envió en su carga (si el sensor manda su propio `rssi`, el derivado no se agrega: no se
-    mezclan dos orígenes); cuentan en el tope **antes** de decidir si la trama cabe, pero si las del sensor caben y con ellas no, se omiten y la trama entra (punto 53 vii; revisión del 25/11/2026); se procesan **al final**, después de
+    mezclan dos orígenes); cuentan en el tope **antes** de decidir si la trama cabe, pero si las del sensor caben y con ellas no, se omiten y la trama entra (punto 53 vii; corrección del 25/11/2026); se procesan **al final**, después de
     las del sensor, y solo si la trama dejó al menos una lectura guardada (una reentrega o un fCnt repetido no las agregan); fuera del
     rango del catálogo se **omiten sin cuarentena** y se nombran en la línea de registro de la trama (§4.1); guardadas, publican su
     evento en vivo y evalúan umbrales como cualquier lectura. **Límite aceptado:** con el sensor roto (ninguna lectura válida) y la radio
@@ -2093,15 +2098,23 @@ entra. Lo que aquí se marca «a fijar al implementar» es un detalle que el dis
     equipo no tiene como canal (una magnitud del catálogo sin canal, con su valor), las claves fuera del mapa (sin magnitud en el catálogo) y,
     en LoRaWAN, la señal del enlace (`rssi`, `snr`) si el equipo no la guarda. Por clave: la más reciente, con su último valor **numérico**
     (un texto no se muestra: puede ser cualquier cosa) y su instante; a lo más 50 claves y cada una recortada a 32 caracteres sin caracteres
-    invisibles (como en el registro). Una trama que el adaptador ya no entiende se salta. Costo acotado: 20 cargas de a lo más 64 KiB por
-    petición, sobre el índice (dispositivo, recibido_en) de cada tabla. Lo que se ve vence con la retención de las tramas.
+    invisibles (como en el registro), con el valor buscado por la clave tal como llegó (la recortada es solo para mostrar). **Orden:**
+    primero la señal del enlace y las claves con magnitud en el catálogo (las que se pueden agregar), después las que no la tienen; una
+    carga con miles de claves desconocidas no deja fuera la señal. Una trama que el adaptador ya no entiende se salta. Cada carga se
+    interpreta una sola vez. **Topes** (corrección del 25/11/2026: el costo por petición estaba acotado, pero no el de varias a la vez):
+    20 cargas de a lo más 64 KiB por petición, sobre el índice (dispositivo, recibido_en) de cada tabla; **una relectura a la vez por
+    proceso** (otra simultánea responde **429** `codigo: sin_guardar_ocupado`, con `reintentar_en_s: 5`); **una cada 10 s por persona y
+    equipo** (antes, **429** `codigo: sin_guardar_espera`, con los segundos que faltan en `reintentar_en_s`); todas sus
+    consultas en **una sola conexión** del grupo, en una transacción de solo lectura con `statement_timeout` de **5 s**, que la base
+    cancela en el servidor (vencido, **503** `codigo: sin_guardar_tiempo`, «la relectura tardó demasiado: inténtalo de nuevo»). Lo que se ve vence con la
+    retención de las tramas.
     (ii) **«Elegir qué ver».** `preferencia.magnitudes_ocultas text[] NOT NULL DEFAULT '{}'` (migración 30; a lo más 50, códigos con la forma
     del catálogo; `UPDATE` por columna para `plataforma_app`, repetido en la 14). `PUT /preferencias` sigue reemplazando todo y exige la lista
-    exacta de campos, salvo el nuevo: ausente, se conserva la lista guardada (revisión del 25/11/2026: obligatorio, una pestaña abierta con
+    exacta de campos, salvo el nuevo: ausente, se conserva la lista guardada (corrección del 25/11/2026: obligatorio, una pestaña abierta con
     el panel anterior al despliegue recibía 400 en cada «Guardar» hasta recargar; el panel nuevo siempre lo manda). `GET /sitios/{id}/ahora` lee la lista de la persona en la primera consulta (una subconsulta sobre `preferencia`, sin
     una consulta más) y la aplica al agregado por magnitud y, en el proceso, a los canales de cada equipo antes de elegir los tres; responde
     `ocultas` (los códigos que aplicó) y, en cada tarjeta, `canales_ocultos` (cuántos de sus canales deja fuera), para que el panel lo diga:
-    una tarjeta con todo oculto no queda muda y su estado «Alerta» se ve igual (revisión del 25/11/2026). Sin persona (la clave de administrador), nada se oculta. Una magnitud que ya no existe en la lista
+    una tarjeta con todo oculto no queda muda y su estado «Alerta» se ve igual (corrección del 25/11/2026). Sin persona (la clave de administrador), nada se oculta. Una magnitud que ya no existe en la lista
     no hace daño: no coincide con ningún canal.
 
 ## 9. Crecimiento, resiliencia y respaldo (aprobado el 06/10/2026)

@@ -27,12 +27,12 @@ const fila = (payload: Buffer, minuto: number, topico = `sitio/uct/pasarela/p/${
 describe('clavesSinGuardar', () => {
   it('ChirpStack: una magnitud del catálogo sin canal (por su alias), una clave sin magnitud con su número, un texto sin valor y la señal del enlace', () => {
     const r = clavesSinGuardar([fila(up({ temperature: 21.5, humidity: 55, co2: 412, firmware: 'v1.2' }), 1)], nodo(), ADAPTADORES);
-    expect(r).toEqual([
+    expect(r).toEqual([ // primero la señal y lo que tiene magnitud; después lo que no
+      { clave: 'rssi', magnitud: 'rssi', valor: -87, unidad: 'dBm', visto: '2026-11-25T12:01:00.000Z', origen: 'enlace' },
+      { clave: 'snr', magnitud: 'snr', valor: 7.5, unidad: 'dB', visto: '2026-11-25T12:01:00.000Z', origen: 'enlace' },
       { clave: 'humedad', magnitud: 'humedad', valor: 55, unidad: '%RH', visto: '2026-11-25T12:01:00.000Z', origen: 'carga' },
       { clave: 'co2', magnitud: null, valor: 412, unidad: null, visto: '2026-11-25T12:01:00.000Z', origen: 'carga' },
       { clave: 'firmware', magnitud: null, valor: null, unidad: null, visto: '2026-11-25T12:01:00.000Z', origen: 'carga' }, // un texto no se muestra
-      { clave: 'rssi', magnitud: 'rssi', valor: -87, unidad: 'dBm', visto: '2026-11-25T12:01:00.000Z', origen: 'enlace' },
-      { clave: 'snr', magnitud: 'snr', valor: 7.5, unidad: 'dB', visto: '2026-11-25T12:01:00.000Z', origen: 'enlace' },
     ]);
   });
   it('lo declarado no se ofrece; de dos tramas, el valor y la hora de la más reciente (aunque lleguen desordenadas)', () => {
@@ -54,7 +54,21 @@ describe('clavesSinGuardar', () => {
     expect(clavesSinGuardar([fila(up({ temperature: 1, ...muchas }, []), 1)], nodo(), ADAPTADORES)).toHaveLength(MAX_CLAVES_SIN_GUARDAR);
     expect(clavesSinGuardar([fila(up({ temperature: 1 }), 1)], nodo({ formato: 'otro' }), ADAPTADORES)).toEqual([]);
   });
-  // Tope de trabajo (revisión del 25/11/2026): una carga de 64 KiB con miles de claves desconocidas no se vuelve a leer por cada clave. Con
+  // Corrección del 25/11/2026: el tope de 50 se llenaba con las claves de la carga antes de mirar la señal, y el valor se buscaba con la
+  // clave ya recortada (32 caracteres, sin lo invisible): una clave larga o con un carácter invisible salía «sin valor numérico».
+  it('primero la señal y las claves con magnitud: 60 claves desconocidas no dejan fuera rssi, snr ni humedad, que van primero', () => {
+    const muchas = Object.fromEntries(Array.from({ length: 60 }, (_, i) => [`zz${i}`, i]));
+    const r = clavesSinGuardar([fila(up({ temperature: 1, ...muchas, humidity: 40 }), 1)], nodo(), ADAPTADORES);
+    expect(r).toHaveLength(MAX_CLAVES_SIN_GUARDAR);
+    expect(r.slice(0, 3).map((c) => c.clave)).toEqual(['rssi', 'snr', 'humedad']);
+    expect(r.slice(3).every((c) => c.magnitud === null)).toBe(true);
+  });
+  it('el valor se busca con la clave tal como llegó; la recortada es solo para mostrar', () => {
+    const larga = 'x'.repeat(40);
+    const r = clavesSinGuardar([fila(up({ temperature: 1, [larga]: 7, 'a\u202eb': 8 }, []), 1)], nodo(), ADAPTADORES);
+    expect(r.map((c) => [c.clave, c.valor])).toEqual([['x'.repeat(32), 7], ['a?b', 8]]);
+  });
+  // Tope de trabajo (corrección del 25/11/2026): una carga de 64 KiB con miles de claves desconocidas no se vuelve a leer por cada clave. Con
   // 20 tramas así, leerla otra vez por clave eran decenas de miles de JSON.parse de 64 KiB en el hilo del servidor.
   it('cada trama se interpreta a lo más dos veces (el adaptador y el valor de sus claves), tenga las claves que tenga', () => {
     const muchas = Object.fromEntries(Array.from({ length: 3000 }, (_, i) => [`clave_desconocida_${i}`, i]));

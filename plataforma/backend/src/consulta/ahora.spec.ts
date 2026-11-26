@@ -161,7 +161,7 @@ describe('TableroService.ahora: las magnitudes ocultas de la persona', () => {
     expect(r.dispositivos[0]?.canales_total).toBe(3);
     expect(r.dispositivos[0]?.canales_ocultos).toBe(2);
   });
-  // Revisión del 25/11/2026: ocultarlo todo no deja una tarjeta muda ni esconde una alerta. La tarjeta sigue (con su estado «Alerta» y en su
+  // Corrección del 25/11/2026: ocultarlo todo no deja una tarjeta muda ni esconde una alerta. La tarjeta sigue (con su estado «Alerta» y en su
   // orden) y dice cuántas magnitudes oculta la preferencia, para que el panel lo explique; las condiciones abiertas no dependen de esto.
   it('ocultando todas las magnitudes de un equipo en alerta, la tarjeta sigue, en alerta y primera, sin canales y con canales_ocultos', async () => {
     const { servicio } = base(2, { ocultas: ['temperatura', 'humedad', 'bateria', 'humedad_suelo', 'rssi'] });

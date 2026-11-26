@@ -30,7 +30,9 @@ export class ChirpstackAdaptador implements Adaptador {
     if (typeof info !== 'object' || info === null) throw new IdentidadNoVerificada('sin deviceInfo');
     exigirDevEui((info as Record<string, unknown>).devEui, ctx, 'deviceInfo.devEui');
     anotarFcnt(evento.fCnt, ctx);
-    ctx.enlace = enlaceDe(evento.rxInfo, true);
+    // El 0 dB ausente se infiere solo con modulación LoRa declarada (`txInfo.modulation.lora`, gw.proto; docs/10 §8.4 punto 71).
+    const modulacion = (evento.txInfo as { modulation?: { lora?: unknown } } | undefined)?.modulation;
+    ctx.enlace = enlaceDe(evento.rxInfo, typeof modulacion?.lora === 'object' && modulacion.lora !== null);
     const objeto = evento.object;
     if (typeof objeto !== 'object' || objeto === null || Array.isArray(objeto)) {
       if (!ctx.decodificador) {

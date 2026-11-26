@@ -381,7 +381,7 @@ describe('Resumen (L2, L3): dos pedidos, indicadores y «Ahora»', () => {
 });
 
 // «Elegir qué ver» por persona (docs/19 §4 AA, punto 7; RF-56, HU-29).
-// Revisión del 25/11/2026: una tarjeta cuyas magnitudes oculta la preferencia no queda muda, y una en alerta sigue en alerta.
+// Corrección del 25/11/2026: una tarjeta cuyas magnitudes oculta la preferencia no queda muda, y una en alerta sigue en alerta.
 describe('«Ahora» con magnitudes ocultas por la persona', () => {
   it('sin canales visibles, la tarjeta dice que todo está oculto y conserva «Alerta»; con algunos ocultos, cuántos', () => {
     const datos = datosAhora(false);

@@ -10,7 +10,9 @@ import { limpia } from './texto.js';
 
 export const MAX_TRAMAS_SIN_GUARDAR = 20; // las tramas más recientes que se releen por petición
 export const MAX_CLAVES_SIN_GUARDAR = 50;
-export const TOPE_SIN_GUARDAR_MS = 5_000; // tiempo máximo de cada consulta de la relectura (revisión del 25/11/2026)
+export const TOPE_SIN_GUARDAR_MS = 5_000; // statement_timeout de la relectura, en el servidor (docs/10 §8.4 punto 72 i)
+export const MAX_SIN_GUARDAR_EN_CURSO = 1; // relecturas simultáneas por proceso; otra, 429
+export const ESPERA_SIN_GUARDAR_MS = 10_000; // una relectura cada 10 s por persona y equipo; antes, 429
 const MAX_CLAVE = 32; // como en la línea de registro de la trama: recortada y sin caracteres invisibles
 
 export interface FilaRetenida { payload: Buffer; topico: string; recibido_en: Date }
@@ -32,7 +34,7 @@ const MAGNITUD_TOPICO = /^sitio\/[^/]+\/dispositivo\/[^/]+\/([^/]+)$/;
 const numero = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 
 // Los valores de las claves fuera del mapa, del cuerpo JSON (en ChirpStack, de `object`; en Milesight, del cuerpo), leídos UNA vez por
-// trama (revisión del 25/11/2026: leerlo por cada clave eran miles de JSON.parse de hasta 64 KiB por petición). Solo números.
+// trama (corrección del 25/11/2026: leerlo por cada clave eran miles de JSON.parse de hasta 64 KiB por petición). Solo números.
 function fuenteDeValores(formato: string, carga: Buffer): Record<string, unknown> | null {
   try {
     const v = JSON.parse(carga.toString('utf8')) as Record<string, unknown> | null;
@@ -50,9 +52,14 @@ export function clavesSinGuardar(filas: readonly FilaRetenida[], e: EquipoSinGua
   if (adaptador === undefined) return [];
   const dePasarela = e.formato === 'chirpstack' || e.formato === 'milesight';
   const resolver = resolverDesde(dePasarela ? e.alias : null);
-  const vistas = new Map<string, ClaveSinGuardar>();
+  // Dos grupos, cada uno hasta el tope (corrección del 25/11/2026): primero la señal del enlace y las claves con magnitud en el catálogo
+  // (las que se pueden agregar), después las que no la tienen. Así miles de claves desconocidas no dejan fuera la señal.
+  const conMagnitud = new Map<string, ClaveSinGuardar>();
+  const sinMagnitud = new Map<string, ClaveSinGuardar>();
+  const vista = (clave: string): boolean => conMagnitud.has(clave) || sinMagnitud.has(clave);
   const agregar = (c: ClaveSinGuardar): void => {
-    if (vistas.size < MAX_CLAVES_SIN_GUARDAR && !vistas.has(c.clave)) vistas.set(c.clave, c);
+    const grupo = c.magnitud !== null ? conMagnitud : sinMagnitud;
+    if (grupo.size < MAX_CLAVES_SIN_GUARDAR && !vista(c.clave)) grupo.set(c.clave, c);
   };
   // De la más reciente a la más antigua: la primera vez que aparece una clave, es su último valor.
   for (const f of [...filas].sort((a, b) => b.recibido_en.getTime() - a.recibido_en.getTime())) {
@@ -69,20 +76,23 @@ export function clavesSinGuardar(filas: readonly FilaRetenida[], e: EquipoSinGua
       // Una trama que no se entiende no ofrece lecturas; las claves fuera del mapa que alcanzó a anotar («ninguna clave conocida»), sí.
     }
     const visto = f.recibido_en.toISOString();
+    for (const m of MAGNITUDES_ENLACE) {
+      const v = ctx.enlace?.[m];
+      if (v !== undefined && !e.declaradas.includes(m)) agregar({ clave: m, magnitud: e.catalogo.has(m) ? m : null, valor: v, unidad: m === 'rssi' ? 'dBm' : 'dB', visto, origen: 'enlace' });
+    }
     for (const l of lecturas) {
       if (e.declaradas.includes(l.magnitud)) continue;
       const enCatalogo = e.catalogo.has(l.magnitud);
       agregar({ clave: limpia(l.magnitud, MAX_CLAVE), magnitud: enCatalogo ? l.magnitud : null, valor: numero(l.valor), unidad: l.unidad ?? null, visto, origen: 'carga' });
     }
-    const ignoradas = (ctx.ignoradas ?? []).filter((k) => !k.endsWith(' (repetida)') && !vistas.has(k));
-    if (ignoradas.length > 0 && vistas.size < MAX_CLAVES_SIN_GUARDAR) {
+    // Las claves fuera del mapa: se muestran limpias, y el valor se busca con la clave tal como llegó (la limpia puede no existir en la carga).
+    const ignoradas = ctx.ignoradas ?? [];
+    const crudas = ctx.ignoradasCrudas ?? [];
+    const nuevas = ignoradas.map((k, i) => [k, crudas[i] ?? k] as const).filter(([k]) => !k.endsWith(' (repetida)') && !vista(k));
+    if (nuevas.length > 0 && sinMagnitud.size < MAX_CLAVES_SIN_GUARDAR) {
       const fuente = fuenteDeValores(e.formato, f.payload);
-      for (const k of ignoradas) agregar({ clave: k, magnitud: null, valor: valorDe(fuente, k), unidad: null, visto, origen: 'carga' });
-    }
-    for (const m of MAGNITUDES_ENLACE) {
-      const v = ctx.enlace?.[m];
-      if (v !== undefined && !e.declaradas.includes(m)) agregar({ clave: m, magnitud: e.catalogo.has(m) ? m : null, valor: v, unidad: m === 'rssi' ? 'dBm' : 'dB', visto, origen: 'enlace' });
+      for (const [k, cruda] of nuevas) agregar({ clave: k, magnitud: null, valor: valorDe(fuente, cruda), unidad: null, visto, origen: 'carga' });
     }
   }
-  return [...vistas.values()];
+  return [...conMagnitud.values(), ...sinMagnitud.values()].slice(0, MAX_CLAVES_SIN_GUARDAR);
 }

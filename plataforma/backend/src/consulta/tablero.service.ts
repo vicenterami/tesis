@@ -215,7 +215,7 @@ export class TableroService {
     const dispositivos = base.pagina.map((d) => {
       const suyos = porDispositivo.get(d.id) ?? [];
       const todos = suyos.filter((k) => !ocultas.has(k.magnitud));
-      // `canales_ocultos`: cuántos deja fuera la preferencia, para que el panel lo diga (una tarjeta sin canales no queda muda; revisión del 25/11/2026).
+      // `canales_ocultos`: cuántos deja fuera la preferencia, para que el panel lo diga (una tarjeta sin canales no queda muda; corrección del 25/11/2026).
       return { ...d, canales_total: todos.length, canales_ocultos: suyos.length - todos.length, canales: elegirCanales(todos) };
     });
     const mostrados = dispositivos.flatMap((d) => d.canales.map((k) => k.id));

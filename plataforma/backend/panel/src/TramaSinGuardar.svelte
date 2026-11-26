@@ -54,9 +54,11 @@
     agregando = magnitud;
     aviso = null;
     try {
-      await pedir('POST', `/dispositivos/${encodeURIComponent(dispositivoId)}/canales`, { cuerpo: { magnitud } });
+      const r = await pedir<{ agregada?: boolean }>('POST', `/dispositivos/${encodeURIComponent(dispositivoId)}/canales`, { cuerpo: { magnitud } });
       if (datos !== null) datos = { ...datos, claves: datos.claves.filter((x) => x.magnitud !== magnitud) };
-      aviso = { tipo: 'exito', texto: `«${magnitud}»: se guarda desde la próxima trama; lo que llegó antes no se rellena.` };
+      aviso = r?.agregada === false
+        ? { tipo: 'info', texto: `«${magnitud}»: el equipo ya la guardaba (se agregó desde otra pantalla).` }
+        : { tipo: 'exito', texto: `«${magnitud}»: se guarda desde la próxima trama; lo que llegó antes no se rellena.` };
       alAgregar(magnitud);
     } catch (e) {
       aviso = avisoDeError(e);
@@ -71,10 +73,12 @@
   <section class="panel-seccion" aria-labelledby="{uid}-titulo" data-sin-guardar>
     <h3 id="{uid}-titulo">Lo que la trama trae y no se guarda</h3>
     {#if aviso !== null}<Aviso tipo={aviso.tipo} texto={aviso.texto} alCerrar={() => (aviso = null)} />{/if}
+    <!-- Un error al volver a revisar (429 por el tope, 503 por el tiempo) se dice sin borrar la lista que ya se ve (docs/19 §4 AA, punto 6). -->
+    {#if error !== null && datos !== null}<div data-sin-guardar-error><Aviso tipo="error" texto={`No se pudieron volver a revisar las tramas: ${error}`} alCerrar={() => (error = null)} /></div>{/if}
     {#if !pedido}
       <p class="vivo">Revisa las tramas recientes de este equipo para ver si traen algo que no guarda (otra magnitud, la señal del enlace).
         <Boton etiqueta="Revisar las tramas" onclick={() => void cargar()} data-revisar-tramas /></p>
-    {:else if error !== null}
+    {:else if error !== null && datos === null}
       <Aviso tipo="error" texto={`No se pudieron revisar las tramas: ${error}`} accion={{ etiqueta: 'Volver a revisar', alHacer: () => void cargar() }} />
     {:else if datos === null}
       <p class="vacio" aria-busy="true">Revisando las tramas recientes…</p>
@@ -96,5 +100,6 @@
         {/each}
       </ul>
     {/if}
+    {#if datos !== null}<p class="vivo"><Boton etiqueta="Volver a revisar" variante="discreto" onclick={() => void cargar()} data-revisar-otra-vez /></p>{/if}
   </section>
 {/if}

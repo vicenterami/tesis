@@ -91,7 +91,7 @@ inline long leerTexto(const char *&p, const char *fin, char *buf, size_t cap) {
           else return -1;
         }
         if (cp >= 0xD800 && cp <= 0xDFFF) return -1;  // pares sustitutos: ningún campo los necesita
-        if (cp == 0) return -1;  // el nulo cortaría el campo en C y lo que sigue saltaría la validación (revisión del 25/11/2026)
+        if (cp == 0) return -1;  // el nulo cortaría el campo en C y lo que sigue saltaría la validación (corrección del 25/11/2026)
         if (cp < 0x80) { if (!poner(static_cast<unsigned char>(cp))) return -1; }
         else if (cp < 0x800) { if (!poner(0xC0 | (cp >> 6)) || !poner(0x80 | (cp & 0x3F))) return -1; }
         else if (!poner(0xE0 | (cp >> 12)) || !poner(0x80 | ((cp >> 6) & 0x3F)) || !poner(0x80 | (cp & 0x3F))) return -1;

@@ -1,7 +1,8 @@
 import { AvisosAcotados } from '../arranque.js';
-import { Inject, Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
+import { HttpException, HttpStatus, Inject, Injectable, Logger, OnModuleInit, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Pool, type QueryConfig } from 'pg';
+import { Pool, type PoolClient, type QueryConfig } from 'pg';
+import { errorDeCliente } from '../db/cliente.js';
 import { AlertasService } from '../alertas/alertas.service.js';
 import { BrokerService } from '../broker/broker.service.js';
 import { POOL } from '../db/db.module.js';
@@ -22,7 +23,7 @@ import { aCanonica } from './unidades.js';
 import { porcentaje } from '../consulta/escala.js';
 import { DestinoClave, resolverDesde } from './adaptadores/mapa-claves.js';
 import type { Receta } from './adaptadores/receta.js';
-import { ClaveSinGuardar, FilaRetenida, MAX_TRAMAS_SIN_GUARDAR, TOPE_SIN_GUARDAR_MS, clavesSinGuardar } from './sin-guardar.js';
+import { ClaveSinGuardar, ESPERA_SIN_GUARDAR_MS, FilaRetenida, MAX_SIN_GUARDAR_EN_CURSO, MAX_TRAMAS_SIN_GUARDAR, TOPE_SIN_GUARDAR_MS, clavesSinGuardar } from './sin-guardar.js';
 
 // Forma del tópico acordada: sitio/<sitio>/dispositivo/<id_fisico>/<magnitud>
 const PATRON_TOPICO = /^sitio\/([^/]+)\/dispositivo\/([^/]+)\/([^/]+)$/;
@@ -279,7 +280,7 @@ export class RecepcionService implements OnModuleInit {
     // primera trama que entra dentro del presupuesto en una hora posterior. El dispositivo se marca vivo igual: es volumen, no enlace.
     const tope = this.presupuesto(dispositivo);
     let rechazoTope: string | null = null;
-    // Las del enlace cuentan contra el tope, pero nunca hacen rechazar una trama que sin ellas cabía (punto 53 vii; revisión del 25/11/2026):
+    // Las del enlace cuentan contra el tope, pero nunca hacen rechazar una trama que sin ellas cabía (punto 53 vii; corrección del 25/11/2026):
     // si las del sensor caben y con la señal no, la señal se omite, sin cuarentena, y lo dice la línea de registro de la trama.
     let senalOmitidaPorTope = 0;
     if (enlace.length > 0 && antes.lecturas + lecturas.length <= tope && antes.lecturas + lecturas.length + enlace.length > tope) {
@@ -287,8 +288,10 @@ export class RecepcionService implements OnModuleInit {
       enlace = [];
     }
     if (lecturas.length > 0 && antes.lecturas + lecturas.length + enlace.length > tope) {
-      const trae = lecturas.length + enlace.length;
-      rechazoTope = `tope de ${tope} lecturas por hora superado: ${antes.lecturas} ya aceptadas desde las ${ventanaInicio.toISOString().slice(11, 16)} UTC y la trama trae ${trae}; se rechaza entera`;
+      // Lo que trae es lo del sensor; la señal, que no se intenta, se nombra aparte (corrección del 25/11/2026). Sin señal, el texto de antes.
+      const trae = lecturas.length;
+      const senal = enlace.length > 0 ? ` del sensor (y ${enlace.length} de la señal del enlace, que no se intentan)` : '';
+      rechazoTope = `tope de ${tope} lecturas por hora superado: ${antes.lecturas} ya aceptadas desde las ${ventanaInicio.toISOString().slice(11, 16)} UTC y la trama trae ${trae}${senal}; se rechaza entera`;
       await this.cuarentena(trama, 'tope', rechazoTope, cuota);
       sobreTope = 1;
       lecturas = [];
@@ -301,8 +304,6 @@ export class RecepcionService implements OnModuleInit {
       // Si la hora nueva empezó con tramas sin lecturas, este camino no corre: la cierra el barrido de supervisión (revisión del 17/10).
       await this.supervision.cerrarTope(dispositivo.id, ctx.idFisico, { ventana: ventanaInicio.toISOString(), rechazadas_hora_anterior: dispositivo.ventana_sobre_tope });
     }
-    // Contra el presupuesto cuentan las lecturas examinadas, válidas o no: cada una cuesta una consulta (revisión del 17/10).
-    const examinadas = lecturas.length + enlace.length;
 
     // ── [4] Desvío del reloj de la pasarela (docs/10 §8.4 punto 54; docs/13 regla 18) ──
     // Una marca de pasarela a más de 10 min de la llegada se reemplaza por la hora de recepción (abajo, tiempoPlausible) y abre la
@@ -348,6 +349,9 @@ export class RecepcionService implements OnModuleInit {
       }
     }
 
+    // Contra el presupuesto cuentan las lecturas examinadas, válidas o no: cada una cuesta una consulta (revisión del 17/10). Las de la señal,
+    // solo si se intentaron: con ninguna del sensor guardada no se examinan (corrección del 25/11/2026).
+    const examinadas = (): number => lecturas.length + (guardadas > 0 ? enlace.length : 0);
     if (rechazos.length) await this.cuarentena(trama, 'invalida', rechazos.join('; '), cuota);
     // Trama cruda aceptada (migración 09): solo si dejó al menos una lectura nueva. Una reentrega duplicada
     // no se vuelve a guardar: su original ya está. Vence a los RETENCION_TRAMA_DIAS (RetencionService).
@@ -375,7 +379,7 @@ export class RecepcionService implements OnModuleInit {
          ventana_sobre_tope = CASE WHEN estado_dispositivo.ventana_inicio = EXCLUDED.ventana_inicio THEN estado_dispositivo.ventana_sobre_tope + EXCLUDED.ventana_sobre_tope ELSE EXCLUDED.ventana_sobre_tope END,
          ventana_omitidas = CASE WHEN estado_dispositivo.ventana_inicio = EXCLUDED.ventana_inicio THEN estado_dispositivo.ventana_omitidas + EXCLUDED.ventana_omitidas ELSE EXCLUDED.ventana_omitidas END
        RETURNING visto_por_ultima_vez`,
-      [dispositivo.id, ctx.fcnt ?? null, ventanaInicio, examinadas,
+      [dispositivo.id, ctx.fcnt ?? null, ventanaInicio, examinadas(),
         cuota.guardadas - antes.cuarentena, sobreTope, cuota.omitidas - antes.omitidas, guardadas + duplicadas > 0],
     );
     this.eventos.publicar({
@@ -454,7 +458,8 @@ export class RecepcionService implements OnModuleInit {
     for (const m of MAGNITUDES_ENLACE) {
       const valor = ctx.enlace?.[m];
       if (valor === undefined || !declaradas.includes(m) || delSensor.some((l) => l.magnitud === m)) continue;
-      r.push({ magnitud: m, valor, tiempo: delSensor[0]?.tiempo });
+      // Con su unidad (corrección del 25/11/2026): si el catálogo dijera otra canónica para la magnitud, la conversión la rechaza.
+      r.push({ magnitud: m, valor, unidad: m === 'rssi' ? 'dBm' : 'dB', tiempo: delSensor[0]?.tiempo });
     }
     return r;
   }
@@ -515,27 +520,61 @@ export class RecepcionService implements OnModuleInit {
 
   // «Lo que la trama trae y no se guarda» (GET /dispositivos/{id}/sin-guardar; docs/10 §8.4 punto 72 i): las MAX_TRAMAS_SIN_GUARDAR tramas
   // más recientes del equipo, entre las aceptadas (`trama`) y las rechazadas (`cuarentena`), releídas con el adaptador, la receta y los alias
-  // vigentes (la misma consulta del filtro 1). No escribe nada. undefined si el equipo no existe.
-  async sinGuardar(dispositivoId: string): Promise<{ revisadas: number; claves: ClaveSinGuardar[] } | undefined> {
-    // Con tiempo máximo (revisión del 25/11/2026): relee cargas crudas a pedido de una persona; una base lenta no deja la petición colgada.
-    const conTope = (text: string, values: unknown[] = []): QueryConfig & { query_timeout: number } => ({ text, values, query_timeout: TOPE_SIN_GUARDAR_MS });
-    const id = await this.pool.query<{ id_fisico: string }>(conTope('SELECT id_fisico FROM dispositivo WHERE id = $1', [dispositivoId]));
-    const d = id.rows[0] === undefined ? undefined : await this.buscarDispositivo(id.rows[0].id_fisico);
-    if (d === undefined) return undefined;
-    const [filas, catalogo] = await Promise.all([
-      this.pool.query<FilaRetenida>(conTope(
-        `SELECT payload, topico, recibido_en FROM (
-           (SELECT payload, topico, recibido_en FROM trama WHERE dispositivo_id = $1 ORDER BY recibido_en DESC LIMIT $2)
-           UNION ALL
-           (SELECT payload_crudo, topico, recibido_en FROM cuarentena WHERE dispositivo_id = $1 ORDER BY recibido_en DESC LIMIT $2)) u
-          ORDER BY recibido_en DESC LIMIT $2`, [dispositivoId, MAX_TRAMAS_SIN_GUARDAR])),
-      this.pool.query<{ codigo: string }>(conTope('SELECT codigo FROM magnitud')),
-    ]);
-    const claves = clavesSinGuardar(filas.rows, {
-      formato: d.formato, idFisico: id.rows[0].id_fisico, declaradas: d.magnitudes ?? [], catalogo: new Set(catalogo.rows.map((m) => m.codigo)),
-      decodificador: d.decodificador, receta: d.receta, alias: d.alias,
-    }, this.adaptadores);
-    return { revisadas: filas.rows.length, claves };
+  // vigentes (la misma consulta del filtro 1). No escribe nada. undefined si el equipo no existe. Topes (corrección del 25/11/2026): una a la
+  // vez por proceso (429 sin_guardar_ocupado), una cada ESPERA_SIN_GUARDAR_MS por persona y equipo (429 sin_guardar_espera) y todo en UNA
+  // conexión del grupo, en una transacción de solo lectura con statement_timeout, que la base cancela en el servidor (503 sin_guardar_tiempo).
+  private sinGuardarEnCurso = 0;
+  private readonly ultimaRelectura = new Map<string, number>();
+  async sinGuardar(dispositivoId: string, quien: string): Promise<{ revisadas: number; claves: ClaveSinGuardar[] } | undefined> {
+    const ahora = Date.now();
+    const llave = `${quien}|${dispositivoId}`;
+    const anterior = this.ultimaRelectura.get(llave);
+    if (anterior !== undefined && ahora - anterior < ESPERA_SIN_GUARDAR_MS) {
+      throw demasiadas('sin_guardar_espera', 'acabas de revisar las tramas de este equipo', Math.ceil((ESPERA_SIN_GUARDAR_MS - (ahora - anterior)) / 1000));
+    }
+    if (this.sinGuardarEnCurso >= MAX_SIN_GUARDAR_EN_CURSO) throw demasiadas('sin_guardar_ocupado', 'otra persona está revisando tramas', 5);
+    if (this.ultimaRelectura.size > 1000) for (const [k, t] of this.ultimaRelectura) if (ahora - t >= ESPERA_SIN_GUARDAR_MS) this.ultimaRelectura.delete(k);
+    this.ultimaRelectura.set(llave, ahora);
+    this.sinGuardarEnCurso++;
+    let c: PoolClient | undefined;
+    let abierta = false;
+    try {
+      c = await this.pool.connect();
+      c.on('error', errorDeCliente);
+      await c.query('BEGIN READ ONLY');
+      abierta = true;
+      await c.query(`SET LOCAL statement_timeout = '${TOPE_SIN_GUARDAR_MS}ms'`);
+      const id = await c.query<{ id_fisico: string }>('SELECT id_fisico FROM dispositivo WHERE id = $1', [dispositivoId]);
+      const d = id.rows[0] === undefined ? undefined : await this.buscarDispositivo(id.rows[0].id_fisico, c);
+      let r: { revisadas: number; claves: ClaveSinGuardar[] } | undefined;
+      if (d !== undefined) {
+        const filas = await c.query<FilaRetenida>(
+          `SELECT payload, topico, recibido_en FROM (
+             (SELECT payload, topico, recibido_en FROM trama WHERE dispositivo_id = $1 ORDER BY recibido_en DESC LIMIT $2)
+             UNION ALL
+             (SELECT payload_crudo, topico, recibido_en FROM cuarentena WHERE dispositivo_id = $1 ORDER BY recibido_en DESC LIMIT $2)) u
+            ORDER BY recibido_en DESC LIMIT $2`, [dispositivoId, MAX_TRAMAS_SIN_GUARDAR]);
+        const catalogo = await c.query<{ codigo: string }>('SELECT codigo FROM magnitud');
+        const claves = clavesSinGuardar(filas.rows, {
+          formato: d.formato, idFisico: id.rows[0].id_fisico, declaradas: d.magnitudes ?? [], catalogo: new Set(catalogo.rows.map((m) => m.codigo)),
+          decodificador: d.decodificador, receta: d.receta, alias: d.alias,
+        }, this.adaptadores);
+        r = { revisadas: filas.rows.length, claves };
+      }
+      await c.query('COMMIT');
+      abierta = false;
+      return r;
+    } catch (e) {
+      if (abierta) await c?.query('ROLLBACK').catch(() => undefined);
+      if ((e as { code?: string }).code === '57014') {
+        throw new HttpException({ statusCode: 503, error: 'Service Unavailable', codigo: 'sin_guardar_tiempo', message: 'la relectura tardó demasiado: inténtalo de nuevo' }, HttpStatus.SERVICE_UNAVAILABLE);
+      }
+      throw e;
+    } finally {
+      this.sinGuardarEnCurso--;
+      c?.off('error', errorDeCliente);
+      c?.release();
+    }
   }
 
   private async buscarPasarela(idFisico: string): Promise<Pasarela | undefined> {
@@ -546,8 +585,8 @@ export class RecepcionService implements OnModuleInit {
     return r.rows[0];
   }
 
-  private async buscarDispositivo(idFisico: string): Promise<Dispositivo | undefined> {
-    const r = await this.pool.query<Dispositivo>(
+  private async buscarDispositivo(idFisico: string, c: Pick<Pool, 'query'> | PoolClient = this.pool): Promise<Dispositivo | undefined> {
+    const r = await c.query<Dispositivo>(
       `SELECT d.id, d.estado, d.formato, d.pasarela_id, s.codigo AS sitio_codigo, d.decodificador, e.ultimo_fcnt, d.intervalo_esperado_s,
               (SELECT count(*)::int FROM canal c WHERE c.dispositivo_id = d.id) AS canales, e.ventana_inicio,
               ARRAY(SELECT c.magnitud_codigo FROM canal c WHERE c.dispositivo_id = d.id) AS magnitudes,
@@ -613,4 +652,10 @@ export class RecepcionService implements OnModuleInit {
     const porHora = Math.ceil(3600 / Math.max(1, d.intervalo_esperado_s));
     return Math.max(this.topes.minimo, this.topes.factor * Math.max(1, d.canales) * porHora);
   }
+}
+
+// Un 429 con `codigo` y `reintentar_en_s` (lo que el panel lee para decir cuánto esperar, lib/api.ts).
+function demasiadas(codigo: string, motivo: string, segundos: number): HttpException {
+  return new HttpException({ statusCode: 429, error: 'Too Many Requests', codigo, message: `${motivo}: reintenta en ${segundos} s`, reintentar_en_s: segundos },
+    HttpStatus.TOO_MANY_REQUESTS);
 }

@@ -27,6 +27,7 @@ import select
 import sys
 import termios
 import time
+import unicodedata
 
 PREFIJO = '@plataforma '
 FIRMWARE = 'nodo'
@@ -58,8 +59,10 @@ CAMPO = {
 
 
 def limpio(x, largo=64):
-    """Un valor que mandó el equipo, para imprimirlo: sin controles (una secuencia de escape no llega a la terminal) y acotado."""
-    return ''.join(c if 0x20 <= ord(c) < 0x7F or ord(c) > 0x9F else '?' for c in str(x))[:largo]
+    """Un valor que mandó el equipo, para imprimirlo: sin controles ni nada invisible (una secuencia de escape no llega a la terminal y
+    un U+202E no invierte el texto) y acotado. La misma regla que el backend (recepcion/texto.ts): las categorías Unicode C (control,
+    formato, sin asignar, uso privado) y Z (separadores) se marcan con «?», salvo el espacio común."""
+    return ''.join('?' if c != ' ' and unicodedata.category(c)[0] in 'CZ' else c for c in str(x)[:largo])
 
 
 class Falla(Exception):
@@ -213,7 +216,7 @@ def saludar(enlace, espera=None):
     while time.monotonic() < limite:
         r = enlace.orden({'orden': 'hola'}, min(INTERVALO, max(limite - time.monotonic(), 0.05)))
         # Un error de forma sin orden («json» o «larga») es por lo que había antes en la línea del equipo (un trozo de otra orden o
-        # ruido del arranque), no por este `hola`: se repite (revisión del 25/11/2026).
+        # ruido del arranque), no por este `hola`: se repite (corrección del 25/11/2026).
         if r is None or (r.get('ok') is False and r.get('orden') == ''):
             continue
         if r.get('ok') is not True or r.get('firmware') != FIRMWARE:
@@ -316,7 +319,7 @@ def cmd_cargar(enlace, args, datos):
         raise Falla('El equipo no guardó la configuración: vuelve a intentarlo.')
     print('1. Credencial cargada: el equipo se reinicia con la configuración nueva.')
     # Un `hola` de OTRO arranque: el del equipo que todavía corre con lo anterior no cuenta, aunque traiga el mismo identificador
-    # (revisión del 25/11/2026: recargar el mismo equipo con una red mala terminaba en «el broker la aceptó», con la sesión vieja).
+    # (corrección del 25/11/2026: recargar el mismo equipo con una red mala terminaba en «el broker la aceptó», con la sesión vieja).
     h = esperar_otro_arranque(enlace, hola.get('arranque'))
     if h is None or h.get('id') != datos['id']:
         raise Falla('El equipo no volvió con el identificador cargado: la carga no quedó guardada. Vuelve a intentarlo.')

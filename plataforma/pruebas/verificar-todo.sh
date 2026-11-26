@@ -75,7 +75,7 @@ if command -v docker >/dev/null && command -v pnpm >/dev/null; then
 else echo "omitida: la integración de sitios y zonas necesita docker y pnpm"; fi
 # La señal del enlace, «Agregar una magnitud», «lo que la trama trae y no se guarda» y «elegir qué ver» (docs/19 §4 AA; migraciones 29 y
 # 30; docs/16 §106) en una base DESECHABLE, con la semilla de demostración dos veces. Probada plantando: con `magnitudes_ocultas`
-# obligatoria en PUT /preferencias (como estaba), fallan 5 de 30: los dos del panel anterior y los tres que dependen de esa fila.
+# obligatoria en PUT /preferencias (como estaba), fallan 5 comprobaciones: los dos del panel anterior y los tres que dependen de esa fila (medido el 25/11/2026).
 if command -v docker >/dev/null && command -v pnpm >/dev/null; then
   bash plataforma/pruebas/enlace-integracion.sh > "$VT"/enlace-integracion.txt 2>&1; s=$?; tail -3 "$VT"/enlace-integracion.txt
   { [ $s -eq 0 ] && grep -q '^ENLACE OK$' "$VT"/enlace-integracion.txt; } || { grep '^FALLA' "$VT"/enlace-integracion.txt | head -5; fallos=$((fallos+1)); }

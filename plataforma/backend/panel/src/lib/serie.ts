@@ -296,7 +296,7 @@ async function saludar(e: Enlace, t: Tiempos, senal?: AbortSignal): Promise<Resp
     if (senal?.aborted === true) return { codigo: 'cancelado' };
     const r = await e.orden({ orden: 'hola' }, Math.max(1, Math.min(t.intervalo, limite - Date.now())));
     // Un error de forma sin orden («json» o «larga») es por lo que había antes en la línea (un trozo de otra orden o ruido del arranque),
-    // no por este `hola`: se repite. Revisión del 25/11/2026: tomarlo por respuesta decía «no tiene el firmware» a un equipo nuestro.
+    // no por este `hola`: se repite. Corrección del 25/11/2026: tomarlo por respuesta decía «no tiene el firmware» a un equipo nuestro.
     if (r === null || (!r.ok && r.orden === '')) continue;
     if (!r.ok || r.firmware !== FIRMWARE) return { codigo: 'otro_firmware' };
     if (r.protocolo !== PROTOCOLO || typeof r.arranque !== 'number') return { codigo: 'otra_version', protocolo: typeof r.protocolo === 'number' ? r.protocolo : undefined };

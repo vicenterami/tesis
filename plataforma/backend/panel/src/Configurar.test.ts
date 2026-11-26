@@ -205,6 +205,43 @@ describe('P6 Configurar', () => {
     expect(pedidos.filter((x) => x.metodo === 'POST')).toEqual([{ metodo: 'POST', ruta: `/dispositivos/${ID}/canales`, cuerpo: { magnitud: 'rssi' } }]);
     expect(document.querySelector('[data-sin-guardar-clave="rssi"]')).toBeNull();
   });
+  // Correcciones del 25/11/2026: el canal creado no se dice como error si falla la relectura; «ya la guardaba» no dice «se guarda desde la
+  // próxima trama»; y volver a revisar con el tope del servidor (429) dice cuánto esperar sin borrar la lista que ya se ve.
+  it('«Agregar una magnitud»: si el POST se confirma y la relectura falla, dice que quedó agregada y que recargue (no invita a repetir el POST)', async () => {
+    let posteado = false;
+    responder = (metodo, ruta) => {
+      if (metodo === 'GET' && ruta === `/dispositivos/${ID}`) return posteado ? json({ message: 'caída' }, 500) : json(ficha());
+      if (ruta === '/magnitudes') return json(CATALOGO);
+      if (metodo === 'POST' && ruta === `/dispositivos/${ID}/canales`) { posteado = true; return json({ agregada: true, dispositivo_id: ID, canal: { id: SNR, magnitud: 'snr' } }); }
+      return json({ message: 'no' }, 404);
+    };
+    render(Configurar, { id: ID, sesion: sesion('administrador'), sitios: SITIOS });
+    await waitFor(() => expect(document.querySelector('[data-campo="nueva-magnitud"] option[value="snr"]')).not.toBeNull());
+    await fireEvent.change(document.querySelector('[data-campo="nueva-magnitud"]')!, { target: { value: 'snr' } });
+    await fireEvent.click(document.querySelector('[data-agregar-magnitud]')!);
+    await waitFor(() => expect(document.body.textContent).toContain('Relación señal/ruido: agregada.'));
+    expect(document.body.textContent).toContain('No se pudo releer el equipo: recarga la pantalla');
+    expect(document.querySelector('[data-form-magnitud] [data-aviso="error"]')).toBeNull();
+  });
+  it('«Lo que la trama trae y no se guarda»: «ya la guardaba» si el servidor responde agregada: false; volver a revisar con 429 conserva la lista y dice cuánto esperar', async () => {
+    let revisiones = 0;
+    responder = (metodo, ruta) => {
+      if (metodo === 'GET' && ruta === `/dispositivos/${ID}`) return json(ficha());
+      if (ruta === `/dispositivos/${ID}/sin-guardar`) return ++revisiones === 1 ? json(SIN_GUARDAR) : json({ statusCode: 429, codigo: 'sin_guardar_espera', message: 'acabas de revisar las tramas de este equipo: reintenta en 7 s', reintentar_en_s: 7 }, 429);
+      if (metodo === 'POST' && ruta === `/dispositivos/${ID}/canales`) return json({ agregada: false });
+      return json([]);
+    };
+    render(Configurar, { id: ID, sesion: sesion('administrador'), sitios: SITIOS });
+    await waitFor(() => expect(document.querySelector('[data-revisar-tramas]')).not.toBeNull());
+    await fireEvent.click(document.querySelector('[data-revisar-tramas]')!);
+    await waitFor(() => expect(document.querySelectorAll('[data-sin-guardar-clave]')).toHaveLength(2));
+    await fireEvent.click(document.querySelector('[data-agregar-clave="rssi"]')!);
+    await waitFor(() => expect(document.querySelector('[data-sin-guardar]')!.textContent).toContain('«rssi»: el equipo ya la guardaba'));
+    expect(document.querySelector('[data-sin-guardar]')!.textContent).not.toContain('se guarda desde la próxima trama');
+    await fireEvent.click(document.querySelector('[data-revisar-otra-vez]')!);
+    await waitFor(() => expect(document.querySelector('[data-sin-guardar-error]')!.textContent).toContain('espera 7 s'));
+    expect(document.querySelectorAll('[data-sin-guardar-clave]')).toHaveLength(1); // co2 sigue a la vista
+  });
   it('«Lo que la trama trae y no se guarda»: con perfil de consulta no aparece ni se pide (lee cargas crudas)', async () => {
     render(Configurar, { id: ID, sesion: sesion('consulta'), sitios: SITIOS });
     await waitFor(() => expect(document.querySelector('[data-configurar]')).not.toBeNull());

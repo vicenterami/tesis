@@ -72,7 +72,7 @@ static const char *ESPACIO_NVS = "plataforma", *CLAVE_NVS = "config", *CLAVE_ARR
 static const char *estadoWifi = "sin_conexion";
 static const char *ultimoError = "ninguno";
 // El número de este arranque (protocolo 2): cambia en cada inicio. Tras `configurar`, quien carga espera un `hola` con otro número: así
-// nunca toma por buena la respuesta del equipo que todavía corre con lo anterior (revisión del 25/11/2026).
+// nunca toma por buena la respuesta del equipo que todavía corre con lo anterior (corrección del 25/11/2026).
 static uint32_t arranque = 0;
 
 static WiFiClientSecure tls;
@@ -403,11 +403,18 @@ static void procesarLinea(char *linea, size_t n) {
   } else if (strcmp(o.orden, "borrar") == 0) {
     // Borra la PARTICIÓN de datos entera: `remove` solo marca la entrada como borrada y los bytes quedarían en la flash (ESP-IDF, NVS:
     // «the old key-value pair is marked as erased»); nvs_flash_erase_partition «Erase all content of a specified NVS partition». Se
-    // pierden también lo que guarda el núcleo (calibración de radio, que rehace al arrancar) y el contador de arranques.
+    // pierden también lo que guarda el núcleo (calibración de radio, que rehace al arrancar); el contador de arranques se vuelve a escribir (abajo).
+    // Corrección del 25/11/2026: borrar desinicializa la partición («the partition has to be initialized again to be used», nvs_flash.h de
+    // ESP-IDF 4.4.7, el del núcleo Arduino 2.0.17 de espressif32@7.1.3), así que se reinicializa antes de volver a abrirla, haya salido bien
+    // o mal; y el contador de arranques se vuelve a escribir: sin él, dos `borrar` seguidos arrancaban los dos con el número 1 y quien carga
+    // no distinguía el arranque nuevo del anterior.
     preferencias.end();
     const bool borrada = nvs_flash_erase_partition("nvs") == ESP_OK;
+    nvs_flash_init_partition("nvs");
+    const bool abierta = preferencias.begin(ESPACIO_NVS, false);
+    if (borrada && abierta) preferencias.putUInt(CLAVE_ARRANQUES, arranque);
     Serial.println(borrada ? "memoria no volátil borrada entera; se reinicia" : "no se pudo borrar la memoria no volátil");
-    if (!borrada) { responderError("borrar", "guardar"); preferencias.begin(ESPACIO_NVS, false); }
+    if (!borrada) { responderError("borrar", "guardar"); }
     else { responder("{\"ok\":true,\"orden\":\"borrar\",\"reinicia\":true}"); reiniciarYa(o); }
   } else {
     responderError(o.orden, "orden");

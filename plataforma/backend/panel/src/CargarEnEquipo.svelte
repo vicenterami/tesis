@@ -97,7 +97,7 @@
       puerto = await serie.requestPort(); // el selector del navegador: la persona elige el puerto con este mismo clic
     } catch (x) {
       // NotFoundError: la persona cerró el selector. Otro (SecurityError, NotAllowedError): el navegador no dio permiso al sitio; decir «no elegiste»
-      // sería falso (revisión del 25/11/2026).
+      // sería falso (corrección del 25/11/2026).
       const cerro = x instanceof DOMException && x.name === 'NotFoundError';
       avances[e.id_fisico] = { ...avance(e.id_fisico), en: 'falla', falla: cerro ? 'No elegiste un puerto. Conecta el equipo por USB y vuelve a intentar.'
         : 'El navegador no dio permiso para usar el puerto serie: revisa los permisos de este sitio, o usa la ficha o el guion de terminal.' };

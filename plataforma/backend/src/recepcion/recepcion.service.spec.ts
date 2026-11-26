@@ -780,11 +780,11 @@ describe('RecepcionService: la señal del enlace LoRaWAN como canal declarado', 
   type DispE = { id: string; estado: string; formato: string; pasarela_id: string; magnitudes?: string[]; ultimo_fcnt?: string | null;
     intervalo_esperado_s?: number; canales?: number; ventana_inicio?: Date | null; ventana_lecturas?: number };
   // El mismo andamiaje que arriba, reducido: el nodo chirpstack de la pasarela p1, con las magnitudes que declare la prueba.
-  function armarE(d: DispE, duplicada = false) {
+  function armarE(d: DispE, duplicada = false, unidadSnr = 'dB') {
     const temp = { id: 'k1', magnitud: 'temperatura', unidad_canonica: 'Cel', rango_min: -40, rango_max: 85, escala_cero: null, escala_cien: null };
     const enlace: Record<string, object> = {
       rssi: { id: 'k-rssi', magnitud: 'rssi', unidad_canonica: 'dBm', rango_min: -150, rango_max: 0, escala_cero: null, escala_cien: null },
-      snr: { id: 'k-snr', magnitud: 'snr', unidad_canonica: 'dB', rango_min: -32, rango_max: 32, escala_cero: null, escala_cien: null },
+      snr: { id: 'k-snr', magnitud: 'snr', unidad_canonica: unidadSnr, rango_min: -32, rango_max: 32, escala_cero: null, escala_cien: null },
     };
     const query = vi.fn((sql: string, params?: unknown[]) => {
       if (sql.startsWith('SELECT d.id, d.estado, d.formato')) {
@@ -837,12 +837,19 @@ describe('RecepcionService: la señal del enlace LoRaWAN como canal declarado', 
     expect(publicados.filter((e) => e.tipo === 'medicion')).toHaveLength(3);
     expect(query.mock.calls.filter(([sql]) => String(sql).startsWith('INSERT INTO trama'))).toHaveLength(1);
   });
+  // Corrección del 25/11/2026: la lectura del enlace no traía unidad y se guardaba sin convertir con la canónica que dijera el catálogo.
+  it('la señal lleva su unidad (dBm, dB): si el catálogo dice otra para snr, se omite sin cuarentena en vez de guardarse mal etiquetada', async () => {
+    const { servicio, query } = armarE(CON_ENLACE, false, 'Cel');
+    await servicio.procesar(T_UP, up(RX));
+    expect(insertadas(query)).toEqual([['k1', 21.5], ['k-rssi', -87]]);
+    expect(cuarentenasE(query)).toEqual([]);
+  });
   it('solo lo declarado: con snr y sin rssi, se guarda el snr', async () => {
     const { servicio, query } = armarE({ ...NODO, magnitudes: ['temperatura', 'snr'] });
     await servicio.procesar(T_UP, up(RX));
     expect(insertadas(query)).toEqual([['k1', 21.5], ['k-snr', 7.5]]);
   });
-  // Revisión del 25/11/2026: declarar la señal no puede hacer rechazar una trama que sin ella entraba. Si las del sensor caben y con las del
+  // Corrección del 25/11/2026: declarar la señal no puede hacer rechazar una trama que sin ella entraba. Si las del sensor caben y con las del
   // enlace no, se guardan las del sensor y la señal se omite (sin cuarentena, nombrada en el registro); si las del sensor no caben, como antes.
   it('tope: si las del sensor caben y con la señal no, entra la del sensor y la señal se omite; si la del sensor no cabe, se rechaza entera', async () => {
     const lento = { ...CON_ENLACE, intervalo_esperado_s: 3600, canales: 1, ventana_inicio: VENTANA };
@@ -859,7 +866,10 @@ describe('RecepcionService: la señal del enlace LoRaWAN como canal declarado', 
       await lleno.servicio.procesar(T_UP, up(RX));
       expect(cuarentenasE(lleno.query)).toEqual(['tope']);
       expect(insertadas(lleno.query)).toEqual([]);
-      expect(lleno.abrirTope).toHaveBeenCalledWith('n1', '0101010101010101', expect.objectContaining({ tope: 600, aceptadas: 600, trama: 3 }));
+      // Lo que trae la trama es lo del sensor; la señal no se intentó (corrección del 25/11/2026: antes contaba 3).
+      expect(lleno.abrirTope).toHaveBeenCalledWith('n1', '0101010101010101', expect.objectContaining({ tope: 600, aceptadas: 600, trama: 1 }));
+      const detalle = lleno.query.mock.calls.find(([sql]) => String(sql).startsWith('INSERT INTO cuarentena'))?.[1] as unknown[];
+      expect(String(detalle[4])).toContain('la trama trae 1 del sensor');
       const holgado = armarE({ ...lento, ventana_lecturas: 597 });
       await holgado.servicio.procesar(T_UP, up(RX));
       expect(cuarentenasE(holgado.query)).toEqual([]);
@@ -877,6 +887,7 @@ describe('RecepcionService: la señal del enlace LoRaWAN como canal declarado', 
     await servicio.procesar(T_UP, up(RX, { temperature: 999 }));
     expect(insertadas(query)).toEqual([]);
     expect(cuarentenasE(query)).toEqual(['invalida']);
+    expect(estadoE(query)[3]).toBe(1); // la señal no se intentó: no consume presupuesto (corrección del 25/11/2026)
     const detalle = query.mock.calls.find(([sql]) => String(sql).startsWith('INSERT INTO cuarentena'))?.[1] as unknown[];
     expect(String(detalle[4])).toContain('temperatura');
     expect(String(detalle[4])).not.toMatch(/rssi|snr/);
@@ -919,27 +930,69 @@ describe('RecepcionService: la señal del enlace LoRaWAN como canal declarado', 
   });
 });
 
-// «Lo que la trama trae y no se guarda» (docs/10 §8.4 punto 72 i): relee hasta 20 cargas crudas por petición; sus consultas llevan tiempo
-// máximo (revisión del 25/11/2026), para que una base lenta no deje la petición colgada ocupando una conexión del pool.
-describe('RecepcionService.sinGuardar: consultas con tiempo máximo', () => {
-  it('la del equipo, la de las tramas retenidas y la del catálogo llevan query_timeout (≤ 5 s)', async () => {
-    const llamadas: unknown[] = [];
-    const query = vi.fn((c: string | { text: string }) => {
-      llamadas.push(c);
-      const sql = typeof c === 'string' ? c : c.text;
-      if (sql.startsWith('SELECT id_fisico FROM dispositivo')) return Promise.resolve({ rows: [{ id_fisico: 'n1' }], rowCount: 1 });
-      if (sql.startsWith('SELECT d.id, d.estado, d.formato')) {
-        return Promise.resolve({ rows: [{ id: 'd1', formato: 'plano', magnitudes: ['temperatura'], decodificador: null, receta: null, alias: null }], rowCount: 1 });
-      }
-      return Promise.resolve({ rows: [], rowCount: 0 });
-    });
-    const servicio = new RecepcionService({ query } as unknown as Pool, { alRecibir: vi.fn() } as unknown as BrokerService, {} as AlertasService,
+// «Lo que la trama trae y no se guarda» (docs/10 §8.4 punto 72 i). Corrección del 25/11/2026: el costo por petición estaba acotado, pero no
+// el de varias a la vez. Una relectura a la vez por proceso, una cada 10 s por persona y equipo, y todo en UNA conexión del grupo con
+// `statement_timeout` (lo cancela la base, no solo el cliente).
+describe('RecepcionService.sinGuardar: cupo, espera y una sola conexión con tiempo máximo', () => {
+  const D1 = '11111111-1111-4111-8111-111111111111';
+  const D2 = '22222222-2222-4222-8222-222222222222';
+  function armarS(opciones: { tarda?: Promise<void>; vence?: boolean } = {}) {
+    const enCliente: string[] = [];
+    const delGrupo = vi.fn(() => Promise.reject(new Error('no debe usar el grupo directo')));
+    const release = vi.fn();
+    const cliente = {
+      on: vi.fn(), off: vi.fn(), release,
+      query: vi.fn(async (c: string | { text: string }) => {
+        const sql = typeof c === 'string' ? c : c.text;
+        enCliente.push(sql.trim().replace(/\s+/g, ' ').slice(0, 40));
+        if (sql.startsWith('SELECT id_fisico FROM dispositivo')) {
+          if (opciones.tarda) await opciones.tarda;
+          if (opciones.vence) throw Object.assign(new Error('canceling statement due to statement timeout'), { code: '57014' });
+          return { rows: [{ id_fisico: 'n1' }], rowCount: 1 };
+        }
+        if (sql.startsWith('SELECT d.id, d.estado, d.formato')) {
+          return { rows: [{ id: 'd1', formato: 'plano', magnitudes: ['temperatura'], decodificador: null, receta: null, alias: null }], rowCount: 1 };
+        }
+        return { rows: [], rowCount: 0 };
+      }),
+    };
+    const connect = vi.fn(() => Promise.resolve(cliente));
+    const servicio = new RecepcionService({ query: delGrupo, connect } as unknown as Pool, { alRecibir: vi.fn() } as unknown as BrokerService, {} as AlertasService,
       {} as SupervisionService, new EventosService(), new SenmlAdaptador(), new PlanoAdaptador(), new ChirpstackAdaptador(), new MilesightAdaptador(),
       { get: () => undefined } as unknown as ConfigService);
-    expect(await servicio.sinGuardar('11111111-1111-4111-8111-111111111111')).toEqual({ revisadas: 0, claves: [] });
-    const texto = (c: unknown): string => (typeof c === 'string' ? c : (c as { text: string }).text);
-    const propias = llamadas.filter((c) => !texto(c).startsWith('SELECT d.id, d.estado')); // la del pipeline, compartida, sigue igual
-    expect(propias).toHaveLength(3);
-    for (const c of propias) expect((c as { query_timeout?: number }).query_timeout).toBeLessThanOrEqual(5_000);
+    return { servicio, enCliente, connect, delGrupo, release };
+  }
+  const estado = (e: unknown) => [(e as { getStatus?: () => number }).getStatus?.(), ((e as { getResponse?: () => { codigo?: string; reintentar_en_s?: number } }).getResponse?.() ?? {})];
+  it('todo en UNA conexión del grupo, de solo lectura y con statement_timeout de 5 s; ninguna consulta directa al grupo', async () => {
+    const { servicio, enCliente, connect, delGrupo, release } = armarS();
+    expect(await servicio.sinGuardar(D1, 'u1')).toEqual({ revisadas: 0, claves: [] });
+    expect(connect).toHaveBeenCalledTimes(1);
+    expect(delGrupo).not.toHaveBeenCalled();
+    expect(enCliente.slice(0, 2)).toEqual(['BEGIN READ ONLY', "SET LOCAL statement_timeout = '5000ms'"]);
+    expect(enCliente.at(-1)).toBe('COMMIT');
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+  it('otra relectura simultánea → 429 sin_guardar_ocupado; la misma persona y equipo antes de 10 s → 429 sin_guardar_espera; otra persona u otro equipo, sí', async () => {
+    let soltar!: () => void;
+    const { servicio } = armarS({ tarda: new Promise<void>((r) => { soltar = r; }) });
+    const primera = servicio.sinGuardar(D1, 'u1');
+    const [st, cuerpo] = estado(await servicio.sinGuardar(D2, 'u2').catch((e: unknown) => e));
+    expect([st, (cuerpo as { codigo?: string }).codigo, (cuerpo as { reintentar_en_s?: number }).reintentar_en_s]).toEqual([429, 'sin_guardar_ocupado', 5]);
+    soltar();
+    await primera;
+    const [st2, c2] = estado(await servicio.sinGuardar(D1, 'u1').catch((e: unknown) => e));
+    expect([st2, (c2 as { codigo?: string }).codigo]).toEqual([429, 'sin_guardar_espera']);
+    expect((c2 as { reintentar_en_s?: number }).reintentar_en_s).toBeGreaterThan(0);
+    await expect(servicio.sinGuardar(D1, 'u2')).resolves.toEqual({ revisadas: 0, claves: [] });
+    await expect(servicio.sinGuardar(D2, 'u1')).resolves.toEqual({ revisadas: 0, claves: [] });
+  });
+  it('vencido el tiempo en la base (57014) → 503 sin_guardar_tiempo, la transacción se deshace y la conexión vuelve; el cupo se libera', async () => {
+    const { servicio, enCliente, release } = armarS({ vence: true });
+    const [st, cuerpo] = estado(await servicio.sinGuardar(D1, 'u1').catch((e: unknown) => e));
+    expect([st, (cuerpo as { codigo?: string }).codigo]).toEqual([503, 'sin_guardar_tiempo']);
+    expect(enCliente.at(-1)).toBe('ROLLBACK');
+    expect(release).toHaveBeenCalledTimes(1);
+    const [st2] = estado(await servicio.sinGuardar(D2, 'u1').catch((e: unknown) => e));
+    expect(st2).toBe(503); // el cupo no quedó tomado: vuelve a intentar (y vuelve a vencer en esta base falsa)
   });
 });

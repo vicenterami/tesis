@@ -39,6 +39,8 @@ export interface ContextoTrama {
   fcnt?: number;
   // Salida del adaptador: claves del JSON decodificado que no están en el mapa (la línea de registro de la trama dice cuántas y nombra las cinco primeras).
   ignoradas?: string[];
+  // Las mismas claves tal como llegaron (sin recortar ni limpiar), en el mismo orden: para buscar su valor en la carga (corrección del 25/11/2026).
+  ignoradasCrudas?: string[];
   // Salida LATERAL del adaptador LoRaWAN (docs/10 §8.4 punto 71): la señal del mejor receptor de la trama (`rxInfo`). No son lecturas del
   // adaptador: el pipeline las suma solo si el nodo declaró el canal `rssi` o `snr`, después de las del sensor.
   enlace?: Enlace;

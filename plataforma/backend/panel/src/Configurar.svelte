@@ -144,8 +144,9 @@
   const motivoEscribir = $derived(d === null || puedeEn(sesion, 'escribir', d.sitio_codigo) ? null : 'agregar una magnitud exige el perfil de operador técnico o de administrador en este sitio');
   const motivoAgregar = $derived(motivoEscribir ?? (d?.estado === 'baja' ? 'está dado de baja' : nuevaMagnitud === '' ? 'elige la magnitud' : null));
   // Relee la ficha y suma solo los canales nuevos al formulario (también tras «Agregar» desde «Lo que la trama trae y no se guarda»).
+  // Con su propia señal (corrección del 25/11/2026): con `carga.senal()` cancelaba una carga principal en vuelo, y su falla no es la del POST.
   async function sumarCanalesNuevos(): Promise<void> {
-    const x = await obtener<DispositivoFicha>(`/dispositivos/${encodeURIComponent(id)}`, carga.senal());
+    const x = await obtener<DispositivoFicha>(`/dispositivos/${encodeURIComponent(id)}`, new AbortController().signal);
     if (d === null) return;
     for (const c of x.canales) if (canales[c.id] === undefined) canales[c.id] = { etiqueta: c.etiqueta ?? '', reglas: reglasDe(c), servidor: [], guardando: false, aviso: null };
     d = { ...d, canales: x.canales.map((c) => d!.canales.find((k) => k.id === c.id) ?? c) };
@@ -157,16 +158,23 @@
     agregando = true;
     avisoMagnitud = null;
     const magnitud = nuevaMagnitud;
+    let r: { agregada: boolean };
     try {
-      const r = await pedir<{ agregada: boolean }>('POST', `/dispositivos/${encodeURIComponent(id)}/canales`, { cuerpo: { magnitud } });
-      await sumarCanalesNuevos();
-      const nombre = catalogo.find((m) => m.codigo === magnitud)?.nombre ?? magnitud;
-      avisoMagnitud = r.agregada
-        ? { tipo: 'exito', texto: `${nombre}: agregada. Se guarda desde la próxima trama; lo que llegó antes no se rellena.` }
-        : { tipo: 'info', texto: `${nombre}: el equipo ya la tenía.` };
-      nuevaMagnitud = '';
+      r = await pedir<{ agregada: boolean }>('POST', `/dispositivos/${encodeURIComponent(id)}/canales`, { cuerpo: { magnitud } });
     } catch (e) {
       if (!esCancelacion(e)) avisoMagnitud = avisoDeError(e);
+      agregando = false;
+      return;
+    }
+    // El canal ya quedó (o ya estaba): lo que falle después es la relectura, y se dice como tal (no invita a reintentar el POST).
+    const nombre = catalogo.find((m) => m.codigo === magnitud)?.nombre ?? magnitud;
+    const hecho = r.agregada ? `${nombre}: agregada. Se guarda desde la próxima trama; lo que llegó antes no se rellena.` : `${nombre}: el equipo ya la tenía.`;
+    nuevaMagnitud = '';
+    try {
+      await sumarCanalesNuevos();
+      avisoMagnitud = { tipo: r.agregada ? 'exito' : 'info', texto: hecho };
+    } catch {
+      avisoMagnitud = { tipo: 'info', texto: `${hecho} No se pudo releer el equipo: recarga la pantalla para ver su editor de reglas.` };
     } finally {
       agregando = false;
     }

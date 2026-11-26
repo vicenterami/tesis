@@ -138,6 +138,17 @@ class EquipoSimulado(threading.Thread):
             self.responder({'ok': False, 'orden': orden or '', 'error': 'orden'})
 
 
+class PruebaLimpio(unittest.TestCase):
+    # Corrección del 25/11/2026: lo que manda el equipo se imprime sin nada invisible ni de control, con la misma regla que el backend
+    # (recepcion/texto.ts: categorías C y Z salvo el espacio común): un U+202E invertía el identificador en el aviso de reemplazo.
+    def test_sin_invisibles_ni_controles(self):
+        self.assertEqual(ce.limpio('nodo\u202e1000-'), 'nodo?1000-')
+        self.assertEqual(ce.limpio('a\u200bb\u2028c\u2029d\u00a0e'), 'a?b?c?d?e')
+        self.assertEqual(ce.limpio('\x1b[31mrojo\x9b'), '?[31mrojo?')
+        self.assertEqual(ce.limpio('señal ñandú 1 2'), 'señal ñandú 1 2')
+        self.assertEqual(len(ce.limpio('x' * 100)), 64)
+
+
 class PruebaCargarEquipo(unittest.TestCase):
     def setUp(self):
         self.maestro, esclavo = os.openpty()
