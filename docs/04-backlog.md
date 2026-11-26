@@ -307,6 +307,14 @@ de planificación porque la pauta los evalúa y porque sin ellos no existe forma
 - Con el token en la cabecera, ninguna otra ruta cambia su respuesta, y el token no queda en ningún registro.
 - La vista previa del administrador y la vista del visitante dan los mismos números; ambas se leen a 390 px sin desplazamiento lateral.
 
+**HU-22 — criterio de aceptación agregado el 25/11/2026** (observación del profesor guía del 24/11/2026: el alta no facilitaba cargar la
+credencial; diseño y pruebas en `docs/19 §4`, Z, y `docs/16 §105`; entra en el corte de `docs/19 §4`, «Orden y corte», sin horas nuevas)
+
+- La credencial llega al equipo sin que la persona la copie: por USB en los equipos con el firmware del proyecto («Cargar en el equipo»,
+  o el guion de terminal), y con una ficha de conexión campo por campo para los demás; la clave no se dibuja hasta que se pide.
+- El avance se dice hasta que el broker la acepta y llega la primera trama; una falla, con su remedio, sin nombrar ningún valor secreto.
+- Un equipo ya cargado con otro identificador no se reemplaza sin confirmación explícita.
+
 ## EP-11 · Alertas y notificación
 
 | ID | Elemento | Prior. | Etapa | Horas |

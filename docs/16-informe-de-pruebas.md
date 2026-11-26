@@ -4,7 +4,7 @@ Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emu
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
 cubría al escribirse se agregó después: TT-32 (sensor físico) en §43, §44 y §53, y TT-30 (recuperación ante reinicio) en §11. El
-contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 1007 pruebas unitarias del backend y 649 del panel.
+contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 1010 pruebas unitarias del backend y 684 del panel.
 Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -5901,3 +5901,106 @@ broker por el proxy), y el sitio, las zonas, los equipos con sus lecturas, el en
 base, con la guarda de los recorridos del panel (antes de borrar, cero eventos de la persona fuera del sitio de la corrida): lo que quedó,
 **0** filas. Ningún registro del emisor ni archivo de datos contuvo una clave (búsqueda de las 10 claves en los CSV y de «clave»,
 «password» y «credencial» en el registro). El contenedor del emisor se quitó y las credenciales y el token se borraron con `shred`.
+
+## 105. «Cargar en el equipo»: la red y la credencial por USB, sin placa (docs/19 §4, Z; 25/11/2026)
+
+**Qué se prueba.** Que el alta cargue la red Wi-Fi, el servidor y la credencial en un equipo con el firmware del proyecto por el puerto
+serie (desde el panel con Web Serial, o con `herramientas/cargar-equipo.py`), sin que la persona copie ni vea la clave; que la ficha de
+conexión sirva a los demás equipos; y que ninguna clave (la del equipo ni la de la red) llegue al DOM sin pedirlo, al almacenamiento del
+navegador, a la dirección, a una petición al servidor, a la consola, a los argumentos del guion o a sus mensajes. Diseño en `docs/19 §4`
+(Z), firmware en `docs/17 §6.4` y seguridad en `docs/11 §7` («Carga por USB»).
+
+**Método y resultado.** Todo sin placa:
+
+| Nivel | Con qué | Resultado |
+|---|---|---|
+| Firmware: analizador de órdenes, validación, armador de líneas | `herramientas/probar-protocolo.sh` (C++ compilado en el anfitrión, sin PlatformIO; paso 2y5 del verificador) | 63 de 63 comprobaciones (también con AddressSanitizer y UndefinedBehaviorSanitizer, sin avisos) |
+| Firmware: la imagen | `pio run` de `nodo`, `nodo-s3` y `diagnostico` con la plantilla de secretos (valores falsos, en una copia temporal), con y sin las macros por omisión | compila, sin avisos en `src/` ni en `include/`; `nodo`: 956 301 bytes de flash (73,0 %), 48 808 de RAM |
+| Guion de terminal | `herramientas/prueba_cargar_equipo.py`, contra un equipo simulado en una pseudoterminal (paso 2y5) | 23 de 23 |
+| Panel: protocolo y pantalla | vitest: `lib/serie.test.ts` (20 `it(`, uno de ellos sobre los 33 casos compartidos), `CargarEnEquipo.test.ts` (11) y los del bloque Z en `Alta.test.ts`, con un puerto simulado que contesta como el firmware | 806 de 806 ejecuciones del panel en 49 archivos |
+| Cabeceras | `arranque.spec.ts`: `Permissions-Policy` no niega `serial` en el panel ni en el proxy (y el detector reconoce una negación plantada) | 1104 de 1104 ejecuciones del backend en 80 archivos |
+| Navegadores reales | `plataforma/pruebas/panel-cargar-e2e.sh` (`e2e/cargar.mjs`; paso 4c), Chromium 158 y Firefox 159, a 390 y 1 280 px | 140 de 140 comprobaciones (96 en Chromium, 44 en Firefox) |
+
+**El recorrido en navegadores.** Una persona de descarte por navegador y ancho administra un sitio de descarte; da de alta un equipo por MQTT
+de a uno y tres por lote (dos por MQTT y uno por HTTP). En la ficha: siete campos con su «Copiar», la clave oculta hasta «Mostrar la clave»
+(y fuera del DOM de nuevo al ocultarla) y la descarga en texto (el archivo de descarte se borra). En **Chromium**, el `navigator.serial` de la
+página se reemplaza por uno **simulado** que habla el protocolo del firmware (respuestas partidas en trozos y mezcladas con el registro, el
+reinicio tras `configurar`); se prueban, en este orden: una clave de red de menos de 8 caracteres (se dice arriba y no abre el selector), el
+selector cancelado, el permiso negado, el puerto ocupado (otro programa u otra pestaña), un equipo con otro firmware (no recibe la carga), uno
+que no habla el protocolo (solo su registro de arranque: «no responde» a los 20 s, adelantados con el reloj de Playwright), el campo rechazado
+(«revisa la clave de la red»), el cable desconectado en medio de `configurar` (no se da por cargado), una red que no acepta la clave (cargada,
+y a los 90 s, también adelantados, «No encuentra la red o la clave de la red no es correcta» con «Cargado, sin conectar») y la carga completa
+con 64 kB de ruido sin salto de línea, bytes que no son UTF-8 y un trozo viejo en el búfer del equipo: primero `hola`, después `configurar`
+con la red, su clave, el puerto, el sitio, el identificador y la credencial del alta; DTR y RTS abajo, el puerto cerrado al terminar,
+«cargada → red → broker» y, con un evento entregado al canal en vivo del equipo (no hay equipo real que publique), «Listo: ya envía datos».
+En el lote, la lista de los dos MQTT con el de HTTP contado aparte, de a uno («1 de 2 cargados»). En **Firefox**, la prueba **quita**
+`navigator.serial` de la página y comprueba lo que ve un navegador sin Web Serial: por qué no está el botón, los siete «Copiar», la descarga
+y el guion de terminal; en el lote, el archivo de credenciales. Medido el 25/11/2026: el Firefox 159 de Playwright **sí** expone
+`navigator.serial` (tiene las preferencias `dom.webserial.enabled` y `dom.webserial.gated`); la pantalla decide por la función, no por el
+navegador, y su texto ya no dice que Firefox no la tenga. En los dos navegadores y anchos: ninguna clave en el DOM ni el almacenamiento ni
+la dirección (en cinco momentos, también durante la carga), ni en las peticiones de la página ni en la consola; sin desplazamiento horizontal
+ni errores de JavaScript. Al final da de baja los 3 equipos MQTT por la API (la baja borra su cliente del broker) y el guion cuenta, en el
+archivo del plugin del broker y sin clave, que no quede ningún cliente de la corrida; lo demás se borra como dueño de la base: **0** filas.
+
+**Plantados.** En el panel servido por Vite, con tres cambios a la vez (la clave visible por omisión, sin la corrección del error de forma
+de abajo, y la clave de la red enviada en una petición): 26 de 82 comprobaciones de Chromium fallaron, cada una por su causa (la clave en
+el DOM, la carga que se corta en «otro firmware», «ninguna clave en las peticiones»); restaurado, 82 de 82 (84 con el caso del permiso).
+
+**Correcciones de la revisión de seguridad** (cada una con su prueba, que falla sin ella):
+
+- El panel y el guion tomaban un error de forma sin orden (`{"ok":false,"orden":"","error":"json"}`, lo que el firmware responde a una
+  línea mal formada, por ejemplo un trozo que quedó en su búfer) como la respuesta a `hola` y decían «no tiene el firmware de la plataforma»
+  a un equipo nuestro: ahora repiten el saludo (`lib/serie.ts`, `cargar-equipo.py`).
+- El firmware guardaba sin plazo una orden a medias: si el cable se desconectaba en medio de `configurar`, un trozo de la clave quedaba en
+  memoria y se pegaba al comienzo de la orden siguiente. Ahora se borra a los 2 s sin bytes, solo con el búfer de recepción vacío
+  (`protocolo::Armador`; 7 comprobaciones nuevas).
+- `configurar` esperaba 3 s: si el equipo entraba justo en un saludo TLS (bloquea hasta 10 s), la carga se daba por no confirmada aunque se
+  guardara. Ahora espera lo que un saludo (20 s), en el panel y en el guion.
+- Un campo rechazado se validaba con `in`: un equipo que contestara «toString» como campo mostraba código en el texto de la falla. Ahora
+  `Object.hasOwn`; la lista de respuestas del enlace queda acotada a 64.
+- Si el navegador niega el permiso del puerto, el panel decía «No elegiste un puerto»; ahora lo dice como permiso.
+- Si el navegador no deja copiar, el aviso pedía seleccionar a mano una clave que se ve como puntos: ahora remite a «Mostrar la clave».
+- El guion: un archivo de credenciales que no es UTF-8 o CSV ya no deja un error de Python (que podía citar un trozo con claves), y un
+  `campo` o un `ultimo_error` del equipo que no es texto ya no lo corta; si el cable se desconecta con el puerto abierto, lo dice en una
+  línea (antes, un error de Python).
+
+**Segunda revisión del mismo día (24 hallazgos; los aplicados, cada uno con su prueba, que falla sin él).**
+
+- **La carrera del reinicio (la más grave).** Tras aceptar `configurar`, el firmware seguía contestando unos 300 ms con la configuración
+  vieja; recargar el MISMO identificador (cambio de red, credencial rotada) tomaba el `hola` y el `estado` de la sesión vieja y decía «el
+  broker la aceptó» con una red que nunca conectó. Reproducido contra un equipo falso en una pseudoterminal: salida 0 y «3. El broker la
+  aceptó» en 0,01 s. Ahora el firmware reinicia en el acto tras vaciar la salida, sin volver al `loop`; `hola` trae un número de
+  **arranque** que cambia en cada inicio (protocolo 2, firmware 2.1.0); el panel y el guion exigen, tras `configurar`, un `hola` de otro
+  arranque antes de mirar `estado`, y una versión del protocolo distinta se dice como tal. Los tres simuladores siguen contestando con lo
+  anterior durante una ventana, como el firmware. El mismo caso, con protocolo 2: termina en «No encuentra la red…» (salida 1); plantado
+  sin la comprobación del arranque, vuelve «el broker la aceptó» en las tres pruebas (vitest, guion y navegadores).
+- **Un equipo ya cargado con otro identificador** ya no se reemplaza en silencio: el panel pide escribir el identificador actual (también
+  en el lote) y el guion exige `--reemplazar <actual>`.
+- **`borrar`** borra la partición de datos entera (`nvs_flash_erase_partition`) en vez de marcar la entrada como borrada, y el guion dice
+  con qué arrancó el equipo (lo compilado o sin configurar), no «de fábrica». Recargar no borra lo anterior de la flash: límite declarado
+  en `docs/11 §7`, con la cita de ESP-IDF, junto con que dar de baja o entregar un equipo exige rotar su credencial y la clave de la red.
+- **El permiso del puerto** se suelta al terminar (`forget()`, donde existe); el límite que queda, en `docs/11 §7`.
+- **Escrituras con plazo** y un cierre que no se cuelga (`abort` y cada paso con su plazo), en el panel y en el guion.
+- **El nulo** (`\u0000`): el firmware lo aceptaba y cortaba el campo (lo que seguía saltaba la validación); ahora rechaza la línea. Las
+  tres implementaciones leen los mismos 33 casos (`plataforma/firmware/herramientas/casos-validacion.txt`).
+- **El guion** filtra los controles de lo que manda el equipo antes de imprimirlo (una secuencia de escape no llega a la terminal), abre
+  el puerto en exclusiva (`flock` y `TIOCEXCL`) y dice «no es un puerto serie» en vez de un error de Python.
+- **El firmware** borra también el búfer del nombre del campo al terminar cada línea.
+- **Sin contexto seguro** (HTTP fuera de `localhost`), el panel dice que falta HTTPS, no que el navegador no sirve.
+- **La clave de la red** se enmascara sin ser un campo de contraseña donde el navegador sabe enmascarar un texto (en Chromium, medido),
+  para no invitar al gestor de contraseñas; si un campo de contraseña lo invitaría no se probó en un Chrome real (queda en el laboratorio).
+- **Concordancia:** la rama «Cargar en el equipo» en la secuencia del alta (`docs/10 §3`, y la figura del informe regenerada desde ella),
+  un criterio de aceptación de HU-22 (`docs/04`), los navegadores en una sola frase con su fuente, la atomicidad con la cita de ESP-IDF, y
+  lo probado con placa y sin ella dicho igual en `docs/18`, en el README del firmware y aquí. El verificador comprueba además que la
+  versión del firmware y la del protocolo sean una sola en el firmware, el panel, el guion y los tres simuladores (paso 2y5).
+
+**Lo que NO está probado.** La placa real: grabar la imagen, cargar por Chromium y por el guion, que el equipo se reinicie con lo cargado y
+publique, y verlo «Normal» (laboratorio aparte, cuando haya una placa conectada). El puerto serie real del navegador (el selector, el
+permiso de cada navegador, en especial el de Firefox, y que `forget()` lo suelte como dice su documentación), los tiempos reales de un
+saludo TLS que bloquea, que el gestor de contraseñas de Chrome no ofrezca guardar la clave de la red, y el borrado de la partición en la
+placa. Que escribir el registro en la memoria
+no volátil sea atómico ante un corte de energía se toma de la documentación de ESP-IDF, no se midió. La primera trama de esta prueba es un
+evento entregado por la prueba al canal en vivo, no un mensaje real por el broker. Una placa con USB nativo (sin puente USB-serie) solo se
+probó con el puerto simulado que se cierra al reiniciar (vitest).
+
+Hoy son 1010 pruebas unitarias del backend y 684 del panel.

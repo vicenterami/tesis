@@ -132,7 +132,8 @@ describe('descargar', () => {
     expect(nombreDeArchivo('attachment; filename="../../etc/passwd"', 'x.csv')).toBe('x.csv');
     expect(nombreDeArchivo(null, 'x.csv')).toBe('x.csv');
   });
-  it('nombreDeArchivo: solo .csv, .json, .zip y .xlsx (lo que la API entrega); otra extensión da el nombre de por defecto', () => {
+  it('nombreDeArchivo: solo .csv, .json, .zip, .xlsx y .txt (lo que el panel entrega); otra extensión da el nombre de por defecto', () => {
+    expect(nombreDeArchivo('attachment; filename="conexion-nodo-0001.txt"', 'x.csv')).toBe('conexion-nodo-0001.txt'); // la ficha de conexión (docs/19 §4, Z)
     expect(nombreDeArchivo('attachment; filename="datos.exe"', 'x.csv')).toBe('x.csv');
     expect(nombreDeArchivo('attachment; filename="pagina.html"', 'x.csv')).toBe('x.csv');
     expect(nombreDeArchivo('attachment; filename="sin-extension"', 'x.json')).toBe('x.json');

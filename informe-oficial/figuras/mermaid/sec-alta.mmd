@@ -20,8 +20,15 @@ sequenceDiagram
     end
     API->>DB: INSERT evento «alta» y COMMIT<br/>(todo o nada: si la base no confirma,<br/>deleteClient en el broker)
     API-->>FE: 201 {id, datos de conexión}<br/>— la credencial se muestra UNA vez
-    FE-->>Admin: Muestra credencial + tópico<br/>+ ejemplo de trama
-    Admin->>Dev: Carga credencial en el firmware<br/>(o la entrega al compañero)
+    alt equipo con el firmware del proyecto, por USB (docs/19 §4, Z)
+        Admin->>FE: «Cargar en el equipo» (red Wi-Fi y servidor)
+        FE->>Dev: Web Serial: hola, configurar<br/>(red, servidor, sitio, id, credencial)
+        Dev->>Dev: guarda en su memoria no volátil<br/>y se reinicia (otro «arranque»)
+        FE->>Dev: hola (arranque distinto) y estado<br/>hasta «el broker la aceptó»
+    else equipo de terceros
+        FE-->>Admin: Ficha de conexión (clave oculta<br/>hasta «Mostrar», copiar o descargar)
+        Admin->>Dev: Carga la credencial con<br/>la herramienta del equipo
+    end
     Dev->>MQ: CONNECT (id_fisico, credencial) · TLS
     MQ->>MQ: valida credencial y ACL
     Dev->>MQ: PUBLISH<br/>sitio/…/dispositivo/<id>/<magnitud>

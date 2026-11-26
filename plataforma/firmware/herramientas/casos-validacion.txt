@@ -1,0 +1,33 @@
+# Casos de validación compartidos por las tres implementaciones de las reglas de `configurar` (revisión del 25/11/2026): el firmware
+# (include/protocolo.h, herramientas/prueba-protocolo.cpp), el guion (cargar-equipo.py, prueba_cargar_equipo.py) y el panel (lib/serie.ts,
+# lib/serie.test.ts). Cada línea: el campo que debe rechazarse (o «ninguno») <TAB> un fragmento JSON que reemplaza ese campo en una orden
+# válida. Con un nulo (\u0000) el firmware rechaza la línea entera como mal formada antes de mirar los campos: también es un rechazo.
+ninguno	"red":"red-de-prueba"
+ninguno	"clave_red":""
+ninguno	"red":"Caf\u00e9"
+ninguno	"clave":"abc+/=0123456789"
+ninguno	"servidor":"192.0.2.10"
+red	"red":""
+red	"red":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+red	"red":"\u00f1\u00f1\u00f1\u00f1\u00f1\u00f1\u00f1\u00f1\u00f1\u00f1\u00f1\u00f1\u00f1\u00f1\u00f1\u00f1\u00f1"
+red	"red":"a\u0001b"
+red	"red":"ok\u0000\u0001\u0002"
+clave_red	"clave_red":"corta12"
+clave_red	"clave_red":"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+clave_red	"clave_red":"clave-con-\u00f1-0"
+clave_red	"clave_red":"clave-de-red\u0000xx"
+servidor	"servidor":""
+servidor	"servidor":"-malo"
+servidor	"servidor":".malo"
+servidor	"servidor":"con espacio"
+servidor	"servidor":"a/b"
+puerto	"puerto":0
+puerto	"puerto":65536
+sitio	"sitio":"u"
+sitio	"sitio":"UCT"
+id	"id":"no"
+id	"id":"Nodo-1"
+clave	"clave":"corta"
+clave	"clave":"con espacio 000000000"
+clave	"clave":"kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk"
+clave	"clave":"abcdefghijklmnop\u0000XYZ"

@@ -74,7 +74,7 @@ tabla de casos**, un archivo del panel que leen las tres (`panel/src/lib/estado-
 | P4 | **Condiciones** | Lista con tipo, dispositivo, magnitud y umbral, abierta en, duración; filtro abiertas / todas; al cerrarse, el resumen del episodio, y el reconocimiento con su clasificación (`docs/10 §8.4` punto 49) | Abrir la ficha del dispositivo | `GET /condiciones?abiertas&limite` | HU-05, RF-24 | Etapa 4 (lista sobre lo que la API ya devuelve) |
 | P5 | **Cuarentena** | Últimas tramas rechazadas: cuándo, por qué (`no_registrado`, `dado_de_baja`, `malformada`, `invalida`), detalle, dispositivo si se conoce, la trama cruda plegada | Copiar la trama; ir al alta si el motivo es `no_registrado` | `GET /cuarentena?limite` | RF-11 a RF-13 | Etapa 4 (lista sobre lo que la API ya devuelve) |
 | P6 | **Configurar dispositivo y canales** | Nombre, estado (activo / mantenimiento), intervalo esperado, zona; por canal, etiqueta, umbral alto, umbral bajo, histéresis y retardo de activación | Guardar con bloqueo optimista; validación en vivo (bajo < alto, histéresis dentro de la banda, rango de la magnitud) | `PATCH /dispositivos/{id}`, `PUT /canales/{id}/reglas` (Etapa 4), fijadas el 11/11/2026 (§4 tablero v2, E) | HU-06, HU-13, RF-14, punto 28 | Etapa 4, iteración 1 (exige sesión) |
-| P7 | **Alta de dispositivo** (asistente) | Paso 1 identidad y zona; paso 2 vía y formato (y pasarela si LoRaWAN); paso 3 canales y magnitudes; paso 4 credencial según la vía, mostrada una sola vez; paso 5 «esperando la primera trama» en vivo | Crear; copiar la credencial y el tópico; subir un CSV, validarlo y crear las filas válidas (el alta masiva: §4, bloques N y, desde el 19/11/2026, S); dar de alta un emisor detectado; «+ Nueva zona…» en el selector de zona (con `ajustes`) y, en el alta masiva, la casilla para crear las zonas que no existan (bloque U2) | `POST /dispositivos` (API hecha el 12/10, HU-11, `docs/16 §20`); `POST /dispositivos/lote?modo=validar\|crear` y `GET /cuarentena/detectados` (Etapa 4), fijadas el 11/11/2026 (§4 tablero v2, F) | RF-50, HU-11, HU-22, punto 25 | API: Etapa 3; pantalla, lote y detectados: Etapa 4, iteración 1 |
+| P7 | **Alta de dispositivo** (asistente) | Paso 1 identidad y zona; paso 2 vía y formato (y pasarela si LoRaWAN); paso 3 canales y magnitudes; paso 4 credencial según la vía, mostrada una sola vez; paso 5 «esperando la primera trama» en vivo | Crear; copiar la credencial y el tópico; subir un CSV, validarlo y crear las filas válidas (el alta masiva: §4, bloques N y, desde el 19/11/2026, S); dar de alta un emisor detectado; «+ Nueva zona…» en el selector de zona (con `ajustes`) y, en el alta masiva, la casilla para crear las zonas que no existan (bloque U2); desde el 25/11/2026, «Cargar en el equipo» por USB y la ficha de conexión con «Copiar» por campo (bloque Z) | `POST /dispositivos` (API hecha el 12/10, HU-11, `docs/16 §20`); `POST /dispositivos/lote?modo=validar\|crear` y `GET /cuarentena/detectados` (Etapa 4), fijadas el 11/11/2026 (§4 tablero v2, F) | RF-50, HU-11, HU-22, punto 25 | API: Etapa 3; pantalla, lote y detectados: Etapa 4, iteración 1 |
 | P8 | **Exportar** (el sitio, diseñada el 19/11/2026, §4 bloque R) | Dispositivo (hoy) o sitio (Etapa 4), rango, formato (CSV, XLSX, JSON); tamaño estimado antes de descargar | Descargar | Hecho el 12/10 por dispositivo: `GET /dispositivos/{id}/exportar?formato=csv\|json&desde&hasta` (flujo por tandas; CSV estándar con coma y punto decimal para R, Python y QGIS). Por sitio (bloque R): `GET /sitios/{id}/exportar?formato=csv\|xlsx\|json` con mediciones, tramas y eventos, y `GET /sitios/{id}/exportar/estimacion` | RF-34, HU-08 (adelantada a la Etapa 3 el 12/10) | API: Etapa 3; pantalla, XLSX y por sitio: Etapa 4 |
 | P9 | **Vista pública por enlace** (diseñada el 16/11/2026, §4 bloque O; ✅ base, backend, proxy y las dos pantallas, 17/11/2026, `docs/16 §79` y §80) | Para quien visita sin cuenta: solo los promedios de las magnitudes que un administrador publicó (del sitio y, si lo eligió, de cada zona), nunca el mínimo ni el máximo; un valor sale oculto si lo aportan menos de k dispositivos. Para el administrador, «Publicar una vista» con vista previa y la lista de enlaces | Visitante: cambiar la ventana y pausar la actualización. Administrador: crear (con vencimiento), renovar y revocar | `GET /publico` (token en la cabecera `X-Enlace-Publico`) y `POST /sitios/{id}/enlaces/vista-previa`; crear y listar, `GET`/`POST /sitios/{id}/enlaces`, renovar, `POST /sitios/{id}/enlaces/{enlace}/renovar`, revocar, `DELETE /sitios/{id}/enlaces/{enlace}`, y el tope de enlaces y el k del sitio, `GET`/`PUT /sitios/{id}/enlaces/tope` y `GET`/`PUT /sitios/{id}/enlaces/minimo`, fijadas en el OpenAPI el 17/11/2026 (§4, O); desde el 18/11/2026 el k y el tope se cambian en P15 «Ajustes del sitio» (§4, Q) | RF-62, HU-32, punto 6 | Etapa 4, iteración 1 |
 | P10 | **Sesión y usuarios** | Entrar, cambio de la clave temporal, salir; quién soy en la cabecera; usuarios de mis sitios, su perfil por sitio y la guía de perfiles (cinco desde el 08/11/2026, diseño: `docs/20 §6`) | Entrar, cambiar la clave, salir o cerrar en todos lados; dar de alta (clave temporal una vez), activar y desactivar, asignar una temporal, cambiar el rol | `POST /sesion`, `GET /sesion`, `DELETE /sesion`, `POST /sesion/clave`, `GET /usuarios`, `POST /usuarios`, `PATCH /usuarios/{id}` (`docs/20`) | RF-43, RF-44, HU-18 | Etapa 4; hecha el 08/11/2026 (§4) |
@@ -1893,7 +1893,92 @@ seguido que su intervalo esperado de 180 s).**
 3. **Pruebas.** Por el DOM: el prellenado, y que ningún dato de credencial viaja en la dirección ni en la petición.
 
 **Orden y corte (24/11/2026).** U y U2, V, W, X, Y, en ese orden, entre el 24 y el 27/11/2026 (10 a 14 h estimadas). Desde el 28/11
-el trabajo es el informe: lo que no cierre el 27/11 se declara trabajo futuro, no se estira.
+el trabajo es el informe: lo que no cierre el 27/11 se declara trabajo futuro, no se estira. El 25/11/2026 se sumó Z (abajo), por la
+observación del profesor guía del 24/11 sobre cargar la credencial; entra en el mismo corte.
+
+**Z. «Cargar en el equipo»: la red, el servidor y la credencial por USB (decidido y diseñado el 25/11/2026, antes del código).**
+Lo motiva la retroalimentación de la Etapa 3: el alta entrega usuario y clave y la persona debe cargarlos al sensor por su cuenta, cuando
+la tesis promete facilitarlo. Se decidió la carga por USB desde el panel; el aprovisionamiento por reclamo (el equipo se presenta solo y
+la plataforma le entrega su credencial) queda como trabajo futuro, porque exige que el equipo pruebe que es él y una ventana abierta por
+una persona (`docs/02 §4.3`). La seguridad de lo que sigue, en `docs/11 §7` («Carga por USB»).
+1. **Qué cubre y qué no.** Equipos con el firmware del proyecto (`plataforma/firmware`, `docs/17 §6.4`) conectados por USB al computador
+   de quien da de alta. El navegador habla con el puerto serie por la API Web Serial, en contexto seguro (HTTPS o `localhost`) y con un
+   gesto de la persona: el navegador muestra su propio selector de puertos y la página solo recibe el que la persona elige. Web Serial existe en Chrome desde la versión 89 (Edge y Opera la heredan), en Firefox de escritorio desde la 151 y en Chrome para Android desde la 148; Safari no la tiene (datos de compatibilidad de MDN, `api/Serial.json` de browser-compat-data, https://github.com/mdn/browser-compat-data/blob/main/api/Serial.json, consultados el 25/11/2026).
+   La pantalla decide por la función, no por el nombre del navegador (el Firefox 159 de las pruebas en navegadores expone
+   `navigator.serial`, medido el 25/11/2026); donde no existe, se dice por qué (sin contexto seguro, que falta HTTPS; si no, que el
+   navegador no la tiene) y se ofrecen la ficha y el guion de terminal. Si el navegador niega el permiso, se dice eso (no «no elegiste un
+   puerto»). Al terminar cada carga, el panel suelta el permiso del puerto (`forget()`, `docs/11 §7`). Si el equipo ya está cargado con
+   OTRO identificador, no se reemplaza sin que la persona escriba el actual (un clic de más no basta, tampoco en el lote). Los equipos de terceros se configuran
+   con su propia herramienta: para ellos, la ficha de conexión (punto 6). La CA sigue compilada en el firmware: **una imagen por
+   instalación** (la misma para todos sus equipos) y **la credencial por equipo**, cargada por USB.
+2. **El protocolo serie** (115200 baudios, 8N1; el mismo para el panel y para el guion de terminal). Una orden por línea, un objeto JSON
+   plano de a lo más 512 bytes terminado en `\n`; cada respuesta es una sola línea que empieza con `@plataforma ` seguida de un JSON, para
+   distinguirla del registro normal que el equipo sigue escribiendo. Toda respuesta trae `ok` y `orden`; un error trae `error` y, si es de un
+   campo, `campo`. **Ninguna respuesta devuelve un secreto** y el registro serie nunca escribe la clave del equipo ni la de la red.
+
+   | Orden | Pide | Responde |
+   |---|---|---|
+   | `{"orden":"hola"}` | nada | `firmware` (`nodo`), `version`, `protocolo` (2), `arranque` (cambia en cada inicio), `configurado`, `origen` (`memoria`, `compilado` o `ninguno`) e `id` si lo tiene |
+   | `{"orden":"configurar",…}` | `red` (1 a 32 bytes), `clave_red` (vacía si la red es abierta, o de 8 a 63 caracteres imprimibles), `servidor` (nombre o IPv4, hasta 63, letras, dígitos, punto y guion), `puerto` (1 a 65 535), `sitio` (la forma del código de sitio), `id` (la del identificador físico) y `clave` (16 a 128 caracteres imprimibles sin espacios) | valida todo, guarda **todo o nada** y responde `{"ok":true,"orden":"configurar","reinicia":true}`; el equipo se reinicia y arranca con lo nuevo. Un campo mal: `{"ok":false,"orden":"configurar","error":"campo","campo":"…"}` y no guarda nada |
+   | `{"orden":"estado"}` | nada | `configurado`, `wifi` (`conectado`, `conectando`, `sin_conexion` o `sin_configurar`), `broker` (`conectado` o `desconectado`), `ultimo_error` (`ninguno`, `wifi`, `dns`, `tls`, `credencial` o `broker`), `publicados` y `fallidos` |
+   | `{"orden":"borrar"}` | nada | borra la partición de datos entera, responde `reinicia: true` y arranca con lo que traiga la imagen: sus valores compilados, si los trae, o sin configurar |
+
+   Una línea que no es JSON responde `error: "json"`; una orden desconocida, `error: "orden"`; una línea de más de 512 bytes, `error: "larga"`;
+   si la memoria no aceptó la escritura, `error: "guardar"` (no queda nada a medias). Una línea a medias que se queda 2 s sin bytes (el cable
+   se desconectó en medio de `configurar`) se borra sin responder. Quien habla con el equipo repite `hola` ante un error de forma sin orden
+   (es por un trozo viejo en el búfer, no por el saludo) y espera la respuesta a `configurar` tanto como un saludo (20 s). Tras aceptar
+   `configurar`, el equipo se reinicia en el acto; quien carga no mira `estado` hasta recibir un `hola` con un `arranque` distinto del de
+   antes (el equipo que todavía corre con lo anterior no cuenta, aunque tenga el mismo identificador). Un `protocolo` distinto de 2, o
+   sin `arranque`, se dice como «otra versión» y no recibe la carga.
+3. **El firmware** guarda la configuración en la memoria no volátil del ESP32 (`Preferences`, un solo registro con su versión; según la
+   documentación de ESP-IDF, no medido, un corte a mitad pierde a lo más el valor nuevo: `docs/17 §6.4`). Las macros de `secretos.h` (`WIFI_SSID`, `MQTT_HOST`,
+   `DISPOSITIVO_ID`…) quedan como valores por omisión cuando existen: lo que hoy funciona no se rompe. Sin nada guardado ni compilado, el
+   equipo no intenta conectarse: solo atiende la serie y lo anuncia cada 30 s. El lector de líneas no bloquea: toma lo que haya llegado en
+   cada vuelta del `loop()` y también durante las esperas de Wi-Fi y de NTP; el búfer de recepción es de 1 024 bytes, para que una orden
+   no se pierda durante el saludo TLS (hasta 10 s). El vigía de 120 s sigue igual.
+4. **El panel** (`lib/serie.ts`, el protocolo, independiente de la pantalla; `CargarEnEquipo.svelte`, la pantalla). En el paso 4 del
+   asistente (vía MQTT) y en el paso 3 del alta masiva, el botón **«Cargar en el equipo»**:
+   - pide la red Wi-Fi **una vez** (nombre y clave, la clave en un campo oculto con «Mostrar») y el servidor y su puerto, con la dirección
+     del panel y 8883 ya escritos. La red vive solo en la memoria de la página: nunca va al servidor ni al almacenamiento del navegador, y
+     se olvida al salir de la pantalla;
+   - «Conectar y cargar» abre el selector de puertos del navegador (el gesto es ese clic), saluda (`hola`; espera hasta 20 s, por si el
+     equipo se reinició al abrir el puerto o está en medio de un saludo TLS), comprueba que es nuestro firmware, envía `configurar` y
+     muestra el avance con palabras simples: **«Credencial cargada → Conectó a la red → El broker la aceptó → Llegó la primera
+     trama»**. Las dos del medio salen de `estado` (cada 2 s, hasta 90 s); la última, del canal en vivo del dispositivo (F1), que el panel
+     ya usa. Una falla se dice con su remedio («No encuentra la red o la clave de la red no es correcta», «El servidor no se encontró:
+     revisa la dirección», «El equipo no reconoce el certificado del servidor: grábale la imagen de esta instalación», «El broker rechazó la
+     credencial: rótala desde la ficha del equipo y vuelve a cargarla»);
+   - en el alta masiva, la lista de los creados por MQTT con «Conectar y cargar» en cada uno, de a uno; marca los hechos y permite
+     reintentar; los que no van por MQTT se cuentan aparte (no se cargan por USB). La clave no se muestra en ningún momento;
+   - donde el navegador no tiene puerto serie, el botón no aparece: en su lugar, por qué («Cargar en el equipo por USB no está
+     disponible en este navegador (necesita Web Serial…)», o, sin contexto seguro, «…necesita que el panel se abra por HTTPS») y lo de
+     siempre: copiar, descargar y el guion de terminal;
+   - la clave de la red se enmascara sin ser un campo de contraseña donde el navegador sabe enmascarar un texto, para no invitar al gestor
+     de contraseñas a guardarla para el sitio (si lo ofrecería en un campo de contraseña no se probó en un navegador real: queda en el
+     laboratorio).
+   Accesible por teclado; el avance es una lista con `role="status"`; legible a 390 px; los mismos `Boton`, campos y avisos que el resto
+   del alta.
+5. **El guion de terminal** (`plataforma/firmware/herramientas/cargar-equipo.py`, Python 3 sin bibliotecas externas; Linux y macOS):
+   `hola`, `estado`, `cargar` y `borrar` con el mismo protocolo. `cargar` toma la credencial del archivo de credenciales del alta masiva
+   (`--credenciales archivo.csv --id <id_fisico>`; el sitio sale del tópico) o la pide sin mostrarla; la clave de la red siempre la pide
+   sin mostrarla. Ninguna clave va en los argumentos (no quedan en `ps` ni en el historial) ni se imprime.
+6. **Equipos de terceros: la ficha de conexión.** El paso 4 del asistente muestra servidor, puerto (8883, MQTT sobre TLS), usuario,
+   identificador de cliente (el mismo usuario: el broker lo exige), clave (oculta hasta «Mostrar la clave»: para copiarla o cargarla no
+   hace falta verla), tópico y formato, cada uno con **«Copiar»**, y **«Descargar la ficha (texto)»**: un texto plano con esos campos, uno por línea (no imita el formato de ningún fabricante), con el aviso de que trae la
+   clave. El certificado de la autoridad se pide al administrador de la instalación, como en P18.
+7. **Las cabeceras.** El panel se sirve con `Permissions-Policy: camera=(), microphone=(), geolocation=()`: no nombra `serial`, y el valor
+   por omisión de esa directiva es `self` («The default allowlist for `serial` is `self`», MDN, `docs/11 §7`), así que la página del panel puede usar el puerto serie (y un marco de otro origen, no). Una
+   prueba del backend lo fija: si alguien agrega `serial=()`, falla.
+8. **Pruebas.** Del protocolo, con un puerto **simulado** que se comporta como el firmware (respuestas partidas en trozos y mezcladas con
+   el registro, un equipo que tarda en contestar, uno que no es nuestro, un campo rechazado, las fallas de `estado`); por el DOM, el botón
+   con y sin puerto serie, el avance hasta la primera trama, el lote de a uno con su reintento, y que la clave de la red no llega a
+   `fetch` ni al almacenamiento; del guion, contra un equipo simulado en una pseudoterminal (ninguna clave en la salida ni en los
+   argumentos); del firmware, el analizador de órdenes, el armador de líneas y la validación compilados en el anfitrión, y la compilación
+   de la imagen. En navegadores reales (`plataforma/pruebas/panel-cargar-e2e.sh`, paso 4c del verificador; `docs/16 §105`): en Chromium con
+   el puerto serie simulado en la página y en Firefox con Web Serial quitado de la página (para ver lo que se ofrece sin él), a 390 y
+   1 280 px. Los simuladores (el de vitest, el del recorrido y el equipo falso del guion) siguen contestando con la configuración vieja
+   durante una ventana tras `configurar`, como el firmware real. **Lo que no se prueba sin la placa** (laboratorio
+   aparte): grabar, cargar por el guion y por Chromium y ver el equipo «Normal».
 
 ## 5. Flujos
 **F1 · Alta y primera trama.** Ya está dibujado en el diagrama de secuencia del alta (`docs/10`, figura del informe): el

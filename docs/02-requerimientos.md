@@ -383,7 +383,8 @@ como omisión.
 | Fuera de alcance | Razón |
 |---|---|
 | Analítica predictiva o aprendizaje automático sobre los datos | No aborda ninguna causa identificada; ampliaría el alcance sin fortalecer la tesis |
-| Actuación remota sobre dispositivos (*downlink*, control) | La plataforma es de gestión de datos y conectividad, no de control de procesos |
+| Actuación remota sobre dispositivos (*downlink*, control) | La plataforma es de gestión de datos y conectividad, no de control de procesos. Cargar la red y la credencial por USB desde el panel (`docs/19 §4`, Z) no es actuación remota: es local, con el equipo conectado al computador de quien lo da de alta |
+| Aprovisionamiento automático por reclamo (el equipo se presenta solo y la plataforma le entrega su credencial) | Trabajo futuro: exige que el equipo pruebe que es él (sin eso, cualquiera con la clave de la flota reclama un equipo que espera) y una ventana abierta por una persona; el alta se facilita hoy con la carga por USB para los equipos con el firmware del proyecto |
 | Aplicación móvil nativa | RF-52 se satisface con interfaz web adaptativa |
 | Facturación o gestión comercial de suscripciones | El producto se define como abierto y sin costo de licencia |
 | Firmware de grado comercial para los nodos | Solo el nodo de prueba necesario para la validación |

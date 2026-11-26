@@ -1384,6 +1384,45 @@ if malos:
 print(f'OK    {n} selectores data-* de {len(guiones)} guiones existen en los {len(set(fuentes))} componentes; ninguno busca la leyenda ni el título que uPlot ya no dibuja')
 PY
 
+paso "2y5. Firmware sin placa: el protocolo de la carga por USB (include/protocolo.h) y el guion de terminal (cargar-equipo.py), contra un equipo simulado (docs/17 §6.4)"
+# 25/11/2026: el firmware y el guion tienen sus pruebas en el computador (sin placa ni PlatformIO), pero nadie las corría. Se exigen las dos
+# líneas de resumen: «N de N comprobaciones» del protocolo (con N ≥ 50) y «Ran N tests … OK» del guion (N ≥ 10). Sin g++ se OMITE.
+if command -v "${CXX:-g++}" >/dev/null && command -v python3 >/dev/null; then
+  s=$(bash plataforma/firmware/herramientas/probar-protocolo.sh 2>&1); rc=$?
+  linea=$(grep -E '^[0-9]+ de [0-9]+ comprobaciones' <<<"$s" | tail -1)
+  read -r bien _ de _ <<<"$linea"
+  if [ "$rc" -ne 0 ] || [ -z "$linea" ] || [ "${bien:-0}" != "${de:-x}" ] || [ "${de:-0}" -lt 50 ]; then echo "FALLA protocolo serie (salida $rc): ${linea:-sin resumen}"; grep '^FALLA' <<<"$s" | head -5; fallos=$((fallos+1))
+  else echo "OK    protocolo serie del firmware: $linea"; fi
+  s=$(cd plataforma/firmware && python3 -I herramientas/prueba_cargar_equipo.py 2>&1); rc=$?
+  n=$(grep -oE '^Ran [0-9]+ tests?' <<<"$s" | grep -oE '[0-9]+')
+  if [ "$rc" -ne 0 ] || [ "${n:-0}" -lt 10 ] || ! grep -qx 'OK' <<<"$s"; then echo "FALLA guion cargar-equipo.py (salida $rc, ${n:-0} pruebas)"; grep -E '^(FAIL|ERROR):' <<<"$s" | head -5; fallos=$((fallos+1))
+  else echo "OK    guion de terminal cargar-equipo.py: $n pruebas contra un equipo simulado en una pseudoterminal"; fi
+else echo "omitida: sin ${CXX:-g++} o sin python3"; omitidos="$omitidos 2y5"; fi
+# 25/11/2026: la versión del firmware y la del protocolo están escritas en varios lugares (el firmware, el panel, el guion y los tres equipos
+# simulados): una que se queda atrás hace que las pruebas den verde contra un equipo que ya no existe. Se exige una sola de cada una.
+python3 -I - <<'PY' || fallos=$((fallos+1))
+import re, sys, pathlib
+def uno(ruta, patron):
+    m = re.findall(patron, pathlib.Path(ruta).read_text(encoding='utf-8'), re.M)
+    return m[0] if len(m) == 1 else f'({len(m)} coincidencias)'
+version = {
+    'src/nodo.cpp': uno('plataforma/firmware/src/nodo.cpp', r'FIRMWARE_VERSION = "([\d.]+)"'),
+    'lib/serie-simulado.ts': uno('plataforma/backend/panel/src/lib/serie-simulado.ts', r"^export const VERSION_FIRMWARE = '([\d.]+)'"),
+    'e2e/cargar.mjs': uno('plataforma/backend/panel/e2e/cargar.mjs', r"^const VERSION_FIRMWARE = '([\d.]+)'"),
+    'prueba_cargar_equipo.py': uno('plataforma/firmware/herramientas/prueba_cargar_equipo.py', r"^VERSION_FIRMWARE = '([\d.]+)'"),
+}
+protocolo = {
+    'include/protocolo.h': uno('plataforma/firmware/include/protocolo.h', r'VERSION_PROTOCOLO = (\d+);'),
+    'lib/serie.ts': uno('plataforma/backend/panel/src/lib/serie.ts', r'^export const PROTOCOLO = (\d+);'),
+    'cargar-equipo.py': uno('plataforma/firmware/herramientas/cargar-equipo.py', r'^PROTOCOLO = (\d+)'),
+    'e2e/cargar.mjs': uno('plataforma/backend/panel/e2e/cargar.mjs', r'^const PROTOCOLO = (\d+);'),
+}
+malos = [f'{n}: {d}' for n, d in (('versión del firmware', version), ('versión del protocolo', protocolo)) if len(set(d.values())) != 1 or any(v.startswith('(') for v in d.values())]
+for m in malos: print('FALLA', m)
+if not malos: print(f"OK    firmware {version['src/nodo.cpp']} y protocolo {protocolo['include/protocolo.h']}, iguales en el firmware, el panel, el guion y los tres simuladores")
+sys.exit(1 if malos else 0)
+PY
+
 paso "3. Diagramas: informe = docs = base (generar-figuras.sh --verificar)"
 bash informe-oficial/figuras/generar-figuras.sh --verificar || fallos=$((fallos+1))
 
@@ -1477,7 +1516,7 @@ paso "4b. Sesión y permisos (docs/20 §6 y §8): la matriz ruta × rol con una 
 # 08/11/2026: el primer administrador con X-Clave-Admin, un usuario de consulta, dos sitios propios de la prueba; todo se borra al salir.
 if curl -s -m 2 http://127.0.0.1:3000/salud >/dev/null; then bash plataforma/pruebas/sesion-smoke.sh || fallos=$((fallos+1)); else echo "omitida: backend no está corriendo"; omitidos="$omitidos 4b"; fi
 
-paso "4c. Panel con sesión en navegadores reales (P10; docs/19 §4 y §6): entrar, clave temporal, inventario, exportar, usuarios, vencer y salir, a 390 y 1280 px, en Chromium y Firefox; la vista pública por enlace (P9), la exportación del sitio (P8), el alta masiva (P7) y los sitios y zonas (P15 y P17)"
+paso "4c. Panel con sesión en navegadores reales (P10; docs/19 §4 y §6): entrar, clave temporal, inventario, exportar, usuarios, vencer y salir, a 390 y 1280 px, en Chromium y Firefox; la vista pública por enlace (P9), la exportación del sitio (P8), el alta masiva (P7), los sitios y zonas (P15 y P17) y la carga por USB (Z)"
 # 08/11/2026: el e2e de la pantalla de inicio de sesión contra la pila de desarrollo (el panel servido por la imagen del backend). Sin el backend
 # o sin los navegadores de Playwright, el guion sale con 3 y el paso se OMITE con aviso: nunca «OK» sin haber probado.
 bash plataforma/pruebas/panel-sesion-e2e.sh; r=$?
@@ -1500,6 +1539,13 @@ if [ "$r" = 3 ]; then omitidos="$omitidos 4c-lote"; elif [ "$r" != 0 ]; then fal
 # limpiar se niega a borrar si ve eventos fuera de los sitios de la corrida, y cuenta que no quede nada. Mismas reglas de omisión.
 bash plataforma/pruebas/panel-estructura-e2e.sh; r=$?
 if [ "$r" = 3 ]; then omitidos="$omitidos 4c-estructura"; elif [ "$r" != 0 ]; then fallos=$((fallos+1)); fi
+# 25/11/2026: «Cargar en el equipo» (docs/19 §4, Z; docs/16 §105), sin placa: en Chromium con el puerto serie simulado en la página (saludo,
+# configurar, estado y sus errores: selector cancelado, permiso negado, puerto ocupado, otro firmware, equipo que no habla el protocolo, campo
+# rechazado, cable desconectado, red que no acepta la clave y la carga completa con ruido); en Firefox, sin Web Serial (quitado de la página):
+# copiar, descargar y el guion. Ninguna clave en el DOM, el almacenamiento, la dirección, las peticiones ni la consola; da de baja los equipos
+# MQTT y cuenta que no quede ningún cliente en el broker. Mismas reglas de omisión.
+bash plataforma/pruebas/panel-cargar-e2e.sh; r=$?
+if [ "$r" = 3 ]; then omitidos="$omitidos 4c-cargar"; elif [ "$r" != 0 ]; then fallos=$((fallos+1)); fi
 
 paso "4d. Semilla de demostración: respeta la clave de quien ya eligió la suya (persona_temporal en conservar y rotar, con una persona de descarte)"
 # 13/11/2026: cada corrida de la semilla anulaba la clave propia de las personas de demostración y cortaba sus sesiones. La prueba usa una

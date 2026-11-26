@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  claveApp, AvisosAcotados, claveAdmin, horasClaveTemporal, claveOpcional, HOSTS_LOCALES, hostsPermitidos, interfazDeEscucha, nombreDeHost, rechazoDeHost, registrosEnJson, rutaSinCache, rutaSinIndexar, servirDocumentacion, TOPE_CUERPO, cuerpoExcedido } from './arranque.js';
+  claveApp, AvisosAcotados, claveAdmin, horasClaveTemporal, claveOpcional, HOSTS_LOCALES, hostsPermitidos, interfazDeEscucha, nombreDeHost, rechazoDeHost, registrosEnJson, rutaSinCache, rutaSinIndexar, servirDocumentacion, TOPE_CUERPO, cuerpoExcedido, cabecerasDeLaApi } from './arranque.js';
+import { readFileSync } from 'node:fs';
 
 describe('registrosEnJson (docs/10 §6): JSON en contenedor, texto en desarrollo', () => {
   it('sin variable → texto', () => expect(registrosEnJson(undefined)).toBe(false));
@@ -135,6 +136,29 @@ describe('rutaSinCache (revisión del 08/11/2026): Cache-Control: no-store en to
   });
   it('archivos del panel y la documentación → no (el navegador puede guardarlos)', () => {
     for (const r of ['/panel', '/panel/', '/panel/assets/app.js', '/PANEL/index.html', '/docs', '/docs/swagger-ui.css']) expect(rutaSinCache(r)).toBe(false);
+  });
+});
+
+// «Cargar en el equipo» (docs/19 §4, Z, punto 7): el panel usa el puerto serie del navegador. `Permissions-Policy` no debe negarlo: sin
+// la directiva `serial`, su valor por omisión es `self` (la página del panel sí; un marco de otro origen, no). Ni el backend ni el proxy.
+describe('Permissions-Policy no bloquea el puerto serie en el panel (docs/19 §4, Z)', () => {
+  const niegaSerie = (v: string): boolean => v.split(',').some((d) => /^\s*serial\s*=/.test(d) && !/\bself\b|\*/.test(d.split('=')[1] ?? ''));
+  it('la cabecera del backend, en el panel y en la API, niega cámara, micrófono y ubicación, y no niega `serial`', () => {
+    for (const ruta of ['/panel/', '/panel/index.html', '/dispositivos']) {
+      const h: Record<string, string> = {};
+      cabecerasDeLaApi({ path: ruta }, { setHeader: (k, v) => (h[k] = v) }, () => {});
+      expect(h['Permissions-Policy']).toMatch(/camera=\(\)/);
+      expect(niegaSerie(h['Permissions-Policy'])).toBe(false);
+    }
+  });
+  it('el proxy no agrega una Permissions-Policy que lo niegue', () => {
+    const conf = readFileSync(new URL('../../proxy/nginx.conf', import.meta.url), 'utf8');
+    for (const m of conf.matchAll(/add_header\s+Permissions-Policy\s+"([^"]*)"/gi)) expect(niegaSerie(m[1])).toBe(false);
+  });
+  it('el detector reconoce una negación (si no, las dos de arriba no probarían nada)', () => {
+    expect(niegaSerie('camera=(), serial=()')).toBe(true);
+    expect(niegaSerie('serial=(self)')).toBe(false);
+    expect(niegaSerie('camera=()')).toBe(false);
   });
 });
 

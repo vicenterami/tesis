@@ -13,6 +13,8 @@
   import { onMount, tick, untrack } from 'svelte';
   import Boton from './Boton.svelte';
   import Icono from './Icono.svelte';
+  import CargarEnEquipo, { type EquipoACargar } from './CargarEnEquipo.svelte';
+  import { sitioDeTopico } from './lib/serie';
   import { ErrorApi, alPerderSesion, descargarTexto, esCancelacion, obtener, pedir, ultimaGana } from './lib/api';
   import { avisoDeError } from './lib/avisos';
   import {
@@ -356,6 +358,18 @@
   const bajarLasQueNoEntran = (): void => {
     descargarTexto(csvRechazadas(columnas, original, informe ?? []), `no-entran-${archivo === ORIGEN_PEGADO ? 'lote' : baseDeDescarga(archivo)}.csv`);
   };
+  // «Cargar en el equipo» (docs/19 §4, Z): los creados por MQTT, con su sitio sacado del tópico; los demás (HTTP, LoRaWAN) solo se cuentan.
+  const usb = $derived.by(() => {
+    const equipos: EquipoACargar[] = [];
+    let otros = 0;
+    for (const f of credenciales) {
+      if (f.resultado !== 'creada') continue;
+      const sitio = sitioDeTopico(f.destino ?? f.topico);
+      if (sitio === null || f.credencial === null || f.id === null) otros++;
+      else equipos.push({ id: f.id, id_fisico: f.id_fisico, sitio, clave: f.credencial });
+    }
+    return { equipos, otros };
+  });
   const hayCredencialesSinDescargar = (): boolean => credenciales.length > 0 && !descargadas;
   // Qué se pierde si se cierra la pestaña ahora: las credenciales sin descargar y una creación en vuelo (su respuesta trae las credenciales).
   const hayAlgoQueSePierde = (): boolean => hayCredencialesSinDescargar() || creandoLote;
@@ -639,6 +653,7 @@
             <Boton etiqueta="Descargar credenciales (CSV)" variante="principal" onclick={bajarCredenciales} data-descargar-credenciales />
             <Boton etiqueta="Ya las guardé: olvidarlas" motivoDesactivado={descargadas ? null : 'descárgalas primero'} onclick={() => void olvidarCredenciales()} data-olvidar-credenciales />
           </span>
+          {#if usb.equipos.length > 0}<CargarEnEquipo equipos={usb.equipos} otros={usb.otros} />{/if}
         </div>
       {:else}
         <p class="vivo" tabindex="-1" bind:this={parrafoSinCredenciales} data-sin-credenciales>Las credenciales ya no están en esta página: no se pueden volver a mostrar. Si perdiste alguna, rótala desde la ficha del dispositivo.</p>

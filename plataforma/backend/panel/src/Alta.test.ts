@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Sesion } from './lib/sesion';
 import Alta from './Alta.svelte';
 import { borradorLote, credencialesLote, olvidarCredencialesLote, olvidarLote } from './lib/lote';
+import { PuertoSimulado } from './lib/serie-simulado';
 import { obtener } from './lib/api';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -99,7 +100,11 @@ describe('P7: asistente', () => {
     await fireEvent.click(boton('Siguiente'));
     await escribir('[data-campo="canal"]', 'temperatura');
     await fireEvent.click(boton('Crear el dispositivo'));
-    await waitFor(() => expect(document.querySelector('[data-credencial]')?.textContent).toBe('Cred-una-vez-123'));
+    // La clave no se dibuja hasta pedirla (docs/19 §4, Z): para copiarla o cargarla por USB no hace falta verla.
+    await waitFor(() => expect(document.querySelector('[data-credencial]')).toBeTruthy());
+    expect(document.body.textContent).not.toContain('Cred-una-vez-123');
+    await fireEvent.click(boton('Mostrar la clave'));
+    expect(document.querySelector('[data-credencial]')!.textContent).toBe('Cred-una-vez-123');
     expect(pedidos.find((p) => p.metodo === 'POST')!.cuerpo).toEqual({ id_fisico: 'nodo-1', nombre: 'Nodo uno', zona_id: 'z-lab', via: 'mqtt', formato: 'senml', intervalo_esperado_s: 300, canales: [{ magnitud: 'temperatura' }] });
     expect(document.querySelector('[data-credencial-una-vez]')!.textContent).toContain('La credencial no se vuelve a mostrar');
     await fireEvent.click(boton('Copiar la credencial'));
@@ -126,6 +131,76 @@ describe('P7: asistente', () => {
     await fireEvent.click(boton('Crear el dispositivo'));
     await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('id_fisico «nodo-9» ya existe. Si está en mantenimiento o dado de baja'));
     expect(document.querySelector('[data-credencial]')).toBeNull();
+  });
+});
+
+// Paso 4 por MQTT (docs/19 §4, Z): la ficha de conexión para equipos de terceros y «Cargar en el equipo» por USB.
+describe('P7: ficha de conexión y carga por USB (bloque Z)', () => {
+  const TOPICO = 'sitio/uct/dispositivo/nodo-1/<magnitud>';
+  const CRED = 'clave-falsa-de-prueba-0000000001';
+  async function hastaLaCredencial(): Promise<void> {
+    responder = (metodo, ruta) => (metodo === 'POST' && ruta === '/dispositivos'
+      ? json({ id: NUEVO, id_fisico: 'nodo-1', nombre: 'Nodo uno', formato: 'senml', conexion: { via: 'mqtt', usuario: 'nodo-1', credencial: CRED, topico: TOPICO, ejemplo: {} } }, 201)
+      : json([]));
+    render(Alta, { sesion: SESION, sitios: SITIOS });
+    await escribir('[data-campo="id_fisico"]', 'nodo-1');
+    await escribir('[data-campo="nombre"]', 'Nodo uno');
+    await fireEvent.click(boton('Siguiente'));
+    await fireEvent.click(boton('Siguiente'));
+    await escribir('[data-campo="canal"]', 'temperatura');
+    await fireEvent.click(boton('Crear el dispositivo'));
+    await waitFor(() => expect(document.querySelector('[data-ficha-conexion]')).toBeTruthy());
+  }
+
+  it('cada campo con su «Copiar» (servidor, puerto, usuario, identificador de cliente, clave, tópico y formato) y la ficha en texto plano', async () => {
+    const copiado: string[] = [];
+    vi.stubGlobal('navigator', { clipboard: { writeText: async (s: string) => { copiado.push(s); } } });
+    await hastaLaCredencial();
+    const rotulos = [...document.querySelectorAll('[data-ficha-conexion] dt')].map((x) => x.textContent);
+    expect(rotulos).toEqual(['Servidor', 'Puerto (MQTT sobre TLS)', 'Usuario', 'Identificador de cliente', 'Clave', 'Tópico', 'Formato']);
+    for (const b of ['Copiar el servidor', 'Copiar el puerto', 'Copiar el usuario', 'Copiar el identificador de cliente', 'Copiar la credencial', 'Copiar el tópico', 'Copiar el formato']) {
+      await fireEvent.click(boton(b));
+    }
+    await waitFor(() => expect(copiado).toEqual([window.location.hostname, '8883', 'nodo-1', 'nodo-1', CRED, TOPICO, 'SenML (RFC 8428), JSON']));
+    expect(document.body.textContent).not.toContain(CRED); // copiar no la dibuja
+    await fireEvent.click(boton('Descargar la ficha (texto)'));
+    expect(descargas.at(-1)!.nombre).toBe('conexion-nodo-1.txt');
+    const texto = await descargas.at(-1)!.contenido;
+    expect(texto).toContain('TRAE LA CLAVE');
+    expect(texto.split('\n').filter((l) => !l.startsWith('#') && l !== '')).toEqual([
+      `Servidor: ${window.location.hostname}`, 'Puerto (MQTT sobre TLS): 8883', 'Usuario: nodo-1', 'Identificador de cliente: nodo-1', `Clave: ${CRED}`, `Tópico: ${TOPICO}`,
+      'Formato: SenML (RFC 8428), JSON',
+    ]);
+  });
+
+  it('si el navegador no deja copiar, el aviso remite a «Mostrar la clave» mientras está oculta (copiar a mano los puntos no sirve)', async () => {
+    vi.stubGlobal('navigator', { clipboard: { writeText: async () => { throw new Error('NotAllowedError'); } } });
+    await hastaLaCredencial();
+    await fireEvent.click(boton('Copiar la credencial'));
+    await waitFor(() => expect(document.querySelector('[data-copiar-manual]')?.textContent).toContain('después de «Mostrar la clave»'));
+    expect(document.body.textContent).not.toContain(CRED);
+    await fireEvent.click(boton('Mostrar la clave'));
+    await waitFor(() => expect(document.querySelector('[data-copiar-manual]')?.textContent).not.toContain('Mostrar la clave'));
+    expect(document.querySelector('[data-credencial]')!.textContent).toBe(CRED);
+  });
+
+  it('sin puerto serie en el navegador, el paso dice por qué y deja la ficha; con él, «Cargar en el equipo» manda el sitio del tópico y la clave sin mostrarla', async () => {
+    await hastaLaCredencial();
+    expect(document.querySelector('[data-sin-serie]')).toBeTruthy();
+    cleanup();
+    const puertos: PuertoSimulado[] = [];
+    vi.stubGlobal('isSecureContext', true);
+    vi.stubGlobal('navigator', { clipboard: { writeText: async () => {} }, serial: { requestPort: async () => { const p = new PuertoSimulado(); puertos.push(p); return p; } } });
+    await hastaLaCredencial();
+    expect(document.querySelector('[data-sin-serie]')).toBeNull();
+    await fireEvent.click(boton('Cargar en el equipo'));
+    await fireEvent.input(document.querySelector('[data-campo-carga="red"]')!, { target: { value: 'red-de-prueba' } });
+    await fireEvent.input(document.querySelector('[data-campo-carga="servidor"]')!, { target: { value: 'servidor.ejemplo' } });
+    await fireEvent.click(boton('Conectar y cargar nodo-1'));
+    await waitFor(() => expect(puertos[0]?.recibidas.some((o) => o.orden === 'configurar')).toBe(true));
+    expect(puertos[0]!.recibidas.find((o) => o.orden === 'configurar')).toMatchObject({ sitio: 'uct', id: 'nodo-1', clave: CRED, red: 'red-de-prueba', clave_red: '' });
+    await waitFor(() => expect(document.querySelector('[data-paso-carga="cargada"]')!.getAttribute('data-hecho')).toBe('true'));
+    expect(document.body.textContent).not.toContain(CRED);
   });
 });
 
@@ -495,6 +570,32 @@ describe('P7: alta masiva en tres pasos (docs/19 §4, N7)', () => {
     await fireEvent.click(boton('Dar de alta otro lote'));
     expect(document.querySelector('[data-paso-lote="1"]')).toBeTruthy();
     expect(document.querySelector('[data-filas-leidas]')).toBeNull();
+  });
+
+  it('Z: en el resultado, «Cargar en el equipo» lista los creados por MQTT (el sitio sale del tópico), cuenta aparte los demás y nunca dibuja una clave', async () => {
+    const puertos: PuertoSimulado[] = [];
+    vi.stubGlobal('isSecureContext', true);
+    vi.stubGlobal('navigator', { serial: { requestPort: async () => { const p = new PuertoSimulado(); puertos.push(p); return p; } } });
+    responder = (_m, ruta, cuerpo) => {
+      if (ruta.endsWith('modo=validar')) return json(plan(cuerpo.filas!, 'validar'));
+      const r = plan(cuerpo.filas!, 'crear');
+      // n-1 y n-2 por MQTT (su destino es el tópico); n-3 por HTTP.
+      return json({ ...r, filas: r.filas.map((f) => ({ ...f, credencial: `clave-falsa-de-lote-0000-${f.id_fisico}`, destino: f.id_fisico === 'n-3' ? 'POST /recepcion/n-3' : `sitio/uct/dispositivo/${f.id_fisico}/<magnitud>` })) });
+    };
+    render(Alta, { modo: 'lote', sesion: SESION, sitios: SITIOS });
+    await subir(csv(3));
+    await revisar();
+    await fireEvent.click(boton('Crear 3 dispositivos'));
+    await waitFor(() => expect(document.querySelector('[data-paso-lote="3"]')).toBeTruthy());
+    await fireEvent.click(boton('Cargar en el equipo'));
+    expect([...document.querySelectorAll('[data-equipo-carga]')].map((x) => x.getAttribute('data-equipo-carga'))).toEqual(['n-1', 'n-2']);
+    expect(document.querySelector('[data-otros-carga]')!.textContent).toContain('1 creado no va por MQTT');
+    await fireEvent.input(document.querySelector('[data-campo-carga="red"]')!, { target: { value: 'red-de-prueba' } });
+    await fireEvent.input(document.querySelector('[data-campo-carga="servidor"]')!, { target: { value: 'servidor.ejemplo' } });
+    await fireEvent.click(boton('Conectar y cargar n-2'));
+    await waitFor(() => expect(puertos[0]?.recibidas.some((o) => o.orden === 'configurar')).toBe(true));
+    expect(puertos[0]!.recibidas.find((o) => o.orden === 'configurar')).toMatchObject({ id: 'n-2', sitio: 'uct', clave: 'clave-falsa-de-lote-0000-n-2' });
+    expect(document.body.innerHTML).not.toContain('clave-falsa-de-lote');
   });
 
   it('las cinco tarjetas son botones con aria-pressed y cada una muestra exactamente las filas que cuenta', async () => {

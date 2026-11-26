@@ -10,7 +10,8 @@
   import Aviso from './Aviso.svelte';
   import Boton from './Boton.svelte';
   import AltaLote from './AltaLote.svelte';
-  import { ErrorApi, alPerderSesion, esCancelacion, obtener, pedir, ultimaGana } from './lib/api';
+  import CargarEnEquipo from './CargarEnEquipo.svelte';
+  import { ErrorApi, alPerderSesion, descargarTexto, esCancelacion, obtener, pedir, ultimaGana } from './lib/api';
   import { avisoDeError, type DatosAviso } from './lib/avisos';
   import type { EventoVivo, Sitio } from './lib/modelo';
   import { puedeEn, type Sesion } from './lib/sesion';
@@ -19,6 +20,8 @@
   import { fechaHora, horaLocal } from './lib/tiempo';
   import { abrirCanal, type Canal } from './lib/vivo';
   import { fragmentoAlta, fragmentoFicha, type ModoAlta } from './lib/vista';
+  import { camposDeFicha, textoDeFicha } from './lib/ficha-conexion';
+  import { sitioDeTopico } from './lib/serie';
 
   // `sitioActivo`: el sitio que nombra la cabecera del panel (App.svelte, `sitioNombrado`); el alta masiva ofrece crear ahí las zonas que falten (con `ajustes` en más de un sitio, también en otro de los suyos).
   let { modo = 'uno', idFisico = '', sitio = '', sesion = null, sitios = null, sitioActivo = null }: { modo?: ModoAlta; idFisico?: string; sitio?: string; sesion?: Sesion | null; sitios?: Sitio[] | null; sitioActivo?: Sitio | null } = $props();
@@ -36,8 +39,11 @@
   let pasarelas = $state<{ id: string; id_fisico: string; nombre: string; sitio_codigo: string; activo: boolean }[] | null>(null);
   let creando = $state(false);
   let avisoAlta = $state<DatosAviso | null>(null);
-  let creado = $state<{ id: string; id_fisico: string; nombre: string; conexion: Record<string, unknown> } | null>(null);
+  let creado = $state<{ id: string; id_fisico: string; nombre: string; formato?: string; conexion: Record<string, unknown> } | null>(null);
   let copiado = $state<string | null>(null);
+  // La clave no se dibuja hasta que la persona lo pide: para cargarla por USB o copiarla no hace falta verla (docs/19 §4, Z).
+  let verClave = $state(false);
+  const OCULTA = '••••••••••••';
   let primeraTrama = $state<string | null>(null);
   let canalVivo: Canal | null = null;
 
@@ -167,6 +173,17 @@
     }
   }
 
+  // Paso 4, vía MQTT: la ficha de conexión campo por campo (para equipos de terceros) y «Cargar en el equipo» (docs/19 §4, Z). El servidor
+  // que se propone es la dirección de este panel: el mismo proxy recibe a los equipos en el 8883 (se corrige si el equipo lo alcanza por otra).
+  const fichaMqtt = $derived.by(() => {
+    if (creado === null || creado.conexion.via !== 'mqtt') return null;
+    const cx = creado.conexion;
+    return camposDeFicha({ servidor: window.location.hostname, usuario: String(cx.usuario), credencial: String(cx.credencial), topico: String(cx.topico), formato: creado.formato ?? a.formato });
+  });
+  const equipoUsb = $derived(creado === null || creado.conexion.via !== 'mqtt' ? null : {
+    id: creado.id, id_fisico: creado.id_fisico, sitio: sitioDeTopico(String(creado.conexion.topico)) ?? a.sitio, clave: String(creado.conexion.credencial),
+  });
+
   // Paso 5: el canal en vivo del dispositivo nuevo; la primera `visto` o `medicion` cierra la espera (F1).
   function esperarPrimeraTrama(): void {
     if (creado === null) return;
@@ -187,6 +204,7 @@
     creado = null; // la credencial deja la memoria de la página
     primeraTrama = null;
     copiado = null;
+    verClave = false;
     a = { ...a, id_fisico: '', nombre: '' };
     canalesAlta = [''];
     paso = 1;
@@ -338,15 +356,27 @@
       {:else if paso === 4 && creado !== null}
         {@const cx = creado.conexion}
         <div class="clave-una-vez" data-credencial-una-vez>
-          <p role="status"><strong>{creado.nombre}</strong> quedó dado de alta. <strong>La credencial no se vuelve a mostrar</strong>: cópiala ahora y
-            guárdala en el nodo. Si se pierde, se reemplaza desde la ficha (rotar), nunca se recupera.</p>
-          {#if cx.via === 'mqtt'}
-            <p>Usuario: <code data-usuario-mqtt>{String(cx.usuario)}</code> · Tópico: <code data-topico>{String(cx.topico)}</code></p>
-            <code data-credencial>{String(cx.credencial)}</code>
+          <p role="status"><strong>{creado.nombre}</strong> quedó dado de alta. <strong>La credencial no se vuelve a mostrar</strong>: cárgala ahora en
+            el equipo (por USB o copiándola). Si se pierde, se reemplaza desde la ficha (rotar), nunca se recupera.</p>
+          {#if cx.via === 'mqtt' && fichaMqtt !== null}
+            {#if equipoUsb !== null}<CargarEnEquipo equipos={[equipoUsb]} />{/if}
+            <!-- La ficha de conexión (docs/19 §4, Z, punto 6): cada campo con su «Copiar», para equipos de terceros o para cargarlo a mano. -->
+            <dl class="ficha-conexion" aria-label="Ficha de conexión" data-ficha-conexion>
+              {#each fichaMqtt as c (c.clave)}
+                <dt>{c.rotulo}</dt>
+                <dd>
+                  <code data-usuario-mqtt={c.clave === 'usuario' ? '' : undefined} data-topico={c.clave === 'topico' ? '' : undefined}
+                    data-credencial={c.clave === 'credencial' ? '' : undefined} data-ficha={c.clave}>{c.clave === 'credencial' && !verClave ? OCULTA : c.valor}</code>
+                  <Boton etiqueta={copiado === c.clave ? c.copiado : c.copiar} variante="discreto" onclick={() => void copiar(c.valor, c.clave)} data-copiar={c.clave} />
+                  {#if c.clave === 'credencial'}<Boton etiqueta={verClave ? 'Ocultar la clave' : 'Mostrar la clave'} variante="discreto" presionado={verClave}
+                    onclick={() => (verClave = !verClave)} data-ver-credencial />{/if}
+                </dd>
+              {/each}
+            </dl>
             <span class="acciones">
-              <Boton etiqueta={copiado === 'credencial' ? 'Copiada' : 'Copiar la credencial'} onclick={() => void copiar(String(cx.credencial), 'credencial')} />
-              <Boton etiqueta={copiado === 'topico' ? 'Copiado' : 'Copiar el tópico'} onclick={() => void copiar(String(cx.topico), 'topico')} />
+              <Boton etiqueta="Descargar la ficha (texto)" onclick={() => descargarTexto(textoDeFicha(fichaMqtt), `conexion-${creado?.id_fisico ?? 'equipo'}.txt`, 'text/plain;charset=utf-8')} data-descargar-ficha />
             </span>
+            <p class="ayuda-campo">El archivo trae la clave: guárdalo en un lugar seguro. El certificado de la autoridad (CA) de esta instalación se pide al administrador.</p>
           {:else if cx.via === 'http'}
             <code data-credencial>{String(cx.token)}</code>
             <p class="vivo">{String(cx.nota ?? '')}</p>
@@ -354,7 +384,8 @@
           {:else}
             <p class="vivo" data-sin-credencial>{String(cx.nota ?? 'Un nodo LoRaWAN no tiene credencial propia: la autentica su pasarela.')}</p>
           {/if}
-          {#if copiado === 'manual'}<p class="vivo">El navegador no deja copiar desde esta dirección: selecciónala y cópiala con Ctrl+C.</p>{/if}
+          {#if copiado === 'manual'}<p class="vivo" data-copiar-manual>El navegador no deja copiar desde esta dirección: selecciónala y cópiala con Ctrl+C{#if cx.via === 'mqtt' && !verClave}
+            (la clave, después de «Mostrar la clave»){/if}.</p>{/if}
         </div>
       {:else if paso === 5 && creado !== null}
         <div data-paso="5">

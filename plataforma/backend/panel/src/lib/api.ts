@@ -219,9 +219,9 @@ export function nombreDeArchivo(cabecera: string | null, porDefecto: string): st
     nombre = ''; // un «%» mal formado (URIError): el nombre de por defecto, nunca una descarga que falla
   }
   // Solo el nombre: nada de rutas ni caracteres que un sistema de archivos interprete; y solo las extensiones que la API entrega
-  // (.csv y .json, corrección del 11/11/2026; .zip y .xlsx desde la exportación por sitio, 19/11/2026): un «.exe» o un «.html» ajeno
-  // nunca llega al disco con ese nombre.
-  return /^[\p{L}\p{N}_.\- ]{1,120}$/u.test(nombre) && !nombre.startsWith('.') && /\.(csv|json|zip|xlsx)$/i.test(nombre) ? nombre : porDefecto;
+  // (.csv y .json, corrección del 11/11/2026; .zip y .xlsx desde la exportación por sitio, 19/11/2026; .txt desde la ficha de conexión del
+  // alta, 25/11/2026, docs/19 §4 Z): un «.exe» o un «.html» ajeno nunca llega al disco con ese nombre.
+  return /^[\p{L}\p{N}_.\- ]{1,120}$/u.test(nombre) && !nombre.startsWith('.') && /\.(csv|json|zip|xlsx|txt)$/i.test(nombre) ? nombre : porDefecto;
 }
 
 export interface Guardador {
