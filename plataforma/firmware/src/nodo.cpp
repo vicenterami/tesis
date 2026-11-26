@@ -408,14 +408,22 @@ static void procesarLinea(char *linea, size_t n) {
     // ESP-IDF 4.4.7, el del núcleo Arduino 2.0.17 de espressif32@7.1.3), así que se reinicializa antes de volver a abrirla, haya salido bien
     // o mal; y el contador de arranques se vuelve a escribir: sin él, dos `borrar` seguidos arrancaban los dos con el número 1 y quien carga
     // no distinguía el arranque nuevo del anterior.
+    // Si no se puede reinicializar, reabrir o guardar el contador, no se reinicia sin él: responde «guardar» y lo dice el registro.
     preferencias.end();
     const bool borrada = nvs_flash_erase_partition("nvs") == ESP_OK;
-    nvs_flash_init_partition("nvs");
-    const bool abierta = preferencias.begin(ESPACIO_NVS, false);
-    if (borrada && abierta) preferencias.putUInt(CLAVE_ARRANQUES, arranque);
-    Serial.println(borrada ? "memoria no volátil borrada entera; se reinicia" : "no se pudo borrar la memoria no volátil");
-    if (!borrada) { responderError("borrar", "guardar"); }
-    else { responder("{\"ok\":true,\"orden\":\"borrar\",\"reinicia\":true}"); reiniciarYa(o); }
+    const bool reabierta = nvs_flash_init_partition("nvs") == ESP_OK && preferencias.begin(ESPACIO_NVS, false);
+    const bool contador = borrada && reabierta && preferencias.putUInt(CLAVE_ARRANQUES, arranque) == sizeof(uint32_t);
+    if (!borrada) {
+      Serial.println("no se pudo borrar la memoria no volátil");
+      responderError("borrar", "guardar");
+    } else if (!contador) {
+      Serial.println("memoria no volátil borrada, pero no se pudo reabrir ni guardar el contador de arranques: reinicia el equipo (botón EN)");
+      responderError("borrar", "guardar");
+    } else {
+      Serial.println("memoria no volátil borrada entera; se reinicia");
+      responder("{\"ok\":true,\"orden\":\"borrar\",\"reinicia\":true}");
+      reiniciarYa(o);
+    }
   } else {
     responderError(o.orden, "orden");
   }

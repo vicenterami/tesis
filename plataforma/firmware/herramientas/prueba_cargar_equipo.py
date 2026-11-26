@@ -39,7 +39,7 @@ class EquipoSimulado(threading.Thread):
     """Del lado maestro de la pseudoterminal: lee órdenes y responde como el firmware."""
 
     def __init__(self, maestro, firmware='nodo', rechaza=None, sin_red=False, error_broker=None, basura_inicial=False, corta_en_configurar=False,
-                 ruido=False, config=None, conectado=False, protocolo=None, sin_arranque=False, ventana_vieja=0.2):
+                 ruido=False, config=None, conectado=False, protocolo=None, sin_arranque=False, ventana_vieja=0.2, borrar_sin_contador=False):
         super().__init__(daemon=True)
         self.fd = maestro
         self.firmware = firmware
@@ -54,6 +54,7 @@ class EquipoSimulado(threading.Thread):
         self.protocolo = ce.PROTOCOLO if protocolo is None else protocolo
         self.sin_arranque = sin_arranque  # un firmware viejo, sin `arranque` en `hola`
         self.ventana_vieja = ventana_vieja  # tras `configurar`, sigue contestando con lo anterior (como el firmware mientras vacía la salida)
+        self.borrar_sin_contador = borrar_sin_contador  # borró, pero no pudo reabrir la memoria ni guardar el contador: «guardar», sin reiniciar
         self.arranque = 1
         self.reinicio_en = None
         self.config_nueva = None
@@ -130,6 +131,8 @@ class EquipoSimulado(threading.Thread):
             self.responder({'ok': True, 'orden': 'estado', 'configurado': True, 'wifi': 'conectado' if conectado else 'conectando',
                             'broker': 'conectado' if broker else 'desconectado',
                             'ultimo_error': 'wifi' if self.sin_red else (self.error_broker or 'ninguno'), 'publicados': 0, 'fallidos': 0})
+        elif orden == 'borrar' and self.borrar_sin_contador:
+            self.responder({'ok': False, 'orden': 'borrar', 'error': 'guardar'})
         elif orden == 'borrar':
             self.config_nueva = None
             self.responder({'ok': True, 'orden': 'borrar', 'reinicia': True})
@@ -374,6 +377,15 @@ class PruebaCargarEquipo(unittest.TestCase):
         self.assertIn('arrancó sin configurar', out)
         self.assertNotIn('fábrica', out.replace('no de fábrica', ''))
         self.assertIn('rota también su credencial', out)
+
+    # Corrección del 25/11/2026: si el firmware borró pero no pudo reabrir la memoria ni guardar el contador, responde «guardar» y no se
+    # reinicia; el guion lo dice tal cual y pide reiniciarlo a mano (antes: «no confirmó el borrado», como si no hubiera borrado nada).
+    def test_borrar_sin_contador_lo_dice(self):
+        eq = EquipoSimulado(self.maestro, config={'id': 'nodo-0001'}, borrar_sin_contador=True)
+        codigo, out, err, _ = self.correr(['borrar'], eq)
+        self.assertEqual(codigo, 1)
+        self.assertIn('pudo quedar borrada', err)
+        self.assertIn('botón EN', err)
 
     def test_casos_compartidos_con_el_firmware_y_el_panel(self):
         base = {'red': 'red-de-prueba', 'clave_red': 'clave-de-red-falsa', 'servidor': 'servidor.ejemplo', 'puerto': 8883, 'sitio': 'uct',

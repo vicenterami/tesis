@@ -578,7 +578,7 @@
     },
     "/dispositivos/{id}/sin-guardar": {
       "get": {
-        "description": "Relee las 20 tramas más recientes del equipo (aceptadas y en cuarentena, dentro de su retención) con el adaptador de su formato, sin escribir nada, y responde `revisadas` y `claves[{clave, magnitud, valor, unidad, visto, origen}]`: lo que traen y el equipo no tiene como canal. `magnitud`: la del catálogo que la recibiría (se agrega con POST /dispositivos/{id}/canales), o null si no hay magnitud ni alias para esa clave; `valor`: el último valor numérico visto (un texto no se muestra); `origen`: `carga` o `enlace` (la señal de una trama LoRaWAN). Hasta 50 claves, la más reciente primero, cada una recortada a 32 caracteres. Lee cargas crudas: exige la acción `escribir` (docs/20 §6). Topes: una relectura a la vez por proceso, una cada 10 s por persona y equipo, y 5 s como máximo en la base (docs/10 §8.4 punto 72 i).",
+        "description": "Relee las 20 tramas más recientes del equipo (aceptadas y en cuarentena, dentro de su retención) con el adaptador de su formato, sin escribir nada, y responde `revisadas` y `claves[{clave, magnitud, valor, unidad, visto, origen}]`: lo que traen y el equipo no tiene como canal. `magnitud`: la del catálogo que la recibiría (se agrega con POST /dispositivos/{id}/canales), o null si no hay magnitud ni alias para esa clave; `valor`: el último valor numérico visto (un texto no se muestra); `origen`: `carga` o `enlace` (la señal de una trama LoRaWAN). Hasta 50 claves: primero la señal y las claves con magnitud en el catálogo, después las demás; dentro de cada grupo, la más reciente primero; cada una recortada a 32 caracteres. Lee cargas crudas: exige la acción `escribir` (docs/20 §6). Topes, por proceso: una relectura a la vez; una cada 10 s por persona y equipo, contada desde la última que terminó bien; y 5 s en total para el trabajo en la base, obtener la conexión incluido (docs/10 §8.4 punto 72 i).",
         "operationId": "SinGuardarController_sinGuardar",
         "parameters": [
           {
@@ -617,10 +617,10 @@
             "description": "No existe, o es de otro sitio"
           },
           "429": {
-            "description": "`codigo: sin_guardar_ocupado` (ya hay 1 relectura en curso) o `sin_guardar_espera` (la misma persona revisó este equipo hace menos de 10 s); `reintentar_en_s` dice cuánto esperar"
+            "description": "`codigo: sin_guardar_ocupado` (ya hay 1 relectura en curso en este proceso) o `sin_guardar_espera` (la misma persona revisó bien este equipo hace menos de 10 s); `reintentar_en_s` dice cuánto esperar"
           },
           "503": {
-            "description": "`codigo: sin_guardar_tiempo`: la relectura pasó de 5 s y la base la canceló"
+            "description": "`codigo: sin_guardar_tiempo`: la relectura pasó de 5 s en total (la conexión no llegó a tiempo, o la base canceló la sentencia)"
           }
         },
         "security": [

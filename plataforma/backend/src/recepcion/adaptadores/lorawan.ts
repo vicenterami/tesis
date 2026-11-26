@@ -60,34 +60,34 @@ export function anotarFcnt(v: unknown, ctx: ContextoTrama): void {
   ctx.fcnt = v;
 }
 
-// La señal del enlace de la trama (docs/10 §8.4 punto 71): del arreglo `rxInfo`, el MEJOR receptor, el de mayor SNR medido y, en empate (o
-// entre receptores sin SNR medido), el de mayor RSSI (el SNR satura con señal fuerte). El SNR se llama `snr` en ChirpStack v4 y `loRaSNR` en
-// la pasarela Milesight sin códec. Un valor que no es un número finito se omite; un elemento sin ningún número no compite; un `rxInfo` vacío,
-// ausente o que no es un arreglo no deja nada.
+// La señal del enlace de la trama (docs/10 §8.4 punto 71): del arreglo `rxInfo`, el MEJOR receptor, el de mayor SNR y, en empate (o entre
+// receptores sin SNR), el de mayor RSSI (el SNR satura con señal fuerte). El SNR se llama `snr` en ChirpStack v4 y `loRaSNR` en la pasarela
+// Milesight sin códec. Un valor que no es un número finito se omite, y un RSSI fuera de −150 a 0 dBm también (no es una medición posible:
+// no cuenta para elegir); un elemento sin ningún número no compite; un `rxInfo` vacío, ausente o que no es un arreglo no deja nada.
 // `inferirSnr`: en ChirpStack v4 el elemento es un `gw.UplinkRxInfo` serializado con pbjson SIN `emit_fields()` (api/rust/build.rs), así
-// que un SNR de 0 dB llega ausente. Quien llama lo pide solo con modulación LoRa declarada en la trama (con FSK no hay SNR que omitir). Ese 0
-// se infiere solo con un RSSI dentro de −150 a 0 dBm y NO compite como medido: para elegir el receptor cuenta como «sin SNR», así que nunca
-// le gana a uno con SNR real (corrección del 25/11/2026). En la pasarela Milesight, ausente es ausente.
+// que un SNR de 0 dB llega ausente. Quien llama lo pide solo con modulación LoRa declarada en la trama (con FSK no hay SNR que omitir), y se
+// infiere solo con un RSSI en rango. Con esas dos condiciones el ausente ES 0 dB y compite como cualquier medido (decisión del 25/11/2026):
+// le gana a un receptor a −5 dB y pierde con uno a +3 dB. En la pasarela Milesight, ausente es ausente.
 // Nunca lanza: la señal no es un dato del sensor y no puede mandar la trama a cuarentena.
+export const RANGO_RSSI = { min: -150, max: 0 } as const; // el de la magnitud rssi del catálogo (migración 01)
 export function enlaceDe(rxInfo: unknown, inferirSnr = false): Enlace | undefined {
   if (!Array.isArray(rxInfo)) return undefined;
   const numero = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
   const peso = (x: number | undefined): number => x ?? -Infinity;
-  let mejor: { rssi?: number; snr?: number; medido?: number } | undefined;
+  let mejor: Enlace | undefined;
   for (const r of rxInfo as unknown[]) {
     if (typeof r !== 'object' || r === null || Array.isArray(r)) continue;
     const e = r as Record<string, unknown>;
-    const rssi = numero(e.rssi);
-    const medido = numero(e.snr) ?? numero(e.loRaSNR);
-    let snr = medido;
-    if (snr === undefined && inferirSnr && rssi !== undefined && rssi >= -150 && rssi <= 0 && !('snr' in e) && !('loRaSNR' in e)) snr = 0;
+    const crudo = numero(e.rssi);
+    const rssi = crudo !== undefined && crudo >= RANGO_RSSI.min && crudo <= RANGO_RSSI.max ? crudo : undefined;
+    let snr = numero(e.snr) ?? numero(e.loRaSNR);
+    if (snr === undefined && inferirSnr && rssi !== undefined && !('snr' in e) && !('loRaSNR' in e)) snr = 0;
     if (rssi === undefined && snr === undefined) continue;
-    if (mejor === undefined || peso(medido) > peso(mejor.medido) || (peso(medido) === peso(mejor.medido) && peso(rssi) > peso(mejor.rssi))) {
-      mejor = { rssi, snr, medido };
+    if (mejor === undefined || peso(snr) > peso(mejor.snr) || (peso(snr) === peso(mejor.snr) && peso(rssi) > peso(mejor.rssi))) {
+      mejor = { ...(rssi !== undefined ? { rssi } : {}), ...(snr !== undefined ? { snr } : {}) };
     }
   }
-  if (mejor === undefined) return undefined;
-  return { ...(mejor.rssi !== undefined ? { rssi: mejor.rssi } : {}), ...(mejor.snr !== undefined ? { snr: mejor.snr } : {}) };
+  return mejor;
 }
 
 // Traduce las claves conocidas a lecturas; las desconocidas se anotan en ctx.ignoradas para la línea de registro de la trama.

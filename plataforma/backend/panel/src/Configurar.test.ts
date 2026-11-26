@@ -239,8 +239,41 @@ describe('P6 Configurar', () => {
     await waitFor(() => expect(document.querySelector('[data-sin-guardar]')!.textContent).toContain('«rssi»: el equipo ya la guardaba'));
     expect(document.querySelector('[data-sin-guardar]')!.textContent).not.toContain('se guarda desde la próxima trama');
     await fireEvent.click(document.querySelector('[data-revisar-otra-vez]')!);
-    await waitFor(() => expect(document.querySelector('[data-sin-guardar-error]')!.textContent).toContain('espera 7 s'));
+    await waitFor(() => expect(document.querySelector('[data-sin-guardar-error]')!.textContent).toContain('Acabas de revisar las tramas de este equipo: podrás volver a revisarlas en 7 s.'));
     expect(document.querySelectorAll('[data-sin-guardar-clave]')).toHaveLength(1); // co2 sigue a la vista
+    expect((document.querySelector('[data-revisar-otra-vez]') as HTMLButtonElement).disabled).toBe(true); // deshabilitado mientras dura la espera
+  });
+  // Cada código del servidor con su texto (docs/19 §4 AA, punto 6), y el botón deshabilitado mientras dura la espera indicada.
+  it('«Lo que la trama trae y no se guarda»: 503 sin_guardar_tiempo y 429 sin_guardar_ocupado dicen lo suyo; la espera vence y el botón vuelve', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval', 'Date'] });
+    try {
+      let n = 0;
+      responder = (metodo, ruta) => {
+        if (metodo === 'GET' && ruta === `/dispositivos/${ID}`) return json(ficha());
+        if (ruta === `/dispositivos/${ID}/sin-guardar`) {
+          n++;
+          if (n === 1) return json({ statusCode: 503, codigo: 'sin_guardar_tiempo', message: 'la relectura tardó demasiado: inténtalo de nuevo' }, 503);
+          if (n === 2) return json({ statusCode: 429, codigo: 'sin_guardar_ocupado', message: 'otra revisión de tramas está en curso: reintenta en 5 s', reintentar_en_s: 5 }, 429);
+          return json(SIN_GUARDAR);
+        }
+        return json([]);
+      };
+      render(Configurar, { id: ID, sesion: sesion('administrador'), sitios: SITIOS });
+      await vi.waitFor(() => expect(document.querySelector('[data-revisar-tramas]')).not.toBeNull());
+      await fireEvent.click(document.querySelector('[data-revisar-tramas]')!);
+      await vi.waitFor(() => expect(document.querySelector('[data-sin-guardar]')!.textContent).toContain('La relectura tardó demasiado: inténtalo de nuevo.'));
+      const boton = (): HTMLButtonElement => document.querySelector('[data-revisar-otra-vez]') as HTMLButtonElement;
+      expect(boton().disabled).toBe(false); // sin espera indicada
+      await fireEvent.click(boton());
+      await vi.waitFor(() => expect(document.querySelector('[data-sin-guardar]')!.textContent).toContain('Otra revisión de tramas está en curso: vuelve a intentarlo en 5 s.'));
+      expect(boton().disabled).toBe(true);
+      await vi.advanceTimersByTimeAsync(5_100);
+      await vi.waitFor(() => expect(boton().disabled).toBe(false));
+      await fireEvent.click(boton());
+      await vi.waitFor(() => expect(document.querySelectorAll('[data-sin-guardar-clave]')).toHaveLength(2));
+    } finally {
+      vi.useRealTimers();
+    }
   });
   it('«Lo que la trama trae y no se guarda»: con perfil de consulta no aparece ni se pide (lee cargas crudas)', async () => {
     render(Configurar, { id: ID, sesion: sesion('consulta'), sitios: SITIOS });

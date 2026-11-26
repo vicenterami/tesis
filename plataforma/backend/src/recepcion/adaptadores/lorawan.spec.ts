@@ -312,14 +312,19 @@ describe('enlaceDe: la señal del mejor receptor de rxInfo', () => {
     expect(enlaceDe([{ rssi: -80, snr: 'roto' }], true)).toEqual({ rssi: -80 }); // presente e inválido no es «ausente»
     expect(enlaceDe([{ gatewayId: 'aaaaaaaaaaaaaaaa' }], true)).toBeUndefined(); // sin RSSI no hay evidencia de que la pasarela midiera
   });
-  // Corrección del 25/11/2026 (docs/10 §8.4 punto 71): el 0 inferido no es una medición. No le gana a un receptor con SNR real (antes,
-  // [{−100}, {−80, −15}] elegía la pasarela peor con un SNR inventado) y no se infiere con un RSSI fuera de −150 a 0 dBm.
-  it('el SNR inferido no compite como medido; entre receptores sin SNR medido decide el RSSI; con un RSSI imposible no se infiere', () => {
-    expect(enlaceDe([{ rssi: -100 }, { rssi: -80, snr: -15 }], true)).toEqual({ rssi: -80, snr: -15 });
-    expect(enlaceDe([{ rssi: -80 }, { rssi: -60, snr: -1 }], true)).toEqual({ rssi: -60, snr: -1 });
+  // Decisión del 25/11/2026 (docs/10 §8.4 punto 71): con modulación LoRa declarada y el RSSI en rango, el SNR ausente de ChirpStack ES 0 dB
+  // y compite como cualquier medido; sin LoRa declarada (aquí: inferirSnr false) o con el RSSI fuera de rango, no se infiere nada.
+  it('el 0 inferido compite como medido: le gana a −5 y pierde con +3; todos inferidos → mayor RSSI; sin LoRa o con RSSI imposible no se infiere', () => {
+    expect(enlaceDe([{ rssi: -100, snr: -5 }, { rssi: -50 }], true)).toEqual({ rssi: -50, snr: 0 });
+    expect(enlaceDe([{ rssi: -100, snr: 3 }, { rssi: -50 }], true)).toEqual({ rssi: -100, snr: 3 });
     expect(enlaceDe([{ rssi: -100 }, { rssi: -70 }], true)).toEqual({ rssi: -70, snr: 0 });
-    expect(enlaceDe([{ rssi: 50 }], true)).toEqual({ rssi: 50 });
-    expect(enlaceDe([{ rssi: -151 }], true)).toEqual({ rssi: -151 });
+    expect(enlaceDe([{ rssi: -100, snr: -5 }, { rssi: -50 }], false)).toEqual({ rssi: -100, snr: -5 });
+    expect(enlaceDe([{ rssi: -151 }], true)).toBeUndefined();
+    expect(enlaceDe([{ rssi: 5 }], true)).toBeUndefined();
+  });
+  it('un RSSI fuera de −150 a 0 dBm no cuenta para elegir el receptor (no es una medición posible)', () => {
+    expect(enlaceDe([{ rssi: 5, snr: 9 }, { rssi: -90, snr: 2 }])).toEqual({ snr: 9 });
+    expect(enlaceDe([{ rssi: 5 }, { rssi: -90 }])).toEqual({ rssi: -90 });
   });
 });
 

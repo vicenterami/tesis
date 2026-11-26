@@ -2066,11 +2066,14 @@ entra. Lo que aquí se marca «a fijar al implementar» es un detalle que el dis
     = 7`, `api/proto/gw/gw.proto`) que se serializa con `pbjson_build` **sin** `emit_fields()` («Output fields with their default values»,
     `pbjson-build/src/lib.rs`), a diferencia del propio `UplinkEvent`, que sí lo lleva (`api/rust/build.rs`, rama principal consultada el
     25/11/2026: https://github.com/chirpstack/chirpstack/blob/master/api/rust/build.rs); por eso un SNR de 0 dB llega **ausente**. Regla
-    (corregida el 25/11/2026): en el formato `chirpstack`, un elemento con `rssi` numérico **dentro de −150 a 0 dBm** y sin `snr` vale SNR 0
-    **solo si la trama declara modulación LoRa** (`txInfo.modulation.lora`, `gw.UplinkTxInfo` y `gw.Modulation` en `api/proto/gw/gw.proto`,
-    commit `53f94c6`, consultado el 25/11/2026: con FSK o LR-FHSS no hay SNR que omitir). Ese 0 **inferido no compite como medido**: para
-    elegir el mejor receptor cuenta como «sin SNR», así que nunca le gana a un receptor con SNR real; si gana (por RSSI, entre receptores sin
-    SNR medido), se guarda 0. En el de la pasarela Milesight, ausente es ausente.
+    (decidida el 25/11/2026): en el formato `chirpstack`, un elemento con `rssi` numérico **dentro de −150 a 0 dBm** y sin `snr` vale SNR 0
+    **solo si la trama declara modulación LoRa** (`txInfo.modulation.lora`, `gw.UplinkTxInfo` y `gw.Modulation` en
+    https://github.com/chirpstack/chirpstack/blob/53f94c6ee593dce0340ee98dddfddf14f413d846/api/proto/gw/gw.proto, consultado el 25/11/2026:
+    con FSK o LR-FHSS no hay SNR que omitir). **Con esas dos condiciones, ese 0 compite como cualquier SNR medido**: no es una suposición,
+    es la forma en que ChirpStack escribe un 0 dB medido, así que un receptor a 0 dB le gana a uno a −5 dB (y pierde con uno a +3 dB); entre
+    receptores con el mismo SNR decide el RSSI. Sin modulación LoRa declarada, o con el RSSI fuera de −150 a 0 dBm, no se infiere nada.
+    Además, un RSSI fuera de ese rango no cuenta para elegir el receptor (no es una medición posible); el pipeline lo omite igual por el
+    rango del catálogo. En el de la pasarela Milesight, ausente es ausente.
     (iii) **En el pipeline** (`recepcion.service.ts`): la consulta del filtro 1 trae las magnitudes declaradas del nodo; se suman las del
     enlace que el nodo declaró y que el sensor no envió en su carga (si el sensor manda su propio `rssi`, el derivado no se agrega: no se
     mezclan dos orígenes); cuentan en el tope **antes** de decidir si la trama cabe, pero si las del sensor caben y con ellas no, se omiten y la trama entra (punto 53 vii; corrección del 25/11/2026); se procesan **al final**, después de
@@ -2104,9 +2107,13 @@ entra. Lo que aquí se marca «a fijar al implementar» es un detalle que el dis
     interpreta una sola vez. **Topes** (corrección del 25/11/2026: el costo por petición estaba acotado, pero no el de varias a la vez):
     20 cargas de a lo más 64 KiB por petición, sobre el índice (dispositivo, recibido_en) de cada tabla; **una relectura a la vez por
     proceso** (otra simultánea responde **429** `codigo: sin_guardar_ocupado`, con `reintentar_en_s: 5`); **una cada 10 s por persona y
-    equipo** (antes, **429** `codigo: sin_guardar_espera`, con los segundos que faltan en `reintentar_en_s`); todas sus
-    consultas en **una sola conexión** del grupo, en una transacción de solo lectura con `statement_timeout` de **5 s**, que la base
-    cancela en el servidor (vencido, **503** `codigo: sin_guardar_tiempo`, «la relectura tardó demasiado: inténtalo de nuevo»). Lo que se ve vence con la
+    equipo, por proceso**, contada desde la última relectura que terminó bien (un 404, 503 o 500 no la consumen; antes, **429**
+    `codigo: sin_guardar_espera`, con los segundos que faltan en `reintentar_en_s`); y un **plazo total de 5 s** para el trabajo en la
+    base, obtener la conexión incluido: si el grupo no la entrega a tiempo, 503 (la que llegue después vuelve al grupo); con ella, todas las
+    consultas en **una sola conexión**, en una transacción de solo lectura, con `statement_timeout` igual a lo que queda del plazo antes
+    de cada sentencia (la base la cancela en el servidor) y sin lanzar la siguiente si ya no queda (**503** `codigo: sin_guardar_tiempo`,
+    «la relectura tardó demasiado: inténtalo de nuevo»). La relectura de las cargas en el proceso se suma al plazo (de 70 a 85 ms medidos
+    con 20 cargas de 64 KiB). El cupo se libera en todos los caminos (bien, error, plazo vencido). Lo que se ve vence con la
     retención de las tramas.
     (ii) **«Elegir qué ver».** `preferencia.magnitudes_ocultas text[] NOT NULL DEFAULT '{}'` (migración 30; a lo más 50, códigos con la forma
     del catálogo; `UPDATE` por columna para `plataforma_app`, repetido en la 14). `PUT /preferencias` sigue reemplazando todo y exige la lista

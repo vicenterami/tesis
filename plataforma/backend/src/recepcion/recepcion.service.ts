@@ -520,41 +520,51 @@ export class RecepcionService implements OnModuleInit {
 
   // «Lo que la trama trae y no se guarda» (GET /dispositivos/{id}/sin-guardar; docs/10 §8.4 punto 72 i): las MAX_TRAMAS_SIN_GUARDAR tramas
   // más recientes del equipo, entre las aceptadas (`trama`) y las rechazadas (`cuarentena`), releídas con el adaptador, la receta y los alias
-  // vigentes (la misma consulta del filtro 1). No escribe nada. undefined si el equipo no existe. Topes (corrección del 25/11/2026): una a la
-  // vez por proceso (429 sin_guardar_ocupado), una cada ESPERA_SIN_GUARDAR_MS por persona y equipo (429 sin_guardar_espera) y todo en UNA
-  // conexión del grupo, en una transacción de solo lectura con statement_timeout, que la base cancela en el servidor (503 sin_guardar_tiempo).
+  // vigentes (la misma consulta del filtro 1). No escribe nada. undefined si el equipo no existe. Topes, por proceso (correcciones del
+  // 25/11/2026): una a la vez (429 sin_guardar_ocupado); una cada ESPERA_SIN_GUARDAR_MS por persona y equipo, contada solo desde una relectura
+  // que terminó bien (429 sin_guardar_espera); y un plazo TOTAL de TOPE_SIN_GUARDAR_MS para el trabajo en la base, obtener la conexión
+  // incluido: una sola conexión del grupo, en una transacción de solo lectura, con `statement_timeout` = lo que queda del plazo antes de
+  // cada sentencia (la base la cancela en el servidor) y sin lanzar la siguiente si ya no queda (503 sin_guardar_tiempo).
   private sinGuardarEnCurso = 0;
   private readonly ultimaRelectura = new Map<string, number>();
   async sinGuardar(dispositivoId: string, quien: string): Promise<{ revisadas: number; claves: ClaveSinGuardar[] } | undefined> {
-    const ahora = Date.now();
+    const inicio = Date.now();
     const llave = `${quien}|${dispositivoId}`;
     const anterior = this.ultimaRelectura.get(llave);
-    if (anterior !== undefined && ahora - anterior < ESPERA_SIN_GUARDAR_MS) {
-      throw demasiadas('sin_guardar_espera', 'acabas de revisar las tramas de este equipo', Math.ceil((ESPERA_SIN_GUARDAR_MS - (ahora - anterior)) / 1000));
+    if (anterior !== undefined && inicio - anterior < ESPERA_SIN_GUARDAR_MS) {
+      throw demasiadas('sin_guardar_espera', 'acabas de revisar las tramas de este equipo', Math.ceil((ESPERA_SIN_GUARDAR_MS - (inicio - anterior)) / 1000));
     }
-    if (this.sinGuardarEnCurso >= MAX_SIN_GUARDAR_EN_CURSO) throw demasiadas('sin_guardar_ocupado', 'otra persona está revisando tramas', 5);
-    if (this.ultimaRelectura.size > 1000) for (const [k, t] of this.ultimaRelectura) if (ahora - t >= ESPERA_SIN_GUARDAR_MS) this.ultimaRelectura.delete(k);
-    this.ultimaRelectura.set(llave, ahora);
+    if (this.sinGuardarEnCurso >= MAX_SIN_GUARDAR_EN_CURSO) throw demasiadas('sin_guardar_ocupado', 'otra revisión de tramas está en curso', 5);
     this.sinGuardarEnCurso++;
+    const limite = inicio + TOPE_SIN_GUARDAR_MS;
+    const restante = (): number => {
+      const ms = limite - Date.now();
+      if (ms <= 0) throw tiempoVencido();
+      return ms;
+    };
     let c: PoolClient | undefined;
     let abierta = false;
     try {
-      c = await this.pool.connect();
+      c = await conPlazo(this.pool.connect(), restante());
       c.on('error', errorDeCliente);
       await c.query('BEGIN READ ONLY');
       abierta = true;
-      await c.query(`SET LOCAL statement_timeout = '${TOPE_SIN_GUARDAR_MS}ms'`);
-      const id = await c.query<{ id_fisico: string }>('SELECT id_fisico FROM dispositivo WHERE id = $1', [dispositivoId]);
-      const d = id.rows[0] === undefined ? undefined : await this.buscarDispositivo(id.rows[0].id_fisico, c);
+      const cliente = c;
+      const q = async <T extends object>(text: string, values: unknown[] = []) => {
+        await cliente.query(`SET LOCAL statement_timeout = '${restante()}ms'`);
+        return cliente.query<T>(text, values);
+      };
+      const id = await q<{ id_fisico: string }>('SELECT id_fisico FROM dispositivo WHERE id = $1', [dispositivoId]);
+      const d = id.rows[0] === undefined ? undefined : await this.buscarDispositivo(id.rows[0].id_fisico, { query: q } as unknown as Pick<Pool, 'query'>);
       let r: { revisadas: number; claves: ClaveSinGuardar[] } | undefined;
       if (d !== undefined) {
-        const filas = await c.query<FilaRetenida>(
+        const filas = await q<FilaRetenida>(
           `SELECT payload, topico, recibido_en FROM (
              (SELECT payload, topico, recibido_en FROM trama WHERE dispositivo_id = $1 ORDER BY recibido_en DESC LIMIT $2)
              UNION ALL
              (SELECT payload_crudo, topico, recibido_en FROM cuarentena WHERE dispositivo_id = $1 ORDER BY recibido_en DESC LIMIT $2)) u
             ORDER BY recibido_en DESC LIMIT $2`, [dispositivoId, MAX_TRAMAS_SIN_GUARDAR]);
-        const catalogo = await c.query<{ codigo: string }>('SELECT codigo FROM magnitud');
+        const catalogo = await q<{ codigo: string }>('SELECT codigo FROM magnitud');
         const claves = clavesSinGuardar(filas.rows, {
           formato: d.formato, idFisico: id.rows[0].id_fisico, declaradas: d.magnitudes ?? [], catalogo: new Set(catalogo.rows.map((m) => m.codigo)),
           decodificador: d.decodificador, receta: d.receta, alias: d.alias,
@@ -563,12 +573,16 @@ export class RecepcionService implements OnModuleInit {
       }
       await c.query('COMMIT');
       abierta = false;
+      if (r !== undefined) {
+        // La espera la consume solo una relectura que terminó bien (un 404, un 503 o un 500 no).
+        const ahora = Date.now();
+        if (this.ultimaRelectura.size > 1000) for (const [k, t] of this.ultimaRelectura) if (ahora - t >= ESPERA_SIN_GUARDAR_MS) this.ultimaRelectura.delete(k);
+        this.ultimaRelectura.set(llave, ahora);
+      }
       return r;
     } catch (e) {
       if (abierta) await c?.query('ROLLBACK').catch(() => undefined);
-      if ((e as { code?: string }).code === '57014') {
-        throw new HttpException({ statusCode: 503, error: 'Service Unavailable', codigo: 'sin_guardar_tiempo', message: 'la relectura tardó demasiado: inténtalo de nuevo' }, HttpStatus.SERVICE_UNAVAILABLE);
-      }
+      if ((e as { code?: string }).code === '57014') throw tiempoVencido();
       throw e;
     } finally {
       this.sinGuardarEnCurso--;
@@ -658,4 +672,23 @@ export class RecepcionService implements OnModuleInit {
 function demasiadas(codigo: string, motivo: string, segundos: number): HttpException {
   return new HttpException({ statusCode: 429, error: 'Too Many Requests', codigo, message: `${motivo}: reintenta en ${segundos} s`, reintentar_en_s: segundos },
     HttpStatus.TOO_MANY_REQUESTS);
+}
+
+// La relectura pasó de su plazo total (docs/10 §8.4 punto 72 i).
+function tiempoVencido(): HttpException {
+  return new HttpException({ statusCode: 503, error: 'Service Unavailable', codigo: 'sin_guardar_tiempo', message: 'la relectura tardó demasiado: inténtalo de nuevo' },
+    HttpStatus.SERVICE_UNAVAILABLE);
+}
+
+// Una conexión del grupo con plazo: si no llega a tiempo (el grupo está agotado), 503; la que llegue después se devuelve al grupo.
+async function conPlazo(pedida: Promise<PoolClient>, ms: number): Promise<PoolClient> {
+  let reloj: ReturnType<typeof setTimeout> | undefined;
+  let vencido = false;
+  const plazo = new Promise<never>((_, rechazar) => { reloj = setTimeout(() => { vencido = true; rechazar(tiempoVencido()); }, ms); });
+  try {
+    return await Promise.race([pedida, plazo]);
+  } finally {
+    clearTimeout(reloj);
+    if (vencido) void pedida.then((c) => c.release(), () => undefined);
+  }
 }

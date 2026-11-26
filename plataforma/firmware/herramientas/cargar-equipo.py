@@ -268,6 +268,10 @@ def esperar_otro_arranque(enlace, antes):
 def cmd_borrar(enlace, _args):
     antes = saludar(enlace).get('arranque')
     r = enlace.orden({'orden': 'borrar'})
+    if r is not None and r.get('ok') is False and r.get('error') == 'guardar':
+        # El firmware borró (o lo intentó) y no pudo reabrir la memoria ni guardar su contador de arranques: no se reinicia solo.
+        raise Falla('El equipo no pudo completar el borrado (su memoria pudo quedar borrada, sin el contador de arranques): reinícialo con el '
+                    'botón EN y mira «hola».')
     if r is None or r.get('ok') is not True:
         raise Falla('El equipo no confirmó el borrado.')
     # El firmware borra la partición de datos entera (docs/17 §6.4) y arranca con lo que traiga su imagen.

@@ -1,6 +1,7 @@
 // La señal del enlace en el panel (docs/19 §4 AA; docs/10 §8.4 punto 71): las magnitudes del enlace, el orden de «Tendencias» y la línea de
 // «Red → Calidad del enlace». Lo puro, aquí; los componentes solo dibujan.
 import type { ResumenSitio } from './modelo';
+import { ErrorApi } from './api';
 import { haceCuanto } from './tiempo';
 
 // Las magnitudes del enlace que el alta propone para un nodo LoRaWAN (la misma lista cerrada que MAGNITUDES_ENLACE del backend,
@@ -27,4 +28,21 @@ export function lineaSenal(e: NonNullable<ResumenSitio['enlace']>[number], ahora
   const tiempos = [e.rssi?.tiempo, e.snr?.tiempo].filter((t): t is string => t !== undefined).sort();
   partes.push(haceCuanto(tiempos.at(-1) ?? null, ahora));
   return partes.join(' · ');
+}
+
+// «Lo que la trama trae y no se guarda»: los topes del servidor por su código (docs/10 §8.4 punto 72 i; docs/19 §4 AA, punto 6), con el texto
+// que dice qué pasó y, si el servidor lo indica, cuántos segundos esperar antes de volver a revisar. null = otro error (el aviso de siempre).
+export function errorSinGuardar(e: unknown): { texto: string; esperaS: number | null } | null {
+  if (!(e instanceof ErrorApi)) return null;
+  const n = e.reintentarEnS;
+  switch (e.cuerpo.codigo) {
+    case 'sin_guardar_tiempo':
+      return { texto: 'La relectura tardó demasiado: inténtalo de nuevo.', esperaS: null };
+    case 'sin_guardar_ocupado':
+      return { texto: `Otra revisión de tramas está en curso: vuelve a intentarlo en ${n ?? 5} s.`, esperaS: n ?? 5 };
+    case 'sin_guardar_espera':
+      return { texto: `Acabas de revisar las tramas de este equipo: podrás volver a revisarlas en ${n ?? 10} s.`, esperaS: n ?? 10 };
+    default:
+      return null;
+  }
 }

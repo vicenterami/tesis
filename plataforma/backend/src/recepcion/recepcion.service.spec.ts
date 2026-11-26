@@ -936,7 +936,7 @@ describe('RecepcionService: la señal del enlace LoRaWAN como canal declarado', 
 describe('RecepcionService.sinGuardar: cupo, espera y una sola conexión con tiempo máximo', () => {
   const D1 = '11111111-1111-4111-8111-111111111111';
   const D2 = '22222222-2222-4222-8222-222222222222';
-  function armarS(opciones: { tarda?: Promise<void>; vence?: boolean } = {}) {
+  function armarS(opciones: { tarda?: Promise<void>; vence?: boolean; sinEquipo?: boolean; sinConexion?: boolean; alLeerEquipo?: () => void } = {}) {
     const enCliente: string[] = [];
     const delGrupo = vi.fn(() => Promise.reject(new Error('no debe usar el grupo directo')));
     const release = vi.fn();
@@ -947,6 +947,8 @@ describe('RecepcionService.sinGuardar: cupo, espera y una sola conexión con tie
         enCliente.push(sql.trim().replace(/\s+/g, ' ').slice(0, 40));
         if (sql.startsWith('SELECT id_fisico FROM dispositivo')) {
           if (opciones.tarda) await opciones.tarda;
+          opciones.alLeerEquipo?.();
+          if (opciones.sinEquipo) return { rows: [], rowCount: 0 };
           if (opciones.vence) throw Object.assign(new Error('canceling statement due to statement timeout'), { code: '57014' });
           return { rows: [{ id_fisico: 'n1' }], rowCount: 1 };
         }
@@ -956,7 +958,7 @@ describe('RecepcionService.sinGuardar: cupo, espera y una sola conexión con tie
         return { rows: [], rowCount: 0 };
       }),
     };
-    const connect = vi.fn(() => Promise.resolve(cliente));
+    const connect = vi.fn(() => (opciones.sinConexion ? new Promise<never>(() => undefined) : Promise.resolve(cliente)));
     const servicio = new RecepcionService({ query: delGrupo, connect } as unknown as Pool, { alRecibir: vi.fn() } as unknown as BrokerService, {} as AlertasService,
       {} as SupervisionService, new EventosService(), new SenmlAdaptador(), new PlanoAdaptador(), new ChirpstackAdaptador(), new MilesightAdaptador(),
       { get: () => undefined } as unknown as ConfigService);
@@ -968,7 +970,11 @@ describe('RecepcionService.sinGuardar: cupo, espera y una sola conexión con tie
     expect(await servicio.sinGuardar(D1, 'u1')).toEqual({ revisadas: 0, claves: [] });
     expect(connect).toHaveBeenCalledTimes(1);
     expect(delGrupo).not.toHaveBeenCalled();
-    expect(enCliente.slice(0, 2)).toEqual(['BEGIN READ ONLY', "SET LOCAL statement_timeout = '5000ms'"]);
+    expect(enCliente[0]).toBe('BEGIN READ ONLY');
+    // Antes de cada sentencia, el tiempo que QUEDA del plazo total de 5 s (no 5 s por sentencia).
+    const topes = enCliente.filter((x) => x.startsWith('SET LOCAL statement_timeout')).map((x) => Number(/'(\d+)ms'/.exec(x)?.[1]));
+    expect(topes.length).toBe(4);
+    expect(topes.every((ms, i) => ms > 0 && ms <= 5000 && (i === 0 || ms <= (topes[i - 1] ?? 0)))).toBe(true);
     expect(enCliente.at(-1)).toBe('COMMIT');
     expect(release).toHaveBeenCalledTimes(1);
   });
@@ -986,13 +992,47 @@ describe('RecepcionService.sinGuardar: cupo, espera y una sola conexión con tie
     await expect(servicio.sinGuardar(D1, 'u2')).resolves.toEqual({ revisadas: 0, claves: [] });
     await expect(servicio.sinGuardar(D2, 'u1')).resolves.toEqual({ revisadas: 0, claves: [] });
   });
+  // Corrección del 25/11/2026: el plazo es TOTAL (obtener la conexión incluido), y la espera de 10 s solo la consume una relectura que terminó bien.
+  it('plazo total: con el grupo agotado (la conexión no llega) → 503 a los 5 s, y el cupo queda libre', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+    try {
+      const { servicio } = armarS({ sinConexion: true });
+      const p = servicio.sinGuardar(D1, 'u1').catch((e: unknown) => e);
+      await vi.advanceTimersByTimeAsync(5_001);
+      const [st, cuerpo] = estado(await p);
+      expect([st, (cuerpo as { codigo?: string }).codigo]).toEqual([503, 'sin_guardar_tiempo']);
+      expect((servicio as unknown as { sinGuardarEnCurso: number }).sinGuardarEnCurso).toBe(0); // no quedó «otra relectura en curso»
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('plazo total: si entre sentencias ya pasaron 5 s, no se lanza la siguiente → 503, la transacción se deshace y la conexión vuelve', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    try {
+      const { servicio, enCliente, release } = armarS({ alLeerEquipo: () => vi.setSystemTime(Date.now() + 6_000) });
+      const [st, cuerpo] = estado(await servicio.sinGuardar(D1, 'u1').catch((e: unknown) => e));
+      expect([st, (cuerpo as { codigo?: string }).codigo]).toEqual([503, 'sin_guardar_tiempo']);
+      expect(enCliente.some((x) => x.startsWith('SELECT d.id, d.estado'))).toBe(false);
+      expect(enCliente.at(-1)).toBe('ROLLBACK');
+      expect(release).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('un 404 o un 503 no consumen la espera de 10 s: la misma persona puede volver a intentarlo enseguida', async () => {
+    const nada = armarS({ sinEquipo: true });
+    expect(await nada.servicio.sinGuardar(D1, 'u1')).toBeUndefined();
+    expect(await nada.servicio.sinGuardar(D1, 'u1')).toBeUndefined();
+    const vence = armarS({ vence: true });
+    for (let i = 0; i < 2; i++) expect(estado(await vence.servicio.sinGuardar(D1, 'u1').catch((e: unknown) => e))[0]).toBe(503);
+  });
   it('vencido el tiempo en la base (57014) → 503 sin_guardar_tiempo, la transacción se deshace y la conexión vuelve; el cupo se libera', async () => {
     const { servicio, enCliente, release } = armarS({ vence: true });
     const [st, cuerpo] = estado(await servicio.sinGuardar(D1, 'u1').catch((e: unknown) => e));
     expect([st, (cuerpo as { codigo?: string }).codigo]).toEqual([503, 'sin_guardar_tiempo']);
     expect(enCliente.at(-1)).toBe('ROLLBACK');
     expect(release).toHaveBeenCalledTimes(1);
-    const [st2] = estado(await servicio.sinGuardar(D2, 'u1').catch((e: unknown) => e));
-    expect(st2).toBe(503); // el cupo no quedó tomado: vuelve a intentar (y vuelve a vencer en esta base falsa)
+    const [st2] = estado(await servicio.sinGuardar(D1, 'u1').catch((e: unknown) => e));
+    expect(st2).toBe(503); // ni el cupo ni la espera quedaron tomados: vuelve a intentar (y vuelve a vencer en esta base falsa)
   });
 });

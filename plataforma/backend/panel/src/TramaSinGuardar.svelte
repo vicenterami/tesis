@@ -12,6 +12,7 @@
   import { puedeEn, type Sesion } from './lib/sesion';
   import { haceCuanto } from './lib/tiempo';
   import { simbolo } from './lib/unidades';
+  import { errorSinGuardar } from './lib/senal';
 
   interface Clave { clave: string; magnitud: string | null; valor: number | null; unidad: string | null; visto: string; origen: 'carga' | 'enlace' }
   let {
@@ -32,6 +33,23 @@
   let pedido = $state(false);
   const carga = ultimaGana();
 
+  // Los topes del servidor (429 y 503 de la relectura) se dicen por su código; mientras dura la espera indicada, «Volver a revisar» queda
+  // deshabilitado y dice cuánto falta (docs/19 §4 AA, punto 6).
+  let errorPropio = $state(false); // el texto ya es el de un tope del servidor: se muestra sin prefijo
+  let esperaHasta = $state(0);
+  let ahoraMs = $state(Date.now());
+  let reloj: ReturnType<typeof setInterval> | undefined;
+  const faltaS = $derived(Math.max(0, Math.ceil((esperaHasta - ahoraMs) / 1000)));
+  const motivoEspera = $derived(faltaS > 0 ? `podrás volver a revisar en ${faltaS} s` : null);
+  function esperar(s: number): void {
+    esperaHasta = Date.now() + s * 1000;
+    ahoraMs = Date.now();
+    clearInterval(reloj);
+    reloj = setInterval(() => {
+      ahoraMs = Date.now();
+      if (ahoraMs >= esperaHasta) clearInterval(reloj);
+    }, 1000);
+  }
   async function cargar(): Promise<void> {
     pedido = true;
     try {
@@ -40,12 +58,16 @@
       datos = r;
       error = null;
     } catch (e) {
-      if (!esCancelacion(e)) error = avisoDeError(e).texto;
+      if (esCancelacion(e)) return;
+      const tope = errorSinGuardar(e);
+      errorPropio = tope !== null;
+      error = tope?.texto ?? avisoDeError(e).texto;
+      if (tope?.esperaS) esperar(tope.esperaS);
     }
   }
   onMount(() => {
     if (puede && !bajoDemanda) void cargar();
-    return () => carga.cancelar();
+    return () => { carga.cancelar(); clearInterval(reloj); };
   });
 
   async function agregar(c: Clave): Promise<void> {
@@ -74,12 +96,13 @@
     <h3 id="{uid}-titulo">Lo que la trama trae y no se guarda</h3>
     {#if aviso !== null}<Aviso tipo={aviso.tipo} texto={aviso.texto} alCerrar={() => (aviso = null)} />{/if}
     <!-- Un error al volver a revisar (429 por el tope, 503 por el tiempo) se dice sin borrar la lista que ya se ve (docs/19 §4 AA, punto 6). -->
-    {#if error !== null && datos !== null}<div data-sin-guardar-error><Aviso tipo="error" texto={`No se pudieron volver a revisar las tramas: ${error}`} alCerrar={() => (error = null)} /></div>{/if}
+    {#if error !== null && datos !== null}<div data-sin-guardar-error><Aviso tipo="error" texto={errorPropio ? error : `No se pudieron volver a revisar las tramas: ${error}`} alCerrar={() => (error = null)} /></div>{/if}
     {#if !pedido}
       <p class="vivo">Revisa las tramas recientes de este equipo para ver si traen algo que no guarda (otra magnitud, la señal del enlace).
         <Boton etiqueta="Revisar las tramas" onclick={() => void cargar()} data-revisar-tramas /></p>
     {:else if error !== null && datos === null}
-      <Aviso tipo="error" texto={`No se pudieron revisar las tramas: ${error}`} accion={{ etiqueta: 'Volver a revisar', alHacer: () => void cargar() }} />
+      <div data-sin-guardar-error><Aviso tipo="error" texto={errorPropio ? error : `No se pudieron revisar las tramas: ${error}`} /></div>
+      <p class="vivo"><Boton etiqueta="Volver a revisar" variante="discreto" motivoDesactivado={motivoEspera} onclick={() => void cargar()} data-revisar-otra-vez /></p>
     {:else if datos === null}
       <p class="vacio" aria-busy="true">Revisando las tramas recientes…</p>
     {:else if datos.claves.length === 0}
@@ -100,6 +123,6 @@
         {/each}
       </ul>
     {/if}
-    {#if datos !== null}<p class="vivo"><Boton etiqueta="Volver a revisar" variante="discreto" onclick={() => void cargar()} data-revisar-otra-vez /></p>{/if}
+    {#if datos !== null}<p class="vivo"><Boton etiqueta="Volver a revisar" variante="discreto" motivoDesactivado={motivoEspera} onclick={() => void cargar()} data-revisar-otra-vez /></p>{/if}
   </section>
 {/if}

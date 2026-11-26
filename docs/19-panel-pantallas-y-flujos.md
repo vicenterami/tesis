@@ -2013,9 +2013,12 @@ antes del código; la regla del pipeline, en `docs/10 §8.4` punto 71).**
    sale** (decidido para no guardar nada nuevo): de las tramas ya retenidas del equipo, `trama` (30 días) y `cuarentena`, las 20 más
    recientes, releídas con el adaptador de su formato en cada petición (`GET /dispositivos/{id}/sin-guardar`, `docs/10 §8.4` punto 72).
    Ninguna tabla ni columna nueva: lo que se muestra vence con la retención de las tramas. Primero la señal y las claves con magnitud;
-   a lo más 50. **Topes** (`docs/10 §8.4` punto 72 i): una relectura a la vez en el servidor y una cada 10 s por persona y equipo (si no,
-   429 con `reintentar_en_s`, y el aviso de siempre: «Demasiados intentos: espera N s y reintenta»); 5 s como máximo (si no, 503 y «La
-   relectura tardó demasiado: inténtalo de nuevo»). Ninguno de esos avisos borra la lista que ya se ve, y «Volver a revisar» la repide.
+   a lo más 50. **Topes** (`docs/10 §8.4` punto 72 i), cada uno con su texto: otra revisión en curso en el servidor (429
+   `sin_guardar_ocupado`) → «Otra revisión de tramas está en curso: vuelve a intentarlo en N s.»; la misma persona y equipo antes de 10 s
+   desde su última revisión que terminó bien, por proceso (429 `sin_guardar_espera`) → «Acabas de revisar las tramas de este equipo:
+   podrás volver a revisarlas en N s.»; más de 5 s en total (503 `sin_guardar_tiempo`) → «La relectura tardó demasiado: inténtalo de
+   nuevo.». N es el `reintentar_en_s` del servidor, y mientras dura, «Volver a revisar» queda deshabilitado y dice «podrás volver a
+   revisar en N s». Ninguno de esos avisos borra la lista que ya se ve.
 7. **«Elegir qué ver» por persona** (RF-56, HU-29; ampliación del 25/11/2026, rediseñada tras la refutación). Nada oculto por omisión:
    la persona marca qué magnitudes NO quiere ver en el Resumen («Ahora») y en «Tendencias»; se guarda en sus preferencias
    (`preferencia.magnitudes_ocultas`, migración 30, a lo más 50 códigos). **Dónde se cambia:** el botón «Elegir qué ver» del Resumen (una

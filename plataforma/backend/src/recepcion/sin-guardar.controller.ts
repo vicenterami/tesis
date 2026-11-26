@@ -24,8 +24,8 @@ export class SinGuardarController {
       'escribir nada, y responde `revisadas` y `claves[{clave, magnitud, valor, unidad, visto, origen}]`: lo que traen y el equipo no tiene como canal. ' +
       '`magnitud`: la del catálogo que la recibiría (se agrega con POST /dispositivos/{id}/canales), o null si no hay magnitud ni alias para esa clave; ' +
       '`valor`: el último valor numérico visto (un texto no se muestra); `origen`: `carga` o `enlace` (la señal de una trama LoRaWAN). ' +
-      `Hasta ${MAX_CLAVES_SIN_GUARDAR} claves, la más reciente primero, cada una recortada a 32 caracteres. Lee cargas crudas: exige la acción \`escribir\` (docs/20 §6). ` +
-      `Topes: una relectura a la vez por proceso, una cada ${ESPERA_SIN_GUARDAR_MS / 1000} s por persona y equipo, y ${TOPE_SIN_GUARDAR_MS / 1000} s como máximo en la base (docs/10 §8.4 punto 72 i).`,
+      `Hasta ${MAX_CLAVES_SIN_GUARDAR} claves: primero la señal y las claves con magnitud en el catálogo, después las demás; dentro de cada grupo, la más reciente primero; cada una recortada a 32 caracteres. Lee cargas crudas: exige la acción \`escribir\` (docs/20 §6). ` +
+      `Topes, por proceso: una relectura a la vez; una cada ${ESPERA_SIN_GUARDAR_MS / 1000} s por persona y equipo, contada desde la última que terminó bien; y ${TOPE_SIN_GUARDAR_MS / 1000} s en total para el trabajo en la base, obtener la conexión incluido (docs/10 §8.4 punto 72 i).`,
   })
   @ApiHeader({ name: 'X-Clave-Admin', required: false, description: 'Sin sesión: la clave de administrador (HTTP_CLAVE_ADMIN), como usuario del sistema (docs/20 §5)' })
   @ApiParam({ name: 'id', description: 'UUID del dispositivo' })
@@ -33,8 +33,8 @@ export class SinGuardarController {
   @ApiBadRequestResponse({ description: 'UUID inválido' })
   @ApiUnauthorizedResponse({ description: 'Sin sesión ni X-Clave-Admin' })
   @ApiForbiddenResponse({ description: 'Un perfil sin la acción escribir en ese sitio (docs/20 §6)' })
-  @ApiTooManyRequestsResponse({ description: `\`codigo: sin_guardar_ocupado\` (ya hay ${MAX_SIN_GUARDAR_EN_CURSO} relectura en curso) o \`sin_guardar_espera\` (la misma persona revisó este equipo hace menos de ${ESPERA_SIN_GUARDAR_MS / 1000} s); \`reintentar_en_s\` dice cuánto esperar` })
-  @ApiServiceUnavailableResponse({ description: `\`codigo: sin_guardar_tiempo\`: la relectura pasó de ${TOPE_SIN_GUARDAR_MS / 1000} s y la base la canceló` })
+  @ApiTooManyRequestsResponse({ description: `\`codigo: sin_guardar_ocupado\` (ya hay ${MAX_SIN_GUARDAR_EN_CURSO} relectura en curso en este proceso) o \`sin_guardar_espera\` (la misma persona revisó bien este equipo hace menos de ${ESPERA_SIN_GUARDAR_MS / 1000} s); \`reintentar_en_s\` dice cuánto esperar` })
+  @ApiServiceUnavailableResponse({ description: `\`codigo: sin_guardar_tiempo\`: la relectura pasó de ${TOPE_SIN_GUARDAR_MS / 1000} s en total (la conexión no llegó a tiempo, o la base canceló la sentencia)` })
   @ApiNotFoundResponse({ description: 'No existe, o es de otro sitio' })
   async sinGuardar(@Usuario() u: UsuarioSesion, @Param('id') id: string) {
     exigirEnAlguno(u, 'escribir');
