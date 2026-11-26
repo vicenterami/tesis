@@ -43,7 +43,8 @@
 # confirmado en la base); el porcentaje se muestra truncado.
 # La ventana es la PEDIDA, nunca la que la sonda alcanzó a escribir. Las líneas de la sonda DESPUÉS del fin no cuentan (no sirven para
 # elegir horas). Si la sonda registró minutos ANTES del inicio, el resumen juzga además la peor ventana de 72 h sobre el tramo continuo de
-# líneas que llega al inicio (lo anterior a un hueco de más de 2 minutos es «corrida anterior, no juzgada», como un ensayo previo) y
+# líneas que llega al inicio (lo anterior a un hueco de más de 2 minutos es «corrida anterior, no juzgada», como un ensayo previo; si esa
+# corrida tuvo minutos no disponibles, descartarla exige --fuera-motivo y el veredicto queda rotulado) y
 # el veredicto usa la peor de las dos: empezar más tarde no esconde minutos malos. --fuera-motivo es solo una nota que queda escrita. Las
 # líneas del emisor fuera de la ventana no cuentan (arranca antes que la sonda y se detiene después).
 # --planeada (repetible) marca una caída provocada: se le atribuye solo un incidente que EMPIEZA entre su minuto y dos minutos después, con
@@ -211,7 +212,7 @@ else:
         if par in vistas: continue   # una línea repetida (dentro o fuera de la ventana) cuenta una vez
         vistas.add(par)
         ids.add(mt.group(1)); k = (mt.group(1), minuto(bt))
-        if int(mt.group(3)) - int(mt.group(2)) <= ESPERA_MAX_MS: marcas[k] = marcas.get(k, 0) + 1
+        if 0 <= int(mt.group(3)) - int(mt.group(2)) <= ESPERA_MAX_MS: marcas[k] = marcas.get(k, 0) + 1   # una llegada anterior al envío no vale
         else: tardias[k] = tardias.get(k, 0) + 1   # confirmada tarde: el equipo no tuvo servicio en su ranura
         if ini <= bt < fin_excl: conf_set.add((mt.group(1), int(mt.group(2))))
 conf = len(conf_set)
@@ -283,6 +284,19 @@ if antes:
     m = antes[0]
     while m < ini: tramo.append(m); m += UN_MIN
 antes_no = sum(1 for k in tramo if not disponible(k, por_min_todo, em_min_todo))
+# La corrida anterior no se juzga, pero se cuenta: sus minutos no disponibles (con los que no tienen línea dentro de ella). Si tuvo alguno,
+# descartarla exige un motivo con texto (al menos 10 caracteres, 3 de ellos letras) y el veredicto queda rotulado; sin él, no hay veredicto.
+anterior_min = []
+if anterior:
+    m = min(anterior)
+    while m <= max(anterior): anterior_min.append(m); m += UN_MIN
+anterior_no = sum(1 for k in anterior_min if not disponible(k, por_min_todo, em_min_todo))
+motivo_ok = len(motivo_fuera.strip()) >= 10 and len(re.findall(r'[^\W\d_]', motivo_fuera)) >= 3
+descartada = ''
+if anterior_no:
+    descartada = f'con una corrida anterior descartada ({anterior_no} minutos no disponibles en {len(anterior_min) / 60:.1f} horas)'
+    if not motivo_ok:
+        sin_veredicto.append(f'la corrida anterior, que no se juzga, tuvo {anterior_no} minutos no disponibles: descartarla exige --fuera-motivo con el porqué')
 # Líneas de la sonda DESPUÉS del fin: se aceptan (no sirven para elegir horas). ANTES del inicio: además de la ventana pedida, se juzga la
 # peor ventana de 72 h sobre el tramo continuo que llega al inicio, hasta el fin pedido, y el veredicto usa la peor de las dos: empezar la
 # ventana más tarde dentro de una corrida no puede esconder minutos malos. --fuera-motivo es solo una nota.
@@ -347,7 +361,9 @@ o = []
 o.append(f'**Ventana pedida:** {h(ini)} a {h(fin_excl)} ({total} minutos); la sonda escribió {len(filas)} líneas en ella.\n')
 if anterior:
     o.append(f'Corrida anterior, no juzgada: la sonda escribió {len(anterior)} línea(s) entre {h(min(anterior))} y {h(max(anterior) + UN_MIN)}'
-             f' ({(max(anterior) + UN_MIN - min(anterior)).total_seconds() / 3600:.1f} h), separadas de esta corrida por un hueco de más de 2 minutos.\n')
+             f' ({(max(anterior) + UN_MIN - min(anterior)).total_seconds() / 3600:.1f} h), separadas de esta corrida por un hueco de más de 2 minutos;'
+             f' {"**" if anterior_no else ""}{anterior_no} de sus {len(anterior_min)} minutos no eran disponibles{"**" if anterior_no else ""} (contando los que no tienen línea).'
+             + (f' Motivo para descartarla: «{motivo_fuera.strip()}».' if anterior_no and motivo_ok else '') + '\n')
 if antes:
     o.append(f'**LA SONDA REGISTRÓ {len(tramo)} MINUTO(S) SEGUIDOS ANTES DEL INICIO PEDIDO** ({len(tramo) / 60:.1f} h, sin cortes de más de 2 minutos; **{antes_no} no disponibles**, contando los que no tienen línea):'
              + (f' se juzga también la peor ventana de 72 h sobre todo lo registrado ({peor_ext} minutos no disponibles, desde {h(peor_ext_ini)}) y el veredicto usa la peor.' if peor_ext is not None else ' (ventana de menos de 72 h: sin veredicto del requisito de todos modos).')
@@ -374,7 +390,7 @@ else:
     juzgada = f'la ventana de 72 h juzgada es la peor de las {total - MIN_72H + 1} posibles, desde {h(peor_ini)}: ' if total > MIN_72H else ''
     motivo = (f'{juzgada}{peor_no} minutos no disponibles; el 99 % admite {tope} de {MIN_72H}'
               + (f'; **faltan {faltan} mensajes confirmados en la base**' if faltan else '; no falta ningún confirmado en la base'))
-    o.append(f'| **Veredicto RNF-18 (≥ 99 %)** | **{"APRUEBA" if aprueba else "NO APRUEBA"}**: {motivo} |')
+    o.append(f'| **Veredicto RNF-18 (≥ 99 %)** | **{"APRUEBA" if aprueba else "NO APRUEBA"}**{", " + descartada if descartada else ""}: {motivo} |')
 o.append(f'| Solo el emisor (minutos con su línea, todos los equipos conectados, a lo más {TOL} en vuelo y la marca confirmada de cada equipo) | {ok_emisor} de {total} ({pct(ok_emisor, total)} %); {sin_em} minutos sin línea del emisor |')
 o.append(f'| Solo /salud (200 por el proxy en todas las líneas del minuto) | {ok_salud} de {total} ({pct(ok_salud, total)} %) |')
 o.append(f'| Minutos no disponibles | {no} (de ellos, {sin_linea} sin línea de la sonda) en {len(incidentes)} incidente(s) |')

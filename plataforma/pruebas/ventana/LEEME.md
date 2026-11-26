@@ -35,8 +35,10 @@ real) y que lo que el broker confirmó quedó guardado. El método y los resulta
    la del broker). La ventana es la pedida, no la que la sonda alcanzó a escribir. Que el emisor arranque antes que la sonda y se detenga
    después es lo correcto y no produce aviso. Si la sonda registró minutos ANTES del inicio pedido sin cortes de más de 2 minutos, el
    resumen juzga además la peor ventana de 72 h sobre ese tramo continuo y el veredicto usa la peor; lo anterior a un hueco de más de 2
-   minutos (por ejemplo, el ensayo de 1 hora en la misma carpeta, seguido de una pausa) sale como «Corrida anterior, no juzgada».
-   `--fuera-motivo «…»` deja una nota.
+   minutos (por ejemplo, el ensayo de 1 hora en la misma carpeta, seguido de una pausa) sale como «Corrida anterior, no juzgada», con
+   cuántos de sus minutos no eran disponibles. Si alguno no lo era, descartarla exige `--fuera-motivo «…»` con el porqué (sin él, no hay
+   veredicto) y el veredicto queda rotulado «con una corrida anterior descartada (N minutos no disponibles en H horas)». Si la corrida
+   anterior fue limpia (lo normal en el ensayo), nada cambia y `--fuera-motivo` solo deja una nota.
 
 ## Cómo se interpreta
 
@@ -98,6 +100,9 @@ real) y que lo que el broker confirmó quedó guardado. El método y los resulta
 - Un salto del reloj del servidor hacia adelante deja sin marca a los equipos cuya ranura quedó saltada en ese minuto (un minuto en contra
   del sistema); NTP suele ajustar de a poco, así que es raro. Hacia atrás produce un envío de más, no un hueco.
 - Un corte de menos de 6 s puede caer entre las ranuras de dos equipos y no verse.
+- La medición empieza en la corrida continua de la sonda que llega al inicio; una corrida anterior, separada por un hueco de más de 2
+  minutos, no se juzga, pero sus minutos no disponibles se cuentan y descartarla, si los tuvo, queda motivado y rotulado.
+- Una confirmación cuenta solo si su llegada está entre 0 y 5 s después del envío (una llegada anterior al envío no vale).
 - La memoria es la de `docker stats`, la herramienta que nombra RNF-17: descuenta la caché de archivos inactiva del contenedor, así que
   no es exactamente la cifra que vigila el techo de `deploy.resources.limits.memory` (que la incluye).
 - El emisor publica a la escala del caso real (10 equipos cada 60 s); no es una prueba de carga: RNF-17 queda cubierto aquí en reposo y con

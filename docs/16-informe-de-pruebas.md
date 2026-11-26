@@ -5786,7 +5786,8 @@ sección deja el **método** y el **ensayo del instrumento** en la pila local; e
   veredicto. **Fuera de la ventana:** las líneas de la sonda después del fin no cuentan (no sirven para elegir horas); si la sonda registró
   minutos antes del inicio pedido, el resumen juzga además la peor ventana de 72 h sobre el tramo continuo de líneas que llega al inicio
   (se corta en un hueco de más de 2 minutos; lo anterior sale como «corrida anterior, no juzgada», por ejemplo un ensayo previo en la misma
-  carpeta) y el veredicto usa la peor de las dos (empezar más tarde dentro de una corrida no esconde minutos malos); el aviso cuenta también
+  carpeta, con cuántos de sus minutos no eran disponibles: si alguno, descartarla exige `--fuera-motivo` con el porqué, o no hay veredicto, y
+  el veredicto queda rotulado «con una corrida anterior descartada») y el veredicto usa la peor de las dos (empezar más tarde dentro de una corrida no esconde minutos malos); el aviso cuenta también
   los minutos sin línea de ese tramo; `--fuera-motivo` solo deja una nota. Las líneas del emisor fuera de la ventana no
   cuentan. Las líneas repetidas de `confirmados.csv`, dentro o fuera de la ventana, cuentan una vez. **Sin veredicto (salida 3)**: falta `emisor.csv` o `confirmados.csv`, no
   tienen las columnas o el formato esperados o traen valores no numéricos; el emisor no tiene equipos, son otros que `--equipos` o su
@@ -5794,7 +5795,7 @@ sección deja el **método** y el **ensayo del instrumento** en la pila local; e
   minutos no disponibles es un incidente, con su causa. Además: p95 de la salud (rango más cercano), memoria mediana y máxima por servicio
   y total de la plataforma, reinicios, crecimiento del disco y, para cada caída provocada, el incidente que empieza entre su minuto y dos
   minutos después y el tiempo hasta la primera línea que vio el problema (si no hubo incidente, lo dice).
-- **Prueba del resumen** (`resumen-prueba.sh`, en el verificador): 46 casos con CSV sintéticos, sin tocar la base (el camino de la
+- **Prueba del resumen** (`resumen-prueba.sh`, en el verificador): 51 casos con CSV sintéticos, sin tocar la base (el camino de la
   consulta, con un `docker` falso que devuelve una salida de psql conocida), cada uno con su salida, su texto y su número de minutos no
   disponibles exigidos. Aprueban el caso limpio de 72 horas, el borde de 43, la base con mensajes ajenos de más, el emisor arrancado antes
   que la sonda, las líneas de la sonda después del fin, las horas previas limpias (con o sin nota), un ensayo previo separado por un hueco (de 1 hora o
@@ -5807,8 +5808,10 @@ sección deja el **método** y el **ensayo del instrumento** en la pila local; e
   con o sin «motivo» (se juzga la peor ventana sobre todo lo registrado); quedan sin veredicto un solo equipo, sin `emisor.csv`, sin
   `confirmados.csv`, con `confirmados.csv` vacío o corto, un valor no numérico, un período de 120 s, lo guardado a mano y sin lo guardado;
   una ventana de 1 hora es «ensayo»; `--criticos` recortado y sin `--equipos` son error de uso; y la sonda que empieza tarde no cubre.
-  **Plantado** con el resumen de cada versión anterior: fallaban 14, luego 12, luego 8 y, con el de la versión previa a esta (leyendo
-  `confirmados.csv` sin la columna nueva), 3: los dos ensayos previos con hueco (daban «NO APRUEBA») y el corte de 30 s (no lo veía).
+  Desde la última versión, además: una confirmación con llegada anterior al envío no cuenta (1 minuto); una corrida anterior de 8 horas
+  caídas separada por un hueco de 3 minutos queda sin veredicto sin motivo o con un motivo trivial, y con motivo da el veredicto rotulado;
+  un ensayo previo limpio no cambia nada. **Plantado** con el resumen de cada versión anterior: fallaban 14, luego 12, luego 8, luego 3
+  (los dos ensayos previos con hueco y el corte de 30 s) y, con el de la versión previa a esta, 5 (los cinco casos nuevos).
 - **Diferencia con el método escrito de RNF-18.** `docs/02` decía «emulador publicando cada minuto en el banco; se cuentan las ventanas
   sin confirmación»; se mide en el servidor, con clientes reales por el proxy, y el ensayo mostró por qué solo la confirmación no basta:
   con el backend caído el broker sigue confirmando (guarda en la cola de la sesión persistente), y con el broker caído `/salud` sigue en
@@ -5839,7 +5842,9 @@ sección deja el **método** y el **ensayo del instrumento** en la pila local; e
 La sonda tiene resolución de un minuto: un corte de segundos entre dos ejecuciones puede no verse. La memoria de `docker stats` descuenta la
 caché de archivos inactiva. El emisor publica a la escala del caso real; no es una prueba de carga (esa son §2–§3 y §10). La lista de
 servicios de la sonda nombra solo los de la plataforma, más el emisor (que el resumen separa del total). Un corte de menos de 6 s puede
-caer entre las ranuras de dos equipos y no verse. Un salto del reloj del servidor hacia adelante deja sin marca a los equipos cuya ranura
+caer entre las ranuras de dos equipos y no verse. La medición empieza en la corrida continua que llega al inicio: una corrida anterior,
+separada por un hueco de más de 2 minutos, no se juzga, aunque sus minutos no disponibles se cuentan y su descarte queda motivado. Una
+confirmación cuenta solo si llega entre 0 y 5 s después del envío. Un salto del reloj del servidor hacia adelante deja sin marca a los equipos cuya ranura
 saltó (un minuto en contra del sistema; NTP suele ajustar de a poco); hacia atrás, un envío de más. Después de la medición se versionan el resumen y su tabla, nunca los CSV crudos,
 el registro de errores ni el archivo de configuración (`LEEME.md`).
 
@@ -5883,7 +5888,7 @@ tuvo dos niveles (77 a 78 MiB antes de su caída y 62 a 65 después) y la median
 solo, que incluye minutos que el total no cuenta, cayó en el bajo; en esta corrida, con el backend parejo, casi coinciden (136,6 frente a
 136,1). Para RNF-17 vale la del total, y sobre todo su máxima.
 
-**Plantados del resumen** (además de los 46 casos de `resumen-prueba.sh`): con las últimas líneas de la sonda borradas dice «NO CUBRE LA
+**Plantados del resumen** (además de los 51 casos de `resumen-prueba.sh`): con las últimas líneas de la sonda borradas dice «NO CUBRE LA
 VENTANA PEDIDA», cuenta esos minutos como no disponibles y sale con 1; sin `--desde` o sin `--hasta`/`--horas` sale con 2. En el emisor:
 contra un puerto cerrado reintenta a ≈ 1, 2, 4 y 8 s (antes 1,00, 1,12, 2,11 y 4,00: la espera iba un ciclo atrás) y sale con 2 si no
 puede escribir sus CSV (antes seguía sin medir); el registro de errores de la sonda se recorta a sus últimas líneas y guarda solo el código

@@ -148,9 +148,15 @@ caso mejores-72-con-motivo    0 '**NO APRUEBA**'              - 0    4800 "{\"ma
 caso horas-previas-con-nota   0 'Nota: «la sonda se arrancó 3 h antes para comprobarla»' - 0 4500 '{}' --desde 2026-11-01T03:00Z --horas 72 --equipos 10 --sitio prueba --fuera-motivo 'la sonda se arrancó 3 h antes para comprobarla'
 caso sonda-despues-del-fin    0 '**APRUEBA**'                 - 0    4500 '{}' "${B[@]}"
 caso ensayo-previo-con-hueco  0 'Corrida anterior, no juzgada' 'NO APRUEBA' 0 4320 "{\"sonda_desde\": -180, \"em_desde\": -180, \"faltan_sonda\": $(rango -120 0)}" "${B[@]}"
-caso ensayo-dos-dias-antes    0 'Corrida anterior, no juzgada' 'NO APRUEBA' 0 4320 "{\"sonda_desde\": -2880, \"em_desde\": -5, \"faltan_sonda\": $(rango -2870 0)}" "${B[@]}"
+caso ensayo-dos-dias-antes    0 'Corrida anterior, no juzgada' 'NO APRUEBA' 0 4320 "{\"sonda_desde\": -2880, \"em_desde\": -2880, \"faltan_sonda\": $(rango -2870 0)}" "${B[@]}"
 caso corte-30-s-en-un-minuto  0 '**APRUEBA**'                 - 1    4320 "{\"espera\": $(python3 -I -c 'import json; print(json.dumps([[1000, j, 35000 - 6000 * (j - 2)] for j in range(2, 7)]))')}" "${B[@]}"
 caso confirmacion-a-tiempo    0 '**APRUEBA**'                 - 0    4320 "{\"espera\": $(python3 -I -c 'import json; print(json.dumps([[1000, j, 4000] for j in range(10)]))')}" "${B[@]}"
+caso llegada-antes-del-envio  0 '**APRUEBA**'                 - 1    4320 '{"espera": [[1000, 3, -100]]}' "${B[@]}"
+V8=(--desde 2026-11-01T08:00Z --horas 72 --equipos 10 --sitio prueba)
+caso anterior-caida-sin-motivo 3 'tuvo 477 minutos no disponibles' '**APRUEBA**' - 4800 "{\"malos\": $(rango 0 477), \"faltan_sonda\": $(rango 477 480)}" "${V8[@]}"
+caso anterior-caida-motivo-trivial 3 'exige --fuera-motivo'     '**APRUEBA**' - 4800 "{\"malos\": $(rango 0 477), \"faltan_sonda\": $(rango 477 480)}" "${V8[@]}" --fuera-motivo '.'
+caso anterior-caida-con-motivo 0 '**APRUEBA**, con una corrida anterior descartada (477 minutos no disponibles en 8.0 horas)' - 0 4800 "{\"malos\": $(rango 0 477), \"faltan_sonda\": $(rango 477 480)}" "${V8[@]}" --fuera-motivo 'una prueba fallida de la sonda el día anterior'
+caso ensayo-previo-limpio     0 '0 de sus 60 minutos no eran disponibles' 'descartada' 0 4320 "{\"sonda_desde\": -180, \"em_desde\": -180, \"faltan_sonda\": $(rango -120 0)}" "${B[@]}"
 caso ventana-de-1-hora        0 'sin veredicto del requisito' '**APRUEBA**' 0 60 '{}' --desde 2026-11-01T00:00Z --horas 1 --equipos 10 --sitio prueba
 caso criticos-recortados      2 'no puede quitar'             '**APRUEBA**' - 4320 '{}' "${B[@]}" --criticos backend
 caso sin-equipos              2 'falta --equipos'             '**APRUEBA**' - 4320 '{}' --desde 2026-11-01T00:00Z --horas 72 --sitio prueba
