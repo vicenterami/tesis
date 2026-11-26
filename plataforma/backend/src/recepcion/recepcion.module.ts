@@ -11,11 +11,12 @@ import { RecepcionHttpController } from './http/recepcion-http.controller.js';
 import { Cupo } from './http/topes.js';
 import { VerificacionDeTokens } from './http/verificacion.js';
 import { RecepcionService } from './recepcion.service.js';
+import { SinGuardarController } from './sin-guardar.controller.js';
 
 // Para admitir un formato nuevo: crear su adaptador y registrarlo aquí y en el constructor del servicio.
 @Module({
   imports: [BrokerModule, AlertasModule, SupervisionModule, TiempoRealModule],
-  controllers: [RecepcionHttpController], // vía HTTP (docs/10 §8.4 punto 52)
+  controllers: [RecepcionHttpController, SinGuardarController], // vía HTTP (docs/10 §8.4 punto 52) y lo que la trama trae y no se guarda (punto 72 i)
   providers: [RecepcionService, SenmlAdaptador, PlanoAdaptador, ChirpstackAdaptador, MilesightAdaptador,
     // Con fábrica: sus parámetros (cupo y tope de la caché) tienen valor por defecto y no son proveedores de Nest; la conversión de las
     // credenciales anteriores la hace el servicio (docs/10 §8.4 punto 52).

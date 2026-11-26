@@ -8,6 +8,7 @@ describe('textoActividad', () => {
     expect(textoActividad('evento', 'alta', 'Nodo 1')).toBe('dio de alta «Nodo 1»');
     expect(textoActividad('evento', 'baja', null)).toBe('dio de baja un dispositivo');
     expect(textoActividad('evento', 'reglas_cambiadas', 'N', { magnitud: 'Humedad' })).toBe('cambió los umbrales de «N» (Humedad)');
+    expect(textoActividad('evento', 'canal_alta', 'Nodo 2', { canal_id: 'k', magnitud: 'snr', origen: 'api' })).toBe('agregó una magnitud a «Nodo 2» (snr)');
   });
   it('accesos: entró, salió, bloqueos; un tipo nuevo sin texto cae en el genérico (nunca vacío)', () => {
     expect(textoActividad('acceso', 'ok', null)).toBe('entró al sistema');

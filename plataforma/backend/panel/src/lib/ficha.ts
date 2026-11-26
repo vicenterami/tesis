@@ -38,6 +38,7 @@ const ROTULO_EVENTO: Readonly<Record<string, string>> = {
   credencial: 'Credencial nueva', mudanza: 'Mudanza de zona', condicion_abierta: 'Condición abierta', condicion_cerrada: 'Condición cerrada',
   // Los tipos que registra el backend del tablero v2 (registrarEvento, src/db/evento.ts):
   dispositivo_configurado: 'Cambio de configuración', reglas_cambiadas: 'Cambio de umbrales', canal_calibrado: 'Cambio de calibración', rotacion: 'Credencial nueva',
+  canal_alta: 'Magnitud agregada', // desde el 25/11/2026 (docs/19 §4 AA)
 };
 // Qué pasó, sin quién. «Registrado por N» en el alta y «cambiado por N» en lo demás, SOLO cuando el servidor manda la persona (G1): a quien no
 // administra el sitio le llega `usuario: null`, que no significa «lo hizo el sistema»; entonces no se dice nada de quién (11/11/2026).

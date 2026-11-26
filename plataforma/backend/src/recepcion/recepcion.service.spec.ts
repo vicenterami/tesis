@@ -533,7 +533,7 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
       const dup = armar({ ...NODO, ultimo_fcnt: '10' }, true, PAS); // ON CONFLICT DO NOTHING: ya estaban, pero la trama es la 11
       await dup.servicio.procesar(T_UP, conFcnt(11));
       expect(fcntGuardado(dup.query)).toBe(11);
-      const sinFcnt = armar({ ...NODO, ultimo_fcnt: '10' }, false, PAS); // ChirpStack omite el 0: sesión nueva, sin contador
+      const sinFcnt = armar({ ...NODO, ultimo_fcnt: '10' }, false, PAS); // un emisor que no manda fCnt (p. ej. Milesight con Metadata): sin contador
       await sinFcnt.servicio.procesar(T_UP, up());
       expect(fcntGuardado(sinFcnt.query)).toBe('borrado');
       const primera = armar(NODO, false, PAS); // nodo sin contador guardado todavía
@@ -543,6 +543,18 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
       await rechazada.servicio.procesar(T_UP, up('0101010101010101', { temperature: 999 }));
       expect(cuarentenas(rechazada.query)).toEqual(['invalida']);
       expect(fcntGuardado(rechazada.query)).toBe('sin cambio');
+    });
+    // ChirpStack v4 SÍ emite «fCnt»: 0 (su UplinkEvent se serializa con emit_fields(), api/rust/build.rs; docs/10 §4.1): la sesión nueva
+    // llega con el 0 presente, no ausente. Se guarda, el contador pasa a 0 y la trama 1 siguiente no se descarta.
+    it('re-unión en ChirpStack v4: tras la 10, la trama con fCnt 0 presente se guarda y deja el contador en 0; la 1 siguiente también entra', async () => {
+      const cero = armar({ ...NODO, ultimo_fcnt: '10' }, false, PAS);
+      await cero.servicio.procesar(T_UP, conFcnt(0));
+      expect(medicionesDe(cero.query)).toHaveLength(1);
+      expect(fcntGuardado(cero.query)).toBe(0);
+      const una = armar({ ...NODO, ultimo_fcnt: '0' }, false, PAS);
+      await una.servicio.procesar(T_UP, conFcnt(1));
+      expect(medicionesDe(una.query)).toHaveLength(1);
+      expect(fcntGuardado(una.query)).toBe(1);
     });
     it('el fCnt 0 nunca se compara: tras una re-unión, la trama 0 se guarda aunque la última guardada también fuera la 0 (revisión del 17/10)', async () => {
       const { servicio, query, marcarVivo } = armar({ ...NODO, ultimo_fcnt: '0' }, false, PAS);
@@ -751,5 +763,183 @@ describe('RecepcionService: filtro 6 (supervisar) corre siempre tras autenticar'
       expect(abrirRelojDesviado).not.toHaveBeenCalled();
       expect(cerrarRelojDesviado).not.toHaveBeenCalled();
     });
+  });
+});
+
+// La señal del enlace (docs/10 §8.4 punto 71): del adaptador como salida lateral (ctx.enlace); el pipeline la guarda solo si el nodo declaró
+// el canal, la cuenta en el tope antes de decidir, la guarda al final y solo con una lectura del sensor guardada, y fuera de rango la omite
+// sin cuarentena, nombrándola en la línea de registro.
+describe('RecepcionService: la señal del enlace LoRaWAN como canal declarado', () => {
+  const T_BASE = new Date('2026-10-09T15:00:00.123456Z');
+  const PAS = { id: 'p1', activo: true, sitio_codigo: 'uct' };
+  const T_UP = 'sitio/uct/pasarela/chirpstack-campus/0101010101010101/up';
+  const VENTANA = inicioDeVentana(new Date());
+  const up = (rxInfo: unknown, objeto: object = { temperature: 21.5 }, extra: object = {}) =>
+    Buffer.from(JSON.stringify({ time: new Date().toISOString(), deviceInfo: { devEui: '0101010101010101' }, object: objeto, rxInfo, ...extra }));
+  const RX = [{ gatewayId: 'aaaaaaaaaaaaaaaa', rssi: -87, snr: 7.5 }];
+  type DispE = { id: string; estado: string; formato: string; pasarela_id: string; magnitudes?: string[]; ultimo_fcnt?: string | null;
+    intervalo_esperado_s?: number; canales?: number; ventana_inicio?: Date | null; ventana_lecturas?: number };
+  // El mismo andamiaje que arriba, reducido: el nodo chirpstack de la pasarela p1, con las magnitudes que declare la prueba.
+  function armarE(d: DispE, duplicada = false) {
+    const temp = { id: 'k1', magnitud: 'temperatura', unidad_canonica: 'Cel', rango_min: -40, rango_max: 85, escala_cero: null, escala_cien: null };
+    const enlace: Record<string, object> = {
+      rssi: { id: 'k-rssi', magnitud: 'rssi', unidad_canonica: 'dBm', rango_min: -150, rango_max: 0, escala_cero: null, escala_cien: null },
+      snr: { id: 'k-snr', magnitud: 'snr', unidad_canonica: 'dB', rango_min: -32, rango_max: 32, escala_cero: null, escala_cien: null },
+    };
+    const query = vi.fn((sql: string, params?: unknown[]) => {
+      if (sql.startsWith('SELECT d.id, d.estado, d.formato')) {
+        const fila = { sitio_codigo: 'uct', decodificador: null, ultimo_fcnt: null, intervalo_esperado_s: 60, canales: 1, ventana_inicio: null,
+          ventana_lecturas: 0, ventana_cuarentena: 0, ventana_sobre_tope: 0, ventana_omitidas: 0, reloj_desviado: false, receta: null, alias: ALIAS_SEMILLA,
+          magnitudes: ['temperatura'], ...d };
+        return Promise.resolve({ rows: [fila], rowCount: 1 });
+      }
+      if (sql.startsWith('SELECT p.id, p.activo, s.codigo AS sitio_codigo FROM pasarela')) return Promise.resolve({ rows: [PAS], rowCount: 1 });
+      if (sql.trimStart().startsWith('SELECT c.id, m.codigo AS magnitud')) {
+        const m = params?.[1] as string;
+        const k = m === 'temperatura' ? temp : (d.magnitudes ?? []).includes(m) ? enlace[m] : undefined;
+        return Promise.resolve({ rows: k ? [k] : [], rowCount: k ? 1 : 0 });
+      }
+      if (sql.trimStart().startsWith('INSERT INTO medicion')) return Promise.resolve(duplicada ? { rows: [], rowCount: 0 } : { rows: [{ tiempo: T_BASE }], rowCount: 1 });
+      if (sql.startsWith('INSERT INTO estado_dispositivo')) return Promise.resolve({ rows: [{ visto_por_ultima_vez: T_BASE }], rowCount: 1 });
+      return Promise.resolve({ rows: [], rowCount: 1 });
+    });
+    const evaluar = vi.fn();
+    const abrirTope = vi.fn();
+    const supervision = { marcarVivo: vi.fn(), abrirTope, cerrarTope: vi.fn(), abrirRelojDesviado: vi.fn(), cerrarRelojDesviado: vi.fn() } as unknown as SupervisionService;
+    const eventos = new EventosService();
+    const publicados: EventoPanel[] = [];
+    eventos.flujo().subscribe((e) => publicados.push(e));
+    const servicio = new RecepcionService({ query } as unknown as Pool, { alRecibir: vi.fn() } as unknown as BrokerService, { evaluar } as unknown as AlertasService,
+      supervision, eventos, new SenmlAdaptador(), new PlanoAdaptador(), new ChirpstackAdaptador(), new MilesightAdaptador());
+    return { servicio, query, evaluar, publicados, abrirTope };
+  }
+  const NODO: DispE = { id: 'n1', estado: 'activo', formato: 'chirpstack', pasarela_id: 'p1' };
+  const CON_ENLACE: DispE = { ...NODO, magnitudes: ['temperatura', 'rssi', 'snr'], canales: 3 };
+  // Los canales de las mediciones insertadas, en orden, y su valor.
+  const insertadas = (query: Mock) => query.mock.calls.filter(([sql]) => String(sql).trimStart().startsWith('INSERT INTO medicion'))
+    .map(([, p]) => [(p as unknown[])[0], (p as unknown[])[2]]);
+  const cuarentenasE = (query: Mock) => query.mock.calls.filter(([sql]) => String(sql).startsWith('INSERT INTO cuarentena')).map(([, p]) => (p as unknown[])[2]);
+  const estadoE = (query: Mock) => query.mock.calls.find(([sql]) => String(sql).startsWith('INSERT INTO estado_dispositivo'))?.[1] as unknown[];
+
+  it('un nodo SIN los canales del enlace: exactamente lo de antes (una medición, ninguna cuarentena, 1 lectura en la ventana)', async () => {
+    const { servicio, query } = armarE(NODO);
+    await servicio.procesar(T_UP, up(RX));
+    expect(insertadas(query)).toEqual([['k1', 21.5]]);
+    expect(cuarentenasE(query)).toEqual([]);
+    expect(estadoE(query)[3]).toBe(1);
+  });
+  it('con rssi y snr declarados: se guardan DESPUÉS de la del sensor, cuentan en la ventana, publican su evento y evalúan umbrales', async () => {
+    const { servicio, query, evaluar, publicados } = armarE(CON_ENLACE);
+    await servicio.procesar(T_UP, up(RX));
+    expect(insertadas(query)).toEqual([['k1', 21.5], ['k-rssi', -87], ['k-snr', 7.5]]);
+    expect(estadoE(query)[3]).toBe(3);
+    expect(evaluar).toHaveBeenCalledTimes(3);
+    expect(publicados.filter((e) => e.tipo === 'medicion')).toHaveLength(3);
+    expect(query.mock.calls.filter(([sql]) => String(sql).startsWith('INSERT INTO trama'))).toHaveLength(1);
+  });
+  it('solo lo declarado: con snr y sin rssi, se guarda el snr', async () => {
+    const { servicio, query } = armarE({ ...NODO, magnitudes: ['temperatura', 'snr'] });
+    await servicio.procesar(T_UP, up(RX));
+    expect(insertadas(query)).toEqual([['k1', 21.5], ['k-snr', 7.5]]);
+  });
+  // Revisión del 25/11/2026: declarar la señal no puede hacer rechazar una trama que sin ella entraba. Si las del sensor caben y con las del
+  // enlace no, se guardan las del sensor y la señal se omite (sin cuarentena, nombrada en el registro); si las del sensor no caben, como antes.
+  it('tope: si las del sensor caben y con la señal no, entra la del sensor y la señal se omite; si la del sensor no cabe, se rechaza entera', async () => {
+    const lento = { ...CON_ENLACE, intervalo_esperado_s: 3600, canales: 1, ventana_inicio: VENTANA };
+    const log = vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+    try {
+      const borde = armarE({ ...lento, ventana_lecturas: 598 });
+      await borde.servicio.procesar(T_UP, up(RX));
+      expect(cuarentenasE(borde.query)).toEqual([]);
+      expect(insertadas(borde.query)).toEqual([['k1', 21.5]]);
+      expect(borde.abrirTope).not.toHaveBeenCalled();
+      expect(estadoE(borde.query)[3]).toBe(1);
+      expect(log.mock.calls.map((c) => String(c[0])).some((l) => l.includes('señal omitida por el tope'))).toBe(true);
+      const lleno = armarE({ ...lento, ventana_lecturas: 600 });
+      await lleno.servicio.procesar(T_UP, up(RX));
+      expect(cuarentenasE(lleno.query)).toEqual(['tope']);
+      expect(insertadas(lleno.query)).toEqual([]);
+      expect(lleno.abrirTope).toHaveBeenCalledWith('n1', '0101010101010101', expect.objectContaining({ tope: 600, aceptadas: 600, trama: 3 }));
+      const holgado = armarE({ ...lento, ventana_lecturas: 597 });
+      await holgado.servicio.procesar(T_UP, up(RX));
+      expect(cuarentenasE(holgado.query)).toEqual([]);
+      expect(insertadas(holgado.query)).toHaveLength(3);
+      // El mismo borde sin los canales del enlace: entra igual (lo de antes).
+      const sinCanal = armarE({ ...NODO, intervalo_esperado_s: 3600, canales: 1, ventana_inicio: VENTANA, ventana_lecturas: 598 });
+      await sinCanal.servicio.procesar(T_UP, up(RX));
+      expect(insertadas(sinCanal.query)).toEqual([['k1', 21.5]]);
+    } finally {
+      log.mockRestore();
+    }
+  });
+  it('sin una lectura del sensor guardada, la señal no se guarda: la cuarentena nombra solo al sensor', async () => {
+    const { servicio, query } = armarE(CON_ENLACE);
+    await servicio.procesar(T_UP, up(RX, { temperature: 999 }));
+    expect(insertadas(query)).toEqual([]);
+    expect(cuarentenasE(query)).toEqual(['invalida']);
+    const detalle = query.mock.calls.find(([sql]) => String(sql).startsWith('INSERT INTO cuarentena'))?.[1] as unknown[];
+    expect(String(detalle[4])).toContain('temperatura');
+    expect(String(detalle[4])).not.toMatch(/rssi|snr/);
+  });
+  it('una reentrega (lecturas ya guardadas) no intenta la señal', async () => {
+    const { servicio, query } = armarE(CON_ENLACE, true);
+    await servicio.procesar(T_UP, up(RX));
+    expect(insertadas(query)).toEqual([['k1', 21.5]]);
+  });
+  it('una trama que repite el fCnt no deja la señal ni la cuenta', async () => {
+    const { servicio, query } = armarE({ ...CON_ENLACE, ultimo_fcnt: '42' });
+    await servicio.procesar(T_UP, up(RX, { temperature: 21.5 }, { fCnt: 42 }));
+    expect(insertadas(query)).toEqual([]);
+    expect(estadoE(query)[3]).toBe(0);
+  });
+  it('fuera del rango del catálogo: se omite SIN cuarentena y la línea de registro de la trama la nombra', async () => {
+    const log = vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+    try {
+      const { servicio, query } = armarE(CON_ENLACE);
+      await servicio.procesar(T_UP, up([{ rssi: -87, snr: 40 }]));
+      expect(insertadas(query)).toEqual([['k1', 21.5], ['k-rssi', -87]]);
+      expect(cuarentenasE(query)).toEqual([]);
+      expect(log).toHaveBeenCalledWith(expect.stringMatching(/enlace 1\/2 · enlace omitido \(sin cuarentena\): snr: 40 dB fuera del rango físico \[-32, 32\]/));
+    } finally {
+      log.mockRestore();
+    }
+  });
+  it('si el sensor ya manda rssi en su carga, el derivado de rssi no se agrega (el de snr sí)', async () => {
+    const analizar = vi.spyOn(ChirpstackAdaptador.prototype, 'analizar').mockImplementation(function (this: unknown, c) {
+      c.enlace = { rssi: -87, snr: 7.5 };
+      return [{ magnitud: 'temperatura', valor: 20 }, { magnitud: 'rssi', valor: -30, unidad: 'dBm' }];
+    });
+    try {
+      const { servicio, query } = armarE(CON_ENLACE);
+      await servicio.procesar(T_UP, up(RX));
+      expect(insertadas(query)).toEqual([['k1', 20], ['k-rssi', -30], ['k-snr', 7.5]]);
+    } finally {
+      analizar.mockRestore();
+    }
+  });
+});
+
+// «Lo que la trama trae y no se guarda» (docs/10 §8.4 punto 72 i): relee hasta 20 cargas crudas por petición; sus consultas llevan tiempo
+// máximo (revisión del 25/11/2026), para que una base lenta no deje la petición colgada ocupando una conexión del pool.
+describe('RecepcionService.sinGuardar: consultas con tiempo máximo', () => {
+  it('la del equipo, la de las tramas retenidas y la del catálogo llevan query_timeout (≤ 5 s)', async () => {
+    const llamadas: unknown[] = [];
+    const query = vi.fn((c: string | { text: string }) => {
+      llamadas.push(c);
+      const sql = typeof c === 'string' ? c : c.text;
+      if (sql.startsWith('SELECT id_fisico FROM dispositivo')) return Promise.resolve({ rows: [{ id_fisico: 'n1' }], rowCount: 1 });
+      if (sql.startsWith('SELECT d.id, d.estado, d.formato')) {
+        return Promise.resolve({ rows: [{ id: 'd1', formato: 'plano', magnitudes: ['temperatura'], decodificador: null, receta: null, alias: null }], rowCount: 1 });
+      }
+      return Promise.resolve({ rows: [], rowCount: 0 });
+    });
+    const servicio = new RecepcionService({ query } as unknown as Pool, { alRecibir: vi.fn() } as unknown as BrokerService, {} as AlertasService,
+      {} as SupervisionService, new EventosService(), new SenmlAdaptador(), new PlanoAdaptador(), new ChirpstackAdaptador(), new MilesightAdaptador(),
+      { get: () => undefined } as unknown as ConfigService);
+    expect(await servicio.sinGuardar('11111111-1111-4111-8111-111111111111')).toEqual({ revisadas: 0, claves: [] });
+    const texto = (c: unknown): string => (typeof c === 'string' ? c : (c as { text: string }).text);
+    const propias = llamadas.filter((c) => !texto(c).startsWith('SELECT d.id, d.estado')); // la del pipeline, compartida, sigue igual
+    expect(propias).toHaveLength(3);
+    for (const c of propias) expect((c as { query_timeout?: number }).query_timeout).toBeLessThanOrEqual(5_000);
   });
 });

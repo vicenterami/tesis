@@ -134,4 +134,81 @@ describe('P6 Configurar', () => {
     expect(botonReglas().closest('.boton-envoltura')!.textContent).toContain('configurar exige el perfil');
     expect(pedidos.filter((p) => p.metodo !== 'GET')).toEqual([]);
   });
+
+  // «Agregar una magnitud» (docs/19 §4 AA, punto 3).
+  const CATALOGO = ['temperatura', 'rssi', 'snr'].map((codigo) => ({ codigo, nombre: codigo === 'snr' ? 'Relación señal/ruido' : codigo, unidad: codigo === 'snr' ? 'dB' : codigo === 'rssi' ? 'dBm' : 'Cel',
+    rango_min: -40, rango_max: 85, umbral_alto_sugerido: null, umbral_bajo_sugerido: null, histeresis_sugerida: 0, alias: [], actualizado_en: MARCA_C }));
+  const SNR = '00000000-0000-4000-8000-0000000000c9';
+  it('«Agregar una magnitud»: ofrece las del catálogo que no tiene, envía solo el código y suma el canal nuevo sin perder lo que se edita en los demás', async () => {
+    let conSnr = false;
+    responder = (metodo, ruta) => {
+      if (metodo === 'GET' && ruta === `/dispositivos/${ID}`) {
+        const f = ficha();
+        return json(conSnr ? { ...f, canales: [...f.canales, { id: SNR, magnitud: 'snr', magnitud_nombre: 'Relación señal/ruido', unidad: 'dB', etiqueta: null, actualizado_en: MARCA_C, reglas: [], ultima_medicion: null }] } : f);
+      }
+      if (ruta === '/magnitudes') return json(CATALOGO);
+      if (metodo === 'POST' && ruta === `/dispositivos/${ID}/canales`) { conSnr = true; return json({ agregada: true, dispositivo_id: ID, canal: { id: SNR, magnitud: 'snr' } }); }
+      return json({ message: 'no' }, 404);
+    };
+    render(Configurar, { id: ID, sesion: sesion('administrador'), sitios: SITIOS });
+    const selector = async () => { await waitFor(() => expect(document.querySelector('[data-campo="nueva-magnitud"] option[value="snr"]')).not.toBeNull()); return document.querySelector('[data-campo="nueva-magnitud"]') as HTMLSelectElement; };
+    expect([...(await selector()).options].map((o) => o.value)).toEqual(['', 'rssi', 'snr']); // la temperatura ya la tiene
+    const boton = document.querySelector('[data-agregar-magnitud]') as HTMLButtonElement;
+    expect(boton.disabled).toBe(true); // sin elegir, no envía
+    await fireEvent.input(campoRegla('umbral_alto'), { target: { value: '31' } }); // una edición en curso de otro canal
+    await fireEvent.change(await selector(), { target: { value: 'snr' } });
+    await fireEvent.click(boton);
+    await waitFor(() => expect(document.querySelector(`[data-config-canal="${SNR}"]`)).not.toBeNull());
+    expect(pedidos.filter((x) => x.metodo === 'POST')).toEqual([{ metodo: 'POST', ruta: `/dispositivos/${ID}/canales`, cuerpo: { magnitud: 'snr' } }]);
+    expect(campoRegla('umbral_alto').value).toBe('31');
+    expect(document.body.textContent).toContain('Relación señal/ruido: agregada. Se guarda desde la próxima trama');
+    expect([...(document.querySelector('[data-campo="nueva-magnitud"]') as HTMLSelectElement).options].map((o) => o.value)).toEqual(['', 'rssi']);
+  });
+  it('«Agregar una magnitud» con perfil de consulta: el botón dice por qué no y no se envía nada', async () => {
+    responder = (metodo, ruta) => (metodo === 'GET' && ruta === `/dispositivos/${ID}` ? json(ficha()) : ruta === '/magnitudes' ? json(CATALOGO) : json({ message: 'no' }, 404));
+    render(Configurar, { id: ID, sesion: sesion('consulta'), sitios: SITIOS });
+    await waitFor(() => expect(document.querySelector('[data-agregar-magnitud]')).not.toBeNull());
+    await fireEvent.change(document.querySelector('[data-campo="nueva-magnitud"]')!, { target: { value: 'rssi' } });
+    const boton = document.querySelector('[data-agregar-magnitud]') as HTMLButtonElement;
+    expect(boton.disabled).toBe(true);
+    expect(boton.closest('.boton-envoltura')!.textContent).toContain('agregar una magnitud exige el perfil');
+    await fireEvent.click(boton);
+    expect(pedidos.filter((x) => x.metodo !== 'GET')).toEqual([]);
+  });
+
+  // «Lo que la trama trae y no se guarda» (docs/19 §4 AA, punto 6).
+  const SIN_GUARDAR = { revisadas: 20, claves: [
+    { clave: 'rssi', magnitud: 'rssi', valor: -87, unidad: 'dBm', visto: '2026-11-11T11:59:00Z', origen: 'enlace' },
+    { clave: 'co2', magnitud: null, valor: 412, unidad: null, visto: '2026-11-11T11:59:00Z', origen: 'carga' },
+  ] };
+  it('«Lo que la trama trae y no se guarda»: bajo demanda; «Agregar» crea el canal, la clave sale de la lista y el canal aparece; lo que no tiene magnitud lo dice', async () => {
+    let conRssi = false;
+    responder = (metodo, ruta) => {
+      if (metodo === 'GET' && ruta === `/dispositivos/${ID}`) {
+        const f = ficha();
+        return json(conRssi ? { ...f, canales: [...f.canales, { id: SNR, magnitud: 'rssi', magnitud_nombre: 'Intensidad de señal', unidad: 'dBm', etiqueta: null, actualizado_en: MARCA_C, reglas: [], ultima_medicion: null }] } : f);
+      }
+      if (ruta === `/dispositivos/${ID}/sin-guardar`) return json(SIN_GUARDAR);
+      if (metodo === 'POST' && ruta === `/dispositivos/${ID}/canales`) { conRssi = true; return json({ agregada: true }); }
+      return json([]);
+    };
+    render(Configurar, { id: ID, sesion: sesion('administrador'), sitios: SITIOS });
+    await waitFor(() => expect(document.querySelector('[data-revisar-tramas]')).not.toBeNull());
+    expect(pedidos.some((x) => x.ruta.endsWith('/sin-guardar'))).toBe(false); // nada se relee al abrir la pantalla
+    await fireEvent.click(document.querySelector('[data-revisar-tramas]')!);
+    await waitFor(() => expect(document.querySelectorAll('[data-sin-guardar-clave]')).toHaveLength(2));
+    expect(document.querySelector('[data-sin-guardar-clave="rssi"]')!.textContent).toContain('rssi (señal del enlace): −87 dBm');
+    expect(document.querySelector('[data-sin-guardar-clave="co2"] [data-sin-magnitud]')!.textContent).toBe('sin magnitud en el catálogo: pídelo a quien administra el sistema');
+    expect(document.querySelector('[data-agregar-clave="co2"]')).toBeNull();
+    await fireEvent.click(document.querySelector('[data-agregar-clave="rssi"]')!);
+    await waitFor(() => expect(document.querySelector(`[data-config-canal="${SNR}"]`)).not.toBeNull());
+    expect(pedidos.filter((x) => x.metodo === 'POST')).toEqual([{ metodo: 'POST', ruta: `/dispositivos/${ID}/canales`, cuerpo: { magnitud: 'rssi' } }]);
+    expect(document.querySelector('[data-sin-guardar-clave="rssi"]')).toBeNull();
+  });
+  it('«Lo que la trama trae y no se guarda»: con perfil de consulta no aparece ni se pide (lee cargas crudas)', async () => {
+    render(Configurar, { id: ID, sesion: sesion('consulta'), sitios: SITIOS });
+    await waitFor(() => expect(document.querySelector('[data-configurar]')).not.toBeNull());
+    expect(document.querySelector('[data-sin-guardar]')).toBeNull();
+    expect(pedidos.some((x) => x.ruta.endsWith('/sin-guardar'))).toBe(false);
+  });
 });

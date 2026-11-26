@@ -103,6 +103,8 @@ SELECT d.id, m, et FROM (VALUES
   ('demo-http-01', 'temperatura', NULL),
   ('demo-lora-01', 'temperatura', NULL), ('demo-lora-01', 'humedad', NULL),
   ('demo-lora-02', 'humedad', 'suelo'), ('demo-lora-02', 'bateria', NULL),
+  -- La señal del enlace (migración 29; docs/10 §8.4 punto 71): los dos nodos LoRaWAN la guardan; demo-lora-02, lejos de la pasarela.
+  ('demo-lora-01', 'rssi', NULL), ('demo-lora-01', 'snr', NULL), ('demo-lora-02', 'rssi', NULL), ('demo-lora-02', 'snr', NULL),
   ('d03', 'temperatura', NULL),
   ('demo-identificador-en-el-limite-de-sesenta-y-tres-caracteres-ok', 'temperatura', 'etiqueta de cuarenta caracteres exactos.'),
   ('demo-mag-01', 'pm2_5', NULL), ('demo-mag-01', 'pm10', NULL)
@@ -159,7 +161,11 @@ SELECT c.id, x.tiempo,
            ELSE round((1013 + 4 * cos(2 * pi() * extract(epoch FROM x.tiempo) / 259200))::numeric, 1)::float8 END
          WHEN x.id_fisico = 'demo-suelo-01' AND c.magnitud_codigo = 'humedad' THEN round((13.9 + 1.1 * x.k)::numeric, 1)::float8
          WHEN c.magnitud_codigo = 'bateria' THEN CASE WHEN x.id_fisico = 'demo-lora-02' THEN round((8 + 4.0 * x.k / 480)::numeric, 1)::float8 ELSE 76 END
+         WHEN c.magnitud_codigo = 'rssi' AND x.id_fisico = 'demo-lora-01' THEN -78 + x.k % 7
+         WHEN c.magnitud_codigo = 'rssi' AND x.id_fisico = 'demo-lora-02' THEN -112 + x.k % 5
          WHEN c.magnitud_codigo = 'rssi' THEN -99 + x.k % 5
+         WHEN c.magnitud_codigo = 'snr' THEN CASE WHEN x.id_fisico = 'demo-lora-02' THEN round((-9 + 0.5 * (x.k % 7))::numeric, 1)::float8
+                                                  ELSE round((7.5 + 0.5 * (x.k % 5))::numeric, 1)::float8 END
          WHEN c.magnitud_codigo = 'humedad' THEN round((58 - 12 * x.dia + x.desfase)::numeric, 1)::float8
          WHEN c.magnitud_codigo = 'pm2_5' THEN round((18 + 4 * x.dia + x.desfase)::numeric, 1)::float8
          WHEN c.magnitud_codigo = 'pm10' THEN round((31 + 6 * x.dia + x.desfase)::numeric, 1)::float8
@@ -173,7 +179,8 @@ SELECT c.id, x.tiempo,
   JOIN canal c ON c.dispositivo_id = x.dispositivo_id JOIN magnitud m ON m.codigo = c.magnitud_codigo;
 
 -- La trama cruda de cada recepción, con las mismas lecturas que dejó en `medicion`: SenML con el nombre y la hora base del emisor; «plano»,
--- un valor por tópico; LoRaWAN, el JSON que entrega la pasarela con el códec y los metadatos (devEUI, deviceName, applicationID).
+-- un valor por tópico; LoRaWAN, el JSON que entrega la pasarela con el códec y los metadatos (devEUI, deviceName, applicationID) y, desde el
+-- 25/11/2026, la señal de la trama en `rxInfo` (rssi y loRaSNR, la forma de la pasarela del campus), fuera de los valores decodificados.
 INSERT INTO trama (dispositivo_id, recibido_en, topico, payload, adaptador)
 SELECT t.dispositivo_id, t.recibido,
        CASE t.formato WHEN 'milesight' THEN 'sitio/' || s.codigo || '/pasarela/demo-pasarela-01/' || t.id_fisico || '/up'
@@ -182,9 +189,11 @@ SELECT t.dispositivo_id, t.recibido,
          WHEN 'senml' THEN jsonb_set(jsonb_set(jsonb_agg(jsonb_build_object('n', c.magnitud_codigo, 'u', x.unidad, 'v', x.valor) ORDER BY c.magnitud_codigo),
                                                '{0,bt}', to_jsonb(extract(epoch FROM min(x.tiempo))::bigint)), '{0,bn}', to_jsonb(t.id_fisico))::text
          WHEN 'plano' THEN jsonb_build_object('valor', min(x.valor))::text
-         ELSE (jsonb_build_object('devEUI', t.id_fisico, 'deviceName', t.nombre, 'applicationID', '1')
+         ELSE (jsonb_build_object('devEUI', t.id_fisico, 'deviceName', t.nombre, 'applicationID', '1',
+                                  'rxInfo', jsonb_build_array(jsonb_strip_nulls(jsonb_build_object(
+                                    'rssi', min(x.valor) FILTER (WHERE c.magnitud_codigo = 'rssi'), 'loRaSNR', min(x.valor) FILTER (WHERE c.magnitud_codigo = 'snr')))))
                || jsonb_object_agg(CASE c.magnitud_codigo WHEN 'temperatura' THEN 'temperature' WHEN 'humedad' THEN 'humidity' WHEN 'bateria' THEN 'battery'
-                                   ELSE c.magnitud_codigo END, x.valor))::text END, 'UTF8'),
+                                   ELSE c.magnitud_codigo END, x.valor) FILTER (WHERE c.magnitud_codigo NOT IN ('rssi', 'snr')))::text END, 'UTF8'),
        t.formato
   FROM semilla_trama t
   JOIN dispositivo d ON d.id = t.dispositivo_id JOIN zona z ON z.id = d.zona_id JOIN sitio s ON s.id = z.sitio_id

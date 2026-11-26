@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AhoraSitio, HistoricoSitio, ResumenSitio, Sitio } from './lib/modelo';
 import { SERIES } from './lib/tema';
 import { UNIDADES_POR_DEFECTO } from './lib/unidades';
+import Ahora from './Ahora.svelte';
 
 // P1 Tablero del sitio (docs/19 §4, tablero v2, B; tablero v3, bloque L), por el DOM y en los dos sentidos, contra respuestas simuladas del
 // contrato (I y «Campos»; L6). Resumen: dos pedidos al entrar, la franja de indicadores (enlaces con rótulo y cifra), «Ahora» por magnitud
@@ -55,6 +56,7 @@ vi.mock('uplot', () => {
 });
 vi.mock('uplot/dist/uPlot.min.css', () => ({}));
 import Tablero from './Tablero.svelte';
+import { fijarPreferencias, olvidarPreferencias } from './lib/escritor-preferencias';
 
 const AHORA = new Date('2026-11-11T15:00:00Z');
 const SITIO: Sitio = { id: 's-uct', codigo: 'uct', nombre: 'Campus', zona_horaria: 'America/Santiago', rol: 'administrador', zonas: [] };
@@ -131,8 +133,10 @@ beforeEach(() => {
   oyentes.clear();
   vi.useFakeTimers({ now: AHORA, toFake: ['Date', 'setInterval', 'clearInterval', 'setTimeout', 'clearTimeout'] });
   vi.stubGlobal('EventSource', Fuente);
-  vi.stubGlobal('fetch', vi.fn(async (ruta: string) => {
-    peticiones.push(ruta);
+  vi.stubGlobal('fetch', vi.fn(async (ruta: string, init: RequestInit = {}) => {
+    peticiones.push(init.method === 'PUT' ? `PUT ${ruta} ${String(init.body)}` : ruta);
+    // «Elegir qué ver» (docs/19 §4 AA, punto 7): el PUT de las preferencias responde lo guardado con la marca nueva.
+    if (ruta === '/preferencias' && init.method === 'PUT') return new Response(JSON.stringify({ ...JSON.parse(String(init.body)), actualizado_en: '2026-11-11T15:00:01.000001Z' }));
     if (ruta.startsWith('/sitios/s-uct/resumen?')) return new Response(JSON.stringify(resumen));
     if (ruta.startsWith('/sitios/s-uct/ahora?')) return new Response(JSON.stringify(datosAhora(tendenciaDisponible && ruta.includes('tendencia=si'))));
     const h = /^\/sitios\/s-uct\/historico\?(.*)$/.exec(ruta);
@@ -148,6 +152,7 @@ afterEach(async () => {
   vi.unstubAllGlobals();
   vi.useRealTimers();
   window.location.hash = '';
+  olvidarPreferencias();
 });
 
 const montar = (props: Record<string, unknown> = {}) => render(Tablero, { sitio: SITIO, unidades: UNIDADES_POR_DEFECTO, ...props });
@@ -375,6 +380,72 @@ describe('Resumen (L2, L3): dos pedidos, indicadores y «Ahora»', () => {
   });
 });
 
+// «Elegir qué ver» por persona (docs/19 §4 AA, punto 7; RF-56, HU-29).
+// Revisión del 25/11/2026: una tarjeta cuyas magnitudes oculta la preferencia no queda muda, y una en alerta sigue en alerta.
+describe('«Ahora» con magnitudes ocultas por la persona', () => {
+  it('sin canales visibles, la tarjeta dice que todo está oculto y conserva «Alerta»; con algunos ocultos, cuántos', () => {
+    const datos = datosAhora(false);
+    datos.dispositivos = [
+      { ...datos.dispositivos[0]!, canales_total: 0, canales_ocultos: 4, canales: [] },
+      { ...datos.dispositivos[1]!, canales_ocultos: 2 },
+      { ...datos.dispositivos[2]!, canales_ocultos: 1 },
+    ];
+    render(Ahora, { datos, zona: 'America/Santiago', unidades: UNIDADES_POR_DEFECTO, ahora: new Date('2026-11-11T15:00:00Z'), sitioCodigo: 'uct' });
+    const azotea = tarjeta(AZOTEA);
+    expect(azotea.querySelector('.estado')!.textContent).toBe('Alerta');
+    expect(azotea.querySelector('[data-ahora-ocultos]')!.textContent).toBe('Todas sus magnitudes están ocultas por «Elegir qué ver»: se ven en su ficha');
+    expect(azotea.querySelector('[data-ahora-mas]')).toBeNull();
+    expect(tarjeta(INVERNADERO).querySelector('[data-ahora-ocultos]')!.textContent).toBe('2 magnitudes ocultas por «Elegir qué ver»: se ven en su ficha');
+    expect(tarjeta(NUEVO).querySelector('[data-ahora-ocultos]')).toBeNull(); // sin tramas todavía: «esperando la primera trama» basta
+  });
+});
+
+describe('«Elegir qué ver»: lo aplica el servidor en «Ahora» y el panel en «Tendencias»', () => {
+  const PREFS = { unidad_temperatura: 'C' as const, unidad_longitud: 'm' as const, zona_horaria: 'sitio', tema: 'sistema' as const, notificar: [], vistas: [], sitio_predeterminado: null, actualizado_en: '2026-11-11T14:00:00.000001Z' };
+  const puts = (): string[] => peticiones.filter((p) => p.startsWith('PUT /preferencias'));
+  it('con persona: el botón abre la lista de lo que mide el sitio (todo marcado); desmarcar y «Guardar» manda la lista y repide «Ahora»', async () => {
+    fijarPreferencias({ ...PREFS, magnitudes_ocultas: [] });
+    montar();
+    await listo();
+    expect(document.querySelector('[data-ocultas-cuenta]')).toBeNull();
+    await fireEvent.click(document.querySelector('[data-abrir-elegir]')!);
+    const casillas = [...document.querySelectorAll<HTMLInputElement>('[data-ver-magnitud]')];
+    expect(casillas.map((c) => [c.getAttribute('data-ver-magnitud'), c.checked])).toEqual(MAGNITUDES.map((m) => [m, true]));
+    await fireEvent.click(document.querySelector('[data-ver-magnitud="temperatura"]')!);
+    await fireEvent.click(document.querySelector('[data-ver-magnitud="rssi"]')!);
+    expect(puts()).toEqual([]); // nada se guarda hasta «Guardar»
+    const antes = ahoras().length;
+    await fireEvent.click(document.querySelector('[data-guardar-elegir]')!);
+    await waitFor(() => expect(puts()).toHaveLength(1));
+    expect(JSON.parse(puts()[0]!.replace(/^PUT \/preferencias /, '')).magnitudes_ocultas).toEqual(['temperatura', 'rssi']);
+    await waitFor(() => expect(ahoras().length).toBe(antes + 1));
+    await waitFor(() => expect(document.querySelector('[data-ocultas-cuenta]')!.textContent).toBe('2 magnitudes ocultas.'));
+    expect(document.querySelector('[data-lista-elegir]')).toBeNull(); // se cierra al guardar
+  });
+  it('«Cancelar» no guarda nada; sin persona (el usuario del sistema) el botón no aparece', async () => {
+    fijarPreferencias({ ...PREFS, magnitudes_ocultas: ['snr'] });
+    montar();
+    await listo();
+    await fireEvent.click(document.querySelector('[data-abrir-elegir]')!);
+    await fireEvent.click(document.querySelector('[data-ver-magnitud="humedad"]')!);
+    await fireEvent.click(document.querySelector('[data-cancelar-elegir]')!);
+    expect(puts()).toEqual([]);
+    cleanup();
+    fijarPreferencias(null);
+    montar();
+    await listo();
+    expect(document.querySelector('[data-abrir-elegir]')).toBeNull();
+  });
+  it('«Tendencias»: las ocultas no se piden ni se dibujan, y una línea dice cuántas', async () => {
+    fijarPreferencias({ ...PREFS, magnitudes_ocultas: ['temperatura', 'humedad'] });
+    montar({ ver: 'tendencias' });
+    await waitFor(() => expect(historicos()).toHaveLength(5));
+    expect(historicos().map((h) => new URLSearchParams(h.split('?')[1]).get('magnitud'))).not.toContain('temperatura');
+    expect(document.querySelector('[data-tendencias-ocultas]')!.textContent).toContain('2 magnitudes ocultas');
+    await waitFor(() => expect(document.querySelectorAll('.grafico canvas').length).toBe(document.querySelectorAll('.grafico').length));
+  });
+});
+
 describe('Tendencias y Red (L2, L4): se piden al abrirlas, con la fila del rango', () => {
   const montarVer = (ver: 'tendencias' | 'red', props: Record<string, unknown> = {}) => montar({ ver, ...props });
   const conLienzo = (): Promise<void> => waitFor(() => expect(document.querySelectorAll('.grafico canvas').length).toBe(document.querySelectorAll('.grafico').length));
@@ -441,6 +512,38 @@ describe('Tendencias y Red (L2, L4): se piden al abrirlas, con la fila del rango
     expect(tramas.opciones.scales.y!.range!(null, 0, 2.4)).toEqual([0, 3]);
     expect([...document.querySelectorAll('[data-barra]')].map((b) => b.getAttribute('data-barra'))).toEqual(['Pozo', 'Azotea']);
     expect(document.querySelector('[data-entrega-todos]')!.getAttribute('href')).toBe('#/inventario?sitio=uct&orden=entrega');
+  });
+
+  // «Red → Calidad del enlace» (docs/19 §4 AA, punto 4).
+  it('Red con equipos con canal de señal: una línea por equipo con su última señal y hace cuánto, enlace a su ficha, y las dos gráficas del sitio', async () => {
+    resumen = { ...base(), magnitudes: [...base().magnitudes, { codigo: 'snr', nombre: 'snr', unidad: 'dB', canales: 1 }], total_enlace: 2,
+      enlace: [
+        { id: POZO, nombre: 'Pozo', rssi: null, snr: null },
+        { id: AZOTEA, nombre: 'Azotea', rssi: { valor: -101, tiempo: '2026-11-11T14:58:00Z' }, snr: { valor: -12.5, tiempo: '2026-11-11T14:58:00Z' } },
+      ] };
+    montarVer('red');
+    await waitFor(() => expect(document.querySelectorAll('[data-enlace-grafica]')).toHaveLength(2));
+    expect([...document.querySelectorAll('[data-enlace-linea]')].map((x) => x.textContent)).toEqual(['sin lecturas de señal', '−101 dBm · SNR −12,5 dB · hace 2 min']);
+    expect(document.querySelector(`[data-enlace-equipo="${AZOTEA}"] a`)!.getAttribute('href')).toContain(`#/dispositivos/${AZOTEA}`);
+    expect(historicos().map((h) => new URLSearchParams(h.split('?')[1]).get('magnitud'))).toEqual(['rssi', 'snr']);
+    expect([...document.querySelectorAll('[data-enlace-grafica] h4')].map((x) => x.textContent)).toEqual(['Intensidad de la señal', 'Relación señal/ruido']);
+    expect(document.querySelector('[data-enlace-vacio]')).toBeNull();
+    await conLienzo();
+  });
+  it('Red sin equipos con canal de señal: la línea que dice cómo agregarla y ninguna gráfica ni histórico', async () => {
+    resumen = { ...base(), enlace: [] };
+    montarVer('red');
+    await waitFor(() => expect(document.querySelector('[data-enlace-vacio]')!.textContent).toContain('agrega «rssi» o «snr» en Configurar'));
+    expect(historicos()).toEqual([]);
+    expect(document.querySelector('[data-enlace-lista]')).toBeNull();
+  });
+  it('Tendencias: la salud del equipo va al final antes de cortar en seis, aunque sea la más extendida', async () => {
+    resumen = { ...base(), magnitudes: base().magnitudes.map((m) => ({ ...m, salud: ['bateria', 'rssi', 'tension'].includes(m.codigo) })) };
+    montarVer('tendencias');
+    await waitFor(() => expect(historicos()).toHaveLength(6));
+    expect(historicos().map((h) => new URLSearchParams(h.split('?')[1]).get('magnitud'))).toEqual(['temperatura', 'humedad', 'presion', 'temperatura_suelo', 'bateria', 'rssi']);
+    expect(document.querySelector('[data-magnitudes-lista]')!.textContent).toContain('tension');
+    await conLienzo();
   });
 
   it('el rótulo de las tramas sale del intervalo que declara el servidor, no del pedido', async () => {

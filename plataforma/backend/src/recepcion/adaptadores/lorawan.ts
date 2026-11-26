@@ -1,4 +1,4 @@
-import { ContextoTrama, Lectura } from '../lectura.js';
+import { ContextoTrama, Enlace, Lectura } from '../lectura.js';
 import { limpia } from '../texto.js';
 import { TramaMalformada } from './adaptador.js';
 import { ResolverClave } from './mapa-claves.js';
@@ -51,12 +51,38 @@ export function tiempoDe(v: unknown): Date | undefined {
   return Number.isNaN(d.getTime()) ? undefined : d;
 }
 
-// Contador de trama del uplink (`fCnt`, 32 bits sin signo en el servidor de red; docs/10 §4.1). Ausente: no hay con qué deduplicar
-// y la trama sigue (el JSON de Protocol Buffers omite el valor 0). Presente y con otra forma: la trama no es lo que dice ser.
+// Contador de trama del uplink (`fCnt`, 32 bits sin signo en el servidor de red; docs/10 §4.1). ChirpStack v4 lo emite siempre, también
+// el 0 (su UplinkEvent se serializa con `emit_fields()`, api/rust/build.rs); falta en otros emisores (Milesight con Metadata). Ausente: no
+// hay con qué deduplicar y la trama sigue. Presente y con otra forma: la trama no es lo que dice ser.
 export function anotarFcnt(v: unknown, ctx: ContextoTrama): void {
   if (v === undefined) return;
   if (typeof v !== 'number' || !Number.isInteger(v) || v < 0 || v > 0xffffffff) throw new TramaMalformada('fCnt no es un entero entre 0 y 4294967295');
   ctx.fcnt = v;
+}
+
+// La señal del enlace de la trama (docs/10 §8.4 punto 71): del arreglo `rxInfo`, el MEJOR receptor, el de mayor SNR y, en empate, el de mayor
+// RSSI (el SNR satura con señal fuerte). El SNR se llama `snr` en ChirpStack v4 y `loRaSNR` en la pasarela Milesight sin códec. Un valor que no
+// es un número finito se omite; un elemento sin ningún número no compite; un `rxInfo` vacío, ausente o que no es un arreglo no deja nada.
+// `snrAusenteEsCero`: en ChirpStack v4 el elemento es un `gw.UplinkRxInfo` serializado con pbjson SIN `emit_fields()` (api/rust/build.rs),
+// así que un SNR de 0 dB llega ausente; un elemento con `rssi` y sin `snr` vale 0 dB. En la pasarela Milesight, ausente es ausente.
+// Nunca lanza: la señal no es un dato del sensor y no puede mandar la trama a cuarentena.
+export function enlaceDe(rxInfo: unknown, snrAusenteEsCero = false): Enlace | undefined {
+  if (!Array.isArray(rxInfo)) return undefined;
+  const numero = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
+  let mejor: Enlace | undefined;
+  for (const r of rxInfo as unknown[]) {
+    if (typeof r !== 'object' || r === null || Array.isArray(r)) continue;
+    const e = r as Record<string, unknown>;
+    const rssi = numero(e.rssi);
+    let snr = numero(e.snr) ?? numero(e.loRaSNR);
+    if (snr === undefined && snrAusenteEsCero && rssi !== undefined && !('snr' in e) && !('loRaSNR' in e)) snr = 0;
+    if (rssi === undefined && snr === undefined) continue;
+    const peso = (x: number | undefined): number => x ?? -Infinity;
+    if (mejor === undefined || peso(snr) > peso(mejor.snr) || (peso(snr) === peso(mejor.snr) && peso(rssi) > peso(mejor.rssi))) {
+      mejor = { ...(rssi !== undefined ? { rssi } : {}), ...(snr !== undefined ? { snr } : {}) };
+    }
+  }
+  return mejor;
 }
 
 // Traduce las claves conocidas a lecturas; las desconocidas se anotan en ctx.ignoradas para la línea de registro de la trama.

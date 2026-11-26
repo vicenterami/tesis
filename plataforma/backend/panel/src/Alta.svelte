@@ -20,6 +20,7 @@
   import { fechaHora, horaLocal } from './lib/tiempo';
   import { abrirCanal, type Canal } from './lib/vivo';
   import { fragmentoAlta, fragmentoFicha, type ModoAlta } from './lib/vista';
+  import { MAGNITUDES_ENLACE } from './lib/senal';
   import { camposDeFicha, textoDeFicha } from './lib/ficha-conexion';
   import { sitioDeTopico } from './lib/serie';
 
@@ -36,6 +37,9 @@
   const inicial = untrack(() => ({ idFisico, sitio }));
   let a = $state({ id_fisico: inicial.idFisico, nombre: '', sitio: inicial.sitio, zona_id: '', via: 'mqtt', formato: 'senml', pasarela_id: '', intervalo: '300' });
   let canalesAlta = $state<string[]>(['']);
+  // La señal del enlace (docs/19 §4 AA, punto 2): con la vía LoRaWAN, rssi y snr propuestos y marcados; se pueden desmarcar. No cuentan como
+  // «al menos un canal»: la señal solo se guarda junto a una lectura del sensor.
+  let enlaceAlta = $state<Record<string, boolean>>({ rssi: true, snr: true });
   let pasarelas = $state<{ id: string; id_fisico: string; nombre: string; sitio_codigo: string; activo: boolean }[] | null>(null);
   let creando = $state(false);
   let avisoAlta = $state<DatosAviso | null>(null);
@@ -141,13 +145,19 @@
     if (a.via === 'lorawan' && pasarelas === null) untrack(() => void cargarPasarelas());
   });
 
+  // Los canales escritos y, en LoRaWAN, los del enlace marcados que no se escribieron ya.
+  function canalesDelCuerpo(): string[] {
+    const escritos = canalesAlta.map((x) => x.trim().toLowerCase()).filter((x) => x !== '');
+    const enlace = a.via === 'lorawan' ? MAGNITUDES_ENLACE.map((m) => m.codigo).filter((m) => enlaceAlta[m] === true && !escritos.includes(m)) : [];
+    return [...escritos, ...enlace];
+  }
   async function crear(): Promise<void> {
     if (creando) return;
     creando = true;
     avisoAlta = null;
     const cuerpo: Record<string, unknown> = {
       id_fisico: a.id_fisico.trim().toLowerCase(), nombre: a.nombre.trim(), zona_id: a.zona_id, via: a.via, intervalo_esperado_s: Number(a.intervalo),
-      canales: canalesAlta.map((x) => x.trim().toLowerCase()).filter((x) => x !== '').map((magnitud) => ({ magnitud })),
+      canales: canalesDelCuerpo().map((magnitud) => ({ magnitud })),
     };
     if (a.via === 'lorawan') cuerpo.pasarela_id = a.pasarela_id;
     else cuerpo.formato = a.formato;
@@ -207,6 +217,7 @@
     verClave = false;
     a = { ...a, id_fisico: '', nombre: '' };
     canalesAlta = [''];
+    enlaceAlta = { rssi: true, snr: true };
     paso = 1;
   }
 
@@ -352,6 +363,15 @@
           {/each}
           <span class="ayuda-campo" id="{uid}-canal-ayuda">El código de la magnitud del catálogo (temperatura, humedad, presion…); la unidad la fija el catálogo.</span>
           <span class="acciones"><Boton etiqueta="Agregar un canal" motivoDesactivado={canalesAlta.length >= 20 ? 'como mucho 20 canales' : null} onclick={() => (canalesAlta = [...canalesAlta, ''])} /></span>
+          {#if a.via === 'lorawan'}
+            <fieldset class="regla" data-alta-enlace>
+              <legend>Calidad del enlace</legend>
+              <p class="ayuda-campo">La pasarela dice con qué señal oyó cada trama; se guarda junto a las lecturas del sensor. Desmarca lo que no quieras guardar.</p>
+              {#each MAGNITUDES_ENLACE as m (m.codigo)}
+                <label class="marcar"><input type="checkbox" bind:checked={enlaceAlta[m.codigo]} data-alta-enlace-magnitud={m.codigo} /> {m.nombre}</label>
+              {/each}
+            </fieldset>
+          {/if}
         </div>
       {:else if paso === 4 && creado !== null}
         {@const cx = creado.conexion}

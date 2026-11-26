@@ -8,13 +8,14 @@ export type ClaseActividad = (typeof CLASES_ACTIVIDAD)[number];
 export const MAX_DIAS_ACTIVIDAD = 92; // un trimestre: la bitácora de accesos se borra a los 90 días
 export const DIAS_ACTIVIDAD_POR_DEFECTO = 7;
 
-// Texto por tipo de evento (los que escribe el backend con persona: alta, configuración, reglas, calibración, credenciales, baja, pasarelas)
+// Texto por tipo de evento (los que escribe el backend con persona: alta, configuración, reglas, calibración, magnitud agregada, credenciales, baja, pasarelas)
 // y por resultado de acceso (ck_acceso_resultado). Un tipo nuevo sin texto cae en el genérico: nunca un 500 ni un texto vacío.
 const TEXTOS_EVENTO: Readonly<Record<string, (d: string) => string>> = {
   alta: (d) => `dio de alta ${d}`,
   baja: (d) => `dio de baja ${d}`,
   rotacion: (d) => `rotó la credencial de ${d}`,
   canal_calibrado: (d) => `calibró un canal de ${d}`,
+  canal_alta: (d) => `agregó una magnitud a ${d}`, // desde el 25/11/2026 (docs/19 §4 AA): el detalle nombra la magnitud
   dispositivo_configurado: (d) => `cambió la configuración de ${d}`,
   reglas_cambiadas: (d) => `cambió los umbrales de ${d}`,
   condicion_abierta: (d) => `se abrió una condición en ${d}`,

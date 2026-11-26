@@ -11,7 +11,8 @@ import { cabeceraBorrarCookie } from '../sesion/cookie.js';
 import { Usuario } from '../sesion/guardia.js';
 import type { UsuarioSesion } from '../sesion/permisos.js';
 import { CuentaService, SesionPropia } from './cuenta.service.js';
-import { PANTALLAS_VISTA, PreferenciasLeidas, TEMAS, TIPOS_CONDICION, UNIDADES_LONGITUD, UNIDADES_TEMPERATURA, validarPreferencias } from './preferencias.js';
+import { MAX_MAGNITUDES_OCULTAS, PANTALLAS_VISTA, PreferenciasLeidas, TEMAS, TIPOS_CONDICION, UNIDADES_LONGITUD, UNIDADES_TEMPERATURA, validarPreferencias } from './preferencias.js';
+import { FORMA_MAGNITUD } from '../alta/configuracion.dto.js';
 
 const ID_SESION = /^[0-9a-f]{64}$/;
 const ESQUEMA_PREFERENCIAS = {
@@ -29,6 +30,7 @@ const ESQUEMA_PREFERENCIAS = {
       items: { type: 'object', required: ['nombre', 'pantalla', 'parametros'], properties: { nombre: { type: 'string', maxLength: 60 }, pantalla: { type: 'string', enum: [...PANTALLAS_VISTA] }, parametros: { type: 'object', additionalProperties: { type: 'string', maxLength: 200 } } } },
     },
     sitio_predeterminado: { type: 'string', format: 'uuid', nullable: true },
+    magnitudes_ocultas: { type: 'array', maxItems: MAX_MAGNITUDES_OCULTAS, items: { type: 'string', pattern: FORMA_MAGNITUD.source }, description: 'Las magnitudes que no quiere ver en el Resumen y en «Tendencias» (vacía: ver todo; ausente: se conserva la guardada, para el panel anterior; docs/10 §8.4 punto 72 ii)' },
   },
 } as const;
 
@@ -54,7 +56,7 @@ export class CuentaController {
     summary: 'Mis preferencias (Etapa 4)',
     description: 'Unidades de visualización, zona horaria, tema, tipos de condición con notificación, vistas guardadas y sitio por defecto. Si aún no guardaste ninguna, las de por defecto con `actualizado_en: null`. La base guarda siempre la unidad estándar: esto solo cambia cómo se muestra.',
   })
-  @ApiOkResponse({ description: '`unidad_temperatura, unidad_longitud, zona_horaria, tema, notificar, vistas, sitio_predeterminado, actualizado_en`' })
+  @ApiOkResponse({ description: '`unidad_temperatura, unidad_longitud, zona_horaria, tema, notificar, vistas, sitio_predeterminado, magnitudes_ocultas, actualizado_en`' })
   leer(@Usuario() u: UsuarioSesion): Promise<PreferenciasLeidas> {
     return this.cuenta.preferencias(u);
   }

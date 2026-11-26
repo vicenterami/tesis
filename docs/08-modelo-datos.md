@@ -296,6 +296,7 @@ erDiagram
         uuid sitio_predeterminado FK
         timestamptz creado_en
         timestamptz actualizado_en
+        ARRAY magnitudes_ocultas
     }
     receta_campo {
         text receta_codigo PK,FK
@@ -555,6 +556,16 @@ consistente para reportes.
       cada `UPDATE`; ambos existían desde la migración 05, que la 21 asegura y documenta) es la marca que exige `PATCH /canales/{id}`, y
       `plataforma_app` recibe `UPDATE` solo en `escala_cero` y `escala_cien`. Cada cambio deja un `evento` de tipo **`canal_calibrado`** del
       dispositivo, con la foto `{canal_id, magnitud, antes: {cero, cien}, despues: {cero, cien}, origen: 'api'}` (§7: foto por valor).
+- [x] **Relación señal/ruido del enlace** (migración 29, 25/11/2026; `docs/10 §8.4` punto 71; HU-15, RF-27): la magnitud `snr`
+      («Relación señal/ruido», `dB`, de −32 a 32), junto a `rssi` («Intensidad de señal», `dBm`, −150 a 0, desde la migración 01). Un nodo
+      LoRaWAN guarda la señal de cada trama solo si declara esos canales; nada nuevo en el esquema: un canal más en `canal` (único por
+      dispositivo y magnitud, migración 01) y sus filas en `medicion`. Agregar un canal a un equipo ya creado (`POST /dispositivos/{id}/canales`)
+      deja un `evento` **`canal_alta`** del dispositivo con `{canal_id, magnitud, origen: 'api'}` y quién (§7: foto por valor). Sin permisos
+      nuevos: `plataforma_app` ya inserta en `canal` (migración 14).
+- [x] **Qué magnitudes no ver, por persona** (migración 30, 25/11/2026; `docs/10 §8.4` punto 72 ii; RF-56, HU-29):
+      `preferencia.magnitudes_ocultas text[] NOT NULL DEFAULT '{}'`, con `CHECK` de a lo más 50 elementos; nada oculto por omisión. `plataforma_app`
+      recibe `UPDATE` de esa columna (repetido en la 14). «Lo que la trama trae y no se guarda» no agrega nada al esquema: se relee de `trama` y
+      `cuarentena` (punto 72 i).
 - [ ] **Magnitudes nuevas** del caso de uso (entrevista del 05/10): `radon` (`Bq/m3`, unidad propia: el catálogo
       es el «application context» de RFC 8428 §4.5.2) e `hidrogeno` (`ppm`). Cada una con su rango físico. Con el catálogo editable
       (migración 27) las crea el administrador del sistema desde el panel, si su unidad está en la lista cerrada de unidades.

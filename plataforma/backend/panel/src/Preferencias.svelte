@@ -1,7 +1,7 @@
 <script lang="ts">
   // P13 Preferencias y mi cuenta (docs/19 §4, tablero v2, H; HU-28, HU-29, RF-55, RF-56; docs/20 §11; docs/21 §4 y §5).
   // Preferencias: unidades, zona horaria, tema, notificaciones del navegador (el permiso se pide al activarlas, nunca al cargar), vistas
-  // guardadas y sitio predeterminado; en la base (`GET`/`PUT /preferencias`), guardadas de forma OPTIMISTA y reversible: se ven al instante y,
+  // guardadas, sitio predeterminado y, desde el 25/11/2026, qué magnitudes no ver en el Resumen (docs/19 §4 AA, punto 7); en la base (`GET`/`PUT /preferencias`), guardadas de forma OPTIMISTA y reversible: se ven al instante y,
   // si el servidor las rechaza, vuelven atrás con un aviso que dice por qué. Los guardados van en fila (nunca dos `PUT` en vuelo: el
   // segundo llevaría un `actualizado_en` viejo y daría 409 contra el propio panel). Desde el tablero v3 la fila es la del único escritor
   // de preferencias (lib/escritor-preferencias.ts), que comparte con el botón de tema de la barra superior (docs/19 §4, bloque L, punto 5).
@@ -11,6 +11,8 @@
   import { fijarPreferencias, guardarPreferencias, suscribirPreferencias } from './lib/escritor-preferencias';
   import Aviso from './Aviso.svelte';
   import Boton from './Boton.svelte';
+  import ElegirQueVer from './ElegirQueVer.svelte';
+  import type { Magnitud } from './lib/catalogo';
   import { ErrorApi, descargar, esCancelacion, obtener, pedir, ultimaGana } from './lib/api';
   import { avisoDeError, type DatosAviso } from './lib/avisos';
   import { rotuloCondicion } from './lib/estado-visual';
@@ -37,6 +39,14 @@
   let nombreVista = $state('');
   const zonas = zonasIana();
   const carga = ultimaGana();
+
+  // El catálogo de magnitudes, para «Elegir qué ver» (cualquier sesión puede leerlo; si falla, la lista no aparece).
+  let catalogo = $state<{ codigo: string; nombre: string }[]>([]);
+  onMount(() => {
+    const c = ultimaGana();
+    obtener<Magnitud[]>('/magnitudes', c.senal()).then((m) => (catalogo = m.map((x) => ({ codigo: x.codigo, nombre: x.nombre }))), () => undefined);
+    return () => c.cancelar();
+  });
 
   async function cargar(): Promise<void> {
     try {
@@ -238,6 +248,10 @@
           <label class="marcar"><input type="checkbox" checked={(p.notificar ?? []).includes(t)} onchange={(e) => { const casilla = e.currentTarget; void alternar(t, casilla.checked).then((ok) => { if (!ok) casilla.checked = false; }); }} data-notificar={t} /> {rotuloCondicion(t)}</label>
         {/each}
       </fieldset>
+
+      {#if catalogo.length > 0}
+        <ElegirQueVer magnitudes={catalogo} ocultas={p.magnitudes_ocultas ?? []} siempreAbierto alGuardar={(o) => guardar({ magnitudes_ocultas: o })} />
+      {/if}
 
       <h4>Vistas guardadas</h4>
       {#if (p.vistas ?? []).length === 0}

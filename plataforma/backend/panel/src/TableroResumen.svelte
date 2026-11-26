@@ -6,9 +6,13 @@
   // por segundo; solo un aviso `condicion` de un dispositivo del sitio repide «Ahora» (sin tendencia) y el resumen, con antirrebote; con
   // tramas llegando, el resumen se repide además una vez por minuto (los conteos de tramas). «Pausar» (en la fila del tablero) detiene
   // todo eso y «Reanudar» pide una vez lo que se muestra, como al reconectar (F4). Qué aviso es del sitio lo dice su `sitio_id`.
+  // «Elegir qué ver» (docs/19 §4 AA, punto 7): el servidor aplica la preferencia ANTES de elegir los tres canales; aquí solo se cambia y se
+  // repide «Ahora». Sin persona (el usuario del sistema), el botón no aparece.
   import { onMount, untrack } from 'svelte';
   import Ahora from './Ahora.svelte';
   import Aviso from './Aviso.svelte';
+  import ElegirQueVer from './ElegirQueVer.svelte';
+  import { guardarPreferencias, preferenciasActuales, suscribirPreferencias } from './lib/escritor-preferencias';
   import BarrasOrdenadas from './BarrasOrdenadas.svelte';
   import Medidor from './Medidor.svelte';
   import { aplicarAvisos, conservarTendencia, esDelSitio } from './lib/ahora';
@@ -33,6 +37,18 @@
   let ahora = $state(new Date());
   let recientes = $state<ReadonlySet<string>>(new Set());
   const zona = $derived(sitio.zona_horaria);
+  const inicialPrefs = preferenciasActuales();
+  let ocultas = $state<string[] | null>(inicialPrefs === null ? null : (inicialPrefs.magnitudes_ocultas ?? []));
+  let guardandoOcultas = $state(false);
+  let avisoOcultas = $state<string | null>(null);
+  async function guardarOcultas(nuevas: string[]): Promise<void> {
+    guardandoOcultas = true;
+    avisoOcultas = null;
+    const r = await guardarPreferencias({ magnitudes_ocultas: nuevas });
+    guardandoOcultas = false;
+    if (!r.ok) avisoOcultas = avisoDeError(r.error).texto;
+    else void cargarAhora(false);
+  }
   const id = $derived(encodeURIComponent(sitio.id));
 
   // Las tramas del resumen son las de las últimas 24 horas (cubos de una hora: el resumen no las dibuja, solo las cuenta).
@@ -124,6 +140,7 @@
   });
 
   onMount(() => {
+    const dejar = suscribirPreferencias((p) => (ocultas = p.magnitudes_ocultas ?? []));
     void cargarResumen();
     void cargarAhora(true);
     const reloj = setInterval(() => {
@@ -141,6 +158,7 @@
       repedirTodo.cancelar();
       lecturas.cancelar();
       c.cerrar();
+      dejar();
     };
   });
 
@@ -190,6 +208,10 @@
 
   {#if errorAhora !== null}
     <Aviso tipo="error" texto={`No se pudo leer «Ahora»: ${errorAhora}`} accion={{ etiqueta: 'Reintentar', alHacer: () => void cargarAhora(datosAhora === null) }} />
+  {/if}
+  {#if ocultas !== null && resumen.magnitudes.length > 0}
+    <ElegirQueVer magnitudes={resumen.magnitudes} {ocultas} alGuardar={guardarOcultas} guardando={guardandoOcultas} />
+    {#if avisoOcultas !== null}<Aviso tipo="error" texto={`No se guardó lo que quieres ver: ${avisoOcultas}`} alCerrar={() => (avisoOcultas = null)} />{/if}
   {/if}
   {#if datosAhora !== null}
     <Ahora datos={datosAhora} {zona} {unidades} {ahora} sitioCodigo={sitio.codigo} {recientes} />

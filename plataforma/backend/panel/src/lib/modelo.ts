@@ -138,8 +138,11 @@ export interface ResumenSitio {
   // cubos[].tiempo en segundos Unix, como `tiempos` de los históricos (lo declara el OpenAPI del resumen).
   tramas: { recibidas: number; rechazadas: number; cubos: { tiempo: number; recibidas: number; rechazadas: number }[] };
   atencion: { id: string; nombre: string; estado_visual: 'sin_senal' | 'alerta'; visto_por_ultima_vez: string | null; tipos: string[] }[];
-  magnitudes: { codigo: string; nombre: string; unidad: string; canales: number }[];
+  magnitudes: { codigo: string; nombre: string; unidad: string; canales: number; salud?: boolean }[]; // salud: desde el 25/11/2026
   entrega: { id: string; nombre: string; recibidas: number; esperadas: number; porcentaje: number | null }[];
+  // «Red → Calidad del enlace» (docs/19 §4 AA): la última señal de cada equipo con canal rssi o snr, de peor a mejor (hasta 50).
+  enlace?: { id: string; nombre: string; rssi: { valor: number; tiempo: string } | null; snr: { valor: number; tiempo: string } | null }[];
+  total_enlace?: number;
 }
 
 // GET /sitios/{id}/ahora (docs/19 §4, bloque L, puntos 3 y 6): lo que se mide en este momento. `chispa` (la de arriba y la de cada canal)
@@ -162,6 +165,7 @@ export interface DispositivoAhora {
   visto_por_ultima_vez: string | null;
   intervalo_esperado_s: number;
   canales_total: number;
+  canales_ocultos?: number; // los que oculta «Elegir qué ver» de la persona (desde el 25/11/2026; docs/19 §4 AA, punto 7)
   canales: CanalAhora[]; // hasta tres
 }
 export interface AhoraSitio {
@@ -169,6 +173,7 @@ export interface AhoraSitio {
   sin_senal: number;
   por_magnitud: { codigo: string; nombre: string; unidad: string; salud: boolean; canales: number; promedio: number; minimo: number; maximo: number }[];
   dispositivos: DispositivoAhora[];
+  ocultas?: string[]; // las magnitudes que el servidor dejó fuera por la preferencia de la persona (docs/19 §4 AA, punto 7)
   tendencia: boolean;
   chispa?: { desde: string; intervalo: '1 hour'; puntos: number };
 }
@@ -223,6 +228,7 @@ export interface Preferencias {
   sitio_predeterminado?: string | null;
   notificar?: string[]; // tipos de condición con notificación del navegador
   vistas?: VistaGuardada[];
+  magnitudes_ocultas?: string[]; // «elegir qué ver» (docs/19 §4 AA, punto 7): lo que no quiere ver en el Resumen ni en «Tendencias»
   actualizado_en?: string | null; // null: la persona aún no guardó ninguna (son las de por defecto)
 }
 

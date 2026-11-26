@@ -631,9 +631,10 @@ segundo para mover un cubo de seis horas) y volver a pedir datos por cada trama 
    «Ver los N en el inventario»). Los que están sin señal no se repiten aquí —ya están en «Requiere atención», y una línea lo dice
    (*5 sin señal, en «Requiere atención»*, que en la pestaña queda debajo)—: así nunca se muestra en grande, como si fuera de ahora, un valor de hace semanas. Cada tarjeta: nombre,
    zona, estado, hace cuánto reportó y **hasta tres canales** con su último valor en grande y su unidad para personas (D7): primero
-   las magnitudes de lo que se mide y al final las de salud del equipo (batería y señal: los códigos `bateria`, `tension` y `rssi` del
-   catálogo `magnitud`, definidos en un solo lugar del backend, `MAGNITUDES_SALUD` de `consulta/tablero.ts`; una magnitud de salud nueva se
-   agrega allí y aquí a la vez; dentro de cada grupo, por código, como la ficha); con más de tres, «+N»; un canal cuya
+   las magnitudes de lo que se mide y al final las de salud del equipo (batería y señal: los códigos `bateria`, `tension`, `rssi` y, desde el
+   25/11/2026, `snr` del catálogo `magnitud`, definidos en un solo lugar del backend, `MAGNITUDES_SALUD` de `consulta/tablero.ts`; una magnitud de salud nueva se
+   agrega allí y aquí a la vez; lo que se mide, por código, como la ficha; la salud, en el orden de esa lista, desde el 25/11/2026: por código,
+   un nodo con temperatura, humedad, tensión, rssi y snr perdía la tensión de su tarjeta; bloque AA); con más de tres, «+N»; un canal cuya
    última lectura tiene más de dos intervalos esperados se atenúa y dice su antigüedad. Junto a cada valor, una **línea de
    tendencia** de las últimas 24 horas (24 promedios por hora, en un trazo SVG decorativo: el dato es el número). El enlace es el
    nombre del dispositivo, con el área activa extendida a la tarjeta (§6: la tarjeta entera no es el nombre de un enlace). (c) **En
@@ -1894,7 +1895,8 @@ seguido que su intervalo esperado de 180 s).**
 
 **Orden y corte (24/11/2026).** U y U2, V, W, X, Y, en ese orden, entre el 24 y el 27/11/2026 (10 a 14 h estimadas). Desde el 28/11
 el trabajo es el informe: lo que no cierre el 27/11 se declara trabajo futuro, no se estira. El 25/11/2026 se sumó Z (abajo), por la
-observación del profesor guía del 24/11 sobre cargar la credencial; entra en el mismo corte.
+observación del profesor guía del 24/11 sobre cargar la credencial; entra en el mismo corte. El mismo día se sumó AA (la señal del enlace
+y lo configurable de la vista, HU-15 y HU-29), también dentro del corte.
 
 **Z. «Cargar en el equipo»: la red, el servidor y la credencial por USB (decidido y diseñado el 25/11/2026, antes del código).**
 Lo motiva la retroalimentación de la Etapa 3: el alta entrega usuario y clave y la persona debe cargarlos al sensor por su cuenta, cuando
@@ -1979,6 +1981,58 @@ una persona (`docs/02 §4.3`). La seguridad de lo que sigue, en `docs/11 §7` (�
    1 280 px. Los simuladores (el de vitest, el del recorrido y el equipo falso del guion) siguen contestando con la configuración vieja
    durante una ventana tras `configurar`, como el firmware real. **Lo que no se prueba sin la placa** (laboratorio
    aparte): grabar, cargar por el guion y por Chromium y ver el equipo «Normal».
+
+**AA. La señal del enlace como magnitud que se elige, y «Agregar una magnitud» (HU-15, RF-27, RF-09; diseñado y refutado el 25/11/2026,
+antes del código; la regla del pipeline, en `docs/10 §8.4` punto 71).**
+1. **La señal es una magnitud más, elegida por equipo.** Un nodo LoRaWAN guarda la intensidad de la señal (`rssi`, dBm) y la relación
+   señal/ruido (`snr`, dB) de cada trama solo si tiene esos canales. Nada se oculta ni se agrega solo: lo que el equipo guarda lo decide
+   quien lo configura.
+2. **En el asistente de alta (F1, paso 3)**, con la vía LoRaWAN aparece «Calidad del enlace» con dos casillas, «Intensidad de la señal
+   (rssi)» y «Relación señal/ruido (snr)», marcadas por omisión; se pueden desmarcar. No cuentan como «al menos un canal»: la señal solo se
+   guarda junto a una lectura del sensor. Con otra vía no aparecen (un nodo Wi-Fi que manda su `rssi` lo escribe como cualquier canal).
+3. **«Agregar una magnitud» en P6 Configurar** (acción `escribir`): una sección «Magnitudes que guarda» con las que ya tiene y un selector
+   con las del catálogo que aún no tiene, y el botón «Agregar una magnitud». Responde sin tocar lo que se está editando en los otros
+   canales; el canal nuevo aparece al final con su editor de reglas. Lo que llegó antes no se rellena: la serie empieza con la próxima
+   trama (el aviso lo dice). Sin el permiso, la sección se ve y el botón dice por qué no. En «Actividad» queda «agregó una magnitud a
+   «Nodo» (snr)».
+4. **«Red → Calidad del enlace»**, después de la entrega: una lista por equipo con canal de señal (`enlace[]` de
+   `GET /sitios/{id}/resumen`): nombre, última intensidad y última relación señal/ruido con su unidad, y hace cuánto; sin lectura todavía,
+   «sin lecturas de señal»; de peor a mejor (sin lectura primero, después por intensidad). Debajo, dos gráficas del sitio, «Intensidad de
+   la señal» y «Relación señal/ruido», con el histórico del sitio que ya existe (`…/historico?magnitud=rssi|snr`). Sin equipos con esos
+   canales, una línea dice cómo agregarlos (P6 o el alta). No clasifica la señal en «buena» o «mala»: no hay fuente que lo sostenga.
+5. **Tarjetas y «Tendencias».** La señal es salud del equipo: en la tarjeta de «Ahora» va al final, después de la batería y la tensión
+   (orden de `MAGNITUDES_SALUD`); en «Tendencias», las magnitudes de salud van después de las de medida antes de cortar en seis.
+6. **«Lo que la trama trae y no se guarda»** (ampliación del 25/11/2026), en P6 Configurar y en la ficha (P3), solo con la acción `escribir`
+   (lee cargas crudas, que no son públicas: `docs/10 §8.4` punto 6). Al pulsar «Revisar las tramas» (no al abrir la pantalla: releer 20
+   cargas en cada visita no se justifica), una lista de lo que las tramas recientes del equipo traen y el equipo
+   NO guarda: cada clave con su magnitud del catálogo (o «sin magnitud en el catálogo»), su último valor numérico visto, hace cuánto y de
+   dónde sale (la carga o la señal del enlace). Con magnitud: el botón «Agregar» usa `POST /dispositivos/{id}/canales` y la clave sale de
+   la lista. Sin magnitud: el texto lo dice y, a quien administra el sistema, un enlace al catálogo para crearla (o darle un alias); a los
+   demás, «pídelo a quien administra el sistema». Sin nada que ofrecer, una línea lo dice con cuántas tramas se revisaron. **De dónde
+   sale** (decidido para no guardar nada nuevo): de las tramas ya retenidas del equipo, `trama` (30 días) y `cuarentena`, las 20 más
+   recientes, releídas con el adaptador de su formato en cada petición (`GET /dispositivos/{id}/sin-guardar`, `docs/10 §8.4` punto 72).
+   Ninguna tabla ni columna nueva: lo que se muestra vence con la retención de las tramas.
+7. **«Elegir qué ver» por persona** (RF-56, HU-29; ampliación del 25/11/2026, rediseñada tras la refutación). Nada oculto por omisión:
+   la persona marca qué magnitudes NO quiere ver en el Resumen («Ahora») y en «Tendencias»; se guarda en sus preferencias
+   (`preferencia.magnitudes_ocultas`, migración 30, a lo más 50 códigos). **Dónde se cambia:** el botón «Elegir qué ver» del Resumen (una
+   lista con casillas de las magnitudes que mide el sitio, «Guardar» y «Cancelar») y la misma lista, con todo el catálogo, en P13
+   Preferencias. **Dónde rige:** el servidor la aplica en `GET /sitios/{id}/ahora` ANTES de elegir los tres canales de cada tarjeta y de
+   agregar `por_magnitud` (si se filtrara en el panel, la señal nunca entraría a una tarjeta llena), dentro de la misma consulta (siguen
+   siendo como mucho tres); el panel la aplica en «Tendencias» antes de cortar en seis. **Dónde no:** la ficha muestra siempre todo, «Red»
+   muestra siempre el enlace y el usuario del sistema (sin persona) ve todo. El Resumen dice cuántas oculta («2 magnitudes ocultas:
+   Elegir qué ver»), para que nadie crea que no se miden; y cada tarjeta, cuántas de sus magnitudes oculta («Todas sus magnitudes están
+   ocultas por «Elegir qué ver»: se ven en su ficha»), sin perder su estado «Alerta» ni su lugar (revisión del 25/11/2026).
+8. **Responsivo.** Todo lo nuevo de este bloque se lee y se usa a 390 px sin desplazamiento horizontal y con objetivos táctiles de al
+   menos `--objetivo`, y a 1 280 px; con los componentes y estilos del panel (`Boton`, `Aviso`, `.panel-seccion`, `.marcar`). El recorrido en
+   navegadores, `panel/e2e/enlace.mjs` con su guion `pruebas/panel-enlace-e2e.sh`, comprueba el desborde en los dos anchos.
+9. **Pruebas.** Unitarias: `enlaceDe` (mejor receptor, los dos nombres del SNR, vacío o ausente, valor inválido, el 0 dB de ChirpStack),
+   el pipeline (declarado o no, tope, al final y solo con una lectura guardada, fuera de rango sin cuarentena y en el registro, el
+   sensor que ya manda `rssi`), el orden de la salud con el caso del campus, la ruta nueva (permiso, ajeno, catálogo, idempotencia,
+   evento); por el DOM: las casillas del alta, el botón de P6 y la sección de Red. Integración en una base desechable: la migración 29
+   dos veces, la ruta y el `enlace[]` del resumen. De la ampliación: la relectura de las tramas (con y sin canal, fuera del catálogo,
+   texto no mostrado, el tope de claves, la señal), la preferencia (forma, tope y, ausente en el PUT de un panel anterior, conservada) y «Ahora» filtrando antes del corte de
+   tres sin una consulta más; por el DOM, «Agregar» desde la lista y «Elegir qué ver»; en la base desechable, la ruta, la migración 30 y la
+   preferencia aplicada por la base.
 
 ## 5. Flujos
 **F1 · Alta y primera trama.** Ya está dibujado en el diagrama de secuencia del alta (`docs/10`, figura del informe): el

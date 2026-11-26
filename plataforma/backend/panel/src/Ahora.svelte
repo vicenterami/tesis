@@ -28,6 +28,8 @@
     return { cifra: cifraAhora(c.desdeBase(v)), simbolo: c.simbolo };
   };
   const enInventario = $derived(fragmentoInventario({ ...SIN_FILTROS, sitio: sitioCodigo }));
+  const textoOcultos = (n: number, todas: boolean): string =>
+    `${todas ? 'Todas sus magnitudes están ocultas' : n === 1 ? '1 magnitud oculta' : `${n} magnitudes ocultas`} por «Elegir qué ver»: se ven en su ficha`;
   const ANCHO = 64;
   const ALTO = 22;
 </script>
@@ -89,6 +91,8 @@
               {/each}
             </ul>
             {#if d.canales_total > d.canales.length}<p class="mas" data-ahora-mas>+{d.canales_total - d.canales.length} {d.canales_total - d.canales.length === 1 ? 'canal' : 'canales'} en su ficha</p>{/if}
+            <!-- «Elegir qué ver» (docs/19 §4 AA, punto 7): lo que oculta la preferencia se dice, para que una tarjeta sin canales no quede muda -->
+            {#if (d.canales_ocultos ?? 0) > 0}<p class="mas" data-ahora-ocultos>{textoOcultos(d.canales_ocultos ?? 0, d.canales.length === 0)}</p>{/if}
           {/if}
         </li>
       {/each}

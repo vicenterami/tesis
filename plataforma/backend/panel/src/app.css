@@ -478,6 +478,20 @@ main { padding-bottom: calc(var(--e-4) + var(--alto-avisos, 0px)); }
 .tarjeta-ahora .mas { margin: 0; font-size: var(--t-xs); color: var(--texto-secundario); }
 .ver-todos { margin: var(--e-2) 0 0; }
 .ver-todos a { display: inline-flex; align-items: center; min-height: var(--objetivo); }
+/* «Elegir qué ver» y «Lo que la trama trae y no se guarda» (docs/19 §4 AA, puntos 6 a 8): a 390 px una columna, sin desborde; objetivos
+   táctiles de --objetivo. */
+.elegir-que-ver .fila-elegir { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-1) var(--e-2); margin: var(--e-2) 0; }
+.elegir-que-ver label.marcar, fieldset label.marcar { display: flex; align-items: center; gap: var(--e-2); min-height: var(--objetivo); overflow-wrap: anywhere; min-width: 0; }
+/* La casilla no se encoge cuando el nombre de la magnitud es largo (medido el 25/11/2026 a 390 px en Preferencias: 18 × 24 px). */
+.elegir-que-ver label.marcar input[type='checkbox'], fieldset label.marcar input[type='checkbox'] { flex: none; }
+fieldset.regla > .acciones, fieldset.regla > .ayuda-campo { grid-column: 1 / -1; }
+.lista-sin-guardar { list-style: none; margin: var(--e-2) 0 0; padding: 0; display: grid; gap: var(--e-2); }
+.lista-sin-guardar li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--e-1) var(--e-3); min-width: 0; overflow-wrap: anywhere; }
+.lista-sin-guardar code { overflow-wrap: anywhere; }
+/* «Red → Calidad del enlace» (docs/19 §4 AA): una línea por equipo; el nombre es el enlace a su ficha, con el área táctil mínima. */
+.lista-enlace { list-style: none; margin: var(--e-2) 0 var(--e-4); padding: 0; }
+.lista-enlace li { overflow-wrap: anywhere; }
+.lista-enlace a { display: inline-flex; align-items: center; min-height: var(--objetivo); }
 .solo-telefono { display: none; }
 @media (max-width: 699px) {
   .solo-telefono { display: block; }

@@ -9,7 +9,7 @@ const motivos = (f: () => unknown): string[] => {
 const BUENAS = {
   actualizado_en: null, unidad_temperatura: 'F', unidad_longitud: 'km', zona_horaria: 'America/Punta_Arenas', tema: 'oscuro',
   notificar: ['umbral', 'umbral', 'bateria'], vistas: [{ nombre: ' Mis alertas ', pantalla: 'inventario', parametros: { estado: 'alerta' } }],
-  sitio_predeterminado: '11111111-1111-4111-8111-111111111111',
+  sitio_predeterminado: '11111111-1111-4111-8111-111111111111', magnitudes_ocultas: ['snr', 'rssi'],
 };
 
 // Prueba cruzada (corrección del 11/11/2026): lo que arma el PANEL al guardar una vista (panel/src/lib/preferencias.ts, guardarVista) lo
@@ -62,6 +62,20 @@ describe('validarPreferencias (PUT /preferencias)', () => {
       .toEqual(['vistas debe ser una lista de hasta 20 elementos {nombre, pantalla, parametros}']);
     expect(motivos(() => validarPreferencias({ ...BUENAS, vistas: [{ nombre: 'A', pantalla: 'ficha', parametros: {} }, { nombre: 'a', pantalla: 'ficha', parametros: {} }] })))
       .toEqual(['vistas[1].nombre repetido']);
+  });
+  // «Elegir qué ver» (docs/10 §8.4 punto 72 ii; migración 30). El único campo que PUT admite ausente: una pestaña con el panel anterior al
+  // despliegue no lo envía, y sin él guardar sus preferencias daría 400 hasta recargar; ausente, se conserva lo guardado (null aquí).
+  it('magnitudes_ocultas: códigos del catálogo sin repetir, hasta 50; vacía = ver todo; ausente = se conserva (panel anterior)', () => {
+    expect(validarPreferencias({ ...BUENAS, magnitudes_ocultas: ['snr', 'snr', 'rssi'] }).magnitudes_ocultas).toEqual(['snr', 'rssi']);
+    expect(validarPreferencias({ ...BUENAS, magnitudes_ocultas: [] }).magnitudes_ocultas).toEqual([]);
+    expect(motivos(() => validarPreferencias({ ...BUENAS, magnitudes_ocultas: ['Temperatura', 3] })))
+      .toEqual(['magnitudes_ocultas: «Temperatura» no es un código de magnitud', 'magnitudes_ocultas: «3» no es un código de magnitud']);
+    expect(motivos(() => validarPreferencias({ ...BUENAS, magnitudes_ocultas: Array.from({ length: 51 }, (_, i) => `m${i}`) })))
+      .toEqual(['magnitudes_ocultas debe ser una lista de hasta 50 códigos de magnitud (vacía: ver todo)']);
+    const sinCampo: Record<string, unknown> = { ...BUENAS };
+    delete sinCampo.magnitudes_ocultas;
+    expect(validarPreferencias(sinCampo).magnitudes_ocultas).toBeNull();
+    expect(motivos(() => validarPreferencias({ ...BUENAS, magnitudes_ocultas: null }))).toEqual(['magnitudes_ocultas debe ser una lista de hasta 50 códigos de magnitud (vacía: ver todo)']);
   });
   it('leerPreferencias: sin fila, las de por defecto con actualizado_en null (la primera vez)', async () => {
     const c = { query: () => Promise.resolve({ rows: [] }) } as unknown as Parameters<typeof leerPreferencias>[0];

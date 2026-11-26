@@ -390,6 +390,13 @@ case "${1:-}" in
     r=$(pub "$mid" "$MCRED" "$nativo" "$(sincodec AgAAAJAHMBmYsA== 143 "$t3")"); sleep 2
     f=$(psql_ -tA -c "SELECT e.ultimo_fcnt FROM estado_dispositivo e JOIN dispositivo d ON d.id=e.dispositivo_id WHERE d.id_fisico='$udev'")
     [ "$(valores | cut -d' ' -f1)" = 6 ] && [ "$f" = 143 ] && ok "un fCnt nuevo → 3 lecturas más, y estado_dispositivo.ultimo_fcnt = 143" || falla "fCnt nuevo: $(valores) · ultimo_fcnt «$f»"
+    # La señal del enlace como canal declarado (docs/10 §8.4 punto 71; 25/11/2026): un nodo NUEVO que declara rssi y snr guarda la señal del
+    # rxInfo (rssi y loRaSNR) después de sus 3 lecturas; el nodo de arriba, sin esos canales, siguió dejando exactamente 3 por trama.
+    edev=$(openssl rand -hex 8); r=$(api POST /dispositivos -d "{\"id_fisico\":\"$edev\",\"nombre\":\"Nodo del campus con señal\",\"zona_id\":\"$zona\",\"via\":\"lorawan\",\"pasarela_id\":\"$mpas\",\"decodificador\":\"campus-heltec-v3-v1\",\"intervalo_esperado_s\":180,\"canales\":[{\"magnitud\":\"temperatura\"},{\"magnitud\":\"humedad\"},{\"magnitud\":\"tension\"},{\"magnitud\":\"rssi\"},{\"magnitud\":\"snr\"}]}")
+    [ "${r##*$'\n'}" = 201 ] || falla "alta del nodo con rssi y snr → ${r##*$'\n'}"
+    r=$(pub "$mid" "$MCRED" "sitio/$sitio/pasarela/$mid/device/$edev/event/up" "$(sincodec AgAAAI8HGBmYrw== 7 "$t3" | sed "s/\"devEUI\":\"$udev\"/\"devEUI\":\"$edev\"/")"); sleep 2
+    e=$(psql_ -tA -c "SELECT count(*) || ' ' || string_agg(c.magnitud_codigo || '=' || m.valor, ',' ORDER BY c.magnitud_codigo) FROM medicion m JOIN canal c ON c.id=m.canal_id JOIN dispositivo d ON d.id=c.dispositivo_id WHERE d.id_fisico='$edev'")
+    [ "$e" = "5 humedad=65.52,rssi=-46,snr=10.2,temperatura=18.16,tension=3.75" ] && [ -z "$(cuarentena "sitio/$sitio/pasarela/$mid/device/$edev/event/up")" ] && ok "un nodo que declara rssi y snr guarda la señal del rxInfo (−46 dBm, 10,2 dB) junto a sus 3 lecturas, sin cuarentena" || falla "señal del enlace: «$e»"
     # Porcentaje con la calibración del canal (docs/10 §8.4 punto 51): se calibra la humedad del nodo con 0 % = 0 y 100 % = 200 (una
     # escala cualquiera, para ver la cuenta); la última lectura (65,52) debe salir 32,8 % en la ficha y en el histórico. La ruta que
     # edita la calibración aún no existe: se pone en la base, como lo haría una migración de datos.

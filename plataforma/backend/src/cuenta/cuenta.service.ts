@@ -42,21 +42,21 @@ export class CuentaService {
   }
 
   // PUT /preferencias, con bloqueo optimista (docs/10 §8.4 punto 28): `actualizado_en` null = la primera vez (no había fila); si otra pestaña
-  // la creó o la cambió entretanto, 409 con la vigente.
+  // la creó o la cambió entretanto, 409 con la vigente. Sin `magnitudes_ocultas` (panel anterior al 25/11/2026) se conserva la guardada.
   async guardarPreferencias(u: UsuarioSesion, p: CambioPreferencias): Promise<PreferenciasLeidas> {
     const id = exigirPersona(u);
     if (p.sitio_predeterminado !== null && !u.todos && !u.sitios.has(p.sitio_predeterminado)) {
       throw new BadRequestException(['sitio_predeterminado no es uno de tus sitios']);
     }
-    const valores = [id, p.unidad_temperatura, p.unidad_longitud, p.zona_horaria, p.tema, p.notificar, JSON.stringify(p.vistas), p.sitio_predeterminado];
+    const valores = [id, p.unidad_temperatura, p.unidad_longitud, p.zona_horaria, p.tema, p.notificar, JSON.stringify(p.vistas), p.sitio_predeterminado, p.magnitudes_ocultas];
     const r = p.actualizado_en === null
       ? await this.pool.query(
-        `INSERT INTO preferencia (usuario_id, unidad_temperatura, unidad_longitud, zona_horaria, tema, notificar, vistas, sitio_predeterminado)
-         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8) ON CONFLICT (usuario_id) DO NOTHING RETURNING usuario_id`, valores)
+        `INSERT INTO preferencia (usuario_id, unidad_temperatura, unidad_longitud, zona_horaria, tema, notificar, vistas, sitio_predeterminado, magnitudes_ocultas)
+         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, COALESCE($9::text[], '{}')) ON CONFLICT (usuario_id) DO NOTHING RETURNING usuario_id`, valores)
       : await this.pool.query(
         `UPDATE preferencia SET unidad_temperatura = $2, unidad_longitud = $3, zona_horaria = $4, tema = $5, notificar = $6, vistas = $7::jsonb,
-                sitio_predeterminado = $8
-          WHERE usuario_id = $1 AND actualizado_en = $9::timestamptz RETURNING usuario_id`, [...valores, p.actualizado_en]);
+                sitio_predeterminado = $8, magnitudes_ocultas = COALESCE($9::text[], magnitudes_ocultas)
+          WHERE usuario_id = $1 AND actualizado_en = $10::timestamptz RETURNING usuario_id`, [...valores, p.actualizado_en]);
     if (r.rowCount === 0) {
       const vigente = await leerPreferencias(this.pool, id);
       throw new ConflictException({

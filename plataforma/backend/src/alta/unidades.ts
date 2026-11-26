@@ -25,9 +25,9 @@ export function unidadEscrita(escrita: string, canonica: string): 'catalogo' | '
 }
 
 // Cómo se lee cada unidad del catálogo en los textos para personas (motivos, avisos y el detalle de la revisión): «°C» y no «Cel»,
-// «% de humedad» y no «%RH». Las del catálogo de hoy (db/init: Cel, %RH, hPa, %EL, dBm, ug/m3, V); una que no esté aquí se lee tal cual.
+// «% de humedad» y no «%RH». Las del catálogo de hoy (db/init: Cel, %RH, hPa, %EL, dBm, dB, ug/m3, V); una que no esté aquí se lee tal cual.
 const COMO_SE_LEE: Readonly<Record<string, string>> = {
-  Cel: '°C', '%RH': '% de humedad', '%EL': '% de batería', hPa: 'hPa', dBm: 'dBm', 'ug/m3': 'µg/m³', V: 'V',
+  Cel: '°C', '%RH': '% de humedad', '%EL': '% de batería', hPa: 'hPa', dBm: 'dBm', dB: 'dB', 'ug/m3': 'µg/m³', V: 'V',
 };
 export const comoSeLee = (unidad: string): string => COMO_SE_LEE[unidad] ?? unidad;
 

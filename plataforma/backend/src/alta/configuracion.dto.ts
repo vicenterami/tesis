@@ -68,6 +68,20 @@ export function validarCambioDispositivo(cuerpo: unknown): CambioDispositivo {
   return r;
 }
 
+// ── POST /dispositivos/{id}/canales («Agregar una magnitud», docs/19 §4 AA; docs/10 §8.4 punto 71) ─────────────────────────────────
+// Solo el código de una magnitud del catálogo, con la forma de ck_magnitud_codigo (migración 27); que exista lo decide la base (400).
+export const FORMA_MAGNITUD = /^[a-z][a-z0-9_]{0,39}$/;
+export function validarCanalNuevo(cuerpo: unknown): { magnitud: string } {
+  if (typeof cuerpo !== 'object' || cuerpo === null || Array.isArray(cuerpo)) throw rechazo([{ campo: '(cuerpo)', motivo: 'debe ser un objeto JSON' }]);
+  const c = cuerpo as Record<string, unknown>;
+  const errores: Error400[] = [];
+  const magnitud = typeof c.magnitud === 'string' ? c.magnitud.trim().toLowerCase() : '';
+  if (!FORMA_MAGNITUD.test(magnitud)) errores.push({ campo: 'magnitud', motivo: 'el código de una magnitud del catálogo (GET /magnitudes)' });
+  for (const k of Object.keys(c)) if (k !== 'magnitud') errores.push({ campo: k, motivo: 'campo no admitido' });
+  if (errores.length > 0) throw rechazo(errores);
+  return { magnitud };
+}
+
 // ── PUT /canales/{id}/reglas ────────────────────────────────────────────────────────────────────────────────────────────────────
 export const MAX_REGLAS = 4;
 export const MAX_RETARDO_S = 86_400; // el mismo tope que ck_regla_umbral_retardo_s (migración 23)

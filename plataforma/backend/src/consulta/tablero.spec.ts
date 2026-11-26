@@ -6,7 +6,7 @@ import {
   filtroInventario, intervaloParaRango, leerCursor, patronBusqueda, porcentajeSalud, siguiente,
 } from './tablero.js';
 import { INTERVALOS, SEGUNDOS_INTERVALO } from './validacion.js';
-import { MAX_ENTREGA_RESUMEN, diasRetencionTrama, entregasDelResumen } from './tablero.service.js';
+import { MAX_ENTREGA_RESUMEN, diasRetencionTrama, enlacesDelResumen, entregasDelResumen } from './tablero.service.js';
 import { MAX_DIAS_SITIO, ventana } from './sitios.controller.js';
 
 // Estado visual en el servidor (docs/19 §2; docs/10 §8.4 punto 65 ii): LA tabla de casos del panel (panel/src/lib/estado-visual-casos.json),
@@ -217,5 +217,29 @@ describe('porcentajeSalud: en línea ÷ supervisados, un decimal', () => {
   it('reportan nunca supera a supervisados: si la consulta lo violara, se acota a 100; un negativo, a 0', () => {
     expect(porcentajeSalud(15, 14)).toBe(100);
     expect(porcentajeSalud(-1, 14)).toBe(0);
+  });
+});
+
+// «Red → Calidad del enlace» (docs/19 §4 AA, punto 4): el orden y el tope sobre lo que entrega la consulta del resumen.
+describe('enlacesDelResumen', () => {
+  const u = (valor: number) => ({ valor, tiempo: '2026-11-25T12:00:00.000000Z' });
+  it('de peor a mejor: sin ninguna lectura de señal primero, sin intensidad después, luego por intensidad y por nombre', () => {
+    const r = enlacesDelResumen([
+      { id: 'a', nombre: 'Bueno', rssi: u(-50), snr: u(9) },
+      { id: 'b', nombre: 'Malo', rssi: u(-110), snr: u(-12) },
+      { id: 'c', nombre: 'Nuevo', rssi: null, snr: null },
+      { id: 'd', nombre: 'Solo snr', rssi: null, snr: u(3) },
+      { id: 'e', nombre: 'Alfa', rssi: u(-110), snr: u(1) },
+    ]);
+    expect(r.enlace.map((x) => x.id)).toEqual(['c', 'd', 'e', 'b', 'a']);
+    expect(r.total_enlace).toBe(5);
+  });
+  it(`como mucho ${MAX_ENTREGA_RESUMEN}, con el total aparte; sin equipos, lista vacía`, () => {
+    const muchos = Array.from({ length: MAX_ENTREGA_RESUMEN + 3 }, (_, i) => ({ id: `d${i}`, nombre: `N${i}`, rssi: u(-i), snr: null }));
+    const r = enlacesDelResumen(muchos);
+    expect(r.enlace).toHaveLength(MAX_ENTREGA_RESUMEN);
+    expect(r.total_enlace).toBe(MAX_ENTREGA_RESUMEN + 3);
+    expect(r.enlace[0]?.id).toBe(`d${MAX_ENTREGA_RESUMEN + 2}`);
+    expect(enlacesDelResumen([])).toEqual({ enlace: [], total_enlace: 0 });
   });
 });

@@ -29,6 +29,10 @@ export function fijarPreferencias(p: Preferencias | null | undefined): void {
   actuales = p === null || p === undefined ? null : { ...p };
   avisar();
 }
+// Las vigentes (null sin persona: sin sesión o el usuario del sistema, que no guarda nada).
+export function preferenciasActuales(): Preferencias | null {
+  return actuales;
+}
 export function suscribirPreferencias(f: Oyente): () => void {
   oyentes.add(f);
   return () => oyentes.delete(f);

@@ -576,6 +576,58 @@
         ]
       }
     },
+    "/dispositivos/{id}/sin-guardar": {
+      "get": {
+        "description": "Relee las 20 tramas más recientes del equipo (aceptadas y en cuarentena, dentro de su retención) con el adaptador de su formato, sin escribir nada, y responde `revisadas` y `claves[{clave, magnitud, valor, unidad, visto, origen}]`: lo que traen y el equipo no tiene como canal. `magnitud`: la del catálogo que la recibiría (se agrega con POST /dispositivos/{id}/canales), o null si no hay magnitud ni alias para esa clave; `valor`: el último valor numérico visto (un texto no se muestra); `origen`: `carga` o `enlace` (la señal de una trama LoRaWAN). Hasta 50 claves, la más reciente primero, cada una recortada a 32 caracteres. Lee cargas crudas: exige la acción `escribir` (docs/20 §6).",
+        "operationId": "SinGuardarController_sinGuardar",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "UUID del dispositivo",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Clave-Admin",
+            "in": "header",
+            "description": "Sin sesión: la clave de administrador (HTTP_CLAVE_ADMIN), como usuario del sistema (docs/20 §5)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "`{revisadas, claves[{clave, magnitud, valor, unidad, visto, origen}]}`"
+          },
+          "400": {
+            "description": "UUID inválido"
+          },
+          "401": {
+            "description": "Sin sesión ni X-Clave-Admin"
+          },
+          "403": {
+            "description": "Un perfil sin la acción escribir en ese sitio (docs/20 §6), o sesión sin la cabecera X-Pedido: panel"
+          },
+          "404": {
+            "description": "No existe, o es de otro sitio"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Lo que las tramas del equipo traen y no se guarda (Etapa 4)",
+        "tags": [
+          "dispositivos"
+        ]
+      }
+    },
     "/dispositivos": {
       "get": {
         "description": "Cada dispositivo de los sitios del usuario con su sitio y zona (nombres, y `sitio_codigo` y `zona_id` para filtrar: los nombres pueden repetirse), zona horaria, canales, `en_linea` (la más reciente entre la última trama y `en_servicio_desde`, hace menos de 2 × intervalo esperado; nulo sin tramas), `en_servicio_desde` (desde cuándo se espera que reporte: el alta o la última vuelta a activo), `espera_hasta` (hasta cuándo espera su primera trama: `en_servicio_desde` + la espera del sitio; nulo si ya envió alguna), número de condiciones abiertas, `estado_visual` (docs/19 §2: inactivo, sin_senal, alerta, esperando, normal) y `entrega` (% de tramas recibidas sobre las esperadas en las últimas 24 h, contadas desde `en_servicio_desde` si es posterior, acotado a 100; nulo si no hay una trama esperada completa en la ventana, si no está activo o si espera su primera trama). Filtros opcionales en el servidor (docs/19 §4, C) y, con `limite` o `desplazamiento`, una página; el total que cumple los filtros va en la cabecera `X-Total` (Etapa 4). Sin parámetros, la lista completa como antes. `entrega` usa siempre una ventana fija de 24 h (la del resumen del sitio es la del rango pedido); `orden=entrega` ordena de peor a mejor con los nulos al final; `orden=atencion`, por estado visual (sin_senal, alerta, normal, esperando, inactivo) y nombre.",
@@ -1779,7 +1831,7 @@
     },
     "/sitios/{id}/resumen": {
       "get": {
-        "description": "Una consulta por petición (docs/10 §8.4 punto 65 iii). `sitio`, `ventana{desde, hasta, intervalo}`, `dispositivos{total, normal, alerta, sin_senal, esperando, inactivo}` (estado visual de docs/19 §2), `salud{reportan, supervisados, porcentaje}` (en línea ÷ supervisados: ni inactivos ni esperando su primera trama), `condiciones_abiertas[{tipo, n}]`, `tramas{recibidas, rechazadas, cubos[{tiempo, recibidas, rechazadas}]}` (tiempo en segundos Unix, como `tiempos` de los históricos; cubos en la zona del sitio; los cubos sin datos no se emiten: no son 0), `atencion[{id, nombre, estado_visual, visto_por_ultima_vez, tipos}]` (hasta diez, sin señal primero), `magnitudes[{codigo, nombre, unidad, canales}]` y `entrega[{id, nombre, recibidas, esperadas, porcentaje}]`: los 50 dispositivos activos con peor entrega, de peor a mejor, y `total_activos`, cuántos hay (todos, en `GET /dispositivos?orden=entrega`). Porcentaje nulo si no hay una trama esperada completa en la ventana, contada desde su entrada en servicio (`en_servicio_desde`) y dentro de la retención de tramas (medida desde ahora), y nulo para quien espera su primera trama; 0 % si se esperaban y no llegó ninguna. Sin `intervalo`, el más fino que deja la ventana en 300 cubos o menos.",
+        "description": "Una consulta por petición (docs/10 §8.4 punto 65 iii). `sitio`, `ventana{desde, hasta, intervalo}`, `dispositivos{total, normal, alerta, sin_senal, esperando, inactivo}` (estado visual de docs/19 §2), `salud{reportan, supervisados, porcentaje}` (en línea ÷ supervisados: ni inactivos ni esperando su primera trama), `condiciones_abiertas[{tipo, n}]`, `tramas{recibidas, rechazadas, cubos[{tiempo, recibidas, rechazadas}]}` (tiempo en segundos Unix, como `tiempos` de los históricos; cubos en la zona del sitio; los cubos sin datos no se emiten: no son 0), `atencion[{id, nombre, estado_visual, visto_por_ultima_vez, tipos}]` (hasta diez, sin señal primero), `magnitudes[{codigo, nombre, unidad, canales, salud}]` (`salud`: batería o señal, MAGNITUDES_SALUD), `enlace[{id, nombre, rssi, snr}]` (cada uno `{valor, tiempo}` o null: la última lectura de señal de cada equipo con canal rssi o snr, no dado de baja; sin ninguna lectura primero, después por intensidad, hasta 50) con `total_enlace`, cuántos hay; y `entrega[{id, nombre, recibidas, esperadas, porcentaje}]`: los 50 dispositivos activos con peor entrega, de peor a mejor, y `total_activos`, cuántos hay (todos, en `GET /dispositivos?orden=entrega`). Porcentaje nulo si no hay una trama esperada completa en la ventana, contada desde su entrada en servicio (`en_servicio_desde`) y dentro de la retención de tramas (medida desde ahora), y nulo para quien espera su primera trama; 0 % si se esperaban y no llegó ninguna. Sin `intervalo`, el más fino que deja la ventana en 300 cubos o menos.",
         "operationId": "SitiosController_resumen",
         "parameters": [
           {
@@ -1854,7 +1906,7 @@
     },
     "/sitios/{id}/ahora": {
       "get": {
-        "description": "Como mucho tres consultas por petición, sin una por dispositivo (docs/10 §8.4 punto 65 viii). `reportan` y `sin_senal`: cuántos dispositivos del sitio tienen estado visual normal o alerta, y sin señal (la regla de docs/19 §2, la misma del inventario y del resumen). `por_magnitud[{codigo, nombre, unidad, salud, canales, promedio, minimo, maximo}]`: sobre la última lectura de cada canal de los que reportan, solo si tiene menos de dos intervalos esperados del dispositivo (una lectura vieja no entra); `canales`, cuántos aportan; las de salud del equipo al final. `dispositivos[{id, nombre, zona, estado_visual, visto_por_ultima_vez, intervalo_esperado_s, canales_total, canales}]`: los que reportan, primero los de alerta y después por zona y nombre, hasta `limite`; `canales` trae hasta 3 `{id, magnitud, magnitud_nombre, unidad, salud, ultima{valor, tiempo, porcentaje}|null}`: primero lo que se mide y al final la salud del equipo (bateria, tension, rssi). Con `tendencia=si`, además `chispa{desde, intervalo, puntos}` y, en cada canal, `chispa`: 24 promedios por hora alineados a la hora UTC, el último de la hora en curso (parcial); un cubo sin lecturas es null, no 0. `tendencia` va siempre: true si la tendencia está en la respuesta; false si no se pidió o si se omitió porque su cálculo pasó de 2000 ms o ya había 2 en curso (no es un error: el resto de la respuesta es el mismo). Consulta o más en su sitio; otro sitio, 404.",
+        "description": "Como mucho tres consultas por petición, sin una por dispositivo (docs/10 §8.4 punto 65 viii). `reportan` y `sin_senal`: cuántos dispositivos del sitio tienen estado visual normal o alerta, y sin señal (la regla de docs/19 §2, la misma del inventario y del resumen). `por_magnitud[{codigo, nombre, unidad, salud, canales, promedio, minimo, maximo}]`: sobre la última lectura de cada canal de los que reportan, solo si tiene menos de dos intervalos esperados del dispositivo (una lectura vieja no entra); `canales`, cuántos aportan; las de salud del equipo al final. `dispositivos[{id, nombre, zona, estado_visual, visto_por_ultima_vez, intervalo_esperado_s, canales_total, canales_ocultos, canales}]`: los que reportan, primero los de alerta y después por zona y nombre, hasta `limite`; `canales` trae hasta 3 `{id, magnitud, magnitud_nombre, unidad, salud, ultima{valor, tiempo, porcentaje}|null}`: primero lo que se mide y al final la salud del equipo (bateria, tension, rssi, snr). `ocultas`: las magnitudes que la persona eligió no ver (preferencia `magnitudes_ocultas`): no entran a `por_magnitud`, ni a los canales de las tarjetas ni a `canales_total` (se aplican ANTES de elegir los tres; sin persona, ninguna); `canales_ocultos`, cuántos canales del dispositivo dejan fuera. Con `tendencia=si`, además `chispa{desde, intervalo, puntos}` y, en cada canal, `chispa`: 24 promedios por hora alineados a la hora UTC, el último de la hora en curso (parcial); un cubo sin lecturas es null, no 0. `tendencia` va siempre: true si la tendencia está en la respuesta; false si no se pidió o si se omitió porque su cálculo pasó de 2000 ms o ya había 2 en curso (no es un error: el resto de la respuesta es el mismo). Consulta o más en su sitio; otro sitio, 404.",
         "operationId": "SitiosController_ahora",
         "parameters": [
           {
@@ -2614,6 +2666,86 @@
           }
         ],
         "summary": "Plantilla del alta por lote (Etapa 4)",
+        "tags": [
+          "dispositivos"
+        ]
+      }
+    },
+    "/dispositivos/{id}/canales": {
+      "post": {
+        "description": "Agrega un canal de una magnitud del catálogo (`magnitud`, el código de GET /magnitudes) a un dispositivo ya creado, hasta 20 canales. Idempotente: si ya la tiene, responde ese canal con `agregada: false` y no cambia nada. Los canales existentes no se tocan; lo que llegó antes no se rellena (el canal empieza con la próxima trama). Deja el evento `canal_alta` `{canal_id, magnitud, origen}` con quién. Un nodo LoRaWAN con `rssi` o `snr` guarda desde entonces la señal de cada trama (docs/10 §8.4 punto 71). Exige la acción `escribir` en el sitio (docs/20 §6).",
+        "operationId": "AltaController_agregarCanal",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "UUID del dispositivo",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Clave-Admin",
+            "in": "header",
+            "description": "Sin sesión: la clave de administrador (HTTP_CLAVE_ADMIN), como usuario del sistema (docs/20 §5)",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "magnitud"
+                ],
+                "properties": {
+                  "magnitud": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_]{0,39}$"
+                  }
+                },
+                "example": {
+                  "magnitud": "snr"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "`{agregada, dispositivo_id, canal{id, magnitud, unidad, etiqueta, escala_cero, escala_cien}}`: el canal nuevo, o el que ya tenía esa magnitud"
+          },
+          "400": {
+            "description": "UUID inválido, o la magnitud no tiene la forma o no está en el catálogo: `errores[{campo, motivo}]`"
+          },
+          "401": {
+            "description": "Sin sesión ni X-Clave-Admin, o X-Clave-Admin incorrecta"
+          },
+          "403": {
+            "description": "Un perfil sin ese permiso en ese sitio (docs/20 §6), o sesión sin la cabecera X-Pedido: panel"
+          },
+          "404": {
+            "description": "No existe, o es de otro sitio"
+          },
+          "409": {
+            "description": "Está dado de baja, o ya tiene 20 canales"
+          },
+          "503": {
+            "description": "Otra operación sobre el mismo dispositivo en curso"
+          }
+        },
+        "security": [
+          {
+            "sesion": []
+          }
+        ],
+        "summary": "Agregar una magnitud a un dispositivo (Etapa 4)",
         "tags": [
           "dispositivos"
         ]
@@ -3792,7 +3924,7 @@
         "parameters": [],
         "responses": {
           "200": {
-            "description": "`unidad_temperatura, unidad_longitud, zona_horaria, tema, notificar, vistas, sitio_predeterminado, actualizado_en`"
+            "description": "`unidad_temperatura, unidad_longitud, zona_horaria, tema, notificar, vistas, sitio_predeterminado, magnitudes_ocultas, actualizado_en`"
           },
           "401": {
             "description": "sesión requerida"
@@ -3925,6 +4057,15 @@
                     "type": "string",
                     "format": "uuid",
                     "nullable": true
+                  },
+                  "magnitudes_ocultas": {
+                    "type": "array",
+                    "maxItems": 50,
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[a-z][a-z0-9_]{0,39}$"
+                    },
+                    "description": "Las magnitudes que no quiere ver en el Resumen y en «Tendencias» (vacía: ver todo; ausente: se conserva la guardada, para el panel anterior; docs/10 §8.4 punto 72 ii)"
                   }
                 }
               }

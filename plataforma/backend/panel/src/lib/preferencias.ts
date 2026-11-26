@@ -15,6 +15,7 @@ export const PREFERENCIAS_POR_DEFECTO: Required<Omit<Preferencias, 'actualizado_
   sitio_predeterminado: null,
   notificar: [],
   vistas: [],
+  magnitudes_ocultas: [],
 };
 
 // Las zonas IANA que conoce el navegador (las mismas que valida el servidor con Intl.supportedValuesOf); sin esa función, solo UTC.
@@ -37,8 +38,20 @@ export function cuerpoPreferencias(p: Preferencias): Preferencias {
     sitio_predeterminado: p.sitio_predeterminado ?? null,
     notificar: [...(p.notificar ?? [])],
     vistas: [...(p.vistas ?? [])],
+    magnitudes_ocultas: [...(p.magnitudes_ocultas ?? [])], // siempre se envía (desde el 25/11/2026); ausente, el servidor conservaría la guardada
     actualizado_en: p.actualizado_en ?? null, // null la primera vez (aún no hay fila): el servidor lo exige igual
   };
+}
+
+// «Elegir qué ver» (docs/19 §4 AA, punto 7): lo que la persona no quiere ver; marcar una casilla «ver» la quita de la lista. El orden
+// de la lista guardada sigue el de las magnitudes ofrecidas, para que guardar dos veces lo mismo no cambie nada; las ocultas que no se
+// ofrecen aquí (otro sitio, una magnitud que ya no se mide) se conservan.
+export function alternarOculta(ocultas: readonly string[], ofrecidas: readonly string[], codigo: string, ver: boolean): string[] {
+  const resto = ocultas.filter((m) => !ofrecidas.includes(m));
+  const aqui = new Set(ocultas.filter((m) => ofrecidas.includes(m)));
+  if (ver) aqui.delete(codigo);
+  else aqui.add(codigo);
+  return [...resto, ...ofrecidas.filter((m) => aqui.has(m))];
 }
 
 // Cambio optimista: lo nuevo para mostrar ya y lo anterior para volver si el servidor lo rechaza.

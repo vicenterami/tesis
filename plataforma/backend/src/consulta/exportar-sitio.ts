@@ -3,7 +3,8 @@
 // Funciones puras sobre tres fuentes que se recorren una vez y una salida con contrapresión: el controlador conecta las consultas por
 // tandas (consulta.service.ts) y la respuesta HTTP. Nada de personas en el archivo (docs/21, minimización): quién hizo cada cambio se
 // queda en «Actividad» (P14); el detalle de los eventos de un dispositivo no lleva nombres, correos ni ids de usuario (revisado el
-// 19/11/2026 en cada escritor de `evento`: alta, baja, rotación, calibración, configuración, reglas, condiciones).
+// 19/11/2026 en cada escritor de `evento`: alta, baja, rotación, calibración, configuración, reglas, condiciones; el 25/11/2026, canal_alta:
+// {canal_id, magnitud, origen}).
 import { celdaCsv, celdaNumerica, nombreSaneado } from './exportar.js';
 import { LibroXlsx, type Celda, type Columna } from './xlsx.js';
 import { EscritorZip, TOPES_ZIP, type TopesZip } from './zip.js';

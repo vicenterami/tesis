@@ -16,7 +16,7 @@ export type Perfil = (typeof PERFILES)[number];
 //   leer        GET de dispositivos, ficha, históricos, eventos, condiciones, cuarentena, pasarelas, sitios, resumen y el canal en vivo
 //   exportar    GET /dispositivos/{id}/exportar, GET /sitios/{id}/exportar y GET /sitios/{id}/exportar/estimacion (datos crudos, no públicos:
 //               docs/10 §8.4 punto 6; las dos del sitio desde el 19/11/2026, docs/19 §4 bloque R): administrador de sitio e investigador
-//   escribir    alta (de a uno y por lote), rotación de credenciales, calibración, pasarelas, bandeja de detectados
+//   escribir    alta (de a uno y por lote), rotación de credenciales, calibración, «agregar una magnitud», pasarelas, bandeja de detectados
 //   baja        DELETE /dispositivos/{id} y DELETE /pasarelas/{id} (el equipo deja de recibir datos): solo quien administra el sitio
 //   configurar  PATCH /dispositivos/{id} y PUT /canales/{id}/reglas: operador técnico y administradores
 //   usuarios    alta y cambios de usuarios y de sus perfiles (y ver el nombre de quien hizo un cambio: docs/21 §2)

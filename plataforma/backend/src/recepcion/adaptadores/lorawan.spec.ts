@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { ContextoTrama } from '../lectura.js';
 import { TramaMalformada } from './adaptador.js';
 import { ChirpstackAdaptador } from './chirpstack.adaptador.js';
-import { IdentidadNoVerificada } from './lorawan.js';
+import { IdentidadNoVerificada, enlaceDe } from './lorawan.js';
 import { ALIAS_SEMILLA, recetaSiSembrada, resolverSemilla } from './catalogo-semilla.prueba.js';
 import { MilesightAdaptador } from './milesight.adaptador.js';
 import { aplicarReceta } from './receta.js';
@@ -289,5 +289,57 @@ describe('recetas sembradas: cada una cita magnitudes del catálogo y la del cam
     expect(catalogo.get('tension')).toBe('V');
     expect(malas).toEqual([]);
     expect(aplicarReceta(recetaSiSembrada('campus-heltec-v3-v1')!, Buffer.from(CAPTURA_UG65.data, 'base64')).map((l) => l.valor)).toEqual([18.16, 65.52, 3.75]);
+  });
+});
+
+// La señal del enlace como salida LATERAL (docs/10 §8.4 punto 71): `ctx.enlace`, sin tocar las lecturas del adaptador.
+describe('enlaceDe: la señal del mejor receptor de rxInfo', () => {
+  it('el de mayor SNR; en empate, el de mayor RSSI; los dos nombres del SNR (snr y loRaSNR)', () => {
+    expect(enlaceDe([{ rssi: -40, snr: 2 }, { rssi: -100, snr: 7.5 }, { rssi: -90, snr: 7.5 }])).toEqual({ rssi: -90, snr: 7.5 });
+    expect(enlaceDe([{ rssi: -46, loRaSNR: 10.2 }, { rssi: -30, loRaSNR: -3 }])).toEqual({ rssi: -46, snr: 10.2 });
+  });
+  it('vacío, ausente o que no es un arreglo: nada', () => {
+    for (const x of [[], undefined, null, {}, 'rxInfo', 3]) expect(enlaceDe(x)).toBeUndefined();
+  });
+  it('un valor que no es un número finito se omite y un elemento sin números no compite; nunca lanza', () => {
+    expect(enlaceDe([{ rssi: '-40', snr: null }, 7, null, [1], { rssi: -80, snr: 'x' }])).toEqual({ rssi: -80 });
+    expect(enlaceDe([{ gatewayId: 'aaaaaaaaaaaaaaaa' }])).toBeUndefined();
+    expect(enlaceDe([{ snr: -5 }])).toEqual({ snr: -5 });
+  });
+  it('SNR ausente con RSSI presente: 0 dB solo si se pide (ChirpStack v4 omite el 0 al serializar gw.UplinkRxInfo); con otro nombre presente, no', () => {
+    expect(enlaceDe([{ rssi: -80 }], true)).toEqual({ rssi: -80, snr: 0 });
+    expect(enlaceDe([{ rssi: -80 }])).toEqual({ rssi: -80 });
+    expect(enlaceDe([{ rssi: -80, snr: 'roto' }], true)).toEqual({ rssi: -80 }); // presente e inválido no es «ausente»
+    expect(enlaceDe([{ gatewayId: 'aaaaaaaaaaaaaaaa' }], true)).toBeUndefined(); // sin RSSI no hay evidencia de que la pasarela midiera
+    expect(enlaceDe([{ rssi: -80 }, { rssi: -60, snr: -1 }], true)).toEqual({ rssi: -80, snr: 0 }); // el 0 compite como cualquier SNR
+  });
+});
+
+describe('los adaptadores dejan la señal en ctx.enlace y no cambian sus lecturas', () => {
+  it('ChirpStack: el rxInfo del ejemplo oficial → {rssi −36, snr 10,5}; las lecturas siguen siendo las dos del object', () => {
+    const c = ctx(eventoUp());
+    expect(new ChirpstackAdaptador().analizar(c).map((l) => l.magnitud)).toEqual(['temperatura', 'humedad']);
+    expect(c.enlace).toEqual({ rssi: -36, snr: 10.5 });
+  });
+  it('ChirpStack: un receptor sin snr (0 dB omitido por el JSON) → snr 0; sin rxInfo → nada', () => {
+    const c = ctx(eventoUp({ rxInfo: [{ gatewayId: 'aaaaaaaaaaaaaaaa', rssi: -101 }] }));
+    new ChirpstackAdaptador().analizar(c);
+    expect(c.enlace).toEqual({ rssi: -101, snr: 0 });
+    const sin = ctx(eventoUp({ rxInfo: undefined }));
+    new ChirpstackAdaptador().analizar(sin);
+    expect(sin.enlace).toBeUndefined();
+  });
+  it('Milesight sin códec: la captura de la UG65 → {rssi −46, snr 10,2} (loRaSNR); sin loRaSNR, solo el rssi (ausente es ausente)', () => {
+    const c = conPerfil(CAPTURA_UG65);
+    expect(new MilesightAdaptador().analizar(c)).toHaveLength(3);
+    expect(c.enlace).toEqual({ rssi: -46, snr: 10.2 });
+    const solo = conPerfil({ ...CAPTURA_UG65, rxInfo: [{ rssi: -46 }] });
+    new MilesightAdaptador().analizar(solo);
+    expect(solo.enlace).toEqual({ rssi: -46 });
+  });
+  it('Milesight con códec y Metadata: sin captura real que traiga rxInfo, no se lee (ni aunque venga)', () => {
+    const c = ctx(JSON.stringify({ devEUI: DEVEUI, temperature: 20, rxInfo: [{ rssi: -50, loRaSNR: 3 }] }));
+    new MilesightAdaptador().analizar(c);
+    expect(c.enlace).toBeUndefined();
   });
 });

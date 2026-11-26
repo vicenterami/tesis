@@ -444,7 +444,7 @@ for r in "/sitios/$SITIO_B/resumen" "/sitios/$SITIO_B/ahora" "/sitios/$SITIO_B/h
 done
 # «Ahora» (docs/19 §4, L6): con tendencia, la forma; el dispositivo de A está, el de B no; limite fuera de 1–60 → 400 antes del alcance.
 caso "consulta: GET /sitios/{id}/ahora?tendencia=si (su sitio)" 200 con GET "/sitios/$SITIO_A/ahora?tendencia=si&limite=60"
-[ "$(campo "(sorted(v) == ['chispa', 'dispositivos', 'por_magnitud', 'reportan', 'sin_senal', 'tendencia'] and v['tendencia'] is True, v['chispa']['puntos'], all(len(c['chispa']) == 24 for d in v['dispositivos'] for c in d['canales']), '$DB' in [d['id'] for d in v['dispositivos']])")" = "(True, 24, True, False)" ] \
+[ "$(campo "(sorted(v) == ['chispa', 'dispositivos', 'ocultas', 'por_magnitud', 'reportan', 'sin_senal', 'tendencia'] and v['tendencia'] is True, v['chispa']['puntos'], all(len(c['chispa']) == 24 for d in v['dispositivos'] for c in d['canales']), '$DB' in [d['id'] for d in v['dispositivos']])")" = "(True, 24, True, False)" ] \
   && ok "consulta: «Ahora» con tendencia trae la chispa de 24 cubos y ningún dispositivo de otro sitio" || falla "consulta: GET /sitios/{id}/ahora?tendencia=si → $(head -c 300 "$T/r")"
 caso "consulta: GET /sitios/{id}/ahora?limite=61 → 400" 400 con GET "/sitios/$SITIO_A/ahora?limite=61"
 caso "consulta, otro sitio: GET /sitios/{id}/ahora?limite=61 → 400 (la entrada se valida antes que el alcance)" 400 con GET "/sitios/$SITIO_B/ahora?limite=61"

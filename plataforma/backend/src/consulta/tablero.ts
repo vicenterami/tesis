@@ -206,12 +206,17 @@ export function alinear(filas: readonly FilaCubo[], canales: readonly string[]):
 }
 
 // ── «Ahora»: lo que se mide en este momento (docs/19 §4, bloque L, puntos 3 y 6) ──────────────────────────────────────────────────
-// Magnitudes de **salud del equipo** (L3b): batería (nivel y tensión) y señal. Un solo lugar del backend, con los códigos del catálogo
-// `magnitud` (migraciones 01 y 17); en la tarjeta de un dispositivo van al final, después de lo que se mide. Una magnitud nueva de salud
-// se agrega aquí y en docs/19 L3b, juntas.
-export const MAGNITUDES_SALUD = ['bateria', 'tension', 'rssi'] as const;
+// Magnitudes de **salud del equipo** (L3b): batería (nivel y tensión) y señal (intensidad y relación señal/ruido). Un solo lugar del backend,
+// con los códigos del catálogo `magnitud` (migraciones 01, 17 y 29); en la tarjeta de un dispositivo van al final, después de lo que se mide,
+// y EN ESTE ORDEN (desde el 25/11/2026, docs/19 §4 AA: por código, un nodo con temperatura, humedad, tensión, rssi y snr perdía la tensión
+// de su tarjeta). Una magnitud nueva de salud se agrega aquí y en docs/19 L3b, juntas.
+export const MAGNITUDES_SALUD = ['bateria', 'tension', 'rssi', 'snr'] as const;
 export function esSalud(magnitud: string): boolean {
   return (MAGNITUDES_SALUD as readonly string[]).includes(magnitud);
+}
+// Dónde va una magnitud: lo que se mide, todo en el grupo 0 (dentro, por código); la salud, por su posición en MAGNITUDES_SALUD (1, 2, …).
+export function posicionSalud(magnitud: string): number {
+  return (MAGNITUDES_SALUD as readonly string[]).indexOf(magnitud) + 1;
 }
 // Cuántos canales lleva cada tarjeta, y los topes de `limite` (de 1 a 60; 24 por defecto).
 export const MAX_CANALES_AHORA = 3;
@@ -231,9 +236,10 @@ export interface CanalConUltima {
   escala_cero: number | null; escala_cien: number | null; ultima: { valor: number; tiempo: string } | null;
 }
 
-// El orden de los canales en una tarjeta: primero lo que se mide, al final la salud; dentro, por código de magnitud (como la ficha) e id.
+// El orden de los canales en una tarjeta: primero lo que se mide, por código de magnitud (como la ficha); al final la salud, en el orden de
+// MAGNITUDES_SALUD; después, por id.
 export function ordenCanales(a: Pick<CanalConUltima, 'id' | 'magnitud'>, b: Pick<CanalConUltima, 'id' | 'magnitud'>): number {
-  return Number(esSalud(a.magnitud)) - Number(esSalud(b.magnitud)) || a.magnitud.localeCompare(b.magnitud) || a.id.localeCompare(b.id);
+  return posicionSalud(a.magnitud) - posicionSalud(b.magnitud) || a.magnitud.localeCompare(b.magnitud) || a.id.localeCompare(b.id);
 }
 export function elegirCanales<T extends Pick<CanalConUltima, 'id' | 'magnitud'>>(canales: readonly T[]): T[] {
   return [...canales].sort(ordenCanales).slice(0, MAX_CANALES_AHORA);
@@ -417,7 +423,7 @@ export function porMagnitud(filas: readonly FilaMagnitud[]): AgregadoMagnitud[] 
       codigo: f.codigo, nombre: f.nombre, unidad: f.unidad, salud: esSalud(f.codigo), canales: f.canales,
       promedio: redondeo(f.promedio), minimo: f.minimo, maximo: f.maximo,
     }))
-    .sort((a, b) => Number(a.salud) - Number(b.salud) || a.codigo.localeCompare(b.codigo));
+    .sort((a, b) => posicionSalud(a.codigo) - posicionSalud(b.codigo) || a.codigo.localeCompare(b.codigo));
 }
 
 // La ventana de la tendencia: desde el inicio de la hora UTC en curso menos 23 h, 24 cubos (hasta el fin de la hora en curso).

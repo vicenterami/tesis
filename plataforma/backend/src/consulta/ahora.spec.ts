@@ -21,7 +21,7 @@ const canal = (id: string, magnitud: string, valor: number | null, edadS = 30, i
 });
 
 describe('salud del equipo: un solo conjunto, con los códigos del catálogo', () => {
-  it('batería (nivel y tensión) y señal', () => expect([...MAGNITUDES_SALUD]).toEqual(['bateria', 'tension', 'rssi']));
+  it('batería (nivel y tensión) y señal (intensidad y relación señal/ruido), en ese orden', () => expect([...MAGNITUDES_SALUD]).toEqual(['bateria', 'tension', 'rssi', 'snr']));
 });
 
 describe('elegirCanales: hasta tres, primero lo que se mide y al final la salud', () => {
@@ -32,6 +32,14 @@ describe('elegirCanales: hasta tres, primero lo que se mide y al final la salud'
   });
   it('una medida y dos de salud → la medida primero y la salud al final (batería antes que señal, por código)', () => {
     expect(elegirCanales([canal('a', 'rssi', 1), canal('b', 'bateria', 1), canal('c', 'humedad', 1)]).map((k) => k.magnitud)).toEqual(['humedad', 'bateria', 'rssi']);
+  });
+  it('el caso del campus (temperatura, humedad, tensión, rssi, snr): la tensión no se pierde; la salud va en el orden de MAGNITUDES_SALUD, no por código', () => {
+    const r = elegirCanales([canal('a', 'snr', 1), canal('b', 'rssi', 1), canal('c', 'tension', 1), canal('d', 'humedad', 1), canal('e', 'temperatura', 1)]);
+    expect(r.map((k) => k.magnitud)).toEqual(['humedad', 'temperatura', 'tension']);
+    expect(elegirCanales([canal('a', 'snr', 1), canal('b', 'rssi', 1), canal('c', 'bateria', 1), canal('d', 'tension', 1)]).map((k) => k.magnitud))
+      .toEqual(['bateria', 'tension', 'rssi']);
+    expect(porMagnitud([fila('snr', 2, 5), fila('tension', 2, 3.7), fila('rssi', 2, -90), fila('humedad', 2, 50)]).map((x) => x.codigo))
+      .toEqual(['humedad', 'tension', 'rssi', 'snr']);
   });
   it('no cambia la lista de entrada', () => {
     const l = [canal('a', 'rssi', 1), canal('b', 'humedad', 1)];
@@ -77,7 +85,7 @@ describe('tendencia: 24 cubos de una hora alineados a la hora UTC', () => {
 // El servicio contra una base falsa: cuenta las sentencias (las del pool y las de la conexión propia de la tendencia) y arma la respuesta
 // con lo que la base devolvería. `n` dispositivos reportan; la base devuelve los de la página (el LIMIT) y, de canales, los de los ids que
 // se le pasan. `tendencia`: 'ok', 'tarda' (un tiempo vencido: error 57014), 'falla' (otro error), o una promesa que la retiene.
-interface OpcionesBase { existe?: boolean; sinCanales?: boolean; tendencia?: 'ok' | 'tarda' | 'falla' | Promise<void> }
+interface OpcionesBase { existe?: boolean; sinCanales?: boolean; tendencia?: 'ok' | 'tarda' | 'falla' | Promise<void>; ocultas?: string[] }
 function base(n: number, opciones: OpcionesBase = {}) {
   const ids = Array.from({ length: n }, (_, i) => `d${i}`);
   const consultas: string[] = [];
@@ -87,7 +95,7 @@ function base(n: number, opciones: OpcionesBase = {}) {
   const responder = (sql: string, p: unknown[]) => {
     if (sql.includes('WITH dev AS')) {
       return { rows: [{
-        existe: opciones.existe ?? true, ahora: AHORA, reportan: n, sin_senal: 2,
+        existe: opciones.existe ?? true, ahora: AHORA, reportan: n, sin_senal: 2, ocultas: opciones.ocultas ?? [],
         por_magnitud: [fila('bateria', n, 90), fila('temperatura', n, 20), fila('humedad', n, 50)],
         pagina: ids.slice(0, p[1] as number).map((id, i) => ({
           id, nombre: `nodo ${i}`, zona: 'Invernadero', estado_visual: i === 0 ? 'alerta' : 'normal', visto_por_ultima_vez: hace(30), intervalo_esperado_s: 60,
@@ -130,6 +138,37 @@ function base(n: number, opciones: OpcionesBase = {}) {
   const connect = vi.fn(() => Promise.resolve(cliente));
   return { servicio: new TableroService({ query, connect } as unknown as Pool), consultas, parametros, enCliente, connect, liberadas };
 }
+
+// «Elegir qué ver» (docs/10 §8.4 punto 72 ii): la preferencia de la persona se lee en la consulta (1) y se aplica ANTES del corte de tres.
+describe('TableroService.ahora: las magnitudes ocultas de la persona', () => {
+  it('con persona: la consulta (1) lee su preferencia (un parámetro más, ninguna consulta más) y la aplica al agregado; sin persona, ni parámetro ni lectura', async () => {
+    const con = base(2);
+    await con.servicio.ahora('s1', 24, true, 'u1');
+    expect(con.consultas).toHaveLength(3);
+    expect(con.parametros[0]).toEqual(['s1', 24, 'u1']);
+    const sql = (con.consultas[0] ?? '').replace(/\s+/g, ' ');
+    expect(sql).toContain("JOIN canal c ON c.dispositivo_id = dev.id AND c.magnitud_codigo <> ALL (coalesce((SELECT p.magnitudes_ocultas FROM preferencia p WHERE p.usuario_id = $3::uuid), '{}'::text[]))");
+    const sin = base(2);
+    await sin.servicio.ahora('s1', 24, false);
+    expect(sin.parametros[0]).toEqual(['s1', 24]);
+    expect(sin.consultas[0]).not.toContain('preferencia');
+  });
+  it('se aplican ANTES de elegir los tres: ocultando temperatura y humedad, la señal entra a la tarjeta y el total cuenta solo lo visible', async () => {
+    const { servicio } = base(1, { ocultas: ['temperatura', 'humedad'] });
+    const r = await servicio.ahora('s1', 24, false, 'u1');
+    expect(r.ocultas).toEqual(['temperatura', 'humedad']);
+    expect(r.dispositivos[0]?.canales.map((k) => k.magnitud)).toEqual(['humedad_suelo', 'bateria', 'rssi']);
+    expect(r.dispositivos[0]?.canales_total).toBe(3);
+    expect(r.dispositivos[0]?.canales_ocultos).toBe(2);
+  });
+  // Revisión del 25/11/2026: ocultarlo todo no deja una tarjeta muda ni esconde una alerta. La tarjeta sigue (con su estado «Alerta» y en su
+  // orden) y dice cuántas magnitudes oculta la preferencia, para que el panel lo explique; las condiciones abiertas no dependen de esto.
+  it('ocultando todas las magnitudes de un equipo en alerta, la tarjeta sigue, en alerta y primera, sin canales y con canales_ocultos', async () => {
+    const { servicio } = base(2, { ocultas: ['temperatura', 'humedad', 'bateria', 'humedad_suelo', 'rssi'] });
+    const r = await servicio.ahora('s1', 24, false, 'u1');
+    expect(r.dispositivos.map((d) => [d.estado_visual, d.canales.length, d.canales_total, d.canales_ocultos])).toEqual([['alerta', 0, 0, 5], ['normal', 0, 0, 5]]);
+  });
+});
 
 describe('TableroService.ahora: como mucho tres consultas, sin consultas por fila', () => {
   it('sin tendencia, dos; con tendencia, tres; con 1 o con 60 dispositivos, las mismas', async () => {
@@ -175,11 +214,12 @@ describe('TableroService.ahora: como mucho tres consultas, sin consultas por fil
   it('la forma: exactamente los campos del contrato; tres canales con su total; el % con la calibración; sin tendencia, tendencia: false y ninguna chispa', async () => {
     const { servicio } = base(2);
     const r = await servicio.ahora('s1', 24, false);
-    expect(Object.keys(r).sort()).toEqual(['dispositivos', 'por_magnitud', 'reportan', 'sin_senal', 'tendencia']);
+    expect(Object.keys(r).sort()).toEqual(['dispositivos', 'ocultas', 'por_magnitud', 'reportan', 'sin_senal', 'tendencia']); // ocultas: desde el 25/11/2026
+    expect(r.ocultas).toEqual([]);
     expect(r.tendencia).toBe(false);
     expect(r.dispositivos.map((d) => d.id)).toEqual(['d0', 'd1']); // el orden de la base se respeta
     const d = r.dispositivos[0];
-    expect(Object.keys(d ?? {}).sort()).toEqual(['canales', 'canales_total', 'estado_visual', 'id', 'intervalo_esperado_s', 'nombre', 'visto_por_ultima_vez', 'zona']);
+    expect(Object.keys(d ?? {}).sort()).toEqual(['canales', 'canales_ocultos', 'canales_total', 'estado_visual', 'id', 'intervalo_esperado_s', 'nombre', 'visto_por_ultima_vez', 'zona']);
     expect(d?.canales_total).toBe(5);
     expect(d?.canales.map((k) => k.magnitud)).toEqual(['humedad', 'humedad_suelo', 'temperatura']);
     expect(Object.keys(d?.canales[0] ?? {}).sort()).toEqual(['id', 'magnitud', 'magnitud_nombre', 'salud', 'ultima', 'unidad']);
@@ -271,7 +311,7 @@ describe('SitiosController.ahora: entrada validada antes de tocar la base', () =
     const { c, ahora, exigirSitio } = armar();
     await c.ahora(usuarioSistema(), S);
     await c.ahora(usuarioSistema(), S, '60');
-    expect(ahora.mock.calls).toEqual([[S, 24, false], [S, 60, false]]);
+    expect(ahora.mock.calls).toEqual([[S, 24, false, null], [S, 60, false, null]]); // sin persona (clave de administrador): nada oculto
     expect(exigirSitio).toHaveBeenCalledWith(expect.anything(), 'leer', S);
   });
   it('tendencia: solo «si» la pide; ausente o cualquier otro valor, no', async () => {

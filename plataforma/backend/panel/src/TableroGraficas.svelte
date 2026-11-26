@@ -1,7 +1,8 @@
 <script lang="ts">
   // Pestañas Tendencias y Red del tablero (docs/19 §4, bloque L, puntos 2 y 4). Tendencias: una gráfica por magnitud que el sitio mide
   // (hasta seis; las demás, en una línea; las que no tienen datos en el rango, nombradas en una línea y sin lienzo, L4f). Red: las tramas
-  // por cubo (barras apiladas, eje de enteros) y la entrega por dispositivo. Las dos llevan la fila del rango (B1) y se piden al abrir la
+  // por cubo (barras apiladas, eje de enteros), la entrega por dispositivo y, desde el 25/11/2026, la calidad del enlace (docs/19 §4 AA: la
+  // última señal de cada equipo con canal rssi o snr y dos gráficas del sitio, con el histórico que ya existe). Las dos llevan la fila del rango (B1) y se piden al abrir la
   // pestaña, no al entrar al tablero; las magnitudes, de la más extendida (más dispositivos) a la menos (decidido al implementar). Vivas
   // donde sirve (L4a): con «última hora» o «24 horas», se repiden solas mientras llegan avisos de
   // dispositivos del sitio, como mucho una vez cada sexta parte del cubo (entre 5 y 60 s), sin dos pedidos en vuelo, solo con la pestaña
@@ -22,9 +23,11 @@
   import { RANGO_POR_DEFECTO, intervaloParaVentana, resumenRango, rotuloCada, type ClaveRango } from './lib/grafico';
   import type { EventoVivo, HistoricoSitio, ResumenSitio, Sitio } from './lib/modelo';
   import { esRangoVivo, limitador, periodoRefrescoMs, ventanaAlineada } from './lib/refresco';
+  import { MAGNITUDES_ENLACE, lineaSenal, ordenTendencias } from './lib/senal';
+  import { preferenciasActuales, suscribirPreferencias } from './lib/escritor-preferencias';
   import { coloresSeries, temaVivo } from './lib/tema';
   import type { PreferenciaUnidades } from './lib/unidades';
-  import { MAX_COMPARAR, SIN_FILTROS, fragmentoComparar, fragmentoInventario, fragmentoTablero, type VentanaFija } from './lib/vista';
+  import { MAX_COMPARAR, SIN_FILTROS, fragmentoComparar, fragmentoFicha, fragmentoInventario, fragmentoTablero, type VentanaFija } from './lib/vista';
   import { RECONECTADO, abrirCanalCompartido } from './lib/vivo';
 
   let {
@@ -43,6 +46,7 @@
   let fijaElegida = $state<VentanaFija | null>(untrack(() => fija));
   let resumen = $state<ResumenSitio | null>(null);
   let historicos = $state<HistoricoSitio[]>([]);
+  let historicosEnlace = $state<HistoricoSitio[]>([]); // Red: rssi y snr del sitio (docs/19 §4 AA, punto 4)
   let mostrada = $state<{ desde: Date; hasta: Date; intervalo: string; cargadaEn: number } | null>(null);
   let cargando = $state(false);
   let error = $state<string | null>(null);
@@ -69,8 +73,14 @@
     };
   });
   // Las magnitudes dibujadas (hasta seis, las que tienen datos en el rango), las que quedan en la lista y las que no tienen datos.
-  // Las que más dispositivos miden, primero (con más de seis, las seis más extendidas se dibujan; las demás van a la lista).
-  const magnitudes = $derived([...(resumen?.magnitudes ?? [])].sort((a, b) => b.canales - a.canales || a.nombre.localeCompare(b.nombre, 'es')));
+  // Las que más dispositivos miden, primero (con más de seis, las seis más extendidas se dibujan; las demás van a la lista); desde el
+  // 25/11/2026, la salud del equipo (batería, señal) al final antes del corte (docs/19 §4 AA, punto 5).
+  // «Elegir qué ver» (docs/19 §4 AA, punto 7): las ocultas de la persona no se dibujan ni se piden; «Red» no las aplica.
+  let ocultas = $state<string[]>(preferenciasActuales()?.magnitudes_ocultas ?? []);
+  const visiblesEnTendencias = <T extends { codigo: string }>(ms: readonly T[]): T[] => ms.filter((m) => !ocultas.includes(m.codigo));
+  const magnitudes = $derived(ordenTendencias(visiblesEnTendencias(resumen?.magnitudes ?? [])));
+  const nOcultas = $derived((resumen?.magnitudes ?? []).length - magnitudes.length);
+  const enlaces = $derived(resumen?.enlace ?? []);
   const conDatos = $derived(historicos.filter((h) => resumenRango(h.valores) !== null));
   const sinDatos = $derived(historicos.filter((h) => resumenRango(h.valores) === null).map((h) => magnitudes.find((m) => m.codigo === h.magnitud)?.nombre ?? h.magnitud));
   const enLista = $derived(magnitudes.slice(MAX_GRAFICAS).map((m) => m.nombre));
@@ -100,13 +110,18 @@
     if (!automatico) refresco.marcar();
     try {
       const r = await obtener<ResumenSitio>(`/sitios/${id}/resumen?${q(v, { intervalo: v.intervalo })}`, ctl.signal);
-      const hs = ver === 'tendencias'
-        ? await Promise.all([...r.magnitudes].sort((a, b) => b.canales - a.canales || a.nombre.localeCompare(b.nombre, 'es')).slice(0, MAX_GRAFICAS).map((m) => obtener<HistoricoSitio>(`/sitios/${id}/historico?${q(v, { magnitud: m.codigo, intervalo: v.intervalo })}`, ctl.signal)))
+      const historico = (codigo: string) => obtener<HistoricoSitio>(`/sitios/${id}/historico?${q(v, { magnitud: codigo, intervalo: v.intervalo })}`, ctl.signal);
+      const hs = ver === 'tendencias' ? await Promise.all(ordenTendencias(visiblesEnTendencias(r.magnitudes)).slice(0, MAX_GRAFICAS).map((m) => historico(m.codigo))) : [];
+      // Red: las dos gráficas de la señal, solo si algún equipo tiene canal de señal y de las magnitudes del enlace que el sitio mide (sin
+      // canales, ninguna petición).
+      const he = ver === 'red' && (r.enlace ?? []).length > 0
+        ? await Promise.all(MAGNITUDES_ENLACE.filter((e) => r.magnitudes.some((m) => m.codigo === e.codigo)).map((e) => historico(e.codigo)))
         : [];
       if (ctl.signal.aborted) return;
       if (automatico && pausado) return; // se pausó con el refresco en vuelo: no llega a dibujarse (L4a)
       resumen = r;
       historicos = hs;
+      historicosEnlace = he;
       mostrada = { ...v, cargadaEn: Date.now() };
       error = null;
       if (!automatico) untrack(() => alCambiarVista(fragmentoTablero(sitio.codigo, ver, pedido.rango, pedido.fija)));
@@ -174,6 +189,12 @@
   }
 
   onMount(() => {
+    const dejar = suscribirPreferencias((p) => {
+      const nuevas = p.magnitudes_ocultas ?? [];
+      if (nuevas.join() === ocultas.join()) return;
+      ocultas = nuevas;
+      if (ver === 'tendencias' && mostrada !== null) void cargar(true);
+    });
     void cargar();
     const reloj = setInterval(() => (ahora = Date.now()), 1000);
     const c = abrirCanalCompartido('/eventos', alEvento, (estado, motivo) => {
@@ -184,6 +205,7 @@
       control?.abort();
       refresco.cancelar();
       c.cerrar();
+      dejar();
     };
   });
   const haceSegundosCarga = $derived(mostrada === null ? 0 : Math.max(0, Math.round((ahora - mostrada.cargadaEn) / 1000)));
@@ -214,9 +236,9 @@
 {#if resumen === null || mostrada === null || ventanaGrafico === null}
   {#if error === null}<div class="hueco hueco-graficas" aria-busy="true" aria-label="Cargando las gráficas" data-cargando-graficas></div>{/if}
 {:else if ver === 'tendencias'}
-  {#if magnitudes.length === 0}
+  {#if resumen.magnitudes.length === 0}
     <p class="vacio" data-sin-magnitudes>El sitio no mide ninguna magnitud todavía: aparecerán aquí al llegar la primera medición.</p>
-  {:else if conDatos.length === 0}
+  {:else if conDatos.length === 0 && magnitudes.length > 0}
     <p class="vacio" data-sin-datos-rango>Sin mediciones en este rango. <Boton etiqueta="Ver los últimos 30 días" onclick={() => elegirRango('30d')} data-ultimos-30 /></p>
   {/if}
   <div class="paneles graficas">
@@ -237,6 +259,9 @@
   </div>
   {#if sinDatos.length > 0 && conDatos.length > 0}
     <p class="vivo" data-magnitudes-vacias>Sin datos en este rango: {sinDatos.join(', ')}.</p>
+  {/if}
+  {#if nOcultas > 0}
+    <p class="vivo" data-tendencias-ocultas>{nOcultas === 1 ? '1 magnitud oculta' : `${nOcultas} magnitudes ocultas`} por tu elección («Elegir qué ver», en el Resumen).</p>
   {/if}
   {#if enLista.length > 0}
     <p class="vivo" data-magnitudes-lista>También mide: {enLista.join(', ')} (se ven en la ficha de cada dispositivo).</p>
@@ -264,6 +289,28 @@
       <BarrasOrdenadas titulo="Entrega por dispositivo" orden="asc" maximo={100}
         barras={entregas.map((x) => ({ id: x.id, etiqueta: x.nombre, valor: Math.min(100, x.porcentaje!), texto: `${Math.round(x.porcentaje!)} % (${x.recibidas.toLocaleString('es-CL')} de ${x.esperadas.toLocaleString('es-CL')})` }))} />
       <p class="ver-todos"><a href={fragmentoInventario({ ...SIN_FILTROS, sitio: sitio.codigo, orden: 'entrega' })} data-entrega-todos>Ver todos por entrega</a></p>
+    {/if}
+  </section>
+  <section class="panel-seccion" aria-labelledby="titulo-enlace" data-calidad-enlace>
+    <h3 id="titulo-enlace">Calidad del enlace</h3>
+    {#if enlaces.length === 0}
+      <p class="vivo" data-enlace-vacio>Ningún equipo del sitio guarda la señal. Para guardarla, agrega «rssi» o «snr» en Configurar del equipo (o márcalas en el alta de un nodo LoRaWAN).</p>
+    {:else}
+      <p class="vivo">La última señal que recibió cada equipo, de peor a mejor{(resumen.total_enlace ?? enlaces.length) > enlaces.length ? ` (los ${enlaces.length} peores de ${resumen.total_enlace})` : ''}.</p>
+      <ul class="lista-enlace" data-enlace-lista>
+        {#each enlaces as e (e.id)}
+          <li data-enlace-equipo={e.id}><a href={fragmentoFicha(e.id, null, '24h')}>{e.nombre}</a>: <span data-enlace-linea>{lineaSenal(e, new Date(ahora))}</span></li>
+        {/each}
+      </ul>
+      <div class="paneles graficas">
+        {#each historicosEnlace.filter((h) => resumenRango(h.valores) !== null) as h (h.magnitud)}
+          {@const nombre = h.magnitud === 'rssi' ? 'Intensidad de la señal' : 'Relación señal/ruido'}
+          <section class="panel-seccion" aria-labelledby="titulo-enlace-{h.magnitud}" data-enlace-grafica={h.magnitud}>
+            <h4 id="titulo-enlace-{h.magnitud}">{nombre}</h4>
+            <GraficoSitio historico={h} {nombre} {zona} ventana={ventanaGrafico} {sincronizar} {unidades} />
+          </section>
+        {/each}
+      </div>
     {/if}
   </section>
 {/if}

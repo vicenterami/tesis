@@ -120,6 +120,33 @@ describe('P7: asistente', () => {
     expect(f.readyState).toBe(2); // ya llegó: el canal se cierra
   });
 
+  it('vía LoRaWAN (docs/19 §4 AA, punto 2): «Calidad del enlace» propone rssi y snr marcados; lo desmarcado no viaja y no cuenta como canal; con otra vía no aparece', async () => {
+    const PAS = { id: '00000000-0000-4000-8000-0000000000f1', id_fisico: 'pasarela-de-prueba', nombre: 'Pasarela', sitio_codigo: 'uct', activo: true };
+    responder = (metodo, ruta) => (ruta === '/pasarelas' ? json([PAS])
+      : metodo === 'POST' && ruta === '/dispositivos' ? json({ id: NUEVO, id_fisico: 'aaaaaaaaaaaaaaaa', nombre: 'Nodo', conexion: { via: 'lorawan' } }, 201) : json([]));
+    render(Alta, { sesion: SESION, sitios: SITIOS });
+    await escribir('[data-campo="id_fisico"]', 'aaaaaaaaaaaaaaaa');
+    await escribir('[data-campo="nombre"]', 'Nodo');
+    await fireEvent.click(boton('Siguiente'));
+    await fireEvent.click(boton('Siguiente'));
+    expect(document.querySelector('[data-alta-enlace]')).toBeNull(); // vía MQTT: no aparece
+    await fireEvent.click(boton('Anterior'));
+    await fireEvent.change(document.querySelector('[data-campo="via"]')!, { target: { value: 'lorawan' } });
+    await waitFor(() => expect(document.querySelector('[data-campo="pasarela"] option[value="' + PAS.id + '"]')).not.toBeNull());
+    await fireEvent.change(document.querySelector('[data-campo="pasarela"]')!, { target: { value: PAS.id } });
+    await fireEvent.click(boton('Siguiente'));
+    const casilla = (m: string) => document.querySelector(`[data-alta-enlace-magnitud="${m}"]`) as HTMLInputElement;
+    expect([casilla('rssi').checked, casilla('snr').checked]).toEqual([true, true]);
+    expect(boton('Crear el dispositivo').closest('.boton-envoltura')!.textContent).toContain('al menos un canal'); // la señal sola no basta
+    await fireEvent.click(casilla('rssi'));
+    await escribir('[data-campo="canal"]', 'temperatura');
+    await fireEvent.click(boton('Crear el dispositivo'));
+    await waitFor(() => expect(pedidos.some((x) => x.metodo === 'POST')).toBe(true));
+    const cuerpo = pedidos.find((x) => x.metodo === 'POST')!.cuerpo as Record<string, unknown>;
+    expect(cuerpo.via).toBe('lorawan');
+    expect(cuerpo.pasarela_id).toBe(PAS.id);
+    expect(cuerpo.canales).toEqual([{ magnitud: 'temperatura' }, { magnitud: 'snr' }]);
+  });
   it('un identificador que ya existe (409) no crea un duplicado: lo dice y remite al inventario; un detectado llega con su identificador escrito', async () => {
     responder = (metodo) => (metodo === 'POST' ? json({ statusCode: 409, message: 'id_fisico «nodo-9» ya existe' }, 409) : json([]));
     render(Alta, { sesion: SESION, sitios: SITIOS, idFisico: 'nodo-9', sitio: 'uct' });

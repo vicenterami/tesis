@@ -5,11 +5,13 @@
   //  - bloqueo optimista: cada guardado lleva el `actualizado_en` leído; un 409 dice «alguien lo cambió a las HH:MM: recarga» con el
   //    botón «Recargar» y no pisa nada (lo escrito queda en el formulario hasta recargar);
   //  - nunca optimista en pantalla: lo guardado se muestra cuando el servidor responde, con el botón en «Guardando…»;
+  //  - «Agregar una magnitud» (docs/19 §4 AA, punto 3): un canal más del catálogo, sin tocar lo que se edita en los demás canales;
   //  - los umbrales se escriben en la unidad en que se guardan (la del catálogo, escrita al lado): convertirlos a la preferencia de la
   //    persona sumaría un redondeo a cada guardado (decidido al implementar, 11/11/2026).
   import { onMount } from 'svelte';
   import Aviso from './Aviso.svelte';
   import Boton from './Boton.svelte';
+  import TramaSinGuardar from './TramaSinGuardar.svelte';
   import { ErrorApi, esCancelacion, obtener, pedir, ultimaGana } from './lib/api';
   import { avisoDeError, type DatosAviso } from './lib/avisos';
   import {
@@ -133,6 +135,43 @@
     const r = reglaSugerida(m);
     if (r !== null) canales[cid]!.reglas = [...canales[cid]!.reglas, r];
   };
+  // «Agregar una magnitud» (docs/19 §4 AA, punto 3; acción `escribir`): las del catálogo que el equipo aún no tiene. Lo guardado llega del
+  // servidor; la ficha se relee y solo se suman los canales nuevos al formulario (lo que se edita en los demás no se pierde).
+  let nuevaMagnitud = $state('');
+  let agregando = $state(false);
+  let avisoMagnitud = $state<DatosAviso | null>(null);
+  const disponibles = $derived(d === null ? [] : catalogo.filter((m) => !d!.canales.some((c) => c.magnitud === m.codigo)));
+  const motivoEscribir = $derived(d === null || puedeEn(sesion, 'escribir', d.sitio_codigo) ? null : 'agregar una magnitud exige el perfil de operador técnico o de administrador en este sitio');
+  const motivoAgregar = $derived(motivoEscribir ?? (d?.estado === 'baja' ? 'está dado de baja' : nuevaMagnitud === '' ? 'elige la magnitud' : null));
+  // Relee la ficha y suma solo los canales nuevos al formulario (también tras «Agregar» desde «Lo que la trama trae y no se guarda»).
+  async function sumarCanalesNuevos(): Promise<void> {
+    const x = await obtener<DispositivoFicha>(`/dispositivos/${encodeURIComponent(id)}`, carga.senal());
+    if (d === null) return;
+    for (const c of x.canales) if (canales[c.id] === undefined) canales[c.id] = { etiqueta: c.etiqueta ?? '', reglas: reglasDe(c), servidor: [], guardando: false, aviso: null };
+    d = { ...d, canales: x.canales.map((c) => d!.canales.find((k) => k.id === c.id) ?? c) };
+  }
+  const administraCatalogo = $derived(sesion !== null && (sesion.sistema || sesion.administrador_sistema === true));
+  async function agregarMagnitud(ev: SubmitEvent): Promise<void> {
+    ev.preventDefault();
+    if (d === null || agregando || motivoAgregar !== null) return;
+    agregando = true;
+    avisoMagnitud = null;
+    const magnitud = nuevaMagnitud;
+    try {
+      const r = await pedir<{ agregada: boolean }>('POST', `/dispositivos/${encodeURIComponent(id)}/canales`, { cuerpo: { magnitud } });
+      await sumarCanalesNuevos();
+      const nombre = catalogo.find((m) => m.codigo === magnitud)?.nombre ?? magnitud;
+      avisoMagnitud = r.agregada
+        ? { tipo: 'exito', texto: `${nombre}: agregada. Se guarda desde la próxima trama; lo que llegó antes no se rellena.` }
+        : { tipo: 'info', texto: `${nombre}: el equipo ya la tenía.` };
+      nuevaMagnitud = '';
+    } catch (e) {
+      if (!esCancelacion(e)) avisoMagnitud = avisoDeError(e);
+    } finally {
+      agregando = false;
+    }
+  }
+
   const recargar = (): void => {
     aviso = null;
     void cargar();
@@ -187,6 +226,29 @@
           motivoDesactivado={guardando ? null : motivoGuardar} data-guardar-dispositivo />
       </form>
     </section>
+
+    <section class="panel-seccion" aria-labelledby="{uid}-titulo-magnitudes" data-magnitudes-equipo>
+      <h3 id="{uid}-titulo-magnitudes">Magnitudes que guarda</h3>
+      <p class="vivo" data-magnitudes-actuales>{dd.canales.map((c) => c.magnitud_nombre).join(', ')}.</p>
+      {#if avisoMagnitud !== null}<Aviso tipo={avisoMagnitud.tipo} texto={avisoMagnitud.texto} alCerrar={() => (avisoMagnitud = null)} />{/if}
+      {#if disponibles.length > 0}
+        <form class="formulario-configurar" onsubmit={agregarMagnitud} novalidate data-form-magnitud>
+          <div class="campo">
+            <label for="{uid}-nueva-magnitud">Magnitud del catálogo</label>
+            <select id="{uid}-nueva-magnitud" bind:value={nuevaMagnitud} aria-describedby="{uid}-nueva-magnitud-ayuda" data-campo="nueva-magnitud">
+              <option value="">Elige una…</option>
+              {#each disponibles as m (m.codigo)}<option value={m.codigo}>{m.nombre} ({m.codigo}, {simbolo(m.unidad)})</option>{/each}
+            </select>
+            <span class="ayuda-campo" id="{uid}-nueva-magnitud-ayuda">En un nodo LoRaWAN, «rssi» y «snr» guardan la señal de cada trama. Lo que llegó antes no se rellena.</span>
+          </div>
+          <Boton tipo="submit" etiqueta="Agregar una magnitud" etiquetaCargando="Agregando…" cargando={agregando}
+            motivoDesactivado={agregando ? null : motivoAgregar} data-agregar-magnitud />
+        </form>
+      {:else if catalogo.length > 0}
+        <p class="vivo" data-sin-disponibles>Ya guarda todas las magnitudes del catálogo.</p>
+      {/if}
+    </section>
+    <TramaSinGuardar dispositivoId={dd.id} sitioCodigo={dd.sitio_codigo} {sesion} {administraCatalogo} alAgregar={() => void sumarCanalesNuevos().catch(() => undefined)} />
 
     {#each dd.canales as c (c.id)}
       {@const k = canales[c.id]}

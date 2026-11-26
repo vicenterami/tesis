@@ -4,7 +4,7 @@ Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emu
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
 cubría al escribirse se agregó después: TT-32 (sensor físico) en §43, §44 y §53, y TT-30 (recuperación ante reinicio) en §11. El
-contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 1010 pruebas unitarias del backend y 684 del panel.
+contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 1051 pruebas unitarias del backend y 702 del panel.
 Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -817,7 +817,7 @@ la ACL del rol y la recepción por el filtro 1.
 **Cómo** (`bash plataforma/pruebas/banco/banco.sh lorawan`). Contra el banco desechable, con el broker, el plugin de seguridad y la base
 reales: se da de alta por API una pasarela ChirpStack, un nodo y una pasarela Milesight, y se publica con la credencial de cada pasarela el
 JSON de su fuente oficial (evento `up` de ChirpStack v4; uplink con códec y Metadata de Milesight). Los secretos viajan por la entrada
-estándar. Resultado: **25 de 25 comprobaciones, «LORAWAN OK»**; 26 de 26 desde la corrección de §32, 27 de 27 desde la de §33, 35 de 35 desde la de §34, 36 de 36 desde la de §35, 43 de 43 desde la de §36, 44 de 44 desde la de §38 y 46 de 46 desde la de §46.
+estándar. Resultado: **25 de 25 comprobaciones, «LORAWAN OK»**; 26 de 26 desde la corrección de §32, 27 de 27 desde la de §33, 35 de 35 desde la de §34, 36 de 36 desde la de §35, 43 de 43 desde la de §36, 44 de 44 desde la de §38, 46 de 46 desde la de §46 y 47 de 47 desde la de §106 (la señal del enlace).
 
 | Comprobación | Resultado |
 |---|---|
@@ -6004,3 +6004,66 @@ evento entregado por la prueba al canal en vivo, no un mensaje real por el broke
 probó con el puerto simulado que se cierra al reiniciar (vitest).
 
 Hoy son 1010 pruebas unitarias del backend y 684 del panel.
+
+## 106. La calidad del enlace LoRaWAN, «Agregar una magnitud» y «Elegir qué ver», sin radio real (docs/19 §4, AA; 25/11/2026)
+
+**Qué se prueba.** Que un nodo LoRaWAN que declara los canales `rssi` y `snr` guarde la señal de cada trama (la del mejor receptor de
+`rxInfo`; migración 29, magnitud `snr`) y que uno que no los declara se reciba exactamente como antes; que «Agregar una magnitud»
+(`POST /dispositivos/{id}/canales`) respete permisos, sitio y catálogo y no duplique; que «Lo que la trama trae y no se guarda»
+(`GET /dispositivos/{id}/sin-guardar`) relea solo las tramas retenidas del propio equipo, con topes; y que «Elegir qué ver» (migración 30,
+`preferencia.magnitudes_ocultas`) se aplique en el servidor antes del corte de tres canales sin esconder una alerta. Diseño en
+`docs/19 §4` (AA) y `docs/10 §8.4` puntos 71 y 72.
+
+**Método y resultado.**
+
+| Nivel | Con qué | Resultado |
+|---|---|---|
+| Unitarias del backend | vitest: `lorawan.spec.ts` (`enlaceDe`), `recepcion.service.spec.ts` (el pipeline con y sin los canales, el tope, el fCnt 0 de ChirpStack), `sin-guardar.spec.ts`, `agregar-canal.spec.ts`, `ahora.spec.ts`, `preferencias.spec.ts` | 1145 de 1145 ejecuciones en 82 archivos |
+| Unitarias del panel | vitest: `lib/senal.test.ts`, `Alta.test.ts` (las casillas de la señal junto a la ficha y «Cargar en el equipo»), `Configurar.test.ts`, `Tablero.test.ts`, `Preferencias.test.ts` | 824 de 824 ejecuciones en 50 archivos |
+| Integración en una base desechable | `plataforma/pruebas/enlace-integracion.sh` (todas las migraciones, sin red): la ruta, el resumen, la preferencia aplicada por la base, la 29 y la 30 dos veces y la semilla dos veces | 30 de 30 comprobaciones y 9 de las migraciones y la semilla |
+| Banco: LoRaWAN | `banco.sh lorawan` | 47 de 47; la nueva: un nodo con `rssi` y `snr` guarda −46 dBm y 10,2 dB junto a sus 3 lecturas, sin cuarentena; las demás, con sus mismos conteos |
+| Banco: las cinco entradas | `banco.sh vias` | 28 de 28: las mismas 180 lecturas por cada entrada, sin pérdidas |
+| Navegadores reales | `plataforma/pruebas/panel-enlace-e2e.sh` (`e2e/enlace.mjs`; paso 4c), Chromium 158 y Firefox 159, a 390 y 1 280 px | 72 de 72 comprobaciones |
+| Semilla de demostración | `semilla-demo.sh --completa` sobre la base desechable del banco, sin personas | 33 comprobaciones, con la señal de sus dos nodos LoRaWAN |
+
+**Latencia con la señal declarada.** La misma serie de `vias.sh` por la pasarela Milesight (60 tramas de 10 bytes con `rxInfo`), una vez
+con el nodo sin canales de señal y otra con `rssi` y `snr` declarados (5 lecturas por trama en vez de 3), medida como recepción menos marca
+de la trama sobre las lecturas del sensor: p50 3 ms, p95 4 ms y máximo 5 ms sin la señal; p50 3 ms, p95 4 ms y máximo 4 ms con ella. La
+segunda corrida dejó, como se esperaba, 120 filas más (60 de cada canal de señal); no es un cambio del guion versionado.
+
+**El recorrido en navegadores.** Un operador técnico de descarte por navegador y ancho, en un sitio de descarte con un nodo propio por caso
+(temperatura y `rssi`, doce lecturas de la última hora y una trama cruda con `co2` y la señal en `rxInfo`): oculta la temperatura con
+«Elegir qué ver» y deja de verla en «Ahora», la vuelve a mostrar; en «Red → Calidad del enlace», la línea del nodo y la gráfica de la
+intensidad; en Configurar, «Revisar las tramas» nombra `co2` «sin magnitud en el catálogo» y ofrece `snr` con «Agregar»; en Preferencias,
+«Magnitudes que ves». En cada pantalla, sin desplazamiento horizontal, con objetivos táctiles de al menos 24 × 24 px y sin errores de
+JavaScript. Al salir borra lo de la corrida como dueño de la base: **0** filas, y el conteo de todas las tablas de la base de desarrollo
+antes y después solo difiere en `metrica_broker`, que el backend escribe solo. En su primera corrida fallaron 15 de 63: el recorrido
+compartía un nodo entre los cuatro casos (tras «Agregar snr» del primero, los demás no lo encontraban), miraba «Ahora» antes de su nueva
+respuesta y esperaba una relación señal/ruido que el nodo no guarda; y una casilla de Preferencias medía 18 × 24 px a 390 px (corregida
+en `app.css`: la casilla ya no se encoge con un nombre largo).
+
+**Correcciones de la revisión propia** (cada una con su prueba, que falla sin ella):
+
+- **La señal ya no hace rechazar una trama que sin ella entraba.** Las lecturas del enlace contaban contra el tope por emisor antes de
+  decidir: con 598 de 600 aceptadas en la hora, una trama de 1 lectura del sensor entraba sin la señal y, con ella, se rechazaba entera.
+  Ahora, si las del sensor caben y con la señal no, la señal se omite sin cuarentena y lo dice la línea de registro (`docs/10 §8.4`
+  punto 53 vii).
+- **Una pestaña con el panel anterior ya no recibe 400 al guardar preferencias.** `magnitudes_ocultas` era obligatorio en
+  `PUT /preferencias`: tras el despliegue, cada «Guardar» de una pestaña sin recargar fallaba. Ausente, ahora se conserva la lista guardada
+  (`docs/10 §8.4` punto 72 ii); lo prueban la unitaria, la integración y `sesion-smoke.sh`, que guarda con la forma anterior.
+- **Una tarjeta con todo oculto ya no queda muda.** `GET /sitios/{id}/ahora` trae `canales_ocultos` por equipo y la tarjeta dice
+  «Todas sus magnitudes están ocultas por «Elegir qué ver»: se ven en su ficha» (o cuántas); el estado «Alerta» y su orden no cambian, y
+  las condiciones abiertas no dependen de la preferencia.
+- **La relectura de tramas lee cada carga una vez.** Con 20 tramas de miles de claves desconocidas, el valor de cada clave se leía
+  volviendo a interpretar la carga entera: 60 020 lecturas de JSON y 25 s del hilo del servidor en la prueba; ahora 40 como mucho. Sus
+  consultas llevan tiempo máximo (5 s).
+- **El contador de trama 0.** ChirpStack v4 sí emite `fCnt` 0 (su `UplinkEvent` se serializa con `emit_fields()`); el comentario del
+  adaptador y `docs/10 §4.1` decían que lo omitía. Ninguna lógica dependía de eso (el 0 presente nunca se compara y deja el contador en 0);
+  una prueba nueva fija la re-unión con el 0 presente.
+
+**Lo que NO está probado.** Un ChirpStack real (la ruta C) y los dos nodos del campus con la señal declarada: hoy están desconectados, y
+de su señal real solo está el rango medido en el servidor el 24/11/2026 (migración 29). HU-15 queda en construcción hasta ver la señal de esas
+tramas en «Red → Calidad del enlace» en el servidor (laboratorio aparte). Que el umbral de una magnitud de señal sirva para anticipar fallas
+no se evaluó: no se clasifica la señal en buena o mala sin una fuente que lo sostenga.
+
+Hoy son 1051 pruebas unitarias del backend y 702 del panel.

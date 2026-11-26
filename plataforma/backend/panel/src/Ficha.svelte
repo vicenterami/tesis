@@ -6,6 +6,7 @@
   import Grafico from './Grafico.svelte';
   import SelectorRango from './SelectorRango.svelte';
   import ZonaSitio from './ZonaSitio.svelte';
+  import TramaSinGuardar from './TramaSinGuardar.svelte';
   import Aviso from './Aviso.svelte';
   import Boton from './Boton.svelte';
   import FormularioAMedida from './FormularioAMedida.svelte';
@@ -544,6 +545,10 @@
   {#if puedeEn(sesion, 'configurar', d.sitio_codigo) && d.estado !== 'baja'}
     <!-- P6 (docs/19 §4, tablero v2, E): desde la ficha, para quien puede configurar en el sitio -->
     <p><a href={`#/dispositivos/${d.id}/configurar`} data-ir-configurar>Configurar el dispositivo y sus umbrales</a></p>
+  {/if}
+  {#if d.estado !== 'baja'}
+    <!-- docs/19 §4 AA, punto 6: lo que sus tramas traen y no guarda; solo con «escribir» (el componente lo decide) -->
+    <TramaSinGuardar dispositivoId={d.id} sitioCodigo={d.sitio_codigo} {sesion} administraCatalogo={sesion !== null && (sesion.sistema || sesion.administrador_sistema === true)} alAgregar={() => void cargar()} />
   {/if}
   {#if puedeExportarEn(sesion, d.sitio_codigo)}
     <!-- P8 (docs/19 §4, R, punto 6): todo el sitio del dispositivo, con mediciones, tramas y eventos; los dos botones de CSV siguen abajo -->

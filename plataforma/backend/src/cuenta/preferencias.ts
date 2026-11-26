@@ -1,9 +1,11 @@
 // Preferencias de una persona (docs/19 §4, H; HU-29, RF-56; migración 24): unidades de visualización, zona horaria, tema, tipos de
-// condición con notificación del navegador, vistas guardadas y el sitio por defecto. La base guarda siempre la unidad estándar: esto solo
+// condición con notificación del navegador, vistas guardadas, el sitio por defecto y, desde el 25/11/2026 (migración 30), las magnitudes que no
+// quiere ver en el Resumen y en «Tendencias» (docs/10 §8.4 punto 72 ii). La base guarda siempre la unidad estándar: esto solo
 // cambia cómo se MUESTRA. Todo lo que llega es hostil: se valida aquí, antes de tocar la base, y un cuerpo inválido es 400 con la lista
 // de motivos, como el resto de la API. La zona IANA se valida contra la lista del propio motor (Intl.supportedValuesOf).
 import { BadRequestException } from '@nestjs/common';
 import { FORMA_ACTUALIZADO_EN } from '../alta/calibracion.dto.js';
+import { FORMA_MAGNITUD } from '../alta/configuracion.dto.js';
 import type { Consultable } from '../db/evento.js';
 import { isoUs } from '../db/iso-us.js';
 
@@ -17,6 +19,7 @@ export const PANTALLAS_VISTA = ['inventario', 'ficha', 'tablero'] as const;
 export const MAX_VISTAS = 20;
 export const MAX_PARAMETROS = 20;
 export const MAX_BYTES_VISTAS = 16_384; // el mismo tope que ck_preferencia_vistas
+export const MAX_MAGNITUDES_OCULTAS = 50; // el mismo tope que ck_preferencia_magnitudes_ocultas (migración 30)
 
 export interface Vista { nombre: string; pantalla: (typeof PANTALLAS_VISTA)[number]; parametros: Record<string, string> }
 export interface Preferencias {
@@ -27,16 +30,19 @@ export interface Preferencias {
   notificar: string[];
   vistas: Vista[];
   sitio_predeterminado: string | null;
+  magnitudes_ocultas: string[];
 }
 export interface PreferenciasLeidas extends Preferencias {
   actualizado_en: string | null; // null = la persona aún no guardó ninguna: son las de por defecto
 }
-export interface CambioPreferencias extends Preferencias {
+// `magnitudes_ocultas` null = no vino en el PUT (una pestaña con el panel anterior al 25/11/2026): se conserva lo guardado.
+export interface CambioPreferencias extends Omit<Preferencias, 'magnitudes_ocultas'> {
   actualizado_en: string | null;
+  magnitudes_ocultas: string[] | null;
 }
 
 export const PREFERENCIAS_POR_DEFECTO: Readonly<Preferencias> = Object.freeze({
-  unidad_temperatura: 'C', unidad_longitud: 'm', zona_horaria: 'sitio', tema: 'sistema', notificar: [], vistas: [], sitio_predeterminado: null,
+  unidad_temperatura: 'C', unidad_longitud: 'm', zona_horaria: 'sitio', tema: 'sistema', notificar: [], vistas: [], sitio_predeterminado: null, magnitudes_ocultas: [],
 });
 
 // La lista de zonas del motor, una vez. «UTC» se admite aparte: algunas versiones de V8 no la listan aunque la acepten.
@@ -51,7 +57,7 @@ const CLAVE_PARAMETRO = /^[a-z][a-z0-9_]{0,39}$/;
 // `parametros.ruta`: la ruta del panel que abre la vista (el panel la guarda así; docs/19 «Campos»). Solo una ruta del propio panel: nunca
 // «//otro-origen» ni un esquema; la misma forma que comprueba el panel antes de convertirla en enlace (lib/preferencias.ts).
 export const FORMA_RUTA_PANEL = /^\/(?!\/)[\w\-/?=&%.:,+]*$/;
-const CAMPOS = ['actualizado_en', 'unidad_temperatura', 'unidad_longitud', 'zona_horaria', 'tema', 'notificar', 'vistas', 'sitio_predeterminado'];
+export const CAMPOS = ['actualizado_en', 'unidad_temperatura', 'unidad_longitud', 'zona_horaria', 'tema', 'notificar', 'vistas', 'sitio_predeterminado', 'magnitudes_ocultas'];
 
 function enLista<T extends string>(v: unknown, lista: readonly T[], campo: string, motivos: string[]): T {
   if (typeof v !== 'string' || !(lista as readonly string[]).includes(v)) motivos.push(`${campo} debe ser una de: ${lista.join(', ')}`);
@@ -118,12 +124,22 @@ export function validarPreferencias(cuerpo: unknown): CambioPreferencias {
   const vs = vistas(c.vistas, motivos);
   const s = c.sitio_predeterminado;
   if (s !== null && (typeof s !== 'string' || !UUID.test(s))) motivos.push('sitio_predeterminado debe ser el UUID de uno de tus sitios, o null');
+  // Ausente, se conserva lo guardado: el panel anterior al 25/11/2026 no lo envía y, obligatorio, cada «Guardar» suyo sería 400 hasta recargar.
+  const ocultas: string[] | null = 'magnitudes_ocultas' in c ? [] : null;
+  if (ocultas === null) { /* se conserva */ } else if (!Array.isArray(c.magnitudes_ocultas) || c.magnitudes_ocultas.length > MAX_MAGNITUDES_OCULTAS) {
+    motivos.push(`magnitudes_ocultas debe ser una lista de hasta ${MAX_MAGNITUDES_OCULTAS} códigos de magnitud (vacía: ver todo)`);
+  } else {
+    for (const m of c.magnitudes_ocultas as unknown[]) {
+      if (typeof m !== 'string' || !FORMA_MAGNITUD.test(m)) motivos.push(`magnitudes_ocultas: «${String(m).slice(0, 40)}» no es un código de magnitud`);
+      else if (!ocultas.includes(m)) ocultas.push(m);
+    }
+  }
   for (const k of Object.keys(c)) if (!CAMPOS.includes(k)) motivos.push(`campo no admitido: ${k.slice(0, 40)}`);
-  for (const k of CAMPOS) if (!(k in c)) motivos.push(`falta ${k} (PUT reemplaza todas las preferencias)`);
+  for (const k of CAMPOS) if (k !== 'magnitudes_ocultas' && !(k in c)) motivos.push(`falta ${k} (PUT reemplaza todas las preferencias)`);
   if (motivos.length > 0) throw new BadRequestException(motivos);
   return {
     actualizado_en: a as string | null, unidad_temperatura, unidad_longitud, zona_horaria: zona as string, tema, notificar, vistas: vs,
-    sitio_predeterminado: s === null ? null : (s as string).toLowerCase(),
+    sitio_predeterminado: s === null ? null : (s as string).toLowerCase(), magnitudes_ocultas: ocultas,
   };
 }
 
@@ -131,7 +147,8 @@ export function validarPreferencias(cuerpo: unknown): CambioPreferencias {
 // GET /sesion (que las trae para aplicarlas al cargar: docs/19 §4, H).
 export async function leerPreferencias(c: Consultable, usuarioId: string): Promise<PreferenciasLeidas> {
   const r = await c.query<PreferenciasLeidas>(
-    `SELECT unidad_temperatura, unidad_longitud, zona_horaria, tema, notificar, vistas, sitio_predeterminado, ${isoUs('actualizado_en')} AS actualizado_en
+    `SELECT unidad_temperatura, unidad_longitud, zona_horaria, tema, notificar, vistas, sitio_predeterminado, magnitudes_ocultas,
+            ${isoUs('actualizado_en')} AS actualizado_en
        FROM preferencia WHERE usuario_id = $1`, [usuarioId]);
-  return r.rows[0] ?? { ...PREFERENCIAS_POR_DEFECTO, notificar: [], vistas: [], actualizado_en: null };
+  return r.rows[0] ?? { ...PREFERENCIAS_POR_DEFECTO, notificar: [], vistas: [], magnitudes_ocultas: [], actualizado_en: null };
 }

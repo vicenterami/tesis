@@ -6,7 +6,7 @@ import type { Pool, PoolClient } from 'pg';
 import { POOL } from '../db/db.module.js';
 import { ErrorDynsec, ROL_DISPOSITIVO, ROL_PASARELA, ordenBaja, ordenRotacion, ordenesAlta, ordenesAltaDispositivo, ordenesAltaPasarela } from '../broker/dynsec.js';
 import { DynsecService } from '../broker/dynsec.service.js';
-import { AltaValidada, Formato, Via } from './alta.dto.js';
+import { AltaValidada, Formato, MAX_CANALES, Via } from './alta.dto.js';
 import { CalibracionValidada } from './calibracion.dto.js';
 import { isoUs } from '../db/iso-us.js';
 import { registrarEvento, registrarEventos } from '../db/evento.js';
@@ -51,6 +51,8 @@ export interface CanalCalibrado {
   escala_cien: number | null;
   actualizado_en: string;
 }
+// Resultado de POST /dispositivos/{id}/canales: el canal (el nuevo, o el que ya tenía esa magnitud) y si se agregó ahora.
+export interface CanalAgregado { agregada: boolean; dispositivo_id: string; canal: CanalCreado }
 interface CanalBloqueado { id: string; dispositivo_id: string; magnitud: string; unidad: string; etiqueta: string | null; escala_cero: number | null; escala_cien: number | null; actualizado_en: string }
 // Lo que el dispositivo necesita para conectarse, según su vía (docs/10 §3). La credencial aparece aquí UNA vez.
 export interface ConexionMqtt {
@@ -170,7 +172,7 @@ interface FilaBloqueada {
   pasarela_id: string | null;
   sitio_codigo: string;
 }
-type Operacion = 'alta' | 'baja' | 'rotación' | 'calibración';
+type Operacion = 'alta' | 'baja' | 'rotación' | 'calibración' | 'magnitud nueva';
 
 // Operaciones de escritura simultáneas admitidas por proceso (alta, baja o rotación): cada una retiene una conexión del pool
 // (de 5, compartido con la recepción de tramas) mientras espera al broker (hasta 5 s). Más que esto, 429: el pool no se agota
@@ -381,6 +383,44 @@ export class AltaService {
       await c.query('ROLLBACK').catch(() => undefined);
       throw this.traducir(e, id, 'calibración');
     } finally {
+      c.release();
+    }
+  }
+
+  // «Agregar una magnitud» a un equipo ya creado (POST /dispositivos/{id}/canales; docs/19 §4 AA; docs/10 §8.4 punto 71 vi): un canal de una
+  // magnitud del catálogo, con su evento `canal_alta` y quién, en una transacción; los canales existentes no se tocan. Idempotente: si ya la
+  // tiene, responde el canal que hay y `agregada: false`, sin evento. La fila del dispositivo se bloquea (FOR NO KEY UPDATE, como la baja):
+  // dos peticiones a la vez se ordenan y el tope de MAX_CANALES no se cruza; una trama que entra a la vez no espera (las inserciones hijas
+  // toman FOR KEY SHARE). Lo que llegó antes no se rellena: el canal empieza con la próxima trama.
+  async agregarCanal(id: string, magnitud: string, usuarioId: string | null = null): Promise<CanalAgregado> {
+    const c = await this.pool.connect();
+    c.on('error', errorDeCliente);
+    try {
+      await this.abrir(c);
+      const d = await this.bloquear(c, id);
+      if (d.estado === 'baja') throw new ConflictException('está dado de baja: no se le agregan magnitudes');
+      const m = await c.query<{ unidad: string }>('SELECT unidad_canonica AS unidad FROM magnitud WHERE codigo = $1 FOR SHARE', [magnitud]);
+      if (m.rows.length === 0) throw new BadRequestException({ statusCode: 400, error: 'Bad Request', message: [`magnitud: «${magnitud}» no está en el catálogo`], errores: [{ campo: 'magnitud', motivo: 'no está en el catálogo (GET /magnitudes)' }] });
+      const existentes = await this.canalesDe(c, id);
+      const ya = existentes.find((k) => k.magnitud === magnitud);
+      if (ya !== undefined) {
+        await c.query('COMMIT');
+        return { agregada: false, dispositivo_id: id, canal: ya };
+      }
+      if (existentes.length >= MAX_CANALES) throw new ConflictException(`ya tiene ${MAX_CANALES} canales, el máximo por dispositivo`);
+      const r = await c.query<{ id: string }>(
+        'INSERT INTO canal (dispositivo_id, magnitud_codigo) VALUES ($1, $2) ON CONFLICT (dispositivo_id, magnitud_codigo) DO NOTHING RETURNING id', [id, magnitud]);
+      const canalId = r.rows[0]?.id;
+      if (canalId === undefined) throw new ConflictException('otra operación agregó esa magnitud entretanto: recarga'); // no ocurre con el bloqueo
+      await registrarEvento(c, { dispositivoId: id, tipo: 'canal_alta', usuarioId, detalle: { canal_id: canalId, magnitud, origen: 'api' } });
+      await c.query('COMMIT');
+      this.log.log(`canal: ${d.id_fisico} + ${magnitud}`);
+      return { agregada: true, dispositivo_id: id, canal: { id: canalId, magnitud, unidad: m.rows[0].unidad, etiqueta: null, escala_cero: null, escala_cien: null } };
+    } catch (e) {
+      await c.query('ROLLBACK').catch(() => undefined);
+      throw this.traducir(e, id, 'magnitud nueva');
+    } finally {
+      c.off('error', errorDeCliente);
       c.release();
     }
   }

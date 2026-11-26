@@ -130,7 +130,9 @@ export class SitiosController {
       '(estado visual de docs/19 §2), `salud{reportan, supervisados, porcentaje}` (en línea ÷ supervisados: ni inactivos ni esperando su primera trama), `condiciones_abiertas[{tipo, n}]`, ' +
       '`tramas{recibidas, rechazadas, cubos[{tiempo, recibidas, rechazadas}]}` (tiempo en segundos Unix, como `tiempos` de los históricos; cubos en la zona del ' +
       'sitio; los cubos sin datos no se emiten: no son 0), ' +
-      '`atencion[{id, nombre, estado_visual, visto_por_ultima_vez, tipos}]` (hasta diez, sin señal primero), `magnitudes[{codigo, nombre, unidad, canales}]` ' +
+      '`atencion[{id, nombre, estado_visual, visto_por_ultima_vez, tipos}]` (hasta diez, sin señal primero), `magnitudes[{codigo, nombre, unidad, canales, salud}]` ' +
+      '(`salud`: batería o señal, MAGNITUDES_SALUD), `enlace[{id, nombre, rssi, snr}]` (cada uno `{valor, tiempo}` o null: la última lectura de señal de cada ' +
+      `equipo con canal rssi o snr, no dado de baja; sin ninguna lectura primero, después por intensidad, hasta ${MAX_ENTREGA_RESUMEN}) con \`total_enlace\`, cuántos hay; ` +
       `y \`entrega[{id, nombre, recibidas, esperadas, porcentaje}]\`: los ${MAX_ENTREGA_RESUMEN} dispositivos activos con peor entrega, de peor a mejor, y ` +
       '`total_activos`, cuántos hay (todos, en `GET /dispositivos?orden=entrega`). Porcentaje nulo si no hay una trama esperada completa en la ventana, contada ' +
       'desde su entrada en servicio (`en_servicio_desde`) y dentro de la retención de tramas (medida desde ahora), y nulo para quien espera su primera trama; 0 % si se esperaban y no llegó ninguna. Sin `intervalo`, el más fino que deja la ' +
@@ -158,9 +160,11 @@ export class SitiosController {
       'tienen estado visual normal o alerta, y sin señal (la regla de docs/19 §2, la misma del inventario y del resumen). ' +
       '`por_magnitud[{codigo, nombre, unidad, salud, canales, promedio, minimo, maximo}]`: sobre la última lectura de cada canal de los que reportan, solo si ' +
       'tiene menos de dos intervalos esperados del dispositivo (una lectura vieja no entra); `canales`, cuántos aportan; las de salud del equipo al final. ' +
-      '`dispositivos[{id, nombre, zona, estado_visual, visto_por_ultima_vez, intervalo_esperado_s, canales_total, canales}]`: los que reportan, primero los de ' +
+      '`dispositivos[{id, nombre, zona, estado_visual, visto_por_ultima_vez, intervalo_esperado_s, canales_total, canales_ocultos, canales}]`: los que reportan, primero los de ' +
       'alerta y después por zona y nombre, hasta `limite`; `canales` trae hasta ' + MAX_CANALES_AHORA + ' `{id, magnitud, magnitud_nombre, unidad, salud, ' +
-      'ultima{valor, tiempo, porcentaje}|null}`: primero lo que se mide y al final la salud del equipo (' + MAGNITUDES_SALUD.join(', ') + '). Con `tendencia=si`, ' +
+      'ultima{valor, tiempo, porcentaje}|null}`: primero lo que se mide y al final la salud del equipo (' + MAGNITUDES_SALUD.join(', ') + '). ' +
+      '`ocultas`: las magnitudes que la persona eligió no ver (preferencia `magnitudes_ocultas`): no entran a `por_magnitud`, ni a los canales de las tarjetas ' +
+      'ni a `canales_total` (se aplican ANTES de elegir los tres; sin persona, ninguna); `canales_ocultos`, cuántos canales del dispositivo dejan fuera. Con `tendencia=si`, ' +
       `además \`chispa{desde, intervalo, puntos}\` y, en cada canal, \`chispa\`: ${CUBOS_CHISPA} promedios por hora alineados a la hora UTC, el último de la hora ` +
       'en curso (parcial); un cubo sin lecturas es null, no 0. `tendencia` va siempre: true si la tendencia está en la respuesta; false si no se ' +
       `pidió o si se omitió porque su cálculo pasó de ${TENDENCIA.tiempoMaximoMs} ms o ya había ${TENDENCIA.maxEnCurso} en curso (no es un error: el resto ` +
@@ -176,7 +180,7 @@ export class SitiosController {
     const l = limite(lim, LIMITE_AHORA.porDefecto, LIMITE_AHORA.maximo);
     const sitioId = uuid(id, 'sitio');
     await this.alcance.exigirSitio(u, 'leer', sitioId);
-    return this.tablero.ahora(sitioId, l, tendencia === 'si');
+    return this.tablero.ahora(sitioId, l, tendencia === 'si', u.id); // la persona: sus magnitudes ocultas (docs/10 §8.4 punto 72 ii)
   }
 
   @Get(':id/historico')

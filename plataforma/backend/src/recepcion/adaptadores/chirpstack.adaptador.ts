@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ContextoTrama, Lectura } from '../lectura.js';
 import { Adaptador, TramaMalformada } from './adaptador.js';
-import { IdentidadNoVerificada, anotarFcnt, decodificarData, exigirDevEui, lecturasDe, objetoJson, tiempoDe } from './lorawan.js';
+import { IdentidadNoVerificada, anotarFcnt, decodificarData, enlaceDe, exigirDevEui, lecturasDe, objetoJson, tiempoDe } from './lorawan.js';
 import { SIN_ALIAS } from './mapa-claves.js';
 
 // Evento `up` de la integración MQTT de ChirpStack v4 (docs/10 §8.4 punto 47; ruta C, y la A si algún día hay un ChirpStack propio).
@@ -11,7 +11,8 @@ import { SIN_ALIAS } from './mapa-claves.js';
 //   fCnt                contador de trama (`uint32 f_cnt` del UplinkEvent): el filtro 3 descarta la repetida (docs/10 §4.1)
 //   object              lo que devolvió el decodificador del perfil del dispositivo; sin decodificador no existe
 //   data                la carga en base64: solo se decodifica si no hay object y el nodo declaró un perfil (migración 17)
-// rxInfo[] (gatewayId, rssi, snr) queda en la trama cruda para HU-15.
+//   rxInfo[]            gatewayId, rssi, snr: la señal del mejor receptor va al contexto (ctx.enlace), no a las lecturas; el pipeline la suma
+//                       si el nodo declaró el canal (docs/10 §8.4 punto 71). El detalle por pasarela sigue en la trama cruda.
 
 @Injectable()
 export class ChirpstackAdaptador implements Adaptador {
@@ -29,6 +30,7 @@ export class ChirpstackAdaptador implements Adaptador {
     if (typeof info !== 'object' || info === null) throw new IdentidadNoVerificada('sin deviceInfo');
     exigirDevEui((info as Record<string, unknown>).devEui, ctx, 'deviceInfo.devEui');
     anotarFcnt(evento.fCnt, ctx);
+    ctx.enlace = enlaceDe(evento.rxInfo, true);
     const objeto = evento.object;
     if (typeof objeto !== 'object' || objeto === null || Array.isArray(objeto)) {
       if (!ctx.decodificador) {

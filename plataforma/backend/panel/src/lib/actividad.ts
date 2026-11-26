@@ -39,6 +39,7 @@ export const ROTULO_TIPO_ACTIVIDAD: Readonly<Record<string, string>> = {
   dispositivo_configurado: 'Configuración de dispositivos',
   reglas_cambiadas: 'Cambios de umbrales',
   canal_calibrado: 'Calibraciones',
+  canal_alta: 'Magnitudes agregadas', // desde el 25/11/2026 (docs/19 §4 AA)
   condicion_abierta: 'Condiciones abiertas',
   condicion_cerrada: 'Condiciones cerradas',
   pasarela_alta: 'Altas de pasarelas',

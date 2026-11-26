@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { bloquesDeTexto, esPrivacidad, textoDe } from './legal';
 import { agregarCondicion, debeNotificar, ponerNombres, textoGrupo } from './notificaciones';
-import { alternarNotificacion, cambiar, cuerpoPreferencias, enlaceDeVista, guardarVista } from './preferencias';
+import { alternarNotificacion, alternarOculta, cambiar, cuerpoPreferencias, enlaceDeVista, guardarVista } from './preferencias';
 import { urlActividad } from './actividad';
 
 // Funciones puras de P11 (textos legales), P13 (preferencias), P14 (actividad) y de las notificaciones en pantalla (E).
@@ -22,7 +22,7 @@ describe('P11: los textos legales se muestran como texto, nunca como HTML', () =
 
 describe('P13: preferencias', () => {
   it('el cuerpo de PUT va completo con el actualizado_en leído (null la primera vez); el cambio optimista guarda lo anterior para volver', () => {
-    expect(cuerpoPreferencias({ unidad_temperatura: 'F', actualizado_en: null })).toEqual({ unidad_temperatura: 'F', unidad_longitud: 'm', zona_horaria: 'sitio', tema: 'sistema', sitio_predeterminado: null, notificar: [], vistas: [], actualizado_en: null });
+    expect(cuerpoPreferencias({ unidad_temperatura: 'F', actualizado_en: null })).toEqual({ unidad_temperatura: 'F', unidad_longitud: 'm', zona_horaria: 'sitio', tema: 'sistema', sitio_predeterminado: null, notificar: [], vistas: [], magnitudes_ocultas: [], actualizado_en: null });
     const { nuevas, anteriores } = cambiar({ unidad_temperatura: 'C' }, { unidad_temperatura: 'F' });
     expect([nuevas.unidad_temperatura, anteriores.unidad_temperatura]).toEqual(['F', 'C']);
     expect(alternarNotificacion({ notificar: ['umbral'] }, 'sin_comunicacion', true)).toEqual(['sin_comunicacion', 'umbral']);
@@ -60,5 +60,16 @@ describe('P14 y notificaciones', () => {
     expect(debeNotificar('umbral', ['umbral'], 'granted')).toBe(true);
     expect(debeNotificar('umbral', ['umbral'], 'default')).toBe(false); // sin permiso, solo el aviso en pantalla
     expect(debeNotificar('bateria', ['umbral'], 'granted')).toBe(false); // no lo eligió
+  });
+});
+
+// «Elegir qué ver» (docs/19 §4 AA, punto 7): marcar «ver» la quita de las ocultas; el orden sigue al de lo ofrecido; lo de otro sitio se conserva.
+describe('alternarOculta', () => {
+  it('ocultar y volver a ver; sin repetir; lo que no se ofrece aquí no se toca', () => {
+    const ofrecidas = ['temperatura', 'humedad', 'rssi', 'snr'];
+    expect(alternarOculta([], ofrecidas, 'snr', false)).toEqual(['snr']);
+    expect(alternarOculta(['snr'], ofrecidas, 'rssi', false)).toEqual(['rssi', 'snr']);
+    expect(alternarOculta(['rssi', 'snr'], ofrecidas, 'snr', false)).toEqual(['rssi', 'snr']);
+    expect(alternarOculta(['pm10', 'rssi', 'snr'], ofrecidas, 'rssi', true)).toEqual(['pm10', 'snr']);
   });
 });

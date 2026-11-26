@@ -11,7 +11,7 @@ const SESION: Sesion = {
   sistema: false, usuario: { id: 'u1', nombre: 'Ana', email: 'ana@ejemplo.invalid' }, clave_temporal: false, expira_en: null, inactividad_vence_en: null,
   sitios: [{ sitio_id: 's1', codigo: 'uct', nombre: 'Campus', rol: 'administrador' }], permisos: { administrador: ['leer'], consulta: ['leer'] },
 };
-const PREFS: P = { unidad_temperatura: 'C', unidad_longitud: 'm', zona_horaria: 'sitio', tema: 'sistema', notificar: [], vistas: [], sitio_predeterminado: null, actualizado_en: null };
+const PREFS: P = { unidad_temperatura: 'C', unidad_longitud: 'm', zona_horaria: 'sitio', tema: 'sistema', notificar: [], vistas: [], sitio_predeterminado: null, magnitudes_ocultas: [], actualizado_en: null };
 const SESIONES = [
   { id: 'a'.repeat(64), creada_en: '2026-11-11T10:00:00Z', ultima_actividad: '2026-11-11T12:00:00Z', agente: 'Firefox en Linux', origen: '192.0.2.0/24', actual: true },
   { id: 'b'.repeat(64), creada_en: '2026-11-10T10:00:00Z', ultima_actividad: '2026-11-10T12:00:00Z', agente: 'Chrome en Android', origen: '198.51.100.0/24', actual: false },
@@ -37,6 +37,7 @@ beforeEach(() => {
       if (malas.length > 0) return json({ statusCode: 400, message: malas.map(([, i]) => `vistas[${i}].parametros debe ser un objeto de hasta 20 pares texto → texto`) }, 400);
       return respuestaPut(cuerpo);
     }
+    if (ruta === '/magnitudes') return json([{ codigo: 'temperatura', nombre: 'Temperatura' }, { codigo: 'snr', nombre: 'Relación señal/ruido' }]);
     if (ruta === '/sesiones') return json(SESIONES);
     if (ruta.startsWith('/sesiones/') && metodo === 'DELETE') return json({ revocada: true, actual: false });
     if (ruta === '/terminos') return json({ version: 1, fecha: '2026-11-11', texto: 't' });
@@ -137,5 +138,16 @@ describe('P13 Mi cuenta', () => {
     await fireEvent.click(b());
     await waitFor(() => expect(baja).toHaveBeenCalledTimes(1));
     expect(pedidos.find((p) => p.ruta === '/cuenta/baja' && p.cuerpo?.clave === 'mi-clave-de-verdad')).toBeTruthy();
+  });
+
+  // «Elegir qué ver» (docs/19 §4 AA, punto 7): la misma lista que el Resumen, con todo el catálogo, guardada al cambiar cada casilla.
+  it('«Magnitudes que ves»: todo el catálogo marcado; desmarcar guarda magnitudes_ocultas en el PUT completo', async () => {
+    render(Preferencias, { sesion: SESION });
+    await waitFor(() => expect(document.querySelectorAll('[data-ver-magnitud]')).toHaveLength(2));
+    expect([...document.querySelectorAll<HTMLInputElement>('[data-ver-magnitud]')].every((c) => c.checked)).toBe(true);
+    expect(document.querySelector('[data-abrir-elegir]')).toBeNull(); // aquí va siempre abierta
+    await fireEvent.click(document.querySelector('[data-ver-magnitud="snr"]')!);
+    await waitFor(() => expect(pedidos.find((p) => p.metodo === 'PUT')).toBeTruthy());
+    expect(pedidos.find((p) => p.metodo === 'PUT')!.cuerpo).toEqual({ ...PREFS, magnitudes_ocultas: ['snr'], actualizado_en: null });
   });
 });

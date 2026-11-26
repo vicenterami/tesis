@@ -6,13 +6,13 @@ import {
 } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { AltaValidada, FORMATOS_DIRECTOS, FORMA_ID_FISICO, MAX_CANALES, VIAS, validarAlta } from './alta.dto.js';
-import { AltaService, CredencialRotada, DispositivoCreado, DispositivoDadoDeBaja } from './alta.service.js';
+import { AltaService, CanalAgregado, CredencialRotada, DispositivoCreado, DispositivoDadoDeBaja } from './alta.service.js';
 import { uuid } from '../consulta/validacion.js';
 import { AlcanceService } from '../sesion/alcance.service.js';
 import { Usuario } from '../sesion/guardia.js';
 import { alcanceDeLectura, exigirEnAlguno, permitir } from '../sesion/permisos.js';
 import { ConfiguracionService } from './configuracion.service.js';
-import { validarCambioDispositivo } from './configuracion.dto.js';
+import { FORMA_MAGNITUD, validarCambioDispositivo, validarCanalNuevo } from './configuracion.dto.js';
 import { FORMA_ACTUALIZADO_EN } from './calibracion.dto.js';
 import { ConsultaService } from '../consulta/consulta.service.js';
 import {
@@ -304,6 +304,34 @@ export class AltaController {
     await this.alcance.exigirDispositivo(u, 'configurar', dispositivoId);
     await this.configuracion.cambiarDispositivo(dispositivoId, validarCambioDispositivo(cuerpo), u.id);
     return this.consulta.dispositivo(dispositivoId);
+  }
+
+  // «Agregar una magnitud» a un equipo ya creado (docs/19 §4 AA; docs/10 §8.4 punto 71 vi; docs/20 §6, acción `escribir`).
+  @Post(':id/canales')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Agregar una magnitud a un dispositivo (Etapa 4)',
+    description:
+      `Agrega un canal de una magnitud del catálogo (\`magnitud\`, el código de GET /magnitudes) a un dispositivo ya creado, hasta ${MAX_CANALES} canales. ` +
+      'Idempotente: si ya la tiene, responde ese canal con `agregada: false` y no cambia nada. Los canales existentes no se tocan; lo que llegó ' +
+      'antes no se rellena (el canal empieza con la próxima trama). Deja el evento `canal_alta` `{canal_id, magnitud, origen}` con quién. ' +
+      'Un nodo LoRaWAN con `rssi` o `snr` guarda desde entonces la señal de cada trama (docs/10 §8.4 punto 71). Exige la acción `escribir` en el sitio (docs/20 §6).',
+  })
+  @ApiHeader({ name: 'X-Clave-Admin', required: false, description: 'Sin sesión: la clave de administrador (HTTP_CLAVE_ADMIN), como usuario del sistema (docs/20 §5)' })
+  @ApiParam({ name: 'id', description: 'UUID del dispositivo' })
+  @ApiBody({ schema: { type: 'object', required: ['magnitud'], properties: { magnitud: { type: 'string', pattern: FORMA_MAGNITUD.source } }, example: { magnitud: 'snr' } } })
+  @ApiOkResponse({ description: '`{agregada, dispositivo_id, canal{id, magnitud, unidad, etiqueta, escala_cero, escala_cien}}`: el canal nuevo, o el que ya tenía esa magnitud' })
+  @ApiBadRequestResponse({ description: 'UUID inválido, o la magnitud no tiene la forma o no está en el catálogo: `errores[{campo, motivo}]`' })
+  @ApiUnauthorizedResponse({ description: 'Sin sesión ni X-Clave-Admin, o X-Clave-Admin incorrecta' })
+  @ApiForbiddenResponse({ description: 'Un perfil sin ese permiso en ese sitio (docs/20 §6), o sesión sin la cabecera X-Pedido: panel' })
+  @ApiNotFoundResponse({ description: 'No existe, o es de otro sitio' })
+  @ApiConflictResponse({ description: `Está dado de baja, o ya tiene ${MAX_CANALES} canales` })
+  @ApiResponse({ status: 503, description: 'Otra operación sobre el mismo dispositivo en curso' })
+  async agregarCanal(@Usuario() u: UsuarioSesion, @Param('id') id: string, @Body() cuerpo: unknown): Promise<CanalAgregado> {
+    exigirEnAlguno(u, 'escribir');
+    const dispositivoId = uuid(id, 'dispositivo');
+    await this.alcance.exigirDispositivo(u, 'escribir', dispositivoId);
+    return this.alta.agregarCanal(dispositivoId, validarCanalNuevo(cuerpo).magnitud, u.id);
   }
 
   @Delete(':id')

@@ -129,6 +129,13 @@ DO $$ BEGIN
     GRANT UPDATE (nombre, activo) ON zona TO plataforma_app;
   END IF;
 END $$;
+-- Desde la migración 30, «elegir qué ver» (docs/10 §8.4 punto 72 ii): UPDATE de preferencia.magnitudes_ocultas (el INSERT de preferencia ya
+-- es de toda la fila). Nace después de esta: aquí se repite solo si ya existe la columna.
+DO $$ BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'preferencia' AND column_name = 'magnitudes_ocultas') THEN
+    GRANT UPDATE (magnitudes_ocultas) ON preferencia TO plataforma_app;
+  END IF;
+END $$;
 ALTER DEFAULT PRIVILEGES FOR ROLE plataforma IN SCHEMA public REVOKE INSERT, UPDATE ON TABLES FROM plataforma_app;
 ALTER DEFAULT PRIVILEGES FOR ROLE plataforma IN SCHEMA public GRANT SELECT ON TABLES TO plataforma_app;
 

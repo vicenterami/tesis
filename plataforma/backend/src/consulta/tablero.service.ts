@@ -45,6 +45,17 @@ export function entregasDelResumen(base: readonly BaseEntrega[], desde: Date, ha
   return { entrega: todas.slice(0, MAX_ENTREGA_RESUMEN), total_activos: todas.length };
 }
 
+// «Red → Calidad del enlace» (docs/19 §4 AA, punto 4; docs/10 §8.4 punto 71): por equipo con canal de señal (rssi o snr, no dado de baja), su
+// última lectura de cada una. De peor a mejor: primero los que aún no tienen ninguna lectura de señal, después por intensidad (sin intensidad
+// antes que con ella), después por nombre e id; solo los MAX_ENTREGA_RESUMEN primeros (el mismo tope que la entrega) y cuántos hay.
+type Ultima = { valor: number; tiempo: string } | null;
+export interface BaseEnlace { id: string; nombre: string; rssi: Ultima; snr: Ultima }
+export function enlacesDelResumen(base: readonly BaseEnlace[]): { enlace: BaseEnlace[]; total_enlace: number } {
+  const clave = (x: BaseEnlace): number => (x.rssi === null && x.snr === null ? -Infinity : x.rssi === null ? -1e9 : x.rssi.valor);
+  const todas = [...base].sort((a, b) => clave(a) - clave(b) || a.nombre.localeCompare(b.nombre, 'es') || a.id.localeCompare(b.id));
+  return { enlace: todas.slice(0, MAX_ENTREGA_RESUMEN), total_enlace: todas.length };
+}
+
 export interface SitioDeSesion {
   id: string; codigo: string; nombre: string; zona_horaria: string; descripcion: string | null; rol: string; zonas: { id: string; nombre: string; activo: boolean; dispositivos: number }[];
 }
@@ -121,17 +132,31 @@ export class TableroService {
                                      'en_servicio_desde', iso_utc(dev.en_servicio_desde), 'intervalo_esperado_s', dev.intervalo_esperado_s,
                                      'esperando', dev.estado_visual = 'esperando')), '[]'::json)
             FROM dev LEFT JOIN (SELECT dispositivo_id, count(*)::int AS n FROM tr GROUP BY dispositivo_id) t ON t.dispositivo_id = dev.id
-           WHERE dev.estado = 'activo')
+           WHERE dev.estado = 'activo'),
+        -- La última señal de cada equipo con canal rssi o snr (MAGNITUDES_ENLACE, recepcion/lectura.ts; docs/10 §8.4 punto 71): una lectura
+        -- por canal sobre el índice (canal_id, tiempo), como la ficha. El orden y el tope, en enlacesDelResumen.
+        'enlace_base', (SELECT coalesce(json_agg(json_build_object('id', dev.id, 'nombre', dev.nombre,
+                                     'rssi', (SELECT json_build_object('valor', x.valor, 'tiempo', iso_utc(x.tiempo)) FROM canal c JOIN medicion x ON x.canal_id = c.id
+                                               WHERE c.dispositivo_id = dev.id AND c.magnitud_codigo = 'rssi' ORDER BY x.tiempo DESC LIMIT 1),
+                                     'snr', (SELECT json_build_object('valor', x.valor, 'tiempo', iso_utc(x.tiempo)) FROM canal c JOIN medicion x ON x.canal_id = c.id
+                                               WHERE c.dispositivo_id = dev.id AND c.magnitud_codigo = 'snr' ORDER BY x.tiempo DESC LIMIT 1))), '[]'::json)
+            FROM dev WHERE dev.estado <> 'baja'
+             AND EXISTS (SELECT 1 FROM canal c WHERE c.dispositivo_id = dev.id AND c.magnitud_codigo IN ('rssi', 'snr')))
       ) AS r`, [sitioId, desde, hasta, intervalo]);
     const fila = r.rows[0];
     if (fila === undefined || fila.sitio === null) throw new NotFoundException('sitio no encontrado');
-    const { entrega_base, salud, ...resto } = fila.r as typeof fila.r & { salud: { reportan: number; supervisados: number } };
+    const { entrega_base, enlace_base, salud, magnitudes, ...resto } = fila.r as typeof fila.r & {
+      salud: { reportan: number; supervisados: number }; enlace_base?: BaseEnlace[]; magnitudes?: { codigo: string }[];
+    };
     return {
       sitio: fila.sitio,
       ventana: { desde, hasta, intervalo },
       ...resto,
+      // `salud` por magnitud (desde el 25/11/2026): «Tendencias» deja la salud del equipo al final antes de cortar en seis (docs/19 §4 AA).
+      magnitudes: (magnitudes ?? []).map((m) => ({ ...m, salud: esSalud(m.codigo) })),
       salud: { ...salud, porcentaje: porcentajeSalud(salud.reportan, salud.supervisados) },
       ...entregasDelResumen(entrega_base, desde, hasta),
+      ...enlacesDelResumen(enlace_base ?? []),
     };
   }
 
@@ -142,9 +167,12 @@ export class TableroService {
   // si la página trae dispositivos, los canales DE LA PÁGINA con su última lectura (la consulta de la ficha, SQL_ULTIMA_MEDICION), de donde
   // salen los tres de cada tarjeta; (3) solo con `tendencia` y algún canal mostrado, los promedios por hora de esos canales, en una conexión
   // propia con tiempo máximo y cupo (tendencias(): si no alcanza, la respuesta sale con `tendencia: false`). ahora.spec.ts las cuenta.
-  async ahora(sitioId: string, limite: number, tendencia: boolean) {
+  // `usuarioId`: la persona que pide; sus magnitudes ocultas (preferencia, migración 30; docs/10 §8.4 punto 72 ii) se leen en la consulta (1),
+  // sin una consulta más, y se aplican al agregado y a los canales ANTES de elegir los tres de cada tarjeta. Sin persona, ninguna.
+  async ahora(sitioId: string, limite: number, tendencia: boolean, usuarioId: string | null = null) {
+    const ocultasSql = usuarioId === null ? "'{}'::text[]" : "coalesce((SELECT p.magnitudes_ocultas FROM preferencia p WHERE p.usuario_id = $3::uuid), '{}'::text[])";
     const r = await this.pool.query<{
-      existe: boolean; ahora: string; reportan: number; sin_senal: number; por_magnitud: FilaMagnitud[];
+      existe: boolean; ahora: string; reportan: number; sin_senal: number; por_magnitud: FilaMagnitud[]; ocultas: string[];
       pagina: { id: string; nombre: string; zona: string; estado_visual: string; visto_por_ultima_vez: string | null; intervalo_esperado_s: number }[];
     }>(`
       WITH dev AS (
@@ -153,11 +181,11 @@ export class TableroService {
          WHERE z.sitio_id = $1),
       mag AS (
         SELECT c.magnitud_codigo AS codigo, count(*)::int AS canales, avg(u.valor) AS promedio, min(u.valor) AS minimo, max(u.valor) AS maximo
-          FROM dev JOIN canal c ON c.dispositivo_id = dev.id
+          FROM dev JOIN canal c ON c.dispositivo_id = dev.id AND c.magnitud_codigo <> ALL (${ocultasSql})
          CROSS JOIN LATERAL (SELECT x.valor, x.tiempo FROM medicion x WHERE x.canal_id = c.id ORDER BY x.tiempo DESC LIMIT 1) u
          WHERE dev.estado_visual IN ('normal', 'alerta') AND ${SQL_LECTURA_VIGENTE}
          GROUP BY c.magnitud_codigo)
-      SELECT EXISTS (SELECT 1 FROM sitio WHERE id = $1) AS existe, iso_utc(now()) AS ahora,
+      SELECT EXISTS (SELECT 1 FROM sitio WHERE id = $1) AS existe, iso_utc(now()) AS ahora, ${ocultasSql} AS ocultas,
              (SELECT count(*)::int FROM dev WHERE estado_visual IN ('normal', 'alerta')) AS reportan,
              (SELECT count(*)::int FROM dev WHERE estado_visual = 'sin_senal') AS sin_senal,
              (SELECT coalesce(json_agg(json_build_object('codigo', mag.codigo, 'nombre', m.nombre, 'unidad', m.unidad_canonica, 'canales', mag.canales,
@@ -168,7 +196,7 @@ export class TableroService {
                                        ORDER BY p.orden, p.zona, p.nombre, p.id), '[]'::json)
                 FROM (SELECT dev.*, CASE dev.estado_visual WHEN 'alerta' THEN 0 ELSE 1 END AS orden FROM dev
                        WHERE dev.estado_visual IN ('normal', 'alerta') ORDER BY orden, dev.zona, dev.nombre, dev.id LIMIT $2) p) AS pagina`,
-      [sitioId, limite]);
+      usuarioId === null ? [sitioId, limite] : [sitioId, limite, usuarioId]);
     const base = r.rows[0];
     if (base === undefined || !base.existe) throw new NotFoundException('sitio no encontrado');
     const enPagina = base.pagina.map((d) => d.id);
@@ -183,9 +211,12 @@ export class TableroService {
       if (lista === undefined) porDispositivo.set(k.dispositivo_id, [k]);
       else lista.push(k);
     }
+    const ocultas = new Set(base.ocultas ?? []);
     const dispositivos = base.pagina.map((d) => {
-      const todos = porDispositivo.get(d.id) ?? [];
-      return { ...d, canales_total: todos.length, canales: elegirCanales(todos) };
+      const suyos = porDispositivo.get(d.id) ?? [];
+      const todos = suyos.filter((k) => !ocultas.has(k.magnitud));
+      // `canales_ocultos`: cuántos deja fuera la preferencia, para que el panel lo diga (una tarjeta sin canales no queda muda; revisión del 25/11/2026).
+      return { ...d, canales_total: todos.length, canales_ocultos: suyos.length - todos.length, canales: elegirCanales(todos) };
     });
     const mostrados = dispositivos.flatMap((d) => d.canales.map((k) => k.id));
     let chispas: Map<string, (number | null)[]> | undefined;
@@ -201,6 +232,7 @@ export class TableroService {
     return {
       reportan: base.reportan,
       sin_senal: base.sin_senal,
+      ocultas: [...ocultas],
       por_magnitud: porMagnitud(base.por_magnitud),
       dispositivos: dispositivos.map((d) => ({
         ...d,

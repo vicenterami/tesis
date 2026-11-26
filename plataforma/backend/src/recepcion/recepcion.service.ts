@@ -15,13 +15,14 @@ import { MilesightAdaptador } from './adaptadores/milesight.adaptador.js';
 import { PlanoAdaptador } from './adaptadores/plano.adaptador.js';
 import { SenmlAdaptador } from './adaptadores/senml.adaptador.js';
 import { ContadorCuota, CuotaPorEmisor, inicioDeVentana } from './cuota.js';
-import { ContextoTrama, Lectura } from './lectura.js';
+import { ContextoTrama, Lectura, MAGNITUDES_ENLACE } from './lectura.js';
 import { desvioDePasarela, tiempoPlausible } from './tiempo.js';
 import { limpia } from './texto.js';
 import { aCanonica } from './unidades.js';
 import { porcentaje } from '../consulta/escala.js';
 import { DestinoClave, resolverDesde } from './adaptadores/mapa-claves.js';
 import type { Receta } from './adaptadores/receta.js';
+import { ClaveSinGuardar, FilaRetenida, MAX_TRAMAS_SIN_GUARDAR, TOPE_SIN_GUARDAR_MS, clavesSinGuardar } from './sin-guardar.js';
 
 // Forma del tópico acordada: sitio/<sitio>/dispositivo/<id_fisico>/<magnitud>
 const PATRON_TOPICO = /^sitio\/([^/]+)\/dispositivo\/([^/]+)\/([^/]+)$/;
@@ -46,6 +47,8 @@ interface Dispositivo {
   // alias solo si su formato es de pasarela. JSON: node-postgres lo entrega ya como objeto, con los int4 como números.
   receta: Receta | null;
   alias: Record<string, DestinoClave> | null;
+  // Las magnitudes de los canales declarados (docs/10 §8.4 punto 71): la señal del enlace se suma solo si el nodo declaró `rssi` o `snr`.
+  magnitudes: string[] | null;
 }
 interface Pasarela { id: string; activo: boolean; sitio_codigo: string }
 // Dominio cerrado: el mismo CHECK de la migración 19 (antes 09). Agregar un motivo exige migración, no solo código.
@@ -249,8 +252,9 @@ export class RecepcionService implements OnModuleInit {
           const aviso = this.avisosImprevistos.registrar(`adaptador ${adaptador.nombre}: error imprevisto (${e instanceof Error ? e.name : typeof e}); la trama va a cuarentena como malformada`);
           if (aviso !== null) this.log.error(aviso);
         }
-        // El contador pudo anotarse antes de fallar (p. ej. data corta): una trama que no se entendió no es «la repetida» (§4.1).
+        // El contador pudo anotarse antes de fallar (p. ej. data corta): una trama que no se entendió no es «la repetida» (§4.1). Lo mismo la señal.
         ctx.fcnt = undefined;
+        ctx.enlace = undefined;
         malformada = `formato declarado ${adaptador.nombre}: ${imprevisto ? 'la trama no se pudo interpretar' : (e).message}`;
         // El cuerpo no deja verificar el DevEUI (otro, ausente o ilegible): no hay certeza de que sea del nodo, no se marca vivo (§4.1).
         // Un error imprevisto por el tópico de pasarela tampoco verificó nada.
@@ -267,18 +271,28 @@ export class RecepcionService implements OnModuleInit {
     // porque los mensajes se procesan de a uno (decisión 4, BrokerService).
     const repetida = ctx.fcnt !== undefined && ctx.fcnt !== 0 && dispositivo.ultimo_fcnt !== null && Number(dispositivo.ultimo_fcnt) === ctx.fcnt;
     if (repetida) lecturas = [];
+    // La señal del enlace (docs/10 §8.4 punto 71): solo con lecturas del sensor y solo lo que el nodo declaró y el sensor no envió.
+    let enlace = lecturas.length > 0 ? this.lecturasDeEnlace(ctx, dispositivo, lecturas) : [];
 
     // ── [3] Validar: ¿cabe la trama en el presupuesto de lecturas de la hora? (tope por emisor, docs/10 §8.4 punto 53) ──
     // Se rechaza entera: una serie a medias confunde más que un hueco. La condición se abre una vez por ventana y la cierra la
     // primera trama que entra dentro del presupuesto en una hora posterior. El dispositivo se marca vivo igual: es volumen, no enlace.
     const tope = this.presupuesto(dispositivo);
     let rechazoTope: string | null = null;
-    if (lecturas.length > 0 && antes.lecturas + lecturas.length > tope) {
-      const trae = lecturas.length;
+    // Las del enlace cuentan contra el tope, pero nunca hacen rechazar una trama que sin ellas cabía (punto 53 vii; revisión del 25/11/2026):
+    // si las del sensor caben y con la señal no, la señal se omite, sin cuarentena, y lo dice la línea de registro de la trama.
+    let senalOmitidaPorTope = 0;
+    if (enlace.length > 0 && antes.lecturas + lecturas.length <= tope && antes.lecturas + lecturas.length + enlace.length > tope) {
+      senalOmitidaPorTope = enlace.length;
+      enlace = [];
+    }
+    if (lecturas.length > 0 && antes.lecturas + lecturas.length + enlace.length > tope) {
+      const trae = lecturas.length + enlace.length;
       rechazoTope = `tope de ${tope} lecturas por hora superado: ${antes.lecturas} ya aceptadas desde las ${ventanaInicio.toISOString().slice(11, 16)} UTC y la trama trae ${trae}; se rechaza entera`;
       await this.cuarentena(trama, 'tope', rechazoTope, cuota);
       sobreTope = 1;
       lecturas = [];
+      enlace = [];
       if (antes.sobreTope === 0) {
         await this.supervision.abrirTope(dispositivo.id, ctx.idFisico, { tope, aceptadas: antes.lecturas, trama: trae, ventana: ventanaInicio.toISOString() });
       }
@@ -288,7 +302,7 @@ export class RecepcionService implements OnModuleInit {
       await this.supervision.cerrarTope(dispositivo.id, ctx.idFisico, { ventana: ventanaInicio.toISOString(), rechazadas_hora_anterior: dispositivo.ventana_sobre_tope });
     }
     // Contra el presupuesto cuentan las lecturas examinadas, válidas o no: cada una cuesta una consulta (revisión del 17/10).
-    const examinadas = lecturas.length;
+    const examinadas = lecturas.length + enlace.length;
 
     // ── [4] Desvío del reloj de la pasarela (docs/10 §8.4 punto 54; docs/13 regla 18) ──
     // Una marca de pasarela a más de 10 min de la llegada se reemplaza por la hora de recepción (abajo, tiempoPlausible) y abre la
@@ -316,60 +330,22 @@ export class RecepcionService implements OnModuleInit {
     let guardadas = 0;
     let duplicadas = 0;
     for (const l of lecturas) {
-      const canal = await this.buscarCanal(dispositivo.id, l.magnitud);
-      if (!canal) {
-        rechazos.push(`${l.magnitud}: canal no declarado para este dispositivo`);
-        continue;
+      const r = await this.guardarLectura(l, ctx, dispositivo, recibidoEn, adaptador);
+      if (typeof r === 'object') rechazos.push(r.rechazo);
+      else if (r === 'duplicada') duplicadas++;
+      else guardadas++;
+    }
+    // ── La señal del enlace, al final y solo si la trama dejó al menos una lectura del sensor (docs/10 §8.4 punto 71) ──
+    // Excepción al filtro 3 (docs/10 §4.1): lo que no se guarda NO va a cuarentena; se nombra en la línea de registro de la trama.
+    const omitidasEnlace: string[] = [];
+    let guardadasEnlace = 0;
+    if (guardadas > 0) {
+      for (const l of enlace) {
+        const r = await this.guardarLectura(l, ctx, dispositivo, recibidoEn, adaptador);
+        if (typeof r === 'object') omitidasEnlace.push(r.rechazo);
+        else if (r === 'duplicada') duplicadas++;
+        else guardadasEnlace++;
       }
-      const convertido = aCanonica(l.valor, l.unidad, canal.unidad_canonica);
-      if (convertido === undefined) {
-        rechazos.push(`${l.magnitud}: unidad ${l.unidad} no convertible a ${canal.unidad_canonica}`);
-        continue;
-      }
-      // Un valor finito deja de serlo al convertir (1e306 bar son 1e309 hPa): con un canal sin rango máximo, Infinity pasaría la comparación
-      // de abajo y se guardaría. Se rechaza aquí, sobre el valor ya convertido (docs/10 §4.1).
-      if (!Number.isFinite(convertido)) {
-        rechazos.push(`${l.magnitud}: ${l.valor} ${l.unidad} no cabe en un número finito al convertirlo a ${canal.unidad_canonica}`);
-        continue;
-      }
-      const valor = convertido === 0 ? 0 : convertido; // -0 se guarda como 0 (docs/10 §4.1): un cero no tiene signo físico
-      if ((canal.rango_min !== null && valor < canal.rango_min) || (canal.rango_max !== null && valor > canal.rango_max)) {
-        rechazos.push(`${l.magnitud}: ${valor} ${canal.unidad_canonica} fuera del rango físico [${canal.rango_min ?? '−∞'}, ${canal.rango_max ?? '∞'}]`);
-        continue;
-      }
-      const tiempo = tiempoPlausible(l.tiempo, recibidoEn, adaptador?.origenTiempo);
-      // Idempotente: la misma lectura (canal + instante) puede llegar dos veces con QoS 1 —reentrega
-      // tras una reconexión, o un nodo que reenvía su cola— y debe contar una sola vez (RF-10).
-      // La deduplicación solo tiene sentido si el INSTANTE LO PUSO EL EMISOR. Si la marca no es plausible
-      // y se usa la hora de recepción, cada llegada es una lectura distinta por definición: la base pone
-      // clock_timestamp() (microsegundos) en vez del Date de JavaScript (milisegundos), porque una ráfaga
-      // de tramas en cola se procesa en el mismo milisegundo y colisionaría entre sí (visto el 15/09).
-      const tiempoDelEmisor = tiempo !== recibidoEn;
-      // recibido_en y origen_tiempo (migración 08): la fila dice de dónde salió `tiempo` y permite medir la
-      // deriva del reloj del emisor (recibido_en − tiempo, RF-47). Con origen 'recepcion' esa deriva no
-      // significa nada (tiempo lo puso la base microsegundos después): la vista de salud la excluye.
-      const r = await this.pool.query<{ tiempo: Date }>(
-        `INSERT INTO medicion (canal_id, tiempo, valor, unidad, recibido_en, origen_tiempo)
-         VALUES ($1, COALESCE($2::timestamptz, clock_timestamp()), $3, $4, $5, $6)
-         ON CONFLICT (canal_id, tiempo) DO NOTHING
-         RETURNING tiempo`,
-        [canal.id, tiempoDelEmisor ? tiempo : null, valor, canal.unidad_canonica, recibidoEn,
-          tiempoDelEmisor ? adaptador?.origenTiempo : 'recepcion'],
-      );
-      if (r.rowCount === 0) {
-        duplicadas++;
-        continue; // ya estaba: no se reevalúa el umbral ni se cuenta como nueva
-      }
-      guardadas++;
-      // Al panel en vivo (TT-39), ya guardada: el INSERT se confirma solo (sin transacción por trama).
-      this.eventos.publicar({
-        tipo: 'medicion', dispositivo_id: dispositivo.id, canal_id: canal.id, valor, unidad: canal.unidad_canonica,
-        tiempo: r.rows[0].tiempo.toISOString(), // la marca que puso la base, no la de JavaScript
-        porcentaje: porcentaje(valor, canal.escala_cero ?? null, canal.escala_cien ?? null),
-      });
-      // ── [5] Alertar: ¿la medición cruza un umbral de este canal? (en mantenimiento no abre condiciones, RF-22) ──
-      await this.alertas.evaluar(dispositivo.id, canal.id, ctx.idFisico, valor, canal.unidad_canonica, dispositivo.estado === 'mantenimiento',
-        { tiempo: r.rows[0].tiempo, intervaloS: dispositivo.intervalo_esperado_s });
     }
 
     if (rechazos.length) await this.cuarentena(trama, 'invalida', rechazos.join('; '), cuota);
@@ -411,9 +387,76 @@ export class RecepcionService implements OnModuleInit {
     if (guardadas || duplicadas) {
       const dup = duplicadas ? ` · ${duplicadas} duplicada(s) ignorada(s)` : '';
       const ign = ctx.ignoradas?.length ? ` · ${ctx.ignoradas.length} clave(s) fuera del mapa: ${ctx.ignoradas.slice(0, 5).join(', ')}` : '';
-      this.log.log(`${ctx.idFisico}: ${guardadas}/${lecturas.length} lecturas guardadas vía ${adaptador?.nombre}${dup}${ign}`);
+      const enl = enlace.length ? ` · enlace ${guardadasEnlace}/${enlace.length}` : '';
+      const omi = (omitidasEnlace.length ? ` · enlace omitido (sin cuarentena): ${omitidasEnlace.join('; ')}` : '')
+        + (senalOmitidaPorTope > 0 ? ` · señal omitida por el tope (${senalOmitidaPorTope} lectura(s) del enlace; las del sensor cabían)` : '');
+      this.log.log(`${ctx.idFisico}: ${guardadas}/${lecturas.length} lecturas guardadas vía ${adaptador?.nombre}${dup}${ign}${enl}${omi}`);
     }
-    return { guardadas, duplicadas, rechazos: rechazoTope !== null ? [rechazoTope, ...rechazos] : rechazos, malformada, repetida };
+    return { guardadas: guardadas + guardadasEnlace, duplicadas, rechazos: rechazoTope !== null ? [rechazoTope, ...rechazos] : rechazos, malformada, repetida };
+  }
+
+  // Filtros 3 a 5 para UNA lectura: canal declarado, unidad, rango, INSERT idempotente, evento en vivo y umbral. Devuelve el motivo del
+  // rechazo, o si quedó guardada o ya estaba.
+  private async guardarLectura(l: Lectura, ctx: ContextoTrama, dispositivo: Dispositivo, recibidoEn: Date, adaptador: Adaptador | undefined): Promise<{ rechazo: string } | 'guardada' | 'duplicada'> {
+    const canal = await this.buscarCanal(dispositivo.id, l.magnitud);
+    if (!canal) return { rechazo: `${l.magnitud}: canal no declarado para este dispositivo` };
+    const convertido = aCanonica(l.valor, l.unidad, canal.unidad_canonica);
+    if (convertido === undefined) {
+      return { rechazo: `${l.magnitud}: unidad ${l.unidad} no convertible a ${canal.unidad_canonica}` };
+    }
+    // Un valor finito deja de serlo al convertir (1e306 bar son 1e309 hPa): con un canal sin rango máximo, Infinity pasaría la comparación
+    // de abajo y se guardaría. Se rechaza aquí, sobre el valor ya convertido (docs/10 §4.1).
+    if (!Number.isFinite(convertido)) {
+      return { rechazo: `${l.magnitud}: ${l.valor} ${l.unidad} no cabe en un número finito al convertirlo a ${canal.unidad_canonica}` };
+    }
+    const valor = convertido === 0 ? 0 : convertido; // -0 se guarda como 0 (docs/10 §4.1): un cero no tiene signo físico
+    if ((canal.rango_min !== null && valor < canal.rango_min) || (canal.rango_max !== null && valor > canal.rango_max)) {
+      return { rechazo: `${l.magnitud}: ${valor} ${canal.unidad_canonica} fuera del rango físico [${canal.rango_min ?? '−∞'}, ${canal.rango_max ?? '∞'}]` };
+    }
+    const tiempo = tiempoPlausible(l.tiempo, recibidoEn, adaptador?.origenTiempo);
+    // Idempotente: la misma lectura (canal + instante) puede llegar dos veces con QoS 1 —reentrega
+    // tras una reconexión, o un nodo que reenvía su cola— y debe contar una sola vez (RF-10).
+    // La deduplicación solo tiene sentido si el INSTANTE LO PUSO EL EMISOR. Si la marca no es plausible
+    // y se usa la hora de recepción, cada llegada es una lectura distinta por definición: la base pone
+    // clock_timestamp() (microsegundos) en vez del Date de JavaScript (milisegundos), porque una ráfaga
+    // de tramas en cola se procesa en el mismo milisegundo y colisionaría entre sí (visto el 15/09).
+    const tiempoDelEmisor = tiempo !== recibidoEn;
+    // recibido_en y origen_tiempo (migración 08): la fila dice de dónde salió `tiempo` y permite medir la
+    // deriva del reloj del emisor (recibido_en − tiempo, RF-47). Con origen 'recepcion' esa deriva no
+    // significa nada (tiempo lo puso la base microsegundos después): la vista de salud la excluye.
+    const r = await this.pool.query<{ tiempo: Date }>(
+      `INSERT INTO medicion (canal_id, tiempo, valor, unidad, recibido_en, origen_tiempo)
+       VALUES ($1, COALESCE($2::timestamptz, clock_timestamp()), $3, $4, $5, $6)
+       ON CONFLICT (canal_id, tiempo) DO NOTHING
+       RETURNING tiempo`,
+      [canal.id, tiempoDelEmisor ? tiempo : null, valor, canal.unidad_canonica, recibidoEn,
+        tiempoDelEmisor ? adaptador?.origenTiempo : 'recepcion'],
+    );
+    if (r.rowCount === 0) return 'duplicada'; // ya estaba: no se reevalúa el umbral ni se cuenta como nueva
+    // Al panel en vivo (TT-39), ya guardada: el INSERT se confirma solo (sin transacción por trama).
+    this.eventos.publicar({
+      tipo: 'medicion', dispositivo_id: dispositivo.id, canal_id: canal.id, valor, unidad: canal.unidad_canonica,
+      tiempo: r.rows[0].tiempo.toISOString(), // la marca que puso la base, no la de JavaScript
+      porcentaje: porcentaje(valor, canal.escala_cero ?? null, canal.escala_cien ?? null),
+    });
+    // ── [5] Alertar: ¿la medición cruza un umbral de este canal? (en mantenimiento no abre condiciones, RF-22) ──
+    await this.alertas.evaluar(dispositivo.id, canal.id, ctx.idFisico, valor, canal.unidad_canonica, dispositivo.estado === 'mantenimiento',
+      { tiempo: r.rows[0].tiempo, intervaloS: dispositivo.intervalo_esperado_s });
+    return 'guardada';
+  }
+
+  // Las lecturas de la señal del enlace (docs/10 §8.4 punto 71): de `ctx.enlace`, las magnitudes que el nodo declaró como canal y que el
+  // sensor no envió él mismo (no se mezclan dos orígenes en un canal), con la marca de las lecturas del sensor. Sin canal declarado, ninguna:
+  // un nodo sin `rssi` ni `snr` recibe exactamente lo de antes.
+  private lecturasDeEnlace(ctx: ContextoTrama, dispositivo: Dispositivo, delSensor: readonly Lectura[]): Lectura[] {
+    const declaradas = dispositivo.magnitudes ?? [];
+    const r: Lectura[] = [];
+    for (const m of MAGNITUDES_ENLACE) {
+      const valor = ctx.enlace?.[m];
+      if (valor === undefined || !declaradas.includes(m) || delSensor.some((l) => l.magnitud === m)) continue;
+      r.push({ magnitud: m, valor, tiempo: delSensor[0]?.tiempo });
+    }
+    return r;
   }
 
   // ── Vía HTTP (docs/10 §8.4 punto 52): el filtro 1 lo hace la capa HTTP (http/verificacion.ts) con lo que esta consulta entrega ──
@@ -470,6 +513,31 @@ export class RecepcionService implements OnModuleInit {
     }
   }
 
+  // «Lo que la trama trae y no se guarda» (GET /dispositivos/{id}/sin-guardar; docs/10 §8.4 punto 72 i): las MAX_TRAMAS_SIN_GUARDAR tramas
+  // más recientes del equipo, entre las aceptadas (`trama`) y las rechazadas (`cuarentena`), releídas con el adaptador, la receta y los alias
+  // vigentes (la misma consulta del filtro 1). No escribe nada. undefined si el equipo no existe.
+  async sinGuardar(dispositivoId: string): Promise<{ revisadas: number; claves: ClaveSinGuardar[] } | undefined> {
+    // Con tiempo máximo (revisión del 25/11/2026): relee cargas crudas a pedido de una persona; una base lenta no deja la petición colgada.
+    const conTope = (text: string, values: unknown[] = []): QueryConfig & { query_timeout: number } => ({ text, values, query_timeout: TOPE_SIN_GUARDAR_MS });
+    const id = await this.pool.query<{ id_fisico: string }>(conTope('SELECT id_fisico FROM dispositivo WHERE id = $1', [dispositivoId]));
+    const d = id.rows[0] === undefined ? undefined : await this.buscarDispositivo(id.rows[0].id_fisico);
+    if (d === undefined) return undefined;
+    const [filas, catalogo] = await Promise.all([
+      this.pool.query<FilaRetenida>(conTope(
+        `SELECT payload, topico, recibido_en FROM (
+           (SELECT payload, topico, recibido_en FROM trama WHERE dispositivo_id = $1 ORDER BY recibido_en DESC LIMIT $2)
+           UNION ALL
+           (SELECT payload_crudo, topico, recibido_en FROM cuarentena WHERE dispositivo_id = $1 ORDER BY recibido_en DESC LIMIT $2)) u
+          ORDER BY recibido_en DESC LIMIT $2`, [dispositivoId, MAX_TRAMAS_SIN_GUARDAR])),
+      this.pool.query<{ codigo: string }>(conTope('SELECT codigo FROM magnitud')),
+    ]);
+    const claves = clavesSinGuardar(filas.rows, {
+      formato: d.formato, idFisico: id.rows[0].id_fisico, declaradas: d.magnitudes ?? [], catalogo: new Set(catalogo.rows.map((m) => m.codigo)),
+      decodificador: d.decodificador, receta: d.receta, alias: d.alias,
+    }, this.adaptadores);
+    return { revisadas: filas.rows.length, claves };
+  }
+
   private async buscarPasarela(idFisico: string): Promise<Pasarela | undefined> {
     const r = await this.pool.query<Pasarela>(
       'SELECT p.id, p.activo, s.codigo AS sitio_codigo FROM pasarela p JOIN sitio s ON s.id = p.sitio_id WHERE p.id_fisico = $1',
@@ -482,6 +550,7 @@ export class RecepcionService implements OnModuleInit {
     const r = await this.pool.query<Dispositivo>(
       `SELECT d.id, d.estado, d.formato, d.pasarela_id, s.codigo AS sitio_codigo, d.decodificador, e.ultimo_fcnt, d.intervalo_esperado_s,
               (SELECT count(*)::int FROM canal c WHERE c.dispositivo_id = d.id) AS canales, e.ventana_inicio,
+              ARRAY(SELECT c.magnitud_codigo FROM canal c WHERE c.dispositivo_id = d.id) AS magnitudes,
               COALESCE(e.ventana_lecturas, 0) AS ventana_lecturas, COALESCE(e.ventana_cuarentena, 0) AS ventana_cuarentena,
               COALESCE(e.ventana_sobre_tope, 0) AS ventana_sobre_tope, COALESCE(e.ventana_omitidas, 0) AS ventana_omitidas,
               EXISTS (SELECT 1 FROM condicion rc WHERE rc.dispositivo_id = d.id AND rc.tipo = 'reloj_desviado' AND rc.cerrada_en IS NULL) AS reloj_desviado,
