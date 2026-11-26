@@ -33,8 +33,10 @@ real) y que lo que el broker confirmó quedó guardado. El método y los resulta
    minuto quedaría sin su línea del emisor). Luego `bash resumen.sh --datos ~/ventana-72h/datos --sitio <código> --equipos 10 --desde
    <instante UTC del arranque> --horas 72 --planeada <instante UTC de cada caída provocada>` (una `--planeada` por caída: la del backend y
    la del broker). La ventana es la pedida, no la que la sonda alcanzó a escribir. Que el emisor arranque antes que la sonda y se detenga
-   después es lo correcto y no produce aviso. Si la sonda registró minutos ANTES del inicio pedido (por ejemplo, el ensayo de 1 hora previo),
-   el resumen juzga además la peor ventana de 72 h sobre todo lo registrado y el veredicto usa la peor; `--fuera-motivo «…»` deja una nota.
+   después es lo correcto y no produce aviso. Si la sonda registró minutos ANTES del inicio pedido sin cortes de más de 2 minutos, el
+   resumen juzga además la peor ventana de 72 h sobre ese tramo continuo y el veredicto usa la peor; lo anterior a un hueco de más de 2
+   minutos (por ejemplo, el ensayo de 1 hora en la misma carpeta, seguido de una pausa) sale como «Corrida anterior, no juzgada».
+   `--fuera-motivo «…»` deja una nota.
 
 ## Cómo se interpreta
 
@@ -42,7 +44,8 @@ real) y que lo que el broker confirmó quedó guardado. El método y los resulta
   más de una, manda la peor y el resumen avisa cuántos minutos la tuvieron); (2) `/salud` respondió 200 a través del proxy; (3) el broker
   y la base están arriba y sanos (`--criticos` puede agregar servicios, nunca quitar esos dos); (4) hay línea del emisor para ese minuto,
   con todos sus equipos conectados y a lo más 1 mensaje en vuelo al cerrarlo, y CADA equipo tiene en `confirmados.csv` un mensaje
-  confirmado con marca de tiempo en ese minuto, sin excepciones; (5) el dato llega: la frescura existe y no pasa de 480 s. Un minuto **sin
+  confirmado con marca de tiempo en ese minuto, y esa confirmación llegó a lo más 5 s después del envío (`confirmados.csv` anota también
+  el instante de llegada), sin excepciones; (5) el dato llega: la frescura existe y no pasa de 480 s. Un minuto **sin
   línea** de la sonda o del emisor cuenta como no disponible, también al principio y al final.
 - **Por qué sin excepciones.** El emisor publica alineado al reloj: el equipo j, en el segundo 6·j de cada minuto, recalculado contra el
   reloj en cada envío. Medido 30 minutos dentro de su contenedor con el límite de CPU (`cpus: 0.25`): con el `setInterval` anterior el
@@ -50,6 +53,10 @@ real) y que lo que el broker confirmó quedó guardado. El método y los resulta
   alineado al reloj, a lo más 8 ms y sin acumular. Así la marca de cada equipo cae siempre en su minuto, y un reinicio del emisor no cambia
   las fases. Para que un envío caiga en el minuto siguiente haría falta una pausa de más de 6 s del proceso; si pasa, ese minuto cuenta como
   no disponible (en contra del sistema).
+- **Por qué «a tiempo».** Durante un corte breve del broker la biblioteca guarda los envíos y los reenvía al reconectar: el PUBACK llega,
+  pero tarde, y los clientes pueden reconectar antes del fin del minuto (la sonda y el «conectados» de `emisor.csv` miran solo un instante
+  por minuto). Una confirmación sana por TLS a través del proxy tarda milisegundos (medido en `docs/16 §104`); 5 s queda bajo los 6 s que
+  separan las ranuras de dos equipos, así que un corte de más de 6 s alcanza la ranura de alguno y deja su minuto no disponible.
 - **Las tolerancias, con su fundamento.** En vuelo al cerrar el minuto, 1 mensaje: los equipos publican separados 6 s y un PUBACK tarda
   milisegundos, así que en el instante del borde cabe a lo más uno. **Consistencia de los archivos del emisor:** las marcas de
   `confirmados.csv` en la ventana y la suma de confirmados de `emisor.csv` difieren a lo más en 2 × equipos (uno cuenta por la marca del
@@ -88,6 +95,9 @@ real) y que lo que el broker confirmó quedó guardado. El método y los resulta
   quitan el veredicto; las marcas que faltan, en cambio, cuentan cada una como minuto no disponible, y lo confirmado que falta en la base
   tiene tolerancia 0.
 - Un reinicio del emisor o una pausa de más de 6 s de su proceso cuentan en contra del sistema (minutos no disponibles), no a su favor.
+- Un salto del reloj del servidor hacia adelante deja sin marca a los equipos cuya ranura quedó saltada en ese minuto (un minuto en contra
+  del sistema); NTP suele ajustar de a poco, así que es raro. Hacia atrás produce un envío de más, no un hueco.
+- Un corte de menos de 6 s puede caer entre las ranuras de dos equipos y no verse.
 - La memoria es la de `docker stats`, la herramienta que nombra RNF-17: descuenta la caché de archivos inactiva del contenedor, así que
   no es exactamente la cifra que vigila el techo de `deploy.resources.limits.memory` (que la incluye).
 - El emisor publica a la escala del caso real (10 equipos cada 60 s); no es una prueba de carga: RNF-17 queda cubierto aquí en reposo y con

@@ -7,8 +7,8 @@
 //   hora_utc,enviados,confirmados,reconexiones,conectados,en_vuelo,equipos,periodo_s
 // hora_utc es el INICIO del minuto UTC al que pertenecen los contadores (el resumen lo cruza con el mismo minuto de la sonda); equipos y
 // periodo_s dejan al resumen calcular cuántos envíos esperar por minuto.
-// Además, UNA línea por mensaje confirmado en VENTANA_CONFIRMADOS (/ventana/datos/confirmados.csv): equipo,bt_ms (la marca de tiempo del
-// mensaje en milisegundos, la misma que guarda la base). Se escribe en el instante del PUBACK, sin esperar al fin del minuto: así un
+// Además, UNA línea por mensaje confirmado en VENTANA_CONFIRMADOS (/ventana/datos/confirmados.csv): equipo,bt_ms,llegada_ms (la marca de
+// tiempo del mensaje en milisegundos, la misma que guarda la base, y el instante en que llegó su PUBACK: el resumen exige que llegue a tiempo). Se escribe en el instante del PUBACK, sin esperar al fin del minuto: así un
 // mensaje encolado al final y confirmado después del cierre cuenta en el minuto de SU marca de tiempo, y un proceso que muere sin aviso
 // no pierde lo que ya confirmó. El resumen compara ese conjunto con lo guardado (por equipo y marca de tiempo).
 // enviados = publicaciones entregadas a la biblioteca; confirmados = PUBACK recibidos; en_vuelo = enviados aún sin PUBACK (al momento).
@@ -148,15 +148,20 @@ function arrancar(eq, i) {
       if (err) return;
       // Si no se puede anotar, se dice en voz alta y ese confirmado NO cuenta en emisor.csv: el resumen verá la marca faltante (minuto no
       // disponible) y la diferencia entre los dos archivos, en vez de un confirmados.csv corto en silencio.
-      try { appendFileSync(CONFIRMADOS, `${eq.id},${btMs}\n`); } catch (e) { console.error(`FALLA no puedo anotar en ${CONFIRMADOS} el confirmado de ${eq.id} (${e.code ?? 'error'}): no cuenta como confirmado`); return; }
+      try { appendFileSync(CONFIRMADOS, `${eq.id},${btMs},${Date.now()}\n`); } catch (e) { console.error(`FALLA no puedo anotar en ${CONFIRMADOS} el confirmado de ${eq.id} (${e.code ?? 'error'}): no cuenta como confirmado`); return; }
       m.confirmados++;
     });
   };
   const P = PERIODO_S * 1000;
+  // `ultima` es la ranura ya usada: el temporizador corre con el reloj monótono y puede disparar un milisegundo ANTES de la ranura según el
+  // reloj de pared; sin esto, la cuenta volvía a dar la misma ranura y el equipo publicaba dos veces en ese minuto (visto en el ensayo
+  // local del 25/11/2026, con el broker caído).
+  let ultima = 0;
   const programar = () => {
     const ahora = Date.now();
     let siguiente = Math.floor(ahora / P) * P + fase;
-    if (siguiente <= ahora) siguiente += P;
+    if (siguiente <= ahora || siguiente <= ultima) siguiente += P;
+    ultima = siguiente;
     setTimeout(() => { publicar(); programar(); }, siguiente - ahora);
   };
   programar();

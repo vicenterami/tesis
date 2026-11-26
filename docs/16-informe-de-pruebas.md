@@ -5767,7 +5767,10 @@ sección deja el **método** y el **ensayo del instrumento** en la pila local; e
   5 (con más de una, manda la peor y se avisa); (2) `/salud` en 200 a través del proxy; (3) el broker y la base arriba y sanos (la lista de
   servicios críticos puede agregar otros, nunca quitar esos dos); (4) hay línea del emisor en ese minuto, con todos sus equipos conectados
   y a lo más 1 mensaje en vuelo al cerrarlo, y **cada equipo** tiene en `confirmados.csv` un mensaje confirmado con marca de tiempo en ese
-  minuto, sin excepciones (con los envíos alineados al reloj la marca de cada equipo cae siempre en su minuto; una pausa de más de 6 s del
+  minuto, confirmado a lo más 5 s después del envío (`confirmados.csv` anota también el instante de llegada: durante un corte breve del
+  broker la biblioteca reenvía al reconectar y el PUBACK llega tarde, aunque los clientes reconecten antes del fin del minuto; una
+  confirmación sana tarda milisegundos, ver el ensayo, y 5 s queda bajo los 6 s entre ranuras, así que un corte de más de 6 s alcanza la de
+  algún equipo), sin excepciones (con los envíos alineados al reloj la marca de cada equipo cae siempre en su minuto; una pausa de más de 6 s del
   proceso del emisor la haría caer en el siguiente, y ese minuto cuenta en contra del sistema); (5) el dato llega: la frescura existe y no
   pasa de 480 s. Un minuto sin línea de la sonda o del emisor cuenta como no disponible, también en los bordes. **Tolerancias:** 1 mensaje en
   vuelo al cerrar el minuto (los equipos publican separados 6 s y un PUBACK tarda milisegundos: en el instante del borde cabe uno); y las
@@ -5781,29 +5784,31 @@ sección deja el **método** y el **ensayo del instrumento** en la pila local; e
   de `confirmados.csv` en la ventana se busca por equipo y marca de tiempo con una consulta de solo lectura; tolerancia 0, porque los dos
   lados se atribuyen por la marca del mensaje). `--guardados N`, un número dado a mano, sirve para la prueba y un ensayo sin base, y no da
   veredicto. **Fuera de la ventana:** las líneas de la sonda después del fin no cuentan (no sirven para elegir horas); si la sonda registró
-  minutos antes del inicio pedido, el resumen juzga además la peor ventana de 72 h sobre todo lo registrado y el veredicto usa la peor de
-  las dos (empezar más tarde no esconde minutos malos); `--fuera-motivo` solo deja una nota. Las líneas del emisor fuera de la ventana no
+  minutos antes del inicio pedido, el resumen juzga además la peor ventana de 72 h sobre el tramo continuo de líneas que llega al inicio
+  (se corta en un hueco de más de 2 minutos; lo anterior sale como «corrida anterior, no juzgada», por ejemplo un ensayo previo en la misma
+  carpeta) y el veredicto usa la peor de las dos (empezar más tarde dentro de una corrida no esconde minutos malos); el aviso cuenta también
+  los minutos sin línea de ese tramo; `--fuera-motivo` solo deja una nota. Las líneas del emisor fuera de la ventana no
   cuentan. Las líneas repetidas de `confirmados.csv`, dentro o fuera de la ventana, cuentan una vez. **Sin veredicto (salida 3)**: falta `emisor.csv` o `confirmados.csv`, no
   tienen las columnas o el formato esperados o traen valores no numéricos; el emisor no tiene equipos, son otros que `--equipos` o su
   período pasa de 60 s; `confirmados.csv` está vacío o no cuadra; lo guardado se dio a mano o no se pudo consultar. Con varias causas a la vez, manda la 3. Las caídas provocadas no se descuentan. Cada racha de
   minutos no disponibles es un incidente, con su causa. Además: p95 de la salud (rango más cercano), memoria mediana y máxima por servicio
   y total de la plataforma, reinicios, crecimiento del disco y, para cada caída provocada, el incidente que empieza entre su minuto y dos
   minutos después y el tiempo hasta la primera línea que vio el problema (si no hubo incidente, lo dice).
-- **Prueba del resumen** (`resumen-prueba.sh`, en el verificador): 42 casos con CSV sintéticos, sin tocar la base (el camino de la
+- **Prueba del resumen** (`resumen-prueba.sh`, en el verificador): 46 casos con CSV sintéticos, sin tocar la base (el camino de la
   consulta, con un `docker` falso que devuelve una salida de psql conocida), cada uno con su salida, su texto y su número de minutos no
   disponibles exigidos. Aprueban el caso limpio de 72 horas, el borde de 43, la base con mensajes ajenos de más, el emisor arrancado antes
-  que la sonda, las líneas de la sonda después del fin, las horas previas limpias (con o sin nota) y el reinicio del emisor (con un minuto
-  no disponible si perdió una marca); cuentan como no disponible la marca que cruza el borde y la de un temporizador atrasado (un minuto
-  cada una), y una línea repetida fuera de la ventana no tapa la marca que falta dentro; no aprueban el borde de 44, la base vacía o con un
+  que la sonda, las líneas de la sonda después del fin, las horas previas limpias (con o sin nota), un ensayo previo separado por un hueco (de 1 hora o
+  de dos días antes: «corrida anterior, no juzgada»), una confirmación que llega a los 4 s y el reinicio del emisor (con un minuto
+  no disponible si perdió una marca); cuentan como no disponible la marca que cruza el borde, la de un temporizador atrasado y un corte de
+  30 s dentro de un minuto con las confirmaciones tardías (un minuto cada uno), y una línea repetida fuera de la ventana no tapa la marca que falta dentro; no aprueban el borde de 44, la base vacía o con un
   mensaje de menos, el dato atrasado, el emisor solo la última hora, 1 de 10 confirmados, 9 enviados y 8 confirmados por minuto, un
   equipo mudo, un equipo desconectado, el patrón 0-2-1 de marcas de un equipo, una línea buena y otra mala en el mismo minuto, el estado
   vacío, las caídas planeadas, un hueco en medio, 100 horas con 60 minutos caídos seguidos (la peor ventana) y las mejores 72 de 80 horas,
   con o sin «motivo» (se juzga la peor ventana sobre todo lo registrado); quedan sin veredicto un solo equipo, sin `emisor.csv`, sin
   `confirmados.csv`, con `confirmados.csv` vacío o corto, un valor no numérico, un período de 120 s, lo guardado a mano y sin lo guardado;
   una ventana de 1 hora es «ensayo»; `--criticos` recortado y sin `--equipos` son error de uso; y la sonda que empieza tarde no cubre.
-  **Plantado** con el resumen de la versión anterior: fallan 8 de los 42 (la marca que cruza el borde, el patrón 0-2-1, la línea repetida
-  fuera de la ventana, las horas previas limpias, las mejores 72 de 80 con y sin motivo, la nota en las horas previas y las líneas después
-  del fin).
+  **Plantado** con el resumen de cada versión anterior: fallaban 14, luego 12, luego 8 y, con el de la versión previa a esta (leyendo
+  `confirmados.csv` sin la columna nueva), 3: los dos ensayos previos con hueco (daban «NO APRUEBA») y el corte de 30 s (no lo veía).
 - **Diferencia con el método escrito de RNF-18.** `docs/02` decía «emulador publicando cada minuto en el banco; se cuentan las ventanas
   sin confirmación»; se mide en el servidor, con clientes reales por el proxy, y el ensayo mostró por qué solo la confirmación no basta:
   con el backend caído el broker sigue confirmando (guarda en la cola de la sesión persistente), y con el broker caído `/salud` sigue en
@@ -5833,44 +5838,52 @@ sección deja el **método** y el **ensayo del instrumento** en la pila local; e
 **Límites declarados.** La disponibilidad se mide **dentro del servidor**: no ve la red externa al servidor ni el camino desde Internet.
 La sonda tiene resolución de un minuto: un corte de segundos entre dos ejecuciones puede no verse. La memoria de `docker stats` descuenta la
 caché de archivos inactiva. El emisor publica a la escala del caso real; no es una prueba de carga (esa son §2–§3 y §10). La lista de
-servicios de la sonda nombra solo los de la plataforma, más el emisor (que el resumen separa del total). Después de la medición se versionan el resumen y su tabla, nunca los CSV crudos,
+servicios de la sonda nombra solo los de la plataforma, más el emisor (que el resumen separa del total). Un corte de menos de 6 s puede
+caer entre las ranuras de dos equipos y no verse. Un salto del reloj del servidor hacia adelante deja sin marca a los equipos cuya ranura
+saltó (un minuto en contra del sistema; NTP suele ajustar de a poco); hacia atrás, un envío de más. Después de la medición se versionan el resumen y su tabla, nunca los CSV crudos,
 el registro de errores ni el archivo de configuración (`LEEME.md`).
 
-**Ensayo del instrumento en la pila local** (no es la medición de 72 horas; repetido el 25/11/2026 con la regla final y el emisor alineado
-al reloj): respaldo previo con `pg_dump`; una persona de descarte (administradora del sistema, `@ejemplo.invalid`) creó por la API un sitio
-de descarte, los 10 equipos por el alta masiva y un enlace público; el archivo de credenciales se armó con el formato exacto de la
-descarga, en una carpeta temporal con permisos 600. El emisor arrancó en su contenedor 150 s antes que la sonda y se detuvo un minuto
-después del fin de la ventana (como en la medición real); la sonda corrió en un bucle por minuto (el plan B de `cron`). A los 4 minutos se
-detuvo el **backend** 90 s y, 2 minutos y medio después de levantarlo, el **broker** otros 90 s. El resumen se pidió con el instante de
-arranque de la sonda y el de cierre (13 minutos), `--equipos 10`, las dos caídas como planeadas y lo guardado consultado en la base,
-mensaje por mensaje.
+**Ensayo del instrumento en la pila local** (no es la medición de 72 horas; repetido el 25/11/2026 con la regla final, el emisor alineado
+al reloj y las confirmaciones a tiempo): respaldo previo con `pg_dump`; una persona de descarte (administradora del sistema,
+`@ejemplo.invalid`) creó por la API un sitio de descarte, los 10 equipos por el alta masiva y un enlace público; el archivo de credenciales
+se armó con el formato exacto de la descarga, en una carpeta temporal con permisos 600. El emisor arrancó en su contenedor 150 s antes que
+la sonda y se detuvo un minuto después del fin de la ventana; la sonda corrió en un bucle por minuto (el plan B de `cron`). Tres caídas
+provocadas: el **backend** 90 s; 2 minutos y medio después, el **broker** 90 s; y, 3 minutos después, el **broker 30 s dentro de un
+minuto** (del segundo 10 al 40, entre dos líneas de la sonda). El resumen se pidió con el instante de arranque de la sonda y el de cierre
+(16 minutos), `--equipos 10`, las tres caídas como planeadas y lo guardado consultado en la base, mensaje por mensaje.
 
-| Medida (ensayo local, 13 minutos pedidos) | Valor |
+| Medida (ensayo local, 16 minutos pedidos) | Valor |
 |---|---|
-| Resultado | **ensayo del instrumento: sin veredicto del requisito** (13 minutos; RNF-18 pide 4 320) |
-| Disponibilidad (regla completa) | 8 de 13 (61,53 %, truncado): 5 minutos no disponibles en 2 incidentes |
-| Solo el emisor | 11 de 13: los dos minutos de la caída del broker con los equipos desconectados; con el backend caído el broker siguió confirmando |
-| Solo `/salud` | 11 de 13: los dos minutos del backend caído (502 a través del proxy); con el broker caído `/salud` siguió en 200 |
-| Incidentes | 2, cada uno atribuido a su caída provocada: el del backend, 2 minutos (salud 502, backend y proxy «no sanos», sin frescura), visto a los 18 s; el del broker, 3 minutos (broker no sano, y en dos de ellos el emisor sin todos sus equipos), visto a los 17 s |
-| Envíos alineados al reloj | en el emisor real, con TLS y las dos caídas, la marca de cada equipo se apartó a lo más 8 ms de su segundo fijo: ninguna cruzó de minuto |
+| Resultado | **ensayo del instrumento: sin veredicto del requisito** (16 minutos; RNF-18 pide 4 320) |
+| Disponibilidad (regla completa) | 11 de 16 (68,75 %): 5 minutos no disponibles en 3 incidentes |
+| Solo el emisor | 12 de 16: los tres minutos de la caída larga del broker y el del corte de 30 s; con el backend caído el broker siguió confirmando |
+| Solo `/salud` | 15 de 16: el minuto del backend caído (502 a través del proxy); con el broker caído `/salud` siguió en 200 |
+| Incidentes | 3, cada uno atribuido a su caída provocada: el del backend, 1 minuto, visto a los 35 s; el del broker, 3 minutos, visto a los 34 s; y **el corte de 30 s, 1 minuto, que la sonda no vio** (su línea cae fuera del corte y los clientes ya habían reconectado al cerrar el minuto): lo vio la regla de la confirmación a tiempo |
+| Confirmaciones | sanas: mediana 1 ms y máxima 2 ms entre el envío y el PUBACK (167 mensajes); tardías, más de 5 s: 28, todas de equipos cuya ranura cayó en una de las dos caídas del broker; ningún equipo con dos marcas en un minuto |
 | Fuera de la ventana | sin aviso: las líneas del emisor antes y después no cuentan |
-| Tiempo de respuesta de `/salud` | p95 5 ms (rango más cercano), mediana 5 ms (11 respuestas 200) |
-| Frescura del último dato | mediana 120 s, máxima 300 s (ninguna sobre 480 s); vacía en los 2 minutos del backend caído |
-| Memoria (mediana / máxima, MiB) | base 46,1 / 47,1; broker 3,7 / 4,3 (un arranque visto: su caída); backend 64,9 / 78,1 (un arranque visto); proxy 24,4 / 25,4; **total de la plataforma 151,0 / 153,7** (RNF-17: ≤ 2 048); el emisor, aparte, 28,1 / 34,9, con su chequeo propio en «healthy» al cierre |
+| Tiempo de respuesta de `/salud` | p95 14 ms (rango más cercano), mediana 5 ms (15 respuestas 200) |
+| Frescura del último dato | mediana 180 s, máxima 360 s (ninguna sobre 480 s); vacía en el minuto del backend caído |
+| Memoria (mediana / máxima, MiB) | base 46,3 / 50,7; broker 3,5 / 4,6 (dos arranques vistos: sus caídas); backend 62,0 / 63,0 (un arranque visto); proxy 24,3 / 25,3; **total de la plataforma 136,6 / 141,2** (RNF-17: ≤ 2 048); el emisor, aparte, 28,3 / 32,7, con su chequeo propio en «healthy» al cierre |
 | Reinicios automáticos | 0 en los cinco contenedores |
-| Emisor y confirmaciones | 131 enviados y 130 confirmados en las líneas de la ventana (el envío del equipo 0, en el segundo 0, cae a veces en la línea del minuto vecino porque esa línea se escribe en el mismo instante; las marcas, que van por la marca de tiempo del mensaje, no tienen ese borde); 130 marcas en `confirmados.csv`, de 130 esperadas (10 equipos × 13 minutos), igual a la suma de `emisor.csv`; 10 reconexiones tras la caída del broker |
-| Confirmados frente a guardados | 130 guardados (260 lecturas, 0 en cuarentena), buscados uno por uno por equipo y marca de tiempo: **no falta ningún confirmado** |
-| Tamaño medio por fila | 84 bytes en `medicion` y 216 en `trama`: en 72 horas, unos 7 MB y 9 MB de datos (más sus índices), la base del cálculo de holgura del disco |
+| Emisor | 160 enviados y 160 confirmados en las líneas de la ventana; 160 marcas en `confirmados.csv`, de 160 esperadas (10 equipos × 16 minutos), igual a la suma de `emisor.csv`; 20 reconexiones (una por equipo en cada caída del broker) |
+| Confirmados frente a guardados | 160 guardados (320 lecturas, 0 en cuarentena), buscados uno por uno por equipo y marca de tiempo: **no falta ningún confirmado** |
+| Tamaño medio por fila | 84 bytes en `medicion` y 217 en `trama`: en 72 horas, unos 7 MB y 9 MB de datos (más sus índices), la base del cálculo de holgura del disco |
+
+**Lo que encontró el ensayo anterior a este**, con el mismo guion: un equipo publicó dos veces en un minuto durante la caída del broker. El
+temporizador corre con el reloj monótono y disparó un milisegundo antes de su ranura según el reloj de pared, así que la cuenta volvió a dar
+la misma ranura. El emisor ahora recuerda la última ranura usada y no la repite (plantado con un reloj simulado que siempre dispara 1 ms
+antes: la forma anterior repetía la ranura en cada vuelta; la nueva, nunca). En esa corrida, una confirmación sana tardó 2,4 s justo después
+de una reconexión, bajo el umbral de 5 s.
 
 **Dos cifras que se corrigieron contra los CSV.** (1) En un ensayo anterior el aviso «fuera de la ventana» contó 4 minutos: no eran 4 del
 emisor antes de la sonda, sino 3 antes (150 s de arranque caen en 3 minutos) y 1 después (la línea parcial que el emisor escribe al
 detenerse); con la regla final esas líneas no cuentan. (2) La mediana del total de memoria no es la suma de las medianas por servicio, y
-no debe serlo: el total se calcula minuto a minuto y solo en los minutos con los cuatro servicios vivos, y el backend tiene dos niveles
-(77 a 78 MiB antes de su caída y 62 a 65 después de volver), así que la mediana del total (151,0) cae en el nivel alto, mientras la del
-backend solo (64,9) cae en el bajo porque incluye minutos que el total no cuenta. Las dos cifras son correctas; la que vale para RNF-17 es
-la del total, y sobre todo su máxima (153,7).
+no debe serlo: el total se calcula minuto a minuto y solo en los minutos con los cuatro servicios vivos. En una corrida anterior el backend
+tuvo dos niveles (77 a 78 MiB antes de su caída y 62 a 65 después) y la mediana del total cayó en el nivel alto, mientras la del backend
+solo, que incluye minutos que el total no cuenta, cayó en el bajo; en esta corrida, con el backend parejo, casi coinciden (136,6 frente a
+136,1). Para RNF-17 vale la del total, y sobre todo su máxima.
 
-**Plantados del resumen** (además de los 42 casos de `resumen-prueba.sh`): con las últimas líneas de la sonda borradas dice «NO CUBRE LA
+**Plantados del resumen** (además de los 46 casos de `resumen-prueba.sh`): con las últimas líneas de la sonda borradas dice «NO CUBRE LA
 VENTANA PEDIDA», cuenta esos minutos como no disponibles y sale con 1; sin `--desde` o sin `--hasta`/`--horas` sale con 2. En el emisor:
 contra un puerto cerrado reintenta a ≈ 1, 2, 4 y 8 s (antes 1,00, 1,12, 2,11 y 4,00: la espera iba un ciclo atrás) y sale con 2 si no
 puede escribir sus CSV (antes seguía sin medir); el registro de errores de la sonda se recorta a sus últimas líneas y guarda solo el código

@@ -21,7 +21,8 @@ chmod +x "$T/bin/docker"
 # por minuto), env (enviados por minuto), conectados, mudo (equipos que nunca confirman), artefacto ([minuto, equipo]: su marca pasa al
 # minuto siguiente, que queda con dos; artefactos: una lista de esos), atraso ([desde el minuto, equipo, segundos]: el temporizador del equipo se atrasa esos segundos
 # desde ese minuto, como un setInterval que acumula atraso), quitar y duplicar ([[minuto, equipo], …]: una marca menos o repetida tal
-# cual), em_doble (minutos con dos líneas en emisor.csv: un reinicio), malos / dobles / vacio / faltan_sonda / frescura (como antes),
+# cual), em_doble (minutos con dos líneas en emisor.csv: un reinicio), espera ([[minuto, equipo, ms], …]: el PUBACK de esa marca llega esos
+# ms después del envío; por omisión, 40 ms), malos / dobles / vacio / faltan_sonda / frescura (como antes),
 # sonda_desde y em_desde (primer
 # minuto con línea; negativo = antes del inicio), emisor ('ok'|'none'), conf_csv ('ok'|'vacio'|'corto'|'none'), nan_en, periodo,
 # psql ('todos'|'vacio'|'falta_uno'|'ajenos').
@@ -50,6 +51,7 @@ eq = op.get('equipos', 10); conf = op.get('conf', eq); env = op.get('env', eq); 
 mudo = cj('mudo'); atr = op.get('atraso')
 arts = {tuple(x) for x in op.get('artefactos', [])} | ({tuple(op['artefacto'])} if op.get('artefacto') else set())
 quitar = {tuple(x) for x in op.get('quitar', [])}; duplicar = {tuple(x) for x in op.get('duplicar', [])}
+espera = {(x[0], x[1]): x[2] for x in op.get('espera', [])}
 marcas = {}
 for i in range(op.get('em_desde', 0), mins):
     t = t0 + timedelta(minutes=i)
@@ -58,8 +60,9 @@ for i in range(op.get('em_desde', 0), mins):
         ms = int((t + timedelta(seconds=6 * j)).timestamp() * 1000)
         if (i, j) in arts: ms += 60000 + 3000   # cruza el borde: cae en el minuto siguiente, que queda con dos
         if atr and i >= atr[0] and j == atr[1]: ms += atr[2] * 1000   # temporizador atrasado
-        marcas.setdefault((ms // 60000) * 60000, []).append((f'e{j:02d}', ms))
-        if (i, j) in duplicar: marcas[(ms // 60000) * 60000].append((f'e{j:02d}', ms))
+        lleg = ms + espera.get((i, j), 40)
+        marcas.setdefault((ms // 60000) * 60000, []).append((f'e{j:02d}', ms, lleg))
+        if (i, j) in duplicar: marcas[(ms // 60000) * 60000].append((f'e{j:02d}', ms, lleg))
 lineas = [m for k in sorted(marcas) for m in marcas[k]]
 if op.get('emisor', 'ok') != 'none':
     with open(f'{d}/emisor.csv', 'w') as fe:
@@ -75,12 +78,12 @@ if modo != 'none':
         if modo == 'ok': sel = lineas
         elif modo == 'corto': sel = lineas[:len(lineas) // 2]
         else: sel = []
-        fc.writelines(f'{e},{ms}\n' for e, ms in sel)
+        fc.writelines(f'{e},{ms},{ll}\n' for e, ms, ll in sel)
 pm = op.get('psql', 'todos')
 with open(f'{d}/psql.txt', 'w') as fp:
     sel = [] if pm == 'vacio' else lineas[1:] if pm == 'falta_uno' else list(dict.fromkeys(lineas))
-    fp.writelines(f'{e} {ms}\n' for e, ms in sel)
-    if pm == 'ajenos': fp.writelines(f'otro-{j} {ms + 1}\n' for j, (_, ms) in enumerate(lineas[:500]))
+    fp.writelines(f'{e} {ms}\n' for e, ms, _ in sel)
+    if pm == 'ajenos': fp.writelines(f'otro-{j} {ms + 1}\n' for j, (_, ms, _) in enumerate(lineas[:500]))
     fp.write(f'resumen {eq} {2 * len(sel)} 0\n')
 PY
 }
@@ -144,6 +147,10 @@ caso mejores-72-de-80-horas   0 '**NO APRUEBA**'              - 0    4800 "{\"ma
 caso mejores-72-con-motivo    0 '**NO APRUEBA**'              - 0    4800 "{\"malos\": $(rango 0 480)}" --desde 2026-11-01T08:00Z --horas 72 --equipos 10 --sitio prueba --fuera-motivo '.'
 caso horas-previas-con-nota   0 'Nota: «la sonda se arrancó 3 h antes para comprobarla»' - 0 4500 '{}' --desde 2026-11-01T03:00Z --horas 72 --equipos 10 --sitio prueba --fuera-motivo 'la sonda se arrancó 3 h antes para comprobarla'
 caso sonda-despues-del-fin    0 '**APRUEBA**'                 - 0    4500 '{}' "${B[@]}"
+caso ensayo-previo-con-hueco  0 'Corrida anterior, no juzgada' 'NO APRUEBA' 0 4320 "{\"sonda_desde\": -180, \"em_desde\": -180, \"faltan_sonda\": $(rango -120 0)}" "${B[@]}"
+caso ensayo-dos-dias-antes    0 'Corrida anterior, no juzgada' 'NO APRUEBA' 0 4320 "{\"sonda_desde\": -2880, \"em_desde\": -5, \"faltan_sonda\": $(rango -2870 0)}" "${B[@]}"
+caso corte-30-s-en-un-minuto  0 '**APRUEBA**'                 - 1    4320 "{\"espera\": $(python3 -I -c 'import json; print(json.dumps([[1000, j, 35000 - 6000 * (j - 2)] for j in range(2, 7)]))')}" "${B[@]}"
+caso confirmacion-a-tiempo    0 '**APRUEBA**'                 - 0    4320 "{\"espera\": $(python3 -I -c 'import json; print(json.dumps([[1000, j, 4000] for j in range(10)]))')}" "${B[@]}"
 caso ventana-de-1-hora        0 'sin veredicto del requisito' '**APRUEBA**' 0 60 '{}' --desde 2026-11-01T00:00Z --horas 1 --equipos 10 --sitio prueba
 caso criticos-recortados      2 'no puede quitar'             '**APRUEBA**' - 4320 '{}' "${B[@]}" --criticos backend
 caso sin-equipos              2 'falta --equipos'             '**APRUEBA**' - 4320 '{}' --desde 2026-11-01T00:00Z --horas 72 --sitio prueba

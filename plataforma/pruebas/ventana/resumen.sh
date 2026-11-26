@@ -19,7 +19,11 @@
 #   3. los servicios críticos están arriba y sanos (por omisión y como mínimo, el broker y la base: «mosquitto timescaledb»);
 #   4. hay línea del emisor para ese minuto, con TODOS sus equipos conectados y a lo más 1 mensaje en vuelo al cerrarlo, y CADA equipo tiene
 #      en confirmados.csv un mensaje confirmado con marca de tiempo en ese minuto (sin excepciones: el emisor publica alineado al reloj, así
-#      que la marca de cada equipo cae siempre en su minuto; un minuto sin la marca de un equipo es no disponible, en contra del sistema);
+#      que la marca de cada equipo cae siempre en su minuto; un minuto sin la marca de un equipo es no disponible, en contra del sistema),
+#      y esa confirmación llegó a lo más 5 s después del envío (confirmados.csv anota también el instante de llegada): un corte breve del
+#      broker, aunque los clientes reconecten antes del fin del minuto, deja tardía la confirmación de los equipos cuya ranura cayó en él.
+#      Fundamento de los 5 s: una confirmación sana por TLS a través del proxy tarda milisegundos (medido en docs/16 §104), y 5 s queda bajo
+#      los 6 s que separan las ranuras de dos equipos: un corte de más de 6 s alcanza siempre la ranura de alguno;
 #   5. los datos llegan: la frescura del último dato del sitio (vista pública) existe y no pasa de --umbral-frescura (480 s).
 # Tolerancias, con su fundamento. En vuelo al cerrar el minuto: 1 mensaje (los equipos publican en su segundo fijo, separados período /
 # equipos, 6 s con 10 equipos cada 60 s, y un PUBACK tarda milisegundos: en el instante del borde cabe a lo más uno). Consistencia entre los
@@ -38,7 +42,8 @@
 # minutos no disponibles de la ventana de 72 h juzgada son a lo más el 1 % redondeado hacia abajo, 43 de 4 320, y no falta ningún
 # confirmado en la base); el porcentaje se muestra truncado.
 # La ventana es la PEDIDA, nunca la que la sonda alcanzó a escribir. Las líneas de la sonda DESPUÉS del fin no cuentan (no sirven para
-# elegir horas). Si la sonda registró minutos ANTES del inicio, el resumen juzga además la peor ventana de 72 h sobre todo lo registrado y
+# elegir horas). Si la sonda registró minutos ANTES del inicio, el resumen juzga además la peor ventana de 72 h sobre el tramo continuo de
+# líneas que llega al inicio (lo anterior a un hueco de más de 2 minutos es «corrida anterior, no juzgada», como un ensayo previo) y
 # el veredicto usa la peor de las dos: empezar más tarde no esconde minutos malos. --fuera-motivo es solo una nota que queda escrita. Las
 # líneas del emisor fuera de la ventana no cuentan (arranca antes que la sonda y se detiene después).
 # --planeada (repetible) marca una caída provocada: se le atribuye solo un incidente que EMPIEZA entre su minuto y dos minutos después, con
@@ -112,6 +117,7 @@ datos, desde, hasta, guardados, ruta_guard, base_res, sitio, umbral, umbral_disc
 planeadas = sys.argv[13:]; N = int(equipos_arg)
 umbral = int(umbral); umbral_disco = int(umbral_disco); criticos = criticos.split()
 UN_MIN = timedelta(minutes=1); TOL = 1; MIN_72H = 72 * 60
+ESPERA_MAX_MS = 5000   # confirmación a tiempo: a lo más 5 s entre el envío y el PUBACK (fundamento en la cabecera)
 ENTERO = re.compile(r'^[0-9]+$')
 def t(s):
     s = (s or '').strip()
@@ -190,7 +196,7 @@ elif equipos_n is not None and any(x['equipos'] != N for x in em_min_todo.values
     sin_veredicto.append(f'el emisor escribe {sorted({x["equipos"] for x in em_min_todo.values()})} equipos y --equipos dice {N}')
 em_min = {k: v for k, v in em_min_todo.items() if en_ventana(k)}
 
-conf_set = set(); marcas = {}; ids = set(); vistas = set()
+conf_set = set(); marcas = {}; tardias = {}; ids = set(); vistas = set()
 ruta_conf = os.path.join(datos, 'confirmados.csv')
 if not os.path.exists(ruta_conf):
     sin_veredicto.append('no hay confirmados.csv (el emisor lo escribe junto a emisor.csv)')
@@ -198,13 +204,15 @@ else:
     for n_linea, linea in enumerate(open(ruta_conf), 1):
         linea = linea.strip()
         if not linea: continue
-        mt = re.fullmatch(r'([A-Za-z0-9][A-Za-z0-9._-]{0,62}),([0-9]{10,16})', linea)
-        if not mt: sin_veredicto.append(f'confirmados.csv, línea {n_linea}: no es «equipo,marca_ms»'); break
+        mt = re.fullmatch(r'([A-Za-z0-9][A-Za-z0-9._-]{0,62}),([0-9]{10,16}),([0-9]{10,16})', linea)
+        if not mt: sin_veredicto.append(f'confirmados.csv, línea {n_linea}: no es «equipo,marca_ms,llegada_ms» (¿emisor anterior?)'); break
         bt = datetime.fromtimestamp(int(mt.group(2)) / 1000, tz=timezone.utc)
         par = (mt.group(1), int(mt.group(2)))
         if par in vistas: continue   # una línea repetida (dentro o fuera de la ventana) cuenta una vez
         vistas.add(par)
-        ids.add(mt.group(1)); k = (mt.group(1), minuto(bt)); marcas[k] = marcas.get(k, 0) + 1
+        ids.add(mt.group(1)); k = (mt.group(1), minuto(bt))
+        if int(mt.group(3)) - int(mt.group(2)) <= ESPERA_MAX_MS: marcas[k] = marcas.get(k, 0) + 1
+        else: tardias[k] = tardias.get(k, 0) + 1   # confirmada tarde: el equipo no tuvo servicio en su ranura
         if ini <= bt < fin_excl: conf_set.add((mt.group(1), int(mt.group(2))))
 conf = len(conf_set)
 if len(ids) > N: sin_veredicto.append(f'confirmados.csv trae {len(ids)} equipos distintos y --equipos dice {N}')
@@ -259,11 +267,25 @@ aprueba = peor_no <= tope and (faltan or 0) == 0
 # Fuera de la ventana: solo los minutos con línea de la sonda (el emisor arranca antes y se detiene después, a propósito).
 fuera = sorted(k for k in por_min_todo if not en_ventana(k))
 fuera_no = sum(1 for k in fuera if not disponible(k, por_min_todo, em_min_todo))
-antes = [k for k in fuera if k < ini]; despues = [k for k in fuera if k > fin]
-antes_no = sum(1 for k in antes if not disponible(k, por_min_todo, em_min_todo))
+antes_todo = [k for k in fuera if k < ini]; despues = [k for k in fuera if k > fin]
+# El tramo CONTINUO de líneas de la sonda que termina en el inicio pedido (se corta en un hueco de más de 2 minutos): lo anterior a ese
+# hueco es otra corrida (por ejemplo, el ensayo de 1 hora) y no se juzga.
+antes = []
+if antes_todo:
+    previo = ini
+    for k in sorted(antes_todo, reverse=True):
+        if previo - k > 3 * UN_MIN: break
+        antes.append(k); previo = k
+    antes.sort()
+anterior = [k for k in antes_todo if not antes or k < antes[0]]
+tramo = []
+if antes:
+    m = antes[0]
+    while m < ini: tramo.append(m); m += UN_MIN
+antes_no = sum(1 for k in tramo if not disponible(k, por_min_todo, em_min_todo))
 # Líneas de la sonda DESPUÉS del fin: se aceptan (no sirven para elegir horas). ANTES del inicio: además de la ventana pedida, se juzga la
-# peor ventana de 72 h sobre TODO lo que la sonda registró desde su primera línea hasta el fin pedido, y el veredicto usa la peor de las
-# dos: empezar la ventana más tarde no puede esconder minutos malos. --fuera-motivo es solo una nota.
+# peor ventana de 72 h sobre el tramo continuo que llega al inicio, hasta el fin pedido, y el veredicto usa la peor de las dos: empezar la
+# ventana más tarde dentro de una corrida no puede esconder minutos malos. --fuera-motivo es solo una nota.
 peor_ext = None
 if antes and total >= MIN_72H:
     ext = []
@@ -323,8 +345,11 @@ recon = sum(x['reconexiones'] for x in em_min.values())
 
 o = []
 o.append(f'**Ventana pedida:** {h(ini)} a {h(fin_excl)} ({total} minutos); la sonda escribió {len(filas)} líneas en ella.\n')
+if anterior:
+    o.append(f'Corrida anterior, no juzgada: la sonda escribió {len(anterior)} línea(s) entre {h(min(anterior))} y {h(max(anterior) + UN_MIN)}'
+             f' ({(max(anterior) + UN_MIN - min(anterior)).total_seconds() / 3600:.1f} h), separadas de esta corrida por un hueco de más de 2 minutos.\n')
 if antes:
-    o.append(f'**LA SONDA REGISTRÓ {len(antes)} MINUTO(S) ANTES DEL INICIO PEDIDO** ({len(antes) / 60:.1f} h; **{antes_no} no disponibles**):'
+    o.append(f'**LA SONDA REGISTRÓ {len(tramo)} MINUTO(S) SEGUIDOS ANTES DEL INICIO PEDIDO** ({len(tramo) / 60:.1f} h, sin cortes de más de 2 minutos; **{antes_no} no disponibles**, contando los que no tienen línea):'
              + (f' se juzga también la peor ventana de 72 h sobre todo lo registrado ({peor_ext} minutos no disponibles, desde {h(peor_ext_ini)}) y el veredicto usa la peor.' if peor_ext is not None else ' (ventana de menos de 72 h: sin veredicto del requisito de todos modos).')
              + (f' Nota: «{motivo_fuera.strip()}».' if motivo_fuera.strip() else '') + '\n')
 if despues:
