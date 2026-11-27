@@ -12,5 +12,5 @@
 # (docs/16 §12). El FROM no cambia: la reconstrucción de 1.30.7-alpine publicada ese mismo día no hace falta para cerrarlas y todavía
 # no cumple las 24 h de publicada que se le piden a una huella nueva.
 # Cuando la imagen oficial se reconstruya con ellas, el escaneo dará 0 sin este RUN y el archivo vuelve a ser solo el FROM.
-FROM nginx:1.30.7-alpine@sha256:bef154735288bc38d99fac41ae63730684bcc661503673a04a0f9bc526ba8598
+FROM nginx:1.30.7-alpine@sha256:caf4e1e032a20f9c3c5e28fc7f25ffd768ad8677b4975c54193075997b3a97e3
 RUN apk upgrade --no-cache libexpat pcre2 tiff libpng nghttp2-libs zlib libx11 brotli-libs curl libcurl libxslt libxml2
