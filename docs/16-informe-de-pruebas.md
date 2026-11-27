@@ -4,7 +4,7 @@ Cubre las **pruebas iniciales** de la Etapa 3 (`docs/04`, rúbrica 30 %): el emu
 carga (TT-29) y las pruebas de carrera, contrastadas con RNF-01, RNF-02, RNF-03 y RNF-17 (`docs/02`). Es preliminar:
 corre en un portátil, sin TLS ni proxy y con un broker sin credenciales (§1); los valores son sintéticos. Lo que no
 cubría al escribirse se agregó después: TT-32 (sensor físico) en §43, §44 y §53, y TT-30 (recuperación ante reinicio) en §11. El
-contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 1061 pruebas unitarias del backend y 706 del panel.
+contrato de trama (TT-27) tiene su matriz desde el 15/11/2026 (§73). Hoy son 1061 pruebas unitarias del backend y 708 del panel.
 Todo lo de aquí se repite con dos comandos (§8).
 
 ## 1. Banco de pruebas desechable
@@ -6114,4 +6114,4 @@ señal real solo está el rango medido en el servidor el 24/11/2026 (migración 
 tramas en «Red → Calidad del enlace» en el servidor (laboratorio aparte). Que el umbral de una magnitud de señal sirva para anticipar fallas
 no se evaluó: no se clasifica la señal en buena o mala sin una fuente que lo sostenga.
 
-Hoy son 1061 pruebas unitarias del backend y 706 del panel.
+Hoy son 1061 pruebas unitarias del backend y 708 del panel.

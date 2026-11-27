@@ -242,6 +242,13 @@ persona lo encuentra:
    lista de claves comunes la revisa solo el servidor, y sus motivos se muestran tal cual), la nueva se escribe dos veces
    (`autocomplete="new-password"`) y la temporal que la persona acaba de usar no se pide otra vez (vive solo en memoria). La misma pantalla,
    no obligatoria, se abre desde «Cambiar la clave» en la cabecera.
+   **Ver lo que se escribe (27/11/2026).** Todo campo donde la persona teclea una clave (el de «Entrar», los tres de esta pantalla y el
+   de «Darme de baja») es el mismo componente (`CampoClave.svelte`) y lleva al lado «Mostrar», con el icono del ojo y su texto (la regla
+   de `§6`: ningún botón solo con icono), que pasa a «Ocultar» con el ojo tachado y `aria-pressed`. Nace oculto; mostrar es por campo, no
+   para toda la pantalla; al enviar el formulario vuelve a ocultarse, así una clave no queda a la vista mientras el servidor responde ni
+   después de un rechazo. Visible u oculto, el campo conserva su `autocomplete` (el gestor de claves lo sigue reconociendo) y nunca pasa
+   por el corrector ortográfico ni por las mayúsculas automáticas del navegador (`spellcheck="false"`, `autocapitalize="off"`): un
+   corrector en línea recibiría la clave. El botón no envía el formulario y no guarda nada: la clave sigue viviendo solo en el campo.
 3. **Dentro.** La cabecera dice quién soy: nombre y cada sitio con su rol («Campus (administrador)»), y ofrece «Cambiar la clave», «Salir»
    y «Cerrar en todos lados» (`DELETE /sesion?todas=true`). El menú muestra «Usuarios» solo a quien administra algún sitio.
 4. **Renovar y vencer** (`docs/20 §3`). Mientras la persona mueve el ratón, toca o teclea, un `GET /sesion` como mucho cada 5 minutos; una

@@ -11,6 +11,7 @@
   import { fijarPreferencias, guardarPreferencias, suscribirPreferencias } from './lib/escritor-preferencias';
   import Aviso from './Aviso.svelte';
   import Boton from './Boton.svelte';
+  import CampoClave from './CampoClave.svelte';
   import ElegirQueVer from './ElegirQueVer.svelte';
   import type { Magnitud } from './lib/catalogo';
   import { ErrorApi, descargar, esCancelacion, obtener, pedir, ultimaGana } from './lib/api';
@@ -317,7 +318,7 @@
           Los respaldos anteriores se borran al vencer (30 días). Si más adelante necesitas entrar, te pueden dar una cuenta nueva.</p>
       </div>
       <form class="formulario-alta" onsubmit={darseDeBaja} novalidate data-form-baja>
-        <label>Tu clave actual <input type="password" autocomplete="current-password" bind:value={clave} data-clave-baja /></label>
+        <div class="campo"><label for="clave-baja">Tu clave actual</label><CampoClave id="clave-baja" autocomplete="current-password" bind:value={clave} data-clave-baja /></div>
         <label class="marcar"><input type="checkbox" bind:checked={entiendo} data-entiendo-baja /> Entiendo que no se puede deshacer</label>
         <Boton tipo="submit" variante="peligro" etiqueta="Darme de baja" etiquetaCargando="Dando de baja…" cargando={dandoDeBaja}
           motivoDesactivado={dandoDeBaja ? null : clave === '' ? 'falta tu clave actual' : !entiendo ? 'marca que entiendes que es irreversible' : null} data-darme-de-baja />

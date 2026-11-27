@@ -5,6 +5,7 @@
   // clave pide una temporal a quien administra su sitio.
   import Aviso from './Aviso.svelte';
   import Boton from './Boton.svelte';
+  import CampoClave from './CampoClave.svelte';
   import { ErrorApi, pedir } from './lib/api';
   import { avisoDeError, type DatosAviso } from './lib/avisos';
   import { TEXTO_CREDENCIALES, type SesionAbierta } from './lib/sesion';
@@ -46,7 +47,7 @@
     <label for="entrar-email">Correo</label>
     <input id="entrar-email" name="email" type="email" autocomplete="username" inputmode="email" maxlength="254" bind:value={email} required />
     <label for="entrar-clave">Clave</label>
-    <input id="entrar-clave" name="clave" type="password" autocomplete="current-password" maxlength="128" bind:value={clave} required />
+    <CampoClave id="entrar-clave" name="clave" autocomplete="current-password" maxlength={128} bind:value={clave} required />
     {#if aviso !== null}<Aviso tipo={aviso.tipo} texto={aviso.texto} />{/if}
     <Boton tipo="submit" variante="principal" etiqueta="Entrar" etiquetaCargando="Entrando…" {cargando} data-boton-entrar />
   </form>

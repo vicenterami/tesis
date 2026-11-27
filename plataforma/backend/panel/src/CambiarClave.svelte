@@ -5,6 +5,7 @@
   // una cookie nueva (identificador regenerado) y cierra las demás sesiones de la persona.
   import Aviso from './Aviso.svelte';
   import Boton from './Boton.svelte';
+  import CampoClave from './CampoClave.svelte';
   import { ErrorApi, pedir } from './lib/api';
   import { avisoDeError, type DatosAviso } from './lib/avisos';
   import { REGLAS_CLAVE, motivosDeClaveNueva } from './lib/clave';
@@ -60,12 +61,12 @@
     {#if email !== null}<input type="email" name="email" autocomplete="username" value={email} readonly hidden />{/if}
     {#if !conocida}
       <label for="clave-actual">Clave actual (o la temporal que te dieron)</label>
-      <input id="clave-actual" type="password" autocomplete="current-password" maxlength="1024" bind:value={actual} />
+      <CampoClave id="clave-actual" autocomplete="current-password" maxlength={1024} bind:value={actual} />
     {/if}
     <label for="clave-nueva">Clave nueva</label>
-    <input id="clave-nueva" type="password" autocomplete="new-password" maxlength="128" bind:value={nueva} aria-describedby="clave-estado" />
+    <CampoClave id="clave-nueva" autocomplete="new-password" maxlength={128} bind:value={nueva} aria-describedby="clave-estado" />
     <label for="clave-repetida">Repite la clave nueva</label>
-    <input id="clave-repetida" type="password" autocomplete="new-password" maxlength="128" bind:value={repetida} />
+    <CampoClave id="clave-repetida" autocomplete="new-password" maxlength={128} bind:value={repetida} />
     <p id="clave-estado" class="vivo" aria-live="polite" data-clave-estado>
       {#if nueva === ''}Aún no escribes la clave nueva.{:else if motivos.length === 0}Cumple las reglas que se comprueban aquí; el servidor revisa además la lista de claves comunes.{:else}{motivos.join('; ')}.{/if}
     </p>
