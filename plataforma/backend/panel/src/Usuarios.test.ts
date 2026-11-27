@@ -25,6 +25,10 @@ beforeEach(() => {
   respuestaPatch = () => new Response(JSON.stringify({ ...bea, activo: false, actualizado_en: '2026-11-08T13:00:00.000000Z' }));
   vi.stubGlobal('fetch', vi.fn(async (ruta: string, init: RequestInit = {}) => {
     const metodo = init.method ?? 'GET';
+    // Como el navegador: una petición cuya señal se canceló no entrega su respuesta (27/11/2026: el simulacro la entregaba igual y
+    // escondía que la lista de sitios del administrador del sistema se cancelaba al cargar las personas).
+    await Promise.resolve();
+    if (init.signal?.aborted) throw new DOMException('La petición se canceló', 'AbortError');
     pedidos.push({ metodo, ruta, cuerpo: typeof init.body === 'string' ? JSON.parse(init.body) : undefined, pedido: (init.headers as Record<string, string>)['X-Pedido'] });
     if (ruta === '/usuarios' && metodo === 'GET') return new Response(JSON.stringify(lista));
     if (ruta === '/sitios' && metodo === 'GET') return new Response(JSON.stringify([{ id: 's-uct', codigo: 'uct', nombre: 'Campus' }, { id: 's-mag', codigo: 'mag', nombre: 'Magallanes' }]));

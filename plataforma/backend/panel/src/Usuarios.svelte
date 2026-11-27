@@ -71,6 +71,9 @@
   });
 
   const lista = ultimaGana(); // una recarga nueva cancela la anterior: la respuesta vieja nunca pisa a la nueva
+  // Los sitios del administrador del sistema van con su PROPIA señal (27/11/2026): compartían la de la lista de personas y la carga de
+  // las personas, que arranca enseguida, cancelaba la de los sitios: el selector de sitio y los roles por sitio quedaban vacíos.
+  const cargaSitios = ultimaGana();
   async function cargar(): Promise<void> {
     try {
       usuarios = await obtener<UsuarioListado[]>('/usuarios', lista.senal());
@@ -205,7 +208,7 @@
 
   onMount(() => {
     if (soyGlobal) {
-      void obtener<Sitio[]>('/sitios', lista.senal())
+      void obtener<Sitio[]>('/sitios', cargaSitios.senal())
         .then((s) => {
           todosLosSitios = s.map((x) => ({ sitio_id: x.id, codigo: x.codigo, nombre: x.nombre }));
           if (sitioAlta === '' && todosLosSitios.length > 0) sitioAlta = todosLosSitios[0]!.sitio_id;
@@ -214,7 +217,7 @@
     }
     if (sitioAlta === '' && misSitios.length > 0) sitioAlta = misSitios[0]!.sitio_id;
     void cargar();
-    return () => lista.cancelar();
+    return () => { lista.cancelar(); cargaSitios.cancelar(); };
   });
 </script>
 
