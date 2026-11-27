@@ -293,6 +293,25 @@ antes de construir, como `pila.sh`: su reconstrucción dejaba la imagen del back
 Resultado: la tabla de arriba, `AVISO 26 en residuos documentados (docs/11 §4): usr/local/bin/gosu`, el AVISO del servidor PostgreSQL y
 `OK    4 imágenes: ninguna vulnerabilidad alta o crítica con versión corregida publicada fuera de los residuos documentados` (salida 0).
 
+**Escaneo del 27/11/2026** (el guion dio «HAY QUE ACTUAR» en el servidor de prueba, antes de aplicar ninguna migración: el despliegue se
+detuvo ahí, con el backend devuelto a su estado anterior; Trivy 0.74.0, bases frescas con `--pull --no-cache`). Críticas / altas y, entre
+paréntesis, cuántas con versión corregida publicada fuera de los residuos. El «antes» y el «después» se escanearon el mismo día en el equipo
+de desarrollo, y el «antes» coincide con lo que dio el servidor:
+
+| Imagen | Antes | Después | Qué se hizo |
+|---|---|---|---|
+| broker | 0 / 0 (0) | 0 / 0 (0) | Nada: imagen sin cambios |
+| backend | 0 / 51 (1) | 0 / 50 (0) | `libzstd1` 1.5.7+dfsg-1 → 1.5.7+dfsg-1+deb13u1 (una alta, CVE-2026-124851), sumada a la lista de paquetes que se actualizan |
+| proxy | 0 / 7 (7) | 0 / 0 (0) | `libxml2` 2.13.9-r2 → r5 (7 altas: CVE-2026-11979, -86138, -86139, -86140, -86142, -86143 y -86144), sumada a la lista de `apk upgrade` |
+| base | 1 / 32 (7) | 1 / 25 (0) | `libxml2` 2.13.9-r2 → r5 (las mismas 7), sumada a la lista de `apk upgrade`: es dependencia del servidor que corre (`.postgresql-rundeps` pide `so:libxml2.so.2`) |
+
+El `FROM` del proxy no cambia: ese mismo día se publicó una reconstrucción de `nginx:1.30.7-alpine`, pero no hace falta para cerrar estas
+siete y todavía no cumple las 24 h de publicada que se le piden a una huella nueva. Las versiones se comprobaron dentro de los contenedores
+(`apk list -I`: `libxml2-2.13.9-r5` en el proxy y en la base; `dpkg-query`: `libzstd1` 1.5.7+dfsg-1+deb13u1 en el backend). La pila de
+desarrollo se recreó con las imágenes nuevas: los cuatro servicios sanos, `/salud` responde y la base conservó sus datos. Resultado: la
+tabla de arriba, `AVISO 26 en residuos documentados (docs/11 §4): usr/local/bin/gosu` y `OK    4 imágenes: ninguna vulnerabilidad alta o
+crítica con versión corregida publicada fuera de los residuos documentados` (salida 0).
+
 **Dependencias, 25/10/2026.** Con el mismo lockfile que el 23/10 daba 0 avisos, la auditoría volvió a fallar (el PR agrupado de Dependabot
 lo destapó en el CI): avisos publicados del 19 al 23/10 contra paquetes que ya estaban. Dos altos **en producción**, ambos de denegación
 de servicio: `body-parser` < 2.4.0 (https://github.com/advisories/GHSA-27r3-jxmh-p828, cuerpo comprimido con bytes de sobra; alcanzable

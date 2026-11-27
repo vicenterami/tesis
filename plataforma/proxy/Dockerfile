@@ -8,6 +8,9 @@
 # El 13/11/2026: libxslt (1.1.43-r3 → r4, 3 altas), sumada a la lista.
 # El 18/11/2026: cinco altas de nginx mismo (CVE-2026-113425, -121810, -123007, -123633, -123634), corregidas en 1.30.7: el FROM subió
 # a 1.30.7-alpine, publicada ese mismo día, fijada por digest de índice y escaneada antes de darla por buena (docs/16 §88).
+# El 27/11/2026: libxml2 (2.13.9-r2 → r5, 7 altas: CVE-2026-11979, -86138, -86139, -86140, -86142, -86143 y -86144), sumada a la lista
+# (docs/16 §12). El FROM no cambia: la reconstrucción de 1.30.7-alpine publicada ese mismo día no hace falta para cerrarlas y todavía
+# no cumple las 24 h de publicada que se le piden a una huella nueva.
 # Cuando la imagen oficial se reconstruya con ellas, el escaneo dará 0 sin este RUN y el archivo vuelve a ser solo el FROM.
 FROM nginx:1.30.7-alpine@sha256:bef154735288bc38d99fac41ae63730684bcc661503673a04a0f9bc526ba8598
-RUN apk upgrade --no-cache libexpat pcre2 tiff libpng nghttp2-libs zlib libx11 brotli-libs curl libcurl libxslt
+RUN apk upgrade --no-cache libexpat pcre2 tiff libpng nghttp2-libs zlib libx11 brotli-libs curl libcurl libxslt libxml2

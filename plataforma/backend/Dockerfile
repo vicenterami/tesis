@@ -33,7 +33,8 @@ FROM node:22.23.5-trixie-slim@sha256:68c76cfad89921b927eae28ba21407475e29d0ce450
 WORKDIR /app
 ENV NODE_ENV=production
 # Parches de Debian que la imagen oficial todavía no trae (09/11/2026; solo los listados, sin upgrade general).
-RUN apt-get update && apt-get install -y --no-install-recommends --only-upgrade zlib1g && rm -rf /var/lib/apt/lists/*
+# El 27/11/2026: libzstd1 (1.5.7+dfsg-1 → 1.5.7+dfsg-1+deb13u1, una alta: CVE-2026-124851), sumada a la lista.
+RUN apt-get update && apt-get install -y --no-install-recommends --only-upgrade zlib1g libzstd1 && rm -rf /var/lib/apt/lists/*
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY panel/package.json ./panel/
