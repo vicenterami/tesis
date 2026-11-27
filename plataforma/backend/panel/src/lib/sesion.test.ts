@@ -19,6 +19,18 @@ describe('puedeEn y puedeEnAlguno: lo que la matriz de GET /sesion permite en ca
     expect(puedeEnAlguno(persona([['uct', 'Campus', 'consulta']]), 'usuarios')).toBe(false);
     expect(puedeEnAlguno(null, 'usuarios')).toBe(false);
   });
+
+  it('el administrador del sistema alcanza a todos los sitios, también a uno donde no tiene rol (docs/20 §2); lo que su perfil no trae, no', () => {
+    // 27/11/2026: creó un sitio y el alta no se lo ofrecía, porque el panel miraba solo sus roles por sitio; el servidor ya lo dejaba.
+    const base = persona([['uct', 'Campus', 'consulta']]);
+    const s = { ...base, administrador_sistema: true, permisos: { ...base.permisos, administrador_sistema: ['leer', 'escribir', 'usuarios'] } };
+    expect(puedeEn(s, 'escribir', 'sitio-nuevo')).toBe(true);
+    expect(puedeEn(s, 'escribir', 'uct')).toBe(true);
+    expect(puedeEn(s, 'no-existe', 'sitio-nuevo')).toBe(false);
+    const sinSitios = persona([]);
+    expect(puedeEnAlguno({ ...sinSitios, administrador_sistema: true, permisos: s.permisos }, 'usuarios')).toBe(true);
+    expect(puedeEn({ ...base, administrador_sistema: false }, 'escribir', 'sitio-nuevo')).toBe(false);
+  });
   it('quién soy: nombre y sitios con su rol; el usuario del sistema, todos los sitios', () => {
     expect(quienSoy(persona([['uct', 'Campus', 'administrador'], ['mag', 'Magallanes', 'consulta']]))).toEqual({ nombre: 'Ana', sitios: 'Campus (administrador), Magallanes (consulta)' });
     expect(quienSoy({ sistema: true, nombre: 'sistema (clave de administrador)', sitios: 'todos', rol: 'administrador', permisos }).sitios).toBe('todos los sitios (administrador)');

@@ -34,9 +34,20 @@ export type Sesion =
 
 // ¿Puede `accion` en el sitio de código `codigo`? Con el usuario del sistema, sí en todos. Sin la matriz (un backend anterior), no se
 // supone nada: se deja al servidor (true) y su 403 se muestra.
+// La persona que es administradora del sistema alcanza a TODOS los sitios, también a los que no tiene como rol (docs/20 §2; en el
+// servidor, `todos`): rige su perfil `administrador_sistema` de la matriz. Hasta el 27/11/2026 el panel miraba solo sus roles por
+// sitio y no le ofrecía, por ejemplo, dar de alta en un sitio que acababa de crear.
+const PERFIL_SISTEMA = 'administrador_sistema';
+function comoSistema(s: Exclude<Sesion, { sistema: true }>, accion: string): boolean | null {
+  if (s.administrador_sistema !== true) return null;
+  const acciones = s.permisos?.[PERFIL_SISTEMA];
+  return acciones === undefined ? true : acciones.includes(accion);
+}
 export function puedeEn(s: Sesion | null, accion: string, codigo: string): boolean {
   if (s === null) return true;
   if (s.sistema) return true;
+  const global = comoSistema(s, accion);
+  if (global !== null) return global;
   const sitio = s.sitios.find((x) => x.codigo === codigo);
   if (sitio === undefined) return false;
   const acciones = s.permisos?.[sitio.rol];
@@ -47,6 +58,7 @@ export function puedeEn(s: Sesion | null, accion: string, codigo: string): boole
 export function puedeEnAlguno(s: Sesion | null, accion: string): boolean {
   if (s === null) return false;
   if (s.sistema) return true;
+  if (comoSistema(s, accion) === true) return true;
   return s.sitios.some((x) => (s.permisos?.[x.rol] ?? []).includes(accion));
 }
 
