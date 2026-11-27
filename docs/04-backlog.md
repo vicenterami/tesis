@@ -330,7 +330,7 @@ credencial; diseño y pruebas en `docs/19 §4`, Z, y `docs/16 §105`; entra en e
 | **TT-24** | Comparar al menos tres alternativas de alojamiento con criterios ponderados | M | 2 | 4 |
 | **TT-25** | Cuantificar el costo mensual y anual de operación en CLP y USD | M | 2 | 3 |
 | **TT-26** | Redactar la recomendación de despliegue justificada | M | 2 | 1 |
-| **TT-40** | Despliegue comparativo en el banco de pruebas: ThingsBoard CE, OpenRemote y Magistrala con el mismo emulador (TT-28) y las mismas métricas (memoria en reposo y bajo carga, pasos para dar de alta un dispositivo y para una alerta, exportación), con datos propios en vez de cifras declaradas por el fabricante (decisión del 06/10/2026, `docs/10 §8.4` punto 14) | S | 4 | 6 |
+| **TT-40** | Comparación medida con los referentes, con datos propios en vez de cifras declaradas por el fabricante (decisión del 06/10/2026, `docs/10 §8.4` punto 14; método desde el 25/11/2026 en `docs/23`): una máquina virtual idéntica por plataforma (2 vCPU, 2 o 4 GB), el mismo generador neutro con el formato nativo de cada una, y como resultado principal, por tamaño de servidor, **arranca y guarda toda la carga: sí o no**; dos filas por referente (su Compose por omisión y lo que prescribe su documentación); la memoria en MiB solo como descripción; los pasos del alta, descriptivos. ThingsBoard CE v4.3.1.8 (principal), OpenRemote 1.34.1 si alcanza, Magistrala sujeta a una comprobación de 30 min. Se recorta la comparación de alerta y exportación (`docs/23 §13`) | S | 4 | 6 |
 | **TT-41** | Diseño del despliegue en Kubernetes: equivalencias Compose → k3s, estado por pieza (qué escala y qué no), N réplicas con suscripciones compartidas y respaldos (`docs/14 §6`) | C | 3 | 2 |
 
 ## EP-13 · Validación y pruebas

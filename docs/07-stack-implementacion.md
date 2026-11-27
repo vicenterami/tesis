@@ -73,8 +73,9 @@ el informe**. Hay que elegir conscientemente:
   sirva los archivos estáticos del dashboard (`@nestjs/serve-static`). Válido y recomendable.
 - **`docker compose up -d --build`** + `restart: unless-stopped` para el arranque y la recuperación (Kubernetes: las imágenes ya son OCI; el diseño del despliegue en k3s, qué escala y qué no, está en `docs/14 §6`, decidido el 21/10/2026: Compose ahora, clúster cuando exista)
   automática (ya contemplado como RNF de la plataforma).
-- **`docker stats`**: comando para medir el consumo real de cada contenedor — es exactamente el
-  instrumento del banco de comparación contra ThingsBoard (backlog TT-40) de la Etapa 4.
+- **`docker stats`**: comando para medir el consumo real de cada contenedor — es el instrumento de RNF-17
+  para la plataforma propia en el servidor de prueba. La comparación contra los referentes (TT-40) usa otro:
+  una máquina virtual por plataforma y la memoria leída del núcleo y de cada cgroup (`docs/23`, 25/11/2026).
 - **Persistencia del driver `pg` sobre TypeORM**: para series de tiempo, SQL directo con `time_bucket`
   es más simple y rápido que un ORM. Decisión de la Etapa 2; coherente con mantener el backend liviano.
 

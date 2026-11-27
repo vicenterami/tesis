@@ -1,0 +1,14 @@
+# Red de la máquina (docs/23 §3.3): dos interfaces de red de usuario de QEMU, cada una con su propia subred. La primera lleva la ruta
+# por omisión; la segunda solo su subred. Así los dispositivos emulados llegan desde DOS direcciones de origen (la puerta de cada
+# subred), la misma división para todas las plataformas (ver §3.3: el tope de 100 conexiones por dirección del proxy propio).
+version: 2
+ethernets:
+  red-a:
+    match: { macaddress: "52:54:00:40:00:0a" }
+    set-name: red-a
+    dhcp4: true
+  red-b:
+    match: { macaddress: "52:54:00:40:00:0b" }
+    set-name: red-b
+    dhcp4: true
+    dhcp4-overrides: { use-routes: false, use-dns: false }

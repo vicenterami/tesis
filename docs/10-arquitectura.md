@@ -1040,9 +1040,13 @@ repositorio: proxies (111 filas verificadas), laboratorio de TimescaleDB (8 obse
     por dispositivo se muestra en la vista de salud (`docs/08 §8`).
 13. **RNF-17 se mantiene** como requisito; la memoria es criterio ponderado, no veto. Si la evolución exige
     superarlo se renegocia con el profesor guía antes de cambiar OE5 (`docs/02`).
-14. **Despliegue comparativo** contra ThingsBoard CE, OpenRemote y Magistrala con el mismo emulador y las mismas
-    métricas: tarea TT-40 en la Etapa 4 (`docs/04`), con una cata de dos horas en la Etapa 3 (levantar ThingsBoard
-    CE y medir su memoria) porque el informe hoy cita el «≥ 4 GB» de terceros.
+14. **Comparación medida** contra los referentes, con datos propios, porque el informe hoy cita el «≥ 4 GB» de
+    terceros: tarea TT-40 en la Etapa 4 (`docs/04`). El método es una máquina virtual idéntica por plataforma, un
+    generador de carga neutro con el formato nativo de cada una y, como resultado, «arranca y guarda toda la
+    carga» por tamaño de servidor (`docs/23`); la comparación de alerta y exportación se recorta. (Decidido el
+    06/10/2026 como despliegue comparativo con el emulador propio y una cata en la Etapa 3; el método cambió el
+    25/11/2026 porque ese emulador favorecía a la plataforma propia, `docs/23 §5.1`, y los pilotos de `docs/23 §9`
+    reemplazaron la cata.)
 15. **Lecciones de método (06/10):** toda migración lleva `SET LOCAL lock_timeout = '5s'`; cada barrido del supervisor
     deja una línea de resumen; las marcas que escribe el sistema sobre `dispositivo` no deben parecer una edición
     humana (decidido el 08/10: tabla `estado_dispositivo`, punto 27); «valor congelado» entra como condición candidata.

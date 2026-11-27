@@ -1,0 +1,47 @@
+# ThingsBoard CE, un nodo, cola en memoria: el Compose «In Memory (default)» de su guía oficial de instalación con Docker
+# (https://thingsboard.io/docs/user-guide/install/docker/, consultada el 25/11/2026).
+# Copia textual salvo DOS líneas, anotadas (docs/23 §4.2): las imágenes van fijadas por digest a la versión del protocolo
+# (la guía dice thingsboard/tb-node:4.3.1.9, publicada el 24/11, y postgres:18, que ese día apuntaba a 18.7, del 24/11: menos de 7 días).
+# La clave de PostgreSQL es la de ejemplo de la propia guía (pública); la base no publica puerto fijo hacia afuera de la máquina.
+services:
+  postgres:
+    restart: always
+    image: "${TB_POSTGRES}"          # guía: "postgres:18"
+    ports:
+      - "5432"
+    environment:
+      POSTGRES_DB: thingsboard
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d thingsboard"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+  thingsboard-ce:
+    restart: always
+    image: "${TB_NODO}"              # guía: "thingsboard/tb-node:4.3.1.9"
+    ports:
+      - "8080:8080"
+      - "7070:7070"
+      - "1883:1883"
+      - "8883:8883"
+      - "5683-5688:5683-5688/udp"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "100m"
+        max-file: "10"
+    environment:
+      TB_SERVICE_ID: tb-ce-node
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/thingsboard
+      SPRING_DATASOURCE_PASSWORD: postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+volumes:
+  postgres-data:
+    name: tb-postgres-data
+    driver: local

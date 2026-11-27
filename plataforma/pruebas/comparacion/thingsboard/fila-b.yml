@@ -1,0 +1,10 @@
+# Fila B de ThingsBoard (docs/23 §4.3): lo que prescribe SU guía para la memoria, nunca un ajuste nuestro. Guía de instalación en Ubuntu,
+# «Step 5. [Optional] Memory Configuration» (https://thingsboard.io/docs/installation/ubuntu/, 25/11/2026): «Set the heap size to half of
+# your total RAM … Example: 2G for a 4 GB server» y «It should be set to at least 2G». Con la línea que da la guía:
+#   export JAVA_OPTS="$JAVA_OPTS -Xms4G -Xmx4G -Xss512k -XX:+AlwaysPreTouch"   (la línea de la guía trae 4G; para un servidor de 4 GB su regla, la mitad, da 2G, que es lo que se usa abajo)
+# La imagen tb-node lee JAVA_OPTS del entorno (su thingsboard.conf hace export JAVA_OPTS="$JAVA_OPTS …"). Solo rige en 4 GB: en 2 GB la
+# mitad (1G) queda bajo el mínimo de 2G que la misma guía fija, así que la fila B en 2 GB se reporta «fuera del mínimo declarado» y no se corre.
+services:
+  thingsboard-ce:
+    environment:
+      JAVA_OPTS: "-Xms2G -Xmx2G -Xss512k -XX:+AlwaysPreTouch"

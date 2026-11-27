@@ -208,8 +208,11 @@ paso "2f3. Sin direcciones IPv4 reales: solo loopback, 0.0.0.0 y las de document
 # 198.51.100.0/24 o 203.0.113.0/24. Se cuentan las encontradas: si el patrón no encuentra ninguna (ni 127.0.0.1), no revisó nada.
 # 19/11/2026: un número de sección de una norma con cuatro niveles (§4.3.9.4 de la especificación ZIP, §22.9.2.19 de ECMA-376) tiene la
 # forma de una dirección; con «§» delante es una sección y no cuenta. Se captura el «§» para distinguirlo; sin él, la regla es la de siempre.
-git grep --untracked -I -n -o -E '(§)?\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' -- ':!privado' ':!historico' ':!*.pdf' > "$VT"/ipv4.txt 2>&1; rc=$?
-total=$(wc -l < "$VT"/ipv4.txt); ajenas=$(grep -vE ':(§[0-9.]+|127\.[0-9]+\.[0-9]+\.[0-9]+|0\.0\.0\.0|192\.0\.2\.[0-9]+|198\.51\.100\.[0-9]+|203\.0\.113\.[0-9]+)$' "$VT"/ipv4.txt)
+# 27/11/2026: las versiones de ThingsBoard tienen cuatro números. En prosa se escriben con «v» delante (v4.3.1.8), que el patrón ya
+# no toma; en la etiqueta de su imagen no cabe la «v», así que «tb-node:» delante se captura igual que el «§» y solo se acepta la forma de su versión (4.x.y.z, un dígito por
+# componente): «tb-node:» seguido de cualquier otra cosa con forma de dirección sigue contando. Nada más se exceptúa.
+git grep --untracked -I -n -o -E '(§|tb-node:)?\b([0-9]{1,3}\.){3}[0-9]{1,3}\b' -- ':!privado' ':!historico' ':!*.pdf' > "$VT"/ipv4.txt 2>&1; rc=$?
+total=$(wc -l < "$VT"/ipv4.txt); ajenas=$(grep -vE ':(§[0-9.]+|tb-node:4\.[0-9]\.[0-9]\.[0-9]|127\.[0-9]+\.[0-9]+\.[0-9]+|0\.0\.0\.0|192\.0\.2\.[0-9]+|198\.51\.100\.[0-9]+|203\.0\.113\.[0-9]+)$' "$VT"/ipv4.txt)
 if [ "$rc" -gt 1 ] || [ "$total" -lt 1 ]; then echo "FALLA git grep falló ($rc) o no encontró ninguna dirección: no se revisó nada"; fallos=$((fallos+1))
 elif [ -n "$ajenas" ]; then echo "FALLA direcciones IPv4 que no son de loopback ni de documentación:"; echo "$ajenas" | cut -c1-120 | sed 's/^/  /'; fallos=$((fallos+1))
 else echo "OK    $total direcciones IPv4 en archivos versionados o nuevos: todas de loopback, 0.0.0.0 o de documentación"; fi
@@ -242,6 +245,18 @@ ajenos16=$(while IFS= read -r l; do [ -z "$l" ] && continue; f16=${l%%:*}; r16=$
 if [ "$n16" -lt 100 ] || [ "$total16" -lt 1 ]; then echo "FALLA revisó $n16 archivos y encontró $total16 cadenas de 16 hexadecimales: algo no se leyó (no revisó nada)"; fallos=$((fallos+1))
 elif [ -n "$ajenos16" ]; then echo "FALLA cadenas de 16 hexadecimales con forma de dato real (no están en la lista de sintéticos del paso):"; echo "$ajenos16" | cut -c1-140 | sed 's/^/  /'; fallos=$((fallos+1))
 else echo "OK    $n16 archivos revisados; $total16 cadenas de 16 hexadecimales, todas de la lista de sintéticos"; fi
+
+paso "2f6. Sin direcciones MAC con forma de dato real en archivos versionados o nuevos: solo las de administración local de QEMU y las de documentación (27/11/2026)"
+# Seis pares hexadecimales separados por «:» o «-». Hasta hoy ningún paso las miraba (el 2f5 busca los ocho pares de un EUI-64). Se permiten
+# dos prefijos y nada más: 52:54:00, el que QEMU usa por convención para sus tarjetas virtuales (primer octeto 0x52: bit de administración
+# local activo, no pertenece a ningún fabricante ni identifica un equipo; las usa el banco de la comparación, docs/23 §3.3), y 00:00:5E:00:53,
+# el rango de documentación de RFC 7042 §2.1.2. Lo hallado se muestra enmascarado: si fuera real, no se repite entero en pantalla.
+git grep --untracked -I -n -o -i -E '\b([0-9a-f]{2}[:-]){5}[0-9a-f]{2}\b' -- ':!privado' ':!historico' ':!*.pdf' > "$VT"/mac.txt 2>&1; rc=$?
+mac_ajenas=$(grep -viE ':(52[:-]54[:-]00|00[:-]00[:-]5e[:-]00[:-]53)[:-][0-9a-f]{2}([:-][0-9a-f]{2})*$' "$VT"/mac.txt)
+# Hoy hay cuatro legítimas (las del banco): si el patrón dejara de encontrar alguna, el paso no habría revisado nada.
+if [ "$rc" -gt 1 ] || [ "$(wc -l < "$VT"/mac.txt)" -lt 1 ]; then echo "FALLA git grep falló ($rc) o no encontró ninguna dirección MAC: no se revisó nada"; fallos=$((fallos+1))
+elif [ -n "$mac_ajenas" ]; then echo "FALLA direcciones MAC que no son de administración local de QEMU ni de documentación (enmascaradas):"; echo "$mac_ajenas" | sed -E 's/^([^:]+:[0-9]+:)([0-9a-fA-F]{2})[0-9a-fA-F:-]+$/\1 \2…/; s/^/  /'; fallos=$((fallos+1))
+else echo "OK    $(wc -l < "$VT"/mac.txt) direcciones MAC en archivos versionados o nuevos: todas de administración local de QEMU o de documentación"; fi
 
 paso "2g. Migraciones citadas en prosa (docs e informe) == archivos NN-*.sql en disco"
 # Hallazgo del 26/09: informe y docs/12 decían «6 migraciones» cuando ya había 7 en disco (la 07 del 23/09).
@@ -982,7 +997,8 @@ for f in arch:
         if es_md and l.lstrip().startswith('```'): codigo = not codigo; continue
         if (es_md and not codigo) or l.lstrip().startswith('#'): continue
         for m in pat.finditer(re.sub(r'\s#.*$', '', l)):
-            if not m.group(1).startswith('plataforma-'): malos.append(f'{f}:{n}: {m.group(0)}')
+            # 27/11/2026: «tcp:127.0.0.1» y «udp:…» son reenvíos de puerto de QEMU (hostfwd), no una imagen; solo esos dos nombres se saltan.
+            if not m.group(1).startswith('plataforma-') and m.group(1) not in ('tcp', 'udp'): malos.append(f'{f}:{n}: {m.group(0)}')
 if n_from < 4 or n_reg < 1 or n_arch < 20:
     malos.append(f'revisó de menos: {n_from} FROM (>= 4), {n_reg} imágenes de registro (>= 1), {n_arch} archivos (>= 20)')
 for m in malos: print('FALLA', m)

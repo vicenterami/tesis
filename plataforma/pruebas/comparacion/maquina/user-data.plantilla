@@ -1,0 +1,38 @@
+#cloud-config
+# Primer arranque de la máquina base de la comparación (docs/23 §3). Lo rellena vm.sh con envsubst (solo las variables ${…} de abajo).
+# Deja: el usuario `banco` con la llave pública del banco (sin clave, sin entrada por contraseña), Docker de versión fijada y retenida,
+# los temporizadores y servicios que meten ruido distinto en cada corrida apagados, sin intercambio, y la máquina apagada al terminar.
+hostname: tt40
+users:
+  - name: banco
+    shell: /bin/bash
+    lock_passwd: true
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    groups: [adm]
+    ssh_authorized_keys:
+      - ${LLAVE_PUBLICA}
+ssh_pwauth: false
+package_update: false
+package_upgrade: false
+swap:
+  size: 0
+write_files:
+  - path: /etc/apt/apt.conf.d/99-banco-sin-automaticos
+    content: |
+      APT::Periodic::Update-Package-Lists "0";
+      APT::Periodic::Unattended-Upgrade "0";
+      APT::Periodic::Download-Upgradeable-Packages "0";
+      APT::Periodic::AutocleanInterval "0";
+runcmd:
+  - [bash, -c, "set -e; for u in apt-daily.timer apt-daily-upgrade.timer unattended-upgrades.service snapd.service snapd.socket snapd.seeded.service motd-news.timer fwupd-refresh.timer man-db.timer update-notifier-download.timer update-notifier-motd.timer; do systemctl disable --now $u 2>/dev/null || true; systemctl mask $u 2>/dev/null || true; done"]
+  - [bash, -c, "swapoff -a; sed -i '/\\sswap\\s/d' /etc/fstab"]
+  - [bash, -c, "set -e; install -m 0755 -d /etc/apt/keyrings; curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc; gpg --show-keys --with-colons /etc/apt/keyrings/docker.asc | grep -q '^fpr:::::::::${DOCKER_GPG_HUELLA}:' || { echo 'BANCO: huella de Docker distinta' > /dev/console; exit 1; }; chmod a+r /etc/apt/keyrings/docker.asc"]
+  - [bash, -c, "echo 'deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu noble stable' > /etc/apt/sources.list.d/docker.list"]
+  - [bash, -c, "set -e; apt-get update -q; DEBIAN_FRONTEND=noninteractive apt-get install -y -q docker-ce=${DOCKER_CE} docker-ce-cli=${DOCKER_CE} containerd.io=${CONTAINERD} docker-compose-plugin=${COMPOSE_PLUGIN} docker-buildx-plugin=${BUILDX_PLUGIN} jq; apt-mark hold docker-ce docker-ce-cli containerd.io docker-compose-plugin docker-buildx-plugin"]
+  - [bash, -c, "usermod -aG docker banco; systemctl enable docker"]
+  - [bash, -c, "docker version --format 'BANCO docker {{.Server.Version}}' > /dev/console && echo BANCO-BASE-LISTA > /dev/console"]
+  - [touch, /etc/cloud/cloud-init.disabled]
+power_state:
+  mode: poweroff
+  delay: now
+  timeout: 60
